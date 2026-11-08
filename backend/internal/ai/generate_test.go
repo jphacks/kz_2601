@@ -57,9 +57,11 @@ func withBadEntity(t *testing.T, raw []byte) string {
 	return strings.Replace(string(raw), `"type": "list", "entity": "expense"`, `"type": "list", "entity": "ghost"`, 1)
 }
 
+// newSvc has the photo switch on (TextImage): with it off every request is
+// restricted (no inputPhoto, client_features.go), see TestTextImageOffRestrictsPrompt.
 func newSvc(f *fakeCaller) (*Service, *appconfigclient.Memory) {
 	store := appconfigclient.NewMemory()
-	return &Service{Claude: f, Store: store, Model: "test-model"}, store
+	return &Service{Claude: f, Store: store, Model: "test-model", TextImage: true}, store
 }
 
 func TestCreate_RegeneratesOnProblemsThenSucceeds(t *testing.T) {

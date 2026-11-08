@@ -13,10 +13,14 @@ type runCache struct {
 	index map[string]map[string][]string // entity\x00field -> value key -> record ids (at most 2)
 	// similar: entity\x00fields -> the records with their compared items.
 	similar map[string][]similarRec
+	// picked: rule id -> the records pick with exclude chose for earlier
+	// rows of this run (the writes come after planning, so exclude's list
+	// does not see them yet).
+	picked map[string]map[string]bool
 }
 
 func newRunCache() *runCache {
-	return &runCache{lists: map[string][]expreval.Record{}, index: map[string]map[string][]string{}, similar: map[string][]similarRec{}}
+	return &runCache{lists: map[string][]expreval.Record{}, index: map[string]map[string][]string{}, similar: map[string][]similarRec{}, picked: map[string]map[string]bool{}}
 }
 
 // lookupHolds evaluates rule.Lookup for row: the entity is listed through

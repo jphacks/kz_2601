@@ -198,6 +198,46 @@ func TestPlanPickEach(t *testing.T) {
 	}
 }
 
+// With exclude, the rows of one on.each run never pick the same record: the
+// run plans every row before writing, so the earlier rows' picks are skipped
+// (oldest / newest / random alike). Rows past the candidates pick nothing.
+func TestPlanPickEachExcludeSpreads(t *testing.T) {
+	for _, order := range []string{dsl.PickOldest, dsl.PickNewest, dsl.PickRandom} {
+		a := readsApp(t, "server_rules_pick.json")
+		r := rule(t, a, "next_after_eat")
+		r.On = dsl.RuleTrigger{Every: "daily", Time: "08:00", Each: "eats"}
+		r.Pick.Order = order
+		r.Do = r.Do[:1]
+		var eats []expreval.Record
+		for i := range 4 {
+			eats = append(eats, rec(fmt.Sprintf("e%d", i), map[string]any{"menu": "m1"}))
+		}
+		l := &listReader{recs: map[string][]expreval.Record{"menus": menus(), "eats": eats}}
+		rows, err := PlanEach(context.Background(), a, r, dailyPick("run-1"), l)
+		if err != nil {
+			t.Fatal(err)
+		}
+		seen := map[any]bool{}
+		for _, rp := range rows {
+			seen[rp.Plan.Writes[0].Values["next"]] = true
+		}
+		// m1 is eaten: m2, m3, m4 once each, the 4th row has nothing left
+		if len(rows) != 3 || len(seen) != 3 || seen["m1"] {
+			t.Fatalf("%s: rows %d picks %v", order, len(rows), seen)
+		}
+		// a retry of the run picks the same records
+		again, err := PlanEach(context.Background(), a, r, dailyPick("run-1"), l)
+		if err != nil || len(again) != len(rows) {
+			t.Fatalf("%s retry: %d %v", order, len(again), err)
+		}
+		for i := range rows {
+			if again[i].Plan.Writes[0].Values["next"] != rows[i].Plan.Writes[0].Values["next"] {
+				t.Fatalf("%s retry row %d differs", order, i)
+			}
+		}
+	}
+}
+
 // A failed list stops the run (never a pick from part of the records).
 func TestPlanPickListError(t *testing.T) {
 	a := readsApp(t, "server_rules_pick.json")

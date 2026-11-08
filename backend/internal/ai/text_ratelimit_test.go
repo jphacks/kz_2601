@@ -65,8 +65,8 @@ func TestText402DoesNotChargeTheRateLimit(t *testing.T) {
 			if len(fc.calls) != 0 {
 				t.Fatal("Claude must not be called")
 			}
-			if counting.n.Load() != 2 || counting.refunds.Load() != 2 {
-				t.Fatalf("charged %d refunded %d", counting.n.Load(), counting.refunds.Load())
+			if counting.n.Load() != 2 || counting.refunds.Load() != 2 || counting.waived.Load() != 2 {
+				t.Fatalf("charged %d refunded %d waived %d", counting.n.Load(), counting.refunds.Load(), counting.waived.Load())
 			}
 			// the count really is untouched: an accepted call is charged from the full limit
 			pro[c.uid] = true

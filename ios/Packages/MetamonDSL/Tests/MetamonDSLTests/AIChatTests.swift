@@ -25,6 +25,23 @@ final class AIChatTests: XCTestCase {
         XCTAssertEqual(AIChat.own([mine, local, other], uid: nil).map(\.id), ["b"], "uid が分からなければ author の無い分だけ")
     }
 
+    /// speak: true で読む返事は、本文が同じ一番新しい AI の発言(自分の同じ文・古い同じ返事ではない)。
+    func testSpokenReplyIsTheNewestMatchingAITurn() {
+        let turns = [AIChat.Turn(id: "a", role: .assistant, text: "Hello"), AIChat.Turn(id: "b", role: .user, text: "Hello"),
+                     AIChat.Turn(id: "c", role: .assistant, text: "Hello"), AIChat.Turn(id: "d", role: .user, text: "Bye")]
+        XCTAssertEqual(AIChat.spokenReply(turns, reply: " Hello\n")?.id, "c")
+        XCTAssertNil(AIChat.spokenReply(turns, reply: "Bye"), "自分の発言は読まない")
+        XCTAssertNil(AIChat.spokenReply(turns, reply: "  "))
+        XCTAssertNil(AIChat.spokenReply([], reply: "Hello"))
+    }
+
+    func testSpeakDecodes() throws {
+        let on = try JSONDecoder().decode(Component.self, from: Data(#"{"type":"aiChat","entity":"turn","textField":"text","persona":"p","speak":true}"#.utf8))
+        XCTAssertEqual(on.speak, true)
+        let off = try JSONDecoder().decode(Component.self, from: Data(#"{"type":"aiChat","entity":"turn","textField":"text","persona":"p"}"#.utf8))
+        XCTAssertNil(off.speak)
+    }
+
     func testTurnsAlternateWithoutRoleField() {
         let rows = [rec("a", "1", at: 1), rec("b", "2", at: 2), rec("c", "3", at: 3)]
         XCTAssertEqual(AIChat.turns(rows, textField: "text", roleField: nil).map(\.role), [.user, .assistant, .user])

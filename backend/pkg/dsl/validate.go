@@ -705,6 +705,7 @@ func (a *App) Validate() error {
 	checkRecordNav(a, entities, add) // #256
 	checkDashcamCount(a, add)        // #410
 	checkMusicPlayerCount(a, add)
+	checkAIInputFeeds(a, add) // ai_input_feed.go
 
 	if len(p) > 0 {
 		return &ValidationError{Problems: p}

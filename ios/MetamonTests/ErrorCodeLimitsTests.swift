@@ -1,6 +1,6 @@
 import XCTest
 import MetamonDSL
-import MetamonRenderer
+@testable import MetamonRenderer
 import MetamonServices
 @testable import Metamon
 
@@ -125,11 +125,12 @@ final class ErrorCodeLimitsTests: XCTestCase {
     func testSyncQueueEmitsDedicatedEvents() async throws {
         let cases: [(APIError, SyncEvent)] = [
             (planLimitError(byCreator: true),
-             .planLimit(appId: "a", entity: "expense", limit: PlanLimit(resource: .recordsPerApp, plan: "free", limit: 5000, upgrade: true, byCreator: true))),
+             .planLimit(appId: "a", entity: "expense", limit: PlanLimit(resource: .recordsPerApp, plan: "free", limit: 5000, upgrade: true, byCreator: true),
+                        recordId: "local-e1")),
             (.server(status: 403, code: "app_stopped", message: "", details: ["level": .string("global")]),
-             .appStopped(appId: "a", entity: "expense")),
+             .appStopped(appId: "a", entity: "expense", recordId: "local-e1")),
             (.server(status: 422, code: "text_not_allowed", message: "表示できない言葉が含まれています", details: ["field": .string("memo")]),
-             .textNotAllowed(appId: "a", entity: "expense", field: "memo")),
+             .textNotAllowed(appId: "a", entity: "expense", field: "memo", recordId: "local-e1")),
         ]
         for (error, expected) in cases {
             let dir = FileManager.default.temporaryDirectory.appendingPathComponent("metamon-codes-\(UUID().uuidString)")
@@ -157,14 +158,15 @@ final class ErrorCodeLimitsTests: XCTestCase {
         let rt = AppRuntime(document: doc, services: BuildConfig.make(environment: .mock))
         let entity = try XCTUnwrap(rt.dsl.entity("expenses"))
         let refusals: [SyncEvent] = [
-            .planLimit(appId: doc.appId, entity: "expenses", limit: PlanLimit(resource: .recordsPerApp)),
-            .appStopped(appId: doc.appId, entity: "expenses"),
-            .textNotAllowed(appId: doc.appId, entity: "expenses", field: "memo"),
+            .planLimit(appId: doc.appId, entity: "expenses", limit: PlanLimit(resource: .recordsPerApp), recordId: "local-x"),
+            .appStopped(appId: doc.appId, entity: "expenses", recordId: "local-x"),
+            .textNotAllowed(appId: doc.appId, entity: "expenses", field: "memo", recordId: "local-x"),
+            .rejected(appId: doc.appId, entity: "expenses", message: "bad", recordId: "local-x"),
         ]
         for event in refusals {
             let form = FormDraft(entity: entity)
             form.markSaved(queuedOffline: false)
-            rt.lastSavedForm = .init(appId: doc.appId, entity: "expenses", form: form)
+            rt.lastSavedForm = .init(appId: doc.appId, entity: "expenses", recordId: "local-x", form: form)
             rt.revokeSaveFeedback(for: event)
             XCTAssertNil(form.lastSaveResult, "保存バーの「保存しました」を取り消す: \(event)")
             XCTAssertNil(rt.lastSavedForm)
@@ -176,11 +178,40 @@ final class ErrorCodeLimitsTests: XCTestCase {
         let rt = AppRuntime(document: doc, services: BuildConfig.make(environment: .mock))
         let form = FormDraft(entity: try XCTUnwrap(rt.dsl.entity("expenses")))
         form.markSaved(queuedOffline: false)
-        rt.lastSavedForm = .init(appId: doc.appId, entity: "expenses", form: form)
+        rt.lastSavedForm = .init(appId: doc.appId, entity: "expenses", recordId: "local-x", form: form)
         rt.revokeSaveFeedback(for: .sent(appId: doc.appId, entity: "expenses"))
-        rt.revokeSaveFeedback(for: .appStopped(appId: doc.appId, entity: "members"))
-        rt.revokeSaveFeedback(for: .appStopped(appId: "other", entity: "expenses"))
+        rt.revokeSaveFeedback(for: .appStopped(appId: doc.appId, entity: "members", recordId: "local-x"))
+        rt.revokeSaveFeedback(for: .appStopped(appId: "other", entity: "expenses", recordId: "local-x"))
         XCTAssertEqual(form.lastSaveResult, .saved)
+    }
+
+    /// 同じ entity でも、前に積んだ別の記録が断られた時は今のフォームの「保存しました」を消さない(recordId で見分ける)。
+    func testOlderQueuedRefusalKeepsOtherFormsFeedback() throws {
+        let doc = try DSLExamples.document("warikan", version: 1)
+        let rt = AppRuntime(document: doc, services: BuildConfig.make(environment: .mock))
+        let form = FormDraft(entity: try XCTUnwrap(rt.dsl.entity("expenses")))
+        form.markSaved(queuedOffline: false)
+        rt.lastSavedForm = .init(appId: doc.appId, entity: "expenses", recordId: "local-new", form: form)
+        rt.revokeSaveFeedback(for: .rejected(appId: doc.appId, entity: "expenses", message: "bad", recordId: "local-old"))
+        rt.revokeSaveFeedback(for: .planLimit(appId: doc.appId, entity: "expenses", limit: PlanLimit(resource: .recordsPerApp)))
+        XCTAssertEqual(form.lastSaveResult, .saved, "別の操作・id の分からない拒否では取り消さない")
+        XCTAssertNotNil(rt.lastSavedForm)
+        rt.revokeSaveFeedback(for: .rejected(appId: doc.appId, entity: "expenses", message: "bad", recordId: "local-new"))
+        XCTAssertNil(form.lastSaveResult)
+    }
+
+    /// saveRecord が覚える recordId は、積んだ操作(断られた時の SyncEvent)の id と同じ仮 id。
+    func testSaveRecordRemembersQueuedRecordId() async throws {
+        let doc = try DSLExamples.document("warikan", version: 1)
+        let rt = AppRuntime(document: doc, services: BuildConfig.make(environment: .mock))
+        let draft = FormDraft(entity: try XCTUnwrap(rt.dsl.entity("members")))
+        draft.values["name"] = .string("太郎")
+        await rt.run(Action(type: .saveRecord, entity: "members"), ActionContext(route: Route(screen: "members", stack: "sheet"), form: draft))
+        let saved = try XCTUnwrap(rt.lastSavedForm)
+        XCTAssertTrue(saved.recordId.hasPrefix("local-"), "新規は仮 id(キューの create の recordId)")
+        XCTAssertTrue(rt.records(for: "members").contains { $0.id == saved.recordId })
+        rt.revokeSaveFeedback(for: .rejected(appId: doc.appId, entity: "members", message: "bad", recordId: saved.recordId))
+        XCTAssertNil(draft.lastSaveResult)
     }
 }
 

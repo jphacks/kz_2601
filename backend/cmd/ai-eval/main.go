@@ -450,6 +450,9 @@ func runCase(ctx context.Context, svc *ai.Service, store *appconfigclient.Memory
 		// text.highlight: text_highlight.go
 		rec.ExpectMisses = append(rec.ExpectMisses, checkTextHighlight(c.Expect, app)...)
 		rec.ExpectMisses = append(rec.ExpectMisses, checkPlaceSearch(c.Expect, app)...) // place_search.go
+		rec.ExpectMisses = append(rec.ExpectMisses, checkAIChatSpeak(c.Expect, app)...) // ai_chat.go
+		// aiChat saveTo: ai_chat_save_to.go
+		rec.ExpectMisses = append(rec.ExpectMisses, checkAIChatSaveTo(c.Expect, app)...)
 		// #507: matching.go
 		rec.ExpectMisses = append(rec.ExpectMisses, checkMatching(c.Expect, app)...)
 		rec.ExpectMisses = append(rec.ExpectMisses, checkRepeat(c.Expect, app)...)      // #266: repeat.go
@@ -461,6 +464,7 @@ func runCase(ctx context.Context, svc *ai.Service, store *appconfigclient.Memory
 		rec.ExpectMisses = append(rec.ExpectMisses, checkFeed(c.Expect, app)...)        // #348: feed.go
 		rec.ExpectMisses = append(rec.ExpectMisses, checkServerRules(c.Expect, app)...) // #343: server_rules.go
 		rec.ExpectMisses = append(rec.ExpectMisses, checkAlarm(c.Expect, app)...)       // alarm.go
+		rec.ExpectMisses = append(rec.ExpectMisses, checkAddMinutes(c.Expect, app)...)  // add_minutes.go
 	}
 	created[c.ID] = res.DSL // edits too, so an edit can build on an earlier edit (#229)
 	log.Printf("[%s] ok attempts=%d fallback=%v claude=%dms first=%dms out=%d chars=%d tabs=%d screens=%d area=%.2f misses=%v summary=%q",

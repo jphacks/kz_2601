@@ -72,7 +72,7 @@ struct AppsUsageNotice: View {
                 }
                 .padding(.top, Theme.Spacing.md)
                 .transition(.opacity)
-                .onAppear { log.markShown(notice) } // 出した時点で数える(閉じても同じ日はもう出さない)
+                .onAppear { log.markShown(notice, uid: rt.currentUserId) } // 出した時点で数える(閉じても同じ日はもう出さない)
             }
         }
         .task(id: PlanUsageStore.shared.revision) { await check() }
@@ -83,7 +83,8 @@ struct AppsUsageNotice: View {
 
     private func check() async {
         await rt.refreshPlanUsage()
-        guard notice == nil, let next = UsageNoticeRules.appsNotice(PlanUsageStore.shared.me), log.shouldShow(next) else { return }
+        guard notice == nil, let next = UsageNoticeRules.appsNotice(PlanUsageStore.shared.me),
+              log.shouldShow(next, uid: rt.currentUserId) else { return }
         withAnimation(.easeInOut(duration: 0.2)) { notice = next }
     }
 
@@ -117,7 +118,7 @@ struct UsageNoticeHost: ViewModifier {
                         .padding(.horizontal, Theme.Spacing.md)
                         .padding(.top, Theme.Spacing.sm)
                         .transition(.move(edge: .top).combined(with: .opacity))
-                        .onAppear { log.markShown(notice) } // 見えた時点で数える
+                        .onAppear { log.markShown(notice, uid: rt.currentUserId) } // 見えた時点で数える
                         .task(id: notice.id) {
                             try? await Task.sleep(for: .seconds(8))
                             guard !Task.isCancelled, self.notice?.id == notice.id else { return }
@@ -136,7 +137,7 @@ struct UsageNoticeHost: ViewModifier {
         let appId = rt.document.appId
         await rt.refreshPlanUsage()
         guard !Task.isCancelled, rt.document.appId == appId, notice == nil,
-              let next = UsageNoticeRules.appNotices(rt.currentAppUsage).first(where: { log.shouldShow($0) }) else { return }
+              let next = UsageNoticeRules.appNotices(rt.currentAppUsage).first(where: { log.shouldShow($0, uid: rt.currentUserId) }) else { return }
         notice = next
     }
 
