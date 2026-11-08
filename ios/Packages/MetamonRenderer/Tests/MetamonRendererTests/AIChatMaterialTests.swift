@@ -141,6 +141,29 @@ final class AIChatMaterialTests: XCTestCase {
         XCTAssertFalse(m.text.contains("関係ない新しい日記"))
     }
 
+    /// 2 番目の大きい記録が入りきらなくても、後ろの小さい関係する記録は全部入る(飛ばして埋める)。並びは変えない。
+    func testOversizedSecondRecordDoesNotBlockSmallerOnes() throws {
+        let e = try entity()
+        let big = rec("big", "支払期限 " + String(repeating: "あ", count: 2800), day: 9) // 1 件目の後ろには入らない
+        let small = (1...8).map { rec("s\($0)", "支払期限 メモ\($0)", day: $0) }
+        let rows = [rec("top", "支払期限 一番新しい", day: 10), big, rec("other", "関係ない日記", day: 20)] + small
+        let m = try XCTUnwrap(AIChatMaterial.request(entity: e, records: rows, uid: "me", limit: nil, query: "支払期限"))
+        XCTAssertLessThanOrEqual(m.text.utf8.count, AIChatMaterial.maxBytes)
+        XCTAssertFalse(m.text.contains("ああああ"), "入りきらない大きい記録は飛ばす")
+        let want = ["一番新しい"] + (1...8).reversed().map { "メモ\($0)" } + ["関係ない日記"]
+        XCTAssertEqual(m.text.split(separator: "\n").map(String.init), want.map { "- 本文: " + ($0 == "関係ない日記" ? "" : "支払期限 ") + $0 + " / 気分: つらい" })
+        // 入力の並びが変わっても同じ
+        XCTAssertEqual(AIChatMaterial.request(entity: e, records: rows.reversed(), uid: "me", limit: nil, query: "支払期限"), m)
+        // 発言が無ければ新しい順(#748)のまま、大きい記録だけ飛ばす
+        let plain = try XCTUnwrap(AIChatMaterial.request(entity: e, records: rows, uid: "me", limit: nil))
+        XCTAssertEqual(plain.text.split(separator: "\n").map(String.init),
+                       ["- 本文: 関係ない日記 / 気分: つらい", "- 本文: 支払期限 一番新しい / 気分: つらい"]
+                       + (1...8).reversed().map { "- 本文: 支払期限 メモ\($0) / 気分: つらい" })
+        // limit は選ぶ件数のまま(飛ばした分を limit の外から足さない)
+        let three = try XCTUnwrap(AIChatMaterial.request(entity: e, records: rows, uid: "me", limit: 3, query: "支払期限"))
+        XCTAssertEqual(three.text.split(separator: "\n").count, 2)
+    }
+
     /// 同じ点なら新しい順、同じ時刻なら id 順。入力の並びが変わっても同じ結果。
     func testTiesAreBrokenDeterministically() throws {
         let fs = AIChatMaterial.fields(of: try entity())

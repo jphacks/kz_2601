@@ -6,6 +6,7 @@ import MetamonDSL
 /// shared / public では未送信の分だけ自分。他の人の分・サーバーの規則が作った記録は送らない・#733 の aiButton と同じ規則)。
 /// 最後の発言に近い記録から(`AIChatRelevance`: 語が重なる記録を重なりの大きい順・残りは新しい順)`limit` 件(既定・上限 20)、
 /// 1 件 1 行の「名前: 値」(aiButton の `AIRequestBuilder.describe`)で 8 KB まで。発言が無い・語が重ならなければ新しい順(#748 と同じ)。
+/// 入りきらない記録は飛ばし、選んだ limit 件のうち後ろの入る記録で埋める(大きい記録が関係の深い小さい記録を塞がない)。
 /// 値の中の改行は「 ⏎ 」にする(1 件が何件にも見えないように)。
 /// hidden の field は誰の記録でも送らない。写真・位置・参照など読めない型と computed も送らない。
 enum AIChatMaterial {
@@ -75,9 +76,12 @@ enum AIChatMaterial {
                 used += sep + line.utf8.count
                 continue
             }
-            // 1 件目だけは切って入れる(取り込んだ PDF など。発言に近い所があればそこから)
-            if lines.isEmpty { lines.append(AIChatRelevance.window(line, query: q, maxBytes: maxBytes)) }
-            break // 入りきらない記録は落とす
+            // 1 件目だけは切って入れる(取り込んだ PDF など。発言に近い所があればそこから)。8 KB を使い切るので終わり
+            if lines.isEmpty {
+                lines.append(AIChatRelevance.window(line, query: q, maxBytes: maxBytes))
+                break
+            }
+            // 入りきらない記録は飛ばして次へ(後ろの小さい記録で埋める)
         }
         guard !lines.isEmpty else { return nil }
         let name = String(String.UnicodeScalarView(entity.name.trimmingCharacters(in: .whitespacesAndNewlines)
