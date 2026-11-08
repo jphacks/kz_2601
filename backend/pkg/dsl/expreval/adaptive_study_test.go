@@ -89,19 +89,49 @@ func TestAdaptiveStudyTargetFromLastWeek(t *testing.T) {
 		}
 	}
 
-	// stat.value: this week's (11-09..11-15) completion rate.
-	var stat *dsl.Expr
+	// stat.value: this week's (11-09..11-15) completion rate as a ratio;
+	// format "percent" multiplies by 100 on iOS (StatLeaf.exprValue).
+	var stat *dsl.Component
 	for _, s := range app.Screens {
-		for _, c := range s.Components {
+		for i, c := range s.Components {
 			if c.ID == "rate_now" {
-				stat = c.Value
+				stat = &s.Components[i]
 			}
 		}
 	}
-	if stat == nil {
+	if stat == nil || stat.Value == nil {
 		t.Fatal("stat rate_now missing")
 	}
-	if got := ev.Eval(*stat, nil); got != NumberValue(100) {
-		t.Errorf("rate_now = %+v, want 100", got)
+	if stat.Format != "percent" {
+		t.Errorf("rate_now format = %q, want percent", stat.Format)
+	}
+	if got := ev.Eval(*stat.Value, nil); got != NumberValue(1) {
+		t.Errorf("rate_now = %+v, want 1 (100%%)", got)
+	}
+}
+
+// Saved weeks and plans must be editable: some list opens each form by item
+// tap (a table row can't be tapped; the toolbar only opens a new record).
+func TestAdaptiveStudyFormsOpenForSavedRecords(t *testing.T) {
+	raw, err := os.ReadFile(filepath.Join("..", "..", "..", "..", "docs", "dsl", "examples", "adaptive_study.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	app, err := dsl.Parse(raw)
+	if err != nil {
+		t.Fatalf("Parse: %v", err)
+	}
+	tapped := map[string]bool{}
+	for _, s := range app.Screens {
+		for _, c := range s.Components {
+			if c.Type == dsl.CompList && c.OnItemTap != nil && c.OnItemTap.Type == dsl.ActionNavigate {
+				tapped[c.OnItemTap.Screen] = true
+			}
+		}
+	}
+	for _, s := range app.Screens {
+		if s.Entity != "" && !tapped[s.ID] {
+			t.Errorf("form %q (entity %q) is never opened by a list item tap, so saved records can't be fixed", s.ID, s.Entity)
+		}
 	}
 }
