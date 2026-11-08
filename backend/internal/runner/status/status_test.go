@@ -11,6 +11,8 @@ func TestResult(t *testing.T) {
 		{"", "", false, ResultNone},
 		{"ok", "", false, ResultOK},
 		{"ok", "", true, ResultNotifyPaused},
+		{"ok", "app_limit", false, ResultLimit},
+		{"ok", "app_limit", true, ResultLimit},
 		{"skipped_quota", "", false, ResultLimit},
 		{"skipped_global", "", false, ResultServiceLimit},
 		{"skipped_paused", "", false, ResultServicePaused},
