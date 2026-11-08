@@ -104,4 +104,24 @@ func TestBookLookupUserCapAndKillSwitch(t *testing.T) {
 	if r.code != http.StatusServiceUnavailable || hits.Load() != 0 {
 		t.Errorf("disabled: %d %s (hits %d)", r.code, r.raw, hits.Load())
 	}
+	// off: 503 before the ISBN check, so a saved button always gets "not available"
+	if r := off.do("u1", http.MethodGet, "/v1/lookup/book?isbn=123", nil, nil); r.code != http.StatusServiceUnavailable {
+		t.Errorf("disabled, bad ISBN: %d %s", r.code, r.raw)
+	}
+}
+
+// Off by default (openBD's terms, 2026-11-08): without BOOK_LOOKUP_ENABLED
+// the production wiring answers 503 reason=disabled and never fetches.
+func TestBookLookupOffByDefault(t *testing.T) {
+	t.Setenv("FIREBASE_AUTH_EMULATOR_HOST", "localhost:9099")
+	t.Setenv("BOOK_LOOKUP_ENABLED", "")
+	t.Setenv("BOOK_LOOKUP_DISABLED", "")
+	t.Setenv("FEEDS_DISABLED", "")
+	e := &env{t: t, h: auth.Middleware(nil, auth.ModeDev)(New(store.NewMemory()))}
+	r := e.do("u1", http.MethodGet, "/v1/lookup/book?isbn=9784780802047", nil, nil)
+	errBody, _ := r.body["error"].(map[string]any)
+	details, _ := errBody["details"].(map[string]any)
+	if r.code != http.StatusServiceUnavailable || details["reason"] != "disabled" || errBody["message"] != "本の情報の取得は今使えません" {
+		t.Fatalf("default: %d %s", r.code, r.raw)
+	}
 }

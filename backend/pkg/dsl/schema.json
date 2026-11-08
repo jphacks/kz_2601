@@ -3992,6 +3992,25 @@
         },
         "saveTo": {
           "$ref": "#/$defs/AISaveTo"
+        },
+        "inputFeeds": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 3,
+          "uniqueItems": true,
+          "items": {
+            "type": "string"
+          },
+          "description": "generate の材料に足す feed: 同じ画面の feed 部品の id(1〜3 個・天気・気圧・警報・祝日・お知らせ)。iOS が画面に読み込んだ行(合わせて最大 20 行・2KB)を「外部データ」として渡す(今日の天気と気圧から体調のアドバイス)。"
+        },
+        "outputs": {
+          "type": "object",
+          "minProperties": 1,
+          "maxProperties": 10,
+          "additionalProperties": {
+            "type": "string"
+          },
+          "description": "generate の shape fields の項目名 → 入れる screen.entity の field id(string/text/integer/number/date/datetime/enum)。例: {\"題名\":\"title\",\"日時\":\"start\",\"場所\":\"place\"}。iOS が型に直してフォームのドラフトに入れる(読めない値・enum の options に無い値は空のまま)。保存は利用者。output とは一緒に使わない。"
         }
       },
       "description": "押すと AI が走るボタン。summarize/classify/rewrite/extract/suggest はフォームの入力を処理して output field に入れる(端末内 AI(Apple Intelligence / Foundation Models)が使えれば無料で端末の中だけ、無い端末では Tailor It Pro のオンライン AI。写真は inputPhoto を付けた時だけオンライン AI に送る)。generate は prompt の決まった指示で新しく文章を書かせ、shape(1 行 / 箇条書き N 個 / 項目つき)でボタンの下に出す。端末内 AI が使えればそれで、無ければ Tailor It Pro のオンライン AI で書く。",

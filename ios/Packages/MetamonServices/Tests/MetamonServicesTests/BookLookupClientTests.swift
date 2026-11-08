@@ -32,6 +32,19 @@ final class BookLookupClientTests: XCTestCase {
         XCTAssertEqual(req.url?.query, "isbn=9784780802047")
     }
 
+    func testDisabledIsBookLookupOff() async throws {
+        StubURLProtocol.reset([.init(status: 503, body: #"{"error":{"code":"upstream_unavailable","message":"本の情報の取得は今使えません","details":{"reason":"disabled"}}}"#)])
+        let client = HTTPBookLookupClient(baseURL: base, token: StaticTokenProvider("u1"))
+        do {
+            _ = try await client.lookup(isbn: "9784780802047")
+            XCTFail("503 は throw")
+        } catch let e as APIError {
+            XCTAssertTrue(e.isBookLookupOff)
+        }
+        XCTAssertFalse(APIError.server(status: 503, code: "upstream_unavailable", message: "つながらない").isBookLookupOff)
+        XCTAssertFalse(APIError.server(status: 404, code: "not_found", message: "", details: ["reason": .string("disabled")]).isBookLookupOff)
+    }
+
     func testNotFoundIsAPIError404() async throws {
         StubURLProtocol.reset([.init(status: 404, body: #"{"error":{"code":"not_found","message":"この ISBN の本は見つかりませんでした"}}"#)])
         let client = HTTPBookLookupClient(baseURL: base, token: StaticTokenProvider("u1"))
