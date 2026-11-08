@@ -89,6 +89,8 @@ func checkAIGenerate(exp map[string]any, a *dsl.App) []string {
 			miss = append(miss, fmt.Sprintf("aiInputPhoto=%v got %v", want, got))
 		}
 	}
+	miss = append(miss, checkAIInputFeeds(exp, a)...)
+	miss = append(miss, checkAIOutputs(exp, a)...)
 	return append(miss, checkAISaveTo(exp, a)...)
 }
 

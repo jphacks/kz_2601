@@ -664,6 +664,23 @@
         }
       }
     },
+    "%lld 項目を入力欄に入れました。確認して保存してください" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Filled %lld fields. Check them and save."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld 項目を入力欄に入れました。確認して保存してください"
+          }
+        }
+      }
+    },
     "%lld人で割ります" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -3108,6 +3125,40 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "入力してください"
+          }
+        }
+      }
+    },
+    "入力欄に入れました: %@" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Filled: %@"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "入力欄に入れました: %@"
+          }
+        }
+      }
+    },
+    "入力済みのため入れなかった: %@" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Already filled, left as is: %@"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "入力済みのため入れなかった: %@"
           }
         }
       }
@@ -5573,6 +5624,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "読み上げる内容がまだありません"
+          }
+        }
+      }
+    },
+    "読み取れず空のまま: %@" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Couldn't read, left empty: %@"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "読み取れず空のまま: %@"
           }
         }
       }
