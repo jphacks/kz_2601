@@ -27,6 +27,7 @@ func (a *App) Lint() []string {
 	l.computed()
 	l.screens()
 	l.entityReach()
+	l.savedRecordReach() // saved_record.go
 	l.navGraph()
 	l.micSeat()
 	l.dupAddControls()
