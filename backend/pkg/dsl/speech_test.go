@@ -43,11 +43,11 @@ func TestSpeechLeavesValid(t *testing.T) {
 func TestSpeechLeavesSemanticErrors(t *testing.T) {
 	app := speechApp()
 	app.Screens[0].Components = []Component{
-		{Type: CompTranscribeField, Field: "body"},                        // needs screen.entity
-		{Type: CompSpeakButton},                                           // no source
-		{Type: CompSpeakButton, Text: "a", Field: "note"},                 // two sources
-		{Type: CompSpeakButton, Field: "note"},                            // field needs screen.entity
-		{Type: CompSpeakButton, Text: "{{note}}"},                         // placeholder needs screen.entity
+		{Type: CompTranscribeField, Field: "body"},                         // needs screen.entity
+		{Type: CompSpeakButton},                                            // no source
+		{Type: CompSpeakButton, Text: "a", Field: "note"},                  // two sources
+		{Type: CompSpeakButton, Field: "note"},                             // field needs screen.entity
+		{Type: CompSpeakButton, Text: "{{note}}"},                          // placeholder needs screen.entity
 		{Type: CompSpeakButton, Text: strings.Repeat("あ", SpeakMaxText+1)}, // too long
 	}
 	app.Screens[1].Components = []Component{

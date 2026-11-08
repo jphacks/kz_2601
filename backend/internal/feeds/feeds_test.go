@@ -65,9 +65,9 @@ type fake struct {
 	mu       sync.Mutex
 	redirect string
 	srv      *httptest.Server
-	hits sync.Map // path -> *atomic.Int32
-	body map[string][]byte
-	code map[string]int
+	hits     sync.Map // path -> *atomic.Int32
+	body     map[string][]byte
+	code     map[string]int
 }
 
 func newFake(t *testing.T) *fake {
