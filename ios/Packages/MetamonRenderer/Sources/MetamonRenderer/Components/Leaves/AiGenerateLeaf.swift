@@ -14,7 +14,9 @@ struct AiGenerateLeaf: View {
     @State private var usedOnline = false
     @State private var error: String?
     @State private var runs = 0
-    @State private var filled: [AIOutputs.Fill] = [] // outputs: 今回フォームに入れた / 読めなかった項目
+    @State private var filled: [AIOutputs.Fill] = [] // outputs: 今回の項目(読めなかったものも)
+    @State private var applied = AIOutputs.Applied() // outputs: 入れた / 入力済みのため入れなかった項目
+    @State private var aiValues: [String: JSONValue] = [:] // outputs: 前回 AI が入れた値(そのままなら次は入れ替えてよい)
 
     private var route: AIGenerateRoute {
         AIGenerateRoute.choose(availability: availability, hostOnline: rt.aiText?.supportsOnlineAIText ?? false, mock: AIGenerateRoute.isMock,
@@ -80,25 +82,39 @@ struct AiGenerateLeaf: View {
     }
 
     @ViewBuilder private var outputsCaption: some View {
-        let ok = filled.filter { $0.value != nil }.count
+        let ok = applied.applied.count
+        let kept = applied.kept.map(\.fieldName)
         let missed = filled.filter { $0.value == nil }.map(\.fieldName)
         VStack(alignment: .leading, spacing: 2) {
             if ok > 0 { Text(L("\(ok) 項目を入力欄に入れました。確認して保存してください")) }
+            if !kept.isEmpty { Text(L("入力済みのため入れなかった: \(kept.joined(separator: "、"))")) }
             if !missed.isEmpty { Text(L("読み取れず空のまま: \(missed.joined(separator: "、"))")) }
         }
         .font(.caption).foregroundStyle(.secondary)
         .accessibilityIdentifier("aiGenerate.outputs")
     }
 
-    /// outputs: 結果の各項目を field の型に直してドラフトに入れる。読めない項目は触らない(入力済みは消さない)。
+    /// outputs: 結果の各項目を field の型に直してドラフトに入れる。空の field だけに入れ、利用者が入れた値は上書きしない
+    /// (新規で開いたままの初期値と、前回 AI が入れたままの値は入れ替える)。読めない項目は触らない。
     private func fillOutputs(_ out: AITextResult, form: FormDraft) {
         guard out.shape == .fields, let outputs = c.outputs, !outputs.isEmpty else {
             filled = []
+            applied = AIOutputs.Applied()
             return
         }
         filled = AIOutputs.fills(out.fields ?? [], outputs: outputs, entity: form.entity)
-        for f in filled { if let v = f.value { form.values[f.field] = v } }
-        let names = filled.filter { $0.value != nil }.map(\.fieldName)
+        var values = form.values
+        let previous = aiValues
+        applied = AIOutputs.apply(filled, to: &values) { id, cur in
+            if previous[id] == cur { return true }
+            guard !form.isEditing, let f = form.entity.field(id) else { return false }
+            return FieldCoding.normalize(cur, for: f) == form.baseline[id] // 新規で開いたままの初期値
+        }
+        for f in applied.applied {
+            form.values[f.field] = values[f.field]
+            aiValues[f.field] = values[f.field]
+        }
+        let names = applied.applied.map(\.fieldName)
         if !names.isEmpty {
             AccessibilityNotification.Announcement(L("入力欄に入れました: \(names.joined(separator: "、"))")).post()
         }

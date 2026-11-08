@@ -3146,6 +3146,23 @@
         }
       }
     },
+    "入力済みのため入れなかった: %@" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Already filled, left as is: %@"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "入力済みのため入れなかった: %@"
+          }
+        }
+      }
+    },
     "全員" : {
       "extractionState" : "manual",
       "localizations" : {

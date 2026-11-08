@@ -59,6 +59,10 @@ func checkAIOutputs(where string, c *Component, form *Entity, add func(string, .
 			add("%s: aiButton outputs %q → field %q is computed (read-only)", where, name, id)
 		case !aiOutputTypes[f.Type]:
 			add("%s: aiButton outputs %q → field %q must be string, text, integer, number, date, datetime or enum (got %s)", where, name, id, f.Type)
+		case f.Hidden:
+			add("%s: aiButton outputs %q → field %q is hidden (an answer key the AI must not fill)", where, name, id)
+		case f.AdminOnly():
+			add("%s: aiButton outputs %q → field %q is editableBy admins; members could not save it", where, name, id)
 		}
 		if prev, ok := used[id]; ok {
 			add("%s: aiButton outputs %q and %q both fill field %q", where, prev, name, id)

@@ -75,6 +75,26 @@ func TestAIOutputsSemanticErrors(t *testing.T) {
 	}
 }
 
+func TestAIOutputsHiddenAndAdminFields(t *testing.T) {
+	app := outputsApp(
+		fieldsButton("h", []string{"a"}, map[string]string{"a": "key"}),
+		fieldsButton("m", []string{"a"}, map[string]string{"a": "memo"}),
+	)
+	app.Entities[0].Fields = append(app.Entities[0].Fields,
+		Field{ID: "key", Name: "正解", Type: FieldString, Hidden: true},
+		Field{ID: "memo", Name: "管理メモ", Type: FieldString, EditableBy: RoleAdmins},
+	)
+	err := app.Validate()
+	if err == nil {
+		t.Fatal("hidden / editableBy admins targets should be rejected")
+	}
+	for _, w := range []string{`field "key" is hidden`, `field "memo" is editableBy admins`} {
+		if !strings.Contains(err.Error(), w) {
+			t.Errorf("missing %q in\n%s", w, err)
+		}
+	}
+}
+
 func TestAIOutputsNeedForm(t *testing.T) {
 	app := outputsApp(fieldsButton("", []string{"a"}, map[string]string{"a": "title"}))
 	app.Screens[0].Entity = ""

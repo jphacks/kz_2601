@@ -38,6 +38,57 @@ final class AIOutputsTests: XCTestCase {
         XCTAssertNil(AIOutputs.value("よくできました", field: score))
     }
 
+    func testKanjiMultipliers() throws {
+        let score = try field("score"), rate = try field("rate")
+        XCTAssertEqual(AIOutputs.value("3万円", field: rate), .number(30000), "「3万円」を 3 にしない")
+        XCTAssertEqual(AIOutputs.value("約 1.5万人", field: rate), .number(15000))
+        XCTAssertEqual(AIOutputs.value("３万５０００円", field: rate), .number(35000))
+        XCTAssertEqual(AIOutputs.value("1億2000万", field: rate), .number(120_000_000))
+        XCTAssertEqual(AIOutputs.value("3千万円", field: rate), .number(30_000_000))
+        XCTAssertEqual(AIOutputs.value("5千", field: score), .number(5000))
+        XCTAssertNil(AIOutputs.value("3万〜5万円", field: rate), "範囲は読まない")
+        XCTAssertNil(AIOutputs.value("3万円以上", field: rate), "残りが曖昧なら空")
+        XCTAssertNil(AIOutputs.value("千円札", field: rate))
+        var thousand = try field("rate")
+        thousand.unit = "千円"
+        XCTAssertEqual(AIOutputs.value("3千円", field: thousand), .number(3), "単位が千円なら単位どおり")
+    }
+
+    func testYearlessDatesRollToNextYear() throws {
+        let day = try field("day"), start = try field("start")
+        let dec = ISO8601DateFormatter().date(from: "2026-12-20T03:00:00Z")!
+        XCTAssertEqual(AIOutputs.value("1/10", field: day, now: dec), .string("2027-01-10"), "12 月の「1/10」は来年")
+        XCTAssertEqual(AIOutputs.value("1月10日", field: day, now: dec), .string("2027-01-10"))
+        XCTAssertEqual(AIOutputs.value("12/1", field: day, now: dec), .string("2026-12-01"), "少し前は今年のまま")
+        XCTAssertEqual(AIOutputs.value("2026/1/10", field: day, now: dec), .string("2026-01-10"), "年があればそのまま")
+        let jan = try XCTUnwrap(AIOutputs.value("1/10 18:00", field: start, now: dec)?.stringValue.flatMap { FieldCoding.date(from: .string($0)) })
+        XCTAssertEqual(Calendar(identifier: .gregorian).dateComponents(in: FieldCoding.dateFormatter.timeZone, from: jan).year, 2027)
+    }
+
+    func testDateFieldKeepsGivenOffsetDay() throws {
+        let day = try field("day")
+        XCTAssertEqual(AIOutputs.value("2026-11-20T23:30:00-05:00", field: day, now: now), .string("2026-11-20"), "TZ で日をずらさない")
+        XCTAssertEqual(AIOutputs.value("2026-11-20T00:30:00+09:00", field: day, now: now), .string("2026-11-20"))
+        XCTAssertNil(AIOutputs.value("2026-02-30T10:00:00Z", field: day, now: now))
+    }
+
+    func testApplyDoesNotOverwrite() throws {
+        let e = try entity()
+        let fills = AIOutputs.fills([AITextField(name: "題名", value: "秋の音楽祭"), AITextField(name: "点数", value: "85"),
+                                     AITextField(name: "種類", value: "展示"), AITextField(name: "日時", value: "不明")],
+                                    outputs: ["題名": "title", "点数": "score", "種類": "kind", "日時": "start"], entity: e, now: now)
+        var values: [String: JSONValue] = ["title": .string("自分で書いた題"), "score": .null, "kind": .string("講演"), "start": .string("2026-11-20T09:00:00Z")]
+        let r = AIOutputs.apply(fills, to: &values) { id, _ in id == "kind" }
+        XCTAssertEqual(r.applied.map(\.field), ["score", "kind"])
+        XCTAssertEqual(r.kept.map(\.fieldName), ["題名"])
+        XCTAssertEqual(values["title"], .string("自分で書いた題"), "入力済みは上書きしない")
+        XCTAssertEqual(values["score"], .number(85))
+        XCTAssertEqual(values["kind"], .string("展示"), "入れ替えてよい値(初期値・前回の AI)は入れる")
+        XCTAssertEqual(values["start"], .string("2026-11-20T09:00:00Z"), "読めない値は触らない")
+        var same: [String: JSONValue] = ["title": .string("秋の音楽祭")]
+        XCTAssertEqual(AIOutputs.apply(Array(fills.prefix(1)), to: &same) { _, _ in false }.kept, [], "同じ値は入れなかった扱いにしない")
+    }
+
     func testDates() throws {
         let start = try field("start"), day = try field("day")
         let a = AIOutputs.value("2026/11/20 18:00", field: start, now: now)
@@ -71,10 +122,15 @@ final class AIOutputsTests: XCTestCase {
         XCTAssertEqual(fills[2].value, .string("展示"))
     }
 
-    func testHint() throws {
+    func testFormatsAndHint() throws {
         let e = try entity()
-        XCTAssertNil(AIOutputs.hint(items: ["題名"], outputs: ["題名": "title"], entity: e, english: false))
-        XCTAssertEqual(AIOutputs.hint(items: ["点数", "日"], outputs: ["点数": "score", "日": "day"], entity: e, english: true),
+        XCTAssertNil(AIOutputs.formats(items: ["題名"], outputs: ["題名": "title"], entity: e))
+        let f = AIOutputs.formats(items: ["点数", "日", "種類", "題名"], outputs: ["点数": "score", "日": "day", "種類": "kind", "題名": "title"], entity: e)
+        XCTAssertEqual(f, [AITextFormat(item: "点数", kind: "number"), AITextFormat(item: "日", kind: "date"),
+                           AITextFormat(item: "種類", kind: "enum", options: ["講演", "展示", "Live"])])
+        XCTAssertEqual(AIOutputs.hint(Array(f!.prefix(2)), english: true),
                        "Format: 点数=number only / 日=YYYY/M/D (M/D if no year) (unknown: -)")
+        XCTAssertEqual(AIOutputs.hint([f![2]], english: false), "書き方: 種類=講演/展示/Live のどれか(分からなければ -)")
+        XCTAssertNil(AIOutputs.hint(nil, english: false))
     }
 }
