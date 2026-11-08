@@ -79,6 +79,27 @@ func TestParseWarnings(t *testing.T) {
 	}
 }
 
+// Reports out of time order: per (area, kind) the newest report decides, so
+// a warning lifted by a later report is not shown, and an
+// older 発表 does not stand beside a newer 継続.
+func TestParseWarningsNewestReportWins(t *testing.T) {
+	items, err := parseWarnings(fixture(t, "jma_warning_r8_order.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var got []string
+	for _, it := range items {
+		got = append(got, it.Title+"|"+it.Subtitle+"|"+it.Date)
+	}
+	want := []string{
+		"大雨警報|継続 · 後志地方|2026-11-05T13:00:00+09:00",
+		"大雨注意報|発表 · 石狩地方|2026-11-05T16:00:00+09:00",
+	}
+	if strings.Join(got, "\n") != strings.Join(want, "\n") {
+		t.Fatalf("items:\n%s\nwant:\n%s", strings.Join(got, "\n"), strings.Join(want, "\n"))
+	}
+}
+
 func TestPressure(t *testing.T) {
 	// The fixture starts at 2026-11-07T18:00Z (11-08 03:00 JST).
 	now := time.Date(2026, 11, 8, 3, 10, 0, 0, jst)

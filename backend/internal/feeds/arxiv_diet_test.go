@@ -178,8 +178,8 @@ func TestGapProviders(t *testing.T) {
 			t.Fatalf("%s: %v", id, err)
 		}
 	}
-	if d := c.now().Sub(start); d != 6*time.Second {
-		t.Errorf("3 categories took %s of waiting, want 6s (3 s apart)", d)
+	if d := c.now().Sub(start); d != 2*arxivGap {
+		t.Errorf("3 categories took %s of waiting, want %s (%s apart)", d, 2*arxivGap, arxivGap)
 	}
 	// diet has its own turn: no wait right after arxiv.
 	before := c.now()

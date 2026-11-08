@@ -58,6 +58,8 @@ func checkServerRules(exp map[string]any, a *dsl.App) []string {
 				actions = append(actions, "updateRecord")
 			case act.Increment != nil:
 				actions = append(actions, "increment")
+			case act.SaveFeed != nil:
+				actions = append(actions, "saveFeed")
 			}
 		}
 	}
@@ -133,6 +135,12 @@ func (s sampleRefs) Record(_ context.Context, entity, id string) (expreval.Recor
 		return expreval.Record{}, false, nil
 	}
 	return sampleRecord(e, id, false), true, nil
+}
+
+// Feed gives a made-up snapshot (saveFeed).
+func (sampleRefs) Feed(context.Context, string, string) (engine.FeedSnapshot, error) {
+	lo, hi, drop := 1003.0, 1012.0, true
+	return engine.FeedSnapshot{Summary: "1003〜1012 hPa", Min: &lo, Max: &hi, Drop: &drop}, nil
 }
 
 // List gives two made-up records of the entity (on.each / agg).

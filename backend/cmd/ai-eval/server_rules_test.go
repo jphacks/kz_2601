@@ -90,3 +90,18 @@ func TestServerRulesPickMetrics(t *testing.T) {
 		t.Fatalf("want 1 miss: %v", miss)
 	}
 }
+
+// ruleAction saveFeed; ruleSim plans it on a made-up snapshot.
+func TestServerRulesSaveFeedMetrics(t *testing.T) {
+	raw, err := os.ReadFile("../../pkg/dsl/testdata/server_rules_feed.json")
+	if err != nil {
+		t.Fatal(err)
+	}
+	app, err := dsl.Parse(raw)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if miss := checkServerRules(map[string]any{"ruleTrigger": "daily", "ruleAction": "saveFeed", "ruleSim": true}, app); len(miss) != 0 {
+		t.Fatal(miss)
+	}
+}

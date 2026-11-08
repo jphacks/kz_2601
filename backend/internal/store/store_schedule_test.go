@@ -75,6 +75,15 @@ func TestStoreSchedules(t *testing.T) {
 		if len(claimed) != 1 || string(claimed[0].Charge) != string(charge) {
 			t.Fatalf("charge: %+v", claimed)
 		}
+		// a deferral puts it back and counts itself (attempts still grow)
+		if err := q.DeferOutbox(ctx, env, claimed[0].EventID, 3, due, "busy", nil); err != nil {
+			t.Fatal(err)
+		}
+		claimed, _ = q.ClaimOutbox(ctx, env, due, time.Minute, 10)
+		if len(claimed) != 1 || claimed[0].Attempts != 4 || claimed[0].Deferrals != 1 || claimed[0].LastError != "busy" ||
+			string(claimed[0].Charge) != string(charge) {
+			t.Fatalf("deferred: %+v", claimed)
+		}
 
 		// moving on: the next run, the row's lastDueAt
 		next := due.Add(24 * time.Hour)

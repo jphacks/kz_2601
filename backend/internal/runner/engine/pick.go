@@ -35,6 +35,10 @@ func pickRow(app *dsl.App, rule *dsl.ServerRule, ev Trigger, row *expreval.Row, 
 		if src.err != nil {
 			return nil, false
 		}
+		// earlier rows of this run: their creates are not written yet
+		for id := range c.picked[rule.ID] {
+			skip[id] = true
+		}
 	}
 	seed := ev.RunID + "\x00" + rule.ID + "\x00" + rowKey
 	load := countLoads(rule, ev, row, rowKey, src, c)
@@ -72,6 +76,12 @@ func pickRow(app *dsl.App, rule *dsl.ServerRule, ev Trigger, row *expreval.Row, 
 	}
 	if best == nil {
 		return nil, false
+	}
+	if p.Exclude != nil {
+		if c.picked[rule.ID] == nil {
+			c.picked[rule.ID] = map[string]bool{}
+		}
+		c.picked[rule.ID][best.ID] = true
 	}
 	out := expreval.Row{Record: expreval.Record{}}
 	if row != nil {

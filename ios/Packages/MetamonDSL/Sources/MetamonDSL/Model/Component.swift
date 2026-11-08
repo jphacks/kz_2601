@@ -164,6 +164,7 @@ public struct Component: Decodable, Identifiable, Sendable {
     public var length: String?         // short(既定)| long = 長い文・オンライン AI だけ
     public var inputPhoto: String?     // 一緒に AI に見せる photo field(オンライン AI だけ)
     public var saveTo: AISaveTo?       // generate list: 1 項目 = 1 件の記録(AISaveTo.swift)
+    public var inputFeeds: [String]?   // generate: 同じ画面の feed の id(行を材料に足す・AIFeedInput.swift)
     public var target: Double?         // progressBar entity モードの分母
     public var tone: String?           // progressBar: positive(目標)| negative(予算)・#140
     public var url: String?            // link
@@ -261,7 +262,7 @@ public struct Component: Decodable, Identifiable, Sendable {
         case min, max, step, minLines
         case by
         case nameField, balanceField
-        case task, input, output, options, shape, count, items, length, inputPhoto, saveTo
+        case task, input, output, options, shape, count, items, length, inputPhoto, saveTo, inputFeeds
         case tone
         case metric, period
         case columnField, rowField, columnValues, rowValues, rowRange
@@ -349,6 +350,7 @@ public struct Component: Decodable, Identifiable, Sendable {
         length = try? c.decodeIfPresent(String.self, forKey: .length)
         inputPhoto = try? c.decodeIfPresent(String.self, forKey: .inputPhoto)
         saveTo = try? c.decodeIfPresent(AISaveTo.self, forKey: .saveTo)
+        inputFeeds = try? c.decodeIfPresent([String].self, forKey: .inputFeeds)
         target = try? c.decodeIfPresent(Double.self, forKey: .target)
         tone = try? c.decodeIfPresent(String.self, forKey: .tone)
         url = try? c.decodeIfPresent(String.self, forKey: .url)

@@ -54,8 +54,13 @@ func (q *Queue) Claim(ctx context.Context, limit int) ([]store.OutboxEvent, erro
 	return q.st.ClaimOutbox(ctx, q.env, q.Now(), q.Lease, limit)
 }
 
-// Exhausted reports whether ev (as claimed) is past MaxAttempts.
-func (q *Queue) Exhausted(ev store.OutboxEvent) bool { return ev.Attempts > q.MaxAttempts }
+// Exhausted reports whether ev (as claimed) is past MaxAttempts. Deferred
+// claims (Defer) do not count.
+func (q *Queue) Exhausted(ev store.OutboxEvent) bool { return Failures(ev) > q.MaxAttempts }
+
+// Failures is the attempt number of ev that counts toward giving up: its
+// claims minus its deferrals.
+func Failures(ev store.OutboxEvent) int { return ev.Attempts - ev.Deferrals }
 
 // Done finishes ev with outcome. ErrLeaseLost (another runner took it) is
 // not an error here: that runner records its own result.
@@ -72,11 +77,18 @@ func (q *Queue) GiveUp(ctx context.Context, ev store.OutboxEvent, lastError stri
 	}))
 }
 
-// Retry puts ev back after Delay(ev.Attempts). code is a short error class
+// Retry puts ev back after Delay(Failures(ev)). code is a short error class
 // (never content); charge (nil = keep the stored one) is what this attempt
 // counted, refunded if the event gives up.
 func (q *Queue) Retry(ctx context.Context, ev store.OutboxEvent, code string, charge json.RawMessage) error {
-	return ignoreLost(q.st.RetryOutbox(ctx, q.env, ev.EventID, ev.Attempts, q.Now().Add(q.Delay(ev.Attempts)), code, charge))
+	return ignoreLost(q.st.RetryOutbox(ctx, q.env, ev.EventID, ev.Attempts, q.Now().Add(q.Delay(Failures(ev))), code, charge))
+}
+
+// Defer puts ev back to be claimed at `at` without this claim counting
+// toward MaxAttempts (a wait the run cannot help, e.g. a busy or recently
+// failed feed source). The caller bounds how long an event may be deferred.
+func (q *Queue) Defer(ctx context.Context, ev store.OutboxEvent, at time.Time, code string, charge json.RawMessage) error {
+	return ignoreLost(q.st.DeferOutbox(ctx, q.env, ev.EventID, ev.Attempts, at, code, charge))
 }
 
 // Delay is the wait after the attempt-th failure.

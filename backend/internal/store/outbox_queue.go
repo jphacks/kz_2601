@@ -48,4 +48,8 @@ type OutboxQueue interface {
 	// the event is still at attempt (else ErrLeaseLost). A non-nil charge
 	// replaces the stored one (nil keeps it).
 	RetryOutbox(ctx context.Context, env, eventID string, attempt int, at time.Time, lastError string, charge json.RawMessage) error
+	// DeferOutbox is RetryOutbox that also counts one deferral, so this
+	// claim does not count toward giving up (Attempts still grows: quota
+	// charges attempt 1 only).
+	DeferOutbox(ctx context.Context, env, eventID string, attempt int, at time.Time, lastError string, charge json.RawMessage) error
 }
