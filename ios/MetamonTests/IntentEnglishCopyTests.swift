@@ -52,4 +52,29 @@ final class IntentEnglishCopyTests: XCTestCase {
         keys += [TailorIntentError.notReady, .targetNotFound("家計簿"), .missingFields(["金額"])].map(\.localizedStringResource.key)
         assertTranslated(keys)
     }
+
+    /// Siri のフレーズ(AppShortcuts.xcstrings)。英語もアプリ名を含み、パラメータは日本語と同じ。
+    func testShortcutPhrasesHaveEnglish() {
+        let phrases = [
+            "${applicationName}で${target}に記録",
+            "${applicationName}で${target}に記録を追加",
+            "${applicationName}で記録を追加",
+            "${applicationName}に記録",
+            "${applicationName}で${target}を開く",
+            "${applicationName}で${target}を開いて",
+            "${applicationName}で記録帳を開く",
+            "${applicationName}でアプリを開く",
+            "${applicationName}で話しかける",
+            "${applicationName}に話しかける",
+        ]
+        for key in phrases {
+            let value = en.localizedString(forKey: key, value: "__missing__", table: "AppShortcuts")
+            XCTAssertNotEqual(value, "__missing__", "英語のフレーズが無い: \(key)")
+            XCTAssertNotEqual(value, key, "英語のフレーズが日本語のまま: \(key)")
+            XCTAssertTrue(value.contains("${applicationName}"), "英語のフレーズにアプリ名が無い: \(value)")
+            XCTAssertEqual(value.contains("${target}"), key.contains("${target}"), "パラメータが合わない: \(value)")
+        }
+        let titles = ["記録を追加", "記録帳を開く", "アプリを開く", "話しかける"]
+        assertTranslated(titles)
+    }
 }
