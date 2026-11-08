@@ -24,10 +24,6 @@ import (
 
 // Bounds of a suggestion.
 const (
-	maxChatSaveNameRunes    = 40
-	maxChatSaveOptions      = 50
-	maxChatSaveOptionRunes  = 50
-	maxChatSaveUnitRunes    = 20
 	maxChatSuggestString    = 200  // runes of a string value
 	maxChatSuggestText      = 2000 // runes of a text value
 	maxChatSuggestNumber    = 1e9  // |number|
@@ -52,7 +48,10 @@ type ChatSaveField struct {
 	Required bool     `json:"required,omitempty"`
 }
 
-// normalizeChatSaveTo checks req.SaveTo (nil = none) in place.
+// normalizeChatSaveTo checks req.SaveTo (nil = none) in place. A malformed
+// saveTo is a 400; names, units or enum options over the bounds
+// (dsl.MaxAIChatSave*, which validation applies) drop saveTo instead, so an
+// app published before those bounds still chats, only without suggest.
 func normalizeChatSaveTo(req *TextRequest) error {
 	s := req.SaveTo
 	if s == nil {
@@ -62,8 +61,6 @@ func normalizeChatSaveTo(req *TextRequest) error {
 	switch {
 	case !fieldIDRe.MatchString(s.Entity):
 		return badText("saveTo.entity must be an entity id")
-	case utf8.RuneCountInString(s.Name) > maxChatSaveNameRunes:
-		return badText("saveTo.name must be at most 40 characters")
 	case len(s.Fields) == 0 || len(s.Fields) > dsl.MaxAIChatSaveFields:
 		return badText("saveTo.fields must have 1.." + strconv.Itoa(dsl.MaxAIChatSaveFields) + " fields")
 	}
@@ -77,25 +74,37 @@ func normalizeChatSaveTo(req *TextRequest) error {
 		switch {
 		case !fieldIDRe.MatchString(f.ID) || seen[f.ID]:
 			return badText("saveTo.fields need unique field ids")
-		case f.Name == "" || utf8.RuneCountInString(f.Name) > maxChatSaveNameRunes:
-			return badText("saveTo field names must be 1..40 characters")
 		case !dsl.AIChatSaveFieldTypes[dsl.FieldType(f.Type)]:
 			return badText("saveTo field type must be string, text, number, date or enum")
-		case utf8.RuneCountInString(f.Unit) > maxChatSaveUnitRunes:
-			return badText("saveTo field unit must be at most 20 characters")
 		case (f.Type == string(dsl.FieldEnum)) != (len(f.Options) > 0):
 			return badText("saveTo enum fields (and only they) need options")
-		case len(f.Options) > maxChatSaveOptions:
-			return badText("saveTo field options must be at most 50")
 		}
 		seen[f.ID] = true
+	}
+	if !chatSaveToFits(s) {
+		req.SaveTo = nil
+	}
+	return nil
+}
+
+// chatSaveToFits: the entity / field names, units and enum options are
+// within dsl.MaxAIChatSave* (what the prompt and schema carry).
+func chatSaveToFits(s *ChatSaveTo) bool {
+	if utf8.RuneCountInString(s.Name) > dsl.MaxAIChatSaveNameRunes {
+		return false
+	}
+	for _, f := range s.Fields {
+		if f.Name == "" || utf8.RuneCountInString(f.Name) > dsl.MaxAIChatSaveNameRunes ||
+			utf8.RuneCountInString(f.Unit) > dsl.MaxAIChatSaveUnitRunes || len(f.Options) > dsl.MaxAIChatSaveOptions {
+			return false
+		}
 		for _, o := range f.Options {
-			if strings.TrimSpace(o) == "" || utf8.RuneCountInString(o) > maxChatSaveOptionRunes {
-				return badText("saveTo field options must be 1..50 characters")
+			if strings.TrimSpace(o) == "" || utf8.RuneCountInString(o) > dsl.MaxAIChatSaveOptionRunes {
+				return false
 			}
 		}
 	}
-	return nil
+	return true
 }
 
 // scopeKey is what the device sends for one aiChat saveTo, without today

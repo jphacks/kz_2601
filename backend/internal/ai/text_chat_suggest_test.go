@@ -3,6 +3,7 @@ package ai
 import (
 	"encoding/json"
 	"net/http"
+	"strconv"
 	"strings"
 	"testing"
 
@@ -128,11 +129,8 @@ func TestNormalizeChatSaveTo(t *testing.T) {
 		"too many fields": func(s *ChatSaveTo) { s.Fields = append(s.Fields, s.Fields...) },
 		"twice":           func(s *ChatSaveTo) { s.Fields[1].ID = "dish" },
 		"type":            func(s *ChatSaveTo) { s.Fields[0].Type = "boolean" },
-		"no name":         func(s *ChatSaveTo) { s.Fields[0].Name = " " },
 		"enum options":    func(s *ChatSaveTo) { s.Fields[2].Options = nil },
 		"options on text": func(s *ChatSaveTo) { s.Fields[4].Options = []string{"a"} },
-		"blank option":    func(s *ChatSaveTo) { s.Fields[2].Options = []string{"朝食", " "} },
-		"long name":       func(s *ChatSaveTo) { s.Name = strings.Repeat("あ", 41) },
 	}
 	for name, mutate := range cases {
 		s := mealSaveTo()
@@ -145,6 +143,33 @@ func TestNormalizeChatSaveTo(t *testing.T) {
 	ok := TextRequest{Task: "chat", Instruction: "p", Messages: []TextMessage{{Role: "user", Text: "x"}}, SaveTo: mealSaveTo()}
 	if err := normalizeTextRequest(&ok); err != nil {
 		t.Fatal(err)
+	}
+	// names, units and options over the bounds drop saveTo: the chat goes on without suggest
+	drops := map[string]func(s *ChatSaveTo){
+		"long entity name": func(s *ChatSaveTo) { s.Name = strings.Repeat("あ", 41) },
+		"no field name":    func(s *ChatSaveTo) { s.Fields[0].Name = " " },
+		"long field name":  func(s *ChatSaveTo) { s.Fields[0].Name = strings.Repeat("あ", 41) },
+		"long unit":        func(s *ChatSaveTo) { s.Fields[3].Unit = strings.Repeat("u", 21) },
+		"many options":     func(s *ChatSaveTo) { s.Fields[2].Options = manyOptions(51) },
+		"long option":      func(s *ChatSaveTo) { s.Fields[2].Options = []string{"朝食", strings.Repeat("あ", 51)} },
+		"blank option":     func(s *ChatSaveTo) { s.Fields[2].Options = []string{"朝食", " "} },
+	}
+	for name, mutate := range drops {
+		s := mealSaveTo()
+		mutate(s)
+		req := TextRequest{Task: "chat", Instruction: "p", Messages: []TextMessage{{Role: "user", Text: "x"}}, SaveTo: s}
+		if err := normalizeTextRequest(&req); err != nil {
+			t.Errorf("%s: %v (want saveTo dropped, not 400)", name, err)
+		} else if req.SaveTo != nil {
+			t.Errorf("%s: saveTo kept", name)
+		}
+	}
+	edge := mealSaveTo()
+	edge.Name, edge.Fields[0].Name, edge.Fields[3].Unit = strings.Repeat("あ", 40), strings.Repeat("あ", 40), strings.Repeat("u", 20)
+	edge.Fields[2].Options = manyOptions(50)
+	atBounds := TextRequest{Task: "chat", Instruction: "p", Messages: []TextMessage{{Role: "user", Text: "x"}}, SaveTo: edge}
+	if err := normalizeTextRequest(&atBounds); err != nil || atBounds.SaveTo == nil {
+		t.Fatalf("at the bounds: err=%v saveTo=%v", err, atBounds.SaveTo)
 	}
 	gen := TextRequest{Instruction: "励ましの一言", SaveTo: mealSaveTo()}
 	if err := normalizeTextRequest(&gen); err == nil || !strings.Contains(err.Error(), "saveTo is only for task chat") {
@@ -217,4 +242,12 @@ func TestGenerationSchemaSaveToShapes(t *testing.T) {
 		t.Fatal("saveTo defs pruned")
 	}
 	t.Logf("generation schema: %d bytes", len(GenerationSchema()))
+}
+
+func manyOptions(n int) []string {
+	out := make([]string, n)
+	for i := range out {
+		out[i] = "o" + strconv.Itoa(i)
+	}
+	return out
 }

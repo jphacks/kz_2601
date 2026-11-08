@@ -98,6 +98,38 @@ func TestAIChatSaveToSemanticErrors(t *testing.T) {
 			t.Errorf("missing %q in:\n%s", want, joined)
 		}
 	}
+	// names, units and enum options over what /v1/text reads
+	long := func(n int) string { return strings.Repeat("あ", n) }
+	bounds := map[string]func(a *App){
+		`aiChat saveTo entity "meal" name must be at most 40 characters`: func(a *App) { a.Entities[1].Name = long(41) },
+		`aiChat saveTo field "dish" name must be 1..40 characters`:       func(a *App) { a.Entities[1].Fields[0].Name = long(41) },
+		`aiChat saveTo field "kcal" unit must be at most 20 characters`:  func(a *App) { a.Entities[1].Fields[3].Unit = long(21) },
+		`aiChat saveTo field "kind" must have at most 50 options`: func(a *App) {
+			opts := make([]string, 51)
+			for i := range opts {
+				opts[i] = "o" + strings.Repeat("x", i)
+			}
+			a.Entities[1].Fields[2].Options = opts
+		},
+		`aiChat saveTo field "kind" options must be 1..50 characters`: func(a *App) { a.Entities[1].Fields[2].Options = []string{"朝食", long(51)} },
+	}
+	for want, mutate := range bounds {
+		app := mealChatApp(&AISaveTo{Entity: "meal", Fields: []string{"dish", "date", "kind", "kcal"}})
+		mutate(&app)
+		ve, ok := app.Validate().(*ValidationError)
+		if !ok {
+			t.Errorf("%s: expected ValidationError", want)
+			continue
+		}
+		if joined := strings.Join(ve.Problems, "\n"); !strings.Contains(joined, want) {
+			t.Errorf("missing %q in:\n%s", want, joined)
+		}
+	}
+	atBounds := mealChatApp(&AISaveTo{Entity: "meal", Fields: []string{"dish", "date", "kind", "kcal"}})
+	atBounds.Entities[1].Name, atBounds.Entities[1].Fields[0].Name, atBounds.Entities[1].Fields[3].Unit = long(40), long(40), long(20)
+	if err := atBounds.Validate(); err != nil {
+		t.Fatalf("at the bounds: %v", err)
+	}
 	// a required date fills itself (today), so it may stay out of fields
 	ok := mealChatApp(&AISaveTo{Entity: "meal", Fields: []string{"dish"}})
 	if err := ok.Validate(); err != nil {
