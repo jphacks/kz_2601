@@ -129,7 +129,7 @@ struct AiChatLeaf: View {
 
     /// 表示と送る履歴に使う記録(自分の分だけ・`AIChat.own`)。
     private func ownRecords(_ entity: Entity) -> [Record] {
-        AIChat.own(rt.viewRecords(for: entity.id), uid: rt.currentUserId)
+        AIChat.own(rt.viewRecords(for: entity.id), uid: rt.currentUserId, shared: entity.isShared)
     }
 
     private func scrollToEnd(_ proxy: ScrollViewProxy, _ turns: [AIChat.Turn]) {

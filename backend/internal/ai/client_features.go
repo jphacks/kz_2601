@@ -26,6 +26,9 @@ const (
 	// form / detail screens (text_highlight_rules.go): they shipped together.
 	FeatureTextHighlight = "text.highlight"
 	FeatureFeedV2        = "feed.v2" // feed providers warnings / pressure (feed_warnings_pressure_rules.go)
+	// FeatureAIChatInput covers aiChat inputEntity and its limit
+	// (ai_chat_rules_input.go): a build without it ignores both silently.
+	FeatureAIChatInput = "aiChat.inputEntity"
 )
 
 // clientFeature is one optional DSL part judged by supportedFeatures.
@@ -163,6 +166,27 @@ var clientFeatures = []clientFeature{
 		places:    func(root map[string]any) []string { return componentPlaces(root, isFeedV2) },
 		strip:     func(root map[string]any) int { return dropComponents(root, isFeedV2) },
 		violation: "feed provider warnings / pressure is not available in this app build: use provider weather or remove the feed",
+	},
+	{
+		key:    FeatureAIChatInput,
+		rules:  []string{aiChatInputRules},
+		note:   "- aiChat の inputEntity(自分の記録を読んで話す)と limit は使わない(この版では動かない)。aiChat は会話だけにし、頼まれたら「記録を AI に読ませて話すのはこの版ではできないため、会話だけの形にしました。」と申告する。\n",
+		schema: func(defs map[string]any) { deleteProps(defs, "AiChat", "inputEntity", "limit") },
+		places: func(root map[string]any) []string {
+			return componentPlaces(root, func(c map[string]any) bool {
+				return isType(c, dsl.CompAiChat) && (c["inputEntity"] != nil || c["limit"] != nil)
+			})
+		},
+		strip: func(root map[string]any) int {
+			return editComponents(root, func(c map[string]any) bool {
+				if !isType(c, dsl.CompAiChat) {
+					return false
+				}
+				a, b := deleteKey(c, "inputEntity"), deleteKey(c, "limit")
+				return a || b
+			})
+		},
+		violation: "aiChat inputEntity is not available in this app build: omit inputEntity and limit (the chat still works without records)",
 	},
 }
 
