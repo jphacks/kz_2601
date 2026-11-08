@@ -178,6 +178,9 @@ type Service struct {
 	Pro paid.ProChecker
 	// ProMode is PRO_GATE_MODE: enforce ("" too) / log / off.
 	ProMode paid.Mode
+	// NoBookLookup: the book lookup is off on appconfig (BOOK_LOOKUP_ENABLED
+	// unset), so the AI does not generate lookupBook (clientRestriction).
+	NoBookLookup bool
 	// TextImage accepts the photo of aiButton inputPhoto on /v1/text
 	// (text_image.go; env AI_TEXT_IMAGE=1). Off = 403.
 	TextImage bool
@@ -185,6 +188,10 @@ type Service struct {
 	// with appId is covered by the creator's Pro (text_payer.go). nil = the
 	// caller's own Pro only.
 	Members AppMembers
+	// CreatorPaid caps the creator-paid /v1/text calls per app and day
+	// (text_payer_scope.go). nil = not counted.
+	CreatorPaid *CreatorPaidCap
+	scopes      scopeCache // compiled published DSL per appId (text_payer_scope.go)
 
 	// Logger gets the ai.generate line per /v1/generate (#322); nil = slog.Default().
 	Logger *slog.Logger
@@ -237,7 +244,7 @@ func (s *Service) GenerateStream(ctx context.Context, req Request, sink Sink) (*
 }
 
 func (s *Service) generateStream(ctx context.Context, req Request, sink Sink, started time.Time, tr *genTrace) (*Result, error) {
-	restrict := NewClientRestriction(req.AllowedComponents, req.DisabledFeatures, req.SupportedFeatures)
+	restrict := s.clientRestriction(req.AllowedComponents, req.DisabledFeatures, req.SupportedFeatures)
 	ctx = withRestriction(ctx, restrict)
 	transcript := strings.TrimSpace(req.Transcript)
 	if transcript == "" {

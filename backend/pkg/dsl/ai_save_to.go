@@ -7,9 +7,11 @@ package dsl
 // At most MaxAIItems records per run (count is capped there).
 
 // AISaveTo names where each list item goes: entity.field (string / text).
+// aiChat uses Fields instead (ai_chat_save_to.go).
 type AISaveTo struct {
-	Entity string `json:"entity"`
-	Field  string `json:"field"`
+	Entity string   `json:"entity"`
+	Field  string   `json:"field,omitempty"`
+	Fields []string `json:"fields,omitempty"` // aiChat only
 }
 
 func checkAISaveTo(where string, c *Component, entities map[string]*Entity, add func(string, ...any)) {
