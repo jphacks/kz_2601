@@ -3,18 +3,25 @@ package dsl
 import (
 	"fmt"
 	"slices"
+	"strings"
 )
 
 // ExprShapeProblems checks an expression without an app around it: op names
-// and arity (Ops), agg names, filter ops, period filters taking null,
-// nextOccurrence's unit and nesting depth. Names of entities / fields /
-// settings are not resolved (there is no app), so it is for snippets such as
-// the examples the AI prompts teach.
+// and arity (Ops), agg names, agg field / by, filter ops, period filters
+// taking null, nextOccurrence's unit and nesting depth. Names of entities /
+// fields / settings and the types they give are not resolved (there is no
+// app), so it is never stricter than Parse and never a substitute for it: it
+// is for snippets such as the examples the AI prompts teach.
 func ExprShapeProblems(e *Expr) []string {
 	var out []string
 	add := func(format string, args ...any) { out = append(out, fmt.Sprintf(format, args...)) }
 	var walk func(where string, e *Expr, depth int)
 	walkFilter := func(where string, f *Filter, depth int) {
+		// Parse rejects these inside agg (component filters only).
+		if strings.HasPrefix(f.Field, RecordMarkPrefix) || f.Field == RecordAuthor || isMeValue(f.Value) || isMyFollowsValue(f.Value) {
+			add(`%s: %q / {"me":true} / {"myFollows":true} work only as a component's filter, not inside agg`, where, f.Field)
+			return
+		}
 		if !slices.Contains(FilterOps, f.Op) {
 			add("%s: filter op %q is not one of %v", where, f.Op, FilterOps)
 		}
@@ -23,9 +30,6 @@ func ExprShapeProblems(e *Expr) []string {
 				add("%s: filter op %s takes value null", where, f.Op)
 			}
 			return
-		}
-		if isMeValue(f.Value) || isMyFollowsValue(f.Value) {
-			return // a component filter's {"me":true} / {"myFollows":true}
 		}
 		ve, err := exprFromValue(f.Value)
 		if err != nil {
@@ -47,11 +51,18 @@ func ExprShapeProblems(e *Expr) []string {
 		}
 		switch e.Kind {
 		case ExprAgg:
-			if !slices.Contains(AggregateFuncs, e.Agg.Agg) {
-				add("%s: agg %q is not one of %v", where, e.Agg.Agg, AggregateFuncs)
+			a := e.Agg
+			if !slices.Contains(AggregateFuncs, a.Agg) {
+				add("%s: agg %q is not one of %v", where, a.Agg, AggregateFuncs)
 			}
-			for i := range e.Agg.Filter {
-				walkFilter(fmt.Sprintf("%s.filter[%d]", where, i), &e.Agg.Filter[i], depth)
+			if a.Agg != "count" && a.Field == "" {
+				add("%s: agg %s needs a field (only count goes without)", where, a.Agg)
+			}
+			if a.By != "" && !IsPickAgg(a.Agg) {
+				add("%s: by is only for agg latest/earliest", where)
+			}
+			for i := range a.Filter {
+				walkFilter(fmt.Sprintf("%s.filter[%d]", where, i), &a.Filter[i], depth)
 			}
 		case ExprOp:
 			spec, ok := Ops[e.Op]
@@ -60,8 +71,8 @@ func ExprShapeProblems(e *Expr) []string {
 				return
 			}
 			n := len(e.Args)
-			if n < spec.minArgs || (spec.maxArgs >= 0 && n > spec.maxArgs) {
-				add("%s: op %s takes %d..%d args (got %d; -1 = any)", where, e.Op, spec.minArgs, spec.maxArgs, n)
+			if msg := spec.arityProblem(e.Op, n); msg != "" {
+				add("%s: %s", where, msg)
 			}
 			if e.Op == "nextOccurrence" && n == 2 && !IsRepeatUnit(e.Args[1]) {
 				add(`%s: nextOccurrence args[1] must be "monthly" or "yearly"`, where)

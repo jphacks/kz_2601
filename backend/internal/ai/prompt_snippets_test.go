@@ -2,11 +2,12 @@ package ai
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
+	"maps"
 	"regexp"
 	"slices"
-	"sort"
 	"strings"
 	"testing"
 
@@ -20,7 +21,7 @@ import (
 // shape the validator rejects. Snippets that are templates rather than JSON
 // (<entityId>, "...", "field"?:) are skipped and counted.
 func TestPromptSnippetsValid(t *testing.T) {
-	prompts := []struct{ name, text string }{
+	base := []struct{ name, text string }{
 		{"systemPrompt", systemPrompt},
 		{"editRules", editRules},
 		{"serverRulesPrompt", serverRulesPrompt},
@@ -28,6 +29,24 @@ func TestPromptSnippetsValid(t *testing.T) {
 		{"chatSystemPrompt", chatSystemPrompt},
 		{"chatEditSystemPrompt", chatEditSystemPrompt},
 		{"chatCreateSystemPrompt", chatCreateSystemPrompt},
+	}
+	prompts := slices.Clone(base)
+	// restrictPrompt swaps lines for older / review builds (settings via
+	// agg latest, Safari instead of webView, ...); those replacements teach
+	// snippets of their own. Already-seen snippets are not counted again.
+	all := slices.Sorted(maps.Keys(knownComponentTypes))
+	noWeb := slices.DeleteFunc(slices.Clone(all), func(s string) bool { return s == "webView" || s == "chatThread" })
+	for _, r := range []struct {
+		name string
+		r    Restriction
+	}{
+		{"oldClient", NewClientRestriction(all, nil, nil)},
+		{"reviewBuild", NewClientRestriction(noWeb, []string{FeatureSharedData, FeatureFieldHealth, FeatureCameraCapture}, nil)},
+	} {
+		ctx := withRestriction(context.Background(), r.r)
+		for _, p := range base {
+			prompts = append(prompts, struct{ name, text string }{r.name + "/" + p.name, restrictPrompt(ctx, p.text)})
+		}
 	}
 	v := newSnippetValidator(t)
 	seen := map[string]bool{}
@@ -240,6 +259,14 @@ func (v *snippetValidator) check(s string) (class string, problems []string, ski
 		raw = areaPlaceholder.ReplaceAll(raw, []byte(`"area":"A1:F1"`))
 		raw = anglePlaceholder.ReplaceAllFunc(raw, func([]byte) []byte { return []byte("x") })
 	}
+	defer func() {
+		switch class {
+		case "", "expression", "values", "set-value", "filter", "app", "op-label", "typed", "unclassified", "invalid-json":
+			// checked whole already (or not at all)
+		default:
+			problems = append(problems, nestedExprProblems(raw)...)
+		}
+	}()
 	var m map[string]json.RawMessage
 	if err := json.Unmarshal(raw, &m); err != nil {
 		if anglePlaceholder.MatchString(s) || elision.MatchString(s) || strings.Contains(s, ":X") || strings.Contains(s, "Expr") || bareProse.MatchString(s) {
@@ -307,6 +334,12 @@ func (v *snippetValidator) check(s string) (class string, problems []string, ski
 	case has("id", "on", "do"):
 		return "server-rule", v.schema("ServerRule", raw), ""
 	case len(m) == 1 && has("op"):
+		// {"op":"add"} names an op in the catalog list: the name must exist.
+		var name string
+		_ = json.Unmarshal(m["op"], &name)
+		if _, ok := dsl.Ops[name]; !ok && !slices.Contains(dsl.FilterOps, name) {
+			return "op-label", []string{fmt.Sprintf("unknown op %q", name)}, ""
+		}
 		return "", nil, "op name label (catalog list)"
 	case has("op", "entity", "field", "equals"):
 		return "server-lookup", v.schema("ServerRule/properties/lookup", raw), ""
@@ -341,17 +374,61 @@ func (v *snippetValidator) check(s string) (class string, problems []string, ski
 		return "table-column", v.schema("TableColumn", raw), ""
 	case allExprs(m):
 		// server rule values map {"<field>": Expr}.
-		for _, r := range m {
-			problems = append(problems, v.expr(r)...)
+		for _, k := range slices.Sorted(maps.Keys(m)) {
+			problems = append(problems, v.expr(m[k])...)
 		}
 		return "values", problems, ""
+	case typ != "":
+		return "typed", []string{fmt.Sprintf("type %q is neither a component nor an action type", typ)}, ""
 	}
-	keys := make([]string, 0, len(m))
-	for k := range m {
-		keys = append(keys, k)
+	// Not skipped: a snippet the classifier does not know would otherwise
+	// never be validated. Teach the classifier or allowlist it.
+	return "unclassified", []string{"no check for keys " + strings.Join(slices.Sorted(maps.Keys(m)), ",")}, ""
+}
+
+// nestedExprProblems shape-checks every expression inside a component,
+// entity, rule, ... (the schema does not know op arity or agg names).
+func nestedExprProblems(raw []byte) []string {
+	var doc any
+	if json.Unmarshal(raw, &doc) != nil {
+		return nil
 	}
-	sort.Strings(keys)
-	return "", nil, "other " + strings.Join(keys, ",")
+	var out []string
+	var walk func(n any, top bool)
+	walk = func(n any, top bool) {
+		switch n := n.(type) {
+		case []any:
+			for _, c := range n {
+				walk(c, false)
+			}
+		case map[string]any:
+			if !top && looksLikeExpr(n) {
+				b, _ := json.Marshal(n)
+				var e dsl.Expr
+				if err := json.Unmarshal(b, &e); err != nil {
+					out = append(out, err.Error())
+				} else {
+					out = append(out, dsl.ExprShapeProblems(&e)...)
+				}
+				return
+			}
+			for _, k := range slices.Sorted(maps.Keys(n)) {
+				walk(n[k], false)
+			}
+		}
+	}
+	walk(doc, true)
+	return out
+}
+
+func looksLikeExpr(m map[string]any) bool {
+	_, op := m["op"]
+	_, args := m["args"]
+	_, agg := m["agg"]
+	_, ent := m["entity"]
+	_, cond := m["if"]
+	_, then := m["then"]
+	return (op && args && len(m) == 2) || (agg && ent) || (cond && then)
 }
 
 // fillSnippet applies the defaults the generation path fills in.
@@ -396,7 +473,20 @@ func allExprs(m map[string]json.RawMessage) bool {
 }
 
 // filterShape checks a filter's op / value through an agg around it.
+// A component's own filter may name $author / $marks.* or take {"me":true}
+// (agg may not), so those parts are swapped for plain ones first.
 func (v *snippetValidator) filterShape(raw []byte) []string {
+	var f map[string]any
+	if json.Unmarshal(raw, &f) != nil {
+		return nil
+	}
+	if s, _ := f["field"].(string); strings.HasPrefix(s, "$") {
+		f["field"] = "x"
+	}
+	if val, ok := f["value"].(map[string]any); ok && (val["me"] != nil || val["myFollows"] != nil) {
+		f["value"] = "x"
+	}
+	raw, _ = json.Marshal(f)
 	var e dsl.Expr
 	if err := json.Unmarshal([]byte(`{"agg":"count","entity":"x","filter":`+string(raw)+`}`), &e); err != nil {
 		return []string{err.Error()}
@@ -451,6 +541,16 @@ func TestSnippetValidatorCatches(t *testing.T) {
 		{`{"op":"<name>","args":[Expr,...]}`, false, true},
 		{`{"agg":"count",...}`, false, true},
 		{`{"op":"add"}`, false, true},
+		// #764 follow-up: these used to be skipped or passed.
+		{`{"op":"subtract"}`, true, false},
+		{`{"type":"navigat","screen":"x"}`, true, false},
+		{`{"type":"stats","label":"x"}`, true, false},
+		{`{"foo":1,"bar":2}`, true, false},
+		{`{"type":"stat","label":"x","value":{"op":"addDays","args":[1]}}`, true, false},
+		{`{"op":"add","path":"/screens/0/components/-","value":{"type":"stat","label":"x","value":{"agg":"total","entity":"e","field":"a"}}}`, true, false},
+		{`{"entity":"e","order":"random","filter":[{"field":"a","op":"eq","value":{"op":"not","args":[]}}]}`, true, false},
+		{`{"type":"stat","label":"x","value":{"agg":"sum","entity":"e"}}`, true, false},
+		{`{"type":"stat","label":"自分","entity":"e","aggregate":"count","filter":{"field":"$author","op":"eq","value":{"me":true}}}`, false, false},
 	} {
 		_, problems, skip := v.check(tc.src)
 		if (skip != "") != tc.skip || (len(problems) > 0) != tc.fail {

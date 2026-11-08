@@ -335,6 +335,21 @@ type opSpec struct {
 	result           exprType // tAny = depends on the args (coalesce)
 }
 
+// arityProblem says why n args do not fit op ("" = they do). Shared by the
+// app checker and ExprShapeProblems so the two cannot drift.
+func (s opSpec) arityProblem(op string, n int) string {
+	switch {
+	case s.maxArgs < 0 && n < s.minArgs:
+		return fmt.Sprintf("op %s needs at least %d args (got %d)", op, s.minArgs, n)
+	case s.maxArgs >= 0 && (n < s.minArgs || n > s.maxArgs):
+		if s.minArgs == s.maxArgs {
+			return fmt.Sprintf("op %s takes exactly %d args (got %d)", op, s.minArgs, n)
+		}
+		return fmt.Sprintf("op %s takes %d-%d args (got %d)", op, s.minArgs, s.maxArgs, n)
+	}
+	return ""
+}
+
 // Ops is the closed operator table (keep in sync with $defs/ExprOp.op enum
 // and docs/dsl/expressions.md). "date" args also accept strings.
 var Ops = map[string]opSpec{
@@ -472,15 +487,8 @@ func (c *exprChecker) check(where string, e *Expr, row *Entity, depth int) exprT
 			c.add("%s: op %s reads the device's check history and is not available in server rules", where, e.Op)
 		}
 		n := len(e.Args)
-		switch {
-		case spec.maxArgs < 0 && n < spec.minArgs:
-			c.add("%s: op %s needs at least %d args (got %d)", where, e.Op, spec.minArgs, n)
-		case spec.maxArgs >= 0 && (n < spec.minArgs || n > spec.maxArgs):
-			if spec.minArgs == spec.maxArgs {
-				c.add("%s: op %s takes exactly %d args (got %d)", where, e.Op, spec.minArgs, n)
-			} else {
-				c.add("%s: op %s takes %d-%d args (got %d)", where, e.Op, spec.minArgs, spec.maxArgs, n)
-			}
+		if msg := spec.arityProblem(e.Op, n); msg != "" {
+			c.add("%s: %s", where, msg)
 		}
 		types := make([]exprType, n)
 		for i := range e.Args {
