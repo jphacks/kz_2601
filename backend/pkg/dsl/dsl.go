@@ -482,6 +482,8 @@ type Component struct {
 	InputPhoto string `json:"inputPhoto,omitempty"`
 	// InputFeeds are ids of feeds on the same screen whose rows go with the call (ai_input_feed.go).
 	InputFeeds []string `json:"inputFeeds,omitempty"`
+	// Outputs maps generate fields item names to form fields they fill (ai_outputs.go).
+	Outputs map[string]string `json:"outputs,omitempty"`
 
 	// healthStat (#167). Label / Target are shared.
 	Metric string `json:"metric,omitempty"` // steps|weight

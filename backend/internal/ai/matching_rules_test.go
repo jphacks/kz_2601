@@ -62,7 +62,7 @@ func TestMatchingRestriction(t *testing.T) {
 	if strings.Contains(string(old.assets().genSch), `"match":`) {
 		t.Fatal("restricted schema still offers match")
 	}
-	if !strings.Contains(string(NewClientRestriction(all, nil, []string{FeatureRecordRetention, FeatureNotificationWhen, FeatureMatching, FeatureSingleEntity, FeatureDataRoles, FeatureAddressed, FeatureNotificationNear}).assets().genSch), `"match":`) &&
+	if !strings.Contains(string(NewClientRestriction(all, nil, currentFeatures).assets().genSch), `"match":`) &&
 		!strings.Contains(string(generationSchema), `"match":`) {
 		t.Fatal("the full schema must offer match")
 	}
@@ -142,7 +142,7 @@ func TestMatchingComponentsInRecipe(t *testing.T) {
 	for k := range knownComponentTypes {
 		all = append(all, k)
 	}
-	current := NewClientRestriction(all, nil, []string{FeatureRecordRetention, FeatureNotificationWhen, FeatureMatching, FeatureSingleEntity, FeatureDataRoles, FeatureAddressed, FeatureNotificationNear})
+	current := NewClientRestriction(all, nil, currentFeatures)
 	if current.Active() {
 		t.Fatalf("a build with every part and matching is unrestricted: %v", current.Disallowed())
 	}

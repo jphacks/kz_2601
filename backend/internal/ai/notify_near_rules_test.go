@@ -42,7 +42,7 @@ func TestPromptTeachesNotifyNear(t *testing.T) {
 // reminders) and jitterMinutes dropped.
 func TestNotifyNearRestriction(t *testing.T) {
 	all := allComponentTypes()
-	old := NewClientRestriction(all, nil, currentFeatures[:len(currentFeatures)-1])
+	old := NewClientRestriction(all, nil, featuresWithout(FeatureNotificationNear))
 	if !old.Active() || !old.NoNear() || old.NoWhen() {
 		t.Fatalf("a build without notification.near: active=%v noNear=%v noWhen=%v", old.Active(), old.NoNear(), old.NoWhen())
 	}

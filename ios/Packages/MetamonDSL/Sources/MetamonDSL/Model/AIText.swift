@@ -65,13 +65,16 @@ public struct AITextRequest: Codable, Equatable, Sendable {
     public var image: AITextImage?
     /// aiChat の会話(task "chat"・古い順・最後は利用者・オンライン AI だけ)。nil = 会話でない
     public var messages: [AITextMessage]?
+    /// fields の項目の書き方(aiButton outputs の数・日付・enum)。書き方の文はサーバー(端末内 AI はこちら)が足す。
+    /// instruction はボタンの指示のまま(作成者が払う呼び出しの照合はそれと比べる)
+    public var formats: [AITextFormat]?
     /// aiChat saveTo の field の形(task "chat" だけ)。付けると返事が記録の案(`AITextResult.suggest`)を返せる
     public var saveTo: AITextSaveTo?
 
     public init(instruction: String, shape: AITextShape, count: Int? = nil, items: [String]? = nil,
                 input: String? = nil, locale: String? = nil, task: String? = nil, options: [String]? = nil,
                 length: String? = nil, appId: String? = nil, image: AITextImage? = nil, messages: [AITextMessage]? = nil,
-                saveTo: AITextSaveTo? = nil) {
+                formats: [AITextFormat]? = nil, saveTo: AITextSaveTo? = nil) {
         self.saveTo = saveTo
         self.instruction = instruction
         self.shape = shape
@@ -85,6 +88,7 @@ public struct AITextRequest: Codable, Equatable, Sendable {
         self.appId = appId
         self.image = image
         self.messages = messages
+        self.formats = formats?.isEmpty == true ? nil : formats
     }
 
     /// 同じ依頼に appId を付ける(空なら付けない)。写真などほかの値はそのまま。
@@ -105,6 +109,20 @@ public struct AITextRequest: Codable, Equatable, Sendable {
 
     /// list の実際の個数(既定 3・1〜10)。
     public var resolvedCount: Int { Swift.min(Swift.max(count ?? AITextLimits.defaultCount, 1), AITextLimits.maxItems) }
+}
+
+/// `POST /v1/text` の `formats` の 1 つ(kind は number | date | datetime | enum)。
+public struct AITextFormat: Codable, Equatable, Sendable {
+    public var item: String
+    public var kind: String
+    /// enum の選択肢(enum 以外は nil・20 個・各 40 字まで)
+    public var options: [String]?
+
+    public init(item: String, kind: String, options: [String]? = nil) {
+        self.item = item
+        self.kind = kind
+        self.options = options
+    }
 }
 
 /// `POST /v1/text` の `messages` の 1 発言(role は user | assistant)。
