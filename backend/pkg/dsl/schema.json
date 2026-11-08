@@ -316,7 +316,7 @@
         },
         "computed": {
           "$ref": "#/$defs/Expr",
-          "description": "Read-only calculated field (never stored, never bound to inputs). Evaluated per record: `ref` reads this record's fields (\"id\" = record id). type must be number|integer|currency|string|boolean|date. Usable in list/table/stat/chart like a stored field."
+          "description": "Read-only calculated field (never stored, never bound to inputs). Evaluated per record: `ref` reads this record's fields (\"id\" = record id). type must be number|integer|currency|string|boolean|date|datetime (addMinutes of a date / datetime needs datetime: string / date would drop the time). Usable in list/table/stat/chart like a stored field."
         },
         "health": {
           "type": "string",
