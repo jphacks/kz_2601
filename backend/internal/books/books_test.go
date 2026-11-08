@@ -334,3 +334,44 @@ func TestProductionClientAndRedirects(t *testing.T) {
 		t.Error("followed a redirect to another host")
 	}
 }
+
+// A caller that disconnects mid-fetch neither fails the waiters nor caches
+// a failure: the fetch finishes and the book is cached for everyone.
+func TestCanceledCallerDoesNotPoisonCache(t *testing.T) {
+	release := make(chan struct{})
+	f := newSource(t, func(w http.ResponseWriter, isbn string) {
+		<-release
+		recorded(t)(w, isbn)
+	})
+	s := newService(f, &clock{t: time.Now()}, Options{})
+	ctx, cancel := context.WithCancel(context.Background())
+	first := make(chan error, 1)
+	go func() {
+		_, err := s.Lookup(ctx, "9784780802047")
+		first <- err
+	}()
+	for f.hits.Load() == 0 {
+		time.Sleep(time.Millisecond)
+	}
+	waiter := make(chan error, 1)
+	go func() {
+		_, err := s.Lookup(context.Background(), "9784780802047")
+		waiter <- err
+	}()
+	time.Sleep(20 * time.Millisecond)
+	cancel()
+	time.Sleep(20 * time.Millisecond)
+	close(release)
+	if err := <-first; err != nil {
+		t.Fatalf("first caller: %v", err)
+	}
+	if err := <-waiter; err != nil {
+		t.Fatalf("waiter: %v", err)
+	}
+	if b, err := s.Lookup(context.Background(), "9784780802047"); err != nil || b == nil {
+		t.Fatalf("after: %v %v", b, err)
+	}
+	if f.hits.Load() != 1 {
+		t.Errorf("source hit %d times, want 1", f.hits.Load())
+	}
+}

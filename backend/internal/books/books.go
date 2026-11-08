@@ -206,12 +206,20 @@ func (s *Service) Lookup(ctx context.Context, rawISBN string) (*Book, error) {
 		s.inflight[isbn] = ch
 		s.mu.Unlock()
 
-		book, err := s.fetch(ctx, isbn)
+		// The fetch outlives the caller (requestTimeout bounds it): a client
+		// that disconnects must not fail the waiters nor cache a failure.
+		book, err := s.fetch(context.WithoutCancel(ctx), isbn)
 
 		s.mu.Lock()
 		now = s.now()
 		e := &entry{book: book}
 		switch {
+		case errors.Is(err, context.Canceled):
+			// not the source's answer: nothing is cached, the waiters retry
+			delete(s.inflight, isbn)
+			close(ch)
+			s.mu.Unlock()
+			return nil, ErrUpstream
 		case err == nil:
 			e.expires = now.Add(foundTTL)
 		case errors.Is(err, ErrNotFound):

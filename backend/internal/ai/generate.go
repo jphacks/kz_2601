@@ -237,7 +237,7 @@ func (s *Service) GenerateStream(ctx context.Context, req Request, sink Sink) (*
 }
 
 func (s *Service) generateStream(ctx context.Context, req Request, sink Sink, started time.Time, tr *genTrace) (*Result, error) {
-	restrict := NewClientRestriction(req.AllowedComponents, req.DisabledFeatures, req.SupportedFeatures)
+	restrict := s.clientRestriction(req.AllowedComponents, req.DisabledFeatures, req.SupportedFeatures)
 	ctx = withRestriction(ctx, restrict)
 	transcript := strings.TrimSpace(req.Transcript)
 	if transcript == "" {

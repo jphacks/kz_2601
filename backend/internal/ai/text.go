@@ -343,8 +343,9 @@ func parseTextOutput(raw string, req TextRequest) (*TextResult, error) {
 // textHandler serves POST /v1/text. A verified caller is required (the rate
 // limiter verifies first in production; auth.Optional covers a bare run).
 // Order: photo checks (403 switch off / 400 / 413) → text checks → Pro gate
-// (402) → Claude. Only the 402 gives the rate limit units back
-// (ratelimit.Waive); 400 / 403 / 413 keep the charge like /v1/generate.
+// (402) → Claude. The 402 and the 403 of the photo switch (off on the
+// server, nothing the user can fix) give the rate limit units back
+// (ratelimit.Waive); 400 / 413 keep the charge like /v1/generate.
 func textHandler(svc *Service) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if auth.UID(r.Context()) == "" {
@@ -366,6 +367,9 @@ func textHandler(svc *Service) http.Handler {
 			return
 		}
 		if err := svc.checkTextImageRequest(req); err != nil {
+			if req.Image != nil && !svc.TextImage {
+				ratelimit.Waive(r.Context()) // the switch is off: not the caller's error
+			}
 			svc.writeErr(w, r, err)
 			return
 		}

@@ -67,7 +67,9 @@ type Restriction struct {
 	noAddressed bool
 	// noNear: the client has no Notification.near / jitterMinutes (notify_near_rules.go)
 	noNear bool
-	key         string // "" = no restriction; memo key otherwise
+	// off: the clientFeatures (client_features.go) that are not available
+	off map[string]bool
+	key string // "" = no restriction; memo key otherwise
 }
 
 // knownComponentTypes are the container and leaf types of the canonical schema.
@@ -157,6 +159,7 @@ func NewClientRestriction(allowed, disabled, supported []string) Restriction {
 	if len(allowed) > 0 && !slices.Contains(supported, FeatureNotificationNear) {
 		r.noNear = true
 	}
+	r.off = clientFeaturesOff(allowed, supported)
 	r.withholdMatchingUI()
 	r.setKey()
 	return r
@@ -176,9 +179,9 @@ func (r *Restriction) withholdMatchingUI() {
 
 func (r *Restriction) setKey() {
 	r.key = ""
-	if len(r.disallowed) > 0 || r.noHealth || r.noCamera || r.noShared || r.noRetention || r.noWhen || r.noMatching || r.noSingle || r.noRoles || r.noAddressed || r.noNear {
+	if len(r.disallowed) > 0 || r.noHealth || r.noCamera || r.noShared || r.noRetention || r.noWhen || r.noMatching || r.noSingle || r.noRoles || r.noAddressed || r.noNear || len(r.off) > 0 {
 		r.key = strings.Join(r.Disallowed(), ",") + fmt.Sprintf("|h=%t|c=%t|s=%t|r=%t|w=%t", r.noHealth, r.noCamera, r.noShared, r.noRetention, r.noWhen) +
-			fmt.Sprintf("|m=%t|1=%t|a=%t|to=%t|n=%t", r.noMatching, r.noSingle, r.noRoles, r.noAddressed, r.noNear)
+			fmt.Sprintf("|m=%t|1=%t|a=%t|to=%t|n=%t|f=%s", r.noMatching, r.noSingle, r.noRoles, r.noAddressed, r.noNear, r.offKey())
 	}
 }
 
@@ -338,6 +341,9 @@ func restrictSchemaJSON(raw []byte, r Restriction) []byte {
 	}
 	if r.noNear {
 		restrictNearSchema(defs)
+	}
+	for _, f := range r.offFeatures() {
+		f.schema(defs)
 	}
 	if r.noMatching {
 		if entity, _ := defs["Entity"].(map[string]any); entity != nil {
@@ -510,6 +516,9 @@ func buildRestrictedPrompt(system string, r Restriction) string {
 	if r.noNear {
 		s = dropNearRules(s)
 	}
+	for _, f := range r.offFeatures() {
+		s = dropFeatureRules(s, f)
+	}
 	if r.noMatching {
 		s = strings.Replace(s, "\n\n"+matchingRules, "", 1)
 		s = strings.Replace(s, matchingChatRule, noMatchingChatRule, 1)
@@ -583,6 +592,9 @@ func restrictionNote(r Restriction) string {
 	}
 	if r.noNear {
 		b.WriteString(noNearNote)
+	}
+	for _, f := range r.offFeatures() {
+		b.WriteString(f.note)
 	}
 	if r.noMatching && !r.noShared {
 		b.WriteString("- entity の match は使わない(この版ではお互いに承認してつながる仕組みが無い)。仲間探しを頼まれたら「この版ではお互いに承認してつながる仕組みは使えません。最新版に更新すると使えます」と伝え、みんなで見るプロフィールの一覧(連絡先・写真・位置は載せない)で近い形を作る。\n")
@@ -677,6 +689,7 @@ func restrictionViolations(raw, base []byte, r Restriction) []string {
 	if r.noNear {
 		out = append(out, nearViolations(raw, base)...)
 	}
+	out = append(out, featureViolations(raw, base, r)...)
 	if r.noSingle {
 		prev := map[string]bool{}
 		for _, id := range singleEntities(base) {
@@ -927,7 +940,13 @@ func enforceRestriction(raw []byte, r Restriction) (out []byte, notes []string, 
 	if r.noNear {
 		near = unnear(root)
 	}
-	if len(removed) == 0 && health == 0 && camera == 0 && private == 0 && retention == 0 && when == 0 && matching == 0 && single == 0 && roles == 0 && addressed == 0 && near == 0 {
+	var featureNotes []string
+	for _, f := range r.offFeatures() {
+		if n := f.strip(root); n > 0 {
+			featureNotes = append(featureNotes, fmt.Sprintf("dropped %s on %d place(s)", f.key, n))
+		}
+	}
+	if len(removed) == 0 && health == 0 && camera == 0 && private == 0 && retention == 0 && when == 0 && matching == 0 && single == 0 && roles == 0 && addressed == 0 && near == 0 && len(featureNotes) == 0 {
 		return raw, nil, false
 	}
 	for _, t := range sortedIntKeys(removed) {
@@ -963,6 +982,7 @@ func enforceRestriction(raw []byte, r Restriction) (out []byte, notes []string, 
 	if near > 0 {
 		notes = append(notes, fmt.Sprintf("dropped near notification / jitterMinutes on %d place(s)", near))
 	}
+	notes = append(notes, featureNotes...)
 	b, err := json.Marshal(root)
 	if err != nil {
 		return raw, nil, false

@@ -2,6 +2,7 @@ package ai
 
 import (
 	"context"
+	"slices"
 	"strings"
 	"testing"
 
@@ -40,7 +41,19 @@ const dmDoc = `{"schemaVersion":1,"app":{"name":"連絡","voiceEntry":"none"},"i
  {"id":"note","title":"ひとこと","entity":"notes","toolbar":[{"label":"送信","action":{"type":"saveRecord","entity":"notes"}}],"components":[
  {"type":"picker","field":"to","label":"宛先"},{"type":"textField","field":"body","label":"本文"}]}]}`
 
-var currentFeatures = []string{FeatureRecordRetention, FeatureNotificationWhen, FeatureMatching, FeatureSingleEntity, FeatureDataRoles, FeatureAddressed, FeatureNotificationNear}
+var currentFeatures = []string{FeatureRecordRetention, FeatureNotificationWhen, FeatureMatching, FeatureSingleEntity, FeatureDataRoles, FeatureAddressed, FeatureNotificationNear,
+	FeatureAILong, FeatureAIInputPhoto, FeatureAISaveTo, FeatureLookupBook, FeatureTextHighlight, FeatureFeedV2}
+
+// featuresWithout is currentFeatures minus some.
+func featuresWithout(drop ...string) []string {
+	var out []string
+	for _, f := range currentFeatures {
+		if !slices.Contains(drop, f) {
+			out = append(out, f)
+		}
+	}
+	return out
+}
 
 // Builds without addressedMessages: no addressedTo / members in the schema,
 // prompt or output, and the output stays valid.
@@ -53,7 +66,7 @@ func TestAddressedRestriction(t *testing.T) {
 		t.Fatal("a current build must stay unrestricted")
 	}
 	for name, r := range map[string]Restriction{
-		"no addressed": NewClientRestriction(all, nil, currentFeatures[:5]),
+		"no addressed": NewClientRestriction(all, nil, featuresWithout(FeatureAddressed)),
 		"no roles":     NewClientRestriction(all, nil, []string{FeatureRecordRetention, FeatureNotificationWhen, FeatureMatching, FeatureSingleEntity}),
 	} {
 		t.Run(name, func(t *testing.T) {
