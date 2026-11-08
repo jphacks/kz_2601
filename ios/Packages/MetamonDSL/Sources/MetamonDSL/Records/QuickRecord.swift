@@ -4,6 +4,7 @@ import Foundation
 /// DSL を変えずに、どの生成アプリでも動くよう Field の型だけで当てはめる:
 /// - タイトル系(titleField → 最初の string/text): 数値を除いた文言。enum ならオプションに一致する値
 /// - 数値 1 つ(最初の required な数値 → 最初の数値): 文中の数値(またはパラメータ)
+/// - ref: 参照先レコードの見出し(`refChoices`)に一致すればその id。一致しなければ既定値
 /// - それ以外: フォームと同じ既定値(`FieldCoding.defaultValue`。date の now・enum の先頭など)
 public enum QuickRecord {
     public struct Parsed: Equatable, Sendable {
@@ -20,6 +21,16 @@ public enum QuickRecord {
         public var missing: [String]
         /// 応答用の短い要約(例: 「ランチ ¥800」)
         public var summary: String
+    }
+
+    /// ref の候補 1 件(参照先レコードの id と見出し)。
+    public struct RefChoice: Equatable, Sendable {
+        public var id: String
+        public var title: String
+        public init(id: String, title: String) {
+            self.id = id
+            self.title = title
+        }
     }
 
     // MARK: - Parse
@@ -98,10 +109,26 @@ public enum QuickRecord {
         return usable.filter { withForm.contains($0.id) } + usable.filter { !withForm.contains($0.id) }
     }
 
+    /// entity の ref 項目ごとの候補(field id → 参照先レコードの見出し)。見出しは画面と同じ `displayTitleField`。
+    /// `records` は参照先 entity id → そのレコード(呼び出し側がローカル DB から読む)。
+    public static func refChoices(for entity: Entity, in dsl: AppDSL, records: [String: [Record]]) -> [String: [RefChoice]] {
+        var out: [String: [RefChoice]] = [:]
+        for f in entity.fields where f.type == .ref {
+            guard let target = f.refEntity.flatMap(dsl.entity), let tf = target.displayTitleField else { continue }
+            out[f.id] = (records[target.id] ?? []).compactMap { r in
+                let title = FieldCoding.display(r[tf], field: target.field(tf))
+                return title.isEmpty ? nil : RefChoice(id: r.id, title: title)
+            }
+        }
+        return out
+    }
+
     // MARK: - Build
 
     /// `text`(一言)と `number`(明示パラメータ。nil なら文中の数値)から 1 レコード分の `data` を作る。
-    public static func build(entity: Entity, text: String?, number explicit: Double? = nil) -> Draft {
+    /// `refChoices` は ref 項目の候補(`refChoices(for:in:records:)`)。無い ref は既定値のまま。
+    public static func build(entity: Entity, text: String?, number explicit: Double? = nil,
+                             refChoices: [String: [RefChoice]] = [:]) -> Draft {
         let parsed = parse(text ?? "")
         let number = explicit ?? parsed.number
         var values: [String: JSONValue] = [:]
@@ -113,6 +140,12 @@ public enum QuickRecord {
         // 文中にオプション名がある enum は全部それに合わせる(「交通費 300円」→ category=交通費)
         for f in entity.fields where f.type == .enum {
             if let hit = matchOption(in: rawText, options: f.options ?? []) { values[f.id] = .string(hit) }
+        }
+        // ref も同じ最長一致で参照先の見出しに合わせ、id を入れる(「食費 コンビニ」→ category=食費レコードの id)
+        for f in entity.fields where f.type == .ref {
+            let choices = refChoices[f.id] ?? []
+            if let hit = matchOption(in: rawText, options: choices.map(\.title)),
+               let choice = choices.first(where: { $0.title == hit }) { values[f.id] = .string(choice.id) }
         }
         if let titleF, let title = parsed.title {
             if titleF.type == .enum {

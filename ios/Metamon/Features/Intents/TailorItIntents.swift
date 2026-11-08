@@ -69,12 +69,19 @@ struct AddRecordIntent: AppIntent {
         guard let doc = await IntentHost.shared.document(appId: target.appId),
               let entity = doc.dsl.entity(target.entityId) else { throw TailorIntentError.targetNotFound(target.title) }
 
+        // ref 項目(カテゴリ台帳など)は参照先のレコードをローカル DB から読み、見出しで当てる
+        var refRecords: [String: [Record]] = [:]
+        for refEntity in Set(entity.fields.filter { $0.type == .ref }.compactMap(\.refEntity)) {
+            refRecords[refEntity] = await runtime.recordSync.cached(appId: target.appId, entity: refEntity)
+        }
+        let refChoices = QuickRecord.refChoices(for: entity, in: doc.dsl, records: refRecords)
+
         var number = amount
-        var draft = QuickRecord.build(entity: entity, text: content, number: number)
+        var draft = QuickRecord.build(entity: entity, text: content, number: number, refChoices: refChoices)
         // 数値項目(金額など)だけが足りなければ Siri で聞き返す
         if let numberField = QuickRecord.numberField(of: entity), draft.missing.contains(numberField.name) {
             number = try await $amount.requestValue(IntentDialog("\(numberField.name)はいくつですか?"))
-            draft = QuickRecord.build(entity: entity, text: content, number: number)
+            draft = QuickRecord.build(entity: entity, text: content, number: number, refChoices: refChoices)
         }
         guard draft.missing.isEmpty else { throw TailorIntentError.missingFields(draft.missing) }
 
