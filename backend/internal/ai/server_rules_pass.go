@@ -34,6 +34,7 @@ type ServerRulesMeta struct {
 	Usage    Usage    `json:"usage"`              // tokens of this pass
 	Declined string   `json:"declined,omitempty"` // the model's refusal sentence (out-of-vocabulary request)
 	Problems []string `json:"problems,omitempty"` // last validation problems when not applied
+	Dropped  []string `json:"dropped,omitempty"`  // rule ids removed as repeats of a local notification
 }
 
 // serverRulesAskRe: the request mentions an automatic action. A false
@@ -280,6 +281,7 @@ func (s *Service) runServerRulesPass(ctx context.Context, transcript string, cur
 			continue
 		}
 		sm.Problems = nil
+		next, app, sm.Dropped = withoutOnDeviceDuplicates(current, next, app, rules)
 		sm.Rules = len(app.ServerRules)
 		if sameServerRules(current, app) {
 			return current, sm
