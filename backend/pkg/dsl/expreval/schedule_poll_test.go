@@ -8,6 +8,40 @@ import (
 	"github.com/jphacks/kz_2601/backend/pkg/dsl"
 )
 
+// The answer button (prefillRef) on a day's form needs a saved day: iOS
+// refuses it on a new form. So some list must open that form by item tap
+// (edit mode); a table rows can't be tapped and the toolbar opens it new.
+func TestSchedulePollAnswerButtonOnSavedDay(t *testing.T) {
+	raw, err := os.ReadFile(filepath.Join("..", "..", "..", "..", "docs", "dsl", "examples", "schedule_poll.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	app, err := dsl.Parse(raw)
+	if err != nil {
+		t.Fatalf("Parse: %v", err)
+	}
+	hosts := map[string]bool{}  // form screens holding a prefillRef button
+	tapped := map[string]bool{} // screens opened by an item tap
+	for _, s := range app.Screens {
+		for _, c := range s.Components {
+			if c.Action != nil && c.Action.PrefillRef != "" {
+				hosts[s.ID] = true
+			}
+			if (c.Type == dsl.CompList || c.Type == dsl.CompMapView) && c.OnItemTap != nil && c.OnItemTap.Type == dsl.ActionNavigate {
+				tapped[c.OnItemTap.Screen] = true
+			}
+		}
+	}
+	if len(hosts) == 0 {
+		t.Fatal("no prefillRef button")
+	}
+	for id := range hosts {
+		if !tapped[id] {
+			t.Errorf("screen %q holds a prefillRef button but no list onItemTap opens it, so it only ever has a new (unsaved) record", id)
+		}
+	}
+}
+
 // D_2210: each candidate day counts the answers that point at it with a
 // given status, using the existing computed agg (row ref + literal filter).
 func TestSchedulePollCountsPerDay(t *testing.T) {

@@ -9,14 +9,23 @@ import MetamonServices
 final class RecordDeleteUndoFlowTests: XCTestCase {
     private let appId = "test-undo-\(UUID().uuidString.lowercased())"
 
-    private func runtime() throws -> AppRuntime {
+    private func runtime(online: Bool = true) throws -> AppRuntime {
         let json = """
         {"schemaVersion":1,"app":{"name":"メモ","voiceEntry":"floating"},"initialScreen":"home",
          "entities":[{"id":"memo","name":"メモ","fields":[{"id":"title","name":"題","type":"string"}]}],
          "screens":[{"id":"home","title":"メモ","components":[{"type":"list","entity":"memo","swipeToDelete":true}]}]}
         """
         let dsl = try JSONDecoder().decode(AppDSL.self, from: Data(json.utf8))
-        return AppRuntime(document: AppDocument(appId: appId, version: 1, dsl: dsl), services: BuildConfig.make(environment: .mock))
+        let services = BuildConfig.make(environment: .mock)
+        // 圏外: 積んだ削除をその場で送らない(`stop()` は購読を止めるだけで、オンラインなら書き込みのたびに列を流す)。
+        // 送らない列は端末に残るので、前の試行の分を数えないよう試行ごとの置き場にする
+        var sync: RecordSyncEngine?
+        if !online {
+            let dir = FileManager.default.temporaryDirectory.appendingPathComponent(appId, isDirectory: true)
+            addTeardownBlock { try? FileManager.default.removeItem(at: dir) }
+            sync = RecordSyncEngine(client: services.appConfig, connectivity: ManualConnectivity(online: false), directory: dir)
+        }
+        return AppRuntime(document: AppDocument(appId: appId, version: 1, dsl: dsl), services: services, recordSync: sync)
     }
 
     func testDeleteFromListThenUndoRestoresWithoutSending() async throws {
@@ -59,21 +68,19 @@ final class RecordDeleteUndoFlowTests: XCTestCase {
     }
 
     func testSettleBeforeSignOutDismissesUndoAndCountsDeleteAsUnsent() async throws {
-        let rt = try runtime()
-        rt.recordSync.stop() // 送らずに列の件数を見る
+        let rt = try runtime(online: false) // 送らずに列の件数を見る
         await deletePending(rt, "s1")
         await rt.settlePendingRecordDeletes()
         XCTAssertNil(rt.recordUndo, "「元に戻す」を閉じる")
         XCTAssertTrue(rt.recordSync.pendingDeletions.isEmpty, "待ちを残さない")
         let queued = await rt.recordSync.queue.count
-        XCTAssertEqual(queued, 1, "列に積む(オンラインならいまのアカウントで送る)")
+        XCTAssertEqual(queued, 1, "列に積む(オンラインならいまのアカウントで送る。圏外なので残る)")
         XCTAssertEqual(SignOutFlow.prompt(pending: rt.recordSync.pendingCount, isOnline: false), .unsent(count: 1, canSend: false),
                        "ログアウトの確認に未送信として出る(黙って捨てない)")
     }
 
     func testDiscardSignOutWithPendingDeleteLeavesNothingForNextAccount() async throws {
-        let rt = try runtime()
-        rt.recordSync.stop()
+        let rt = try runtime(online: false)
         await deletePending(rt, "s2")
         let session = AuthSession(service: rt.services.auth)
         let outcome = try await session.signOutAndWipe(runtime: rt, choice: .discardAndWipe)
@@ -87,8 +94,7 @@ final class RecordDeleteUndoFlowTests: XCTestCase {
     }
 
     func testAccountDeletionWithPendingDeleteLeavesNothingForNextAccount() async throws {
-        let rt = try runtime()
-        rt.recordSync.stop()
+        let rt = try runtime(online: false)
         await deletePending(rt, "s3")
         let session = AuthSession(service: rt.services.auth)
         let deleted = try await session.deleteAccount(account: NoopAccount(), runtime: rt)

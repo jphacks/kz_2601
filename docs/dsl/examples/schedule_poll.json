@@ -55,13 +55,17 @@
         { "label": "候補日を足す", "icon": "plus", "action": { "type": "navigate", "screen": "day_form", "presentation": "sheet" } }
       ],
       "components": [
-        { "type": "table", "id": "days", "area": "A1:F12", "entity": "days",
+        { "type": "table", "id": "days", "area": "A1:F5", "entity": "days",
           "columns": [
             { "field": "date", "title": "日付" },
             { "field": "ok_count", "title": "参加できる" },
             { "field": "maybe_count", "title": "未定" }
           ],
-          "sort": { "field": "date", "direction": "asc" } }
+          "sort": { "field": "date", "direction": "asc" } },
+        { "type": "list", "id": "day_list", "area": "A6:F12", "entity": "days",
+          "item": { "title": "date", "subtitle": "note", "trailing": "ok_count" },
+          "sort": { "field": "date", "direction": "asc" }, "emptyText": "まだ候補日がありません",
+          "onItemTap": { "type": "navigate", "screen": "day_form", "presentation": "push" } }
       ]
     },
     {
