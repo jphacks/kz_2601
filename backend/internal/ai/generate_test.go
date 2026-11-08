@@ -145,7 +145,7 @@ func TestEdit_PatchAppliedAndSummaryFromModel(t *testing.T) {
 	if !strings.Contains(string(res.DSL), "カフェ") || res.Summary != "カテゴリにカフェを追加し、合計を大きくしました" {
 		t.Fatalf("dsl/summary: %s", res.Summary)
 	}
-	if !strings.Contains(f.calls[0].System, "JSON Patch") || !strings.Contains(f.calls[0].Messages[0].Content, "version 2") {
+	if !strings.Contains(f.calls[0].SystemSuffix, "JSON Patch") || f.calls[0].System != systemPrompt || !strings.Contains(f.calls[0].Messages[0].Content, "version 2") {
 		t.Fatal("edit prompt should include patch rules and current version")
 	}
 }

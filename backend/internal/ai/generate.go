@@ -522,7 +522,7 @@ func (s *Service) generateEdit(ctx context.Context, transcript string, env *appc
 	var linted *attemptResult
 	baseLint := lintOf(env.DSL)
 	for i := 0; i <= s.maxRegen(); i++ {
-		resp, err := s.call(WithOperation(ctx, OpPatch), systemPrompt+"\n"+editRules,
+		resp, err := s.callWith(WithOperation(ctx, OpPatch), systemPrompt, editSystemSuffix(),
 			editUserMessage(transcript, env.Version, string(env.DSL), problems, loc), PatchGenerationSchema(), ar,
 			summaryEventWatcher(sink, loc, ar.meta.Attempts+1))
 		if err != nil {
@@ -647,6 +647,11 @@ func applyRestriction(ar *attemptResult, r Restriction, create bool, loc Locale)
 // call performs one Claude request and folds usage/attempts/latency into ar.
 // onText (nil = non-streaming) receives the text deltas.
 func (s *Service) call(ctx context.Context, system, user string, schema json.RawMessage, ar *attemptResult, onText func(string)) (*Response, error) {
+	return s.callWith(ctx, system, "", user, schema, ar, onText)
+}
+
+// callWith is call with a second cached system block (Completion.SystemSuffix).
+func (s *Service) callWith(ctx context.Context, system, suffix, user string, schema json.RawMessage, ar *attemptResult, onText func(string)) (*Response, error) {
 	timeout := s.CallTimeout
 	if timeout == 0 {
 		timeout = 40 * time.Second
@@ -655,7 +660,7 @@ func (s *Service) call(ctx context.Context, system, user string, schema json.Raw
 	defer cancel()
 	t := time.Now()
 	system, schema = restrictPrompt(ctx, system), restrictSchema(ctx, schema)
-	resp, err := s.Claude.Complete(cctx, Completion{System: system, Messages: []Message{{Role: "user", Content: user}}, Schema: schema, OnText: onText})
+	resp, err := s.Claude.Complete(cctx, Completion{System: system, SystemSuffix: restrictPromptSuffix(ctx, suffix), Messages: []Message{{Role: "user", Content: user}}, Schema: schema, OnText: onText})
 	ar.latency += time.Since(t)
 	ar.meta.Attempts++
 	ar.meta.Regenerations = ar.meta.Attempts - 1

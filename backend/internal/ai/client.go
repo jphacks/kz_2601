@@ -35,7 +35,7 @@ type Message struct {
 
 // Completion is one structured-output request to Claude.
 type Completion struct {
-	System    string          // cached as a single text block
+	System    string          // first cached system block
 	Messages  []Message       // user/assistant turns
 	Schema    json.RawMessage // output_config.format json_schema
 	MaxTokens int
@@ -53,6 +53,10 @@ type Completion struct {
 	// Thinking, when set, is sent as thinking.type (adaptive|disabled|
 	// between_tools). Empty = omitted (the model default, adaptive).
 	Thinking string
+	// SystemSuffix, when set, is a second cached block after System (edit
+	// rules): the model reads System+SystemSuffix, and a request whose System
+	// equals another's (create) reuses that cached prefix.
+	SystemSuffix string
 }
 
 // Usage is the token accounting of one call.
@@ -228,8 +232,10 @@ func (c *Client) Complete(ctx context.Context, req Completion) (*Response, error
 	if req.Thinking != "" {
 		wr.Thinking = map[string]any{"type": req.Thinking}
 	}
-	if req.System != "" {
-		wr.System = []wireBlock{{Type: "text", Text: req.System, CacheControl: map[string]any{"type": "ephemeral"}}}
+	for _, t := range []string{req.System, req.SystemSuffix} {
+		if t != "" {
+			wr.System = append(wr.System, wireBlock{Type: "text", Text: t, CacheControl: map[string]any{"type": "ephemeral"}})
+		}
 	}
 	oc := map[string]any{}
 	if effort != "" {
