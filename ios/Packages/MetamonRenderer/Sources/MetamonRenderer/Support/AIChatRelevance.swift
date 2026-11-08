@@ -9,34 +9,40 @@ enum AIChatRelevance {
     /// 発言・記録の語。
     static func tokens(_ s: String) -> Set<String> {
         var out = Set<String>()
+        scan(s, pair: { a, b in
+            var v = String.UnicodeScalarView()
+            v.append(a); v.append(b)
+            out.insert(String(v))
+        }, single: { out.insert(String(Character($0))) }, word: { out.insert(String($0)) })
+        return out
+    }
+
+    /// 語を順に渡す(`tokens` と `Matcher` の共通部分)。かな漢字の 2 文字は String を作らずに渡す。
+    private static func scan(_ s: String, pair: (Unicode.Scalar, Unicode.Scalar) -> Void, single: (Unicode.Scalar) -> Void,
+                             word emit: (String.UnicodeScalarView) -> Void) {
         var word = String.UnicodeScalarView()
-        var cjk: [Unicode.Scalar] = []
+        var prev: Unicode.Scalar?, run = 0
         func flush() {
-            if word.count >= 2 { out.insert(String(word)) }
-            word.removeAll()
-            if cjk.count == 1 { out.insert(String(Character(cjk[0]))) }
-            if cjk.count >= 2 {
-                for i in 0..<(cjk.count - 1) {
-                    var v = String.UnicodeScalarView()
-                    v.append(cjk[i]); v.append(cjk[i + 1])
-                    out.insert(String(v))
-                }
-            }
-            cjk.removeAll()
+            if word.count >= 2 { emit(word) }
+            word.removeAll(keepingCapacity: true)
+            if run == 1, let p = prev { single(p) }
+            prev = nil
+            run = 0
         }
         for u in s.precomposedStringWithCompatibilityMapping.lowercased().unicodeScalars {
             if isCJK(u) {
                 if !word.isEmpty { flush() }
-                cjk.append(u)
+                if let p = prev { pair(p, u) }
+                prev = u
+                run += 1
             } else if u.properties.isAlphabetic || u.properties.numericType != nil {
-                if !cjk.isEmpty { flush() }
+                if run > 0 { flush() }
                 word.append(u)
             } else {
                 flush()
             }
         }
         flush()
-        return out
     }
 
     static func isCJK(_ u: Unicode.Scalar) -> Bool {
@@ -44,6 +50,7 @@ enum AIChatRelevance {
         case 0x3005, 0x3007, // 々 〇
              0x3040...0x30FF, // ひらがな・カタカナ(ー を含む)
              0x3400...0x4DBF, 0x4E00...0x9FFF, 0xF900...0xFAFF, // 漢字
+             0x20000...0x323AF, 0x2F800...0x2FA1F, // 拡張の漢字(𠮷 など)
              0xAC00...0xD7AF: // ハングル
             true
         default:
@@ -51,10 +58,44 @@ enum AIChatRelevance {
         }
     }
 
+    /// 発言の語のうち、文書に含まれるもの(= `tokens(doc).intersection(query)`)。
+    /// 記録の全部の語の String を作らない(1000 件 × 8 KB でも軽く)。
+    struct Matcher {
+        private var pairs: [UInt64: String] = [:], singles: [UInt32: String] = [:], words: Set<String> = []
+        private var maxWord = 0
+
+        init(_ query: Set<String>) {
+            for t in query {
+                let us = Array(t.unicodeScalars)
+                if us.count == 2, isCJK(us[0]), isCJK(us[1]) {
+                    pairs[UInt64(us[0].value) << 32 | UInt64(us[1].value)] = t
+                } else if us.count == 1, isCJK(us[0]) {
+                    singles[us[0].value] = t
+                } else {
+                    words.insert(t)
+                    maxWord = max(maxWord, us.count)
+                }
+            }
+        }
+
+        func matches(_ doc: String) -> Set<String> {
+            var out = Set<String>()
+            AIChatRelevance.scan(doc, pair: { a, b in
+                if let t = pairs[UInt64(a.value) << 32 | UInt64(b.value)] { out.insert(t) }
+            }, single: { if let t = singles[$0.value] { out.insert(t) } }, word: { w in
+                guard w.count <= maxWord else { return }
+                let t = String(w)
+                if words.contains(t) { out.insert(t) }
+            })
+            return out
+        }
+    }
+
     /// 各文書の点(`documents` と同じ順)。0 = 発言の語を 1 つも含まない。
     static func scores(query: Set<String>, documents: [String]) -> [Double] {
         let terms = query.sorted()
-        let sets = documents.map { tokens($0).intersection(query) }
+        let matcher = Matcher(query)
+        let sets = documents.map { matcher.matches($0) }
         var df: [String: Int] = [:]
         for s in sets { for t in s { df[t, default: 0] += 1 } }
         let n = Double(documents.count)
@@ -81,7 +122,8 @@ enum AIChatRelevance {
             used += n
         }
         chunks.append(line[start...])
-        let hits = chunks.map { tokens(String($0)).intersection(query).count }
+        let matcher = Matcher(query)
+        let hits = chunks.map { matcher.matches(String($0)).count }
         let marker = "- …"
         let budget = maxBytes - marker.utf8.count
         var best = 0, bestScore = -1

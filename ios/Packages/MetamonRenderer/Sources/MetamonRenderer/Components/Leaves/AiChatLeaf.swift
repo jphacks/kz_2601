@@ -317,8 +317,11 @@ struct AiChatLeaf: View {
                 var material: AITextMaterial?
                 if let input {
                     await rt.load(entities: [input.id])
-                    material = AIChatMaterial.request(entity: input, records: rt.records(for: input.id),
-                                                      uid: rt.currentUserId, limit: limit, query: text)
+                    let records = rt.records(for: input.id), uid = rt.currentUserId
+                    // 記録が多い・大きい(取り込んだ PDF)と選びに時間がかかるのでメインの外で
+                    material = await Task.detached(priority: .userInitiated) {
+                        AIChatMaterial.request(entity: input, records: records, uid: uid, limit: limit, query: text)
+                    }.value
                 }
                 let request = AIChat.request(persona: persona, history: history, next: text, long: long, locale: locale,
                                              saveTo: saveRequest, material: material)
