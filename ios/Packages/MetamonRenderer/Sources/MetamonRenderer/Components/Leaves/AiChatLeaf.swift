@@ -8,6 +8,8 @@ import MetamonDSL
 /// 自分の発言を先に保存する(返事に失敗しても残る)。roleField の無い古い DSL(stg)は役を交互の並びで読むので、
 /// 返事が来てから 2 件を対で保存する(片方が保存できない・断られたらもう片方も消す = `AIChatPairSaving`)。
 /// 読み上げ: AI の吹き出しごとに小さなスピーカー(`speakButton` と同じ `LeafSpeech`・端末の声)。`speak: true` なら届いた返事を自動で読む。画面を離れたら止める。
+/// 話して入力: 入力欄の横のマイク(`transcribeField` と同じ `DictationHost`・端末内)。押して始め、押して止めると入力欄に文字が入る。送るのはユーザー。
+/// 録音を始めると読み上げを止め、録音の間は返事を自動で読まない。画面を離れた・マイク FAB の音声入力が始まったら録音を捨てる。
 struct AiChatLeaf: View {
     @Environment(\.dslRuntime) private var rt
     @Environment(\.fabFrame) private var fabFrame
@@ -27,6 +29,7 @@ struct AiChatLeaf: View {
     @State private var owner = UUID().uuidString
     /// 画面に出ているか。送信の Task は画面を離れても続くので、離れた後に届いた返事は保存だけして読まない
     @State private var visible = false
+    @State private var micPhase: DictationPhase = .idle
     private var speech: LeafSpeech { .shared }
 
     private var online: Bool { rt.aiText?.supportsOnlineAIText ?? false }
@@ -42,6 +45,10 @@ struct AiChatLeaf: View {
             .onDisappear {
                 visible = false
                 stopSpeech()
+                cancelDictation()
+            }
+            .onChange(of: rt.dictation?.isVoiceInputActive ?? false) { _, active in
+                if active { cancelDictation() }
             }
         } else {
             UnsupportedComponent(label: "aiChat")
@@ -79,7 +86,8 @@ struct AiChatLeaf: View {
                             if t.role == .user {
                                 AiChatBubble(text: t.text, mine: true).id(t.id)
                             } else {
-                                AiChatBubble(text: t.text, mine: false, speaking: speech.speakingOwner == speechOwner(t.id)) {
+                                AiChatBubble(text: t.text, mine: false, speaking: speech.speakingOwner == speechOwner(t.id),
+                                             canSpeak: AiChatMic.canSpeak(phase: micPhase)) {
                                     toggleSpeech(t)
                                 }
                                 .id(t.id)
@@ -136,6 +144,7 @@ struct AiChatLeaf: View {
                 .accessibilityIdentifier("aiChat.input")
                 .onChange(of: draft) { _, new in dropEcho(new) }
                 .renderInputChrome(focused: focused)
+            micButton
             Button { send(entity: entity, textField: textField) } label: {
                 Image(systemName: "arrow.up.circle.fill").font(.system(size: 34)).frame(height: 44)
             }
@@ -151,7 +160,93 @@ struct AiChatLeaf: View {
     }
 
     private var canSend: Bool {
-        online && !sending && !draft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+        AiChatMic.canSend(online: online, sending: sending, draft: draft, phase: micPhase)
+    }
+
+    // MARK: - 話して入力
+
+    private var mic: AiChatMic {
+        let host = rt.dictation
+        return AiChatMic.state(phase: micPhase, readiness: host?.dictationReadiness,
+                               voiceInputActive: host?.isVoiceInputActive ?? false, online: online)
+    }
+
+    @ViewBuilder private var micButton: some View {
+        let mic = mic
+        if mic != .hidden {
+            Button { micTapped(mic) } label: {
+                Group {
+                    switch mic {
+                    case .transcribing: ProgressView()
+                    case .stop: Image(systemName: "stop.circle.fill").symbolEffect(.pulse)
+                    case .prepare: Image(systemName: "arrow.down.circle")
+                    default: Image(systemName: "mic.circle")
+                    }
+                }
+                .font(.system(size: 30))
+                .frame(minWidth: 44, minHeight: 44)
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .foregroundStyle(mic == .stop ? AnyShapeStyle(.red) : (mic.enabled ? AnyShapeStyle(RenderTheme.brandFill) : AnyShapeStyle(.tertiary)))
+            .disabled(!mic.enabled)
+            .accessibilityLabel(Self.micLabel(mic))
+            .accessibilityHint(mic == .start ? L("話した言葉が入力欄に入ります。確かめてから送れます") : "")
+            .accessibilityIdentifier("aiChat.mic")
+        }
+    }
+
+    static func micLabel(_ mic: AiChatMic) -> String {
+        switch mic {
+        case .hidden, .start: L("話して入力")
+        case .stop: L("聞いています… タップで終わる")
+        case .transcribing: L("文字にしています…")
+        case .prepare: L("音声モデルを用意する")
+        case .busy: L("今は話して入力を使えません")
+        }
+    }
+
+    private func micTapped(_ mic: AiChatMic) {
+        switch mic {
+        case .start: Task { await startDictation() }
+        case .stop: Task { await finishDictation() }
+        case .prepare: rt.dictation?.prepareDictation()
+        case .hidden, .transcribing, .busy: break
+        }
+    }
+
+    private func startDictation() async {
+        guard let host = rt.dictation, micPhase == .idle else { return }
+        await KeyboardState.finishEditing() // 変換中の文字を確定させてから(入力欄に足すので)
+        focused = false
+        stopSpeech()
+        error = nil
+        do {
+            try await host.startDictation() // 読み上げ(アプリ全体)を止め、録音の間は読まない
+            guard visible, !host.isVoiceInputActive else { return host.cancelDictation() } // 始める間に画面を離れた
+            micPhase = .listening
+        } catch {
+            self.error = error.localizedDescription
+        }
+    }
+
+    private func finishDictation() async {
+        guard let host = rt.dictation, micPhase == .listening else { return }
+        micPhase = .transcribing
+        do {
+            let text = try await host.finishDictation()
+            echo = nil
+            draft = DictationText.appending(text, to: draft)
+        } catch {
+            self.error = error.localizedDescription
+        }
+        micPhase = .idle
+    }
+
+    private func cancelDictation() {
+        guard micPhase == .listening else { return }
+        rt.dictation?.cancelDictation()
+        micPhase = .idle
     }
 
     private func send(entity: Entity, textField: String) {
@@ -191,7 +286,7 @@ struct AiChatLeaf: View {
                     self.error = roleField == nil ? L("会話を保存できませんでした") : L("AI の返事を保存できませんでした")
                 } else if let spoken = AIChat.spokenReply(AIChat.turns(ownRecords(entity), textField: textField, roleField: roleField),
                                                           reply: reply.text) {
-                    autoRead(spoken) // speak: true(保存できた返事だけ・録音中は LeafSpeech が読まない)
+                    autoRead(spoken) // speak: true(保存できた返事だけ・録音中は読まない)
                 }
             } catch {
                 if roleField == nil { pending = nil; restore(text) }
@@ -204,13 +299,15 @@ struct AiChatLeaf: View {
     enum AutoRead: Equatable { case none, speak, announce }
 
     /// 画面を離れた後は読まない。VoiceOver が動いている時は端末の声と重ねず、VoiceOver に読ませる(スピーカーのボタンはそのまま)。
-    static func autoReadMode(speak: Bool?, visible: Bool, voiceOver: Bool) -> AutoRead {
-        guard speak == true, visible else { return .none }
+    /// 話して入力の録音・文字起こしの間も読まない(声をマイクが拾う・VoiceOver の読み上げも同じ)。
+    static func autoReadMode(speak: Bool?, visible: Bool, voiceOver: Bool, recording: Bool = false) -> AutoRead {
+        guard speak == true, visible, !recording else { return .none }
         return voiceOver ? .announce : .speak
     }
 
     private func autoRead(_ turn: AIChat.Turn) {
-        switch Self.autoReadMode(speak: c.speak, visible: visible, voiceOver: UIAccessibility.isVoiceOverRunning) {
+        switch Self.autoReadMode(speak: c.speak, visible: visible, voiceOver: UIAccessibility.isVoiceOverRunning,
+                                 recording: micPhase != .idle) {
         case .none: break
         case .speak: speech.speak(turn.text, owner: speechOwner(turn.id))
         case .announce: UIAccessibility.post(notification: .announcement, argument: turn.text)
@@ -261,6 +358,8 @@ private struct AiChatBubble: View {
     let text: String
     let mine: Bool
     var speaking = false
+    /// 話して入力の録音中は false(スピーカーを押せない)
+    var canSpeak = true
     /// AI の吹き出しだけ: 読み上げ / 止める
     var onSpeak: (() -> Void)?
 
@@ -294,6 +393,7 @@ private struct AiChatBubble: View {
                     }
                     .buttonStyle(.plain)
                     .foregroundStyle(.secondary)
+                    .disabled(!canSpeak && !speaking)
                     .accessibilityLabel(speaking ? L("止める") : L("読み上げる"))
                     .accessibilityIdentifier("aiChat.speak")
                 }

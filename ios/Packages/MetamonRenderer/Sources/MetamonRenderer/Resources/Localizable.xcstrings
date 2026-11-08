@@ -2721,6 +2721,23 @@
         }
       }
     },
+    "今は話して入力を使えません" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Speak to type isn't available right now"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "今は話して入力を使えません"
+          }
+        }
+      }
+    },
     "件" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -5675,6 +5692,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "話しかけてみましょう"
+          }
+        }
+      }
+    },
+    "話した言葉が入力欄に入ります。確かめてから送れます" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "What you say goes into the message box. You can check it before sending."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "話した言葉が入力欄に入ります。確かめてから送れます"
           }
         }
       }
