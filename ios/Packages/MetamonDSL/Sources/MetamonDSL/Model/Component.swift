@@ -55,6 +55,8 @@ public enum ComponentType: String, Decodable, Sendable, CaseIterable {
     case gridTable
     // leaf(ランダムに 1 件選ぶ・#263)。entity / title / titleField / subtitleField / filter / label / onItemTap は共用
     case randomPicker
+    // leaf(トーナメント表・BracketDraw)。entity / title / titleField は共用
+    case bracket
     // leaf(ファイルの取り込み: CSV の行 / テキスト・PDF の本文を記録に。端末内だけ)。entity / field / label は共用
     case fileImport
     // leaf(目的地までの道案内・#411)。title / label / entity / locationField / titleField / mode は共用
@@ -237,6 +239,9 @@ public struct Component: Decodable, Identifiable, Sendable {
     public var front: String?          // 表の field
     public var back: String?           // 裏の field
     public var toggle: String?         // 覚えた / まだ を保存する boolean field
+    // bracket。entity / title / titleField は共用
+    public var winsField: String?      // 勝った回戦の数を保存する integer field
+    public var seedField: String?      // シード順の integer / number field(nil = 登録順)
     // feed(#348)。URL は持たない
     public var provider: String?       // weather|warnings|pressure|holidays|rss|arxiv|diet
     public var region: String?         // weather / warnings / pressure: 気象庁の府県予報区のコード
@@ -271,6 +276,7 @@ public struct Component: Decodable, Identifiable, Sendable {
         case accept, map
         case show
         case front, back, toggle
+        case winsField, seedField
         case visibleTo, highlight
         case provider, region, feedId
         case query, category, near, addressField, pins
@@ -390,6 +396,8 @@ public struct Component: Decodable, Identifiable, Sendable {
         front = try? c.decodeIfPresent(String.self, forKey: .front)
         back = try? c.decodeIfPresent(String.self, forKey: .back)
         toggle = try? c.decodeIfPresent(String.self, forKey: .toggle)
+        winsField = try? c.decodeIfPresent(String.self, forKey: .winsField)
+        seedField = try? c.decodeIfPresent(String.self, forKey: .seedField)
         provider = try? c.decodeIfPresent(String.self, forKey: .provider)
         region = try? c.decodeIfPresent(String.self, forKey: .region)
         feedId = try? c.decodeIfPresent(String.self, forKey: .feedId)
