@@ -30,6 +30,8 @@ struct AiChatLeaf: View {
     /// 画面に出ているか。送信の Task は画面を離れても続くので、離れた後に届いた返事は保存だけして読まない
     @State private var visible = false
     @State private var micPhase: DictationPhase = .idle
+    /// 録音中に届いた返事(VoiceOver で読む分)。録音が終わったら読む
+    @State private var announceQueue = AiChatAnnounceQueue()
     private var speech: LeafSpeech { .shared }
 
     private var online: Bool { rt.aiText?.supportsOnlineAIText ?? false }
@@ -46,6 +48,12 @@ struct AiChatLeaf: View {
                 visible = false
                 stopSpeech()
                 cancelDictation()
+                announceQueue.clear()
+            }
+            .onChange(of: micPhase) { _, phase in
+                if let text = announceQueue.phaseChanged(to: phase, visible: visible, voiceOver: UIAccessibility.isVoiceOverRunning) {
+                    UIAccessibility.post(notification: .announcement, argument: text)
+                }
             }
             .onChange(of: rt.dictation?.isVoiceInputActive ?? false) { _, active in
                 if active { cancelDictation() }
@@ -177,7 +185,7 @@ struct AiChatLeaf: View {
             Button { micTapped(mic) } label: {
                 Group {
                     switch mic {
-                    case .transcribing: ProgressView()
+                    case .transcribing, .starting: ProgressView()
                     case .stop: Image(systemName: "stop.circle.fill").symbolEffect(.pulse)
                     case .prepare: Image(systemName: "arrow.down.circle")
                     default: Image(systemName: "mic.circle")
@@ -190,15 +198,17 @@ struct AiChatLeaf: View {
             .buttonStyle(.plain)
             .foregroundStyle(mic == .stop ? AnyShapeStyle(.red) : (mic.enabled ? AnyShapeStyle(RenderTheme.brandFill) : AnyShapeStyle(.tertiary)))
             .disabled(!mic.enabled)
-            .accessibilityLabel(Self.micLabel(mic))
+            .accessibilityLabel(Self.micLabel(mic, voiceOver: UIAccessibility.isVoiceOverRunning))
             .accessibilityHint(mic == .start ? L("話した言葉が入力欄に入ります。確かめてから送れます") : "")
             .accessibilityIdentifier("aiChat.mic")
         }
     }
 
-    static func micLabel(_ mic: AiChatMic) -> String {
+    /// VoiceOver が動いている時は録音を始める〜録音中にラベルを変えない(変わったラベルを VoiceOver が読み、その声をマイクが拾う)。
+    static func micLabel(_ mic: AiChatMic, voiceOver: Bool = false) -> String {
         switch mic {
-        case .hidden, .start: L("話して入力")
+        case .hidden, .start, .starting: L("話して入力")
+        case .stop where voiceOver: L("話して入力")
         case .stop: L("聞いています… タップで終わる")
         case .transcribing: L("文字にしています…")
         case .prepare: L("音声モデルを用意する")
@@ -211,22 +221,28 @@ struct AiChatLeaf: View {
         case .start: Task { await startDictation() }
         case .stop: Task { await finishDictation() }
         case .prepare: rt.dictation?.prepareDictation()
-        case .hidden, .transcribing, .busy: break
+        case .hidden, .starting, .transcribing, .busy: break
         }
     }
 
     private func startDictation() async {
-        guard let host = rt.dictation, micPhase == .idle else { return }
+        guard let host = rt.dictation, AiChatMic.canStart(phase: micPhase) else { return }
+        micPhase = .starting // await の間に押し直されても二重に始めない
         await KeyboardState.finishEditing() // 変換中の文字を確定させてから(入力欄に足すので)
         focused = false
         stopSpeech()
         error = nil
         do {
             try await host.startDictation() // 読み上げ(アプリ全体)を止め、録音の間は読まない
-            guard visible, !host.isVoiceInputActive else { return host.cancelDictation() } // 始める間に画面を離れた
+            guard visible, !host.isVoiceInputActive else { // 始める間に画面を離れた・マイク FAB が始まった
+                host.cancelDictation()
+                micPhase = .idle
+                return
+            }
             micPhase = .listening
         } catch {
             self.error = error.localizedDescription
+            micPhase = .idle
         }
     }
 
@@ -296,19 +312,22 @@ struct AiChatLeaf: View {
     }
 
     /// 届いた返事の自動の読み上げ(`speak: true`)。
-    enum AutoRead: Equatable { case none, speak, announce }
+    enum AutoRead: Equatable { case none, speak, announce, queue }
 
     /// 画面を離れた後は読まない。VoiceOver が動いている時は端末の声と重ねず、VoiceOver に読ませる(スピーカーのボタンはそのまま)。
-    /// 話して入力の録音・文字起こしの間も読まない(声をマイクが拾う・VoiceOver の読み上げも同じ)。
+    /// 話して入力の録音・文字起こしの間は読まない(声をマイクが拾う)。VoiceOver の時は録音が終わってから読む(`.queue`)。
     static func autoReadMode(speak: Bool?, visible: Bool, voiceOver: Bool, recording: Bool = false) -> AutoRead {
-        guard speak == true, visible, !recording else { return .none }
+        guard speak == true, visible else { return .none }
+        if recording { return voiceOver ? .queue : .none }
         return voiceOver ? .announce : .speak
     }
 
     private func autoRead(_ turn: AIChat.Turn) {
-        switch Self.autoReadMode(speak: c.speak, visible: visible, voiceOver: UIAccessibility.isVoiceOverRunning,
-                                 recording: micPhase != .idle) {
+        let mode = Self.autoReadMode(speak: c.speak, visible: visible, voiceOver: UIAccessibility.isVoiceOverRunning,
+                                     recording: micPhase != .idle)
+        switch mode {
         case .none: break
+        case .queue: announceQueue.received(turn.text, mode: mode)
         case .speak: speech.speak(turn.text, owner: speechOwner(turn.id))
         case .announce: UIAccessibility.post(notification: .announcement, argument: turn.text)
         }
