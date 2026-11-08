@@ -20,6 +20,8 @@ import (
 type AppMembers interface {
 	AppOwner(ctx context.Context, appID string) (string, error)
 	GetMember(ctx context.Context, appID, uid string) (*store.Member, error)
+	// GetPublicApp is the shared app's published DSL (apps_public/{appId}).
+	GetPublicApp(ctx context.Context, appID string) (*store.PublicApp, error)
 }
 
 // reasonCreatorNeedsPro is details.reason when the caller is a participant
@@ -58,9 +60,21 @@ func (s *Service) sharedCreator(ctx context.Context, appID, uid string) string {
 	return owner
 }
 
+// fromSharedApp reports whether req is what a component of the shared app's
+// published DSL sends (text_payer_scope.go).
+func (s *Service) fromSharedApp(ctx context.Context, req TextRequest) bool {
+	sc := s.appScopeOf(ctx, req.AppID)
+	if sc == nil || !sc.sends(req) {
+		s.logger().InfoContext(ctx, "ai: text request does not match the shared app", slog.Bool("published", sc != nil && len(sc.comps) > 0))
+		return false
+	}
+	return true
+}
+
 // gateText applies the onlineAI gate (#316) and returns ctx marked with the
 // payer. The caller's own Pro comes first; a participant of a shared app is
-// covered by the creator's.
+// covered by the creator's when the request matches one of the app's
+// aiButton / aiChat components, within the app's daily cap.
 func (s *Service) gateText(ctx context.Context, req TextRequest) (context.Context, error) {
 	if !validTextAppID(req.AppID) {
 		return ctx, badText("invalid appId")
@@ -69,9 +83,13 @@ func (s *Service) gateText(ctx context.Context, req TextRequest) (context.Contex
 	if s.Pro == nil || !s.ProMode.Checks() || s.Pro.IsPro(ctx, uid) {
 		return ctx, nil
 	}
-	if owner := s.sharedCreator(ctx, req.AppID, uid); owner != "" {
+	if owner := s.sharedCreator(ctx, req.AppID, uid); owner != "" && s.fromSharedApp(ctx, req) {
 		if s.Pro.IsPro(ctx, owner) || !s.ProMode.Stop(ctx, s.logger(), "ai.text", owner, []string{paid.OnlineAI}) {
-			return withPayer(ctx, owner), nil
+			refund, err := s.CreatorPaid.take(ctx, s.logger(), req.AppID, uid)
+			if err != nil {
+				return ctx, err
+			}
+			return withCreatorRefund(withPayer(ctx, owner), refund), nil
 		}
 		e := onlineAIRequired(req.Locale)
 		e.Details["reason"] = reasonCreatorNeedsPro

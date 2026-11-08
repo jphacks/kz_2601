@@ -391,14 +391,16 @@ func textHandler(svc *Service) http.Handler {
 		// #316: the online AI of an app is a Pro feature (the on-device AI is free)
 		ctx, err := svc.gateText(r.Context(), req)
 		if err != nil {
-			if asError(err).Status == http.StatusPaymentRequired {
-				ratelimit.Waive(r.Context()) // no Claude call: the 402 is not charged
+			// no Claude call: the 402 (and the app's daily cap, 429) are not charged
+			if st := asError(err).Status; st == http.StatusPaymentRequired || st == http.StatusTooManyRequests {
+				ratelimit.Waive(r.Context())
 			}
 			svc.writeErr(w, r, err)
 			return
 		}
 		res, err := svc.text(ctx, req, loc)
 		if err != nil {
+			refundCreatorPaid(ctx, asError(err).Status) // Claude 5xx: the creator-paid count comes back
 			svc.writeErr(w, r, err)
 			return
 		}
