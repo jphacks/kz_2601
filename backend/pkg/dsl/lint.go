@@ -23,6 +23,8 @@ import (
 //   - a toolbar item opening the same form as a button on the screen (#416)
 //   - a date/datetime defaultValue other than "now" or a date ("today" is
 //     saved as the text "today", which no date filter matches)
+//   - a match "profile" field that looks like contact info or identity
+//     (phone, email, LINE/SNS, address, age, school, real name, gender)
 func (a *App) Lint() []string {
 	l := &linter{app: a, entities: map[string]*Entity{}}
 	for i := range a.Entities {
@@ -39,6 +41,7 @@ func (a *App) Lint() []string {
 	l.progressTargetDefault() // progress_target.go
 	l.dupAddControls()
 	l.privateChat()
+	l.matchProfileFields() // matching_lint.go
 	l.optionalTitle()
 	l.settingMaxMin()
 	l.photoIllustrate() // photo_illustrate.go

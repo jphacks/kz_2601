@@ -2,6 +2,8 @@ package ai
 
 import (
 	"context"
+	"encoding/json"
+	"os"
 	"slices"
 	"strings"
 	"testing"
@@ -77,6 +79,45 @@ func TestMatchingRestriction(t *testing.T) {
 	out, notes, changed := enforceRestriction(raw, old)
 	if !changed || strings.Contains(string(out), `"match"`) || len(notes) != 1 {
 		t.Fatalf("enforce: changed=%v notes=%v out=%s", changed, notes, out)
+	}
+}
+
+// The ai-eval cases agree with the server's dating check (no model needed):
+// a peer-finding case is never declined, and every declined case
+// (matchProfile false + noOmission) is caught by datingAsked, so the server
+// adds the decline even when the model forgets it.
+func TestMatchingCasesAgreeWithDatingAsked(t *testing.T) {
+	raw, err := os.ReadFile("eval/matching_cases.json")
+	if err != nil {
+		t.Fatal(err)
+	}
+	var cases []struct {
+		ID         string         `json:"id"`
+		Transcript string         `json:"transcript"`
+		Expect     map[string]any `json:"expect"`
+	}
+	if err := json.Unmarshal(raw, &cases); err != nil {
+		t.Fatal(err)
+	}
+	declined := 0
+	for _, c := range cases {
+		profile, ok := c.Expect["matchProfile"].(bool)
+		if !ok {
+			continue
+		}
+		noOmission, _ := c.Expect["noOmission"].(bool)
+		switch {
+		case profile && datingAsked(c.Transcript):
+			t.Errorf("%s: a peer-finding request is declined as dating: %q", c.ID, c.Transcript)
+		case !profile && noOmission:
+			declined++
+			if !datingAsked(c.Transcript) {
+				t.Errorf("%s: a dating request is not caught by datingAsked: %q", c.ID, c.Transcript)
+			}
+		}
+	}
+	if declined == 0 {
+		t.Fatal("no dating cases found")
 	}
 }
 
