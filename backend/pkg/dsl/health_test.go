@@ -10,14 +10,14 @@ func TestHealthStatSemanticErrors(t *testing.T) {
 	goal, zero := 8000.0, 0.0
 	app := memoApp()
 	app.Screens[0].Components = []Component{
-		{Type: CompHealthStat, Metric: "steps", Label: "今日の歩数", Target: &goal}, // ok
-		{Type: CompHealthStat, Metric: "weight", Period: "week", Label: "体重"},  // ok
-		{Type: CompHealthStat, Metric: "sleep", Label: "睡眠"},                   // bad metric
-		{Type: CompHealthStat, Metric: "steps", Period: "month", Label: "歩数"},  // bad period
-		{Type: CompHealthStat, Metric: "steps"},                                // no label
-		{Type: CompHealthStat, Metric: "weight", Label: "体重", Target: &goal},   // target on weight
-		{Type: CompHealthStat, Metric: "steps", Label: "歩数", Target: &zero},    // target <= 0
-		{Type: CompHealthStat, Metric: "steps", Label: "歩数", Entity: "memo"},   // entity not allowed
+		{Type: CompHealthStat, Metric: "steps", Label: "今日の歩数", Target: NumExpr(goal)}, // ok
+		{Type: CompHealthStat, Metric: "weight", Period: "week", Label: "体重"},          // ok
+		{Type: CompHealthStat, Metric: "sleep", Label: "睡眠"},                           // bad metric
+		{Type: CompHealthStat, Metric: "steps", Period: "month", Label: "歩数"},          // bad period
+		{Type: CompHealthStat, Metric: "steps"},                                        // no label
+		{Type: CompHealthStat, Metric: "weight", Label: "体重", Target: NumExpr(goal)},   // target on weight
+		{Type: CompHealthStat, Metric: "steps", Label: "歩数", Target: NumExpr(zero)},    // target <= 0
+		{Type: CompHealthStat, Metric: "steps", Label: "歩数", Entity: "memo"},           // entity not allowed
 	}
 	err := app.Validate()
 	ve, ok := err.(*ValidationError)

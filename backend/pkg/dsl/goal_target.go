@@ -1,13 +1,16 @@
 package dsl
 
-import "strings"
+import (
+	"fmt"
+	"strings"
+)
 
 // Literal goal on a bar: a progressBar target (or a gauge max) is a number
 // literal while the app keeps the goal in its own entity, so editing the
 // goal changes nothing on the bar (nav_study: target 120 next to
-// goal.target_minutes). progressBar.target / gauge.max are literal-only
-// (expressions.md: value/target as Expr deferred), so the bar cannot follow
-// the goal; a stat with format percent over {"setting"} / agg latest can.
+// goal.target_minutes). A progressBar target can read the goal with
+// {"setting"} (progress_target.go); gauge.max is literal-only, so a stat with
+// format percent over {"setting"} / agg latest shows the rate instead.
 //
 // A goal entity is a setting entity (settingEntities) or any entity whose id /
 // name says goal / target / budget and that no ref points at (a master such
@@ -147,7 +150,9 @@ func (l *linter) goalTarget() {
 			var lit *float64
 			switch c.Type {
 			case CompProgressBar:
-				key, lit = "target", c.Target
+				if v, ok := c.Target.Number(); ok {
+					key, lit = "target", &v
+				}
 			case CompGauge:
 				key, lit = "max", c.Max
 			default:
@@ -161,7 +166,17 @@ func (l *linter) goalTarget() {
 					continue
 				}
 				e := l.entities[g.entity]
-				read := goalReadFix(g.entity, g.field, e != nil && e.Single)
+				single := e != nil && e.Single
+				if c.Type == CompProgressBar {
+					fix := fmt.Sprintf(`set target to {"setting":%q}`, g.field)
+					if !single {
+						fix = fmt.Sprintf(`make %q "single": true and %s`, g.entity, fix)
+					}
+					l.add(`screen %q %s: progressBar target is the literal %v while the goal is kept in %s.%s, so changing the goal never moves the bar; %s`,
+						s.ID, w, *lit, g.entity, g.field, fix)
+					return
+				}
+				read := goalReadFix(g.entity, g.field, single)
 				l.add(`screen %q %s: %s %s is the literal %v while the goal is kept in %s.%s, so changing the goal never moves the bar (%s takes only a number); show the rate as a stat {"format":"percent","value":{"op":"div","args":[<the %s total over %q>,<goal>]}} where <goal> is %s`,
 					s.ID, w, c.Type, key, *lit, g.entity, g.field, key, c.Type, c.Entity, read)
 				return

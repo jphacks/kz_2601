@@ -37,7 +37,7 @@ Expr := number | string | boolean
 | `agg` | エンティティ全レコード(filter で絞る)の集計。count 以外は `field` 必須。`field` に computed フィールドも可。`latest` / `earliest`(#133)は `by`(date/datetime field)で並べた最新 / 最古の 1 件の `field` の値(型は field のまま・数値以外も可) |
 | `op` | 関数呼び出し。§3 の閉じた一覧のみ |
 | `if` | `if` が true なら `then`、それ以外は `else` |
-| `setting` | single の entity(設定値の置き場・README §3.11・#267)の 1 件のレコードのフィールド値。行コンテキストに依らず、式を書ける所ならどこでも書ける(`stat.value`・通知の `when` も可。server rules は不可。`progressBar` / `gauge` の `value` は数値リテラルのみなので書けない)。保存前・空の field は `defaultValue`(date の `"now"` は当てずに nil)。computed の field も読める(保存前は初期値の 1 件で評価)。2 件以上あれば `createdAt` が最も新しい 1 件(同じなら後の方)。single の entity に `agg` は使えない(backend が拒否) |
+| `setting` | single の entity(設定値の置き場・README §3.11・#267)の 1 件のレコードのフィールド値。行コンテキストに依らず、式を書ける所ならどこでも書ける(`stat.value`・通知の `when` も可。server rules は不可。`progressBar` / `gauge` の `value` は数値リテラルのみなので書けない。`progressBar.target` には書ける・下記)。保存前・空の field は `defaultValue`(date の `"now"` は当てずに nil)。computed の field も読める(保存前は初期値の 1 件で評価)。2 件以上あれば `createdAt` が最も新しい 1 件(同じなら後の方)。single の entity に `agg` は使えない(backend が拒否) |
 
 `agg.filter` は `Filter` 1 つ、または配列(AND)。`Filter.value` には Expr を書ける。computed 内の agg では `value` の `ref` は**外側のレコード**を指す:
 
@@ -117,6 +117,7 @@ Expr := number | string | boolean
 - **`Field.type = "ref"` + `refEntity`**: 他エンティティのレコード参照。保存値はレコード id の文字列。入力は **`picker`**(選択肢 = refEntity のレコード、表示は titleField)。list/table では参照先の titleField を表示する。
 - **`settlement`(Leaf)**: `{"type":"settlement","entity":"members","nameField":"name","balanceField":"balance"}` + `id?` `area?` `title?`。balance(正=受け取る・負=払う)から貪欲法(最大の債務者 → 最大の債権者に min(|負|, 正) を送る、を繰り返す)で「A → B ¥1,200」を列挙。割り勘専用の割り切り部品。合計 0 にならない端数(1 円未満の丸め差)は無視してよい。全員 0 なら「精算は不要です」。
 - progressBar / gauge の `value` は従来どおり**数値リテラルのみ**(Expr は不可。後述 §8)。
+- progressBar の `target` は数値か `{"setting": "<fieldId>"}`(single の entity の数値 field)。利用者が変える目標(1 日の歩数の目標など)でバーが動く。値が空・0 以下の間は「—」(supportedFeatures `progressBar.settingTarget`)。
 
 ## 5. 評価ルール(iOS)
 
@@ -244,7 +245,7 @@ AI のカタログにも同じものが載る(`$defs/Expr.x-recipes`)。
 - lookup の多段(`a.b.c`)。必要なら参照先 entity に computed を作って 1 段で読む。
 - 副作用(式からの保存・通知・遷移)。
 - サーバー側評価・集計 API(評価は iOS。件数が増えたら README 決定表 #10 の集計 API と合わせて検討)。
-- progressBar/gauge の `value`/`target` を Expr にすること(stat.value で代替可能・iOS 契約の拡大を避けた。必要なら後段で)。
+- progressBar/gauge の `value`・gauge の `max` を Expr にすること(progressBar.target の `{"setting"}` だけは入れた。stat.value で代替可能・iOS 契約の拡大を避けた。必要なら後段で)。
 - タイムゾーン指定・通貨換算。
 - 乱数(`random` op)。式は描画・レコード再取得のたびに評価されるので、乱数を入れると表示のたびに値が変わる。「ランダムに 1 件選ぶ」は専用 Leaf `randomPicker`(#263・ボタンを押した時だけ選び、部品の表示状態に持つ)で書く。
 

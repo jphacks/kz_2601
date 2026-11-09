@@ -37,9 +37,10 @@ func goalLint(t *testing.T, entity, name, single, field, fieldType, comps string
 }
 
 const (
-	barLit   = `{"type":"progressBar","label":"今日","entity":"study","field":"minutes","aggregate":"sum","target":120,"tone":"positive"},`
-	gaugeLit = `{"type":"gauge","label":"今日","entity":"study","field":"minutes","aggregate":"sum","max":120},`
-	rateStat = `{"type":"stat","label":"達成率","format":"percent","value":{"op":"div","args":[{"agg":"sum","entity":"study","field":"minutes"},{"setting":"target_minutes"}]}},`
+	barLit     = `{"type":"progressBar","label":"今日","entity":"study","field":"minutes","aggregate":"sum","target":120,"tone":"positive"},`
+	barSetting = `{"type":"progressBar","label":"今日","entity":"study","field":"minutes","aggregate":"sum","target":{"setting":"target_minutes"}},`
+	gaugeLit   = `{"type":"gauge","label":"今日","entity":"study","field":"minutes","aggregate":"sum","max":120},`
+	rateStat   = `{"type":"stat","label":"達成率","format":"percent","value":{"op":"div","args":[{"agg":"sum","entity":"study","field":"minutes"},{"setting":"target_minutes"}]}},`
 )
 
 func TestLintGoalTarget(t *testing.T) {
@@ -50,12 +51,13 @@ func TestLintGoalTarget(t *testing.T) {
 		// nav_study: a goal entity with target_minutes, the bar says 120
 		"single setting": {"goal", "目標", `"single":true,`, "target_minutes", "integer", rateStat + barLit, `{"setting":"target_minutes"}`},
 		// logic_budget / logic_oshi: a goal entity named for it, read by nothing
-		"named entity":  {"budget", "予算", "", "minutes", "integer", barLit, `{"agg":"latest","entity":"budget","field":"minutes"} (the newest record; by is optional`},
+		"named entity":  {"budget", "予算", "", "minutes", "integer", barLit, `make "budget" "single": true and set target to {"setting":"minutes"}`},
 		"japanese name": {"plan", "目標", "", "minutes", "integer", barLit, `plan.minutes`},
 		"gauge max":     {"goal", "目標", `"single":true,`, "target_minutes", "integer", gaugeLit, "gauge max is the literal 120"},
 		// fine: the bar is the only goal (no goal entity) / the rate reads it
 		"no goal entity": {"memo", "メモ", `"single":true,`, "note_count", "integer", barLit, ""},
 		"rate stat only": {"goal", "目標", `"single":true,`, "target_minutes", "integer", rateStat, ""},
+		"bar reads goal": {"goal", "目標", `"single":true,`, "target_minutes", "integer", barSetting, ""},
 	} {
 		t.Run(name, func(t *testing.T) {
 			got := goalLint(t, tc.entity, tc.ename, tc.single, tc.field, tc.ftype, tc.comps)

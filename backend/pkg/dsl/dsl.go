@@ -455,7 +455,7 @@ type Component struct {
 	Name          string        `json:"name,omitempty"`          // icon: SF Symbols name / avatar: initials source
 	Color         string        `json:"color,omitempty"`         // SemanticColor enum
 	Value         *Expr         `json:"value,omitempty"`         // stat: Expr / progressBar (0..1) & gauge: number literal
-	Target        *float64      `json:"target,omitempty"`        // progressBar entity mode denominator
+	Target        *Expr         `json:"target,omitempty"`        // progressBar entity mode denominator: number or {"setting"} (progress_target.go) / healthStat: number
 	Tone          string        `json:"tone,omitempty"`          // progressBar: positive (goal) | negative (budget)
 	URL           string        `json:"url,omitempty"`           // link
 	Image         string        `json:"image,omitempty"`         // avatar literal (https / data URL)
