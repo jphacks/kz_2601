@@ -61,6 +61,9 @@ settings:
     # App Attest の環境(#318・entitlement com.apple.developer.devicecheck.appattest-environment に展開)。
     # 開発署名で端末に入れる Debug / Staging は development、配布の Release / Review は production。docs/infra/app-check.md
     METAMON_APP_ATTEST_ENV: development
+    # プッシュ通知の環境(#683・Metamon.entitlements の aps-environment に展開)。Debug / Staging は development(APNs sandbox)、
+    # Release は production。Review は通知を外しているので Metamon-Review.entitlements に入れない。docs/infra/runtime-config.md
+    METAMON_APS_ENV: development
   configs:
     Debug:
       METAMON_BUNDLE_ID_SUFFIX: "${METAMON_STG_BUNDLE_ID_SUFFIX}"
@@ -73,6 +76,7 @@ settings:
       METAMON_FIREBASE_ENV: prod
       METAMON_DISPLAY_NAME: "Tailor It"
       METAMON_APP_ATTEST_ENV: production
+      METAMON_APS_ENV: production
     Review:
       METAMON_AI_BASE_URL: "https://ai-prod-378953239426.asia-northeast1.run.app"
       METAMON_APPCONFIG_BASE_URL: "https://appconfig-prod-378953239426.asia-northeast1.run.app"
@@ -124,9 +128,10 @@ targets:
       - target: MetamonWidget
     # Sign in with Apple + App Group(ウィジェットとの共有)。自動署名(-allowProvisioningUpdates)が App ID に capability を付与する(有料 Developer Program 必須)。
     # 中身: Sign in with Apple / App Group / HealthKit(healthStat / Field.health・#167。自動署名で App ID に HealthKit が付く)/
-    # App Attest(App Check・#318。環境は METAMON_APP_ATTEST_ENV。自動署名で App ID に App Attest が付く)。
+    # App Attest(App Check・#318。環境は METAMON_APP_ATTEST_ENV。自動署名で App ID に App Attest が付く)/
+    # Push(aps-environment・#683。環境は METAMON_APS_ENV。自動署名で App ID に Push Notifications が付く)。
     # 構成ごとに別ファイルにするため xcodegen の `entitlements:` ではなく CODE_SIGN_ENTITLEMENTS で指定する(#245)。
-    # Review(審査用)は HealthKit を外した Metamon/Metamon-Review.entitlements。
+    # Review(審査用)は HealthKit と Push を外した Metamon/Metamon-Review.entitlements。
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: jp.kz2601.metamon$(METAMON_BUNDLE_ID_SUFFIX)
