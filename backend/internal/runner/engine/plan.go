@@ -82,6 +82,9 @@ func (e *ReadLimitError) Error() string {
 // Unwrap makes errors.Is(err, ErrReadLimit) true.
 func (e *ReadLimitError) Unwrap() error { return ErrReadLimit }
 
+// ErrMismatch: the rule names data the app does not have (any more).
+var ErrMismatch = errors.New("engine: rule does not fit the app")
+
 // errNoLister: a rule reads records (each / agg) but the reader cannot list.
 var errNoLister = errors.New("engine: the rule lists records but the reader has no List")
 
@@ -320,7 +323,7 @@ func matchTrigger(app *dsl.App, rule *dsl.ServerRule, ev Trigger) (*expreval.Row
 	}
 	ent := app.EntityByID(ev.Entity)
 	if ent == nil {
-		return nil, false, fmt.Errorf("engine: entity %q is not in the app", ev.Entity)
+		return nil, false, fmt.Errorf("engine: entity %q is not in the app: %w", ev.Entity, ErrMismatch)
 	}
 	row := &expreval.Row{Entity: ent, Record: ev.Record}
 	if ev.Kind == KindUpdated {
@@ -375,7 +378,7 @@ func (p *planner) action(i int, act *dsl.RuleAction, out *Plan) error {
 	case act.CreateRecord != nil:
 		target := p.app.EntityByID(act.CreateRecord.Entity)
 		if target == nil {
-			return fmt.Errorf("engine: createRecord entity %q is not in the app", act.CreateRecord.Entity)
+			return fmt.Errorf("engine: createRecord entity %q is not in the app: %w", act.CreateRecord.Entity, ErrMismatch)
 		}
 		vals := p.values(target, act.CreateRecord.Values)
 		for k, v := range vals {

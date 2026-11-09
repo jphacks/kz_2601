@@ -1775,6 +1775,25 @@ components:
         - service_paused
         - stopped
         - unavailable
+    AutomationFailureReason:
+      type: string
+      description: |
+        うまくいかなかった時の理由。result が failed の時だけ返す(それ以外・古い記録では省く)。決まった語だけを返し、エラーの中身・パス・ID は返さない。iOS はこの語ごとに文言を持つ。知らない語は「何度か試しましたがうまくいきませんでした」として扱う。
+        - notify_failed: 通知を送れなかった
+        - record_unavailable: 読む・変えるはずの記録が無くなっていたか、読めなかった
+        - mismatch: ルールが今のアプリのデータの形と合っていない
+        - write_rejected: 記録を保存できなかった(同じ値の記録が既にある等)
+        - source_unavailable: 外部の情報を取りにいけなかった
+        - timeout: 時間内に終わらなかった
+        - internal: サービス側の問題(または分類できない失敗)
+      enum:
+        - internal
+        - mismatch
+        - notify_failed
+        - record_unavailable
+        - source_unavailable
+        - timeout
+        - write_rejected
     AutomationRule:
       type: object
       required: [id, description, trigger, result, enabled]
@@ -1783,6 +1802,7 @@ components:
         description: { type: string, description: 'ルールの説明(`DescribeServerRuleIn`)。Accept-Language が en なら英語、それ以外・無しなら日本語。例: 「毎日 07:00、「記録」に記録を足す」 / Every day at 07:00: add a record to "記録"' }
         trigger: { type: string, enum: [record, schedule] }
         result: { $ref: '#/components/schemas/AutomationResult' }
+        failureReason: { $ref: '#/components/schemas/AutomationFailureReason' }
         enabled: { type: boolean, description: 'false = 作成者がオフにしている(DSL の serverRules[].enabled)。オフのルールは動かず、実行の数にも数えない。切り替えは PATCH /v1/apps/{appId}/dsl か AI の編集' }
         consecutiveFailures: { type: integer, minimum: 0, description: 'うまくいかなかった(failed)回数の連続。うまく動くと 0 に戻る。0 なら省く。続いていればチャットで直すか提案する目安' }
         lastRunAt: { type: string, format: date-time, description: 最後に動いた(止めた・失敗したを含む)時刻。まだ無ければ省く }

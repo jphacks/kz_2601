@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/jphacks/kz_2601/backend/internal/ratelimit"
+	"github.com/jphacks/kz_2601/backend/internal/runner/status"
 	"github.com/jphacks/kz_2601/backend/internal/store"
 )
 
@@ -158,6 +159,54 @@ func TestAutomationsResultsAndStops(t *testing.T) {
 			t.Fatalf("quota of an earlier day: %s", r.raw)
 		}
 		if m := r.body["rules"].([]any)[0].(map[string]any); m["result"] != "ok" {
+			t.Fatalf("after an ok run: %v", m)
+		}
+	})
+}
+
+// #347: a failed rule shows its fixed reason word; a word this build does
+// not know, or a reason on a result other than failed, is left out.
+func TestAutomationsFailureReason(t *testing.T) {
+	t.Setenv("APP_ENV", "auto")
+	storeEnvs(t, func(t *testing.T, e *env, st store.Store, sfx string) {
+		ctx := t.Context()
+		owner := "auto-fail-owner" + sfx
+		id := "AUTO-FAIL" + sfx
+		app := "/v1/apps/" + id
+		e.putDSLAt(owner, app, []byte(twoRules), nil)
+
+		w := st.(store.RuleStatuses)
+		now := store.Now()
+		put := func(rule, outcome, reason string) {
+			t.Helper()
+			s := store.RuleStatus{ID: store.RuleStatusID(id, owner, rule), AppID: id, RuleID: rule, At: now, Outcome: outcome,
+				FailureReason: reason, Failed: outcome == "gave_up", ExpireAt: now.Add(store.RuleStatusTTL)}
+			if err := w.PutRuleStatus(ctx, "auto", s); err != nil {
+				t.Fatal(err)
+			}
+		}
+		get := func() (m, l map[string]any) {
+			t.Helper()
+			r := e.do(owner, http.MethodGet, app+"/automations", nil, nil)
+			if r.code != http.StatusOK {
+				t.Fatalf("get: %d %s", r.code, r.raw)
+			}
+			rules := r.body["rules"].([]any)
+			return rules[0].(map[string]any), rules[1].(map[string]any)
+		}
+
+		put("morning", "gave_up", status.FailureMismatch)
+		put("on_log", "gave_up", "users/x/apps/y: boom") // not a Failure* word: never returned
+		m, l := get()
+		if m["result"] != status.ResultFailed || m["failureReason"] != status.FailureMismatch || m["consecutiveFailures"] != float64(1) {
+			t.Fatalf("morning: %v", m)
+		}
+		if _, has := l["failureReason"]; l["result"] != status.ResultFailed || has {
+			t.Fatalf("on_log: %v", l)
+		}
+
+		put("morning", "ok", "") // an ok run clears the reason
+		if m, _ := get(); m["result"] != status.ResultOK || m["failureReason"] != nil {
 			t.Fatalf("after an ok run: %v", m)
 		}
 	})

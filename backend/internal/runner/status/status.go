@@ -88,3 +88,60 @@ func Result(outcome, reason string, notifyPaused bool) string {
 	}
 	return ResultOther
 }
+
+// Failure reasons: why a failed run gave up, in the fixed words of openapi
+// AutomationFailureReason. Only these leave the backend: never the error,
+// a path, an id or a scope violation's detail (#347).
+const (
+	FailureNotifyFailed      = "notify_failed"      // a notification could not be sent
+	FailureRecordUnavailable = "record_unavailable" // the record to read or change was gone or not readable
+	FailureMismatch          = "mismatch"           // the rule does not fit the app's data any more
+	FailureWriteRejected     = "write_rejected"     // a record could not be saved (e.g. a duplicate value)
+	FailureSourceUnavailable = "source_unavailable" // an outside source (feed) could not be read
+	FailureTimeout           = "timeout"            // the run did not finish in time
+	FailureInternal          = "internal"           // a problem on the service's side (or not known)
+)
+
+// Error codes as the runner writes them to the outbox (runner.errorCode,
+// and "feed_wait" of a deferred run).
+const (
+	CodeSendFailed     = "send_failed"
+	CodeScopeViolation = "scope_violation"
+	CodeNotReadable    = "not_readable"
+	CodeNotFound       = "not_found"
+	CodeMismatch       = "mismatch"
+	CodeWriteRejected  = "write_rejected"
+	CodeFeedWait       = "feed_wait"
+	CodeTimeout        = "timeout"
+	CodeError          = "error"
+)
+
+// FailureReason is the creator's word for a run that gave up with the
+// runner's error code. A scope violation is the service's own problem.
+func FailureReason(code string) string {
+	switch code {
+	case CodeSendFailed:
+		return FailureNotifyFailed
+	case CodeNotReadable, CodeNotFound:
+		return FailureRecordUnavailable
+	case CodeMismatch:
+		return FailureMismatch
+	case CodeWriteRejected:
+		return FailureWriteRejected
+	case CodeFeedWait:
+		return FailureSourceUnavailable
+	case CodeTimeout:
+		return FailureTimeout
+	}
+	return FailureInternal
+}
+
+// IsFailureReason reports whether w is one of the Failure* words.
+func IsFailureReason(w string) bool {
+	switch w {
+	case FailureNotifyFailed, FailureRecordUnavailable, FailureMismatch, FailureWriteRejected,
+		FailureSourceUnavailable, FailureTimeout, FailureInternal:
+		return true
+	}
+	return false
+}

@@ -17,13 +17,33 @@ import (
 	"github.com/jphacks/kz_2601/backend/internal/runner/quota"
 	"github.com/jphacks/kz_2601/backend/internal/runner/schedule"
 	"github.com/jphacks/kz_2601/backend/internal/runner/scope"
+	"github.com/jphacks/kz_2601/backend/internal/runner/status"
 	"github.com/jphacks/kz_2601/backend/internal/store"
 	"github.com/jphacks/kz_2601/backend/pkg/dsl"
 	"github.com/jphacks/kz_2601/backend/pkg/dsl/expreval"
+	"google.golang.org/grpc/codes"
+	grpcstatus "google.golang.org/grpc/status"
 )
 
 // errSendRetry: a notification failed in a way a retry may fix.
 var errSendRetry = errors.New("runner: notification send failed")
+
+// errWriteRejected: the store refused a planned write (a value it does not
+// take, a duplicate), as opposed to a write that could not get through.
+var errWriteRejected = errors.New("runner: write rejected")
+
+// rejectedWrite marks err of a planned write with errWriteRejected when the
+// store refused the write itself.
+func rejectedWrite(err error) error {
+	if errors.Is(err, store.ErrDuplicate) || errors.Is(err, store.ErrAlreadyExists) {
+		return fmt.Errorf("%w: %w", errWriteRejected, err)
+	}
+	switch grpcstatus.Code(err) {
+	case codes.InvalidArgument, codes.FailedPrecondition, codes.AlreadyExists, codes.OutOfRange:
+		return fmt.Errorf("%w: %w", errWriteRejected, err)
+	}
+	return err
+}
 
 // RunEvent is the message (and `event` attr) of the per-run audit log.
 // Cloud Logging filter: jsonPayload.event="runner.run". It carries ids,
@@ -360,7 +380,7 @@ func (r *Runner) runRule(ctx context.Context, h *scope.Handle, ev store.OutboxEv
 			written++
 			wrote, err := r.write(ctx, h, ev, rule, row.key, w)
 			if err != nil {
-				return fail(err)
+				return fail(rejectedWrite(err))
 			}
 			if wrote {
 				usage.Writes++
@@ -668,6 +688,8 @@ type runLog struct {
 	// quota: the app's execution counter of quotaDay (rule status, #347)
 	quota    *quota.Block
 	quotaDay string
+	// lastError: the error code (errorCode) of the last attempt of a gave_up run
+	lastError string
 }
 
 // logRun writes one runner.run line.
@@ -727,6 +749,9 @@ func (r *Runner) putStatus(ctx context.Context, ev store.OutboxEvent, l runLog) 
 		s.LastOKAt = now
 	}
 	s.Failed = l.outcome == queue.OutcomeGaveUp // failures in a row (#347)
+	if s.Failed {
+		s.FailureReason = status.FailureReason(l.lastError) // the fixed word only, never the error
+	}
 	if l.quota != nil && l.quotaDay != "" {
 		s.QuotaDay, s.QuotaUsed, s.QuotaLimit = l.quotaDay, l.quota.Used, l.quota.Limit
 	}

@@ -13,18 +13,19 @@ var (
 )
 
 type ruleStatusDoc struct {
-	AppID        string    `firestore:"appId"`
-	RuleID       string    `firestore:"ruleId"`
-	At           time.Time `firestore:"at"`
-	Outcome      string    `firestore:"outcome"`
-	Reason       string    `firestore:"reason,omitempty"`
-	NotifyPaused bool      `firestore:"notifyPaused,omitempty"`
-	LastOKAt     time.Time `firestore:"lastOkAt,omitempty"`
-	QuotaDay     string    `firestore:"quotaDay,omitempty"`
-	QuotaUsed    int       `firestore:"quotaUsed,omitempty"`
-	QuotaLimit   int       `firestore:"quotaLimit,omitempty"`
-	ExpireAt     time.Time `firestore:"expireAt"`
-	Failures     int       `firestore:"failures,omitempty"`
+	AppID         string    `firestore:"appId"`
+	RuleID        string    `firestore:"ruleId"`
+	At            time.Time `firestore:"at"`
+	Outcome       string    `firestore:"outcome"`
+	Reason        string    `firestore:"reason,omitempty"`
+	NotifyPaused  bool      `firestore:"notifyPaused,omitempty"`
+	LastOKAt      time.Time `firestore:"lastOkAt,omitempty"`
+	QuotaDay      string    `firestore:"quotaDay,omitempty"`
+	QuotaUsed     int       `firestore:"quotaUsed,omitempty"`
+	QuotaLimit    int       `firestore:"quotaLimit,omitempty"`
+	ExpireAt      time.Time `firestore:"expireAt"`
+	Failures      int       `firestore:"failures,omitempty"`
+	FailureReason string    `firestore:"failureReason,omitempty"`
 }
 
 func (f *Firestore) ruleStatusCol(env string) *firestore.CollectionRef {
@@ -35,13 +36,14 @@ func (f *Firestore) ruleStatusCol(env string) *firestore.CollectionRef {
 // empty are left out of the merge, so the stored ones stay.
 func (f *Firestore) PutRuleStatus(ctx context.Context, env string, s RuleStatus) error {
 	data := map[string]any{
-		"appId":        s.AppID,
-		"ruleId":       s.RuleID,
-		"at":           s.At.UTC(),
-		"outcome":      s.Outcome,
-		"reason":       s.Reason,
-		"notifyPaused": s.NotifyPaused,
-		"expireAt":     s.ExpireAt.UTC(),
+		"appId":         s.AppID,
+		"ruleId":        s.RuleID,
+		"at":            s.At.UTC(),
+		"outcome":       s.Outcome,
+		"reason":        s.Reason,
+		"notifyPaused":  s.NotifyPaused,
+		"failureReason": s.FailureReason, // overwritten: cleared by any run that did not give up
+		"expireAt":      s.ExpireAt.UTC(),
 	}
 	if !s.LastOKAt.IsZero() {
 		data["lastOkAt"] = s.LastOKAt.UTC()
@@ -86,7 +88,7 @@ func (f *Firestore) GetRuleStatuses(ctx context.Context, env string, ids []strin
 		}
 		out[snap.Ref.ID] = RuleStatus{ID: snap.Ref.ID, AppID: d.AppID, RuleID: d.RuleID, At: d.At, Outcome: d.Outcome,
 			Reason: d.Reason, NotifyPaused: d.NotifyPaused, LastOKAt: d.LastOKAt, QuotaDay: d.QuotaDay,
-			QuotaUsed: d.QuotaUsed, QuotaLimit: d.QuotaLimit, ExpireAt: d.ExpireAt, Failures: d.Failures}
+			QuotaUsed: d.QuotaUsed, QuotaLimit: d.QuotaLimit, ExpireAt: d.ExpireAt, Failures: d.Failures, FailureReason: d.FailureReason}
 	}
 	return out, nil
 }

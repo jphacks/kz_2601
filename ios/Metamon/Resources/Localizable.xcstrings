@@ -6665,6 +6665,23 @@
         }
       }
     },
+    "サービス側の問題でした" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "A problem on our side"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "サービス側の問題でした"
+          }
+        }
+      }
+    },
     "サービス全体で一時停止しています" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -7222,6 +7239,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "データについて"
+          }
+        }
+      }
+    },
+    "データを保存できませんでした" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Couldn't save the data"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "データを保存できませんでした"
           }
         }
       }
@@ -8106,6 +8140,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "リンクを送る"
+          }
+        }
+      }
+    },
+    "ルールが今のアプリのデータの形と合っていません" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The rule no longer matches the app's data"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ルールが今のアプリのデータの形と合っていません"
           }
         }
       }
@@ -9449,6 +9500,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "使い方を見る"
+          }
+        }
+      }
+    },
+    "使うはずのデータが見つからないか、読めませんでした" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The data it uses was missing or couldn't be read"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "使うはずのデータが見つからないか、読めませんでした"
           }
         }
       }
@@ -11612,6 +11680,23 @@
         }
       }
     },
+    "外部の情報を取りにいけませんでした" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Couldn't get information from the outside source"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "外部の情報を取りにいけませんでした"
+          }
+        }
+      }
+    },
     "失敗: %@" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -12577,6 +12662,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "時間がかかりすぎました"
+          }
+        }
+      }
+    },
+    "時間内に終わりませんでした" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Didn't finish in time"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "時間内に終わりませんでした"
           }
         }
       }
@@ -16453,6 +16555,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "通知を予約できませんでした"
+          }
+        }
+      }
+    },
+    "通知を送れませんでした" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Couldn't send the notification"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "通知を送れませんでした"
           }
         }
       }

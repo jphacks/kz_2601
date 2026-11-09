@@ -247,6 +247,9 @@ struct AutomationRuleRow: View {
                 Text(Self.label(rule.result))
             }
             .font(.footnote)
+            if rule.result == .failed, let reason = rule.failureReason {
+                Text(Self.failureLabel(reason)).font(.caption).foregroundStyle(.secondary)
+            }
             if rule.stopped != nil, rule.result != .stopped {
                 Text("運営がこのルールを止めています。").font(.footnote).foregroundStyle(.orange)
             }
@@ -279,6 +282,19 @@ struct AutomationRuleRow: View {
         case .failed: "何度か試しましたがうまくいきませんでした"
         case .disabled: "オフにしていたため動かしませんでした"
         case .other: "動きませんでした"
+        }
+    }
+
+    /// 「何度か試しましたが…」の下に出す理由(#347)。サーバーは決まった語しか返さない。
+    static func failureLabel(_ r: AutomationRule.FailureReason) -> LocalizedStringKey {
+        switch r {
+        case .notifyFailed: "通知を送れませんでした"
+        case .recordUnavailable: "使うはずのデータが見つからないか、読めませんでした"
+        case .mismatch: "ルールが今のアプリのデータの形と合っていません"
+        case .writeRejected: "データを保存できませんでした"
+        case .sourceUnavailable: "外部の情報を取りにいけませんでした"
+        case .timeout: "時間内に終わりませんでした"
+        case .internal: "サービス側の問題でした"
         }
     }
 

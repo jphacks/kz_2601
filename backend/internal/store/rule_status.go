@@ -44,6 +44,9 @@ type RuleStatus struct {
 	// one; a put with LastOKAt resets it to 0; any other put keeps it.
 	Failures int  `json:"failures,omitempty"`
 	Failed   bool `json:"-"`
+	// FailureReason: why a gave_up run failed (status.Failure*, a fixed word,
+	// never the error). Empty for any other outcome: each put overwrites it.
+	FailureReason string `json:"failureReason,omitempty"`
 }
 
 // RuleStatusID names a rule's status: a hash of the parts (like ScheduleKey).

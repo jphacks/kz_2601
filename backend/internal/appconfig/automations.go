@@ -53,7 +53,9 @@ type automationRule struct {
 	Description string `json:"description"`
 	Trigger     string `json:"trigger"` // record | schedule
 	Result      string `json:"result"`  // status.Result*
-	Enabled     bool   `json:"enabled"` // false: the creator turned it off (serverRules[].enabled)
+	// FailureReason: why a failed run gave up (status.Failure*); only with result failed.
+	FailureReason string `json:"failureReason,omitempty"`
+	Enabled       bool   `json:"enabled"` // false: the creator turned it off (serverRules[].enabled)
 	// ConsecutiveFailures: runs that gave up in a row (0 after an ok run);
 	// iOS offers a fix in the chat when it keeps failing.
 	ConsecutiveFailures int             `json:"consecutiveFailures,omitempty"`
@@ -151,6 +153,9 @@ func (h *Handler) automations(w http.ResponseWriter, r *http.Request) {
 		}
 		if st != nil {
 			item.Result = status.Result(st.Outcome, st.Reason, st.NotifyPaused)
+			if item.Result == status.ResultFailed {
+				item.FailureReason = failureReasonOf(st.FailureReason)
+			}
 			item.LastRunAt = timePtr(st.At)
 			item.ConsecutiveFailures = st.Failures
 			if st.QuotaDay != "" && st.QuotaLimit > 0 && (latest == nil || st.At.After(latest.At)) {
@@ -191,3 +196,12 @@ func quotaOf(s *store.RuleStatus, now time.Time) *automationQuota {
 }
 
 func timePtr(t time.Time) *time.Time { return &t }
+
+// failureReasonOf is the stored reason when it is one of the fixed words
+// (status.Failure*), "" otherwise: nothing else of a status leaves here.
+func failureReasonOf(stored string) string {
+	if status.IsFailureReason(stored) {
+		return stored
+	}
+	return ""
+}
