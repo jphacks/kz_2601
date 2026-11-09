@@ -8,10 +8,13 @@ import (
 // The speech rules reach the generation prompt, and the catalog / chat index
 // (both built from the schema) describe transcribeField and speakButton.
 func TestSpeechRulesReachPrompts(t *testing.T) {
-	for _, want := range []string{"## 文字起こし・読み上げ", "**transcribeField**{field", "**speakButton**", "同じ field に textEditor を重ねない"} {
+	for _, want := range []string{"## 文字起こし・読み上げ", "**transcribeField**{field", "**speakButton**"} {
 		if !strings.Contains(systemPrompt, want) {
 			t.Errorf("systemPrompt lacks %q", want)
 		}
+	}
+	if !strings.Contains(catalog, "同じ field に textEditor を重ねて置かない") {
+		t.Error("catalog lacks the transcribeField/textEditor overlap rule")
 	}
 	if !strings.Contains(catalog, "\n- transcribeField: field") {
 		t.Error("catalog lacks the transcribeField line with its required keys")
