@@ -25,7 +25,7 @@ var serverRulesPickSection = strings.TrimSpace(`
 - each の無い時刻のきっかけでも使える(宛先は owner・members、createRecord)。行のレコード自身は選ばない。entity と exclude の entity は同じアプリ・ルールと同じ側だけ(宛先付きは不可)。hidden・computed の field では絞らない。
 - 毎朝のおすすめ: 「まだ食べていないメニューを毎朝 1 つおすすめして」(shared の menus{name}・eats{menu:ref→menus}・picks{menu:ref→menus, name:string, day:date})= on {every:"daily",time:"08:00"}・pick {"entity":"menus","order":"random","exclude":{"entity":"eats","field":"menu"}}・createRecord picks values [{"field":"menu","value":{"ref":"$pick"}},{"field":"name","value":{"ref":"$pick.name"}},{"field":"day","value":{"op":"today","args":[]}}]・notify to {"kind":"members"}(body「今日は {$pick.name} はどうですか」)。画面は picks の list。
 - 献立の提案: 「毎晩、明日の献立を主菜からランダムに決めて」(private の recipes{name, kind:enum})= on {every:"daily",time:"20:00"}・pick {"entity":"recipes","order":"random","filter":[{"field":"kind","op":"eq","value":"main"}]}・createRecord plans・notify owner(body「明日は {$pick.name}」)。
-- 順番に出す: 「登録した豆知識を古い順に毎日 1 つ出して」= pick {"order":"oldest","exclude":{"entity":"shown","field":"tip"}} と createRecord shown {tip:$pick}(出したものを記録して次は除く)。
+- 順番に出す: 「登録した豆知識を古い順に毎日 1 つ出して」= pick {"entity":"tips","order":"oldest","exclude":{"entity":"shown","field":"tip"}} と createRecord shown {tip:$pick}(出したものを記録して次は除く)。
 `)
 
 func init() {

@@ -448,6 +448,7 @@ func runCase(ctx context.Context, svc *ai.Service, store *appconfigclient.Memory
 		rec.ExpectMisses = append(rec.ExpectMisses, checkNearby(c.Expect, app)...)     // #425: nearby.go
 		rec.ExpectMisses = append(rec.ExpectMisses, checkMusic(c.Expect, app)...)      // #412: music.go
 		rec.ExpectMisses = append(rec.ExpectMisses, checkRetention(c.Expect, app)...)  // #482: retention.go
+		rec.ExpectMisses = append(rec.ExpectMisses, checkMasterTappable(c.Expect, app)...)
 		// text.highlight: text_highlight.go
 		rec.ExpectMisses = append(rec.ExpectMisses, checkTextHighlight(c.Expect, app)...)
 		rec.ExpectMisses = append(rec.ExpectMisses, checkPlaceSearch(c.Expect, app)...) // place_search.go

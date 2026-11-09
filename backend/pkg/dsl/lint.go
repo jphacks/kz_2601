@@ -32,6 +32,7 @@ func (a *App) Lint() []string {
 	l.dateDefaults()
 	l.screens()
 	l.entityReach()
+	l.savedRecordReach() // saved_record.go
 	l.navGraph()
 	l.micSeat()
 	l.dupAddControls()
