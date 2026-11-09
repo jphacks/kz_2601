@@ -5,6 +5,8 @@ import PackageDescription
 
 let package = Package(
     name: "MetamonServices",
+    // 固定文言は Resources/Localizable.xcstrings(日本語がソース・英訳を併記)。`Bundle.module` で引く
+    defaultLocalization: "ja",
     platforms: [.iOS(.v17), .macOS(.v14)],
     products: [
         .library(name: "MetamonServices", targets: ["MetamonServices"]),
@@ -28,6 +30,7 @@ let package = Package(
                 // App Check(#318): App Attest / DeviceCheck / デバッグ用のトークンを ai・appconfig に付ける
                 .product(name: "FirebaseAppCheck", package: "firebase-ios-sdk"),
             ],
+            resources: [.process("Resources")],
             swiftSettings: [.enableExperimentalFeature("StrictConcurrency=targeted")]
         ),
         .testTarget(

@@ -8,7 +8,7 @@ public enum AppListEdit {
 
     /// 実装の無いクライアント(テスト用など)が投げる。
     public struct Unsupported: LocalizedError {
-        public var errorDescription: String? { "この接続先では使えません" }
+        public var errorDescription: String? { L("この接続先では使えません") }
     }
     public static let unsupported = Unsupported()
 

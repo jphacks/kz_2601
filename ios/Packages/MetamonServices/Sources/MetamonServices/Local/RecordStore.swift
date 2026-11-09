@@ -50,7 +50,8 @@ public struct LocalRecord: Codable, Sendable, Equatable, Identifiable {
 
     /// Renderer に渡す形。
     public var record: Record {
-        Record(id: recordId, data: data, createdAt: createdAt, updatedAt: updatedAt, author: author, authorName: authorName, marks: marks)
+        Record(id: recordId, data: data, createdAt: createdAt, updatedAt: updatedAt, author: author, authorName: authorName, marks: marks,
+               unsent: pendingOp == .create)
     }
 
     /// 未送信 create の仮 id(`local-<clientId>`)。サーバー採番後に差し替わる。

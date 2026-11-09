@@ -28,8 +28,8 @@ enum AIGenerateRoute: Equatable {
 
     static var isMock: Bool { ProcessInfo.processInfo.environment["METAMON_MOCK"] == "1" }
 
-    static let longUnavailable = "長い文章はオンラインの AI だけで書けます(この版では使えません)"
-    static let photoUnavailable = "写真を読むのはオンラインの AI だけです(この版では使えません)"
+    static var longUnavailable: String { L("長い文章はオンラインの AI だけで書けます(この版では使えません)") }
+    static var photoUnavailable: String { L("写真を読むのはオンラインの AI だけです(この版では使えません)") }
 }
 
 // MARK: - 依頼の組み立て(純粋関数・テスト対象)
@@ -41,8 +41,8 @@ enum AIGenerateBuilder {
 
         var errorDescription: String? {
             switch self {
-            case .noInstruction: "この AI ボタンの設定が正しくありません"
-            case .noRecords: "先に記録を追加してください"
+            case .noInstruction: L("この AI ボタンの設定が正しくありません")
+            case .noRecords: L("先に記録を追加してください")
             }
         }
     }
