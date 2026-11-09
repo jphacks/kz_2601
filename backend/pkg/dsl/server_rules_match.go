@@ -65,6 +65,14 @@ func (r *ServerRule) ReferencedFields() []string {
 			addField(f) // the row's values similar compares
 		}
 	}
+	if p := r.Pick; p != nil {
+		if p.Exclude != nil && p.Exclude.Match != nil && p.Exclude.Match.Equals != LookupID {
+			addField(p.Exclude.Match.Equals) // the row's value exclude.match compares
+		}
+		if p.Count != nil && p.Count.Entity == r.RowEntity() {
+			addField(p.Count.Field) // the row's current assignment is not counted
+		}
+	}
 	for _, act := range r.Do {
 		switch {
 		case act.Notify != nil:

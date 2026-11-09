@@ -10,10 +10,10 @@ MANIFEST="${TARGET_BUILD_DIR}/${UNLOCALIZED_RESOURCES_FOLDER_PATH}/PrivacyInfo.x
 [ -f "$MANIFEST" ] || { echo "warning: extend-privacy-manifest: ${MANIFEST} が無い"; exit 0; }
 
 # 購入履歴(App 内課金の取引をサーバーで確かめて保存・v1/me/entitlements/apple)
-# 製品の操作(aiButton の集計・v1/metrics/ai-button)
+# (製品の操作は、サーバーの利用の集計が全部の版にあるので元のファイルで宣言済み。aiButton の集計もそこに入る)
 # カスタマーサポート(アプリ内のフィードバック・v1/feedback)
 # デバイス ID(プッシュの端末の登録・v1/me/devices)
-for type in PurchaseHistory ProductInteraction CustomerSupport DeviceID; do
+for type in PurchaseHistory CustomerSupport DeviceID; do
   key="NSPrivacyCollectedDataType${type}"
   # 差分ビルドでリソースがコピーし直されない時に二重に足さない
   if plutil -extract NSPrivacyCollectedDataTypes xml1 -o - "$MANIFEST" | grep -q "<string>${key}</string>"; then

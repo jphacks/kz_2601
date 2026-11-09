@@ -32,9 +32,10 @@ jobs:
       - name: shellcheck を取得(バージョン固定)
         run: |
           set -euo pipefail
-          curl -fsSL \
-            "https://github.com/koalaman/shellcheck/releases/download/v${SHELLCHECK_VERSION}/shellcheck-v${SHELLCHECK_VERSION}.linux.x86_64.tar.xz" \
-            | tar xJ -C "$RUNNER_TEMP"
+          # GitHub の一時的な 5xx で落ちないよう再試行する。途中で切れた時に壊れた tar を作らないようファイルに落としてから展開
+          curl -fsSL --retry 5 --retry-delay 5 --retry-all-errors -o "$RUNNER_TEMP/shellcheck.tar.xz" \
+            "https://github.com/koalaman/shellcheck/releases/download/v${SHELLCHECK_VERSION}/shellcheck-v${SHELLCHECK_VERSION}.linux.x86_64.tar.xz"
+          tar xJf "$RUNNER_TEMP/shellcheck.tar.xz" -C "$RUNNER_TEMP"
           echo "$RUNNER_TEMP/shellcheck-v${SHELLCHECK_VERSION}" >>"$GITHUB_PATH"
       - name: shellcheck(追跡中の *.sh 全部)
         run: |
@@ -82,9 +83,10 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p "$RUNNER_TEMP/actionlint"
-          curl -fsSL \
-            "https://github.com/rhysd/actionlint/releases/download/v${ACTIONLINT_VERSION}/actionlint_${ACTIONLINT_VERSION}_linux_amd64.tar.gz" \
-            | tar xz -C "$RUNNER_TEMP/actionlint"
+          # 上の取得と同じく 5xx を再試行し、ファイルに落としてから展開
+          curl -fsSL --retry 5 --retry-delay 5 --retry-all-errors -o "$RUNNER_TEMP/actionlint.tar.gz" \
+            "https://github.com/rhysd/actionlint/releases/download/v${ACTIONLINT_VERSION}/actionlint_${ACTIONLINT_VERSION}_linux_amd64.tar.gz"
+          tar xzf "$RUNNER_TEMP/actionlint.tar.gz" -C "$RUNNER_TEMP/actionlint"
           echo "$RUNNER_TEMP/actionlint" >>"$GITHUB_PATH"
       - name: actionlint(.github/workflows/*.yml)
         run: |

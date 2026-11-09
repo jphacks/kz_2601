@@ -94,7 +94,7 @@ public struct MusicRequestInbox: Equatable, Sendable {
         }
         if autoAccept { return .queue(song) }
         var name = MusicRequestRules.clip(sender, MusicRequestRules.maxSender)
-        if name.isEmpty { name = "近くの人" }
+        if name.isEmpty { name = L("近くの人") }
         pending.append(MusicRequest(song: song, sender: name))
         if pending.count > MusicRequestRules.maxPending { pending.removeFirst(pending.count - MusicRequestRules.maxPending) }
         return .pending

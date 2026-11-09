@@ -303,6 +303,9 @@ func (r *Runner) runRule(ctx context.Context, h *scope.Handle, ev store.OutboxEv
 	rl := runLog{ruleID: rule.ID}
 	finish := func(outcome string) string {
 		usage.Outcome, rl.outcome = outcome, outcome
+		if outcome == quota.OutcomeOK && appLimited(usage.Limit) {
+			rl.reason = ReasonAppLimit
+		}
 		usage.CPUMs, rl.took = time.Since(start).Milliseconds(), time.Since(start)
 		r.cfg.Quota.LogUsage(ctx, usage)
 		r.logRun(ctx, ev, rl)
@@ -320,7 +323,7 @@ func (r *Runner) runRule(ctx context.Context, h *scope.Handle, ev store.OutboxEv
 		}
 		return finish(dec.Outcome), quota.Charge{}, nil
 	}
-	reader := &ruleReader{h: h, q: r.cfg.Quota, dec: dec, maxReads: r.cfg.Quota.RunReadCap(dec.Plan), charged: charged, usage: &usage}
+	reader := &ruleReader{h: h, q: r.cfg.Quota, dec: dec, maxReads: r.cfg.Quota.RunReadCap(dec.Plan), charged: charged, usage: &usage, feeds: r.cfg.Feeds}
 	rows, err := planRows(ctx, app, rule, trig, reader)
 	if errors.Is(err, engine.ErrReadLimit) {
 		// stopped, never computed on part of the records (#338: stop, do not delay)
@@ -349,6 +352,7 @@ func (r *Runner) runRule(ctx context.Context, h *scope.Handle, ev store.OutboxEv
 	usage.WritesDropped = grant.Dropped
 	written := 0
 	for _, row := range rows {
+		rl.skips = append(rl.skips, row.Plan.Skipped...)
 		for _, w := range row.Plan.Writes {
 			if written >= grant.Allowed {
 				break
@@ -371,7 +375,7 @@ func (r *Runner) runRule(ctx context.Context, h *scope.Handle, ev store.OutboxEv
 		consent = r.cfg.Consent
 	}
 	resolver, err := notify.NewResolver(notify.Config{Directory: h, Accounts: h, Consent: consent, Age: r.cfg.Age,
-		Limiter: recipientLimiter{q: r.cfg.Quota, dec: dec, charged: charged}})
+		Limiter: recipientLimiter{q: r.cfg.Quota, dec: dec, charged: charged, usage: &usage}})
 	if err != nil {
 		return fail(err)
 	}
@@ -467,6 +471,7 @@ type ruleReader struct {
 	read     int // records listed so far
 	charged  *quota.Charge
 	usage    *quota.Usage
+	feeds    FeedGetter // saveFeed (feed.go); nil = skipped
 }
 
 // Record implements engine.RefReader.
@@ -523,12 +528,24 @@ func createClientID(eventID, rule string, action int, row string) string {
 	return client
 }
 
+// keyedClientID is the idempotency key of a create named by its key
+// (PlannedWrite.Key) instead of the run: the same rule, action and key give
+// the same record whichever event runs it. The record set is the app's (and
+// the user's), so the app and uid need not be in it.
+func keyedClientID(rule string, action int, key string) string {
+	return "key/" + rule + "/" + strconv.Itoa(action) + "/" + key
+}
+
 // write carries out one planned write once. wrote=false: already done by
 // an earlier attempt, or the target record is gone.
 func (r *Runner) write(ctx context.Context, h *scope.Handle, ev store.OutboxEvent, rule *dsl.ServerRule, row string, w engine.PlannedWrite) (bool, error) {
 	switch w.Kind {
 	case engine.WriteCreate:
-		id := store.IDFromClientID(createClientID(ev.EventID, rule.ID, w.Action, row))
+		client := createClientID(ev.EventID, rule.ID, w.Action, row)
+		if w.Key != "" {
+			client = keyedClientID(rule.ID, w.Action, w.Key)
+		}
+		id := store.IDFromClientID(client)
 		origin := store.RecordOrigin{RuleID: rule.ID, Version: ev.Version, EventID: ev.EventID, ActorUID: ev.ActorUID}
 		return h.CreateRecord(ctx, w.Entity, id, w.Values, origin)
 	case engine.WriteUpdate, engine.WriteIncrement:
@@ -615,6 +632,7 @@ type recipientLimiter struct {
 	q       *quota.Quota
 	dec     quota.Decision
 	charged *quota.Charge // what the grants counted (refund on give-up)
+	usage   *quota.Usage  // Limit gets the app's notify limit when it dropped someone
 }
 
 func (l recipientLimiter) Limit(ctx context.Context, uids []string) ([]string, []notify.LimitDrop, error) {
@@ -628,6 +646,9 @@ func (l recipientLimiter) Limit(ctx context.Context, uids []string) ([]string, [
 	drops := make([]notify.LimitDrop, 0, len(g.Dropped))
 	for _, d := range g.Dropped {
 		drops = append(drops, notify.LimitDrop{UID: d.UID, Scope: d.Block.Scope})
+		if l.usage != nil && d.Block.Scope == quota.ScopeAppNotify {
+			l.usage.Limit = d.Block.Scope
+		}
 	}
 	return g.Allowed, drops, nil
 }
@@ -641,6 +662,7 @@ type runLog struct {
 	// notifiesSkipped: notify actions not sent because of notifyPaused
 	notifiesSkipped int
 	writesSkipped   int
+	skips           []engine.PlannedSkip // actions the plan left out (reason codes)
 	notifies        []notify.Summary
 	took            time.Duration
 	// quota: the app's execution counter of quotaDay (rule status, #347)
@@ -673,6 +695,13 @@ func (r *Runner) logRun(ctx context.Context, ev store.OutboxEvent, l runLog) {
 	}
 	if l.writesSkipped > 0 {
 		attrs = append(attrs, slog.Int("writes_skipped", l.writesSkipped))
+	}
+	if len(l.skips) > 0 {
+		reasons := make([]string, len(l.skips))
+		for i, s := range l.skips {
+			reasons[i] = s.Reason
+		}
+		attrs = append(attrs, slog.Int("actions_skipped", len(l.skips)), slog.Any("skip_reasons", reasons))
 	}
 	if len(l.notifies) > 0 {
 		attrs = append(attrs, slog.Any("notifies", l.notifies))

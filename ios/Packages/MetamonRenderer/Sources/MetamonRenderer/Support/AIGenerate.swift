@@ -28,8 +28,8 @@ enum AIGenerateRoute: Equatable {
 
     static var isMock: Bool { ProcessInfo.processInfo.environment["METAMON_MOCK"] == "1" }
 
-    static let longUnavailable = "長い文章はオンラインの AI だけで書けます(この版では使えません)"
-    static let photoUnavailable = "写真を読むのはオンラインの AI だけです(この版では使えません)"
+    static var longUnavailable: String { L("長い文章はオンラインの AI だけで書けます(この版では使えません)") }
+    static var photoUnavailable: String { L("写真を読むのはオンラインの AI だけです(この版では使えません)") }
 }
 
 // MARK: - 依頼の組み立て(純粋関数・テスト対象)
@@ -41,8 +41,8 @@ enum AIGenerateBuilder {
 
         var errorDescription: String? {
             switch self {
-            case .noInstruction: "この AI ボタンの設定が正しくありません"
-            case .noRecords: "先に記録を追加してください"
+            case .noInstruction: L("この AI ボタンの設定が正しくありません")
+            case .noRecords: L("先に記録を追加してください")
             }
         }
     }
@@ -51,14 +51,18 @@ enum AIGenerateBuilder {
     static func build(_ c: Component, form: Entity?, values: [String: JSONValue],
                       sourceEntity: Entity?, records: [Record], locale: String) throws -> AITextRequest {
         let english = locale == "en"
-        var instruction = (c.prompt ?? "").replacingOccurrences(of: "{{input}}", with: english ? "the data below" : "下の材料")
-        if let form {
-            for f in form.fields {
-                instruction = instruction.replacingOccurrences(of: "{{\(f.id)}}", with: FieldCoding.display(values[f.id] ?? .null, field: f))
-            }
+        var instruction = AIPlaceholder.replace(c.prompt ?? "") { id in
+            if id == "input" { return english ? "the data below" : "下の材料" }
+            guard let f = form?.fields.first(where: { $0.id == id }) else { return nil }
+            return FieldCoding.display(values[f.id] ?? .null, field: f)
         }
         instruction = String(instruction.trimmingCharacters(in: .whitespacesAndNewlines).prefix(AITextLimits.maxInstruction))
         guard !instruction.isEmpty else { throw BuildError.noInstruction }
+        // outputs: 数・日付・enum の書き方は formats で別に渡す(指示はボタンの指示のまま・作成者が払う呼び出しの照合のため)
+        var formats: [AITextFormat]?
+        if c.shape == AITextShape.fields.rawValue, let outputs = c.outputs, let form {
+            formats = AIOutputs.formats(items: Array((c.items ?? []).prefix(AITextLimits.maxItems)), outputs: outputs, entity: form)
+        }
 
         var input: String?
         if let source = sourceEntity {
@@ -79,7 +83,7 @@ enum AIGenerateBuilder {
             instruction: instruction, shape: shape,
             count: shape == .list ? Swift.min(Swift.max(c.count ?? AITextLimits.defaultCount, 1), AITextLimits.maxItems) : nil,
             items: shape == .fields ? Array((c.items ?? []).prefix(AITextLimits.maxItems)) : nil,
-            input: input, locale: locale, length: long ? "long" : nil)
+            input: input, locale: locale, length: long ? "long" : nil, formats: formats)
     }
 
     /// 端末内 AI の instructions(安全の指示は backend の system と同じ趣旨)。
@@ -98,7 +102,9 @@ enum AIGenerateBuilder {
         switch r.shape {
         case .line: p += "形: 1 文だけ\n"
         case .list: p += "形: 重複しない短い案を \(r.resolvedCount) 個\n"
-        case .fields: p += "形: 次の項目ごとに短く 1 つずつ: " + (r.items ?? []).joined(separator: " / ") + "\n"
+        case .fields:
+            p += "形: 次の項目ごとに短く 1 つずつ: " + (r.items ?? []).joined(separator: " / ") + "\n"
+            if let hint = AIOutputs.hint(r.formats, english: r.locale == "en") { p += hint + "\n" }
         }
         if let input = r.input { p += "材料:\n\(input)\n" }
         return p

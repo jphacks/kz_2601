@@ -81,7 +81,7 @@ func TestFollowsCap(t *testing.T) {
 func TestStoreAccountPurgeFollows(t *testing.T) {
 	bothStores(t, func(t *testing.T, s Store, sfx string) {
 		ctx := context.Background()
-		app := "PF-APP"+sfx
+		app := "PF-APP" + sfx
 		leaver, fan, idol := "pf-leaver"+sfx, "pf-fan"+sfx, "pf-idol"+sfx
 		if _, _, err := s.EnsureApp(ctx, leaver, app, json.RawMessage(`{}`), "x"); err != nil {
 			t.Fatal(err)

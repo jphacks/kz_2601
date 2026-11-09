@@ -78,7 +78,7 @@ struct NearbyPassbyLeaf: View {
                 .foregroundStyle(.secondary)
         } else {
             Text(fieldNames.isEmpty ? L("送る項目がありません")
-                 : "オンにすると、この画面を開いている間 近くの同じアプリの人と\(fieldNames.map { "「\($0)」" }.joined())を交換します")
+                 : L("オンにすると、この画面を開いている間 近くの同じアプリの人と\(fieldNames.map { "「\($0)」" }.joined())を交換します"))
                 .font(.footnote)
                 .foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
@@ -142,7 +142,7 @@ struct NearbyPassbyLeaf: View {
                                     .font(.caption).foregroundStyle(.secondary)
                             }
                             Spacer()
-                            Text("\(e.times) 回").font(.caption).foregroundStyle(.secondary)
+                            Text(L("\(e.times) 回")).font(.caption).foregroundStyle(.secondary)
                         }
                         .accessibilityElement(children: .combine)
                     }

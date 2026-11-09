@@ -4,16 +4,17 @@
   Tailor It のプライバシーマニフェスト(#452 G6・#328)。中身の一覧と根拠は docs/store/privacy-label.md(栄養ラベルの答えと 1 対 1)。
   対象は App Store に出す審査用の版(APP_STORE_REVIEW)。通常の版だけで増える種類は privacy-label.md の 4 章。
   通常の版(Debug / Staging / Release)は、ビルドの最後に scripts/extend-privacy-manifest.sh がバンドルの写しに
-  購入履歴・製品の操作・カスタマーサポートを足す(この元のファイルは審査用の版の申告のまま)。
+  購入履歴・カスタマーサポート・デバイス ID を足す(この元のファイルは審査用の版の申告のまま)。
   理由が要る API:
     UserDefaults: アプリだけの設定(CA92.1)・App Group でウィジェットと共有(1C8F.1・WidgetSnapshot)
     空き容量: 音声モデルのダウンロード前の確認と不足分の表示(E174.1 / 85F4.1・ModelDownloadAdvice。DashcamRecorder は通常の版だけ)
     ファイルの日時・起動時間・キーボードは使わない(#328 で grep 済み)。
-  集めるデータ(すべて本人に紐づく・トラッキングなし・用途はアプリの機能):
+  集めるデータ(すべて本人に紐づく・トラッキングなし・用途はアプリの機能。製品の操作とユーザー ID はアナリティクスも):
     ユーザー ID / 名前 / メールアドレス(Sign in with Apple が渡した時に Firebase Auth が保存)/
     その他のユーザーコンテンツ(記録帳の設計・記録・AI に送る依頼の文と会話)/ 写真またはビデオ(記録に入れた縮小画像)/ 正確な位置(記録に入れた場所)/
-    クラッシュのデータ / パフォーマンスのデータ / その他の診断データ(Firebase Crashlytics・#296。端末の状態・インストールの識別子。uid を付けるので本人に紐づく)
-  集めないもの: 音声(端末内で文字にする)・ヘルスケア・広告 ID・分析・購入(審査用の版は課金なし)・使用状況(aiButton の集計は通常の版だけ)。
+    クラッシュのデータ / パフォーマンスのデータ / その他の診断データ(Firebase Crashlytics・#296。端末の状態・インストールの識別子。uid を付けるので本人に紐づく)/
+    製品の操作(サーバーの利用の集計・#297。uid_hash 付きで、全部の版が対象。通常の版の aiButton の集計もここに入る)
+  集めないもの: 音声(端末内で文字にする)・ヘルスケア・広告 ID・分析の SDK・購入(審査用の版は課金なし)。
   依存 SDK のうち FirebaseAppCheck / FirebaseSessions / AppCheckCore / WhisperKit は自前のマニフェストを持たない(13.1.1・1.1.1 時点)。
   これらの UserDefaults はこのマニフェストの CA92.1 で覆う。
 -->
@@ -35,6 +36,7 @@
 			<key>NSPrivacyCollectedDataTypePurposes</key>
 			<array>
 				<string>NSPrivacyCollectedDataTypePurposeAppFunctionality</string>
+				<string>NSPrivacyCollectedDataTypePurposeAnalytics</string>
 			</array>
 		</dict>
 		<dict>
@@ -131,6 +133,18 @@
 			<key>NSPrivacyCollectedDataTypePurposes</key>
 			<array>
 				<string>NSPrivacyCollectedDataTypePurposeAppFunctionality</string>
+			</array>
+		</dict>
+		<dict>
+			<key>NSPrivacyCollectedDataType</key>
+			<string>NSPrivacyCollectedDataTypeProductInteraction</string>
+			<key>NSPrivacyCollectedDataTypeLinked</key>
+			<true/>
+			<key>NSPrivacyCollectedDataTypeTracking</key>
+			<false/>
+			<key>NSPrivacyCollectedDataTypePurposes</key>
+			<array>
+				<string>NSPrivacyCollectedDataTypePurposeAnalytics</string>
 			</array>
 		</dict>
 	</array>

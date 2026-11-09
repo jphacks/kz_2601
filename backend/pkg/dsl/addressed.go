@@ -155,6 +155,9 @@ func checkAddressedRule(a *App, r *ServerRule, addressed map[string]*Entity, whe
 		if p.Exclude != nil && addressed[p.Exclude.Entity] != nil {
 			add("%s.pick.exclude: entity %q is addressed (only its author and recipients read it); a rule cannot read its records", where, p.Exclude.Entity)
 		}
+		if p.Count != nil && addressed[p.Count.Entity] != nil {
+			add("%s.pick.count: entity %q is addressed (only its author and recipients read it); a rule cannot count its records", where, p.Count.Entity)
+		}
 	}
 	rowEntity := a.EntityByID(r.RowEntity())
 	seen := map[string]bool{} // one problem per expression shape
@@ -175,6 +178,8 @@ func checkAddressedRule(a *App, r *ServerRule, addressed map[string]*Entity, whe
 		switch {
 		case act.Notify != nil && row != nil && act.Notify.To.Kind != RecipientAuthor && act.Notify.To.Kind != RecipientRecipients:
 			add(`%s.notify.to: entity %q is addressed (only its author and recipients read it); notify kind "author" or "recipients" only`, w, row.ID)
+		case act.SaveFeed != nil && addressed[act.SaveFeed.Entity] != nil:
+			add("%s.saveFeed: entity %q is addressed; a rule cannot send it (the sender picks the recipients)", w, act.SaveFeed.Entity)
 		case act.CreateRecord != nil && addressed[act.CreateRecord.Entity] != nil:
 			add("%s.createRecord: entity %q is addressed; a rule cannot send it (the sender picks the recipients)", w, act.CreateRecord.Entity)
 		case act.CreateRecord != nil && row != nil:

@@ -79,6 +79,9 @@ type Meta struct {
 	LogicPass        *LogicMeta `json:"logicPass,omitempty"` // set when the logic pass ran
 	// ServerRules is set when the server-rules pass ran (#343).
 	ServerRules *ServerRulesMeta `json:"serverRules,omitempty"`
+	// ServerNeed is the main call's serverNeed (AI_SERVER_RULES=1 only; set
+	// even when the pass did not run, "" = the field was missing).
+	ServerNeed string `json:"serverNeed,omitempty"`
 	// LintRetried: the first valid output had content warnings (dsl.Lint) and
 	// was regenerated once with them; Lint lists the warnings left in the
 	// returned document (create) or added by the patch (edit).
@@ -178,6 +181,9 @@ type Service struct {
 	Pro paid.ProChecker
 	// ProMode is PRO_GATE_MODE: enforce ("" too) / log / off.
 	ProMode paid.Mode
+	// NoBookLookup: the book lookup is off on appconfig (BOOK_LOOKUP_ENABLED
+	// unset), so the AI does not generate lookupBook (clientRestriction).
+	NoBookLookup bool
 	// TextImage accepts the photo of aiButton inputPhoto on /v1/text
 	// (text_image.go; env AI_TEXT_IMAGE=1). Off = 403.
 	TextImage bool
@@ -185,6 +191,10 @@ type Service struct {
 	// with appId is covered by the creator's Pro (text_payer.go). nil = the
 	// caller's own Pro only.
 	Members AppMembers
+	// CreatorPaid caps the creator-paid /v1/text calls per app and day
+	// (text_payer_scope.go). nil = not counted.
+	CreatorPaid *CreatorPaidCap
+	scopes      scopeCache // compiled published DSL per appId (text_payer_scope.go)
 
 	// Logger gets the ai.generate line per /v1/generate (#322); nil = slog.Default().
 	Logger *slog.Logger
@@ -212,6 +222,12 @@ type attemptResult struct {
 	// forceFull: the DSL was changed after the patch (build restriction), so
 	// it is saved as a full document instead of the model's ops.
 	forceFull bool
+	// before: the app as it was before this turn (edit); nil on create.
+	before []byte
+	// serverNeed: the model's root serverNeed (AI_SERVER_RULES=1); needSeen:
+	// the accepted output had the key (server_need.go).
+	serverNeed string
+	needSeen   bool
 }
 
 // Generate runs the pipeline: fetch current -> decide mode -> Claude ->
@@ -237,7 +253,7 @@ func (s *Service) GenerateStream(ctx context.Context, req Request, sink Sink) (*
 }
 
 func (s *Service) generateStream(ctx context.Context, req Request, sink Sink, started time.Time, tr *genTrace) (*Result, error) {
-	restrict := NewClientRestriction(req.AllowedComponents, req.DisabledFeatures, req.SupportedFeatures)
+	restrict := s.clientRestriction(req.AllowedComponents, req.DisabledFeatures, req.SupportedFeatures)
 	ctx = withRestriction(ctx, restrict)
 	transcript := strings.TrimSpace(req.Transcript)
 	if transcript == "" {
@@ -246,6 +262,7 @@ func (s *Service) generateStream(ctx context.Context, req Request, sink Sink, st
 	if req.AppID == "" || transcript == "" {
 		return nil, &Error{Status: http.StatusBadRequest, Code: httpx.CodeBadRequest, Message: "appId and transcript are required"}
 	}
+	ctx = withServerPush(ctx, s.serverRulesOn(ctx, transcript)) // push wording + serverNeed (server_need.go)
 	loc, err := resolveLocale(req.Locale, transcript)
 	if err != nil {
 		return nil, err
@@ -293,6 +310,8 @@ func (s *Service) generateStream(ctx context.Context, req Request, sink Sink, st
 	case ModeEdit:
 		ar, err = s.generateEdit(ctx, transcript, env, loc, sink)
 		if err == nil {
+			// the server-rules pass compares notifications with it
+			ar.before = env.DSL
 			ar.summary = withShareNote(ar.summary, transcript, env.DSL, ar.raw, loc) // #259 #215
 			notePublicPII(ar, env.DSL, loc)                                          // #253
 		}
@@ -394,8 +413,10 @@ func (s *Service) generateFull(ctx context.Context, transcript, refDSL string, m
 	ar.meta.Model = s.Model
 	var problems []string
 	var lastCandidate []byte
+	var lastNeed string
+	var lastNeedSeen bool
 	var linted *attemptResult // valid output kept while regenerating for its lint warnings
-	streamed := false // a component event was sent: a regeneration sends restart (#636)
+	streamed := false         // a component event was sent: a regeneration sends restart (#636)
 	for i := 0; i <= s.maxRegen(); i++ {
 		if i > 0 {
 			restartEvent(sink, loc, ar.meta.Attempts+1, streamed)
@@ -405,14 +426,15 @@ func (s *Service) generateFull(ctx context.Context, transcript, refDSL string, m
 		if err != nil {
 			return nil, err
 		}
-		raw := dropFormPhotoPreviews(fillDefaults(extractJSON(resp.Text)))
+		body, need, needSeen := takeServerNeed(extractJSON(resp.Text)) // never reaches the DSL
+		raw := dropFormPhotoPreviews(fillDefaults(body))
 		raw = fixButtonOverlap(raw) // before validation: saves a regeneration (#169)
 		app, perr := dsl.Parse(raw)
 		if perr == nil && linted == nil && i < s.maxRegen() {
 			// #245: a part this build cannot render is a validation problem;
 			// on the last attempt it is accepted and removed by applyRestriction.
 			if v := restrictionViolations(raw, nil, restrictionFrom(ctx)); len(v) > 0 {
-				lastCandidate = raw
+				lastCandidate, lastNeed, lastNeedSeen = raw, need, needSeen
 				problems = v
 				ar.meta.LastProblems = problems
 				continue
@@ -463,6 +485,10 @@ func (s *Service) generateFull(ctx context.Context, transcript, refDSL string, m
 			ar.raw = canon(raw)
 			ar.summary = summarizeFor(app, loc)
 			ar.meta.Lint = app.Lint()
+			ar.serverNeed, ar.needSeen = need, needSeen
+			if linted != nil { // OR across the lint retry
+				ar.serverNeed, ar.needSeen = mergeServerNeed(linted.serverNeed, need), linted.needSeen || needSeen
+			}
 			// #257: parts of the request dropped without a word count as content problems too
 			om := omissions(transcript, app, app.App.Description, !uiOnly)
 			lintRetry := s.LintRetry && len(ar.meta.Lint)+len(om) > 0
@@ -492,15 +518,18 @@ func (s *Service) generateFull(ctx context.Context, transcript, refDSL string, m
 			break // the lint retry broke the document: keep the earlier valid one
 		}
 		lastCandidate = raw
+		lastNeed, lastNeedSeen = need, needSeen
 		problems = problemsOf(perr, resp)
 		ar.meta.LastProblems = problems
 	}
 	if linted != nil {
 		ar.raw, ar.summary, ar.meta.Lint = linted.raw, linted.summary, linted.meta.Lint
+		ar.serverNeed, ar.needSeen = linted.serverNeed, linted.needSeen
 		return ar, nil
 	}
 	if stripped, ok := stripAreas(lastCandidate); ok {
 		if app, perr := dsl.Parse(stripped); perr == nil {
+			ar.serverNeed, ar.needSeen = lastNeed, lastNeedSeen
 			ar.raw = stripped
 			ar.summary = summarizeFor(app, loc)
 			ar.meta.AreaFallback = true
@@ -519,17 +548,21 @@ func (s *Service) generateEdit(ctx context.Context, transcript string, env *appc
 	var problems []string
 	var lastOps []dsl.PatchOp
 	var lastSummary string
+	var lastNeed string
+	var lastNeedSeen bool
 	var linted *attemptResult
 	baseLint := lintOf(env.DSL)
 	for i := 0; i <= s.maxRegen(); i++ {
-		resp, err := s.call(WithOperation(ctx, OpPatch), systemPrompt+"\n"+editRules,
+		resp, err := s.callWith(WithOperation(ctx, OpPatch), systemPrompt, editSystemSuffix(),
 			editUserMessage(transcript, env.Version, string(env.DSL), problems, loc), PatchGenerationSchema(), ar,
 			summaryEventWatcher(sink, loc, ar.meta.Attempts+1))
 		if err != nil {
 			return nil, err
 		}
 		var doc dsl.PatchDocument
-		uerr := json.Unmarshal(extractJSON(resp.Text), &doc)
+		out := extractJSON(resp.Text)
+		uerr := json.Unmarshal(out, &doc)
+		need, needSeen := editServerNeed(out) // beside the PatchDocument (server_need.go)
 		if uerr != nil && linted != nil {
 			break
 		}
@@ -547,7 +580,7 @@ func (s *Service) generateEdit(ctx context.Context, transcript string, env *appc
 			// #245: the patch may not add parts this build cannot render
 			// (ones already in the app are removed by applyRestriction).
 			if v := restrictionViolations(next, env.DSL, restrictionFrom(ctx)); len(v) > 0 {
-				lastOps, lastSummary = doc.Patch, doc.Summary
+				lastOps, lastSummary, lastNeed, lastNeedSeen = doc.Patch, doc.Summary, need, needSeen
 				problems = v
 				ar.meta.LastProblems = problems
 				continue
@@ -557,6 +590,10 @@ func (s *Service) generateEdit(ctx context.Context, transcript string, env *appc
 			ar.raw = next
 			ar.ops = doc.Patch
 			ar.summary = normalizeDigits(strings.TrimSpace(doc.Summary))
+			ar.serverNeed, ar.needSeen = need, needSeen
+			if linted != nil { // OR across the lint retry
+				ar.serverNeed, ar.needSeen = mergeServerNeed(linted.serverNeed, need), linted.needSeen || needSeen
+			}
 			ar.meta.Lint = newLint(baseLint, lintOf(next))
 			lintRetry := s.LintRetry && len(ar.meta.Lint) > 0
 			// #259: a share request answered with "できない" gets one retry even with LintRetry off
@@ -583,12 +620,13 @@ func (s *Service) generateEdit(ctx context.Context, transcript string, env *appc
 		if linted != nil {
 			break
 		}
-		lastOps, lastSummary = doc.Patch, doc.Summary
+		lastOps, lastSummary, lastNeed, lastNeedSeen = doc.Patch, doc.Summary, need, needSeen
 		problems = problemsOf(perr, resp)
 		ar.meta.LastProblems = problems
 	}
 	if linted != nil {
 		ar.raw, ar.ops, ar.summary, ar.meta.Lint = linted.raw, linted.ops, linted.summary, linted.meta.Lint
+		ar.serverNeed, ar.needSeen = linted.serverNeed, linted.needSeen
 		return ar, nil
 	}
 	// Fallback 1: apply the last patch unchecked, drop areas, re-validate.
@@ -599,6 +637,7 @@ func (s *Service) generateEdit(ctx context.Context, transcript string, env *appc
 					ar.raw = stripped
 					ar.ops = lastOps
 					ar.summary = strings.TrimSpace(lastSummary)
+					ar.serverNeed, ar.needSeen = lastNeed, lastNeedSeen
 					ar.meta.AreaFallback = true
 					return ar, nil
 				}
@@ -647,15 +686,21 @@ func applyRestriction(ar *attemptResult, r Restriction, create bool, loc Locale)
 // call performs one Claude request and folds usage/attempts/latency into ar.
 // onText (nil = non-streaming) receives the text deltas.
 func (s *Service) call(ctx context.Context, system, user string, schema json.RawMessage, ar *attemptResult, onText func(string)) (*Response, error) {
+	return s.callWith(ctx, system, "", user, schema, ar, onText)
+}
+
+// callWith is call with a second cached system block (Completion.SystemSuffix).
+func (s *Service) callWith(ctx context.Context, system, suffix, user string, schema json.RawMessage, ar *attemptResult, onText func(string)) (*Response, error) {
 	timeout := s.CallTimeout
 	if timeout == 0 {
 		timeout = 40 * time.Second
 	}
 	cctx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
+	schema = serverNeedSchema(ctx, schema) // restricted first, then + serverNeed (server_need.go)
 	t := time.Now()
-	system, schema = restrictPrompt(ctx, system), restrictSchema(ctx, schema)
-	resp, err := s.Claude.Complete(cctx, Completion{System: system, Messages: []Message{{Role: "user", Content: user}}, Schema: schema, OnText: onText})
+	system, schema = serverPushPrompt(ctx, restrictPrompt(ctx, system)), restrictSchema(ctx, schema)
+	resp, err := s.Claude.Complete(cctx, Completion{System: system, SystemSuffix: restrictPromptSuffix(ctx, suffix), Messages: []Message{{Role: "user", Content: user}}, Schema: schema, OnText: onText})
 	ar.latency += time.Since(t)
 	ar.meta.Attempts++
 	ar.meta.Regenerations = ar.meta.Attempts - 1

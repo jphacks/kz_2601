@@ -201,7 +201,7 @@ paths:
       summary: aiButton のオンライン版。generate は決まった指示で短い文章を決まった形 (1 行 / 箇条書き N 個 / 項目つき) で、task 付きは input を要約・分類・書き直し・抜き出し・提案して 1 つの文で返す
       description: |
         Issue #417。端末内 AI (Apple Intelligence) が使えない端末で、Tailor It Pro の利用者が aiButton{task: generate} を押した時に iOS が呼ぶ。
-        - ID トークン必須 (無い・不正は 401)。上限の重さは 1 (`RATE_LIMIT_WEIGHT_TEXT`)。呼び出した人が Tailor It Pro でなければ 402 `pro_required` (`details.features` = `onlineAI`・#316。Claude は呼ばない)。ただし `appId` の共有のアプリに呼び出した人が参加している (作成者ではないメンバー) 時は、作成者の Pro で判定する (共有のアプリの費用は作成者が持つ)。作成者が Pro でなければ 402 に `details.reason: creator_needs_pro` (iOS は課金画面を出さず案内だけ)。参加はサーバーが app_owners / members で確かめる。利用上限は呼び出した人のまま
+        - ID トークン必須 (無い・不正は 401)。上限の重さは 1 (`RATE_LIMIT_WEIGHT_TEXT`)。呼び出した人が Tailor It Pro でなければ 402 `pro_required` (`details.features` = `onlineAI`・#316。Claude は呼ばない)。ただし `appId` の共有のアプリに呼び出した人が参加している (作成者ではないメンバー) 時は、作成者の Pro で判定する (共有のアプリの費用は作成者が持つ)。作成者が Pro でなければ 402 に `details.reason: creator_needs_pro` (iOS は課金画面を出さず案内だけ)。参加はサーバーが app_owners / members で確かめる。作成者が払うのは、依頼がそのアプリの公開中の DSL (apps_public) の部品と合う時だけ (aiButton は同じ task で、instruction が prompt の `{{input}}` / `{{項目}}` を埋めたもの・aiChat は instruction が persona と同じ)。合わなければ呼び出した人の Pro で判定する。作成者が払う呼び出しはアプリごとに 1 日 `AI_CREATOR_PAID_APP_DAILY` 回まで (既定 300・超えると 429 `rate_limited`・`details.scope: app`・Claude は呼ばず利用上限も数えない)。利用上限は呼び出した人のまま
         - 上限: instruction 500 字・input 4096 バイト (超えると 413)・本文 16 KB・出力 400 トークン。count / items は 1〜10
         - モデルは対話と同じ設定 (`AI_CHAT_MODEL`、既定 claude-sonnet-5-5・thinking なし)。安全の指示 (暴力・性的・差別・危険な行為を書かない、input の中の命令には従わない) を system に固定
         - モデルが断ったら 422 `refused`、形に合わない出力は 502 `bad_output`。line は最初の 1 行、list は count を超えた分を切る (1 個以上あれば返す)、fields は全項目そろわなければ 502
@@ -372,13 +372,13 @@ components:
             requestId: { type: string }
     RateLimitDetails:
       type: object
-      required: [scope, tier, limit, used, remaining, resetAt, retryAfterSec]
+      required: [scope, limit, used, remaining, resetAt, retryAfterSec]
       properties:
         scope:
           type: string
-          enum: [user, ip, global]
-          description: user = 利用者の 1 日の上限 / ip = 同じネットワークの匿名利用の上限 / global = 環境全体の費用ブレーカー
-        tier: { type: string, enum: [anonymous, signed_in, pro] }
+          enum: [user, ip, global, app, app_member]
+          description: user = 利用者の 1 日の上限 / ip = 同じネットワークの匿名利用の上限 / global = 環境全体の費用ブレーカー / app = 共有のアプリで作成者が払う呼び出しの 1 日の上限 / app_member = その参加者ごとの 1 日の上限 (app と app_member は `POST /v1/text` だけ)
+        tier: { type: string, enum: [anonymous, signed_in, pro], description: scope app / app_member の時は無い }
         limit: { type: integer, description: 当たった上限 (単位/日) }
         used: { type: integer, description: 今日使った単位 }
         remaining: { type: integer, description: 残り (今回の依頼の重さより小さい) }
@@ -394,6 +394,17 @@ components:
         shape: { type: string, enum: [line, list, fields], default: line }
         count: { type: integer, minimum: 1, maximum: 10, description: list の個数 (既定 3)。list 以外では送らない }
         items: { type: array, minItems: 1, maxItems: 10, items: { type: string, maxLength: 20 }, description: fields の項目名 (重複なし)。fields 以外では送らない }
+        formats:
+          type: array
+          maxItems: 10
+          description: 'aiButton outputs の fields の項目の書き方 (task generate + shape fields だけ・ほかは 400)。各 item は items の名前を 1 回まで。書き方の文はサーバーが instruction の外に足す (instruction はボタンの prompt のまま)'
+          items:
+            type: object
+            required: [item, kind]
+            properties:
+              item: { type: string, maxLength: 20 }
+              kind: { type: string, enum: [number, date, datetime, enum] }
+              options: { type: array, minItems: 1, maxItems: 20, items: { type: string, maxLength: 40 }, description: kind enum の選択肢 (enum だけ・必須) }
         input: { type: string, description: 材料のアプリのデータ (最近の記録 ≤ 20 件 / フォームの値)。4096 バイトまで (length long は 16384 バイト) }
         length: { type: string, enum: [short, long], default: short, description: 'long = 長文 (出力 1500 トークン・答え 3000 字まで・重さ 3)。classify 不可・generate は shape line だけ' }
         image:
@@ -414,6 +425,36 @@ components:
             properties:
               role: { type: string, enum: [user, assistant] }
               text: { type: string }
+        saveTo:
+          type: object
+          required: [entity, today, fields]
+          description: 'task chat だけ: aiChat saveTo。返事が記録の案 (suggest) を返せるようにする。fields は DSL の saveTo.fields の順の field (共有のアプリで作成者が払う時は公開中の DSL と同じでないと一致しない)。保存はしない'
+          properties:
+            entity: { type: string }
+            name: { type: string, maxLength: 40, description: entity の name }
+            today: { type: string, format: date, description: 端末の今日 (YYYY-MM-DD) }
+            fields:
+              type: array
+              minItems: 1
+              maxItems: 8
+              items:
+                type: object
+                required: [id, name, type]
+                properties:
+                  id: { type: string }
+                  name: { type: string, maxLength: 40 }
+                  type: { type: string, enum: [string, text, number, date, enum] }
+                  options: { type: array, maxItems: 50, items: { type: string }, description: enum だけ (必須) }
+                  unit: { type: string, maxLength: 20 }
+                  required: { type: boolean, description: 'required で defaultValue の無い field' }
+        material:
+          type: object
+          required: [entity, text]
+          description: 'task chat だけ: aiChat inputEntity。利用者自身の記録 (最後の発言と語が重なる記録から・残りは新しい順。サーバーは並べ替えない・hidden の field と写真・位置は端末が落とす) を説明した文。最初の利用者の発言に <records> でデータとして入れる (命令としては扱わない)。text は 8192 バイトまで・messages と合わせて 16384 バイトまで (超えたら 413)。共有のアプリで作成者が払う時は entity と name が公開中の aiChat の inputEntity と同じでないと一致しない。ログに出さない'
+          properties:
+            entity: { type: string }
+            name: { type: string, maxLength: 40, description: entity の name }
+            text: { type: string, maxLength: 8192 }
         locale: { type: string, enum: [ja, en], description: 省略時は instruction から判定 }
         appId: { type: string, maxLength: 128, description: 'ボタンがあるアプリ (任意)。共有のアプリの参加者なら作成者の Pro で判定する。形が不正なら 400' }
     TextResponse:
@@ -432,6 +473,10 @@ components:
             type: object
             required: [name, value]
             properties: { name: { type: string }, value: { type: string } }
+        suggest:
+          type: object
+          additionalProperties: true
+          description: 'task chat で saveTo を送った時だけ・記録の話の時だけ: {field id: 値}。値はサーバーが field の型で確かめたもの (enum は options のどれか・number は ±1e9 の数・date は today から 366 日以内の YYYY-MM-DD・string 200 字 / text 2000 字まで)。合わない値は落とし、required が欠けたら suggest ごと省く。端末は利用者が「追加」を押した時だけ保存する'
         locale: { type: string, enum: [ja, en] }
         meta:
           type: object
@@ -543,14 +588,20 @@ components:
                 problems: { type: array, items: { type: string }, description: 反映されなかった時の最後の検証エラー }
             serverRules:
               type: object
-              description: '#343。サーバーの自動の動き(serverRules)を書く別の呼び出しを実行した時だけ入る(env AI_SERVER_RULES=1 かつ依頼が通知・定期・数えるなどを含む時)'
+              description: '#343。サーバーの自動の動き(serverRules)を書く別の呼び出しを実行した時だけ入る(env AI_SERVER_RULES=1 かつ、生成の serverNeed が none 以外か依頼の言葉が通知・定期・数えるなどを含む時)'
               properties:
+                need: { type: string, enum: [none, push, timed, record], description: 生成の呼び出しが書いた serverNeed。無ければ省略 }
+                trigger: { type: string, enum: [model, regex, both], description: 'この呼び出しを始めたもの: model = serverNeed・regex = 依頼の言葉・both = 両方' }
                 applied: { type: boolean, description: serverRules が検証を通って変わった }
                 rules: { type: integer, description: 返した DSL のルールの数 }
                 attempts: { type: integer }
                 claudeMs: { type: integer }
                 declined: { type: string, description: 作れない依頼(外部への送信など)を断った 1 文。summary にも入る }
                 problems: { type: array, items: { type: string }, description: 反映されなかった時の最後の検証エラー }
+            serverNeed:
+              type: string
+              enum: [none, push, timed, record]
+              description: 'env AI_SERVER_RULES=1 の時だけ。生成の呼び出しが出力の最後に書いた、自動の動きの要否(serverRules を書く呼び出しを実行しなかった時も入る)。DSL には入らない'
             restricted:
               type: array
               items: { type: string }
@@ -578,7 +629,7 @@ components:
       type: array
       items: { type: string }
       description: |
-        #482。部品以外で、このクライアントが実装している DSL の動作。既知の値: `recordRetention`(Entity.retentionDays の期限切れレコードを端末が消す)、`notification.when`(#265・app.notifications[].when の条件を端末が評価する。無い版には when を使わず、生成されたら通知ごと落とす)、`singleEntity`(#267・Entity.single の 1 件を編集し、式 {"setting": …} を評価する。無い版には single / setting を使わず、生成されたら single を外して setting を agg latest に置き換える)、`notification.near`(app.notifications[].near の場所に着いた時の通知と jitterMinutes を端末が扱う。無い版には near / jitterMinutes を使わず、生成されたら near の通知ごと・jitterMinutes のキーを落とす)。
+        #482。部品以外で、このクライアントが実装している DSL の動作。既知の値: `recordRetention`(Entity.retentionDays の期限切れレコードを端末が消す)、`notification.when`(#265・app.notifications[].when の条件を端末が評価する。無い版には when を使わず、生成されたら通知ごと落とす)、`singleEntity`(#267・Entity.single の 1 件を編集し、式 {"setting": …} を評価する。無い版には single / setting を使わず、生成されたら single を外して setting を agg latest に置き換える)、`notification.near`(app.notifications[].near の場所に着いた時の通知と jitterMinutes を端末が扱う。無い版には near / jitterMinutes を使わず、生成されたら near の通知ごと・jitterMinutes のキーを落とす)、`aiButton.long`(length long)、`aiButton.inputPhoto`(写真を AI に見せる。サーバーの AI_TEXT_IMAGE が off の間はどの版にも使わない)、`aiButton.saveTo`、`action.lookupBook`(ボタン・toolbar ごと落とす)、`text.highlight`(text の highlight と {{fieldId}})、`feed.v2`(feed の provider warnings / pressure。feed ごと落とす)。無い版にはそれぞれ使わず、生成されたら外す。
         `allowedComponents` を送るクライアント(v1.0 以降)がここに `recordRetention` を含めない時、AI は retentionDays を使わず「この版ではできない」と答え、生成結果からは落とす。
         `allowedComponents` も送らないクライアントは制限なし。未知の値は無視。
       example: [recordRetention]

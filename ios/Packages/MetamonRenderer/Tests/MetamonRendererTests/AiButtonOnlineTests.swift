@@ -49,6 +49,14 @@ final class AiButtonOnlineTests: XCTestCase {
         }
     }
 
+    func testSpacedInputPlaceholderBecomesMarker() throws {
+        let (_, entity) = try button("ai_summary")
+        let c = try JSONDecoder().decode(Component.self, from: Data(#"{"type":"aiButton","task":"summarize","input":"body","output":"summary","prompt":"{{ input }} を{{  mood  }}な調子で要約。{{in put}}"}"#.utf8))
+        let r = try AIRequestBuilder.online(c, entity: entity, values: ["body": "公園で遊んだ。", "mood": "うれしい"], locale: "ja")
+        XCTAssertEqual(r.instruction, "下の材料 をうれしいな調子で要約。{{in put}}")
+        XCTAssertEqual(r.input, "公園で遊んだ。")
+    }
+
     func testFillWritesAnswerIntoOutput() async throws {
         let (c, entity) = try button("ai_summary")
         let form = FormDraft(entity: entity)

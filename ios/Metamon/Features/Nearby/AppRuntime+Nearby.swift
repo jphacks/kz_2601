@@ -32,7 +32,7 @@ extension AppRuntime: NearbyHost {
         let sender = ui.service?.myName ?? nearbyDisplayName
         let payload = NearbyShare.makePayload(sender: sender, appId: document.appId, appName: dsl.app.name, entity: e, records: records)
         guard payload.header.count > 0 else {
-            toast = "送る記録がありません"
+            toast = L10n.tr("送る記録がありません")
             return
         }
         ui.request = .init(payload: payload)
@@ -42,7 +42,7 @@ extension AppRuntime: NearbyHost {
     func requestSong(_ song: MusicSong) {
         let sender = NearbyUI.shared.service?.myName ?? nearbyDisplayName
         guard let payload = NearbyShare.makeSongRequest(song, sender: sender, appId: document.appId, appName: dsl.app.name) else {
-            toast = "曲名を入れてください"
+            toast = L10n.tr("曲名を入れてください")
             return
         }
         NearbyUI.shared.request = .init(payload: payload)
@@ -59,11 +59,11 @@ extension AppRuntime: NearbyHost {
         guard NearbyUI.shared.service == nil else { return }
         let service = NearbyService(displayName: nearbyDisplayName)
         service.decide = { [weak self] header in
-            guard let self else { return .reject(reason: "今は受け取れません") }
+            guard let self else { return .reject(reason: L10n.tr("今は受け取れません")) }
             return NearbyShare.decide(header, dsl: self.dsl, appId: self.document.appId)
         }
         service.onReceive = { [weak self] payload, _ in
-            guard let self else { return .init(ok: false, added: 0, message: "今は受け取れません") }
+            guard let self else { return .init(ok: false, added: 0, message: L10n.tr("今は受け取れません")) }
             return await self.importNearby(payload)
         }
         NearbyUI.shared.install(service)
@@ -87,15 +87,15 @@ extension AppRuntime: NearbyHost {
             guard let entity = dsl.entity(entityId) else { return .init(ok: false, added: 0) }
             let rows = NearbyShare.sanitize(payload.records, into: entity, sameApp: sameApp)
             guard !rows.isEmpty else {
-                toast = "\(h.sender)さんから届いた記録に、追加できる項目がありませんでした"
-                return .init(ok: false, added: 0, message: "追加できる項目がありませんでした")
+                toast = L10n.tr("\(h.sender)さんから届いた記録に、追加できる項目がありませんでした")
+                return .init(ok: false, added: 0, message: L10n.tr("追加できる項目がありませんでした"))
             }
             let appId = document.appId
             for row in rows {
                 _ = await recordSync.save(appId: appId, entity: entityId, recordId: nil, data: row, author: postAuthor(for: entityId))
             }
             await reloadLocal(entityId, appId: appId)
-            toast = "\(h.sender)さんから「\(entity.name)」を \(rows.count) 件追加しました"
+            toast = L10n.tr("\(h.sender)さんから「\(entity.name)」を \(rows.count) 件追加しました")
             return .init(ok: true, added: rows.count)
         }
     }
@@ -105,7 +105,7 @@ extension AppRuntime {
     /// 曲のリクエスト(#412)を musicPlayer の承認待ちへ(autoAccept なら再生待ちへ)。招待後に切り替わったアプリでは断る。
     func importSongRequest(_ song: MusicSong, from sender: String) async -> NearbyShare.Ack {
         guard let player = dsl.musicPlayer, player.allowRequests == true else {
-            return .init(ok: false, added: 0, message: "相手のアプリは今、曲のリクエストを受け付けていません")
+            return .init(ok: false, added: 0, message: L10n.tr("相手のアプリは今、曲のリクエストを受け付けていません"))
         }
         return await MusicSession.shared.receive(song, from: sender, autoAccept: player.autoAccept == true)
     }

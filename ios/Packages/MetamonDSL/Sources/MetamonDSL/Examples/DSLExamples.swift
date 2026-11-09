@@ -16,6 +16,7 @@ public enum DSLExamples {
             "gallery-web",
             "warikan",
             "bmi",
+            "adaptive_study",
             "shopping",
             "navigation",
             "post_comments",

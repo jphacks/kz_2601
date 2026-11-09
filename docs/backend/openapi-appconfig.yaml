@@ -1383,7 +1383,7 @@ paths:
         - diet: `q`(国会会議録で探す語・空白をまとめて 1〜40 字・制御文字や見えない文字は 400)が必須。発言の新しい会議の順に、発言者(会派)・院と会議名と号・会議の日付・発言のページ。発言の本文は返さない。`q` は diet 以外では 400。
         - 上の表に無いパラメータ・同じパラメータの重複は 400。
         - サーバーはプロバイダごとにキャッシュする(天気 30 分・警報 10 分・気圧 30 分・祝日 12 時間・rss 15 分・arxiv 3 時間・diet 3 時間)。arxiv と diet は出どころの求めにより、インスタンスあたり 1 本ずつ 3 秒あけて取りに行く(順番待ちは 10 秒まで。超えたら 503)。出どころが落ちている時は 24 時間以内の最後の取得結果を `stale: true` で返す。
-        - 1 ユーザー 1 時間 `FEEDS_USER_PER_HOUR` 回(既定 120)。超えると 429 `rate_limited`。出どころへの取得はインスタンスあたり 1 分 `FEEDS_UPSTREAM_PER_MINUTE` 回(既定 30)まで。
+        - 1 ユーザー 1 時間 `FEEDS_USER_PER_HOUR` 回(既定 120)。超えると 429 `rate_limited`。出どころへの取得はインスタンスあたり 1 分 `FEEDS_UPSTREAM_PER_MINUTE` 回(既定 30)まで(diet は別枠で 1 分 10 回)。diet の検索語で出どころまで取りに行くのは 1 ユーザー 1 時間 20 回まで(キャッシュにある語は数えない・超えると 429 `rate_limited`)。
         - `FEEDS_DISABLED`(カンマ区切りの provider・`all`)で止められる。止めている provider は 503 `upstream_unavailable`(details.reason = disabled)。
         - 出典(`source`)を一覧の下に必ず出す(公共データ利用規約 第1.0版・pressure は CC BY 4.0 の出典の記載)。
       parameters:
@@ -1445,7 +1445,7 @@ paths:
         - 取りに行く URL はサーバーのコードで固定(`https://api.openbd.jp/v1/get?isbn={13 桁}`)。公開アドレス以外へはつながない(feeds と同じクライアント)・8 秒で打ち切り・本文 256 KiB まで・同じホストへのリダイレクト 3 回まで。
         - キャッシュは ISBN ごと(見つかった本 1 日・無かった 6 時間・失敗 1 分)。同じ ISBN の同時の取得は 1 回にまとめる。
         - 1 ユーザー 1 時間 `BOOK_LOOKUP_USER_PER_HOUR` 回(既定 60)。超えると 429 `rate_limited`。出どころへの取得はインスタンスあたり 1 分 `BOOK_LOOKUP_UPSTREAM_PER_MINUTE` 回(既定 30)まで。
-        - `BOOK_LOOKUP_DISABLED=1`(または `FEEDS_DISABLED=all`)で止められる。止めている時は 503 `upstream_unavailable`(details.reason = disabled)。
+        - **既定で止めている**(openBD の利用条件が本の紹介のためなので・2026-11-08)。`BOOK_LOOKUP_ENABLED=1` の時だけ動く。`BOOK_LOOKUP_DISABLED=1`・`FEEDS_DISABLED=all` は ENABLED より強く止める。止めている時は ISBN を確かめる前に 503 `upstream_unavailable`(details.reason = disabled)。
         - 利用者のことは何も出どころへ送らない(ISBN だけ)。出典(`source`)をフォームの下に出す。
       parameters:
         - { name: isbn, in: query, required: true, schema: { type: string, maxLength: 40 }, example: 978-4-7808-0204-7 }
@@ -1747,7 +1747,7 @@ components:
         - none: まだ動いていない(30 日以上動いていない時も)
         - ok: 動いた
         - notify_paused: 動いたが通知は止めた(通知の停止中)
-        - limit: 今日の上限に達したので止めた
+        - limit: 今日の上限に達したので止めた(動いたが、アプリの今日の書き込み・通知の上限で一部を止めた時も)
         - service_limit: サービス全体の今日の上限に達したので止めた
         - service_paused: サービス全体で自動の動きを一時停止している
         - plan: 今のプランでは動かない(匿名のアカウント・共有のデータは Pro)

@@ -33,7 +33,7 @@ auto はミドルウェアの時点で修正か新規かが分からないので
 | 200 で、mode auto が修正(edit)になった | 3 − 2 = 1(新規 − 修正の重さ) | 修正の重さは表の 2。auto だけ安くも高くもしない |
 | 200 で、mode auto が「元に戻す」(undo)になった | 3 全部 | Claude を呼ばない |
 | 4xx(入力の誤り・422・Claude の 429 も含む)と 500 | 返さない | 利用者が起こせる失敗、または原因が分からない失敗 |
-| `/v1/text` の 402 `pro_required`(Pro が無い・`creator_needs_pro`) | 数えた分の全部(応答の前) | Claude を呼ばない。handler が `ratelimit.Waive` で応答の前に返し、`X-RateLimit-Remaining` もこの依頼を数えない値に書き直す。400 / 403(写真のスイッチ off)/ 413 は上の 4xx と同じく返さない |
+| `/v1/text` の 402 `pro_required`(Pro が無い・`creator_needs_pro`)と 429 `scope: app`(作成者が払う呼び出しの 1 日の上限) | 数えた分の全部(応答の前)。ただし 1 人 1 時間 30 回まで(下の「返した依頼の上限」) | Claude を呼ばない。handler が `ratelimit.Waive` で応答の前に返し、`X-RateLimit-Remaining` もこの依頼を数えない値に書き直す。400 / 403(写真のスイッチ off)/ 413 は上の 4xx と同じく返さない |
 | 503 `ai_paused` | (数えていない) | 一時停止はレートリミットの手前で返す(`cmd/ai/main_test.go` で順番を固定) |
 | 途中で端末が切断した(ストリームの途中など) | 返さない | Claude の 1 回分の費用はもうかかっている。控えめな方を選んだ |
 
@@ -46,6 +46,39 @@ auto はミドルウェアの時点で修正か新規かが分からないので
   - 利用者の上限が 0(数えない)の時はヘッダーを付けない(「残り 0」と出さないため)。iOS はヘッダーの無い応答では前の値を変えない(日付が変わると隠す)。429 は今までどおり付ける。
 - 返した時はログに `ratelimit.refund`(units・status・mode・path)が出る。
 
+### 返した依頼の上限
+
+返した依頼(`ratelimit.Waive`)も、サーバーでは Firestore の読み書き(数える・返す・作成者や参加の確認)を使う。そこで返した回数を利用者ごと・1 時間ごと(`RATE_LIMIT_WAIVED_HOURLY`・既定 30)と、IP ごと・1 時間ごと(`RATE_LIMIT_WAIVED_IP_HOURLY`・既定 120・匿名のアカウントを作り直しても同じ IP で数える)に別に数える。2 つは 1 回のトランザクションで数え、どちらかが上限なら数えない。
+
+```
+rateLimits/{env}_{yyyy-mm-ddTHH}_waived_{uid}                    {count, scope: waived, expireAt, updatedAt}
+rateLimits/{env}_{yyyy-mm-ddTHH}_waived_ip_{sha256 先頭 8 バイト}   同上(生の IP は残さない・IPv6 は /64 単位)
+```
+
+- 上限までは今までどおり、1 日の利用上限を数えない(`X-RateLimit-Remaining` も変わらない)。
+- どちらかの上限を超えた分は返さず、その依頼の重さを 1 日の利用上限で数える。上限に届くと、それ以降はミドルウェアの 429 で止まり、handler まで届かない。
+- 数える時に Firestore が失敗したら返す(今までと同じ)。
+- 返した回数を数えた後で 1 日の利用上限を返すのに失敗したら、返した回数も戻す(その依頼は返さなかったものとして利用上限を数えたまま。返した回数だけが増えて食い違うことはない)。戻すのにも失敗した時は返した回数が 1 多いまま残る(上限に早く届く側にずれるだけ・ログ `ratelimit: waive count give-back failed`)。
+- 実装: `backend/internal/ratelimit/waive_cap.go`。
+
+### 作成者が払う呼び出しの上限
+
+共有のアプリの参加者の `/v1/text` は作成者の Pro で通る([pro.md](features/pro.md))。作成者が払う呼び出しを、アプリの部品の設定と照らし合わせ、アプリごとの 1 日の回数で数える。
+
+- 照らし合わせ: 依頼がアプリの公開中の DSL(`apps_public/{appId}`)の部品と合う時だけ作成者が払う。aiButton は同じ task(無ければ generate)で、instruction が prompt の `{{input}}`(端末が書く「下の材料」/「the data below」)と `{{項目}}`(どんな文字でもよい)を埋めたもの。端末と同じく、置き換えるのは `{{input}}` と `{{項目の id}}` がそのままの形の時だけ(`{{ input }}` のように中に空白があるものは文字のまま)。aiChat は instruction が persona と同じ。`length: long` は部品も long の時、写真つきは部品に inputPhoto がある時だけ。端末が 500 字で切った instruction は、途中までが合えばよい。合わなければ呼び出した人の Pro で判定する(Pro でなければ理由なしの 402)。
+  - 項目で埋める文字は合計 400 字まで(DSL に項目ごとの長さの上限は無いので合計だけ)。
+  - `{{項目}}` があって、prompt の自分の文字(空白と `{{…}}` を除く)が 20 字に満たない部品と、`{{項目}}` が 20 個を超える部品は、作成者が払う対象にしない。
+  - prompt は RE2 の正規表現にして照らし合わせる(入力の長さに比例する時間で終わる)。1 つのアプリで見る aiButton / aiChat は 100 個まで。公開中の DSL を読んで組み立てた結果は、インスタンスごとにアプリ 128 件まで 60 秒覚える(公開し直しは最大 60 秒遅れて効く)。
+- 回数: アプリごと・1 日(0:00 JST)ごとに `AI_CREATOR_PAID_APP_DAILY` 回まで(既定 300)、さらにアプリ × 参加者ごと・1 日ごとに `AI_CREATOR_PAID_MEMBER_DAILY` 回まで(既定 30・aiChat も含む)。どちらも `0` で数えない。2 つは 1 回のトランザクションで数え、どちらかが上限なら数えない。超えると 429 `rate_limited`(`details.scope: app` / `app_member`)で、Claude は呼ばず、利用上限も数えない(上の「返す時」)。Firestore が失敗した時はインスタンスのメモリで数える。
+- Claude が 502 / 503 / 504 で終わった時は、数えた 1 回を返す(利用上限の「返す時」と同じ。途中で切れた依頼は返さない)。
+
+```
+rateLimits/{env}_{yyyy-mm-dd}_creator_paid_{appId}             {count, scope: app, expireAt, updatedAt}
+rateLimits/{env}_{yyyy-mm-dd}_creator_paid_{appId}_uid_{uid}   {count, scope: app_member, expireAt, updatedAt}
+```
+
+- 実装: `backend/internal/ai/text_payer_scope.go`。
+
 ## 上限の既定値(1 日・0:00 JST で切り替え)
 
 | 環境変数 | 既定 | 目安 |
@@ -55,6 +88,9 @@ auto はミドルウェアの時点で修正か新規かが分からないので
 | `RATE_LIMIT_PRO_DAILY` | 300 | Pro でも上限はある(緩い)。Pro はサーバーで検証した権利(`users/{uid}/entitlements/pro`・#314 #449)で判定 |
 | `RATE_LIMIT_IP_DAILY` | 300 | 匿名だけ。同じ IP からの匿名の合計(作り直し対策) |
 | `RATE_LIMIT_GLOBAL_DAILY` | 2000 | 環境全体の費用ブレーカー。新規作成なら約 660 回 |
+| `RATE_LIMIT_WAIVED_HOURLY` | 30 | 1 人 1 時間に数えずに返す依頼(上の「返した依頼の上限」)。`0` で数えない |
+| `RATE_LIMIT_WAIVED_IP_HOURLY` | 120 | 同じ IP から 1 時間に数えずに返す依頼(上の「返した依頼の上限」)。`0` で数えない |
+| `AI_CREATOR_PAID_APP_DAILY` / `AI_CREATOR_PAID_MEMBER_DAILY` | 300 / 30 | 作成者が払う呼び出しの、アプリごと / アプリ × 参加者ごとの 1 日の回数(上の「作成者が払う呼び出しの上限」)。`0` で数えない |
 | `RATE_LIMIT_WEIGHT_CREATE` / `_EDIT` / `_CHAT` / `_TEXT` / `_TEXT_TASK` / `_TEXT_LONG` / `_TEXT_IMAGE` | 3 / 2 / 1 / 1 / 2 / 3 / 3 | `_TEXT_TASK` は `/v1/text` の本文に generate 以外の `task` がある時。`_TEXT_LONG` は本文に `length: "long"` がある時と `task: "chat"`(aiChat)の時。`_TEXT_IMAGE` は本文に `image` がある時。重なった時は大きい方(max) |
 | `RATE_LIMIT` | on(GOOGLE_CLOUD_PROJECT があれば) | `off` で無効。ローカルで素の起動なら既定 off |
 | `RATE_LIMIT_STORE` | firestore | `memory` でインスタンスごとのメモリ |
@@ -69,11 +105,12 @@ auto はミドルウェアの時点で修正か新規かが分からないので
 ```
 rateLimits/{env}_{yyyy-mm-dd}_uid_{uid}        {count, scope, expireAt, updatedAt}
 rateLimits/{env}_{yyyy-mm-dd}_ip_{sha256 先頭 8 バイト}   匿名だけ。生の IP は残さない(IPv6 は /64 単位)
-rateLimits/{env}_{yyyy-mm-dd}_global
+rateLimits/{env}_{yyyy-mm-dd}_global_{0〜9}     global の分割(下の「global の分割」)
+rateLimits/{env}_{yyyy-mm-dd}_global          分割前の 1 ドキュメント。読むだけで、もう書かない
 ```
 
 - `env` は `APP_ENV`(stg / prod)。同じ Firestore でも環境ごとに分かれる。
-- 1 回の依頼 = 1 トランザクション。全部の数を読み、どれか 1 つでも超えるなら**何も書かず** 429。超えなければ全部に足す。返す時(上)ももう 1 トランザクション。
+- 1 回の依頼 = 1 トランザクション。全部の数を読み、どれか 1 つでも超えるなら**何も書かず** 429。超えなければ全部に足す。返す時(上)ももう 1 トランザクション。global だけは読み方が違う(下の「global の分割」)。
 - Firestore が使えない時(障害・権限)は、インスタンスのメモリで数え続ける(止めない・青天井にもしない)。
 - `expireAt` = その日の終わり + 1 日。TTL ポリシーで自動で消える(下の手順)。
 
@@ -81,7 +118,18 @@ rateLimits/{env}_{yyyy-mm-dd}_global
 
 1 回の依頼で 読み 2〜3・書き 2〜3(匿名は IP の分が増える)。1000 人 × 10 回/日 = 1 万回なら 読み 3 万・書き 3 万/日。無料枠(読み 5 万・書き 2 万/日)を少し超えても数セント/日で、Claude の 1 回分より安い。返す時(サーバーの失敗と、mode auto が修正になった時。iOS は auto を送るので修正のたび)は、同じ数の読み書きがもう 1 回増える。
 
-`global` は 1 つのドキュメントに全員が書く。Firestore は 1 ドキュメントあたり毎秒 1 回程度が目安で、Claude の 1 回が数十秒かかる今の規模なら足りる。毎秒数回を超えるようなら、global を数個に分ける(shard)。
+global は数える時に分割の 10 個と分割前の 1 個を読むので、global の読みは 1 回 → 11 回になる(1 万回/日なら 読み +10 万/日 ≒ 6 セント)。書きは 1 個だけで変わらない。
+
+### global の分割
+
+`global` は環境の全員が書くので、1 ドキュメントだと Firestore の目安(1 ドキュメントあたり毎秒 1 回程度)で詰まり、トランザクションが待ち・やり直しになる(エミュレータでもロック待ちが出た・#732)。そこで global だけを 10 個(`ratelimit.GlobalShards`)のドキュメントに分ける。利用者・IP は 1 人の分なので分けない。
+
+- **数える時**: 10 個 + 分割前の 1 個をトランザクションの外で読んで合計する(ロックを取らない)。上限まで 50 単位(`ratelimit.ShardStrictMargin`)より余裕があれば、トランザクションは利用者・IP を今までどおり読んで書き、global は乱数で選んだ 1 個に足すだけ(読まずに `Increment`)。同じ 1 個を選んだ依頼どうしでも、読みのロックが無いので取り消し合わない。
+- **上限の近く**: 残りが 50 単位以内なら、トランザクションの中で 11 個を全部読んで確かめる(分割前と同じ正確さ。この時だけ依頼どうしが順番待ちになる)。
+- **超え得る量(最悪)**: 余裕がある時の判断は少し古い合計を使う。同時に通った依頼はみな「上限より 50 以上下」を見ているので、上限を超えるのは、その瞬間に同時に通った依頼の重さの合計が 50 を超えた分だけ(新規作成なら 17 件以上が同時)。1 件ずつ来る時は超えない。
+- **返す時**: 数えた時に足した 1 個(`Usage.Charged` に入る)から引く。
+- **分割前のドキュメント**: その日の分(切り替えの日)はそのまま合計に入る。もう書かないので、TTL で翌日に消える。古い版のインスタンスが残っている間はそちらが書くが、それも合計に入る。
+- 10 個は固定。途中で減らすと、外れた分割の数が合計から落ちるので変えない(変えるなら日付の切り替わりで)。
 
 ## プランごとの上限(#317)
 

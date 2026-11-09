@@ -65,13 +65,16 @@ func parseWarnings(body []byte) ([]Item, error) {
 	if len(reports) == 0 {
 		return nil, errors.New("warnings: no reports")
 	}
-	type key struct{ code, status string }
-	type group struct {
-		areas []string
-		seen  map[string]bool
-		at    time.Time
+	// The reports are not in time order and an older one may still list a
+	// kind a newer one lifted: per (area, kind) only the newest report counts
+	// (a tie goes to the later one in the file).
+	type slot struct{ area, code string }
+	type state struct {
+		status string
+		at     time.Time
 	}
-	groups := map[key]*group{}
+	latest := map[slot]state{}
+	var slots []slot // first-seen order keeps the area order of the file
 	for _, r := range reports {
 		at, err := time.Parse(time.RFC3339, r.ReportDatetime)
 		if err != nil {
@@ -79,23 +82,44 @@ func parseWarnings(body []byte) ([]Item, error) {
 		}
 		for _, a := range r.Warning.Class10Items {
 			for _, k := range a.Kinds {
-				if _, ok := warningKinds[k.Code]; !ok || !activeStatus(k.Status) {
+				if _, ok := warningKinds[k.Code]; !ok {
 					continue
 				}
-				kk := key{k.Code, clean(k.Status, 20)}
-				g := groups[kk]
-				if g == nil {
-					g = &group{seen: map[string]bool{}}
-					groups[kk] = g
+				s := slot{a.AreaCode, k.Code}
+				prev, seen := latest[s]
+				if !seen {
+					slots = append(slots, s)
+				} else if at.Before(prev.at) {
+					continue
 				}
-				if at.After(g.at) {
-					g.at = at
-				}
-				if name := class10Names[a.AreaCode]; name != "" && !g.seen[name] {
-					g.seen[name] = true
-					g.areas = append(g.areas, name)
-				}
+				latest[s] = state{k.Status, at}
 			}
+		}
+	}
+	type key struct{ code, status string }
+	type group struct {
+		areas []string
+		seen  map[string]bool
+		at    time.Time
+	}
+	groups := map[key]*group{}
+	for _, s := range slots {
+		st := latest[s]
+		if !activeStatus(st.status) {
+			continue
+		}
+		kk := key{s.code, clean(st.status, 20)}
+		g := groups[kk]
+		if g == nil {
+			g = &group{seen: map[string]bool{}}
+			groups[kk] = g
+		}
+		if st.at.After(g.at) {
+			g.at = st.at
+		}
+		if name := class10Names[s.area]; name != "" && !g.seen[name] {
+			g.seen[name] = true
+			g.areas = append(g.areas, name)
 		}
 	}
 	out := make([]Item, 0, len(groups))

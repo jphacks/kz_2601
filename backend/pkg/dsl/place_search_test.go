@@ -64,7 +64,7 @@ func TestPlaceSearchValidAndParses(t *testing.T) {
 	app.Screens[1].Components = []Component{
 		{Type: CompPlaceSearch, Label: "近くのカフェ", Category: "cafe", Near: "current", NameField: "note", LocationField: "place", AddressField: "addr", Pins: true},
 		{Type: CompPlaceSearch, Query: "コワーキング", AddressField: "body"}, // text works too
-		{Type: CompPlaceSearch, LocationField: "place"},                 // free search, one field
+		{Type: CompPlaceSearch, LocationField: "place"},                // free search, one field
 		{Type: CompLocationButton, Field: "place", AddressField: "addr"},
 	}
 	if err := app.Validate(); err != nil {

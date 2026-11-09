@@ -164,7 +164,9 @@ public struct Component: Decodable, Identifiable, Sendable {
     public var length: String?         // short(既定)| long = 長い文・オンライン AI だけ
     public var inputPhoto: String?     // 一緒に AI に見せる photo field(オンライン AI だけ)
     public var saveTo: AISaveTo?       // generate list: 1 項目 = 1 件の記録(AISaveTo.swift)
+    public var chatSaveTo: AIChatSaveTo? // aiChat の saveTo {entity, fields}: 話しかけて記録する(AIChatSaveTo.swift)
     public var inputFeeds: [String]?   // generate: 同じ画面の feed の id(行を材料に足す・AIFeedInput.swift)
+    public var outputs: [String: String]? // generate fields: 項目名 → フォームの field(AIOutputs.swift)
     public var target: Double?         // progressBar entity モードの分母
     public var tone: String?           // progressBar: positive(目標)| negative(予算)・#140
     public var url: String?            // link
@@ -212,6 +214,7 @@ public struct Component: Decodable, Identifiable, Sendable {
     public var roleField: String?      // user / assistant を書く field(nil = 自分と AI が交互)
     public var persona: String?        // AI の役と話し方(500 字まで・サーバーへは instruction)
     public var speak: Bool?            // aiChat: 新しい AI の返事を端末の声で自動で読み上げる
+    public var inputEntity: String?    // aiChat: 自分の記録を参考として AI に添える entity(limit 件・AIChatMaterial.swift)
     // dashcam(#410)。title は共用。nil = 既定値(DashcamConfig)
     public var keepMinutes: Int?       // ループで残す分数
     public var maxStorageMB: Int?      // 録画の容量上限
@@ -263,11 +266,11 @@ public struct Component: Decodable, Identifiable, Sendable {
         case min, max, step, minLines
         case by
         case nameField, balanceField
-        case task, input, output, options, shape, count, items, length, inputPhoto, saveTo, inputFeeds
+        case task, input, output, options, shape, count, items, length, inputPhoto, saveTo, inputFeeds, outputs
         case tone
         case metric, period
         case columnField, rowField, columnValues, rowValues, rowRange
-        case textField, photoField, roleField, persona, speak
+        case textField, photoField, roleField, persona, speak, inputEntity
         case keepMinutes, maxStorageMB, impactG, autoStart, audio, sensor, threshold, analyze, fields, distance, allowRequests, autoAccept
         case accept, map
         case show
@@ -351,7 +354,9 @@ public struct Component: Decodable, Identifiable, Sendable {
         length = try? c.decodeIfPresent(String.self, forKey: .length)
         inputPhoto = try? c.decodeIfPresent(String.self, forKey: .inputPhoto)
         saveTo = try? c.decodeIfPresent(AISaveTo.self, forKey: .saveTo)
+        chatSaveTo = try? c.decodeIfPresent(AIChatSaveTo.self, forKey: .saveTo)
         inputFeeds = try? c.decodeIfPresent([String].self, forKey: .inputFeeds)
+        outputs = try? c.decodeIfPresent([String: String].self, forKey: .outputs)
         target = try? c.decodeIfPresent(Double.self, forKey: .target)
         tone = try? c.decodeIfPresent(String.self, forKey: .tone)
         url = try? c.decodeIfPresent(String.self, forKey: .url)
@@ -374,6 +379,7 @@ public struct Component: Decodable, Identifiable, Sendable {
         roleField = try? c.decodeIfPresent(String.self, forKey: .roleField)
         persona = try? c.decodeIfPresent(String.self, forKey: .persona)
         speak = try? c.decodeIfPresent(Bool.self, forKey: .speak)
+        inputEntity = try? c.decodeIfPresent(String.self, forKey: .inputEntity)
         keepMinutes = try? c.decodeIfPresent(Int.self, forKey: .keepMinutes)
         maxStorageMB = try? c.decodeIfPresent(Int.self, forKey: .maxStorageMB)
         impactG = try? c.decodeIfPresent(Double.self, forKey: .impactG)

@@ -37,7 +37,7 @@ Expr := number | string | boolean
 | `agg` | エンティティ全レコード(filter で絞る)の集計。count 以外は `field` 必須。`field` に computed フィールドも可。`latest` / `earliest`(#133)は `by`(date/datetime field)で並べた最新 / 最古の 1 件の `field` の値(型は field のまま・数値以外も可) |
 | `op` | 関数呼び出し。§3 の閉じた一覧のみ |
 | `if` | `if` が true なら `then`、それ以外は `else` |
-| `setting` | single の entity(設定値の置き場・README §3.11・#267)の 1 件のレコードのフィールド値。行コンテキストに依らず**どこでも**書ける(`stat.value`・通知の `when` も可)。保存前・空の field は `defaultValue`(date の `"now"` は当てずに nil)。computed の field も読める(保存前は初期値の 1 件で評価)。2 件以上あれば `createdAt` が最も新しい 1 件(同じなら後の方)。single の entity に `agg` は使えない(backend が拒否) |
+| `setting` | single の entity(設定値の置き場・README §3.11・#267)の 1 件のレコードのフィールド値。行コンテキストに依らず、式を書ける所ならどこでも書ける(`stat.value`・通知の `when` も可。server rules は不可。`progressBar` / `gauge` の `value` は数値リテラルのみなので書けない)。保存前・空の field は `defaultValue`(date の `"now"` は当てずに nil)。computed の field も読める(保存前は初期値の 1 件で評価)。2 件以上あれば `createdAt` が最も新しい 1 件(同じなら後の方)。single の entity に `agg` は使えない(backend が拒否) |
 
 `agg.filter` は `Filter` 1 つ、または配列(AND)。`Filter.value` には Expr を書ける。computed 内の agg では `value` の `ref` は**外側のレコード**を指す:
 
@@ -75,6 +75,7 @@ Expr := number | string | boolean
 | | `addDays` | (d, n) | 日付 = d の n 日後(n は四捨五入。絶対値が 100000 日 = 約 273 年を超えると「—」) |
 | | `nextOccurrence` | (d, `"monthly"` \| `"yearly"`) | 日付 = d から毎月 / 毎年くり返す日のうち、**今日以降で最も近い日**(0:00)。d が今日以降なら d。日が無い月は月末に寄せる(§3.1)。第 2 引数は文字列リテラルだけ(#266) |
 | 時刻 | `hoursBetween` | (start, end) | 数値 = end − start の時間数(小数。30 分 = 0.5)。**end < start は日付またぎとして +24h**(22:00→05:00 = 7)。同じ時刻は 0 |
+| | `addMinutes` | (t, n) | t の n 分後(n は四捨五入・負なら前・数値 field や式も可。絶対値が 100000 日ぶん = 144000000 分を超えると「—」)。**t が `"HH:mm"`(`"H:mm"`・`"HH:mm:ss"`)なら `"HH:mm"` の文字列**で 24 時間で一周する(00:20 の 90 分前 = `"22:50"`・秒があれば `"HH:mm:ss"`)。**t が日付・日時なら日時**で、経過した分を足す(`"YYYY-MM-DD"` と date field はその日の最初の時刻 = ふつう 0:00 から数える。夏時間の切り替えをまたぐと時計の表示は切り替えぶんずれる)。数値・真偽の t は「—」。例: 出発時刻 = `addMinutes(ref arrive, neg(coalesce(ref travel_min, 0)))`。古い iOS は `supportedFeatures` の `expr.addMinutes` で見分ける(README §5.3) |
 | | `year` `month` `day` `weekday` | (d) | 数値(month 1-12、weekday 1=日 … 7=土) |
 | 変換 | `toNumber` `toString` | 任意 1 個 | 数値(変換不可はエラー)/ 文字列 |
 | その他 | `coalesce` | (a, b) | a が空(nil・空文字)/評価エラーなら b |

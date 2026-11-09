@@ -66,6 +66,10 @@ func TestServerRulesOverlapWire(t *testing.T) {
 	if p := plan("2026-11-10T10:30:00+09:00", "2026-11-10T11:30:00+09:00"); len(p.Notifies) != 1 || p.Notifies[0].Body != "面談 がほかの予約と重なっています" {
 		t.Fatalf("clash: %+v", p)
 	}
+	// only the row's end reaches into b1: equalsEnd survives the wire form
+	if p := plan("2026-11-10T09:00:00+09:00", "2026-11-10T10:30:00+09:00"); len(p.Notifies) != 1 {
+		t.Fatalf("clash through the end: %+v", p)
+	}
 	if p := plan("2026-11-10T11:00:00+09:00", "2026-11-10T12:00:00+09:00"); !p.Empty() {
 		t.Fatalf("back to back: %+v", p)
 	}
