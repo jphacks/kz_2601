@@ -131,7 +131,7 @@ struct AutomationsView: View {
 
     @ViewBuilder
     private func loaded(_ a: AppAutomations) -> some View {
-        if a.stopped != nil || a.notifyPaused != nil {
+        if Self.showsStopAppeal(a) {
             Section {
                 if let s = a.stopped {
                     stopNotice(Text("運営がこのアプリの自動の動きを止めています。"), until: s.until)
@@ -139,6 +139,12 @@ struct AutomationsView: View {
                 if let s = a.notifyPaused {
                     stopNotice(Text("通知を一時的に止めています。自動の動きは動いています。"), until: s.until)
                 }
+                // #346: 心当たりがない時の申し立て先(設定の「お問い合わせ」と同じ窓口)
+                Link(destination: LegalDocument.contactURL) {
+                    Text("止まった理由に心当たりがない時は、お問い合わせからご連絡ください")
+                        .font(.footnote)
+                }
+                .accessibilityIdentifier("automations.stopAppeal")
             }
         }
         Section {
@@ -163,7 +169,7 @@ struct AutomationsView: View {
                 Text("日本時間の 0 時に 0 に戻ります。")
             }
         }
-        if Self.needsContact(a) {
+        if Self.needsContact(a), !Self.showsStopAppeal(a) { // 止めた時は上の申し立ての行で足りる
             Section {
                 Link(destination: LegalDocument.contactURL) {
                     Label("お問い合わせ", systemImage: "envelope")
@@ -183,6 +189,11 @@ struct AutomationsView: View {
                     .font(.footnote).foregroundStyle(.secondary)
             }
         }
+    }
+
+    /// 運営が何かを止めている(アプリ全体・通知・どれかのルール)時だけ、停止の案内の下に申し立ての行を出す(#346)。
+    static func showsStopAppeal(_ a: AppAutomations) -> Bool {
+        a.stopped != nil || a.notifyPaused != nil || a.rules.contains { $0.stopped != nil || $0.result == .stopped }
     }
 
     /// 運営の停止・止まった結果がある時だけ、お問い合わせへの導線を出す。

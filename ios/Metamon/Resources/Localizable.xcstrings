@@ -13210,6 +13210,23 @@
         }
       }
     },
+    "止まった理由に心当たりがない時は、お問い合わせからご連絡ください" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "If you don't know why it was stopped, please reach us through Contact"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "止まった理由に心当たりがない時は、お問い合わせからご連絡ください"
+          }
+        }
+      }
+    },
     "止まっている理由について確かめたい時は、お問い合わせください。" : {
       "extractionState" : "manual",
       "localizations" : {
