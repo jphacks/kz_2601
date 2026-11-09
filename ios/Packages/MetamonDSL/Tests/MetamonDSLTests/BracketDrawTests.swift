@@ -317,4 +317,30 @@ final class BracketDrawTests: XCTestCase {
         XCTAssertEqual(Set(clear.keys), ["a", "b", "c", "d"])
         XCTAssertTrue(clear.values.allSatisfy(\.isNull))
     }
+
+    func testLateEntrantWithFormDefaultStartedIsExcluded() {
+        // 3 日に開始 → 6 日にフォームで e を追加(datetime の既定値 now で started が 6 日に入る)
+        let rs = [s("a", wins: 1, at: 1, updated: 3, started: 3), s("b", at: 2, started: 3), s("e", at: 6, started: 6)]
+        let d = BracketDraw(records: rs, winsField: "wins", seedField: nil, startedField: "started")
+        XCTAssertEqual(d.entrants.map(\.id), ["a", "b"])
+        XCTAssertEqual(d.lateEntrants, 1)
+    }
+
+    func testStampedEntrantCreatedAfterStartIsKeptWithinTolerance() {
+        // 時計のずれ: b は createdAt が開始より後でも開始時刻(0.5 秒ずれ)が入っていれば残す。e はフォームの既定値で後
+        var b = s("b", at: 4)
+        b.data["started"] = .string("2026-11-03T00:00:00.500Z")
+        let rs = [s("a", wins: 1, at: 1, updated: 5, started: 3), b, s("e", at: 6, started: 6)]
+        let d = BracketDraw(records: rs, winsField: "wins", seedField: nil, startedField: "started")
+        XCTAssertEqual(d.entrants.map(\.id), ["a", "b"])
+        XCTAssertEqual(d.lateEntrants, 1)
+    }
+
+    func testLateFormStartedDoesNotOverrideTimestampRuleForOldDraws() {
+        // 開始時刻を書かない古い版で始めた表(勝者に値なし)に、フォームで e を足しても e は入らない
+        let rs = [s("a", wins: 1, at: 1, updated: 3), s("b", at: 2), s("e", at: 6, started: 6)]
+        let d = BracketDraw(records: rs, winsField: "wins", seedField: nil, startedField: "started")
+        XCTAssertEqual(d.entrants.map(\.id), ["a", "b"])
+        XCTAssertEqual(d.lateEntrants, 1)
+    }
 }

@@ -41,6 +41,8 @@ public struct BracketDraw: Equatable, Sendable {
     public let entrants: [Record]
     /// 開始後に追加されたため枠に入れなかった人数(`frozen`)。
     public let lateEntrants: Int
+    /// `startWrites` で固定前の枠を組み直すため。
+    private let seedField: String?
 
     public var champion: Record? { rounds.last?.first?.winnerRecord }
 
@@ -52,6 +54,7 @@ public struct BracketDraw: Equatable, Sendable {
         let entrants = Array(Self.seeded(pool, seedField: seedField).prefix(Self.maxEntrants))
         self.entrants = entrants
         self.lateEntrants = late
+        self.seedField = seedField
         guard entrants.count >= 2 else {
             rounds = []
             return
@@ -88,7 +91,8 @@ public struct BracketDraw: Equatable, Sendable {
 
     /// 開始後に追加された人を外す。保存済みの wins >= 1 の人がいる時だけ固定する(全部取り消すと外れる)。wins >= 1 の人は常に残す。
     /// - startedField あり(値の入った人がいる): 最初の結果と一緒に、枠に入れた全員へ開始時刻を書く(`startWrites`)。
-    ///   値の入った人と、createdAt が最も早い値以前の人を残す(正確)。
+    ///   勝者の最も早い値を開始とし、それと同じ値(±1 秒)の人と createdAt がそれ以前の人を残す(正確)。
+    ///   それより後の値(後から足した人のフォームの既定値 now など)は開始の印とみなさない。勝者に値が無ければ時刻の規則。
     /// - startedField なし・値が無い(古いアプリ): wins >= 1 の人の updatedAt の最も早い時刻を開始とし、createdAt がそれ以前の人を残す。
     ///   勝者がまた勝つと updatedAt が進むので、1 回戦の途中に足した人が後で入ることがある。
     /// 時刻が読めない時は全員。保存待ち(pending)は見ない: 保存前の updatedAt は結果の時刻でないため。
@@ -96,10 +100,13 @@ public struct BracketDraw: Equatable, Sendable {
         let winners = records.filter { wins($0, field: winsField) >= 1 }
         guard !winners.isEmpty else { return (records, 0) }
         let field = startedField.flatMap { $0.isEmpty ? nil : $0 }
-        let stamped = field.map { f in records.filter { ChatThread.date($0[f].stringValue) != nil } } ?? []
-        let started = stamped.isEmpty
-            ? winners.compactMap { ChatThread.date($0.updatedAt) }.min()
-            : stamped.compactMap { ChatThread.date($0[field!].stringValue) }.min()
+        let times: [(id: String, at: Date)] = field.map { f in records.compactMap { r in ChatThread.date(r[f].stringValue).map { (r.id, $0) } } } ?? []
+        // 開始時刻は勝者の値の最も早いもの(勝者は必ず枠の中・開始時に書かれる)。後から足した人の値(フォームの既定値 now)は使わない
+        let winnerIds = Set(winners.map(\.id))
+        let earliest = times.filter { winnerIds.contains($0.id) }.map(\.at).min()
+        // 枠の全員に同じ時刻を 1 度に書くので、その値と同じ(±1 秒)人だけが開始時の出場者
+        let stamped = earliest.map { e in times.filter { $0.at.timeIntervalSince(e) <= Self.startTolerance } } ?? []
+        let started = earliest ?? winners.compactMap { ChatThread.date($0.updatedAt) }.min()
         guard let started else { return (records, 0) }
         let stampedIds = Set(stamped.map(\.id))
         let kept = records.filter { r in
@@ -110,8 +117,12 @@ public struct BracketDraw: Equatable, Sendable {
         return (kept, records.count - kept.count)
     }
 
+    /// 同じ開始時刻とみなす幅(`frozen`)。
+    static let startTolerance: TimeInterval = 1
+
     /// 勝ち数の書き込み(`tap` の結果)と一緒に送る startedField の値(recordId → 値)。
-    /// 結果が 0 → 1 つになる時: 枠に入れた全員に now、ほかで値の残っている人は null。結果が 1 → 0 になる時(全部取り消し): 値のある人を null。
+    /// 結果が 0 → 1 つになる時: 登録済みの全員(シード順に最大 `maxEntrants`)に now、ほかで値の残っている人は null。
+    /// 枠は既存の開始時刻(後から足した人のフォームの既定値など)に頼らず組み直す。結果が 1 → 0 になる時(全部取り消し): 値のある人を null。
     public func startWrites(for update: [String: Int], records: [Record], winsField: String, startedField: String?,
                             pending: [String: Int] = [:], now: String) -> [String: JSONValue] {
         guard let f = startedField, !f.isEmpty else { return [:] }
@@ -120,7 +131,7 @@ public struct BracketDraw: Equatable, Sendable {
         var out: [String: JSONValue] = [:]
         if before == after { return out }
         for r in records where !r[f].isNull { out[r.id] = .null }
-        if after { for r in entrants { out[r.id] = .string(now) } }
+        if after { for r in Self.seeded(records, seedField: seedField).prefix(Self.maxEntrants) { out[r.id] = .string(now) } }
         return out
     }
 
