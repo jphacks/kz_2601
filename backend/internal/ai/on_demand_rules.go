@@ -18,17 +18,20 @@ import (
 //
 // instead of `systemPrompt += "\n\n" + xRules`. The block is still appended
 // to systemPrompt (later init rewrites and the rule tests see it as before),
-// and with Service.OnDemandRules (env AI_ON_DEMAND_RULES=1) create / edit
-// send onDemandCore(systemPrompt): the prompt without every registered block,
-// identical for all requests, so it stays cached. The recipes the request
-// matches go after it in Completion.SystemTail (uncached).
+// and with Service.OnDemandRules (cmd/ai: on unless AI_ON_DEMAND_RULES=0)
+// create / edit send onDemandCore(systemPrompt): the prompt without every
+// registered block, identical for all requests, so it stays cached. The
+// recipes the request needs go after it in Completion.SystemTail (uncached).
 //
-// A recipe matches when one of its words is in the transcript or in the
-// existing app's text (edit / reference DSL), or one of its parts is in that
-// app's compact JSON. A miss loses the recipe; a false hit only costs its
-// bytes, so words are broad (TestOnDemandRecall_*). Off by default: on
-// phrasings not used to write the words, recall is ~70-79% (under the 80%
-// target), so the switch waits for a better selector or a live eval.
+// The recipes sent are the union of two pickers:
+//   - keywords: one of a recipe's words is in the transcript or in the
+//     existing app's text (edit / reference DSL), or one of its parts is in
+//     that app's compact JSON (TestOnDemandRecall_*; ~70-79% on unseen wording).
+//   - the selector (recipe_selector.go): a small model reads the transcript
+//     and the app's names against a one-line index of the recipes. On timeout
+//     or error the keywords alone decide.
+//
+// A miss loses the recipe; a false hit only costs its bytes.
 
 // onDemandHeading leads the tail: recipes are sent one per bullet.
 const onDemandHeading = "## この依頼に近い作り方(過去の作品から。当てはまる所だけ使う)"
@@ -107,30 +110,50 @@ func onDemandCore(system string) string {
 	return v.(string)
 }
 
+// Recipe sources in Meta.RecipeSources.
+const (
+	recipeByKeyword  = "keyword"
+	recipeBySelector = "selector"
+	recipeByBoth     = "both"
+)
+
 // onDemandPrompt is the first system block and the tail of a create / edit
-// turn. Off (Service.OnDemandRules unset) = the whole systemPrompt, no tail.
-func (s *Service) onDemandPrompt(transcript string, app []byte) (system string, tail, ids []string) {
+// turn, and fills meta's recipe fields. Off (Service.OnDemandRules unset) =
+// the whole systemPrompt, no tail, no selector call. The selector started by
+// generateStream rides on ctx; without one (direct calls) it runs here.
+func (s *Service) onDemandPrompt(ctx context.Context, transcript string, app []byte, meta *Meta) (system string, tail []string) {
 	if !s.OnDemandRules {
-		return systemPrompt, nil, nil
+		return systemPrompt, nil
 	}
-	tail, ids = onDemandTail(transcript, app)
-	return onDemandCore(systemPrompt), tail, ids
+	pick := recipePickFrom(ctx)
+	if pick == nil {
+		pick = s.startRecipePick(ctx, transcript, app)
+	}
+	picked, status, dur := pick.wait()
+	meta.RecipeSelector, meta.RecipeSelectorMs = status, dur.Milliseconds()
+	ids, sources := unionRecipes(keywordRecipes(transcript, app), picked)
+	meta.Recipes, meta.RecipeSources = ids, sources
+	return onDemandCore(systemPrompt), recipeTail(ids)
 }
 
-// onDemandTail is the tail block of a request as pieces: the heading, then
-// each matched recipe, every piece led by "\n\n" (so dropFeatureRules removes
-// a feature's recipe in a restricted build). None matched = nil. app is the
-// existing / reference DSL (nil on a plain create).
-func onDemandTail(transcript string, app []byte) (pieces, ids []string) {
-	text := normalizeTrigger(transcript) + appText(app)
-	compact := ""
-	if len(app) > 0 {
-		compact = compactJSON(string(app))
+// unionRecipes merges the two pickers in registration order and names who
+// picked each recipe.
+func unionRecipes(keyword, selector []string) ([]string, map[string]string) {
+	src := map[string]string{}
+	for _, id := range keyword {
+		src[id] = recipeByKeyword
 	}
-	for _, blk := range onDemandBlocks {
-		for _, r := range blk.recipes {
-			if r.matches(text, compact) {
-				pieces = append(pieces, "\n\n"+r.text)
+	for _, id := range selector {
+		if src[id] == recipeByKeyword {
+			src[id] = recipeByBoth
+		} else {
+			src[id] = recipeBySelector
+		}
+	}
+	var ids []string
+	for _, b := range onDemandBlocks {
+		for _, r := range b.recipes {
+			if src[r.id] != "" {
 				ids = append(ids, r.id)
 			}
 		}
@@ -138,7 +161,54 @@ func onDemandTail(transcript string, app []byte) (pieces, ids []string) {
 	if len(ids) == 0 {
 		return nil, nil
 	}
-	return append([]string{"\n\n" + onDemandHeading}, pieces...), ids
+	return ids, src
+}
+
+// keywordRecipes are the recipes whose words or parts match, in registration
+// order. app is the existing / reference DSL (nil on a plain create).
+func keywordRecipes(transcript string, app []byte) []string {
+	text := normalizeTrigger(transcript) + appText(app)
+	compact := ""
+	if len(app) > 0 {
+		compact = compactJSON(string(app))
+	}
+	var ids []string
+	for _, blk := range onDemandBlocks {
+		for _, r := range blk.recipes {
+			if r.matches(text, compact) {
+				ids = append(ids, r.id)
+			}
+		}
+	}
+	return ids
+}
+
+// recipeTail is the tail block as pieces: the heading, then each recipe in
+// ids, every piece led by "\n\n" (so dropFeatureRules removes a feature's
+// recipe in a restricted build). No ids = nil. Unknown ids are skipped.
+func recipeTail(ids []string) []string {
+	want := map[string]bool{}
+	for _, id := range ids {
+		want[id] = true
+	}
+	var pieces []string
+	for _, blk := range onDemandBlocks {
+		for _, r := range blk.recipes {
+			if want[r.id] {
+				pieces = append(pieces, "\n\n"+r.text)
+			}
+		}
+	}
+	if len(pieces) == 0 {
+		return nil
+	}
+	return append([]string{"\n\n" + onDemandHeading}, pieces...)
+}
+
+// onDemandTail is the keyword-only tail (tests, size logs).
+func onDemandTail(transcript string, app []byte) (pieces, ids []string) {
+	ids = keywordRecipes(transcript, app)
+	return recipeTail(ids), ids
 }
 
 // restrictTail joins the pieces, each restricted like a second block (per

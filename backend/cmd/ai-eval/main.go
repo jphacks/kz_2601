@@ -222,7 +222,8 @@ func main() {
 	envFile := flag.String("env-file", "", "KEY=VALUE file to load into the environment first (e.g. ../.env); values are never printed")
 	logicPass := flag.Bool("logic-pass", false, "enable the 2nd calculations-only call after each create (same as AI_LOGIC_PASS=1)")
 	serverRules := flag.Bool("server-rules", false, "enable the server-rules call when the request asks for an automatic action (same as AI_SERVER_RULES=1, #343)")
-	onDemand := flag.Bool("on-demand-rules", false, "send the JPHACKS product recipes only when the request matches them (same as AI_ON_DEMAND_RULES=1)")
+	onDemand := flag.Bool("on-demand-rules", true, "send the JPHACKS product recipes only when keywords or the selector call pick them, as cmd/ai does (-on-demand-rules=false = AI_ON_DEMAND_RULES=0)")
+	recipeModel := flag.String("recipe-model", "", "model of the recipe selector call (empty = ai.DefaultRecipeModel, same as AI_RECIPE_MODEL)")
 	chat := flag.Bool("chat", false, "run the clarify-phase cases (internal/ai/eval/chat_cases.json unless -cases is set) through Service.Chat instead of /generate")
 	chatModel := flag.String("chat-model", "", "-chat: clarify model (empty = ai.DefaultChatModel, same as AI_CHAT_MODEL)")
 	chatEffort := flag.String("chat-effort", "", "-chat: clarify effort (empty = ai.DefaultChatEffort)")
@@ -291,6 +292,7 @@ func main() {
 		LogicPass:       *logicPass,
 		ServerRulesPass: *serverRules,
 		OnDemandRules:   *onDemand,
+		RecipeModel:     *recipeModel,
 	}
 	ctx := context.Background()
 	if *chat {

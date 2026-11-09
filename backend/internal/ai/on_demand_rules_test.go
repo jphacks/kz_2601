@@ -12,7 +12,9 @@ import (
 	"slices"
 	"sort"
 	"strings"
+	"sync"
 	"testing"
+	"time"
 
 	"github.com/jphacks/kz_2601/backend/internal/appconfigclient"
 )
@@ -219,8 +221,8 @@ func TestOnDemandRecall_Train(t *testing.T) {
 	}
 }
 
-// onDemandHoldoutFloor guards the held-out recall against regressions. The
-// target to turn AI_ON_DEMAND_RULES on by default is 0.80, not met yet.
+// onDemandHoldoutFloor guards the keyword-only held-out recall against
+// regressions (the selector call covers the rest: recipe_selector.go).
 const onDemandHoldoutFloor = 0.65
 
 // Paraphrases not used to write the triggers: recall is reported (go test
@@ -269,32 +271,83 @@ func TestOnDemand_EditAppSelectsItsRecipes(t *testing.T) {
 	}
 }
 
-// onDemandCalls runs one create and one edit and returns the Completions.
-func onDemandCalls(t *testing.T, ctx context.Context, on bool, create, edit string) (Completion, Completion) {
+// selectorFake answers the recipe selector call (Model = the recipe model)
+// with reply (or blocks until its ctx ends when block is set, or fails with
+// err) and passes every other call to gen.
+type selectorFake struct {
+	mu       sync.Mutex
+	gen      *fakeCaller
+	reply    string
+	block    bool
+	err      error
+	selector []Completion
+	ops      []string
+}
+
+func (f *selectorFake) Complete(ctx context.Context, req Completion) (*Response, error) {
+	if req.Model == DefaultRecipeModel {
+		f.mu.Lock()
+		f.selector = append(f.selector, req)
+		f.ops = append(f.ops, operationOf(ctx))
+		f.mu.Unlock()
+		if f.block {
+			<-ctx.Done()
+			return nil, ctx.Err()
+		}
+		if f.err != nil {
+			return nil, f.err
+		}
+		return &Response{Text: f.reply, StopReason: "end_turn", Usage: Usage{InputTokens: 900, OutputTokens: 12}}, nil
+	}
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	return f.gen.Complete(ctx, req)
+}
+
+// onDemandRun is one create and one edit through Generate.
+type onDemandRun struct {
+	create, edit         Completion
+	createMeta, editMeta Meta
+	sel                  *selectorFake
+}
+
+// onDemandCalls runs one create and one edit; sel (nil = it picks nothing)
+// answers their selector calls.
+func onDemandCalls(t *testing.T, ctx context.Context, on bool, create, edit string, sel *selectorFake) onDemandRun {
 	t.Helper()
+	if sel == nil {
+		sel = &selectorFake{reply: `{"ids":[]}`}
+	}
 	kb := kakeibo(t)
 	f := &fakeCaller{replies: []string{string(kb)}}
-	svc := &Service{Claude: f, Store: appconfigclient.NewMemory(), Model: "m", OnDemandRules: on}
-	if _, err := svc.Generate(ctx, Request{AppID: "a1", Transcript: create}); err != nil {
+	sel.gen = f
+	svc := &Service{Claude: sel, Store: appconfigclient.NewMemory(), Model: "m", OnDemandRules: on, RecipeTimeout: 200 * time.Millisecond}
+	cr, err := svc.Generate(ctx, Request{AppID: "a1", Transcript: create})
+	if err != nil {
 		t.Fatal(err)
 	}
 	store := appconfigclient.NewMemory()
 	if _, err := store.Put(context.Background(), "a1", 1, kb, appconfigclient.Source{Kind: "system"}); err != nil {
 		t.Fatal(err)
 	}
-	g := &fakeCaller{replies: []string{`{"patch":[],"summary":"x"}`}}
-	svc = &Service{Claude: g, Store: store, Model: "m", OnDemandRules: on}
-	_, _ = svc.Generate(ctx, Request{AppID: "a1", Transcript: edit})
+	g := &fakeCaller{replies: []string{`{"patch":[{"op":"replace","path":"/app/name","value":"家計簿2"}],"summary":"x"}`}}
+	sel.gen = g
+	svc = &Service{Claude: sel, Store: store, Model: "m", OnDemandRules: on, RecipeTimeout: 200 * time.Millisecond}
+	er, err := svc.Generate(ctx, Request{AppID: "a1", Transcript: edit})
+	if err != nil {
+		t.Fatal(err)
+	}
 	if len(f.calls) == 0 || len(g.calls) == 0 {
 		t.Fatalf("calls: create %d edit %d", len(f.calls), len(g.calls))
 	}
-	return f.calls[0], g.calls[0]
+	return onDemandRun{create: f.calls[0], edit: g.calls[0], createMeta: cr.Meta, editMeta: er.Meta, sel: sel}
 }
 
 // The cached blocks are the same for every request; only the tail differs.
 func TestOnDemand_CoreCachedRecipesInTail(t *testing.T) {
-	hit, hitEdit := onDemandCalls(t, context.Background(), true, "大事か急ぎかの4象限で見るToDo", "カテゴリにカフェを足して。あと何%制覇したかも")
-	miss, missEdit := onDemandCalls(t, context.Background(), true, "家計簿を作って", "カテゴリにカフェを足して")
+	h := onDemandCalls(t, context.Background(), true, "大事か急ぎかの4象限で見るToDo", "カテゴリにカフェを足して。あと何%制覇したかも", nil)
+	m := onDemandCalls(t, context.Background(), true, "家計簿を作って", "カテゴリにカフェを足して", nil)
+	hit, hitEdit, miss, missEdit := h.create, h.edit, m.create, m.edit
 	// the default Service (AI_TEXT_IMAGE off) restricts the core: compare with that
 	core := restrictPrompt(withRestriction(context.Background(), (&Service{}).clientRestriction(nil, nil, nil)), onDemandCore(systemPrompt))
 	if hit.System != core || miss.System != core || hitEdit.System != core || missEdit.System != core {
@@ -314,12 +367,166 @@ func TestOnDemand_CoreCachedRecipesInTail(t *testing.T) {
 	}
 }
 
-// Off (the default): the whole systemPrompt in the first block, no tail.
+// Kill switch (AI_ON_DEMAND_RULES=0 = OnDemandRules off): the whole
+// systemPrompt in the first block, no tail, no selector call, no recipe meta.
 func TestOnDemand_OffSendsWholePrompt(t *testing.T) {
-	create, edit := onDemandCalls(t, context.Background(), false, "大事か急ぎかの4象限で見るToDo", "何%制覇したかも見たい")
+	r := onDemandCalls(t, context.Background(), false, "大事か急ぎかの4象限で見るToDo", "何%制覇したかも見たい", &selectorFake{reply: `{"ids":["slot_booking"]}`})
 	full := restrictPrompt(withRestriction(context.Background(), (&Service{}).clientRestriction(nil, nil, nil)), systemPrompt)
-	if create.System != full || edit.System != full || create.SystemTail != "" || edit.SystemTail != "" {
+	if r.create.System != full || r.edit.System != full || r.create.SystemTail != "" || r.edit.SystemTail != "" {
 		t.Fatal("off: the request must be today's, byte for byte")
+	}
+	if r.edit.SystemSuffix != editSystemSuffix() || r.create.SystemSuffix != "" {
+		t.Fatal("off: edit keeps its editRules block")
+	}
+	if len(r.sel.selector) != 0 || r.createMeta.Recipes != nil || r.createMeta.RecipeSelector != "" {
+		t.Fatalf("off: no selector call (%d) and no recipe meta", len(r.sel.selector))
+	}
+}
+
+// Keyword hits and selector picks are unioned in the tail, with their source.
+func TestOnDemand_SelectorUnionedWithKeywords(t *testing.T) {
+	sel := &selectorFake{reply: `{"ids":["one_vote","priority_matrix"]}`}
+	r := onDemandCalls(t, context.Background(), true, "大事か急ぎかの4象限で見るToDo", "ボタンの色を青にして", sel)
+	m := r.createMeta
+	if !slices.Equal(m.Recipes, []string{"one_vote", "priority_matrix"}) {
+		t.Fatalf("recipes %v", m.Recipes)
+	}
+	if m.RecipeSources["priority_matrix"] != recipeByBoth || m.RecipeSources["one_vote"] != recipeBySelector || m.RecipeSelector != recipeSelOK {
+		t.Fatalf("sources %v selector %q", m.RecipeSources, m.RecipeSelector)
+	}
+	if !strings.Contains(r.create.SystemTail, "1 人 1 票") || !strings.Contains(r.create.SystemTail, "gridTable{entity: task") {
+		t.Fatalf("tail: %q", r.create.SystemTail)
+	}
+	// the edit: the selector alone brings recipes the keywords miss
+	if r.editMeta.RecipeSources["one_vote"] != recipeBySelector || !strings.Contains(r.edit.SystemTail, "1 人 1 票") {
+		t.Fatalf("edit meta %v", r.editMeta.RecipeSources)
+	}
+	if len(sel.selector) != 2 || sel.ops[0] != OpRecipes {
+		t.Fatalf("selector calls %d ops %v", len(sel.selector), sel.ops)
+	}
+	c := sel.selector[0]
+	sys, schema := recipeIndexOnce()
+	if c.System != sys || !c.Structured || string(c.Schema) != string(schema) || c.Effort != "low" || c.Thinking != "disabled" || c.SystemTail != "" {
+		t.Fatalf("selector request: %+v", c)
+	}
+	// edit: the app's name, entities and parts go with the transcript
+	if u := sel.selector[1].Messages[0].Content; !strings.Contains(u, "今のアプリ:") || !strings.Contains(u, "部品:") {
+		t.Fatalf("edit selector message: %q", u)
+	}
+}
+
+// Unknown or repeated ids are dropped; a non-JSON reply counts as invalid.
+func TestRecipeSelector_DropsUnknownIDs(t *testing.T) {
+	ids, st := parseRecipeIDs(`{"ids":["one_vote","no_such","one_vote","SLOT_BOOKING"]}`)
+	if !slices.Equal(ids, []string{"one_vote"}) || st != recipeSelOK {
+		t.Fatalf("ids %v status %s", ids, st)
+	}
+	if ids, st := parseRecipeIDs("たぶん one_vote"); ids != nil || st != recipeSelInvalid {
+		t.Fatalf("invalid reply: %v %s", ids, st)
+	}
+	r := onDemandCalls(t, context.Background(), true, "家計簿を作って", "カテゴリにカフェを足して", &selectorFake{reply: `{"ids":["made_up"]}`})
+	if r.createMeta.Recipes != nil || r.create.SystemTail != "" {
+		t.Fatalf("unknown ids must not reach the tail: %v", r.createMeta.Recipes)
+	}
+}
+
+// A selector slower than RecipeTimeout (or failing) leaves the keywords alone;
+// the generation still runs.
+func TestRecipeSelector_TimeoutAndErrorFallBackToKeywords(t *testing.T) {
+	for _, c := range []struct {
+		sel  *selectorFake
+		want string
+	}{
+		{&selectorFake{block: true}, recipeSelTimeout},
+		{&selectorFake{err: &APIError{Status: 500, Type: "api_error"}}, recipeSelError},
+	} {
+		start := time.Now()
+		r := onDemandCalls(t, context.Background(), true, "大事か急ぎかの4象限で見るToDo", "何%制覇したかも見たい", c.sel)
+		if r.createMeta.RecipeSelector != c.want || r.editMeta.RecipeSelector != c.want {
+			t.Fatalf("status %q / %q, want %s", r.createMeta.RecipeSelector, r.editMeta.RecipeSelector, c.want)
+		}
+		if !slices.Equal(r.createMeta.Recipes, []string{"priority_matrix"}) || r.createMeta.RecipeSources["priority_matrix"] != recipeByKeyword {
+			t.Fatalf("keywords only: %v", r.createMeta.Recipes)
+		}
+		if c.want == recipeSelTimeout && (time.Since(start) > 2*time.Second || r.createMeta.RecipeSelectorMs < 150) {
+			t.Fatalf("timeout wait %v (selector %d ms)", time.Since(start), r.createMeta.RecipeSelectorMs)
+		}
+	}
+}
+
+// With a selector that answers right, every eval case and every phrasing
+// gets its recipe (the real model's recall is for the live quality tests).
+func TestOnDemandRecall_WithRightSelectorIs100(t *testing.T) {
+	type want struct{ text, id string }
+	var all []want
+	for _, cs := range readEvalCases(t, "jphacks_*cases.json") {
+		for _, c := range cs {
+			if id := onDemandEvalCases[c.ID]; id != "" {
+				all = append(all, want{c.Transcript, id})
+			}
+		}
+	}
+	p := readPhrasings(t)
+	for _, set := range []map[string][]string{p.Train, p.Tuned, p.Holdout} {
+		for id, ss := range set {
+			for _, s := range ss {
+				all = append(all, want{s, id})
+			}
+		}
+	}
+	for _, w := range all {
+		f := &selectorFake{reply: `{"ids":["` + w.id + `"]}`}
+		s := &Service{Claude: f, OnDemandRules: true}
+		var meta Meta
+		_, tail := s.onDemandPrompt(context.Background(), w.text, nil, &meta)
+		if !slices.Contains(meta.Recipes, w.id) || !strings.Contains(strings.Join(tail, ""), recipeText(w.id)) {
+			t.Errorf("%s: not sent for %q", w.id, w.text)
+		}
+	}
+	t.Logf("with a right selector: %d/%d phrasings get their recipe", len(all), len(all))
+}
+
+func recipeText(id string) string {
+	for _, b := range onDemandBlocks {
+		for _, r := range b.recipes {
+			if r.id == id {
+				return r.text
+			}
+		}
+	}
+	return "\x00missing"
+}
+
+// The selector's index: one short line per recipe, and its size.
+func TestRecipeSelector_Index(t *testing.T) {
+	sys, schema := recipeIndexOnce()
+	for _, b := range onDemandBlocks {
+		for _, r := range b.recipes {
+			d := recipeDesc(r.text)
+			if d == "" || len([]rune(d)) > 120 || !strings.Contains(sys, r.id+": "+d+"\n") {
+				t.Errorf("%s: index line %q", r.id, d)
+			}
+		}
+	}
+	if !json.Valid(schema) {
+		t.Fatal("schema")
+	}
+	u := recipeUserMessage("ボタンを青に", kakeibo(t))
+	t.Logf("selector system %d bytes (~%d tokens), schema %d bytes, kakeibo edit message %d bytes: %q", len(sys), len(sys)*2/5, len(schema), len(u), u)
+}
+
+// Haiku 5.5 is priced on its short-prompt card, and the long one above 100K.
+func TestEstimateCostUSD_HaikuTiers(t *testing.T) {
+	short, ok := EstimateCostUSD("claude-haiku-5-5", Usage{InputTokens: 50_000, OutputTokens: 50_000})
+	if !ok || short < 0.0299 || short > 0.0301 {
+		t.Fatalf("short card: %v %v", short, ok)
+	}
+	long, _ := EstimateCostUSD("claude-haiku-5-5", Usage{InputTokens: 200_000})
+	if long < 0.0999 || long > 0.1001 {
+		t.Fatalf("long card: %v", long)
+	}
+	if _, ok := EstimateCostUSD(DefaultRecipeModel, Usage{InputTokens: 1}); !ok {
+		t.Fatal("the selector's default model must be priced")
 	}
 }
 

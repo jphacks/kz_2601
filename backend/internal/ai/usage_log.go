@@ -59,19 +59,31 @@ type modelPrice struct {
 // the cost or adding a model, then bump PricingAsOf. A model id missing here
 // logs no cost rather than a wrong one. The client only writes 5-minute cache
 // entries, so cache_creation is priced at the 5m write rate. Claude Haiku 5.5
-// is left out on purpose: its price depends on the prompt length.
+// has two rate cards by prompt length: its row here is the one for prompts up
+// to haikuShortPromptTokens, haikuLongPrice the one above (EstimateCostUSD).
+// Both are from the model's release notes (input / output, cache reads 0.1x,
+// 5m writes 1.25x): confirm them on the pricing page before relying on them.
 var modelPrices = map[string]modelPrice{
+	"claude-haiku-5-5":  {Input: 0.10, Output: 0.50, CacheWrite5m: 0.125, CacheRead: 0.01},
 	"claude-sonnet-5-5": {Input: 2, Output: 10, CacheWrite5m: 2.5, CacheRead: 0.10},
 	"claude-sonnet-5":   {Input: 2, Output: 10, CacheWrite5m: 2.5, CacheRead: 0.20},
 	"claude-opus-5-5":   {Input: 4, Output: 20, CacheWrite5m: 5, CacheRead: 0.20},
 	"claude-opus-5":     {Input: 5, Output: 25, CacheWrite5m: 6.25, CacheRead: 0.50},
 }
 
+// Claude Haiku 5.5 above haikuShortPromptTokens prompt tokens (input + cache).
+const haikuShortPromptTokens = 100_000
+
+var haikuLongPrice = modelPrice{Input: 0.50, Output: 2.50, CacheWrite5m: 0.625, CacheRead: 0.05}
+
 // EstimateCostUSD prices u at model's list price; ok=false for an unknown model.
 func EstimateCostUSD(model string, u Usage) (usd float64, ok bool) {
 	p, ok := modelPrices[model]
 	if !ok {
 		return 0, false
+	}
+	if model == "claude-haiku-5-5" && u.InputTokens+u.CacheReadInputTokens+u.CacheCreationInputTokens > haikuShortPromptTokens {
+		p = haikuLongPrice
 	}
 	return (float64(u.InputTokens)*p.Input +
 		float64(u.OutputTokens)*p.Output +
