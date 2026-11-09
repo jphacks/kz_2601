@@ -15,6 +15,7 @@
 //	rn_rcpt_app_{appId}_{uid}     notifications one person got from one app
 //	rn_rcpt_total_{uid}           notifications one person got in total
 //	rr_app_{appId}                records read by one app's rules (each / agg)
+//	rq_warn_app_{appId}_{level}   the creator's 80% / 100% push was sent (limit 1, warn.go)
 package quota
 
 import (
@@ -160,6 +161,7 @@ type Quota struct {
 	store    ratelimit.Store
 	fallback ratelimit.Store
 	pro      ProChecker
+	warned   warned
 	// Logger receives runner.usage and fallback warnings; nil = slog.Default().
 	Logger *slog.Logger
 }
