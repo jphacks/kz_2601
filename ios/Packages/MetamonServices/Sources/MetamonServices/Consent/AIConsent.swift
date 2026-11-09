@@ -9,7 +9,8 @@ import MetamonDSL
 public final class AIConsentStore {
     /// 説明文(AIConsentView・プライバシーポリシー)の版。送る中身・送り先を変えたら上げる(ポリシー 6 章)。
     /// 1: 初版(#246)。2: 「AI で書く」の範囲(要約・分類・書き直し・抜き出し・提案)と 4KB・端末内 AI なら送らない(ポリシー 2026-11 改定)。
-    nonisolated public static let currentVersion = 2
+    /// 3: 長い答えは最大 16KB・いつもオンライン / aiChat 直近 20 発言・16KB / 写真のボタン 1 枚(JPEG・1024px)/ 共有は自分の記録だけ(ポリシー 2026-11-08 改定)。
+    nonisolated public static let currentVersion = 3
 
     nonisolated static let versionKey = "metamon.aiConsent.version"
     nonisolated static let dateKey = "metamon.aiConsent.date"

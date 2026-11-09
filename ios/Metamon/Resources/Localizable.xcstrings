@@ -2432,19 +2432,19 @@
         }
       }
     },
-    "「AI で書く」ボタン(文を作る・要約・分類・書き直し・抜き出し・提案)は、端末の中の AI が使える時は送りません。使えない時だけ、押した時に、最近の記録と入力中の文字(最大 4KB)を送ります。写真・音声・動画は送りません。" : {
+    "「AI で書く」ボタン(文を作る・要約・分類・書き直し・抜き出し・提案)は、押した時だけ送ります。短い答えは、端末の中の AI が使える時は送らず、使えない時だけ最近の記録と入力中の文字(最大 4KB)を送ります。長い答えのボタンは、いつも最大 16KB を送ります。共有のアプリで材料にするのは、自分が入れた記録だけです。" : {
       "extractionState" : "manual",
       "localizations" : {
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "\"Write with AI\" buttons (write, summarize, classify, rewrite, extract, suggest) send nothing when on-device AI is available. Only when it is not, tapping one sends recent records and the text being entered (up to 4KB). Photos, audio and video are never sent."
+            "value" : "\"Write with AI\" buttons (write, summarize, classify, rewrite, extract, suggest) send data only when tapped. Short answers send nothing when on-device AI is available; otherwise they send recent records and the text being entered (up to 4KB). Long-answer buttons always send up to 16KB. In a shared app, only records you added are used."
           }
         },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "「AI で書く」ボタン(文を作る・要約・分類・書き直し・抜き出し・提案)は、端末の中の AI が使える時は送りません。使えない時だけ、押した時に、最近の記録と入力中の文字(最大 4KB)を送ります。写真・音声・動画は送りません。"
+            "value" : "「AI で書く」ボタン(文を作る・要約・分類・書き直し・抜き出し・提案)は、押した時だけ送ります。短い答えは、端末の中の AI が使える時は送らず、使えない時だけ最近の記録と入力中の文字(最大 4KB)を送ります。長い答えのボタンは、いつも最大 16KB を送ります。共有のアプリで材料にするのは、自分が入れた記録だけです。"
           }
         }
       }
@@ -2462,6 +2462,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "「AI で書く」ボタン(文を作る・要約・分類・書き直し・抜き出し・提案)は、端末の中の AI だけで動き、何も送りません。"
+          }
+        }
+      }
+    },
+    "「AI と話す」部品は、送るたびに、そのアプリに保存した自分の会話の直近の発言(最大 20 件・16KB)を送ります。参考にする記録帳が決めてあるアプリでは、その記録帳の自分の記録の新しいもの(最大 20 件・8KB)も送ります。写真は「写真を材料にするボタン」を押した時だけ、縮めた 1 枚(JPEG・長い辺 1024 ピクセル以下)を送ります。音声・動画は送りません。" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The \"AI chat\" part sends the latest turns of your own conversation saved in that app (up to 20 turns, 16KB) each time you send a message. If the app sets a reference list, your own latest records from it (up to 20, 8KB) are also sent. A photo is sent only when you tap a \"photo\" AI button: one downscaled image (JPEG, long edge up to 1024 pixels). Audio and video are never sent."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "「AI と話す」部品は、送るたびに、そのアプリに保存した自分の会話の直近の発言(最大 20 件・16KB)を送ります。参考にする記録帳が決めてあるアプリでは、その記録帳の自分の記録の新しいもの(最大 20 件・8KB)も送ります。写真は「写真を材料にするボタン」を押した時だけ、縮めた 1 枚(JPEG・長い辺 1024 ピクセル以下)を送ります。音声・動画は送りません。"
           }
         }
       }
@@ -5458,19 +5475,19 @@
         }
       }
     },
-    "アプリを作る・直すときは、話した内容・会話・アプリの設計を Anthropic 社の AI に送ります(記録の中身は送りません)。「AI で書く」ボタンは、端末の中の AI が使えない時だけ、押した時に最近の記録と入力中の文字(最大 4KB)を送ります。同意を取り消すと、AI を使う機能が使えなくなります(閲覧・記録は使えます)。送信済みの内容は取り消せません。" : {
+    "アプリを作る・直すときは、話した内容・会話・アプリの設計を Anthropic 社の AI に送ります(記録の中身は送りません)。「AI で書く」ボタンは、押した時だけ送ります(短い答えは端末の中の AI が使えない時だけ最大 4KB、長い答えはいつも最大 16KB)。「AI と話す」部品は直近の会話(最大 20 件・16KB)と、決めてあれば参考の自分の記録(最大 20 件・8KB)を、写真のボタンは縮めた写真 1 枚を送ります。同意を取り消すと、AI を使う機能が使えなくなります(閲覧・記録は使えます)。送信済みの内容は取り消せません。" : {
       "extractionState" : "manual",
       "localizations" : {
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "When you build or edit an app, what you said, the conversation and the app design are sent to Anthropic's AI (the contents of your records are not). \"Write with AI\" buttons send recent records and the text being entered (up to 4KB) only when tapped and only if on-device AI is unavailable. If you withdraw consent, AI features are disabled (viewing and recording still work). Data already sent cannot be recalled."
+            "value" : "When you build or edit an app, what you said, the conversation and the app design are sent to Anthropic's AI (the contents of your records are not). \"Write with AI\" buttons send data only when tapped (short answers up to 4KB, only if on-device AI is unavailable; long answers always up to 16KB). The \"AI chat\" part sends the latest conversation (up to 20 turns, 16KB) and, if set, your own reference records (up to 20, 8KB), and a photo button sends one downscaled photo. If you withdraw consent, AI features are disabled (viewing and recording still work). Data already sent cannot be recalled."
           }
         },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "アプリを作る・直すときは、話した内容・会話・アプリの設計を Anthropic 社の AI に送ります(記録の中身は送りません)。「AI で書く」ボタンは、端末の中の AI が使えない時だけ、押した時に最近の記録と入力中の文字(最大 4KB)を送ります。同意を取り消すと、AI を使う機能が使えなくなります(閲覧・記録は使えます)。送信済みの内容は取り消せません。"
+            "value" : "アプリを作る・直すときは、話した内容・会話・アプリの設計を Anthropic 社の AI に送ります(記録の中身は送りません)。「AI で書く」ボタンは、押した時だけ送ります(短い答えは端末の中の AI が使えない時だけ最大 4KB、長い答えはいつも最大 16KB)。「AI と話す」部品は直近の会話(最大 20 件・16KB)と、決めてあれば参考の自分の記録(最大 20 件・8KB)を、写真のボタンは縮めた写真 1 枚を送ります。同意を取り消すと、AI を使う機能が使えなくなります(閲覧・記録は使えます)。送信済みの内容は取り消せません。"
           }
         }
       }
@@ -15471,19 +15488,19 @@
         }
       }
     },
-    "送り先: Tailor It のサーバー(Google Cloud)を経由して Anthropic, PBC(米国)へ。送った内容は、アプリを作る・ボタンの文を作るためだけに使います。" : {
+    "送り先: Tailor It のサーバー(Google Cloud)を経由して Anthropic, PBC(米国)へ。送った内容は、アプリを作る・ボタンの文を作る・会話の返事を作るためだけに使います。" : {
       "extractionState" : "manual",
       "localizations" : {
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Destination: Anthropic, PBC (USA), via Tailor It's server (Google Cloud). It is used only to build your app or to write a button's text."
+            "value" : "Destination: Anthropic, PBC (USA), via Tailor It's server (Google Cloud). It is used only to build your app, write a button's text or reply in a chat."
           }
         },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "送り先: Tailor It のサーバー(Google Cloud)を経由して Anthropic, PBC(米国)へ。送った内容は、アプリを作る・ボタンの文を作るためだけに使います。"
+            "value" : "送り先: Tailor It のサーバー(Google Cloud)を経由して Anthropic, PBC(米国)へ。送った内容は、アプリを作る・ボタンの文を作る・会話の返事を作るためだけに使います。"
           }
         }
       }
