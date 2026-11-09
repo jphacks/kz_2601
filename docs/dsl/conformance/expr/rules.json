@@ -1,0 +1,331 @@
+{
+  "description": "Patterns the prompt rules teach (#775): self-ref prev lookup with coalesce, overdue count (date lt today), HP clamp, same-today count by row value, latest per parent + daysBetween (coalesce 9999 so never-contacted sorts first in desc), nested if diagnosis.",
+  "defaults": {
+    "now": "2026-10-28T15:30:45+09:00",
+    "timeZone": "Asia/Tokyo",
+    "entities": [
+      {
+        "id": "task",
+        "name": "タスク",
+        "fields": [
+          {"id": "title", "name": "名前", "type": "string"},
+          {"id": "due", "name": "期限", "type": "date"},
+          {"id": "done", "name": "済み", "type": "boolean", "defaultValue": false},
+          {"id": "prev", "name": "前のタスク", "type": "ref", "refEntity": "task"},
+          {
+            "id": "ready",
+            "name": "今できる",
+            "type": "boolean",
+            "computed": {
+              "op": "and",
+              "args": [{"op": "not", "args": [{"ref": "done"}]}, {"op": "coalesce", "args": [{"ref": "prev.done"}, true]}]
+            }
+          }
+        ],
+        "titleField": "title"
+      },
+      {
+        "id": "friend",
+        "name": "友だち",
+        "fields": [
+          {"id": "name", "name": "名前", "type": "string"},
+          {
+            "id": "last_sent",
+            "name": "最後",
+            "type": "date",
+            "computed": {
+              "entity": "card",
+              "agg": "latest",
+              "field": "date",
+              "by": "date",
+              "filter": {"value": {"ref": "id"}, "op": "eq", "field": "friend"}
+            }
+          },
+          {
+            "id": "days_since",
+            "name": "経過",
+            "type": "integer",
+            "computed": {
+              "op": "coalesce",
+              "args": [{"op": "daysBetween", "args": [{"ref": "last_sent"}, {"op": "today", "args": []}]}, 9999]
+            }
+          }
+        ],
+        "titleField": "name"
+      },
+      {
+        "id": "card",
+        "name": "記録",
+        "fields": [
+          {"id": "friend", "name": "友だち", "type": "ref", "refEntity": "friend"},
+          {"id": "date", "name": "日付", "type": "date"}
+        ]
+      },
+      {
+        "id": "post",
+        "name": "投稿",
+        "fields": [
+          {"id": "feeling", "name": "気分", "type": "enum", "options": ["晴れ", "くもり", "雨"]},
+          {"id": "date", "name": "日付", "type": "date"},
+          {
+            "id": "same_today",
+            "name": "同じ人",
+            "type": "integer",
+            "computed": {
+              "entity": "post",
+              "agg": "count",
+              "filter": [{"value": {"ref": "feeling"}, "op": "eq", "field": "feeling"}, {"value": null, "op": "today", "field": "date"}]
+            }
+          }
+        ]
+      },
+      {
+        "id": "quiz",
+        "name": "診断",
+        "fields": [
+          {"id": "acidity", "name": "酸味", "type": "enum", "options": ["好き", "苦手"]},
+          {"id": "milk", "name": "ミルク", "type": "boolean"},
+          {
+            "id": "result",
+            "name": "結果",
+            "type": "string",
+            "computed": {
+              "if": {"op": "eq", "args": [{"ref": "acidity"}, "好き"]},
+              "then": "エチオピア(浅煎り)",
+              "else": {"if": {"ref": "milk"}, "then": "ブラジル(中深煎り)", "else": "マンデリン(深煎り)"}
+            }
+          }
+        ]
+      }
+    ],
+    "records": {
+      "card": [
+        {"id": "c1", "data": {"date": "2026-10-01", "friend": "f1"}},
+        {"id": "c2", "data": {"date": "2026-10-18", "friend": "f1"}},
+        {"id": "c3", "data": {"date": "2026-09-10", "friend": "f1"}}
+      ],
+      "friend": [{"id": "f1", "data": {"name": "Alice"}}, {"id": "f2", "data": {"name": "Bob"}}],
+      "post": [
+        {"id": "p1", "data": {"date": "2026-10-28", "feeling": "晴れ"}},
+        {"id": "p2", "data": {"date": "2026-10-28", "feeling": "晴れ"}},
+        {"id": "p3", "data": {"date": "2026-10-27", "feeling": "晴れ"}},
+        {"id": "p4", "data": {"date": "2026-10-28", "feeling": "雨"}}
+      ],
+      "task": [
+        {"id": "t1", "data": {"done": true, "due": "2026-10-27", "title": "A"}},
+        {"id": "t2", "data": {"done": false, "due": "2026-10-28", "prev": "t1", "title": "B"}},
+        {"id": "t3", "data": {"done": false, "due": "2026-10-26", "prev": "t2", "title": "C"}},
+        {"id": "t4", "data": {"done": false, "due": "2026-10-29", "prev": "gone", "title": "D"}},
+        {"id": "t5", "data": {"done": false, "due": "2026-10-20", "title": "E"}},
+        {"id": "t6", "data": {"prev": "t7", "title": "F"}},
+        {"id": "t7", "data": {"title": "G"}}
+      ]
+    }
+  },
+  "cases": [
+    {
+      "name": "prev/lookup-self-ref-bool-true",
+      "expr": {"ref": "prev.done"},
+      "row": {"entity": "task", "record": {"id": "t2", "data": {"done": false, "due": "2026-10-28", "prev": "t1", "title": "B"}}},
+      "expected": {"type": "bool", "value": true, "text": "true"}
+    },
+    {
+      "name": "prev/lookup-self-ref-bool-false",
+      "expr": {"ref": "prev.done"},
+      "row": {"entity": "task", "record": {"id": "t3", "data": {"done": false, "due": "2026-10-26", "prev": "t2", "title": "C"}}},
+      "expected": {"type": "bool", "value": false, "text": "false"}
+    },
+    {
+      "name": "prev/coalesce-keeps-false",
+      "expr": {"op": "coalesce", "args": [{"ref": "prev.done"}, true]},
+      "row": {"entity": "task", "record": {"id": "t3", "data": {"done": false, "due": "2026-10-26", "prev": "t2", "title": "C"}}},
+      "expected": {"type": "bool", "value": false, "text": "false"}
+    },
+    {
+      "name": "prev/ready-prev-done",
+      "expr": {"ref": "ready"},
+      "row": {"entity": "task", "record": {"id": "t2", "data": {"done": false, "due": "2026-10-28", "prev": "t1", "title": "B"}}},
+      "expected": {"type": "bool", "value": true, "text": "true"}
+    },
+    {
+      "name": "prev/ready-prev-not-done",
+      "expr": {"ref": "ready"},
+      "row": {"entity": "task", "record": {"id": "t3", "data": {"done": false, "due": "2026-10-26", "prev": "t2", "title": "C"}}},
+      "expected": {"type": "bool", "value": false, "text": "false"}
+    },
+    {
+      "name": "prev/ready-no-prev",
+      "expr": {"ref": "ready"},
+      "row": {"entity": "task", "record": {"id": "t5", "data": {"done": false, "due": "2026-10-20", "title": "E"}}},
+      "expected": {"type": "bool", "value": true, "text": "true"}
+    },
+    {
+      "name": "prev/ready-self-done",
+      "expr": {"ref": "ready"},
+      "row": {"entity": "task", "record": {"id": "t1", "data": {"done": true, "due": "2026-10-27", "title": "A"}}},
+      "expected": {"type": "bool", "value": false, "text": "false"}
+    },
+    {
+      "name": "prev/ready-prev-dangling",
+      "expr": {"ref": "ready"},
+      "row": {
+        "entity": "task",
+        "record": {"id": "t4", "data": {"done": false, "due": "2026-10-29", "prev": "gone", "title": "D"}}
+      },
+      "expected": {"type": "bool", "value": true, "text": "true"}
+    },
+    {
+      "name": "prev/ready-prev-done-missing",
+      "expr": {"ref": "ready"},
+      "row": {"entity": "task", "record": {"id": "t6", "data": {"prev": "t7", "title": "F"}}},
+      "expected": {"type": "bool", "value": true, "text": "true"}
+    },
+    {
+      "name": "prev/count-ready",
+      "expr": {"entity": "task", "agg": "count", "filter": {"value": true, "op": "eq", "field": "ready"}},
+      "expected": {"type": "number", "value": 5, "text": "5"}
+    },
+    {
+      "name": "hp/overdue-count",
+      "expr": {
+        "entity": "task",
+        "agg": "count",
+        "filter": [{"value": false, "op": "eq", "field": "done"}, {"value": {"op": "today", "args": []}, "op": "lt", "field": "due"}]
+      },
+      "expected": {"type": "number", "value": 2, "text": "2"}
+    },
+    {
+      "name": "hp/overdue-count-new-york",
+      "now": "2026-10-28T12:00:00-04:00",
+      "timeZone": "America/New_York",
+      "expr": {
+        "entity": "task",
+        "agg": "count",
+        "filter": [{"value": false, "op": "eq", "field": "done"}, {"value": {"op": "today", "args": []}, "op": "lt", "field": "due"}]
+      },
+      "expected": {"type": "number", "value": 2, "text": "2"}
+    },
+    {
+      "name": "hp/overdue-datetime-due-today",
+      "expr": {
+        "entity": "task",
+        "agg": "count",
+        "filter": [{"value": false, "op": "eq", "field": "done"}, {"value": {"op": "today", "args": []}, "op": "lt", "field": "due"}]
+      },
+      "entities": [
+        {
+          "id": "task",
+          "name": "タスク",
+          "fields": [{"id": "due", "name": "期限", "type": "date"}, {"id": "done", "name": "済み", "type": "boolean"}]
+        }
+      ],
+      "records": {
+        "task": [
+          {"id": "t1", "data": {"done": false, "due": "2026-10-28T09:00:00+09:00"}},
+          {"id": "t2", "data": {"done": false, "due": "2026-10-27T23:59:00+09:00"}}
+        ]
+      },
+      "expected": {"type": "number", "value": 1, "text": "1"}
+    },
+    {
+      "name": "hp/clamp",
+      "expr": {
+        "op": "clamp",
+        "args": [
+          {
+            "op": "add",
+            "args": [
+              {
+                "op": "sub",
+                "args": [
+                  100,
+                  {
+                    "op": "mul",
+                    "args": [10, {"entity": "task", "agg": "count", "filter": {"value": true, "op": "eq", "field": "done"}}]
+                  }
+                ]
+              },
+              {
+                "op": "mul",
+                "args": [
+                  10,
+                  {
+                    "entity": "task",
+                    "agg": "count",
+                    "filter": [
+                      {"value": false, "op": "eq", "field": "done"},
+                      {"value": {"op": "today", "args": []}, "op": "lt", "field": "due"}
+                    ]
+                  }
+                ]
+              }
+            ]
+          },
+          0,
+          100
+        ]
+      },
+      "expected": {"type": "number", "value": 100, "text": "100"}
+    },
+    {
+      "name": "same-today/row-value",
+      "expr": {"ref": "same_today"},
+      "row": {"entity": "post", "record": {"id": "p1", "data": {"date": "2026-10-28", "feeling": "晴れ"}}},
+      "expected": {"type": "number", "value": 2, "text": "2"}
+    },
+    {
+      "name": "same-today/other-value",
+      "expr": {"ref": "same_today"},
+      "row": {"entity": "post", "record": {"id": "p4", "data": {"date": "2026-10-28", "feeling": "雨"}}},
+      "expected": {"type": "number", "value": 1, "text": "1"}
+    },
+    {
+      "name": "last-sent/latest-per-parent",
+      "expr": {"ref": "last_sent"},
+      "row": {"entity": "friend", "record": {"id": "f1", "data": {"name": "Alice"}}},
+      "expected": {"type": "date", "value": "2026-10-18T00:00:00+09:00", "text": "2026-10-18"}
+    },
+    {
+      "name": "last-sent/days-since",
+      "expr": {"ref": "days_since"},
+      "row": {"entity": "friend", "record": {"id": "f1", "data": {"name": "Alice"}}},
+      "expected": {"type": "number", "value": 10, "text": "10"}
+    },
+    {
+      "name": "last-sent/no-records-last-sent-is-nil",
+      "expr": {"ref": "last_sent"},
+      "row": {"entity": "friend", "record": {"id": "f2", "data": {"name": "Bob"}}},
+      "expected": {"type": "nil"}
+    },
+    {
+      "name": "last-sent/no-records-days-since-sorts-first",
+      "expr": {"ref": "days_since"},
+      "row": {"entity": "friend", "record": {"id": "f2", "data": {"name": "Bob"}}},
+      "expected": {"type": "number", "value": 9999, "text": "9999"}
+    },
+    {
+      "name": "diagnosis/first-branch",
+      "expr": {"ref": "result"},
+      "row": {"entity": "quiz", "record": {"id": "q1", "data": {"acidity": "好き", "milk": true}}},
+      "expected": {"type": "string", "value": "エチオピア(浅煎り)", "text": "エチオピア(浅煎り)"}
+    },
+    {
+      "name": "diagnosis/nested-then",
+      "expr": {"ref": "result"},
+      "row": {"entity": "quiz", "record": {"id": "q2", "data": {"acidity": "苦手", "milk": true}}},
+      "expected": {"type": "string", "value": "ブラジル(中深煎り)", "text": "ブラジル(中深煎り)"}
+    },
+    {
+      "name": "diagnosis/nested-else",
+      "expr": {"ref": "result"},
+      "row": {"entity": "quiz", "record": {"id": "q3", "data": {"acidity": "苦手", "milk": false}}},
+      "expected": {"type": "string", "value": "マンデリン(深煎り)", "text": "マンデリン(深煎り)"}
+    },
+    {
+      "name": "diagnosis/unanswered",
+      "expr": {"ref": "result"},
+      "row": {"entity": "quiz", "record": {"id": "q4", "data": {}}},
+      "expected": {"type": "string", "value": "マンデリン(深煎り)", "text": "マンデリン(深煎り)"}
+    }
+  ]
+}

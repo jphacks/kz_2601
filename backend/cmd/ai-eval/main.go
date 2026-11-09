@@ -82,6 +82,16 @@ type Case struct {
 	// PendingExpect: expect keys an open PR adds (jphacks_coverage_pending_cases.json).
 	// A key is checked once expectKeys knows it; until then it is skipped (coverage.go).
 	PendingExpect map[string]any `json:"pendingExpect,omitempty"`
+	// TextImage turns on Service.TextImage (AI_TEXT_IMAGE=1) for this case:
+	// with it off, aiButton inputPhoto is not generated (clientRestriction).
+	TextImage bool `json:"textImage,omitempty"`
+}
+
+// caseSwitches applies the case's server switches to svc; call the result to restore them.
+func caseSwitches(svc *ai.Service, c Case) func() {
+	prev := svc.TextImage
+	svc.TextImage = c.TextImage
+	return func() { svc.TextImage = prev }
 }
 
 type Metrics struct {
@@ -212,6 +222,8 @@ func main() {
 	envFile := flag.String("env-file", "", "KEY=VALUE file to load into the environment first (e.g. ../.env); values are never printed")
 	logicPass := flag.Bool("logic-pass", false, "enable the 2nd calculations-only call after each create (same as AI_LOGIC_PASS=1)")
 	serverRules := flag.Bool("server-rules", false, "enable the server-rules call when the request asks for an automatic action (same as AI_SERVER_RULES=1, #343)")
+	onDemand := flag.Bool("on-demand-rules", true, "send the JPHACKS product recipes only when keywords or the selector call pick them, as cmd/ai does (-on-demand-rules=false = AI_ON_DEMAND_RULES=0)")
+	recipeModel := flag.String("recipe-model", "", "model of the recipe selector call (empty = ai.DefaultRecipeModel, same as AI_RECIPE_MODEL)")
 	chat := flag.Bool("chat", false, "run the clarify-phase cases (internal/ai/eval/chat_cases.json unless -cases is set) through Service.Chat instead of /generate")
 	chatModel := flag.String("chat-model", "", "-chat: clarify model (empty = ai.DefaultChatModel, same as AI_CHAT_MODEL)")
 	chatEffort := flag.String("chat-effort", "", "-chat: clarify effort (empty = ai.DefaultChatEffort)")
@@ -279,6 +291,8 @@ func main() {
 		CallTimeout:     *timeout,
 		LogicPass:       *logicPass,
 		ServerRulesPass: *serverRules,
+		OnDemandRules:   *onDemand,
+		RecipeModel:     *recipeModel,
 	}
 	ctx := context.Background()
 	if *chat {
@@ -379,6 +393,7 @@ func runCase(ctx context.Context, svc *ai.Service, store *appconfigclient.Memory
 			log.Fatalf("[%s] seed: %v", c.ID, err)
 		}
 	}
+	defer caseSwitches(svc, c)()
 	log.Printf("[%s] %s effort=%s locale=%s stream=%v %q", c.ID, c.Kind, effort, loc, stream, c.Transcript)
 	rec := Record{ID: c.ID, Kind: c.Kind, Group: c.Group, Transcript: c.Transcript, Locale: string(loc), Checked: len(c.Expect) > 0}
 	started := time.Now()

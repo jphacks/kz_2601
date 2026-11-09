@@ -162,6 +162,7 @@ Web の作品はモバイルに置き換えて考えた(Web だから × には�
 - **依頼の文**: 利用者が話す形で、その作品の本体の体験を 1〜2 文で頼む。作品名・チーム名は入れず、`note` の先頭にリポジトリの名前(`jphacks/<repo>`)・判定・受賞を書いた。
 - **期待の付け方**: 本体の体験に要る物だけを、既存の期待のキーで書く(部品 `has`・共有 `shared` / `scope`・計算 `calc` / `computed`・通知 `notification`・写真の読み取り `photoAnalyze`・AI `aiGenerate` / `aiTask` / `aiLength` / `aiInputPhoto`・本の情報 `lookupBook`・ハイライト `textHighlight`・曲のリクエスト `musicRequests`・マッチング `matchProfile`・ルール `serverRules` / `ruleTrigger` / `ruleAction` など)。見た目・画面の数・タブは見ない。○ の作品は「欠けるもの」(一覧のメモ)を期待に入れない。
 - **PR 待ちの期待**: develop に無い部品は `has` の名前(`transcribeField` など)で書く。PR が足す期待のキー(`addToCalendar` など)は `pendingExpect` に置き、PR がマージされてキーが入ると自動で確かめる対象になる(それまでは実行のログに「not checked until the PR is merged」と出て、確かめない)。
+- **写真を AI に見せるケース**: `aiInputPhoto: true` を期待するケースには `"textImage": true` を付ける。そのケースだけ `Service.TextImage`(本番の `AI_TEXT_IMAGE=1`)を入れて実行する。切ったままだと inputPhoto は作られない。
 - **作れた** = 生成が成功し、期待をすべて満たした作品。試験(`backend/cmd/ai-eval/coverage_test.go`)が、作品の数(30〜40)・依頼の文にチーム名が無いこと・develop のファイルが develop の部品だけを使うこと・PR 待ちのケースが本当に新しい部品を要ることを確かめる。
 
 ### コマンド(`backend/` で)

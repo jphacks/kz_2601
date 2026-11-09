@@ -12,4 +12,16 @@ var jphacksProductsRules = strings.TrimSpace(`
 - 「キャラの HP・体力・元気度」が記録で増減: 記録に integer points(良い習慣 +・悪い習慣 −。enum からなら computed if)、HP = stat.value {"op":"clamp","args":[{"op":"add","args":[50,{"agg":"sum","entity":"habit_log","field":"points","filter":{"field":"date","op":"today","value":null}}]},0,100]}。動くキャラの絵は作れないと summary で伝える。
 `)
 
-func init() { systemPrompt += "\n\n" + jphacksProductsRules }
+// Sent only when the request matches (on_demand_rules.go), one trigger per bullet.
+func init() {
+	onDemandRules(jphacksProductsRules,
+		recipe("slot_booking", []string{"枠", "空きコマ", "コマ+取|予約|選|押さえ", "早い者勝ち", "先着", "押さえ", "予約", "申し込", "申込", "空き時間", "空いている時間", "空いてる時間", "時間帯+選", "ブッキング", "1人だけ", "1人まで", "一人だけ", "面談", "レッスン+選|申|取", "booking", "reserv", "appointment", "slot"},
+			`"id":"slot"`, `"id":"booking"`),
+		recipe("priority_matrix", []string{"マトリクス", "2軸", "4分割", "四分割", "大切+締め切り|締切|急", "マトリックス", "象限", "4つのマス", "4つに分", "マス目", "アイゼンハワー", "重要+急", "大事+急", "優先+急", "緊急+重要", "matrix", "quadrant", "eisenhower", "urgent+important"},
+			`"type":"gridTable"`),
+		recipe("complete_rate", []string{"制覇", "全種類", "尽く", "割合+食べた|行った|読んだ|登った|集めた", "まだ+ランダム", "コンプ", "何%", "何パーセント", "パーセント+チェック|印|行った|食べた|読んだ", "何割", "達成率", "達成度", "全部のうち", "図鑑", "割合+チェック|印", "踏破", "まだ+おすすめ", "complet+%|percent|rate", "percent+check"},
+			`"format":"percent"`),
+		recipe("char_hp", []string{"hp", "げんき", "元気+増|減|ふえ|へる|上が|下が|変わ", "弱る", "体力", "ライフ", "元気度", "健康度", "ゲージ", "キャラ", "ペット+増|減|上が|下が", "育成", "health point"},
+			`"op":"clamp"`),
+	)
+}

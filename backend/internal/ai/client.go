@@ -57,6 +57,9 @@ type Completion struct {
 	// rules): the model reads System+SystemSuffix, and a request whose System
 	// equals another's (create) reuses that cached prefix.
 	SystemSuffix string
+	// SystemTail, when set, is an uncached block after both: per-request
+	// rules (on_demand_rules.go) that must not change the cached prefix.
+	SystemTail string
 }
 
 // Usage is the token accounting of one call.
@@ -236,6 +239,9 @@ func (c *Client) Complete(ctx context.Context, req Completion) (*Response, error
 		if t != "" {
 			wr.System = append(wr.System, wireBlock{Type: "text", Text: t, CacheControl: map[string]any{"type": "ephemeral"}})
 		}
+	}
+	if req.SystemTail != "" {
+		wr.System = append(wr.System, wireBlock{Type: "text", Text: req.SystemTail})
 	}
 	oc := map[string]any{}
 	if effort != "" {
