@@ -56,17 +56,18 @@ func TestServerPushWording_Generate(t *testing.T) {
 		pass       bool
 		disabled   []string
 		transcript string
-		on         bool
+		on         bool // wording + serverNeed (serverRulesOn)
+		ran        bool // the pass ran (kakeibo has no serverNeed: the regex decides)
 	}{
-		{"default off", false, nil, "家計簿を作って。毎日リマインドして", false},
-		{"pass on", true, nil, "家計簿を作って。毎日リマインドして", true},
-		// The pass skips requests that ask for no automatic action, so the
-		// prompt must not say 「この後の工程で作られる」 for them.
-		{"pass on, no ask", true, nil, "家計簿を作って", false},
-		{"pass on, push ask", true, nil, "部活のチャット。新着はプッシュして", true},
-		{"pass on, ask the regex misses", true, nil, "部活のチャット。新着が来たら鳴らして", false},
-		{"no shared data", true, []string{FeatureSharedData}, "家計簿を作って。毎日リマインドして", false},
-		{"opted out", true, nil, "家計簿を作って。毎日リマインドして" + without, false},
+		{"default off", false, nil, "家計簿を作って。毎日リマインドして", false, false},
+		{"pass on", true, nil, "家計簿を作って。毎日リマインドして", true, true},
+		// The wording follows serverRulesOn: the model may still ask with
+		// serverNeed, so 「serverNeed を書けば…この後の工程で」 is conditional.
+		{"pass on, no ask", true, nil, "家計簿を作って", true, false},
+		{"pass on, push ask", true, nil, "部活のチャット。新着はプッシュして", true, true},
+		{"pass on, ask the regex misses", true, nil, "部活のチャット。新着が来たら鳴らして", true, false},
+		{"no shared data", true, []string{FeatureSharedData}, "家計簿を作って。毎日リマインドして", false, false},
+		{"opted out", true, nil, "家計簿を作って。毎日リマインドして" + without, false, false},
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
@@ -83,12 +84,15 @@ func TestServerPushWording_Generate(t *testing.T) {
 			if got := strings.Contains(sys, chatThreadPushCannot); got == c.on {
 				t.Errorf("cannot line present=%t, want %t", got, !c.on)
 			}
+			if got := strings.Contains(sys, serverNeedSection); got != c.on {
+				t.Errorf("serverNeed section present=%t, want %t", got, c.on)
+			}
 			ran := false
 			for _, call := range f.calls {
 				ran = ran || call.System == serverRulesPrompt
 			}
-			if ran != c.on {
-				t.Errorf("server-rules pass ran=%t, but the push wording says %t", ran, c.on)
+			if ran != c.ran {
+				t.Errorf("server-rules pass ran=%t, want %t", ran, c.ran)
 			}
 		})
 	}

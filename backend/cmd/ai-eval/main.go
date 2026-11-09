@@ -157,8 +157,12 @@ type Record struct {
 	ExpectMisses  []string            `json:"expectMisses,omitempty"`
 	LogicPass     *ai.LogicMeta       `json:"logicPass,omitempty"`
 	ServerRules   *ai.ServerRulesMeta `json:"serverRules,omitempty"` // #343
-	Patch         []dsl.PatchOp       `json:"patch,omitempty"`
-	DSL           json.RawMessage     `json:"dsl,omitempty"`
+	// -server-rules: the main call's serverNeed and what started the pass
+	// (model|regex|both; "" = the pass did not run)
+	ServerNeed    string          `json:"serverNeed,omitempty"`
+	ServerTrigger string          `json:"serverTrigger,omitempty"`
+	Patch         []dsl.PatchOp   `json:"patch,omitempty"`
+	DSL           json.RawMessage `json:"dsl,omitempty"`
 }
 
 type Run struct {
@@ -417,6 +421,13 @@ func runCase(ctx context.Context, svc *ai.Service, store *appconfigclient.Memory
 	rec.Omissions = res.Meta.Omissions
 	rec.LogicPass = res.Meta.LogicPass
 	rec.ServerRules = res.Meta.ServerRules
+	rec.ServerNeed = res.Meta.ServerNeed
+	if rec.ServerRules != nil {
+		rec.ServerTrigger = rec.ServerRules.Trigger
+	}
+	if svc.ServerRulesPass {
+		log.Printf("[%s] serverNeed=%q trigger=%q", c.ID, rec.ServerNeed, rec.ServerTrigger)
+	}
 	rec.Patch = res.Patch
 	rec.DSL = res.DSL
 	if app, perr := dsl.Parse(res.DSL); perr == nil {
