@@ -337,6 +337,7 @@ func (r *Runner) runRule(ctx context.Context, h *scope.Handle, ev store.OutboxEv
 	}
 	charged.Parts = append(charged.Parts, dec.Charge.Parts...)
 	rl.quota, rl.quotaDay = dec.AppExec, dec.Day
+	r.warnQuota(ctx, h, dec, ev.AppID, app.App.Name, creator, notifyPaused)
 	if !dec.Allowed {
 		if dec.Block != nil {
 			usage.Limit = dec.Block.Scope
