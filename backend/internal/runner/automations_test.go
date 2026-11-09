@@ -33,6 +33,9 @@ func TestEveryOutcomeHasACreatorWord(t *testing.T) {
 			t.Errorf("reason %s -> %s, want %s", reason, got, w)
 		}
 	}
+	if got := status.Result(quota.OutcomeOK, runner.ReasonAppLimit, false); got != status.ResultLimit {
+		t.Errorf("ok + %s -> %s", runner.ReasonAppLimit, got)
+	}
 }
 
 // #347 完了の条件: after a run the creator sees the rule's result, when it

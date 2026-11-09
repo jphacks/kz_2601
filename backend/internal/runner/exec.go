@@ -303,6 +303,9 @@ func (r *Runner) runRule(ctx context.Context, h *scope.Handle, ev store.OutboxEv
 	rl := runLog{ruleID: rule.ID}
 	finish := func(outcome string) string {
 		usage.Outcome, rl.outcome = outcome, outcome
+		if outcome == quota.OutcomeOK && appLimited(usage.Limit) {
+			rl.reason = ReasonAppLimit
+		}
 		usage.CPUMs, rl.took = time.Since(start).Milliseconds(), time.Since(start)
 		r.cfg.Quota.LogUsage(ctx, usage)
 		r.logRun(ctx, ev, rl)
@@ -372,7 +375,7 @@ func (r *Runner) runRule(ctx context.Context, h *scope.Handle, ev store.OutboxEv
 		consent = r.cfg.Consent
 	}
 	resolver, err := notify.NewResolver(notify.Config{Directory: h, Accounts: h, Consent: consent, Age: r.cfg.Age,
-		Limiter: recipientLimiter{q: r.cfg.Quota, dec: dec, charged: charged}})
+		Limiter: recipientLimiter{q: r.cfg.Quota, dec: dec, charged: charged, usage: &usage}})
 	if err != nil {
 		return fail(err)
 	}
@@ -629,6 +632,7 @@ type recipientLimiter struct {
 	q       *quota.Quota
 	dec     quota.Decision
 	charged *quota.Charge // what the grants counted (refund on give-up)
+	usage   *quota.Usage  // Limit gets the app's notify limit when it dropped someone
 }
 
 func (l recipientLimiter) Limit(ctx context.Context, uids []string) ([]string, []notify.LimitDrop, error) {
@@ -642,6 +646,9 @@ func (l recipientLimiter) Limit(ctx context.Context, uids []string) ([]string, [
 	drops := make([]notify.LimitDrop, 0, len(g.Dropped))
 	for _, d := range g.Dropped {
 		drops = append(drops, notify.LimitDrop{UID: d.UID, Scope: d.Block.Scope})
+		if l.usage != nil && d.Block.Scope == quota.ScopeAppNotify {
+			l.usage.Limit = d.Block.Scope
+		}
 	}
 	return g.Allowed, drops, nil
 }
