@@ -8,7 +8,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/jphacks/kz_2601/backend/internal/paid"
 	"github.com/jphacks/kz_2601/backend/pkg/dsl"
 )
 
@@ -35,6 +34,7 @@ type ServerRulesMeta struct {
 	Usage    Usage    `json:"usage"`              // tokens of this pass
 	Declined string   `json:"declined,omitempty"` // the model's refusal sentence (out-of-vocabulary request)
 	Problems []string `json:"problems,omitempty"` // last validation problems when not applied
+	Dropped  []string `json:"dropped,omitempty"`  // rule ids removed as repeats of a local notification
 }
 
 // serverRulesAskRe: the request mentions an automatic action. A false
@@ -240,7 +240,7 @@ func withServerRules(current []byte, rules []map[string]any) ([]byte, error) {
 // runServerRulesPass returns the validated DSL with the new serverRules (or
 // current when nothing applied) and the pass metadata. It never fails the
 // request: a call error or rules that never validate keep current.
-func (s *Service) runServerRulesPass(ctx context.Context, transcript string, current []byte, loc Locale) ([]byte, *ServerRulesMeta) {
+func (s *Service) runServerRulesPass(ctx context.Context, transcript string, current, before []byte, loc Locale) ([]byte, *ServerRulesMeta) {
 	sm := &ServerRulesMeta{}
 	var problems []string
 	for i := 0; i <= s.maxRegen(); i++ {
@@ -281,6 +281,7 @@ func (s *Service) runServerRulesPass(ctx context.Context, transcript string, cur
 			continue
 		}
 		sm.Problems = nil
+		next, app, sm.Dropped = withoutOnDeviceDuplicates(current, before, next, app, rules)
 		sm.Rules = len(app.ServerRules)
 		if sameServerRules(current, app) {
 			return current, sm
@@ -306,12 +307,9 @@ func sameServerRules(current []byte, next *dsl.App) bool {
 // edit turn and folds it into ar: the DSL, the patch (edit: one more op), the
 // summary (the rules in plain words, or the refusal) and the metadata.
 func (s *Service) applyServerRulesPass(ctx context.Context, transcript string, ar *attemptResult, loc Locale) {
-	if !s.serverRulesEnabled() || !wantsServerRules(transcript) {
-		return
-	}
 	// #316: serverRules need Pro. A build without purchases (App Store review:
-	// it also has no shared data) and 「この機能なしで作る」 get none.
-	if restrictionFrom(ctx).NoSharedData() || defaultPaidCatalog.dropped(transcript, paid.ServerRules) {
+	// it also has no shared data) and 「この機能なしで作る」 get none (serverRulesPassRuns).
+	if !s.serverRulesPassRuns(ctx, transcript) {
 		return
 	}
 	before, err := dsl.Parse(ar.raw)
@@ -319,7 +317,7 @@ func (s *Service) applyServerRulesPass(ctx context.Context, transcript string, a
 		return // matching apps cannot have server rules (#339)
 	}
 	t := time.Now()
-	next, sm := s.runServerRulesPass(ctx, transcript, ar.raw, loc)
+	next, sm := s.runServerRulesPass(ctx, transcript, ar.raw, ar.before, loc)
 	ar.latency += time.Since(t)
 	ar.meta.Usage.Add(sm.Usage)
 	ar.meta.ServerRules = sm

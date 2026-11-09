@@ -700,6 +700,13 @@ func checkExpect(exp map[string]any, m *Metrics, summary string) []string {
 					miss = append(miss, fmt.Sprintf("summaryHas: %q", w))
 				}
 			}
+		case "summaryNot": // the summary must not say this (-server-rules: no 代替 for push)
+			ws, _ := v.([]any)
+			for _, w := range ws {
+				if strings.Contains(summary, fmt.Sprint(w)) {
+					miss = append(miss, fmt.Sprintf("summaryNot: %q", w))
+				}
+			}
 		}
 	}
 	sort.Strings(miss)
