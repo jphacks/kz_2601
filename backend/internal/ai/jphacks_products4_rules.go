@@ -15,4 +15,20 @@ var jphacksProducts4Rules = strings.TrimSpace(`
 - 「○○した日としなかった日で比べる」(エナドリ・コーヒー・運動と作業の出来・睡眠): 1 日 1 件の記録 day{date: date(defaultValue now), drinks: integer(defaultValue 0), sleep: number(unit 時間), score: integer(1〜5 の出来)}に、飲んだ日の平均(小数 1 桁) = stat.value {"op":"div","args":[{"op":"round","args":[{"op":"mul","args":[{"agg":"avg","entity":"day","field":"score","filter":{"field":"drinks","op":"gt","value":0}},10]}]},10]}・飲まなかった日の平均 = 同じ形で filter {"field":"drinks","op":"eq","value":0}。chart で日ごとの score を出し、AI の助言は aiButton{task: generate, entity: day, limit: 14, prompt: 「{{input}} の記録から、飲み方と睡眠についての助言」}。比べるだけで、原因かどうかは分からないと summary で伝える。
 `)
 
-func init() { systemPrompt += "\n\n" + jphacksProducts4Rules }
+// Sent only when the request matches (on_demand_rules.go), one trigger per bullet.
+func init() {
+	onDemandRules(jphacksProducts4Rules,
+		recipe("level_rewrite", []string{"言い換え", "書き換え", "書きかえ", "やさしい日本語", "やさしく", "易しく", "わかりやすく+直|書", "分かりやすく+直|書", "分かる言葉", "レベルに合わせ", "英語力", "学年+合わせ", "難しい単語", "難しい語", "難しい言葉", "英文", "日英", "rewrite", "paraphrase", "simplify"},
+			`"task":"rewrite"`),
+		recipe("meeting_review", []string{"会議", "ミーティング", "打ち合わせ", "打合せ", "議事録", "論点", "文字起こし", "停滞", "meeting", "transcri"},
+			`"type":"transcribeField"`),
+		recipe("kind_coef", []string{"co2", "二酸化炭素", "削減", "種類ごと", "係数", "リサイクル", "単価", "排出量", "エコ", "ゴミ+種類|分別", "分別", "carbon", "emission"},
+			`"id":"co2"`),
+		recipe("today_weekday", []string{"曜日", "時間割", "持ち物", "当番", "月曜+火曜|水曜|木曜|金曜", "weekday", "timetable", "day of the week"},
+			`"op":"weekday"`),
+		recipe("need_kcal", []string{"カロリー", "エネルギー", "摂る", "kcal", "代謝", "摂取", "献立", "身長+体重", "calorie", "bmr"},
+			`"id":"kcal"`),
+		recipe("did_vs_didnt", []string{"日と+比|違|差", "なかった日", "しなかった日", "ない日", "抜いた日", "なかった+比|違|差", "した日+比", "エナドリ", "エナジードリンク", "比べ+日", "比較+日", "compare+days"},
+			`"id":"drinks"`),
+	)
+}

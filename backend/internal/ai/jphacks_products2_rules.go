@@ -15,4 +15,19 @@ var jphacksProducts2Rules = strings.TrimSpace(`
 - 「いくつかの質問に答えると、おすすめ・タイプを診断」(選ぶ答えが決まっている): 質問ごとに enum / boolean の field、結果は computed(string)の if の入れ子 {"if":{"op":"eq","args":[{"ref":"acidity"},"好き"]},"then":"エチオピア(浅煎り)","else":"マンデリン(深煎り)"}。AI は要らない(説明の文も作るなら aiButton を足す)。答えの記録は list(item.title = 結果)で残す。
 `)
 
-func init() { systemPrompt += "\n\n" + jphacksProducts2Rules }
+// Sent only when the request matches (on_demand_rules.go), one trigger per bullet.
+func init() {
+	onDemandRules(jphacksProducts2Rules,
+		recipe("monster_hp", []string{"モンスター", "敵", "ボス", "ダメージ", "倒", "hp", "体力+期限|締め切り|締切|タスク|課題|宿題|todo|やること", "ライフ+期限|締め切り|締切|タスク|課題|宿題|todo|やること", "回復+期限|締め切り|締切", "monster", "enemy", "boss"},
+			`"op":"clamp"`),
+		recipe("own_done", []string{"各自", "自分の分", "自分だけ+チェック|済|完了|終わ", "それぞれ+チェック|済|完了|終わ|読|用意", "ひとりひとり", "一人一人", "一人ひとり", "自分がまだ", "自分が+まだ", "未読+共有|みんな|全員", "個人ごと", "メンバーごと+済|完了|チェック", "each+own"},
+			`"$marks.`),
+		recipe("prev_task", []string{"前の作業", "先行", "完了したら", "解放", "前のタスク", "前の工程", "先にやる", "前後関係", "依存", "着手", "取りかかれ", "取り掛かれ", "始められる", "順番+タスク|作業|工程|手順", "工程", "後続", "prerequisite", "depend", "blocked"},
+			`"ref":"prev.done"`),
+		recipe("same_feeling", []string{"同じ気分", "おなじ+何人|人数|人の数|人が|人は|仲間", "きもち+投稿|つぶや|何人", "同じ+何人|人数|人の数|人が|人は", "同じ答え", "気分+投稿|sns|みんな", "same+people"},
+			`"id":"same_today"`),
+		recipe("keep_in_touch", []string{"疎遠", "最終+訪問|連絡|来店|会", "時間がたって", "最後に", "しばらく+連絡|会|話|送", "連絡していない", "連絡してない", "話していない", "会っていない", "会ってない", "間が空", "日にちが空", "久しぶり", "前回から", "keep in touch", "last contact", "haven't"},
+			`"op":"daysBetween"`, `"id":"last_sent"`),
+		recipe("diagnosis", []string{"診断", "質問に答え", "質問+おすすめ|判定|タイプ|合う|向いて|提案", "タイプ+判定|診断", "答え+おすすめ", "yes+no", "チャート式", "心理テスト", "性格", "quiz+recommend"}),
+	)
+}

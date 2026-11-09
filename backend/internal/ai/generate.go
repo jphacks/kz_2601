@@ -93,6 +93,8 @@ type Meta struct {
 	// Restricted (#245): what the build restriction removed from the output
 	// after generation (disallowed parts, Field.health, camera sources).
 	Restricted []string `json:"restricted,omitempty"`
+	// Recipes: the on-demand recipes sent with the request (on_demand_rules.go).
+	Recipes []string `json:"recipes,omitempty"`
 }
 
 // Event is a progress message emitted by GenerateStream before the Result,
@@ -184,6 +186,10 @@ type Service struct {
 	// NoBookLookup: the book lookup is off on appconfig (BOOK_LOOKUP_ENABLED
 	// unset), so the AI does not generate lookupBook (clientRestriction).
 	NoBookLookup bool
+	// OnDemandRules sends the JPHACKS product recipes only when the request
+	// matches them (on_demand_rules.go; env AI_ON_DEMAND_RULES=1). Off = the
+	// whole systemPrompt, as before.
+	OnDemandRules bool
 	// TextImage accepts the photo of aiButton inputPhoto on /v1/text
 	// (text_image.go; env AI_TEXT_IMAGE=1). Off = 403.
 	TextImage bool
@@ -411,6 +417,8 @@ func (s *Service) generateFull(ctx context.Context, transcript, refDSL string, m
 		ar.meta = *meta
 	}
 	ar.meta.Model = s.Model
+	system, tail, recipes := s.onDemandPrompt(transcript, []byte(refDSL))
+	ar.meta.Recipes = recipes
 	var problems []string
 	var lastCandidate []byte
 	var lastNeed string
@@ -421,7 +429,7 @@ func (s *Service) generateFull(ctx context.Context, transcript, refDSL string, m
 		if i > 0 {
 			restartEvent(sink, loc, ar.meta.Attempts+1, streamed)
 		}
-		resp, err := s.call(WithOperation(ctx, OpGenerate), systemPrompt, createUserMessage(transcript, refDSL, problems, loc, uiOnly), GenerationSchema(), ar,
+		resp, err := s.callBlocks(WithOperation(ctx, OpGenerate), system, "", tail, createUserMessage(transcript, refDSL, problems, loc, uiOnly), GenerationSchema(), ar,
 			createEventWatcher(sink, loc, ar.meta.Attempts+1, &streamed))
 		if err != nil {
 			return nil, err
@@ -545,6 +553,8 @@ func (s *Service) generateFull(ctx context.Context, transcript, refDSL string, m
 func (s *Service) generateEdit(ctx context.Context, transcript string, env *appconfigclient.Envelope, loc Locale, sink Sink) (*attemptResult, error) {
 	ar := &attemptResult{}
 	ar.meta.Model = s.Model
+	system, tail, recipes := s.onDemandPrompt(transcript, env.DSL)
+	ar.meta.Recipes = recipes
 	var problems []string
 	var lastOps []dsl.PatchOp
 	var lastSummary string
@@ -553,7 +563,7 @@ func (s *Service) generateEdit(ctx context.Context, transcript string, env *appc
 	var linted *attemptResult
 	baseLint := lintOf(env.DSL)
 	for i := 0; i <= s.maxRegen(); i++ {
-		resp, err := s.callWith(WithOperation(ctx, OpPatch), systemPrompt, editSystemSuffix(),
+		resp, err := s.callBlocks(WithOperation(ctx, OpPatch), system, editSystemSuffix(), tail,
 			editUserMessage(transcript, env.Version, string(env.DSL), problems, loc), PatchGenerationSchema(), ar,
 			summaryEventWatcher(sink, loc, ar.meta.Attempts+1))
 		if err != nil {
@@ -647,7 +657,7 @@ func (s *Service) generateEdit(ctx context.Context, transcript string, env *appc
 	// Fallback 2: one full rewrite with the current DSL as reference.
 	meta := ar.meta
 	meta.DowngradedToFull = true
-	full := &Service{Claude: s.Claude, Store: s.Store, Model: s.Model, MaxRegenerations: -1, CallTimeout: s.CallTimeout}
+	full := &Service{Claude: s.Claude, Store: s.Store, Model: s.Model, MaxRegenerations: -1, CallTimeout: s.CallTimeout, OnDemandRules: s.OnDemandRules}
 	fr, err := full.generateFull(ctx, transcript, string(env.DSL), &meta, loc, sink, false)
 	if err != nil {
 		var ge *Error
@@ -691,6 +701,11 @@ func (s *Service) call(ctx context.Context, system, user string, schema json.Raw
 
 // callWith is call with a second cached system block (Completion.SystemSuffix).
 func (s *Service) callWith(ctx context.Context, system, suffix, user string, schema json.RawMessage, ar *attemptResult, onText func(string)) (*Response, error) {
+	return s.callBlocks(ctx, system, suffix, nil, user, schema, ar, onText)
+}
+
+// callBlocks is callWith plus the uncached on-demand recipes (Completion.SystemTail).
+func (s *Service) callBlocks(ctx context.Context, system, suffix string, tail []string, user string, schema json.RawMessage, ar *attemptResult, onText func(string)) (*Response, error) {
 	timeout := s.CallTimeout
 	if timeout == 0 {
 		timeout = 40 * time.Second
@@ -700,7 +715,7 @@ func (s *Service) callWith(ctx context.Context, system, suffix, user string, sch
 	schema = serverNeedSchema(ctx, schema) // restricted first, then + serverNeed (server_need.go)
 	t := time.Now()
 	system, schema = serverPushPrompt(ctx, restrictPrompt(ctx, system)), restrictSchema(ctx, schema)
-	resp, err := s.Claude.Complete(cctx, Completion{System: system, SystemSuffix: restrictPromptSuffix(ctx, suffix), Messages: []Message{{Role: "user", Content: user}}, Schema: schema, OnText: onText})
+	resp, err := s.Claude.Complete(cctx, Completion{System: system, SystemSuffix: restrictPromptSuffix(ctx, suffix), SystemTail: restrictTail(ctx, tail), Messages: []Message{{Role: "user", Content: user}}, Schema: schema, OnText: onText})
 	ar.latency += time.Since(t)
 	ar.meta.Attempts++
 	ar.meta.Regenerations = ar.meta.Attempts - 1

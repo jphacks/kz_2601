@@ -15,4 +15,20 @@ var jphacksProducts3Rules = strings.TrimSpace(`
 - 「投稿された情報が合っているかをみんなで確かめる」(設備・お店の情報): 情報 facility{name, place: location}(public・mapView)と確認 check{facility: ref → facility, answer: enum [ある, ない]}(public・"unique":["facility","$author"] = 1 人 1 回)。facility の computed yes(integer) = {"agg":"count","entity":"check","filter":[{"field":"facility","op":"eq","value":{"ref":"id"}},{"field":"answer","op":"eq","value":"ある"}]}・no も同じ形・判定 status(string) = {"if":{"op":"gt","args":[{"ref":"yes"},{"ref":"no"}]},"then":"ある","else":{"if":{"op":"gt","args":[{"ref":"no"},{"ref":"yes"}]},"then":"ない","else":"未確認"}}。地図と一覧の行から navigate + prefillRef で確認のフォームを開く。
 `)
 
-func init() { systemPrompt += "\n\n" + jphacksProducts3Rules }
+// Sent only when the request matches (on_demand_rules.go), one trigger per bullet.
+func init() {
+	onDemandRules(jphacksProducts3Rules,
+		recipe("streak_grow", []string{"育つ", "育って", "育てる", "成長", "植物", "収穫", "芽", "つぼみ", "花が咲", "実がな", "続けた日数", "続いた日数", "連続", "日続", "継続", "streak", "grow"},
+			`"op":"streak"`),
+		recipe("one_vote", []string{"投票", "票", "多数決", "一番人気", "候補+決め|選", "vote", "poll"},
+			`"id":"vote"`, `"unique":["$author"]`),
+		recipe("timer_record", []string{"タイマー", "ポモドーロ", "ストップウォッチ", "計って", "測って", "計った", "測った", "集中した時間", "集中時間", "集中+記録", "timer", "pomodoro", "stopwatch"},
+			`"type":"timerDisplay"`),
+		recipe("level_up", []string{"レベル", "経験値", "exp+レベル|ランク|上が|たま|ため|ポイント", "称号", "ランク+上が", "あと何", "level"},
+			`"op":"mod"`),
+		recipe("char_count", []string{"文字数", "文字の数", "文字を数", "文章の長さ", "本文の長さ", "字数", "何文字", "何字", "character count", "word count"},
+			`"type":"fileImport"`, `"op":"len"`),
+		recipe("info_check", []string{"合っているか", "合ってるか", "正しいか", "本当に", "確かめ", "確認+投稿|情報|地図", "バリアフリー", "多目的トイレ", "あった+なかった", "情報+正し|合っ|確か", "間違い+情報", "verify", "accurate"},
+			`"id":"check"`),
+	)
+}

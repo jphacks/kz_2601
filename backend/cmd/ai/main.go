@@ -100,6 +100,8 @@ func main() {
 			Effort:   os.Getenv("AI_CHAT_EFFORT"),
 			Thinking: os.Getenv("AI_CHAT_THINKING"),
 		},
+		// JPHACKS product recipes only when the request matches them; off until a live eval
+		OnDemandRules: os.Getenv("AI_ON_DEMAND_RULES") == "1",
 		// /v1/chat callers (#286): AUTH_MODE=firebase (default) | dev
 		Verifier: verifier,
 		AuthMode: authMode,

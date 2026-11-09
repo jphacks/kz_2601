@@ -22,8 +22,24 @@ var jphacksProducts5Rest = strings.TrimSpace(`
 - 「メッセージの感情を AI が分けて、割合を見る」(LINE・チャットの文を貼る): msg{body: text(required), emotion: enum [うれしい, ふつう, かなしい, いらいら], date: date(defaultValue now)}のフォームに textField(body・multiline)・aiButton{task: classify, input: body, output: emotion}・picker(emotion)。ホームに chart{entity: msg, kind: pie, groupBy: emotion, aggregate: count, title: 感情の割合}と、月ごとの変化 chart{entity: msg, kind: bar, groupBy: date, bucket: month, aggregate: count}。LINE などから自動で取り込むことはできない(文は貼る)と summary で伝える。
 `)
 
+// Sent only when the request matches (on_demand_rules.go), one trigger per bullet.
 func init() {
-	systemPrompt += "\n\n" + jphacksProducts5Rules + "\n\n" + jphacksProducts5PhotoRule
+	onDemandRules(jphacksProducts5Rules,
+		recipe("evac_badges", []string{"避難", "津波", "逃げ", "高台", "防災", "訓練", "災害", "バッジ", "地震", "大雨", "evacuat", "shelter", "drill", "badge"},
+			`"type":"routeGuide"`),
+		recipe("sns_practice", []string{"個人情報", "悪口", "リテラシー", "誹謗", "投稿+練習", "sns+練習|子ども|子供|ai", "投稿+ai+判定|チェック|見て", "書き込+練習", "安全な+投稿", "住所+名前", "privacy", "bully"},
+			`"id":"safety"`),
+		recipe("urgency_color", []string{"急ぎ度", "デッドライン", "deadline", "どれから", "順位+締め切り|締切|期限|期日|デッドライン", "大事+締め切り|締切|期限|期日|デッドライン", "緊急度", "急ぐ順", "優先+期限|締め切り|締切|期日", "重要度+期限|締め切り|締切|期日", "赤く", "色で", "色の段階", "段階+色", "urgency", "deadline+priority"},
+			`"id":"urgency"`, `"op":"daysUntil"`),
+		recipe("store_mom", []string{"前月比", "先月比", "前年比", "売上+店|先月|前月|支店", "売り上げ+店|先月|前月|支店", "支店", "店舗+売", "店ごと", "sales"},
+			`"id":"last_month"`),
+		recipe("emotion_ratio", []string{"感情", "喜び", "怒り", "悲しみ", "トーク+ai|分", "雰囲気+判定|分", "気持ち+分類|分け|判定|割合", "ポジティブ", "ネガティブ", "line+メッセージ|トーク|貼", "喜怒哀楽", "emotion", "sentiment"},
+			`"id":"emotion"`),
+	)
+	onDemandRules(jphacksProducts5PhotoRule,
+		recipe("manual_photo", []string{"手順書", "マニュアル", "手順+写真|ai", "写真+判定|採点|できているか|できたか|チェック", "manual", "instructions"},
+			`"inputPhoto"`),
+	)
 	for i := range clientFeatures {
 		if clientFeatures[i].key == FeatureAIInputPhoto {
 			clientFeatures[i].rules = append(clientFeatures[i].rules, jphacksProducts5PhotoRule)

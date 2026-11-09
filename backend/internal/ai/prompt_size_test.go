@@ -27,6 +27,8 @@ func TestPromptSizeBudget(t *testing.T) {
 	}{
 		{"systemPrompt", systemPrompt, systemPromptBudget},
 		{"systemPrompt+editRules", systemPrompt + "\n" + editRules, editPromptBudget},
+		// with AI_ON_DEMAND_RULES=1: the JPHACKS recipes leave the cached block (on_demand_rules.go)
+		{"systemPrompt (on-demand core)", onDemandCore(systemPrompt), systemPromptBudget},
 		{"serverRulesPrompt", serverRulesPrompt, serverRulesPromptBudget},
 	} {
 		n := len(c.prompt)
