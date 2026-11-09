@@ -246,6 +246,7 @@ public struct Component: Decodable, Identifiable, Sendable {
     // bracket。entity / title / titleField は共用
     public var winsField: String?      // 勝った回戦の数を保存する integer field
     public var seedField: String?      // シード順の integer / number field(nil = 登録順)
+    public var startedField: String?   // 大会を始めた時刻を保存する datetime field(nil = 時刻の規則で固定)
     // feed(#348)。URL は持たない
     public var provider: String?       // weather|warnings|pressure|holidays|rss|arxiv|diet
     public var region: String?         // weather / warnings / pressure: 気象庁の府県予報区のコード
@@ -280,7 +281,7 @@ public struct Component: Decodable, Identifiable, Sendable {
         case accept, map
         case show
         case front, back, toggle
-        case winsField, seedField
+        case winsField, seedField, startedField
         case visibleTo, highlight
         case provider, region, feedId
         case query, category, near, addressField, pins
@@ -406,6 +407,7 @@ public struct Component: Decodable, Identifiable, Sendable {
         toggle = try? c.decodeIfPresent(String.self, forKey: .toggle)
         winsField = try? c.decodeIfPresent(String.self, forKey: .winsField)
         seedField = try? c.decodeIfPresent(String.self, forKey: .seedField)
+        startedField = try? c.decodeIfPresent(String.self, forKey: .startedField)
         provider = try? c.decodeIfPresent(String.self, forKey: .provider)
         region = try? c.decodeIfPresent(String.self, forKey: .region)
         feedId = try? c.decodeIfPresent(String.self, forKey: .feedId)

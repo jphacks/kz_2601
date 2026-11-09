@@ -163,7 +163,11 @@ struct BracketLeaf: View {
             return
         case .update(let wins):
             let records = rt.records(for: entityId)
-            for id in wins.keys {
+            let started = Self.startedField(c, in: entity)
+            let starts = draw.startWrites(for: wins, records: records, winsField: winsField, startedField: started, pending: pending,
+                                          now: FieldCoding.datetimeFormatter.string(from: DSLClock.now()))
+            let plan = Self.writePlan(wins: wins, starts: starts, winsField: winsField, startedField: started)
+            for (id, _) in plan {
                 if let r = records.first(where: { $0.id == id }), !rt.canEdit(entity: entityId, record: r) {
                     rt.notifyReadOnly(entity: entityId)
                     return
@@ -174,13 +178,13 @@ struct BracketLeaf: View {
             Task {
                 // 順に保存: 下げる方(元の勝者)が先。途中で失敗したら残りは送らない(勝者が 2 人になる途中の形を残さない)
                 var failed = false
-                for (id, w) in Self.writeOrder(wins) {
+                for (id, data) in plan {
                     if !failed {
-                        failed = !(await rt.updateRecord(entity: entityId, recordId: id, data: [winsField: .number(Double(w))]))
+                        failed = !(await rt.updateRecord(entity: entityId, recordId: id, data: data))
                         if failed { print("[Metamon] bracket not saved: \(entityId)/\(id)") }
                     }
                     // 失敗なら保存待ちを外す = ストアの値に戻る
-                    if pending[id] == w { pending[id] = nil }
+                    if let w = wins[id], pending[id] == w { pending[id] = nil }
                 }
             }
         }
@@ -191,6 +195,26 @@ struct BracketLeaf: View {
     /// 保存の順: 勝ち数の小さい方(取り消し・元の勝者を戻す方)から。同じなら id 順。
     static func writeOrder(_ wins: [String: Int]) -> [(String, Int)] {
         wins.sorted { $0.value != $1.value ? $0.value < $1.value : $0.key < $1.key }.map { ($0.key, $0.value) }
+    }
+
+    /// 保存する順と中身(recordId → data)。開始時刻を書く時は先に書いてから勝ち数(勝ちが残れば必ず開始時刻がある)、
+    /// 消す時は勝ち数を戻してから消す。勝ち数は `writeOrder`。同じ人の開始時刻は勝ち数と一緒に送る。
+    static func writePlan(wins: [String: Int], starts: [String: JSONValue], winsField: String, startedField: String?) -> [(String, [String: JSONValue])] {
+        let winWrites: [(String, [String: JSONValue])] = writeOrder(wins).map { id, w in
+            var d: [String: JSONValue] = [winsField: .number(Double(w))]
+            if let f = startedField, let v = starts[id] { d[f] = v }
+            return (id, d)
+        }
+        guard let f = startedField, !starts.isEmpty else { return winWrites }
+        let only = starts.keys.filter { wins[$0] == nil }.sorted().map { ($0, [f: starts[$0]!]) }
+        let setting = starts.values.contains { !$0.isNull }
+        return setting ? only + winWrites : winWrites + only
+    }
+
+    /// 開始時刻を保存できる field(datetime・computed でない)。無ければ nil(時刻の規則で固定)。
+    static func startedField(_ c: Component, in entity: Entity?) -> String? {
+        guard let id = c.startedField, let f = entity?.field(id), f.computed == nil, f.type == .datetime else { return nil }
+        return id
     }
 
     /// VoiceOver の試合の見出し: 「準決勝 第 1 試合」。
@@ -205,7 +229,8 @@ struct BracketLeaf: View {
     }
 
     static func draw(_ c: Component, rt: any DSLRuntime, pending: [String: Int]) -> BracketDraw {
-        BracketDraw(records: rt.records(for: c.entity ?? ""), winsField: c.winsField ?? "", seedField: c.seedField, pending: pending)
+        BracketDraw(records: rt.records(for: c.entity ?? ""), winsField: c.winsField ?? "", seedField: c.seedField,
+                    startedField: startedField(c, in: rt.dsl.entity(c.entity ?? "")), pending: pending)
     }
 
     /// 決勝・準決勝・準々決勝、それより前は「n 回戦」。

@@ -46,8 +46,9 @@ public struct BracketDraw: Equatable, Sendable {
 
     /// - Parameters:
     ///   - pending: 保存待ちの勝ち数(楽観的 UI)。保存値より優先する。
-    public init(records: [Record], winsField: String, seedField: String?, pending: [String: Int] = [:]) {
-        let (pool, late) = Self.frozen(records, winsField: winsField)
+    ///   - startedField: 開始時刻の datetime field(`frozen`)。
+    public init(records: [Record], winsField: String, seedField: String?, startedField: String? = nil, pending: [String: Int] = [:]) {
+        let (pool, late) = Self.frozen(records, winsField: winsField, startedField: startedField)
         let entrants = Array(Self.seeded(pool, seedField: seedField).prefix(Self.maxEntrants))
         self.entrants = entrants
         self.lateEntrants = late
@@ -85,22 +86,42 @@ public struct BracketDraw: Equatable, Sendable {
 
     // MARK: - 組み合わせの固定
 
-    /// 開始後に追加された人を外す。保存済みの wins >= 1 の人がいれば、その人たちの updatedAt の最も早い時刻を「開始」とし、
-    /// それより後に作られた(createdAt > 開始)wins 0 の人を外す。wins >= 1 の人は常に残す。
-    /// 結果が 1 つも無い(全部取り消した場合も)・時刻が読めない時は全員(従来どおり毎回組み直す)。
-    /// 保存待ち(pending)は見ない: 保存前の updatedAt は結果の時刻でないため。
-    public static func frozen(_ records: [Record], winsField: String) -> (entrants: [Record], late: Int) {
-        let started = records
-            .filter { wins($0, field: winsField) >= 1 }
-            .compactMap { ChatThread.date($0.updatedAt) }
-            .min()
+    /// 開始後に追加された人を外す。保存済みの wins >= 1 の人がいる時だけ固定する(全部取り消すと外れる)。wins >= 1 の人は常に残す。
+    /// - startedField あり(値の入った人がいる): 最初の結果と一緒に、枠に入れた全員へ開始時刻を書く(`startWrites`)。
+    ///   値の入った人と、createdAt が最も早い値以前の人を残す(正確)。
+    /// - startedField なし・値が無い(古いアプリ): wins >= 1 の人の updatedAt の最も早い時刻を開始とし、createdAt がそれ以前の人を残す。
+    ///   勝者がまた勝つと updatedAt が進むので、1 回戦の途中に足した人が後で入ることがある。
+    /// 時刻が読めない時は全員。保存待ち(pending)は見ない: 保存前の updatedAt は結果の時刻でないため。
+    public static func frozen(_ records: [Record], winsField: String, startedField: String? = nil) -> (entrants: [Record], late: Int) {
+        let winners = records.filter { wins($0, field: winsField) >= 1 }
+        guard !winners.isEmpty else { return (records, 0) }
+        let field = startedField.flatMap { $0.isEmpty ? nil : $0 }
+        let stamped = field.map { f in records.filter { ChatThread.date($0[f].stringValue) != nil } } ?? []
+        let started = stamped.isEmpty
+            ? winners.compactMap { ChatThread.date($0.updatedAt) }.min()
+            : stamped.compactMap { ChatThread.date($0[field!].stringValue) }.min()
         guard let started else { return (records, 0) }
+        let stampedIds = Set(stamped.map(\.id))
         let kept = records.filter { r in
-            if wins(r, field: winsField) >= 1 { return true }
+            if wins(r, field: winsField) >= 1 || stampedIds.contains(r.id) { return true }
             guard let created = ChatThread.date(r.createdAt) else { return true }
             return created <= started
         }
         return (kept, records.count - kept.count)
+    }
+
+    /// 勝ち数の書き込み(`tap` の結果)と一緒に送る startedField の値(recordId → 値)。
+    /// 結果が 0 → 1 つになる時: 枠に入れた全員に now、ほかで値の残っている人は null。結果が 1 → 0 になる時(全部取り消し): 値のある人を null。
+    public func startWrites(for update: [String: Int], records: [Record], winsField: String, startedField: String?,
+                            pending: [String: Int] = [:], now: String) -> [String: JSONValue] {
+        guard let f = startedField, !f.isEmpty else { return [:] }
+        let before = records.contains { Self.wins($0, field: winsField, pending: pending) >= 1 }
+        let after = records.contains { (update[$0.id] ?? Self.wins($0, field: winsField, pending: pending)) >= 1 }
+        var out: [String: JSONValue] = [:]
+        if before == after { return out }
+        for r in records where !r[f].isNull { out[r.id] = .null }
+        if after { for r in entrants { out[r.id] = .string(now) } }
+        return out
     }
 
     // MARK: - 並べ方

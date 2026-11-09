@@ -256,4 +256,65 @@ final class BracketDrawTests: XCTestCase {
         let noTime = BracketDraw(records: [p("a", wins: 1, at: 1), p("b", at: 2), p("c", at: 6)], winsField: "wins", seedField: nil)
         XCTAssertEqual(noTime.entrants.count, 3)
     }
+
+    // MARK: - startedField(開始時刻を保存して正確に固定)
+
+    private func day(_ d: Int) -> String { String(format: "2026-11-%02dT00:00:00Z", d) }
+
+    private func s(_ id: String, wins: Int = 0, at d: Int, updated: Int? = nil, started: Int? = nil) -> Record {
+        var r = q(id, wins: wins, at: d, updated: updated)
+        if let started { r.data["started"] = .string(day(started)) }
+        return r
+    }
+
+    func testStartedFieldFreezesExactlyWhenFirstWinnerAdvances() {
+        // 5 日に開始(4 人に開始時刻)・a が d に勝つ → 6 日に e を追加 → 7 日に b が c に勝つ → 8 日に a が決勝で b に勝つ
+        let rs = [s("a", wins: 2, at: 1, updated: 8, started: 5), s("b", wins: 1, at: 2, updated: 7, started: 5),
+                  s("c", at: 3, started: 5), s("d", at: 4, started: 5), s("e", at: 6)]
+        let exact = BracketDraw(records: rs, winsField: "wins", seedField: nil, startedField: "started")
+        XCTAssertEqual(exact.entrants.map(\.id), ["a", "b", "c", "d"])
+        XCTAssertEqual(exact.lateEntrants, 1)
+        XCTAssertEqual(pairs(exact), [["a", "d"], ["b", "c"]])
+        XCTAssertEqual(exact.champion?.id, "a")
+        // 開始時刻が無い時(時刻の規則)は、a の updatedAt が進んだので e が入ってしまう
+        let fallback = BracketDraw(records: rs.map { var r = $0; r.data["started"] = nil; return r }, winsField: "wins", seedField: nil, startedField: "started")
+        XCTAssertEqual(fallback.entrants.count, 5)
+    }
+
+    func testStartedFieldKeepsStampedEntrantsEvenIfCreatedLaterByClock() {
+        // 端末の時計が遅れていても、開始時刻を書いた人は残す
+        let rs = [s("a", wins: 1, at: 1, updated: 5, started: 3), s("b", at: 4, started: 3), s("e", at: 6)]
+        let d = BracketDraw(records: rs, winsField: "wins", seedField: nil, startedField: "started")
+        XCTAssertEqual(d.entrants.map(\.id), ["a", "b"])
+        XCTAssertEqual(d.lateEntrants, 1)
+    }
+
+    func testStartedFieldIgnoredWithoutResults() {
+        // 全部取り消した(消し残しの開始時刻があっても)固定しない
+        let rs = [s("a", at: 1, started: 5), s("b", at: 2, started: 5), s("e", at: 6)]
+        XCTAssertEqual(BracketDraw(records: rs, winsField: "wins", seedField: nil, startedField: "started").lateEntrants, 0)
+    }
+
+    func testStartWritesOnFirstResultAndUndoAll() {
+        let fresh = [s("a", at: 1), s("b", at: 2), s("x", at: 3, started: 1)]
+        let d = BracketDraw(records: fresh, winsField: "wins", seedField: nil, startedField: "started")
+        let m = d.rounds[0][1]
+        guard case .update(let first) = d.tap(m, side: .a, winsField: "wins") else { return XCTFail() }
+        let w = d.startWrites(for: first, records: fresh, winsField: "wins", startedField: "started", now: day(9))
+        XCTAssertEqual(w.count, 3, "枠の全員に開始時刻")
+        XCTAssertTrue(w.values.allSatisfy { $0 == .string(day(9)) })
+        XCTAssertTrue(d.startWrites(for: first, records: fresh, winsField: "wins", startedField: nil, now: day(9)).isEmpty)
+
+        let started = [s("a", wins: 1, at: 1, updated: 9, started: 9), s("b", at: 2, started: 9), s("c", at: 3, started: 9), s("d", at: 4, started: 9)]
+        let sd = BracketDraw(records: started, winsField: "wins", seedField: nil, startedField: "started")
+        // 2 つ目の結果では書かない
+        guard case .update(let second) = sd.tap(sd.rounds[0][1], side: .a, winsField: "wins") else { return XCTFail() }
+        XCTAssertTrue(sd.startWrites(for: second, records: started, winsField: "wins", startedField: "started", now: day(10)).isEmpty)
+        // 最後の結果を取り消すと全員の開始時刻を消す
+        guard case .update(let undo) = sd.tap(sd.rounds[0][0], side: .a, winsField: "wins") else { return XCTFail() }
+        XCTAssertEqual(undo, ["a": 0])
+        let clear = sd.startWrites(for: undo, records: started, winsField: "wins", startedField: "started", now: day(10))
+        XCTAssertEqual(Set(clear.keys), ["a", "b", "c", "d"])
+        XCTAssertTrue(clear.values.allSatisfy(\.isNull))
+    }
 }

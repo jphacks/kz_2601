@@ -17,6 +17,7 @@ func bracketApp() App {
 			{ID: "rating", Name: "レート", Type: FieldNumber},
 			{ID: "memo", Name: "メモ", Type: FieldString},
 			{ID: "auto", Name: "自動", Type: FieldInteger, Computed: &Expr{Kind: ExprLiteral, Lit: 1.0}},
+			{ID: "started", Name: "開始", Type: FieldDatetime},
 		}},
 		{ID: "setting", Name: "設定", Single: true, Fields: []Field{
 			{ID: "name", Name: "名前", Type: FieldString},
@@ -32,6 +33,7 @@ func TestBracketValid(t *testing.T) {
 		{Type: CompBracket, Entity: "entrant", TitleField: "name", WinsField: "wins"},
 		{Type: CompBracket, Entity: "entrant", TitleField: "name", WinsField: "wins", SeedField: "seed", Title: "卓球大会"},
 		{Type: CompBracket, Entity: "entrant", TitleField: "name", WinsField: "wins", SeedField: "rating"},
+		{Type: CompBracket, Entity: "entrant", TitleField: "name", WinsField: "wins", StartedField: "started"},
 	}
 	if err := app.Validate(); err != nil {
 		t.Fatalf("valid bracket rejected: %v", err)
@@ -40,6 +42,8 @@ func TestBracketValid(t *testing.T) {
 
 func TestBracketSemanticErrors(t *testing.T) {
 	app := bracketApp()
+	app.Entities[0].Fields = append(app.Entities[0].Fields,
+		Field{ID: "auto_at", Name: "自動の時刻", Type: FieldDatetime, Computed: &Expr{Kind: ExprLiteral, Lit: 1.0}})
 	b := func(mod func(c *Component)) Component {
 		c := Component{Type: CompBracket, Entity: "entrant", TitleField: "name", WinsField: "wins"}
 		mod(&c)
@@ -57,6 +61,9 @@ func TestBracketSemanticErrors(t *testing.T) {
 		b(func(c *Component) { c.SeedField = "memo" }),
 		b(func(c *Component) { c.SeedField = "wins" }),
 		b(func(c *Component) { c.Entity = "setting" }),
+		b(func(c *Component) { c.StartedField = "missing_start" }),
+		b(func(c *Component) { c.StartedField = "memo" }),
+		b(func(c *Component) { c.StartedField = "auto_at" }),
 	}
 	err := app.Validate()
 	ve, ok := err.(*ValidationError)
@@ -76,6 +83,9 @@ func TestBracketSemanticErrors(t *testing.T) {
 		`bracket seedField "memo" must be integer or number`,
 		`bracket winsField and seedField are the same field "wins"`,
 		`bracket entity "setting" is single`,
+		`bracket startedField "missing_start" not in entity "entrant"`,
+		`bracket startedField "memo" must be a datetime field`,
+		`bracket startedField "auto_at" is computed`,
 	} {
 		if !strings.Contains(joined, want) {
 			t.Errorf("missing problem %q in:\n%s", want, joined)
