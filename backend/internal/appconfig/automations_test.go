@@ -33,6 +33,14 @@ func TestAutomationsCreatorOnly(t *testing.T) {
 			!strings.Contains(rule["description"].(string), "毎日 07:00") || rule["lastRunAt"] != nil {
 			t.Fatalf("rule: %v", rule)
 		}
+		// the description follows Accept-Language (ja when absent / unknown)
+		for lang, want := range map[string]string{"en-US,en;q=0.9": "Every day at 07:00", "en": "Every day at 07:00", "fr": "毎日 07:00", "ja": "毎日 07:00"} {
+			r := e.do(owner, http.MethodGet, app+"/automations", nil, map[string]string{"Accept-Language": lang})
+			rules, _ := r.body["rules"].([]any)
+			if r.code != http.StatusOK || len(rules) != 1 || !strings.Contains(rules[0].(map[string]any)["description"].(string), want) {
+				t.Fatalf("%s: %d %s", lang, r.code, r.raw)
+			}
+		}
 		for _, k := range []string{"stopped", "notifyPaused", "quota"} {
 			if _, ok := r.body[k]; ok {
 				t.Fatalf("%s without a stop / run: %s", k, r.raw)

@@ -50,6 +50,7 @@ final class AppCheckHeaderTests: XCTestCase {
         let req = try XCTUnwrap(StubURLProtocol.requests.first)
         XCTAssertEqual(req.value(forHTTPHeaderField: "Authorization"), "Bearer tok-1")
         XCTAssertEqual(req.value(forHTTPHeaderField: "X-Client-Platform"), "ios")
+        XCTAssertEqual(req.value(forHTTPHeaderField: "Accept-Language"), ClientInfo.languageCode())
     }
 
     func testNoProviderOrNoTokenSendsWithoutHeader() async throws {
