@@ -110,8 +110,8 @@ match_quota/{uid}   {day, n}  送った回数(JST の 1 日ごと)
 |---|---|---|
 | 位置 | 正確な位置は持たない。地域は都道府県や「オンライン」までの enum | `Validate`(location の field 不可)・AI の規則 |
 | 写真 | プロフィールに写真・動画を置かない(知らない人が見る) | `Validate` |
-| 連絡先 | つながるまで見せない。連絡先は `matched` の entity にだけ書く | サーバーの絞り込み・AI の規則・ai-eval `matchSafe` |
-| 年齢・性別・学校 | プロフィールに入れない | AI の規則・ai-eval `matchSafe` |
+| 連絡先 | つながるまで見せない。連絡先は `matched` の entity にだけ書く | サーバーの絞り込み・AI の規則・lint(下)・ai-eval `matchSafe` |
+| 年齢・性別・学校・本名 | プロフィールに入れない | AI の規則・lint(下)・ai-eval `matchSafe` |
 | 18 歳未満 | 送る・承認するには本人の「18 歳以上」の確認(`ageConfirmed: true`)が要る。年齢そのものは保存しない。中高生の仲間探しは match を使わず招待制の shared にする | サーバー(400 `age_unconfirmed`)・AI の規則 |
 | 断られたことを知らせない | 見送り・ブロックされた送信も、送った人には pending のまま | `pairView` |
 | しつこい送信 | 見送られた相手への送り直しは届かない。1 人 1 日 30 回まで(送り直しも数える) | ペアの状態・`match_quota` |
@@ -120,6 +120,24 @@ match_quota/{uid}   {day, n}  送った回数(JST の 1 日ごと)
 | 運営の非公開化 | 非公開のアプリでは仲間探しの API も止まる | `matchApp` |
 | 退会 | 本人を含むペア・`match_quota/{uid}`・本人のプロフィールと連絡先のレコードを消す(「共有アプリの投稿は残す」の例外: 本人を表す情報のため) | `PurgeAccount`(ログ `matchPairs` / `matchRecords`)・[account-purge.md](../../infra/account-purge.md) |
 | 自由文のメッセージ | 「つながりたい」に文章は付けない(嫌がらせの経路を作らない) | API |
+
+### 6.1 プロフィールの項目の lint
+
+`match:"profile"` の field が連絡先・本人を特定する情報に見えると、lint の警告を出す(`backend/pkg/dsl/matching_lint.go`)。警告なので保存はでき、AI は警告を受けて 1 回作り直す。ai-eval の `matchSafe` も同じ判定(`dsl.ProfileSensitiveField`)を使う。DSL に電話・メールの型は無いので、field の id と名前で見る(日本語は部分一致、英語は `_`・空白・camelCase で区切った単語で一致)。
+
+| 種類 | 日本語 | 英語 | 直す先 |
+|---|---|---|---|
+| 電話 | 電話・携帯番号 | phone・tel・telephone | `matched` へ |
+| メール | メール | email・e mail・mail | `matched` へ |
+| 連絡先 | 連絡先 | contact | `matched` へ |
+| LINE・SNS | インスタ・ツイッター | line・sns・twitter・instagram・insta・discord・facebook・tiktok・handle | `matched` へ |
+| 住所 | 住所・番地・郵便番号 | address・postal・postcode・zipcode | `matched` へ |
+| 年齢・誕生日 | 年齢・生年月日・誕生日(年齢層は除く) | age・birthday・birthdate・birth・dob(age range・age group は除く) | 消す |
+| 学校 | 学校・高校・大学名 | school・university・college | 消す |
+| 本名 | 本名・氏名・実名・フルネーム・名字・苗字 | full name・real name・first name・last name・family name・given name・surname | 消す |
+| 性別 | 性別 | gender・sex | 消す |
+
+警告しないもの: `hidden`・`computed`・boolean の field。enum は連絡先の種類では警告しない(「連絡方法: LINE / メール」は選択肢で、連絡先そのものではない)が、年齢・性別などは enum でも警告する。ニックネーム・名前・自己紹介・年齢層の好みは警告しない。
 
 ## 7. App Store と法律のメモ
 
