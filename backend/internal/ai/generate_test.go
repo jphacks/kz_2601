@@ -124,7 +124,16 @@ func TestCreate_FailsWithProblemsWhenUnfixable(t *testing.T) {
 	}
 }
 
+// The edit's first block is what create sends under the same restriction
+// (shared prompt cache), with AI_TEXT_IMAGE off (inputPhoto restricted) or on.
 func TestEdit_PatchAppliedAndSummaryFromModel(t *testing.T) {
+	for _, textImage := range []bool{false, true} {
+		testEditPatchApplied(t, textImage)
+	}
+}
+
+func testEditPatchApplied(t *testing.T, textImage bool) {
+	t.Helper()
 	kb := kakeibo(t)
 	store := appconfigclient.NewMemory()
 	if _, err := store.Put(context.Background(), "a1", 1, kb, appconfigclient.Source{Kind: "system"}); err != nil {
@@ -132,11 +141,11 @@ func TestEdit_PatchAppliedAndSummaryFromModel(t *testing.T) {
 	}
 	badPatch := `{"patch":[{"op":"add","path":"/entities/9/fields/-","value":"カフェ"}],"summary":"x"}`
 	goodPatch := `{"patch":[{"op":"add","path":"/entities/0/fields/1/options/-","value":"カフェ"},{"op":"replace","path":"/screens/0/components/0/area","value":"A1:F4"},{"op":"replace","path":"/screens/0/components/2/area","value":"A5:F10"}],"summary":"カテゴリにカフェを追加し、合計を大きくしました"}`
-	f := &fakeCaller{replies: []string{badPatch, goodPatch}}
-	svc := &Service{Claude: f, Store: store, Model: "test-model"}
+	f := &fakeCaller{replies: []string{badPatch, goodPatch, string(kb)}}
+	svc := &Service{Claude: f, Store: store, Model: "test-model", TextImage: textImage}
 	res, err := svc.Generate(context.Background(), Request{AppID: "a1", Transcript: "カテゴリにカフェを追加して"})
 	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
+		t.Fatalf("textImage=%v: unexpected error: %v", textImage, err)
 	}
 	if res.Mode != "patch" || len(res.Patch) != 3 || res.Version != 3 || res.PreviousVersion != 2 {
 		t.Fatalf("result: mode=%s patch=%d v=%d prev=%d", res.Mode, len(res.Patch), res.Version, res.PreviousVersion)
@@ -147,8 +156,24 @@ func TestEdit_PatchAppliedAndSummaryFromModel(t *testing.T) {
 	if !strings.Contains(string(res.DSL), "カフェ") || res.Summary != "カテゴリにカフェを追加し、合計を大きくしました" {
 		t.Fatalf("dsl/summary: %s", res.Summary)
 	}
-	if !strings.Contains(f.calls[0].System, "JSON Patch") || !strings.Contains(f.calls[0].Messages[0].Content, "version 2") {
+	if !strings.Contains(f.calls[0].SystemSuffix, "JSON Patch") || !strings.Contains(f.calls[0].Messages[0].Content, "version 2") {
 		t.Fatal("edit prompt should include patch rules and current version")
+	}
+	// Create on the same Service (same restriction) sends the same first block.
+	if _, err := svc.Generate(context.Background(), Request{AppID: "b1", Transcript: "家計簿"}); err != nil {
+		t.Fatalf("textImage=%v: create: %v", textImage, err)
+	}
+	create := f.calls[len(f.calls)-1]
+	if create.SystemSuffix != "" || f.calls[0].System != create.System {
+		t.Fatalf("textImage=%v: edit's first block differs from create's", textImage)
+	}
+	rctx := withRestriction(context.Background(), svc.clientRestriction(nil, nil, nil))
+	if f.calls[0].System != restrictPrompt(rctx, systemPrompt) {
+		t.Fatalf("textImage=%v: first block is not the restricted systemPrompt", textImage)
+	}
+	// AI_TEXT_IMAGE off drops the inputPhoto rules; on, the prompt is untouched.
+	if restricted := f.calls[0].System != systemPrompt; restricted == textImage {
+		t.Fatalf("textImage=%v: inputPhoto restriction applied=%v", textImage, restricted)
 	}
 }
 

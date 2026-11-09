@@ -257,7 +257,8 @@ jobs:
         if: steps.xcodegen-cache.outputs.cache-hit != 'true'
         run: |
           set -euo pipefail
-          curl -fsSL -o "$RUNNER_TEMP/xcodegen.zip" \
+          # GitHub の一時的な 5xx で落ちないよう再試行(macOS runner の curl は 8.x で --retry-all-errors 対応)
+          curl -fsSL --retry 5 --retry-delay 5 --retry-all-errors -o "$RUNNER_TEMP/xcodegen.zip" \
             "https://github.com/yonaskolb/XcodeGen/releases/download/${XCODEGEN_VERSION}/xcodegen.zip"
           unzip -q "$RUNNER_TEMP/xcodegen.zip" -d "$RUNNER_TEMP"
 

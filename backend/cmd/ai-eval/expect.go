@@ -54,6 +54,7 @@ var expectKeys = map[string]expectKind{
 	"meFilter":     expectBool,   // #251 (PR #384)
 	"scopeNot":     expectString, // #254 (PR #405)
 	"summaryHas":   expectStrings,
+	"summaryNot":   expectStrings,
 	"prefillRef":   expectBool, // #256 (PR #387)
 	// checkMarks (#255, PR #398)
 	"mark":       expectBool,

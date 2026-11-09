@@ -17,7 +17,7 @@ import (
 // creator (none falls through to "other").
 func TestEveryOutcomeHasACreatorWord(t *testing.T) {
 	for _, o := range []string{quota.OutcomeOK, quota.OutcomeSkippedQuota, quota.OutcomeSkippedGlobal, quota.OutcomeSkippedPaused,
-		quota.OutcomeSkippedPlan, runner.OutcomeSkippedStale, runner.OutcomeSkippedLate, runner.OutcomeSkippedInactive, queue.OutcomeGaveUp} {
+		quota.OutcomeSkippedPlan, runner.OutcomeSkippedStale, runner.OutcomeSkippedLate, runner.OutcomeSkippedInactive, queue.OutcomeGaveUp, runner.OutcomeSkippedDisabled} {
 		if got := status.Result(o, "", false); got == status.ResultOther || got == status.ResultNone {
 			t.Errorf("outcome %s -> %s", o, got)
 		}
@@ -32,6 +32,9 @@ func TestEveryOutcomeHasACreatorWord(t *testing.T) {
 		if got := status.Result(runner.OutcomeSkippedStopped, reason, false); got != w {
 			t.Errorf("reason %s -> %s, want %s", reason, got, w)
 		}
+	}
+	if got := status.Result(quota.OutcomeOK, runner.ReasonAppLimit, false); got != status.ResultLimit {
+		t.Errorf("ok + %s -> %s", runner.ReasonAppLimit, got)
 	}
 }
 

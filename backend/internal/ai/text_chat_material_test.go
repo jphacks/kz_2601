@@ -46,6 +46,24 @@ func TestTextChatMaterialInFirstUserTurn(t *testing.T) {
 	}
 }
 
+// The device ranks the records (relevant to the latest message first, so an
+// older record can come before a newer one); the server keeps that order and
+// the text as sent, only trimming the ends.
+func TestTextChatMaterialKeepsDeviceOrder(t *testing.T) {
+	fixNonce(t, "n0nce")
+	svc, fc := textSvc(reply("12 月 15 日です"))
+	text := "- 本文: 請求書の支払期限は 12 月 15 日 / 日付: 10/1\n- 本文: 散歩した / 日付: 11/7\n- 本文: カレー / 日付: 11/6"
+	b, _ := json.Marshal(TextRequest{Task: "chat", Instruction: "資料に答える",
+		Messages: []TextMessage{{Role: "user", Text: "支払期限はいつ?"}},
+		Material: &ChatMaterial{Entity: "docs", Name: "資料", Text: "\n " + text + " \n"}})
+	if rec := postText(t, NewHandler(svc), "u1", string(b)); rec.Code != http.StatusOK {
+		t.Fatalf("%d %s", rec.Code, rec.Body.String())
+	}
+	if first := fc.calls[0].Messages[0].Content; !strings.Contains(first, ">\n"+text+"\n</records-n0nce>") {
+		t.Fatalf("order or text changed: %q", first)
+	}
+}
+
 func fixNonce(t *testing.T, n string) {
 	t.Helper()
 	prev := chatMaterialNonce
