@@ -141,7 +141,7 @@ match_quota/{uid}   {day, n}  送った回数(JST の 1 日ごと)
 
 - 断りの一文: 「恋愛や出会いを目的に知らない人同士を引き合わせることはできません(出会い系サイト規制法の届出や年齢確認が必要になるため)。趣味・勉強・イベントの仲間探しなら作れます。」
 - `allowedComponents` を送るのに `matching` が無い版(今の iOS 全部): `restrict.go` が生成スキーマから `Entity.match` を外し、規則を落とし、生成結果に新しく付いた match は作り直させ、残れば取り除く(#482 の `retentionDays` と同じ)。
-- ai-eval: `internal/ai/eval/matching_cases.json`(作成 7 件)・`matching_chat_cases.json`(チャット 2 件)。expect は `matchProfile` / `matchMatched` / `matchSafe`(`cmd/ai-eval/matching.go`)。
+- ai-eval: `internal/ai/eval/matching_cases.json`(作成 9 件。「恋愛目的じゃない」仲間探し・中学生どうし = match を使わず shared も)・`matching_chat_cases.json`(チャット 3 件)。expect は `matchProfile` / `matchMatched` / `matchSafe` / `matchUI`(`cmd/ai-eval/matching.go`)。断るケース(`matchProfile: false` + `noOmission`)が `datingAsked` に当たり、仲間探しのケースが当たらないことはモデル無しで確かめる(`TestMatchingCasesAgreeWithDatingAsked`)。
 
 ## 9. DSL の部品(phase 2)
 
