@@ -227,7 +227,7 @@ DSL 差し替え時(`apply`)は paths/sheet を全部リセットする(画面 i
 | 消す | サインアウトは `wipeLocal` の先頭、退会は `DELETE /v1/me` の前に `DELETE /v1/me/devices/{installationId}`。最大 3 秒で先へ進み、失敗で止めない。通知の許可を切った時も消す |
 | 同意 | 設定の「他の人の行動で届く通知」(共有・公開の記録があるアプリで、作成者以外)が `PUT /v1/me/notify-consent/{appId}`。参加の画面で「参加する」を押すと有効。読む API が無いので値は端末の控え(`NotifyConsentStore`)で、ログアウトや入れ直しの後はオフに見える |
 | タップ | 本文の `appId` を `IntentHost` に渡して開く(bootstrap の前なら待つ)。ローカル通知に `appId` は無い |
-| entitlement | `aps-environment` は App ID の Push の有効化(人の作業)の後に `Metamon.entitlements` に足す。それまで登録は失敗するだけで、利用者には何も出さない |
+| entitlement | `Metamon.entitlements` の `aps-environment` = `$(METAMON_APS_ENV)`(`project.yml`。Debug / Staging は development、Release は production・#683)。審査用の `Metamon-Review.entitlements` には入れない。App ID の Push Notifications は自動署名が付ける(手動署名なら人が App ID で有効にして profile を作り直す)。登録に失敗しても利用者には何も出さない |
 
 ## 6. 音声入力画面とホットリロード
 

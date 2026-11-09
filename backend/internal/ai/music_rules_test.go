@@ -8,7 +8,7 @@ import (
 // #412: the music rules reach the generation prompt and both chat prompts,
 // and the catalog / chat index (built from the schema) list musicPlayer.
 func TestMusicRulesReachPrompts(t *testing.T) {
-	for _, want := range []string{"## 音楽を流す(#412)", "allowRequests: true", "Spotify・YouTube Music の再生・操作はできない"} {
+	for _, want := range []string{"## 音楽を流す(#412)", "Spotify・YouTube Music の再生・操作はできない"} {
 		if !strings.Contains(systemPrompt, want) {
 			t.Errorf("systemPrompt lacks %q", want)
 		}
@@ -20,6 +20,9 @@ func TestMusicRulesReachPrompts(t *testing.T) {
 	}
 	if !strings.Contains(catalog, "\n- musicPlayer:") {
 		t.Error("catalog lacks musicPlayer")
+	}
+	if !strings.Contains(catalog, "allowRequests: true") {
+		t.Error("catalog lacks the allowRequests usage")
 	}
 	if !strings.Contains(chatCapabilityIndex, "musicPlayer") {
 		t.Error("chat capability index lacks musicPlayer")
