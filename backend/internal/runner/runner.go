@@ -15,11 +15,13 @@ import (
 	"time"
 
 	"github.com/jphacks/kz_2601/backend/internal/feeds"
+	"github.com/jphacks/kz_2601/backend/internal/runner/engine"
 	"github.com/jphacks/kz_2601/backend/internal/runner/notify"
 	"github.com/jphacks/kz_2601/backend/internal/runner/queue"
 	"github.com/jphacks/kz_2601/backend/internal/runner/quota"
 	"github.com/jphacks/kz_2601/backend/internal/runner/schedule"
 	"github.com/jphacks/kz_2601/backend/internal/runner/scope"
+	"github.com/jphacks/kz_2601/backend/internal/runner/status"
 	"github.com/jphacks/kz_2601/backend/internal/store"
 )
 
@@ -227,7 +229,7 @@ func (r *Runner) Tick(ctx context.Context, budget time.Duration) (TickResult, er
 func (r *Runner) handle(ctx context.Context, ev store.OutboxEvent) (status, outcome string, err error) {
 	if r.queue.Exhausted(ev) {
 		for _, id := range ev.RuleIDs {
-			r.logRun(ctx, ev, runLog{ruleID: id, outcome: queue.OutcomeGaveUp})
+			r.logRun(ctx, ev, runLog{ruleID: id, outcome: queue.OutcomeGaveUp, lastError: ev.LastError})
 		}
 		r.refund(ctx, ev)
 		return store.OutboxGaveUp, queue.OutcomeGaveUp, r.queue.GiveUp(ctx, ev, "")
@@ -330,17 +332,27 @@ func summarize(rules map[string]string) string {
 	return out
 }
 
-// errorCode is a short class of err for the outbox document (never content).
+// errorCode is a short class of err for the outbox document (never content):
+// a status.Code*. status.FailureReason turns the last one of a run that gave
+// up into the creator's word (#347).
 func errorCode(err error) string {
 	switch {
 	case errors.Is(err, errSendRetry):
-		return "send_failed"
+		return status.CodeSendFailed
 	case errors.Is(err, scope.ErrViolation):
-		return "scope_violation"
+		return status.CodeScopeViolation
 	case errors.Is(err, scope.ErrNotReadable):
-		return "not_readable"
+		return status.CodeNotReadable
+	case errors.Is(err, store.ErrNotFound):
+		return status.CodeNotFound
+	case errors.Is(err, engine.ErrMismatch):
+		return status.CodeMismatch
+	case errors.Is(err, errWriteRejected):
+		return status.CodeWriteRejected
+	case errors.Is(err, errFeedWait):
+		return status.CodeFeedWait
 	case errors.Is(err, context.DeadlineExceeded), errors.Is(err, context.Canceled):
-		return "timeout"
+		return status.CodeTimeout
 	}
-	return "error"
+	return status.CodeError
 }

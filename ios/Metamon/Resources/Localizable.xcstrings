@@ -6665,6 +6665,23 @@
         }
       }
     },
+    "サービス側の問題でした" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "A problem on our side"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "サービス側の問題でした"
+          }
+        }
+      }
+    },
     "サービス全体で一時停止しています" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -7222,6 +7239,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "データについて"
+          }
+        }
+      }
+    },
+    "データを保存できませんでした" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Couldn't save the data"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "データを保存できませんでした"
           }
         }
       }
@@ -8106,6 +8140,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "リンクを送る"
+          }
+        }
+      }
+    },
+    "ルールが今のアプリのデータの形と合っていません" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The rule no longer matches the app's data"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ルールが今のアプリのデータの形と合っていません"
           }
         }
       }
@@ -9449,6 +9500,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "使い方を見る"
+          }
+        }
+      }
+    },
+    "使うはずのデータが見つからないか、読めませんでした" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The data it uses was missing or couldn't be read"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "使うはずのデータが見つからないか、読めませんでした"
           }
         }
       }
@@ -11612,6 +11680,23 @@
         }
       }
     },
+    "外部の情報を取りにいけませんでした" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Couldn't get information from the outside source"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "外部の情報を取りにいけませんでした"
+          }
+        }
+      }
+    },
     "失敗: %@" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -12581,6 +12666,23 @@
         }
       }
     },
+    "時間内に終わりませんでした" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Didn't finish in time"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "時間内に終わりませんでした"
+          }
+        }
+      }
+    },
     "暴力的・危険な内容" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -13104,6 +13206,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "次回更新"
+          }
+        }
+      }
+    },
+    "止まった理由に心当たりがない時は、お問い合わせからご連絡ください" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "If you don't know why it was stopped, please reach us through Contact"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "止まった理由に心当たりがない時は、お問い合わせからご連絡ください"
           }
         }
       }
@@ -13873,6 +13992,23 @@
         }
       }
     },
+    "直す" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Fix"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "直す"
+          }
+        }
+      }
+    },
     "直す依頼を入力欄に入れて、設定を閉じます" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -13886,6 +14022,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "直す依頼を入力欄に入れて、設定を閉じます"
+          }
+        }
+      }
+    },
+    "直す依頼を入力欄に入れます(まだ送りません)" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Puts a fix request in the message field (not sent yet)"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "直す依頼を入力欄に入れます(まだ送りません)"
           }
         }
       }
@@ -14430,6 +14583,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "自動の動き「%@」が続けてうまくいっていません。うまく動くように直して"
+          }
+        }
+      }
+    },
+    "自動の動き「%@」が続けて失敗しています。直しますか?" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The automation “%@” keeps failing. Fix it?"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "自動の動き「%@」が続けて失敗しています。直しますか?"
           }
         }
       }
@@ -16453,6 +16623,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "通知を予約できませんでした"
+          }
+        }
+      }
+    },
+    "通知を送れませんでした" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Couldn't send the notification"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "通知を送れませんでした"
           }
         }
       }

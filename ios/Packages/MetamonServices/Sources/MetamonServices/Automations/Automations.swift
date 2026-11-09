@@ -80,6 +80,12 @@ public struct AutomationRule: Decodable, Sendable, Equatable, Identifiable {
         public var isProblem: Bool { self != .none && self != .ok && self != .disabled }
     }
 
+    /// うまくいかなかった理由(openapi `AutomationFailureReason`)。決まった語だけ。知らない語は nil(いつもの文言だけを出す)。
+    public enum FailureReason: String, Sendable, Equatable, CaseIterable {
+        case notifyFailed = "notify_failed", recordUnavailable = "record_unavailable", mismatch
+        case writeRejected = "write_rejected", sourceUnavailable = "source_unavailable", timeout, `internal`
+    }
+
     public enum Trigger: String, Decodable, Sendable, Equatable { case record, schedule }
 
     public var id: String
@@ -95,6 +101,8 @@ public struct AutomationRule: Decodable, Sendable, Equatable, Identifiable {
     public var enabled: Bool?
     /// うまくいかなかった回数の連続(省略 = 0)
     public var consecutiveFailures: Int
+    /// `result == .failed` の時の理由(それ以外・古いサーバー・知らない語は nil)
+    public var failureReason: FailureReason?
 
     /// 何回続けて失敗したら「直しますか?」を出すか
     public static let fixSuggestionThreshold = 3
@@ -102,7 +110,7 @@ public struct AutomationRule: Decodable, Sendable, Equatable, Identifiable {
 
     public init(id: String, description: String, trigger: Trigger = .record, result: Result = .none,
                 lastRunAt: Date? = nil, lastOkAt: Date? = nil, stopped: AutomationStop? = nil,
-                enabled: Bool? = nil, consecutiveFailures: Int = 0) {
+                enabled: Bool? = nil, consecutiveFailures: Int = 0, failureReason: FailureReason? = nil) {
         self.id = id
         self.description = description
         self.trigger = trigger
@@ -112,9 +120,10 @@ public struct AutomationRule: Decodable, Sendable, Equatable, Identifiable {
         self.stopped = stopped
         self.enabled = enabled
         self.consecutiveFailures = consecutiveFailures
+        self.failureReason = result == .failed ? failureReason : nil
     }
 
-    enum CodingKeys: String, CodingKey { case id, description, trigger, result, lastRunAt, lastOkAt, stopped, enabled, consecutiveFailures }
+    enum CodingKeys: String, CodingKey { case id, description, trigger, result, lastRunAt, lastOkAt, stopped, enabled, consecutiveFailures, failureReason }
 
     public init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
@@ -127,6 +136,8 @@ public struct AutomationRule: Decodable, Sendable, Equatable, Identifiable {
         stopped = try c.decodeIfPresent(AutomationStop.self, forKey: .stopped)
         enabled = try? c.decodeIfPresent(Bool.self, forKey: .enabled)
         consecutiveFailures = max(0, (try? c.decodeIfPresent(Int.self, forKey: .consecutiveFailures)) ?? 0)
+        let reason = (try? c.decodeIfPresent(String.self, forKey: .failureReason)) ?? nil
+        failureReason = result == .failed ? reason.flatMap(FailureReason.init(rawValue:)) : nil
     }
 }
 

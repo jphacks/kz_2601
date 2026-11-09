@@ -131,7 +131,7 @@ struct AutomationsView: View {
 
     @ViewBuilder
     private func loaded(_ a: AppAutomations) -> some View {
-        if a.stopped != nil || a.notifyPaused != nil {
+        if Self.showsStopAppeal(a) {
             Section {
                 if let s = a.stopped {
                     stopNotice(Text("運営がこのアプリの自動の動きを止めています。"), until: s.until)
@@ -139,6 +139,12 @@ struct AutomationsView: View {
                 if let s = a.notifyPaused {
                     stopNotice(Text("通知を一時的に止めています。自動の動きは動いています。"), until: s.until)
                 }
+                // #346: 心当たりがない時の申し立て先(設定の「お問い合わせ」と同じ窓口)
+                Link(destination: LegalDocument.contactURL) {
+                    Text("止まった理由に心当たりがない時は、お問い合わせからご連絡ください")
+                        .font(.footnote)
+                }
+                .accessibilityIdentifier("automations.stopAppeal")
             }
         }
         Section {
@@ -163,7 +169,7 @@ struct AutomationsView: View {
                 Text("日本時間の 0 時に 0 に戻ります。")
             }
         }
-        if Self.needsContact(a) {
+        if Self.needsContact(a), !Self.showsStopAppeal(a) { // 止めた時は上の申し立ての行で足りる
             Section {
                 Link(destination: LegalDocument.contactURL) {
                     Label("お問い合わせ", systemImage: "envelope")
@@ -183,6 +189,11 @@ struct AutomationsView: View {
                     .font(.footnote).foregroundStyle(.secondary)
             }
         }
+    }
+
+    /// 運営が何かを止めている(アプリ全体・通知・どれかのルール)時だけ、停止の案内の下に申し立ての行を出す(#346)。
+    static func showsStopAppeal(_ a: AppAutomations) -> Bool {
+        a.stopped != nil || a.notifyPaused != nil || a.rules.contains { $0.stopped != nil || $0.result == .stopped }
     }
 
     /// 運営の停止・止まった結果がある時だけ、お問い合わせへの導線を出す。
@@ -247,6 +258,9 @@ struct AutomationRuleRow: View {
                 Text(Self.label(rule.result))
             }
             .font(.footnote)
+            if rule.result == .failed, let reason = rule.failureReason {
+                Text(Self.failureLabel(reason)).font(.caption).foregroundStyle(.secondary)
+            }
             if rule.stopped != nil, rule.result != .stopped {
                 Text("運営がこのルールを止めています。").font(.footnote).foregroundStyle(.orange)
             }
@@ -279,6 +293,19 @@ struct AutomationRuleRow: View {
         case .failed: "何度か試しましたがうまくいきませんでした"
         case .disabled: "オフにしていたため動かしませんでした"
         case .other: "動きませんでした"
+        }
+    }
+
+    /// 「何度か試しましたが…」の下に出す理由(#347)。サーバーは決まった語しか返さない。
+    static func failureLabel(_ r: AutomationRule.FailureReason) -> LocalizedStringKey {
+        switch r {
+        case .notifyFailed: "通知を送れませんでした"
+        case .recordUnavailable: "使うはずのデータが見つからないか、読めませんでした"
+        case .mismatch: "ルールが今のアプリのデータの形と合っていません"
+        case .writeRejected: "データを保存できませんでした"
+        case .sourceUnavailable: "外部の情報を取りにいけませんでした"
+        case .timeout: "時間内に終わりませんでした"
+        case .internal: "サービス側の問題でした"
         }
     }
 
