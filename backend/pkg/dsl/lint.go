@@ -35,8 +35,11 @@ func (a *App) Lint() []string {
 	l.savedRecordReach() // saved_record.go
 	l.navGraph()
 	l.micSeat()
+	l.goalTarget()
 	l.dupAddControls()
 	l.privateChat()
+	l.optionalTitle()
+	l.settingMaxMin()
 	return l.out
 }
 

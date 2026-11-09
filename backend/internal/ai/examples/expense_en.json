@@ -34,7 +34,7 @@
         {
           "type": "section", "id": "recent", "area": "A3:F10", "title": "Recent expenses",
           "children": [
-            { "type": "list", "entity": "expense", "item": { "title": "note", "subtitle": "category", "trailing": "amount" },
+            { "type": "list", "entity": "expense", "item": { "title": "category", "subtitle": "note", "trailing": "amount" },
               "sort": { "field": "date", "direction": "desc" }, "emptyText": "No expenses yet", "swipeToDelete": true,
               "onItemTap": { "type": "navigate", "screen": "expense_form", "presentation": "push" } }
           ]
