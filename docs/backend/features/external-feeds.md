@@ -14,12 +14,13 @@
 6. [環境変数](#環境変数)
 7. [審査用の版](#審査用の版)
 8. [試験](#試験)
-9. [まだ決めていないこと・残る危険](#まだ決めていないこと残る危険)
+9. [記録に残す(サーバーの自動の動き saveFeed)](#記録に残すサーバーの自動の動き-savefeed)
+10. [まだ決めていないこと・残る危険](#まだ決めていないこと残る危険)
 
 ## できること
 
 - 作ったアプリに、**天気予報(府県の単位)・今出ている気象の警報と注意報(府県の単位)・48 時間の気圧の予報(府県の代表地点)・これから来る祝日・運営が許可したお知らせ(RSS)・arXiv の分野ごとの新着論文・国会会議録の発言の検索** の一覧を出す。
-- **読むだけ**。外へ送る・書き込む連携は無い。読んだ内容を記録に保存する・計算やグラフに使うこともできない(表示だけ)。
+- **読むだけ**。外へ送る・書き込む連携は無い。部品(feed)が読んだ内容は記録に保存できない(表示だけ)。天気・気圧・警報を毎日の記録として残すのは、サーバーの自動の動きの `saveFeed`(下)だけ。
 - 任意の URL・任意のサイト・任意の RSS は書けない。出どころは閉じた一覧(provider)と、その中の決まった値(府県予報区のコード・フィードの id)だけ。
 - 警報: 解除された・出ていないものは出さない。警報が出たら知らせる(通知)・市町村の単位・地震や津波はできない。
 - 気圧: 6 時間ごとの行に最低 / 最高(hPa)・1 時間ごとの値の小さな折れ線・急な低下の印(24 時間以内に 6 hPa 以上下がる)を出す。値を記録・グラフ・通知の条件に使うことはできない。
@@ -141,6 +142,30 @@ diet の検索語で出どころまで取りに行く回数は、利用者ごと
 - AI: warnings・pressure の規則は `feed_warnings_pressure_rules.go`(`TestFeedWarningsPressureRules`)・ai-eval `feed_cases.json` に 2 件・`jphacks_coverage_cases.json` の hs_2503・NG_2301。
 - arxiv・diet: `backend/internal/feeds/arxiv_diet_test.go`(2026-11-08 に 1 回だけ実際に取った応答を 4 件に切って `testdata/arxiv_api_cs_AI.xml`・`testdata/kokkai_speech_kodomo.json` に置いた。解析・送る問い合わせ・通信の前に断る値・3 秒あける・1 つずつ止める・キャッシュの上限)・`backend/pkg/dsl/feed_arxiv_diet_test.go`・`backend/internal/appconfig/feeds_arxiv_diet_test.go`(`q` の検証)・AI の規則 `feed_arxiv_diet_rules.go`(`TestFeedArxivDietRules`)・ai-eval `feed_arxiv_diet_cases.json`(4 件・NHK は作らない)・iOS `FeedTests` / `FeedLeafTests`。
 - iOS: `FeedTests`(DSL から問い合わせ)・`FeedLeafTests`(表示の組み立て)・`FeedClientTests`(appconfig だけに聞く・キャッシュ)。
+
+## 記録に残す(サーバーの自動の動き saveFeed)
+
+予報は「今から先」しか見られないので、体調と気圧の関係のように後で比べたいアプリ(jphacks/tk_a_2518)のために、時刻のきっかけのサーバーのルール(`serverRules`・Pro)がその時の値を記録 1 件として残せる。
+
+```json
+{"id": "daily_feed", "on": {"every": "daily", "time": "07:00"},
+ "do": [{"saveFeed": {"provider": "pressure", "region": "130000", "entity": "pressure_log",
+   "fields": {"date": "day", "summary": "note", "min": "low", "max": "high", "drop": "falling"}}}]}
+```
+
+| provider | 残す値 |
+|---|---|
+| `weather` | summary = 今日の天気の言葉・min / max = 今日の最低 / 最高気温(°C。気象庁の発表に無い時は書かない) |
+| `pressure` | これから 24 時間(6 時間の行 4 つ): min / max(hPa)・drop = 6 hPa 以上の急な低下・summary = 低下の文か「1003〜1012 hPa」 |
+| `warnings` | summary = 今出ている警報・注意報の名前(「大雨警報・雷注意報」・無ければ「発表なし」) |
+
+- 語彙は閉じている: provider は上の 3 つ・region は feed と同じ府県予報区のコード(DSL に書いた決まった値。記録の値は差し込めない)。each の無い時刻のきっかけだけ(1 回の実行で 1 回取る)・アプリに 3 つまで。
+- 書く先は `createRecord` と同じ: ルールと同じ側の entity(private は作成者の記録・shared / public はアプリの記録)・single と宛先付きは不可・連鎖の検出に入る。fields は残す値 → field の id(date は date / datetime・summary は string / text・min / max は number / integer・drop は boolean)。required の field は値が必ずある date か summary だけ。
+- 取りに行くのは runner(`backend/internal/runner/feed.go`)で、appconfig と同じ `internal/feeds` の `Service` を使う(許可リスト・接続先の確認・応答の上限・キャッシュ・1 分あたりの取得・`FEEDS_DISABLED`)。止めた provider の回は何も書かずに ok。出どころが落ちて古い写ししか無い時は保存せず、その回をやり直す(やり直しの上限・遅れの上限は他のルールと同じ)。
+- 書き込みは他のルールと同じ実行・書き込みの上限・止めるスイッチ・Pro の判定を通る。
+- AI: `server_rules_vocab_savefeed.go`(自動の動きの工程の語彙)・`weather_log_rules.go`(生成の本体に「毎日の気圧・天気を残すなら記録の entity と list / chart を作る」の 1 行。feed の部品が使えない版でも残る)。ai-eval `server_rules_cases.json` の `sr_save_pressure`。
+- 試験: `pkg/dsl/server_rules_feed_test.go`・`internal/runner/feed_test.go` / `feed_snapshot_test.go`・`internal/ai/server_rules_vocab_savefeed_test.go`。
+- runner の Cloud Run から外部の HTTPS に出られるかは、runner をデプロイする時に確かめる(まだデプロイしていない)。
 
 ## まだ決めていないこと・残る危険
 

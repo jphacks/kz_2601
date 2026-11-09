@@ -3,6 +3,10 @@ import XCTest
 
 /// `nearbyShare`(#36)の送受信データ・取り込み判定。MultipeerConnectivity を通さずに検証する。
 final class NearbyShareTests: XCTestCase {
+    private var savedLanguage: String?
+    override func setUp() { savedLanguage = setAppLanguage("ja") } // 文言は日本語で確かめる(シミュレータの言語に依らない)
+    override func tearDown() { setAppLanguage(savedLanguage) }
+
     private func attendance() throws -> (AppDSL, Entity) {
         let dsl = try ExamplesFixture.load("attendance_nearby")
         return (dsl, try XCTUnwrap(dsl.entity("attendance")))

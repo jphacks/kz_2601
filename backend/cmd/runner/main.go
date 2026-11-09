@@ -25,6 +25,7 @@
 //	                                           appconfig writes it). firebase = Firebase Auth (needs
 //	                                           roles/firebaseauth.viewer; not deployed).
 //	                                           "" = unknown, so only the actor's own notifications go out
+//	FEEDS_DISABLED / FEEDS_UPSTREAM_PER_MINUTE public feeds saveFeed reads (internal/feeds; same as appconfig)
 //	PORT                                       default 8080
 //
 // A stg process on the production database refuses to start even with
@@ -49,6 +50,7 @@ import (
 	_ "time/tzdata" // creators' time zones on a distroless image
 
 	"github.com/jphacks/kz_2601/backend/internal/entitlement"
+	"github.com/jphacks/kz_2601/backend/internal/feeds"
 	"github.com/jphacks/kz_2601/backend/internal/fsenv"
 	"github.com/jphacks/kz_2601/backend/internal/httpx"
 	"github.com/jphacks/kz_2601/backend/internal/ratelimit"
@@ -125,7 +127,7 @@ func main() {
 	// Notifications are resolved against the stored devices and consents
 	// (#269). Without an APNs key (push.Sender nil) LogSender logs their shape only.
 	r, err := runner.New(runner.Config{Env: env, Store: st, Quota: q, Sender: push.Sender, PushEnvironment: push.Environment,
-		Age: age, Paused: pausedFromEnv(os.Getenv),
+		Age: age, Paused: pausedFromEnv(os.Getenv), Feeds: feeds.New(feeds.OptionsFromEnv(os.Getenv)),
 		NotifyPaused: flagFromEnv(os.Getenv, "RUNNER_NOTIFY_PAUSED"), AutoPause: autoPause, MaxLate: maxLate, Logger: logger})
 	if err != nil {
 		logger.Error("runner: init failed", slog.Any("error", err))

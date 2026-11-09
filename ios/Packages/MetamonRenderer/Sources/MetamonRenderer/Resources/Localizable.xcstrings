@@ -307,6 +307,57 @@
         }
       }
     },
+    "%@さんから" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "From %@"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@さんから"
+          }
+        }
+      }
+    },
+    "%@さんから「%@」のリクエストが届きました" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$@ requested “%2$@”"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@さんから「%@」のリクエストが届きました"
+          }
+        }
+      }
+    },
+    "%@さんのリクエスト「%@」を再生待ちに入れました" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Added %1$@'s request “%2$@” to Up Next"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@さんのリクエスト「%@」を再生待ちに入れました"
+          }
+        }
+      }
+    },
     "%@のタイマーが終わりました" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -613,6 +664,23 @@
         }
       }
     },
+    "%lld 回" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld times"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld 回"
+          }
+        }
+      }
+    },
     "%lld 回戦" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -902,6 +970,91 @@
         }
       }
     },
+    "AI で処理" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Process with AI"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "AI で処理"
+          }
+        }
+      }
+    },
+    "AI で分類" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Classify with AI"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "AI で分類"
+          }
+        }
+      }
+    },
+    "AI で抜き出す" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Extract with AI"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "AI で抜き出す"
+          }
+        }
+      }
+    },
+    "AI で書き直す" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Rewrite with AI"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "AI で書き直す"
+          }
+        }
+      }
+    },
+    "AI で要約" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Summarize with AI"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "AI で要約"
+          }
+        }
+      }
+    },
     "AI で読み取っています…" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -936,6 +1089,91 @@
         }
       }
     },
+    "AI に提案してもらう" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Get an AI suggestion"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "AI に提案してもらう"
+          }
+        }
+      }
+    },
+    "AI に書いてもらう" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Write with AI"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "AI に書いてもらう"
+          }
+        }
+      }
+    },
+    "AI に渡せるのは自分が書いた記録だけです" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Only records you wrote can be given to the AI"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "AI に渡せるのは自分が書いた記録だけです"
+          }
+        }
+      }
+    },
+    "AI の処理に失敗しました(%@)" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "AI processing failed (%@)"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "AI の処理に失敗しました(%@)"
+          }
+        }
+      }
+    },
+    "AI の答えを読み取れませんでした。もう一度お試しください" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Couldn't read the AI's answer. Please try again"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "AI の答えを読み取れませんでした。もう一度お試しください"
+          }
+        }
+      }
+    },
     "AI の結果を「%@」に保存" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -966,6 +1204,142 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "AI の返事を保存できませんでした"
+          }
+        }
+      }
+    },
+    "AI モデルを準備中です。しばらくしてから再度お試しください" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The AI model is getting ready. Please try again in a moment"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "AI モデルを準備中です。しばらくしてから再度お試しください"
+          }
+        }
+      }
+    },
+    "Apple Intelligence に対応していない端末です" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "This device doesn't support Apple Intelligence"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Apple Intelligence に対応していない端末です"
+          }
+        }
+      }
+    },
+    "Apple Intelligence を利用できません" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Apple Intelligence isn't available"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Apple Intelligence を利用できません"
+          }
+        }
+      }
+    },
+    "Apple Music で「%@」が見つかりませんでした" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Couldn't find “%@” on Apple Music"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Apple Music で「%@」が見つかりませんでした"
+          }
+        }
+      }
+    },
+    "Apple Music へのアクセスが許可されていません。設定アプリの Tailor It で「メディアと Apple Music」をオンにしてください" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Apple Music access isn't allowed. In Settings > Tailor It, turn on “Media & Apple Music”"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Apple Music へのアクセスが許可されていません。設定アプリの Tailor It で「メディアと Apple Music」をオンにしてください"
+          }
+        }
+      }
+    },
+    "Apple Music を使う" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Use Apple Music"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Apple Music を使う"
+          }
+        }
+      }
+    },
+    "Apple Music を使えません" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Apple Music isn't available"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Apple Music を使えません"
+          }
+        }
+      }
+    },
+    "Apple Music を使っていなくても送れます。相手の端末が Apple Music で探して再生します。" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "You can send this without Apple Music. The other device finds and plays it on Apple Music."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Apple Music を使っていなくても送れます。相手の端末が Apple Music で探して再生します。"
           }
         }
       }
@@ -1051,6 +1425,57 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "QRを読み取る"
+          }
+        }
+      }
+    },
+    "Spotify で「%@」を開く(Spotify の操作はできません)" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Open “%@” in Spotify (Spotify can't be controlled from here)"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Spotify で「%@」を開く(Spotify の操作はできません)"
+          }
+        }
+      }
+    },
+    "Spotify で探す" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Search on Spotify"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Spotify で探す"
+          }
+        }
+      }
+    },
+    "iOS 26 以降が必要です" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Requires iOS 26 or later"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "iOS 26 以降が必要です"
           }
         }
       }
@@ -1208,6 +1633,40 @@
         }
       }
     },
+    "「%@」を再生待ちに入れました" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Added “%@” to Up Next"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "「%@」を再生待ちに入れました"
+          }
+        }
+      }
+    },
+    "「曲を探す」から追加できます" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Add songs with “Find songs”"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "「曲を探す」から追加できます"
+          }
+        }
+      }
+    },
     "あと%lld分" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -1306,6 +1765,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "お互いに連絡先が見えなくなります。相手に通知は送られません。"
+          }
+        }
+      }
+    },
+    "この AI ボタンの設定が正しくありません" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "This AI button isn't set up correctly"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "この AI ボタンの設定が正しくありません"
           }
         }
       }
@@ -1412,6 +1888,40 @@
         }
       }
     },
+    "この写真は読み込めない場所にあります。撮り直すか選び直してください" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "This photo is in a place the app can't read. Retake it or choose another one"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "この写真は読み込めない場所にあります。撮り直すか選び直してください"
+          }
+        }
+      }
+    },
+    "この場所に決める" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Use this place"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "この場所に決める"
+          }
+        }
+      }
+    },
     "この版では AI と話せません" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -1480,6 +1990,57 @@
         }
       }
     },
+    "この端末では AI を使えません" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "AI isn't available on this device"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "この端末では AI を使えません"
+          }
+        }
+      }
+    },
+    "この端末では Apple Music の利用が制限されています" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Apple Music is restricted on this device"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "この端末では Apple Music の利用が制限されています"
+          }
+        }
+      }
+    },
+    "この端末では Apple Music を使えません" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Apple Music isn't available on this device"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "この端末では Apple Music を使えません"
+          }
+        }
+      }
+    },
     "この端末ではヘルスデータを使えません" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -1531,6 +2092,23 @@
         }
       }
     },
+    "この端末は距離・方向の測定に対応していません" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "This device can't measure distance and direction"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "この端末は距離・方向の測定に対応していません"
+          }
+        }
+      }
+    },
     "この録音ファイルは読めませんでした" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -1578,6 +2156,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "しきい値を超えました"
+          }
+        }
+      }
+    },
+    "すれ違い通信をはじめますか？" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Start pass-by sharing?"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "すれ違い通信をはじめますか？"
           }
         }
       }
@@ -1786,6 +2381,23 @@
         }
       }
     },
+    "まだ誰ともすれ違っていません" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "You haven't passed anyone yet"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "まだ誰ともすれ違っていません"
+          }
+        }
+      }
+    },
     "まだ誰ともつながっていません" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -1888,6 +2500,23 @@
         }
       }
     },
+    "やめる" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cancel"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "やめる"
+          }
+        }
+      }
+    },
     "やり直す" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -1935,6 +2564,91 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "アプリを離れたので文字起こしをやめました。もう一度選んでください"
+          }
+        }
+      }
+    },
+    "アーティスト(任意)" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Artist (optional)"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "アーティスト(任意)"
+          }
+        }
+      }
+    },
+    "オンにすると、この画面を開いている間 近くの同じアプリの人と%@を交換します" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "When on, you swap %@ with nearby people using the same app while this screen is open"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "オンにすると、この画面を開いている間 近くの同じアプリの人と%@を交換します"
+          }
+        }
+      }
+    },
+    "オンラインの AI が入力しました。確認して保存してください" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Filled in by online AI. Check the values and save."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "オンラインの AI が入力しました。確認して保存してください"
+          }
+        }
+      }
+    },
+    "オンラインの AI が書きました" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Written by online AI"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "オンラインの AI が書きました"
+          }
+        }
+      }
+    },
+    "オンラインの AI で処理し、結果を入力欄に入れます" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Processes with online AI and fills in the result"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "オンラインの AI で処理し、結果を入力欄に入れます"
           }
         }
       }
@@ -2296,6 +3010,40 @@
         }
       }
     },
+    "チェックする" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Check"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "チェックする"
+          }
+        }
+      }
+    },
+    "チェックを外す" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Uncheck"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "チェックを外す"
+          }
+        }
+      }
+    },
     "チェック済み" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -2636,6 +3384,23 @@
         }
       }
     },
+    "リクエスト(%lld)" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Requests (%lld)"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "リクエスト(%lld)"
+          }
+        }
+      }
+    },
     "リセット" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -2700,6 +3465,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "一時停止"
+          }
+        }
+      }
+    },
+    "一時停止中" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Paused"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "一時停止中"
           }
         }
       }
@@ -3023,6 +3805,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "位置情報を取得できませんでした(%@)"
+          }
+        }
+      }
+    },
+    "低下" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Dropping"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "低下"
           }
         }
       }
@@ -3384,6 +4183,57 @@
         }
       }
     },
+    "先に入力してください" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Enter something first"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "先に入力してください"
+          }
+        }
+      }
+    },
+    "先に写真を撮るか選んでください" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Take or choose a photo first"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "先に写真を撮るか選んでください"
+          }
+        }
+      }
+    },
+    "先に記録を追加してください" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Add a record first"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "先に記録を追加してください"
+          }
+        }
+      }
+    },
     "先の回戦の結果を取り消してから変えてください" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -3414,6 +4264,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "入力してください"
+          }
+        }
+      }
+    },
+    "入力欄にも入れました。確認して保存してください" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Also filled in the field. Check it and save."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "入力欄にも入れました。確認して保存してください"
           }
         }
       }
@@ -3571,6 +4438,74 @@
         }
       }
     },
+    "再生" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Play"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "再生"
+          }
+        }
+      }
+    },
+    "再生待ち" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Up Next"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "再生待ち"
+          }
+        }
+      }
+    },
+    "再生待ちに追加" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Add to Up Next"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "再生待ちに追加"
+          }
+        }
+      }
+    },
+    "再生待ちは空です" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Up Next is empty"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "再生待ちは空です"
+          }
+        }
+      }
+    },
     "再試行" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -3669,6 +4604,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "写真から選ぶ"
+          }
+        }
+      }
+    },
+    "写真が大きすぎます(10 MB まで)。撮り直すか選び直してください" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The photo is too large (up to 10 MB). Retake it or choose another one"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "写真が大きすぎます(10 MB まで)。撮り直すか選び直してください"
           }
         }
       }
@@ -3775,6 +4727,40 @@
         }
       }
     },
+    "写真を読み込めませんでした。撮り直してからお試しください" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Couldn't load the photo. Retake it and try again"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "写真を読み込めませんでした。撮り直してからお試しください"
+          }
+        }
+      }
+    },
+    "写真を読むのはオンラインの AI だけです(この版では使えません)" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Only online AI can read photos (not available in this version)"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "写真を読むのはオンラインの AI だけです(この版では使えません)"
+          }
+        }
+      }
+    },
     "写真を選ぶ" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -3877,6 +4863,23 @@
         }
       }
     },
+    "分類の候補がありません" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No categories to choose from"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "分類の候補がありません"
+          }
+        }
+      }
+    },
     "別の記録が進行中です" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -3924,6 +4927,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "前のページ"
+          }
+        }
+      }
+    },
+    "前の曲" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Previous song"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "前の曲"
           }
         }
       }
@@ -4217,6 +5237,74 @@
         }
       }
     },
+    "同じ曲がもう入っています" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "That song is already in the queue"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "同じ曲がもう入っています"
+          }
+        }
+      }
+    },
+    "同意してはじめる" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Agree and start"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "同意してはじめる"
+          }
+        }
+      }
+    },
+    "地図を動かして、ピンの位置で決められます" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Move the map to choose the spot under the pin"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "地図を動かして、ピンの位置で決められます"
+          }
+        }
+      }
+    },
+    "場所を変える" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Change place"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "場所を変える"
+          }
+        }
+      }
+    },
     "場所を登録した行き先がまだありません" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -4230,6 +5318,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "場所を登録した行き先がまだありません"
+          }
+        }
+      }
+    },
+    "場所を選ぶ" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Choose a place"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "場所を選ぶ"
           }
         }
       }
@@ -4281,6 +5386,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "実機のみ"
+          }
+        }
+      }
+    },
+    "店名・地名・住所で検索" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Search by name, place, or address"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "店名・地名・住所で検索"
           }
         }
       }
@@ -4591,6 +5713,23 @@
         }
       }
     },
+    "操作できませんでした" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Couldn't do that"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "操作できませんでした"
+          }
+        }
+      }
+    },
     "文字にしています…" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -4655,6 +5794,125 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "文字起こしをやめました"
+          }
+        }
+      }
+    },
+    "曲を入れられませんでした" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Couldn't add the song"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "曲を入れられませんでした"
+          }
+        }
+      }
+    },
+    "曲を再生するには Apple Music の契約が必要です" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Playing songs needs an Apple Music subscription"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "曲を再生するには Apple Music の契約が必要です"
+          }
+        }
+      }
+    },
+    "曲を探す" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Find songs"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "曲を探す"
+          }
+        }
+      }
+    },
+    "曲名" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Song title"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "曲名"
+          }
+        }
+      }
+    },
+    "曲名でリクエスト" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Request by title"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "曲名でリクエスト"
+          }
+        }
+      }
+    },
+    "曲名のないリクエストは受け取れません" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Requests without a song title can't be accepted"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "曲名のないリクエストは受け取れません"
+          }
+        }
+      }
+    },
+    "曲名・アーティスト" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Song or artist"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "曲名・アーティスト"
           }
         }
       }
@@ -4846,6 +6104,23 @@
         }
       }
     },
+    "検索を消す" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Clear search"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "検索を消す"
+          }
+        }
+      }
+    },
     "横向き" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -4876,6 +6151,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "次のページ"
+          }
+        }
+      }
+    },
+    "次の曲" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Next song"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "次の曲"
           }
         }
       }
@@ -4948,6 +6240,23 @@
         }
       }
     },
+    "気圧が大きく下がります" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Air pressure will drop sharply"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "気圧が大きく下がります"
+          }
+        }
+      }
+    },
     "水平です" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -5012,6 +6321,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "添付する写真"
+          }
+        }
+      }
+    },
+    "測定中" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Measuring"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "測定中"
           }
         }
       }
@@ -5186,6 +6512,23 @@
         }
       }
     },
+    "画面を閉じる・アプリを裏に回すと止まります(iOS の制約)" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Stops when you close this screen or leave the app (iOS limitation)"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "画面を閉じる・アプリを裏に回すと止まります(iOS の制約)"
+          }
+        }
+      }
+    },
     "目標 %@ 歩の %lld%%" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -5305,6 +6648,23 @@
         }
       }
     },
+    "相手の端末で曲を再生待ちに入れられませんでした" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Couldn't add the song to Up Next on their device"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "相手の端末で曲を再生待ちに入れられませんでした"
+          }
+        }
+      }
+    },
     "破棄" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -5390,6 +6750,23 @@
         }
       }
     },
+    "端末内の AI が入力しました。確認して保存してください" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Filled in by on-device AI. Check the values and save."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "端末内の AI が入力しました。確認して保存してください"
+          }
+        }
+      }
+    },
     "端末内の AI が読み取りました。確認して保存してください" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -5420,6 +6797,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "端末内の AI で写真を読み取り、入力欄に入れます"
+          }
+        }
+      }
+    },
+    "端末内の AI で処理し、結果を入力欄に入れます" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Processes with on-device AI and fills in the result"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "端末内の AI で処理し、結果を入力欄に入れます"
           }
         }
       }
@@ -6002,6 +7396,23 @@
         }
       }
     },
+    "設定 > Apple Intelligence と Siri でオンにしてください" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Turn it on in Settings > Apple Intelligence & Siri"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "設定 > Apple Intelligence と Siri でオンにしてください"
+          }
+        }
+      }
+    },
     "設定を開く" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -6291,6 +7702,74 @@
         }
       }
     },
+    "近くの人にリクエスト" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Request from someone nearby"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "近くの人にリクエスト"
+          }
+        }
+      }
+    },
+    "近くの人に送る" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Send to someone nearby"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "近くの人に送る"
+          }
+        }
+      }
+    },
+    "近くの人を探しています" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Looking for people nearby"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "近くの人を探しています"
+          }
+        }
+      }
+    },
+    "近くの友だちが同じアプリから曲をリクエストできます(届いたら「追加」で再生待ちへ)" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Friends nearby can request songs from the same app (tap “Add” to put them in Up Next)"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "近くの友だちが同じアプリから曲をリクエストできます(届いたら「追加」で再生待ちへ)"
+          }
+        }
+      }
+    },
     "近くの場所" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -6304,6 +7783,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "近くの場所"
+          }
+        }
+      }
+    },
+    "近くの端末を探して %lld 件を送ります" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Finds a nearby device and sends %lld records"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "近くの端末を探して %lld 件を送ります"
           }
         }
       }
@@ -6423,6 +7919,40 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "送りました"
+          }
+        }
+      }
+    },
+    "送る記録がありません" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No records to send"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "送る記録がありません"
+          }
+        }
+      }
+    },
+    "送る項目がありません" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No fields to send"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "送る項目がありません"
           }
         }
       }
@@ -6767,6 +8297,23 @@
         }
       }
     },
+    "長い文章はオンラインの AI だけで書けます(この版では使えません)" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Only online AI can write long text (not available in this version)"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "長い文章はオンラインの AI だけで書けます(この版では使えません)"
+          }
+        }
+      }
+    },
     "長すぎて QR コードにできません" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -6933,6 +8480,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "音声案内をオンにする"
+          }
+        }
+      }
+    },
+    "音楽" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Music"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "音楽"
           }
         }
       }

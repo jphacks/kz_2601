@@ -93,7 +93,7 @@ public struct AppDSL: Decodable, Sendable {
     public static let fallback: AppDSL = {
         let json = """
         {"schemaVersion":1,"app":{"name":"Tailor It","voiceEntry":"none"},"initialScreen":"home","entities":[],
-         "screens":[{"id":"home","title":"Tailor It","components":[{"type":"text","text":"DSL を読み込めませんでした"}]}]}
+         "screens":[{"id":"home","title":"Tailor It","components":[{"type":"text","text":"\(L("DSL を読み込めませんでした"))"}]}]}
         """
         return try! JSONDecoder().decode(AppDSL.self, from: Data(json.utf8))
     }()

@@ -260,7 +260,7 @@ struct MenuSelect: View {
         } label: {
             HStack(spacing: RenderTheme.Spacing.sm + 2) {
                 InputIcon(name: icon)
-                Text(current ?? "選択してください")
+                Text(current ?? L("選択してください"))
                     .font(RenderTheme.Fonts.inputValue)
                     .foregroundStyle(current == nil || selection.isEmpty ? .secondary : .primary)
                     .lineLimit(1)

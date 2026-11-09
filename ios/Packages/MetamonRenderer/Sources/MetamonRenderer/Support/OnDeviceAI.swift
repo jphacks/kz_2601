@@ -27,7 +27,7 @@ enum AIAvailability: Equatable, Sendable {
         case other
     }
 
-    static let title = "この端末では AI を使えません"
+    static var title: String { L("この端末では AI を使えません") }
 
     var isAvailable: Bool { self == .available }
 
@@ -35,11 +35,11 @@ enum AIAvailability: Equatable, Sendable {
     var message: String? {
         guard case .unavailable(let reason) = self else { return nil }
         switch reason {
-        case .deviceNotEligible: return "Apple Intelligence に対応していない端末です"
-        case .appleIntelligenceNotEnabled: return "設定 > Apple Intelligence と Siri でオンにしてください"
-        case .modelNotReady: return "AI モデルを準備中です。しばらくしてから再度お試しください"
-        case .osTooOld: return "iOS 26 以降が必要です"
-        case .other: return "Apple Intelligence を利用できません"
+        case .deviceNotEligible: return L("Apple Intelligence に対応していない端末です")
+        case .appleIntelligenceNotEnabled: return L("設定 > Apple Intelligence と Siri でオンにしてください")
+        case .modelNotReady: return L("AI モデルを準備中です。しばらくしてから再度お試しください")
+        case .osTooOld: return L("iOS 26 以降が必要です")
+        case .other: return L("Apple Intelligence を利用できません")
         }
     }
 
@@ -101,6 +101,8 @@ enum AIRequestBuilder {
     static let maxInputCharacters = 3000
     /// entity 入力の既定件数。
     static let defaultLimit = 20
+    /// entity 入力の件数の上限(DSL schema の aiButton.limit maximum)。
+    static let maxLimit = 50
 
     enum BuildError: LocalizedError, Equatable {
         case unknownTask
@@ -109,9 +111,9 @@ enum AIRequestBuilder {
 
         var errorDescription: String? {
             switch self {
-            case .unknownTask: "この AI ボタンの設定が正しくありません"
-            case .emptyInput: "先に入力してください"
-            case .noOptions: "分類の候補がありません"
+            case .unknownTask: L("この AI ボタンの設定が正しくありません")
+            case .emptyInput: L("先に入力してください")
+            case .noOptions: L("分類の候補がありません")
             }
         }
     }
@@ -163,7 +165,7 @@ enum AIRequestBuilder {
                           sourceEntity: Entity?, records: [Record]) -> String {
         if let source = sourceEntity {
             let recent = records.sorted { ($0.updatedAt ?? $0.createdAt ?? "") > ($1.updatedAt ?? $1.createdAt ?? "") }
-                .prefix(Swift.max(c.limit ?? defaultLimit, 1))
+                .prefix(Swift.min(Swift.max(c.limit ?? defaultLimit, 1), maxLimit))
             return recent.map { r in
                 "- " + describe(source.storedFields.filter { $0.id != c.output }, value: { r.data[$0] ?? .null }, separator: " / ")
             }.joined(separator: "\n")
@@ -211,8 +213,8 @@ enum OnDeviceAIError: LocalizedError {
     var errorDescription: String? {
         switch self {
         case .unavailable(let a): a.message ?? AIAvailability.title
-        case .invalidResponse: "AI の答えを読み取れませんでした。もう一度お試しください"
-        case .failed(let detail, _): "AI の処理に失敗しました(\(detail))"
+        case .invalidResponse: L("AI の答えを読み取れませんでした。もう一度お試しください")
+        case .failed(let detail, _): L("AI の処理に失敗しました(\(detail))")
         }
     }
 

@@ -20,6 +20,9 @@ final class AiButtonTests: XCTestCase {
     // MARK: 可用性
 
     func testUnavailableReasonsHaveMessages() {
+        let savedLanguage = LanguagePreference.shared.setting
+        LanguagePreference.shared.setting = .ja // 文言は日本語で確かめる
+        defer { LanguagePreference.shared.setting = savedLanguage }
         XCTAssertTrue(AIAvailability.available.isAvailable)
         XCTAssertNil(AIAvailability.available.message)
         let reasons: [AIAvailability.Reason] = [.deviceNotEligible, .appleIntelligenceNotEnabled, .modelNotReady, .osTooOld, .other]

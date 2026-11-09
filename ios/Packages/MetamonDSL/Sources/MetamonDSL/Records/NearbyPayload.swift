@@ -107,14 +107,14 @@ public enum NearbyShare {
 
     /// 受け取れるか。同じ appId なら entity id が在れば OK。別アプリなら entity id と保存フィールド(id+型)の集合が一致する時だけ。
     public static func decide(_ header: Header, dsl: AppDSL, appId: String) -> Decision {
-        guard header.v <= version else { return .reject(reason: "相手のアプリが新しすぎるため受け取れません") }
+        guard header.v <= version else { return .reject(reason: L("相手のアプリが新しすぎるため受け取れません")) }
         if let song = header.song { return decideSong(song, dsl: dsl, sameApp: header.appId == appId) }
         guard let entity = dsl.entity(header.entityId) else {
-            return .reject(reason: "このアプリには「\(header.entityName)」がないため受け取れません")
+            return .reject(reason: L("このアプリには「\(header.entityName)」がないため受け取れません"))
         }
         if header.appId == appId { return .accept(entityId: entity.id, sameApp: true) }
         guard Set(signature(of: entity)) == Set(header.fields) else {
-            return .reject(reason: "「\(header.entityName)」の項目が違うため受け取れません(同じアプリを開いてください)")
+            return .reject(reason: L("「\(header.entityName)」の項目が違うため受け取れません(同じアプリを開いてください)"))
         }
         return .accept(entityId: entity.id, sameApp: false)
     }
@@ -156,8 +156,8 @@ public enum NearbyShare {
 
     /// 今のアプリが allowRequests の musicPlayer を使っている時だけ受け取る(同じアプリの別コピーでもよい)。
     static func decideSong(_ song: MusicSong, dsl: AppDSL, sameApp: Bool) -> Decision {
-        guard dsl.usesMusicRequests else { return .reject(reason: "このアプリは曲のリクエストを受け付けていません") }
-        guard MusicRequestRules.sanitize(song) != nil else { return .reject(reason: "曲名のないリクエストは受け取れません") }
+        guard dsl.usesMusicRequests else { return .reject(reason: L("このアプリは曲のリクエストを受け付けていません")) }
+        guard MusicRequestRules.sanitize(song) != nil else { return .reject(reason: L("曲名のないリクエストは受け取れません")) }
         return .accept(entityId: songEntityId, sameApp: sameApp)
     }
 

@@ -1,0 +1,550 @@
+{
+  "sourceLanguage" : "ja",
+  "strings" : {
+    "AI を一時的に止めています。しばらくしてからもう一度お試しください" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "AI is temporarily paused. Please try again later"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "AI を一時的に止めています。しばらくしてからもう一度お試しください"
+          }
+        }
+      }
+    },
+    "Apple から ID トークンを取得できませんでした" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Couldn't get an ID token from Apple"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Apple から ID トークンを取得できませんでした"
+          }
+        }
+      }
+    },
+    "Firebase が設定されていません(GoogleService-Info.plist を同期してください)" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Firebase isn't configured (sync GoogleService-Info.plist)"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Firebase が設定されていません(GoogleService-Info.plist を同期してください)"
+          }
+        }
+      }
+    },
+    "URL が不正です" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Invalid URL"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "URL が不正です"
+          }
+        }
+      }
+    },
+    "この Apple ID は、すでに別のアカウントで使われています" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "This Apple ID is already used by another account"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "この Apple ID は、すでに別のアカウントで使われています"
+          }
+        }
+      }
+    },
+    "この接続先では使えません" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Not available with this server"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "この接続先では使えません"
+          }
+        }
+      }
+    },
+    "この端末では音声モデルの準備ができるまで声で入力できません。文字で入力してください" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Voice input isn't available on this device until the speech model is ready. Please type instead"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "この端末では音声モデルの準備ができるまで声で入力できません。文字で入力してください"
+          }
+        }
+      }
+    },
+    "すでに Apple でサインインしています" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "You're already signed in with Apple"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "すでに Apple でサインインしています"
+          }
+        }
+      }
+    },
+    "もう一度 Apple でサインインしてください" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sign in with Apple again"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "もう一度 Apple でサインインしてください"
+          }
+        }
+      }
+    },
+    "もう一度サインインしてから削除してください" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sign in again, then delete"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "もう一度サインインしてから削除してください"
+          }
+        }
+      }
+    },
+    "オフライン" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Offline"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "オフライン"
+          }
+        }
+      }
+    },
+    "オフライン・未送信 %lld 件" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Offline, %lld unsent"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "オフライン・未送信 %lld 件"
+          }
+        }
+      }
+    },
+    "マイクから音声が届きませんでした(録音%.1f秒・0サンプル)。他のアプリの通話/録音を終了して再試行してください" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No audio came from the microphone (recorded %.1fs, 0 samples). End calls or recordings in other apps and try again"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "マイクから音声が届きませんでした(録音%.1f秒・0サンプル)。他のアプリの通話/録音を終了して再試行してください"
+          }
+        }
+      }
+    },
+    "マイクの権限がありません。設定アプリ > Tailor It でマイクを許可してください" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No microphone access. Allow the microphone in Settings > Tailor It"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "マイクの権限がありません。設定アプリ > Tailor It でマイクを許可してください"
+          }
+        }
+      }
+    },
+    "・" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : ", "
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "・"
+          }
+        }
+      }
+    },
+    "会話が長すぎて AI に送れませんでした。短くしてからお試しください" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The conversation is too long to send to AI. Shorten it and try again"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "会話が長すぎて AI に送れませんでした。短くしてからお試しください"
+          }
+        }
+      }
+    },
+    "使えるマイクが見つかりません(他のアプリが使用中か、入力ルートがありません)" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No usable microphone found (another app is using it, or there's no input route)"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "使えるマイクが見つかりません(他のアプリが使用中か、入力ルートがありません)"
+          }
+        }
+      }
+    },
+    "入力:%@" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Input: %@"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "入力:%@"
+          }
+        }
+      }
+    },
+    "写真を AI に見せる機能は、今は使えません" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Showing photos to AI isn't available right now"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "写真を AI に見せる機能は、今は使えません"
+          }
+        }
+      }
+    },
+    "写真を AI に送れませんでした。撮り直してからお試しください" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Couldn't send the photo to AI. Retake it and try again"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "写真を AI に送れませんでした。撮り直してからお試しください"
+          }
+        }
+      }
+    },
+    "最新" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Up to date"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "最新"
+          }
+        }
+      }
+    },
+    "未送信 %lld 件" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld unsent"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "未送信 %lld 件"
+          }
+        }
+      }
+    },
+    "材料の記録が多すぎます。記録を減らしてからお試しください" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Too many records to use. Reduce the records and try again"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "材料の記録が多すぎます。記録を減らしてからお試しください"
+          }
+        }
+      }
+    },
+    "無音" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Silent"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "無音"
+          }
+        }
+      }
+    },
+    "送信中(%lld 件)" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sending (%lld)"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "送信中(%lld 件)"
+          }
+        }
+      }
+    },
+    "録音%.1f秒" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Recorded %.1fs"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "録音%.1f秒"
+          }
+        }
+      }
+    },
+    "録音が短すぎました(%.1f秒)。タップしてから話し、話し終えてからもう一度タップしてください" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The recording was too short (%.1fs). Tap, speak, then tap again when you're done"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "録音が短すぎました(%.1f秒)。タップしてから話し、話し終えてからもう一度タップしてください"
+          }
+        }
+      }
+    },
+    "録音を開始できませんでした(オーディオセッション: %@)" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Couldn't start recording (audio session: %@)"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "録音を開始できませんでした(オーディオセッション: %@)"
+          }
+        }
+      }
+    },
+    "音声が小さすぎました(録音%.1f秒・音量%.0fdB)。マイクに向かって話してください" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The audio was too quiet (recorded %1$.1fs, level %2$.0fdB). Speak toward the microphone"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "音声が小さすぎました(録音%.1f秒・音量%.0fdB)。マイクに向かって話してください"
+          }
+        }
+      }
+    },
+    "音声モデルを準備中です(%@)。少し待ってからお試しください" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Preparing the speech model (%@). Wait a moment and try again"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "音声モデルを準備中です(%@)。少し待ってからお試しください"
+          }
+        }
+      }
+    },
+    "音声認識の許可がありません。音声モデルの準備ができるまでは、文字で入力してください" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No speech recognition permission. Type your input until the speech model is ready"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "音声認識の許可がありません。音声モデルの準備ができるまでは、文字で入力してください"
+          }
+        }
+      }
+    },
+    "音量%.0fdB" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Level %.0fdB"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "音量%.0fdB"
+          }
+        }
+      }
+    }
+  },
+  "version" : "1.0"
+}

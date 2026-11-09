@@ -429,6 +429,7 @@ func runCase(ctx context.Context, svc *ai.Service, store *appconfigclient.Memory
 		rec.ExpectMisses = append(rec.ExpectMisses, checkExport(c.Expect, app)...)
 		rec.ExpectMisses = append(rec.ExpectMisses, checkSensor(c.Expect, app, rec.Summary)...)
 		rec.ExpectMisses = append(rec.ExpectMisses, checkPhotoAI(c.Expect, app)...)
+		rec.ExpectMisses = append(rec.ExpectMisses, checkCountWhere(c.Expect, app)...)
 		if v, ok := c.Expect["noOmission"].(bool); ok && v && len(rec.Omissions) > 0 {
 			rec.ExpectMisses = append(rec.ExpectMisses, fmt.Sprintf("omissions=%v", rec.Omissions))
 		}
@@ -457,6 +458,8 @@ func runCase(ctx context.Context, svc *ai.Service, store *appconfigclient.Memory
 		rec.ExpectMisses = append(rec.ExpectMisses, checkAIChatInput(c.Expect, app)...)
 		// #507: matching.go
 		rec.ExpectMisses = append(rec.ExpectMisses, checkMatching(c.Expect, app)...)
+		// rowWindow: row_window.go
+		rec.ExpectMisses = append(rec.ExpectMisses, checkRowWindow(c.Expect, app)...)
 		rec.ExpectMisses = append(rec.ExpectMisses, checkRepeat(c.Expect, app)...)      // #266: repeat.go
 		rec.ExpectMisses = append(rec.ExpectMisses, checkSingle(c.Expect, app)...)      // #267: single.go
 		rec.ExpectMisses = append(rec.ExpectMisses, checkAddressed(c.Expect, app)...)   // #271: addressed.go
@@ -467,6 +470,7 @@ func runCase(ctx context.Context, svc *ai.Service, store *appconfigclient.Memory
 		rec.ExpectMisses = append(rec.ExpectMisses, checkServerRules(c.Expect, app)...) // #343: server_rules.go
 		rec.ExpectMisses = append(rec.ExpectMisses, checkAlarm(c.Expect, app)...)       // alarm.go
 		rec.ExpectMisses = append(rec.ExpectMisses, checkAddMinutes(c.Expect, app)...)  // add_minutes.go
+		rec.ExpectMisses = append(rec.ExpectMisses, checkUnique(c.Expect, app)...)      // unique.go
 	}
 	created[c.ID] = res.DSL // edits too, so an edit can build on an earlier edit (#229)
 	log.Printf("[%s] ok attempts=%d fallback=%v claude=%dms first=%dms out=%d chars=%d tabs=%d screens=%d area=%.2f misses=%v summary=%q",

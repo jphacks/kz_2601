@@ -159,6 +159,8 @@ type options struct {
 	storeDevices bool
 	// sender replaces h.sender (e.g. an apns.Client on a fake APNs).
 	sender notify.Sender
+	// feeds: what saveFeed reads (feed_test.go); nil = none.
+	feeds runner.FeedGetter
 }
 
 func stores(t *testing.T, opts options, f func(t *testing.T, h *harness)) {
@@ -205,6 +207,9 @@ func newHarness(t *testing.T, st runnerStore, sfx string, opts options) *harness
 	}
 	if opts.sender != nil {
 		cfg.Sender = opts.sender
+	}
+	if opts.feeds != nil {
+		cfg.Feeds = opts.feeds
 	}
 	r, err := runner.New(cfg)
 	if err != nil {

@@ -38,7 +38,7 @@ public enum NearbyPassby {
         /// passby の nearbyShare なら設定を返す。
         public init?(_ c: Component) {
             guard c.type == .nearbyShare, c.mode == "passby", let entity = c.entity else { return nil }
-            self.init(componentId: c.id, entityId: entity, label: c.label ?? "すれ違い通信", fields: c.fields ?? [],
+            self.init(componentId: c.id, entityId: entity, label: c.label ?? L("すれ違い通信"), fields: c.fields ?? [],
                       limit: c.limit ?? NearbyPassby.defaultLimit, distance: c.distance ?? false)
         }
     }
@@ -251,11 +251,11 @@ public enum NearbyPassby {
     public static func directionText(azimuth: Float) -> String {
         let deg = azimuth * 180 / .pi
         switch deg {
-        case -20...20: return "正面"
-        case 20...70: return "右前"
-        case -70 ... -20: return "左前"
-        case 70...: return "右"
-        default: return "左"
+        case -20...20: return L("正面")
+        case 20...70: return L("右前")
+        case -70 ... -20: return L("左前")
+        case 70...: return L("右")
+        default: return L("左")
         }
     }
 

@@ -135,3 +135,50 @@ func TestQueueGiveUp(t *testing.T) {
 		}
 	})
 }
+
+// Deferred claims do not count toward MaxAttempts, and the retry delay
+// follows the failures only.
+func TestQueueDeferNotCounted(t *testing.T) {
+	stores(t, func(t *testing.T, st queueStore, sfx string) {
+		ctx := t.Context()
+		env := "d" + sfx
+		if _, _, err := st.CreateRecordEmit(ctx, store.PublicRecords("D"+sfx, "e"), store.Record{ID: "a", Data: map[string]any{}}, emit(env)); err != nil {
+			t.Fatal(err)
+		}
+		now := time.Now().Add(time.Second)
+		q := New(st, env)
+		q.Now = func() time.Time { return now }
+		claim := func() store.OutboxEvent {
+			t.Helper()
+			got, err := q.Claim(ctx, 10)
+			if err != nil || len(got) != 1 {
+				t.Fatalf("claim: %+v %v", got, err)
+			}
+			return got[0]
+		}
+		for range 5 { // more deferrals than MaxAttempts
+			ev := claim()
+			if q.Exhausted(ev) {
+				t.Fatalf("exhausted by deferrals: %+v", ev)
+			}
+			if err := q.Defer(ctx, ev, now.Add(time.Minute), "busy", nil); err != nil {
+				t.Fatal(err)
+			}
+			now = now.Add(time.Minute)
+		}
+		ev := claim()
+		if ev.Attempts != 6 || ev.Deferrals != 5 || Failures(ev) != 1 {
+			t.Fatalf("after deferrals: %+v", ev)
+		}
+		if err := q.Retry(ctx, ev, "x", nil); err != nil {
+			t.Fatal(err)
+		}
+		if got, _ := q.Claim(ctx, 10); len(got) != 0 {
+			t.Fatalf("retry delay is the first one's: claimed at once %+v", got)
+		}
+		now = now.Add(q.Delay(1) + time.Second)
+		if ev := claim(); Failures(ev) != 2 || q.Exhausted(ev) {
+			t.Fatalf("second failure: %+v", ev)
+		}
+	})
+}

@@ -11,10 +11,10 @@ public enum ShareTarget: String, Sendable, CaseIterable {
     /// ボタンの既定ラベル(`label` 省略時)。
     public var defaultLabel: String {
         switch self {
-        case .any: "共有"
-        case .line: "LINE で送る"
-        case .slack: "Slack に送る"
-        case .discord: "Discord に送る"
+        case .any: L("共有")
+        case .line: L("LINE で送る")
+        case .slack: L("Slack に送る")
+        case .discord: L("Discord に送る")
         }
     }
 
