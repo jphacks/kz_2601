@@ -58,7 +58,7 @@
 | 国立国会図書館サーチの API | 書誌は CC BY 4.0 で使えるが、応答が XML(OpenSearch / SRU)で形が大きい。openBD が同じ書誌を JSON で返すので先に openBD にした。openBD v1 が終わる時の第一の代わり |
 | 書店の API(楽天ブックスなど) | 鍵(アプリ ID)が要る |
 
-出どころを増やす・替える時: `backend/internal/books/books.go` の `DefaultEndpoint` と解析を足し、**規約(目的の制限・再配布・出典)を確かめてこの表に URL を書いてから**。追加・切り替えは人の判断(#339)。
+出どころを増やす・替える時: `backend/internal/books/books.go` の `DefaultEndpoint` と解析を足し、**規約(目的の制限・再配布・出典)を確かめてこの表に URL を書いてから**。表に無い URL・https でない URL をコードに書くと `TestEndpointMatchesDoc`(`internal/books/allowlist_doc_test.go`)が落ちる。追加・切り替えは人の判断(#339)。
 
 ### 既定で止めている理由
 

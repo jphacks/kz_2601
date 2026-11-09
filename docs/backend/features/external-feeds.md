@@ -78,7 +78,7 @@ arxiv・diet の表示: どちらも**一覧(メタデータ)とリンクだけ*
 
 加工の扱い: 公共データ利用規約は、編集・加工したら加工したことを書くよう求める。警報は気象庁のコードを名前に置き換え、種類と状態ごとに地域をまとめて出す(加工)。気圧は 1 時間ごとの値を 6 時間の行にまとめ、低下の印を足す(加工)ので、出典の license に「CC BY 4.0・6 時間ごとにまとめて加工」と書いた。天気は気象庁の天気のコードを「晴れ / くもり / 雨 / 雪」と絵に置き換えて出すので、出典の行は「出典: 気象庁ホームページ(公共データ利用規約(第1.0版))」とし、加工の表記の要否と書き方は**人が確かめる**(下の「まだ決めていないこと」)。
 
-許可リストを増やす時: `backend/internal/feeds/client.go` の `DefaultEndpoints` と `backend/pkg/dsl/feed.go` の `RSSFeeds` に 1 行ずつ足す(テストが両方の一致を見る)。arXiv の分野は `backend/pkg/dsl/feed_arxiv_diet.go` の `ArxivCategories`(スキーマの `feedId` の説明と AI の規則 `feed_arxiv_diet_rules.go` にも書く。テストが規則との一致を見る)。**規約(再配布・商用・出典)を確かめて、この表に URL を書いてから**。追加は人の判断(#339)。
+許可リストを増やす時: `backend/internal/feeds/client.go` の `DefaultEndpoints` と `backend/pkg/dsl/feed.go` の `RSSFeeds` に 1 行ずつ足す(テストが両方の一致を見る)。arXiv の分野は `backend/pkg/dsl/feed_arxiv_diet.go` の `ArxivCategories`(スキーマの `feedId` の説明と AI の規則 `feed_arxiv_diet_rules.go` にも書く。テストが規則との一致を見る)。**規約(再配布・商用・出典)を確かめて、この表に URL を書いてから**。表に無い URL・https でない URL・「外したもの」の URL がコードの許可リストにあると、`TestAllowlistMatchesDoc`(`internal/feeds/allowlist_doc_test.go`)が落ちる。追加は人の判断(#339)。
 
 ISBN から本の情報を引く `lookupBook` も同じ作り(専用のクライアント・固定の URL・上限・キャッシュ・止める)で、出どころは openBD だけ: [book-lookup.md](book-lookup.md)。
 
