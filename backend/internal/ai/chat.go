@@ -339,7 +339,7 @@ func (s *Service) Chat(ctx context.Context, req ChatRequest) (out *ChatResult, e
 	if req.AppID == "" {
 		return nil, &Error{Status: http.StatusBadRequest, Code: httpx.CodeBadRequest, Message: "appId is required"}
 	}
-	ctx = withRestriction(ctx, NewClientRestriction(req.AllowedComponents, req.DisabledFeatures, req.SupportedFeatures))
+	ctx = withRestriction(ctx, s.clientRestriction(req.AllowedComponents, req.DisabledFeatures, req.SupportedFeatures))
 	incoming, err := normalizeMessages(req.Messages)
 	if err != nil {
 		return nil, err

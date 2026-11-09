@@ -72,9 +72,12 @@ type OutboxEvent struct {
 	// (the runner removes the field, outbox_queue.go).
 	AvailableAt time.Time `json:"availableAt"`
 	Attempts    int       `json:"attempts"`
-	Status      string    `json:"status"`
-	CreatedAt   time.Time `json:"createdAt"`
-	ExpireAt    time.Time `json:"expireAt"`
+	// Deferrals: claims put back without counting as a failure (DeferOutbox);
+	// Attempts - Deferrals is what counts toward giving up.
+	Deferrals int       `json:"deferrals,omitempty"`
+	Status    string    `json:"status"`
+	CreatedAt time.Time `json:"createdAt"`
+	ExpireAt  time.Time `json:"expireAt"`
 
 	// Set by the runner (outbox_queue.go).
 	Outcome      string            `json:"outcome,omitempty"`

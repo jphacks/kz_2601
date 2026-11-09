@@ -285,10 +285,11 @@ final class AppRuntime: DSLRuntime {
     /// `openUrl` で外部に渡す処理(テストで差し替える)。
     @ObservationIgnored var openExternalURL: @MainActor (URL) async -> Bool = { await UIApplication.shared.open($0) }
 
-    init(document: AppDocument, services: Services) {
+    /// - Parameter recordSync: テストで到達性を固定したい時に渡す(既定は `RecordSyncFactory`)
+    init(document: AppDocument, services: Services, recordSync injected: RecordSyncEngine? = nil) {
         self.document = document
         self.services = services
-        self.recordSync = RecordSyncFactory.make(client: services.appConfig)
+        self.recordSync = injected ?? RecordSyncFactory.make(client: services.appConfig)
         self.deferredMorph = DeferredSend(connectivity: recordSync.connectivity)
         self.selectedTab = document.dsl.initialTab
         recordSync.onEvent = { [weak self] event in self?.handle(event) }
@@ -436,9 +437,15 @@ final class AppRuntime: DSLRuntime {
     @ObservationIgnored private var savingForms: Set<ObjectIdentifier> = []
     /// 最後に書き込んだフォーム。送った後にサーバーが断ったら「保存しました」を取り消す(M10 × #317 / #346 / #321)
     @ObservationIgnored var lastSavedForm: SavedForm?
+    #if !APP_STORE_REVIEW
+    /// roleField の無い aiChat の対(仮 id → 相方)。片方が断られたら相方も消す(AppRuntime+AIChat.swift)
+    @ObservationIgnored var aiChatPartners: [String: AIChatPartner] = [:]
+    #endif
     struct SavedForm {
         let appId: String
         let entity: String
+        /// 書いた行の id(新規は仮 id `local-…`)。断られた操作の `SyncEvent` の recordId と一致した時だけ取り消す
+        let recordId: String
         weak var form: FormDraft?
     }
 
@@ -1057,11 +1064,17 @@ final class AppRuntime: DSLRuntime {
 
     /// `locationTracker`(#168)の位置 1 点。フォームを通さず 1 件足す(saveRecord と同じくローカル DB に即反映・送信は同期キュー)。
     func createRecord(entity: String, data: [String: JSONValue]) async -> Bool {
-        guard dsl.entity(entity) != nil else { return false }
-        records[entity] = await recordSync.save(appId: document.appId, entity: entity, recordId: nil, data: data, author: postAuthor(for: entity))
+        await createRecordId(entity: entity, data: data) != nil
+    }
+
+    /// `createRecord` と同じ。作った行の id(仮 id `local-…`)を返す。保存できなければ nil。
+    func createRecordId(entity: String, data: [String: JSONValue]) async -> String? {
+        guard dsl.entity(entity) != nil else { return nil }
+        let written = await recordSync.write(appId: document.appId, entity: entity, recordId: nil, data: data, author: postAuthor(for: entity))
+        records[entity] = written.records
         WidgetSnapshotWriter.write(dsl: dsl, records: records)
         await purgeExpired(entity) // #482
-        return true
+        return written.recordId
     }
 
     func load(entities: Set<String>, force: Bool = false) async {
@@ -1130,6 +1143,9 @@ final class AppRuntime: DSLRuntime {
     private func handle(_ event: SyncEvent) {
         Task { @MainActor in
             revokeSaveFeedback(for: event)
+            #if !APP_STORE_REVIEW
+            await revertAIChatPartner(for: event)
+            #endif
             switch event {
             case .sent(let appId, let entity):
                 PlanUsageStore.shared.invalidateApp(appId) // #317 記録・写真の量を読み直す
@@ -1142,11 +1158,11 @@ final class AppRuntime: DSLRuntime {
                 guard appId == document.appId else { return }
                 toast = L10n.tr("他の端末で変更されていたため、サーバーの内容に合わせました")
                 await refresh(entity)
-            case .forbidden(let appId, let entity):
+            case .forbidden(let appId, let entity, _):
                 guard appId == document.appId else { return }
                 notifyReadOnly(entity: entity)
                 await refresh(entity) // 楽観的に書いた値をサーバーの内容に戻す
-            case .rejected(let appId, let entity, let message, let field):
+            case .rejected(let appId, let entity, let message, let field, _):
                 guard appId == document.appId else { return }
                 toast = rejectedToast(entity: entity, field: field, message: message)
                 let cached = await recordSync.cached(appId: appId, entity: entity)
@@ -1157,34 +1173,34 @@ final class AppRuntime: DSLRuntime {
                 toast = L10n.tr("送信に失敗しました(未送信 \(pending) 件)。接続を確認してください")
             case .drained:
                 break
-            case .notMember(let appId, let entity):
+            case .notMember(let appId, let entity, _):
                 guard appId == document.appId else { return }
                 toast = SharedAccessDenial.notMember.message // 送信待ちには残さず、楽観的に出した分を戻す
                 let cached = await recordSync.cached(appId: appId, entity: entity)
                 guard appId == document.appId else { return } // 読む間に別のアプリへ切り替わった
                 records[entity] = cached
                 WidgetSnapshotWriter.write(dsl: dsl, records: records)
-            case .denied(let appId, let entity, let denial):
+            case .denied(let appId, let entity, let denial, _):
                 guard appId == document.appId else { return }
                 toast = denialMessage(denial, entity: entity) // #272 #273
                 await refresh(entity) // 楽観的に書いた値をサーバーの内容に戻す
-            case .proRequired(let appId, let entity, let pro):
+            case .proRequired(let appId, let entity, let pro, _):
                 guard appId == document.appId else { return }
                 presentProRequiredWrite(pro) // #316: 書いた分は戻した。作成者なら課金画面、参加者なら案内
                 records[entity] = await recordSync.cached(appId: appId, entity: entity)
                 WidgetSnapshotWriter.write(dsl: dsl, records: records)
-            case .planLimit(let appId, let entity, let limit):
+            case .planLimit(let appId, let entity, let limit, _):
                 guard appId == document.appId else { return }
                 // #317: 書いた分は戻した。課金画面は自動で開かない(作成者はカードの「Pro にする」から・参加者には出さない)
                 withAnimation(.easeInOut(duration: 0.3)) { errorCard = ErrorPresentation(kind: .planLimit(limit), transcript: "") }
                 records[entity] = await recordSync.cached(appId: appId, entity: entity)
                 WidgetSnapshotWriter.write(dsl: dsl, records: records)
-            case .appStopped(let appId, let entity):
+            case .appStopped(let appId, let entity, _):
                 guard appId == document.appId else { return }
                 toast = ErrorCopy.appStoppedBody // #346
                 records[entity] = await recordSync.cached(appId: appId, entity: entity)
                 WidgetSnapshotWriter.write(dsl: dsl, records: records)
-            case .textNotAllowed(let appId, let entity, let field):
+            case .textNotAllowed(let appId, let entity, let field, _):
                 guard appId == document.appId else { return }
                 toast = textNotAllowedToast(entity: entity, field: field) // #321
                 records[entity] = await recordSync.cached(appId: appId, entity: entity)
@@ -1193,21 +1209,24 @@ final class AppRuntime: DSLRuntime {
         }
     }
 
-    /// サーバーが書き込みを断った(破棄された)イベントなら、その entity に最後に保存したフォームの「保存しました」を取り消す。
+    /// サーバーが書き込みを断った(破棄された)イベントが、最後に保存したフォームの操作そのものなら「保存しました」を取り消す。
     /// 保存は送信待ちに積んだ時点で数えるので、断られた分はここで戻す(画面を閉じた後なら toast・カードだけが残る)。
+    /// 同じ entity の前に積んだ別の記録が断られても、今のフォームの表示は変えない(recordId で見分ける)。
     func revokeSaveFeedback(for event: SyncEvent) {
-        guard let (appId, entity) = Self.refusedWrite(event),
-              let saved = lastSavedForm, saved.appId == appId, saved.entity == entity else { return }
+        guard let refused = Self.refusedWrite(event), let recordId = refused.recordId,
+              let saved = lastSavedForm, saved.appId == refused.appId, saved.entity == refused.entity,
+              saved.recordId == recordId else { return }
         saved.form?.markSaveRefused()
         lastSavedForm = nil
     }
 
-    static func refusedWrite(_ event: SyncEvent) -> (appId: String, entity: String)? {
+    static func refusedWrite(_ event: SyncEvent) -> (appId: String, entity: String, recordId: String?)? {
         switch event {
-        case .forbidden(let appId, let entity), .rejected(let appId, let entity, _, _), .notMember(let appId, let entity),
-             .denied(let appId, let entity, _), .proRequired(let appId, let entity, _), .planLimit(let appId, let entity, _),
-             .appStopped(let appId, let entity), .textNotAllowed(let appId, let entity, _):
-            return (appId, entity)
+        case .forbidden(let appId, let entity, let id), .rejected(let appId, let entity, _, _, let id),
+             .notMember(let appId, let entity, let id), .denied(let appId, let entity, _, let id),
+             .proRequired(let appId, let entity, _, let id), .planLimit(let appId, let entity, _, let id),
+             .appStopped(let appId, let entity, let id), .textNotAllowed(let appId, let entity, _, let id):
+            return (appId, entity, id)
         case .sent, .conflict, .paused, .drained:
             return nil
         }
@@ -1305,10 +1324,11 @@ final class AppRuntime: DSLRuntime {
             // 楽観的 UI: ローカル DB に即反映して画面を進める。appconfig への送信は recordSync のキューが行う
             let payload = form.payload
             let isNew = recordId == nil
-            records[entity] = await recordSync.save(appId: document.appId, entity: entity, recordId: recordId, data: payload,
-                                                    author: postAuthor(for: entity))
+            let written = await recordSync.write(appId: document.appId, entity: entity, recordId: recordId, data: payload,
+                                                 author: postAuthor(for: entity))
+            records[entity] = written.records
             form.markSaved(queuedOffline: !recordSync.isOnline) // 閉じても破棄の確認を出さない・オフラインなら保存バーが送信待ちと出す(M10)
-            lastSavedForm = SavedForm(appId: document.appId, entity: entity, form: form)
+            lastSavedForm = SavedForm(appId: document.appId, entity: entity, recordId: written.recordId, form: form)
             WidgetSnapshotWriter.write(dsl: dsl, records: records)
             #if !APP_STORE_REVIEW
             writeHealthFields(entity: entity, data: payload, isNew: isNew) // Field.health(#167)

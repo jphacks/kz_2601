@@ -2,6 +2,7 @@ package runner_test
 
 import (
 	"fmt"
+	"math/rand/v2"
 	"net/http"
 	"slices"
 	"strings"
@@ -11,7 +12,12 @@ import (
 	"github.com/jphacks/kz_2601/backend/internal/runner/quota"
 )
 
-func hexToken(n int) string { return fmt.Sprintf("%064x", n) }
+// tokenSalt keeps this package's tokens apart from the other packages' that
+// share the emulator in parallel: the token index (device_tokens) is global,
+// so registering the same token elsewhere would drop our device.
+var tokenSalt = rand.Uint64()
+
+func hexToken(n int) string { return fmt.Sprintf("%016x%048x", tokenSalt, n) }
 
 func (h *harness) registerDevice(uid, inst string, tok int, env string) {
 	h.t.Helper()

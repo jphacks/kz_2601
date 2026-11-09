@@ -78,19 +78,26 @@ func normalizeChatRequest(req *TextRequest) error {
 	if req.Messages[len(req.Messages)-1].Role != "user" {
 		return badText("the last message must be the user's")
 	}
-	return nil
+	if err := normalizeChatMaterial(req); err != nil { // text_chat_material.go
+		return err
+	}
+	return normalizeChatSaveTo(req) // text_chat_suggest.go
 }
 
 // applyChat turns a built completion into the chat variant: the fixed chat
 // frame, the turns as conversation and a {text} answer.
 func applyChat(c *Completion, req TextRequest, loc Locale) {
 	c.System = chatTurnSystemPrompt(loc)
+	if req.Material != nil {
+		c.System += "\n" + chatMaterialRule // text_chat_material.go
+	}
 	c.Messages = chatTurns(req)
 	c.Schema = textSchema(TextRequest{Shape: "line"})
 	c.MaxTokens = TextMaxTaskOutputToken
 	if req.isLong() {
 		c.MaxTokens = TextMaxLongOutputToken
 	}
+	applyChatSaveTo(c, req, loc) // text_chat_suggest.go
 }
 
 // chatTurns maps the turns onto alternating Messages: leading assistant turns
@@ -115,7 +122,7 @@ func chatTurns(req TextRequest) []Message {
 		}
 		out = append(out, Message{Role: m.Role, Content: content})
 	}
-	out[0].Content = "<persona>\n" + req.Instruction + "\n</persona>\n\n" + out[0].Content
+	out[0].Content = "<persona>\n" + req.Instruction + "\n</persona>\n\n" + chatMaterialBlock(req.Material) + out[0].Content
 	return out
 }
 
@@ -162,5 +169,6 @@ func parseChatOutput(raw string, req TextRequest) (*TextResult, error) {
 	if r := []rune(text); len(r) > limit {
 		text = string(r[:limit])
 	}
-	return &TextResult{Shape: "line", Task: textTaskChat, Text: text, Length: length}, nil
+	return &TextResult{Shape: "line", Task: textTaskChat, Text: text, Length: length,
+		Suggest: parseChatSuggest([]byte(raw), req.SaveTo)}, nil // text_chat_suggest.go
 }

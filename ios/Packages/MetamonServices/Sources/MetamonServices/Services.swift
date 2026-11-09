@@ -62,7 +62,7 @@ public enum APIError: LocalizedError {
         switch self {
         case .server(_, let code, let message, _): return message.isEmpty ? code : message
         case .http(let status, let body): return "HTTP \(status): \(body.prefix(200))"
-        case .invalidURL: return "URL が不正です"
+        case .invalidURL: return L("URL が不正です")
         }
     }
 

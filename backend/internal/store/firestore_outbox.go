@@ -36,6 +36,7 @@ type outboxDoc struct {
 	ChargeJSON     string         `firestore:"chargeJson,omitempty"`
 	AvailableAt    time.Time      `firestore:"availableAt"`
 	Attempts       int64          `firestore:"attempts"`
+	Deferrals      int64          `firestore:"deferrals,omitempty"`
 	Status         string         `firestore:"status"`
 	CreatedAt      time.Time      `firestore:"createdAt"`
 	ExpireAt       time.Time      `firestore:"expireAt"`
@@ -51,7 +52,7 @@ func toOutboxDoc(ev *OutboxEvent) outboxDoc {
 		Kind: ev.Kind, AppID: ev.AppID, Scope: ev.Scope, UID: ev.UID, Entity: ev.Entity, RecordID: ev.RecordID, Author: ev.Author,
 		Version: int64(ev.Version), RuleIDs: ev.RuleIDs, ChangedFields: ev.ChangedFields, Data: ev.Data, Prev: ev.Prev,
 		ActorUID: ev.ActorUID, ActorAnonymous: ev.ActorAnonymous, TimeZone: ev.TimeZone, DueAt: ev.DueAt, ChargeJSON: string(ev.Charge),
-		AvailableAt: ev.AvailableAt, Attempts: int64(ev.Attempts), Status: ev.Status, CreatedAt: ev.CreatedAt, ExpireAt: ev.ExpireAt,
+		AvailableAt: ev.AvailableAt, Attempts: int64(ev.Attempts), Deferrals: int64(ev.Deferrals), Status: ev.Status, CreatedAt: ev.CreatedAt, ExpireAt: ev.ExpireAt,
 	}
 }
 
@@ -61,7 +62,7 @@ func (d *outboxDoc) toEvent(env, id string) OutboxEvent {
 		Kind: d.Kind, AppID: d.AppID, Scope: d.Scope, UID: d.UID, Entity: d.Entity, RecordID: d.RecordID, Author: d.Author,
 		Version: int(d.Version), RuleIDs: d.RuleIDs, ChangedFields: d.ChangedFields, Data: d.Data, Prev: d.Prev,
 		ActorUID: d.ActorUID, ActorAnonymous: d.ActorAnonymous, TimeZone: d.TimeZone, DueAt: d.DueAt, Charge: rawOrNil(d.ChargeJSON),
-		AvailableAt: d.AvailableAt, Attempts: int(d.Attempts), Status: d.Status, CreatedAt: d.CreatedAt, ExpireAt: d.ExpireAt,
+		AvailableAt: d.AvailableAt, Attempts: int(d.Attempts), Deferrals: int(d.Deferrals), Status: d.Status, CreatedAt: d.CreatedAt, ExpireAt: d.ExpireAt,
 		Outcome: d.Outcome, RuleOutcomes: d.RuleOutcomes, LastError: d.LastError, FinishedAt: d.FinishedAt,
 	}
 }

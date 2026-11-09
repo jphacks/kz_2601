@@ -152,7 +152,7 @@ final class PassbyController: NearbyPassbyController {
         }
         ledger.met(payload.senderId, name: payload.name, at: .now, records: changed)
         saveLedger()
-        if changed > 0 { runtime.toast = "\(payload.name)さんとすれ違いました(\(entity.name) \(changed) 件)" }
+        if changed > 0 { runtime.toast = L10n.tr("\(payload.name)さんとすれ違いました(\(entity.name) \(changed) 件)") }
     }
 
     // MARK: - 台帳

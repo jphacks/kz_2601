@@ -282,14 +282,28 @@ func TestTextImageCreatorPays(t *testing.T) {
 }
 
 // The switch comes before the Pro gate: off = 403 even for a participant of
-// a creator without Pro, and the 403 keeps the charge like the other 4xx
-// (only the 402 is waived).
-func TestTextImageDisabledKeepsTheCharge(t *testing.T) {
+// a creator without Pro, and the 403 is waived like the 402 (the switch is
+// on the server; the user cannot fix it).
+func TestTextImageDisabledIsNotCharged(t *testing.T) {
 	limit := ratelimit.DefaultLimits.SignedIn
 	h, fc, counting := imageLimitStack(t, false)
 	body := imageBody(t, TextRequest{Instruction: "説明", AppID: "F", Image: &TextImage{MediaType: "image/jpeg", Data: testJPEG(t, 32, 32)}})
 	rec := postText(t, h, "member", body)
 	if rec.Code != http.StatusForbidden || errCode(t, rec) != httpx.CodeForbidden || len(fc.calls) != 0 {
+		t.Fatalf("%d %s", rec.Code, rec.Body.String())
+	}
+	if got := remaining(t, rec.Header()); got != limit || counting.refunds.Load() != 1 {
+		t.Fatalf("remaining %d, want %d, refunds %d", got, limit, counting.refunds.Load())
+	}
+}
+
+// A bad photo with the switch on keeps the charge (the client sent it).
+func TestTextImageBadPhotoKeepsTheCharge(t *testing.T) {
+	limit := ratelimit.DefaultLimits.SignedIn
+	h, _, counting := imageLimitStack(t, true)
+	body := imageBody(t, TextRequest{Instruction: "説明", AppID: "P", Image: &TextImage{MediaType: "image/png", Data: testJPEG(t, 32, 32)}})
+	rec := postText(t, h, "member", body)
+	if rec.Code != http.StatusBadRequest {
 		t.Fatalf("%d %s", rec.Code, rec.Body.String())
 	}
 	if got, want := remaining(t, rec.Header()), limit-ratelimit.DefaultWeights.TextImage; got != want || counting.refunds.Load() != 0 {

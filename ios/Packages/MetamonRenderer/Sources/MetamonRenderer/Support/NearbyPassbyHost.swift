@@ -61,7 +61,7 @@ public final class StaticNearbyPassbyController: NearbyPassbyController {
     public var isAdvertising = false
     public var encounters: [NearbyPassby.Encounter] = []
     public var peers: [PassbyPeer] = []
-    public var distanceSupport: PassbyDistanceSupport = .unsupported("この端末は距離・方向の測定に対応していません")
+    public var distanceSupport: PassbyDistanceSupport = .unsupported(L("この端末は距離・方向の測定に対応していません"))
     public var notice: String?
     public private(set) var optedIn: Set<String> = []
     public private(set) var attached: String?

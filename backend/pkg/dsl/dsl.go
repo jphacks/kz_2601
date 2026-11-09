@@ -480,6 +480,10 @@ type Component struct {
 	SaveTo  *AISaveTo `json:"saveTo,omitempty"`  // generate list: one record per item (ai_save_to.go)
 	// InputPhoto is a photo field of the form sent with the call (cloud only, ai_button_photo.go).
 	InputPhoto string `json:"inputPhoto,omitempty"`
+	// InputFeeds are ids of feeds on the same screen whose rows go with the call (ai_input_feed.go).
+	InputFeeds []string `json:"inputFeeds,omitempty"`
+	// Outputs maps generate fields item names to form fields they fill (ai_outputs.go).
+	Outputs map[string]string `json:"outputs,omitempty"`
 
 	// healthStat (#167). Label / Target are shared.
 	Metric string `json:"metric,omitempty"` // steps|weight
@@ -498,6 +502,9 @@ type Component struct {
 	// aiChat (ai_chat.go). Entity / TextField / Length / Placeholder / EmptyText are shared.
 	RoleField string `json:"roleField,omitempty"` // user|assistant per turn (optional)
 	Persona   string `json:"persona,omitempty"`   // who the AI is (≤ 500 chars)
+	Speak     bool   `json:"speak,omitempty"`     // read each new AI reply aloud (on-device voice)
+	// InputEntity: the user's own records of it go with each turn as reference (ai_chat_input.go). Limit is shared.
+	InputEntity string `json:"inputEntity,omitempty"`
 	// dashcam (#410). Title is shared. Zero = iOS default.
 	KeepMinutes  int      `json:"keepMinutes,omitempty"`  // loop length (default 10)
 	MaxStorageMB int      `json:"maxStorageMB,omitempty"` // storage cap (default 2000)

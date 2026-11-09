@@ -8,6 +8,12 @@ import MetamonDSL
 public protocol FeedHost: AnyObject {
     /// 同じ問い合わせはホストがしばらく覚えておく(画面を行き来するたびに取りに行かない)。`force` で取り直す。
     func feed(_ query: FeedQuery, force: Bool) async throws -> FeedResult
+    /// 覚えている行(古くなっていても・取りに行かない)。画面の feed が今出している行と同じ。無ければ nil。
+    func cachedFeed(_ query: FeedQuery) -> FeedResult?
+}
+
+public extension FeedHost {
+    func cachedFeed(_ query: FeedQuery) -> FeedResult? { nil }
 }
 
 public extension DSLRuntime {

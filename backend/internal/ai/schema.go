@@ -216,6 +216,12 @@ func mergeProp(a, b map[string]any) map[string]any {
 	if a == nil {
 		return cp
 	}
+	if merged, ok := mergeRefs(a, cp); ok {
+		return merged
+	}
+	if alts, ok := typeAlternatives(a, cp); ok {
+		return map[string]any{"anyOf": alts}
+	}
 	ae, aok := a["enum"].([]any)
 	be, bok := cp["enum"].([]any)
 	if aok && bok {
@@ -237,6 +243,40 @@ func mergeProp(a, b map[string]any) map[string]any {
 		}
 	}
 	return a
+}
+
+// typeAlternatives: when one side is an object / array and the other
+// a different shape (Notification.near object vs placeSearch near string),
+// neither may win: both stay as anyOf alternatives (a merged anyOf grows).
+// ok=false leaves the scalar merge to mergeProp.
+func typeAlternatives(a, b map[string]any) ([]any, bool) {
+	shape := func(m map[string]any) string {
+		if ref, ok := m["$ref"].(string); ok {
+			return ref
+		}
+		t, _ := m["type"].(string)
+		return t
+	}
+	structured := func(s string) bool { return s == "object" || s == "array" }
+	var alts []any
+	if prev, ok := a["anyOf"].([]any); ok && len(a) == 1 {
+		alts = append(alts, prev...)
+	} else {
+		alts = []any{a}
+	}
+	bs := shape(b)
+	for i, v := range alts {
+		m, _ := v.(map[string]any)
+		s := shape(m)
+		if s == bs || (!structured(s) && !structured(bs)) {
+			if len(alts) == 1 {
+				return nil, false // same shape or two scalars: the usual merge
+			}
+			alts[i] = mergeProp(m, b) // keep merging into the matching alternative
+			return alts, true
+		}
+	}
+	return append(alts, b), true
 }
 
 func sortedKeys(m map[string]any) []string {
@@ -366,4 +406,29 @@ func dropServerRules(root map[string]any) {
 			delete(defs, name)
 		}
 	}
+}
+
+// mergeRefs: one property name over different defs (saveTo is AISaveTo on
+// aiButton and AIChatSaveTo on aiChat) becomes anyOf of the refs, so the
+// flattened leaf accepts each part's shape. ok is false when b is not a
+// plain $ref or a already accepts it.
+func mergeRefs(a, b map[string]any) (map[string]any, bool) {
+	br, isRef := b["$ref"].(string)
+	if !isRef || len(b) != 1 || len(a) != 1 {
+		return nil, false
+	}
+	var refs []any
+	if ar, ok := a["$ref"].(string); ok {
+		refs = []any{map[string]any{"$ref": ar}}
+	} else if alts, ok := a["anyOf"].([]any); ok {
+		refs = alts
+	} else {
+		return nil, false
+	}
+	for _, r := range refs {
+		if m, _ := r.(map[string]any); m["$ref"] == br {
+			return nil, false
+		}
+	}
+	return map[string]any{"anyOf": append(refs, map[string]any{"$ref": br})}, true
 }

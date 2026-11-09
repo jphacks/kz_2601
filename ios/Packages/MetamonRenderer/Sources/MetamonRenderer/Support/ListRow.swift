@@ -210,7 +210,7 @@ struct ListRow: View {
         .accessibilityValue(accessibilityValueText)
         .accessibilityActions {
             if let onToggle {
-                Button(checked ? "チェックを外す" : "チェックする", action: onToggle)
+                Button(checked ? L("チェックを外す") : L("チェックする"), action: onToggle)
             }
             if let audio = trailingAudio.flatMap(AudioValue.init) {
                 Button(L("録音を再生")) { AudioPlayback.shared.toggle(audio) }

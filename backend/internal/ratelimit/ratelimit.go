@@ -44,6 +44,11 @@ type Limits struct {
 	PerIP int
 	// Global is the cost breaker across every caller of this environment.
 	Global int
+	// WaivedHourly caps, per uid and hour, the requests a handler gives back
+	// with Waive (waive_cap.go). Past it the request keeps its charge.
+	WaivedHourly int
+	// WaivedIPHourly is the same per client address (every tier).
+	WaivedIPHourly int
 }
 
 // Weights are the units one request costs.
@@ -66,7 +71,7 @@ type Weights struct {
 
 // DefaultLimits / DefaultWeights: see docs/backend/rate-limit.md for the reasoning.
 var (
-	DefaultLimits  = Limits{Anonymous: 30, SignedIn: 60, Pro: 300, PerIP: 300, Global: 2000}
+	DefaultLimits  = Limits{Anonymous: 30, SignedIn: 60, Pro: 300, PerIP: 300, Global: 2000, WaivedHourly: 30, WaivedIPHourly: 120}
 	DefaultWeights = Weights{Create: 3, Edit: 2, Chat: 1, Text: 1, TextTask: 2, TextLong: 3, TextImage: 3}
 )
 
@@ -86,7 +91,16 @@ type Counter struct {
 	ID    string
 	Scope string
 	Limit int
+	// Shards > 1 spreads the counter over that many documents (Firestore;
+	// Memory ignores it). Only the environment-wide global counter uses it
+	// (GlobalShards); see firestore_shard.go.
+	Shards int
 }
+
+// GlobalShards is the number of documents the global counter is spread over
+// (docs/backend/rate-limit.md "global の分割"). Changing it mid-day only moves
+// new charges; documents beyond it are no longer read, so keep it fixed.
+const GlobalShards = 10
 
 // Usage is what a Store reports back from Consume.
 type Usage struct {
@@ -94,6 +108,10 @@ type Usage struct {
 	Counts []int
 	// Blocked is the index of the first counter that would overflow, or -1.
 	Blocked int
+	// Charged is the counters Refund must use to take this charge back, when
+	// they differ from the ones passed to Consume (a sharded counter names
+	// the shard document it was charged to). nil = the same counters.
+	Charged []Counter
 }
 
 // Store charges weight to every counter atomically, or to none of them when
@@ -254,7 +272,7 @@ func (l *Limiter) Allow(ctx context.Context, id auth.Identity, ip string, weight
 		counters = append(counters, Counter{ID: fmt.Sprintf("%s_%s_ip_%s", prefix, day, ipKey(ip)), Scope: ScopeIP, Limit: l.cfg.Limits.PerIP})
 	}
 	if l.cfg.Limits.Global > 0 {
-		counters = append(counters, Counter{ID: fmt.Sprintf("%s_%s_global", prefix, day), Scope: ScopeGlobal, Limit: l.cfg.Limits.Global})
+		counters = append(counters, Counter{ID: fmt.Sprintf("%s_%s_global", prefix, day), Scope: ScopeGlobal, Limit: l.cfg.Limits.Global, Shards: GlobalShards})
 	}
 	if len(counters) == 0 {
 		return dec, nil
@@ -281,7 +299,11 @@ func (l *Limiter) Allow(ctx context.Context, id auth.Identity, ip string, weight
 		dec.Remaining = max(0, c.Limit-dec.Used)
 		return dec, nil
 	}
-	dec.charge = charge{store: store, counters: counters, weight: weight, expireAt: expireAt}
+	charged := counters
+	if usage.Charged != nil {
+		charged = usage.Charged
+	}
+	dec.charge = charge{store: store, counters: charged, weight: weight, expireAt: expireAt}
 	if counters[0].Scope == ScopeUser {
 		dec.Used = usage.Counts[0]
 		dec.Remaining = max(0, limit-dec.Used)
@@ -322,6 +344,14 @@ func (l *Limiter) Refund(ctx context.Context, dec Decision, units int) error {
 // docSafe keeps a Firestore document id legal ("/" is the only banned rune).
 func docSafe(s string) string {
 	return strings.ReplaceAll(s, "/", "_")
+}
+
+// IPKey is ipKey for other per-address counts (feeds).
+func IPKey(ip string) string {
+	if ip == "" {
+		return ""
+	}
+	return ipKey(ip)
 }
 
 // ipKey hashes the address (no raw IPs at rest). IPv6 is grouped by /64:

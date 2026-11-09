@@ -153,6 +153,22 @@ func (f *Firestore) RetryOutbox(ctx context.Context, env, eventID string, attemp
 	})
 }
 
+// DeferOutbox implements OutboxQueue.
+func (f *Firestore) DeferOutbox(ctx context.Context, env, eventID string, attempt int, at time.Time, lastError string, charge json.RawMessage) error {
+	return f.leased(ctx, env, eventID, attempt, func() []firestore.Update {
+		u := []firestore.Update{
+			{Path: "availableAt", Value: at},
+			{Path: "status", Value: OutboxRetry},
+			{Path: "lastError", Value: lastError},
+			{Path: "deferrals", Value: firestore.Increment(1)},
+		}
+		if charge != nil {
+			u = append(u, firestore.Update{Path: "chargeJson", Value: string(charge)})
+		}
+		return u
+	})
+}
+
 func (f *Firestore) runnerMarkRef(env, key string) *firestore.DocumentRef {
 	return f.c.Collection(runnerCollection).Doc(env).Collection("done").Doc(runnerMarkID(key))
 }

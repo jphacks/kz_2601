@@ -73,7 +73,7 @@ public enum RecordExport {
         var base = title.unicodeScalars.map { bad.contains($0) ? "_" : String($0) }.joined()
             .trimmingCharacters(in: .whitespaces)
         while base.hasPrefix(".") { base.removeFirst() }
-        if base.isEmpty { base = "書き出し" }
+        if base.isEmpty { base = L("書き出し") }
         return String(base.prefix(80)) + "." + ext
     }
 }

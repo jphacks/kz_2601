@@ -13,7 +13,7 @@ import WhisperKit
 /// `[Voice]` プレフィックスで stdout(`devicectl device process launch --console`)と os_log(category: voice)に出す。
 @MainActor
 @Observable
-public final class WhisperKitRecognizer: SpeechTranscriber {
+public final class WhisperKitRecognizer: SpeechTranscriber, AudioFileTranscriber {
     public private(set) var status: TranscriberStatus = .notDownloaded
     public private(set) var downloadProgress: Double = 0
     public private(set) var lastDiagnostics: TranscriberDiagnostics?
@@ -34,6 +34,8 @@ public final class WhisperKitRecognizer: SpeechTranscriber {
     @ObservationIgnored private var watchdog: Task<Void, Never>?
     @ObservationIgnored private let logger = Logger(subsystem: "jp.kz2601.metamon", category: "voice")
     private var isRecording = false
+    /// 録音ファイルを文字にしている間 true(同じモデルで録音を始めない)
+    private var isTranscribingFile = false
     /// 認識言語("ja" | "en")。録音ごとに読むので、アプリの言語設定を切り替えると次の発話から反映される(#45)。
     @ObservationIgnored public var language: () -> String = { "ja" }
 
@@ -133,7 +135,7 @@ public final class WhisperKitRecognizer: SpeechTranscriber {
         diag.modelFolderExists = localModelFolder != nil
         defer { lastDiagnostics = diag }
 
-        guard let pipe else {
+        guard let pipe, !isTranscribingFile else {
             diag.failure = "notReady"
             throw TranscriberFailure.notReady("\(status)")
         }
@@ -232,7 +234,7 @@ public final class WhisperKitRecognizer: SpeechTranscriber {
         }
 
         status = .recognizing
-        defer { status = .ready }
+        defer { status = Self.statusAfterRecognizing(status) }
         let options = DecodingOptions(
             task: .transcribe,
             language: language(),
@@ -255,6 +257,69 @@ public final class WhisperKitRecognizer: SpeechTranscriber {
             lastDiagnostics = diag
             log("transcribe failed: \(error)")
             throw error
+        }
+    }
+
+    // MARK: - 録音ファイル(fileImport accept audio)
+
+    public var canTranscribeFiles: Bool { pipe != nil && status == .ready && !isRecording && !isTranscribingFile }
+
+    /// ファイルを `AudioFileChunking.blockSeconds` ごとに 16kHz モノラルで読み、その区切りだけを文字にする(全体をメモリに載せない)。端末内だけ。
+    /// キャンセルは区切りの間で見て、文字にしている途中は WhisperKit の callback に false を返して止める。
+    public func transcribeFile(at url: URL, progress: @escaping @MainActor (Double) -> Void) async throws -> String {
+        guard let pipe, canTranscribeFiles else { throw TranscriberFailure.notReady("\(status)") }
+        isTranscribingFile = true
+        status = .recognizing
+        defer {
+            isTranscribingFile = false
+            status = Self.statusAfterRecognizing(status)
+        }
+        let path = url.path
+        let seconds = try Self.audioSeconds(path: path)
+        log("file transcribe start seconds=\(Int(seconds)) blocks=\(AudioFileChunking.windows(seconds: seconds).count)")
+        let options = DecodingOptions(
+            task: .transcribe,
+            language: language(),
+            usePrefillPrompt: true,
+            detectLanguage: false,
+            skipSpecialTokens: true,
+            withoutTimestamps: true,
+            chunkingStrategy: .vad
+        )
+        let text = try await AudioFileChunking.run(
+            seconds: seconds,
+            read: { window in try Self.readWindow(path: path, window) },
+            transcribe: { samples, stop in
+                guard Self.levels(of: samples).0 >= Self.silencePeak else { return "" }
+                let results = try await pipe.transcribe(audioArray: samples, decodeOptions: options, callback: { _ in
+                    stop.isStopped ? false : nil
+                })
+                return results.map(\.text).joined().trimmingCharacters(in: .whitespacesAndNewlines)
+            },
+            progress: progress
+        )
+        log("file transcribe done chars=\(text.count)")
+        return text
+    }
+
+    /// 文字にし終えた後の状態。途中で失敗・読み直しに変わっていたら上書きしない。
+    nonisolated static func statusAfterRecognizing(_ current: TranscriberStatus) -> TranscriberStatus {
+        current == .recognizing ? .ready : current
+    }
+
+    /// 録音の長さ(秒)。ヘッダだけ読む。
+    nonisolated static func audioSeconds(path: String) throws -> Double {
+        let file = try AVAudioFile(forReading: URL(fileURLWithPath: path), commonFormat: .pcmFormatFloat32, interleaved: false)
+        guard file.fileFormat.sampleRate > 0 else { return 0 }
+        return Double(file.length) / file.fileFormat.sampleRate
+    }
+
+    /// 区切り 1 つ分だけを 16kHz モノラルで読む(呼ぶ側の Task のまま・主スレッドの外)。
+    nonisolated static func readWindow(path: String, _ window: Range<Double>) throws -> [Float] {
+        try autoreleasepool {
+            let file = try AVAudioFile(forReading: URL(fileURLWithPath: path), commonFormat: .pcmFormatFloat32, interleaved: false)
+            let buffer = try AudioProcessor.loadAudio(fromFile: file, startTime: window.lowerBound, endTime: window.upperBound)
+            return AudioProcessor.convertBufferToArray(buffer: buffer)
         }
     }
 

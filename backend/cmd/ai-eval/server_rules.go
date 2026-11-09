@@ -22,9 +22,9 @@ import (
 //   - ruleEach (bool): some rule has on.each (#340 reads).
 //   - ruleAgg (bool): some rule reads records with agg.
 //   - ruleWith (bool): some notify has with.
-//   - ruleLookup (string): some rule has a lookup with op exists|notExists.
+//   - ruleLookup (string): some rule has a lookup with op exists|notExists|overlaps|notOverlaps.
 //   - ruleSimilar (bool): some rule searches the most similar record (similar).
-//   - rulePick (string): some rule picks one record with order random|oldest|newest (pick).
+//   - rulePick (string): some rule picks one record with order random|oldest|newest|fewest|most (pick; fewest / most = assignment with count).
 //
 // Cases: internal/ai/eval/server_rules_cases.json (-cases).
 func checkServerRules(exp map[string]any, a *dsl.App) []string {
@@ -58,6 +58,8 @@ func checkServerRules(exp map[string]any, a *dsl.App) []string {
 				actions = append(actions, "updateRecord")
 			case act.Increment != nil:
 				actions = append(actions, "increment")
+			case act.SaveFeed != nil:
+				actions = append(actions, "saveFeed")
 			}
 		}
 	}
@@ -133,6 +135,12 @@ func (s sampleRefs) Record(_ context.Context, entity, id string) (expreval.Recor
 		return expreval.Record{}, false, nil
 	}
 	return sampleRecord(e, id, false), true, nil
+}
+
+// Feed gives a made-up snapshot (saveFeed).
+func (sampleRefs) Feed(context.Context, string, string) (engine.FeedSnapshot, error) {
+	lo, hi, drop := 1003.0, 1012.0, true
+	return engine.FeedSnapshot{Summary: "1003〜1012 hPa", Min: &lo, Max: &hi, Drop: &drop}, nil
 }
 
 // List gives two made-up records of the entity (on.each / agg).

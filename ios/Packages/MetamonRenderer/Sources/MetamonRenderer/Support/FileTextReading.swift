@@ -3,10 +3,10 @@ import UIKit
 import UniformTypeIdentifiers
 import MetamonDSL
 
-/// `fileImport` が読むファイルの種類と、テキスト / PDF の本文の取り出し。すべて端末内で、ファイルはコピーも保存もしない。
+/// `fileImport` が読むファイルの種類と、テキスト / PDF の本文の取り出し(録音は `AudioFileImport`)。すべて端末内で、ファイルはコピーも保存もしない。
 enum FileTextReading {
     enum Kind: Equatable {
-        case csv, text, pdf
+        case csv, text, pdf, audio
     }
 
     /// `accept` → ファイル選択に出す種類。
@@ -17,6 +17,7 @@ enum FileTextReading {
             case "csv": out.append(.commaSeparatedText)
             case "text": out.append(.plainText)
             case "pdf": out.append(.pdf)
+            case "audio": out.append(.audio)
             default: break
             }
         }
@@ -29,6 +30,7 @@ enum FileTextReading {
         if accept.contains("csv"), type.conforms(to: .commaSeparatedText) { return .csv }
         if accept.contains("pdf"), type.conforms(to: .pdf) { return .pdf }
         if accept.contains("text"), type.conforms(to: .plainText) { return .text }
+        if accept.contains("audio"), type.conforms(to: .audio) { return .audio }
         return nil
     }
 

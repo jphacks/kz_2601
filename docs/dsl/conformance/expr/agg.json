@@ -93,6 +93,7 @@
         "marks": [{"id": "like", "icon": "heart", "label": "いいね"}],
         "scope": "shared"
       },
+      {"id": "weeks", "name": "週", "fields": [{"id": "start", "name": "週の始まり", "type": "date"}]},
       {
         "id": "loop",
         "name": "循環",
@@ -349,6 +350,20 @@
         "filter": {"value": {"op": "addDays", "args": [{"op": "today", "args": []}, -7]}, "op": "gte", "field": "date"}
       },
       "expected": {"type": "number", "value": 3, "text": "3"}
+    },
+    {
+      "name": "row/date-range-relative-to-row",
+      "note": "adaptive_study の先週の数え方: 行の日付から 7 日前以上・行の日付より前",
+      "expr": {
+        "entity": "expenses",
+        "agg": "count",
+        "filter": [
+          {"value": {"op": "addDays", "args": [{"ref": "start"}, -7]}, "op": "gte", "field": "date"},
+          {"value": {"ref": "start"}, "op": "lt", "field": "date"}
+        ]
+      },
+      "row": {"entity": "weeks", "record": {"id": "w1", "data": {"start": "2026-10-28"}}},
+      "expected": {"type": "number", "value": 2, "text": "2"}
     },
     {
       "name": "filter/eq-number-vs-string",

@@ -6,6 +6,7 @@ import (
 	"encoding/xml"
 	"errors"
 	"fmt"
+	"net/url"
 	"strings"
 	"time"
 )
@@ -15,6 +16,7 @@ import (
 type arxivFeed struct {
 	XMLName xml.Name `xml:"http://www.w3.org/2005/Atom feed"`
 	Entries []struct {
+		ID        string    `xml:"id"`
 		Title     string    `xml:"title"`
 		Published string    `xml:"published"`
 		Links     []xmlLink `xml:"link"`
@@ -40,7 +42,7 @@ func parseArxiv(body []byte) ([]Item, error) {
 		if title == "" {
 			continue
 		}
-		it := Item{Title: title, URL: entryLink(e.Links)}
+		it := Item{Title: title, URL: arxivLink(e.Links, e.ID)}
 		if t, ok := parseFeedTime(e.Published); ok {
 			it.Date = t.In(jst).Format(time.RFC3339)
 		}
@@ -57,6 +59,29 @@ func parseArxiv(body []byte) ([]Item, error) {
 		out = append(out, it)
 	}
 	return out, nil
+}
+
+// arxivLink is the abstract page: the alternate link, else the entry id.
+// The API may write them as http://arxiv.org/...; those become https.
+func arxivLink(ls []xmlLink, id string) string {
+	for _, l := range ls {
+		if l.Rel == "" || l.Rel == "alternate" {
+			if u := httpsURL(upgradeArxiv(l.Href)); u != "" {
+				return u
+			}
+		}
+	}
+	return httpsURL(upgradeArxiv(id))
+}
+
+// upgradeArxiv turns http on arxiv.org / export.arxiv.org into https.
+func upgradeArxiv(raw string) string {
+	u, err := url.Parse(strings.TrimSpace(raw))
+	if err != nil || u.Scheme != "http" || (u.Host != "arxiv.org" && u.Host != "export.arxiv.org") {
+		return raw
+	}
+	u.Scheme = "https"
+	return u.String()
 }
 
 // ---- diet (kokkai.ndl.go.jp/api/speech, JSON) ---------------------------------
