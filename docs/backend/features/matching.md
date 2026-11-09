@@ -137,7 +137,7 @@ match_quota/{uid}   {day, n}  送った回数(JST の 1 日ごと)
 | 本名 | 本名・氏名・実名・フルネーム・名字・苗字 | full name・real name・first name・last name・family name・given name・surname | 消す |
 | 性別 | 性別 | gender・sex | 消す |
 
-警告しないもの: `hidden`・`computed`・boolean の field。enum は連絡先の種類では警告しない(「連絡方法: LINE / メール」は選択肢で、連絡先そのものではない)が、年齢・性別などは enum でも警告する。ニックネーム・名前・自己紹介・年齢層の好みは警告しない。
+警告しないもの: `computed`・boolean の field。`hidden` の field は警告する(`hidden` は画面に出さないだけで、値は全員の端末に届く)。enum は連絡先の種類では警告しない(「連絡方法: LINE / メール」は選択肢で、連絡先そのものではない)が、年齢・性別などは enum でも警告する。ニックネーム・名前・自己紹介・年齢層の好みは警告しない。
 
 ## 7. App Store と法律のメモ
 

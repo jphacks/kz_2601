@@ -37,8 +37,10 @@ var profileSensitiveKinds = []sensitiveKind{
 
 // ProfileSensitiveField reports what a field of a match:"profile" entity
 // looks like ("a phone number", "an age or birthday", ...) or "" when it is
-// fine. Hidden and computed fields and booleans never warn; an enum warns
-// only for identity (an age bracket, a gender), not for a contact method.
+// fine. Computed fields and booleans never warn; an enum warns only for
+// identity (an age bracket, a gender), not for a contact method. Hidden
+// fields warn too: hidden is display-only and the value still reaches every
+// device (hidden.go).
 func ProfileSensitiveField(f *Field) string {
 	if k := profileSensitive(f); k != nil {
 		return k.what
@@ -47,7 +49,7 @@ func ProfileSensitiveField(f *Field) string {
 }
 
 func profileSensitive(f *Field) *sensitiveKind {
-	if f.Hidden || f.Computed != nil || f.Type == FieldBoolean {
+	if f.Computed != nil || f.Type == FieldBoolean {
 		return nil
 	}
 	words := " " + strings.Join(append(fieldWords(f.ID), fieldWords(f.Name)...), " ") + " "

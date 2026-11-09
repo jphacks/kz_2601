@@ -64,8 +64,8 @@ func TestProfileSensitiveField(t *testing.T) {
 		}
 	}
 	hidden := Field{ID: "phone", Name: "電話番号", Type: FieldString, Hidden: true}
-	if got := ProfileSensitiveField(&hidden); got != "" {
-		t.Errorf("hidden field: got %q", got)
+	if got := ProfileSensitiveField(&hidden); got != "a phone number" {
+		t.Errorf("hidden field (display-only, still on every device) must warn: got %q", got)
 	}
 }
 

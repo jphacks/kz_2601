@@ -11,7 +11,8 @@ import (
 //   - matchMatched (bool): some entity has match "matched".
 //   - matchSafe (bool): the profile has no field that looks like contact info,
 //     age, gender, birthday, school, address or a real name (those stay off
-//     what strangers see). Same keywords as the lint the AI retries on
+//     what strangers see; a hidden field counts, since its value still
+//     reaches every device). Same keywords as the lint the AI retries on
 //     (dsl.ProfileSensitiveField), so the eval and the retry agree.
 //   - matchUI (bool): a profile list has item.interest and a matchList shows
 //     incoming or matched people (phase 2: people can actually connect).
