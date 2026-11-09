@@ -3,6 +3,7 @@ import Foundation
 /// `bracket`(トーナメント表)の組み合わせと勝ち上がり。描画(BracketLeaf)と描画の木(RenderTree)が同じ計算を使う。
 /// 組み合わせは保存しない: 出場者を seedField の昇順(値の無い人は後ろ)→ 登録順に並べ、2 のべき乗の枠に標準のシード配置で入れる。
 /// 勝ち上がりは winsField(勝った回戦の数)だけで決まる。規則は docs/dsl/README.md の bracket の補足。
+/// 結果が 1 つでも付いたら組み合わせを固定する(`frozen`): 開始後に追加された出場者は枠に入れない。
 public struct BracketDraw: Equatable, Sendable {
     /// 描く出場者の上限(6 回戦)。Go の `dsl.MaxBracketEntrants` と同じ。
     public static let maxEntrants = 64
@@ -38,14 +39,18 @@ public struct BracketDraw: Equatable, Sendable {
     public let rounds: [[Match]]
     /// 枠に入れた出場者(シード順)。
     public let entrants: [Record]
+    /// 開始後に追加されたため枠に入れなかった人数(`frozen`)。
+    public let lateEntrants: Int
 
     public var champion: Record? { rounds.last?.first?.winnerRecord }
 
     /// - Parameters:
     ///   - pending: 保存待ちの勝ち数(楽観的 UI)。保存値より優先する。
     public init(records: [Record], winsField: String, seedField: String?, pending: [String: Int] = [:]) {
-        let entrants = Array(Self.seeded(records, seedField: seedField).prefix(Self.maxEntrants))
+        let (pool, late) = Self.frozen(records, winsField: winsField)
+        let entrants = Array(Self.seeded(pool, seedField: seedField).prefix(Self.maxEntrants))
         self.entrants = entrants
+        self.lateEntrants = late
         guard entrants.count >= 2 else {
             rounds = []
             return
@@ -76,6 +81,26 @@ public struct BracketDraw: Equatable, Sendable {
             out.append(cur)
         }
         rounds = out
+    }
+
+    // MARK: - 組み合わせの固定
+
+    /// 開始後に追加された人を外す。保存済みの wins >= 1 の人がいれば、その人たちの updatedAt の最も早い時刻を「開始」とし、
+    /// それより後に作られた(createdAt > 開始)wins 0 の人を外す。wins >= 1 の人は常に残す。
+    /// 結果が 1 つも無い(全部取り消した場合も)・時刻が読めない時は全員(従来どおり毎回組み直す)。
+    /// 保存待ち(pending)は見ない: 保存前の updatedAt は結果の時刻でないため。
+    public static func frozen(_ records: [Record], winsField: String) -> (entrants: [Record], late: Int) {
+        let started = records
+            .filter { wins($0, field: winsField) >= 1 }
+            .compactMap { ChatThread.date($0.updatedAt) }
+            .min()
+        guard let started else { return (records, 0) }
+        let kept = records.filter { r in
+            if wins(r, field: winsField) >= 1 { return true }
+            guard let created = ChatThread.date(r.createdAt) else { return true }
+            return created <= started
+        }
+        return (kept, records.count - kept.count)
     }
 
     // MARK: - 並べ方

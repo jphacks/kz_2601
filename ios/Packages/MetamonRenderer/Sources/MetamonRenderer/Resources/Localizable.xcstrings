@@ -8365,6 +8365,23 @@
         }
       }
     },
+    "開始後に追加された %lld 人は、この表に入りません" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld entrants added after the start are not in this bracket"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "開始後に追加された %lld 人は、この表に入りません"
+          }
+        }
+      }
+    },
     "関節の位置を重ねた写真" : {
       "extractionState" : "manual",
       "localizations" : {

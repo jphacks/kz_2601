@@ -45,6 +45,12 @@ struct BracketLeaf: View {
                 }
                 .accessibilityIdentifier("bracket.rounds")
             }
+            if draw.lateEntrants > 0 {
+                Text(L("開始後に追加された \(draw.lateEntrants) 人は、この表に入りません"))
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .accessibilityIdentifier("bracket.late")
+            }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         .renderCard(wash: true)

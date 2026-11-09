@@ -197,4 +197,63 @@ final class BracketDrawTests: XCTestCase {
         XCTAssertEqual(c.seedField, "seed")
         XCTAssertEqual(c.titleField, "name")
     }
+
+    // MARK: - 組み合わせの固定(最初の結果の後に足した人は入れない)
+
+    private func q(_ id: String, wins: Int = 0, seed: Double? = nil, at day: Int, updated: Int? = nil) -> Record {
+        var r = p(id, wins: wins, seed: seed, at: day)
+        r.updatedAt = String(format: "2026-11-%02dT00:00:00Z", updated ?? day)
+        return r
+    }
+
+    private func pairs(_ d: BracketDraw) -> [[String?]] { d.rounds.first?.map(ids) ?? [] }
+
+    func testBeforeAnyResultAddingEntrantRebuildsDraw() {
+        let four = [q("a", at: 1), q("b", at: 2), q("c", at: 3), q("d", at: 4)]
+        let before = BracketDraw(records: four, winsField: "wins", seedField: nil)
+        let after = BracketDraw(records: four + [q("e", at: 6)], winsField: "wins", seedField: nil)
+        XCTAssertEqual(after.entrants.count, 5)
+        XCTAssertEqual(after.lateEntrants, 0)
+        XCTAssertNotEqual(pairs(before), pairs(after), "結果が無いうちは組み直す")
+    }
+
+    func testAfterFirstResultLateEntrantIsNotPlacedAndCounted() {
+        let four = [q("a", wins: 1, at: 1, updated: 5), q("b", at: 2), q("c", at: 3), q("d", at: 4)]
+        let frozen = BracketDraw(records: four, winsField: "wins", seedField: "seed")
+        // 開始(5 日)の後に作った e は、シード 1 でも入れない
+        let late = BracketDraw(records: four + [q("e", seed: 1, at: 6)], winsField: "wins", seedField: "seed")
+        XCTAssertEqual(late.entrants.map(\.id), frozen.entrants.map(\.id))
+        XCTAssertEqual(late.rounds, frozen.rounds)
+        XCTAssertEqual(late.lateEntrants, 1)
+        XCTAssertEqual(frozen.lateEntrants, 0)
+        XCTAssertEqual(pairs(late), [["a", "d"], ["b", "c"]])
+        XCTAssertEqual(late.rounds[0][0].winner, .a)
+    }
+
+    func testRemovingLateEntrantKeepsFrozenDraw() {
+        let four = [q("a", wins: 1, at: 1, updated: 5), q("b", at: 2), q("c", at: 3), q("d", at: 4)]
+        let withLate = BracketDraw(records: four + [q("e", at: 6), q("f", at: 7)], winsField: "wins", seedField: nil)
+        let removed = BracketDraw(records: four + [q("f", at: 7)], winsField: "wins", seedField: nil)
+        XCTAssertEqual(withLate.rounds, removed.rounds)
+        XCTAssertEqual(withLate.lateEntrants, 2)
+        XCTAssertEqual(removed.lateEntrants, 1)
+    }
+
+    func testUndoingAllResultsUnfreezes() {
+        // a の勝ちを取り消した(wins 0・updatedAt は取り消した時刻)
+        let rs = [q("a", at: 1, updated: 8), q("b", at: 2), q("c", at: 3), q("d", at: 4), q("e", at: 6)]
+        let d = BracketDraw(records: rs, winsField: "wins", seedField: nil)
+        XCTAssertEqual(d.entrants.count, 5)
+        XCTAssertEqual(d.lateEntrants, 0)
+    }
+
+    func testFreezeIgnoresPendingAndMissingTimestamps() {
+        let four = [q("a", at: 1), q("b", at: 2), q("c", at: 3), q("d", at: 4)]
+        // 保存待ちの勝ちでは固定しない(保存後の updatedAt が開始の時刻)
+        let pending = BracketDraw(records: four + [q("e", at: 6)], winsField: "wins", seedField: nil, pending: ["a": 1])
+        XCTAssertEqual(pending.lateEntrants, 0)
+        // updatedAt の無い勝者しかいなければ固定しない
+        let noTime = BracketDraw(records: [p("a", wins: 1, at: 1), p("b", at: 2), p("c", at: 6)], winsField: "wins", seedField: nil)
+        XCTAssertEqual(noTime.entrants.count, 3)
+    }
 }
