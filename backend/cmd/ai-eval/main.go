@@ -167,8 +167,12 @@ type Record struct {
 	ExpectMisses  []string            `json:"expectMisses,omitempty"`
 	LogicPass     *ai.LogicMeta       `json:"logicPass,omitempty"`
 	ServerRules   *ai.ServerRulesMeta `json:"serverRules,omitempty"` // #343
-	Patch         []dsl.PatchOp       `json:"patch,omitempty"`
-	DSL           json.RawMessage     `json:"dsl,omitempty"`
+	// -server-rules: the main call's serverNeed and what started the pass
+	// (model|regex|both; "" = the pass did not run)
+	ServerNeed    string          `json:"serverNeed,omitempty"`
+	ServerTrigger string          `json:"serverTrigger,omitempty"`
+	Patch         []dsl.PatchOp   `json:"patch,omitempty"`
+	DSL           json.RawMessage `json:"dsl,omitempty"`
 }
 
 type Run struct {
@@ -428,6 +432,13 @@ func runCase(ctx context.Context, svc *ai.Service, store *appconfigclient.Memory
 	rec.Omissions = res.Meta.Omissions
 	rec.LogicPass = res.Meta.LogicPass
 	rec.ServerRules = res.Meta.ServerRules
+	rec.ServerNeed = res.Meta.ServerNeed
+	if rec.ServerRules != nil {
+		rec.ServerTrigger = rec.ServerRules.Trigger
+	}
+	if svc.ServerRulesPass {
+		log.Printf("[%s] serverNeed=%q trigger=%q", c.ID, rec.ServerNeed, rec.ServerTrigger)
+	}
 	rec.Patch = res.Patch
 	rec.DSL = res.DSL
 	if app, perr := dsl.Parse(res.DSL); perr == nil {
@@ -440,6 +451,7 @@ func runCase(ctx context.Context, svc *ai.Service, store *appconfigclient.Memory
 		rec.ExpectMisses = append(rec.ExpectMisses, checkExport(c.Expect, app)...)
 		rec.ExpectMisses = append(rec.ExpectMisses, checkSensor(c.Expect, app, rec.Summary)...)
 		rec.ExpectMisses = append(rec.ExpectMisses, checkPhotoAI(c.Expect, app)...)
+		rec.ExpectMisses = append(rec.ExpectMisses, checkCountWhere(c.Expect, app)...)
 		if v, ok := c.Expect["noOmission"].(bool); ok && v && len(rec.Omissions) > 0 {
 			rec.ExpectMisses = append(rec.ExpectMisses, fmt.Sprintf("omissions=%v", rec.Omissions))
 		}
@@ -465,8 +477,12 @@ func runCase(ctx context.Context, svc *ai.Service, store *appconfigclient.Memory
 		rec.ExpectMisses = append(rec.ExpectMisses, checkAIChatSpeak(c.Expect, app)...) // ai_chat.go
 		// aiChat saveTo: ai_chat_save_to.go
 		rec.ExpectMisses = append(rec.ExpectMisses, checkAIChatSaveTo(c.Expect, app)...)
+		// aiChat inputEntity: ai_chat_input.go
+		rec.ExpectMisses = append(rec.ExpectMisses, checkAIChatInput(c.Expect, app)...)
 		// #507: matching.go
 		rec.ExpectMisses = append(rec.ExpectMisses, checkMatching(c.Expect, app)...)
+		// rowWindow: row_window.go
+		rec.ExpectMisses = append(rec.ExpectMisses, checkRowWindow(c.Expect, app)...)
 		rec.ExpectMisses = append(rec.ExpectMisses, checkRepeat(c.Expect, app)...)      // #266: repeat.go
 		rec.ExpectMisses = append(rec.ExpectMisses, checkSingle(c.Expect, app)...)      // #267: single.go
 		rec.ExpectMisses = append(rec.ExpectMisses, checkAddressed(c.Expect, app)...)   // #271: addressed.go
@@ -477,6 +493,7 @@ func runCase(ctx context.Context, svc *ai.Service, store *appconfigclient.Memory
 		rec.ExpectMisses = append(rec.ExpectMisses, checkServerRules(c.Expect, app)...) // #343: server_rules.go
 		rec.ExpectMisses = append(rec.ExpectMisses, checkAlarm(c.Expect, app)...)       // alarm.go
 		rec.ExpectMisses = append(rec.ExpectMisses, checkAddMinutes(c.Expect, app)...)  // add_minutes.go
+		rec.ExpectMisses = append(rec.ExpectMisses, checkUnique(c.Expect, app)...)      // unique.go
 	}
 	created[c.ID] = res.DSL // edits too, so an edit can build on an earlier edit (#229)
 	log.Printf("[%s] ok attempts=%d fallback=%v claude=%dms first=%dms out=%d chars=%d tabs=%d screens=%d area=%.2f misses=%v summary=%q",
@@ -703,6 +720,13 @@ func checkExpect(exp map[string]any, m *Metrics, summary string) []string {
 			for _, w := range ws {
 				if !strings.Contains(summary, fmt.Sprint(w)) {
 					miss = append(miss, fmt.Sprintf("summaryHas: %q", w))
+				}
+			}
+		case "summaryNot": // the summary must not say this (-server-rules: no 代替 for push)
+			ws, _ := v.([]any)
+			for _, w := range ws {
+				if strings.Contains(summary, fmt.Sprint(w)) {
+					miss = append(miss, fmt.Sprintf("summaryNot: %q", w))
 				}
 			}
 		}

@@ -3,6 +3,7 @@ package appconfig
 import (
 	"context"
 	"fmt"
+	"math/rand/v2"
 	"net/http"
 	"strings"
 	"testing"
@@ -11,8 +12,16 @@ import (
 	"github.com/jphacks/kz_2601/backend/internal/store"
 )
 
+// devTokenSalt keeps this package's tokens apart from the other packages'
+// that share the emulator in parallel: the token index (device_tokens) is
+// global, so registering the same token elsewhere would drop our device.
+var devTokenSalt = rand.Uint64()
+
+// devToken is the n-th test token, lower-case as the store keeps it.
+func devToken(n int) string { return fmt.Sprintf("%016x%048x", devTokenSalt, n) }
+
 func deviceBody(tok int) string {
-	return fmt.Sprintf(`{"token":"%064X","environment":"sandbox","appVersion":"1.2.0","os":"iOS 18.1"}`, tok)
+	return fmt.Sprintf(`{"token":%q,"environment":"sandbox","appVersion":"1.2.0","os":"iOS 18.1"}`, strings.ToUpper(devToken(tok)))
 }
 
 // #269: PUT / DELETE /v1/me/devices/{installationId} on the caller's own devices.
@@ -26,18 +35,18 @@ func TestDevicesAPI(t *testing.T) {
 		if r.code != http.StatusOK || r.body["environment"] != "sandbox" || r.body["os"] != "iOS 18.1" || r.body["createdAt"] == nil {
 			t.Fatalf("put: %d %s", r.code, r.raw)
 		}
-		if strings.Contains(strings.ToLower(string(r.raw)), fmt.Sprintf("%064x", 1)) || r.body["token"] != nil {
+		if strings.Contains(strings.ToLower(string(r.raw)), devToken(1)) || r.body["token"] != nil {
 			t.Fatalf("token echoed: %s", r.raw)
 		}
 		ds, err := st.ListDevices(ctx, a)
-		if err != nil || len(ds) != 1 || ds[0].Token != fmt.Sprintf("%064x", 1) || ds[0].Environment != store.DeviceSandbox {
+		if err != nil || len(ds) != 1 || ds[0].Token != devToken(1) || ds[0].Environment != store.DeviceSandbox {
 			t.Fatalf("stored (lower-cased): %+v %v", ds, err)
 		}
 		// update keeps one entry
 		if r := e.do(a, http.MethodPut, path, deviceBody(2), nil); r.code != http.StatusOK {
 			t.Fatalf("update: %d %s", r.code, r.raw)
 		}
-		if ds, _ := st.ListDevices(ctx, a); len(ds) != 1 || ds[0].Token != fmt.Sprintf("%064x", 2) {
+		if ds, _ := st.ListDevices(ctx, a); len(ds) != 1 || ds[0].Token != devToken(2) {
 			t.Fatalf("after update: %+v", ds)
 		}
 

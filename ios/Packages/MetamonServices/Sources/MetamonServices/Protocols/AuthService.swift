@@ -28,12 +28,12 @@ public enum AuthError: LocalizedError, Sendable {
 
     public var errorDescription: String? {
         switch self {
-        case .notConfigured: return "Firebase が設定されていません(GoogleService-Info.plist を同期してください)"
-        case .invalidAppleCredential: return "Apple から ID トークンを取得できませんでした"
-        case .requiresRecentLogin: return "もう一度サインインしてから削除してください"
-        case .credentialAlreadyInUse: return "この Apple ID は、すでに別のアカウントで使われています"
-        case .alreadyLinked: return "すでに Apple でサインインしています"
-        case .noPendingAppleAccount: return "もう一度 Apple でサインインしてください"
+        case .notConfigured: return L("Firebase が設定されていません(GoogleService-Info.plist を同期してください)")
+        case .invalidAppleCredential: return L("Apple から ID トークンを取得できませんでした")
+        case .requiresRecentLogin: return L("もう一度サインインしてから削除してください")
+        case .credentialAlreadyInUse: return L("この Apple ID は、すでに別のアカウントで使われています")
+        case .alreadyLinked: return L("すでに Apple でサインインしています")
+        case .noPendingAppleAccount: return L("もう一度 Apple でサインインしてください")
         }
     }
 }

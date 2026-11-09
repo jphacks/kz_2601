@@ -180,9 +180,8 @@ struct StatLeaf: View {
         let failed = entities.contains { rt.records(for: $0).isEmpty && rt.emptyState(for: $0) == .unavailable }
         guard !failed, let v = rt.evaluator().evaluate(expr) else { return (EmptyPlaceholder.unavailableValue, false, true) }
         switch v {
-        // percent の value は比率(0〜1)で来る(生成 DSL は全件 `sum / 目標` の形・progressBar の value と同じ尺度)。
-        // そのまま "%.0f%%" に通すと 1.42 → 「1%」になっていた(#131)
-        case .number(let n): return (Aggregator.format(c.format == "percent" ? n * 100 : n, as: c.format, unit: c.unit), false, false)
+        // percent の value は比率(0〜1)。100 倍は Aggregator.format が持つ(#131・aggregate モードと同じ尺度)
+        case .number(let n): return (Aggregator.format(n, as: c.format, unit: c.unit), false, false)
         default: return (v.text, false, false)
         }
     }

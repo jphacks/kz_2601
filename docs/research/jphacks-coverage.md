@@ -294,7 +294,7 @@ go run ./cmd/ai-eval -score '../docs/backend/ai-eval/raw/*-jphacks*.json'  # PR 
 | [D_2207](https://github.com/jphacks/D_2207) | - | README雛形のまま | その他 | ? | - | 内容なし |  |
 | [D_2208](https://github.com/jphacks/D_2208) | スマートポインター | スマホからホストPCのスライドを共同操作する | Web専用,共有 | × | WEB_ONLY,REALTIME | PCの操作が本体。発表タイマーと順番共有版で代替 | 決勝 |
 | [D_2209](https://github.com/jphacks/D_2209) | Airdapt | なぞった地域に雰囲気が似た街を衛星画像で探す | 地図,独自ML | × | CUSTOM_ML | 衛星画像の特徴検索が本体。街の条件タグ照合版で代替 |  |
-| [D_2210](https://github.com/jphacks/D_2210) | スケジュールマジック | グループの予定から全員が空く日を探す | 共有,記録 | ○ | SERVER_LOGIC | 空き日の濃淡集計は Tailor It では簡易になる。予定の重ね表示で代替 |  |
+| [D_2210](https://github.com/jphacks/D_2210) | スケジュールマジック | グループの予定から全員が空く日を探す | 共有,記録 | ○ | SERVER_LOGIC | 空き日の濃淡集計は Tailor It では簡易になる。予定の重ね表示で代替。候補日のうち誰の予定とも重ならない日は serverRules の `lookup` の `notOverlaps`(期間の重なり)で印を付けられる。何人が空いているかの濃淡は欠ける(○ のまま) |  |
 | [D_2211](https://github.com/jphacks/D_2211) | - | README雛形のまま | その他 | ? | - | 内容なし |  |
 | [D_2212](https://github.com/jphacks/D_2212) | Complete Menu! | 外食店のメニュー制覇を記録しおすすめを出す | 記録,ゲーム | ○ | SERVER_LOGIC | 店メニューは手入力。おすすめは serverRules の `pick`(#715)(まだ食べていないメニューからランダム・古い順に 1 つ選んで記録・通知)で作れる。店のメニューの取得と好みに合わせたおすすめは欠ける |  |
 | [D_2213](https://github.com/jphacks/D_2213) | - | README雛形のまま | その他 | ? | - | 内容なし |  |
@@ -489,7 +489,7 @@ go run ./cmd/ai-eval -score '../docs/backend/ai-eval/raw/*-jphacks*.json'  # PR 
 | [ng_2409](https://github.com/jphacks/ng_2409) | - | README が雛形のまま | - | ? | - | 雛形のまま |  |
 | [ng_2410](https://github.com/jphacks/ng_2410) | モットーク！ | AIと音声で会話し質問力を採点して助言する | AI,音声 | × | CLOUD_AI,STT,TTS | 長い会話AIと音声が本体。代案: 質問を文字で書き端末AIが短く講評 |  |
 | [ng_2411](https://github.com/jphacks/ng_2411) | - | README が雛形のまま | - | ? | - | 雛形のまま |  |
-| [ng_2412](https://github.com/jphacks/ng_2412) | タスクにゃん | 締切と必要日数から作業日程を自動で組む | 記録,フォーム | ○ | SERVER_LOGIC | 作業不可日を避ける自動割付は無く日割り計算まで |  |
+| [ng_2412](https://github.com/jphacks/ng_2412) | タスクにゃん | 締切と必要日数から作業日程を自動で組む | 記録,フォーム | ○ | SERVER_LOGIC | 作業不可日を避ける自動割付は無く日割り計算まで。作業の期間に作業不可日が入っていることは serverRules の `lookup` の `overlaps`(期間の重なり)で知らせられる(○ のまま) |  |
 | [ng_2413](https://github.com/jphacks/ng_2413) | Meacle | 身体情報から必要栄養を計算し献立を自動で出す | 記録,フォーム | ○ | SERVER_LOGIC | 栄養バランスの最適化は無くランダム提案と合計表示。ランダムな献立の提案は serverRules の `pick`(#715)(主菜などで絞って毎日 1 つ選んで記録・通知)で作れる |  |
 | [ng_2414](https://github.com/jphacks/ng_2414) | 留守るちゃん | インターホン映像の顔認証で知人と不審者を判定する | カメラ,独自ML,HW | × | CAMERA_LIVE,CUSTOM_ML | 顔認証が本体。代案: 訪問者を撮影し知人か不審者かを手で記録 |  |
 | [ng_2415](https://github.com/jphacks/ng_2415) | StandTogether | 球場の音から応援歌を特定して歌詞を表示する | 音声,独自ML | × | CUSTOM_ML | 音の照合が本体。代案: 応援歌リストの検索と歌詞表示 |  |

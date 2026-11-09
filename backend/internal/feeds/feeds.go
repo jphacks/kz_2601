@@ -76,6 +76,10 @@ var (
 	ErrDisabled = errors.New("feeds: provider disabled")
 	ErrBusy     = errors.New("feeds: outgoing request budget used up")
 	ErrUpstream = errors.New("feeds: source unavailable")
+	// ErrRecentFailure is ErrUpstream served from the cache: the source
+	// failed less than FailTTL ago and was not asked again. A caller that
+	// retries should wait FailTTL (the runner's saveFeed defers, feed.go).
+	ErrRecentFailure = fmt.Errorf("%w (failed recently, cached)", ErrUpstream)
 	// ErrUserLimit: the caller's search words reached the source too often
 	// this hour (cached answers are still served).
 	ErrUserLimit = errors.New("feeds: per-user source fetches used up")
@@ -110,9 +114,9 @@ var providerLimits = map[string]limits{
 }
 
 const (
-	// failTTL keeps a failure for a while so a broken source is not retried
-	// by every request.
-	failTTL = time.Minute
+	// FailTTL keeps a failure for a while so a broken source is not retried
+	// by every request (ErrRecentFailure until it passes).
+	FailTTL = time.Minute
 	// staleFor is how long a last good copy may stand in for a failing source.
 	staleFor = 24 * time.Hour
 	// maxStoredItems caps what one cached entry keeps.
@@ -364,7 +368,7 @@ func (s *Service) entry(ctx context.Context, q Query) (*entry, bool, error) {
 		if e != nil && now.Before(e.expires) {
 			s.mu.Unlock()
 			if !e.failedAt.IsZero() {
-				return s.staleOr(e, now)
+				return s.staleOr(e, now, ErrRecentFailure)
 			}
 			return e, false, nil
 		}
@@ -441,7 +445,7 @@ func (s *Service) entry(ctx context.Context, q Query) (*entry, bool, error) {
 }
 
 // run fetches q and settles c. A fetch that ended by its context (cancel or
-// deadline) is not remembered for failTTL: the next caller tries again.
+// deadline) is not remembered for FailTTL: the next caller tries again.
 func (s *Service) run(ctx context.Context, k string, q Query, e *entry, c *call, done func()) {
 	if done != nil {
 		defer done()
@@ -465,7 +469,7 @@ func (s *Service) run(ctx context.Context, k string, q Query, e *entry, c *call,
 	case errors.Is(err, context.Canceled), errors.Is(err, context.DeadlineExceeded):
 		keep = false
 	default:
-		ne.failedAt, ne.expires = now, now.Add(failTTL)
+		ne.failedAt, ne.expires = now, now.Add(FailTTL)
 	}
 	if err != nil {
 		slog.Warn("feeds: fetch failed", slog.String("provider", q.Provider), slog.String("region", q.Region),
@@ -478,7 +482,7 @@ func (s *Service) run(ctx context.Context, k string, q Query, e *entry, c *call,
 		s.cache[k] = ne
 	}
 	if err != nil {
-		c.e, c.stale, c.err = s.staleOr(ne, now)
+		c.e, c.stale, c.err = s.staleOr(ne, now, ErrUpstream)
 	} else {
 		c.e = ne
 	}
@@ -486,11 +490,11 @@ func (s *Service) run(ctx context.Context, k string, q Query, e *entry, c *call,
 	close(c.done)
 }
 
-func (s *Service) staleOr(e *entry, now time.Time) (*entry, bool, error) {
+func (s *Service) staleOr(e *entry, now time.Time, fail error) (*entry, bool, error) {
 	if e.items != nil && now.Sub(e.fetchedAt) < staleFor {
 		return e, true, nil
 	}
-	return nil, false, ErrUpstream
+	return nil, false, fail
 }
 
 // await waits for c, or gives up when ctx ends (the fetch goes on).

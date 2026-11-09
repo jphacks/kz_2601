@@ -18,7 +18,9 @@ func TestWaiveIPHourlyCap(t *testing.T) {
 	m := NewMemory()
 	l := New(Config{Limits: Limits{Anonymous: 30, PerIP: 300, Global: 2000, WaivedHourly: 5, WaivedIPHourly: 2},
 		Weights: DefaultWeights, Env: "test", Now: c.now}, m, nil)
-	h := func(got *bool) http.Handler { return l.Middleware(auth.DevVerifier{})(waiving(http.StatusPaymentRequired, got)) }
+	h := func(got *bool) http.Handler {
+		return l.Middleware(auth.DevVerifier{})(waiving(http.StatusPaymentRequired, got))
+	}
 	for i, want := range []bool{true, true, false} {
 		var waived bool
 		serve(t, h(&waived), "POST", "/v1/text", "anon:new"+string(rune('a'+i)), `{}`) // same address, new uid each time

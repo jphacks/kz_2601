@@ -46,7 +46,9 @@ func TestWaiveHourlyCap(t *testing.T) {
 	c := &clock{t: time.Date(2026, 10, 25, 22, 10, 0, 0, JST)}
 	m := NewMemory()
 	l := New(Config{Limits: Limits{SignedIn: 60, Global: 2000, WaivedHourly: 2}, Weights: DefaultWeights, Env: "test", Now: c.now}, m, nil)
-	h := func(got *bool) http.Handler { return l.Middleware(auth.DevVerifier{})(waiving(http.StatusPaymentRequired, got)) }
+	h := func(got *bool) http.Handler {
+		return l.Middleware(auth.DevVerifier{})(waiving(http.StatusPaymentRequired, got))
+	}
 	for i, want := range []bool{true, true, false} {
 		var waived bool
 		serve(t, h(&waived), "POST", "/v1/text", "u1", `{"task":"summarize"}`)

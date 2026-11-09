@@ -19,10 +19,26 @@ final class AIChatTests: XCTestCase {
 
     func testOwnKeepsOnlyMyRecords() {
         var mine = rec("a", "自分", role: "user", at: 1); mine.author = "u1"
-        let local = rec("b", "未送信", role: "user", at: 2)
+        let local = rec("b", "author 無し", role: "user", at: 2)
         var other = rec("c", "他の人", role: "user", at: 3); other.author = "u2"
-        XCTAssertEqual(AIChat.own([mine, local, other], uid: "u1").map(\.id), ["a", "b"])
-        XCTAssertEqual(AIChat.own([mine, local, other], uid: nil).map(\.id), ["b"], "uid が分からなければ author の無い分だけ")
+        var empty = rec("d", "author が空", role: "user", at: 4); empty.author = ""
+        XCTAssertEqual(AIChat.own([mine, local, other, empty], uid: "u1", shared: false).map(\.id), ["a", "b", "d"])
+        XCTAssertEqual(AIChat.own([mine, local, other, empty], uid: nil, shared: false).map(\.id), ["b", "d"],
+                       "uid が分からなければ author の無い分だけ")
+        XCTAssertEqual(AIChat.own([mine, local, other, empty], uid: "", shared: false).map(\.id), ["b", "d"], "空の uid は無いのと同じ")
+    }
+
+    /// shared / public: author の無い記録はサーバーの規則が作った分・古い分もあるので、未送信の分だけ自分。author が空も無いのと同じ。
+    func testOwnOnSharedCountsAuthorlessOnlyWhenUnsent() {
+        var mine = rec("a", "自分", role: "user", at: 1); mine.author = "u1"
+        let server = rec("b", "規則が作った・古い記録", role: "user", at: 2)
+        var unsent = rec("c", "未送信", role: "user", at: 3); unsent.unsent = true
+        var other = rec("d", "他の人", role: "user", at: 4); other.author = "u2"
+        var empty = rec("e", "author が空", role: "user", at: 5); empty.author = ""
+        var emptyUnsent = empty; emptyUnsent.id = "f"; emptyUnsent.unsent = true
+        let rows = [mine, server, unsent, other, empty, emptyUnsent]
+        XCTAssertEqual(AIChat.own(rows, uid: "u1", shared: true).map(\.id), ["a", "c", "f"])
+        XCTAssertEqual(AIChat.own(rows, uid: nil, shared: true).map(\.id), ["c", "f"])
     }
 
     /// speak: true で読む返事は、本文が同じ一番新しい AI の発言(自分の同じ文・古い同じ返事ではない)。

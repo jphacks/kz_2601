@@ -34,7 +34,7 @@ struct NearbyShareLeaf: View {
         Button {
             runtime.nearby?.shareNearby(entity: entity, records: rows)
         } label: {
-            Label(c.label ?? "近くの人に送る", systemImage: "antenna.radiowaves.left.and.right")
+            Label(c.label ?? L("近くの人に送る"), systemImage: "antenna.radiowaves.left.and.right")
                 .frame(maxWidth: .infinity)
         }
         .buttonStyle(RenderButtonStyle(kind: .secondary))
@@ -42,7 +42,7 @@ struct NearbyShareLeaf: View {
         .task(id: entity) {
             if ctx.form?.entity.id != entity { await runtime.load(entities: [entity]) }
         }
-        .accessibilityHint(rows.isEmpty ? "送る記録がありません" : "近くの端末を探して \(rows.count) 件を送ります")
+        .accessibilityHint(rows.isEmpty ? L("送る記録がありません") : L("近くの端末を探して \(rows.count) 件を送ります"))
     }
 }
 #endif

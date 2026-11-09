@@ -8,7 +8,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/jphacks/kz_2601/backend/internal/paid"
 	"github.com/jphacks/kz_2601/backend/pkg/dsl"
 )
 
@@ -35,6 +34,11 @@ type ServerRulesMeta struct {
 	Usage    Usage    `json:"usage"`              // tokens of this pass
 	Declined string   `json:"declined,omitempty"` // the model's refusal sentence (out-of-vocabulary request)
 	Problems []string `json:"problems,omitempty"` // last validation problems when not applied
+	Dropped  []string `json:"dropped,omitempty"`  // rule ids removed as repeats of a local notification
+	// Need is the main call's serverNeed ("" = missing); Trigger says what
+	// started the pass: model (serverNeed) | regex (wantsServerRules) | both.
+	Need    string `json:"need,omitempty"`
+	Trigger string `json:"trigger,omitempty"`
 }
 
 // serverRulesAskRe: the request mentions an automatic action. A false
@@ -240,7 +244,7 @@ func withServerRules(current []byte, rules []map[string]any) ([]byte, error) {
 // runServerRulesPass returns the validated DSL with the new serverRules (or
 // current when nothing applied) and the pass metadata. It never fails the
 // request: a call error or rules that never validate keep current.
-func (s *Service) runServerRulesPass(ctx context.Context, transcript string, current []byte, loc Locale) ([]byte, *ServerRulesMeta) {
+func (s *Service) runServerRulesPass(ctx context.Context, transcript string, current, before []byte, loc Locale) ([]byte, *ServerRulesMeta) {
 	sm := &ServerRulesMeta{}
 	var problems []string
 	for i := 0; i <= s.maxRegen(); i++ {
@@ -281,6 +285,7 @@ func (s *Service) runServerRulesPass(ctx context.Context, transcript string, cur
 			continue
 		}
 		sm.Problems = nil
+		next, app, sm.Dropped = withoutOnDeviceDuplicates(current, before, next, app, rules)
 		sm.Rules = len(app.ServerRules)
 		if sameServerRules(current, app) {
 			return current, sm
@@ -306,12 +311,22 @@ func sameServerRules(current []byte, next *dsl.App) bool {
 // edit turn and folds it into ar: the DSL, the patch (edit: one more op), the
 // summary (the rules in plain words, or the refusal) and the metadata.
 func (s *Service) applyServerRulesPass(ctx context.Context, transcript string, ar *attemptResult, loc Locale) {
-	if !s.serverRulesEnabled() || !wantsServerRules(transcript) {
+	// #316: serverRules need Pro. A build without purchases (App Store review:
+	// it also has no shared data) and 「この機能なしで作る」 get none (serverRulesOn).
+	if !s.serverRulesOn(ctx, transcript) {
 		return
 	}
-	// #316: serverRules need Pro. A build without purchases (App Store review:
-	// it also has no shared data) and 「この機能なしで作る」 get none.
-	if restrictionFrom(ctx).NoSharedData() || defaultPaidCatalog.dropped(transcript, paid.ServerRules) {
+	ar.meta.ServerNeed = ar.serverNeed
+	if !ar.needSeen {
+		mode := "create"
+		if ar.before != nil {
+			mode = "edit"
+		}
+		s.logServerNeedMissing(ctx, mode)
+	}
+	// serverNeed from the main call, the regex as the safety net (server_need.go)
+	trigger := serverRulesTrigger(ar.serverNeed, transcript)
+	if trigger == "" {
 		return
 	}
 	before, err := dsl.Parse(ar.raw)
@@ -319,15 +334,20 @@ func (s *Service) applyServerRulesPass(ctx context.Context, transcript string, a
 		return // matching apps cannot have server rules (#339)
 	}
 	t := time.Now()
-	next, sm := s.runServerRulesPass(ctx, transcript, ar.raw, loc)
+	next, sm := s.runServerRulesPass(ctx, transcript, ar.raw, ar.before, loc)
 	ar.latency += time.Since(t)
 	ar.meta.Usage.Add(sm.Usage)
+	sm.Need, sm.Trigger = ar.serverNeed, trigger
 	ar.meta.ServerRules = sm
 	if !sm.Applied {
 		switch {
 		case sm.Declined != "":
 			ar.summary = appendSentence(ar.summary, sm.Declined, loc)
 		case len(sm.Problems) > 0:
+			ar.summary = appendSentence(ar.summary, loc.serverRulesFailed(), loc)
+		case serverNeedAsked(ar.serverNeed) && len(before.ServerRules) == 0 && len(sm.Dropped) == 0:
+			// the main call asked, the pass made nothing: not silent
+			// (a rule dropped as a repeat of a local notification is covered)
 			ar.summary = appendSentence(ar.summary, loc.serverRulesFailed(), loc)
 		}
 		return

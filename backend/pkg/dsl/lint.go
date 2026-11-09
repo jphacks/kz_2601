@@ -3,7 +3,9 @@ package dsl
 import (
 	"fmt"
 	"math"
+	"regexp"
 	"strings"
+	"time"
 )
 
 // Lint reports content problems in a document that already passes Validate:
@@ -19,19 +21,25 @@ import (
 //     year) but the filter is missing or another period
 //   - screen graph (nav.go): unreachable screens, fullScreen without a way back
 //   - a toolbar item opening the same form as a button on the screen (#416)
+//   - a date/datetime defaultValue other than "now" or a date ("today" is
+//     saved as the text "today", which no date filter matches)
 func (a *App) Lint() []string {
 	l := &linter{app: a, entities: map[string]*Entity{}}
 	for i := range a.Entities {
 		l.entities[a.Entities[i].ID] = &a.Entities[i]
 	}
 	l.computed()
+	l.dateDefaults()
 	l.screens()
 	l.entityReach()
 	l.savedRecordReach() // saved_record.go
 	l.navGraph()
 	l.micSeat()
+	l.goalTarget()
 	l.dupAddControls()
 	l.privateChat()
+	l.optionalTitle()
+	l.settingMaxMin()
 	return l.out
 }
 
@@ -57,6 +65,26 @@ func (l *linter) computed() {
 	}
 }
 
+var dayLiteral = regexp.MustCompile(`^[0-9]{1,4}-[0-9]{1,2}-[0-9]{1,2}$`)
+
+// dateDefaults: iOS (FieldCoding.defaultValue) turns only "now" into the
+// current date; any other default is saved as is.
+func (l *linter) dateDefaults() {
+	for _, e := range l.app.Entities {
+		for _, f := range e.Fields {
+			if (f.Type != FieldDate && f.Type != FieldDatetime) || f.DefaultValue == nil {
+				continue
+			}
+			if s, ok := f.DefaultValue.(string); ok {
+				if _, err := time.Parse(time.RFC3339, s); s == "now" || dayLiteral.MatchString(s) || err == nil {
+					continue
+				}
+			}
+			l.add(`entity %q field %q: defaultValue %s is not a date; use "now" (today) or a fixed date such as "2026-04-01", or remove it`, e.ID, f.ID, quoteLit(f.DefaultValue))
+		}
+	}
+}
+
 func (l *linter) screens() {
 	for _, s := range l.app.Screens {
 		for i := range s.Components {
@@ -77,6 +105,9 @@ func (l *linter) component(where string, c *Component) {
 	if c.Type == CompStat && c.Value != nil {
 		l.constExpr(where+".value", c.Value)
 		l.exprFilters(where+".value", c.Value)
+	}
+	if c.Type == CompStat && c.Aggregate != "" && c.Format == "percent" {
+		l.add(`%s: format percent is for value (a 0..1 ratio, shown x100); the result of aggregate %q is not a 0..1 ratio. Compute the ratio in value instead, e.g. {"op":"div","args":[{"agg":"sum","entity":...,"field":...},<target>]} with percent, or drop format`, where, c.Aggregate)
 	}
 	switch c.Type {
 	case CompStat, CompProgressBar, CompGauge:

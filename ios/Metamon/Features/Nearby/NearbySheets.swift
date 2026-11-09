@@ -41,7 +41,7 @@ struct NearbySheets: ViewModifier {
 
     private func incomingTitle(_ item: NearbyService.Incoming?) -> String {
         guard let h = item?.header else { return "" }
-        return "\(h.sender)さんから「\(h.entityName)」が \(h.count) 件届きました"
+        return L10n.tr("\(h.sender)さんから「\(h.entityName)」が \(h.count) 件届きました")
     }
 }
 
@@ -112,8 +112,8 @@ struct NearbySendSheet: View {
         NavigationStack {
             List {
                 Section {
-                    LabeledContent("送るもの", value: payload.header.song.map { "「\($0.title)」のリクエスト" }
-                        ?? "「\(payload.header.entityName)」\(payload.header.count) 件")
+                    LabeledContent("送るもの", value: payload.header.song.map { L10n.tr("「\($0.title)」のリクエスト") }
+                        ?? L10n.tr("「\(payload.header.entityName)」\(payload.header.count) 件"))
                     LabeledContent("あなたの名前", value: service.myName)
                 }
                 Section {
@@ -161,9 +161,9 @@ struct NearbySendSheet: View {
         case .idle:
             nil
         case .inviting(let name):
-            statusLabel("\(name)さんの承認を待っています…", icon: "hourglass", color: .secondary, spinning: true)
+            statusLabel(L10n.tr("\(name)さんの承認を待っています…"), icon: "hourglass", color: .secondary, spinning: true)
         case .sending(let name):
-            statusLabel("\(name)さんに送っています…", icon: "arrow.up.circle", color: .secondary, spinning: true)
+            statusLabel(L10n.tr("\(name)さんに送っています…"), icon: "arrow.up.circle", color: .secondary, spinning: true)
         case .done(let message):
             statusLabel(message, icon: "checkmark.circle.fill", color: .green, spinning: false)
         case .failed(let message):

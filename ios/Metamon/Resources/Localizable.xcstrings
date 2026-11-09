@@ -290,6 +290,176 @@
         }
       }
     },
+    "%@さんから「%@」が %lld 件届きました" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$@ sent %3$lld “%2$@” records"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@さんから「%@」が %lld 件届きました"
+          }
+        }
+      }
+    },
+    "%@さんから「%@」を %lld 件追加しました" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Added %3$lld “%2$@” records from %1$@"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@さんから「%@」を %lld 件追加しました"
+          }
+        }
+      }
+    },
+    "%@さんから届いた記録に、追加できる項目がありませんでした" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The records from %@ had no fields that could be added"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@さんから届いた記録に、追加できる項目がありませんでした"
+          }
+        }
+      }
+    },
+    "%@さんから応答がありませんでした" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No response from %@"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@さんから応答がありませんでした"
+          }
+        }
+      }
+    },
+    "%@さんが受け取りませんでした" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ didn't accept"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@さんが受け取りませんでした"
+          }
+        }
+      }
+    },
+    "%@さんが受け取れませんでした" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ couldn't receive it"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@さんが受け取れませんでした"
+          }
+        }
+      }
+    },
+    "%@さんとすれ違いました(%@ %lld 件)" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Passed %1$@ (%2$@: %3$lld)"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@さんとすれ違いました(%@ %lld 件)"
+          }
+        }
+      }
+    },
+    "%@さんに %lld 件届きました" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Delivered %2$lld to %1$@"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@さんに %lld 件届きました"
+          }
+        }
+      }
+    },
+    "%@さんに送っています…" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sending to %@…"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@さんに送っています…"
+          }
+        }
+      }
+    },
+    "%@さんの承認を待っています…" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Waiting for %@ to accept…"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@さんの承認を待っています…"
+          }
+        }
+      }
+    },
     "%@には Tailor It Pro(%@ / 月)が必要です" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -1123,6 +1293,23 @@
         }
       }
     },
+    "Apple に引き継ぎました。機種変更のあとも同じ Apple ID で戻れます" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Linked to Apple. You can come back with the same Apple ID after changing phones"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Apple に引き継ぎました。機種変更のあとも同じ Apple ID で戻れます"
+          }
+        }
+      }
+    },
     "ISBN を確かめてください(10 桁か 13 桁)" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -1616,6 +1803,23 @@
         }
       }
     },
+    "「%@」%lld 件" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%2$lld “%1$@” records"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "「%@」%lld 件"
+          }
+        }
+      }
+    },
     "「%@」ができました" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -1884,6 +2088,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "「%@」に近い記録帳が複数あります。一覧から選んでください"
+          }
+        }
+      }
+    },
+    "「%@」のリクエスト" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Request for “%@”"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "「%@」のリクエスト"
           }
         }
       }
@@ -2211,19 +2432,19 @@
         }
       }
     },
-    "「AI で書く」ボタン(文を作る・要約・分類・書き直し・抜き出し・提案)は、端末の中の AI が使える時は送りません。使えない時だけ、押した時に、最近の記録と入力中の文字(最大 4KB)を送ります。写真・音声・動画は送りません。" : {
+    "「AI で書く」ボタン(文を作る・要約・分類・書き直し・抜き出し・提案)は、押した時だけ送ります。短い答えは、端末の中の AI が使える時は送らず、使えない時だけ最近の記録と入力中の文字(最大 4KB)を送ります。長い答えのボタンは、いつも最大 16KB を送ります。共有のアプリで材料にするのは、自分が入れた記録だけです。" : {
       "extractionState" : "manual",
       "localizations" : {
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "\"Write with AI\" buttons (write, summarize, classify, rewrite, extract, suggest) send nothing when on-device AI is available. Only when it is not, tapping one sends recent records and the text being entered (up to 4KB). Photos, audio and video are never sent."
+            "value" : "\"Write with AI\" buttons (write, summarize, classify, rewrite, extract, suggest) send data only when tapped. Short answers send nothing when on-device AI is available; otherwise they send recent records and the text being entered (up to 4KB). Long-answer buttons always send up to 16KB. In a shared app, only records you added are used."
           }
         },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "「AI で書く」ボタン(文を作る・要約・分類・書き直し・抜き出し・提案)は、端末の中の AI が使える時は送りません。使えない時だけ、押した時に、最近の記録と入力中の文字(最大 4KB)を送ります。写真・音声・動画は送りません。"
+            "value" : "「AI で書く」ボタン(文を作る・要約・分類・書き直し・抜き出し・提案)は、押した時だけ送ります。短い答えは、端末の中の AI が使える時は送らず、使えない時だけ最近の記録と入力中の文字(最大 4KB)を送ります。長い答えのボタンは、いつも最大 16KB を送ります。共有のアプリで材料にするのは、自分が入れた記録だけです。"
           }
         }
       }
@@ -2241,6 +2462,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "「AI で書く」ボタン(文を作る・要約・分類・書き直し・抜き出し・提案)は、端末の中の AI だけで動き、何も送りません。"
+          }
+        }
+      }
+    },
+    "「AI と話す」部品は、送るたびに、そのアプリに保存した自分の会話の直近の発言(最大 20 件・16KB)を送ります。参考にする記録帳が決めてあるアプリでは、その記録帳の自分の記録の新しいもの(最大 20 件・8KB)も送ります。写真は「写真を材料にするボタン」を押した時だけ、縮めた 1 枚(JPEG・長い辺 1024 ピクセル以下)を送ります。音声・動画は送りません。" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The \"AI chat\" part sends the latest turns of your own conversation saved in that app (up to 20 turns, 16KB) each time you send a message. If the app sets a reference list, your own latest records from it (up to 20, 8KB) are also sent. A photo is sent only when you tap a \"photo\" AI button: one downscaled image (JPEG, long edge up to 1024 pixels). Audio and video are never sent."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "「AI と話す」部品は、送るたびに、そのアプリに保存した自分の会話の直近の発言(最大 20 件・16KB)を送ります。参考にする記録帳が決めてあるアプリでは、その記録帳の自分の記録の新しいもの(最大 20 件・8KB)も送ります。写真は「写真を材料にするボタン」を押した時だけ、縮めた 1 枚(JPEG・長い辺 1024 ピクセル以下)を送ります。音声・動画は送りません。"
           }
         }
       }
@@ -2445,6 +2683,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "あなたが付けた記録も、参加している人に見えます"
+          }
+        }
+      }
+    },
+    "あなたの名前" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Your name"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "あなたの名前"
           }
         }
       }
@@ -2955,6 +3210,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "ここまでに記録した地点はそのまま残ります。"
+          }
+        }
+      }
+    },
+    "この Apple ID は別のアカウントで使われています" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "This Apple ID is used by another account"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "この Apple ID は別のアカウントで使われています"
           }
         }
       }
@@ -3724,6 +3996,23 @@
         }
       }
     },
+    "この端末は距離・方向の測定に対応していません(iPhone 11 以降・SE を除く)" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "This device can't measure distance and direction (requires iPhone 11 or later, except SE)"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "この端末は距離・方向の測定に対応していません(iPhone 11 以降・SE を除く)"
+          }
+        }
+      }
+    },
     "この記録を家族だけで共有して" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -3924,6 +4213,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "そのままにする"
+          }
+        }
+      }
+    },
+    "そのアカウントに切り替える" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Switch to that account"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "そのアカウントに切り替える"
           }
         }
       }
@@ -5169,19 +5475,19 @@
         }
       }
     },
-    "アプリを作る・直すときは、話した内容・会話・アプリの設計を Anthropic 社の AI に送ります(記録の中身は送りません)。「AI で書く」ボタンは、端末の中の AI が使えない時だけ、押した時に最近の記録と入力中の文字(最大 4KB)を送ります。同意を取り消すと、AI を使う機能が使えなくなります(閲覧・記録は使えます)。送信済みの内容は取り消せません。" : {
+    "アプリを作る・直すときは、話した内容・会話・アプリの設計を Anthropic 社の AI に送ります(記録の中身は送りません)。「AI で書く」ボタンは、押した時だけ送ります(短い答えは端末の中の AI が使えない時だけ最大 4KB、長い答えはいつも最大 16KB)。「AI と話す」部品は直近の会話(最大 20 件・16KB)と、決めてあれば参考の自分の記録(最大 20 件・8KB)を、写真のボタンは縮めた写真 1 枚を送ります。同意を取り消すと、AI を使う機能が使えなくなります(閲覧・記録は使えます)。送信済みの内容は取り消せません。" : {
       "extractionState" : "manual",
       "localizations" : {
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "When you build or edit an app, what you said, the conversation and the app design are sent to Anthropic's AI (the contents of your records are not). \"Write with AI\" buttons send recent records and the text being entered (up to 4KB) only when tapped and only if on-device AI is unavailable. If you withdraw consent, AI features are disabled (viewing and recording still work). Data already sent cannot be recalled."
+            "value" : "When you build or edit an app, what you said, the conversation and the app design are sent to Anthropic's AI (the contents of your records are not). \"Write with AI\" buttons send data only when tapped (short answers up to 4KB, only if on-device AI is unavailable; long answers always up to 16KB). The \"AI chat\" part sends the latest conversation (up to 20 turns, 16KB) and, if set, your own reference records (up to 20, 8KB), and a photo button sends one downscaled photo. If you withdraw consent, AI features are disabled (viewing and recording still work). Data already sent cannot be recalled."
           }
         },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "アプリを作る・直すときは、話した内容・会話・アプリの設計を Anthropic 社の AI に送ります(記録の中身は送りません)。「AI で書く」ボタンは、端末の中の AI が使えない時だけ、押した時に最近の記録と入力中の文字(最大 4KB)を送ります。同意を取り消すと、AI を使う機能が使えなくなります(閲覧・記録は使えます)。送信済みの内容は取り消せません。"
+            "value" : "アプリを作る・直すときは、話した内容・会話・アプリの設計を Anthropic 社の AI に送ります(記録の中身は送りません)。「AI で書く」ボタンは、押した時だけ送ります(短い答えは端末の中の AI が使えない時だけ最大 4KB、長い答えはいつも最大 16KB)。「AI と話す」部品は直近の会話(最大 20 件・16KB)と、決めてあれば参考の自分の記録(最大 20 件・8KB)を、写真のボタンは縮めた写真 1 枚を送ります。同意を取り消すと、AI を使う機能が使えなくなります(閲覧・記録は使えます)。送信済みの内容は取り消せません。"
           }
         }
       }
@@ -5284,6 +5590,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "アプリを読み込めませんでした。接続を確認してください"
+          }
+        }
+      }
+    },
+    "アプリを閉じていても、この時刻に届きます。" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "These arrive at this time even when the app is closed."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "アプリを閉じていても、この時刻に届きます。"
           }
         }
       }
@@ -6563,6 +6886,23 @@
         }
       }
     },
+    "データを読み取れませんでした" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Couldn't read the data"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "データを読み取れませんでした"
+          }
+        }
+      }
+    },
     "ニックネーム" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -7804,6 +8144,23 @@
         }
       }
     },
+    "予約中の通知はありません" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No scheduled notifications"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "予約中の通知はありません"
+          }
+        }
+      }
+    },
     "人気" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -8055,6 +8412,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "今の記録帳を初期状態に戻しますか？"
+          }
+        }
+      }
+    },
+    "今は受け取れません" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Can't receive right now"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "今は受け取れません"
           }
         }
       }
@@ -9024,6 +9398,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "元に戻す"
+          }
+        }
+      }
+    },
+    "元に戻せません。" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "This can't be undone."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "元に戻せません。"
           }
         }
       }
@@ -10167,6 +10558,57 @@
         }
       }
     },
+    "受け取らない" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Decline"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "受け取らない"
+          }
+        }
+      }
+    },
+    "受け取る" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Accept"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "受け取る"
+          }
+        }
+      }
+    },
+    "受け取ると「%@」に追加します。" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Accepting adds them to “%@”."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "受け取ると「%@」に追加します。"
+          }
+        }
+      }
+    },
     "受付" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -10605,6 +11047,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "変更しました"
+          }
+        }
+      }
+    },
+    "変更できませんでした。何をどう変えるか、もう少し詳しく教えてください。" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Couldn't make the change. Tell me a bit more about what to change and how."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "変更できませんでした。何をどう変えるか、もう少し詳しく教えてください。"
           }
         }
       }
@@ -11170,6 +11629,23 @@
         }
       }
     },
+    "接続が切れました" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Disconnected"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "接続が切れました"
+          }
+        }
+      }
+    },
     "接続が戻ったら自動で送ります" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -11714,6 +12190,23 @@
         }
       }
     },
+    "曲名を入れてください" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Enter a song title"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "曲名を入れてください"
+          }
+        }
+      }
+    },
     "書き出す" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -12152,6 +12645,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "機種"
+          }
+        }
+      }
+    },
+    "次の通知" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Upcoming notifications"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "次の通知"
           }
         }
       }
@@ -12985,6 +13495,40 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "相手が見つかりませんでした。一覧を更新してください"
+          }
+        }
+      }
+    },
+    "相手のアプリは今、曲のリクエストを受け付けていません" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Their app isn't taking song requests right now"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "相手のアプリは今、曲のリクエストを受け付けていません"
+          }
+        }
+      }
+    },
+    "相手も Tailor It で同じアプリを開いていると表示されます。相手が「受け取る」を押すと届きます。" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "People appear here when they have the same app open in Tailor It. It's delivered when they tap “Accept”."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "相手も Tailor It で同じアプリを開いていると表示されます。相手が「受け取る」を押すと届きます。"
           }
         }
       }
@@ -14757,6 +15301,108 @@
         }
       }
     },
+    "近くの Tailor It を探しています…" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Looking for Tailor It nearby…"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "近くの Tailor It を探しています…"
+          }
+        }
+      }
+    },
+    "近くの人に送る" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Send to someone nearby"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "近くの人に送る"
+          }
+        }
+      }
+    },
+    "近くの端末" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nearby devices"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "近くの端末"
+          }
+        }
+      }
+    },
+    "近くの端末を探せませんでした(ローカルネットワークの許可を確認してください)" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Couldn't look for nearby devices (check Local Network access)"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "近くの端末を探せませんでした(ローカルネットワークの許可を確認してください)"
+          }
+        }
+      }
+    },
+    "近くの端末を探せませんでした(設定 › プライバシー › ローカルネットワークで Tailor It を許可してください)" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Couldn't look for nearby devices (allow Tailor It in Settings › Privacy › Local Network)"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "近くの端末を探せませんでした(設定 › プライバシー › ローカルネットワークで Tailor It を許可してください)"
+          }
+        }
+      }
+    },
+    "追加できる項目がありませんでした" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nothing could be added"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "追加できる項目がありませんでした"
+          }
+        }
+      }
+    },
     "追加ボタンを左上に移して" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -14842,19 +15488,19 @@
         }
       }
     },
-    "送り先: Tailor It のサーバー(Google Cloud)を経由して Anthropic, PBC(米国)へ。送った内容は、アプリを作る・ボタンの文を作るためだけに使います。" : {
+    "送り先: Tailor It のサーバー(Google Cloud)を経由して Anthropic, PBC(米国)へ。送った内容は、アプリを作る・ボタンの文を作る・会話の返事を作るためだけに使います。" : {
       "extractionState" : "manual",
       "localizations" : {
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Destination: Anthropic, PBC (USA), via Tailor It's server (Google Cloud). It is used only to build your app or to write a button's text."
+            "value" : "Destination: Anthropic, PBC (USA), via Tailor It's server (Google Cloud). It is used only to build your app, write a button's text or reply in a chat."
           }
         },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "送り先: Tailor It のサーバー(Google Cloud)を経由して Anthropic, PBC(米国)へ。送った内容は、アプリを作る・ボタンの文を作るためだけに使います。"
+            "value" : "送り先: Tailor It のサーバー(Google Cloud)を経由して Anthropic, PBC(米国)へ。送った内容は、アプリを作る・ボタンの文を作る・会話の返事を作るためだけに使います。"
           }
         }
       }
@@ -14893,6 +15539,23 @@
         }
       }
     },
+    "送るもの" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sending"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "送るもの"
+          }
+        }
+      }
+    },
     "送るスクショ" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -14910,6 +15573,23 @@
         }
       }
     },
+    "送るデータを作れませんでした" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Couldn't prepare the data to send"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "送るデータを作れませんでした"
+          }
+        }
+      }
+    },
     "送る前に" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -14923,6 +15603,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "送る前に"
+          }
+        }
+      }
+    },
+    "送る記録がありません" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No records to send"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "送る記録がありません"
           }
         }
       }
@@ -15008,6 +15705,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "送信しました"
+          }
+        }
+      }
+    },
+    "送信に失敗しました" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Couldn't send"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "送信に失敗しました"
           }
         }
       }
@@ -15148,6 +15862,23 @@
         }
       }
     },
+    "通知がオフです(タップで設定を開く)" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Notifications are off (tap to open Settings)"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "通知がオフです(タップで設定を開く)"
+          }
+        }
+      }
+    },
     "通知がオフのため、このアプリの通知は届きません" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -15212,6 +15943,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "通知を予約しました(%@)"
+          }
+        }
+      }
+    },
+    "通知を予約できませんでした" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Couldn't schedule the notification"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "通知を予約できませんでした"
           }
         }
       }

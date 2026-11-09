@@ -285,10 +285,11 @@ final class AppRuntime: DSLRuntime {
     /// `openUrl` で外部に渡す処理(テストで差し替える)。
     @ObservationIgnored var openExternalURL: @MainActor (URL) async -> Bool = { await UIApplication.shared.open($0) }
 
-    init(document: AppDocument, services: Services) {
+    /// - Parameter recordSync: テストで到達性を固定したい時に渡す(既定は `RecordSyncFactory`)
+    init(document: AppDocument, services: Services, recordSync injected: RecordSyncEngine? = nil) {
         self.document = document
         self.services = services
-        self.recordSync = RecordSyncFactory.make(client: services.appConfig)
+        self.recordSync = injected ?? RecordSyncFactory.make(client: services.appConfig)
         self.deferredMorph = DeferredSend(connectivity: recordSync.connectivity)
         self.selectedTab = document.dsl.initialTab
         recordSync.onEvent = { [weak self] event in self?.handle(event) }

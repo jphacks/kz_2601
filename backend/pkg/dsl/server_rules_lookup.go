@@ -26,10 +26,14 @@ import (
 
 // RuleLookup is a rule's cross-entity lookup.
 type RuleLookup struct {
-	Op     string `json:"op"`     // exists|notExists
+	Op     string `json:"op"`     // exists|notExists|overlaps|notOverlaps
 	Entity string `json:"entity"` // the entity searched
 	Field  string `json:"field"`  // its field compared ("$id" = the record id)
 	Equals string `json:"equals"` // the row's field it must equal ("$id" = the row's id)
+	// FieldEnd / EqualsEnd: the end of the period of an overlap op
+	// (server_rules_overlap.go); "" = the period is its start only.
+	FieldEnd  string `json:"fieldEnd,omitempty"`
+	EqualsEnd string `json:"equalsEnd,omitempty"`
 }
 
 // Lookup ops and the record id name.
@@ -79,8 +83,15 @@ func checkRuleLookup(where string, rc *ruleCheck) {
 	}
 	where += ".lookup"
 	add := rc.add
+	if l.IsOverlap() {
+		checkRuleOverlap(where, rc)
+		return
+	}
 	if l.Op != LookupExists && l.Op != LookupNotExists {
-		add("%s: op %q must be exists or notExists", where, l.Op)
+		add("%s: op %q must be exists, notExists, overlaps or notOverlaps", where, l.Op)
+	}
+	if l.FieldEnd != "" || l.EqualsEnd != "" {
+		add("%s: fieldEnd / equalsEnd are only for op overlaps / notOverlaps", where)
 	}
 	if rc.row == nil {
 		add("%s: needs a record trigger or on.each (the row whose value is looked up)", where)
@@ -176,6 +187,9 @@ func (a *App) describeLookup(r *ServerRule, row *Entity) string {
 	l := r.Lookup
 	if l == nil {
 		return ""
+	}
+	if l.IsOverlap() {
+		return a.describeOverlap(l, row)
 	}
 	name := func(e *Entity, id, self string) string {
 		if id == LookupID {

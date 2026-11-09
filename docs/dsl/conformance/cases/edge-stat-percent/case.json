@@ -1,0 +1,19 @@
+{
+  "dsl": {
+    "schemaVersion": 1,
+    "app": {"name": "達成率"},
+    "initialScreen": "home",
+    "entities": [],
+    "screens": [
+      {"id": "home", "title": "達成率", "components": [
+        {"type": "stat", "id": "half", "area": "A1:C2", "label": "半分", "format": "percent", "value": 0.5},
+        {"type": "stat", "id": "over", "area": "D1:F2", "label": "超過", "format": "percent", "value": 1.42}
+      ]}
+    ]
+  },
+  "device": {
+    "now": "2026-11-12T12:00:00+09:00",
+    "timeZone": "Asia/Tokyo",
+    "locale": "ja_JP"
+  }
+}

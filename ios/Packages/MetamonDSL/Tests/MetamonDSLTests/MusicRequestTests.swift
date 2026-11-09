@@ -3,6 +3,10 @@ import XCTest
 
 /// `musicPlayer`(#412): 曲のリクエストの検証・承認待ち・近距離共有の判定・Spotify のリンク。
 final class MusicRequestTests: XCTestCase {
+    private var savedLanguage: String?
+    override func setUp() { savedLanguage = setAppLanguage("ja") } // 文言は日本語で確かめる(シミュレータの言語に依らない)
+    override func tearDown() { setAppLanguage(savedLanguage) }
+
     private let song = MusicSong(id: "1440857781", title: "夜に駆ける", artist: "YOASOBI", artworkURL: "https://example.com/a.jpg")
 
     func testExampleDecodes() throws {

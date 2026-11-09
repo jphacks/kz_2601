@@ -10,8 +10,8 @@ import (
 )
 
 // featuresDoc uses every clientFeature once: aiButton long / inputPhoto /
-// saveTo / inputFeeds / outputs, lookupBook (button and toolbar), text {{field}} + highlight and a
-// warnings feed.
+// saveTo / inputFeeds / outputs, lookupBook (button and toolbar), text {{field}} + highlight, a
+// warnings feed, addMinutes and aiChat inputEntity.
 const featuresDoc = `{"schemaVersion":1,"app":{"name":"本","description":"d","icon":"book","voiceEntry":"fullscreen"},"initialScreen":"home",
 "entities":[
  {"id":"book","name":"本","titleField":"title","fields":[
@@ -19,7 +19,8 @@ const featuresDoc = `{"schemaVersion":1,"app":{"name":"本","description":"d","i
   {"id":"body","name":"本文","type":"text"},{"id":"keywords","name":"語","type":"string"},
   {"id":"photo","name":"写真","type":"photo"},{"id":"note","name":"メモ","type":"text"},
   {"id":"meet","name":"集合","type":"string"},{"id":"leave","name":"出発","type":"string","computed":{"op":"addMinutes","args":[{"ref":"meet"},-30]}}]},
- {"id":"card","name":"カード","titleField":"q","fields":[{"id":"q","name":"問題","type":"string","required":true}]}],
+ {"id":"card","name":"カード","titleField":"q","fields":[{"id":"q","name":"問題","type":"string","required":true}]},
+ {"id":"turn","name":"会話","fields":[{"id":"text","name":"本文","type":"text","required":true},{"id":"role","name":"話した人","type":"enum","options":["user","assistant"]}]}],
 "screens":[
  {"id":"home","title":"ホーム","components":[
   {"type":"feed","provider":"warnings","region":"130000"},
@@ -38,7 +39,9 @@ const featuresDoc = `{"schemaVersion":1,"app":{"name":"本","description":"d","i
   {"type":"aiButton","task":"extract","inputPhoto":"photo","output":"note","label":"写真を読む"},
   {"type":"text","text":"{{body}}","highlight":{"field":"keywords"}},
   {"type":"text","text":"本の記録"}],
-  "toolbar":[{"label":"保存","action":{"type":"saveRecord","entity":"book"}},{"label":"ISBN","action":{"type":"lookupBook","bookLookup":{"isbnField":"isbn","titleField":"title"}}}]}]}`
+  "toolbar":[{"label":"保存","action":{"type":"saveRecord","entity":"book"}},{"label":"ISBN","action":{"type":"lookupBook","bookLookup":{"isbnField":"isbn","titleField":"title"}}}]},
+ {"id":"talk","title":"相談","components":[
+  {"type":"aiChat","area":"A1:F12","entity":"turn","textField":"text","roleField":"role","persona":"本の記録を読んで話す相手","inputEntity":"book","limit":5}]}]}`
 
 func TestClientFeaturesDocIsValid(t *testing.T) {
 	if _, err := dsl.Parse([]byte(featuresDoc)); err != nil {
@@ -69,6 +72,7 @@ func TestClientFeaturesRestriction(t *testing.T) {
 		FeatureTextHighlight:  {"## 文の大事な語に印をつける(text.highlight)", "Text.highlight", 1, `{{body}}`},
 		FeatureFeedV2:         {"警報・注意報」「大雨警報が出ているか」", `"warnings"`, 1, `"warnings"`},
 		FeatureExprAddMinutes: {"## 時刻に分を足す・引く(addMinutes)", `"addMinutes"`, 1, `"addMinutes"`},
+		FeatureAIChatInput:    {"## 自分の記録を読んで話す(aiChat inputEntity)", "AiChat.inputEntity", 1, `"inputEntity"`},
 	}
 	if len(gone) != len(clientFeatures) {
 		t.Fatalf("test covers %d of %d features", len(gone), len(clientFeatures))

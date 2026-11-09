@@ -125,6 +125,11 @@ type PlannedWrite struct {
 	Values   map[string]any // create / update
 	Field    string         // increment
 	By       float64        // increment
+	// Key (create only) names the record independently of the run: the
+	// runner derives its id from the rule, the action and Key, so runs of
+	// different events with the same Key create it once ("" = once per
+	// run). saveFeed: the day in Japan time.
+	Key string
 }
 
 // PlannedNotify is one notification with its recipient still a kind (who it
@@ -146,6 +151,15 @@ type PlannedNotify struct {
 type Plan struct {
 	Writes   []PlannedWrite
 	Notifies []PlannedNotify
+	// Skipped: actions left out on purpose (the runner logs them); never
+	// a reason to retry.
+	Skipped []PlannedSkip
+}
+
+// PlannedSkip is an action the plan leaves out, with a short reason code.
+type PlannedSkip struct {
+	Action int
+	Reason string
 }
 
 // Empty reports whether the plan does nothing.
@@ -226,7 +240,7 @@ func planOne(ctx context.Context, app *dsl.App, rule *dsl.ServerRule, ev Trigger
 		src.listed[id] = true
 	}
 	e := expreval.New(expreval.Env{Entities: app.Entities, Source: src, Now: ev.At, Location: loc})
-	p := planner{app: app, ev: ev, row: row, e: e, loc: loc, each: rule.On.Each != ""}
+	p := planner{app: app, ev: ev, row: row, e: e, loc: loc, each: rule.On.Each != "", src: src}
 	if rule.If != nil {
 		v := e.Eval(*rule.If, row)
 		if src.err != nil {
@@ -237,7 +251,12 @@ func planOne(ctx context.Context, app *dsl.App, rule *dsl.ServerRule, ev Trigger
 		}
 	}
 	if rule.Lookup != nil {
-		ok := lookupHolds(app, rule.Lookup, row, src, cache)
+		var ok bool
+		if rule.Lookup.IsOverlap() {
+			ok = overlapHolds(app, rule.Lookup, row, src, cache, loc)
+		} else {
+			ok = lookupHolds(app, rule.Lookup, row, src, cache)
+		}
 		if src.err != nil {
 			return Plan{}, src.err
 		}
@@ -265,6 +284,7 @@ func planOne(ctx context.Context, app *dsl.App, rule *dsl.ServerRule, ev Trigger
 			return Plan{}, nil
 		}
 		p.row = picked
+		cache.noteAssigned(rule, row, picked)
 	}
 	var out Plan
 	for i := range rule.Do {
@@ -332,10 +352,13 @@ type planner struct {
 	// each: the row was just listed (on.each), so an update of the row that
 	// changes nothing is not written (a daily recount writes only changes).
 	each bool
+	src  *refSource // ctx + refs (saveFeed reads the feed through refs)
 }
 
 func (p *planner) action(i int, act *dsl.RuleAction, out *Plan) error {
 	switch {
+	case act.SaveFeed != nil:
+		return p.saveFeed(i, act.SaveFeed, out)
 	case act.Notify != nil:
 		n := PlannedNotify{Action: i, To: act.Notify.To,
 			Title: p.render(act.Notify.Title, dsl.MaxNotifyTitleRunes, act.Notify.With),
