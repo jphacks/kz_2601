@@ -155,7 +155,7 @@ public struct BracketDraw: Equatable, Sendable {
         Self.tap(match, side: side, winsField: winsField, pending: pending, nextDecided: nextDecided(match))
     }
 
-    /// 試合の side の人をタップした時。勝者でなければ勝者に(相手が勝者なら戻す)、勝者なら取り消す。
+    /// 試合の side の人をタップした時。勝者でなければ勝者に(相手が勝者なら戻す)、勝者なら取り消す(相手も wins >= r なら相手も r-1 = 未定)。
     /// 先の試合(nextDecided)に結果が付いていれば、勝った側・負けた側どちらでも変えない: 変えると先の結果が別の人に移る。
     /// wins の大きさでは止めない(よそで大きすぎる値が入っても、先が未定なら取り消せる)。
     public static func tap(_ match: Match, side: Side, winsField: String, pending: [String: Int] = [:], nextDecided: Bool) -> TapResult {
@@ -163,8 +163,13 @@ public struct BracketDraw: Equatable, Sendable {
         let (me, other) = side == .a ? (a, b) : (b, a)
         let r = match.round
         if match.winner != nil, nextDecided { return .locked }
-        if match.winner == side { return .update([me.id: r - 1]) }
         let wo = wins(other, field: winsField, pending: pending)
+        if match.winner == side {
+            // 取り消し: 相手も wins >= r(よその値で 2 人とも勝ち)なら一緒に r-1。でないと相手が勝者に変わる
+            var out = [me.id: r - 1]
+            if wo >= r { out[other.id] = r - 1 }
+            return .update(out)
+        }
         var out = [me.id: r]
         if wo >= r { out[other.id] = r - 1 }
         return .update(out)

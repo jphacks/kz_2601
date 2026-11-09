@@ -158,6 +158,22 @@ final class BracketDrawTests: XCTestCase {
         XCTAssertEqual(e.tap(e.rounds[0][0], side: .b, winsField: "wins"), .update(["d": 1, "a": 0]))
     }
 
+    /// よその値で 2 人とも wins >= r の試合: 勝者の取り消しは 2 人とも r-1(相手を勝者にしない)。先が決まっていればこれまでどおり locked。
+    func testUndoWhenBothHaveWinsClearsTheMatch() {
+        let d = four(["a": 1, "d": 2]) // a-d は 2 人とも >= 1・d の方が大きい
+        let m = d.rounds[0][0]
+        XCTAssertEqual(m.winner, .b)
+        XCTAssertEqual(d.tap(m, side: .b, winsField: "wins"), .update(["d": 0, "a": 0]))
+        let undone = four(["a": 0, "d": 0]).rounds[0][0]
+        XCTAssertNil(undone.winner)
+        // 保存待ちの値でも同じ
+        XCTAssertEqual(four().tap(four().rounds[0][0], side: .a, winsField: "wins", pending: ["a": 1, "d": 1]), .update(["a": 0, "d": 0]))
+        // d が 2 回戦で勝っていれば(先が決まっている)変えられない
+        let locked = four(["a": 1, "d": 2, "b": 1])
+        XCTAssertEqual(locked.rounds[1][0].winner, .a)
+        XCTAssertEqual(locked.tap(locked.rounds[0][0], side: .b, winsField: "wins"), .locked)
+    }
+
     /// Int に収まらない wins(CSV の取り込み・型を変えた field の古い値)でも落ちない。
     func testHugeWinsDoNotTrap() {
         let r = Record(id: "a", data: ["wins": .number(1e20)])
