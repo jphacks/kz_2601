@@ -167,7 +167,10 @@ final class BracketDrawTests: XCTestCase {
         let undone = four(["a": 0, "d": 0]).rounds[0][0]
         XCTAssertNil(undone.winner)
         // 保存待ちの値でも同じ
-        XCTAssertEqual(four().tap(four().rounds[0][0], side: .a, winsField: "wins", pending: ["a": 1, "d": 1]), .update(["a": 0, "d": 0]))
+        let pending = ["a": 1, "d": 1]
+        let pd = BracketDraw(records: four().entrants, winsField: "wins", seedField: nil, pending: pending)
+        XCTAssertEqual(pd.rounds[0][0].winner, .a) // 同じ値なら上の枠
+        XCTAssertEqual(pd.tap(pd.rounds[0][0], side: .a, winsField: "wins", pending: pending), .update(["a": 0, "d": 0]))
         // d が 2 回戦で勝っていれば(先が決まっている)変えられない
         let locked = four(["a": 1, "d": 2, "b": 1])
         XCTAssertEqual(locked.rounds[1][0].winner, .a)
