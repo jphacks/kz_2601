@@ -1,7 +1,8 @@
 package appconfig
 
-// ISBN lookup: GET /v1/lookup/book?isbn= fills a form from a book's ISBN
-// (DSL lookupBook). Same model as the external feeds (#348): the server is the
+// ISBN lookup: POST /v1/lookup/book {"isbn"} fills a form from a book's ISBN
+// (DSL lookupBook). GET ?isbn= is the same lookup, kept for older iOS builds
+// (lookup_body.go: user-entered values stay out of URLs). Same model as the external feeds (#348): the server is the
 // only party that talks to the source, takes nothing from the request but a
 // checked ISBN and sends nothing about the user. internal/books holds the
 // source, the address check, the timeout, the body cap and the cache.
@@ -30,7 +31,8 @@ func init() {
 		if h.bookUsers == nil {
 			h.bookUsers = newFeedLimiter(bookLookupsPerHour(os.Getenv), time.Now)
 		}
-		mux.HandleFunc("GET /v1/lookup/book", h.lookupBook)
+		mux.HandleFunc("GET /v1/lookup/book", h.lookupBook) // deprecated: older iOS builds
+		mux.HandleFunc("POST /v1/lookup/book", h.lookupBookBody)
 	})
 }
 
@@ -49,7 +51,7 @@ func bookLookupsPerHour(getenv func(string) string) int {
 	return DefaultBookLookupsPerHour
 }
 
-// lookupBook: GET /v1/lookup/book?isbn=
+// lookupBook: GET /v1/lookup/book?isbn= (deprecated)
 func (h *Handler) lookupBook(w http.ResponseWriter, r *http.Request) {
 	vals := r.URL.Query()
 	for k, v := range vals {
@@ -58,6 +60,22 @@ func (h *Handler) lookupBook(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	}
+	h.serveBook(w, r, vals.Get("isbn"))
+}
+
+// lookupBookBody: POST /v1/lookup/book {"isbn"}
+func (h *Handler) lookupBookBody(w http.ResponseWriter, r *http.Request) {
+	var in struct {
+		ISBN string `json:"isbn"`
+	}
+	if !decodeLookupBody(w, r, &in) {
+		return
+	}
+	h.serveBook(w, r, in.ISBN)
+}
+
+// serveBook is the lookup shared by GET and POST (checks, cap, fetch, reply).
+func (h *Handler) serveBook(w http.ResponseWriter, r *http.Request, isbn string) {
 	// Off unless BOOK_LOOKUP_ENABLED (books.EnabledFromEnv): 503 for every
 	// call, so a saved lookupBook button shows "not available now".
 	if !h.books.Enabled() {
@@ -65,7 +83,7 @@ func (h *Handler) lookupBook(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	// Checked before the per-user count and before any fetch.
-	if _, ok := books.NormalizeISBN(vals.Get("isbn")); !ok {
+	if _, ok := books.NormalizeISBN(isbn); !ok {
 		fail(w, apiErr(http.StatusBadRequest, httpx.CodeBadRequest, "ISBN を確かめてください(10 桁か 13 桁)").With("field", "isbn"))
 		return
 	}
@@ -77,7 +95,7 @@ func (h *Handler) lookupBook(w http.ResponseWriter, r *http.Request) {
 	}
 	ctx, cancel := context.WithTimeout(r.Context(), 15*time.Second)
 	defer cancel()
-	book, err := h.books.Lookup(ctx, vals.Get("isbn"))
+	book, err := h.books.Lookup(ctx, isbn)
 	switch {
 	case errors.Is(err, books.ErrInvalidISBN):
 		fail(w, apiErr(http.StatusBadRequest, httpx.CodeBadRequest, "ISBN を確かめてください(10 桁か 13 桁)").With("field", "isbn"))

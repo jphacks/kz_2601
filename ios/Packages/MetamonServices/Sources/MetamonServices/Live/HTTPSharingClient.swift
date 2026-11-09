@@ -41,11 +41,15 @@ public struct HTTPSharingClient: SharingClient {
     }
 
     public func searchPublicApps(query: String, sort: String) async throws -> [PublicAppListing] {
-        var c = URLComponents()
-        c.queryItems = [URLQueryItem(name: "q", value: query), URLQueryItem(name: "sort", value: sort),
-                        URLQueryItem(name: "pageSize", value: "50")]
-        let path = "v1/public-apps?" + (c.percentEncodedQuery ?? "")
-        return try JSONDecoder().decode(ListResponse.self, from: try await request("GET", path)).items
+        // POST: 入力された検索語を URL に載せない
+        let body = SearchBody(q: query, sort: sort, pageSize: 50)
+        return try JSONDecoder().decode(ListResponse.self, from: try await request("POST", "v1/public-apps/search", body: body)).items
+    }
+
+    private struct SearchBody: Encodable {
+        let q: String
+        let sort: String
+        let pageSize: Int
     }
 
     public func install(publicAppId: String) async throws -> InstalledApp {

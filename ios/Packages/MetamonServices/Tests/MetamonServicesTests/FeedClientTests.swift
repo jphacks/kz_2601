@@ -34,10 +34,24 @@ final class FeedClientTests: XCTestCase {
         XCTAssertEqual(r.source.name, "気象庁ホームページ")
         XCTAssertFalse(r.stale)
         let req = try XCTUnwrap(StubURLProtocol.lock.withLock { StubURLProtocol.requests }.first)
-        XCTAssertEqual(req.httpMethod, "GET")
+        XCTAssertEqual(req.httpMethod, "POST")
         XCTAssertEqual(req.url?.host(), "appconfig.test")
         XCTAssertEqual(req.url?.path, "/v1/feeds/weather")
-        XCTAssertEqual(req.url?.query, "region=170000&limit=3")
+        XCTAssertNil(req.url?.query)
+        XCTAssertEqual(StubURLProtocol.bodyJSON(req), ["region": "170000", "limit": 3])
+    }
+
+    /// diet の検索語は本文にだけ入る(URL に載せない)。
+    func testDietQueryInBodyOnly() async throws {
+        StubURLProtocol.reset([.init(status: 200, body: #"{"provider":"diet","title":"国会会議録「予算」","items":[],"source":{"name":"国会会議録検索システム","url":"https://kokkai.ndl.go.jp/","license":"l"}}"#)])
+        let client = HTTPFeedClient(baseURL: base, token: StaticTokenProvider("u1"))
+        let r = try await client.feed(FeedQuery(provider: "diet", q: "こども 予算+α&x=1"))
+        XCTAssertEqual(r.provider, "diet")
+        let req = try XCTUnwrap(StubURLProtocol.lock.withLock { StubURLProtocol.requests }.first)
+        XCTAssertEqual(req.httpMethod, "POST")
+        XCTAssertEqual(req.url?.path, "/v1/feeds/diet")
+        XCTAssertNil(req.url?.query)
+        XCTAssertEqual(StubURLProtocol.bodyJSON(req), ["q": "こども 予算+α&x=1", "limit": 5])
     }
 
     @MainActor

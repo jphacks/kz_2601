@@ -3,7 +3,7 @@
 import Foundation
 import MetamonDSL
 
-/// 外部の公開データ(#348・`GET /v1/feeds/{provider}`)。端末は appconfig にだけ聞き、外部へ直接つながらない。
+/// 外部の公開データ(#348・`POST /v1/feeds/{provider}`)。端末は appconfig にだけ聞き、外部へ直接つながらない。
 public protocol FeedClient: Sendable {
     func feed(_ query: FeedQuery) async throws -> FeedResult
 }

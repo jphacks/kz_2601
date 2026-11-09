@@ -27,6 +27,7 @@
 | PUT | `/v1/apps/{appId}/follows/{uid}` | `{following: true, count}`(冪等) |
 | DELETE | `/v1/apps/{appId}/follows/{uid}` | `{following: false, count}`(冪等) |
 | GET | `/v1/apps/{appId}/entities/{e}/records?filterField=author&filterOp=in&filterValue=myFollows` | フォローしている人の投稿(`nin` = それ以外) |
+| POST | `/v1/apps/{appId}/entities/{e}/records/query` `{"filterField":"author","filterOp":"in","filterValue":"myFollows"}` | 同じ(条件を本文で送る形) |
 
 エラー: 公開済みの DSL に共有の entity が無い 404 `no_shared_data` / 自分 400 `follow_self` / 500 人を超える 403 `follows_full` / scope:shared だけのアプリで、呼んだ人が参加者でない 403 `not_member`・相手が参加者でない 404 `not_in_app` / 運営が非公開にしたアプリ 403 `unpublished`。契約は [openapi-appconfig.yaml](../openapi-appconfig.yaml)。
 

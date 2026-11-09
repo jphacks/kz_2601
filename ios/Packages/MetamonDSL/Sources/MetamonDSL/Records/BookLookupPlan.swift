@@ -18,7 +18,7 @@ public struct BookLookupSpec: Decodable, Equatable, Sendable {
     }
 }
 
-/// `GET /v1/lookup/book` の応答。
+/// `POST /v1/lookup/book` の応答。
 public struct BookInfo: Decodable, Equatable, Sendable {
     public struct Source: Decodable, Equatable, Sendable {
         public var name: String

@@ -102,6 +102,7 @@ func New(s store.Store, opts ...Option) *http.ServeMux {
 	mux.HandleFunc("GET /v1/apps/{appId}/entities/{entityId}", h.getEntity)
 
 	mux.HandleFunc("GET /v1/apps/{appId}/entities/{entityId}/records", h.listRecords)
+	mux.HandleFunc("POST /v1/apps/{appId}/entities/{entityId}/records/query", h.queryRecords)
 	mux.HandleFunc("POST /v1/apps/{appId}/entities/{entityId}/records", h.createRecord)
 	mux.HandleFunc("DELETE /v1/apps/{appId}/entities/{entityId}/records", h.deleteAllRecords)
 	mux.HandleFunc("GET /v1/apps/{appId}/entities/{entityId}/records/{recordId}", h.getRecord)
@@ -216,16 +217,21 @@ func requireIfMatch(r *http.Request) (int, error) {
 type paging struct{ size, offset int }
 
 func parsePaging(r *http.Request) (paging, error) {
+	return pagingFrom(r.URL.Query().Get("pageSize"), r.URL.Query().Get("pageToken"))
+}
+
+// pagingFrom reads pageSize / pageToken ("" = not sent) from a query or a body.
+func pagingFrom(size, token string) (paging, error) {
 	p := paging{size: defaultPage}
-	if s := r.URL.Query().Get("pageSize"); s != "" {
-		n, err := strconv.Atoi(s)
+	if size != "" {
+		n, err := strconv.Atoi(size)
 		if err != nil || n < 1 {
 			return p, apiErr(http.StatusBadRequest, httpx.CodeBadRequest, "pageSize must be a positive integer")
 		}
 		p.size = min(n, maxPage)
 	}
-	if t := r.URL.Query().Get("pageToken"); t != "" {
-		b, err := base64.RawURLEncoding.DecodeString(t)
+	if token != "" {
+		b, err := base64.RawURLEncoding.DecodeString(token)
 		n, err2 := strconv.Atoi(string(b))
 		if err != nil || err2 != nil || n < 0 {
 			return p, apiErr(http.StatusBadRequest, httpx.CodeBadRequest, "invalid pageToken")

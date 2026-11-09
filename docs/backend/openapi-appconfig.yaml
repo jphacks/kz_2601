@@ -409,6 +409,7 @@ paths:
       tags: [records]
       summary: レコード一覧
       description: |
+        **filter つきの呼び出しは kept for older iOS builds**。新しい呼び出しは filter(`filterValue` に uid などが入る)を本文で送る `POST .../records/query`(利用者の値を URL に載せない)。filter なしのページ送り(`pageSize`/`pageToken`/sort だけ)は GET のままでよい。
         既定は `createdAt desc`。`sort`/`filter` は DSL の List と同じ語彙。
         複合インデックスが無い組み合わせはサーバー側メモリソート (1 entity 上限 2000 件、超過は 413)。
         public/shared entity は全ユーザーの投稿が返り、各レコードに `author`/`authorName` が付く。
@@ -422,11 +423,11 @@ paths:
         - { $ref: '#/components/parameters/PageToken' }
         - { in: query, name: sortField, schema: { type: string } }
         - { in: query, name: sortDir, schema: { type: string, enum: [asc, desc] } }
-        - { in: query, name: filterField, schema: { type: string } }
-        - { in: query, name: filterOp, schema: { type: string, enum: [eq, neq, gt, gte, lt, lte, thisMonth, today, in, nin] }, description: 'in / nin は filterField=author・filterValue=myFollows だけ (#270)' }
-        - { in: query, name: filterValue, schema: { type: string } }
+        - { in: query, name: filterField, deprecated: true, schema: { type: string }, description: 'POST .../records/query の本文で送る' }
+        - { in: query, name: filterOp, deprecated: true, schema: { type: string, enum: [eq, neq, gt, gte, lt, lte, thisMonth, today, in, nin] }, description: 'in / nin は filterField=author・filterValue=myFollows だけ (#270)。POST .../records/query の本文で送る' }
+        - { in: query, name: filterValue, deprecated: true, schema: { type: string }, description: 'POST .../records/query の本文で送る' }
       responses:
-        '200':
+        '200': &recordsListOK
           description: OK
           content:
             application/json:
@@ -473,6 +474,40 @@ paths:
       parameters: [{ in: query, name: confirm, required: true, schema: { type: boolean } }]
       responses:
         '204': { description: Deleted }
+
+  /apps/{appId}/entities/{entityId}/records/query:
+    parameters: [{ $ref: '#/components/parameters/AppId' }, { $ref: '#/components/parameters/EntityId' }]
+    post:
+      tags: [records]
+      summary: レコード一覧(GET .../records と同じ・filter / sort / ページは本文)
+      description: |
+        GET .../records と同じ一覧(読める人・shared の参加者だけ・ブロック・非公開・並べ替え・ページ送り・応答の形はすべて同じ)。
+        filter の値(`filterField=author` の uid など)を URL に載せないため、条件を JSON の本文で送る。本文の値はログに残さない。
+        - 本文は 4 KiB まで(超えると 413)。未知のキー・型の違い(`pageSize` は整数・他は文字列)・クエリ文字列付きは 400。
+        - `{}` は filter なし・既定の並び(`createdAt desc`)・既定のページサイズ。
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              properties:
+                filterField: { type: string }
+                filterOp: { type: string, enum: [eq, neq, gt, gte, lt, lte, thisMonth, today, in, nin], description: 'in / nin は filterField=author・filterValue=myFollows だけ (#270)' }
+                filterValue: { type: string }
+                sortField: { type: string }
+                sortDir: { type: string, enum: [asc, desc] }
+                pageSize: { type: integer, minimum: 1, description: 上限を超えた値は上限に丸める }
+                pageToken: { type: string, description: 前の応答の nextPageToken }
+            example: { filterField: author, filterOp: neq, filterValue: '<uid>', pageSize: 100 }
+      responses:
+        '200': *recordsListOK
+        '400': { description: filter / sort / pageSize / pageToken が不正・未知のキー・クエリ文字列付き, content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/NotMember' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '413': { description: 本文が 4 KiB を超える・1 entity のレコードが多すぎてメモリで並べられない, content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
 
   /apps/{appId}/entities/{entityId}/records/{recordId}:
     parameters:
@@ -687,8 +722,10 @@ paths:
   /public-apps:
     get:
       tags: [sharing]
+      deprecated: true
       summary: 公開アプリを検索
       description: |
+        **kept for older iOS builds**。新しい呼び出しは同じ条件を本文で送る `POST /public-apps/search`(利用者が入力した値を URL に載せない)。
         名前・説明・タグ・作者名の部分一致(大文字小文字無視)。件数が少ない前提で最大 500 件をメモリ内で絞り込む(全文検索はしない)。
         運営が非公開にした掲載は掲載者本人にだけ返る(`hidden`・`hiddenReason` 付き)。ブロックしたユーザーの掲載は返らない(#321)。
       parameters:
@@ -697,7 +734,7 @@ paths:
         - { $ref: '#/components/parameters/PageSize' }
         - { $ref: '#/components/parameters/PageToken' }
       responses:
-        '200':
+        '200': &publicAppsOK
           description: OK
           content:
             application/json:
@@ -707,6 +744,31 @@ paths:
                   items: { type: array, items: { $ref: '#/components/schemas/PublicApp' } }
                   nextPageToken: { type: string }
         '400': { description: sort が不正, content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+  /public-apps/search:
+    post:
+      tags: [sharing]
+      summary: 公開アプリを検索(GET /public-apps と同じ・条件は本文)
+      description: |
+        GET /public-apps と同じ検索。利用者が入力した検索語を URL に載せないため、条件を JSON の本文で送る。
+        - 本文は 4 KiB まで(超えると 413)。未知のキー・型の違い・クエリ文字列付きは 400。
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              properties:
+                q: { type: string }
+                sort: { type: string, enum: [popular, new], default: popular }
+                pageSize: { type: integer, minimum: 1, description: 上限を超えた値は上限に丸める }
+                pageToken: { type: string, description: 前の応答の nextPageToken }
+            example: { q: 家計簿, sort: popular, pageSize: 50 }
+      responses:
+        '200': *publicAppsOK
+        '400': { description: sort / pageSize / pageToken が不正・未知のキー・クエリ文字列付き, content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '413': { description: 本文が 4 KiB を超える, content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
   /public-apps/{id}/install:
     parameters: [{ in: path, name: id, required: true, schema: { type: string } }]
     post:
@@ -1370,8 +1432,10 @@ paths:
   /feeds/{provider}:
     get:
       tags: [feeds]
+      deprecated: true
       summary: 外部の公開データを読む(DSL の feed・#348)。運営の許可リストだけ・読むだけ
       description: |
+        **kept for older iOS builds**。新しい呼び出しは同じパラメータを本文で送る POST(利用者が入力した値を URL に載せない)。中身・上限・キャッシュは POST と同じ。
         DSL の `feed` 部品が表示するデータを、サーバーが**決まった出どころ**から取って返す。端末は外部へ直接つながらない。
         - provider は閉じた一覧(weather / warnings / pressure / holidays / rss / arxiv / diet)。取りに行く URL はサーバーのコードで固定で、リクエストから URL・ホスト・パスは受け取らない。
         - weather: `region`(気象庁の府県予報区のコード・`dsl.WeatherRegions` のどれか)が必須。位置(緯度経度)は受け取らない。
@@ -1393,7 +1457,7 @@ paths:
         - { name: q, in: query, schema: { type: string, minLength: 1, maxLength: 40 }, description: 'diet だけ・必須。国会会議録で探す語(空白区切りは AND)' }
         - { name: limit, in: query, schema: { type: integer, minimum: 1, maximum: 20, default: 5 } }
       responses:
-        '200':
+        '200': &feedOK
           description: 'OK(Cache-Control は private, max-age=300)'
           content:
             application/json:
@@ -1434,12 +1498,43 @@ paths:
         '404': { description: 未知の provider, content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
         '429': { description: 1 時間の上限。`Retry-After` と details(scope=user・limit・retryAfterSec), content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
         '503': { description: 止めている(details.reason = disabled)・出どころに今つながらない(`Retry-After`), content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+    post:
+      tags: [feeds]
+      summary: 外部の公開データを読む(GET と同じ・パラメータは本文)
+      description: |
+        GET と同じ読み込み(許可リスト・検査・キャッシュ・1 ユーザー 1 時間の上限は GET と共通で数える)。利用者が入力した値(diet の `q`)を URL に載せないため、パラメータを JSON の本文で送る。
+        - 本文は 4 KiB まで(超えると 413)。未知のキー・型の違い・クエリ文字列付きは 400。
+      parameters:
+        - { name: provider, in: path, required: true, schema: { type: string, enum: [weather, holidays, rss, warnings, pressure, arxiv, diet] } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              properties:
+                region: { type: string, pattern: '^[0-9]{6}$', description: 'weather / warnings / pressure だけ・必須' }
+                feedId: { type: string, description: 'rss・arxiv だけ・必須(GET の feedId と同じ一覧)' }
+                q: { type: string, minLength: 1, maxLength: 40, description: 'diet だけ・必須。国会会議録で探す語' }
+                limit: { type: integer, minimum: 1, maximum: 20, default: 5 }
+            example: { q: 予算 委員会, limit: 5 }
+      responses:
+        '200': *feedOK
+        '400': { description: 許可リストに無い region / feedId・未知のキー・limit の範囲外・クエリ文字列付き, content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '404': { description: 未知の provider, content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+        '413': { description: 本文が 4 KiB を超える, content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+        '429': { description: 1 時間の上限(GET と共通)。`Retry-After` と details(scope=user・limit・retryAfterSec), content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+        '503': { description: 止めている(details.reason = disabled)・出どころに今つながらない(`Retry-After`), content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
 
   /lookup/book:
     get:
       tags: [lookup]
+      deprecated: true
       summary: ISBN から本の書名・著者・出版社・出版日を引く(DSL の lookupBook)
       description: |
+        **kept for older iOS builds**。新しい呼び出しは `isbn` を本文で送る POST(利用者が入力した値を URL に載せない)。中身・上限・キャッシュは POST と同じ。
         DSL の `lookupBook` ボタンがフォームを埋めるための値を、サーバーが**決まった出どころ**(openBD v1・鍵なし)から取って返す。端末は外部へ直接つながらない。
         - `isbn` だけを受け取る(ISBN-10 / ISBN-13・ハイフンと空白は可)。桁と検査数字(ISBN-13 は 978 / 979 始まり)を確かめてから取りに行くので、正しくない ISBN は出どころへ出ない(400)。他のパラメータ・重複は 400。
         - 取りに行く URL はサーバーのコードで固定(`https://api.openbd.jp/v1/get?isbn={13 桁}`)。公開アドレス以外へはつながない(feeds と同じクライアント)・8 秒で打ち切り・本文 256 KiB まで・同じホストへのリダイレクト 3 回まで。
@@ -1450,7 +1545,7 @@ paths:
       parameters:
         - { name: isbn, in: query, required: true, schema: { type: string, maxLength: 40 }, example: 978-4-7808-0204-7 }
       responses:
-        '200':
+        '200': &bookOK
           description: 'OK(Cache-Control は private, max-age=3600)'
           content:
             application/json:
@@ -1485,6 +1580,31 @@ paths:
         '401': { $ref: '#/components/responses/Unauthenticated' }
         '404': { description: この ISBN の本が出どころに無い, content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
         '429': { description: 1 時間の上限。`Retry-After` と details(scope=user・limit・retryAfterSec), content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+        '503': { description: 止めている(details.reason = disabled)・出どころに今つながらない・取得の予算切れ(`Retry-After`), content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+    post:
+      tags: [lookup]
+      summary: ISBN から本の情報を引く(GET と同じ・ISBN は本文)
+      description: |
+        GET と同じ引き方(検査・キャッシュ・止め方・1 ユーザー 1 時間の上限は GET と共通で数える)。利用者が入力した ISBN を URL に載せないため、JSON の本文で送る。
+        - 本文は 4 KiB まで(超えると 413)。未知のキー・型の違い・クエリ文字列付きは 400。止めている時は ISBN を確かめる前に 503。
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [isbn]
+              properties:
+                isbn: { type: string, maxLength: 40, description: ISBN-10 / ISBN-13(ハイフンと空白は可) }
+            example: { isbn: 978-4-7808-0204-7 }
+      responses:
+        '200': *bookOK
+        '400': { description: ISBN の桁・検査数字が正しくない・未知のキー・クエリ文字列付き, content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '404': { description: この ISBN の本が出どころに無い, content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+        '413': { description: 本文が 4 KiB を超える, content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+        '429': { description: 1 時間の上限(GET と共通)。`Retry-After` と details(scope=user・limit・retryAfterSec), content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
         '503': { description: 止めている(details.reason = disabled)・出どころに今つながらない・取得の予算切れ(`Retry-After`), content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
 
   /client-config:

@@ -120,6 +120,7 @@ public struct HTTPAppConfigClient: AppConfigClient {
 
     // MARK: - Records
 
+    /// filter なし(pageSize / pageToken だけで利用者の値を含まない)なので GET のまま。絞り込みは `POST .../records/query`。
     public func list(appId: String, entity: String) async throws -> [Record] {
         var items: [Record] = []
         var token: String?

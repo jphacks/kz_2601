@@ -2,7 +2,7 @@
 #if !APP_STORE_REVIEW
 import MetamonDSL
 
-/// 外部の公開データ(#348)。appconfig の `GET /v1/feeds/{provider}` を読む。端末は外部へ直接つながらない。
+/// 外部の公開データ(#348)。appconfig の `POST /v1/feeds/{provider}` を読む。端末は外部へ直接つながらない。
 /// 持たないホスト(モック・プレビュー)では「読み込めませんでした」。
 @MainActor
 public protocol FeedHost: AnyObject {

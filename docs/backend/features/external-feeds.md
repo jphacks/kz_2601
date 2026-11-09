@@ -101,7 +101,7 @@ ISBN から本の情報を引く `lookupBook` も同じ作り(専用のクライ
 
 ## API
 
-`GET /v1/feeds/{provider}?region=&feedId=&q=&limit=`(認証が要る。`q` は diet だけ)。形は [openapi-appconfig.yaml](../openapi-appconfig.yaml) の `/feeds/{provider}`。
+`POST /v1/feeds/{provider}` に `{"region","feedId","q","limit"}`(認証が要る。`q` は diet だけ。利用者が入力した値を URL に載せないため本文で送る・`GET ?region=&feedId=&q=&limit=` は古い iOS ビルドのために残している)。形は [openapi-appconfig.yaml](../openapi-appconfig.yaml) の `/feeds/{provider}`。
 
 ```json
 {"provider": "weather", "title": "石川県の天気",
@@ -121,7 +121,7 @@ diet の検索語で出どころまで取りに行く回数は、利用者ごと
 | 変数 | 何をするか | 既定 |
 |---|---|---|
 | `FEEDS_DISABLED` | 止める provider(カンマ区切り。`all` = 全部) | 無し(止めない) |
-| `FEEDS_USER_PER_HOUR` | 1 人 1 時間の `GET /v1/feeds` の回数(`0` で数えない) | 120 |
+| `FEEDS_USER_PER_HOUR` | 1 人 1 時間の `/v1/feeds` の回数(GET と POST の合計・`0` で数えない) | 120 |
 | `FEEDS_UPSTREAM_PER_MINUTE` | インスタンスあたり 1 分の出どころへの取得 | 30 |
 
 ## 審査用の版
