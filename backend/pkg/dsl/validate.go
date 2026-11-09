@@ -692,6 +692,8 @@ func (a *App) Validate() error {
 				checkAction(where+".onItemTap", c.OnItemTap)
 			case CompFlashcards:
 				checkFlashcards(where, c, entities, add) // flashcards.go
+			case CompBracket:
+				checkBracket(where, c, entities, add) // bracket.go
 			case CompFeed:
 				checkFeed(where, c, add) // feed.go
 			default:

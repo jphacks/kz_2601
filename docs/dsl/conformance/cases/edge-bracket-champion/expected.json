@@ -1,0 +1,229 @@
+{
+  "screens" : [
+    {
+      "id" : "home",
+      "layout" : "grid",
+      "nodes" : [
+        {
+          "cell" : {
+            "col" : 0,
+            "colSpan" : 6,
+            "row" : 0,
+            "rowSpan" : 7
+          },
+          "id" : "draw",
+          "props" : {
+            "champion" : {
+              "recordId" : "p1",
+              "title" : "青木"
+            },
+            "entity" : "entrant",
+            "rounds" : [
+              {
+                "matches" : [
+                  {
+                    "a" : {
+                      "recordId" : "p1",
+                      "title" : "青木"
+                    },
+                    "b" : {
+                      "recordId" : "p4",
+                      "title" : "江藤"
+                    },
+                    "winner" : "a"
+                  },
+                  {
+                    "a" : {
+                      "recordId" : "p2",
+                      "title" : "井上"
+                    },
+                    "b" : {
+                      "recordId" : "p3",
+                      "title" : "上田"
+                    },
+                    "winner" : "b"
+                  }
+                ],
+                "title" : "準決勝"
+              },
+              {
+                "matches" : [
+                  {
+                    "a" : {
+                      "recordId" : "p1",
+                      "title" : "青木"
+                    },
+                    "b" : {
+                      "recordId" : "p3",
+                      "title" : "上田"
+                    },
+                    "winner" : "a"
+                  }
+                ],
+                "title" : "決勝"
+              }
+            ],
+            "title" : "トーナメント表"
+          },
+          "state" : "rendered",
+          "type" : "bracket"
+        },
+        {
+          "actions" : [
+            {
+              "action" : {
+                "presentation" : "sheet",
+                "screen" : "entrant_form",
+                "type" : "navigate"
+              },
+              "on" : "rowTap"
+            }
+          ],
+          "cell" : {
+            "col" : 0,
+            "colSpan" : 6,
+            "row" : 7,
+            "rowSpan" : 3
+          },
+          "id" : "entrants",
+          "props" : {
+            "entity" : "entrant",
+            "rows" : [
+              {
+                "recordId" : "p4",
+                "title" : "江藤"
+              },
+              {
+                "recordId" : "p3",
+                "title" : "上田"
+              },
+              {
+                "recordId" : "p2",
+                "title" : "井上"
+              },
+              {
+                "recordId" : "p1",
+                "title" : "青木"
+              }
+            ]
+          },
+          "state" : "rendered",
+          "type" : "list"
+        },
+        {
+          "actions" : [
+            {
+              "action" : {
+                "presentation" : "sheet",
+                "screen" : "entrant_form",
+                "type" : "navigate"
+              },
+              "on" : "tap"
+            }
+          ],
+          "cell" : {
+            "col" : 3,
+            "colSpan" : 3,
+            "row" : 10,
+            "rowSpan" : 2
+          },
+          "id" : "add",
+          "props" : {
+            "label" : "出場者を追加"
+          },
+          "state" : "rendered",
+          "type" : "button"
+        }
+      ],
+      "route" : {
+        "recordId" : null,
+        "screen" : "home",
+        "stack" : "main"
+      },
+      "title" : "トーナメント",
+      "toolbar" : [
+
+      ]
+    },
+    {
+      "form" : {
+        "entity" : "entrant",
+        "readOnly" : false,
+        "recordId" : null,
+        "values" : {
+          "wins" : 0
+        }
+      },
+      "id" : "entrant_form",
+      "layout" : "form",
+      "nodes" : [
+        {
+          "band" : 0,
+          "cell" : {
+            "col" : 0,
+            "colSpan" : 6,
+            "row" : 0,
+            "rowSpan" : 6
+          },
+          "children" : [
+            {
+              "id" : null,
+              "props" : {
+                "field" : "name",
+                "label" : "名前",
+                "placeholder" : "山田",
+                "value" : null
+              },
+              "state" : "rendered",
+              "type" : "textField"
+            },
+            {
+              "id" : null,
+              "props" : {
+                "field" : "seed",
+                "label" : "シード(小さいほど上位・空なら登録順)",
+                "value" : null
+              },
+              "state" : "rendered",
+              "type" : "numberField"
+            }
+          ],
+          "id" : "who",
+          "props" : {
+            "title" : "出場者"
+          },
+          "state" : "rendered",
+          "type" : "section"
+        },
+        {
+          "band" : 1,
+          "cell" : {
+            "col" : 0,
+            "colSpan" : 6,
+            "row" : 10,
+            "rowSpan" : 2
+          },
+          "id" : "delete",
+          "state" : "hidden",
+          "type" : "button"
+        }
+      ],
+      "route" : {
+        "recordId" : null,
+        "screen" : "entrant_form",
+        "stack" : "main"
+      },
+      "saveBar" : {
+        "action" : {
+          "entity" : "entrant",
+          "type" : "saveRecord"
+        },
+        "label" : "保存"
+      },
+      "title" : "出場者",
+      "toolbar" : [
+
+      ]
+    }
+  ]
+}

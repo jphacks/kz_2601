@@ -116,6 +116,7 @@ case の名前: `example-*`(`docs/dsl/examples` をそのまま描く)・`flow-*
 | `progressBar` | `ratio`(1 を超えてもよい)・`percent` |
 | `gauge` | `value`・`unit` |
 | `settlement` | `title`・`transfers: [{from, to, amount}]` |
+| `bracket` | `rounds: [{title, matches: [{a, b, winner, bye?}]}]`(a / b は `{recordId, title}` か `null`・winner は `"a"` / `"b"` / `null`・1 回戦の不戦勝は `bye: true`)・`champion`(`{recordId, title}` か `null`)。組み合わせと勝ち上がりの規則は `../README.md` の bracket の補足 |
 | `flashcards` | `cards: [{recordId, front, back, learned?}]`(開いた直後の山札: filter → 登録順。toggle を比べる filter は値の無いカードを「まだ」として扱う)・`progress`(`1 / 3`。空なら `0 / 0`) |
 | `link` | `text`・`opens`(URL として開けるか) |
 | `disclosure` | `title`・`expanded` |

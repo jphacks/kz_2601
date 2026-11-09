@@ -43,6 +43,7 @@ public enum DSLExamples {
             "form_check",
             "drive_music",
             "vocab",
+            "tournament",
             "ai_counselor",
             "nearby_spots",
             "schedule_poll",

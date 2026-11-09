@@ -1,0 +1,3 @@
+[
+  {"id": "br_tournament", "kind": "create", "group": "bracket", "transcript": "社内の卓球大会のトーナメント表を作りたい。出場者を登録したら対戦の組み合わせを自動で作って、勝った人をタップしたら次の試合に進むようにして", "note": "jphacks/tk_2421 らくらくトーナメント。出場者の entity + bracket(list・table で代替しない)", "expect": {"has": ["bracket", "list"], "lacks": ["table"], "substitution": false, "unreachable": 0}}
+]
