@@ -78,6 +78,9 @@ func normalizeChatRequest(req *TextRequest) error {
 	if req.Messages[len(req.Messages)-1].Role != "user" {
 		return badText("the last message must be the user's")
 	}
+	if err := normalizeChatMaterial(req); err != nil { // text_chat_material.go
+		return err
+	}
 	return normalizeChatSaveTo(req) // text_chat_suggest.go
 }
 
@@ -85,6 +88,9 @@ func normalizeChatRequest(req *TextRequest) error {
 // frame, the turns as conversation and a {text} answer.
 func applyChat(c *Completion, req TextRequest, loc Locale) {
 	c.System = chatTurnSystemPrompt(loc)
+	if req.Material != nil {
+		c.System += "\n" + chatMaterialRule // text_chat_material.go
+	}
 	c.Messages = chatTurns(req)
 	c.Schema = textSchema(TextRequest{Shape: "line"})
 	c.MaxTokens = TextMaxTaskOutputToken
@@ -116,7 +122,7 @@ func chatTurns(req TextRequest) []Message {
 		}
 		out = append(out, Message{Role: m.Role, Content: content})
 	}
-	out[0].Content = "<persona>\n" + req.Instruction + "\n</persona>\n\n" + out[0].Content
+	out[0].Content = "<persona>\n" + req.Instruction + "\n</persona>\n\n" + chatMaterialBlock(req.Material) + out[0].Content
 	return out
 }
 

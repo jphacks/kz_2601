@@ -70,12 +70,15 @@ public struct AITextRequest: Codable, Equatable, Sendable {
     public var formats: [AITextFormat]?
     /// aiChat saveTo の field の形(task "chat" だけ)。付けると返事が記録の案(`AITextResult.suggest`)を返せる
     public var saveTo: AITextSaveTo?
+    /// aiChat inputEntity の「参考の記録」(task "chat" だけ・利用者自身の記録・AIChatMaterial)。nil = 添えない
+    public var material: AITextMaterial?
 
     public init(instruction: String, shape: AITextShape, count: Int? = nil, items: [String]? = nil,
                 input: String? = nil, locale: String? = nil, task: String? = nil, options: [String]? = nil,
                 length: String? = nil, appId: String? = nil, image: AITextImage? = nil, messages: [AITextMessage]? = nil,
-                formats: [AITextFormat]? = nil, saveTo: AITextSaveTo? = nil) {
+                formats: [AITextFormat]? = nil, saveTo: AITextSaveTo? = nil, material: AITextMaterial? = nil) {
         self.saveTo = saveTo
+        self.material = material
         self.instruction = instruction
         self.shape = shape
         self.count = count
@@ -122,6 +125,21 @@ public struct AITextFormat: Codable, Equatable, Sendable {
         self.item = item
         self.kind = kind
         self.options = options
+    }
+}
+
+/// `POST /v1/text` の `material`(aiChat inputEntity): 利用者自身の記録を説明した文。サーバーは会話の最初の発言に `<records>` でデータとして入れる。
+public struct AITextMaterial: Codable, Equatable, Sendable {
+    public var entity: String
+    /// entity の name(40 文字まで・空なら nil)
+    public var name: String?
+    /// 新しい順の「名前: 値」の行(8 KB まで)
+    public var text: String
+
+    public init(entity: String, name: String?, text: String) {
+        self.entity = entity
+        self.name = name
+        self.text = text
     }
 }
 

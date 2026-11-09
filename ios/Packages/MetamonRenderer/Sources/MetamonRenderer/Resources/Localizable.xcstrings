@@ -4982,6 +4982,23 @@
         }
       }
     },
+    "参考に「%@」の自分の記録も AI に渡します" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Your own “%@” records are also sent to the AI as reference"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "参考に「%@」の自分の記録も AI に渡します"
+          }
+        }
+      }
+    },
     "取り下げる" : {
       "extractionState" : "manual",
       "localizations" : {

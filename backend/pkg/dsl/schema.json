@@ -4161,10 +4161,20 @@
         },
         "saveTo": {
           "$ref": "#/$defs/AIChatSaveTo"
+        },
+        "inputEntity": {
+          "type": "string",
+          "description": "AI に参考として読ませる記録の entity(会話の entity とは別)。送るたびに利用者自身の新しい記録 limit 件(8 KB まで・hidden の field と写真・位置は送らない)を会話に添える。shared / public でも自分が書いた記録だけ。例: 日記を踏まえた相談・保存した問題についての質問・取り込んだ資料への質問。"
+        },
+        "limit": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 20,
+          "description": "inputEntity の新しい記録を何件読ませるか(既定 20・最大 20)。inputEntity がある時だけ。"
         }
       },
       "description": "クラウドの AI と何往復も話すチャット画面(相談相手・家庭教師・会話の練習相手・壁打ち)。吹き出しで自分は右・AI は左、画面下の入力欄から送ると AI が直近 20 発言を踏まえて返事をし、両方を entity に保存するので会話が残る。オンラインだけで動く(Tailor It Pro・共有のアプリは作成者の Pro)。saveTo を付けると「今日カレー食べた」のような発言から記録の案を返事の下に出し、利用者が「追加」を押した時だけ entity に 1 件足す。ボタン 1 回で 1 回書かせるなら aiButton(人どうしのチャットは別の部品)。",
-      "x-usage": "会話用のタブかホーム画面に A1:F12 で 1 つだけ置き、同じ画面に他の部品を置かない。entity は turn{text: text(required), role: enum[user, assistant]} だけ(scope は付けない)。フォーム画面・追加ボタン・list は作らない。「話して記録」「AI に言えば記録してくれる」(食事・支出・体調・やったこと)なら saveTo{entity: 記録用の別 entity, fields: [AI が埋める field]} を付け、記録を見る list は別の画面に置く。persona に役・口調・してほしいこと(質問は 1 つずつ・答えを言わずヒント等)を書く。"
+      "x-usage": "会話用のタブかホーム画面に A1:F12 で 1 つだけ置き、同じ画面に他の部品を置かない。entity は turn{text: text(required), role: enum[user, assistant]} だけ(scope は付けない)。フォーム画面・追加ボタン・list は作らない。「話して記録」「AI に言えば記録してくれる」(食事・支出・体調・やったこと)なら saveTo{entity: 記録用の別 entity, fields: [AI が埋める field]} を付け、記録を見る list は別の画面に置く。「日記を踏まえて相談」「保存した問題について質問」「取り込んだ資料について聞く」なら inputEntity: その記録の entity(limit は既定のまま)を付け、記録のフォーム・list は別の画面に置く。persona に役・口調・してほしいこと(質問は 1 つずつ・答えを言わずヒント等)を書く。"
     },
     "HealthStat": {
       "type": "object",

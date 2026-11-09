@@ -43,11 +43,12 @@ public enum ClientCapabilities {
     /// 審査用の版も同じ(位置の判定は端末の中だけ・使用中のみの許可)。
     /// aiButton.long・aiButton.inputPhoto・aiButton.saveTo・aiButton.inputFeeds(画面の feed の行を AI に読ませる)・aiButton.outputs(fields を項目ごとにフォームへ)・action.lookupBook・text.highlight(text の {{fieldId}} も)・feed.v2(feed の warnings / pressure): 知らない版は黙って無視するか描けないので、無い版には生成させない。審査用の版も同じ(feed は部品ごと外す)。
     /// expr.addMinutes(計算式の op addMinutes・到着 − 所要分 = 出発): 知らない版は式を「—」にするので、無い版には生成させない。審査用の版も同じ(端末内の計算だけ)。
+    /// aiChat.inputEntity(aiChat の inputEntity と limit・自分の記録を読んで話す): 知らない版は黙って無視するので、無い版には生成させない。審査用の版も同じ(aiChat は部品ごと外す)。
     public static var supportedFeatures: [String] {
         #if APP_STORE_REVIEW
-        ["recordRetention", "notification.when", "singleEntity", "notification.near", "aiButton.long", "aiButton.inputPhoto", "aiButton.saveTo", "aiButton.inputFeeds", "aiButton.outputs", "action.lookupBook", "text.highlight", "feed.v2", "expr.addMinutes"]
+        ["recordRetention", "notification.when", "singleEntity", "notification.near", "aiButton.long", "aiButton.inputPhoto", "aiButton.saveTo", "aiButton.inputFeeds", "aiButton.outputs", "action.lookupBook", "text.highlight", "feed.v2", "expr.addMinutes", "aiChat.inputEntity"]
         #else
-        ["recordRetention", "matching", "notification.when", "singleEntity", "dataRoles", "addressedMessages", "notification.near", "aiButton.long", "aiButton.inputPhoto", "aiButton.saveTo", "aiButton.inputFeeds", "aiButton.outputs", "action.lookupBook", "text.highlight", "feed.v2", "expr.addMinutes"]
+        ["recordRetention", "matching", "notification.when", "singleEntity", "dataRoles", "addressedMessages", "notification.near", "aiButton.long", "aiButton.inputPhoto", "aiButton.saveTo", "aiButton.inputFeeds", "aiButton.outputs", "action.lookupBook", "text.highlight", "feed.v2", "expr.addMinutes", "aiChat.inputEntity"]
         #endif
     }
 
