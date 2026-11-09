@@ -100,6 +100,7 @@ type Options struct {
 	Now       func() time.Time // default: time.Now
 	Disabled  bool             // kill switch
 	PerMinute int              // 0 = DefaultUpstreamPerMinute
+	Logger    *slog.Logger     // feeds.fetch lines; default: slog.Default()
 }
 
 // EnabledFromEnv: the lookup is off unless BOOK_LOOKUP_ENABLED is 1 / true
@@ -143,6 +144,7 @@ type Service struct {
 	client    *http.Client
 	ep        Endpoint
 	now       func() time.Time
+	log       *slog.Logger // nil: slog.Default()
 	disabled  bool
 	perMinute int
 
@@ -161,7 +163,7 @@ type entry struct {
 
 // New builds a Service.
 func New(o Options) *Service {
-	s := &Service{client: o.Client, now: o.Now, disabled: o.Disabled, perMinute: o.PerMinute,
+	s := &Service{client: o.Client, now: o.Now, log: o.Logger, disabled: o.Disabled, perMinute: o.PerMinute,
 		cache: map[string]*entry{}, inflight: map[string]chan struct{}{}}
 	if s.client == nil {
 		s.client = feeds.NewClient()
@@ -223,7 +225,11 @@ func (s *Service) Lookup(ctx context.Context, rawISBN string) (*Book, error) {
 
 		// The fetch outlives the caller (requestTimeout bounds it): a client
 		// that disconnects must not fail the waiters nor cache a failure.
-		book, err := s.fetch(context.WithoutCancel(ctx), isbn)
+		start := time.Now()
+		book, n, err := s.fetch(context.WithoutCancel(ctx), isbn)
+		// no ISBN in the line: "found" says whether openBD had a record
+		feeds.LogFetch(ctx, s.log, feeds.FetchLine{Provider: Provider, Err: fetchErr(err), Bytes: n,
+			Duration: time.Since(start), Attrs: []slog.Attr{slog.Bool("found", book != nil)}})
 
 		s.mu.Lock()
 		now = s.now()
@@ -241,7 +247,6 @@ func (s *Service) Lookup(ctx context.Context, rawISBN string) (*Book, error) {
 			e.expires = now.Add(missTTL)
 		default:
 			e.failed, e.expires = true, now.Add(failTTL)
-			slog.Warn("books: fetch failed", slog.String("isbn", isbn), slog.Any("error", err))
 		}
 		s.store(isbn, e, now)
 		delete(s.inflight, isbn)
@@ -304,49 +309,64 @@ func (s *Service) host() string {
 // checkRedirect: at most 3, each to the source's own scheme + host.
 func (s *Service) checkRedirect(req *http.Request, via []*http.Request) error {
 	if len(via) >= 3 {
-		return errors.New("too many redirects")
+		return fmt.Errorf("%w: too many redirects", feeds.ErrRedirectBlocked)
 	}
 	if req.URL.User != nil || req.URL.Scheme+"://"+req.URL.Host != s.host() {
-		return fmt.Errorf("redirect to %s is not allowed", req.URL.Host)
+		return fmt.Errorf("%w: %s", feeds.ErrRedirectBlocked, req.URL.Host)
 	}
 	return nil
 }
 
+// Provider is the provider label of the lookup's feeds.fetch lines.
+const Provider = "books"
+
+// fetchErr: "no record" is a working answer in the fetch line.
+func fetchErr(err error) error {
+	if errors.Is(err, ErrNotFound) {
+		return nil
+	}
+	return err
+}
+
 // fetch asks the source for one ISBN (13 checked digits: no other input
-// reaches the URL).
-func (s *Service) fetch(ctx context.Context, isbn string) (*Book, error) {
+// reaches the URL) and reports the body size. The errors carry no ISBN, but
+// a transport error (*url.Error) holds the URL: log feeds.FetchStatus only.
+func (s *Service) fetch(ctx context.Context, isbn string) (*Book, int, error) {
 	ctx, cancel := context.WithTimeout(ctx, requestTimeout)
 	defer cancel()
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, s.ep.GetURL+"?isbn="+isbn, nil)
 	if err != nil {
-		return nil, err
+		return nil, 0, err
 	}
 	req.Header.Set("User-Agent", userAgent)
 	req.Header.Set("Accept", "application/json")
 	resp, err := s.client.Do(req)
 	if err != nil {
-		return nil, err
+		return nil, 0, err
 	}
 	defer func() { _ = resp.Body.Close() }()
 	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("status %d", resp.StatusCode)
+		return nil, 0, &feeds.StatusError{Code: resp.StatusCode}
 	}
 	if resp.ContentLength > maxBody {
-		return nil, fmt.Errorf("body too large (%d bytes)", resp.ContentLength)
+		return nil, 0, fmt.Errorf("%w (%d bytes)", feeds.ErrTooLarge, resp.ContentLength)
 	}
 	body, err := io.ReadAll(io.LimitReader(resp.Body, maxBody+1))
 	if err != nil {
-		return nil, err
+		return nil, len(body), err
 	}
 	if len(body) > maxBody {
-		return nil, fmt.Errorf("body over %d bytes", maxBody)
+		return nil, len(body), fmt.Errorf("%w (over %d bytes)", feeds.ErrTooLarge, maxBody)
 	}
 	book, err := s.parseOpenBD(body, isbn)
 	if err != nil {
-		return nil, err
+		if !errors.Is(err, ErrNotFound) {
+			err = fmt.Errorf("%w: %w", feeds.ErrBadResponse, err)
+		}
+		return nil, len(body), err
 	}
 	book.FetchedAt = s.now().UTC()
-	return book, nil
+	return book, len(body), nil
 }
 
 // openBD v1 answers [record] or [null]; only summary is read.
@@ -375,7 +395,7 @@ func (s *Service) parseOpenBD(body []byte, isbn string) (*Book, error) {
 		return nil, ErrNotFound
 	}
 	if got, ok := NormalizeISBN(sm.ISBN); ok && got != isbn {
-		return nil, fmt.Errorf("record is for %s, asked %s", got, isbn)
+		return nil, errors.New("record is for another ISBN")
 	}
 	return &Book{
 		ISBN:          isbn,

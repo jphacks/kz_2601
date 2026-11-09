@@ -58,7 +58,7 @@
 | 国立国会図書館サーチの API | 書誌は CC BY 4.0 で使えるが、応答が XML(OpenSearch / SRU)で形が大きい。openBD が同じ書誌を JSON で返すので先に openBD にした。openBD v1 が終わる時の第一の代わり |
 | 書店の API(楽天ブックスなど) | 鍵(アプリ ID)が要る |
 
-出どころを増やす・替える時: `backend/internal/books/books.go` の `DefaultEndpoint` と解析を足し、**規約(目的の制限・再配布・出典)を確かめてこの表に URL を書いてから**。追加・切り替えは人の判断(#339)。
+出どころを増やす・替える時: `backend/internal/books/books.go` の `DefaultEndpoint` と解析を足し、**規約(目的の制限・再配布・出典)を確かめてこの表に URL を書いてから**。表に無い URL・https でない URL をコードに書くと `TestEndpointMatchesDoc`(`internal/books/allowlist_doc_test.go`)が落ちる。追加・切り替えは人の判断(#339)。
 
 ### 既定で止めている理由
 
@@ -81,6 +81,7 @@ openBD の利用条件は「本の販促・紹介の目的に限る」。蔵書�
 | 宛先は許可リストだけ | 取りに行く URL はコードで固定。リクエストから受け取るのは `isbn` だけで、**桁と検査数字を確かめてから**(ISBN-10 は 13 桁に直す・ISBN-13 は 978 / 979 始まり)13 桁の数字だけを URL に入れる。正しくない ISBN・他のパラメータ・重複は通信の前に 400 |
 | 内部のアドレスに届かない | feeds の専用のクライアント(`feeds.NewClient`)を使う。接続の直前に実際の接続先のアドレスを確かめ、公開のユニキャスト以外には接続しない。リダイレクトは同じ scheme + ホストだけ・3 回まで |
 | 送る項目を最小にする | 送るのは ISBN だけ。uid・記録の値は送らない |
+| ログ | 外へ取りに行くたびに `feeds.fetch` を 1 行(provider `books`・status・bytes・duration_ms・found)。キャッシュから返した時は書かない。ISBN・URL・応答の本文・uid は書かない |
 | 量の上限 | 8 秒で打ち切り・本文 256 KiB まで。書名 300・著者 300・出版社 120 文字で切る。キャッシュは ISBN ごと(見つかった 1 日・無かった 6 時間・失敗 1 分)で最大 1 万件。同じ ISBN の同時の取得は 1 回にまとめる。出どころへはインスタンスあたり 1 分 30 回まで・利用者ごとに 1 時間 60 回まで |
 | 止められる | 既定で止めている(`BOOK_LOOKUP_ENABLED=1` の時だけ動く)。`BOOK_LOOKUP_DISABLED=1`・`FEEDS_DISABLED=all` は ENABLED より強く止める。止めている時は 503(`reason = disabled`)で、iOS は「本の情報の取得は今使えません。手で入力してください」 |
 | 応答の確かめ | 出どころの記録の ISBN が問い合わせと違えば捨てる。書影の URL は `https://cover.openbd.jp/` だけ残す |
