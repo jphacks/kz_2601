@@ -19,7 +19,8 @@ runner/{env}/rule_status/{RuleStatusID(appId, uid, ruleId)}
 | ルールの一覧 | 作成者の DSL の最新の版の `serverRules`。説明は `DescribeServerRule`(日本語) |
 | どの結果を見せるか | 共有・公開のデータで動いた結果(uid "")と、作成者本人の private のデータで動いた結果のうち新しい方。他の人の private のデータの結果は読まない |
 | 結果の語 | `internal/runner/status` が runner の outcome / reason を利用者向けの決まった語に変える(openapi `AutomationResult`)。上限の種類・停止の段・理由のコードは返さない |
-| 運営の停止 | アプリ・ルールの停止と通知の停止が**効いているか**と、自動で解ける時刻だけ(`store.StopState`)。理由・誰が止めたか・通報の数は返さない。appconfig は停止を書けない・解けない(#337) |
+| 運営の停止 | アプリ・ルール・全体(`stop-all`)の停止と通知の停止が**効いているか**と、自動で解ける時刻だけ(`store.StopState`)。全体の停止は `stopped` に出る。理由・誰が止めたか・通報の数は返さない。appconfig は停止を書けない・解けない(#337)。止め方は [runner.md の止め方](../../infra/runner.md#止め方)(`go run ./cmd/moderate`) |
+| 停止が効くまで | runner は実行の直前に停止を読む。止める前に outbox に積まれていたきっかけも、次の tick(毎分)で `skipped_stopped` になり、解いた後も動かない(#346・`TestStopCatchesQueuedTriggers`)。`-force` の時は、ルールのきっかけになる書き込みがその場で 403 `app_stopped` |
 | 今日の数 | runner の上限の数え方(アプリの実行 `rx_app_{appId}`)で、最後の実行が見た数と上限。日本時間の日が変わっていれば 0。返金(あきらめた実行)は反映しない |
 
 ## 環境変数
