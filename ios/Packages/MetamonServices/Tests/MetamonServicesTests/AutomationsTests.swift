@@ -75,6 +75,33 @@ final class AutomationsTests: XCTestCase {
         XCTAssertEqual(r[3].consecutiveFailures, 0)
     }
 
+    /// failureReason を読む。知らない語・型違い・failed 以外の結果・古いサーバー(無し)は nil(いつもの文言だけ)。
+    func testDecodeFailureReason() throws {
+        let json = #"""
+        {"appId":"a","rules":[
+          {"id":"notify","description":"x","trigger":"record","result":"failed","failureReason":"notify_failed"},
+          {"id":"new","description":"x","trigger":"record","result":"failed","failureReason":"brand_new_reason"},
+          {"id":"old","description":"x","trigger":"record","result":"failed"},
+          {"id":"weird","description":"x","trigger":"record","result":"failed","failureReason":3},
+          {"id":"ok","description":"x","trigger":"record","result":"ok","failureReason":"timeout"}
+        ]}
+        """#
+        let r = try JSONDecoder().decode(AppAutomations.self, from: Data(json.utf8)).rules
+        XCTAssertEqual(r.count, 5)
+        XCTAssertEqual(r[0].failureReason, .notifyFailed)
+        XCTAssertNil(r[1].failureReason)
+        XCTAssertEqual(r[1].result, .failed)
+        XCTAssertNil(r[2].failureReason)
+        XCTAssertNil(r[3].failureReason)
+        XCTAssertNil(r[4].failureReason)
+        // サーバーの語(openapi AutomationFailureReason)を全部知っている
+        for word in ["internal", "mismatch", "notify_failed", "record_unavailable", "source_unavailable", "timeout", "write_rejected"] {
+            XCTAssertNotNil(AutomationRule.FailureReason(rawValue: word), word)
+        }
+        XCTAssertEqual(AutomationRule.FailureReason.allCases.count, 7)
+        XCTAssertNil(AutomationRule(id: "r", description: "x", result: .ok, failureReason: .timeout).failureReason)
+    }
+
     func testSuggestsFixThreshold() {
         XCTAssertFalse(AutomationRule(id: "r", description: "x", consecutiveFailures: 2).suggestsFix)
         XCTAssertTrue(AutomationRule(id: "r", description: "x", consecutiveFailures: 3).suggestsFix)

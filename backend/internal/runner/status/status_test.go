@@ -47,9 +47,48 @@ func TestResult(t *testing.T) {
 	}
 }
 
+func TestFailureReason(t *testing.T) {
+	cases := map[string]string{
+		"send_failed":     FailureNotifyFailed,
+		"not_readable":    FailureRecordUnavailable,
+		"not_found":       FailureRecordUnavailable,
+		"mismatch":        FailureMismatch,
+		"write_rejected":  FailureWriteRejected,
+		"feed_wait":       FailureSourceUnavailable,
+		"timeout":         FailureTimeout,
+		"scope_violation": FailureInternal, // never told apart for the creator
+		"error":           FailureInternal,
+		"":                FailureInternal,
+		"something_new":   FailureInternal,
+	}
+	for code, want := range cases {
+		if got := FailureReason(code); got != want {
+			t.Errorf("FailureReason(%q) = %q, want %q", code, got, want)
+		}
+	}
+}
+
 // TestResultsMatchSpec keeps the Result* words equal to the openapi
 // AutomationResult enum iOS decodes (#347).
 func TestResultsMatchSpec(t *testing.T) {
+	got := constWords(t, "Result")
+	if want := specEnum(t, "../../../../docs/backend/openapi-appconfig.yaml", "AutomationResult:"); !slices.Equal(got, want) {
+		t.Errorf("Result* words %v, openapi AutomationResult enum %v", got, want)
+	}
+}
+
+// TestFailureReasonsMatchSpec keeps the Failure* words equal to the openapi
+// AutomationFailureReason enum iOS decodes (#347).
+func TestFailureReasonsMatchSpec(t *testing.T) {
+	got := constWords(t, "Failure")
+	if want := specEnum(t, "../../../../docs/backend/openapi-appconfig.yaml", "AutomationFailureReason:"); !slices.Equal(got, want) {
+		t.Errorf("Failure* words %v, openapi AutomationFailureReason enum %v", got, want)
+	}
+}
+
+// constWords returns the sorted string constants of status.go named prefix*.
+func constWords(t *testing.T, prefix string) []string {
+	t.Helper()
 	f, err := parser.ParseFile(token.NewFileSet(), "status.go", nil, 0)
 	if err != nil {
 		t.Fatal(err)
@@ -57,7 +96,7 @@ func TestResultsMatchSpec(t *testing.T) {
 	var got []string
 	ast.Inspect(f, func(n ast.Node) bool {
 		vs, ok := n.(*ast.ValueSpec)
-		if !ok || len(vs.Names) != 1 || !strings.HasPrefix(vs.Names[0].Name, "Result") || len(vs.Values) != 1 {
+		if !ok || len(vs.Names) != 1 || !strings.HasPrefix(vs.Names[0].Name, prefix) || len(vs.Values) != 1 {
 			return true
 		}
 		if lit, ok := vs.Values[0].(*ast.BasicLit); ok && lit.Kind == token.STRING {
@@ -67,9 +106,7 @@ func TestResultsMatchSpec(t *testing.T) {
 		return true
 	})
 	slices.Sort(got)
-	if want := specEnum(t, "../../../../docs/backend/openapi-appconfig.yaml", "AutomationResult:"); !slices.Equal(got, want) {
-		t.Errorf("Result* words %v, openapi AutomationResult enum %v", got, want)
-	}
+	return got
 }
 
 // specEnum reads the block-list enum of the schema named key.
