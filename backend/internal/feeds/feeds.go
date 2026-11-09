@@ -144,6 +144,7 @@ type Service struct {
 	client         *http.Client
 	ep             Endpoints
 	now            func() time.Time
+	log            *slog.Logger                              // nil: slog.Default()
 	sleep          func(context.Context, time.Duration) bool // sleepCtx; tests move a fake clock
 	disabled       map[string]bool
 	userMissesHour int
@@ -200,11 +201,12 @@ type Options struct {
 	UserMissesPerHour int
 	// IPMissesPerHour caps a client address's search-word fetches; 0 = DefaultIPMissesPerHour.
 	IPMissesPerHour int
+	Logger          *slog.Logger // feeds.fetch lines; default: slog.Default()
 }
 
 // New builds a Service.
 func New(o Options) *Service {
-	s := &Service{client: o.Client, now: o.Now, disabled: map[string]bool{},
+	s := &Service{client: o.Client, now: o.Now, log: o.Logger, disabled: map[string]bool{},
 		cache: map[string]*entry{}, inflight: map[string]*call{},
 		turns: map[string]chan struct{}{}, lastAt: map[string]time.Time{},
 		userMissesHour: cmp.Or(max(o.UserMissesPerHour, 0), DefaultUserMissesPerHour),
@@ -450,7 +452,13 @@ func (s *Service) run(ctx context.Context, k string, q Query, e *entry, c *call,
 	if done != nil {
 		defer done()
 	}
-	title, items, err := s.fetch(ctx, q)
+	start := time.Now()
+	title, items, n, err := s.fetch(ctx, q)
+	feedAttrs := []slog.Attr{slog.String("region", q.Region), slog.String("feed_id", q.FeedID)}
+	if q.Q != "" { // the length only: the words stay out of the logs
+		feedAttrs = append(feedAttrs, slog.Int("q_runes", len([]rune(q.Q))))
+	}
+	LogFetch(ctx, s.log, FetchLine{Provider: q.Provider, Err: err, Bytes: n, Duration: time.Since(start), Attrs: feedAttrs})
 
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -470,10 +478,6 @@ func (s *Service) run(ctx context.Context, k string, q Query, e *entry, c *call,
 		keep = false
 	default:
 		ne.failedAt, ne.expires = now, now.Add(FailTTL)
-	}
-	if err != nil {
-		slog.Warn("feeds: fetch failed", slog.String("provider", q.Provider), slog.String("region", q.Region),
-			slog.String("feedId", q.FeedID), slog.Int("qRunes", len([]rune(q.Q))), slog.Any("error", err))
 	}
 	if keep {
 		if s.cache[k] == nil && len(s.cache) >= maxCacheEntries {
@@ -647,73 +651,56 @@ func (s *Service) prune(now time.Time) {
 	}
 }
 
-// fetch reads one source. The URL comes from Endpoints only.
-func (s *Service) fetch(ctx context.Context, q Query) (string, []Item, error) {
-	lim := providerLimits[q.Provider]
+// fetch reads one source and reports the body size. The URL comes from
+// Endpoints only.
+func (s *Service) fetch(ctx context.Context, q Query) (string, []Item, int, error) {
+	var rawURL, title string
+	var parse func([]byte) ([]Item, error)
 	switch q.Provider {
 	case dsl.FeedWeather:
-		body, err := s.get(ctx, s.ep.weatherURL(q.Region), lim.maxBody)
-		if err != nil {
-			return "", nil, err
-		}
-		items, err := parseWeather(body)
-		return dsl.WeatherRegions[q.Region] + "の天気", items, err
+		rawURL, title, parse = s.ep.weatherURL(q.Region), dsl.WeatherRegions[q.Region]+"の天気", parseWeather
 	case dsl.FeedHolidays:
-		body, err := s.get(ctx, s.ep.Holidays, lim.maxBody)
-		if err != nil {
-			return "", nil, err
-		}
-		items, err := parseHolidays(body)
 		// The file goes back to 1955: keep today and later only.
-		return "国民の祝日", fromToday(items, s.now()), err
+		rawURL, title = s.ep.Holidays, "国民の祝日"
+		parse = func(b []byte) ([]Item, error) {
+			items, err := parseHolidays(b)
+			return fromToday(items, s.now()), err
+		}
 	case dsl.FeedRSS:
 		f := s.ep.RSS[q.FeedID]
-		body, err := s.get(ctx, f.URL, lim.maxBody)
-		if err != nil {
-			return "", nil, err
-		}
-		items, err := parseRSS(body)
-		return f.Name, items, err
+		rawURL, title, parse = f.URL, f.Name, parseRSS
 	case dsl.FeedWarnings:
-		body, err := s.get(ctx, s.ep.warningURL(q.Region), lim.maxBody)
-		if err != nil {
-			return "", nil, err
-		}
-		items, err := parseWarnings(body)
-		return dsl.WeatherRegions[q.Region] + "の警報・注意報", items, err
+		rawURL, title, parse = s.ep.warningURL(q.Region), dsl.WeatherRegions[q.Region]+"の警報・注意報", parseWarnings
 	case dsl.FeedPressure:
 		u, ok := s.ep.pressureURL(q.Region)
 		if !ok {
-			return "", nil, ErrUnknown
+			return "", nil, 0, ErrUnknown
 		}
-		body, err := s.get(ctx, u, lim.maxBody)
-		if err != nil {
-			return "", nil, err
-		}
-		items, err := parsePressure(body, s.now())
-		return dsl.WeatherRegions[q.Region] + "の気圧", items, err
+		rawURL, title = u, dsl.WeatherRegions[q.Region]+"の気圧"
+		parse = func(b []byte) ([]Item, error) { return parsePressure(b, s.now()) }
 	case dsl.FeedArxiv:
-		body, err := s.get(ctx, s.ep.arxivURL(q.FeedID), lim.maxBody)
-		if err != nil {
-			return "", nil, err
-		}
-		items, err := parseArxiv(body)
-		return "arXiv " + q.FeedID + "(" + dsl.ArxivCategories[q.FeedID] + ")の新着", items, err
+		rawURL, title, parse = s.ep.arxivURL(q.FeedID), "arXiv "+q.FeedID+"("+dsl.ArxivCategories[q.FeedID]+")の新着", parseArxiv
 	case dsl.FeedDiet:
-		body, err := s.get(ctx, s.ep.dietURL(q.Q), lim.maxBody)
-		if err != nil {
-			return "", nil, err
-		}
-		items, err := parseDiet(body)
-		return "国会会議録「" + q.Q + "」", items, err
+		rawURL, title, parse = s.ep.dietURL(q.Q), "国会会議録「"+q.Q+"」", parseDiet
+	default:
+		return "", nil, 0, ErrUnknown
 	}
-	return "", nil, ErrUnknown
+	body, err := s.get(ctx, rawURL, providerLimits[q.Provider].maxBody)
+	if err != nil {
+		return "", nil, len(body), err
+	}
+	items, err := parse(body)
+	if err != nil {
+		return "", nil, len(body), fmt.Errorf("%w: %w", ErrBadResponse, err)
+	}
+	return title, items, len(body), nil
 }
 
-// get performs one GET with a body cap. Anything but 200 is an error.
+// get performs one GET with a body cap. Anything but 200 is an error. The
+// errors carry no URL (nothing logs them, but keep it that way).
 func (s *Service) get(ctx context.Context, rawURL string, maxBody int64) ([]byte, error) {
 	if !s.ep.allowedURL(rawURL) {
-		return nil, fmt.Errorf("%w: %s", ErrUnknown, rawURL)
+		return nil, ErrUnknown
 	}
 	ctx, cancel := context.WithTimeout(ctx, requestTimeout)
 	defer cancel()
@@ -728,17 +715,17 @@ func (s *Service) get(ctx context.Context, rawURL string, maxBody int64) ([]byte
 	}
 	defer func() { _ = resp.Body.Close() }()
 	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("status %d", resp.StatusCode)
+		return nil, &StatusError{Code: resp.StatusCode}
 	}
 	if resp.ContentLength > maxBody {
-		return nil, fmt.Errorf("body too large (%d bytes)", resp.ContentLength)
+		return nil, fmt.Errorf("%w (%d bytes)", ErrTooLarge, resp.ContentLength)
 	}
 	body, err := io.ReadAll(io.LimitReader(resp.Body, maxBody+1))
 	if err != nil {
-		return nil, err
+		return body, err
 	}
 	if int64(len(body)) > maxBody {
-		return nil, fmt.Errorf("body over %d bytes", maxBody)
+		return body, fmt.Errorf("%w (over %d bytes)", ErrTooLarge, maxBody)
 	}
 	return body, nil
 }

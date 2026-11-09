@@ -379,7 +379,7 @@ func isTargetLabel(label string) bool {
 // listTypes show an entity's records one by one.
 var listTypes = map[ComponentType]bool{
 	CompList: true, CompTable: true, CompTimeline: true, CompCalendar: true, CompMapView: true, CompSettlement: true, CompGridTable: true,
-	CompChatThread: true, CompMatchList: true, CompFlashcards: true, CompAiChat: true,
+	CompChatThread: true, CompMatchList: true, CompFlashcards: true, CompAiChat: true, CompBracket: true,
 }
 
 func (l *linter) entityReach() {

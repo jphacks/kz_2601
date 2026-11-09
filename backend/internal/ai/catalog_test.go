@@ -68,6 +68,8 @@ func TestCatalogCoversEverySchemaType(t *testing.T) {
 		dsl.CompSettlement,
 		// random pick (#263)
 		dsl.CompRandomPicker,
+		// tournament bracket (bracket.go)
+		dsl.CompBracket,
 		// handwriting / drawing (PencilKit -> photo field)
 		dsl.CompDrawingField,
 		// file import: csv / text / pdf -> records on the device

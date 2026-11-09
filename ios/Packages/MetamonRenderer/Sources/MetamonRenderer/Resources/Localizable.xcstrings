@@ -137,6 +137,23 @@
         }
       }
     },
+    "%@ 第 %lld 試合" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$@, match %2$lld"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ 第 %lld 試合"
+          }
+        }
+      }
+    },
     "%@(描いた絵あり)" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -167,6 +184,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "%@(添付済み)"
+          }
+        }
+      }
+    },
+    "%@(相手: %@)" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$@ (vs %2$@)"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@(相手: %@)"
           }
         }
       }
@@ -643,6 +677,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "%lld 回"
+          }
+        }
+      }
+    },
+    "%lld 回戦" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Round %lld"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld 回戦"
           }
         }
       }
@@ -2925,6 +2976,23 @@
         }
       }
     },
+    "ダブルタップで勝者にする" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Double-tap to make the winner"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ダブルタップで勝者にする"
+          }
+        }
+      }
+    },
     "ダブルタップで開きます" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -3448,6 +3516,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "上限(1 回 %lld 件・合計 %lld 件)を超える %lld 行は入れません"
+          }
+        }
+      }
+    },
+    "不戦勝" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bye"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "不戦勝"
           }
         }
       }
@@ -4030,6 +4115,23 @@
         }
       }
     },
+    "優勝: %@" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Champion: %@"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "優勝: %@"
+          }
+        }
+      }
+    },
     "元に戻す" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -4128,6 +4230,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "先に記録を追加してください"
+          }
+        }
+      }
+    },
+    "先の回戦の結果を取り消してから変えてください" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Undo the later round's result first"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "先の回戦の結果を取り消してから変えてください"
           }
         }
       }
@@ -4710,6 +4829,40 @@
         }
       }
     },
+    "出場者が 2 人以上になると表ができます" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The bracket appears once there are 2 or more entrants"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "出場者が 2 人以上になると表ができます"
+          }
+        }
+      }
+    },
+    "出場者を追加してください" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Add entrants"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "出場者を追加してください"
+          }
+        }
+      }
+    },
     "分類の候補がありません" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -4910,6 +5063,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "動画を撮るかライブラリから選びます"
+          }
+        }
+      }
+    },
+    "勝ち" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Won"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "勝ち"
           }
         }
       }
@@ -5832,6 +6002,23 @@
         }
       }
     },
+    "未定" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "TBD"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "未定"
+          }
+        }
+      }
+    },
     "未選択 = 全員で割ります" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -6087,6 +6274,23 @@
         }
       }
     },
+    "決勝" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Final"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "決勝"
+          }
+        }
+      }
+    },
     "消しゴム" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -6134,6 +6338,40 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "測定中"
+          }
+        }
+      }
+    },
+    "準々決勝" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Quarterfinal"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "準々決勝"
+          }
+        }
+      }
+    },
+    "準決勝" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Semifinal"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "準決勝"
           }
         }
       }
@@ -7426,6 +7664,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "読めない行: %lld 行(入れません)"
+          }
+        }
+      }
+    },
+    "負け" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Lost"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "負け"
           }
         }
       }
