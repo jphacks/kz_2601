@@ -141,10 +141,10 @@ func (ep Endpoints) allowedURL(raw string) bool {
 // the same scheme (no https -> http downgrade, no other site).
 func (ep Endpoints) checkRedirect(req *http.Request, via []*http.Request) error {
 	if len(via) >= 3 {
-		return errors.New("too many redirects")
+		return fmt.Errorf("%w: too many redirects", ErrRedirectBlocked)
 	}
 	if !ep.allowedURL(req.URL.String()) || (len(via) > 0 && req.URL.Scheme != via[0].URL.Scheme) {
-		return fmt.Errorf("redirect to %s is not allowed", req.URL.Host)
+		return fmt.Errorf("%w: %s", ErrRedirectBlocked, req.URL.Host)
 	}
 	return nil
 }
