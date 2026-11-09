@@ -5,6 +5,7 @@ import (
 	"errors"
 	"net/http"
 	"sort"
+	"strconv"
 	"strings"
 	"time"
 	"unicode/utf8"
@@ -76,19 +77,57 @@ func (h *Handler) ownRecord(r *http.Request, rs store.RecordSet, ent *dsl.Entity
 	return rec, nil
 }
 
+// recordsQuery is the filter / sort / paging of one records list: the GET
+// query or the POST .../records/query body. PageSize is nil when not sent.
+type recordsQuery struct {
+	FilterField string `json:"filterField"`
+	FilterOp    string `json:"filterOp"`
+	FilterValue string `json:"filterValue"`
+	SortField   string `json:"sortField"`
+	SortDir     string `json:"sortDir"`
+	PageSize    *int   `json:"pageSize"`
+	PageToken   string `json:"pageToken"`
+}
+
+// listRecords: GET .../records?filterField=&filterOp=&filterValue=&sortField=&sortDir=&pageSize=&pageToken=
+// The filter form is deprecated (kept for older iOS builds): a filterValue
+// such as a uid belongs in the POST .../records/query body.
 func (h *Handler) listRecords(w http.ResponseWriter, r *http.Request) {
+	q := r.URL.Query()
+	in := recordsQuery{
+		FilterField: q.Get("filterField"), FilterOp: q.Get("filterOp"), FilterValue: q.Get("filterValue"),
+		SortField: q.Get("sortField"), SortDir: q.Get("sortDir"), PageToken: q.Get("pageToken"),
+	}
+	h.serveRecords(w, r, in, q.Get("pageSize"))
+}
+
+// queryRecords: POST .../records/query {"filterField","filterOp","filterValue","sortField","sortDir","pageSize","pageToken"}
+func (h *Handler) queryRecords(w http.ResponseWriter, r *http.Request) {
+	var in recordsQuery
+	if !decodeLookupBody(w, r, &in) {
+		return
+	}
+	size := ""
+	if in.PageSize != nil {
+		size = strconv.Itoa(*in.PageSize) // < 1: the same 400 as the query
+	}
+	h.serveRecords(w, r, in, size)
+}
+
+// serveRecords is the list shared by GET and POST (entity, authorization,
+// filter, sort, paging, reply). size is pageSize as sent ("" = default).
+func (h *Handler) serveRecords(w http.ResponseWriter, r *http.Request, in recordsQuery, size string) {
 	cur, ent, eid, err := h.entityOf(r)
 	if err != nil {
 		fail(w, err)
 		return
 	}
-	p, err := parsePaging(r)
+	p, err := pagingFrom(size, in.PageToken)
 	if err != nil {
 		fail(w, err)
 		return
 	}
-	q := r.URL.Query()
-	sortField, sortDir := q.Get("sortField"), q.Get("sortDir")
+	sortField, sortDir := in.SortField, in.SortDir
 	if sortField == "" {
 		sortField = "createdAt"
 	}
@@ -103,7 +142,7 @@ func (h *Handler) listRecords(w http.ResponseWriter, r *http.Request) {
 		fail(w, apiErr(http.StatusBadRequest, httpx.CodeBadRequest, "unknown sortField").With("field", sortField))
 		return
 	}
-	pred, err := h.recordFilter(r, cur.ID, ent, q.Get("filterField"), q.Get("filterOp"), q.Get("filterValue")) // follows.go (#270)
+	pred, err := h.recordFilter(r, cur.ID, ent, in.FilterField, in.FilterOp, in.FilterValue) // follows.go (#270)
 	if err != nil {
 		fail(w, err)
 		return

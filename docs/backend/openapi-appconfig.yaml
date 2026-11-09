@@ -409,6 +409,7 @@ paths:
       tags: [records]
       summary: レコード一覧
       description: |
+        **filter つきの呼び出しは kept for older iOS builds**。新しい呼び出しは filter(`filterValue` に uid などが入る)を本文で送る `POST .../records/query`(利用者の値を URL に載せない)。filter なしのページ送り(`pageSize`/`pageToken`/sort だけ)は GET のままでよい。
         既定は `createdAt desc`。`sort`/`filter` は DSL の List と同じ語彙。
         複合インデックスが無い組み合わせはサーバー側メモリソート (1 entity 上限 2000 件、超過は 413)。
         public/shared entity は全ユーザーの投稿が返り、各レコードに `author`/`authorName` が付く。
@@ -422,11 +423,11 @@ paths:
         - { $ref: '#/components/parameters/PageToken' }
         - { in: query, name: sortField, schema: { type: string } }
         - { in: query, name: sortDir, schema: { type: string, enum: [asc, desc] } }
-        - { in: query, name: filterField, schema: { type: string } }
-        - { in: query, name: filterOp, schema: { type: string, enum: [eq, neq, gt, gte, lt, lte, thisMonth, today, in, nin] }, description: 'in / nin は filterField=author・filterValue=myFollows だけ (#270)' }
-        - { in: query, name: filterValue, schema: { type: string } }
+        - { in: query, name: filterField, deprecated: true, schema: { type: string }, description: 'POST .../records/query の本文で送る' }
+        - { in: query, name: filterOp, deprecated: true, schema: { type: string, enum: [eq, neq, gt, gte, lt, lte, thisMonth, today, in, nin] }, description: 'in / nin は filterField=author・filterValue=myFollows だけ (#270)。POST .../records/query の本文で送る' }
+        - { in: query, name: filterValue, deprecated: true, schema: { type: string }, description: 'POST .../records/query の本文で送る' }
       responses:
-        '200':
+        '200': &recordsListOK
           description: OK
           content:
             application/json:
@@ -473,6 +474,40 @@ paths:
       parameters: [{ in: query, name: confirm, required: true, schema: { type: boolean } }]
       responses:
         '204': { description: Deleted }
+
+  /apps/{appId}/entities/{entityId}/records/query:
+    parameters: [{ $ref: '#/components/parameters/AppId' }, { $ref: '#/components/parameters/EntityId' }]
+    post:
+      tags: [records]
+      summary: レコード一覧(GET .../records と同じ・filter / sort / ページは本文)
+      description: |
+        GET .../records と同じ一覧(読める人・shared の参加者だけ・ブロック・非公開・並べ替え・ページ送り・応答の形はすべて同じ)。
+        filter の値(`filterField=author` の uid など)を URL に載せないため、条件を JSON の本文で送る。本文の値はログに残さない。
+        - 本文は 4 KiB まで(超えると 413)。未知のキー・型の違い(`pageSize` は整数・他は文字列)・クエリ文字列付きは 400。
+        - `{}` は filter なし・既定の並び(`createdAt desc`)・既定のページサイズ。
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              properties:
+                filterField: { type: string }
+                filterOp: { type: string, enum: [eq, neq, gt, gte, lt, lte, thisMonth, today, in, nin], description: 'in / nin は filterField=author・filterValue=myFollows だけ (#270)' }
+                filterValue: { type: string }
+                sortField: { type: string }
+                sortDir: { type: string, enum: [asc, desc] }
+                pageSize: { type: integer, minimum: 1, description: 上限を超えた値は上限に丸める }
+                pageToken: { type: string, description: 前の応答の nextPageToken }
+            example: { filterField: author, filterOp: neq, filterValue: '<uid>', pageSize: 100 }
+      responses:
+        '200': *recordsListOK
+        '400': { description: filter / sort / pageSize / pageToken が不正・未知のキー・クエリ文字列付き, content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/NotMember' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '413': { description: 本文が 4 KiB を超える・1 entity のレコードが多すぎてメモリで並べられない, content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
 
   /apps/{appId}/entities/{entityId}/records/{recordId}:
     parameters:

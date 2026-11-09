@@ -1,7 +1,8 @@
 package appconfig
 
 // POST variants of the lookups that carry user-entered values (the ISBN, the
-// diet search term, the public-apps search): the value goes in a small JSON
+// diet search term, the public-apps search, the records filter such as an
+// author uid): the value goes in a small JSON
 // body so it stays out of the URL. The GET variants stay for older iOS
 // builds. Neither path logs the values.
 

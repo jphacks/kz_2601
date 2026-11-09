@@ -61,6 +61,7 @@ var wantRoutes = []string{
 	"POST /v1/apps",
 	"POST /v1/apps/{appId}/duplicate",
 	"POST /v1/apps/{appId}/entities/{entityId}/records",
+	"POST /v1/apps/{appId}/entities/{entityId}/records/query",
 	"POST /v1/apps/{appId}/interests",
 	"POST /v1/apps/{appId}/interests/{uid}/accept",
 	"POST /v1/apps/{appId}/publish",

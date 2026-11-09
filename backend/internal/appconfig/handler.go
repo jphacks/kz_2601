@@ -102,6 +102,7 @@ func New(s store.Store, opts ...Option) *http.ServeMux {
 	mux.HandleFunc("GET /v1/apps/{appId}/entities/{entityId}", h.getEntity)
 
 	mux.HandleFunc("GET /v1/apps/{appId}/entities/{entityId}/records", h.listRecords)
+	mux.HandleFunc("POST /v1/apps/{appId}/entities/{entityId}/records/query", h.queryRecords)
 	mux.HandleFunc("POST /v1/apps/{appId}/entities/{entityId}/records", h.createRecord)
 	mux.HandleFunc("DELETE /v1/apps/{appId}/entities/{entityId}/records", h.deleteAllRecords)
 	mux.HandleFunc("GET /v1/apps/{appId}/entities/{entityId}/records/{recordId}", h.getRecord)
