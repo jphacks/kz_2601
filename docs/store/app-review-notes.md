@@ -197,66 +197,108 @@ App 内課金なし
 
 ## 7. M4: サーバーの自動の動きを含む版(下書き)
 
-#349。**serverRules(サーバーの自動の動き)を含む版のための下書き。今の審査用の版には serverRules が無いので、2 章の文には足さない。**(今の審査用の版では server-rules pass を飛ばし、iOS の `Features/Automations` も外している・#316 #614・`docs/ios/review-build.md`)
+#349。**serverRules(サーバーの自動の動き)を含む版のための下書き。今の審査用の版には serverRules が無いので、2 章の文には足さない。**(今の審査用の版では AI が serverRules を作らず、iOS の `Features/Automations` と `Features/Push` も外している・#316 #614 #269・`docs/ios/review-build.md` の 46・47 行)
 
-### 7.1 使う前に確かめること
+根拠は 2026-11-09 の `origin/develop`(`e988c309`)の `ファイル:行`。コードが変わったら 7.4 の表を確かめ直す。
+
+### 7.1 何が端末に届き、何が届かないか
+
+| 届くもの | 届かないもの |
+|---|---|
+| 記録帳の JSON(DSL)。serverRules もその中のデータとして入る | コード・スクリプト・式の実行環境。ルールを実行する仕組みはサーバーにだけある |
+| ルールが送った通知(APNs) | 新しい部品・新しい処理の種類。どちらもバイナリ(部品)とサーバーのコード(処理)に固定で、増えるのは更新の時だけ |
+| 「自動の動き」の一覧と、ルールごとのオン / オフの切り替え(通常の版だけ・#347) | — |
+
+iOS は serverRules の中身を解釈しない。数を数えるだけ(設定に「自動の動き」を出すかの判断)で、オン / オフは DSL の `enabled` を書き換える patch を送るだけ。
+
+### 7.2 使う前に確かめること
 
 | 項目 | 確かめ方 | 理由 |
 |---|---|---|
-| その版のバイナリに serverRules の機能がある | `APP_STORE_REVIEW` で `Features/Automations` を外す `#if` を外した版か | 書いた機能は必ずバイナリにある(2.5.19・2.3.1) |
+| その版のバイナリに serverRules の機能がある | `APP_STORE_REVIEW` で `Features/Automations` と `Features/Push` を外す `#if` を外した版か | 書いた機能は必ずバイナリにある(2.5.19・2.3.1) |
 | 課金(Pro)が入っている | serverRules は Pro の機能(`paid.ServerRules`・#316)。課金を入れた版なら 2 章の NO IN-APP PURCHASES の段落も差し替える | 課金なしの版では serverRules が作られない |
-| iOS のプッシュ通知の登録と、アプリごとの通知の同意の画面がある | 通常の版には登録(`Features/Push`)・同意の画面・`aps-environment`(#683)がある。審査用の版は `APP_STORE_REVIEW` で `Features/Push` を外し、`Metamon-Review.entitlements` に `aps-environment` も無い。この章を使う版では両方を戻す(`docs/ios/review-build.md`) | 「通知は同意した人だけ」の説明に画面が要る。通知が届かないと 2.1 |
+| `PRO_GATE_MODE` が `enforce` | ai・appconfig・runner の 3 つ(`docs/infra/runtime-config.md`) | 審査用の版に serverRules が無いと言えるのは、AI が作らないことと、Pro でない人の保存が 402 になることの両方による |
+| プッシュの entitlement | 通常の版の `ios/Metamon/Metamon.entitlements` には `aps-environment` がある(#683。`METAMON_APS_ENV` で Debug / Staging は development、Release は production)。審査用の版は `Features/Push`(PushHost)を外し、`Metamon-Review.entitlements` にも `aps-environment` が無い。この章を使う版では両方を戻す(`docs/ios/review-build.md`) | 無いと APNs のトークンが取れず、通知が届かない(`PushHost.swift` の 61 行のコメント) |
+| 通知の許可の求め方 | 本体が、本体の UI で、使う時に OS の許可を求めるか | 4.5.4(必須にしない)・4.7.3 |
 | 共有のデータ(`sharedData`)が入っているか | `ClientCapabilities.reviewDisabledFeatures` に `sharedData` が残っていれば共有は無い | 共有が無い版では英語の版の「Other people receive them only if …」の文を消す(外した機能を書かない) |
-| runner が動いている | 審査の期間中、runner がデプロイされて動いていること(2026-11-07 時点は未デプロイ) | 審査で自動の動きを試されたときに届かないと 2.1 |
-| ASC の 4,000 字 | 下の段落は 1273 字。2 章の文は 3,994 字なので、そのまま足すと超える。足す時は 2 章のほかの所を削り、合計を数え直す | ASC に入らない |
+| `saveFeed` を使うか | その版で天気の記録を残す作りを出すか | 出さないなら英語の版の「save today's public weather forecast」と「The only outside data …」を消す |
+| runner が動いている | 審査の期間中、runner がデプロイされて動いていること(`docs/infra/runner.md`) | 審査で自動の動きを試されたときに届かないと 2.1 |
+| ASC の 4,000 字 | 7.3 の段落は 1,631 字(Python の `len()`)。2 章の文は 3,994 字なので、そのまま足すと超える。足す時は 2 章のほかの所を削り、合計を数え直す | ASC に入らない |
 
-### 7.2 英語の版(2 章の HOW IT WORKS の後に足す)
+### 7.3 英語の版(2 章の HOW IT WORKS の後に足す)
 
 ```text
 SERVER AUTOMATIONS - NO DOWNLOADED CODE (Guidelines 2.5.2, 4.7, 4.5.4)
-- A tracker can have simple automatic actions, such as a reminder at a set time or a count that goes up when a record is added. They are declarative rules in the tracker's JSON configuration: a trigger (a record is added or changed, or a daily, weekly or monthly time), an optional condition, and up to five actions from a closed list (send a notification, add or update a record, add to a number).
-- The rules run on our servers, not on the device. The device receives only the JSON configuration (data) and the notifications. The app does not run the rules, and it never downloads or runs code.
-- Our server checks every rule against a fixed schema when it is saved and applies the same limits when it runs. Rules cannot send email or messages to other services, reach web pages, or notify arbitrary people.
+- A tracker can have simple automatic actions, such as a reminder at a set time or a count that goes up when a record is added. They are declarative rules stored as data in the tracker's JSON configuration: a trigger (a record is added or changed, or a daily, weekly or monthly time), an optional condition over the tracker's own records, and up to five actions from a closed list (send a notification, add or update a record, add to a number, save today's public weather forecast as a record).
+- The rules run on our servers, not on the device. The device receives only the JSON configuration (data) and the notifications. The app does not run the rules, and it never downloads or runs code. The kinds of actions are fixed in our server's code; a rule can only choose from them and cannot add new ones.
+- Our server checks every rule against a fixed schema before it is saved, and checks again who may receive each notification when it runs. Rules cannot send email or messages to other services, open web pages, or notify arbitrary people. The only outside data is the public weather forecast for a fixed region, which our server reads from a fixed list of sources.
 - Notifications go to the tracker's owner. Other people receive them only if they take part in a shared tracker and have turned on notifications for that tracker. Notification text cannot contain links or claim to be official. We do not use notifications for advertising or marketing.
 - Our operators can stop all automatic actions, all notifications, or a single tracker or rule at any time.
 ```
 
-### 7.3 日本語の版(確認用)
+### 7.4 日本語の版(確認用)
 
 ```text
 サーバーの自動の動き(コードをダウンロードしない・2.5.2 / 4.7 / 4.5.4)
 - 記録帳に、決まった時刻のリマインダーや、記録を足すと増える数などの簡単な自動の動きを
-  付けられます。これは記録帳の JSON の設定に書かれた宣言的なルールです。きっかけ(記録が
-  足された・変わった、毎日・毎週・毎月の時刻)、任意の条件、決まった一覧から選ぶ 5 つまでの
-  処理(通知を送る・記録を足す / 直す・数を足す)だけでできています。
+  付けられます。これは記録帳の JSON の設定にデータとして書かれた宣言的なルールです。きっかけ
+  (記録が足された・変わった、毎日・毎週・毎月の時刻)、その記録帳の記録についての任意の条件、
+  決まった一覧から選ぶ 5 つまでの処理(通知を送る・記録を足す / 直す・数を足す・今日の公開の
+  天気予報を記録に残す)だけでできています。
 - ルールは端末ではなく、私たちのサーバーで動きます。端末に届くのは JSON の設定(データ)と
-  通知だけです。アプリはルールを実行せず、コードをダウンロードも実行もしません。
-- サーバーは、保存の時にすべてのルールを決まったスキーマで確かめ、動かす時にも同じ制限を
-  当てます。ルールから、メールや他のサービスへの送信・Web ページへのアクセス・任意の人への
-  通知はできません。
+  通知だけです。アプリはルールを実行せず、コードをダウンロードも実行もしません。処理の種類は
+  サーバーのコードに固定で、ルールはその中から選ぶだけで、新しい処理は足せません。
+- サーバーは、保存の前にすべてのルールを決まったスキーマで確かめ、動かす時にも通知を受け取って
+  よい人かを確かめ直します。ルールから、メールや他のサービスへの送信・Web ページを開くこと・
+  任意の人への通知はできません。外のデータは、決まった地域の公開の天気予報だけで、サーバーが
+  決まった取得先の一覧から読みます。
 - 通知は記録帳の作成者に届きます。ほかの人に届くのは、共有の記録帳に参加して、その記録帳の
   通知を有効にした場合だけです。通知の文にはリンクを入れられず、公式を名乗れません。
   通知を広告や宣伝には使いません。
 - 運営は、すべての自動の動き・すべての通知・1 つの記録帳・1 つのルールを、いつでも止められます。
 ```
 
-### 7.4 文とコードの対応
+### 7.5 文とコードの対応
 
-| 文 | 根拠(origin/develop) |
+| 文 | 根拠(`origin/develop` `e988c309`) |
 |---|---|
-| 宣言的なルール・きっかけ・条件・5 つまでの処理・決まった一覧 | `backend/pkg/dsl/server_rules.go`(`ruleEvery` = daily / weekly / monthly、処理は notify / createRecord / updateRecord / increment の 1 つずつ)・AI の規則 `backend/internal/ai/server_rules_pass.go` |
-| サーバーで動く・端末はルールを実行しない | 実行は `backend/internal/runner`。iOS は serverRules の数だけを読み、中身は使わない(`MetamonDSL/Model/AppDocument.swift` の `serverRuleCount`) |
-| 保存の時に確かめ、動かす時にも制限を当てる | 保存: `dsl.Parse`(`validate.go` の `checkServerRules`)。実行: `runner/notify/recipients.go`(宛先の種類・参加者・ブロック・同意・上限)・`runner/engine/render.go`(差し込む値の無害化) |
-| 外部への送信・任意の宛先が無い | 宛先の種類は owner / author / authorOf / members だけ(`server_rules.go`)。外部への送信の処理は語彙に無い(#339) |
-| 作成者以外は同意した人だけ | `recipients.go`: 作成者以外は `Consent.Allows` が true の人だけ(既定 `NoConsent` = 誰も同意していない)。同意は `PUT /v1/me/notify-consent/{appId}` |
-| リンクを入れられない・公式を名乗れない | `server_rules.go` の `notifyURLRe`・`notifyNameWords`(公式・運営・Tailor It・Apple)。差し込む値の URL は `render.go` で伏せる |
-| 広告や宣伝に使わない | 通知を送るのは runner がルールから送るものだけ(APNs を呼ぶのは `runner/notify/apns` だけで、運営が一斉に送る仕組みは無い)。規約 `docs/legal/terms.md` が作成者の宣伝目的の通知を禁じる |
-| 運営が止められる | `RUNNER_PAUSED`(全部)・`RUNNER_NOTIFY_PAUSED`(通知だけ)・アプリとルールの停止(`backend/internal/runner/stops.go`・`cmd/runner/main.go`・#346) |
+| ルールは JSON の中のデータ。きっかけ・条件・処理の形 | `backend/pkg/dsl/server_rules.go:24-40`(`ServerRule`)・`:44-55`(`RuleTrigger`。`ruleEvery` = daily / weekly / monthly は `:140`)・`:58-65`(`RuleAction` は notify / createRecord / updateRecord / increment / saveFeed の 5 つの欄) |
+| 1 つの処理は決まった一覧の 1 つだけ | `server_rules.go:378-389`(5 つのうち 1 つでなければ却下) |
+| 5 つまでの処理 | `server_rules.go:128`(`MaxRuleActionsPro = 5`)・`:221-223`(超えたら却下)。無料の枠は 3(`:127`・`ServerRuleQuotaProblems` `:716`) |
+| 条件は記録帳の記録についての式 | `server_rules.go:208-214`(`if` は真偽の式だけ)。式は `backend/pkg/dsl/expreval/ops.go:23-338` の決まった演算(四則・比較・日付)だけを `switch` で計算する。外部のスクリプトの実行環境(JS など)は `backend/go.mod` に無い |
+| 天気予報を記録に残す・外のデータは決まった地域と取得先だけ | `backend/pkg/dsl/server_rules_feed.go:9-24`(地域は決まったコードで、記録の値は使わない)・`:49`(weather / pressure / warnings だけ)。取得は `backend/internal/runner/feed.go:54` から `internal/feeds` を通る(`backend/internal/feeds/client.go:135-147` の許可した取得先だけ・転送先も同じ) |
+| サーバーで動く・端末はルールを実行しない | 実行は `backend/internal/runner/engine/plan.go:358-412`(処理ごとの `switch`)。iOS は serverRules を数えるだけ(`ios/Packages/MetamonDSL/Sources/MetamonDSL/Model/AppDocument.swift:49-50`・`:114`)。数は設定の表示に使うだけ(`ios/Metamon/Features/Automations/AutomationsView.swift:13`) |
+| 保存の前にスキーマで確かめる | `backend/pkg/dsl/validate.go:69-82`(JSON Schema → 知らない欄を拒む → `Validate`)・`:273`(`checkServerRules`)。保存の入口: `backend/internal/appconfig/apps.go:76`・`backend/internal/appconfig/dsl.go:108`(全体)・`:177`(patch。`backend/pkg/dsl/patch.go:62` で `Parse`)・`:285`(前の版に戻す) |
+| Pro でない人は保存できない | `backend/internal/appconfig/pro_gate.go:66-86`(`PRO_GATE_MODE=enforce` の時に 402)・`backend/internal/paid/paid.go:147` |
+| 審査用の版では AI が serverRules を作らない | `backend/internal/ai/server_push_wording.go:50-52`(`sharedData` を無効にした依頼では pass を飛ばす)・`backend/internal/ai/server_rules_pass.go:313-318`。iOS の審査用の版は `sharedData` を無効にして送る(`ios/Packages/MetamonDSL/Sources/MetamonDSL/Model/ClientCapabilities.swift:20`・`:56-61`) |
+| 動かす時に、受け取ってよい人かを確かめ直す | `backend/internal/runner/notify/recipients.go:194`(宛先の種類をデータの範囲で確かめ直す・`:127-133`)・`:302-351`(退会・参加者・ブロック・新しいアカウント・同意)。宛先付きの規則も `backend/internal/runner/exec.go:124`・`:195-197` で確かめ直す |
+| 任意の宛先・外部への送信が無い | 宛先の種類は owner / author / authorOf / members / recipients だけ(`server_rules.go:79`・`:540-547`)。データの範囲ごとの表は `:524-528`(自分だけの記録帳は owner だけ)。外部へ送る処理は `RuleAction`(`:58-65`)に無い(#339) |
+| 作成者以外は同意した人だけ | `recipients.go:342-350`(作成者以外は `Consent.Allows` が true の人だけ)・`:81-87`(既定は誰も同意していない)。iOS の同意の画面は通常の版の `ios/Metamon/Features/Push/PushConsentSection.swift`(`PUT /v1/me/notify-consent/{appId}`) |
+| リンクを入れられない・公式を名乗れない | 保存の時: `server_rules.go:142`・`:605`(URL)・`:145`・`:622`(公式・運営・Tailor It・Apple)。動かす時: 差し込む値の URL・メール・電話番号を伏せる(`backend/internal/runner/engine/render.go:30`・`:104-120`) |
+| 広告や宣伝に使わない | APNs を呼ぶのは runner だけ(`backend/cmd/runner/push.go:38-57` 以外に `apns.` の呼び出しは無い)で、運営が一斉に送る仕組みは無い。規約が作成者の宣伝目的の通知を禁じる(`docs/legal/terms.md:46`) |
+| 運営が止められる | `RUNNER_PAUSED`(全部)・`RUNNER_NOTIFY_PAUSED`(通知だけ): `backend/cmd/runner/main.go:14-15`・`:130-131`、`backend/internal/runner/exec.go:50-53`。アプリとルールの停止: `backend/internal/runner/stops.go:12-20`(#346) |
+| (2 章)知らない部品は描かない | `ios/Packages/MetamonDSL/Sources/MetamonDSL/Model/Component.swift:78-80`・`:292`(知らない type は `.unknown`)・`ios/Packages/MetamonRenderer/Sources/MetamonRenderer/Screen/DSLView.swift:37-41`(登録に無い部品は `UnavailableComponent` の枠)・`ios/Packages/MetamonRenderer/Sources/MetamonRenderer/Support/UnavailableComponent.swift:4-22`(「アプリを更新すると表示できます」) |
+| (2 章)審査用の版で外した部品・機能 | `ClientCapabilities.swift:17`(`reviewExcludedComponents`)・`:20`(`reviewDisabledFeatures`)・`:28-34`(`APP_STORE_REVIEW` で allowlist を送る)。ビルドの設定は `ios/project.yml:147-150` |
 
-### 7.5 聞かれたときの答え方(足す分)
+### 7.6 聞かれたときの答え方(足す分)
 
 | 聞かれそうなこと | 答えの要点 |
 |---|---|
-| 「サーバーの機能でアプリの動きを後から変えている」(2.5.2) | ルールは JSON のデータで、サーバーで動く。処理の種類はサーバーに固定で、端末にコードは届かない。端末は今までと同じ JSON と通知を受け取るだけ |
-| 「作ったものが別のアプリとして振る舞っている」(4.7) | 記録帳と自動の動きは Tailor It の中だけにあり、通知も Tailor It の通知として届く。外で動かす・書き出す方法は無い |
-| 「プッシュ通知を宣伝に使っていないか・必須にしていないか」(4.5.4) | 通知は利用者が頼んだルールの知らせだけ。ほかの人には記録帳ごとの同意の後だけ。運営からの宣伝の通知は無い。iOS の通知の許可は Tailor It 本体が求める |
+| 「サーバーの機能でアプリの動きを後から変えている」(2.5.2) | ルールは JSON のデータで、サーバーで動く。処理の種類はサーバーのコードに固定で、端末にコードは届かない。端末は今までと同じ JSON と通知を受け取るだけ。新しい部品は App Store の更新でしか増えない |
+| 「作ったものが別のアプリとして振る舞っている」(4.7) | 記録帳と自動の動きは Tailor It の中だけにあり、通知も Tailor It の通知として届く。外で動かす・書き出す方法は無い。記録帳はネイティブの部品の組み合わせで、HTML5 / JavaScript のミニアプリではない(`webView` を戻す版は 2 章の [WEB PAGES] の差し替えを使う) |
+| 「プッシュ通知を宣伝に使っていないか・必須にしていないか」(4.5.4) | 通知は利用者が頼んだルールの知らせだけ。ほかの人には記録帳ごとの同意の後だけ。運営からの宣伝の通知は無い。iOS の通知の許可は Tailor It 本体が求める(求める時と、断った時の動きは出す版で確かめる・7.2) |
+| 「外部のサービスに送っていないか」(5.1.2) | 外へ出るのは決まった地域の天気予報の取得だけで、記録の値も利用者の情報も送らない |
+
+### 7.7 チームへ: 残る論点(ASC には貼らない)
+
+審査で通るかは Apple の判断で、ここに書いたことは「通る」を保証しない **(推測)**。
+
+| # | 論点 | 今の状態 | 次の一手 |
+|---|---|---|---|
+| 1 | 4.7 の「ソフト」とみなされるか | サーバーで動くことは 2.5.2 の答えにはなるが、4.7 は配り方(ミニアプリ・プラグイン)の論点で、どこで動くかだけでは答えにならない。答えは「記録帳は本体の部品の組み合わせの個人のコンテンツ」(4.3 の案 A・[playbook](../release/app-review-playbook.md))に寄る | 自動の動きを含む版は、まず共有なし(owner への通知だけ)で出し、4.7 の指摘が無いか見る |
+| 2 | 条件・値の式 | 条件や値に式があり、決まった演算だけだがループのない小さな計算はできる。「データだけ」と書いて式を伏せると 2.3.1 の論点になるので、英語の版は「condition」と書いている | 聞かれたら 2 章の「fixed, built-in evaluator」と同じ説明で答える |
+| 3 | 動かす時の確かめ | 前の規則で保存した版も動かせるよう、runner は保存の時の確かめをすべてはやり直さない(`exec.go:208-216`)。動かす時に確かめ直すのは宛先・同意・宛先付きの規則・差し込む値。英語の版は「checks again who may receive each notification」までしか言っていない | 「動かす時も同じ制限」とは書かない。言い回しを強める時はコードを先に足す |
+| 4 | 通知が届くか | 通常の版には `aps-environment` がある(Release は production・#683)が、審査用の版は PushHost も `aps-environment` も無い(7.2)。runner も未デプロイなら、審査で試されて届かない(2.1) | 出す版で PushHost・entitlement・runner(`RUNNER_APNS_ENVIRONMENT=production`)を確かめてから、この段落を足す |
+| 5 | 4,000 字 | 2 章 3,994 字 + 7.3 の 1,631 字で超える | 7.3 を足す版では、2 章の DEVICE FEATURES のうちその版に無い行などを削る。足す前に字数を数える |
+| 6 | 審査用の版に serverRules が無いことの根拠 | AI が作らないこと(`server_push_wording.go:50-52`)と、Pro の保存の判定(`pro_gate.go:66-86`)に寄る。`PRO_GATE_MODE` を `log` / `off` にすると後者が外れる | 審査の期間中は `enforce` のままにする(7.2) |
+| 7 | 天気予報(`saveFeed`) | 外のデータを読む唯一の処理。取得先は許可の一覧だけ | 天気の記録を出さない版では、英語の版の該当の文を消す |
