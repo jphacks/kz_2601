@@ -34,6 +34,9 @@ public protocol DSLRuntime: AnyObject, Observable {
     var currentUserId: String? { get }
     /// 変更できないレコード(他人の共有レコード)を触った時。ホストが「作った人だけが変更できます」を出す。
     func notifyReadOnly(entity: String)
+    /// 楽観的に描いた変更(一覧のチェック・単語カード・トーナメントの勝者)が保存できず戻した時。ホストが「保存できませんでした」を出す。
+    /// 1 回の操作につき 1 回だけ呼ぶ(`OptimisticSave`)。変更できない記録で止まった時は `notifyReadOnly` が出るので呼ばない。
+    func notifySaveFailed(entity: String)
 }
 
 public extension DSLRuntime {
@@ -46,6 +49,7 @@ public extension DSLRuntime {
     func createRecord(entity: String, data: [String: JSONValue]) async -> Bool { false }
     var currentUserId: String? { nil }
     func notifyReadOnly(entity: String) {}
+    func notifySaveFailed(entity: String) {}
 
     /// 自分が更新できるレコードか(#249 / #252)。他人の共有レコードは entity.edit が members の時だけ。
     func canEdit(entity: String, record: Record) -> Bool {

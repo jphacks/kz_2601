@@ -1040,6 +1040,11 @@ final class AppRuntime: DSLRuntime {
         toast = L10n.tr("このデータは作った人だけが変更できます")
     }
 
+    /// 一覧のチェックなど、その場で描いた変更を保存できず戻した時の一言(read-only と同じ下部の toast)。
+    func notifySaveFailed(entity: String) {
+        toast = L10n.tr("保存できませんでした。通信を確かめてもう一度お試しください")
+    }
+
     private func record(_ entity: String, _ id: String) -> Record? {
         records[entity]?.first { $0.id == id }
     }
