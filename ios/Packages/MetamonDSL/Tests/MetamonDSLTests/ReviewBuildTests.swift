@@ -23,7 +23,7 @@ final class ReviewBuildTests: XCTestCase {
         #if APP_STORE_REVIEW
         XCTAssertEqual(ClientCapabilities.supportedFeatures, ["recordRetention", "notification.when", "singleEntity", "notification.near", "aiButton.long", "aiButton.inputPhoto", "aiButton.saveTo", "aiButton.inputFeeds", "aiButton.outputs", "action.lookupBook", "text.highlight", "feed.v2", "expr.addMinutes", "aiChat.inputEntity", "component.bracket"])
         #else
-        XCTAssertEqual(ClientCapabilities.supportedFeatures, ["recordRetention", "matching", "notification.when", "singleEntity", "dataRoles", "addressedMessages", "notification.near", "aiButton.long", "aiButton.inputPhoto", "aiButton.saveTo", "aiButton.inputFeeds", "aiButton.outputs", "action.lookupBook", "text.highlight", "feed.v2", "expr.addMinutes", "aiChat.inputEntity", "component.bracket"])
+        XCTAssertEqual(ClientCapabilities.supportedFeatures, ["recordRetention", "matching", "notification.when", "singleEntity", "dataRoles", "addressedMessages", "notification.near", "aiButton.long", "aiButton.inputPhoto", "aiButton.saveTo", "aiButton.inputFeeds", "aiButton.outputs", "action.lookupBook", "text.highlight", "feed.v2", "expr.addMinutes", "aiChat.inputEntity", "component.bracket", "photoField.illustrate"])
         #endif
     }
 
