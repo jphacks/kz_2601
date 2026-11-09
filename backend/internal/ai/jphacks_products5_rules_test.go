@@ -1,6 +1,7 @@
 package ai
 
 import (
+	"context"
 	"encoding/json"
 	"strings"
 	"testing"
@@ -42,6 +43,28 @@ func TestJPHACKSProducts5Rules_InPrompt(t *testing.T) {
 	for _, s := range []string{jp5RateExpr, jp5ReachedExpr, jp5BadgesExpr, jp5SafeFilter, jp5MineFilter, jp5UrgencyExpr, jp5StageExpr, jp5AgoExpr, jp5ThisMonthExpr, jp5LastMonthExpr, jp5GrowthExpr} {
 		if !json.Valid([]byte(s)) {
 			t.Errorf("not valid JSON: %s", s)
+		}
+	}
+}
+
+// The inputPhoto rule is in the full prompt only: with AI_TEXT_IMAGE off
+// (the production default) the restricted prompt drops it, the rest stays.
+func TestJPHACKSProducts5PhotoRule_GatedByTextImage(t *testing.T) {
+	on := (&Service{TextImage: true}).clientRestriction(nil, nil, nil)
+	full := restrictPrompt(withRestriction(context.Background(), on), systemPrompt)
+	off := (&Service{}).clientRestriction(nil, nil, nil)
+	restricted := withoutNote(restrictPrompt(withRestriction(context.Background(), off), systemPrompt))
+	for _, s := range []string{jphacksProducts5PhotoRule, jp5CheckPrompt, jp5RateExpr} {
+		if !strings.Contains(full, s) {
+			t.Errorf("full prompt lacks %.60s", s)
+		}
+		if strings.Contains(restricted, s) {
+			t.Errorf("restricted prompt still has %.60s", s)
+		}
+	}
+	for _, s := range []string{jp5DrillPrompt, jp5UrgencyExpr, jp5GrowthExpr} {
+		if !strings.Contains(restricted, s) {
+			t.Errorf("restricted prompt lost %.60s", s)
 		}
 	}
 }
