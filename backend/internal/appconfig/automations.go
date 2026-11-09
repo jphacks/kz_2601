@@ -123,7 +123,7 @@ func (h *Handler) automations(w http.ResponseWriter, r *http.Request) {
 	}
 	out.NotifyPaused = stopOf(stops, store.NotifyStopID(appID))
 
-	desc := lang(r) // description language (Accept-Language)
+	desc := lang(r)              // description language (Accept-Language)
 	var latest *store.RuleStatus // the newest run that saw the day's counter
 	for i := range a.ServerRules {
 		rule := &a.ServerRules[i]
