@@ -166,18 +166,19 @@ struct BracketLeaf: View {
             for (id, w) in wins { pending[id] = w }
             taps += 1
             Task {
-                // 順に保存: 下げる方(元の勝者)が先。途中で失敗したら残りは送らない(勝者が 2 人になる途中の形を残さない)
-                var failed = false
-                for (id, w) in Self.writeOrder(wins) {
-                    if !failed {
-                        failed = !(await rt.updateRecord(entity: entityId, recordId: id, data: [winsField: .number(Double(w))]))
-                        if failed { print("[Metamon] bracket not saved: \(entityId)/\(id)") }
-                    }
+                // 順に保存: 下げる方(元の勝者)が先。途中で失敗したら残りは送らない(勝者が 2 人になる途中の形を残さない)。失敗の一言は 1 回
+                _ = await Self.save(wins, winsField: winsField, entity: entityId, rt: rt) { id in
                     // 失敗なら保存待ちを外す = ストアの値に戻る
-                    if pending[id] == w { pending[id] = nil }
+                    if pending[id] == wins[id] { pending[id] = nil }
                 }
             }
         }
+    }
+
+    /// 勝ち数を `writeOrder` の順に保存する(`OptimisticSave.updateInOrder`)。全部保存できたら true。
+    static func save(_ wins: [String: Int], winsField: String, entity: String, rt: any DSLRuntime, settle: (String) -> Void) async -> Bool {
+        let writes = writeOrder(wins).map { (recordId: $0.0, data: [winsField: JSONValue.number(Double($0.1))]) }
+        return await OptimisticSave.updateInOrder(rt, entity: entity, writes: writes, settle: settle)
     }
 
     // MARK: - 計算(描画の木 RenderTree と共用)

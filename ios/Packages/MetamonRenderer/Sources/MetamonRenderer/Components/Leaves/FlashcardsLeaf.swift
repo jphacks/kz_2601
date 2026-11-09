@@ -175,8 +175,7 @@ struct FlashcardsLeaf: View {
         AccessibilityNotification.Announcement(learned ? L("覚えた") : L("まだ")).post()
         guard let patch else { return }
         Task {
-            let saved = await rt.updateRecord(entity: entityId, recordId: card.id, data: patch)
-            if !saved { print("[Metamon] flashcards not saved: \(entityId)/\(card.id)") }
+            _ = await OptimisticSave.update(rt, entity: entityId, recordId: card.id, data: patch)
             deck.settle(card.id, requested: learned)
         }
     }

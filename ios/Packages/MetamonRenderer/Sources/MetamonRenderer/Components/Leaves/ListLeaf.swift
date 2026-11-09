@@ -102,8 +102,7 @@ struct ListLeaf: View {
         withAnimation(RenderTheme.Motion.select) { toggleOverrides[row.id] = next }
         toggleTaps += 1
         Task {
-            let saved = await rt.updateRecord(entity: entity, recordId: row.id, data: ListToggle.patch(row, field: field, on: next, daily: daily, today: today))
-            if !saved { print("[Metamon] list toggle not saved: \(entity)/\(row.id)") }
+            _ = await OptimisticSave.update(rt, entity: entity, recordId: row.id, data: ListToggle.patch(row, field: field, on: next, daily: daily, today: today))
             withAnimation(RenderTheme.Motion.select) { ListToggle.settle(&toggleOverrides, recordId: row.id, requested: next) }
         }
     }
