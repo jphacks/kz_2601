@@ -82,6 +82,16 @@ type Case struct {
 	// PendingExpect: expect keys an open PR adds (jphacks_coverage_pending_cases.json).
 	// A key is checked once expectKeys knows it; until then it is skipped (coverage.go).
 	PendingExpect map[string]any `json:"pendingExpect,omitempty"`
+	// TextImage turns on Service.TextImage (AI_TEXT_IMAGE=1) for this case:
+	// with it off, aiButton inputPhoto is not generated (clientRestriction).
+	TextImage bool `json:"textImage,omitempty"`
+}
+
+// caseSwitches applies the case's server switches to svc; call the result to restore them.
+func caseSwitches(svc *ai.Service, c Case) func() {
+	prev := svc.TextImage
+	svc.TextImage = c.TextImage
+	return func() { svc.TextImage = prev }
 }
 
 type Metrics struct {
@@ -375,6 +385,7 @@ func runCase(ctx context.Context, svc *ai.Service, store *appconfigclient.Memory
 			log.Fatalf("[%s] seed: %v", c.ID, err)
 		}
 	}
+	defer caseSwitches(svc, c)()
 	log.Printf("[%s] %s effort=%s locale=%s stream=%v %q", c.ID, c.Kind, effort, loc, stream, c.Transcript)
 	rec := Record{ID: c.ID, Kind: c.Kind, Group: c.Group, Transcript: c.Transcript, Locale: string(loc), Checked: len(c.Expect) > 0}
 	started := time.Now()
