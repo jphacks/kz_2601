@@ -73,6 +73,18 @@ func wantLint(t *testing.T, got []string, substr string) {
 	t.Errorf("want a warning containing %q, got:\n%s", substr, strings.Join(got, "\n"))
 }
 
+func TestLintDateDefault(t *testing.T) {
+	for _, bad := range []string{`"today"`, `"明日"`, `0`} {
+		got := lintWith(t, `,{"id":"due","name":"期限","type":"date","defaultValue":`+bad+`}`, "")
+		wantLint(t, got, `field "due": defaultValue`)
+	}
+	for _, ok := range []string{`"now"`, `"2026-04-01"`, `"2026-04-01T09:00:00+09:00"`} {
+		if got := lintWith(t, `,{"id":"due","name":"期限","type":"datetime","defaultValue":`+ok+`}`, ""); len(got) > 0 {
+			t.Errorf("%s: %v", ok, got)
+		}
+	}
+}
+
 func TestLintBaseClean(t *testing.T) {
 	if w := lintWith(t, "", ""); len(w) > 0 {
 		t.Fatalf("base should be clean: %v", w)
