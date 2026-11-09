@@ -1,0 +1,6 @@
+[
+  {"id": "sp_poll_count", "kind": "create", "group": "schedule-poll", "transcript": "日程調整アプリ。候補日ごとに何人参加できるか見たい", "expect": {"ref": true, "computed": true, "prefillRef": true, "countWhere": true}, "note": "schedule_poll.json: 候補日の computed = agg count answers、filter は [day eq {ref:id}, status eq 参加できる]"},
+  {"id": "sp_practice_attend", "kind": "create", "group": "schedule-poll", "transcript": "出欠を取って、各練習日の参加人数を出したい", "expect": {"ref": true, "computed": true, "prefillRef": true, "countWhere": true}, "note": "練習日の computed = 出欠のうち参加だけの count(出欠の総数ではない)"},
+  {"id": "sp_poll_maybe", "kind": "create", "group": "schedule-poll", "transcript": "飲み会の候補日を出して、みんなが〇△×で答える。候補日ごとに〇と△の人数を並べて見たい", "expect": {"ref": true, "computed": true, "countWhere": true}, "note": "値ごとに 1 つずつ computed(〇の数・△の数)"},
+  {"id": "sp_no_count", "kind": "create", "group": "schedule-poll", "transcript": "練習日の予定を一覧にして、場所とメモを書いておきたい", "expect": {"computed": false, "countWhere": false}, "note": "否定: 行ごとの集計は要らない。count の computed を足さない(場所をマスタの ref にするのは可なので ref は見ない)"}
+]

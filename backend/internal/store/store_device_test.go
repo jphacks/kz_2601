@@ -3,12 +3,18 @@ package store
 import (
 	"context"
 	"fmt"
+	"math/rand/v2"
 	"strings"
 	"testing"
 	"time"
 )
 
-func devToken(n int) string { return fmt.Sprintf("%064x", n) }
+// devTokenSalt keeps this package's tokens apart from the other packages'
+// that share the emulator in parallel: the token index (device_tokens) is
+// global, so registering the same token elsewhere would drop our device.
+var devTokenSalt = rand.Uint64()
+
+func devToken(n int) string { return fmt.Sprintf("%016x%048x", devTokenSalt, n) }
 
 func deviceIDs(t *testing.T, s Store, uid string) []string {
 	t.Helper()
