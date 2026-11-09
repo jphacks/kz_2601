@@ -455,7 +455,7 @@ type Component struct {
 	Name          string        `json:"name,omitempty"`          // icon: SF Symbols name / avatar: initials source
 	Color         string        `json:"color,omitempty"`         // SemanticColor enum
 	Value         *Expr         `json:"value,omitempty"`         // stat: Expr / progressBar (0..1) & gauge: number literal
-	Target        *float64      `json:"target,omitempty"`        // progressBar entity mode denominator
+	Target        *Expr         `json:"target,omitempty"`        // progressBar entity mode denominator: number or {"setting"} (progress_target.go) / healthStat: number
 	Tone          string        `json:"tone,omitempty"`          // progressBar: positive (goal) | negative (budget)
 	URL           string        `json:"url,omitempty"`           // link
 	Image         string        `json:"image,omitempty"`         // avatar literal (https / data URL)
@@ -499,8 +499,9 @@ type Component struct {
 	RowRange     *GridRange `json:"rowRange,omitempty"`     // integer rowField range (default 1..6)
 
 	// bracket (bracket.go). Entity / TitleField / Title are shared.
-	WinsField string `json:"winsField,omitempty"` // integer: rounds won (0 = in round 1)
-	SeedField string `json:"seedField,omitempty"` // integer / number: seed order, low first (else creation order)
+	WinsField    string `json:"winsField,omitempty"`    // integer: rounds won (0 = in round 1)
+	SeedField    string `json:"seedField,omitempty"`    // integer / number: seed order, low first (else creation order)
+	StartedField string `json:"startedField,omitempty"` // datetime: when the first result was recorded (freezes the draw)
 
 	// chatThread (#260). Entity / Placeholder / EmptyText are shared.
 	TextField  string `json:"textField,omitempty"`  // message body (string/text field)
@@ -523,6 +524,9 @@ type Component struct {
 	Threshold *SensorThreshold `json:"threshold,omitempty"`
 	// photoField (#418): on-device reading of the picked photo into other fields.
 	Analyze []PhotoAnalyze `json:"analyze,omitempty"`
+	// photoField: also offer an illustration made on the device (Apple Image
+	// Playground) from the record's title, saved like a picked photo.
+	Illustrate bool `json:"illustrate,omitempty"`
 	// fileImport (file_import.go). Entity / Field / Label are shared.
 	Accept []string       `json:"accept,omitempty"` // csv|text|pdf
 	Map    []ImportColumn `json:"map,omitempty"`    // csv: column header -> field id

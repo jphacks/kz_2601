@@ -29,6 +29,27 @@ final class BracketLeafTests: XCTestCase {
         XCTAssertNil(BracketLeaf.winsField(c, in: dsl.entity("entrant")))
     }
 
+    func testStartedFieldMustBeStoredDatetime() throws {
+        let dsl = try tournament()
+        var c = try XCTUnwrap(dsl.screens.flatMap(\.allComponents).first { $0.type == .bracket })
+        XCTAssertEqual(BracketLeaf.startedField(c, in: dsl.entity("entrant")), "started")
+        c.startedField = "seed"
+        XCTAssertNil(BracketLeaf.startedField(c, in: dsl.entity("entrant")), "datetime でなければ時刻の規則")
+        c.startedField = nil
+        XCTAssertNil(BracketLeaf.startedField(c, in: dsl.entity("entrant")))
+    }
+
+    /// 開始時刻は勝ち数より先に書き(勝ちが残れば必ず開始時刻がある)、消す時は勝ち数を戻してから消す。
+    func testWritePlanOrdersStartAroundWins() {
+        let now = JSONValue.string("2026-11-09T00:00:00Z")
+        let set = BracketLeaf.writePlan(wins: ["a": 1], starts: ["a": now, "b": now], winsField: "wins", startedField: "started")
+        XCTAssertEqual(set.map(\.0), ["b", "a"])
+        XCTAssertEqual(set[1].1, ["wins": .number(1), "started": now])
+        let clear = BracketLeaf.writePlan(wins: ["a": 0], starts: ["a": .null, "b": .null], winsField: "wins", startedField: "started")
+        XCTAssertEqual(clear.map(\.0), ["a", "b"])
+        XCTAssertEqual(BracketLeaf.writePlan(wins: ["a": 1], starts: [:], winsField: "wins", startedField: nil).map(\.1), [["wins": .number(1)]])
+    }
+
     /// 勝者を入れ替える時は元の勝者を下げる方を先に保存する(途中で失敗しても勝者が 2 人にならない)。
     func testWriteOrderLowersFirst() {
         XCTAssertEqual(BracketLeaf.writeOrder(["me": 2, "other": 1]).map(\.0), ["other", "me"])

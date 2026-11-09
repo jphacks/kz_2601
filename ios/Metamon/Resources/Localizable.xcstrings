@@ -9742,6 +9742,23 @@
         }
       }
     },
+    "保存できませんでした。通信を確かめてもう一度お試しください" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Couldn't save. Check your connection and try again"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "保存できませんでした。通信を確かめてもう一度お試しください"
+          }
+        }
+      }
+    },
     "個人の情報も公開されます" : {
       "extractionState" : "manual",
       "localizations" : {

@@ -418,6 +418,7 @@ func (a *App) Validate() error {
 				checkComponentFilterValue(where, c.Filter, entities, add)
 				checkComponentPeriodFilter(where, c, entities, add)
 			}
+			checkPhotoIllustrate(where, c, add) // photo_illustrate.go
 			switch c.Type {
 			case CompText:
 				checkText(where, c, formEntity, add) // text_highlight.go
@@ -885,9 +886,7 @@ func checkProgressBar(where string, c *Component, entities map[string]*Entity, a
 	if _, ok := checkAggregateRef(where, c, entities, add); !ok {
 		return
 	}
-	if c.Target == nil || *c.Target <= 0 {
-		add("%s: progressBar entity mode needs target > 0", where)
-	}
+	checkProgressTarget(where, c.Target, entities, add)
 }
 
 func checkGauge(where string, c *Component, entities map[string]*Entity, add func(string, ...any)) {

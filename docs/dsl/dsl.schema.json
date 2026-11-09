@@ -1737,6 +1737,10 @@
             "$ref": "#/$defs/PhotoAnalyze"
           },
           "description": "写真を撮った・選んだ直後に端末内で読み取り、into の field に入れる(読み取れなかった項目は今の値のまま。「もう一度読み取る」で読み直せる)。保存はユーザー。"
+        },
+        "illustrate": {
+          "type": "boolean",
+          "description": "true で写真ボタンの横に「イラストを作る」を出す。端末内の Apple Image Playground でレコードのタイトル(無ければ最初の文字の field)からイラストを作り、選んだ写真と同じ形でこの photo field に入れる。クラウドでは作らない。使えない端末(Apple Intelligence の無い端末・iOS 18.1 未満)ではボタンを出さない。"
         }
       }
     },
@@ -2520,8 +2524,15 @@
           "description": "Numeric field aggregated (required unless aggregate=count)."
         },
         "target": {
-          "type": "number",
-          "description": "Entity mode denominator (> 0), e.g. monthly budget 30000."
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "$ref": "#/$defs/ExprSetting"
+            }
+          ],
+          "description": "Entity mode denominator (> 0), e.g. monthly budget 30000. A goal the user edits: {\"setting\":\"<fieldId>\"} (numeric field of a single entity)."
         },
         "filter": {
           "$ref": "#/$defs/Filter"
@@ -3628,6 +3639,10 @@
         "seedField": {
           "type": "string",
           "description": "シード順の integer / number field(小さいほど上位・上位から不戦勝)。省略 = 登録順。"
+        },
+        "startedField": {
+          "type": "string",
+          "description": "大会を始めた時刻を保存する datetime field(computed でない・フォームに出さない)。最初の結果と一緒に表の全員へ書き、開始後に足した人を表に入れない。省略 = 更新時刻から推定。"
         }
       },
       "description": "トーナメント表(勝ち抜き戦・ノックアウト)。entity の出場者(最大 64)から 1 回戦の組み合わせを自動で作り(seedField の順か登録順・2 のべき乗に足りない分は上位シードの不戦勝)、回戦を列にして勝ち上がりを表示する。試合の 2 人のどちらかをタップするとその人を勝者にし(もう一度タップで取り消し)、winsField に保存して次の回戦に進める。最後の勝者を優勝として出す。「トーナメント表」「勝ち抜き戦」「対戦表を自動で作る」「勝ち上がり」の時に必ずこれを選ぶ(list や table で代替しない)。リーグ戦(総当たり)・敗者復活・3 位決定戦・スコアの記録はできない。",
@@ -3930,7 +3945,7 @@
       "required": [
         "setting"
       ],
-      "description": "single の entity(設定値の置き場・#267)の 1 件のレコードのフィールド値。行が無い場所(stat.value・通知の when・filter の value)でも、どの entity の computed からでも読める。progressBar / gauge の value・target は不可。保存前・未入力は field の defaultValue。",
+      "description": "single の entity(設定値の置き場・#267)の 1 件のレコードのフィールド値。行が無い場所(stat.value・通知の when・filter の value)でも、どの entity の computed からでも読める。progressBar の target には使える(value・gauge は不可)。保存前・未入力は field の defaultValue。",
       "properties": {
         "setting": {
           "type": "string",

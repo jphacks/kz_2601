@@ -170,6 +170,7 @@ public struct Component: Decodable, Identifiable, Sendable {
     public var inputFeeds: [String]?   // generate: 同じ画面の feed の id(行を材料に足す・AIFeedInput.swift)
     public var outputs: [String: String]? // generate fields: 項目名 → フォームの field(AIOutputs.swift)
     public var target: Double?         // progressBar entity モードの分母
+    public var targetExpr: Expr?       // progressBar: target が式 {"setting": …} の時(変えられる目標)。数値なら `target`
     public var tone: String?           // progressBar: positive(目標)| negative(予算)・#140
     public var url: String?            // link
     public var image: String?          // avatar リテラル(https / data URL)
@@ -228,6 +229,8 @@ public struct Component: Decodable, Identifiable, Sendable {
     public var threshold: SensorThreshold?
     // photoField(#418): 写真から読み取って他の field に入れる。壊れた項目だけ落とす
     public var analyze: [PhotoAnalyze] = []
+    // photoField: 端末内の Image Playground でイラストを作るボタンも出す(使えない端末では出さない)
+    public var illustrate: Bool = false
     // fileImport
     public var accept: [String] = []       // csv|text|pdf
     public var map: [ImportColumn] = []    // csv: 見出し → field id
@@ -246,6 +249,7 @@ public struct Component: Decodable, Identifiable, Sendable {
     // bracket。entity / title / titleField は共用
     public var winsField: String?      // 勝った回戦の数を保存する integer field
     public var seedField: String?      // シード順の integer / number field(nil = 登録順)
+    public var startedField: String?   // 大会を始めた時刻を保存する datetime field(nil = 時刻の規則で固定)
     // feed(#348)。URL は持たない
     public var provider: String?       // weather|warnings|pressure|holidays|rss|arxiv|diet
     public var region: String?         // weather / warnings / pressure: 気象庁の府県予報区のコード
@@ -276,11 +280,11 @@ public struct Component: Decodable, Identifiable, Sendable {
         case metric, period
         case columnField, rowField, columnValues, rowValues, rowRange
         case textField, photoField, roleField, persona, speak, inputEntity
-        case keepMinutes, maxStorageMB, impactG, autoStart, audio, sensor, threshold, analyze, fields, distance, allowRequests, autoAccept
+        case keepMinutes, maxStorageMB, impactG, autoStart, audio, sensor, threshold, analyze, illustrate, fields, distance, allowRequests, autoAccept
         case accept, map
         case show
         case front, back, toggle
-        case winsField, seedField
+        case winsField, seedField, startedField
         case visibleTo, highlight
         case provider, region, feedId
         case query, category, near, addressField, pins
@@ -364,6 +368,7 @@ public struct Component: Decodable, Identifiable, Sendable {
         inputFeeds = try? c.decodeIfPresent([String].self, forKey: .inputFeeds)
         outputs = try? c.decodeIfPresent([String: String].self, forKey: .outputs)
         target = try? c.decodeIfPresent(Double.self, forKey: .target)
+        if target == nil { targetExpr = try? c.decodeIfPresent(Expr.self, forKey: .target) }
         tone = try? c.decodeIfPresent(String.self, forKey: .tone)
         url = try? c.decodeIfPresent(String.self, forKey: .url)
         image = try? c.decodeIfPresent(String.self, forKey: .image)
@@ -394,6 +399,7 @@ public struct Component: Decodable, Identifiable, Sendable {
         sensor = try? c.decodeIfPresent(String.self, forKey: .sensor)
         threshold = try? c.decodeIfPresent(SensorThreshold.self, forKey: .threshold)
         analyze = ((try? c.decodeIfPresent(Lossy<PhotoAnalyze>.self, forKey: .analyze))?.wrappedValue ?? []).filter { $0.kind != .unknown }
+        illustrate = (try? c.decodeIfPresent(Bool.self, forKey: .illustrate)) ?? false
         accept = (try? c.decodeIfPresent(Lossy<String>.self, forKey: .accept))?.wrappedValue ?? []
         map = (try? c.decodeIfPresent(Lossy<ImportColumn>.self, forKey: .map))?.wrappedValue ?? []
         fields = try? c.decodeIfPresent([String].self, forKey: .fields)
@@ -406,6 +412,7 @@ public struct Component: Decodable, Identifiable, Sendable {
         toggle = try? c.decodeIfPresent(String.self, forKey: .toggle)
         winsField = try? c.decodeIfPresent(String.self, forKey: .winsField)
         seedField = try? c.decodeIfPresent(String.self, forKey: .seedField)
+        startedField = try? c.decodeIfPresent(String.self, forKey: .startedField)
         provider = try? c.decodeIfPresent(String.self, forKey: .provider)
         region = try? c.decodeIfPresent(String.self, forKey: .region)
         feedId = try? c.decodeIfPresent(String.self, forKey: .feedId)
