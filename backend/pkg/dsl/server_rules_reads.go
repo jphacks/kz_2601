@@ -112,6 +112,9 @@ func (r *ServerRule) ReadEntities() []string {
 		if r.Pick.Exclude != nil && r.Pick.Exclude.Entity != "" {
 			seen[r.Pick.Exclude.Entity] = true
 		}
+		if r.Pick.Count != nil && r.Pick.Count.Entity != "" {
+			seen[r.Pick.Count.Entity] = true
+		}
 	}
 	r.walkExprs(func(e *Expr) {
 		if e.Kind == ExprAgg && e.Agg != nil && e.Agg.Entity != "" {

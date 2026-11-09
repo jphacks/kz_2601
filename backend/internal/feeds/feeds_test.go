@@ -65,9 +65,9 @@ type fake struct {
 	mu       sync.Mutex
 	redirect string
 	srv      *httptest.Server
-	hits sync.Map // path -> *atomic.Int32
-	body map[string][]byte
-	code map[string]int
+	hits     sync.Map // path -> *atomic.Int32
+	body     map[string][]byte
+	code     map[string]int
 }
 
 func newFake(t *testing.T) *fake {
@@ -285,7 +285,7 @@ func TestCacheAndStale(t *testing.T) {
 		t.Fatalf("source hit %d times within the TTL, want 1", n)
 	}
 	// After the TTL the source fails: the last good copy is served as stale,
-	// and the failure is remembered for failTTL (no retry storm).
+	// and the failure is remembered for FailTTL (no retry storm).
 	c.add(16 * time.Minute)
 	f.mu.Lock()
 	f.code["/rss2.xml"] = http.StatusInternalServerError
@@ -305,8 +305,14 @@ func TestCacheAndStale(t *testing.T) {
 		t.Errorf("err = %v, want ErrUpstream", err)
 	}
 	// A source that never answered is an error, not an empty list.
-	if _, err := s.Get(ctx, Query{Provider: dsl.FeedWeather, Region: "130000"}, 5); !errors.Is(err, ErrUpstream) {
+	wq := Query{Provider: dsl.FeedWeather, Region: "130000"}
+	if _, err := s.Get(ctx, wq, 5); !errors.Is(err, ErrUpstream) || errors.Is(err, ErrRecentFailure) {
 		t.Errorf("404 source: %v", err)
+	}
+	// Within FailTTL the cached failure answers, marked as such (a caller
+	// waits FailTTL instead of retrying into it).
+	if _, err := s.Get(ctx, wq, 5); !errors.Is(err, ErrRecentFailure) || !errors.Is(err, ErrUpstream) {
+		t.Errorf("cached failure: %v", err)
 	}
 }
 

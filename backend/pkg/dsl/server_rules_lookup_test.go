@@ -98,7 +98,7 @@ func TestServerRulesLookupRejects(t *testing.T) {
 		edit func(a *App)
 		want string
 	}{
-		{"bad op", func(a *App) { a.ServerRules[1].Lookup.Op = "in" }, `op "in" must be exists or notExists`},
+		{"bad op", func(a *App) { a.ServerRules[1].Lookup.Op = "in" }, `op "in" must be exists, notExists, overlaps or notOverlaps`},
 		{"unknown entity", func(a *App) { a.ServerRules[1].Lookup.Entity = "ghost" }, `entity "ghost" does not exist`},
 		{"unknown field", func(a *App) { a.ServerRules[1].Lookup.Field = "ghost" }, `field "ghost" is not a field of entity "roster"`},
 		{"unknown equals", func(a *App) { a.ServerRules[1].Lookup.Equals = "ghost" }, `equals "ghost" is not a field of entity "registrations"`},

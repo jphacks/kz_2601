@@ -60,6 +60,8 @@ type RuleAction struct {
 	CreateRecord *RuleCreateRecord `json:"createRecord,omitempty"`
 	UpdateRecord *RuleUpdateRecord `json:"updateRecord,omitempty"`
 	Increment    *RuleIncrement    `json:"increment,omitempty"`
+	// SaveFeed: a time trigger saves a public feed snapshot (server_rules_feed.go).
+	SaveFeed *RuleSaveFeed `json:"saveFeed,omitempty"`
 }
 
 // RuleNotify is a push notification with a fixed template.
@@ -222,13 +224,14 @@ func checkServerRules(a *App, entities map[string]*Entity, add func(string, ...a
 		for j := range r.Do {
 			checkRuleAction(fmt.Sprintf("%s.do[%d]", where, j), rc, &r.Do[j])
 		}
-		if n := len(rc.reads); n > MaxRuleReadEntities {
-			add("%s: reads the records of %d entities (each + agg + lookup + similar + pick: %s); at most %d", where, n, strings.Join(sortedKeys(rc.reads), ", "), MaxRuleReadEntities)
+		if n, most := len(rc.reads), r.readCap(); n > most {
+			add("%s: reads the records of %d entities (each + agg + lookup + similar + pick: %s); at most %d", where, n, strings.Join(sortedKeys(rc.reads), ", "), most)
 		}
 	}
 	if scheduled > MaxScheduledRulesPro {
 		add("serverRules: too many time-triggered rules (%d > %d)", scheduled, MaxScheduledRulesPro)
 	}
+	checkSaveFeedCount(a, add)
 	checkRuleChains(a, add)
 }
 
@@ -375,16 +378,18 @@ func checkRuleTrigger(where string, r *ServerRule, entities map[string]*Entity, 
 func checkRuleAction(where string, rc *ruleCheck, act *RuleAction) {
 	row, scope, entities, add := rc.row, rc.scope, rc.entities, rc.add
 	n := 0
-	for _, set := range []bool{act.Notify != nil, act.CreateRecord != nil, act.UpdateRecord != nil, act.Increment != nil} {
+	for _, set := range []bool{act.Notify != nil, act.CreateRecord != nil, act.UpdateRecord != nil, act.Increment != nil, act.SaveFeed != nil} {
 		if set {
 			n++
 		}
 	}
 	if n != 1 {
-		add("%s: write exactly one of notify, createRecord, updateRecord, increment (got %d)", where, n)
+		add("%s: write exactly one of notify, createRecord, updateRecord, increment, saveFeed (got %d)", where, n)
 		return
 	}
 	switch {
+	case act.SaveFeed != nil:
+		checkRuleSaveFeed(where+".saveFeed", rc, act.SaveFeed)
 	case act.Notify != nil:
 		checkRuleNotify(where+".notify", rc, act.Notify)
 	case act.CreateRecord != nil:
@@ -662,6 +667,8 @@ func checkRuleChains(a *App, add func(string, ...any)) {
 			switch {
 			case act.CreateRecord != nil:
 				writes[act.CreateRecord.Entity] = append(writes[act.CreateRecord.Entity], write{rule: r.ID, create: true})
+			case act.SaveFeed != nil:
+				writes[act.SaveFeed.Entity] = append(writes[act.SaveFeed.Entity], write{rule: r.ID, create: true})
 			case act.UpdateRecord != nil && row != nil:
 				target := row.ID
 				if act.UpdateRecord.Ref != "" {
@@ -814,6 +821,8 @@ func (a *App) DescribeServerRule(r *ServerRule) string {
 			acts = append(acts, who+"に通知")
 		case act.CreateRecord != nil:
 			acts = append(acts, fmt.Sprintf("「%s」に記録を足す", ename(act.CreateRecord.Entity)))
+		case act.SaveFeed != nil:
+			acts = append(acts, describeSaveFeed(act.SaveFeed, ename))
 		case act.UpdateRecord != nil && act.UpdateRecord.Ref == "":
 			acts = append(acts, "その記録を書き換える")
 		case act.UpdateRecord != nil:
