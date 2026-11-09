@@ -11,7 +11,8 @@ import (
 
 // featuresDoc uses every clientFeature once: aiButton long / inputPhoto /
 // saveTo / inputFeeds / outputs, lookupBook (button and toolbar), text {{field}} + highlight, a
-// warnings feed, addMinutes, aiChat inputEntity, bracket and photoField illustrate.
+// warnings feed, addMinutes, aiChat inputEntity, bracket, a progressBar setting
+// target and photoField illustrate.
 const featuresDoc = `{"schemaVersion":1,"app":{"name":"本","description":"d","icon":"book","voiceEntry":"fullscreen"},"initialScreen":"home",
 "entities":[
  {"id":"player","name":"出場者","titleField":"name","fields":[{"id":"name","name":"名前","type":"string"},{"id":"wins","name":"勝ち上がり","type":"integer"}]},
@@ -21,6 +22,7 @@ const featuresDoc = `{"schemaVersion":1,"app":{"name":"本","description":"d","i
   {"id":"photo","name":"写真","type":"photo"},{"id":"note","name":"メモ","type":"text"},
   {"id":"meet","name":"集合","type":"string"},{"id":"leave","name":"出発","type":"string","computed":{"op":"addMinutes","args":[{"ref":"meet"},-30]}}]},
  {"id":"card","name":"カード","titleField":"q","fields":[{"id":"q","name":"問題","type":"string","required":true}]},
+ {"id":"goal","name":"目標","single":true,"fields":[{"id":"pages","name":"ページ","type":"integer","defaultValue":300}]},
  {"id":"turn","name":"会話","fields":[{"id":"text","name":"本文","type":"text","required":true},{"id":"role","name":"話した人","type":"enum","options":["user","assistant"]}]}],
 "screens":[
  {"id":"home","title":"ホーム","components":[
@@ -29,6 +31,7 @@ const featuresDoc = `{"schemaVersion":1,"app":{"name":"本","description":"d","i
   {"type":"feed","id":"wx","provider":"weather","region":"170000"},
   {"type":"aiButton","task":"generate","label":"問題を作る","prompt":"英単語の問題","shape":"list","count":5,"saveTo":{"entity":"card","field":"q"}},
   {"type":"aiButton","task":"generate","label":"服装","prompt":"今日の天気に合う服装","inputFeeds":["wx"]},
+  {"type":"progressBar","label":"読んだ本","entity":"book","aggregate":"count","target":{"setting":"pages"},"tone":"positive"},
   {"type":"list","entity":"book","item":{"title":"title"},"onItemTap":{"type":"navigate","screen":"form"}}]},
  {"id":"form","title":"本","entity":"book","components":[
   {"type":"textField","field":"isbn"},
@@ -65,18 +68,19 @@ func TestClientFeaturesRestriction(t *testing.T) {
 		places int    // uses in featuresDoc
 		left   string // a doc fragment that must go
 	}{
-		FeatureAILong:         {"## アプリの中の AI の長い文章(aiButton length long)", "AiButton.length", 1, `"length"`},
-		FeatureAIInputPhoto:   {"## アプリの中の AI に写真を見せる(aiButton inputPhoto)", "AiButton.inputPhoto", 1, `"inputPhoto"`},
-		FeatureAISaveTo:       {"## AI が作った項目を 1 件ずつ記録に足す(aiButton saveTo)", "AiButton.saveTo", 1, `"saveTo"`},
-		FeatureAIInputFeeds:   {"inputFeeds: [その feed の id]", "AiButton.inputFeeds", 1, `"inputFeeds"`},
-		FeatureAIOutputs:      {"## AI の答えを項目ごとに入力欄へ入れる(aiButton outputs)", "AiButton.outputs", 1, `"outputs"`},
-		FeatureLookupBook:     {"## ISBN から本の情報を入れる(lookupBook)", "Action.bookLookup", 2, `"lookupBook"`},
-		FeatureTextHighlight:  {"## 文の大事な語に印をつける(text.highlight)", "Text.highlight", 1, `{{body}}`},
-		FeatureFeedV2:         {"警報・注意報」「大雨警報が出ているか」", `"warnings"`, 1, `"warnings"`},
-		FeatureExprAddMinutes: {"## 時刻に分を足す・引く(addMinutes)", `"addMinutes"`, 1, `"addMinutes"`},
-		FeatureAIChatInput:    {"## 自分の記録を読んで話す(aiChat inputEntity)", "AiChat.inputEntity", 1, `"inputEntity"`},
-		FeatureBracket:        {"## トーナメント表(bracket)", `"#/$defs/Bracket"`, 1, `"bracket"`},
-		FeatureIllustrate:     {"photoField に illustrate: true", "PhotoField.illustrate", 1, `"illustrate"`},
+		FeatureAILong:                {"## アプリの中の AI の長い文章(aiButton length long)", "AiButton.length", 1, `"length"`},
+		FeatureAIInputPhoto:          {"## アプリの中の AI に写真を見せる(aiButton inputPhoto)", "AiButton.inputPhoto", 1, `"inputPhoto"`},
+		FeatureAISaveTo:              {"## AI が作った項目を 1 件ずつ記録に足す(aiButton saveTo)", "AiButton.saveTo", 1, `"saveTo"`},
+		FeatureAIInputFeeds:          {"inputFeeds: [その feed の id]", "AiButton.inputFeeds", 1, `"inputFeeds"`},
+		FeatureAIOutputs:             {"## AI の答えを項目ごとに入力欄へ入れる(aiButton outputs)", "AiButton.outputs", 1, `"outputs"`},
+		FeatureLookupBook:            {"## ISBN から本の情報を入れる(lookupBook)", "Action.bookLookup", 2, `"lookupBook"`},
+		FeatureTextHighlight:         {"## 文の大事な語に印をつける(text.highlight)", "Text.highlight", 1, `{{body}}`},
+		FeatureFeedV2:                {"警報・注意報」「大雨警報が出ているか」", `"warnings"`, 1, `"warnings"`},
+		FeatureExprAddMinutes:        {"## 時刻に分を足す・引く(addMinutes)", `"addMinutes"`, 1, `"addMinutes"`},
+		FeatureAIChatInput:           {"## 自分の記録を読んで話す(aiChat inputEntity)", "AiChat.inputEntity", 1, `"inputEntity"`},
+		FeatureBracket:               {"## トーナメント表(bracket)", `"#/$defs/Bracket"`, 1, `"bracket"`},
+		FeatureProgressSettingTarget: {`progressBar は target {"setting":"<fieldId>"} で目標を読める`, "A goal the user edits", 1, `{"setting"`},
+		FeatureIllustrate:            {"photoField に illustrate: true", "PhotoField.illustrate", 1, `"illustrate"`},
 	}
 	if len(gone) != len(clientFeatures) {
 		t.Fatalf("test covers %d of %d features", len(gone), len(clientFeatures))

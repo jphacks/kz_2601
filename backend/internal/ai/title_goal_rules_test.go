@@ -26,7 +26,7 @@ func TestTitleGoalRules(t *testing.T) {
 			t.Errorf("goal section lacks %q", want)
 		}
 	}
-	if strings.Count(systemPrompt, "progressBar の target・gauge の max は数値しか書けない") != 1 {
+	if strings.Count(systemPrompt, "progressBar の target・gauge の max") != 1 {
 		t.Error("the goal-rate bullet must appear once (one goal section)")
 	}
 	old := NewClientRestriction(allComponentTypes(), nil, []string{FeatureRecordRetention, FeatureNotificationWhen, FeatureMatching})

@@ -36,6 +36,7 @@ func (a *App) Lint() []string {
 	l.navGraph()
 	l.micSeat()
 	l.goalTarget()
+	l.progressTargetDefault() // progress_target.go
 	l.dupAddControls()
 	l.privateChat()
 	l.optionalTitle()

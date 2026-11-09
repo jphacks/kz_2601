@@ -2524,8 +2524,15 @@
           "description": "Numeric field aggregated (required unless aggregate=count)."
         },
         "target": {
-          "type": "number",
-          "description": "Entity mode denominator (> 0), e.g. monthly budget 30000."
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "$ref": "#/$defs/ExprSetting"
+            }
+          ],
+          "description": "Entity mode denominator (> 0), e.g. monthly budget 30000. A goal the user edits: {\"setting\":\"<fieldId>\"} (numeric field of a single entity)."
         },
         "filter": {
           "$ref": "#/$defs/Filter"
@@ -3934,7 +3941,7 @@
       "required": [
         "setting"
       ],
-      "description": "single の entity(設定値の置き場・#267)の 1 件のレコードのフィールド値。行が無い場所(stat.value・通知の when・filter の value)でも、どの entity の computed からでも読める。progressBar / gauge の value・target は不可。保存前・未入力は field の defaultValue。",
+      "description": "single の entity(設定値の置き場・#267)の 1 件のレコードのフィールド値。行が無い場所(stat.value・通知の when・filter の value)でも、どの entity の computed からでも読める。progressBar の target には使える(value・gauge は不可)。保存前・未入力は field の defaultValue。",
       "properties": {
         "setting": {
           "type": "string",

@@ -13,7 +13,9 @@ struct ProgressBarLeaf: View {
         let style = Self.style(raw: raw, tone: c.tone)
         // 取得失敗(#85)は「0%」ではなく「—」(記録が無いのと区別・stat と同じ)
         let unavailable = Self.isUnavailable(c, rt: rt)
-        let percent = unavailable ? EmptyPlaceholder.unavailableValue : Self.percentText(raw: raw, tone: c.tone)
+        // 目標 {"setting"} が空・0 以下の間も「—」(0% と区別・0 で割らない)
+        let noTarget = Self.missingTarget(c, rt: rt)
+        let percent = unavailable || noTarget ? EmptyPlaceholder.unavailableValue : Self.percentText(raw: raw, tone: c.tone)
         // area が 1 行しか無いとラベル + バーの 2 段がセルに収まらず、下端が隣のセルに隠れていた(#157)。
         // 高さが足りない時はラベル・バー・% を 1 段に並べた低いカードに切り替える(セル内スクロールにはしない)
         ViewThatFits(in: .vertical) {
@@ -115,11 +117,24 @@ struct ProgressBarLeaf: View {
         return rt.filteredRecords(c).isEmpty && rt.emptyState(for: entityId) == .unavailable
     }
 
+    /// entity モードの分母: 数値の `target`、または `targetExpr`({"setting"}・利用者が変える目標)の今の値。0 以下・空は nil。
+    @MainActor
+    static func target(_ c: Component, rt: any DSLRuntime) -> Double? {
+        guard let t = c.target ?? c.targetExpr.flatMap({ rt.evaluator().evaluate($0)?.number }), t.isFinite, t > 0 else { return nil }
+        return t
+    }
+
+    /// 目標を式で読むのに、その値が空・0 以下(まだ保存していない設定など)。
+    @MainActor
+    static func missingTarget(_ c: Component, rt: any DSLRuntime) -> Bool {
+        c.value == nil && c.entity != nil && c.target == nil && c.targetExpr != nil && target(c, rt: rt) == nil
+    }
+
     /// 比率(1 を超えてもよい)。適合テストの描画の木(`RenderTree`)も同じ値を使う。
     @MainActor
     static func ratio(_ c: Component, rt: any DSLRuntime) -> Double {
         if let v = c.value { return v }
-        guard let entityId = c.entity, let target = c.target, target > 0 else { return 0 }
+        guard let entityId = c.entity, let target = target(c, rt: rt) else { return 0 }
         let rows = rt.filteredRecords(c)
         return Aggregator.aggregate(c.aggregate ?? "sum", field: c.field, over: rows) / target
     }

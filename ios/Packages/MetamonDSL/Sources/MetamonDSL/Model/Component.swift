@@ -170,6 +170,7 @@ public struct Component: Decodable, Identifiable, Sendable {
     public var inputFeeds: [String]?   // generate: 同じ画面の feed の id(行を材料に足す・AIFeedInput.swift)
     public var outputs: [String: String]? // generate fields: 項目名 → フォームの field(AIOutputs.swift)
     public var target: Double?         // progressBar entity モードの分母
+    public var targetExpr: Expr?       // progressBar: target が式 {"setting": …} の時(変えられる目標)。数値なら `target`
     public var tone: String?           // progressBar: positive(目標)| negative(予算)・#140
     public var url: String?            // link
     public var image: String?          // avatar リテラル(https / data URL)
@@ -366,6 +367,7 @@ public struct Component: Decodable, Identifiable, Sendable {
         inputFeeds = try? c.decodeIfPresent([String].self, forKey: .inputFeeds)
         outputs = try? c.decodeIfPresent([String: String].self, forKey: .outputs)
         target = try? c.decodeIfPresent(Double.self, forKey: .target)
+        if target == nil { targetExpr = try? c.decodeIfPresent(Expr.self, forKey: .target) }
         tone = try? c.decodeIfPresent(String.self, forKey: .tone)
         url = try? c.decodeIfPresent(String.self, forKey: .url)
         image = try? c.decodeIfPresent(String.self, forKey: .image)

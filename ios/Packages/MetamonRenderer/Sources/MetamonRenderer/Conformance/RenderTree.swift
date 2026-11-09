@@ -226,7 +226,10 @@ public struct RenderTree {
             return ["buckets": .array(ChartLeaf.buckets(c, rt: rt).map { .object(["label": .string($0.label), "value": .number($0.value)]) })]
         case .progressBar:
             let raw = ProgressBarLeaf.ratio(c, rt: rt)
-            return ["ratio": .number(raw), "percent": .string(ProgressBarLeaf.percentText(raw: raw, tone: c.tone))]
+            let percent = ProgressBarLeaf.missingTarget(c, rt: rt) ? EmptyPlaceholder.unavailableValue : ProgressBarLeaf.percentText(raw: raw, tone: c.tone)
+            var p: [String: JSONValue] = ["ratio": .number(raw), "percent": .string(percent)]
+            if c.targetExpr != nil, let t = ProgressBarLeaf.target(c, rt: rt) { p["target"] = .number(t) }
+            return p
         case .gauge:
             let (value, unit) = GaugeLeaf.value(c, rt: rt)
             var p: [String: JSONValue] = ["value": .number(value)]
