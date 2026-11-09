@@ -260,6 +260,23 @@ public struct RenderTree {
             let progress = FlashcardDeck().progress(in: cards)
             p["progress"] = .string("\(progress.position) / \(progress.total)")
             return p
+        case .bracket:
+            // 回戦ごとの試合(枠の上 a・下 b・勝者 winner・不戦勝 bye)と優勝
+            let draw = BracketLeaf.draw(c, rt: rt, pending: [:])
+            let entity = rt.dsl.entity(c.entity ?? "")
+            let entrant = { (r: Record?) -> JSONValue in
+                guard let r else { return .null }
+                let f = c.titleField ?? ""
+                return .object(["recordId": .string(r.id), "title": .string(rt.display(r[f], field: entity?.field(f)))])
+            }
+            let rounds: [JSONValue] = draw.rounds.enumerated().map { i, matches in
+                .object(["title": .string(BracketLeaf.roundTitle(i + 1, of: draw.rounds.count)), "matches": .array(matches.map { m in
+                    var o: [String: JSONValue] = ["a": entrant(m.a), "b": entrant(m.b), "winner": m.winner.map { .string($0.rawValue) } ?? .null]
+                    if m.bye { o["bye"] = .bool(true) }
+                    return .object(o)
+                })])
+            }
+            return ["rounds": .array(rounds), "champion": entrant(draw.champion)]
         case .image:
             let value = c.field.flatMap { ctx.form?.values[$0] } ?? .null
             return ["hasImage": .bool(!value.isNull)]

@@ -333,6 +333,8 @@ const (
 	CompSettlement ComponentType = "settlement" // greedy "A pays B" list from a balance field
 	// random pick (#263): one record per button press, not saved
 	CompRandomPicker ComponentType = "randomPicker"
+	// tournament bracket (bracket.go): rounds from entrants + their wins field
+	CompBracket ComponentType = "bracket"
 	// file import (file_import.go): CSV rows / text / PDF body -> records, on the device
 	CompFileImport ComponentType = "fileImport"
 	// on-device AI (#78)
@@ -495,6 +497,10 @@ type Component struct {
 	ColumnValues []string   `json:"columnValues,omitempty"` // explicit column headers (else enum options)
 	RowValues    []string   `json:"rowValues,omitempty"`    // explicit row headers for enum/string rowField
 	RowRange     *GridRange `json:"rowRange,omitempty"`     // integer rowField range (default 1..6)
+
+	// bracket (bracket.go). Entity / TitleField / Title are shared.
+	WinsField string `json:"winsField,omitempty"` // integer: rounds won (0 = in round 1)
+	SeedField string `json:"seedField,omitempty"` // integer / number: seed order, low first (else creation order)
 
 	// chatThread (#260). Entity / Placeholder / EmptyText are shared.
 	TextField  string `json:"textField,omitempty"`  // message body (string/text field)
