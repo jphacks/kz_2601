@@ -2,7 +2,7 @@
 
 
 施行日: 2026年10月30日
-改定日: 2026年11月8日
+改定日: 2026年11月9日
 運営者: 高岡己太朗
 連絡先: support@tailor-it.app
 
@@ -60,7 +60,7 @@ Tailor It(以下「本アプリ」)は、話した内容や入力した文から
 - 本アプリの版によって、使える機能が異なります。次の機能は、その版で利用できる場合に限り、作ったアプリが使う時だけ許可を求めます。
   - マイク(音声入力・録音)、音声認識(1.2 の準備中の仮の聞き取り)、カメラ・写真(写真の項目・QR コードの読み取り)、位置情報(場所の項目・地図・道案内・近くの場所の検索・住所の入力・保存した場所に着いた時の通知)、モーション、ヘルスケア(歩数・体重の表示)、ローカルネットワーク(近くの端末と送り合う)、Apple Music、通知。
 - ヘルスケアのデータは端末の中で表示するだけで、サーバー・AI には送りません。広告やマーケティングには使いません。App Store で配布する版にはヘルスケアの機能が無い場合があり、その場合はヘルスケアのデータを一切読み取りません。
-- 位置情報・写真は、ユーザーが記録に入れた場合に限り、記録の一部として 1.4 のとおり保存します。
+- 位置情報・写真は、ユーザーが記録に入れた場合に限り、記録の一部として 1.4 のとおり保存します。写真の項目で、端末の中の Image Playground で作ったイラストも、写真と同じに扱います(イラストは端末の中だけで作り、作るために何かを送ることはありません)。
 - 地図の表示・近くの場所の検索・住所の入力・道案内では、端末から Apple に直接、検索の言葉と位置を送ります(2 章)。本アプリのサーバーには送りません。
 - 保存した場所に着いた時の通知は、iPhone の仕組みで端末の中で判定します。この判定のために位置をサーバーに送ることはありません。
 
@@ -186,7 +186,7 @@ Tailor It(以下「本アプリ」)は、話した内容や入力した文から
 
 > This summary is for convenience. The Japanese text above prevails.
 
-- **Operator:** Kotaro Takaoka (高岡己太朗) (individual). **Effective:** October 30, 2026. **Revised:** November 8, 2026.
+- **Operator:** Kotaro Takaoka (高岡己太朗) (individual). **Effective:** October 30, 2026. **Revised:** November 9, 2026.
 - **Sign-in:** Sign in with Apple or anonymous, via Google Firebase Authentication. Firebase stores your user ID and, if Apple provides them, your name and email (or Apple's private relay address). Our own server (Firestore) uses only the user ID.
 - **Voice:** Speech is transcribed **on the device** (WhisperKit). **Audio is never uploaded.** Only when the speech model is not on the device (e.g. first use), and after asking you, it is downloaded over HTTPS from **Hugging Face, Inc. (USA)**. Hugging Face receives only standard connection data (your IP address and the file request), never audio, what you say, your records or account details. See [Hugging Face's privacy policy](https://huggingface.co/privacy). While the model is being prepared, Apple's **on-device** speech recognition transcribes your speech temporarily (with the "Speech Recognition" permission); your voice still never leaves the device and is not recorded. The microphone of the "AI chat" part and importing audio files (where available) also transcribe on the device; the audio is never sent (transcribed text you put in a record is stored as a record).
 - **Third-party AI:** Only **after your explicit consent**, the transcribed/typed request, the current conversation and the current app design (screen/field names) are sent through our server (Google Cloud Run, Tokyo) to **Anthropic, PBC (USA, "Claude")** solely to build or edit your app. The contents of your records are not sent when building, editing or chatting about your app. AI parts inside your apps (where available) send data only when you tap or send, within the same consent:
@@ -198,7 +198,7 @@ Tailor It(以下「本アプリ」)は、話した内容や入力した文から
   - A participant of a shared app may use the online AI under the creator's Tailor It Pro. The participant's own consent is still required, and what the participant sends is not delivered to the creator (AI answers saved to the shared app's records are shared with its participants).
 - **Use by Anthropic:** data sent to Anthropic is used only to build your app, write a button's text (including summaries) or reply in a chat (including suggested records). Under Anthropic's commercial terms, API inputs and outputs are not used to train their models. Without consent you can still view and use your apps. You can withdraw consent in Settings at any time.
 - **Storage:** App designs, version history and records (including downscaled photos you add) are stored on the device and in Google Cloud Firestore (Tokyo). Conversations for building an app are kept on the server for up to 30 minutes. "AI chat" conversations are saved as your private records of that app. Server logs are kept for up to 30 days (request paths may include lookup values such as an ISBN or search term). We keep Firestore backups to recover from failures: point-in-time recovery data for the last 7 days and daily backups kept for 14 days. Both expire automatically.
-- **Device features** (microphone, speech recognition, camera/photos, location, motion, Health, local network, Apple Music, notifications) are used only where available in your build, only when your app uses them, and with your permission. Location is also used for nearby place search, address entry and notifications when you arrive near a saved place; arrival is detected on the device by iOS and your location is not sent to our server for this. Health data stays on the device and is never used for advertising.
+- **Device features** (microphone, speech recognition, camera/photos, location, motion, Health, local network, Apple Music, notifications) are used only where available in your build, only when your app uses them, and with your permission. Location is also used for nearby place search, address entry and notifications when you arrive near a saved place; arrival is detected on the device by iOS and your location is not sent to our server for this. Health data stays on the device and is never used for advertising. Illustrations you create on the device with Image Playground in a photo field are treated the same as photos (they are created on the device only; nothing is sent to create them).
 - **Maps** (where available): map display, place search, address lookup and route guidance use Apple's MapKit, which sends your search terms and locations (current location, visible map area, chosen place) **directly from the device to Apple**. They do not pass through our server and we do not receive them. [Apple's privacy policy](https://www.apple.com/legal/privacy/) applies.
 - **Sharing / public data** (where available): shared links, the "Discover" catalog and data marked "public" can be seen by others. You can withdraw sharing at any time.
 - **Payments** (if offered) are processed by Apple; we never receive payment details. Our server verifies Apple's signed transactions (and Apple's server notifications) and stores, with your user ID, the product ID, transaction IDs, expiry, revocation/refund time, auto-renew status, grace period, environment and which account a subscription belongs to. Purchases carry a value derived from your user ID that cannot be turned back into it.
