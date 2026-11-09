@@ -313,12 +313,15 @@ struct AiChatLeaf: View {
                 pending = text
             }
             do {
-                // inputEntity: 自分の記録を「参考の記録」として添える(AIChatMaterial.swift)
+                // inputEntity: 自分の記録を「参考の記録」として添える(今の発言に近い記録から・AIChatMaterial.swift)
                 var material: AITextMaterial?
                 if let input {
                     await rt.load(entities: [input.id])
-                    material = AIChatMaterial.request(entity: input, records: rt.records(for: input.id),
-                                                      uid: rt.currentUserId, limit: limit)
+                    let records = rt.records(for: input.id), uid = rt.currentUserId
+                    // 記録が多い・大きい(取り込んだ PDF)と選びに時間がかかるのでメインの外で
+                    material = await Task.detached(priority: .userInitiated) {
+                        AIChatMaterial.request(entity: input, records: records, uid: uid, limit: limit, query: text)
+                    }.value
                 }
                 let request = AIChat.request(persona: persona, history: history, next: text, long: long, locale: locale,
                                              saveTo: saveRequest, material: material)
