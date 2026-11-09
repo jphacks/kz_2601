@@ -44,6 +44,7 @@ const (
 	reasonOperatorStop   = "operator_stop"
 	reasonRuleRemoved    = "rule_removed"
 	reasonVersionMissing = "version_missing"
+	reasonAppLimit       = "app_limit" // ok, but the app's daily limit cut writes / notifications
 )
 
 // Result is the creator's word for one rule run. notifyPaused: the run was
@@ -53,6 +54,9 @@ func Result(outcome, reason string, notifyPaused bool) string {
 	case "":
 		return ResultNone
 	case outcomeOK:
+		if reason == reasonAppLimit {
+			return ResultLimit
+		}
 		if notifyPaused {
 			return ResultNotifyPaused
 		}

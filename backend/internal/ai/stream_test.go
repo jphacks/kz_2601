@@ -197,7 +197,7 @@ func TestGenerateStream_EditSummaryFirst(t *testing.T) {
 	if len(events) != 1 || events[0].Type != "summary" || events[0].Summary != "カテゴリにカフェを追加しました。" {
 		t.Fatalf("events: %+v", events)
 	}
-	if res.Mode != "patch" || !strings.Contains(f.calls[0].System, `{"summary":"...","patch":`) {
+	if res.Mode != "patch" || !strings.Contains(f.calls[0].SystemSuffix, `{"summary":"...","patch":`) {
 		t.Fatalf("edit prompt must ask for summary first: mode=%s", res.Mode)
 	}
 }

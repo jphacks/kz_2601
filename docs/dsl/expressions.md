@@ -37,7 +37,7 @@ Expr := number | string | boolean
 | `agg` | エンティティ全レコード(filter で絞る)の集計。count 以外は `field` 必須。`field` に computed フィールドも可。`latest` / `earliest`(#133)は `by`(date/datetime field)で並べた最新 / 最古の 1 件の `field` の値(型は field のまま・数値以外も可) |
 | `op` | 関数呼び出し。§3 の閉じた一覧のみ |
 | `if` | `if` が true なら `then`、それ以外は `else` |
-| `setting` | single の entity(設定値の置き場・README §3.11・#267)の 1 件のレコードのフィールド値。行コンテキストに依らず**どこでも**書ける(`stat.value`・通知の `when` も可)。保存前・空の field は `defaultValue`(date の `"now"` は当てずに nil)。computed の field も読める(保存前は初期値の 1 件で評価)。2 件以上あれば `createdAt` が最も新しい 1 件(同じなら後の方)。single の entity に `agg` は使えない(backend が拒否) |
+| `setting` | single の entity(設定値の置き場・README §3.11・#267)の 1 件のレコードのフィールド値。行コンテキストに依らず、式を書ける所ならどこでも書ける(`stat.value`・通知の `when` も可。server rules は不可。`progressBar` / `gauge` の `value` は数値リテラルのみなので書けない)。保存前・空の field は `defaultValue`(date の `"now"` は当てずに nil)。computed の field も読める(保存前は初期値の 1 件で評価)。2 件以上あれば `createdAt` が最も新しい 1 件(同じなら後の方)。single の entity に `agg` は使えない(backend が拒否) |
 
 `agg.filter` は `Filter` 1 つ、または配列(AND)。`Filter.value` には Expr を書ける。computed 内の agg では `value` の `ref` は**外側のレコード**を指す:
 
