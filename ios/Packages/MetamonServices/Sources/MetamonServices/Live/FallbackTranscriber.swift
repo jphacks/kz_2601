@@ -7,7 +7,7 @@ import Observation
 /// - モデルの状態(status・DL 進捗・needsDownload・prepare)は本命のまま見せる(設定・確認アラート・DL の表示は変わらない)。
 @MainActor
 @Observable
-public final class FallbackTranscriber: SpeechTranscriber {
+public final class FallbackTranscriber: SpeechTranscriber, AudioFileTranscriber {
     enum Engine { case primary, provisional }
 
     @ObservationIgnored public let primary: any SpeechTranscriber
@@ -57,5 +57,17 @@ public final class FallbackTranscriber: SpeechTranscriber {
         guard let e = active else { return }
         engine(e).cancelRecording()
         active = nil
+    }
+
+    // MARK: - 録音ファイル
+
+    /// 本命だけで文字にする(仮の聞き取りは短い発話向けで、長い録音には使わない)。録音中は使わない。
+    private var fileEngine: (any AudioFileTranscriber)? { primary as? any AudioFileTranscriber }
+
+    public var canTranscribeFiles: Bool { active == nil && (fileEngine?.canTranscribeFiles ?? false) }
+
+    public func transcribeFile(at url: URL, progress: @escaping @MainActor (Double) -> Void) async throws -> String {
+        guard canTranscribeFiles, let fileEngine else { throw TranscriberFailure.notReady("\(status)") }
+        return try await fileEngine.transcribeFile(at: url, progress: progress)
     }
 }

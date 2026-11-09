@@ -12,7 +12,7 @@ var fileImportRules = strings.TrimSpace(`
 - CSV の列名が field の name と違うと分かっている時だけ map: [{column: 列名, field: field id}](例「氏名」の列 → name)。分からなければ map を省き、field の name を表計算の 1 行目と同じ言葉にする。
 - text / pdf の entity は 例 doc{title: string, body: text, added: date(defaultValue now)}(titleField: title)。本文の field は type text(20000 字まで)。title・body 以外の required は付けないか defaultValue を書く。要約したいと言われたら、同じ entity のフォームに aiButton{task: summarize, input: body} を足す。
 - 取り込みは端末の中だけで、ファイルそのものは送らない・残さない。entity の scope が public のものと、設定の 1 件を持つ entity(single: true)には使えない(shared は可)。
-- 音声・動画・画像・Word・Excel(.xlsx)のファイルそのものは読めない(Excel は「CSV で保存」してもらう)。PDF の質問に答える AI チャットはできない(本文を記録に入れて aiButton で要約する形にし、summary で正直に伝える)。
+- 動画・画像・Word・Excel(.xlsx)のファイルそのものは読めない(Excel は「CSV で保存」してもらう。録音ファイルは次の「録音ファイルの文字起こし」)。PDF の質問に答える AI チャットはできない(本文を記録に入れて aiButton で要約する形にし、summary で正直に伝える)。
 - 既存アプリへの「CSV から取り込めるようにして」は、記録の一覧がある画面に fileImport を add する(entity・list は作り直さない)。
 `)
 
