@@ -523,6 +523,9 @@ type Component struct {
 	Threshold *SensorThreshold `json:"threshold,omitempty"`
 	// photoField (#418): on-device reading of the picked photo into other fields.
 	Analyze []PhotoAnalyze `json:"analyze,omitempty"`
+	// photoField: also offer an illustration made on the device (Apple Image
+	// Playground) from the record's title, saved like a picked photo.
+	Illustrate bool `json:"illustrate,omitempty"`
 	// fileImport (file_import.go). Entity / Field / Label are shared.
 	Accept []string       `json:"accept,omitempty"` // csv|text|pdf
 	Map    []ImportColumn `json:"map,omitempty"`    // csv: column header -> field id

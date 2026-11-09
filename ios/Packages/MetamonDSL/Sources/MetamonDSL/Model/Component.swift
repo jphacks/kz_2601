@@ -228,6 +228,8 @@ public struct Component: Decodable, Identifiable, Sendable {
     public var threshold: SensorThreshold?
     // photoField(#418): 写真から読み取って他の field に入れる。壊れた項目だけ落とす
     public var analyze: [PhotoAnalyze] = []
+    // photoField: 端末内の Image Playground でイラストを作るボタンも出す(使えない端末では出さない)
+    public var illustrate: Bool = false
     // fileImport
     public var accept: [String] = []       // csv|text|pdf
     public var map: [ImportColumn] = []    // csv: 見出し → field id
@@ -276,7 +278,7 @@ public struct Component: Decodable, Identifiable, Sendable {
         case metric, period
         case columnField, rowField, columnValues, rowValues, rowRange
         case textField, photoField, roleField, persona, speak, inputEntity
-        case keepMinutes, maxStorageMB, impactG, autoStart, audio, sensor, threshold, analyze, fields, distance, allowRequests, autoAccept
+        case keepMinutes, maxStorageMB, impactG, autoStart, audio, sensor, threshold, analyze, illustrate, fields, distance, allowRequests, autoAccept
         case accept, map
         case show
         case front, back, toggle
@@ -394,6 +396,7 @@ public struct Component: Decodable, Identifiable, Sendable {
         sensor = try? c.decodeIfPresent(String.self, forKey: .sensor)
         threshold = try? c.decodeIfPresent(SensorThreshold.self, forKey: .threshold)
         analyze = ((try? c.decodeIfPresent(Lossy<PhotoAnalyze>.self, forKey: .analyze))?.wrappedValue ?? []).filter { $0.kind != .unknown }
+        illustrate = (try? c.decodeIfPresent(Bool.self, forKey: .illustrate)) ?? false
         accept = (try? c.decodeIfPresent(Lossy<String>.self, forKey: .accept))?.wrappedValue ?? []
         map = (try? c.decodeIfPresent(Lossy<ImportColumn>.self, forKey: .map))?.wrappedValue ?? []
         fields = try? c.decodeIfPresent([String].self, forKey: .fields)

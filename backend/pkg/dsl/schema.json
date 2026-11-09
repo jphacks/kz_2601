@@ -1737,6 +1737,10 @@
             "$ref": "#/$defs/PhotoAnalyze"
           },
           "description": "写真を撮った・選んだ直後に端末内で読み取り、into の field に入れる(読み取れなかった項目は今の値のまま。「もう一度読み取る」で読み直せる)。保存はユーザー。"
+        },
+        "illustrate": {
+          "type": "boolean",
+          "description": "true で写真ボタンの横に「イラストを作る」を出す。端末内の Apple Image Playground でレコードのタイトル(無ければ最初の文字の field)からイラストを作り、選んだ写真と同じ形でこの photo field に入れる。クラウドでは作らない。使えない端末(Apple Intelligence の無い端末・iOS 18.1 未満)ではボタンを出さない。"
         }
       }
     },
