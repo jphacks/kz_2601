@@ -23,7 +23,7 @@ public struct ShareInfo: Codable, Sendable, Equatable {
     }
 }
 
-/// 「探す」の 1 件(`GET /v1/public-apps` の items・#50)。DSL 本文は含まない。
+/// 「探す」の 1 件(`POST /v1/public-apps/search` の items・#50)。DSL 本文は含まない。
 public struct PublicAppListing: Codable, Sendable, Equatable, Identifiable, Hashable {
     public var id: String
     public var name: String

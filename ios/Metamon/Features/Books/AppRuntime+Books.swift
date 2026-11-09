@@ -4,7 +4,7 @@ import MetamonRenderer
 import MetamonServices
 
 /// `lookupBook`: フォームの ISBN から本の情報を引き、書名などの field を上書きする(保存はしない)。
-/// 端末は appconfig にだけ聞く(`GET /v1/lookup/book`)。見つからない・つながらない時はメッセージだけで手入力に戻る。
+/// 端末は appconfig にだけ聞く(`POST /v1/lookup/book`)。見つからない・つながらない時はメッセージだけで手入力に戻る。
 extension AppRuntime {
     func lookupBook(_ action: Action, _ ctx: ActionContext) async {
         guard let spec = action.bookLookup, let form = ctx.form, !form.isReadOnly else {

@@ -26,10 +26,12 @@ final class BookLookupClientTests: XCTestCase {
         XCTAssertEqual(b.title, "おにぎりレシピ101")
         XCTAssertEqual(b.source.name, "openBD")
         let req = try XCTUnwrap(StubURLProtocol.lock.withLock { StubURLProtocol.requests }.first)
-        XCTAssertEqual(req.httpMethod, "GET")
+        XCTAssertEqual(req.httpMethod, "POST")
         XCTAssertEqual(req.url?.host(), "appconfig.test")
         XCTAssertEqual(req.url?.path, "/v1/lookup/book")
-        XCTAssertEqual(req.url?.query, "isbn=9784780802047")
+        XCTAssertNil(req.url?.query, "ISBN は URL に載せない")
+        XCTAssertEqual(req.value(forHTTPHeaderField: "Content-Type"), "application/json")
+        XCTAssertEqual(StubURLProtocol.bodyJSON(req), ["isbn": "9784780802047"])
     }
 
     func testDisabledIsBookLookupOff() async throws {

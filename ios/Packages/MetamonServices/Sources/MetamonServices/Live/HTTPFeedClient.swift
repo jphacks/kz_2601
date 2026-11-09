@@ -14,7 +14,8 @@ public struct HTTPFeedClient: FeedClient {
     }
 
     public func feed(_ query: FeedQuery) async throws -> FeedResult {
-        let data = try await HTTP.send("GET", baseURL: baseURL, path: query.path, body: nil, token: token, timeout: 20)
+        // POST: diet の検索語などを URL に載せない(GET は古いビルドのためにサーバーに残っているだけ)
+        let data = try await HTTP.send("POST", baseURL: baseURL, path: query.path, body: query, token: token, timeout: 20)
         return try JSONDecoder().decode(FeedResult.self, from: data)
     }
 }

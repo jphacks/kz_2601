@@ -2,7 +2,7 @@
 #if !APP_STORE_REVIEW
 import Foundation
 
-/// `feed` が読むもの(`GET /v1/feeds/{provider}`・#348)。URL は持たない: provider と、その型の決まったパラメータだけ。
+/// `feed` が読むもの(`POST /v1/feeds/{provider}`・#348)。URL は持たない: provider と、その型の決まったパラメータだけ。
 public struct FeedQuery: Hashable, Sendable {
     public var provider: String
     public var region: String?
@@ -34,18 +34,20 @@ public struct FeedQuery: Hashable, Sendable {
     /// `region`(府県予報区のコード)を読む provider。
     public static let regionProviders: Set<String> = ["weather", "warnings", "pressure"]
 
-    /// `v1/feeds/{provider}?…`。q(日本語・記号)は百分率符号化し、`+` も `%2B` にする(サーバーは `+` を空白と読む)。
-    public var path: String {
-        var items = [URLQueryItem]()
-        if let region { items.append(URLQueryItem(name: "region", value: region)) }
-        if let feedId { items.append(URLQueryItem(name: "feedId", value: feedId)) }
-        if let q { items.append(URLQueryItem(name: "q", value: q)) }
-        items.append(URLQueryItem(name: "limit", value: String(limit)))
-        var c = URLComponents()
-        c.path = "v1/feeds/\(provider)"
-        c.queryItems = items
-        c.percentEncodedQuery = c.percentEncodedQuery?.replacingOccurrences(of: "+", with: "%2B")
-        return c.string ?? "v1/feeds/\(provider)"
+    /// `POST v1/feeds/{provider}` の宛先。パラメータは本文(`Encodable`)で送り、URL に載せない。
+    public var path: String { "v1/feeds/\(provider)" }
+}
+
+/// POST の本文: `{"region","feedId","q","limit"}`(無いものは送らない・provider は宛先に入る)。
+extension FeedQuery: Encodable {
+    enum BodyKeys: String, CodingKey { case region, feedId, q, limit }
+
+    public func encode(to encoder: Encoder) throws {
+        var c = encoder.container(keyedBy: BodyKeys.self)
+        try c.encodeIfPresent(region, forKey: .region)
+        try c.encodeIfPresent(feedId, forKey: .feedId)
+        try c.encodeIfPresent(q, forKey: .q)
+        try c.encode(limit, forKey: .limit)
     }
 }
 

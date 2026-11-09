@@ -8,31 +8,38 @@ final class FeedTests: XCTestCase {
         try JSONDecoder().decode(Component.self, from: Data(json.utf8))
     }
 
+    /// POST の本文(無いキーは送らない)。
+    private func body(_ q: FeedQuery) throws -> NSDictionary {
+        try XCTUnwrap(JSONSerialization.jsonObject(with: JSONEncoder().encode(q)) as? NSDictionary)
+    }
+
     func testQueryFromComponent() throws {
         let w = try XCTUnwrap(FeedQuery(try component(#"{"type":"feed","provider":"weather","region":"130000","feedId":"x","limit":7}"#)))
         XCTAssertEqual(w, FeedQuery(provider: "weather", region: "130000", limit: 7), "weather は feedId を送らない")
-        XCTAssertEqual(w.path, "v1/feeds/weather?region=130000&limit=7")
+        XCTAssertEqual(w.path, "v1/feeds/weather")
+        XCTAssertEqual(try body(w), ["region": "130000", "limit": 7])
         let r = try XCTUnwrap(FeedQuery(try component(#"{"type":"feed","provider":"rss","feedId":"digital-news","region":"1","limit":99}"#)))
-        XCTAssertEqual(r.path, "v1/feeds/rss?feedId=digital-news&limit=20", "limit は 1〜20")
+        XCTAssertEqual(try body(r), ["feedId": "digital-news", "limit": 20], "limit は 1〜20")
         let h = try XCTUnwrap(FeedQuery(try component(#"{"type":"feed","provider":"holidays"}"#)))
-        XCTAssertEqual(h.path, "v1/feeds/holidays?limit=5")
+        XCTAssertEqual(try body(h), ["limit": 5])
         XCTAssertNil(FeedQuery(try component(#"{"type":"feed","provider":"https://evil.example"}"#)))
         XCTAssertNil(FeedQuery(try component(#"{"type":"feed"}"#)))
     }
 
     func testWarningsAndPressureSendRegion() throws {
         let w = try XCTUnwrap(FeedQuery(try component(#"{"type":"feed","provider":"warnings","region":"170000","feedId":"x"}"#)))
-        XCTAssertEqual(w.path, "v1/feeds/warnings?region=170000&limit=5")
+        XCTAssertEqual(try body(w), ["region": "170000", "limit": 5])
         let p = try XCTUnwrap(FeedQuery(try component(#"{"type":"feed","provider":"pressure","region":"016000","limit":8}"#)))
-        XCTAssertEqual(p.path, "v1/feeds/pressure?region=016000&limit=8")
+        XCTAssertEqual(try body(p), ["region": "016000", "limit": 8])
     }
 
     func testArxivAndDietQueries() throws {
         let a = try XCTUnwrap(FeedQuery(try component(#"{"type":"feed","provider":"arxiv","feedId":"cs.CL","query":"x","limit":10}"#)))
-        XCTAssertEqual(a.path, "v1/feeds/arxiv?feedId=cs.CL&limit=10", "arxiv は q を送らない")
+        XCTAssertEqual(try body(a), ["feedId": "cs.CL", "limit": 10], "arxiv は q を送らない")
         let d = try XCTUnwrap(FeedQuery(try component(#"{"type":"feed","provider":"diet","query":"こども 予算+α&x=1","feedId":"cs.AI"}"#)))
         XCTAssertNil(d.feedId)
-        XCTAssertEqual(d.path, "v1/feeds/diet?q=%E3%81%93%E3%81%A9%E3%82%82%20%E4%BA%88%E7%AE%97%2B%CE%B1%26x%3D1&limit=5")
+        XCTAssertEqual(d.path, "v1/feeds/diet", "語は URL に載せない")
+        XCTAssertEqual(try body(d), ["q": "こども 予算+α&x=1", "limit": 5])
         XCTAssertNil(FeedQuery(try component(#"{"type":"feed","provider":"diet"}"#)), "語の無い diet は問い合わせない")
         XCTAssertNil(FeedQuery(try component(#"{"type":"feed","provider":"nhk","feedId":"cat0"}"#)))
     }

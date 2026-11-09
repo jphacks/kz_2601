@@ -87,7 +87,7 @@ openBD の利用条件は「本の販促・紹介の目的に限る」。蔵書�
 
 ## API と環境変数
 
-`GET /v1/lookup/book?isbn=978-4-7808-0204-7` → `{isbn, title, authors?, publisher?, publishedDate?, coverUrl?, source{name,url,license}, fetchedAt}`(`docs/backend/openapi-appconfig.yaml` の `/lookup/book`)。404 = 見つからない・429 = 利用者の上限・503 = 止めている / つながらない。
+`POST /v1/lookup/book` に `{"isbn":"978-4-7808-0204-7"}`(利用者が入力した値を URL に載せないため本文で送る・`GET ?isbn=` は古い iOS ビルドのために残している) → `{isbn, title, authors?, publisher?, publishedDate?, coverUrl?, source{name,url,license}, fetchedAt}`(`docs/backend/openapi-appconfig.yaml` の `/lookup/book`)。404 = 見つからない・429 = 利用者の上限・503 = 止めている / つながらない。
 
 | 環境変数 | 中身 | 既定 |
 |---|---|---|

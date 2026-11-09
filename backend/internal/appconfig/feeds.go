@@ -1,6 +1,7 @@
 package appconfig
 
-// External feeds (#348): GET /v1/feeds/{provider} reads allowlisted public
+// External feeds (#348): POST /v1/feeds/{provider} (typed parameters in the
+// body; GET with a query is kept for older iOS builds) reads allowlisted public
 // data (weather / warnings / pressure / holidays / allowlisted rss / arxiv
 // category / diet speech search) for the DSL feed leaf. The
 // server is the only party that talks to the source (the device never does),
@@ -36,7 +37,8 @@ func init() {
 		if h.feedUsers == nil {
 			h.feedUsers = newFeedLimiter(feedsPerHour(os.Getenv), time.Now)
 		}
-		mux.HandleFunc("GET /v1/feeds/{provider}", h.getFeed)
+		mux.HandleFunc("GET /v1/feeds/{provider}", h.getFeed) // deprecated: older iOS builds
+		mux.HandleFunc("POST /v1/feeds/{provider}", h.postFeed)
 	})
 }
 
@@ -57,11 +59,18 @@ func feedsPerHour(getenv func(string) string) int {
 
 var feedParams = map[string]bool{"region": true, "feedId": true, "q": true, "limit": true}
 
-// getFeed: GET /v1/feeds/{provider}?region=&feedId=&q=&limit=
+// feedInput is the typed parameters of one feed read: the GET query or the
+// POST body. Q and Limit are nil when not sent.
+type feedInput struct {
+	Region string  `json:"region"`
+	FeedID string  `json:"feedId"`
+	Q      *string `json:"q"`
+	Limit  *int    `json:"limit"`
+}
+
+// getFeed: GET /v1/feeds/{provider}?region=&feedId=&q=&limit= (deprecated)
 func (h *Handler) getFeed(w http.ResponseWriter, r *http.Request) {
-	q := feeds.Query{Provider: r.PathValue("provider")}
-	if !dsl.FeedProviders[q.Provider] {
-		fail(w, apiErr(http.StatusNotFound, httpx.CodeNotFound, "unknown feed provider"))
+	if !knownFeed(w, r) {
 		return
 	}
 	vals := r.URL.Query()
@@ -71,20 +80,59 @@ func (h *Handler) getFeed(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	}
-	q.Region, q.FeedID, q.Q = vals.Get("region"), vals.Get("feedId"), vals.Get("q")
-	if _, ok := dsl.NormalizeFeedQuery(q.Q); vals.Has("q") && (q.Provider != dsl.FeedDiet || !ok) {
-		fail(w, apiErr(http.StatusBadRequest, httpx.CodeBadRequest,
-			fmt.Sprintf("q is for diet only: 1..%d characters, no control characters", dsl.FeedQueryMaxRunes)).With("field", "q"))
-		return
+	in := feedInput{Region: vals.Get("region"), FeedID: vals.Get("feedId")}
+	if vals.Has("q") {
+		v := vals.Get("q")
+		in.Q = &v
 	}
-	limit := 0
 	if raw := vals.Get("limit"); raw != "" {
 		n, err := strconv.Atoi(raw)
-		if err != nil || n < 1 || n > dsl.FeedMaxLimit {
+		if err != nil {
+			n = 0 // out of range: same 400 as limit=0
+		}
+		in.Limit = &n
+	}
+	h.serveFeed(w, r, in)
+}
+
+// postFeed: POST /v1/feeds/{provider} {"region","feedId","q","limit"}
+func (h *Handler) postFeed(w http.ResponseWriter, r *http.Request) {
+	if !knownFeed(w, r) {
+		return
+	}
+	var in feedInput
+	if !decodeLookupBody(w, r, &in) {
+		return
+	}
+	h.serveFeed(w, r, in)
+}
+
+func knownFeed(w http.ResponseWriter, r *http.Request) bool {
+	if !dsl.FeedProviders[r.PathValue("provider")] {
+		fail(w, apiErr(http.StatusNotFound, httpx.CodeNotFound, "unknown feed provider"))
+		return false
+	}
+	return true
+}
+
+// serveFeed is the read shared by GET and POST (checks, cap, fetch, reply).
+func (h *Handler) serveFeed(w http.ResponseWriter, r *http.Request, in feedInput) {
+	q := feeds.Query{Provider: r.PathValue("provider"), Region: in.Region, FeedID: in.FeedID}
+	if in.Q != nil {
+		q.Q = *in.Q
+		if _, ok := dsl.NormalizeFeedQuery(q.Q); q.Provider != dsl.FeedDiet || !ok {
+			fail(w, apiErr(http.StatusBadRequest, httpx.CodeBadRequest,
+				fmt.Sprintf("q is for diet only: 1..%d characters, no control characters", dsl.FeedQueryMaxRunes)).With("field", "q"))
+			return
+		}
+	}
+	limit := 0
+	if in.Limit != nil {
+		if n := *in.Limit; n < 1 || n > dsl.FeedMaxLimit {
 			fail(w, apiErr(http.StatusBadRequest, httpx.CodeBadRequest, fmt.Sprintf("limit must be 1..%d", dsl.FeedMaxLimit)).With("field", "limit"))
 			return
 		}
-		limit = n
+		limit = *in.Limit
 	}
 	if wait, ok := h.feedUsers.take(uidOf(r)); !ok {
 		w.Header().Set("Retry-After", strconv.Itoa(wait))
