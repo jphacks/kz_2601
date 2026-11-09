@@ -119,10 +119,11 @@ public enum Aggregator {
         }
     }
 
+    /// percent は比率(0〜1)を受けて 100 倍で出す(0.5 → 「50%」)。stat の value / aggregate のどちらから来ても同じ尺度(schema の format 定義)。
     public static func format(_ value: Double, as format: String?, unit: String? = nil) -> String {
         switch format {
         case "currency": return FieldCoding.currency(value)
-        case "percent": return String(format: "%.0f%%", value)
+        case "percent": return String(format: "%.0f%%", value * 100)
         default:
             let s = FieldCoding.plainNumber(value)
             return unit.map { s + " " + $0 } ?? s

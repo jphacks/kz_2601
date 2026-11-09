@@ -69,7 +69,20 @@ jobs:
       - name: go vet
         run: go vet ./...
 
+      # action はバイナリを GitHub から取得し、5xx を再試行しない(install-mode: goinstall はビルドで 5 分枠を超えうる)。
+      # 1 回目は continue-on-error にし、失敗した時だけもう 1 回走らせる。2 回目の結果がジョブの成否になる
+      # (lint の本当の指摘なら 2 回目も落ちる)。
       - name: golangci-lint
+        id: golangci-lint
+        continue-on-error: true
+        uses: golangci/golangci-lint-action@v9
+        with:
+          version: latest
+          working-directory: backend
+          args: --timeout=3m
+
+      - name: golangci-lint(再試行)
+        if: steps.golangci-lint.outcome == 'failure'
         uses: golangci/golangci-lint-action@v9
         with:
           version: latest
