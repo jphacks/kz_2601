@@ -47,7 +47,7 @@ func operationOf(ctx context.Context) string {
 func UIDHash(uid string) string { return httpx.UIDHash(uid) }
 
 // PricingAsOf is the date modelPrices was last checked against the pricing page.
-const PricingAsOf = "2026-10-30"
+const PricingAsOf = "2026-11-09"
 
 // modelPrice is USD per million tokens.
 type modelPrice struct {
