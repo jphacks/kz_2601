@@ -13992,6 +13992,23 @@
         }
       }
     },
+    "直す" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Fix"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "直す"
+          }
+        }
+      }
+    },
     "直す依頼を入力欄に入れて、設定を閉じます" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -14005,6 +14022,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "直す依頼を入力欄に入れて、設定を閉じます"
+          }
+        }
+      }
+    },
+    "直す依頼を入力欄に入れます(まだ送りません)" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Puts a fix request in the message field (not sent yet)"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "直す依頼を入力欄に入れます(まだ送りません)"
           }
         }
       }
@@ -14549,6 +14583,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "自動の動き「%@」が続けてうまくいっていません。うまく動くように直して"
+          }
+        }
+      }
+    },
+    "自動の動き「%@」が続けて失敗しています。直しますか?" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The automation “%@” keeps failing. Fix it?"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "自動の動き「%@」が続けて失敗しています。直しますか?"
           }
         }
       }

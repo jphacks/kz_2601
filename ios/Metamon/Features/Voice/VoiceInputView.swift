@@ -23,6 +23,10 @@ struct VoiceInputView: View {
     /// 初期画面の例文のカテゴリ(#274)
     @State private var exampleCategory = "record"
     @FocusState private var typing: Bool
+    #if !APP_STORE_REVIEW
+    /// 続けて失敗している自動の動きの「直しますか?」(#347)。生成後のシートで、作成者の時だけ中身が入る
+    @State private var automationFix: AutomationFixOfferModel?
+    #endif
 
     enum Phase { case idle, listening, transcribing, thinking }
 
@@ -47,10 +51,17 @@ struct VoiceInputView: View {
                     // 入力欄のキーボード追従は ClarifyChatView の safeAreaInset だけに任せる(#208):
                     // ここで safeAreaInset や phase のアニメーションを重ねると、返事が届いた瞬間(phase: thinking → idle)に
                     // キーボード分の安全領域ごとアニメーションし直して入力欄がずれうる
+                    #if APP_STORE_REVIEW
                     ClarifyChatView(micMode: micMode, statusText: statusText, onMic: { Task { await toggle() } },
                                     onSend: { submit($0) })
                         .readableWidth() // 横向きで吹き出し・入力欄が横に間延びしないように(#625)
                         .transition(.opacity)
+                    #else
+                    ClarifyChatView(micMode: micMode, statusText: statusText, onMic: { Task { await toggle() } },
+                                    onSend: { submit($0) }, automationFix: automationFixModel)
+                        .readableWidth() // 横向きで吹き出し・入力欄が横に間延びしないように(#625)
+                        .transition(.opacity)
+                    #endif
                 } else if compactHeight {
                     // 横向き(#625): 縦に積むと入力欄の上に見出しとマイクが入らないので 2 列にする。
                     // 文字・録音の状態はこの View の @State なので、回転して並べ方が変わっても残る
@@ -106,6 +117,16 @@ struct VoiceInputView: View {
             insertDraft(draft)
         }
         .onTapGesture { typing = false }
+        #if !APP_STORE_REVIEW
+        // 開いた時に 1 回だけ取りに行く(待たせない・取れなければ何も出さない)
+        .task(id: rt.document.appId) {
+            guard !isInitial, rt.dsl.serverRuleCount > 0, let client = services.automations else { automationFix = nil; return }
+            let model = AutomationFixOfferModel(appId: rt.document.appId, client: client)
+            await model.load()
+            guard !Task.isCancelled else { return }
+            withAnimation(.easeInOut(duration: 0.25)) { automationFix = model }
+        }
+        #endif
         // 録音中にシートを下に払って閉じたら録音を捨てる(マイクが点いたまま残り、次に話した時に前の音が混ざっていた)
         .onDisappear {
             guard phase == .listening else { return }
@@ -150,7 +171,14 @@ struct VoiceInputView: View {
     /// 例文・文字入力・「探す」。縦向きは画面の下に固定、横向きは右の列の下に置く。
     private var bottomPanel: some View {
         VStack(spacing: 0) {
-            if !typing { examples }
+            if !typing {
+                #if !APP_STORE_REVIEW
+                if let automationFixModel, phase == .idle, rt.errorCard == nil {
+                    AutomationFixOfferRow(model: automationFixModel).padding(.bottom, Theme.Spacing.sm)
+                }
+                #endif
+                examples
+            }
             RemainingTodayBadge() // #630 今日の残り
             textEntry
             #if !APP_STORE_REVIEW
@@ -390,6 +418,10 @@ struct VoiceInputView: View {
     }
 
     // MARK: - State
+
+    #if !APP_STORE_REVIEW
+    private var automationFixModel: AutomationFixOfferModel? { isInitial ? nil : automationFix }
+    #endif
 
     private var transcriber: any SpeechTranscriber { services.transcriber }
 

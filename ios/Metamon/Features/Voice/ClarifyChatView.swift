@@ -15,6 +15,10 @@ struct ClarifyChatView: View {
     let statusText: String
     let onMic: () -> Void
     let onSend: (String) -> Void
+    #if !APP_STORE_REVIEW
+    /// 続けて失敗している自動の動きの「直しますか?」(#347)。nil = 出さない
+    var automationFix: AutomationFixOfferModel? = nil
+    #endif
 
     @State private var typed = ""
     /// #220: 複数選択中の案・チップ。返事(吹き出しの数)が変わったら空に戻す
@@ -64,6 +68,7 @@ struct ClarifyChatView: View {
                         HeldBuildCard() // H3: 無料枠切れで止めた。会話は残して「続きから作る」
                             .transition(.move(edge: .bottom).combined(with: .opacity))
                     } else if !collapsesOffer {
+                        if let automationFix, !busy, rt.errorCard == nil { AutomationFixOfferRow(model: automationFix) }
                         suggestionChips
                         actionButton
                     }
