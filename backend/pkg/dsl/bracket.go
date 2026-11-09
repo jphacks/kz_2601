@@ -7,7 +7,10 @@ package dsl
 // winsField holds the number of rounds an entrant has won. Tapping an
 // entrant in a match writes that number through the same record update as
 // list.item.toggle, so only those who may edit the records set winners. The
-// pairing itself is never stored.
+// pairing itself is never stored; once a result exists it is frozen to the
+// entrants that existed at the start. startedField (optional datetime) makes
+// that exact: iOS writes the start time to every placed entrant with the
+// first result and clears it when every result is undone.
 
 // MaxBracketEntrants bounds the drawn entrants (6 rounds); iOS leaves out the rest.
 const MaxBracketEntrants = 64
@@ -43,6 +46,16 @@ func checkBracket(where string, c *Component, entities map[string]*Entity, add f
 			add("%s: bracket seedField %q not in entity %q (fields: %s)", where, c.SeedField, e.ID, fieldIDs(e))
 		case f.Type != FieldInteger && f.Type != FieldNumber:
 			add("%s: bracket seedField %q must be integer or number (got %s); omit it to seed by creation order", where, f.ID, f.Type)
+		}
+	}
+	if c.StartedField != "" {
+		switch f := e.FieldByID(c.StartedField); {
+		case f == nil:
+			add("%s: bracket startedField %q not in entity %q (fields: %s)", where, c.StartedField, e.ID, fieldIDs(e))
+		case f.Type != FieldDatetime:
+			add("%s: bracket startedField %q must be a datetime field (got %s); it stores when the first result was recorded", where, f.ID, f.Type)
+		case f.Computed != nil:
+			add("%s: bracket startedField %q is computed (read-only); point it at a stored datetime field", where, f.ID)
 		}
 	}
 	if c.WinsField != "" && c.WinsField == c.SeedField {

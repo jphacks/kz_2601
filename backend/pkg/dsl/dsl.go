@@ -499,8 +499,9 @@ type Component struct {
 	RowRange     *GridRange `json:"rowRange,omitempty"`     // integer rowField range (default 1..6)
 
 	// bracket (bracket.go). Entity / TitleField / Title are shared.
-	WinsField string `json:"winsField,omitempty"` // integer: rounds won (0 = in round 1)
-	SeedField string `json:"seedField,omitempty"` // integer / number: seed order, low first (else creation order)
+	WinsField    string `json:"winsField,omitempty"`    // integer: rounds won (0 = in round 1)
+	SeedField    string `json:"seedField,omitempty"`    // integer / number: seed order, low first (else creation order)
+	StartedField string `json:"startedField,omitempty"` // datetime: when the first result was recorded (freezes the draw)
 
 	// chatThread (#260). Entity / Placeholder / EmptyText are shared.
 	TextField  string `json:"textField,omitempty"`  // message body (string/text field)

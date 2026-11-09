@@ -16,7 +16,8 @@
       "fields": [
         { "id": "name", "name": "名前", "type": "string", "required": true },
         { "id": "seed", "name": "シード", "type": "integer" },
-        { "id": "wins", "name": "勝ち上がり", "type": "integer", "defaultValue": 0 }
+        { "id": "wins", "name": "勝ち上がり", "type": "integer", "defaultValue": 0 },
+        { "id": "started", "name": "開始", "type": "datetime" }
       ]
     }
   ],
@@ -27,7 +28,7 @@
       "components": [
         {
           "type": "bracket", "id": "draw", "area": "A1:F7", "title": "トーナメント表",
-          "entity": "entrant", "titleField": "name", "winsField": "wins", "seedField": "seed"
+          "entity": "entrant", "titleField": "name", "winsField": "wins", "seedField": "seed", "startedField": "started"
         },
         {
           "type": "list", "id": "entrants", "area": "A8:F10",
