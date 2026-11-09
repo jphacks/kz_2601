@@ -108,7 +108,7 @@ func TestRunnerQuotaWarningSendFailure(t *testing.T) {
 		}
 		var warns int
 		for _, p := range s.Pushes() {
-			if p.Title != "追加" && strings.HasPrefix(p.Token, "tok-warnf") {
+			if p.Title != "追加" && p.AppID == id { // the sender is shared by both subtests
 				warns++
 			}
 		}
