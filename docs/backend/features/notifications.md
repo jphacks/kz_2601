@@ -23,4 +23,4 @@ device_tokens/{sha256(token)}          # {uid, installationId}: トークンを�
 | 同意 | `PUT /v1/me/notify-consent/{appId}` `{allowed}`。保存が無い = 受け取らない(作成者以外には送らない)。有効にするには自分のコピー(404)と、shared のデータがあるアプリでは参加(403 `not_member`)が要る。無効はいつでも |
 | 同意の既定(#339) | shared は参加の時に確認つきで有効・public は無効。iOS が参加の画面でこの API を呼んで実現する |
 
-iOS 側は [iOS アーキテクチャ §5.1](../../ios/architecture.md#51-プッシュ通知269)。App ID の Push の有効化と entitlement の `aps-environment` は人の作業で、それまで登録は失敗するだけ。
+iOS 側は [iOS アーキテクチャ §5.1](../../ios/architecture.md#51-プッシュ通知269)。entitlement の `aps-environment` は通常の版の `Metamon.entitlements` に入っている(Debug / Staging は development、Release は production・#683)。送る側の APNs の宛先は runner の `RUNNER_APNS_ENVIRONMENT`([runtime-config.md](../../infra/runtime-config.md))。

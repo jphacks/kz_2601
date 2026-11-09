@@ -205,7 +205,7 @@ App 内課金なし
 |---|---|---|
 | その版のバイナリに serverRules の機能がある | `APP_STORE_REVIEW` で `Features/Automations` を外す `#if` を外した版か | 書いた機能は必ずバイナリにある(2.5.19・2.3.1) |
 | 課金(Pro)が入っている | serverRules は Pro の機能(`paid.ServerRules`・#316)。課金を入れた版なら 2 章の NO IN-APP PURCHASES の段落も差し替える | 課金なしの版では serverRules が作られない |
-| iOS のプッシュ通知の登録と、アプリごとの通知の同意の画面がある | 2026-11-07 時点では iOS 側は未実装(サーバーの `PUT /v1/me/devices/{installationId}`・`PUT /v1/me/notify-consent/{appId}` だけある・`docs/backend/features/notifications.md`) | 「通知は同意した人だけ」の説明に画面が要る |
+| iOS のプッシュ通知の登録と、アプリごとの通知の同意の画面がある | 通常の版には登録(`Features/Push`)・同意の画面・`aps-environment`(#683)がある。審査用の版は `APP_STORE_REVIEW` で `Features/Push` を外し、`Metamon-Review.entitlements` に `aps-environment` も無い。この章を使う版では両方を戻す(`docs/ios/review-build.md`) | 「通知は同意した人だけ」の説明に画面が要る。通知が届かないと 2.1 |
 | 共有のデータ(`sharedData`)が入っているか | `ClientCapabilities.reviewDisabledFeatures` に `sharedData` が残っていれば共有は無い | 共有が無い版では英語の版の「Other people receive them only if …」の文を消す(外した機能を書かない) |
 | runner が動いている | 審査の期間中、runner がデプロイされて動いていること(2026-11-07 時点は未デプロイ) | 審査で自動の動きを試されたときに届かないと 2.1 |
 | ASC の 4,000 字 | 下の段落は 1273 字。2 章の文は 3,994 字なので、そのまま足すと超える。足す時は 2 章のほかの所を削り、合計を数え直す | ASC に入らない |
