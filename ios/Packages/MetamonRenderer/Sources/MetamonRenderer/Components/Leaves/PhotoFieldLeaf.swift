@@ -6,6 +6,7 @@ import MetamonDSL
 /// `photoField`(P0 カメラ): source(camera|library|both)に応じて実機カメラ / 写真選択 / 二択ダイアログ。
 /// 取得した画像は `PhotoCodec` で 800px 以下・JPEG q0.5 の "data:image/jpeg;base64,..." にして photo フィールドへ。
 /// カメラが無い端末(シミュレータ等)では自動で写真選択に落ちる(`PhotoSourcePolicy`)。
+/// `illustrate` なら端末内の Image Playground で作った絵も同じ形で入れる(`PhotoIllustrate`・使えない端末では出さない)。
 /// `analyze`(#418)があれば、撮った・選んだ直後に端末内で読み取って他の field のドラフトに入れる(`PhotoReader`)。
 struct PhotoFieldLeaf: View {
     let c: Component
@@ -16,6 +17,7 @@ struct PhotoFieldLeaf: View {
     @State private var showCamera = false
     @State private var showChooser = false
     @State private var showDenied = false
+    @State private var showIllustrate = false
     @State private var reading = false
     @State private var readStatus: ReadStatus?
     @State private var pose: BodyPose?
@@ -77,7 +79,18 @@ struct PhotoFieldLeaf: View {
                 .accessibilityLabel(c.label ?? L("写真を撮る / 選ぶ"))
                 .accessibilityHint(sourceHint)
             }
+            if PhotoIllustrate.showsButton(requested: c.illustrate, available: PhotoIllustrate.isAvailable) {
+                Button { showIllustrate = true } label: {
+                    Label(L("イラストを作る"), systemImage: "wand.and.stars").frame(maxWidth: .infinity)
+                }
+                .buttonStyle(RenderButtonStyle(kind: .secondary))
+                .accessibilityHint(L("端末内の Image Playground でイラストを作ります"))
+            }
         }
+        // illustrate: 端末内で作った絵を、選んだ写真と同じ形で入れる(クラウドでは作らない)
+        .modifier(IllustrateSheet(isPresented: $showIllustrate, concept: PhotoIllustrate.concept(entity: form.entity, values: form.values)) { url in
+            if let encoded = PhotoIllustrate.dataURL(fromFileAt: url) { setPhoto(encoded, form: form, field: field) }
+        })
         #if !APP_STORE_REVIEW
         .confirmationDialog(c.label ?? L("写真"), isPresented: $showChooser, titleVisibility: .hidden) {
             Button(L("撮影")) { openCamera() }

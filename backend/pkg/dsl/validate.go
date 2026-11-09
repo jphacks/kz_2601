@@ -418,6 +418,7 @@ func (a *App) Validate() error {
 				checkComponentFilterValue(where, c.Filter, entities, add)
 				checkComponentPeriodFilter(where, c, entities, add)
 			}
+			checkPhotoIllustrate(where, c, add) // photo_illustrate.go
 			switch c.Type {
 			case CompText:
 				checkText(where, c, formEntity, add) // text_highlight.go

@@ -41,6 +41,7 @@ func (a *App) Lint() []string {
 	l.privateChat()
 	l.optionalTitle()
 	l.settingMaxMin()
+	l.photoIllustrate() // photo_illustrate.go
 	return l.out
 }
 
