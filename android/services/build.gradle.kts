@@ -1,6 +1,7 @@
 // :services — I/O(認証・API・音声など)。iOS の MetamonServices に当たる。Compose は使わない。
 plugins {
     alias(libs.plugins.android.library)
+    alias(libs.plugins.kotlin.serialization)
 }
 
 android {
@@ -20,10 +21,20 @@ android {
 dependencies {
     api(project(":dsl"))
     api(libs.kotlinx.coroutines.core)
+    api(libs.okhttp)
     implementation(libs.kotlinx.coroutines.android)
     implementation(platform(libs.firebase.bom))
     implementation(libs.firebase.auth)
 
     testImplementation(libs.junit)
     testImplementation(libs.kotlinx.coroutines.test)
+    testImplementation(libs.okhttp.mockwebserver)
+}
+
+// エラーコードの一覧が backend(backend/internal/httpx/codes.go)と揃っているかをテストで確かめる。
+val backendCodesFile = rootDir.resolve("../backend/internal/httpx/codes.go")
+
+tasks.withType<Test>().configureEach {
+    inputs.file(backendCodesFile).withPropertyName("backendCodes").withPathSensitivity(PathSensitivity.RELATIVE)
+    systemProperty("metamon.backendCodesFile", backendCodesFile.absolutePath)
 }
