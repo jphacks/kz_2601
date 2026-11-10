@@ -161,6 +161,40 @@
         }
       }
     },
+    "ON にすると、新しく作る時も作ったアプリを変える時も、まずチャットで AI に相談できます。質問には答え、案を出すので「これでいく」で反映します。OFF にすると、話した内容をすぐ反映します。" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "When on, you can first chat with the AI both when making a new app and when changing one. It answers questions and suggests ideas; tap \"Go with this\" to apply. When off, what you say is applied right away."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ON にすると、新しく作る時も作ったアプリを変える時も、まずチャットで AI に相談できます。質問には答え、案を出すので「これでいく」で反映します。OFF にすると、話した内容をすぐ反映します。"
+          }
+        }
+      }
+    },
+    "ON にすると、新しく用意する時も記録帳を直す時も、まずチャットで AI に相談できます。質問には答え、案を出すので「これでいく」で反映します。OFF にすると、話した内容をすぐ反映します。" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "When on, you can first chat with the AI both when setting up a new tracker and when adjusting one. It answers questions and suggests ideas; tap \"Go with this\" to apply. When off, what you say is applied right away."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ON にすると、新しく用意する時も記録帳を直す時も、まずチャットで AI に相談できます。質問には答え、案を出すので「これでいく」で反映します。OFF にすると、話した内容をすぐ反映します。"
+          }
+        }
+      }
+    },
     "QRコードを読み取って記録できるようにして" : {
       "localizations" : {
         "en" : {
@@ -2913,6 +2947,23 @@
         }
       }
     },
+    "新しいアプリを声だけで相談している時は、内容がそろうと少し待ってから自動で作り始めます。作ったアプリの変更は、意図しない変更を防ぐため必ず「これでいく」を押してから反映します。" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "When you plan a new app by voice only, building starts automatically shortly after everything is clear. Changes to an app you already made are applied only after you tap \"Go with this\", so nothing changes by accident."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "新しいアプリを声だけで相談している時は、内容がそろうと少し待ってから自動で作り始めます。作ったアプリの変更は、意図しない変更を防ぐため必ず「これでいく」を押してから反映します。"
+          }
+        }
+      }
+    },
     "新しいウインドウ" : {
       "localizations" : {
         "en" : {
@@ -2925,6 +2976,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "新しいウインドウ"
+          }
+        }
+      }
+    },
+    "新しい記録帳を声だけで相談している時は、内容がそろうと少し待ってから自動で用意し始めます。用意した記録帳の変更は、意図しない変更を防ぐため必ず「これでいく」を押してから反映します。" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "When you plan a new tracker by voice only, setup starts automatically shortly after everything is clear. Changes to a tracker you already set up are applied only after you tap \"Go with this\", so nothing changes by accident."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "新しい記録帳を声だけで相談している時は、内容がそろうと少し待ってから自動で用意し始めます。用意した記録帳の変更は、意図しない変更を防ぐため必ず「これでいく」を押してから反映します。"
           }
         }
       }

@@ -50,6 +50,10 @@ struct MacUnavailableSettingRow: View {
 // MARK: - 一般(言語・対話・読み上げ)
 
 private struct MacGeneralSettings: View {
+    // 対話(#75 / #160)。iOS と同じ保存先(`ClarifySettings`)。会話のシート(#967)が開く時に読む
+    @State private var clarifyEnabled = ClarifySettings.enabled
+    @State private var clarifyAutoBuild = ClarifySettings.autoBuild
+
     var body: some View {
         @Bindable var language = LanguagePreference.shared
         Form {
@@ -64,11 +68,25 @@ private struct MacGeneralSettings: View {
             } footer: {
                 Text(L10n.key("新しく作るアプリと質問もこの言語になります。作成済みのアプリの文言は変わりません。", review: "新しく用意する記録帳と質問もこの言語になります。用意済みの記録帳の文言は変わりません。"))
             }
-            // 対話・読み上げは Mac の会話の画面(#967)ができてから切り替えられるようにする
-            Section("対話") {
-                MacUnavailableSettingRow(title: "チャットで相談してから作る")
-                MacUnavailableSettingRow(title: "答えがそろったら自動で作る")
+            Section {
+                Toggle("チャットで相談してから作る", isOn: $clarifyEnabled)
+                    .accessibilityIdentifier("settings.clarify")
+                    .onChange(of: clarifyEnabled) { _, on in ClarifySettings.enabled = on }
+                Toggle("答えがそろったら自動で作る", isOn: $clarifyAutoBuild)
+                    .disabled(!clarifyEnabled)
+                    .accessibilityIdentifier("settings.clarifyAutoBuild")
+                    .onChange(of: clarifyAutoBuild) { _, on in ClarifySettings.autoBuild = on }
+            } header: {
+                Text("対話")
+            } footer: {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(L10n.key("ON にすると、新しく作る時も作ったアプリを変える時も、まずチャットで AI に相談できます。質問には答え、案を出すので「これでいく」で反映します。OFF にすると、話した内容をすぐ反映します。",
+                                  review: "ON にすると、新しく用意する時も記録帳を直す時も、まずチャットで AI に相談できます。質問には答え、案を出すので「これでいく」で反映します。OFF にすると、話した内容をすぐ反映します。"))
+                    Text(L10n.key("新しいアプリを声だけで相談している時は、内容がそろうと少し待ってから自動で作り始めます。作ったアプリの変更は、意図しない変更を防ぐため必ず「これでいく」を押してから反映します。",
+                                  review: "新しい記録帳を声だけで相談している時は、内容がそろうと少し待ってから自動で用意し始めます。用意した記録帳の変更は、意図しない変更を防ぐため必ず「これでいく」を押してから反映します。"))
+                }
             }
+            // 読み上げは Mac の読み上げ(後の Issue)ができてから切り替えられるようにする
             Section("読み上げ") {
                 MacUnavailableSettingRow(title: "挨拶と質問を読み上げる")
             }

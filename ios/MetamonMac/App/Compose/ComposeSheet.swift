@@ -127,7 +127,7 @@ private struct ComposeChat: View {
     private func deliver(_ text: String) {
         let typed = session.draft.trimmingCharacters(in: .whitespacesAndNewlines)
         session.draft = typed.isEmpty ? text : typed + " " + text
-        if session.phase == .chatting, !session.sending { session.sendDraft() }
+        if session.phase == .chatting, !session.sending { session.sendDraft(source: typed.isEmpty ? .voice : .text) }
     }
 
     private var greeting: some View {
