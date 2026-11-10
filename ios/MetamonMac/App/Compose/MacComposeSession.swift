@@ -58,6 +58,9 @@ final class MacComposeSession: Identifiable {
     var draft: String
     /// 声で頼む(⇧⌘M・#966)で開いた。シートが出たらすぐ録音を始める(1 回だけ)
     var startsWithVoice = false
+    /// 画面マップの「この画面について話す」(#970)で開いた時の画面。直す時は作る指示の先頭に「画面「B」(id: b)で: 」を付ける
+    /// (iOS の `runFromChat` と同じ・会話の吹き出しには付けない)。会話のチップの × で外せる
+    var screen: ScreenContext?
     /// 複数選択の question で選んだチップ・proposal で選んだ案の id
     var selectedChips: [String] = []
     var selectedOptions: [String] = []
@@ -285,9 +288,10 @@ final class MacComposeSession: Identifiable {
         withAnimation { phase = .generating(job) }
         MacVoiceOver.announce(L10n.tr("作っています"))
         let version: Int = if case .edit(_, _, let v) = target { v } else { 0 }
+        let instruction = Self.instruction(transcript, about: mode == .edit ? screen : nil)
         task = Task { [ai, appId] in
             do {
-                let result = try await ai.morph(transcript: transcript, appId: appId, currentVersion: version,
+                let result = try await ai.morph(transcript: instruction, appId: appId, currentVersion: version,
                                                 locale: Self.locale) { progress in
                     Task { @MainActor [weak self] in self?.apply(progress) }
                 }
@@ -300,6 +304,12 @@ final class MacComposeSession: Identifiable {
                 show(Self.presentation(for: error, transcript: transcript, origin: .generate))
             }
         }
+    }
+
+    /// 画面マップの文脈を付けた作る指示(#970)。文脈が無ければそのまま
+    static func instruction(_ transcript: String, about screen: ScreenContext?) -> String {
+        guard let screen else { return transcript }
+        return ScreenMapCopy.contextPrefix(screen) + transcript
     }
 
     private func apply(_ progress: GenerateProgress) {
