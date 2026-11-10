@@ -48,7 +48,7 @@ class FileImportFlowTest {
           {"type":"fileImport","entity":"member","accept":["csv"],"map":[{"column":"氏名","field":"name"}]},
           {"type":"fileImport","entity":"note","accept":["text","pdf","audio"],"field":"body"},
           {"type":"fileImport","entity":"board","accept":["csv"]},
-          {"type":"fileImport","entity":"member","accept":["pdf","audio"]}
+          {"type":"fileImport","entity":"member","accept":["audio"]}
          ]}]}
         """.trimIndent(),
     )
@@ -89,8 +89,10 @@ class FileImportFlowTest {
     @Test
     fun pickerOffersOnlyKindsThisDeviceCanRead() {
         assertTrue("text/csv" in FileImportFlow.mimeTypes(listOf(Accept.CSV)))
-        assertEquals(listOf("text/plain", "text/markdown"), FileImportFlow.mimeTypes(listOf(Accept.TEXT, Accept.PDF, Accept.AUDIO)))
-        assertTrue(FileImportFlow.mimeTypes(listOf(Accept.PDF, Accept.AUDIO)).isEmpty())
+        assertEquals(listOf("text/plain", "text/markdown", "application/pdf"), FileImportFlow.mimeTypes(listOf(Accept.TEXT, Accept.PDF, Accept.AUDIO)))
+        // 録音はまだ読めない(#1180)。PDF は読める(#1181)
+        assertTrue(FileImportFlow.mimeTypes(listOf(Accept.AUDIO)).isEmpty())
+        assertEquals(setOf(Accept.AUDIO), FileImportFlow.unavailableKinds)
         // CSV は text/plain を名乗っても拡張子で CSV。accept に無い種類は null。
         assertEquals(ImportKind.CSV, FileImportFlow.kind("a.CSV", "text/plain", listOf(Accept.CSV, Accept.TEXT)))
         assertEquals(ImportKind.CSV, FileImportFlow.kind("download", "text/csv; charset=utf-8", listOf(Accept.CSV)))
@@ -181,6 +183,23 @@ class FileImportFlowTest {
         assertEquals(ImportStep.Problem(ImportProblem.EmptyText), empty)
         val full = FileImportFlow.planText("x", "a.txt", components[1], note, RecordImport.MAX_RECORDS_PER_ENTITY)
         assertEquals(ImportStep.Problem(ImportProblem.Full), full)
+    }
+
+    @Test
+    fun pdfBodyBecomesOneRecordOrUnreadable() {
+        val ok = FileImportFlow.prepare(ByteArray(4), ImportKind.PDF, "議事録.pdf", components[1], note, 0, pdfText = { "1 ページ目\n\n2 ページ目" }) { _, _ -> null }
+        ok as ImportStep.Confirm
+        assertEquals(JSONValue.Str("1 ページ目\n\n2 ページ目"), ok.rows.single()["body"])
+        assertEquals(JSONValue.Str("議事録"), ok.rows.single()["title"])
+
+        for (text in listOf(null, " \n")) {
+            val bad = FileImportFlow.prepare(ByteArray(4), ImportKind.PDF, "a.pdf", components[1], note, 0, pdfText = { text }) { _, _ -> null }
+            assertEquals(ImportStep.Problem(ImportProblem.PdfUnreadable), bad)
+        }
+        var called = false
+        val big = FileImportFlow.prepare(ByteArray(RecordImport.MAX_PDF_BYTES + 1), ImportKind.PDF, "a.pdf", components[1], note, 0, pdfText = { called = true; "x" }) { _, _ -> null }
+        assertEquals(ImportStep.Problem(ImportProblem.TooLarge(30)), big)
+        assertFalse(called)
     }
 
     @Test

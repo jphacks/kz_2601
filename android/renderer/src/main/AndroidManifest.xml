@@ -11,9 +11,9 @@
                 android:name="android.support.FILE_PROVIDER_PATHS"
                 android:resource="@xml/metamon_media_paths" />
         </provider>
-        <!-- qrScanner(#866): Google Code Scanner の読み取りモジュールをインストール時に落とす(初回に押してから待たせない) -->
+        <!-- qrScanner(#866)の読み取りと fileImport の PDF(#1181)の日本語の文字認識のモジュールをインストール時に落とす(初回に待たせない) -->
         <meta-data
             android:name="com.google.mlkit.vision.DEPENDENCIES"
-            android:value="barcode_ui" />
+            android:value="barcode_ui,ocr_ja" />
     </application>
 </manifest>

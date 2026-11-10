@@ -48,6 +48,7 @@ internal object FileImportCopy {
             res.getString(R.string.renderer_import_problem_columns, p.entityName, p.fieldNames.joinToString(res.getString(R.string.renderer_import_separator)))
         is ImportProblem.NothingToAdd -> csv(res, p.summary)
         ImportProblem.EmptyText -> res.getString(R.string.renderer_import_problem_empty_text)
+        ImportProblem.PdfUnreadable -> res.getString(R.string.renderer_import_problem_pdf_unreadable)
         ImportProblem.Full -> res.getString(R.string.renderer_import_problem_full)
         ImportProblem.KindUnavailable -> res.getString(R.string.renderer_import_problem_kind_unavailable)
     }

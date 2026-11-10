@@ -13,7 +13,7 @@ import jp.kz2601.metamon.dsl.records.JSONValue
 import jp.kz2601.metamon.renderer.DSLRuntime
 import jp.kz2601.metamon.renderer.form.FormChoices
 
-/** 読むファイルの種類。Android で読めるのは CSV と文字だけ(PDF・録音は [FileImportFlow.unavailableKinds])。 */
+/** 読むファイルの種類。Android でまだ読めないのは録音だけ([FileImportFlow.unavailableKinds])。 */
 enum class ImportKind { CSV, TEXT, PDF, AUDIO }
 
 /** 確認の文の材料(文言は [FileImportCopy])。 */
@@ -41,8 +41,10 @@ sealed interface ImportProblem {
     /** 当たる列はあるが、足せる行が 1 つも無い(読めない行・上限) */
     data class NothingToAdd(val summary: ImportMessage.Csv) : ImportProblem
     data object EmptyText : ImportProblem
+    /** PDF から文字を 1 つも取り出せない(壊れている・暗号化・文字認識もできない) */
+    data object PdfUnreadable : ImportProblem
     data object Full : ImportProblem
-    /** 録音・PDF: この端末ではまだ読めない */
+    /** 録音: この端末ではまだ読めない */
     data object KindUnavailable : ImportProblem
 }
 
@@ -57,8 +59,8 @@ sealed interface ImportStep {
  * ファイルは読むだけで、送らない・コピーしない・残さない。
  */
 object FileImportFlow {
-    /** Android ではまだ読めない種類(PDF の本文の取り出し・録音の文字起こし。子 Issue)。 */
-    val unavailableKinds = setOf(Accept.PDF, Accept.AUDIO)
+    /** Android ではまだ読めない種類(録音の文字起こし・#1180)。 */
+    val unavailableKinds = setOf(Accept.AUDIO)
 
     private val csvMimes = listOf("text/csv", "text/comma-separated-values", "application/csv")
     private val textExtensions = setOf("txt", "text", "md", "markdown")
@@ -68,6 +70,7 @@ object FileImportFlow {
         val out = linkedSetOf<String>()
         if (Accept.CSV in accept) out += csvMimes + listOf("application/vnd.ms-excel", "text/plain")
         if (Accept.TEXT in accept) out += listOf("text/plain", "text/markdown")
+        if (Accept.PDF in accept) out += "application/pdf"
         return out.toList()
     }
 
@@ -89,7 +92,7 @@ object FileImportFlow {
     fun usable(c: Component, entity: Entity?): Boolean =
         entity != null && entity.scope != "public" && !entity.single && mimeTypes(c.accept).isNotEmpty()
 
-    /** 読んだバイト列 → 確認する中身(または理由)。`existing` は今の件数。 */
+    /** 読んだバイト列 → 確認する中身(または理由)。`existing` は今の件数。`pdfText` は PDF の本文の取り出し(端末では [PdfTextReader])。 */
     fun prepare(
         bytes: ByteArray,
         kind: ImportKind,
@@ -97,6 +100,7 @@ object FileImportFlow {
         c: Component,
         entity: Entity,
         existing: Int,
+        pdfText: (ByteArray) -> String? = { null },
         refId: (Field, String) -> String?,
     ): ImportStep {
         if (bytes.size > byteLimit(kind)) return ImportStep.Problem(ImportProblem.TooLarge(byteLimit(kind) / 1_000_000))
@@ -106,7 +110,11 @@ object FileImportFlow {
                 val text = RecordImport.plainText(bytes)
                 if (text.isNullOrBlank()) ImportStep.Problem(ImportProblem.EmptyText) else planText(text, fileName, c, entity, existing)
             }
-            ImportKind.PDF, ImportKind.AUDIO -> ImportStep.Problem(ImportProblem.KindUnavailable)
+            ImportKind.PDF -> {
+                val text = pdfText(bytes)
+                if (text.isNullOrBlank()) ImportStep.Problem(ImportProblem.PdfUnreadable) else planText(text, fileName, c, entity, existing)
+            }
+            ImportKind.AUDIO -> ImportStep.Problem(ImportProblem.KindUnavailable)
         }
     }
 

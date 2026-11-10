@@ -38,8 +38,8 @@ import kotlinx.coroutines.withContext
 /**
  * `fileImport`(#865・iOS の FileImportLeaf): ボタンでファイルを選び(Storage Access Framework・権限の確認なし)、entity に記録を足す。
  * - csv: 1 行 = 1 件(列の当て方・型の変換は :dsl の RecordImport)。足す前に「n 件を追加・m 行は読めない」を確かめる。
- * - text: 本文を `field` に入れた記録を 1 件。
- * - pdf / audio: この端末ではまだ読めない(選べる種類から外し、ボタンの下に一言)。
+ * - text / pdf: 本文を `field` に入れた記録を 1 件(PDF の画像だけのページは端末内の文字認識・[PdfTextReader])。
+ * - audio: この端末ではまだ読めない(選べる種類から外し、ボタンの下に一言・#1180)。
  * ファイルは読むだけで、送らない・コピーしない・残さない。足すのは [DSLRuntime.addRecord](フォームの保存と同じく端末に入り同期)。
  */
 @Composable
@@ -99,7 +99,7 @@ fun FileImportLeaf(c: Component, ctx: RenderContext, modifier: Modifier = Modifi
             running = reading || p != null,
         )
         if (c.accept.any { it in FileImportFlow.unavailableKinds }) {
-            Text(stringResource(R.string.renderer_import_kind_note), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Text(stringResource(R.string.renderer_import_audio_note), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
         status?.let {
             Text(it, Modifier.testTag("fileImport.status"), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
@@ -148,11 +148,11 @@ private suspend fun read(context: Context, uri: Uri, c: Component, entity: Entit
         }.getOrNull() ?: uri.lastPathSegment.orEmpty()
         val kind = FileImportFlow.kind(name, resolver.getType(uri), c.accept)
             ?: return@withContext ImportStep.Problem(ImportProblem.Unsupported)
-        if (kind in setOf(ImportKind.PDF, ImportKind.AUDIO)) return@withContext ImportStep.Problem(ImportProblem.KindUnavailable)
+        if (kind == ImportKind.AUDIO) return@withContext ImportStep.Problem(ImportProblem.KindUnavailable)
         val limit = FileImportFlow.byteLimit(kind)
         val bytes = runCatching {
             resolver.openInputStream(uri)?.use { input -> input.readNBytes(limit + 1) }
         }.getOrNull() ?: return@withContext ImportStep.Problem(ImportProblem.CannotOpen)
         val existing = FormChoices.records(ctx.runtime, entity.id).size
-        FileImportFlow.prepare(bytes, kind, name, c, entity, existing) { field, ref -> FileImportFlow.refId(ctx.runtime, field, ref) }
+        FileImportFlow.prepare(bytes, kind, name, c, entity, existing, pdfText = { PdfTextReader.text(context, it) }) { field, ref -> FileImportFlow.refId(ctx.runtime, field, ref) }
     }
