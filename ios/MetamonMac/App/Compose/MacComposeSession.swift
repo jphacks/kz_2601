@@ -8,6 +8,7 @@ import MetamonServices
 /// アプリを作る・直す会話(#967)の状態。iOS の `AppRuntime+Clarify` / `AppRuntime+BuildStage` の Mac 版。
 /// 判断は iOS と同じ `ClarifyFlow`(何を出すか)・`MultiSelect`(複数選択)・`BuildChoreography`(組み上げ)を使う。
 /// AI は Mac に Firebase が無い間(#930)は `MockAIClient`(iOS の METAMON_MOCK と同じ・同梱の DSL 例を返す)。
+/// AI に送る前に同意(#246・5.1.2(i))を確かめる。無ければ送らずに同意の説明を出し、同意したら止めた 1 件を送る(iOS の `requireAIConsent`)。
 /// 流れ: 頼む(文字)→ 聞き返し・案(chat)→「これでいく」→ 生成中(組み立て台・経過秒)→ 組み上げ → 完成の要約。
 @MainActor
 @Observable
@@ -61,9 +62,28 @@ final class MacComposeSession: Identifiable {
     var selectedChips: [String] = []
     var selectedOptions: [String] = []
 
+    /// 設定の「対話」(#973)。開いた時に読む(iOS の `ClarifySettings` と同じ保存先)
+    @ObservationIgnored private let clarifyEnabled: Bool
+    @ObservationIgnored private let clarifyAutoBuild: Bool
+    /// 最後に吹き出しを足した入力手段(自動で作るかの判定・#160)。声で頼む(#966)は `.voice` を渡す
+    @ObservationIgnored private var lastInput: ClarifyFlow.InputSource?
+    /// 要約カードを見せてから自動で作る待ち(#160)
+    private(set) var autoBuildPending = false
+    @ObservationIgnored private var autoBuildTask: Task<Void, Never>?
+
+    /// 同意を待って止めた 1 件(iOS の `utteranceAwaitingConsent`)。同意したら送り直す・「あとで」なら捨てる
+    enum Held: Equatable {
+        case message(String)
+        case build(String)
+    }
+    private(set) var heldForConsent: Held?
+    /// 同意の説明を出す(ComposeSheet がシートで出す)
+    var needsConsent = false
+
     @ObservationIgnored private let ai: any AIClient
     @ObservationIgnored private let appId: String
     @ObservationIgnored private let reduceMotion: () -> Bool
+    @ObservationIgnored private let isConsentGranted: @MainActor () -> Bool
     @ObservationIgnored private var task: Task<Void, Never>?
     /// 結果を中央に当てる(MacRootView がアプリの一覧を差し替える)
     @ObservationIgnored var onResult: (AppDocument) -> Void = { _ in }
@@ -85,31 +105,76 @@ final class MacComposeSession: Identifiable {
     var offer: ClarifyFlow.Offer { latest.map(ClarifyFlow.offer(for:)) ?? .none }
     var shortcut: ClarifyFlow.Shortcut { bubbles.isEmpty ? .none : ClarifyFlow.shortcut(for: latest, mode: mode) }
 
-    init(target: Target, draft: String = "", ai: any AIClient = MockAIClient(),
-         reduceMotion: @escaping () -> Bool = { NSWorkspace.shared.accessibilityDisplayShouldReduceMotion }) {
+    init(target: Target, draft: String = "", ai: any AIClient = MacComposeSession.gatedAI(),
+         reduceMotion: @escaping () -> Bool = { NSWorkspace.shared.accessibilityDisplayShouldReduceMotion },
+         isConsentGranted: @escaping @MainActor () -> Bool = { AIConsentStore.shared.isGranted },
+         clarifyEnabled: Bool = ClarifySettings.enabled, clarifyAutoBuild: Bool = ClarifySettings.autoBuild) {
         self.target = target
         self.draft = draft
         self.ai = ai
         self.reduceMotion = reduceMotion
+        self.isConsentGranted = isConsentGranted
+        self.clarifyEnabled = clarifyEnabled
+        self.clarifyAutoBuild = clarifyAutoBuild
         switch target {
         case .create: appId = "mac-\(UUID().uuidString.prefix(8).lowercased())"
         case .edit(let id, _, _): appId = id
         }
     }
 
+    /// Mac の AI。同意が無ければどの入口からも送らないよう `ConsentGatedAIClient` で包む(最後の砦・iOS の MetamonApp と同じ)
+    nonisolated static func gatedAI(base: any AIClient = MockAIClient()) -> any AIClient {
+        ConsentGatedAIClient(base: base) { AIConsentStore.isGranted(in: .standard) }
+    }
+
+    // MARK: - 同意(#246)
+
+    /// AI に送る直前に呼ぶ。未同意なら 1 件を止めて同意の説明を出し、false(送らない)
+    private func requireConsent(_ held: Held) -> Bool {
+        if isConsentGranted() { return true }
+        heldForConsent = held
+        needsConsent = true
+        return false
+    }
+
+    /// 同意の説明が閉じた時。同意していれば止めた 1 件を送る。「あとで」なら送らず、書いた文は入力欄に戻す
+    func resumeAfterConsent() {
+        needsConsent = false
+        guard let held = heldForConsent else { return }
+        heldForConsent = nil
+        guard isConsentGranted() else {
+            // 書いた文は入力欄に戻す(相談 OFF で 1 発目をそのまま作ろうとした時も)
+            switch held {
+            case .message(let text) where draft.isEmpty: draft = text
+            case .build(let text) where draft.isEmpty && bubbles.isEmpty: draft = text
+            default: break
+            }
+            return
+        }
+        switch held {
+        case .message(let text): send(text, source: lastInput ?? .text)
+        case .build(let transcript): build(transcript)
+        }
+    }
+
     // MARK: - 会話
 
-    /// 入力欄の文を送る(Return)
-    func sendDraft() {
+    /// 入力欄の文を送る(Return)。声で頼んだ文(#966)は `.voice`(自動で作るかの判定に使う)
+    func sendDraft(source: ClarifyFlow.InputSource = .text) {
         let text = draft.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !text.isEmpty else { return }
         draft = ""
-        send(text)
+        send(text, source: source)
     }
 
     /// 1 発言を送る。1 発目は `ClarifyFlow.startConversation`(前の会話に混ざらない)、2 発目からは全履歴。
-    func send(_ text: String) {
+    /// 設定の「チャットで相談してから作る」が OFF なら、1 発目をそのまま作る・直す(iOS と同じ・一発で反映)。
+    func send(_ text: String, source: ClarifyFlow.InputSource = .text) {
         guard !sending, phase == .chatting else { return }
+        lastInput = source
+        if !clarifyEnabled, bubbles.isEmpty { return build(text) }
+        guard requireConsent(.message(text)) else { return }
+        cancelAutoBuild()
         let first = bubbles.isEmpty
         bubbles.append(Bubble(role: .user, text: text))
         selectedChips = []
@@ -128,25 +193,48 @@ final class MacComposeSession: Identifiable {
                 latest = turn
                 bubbles.append(Bubble(role: .assistant, text: turn.text))
                 MacVoiceOver.announce(turn.text)
+                scheduleAutoBuildIfNeeded(turn)
             } catch {
                 guard !Task.isCancelled else { return }
                 // 届かなかった発言は履歴から外して入力欄に戻す(送り直しで同じ文が 2 回入らないように)
                 if bubbles.last?.role == .user { bubbles.removeLast() }
+                // 送る途中で同意を取り消した時(包みが止めた): 同意の説明を出して、同意したら送り直す
+                if error as? AIConsentError == .notGranted { _ = requireConsent(.message(text)); return }
                 if draft.isEmpty { draft = text }
                 show(Self.presentation(for: error, transcript: text, origin: .chat))
             }
         }
     }
 
+    /// 声だけで進めていて ready が来たら、要約カードを少し見せてから作る(#160・create だけ・iOS と同じ判定)。
+    /// その間に送る・ボタンを押す・閉じると取り消す。
+    private func scheduleAutoBuildIfNeeded(_ turn: ChatTurn) {
+        guard ClarifyFlow.shouldAutoBuild(turn: turn, lastInput: lastInput, enabled: clarifyAutoBuild, mode: mode) else { return }
+        autoBuildPending = true
+        autoBuildTask = Task { [weak self] in
+            try? await Task.sleep(for: ClarifyFlow.autoBuildDelay)
+            guard let self, !Task.isCancelled, self.autoBuildPending else { return }
+            self.autoBuildPending = false
+            self.autoBuildTask = nil
+            self.confirm()
+        }
+    }
+
+    private func cancelAutoBuild() {
+        autoBuildTask?.cancel()
+        autoBuildTask = nil
+        autoBuildPending = false
+    }
+
     /// チップを押す。複数選択の question は選ぶだけ(「決定」で送る)、それ以外はそのまま答えとして送る。
     func tapChip(_ chip: String) {
-        guard latest?.isMultiSelect == true, latest?.kind == .question else { return send(chip) }
+        guard latest?.isMultiSelect == true, latest?.kind == .question else { return send(chip, source: .chip) }
         if let i = selectedChips.firstIndex(of: chip) { selectedChips.remove(at: i) } else { selectedChips.append(chip) }
     }
 
     func submitChips() {
         guard MultiSelect.canSubmit(selectedCount: selectedChips.count) else { return }
-        send(MultiSelect.joinedAnswer(selectedChips))
+        send(MultiSelect.joinedAnswer(selectedChips), source: .chip)
     }
 
     func toggleOption(_ option: ChatOption) {
@@ -187,7 +275,8 @@ final class MacComposeSession: Identifiable {
     // MARK: - 生成
 
     func build(_ transcript: String) {
-        guard phase == .chatting, !transcript.isEmpty else { return }
+        guard phase == .chatting, !transcript.isEmpty, requireConsent(.build(transcript)) else { return }
+        cancelAutoBuild()
         task?.cancel()
         sending = false
         failure = nil
@@ -206,6 +295,7 @@ final class MacComposeSession: Identifiable {
             } catch {
                 guard !Task.isCancelled else { return }
                 withAnimation { phase = .chatting }
+                if error as? AIConsentError == .notGranted { _ = requireConsent(.build(transcript)); return }
                 show(Self.presentation(for: error, transcript: transcript, origin: .generate))
             }
         }
@@ -290,7 +380,10 @@ final class MacComposeSession: Identifiable {
     func dismissFailure() { withAnimation { failure = nil } }
 
     /// シートを閉じる時。走っている呼び出しを止める
-    func close() { task?.cancel() }
+    func close() {
+        cancelAutoBuild()
+        task?.cancel()
+    }
 
     @ObservationIgnored private var pendingReveal: (() -> Void)?
 

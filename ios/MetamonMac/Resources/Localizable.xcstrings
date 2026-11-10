@@ -101,6 +101,102 @@
         }
       }
     },
+    "AI が作るので、同じ頼み方でも毎回少し違うものができます。" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Because AI builds the app, the same request can give a slightly different result each time."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "AI が作るので、同じ頼み方でも毎回少し違うものができます。"
+          }
+        }
+      }
+    },
+    "AI との会話の履歴" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Your conversation with the AI"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "AI との会話の履歴"
+          }
+        }
+      }
+    },
+    "AI に送る内容の説明を改めました。もう一度ご確認ください。" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "We've updated what is sent to the AI. Please review it again."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "AI に送る内容の説明を改めました。もう一度ご確認ください。"
+          }
+        }
+      }
+    },
+    "AI へのデータ送信" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sending data to AI"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "AI へのデータ送信"
+          }
+        }
+      }
+    },
+    "AI へのデータ送信について" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "About sending data to AI"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "AI へのデータ送信について"
+          }
+        }
+      }
+    },
+    "AI への送信の同意を取り消しますか？" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Withdraw consent to send data to AI?"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "AI への送信の同意を取り消しますか？"
+          }
+        }
+      }
+    },
     "AI を一時停止しています" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -135,6 +231,22 @@
         }
       }
     },
+    "AI ボタンの利用状況を送る" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Send AI button usage"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "AI ボタンの利用状況を送る"
+          }
+        }
+      }
+    },
     "Apple でサインイン" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -148,6 +260,56 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Apple でサインイン"
+          }
+        }
+      }
+    },
+    "Apple でサインイン中" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Signed in with Apple"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Apple でサインイン中"
+          }
+        }
+      }
+    },
+    "ON にすると、新しく作る時も作ったアプリを変える時も、まずチャットで AI に相談できます。質問には答え、案を出すので「これでいく」で反映します。OFF にすると、話した内容をすぐ反映します。" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "When on, you can first chat with the AI both when making a new app and when changing one. It answers questions and suggests ideas; tap \"Go with this\" to apply. When off, what you say is applied right away."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ON にすると、新しく作る時も作ったアプリを変える時も、まずチャットで AI に相談できます。質問には答え、案を出すので「これでいく」で反映します。OFF にすると、話した内容をすぐ反映します。"
+          }
+        }
+      }
+    },
+    "ON にすると、新しく用意する時も記録帳を直す時も、まずチャットで AI に相談できます。質問には答え、案を出すので「これでいく」で反映します。OFF にすると、話した内容をすぐ反映します。" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "When on, you can first chat with the AI both when setting up a new tracker and when adjusting one. It answers questions and suggests ideas; tap \"Go with this\" to apply. When off, what you say is applied right away."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ON にすると、新しく用意する時も記録帳を直す時も、まずチャットで AI に相談できます。質問には答え、案を出すので「これでいく」で反映します。OFF にすると、話した内容をすぐ反映します。"
           }
         }
       }
@@ -185,6 +347,38 @@
         }
       }
     },
+    "Tailor It Pro" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tailor It Pro"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tailor It Pro"
+          }
+        }
+      }
+    },
+    "Tailor It β へようこそ" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Welcome to the Tailor It beta"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tailor It β へようこそ"
+          }
+        }
+      }
+    },
     "openUrl: url は https か line/slack/discord/tel/mailto/maps のみ" : {
       "localizations" : {
         "en" : {
@@ -197,6 +391,54 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "openUrl: url は https か line/slack/discord/tel/mailto/maps のみ"
+          }
+        }
+      }
+    },
+    "β の期間中は、作ったアプリや記録が消えることがあります。大事なデータは、ほかの場所にも残してください。" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "During the beta, the apps you make and your records may be erased. Keep a copy of anything important somewhere else."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "β の期間中は、作ったアプリや記録が消えることがあります。大事なデータは、ほかの場所にも残してください。"
+          }
+        }
+      }
+    },
+    "β 版のご案内" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "About the beta"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "β 版のご案内"
+          }
+        }
+      }
+    },
+    "β 版を試していただき、ありがとうございます。使ってみて気づいたことを、ぜひ教えてください。" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Thanks for trying the beta. Please tell us anything you notice while using it."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "β 版を試していただき、ありがとうございます。使ってみて気づいたことを、ぜひ教えてください。"
           }
         }
       }
@@ -214,6 +456,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "。サインインすると上限が増えます"
+          }
+        }
+      }
+    },
+    "「%@」" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "“%@”"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "「%@」"
           }
         }
       }
@@ -248,6 +506,54 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "「%@」に表示できない言葉が含まれています"
+          }
+        }
+      }
+    },
+    "「AI で書く」ボタン(文を作る・要約・分類・書き直し・抜き出し・提案)は、押した時だけ送ります。短い答えは、端末の中の AI が使える時は送らず、使えない時だけ最近の記録と入力中の文字(最大 4KB)を送ります。長い答えのボタンは、いつも最大 16KB を送ります。共有のアプリで材料にするのは、自分が入れた記録だけです。" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "\"Write with AI\" buttons (write, summarize, classify, rewrite, extract, suggest) send data only when tapped. Short answers send nothing when on-device AI is available; otherwise they send recent records and the text being entered (up to 4KB). Long-answer buttons always send up to 16KB. In a shared app, only records you added are used."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "「AI で書く」ボタン(文を作る・要約・分類・書き直し・抜き出し・提案)は、押した時だけ送ります。短い答えは、端末の中の AI が使える時は送らず、使えない時だけ最近の記録と入力中の文字(最大 4KB)を送ります。長い答えのボタンは、いつも最大 16KB を送ります。共有のアプリで材料にするのは、自分が入れた記録だけです。"
+          }
+        }
+      }
+    },
+    "「AI で書く」ボタン(文を作る・要約・分類・書き直し・抜き出し・提案)は、端末の中の AI だけで動き、何も送りません。" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "\"Write with AI\" buttons (write, summarize, classify, rewrite, extract, suggest) run only with on-device AI and send nothing."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "「AI で書く」ボタン(文を作る・要約・分類・書き直し・抜き出し・提案)は、端末の中の AI だけで動き、何も送りません。"
+          }
+        }
+      }
+    },
+    "「AI と話す」部品は、送るたびに、そのアプリに保存した自分の会話の直近の発言(最大 20 件・16KB)を送ります。参考にする記録帳が決めてあるアプリでは、その記録帳の自分の記録の新しいもの(最大 20 件・8KB)も送ります。写真は「写真を材料にするボタン」を押した時だけ、縮めた 1 枚(JPEG・長い辺 1024 ピクセル以下)を送ります。音声・動画は送りません。" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The \"AI chat\" part sends the latest turns of your own conversation saved in that app (up to 20 turns, 16KB) each time you send a message. If the app sets a reference list, your own latest records from it (up to 20, 8KB) are also sent. A photo is sent only when you tap a \"photo\" AI button: one downscaled image (JPEG, long edge up to 1024 pixels). Audio and video are never sent."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "「AI と話す」部品は、送るたびに、そのアプリに保存した自分の会話の直近の発言(最大 20 件・16KB)を送ります。参考にする記録帳が決めてあるアプリでは、その記録帳の自分の記録の新しいもの(最大 20 件・8KB)も送ります。写真は「写真を材料にするボタン」を押した時だけ、縮めた 1 枚(JPEG・長い辺 1024 ピクセル以下)を送ります。音声・動画は送りません。"
           }
         }
       }
@@ -607,6 +913,22 @@
         }
       }
     },
+    "このアプリ" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "This App"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "このアプリ"
+          }
+        }
+      }
+    },
     "このアプリからの接続を確認できませんでした。少し待ってもう一度お試しください。続く時は App Store から最新版を入れてください" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -688,6 +1010,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "このアプリの自動の動きは運営が止めています。この変更は保存できませんでした"
+          }
+        }
+      }
+    },
+    "このアプリは上のオープンソースソフトウェアを使っています。" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "This app uses the open source software listed above."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "このアプリは上のオープンソースソフトウェアを使っています。"
           }
         }
       }
@@ -785,6 +1123,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "この変更の前に戻します(⌥⌘Z)"
+          }
+        }
+      }
+    },
+    "この端末では使えません" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Not available on this device"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "この端末では使えません"
           }
         }
       }
@@ -998,6 +1352,22 @@
         }
       }
     },
+    "はじめる" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Get started"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "はじめる"
+          }
+        }
+      }
+    },
     "ふつう 10 秒ほど" : {
       "localizations" : {
         "en" : {
@@ -1027,6 +1397,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "ほかのアプリの通話や録音を終えてから、もう一度お試しください"
+          }
+        }
+      }
+    },
+    "まだできないこと" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Not supported yet"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "まだできないこと"
           }
         }
       }
@@ -1180,6 +1566,22 @@
         }
       }
     },
+    "アカウント" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Account"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "アカウント"
+          }
+        }
+      }
+    },
     "アプリ" : {
       "localizations" : {
         "en" : {
@@ -1212,6 +1614,38 @@
         }
       }
     },
+    "アプリが落ちた時に、落ちた場所(プログラムの位置)・端末の機種・OS・アプリの版とユーザー ID を Google の Firebase Crashlytics に送り、不具合を直すのに使います。話した内容・記録・作ったアプリの中身は送りません。" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "When the app crashes, where it crashed (the location in the code), your device model, OS, app version and user ID are sent to Google's Firebase Crashlytics and used to fix bugs. What you say, your records and the contents of your apps are never sent."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "アプリが落ちた時に、落ちた場所(プログラムの位置)・端末の機種・OS・アプリの版とユーザー ID を Google の Firebase Crashlytics に送り、不具合を直すのに使います。話した内容・記録・作ったアプリの中身は送りません。"
+          }
+        }
+      }
+    },
+    "アプリが落ちた時に、落ちた場所(プログラムの位置)・端末の機種・OS・アプリの版とユーザー ID を Google の Firebase Crashlytics に送り、不具合を直すのに使います。話した内容・記録・記録帳の中身は送りません。" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "When the app crashes, where it crashed (the location in the code), your device model, OS, app version and user ID are sent to Google's Firebase Crashlytics and used to fix bugs. What you say, your records and the contents of your trackers are never sent."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "アプリが落ちた時に、落ちた場所(プログラムの位置)・端末の機種・OS・アプリの版とユーザー ID を Google の Firebase Crashlytics に送り、不具合を直すのに使います。話した内容・記録・記録帳の中身は送りません。"
+          }
+        }
+      }
+    },
     "アプリの一覧へ" : {
       "localizations" : {
         "en" : {
@@ -1224,6 +1658,70 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "アプリの一覧へ"
+          }
+        }
+      }
+    },
+    "アプリを作る・直すときに、記録したデータ(数値・メモ・写真など)の中身は送りません。" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "When you build or edit an app, the contents of your records (numbers, notes, photos, etc.) are not sent."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "アプリを作る・直すときに、記録したデータ(数値・メモ・写真など)の中身は送りません。"
+          }
+        }
+      }
+    },
+    "アプリを作る・直すときは、次の内容を Anthropic 社の AI(Claude)に送ります。" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "When you build or edit an app, the following is sent to Anthropic's AI (Claude)."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "アプリを作る・直すときは、次の内容を Anthropic 社の AI(Claude)に送ります。"
+          }
+        }
+      }
+    },
+    "アプリを作る・直すときは、話した内容・会話・アプリの設計を Anthropic 社の AI に送ります(記録の中身は送りません)。「AI で書く」ボタンは、押した時だけ送ります(短い答えは端末の中の AI が使えない時だけ最大 4KB、長い答えはいつも最大 16KB)。「AI と話す」部品は直近の会話(最大 20 件・16KB)と、決めてあれば参考の自分の記録(最大 20 件・8KB)を、写真のボタンは縮めた写真 1 枚を送ります。同意を取り消すと、AI を使う機能が使えなくなります(閲覧・記録は使えます)。送信済みの内容は取り消せません。" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "When you build or edit an app, what you said, the conversation and the app design are sent to Anthropic's AI (the contents of your records are not). \"Write with AI\" buttons send data only when tapped (short answers up to 4KB, only if on-device AI is unavailable; long answers always up to 16KB). The \"AI chat\" part sends the latest conversation (up to 20 turns, 16KB) and, if set, your own reference records (up to 20, 8KB), and a photo button sends one downscaled photo. If you withdraw consent, AI features are disabled (viewing and recording still work). Data already sent cannot be recalled."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "アプリを作る・直すときは、話した内容・会話・アプリの設計を Anthropic 社の AI に送ります(記録の中身は送りません)。「AI で書く」ボタンは、押した時だけ送ります(短い答えは端末の中の AI が使えない時だけ最大 4KB、長い答えはいつも最大 16KB)。「AI と話す」部品は直近の会話(最大 20 件・16KB)と、決めてあれば参考の自分の記録(最大 20 件・8KB)を、写真のボタンは縮めた写真 1 枚を送ります。同意を取り消すと、AI を使う機能が使えなくなります(閲覧・記録は使えます)。送信済みの内容は取り消せません。"
+          }
+        }
+      }
+    },
+    "アプリを作る・直す機能と対話が使えなくなります。もう一度同意すると使えます。" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Making and editing apps, and chat, will be disabled until you agree again."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "アプリを作る・直す機能と対話が使えなくなります。もう一度同意すると使えます。"
           }
         }
       }
@@ -1327,6 +1825,22 @@
         }
       }
     },
+    "オープンソースソフトウェア" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Open Source Software"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "オープンソースソフトウェア"
+          }
+        }
+      }
+    },
     "カテゴリごとの割合を円グラフで見せて" : {
       "localizations" : {
         "en" : {
@@ -1359,6 +1873,22 @@
         }
       }
     },
+    "カレンダー・連絡先・銀行など、ほかのアプリやサービスのデータは読み込めません。" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "It can't read data from other apps or services, such as Calendar, Contacts, or your bank."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "カレンダー・連絡先・銀行など、ほかのアプリやサービスのデータは読み込めません。"
+          }
+        }
+      }
+    },
     "キャンセル" : {
       "localizations" : {
         "en" : {
@@ -1375,6 +1905,22 @@
         }
       }
     },
+    "クラッシュ報告を送る" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Send crash reports"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "クラッシュ報告を送る"
+          }
+        }
+      }
+    },
     "グラフ・合計" : {
       "localizations" : {
         "en" : {
@@ -1387,6 +1933,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "グラフ・合計"
+          }
+        }
+      }
+    },
+    "コピーしました" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Copied"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "コピーしました"
           }
         }
       }
@@ -1492,6 +2054,38 @@
         }
       }
     },
+    "スキップ" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Skip"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "スキップ"
+          }
+        }
+      }
+    },
+    "ソースコード" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Source Code"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ソースコード"
+          }
+        }
+      }
+    },
     "タップしてから話し、話し終えたらもう一度タップしてください" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -1537,6 +2131,86 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "ダウンロード"
+          }
+        }
+      }
+    },
+    "チャットで相談してから作る" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Chat before building"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "チャットで相談してから作る"
+          }
+        }
+      }
+    },
+    "データについて" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "About your data"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "データについて"
+          }
+        }
+      }
+    },
+    "バージョン" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Version"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "バージョン"
+          }
+        }
+      }
+    },
+    "プライバシー" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Privacy"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "プライバシー"
+          }
+        }
+      }
+    },
+    "プライバシーポリシー" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Privacy Policy"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "プライバシーポリシー"
           }
         }
       }
@@ -1589,6 +2263,22 @@
         }
       }
     },
+    "ボタンを大きくして" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Make the buttons bigger"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ボタンを大きくして"
+          }
+        }
+      }
+    },
     "ボタンを押したら、今いる場所を記録できるようにして" : {
       "localizations" : {
         "en" : {
@@ -1618,6 +2308,38 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "マイクに近づいて、もう一度話してください"
+          }
+        }
+      }
+    },
+    "マイクをクリックして「家計簿が欲しい」のように話すだけ。文字で入力しても作れます。" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Click the mic and say something like “I want a budget app.” You can also type it."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "マイクをクリックして「家計簿が欲しい」のように話すだけ。文字で入力しても作れます。"
+          }
+        }
+      }
+    },
+    "マイクをクリックして「家計簿をつけたい」のように話すだけ。文字で入力しても用意できます。" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Click the mic and say something like “I want to keep a budget.” You can also type it."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "マイクをクリックして「家計簿をつけたい」のように話すだけ。文字で入力しても用意できます。"
           }
         }
       }
@@ -1655,6 +2377,70 @@
         }
       }
     },
+    "メモ欄を足して" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Add a notes field"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "メモ欄を足して"
+          }
+        }
+      }
+    },
+    "ユーザー ID" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "User ID"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ユーザー ID"
+          }
+        }
+      }
+    },
+    "ライセンス" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Licenses"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ライセンス"
+          }
+        }
+      }
+    },
+    "ライセンスを読み込めませんでした" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Could not load the licenses"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ライセンスを読み込めませんでした"
+          }
+        }
+      }
+    },
     "・" : {
       "localizations" : {
         "en" : {
@@ -1667,6 +2453,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "・"
+          }
+        }
+      }
+    },
+    "一般" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "General"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "一般"
           }
         }
       }
@@ -1785,6 +2587,70 @@
         }
       }
     },
+    "今のアプリの版" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Current app revision"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "今のアプリの版"
+          }
+        }
+      }
+    },
+    "今のアプリの設計(画面・項目・アプリ名など)" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The current app design (screens, fields, app name, etc.)"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "今のアプリの設計(画面・項目・アプリ名など)"
+          }
+        }
+      }
+    },
+    "今の記録帳の版" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Current logbook revision"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "今の記録帳の版"
+          }
+        }
+      }
+    },
+    "今の記録帳の画面の形(画面・項目・名前など)" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The current tracker's layout (screens, fields, name, etc.)"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "今の記録帳の画面の形(画面・項目・名前など)"
+          }
+        }
+      }
+    },
     "今は簡易の聞き取りで話せます。音声モデル(約%lldMB)を入れると、より正確に聞き取れます。" : {
       "localizations" : {
         "en" : {
@@ -1835,6 +2701,22 @@
         }
       }
     },
+    "今日の残り" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Left today"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "今日の残り"
+          }
+        }
+      }
+    },
     "今日はここまでです" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -1864,6 +2746,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "今月の合計を、画面のいちばん上に大きく出して"
+          }
+        }
+      }
+    },
+    "他の人の行動で届く通知" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Notifications from other people's activity"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "他の人の行動で届く通知"
           }
         }
       }
@@ -1947,6 +2845,38 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "作れる記録帳の数"
+          }
+        }
+      }
+    },
+    "使い方を見る" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "How to use"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "使い方を見る"
+          }
+        }
+      }
+    },
+    "使っている量" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Usage"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "使っている量"
           }
         }
       }
@@ -2261,6 +3191,22 @@
         }
       }
     },
+    "利用規約" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Terms of Use"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "利用規約"
+          }
+        }
+      }
+    },
     "削除" : {
       "localizations" : {
         "en" : {
@@ -2325,6 +3271,38 @@
         }
       }
     },
+    "匿名で利用中" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Using anonymously"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "匿名で利用中"
+          }
+        }
+      }
+    },
+    "取り消す" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Withdraw"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "取り消す"
+          }
+        }
+      }
+    },
     "右下に「+ 追加」ボタンを置いて、押したら入力の画面が開くようにして" : {
       "localizations" : {
         "en" : {
@@ -2353,6 +3331,118 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "合計をもっと大きく表示して"
+          }
+        }
+      }
+    },
+    "同意した日時" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Agreed on"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "同意した日時"
+          }
+        }
+      }
+    },
+    "同意して使う" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Agree and continue"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "同意して使う"
+          }
+        }
+      }
+    },
+    "同意しなくても、作ったアプリの閲覧・記録はできます。AI を使う機能だけが使えません。同意は設定からいつでも取り消せます(送信済みの内容は取り消せません)。" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Without consent you can still view and record in your apps; only AI features are unavailable. You can withdraw consent in Settings at any time (data already sent cannot be recalled)."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "同意しなくても、作ったアプリの閲覧・記録はできます。AI を使う機能だけが使えません。同意は設定からいつでも取り消せます(送信済みの内容は取り消せません)。"
+          }
+        }
+      }
+    },
+    "同意しなくても、記録帳の閲覧・記録はできます。AI を使う機能だけが使えません。同意は設定からいつでも取り消せます(送信済みの内容は取り消せません)。" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Without consent you can still view and record in your trackers; only AI features are unavailable. You can withdraw consent in Settings at any time (data already sent cannot be recalled)."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "同意しなくても、記録帳の閲覧・記録はできます。AI を使う機能だけが使えません。同意は設定からいつでも取り消せます(送信済みの内容は取り消せません)。"
+          }
+        }
+      }
+    },
+    "同意を取り消す" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Withdraw consent"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "同意を取り消す"
+          }
+        }
+      }
+    },
+    "同意済み" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Agreed"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "同意済み"
+          }
+        }
+      }
+    },
+    "問い合わせの時は、この内容を伝えてください。" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Please include these details when you contact support."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "問い合わせの時は、この内容を伝えてください。"
           }
         }
       }
@@ -2550,6 +3640,38 @@
         }
       }
     },
+    "家計簿アプリを作って" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Make a budget app"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "家計簿アプリを作って"
+          }
+        }
+      }
+    },
+    "対話" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Conversation"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "対話"
+          }
+        }
+      }
+    },
     "少し待ってから、もう一度お試しください" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -2644,6 +3766,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "戻る"
+          }
+        }
+      }
+    },
+    "挨拶と質問を読み上げる" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Read greetings and questions aloud"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "挨拶と質問を読み上げる"
           }
         }
       }
@@ -2812,6 +3950,22 @@
         }
       }
     },
+    "文書を読み込めませんでした" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Couldn't load the document"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "文書を読み込めませんでした"
+          }
+        }
+      }
+    },
     "新しいアプリ" : {
       "localizations" : {
         "en" : {
@@ -2844,6 +3998,23 @@
         }
       }
     },
+    "新しいアプリを声だけで相談している時は、内容がそろうと少し待ってから自動で作り始めます。作ったアプリの変更は、意図しない変更を防ぐため必ず「これでいく」を押してから反映します。" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "When you plan a new app by voice only, building starts automatically shortly after everything is clear. Changes to an app you already made are applied only after you tap \"Go with this\", so nothing changes by accident."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "新しいアプリを声だけで相談している時は、内容がそろうと少し待ってから自動で作り始めます。作ったアプリの変更は、意図しない変更を防ぐため必ず「これでいく」を押してから反映します。"
+          }
+        }
+      }
+    },
     "新しいウインドウ" : {
       "localizations" : {
         "en" : {
@@ -2860,6 +4031,23 @@
         }
       }
     },
+    "新しい記録帳を声だけで相談している時は、内容がそろうと少し待ってから自動で用意し始めます。用意した記録帳の変更は、意図しない変更を防ぐため必ず「これでいく」を押してから反映します。" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "When you plan a new tracker by voice only, setup starts automatically shortly after everything is clear. Changes to a tracker you already set up are applied only after you tap \"Go with this\", so nothing changes by accident."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "新しい記録帳を声だけで相談している時は、内容がそろうと少し待ってから自動で用意し始めます。用意した記録帳の変更は、意図しない変更を防ぐため必ず「これでいく」を押してから反映します。"
+          }
+        }
+      }
+    },
     "新しい記録帳を用意する" : {
       "localizations" : {
         "en" : {
@@ -2872,6 +4060,38 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "新しい記録帳を用意する"
+          }
+        }
+      }
+    },
+    "新しく作るアプリと質問もこの言語になります。作成済みのアプリの文言は変わりません。" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "New apps and questions will also use this language. Text in apps you already made stays the same."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "新しく作るアプリと質問もこの言語になります。作成済みのアプリの文言は変わりません。"
+          }
+        }
+      }
+    },
+    "新しく用意する記録帳と質問もこの言語になります。用意済みの記録帳の文言は変わりません。" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "New trackers and questions will also use this language. Text in trackers you already set up stays the same."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "新しく用意する記録帳と質問もこの言語になります。用意済みの記録帳の文言は変わりません。"
           }
         }
       }
@@ -2942,6 +4162,22 @@
         }
       }
     },
+    "最新版をウェブで見る" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "View the latest version on the web"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "最新版をウェブで見る"
+          }
+        }
+      }
+    },
     "有料の機能は Mac ではまだ使えないため、無料版で作ります" : {
       "localizations" : {
         "en" : {
@@ -2954,6 +4190,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "有料の機能は Mac ではまだ使えないため、無料版で作ります"
+          }
+        }
+      }
+    },
+    "未同意" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Not agreed"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "未同意"
           }
         }
       }
@@ -2987,6 +4239,54 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "次のアプリ"
+          }
+        }
+      }
+    },
+    "次の通知" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Upcoming notifications"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "次の通知"
+          }
+        }
+      }
+    },
+    "次へ" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Next"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "次へ"
+          }
+        }
+      }
+    },
+    "毎日の体重を記録して、グラフで見せて" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Log my weight every day and show it as a graph"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "毎日の体重を記録して、グラフで見せて"
           }
         }
       }
@@ -3121,6 +4421,22 @@
         }
       }
     },
+    "版" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Version"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "版"
+          }
+        }
+      }
+    },
     "用意できました" : {
       "localizations" : {
         "en" : {
@@ -3150,6 +4466,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "用意を取りやめました"
+          }
+        }
+      }
+    },
+    "画面がたくさんつながるアプリや、ゲームのように動くアプリは、思った通りにできないことがあります。" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Apps with many connected screens, or game-like apps with motion, may not turn out as you expect."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "画面がたくさんつながるアプリや、ゲームのように動くアプリは、思った通りにできないことがあります。"
           }
         }
       }
@@ -3250,6 +4582,54 @@
         }
       }
     },
+    "端末内の AI が使えるか(非対応の端末・オフ・準備中)と、AI ボタンが答えを出せなかった回数を、ボタンの種類(要約・分類など)ごとに 1 日 1 回まとめて送ります。ユーザー ID・入力した文・記録は送りません。" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Once a day, sends whether on-device AI is available (unsupported device, turned off, or preparing) and how many times AI buttons could not answer, per button type (summarize, classify, etc.). Your user ID, the text you typed, and your records are not sent."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "端末内の AI が使えるか(非対応の端末・オフ・準備中)と、AI ボタンが答えを出せなかった回数を、ボタンの種類(要約・分類など)ごとに 1 日 1 回まとめて送ります。ユーザー ID・入力した文・記録は送りません。"
+          }
+        }
+      }
+    },
+    "筋トレの記録アプリを作って" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Make a workout log app"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "筋トレの記録アプリを作って"
+          }
+        }
+      }
+    },
+    "答えがそろったら自動で作る" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Build automatically when ready"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "答えがそろったら自動で作る"
+          }
+        }
+      }
+    },
     "答えや続きを書く" : {
       "localizations" : {
         "en" : {
@@ -3346,6 +4726,22 @@
         }
       }
     },
+    "自動" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Automatic"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "自動"
+          }
+        }
+      }
+    },
     "自動の動きが止まっています" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -3414,6 +4810,22 @@
         }
       }
     },
+    "言語" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Language"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "言語"
+          }
+        }
+      }
+    },
     "記録した場所を地図にピンで出して" : {
       "localizations" : {
         "en" : {
@@ -3442,6 +4854,70 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "記録に写真を付けられるようにして"
+          }
+        }
+      }
+    },
+    "記録帳を用意する・直すときに、記録したデータ(数値・メモ・写真など)の中身は送りません。" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "When you set up or adjust a tracker, the contents of your records (numbers, notes, photos, etc.) are not sent."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "記録帳を用意する・直すときに、記録したデータ(数値・メモ・写真など)の中身は送りません。"
+          }
+        }
+      }
+    },
+    "記録帳を用意する・直すときは、次の内容を Anthropic 社の AI(Claude)に送ります。" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "When you set up or adjust a tracker, the following is sent to Anthropic's AI (Claude)."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "記録帳を用意する・直すときは、次の内容を Anthropic 社の AI(Claude)に送ります。"
+          }
+        }
+      }
+    },
+    "記録帳を用意する・直すときは、話した内容・会話・記録帳の画面の形を Anthropic 社の AI に送ります(記録の中身は送りません)。「AI で書く」ボタンは端末の中の AI だけで動き、送りません。同意を取り消すと、AI を使う機能が使えなくなります(閲覧・記録は使えます)。送信済みの内容は取り消せません。" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "When you set up or adjust a tracker, what you said, the conversation and the tracker's layout are sent to Anthropic's AI (the contents of your records are not). \"Write with AI\" buttons run only with on-device AI and send nothing. If you withdraw consent, AI features are disabled (viewing and recording still work). Data already sent cannot be recalled."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "記録帳を用意する・直すときは、話した内容・会話・記録帳の画面の形を Anthropic 社の AI に送ります(記録の中身は送りません)。「AI で書く」ボタンは端末の中の AI だけで動き、送りません。同意を取り消すと、AI を使う機能が使えなくなります(閲覧・記録は使えます)。送信済みの内容は取り消せません。"
+          }
+        }
+      }
+    },
+    "記録帳を用意する・直す機能と対話が使えなくなります。もう一度同意すると使えます。" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Setting up and adjusting trackers, and chat, will be disabled until you agree again."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "記録帳を用意する・直す機能と対話が使えなくなります。もう一度同意すると使えます。"
           }
         }
       }
@@ -3479,22 +4955,6 @@
         }
       }
     },
-    "設定はまだありません" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "No Settings Yet"
-          }
-        },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "設定はまだありません"
-          }
-        }
-      }
-    },
     "設定を開く" : {
       "localizations" : {
         "en" : {
@@ -3524,6 +4984,38 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "設定アプリ > Tailor It でマイクを許可してください"
+          }
+        }
+      }
+    },
+    "試してほしい依頼" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Things to try"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "試してほしい依頼"
+          }
+        }
+      }
+    },
+    "話した内容・入力した文(端末内で文字にしたもの。音声そのものは送りません)" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "What you said or typed (transcribed on this device; audio itself is never sent)"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "話した内容・入力した文(端末内で文字にしたもの。音声そのものは送りません)"
           }
         }
       }
@@ -3592,6 +5084,38 @@
         }
       }
     },
+    "話すと、アプリができる" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Talk, and an app appears"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "話すと、アプリができる"
+          }
+        }
+      }
+    },
+    "話すと、記録帳が用意できる" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Talk, and your tracker is ready"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "話すと、記録帳が用意できる"
+          }
+        }
+      }
+    },
     "詳しい画面で、内容を直したり消したりできるようにして" : {
       "localizations" : {
         "en" : {
@@ -3604,6 +5128,86 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "詳しい画面で、内容を直したり消したりできるようにして"
+          }
+        }
+      }
+    },
+    "詳細" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Details"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "詳細"
+          }
+        }
+      }
+    },
+    "詳細(サポート用)" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Details (for support)"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "詳細(サポート用)"
+          }
+        }
+      }
+    },
+    "詳細をコピー" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Copy details"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "詳細をコピー"
+          }
+        }
+      }
+    },
+    "説明を読んで同意する" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Read and agree"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "説明を読んで同意する"
+          }
+        }
+      }
+    },
+    "読み上げ" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Read aloud"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "読み上げ"
           }
         }
       }
@@ -3669,6 +5273,38 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "追加ボタン・入力欄"
+          }
+        }
+      }
+    },
+    "送り先: Tailor It のサーバー(Google Cloud)を経由して Anthropic, PBC(米国)へ。送った内容は、アプリを作る・ボタンの文を作る・会話の返事を作るためだけに使います。" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Destination: Anthropic, PBC (USA), via Tailor It's server (Google Cloud). It is used only to build your app, write a button's text or reply in a chat."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "送り先: Tailor It のサーバー(Google Cloud)を経由して Anthropic, PBC(米国)へ。送った内容は、アプリを作る・ボタンの文を作る・会話の返事を作るためだけに使います。"
+          }
+        }
+      }
+    },
+    "送り先: Tailor It のサーバー(Google Cloud)を経由して Anthropic, PBC(米国)へ。送った内容は、記録帳の画面を用意するためだけに使います。" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Destination: Anthropic, PBC (USA), via Tailor It's server (Google Cloud). It is used only to set up your tracker's screens."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "送り先: Tailor It のサーバー(Google Cloud)を経由して Anthropic, PBC(米国)へ。送った内容は、記録帳の画面を用意するためだけに使います。"
           }
         }
       }
@@ -3863,6 +5499,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "音声を聞き取れませんでした。もう一度はっきり話してください"
+          }
+        }
+      }
+    },
+    "音声モデル" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Voice model"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "音声モデル"
           }
         }
       }

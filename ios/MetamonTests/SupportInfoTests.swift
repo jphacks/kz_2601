@@ -37,6 +37,14 @@ final class SupportInfoTests: XCTestCase {
         XCTAssertTrue(lines[0].hasSuffix(": abc123"))
     }
 
+    /// #973: Mac は音声モデル・接続先・アプリの版を持たない。その行は出さず、バージョンだけ残る。
+    func testMacShapeShowsOnlyVersion() {
+        let mac = SupportInfo(uid: nil, voiceModel: nil, aiEndpoint: nil, appConfigEndpoint: nil,
+                              appVersion: "1.2", build: "34", appRevision: nil)
+        XCTAssertEqual(mac.rows.map(\.value), ["1.2 (34)"])
+        XCTAssertEqual(mac.clipboardText, "バージョン: 1.2 (34)")
+    }
+
     func testAccountStatusHasNoIdentifier() {
         XCTAssertEqual(SupportInfo.accountStatus(isAnonymous: true), "匿名で利用中")
         XCTAssertEqual(SupportInfo.accountStatus(isAnonymous: false), "Apple でサインイン中")
