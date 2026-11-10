@@ -116,7 +116,7 @@ class AppContainer(
     val environmentLabel: String get() = if (knobs.mock) "mock" else environment.name
 
     /** サインイン状態(未サインインならサインイン画面) */
-    val session = AuthSession(auth)
+    val session = AuthSession(auth, beforeSignOut = { push?.unregister() })
 
     /** 同意の画面を出す時点(起動時・AI に送る直前・設定から・#888) */
     val consentPrompt = ConsentPrompt(consent)

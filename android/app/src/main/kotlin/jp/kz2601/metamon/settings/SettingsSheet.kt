@@ -34,13 +34,15 @@ import jp.kz2601.metamon.R
 import jp.kz2601.metamon.consent.LegalLinks
 import jp.kz2601.metamon.language.AppLocales
 import jp.kz2601.metamon.language.LanguageSection
+import jp.kz2601.metamon.push.PushConsentSection
+import jp.kz2601.metamon.push.PushHost
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import java.time.format.FormatStyle
 
 /**
  * 最小の設定(iOS の SettingsSheet のうち #888 の分): プライバシー(AI へのデータ送信の同意)・クラッシュ報告・
- * AI ボタンの利用状況・言語(#843 の [LanguageSection])。ほかの項目は設定の画面(#898)で足す。
+ * AI ボタンの利用状況・他の人の行動で届く通知(#887 の [PushConsentSection])・言語(#843 の [LanguageSection])。ほかの項目は設定の画面(#898)で足す。
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -57,6 +59,12 @@ fun SettingsSheet(container: AppContainer, onDismiss: () -> Unit) {
             }
             PrivacySection(container)
             HorizontalDivider(Modifier.padding(vertical = 8.dp))
+            // 他の人の行動で届く通知(#887)。共有・公開の記録があるアプリだけ
+            val document = container.runtime.state.collectAsStateWithLifecycle().value.document
+            if (container.push != null && PushHost.canSetConsent(document.dsl)) {
+                PushConsentSection(container.push, document.appId, document.dsl)
+                HorizontalDivider(Modifier.padding(vertical = 8.dp))
+            }
             val context = LocalContext.current
             var language by remember { mutableStateOf(AppLocales.setting(context)) }
             LanguageSection(language, onSelect = { selected ->

@@ -292,11 +292,11 @@ private fun GeneratedApp(state: VoiceUiState, dsl: AppDSL, runtime: AppRuntime, 
 
 /**
  * 通知を押した時に appId のアプリを開く(#887)。今開いているアプリなら何もしない。
- * 別のアプリへの切り替えは #1069 の `AppRuntime.switchApp`(#1078)につなぐ。この枝には切り替えの口がまだ無い。
+ * 別のアプリは [AppRuntime.switchApp](#1069)で開く。読めなければ今のアプリのまま(切り替え側がトーストを出す)。
  */
-private fun openFromNotification(runtime: AppRuntime, appId: String) {
+private suspend fun openFromNotification(runtime: AppRuntime, appId: String) {
     if (runtime.document.appId == appId) return
-    Log.i(AppContainer.TAG, "push: open requested for another app (switching arrives with #1078)")
+    if (!runtime.switchApp(appId)) Log.i(AppContainer.TAG, "push: could not open the app from the notification")
 }
 
 /** 生成の途中経過を 1 行にする。今の画面の途中経過は [GeneratingView] が出す(文言の置き場として残す)。 */
