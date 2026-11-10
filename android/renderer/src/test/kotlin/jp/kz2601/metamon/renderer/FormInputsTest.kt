@@ -107,9 +107,9 @@ class FormInputsTest {
     }
 
     @Test
-    fun registryHasTheTwelveInputs() {
+    fun registryHasTheInputs() {
         val wires = InputRules.inputTypes.map { it.wire }.toSet()
-        assertEquals(12, wires.size)
+        assertEquals("#858 の 12 種 + 写真・手書き", 14, wires.size)
         assertTrue(ComponentRegistry.standard.registeredTypes.containsAll(wires))
     }
 

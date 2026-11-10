@@ -44,6 +44,7 @@ import jp.kz2601.metamon.language.AppLocales
 import jp.kz2601.metamon.permissions.PermissionOffBarHost
 import jp.kz2601.metamon.auth.RootScreen
 import jp.kz2601.metamon.auth.SignInScreen
+import jp.kz2601.metamon.permissions.ProvideRendererPermissions
 import jp.kz2601.metamon.renderer.DSLView
 import jp.kz2601.metamon.renderer.theme.MetamonRenderTheme
 import jp.kz2601.metamon.renderer.theme.ReadableWidth
@@ -248,7 +249,8 @@ private fun GeneratedApp(state: VoiceUiState, dsl: AppDSL, runtime: AppRuntime, 
     Column(Modifier.fillMaxSize()) {
         // 部品が使う権限が断られていたら上に「オフ」のバー(#890・iOS の NotificationsOffBar)。要約は FeedbackHost が出す(#895)
         PermissionOffBarHost(dsl, appId, busy = state.isGenerating, summaryShowing = state.summary != null)
-        DSLView(dsl, runtime)
+        // カメラなど部品が使う権限は使う直前にアプリの窓口で聞く(#862)
+        ProvideRendererPermissions { DSLView(dsl, runtime) }
     }
 }
 
