@@ -81,6 +81,19 @@ final class ListRowCopyTests: XCTestCase {
         XCTAssertEqual(text, "メモ: ランチ")
     }
 
+    func testCopyCommandTargetsFocusedRowOnly() {
+        let rows = [Record(id: "a", data: [:]), Record(id: "b", data: [:])]
+        XCTAssertEqual(ListRowCopyCommand.target(focusedRowId: "b", textInputActive: false, rows: rows)?.id, "b")
+        XCTAssertNil(ListRowCopyCommand.target(focusedRowId: nil, textInputActive: false, rows: rows), "行を選んでいない時は何もしない")
+        XCTAssertNil(ListRowCopyCommand.target(focusedRowId: "gone", textInputActive: false, rows: rows), "消えた行は対象外")
+    }
+
+    func testCopyCommandYieldsToTextInput() {
+        let rows = [Record(id: "a", data: [:])]
+        XCTAssertNil(ListRowCopyCommand.target(focusedRowId: "a", textInputActive: true, rows: rows),
+                     "入力欄が文字を受けている時は入力欄のコピーに任せる")
+    }
+
     #if os(macOS)
     func testPasteboardRoundTripOnNamedBoard() {
         let board = NSPasteboard(name: NSPasteboard.Name("metamon.test.\(UUID().uuidString)"))
