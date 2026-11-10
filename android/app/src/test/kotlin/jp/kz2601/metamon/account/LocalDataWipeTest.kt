@@ -1,5 +1,6 @@
 package jp.kz2601.metamon.account
 
+import jp.kz2601.metamon.renderer.components.RemoteImages
 import jp.kz2601.metamon.runtime.RuntimeFixture
 import jp.kz2601.metamon.services.consent.InMemoryKeyValueStore
 import jp.kz2601.metamon.services.feeds.FeedCache
@@ -22,7 +23,7 @@ import org.junit.Test
 import org.junit.rules.TemporaryFolder
 import kotlin.coroutines.EmptyCoroutineContext
 
-/** 後片付けで、会話の履歴・投稿に出す名前・feed の覚えた行・端末内の動画 / 録音も消す(#841 + #893 / #875 / #876 / #863 / #1084)。 */
+/** 後片付けで、会話の履歴・投稿に出す名前・feed の覚えた行・端末内の動画 / 録音・https の画像のキャッシュも消す(#841 + #893 / #875 / #876 / #863 / #1084)。 */
 class LocalDataWipeTest {
     @get:Rule
     val tmp = TemporaryFolder()
@@ -39,6 +40,7 @@ class LocalDataWipeTest {
         val video = tmp.newFolder("metamon-videos").resolve("v1.mp4").apply { writeText("x") }
         val feedDir = tmp.newFolder("metamon-feeds").apply { resolve("x.json").writeText("{}") }
         val feeds = FeedCache(feedDir, io = EmptyCoroutineContext)
+        val images = tmp.newFolder(RemoteImages.DISK_DIR).apply { resolve("journal").writeText("x") }
         var resets = 0
 
         LocalDataWipe(
@@ -48,6 +50,7 @@ class LocalDataWipeTest {
             chatHistory = history,
             authorProfile = profile,
             removeLocalMedia = { video.parentFile?.deleteRecursively() },
+            clearImageCache = { RemoteImages.wipe(images) },
             feedCache = feeds,
         )()
 
@@ -56,6 +59,7 @@ class LocalDataWipeTest {
         assertFalse(profile.asked)
         assertFalse(video.exists())
         assertFalse(feedDir.exists())
+        assertFalse(images.exists())
         assertEquals(1, resets)
     }
 }

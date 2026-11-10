@@ -20,6 +20,7 @@ import jp.kz2601.metamon.voice.ChatHistoryStore
  * - 投稿に表示する名前(#875・[AuthorProfile.clear])
  * - feed の覚えた行(#876・[FeedCache.removeAll] = iOS `FeedCache.removeAll()`)
  * - 端末内の動画(#863)・録音(#1084)のファイル([removeLocalMedia] = iOS `LocalVideoStore` / `LocalAudioStore` の removeAll)
+ * - https の画像のキャッシュ(メモリ・ディスク。[clearImageCache] = iOS は URLCache)
  * - 画面の状態・appId(新しい appId に。[resetRuntime] = iOS `recordUndo = nil`・`resetToInitial()`・`DeviceAppID.set`)
  * - 音声の画面の状態は [AccountGuard.generation] で作り直す(iOS `chatHistory = []`)
  */
@@ -32,6 +33,7 @@ class LocalDataWipe(
     private val chatHistory: ChatHistoryStore? = null,
     private val authorProfile: AuthorProfile? = null,
     private val removeLocalMedia: () -> Unit = {},
+    private val clearImageCache: () -> Unit = {},
     private val feedCache: FeedCache? = null,
 ) {
     suspend operator fun invoke() {
@@ -42,6 +44,7 @@ class LocalDataWipe(
         authorProfile?.clear()
         chatHistory?.removeAll()
         removeLocalMedia()
+        clearImageCache()
         feedCache?.removeAll()
         resetRuntime() // 一覧・DSL を消した後に新しい appId へ
     }
