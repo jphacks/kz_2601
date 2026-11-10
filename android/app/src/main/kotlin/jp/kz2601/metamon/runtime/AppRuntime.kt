@@ -212,10 +212,16 @@ class AppRuntime(
      * 生成(音声 #995)の結果を受け取る。ai は送った appId で返すので、別の appId なら新しいアプリとして開き、その appId を保存する。
      * 同じアプリの古い版(ホットリロードが先に新しい版を当てた)は捨てる。
      */
-    fun adoptGenerated(doc: AppDocument) {
+    suspend fun adoptGenerated(doc: AppDocument) {
         if (doc == document) return
         if (doc.appId == document.appId && doc.version < document.version) return
+        show(doc)
+    }
+
+    /** [apply] して、その DSL の entity の記録を読む(生成・切り替えの結果はここを通す。読まないと一覧が空のまま)。 */
+    suspend fun show(doc: AppDocument) {
         apply(doc)
+        load(doc.dsl.entities.map { it.id }.toSet())
     }
 
     /** `GET /v1/apps`。届かなければ保存した一覧(とトースト)。結果は [apps] にも入れる。 */
@@ -257,9 +263,10 @@ class AppRuntime(
             showToast(RuntimeCopy.SWITCH_FAILED)
             return false
         }
-        apply(next.copy(appId = appId))
-        _state.update { it.copy(offline = offline, toast = RuntimeCopy.switched(next.dsl.app.name, offline)) }
-        scope.launch { load(dsl.entities.map { it.id }.toSet()) }
+        show(next.copy(appId = appId))
+        if (document.appId == appId) {
+            _state.update { it.copy(offline = offline, toast = RuntimeCopy.switched(next.dsl.app.name, offline)) }
+        }
         return true
     }
 

@@ -26,6 +26,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.foundation.layout.Row
 import androidx.compose.material3.TextButton
@@ -92,7 +93,8 @@ fun MetamonApp(container: AppContainer) {
             appId = { container.appId.current },
             initial = AppDocument(appId = container.appId.current, dsl = container.initialDsl),
             buildNowUtterance = buildNow,
-            log = { Log.i(AppContainer.TAG, it) },
+            // 発話・AI の返事を含むので debug だけ(release の logcat に個人の情報を出さない)
+            log = { if (BuildConfig.DEBUG) Log.i(AppContainer.TAG, it) },
         )
     }
     val state by vm.state.collectAsStateWithLifecycle()
@@ -114,7 +116,7 @@ fun MetamonApp(container: AppContainer) {
             runtime.dismissVoiceSheet()
         }
     }
-    // 生成の結果をランタイムに渡す(別の appId なら新しいアプリとして開いて保存する)
+    // 生成の結果をランタイムに渡す(別の appId なら新しいアプリとして開いて保存し、記録を読む)
     LaunchedEffect(state.document) { runtime.adoptGenerated(state.document) }
     // ランタイムが開いたアプリ(起動時の開き直し・切り替え・ホットリロード)を音声の画面にも映す
     LaunchedEffect(runtimeState.document) { vm.adopt(runtimeState.document) }
@@ -126,8 +128,11 @@ fun MetamonApp(container: AppContainer) {
         }
     }
 
-    // ヘッドレス E2E 用のつまみ(debug だけ値が入る)
+    // ヘッドレス E2E 用のつまみ(debug だけ値が入る)。回転などで作り直しても 1 回だけ
+    var knobsRan by rememberSaveable { mutableStateOf(false) }
     LaunchedEffect(vm) {
+        if (knobsRan) return@LaunchedEffect
+        knobsRan = true
         val knobs = container.knobs
         knobs.autoTranscript?.let { vm.generateNow(it) }
         if (knobs.autoNav.isEmpty()) return@LaunchedEffect
