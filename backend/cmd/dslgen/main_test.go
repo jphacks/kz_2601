@@ -110,10 +110,12 @@ const tinySchema = `{
     }},
     "Leaf": {"anyOf": [{"$ref": "#/$defs/Text"}, {"$ref": "#/$defs/Pic"}]},
     "Text": {"type": "object", "properties": {
-      "type": {"const": "text"}, "size": {"type": "string", "enum": ["small"]}, "value": {"type": "string"}
+      "type": {"const": "text"}, "size": {"type": "string", "enum": ["small"]}, "value": {"type": "string"},
+      "max": {"type": "integer"}, "expr": {"$ref": "#/$defs/Expr"}
     }},
     "Pic": {"type": "object", "properties": {
-      "type": {"const": "pic"}, "size": {"type": "string", "enum": ["large"]}, "value": {"type": "number"}
+      "type": {"const": "pic"}, "size": {"type": "string", "enum": ["large"]}, "value": {"type": "number"},
+      "max": {"type": "number"}, "expr": {"type": "number"}
     }},
     "Expr": {"anyOf": [{"type": "number"}, {"$ref": "#/$defs/ExprRef"}]},
     "ExprRef": {"type": "object", "required": ["ref"], "properties": {"ref": {"type": "string"}}}
@@ -135,6 +137,8 @@ func TestGenerateShapes(t *testing.T) {
 		"val size: Size? = null,", // enums unioned across parts
 		"    SMALL(\"small\"),\n    LARGE(\"large\"),",
 		"val value: JsonElement? = null,", // string vs number → JsonElement
+		"val max: Double? = null,",        // integer + number → number
+		"val expr: Expr? = null,",         // Expr + number → Expr
 		"VSTACK(\"vstack\", true),",
 		"PIC(\"pic\"),",
 		"ComponentType.VSTACK to setOf(\"type\", \"title\", \"children\"),",

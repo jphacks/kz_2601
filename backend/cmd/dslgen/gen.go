@@ -325,7 +325,7 @@ func (g *generator) buildComponent() error {
 			return fmt.Errorf("%s.%s: %w", owner, key, err)
 		}
 		if old, ok := index[key]; ok {
-			old.shape = mergeShape(old.shape, s)
+			old.shape = g.mergeShape(old.shape, s)
 			return nil
 		}
 		np := &prop{key: key, shape: cloneForComponent(s, key)}
@@ -389,9 +389,9 @@ func cloneForComponent(s *shape, key string) *shape {
 	return s
 }
 
-func mergeShape(a, b *shape) *shape {
+func (g *generator) mergeShape(a, b *shape) *shape {
 	if a.kind != b.kind {
-		return &shape{kind: kJSON}
+		return g.widen(a, b)
 	}
 	switch a.kind {
 	case kEnum:
@@ -402,7 +402,7 @@ func mergeShape(a, b *shape) *shape {
 		}
 		return a
 	case kList:
-		m := mergeShape(a.elem, b.elem)
+		m := g.mergeShape(a.elem, b.elem)
 		if m.kind == kJSON && a.elem.kind != kJSON {
 			return &shape{kind: kJSON}
 		}
@@ -414,6 +414,31 @@ func mergeShape(a, b *shape) *shape {
 		}
 	}
 	return a
+}
+
+// widen merges two different kinds when one holds the other: integer ⊂
+// number, and number ⊂ a sealed def with a number variant (Expr). Otherwise
+// the key becomes JsonElement.
+func (g *generator) widen(a, b *shape) *shape {
+	isNum := func(s *shape) bool { return s.kind == kInt || s.kind == kNumber }
+	if isNum(a) && isNum(b) {
+		return &shape{kind: kNumber}
+	}
+	for _, pair := range [][2]*shape{{a, b}, {b, a}} {
+		if pair[0].kind == kSealed && isNum(pair[1]) && g.sealedHasNumber(pair[0].class) {
+			return pair[0]
+		}
+	}
+	return &shape{kind: kJSON}
+}
+
+func (g *generator) sealedHasNumber(name string) bool {
+	for _, v := range g.defs.obj(name).arr("anyOf") {
+		if o, ok := v.(*object); ok && (o.str("type") == "number" || o.str("type") == "integer") {
+			return true
+		}
+	}
+	return false
 }
 
 func (g *generator) buildSealed(name string) error {

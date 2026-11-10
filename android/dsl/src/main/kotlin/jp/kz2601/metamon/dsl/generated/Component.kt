@@ -147,7 +147,7 @@ data class Component(
     val height: Height? = null,
     @Serializable(with = LenientIntSerializer::class)
     val maxDuration: Int? = null,
-    val value: JsonElement? = null,
+    val value: Expr? = null,
     @Serializable(with = LenientStringSerializer::class)
     val entity: String? = null,
     @Serializable(with = ListItemLenientSerializer::class)
@@ -177,7 +177,8 @@ data class Component(
     val size: Size? = null,
     @Serializable(with = LenientDoubleSerializer::class)
     val min: Double? = null,
-    val max: JsonElement? = null,
+    @Serializable(with = LenientDoubleSerializer::class)
+    val max: Double? = null,
     @Serializable(with = LenientDoubleSerializer::class)
     val step: Double? = null,
     @Serializable(with = LenientIntSerializer::class)
