@@ -23,10 +23,12 @@ import (
 // Two checks, both under PLAN_LIMITS_MODE (log: plan_limit.would_block only):
 //   - checkAppLimit, before a new app is made (the first GET /dsl of a new
 //     appId, POST /apps, duplicate, installing / joining from a link or the
-//     catalog): a count, so iOS is told before the AI runs.
+//     catalog): a count, so iOS is told before the AI runs. It is outside
+//     any transaction and only an early answer, never the guard.
 //   - the commit that makes a blank app held (h.commit, store.Commit.HeldLimit):
 //     counted in the same transaction, so two requests at once cannot both
-//     take the last slot.
+//     take the last slot. Generating a blank and duplicating / installing /
+//     joining (seedCopy: a blank at version 1, then this commit) all end here.
 //
 // Over the limit: 402 app_limit_reached with details {resource: apps, plan,
 // held, limit, base, purchasedSlots, canBuySlot, slotCoins, upgrade, apps:

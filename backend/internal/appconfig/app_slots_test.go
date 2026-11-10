@@ -210,3 +210,41 @@ func TestHeldAppLimitLostRaceRemovesBlank(t *testing.T) {
 		t.Fatalf("a blank copy was left: %s", r.raw)
 	}
 }
+
+// Two joins at once with one slot left (a share link): one is refused and
+// leaves no blank copy behind.
+func TestHeldAppLimitConcurrentJoins(t *testing.T) {
+	e := newSlotEnv(t, proSet{"owner": true}, fakeSlots{}, plan.ModeEnforce)
+	e.ownApp("friend", "/v1/apps/HCJ-OWN", kakeibo(t))
+	ids := []string{"HCJ-A", "HCJ-B", "HCJ-C"}
+	toks := make([]string, len(ids))
+	for i, id := range ids {
+		e.ownApp("owner", "/v1/apps/"+id, sharedKakeibo(t))
+		toks[i] = e.share("owner", "/v1/apps/"+id)
+	}
+	codes := make([]int, len(ids))
+	var wg sync.WaitGroup
+	for i := range ids {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			codes[i] = e.do("friend", http.MethodPost, "/v1/shares/"+toks[i]+"/import", nil, nil).code
+		}()
+	}
+	wg.Wait()
+	created, refused := 0, 0
+	for _, c := range codes {
+		switch c {
+		case http.StatusCreated:
+			created++
+		case http.StatusPaymentRequired:
+			refused++
+		}
+	}
+	if created != 1 || refused != 2 {
+		t.Fatalf("codes %v", codes)
+	}
+	if r := e.do("friend", http.MethodGet, "/v1/apps", nil, nil); len(r.body["items"].([]any)) != 2 {
+		t.Fatalf("held %s", r.raw)
+	}
+}
