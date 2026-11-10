@@ -181,8 +181,10 @@ func (s *Service) expire(ctx context.Context, ref HoldRef) error {
 	return nil
 }
 
-// Sweep returns up to limit expired holds of anyone (a scheduled job or the
-// ai process; wallet reads also return their own).
+// Sweep returns up to limit expired holds of anyone. Nothing calls it yet
+// (no scheduled job runs it): expired holds are returned when their payer's
+// wallet is next read (Wallet, Reserve). Wiring it to a scheduler is an infra
+// change.
 func (s *Service) Sweep(ctx context.Context, limit int) (int, error) {
 	if s.Mode() != ModeEnforce {
 		return 0, nil

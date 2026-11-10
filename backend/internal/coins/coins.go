@@ -3,7 +3,9 @@
 // payer's coins: Reserve holds the call's upper bound before it runs, Commit
 // charges the actual cost (never more than the hold) and Release returns the
 // whole hold when the call failed. A hold nobody settles expires and is
-// returned (Service.Sweep, and lazily on the next wallet read).
+// returned the next time the payer's wallet is read (Service.Wallet, or the
+// next Reserve). No scheduled job calls Service.Sweep yet: until one does, an
+// expired hold stays in Reserved (not spendable, not lost) until that read.
 //
 //	users/{uid}/coins/wallet          Wallet: balance by source, held coins, the open holds
 //	users/{uid}/coinLedger/{entryId}  Entry: one row per balance change (same transaction)
@@ -150,7 +152,7 @@ type Hold struct {
 	Status         string    `json:"status" firestore:"status"`
 	Charged        int64     `json:"charged" firestore:"charged"`
 	CreatedAt      time.Time `json:"-" firestore:"createdAt"`
-	// ExpireAt is set only while held (Sweep queries it; settled holds drop it).
+	// ExpireAt is set only while held (Store.Expired queries it; settled holds drop it).
 	ExpireAt  time.Time `json:"-" firestore:"expireAt,omitempty"`
 	SettledAt time.Time `json:"-" firestore:"settledAt,omitempty"`
 	// DeleteAt is for a Firestore TTL policy on settled holds (kept a while
