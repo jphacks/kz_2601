@@ -9,6 +9,14 @@ import jp.kz2601.metamon.dsl.ComponentType
 import jp.kz2601.metamon.renderer.DSLRuntime
 import jp.kz2601.metamon.renderer.NoopDSLRuntime
 import jp.kz2601.metamon.renderer.components.ButtonLeaf
+import jp.kz2601.metamon.renderer.components.AvatarLeaf
+import jp.kz2601.metamon.renderer.components.BadgeLeaf
+import jp.kz2601.metamon.renderer.components.EmptyStateLeaf
+import jp.kz2601.metamon.renderer.components.IconLeaf
+import jp.kz2601.metamon.renderer.components.ImageLeaf
+import jp.kz2601.metamon.renderer.components.LabelLeaf
+import jp.kz2601.metamon.renderer.components.LinkLeaf
+import jp.kz2601.metamon.renderer.components.MarkdownLeaf
 import jp.kz2601.metamon.renderer.components.CardContainer
 import jp.kz2601.metamon.renderer.components.CarouselContainer
 import jp.kz2601.metamon.renderer.components.DisclosureContainer
@@ -71,11 +79,20 @@ class ComponentRegistry private constructor(private val builders: Map<String, Co
             register(ComponentType.DISCLOSURE) { c, ctx, m -> DisclosureContainer(c, ctx, m) }
             register(ComponentType.CAROUSEL) { c, ctx, m -> CarouselContainer(c, ctx, m) }
             register(ComponentType.GRID) { c, ctx, m -> GridContainer(c, ctx, m) }
-            // leaf
+            // leaf: 表示(11・#857)
             register(ComponentType.TEXT) { c, _, m -> TextLeaf(c, m) }
-            register(ComponentType.BUTTON) { c, ctx, m -> ButtonLeaf(c, ctx, m) }
-            register(ComponentType.SPACER) { c, _, m -> SpacerLeaf(c, m) }
+            register(ComponentType.LABEL) { c, _, m -> LabelLeaf(c, m) }
+            register(ComponentType.ICON) { c, _, m -> IconLeaf(c, m) }
+            register(ComponentType.MARKDOWN) { c, _, m -> MarkdownLeaf(c, m) }
+            register(ComponentType.BADGE) { c, _, m -> BadgeLeaf(c, m) }
+            register(ComponentType.AVATAR) { c, ctx, m -> AvatarLeaf(c, ctx, m) }
+            register(ComponentType.IMAGE) { c, ctx, m -> ImageLeaf(c, ctx, m) }
             register(ComponentType.DIVIDER) { _, _, m -> DividerLeaf(m) }
+            register(ComponentType.SPACER) { c, _, m -> SpacerLeaf(c, m) }
+            register(ComponentType.LINK) { c, _, m -> LinkLeaf(c, m) }
+            register(ComponentType.EMPTY_STATE) { c, _, m -> EmptyStateLeaf(c, m) }
+            // leaf: その他
+            register(ComponentType.BUTTON) { c, ctx, m -> ButtonLeaf(c, ctx, m) }
             register(ComponentType.VOICE_INPUT) { c, ctx, m -> VoiceInputLeaf(c, ctx, m) }
         }
     }

@@ -8,6 +8,9 @@ import jp.kz2601.metamon.dsl.screen
 import jp.kz2601.metamon.renderer.components.disclosureTitle
 import jp.kz2601.metamon.renderer.components.gridColumns
 import jp.kz2601.metamon.renderer.components.isButtonVisible
+import jp.kz2601.metamon.renderer.components.linkOpens
+import jp.kz2601.metamon.renderer.components.linkText
+import jp.kz2601.metamon.renderer.components.photoFieldValue
 import jp.kz2601.metamon.renderer.layout.GridArea
 import jp.kz2601.metamon.renderer.layout.formBands
 import jp.kz2601.metamon.renderer.layout.gridPlacement
@@ -27,7 +30,7 @@ import kotlinx.serialization.json.JsonPrimitive
  * (`gridPlacement` / `localGridPlacement` / `formBands`)から取る。
  *
  * まだ入れていないもの(子 Issue): フォームのドラフト(`form`・`hidden`・`needsForm`)・toolbar / saveBar・
- * レコードから解決する値(stat / list / chart …)。レジストリに無い Leaf は `unavailable` になる。
+ * レコードから解決する値(stat / list / chart …)・text の `{{field}}` の差し込み。レジストリに無い Leaf は `unavailable` になる。
  *
  * @param available 描ける type(レジストリの登録 ∩ 端末の能力)。外れた既知の type は `unavailable`、知らない type は `unknown`。
  */
@@ -93,6 +96,9 @@ class RenderTree(private val dsl: AppDSL, private val available: Set<String>) {
         c.title?.let { put("title", JsonPrimitive(it)) }
         c.text?.let { put("text", JsonPrimitive(it)) }
         c.label?.let { put("label", JsonPrimitive(it)) }
+        c.message?.let { put("message", JsonPrimitive(it)) }
+        c.url?.let { put("url", JsonPrimitive(it)) }
+        c.field?.let { put("field", JsonPrimitive(it)) }
         c.expanded?.let { put("expanded", JsonPrimitive(it)) }
     }
 
@@ -103,6 +109,9 @@ class RenderTree(private val dsl: AppDSL, private val available: Set<String>) {
             "expanded" to JsonPrimitive(c.expanded ?: false),
         )
         ComponentType.GRID -> mapOf("columns" to JsonPrimitive(c.gridColumns))
+        ComponentType.LINK -> mapOf("text" to JsonPrimitive(c.linkText()), "opens" to JsonPrimitive(c.linkOpens))
+        // フォームのドラフトが入るまで field の値は無い(photoFieldValue)
+        ComponentType.IMAGE -> mapOf("hasImage" to JsonPrimitive(photoFieldValue(c, null) != null))
         else -> emptyMap()
     }
 
