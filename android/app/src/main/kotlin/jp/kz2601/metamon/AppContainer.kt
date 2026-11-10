@@ -11,6 +11,9 @@ import jp.kz2601.metamon.runtime.AppAiHost
 import jp.kz2601.metamon.runtime.AppDirectory
 import jp.kz2601.metamon.runtime.AppFeedHost
 import jp.kz2601.metamon.runtime.AppRuntime
+import jp.kz2601.metamon.runtime.KeyValueRetentionConsent
+import jp.kz2601.metamon.runtime.RecordRetentionRunner
+import jp.kz2601.metamon.runtime.RetentionConsentStore
 import jp.kz2601.metamon.runtime.RuntimeHost
 import jp.kz2601.metamon.runtime.SocialServices
 import jp.kz2601.metamon.runtime.TranscriberDictationHost
@@ -31,6 +34,8 @@ import jp.kz2601.metamon.account.MediaTempFiles
 import jp.kz2601.metamon.account.OwnerGatedTokens
 import jp.kz2601.metamon.auth.AuthSession
 import jp.kz2601.metamon.consent.ConsentPrompt
+import jp.kz2601.metamon.onboarding.FirstRunTutorialStore
+import jp.kz2601.metamon.onboarding.TutorialPrompt
 import jp.kz2601.metamon.permissions.PermissionCenter
 import jp.kz2601.metamon.services.account.AccountClient
 import jp.kz2601.metamon.services.account.HttpAccountClient
@@ -159,6 +164,10 @@ class AppContainer(
     private val social: SocialServices? = null,
     /** https の画像のキャッシュを消す(#841 の後片付け) */
     private val clearImageCache: () -> Unit = {},
+    /** 記録の保存期間を確認した記録(#482・端末ごと)。モックはメモリだけ */
+    private val retentionConsent: RetentionConsentStore = KeyValueRetentionConsent(InMemoryKeyValueStore()),
+    /** 初回のチュートリアルと「こう話すと直せます」を見た印(#900)。モックは見た扱いで始める */
+    val tutorial: FirstRunTutorialStore = FirstRunTutorialStore(InMemoryKeyValueStore()).apply { markAllSeen() },
 ) {
     /** 画面の下に出す接続先の名前(モックなら "mock")。 */
     val environmentLabel: String get() = if (knobs.mock) "mock" else environment.name
@@ -168,6 +177,9 @@ class AppContainer(
 
     /** 同意の画面を出す時点(起動時・AI に送る直前・設定から・#888) */
     val consentPrompt = ConsentPrompt(consent)
+
+    /** 初回のチュートリアルを出す時点(同意の後・設定の「使い方を見る」・#900) */
+    val tutorialPrompt = TutorialPrompt(tutorial)
 
     /** 前の日までの aiButton の集計を送る(起動・前面に戻った時。送るのは 1 日 1 回) */
     suspend fun flushAiButtonMetrics() {
@@ -186,12 +198,18 @@ class AppContainer(
             removeLocalMedia = removeLocalMedia,
             clearImageCache = clearImageCache,
             feedCache = feedCache,
+            // チュートリアルと「こう話すと直せます」の印(iOS は LocalWipe.clearDefaults で消える)。次の人には出し直す
+            forgetTutorial = {
+                tutorial.forget()
+                tutorialPrompt.reset()
+            },
             // 同意は人ごと(iOS は UserDefaults ごと消す)。前の人の止めた発話も次の人の同意で送らない
             forgetConsent = {
                 consent.forget()
                 consentPrompt.reset()
                 aiButtonMetrics.clearCounts()
                 social?.ageGate?.reset() // 18 歳以上の確認(#877)も人ごと(iOS は UserDefaults ごと消す)
+                runtime.retention?.forget() // 記録の保存期間の確認(#482)も人ごと(iOS は UserDefaults ごと消す)
             },
         )
     }
@@ -337,10 +355,12 @@ class AppContainer(
                 activeOwner = owner,
                 forgetDeviceState = forgetDeviceState(context),
                 authorProfile = AuthorProfile(SharedPreferencesKeyValueStore.of(context, AUTHOR_PREFS)),
+                retentionConsent = KeyValueRetentionConsent(SharedPreferencesKeyValueStore.of(context, RETENTION_PREFS)),
                 chatHistory = ChatHistoryStore(File(context.filesDir, "chat_history")),
                 removeLocalMedia = removeLocalMedia(context),
                 social = SocialServices(HttpMatchingClient(appConfigHttp), HttpModerationClient(appConfigHttp), MatchingAgeGate(prefs)),
                 clearImageCache = { RemoteImages.wipe(context) },
+                tutorial = FirstRunTutorialStore(SharedPreferencesKeyValueStore.of(context, FirstRunTutorialStore.PREFS)),
             )
         }
 
@@ -435,6 +455,7 @@ class AppContainer(
         /** 同意・クラッシュ報告・AI ボタンの集計(#888) */
         private const val PRIVACY_PREFS = "metamon-privacy"
         private const val AUTHOR_PREFS = "metamon-author"
+        private const val RETENTION_PREFS = "metamon-retention"
     }
 
     /** アプリ全体のランタイム(#889)。起動時に 1 つだけ作る。 */
@@ -458,6 +479,11 @@ class AppContainer(
             aiHost = aiHost,
             authorProfile = authorProfile,
             socialServices = social,
+            // 後片付けを始めたら(ActiveOwner が外れたら)消さない(#841 の OwnerGatedTokens と同じ)
+            retention = RecordRetentionRunner(
+                recordSync, retentionConsent,
+                currentUserId = { activeOwner.uid?.takeIf { it == auth.currentUser.value?.uid } },
+            ),
         ).also { it.dictation = TranscriberDictationHost(transcriber, CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)) }
     }
 

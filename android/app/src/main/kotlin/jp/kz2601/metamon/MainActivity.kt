@@ -40,6 +40,8 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import jp.kz2601.metamon.dsl.AppDSL
 import jp.kz2601.metamon.dsl.AppDocument
 import jp.kz2601.metamon.consent.AiConsentDialog
+import jp.kz2601.metamon.onboarding.TutorialScreen
+import jp.kz2601.metamon.services.consent.AiConsentStatus
 import jp.kz2601.metamon.feedback.FeedbackHost
 import jp.kz2601.metamon.feedback.UndoHeaderButtons
 import jp.kz2601.metamon.language.AppLocales
@@ -55,6 +57,7 @@ import jp.kz2601.metamon.renderer.DSLView
 import jp.kz2601.metamon.renderer.components.feed.LocalFeedHost
 import jp.kz2601.metamon.renderer.theme.MetamonRenderTheme
 import jp.kz2601.metamon.renderer.theme.ReadableWidth
+import jp.kz2601.metamon.retention.RetentionPromptHost
 import jp.kz2601.metamon.runtime.AppRuntime
 import jp.kz2601.metamon.runtime.NavigationSnapshot
 import jp.kz2601.metamon.runtime.TranscriberDictationHost
@@ -184,6 +187,16 @@ fun MetamonApp(container: AppContainer) {
         delay(CONSENT_PROMPT_DELAY_MILLIS)
         container.consentPrompt.showOnLaunchIfNeeded()
     }
+    // 同意の画面が閉じたら(要らない時は起動して少し待って)初回のチュートリアルを出す(iOS の TutorialHost・#900)
+    val consentVisible by container.consentPrompt.visible.collectAsStateWithLifecycle()
+    LaunchedEffect(consentVisible) {
+        if (consentVisible) return@LaunchedEffect
+        delay(TUTORIAL_PROMPT_DELAY_MILLIS)
+        container.tutorialPrompt.presentIfNeeded(
+            consentPrompted = container.consent.state.value.status != AiConsentStatus.NOT_PROMPTED,
+            consentShowing = container.consentPrompt.visible.value,
+        )
+    }
     // 部品のマイク(onVoiceInput)は音声のシートを開く
     LaunchedEffect(runtimeState.showVoiceSheet) {
         if (runtimeState.showVoiceSheet) {
@@ -258,7 +271,7 @@ fun MetamonApp(container: AppContainer) {
     ) { padding ->
         Box(Modifier.fillMaxSize().padding(padding)) {
             // 生成中の組み立て台・変わった部品の印・完成の後のお知らせ(#894)
-            BuildStageHost(state, onCancel = vm::cancelGenerate, onOpenVoice = vm::openVoice) {
+            BuildStageHost(state, onCancel = vm::cancelGenerate, onOpenVoice = vm::openVoice, editHints = container.tutorial.editHints) {
                 if (state.isInitial) {
                     VoiceRoute(vm, onMicLongPress = openSwitcher)
                 } else {
@@ -275,9 +288,36 @@ fun MetamonApp(container: AppContainer) {
         }
     }
 
-    if (settingsOpen) SettingsSheet(container, busy = state.isGenerating, onDismiss = { settingsOpen = false })
+    if (settingsOpen) {
+        SettingsSheet(
+            container,
+            busy = state.isGenerating,
+            onDismiss = { settingsOpen = false },
+            remainingToday = state.remainingToday,
+            isPro = state.isPro,
+            onRefreshUsage = { vm.refreshUsage() },
+            onStopRetention = vm::generateNow,
+            onShowTutorial = {
+                settingsOpen = false
+                container.tutorialPrompt.replay()
+            },
+            canUndo = state.canUndo && !state.undoing && !state.isGenerating,
+            onUndo = {
+                settingsOpen = false
+                vm.undo(state.document.version)
+            },
+            onPickTip = { text ->
+                settingsOpen = false
+                vm.putDraft(text)
+            },
+            onReset = {
+                settingsOpen = false
+                runtime.startNewApp()
+                vm.noteHomeEntry(Greeting.HomeEntry.HOME)
+            },
+        )
+    }
     // 設定のシートより後に置く(設定から出した時に上に重ねる)
-    val consentVisible by container.consentPrompt.visible.collectAsStateWithLifecycle()
     if (consentVisible) {
         val consentState by container.consent.state.collectAsStateWithLifecycle()
         AiConsentDialog(
@@ -286,6 +326,14 @@ fun MetamonApp(container: AppContainer) {
             onLater = container.consentPrompt::later,
         )
     }
+    // 初回のチュートリアル(#900)。同意の画面とは重ねない(閉じてから出す)
+    val tutorialVisible by container.tutorialPrompt.visible.collectAsStateWithLifecycle()
+    if (tutorialVisible && !consentVisible) {
+        TutorialScreen(onFinish = container.tutorialPrompt::finish)
+    }
+
+    // 記録の保存期間の確認(#482)。生成中・音声のシートの間は待つ
+    RetentionPromptHost(runtime, busy = state.isGenerating || state.voiceOpen, onStop = vm::generateNow)
 
     if (switcherOpen) {
         AppSwitcherDialog(
@@ -343,3 +391,6 @@ private const val AUTO_NAV_START_MILLIS = 3_000L
 
 /** 起動の画面が落ち着いてから同意の画面を出す(iOS の ConsentHost と同じ 0.5 秒) */
 private const val CONSENT_PROMPT_DELAY_MILLIS = 500L
+
+/** 同意の画面が閉じきってから(要らない時は起動の画面が落ち着いてから)チュートリアルを出す(iOS の TutorialHost の 0.7〜0.8 秒) */
+private const val TUTORIAL_PROMPT_DELAY_MILLIS = 800L

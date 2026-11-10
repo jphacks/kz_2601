@@ -28,8 +28,7 @@ data class DeviceCapabilities(
          * 有無を変えたら iOS の ClientCapabilities.swift のコメントと揃える。
          */
         internal val features: List<Feature> = listOf(
-            // 記録の自動削除: 判定(RecordRetention)だけで、消す処理をまだ呼んでいない
-            Feature("recordRetention", implemented = false),
+            Feature("recordRetention", implemented = true), // RecordRetentionRunner・確認の保存(#482)
             // 仲間探し(#877): matchList・list の「つながりたい」・通報 / ブロック。iOS の通常の版と同じく送る
             Feature("matching", implemented = true, needs = ComponentType.MATCH_LIST),
             Feature("notification.when", implemented = true), // ConditionNotifications

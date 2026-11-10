@@ -42,7 +42,6 @@ import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.clearAndSetSemantics
@@ -70,10 +69,10 @@ fun BoxScope.BuildStageHost(
     state: VoiceUiState,
     onCancel: () -> Unit,
     onOpenVoice: () -> Unit,
+    editHints: EditHintStore? = null,
     content: @Composable BoxScope.() -> Unit,
 ) {
-    val context = LocalContext.current
-    val stage = remember { BuildStageState(EditHintStore.of(context)) }
+    val stage = remember(editHints) { BuildStageState(editHints) }
     val reduceMotion = LocalReduceMotion.current
     LaunchedEffect(state) { stage.update(state, SystemClock.elapsedRealtime(), reduceMotion) }
 

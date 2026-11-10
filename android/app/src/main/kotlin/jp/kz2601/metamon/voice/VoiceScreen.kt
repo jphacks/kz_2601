@@ -160,6 +160,13 @@ fun VoiceScreen(
         delay(GREETING_SPEECH_DELAY_MILLIS)
         if (state.isInitial && !state.showsChat) vm.speakGreeting(title + "\n" + subtitle)
     }
+    // 設定の「頼み方のコツ」で選んだ文(#1161)。入れるだけで送らない
+    LaunchedEffect(state.draft) {
+        state.draft?.let {
+            typed = it
+            vm.consumeDraft()
+        }
+    }
     if (showTips) {
         PromptTipsSheet(onDismiss = { showTips = false }) { text ->
             showTips = false
@@ -773,7 +780,7 @@ private fun RemainingTodayBadge(state: VoiceUiState) {
 
 /** 戻る時刻(上限のカードと同じ書き方)。分からなければ「明日」 */
 @Composable
-private fun resetText(at: Instant?): String {
+internal fun resetText(at: Instant?): String {
     val english = LocalConfiguration.current.locales[0].language == "en"
     return at?.let {
         DateTimeFormatter.ofPattern(if (english) "MMM d, H:mm" else "M月d日 H:mm", if (english) Locale.US else Locale.JAPAN)
