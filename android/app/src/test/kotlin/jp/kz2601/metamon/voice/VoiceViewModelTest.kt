@@ -10,12 +10,13 @@ import jp.kz2601.metamon.services.ChatTurn
 import jp.kz2601.metamon.services.GenerateMode
 import jp.kz2601.metamon.services.GenerateProgress
 import jp.kz2601.metamon.services.MorphResult
+import jp.kz2601.metamon.services.SpeechTranscriber
 import jp.kz2601.metamon.services.StreamedComponent
+import jp.kz2601.metamon.services.TranscriberFailure
+import jp.kz2601.metamon.services.TranscriberStatus
 import jp.kz2601.metamon.services.http.ApiError
 import jp.kz2601.metamon.services.http.FailureKind
 import jp.kz2601.metamon.services.mock.MockSpeechTranscriber
-import jp.kz2601.metamon.services.speech.TranscriberFailure
-import jp.kz2601.metamon.services.speech.TranscriberStatus
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -199,6 +200,34 @@ class VoiceViewModelTest {
         advanceUntilIdle()
         assertEquals(listOf("早起きチェック"), ai.morphCalls)
         assertEquals(VoicePhase.DONE, vm.state.value.phase)
+    }
+
+    /** iOS と同じ最小の口だけの実装(feat/android-mock の MockTranscriber と同じ形)でも動く。 */
+    @Test
+    fun minimalTranscriberWithoutFlows() = runTest {
+        val minimal = object : SpeechTranscriber {
+            override val isReady = true
+            override suspend fun prepare() = Unit
+            override suspend fun startRecording() = Unit
+            override suspend fun stopAndTranscribe() = "サークルの出欠"
+            override fun cancelRecording() = Unit
+        }
+        val ai = FakeAI()
+        val vm = VoiceViewModel(
+            minimal,
+            ai,
+            { "app-1" },
+            initial,
+            clarifyEnabled = false,
+            scope = CoroutineScope(StandardTestDispatcher(testScheduler) + Job()),
+        )
+        vm.onMicTap()
+        advanceUntilIdle()
+        // listening が流れなくても勝手に止まらない
+        assertEquals(VoicePhase.LISTENING, vm.state.value.phase)
+        vm.onMicTap()
+        advanceUntilIdle()
+        assertEquals(listOf("サークルの出欠"), ai.morphCalls)
     }
 
     @Test

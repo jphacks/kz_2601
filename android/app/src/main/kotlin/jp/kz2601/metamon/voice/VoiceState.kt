@@ -3,8 +3,8 @@ package jp.kz2601.metamon.voice
 import jp.kz2601.metamon.dsl.AppDocument
 import jp.kz2601.metamon.services.ChatTurn
 import jp.kz2601.metamon.services.StreamedComponent
+import jp.kz2601.metamon.services.TranscriberFailure
 import jp.kz2601.metamon.services.http.FailureKind
-import jp.kz2601.metamon.services.speech.TranscriberFailure
 
 /**
  * 「話す → 文字 → 生成 → 変身」の段階(#359)。

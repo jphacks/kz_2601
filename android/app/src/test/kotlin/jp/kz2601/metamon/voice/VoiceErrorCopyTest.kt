@@ -1,9 +1,9 @@
 package jp.kz2601.metamon.voice
 
 import jp.kz2601.metamon.R
+import jp.kz2601.metamon.services.TranscriberFailure
 import jp.kz2601.metamon.services.http.FailureKind
 import jp.kz2601.metamon.services.http.RateLimitInfo
-import jp.kz2601.metamon.services.speech.TranscriberFailure
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue

@@ -2,8 +2,8 @@ package jp.kz2601.metamon.voice
 
 import androidx.annotation.StringRes
 import jp.kz2601.metamon.R
+import jp.kz2601.metamon.services.TranscriberFailure
 import jp.kz2601.metamon.services.http.FailureKind
-import jp.kz2601.metamon.services.speech.TranscriberFailure
 import java.time.Instant
 
 /** 状態カードの中身。1 文で「何が起きたか + 次の一手」(iOS の `ErrorCopy`)。秒数・dB・サーバーの文は出さない(H9)。 */

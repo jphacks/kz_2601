@@ -1,5 +1,6 @@
-package jp.kz2601.metamon.services.speech
+package jp.kz2601.metamon.services
 
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 
 /** 声を文字にする仕組みの状態(画面の表示用)。iOS の `TranscriberStatus` に当たる。 */
@@ -23,15 +24,20 @@ sealed interface TranscriberStatus {
 /**
  * 音声入力(iOS の `SpeechTranscriber`)。実機は [AndroidSpeechTranscriber]、テストはモック。
  * 声は端末の外へ送らない(#354 §3)。端末内の認識が無い端末は [TranscriberStatus.Unavailable] になり、文字入力に落とす。
+ * iOS と同じ最小の口(isReady / prepare / startRecording / stopAndTranscribe / cancelRecording)だけ実装しても使えるよう、
+ * 状態の流れには既定を置く(常に Ready・途中の聞き取り無し・自分から止まらない)。
  */
 interface SpeechTranscriber {
-    val status: StateFlow<TranscriberStatus>
+    val status: StateFlow<TranscriberStatus> get() = AlwaysReady
 
     /** 録音中の途中の聞き取り。録音の始めに "" に戻る */
-    val partial: StateFlow<String>
+    val partial: StateFlow<String> get() = NoPartial
 
-    /** 聞いている間 true。認識器が無音で自分から止まった時も false になる(画面はそれを見て [stopAndTranscribe] を呼ぶ) */
-    val listening: StateFlow<Boolean>
+    /**
+     * 聞いている間 true。認識器が無音で自分から止まった時に false へ戻る(画面はそれを見て [stopAndTranscribe] を呼ぶ)。
+     * 既定は常に false(= 自分からは止まらない。画面は true → false の変化だけを見る)。
+     */
+    val listening: StateFlow<Boolean> get() = NeverListening
 
     val isReady: Boolean get() = status.value == TranscriberStatus.Ready
 
@@ -56,6 +62,10 @@ interface SpeechTranscriber {
     /** 録音を捨てて止める(画面が閉じられた時など)。録音していなければ何もしない */
     fun cancelRecording()
 }
+
+private val AlwaysReady: StateFlow<TranscriberStatus> = MutableStateFlow(TranscriberStatus.Ready)
+private val NoPartial: StateFlow<String> = MutableStateFlow("")
+private val NeverListening: StateFlow<Boolean> = MutableStateFlow(false)
 
 /** 録音 / 認識が失敗した理由。画面の文言は :app の `VoiceErrorCopy`(iOS の `ErrorCopy.transcriber*`)で決める。 */
 sealed class TranscriberFailure(message: String) : Exception(message) {

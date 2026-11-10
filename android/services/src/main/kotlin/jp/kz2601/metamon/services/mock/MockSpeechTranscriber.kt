@@ -1,8 +1,8 @@
 package jp.kz2601.metamon.services.mock
 
-import jp.kz2601.metamon.services.speech.SpeechTranscriber
-import jp.kz2601.metamon.services.speech.TranscriberFailure
-import jp.kz2601.metamon.services.speech.TranscriberStatus
+import jp.kz2601.metamon.services.SpeechTranscriber
+import jp.kz2601.metamon.services.TranscriberFailure
+import jp.kz2601.metamon.services.TranscriberStatus
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 

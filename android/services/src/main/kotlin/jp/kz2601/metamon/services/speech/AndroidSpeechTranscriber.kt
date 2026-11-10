@@ -13,6 +13,10 @@ import android.speech.RecognitionSupport
 import android.speech.RecognitionSupportCallback
 import android.speech.RecognizerIntent
 import android.speech.SpeechRecognizer
+import jp.kz2601.metamon.services.SpeechTranscriber
+import jp.kz2601.metamon.services.TranscriberFailure
+import jp.kz2601.metamon.services.TranscriberStatus
+import jp.kz2601.metamon.services.speechLanguageTag
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow

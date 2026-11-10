@@ -9,6 +9,7 @@ import jp.kz2601.metamon.services.AIClient
 import jp.kz2601.metamon.services.AppConfigClient
 import jp.kz2601.metamon.services.AppEnvironment
 import jp.kz2601.metamon.services.AuthService
+import jp.kz2601.metamon.services.SpeechTranscriber
 import jp.kz2601.metamon.services.http.AuthTokenProvider
 import jp.kz2601.metamon.services.http.ClientInfo
 import jp.kz2601.metamon.services.http.DeviceContext
@@ -19,7 +20,6 @@ import jp.kz2601.metamon.services.live.HttpAIClient
 import jp.kz2601.metamon.services.live.HttpAppConfigClient
 import jp.kz2601.metamon.services.mock.MockAuthService
 import jp.kz2601.metamon.services.speech.AndroidSpeechTranscriber
-import jp.kz2601.metamon.services.speech.SpeechTranscriber
 
 /** 手書きの組み立て 1 か所(#354 §5。Hilt は使わない・iOS の `BuildConfig.make` と同じ形)。 */
 class AppContainer(

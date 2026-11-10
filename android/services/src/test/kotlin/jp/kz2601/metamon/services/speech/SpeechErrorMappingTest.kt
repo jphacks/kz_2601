@@ -1,7 +1,10 @@
 package jp.kz2601.metamon.services.speech
 
+import jp.kz2601.metamon.services.TranscriberFailure
+import jp.kz2601.metamon.services.TranscriberStatus
 import jp.kz2601.metamon.services.mock.MockSpeechTranscriber
 import jp.kz2601.metamon.services.speech.SpeechErrorMapping.failure
+import jp.kz2601.metamon.services.speechLanguageTag
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse

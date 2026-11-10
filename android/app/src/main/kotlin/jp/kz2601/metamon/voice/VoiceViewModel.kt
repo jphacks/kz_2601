@@ -9,16 +9,17 @@ import jp.kz2601.metamon.services.ChatMode
 import jp.kz2601.metamon.services.ChatOption
 import jp.kz2601.metamon.services.ChatTurn
 import jp.kz2601.metamon.services.GenerateProgress
+import jp.kz2601.metamon.services.SpeechTranscriber
+import jp.kz2601.metamon.services.TranscriberFailure
+import jp.kz2601.metamon.services.TranscriberStatus
 import jp.kz2601.metamon.services.http.FailureKind
-import jp.kz2601.metamon.services.speech.SpeechTranscriber
-import jp.kz2601.metamon.services.speech.TranscriberFailure
-import jp.kz2601.metamon.services.speech.TranscriberStatus
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.dropWhile
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
@@ -106,7 +107,7 @@ class VoiceViewModel(
                 scope.launch { transcriber.partial.collect { p -> _state.update { it.copy(partial = p) } } },
                 // 認識器が無音で自分から止まったら、タップを待たずに文字にする
                 scope.launch {
-                    transcriber.listening.first { !it }
+                    transcriber.listening.dropWhile { !it }.first { !it } // true になってから false に戻った時だけ
                     if (_state.value.phase == VoicePhase.LISTENING) stopListening()
                 },
             )

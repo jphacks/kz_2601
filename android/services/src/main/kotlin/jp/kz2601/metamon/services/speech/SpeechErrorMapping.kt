@@ -1,5 +1,7 @@
 package jp.kz2601.metamon.services.speech
 
+import jp.kz2601.metamon.services.TranscriberFailure
+
 /**
  * `SpeechRecognizer.ERROR_*` → [TranscriberFailure]。端末に依らないので JVM でテストする。
  * 値は android.speech.SpeechRecognizer と同じ(テストで android.jar を読まないよう写してある)。
