@@ -18,6 +18,8 @@ import jp.kz2601.metamon.services.live.FirebaseBootstrap
 import jp.kz2601.metamon.services.live.HttpAIClient
 import jp.kz2601.metamon.services.live.HttpAppConfigClient
 import jp.kz2601.metamon.services.mock.MockAuthService
+import jp.kz2601.metamon.services.speech.AndroidSpeechTranscriber
+import jp.kz2601.metamon.services.speech.SpeechTranscriber
 
 /** 手書きの組み立て 1 か所(#354 §5。Hilt は使わない・iOS の `BuildConfig.make` と同じ形)。 */
 class AppContainer(
@@ -26,6 +28,8 @@ class AppContainer(
     val initialDsl: AppDSL,
     val appConfig: AppConfigClient,
     val ai: AIClient,
+    val transcriber: SpeechTranscriber,
+    val appId: DeviceAppId,
 ) {
     companion object {
         fun make(context: Context): AppContainer {
@@ -39,10 +43,11 @@ class AppContainer(
 
             val tokens = AuthTokenProvider(auth)
             val clientInfo = ClientInfo(version = BuildConfig.VERSION_NAME, build = BuildConfig.VERSION_CODE.toString())
-            val device = DeviceContext(language = {
+            val language = {
                 val locales = LocaleList.getDefault()
                 ClientInfo.languageCode((0 until locales.size()).map(locales::get))
-            })
+            }
+            val device = DeviceContext(language = language)
             // App Check(Play Integrity)はまだ無い: ヘッダ無しで送る(backend が enforce の環境では 401 になる)
             val client = MetamonHttp.defaultClient()
             fun http(baseUrl: String) = MetamonHttp(baseUrl, tokens, clientInfo, appCheck = null, client = client, device = device)
@@ -54,6 +59,9 @@ class AppContainer(
                 initialDsl = loadInitialDsl(context),
                 appConfig = HttpAppConfigClient(http(environment.appConfigBaseUrl)),
                 ai = HttpAIClient(http(environment.aiBaseUrl), log = log),
+                // 声は端末内だけで文字にする(#354 §3)。端末内が無い端末は文字入力に落とす
+                transcriber = AndroidSpeechTranscriber(context, language = language, log = { Log.i("Metamon", it) }),
+                appId = DeviceAppId(context),
             )
         }
 
