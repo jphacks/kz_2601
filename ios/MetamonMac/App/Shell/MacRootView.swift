@@ -96,7 +96,12 @@ struct MacRootView: View {
                 .environment(voice)
         }
         .task { voice.prepareIfAllowed() } // モデルが端末にあれば読み込む(無ければ起動では聞かない)
-        .onAppear(perform: reopenLastApp)
+        .onAppear {
+            reopenLastApp()
+            // self ごと捕まえると見張り(State)との循環で残るので、シートの Binding だけ渡す
+            let map = $showsScreenMap, tips = $showsTips
+            discardGuard.beforeAsking = { map.wrappedValue = false; tips.wrappedValue = false }
+        }
         .onChange(of: selectedAppId) { _, id in
             if let id { library.lastAppId = id }
             showsScreenMap = false
@@ -258,7 +263,6 @@ struct MacRootView: View {
 
     private func switchApp(to id: String?) {
         guard id != selectedAppId else { return }
-        showsScreenMap = false // 確認を画面マップのシートの裏に出さない
         discardGuard.run { selectedAppId = id }
     }
 

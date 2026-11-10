@@ -16,6 +16,8 @@ final class MacDiscardGuard {
     weak var window: NSWindow?
     /// 会話のシートを開く前に「破棄」を選んだ(または入力が無かった)。シートを閉じるまでは聞き直さない
     var released = false
+    /// 確認を出す直前に、シェルのシート(画面マップ・頼み方の例)を下げる(`MacRootView` が入れる)。確認をシートの裏に出さない
+    var beforeAsking: () -> Void = {}
 
     init() { Self.all.add(self) }
 
@@ -25,6 +27,7 @@ final class MacDiscardGuard {
     /// 入力を失わなければすぐ `action`。失うなら確認を出し、「破棄」で `action`。
     func run(_ action: @escaping () -> Void) {
         guard let runtime, !released else { return action() }
+        if runtime.hasUnsavedInput() { beforeAsking() }
         runtime.confirmDiscard(then: action)
     }
 
@@ -38,9 +41,11 @@ final class MacDiscardGuard {
     /// ⌘Q: 入力のあるウインドウ(前にあるものを優先)で確認を出す。出したら true(「破棄」で `quit`)。
     static func confirmQuit(_ quit: @escaping () -> Void) -> Bool {
         let guards = all.allObjects.filter(\.hasUnsavedInput)
-        guard let target = guards.first(where: { $0.window?.isKeyWindow == true }) ?? guards.first,
+        // シートが前にある時はシートが key・元のウインドウは main なので main で見る
+        guard let target = guards.first(where: { $0.window?.isMainWindow == true }) ?? guards.first,
               let runtime = target.runtime else { return false }
         target.window?.makeKeyAndOrderFront(nil)
+        target.beforeAsking()
         runtime.discardRequest = DiscardRequest(perform: quit)
         return true
     }
