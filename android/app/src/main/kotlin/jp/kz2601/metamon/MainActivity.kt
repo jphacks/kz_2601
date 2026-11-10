@@ -43,6 +43,7 @@ import jp.kz2601.metamon.consent.AiConsentDialog
 import jp.kz2601.metamon.onboarding.TutorialScreen
 import jp.kz2601.metamon.services.consent.AiConsentStatus
 import jp.kz2601.metamon.feedback.FeedbackHost
+import jp.kz2601.metamon.feedback.TalkBackAnnouncer
 import jp.kz2601.metamon.feedback.UndoHeaderButtons
 import jp.kz2601.metamon.language.AppLocales
 import jp.kz2601.metamon.notifications.LocalNotifications
@@ -187,6 +188,8 @@ fun MetamonApp(container: AppContainer) {
     val runtimeState by runtime.state.collectAsStateWithLifecycle()
 
     LaunchedEffect(runtime) { runtime.bootstrap() }
+    // AI の質問・返事・完成の要約・状態カード・トーストを出たのと同時に TalkBack に読ませる(H8)
+    TalkBackAnnouncer(vm.state, runtime.state)
     // 初回起動・説明の版が上がった時に 1 回だけ同意の画面を出す(iOS の ConsentHost・#888)
     LaunchedEffect(Unit) {
         delay(CONSENT_PROMPT_DELAY_MILLIS)

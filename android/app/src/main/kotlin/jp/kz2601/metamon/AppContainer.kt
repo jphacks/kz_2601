@@ -60,6 +60,7 @@ import jp.kz2601.metamon.voice.ClarifySettings
 import jp.kz2601.metamon.voice.FabPositionStore
 import jp.kz2601.metamon.voice.LaunchVisits
 import jp.kz2601.metamon.voice.SpeechSettings
+import jp.kz2601.metamon.renderer.a11y.TalkBack
 import jp.kz2601.metamon.renderer.components.RemoteImages
 import jp.kz2601.metamon.renderer.components.audio.LocalAudioStore
 import jp.kz2601.metamon.renderer.components.media.VideoCodec
@@ -169,6 +170,8 @@ class AppContainer(
     private val retentionConsent: RetentionConsentStore = KeyValueRetentionConsent(InMemoryKeyValueStore()),
     /** 初回のチュートリアルと「こう話すと直せます」を見た印(#900)。モックは見た扱いで始める */
     val tutorial: FirstRunTutorialStore = FirstRunTutorialStore(InMemoryKeyValueStore()).apply { markAllSeen() },
+    /** TalkBack が動いているか(削除の取り消しの時間を延ばす・H8) */
+    private val talkBackRunning: () -> Boolean = { false },
 ) {
     /** 画面の下に出す接続先の名前(モックなら "mock")。 */
     val environmentLabel: String get() = if (knobs.mock) "mock" else environment.name
@@ -294,6 +297,7 @@ class AppContainer(
                 chatHistory = ChatHistoryStore(null),
                 removeLocalMedia = removeLocalMedia(context),
                 clearImageCache = { RemoteImages.wipe(context) },
+                talkBackRunning = { TalkBack.isRunning(context) },
             )
         }
 
@@ -362,6 +366,7 @@ class AppContainer(
                 social = SocialServices(HttpMatchingClient(appConfigHttp), HttpModerationClient(appConfigHttp), MatchingAgeGate(prefs)),
                 clearImageCache = { RemoteImages.wipe(context) },
                 tutorial = FirstRunTutorialStore(SharedPreferencesKeyValueStore.of(context, FirstRunTutorialStore.PREFS)),
+                talkBackRunning = { TalkBack.isRunning(context) },
             )
         }
 
@@ -486,6 +491,7 @@ class AppContainer(
                 recordSync, retentionConsent,
                 currentUserId = { activeOwner.uid?.takeIf { it == auth.currentUser.value?.uid } },
             ),
+            undoGraceMillis = { TalkBack.recordUndoMillis(talkBackRunning()) },
         ).also { it.dictation = TranscriberDictationHost(transcriber, CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)) }
     }
 
