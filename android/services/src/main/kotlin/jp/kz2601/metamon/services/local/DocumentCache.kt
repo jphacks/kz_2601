@@ -29,13 +29,19 @@ class DocumentCache(
     private val lock = Mutex()
     private val memory = mutableMapOf<String, String>()
 
+    /** [removeAll] の回数。取りに行く前に読み、[store] に渡すと、その間に消した後の古い応答を書かない。 */
+    @Volatile
+    var epoch: Int = 0
+        private set
+
     /**
      * 封筒を保存する。手元により新しい版があれば置き換えない(遅れて届いた古い応答で巻き戻さない)。
-     * 版を読めない封筒は保存しない。
+     * 版を読めない封筒は保存しない。[since] が今の [epoch] と違えば(取りに行った後に全部消した)保存しない。
      */
-    suspend fun store(appId: String, envelopeJson: String) {
+    suspend fun store(appId: String, envelopeJson: String, since: Int? = null) {
         val version = versionOf(envelopeJson) ?: return
         lock.withLock {
+            if (since != null && since != epoch) return
             val current = read(appId)?.let(::versionOf)
             if (current != null && current > version) return
             memory[appId] = envelopeJson
@@ -73,6 +79,7 @@ class DocumentCache(
     /** アカウント削除(#119): 全 appId の DSL を消す。 */
     suspend fun removeAll() {
         lock.withLock {
+            epoch++
             memory.clear()
             val dir = directory ?: return
             withContext(io) { dir.deleteRecursively() }

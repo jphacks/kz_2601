@@ -38,18 +38,23 @@ class FeedCache(
     private val lock = Mutex()
     private val memory = mutableMapOf<String, Entry>()
 
+    /** [removeAll] の回数。取りに行く前に読み、取れた後に変わっていたら(その間に全部消した)書かない。 */
+    @Volatile
+    var epoch: Int = 0
+        private set
+
     suspend fun load(query: FeedQuery, force: Boolean, client: FeedClient): FeedResult {
-        val cached = lock.withLock { read(query) }
+        val (cached, since) = lock.withLock { read(query) to epoch }
         if (!force && cached != null && now() - cached.at in 0 until ttlMillis) return cached.result
         val result = try {
             client.feed(query)
         } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {
-            if (cached != null && now() - cached.at < staleLimitMillis) return cached.result.copy(stale = true)
+            if (cached != null && since == epoch && now() - cached.at < staleLimitMillis) return cached.result.copy(stale = true)
             throw e
         }
-        lock.withLock { write(query, Entry(result, now())) }
+        lock.withLock { if (since == epoch) write(query, Entry(result, now())) }
         return result
     }
 
@@ -59,6 +64,7 @@ class FeedCache(
     /** サインアウト・アカウント削除。 */
     suspend fun removeAll() {
         lock.withLock {
+            epoch++
             memory.clear()
             val dir = directory ?: return
             withContext(io) { dir.deleteRecursively() }
