@@ -8,8 +8,10 @@ Kotlin + Jetpack Compose のネイティブアプリ。技術の選び方は [`d
 2. [要るもの](#要るもの)
 3. [ビルドとテスト](#ビルドとテスト)
 4. [stg と prod](#stg-と-prod)
-5. [Firebase の設定](#firebase-の設定)
-6. [版を上げる](#版を上げる)
+5. [モックとつまみ](#モックとつまみ)
+6. [Firebase の設定](#firebase-の設定)
+7. [版を上げる](#版を上げる)
+8. [アイコンの対応表](#アイコンの対応表)
 
 ## モジュール
 
@@ -66,6 +68,32 @@ product flavor `env` で分ける。値は `BuildConfig` に入る(iOS の `ios/
 
 stg の画面の下には接続先と認証の状態(`stg / auth=mock / uid=…`)が出る。
 
+## モックとつまみ
+
+サーバー無しで画面を動かす構成(#844)。iOS の `METAMON_MOCK=1` などと同じ名前のつまみを、起動の intent extra で渡す。**つまみを読むのは debug のビルドだけ**(`app/src/debug`)。release は `app/src/release` の版が何も読まない。
+
+```sh
+adb shell am force-stop jp.kz2601.metamon.stg
+adb shell am start -n jp.kz2601.metamon.stg/jp.kz2601.metamon.MainActivity \
+  --es METAMON_MOCK 1 --es METAMON_AUTO_TRANSCRIPT "家計簿アプリが欲しい"
+```
+
+つまみはアプリの起動時に 1 回だけ読む。変える時は `force-stop` してから起動し直す。instrumentation のテストは、引数(`-e METAMON_MOCK 1`)を同じ名前の extra にして `ActivityScenario` に渡す。
+
+| つまみ | 中身 |
+|---|---|
+| `METAMON_MOCK=1` | 全部モック(認証・appconfig・ai・文字起こし)。ai は発話の語でサンプル DSL を選び、生成の途中経過も擬似で流す |
+| `METAMON_MOCK_AI_DELAY=<秒>` | モックの ai の応答待ち(既定 1.2) |
+| `METAMON_MOCK_SHARING=1` | 変身一覧に 2 件入れ、共有を端末内で完結させる |
+| `METAMON_INITIAL_EXAMPLE=<名前>` | 最初に描く DSL を `docs/dsl/examples/<名前>.json` にする |
+| `METAMON_INITIAL_DSL_PATH=<パス>` | 最初に描く DSL を端末のファイルから読む(見た目の監査用。アプリが読める `/sdcard/Android/data/<applicationId>/files/` に `adb push` して、そのパスを渡す) |
+| `METAMON_INITIAL_SCREEN=<screen>` | 最初の画面を変える |
+| `METAMON_AUTO_TRANSCRIPT=<文>` | 起動直後に 1 回だけ発話を投げる |
+| `METAMON_AUTO_NAV=a,b,c` / `METAMON_AUTO_NAV_INTERVAL=<秒>` | 起動 3 秒後から画面を順に出す。今の行は logcat(`Metamon`)と `cache/autonav-step` に出る |
+| `METAMON_E2E_OFFLINE_SECONDS=<n>` | 起動から n 秒は記録の API を圏外にする(DSL の取得は通す) |
+
+モックの実装は `services/src/main/kotlin/.../services/mock/`(iOS の `MetamonServices/Mock`)。
+
 ## Firebase の設定
 
 `google-services.json` は**コミットしない**(`.gitignore` 済み)。無くてもビルドは通り(警告だけ)、起動すると認証はモック(固定 uid・トークン無し)で動く。iOS で plist が無い時と同じ。
@@ -84,3 +112,9 @@ Firebase Console に Android アプリ(`jp.kz2601.metamon`・stg を同じプロ
 ## 版を上げる
 
 版は `gradle/libs.versions.toml` だけで決める。今は compileSdk 36 に合わせて、compileSdk 37 を求める版(Compose 1.12・core 1.19・lifecycle 2.11)を使っていない。SDK の platform 37 を入れたら、compileSdk と一緒に上げる。
+
+## アイコンの対応表
+
+DSL のアイコン名は SF Symbols の語彙なので、`docs/dsl/icon-map.json`(iOS と共有する正典)で Material の名前に写す。表に無い名前は末尾の `.fill` / `.circle` / `.square` を外して引き直し、それでも無ければ細い円を出す。
+
+APK を小さく保つため material-icons-extended は依存に足さず、表で使う絵だけを取り込む。名前を足したら、extended と core の sources jar(版は `materialIconsCore`)を展開して `python3 scripts/gen-symbol-icons.py <extended> <core>` を回す(`renderer/.../theme/icons/` を作り直す)。`SymbolIconTableTest` が、例・schema・backend の AI のカタログ・部品が書く名前の漏れを見る。

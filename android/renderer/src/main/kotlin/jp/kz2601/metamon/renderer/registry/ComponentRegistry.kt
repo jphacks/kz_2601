@@ -6,9 +6,18 @@ import androidx.compose.ui.Modifier
 import jp.kz2601.metamon.dsl.Action
 import jp.kz2601.metamon.dsl.Component
 import jp.kz2601.metamon.dsl.ComponentType
+import jp.kz2601.metamon.renderer.ActionContext
 import jp.kz2601.metamon.renderer.DSLRuntime
 import jp.kz2601.metamon.renderer.NoopDSLRuntime
 import jp.kz2601.metamon.renderer.components.ButtonLeaf
+import jp.kz2601.metamon.renderer.components.AvatarLeaf
+import jp.kz2601.metamon.renderer.components.BadgeLeaf
+import jp.kz2601.metamon.renderer.components.EmptyStateLeaf
+import jp.kz2601.metamon.renderer.components.IconLeaf
+import jp.kz2601.metamon.renderer.components.ImageLeaf
+import jp.kz2601.metamon.renderer.components.LabelLeaf
+import jp.kz2601.metamon.renderer.components.LinkLeaf
+import jp.kz2601.metamon.renderer.components.MarkdownLeaf
 import jp.kz2601.metamon.renderer.components.CardContainer
 import jp.kz2601.metamon.renderer.components.CarouselContainer
 import jp.kz2601.metamon.renderer.components.DisclosureContainer
@@ -20,15 +29,24 @@ import jp.kz2601.metamon.renderer.components.SpacerLeaf
 import jp.kz2601.metamon.renderer.components.TextLeaf
 import jp.kz2601.metamon.renderer.components.VStackContainer
 import jp.kz2601.metamon.renderer.components.VoiceInputLeaf
+import jp.kz2601.metamon.renderer.components.inputs.registerInputLeaves
+import jp.kz2601.metamon.renderer.form.FormDraft
 import jp.kz2601.metamon.renderer.navigation.Route
 
-/** 描画中の文脈。どの画面(route)か・能力(runtime)・アクションの実行口。 */
+/** 描画中の文脈。どの画面(route)か・能力(runtime)・その画面のフォームの下書き・アクションの実行口。 */
 class RenderContext(
     val route: Route,
     val runtime: DSLRuntime = NoopDSLRuntime,
-    /** button などが押された時。遷移は描画器が、それ以外は runtime が受ける。 */
-    val perform: (Action) -> Unit = {},
-)
+    /** `screen.entity` を持つ画面の下書き(入力部品が書く)。無ければ入力部品は「フォームの外」の枠になる。 */
+    val form: FormDraft? = null,
+    /** 押した場所つきのアクション。遷移は描画器が、それ以外は runtime が受ける。一覧の行タップは recordId 付きで呼ぶ。 */
+    val dispatch: (Action, ActionContext) -> Unit = { _, _ -> },
+) {
+    /** button などが押された時(この画面・このフォームから)。 */
+    val perform: (Action) -> Unit = { dispatch(it, ActionContext(route, form)) }
+
+    fun withForm(form: FormDraft?): RenderContext = RenderContext(route, runtime, form, dispatch)
+}
 
 typealias ComponentBuilder = @Composable (component: Component, ctx: RenderContext, modifier: Modifier) -> Unit
 
@@ -71,11 +89,22 @@ class ComponentRegistry private constructor(private val builders: Map<String, Co
             register(ComponentType.DISCLOSURE) { c, ctx, m -> DisclosureContainer(c, ctx, m) }
             register(ComponentType.CAROUSEL) { c, ctx, m -> CarouselContainer(c, ctx, m) }
             register(ComponentType.GRID) { c, ctx, m -> GridContainer(c, ctx, m) }
-            // leaf
+            // input(12)・登録は components/inputs/InputLeaves.kt
+            registerInputLeaves()
+            // leaf: 表示(11・#857)
             register(ComponentType.TEXT) { c, _, m -> TextLeaf(c, m) }
-            register(ComponentType.BUTTON) { c, ctx, m -> ButtonLeaf(c, ctx, m) }
-            register(ComponentType.SPACER) { c, _, m -> SpacerLeaf(c, m) }
+            register(ComponentType.LABEL) { c, _, m -> LabelLeaf(c, m) }
+            register(ComponentType.ICON) { c, _, m -> IconLeaf(c, m) }
+            register(ComponentType.MARKDOWN) { c, _, m -> MarkdownLeaf(c, m) }
+            register(ComponentType.BADGE) { c, _, m -> BadgeLeaf(c, m) }
+            register(ComponentType.AVATAR) { c, ctx, m -> AvatarLeaf(c, ctx, m) }
+            register(ComponentType.IMAGE) { c, ctx, m -> ImageLeaf(c, ctx, m) }
             register(ComponentType.DIVIDER) { _, _, m -> DividerLeaf(m) }
+            register(ComponentType.SPACER) { c, _, m -> SpacerLeaf(c, m) }
+            register(ComponentType.LINK) { c, _, m -> LinkLeaf(c, m) }
+            register(ComponentType.EMPTY_STATE) { c, _, m -> EmptyStateLeaf(c, m) }
+            // leaf: その他
+            register(ComponentType.BUTTON) { c, ctx, m -> ButtonLeaf(c, ctx, m) }
             register(ComponentType.VOICE_INPUT) { c, ctx, m -> VoiceInputLeaf(c, ctx, m) }
         }
     }
