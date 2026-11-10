@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 一覧・集計・カレンダー・表の固定の文言(#1070・#859)。文言の正は iOS の MetamonRenderer の Localizable.xcstrings -->
+<resources>
+    <string name="lists_add">追加</string>
+    <string name="lists_avg">%1$sの平均</string>
+    <string name="lists_cell_empty">空き</string>
+    <string name="lists_chart_empty">まだ記録がありません。記録するとグラフになります</string>
+    <string name="lists_chart_summary_many">%1$d 項目。最大は %2$s の %3$s、最小は %4$s の %5$s</string>
+    <string name="lists_chart_summary_one">%1$d 項目。%2$s の %3$s</string>
+    <string name="lists_check">チェックする</string>
+    <string name="lists_checked">チェック済み</string>
+    <string name="lists_clear">クリア</string>
+    <string name="lists_count">件数</string>
+    <string name="lists_count_unit">件</string>
+    <string name="lists_delete">削除</string>
+    <string name="lists_edit">編集</string>
+    <string name="lists_empty">まだありません</string>
+    <string name="lists_everyone">全員</string>
+    <string name="lists_gauge">ゲージ</string>
+    <string name="lists_gauge_range">%1$s(範囲 %2$s〜%3$s)</string>
+    <string name="lists_list_last">、</string>
+    <string name="lists_list_pair">、</string>
+    <string name="lists_list_separator">、</string>
+    <string name="lists_max">%1$sの最大</string>
+    <string name="lists_member">参加者</string>
+    <string name="lists_min">%1$sの最小</string>
+    <string name="lists_next_month">次の月</string>
+    <string name="lists_no_data">データがありません</string>
+    <string name="lists_no_events">予定はありません</string>
+    <string name="lists_no_records">記録なし</string>
+    <string name="lists_not_checked">未チェック</string>
+    <string name="lists_open">開く</string>
+    <string name="lists_previous_month">前の月</string>
+    <string name="lists_progress">進捗</string>
+    <string name="lists_records_count">記録%1$d件</string>
+    <string name="lists_search">検索</string>
+    <string name="lists_sentence_separator">。</string>
+    <string name="lists_sum">%1$sの合計</string>
+    <string name="lists_today">%1$s、今日</string>
+    <string name="lists_unavailable">取得できませんでした</string>
+    <string name="lists_uncheck">チェックを外す</string>
+    <string name="lists_untitled">(無題)</string>
+</resources>

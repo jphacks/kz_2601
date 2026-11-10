@@ -56,6 +56,7 @@ import jp.kz2601.metamon.services.consent.KeyValueStore
 import jp.kz2601.metamon.services.consent.SharedPreferencesKeyValueStore
 import jp.kz2601.metamon.services.social.AuthorProfile
 import jp.kz2601.metamon.voice.ChatHistoryStore
+import jp.kz2601.metamon.voice.ClarifySettings
 import jp.kz2601.metamon.voice.FabPositionStore
 import jp.kz2601.metamon.voice.LaunchVisits
 import jp.kz2601.metamon.voice.SpeechSettings
@@ -400,6 +401,7 @@ class AppContainer(
             SpeechSettings(context).clear()
             LaunchVisits.forget(context)
             FabPositionStore(context).clear()
+            ClarifySettings(context).clear() // 聞き返しの設定(iOS は UserDefaults ごと消す)
         }
 
         /** 端末内の動画・録音のファイル(どちらもバックアップされない領域)と、撮影・録音の途中で残った一時ファイル。 */

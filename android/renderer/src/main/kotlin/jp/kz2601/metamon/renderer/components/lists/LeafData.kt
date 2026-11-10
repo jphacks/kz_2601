@@ -27,6 +27,8 @@ class LeafData(
     val runtime: DSLRuntime,
     private val records: Map<String, List<Record>>,
     val now: Instant = DSLClock.now(),
+    /** 値の文言。既定は適合テストの値(iOS の日本語)。画面は [rememberLeafData] が端末の言語で渡す。 */
+    val labels: ValueLabels = ValueLabels.JAPANESE,
 ) {
     val evaluator: ExprEvaluator = ExprEvaluator(runtime.entityModels, { records[it].orEmpty() }, now)
 
@@ -47,10 +49,10 @@ class LeafData(
         when (field?.type) {
             FieldType.REFS -> {
                 val names = Aggregator.refIds(value).mapNotNull { refTitle(it, field.refEntity) }
-                return if (names.isEmpty()) "全員" else names.joinToString("、")
+                return if (names.isEmpty()) labels.everyone else labels.joinList(names)
             }
             FieldType.MEMBER -> return memberName(value.stringValue)
-            FieldType.MEMBERS -> return Aggregator.refIds(value).joinToString("、") { memberName(it) }
+            FieldType.MEMBERS -> return labels.joinList(Aggregator.refIds(value).map { memberName(it) })
             FieldType.REF -> {
                 val id = value.stringValue?.takeIf { it.isNotEmpty() } ?: return ""
                 // enum から ref に変えた後の古い記録は選択肢の名前そのものを持つ(#194)
@@ -72,16 +74,16 @@ class LeafData(
         return FieldCoding.display(record[tf], target.field(tf), now = now)
     }
 
-    private fun memberName(uid: String?): String = memberName(runtime, uid)
+    private fun memberName(uid: String?): String = memberName(runtime, uid, labels.member)
 
     companion object {
-        /** 名簿に無い(抜けた・読む前)・表示名が空のメンバーの出し方(iOS の `MembersHost` と同じ・#1076)。 */
-        const val MEMBER_FALLBACK = "参加者"
-
-        /** type member の値(uid)の表示名。未選択は空。一覧・遊び系・チャットはここを使う。 */
-        fun memberName(runtime: DSLRuntime, uid: String?): String {
+        /**
+         * type member の値(uid)の表示名。未選択は空。一覧・遊び系・チャットはここを使う。
+         * 名簿に無い(抜けた・読む前)・表示名が空なら [fallback](iOS の `MembersHost` と同じ・#1076)。
+         */
+        fun memberName(runtime: DSLRuntime, uid: String?, fallback: String): String {
             if (uid.isNullOrEmpty()) return ""
-            return runtime.formMembers.firstOrNull { it.uid == uid }?.displayName?.takeIf { it.isNotEmpty() } ?: MEMBER_FALLBACK
+            return runtime.formMembers.firstOrNull { it.uid == uid }?.displayName?.takeIf { it.isNotEmpty() } ?: fallback
         }
     }
 }
@@ -91,5 +93,6 @@ class LeafData(
 fun rememberLeafData(runtime: DSLRuntime): LeafData {
     val flow = runtime.recordsFlow
     val records = flow?.collectAsState()?.value.orEmpty()
-    return remember(runtime, records) { LeafData(runtime, records) }
+    val labels = rememberValueLabels()
+    return remember(runtime, records, labels) { LeafData(runtime, records, labels = labels) }
 }

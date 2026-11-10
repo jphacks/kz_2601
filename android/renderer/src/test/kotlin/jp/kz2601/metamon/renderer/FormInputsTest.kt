@@ -224,7 +224,7 @@ class FormInputsTest {
         val rt = FakeRuntime(entities, mapOf("shop" to listOf(Record("s1", mapOf("title" to JSONValue.Str("八百屋"))))))
         val shop = item.field("shop")!!
         assertEquals(listOf("s1" to "八百屋"), FormChoices.refOptions(shop, rt).map { it.id to it.title })
-        assertEquals("お店", FormChoices.refEntityName(shop, rt))
+        assertEquals("お店", FormChoices.refEntityName(shop, rt, "linked item"))
         val f = FormDraft(item)
         f.setNumberText("count", "2")
         f.setNumberText("price", "150")

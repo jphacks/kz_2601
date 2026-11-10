@@ -1,61 +1,64 @@
 package jp.kz2601.metamon.runtime
 
+import jp.kz2601.metamon.R
 import jp.kz2601.metamon.dsl.ActionType
 
-/** AppRuntime が出す文言(iOS の L10n キーと同じ日本語)。 */
+/** AppRuntime が出す文言(iOS の L10n キーと同じ)。文は strings_runtime.xml、画面で解決する。 */
 object RuntimeCopy {
-    const val NO_FORM = "保存するフォームがありません"
-    const val READ_ONLY = "このデータは作った人だけが変更できます"
-    const val SAVE_FAILED = "保存できませんでした。通信を確かめてもう一度お試しください"
-    const val OPEN_URL_REJECTED = "openUrl: url は https か line/slack/discord/tel/mailto/maps のみ"
-    const val SAVE_PARENT_FIRST = "先に保存してください"
-    const val REJECTED_GENERIC = "保存できませんでした。入力を確認して、もう一度お試しください"
-    const val CONFLICT = "他の端末で変更されていたため、サーバーの内容に合わせました"
-    const val NOT_MEMBER = "この共有に参加していません。招待リンクから参加してください"
-    const val APP_STOPPED = "このアプリの自動の動きは運営が止めています。この変更は保存できませんでした"
-    const val TEXT_NOT_ALLOWED = "表示できない言葉が含まれています"
-    const val ADMINS_ONLY = "管理者だけができる操作です"
-    const val ONE_PER_PERSON = "1 人 1 件までです。もう登録しています"
-    const val DUPLICATE = "同じ内容の記録がもうあります"
-    const val NOTIFICATION_FAILED = "通知を予約できませんでした"
-    const val FAILED = "うまくいきませんでした"
-    const val DELETED = "削除しました"
-    const val UNDO = "元に戻す"
-    const val UNAVAILABLE_ON_ANDROID = "この機能は Android ではまだ使えません"
+    val NO_FORM = UiText.Res(R.string.runtime_no_form)
+    val READ_ONLY = UiText.Res(R.string.runtime_read_only)
+    val SAVE_FAILED = UiText.Res(R.string.runtime_save_failed)
+    val OPEN_URL_REJECTED = UiText.Res(R.string.runtime_open_url_rejected)
+    val SAVE_PARENT_FIRST = UiText.Res(R.string.runtime_save_parent_first)
+    val REJECTED_GENERIC = UiText.Res(R.string.runtime_rejected_generic)
+    val CONFLICT = UiText.Res(R.string.runtime_conflict)
+    val NOT_MEMBER = UiText.Res(R.string.runtime_not_member)
+    val APP_STOPPED = UiText.Res(R.string.runtime_app_stopped)
+    val TEXT_NOT_ALLOWED = UiText.Res(R.string.runtime_text_not_allowed)
+    val ADMINS_ONLY = UiText.Res(R.string.runtime_admins_only)
+    val ONE_PER_PERSON = UiText.Res(R.string.runtime_one_per_person)
+    val DUPLICATE = UiText.Res(R.string.runtime_duplicate)
+    val NOTIFICATION_FAILED = UiText.Res(R.string.runtime_notification_failed)
+    val FAILED = UiText.Res(R.string.runtime_failed)
+    val UNAVAILABLE_ON_ANDROID = UiText.Res(R.string.runtime_unavailable_on_android)
     const val NAME_SEPARATOR = "・"
-    const val HOT_RELOADED = "最新の内容に更新しました"
-    const val OFFLINE_RESTORED = "オフラインです。最後に保存したアプリを表示しています"
-    const val APPS_OFFLINE = "オフラインです。保存済みの変身一覧を表示しています"
-    const val APPS_FAILED = "変身一覧を読み込めませんでした"
-    const val SWITCH_FAILED = "アプリを読み込めませんでした。接続を確認してください"
+    val HOT_RELOADED = UiText.Res(R.string.runtime_hot_reloaded)
+    val OFFLINE_RESTORED = UiText.Res(R.string.runtime_offline_restored)
+    val APPS_OFFLINE = UiText.Res(R.string.runtime_apps_offline)
+    val APPS_FAILED = UiText.Res(R.string.runtime_apps_failed)
+    val SWITCH_FAILED = UiText.Res(R.string.runtime_switch_failed)
 
-    fun switched(name: String, offline: Boolean) = "「$name」に変身しました" + if (offline) "(オフライン・キャッシュ)" else ""
+    /** 共有の投稿の表示名(field id が authorName の時の名前)。 */
+    val AUTHOR_NAME = UiText.Res(R.string.runtime_author_name)
 
-    fun missingRequired(names: List<String>) = "${names.joinToString(NAME_SEPARATOR)} を入力してください"
+    fun switched(name: String, offline: Boolean) =
+        UiText.Res(if (offline) R.string.runtime_switched_offline else R.string.runtime_switched, name)
 
-    fun saveParentFirst(name: String) = if (name.isEmpty()) SAVE_PARENT_FIRST else "先に「$name」を保存してください"
+    fun missingRequired(names: List<String>) = UiText.Res(R.string.runtime_missing_required, names.joinToString(NAME_SEPARATOR))
 
-    fun rejected(fieldName: String) = "保存できませんでした。「$fieldName」の入力を確認してください"
+    fun saveParentFirst(name: String) = if (name.isEmpty()) SAVE_PARENT_FIRST else UiText.Res(R.string.runtime_save_parent_first_named, name)
 
-    fun paused(pending: Int) = "送信に失敗しました(未送信 $pending 件)。接続を確認してください"
+    fun rejected(fieldName: String) = UiText.Res(R.string.runtime_rejected_field, fieldName)
 
-    fun notificationScheduled(whenText: String) = "通知を予約しました($whenText)"
+    fun paused(pending: Int) = UiText.Res(R.string.runtime_paused, pending)
 
-    fun unknownAction(rawType: String) = "未対応のアクション: $rawType"
+    fun notificationScheduled(whenText: String) = UiText.Res(R.string.runtime_notification_scheduled, whenText)
 
-    fun adminsOnly(fieldName: String) = "「$fieldName」は管理者だけが変更できます"
+    fun unknownAction(rawType: String) = UiText.Res(R.string.runtime_unknown_action, rawType)
 
-    fun duplicate(names: List<String>) = "「${names.joinToString(NAME_SEPARATOR)}」が同じ記録がもうあります"
+    fun adminsOnly(fieldName: String) = UiText.Res(R.string.runtime_admins_only_field, fieldName)
 
-    fun textNotAllowed(fieldName: String) = "「$fieldName」に表示できない言葉が含まれています"
+    fun duplicate(names: List<String>) = UiText.Res(R.string.runtime_duplicate_fields, names.joinToString(NAME_SEPARATOR))
+
+    fun textNotAllowed(fieldName: Any) = UiText.Res(R.string.runtime_text_not_allowed_field, fieldName)
 
     /** 確認ダイアログの主ボタン(iOS の `Confirm.button(for:)`)。 */
-    fun confirmButton(type: ActionType): Pair<String, Boolean> = when (type) {
-        ActionType.DELETE_RECORD -> "削除" to true
-        ActionType.RESET_FORM -> "入力を消す" to true
-        ActionType.SAVE_RECORD -> "保存" to false
-        ActionType.EXPORT -> "書き出す" to false
-        ActionType.NAVIGATE, ActionType.OPEN_URL -> "開く" to false
-        else -> "続ける" to false
+    fun confirmButton(type: ActionType): Pair<Int, Boolean> = when (type) {
+        ActionType.DELETE_RECORD -> R.string.runtime_confirm_delete to true
+        ActionType.RESET_FORM -> R.string.runtime_confirm_reset to true
+        ActionType.SAVE_RECORD -> R.string.runtime_confirm_save to false
+        ActionType.EXPORT -> R.string.runtime_confirm_export to false
+        ActionType.NAVIGATE, ActionType.OPEN_URL -> R.string.runtime_confirm_open to false
+        else -> R.string.runtime_confirm_continue to false
     }
 }

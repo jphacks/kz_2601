@@ -43,6 +43,8 @@ import jp.kz2601.metamon.dsl.records.Record
 import jp.kz2601.metamon.renderer.ActionContext
 import jp.kz2601.metamon.renderer.DSLRuntime
 import jp.kz2601.metamon.renderer.R
+import jp.kz2601.metamon.renderer.components.lists.ValueLabels
+import jp.kz2601.metamon.renderer.components.lists.rememberValueLabels
 import jp.kz2601.metamon.renderer.registry.RenderContext
 import jp.kz2601.metamon.renderer.theme.RenderTheme
 import jp.kz2601.metamon.renderer.theme.SymbolIcon
@@ -68,6 +70,7 @@ fun RandomPickerLeaf(c: Component, ctx: RenderContext, modifier: Modifier = Modi
     val haptics = LocalHapticFeedback.current
     val reduceMotion = rememberReduceMotion()
     val untitled = stringResource(R.string.play_random_untitled)
+    val valueLabels = rememberValueLabels()
     val picked = pickedId?.let { id -> candidates.firstOrNull { it.id == id } }
     val shown = spinning ?: picked
     val isFinal = spinning == null
@@ -88,8 +91,8 @@ fun RandomPickerLeaf(c: Component, ctx: RenderContext, modifier: Modifier = Modi
         Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
             when {
                 shown != null -> PickedResult(
-                    title = randomPickerTitle(c, ctx.runtime, all, shown) ?: untitled,
-                    subtitle = if (isFinal) randomPickerSubtitle(c, ctx.runtime, all, shown) else null,
+                    title = randomPickerTitle(c, ctx.runtime, all, shown, valueLabels) ?: untitled,
+                    subtitle = if (isFinal) randomPickerSubtitle(c, ctx.runtime, all, shown, valueLabels) else null,
                     isFinal = isFinal,
                     onOpen = if (isFinal && c.onItemTap != null) {
                         { c.onItemTap?.let { ctx.dispatch(it, ActionContext(ctx.route, ctx.form, recordId = shown.id)) } }
@@ -161,17 +164,17 @@ private fun PickedResult(title: String, subtitle: String?, isFinal: Boolean, onO
 }
 
 /** 見出し(titleField → entity の見出し)。空なら null(呼び側が「(無題)」)。 */
-fun randomPickerTitle(c: Component, runtime: DSLRuntime, all: Map<String, List<Record>>, r: Record): String? {
+fun randomPickerTitle(c: Component, runtime: DSLRuntime, all: Map<String, List<Record>>, r: Record, labels: ValueLabels = ValueLabels.JAPANESE): String? {
     val entity = runtime.entityModel(c.entity.orEmpty())
     val f = c.titleField ?: entity?.displayTitleField ?: ""
-    return PlayRecords.display(runtime, all, r[f], entity?.field(f)).ifEmpty { null }
+    return PlayRecords.display(runtime, all, r[f], entity?.field(f), labels).ifEmpty { null }
 }
 
 /** 補足(subtitleField)。空・評価できない値は null。 */
-fun randomPickerSubtitle(c: Component, runtime: DSLRuntime, all: Map<String, List<Record>>, r: Record): String? {
+fun randomPickerSubtitle(c: Component, runtime: DSLRuntime, all: Map<String, List<Record>>, r: Record, labels: ValueLabels = ValueLabels.JAPANESE): String? {
     val f = c.subtitleField?.takeIf { it.isNotEmpty() } ?: return null
     val entity = runtime.entityModel(c.entity.orEmpty())
-    val s = PlayRecords.display(runtime, all, r[f] ?: JSONValue.Null, entity?.field(f))
+    val s = PlayRecords.display(runtime, all, r[f] ?: JSONValue.Null, entity?.field(f), labels)
     return s.takeUnless { it.isEmpty() || it == FieldCoding.UNAVAILABLE }
 }
 

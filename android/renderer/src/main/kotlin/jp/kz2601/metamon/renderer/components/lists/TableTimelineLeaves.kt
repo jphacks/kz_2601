@@ -48,7 +48,7 @@ fun TableLeaf(c: Component, ctx: RenderContext, modifier: Modifier = Modifier) {
         Row(Modifier.fillMaxWidth().semantics { heading() }, horizontalArrangement = Arrangement.spacedBy(RenderTheme.Spacing.row)) {
             columns.forEach { col ->
                 Text(
-                    TableCells.header(col, entity),
+                    TableCells.header(col, entity, data.labels),
                     Modifier.weight(1f),
                     style = RenderTheme.Fonts.tableHeader,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -61,7 +61,7 @@ fun TableLeaf(c: Component, ctx: RenderContext, modifier: Modifier = Modifier) {
         HorizontalDivider(Modifier.padding(vertical = 6.dp), color = RenderTheme.colors.hairline)
         rows.forEach { row ->
             // 行は 1 要素で「見出し: 値」を続けて読む
-            val spoken = columns.mapIndexed { i, col -> "${TableCells.header(col, entity)}: ${row.texts.getOrElse(i) { "" }}" }.joinToString(", ")
+            val spoken = columns.mapIndexed { i, col -> "${TableCells.header(col, entity, data.labels)}: ${row.texts.getOrElse(i) { "" }}" }.joinToString(", ")
             Row(
                 Modifier.fillMaxWidth().padding(vertical = 5.dp).clearAndSetSemantics { contentDescription = spoken },
                 horizontalArrangement = Arrangement.spacedBy(RenderTheme.Spacing.row),
@@ -78,7 +78,7 @@ fun TableLeaf(c: Component, ctx: RenderContext, modifier: Modifier = Modifier) {
                 }
             }
         }
-        if (rows.isEmpty()) EmptyPlaceholder("tablecells", LIST_EMPTY_TEXT)
+        if (rows.isEmpty()) EmptyPlaceholder("tablecells", data.labels.empty)
     }
 }
 
@@ -89,7 +89,7 @@ fun TimelineLeaf(c: Component, ctx: RenderContext, modifier: Modifier = Modifier
     val entity = data.entity(c.entity)
     val rows = TimelineRows.rows(c, data)
     if (rows.isEmpty()) {
-        EmptyPlaceholder("clock", LIST_EMPTY_TEXT, modifier)
+        EmptyPlaceholder("clock", data.labels.empty, modifier)
         return
     }
     val colors = RenderTheme.colors

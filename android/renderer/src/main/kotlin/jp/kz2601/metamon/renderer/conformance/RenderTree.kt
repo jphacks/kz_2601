@@ -9,7 +9,6 @@ import jp.kz2601.metamon.dsl.screen
 import jp.kz2601.metamon.dsl.records.FieldCoding
 import jp.kz2601.metamon.renderer.components.lists.ChartBuckets
 import jp.kz2601.metamon.renderer.components.lists.GaugeValue
-import jp.kz2601.metamon.renderer.components.lists.LIST_EMPTY_TEXT
 import jp.kz2601.metamon.renderer.components.lists.LeafData
 import jp.kz2601.metamon.renderer.components.lists.ListRows
 import jp.kz2601.metamon.renderer.components.lists.ListToggle
@@ -21,6 +20,7 @@ import jp.kz2601.metamon.renderer.DSLRuntime
 import jp.kz2601.metamon.renderer.NoopDSLRuntime
 import jp.kz2601.metamon.renderer.components.disclosureTitle
 import jp.kz2601.metamon.renderer.components.inputs.InputRules
+import jp.kz2601.metamon.renderer.components.lists.ValueLabels
 import jp.kz2601.metamon.renderer.form.FormDraft
 import jp.kz2601.metamon.renderer.components.gridColumns
 import jp.kz2601.metamon.renderer.components.isButtonVisible
@@ -161,7 +161,7 @@ class RenderTree(
             val data = leafData()
             val entity = data.entity(c.entity)
             mapOf(
-                "columns" to JsonArray(c.columns.map { JsonPrimitive(TableCells.header(it, entity)) }),
+                "columns" to JsonArray(c.columns.map { JsonPrimitive(TableCells.header(it, entity, data.labels)) }),
                 "rows" to JsonArray(TableCells.rows(c, data).map { r -> JsonArray(r.texts.map(::JsonPrimitive)) }),
             )
         }
@@ -217,7 +217,8 @@ class RenderTree(
         else -> emptyMap()
     }
 
-    private fun leafData() = LeafData(runtime, runtime.recordsFlow?.value.orEmpty())
+    // 値の文言は iOS の日本語の期待値と突き合わせる
+    private fun leafData() = LeafData(runtime, runtime.recordsFlow?.value.orEmpty(), labels = ValueLabels.JAPANESE)
 
     private fun listProps(c: Component, data: LeafData): Map<String, JsonElement> {
         val entity = data.entity(c.entity)
@@ -239,7 +240,7 @@ class RenderTree(
                 },
             ),
         )
-        if (rows.isEmpty()) out["emptyText"] = JsonPrimitive(c.emptyText ?: LIST_EMPTY_TEXT)
+        if (rows.isEmpty()) out["emptyText"] = JsonPrimitive(c.emptyText ?: data.labels.empty)
         return out
     }
 

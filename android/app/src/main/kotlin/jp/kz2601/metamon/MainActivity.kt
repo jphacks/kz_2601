@@ -61,6 +61,7 @@ import jp.kz2601.metamon.retention.RetentionPromptHost
 import jp.kz2601.metamon.runtime.AppRuntime
 import jp.kz2601.metamon.runtime.NavigationSnapshot
 import jp.kz2601.metamon.runtime.TranscriberDictationHost
+import jp.kz2601.metamon.runtime.UiText
 import jp.kz2601.metamon.services.GenerateProgress
 import jp.kz2601.metamon.services.PlanUsageSource
 import jp.kz2601.metamon.voice.AndroidSpeechEngine
@@ -414,11 +415,13 @@ private suspend fun openFromNotification(runtime: AppRuntime, appId: String) {
 }
 
 /** 生成の途中経過を 1 行にする。今の画面の途中経過は [BuildStageHost] が出す(文言の置き場として残す)。 */
-internal fun progressText(p: GenerateProgress): String = when (p) {
-    is GenerateProgress.App -> "「${p.name}」を作っています" + if (p.tabs.isEmpty()) "" else "(${p.tabs.joinToString("・")})"
-    is GenerateProgress.Summary -> p.text
-    is GenerateProgress.Component -> "部品 ${p.component.index + 1}: ${p.component.label ?: p.component.type}"
-    is GenerateProgress.Restart -> "やり直しています"
+internal fun progressText(p: GenerateProgress): UiText = when (p) {
+    is GenerateProgress.App ->
+        if (p.tabs.isEmpty()) UiText.Res(R.string.voice_progress_app, p.name)
+        else UiText.Res(R.string.voice_progress_app_tabs, p.name, p.tabs.joinToString("・"))
+    is GenerateProgress.Summary -> UiText.Raw(p.text)
+    is GenerateProgress.Component -> UiText.Res(R.string.voice_progress_component, p.component.index + 1, p.component.label ?: p.component.type)
+    is GenerateProgress.Restart -> UiText.Res(R.string.voice_progress_restart)
 }
 
 private const val AUTO_NAV_START_MILLIS = 3_000L

@@ -15,11 +15,13 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import jp.kz2601.metamon.dsl.Component
 import jp.kz2601.metamon.dsl.logic.ExternalUrlPolicy
+import jp.kz2601.metamon.renderer.R
 import jp.kz2601.metamon.renderer.theme.RenderTheme
 import jp.kz2601.metamon.renderer.theme.SymbolIcon
 import jp.kz2601.metamon.renderer.theme.colors
@@ -66,7 +68,7 @@ fun LinkLeaf(c: Component, modifier: Modifier = Modifier) {
         modifier
             .fillMaxWidth()
             .defaultMinSize(minHeight = 44.dp)
-            .clickable(role = Role.Button, onClickLabel = "開く") { openExternalUrl(context, target) },
+            .clickable(role = Role.Button, onClickLabel = stringResource(R.string.lists_open)) { openExternalUrl(context, target) },
         horizontalArrangement = Arrangement.spacedBy(RenderTheme.Spacing.xs),
         verticalAlignment = Alignment.CenterVertically,
     ) {

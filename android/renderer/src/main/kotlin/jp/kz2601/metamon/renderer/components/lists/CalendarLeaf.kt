@@ -27,6 +27,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.heading
@@ -42,6 +43,7 @@ import jp.kz2601.metamon.dsl.expr.DSLClock
 import jp.kz2601.metamon.dsl.records.FieldCoding
 import jp.kz2601.metamon.dsl.records.Record
 import jp.kz2601.metamon.renderer.ActionContext
+import jp.kz2601.metamon.renderer.R
 import jp.kz2601.metamon.renderer.form.FormPrefill
 import jp.kz2601.metamon.renderer.registry.RenderContext
 import jp.kz2601.metamon.renderer.theme.RenderTheme
@@ -95,6 +97,8 @@ fun CalendarLeaf(c: Component, ctx: RenderContext, modifier: Modifier = Modifier
     val days = CalendarMonth.byDay(data.viewRecords(entityId), dateField)
     val colors = RenderTheme.colors
     val dayLabel = DateTimeFormatter.ofLocalizedDate(FormatStyle.FULL).withLocale(locale)
+    val previousMonth = stringResource(R.string.lists_previous_month)
+    val nextMonth = stringResource(R.string.lists_next_month)
 
     Column(modifier.renderCard(), verticalArrangement = Arrangement.spacedBy(10.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically) {
@@ -102,7 +106,7 @@ fun CalendarLeaf(c: Component, ctx: RenderContext, modifier: Modifier = Modifier
                 Text(it, style = RenderTheme.Fonts.sectionTitle, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
             Spacer(Modifier.weight(1f))
-            IconButton(onClick = { month = month.minusMonths(1) }, Modifier.semantics { contentDescription = "前の月" }) {
+            IconButton(onClick = { month = month.minusMonths(1) }, Modifier.semantics { contentDescription = previousMonth }) {
                 SymbolIcon("chevron.left", 22.dp, MaterialTheme.colorScheme.onSurface)
             }
             Text(
@@ -112,7 +116,7 @@ fun CalendarLeaf(c: Component, ctx: RenderContext, modifier: Modifier = Modifier
                 textAlign = TextAlign.Center,
                 maxLines = 1,
             )
-            IconButton(onClick = { month = month.plusMonths(1) }, Modifier.semantics { contentDescription = "次の月" }) {
+            IconButton(onClick = { month = month.plusMonths(1) }, Modifier.semantics { contentDescription = nextMonth }) {
                 SymbolIcon("chevron.right", 22.dp, MaterialTheme.colorScheme.onSurface)
             }
         }
@@ -158,13 +162,13 @@ fun CalendarLeaf(c: Component, ctx: RenderContext, modifier: Modifier = Modifier
                     ctx.dispatch(action, ActionContext(ctx.route, ctx.form))
                 }) {
                     SymbolIcon("plus", 18.dp, colors.brandText)
-                    Text("追加", color = colors.brandText, fontWeight = FontWeight.SemiBold)
+                    Text(stringResource(R.string.lists_add), color = colors.brandText, fontWeight = FontWeight.SemiBold)
                 }
             }
         }
         val rows = days[selected].orEmpty()
         if (rows.isEmpty()) {
-            Text("予定はありません", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Text(stringResource(R.string.lists_no_events), style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
         } else {
             val item = ListItem(title = entity?.titleField ?: dateField)
             rows.forEach { row ->
@@ -185,6 +189,9 @@ fun CalendarLeaf(c: Component, ctx: RenderContext, modifier: Modifier = Modifier
 private fun DayCell(date: LocalDate, count: Int, isSelected: Boolean, isToday: Boolean, label: DateTimeFormatter, onClick: () -> Unit) {
     val colors = RenderTheme.colors
     val bg = if (isSelected) Brush.linearGradient(listOf(colors.brandFillStart, colors.brandFillEnd)) else Brush.linearGradient(listOf(Color.Transparent, Color.Transparent))
+    val day = date.format(label)
+    val description = if (isToday) stringResource(R.string.lists_today, day) else day
+    val state = if (count > 0) stringResource(R.string.lists_records_count, count) else stringResource(R.string.lists_no_records)
     Column(
         Modifier
             .fillMaxWidth()
@@ -192,8 +199,8 @@ private fun DayCell(date: LocalDate, count: Int, isSelected: Boolean, isToday: B
             .background(bg, RoundedCornerShape(10.dp))
             .clickable(onClick = onClick)
             .clearAndSetSemantics {
-                contentDescription = date.format(label) + if (isToday) "、今日" else ""
-                stateDescription = if (count > 0) "記録${count}件" else "記録なし"
+                contentDescription = description
+                stateDescription = state
                 selected = isSelected
             },
         horizontalAlignment = Alignment.CenterHorizontally,

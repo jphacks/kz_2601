@@ -23,6 +23,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
@@ -37,6 +38,7 @@ import jp.kz2601.metamon.dsl.Component
 import jp.kz2601.metamon.dsl.Height
 import jp.kz2601.metamon.dsl.records.JSONValue
 import jp.kz2601.metamon.dsl.records.VideoValue
+import jp.kz2601.metamon.renderer.R
 import jp.kz2601.metamon.renderer.registry.RenderContext
 import jp.kz2601.metamon.renderer.theme.RenderTheme
 import jp.kz2601.metamon.renderer.theme.SymbolIcon
@@ -60,6 +62,16 @@ object PhotoValue {
 
     /** 写真があるか(iOS の PhotoView.hasPhoto)。 */
     fun hasPhoto(value: String?): Boolean = dataBytes(value) != null || isRemote(value)
+
+    /**
+     * 記録・下書きの値 → 描く写真(data URL / https)。video field の値はサムネイル(iOS の PhotoCodec)。
+     * 文字列でない・写真でない値は null。
+     */
+    fun of(value: JSONValue?): String? {
+        val raw = (value as? JSONValue.Str)?.value ?: return null
+        val photo = if (raw.startsWith(VideoValue.PREFIX)) VideoValue.parse(raw)?.thumbnail else raw
+        return photo?.takeIf { hasPhoto(it) }
+    }
 }
 
 /** avatar のイニシャル。「山田 太郎」→「山太」、英字 1 語は先頭 2 文字を大文字、日本語 1 語は 1 文字(iOS と同じ)。 */
@@ -87,9 +99,7 @@ private fun rememberPhoto(value: String?): ImageBitmap? = remember(value) {
  */
 internal fun photoFieldValue(c: Component, ctx: RenderContext?): String? {
     val field = c.field ?: return null
-    val raw = (ctx?.form?.values?.get(field) as? JSONValue.Str)?.value ?: return null
-    val value = if (raw.startsWith(VideoValue.PREFIX)) VideoValue.parse(raw)?.thumbnail else raw
-    return value?.takeIf { PhotoValue.hasPhoto(it) }
+    return PhotoValue.of(ctx?.form?.values?.get(field))
 }
 
 /** `avatar`: 円の画像。優先順: photo field → `image`(data URL / https)→ `name` のイニシャル → 人のアイコン。読み上げは name。 */
@@ -99,10 +109,11 @@ fun AvatarLeaf(c: Component, ctx: RenderContext, modifier: Modifier = Modifier) 
     val value = photoFieldValue(c, ctx) ?: c.image
     val bitmap = rememberPhoto(value)
     val remote = if (bitmap == null) RemoteImages.loadableUrl(value) else null
+    val avatar = c.name ?: stringResource(R.string.inputs_avatar)
     val colors = RenderTheme.colors
     Box(
         modifier.fillMaxWidth().clearAndSetSemantics {
-            contentDescription = c.name ?: "アバター"
+            contentDescription = avatar
             role = Role.Image
         },
         contentAlignment = Alignment.Center,
@@ -157,6 +168,7 @@ fun PhotoView(value: String?, height: Dp, modifier: Modifier = Modifier) {
     val phase = remote?.let { rememberRemotePhase(it) }
     // 読めなかった https は「写真なし」と同じ枠・読み上げ
     val has = bitmap != null || (remote != null && phase?.value != RemotePhase.FAILED)
+    val photoLabel = stringResource(if (has) R.string.inputs_photo else R.string.inputs_no_photo)
     Box(
         modifier
             .fillMaxWidth()
@@ -164,7 +176,7 @@ fun PhotoView(value: String?, height: Dp, modifier: Modifier = Modifier) {
             .clip(RoundedCornerShape(RenderTheme.Radius.inner))
             .background(MaterialTheme.colorScheme.surfaceVariant)
             .clearAndSetSemantics {
-                contentDescription = if (has) "写真" else "写真なし"
+                contentDescription = photoLabel
                 if (has) role = Role.Image
             },
         contentAlignment = Alignment.Center,

@@ -25,6 +25,7 @@ import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.stateDescription
@@ -33,6 +34,7 @@ import androidx.compose.ui.unit.dp
 import jp.kz2601.metamon.dsl.Component
 import jp.kz2601.metamon.dsl.records.Aggregator
 import jp.kz2601.metamon.dsl.records.FieldCoding
+import jp.kz2601.metamon.renderer.R
 import jp.kz2601.metamon.renderer.registry.RenderContext
 import jp.kz2601.metamon.renderer.theme.LocalReduceMotion
 import jp.kz2601.metamon.renderer.theme.RenderTheme
@@ -66,9 +68,10 @@ fun ProgressBarLeaf(c: Component, ctx: RenderContext, modifier: Modifier = Modif
         if (LocalReduceMotion.current) snap() else tween(300),
         label = "progress",
     )
+    val progressLabel = c.label ?: stringResource(R.string.lists_progress)
     Column(
         modifier.renderCard().clearAndSetSemantics {
-            contentDescription = c.label ?: "進捗"
+            contentDescription = progressLabel
             stateDescription = percent
         },
         verticalArrangement = Arrangement.spacedBy(6.dp),
@@ -95,12 +98,14 @@ fun GaugeLeaf(c: Component, ctx: RenderContext, modifier: Modifier = Modifier) {
     val clamped = value.coerceIn(lo, hi)
     val valueText = Aggregator.format(value, null, null)
     val title = c.label?.let { l -> unit?.let { "$l ($it)" } ?: l }
+    val gaugeLabel = title ?: stringResource(R.string.lists_gauge)
+    val gaugeState = stringResource(R.string.lists_gauge_range, valueText, compact(lo), compact(hi))
     val colors = RenderTheme.colors
     Column(
         modifier.renderCard().clearAndSetSemantics {
             // 「体重 (kg), 62.5(範囲 40〜120)」と 1 要素で読む
-            contentDescription = title ?: "ゲージ"
-            stateDescription = "$valueText(範囲 ${compact(lo)}〜${compact(hi)})"
+            contentDescription = gaugeLabel
+            stateDescription = gaugeState
         },
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(8.dp),
