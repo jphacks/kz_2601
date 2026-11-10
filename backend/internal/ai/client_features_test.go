@@ -12,7 +12,7 @@ import (
 // featuresDoc uses every clientFeature once: aiButton long / inputPhoto /
 // saveTo / inputFeeds / outputs, lookupBook (button and toolbar), text {{field}} + highlight, a
 // warnings feed, addMinutes, aiChat inputEntity, bracket, a progressBar setting
-// target and photoField illustrate.
+// target, photoField illustrate and callButton.
 const featuresDoc = `{"schemaVersion":1,"app":{"name":"本","description":"d","icon":"book","voiceEntry":"fullscreen"},"initialScreen":"home",
 "entities":[
  {"id":"player","name":"出場者","titleField":"name","fields":[{"id":"name","name":"名前","type":"string"},{"id":"wins","name":"勝ち上がり","type":"integer"}]},
@@ -23,10 +23,12 @@ const featuresDoc = `{"schemaVersion":1,"app":{"name":"本","description":"d","i
   {"id":"meet","name":"集合","type":"string"},{"id":"leave","name":"出発","type":"string","computed":{"op":"addMinutes","args":[{"ref":"meet"},-30]}}]},
  {"id":"card","name":"カード","titleField":"q","fields":[{"id":"q","name":"問題","type":"string","required":true}]},
  {"id":"goal","name":"目標","single":true,"fields":[{"id":"pages","name":"ページ","type":"integer","defaultValue":300}]},
- {"id":"turn","name":"会話","fields":[{"id":"text","name":"本文","type":"text","required":true},{"id":"role","name":"話した人","type":"enum","options":["user","assistant"]}]}],
+ {"id":"turn","name":"会話","fields":[{"id":"text","name":"本文","type":"text","required":true},{"id":"role","name":"話した人","type":"enum","options":["user","assistant"]}]},
+ {"id":"msg","name":"連絡","scope":"shared","fields":[{"id":"body","name":"本文","type":"string"}]}],
 "screens":[
  {"id":"home","title":"ホーム","components":[
   {"type":"bracket","entity":"player","titleField":"name","winsField":"wins"},
+  {"type":"callButton","label":"話す"},
   {"type":"feed","provider":"warnings","region":"130000"},
   {"type":"feed","id":"wx","provider":"weather","region":"170000"},
   {"type":"aiButton","task":"generate","label":"問題を作る","prompt":"英単語の問題","shape":"list","count":5,"saveTo":{"entity":"card","field":"q"}},
@@ -81,6 +83,7 @@ func TestClientFeaturesRestriction(t *testing.T) {
 		FeatureBracket:               {"## トーナメント表(bracket)", `"#/$defs/Bracket"`, 1, `"bracket"`},
 		FeatureProgressSettingTarget: {`progressBar は target {"setting":"<fieldId>"} で目標を読める`, "A goal the user edits", 1, `{"setting"`},
 		FeatureIllustrate:            {"photoField に illustrate: true", "PhotoField.illustrate", 1, `"illustrate"`},
+		FeatureCallButton:            {"callButton{label, video?: true}", `"#/$defs/CallButton"`, 1, `"callButton"`},
 	}
 	if len(gone) != len(clientFeatures) {
 		t.Fatalf("test covers %d of %d features", len(gone), len(clientFeatures))
