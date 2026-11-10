@@ -39,6 +39,7 @@ import jp.kz2601.metamon.dsl.AppDocument
 import jp.kz2601.metamon.feedback.FeedbackHost
 import jp.kz2601.metamon.feedback.UndoHeaderButtons
 import jp.kz2601.metamon.language.AppLocales
+import jp.kz2601.metamon.permissions.MicrophoneAccessProvider
 import jp.kz2601.metamon.permissions.PermissionOffBarHost
 import jp.kz2601.metamon.auth.RootScreen
 import jp.kz2601.metamon.auth.SignInScreen
@@ -46,6 +47,7 @@ import jp.kz2601.metamon.renderer.DSLView
 import jp.kz2601.metamon.renderer.theme.MetamonRenderTheme
 import jp.kz2601.metamon.renderer.theme.ReadableWidth
 import jp.kz2601.metamon.runtime.AppRuntime
+import jp.kz2601.metamon.runtime.TranscriberDictationHost
 import jp.kz2601.metamon.services.GenerateProgress
 import jp.kz2601.metamon.voice.AppConfigVersions
 import jp.kz2601.metamon.voice.GeneratingView
@@ -72,7 +74,7 @@ class MainActivity : ComponentActivity() {
         val container = (application as MetamonApplication).container(DebugLaunch.knobs(intent))
         setContent {
             MetamonRenderTheme {
-                MetamonRoot(container)
+                MicrophoneAccessProvider { MetamonRoot(container) }
             }
         }
     }
@@ -126,6 +128,8 @@ fun MetamonApp(container: AppContainer) {
     }
     // 生成の結果をランタイムに渡す(別の appId なら新しいアプリとして開いて保存し、記録を読む)
     LaunchedEffect(state.document) { runtime.adoptGenerated(state.document) }
+    // マイク FAB の音声入力が出ている間は transcribeField の録音を捨てる(#864)
+    LaunchedEffect(state.voiceOpen) { (runtime.dictation as? TranscriberDictationHost)?.setVoiceInputActive(state.voiceOpen) }
     // ランタイムが開いたアプリ(起動時の開き直し・切り替え・ホットリロード)を音声の画面にも映す
     LaunchedEffect(runtimeState.document) { vm.adopt(runtimeState.document) }
 

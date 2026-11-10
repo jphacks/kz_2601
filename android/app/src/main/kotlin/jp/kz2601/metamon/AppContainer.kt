@@ -8,6 +8,7 @@ import jp.kz2601.metamon.runtime.AndroidRuntimeHost
 import jp.kz2601.metamon.runtime.AppDirectory
 import jp.kz2601.metamon.runtime.AppRuntime
 import jp.kz2601.metamon.runtime.RuntimeHost
+import jp.kz2601.metamon.runtime.TranscriberDictationHost
 import jp.kz2601.metamon.dsl.decode
 import jp.kz2601.metamon.dsl.fallback
 import jp.kz2601.metamon.dsl.screen
@@ -237,6 +238,6 @@ class AppContainer(
                 cache = appList,
                 fresh = { id -> AppDocument(appId = id, dsl = initialDsl) },
             ),
-        )
+        ).also { it.dictation = TranscriberDictationHost(transcriber, CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)) }
     }
 }

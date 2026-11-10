@@ -13,6 +13,7 @@ import jp.kz2601.metamon.dsl.records.Record
 import jp.kz2601.metamon.dsl.records.RecordPermission
 import jp.kz2601.metamon.renderer.ActionContext
 import jp.kz2601.metamon.renderer.DSLRuntime
+import jp.kz2601.metamon.renderer.components.audio.DictationHost
 import jp.kz2601.metamon.dsl.logic.ExternalUrlPolicy
 import jp.kz2601.metamon.renderer.NavigationHost
 import jp.kz2601.metamon.renderer.components.play.RecordWriter
@@ -405,6 +406,9 @@ class AppRuntime(
     override fun onVoiceInput(componentId: String?) {
         _state.update { it.copy(showVoiceSheet = true) }
     }
+
+    /** transcribeField の話して入力(#864)。AppContainer が本体の認識器で差す。 */
+    override var dictation: DictationHost? = null
 
     override fun onAction(action: Action, context: ActionContext) {
         scope.launch { run(action, context) }
