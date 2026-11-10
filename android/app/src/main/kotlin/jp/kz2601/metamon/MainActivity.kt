@@ -55,6 +55,7 @@ import jp.kz2601.metamon.renderer.DSLView
 import jp.kz2601.metamon.renderer.components.feed.LocalFeedHost
 import jp.kz2601.metamon.renderer.theme.MetamonRenderTheme
 import jp.kz2601.metamon.renderer.theme.ReadableWidth
+import jp.kz2601.metamon.retention.RetentionPromptHost
 import jp.kz2601.metamon.runtime.AppRuntime
 import jp.kz2601.metamon.runtime.NavigationSnapshot
 import jp.kz2601.metamon.runtime.TranscriberDictationHost
@@ -286,6 +287,9 @@ fun MetamonApp(container: AppContainer) {
             onLater = container.consentPrompt::later,
         )
     }
+
+    // 記録の保存期間の確認(#482)。生成中・音声のシートの間は待つ
+    RetentionPromptHost(runtime, busy = state.isGenerating || state.voiceOpen, onStop = vm::generateNow)
 
     if (switcherOpen) {
         AppSwitcherDialog(

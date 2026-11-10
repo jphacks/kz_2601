@@ -125,6 +125,8 @@ class AppRuntime(
     private val authorProfile: AuthorProfile? = null,
     /** 仲間探し・通報・ブロック(#877)。null なら出さない(モック・テスト) */
     socialServices: SocialServices? = null,
+    /** 記録の保存期間(#482)。null なら自動で消さない(モック・テスト) */
+    val retention: RecordRetentionRunner? = null,
 ) : DSLRuntime, NavigationHost, RecordWriter, TimerHost, AiChatPairSaving, AuthorNameHost,
     ModerationHost, MatchingHost, SocialPromptHost, BlockedUsersHost {
     private val _state = MutableStateFlow(RuntimeState(document))
@@ -192,6 +194,7 @@ class AppRuntime(
         }
         startHotReload()
         scope.launch { social.loadBlockedUsers() }
+        sweepRetention(noteDsl = true) // #482 起動時の DSL(オフラインでは apply を通らない)
         pendingNavigationRestore?.let {
             pendingNavigationRestore = null
             applyNavigationRestore(it)
@@ -261,6 +264,7 @@ class AppRuntime(
         publishRecords()
         _navigation.value = NavigationState.initial(doc.dsl)
         noteAppliedVersion(doc, switched)
+        sweepRetention(noteDsl = true) // #482 保存期間の確認と期限切れの削除
     }
 
     // アプリの持ち物(iOS の DeviceAppID・変身一覧・#881)
@@ -398,6 +402,7 @@ class AppRuntime(
         if (!active) _state.update { it.copy(recordUndo = null) } // 背面では削除を送り切るので戻せない
         hotReloader?.setForeground(active)
         // 起動の前(bootstrap がまだ)は bootstrap が読むので取り直さない
+        if (active) sweepRetention() // #482 背面の間に期限を過ぎた記録
         if (active && bootstrapJob?.isCompleted == true) catchUpJob = scope.launch { catchUpAfterBackground() }
     }
 
@@ -522,6 +527,7 @@ class AppRuntime(
         val initial = NavigationState.initial(doc.dsl)
         _navigation.value = if (doc.dsl.app.tabs.any { it.screen == tab }) initial.copy(selectedTab = tab) else initial
         noteAppliedVersion(doc, switched = false)
+        sweepRetention(noteDsl = true) // #482
         scope.launch { load(keep) }
     }
 
@@ -667,6 +673,7 @@ class AppRuntime(
         } finally {
             _state.update { it.copy(loading = it.loading - entity) }
         }
+        sweepRetention(entity) // #482 サーバーから届いた期限切れ(別の端末で作った自分の記録など)
     }
 
     /** 一覧のワンタップ更新(list.item.toggle)・トーナメントの勝者・単語カードの結果。表示中に無い記録は保存しない。 */
@@ -907,6 +914,7 @@ class AppRuntime(
             setRecords(appId, entity, list)
             form.markSaved(queuedOffline = !recordSync.isOnline)
             lastSavedForm = SavedForm(appId, entity, written, form)
+            sweepRetention(entity) // #482 保存の後
         } finally {
             savingLock.withLock { savingForms.remove(form) }
         }
@@ -1047,6 +1055,22 @@ class AppRuntime(
         if (appId != document.appId) return // 読む間に別のアプリへ切り替わった
         _state.update { it.copy(records = it.records + (entity to list.map { r -> r.toDsl() })) }
         publishRecords()
+    }
+
+    /**
+     * 記録の保存期間(#482・[RecordRetentionRunner])。[noteDsl] なら確認が要るかも見直す。
+     * 期限切れを消したら表示中の一覧だけ差し替える(未表示の entity は画面が開いた時に読む)。
+     */
+    fun sweepRetention(entity: String? = null, noteDsl: Boolean = false) {
+        val r = retention ?: return
+        val doc = document
+        val models = entityModels
+        if (noteDsl) r.note(doc.appId, doc.version, models)
+        val targets = if (entity == null) models else models.filter { it.id == entity }
+        if (targets.none { it.retentionDays != null }) return
+        scope.launch {
+            for (e in r.purgeAll(doc.appId, targets)) if (_state.value.records[e] != null) reloadCached(doc.appId, e)
+        }
     }
 
     private suspend fun ifCurrent(appId: String, body: suspend () -> Unit) {

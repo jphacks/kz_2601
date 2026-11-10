@@ -11,6 +11,9 @@ import jp.kz2601.metamon.runtime.AppAiHost
 import jp.kz2601.metamon.runtime.AppDirectory
 import jp.kz2601.metamon.runtime.AppFeedHost
 import jp.kz2601.metamon.runtime.AppRuntime
+import jp.kz2601.metamon.runtime.KeyValueRetentionConsent
+import jp.kz2601.metamon.runtime.RecordRetentionRunner
+import jp.kz2601.metamon.runtime.RetentionConsentStore
 import jp.kz2601.metamon.runtime.RuntimeHost
 import jp.kz2601.metamon.runtime.SocialServices
 import jp.kz2601.metamon.runtime.TranscriberDictationHost
@@ -159,6 +162,8 @@ class AppContainer(
     private val social: SocialServices? = null,
     /** https の画像のキャッシュを消す(#841 の後片付け) */
     private val clearImageCache: () -> Unit = {},
+    /** 記録の保存期間を確認した記録(#482・端末ごと)。モックはメモリだけ */
+    private val retentionConsent: RetentionConsentStore = KeyValueRetentionConsent(InMemoryKeyValueStore()),
 ) {
     /** 画面の下に出す接続先の名前(モックなら "mock")。 */
     val environmentLabel: String get() = if (knobs.mock) "mock" else environment.name
@@ -337,6 +342,7 @@ class AppContainer(
                 activeOwner = owner,
                 forgetDeviceState = forgetDeviceState(context),
                 authorProfile = AuthorProfile(SharedPreferencesKeyValueStore.of(context, AUTHOR_PREFS)),
+                retentionConsent = KeyValueRetentionConsent(SharedPreferencesKeyValueStore.of(context, RETENTION_PREFS)),
                 chatHistory = ChatHistoryStore(File(context.filesDir, "chat_history")),
                 removeLocalMedia = removeLocalMedia(context),
                 social = SocialServices(HttpMatchingClient(appConfigHttp), HttpModerationClient(appConfigHttp), MatchingAgeGate(prefs)),
@@ -435,6 +441,7 @@ class AppContainer(
         /** 同意・クラッシュ報告・AI ボタンの集計(#888) */
         private const val PRIVACY_PREFS = "metamon-privacy"
         private const val AUTHOR_PREFS = "metamon-author"
+        private const val RETENTION_PREFS = "metamon-retention"
     }
 
     /** アプリ全体のランタイム(#889)。起動時に 1 つだけ作る。 */
@@ -458,6 +465,7 @@ class AppContainer(
             aiHost = aiHost,
             authorProfile = authorProfile,
             socialServices = social,
+            retention = RecordRetentionRunner(recordSync, retentionConsent, currentUserId = { auth.currentUser.value?.uid }),
         ).also { it.dictation = TranscriberDictationHost(transcriber, CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)) }
     }
 
