@@ -87,6 +87,9 @@ class ClarifySettings(context: Context) {
         get() = prefs.getBoolean(KEY_AUTO_BUILD, true)
         set(value) = prefs.edit().putBoolean(KEY_AUTO_BUILD, value).apply()
 
+    /** 後片付け(#841)で既定(ON)に戻す。iOS は UserDefaults ごと消す。 */
+    fun clear() = prefs.edit().clear().apply()
+
     private companion object {
         const val PREFS = "metamon.clarify"
         const val KEY_ENABLED = "enabled"
