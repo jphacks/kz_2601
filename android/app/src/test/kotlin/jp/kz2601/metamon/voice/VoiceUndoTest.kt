@@ -252,4 +252,25 @@ class VoiceUndoTest {
         assertNull(vm.state.value.summaryAction)
         assertTrue("シートの「元に戻す」はまだ押せる", vm.state.value.canUndo)
     }
+
+    @Test
+    fun switchingAppsDropsThePreviousAppsUndoHistory() = runTest {
+        val vm = vm(FakeAI())
+        generate(vm, "家計簿")
+        generate(vm, "家計簿・グラフ付き")
+        assertTrue(vm.state.value.canUndo)
+
+        // 一覧から別のアプリへ切り替えた(ランタイムが開いたアプリを映す)
+        vm.adopt(AppDocument("app-2", 3, appDsl("割り勘")))
+        val switched = vm.state.value
+        assertFalse("前のアプリの履歴で「元に戻す」を出さない", switched.canUndo)
+        assertFalse(switched.canRedo)
+        assertNull(switched.summaryAction)
+
+        vm.undo()
+        advanceUntilIdle()
+        assertEquals("前のアプリの版を当てない", "app-2", vm.state.value.document.appId)
+        assertEquals("割り勘", vm.appName)
+        assertEquals(UndoNotice.NO_EARLIER, vm.state.value.notice)
+    }
 }
