@@ -30,6 +30,8 @@ import jp.kz2601.metamon.AppContainer
 import jp.kz2601.metamon.R
 import jp.kz2601.metamon.auth.CredentialManagerGoogleSignIn
 import jp.kz2601.metamon.auth.GoogleWebClientId
+import jp.kz2601.metamon.runtime.UiText
+import jp.kz2601.metamon.runtime.resolve
 import jp.kz2601.metamon.services.AuthUser
 import jp.kz2601.metamon.services.account.SignOutFlow
 import kotlinx.coroutines.CancellationException
@@ -40,7 +42,7 @@ private sealed interface AccountDialog {
     data class SignOut(val prompt: SignOutFlow.Prompt) : AccountDialog
     data class Unsent(val count: Int) : AccountDialog
     data object Delete : AccountDialog
-    data class Failed(val title: Int, val message: String) : AccountDialog
+    data class Failed(val title: Int, val message: UiText) : AccountDialog
 }
 
 /**
@@ -59,7 +61,6 @@ fun AccountSection(container: AppContainer, user: AuthUser, busy: Boolean) {
     val guard = container.accountGuard
     var dialog by remember { mutableStateOf<AccountDialog?>(null) }
     var working by remember { mutableStateOf<Int?>(null) } // 進行中の文言
-    val unknownError = stringResource(R.string.account_sign_out_failed)
 
     fun signOut(choice: SignOutFlow.Choice) {
         dialog = null
@@ -73,7 +74,7 @@ fun AccountSection(container: AppContainer, user: AuthUser, busy: Boolean) {
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
-                dialog = AccountDialog.Failed(R.string.account_sign_out_failed, e.message ?: unknownError)
+                dialog = AccountDialog.Failed(R.string.account_sign_out_failed, AccountFailureText.of(e))
             } finally {
                 working = null
             }
@@ -105,7 +106,7 @@ fun AccountSection(container: AppContainer, user: AuthUser, busy: Boolean) {
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
-                dialog = AccountDialog.Failed(R.string.account_delete_failed, e.message ?: unknownError)
+                dialog = AccountDialog.Failed(R.string.account_delete_failed, AccountFailureText.of(e))
             } finally {
                 working = null
             }
@@ -162,7 +163,7 @@ fun AccountSection(container: AppContainer, user: AuthUser, busy: Boolean) {
         is AccountDialog.Failed -> AlertDialog(
             onDismissRequest = { dialog = null },
             title = { Text(stringResource(d.title)) },
-            text = { Text(d.message) },
+            text = { Text(d.message.resolve()) },
             confirmButton = { TextButton(onClick = { dialog = null }) { Text(stringResource(R.string.account_ok)) } },
         )
         null -> Unit

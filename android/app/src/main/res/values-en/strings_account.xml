@@ -5,8 +5,10 @@
     <string name="account_delete_confirm">Delete</string>
     <string name="account_delete_failed">Couldn’t delete your account</string>
     <string name="account_delete_message">Your account and all your apps will no longer be usable. This can’t be undone.\n\nYour share links and Explore listings will be taken down. Data on this device is also erased. Posts in apps shared with others remain.</string>
+    <string name="account_delete_requires_recent_login">Sign in again, then delete</string>
     <string name="account_delete_title">Delete your account?</string>
     <string name="account_deleting">Deleting…</string>
+    <string name="account_failed_try_again">Please wait a moment and try again</string>
     <string name="account_menu">Account</string>
     <string name="account_ok">OK</string>
     <string name="account_send_then_sign_out">Send, Then Sign Out</string>
