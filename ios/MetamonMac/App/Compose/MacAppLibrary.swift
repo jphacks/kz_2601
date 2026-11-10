@@ -21,6 +21,8 @@ final class MacAppLibrary {
     /// 作ったアプリの id(一覧の並び・上から)
     private(set) var createdIds: [String] = []
     private var envelopes: [String: Data] = [:]
+    /// 一覧に残す名前・版。端末の DSL と揃える(封筒の無い版を当てても進めない)
+    private var savedRows: [String: LocalAppLibrary.Row] = [:]
     private var histories: [String: LocalVersionHistory<Version?>] = [:]
     @ObservationIgnored private let store: LocalAppLibrary?
 
@@ -30,6 +32,7 @@ final class MacAppLibrary {
         for entry in store?.load() ?? [] {
             generated[entry.summary.id] = entry.document
             envelopes[entry.summary.id] = entry.envelope
+            savedRows[entry.summary.id] = .init(name: entry.document.dsl.app.name, version: entry.document.version)
             createdIds.append(entry.summary.id)
         }
     }
@@ -93,6 +96,7 @@ final class MacAppLibrary {
         createdIds.remove(at: index)
         generated[appId] = nil
         envelopes[appId] = nil
+        savedRows[appId] = nil
         histories[appId] = nil
         store?.remove(appId: appId)
         saveList()
@@ -121,19 +125,20 @@ final class MacAppLibrary {
         generated[appId].map { Version(document: $0, envelope: envelopes[appId]) }
     }
 
-    /// 今の版を差し替える。作ったアプリは端末にも残す
+    /// 今の版を差し替える。作ったアプリは端末にも残す。封筒の無い版は DSL も一覧も前のまま(古い DSL に新しい名前を付けない)
     private func set(_ appId: String, _ version: Version?) {
         generated[appId] = version?.document
         envelopes[appId] = version?.envelope
-        guard isCreated(appId) else { return }
-        if let envelope = version?.envelope { store?.store(appId: appId, envelope: envelope) }
+        guard isCreated(appId), let envelope = version?.envelope else { return }
+        store?.store(appId: appId, envelope: envelope)
+        savedRows[appId] = LocalAppLibrary.row(after: version?.document, envelope: envelope, previous: savedRows[appId])
         saveList() // 名前・版が変わる
     }
 
     private func saveList() {
         guard let store else { return }
         store.save(LocalAppLibrary.summaries(createdIds.compactMap { id in
-            generated[id].map { (id, $0.dsl.app.name, $0.version) }
+            savedRows[id].map { (id, $0.name, $0.version) }
         }))
     }
 }

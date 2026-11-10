@@ -4,7 +4,8 @@ import AppKit
 import SwiftUI
 
 /// 外から届いた URL を受ける(#975)。ウインドウの根に 1 行で付ける。
-/// - URL スキーム(`tailorit://`)は onOpenURL、Universal Links は Web 閲覧の NSUserActivity で届く
+/// - URL スキーム(`tailorit://`)は onOpenURL で届く。Universal Links(https)は iOS と同じく未対応(associated domains が無い)。
+///   Web 閲覧の NSUserActivity も読むが、中の https は `ShareURL` が受けないので何もしない
 /// - 起動していない時: macOS がアプリを起動し、最初のウインドウに届く
 /// - 開いている時: 新しいウインドウを作らず、今あるウインドウ(手前のもの)で受ける(handlesExternalEvents)
 /// - 知らない URL は何もしない(iOS と同じ)。Mac にはサインインがまだ無いので、保留せずその場で出す

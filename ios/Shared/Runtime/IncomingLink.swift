@@ -5,7 +5,8 @@ import MetamonServices
 
 /// 外から届いた URL のうち、アプリが開くもの(#975)。読み方は iOS と同じ `ShareURL.token`。
 /// - `tailorit://import/<token>`: URL スキーム(QR・共有ページの「アプリで開く」)
-/// - Universal Links: Web 閲覧の NSUserActivity。`ShareURL` が受ける https のリンクだけ(#331)
+/// - Web 閲覧の NSUserActivity: 中の URL を同じ規則で読む。`ShareURL` は https を受けないので、今は常に nil
+///   (iOS・Mac とも associated domains が無く Universal Links は未対応。https の共有ページは「アプリで開く」で tailorit:// に渡す)
 /// それ以外(知らない URL)は nil。iOS と同じく何もしない。
 enum IncomingLink: Equatable {
     case share(token: String)

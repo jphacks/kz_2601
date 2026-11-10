@@ -12,6 +12,12 @@ struct LocalAppLibrary {
         var envelope: Data
     }
 
+    /// 一覧に置く名前・版。端末に残した DSL と同じものだけを持つ
+    struct Row: Equatable {
+        var name: String
+        var version: Int
+    }
+
     static let currentAppKey = "metamon.local.currentAppId"
 
     let list: AppListCache
@@ -54,6 +60,13 @@ struct LocalAppLibrary {
         entries.enumerated().map { i, e in
             AppSummary(id: e.id, name: e.name, currentVersion: e.version, sortIndex: i + 1)
         }
+    }
+
+    /// 版を当てた後に一覧へ置く行。封筒(端末に残す DSL)が無い版は DSL を残せないので、行も前のまま。
+    /// 一覧だけ進めると、次に開いた時に古い DSL へ新しい名前・版が付くため
+    static func row(after document: AppDocument?, envelope: Data?, previous: Row?) -> Row? {
+        guard let document, envelope != nil else { return previous }
+        return Row(name: document.dsl.app.name, version: document.version)
     }
 
     /// 開き直すアプリ: 前に開いていたアプリが一覧にあればそれ、無ければ nil(何も選ばない)

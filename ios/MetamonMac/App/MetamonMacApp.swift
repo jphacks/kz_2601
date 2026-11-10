@@ -1,4 +1,5 @@
 import SwiftUI
+import AppKit
 import MetamonDSL
 import MetamonRenderer
 import MetamonServices
@@ -20,6 +21,11 @@ struct MetamonMacApp: App {
         #if !APP_STORE_REVIEW
         BetaWelcomeStore.shared.applyLaunchOverride()
         #endif
+        // 記録の一時フォルダ(MacAppRuntime.mockRecordSync)を起動時(前回の残り)と終了時に片付ける
+        MacAppRuntime.removePreviewDirectories()
+        NotificationCenter.default.addObserver(forName: NSApplication.willTerminateNotification, object: nil, queue: .main) { _ in
+            MainActor.assumeIsolated { MacAppRuntime.removePreviewDirectories() }
+        }
     }
 
     var body: some Scene {

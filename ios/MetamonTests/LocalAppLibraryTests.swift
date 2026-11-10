@@ -47,6 +47,20 @@ final class LocalAppLibraryTests: XCTestCase {
         XCTAssertEqual(entries[1].document.dsl.app.name, "仕事の家計簿")
     }
 
+    /// 封筒の無い版を当てても一覧は進めない(古い DSL に新しい名前・版を付けない)
+    func testRowStaysWithoutEnvelope() async throws {
+        let a = try await MockAIClient(delay: .zero).morph(transcript: "家計簿のアプリ", appId: "a", currentVersion: 0)
+        let previous = LocalAppLibrary.Row(name: "前の名前", version: 1)
+        var next = a.document
+        next.dsl.app.name = "新しい名前"
+        next.version = 2
+
+        XCTAssertEqual(LocalAppLibrary.row(after: next, envelope: nil, previous: previous), previous)
+        XCTAssertNil(LocalAppLibrary.row(after: next, envelope: nil, previous: nil))
+        XCTAssertEqual(LocalAppLibrary.row(after: nil, envelope: Data(), previous: previous), previous)
+        XCTAssertEqual(LocalAppLibrary.row(after: next, envelope: Data(), previous: previous), .init(name: "新しい名前", version: 2))
+    }
+
     func testCurrentAppIsKeptAndClearedOnRemove() {
         library.currentAppId = "a"
         XCTAssertEqual(library.currentAppId, "a")

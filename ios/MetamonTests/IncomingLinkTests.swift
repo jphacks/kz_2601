@@ -22,7 +22,7 @@ final class IncomingLinkTests: XCTestCase {
         }
     }
 
-    /// Universal Links は Web 閲覧の activity だけ。ほかの種類の activity は URL があっても見ない
+    /// activity は Web 閲覧のものだけ読む。ほかの種類は URL があっても見ない。https は ShareURL が受けないので Web 閲覧でも nil
     func testActivityMustBeWebBrowsing() {
         let other = NSUserActivity(activityType: "jp.kz2601.metamon.other")
         other.webpageURL = URL(string: "https://tailor-it.app/s/tok_1")!
@@ -31,6 +31,10 @@ final class IncomingLinkTests: XCTestCase {
         let unknown = NSUserActivity(activityType: NSUserActivityTypeBrowsingWeb)
         unknown.webpageURL = URL(string: "https://tailor-it.app/terms")!
         XCTAssertNil(IncomingLink(activity: unknown))
+
+        let shareLike = NSUserActivity(activityType: NSUserActivityTypeBrowsingWeb)
+        shareLike.webpageURL = URL(string: "https://tailor-it.app/s/tok_1")!
+        XCTAssertNil(IncomingLink(activity: shareLike))
 
         XCTAssertNil(IncomingLink(activity: NSUserActivity(activityType: NSUserActivityTypeBrowsingWeb)))
     }
