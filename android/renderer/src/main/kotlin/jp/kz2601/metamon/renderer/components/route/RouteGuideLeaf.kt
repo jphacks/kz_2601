@@ -56,6 +56,7 @@ import jp.kz2601.metamon.renderer.theme.renderCard
 /**
  * `routeGuide`(#868): 目的地までの道案内。Android 版は地図 SDK を持たず、行き先・車 / 徒歩・現在地からの直線距離を見せ、
  * 案内は端末の地図アプリ(Google マップのナビ → 地図アプリ → ブラウザの順)に渡す。位置は権限が既にある時だけ読む(ここでは聞かない)。
+ * `address` の行き先は端末の Geocoder で緯度経度にして距離を出す(引けなければ距離を出さない・地図アプリには住所のまま渡す)。
  */
 @Composable
 fun RouteGuideLeaf(c: Component, ctx: RenderContext, modifier: Modifier = Modifier) {
@@ -90,6 +91,13 @@ fun RouteGuideLeaf(c: Component, ctx: RenderContext, modifier: Modifier = Modifi
     var mode by rememberSaveable { mutableStateOf(RouteMode.of(c.mode)) }
     var failed by remember { mutableStateOf(false) }
     val here = remember { lastKnownLocation(context) }
+    // 住所の行き先は端末の Geocoder で緯度経度にして距離を出す(#1350)。引いた結果は部品の中で住所ごとに覚える。
+    val addressCache = remember { RouteAddressCache { RouteGeocoder.lookup(context, it) } }
+    var addressLookup by remember(address) { mutableStateOf(address?.let(addressCache::peek)) }
+    if (address != null) {
+        LaunchedEffect(address) { if (addressLookup == null) addressLookup = addressCache.resolve(address) }
+    }
+    val distancePlace = place ?: address?.let { addressLookup.place(it) }
     val destinationLabel = stringResource(R.string.renderer_route_destination)
     fun name(p: RoutePlace) = p.name.ifEmpty { destinationLabel }
 
@@ -108,8 +116,8 @@ fun RouteGuideLeaf(c: Component, ctx: RenderContext, modifier: Modifier = Modifi
             choiceName = ::name,
             onSelect = { selectedId = it.id; failed = false },
         )
-        if (place != null && here != null) {
-            val meters = RouteGuide.distanceMeters(here.latitude, here.longitude, place.lat, place.lng)
+        if (distancePlace != null && here != null) {
+            val meters = RouteGuide.distanceMeters(here.latitude, here.longitude, distancePlace.lat, distancePlace.lng)
             Text(
                 stringResource(R.string.renderer_route_distance, RouteGuide.formatDistance(meters)),
                 Modifier.testTag("routeGuide.distance"),
@@ -138,6 +146,7 @@ fun RouteGuideLeaf(c: Component, ctx: RenderContext, modifier: Modifier = Modifi
         )
         val note = when {
             failed -> stringResource(R.string.renderer_route_no_app)
+            address != null && addressLookup == AddressLookup.NotFound -> stringResource(R.string.renderer_route_address_not_found, address)
             target == null && choosesRecord -> stringResource(R.string.renderer_route_no_places)
             target == null -> stringResource(R.string.renderer_route_choose_place)
             else -> stringResource(R.string.renderer_route_opens_maps)
