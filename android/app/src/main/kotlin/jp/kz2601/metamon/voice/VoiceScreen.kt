@@ -1,12 +1,5 @@
 package jp.kz2601.metamon.voice
 
-import android.Manifest
-import android.content.Intent
-import android.content.pm.PackageManager
-import android.net.Uri
-import android.provider.Settings
-import androidx.activity.compose.rememberLauncherForActivityResult
-import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -72,8 +65,11 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LifecycleEventEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import jp.kz2601.metamon.R
+import jp.kz2601.metamon.permissions.PermissionCenter
+import jp.kz2601.metamon.permissions.rememberPermissionRequest
 import jp.kz2601.metamon.services.ChatOption
 import jp.kz2601.metamon.services.ChatTurn
+import jp.kz2601.metamon.services.permissions.AppPermission
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import java.util.Calendar
@@ -84,16 +80,12 @@ import java.util.Locale
 fun VoiceRoute(vm: VoiceViewModel, modifier: Modifier = Modifier) {
     val state by vm.state.collectAsStateWithLifecycle()
     val context = LocalContext.current
-    val permission = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
+    // 権限の窓口(#890)に寄せる。理由のダイアログは出さず、断られたら今までどおり状態カードで「設定を開く」
+    val askMic = rememberPermissionRequest(AppPermission.MICROPHONE, explain = false) { granted ->
         if (granted) vm.onMicTap() else vm.onPermissionDenied()
     }
     val onMic = {
-        val granted = context.checkSelfPermission(Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED
-        if (state.phase == VoicePhase.LISTENING || granted || !state.voiceAvailable) {
-            vm.onMicTap()
-        } else {
-            permission.launch(Manifest.permission.RECORD_AUDIO)
-        }
+        if (state.phase == VoicePhase.LISTENING || !state.voiceAvailable) vm.onMicTap() else askMic()
     }
     // 裏に回ったら録音を捨てる(マイクが点いたまま残らないように)
     LifecycleEventEffect(Lifecycle.Event.ON_STOP) { vm.onScreenHidden() }
@@ -101,12 +93,7 @@ fun VoiceRoute(vm: VoiceViewModel, modifier: Modifier = Modifier) {
         state = state,
         onMic = onMic,
         vm = vm,
-        onOpenSettings = {
-            context.startActivity(
-                Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.fromParts("package", context.packageName, null))
-                    .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
-            )
-        },
+        onOpenSettings = { PermissionCenter.get(context).openSettings(context, AppPermission.MICROPHONE) },
         modifier = modifier,
     )
 }
