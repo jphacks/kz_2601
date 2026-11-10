@@ -75,7 +75,7 @@ macOS runner は Linux の 10 倍の分単価なので、ubuntu の `ios-changes
 
 | 変わった場所 | macOS ジョブ | 回るテスト |
 |---|---|---|
-| `ios/Packages/MetamonDSL/**` だけ | `ios-dsl` | `swift test`(MetamonDSLTests)。アプリのビルド・シミュレータ無し |
+| `ios/Packages/MetamonDSL/**` だけ | `ios-dsl` | macOS の `xcodebuild test`(MetamonDSLTests・`ios/scripts/mac-package-test.sh`)。アプリのビルド・シミュレータ無し |
 | MetamonDSL + 他の iOS 変更 | `ios-xcode` | MetamonDSLTests / MetamonRendererTests / MetamonServicesTests / MetamonTests |
 | `ios/Packages/MetamonRenderer/**` | `ios-xcode` | MetamonRendererTests + MetamonTests |
 | `ios/Packages/MetamonServices/**` | `ios-xcode` | MetamonServicesTests + MetamonTests |
@@ -94,6 +94,21 @@ macOS runner は Linux の 10 倍の分単価なので、ubuntu の `ios-changes
   gh run rerun <run-id>
   ```
 
+## mac-ci(Mac アプリと共有パッケージの macOS ビルド・テスト)
+
+`.github/workflows/mac-ci.yml`(#928)。ios-ci と同じく ubuntu の `mac-changes` で変わった場所を見て、必要な時だけ macOS で回す。集約ジョブは `mac-ci`(macOS ジョブがスキップでも成功で終わる)。**required check にするかはオーナーが判断する**。
+
+| 変わった場所 | Mac アプリ(MetamonMac)のビルド | macOS で回るテスト |
+|---|---|---|
+| `ios/Packages/MetamonDSL/**`・DSL のテストデータ(`docs/dsl/**` の一部・テストが読む backend の JSON) | する | DSL / Renderer / Services |
+| `ios/Packages/MetamonRenderer/**`・`docs/dsl/conformance/**`・`docs/dsl/examples/**` | する | Renderer |
+| `ios/Packages/MetamonServices/**` | する | Services |
+| `ios/MetamonMac/**`・`ios/project.yml` | する | なし |
+| `.github/workflows/mac-ci.yml`・develop / main への push(上記のどれかが変更) | する | 全部 |
+
+- テストは各パッケージのフォルダで `xcodebuild test -destination platform=macOS`(`ios/scripts/mac-package-test.sh <パッケージ名>`)。署名しない・秘密を使わない。
+- 手元で回す時、repo か DerivedData が `~/Desktop`・`~/Documents`・`~/Downloads` の下にあると、テストの実行役が読めずに落ちる(macOS の保護)。repo(clone)と DerivedData(`MAC_DERIVED_DATA`)の両方を保護の外(例: `~/src`)に置く。CI では起きない。
+
 ## backend-emulator(Firestore エミュレータ試験・必須ではない)
 
 `.github/workflows/backend-emulator.yml`(#546)。`backend-ci` は 5 分上限なので別 workflow。
@@ -109,7 +124,7 @@ macOS runner は Linux の 10 倍の分単価なので、ubuntu の `ios-changes
 1. PR の Checks タブ → 赤い job をクリック → 失敗した step を開く(`::error` 行が要点)。
 2. 各 job の典型的な原因:
    - `backend-ci`: `golangci-lint` の指摘(未使用変数・エラー未処理)、`go test -race` のデータ競合。ローカルで `cd backend && go vet ./... && go test ./... -race` を先に通す。
-   - `ios-ci`: 実体は `ios-dsl` / `ios-xcode` ジョブ(`ios-ci` はその結果を集約するだけ)。赤い方を開く。DSL だけなら `cd ios/Packages/MetamonDSL && swift test` で再現。ビルドエラーはローカルの `xcodegen generate && xcodebuild build -destination 'generic/platform=iOS Simulator' CODE_SIGNING_ALLOWED=NO` で再現。**タイムアウト(30分)** なら SwiftPM の依存が重い → キャッシュが効いているか(`SwiftPM キャッシュ` step の cache-hit)を見る。macOS runner は分単価が高いので、原因を特定せずに Re-run を連打しない。
+   - `ios-ci`: 実体は `ios-dsl` / `ios-xcode` ジョブ(`ios-ci` はその結果を集約するだけ)。赤い方を開く。DSL だけなら `ios/scripts/mac-package-test.sh MetamonDSL` で再現(`swift test` は文字列カタログを訳さないので英語の文言のテストだけ落ちる)。ビルドエラーはローカルの `xcodegen generate && xcodebuild build -destination 'generic/platform=iOS Simulator' CODE_SIGNING_ALLOWED=NO` で再現。**タイムアウト(30分)** なら SwiftPM の依存が重い → キャッシュが効いているか(`SwiftPM キャッシュ` step の cache-hit)を見る。macOS runner は分単価が高いので、原因を特定せずに Re-run を連打しない。
    - `secrets-scan`: gitleaks が秘密らしき文字列を検出。**本物なら即座にキーを無効化(ローテート)**してから履歴を消す(`git filter-repo`)。誤検知なら `.gitleaksignore` に fingerprint を追加。
 3. 直して push すれば同じ PR の古い実行は自動キャンセルされ再実行される。
 4. どうしても原因不明なら `gh run view <run-id> --log-failed` でログを全部落として読む。
