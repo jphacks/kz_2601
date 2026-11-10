@@ -60,8 +60,17 @@ import jp.kz2601.metamon.renderer.screen.GridScreenLayout
 import jp.kz2601.metamon.renderer.theme.MetamonRenderTheme
 import jp.kz2601.metamon.renderer.theme.colors
 import jp.kz2601.metamon.renderer.theme.RenderTheme
-import androidx.compose.foundation.layout.imePadding
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.exclude
+import androidx.compose.foundation.layout.ime
+import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.ui.layout.boundsInRoot
+import androidx.compose.ui.layout.findRootCoordinates
+import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalFocusManager
@@ -228,8 +237,8 @@ fun ScreenView(
 
 /**
  * 画面下の保存ボタン(iOS の `FormSaveBar.bar`)。押下中はスピナーで 2 回目を受けず、書けたら 0.6 秒だけ
- * 「保存しました」(オフラインなら「接続が戻ったら自動で送ります」)を出して戻す。TalkBack にも読ませる。
- * キーボードが出ている時はその上に出る(imePadding)。
+ * 「保存しました」(オフラインなら「接続が戻ったら自動で送ります」)を出して戻す。TalkBack には知らせで 1 回だけ読ませる
+ * (ボタンの読み上げは iOS と同じく元の名前のまま)。キーボードが出ている時はその上に出る。
  */
 @Composable
 private fun FormSaveBar(button: ToolbarButton, ctx: RenderContext) {
@@ -242,6 +251,8 @@ private fun FormSaveBar(button: ToolbarButton, ctx: RenderContext) {
     val saved = stringResource(R.string.renderer_save_bar_saved)
     val queued = stringResource(R.string.renderer_save_bar_queued_offline)
     val lastResult = form?.lastSaveResult
+    // バーの下にある分(タブバー・アプリの下の帯)。キーボードの高さからこれを引いた分だけ上げる(imePadding だと二重になる)
+    var belowBar by remember { mutableIntStateOf(0) }
     LaunchedEffect(feedback, lastResult) { feedback.onSaveResultChanged(lastResult) } // 送った後にサーバーが断った
     val phase = feedback.phase
     val done = (phase as? SaveBarPhase.Done)?.result
@@ -268,7 +279,11 @@ private fun FormSaveBar(button: ToolbarButton, ctx: RenderContext) {
             null -> button.icon ?: "checkmark"
         },
         running = phase == SaveBarPhase.Saving,
-        modifier = Modifier.imePadding().padding(horizontal = RenderTheme.Spacing.md, vertical = RenderTheme.Spacing.sm),
+        modifier = Modifier
+            .onGloballyPositioned { c -> belowBar = (c.findRootCoordinates().size.height - c.boundsInRoot().bottom).toInt().coerceAtLeast(0) }
+            .windowInsetsPadding(WindowInsets.ime.exclude(WindowInsets(bottom = belowBar)))
+            .padding(horizontal = RenderTheme.Spacing.md, vertical = RenderTheme.Spacing.sm)
+            .semantics { contentDescription = button.label },
     )
 }
 
