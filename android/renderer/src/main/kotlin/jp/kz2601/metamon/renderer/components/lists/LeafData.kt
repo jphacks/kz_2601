@@ -72,9 +72,17 @@ class LeafData(
         return FieldCoding.display(record[tf], target.field(tf), now = now)
     }
 
-    private fun memberName(uid: String?): String {
-        if (uid.isNullOrEmpty()) return ""
-        return runtime.formMembers.firstOrNull { it.uid == uid }?.displayName ?: FieldCoding.UNAVAILABLE
+    private fun memberName(uid: String?): String = memberName(runtime, uid)
+
+    companion object {
+        /** 名簿に無い(抜けた・読む前)・表示名が空のメンバーの出し方(iOS の `MembersHost` と同じ・#1076)。 */
+        const val MEMBER_FALLBACK = "参加者"
+
+        /** type member の値(uid)の表示名。未選択は空。一覧・遊び系・チャットはここを使う。 */
+        fun memberName(runtime: DSLRuntime, uid: String?): String {
+            if (uid.isNullOrEmpty()) return ""
+            return runtime.formMembers.firstOrNull { it.uid == uid }?.displayName?.takeIf { it.isNotEmpty() } ?: MEMBER_FALLBACK
+        }
     }
 }
 
