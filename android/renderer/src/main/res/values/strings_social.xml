@@ -1,6 +1,11 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- みんなで使う部品(#875・iOS の ChatThreadLeaf / ModerationMenuItems / AuthorNamePromptModifier)。名前順。 -->
+<!-- みんなで使う部品(#875・#877・iOS の ChatThreadLeaf / MatchListLeaf / ModerationDialogs / AuthorNamePromptModifier)。名前順。 -->
 <resources>
+    <string name="social_adult_confirm">18 歳以上です</string>
+    <string name="social_adult_decline">18 歳未満です</string>
+    <string name="social_adult_footnote">年齢や生年月日は保存しません。この確認は、この端末に 1 回だけ記録します。</string>
+    <string name="social_adult_message">仲間探しでは、知らない人と「つながりたい」を送り合い、お互いに承認すると連絡先が見えるようになります。18 歳以上の方だけが使えます。</string>
+    <string name="social_adult_title">18 歳以上ですか?</string>
     <string name="social_anonymous">匿名</string>
     <string name="social_author_name_anonymous">匿名で投稿</string>
     <string name="social_author_name_message">ほかの人の一覧にこの名前が表示されます。Google アカウントの名前やメールアドレスは表示しません。あとから設定で変えられます。</string>
@@ -8,11 +13,55 @@
     <string name="social_author_name_post">この名前で投稿</string>
     <string name="social_author_name_title">投稿に表示する名前</string>
     <string name="social_block">投稿者をブロック</string>
+    <string name="social_block_confirm">ブロックする</string>
+    <string name="social_block_failed_title">ブロックできませんでした</string>
+    <string name="social_block_message">この人の投稿と公開したアプリが、あなたに表示されなくなります。相手には知らされません。設定からいつでも解除できます。</string>
+    <string name="social_block_title">「%1$s」さんをブロックしますか?</string>
+    <string name="social_blocked_message">「%1$s」さんの投稿と公開したアプリは表示されません。設定から解除できます。</string>
+    <string name="social_blocked_title">ブロックしました</string>
+    <string name="social_blocked_users_empty">ブロックしている人はいません</string>
+    <string name="social_blocked_users_footer">ブロックした人の投稿と公開したアプリは表示されません。</string>
+    <string name="social_blocked_users_header">ブロック中のユーザー</string>
+    <string name="social_cancel">キャンセル</string>
     <string name="social_chat_empty">まだメッセージはありません</string>
     <string name="social_chat_me">自分</string>
     <string name="social_chat_other">相手</string>
     <string name="social_chat_photo">写真</string>
     <string name="social_chat_placeholder">メッセージ</string>
     <string name="social_chat_send">送信</string>
+    <string name="social_interest_accept">承認する</string>
+    <string name="social_interest_matched">つながりました</string>
+    <string name="social_interest_send">つながりたい</string>
+    <string name="social_interest_sent">送りました</string>
+    <string name="social_match_accept">承認</string>
+    <string name="social_match_decline">見送る</string>
+    <string name="social_match_empty_incoming">まだ届いていません</string>
+    <string name="social_match_empty_matches">まだ誰ともつながっていません</string>
+    <string name="social_match_empty_outgoing">送った「つながりたい」はありません</string>
+    <string name="social_match_failed">読み込めませんでした</string>
+    <string name="social_match_loading">読み込み中…</string>
+    <string name="social_match_missing_profile">プロフィールが見つかりません</string>
+    <string name="social_match_retry">もう一度読み込む</string>
+    <string name="social_match_withdraw">取り下げる</string>
+    <string name="social_ok">OK</string>
+    <string name="social_reason_harassment">嫌がらせ・差別</string>
+    <string name="social_reason_illegal">違法な内容</string>
+    <string name="social_reason_other">その他</string>
+    <string name="social_reason_privacy">個人情報の公開</string>
+    <string name="social_reason_sexual">性的な内容</string>
+    <string name="social_reason_spam">スパム・宣伝</string>
+    <string name="social_reason_violence">暴力的・危険な内容</string>
     <string name="social_report">通報する</string>
+    <string name="social_report_failed_title">通報できませんでした</string>
+    <string name="social_report_limited">今日はこれ以上通報できません。明日またお試しください</string>
+    <string name="social_report_message">運営が内容を確認します。通報したことは相手に知らされません。</string>
+    <string name="social_report_title">通報の理由</string>
+    <string name="social_reported_message">運営が内容を確認し、利用規約に反するものは非公開にします。この人を表示したくない時はブロックもできます。</string>
+    <string name="social_reported_title">通報しました</string>
+    <string name="social_try_again">うまくいきませんでした。もう一度お試しください</string>
+    <string name="social_unblock">解除</string>
+    <string name="social_unmatch">つながりを解除</string>
+    <string name="social_unmatch_confirm">解除する</string>
+    <string name="social_unmatch_message">お互いに連絡先が見えなくなります。相手に通知は送られません。</string>
+    <string name="social_unmatch_title">つながりを解除しますか?</string>
 </resources>
