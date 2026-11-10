@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="consent_agree">Agree and continue</string>
+    <string name="consent_ai_button">\"Write with AI\" buttons (write, summarize, classify, rewrite, extract, suggest) send data only when tapped. Short answers send nothing when on-device AI is available; otherwise they send recent records and the text being entered (up to 4KB). Long-answer buttons always send up to 16KB. In a shared app, only records you added are used.</string>
+    <string name="consent_ai_chat">The \"AI chat\" part sends the latest turns of your own conversation saved in that app (up to 20 turns, 16KB) each time you send a message. If the app sets a reference list, your own latest records from it (up to 20, 8KB) are also sent. A photo is sent only when you tap a \"photo\" AI button: one downscaled image (JPEG, long edge up to 1024 pixels). Audio and video are never sent.</string>
+    <string name="consent_destination">Destination: Anthropic, PBC (USA), via Tailor It\'s server (Google Cloud). It is used only to build your app, write a button\'s text or reply in a chat.</string>
+    <string name="consent_intro">When you build or edit an app, the following is sent to Anthropic\'s AI (Claude).</string>
+    <string name="consent_item_chat">Your conversation with the AI</string>
+    <string name="consent_item_design">The current app design (screens, fields, app name, etc.)</string>
+    <string name="consent_item_utterance">What you said or typed (transcribed on this device; audio itself is never sent)</string>
+    <string name="consent_later">Not now</string>
+    <string name="consent_no_records">When you build or edit an app, the contents of your records (numbers, notes, photos, etc.) are not sent.</string>
+    <string name="consent_reconsent">We\'ve updated what is sent to the AI. Please review it again.</string>
+    <string name="consent_title">About sending data to AI</string>
+    <string name="consent_without">Without consent you can still view and record in your apps; only AI features are unavailable. You can withdraw consent in Settings at any time (data already sent cannot be recalled).</string>
+    <string name="legal_privacy_policy">Privacy Policy</string>
+    <string name="legal_terms">Terms of Use</string>
+    <string name="settings_ai_button_metrics">Send AI button usage</string>
+    <string name="settings_ai_button_metrics_footer">Once a day, sends whether on-device AI is available (unsupported device, turned off, or preparing) and how many times AI buttons could not answer, per button type (summarize, classify, etc.). Your user ID, the text you typed, and your records are not sent.</string>
+    <string name="settings_ai_consent">Sending data to AI</string>
+    <string name="settings_ai_consent_date">Agreed on</string>
+    <string name="settings_ai_consent_grant">Read and agree</string>
+    <string name="settings_ai_consent_granted">Agreed</string>
+    <string name="settings_ai_consent_not_granted">Not agreed</string>
+    <string name="settings_ai_consent_revoke">Withdraw consent</string>
+    <string name="settings_close">Close</string>
+    <string name="settings_crash_reporting">Send crash reports</string>
+    <string name="settings_crash_reporting_footer">When the app crashes, where it crashed (the location in the code), your device model, OS, app version and user ID are sent to Google\'s Firebase Crashlytics and used to fix bugs. What you say, your records and the contents of your apps are never sent.</string>
+    <string name="settings_privacy_footer">When you build or edit an app, what you said, the conversation and the app design are sent to Anthropic\'s AI (the contents of your records are not). \"Write with AI\" buttons send data only when tapped (short answers up to 4KB, only if on-device AI is unavailable; long answers always up to 16KB). The \"AI chat\" part sends the latest conversation (up to 20 turns, 16KB) and, if set, your own reference records (up to 20, 8KB), and a photo button sends one downscaled photo. If you withdraw consent, AI features are disabled (viewing and recording still work). Data already sent cannot be recalled.</string>
+    <string name="settings_privacy_header">Privacy</string>
+    <string name="settings_revoke_cancel">Cancel</string>
+    <string name="settings_revoke_confirm">Withdraw</string>
+    <string name="settings_revoke_message">Making and editing apps, and chat, will be disabled until you agree again.</string>
+    <string name="settings_revoke_title">Withdraw consent to send data to AI?</string>
+    <string name="settings_title">Settings</string>
+</resources>

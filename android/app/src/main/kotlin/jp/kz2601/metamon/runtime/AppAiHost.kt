@@ -16,7 +16,7 @@ data class AiTextAccess(val consentGranted: Boolean, val isPro: Boolean, val enf
 /**
  * aiButton のホスト側(iOS の AppRuntime+AIText / +AIButtonMetrics)。
  * 端末内 AI が使えない時だけ `POST /v1/text` を呼ぶ。判定は [AiTextGate](同意 → Pro)。断る時は理由の [AiTextError] を投げ、部品が文言を出す。
- * 同意画面(#053)・課金画面(#073)はまだ無いので、今は出さずに理由だけ返す。
+ * 同意が無い時は [onNeedsConsent] で同意の画面を出す(iOS の `requireAIConsent`・#888)。課金画面(#073)はまだ無いので理由だけ返す。
  */
 class AppAiHost(
     private val ai: AIClient,
@@ -26,15 +26,20 @@ class AppAiHost(
     private val sharedApp: () -> Boolean = { false },
     override val isMock: Boolean = false,
     override val onDevice: OnDeviceAi = UnsupportedOnDeviceAi,
-    /** 端末内 AI の集計の受け口(1 日 1 回送るのは #053 の集計の口が入ってから) */
+    /** 端末内 AI の集計の受け口(貯めて 1 日 1 回送るのは `AiButtonMetricsRecorder`・#888) */
     private val metrics: (AiButtonMetric) -> Unit = {},
+    /** 同意が要る時に同意の画面を出す(#888) */
+    private val onNeedsConsent: () -> Unit = {},
 ) : AiHost {
     override val supportsOnlineText: Boolean get() = true
 
     override suspend fun generateText(request: AiTextRequest): AiTextResult {
         val a = access()
         return when (AiTextGate.decide(a.consentGranted, a.isPro, a.enforced, sharedApp())) {
-            AiTextGate.Decision.NEEDS_CONSENT -> throw AiTextError.NeedsConsent
+            AiTextGate.Decision.NEEDS_CONSENT -> {
+                onNeedsConsent()
+                throw AiTextError.NeedsConsent
+            }
             AiTextGate.Decision.NEEDS_PRO -> throw AiTextError.NeedsPro
             AiTextGate.Decision.SEND -> ai.text(request.inApp(appId()))
         }

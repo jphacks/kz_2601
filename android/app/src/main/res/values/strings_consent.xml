@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- AI へのデータ送信の同意・設定のプライバシー(#888)。文言の正は iOS の Localizable.xcstrings(通常の版) -->
+<resources>
+    <string name="consent_agree">同意して使う</string>
+    <string name="consent_ai_button">「AI で書く」ボタン(文を作る・要約・分類・書き直し・抜き出し・提案)は、押した時だけ送ります。短い答えは、端末の中の AI が使える時は送らず、使えない時だけ最近の記録と入力中の文字(最大 4KB)を送ります。長い答えのボタンは、いつも最大 16KB を送ります。共有のアプリで材料にするのは、自分が入れた記録だけです。</string>
+    <string name="consent_ai_chat">「AI と話す」部品は、送るたびに、そのアプリに保存した自分の会話の直近の発言(最大 20 件・16KB)を送ります。参考にする記録帳が決めてあるアプリでは、その記録帳の自分の記録の新しいもの(最大 20 件・8KB)も送ります。写真は「写真を材料にするボタン」を押した時だけ、縮めた 1 枚(JPEG・長い辺 1024 ピクセル以下)を送ります。音声・動画は送りません。</string>
+    <string name="consent_destination">送り先: Tailor It のサーバー(Google Cloud)を経由して Anthropic, PBC(米国)へ。送った内容は、アプリを作る・ボタンの文を作る・会話の返事を作るためだけに使います。</string>
+    <string name="consent_intro">アプリを作る・直すときは、次の内容を Anthropic 社の AI(Claude)に送ります。</string>
+    <string name="consent_item_chat">AI との会話の履歴</string>
+    <string name="consent_item_design">今のアプリの設計(画面・項目・アプリ名など)</string>
+    <string name="consent_item_utterance">話した内容・入力した文(端末内で文字にしたもの。音声そのものは送りません)</string>
+    <string name="consent_later">あとで</string>
+    <string name="consent_no_records">アプリを作る・直すときに、記録したデータ(数値・メモ・写真など)の中身は送りません。</string>
+    <string name="consent_reconsent">AI に送る内容の説明を改めました。もう一度ご確認ください。</string>
+    <string name="consent_title">AI へのデータ送信について</string>
+    <string name="consent_without">同意しなくても、作ったアプリの閲覧・記録はできます。AI を使う機能だけが使えません。同意は設定からいつでも取り消せます(送信済みの内容は取り消せません)。</string>
+    <string name="legal_privacy_policy">プライバシーポリシー</string>
+    <string name="legal_terms">利用規約</string>
+    <string name="settings_ai_button_metrics">AI ボタンの利用状況を送る</string>
+    <string name="settings_ai_button_metrics_footer">端末内の AI が使えるか(非対応の端末・オフ・準備中)と、AI ボタンが答えを出せなかった回数を、ボタンの種類(要約・分類など)ごとに 1 日 1 回まとめて送ります。ユーザー ID・入力した文・記録は送りません。</string>
+    <string name="settings_ai_consent">AI へのデータ送信</string>
+    <string name="settings_ai_consent_date">同意した日時</string>
+    <string name="settings_ai_consent_grant">説明を読んで同意する</string>
+    <string name="settings_ai_consent_granted">同意済み</string>
+    <string name="settings_ai_consent_not_granted">未同意</string>
+    <string name="settings_ai_consent_revoke">同意を取り消す</string>
+    <string name="settings_close">閉じる</string>
+    <string name="settings_crash_reporting">クラッシュ報告を送る</string>
+    <string name="settings_crash_reporting_footer">アプリが落ちた時に、落ちた場所(プログラムの位置)・端末の機種・OS・アプリの版とユーザー ID を Google の Firebase Crashlytics に送り、不具合を直すのに使います。話した内容・記録・作ったアプリの中身は送りません。</string>
+    <string name="settings_privacy_footer">アプリを作る・直すときは、話した内容・会話・アプリの設計を Anthropic 社の AI に送ります(記録の中身は送りません)。「AI で書く」ボタンは、押した時だけ送ります(短い答えは端末の中の AI が使えない時だけ最大 4KB、長い答えはいつも最大 16KB)。「AI と話す」部品は直近の会話(最大 20 件・16KB)と、決めてあれば参考の自分の記録(最大 20 件・8KB)を、写真のボタンは縮めた写真 1 枚を送ります。同意を取り消すと、AI を使う機能が使えなくなります(閲覧・記録は使えます)。送信済みの内容は取り消せません。</string>
+    <string name="settings_privacy_header">プライバシー</string>
+    <string name="settings_revoke_cancel">キャンセル</string>
+    <string name="settings_revoke_confirm">取り消す</string>
+    <string name="settings_revoke_message">アプリを作る・直す機能と対話が使えなくなります。もう一度同意すると使えます。</string>
+    <string name="settings_revoke_title">AI への送信の同意を取り消しますか？</string>
+    <string name="settings_title">設定</string>
+</resources>
