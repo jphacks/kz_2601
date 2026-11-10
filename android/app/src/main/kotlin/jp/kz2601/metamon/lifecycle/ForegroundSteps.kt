@@ -29,4 +29,8 @@ fun AppContainer.foregroundSteps(): List<ForegroundStep> = listOf(
         override val name = "microphone"
         override suspend fun background() = transcriber.cancelRecording()
     },
+    object : ForegroundStep {
+        override val name = "update" // 最低対応版とお知らせの読み直し(#906・起動時は UpdateGateHost)
+        override suspend fun foreground() = updateGate.check()
+    },
 )

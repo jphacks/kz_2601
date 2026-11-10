@@ -107,6 +107,7 @@ import jp.kz2601.metamon.services.sync.HotReload
 import jp.kz2601.metamon.services.sync.RealtimeDocumentSync
 import jp.kz2601.metamon.services.sync.SseChangeEventSource
 import jp.kz2601.metamon.services.sync.asDocumentFetcher
+import jp.kz2601.metamon.update.UpdateGate
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -179,6 +180,8 @@ class AppContainer(
     private val talkBackRunning: () -> Boolean = { false },
     /** アプリ内のフィードバックの送り先(`POST /v1/feedback`・#319)。モックは送った内容を覚えるだけ */
     val feedback: FeedbackClient = MockFeedbackClient(),
+    /** 最低対応版とアプリ内のお知らせ(#906)。モックは何もしない(iOS と同じ) */
+    val updateGate: UpdateGate = UpdateGate.disabled(InMemoryKeyValueStore()),
 ) {
     /** フィードバックの画面の出し入れ(設定の入口・端末を振った時) */
     val feedbackComposer = FeedbackComposerLauncher()
@@ -382,6 +385,7 @@ class AppContainer(
                 tutorial = FirstRunTutorialStore(SharedPreferencesKeyValueStore.of(context, FirstRunTutorialStore.PREFS)),
                 talkBackRunning = { TalkBack.isRunning(context) },
                 feedback = HttpFeedbackClient(appConfigHttp),
+                updateGate = UpdateGate.live(context, environment.appConfigBaseUrl, client, device),
             )
         }
 

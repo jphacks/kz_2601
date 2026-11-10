@@ -84,6 +84,7 @@ import jp.kz2601.metamon.share.ShareLinkIntents
 import jp.kz2601.metamon.share.ShareSheet
 import jp.kz2601.metamon.share.ShareTarget
 import jp.kz2601.metamon.switcher.AppSwitcherDialog
+import jp.kz2601.metamon.update.UpdateGateHost
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import java.io.File
@@ -142,9 +143,12 @@ class MainActivity : ComponentActivity() {
 @Composable
 fun MetamonRoot(container: AppContainer) {
     val user by container.accountGuard.active.collectAsStateWithLifecycle()
-    when (RootScreen.of(user)) {
-        RootScreen.SignIn -> SignInScreen(container.session)
-        RootScreen.App -> CompositionLocalProvider(LocalFeedHost provides container.feedHost) { MetamonApp(container) }
+    // お知らせのバナーと「アップデートしてください」はサインイン前にも出す(#906)
+    UpdateGateHost(container.updateGate) {
+        when (RootScreen.of(user)) {
+            RootScreen.SignIn -> SignInScreen(container.session)
+            RootScreen.App -> CompositionLocalProvider(LocalFeedHost provides container.feedHost) { MetamonApp(container) }
+        }
     }
 }
 
