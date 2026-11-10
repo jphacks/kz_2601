@@ -27,6 +27,7 @@ import jp.kz2601.metamon.renderer.components.ai.AiChatPairSaving
 import jp.kz2601.metamon.renderer.components.ai.AiHost
 import jp.kz2601.metamon.renderer.components.social.AuthorNameHost
 import jp.kz2601.metamon.renderer.components.social.BlockedUsersHost
+import jp.kz2601.metamon.renderer.components.social.FollowsHost
 import jp.kz2601.metamon.renderer.components.social.MatchingHost
 import jp.kz2601.metamon.renderer.components.social.ModerationHost
 import jp.kz2601.metamon.renderer.components.social.ReportReasonOption
@@ -133,7 +134,7 @@ class AppRuntime(
     /** 共有アプリの参加者と自分が管理者か(#903)。null なら読まない(モック・テスト) */
     val members: AppMembersStore? = null,
 ) : DSLRuntime, NavigationHost, RecordWriter, TimerHost, AiChatPairSaving, AuthorNameHost,
-    ModerationHost, MatchingHost, SocialPromptHost, BlockedUsersHost {
+    ModerationHost, MatchingHost, SocialPromptHost, BlockedUsersHost, FollowsHost {
     private val _state = MutableStateFlow(RuntimeState(document))
     val state: StateFlow<RuntimeState> = _state.asStateFlow()
 
@@ -370,6 +371,7 @@ class AppRuntime(
         _apps.value = emptyList()
         members?.clear() // 前の人の参加者・管理者を次の人に見せない
         social.forget() // 前の人のブロックで次の人の投稿を隠さない(#877)
+        follows.forget()
         val next = directory?.let { it.fresh(it.store.rotate()) } ?: document
         _state.value = RuntimeState(next)
         _records.value = emptyMap()
@@ -781,6 +783,20 @@ class AppRuntime(
     override suspend fun declineInterest(item: MatchInterest, box: MatchBox) = social.declineInterest(item, box)
     override suspend fun unmatch(item: MatchInterest) = social.unmatch(item)
 
+    // フォロー(#1028・iOS の AppRuntime+Follows)
+
+    private val follows = FollowRuntime(socialServices?.follows, scope, object : FollowRuntime.Env {
+        override val appId: String get() = document.appId
+        override val dsl: AppDSL get() = this@AppRuntime.dsl
+        override fun currentUid(): String? = currentUserId()
+        override fun records(entity: String): List<Record> = this@AppRuntime.records(entity)
+        override fun toast(message: UiText) = showToast(message)
+    })
+
+    override val followsVersion: StateFlow<Int> get() = follows.version
+    override fun followedAuthors(): Set<String>? = follows.followedAuthors()
+    override fun followState(entity: String, recordId: String): Boolean? = follows.followState(entity, recordId)
+
     // AI と話す(#874)
 
     /**
@@ -876,8 +892,7 @@ class AppRuntime(
 
             ActionType.RESET_FORM -> ctx.form?.reset()
 
-            ActionType.FOLLOW, ActionType.UNFOLLOW ->
-                attempt(action.type) { host.follow(action, ctx, on = action.type == ActionType.FOLLOW) }
+            ActionType.FOLLOW, ActionType.UNFOLLOW -> follows.run(action, ctx)
 
             ActionType.SCHEDULE_NOTIFICATION -> {
                 val spec = action.notification ?: return

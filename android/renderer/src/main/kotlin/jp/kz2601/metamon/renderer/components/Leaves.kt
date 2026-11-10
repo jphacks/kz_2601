@@ -10,6 +10,7 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
@@ -19,9 +20,12 @@ import jp.kz2601.metamon.dsl.Action
 import jp.kz2601.metamon.dsl.ActionType
 import jp.kz2601.metamon.dsl.Component
 import jp.kz2601.metamon.dsl.Size
+import jp.kz2601.metamon.dsl.records.isFollow
 import jp.kz2601.metamon.renderer.R
 import jp.kz2601.metamon.renderer.components.actions.ActionButton
 import jp.kz2601.metamon.renderer.components.actions.ActionButtonKind
+import jp.kz2601.metamon.renderer.components.social.follows
+import jp.kz2601.metamon.renderer.components.social.showsFollowButton
 import jp.kz2601.metamon.renderer.form.FormDraft
 import jp.kz2601.metamon.renderer.registry.RenderContext
 import jp.kz2601.metamon.renderer.theme.RenderTheme
@@ -55,6 +59,9 @@ fun buttonDefaultIcon(action: Action?): String? = when (action?.type) {
 @Composable
 fun ButtonLeaf(c: Component, ctx: RenderContext, modifier: Modifier = Modifier) {
     if (!isButtonVisible(c.action, ctx.form)) return
+    // follow / unfollow(#270)は今の投稿の作者の状態に合う方だけ
+    if (c.action?.type?.isFollow == true) ctx.runtime.follows?.followsVersion?.collectAsState()?.value
+    if (!ctx.runtime.showsFollowButton(c.action, ctx.form?.recordId)) return
     ActionButton(
         label = c.label.orEmpty(),
         kind = ActionButtonKind.of(c.style),

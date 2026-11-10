@@ -31,10 +31,6 @@ interface RuntimeHost {
      */
     suspend fun notificationsChanged(appId: String, dsl: AppDSL, records: Map<String, List<Record>>) {}
 
-    /** フォローする / 外す(#270)。 */
-    suspend fun follow(action: Action, context: ActionContext, on: Boolean): Unit =
-        throw HostUnavailableException(if (on) ActionType.FOLLOW else ActionType.UNFOLLOW)
-
     /** 記録を書き出して共有シートに渡す(#76)。 */
     suspend fun export(action: Action, context: ActionContext, runtime: AppRuntime): Unit = throw HostUnavailableException(ActionType.EXPORT)
 
