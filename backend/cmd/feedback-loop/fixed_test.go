@@ -12,7 +12,9 @@ import (
 
 type fakeIssues map[int]github.Fix
 
-func (f fakeIssues) IssueFix(_ context.Context, _ string, n int) (github.Fix, error) { return f[n], nil }
+func (f fakeIssues) IssueFix(_ context.Context, _ string, n int) (github.Fix, error) {
+	return f[n], nil
+}
 
 type recPusher struct{ uids []string }
 

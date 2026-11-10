@@ -96,3 +96,20 @@ func TestIngestAppStoreOffByDefault(t *testing.T) {
 		t.Fatal("explicit source while off should fail")
 	}
 }
+
+func TestPurgeCommand(t *testing.T) {
+	ctx := context.Background()
+	ta := newTestApp(t, env{"LOOP_PAUSED": "1"}) // purge runs even while the loop is stopped
+	it := loop.Item{ID: "lin_old", Source: loop.SourceCrash, SourceID: "c", Status: loop.ItemNew, ExpiresAt: ta.now().Add(-time.Hour)}
+	if _, err := ta.ls.PutItem(ctx, it); err != nil {
+		t.Fatal(err)
+	}
+	out := ta.must(t, "purge", "-dry-run")
+	if !strings.Contains(out, "expired 1") {
+		t.Fatalf("%s", out)
+	}
+	ta.must(t, "purge")
+	if _, err := ta.ls.GetItem(ctx, "lin_old"); err == nil {
+		t.Fatal("expired item kept")
+	}
+}

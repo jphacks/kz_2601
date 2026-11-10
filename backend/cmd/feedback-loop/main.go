@@ -70,6 +70,7 @@ func main() {
 	a := &app{
 		loop:     lf,
 		control:  lf,
+		sources:  lf,
 		feedback: st,
 		users:    st,
 		devices:  st,
@@ -93,6 +94,7 @@ const usageText = `usage: feedback-loop <command> [flags]
   drafts list|show|edit|approve|reject|publish   the human review of drafts (see: drafts)
   fixed [-dry-run]                           tell senders when a merged PR fixed their issue (#374)
   notices -uid UID                           one user's 「あなたの声で直りました」 notices
+  purge [-dry-run]                           erase expired copies, copies whose feedback is gone, deleted accounts' copies
   switch show | switch set -by NAME <stage|all> <on|off>   stop switches (#375)
   audit [-since 168h] [-draft ID] [-item ID] [-summary]   the audit log / weekly review
 
@@ -102,8 +104,10 @@ publish, notify) and loop_control/switches does not say off.
 
 // app holds what the commands use (tests build it with in-memory parts).
 type app struct {
-	loop     loop.Store
-	control  loop.Control
+	loop    loop.Store
+	control loop.Control
+	// sources checks feedback/{id} still exists (purge); nil = skip that check.
+	sources  loop.SourceChecker
 	feedback store.FeedbackReader
 	users    ingest.Users
 	// appStore, when set, replaces the App Store Connect fetcher (tests).
@@ -149,6 +153,8 @@ func (a *app) run(ctx context.Context, args []string) error {
 		return a.fixedRun(ctx, rest)
 	case "notices":
 		return a.notices(ctx, rest)
+	case "purge":
+		return a.purge(ctx, rest)
 	case "switch":
 		return a.switches(ctx, rest)
 	case "audit":
@@ -273,5 +279,27 @@ func (a *app) ingestCrash(ctx context.Context, args []string) error {
 		}
 	}
 	fmt.Fprintf(a.out, "ingest-crash: %s created=%v\n", it.ID, created)
+	return nil
+}
+
+// purge is not behind a stop switch: erasing must keep working while the
+// loop is stopped (#367).
+func (a *app) purge(ctx context.Context, args []string) error {
+	fs := flag.NewFlagSet("purge", flag.ContinueOnError)
+	dry := fs.Bool("dry-run", false, "only count")
+	if err := fs.Parse(args); err != nil {
+		return err
+	}
+	res, err := loop.Sweep(ctx, a.loop, a.sources, a.users, a.now().UTC(), *dry)
+	if err != nil {
+		return err
+	}
+	if !*dry {
+		e := loop.Event{Stage: "purge", Action: "purged", Reason: fmt.Sprintf("expired=%d orphans=%d deleted=%d", res.Expired, res.Orphans, res.Deleted)}
+		if err := a.gate().Record(ctx, e); err != nil {
+			return err
+		}
+	}
+	fmt.Fprintf(a.out, "purge: expired %d, orphans %d, deleted accounts %d%s\n", res.Expired, res.Orphans, res.Deleted, map[bool]string{true: " (dry run)"}[*dry])
 	return nil
 }
