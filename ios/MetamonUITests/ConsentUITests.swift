@@ -9,7 +9,9 @@ final class ConsentUITests: XCTestCase {
         continueAfterFailure = false
         app = XCUIApplication()
         app.launchEnvironment = ["METAMON_MOCK": "1", "METAMON_FAB_POSITION": "auto", "METAMON_AI_CONSENT": "reset", "METAMON_CLARIFY": "0", "METAMON_TUTORIAL": "seen"]
-        app.launchArguments = ["-AppleLanguages", "(ja)", "-AppleLocale", "ja_JP", "-metamon.appLanguage", "ja"]
+        // ここで作ったアプリが次のテストの起動に「引き継ぎの案内」(#276)を残さないようにする
+        app.launchArguments = ["-AppleLanguages", "(ja)", "-AppleLocale", "ja_JP", "-metamon.appLanguage", "ja",
+                               "-metamon.accountLinkPrompted", "YES"]
         app.launch()
     }
 
@@ -35,14 +37,11 @@ final class ConsentUITests: XCTestCase {
         XCTAssertTrue(agree.waitForExistence(timeout: 10), "同意前に生成しようとしても同意の画面が出ない")
         XCTAssertFalse(app.buttons["voice.fab"].exists, "同意前に生成された")
 
-        // 同意 → 生成できる(生成したアプリのマイク FAB に切り替わる)
+        // 同意 → 同意の前に入れた 1 件がそのまま送られて生成される(打ち直さない・`resumeUtteranceAfterConsent`)
         agree.tap()
         XCTAssertTrue(waitGone(agree), "同意しても閉じない")
-        XCTAssertTrue(field.waitForExistence(timeout: 10))
-        field.tap()
-        field.typeText("家計簿アプリを作って")
-        app.buttons["送信"].firstMatch.tap()
-        XCTAssertTrue(app.buttons["voice.fab"].waitForExistence(timeout: 30), "同意後に生成できない")
+        XCTAssertTrue(app.buttons["voice.fab"].waitForExistence(timeout: 30), "同意後に、同意の前に入れた依頼で生成されない")
+        XCTAssertFalse(agree.exists, "同意したのにまた同意の画面が出た")
         attach("consent-after-generate")
     }
 
