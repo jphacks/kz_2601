@@ -16,7 +16,6 @@ import jp.kz2601.metamon.renderer.DSLRuntime
 import jp.kz2601.metamon.renderer.components.audio.DictationHost
 import jp.kz2601.metamon.dsl.logic.ExternalUrlPolicy
 import jp.kz2601.metamon.renderer.NavigationHost
-import jp.kz2601.metamon.renderer.components.importing.RecordImportHost
 import jp.kz2601.metamon.renderer.components.play.RecordWriter
 import jp.kz2601.metamon.renderer.components.play.TimerHost
 import jp.kz2601.metamon.renderer.components.ai.AiChatPairSaving
@@ -111,7 +110,7 @@ class AppRuntime(
     private val directory: AppDirectory? = null,
     /** aiButton のオンライン版・端末内 AI(#873)。null なら AI ボタンは理由つきで無効 */
     private val aiHost: AiHost? = null,
-) : DSLRuntime, NavigationHost, RecordWriter, TimerHost, AiChatPairSaving, RecordImportHost {
+) : DSLRuntime, NavigationHost, RecordWriter, TimerHost, AiChatPairSaving {
     private val _state = MutableStateFlow(RuntimeState(document))
     val state: StateFlow<RuntimeState> = _state.asStateFlow()
 

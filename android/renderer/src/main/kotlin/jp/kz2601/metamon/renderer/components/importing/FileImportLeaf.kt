@@ -23,6 +23,7 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import jp.kz2601.metamon.dsl.Component
 import jp.kz2601.metamon.dsl.records.Entity
+import jp.kz2601.metamon.renderer.DSLRuntime
 import jp.kz2601.metamon.renderer.R
 import jp.kz2601.metamon.renderer.components.actions.ActionButton
 import jp.kz2601.metamon.renderer.components.actions.ActionButtonKind
@@ -39,14 +40,13 @@ import kotlinx.coroutines.withContext
  * - csv: 1 行 = 1 件(列の当て方・型の変換は :dsl の RecordImport)。足す前に「n 件を追加・m 行は読めない」を確かめる。
  * - text: 本文を `field` に入れた記録を 1 件。
  * - pdf / audio: この端末ではまだ読めない(選べる種類から外し、ボタンの下に一言)。
- * ファイルは読むだけで、送らない・コピーしない・残さない。足すのは [RecordImportHost.addRecord](フォームの保存と同じく端末に入り同期)。
+ * ファイルは読むだけで、送らない・コピーしない・残さない。足すのは [DSLRuntime.addRecord](フォームの保存と同じく端末に入り同期)。
  */
 @Composable
 fun FileImportLeaf(c: Component, ctx: RenderContext, modifier: Modifier = Modifier) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     val runtime = ctx.runtime
-    val host = runtime as? RecordImportHost
     val entity = c.entity?.let { runtime.entityModel(it) }
     var reading by remember { mutableStateOf(false) }
     var progress by remember { mutableStateOf<Pair<Int, Int>?>(null) }
@@ -59,15 +59,15 @@ fun FileImportLeaf(c: Component, ctx: RenderContext, modifier: Modifier = Modifi
         return
     }
     val mimes = FileImportFlow.mimeTypes(c.accept)
-    val usable = host != null && FileImportFlow.usable(c, entity)
+    val usable = FileImportFlow.usable(c, entity)
 
     val picker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
-        if (uri == null || host == null) return@rememberLauncherForActivityResult
+        if (uri == null) return@rememberLauncherForActivityResult
         scope.launch {
             reading = true
             try {
                 val refs = entity.fields.mapNotNull { it.refEntity }.toSet()
-                host.loadRecords(refs + entity.id)
+                runtime.loadRecords(refs + entity.id)
                 val step = read(context, uri, c, entity, ctx)
                 when (step) {
                     is ImportStep.Confirm -> pending = step
@@ -115,11 +115,10 @@ fun FileImportLeaf(c: Component, ctx: RenderContext, modifier: Modifier = Modifi
             confirmButton = {
                 TextButton(onClick = {
                     pending = null
-                    if (host == null) return@TextButton
                     scope.launch {
                         val total = step.rows.size
                         progress = 0 to total
-                        val added = FileImportFlow.add(host, entity.id, step.rows) { progress = it to total }
+                        val added = FileImportFlow.add(runtime,entity.id, step.rows) { progress = it to total }
                         progress = null
                         status = FileImportCopy.result(res, added, total)
                     }

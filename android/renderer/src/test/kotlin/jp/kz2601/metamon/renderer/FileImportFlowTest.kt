@@ -17,7 +17,6 @@ import jp.kz2601.metamon.renderer.components.importing.ImportKind
 import jp.kz2601.metamon.renderer.components.importing.ImportMessage
 import jp.kz2601.metamon.renderer.components.importing.ImportProblem
 import jp.kz2601.metamon.renderer.components.importing.ImportStep
-import jp.kz2601.metamon.renderer.components.importing.RecordImportHost
 import jp.kz2601.metamon.renderer.registry.ComponentRegistry
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -62,7 +61,7 @@ class FileImportFlowTest {
         override val entityModels: List<Entity>,
         records: Map<String, List<Record>> = emptyMap(),
         private val failIds: Set<String> = emptySet(),
-    ) : DSLRuntime, RecordImportHost {
+    ) : DSLRuntime {
         val added = mutableListOf<Pair<String, Map<String, JSONValue>>>()
         val loaded = mutableListOf<Set<String>>()
         override val recordsFlow: StateFlow<Map<String, List<Record>>> = MutableStateFlow(records)

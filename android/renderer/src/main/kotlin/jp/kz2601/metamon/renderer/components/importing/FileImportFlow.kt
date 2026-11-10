@@ -13,18 +13,6 @@ import jp.kz2601.metamon.dsl.records.JSONValue
 import jp.kz2601.metamon.renderer.DSLRuntime
 import jp.kz2601.metamon.renderer.form.FormChoices
 
-/**
- * fileImport が記録を足す口。:app の AppRuntime が実装する(#1082 の `DSLRuntime.addRecord` / `loadRecords` と同じ形。
- * あちらが入ったら DSLRuntime の口に寄せてこの interface を消す)。
- */
-interface RecordImportHost {
-    /** フォームを通さず 1 件足す。足せたら true。 */
-    suspend fun addRecord(entity: String, data: Map<String, JSONValue>): Boolean
-
-    /** entity の記録を読んでおく(件数の上限と ref の名前の照合に使う)。 */
-    suspend fun loadRecords(entities: Set<String>)
-}
-
 /** 読むファイルの種類。Android で読めるのは CSV と文字だけ(PDF・録音は [FileImportFlow.unavailableKinds])。 */
 enum class ImportKind { CSV, TEXT, PDF, AUDIO }
 
@@ -165,7 +153,7 @@ object FileImportFlow {
     }
 
     /** 1 件ずつ足す。`progress(足せた数)`。足せた件数を返す(途中で失敗しても残りは続ける・iOS と同じ)。 */
-    suspend fun add(host: RecordImportHost, entity: String, rows: List<Map<String, JSONValue>>, progress: (Int) -> Unit = {}): Int {
+    suspend fun add(host: DSLRuntime,entity: String, rows: List<Map<String, JSONValue>>, progress: (Int) -> Unit = {}): Int {
         var added = 0
         for (data in rows) {
             if (host.addRecord(entity, data)) added += 1
