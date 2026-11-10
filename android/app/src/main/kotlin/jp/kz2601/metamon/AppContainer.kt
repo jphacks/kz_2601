@@ -30,6 +30,7 @@ import jp.kz2601.metamon.services.mock.MockAuthService
 import jp.kz2601.metamon.services.mock.MockSeed
 import jp.kz2601.metamon.services.mock.MockTranscriber
 import jp.kz2601.metamon.services.mock.OfflineSimulatingAppConfigClient
+import jp.kz2601.metamon.services.speech.AndroidSpeechTranscriber
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -46,8 +47,9 @@ class AppContainer(
     val initialDsl: AppDSL,
     val appConfig: AppConfigClient,
     val ai: AIClient,
-    /** 文字起こし。本物(#359)が入るまでは、モックの構成の時だけある */
-    val transcriber: SpeechTranscriber?,
+    /** 文字起こし。本物は端末内の認識、モックは決まった文を返す [MockTranscriber] */
+    val transcriber: SpeechTranscriber,
+    val appId: DeviceAppId,
     val knobs: DebugKnobs,
     /** 記録のローカル DB と送信待ちの列(#882)。[MetamonApplication] が start する */
     val recordSync: RecordSyncEngine,
@@ -89,6 +91,7 @@ class AppContainer(
                 appConfig = records,
                 ai = MockAIClient(samples, delayMillis = delayMillis),
                 transcriber = MockTranscriber(),
+                appId = DeviceAppId(context),
                 knobs = knobs,
                 // 本物の記録と混ざらないよう、モックは別の置き場
                 recordSync = recordSync(context, records, "metamon-records-mock"),
@@ -101,10 +104,11 @@ class AppContainer(
 
             val tokens = AuthTokenProvider(auth)
             val clientInfo = ClientInfo(version = BuildConfig.VERSION_NAME, build = BuildConfig.VERSION_CODE.toString())
-            val device = DeviceContext(language = {
+            val language = {
                 val locales = LocaleList.getDefault()
                 ClientInfo.languageCode((0 until locales.size()).map(locales::get))
-            })
+            }
+            val device = DeviceContext(language = language)
             // App Check(Play Integrity)はまだ無い: ヘッダ無しで送る(backend が enforce の環境では 401 になる)
             val client = MetamonHttp.defaultClient()
             fun http(baseUrl: String) = MetamonHttp(baseUrl, tokens, clientInfo, appCheck = null, client = client, device = device)
@@ -118,7 +122,9 @@ class AppContainer(
                 initialDsl = initialDsl,
                 appConfig = appConfig,
                 ai = HttpAIClient(http(environment.aiBaseUrl), log = log),
-                transcriber = null,
+                // 声は端末内だけで文字にする(#354 §3)。端末内が無い端末は文字入力に落とす
+                transcriber = AndroidSpeechTranscriber(context, language = language, log = { Log.i(TAG, it) }),
+                appId = DeviceAppId(context),
                 knobs = knobs,
                 recordSync = recordSync(context, appConfig, "metamon-records"),
             )

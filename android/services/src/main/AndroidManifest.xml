@@ -1,6 +1,16 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
+    <!-- 音声入力(android-050)。声は端末内の認識だけに渡し、外へ送らない -->
+    <uses-permission android:name="android.permission.RECORD_AUDIO" />
+
+    <!-- API 30+ のパッケージの見え方: 認識サービスを見つけるのに要る -->
+    <queries>
+        <intent>
+            <action android:name="android.speech.RecognitionService" />
+        </intent>
+    </queries>
+
     <!-- 到達性の監視(AndroidConnectivity・#882) -->
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
 
