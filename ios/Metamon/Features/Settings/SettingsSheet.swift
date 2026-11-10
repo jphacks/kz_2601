@@ -127,7 +127,7 @@ struct SettingsSheet: View {
         .interactiveDismissDisabled(isDeleting || isSigningOut)
         #if !APP_STORE_REVIEW
         .sheet(item: $feedback) { ctx in
-            FeedbackComposerView(context: ctx, client: services.feedback) { feedback = nil }
+            FeedbackComposerView(context: ctx, client: services.feedback, notifyWhenFixed: services.loopNotices.map { FeedbackFixedOptIn.live(client: $0) }) { feedback = nil }
         }
         #endif
         #if DEBUG
@@ -374,6 +374,9 @@ struct SettingsSheet: View {
                 Label("フィードバックを送る", systemImage: "envelope")
             }
             .accessibilityIdentifier("settings.feedback")
+            if let notices = services.loopNotices {
+                NoticesSettingsRow(client: notices) // #374 「あなたの声で直りました」
+            }
         } footer: {
             Text("端末を振っても開けます。何を送るかは送る前に選べます。")
         }
