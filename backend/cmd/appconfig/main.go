@@ -16,6 +16,7 @@ import (
 	"github.com/jphacks/kz_2601/backend/internal/appconfig"
 	"github.com/jphacks/kz_2601/backend/internal/appstore"
 	"github.com/jphacks/kz_2601/backend/internal/auth"
+	"github.com/jphacks/kz_2601/backend/internal/coins/coinsapi"
 	"github.com/jphacks/kz_2601/backend/internal/entitlement"
 	"github.com/jphacks/kz_2601/backend/internal/fsenv"
 	"github.com/jphacks/kz_2601/backend/internal/httpx"
@@ -64,7 +65,9 @@ func main() {
 	limits := planLimits(logger) // #317
 	api := appconfig.New(st, appconfig.WithPro(pro), appconfig.WithProMode(proMode), appconfig.WithPlanLimits(limits), appconfig.WithTextFilter(textMode), usage(st, logger))
 	entitlement.Register(api, ents) // Pro (#314)
-	handler := newHandler(authed, logger, api, appconfig.SharePage(st), appStoreNotifications(ents, logger))
+	cs := newCoins(st, ents, logger)
+	coinsapi.Register(api, cs) // coins (#630)
+	handler := newHandler(authed, logger, api, appconfig.SharePage(st), appStoreNotifications(ents, logger), coinsapi.Public(cs.Config))
 	server := &http.Server{
 		Handler:           handler,
 		ReadHeaderTimeout: 10 * time.Second,
