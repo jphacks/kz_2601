@@ -12,7 +12,8 @@ import MetamonServices
 ///
 /// サーバーへの接続(appconfig のクライアント・ログイン)は Mac に Firebase がまだ無い(#930)ので、
 /// iOS の `METAMON_MOCK=1` と同じくメモリ上の appconfig(`InMemoryAppConfigClient`)に記録を持つ。
-/// AI・通知・共有・課金など iOS 固有の機能は持たない(未対応のアクションは一言で知らせる)。
+/// AI の部品(aiButton・aiGenerate・aiChat)は `MacAppRuntime+AIText.swift`(#962)。
+/// 通知・共有・課金など iOS 固有の機能は持たない(未対応のアクションは一言で知らせる)。
 @MainActor
 @Observable
 final class MacAppRuntime: RuntimeNavigating {
@@ -35,16 +36,24 @@ final class MacAppRuntime: RuntimeNavigating {
     static let undoSeconds: Double = 5
     /// addToCalendar で出す確認シートの中身(`MacAppRuntime+Calendar.swift`・#978)
     var calendarDraft: CalendarEventDraft?
+    /// AI の部品が同意(#246)の無いまま送ろうとした。中央の列に同意の説明を出す(`MacAppRuntime+AIText.swift`)
+    var needsAIConsent = false
 
     @ObservationIgnored let recordSync: RecordSyncEngine
+    /// AI の部品のオンライン版の送り先(#962)
+    @ObservationIgnored let ai: any AIClient
+    @ObservationIgnored let isAIConsentGranted: @MainActor () -> Bool
     /// lookupBook の問い合わせ先。appconfig への接続(#930)が来るまでは nil
     @ObservationIgnored var books: (any BookLookupClient)?
     @ObservationIgnored var calendarWriter: any CalendarWriting = EventKitCalendarWriter()
     @ObservationIgnored private var savingForms: Set<ObjectIdentifier> = []
 
-    init(appId: String, dsl: AppDSL, recordSync: RecordSyncEngine? = nil) {
+    init(appId: String, dsl: AppDSL, recordSync: RecordSyncEngine? = nil, ai: any AIClient = MacComposeSession.gatedAI(),
+         isAIConsentGranted: @escaping @MainActor () -> Bool = { AIConsentStore.shared.isGranted }) {
         self.appId = appId
         self.dsl = dsl
+        self.ai = ai
+        self.isAIConsentGranted = isAIConsentGranted
         selectedTab = dsl.initialTab // iOS と同じ: initialScreen がタブならそのタブから
         self.recordSync = recordSync ?? Self.mockRecordSync()
         self.recordSync.onEvent = { [weak self] event in self?.handle(event) }
@@ -215,7 +224,7 @@ final class MacAppRuntime: RuntimeNavigating {
             await lookupBook(action, ctx)
 
         default:
-            // AI・通知・共有・書き出しなどは Mac ではまだ動かない(後の Issue)
+            // 通知・共有・書き出しなどは Mac ではまだ動かない(後の Issue)
             toast = L10n.tr("このボタンは Mac ではまだ使えません")
         }
     }

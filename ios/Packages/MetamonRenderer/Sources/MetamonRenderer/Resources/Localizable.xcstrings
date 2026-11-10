@@ -1480,6 +1480,23 @@
         }
       }
     },
+    "macOS 26 以降が必要です" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Requires macOS 26 or later"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "macOS 26 以降が必要です"
+          }
+        }
+      }
+    },
     "openUrlButton: url は https か line/slack/discord/tel/mailto/maps のみ" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -2887,6 +2904,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "ゲージ"
+          }
+        }
+      }
+    },
+    "システム設定 > Apple Intelligence と Siri でオンにしてください" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Turn it on in System Settings > Apple Intelligence & Siri"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "システム設定 > Apple Intelligence と Siri でオンにしてください"
           }
         }
       }
