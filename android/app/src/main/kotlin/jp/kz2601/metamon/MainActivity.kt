@@ -2,6 +2,7 @@ package jp.kz2601.metamon
 
 import android.os.Bundle
 import android.util.Log
+import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
@@ -21,7 +22,6 @@ import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
@@ -29,10 +29,12 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
+import jp.kz2601.metamon.dsl.AppDSL
 import jp.kz2601.metamon.dsl.AppDocument
 import jp.kz2601.metamon.renderer.DSLView
 import jp.kz2601.metamon.renderer.theme.MetamonRenderTheme
 import jp.kz2601.metamon.renderer.theme.ReadableWidth
+import jp.kz2601.metamon.runtime.AppRuntime
 import jp.kz2601.metamon.services.GenerateProgress
 import jp.kz2601.metamon.voice.GeneratingView
 import jp.kz2601.metamon.voice.MicButton
@@ -78,7 +80,28 @@ fun MetamonApp(container: AppContainer) {
         )
     }
     val state by vm.state.collectAsStateWithLifecycle()
-    val runtime = remember(vm) { AppRuntime { vm.openVoice() } }
+    val runtime = container.runtime
+    val runtimeState by runtime.state.collectAsStateWithLifecycle()
+
+    LaunchedEffect(runtime) { runtime.bootstrap() }
+    // トースト・音声シートの見た目は描画の Issue で作る。いまは端末のトーストで出す
+    LaunchedEffect(runtimeState.toast) {
+        runtimeState.toast?.let {
+            Toast.makeText(context, it, Toast.LENGTH_SHORT).show()
+            runtime.dismissToast()
+        }
+    }
+    // 部品のマイク(onVoiceInput)は音声のシートを開く
+    LaunchedEffect(runtimeState.showVoiceSheet) {
+        if (runtimeState.showVoiceSheet) {
+            vm.openVoice()
+            runtime.dismissVoiceSheet()
+        }
+    }
+    // 生成・画面の差し替えの結果をランタイムに渡す
+    LaunchedEffect(state.document) {
+        if (state.document != runtime.document) runtime.apply(state.document)
+    }
 
     LaunchedEffect(container.auth) {
         if (container.auth.currentUser.value == null) {
@@ -121,7 +144,7 @@ fun MetamonApp(container: AppContainer) {
             } else {
                 // 横向き・タブレット・折りたたみでは幅を絞って中央に寄せる(iOS の readableWidth・#842)。
                 ReadableWidth {
-                    GeneratedApp(state, runtime, onDismissSummary = vm::dismissSummary)
+                    GeneratedApp(state, runtimeState.dsl, runtime, onDismissSummary = vm::dismissSummary)
                 }
                 MicButton(
                     state.copy(phase = VoicePhase.IDLE),
@@ -143,14 +166,14 @@ fun MetamonApp(container: AppContainer) {
 }
 
 @Composable
-private fun GeneratedApp(state: VoiceUiState, runtime: AppRuntime, onDismissSummary: () -> Unit) {
+private fun GeneratedApp(state: VoiceUiState, dsl: AppDSL, runtime: AppRuntime, onDismissSummary: () -> Unit) {
     Column(Modifier.fillMaxSize()) {
         state.summary?.let { summary ->
             OutlinedCard(Modifier.fillMaxWidth().padding(12.dp).clickable(onClick = onDismissSummary)) {
                 Text(summary, Modifier.padding(12.dp), style = MaterialTheme.typography.bodyMedium)
             }
         }
-        DSLView(state.document.dsl, runtime)
+        DSLView(dsl, runtime)
     }
 }
 

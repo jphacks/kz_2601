@@ -24,6 +24,7 @@ android {
 
 dependencies {
     api(project(":dsl"))
+    api(libs.kotlinx.coroutines.core)
     implementation(platform(libs.compose.bom))
     api(libs.compose.ui)
     api(libs.compose.material3)
