@@ -11,6 +11,7 @@ Kotlin + Jetpack Compose のネイティブアプリ。技術の選び方は [`d
 5. [モックとつまみ](#モックとつまみ)
 6. [Firebase の設定](#firebase-の設定)
 7. [版を上げる](#版を上げる)
+8. [アイコンの対応表](#アイコンの対応表)
 
 ## モジュール
 
@@ -111,3 +112,9 @@ Firebase Console に Android アプリ(`jp.kz2601.metamon`・stg を同じプロ
 ## 版を上げる
 
 版は `gradle/libs.versions.toml` だけで決める。今は compileSdk 36 に合わせて、compileSdk 37 を求める版(Compose 1.12・core 1.19・lifecycle 2.11)を使っていない。SDK の platform 37 を入れたら、compileSdk と一緒に上げる。
+
+## アイコンの対応表
+
+DSL のアイコン名は SF Symbols の語彙なので、`docs/dsl/icon-map.json`(iOS と共有する正典)で Material の名前に写す。表に無い名前は末尾の `.fill` / `.circle` / `.square` を外して引き直し、それでも無ければ細い円を出す。
+
+APK を小さく保つため material-icons-extended は依存に足さず、表で使う絵だけを取り込む。名前を足したら、extended と core の sources jar(版は `materialIconsCore`)を展開して `python3 scripts/gen-symbol-icons.py <extended> <core>` を回す(`renderer/.../theme/icons/` を作り直す)。`SymbolIconTableTest` が、例・schema・backend の AI のカタログ・部品が書く名前の漏れを見る。

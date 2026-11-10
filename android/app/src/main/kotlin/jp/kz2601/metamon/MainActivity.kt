@@ -32,6 +32,7 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import jp.kz2601.metamon.dsl.AppDocument
 import jp.kz2601.metamon.renderer.DSLView
 import jp.kz2601.metamon.renderer.theme.MetamonRenderTheme
+import jp.kz2601.metamon.renderer.theme.ReadableWidth
 import jp.kz2601.metamon.services.GenerateProgress
 import jp.kz2601.metamon.voice.GeneratingView
 import jp.kz2601.metamon.voice.MicButton
@@ -118,7 +119,10 @@ fun MetamonApp(container: AppContainer) {
             if (state.isInitial) {
                 VoiceRoute(vm)
             } else {
-                GeneratedApp(state, runtime, onDismissSummary = vm::dismissSummary)
+                // 横向き・タブレット・折りたたみでは幅を絞って中央に寄せる(iOS の readableWidth・#842)。
+                ReadableWidth {
+                    GeneratedApp(state, runtime, onDismissSummary = vm::dismissSummary)
+                }
                 MicButton(
                     state.copy(phase = VoicePhase.IDLE),
                     size = 64.dp,
