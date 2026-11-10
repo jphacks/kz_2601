@@ -99,6 +99,7 @@ class AppContainer(
                 knobs = knobs,
                 // 本物の記録と混ざらないよう、モックは別の置き場
                 recordSync = recordSync(context, records, "metamon-records-mock"),
+                host = AndroidRuntimeHost(context.applicationContext),
             )
         }
 
