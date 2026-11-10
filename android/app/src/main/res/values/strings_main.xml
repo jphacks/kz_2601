@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 骨格の画面(MainActivity)の文言(#843) -->
+<resources>
+    <string name="main_voice_not_ready">音声入力は準備中です</string>
+</resources>

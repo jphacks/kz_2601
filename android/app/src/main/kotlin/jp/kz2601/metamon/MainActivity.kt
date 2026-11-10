@@ -1,5 +1,6 @@
 package jp.kz2601.metamon
 
+import android.content.Context
 import android.os.Bundle
 import android.util.Log
 import android.widget.Toast
@@ -20,10 +21,16 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import jp.kz2601.metamon.language.AppLocales
 import jp.kz2601.metamon.renderer.DSLView
 import jp.kz2601.metamon.renderer.theme.MetamonRenderTheme
 
 class MainActivity : ComponentActivity() {
+    // Android 12 / 12L はアプリ内で選んだ言語をここで当てる(13+ はシステム・#843)
+    override fun attachBaseContext(newBase: Context) {
+        super.attachBaseContext(AppLocales.wrap(newBase))
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
@@ -42,7 +49,7 @@ fun MetamonApp(container: AppContainer) {
     val context = LocalContext.current
     val user by container.auth.currentUser.collectAsStateWithLifecycle()
     val runtime = remember {
-        AppRuntime { Toast.makeText(context, "音声入力は準備中です(#359)", Toast.LENGTH_SHORT).show() }
+        AppRuntime { Toast.makeText(context, R.string.main_voice_not_ready, Toast.LENGTH_SHORT).show() }
     }
 
     LaunchedEffect(container.auth) {
