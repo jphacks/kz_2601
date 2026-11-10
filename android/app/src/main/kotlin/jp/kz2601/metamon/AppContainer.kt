@@ -234,6 +234,7 @@ class AppContainer(
             removeLocalMedia = removeLocalMedia,
             clearImageCache = clearImageCache,
             feedCache = feedCache,
+            closeFeedback = feedbackComposer::close,
             // チュートリアルと「こう話すと直せます」の印(iOS は LocalWipe.clearDefaults で消える)。次の人には出し直す
             forgetTutorial = {
                 tutorial.forget()
@@ -261,11 +262,12 @@ class AppContainer(
             owner = activeOwner,
             startSync = recordSync::start,
             stopSync = recordSync::stop,
-            wipe = {
-                wipeLocalData()
-                feedbackComposer.close() // 前の人の画面のスクショ・アプリを次の人の画面に出さない
+            wipe = { wipeLocalData() },
+            onSignedOut = {
+                ShareLinkIntents.inbox.clear()
+                feedbackComposer.close() // 消す前に開き直されても、サインアウトで閉じる(#1315)
             },
-            onSignedOut = { ShareLinkIntents.inbox.clear() },
+            onOwnerReplaced = runtime::resumeAfterAccountSwitch,
         )
     }
 
