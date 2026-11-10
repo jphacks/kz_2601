@@ -305,6 +305,9 @@ targets:
         buildPhase: resources
         type: group
         includes: ["privacy-policy.md", "terms.md"]
+      # エラーの状態カード(#968): 失敗の分け方と文言は iOS のファイルをそのまま使う(見た目の ErrorCard は iOS だけ)
+      - path: Metamon/Features/Voice/ErrorCopy.swift
+      - path: Metamon/Features/Voice/ErrorPresentation.swift
       # iOS と同じ DSL 例をそのままバンドル(コピーを持たない)
       - path: ../docs/dsl/examples
         buildPhase: resources
