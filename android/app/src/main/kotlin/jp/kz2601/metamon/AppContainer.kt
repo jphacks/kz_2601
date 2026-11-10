@@ -109,6 +109,7 @@ import jp.kz2601.metamon.services.push.NotifyConsentStore
 import jp.kz2601.metamon.services.push.NotifyConsentToggle
 import jp.kz2601.metamon.services.push.PushDeviceRegistrar
 import jp.kz2601.metamon.services.push.SharedPreferencesPushPrefs
+import jp.kz2601.metamon.services.push.forgetAccount
 import jp.kz2601.metamon.services.social.MatchingAgeGate
 import jp.kz2601.metamon.services.speech.AndroidSpeechTranscriber
 import jp.kz2601.metamon.services.sync.HotReload
@@ -452,6 +453,8 @@ class AppContainer(
             LaunchVisits.forget(context)
             FabPositionStore(context).clear()
             ClarifySettings(context).clear() // 聞き返しの設定(iOS は UserDefaults ごと消す)
+            SharedPreferencesPushPrefs(FcmTokens.prefs(context)).forgetAccount() // 通知の同意の控え(iOS は UserDefaults ごと消す)
+            UpdateGate.forgetDismissals(context) // 閉じたお知らせ(iOS は UserDefaults ごと消す)
         }
 
         /** 端末内の動画・録音のファイル(どちらもバックアップされない領域)と、撮影・録音の途中で残った一時ファイル。 */

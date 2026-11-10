@@ -23,6 +23,7 @@ import jp.kz2601.metamon.voice.ChatHistoryStore
  * - 端末内の動画(#863)・録音(#1084)のファイル([removeLocalMedia] = iOS `LocalVideoStore` / `LocalAudioStore` の removeAll)
  * - AI への同意・同意の前に止めた 1 件・aiButton の貯めた数・18 歳以上の確認(#877)([forgetConsent] = iOS `LocalWipe.clearDefaults` + `aiConsent.reload()`)
  * - チュートリアルと「こう話すと直せます」を見た印(#900・[forgetTutorial] = iOS `LocalWipe.clearDefaults` + `tutorial.reload()`)
+ * - 他の人の行動で届く通知の同意の控え・登録の控え(installationId は残す)・閉じたお知らせ([forgetDeviceState] の中 = iOS `LocalWipe.clearDefaults`)
  * - 生成アプリの通知の予約・出ている通知([forgetDeviceState] の中 = iOS `notifications.removeAll()`)
  * - https の画像のキャッシュ(メモリ・ディスク。[clearImageCache] = iOS は URLCache)
  * - 画面の状態・appId(新しい appId に。[resetRuntime] = iOS `recordUndo = nil`・`resetToInitial()`・`DeviceAppID.set`)
