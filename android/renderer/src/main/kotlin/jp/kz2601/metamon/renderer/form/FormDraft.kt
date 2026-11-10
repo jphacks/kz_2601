@@ -1,5 +1,11 @@
 package jp.kz2601.metamon.renderer.form
 
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateMapOf
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
+import jp.kz2601.metamon.dsl.Component
 import jp.kz2601.metamon.dsl.records.Entity
 import jp.kz2601.metamon.dsl.records.Field
 import jp.kz2601.metamon.dsl.records.FieldCoding
@@ -11,25 +17,26 @@ enum class FormSaveResult { SAVED, QUEUED_OFFLINE }
 
 /**
  * `screen.entity` を持つ画面が 1 件だけ持つ下書き(iOS の `FormDraft`)。入力部品は `field` をキーに [values] を書く。
- * recordId 付きで開かれたら既存の記録を読んで編集。Compose の状態に載せるのは入力部品の Issue で行う。
+ * recordId 付きで開かれたら既存の記録を読んで編集。[values] と印は Compose の状態(書くと描き直す)。
  */
 class FormDraft(val entity: Entity, record: Record? = null) {
     var recordId: String? = null
         private set
     var author: String? = null
         private set
-    val values: MutableMap<String, JSONValue> = mutableMapOf()
+    val values: MutableMap<String, JSONValue> = mutableStateMapOf()
 
     /** 保存で空のまま弾かれた必須の field id(M10)。 */
-    var flaggedFields: Set<String> = emptySet()
+    var flaggedFields: Set<String> by mutableStateOf(emptySet())
         private set
-    var flagCount = 0
+    var flagCount by mutableIntStateOf(0)
         private set
-    var saveCount = 0
+    var saveCount by mutableIntStateOf(0)
         private set
-    var lastSaveResult: FormSaveResult? = null
+    var lastSaveResult: FormSaveResult? by mutableStateOf(null)
         private set
-    var isReadOnly = false
+    var isReadOnly by mutableStateOf(false)
+    var canDelete by mutableStateOf(false)
 
     private var baseline: Map<String, JSONValue> = emptyMap()
     private var baselineBeforeSave: Map<String, JSONValue>? = null
@@ -74,6 +81,21 @@ class FormDraft(val entity: Entity, record: Record? = null) {
         if (values.isEmpty()) return
         this.values.putAll(values)
         markClean()
+    }
+
+    /** hidden の入力を出してよいか(iOS の `HiddenFields.canEdit`): 新規・作者無しは出す、作者有りは本人だけ。 */
+    fun showsHiddenFields(currentUid: String?): Boolean {
+        if (!isEditing) return true
+        val a = author?.takeIf { it.isNotEmpty() } ?: return true
+        return !currentUid.isNullOrEmpty() && a == currentUid
+    }
+
+    /** 部品 [c] が束縛する field が、このドラフトでは隠す hidden field か。 */
+    fun hides(c: Component, currentUid: String?): Boolean {
+        val fid = c.field ?: return false
+        if (c.entity != null && c.entity != entity.id) return false
+        if (entity.field(fid)?.hidden != true) return false
+        return !showsHiddenFields(currentUid)
     }
 
     /** 保存の前に呼ぶ。空の必須に印を付け、その名前を返す(空なら保存してよい)。 */

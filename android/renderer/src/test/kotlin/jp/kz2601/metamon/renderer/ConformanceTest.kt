@@ -6,7 +6,17 @@ import jp.kz2601.metamon.dsl.decode
 import jp.kz2601.metamon.dsl.screen
 import jp.kz2601.metamon.dsl.ComponentType
 import jp.kz2601.metamon.dsl.DslJson
+import jp.kz2601.metamon.dsl.expr.DSLClock
+import jp.kz2601.metamon.dsl.records.Entity
+import jp.kz2601.metamon.dsl.records.FieldCoding
+import jp.kz2601.metamon.dsl.records.Record
+import jp.kz2601.metamon.dsl.records.RecordPermission
+import jp.kz2601.metamon.dsl.records.entityModels
 import jp.kz2601.metamon.renderer.conformance.RenderTree
+import jp.kz2601.metamon.renderer.form.ScreenForm
+import jp.kz2601.metamon.renderer.navigation.Route
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
 import jp.kz2601.metamon.renderer.navigation.NavigationResolver
 import jp.kz2601.metamon.renderer.navigation.NavigationState
 import jp.kz2601.metamon.renderer.navigation.Presentation
@@ -28,6 +38,9 @@ import org.junit.Assert.assertTrue
 import org.junit.Assert.fail
 import org.junit.Test
 import java.io.File
+import java.time.OffsetDateTime
+import java.time.ZoneId
+import java.util.Locale
 
 /**
  * 適合テスト(#352)を Android で回す。docs/dsl/conformance/cases の case.json を読み、[RenderTree] の木を
@@ -35,9 +48,10 @@ import java.io.File
  *
  * #357 で比べるもの: 画面の id・title・route・layout、部品の id・type・cell・stacked・band・localGrid・children、
  * Container 7 種と Android に登録済みの Leaf の state・props・actions、遷移だけの操作(tap / tapToolbar / back)の後の top と画面。
+ * #858 で足したもの: フォーム画面の `form`(下書きの値)と入力 12 種の state(hidden / needsForm)・props(束縛中の値)。
  *
  * skip(数だけ出して赤にしない): まだ無い Leaf の state・props・actions(`unavailable` / `unknown` の state は比べる)、
- * toolbar・saveBar・form、フォーム・レコードに触れる操作(input・保存・削除・行タップ・prefillRef …)とその後の step。
+ * toolbar・saveBar、フォーム・レコードに触れる操作(input・保存・削除・行タップ・prefillRef …)とその後の step。
  */
 class ConformanceTest {
     private val docsDir = File(requireNotNull(System.getProperty("metamon.dslDocsDir")) { "metamon.dslDocsDir が未設定(Gradle から実行する)" })
@@ -72,6 +86,23 @@ class ConformanceTest {
 
     private fun runCase(dir: File, report: Report) {
         val case = DslJson.parseToJsonElement(File(dir, "case.json").readText()).jsonObject
+        val device = case["device"] as? JsonObject
+        val saved = Triple(DSLClock.fixed, FieldCoding.zone, Locale.getDefault())
+        try {
+            DSLClock.fixed = OffsetDateTime.parse(device?.str("now") ?: "2026-11-12T12:00:00+09:00").toInstant()
+            FieldCoding.zone = ZoneId.of(device?.str("timeZone") ?: "Asia/Tokyo")
+            Locale.setDefault(Locale.forLanguageTag((device?.str("locale") ?: "ja_JP").replace('_', '-')))
+            runCase(dir, case, report)
+        } finally {
+            DSLClock.fixed = saved.first
+            FieldCoding.zone = saved.second
+            Locale.setDefault(saved.third)
+        }
+    }
+
+    private fun JsonObject.str(key: String): String? = (this[key] as? JsonPrimitive)?.contentOrNull
+
+    private fun runCase(dir: File, case: JsonObject, report: Report) {
         val expected = DslJson.parseToJsonElement(File(dir, "expected.json").readText()).jsonObject
         val dslElement = case["dsl"]!!
         val dslJson = (dslElement as? JsonPrimitive)?.contentOrNull?.let { File(docsDir, it).readText() } ?: dslElement.toString()
@@ -81,13 +112,21 @@ class ConformanceTest {
         val components = (caps?.get("components") as? JsonArray)?.map { it.jsonPrimitive.content }?.toSet() ?: allKnown
         val missing = (caps?.get("missingComponents") as? JsonArray)?.map { it.jsonPrimitive.content }?.toSet().orEmpty()
         val device = components - missing
-        val tree = RenderTree(dsl, implemented intersect device)
+        val records = (case["records"] as? JsonObject).orEmpty().mapValues { (_, v) -> v.jsonArray.map { Record.from(it) } }
+        val runtime = CaseRuntime(dsl, records, (case["device"] as? JsonObject)?.str("userId"))
+        val tree = RenderTree(dsl, implemented intersect device, runtime)
+        fun screenOf(route: Route): JsonObject {
+            val screen = dsl.screen(route.screen)
+            val entity = screen?.entity?.let(runtime::entityModel)
+            val form = entity?.let { ScreenForm.makeDraft(it, ScreenForm.formRecord(it, route.recordId, records[it.id].orEmpty()), runtime) }
+            return tree.screen(route, form)
+        }
         // 押せるかは iOS と同じ「全部品が登録済み」で判断する(Android にまだ無い button 以外の Leaf も押せる扱い)
         val tapTree = RenderTree(dsl, allKnown intersect device)
 
         val name = dir.name
         val expScreens = expected["screens"]!!.jsonArray
-        val actScreens = dsl.screens.map { tree.screen(dsl.rootRouteFor(it.id)) }
+        val actScreens = dsl.screens.map { screenOf(dsl.rootRouteFor(it.id)) }
         compareList(expScreens, actScreens, "$name:$.screens", report) { e, a, p -> compareScreen(e.jsonObject, a.jsonObject, p, report) }
 
         val ops = case["operations"] as? JsonArray ?: return
@@ -107,7 +146,7 @@ class ConformanceTest {
             val top = nav.top(dsl)
             same(e["top"], RenderTree.route(top), "$path.top", report)
             same(e["error"] != null, !ok, "$path.error", report)
-            e["screen"]?.let { compareScreen(it.jsonObject, tree.screen(top), "$path.screen", report) }
+            e["screen"]?.let { compareScreen(it.jsonObject, screenOf(top), "$path.screen", report) }
         }
     }
 
@@ -143,8 +182,8 @@ class ConformanceTest {
     }
 
     private fun compareScreen(e: JsonObject, a: JsonObject, path: String, report: Report) {
-        for (k in listOf("id", "title", "route", "layout", "missing")) same(e[k], a[k], "$path.$k", report)
-        for (k in listOf("toolbar", "saveBar", "form")) if (e[k] != null) report.skip("screen.$k")
+        for (k in listOf("id", "title", "route", "layout", "missing", "form")) same(e[k], a[k], "$path.$k", report)
+        for (k in listOf("toolbar", "saveBar")) if (e[k] != null) report.skip("screen.$k")
         compareList(e["nodes"]?.jsonArray, a["nodes"]?.jsonArray, "$path.nodes", report) { en, an, p -> compareNode(en.jsonObject, an.jsonObject, p, report) }
     }
 
@@ -206,4 +245,18 @@ class ConformanceTest {
     }
 
     private fun short(v: Any?): String = v.toString().let { if (it.length > 160) it.take(160) + "…" else it }
+}
+
+/** case の記録と uid を持つだけの能力(iOS の ConformanceRuntime の読む側)。 */
+private class CaseRuntime(dsl: AppDSL, records: Map<String, List<Record>>, private val uid: String?) : DSLRuntime {
+    override val entityModels: List<Entity> = dsl.entityModels()
+    override val recordsFlow: StateFlow<Map<String, List<Record>>> = MutableStateFlow(records)
+
+    override fun onVoiceInput(componentId: String?) = Unit
+
+    override fun canEdit(entity: String, record: Record): Boolean = RecordPermission.canEdit(record, entityModel(entity), uid)
+
+    override fun canDelete(entity: String, record: Record): Boolean = RecordPermission.canDelete(record, entityModel(entity), uid)
+
+    override fun currentUid(): String? = uid
 }
