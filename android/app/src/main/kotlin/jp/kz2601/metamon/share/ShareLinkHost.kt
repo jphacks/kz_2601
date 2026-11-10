@@ -1,7 +1,6 @@
 package jp.kz2601.metamon.share
 
 import android.content.Intent
-import android.content.res.Resources
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -30,14 +29,15 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import jp.kz2601.metamon.AppContainer
 import jp.kz2601.metamon.R
+import jp.kz2601.metamon.renderer.a11y.rememberAnnouncer
 import jp.kz2601.metamon.runtime.AppRuntime
+import jp.kz2601.metamon.runtime.UiText
 import jp.kz2601.metamon.services.InstallResult
 import jp.kz2601.metamon.services.sharing.PendingJoin
 import jp.kz2601.metamon.services.sharing.ShareLinkInbox
@@ -66,7 +66,6 @@ object ShareLinkIntents {
 @Composable
 fun ShareLinkHost(container: AppContainer, canShare: Boolean) {
     val runtime = container.runtime
-    val resources = LocalContext.current.resources
     val user by container.accountGuard.active.collectAsStateWithLifecycle()
     val consentShowing by container.consentPrompt.visible.collectAsStateWithLifecycle()
     val consentState by container.consent.state.collectAsStateWithLifecycle()
@@ -96,8 +95,8 @@ fun ShareLinkHost(container: AppContainer, canShare: Boolean) {
         scope.launch {
             when (val result = opener.open(token)) {
                 is ShareOpenResult.AskToJoin -> join = result.join
-                is ShareOpenResult.Added -> adopt(container, runtime, resources, result)
-                is ShareOpenResult.Failed -> runtime.showToast(resources.getString(result.reason.textRes))
+                is ShareOpenResult.Added -> adopt(container, runtime, result)
+                is ShareOpenResult.Failed -> runtime.showToast(UiText.Res(result.reason.textRes))
             }
         }
     }
@@ -110,7 +109,7 @@ fun ShareLinkHost(container: AppContainer, canShare: Boolean) {
                 when (val result = opener.join(current, name)) {
                     is ShareOpenResult.Added -> {
                         join = null
-                        scope.launch { adopt(container, runtime, resources, result) }
+                        scope.launch { adopt(container, runtime, result) }
                         null
                     }
                     is ShareOpenResult.Failed -> result.reason
@@ -123,17 +122,18 @@ fun ShareLinkHost(container: AppContainer, canShare: Boolean) {
 }
 
 /** 取り込んだアプリに切り替えて一言出す(iOS の `adopt`)。参加した時は他の人の行動の通知も有効にする(#339)。 */
-private suspend fun adopt(container: AppContainer, runtime: AppRuntime, res: Resources, result: ShareOpenResult.Added) {
+private suspend fun adopt(container: AppContainer, runtime: AppRuntime, result: ShareOpenResult.Added) {
     val app: InstallResult = result.app
     if (!runtime.switchApp(app.id)) return // 読めなければ切り替え側がトーストを出す
-    val name = app.name.ifEmpty { res.getString(R.string.share_untitled) }
-    val head = if (result.viaJoin) res.getString(R.string.share_open_joined, name) else res.getString(R.string.share_open_added, name)
-    val extra = when {
-        app.member -> res.getString(R.string.share_open_extra_members)
-        app.joined -> res.getString(R.string.share_open_extra_public)
+    // ランタイムは Context を持たないので文言は UiText で渡す(#1232)。トーストは TalkBack にも読まれる(#1238)
+    val name: Any = app.name.ifEmpty { null } ?: UiText.Res(R.string.share_untitled)
+    val head = UiText.Res(if (result.viaJoin) R.string.share_open_joined else R.string.share_open_added, name)
+    val extra: Any = when {
+        app.member -> UiText.Res(R.string.share_open_extra_members)
+        app.joined -> UiText.Res(R.string.share_open_extra_public)
         else -> ""
     }
-    runtime.showToast(head + extra)
+    runtime.showToast(UiText.Res(R.string.share_open_message, head, extra))
     if (result.viaJoin) container.push?.let { push -> push.consent.change(true, push.currentUid(), app.id) {} }
     runtime.appsList()
 }
@@ -162,6 +162,7 @@ private fun JoinShareSheet(
     onDismiss: () -> Unit,
 ) {
     val scope = rememberCoroutineScope()
+    val announce = rememberAnnouncer()
     var name by remember(join) { mutableStateOf(initialName) }
     var busy by remember(join) { mutableStateOf(false) }
     var failure by remember(join) { mutableStateOf<ShareOpenFailure?>(null) }
@@ -185,7 +186,7 @@ private fun JoinShareSheet(
             }
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 Text(stringResource(R.string.share_join_points_header), style = MaterialTheme.typography.titleSmall)
-                JOIN_POINTS.forEach { Text("・" + stringResource(it), style = MaterialTheme.typography.bodyMedium) }
+                JOIN_POINTS.forEach { Text(stringResource(R.string.share_join_point, stringResource(it)), style = MaterialTheme.typography.bodyMedium) }
             }
             Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
                 Text(stringResource(R.string.share_join_name_label), style = MaterialTheme.typography.titleSmall)
@@ -207,8 +208,10 @@ private fun JoinShareSheet(
                 )
             }
             failure?.let {
+                val text = stringResource(it.textRes)
+                LaunchedEffect(it) { announce(text) } // 参加できなかった理由を TalkBack にも読ませる(H8)
                 Text(
-                    stringResource(it.textRes),
+                    text,
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.error,
                     modifier = Modifier.testTag("join.error"),

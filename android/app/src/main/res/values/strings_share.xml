@@ -17,6 +17,7 @@
     <string name="share_join_name_label">表示名(任意)</string>
     <string name="share_join_name_placeholder">例: 父、たろう</string>
     <string name="share_join_name_rejected">「表示名」に表示できない言葉が含まれています</string>
+    <string name="share_join_point">・%1$s</string>
     <string name="share_join_point_leave">共有シートから、いつでも抜けられます</string>
     <string name="share_join_point_list">参加している人の一覧に、下の名前で出ます</string>
     <string name="share_join_point_notify">他の人の行動で届く通知を受け取ります。設定でオフにできます</string>
@@ -31,6 +32,8 @@
     <string name="share_open_inviter_left">このリンクを送った人はもう参加していないため、参加できません。参加している人に新しいリンクをもらってください</string>
     <string name="share_open_joined">「%1$s」に参加しました</string>
     <string name="share_open_members_full">参加している人が上限(100 人)に達しているため、参加できません</string>
+    <!-- 取り込んだ時の一言(先頭の文 + 補足) -->
+    <string name="share_open_message">%1$s%2$s</string>
     <string name="share_open_offline">シェアされたアプリを開けませんでした。通信できる所でもう一度お試しください</string>
     <string name="share_open_revoked">このシェアリンクは取り消されたか、存在しません</string>
     <string name="share_open_unavailable">シェアリンクはサーバー接続時のみ開けます</string>

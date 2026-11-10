@@ -17,6 +17,7 @@
     <string name="share_join_name_label">Display name (optional)</string>
     <string name="share_join_name_placeholder">e.g. Dad, Taro</string>
     <string name="share_join_name_rejected">“Display name” contains words that can\'t be shown</string>
+    <string name="share_join_point">• %1$s</string>
     <string name="share_join_point_leave">You can leave anytime from the share sheet</string>
     <string name="share_join_point_list">You appear in the member list with the name below</string>
     <string name="share_join_point_notify">You\'ll get notifications from other people\'s activity. You can turn them off in Settings</string>
@@ -31,6 +32,8 @@
     <string name="share_open_inviter_left">The person who sent this link has left this share, so you can\'t join with it. Ask someone who\'s still in it for a new link.</string>
     <string name="share_open_joined">Joined “%1$s”</string>
     <string name="share_open_members_full">This share is full (100 people), so you can\'t join.</string>
+    <!-- 取り込んだ時の一言(先頭の文 + 補足) -->
+    <string name="share_open_message">%1$s%2$s</string>
     <string name="share_open_offline">Couldn\'t open the shared app. Try again when you\'re online.</string>
     <string name="share_open_revoked">This share link was revoked or doesn\'t exist</string>
     <string name="share_open_unavailable">Share links only open when connected to the server</string>
