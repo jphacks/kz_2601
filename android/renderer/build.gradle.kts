@@ -32,6 +32,9 @@ dependencies {
     // photoField のカメラの保存先(FileProvider)
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.browser)
+    // videoPlayer の再生
+    implementation(libs.media3.exoplayer)
+    implementation(libs.media3.ui)
     implementation(libs.compose.material.icons.core)
     implementation(libs.compose.ui.tooling.preview)
     implementation(libs.play.services.code.scanner)

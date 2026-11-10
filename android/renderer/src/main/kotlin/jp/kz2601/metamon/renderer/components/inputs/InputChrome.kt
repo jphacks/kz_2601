@@ -38,7 +38,7 @@ object InputRules {
 
     /** field を書く入力(#858 の 12 種 + 写真・手書き #862)。 */
     val inputTypes: Set<ComponentType> =
-        overridable + ComponentType.COLOR_PICKER + ComponentType.DRAWING_FIELD + ComponentType.PHOTO_FIELD
+        overridable + ComponentType.COLOR_PICKER + ComponentType.DRAWING_FIELD + ComponentType.PHOTO_FIELD + ComponentType.VIDEO_FIELD
 
     /** form の field に書く部品(iOS の `RenderTree.formBound`)。form が無いと needsForm、props に value と label を出す。 */
     val formBound: Set<ComponentType> = inputTypes + setOf(
