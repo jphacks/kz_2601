@@ -135,6 +135,33 @@ func TestCreditApple(t *testing.T) {
 	}
 }
 
+func TestOverflowSettings(t *testing.T) {
+	e := newEnv(t, coins.ModeEnforce)
+	_, body := e.do(t, "GET", "/v1/me/coins", "u1", nil)
+	if ov := body["overflow"].(map[string]any); ov["enabled"] != false || ov["monthlyCap"] != 0.0 || ov["spent"] != 0.0 {
+		t.Fatalf("default %v", ov)
+	}
+	code, body := e.do(t, "PUT", "/v1/me/coins/settings", "u1", map[string]any{"overflow": map[string]any{"enabled": true, "monthlyCap": 50}})
+	if code != 200 || body["initial"] != 3.0 {
+		t.Fatalf("put %d %v", code, body)
+	}
+	if ov := body["overflow"].(map[string]any); ov["enabled"] != true || ov["monthlyCap"] != 50.0 {
+		t.Fatalf("put overflow %v", ov)
+	}
+	if _, body = e.do(t, "GET", "/v1/me/coins", "u1", nil); body["overflow"].(map[string]any)["monthlyCap"] != 50.0 {
+		t.Fatalf("stored %v", body)
+	}
+	for _, bad := range []any{map[string]any{}, map[string]any{"overflow": map[string]any{"monthlyCap": -1}}, map[string]any{"overflow": map[string]any{"enabled": "yes"}}} {
+		if code, body = e.do(t, "PUT", "/v1/me/coins/settings", "u1", bad); code != 400 {
+			t.Fatalf("bad %v: %d %v", bad, code, body)
+		}
+	}
+	off := newEnv(t, coins.ModeOff)
+	if code, _ = off.do(t, "PUT", "/v1/me/coins/settings", "u1", map[string]any{"overflow": map[string]any{"enabled": true}}); code != 404 {
+		t.Fatalf("off %d", code)
+	}
+}
+
 func TestModeOffAPI(t *testing.T) {
 	e := newEnv(t, coins.ModeOff)
 	code, body := e.do(t, "GET", "/v1/me/coins", "u1", nil)

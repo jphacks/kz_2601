@@ -1252,6 +1252,30 @@ paths:
         '401': { $ref: '#/components/responses/Unauthenticated' }
         '410': { description: 退会済み(`account_deleted`), content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
 
+  /me/coins/settings:
+    put:
+      tags: [coins]
+      summary: 枠を超えた後のコイン払いの設定(#630)
+      description: |
+        `overflow.enabled`(既定 OFF)と `overflow.monthlyCap`(本人が決める月のコインの上限・0〜1000000000)を財布に保存する。
+        **保存だけ**: 枠を超えた分をコインで買う処理と `overflow.spent` を数えるのは #630 の 3 段目。今月コインで払った量(`spent`)は変えない。
+        `COIN_BILLING_MODE=off` では 404。
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [overflow]
+              properties:
+                overflow: { $ref: '#/components/schemas/CoinOverflowSettings' }
+      responses:
+        '200': { description: 保存した後の残高, content: { application/json: { schema: { $ref: '#/components/schemas/CoinWallet' } } } }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '404': { description: '`COIN_BILLING_MODE=off`(`not_found`)', content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+        '410': { description: 退会済み(`account_deleted`), content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+
   /me/coins/apple:
     post:
       tags: [coins]
@@ -1912,7 +1936,7 @@ components:
       type: object
       required: [mode, packs, estimates, initialGrant, proMonthly, allowance]
       properties:
-        mode: { type: string, enum: [enforce, log, off], description: '`COIN_BILLING_MODE`。off の時、iOS はコインの画面を出さない' }
+        mode: { type: string, enum: [enforce, log, off], description: '`COIN_BILLING_MODE`。iOS は enforce の時だけコインの画面を出す(off / log では出さない)' }
         packs:
           type: array
           description: '`COIN_PACKS` の順'
@@ -1967,7 +1991,7 @@ components:
         nextCursor: { type: string, description: '続きが無ければ空' }
     CoinWallet:
       type: object
-      required: [mode, total, available, purchased, grant, initial, reserved]
+      required: [mode, total, available, purchased, grant, initial, reserved, overflow]
       properties:
         mode: { type: string, enum: [enforce, log, off] }
         total: { type: integer, description: 'available + reserved' }
@@ -1977,6 +2001,20 @@ components:
         grantPeriodEnd: { type: string, format: date-time, description: 毎月の分の期限(Pro の請求期間の終わり)。無ければ省略 }
         initial: { type: integer, description: 最初の分 }
         reserved: { type: integer, description: 実行中の呼び出しが押さえている分 }
+        overflow:
+          type: object
+          required: [enabled, monthlyCap, spent]
+          description: 枠を超えた後のコイン払い(`PUT /me/coins/settings`)
+          properties:
+            enabled: { type: boolean, description: 既定 false }
+            monthlyCap: { type: integer, description: 本人が決めた月のコインの上限 }
+            spent: { type: integer, description: '今月(日本時間の月)コインで払った量。3 段目までは常に 0' }
+    CoinOverflowSettings:
+      type: object
+      required: [enabled, monthlyCap]
+      properties:
+        enabled: { type: boolean }
+        monthlyCap: { type: integer, minimum: 0, maximum: 1000000000 }
     Entitlements:
       type: object
       required: [isPro, pro]

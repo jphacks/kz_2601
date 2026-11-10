@@ -100,8 +100,11 @@ type Wallet struct {
 	Reserved int64 `json:"reserved" firestore:"reserved"`
 	// Holds are the open holds (hold id -> expireAt), so a wallet read finds
 	// expired ones without a query.
-	Holds     map[string]time.Time `json:"-" firestore:"holds,omitempty"`
-	UpdatedAt time.Time            `json:"updatedAt,omitzero" firestore:"updatedAt,omitempty"`
+	Holds map[string]time.Time `json:"-" firestore:"holds,omitempty"`
+	// Overflow is the owner's opt-in to pay past the server allowance with
+	// coins (PUT /v1/me/coins/settings; part 3 enforces it).
+	Overflow  Overflow  `json:"-" firestore:"overflow"`
+	UpdatedAt time.Time `json:"updatedAt,omitzero" firestore:"updatedAt,omitempty"`
 }
 
 // Available is what a new hold can take.

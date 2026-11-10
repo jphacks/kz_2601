@@ -103,6 +103,9 @@ struct VoiceInputView: View {
                     #endif
             }
         }
+        #if !APP_STORE_REVIEW
+        .coinSheets() // #630 音声シートの上にお店を重ねる(コインが足りない 402・「約 N コイン」から)
+        #endif
         .sheet(isPresented: $showSettings) { SettingsSheet() }
         .sheet(isPresented: $showTips) {
             PromptTipsSheet { text in
@@ -180,6 +183,9 @@ struct VoiceInputView: View {
                 examples
             }
             RemainingTodayBadge() // #630 今日の残り
+            #if !APP_STORE_REVIEW
+            CoinEstimateLine(operation: rt.dsl.isVoiceOnly ? .generate : .edit) // #630 送る前の「約 N コイン」
+            #endif
             textEntry
             #if !APP_STORE_REVIEW
             if isInitial, !typing { DiscoverEntry() } // 「探す」(#50)

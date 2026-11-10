@@ -37,6 +37,7 @@ struct SettingsSheet: View {
                 #endif
                 #if !APP_STORE_REVIEW // 審査用ビルドは App 内課金を持たない(#450 G1)
                 ProSettingsSection() // 課金(#77)
+                CoinSettingsSection() // #630 コイン(サーバーが有効にした時だけ)
                 #endif
                 RemainingTodaySettingsSection() // #630 今日の残り(審査用の版も出す)
                 UsageSettingsSection() // #317 使っている量(作ったアプリの数・今のアプリの記録と写真)
@@ -126,6 +127,7 @@ struct SettingsSheet: View {
         }
         .interactiveDismissDisabled(isDeleting || isSigningOut)
         #if !APP_STORE_REVIEW
+        .coinSheets() // #630 設定の上にお店・プランの比較を重ねる
         .sheet(item: $feedback) { ctx in
             FeedbackComposerView(context: ctx, client: services.feedback) { feedback = nil }
         }

@@ -21,6 +21,7 @@ const maxJWSBytes = 32 << 10
 //
 //	GET  /v1/me/coins                         balance by source
 //	GET  /v1/me/coins/ledger?limit=&cursor=   history, newest first
+//	PUT  /v1/me/coins/settings                {"overflow": {"enabled", "monthlyCap"}} (stored only; part 3 enforces)
 //	POST /v1/me/coins/apple                   {"signedTransaction": "<JWS>"} credits a coin pack
 func Register(mux *http.ServeMux, s *coins.Service) {
 	mux.HandleFunc("GET /v1/me/coins", func(w http.ResponseWriter, r *http.Request) {
@@ -51,6 +52,29 @@ func Register(mux *http.ServeMux, s *coins.Service) {
 			return
 		}
 		httpx.WriteJSON(w, http.StatusOK, map[string]any{"entries": es, "nextCursor": next})
+	})
+	mux.HandleFunc("PUT /v1/me/coins/settings", func(w http.ResponseWriter, r *http.Request) {
+		var req struct {
+			Overflow *coins.OverflowSettings `json:"overflow"`
+		}
+		if !httpx.DecodeBody(w, r, &req) {
+			return
+		}
+		if req.Overflow == nil {
+			httpx.Error(w, http.StatusBadRequest, httpx.CodeBadRequest, "overflow is required")
+			return
+		}
+		v, err := s.SetOverflow(r.Context(), auth.UID(r.Context()), auth.Anonymous(r.Context()), *req.Overflow)
+		switch {
+		case err == nil:
+			httpx.WriteJSON(w, http.StatusOK, v)
+		case errors.Is(err, coins.ErrOff):
+			httpx.Error(w, http.StatusNotFound, httpx.CodeNotFound, "coins are not available")
+		case errors.Is(err, coins.ErrBadCap):
+			httpx.Error(w, http.StatusBadRequest, httpx.CodeBadRequest, err.Error())
+		default:
+			internal(w, r, "settings", err)
+		}
 	})
 	mux.HandleFunc("POST /v1/me/coins/apple", func(w http.ResponseWriter, r *http.Request) {
 		r.Body = http.MaxBytesReader(w, r.Body, maxJWSBytes)
