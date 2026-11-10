@@ -10,7 +10,10 @@ import MetamonServices
 @Observable
 final class AppRuntime: DSLRuntime {
     private(set) var document: AppDocument {
-        didSet { if oldValue.appId != document.appId { reloadChatHistory() } } // #210 アプリごとのチャット履歴
+        didSet {
+            if oldValue.appId != document.appId { reloadChatHistory() } // #210 アプリごとのチャット履歴
+            recordSync.encryptedFields[document.appId] = document.dsl.encryptedFields // #233 暗号化して保存する項目
+        }
     }
     var dsl: AppDSL { document.dsl }
 
@@ -293,6 +296,7 @@ final class AppRuntime: DSLRuntime {
         self.deferredMorph = DeferredSend(connectivity: recordSync.connectivity)
         self.selectedTab = document.dsl.initialTab
         recordSync.onEvent = { [weak self] event in self?.handle(event) }
+        recordSync.encryptedFields[document.appId] = document.dsl.encryptedFields // #233
         reloadChatHistory()
     }
 
@@ -1451,6 +1455,7 @@ final class AppRuntime: DSLRuntime {
         // H9: サーバーの文はログにだけ残し、画面には決まった文を出す
         ErrorLog.record(message, context: "save \(entity)\(field.map { ".\($0)" } ?? "")")
         guard let field else { return L10n.tr("保存できませんでした。入力を確認して、もう一度お試しください") }
+        if message == FieldCipher.unsavedMessage { return message } // #233 鍵がまだ同期されていない
         let name = dsl.entity(entity)?.field(field)?.name ?? field
         return L10n.tr("保存できませんでした。「\(name)」の入力を確認してください")
     }

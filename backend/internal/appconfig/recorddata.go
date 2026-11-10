@@ -115,7 +115,11 @@ func normalizeData(ent *dsl.Entity, in map[string]any, create bool) (map[string]
 			out[f.ID] = nil // sentinel: PATCH removes the key
 			continue
 		}
-		nv, err := normalizeValue(f, v)
+		normalize := normalizeValue
+		if f.Encrypted {
+			normalize = normalizeEncrypted // encrypted.go
+		}
+		nv, err := normalize(f, v)
 		if err != nil {
 			return nil, invalidRecord(f.ID, err.Error())
 		}

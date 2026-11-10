@@ -36,7 +36,7 @@ func TestDefaultList(t *testing.T) {
 		}
 		got = append(got, d.ID+":"+d.Gate)
 	}
-	if strings.Join(got, ",") != "sharedData:save,serverRules:save,onlineAI:use" {
+	if strings.Join(got, ",") != "sharedData:save,serverRules:save,onlineAI:use,encryptedFields:save" {
 		t.Fatalf("list: %v", got)
 	}
 }
@@ -116,5 +116,20 @@ func TestModeStop(t *testing.T) {
 	buf.Reset()
 	if ModeOff.Stop(ctx, log, "x", "u1", nil) || buf.Len() != 0 || ModeOff.Checks() || !ModeLog.Checks() {
 		t.Fatalf("off: %s", buf.String())
+	}
+}
+
+// encryptedFields is save-gated by the DSL marker Field.encrypted.
+func TestEncryptedFieldsGate(t *testing.T) {
+	plain := app([]dsl.Entity{{ID: "e", Fields: []dsl.Field{{ID: "body", Type: dsl.FieldText}}}}, 0)
+	enc := app([]dsl.Entity{{ID: "e", Fields: []dsl.Field{{ID: "body", Type: dsl.FieldText, Encrypted: true}}}}, 0)
+	if got := ids(Default.Added(enc, plain, "ja")); got != EncryptedFields {
+		t.Fatalf("adding encrypted: %q", got)
+	}
+	if got := ids(Default.Added(enc, enc, "ja")); got != "" {
+		t.Fatalf("an app keeps what it had: %q", got)
+	}
+	if got := ids(Default.InApp(plain, "ja")); got != "" {
+		t.Fatalf("plain: %q", got)
 	}
 }

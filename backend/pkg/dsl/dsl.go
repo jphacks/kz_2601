@@ -201,6 +201,9 @@ type Field struct {
 	Hidden       bool      `json:"hidden,omitempty"`    // not shown to answerers (quiz answer key); computed may compare it (#262)
 	// EditableBy "admins": only the app's admins set it (#272, data_rules.go).
 	EditableBy string `json:"editableBy,omitempty"`
+	// Encrypted: iOS stores the value sealed with the user's key
+	// ("enc:v1:..."), so servers only ever see ciphertext (encrypted.go).
+	Encrypted bool `json:"encrypted,omitempty"`
 }
 
 // Screen is one navigable page.

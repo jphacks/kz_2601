@@ -12,8 +12,8 @@ import (
 // featuresDoc uses every clientFeature once: aiButton long / inputPhoto /
 // saveTo / inputFeeds / outputs, lookupBook (button and toolbar), text {{field}} + highlight, a
 // warnings feed, addMinutes, aiChat inputEntity, bracket, a progressBar setting
-// target, photoField illustrate, callButton and openUrlButton app + shareButton
-// shareTo x.
+// target, photoField illustrate, callButton, openUrlButton app + shareButton
+// shareTo x and an encrypted field.
 const featuresDoc = `{"schemaVersion":1,"app":{"name":"本","description":"d","icon":"book","voiceEntry":"fullscreen"},"initialScreen":"home",
 "entities":[
  {"id":"player","name":"出場者","titleField":"name","fields":[{"id":"name","name":"名前","type":"string"},{"id":"wins","name":"勝ち上がり","type":"integer"}]},
@@ -21,6 +21,7 @@ const featuresDoc = `{"schemaVersion":1,"app":{"name":"本","description":"d","i
   {"id":"isbn","name":"ISBN","type":"string"},{"id":"title","name":"書名","type":"string"},
   {"id":"body","name":"本文","type":"text"},{"id":"keywords","name":"語","type":"string"},
   {"id":"photo","name":"写真","type":"photo"},{"id":"note","name":"メモ","type":"text"},
+  {"id":"impression","name":"感想","type":"text","encrypted":true},
   {"id":"meet","name":"集合","type":"string"},{"id":"leave","name":"出発","type":"string","computed":{"op":"addMinutes","args":[{"ref":"meet"},-30]}}]},
  {"id":"card","name":"カード","titleField":"q","fields":[{"id":"q","name":"問題","type":"string","required":true}]},
  {"id":"goal","name":"目標","single":true,"fields":[{"id":"pages","name":"ページ","type":"integer","defaultValue":300}]},
@@ -88,6 +89,7 @@ func TestClientFeaturesRestriction(t *testing.T) {
 		FeatureIllustrate:            {"photoField に illustrate: true", "PhotoField.illustrate", 1, `"illustrate"`},
 		FeatureCallButton:            {"callButton{label, video?: true}", `"#/$defs/CallButton"`, 1, `"callButton"`},
 		FeatureOpenApp:               {"「開く」と「送る」で作る", "OpenUrlButton.app", 2, `"paypay"`},
+		FeatureEncryptedFields:       {"encrypted: true(端末で暗号化", "Field.encrypted", 1, `"encrypted"`},
 	}
 	if len(gone) != len(clientFeatures) {
 		t.Fatalf("test covers %d of %d features", len(gone), len(clientFeatures))
