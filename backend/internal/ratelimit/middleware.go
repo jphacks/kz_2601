@@ -109,7 +109,8 @@ func (l *Limiter) Middleware(verifier auth.IdentityVerifier) func(http.Handler) 
 				return
 			}
 			// verified here: auth.Optional in the handler keeps this uid instead of verifying again
-			ctx := auth.ContextWithUID(r.Context(), id.UID)
+			// (anonymous too: an anonymous account gets no initial coins, #630)
+			ctx := auth.ContextWithIdentity(r.Context(), id)
 			out := &outcome{}
 			out.waive = func(ctx context.Context) bool { return l.waive(ctx, w, id.UID, ClientIP(r), dec, weight) }
 			sw := &statusWriter{ResponseWriter: w}

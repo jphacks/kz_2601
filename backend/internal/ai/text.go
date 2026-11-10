@@ -88,6 +88,7 @@ type TextMeta struct {
 	Model     string `json:"model"`
 	Usage     Usage  `json:"usage"`
 	LatencyMs int64  `json:"latencyMs"`
+	CoinCharge
 }
 
 func badText(msg string) *Error {
@@ -423,12 +424,22 @@ func textHandler(svc *Service) http.Handler {
 			svc.writeErr(w, r, err)
 			return
 		}
+		// #630: the caller holds coins first (a shared app's participant too)
+		ctx, bill, err := svc.reserveCoins(ctx, textPayment(ctx, req))
+		if err != nil {
+			refuseBeforeClaude(ctx) // no Claude call: the units and the creator-paid count come back
+			svc.writeErr(w, r, err)
+			return
+		}
 		res, err := svc.text(ctx, req, loc)
 		if err != nil {
+			bill.settle(ctx, true)
 			refundCreatorPaid(ctx, asError(err).Status) // Claude 5xx: the creator-paid count comes back
 			svc.writeErr(w, r, err)
 			return
 		}
+		res.Meta.CoinCharge = bill.settle(ctx, false)
+		res.Meta.setHeaders(w)
 		writeJSON(w, http.StatusOK, res)
 	})
 }

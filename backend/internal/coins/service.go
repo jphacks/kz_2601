@@ -33,6 +33,8 @@ type ReserveRequest struct {
 	AppID     string
 	// RequestID is X-Request-Id (httpx.RequestID): the same id holds once.
 	RequestID string
+	// Kind picks COIN_RESERVE_<OP>_<KIND> when that is set (TextKinds).
+	Kind string
 	// Max overrides the op's COIN_RESERVE_<OP> when > 0.
 	Max int64
 }
@@ -54,11 +56,10 @@ type Charge struct {
 // Biller is what the AI paths call (part 2 of #630). A nil *Hold (mode off)
 // is valid for Commit and Release and does nothing.
 //
-// Where to hook (part 2): generate / chat / text Reserve at the ratelimit
-// middleware's place (internal/ai, after the payer is known —
-// text_payer_scope.go for a shared app's creator), Commit with the
-// cost_tally total after the response (also for streams), and Release on the
-// failures ratelimit/refund.go refunds today. WriteError writes the 402.
+// The ai service calls it from internal/ai/coins.go: generate / chat / text
+// Reserve before any Claude call (after gateText for a shared app's
+// creator), Commit with the request's cost_tally total, and Release on every
+// failure and on a call without Claude.
 type Biller interface {
 	Reserve(ctx context.Context, r ReserveRequest) (*Hold, error)
 	Commit(ctx context.Context, h *Hold, u Usage) (Charge, error)
@@ -242,6 +243,9 @@ func (s *Service) Reserve(ctx context.Context, r ReserveRequest) (*Hold, error) 
 	amount, ok := s.Config.Reserve[r.Op]
 	if !ok {
 		return nil, fmt.Errorf("%w: %q", ErrUnknownOp, r.Op)
+	}
+	if v, ok := s.Config.Reserve[r.Op+"_"+r.Kind]; ok && r.Kind != "" {
+		amount = v
 	}
 	if r.Max > 0 {
 		amount = r.Max

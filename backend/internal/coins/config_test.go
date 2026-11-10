@@ -1,6 +1,7 @@
 package coins
 
 import (
+	"context"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
@@ -49,6 +50,28 @@ func TestConfigFromEnv(t *testing.T) {
 	// ceil(0.01 × 12.5) = 1 → min 2; ceil(1 × 12.5) = 13
 	if c.Price(0.01) != 2 || c.Price(1) != 13 {
 		t.Fatalf("price %d %d", c.Price(0.01), c.Price(1))
+	}
+}
+
+// A /v1/text kind holds its own amount only when set; otherwise TEXT's.
+func TestReserveTextKinds(t *testing.T) {
+	c, err := ConfigFromEnv(env(map[string]string{
+		"COIN_BILLING_MODE": "enforce", "COIN_RESERVE_TEXT": "2", "COIN_RESERVE_TEXT_LONG": "7", "COIN_RESERVE_TEXT_IMAGE": "0",
+	}))
+	if err != nil {
+		t.Fatal(err)
+	}
+	s := &Service{Config: c, Store: NewMemory()}
+	ctx := context.Background()
+	fund(t, s.Store, "u", 100, time.Now())
+	for kind, want := range map[string]int64{"": 2, "task": 2, "long": 7, "image": 0} {
+		h, err := s.Reserve(ctx, ReserveRequest{UID: "u", Anonymous: true, Op: OpText, Kind: kind, RequestID: "r-" + kind})
+		if err != nil || h.Amount != want || h.Op != OpText {
+			t.Errorf("kind %q: %+v %v, want %d", kind, h, err, want)
+		}
+	}
+	if _, err := ConfigFromEnv(env(map[string]string{"COIN_RESERVE_TEXT_LONG": "-1"})); err == nil {
+		t.Error("negative kind hold accepted")
 	}
 }
 

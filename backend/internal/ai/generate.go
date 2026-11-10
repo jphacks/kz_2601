@@ -100,6 +100,16 @@ type Meta struct {
 	RecipeSources    map[string]string `json:"recipeSources,omitempty"`
 	RecipeSelector   string            `json:"recipeSelector,omitempty"`
 	RecipeSelectorMs int64             `json:"recipeSelectorMs,omitempty"`
+	// Coins / CoinsBalance (#630): what this call charged and the payer's
+	// balance after it. Only with COIN_BILLING_MODE=enforce once charged
+	// (omitted when the charge is settled after the response: chat).
+	CoinCharge
+}
+
+// CoinCharge is the coin charge of one call (#630, coins.go).
+type CoinCharge struct {
+	Coins        *int64 `json:"coins,omitempty"`
+	CoinsBalance *int64 `json:"coinsBalance,omitempty"`
 }
 
 // Event is a progress message emitted by GenerateStream before the Result,
@@ -209,7 +219,9 @@ type Service struct {
 	// CreatorPaid caps the creator-paid /v1/text calls per app and day
 	// (text_payer_scope.go). nil = not counted.
 	CreatorPaid *CreatorPaidCap
-	scopes      scopeCache // compiled published DSL per appId (text_payer_scope.go)
+	// Coins charges the AI calls in coins (#630, coins.go). nil = off.
+	Coins  CoinBiller
+	scopes scopeCache // compiled published DSL per appId (text_payer_scope.go)
 
 	// Logger gets the ai.generate line per /v1/generate (#322); nil = slog.Default().
 	Logger *slog.Logger

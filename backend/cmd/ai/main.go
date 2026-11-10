@@ -128,6 +128,10 @@ func main() {
 	if fsClient != nil && os.Getenv("RATE_LIMIT_STORE") != "memory" {
 		svc.CreatorPaid.Store = ratelimit.NewFirestore(fsClient, os.Getenv("RATE_LIMIT_COLLECTION"))
 	}
+	// COIN_BILLING_MODE (#630): generate / chat / text hold and charge coins
+	if cs := newCoins(fsClient); cs != nil {
+		svc.Coins = cs
+	}
 	// AI_PAUSED=1 stops only the Claude-calling routes with 503 ai_paused,
 	// before the rate limiter (#511). docs/infra/ai-pause.md
 	paused := ai.PausedFromEnv(os.Getenv)
