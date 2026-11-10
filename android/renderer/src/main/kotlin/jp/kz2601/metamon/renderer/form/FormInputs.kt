@@ -10,7 +10,6 @@ import jp.kz2601.metamon.dsl.records.FieldCoding
 import jp.kz2601.metamon.dsl.records.FieldType
 import jp.kz2601.metamon.dsl.records.JSONValue
 import java.time.Instant
-import java.time.LocalDate
 import java.time.LocalTime
 import java.time.ZoneOffset
 import java.time.ZonedDateTime
@@ -230,7 +229,7 @@ object DateInput {
 
     /** 端末のタイムゾーンでのその日 → UTC のその日の 0 時。 */
     fun pickerMillis(at: Instant): Long =
-        LocalDate.ofInstant(at, FieldCoding.zone).atStartOfDay(ZoneOffset.UTC).toInstant().toEpochMilli()
+        at.atZone(FieldCoding.zone).toLocalDate().atStartOfDay(ZoneOffset.UTC).toInstant().toEpochMilli()
 
     /** 選んだ日(UTC の 0 時)に、今の値の時刻(端末のタイムゾーン)を付ける。 */
     fun fromPicker(millis: Long, current: Instant): Instant {

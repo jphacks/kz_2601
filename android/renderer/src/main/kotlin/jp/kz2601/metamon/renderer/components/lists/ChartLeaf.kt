@@ -31,6 +31,7 @@ import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.platform.LocalLocale
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
@@ -46,7 +47,6 @@ import jp.kz2601.metamon.renderer.registry.RenderContext
 import jp.kz2601.metamon.renderer.theme.RenderTheme
 import jp.kz2601.metamon.renderer.theme.colors
 import jp.kz2601.metamon.renderer.theme.renderCard
-import java.util.Locale
 import kotlin.math.atan2
 import kotlin.math.hypot
 import kotlin.math.max
@@ -60,7 +60,7 @@ import kotlin.math.min
 fun ChartLeaf(c: Component, ctx: RenderContext, modifier: Modifier = Modifier) {
     val data = rememberLeafData(ctx.runtime)
     // 日付の見出し(「3月」「3/4週」)は端末の言語で
-    val buckets = ChartBuckets.buckets(c, data, Locale.getDefault())
+    val buckets = ChartBuckets.buckets(c, data, LocalLocale.current.platformLocale)
     var selected by remember(buckets) { mutableStateOf<Int?>(null) }
     Column(modifier.renderCard(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
         c.title?.let { Text(it, style = RenderTheme.Fonts.cardTitle) }

@@ -15,6 +15,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalResources
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
@@ -61,6 +62,7 @@ fun RetentionSettingsSection(runtime: AppRuntime, onStop: (String) -> Unit) {
     }
     if (rows.isEmpty()) return
     val context = LocalContext.current
+    val resources = LocalResources.current
     val english = AppLocales.languageCode(context) == "en"
 
     Text(
@@ -92,7 +94,7 @@ fun RetentionSettingsSection(runtime: AppRuntime, onStop: (String) -> Unit) {
                 onClick = {
                     retention.dismiss()
                     // 声で言うのと同じ指示文(iOS の `removeRetention(entityName:)`)
-                    onStop(context.getString(R.string.retention_stop_instruction_entity, row.name))
+                    onStop(resources.getString(R.string.retention_stop_instruction_entity, row.name))
                 },
                 modifier = Modifier.padding(horizontal = 4.dp).testTag("settings.retention.${row.entity}.stop"),
             ) { Text(stringResource(R.string.retention_stop), color = MaterialTheme.colorScheme.error) }

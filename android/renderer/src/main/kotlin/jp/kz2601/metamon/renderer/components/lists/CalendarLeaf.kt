@@ -27,6 +27,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalLocale
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
@@ -73,7 +74,7 @@ object CalendarMonth {
         val out = LinkedHashMap<LocalDate, MutableList<Record>>()
         for (r in records) {
             val d = FieldCoding.date(r[dateField]) ?: continue
-            out.getOrPut(LocalDate.ofInstant(d, FieldCoding.zone)) { mutableListOf() }.add(r)
+            out.getOrPut(d.atZone(FieldCoding.zone).toLocalDate()) { mutableListOf() }.add(r)
         }
         return out
     }
@@ -87,8 +88,8 @@ object CalendarMonth {
 @Composable
 fun CalendarLeaf(c: Component, ctx: RenderContext, modifier: Modifier = Modifier) {
     val data = rememberLeafData(ctx.runtime)
-    val locale = Locale.getDefault()
-    val today = LocalDate.ofInstant(DSLClock.now(), FieldCoding.zone)
+    val locale = LocalLocale.current.platformLocale
+    val today = DSLClock.now().atZone(FieldCoding.zone).toLocalDate()
     var month by remember { mutableStateOf(YearMonth.from(today)) }
     var selected by remember { mutableStateOf(today) }
     val entityId = c.entity ?: ""

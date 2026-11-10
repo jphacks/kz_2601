@@ -33,7 +33,6 @@ import jp.kz2601.metamon.services.notifications.recordEntity
 import kotlinx.serialization.builtins.MapSerializer
 import kotlinx.serialization.builtins.serializer
 import java.time.Instant
-import java.time.LocalDate
 import java.time.ZoneId
 import java.util.Locale
 
@@ -143,12 +142,19 @@ class LocalNotifications private constructor(private val app: Context) {
         }
         val n = builder.build()
         if (alarm) n.flags = n.flags or android.app.Notification.FLAG_INSISTENT
-        return runCatching { NotificationManagerCompat.from(app).notify(id, n) }.isSuccess
+        return try {
+            NotificationManagerCompat.from(app).notify(id, n)
+            true
+        } catch (_: SecurityException) {
+            false // canPost() の後に許可を外された
+        } catch (_: RuntimeException) {
+            false
+        }
     }
 
     /** 「明日 9:00」の言い方(今日なら時刻だけ)。 */
     fun whenText(at: Instant, now: Instant = Instant.now()): String {
-        val today = LocalDate.ofInstant(at, zone) == LocalDate.ofInstant(now, zone)
+        val today = at.atZone(zone).toLocalDate() == now.atZone(zone).toLocalDate()
         val locale = app.resources.configuration.locales[0] ?: Locale.getDefault()
         val pattern = DateFormat.getBestDateTimePattern(locale, if (today) "Hm" else "MdEEEHm")
         return java.time.format.DateTimeFormatter.ofPattern(pattern, locale).withZone(zone).format(at)
