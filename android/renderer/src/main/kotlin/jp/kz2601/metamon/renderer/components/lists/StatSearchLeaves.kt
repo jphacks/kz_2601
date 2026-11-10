@@ -23,6 +23,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.stateDescription
@@ -33,6 +34,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import jp.kz2601.metamon.dsl.Component
+import jp.kz2601.metamon.renderer.R
 import jp.kz2601.metamon.renderer.components.UnavailableComponent
 import jp.kz2601.metamon.renderer.components.inputs.inputChrome
 import jp.kz2601.metamon.renderer.registry.RenderContext
@@ -51,12 +53,13 @@ fun StatLeaf(c: Component, ctx: RenderContext, modifier: Modifier = Modifier) {
     val v = StatValue.resolve(c, data)
     val colors = RenderTheme.colors
     val label = c.label.orEmpty()
+    val unavailable = stringResource(R.string.lists_unavailable)
     Column(
         modifier
             .renderCard()
             .clearAndSetSemantics {
                 contentDescription = label
-                stateDescription = if (v.unavailable) "取得できませんでした" else v.text
+                stateDescription = if (v.unavailable) unavailable else v.text
             },
         verticalArrangement = Arrangement.spacedBy(RenderTheme.Spacing.xs),
     ) {
@@ -95,7 +98,7 @@ fun SearchBarLeaf(c: Component, ctx: RenderContext, modifier: Modifier = Modifie
         return
     }
     val text = locals.values[key].orEmpty()
-    val placeholder = c.placeholder ?: "検索"
+    val placeholder = c.placeholder ?: stringResource(R.string.lists_search)
     Row(
         modifier.fillMaxWidth().inputChrome(),
         verticalAlignment = Alignment.CenterVertically,
@@ -116,7 +119,7 @@ fun SearchBarLeaf(c: Component, ctx: RenderContext, modifier: Modifier = Modifie
         }
         if (text.isNotEmpty()) {
             IconButton(onClick = { locals.values[key] = "" }, modifier = Modifier.size(32.dp)) {
-                Icon(Icons.Filled.Clear, contentDescription = "クリア", tint = RenderTheme.colors.tertiaryLabel)
+                Icon(Icons.Filled.Clear, contentDescription = stringResource(R.string.lists_clear), tint = RenderTheme.colors.tertiaryLabel)
             }
         }
     }

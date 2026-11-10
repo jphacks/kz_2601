@@ -23,6 +23,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
@@ -37,6 +38,7 @@ import jp.kz2601.metamon.dsl.Component
 import jp.kz2601.metamon.dsl.Height
 import jp.kz2601.metamon.dsl.records.JSONValue
 import jp.kz2601.metamon.dsl.records.VideoValue
+import jp.kz2601.metamon.renderer.R
 import jp.kz2601.metamon.renderer.registry.RenderContext
 import jp.kz2601.metamon.renderer.theme.RenderTheme
 import jp.kz2601.metamon.renderer.theme.SymbolIcon
@@ -99,10 +101,11 @@ fun AvatarLeaf(c: Component, ctx: RenderContext, modifier: Modifier = Modifier) 
     val value = photoFieldValue(c, ctx) ?: c.image
     val bitmap = rememberPhoto(value)
     val remote = if (bitmap == null) RemoteImages.loadableUrl(value) else null
+    val avatar = c.name ?: stringResource(R.string.inputs_avatar)
     val colors = RenderTheme.colors
     Box(
         modifier.fillMaxWidth().clearAndSetSemantics {
-            contentDescription = c.name ?: "アバター"
+            contentDescription = avatar
             role = Role.Image
         },
         contentAlignment = Alignment.Center,
@@ -157,6 +160,7 @@ fun PhotoView(value: String?, height: Dp, modifier: Modifier = Modifier) {
     val phase = remote?.let { rememberRemotePhase(it) }
     // 読めなかった https は「写真なし」と同じ枠・読み上げ
     val has = bitmap != null || (remote != null && phase?.value != RemotePhase.FAILED)
+    val photoLabel = stringResource(if (has) R.string.inputs_photo else R.string.inputs_no_photo)
     Box(
         modifier
             .fillMaxWidth()
@@ -164,7 +168,7 @@ fun PhotoView(value: String?, height: Dp, modifier: Modifier = Modifier) {
             .clip(RoundedCornerShape(RenderTheme.Radius.inner))
             .background(MaterialTheme.colorScheme.surfaceVariant)
             .clearAndSetSemantics {
-                contentDescription = if (has) "写真" else "写真なし"
+                contentDescription = photoLabel
                 if (has) role = Role.Image
             },
         contentAlignment = Alignment.Center,

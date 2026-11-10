@@ -34,6 +34,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.CustomAccessibilityAction
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
@@ -56,6 +57,7 @@ import jp.kz2601.metamon.dsl.records.FieldType
 import jp.kz2601.metamon.dsl.records.Record
 import jp.kz2601.metamon.dsl.records.MatchBox
 import jp.kz2601.metamon.renderer.ActionContext
+import jp.kz2601.metamon.renderer.R
 import jp.kz2601.metamon.renderer.components.social.InterestButton
 import jp.kz2601.metamon.renderer.components.social.MatchingHost
 import jp.kz2601.metamon.renderer.components.social.interestTitle
@@ -185,9 +187,13 @@ internal fun ListRow(
         if (entity?.field(f)?.type == FieldType.ENUM) data.text(record, f, entity).takeIf { it.isNotEmpty() } else null
     }?.let { RenderTheme.colors.category(it) }
     val label = listOfNotNull(texts.title, texts.subtitle, texts.trailing).filter { it.isNotEmpty() }.joinToString(", ")
+    val toggleLabel = stringResource(if (checked) R.string.lists_uncheck else R.string.lists_check)
+    val deleteLabel = stringResource(R.string.lists_delete)
+    val toggleState = toggleOn?.let { stringResource(if (it) R.string.lists_checked else R.string.lists_not_checked) }
+    val openLabel = stringResource(R.string.lists_open)
     val actions = buildList {
-        if (onToggle != null) add(CustomAccessibilityAction(if (checked) "チェックを外す" else "チェックする") { onToggle(); true })
-        if (onDelete != null) add(CustomAccessibilityAction("削除") { onDelete(); true })
+        if (onToggle != null) add(CustomAccessibilityAction(toggleLabel) { onToggle(); true })
+        if (onDelete != null) add(CustomAccessibilityAction(deleteLabel) { onDelete(); true })
         addAll(accessoryActions)
     }
     Box {
@@ -201,10 +207,10 @@ internal fun ListRow(
                 )
                 .clearAndSetSemantics {
                     contentDescription = label
-                    toggleOn?.let { stateDescription = if (it) "チェック済み" else "未チェック" }
+                    toggleState?.let { stateDescription = it }
                     if (onTap != null) {
                         role = Role.Button
-                        onClick("開く") { onTap(); true }
+                        onClick(openLabel) { onTap(); true }
                     }
                     if (actions.isNotEmpty()) customActions = actions
                 }
@@ -247,7 +253,7 @@ internal fun ListRow(
         }
         DropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
             DropdownMenuItem(
-                text = { Text("削除", color = RenderTheme.colors.negative) },
+                text = { Text(deleteLabel, color = RenderTheme.colors.negative) },
                 leadingIcon = { SymbolIcon("trash", 20.dp, RenderTheme.colors.negative) },
                 onClick = {
                     menu = false

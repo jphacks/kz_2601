@@ -31,6 +31,7 @@ import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
@@ -40,6 +41,7 @@ import androidx.compose.ui.unit.dp
 import jp.kz2601.metamon.dsl.Component
 import jp.kz2601.metamon.dsl.ComponentKind
 import jp.kz2601.metamon.dsl.records.Aggregator
+import jp.kz2601.metamon.renderer.R
 import jp.kz2601.metamon.renderer.registry.RenderContext
 import jp.kz2601.metamon.renderer.theme.RenderTheme
 import jp.kz2601.metamon.renderer.theme.colors
@@ -64,7 +66,7 @@ fun ChartLeaf(c: Component, ctx: RenderContext, modifier: Modifier = Modifier) {
         c.title?.let { Text(it, style = RenderTheme.Fonts.cardTitle) }
         if (buckets.isEmpty()) {
             // 記録すると出ることを伝える(L4)
-            EmptyPlaceholder("chart.bar", "まだ記録がありません。記録するとグラフになります")
+            EmptyPlaceholder("chart.bar", stringResource(R.string.lists_chart_empty))
             return@Column
         }
         // 押していない時も高さを取っておく(押すたびにグラフが上下しない)

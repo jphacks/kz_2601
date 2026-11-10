@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 入力系の部品の固定の文言(#1062・#1075)。文言の正は iOS の MetamonRenderer の Localizable.xcstrings -->
+<resources>
+    <string name="inputs_add_ref_first">Add a %1$s first</string>
+    <string name="inputs_avatar">Avatar</string>
+    <string name="inputs_cancel">Cancel</string>
+    <string name="inputs_members_not_loaded">The member list isn\'t loaded yet</string>
+    <string name="inputs_needs_form">%1$s requires screen.entity</string>
+    <string name="inputs_no_photo">No photo</string>
+    <string name="inputs_photo">Photo</string>
+    <string name="inputs_required">Required</string>
+    <string name="inputs_select">Select</string>
+    <string name="inputs_split_all">None selected = split among everyone</string>
+    <string name="inputs_split_count">Split among %1$d</string>
+    <string name="inputs_voice_prompt">Say something</string>
+    <string name="inputs_voice_talk">Talk</string>
+</resources>

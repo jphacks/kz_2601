@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 一覧・集計・カレンダー・表の固定の文言(#1070・#859)。文言の正は iOS の MetamonRenderer の Localizable.xcstrings -->
+<resources>
+    <string name="lists_add">Add</string>
+    <string name="lists_cell_empty">Empty</string>
+    <string name="lists_chart_empty">No records yet. Add one to see the chart</string>
+    <string name="lists_check">Check</string>
+    <string name="lists_checked">Checked</string>
+    <string name="lists_clear">Clear</string>
+    <string name="lists_delete">Delete</string>
+    <string name="lists_edit">Edit</string>
+    <string name="lists_gauge">Gauge</string>
+    <string name="lists_gauge_range">%1$s (range %2$s–%3$s)</string>
+    <string name="lists_next_month">Next month</string>
+    <string name="lists_no_events">Nothing scheduled</string>
+    <string name="lists_no_records">No records</string>
+    <string name="lists_not_checked">Not checked</string>
+    <string name="lists_open">Open</string>
+    <string name="lists_previous_month">Previous month</string>
+    <string name="lists_progress">Progress</string>
+    <string name="lists_records_count">%1$d records</string>
+    <string name="lists_search">Search</string>
+    <string name="lists_today">%1$s, today</string>
+    <string name="lists_unavailable">Unavailable</string>
+    <string name="lists_uncheck">Uncheck</string>
+</resources>
