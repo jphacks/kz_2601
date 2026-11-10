@@ -2,6 +2,7 @@ package jp.kz2601.metamon.voice
 
 import jp.kz2601.metamon.dsl.AppDSL
 import jp.kz2601.metamon.dsl.AppDocument
+import jp.kz2601.metamon.dsl.decode
 import jp.kz2601.metamon.services.AIClient
 import jp.kz2601.metamon.services.ChatMessage
 import jp.kz2601.metamon.services.ChatMode

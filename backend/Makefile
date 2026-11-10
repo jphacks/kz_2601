@@ -27,6 +27,12 @@ schema-sync:
 schema-check:
 	@cmp -s ../docs/dsl/dsl.schema.json pkg/dsl/schema.json || (echo "schema out of sync: run make schema-sync" && exit 1)
 
+# Android の DSL の型(android/dsl/.../generated)をスキーマから作り直す(#351)。
+# 古いままだと cmd/dslgen の TestGeneratedKotlinIsUpToDate が落ちる。
+.PHONY: dsl-gen
+dsl-gen: schema-check
+	go run ./cmd/dslgen
+
 # ---- local dev -------------------------------------------------------------
 # Terminal 1: make emulator   Terminal 2: make dev
 # Firestore エミュレータは CI と同じ gcloud の cloud-firestore-emulator(firebase-tools・firebase.json は不要)。

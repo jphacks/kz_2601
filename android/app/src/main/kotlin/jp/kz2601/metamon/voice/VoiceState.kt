@@ -1,6 +1,7 @@
 package jp.kz2601.metamon.voice
 
 import jp.kz2601.metamon.dsl.AppDocument
+import jp.kz2601.metamon.dsl.isVoiceOnly
 import jp.kz2601.metamon.services.ChatTurn
 import jp.kz2601.metamon.services.StreamedComponent
 import jp.kz2601.metamon.services.TranscriberFailure

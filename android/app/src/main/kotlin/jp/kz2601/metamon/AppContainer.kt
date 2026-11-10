@@ -4,6 +4,8 @@ import android.content.Context
 import android.os.LocaleList
 import android.util.Log
 import jp.kz2601.metamon.dsl.AppDSL
+import jp.kz2601.metamon.dsl.decode
+import jp.kz2601.metamon.dsl.fallback
 import jp.kz2601.metamon.renderer.DSLRuntime
 import jp.kz2601.metamon.services.AIClient
 import jp.kz2601.metamon.services.AppConfigClient
@@ -18,8 +20,14 @@ import jp.kz2601.metamon.services.live.FirebaseAuthService
 import jp.kz2601.metamon.services.live.FirebaseBootstrap
 import jp.kz2601.metamon.services.live.HttpAIClient
 import jp.kz2601.metamon.services.live.HttpAppConfigClient
+import jp.kz2601.metamon.services.local.AndroidConnectivity
+import jp.kz2601.metamon.services.local.RecordSyncEngine
 import jp.kz2601.metamon.services.mock.MockAuthService
 import jp.kz2601.metamon.services.speech.AndroidSpeechTranscriber
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import java.io.File
 
 /** 手書きの組み立て 1 か所(#354 §5。Hilt は使わない・iOS の `BuildConfig.make` と同じ形)。 */
 class AppContainer(
@@ -30,6 +38,8 @@ class AppContainer(
     val ai: AIClient,
     val transcriber: SpeechTranscriber,
     val appId: DeviceAppId,
+    /** 記録のローカル DB と送信待ちの列(#882)。[MetamonApplication] が start する */
+    val recordSync: RecordSyncEngine,
 ) {
     companion object {
         fun make(context: Context): AppContainer {
@@ -53,15 +63,23 @@ class AppContainer(
             fun http(baseUrl: String) = MetamonHttp(baseUrl, tokens, clientInfo, appCheck = null, client = client, device = device)
             val log: (String) -> Unit = { Log.w("Metamon", it) }
 
+            val appConfig = HttpAppConfigClient(http(environment.appConfigBaseUrl))
+
             return AppContainer(
                 environment = environment,
                 auth = auth,
                 initialDsl = loadInitialDsl(context),
-                appConfig = HttpAppConfigClient(http(environment.appConfigBaseUrl)),
+                appConfig = appConfig,
                 ai = HttpAIClient(http(environment.aiBaseUrl), log = log),
                 // 声は端末内だけで文字にする(#354 §3)。端末内が無い端末は文字入力に落とす
                 transcriber = AndroidSpeechTranscriber(context, language = language, log = { Log.i("Metamon", it) }),
                 appId = DeviceAppId(context),
+                recordSync = RecordSyncEngine.create(
+                    client = appConfig,
+                    connectivity = AndroidConnectivity(context),
+                    directory = File(context.filesDir, "metamon-records"),
+                    scope = CoroutineScope(SupervisorJob() + Dispatchers.Default),
+                ),
             )
         }
 

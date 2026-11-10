@@ -36,6 +36,7 @@ import jp.kz2601.metamon.voice.VoicePhase
 import jp.kz2601.metamon.voice.VoiceRoute
 import jp.kz2601.metamon.voice.VoiceUiState
 import jp.kz2601.metamon.voice.VoiceViewModel
+import jp.kz2601.metamon.renderer.theme.MetamonRenderTheme
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -43,7 +44,7 @@ class MainActivity : ComponentActivity() {
         enableEdgeToEdge()
         val container = (application as MetamonApplication).container
         setContent {
-            MaterialTheme {
+            MetamonRenderTheme {
                 MetamonApp(container)
             }
         }

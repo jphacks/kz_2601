@@ -22,7 +22,13 @@ iOS の `Metamon{DSL,Renderer,Services}` + アプリ本体と 1 対 1。依存�
 | `:services` | Android ライブラリ | `MetamonServices` | 認証(Firebase / モック)・接続先・HTTP(OkHttp + kotlinx.serialization)・appconfig / ai のクライアント |
 | `:app` | Android アプリ | `ios/Metamon` | 起動・組み立て(`AppContainer`)・flavor |
 
-`:dsl` の型は仮の手書き。#351 の生成器(`backend/cmd/dslgen`)ができたら、その出力に置き換える。
+`:dsl` の型(`AppDSL`・`Screen`・`Component`・`Action`・`Expr`・enum・部品ごとのキー表 `DslKeys`)は `dsl/src/main/kotlin/.../dsl/generated/` にあり、スキーマ(`backend/pkg/dsl/schema.json`)から `backend/cmd/dslgen` が作る(#351 §7)。**手で直さない**。スキーマを変えたら作り直してコミットする。
+
+```sh
+cd backend && make dsl-gen     # 生成物が古いと backend の go test(TestGeneratedKotlinIsUpToDate)が落ちる
+```
+
+読み方は iOS と同じく寛容: 知らない type は `ComponentType.UNKNOWN`・知らない enum の値は `UNKNOWN`(`VoiceEntry` は `FLOATING`)・省略できるキーの型違いは null・配列の壊れた要素は捨てる。必須のキー(`id` など)が無い・型違いの要素は、その要素だけ配列から落ちる。手書きは `Lenient.kt`(寛容な読み方)と `AppDSL.kt`(封筒・読み込み・最後の手段)だけ。
 
 ## 要るもの
 

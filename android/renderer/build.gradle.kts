@@ -27,6 +27,18 @@ dependencies {
     implementation(platform(libs.compose.bom))
     api(libs.compose.ui)
     api(libs.compose.material3)
+    implementation(libs.androidx.activity.compose)
     implementation(libs.compose.ui.tooling.preview)
     debugImplementation(libs.compose.ui.tooling)
+
+    testImplementation(libs.junit)
+}
+
+// 適合テストは docs/dsl/conformance/cases(全 OS 共通の期待値)と、case が参照する docs/dsl/examples をそのまま読む。
+val dslDocsDir = rootDir.resolve("../docs/dsl")
+
+tasks.withType<Test>().configureEach {
+    inputs.dir(dslDocsDir.resolve("conformance")).withPropertyName("conformanceCases").withPathSensitivity(PathSensitivity.RELATIVE)
+    inputs.dir(dslDocsDir.resolve("examples")).withPropertyName("dslExamples").withPathSensitivity(PathSensitivity.RELATIVE)
+    systemProperty("metamon.dslDocsDir", dslDocsDir.absolutePath)
 }
