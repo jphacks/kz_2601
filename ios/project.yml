@@ -114,6 +114,8 @@ targets:
           - "**/GoogleService-Info*.plist"
       # ウィジェットと共有する受け渡しモデル(WidgetSnapshot)。両ターゲットにコンパイルする
       - path: MetamonWidget/Shared
+      # Mac と共有するランタイムの部品(UIKit に依存しない: 遷移・確認・保存/削除の前段・文言)。#939
+      - path: Shared
       # DSL v1 の正典サンプル(docs/dsl/examples/*.json)をそのままバンドル。iOS 側にコピーを持たない(ドリフト防止)。
       - path: ../docs/dsl/examples
         buildPhase: resources
@@ -277,12 +279,14 @@ targets:
   # Mac のネイティブ版(#929・docs/decisions/363-desktop-strategy.md)。3 つのパッケージを iOS と共有し、殻は ios/MetamonMac/。
   # Bundle ID は iOS と同じ(ユニバーサル購入)。署名は project の base の自動署名・DEVELOPMENT_TEAM(METAMON_TEAM_ID)をそのまま使う。
   # Apple シリコンと Intel の両方(ARCHS_STANDARD = arm64 + x86_64。Debug は ONLY_ACTIVE_ARCH で手元の CPU だけ)。
-  # 今は同梱の DSL 例の一覧を出すだけ。画面の骨格は #933、Firebase の登録は #930、権限の説明は #931。
+  # 同梱の DSL 例を中央で動かす(記録はメモリ上・#939)。画面の骨格は #933、Firebase の登録は #930、権限の説明は #931。
   MetamonMac:
     type: application
     platform: macOS
     sources:
       - path: MetamonMac
+      # iOS の AppRuntime と共有する部品(遷移・確認・保存/削除の前段・文言)。#939
+      - path: Shared
       # iOS と同じ DSL 例をそのままバンドル(コピーを持たない)
       - path: ../docs/dsl/examples
         buildPhase: resources

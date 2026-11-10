@@ -1,0 +1,240 @@
+import SwiftUI
+import AppKit
+import Observation
+import MetamonDSL
+import MetamonRenderer
+import MetamonServices
+
+/// Mac の中央(生成したアプリ)のランタイム(#939)。iOS の `AppRuntime` から UIKit に依存しない部分を共有して動かす:
+/// - 画面の移動: `RuntimeNavigating`(iOS と同じ実装)
+/// - 確認ダイアログ: `RuntimeConfirm`(iOS と同じ文言・主ボタン)
+/// - 保存・削除の前段: `RecordActionSteps`、書き込みと同期: `RecordSyncEngine`(MetamonServices)
+///
+/// サーバーへの接続(appconfig のクライアント・ログイン)は Mac に Firebase がまだ無い(#930)ので、
+/// iOS の `METAMON_MOCK=1` と同じくメモリ上の appconfig(`InMemoryAppConfigClient`)に記録を持つ。
+/// AI・通知・共有・課金など iOS 固有の機能は持たない(未対応のアクションは一言で知らせる)。
+@MainActor
+@Observable
+final class MacAppRuntime: RuntimeNavigating {
+    let dsl: AppDSL
+    let appId: String
+    var paths: [String: [Route]] = [:]
+    var selectedTab: String
+    var sheet: Route?
+    var fullScreen: Route?
+    private(set) var loading: Set<String> = []
+    private(set) var failed: Set<String> = []
+    private(set) var records: [String: [Record]] = [:]
+
+    /// 確認ダイアログ(アクションの confirm)。中央の列に `.confirmationDialog` で出す
+    var confirm: RuntimeConfirm?
+    /// 中央の列の上に出す一言
+    var toast: String?
+    /// 一覧の記録を消した直後の「削除しました・元に戻す」(iOS の M11 と同じく数秒は送らない)
+    var recordUndo: DeletionTicket?
+    static let undoSeconds: Double = 5
+
+    @ObservationIgnored let recordSync: RecordSyncEngine
+    @ObservationIgnored private var savingForms: Set<ObjectIdentifier> = []
+
+    init(appId: String, dsl: AppDSL, recordSync: RecordSyncEngine? = nil) {
+        self.appId = appId
+        self.dsl = dsl
+        selectedTab = dsl.app.tabs.first?.screen ?? ""
+        self.recordSync = recordSync ?? Self.mockRecordSync()
+        self.recordSync.onEvent = { [weak self] event in self?.handle(event) }
+        self.recordSync.start()
+    }
+
+    /// メモリ上の appconfig + 一時フォルダのローカル DB(アプリを閉じれば消える)。iOS の METAMON_MOCK 相当。
+    static func mockRecordSync() -> RecordSyncEngine {
+        let dir = FileManager.default.temporaryDirectory
+            .appendingPathComponent("metamon-mac-preview-\(UUID().uuidString)", isDirectory: true)
+        let store = RecordStore(directory: dir)
+        let client = InMemoryAppConfigClient()
+        return RecordSyncEngine(store: store, queue: SyncQueue(directory: nil, store: store, client: client),
+                                client: client, connectivity: ManualConnectivity(online: true))
+    }
+
+    // MARK: - Records
+
+    func records(for entity: String) -> [Record] { records[entity] ?? [] }
+
+    func load(entities: Set<String>, force: Bool) async {
+        for e in entities where force || records[e] == nil {
+            await refresh(e)
+        }
+    }
+
+    /// ローカル先出し → appconfig(メモリ)の全件で置換。取れずローカルにも無ければ「読み込めませんでした」。
+    func refresh(_ entity: String) async {
+        if records[entity] == nil {
+            let cached = await recordSync.cached(appId: appId, entity: entity)
+            if !cached.isEmpty { records[entity] = cached }
+        }
+        loading.insert(entity)
+        defer { loading.remove(entity) }
+        do {
+            records[entity] = try await recordSync.pull(appId: appId, entity: entity)
+            failed.remove(entity)
+        } catch {
+            if records[entity]?.isEmpty ?? true {
+                records[entity] = []
+                failed.insert(entity)
+            }
+            print("[MetamonMac] records pull failed: entity=\(entity) \(error)")
+        }
+    }
+
+    func updateRecord(entity: String, recordId: String, data: [String: JSONValue]) async -> Bool {
+        guard let current = record(entity, recordId) else { return false }
+        guard canEdit(entity: entity, record: current) else {
+            notifyReadOnly(entity: entity)
+            return false
+        }
+        records[entity] = await recordSync.save(appId: appId, entity: entity, recordId: recordId, data: data)
+        return true
+    }
+
+    func createRecord(entity: String, data: [String: JSONValue]) async -> Bool {
+        guard dsl.entity(entity) != nil else { return false }
+        records[entity] = await recordSync.save(appId: appId, entity: entity, recordId: nil, data: data)
+        return true
+    }
+
+    func notifyReadOnly(entity: String) { toast = RecordActionSteps.readOnlyMessage }
+    func notifySaveFailed(entity: String) { toast = RecordActionSteps.saveFailedMessage }
+
+    private func record(_ entity: String, _ id: String) -> Record? {
+        records[entity]?.first { $0.id == id }
+    }
+
+    private func reloadLocal(_ entity: String) async {
+        records[entity] = await recordSync.cached(appId: appId, entity: entity)
+    }
+
+    /// 同期キューからの通知。送れたらローカルを読み直し、競合はサーバーから引き直す(iOS と同じくサーバー優先)。
+    private func handle(_ event: SyncEvent) {
+        Task { @MainActor in
+            switch event {
+            case .sent(let id, let entity) where id == appId:
+                await reloadLocal(entity)
+            case .conflict(let id, let entity, _) where id == appId:
+                await refresh(entity)
+            case .sent, .conflict, .paused, .drained:
+                break
+            default:
+                toast = RecordActionSteps.saveFailedMessage
+            }
+        }
+    }
+
+    // MARK: - Actions
+
+    func run(_ action: Action, _ ctx: ActionContext) async {
+        if let message = action.confirmMessage {
+            let button = RuntimeConfirm.button(for: action.type)
+            confirm = RuntimeConfirm(message: message, primaryLabel: button.label, isDestructive: button.destructive) { [weak self] in
+                await self?.perform(action, ctx)
+            }
+            return
+        }
+        await perform(action, ctx)
+    }
+
+    private func perform(_ action: Action, _ ctx: ActionContext) async {
+        switch action.type {
+        case .navigate:
+            guard let screen = action.screen else { return }
+            if let ref = action.prefillRef {
+                // 親から子を作る(#256): 今のレコードを子フォームの ref に積み、子は新規で開く
+                guard let parentId = ctx.currentRecordId else {
+                    toast = RecordActionSteps.unsavedParentMessage(ctx)
+                    return
+                }
+                FormPrefill.set([ref: .string(parentId)])
+                navigate(to: screen, presentation: action.presentation, recordId: nil, from: ctx.route)
+                return
+            }
+            navigate(to: screen, presentation: action.presentation, recordId: ctx.recordId, from: ctx.route)
+
+        case .back:
+            close(ctx.route)
+
+        case .saveRecord:
+            await save(action, ctx)
+
+        case .deleteRecord:
+            guard let target = RecordActionSteps.deleteTarget(action, ctx, dsl: dsl) else { return }
+            if let current = record(target.entity, target.recordId), !canDelete(entity: target.entity, record: current) {
+                notifyReadOnly(entity: target.entity)
+                return
+            }
+            await deleteUndoably(entity: target.entity, recordId: target.recordId)
+            if ctx.recordId == nil { close(ctx.route) } // フォーム上からの削除は画面を閉じる
+
+        case .resetForm:
+            ctx.form?.reset()
+
+        case .openUrl:
+            guard let url = ExternalURLPolicy.openable(action.url) else {
+                toast = L10n.tr("openUrl: url は https か line/slack/discord/tel/mailto/maps のみ")
+                return
+            }
+            NSWorkspace.shared.open(url)
+
+        default:
+            // AI・通知・共有・書き出しなどは Mac ではまだ動かない(後の Issue)
+            toast = L10n.tr("このボタンは Mac ではまだ使えません")
+        }
+    }
+
+    private func save(_ action: Action, _ ctx: ActionContext) async {
+        let target = RecordActionSteps.saveTarget(action, ctx, dsl: dsl) { self.records(for: $0) }
+        guard case .ready(let entity, let form, let recordId) = target else {
+            if case .invalid(let message) = target { toast = message }
+            return
+        }
+        if let id = recordId, let current = record(entity, id), !canEdit(entity: entity, record: current) {
+            notifyReadOnly(entity: entity)
+            return
+        }
+        // 既存の記録を何も変えずに保存: 書き込まずに画面だけ進める(M10)
+        guard form.needsWrite else {
+            leaveAfterSave(action, ctx)
+            return
+        }
+        // 保存ボタンの連打で同じ内容が 2 件できないように
+        guard savingForms.insert(ObjectIdentifier(form)).inserted else { return }
+        defer { savingForms.remove(ObjectIdentifier(form)) }
+        let written = await recordSync.write(appId: appId, entity: entity, recordId: recordId, data: form.payload)
+        records[entity] = written.records
+        form.markSaved(queuedOffline: !recordSync.isOnline)
+        leaveAfterSave(action, ctx)
+    }
+
+    /// 保存の後: `screen` があればそこへ、無ければ閉じる。
+    private func leaveAfterSave(_ action: Action, _ ctx: ActionContext) {
+        if let screen = action.screen {
+            navigate(to: screen, presentation: action.presentation, recordId: nil, from: ctx.route)
+        } else {
+            close(ctx.route)
+        }
+    }
+
+    // MARK: - 削除の取り消し(M11)
+
+    func deleteUndoably(entity: String, recordId: String) async {
+        let ticket = await recordSync.deleteUndoably(appId: appId, entity: entity, recordId: recordId,
+                                                     grace: .seconds(Self.undoSeconds)).ticket
+        await reloadLocal(entity)
+        withAnimation { recordUndo = ticket }
+    }
+
+    func undoRecordDelete() async {
+        guard let ticket = recordUndo else { return }
+        withAnimation { recordUndo = nil }
+        guard await recordSync.undoDelete(ticket) != nil else { return }
+        await reloadLocal(ticket.entity)
+    }
+}
