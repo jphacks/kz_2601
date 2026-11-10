@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 英語 -->
+<resources>
+    <string name="share_action">Share</string>
+    <string name="share_close">Close</string>
+    <string name="share_copied">Copied</string>
+    <string name="share_copy">Copy Link</string>
+    <string name="share_creating">Creating link</string>
+    <string name="share_failure_blank">This app has nothing in it yet. Make it with your voice, then share it.</string>
+    <string name="share_failure_generic">Couldn\'t create the link</string>
+    <string name="share_failure_not_member">You haven\'t joined this share. Join from an invite link.</string>
+    <string name="share_failure_offline">Couldn\'t create the link. Try again when you\'re online.</string>
+    <string name="share_failure_unavailable">Sharing only works when connected to the server</string>
+    <string name="share_qr_caption">Scan with the camera to open in Tailor It</string>
+    <string name="share_qr_label">QR code for sharing</string>
+    <string name="share_retry">Try Again</string>
+    <string name="share_revoke">Revoke Link</string>
+    <string name="share_revoke_cancel">Cancel</string>
+    <string name="share_revoke_confirm">Revoke</string>
+    <string name="share_revoke_failed">Couldn\'t revoke</string>
+    <string name="share_revoke_message">This link and QR code will stop working. People who already joined can keep using the app. A new link will be created.</string>
+    <string name="share_revoke_title">Revoke this link?</string>
+    <string name="share_revoked">Link revoked. It can no longer be opened</string>
+    <string name="share_scope_copy">Recipients get their own copy of the app (entries are not shared)</string>
+    <string name="share_scope_members">Recipients join with the link and share the records with you</string>
+    <string name="share_scope_public">Recipients can see everyone\'s posts too</string>
+    <string name="share_send">Send Link</string>
+    <string name="share_send_message">Try “%1$s” on Tailor It\n%2$s</string>
+    <string name="share_settings_footer">Hand the app you\'re using to someone else with a link or QR code</string>
+    <string name="share_settings_row">Share This App</string>
+    <string name="share_title">Share “%1$s”</string>
+    <string name="share_untitled">this app</string>
+</resources>

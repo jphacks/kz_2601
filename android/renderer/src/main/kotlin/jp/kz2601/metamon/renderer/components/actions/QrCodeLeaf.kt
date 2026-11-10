@@ -85,8 +85,8 @@ object QrContent {
     }
 }
 
-/** 1 モジュール 1px の白地・黒の画像(描く時は補間なしで拡大する)。 */
-private fun QrMatrix.bitmap(): ImageBitmap {
+/** 1 モジュール 1px の白地・黒の画像(描く時は補間なしで拡大する)。アプリの共有シート(#901)も使う。 */
+fun QrMatrix.bitmap(): ImageBitmap {
     val pixels = IntArray(size * size) { i -> if (this[i % size, i / size]) 0xFF000000.toInt() else 0xFFFFFFFF.toInt() }
     return Bitmap.createBitmap(pixels, size, size, Bitmap.Config.ARGB_8888).asImageBitmap()
 }
