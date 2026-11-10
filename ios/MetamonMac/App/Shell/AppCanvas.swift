@@ -63,6 +63,7 @@ private struct AppCanvasContent: View {
 private struct RuntimeOverlays: ViewModifier {
     @Bindable var runtime: MacAppRuntime
     @Environment(\.isPresented) private var isPresented
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     private var active: Bool {
         // 根(シートでない)はシートが開いている間は出さない
@@ -83,7 +84,9 @@ private struct RuntimeOverlays: ViewModifier {
                     if active, let message = runtime.toast {
                         ToastCapsule(text: message) { withAnimation { runtime.toast = nil } }
                             .task(id: message) {
-                                try? await Task.sleep(for: .seconds(3))
+                                // 出したのと同時に VoiceOver で読み、VoiceOver の時は長く出しておく(#937・iOS の H8 と同じ)
+                                MacVoiceOver.announce(message)
+                                try? await Task.sleep(for: .seconds(MacVoiceOver.holdSeconds(3)))
                                 guard !Task.isCancelled, runtime.toast == message else { return }
                                 withAnimation { runtime.toast = nil }
                             }
@@ -91,6 +94,7 @@ private struct RuntimeOverlays: ViewModifier {
                     if active, let undo = runtime.recordUndo {
                         UndoDeleteCapsule(runtime: runtime)
                             .task(id: undo.id) {
+                                MacVoiceOver.announce(String(localized: "削除しました"))
                                 try? await Task.sleep(for: .seconds(MacAppRuntime.undoSeconds))
                                 guard !Task.isCancelled, runtime.recordUndo == undo else { return }
                                 withAnimation { runtime.recordUndo = nil }
@@ -98,8 +102,9 @@ private struct RuntimeOverlays: ViewModifier {
                     }
                 }
                 .padding(.top, 12)
-                .animation(.easeInOut(duration: 0.2), value: runtime.toast)
-                .animation(.easeInOut(duration: 0.2), value: runtime.recordUndo)
+                // 「視差効果を減らす」の時は上から滑り込ませず、その場で出す(#937)
+                .animation(reduceMotion ? nil : .easeInOut(duration: 0.2), value: runtime.toast)
+                .animation(reduceMotion ? nil : .easeInOut(duration: 0.2), value: runtime.recordUndo)
             }
     }
 
@@ -119,6 +124,7 @@ private struct ToastCapsule: View {
                 .buttonStyle(.plain)
                 .foregroundStyle(.secondary)
                 .help("閉じる")
+                .accessibilityLabel("閉じる")
         }
         .padding(.horizontal, 14).padding(.vertical, 8)
         .background(.regularMaterial, in: Capsule())
