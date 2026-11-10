@@ -78,9 +78,9 @@ class RenderTree(
         out["state"] = JsonPrimitive(state)
         if (state != "rendered") return JsonObject(out)
 
-        val props = declared(c) + resolved(c) + InputNodes.props(c, form, runtime)
+        val props = declared(c) + resolved(c) + InputNodes.props(c, form, runtime) + PlayNodes.props(c, runtime)
         if (props.isNotEmpty()) out["props"] = JsonObject(props)
-        val actions = actions(c)
+        val actions = actions(c) + PlayNodes.actions(c)
         if (actions.isNotEmpty()) out["actions"] = JsonArray(actions)
         if (c.type.isContainer) {
             val local = c.localGridPlacement
