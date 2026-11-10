@@ -96,6 +96,7 @@ import jp.kz2601.metamon.services.sync.HotReload
 import jp.kz2601.metamon.services.sync.RealtimeDocumentSync
 import jp.kz2601.metamon.services.sync.SseChangeEventSource
 import jp.kz2601.metamon.services.sync.asDocumentFetcher
+import jp.kz2601.metamon.update.UpdateGate
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -160,6 +161,8 @@ class AppContainer(
     private val social: SocialServices? = null,
     /** https の画像のキャッシュを消す(#841 の後片付け) */
     private val clearImageCache: () -> Unit = {},
+    /** 最低対応版とアプリ内のお知らせ(#906)。モックは何もしない(iOS と同じ) */
+    val updateGate: UpdateGate = UpdateGate.disabled(InMemoryKeyValueStore()),
 ) {
     /** 画面の下に出す接続先の名前(モックなら "mock")。 */
     val environmentLabel: String get() = if (knobs.mock) "mock" else environment.name
@@ -342,6 +345,7 @@ class AppContainer(
                 removeLocalMedia = removeLocalMedia(context),
                 social = SocialServices(HttpMatchingClient(appConfigHttp), HttpModerationClient(appConfigHttp), MatchingAgeGate(prefs)),
                 clearImageCache = { RemoteImages.wipe(context) },
+                updateGate = UpdateGate.live(context, environment.appConfigBaseUrl, client, device),
             )
         }
 
