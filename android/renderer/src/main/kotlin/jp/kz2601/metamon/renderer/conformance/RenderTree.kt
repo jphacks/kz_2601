@@ -131,6 +131,8 @@ class RenderTree(
         c.groupBy?.let { put("groupBy", JsonPrimitive(it)) }
         c.bucket?.let { put("bucket", JsonPrimitive(it.wire)) }
         c.kind?.let { put("kind", JsonPrimitive(it.wire)) }
+        c.mode?.let { put("mode", JsonPrimitive(it.wire)) }
+        c.address?.let { put("address", JsonPrimitive(it)) }
         c.unit?.let { put("unit", JsonPrimitive(it)) }
         c.min?.let { put("min", JsonPrimitive(it)) }
         c.max?.let { put("max", JsonPrimitive(it)) }
