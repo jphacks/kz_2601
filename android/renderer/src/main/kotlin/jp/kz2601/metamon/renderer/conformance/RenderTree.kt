@@ -13,6 +13,7 @@ import jp.kz2601.metamon.renderer.components.lists.LeafData
 import jp.kz2601.metamon.renderer.components.lists.ListRows
 import jp.kz2601.metamon.renderer.components.lists.ListToggle
 import jp.kz2601.metamon.renderer.components.lists.ProgressValue
+import jp.kz2601.metamon.renderer.components.lists.ScreenLocals
 import jp.kz2601.metamon.renderer.components.lists.StatValue
 import jp.kz2601.metamon.renderer.components.lists.TableCells
 import jp.kz2601.metamon.renderer.components.lists.TimelineRows
@@ -34,6 +35,7 @@ import jp.kz2601.metamon.renderer.layout.isFormLayout
 import jp.kz2601.metamon.renderer.layout.isVoiceScreen
 import jp.kz2601.metamon.renderer.layout.localGridPlacement
 import jp.kz2601.metamon.renderer.navigation.Route
+import jp.kz2601.metamon.renderer.screen.ScreenToolbar
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonNull
@@ -46,7 +48,7 @@ import kotlinx.serialization.json.doubleOrNull
  * 形は docs/dsl/conformance/README.md、iOS の Conformance/RenderTree.swift と同じ。配置は View と同じ関数
  * (`gridPlacement` / `localGridPlacement` / `formBands`)から取る。
  *
- * まだ入れていないもの(子 Issue): toolbar / saveBar・text の `{{field}}` の差し込み。
+ * まだ入れていないもの(子 Issue): text の `{{field}}` の差し込み。toolbar / saveBar は画面と同じ [ScreenToolbar] から出す。
  * 一覧・集計・グラフ(#859)の値は各 Leaf と同じ関数(components/lists/ListValues.kt)から取る。レジストリに無い Leaf は `unavailable` になる。
  *
  * @param available 描ける type(レジストリの登録 ∩ 端末の能力)。外れた既知の type は `unavailable`、知らない type は `unknown`。
@@ -58,8 +60,8 @@ class RenderTree(
     private val runtime: DSLRuntime = NoopDSLRuntime,
 ) {
 
-    /** route の画面 1 枚。[form] は `ScreenForm.makeDraft` で作ったもの(フォーム画面でなければ null)。 */
-    fun screen(route: Route, form: FormDraft? = null): JsonObject {
+    /** route の画面 1 枚。[form] は `ScreenForm.makeDraft` で作ったもの(フォーム画面でなければ null)。[locals] は検索文字列。 */
+    fun screen(route: Route, form: FormDraft? = null, locals: ScreenLocals? = null): JsonObject {
         val screen = dsl.screen(route.screen)
             ?: return obj("route" to route(route), "missing" to JsonPrimitive(true))
         val placement = screen.gridPlacement
@@ -69,8 +71,8 @@ class RenderTree(
             formBands(placement.placed).forEachIndexed { i, band -> band.items.forEach { bandOf[it.component] = i } }
         }
         val nodes = placement.placedInReadingOrder.map { (c, a) ->
-            node(c, a, bandOf[c]?.let { mapOf("band" to JsonPrimitive(it)) }.orEmpty(), form)
-        } + placement.stacked.map { node(it, null, mapOf("stacked" to JsonPrimitive(true)), form) }
+            node(c, a, bandOf[c]?.let { mapOf("band" to JsonPrimitive(it)) }.orEmpty(), form, locals)
+        } + placement.stacked.map { node(it, null, mapOf("stacked" to JsonPrimitive(true)), form, locals) }
 
         val out = obj(
             "id" to JsonPrimitive(screen.id),
@@ -78,20 +80,36 @@ class RenderTree(
             "route" to route(route),
             "layout" to JsonPrimitive(if (screen.isVoiceScreen) "voice" else if (isForm) "form" else "grid"),
             "nodes" to JsonArray(nodes),
+            "toolbar" to JsonArray(
+                ScreenToolbar.header(screen, dsl, form).map { obj("label" to JsonPrimitive(it.label), "action" to action(it.action)) },
+            ),
         )
-        return if (form == null) out else JsonObject(out + ("form" to InputNodes.form(form)))
+        val bar = when (val b = ScreenToolbar.saveBar(screen, form)) {
+            ScreenToolbar.SaveBar.ReadOnly -> JsonPrimitive("readOnly")
+            is ScreenToolbar.SaveBar.Save -> obj("label" to JsonPrimitive(b.button.label), "action" to action(b.button.action))
+            null -> null
+        }
+        val withBar = if (bar == null) out else JsonObject(out + ("saveBar" to bar))
+        return if (form == null) withBar else JsonObject(withBar + ("form" to InputNodes.form(form)))
     }
 
-    fun node(c: Component, cell: GridArea?, extra: Map<String, JsonElement> = emptyMap(), form: FormDraft? = null): JsonObject {
+    fun node(
+        c: Component,
+        cell: GridArea?,
+        extra: Map<String, JsonElement> = emptyMap(),
+        form: FormDraft? = null,
+        locals: ScreenLocals? = null,
+    ): JsonObject {
         val out = LinkedHashMap(extra)
         out["id"] = c.id?.let(::JsonPrimitive) ?: JsonNull
-        out["type"] = JsonPrimitive(c.type.wire)
+        // DSL に書いた type の文字列そのまま(知らない type も)
+        out["type"] = JsonPrimitive(c.rawType.ifEmpty { c.type.wire })
         cell?.let { out["cell"] = cell(it) }
         val state = state(c, form)
         out["state"] = JsonPrimitive(state)
         if (state != "rendered") return JsonObject(out)
 
-        val props = declared(c) + resolved(c) + InputNodes.props(c, form, runtime) + PlayNodes.props(c, runtime) + SensorNodes.props(c) + AiChatNodes.props(c, runtime)
+        val props = declared(c) + resolved(c, locals) + InputNodes.props(c, form, runtime) + PlayNodes.props(c, runtime) + SensorNodes.props(c) + AiChatNodes.props(c, runtime)
         if (props.isNotEmpty()) out["props"] = JsonObject(props)
         val actions = actions(c)
         if (actions.isNotEmpty()) out["actions"] = JsonArray(actions)
@@ -99,9 +117,9 @@ class RenderTree(
             val local = c.localGridPlacement
             if (local != null) {
                 out["localGrid"] = JsonPrimitive(true)
-                out["children"] = JsonArray(local.map { node(it.component, it.area, form = form) })
+                out["children"] = JsonArray(local.map { node(it.component, it.area, form = form, locals = locals) })
             } else {
-                out["children"] = JsonArray(c.children.map { node(it, null, form = form) })
+                out["children"] = JsonArray(c.children.map { node(it, null, form = form, locals = locals) })
             }
         }
         return JsonObject(out)
@@ -146,7 +164,7 @@ class RenderTree(
     }
 
     /** 解決した値。View と同じ関数を使う。 */
-    private fun resolved(c: Component): Map<String, JsonElement> = when (c.type) {
+    private fun resolved(c: Component, locals: ScreenLocals?): Map<String, JsonElement> = when (c.type) {
         ComponentType.DISCLOSURE -> mapOf(
             "title" to JsonPrimitive(c.disclosureTitle),
             "expanded" to JsonPrimitive(c.expanded ?: false),
@@ -158,7 +176,7 @@ class RenderTree(
         ComponentType.STAT -> StatValue.resolve(c, leafData()).let {
             mapOf("value" to JsonPrimitive(it.text), "unavailable" to JsonPrimitive(it.unavailable))
         }
-        ComponentType.LIST -> listProps(c, leafData())
+        ComponentType.LIST -> listProps(c, leafData(), c.searchField?.let { locals?.values?.get(it) })
         ComponentType.TABLE -> {
             val data = leafData()
             val entity = data.entity(c.entity)
@@ -207,8 +225,7 @@ class RenderTree(
                 unit?.let { put("unit", JsonPrimitive(it)) }
             }
         }
-        // 画面を描かないので検索文字列は空(描く時は ScreenLocals)
-        ComponentType.SEARCH_BAR -> mapOf("query" to JsonPrimitive(""))
+        ComponentType.SEARCH_BAR -> mapOf("query" to JsonPrimitive(c.field?.let { locals?.values?.get(it) }.orEmpty()))
         // aiButton: DSL に書いた値だけ(結果は AI 次第なので木に入れない)
         ComponentType.AI_BUTTON -> buildMap {
             c.task?.let { put("task", JsonPrimitive(it.wire)) }
@@ -222,9 +239,9 @@ class RenderTree(
     // 値の文言は iOS の日本語の期待値と突き合わせる
     private fun leafData() = LeafData(runtime, runtime.recordsFlow?.value.orEmpty(), labels = ValueLabels.JAPANESE)
 
-    private fun listProps(c: Component, data: LeafData): Map<String, JsonElement> {
+    private fun listProps(c: Component, data: LeafData, query: String?): Map<String, JsonElement> {
         val entity = data.entity(c.entity)
-        val rows = ListRows.rows(c, data, null)
+        val rows = ListRows.rows(c, data, query)
         val toggleField = ListToggle.field(c.item, entity)
         val out = linkedMapOf<String, JsonElement>(
             "rows" to JsonArray(

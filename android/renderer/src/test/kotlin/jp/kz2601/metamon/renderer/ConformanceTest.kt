@@ -1,6 +1,15 @@
 package jp.kz2601.metamon.renderer
 
 import jp.kz2601.metamon.dsl.ActionType
+import jp.kz2601.metamon.dsl.Action
+import jp.kz2601.metamon.dsl.Component
+import jp.kz2601.metamon.dsl.Screen
+import jp.kz2601.metamon.dsl.records.JSONValue
+import jp.kz2601.metamon.renderer.components.lists.LeafData
+import jp.kz2601.metamon.renderer.components.lists.ListRows
+import jp.kz2601.metamon.renderer.components.lists.ScreenLocals
+import jp.kz2601.metamon.renderer.form.FormDraft
+import jp.kz2601.metamon.renderer.form.FormPrefill
 import jp.kz2601.metamon.dsl.AppDSL
 import jp.kz2601.metamon.dsl.decode
 import jp.kz2601.metamon.dsl.screen
@@ -50,9 +59,10 @@ import java.util.Locale
  * Container 7 種と Android に登録済みの Leaf の state・props・actions、遷移だけの操作(tap / tapToolbar / back)の後の top と画面。
  * #858 で足したもの: フォーム画面の `form`(下書きの値)と入力 12 種の state(hidden / needsForm)・props(束縛中の値)。
  * #859 で足したもの: 一覧・集計・グラフ 10 種の props(記録から解決した行・値・棒)と rowTap / dateTap の actions。
+ * #851 で足したもの: 画面の toolbar・saveBar、知らない type の文字列、全部の操作(input・search・tapRow・保存・削除・
+ * prefillRef)とその後の top・画面・effects。操作は [CaseSession](iOS の ConformanceRuntime と同じ規則)が実行する。
  *
- * skip(数だけ出して赤にしない): まだ無い Leaf の state・props・actions(`unavailable` / `unknown` の state は比べる)、
- * toolbar・saveBar、フォーム・レコードに触れる操作(input・保存・削除・行タップ・prefillRef …)とその後の step。
+ * skip(数だけ出して赤にしない): Android にまだ無い Leaf の state・props・actions(`unavailable` / `unknown` の state は比べる)。
  */
 class ConformanceTest {
     private val docsDir = File(requireNotNull(System.getProperty("metamon.dslDocsDir")) { "metamon.dslDocsDir が未設定(Gradle から実行する)" })
@@ -116,14 +126,13 @@ class ConformanceTest {
         val records = (case["records"] as? JsonObject).orEmpty().mapValues { (_, v) -> v.jsonArray.map { Record.from(it) } }
         val runtime = CaseRuntime(dsl, records, (case["device"] as? JsonObject)?.str("userId"))
         val tree = RenderTree(dsl, implemented intersect device, runtime)
-        fun screenOf(route: Route): JsonObject {
-            val screen = dsl.screen(route.screen)
-            val entity = screen?.entity?.let(runtime::entityModel)
-            val form = entity?.let { ScreenForm.makeDraft(it, ScreenForm.formRecord(it, route.recordId, records[it.id].orEmpty()), runtime) }
-            return tree.screen(route, form)
-        }
         // 押せるかは iOS と同じ「全部品が登録済み」で判断する(Android にまだ無い button 以外の Leaf も押せる扱い)
-        val tapTree = RenderTree(dsl, allKnown intersect device)
+        val tapTree = RenderTree(dsl, allKnown intersect device, runtime)
+        val session = CaseSession(dsl, runtime, tapTree)
+        fun screenOf(route: Route): JsonObject {
+            val (form, locals) = session.session(route)
+            return tree.screen(route, form, locals)
+        }
 
         val name = dir.name
         val expScreens = expected["screens"]!!.jsonArray
@@ -132,59 +141,23 @@ class ConformanceTest {
 
         val ops = case["operations"] as? JsonArray ?: return
         val expSteps = expected["steps"]?.jsonArray ?: return
-        var nav = NavigationState.initial(dsl)
+        if (expSteps.size != ops.size) report.failures += "$name:$.steps: 数が違う expected ${expSteps.size} but got ${ops.size}"
         for ((i, op) in ops.withIndex()) {
             val path = "$name:$.steps[$i]"
-            val next = applyNavOnly(op.jsonObject, nav, dsl, tapTree)
-            if (next == null) {
-                repeat(ops.size - i) { report.skip("step(フォーム・レコードの操作以降)") }
-                return
-            }
-            val (state, ok) = next
-            nav = state
+            session.effects.clear()
+            val ok = session.apply(op.jsonObject)
             report.steps++
-            val e = expSteps[i].jsonObject
-            val top = nav.top(dsl)
+            val e = expSteps.getOrNull(i)?.jsonObject ?: break
+            val top = session.top
             same(e["top"], RenderTree.route(top), "$path.top", report)
             same(e["error"] != null, !ok, "$path.error", report)
+            same(e["effects"] ?: JsonArray(emptyList()), JsonArray(session.effects), "$path.effects", report)
             e["screen"]?.let { compareScreen(it.jsonObject, screenOf(top), "$path.screen", report) }
         }
     }
 
-    /** 遷移だけの操作を適用する。フォーム・レコードに触れる操作なら null(以降は skip)。 */
-    private fun applyNavOnly(op: JsonObject, nav: NavigationState, dsl: AppDSL, tapTree: RenderTree): Pair<NavigationState, Boolean>? {
-        val route = nav.top(dsl)
-        val screen = dsl.screen(route.screen)
-        val action = when {
-            op.containsKey("tap") -> {
-                val id = op["tap"]!!.jsonPrimitive.content
-                val c = screen?.components?.flatMap { listOf(it) + it.children }?.firstOrNull { it.id == id }
-                if (c?.action == null || tapTree.state(c) != "rendered") return nav to false
-                c.action!!
-            }
-            op.containsKey("tapToolbar") -> {
-                val label = op["tapToolbar"]!!.jsonPrimitive.content
-                screen?.toolbar?.firstOrNull { it.label == label }?.action ?: return nav to false
-            }
-            op.containsKey("back") -> return NavigationResolver.close(nav, route) to true
-            else -> return null
-        }
-        return when (action.type) {
-            ActionType.NAVIGATE -> {
-                if (action.prefillRef != null) return null
-                val to = action.screen ?: return nav to true
-                NavigationResolver.navigate(nav, to, Presentation.of(action.presentation?.wire), null, route, dsl) to true
-            }
-            ActionType.BACK -> NavigationResolver.close(nav, route) to true
-            ActionType.SAVE_RECORD, ActionType.DELETE_RECORD, ActionType.RESET_FORM, ActionType.FOLLOW, ActionType.UNFOLLOW -> null
-            // OS の機能に頼むもの(URL・通知・書き出し…)は遷移しない
-            else -> nav to true
-        }
-    }
-
     private fun compareScreen(e: JsonObject, a: JsonObject, path: String, report: Report) {
-        for (k in listOf("id", "title", "route", "layout", "missing", "form")) same(e[k], a[k], "$path.$k", report)
-        for (k in listOf("toolbar", "saveBar")) if (e[k] != null) report.skip("screen.$k")
+        for (k in listOf("id", "title", "route", "layout", "missing", "form", "toolbar", "saveBar")) same(e[k], a[k], "$path.$k", report)
         compareList(e["nodes"]?.jsonArray, a["nodes"]?.jsonArray, "$path.nodes", report) { en, an, p -> compareNode(en.jsonObject, an.jsonObject, p, report) }
     }
 
@@ -192,9 +165,7 @@ class ConformanceTest {
         val type = e["type"]?.jsonPrimitive?.contentOrNull
         val state = e["state"]?.jsonPrimitive?.contentOrNull
         val isImplemented = type in implemented
-        for (k in listOf("id", "cell", "stacked", "band", "localGrid")) same(e[k], a[k], "$path.$k", report)
-        // 知らない type の文字列は :dsl の型が持っていない(生成器の型で持つ)
-        if (state == "unknown") report.skip("unknown の type 文字列") else same(e["type"], a["type"], "$path.type", report)
+        for (k in listOf("id", "type", "cell", "stacked", "band", "localGrid")) same(e[k], a[k], "$path.$k", report)
 
         if (isImplemented || state == "unavailable" || state == "unknown") {
             same(e["state"], a["state"], "$path.state", report)
@@ -248,10 +219,17 @@ class ConformanceTest {
     private fun short(v: Any?): String = v.toString().let { if (it.length > 160) it.take(160) + "…" else it }
 }
 
-/** case の記録と uid を持つだけの能力(iOS の ConformanceRuntime の読む側)。 */
+/** case の記録と uid を持つ能力(iOS の ConformanceRuntime の読む側)。保存・削除で記録が変わる。 */
 private class CaseRuntime(dsl: AppDSL, records: Map<String, List<Record>>, private val uid: String?) : DSLRuntime {
     override val entityModels: List<Entity> = dsl.entityModels()
-    override val recordsFlow: StateFlow<Map<String, List<Record>>> = MutableStateFlow(records)
+    private val store = MutableStateFlow(records)
+    override val recordsFlow: StateFlow<Map<String, List<Record>>> = store
+
+    fun records(entity: String): List<Record> = store.value[entity].orEmpty()
+
+    fun put(entity: String, rows: List<Record>) {
+        store.value = store.value + (entity to rows)
+    }
 
     override fun onVoiceInput(componentId: String?) = Unit
 
@@ -260,4 +238,147 @@ private class CaseRuntime(dsl: AppDSL, records: Map<String, List<Record>>, priva
     override fun canDelete(entity: String, record: Record): Boolean = RecordPermission.canDelete(record, entityModel(entity), uid)
 
     override fun currentUid(): String? = uid
+}
+
+/**
+ * case の操作を実行する(iOS の ConformanceRuntime の `apply` / `perform`。アプリ本体の保存・削除の規則を写したもの)。
+ * 遷移はアプリと同じ [NavigationResolver]。フォームの下書きと検索文字列は route ごとに 1 つ持つ(画面の状態に当たる)。
+ */
+private class CaseSession(private val dsl: AppDSL, private val runtime: CaseRuntime, private val tapTree: RenderTree) {
+    private var nav = NavigationState.initial(dsl)
+    private val sessions = HashMap<String, Pair<FormDraft?, ScreenLocals>>()
+    private var nextId = 1
+    val effects = mutableListOf<JsonElement>()
+
+    val top: Route get() = nav.top(dsl)
+
+    private val Screen.allComponents: List<Component> get() = components.flatMap { listOf(it) + it.children }
+
+    fun session(route: Route): Pair<FormDraft?, ScreenLocals> = sessions.getOrPut(route.id) {
+        val entity = dsl.screen(route.screen)?.entity?.let(runtime::entityModel)
+        val form = entity?.let { ScreenForm.makeDraft(it, ScreenForm.formRecord(it, route.recordId, runtime.records(it.id)), runtime) }
+        form to ScreenLocals()
+    }
+
+    /** 操作 1 つ。対象が無い・見えていないなら false。 */
+    fun apply(op: JsonObject): Boolean {
+        val route = top
+        val (form, locals) = session(route)
+        val screen = dsl.screen(route.screen)
+        val ctx = ActionContext(route, form)
+        when {
+            op.containsKey("tap") -> {
+                val id = op["tap"]!!.jsonPrimitive.content
+                val c = screen?.allComponents?.firstOrNull { it.id == id } ?: return false
+                val a = c.action ?: return false
+                if (tapTree.state(c, form) != "rendered") return false
+                dispatch(a, ctx)
+            }
+            op.containsKey("tapToolbar") -> {
+                val label = op["tapToolbar"]!!.jsonPrimitive.content
+                val tb = screen?.toolbar?.firstOrNull { it.label == label } ?: return false
+                dispatch(tb.action, ctx)
+            }
+            op.containsKey("tapRow") -> {
+                val row = op["tapRow"]!!.jsonObject
+                // component 省略時は画面で最初の onItemTap を持つ部品(id の無い list 用)
+                val id = (row["component"] as? JsonPrimitive)?.contentOrNull
+                val c = screen?.allComponents?.firstOrNull { if (id == null) it.onItemTap != null else it.id == id } ?: return false
+                val a = c.onItemTap ?: return false
+                if (tapTree.state(c, form) != "rendered") return false
+                val query = c.searchField?.let { locals.values[it] }
+                val rows = ListRows.rows(c, LeafData(runtime, runtime.recordsFlow.value), query)
+                val i = (row["index"] as? JsonPrimitive)?.doubleOrNull?.toInt() ?: 0
+                val r = rows.getOrNull(i) ?: return false
+                dispatch(a, ActionContext(route, form, r.id))
+            }
+            op.containsKey("input") -> {
+                val input = op["input"]!!.jsonObject
+                val f = (input["field"] as? JsonPrimitive)?.contentOrNull
+                if (form == null || f == null) return false
+                form.values[f] = JSONValue.from(input["value"] ?: JsonNull)
+            }
+            op.containsKey("search") -> {
+                val search = op["search"]!!.jsonObject
+                val key = (search["field"] as? JsonPrimitive)?.contentOrNull ?: return false
+                locals.values[key] = (search["text"] as? JsonPrimitive)?.contentOrNull.orEmpty()
+            }
+            op.containsKey("back") -> nav = NavigationResolver.close(nav, route)
+            else -> return false
+        }
+        return true
+    }
+
+    private fun dispatch(action: Action, ctx: ActionContext) {
+        // 確認は「はい」で進める
+        action.confirmMessage?.let { effects += obj("confirm" to JsonPrimitive(it)) }
+        perform(action, ctx)
+    }
+
+    private fun navigate(to: String, action: Action, recordId: String?, from: Route) {
+        nav = NavigationResolver.navigate(nav, to, Presentation.of(action.presentation?.wire), recordId, from, dsl)
+    }
+
+    private fun perform(action: Action, ctx: ActionContext) {
+        when (action.type) {
+            ActionType.NAVIGATE -> {
+                val to = action.screen ?: return
+                val ref = action.prefillRef
+                if (ref == null) {
+                    navigate(to, action, ctx.recordId, ctx.route)
+                    return
+                }
+                val parentId = ctx.currentRecordId
+                if (parentId == null) {
+                    effects += obj("rejected" to JsonPrimitive("unsavedParent"))
+                    return
+                }
+                FormPrefill.set(mapOf(ref to JSONValue.Str(parentId)))
+                navigate(to, action, null, ctx.route)
+                session(top) // 新規フォームは開いた時に初期値を受け取る
+            }
+            ActionType.BACK -> nav = NavigationResolver.close(nav, ctx.route)
+            ActionType.SAVE_RECORD -> save(action, ctx)
+            ActionType.DELETE_RECORD -> {
+                val entity = action.entity ?: ctx.form?.entity?.id ?: return
+                val id = ctx.recordId ?: ctx.form?.recordId ?: return
+                runtime.put(entity, runtime.records(entity).filter { it.id != id })
+                effects += obj("deleted" to obj("entity" to JsonPrimitive(entity), "recordId" to JsonPrimitive(id)))
+                if (ctx.recordId == null) nav = NavigationResolver.close(nav, ctx.route)
+            }
+            // OS の機能を呼ぶもの(URL・通知・書き出し・ライブアクティビティ・音声)は「何を頼んだか」だけ残す
+            else -> effects += obj("request" to RenderTree.action(action))
+        }
+    }
+
+    private fun save(action: Action, ctx: ActionContext) {
+        val form = ctx.form
+        val entity = action.entity ?: form?.entity?.id
+        if (form == null || entity == null) {
+            effects += obj("rejected" to JsonPrimitive("noForm"))
+            return
+        }
+        val missing = form.missingRequiredFields.map { it.name }
+        if (missing.isNotEmpty()) {
+            effects += obj("rejected" to obj("missing" to JsonArray(missing.map(::JsonPrimitive))))
+            return
+        }
+        val payload = form.payload
+        val rows = runtime.records(entity)
+        val existing = form.recordId?.takeIf { id -> rows.any { it.id == id } }
+        val id = existing ?: "new-${nextId++}"
+        runtime.put(entity, if (existing != null) rows.map { if (it.id == id) it.copy(data = payload) else it } else rows + Record(id, payload))
+        effects += obj(
+            "saved" to obj(
+                "entity" to JsonPrimitive(entity),
+                "recordId" to JsonPrimitive(id),
+                "data" to JsonObject(payload.mapValues { it.value.toJsonElement() }),
+            ),
+        )
+        sessions.entries.removeAll { it.value.first === form } // 保存した画面のドラフトは捨てる(開き直すと新規)
+        val to = action.screen
+        if (to != null) navigate(to, action, null, ctx.route) else nav = NavigationResolver.close(nav, ctx.route)
+    }
+
+    private fun obj(vararg pairs: Pair<String, JsonElement>) = JsonObject(mapOf(*pairs))
 }
