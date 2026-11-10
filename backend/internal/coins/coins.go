@@ -23,8 +23,8 @@
 // Part 2 (#630) hooks the AI paths through Biller (Service implements it):
 // generate / edit / chat / text call Reserve where ratelimit runs today,
 // Commit with the cost_tally total and Release on a failure that refunds
-// (ratelimit/refund.go). Part 3 (server allowance overflow) adds block
-// purchases next to Reserve; the 402 codes for both are WriteError.
+// (ratelimit/refund.go). Part 3 (server allowance overflow, overflow.go) buys
+// allowance blocks for the runner (BuyOverflow); the 402 codes are WriteError.
 package coins
 
 import (

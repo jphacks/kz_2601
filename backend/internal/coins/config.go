@@ -35,9 +35,28 @@ const (
 // Ops lists the ops in display order.
 var Ops = []string{OpGenerate, OpEdit, OpChat, OpText}
 
-// Allowance kinds shown by the config endpoint (ALLOWANCE_PRO_<KIND>; the
-// counting is part 3).
-var AllowanceKinds = []string{"runs", "recipients", "writes", "reads"}
+// Allowance kinds (ALLOWANCE_PRO_<KIND>, COIN_OVERFLOW_*_<KIND>): what the
+// runner counts per creator per JST month (part 3, overflow.go).
+const (
+	KindRuns       = "runs"
+	KindRecipients = "recipients"
+	KindWrites     = "writes"
+	KindReads      = "reads"
+)
+
+// AllowanceKinds lists the allowance kinds in display order.
+var AllowanceKinds = []string{KindRuns, KindRecipients, KindWrites, KindReads}
+
+// Block is one overflow block of a kind: Size more units of the monthly
+// allowance for Coins coins. A zero Size or Coins means the kind cannot be
+// bought past the allowance.
+type Block struct {
+	Size  int64 `json:"size"`
+	Coins int64 `json:"coins"`
+}
+
+// On reports whether the block can be bought.
+func (b Block) On() bool { return b.Size > 0 && b.Coins > 0 }
 
 // Pack is one consumable product and the coins it credits.
 type Pack struct {
@@ -65,8 +84,11 @@ type Config struct {
 	ProMonthly int64
 	// HoldTTL is how long an unsettled hold lives before it is returned.
 	HoldTTL time.Duration
-	// Allowance is Pro's monthly server allowance per kind (display only here).
+	// Allowance is Pro's monthly server allowance per kind (0 = not enforced;
+	// still counted for display).
 	Allowance map[string]int64
+	// Overflow is the block bought per kind past the allowance (overflow.go).
+	Overflow map[string]Block
 }
 
 // Defaults that reveal nothing about prices.
@@ -87,6 +109,8 @@ const (
 //	COIN_PRO_MONTHLY      Pro's coins per billing period (default 0)
 //	COIN_HOLD_TTL         unsettled hold lifetime, e.g. 10m (default 10m, ≥ 1m)
 //	ALLOWANCE_PRO_<KIND>  Pro's monthly allowance: RUNS, RECIPIENTS, WRITES, READS (default 0)
+//	COIN_OVERFLOW_BLOCK_<KIND>  units one overflow block adds (default 0 = no overflow)
+//	COIN_OVERFLOW_PRICE_<KIND>  coins of one overflow block (default 0 = no overflow)
 func ConfigFromEnv(getenv func(string) string) (Config, error) {
 	c := Config{
 		MinPerCall: DefaultMinPerCall,
@@ -94,6 +118,7 @@ func ConfigFromEnv(getenv func(string) string) (Config, error) {
 		Reserve:    map[string]int64{},
 		Estimates:  map[string]int64{},
 		Allowance:  map[string]int64{},
+		Overflow:   map[string]Block{},
 	}
 	switch m := Mode(strings.ToLower(strings.TrimSpace(getenv("COIN_BILLING_MODE")))); m {
 	case "":
@@ -125,8 +150,11 @@ func ConfigFromEnv(getenv func(string) string) (Config, error) {
 	}
 	for _, k := range AllowanceKinds {
 		var a int64
+		var b Block
 		num("ALLOWANCE_PRO_"+strings.ToUpper(k), &a)
-		c.Allowance[k] = a
+		num("COIN_OVERFLOW_BLOCK_"+strings.ToUpper(k), &b.Size)
+		num("COIN_OVERFLOW_PRICE_"+strings.ToUpper(k), &b.Coins)
+		c.Allowance[k], c.Overflow[k] = a, b
 	}
 	if err != nil {
 		return c, err

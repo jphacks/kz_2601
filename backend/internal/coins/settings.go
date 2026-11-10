@@ -14,13 +14,22 @@ var ErrBadCap = errors.New("monthlyCap must be 0-1000000000")
 
 // Overflow is wallet.overflow (design: "サーバーの枠と、超えた後のコイン払い").
 // Enabled is off by default; MonthlyCap is the owner's monthly coin limit for
-// overflow; Spent counts the coins spent on overflow in Month (JST yyyymm).
-// This part only stores the setting: part 3 buys the blocks and counts Spent.
+// overflow; Spent counts the coins spent on overflow in Month (JST yyyymm)
+// and Blocks the blocks bought per allowance kind in Month (BuyOverflow).
 type Overflow struct {
-	Enabled    bool   `firestore:"enabled"`
-	MonthlyCap int64  `firestore:"monthlyCap"`
-	Month      string `firestore:"month,omitempty"`
-	Spent      int64  `firestore:"spent"`
+	Enabled    bool             `firestore:"enabled"`
+	MonthlyCap int64            `firestore:"monthlyCap"`
+	Month      string           `firestore:"month,omitempty"`
+	Spent      int64            `firestore:"spent"`
+	Blocks     map[string]int64 `firestore:"blocks,omitempty"`
+}
+
+// inMonth returns o as of month: a new month starts with nothing spent or bought.
+func (o Overflow) inMonth(month string) Overflow {
+	if o.Month != month {
+		o.Month, o.Spent, o.Blocks = month, 0, nil
+	}
+	return o
 }
 
 // OverflowView is View.overflow.
@@ -33,8 +42,11 @@ type OverflowView struct {
 
 var jst = time.FixedZone("JST", 9*60*60)
 
-// overflowMonth is the JST month key of now (the allowance month of the design).
-func overflowMonth(now time.Time) string { return now.In(jst).Format("200601") }
+// MonthKey is the JST month (yyyymm) of now: the allowance month of the
+// design, shared by the runner's monthly counters and wallet.overflow.
+func MonthKey(now time.Time) string { return now.In(jst).Format("200601") }
+
+func overflowMonth(now time.Time) string { return MonthKey(now) }
 
 func (o Overflow) view(now time.Time) OverflowView {
 	v := OverflowView{Enabled: o.Enabled, MonthlyCap: o.MonthlyCap}

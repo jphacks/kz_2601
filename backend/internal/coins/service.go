@@ -9,6 +9,7 @@ import (
 
 	"github.com/jphacks/kz_2601/backend/internal/appstore"
 	"github.com/jphacks/kz_2601/backend/internal/httpx"
+	"github.com/jphacks/kz_2601/backend/internal/ratelimit"
 )
 
 // Log events.
@@ -75,6 +76,11 @@ type Service struct {
 	Verifier *appstore.Verifier
 	Now      func() time.Time
 	Log      *slog.Logger
+	// Counters reads the runner's monthly allowance counters for
+	// GET /v1/me/coins (same Firestore collection, RATE_LIMIT_COLLECTION);
+	// Env is their APP_ENV. nil = allowance not shown.
+	Counters ratelimit.Peeker
+	Env      string
 }
 
 var _ Biller = (*Service)(nil)
@@ -125,6 +131,9 @@ type View struct {
 	Reserved       int64     `json:"reserved"`
 	// Overflow is the opt-in and this month's spend (spent resets each JST month).
 	Overflow OverflowView `json:"overflow"`
+	// Allowance is this JST month's use of Pro's server allowance per kind
+	// (runs / recipients / writes / reads; part 3). Omitted when not read.
+	Allowance map[string]AllowanceUse `json:"allowance,omitempty"`
 }
 
 func (s *Service) view(w Wallet) View {
@@ -153,7 +162,9 @@ func (s *Service) Wallet(ctx context.Context, uid string, anonymous bool) (View,
 			return View{}, err
 		}
 	}
-	return s.view(w), nil
+	v := s.view(w)
+	v.Allowance = s.allowance(ctx, uid, w)
+	return v, nil
 }
 
 // expireDue returns uid's holds past their expireAt; true when one was.
@@ -370,6 +381,17 @@ type PublicConfig struct {
 	InitialGrant int64            `json:"initialGrant"`
 	ProMonthly   int64            `json:"proMonthly"`
 	Allowance    map[string]int64 `json:"allowance"`
+	// Overflow is the block per kind that can be bought past the allowance
+	// (only kinds whose block is on). BlockRuns / BlockCoins repeat the runs
+	// block for the iOS plan sheet.
+	Overflow PublicOverflow `json:"overflow"`
+}
+
+// PublicOverflow is PublicConfig.overflow.
+type PublicOverflow struct {
+	Blocks     map[string]Block `json:"blocks"`
+	BlockRuns  int64            `json:"blockRuns,omitempty"`
+	BlockCoins int64            `json:"blockCoins,omitempty"`
 }
 
 // Public returns the display config.
@@ -391,5 +413,15 @@ func (c Config) Public() PublicConfig {
 	if mode == "" {
 		mode = ModeOff
 	}
-	return PublicConfig{Mode: mode, Packs: packs, Estimates: nz(c.Estimates), InitialGrant: c.InitialGrant, ProMonthly: c.ProMonthly, Allowance: nz(c.Allowance)}
+	ov := PublicOverflow{Blocks: map[string]Block{}}
+	for k, b := range c.Overflow {
+		if b.On() {
+			ov.Blocks[k] = b
+		}
+	}
+	if b := ov.Blocks[KindRuns]; b.On() {
+		ov.BlockRuns, ov.BlockCoins = b.Size, b.Coins
+	}
+	return PublicConfig{Mode: mode, Packs: packs, Estimates: nz(c.Estimates), InitialGrant: c.InitialGrant, ProMonthly: c.ProMonthly,
+		Allowance: nz(c.Allowance), Overflow: ov}
 }
