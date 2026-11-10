@@ -9,6 +9,7 @@ import (
 	"github.com/jphacks/kz_2601/backend/internal/appstore"
 	"github.com/jphacks/kz_2601/backend/internal/coins"
 	"github.com/jphacks/kz_2601/backend/internal/entitlement"
+	"github.com/jphacks/kz_2601/backend/internal/ratelimit"
 	"github.com/jphacks/kz_2601/backend/internal/store"
 )
 
@@ -23,8 +24,11 @@ func newCoins(st store.Store, ents *entitlement.Service, logger *slog.Logger) *c
 		os.Exit(1)
 	}
 	var cs coins.Store = coins.NewMemory()
+	var counters ratelimit.Peeker
 	if fs, ok := st.(*store.Firestore); ok {
 		cs = coins.NewFirestore(fs.Client())
+		// the runner's monthly allowance counters (same RATE_LIMIT_COLLECTION and APP_ENV as the runner)
+		counters = ratelimit.NewFirestore(fs.Client(), os.Getenv("RATE_LIMIT_COLLECTION"))
 	}
 	logger.Info("coin billing", slog.String("mode", string(cfg.Mode)), slog.Int("packs", len(cfg.Packs)))
 	policy := ents.Verifier.Policy
@@ -35,6 +39,8 @@ func newCoins(st store.Store, ents *entitlement.Service, logger *slog.Logger) *c
 		Verifier:     &appstore.Verifier{Roots: ents.Verifier.Roots, Policy: policy},
 		ProPeriodEnd: proPeriodEnd(ents),
 		Log:          logger,
+		Counters:     counters,
+		Env:          os.Getenv("APP_ENV"),
 	}
 }
 

@@ -1258,7 +1258,7 @@ paths:
       summary: 枠を超えた後のコイン払いの設定(#630)
       description: |
         `overflow.enabled`(既定 OFF)と `overflow.monthlyCap`(本人が決める月のコインの上限・0〜1000000000)を財布に保存する。
-        **保存だけ**: 枠を超えた分をコインで買う処理と `overflow.spent` を数えるのは #630 の 3 段目。今月コインで払った量(`spent`)は変えない。
+        `COIN_BILLING_MODE=enforce` の時、runner は作成者の月の枠を超えた分を、ON ならまとまりごとにコインで買う(台帳の `spend_overflow`)。今月の `spent` + 1 まとまりが `monthlyCap` を超えるなら買わずに止める。この口は今月コインで払った量(`spent`)を変えない。
         `COIN_BILLING_MODE=off` では 404。
       requestBody:
         required: true
@@ -1934,7 +1934,7 @@ components:
             requestId: { type: string }
     CoinConfig:
       type: object
-      required: [mode, packs, estimates, initialGrant, proMonthly, allowance]
+      required: [mode, packs, estimates, initialGrant, proMonthly, allowance, overflow]
       properties:
         mode: { type: string, enum: [enforce, log, off], description: '`COIN_BILLING_MODE`。iOS は enforce の時だけコインの画面を出す(off / log では出さない)' }
         packs:
@@ -1950,6 +1950,21 @@ components:
         initialGrant: { type: integer, description: '`COIN_INITIAL_GRANT`' }
         proMonthly: { type: integer, description: '`COIN_PRO_MONTHLY`' }
         allowance: { type: object, additionalProperties: { type: integer }, description: 'Pro の月の枠(runs / recipients / writes / reads・`ALLOWANCE_PRO_<KIND>`)。0 は省く' }
+        overflow:
+          type: object
+          required: [blocks]
+          description: 枠を超えた後にコインで買う 1 まとまり(#630)。買えない種類は省く
+          properties:
+            blocks:
+              type: object
+              additionalProperties:
+                type: object
+                required: [size, coins]
+                properties:
+                  size: { type: integer, description: '1 まとまりで増える量(`COIN_OVERFLOW_BLOCK_<KIND>`)' }
+                  coins: { type: integer, description: '1 まとまりのコイン(`COIN_OVERFLOW_PRICE_<KIND>`)' }
+            blockRuns: { type: integer, description: 'runs の 1 まとまりの回数(blocks.runs.size と同じ。無ければ省く)' }
+            blockCoins: { type: integer, description: 'runs の 1 まとまりのコイン(blocks.runs.coins と同じ。無ければ省く)' }
     CoinCredit:
       type: object
       required: [credited, transactionId, productId, coins, wallet]
@@ -2008,7 +2023,21 @@ components:
           properties:
             enabled: { type: boolean, description: 既定 false }
             monthlyCap: { type: integer, description: 本人が決めた月のコインの上限 }
-            spent: { type: integer, description: '今月(日本時間の月)コインで払った量。3 段目までは常に 0' }
+            spent: { type: integer, description: '今月(日本時間の月)枠を超えた分にコインで払った量' }
+        allowance:
+          type: object
+          description: |
+            Pro のサーバーの月の枠(日本時間の月)の使った量。キーは runs(自動の動きの実行)/ recipients(通知の宛先)/ writes(書き込み)/ reads(読み取り)。
+            runner が作成者ごとに数える(共有アプリも作成者の分)。読めない時・`COIN_BILLING_MODE=off` では省く
+          additionalProperties: { $ref: '#/components/schemas/CoinAllowanceUse' }
+    CoinAllowanceUse:
+      type: object
+      required: [used]
+      properties:
+        used: { type: integer, description: 今月使った量 }
+        limit: { type: integer, description: '今月使える量 = allowance + blocks × 1 まとまりの量。枠が 0(数えるだけ)の時は省く' }
+        allowance: { type: integer, description: '`ALLOWANCE_PRO_<KIND>`。0 は省く' }
+        blocks: { type: integer, description: 今月コインで買ったまとまりの数。0 は省く }
     CoinOverflowSettings:
       type: object
       required: [enabled, monthlyCap]
@@ -2082,8 +2111,13 @@ components:
         - failed: 何度か試したがうまくいかなかった
         - disabled: 作成者がこのルールをオフにしている(オフの前に届いていたきっかけを動かさなかった)
         - other: この版の知らない結果
+        - allowance_exhausted: 作成者の今月のサーバーの枠(実行・通知・書き込み・読み取り)を使い切り、超えた後のコイン払いが OFF なので止めた(動いたが書き込み・通知を止めた時も。#630)
+        - overflow_cap_reached: 超えた後のコイン払いが、作成者の決めた今月のコインの上限に達したので止めた(#630)
+        - coins_insufficient: 超えた後のコイン払いが ON だが、作成者のコインが足りないので止めた(#630)
       enum:
+        - allowance_exhausted
         - changed
+        - coins_insufficient
         - disabled
         - failed
         - inactive
@@ -2093,6 +2127,7 @@ components:
         - notify_paused
         - ok
         - other
+        - overflow_cap_reached
         - plan
         - service_limit
         - service_paused

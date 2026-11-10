@@ -28,6 +28,7 @@ func (m *Memory) Update(_ context.Context, k Keys, fn func(*Tx) error) error {
 	defer m.mu.Unlock()
 	tx := &Tx{Wallet: m.wallets[k.UID]}
 	tx.Wallet.Holds = maps.Clone(tx.Wallet.Holds)
+	tx.Wallet.Overflow.Blocks = maps.Clone(tx.Wallet.Overflow.Blocks)
 	if k.HoldID != "" {
 		if h, ok := m.holds[k.HoldID]; ok {
 			tx.Hold = &h

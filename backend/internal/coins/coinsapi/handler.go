@@ -21,7 +21,7 @@ const maxJWSBytes = 32 << 10
 //
 //	GET  /v1/me/coins                         balance by source
 //	GET  /v1/me/coins/ledger?limit=&cursor=   history, newest first
-//	PUT  /v1/me/coins/settings                {"overflow": {"enabled", "monthlyCap"}} (stored only; part 3 enforces)
+//	PUT  /v1/me/coins/settings                {"overflow": {"enabled", "monthlyCap"}} (the runner enforces it, part 3)
 //	POST /v1/me/coins/apple                   {"signedTransaction": "<JWS>"} credits a coin pack
 func Register(mux *http.ServeMux, s *coins.Service) {
 	mux.HandleFunc("GET /v1/me/coins", func(w http.ResponseWriter, r *http.Request) {
