@@ -1,7 +1,5 @@
 package jp.kz2601.metamon.voice.stage
 
-import android.content.Context
-
 /**
  * 完成の直後に出るお知らせ(#894・iOS の `PostBuildNotice`・H7)。同時に出さず、優先順位の高いものから 1 つずつ(前のが閉じたら次)出す。
  * Android にまだ無いもの(課金画面・公開の記録の確認・保存期間の確認・引き継ぎの案内)も順番だけは iOS と揃えておく。
@@ -32,20 +30,13 @@ enum class PostBuildNotice {
     }
 }
 
-/** 「こう話すと直せます」を出したかを端末に残す(iOS の `FirstRunTutorialStore` の editHint の分)。 */
+/**
+ * 「こう話すと直せます」を出したか(iOS の `FirstRunTutorialStore` の editHint の分)。
+ * 置き場はチュートリアルの見た印と同じ(`FirstRunTutorialStore.editHints`・後片付けで一緒に消す)。
+ */
 class EditHintStore(private val read: () -> Boolean, private val write: () -> Unit) {
     /** 初期画面からの作成の直後で、まだ出していなければ出す */
     fun shouldShow(createdFromInitial: Boolean): Boolean = createdFromInitial && !read()
 
     fun markShown() = write()
-
-    companion object {
-        private const val PREFS = "metamon.tutorial"
-        private const val KEY = "editHintShown"
-
-        fun of(context: Context): EditHintStore {
-            val prefs = context.applicationContext.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
-            return EditHintStore(read = { prefs.getBoolean(KEY, false) }, write = { prefs.edit().putBoolean(KEY, true).apply() })
-        }
-    }
 }
