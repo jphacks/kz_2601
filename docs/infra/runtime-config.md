@@ -93,6 +93,16 @@ runner は prod で GitHub の変数 `RUNNER_DEPLOY=1` の時だけデプロイ�
 | `PLAN_LIMITS_MODE` | appconfig | 上の 3 つの強制。`enforce` = 403 `plan_limit_reached` / `log` = 止めずにログ `plan_limit.would_block` だけ / `off` = 数えない(#317 の前と同じ)。それ以外の値は起動しない | `enforce` |
 | `AI_FREE_DAILY_BUDGET_USD` | ai | 全体の遮断(#317)。その日(JST)の AI の費用(`ai.usage` の `est_cost_usd` の合計・USD)がこれを超えたら、Pro でない人の generate・chat を 503 `free_plan_paused` で止める(0:00 JST に自動で戻る)。`0` / 無しで無効([rate-limit.md](../backend/rate-limit.md#全体の遮断317)) | 無し(無効) |
 | `AI_FREE_BUDGET_RESUME_DAY` | ai | 上の遮断を手で戻す。`2026-11-07` のように JST の日付を入れると、その日だけ止めない(翌日からはまた効く) | 無し |
+| `COIN_BILLING_MODE` | appconfig(2 段目からは ai も・同じ値にする) | コイン(#630・[630-token-billing.md](../decisions/630-token-billing.md))。`off` = 何も読み書きしない(今のまま)。`log` = 財布と履歴を作り(最初の分・Pro の毎月の分・パックの購入)、AI の呼び出しが引くはずの量はログ `coins.would_spend` / `coins.would_block` に出すだけ。`enforce` = 呼び出しごとにコインを押さえて引き、足りなければ 402 `coins_insufficient`。それ以外の値は起動しない | `off` |
+| `COIN_PER_USD` | appconfig・ai | 1 回の費用(`est_cost_usd`)をコインに直す率: `ceil(est_cost_usd × COIN_PER_USD)`。**値は非公開の資料で決め、repo に書かない**。`/v1/coins/config` にも出さない | `0`(数えない) |
+| `COIN_MIN_PER_CALL` | appconfig・ai | 数える呼び出し 1 回の最小のコイン | `1` |
+| `COIN_RESERVE_GENERATE` / `_EDIT` / `_CHAT` / `_TEXT` | appconfig・ai | 呼び出しの前に押さえる量(その処理の上の方の費用)。確定は押さえた量を超えない。値は非公開の資料 | `0` |
+| `COIN_ESTIMATE_GENERATE` / `_EDIT` / `_CHAT` / `_TEXT` | appconfig | 押す前に出す「約 N コイン」(`GET /v1/coins/config` の `estimates`)。`0` は出さない | `0` |
+| `COIN_PACKS` | appconfig | コインのパック(消耗型)の `商品id=枚数` をカンマ区切り(例の形: `<id>=<枚数>,<id>=<枚数>`)。この id だけを `POST /v1/me/coins/apple` で受ける(bundle id・環境は `APPSTORE_*` と同じ)。値は非公開の資料・App Store Connect | 無し(売らない) |
+| `COIN_INITIAL_GRANT` | appconfig | サインイン済み(匿名でない)アカウントに 1 回だけ足すコイン(最初に財布を読んだ時)。`0` の間は足さず、後で入れると次に読んだ人から足す | `0` |
+| `COIN_PRO_MONTHLY` | appconfig | Pro の請求期間ごとのコイン(期間の終わりに消える・繰り越さない) | `0` |
+| `COIN_HOLD_TTL` | appconfig・ai | 確定されない押さえを戻すまでの時間(`10m` のように書く・1 分以上) | `10m` |
+| `ALLOWANCE_PRO_RUNS` / `_RECIPIENTS` / `_WRITES` / `_READS` | appconfig | Pro の月の枠(#630 の 3 段目で数える)。今は `GET /v1/coins/config` の `allowance` に出すだけ | `0` |
 | `LOG_LEVEL` | 両方 | ログの詳しさ(調査の間だけ `debug` など) | info |
 
 この表に無い変数は、運用で変えないでください。変えたい時は Issue にして、ワークフローか本書に足します。

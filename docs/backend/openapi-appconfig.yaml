@@ -22,6 +22,7 @@ tags:
   - { name: account, description: 'アカウント削除(#119)。features/account-deletion.md' }
   - { name: apps }
   - { name: automations, description: '作成者向けの「自動の動き」の見える化(#347)。features/automations.md' }
+  - { name: coins, description: 'コイン(#630・docs/decisions/630-token-billing.md)。残高・履歴・パック(消耗型)の購入の検証。`COIN_BILLING_MODE`(off / log / enforce・既定 off)の後ろ' }
   - { name: dsl }
   - { name: entities }
   - { name: entitlements, description: 'Tailor It Pro の権利(#314)。StoreKit 2 の署名付き取引をサーバーで検証して保存する。features/pro.md' }
@@ -1221,6 +1222,88 @@ paths:
               schema: { $ref: '#/components/schemas/Error' }
               example: { error: { code: invalid_transaction, message: 'the signed transaction could not be verified', details: { reason: signature } } }
 
+  /me/coins:
+    get:
+      tags: [coins]
+      summary: 自分のコインの残高(#630)
+      description: |
+        `users/{uid}/coins/wallet` を出どころ別に返す。引く順番は `grant`(Pro の毎月の分・`grantPeriodEnd` で消える・繰り越さない)→ `initial`(最初の分)→ `purchased`(買った分・期限なし)。
+        - `available` = 新しい呼び出しに使える量、`reserved` = 実行中の呼び出しが押さえている量、`total` = 両方の合計(履歴の合計と一致)
+        - 読むたびに、期限の来た分を整える: サインイン済み(匿名でない)の最初の読み取りで `COIN_INITIAL_GRANT` を 1 回だけ足す / Pro の請求期間が変わったら `COIN_PRO_MONTHLY` に戻す / 期間が過ぎた毎月の分を消す / 確定されないまま `COIN_HOLD_TTL` を過ぎた押さえを戻す
+        - `COIN_BILLING_MODE=off`(既定)では何も読み書きせず `mode: off` とすべて 0 を返す
+      responses:
+        '200': { description: OK, content: { application/json: { schema: { $ref: '#/components/schemas/CoinWallet' } } } }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '410': { description: 退会済み(`account_deleted`), content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+
+  /me/coins/ledger:
+    get:
+      tags: [coins]
+      summary: 自分のコインの履歴(#630)・新しい順
+      description: |
+        `users/{uid}/coinLedger` を新しい順に返す。残高の変更と同じトランザクションで 1 行ずつ書く。`amount` は符号つき。
+        `COIN_BILLING_MODE=off` では空。
+      parameters:
+        - { in: query, name: limit, schema: { type: integer, minimum: 1, maximum: 100, default: 20 } }
+        - { in: query, name: cursor, schema: { type: string }, description: 前の応答の `nextCursor` }
+      responses:
+        '200': { description: OK, content: { application/json: { schema: { $ref: '#/components/schemas/CoinLedger' } } } }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '410': { description: 退会済み(`account_deleted`), content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+
+  /me/coins/apple:
+    post:
+      tags: [coins]
+      summary: コインのパック(消耗型)の署名付き取引を送ってコインを足す(#630)
+      description: |
+        iOS は購入の後、サーバーが 200 を返してから `Transaction.finish()` を呼ぶ(消耗型は StoreKit で復元されないので、届くまで送り直す)。
+        検証は `POST /me/entitlements/apple` と同じ(Apple Root CA - G3・ES256・`bundleId`・`environment`。**Xcode の環境は拒む**)。違いは次のとおり:
+        - `productId` は `COIN_PACKS` にある id だけ。足す枚数も `COIN_PACKS`(この repo に値を書かない)
+        - `type` が `Consumable` であること(`expiresDate` が無い)。取り消し(返金)済みは拒む
+        - **冪等**: `coin_transactions/{transactionId}` と財布を同じトランザクションで書く。同じ取引の 2 回目は `credited: false` で今の残高を返す。別のアカウントが同じ取引を送ると 409
+        - 匿名のアカウントは買えない(403 `forbidden`・`details.reason: anonymous`)
+        - `COIN_BILLING_MODE=off` では 404
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [signedTransaction]
+              properties:
+                signedTransaction: { type: string, description: 'StoreKit 2 の JWS(`header.payload.signature`)', maxLength: 32768 }
+      responses:
+        '200': { description: 足した後(または足し済み)の状態, content: { application/json: { schema: { $ref: '#/components/schemas/CoinCredit' } } } }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { description: '匿名のアカウント(`forbidden`・`details.reason: anonymous`)', content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+        '404': { description: '`COIN_BILLING_MODE=off`(`not_found`)', content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+        '409':
+          description: この取引は別のアカウントに足し済み
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+              example: { error: { code: transaction_owned_by_other, message: 'this purchase was credited to another account' } }
+        '410': { description: 退会済み(`account_deleted`), content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+        '422':
+          description: '検証に失敗。`details.reason` は malformed / chain / signature / bundle_id / product_id / environment / not_consumable / revoked'
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+              example: { error: { code: invalid_transaction, message: 'the signed transaction could not be verified', details: { reason: not_consumable } } }
+
+  /coins/config:
+    get:
+      tags: [coins]
+      security: []
+      summary: コインの表示用の数(#630)・認証不要
+      description: |
+        iOS が画面に出す数(パックの枚数・処理ごとの目安・最初の分・Pro の毎月の分・Pro の月の枠)。iOS に値段を書かないため、すべて appconfig の環境変数(起動時に 1 回読む)から出す。0 の目安・枠は省く。
+        1 コインの値段(`COIN_PER_USD`)は出さない。`Cache-Control: public, max-age=300`。
+      responses:
+        '200': { description: OK, content: { application/json: { schema: { $ref: '#/components/schemas/CoinConfig' } } } }
+
   /appstore/notifications:
     post:
       tags: [entitlements]
@@ -1687,6 +1770,16 @@ components:
         application/json:
           schema: { $ref: '#/components/schemas/Error' }
           example: { error: { code: pro_required, message: 'this needs Tailor It Pro: sharedData', details: { features: [{ id: sharedData, title: みんなで共有するデータ, reason: みんなで書き込むデータはクラウドに保存して全員の端末に同期するため、サーバーの費用がかかります。 }], reason: creator_needs_pro } } }
+    CoinsPaymentRequired:
+      description: |
+        コインで払えない(#630・`COIN_BILLING_MODE=enforce` の時だけ返す。off / log では返さない)。
+        - `coins_insufficient`: 払う人のコインが押さえる量より少ない(`details.required`・`details.balance`・`details.payer` = self / creator)
+        - `allowance_exhausted`: サーバーの月の枠を使い切り、超えた後のコイン払いが OFF
+        - `overflow_cap_reached`: 超えた後のコイン払いが月の上限に着いた(`details.cap`・`details.spent`)
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+          example: { error: { code: coins_insufficient, message: 'not enough coins', details: { required: 5, balance: 2, payer: self } } }
     PlanLimitReached:
       description: |
         プランの上限 (#317・docs/backend/rate-limit.md の「プランごとの上限」)。403 `plan_limit_reached`。払う人のプランで数える: 自分のアプリは呼び出した人、他の人が作ったアプリは作成者。
@@ -1789,9 +1882,11 @@ components:
               description: 機械可読コード。appconfig が返すものだけ(ai のコードは `openapi-ai.yaml` の `Error`)。`backend/internal/httpx/codes.go` と一致することをテストで確かめる(#523)
               enum:
                 - account_deleted
+                - allowance_exhausted
                 - app_check_failed
                 - app_stopped
                 - bad_request
+                - coins_insufficient
                 - duplicate_record
                 - forbidden
                 - internal
@@ -1799,6 +1894,7 @@ components:
                 - invalid_record
                 - invalid_transaction
                 - not_found
+                - overflow_cap_reached
                 - payload_too_large
                 - plan_limit_reached
                 - pro_required
@@ -1812,6 +1908,75 @@ components:
             message: { type: string }
             details: { type: object, additionalProperties: true }
             requestId: { type: string }
+    CoinConfig:
+      type: object
+      required: [mode, packs, estimates, initialGrant, proMonthly, allowance]
+      properties:
+        mode: { type: string, enum: [enforce, log, off], description: '`COIN_BILLING_MODE`。off の時、iOS はコインの画面を出さない' }
+        packs:
+          type: array
+          description: '`COIN_PACKS` の順'
+          items:
+            type: object
+            required: [productId, coins]
+            properties:
+              productId: { type: string }
+              coins: { type: integer, minimum: 1 }
+        estimates: { type: object, additionalProperties: { type: integer }, description: '処理(generate / edit / chat / text)ごとの「約 N コイン」(`COIN_ESTIMATE_<OP>`)。0 は省く' }
+        initialGrant: { type: integer, description: '`COIN_INITIAL_GRANT`' }
+        proMonthly: { type: integer, description: '`COIN_PRO_MONTHLY`' }
+        allowance: { type: object, additionalProperties: { type: integer }, description: 'Pro の月の枠(runs / recipients / writes / reads・`ALLOWANCE_PRO_<KIND>`)。0 は省く' }
+    CoinCredit:
+      type: object
+      required: [credited, transactionId, productId, coins, wallet]
+      properties:
+        credited: { type: boolean, description: 'false = この取引は足し済み(送り直し)' }
+        transactionId: { type: string }
+        productId: { type: string }
+        coins: { type: integer, description: このパックの枚数 }
+        wallet: { $ref: '#/components/schemas/CoinWallet' }
+    CoinLedger:
+      type: object
+      required: [entries, nextCursor]
+      properties:
+        entries:
+          type: array
+          items:
+            type: object
+            required: [id, kind, amount, at]
+            properties:
+              id: { type: string }
+              kind:
+                type: string
+                enum:
+                  - adjust
+                  - grant_expire
+                  - grant_initial
+                  - grant_monthly
+                  - purchase
+                  - refund_apple
+                  - refund_failed
+                  - spend_ai
+                  - spend_overflow
+              amount: { type: integer, description: 符号つきの増減 }
+              op: { type: string, description: 'spend_ai の処理(generate / edit / chat / text)' }
+              appId: { type: string }
+              transactionId: { type: string, description: purchase の App Store の取引 }
+              productId: { type: string }
+              at: { type: string, format: date-time }
+        nextCursor: { type: string, description: '続きが無ければ空' }
+    CoinWallet:
+      type: object
+      required: [mode, total, available, purchased, grant, initial, reserved]
+      properties:
+        mode: { type: string, enum: [enforce, log, off] }
+        total: { type: integer, description: 'available + reserved' }
+        available: { type: integer, description: 'purchased + grant + initial' }
+        purchased: { type: integer, description: 買った分(期限なし) }
+        grant: { type: integer, description: Pro の毎月の分(grantPeriodEnd で消える) }
+        grantPeriodEnd: { type: string, format: date-time, description: 毎月の分の期限(Pro の請求期間の終わり)。無ければ省略 }
+        initial: { type: integer, description: 最初の分 }
+        reserved: { type: integer, description: 実行中の呼び出しが押さえている分 }
     Entitlements:
       type: object
       required: [isPro, pro]
