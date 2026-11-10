@@ -5424,6 +5424,23 @@
         }
       }
     },
+    "動画を選ぶ" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Choose a video"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "動画を選ぶ"
+          }
+        }
+      }
+    },
     "勝ち" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -8463,6 +8480,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "道具"
+          }
+        }
+      }
+    },
+    "選び直す" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Choose again"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "選び直す"
           }
         }
       }
