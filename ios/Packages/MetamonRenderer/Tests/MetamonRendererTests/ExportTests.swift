@@ -194,7 +194,7 @@ final class ExportTests: XCTestCase {
         let view = ButtonLeaf(c: buttons[0], ctx: RenderContext(route: Route(screen: "home")))
             .frame(width: 320)
             .environment(\.dslRuntime, rt)
-        let image = try XCTUnwrap(ImageRenderer(content: view).uiImage)
+        let image = try XCTUnwrap(ImageRenderer(content: view).platformImage)
         XCTAssertGreaterThan(image.size.height, 40)
     }
 

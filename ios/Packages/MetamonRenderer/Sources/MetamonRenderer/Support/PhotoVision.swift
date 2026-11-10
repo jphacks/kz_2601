@@ -1,4 +1,8 @@
+#if canImport(UIKit)
 import UIKit
+#else
+import AppKit
+#endif
 import Vision
 import MetamonDSL
 
@@ -145,7 +149,7 @@ struct PhotoClues: Sendable {
 
 /// `analyze` の全項目を 1 枚の写真に対して実行する。重い処理は呼び出し側の Task から detached で動かす。
 enum PhotoReader {
-    static func read(_ image: UIImage, specs: [PhotoAnalyze], entity: Entity) async -> PhotoReadOutcome {
+    static func read(_ image: PlatformImage, specs: [PhotoAnalyze], entity: Entity) async -> PhotoReadOutcome {
         guard let cg = image.cgImage else { return PhotoReadOutcome(missed: specs.map(\.into)) }
         let clues = await Task.detached(priority: .userInitiated) { PhotoClues.detect(in: cg, for: specs) }.value
         return await apply(clues, specs: specs, entity: entity)

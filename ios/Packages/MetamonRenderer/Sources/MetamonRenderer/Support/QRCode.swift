@@ -1,4 +1,8 @@
+#if canImport(UIKit)
 import UIKit
+#else
+import AppKit
+#endif
 import CoreImage
 import CoreImage.CIFilterBuiltins
 import MetamonDSL
@@ -11,8 +15,8 @@ enum QRCodeImage {
     static let exportSide = 1024
 
     private static let context = CIContext(options: [.useSoftwareRenderer: false])
-    private static let cache: NSCache<NSString, UIImage> = {
-        let c = NSCache<NSString, UIImage>()
+    private static let cache: NSCache<NSString, PlatformImage> = {
+        let c = NSCache<NSString, PlatformImage>()
         c.countLimit = 32
         return c
     }()
@@ -28,22 +32,19 @@ enum QRCodeImage {
     }
 
     /// 1 モジュール `scale` px(余白込み)の白地・黒の QR 画像。`scale` nil = 辺が `exportSide` 前後になる倍率。
-    static func image(for text: String, scale: Int? = nil) -> UIImage? {
+    static func image(for text: String, scale: Int? = nil) -> PlatformImage? {
         let key = "\(scale ?? 0)|\(text)" as NSString
         if let hit = cache.object(forKey: key) { return hit }
         guard let cg = modules(for: text) else { return nil }
         let side = cg.width + quietZone * 2
         let s = max(1, scale ?? exportSide / side)
-        let format = UIGraphicsImageRendererFormat.default()
-        format.scale = 1
-        format.opaque = true
         let px = CGFloat(side * s)
-        let img = UIGraphicsImageRenderer(size: CGSize(width: px, height: px), format: format).image { ctx in
-            UIColor.white.setFill()
+        let img = PlatformGraphics.image(size: CGSize(width: px, height: px), scale: 1, opaque: true) { ctx in
+            PlatformColor.white.setFill()
             ctx.fill(CGRect(x: 0, y: 0, width: px, height: px))
-            ctx.cgContext.interpolationQuality = .none
+            ctx.interpolationQuality = .none
             let inset = CGFloat(quietZone * s)
-            UIImage(cgImage: cg).draw(in: CGRect(x: inset, y: inset, width: CGFloat(cg.width * s), height: CGFloat(cg.height * s)))
+            PlatformImage(cgImage: cg).drawUpright(in: CGRect(x: inset, y: inset, width: CGFloat(cg.width * s), height: CGFloat(cg.height * s)))
         }
         cache.setObject(img, forKey: key)
         return img

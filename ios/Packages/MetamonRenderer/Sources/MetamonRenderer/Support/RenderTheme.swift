@@ -57,7 +57,7 @@ public enum RenderTheme {
         public static let surfaceElevated = SemanticPalette.color(SemanticPalette.surfaceElevated)
         /// 1pt の薄い枠線・セパレータ(紺を 12% / ダークは生成りを 10%)
         public static let hairline = SemanticPalette.color((light: SemanticPalette.RGB(51, 82, 103), dark: SemanticPalette.RGB(244, 241, 232)), lightAlpha: 0.12, darkAlpha: 0.10)
-        public static let separator = Color(.separator)
+        public static let separator = Color.platformSeparator
         /// ブランド色の**文字**(リンク・secondary ボタン・値)。面に対し AA(4.5:1)を満たすトーン(#68 SemanticPalette で検算)
         public static let brandText = SemanticPalette.color(SemanticPalette.brand)
         /// semantic(AA を満たす #68 のトーン。文字にも塗りにも使う)

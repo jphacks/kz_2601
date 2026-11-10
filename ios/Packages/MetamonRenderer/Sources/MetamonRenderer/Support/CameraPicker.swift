@@ -1,13 +1,18 @@
 // 審査用ビルド(APP_STORE_REVIEW・#245)ではバイナリから外す。
 #if !APP_STORE_REVIEW
 import SwiftUI
+#if canImport(UIKit)
 import UIKit
+#else
+import AppKit
+#endif
 import AVFoundation
 
+#if os(iOS)
 /// `UIImagePickerController(sourceType: .camera)` の SwiftUI ラッパ(背面カメラ既定・静止画のみ)。
 /// 呼び出し側は `CameraPicker.isAvailable` と `CameraPicker.requestAccess()` を先に確認する。
 struct CameraPicker: UIViewControllerRepresentable {
-    var onImage: (UIImage) -> Void
+    var onImage: (PlatformImage) -> Void
     @Environment(\.dismiss) private var dismiss
 
     static var isAvailable: Bool {
@@ -42,7 +47,7 @@ struct CameraPicker: UIViewControllerRepresentable {
         init(_ parent: CameraPicker) { self.parent = parent }
 
         func imagePickerController(_ picker: UIImagePickerController, didFinishPickingMediaWithInfo info: [UIImagePickerController.InfoKey: Any]) {
-            if let image = (info[.editedImage] ?? info[.originalImage]) as? UIImage {
+            if let image = (info[.editedImage] ?? info[.originalImage]) as? PlatformImage {
                 parent.onImage(image)
             }
             parent.dismiss()
@@ -53,4 +58,22 @@ struct CameraPicker: UIViewControllerRepresentable {
         }
     }
 }
+#else
+/// Mac: 撮影はまだ無い(TODO mac-027: AVCaptureSession で内蔵 / 連係カメラ)。`isAvailable` が false なので撮影のボタンは出ない。
+struct CameraPicker: View {
+    var onImage: (PlatformImage) -> Void
+
+    static var isAvailable: Bool { false }
+
+    static func requestAccess() async -> Bool {
+        switch AVCaptureDevice.authorizationStatus(for: .video) {
+        case .authorized: return true
+        case .notDetermined: return await AVCaptureDevice.requestAccess(for: .video)
+        default: return false
+        }
+    }
+
+    var body: some View { MacUnavailableView(feature: L("カメラ")) }
+}
+#endif
 #endif

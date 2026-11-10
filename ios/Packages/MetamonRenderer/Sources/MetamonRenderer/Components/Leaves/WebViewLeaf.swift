@@ -24,9 +24,9 @@ struct WebViewLeaf: View {
                     }
                 }
             }
-            .background(Color(.systemBackground))
+            .background(Color.platformBackground)
             .clipShape(RoundedRectangle(cornerRadius: 12))
-            .overlay(RoundedRectangle(cornerRadius: 12).strokeBorder(Color(.separator), lineWidth: 0.5))
+            .overlay(RoundedRectangle(cornerRadius: 12).strokeBorder(Color.platformSeparator, lineWidth: 0.5))
         } else {
             UnsupportedComponent(label: L("webView: https の URL だけ表示できます"))
         }
@@ -70,20 +70,38 @@ final class WebState {
     var reload: (() -> Void)?
 }
 
-private struct WebViewRepresentable: UIViewRepresentable {
+#if os(iOS)
+extension WebViewRepresentable: UIViewRepresentable {
+    func makeUIView(context: Context) -> WKWebView { makeWeb(context.coordinator) }
+    func updateUIView(_ web: WKWebView, context: Context) { updateWeb(web, context.coordinator) }
+    static func dismantleUIView(_ web: WKWebView, coordinator: Coordinator) { dismantle(web, coordinator) }
+}
+#else
+extension WebViewRepresentable: NSViewRepresentable {
+    func makeNSView(context: Context) -> WKWebView { makeWeb(context.coordinator) }
+    func updateNSView(_ web: WKWebView, context: Context) { updateWeb(web, context.coordinator) }
+    static func dismantleNSView(_ web: WKWebView, coordinator: Coordinator) { dismantle(web, coordinator) }
+}
+#endif
+
+@MainActor private struct WebViewRepresentable {
     let url: URL
     let state: WebState
 
     func makeCoordinator() -> Coordinator { Coordinator(state: state) }
 
-    func makeUIView(context: Context) -> WKWebView {
+    func makeWeb(_ coordinator: Coordinator) -> WKWebView {
         let config = WKWebViewConfiguration()
+        #if os(iOS)
         config.allowsInlineMediaPlayback = true
+        #endif
         let web = WKWebView(frame: .zero, configuration: config)
-        web.navigationDelegate = context.coordinator
+        web.navigationDelegate = coordinator
         web.allowsBackForwardNavigationGestures = true
+        #if os(iOS)
         web.scrollView.contentInsetAdjustmentBehavior = .never
-        context.coordinator.observe(web)
+        #endif
+        coordinator.observe(web)
         state.goBack = { [weak web] in web?.goBack() }
         state.goForward = { [weak web] in web?.goForward() }
         state.reload = { [weak web] in
@@ -94,15 +112,15 @@ private struct WebViewRepresentable: UIViewRepresentable {
         return web
     }
 
-    func updateUIView(_ web: WKWebView, context: Context) {
+    func updateWeb(_ web: WKWebView, _ coordinator: Coordinator) {
         // DSL の url が差し替わった時だけ読み直す(同じ URL での再描画でリロードしない)。
-        if context.coordinator.loadedURL != url {
-            context.coordinator.loadedURL = url
+        if coordinator.loadedURL != url {
+            coordinator.loadedURL = url
             web.load(URLRequest(url: url))
         }
     }
 
-    static func dismantleUIView(_ web: WKWebView, coordinator: Coordinator) {
+    static func dismantle(_ web: WKWebView, _ coordinator: Coordinator) {
         coordinator.observations.removeAll()
         web.stopLoading()
     }
@@ -140,7 +158,7 @@ private struct WebViewRepresentable: UIViewRepresentable {
                      decisionHandler: @escaping @MainActor (WKNavigationActionPolicy) -> Void) {
             guard let url = action.request.url, let scheme = url.scheme?.lowercased() else { return decisionHandler(.cancel) }
             if scheme == "https" || scheme == "http" || scheme == "about" { return decisionHandler(.allow) }
-            if ExternalURLPolicy.isAllowed(url) { UIApplication.shared.open(url) }
+            if ExternalURLPolicy.isAllowed(url) { PlatformSystem.open(url) }
             decisionHandler(.cancel)
         }
     }

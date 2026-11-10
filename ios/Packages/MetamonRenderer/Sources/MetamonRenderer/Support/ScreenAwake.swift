@@ -1,10 +1,14 @@
+#if canImport(UIKit)
 import UIKit
+#else
+import AppKit
+#endif
 
 /// 画面を消さない(`isIdleTimerDisabled`)を、使う所ごとに持つ。持っている所が 1 つでもあれば消さない。
 /// 直接 `isIdleTimerDisabled = false` にすると、ドラレコ・道案内・文字起こしの他の使い手の分まで戻してしまうため。
 @MainActor
 final class ScreenAwake {
-    static let shared = ScreenAwake { UIApplication.shared.isIdleTimerDisabled = $0 }
+    static let shared = ScreenAwake { PlatformSystem.setIdleTimerDisabled($0) }
 
     private(set) var holders = 0
     private let apply: (Bool) -> Void
@@ -40,6 +44,7 @@ final class ScreenAwake {
 /// 背面に回った時、今の処理を区切りよく止めるまでの猶予(`beginBackgroundTask`)。`end()` は何度呼んでもよい。
 @MainActor
 final class BackgroundGrace {
+    #if os(iOS)
     private var id: UIBackgroundTaskIdentifier = .invalid
 
     func begin(_ name: String) {
@@ -54,4 +59,9 @@ final class BackgroundGrace {
         UIApplication.shared.endBackgroundTask(id)
         id = .invalid
     }
+    #else
+    // Mac: アプリは背面でも止められないので猶予は要らない
+    func begin(_ name: String) {}
+    func end() {}
+    #endif
 }

@@ -1,5 +1,9 @@
 import PDFKit
+#if canImport(UIKit)
 import UIKit
+#else
+import AppKit
+#endif
 import UniformTypeIdentifiers
 import MetamonDSL
 

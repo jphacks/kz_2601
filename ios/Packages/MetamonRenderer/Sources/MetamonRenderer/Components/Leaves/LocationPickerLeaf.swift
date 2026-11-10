@@ -100,7 +100,7 @@ struct LocationPickerSheet: View {
                 if query.trimmingCharacters(in: .whitespaces).isEmpty { mapArea } else { resultList }
             }
             .navigationTitle(title)
-            .navigationBarTitleDisplayMode(.inline)
+            .inlineNavigationTitle()
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button(L("キャンセル")) { dismiss() }
