@@ -29,12 +29,14 @@ const CodeBadOutput = "bad_output"
 
 const CodeBadRequest = "bad_request"
 
-// another record of the entity has the same entity.unique values (#273)
 // the payer has fewer coins than the call's hold (#630; coins.WriteError, enforce only)
 const CodeCoinsInsufficient = "coins_insufficient"
 
 // another record of the entity has the same entity.unique values (#273)
 const CodeDuplicateRecord = "duplicate_record"
+
+// the X-Request-Id of an AI call was already used for a coin hold (#630, enforce only)
+const CodeDuplicateRequest = "duplicate_request"
 
 const CodeForbidden = "forbidden"
 
