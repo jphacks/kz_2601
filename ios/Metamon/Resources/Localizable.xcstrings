@@ -18446,6 +18446,23 @@
         }
       }
     },
+    "通話" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Call"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "通話"
+          }
+        }
+      }
+    },
     "通話につながりませんでした" : {
       "extractionState" : "manual",
       "localizations" : {
