@@ -215,7 +215,7 @@ class AppRuntime(
     }
 
     /** 一覧のワンタップ更新(list.item.toggle)。表示中に無い記録は保存しない。 */
-    suspend fun updateRecord(entity: String, recordId: String, data: Map<String, JSONValue>): Boolean {
+    override suspend fun updateRecord(entity: String, recordId: String, data: Map<String, JSONValue>): Boolean {
         val current = record(entity, recordId) ?: return false
         if (!canEdit(entity, current)) {
             showToast(RuntimeCopy.READ_ONLY)

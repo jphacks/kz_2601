@@ -17,6 +17,7 @@ import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
@@ -39,6 +40,8 @@ import jp.kz2601.metamon.dsl.fallback
 import jp.kz2601.metamon.dsl.hasTabs
 import jp.kz2601.metamon.dsl.screen
 import jp.kz2601.metamon.renderer.components.UnavailableComponent
+import jp.kz2601.metamon.renderer.components.lists.LocalScreenLocals
+import jp.kz2601.metamon.renderer.components.lists.ScreenLocals
 import jp.kz2601.metamon.renderer.form.rememberScreenForm
 import jp.kz2601.metamon.renderer.layout.isVoiceScreen
 import jp.kz2601.metamon.renderer.navigation.NavigationResolver
@@ -178,7 +181,11 @@ fun ScreenView(
                 screen.toolbar.forEach { tb -> TextButton(onClick = { ctx.perform(tb.action) }) { Text(tb.label) } }
             }
         }
-        GridScreenLayout(screen, ctx, Modifier.weight(1f))
+        // searchBar の検索文字列は画面ごと(遷移で戻ると空に戻る)
+        val locals = remember(screenCtx.route) { ScreenLocals() }
+        CompositionLocalProvider(LocalScreenLocals provides locals) {
+            GridScreenLayout(screen, ctx, Modifier.weight(1f))
+        }
     }
 }
 
