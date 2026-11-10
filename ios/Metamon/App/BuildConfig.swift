@@ -125,6 +125,8 @@ enum BuildConfig {
         .aiButtonMetrics,
         .automations,
         .books,
+        .calls,
+        .coins,
         .entitlements,
         .feedback,
         .feeds,

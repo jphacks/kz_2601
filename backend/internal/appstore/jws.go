@@ -39,7 +39,12 @@ const (
 	ReasonProduct         = "product_id"
 	ReasonEnvironment     = "environment"
 	ReasonNotSubscription = "not_subscription"
+	ReasonNotConsumable   = "not_consumable"
+	ReasonRevoked         = "revoked"
 )
+
+// TypeConsumable is JWSTransaction.type of a consumable in-app purchase (coin packs, #630).
+const TypeConsumable = "Consumable"
 
 // Apple marker extensions (Apple's app-store-server-library checks them too).
 var (
@@ -118,6 +123,36 @@ type payload struct {
 // stays verifiable. Expiry and revocation are not errors: they are reported in
 // the Transaction for the caller to store.
 func (v *Verifier) Verify(signedJWS string) (*Transaction, error) {
+	t, err := v.verifyTransaction(signedJWS)
+	if err != nil {
+		return nil, err
+	}
+	if t.ExpiresDate.IsZero() {
+		// Pro is sold only as an auto-renewable subscription
+		return nil, reject(ReasonNotSubscription, "no expiresDate (type %q)", t.Type)
+	}
+	return t, nil
+}
+
+// VerifyConsumable is Verify for a consumable purchase (coin packs, #630):
+// the same chain, signature and bundle / product / environment checks, but
+// the type must be Consumable (no expiresDate). A revoked (refunded)
+// consumable is ReasonRevoked: it must not be credited.
+func (v *Verifier) VerifyConsumable(signedJWS string) (*Transaction, error) {
+	t, err := v.verifyTransaction(signedJWS)
+	if err != nil {
+		return nil, err
+	}
+	if t.Type != TypeConsumable || !t.ExpiresDate.IsZero() {
+		return nil, reject(ReasonNotConsumable, "type %q", t.Type)
+	}
+	if t.Revoked() {
+		return nil, reject(ReasonRevoked, "revoked at %s", t.RevocationDate)
+	}
+	return t, nil
+}
+
+func (v *Verifier) verifyTransaction(signedJWS string) (*Transaction, error) {
 	var p payload
 	signedAt, err := v.verifyJWS(signedJWS, &p)
 	if err != nil {
@@ -148,10 +183,6 @@ func (v *Verifier) Verify(signedJWS string) (*Transaction, error) {
 	}
 	if !slices.Contains(v.Environments, t.Environment) {
 		return nil, reject(ReasonEnvironment, "environment %q not allowed", t.Environment)
-	}
-	if t.ExpiresDate.IsZero() {
-		// Pro is sold only as an auto-renewable subscription
-		return nil, reject(ReasonNotSubscription, "no expiresDate (type %q)", t.Type)
 	}
 	return t, nil
 }

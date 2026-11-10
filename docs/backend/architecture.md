@@ -21,6 +21,7 @@
 - [外部の公開データの読み取り(#348)](features/external-feeds.md)
 - [ISBN から本の情報を入れる(lookupBook)](features/book-lookup.md)
 - [決まった形の文章(#417)](features/text.md)
+- [通話(#447・LiveKit Cloud)](features/calls.md)
 - [仲間探しのアプリ(#507)](features/matching.md)
 
 ## 1. サービス構成とリクエストフロー

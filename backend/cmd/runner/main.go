@@ -49,6 +49,7 @@ import (
 	"time"
 	_ "time/tzdata" // creators' time zones on a distroless image
 
+	"github.com/jphacks/kz_2601/backend/internal/coins"
 	"github.com/jphacks/kz_2601/backend/internal/entitlement"
 	"github.com/jphacks/kz_2601/backend/internal/feeds"
 	"github.com/jphacks/kz_2601/backend/internal/fsenv"
@@ -96,6 +97,14 @@ func main() {
 		os.Exit(2)
 	}
 	logger.Info("runner: pro gate", slog.String("mode", string(qcfg.ProMode))) // PRO_GATE_MODE (#316)
+	// COIN_BILLING_MODE, ALLOWANCE_PRO_*, COIN_OVERFLOW_* (#630 part 3)
+	ccfg, err := coins.ConfigFromEnv(os.Getenv)
+	if err != nil {
+		logger.Error("runner: bad coin configuration", slog.Any("error", err))
+		os.Exit(2)
+	}
+	qcfg.Allowance = quota.AllowanceFrom(ccfg)
+	logger.Info("runner: monthly allowance", slog.String("mode", string(ccfg.Mode)), slog.Any("allowance", ccfg.Allowance))
 	push, err := pushFromEnv(os.Getenv)
 	if err != nil {
 		logger.Error("runner: bad APNs configuration", slog.Any("error", err))
@@ -118,6 +127,7 @@ func main() {
 	q := quota.New(qcfg, ratelimit.NewFirestore(st.Client(), os.Getenv("RATE_LIMIT_COLLECTION")),
 		entitlement.NewProChecker(entitlement.NewFirestore(st.Client()), policy.Environments))
 	q.Logger = logger
+	q.Buyer = overflowBuyer(ccfg, st.Client(), policy.Environments, logger)
 	age, err := ageFromEnv(ctx, os.Getenv, target.Project, st)
 	if err != nil {
 		logger.Error("runner: account age", slog.Any("error", err))

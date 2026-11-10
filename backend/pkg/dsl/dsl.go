@@ -361,6 +361,8 @@ const (
 	CompFlashcards ComponentType = "flashcards"
 	// external feed (#348): read-only list from an allowlisted public source via appconfig
 	CompFeed ComponentType = "feed"
+	// voice / video call of a shared app's participants (#447, call_button.go)
+	CompCallButton ComponentType = "callButton"
 )
 
 // ContainerTypes lists component types that may have Children.
@@ -558,6 +560,10 @@ type Component struct {
 	Near         string `json:"near,omitempty"`         // "" | current
 	AddressField string `json:"addressField,omitempty"` // placeSearch / locationButton: the address string field
 	Pins         bool   `json:"pins,omitempty"`         // also pin the results on a small map
+
+	// callButton (#447, call_button.go). Label is shared.
+	Video bool   `json:"video,omitempty"` // also offer the camera (audio only otherwise)
+	Room  string `json:"room,omitempty"`  // a separate room of the app ("" = the app's room)
 }
 
 // PhotoAnalyze is one photoField.analyze entry: what to read (Kind) and the

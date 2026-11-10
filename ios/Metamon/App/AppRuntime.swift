@@ -679,6 +679,14 @@ final class AppRuntime: DSLRuntime {
             if gatePaid { await gatePaidGeneration(before: previous) } // #414
         } catch {
             guard document.appId == previous.appId else { return } // 移った先に前のアプリの失敗を出さない
+            #if !APP_STORE_REVIEW
+            // #630: コインが足りない → お店・枠を使い切った → コインの設定。会話は残す(買ってから送り直せる)
+            if !interruptedByOffline, let denial = CoinDenial(error), CoinGate.shared.handle(denial) {
+                withAnimation(.easeInOut(duration: 0.3)) { morphJob = nil }
+                keepChatAfterStop = true
+                return
+            }
+            #endif
             if !interruptedByOffline, let pro = ProRequired(error) { // #316: 有料の機能が入るので保存されなかった
                 withAnimation(.easeInOut(duration: 0.3)) { morphJob = nil }
                 await presentProRequired(pro, transcript: text, gatePaid: gatePaid)
@@ -689,7 +697,7 @@ final class AppRuntime: DSLRuntime {
             print("[Metamon] morph failed: \(failure) (\(error))")
             withAnimation(.easeInOut(duration: 0.3)) { morphJob = nil }
             switch failure { // H3・M3: 上限・無料プランの停止でも会話は消さない(カードから次の一手)
-            case .rateLimited, .planLimit, .freePlanPaused: keepChatAfterStop = true
+            case .rateLimited, .planLimit, .appLimit, .freePlanPaused: keepChatAfterStop = true
             default: break
             }
             await present(failure, transcript: text)
@@ -739,6 +747,11 @@ final class AppRuntime: DSLRuntime {
         case .sessionExpired:
             withAnimation(.easeInOut(duration: 0.3)) { errorCard = ErrorPresentation.from(failure, transcript: transcript) }
             onSessionExpired?()
+        case .appLimit:
+            // #630: カードを残し(閉じても「置き換える」で開き直せる)、置き換えシートをすぐ出す
+            guard let card = ErrorPresentation.from(failure, transcript: transcript) else { return }
+            withAnimation(.easeInOut(duration: 0.3)) { errorCard = card }
+            handle(.replaceApp, of: card)
         default:
             withAnimation(.easeInOut(duration: 0.3)) { errorCard = ErrorPresentation.from(failure, transcript: transcript) }
         }
@@ -767,6 +780,17 @@ final class AppRuntime: DSLRuntime {
             #else
             break // 審査用の版はこのボタンを出さない(`ErrorPresentation.rateLimitPrimary`)
             #endif
+        case .replaceApp:
+            guard case .appLimit(let limit) = card.kind else { return }
+            presentAppLimit(limit) { [weak self] in
+                guard let self, self.errorCard == card else { return } // 待っている間に閉じた・話し直した
+                withAnimation(.easeInOut(duration: 0.3)) { self.errorCard = nil }
+                if card.origin == .chat {
+                    self.retryChat()
+                } else if !card.transcript.isEmpty {
+                    await self.sendMetered(card.transcript)
+                }
+            }
         }
     }
 
@@ -1444,6 +1468,12 @@ final class AppRuntime: DSLRuntime {
         guard let api = error as? APIError else { return ErrorCopy.failure(L10n.tr("うまくいきませんでした"), error, context: "action") }
         if let denial = SharedAccessDenial(api) { return denial.message } // #254
         if let denial = RecordWriteDenial(api), let entity { return denialMessage(denial, entity: entity) } // #272 #273
+        #if !APP_STORE_REVIEW
+        if let denial = CoinDenial(api) { // #630 書き込みの枠・コイン。自分が払う時はお店 / コインの設定も開く
+            CoinGate.shared.handle(denial)
+            return CoinCopy.denialBody(denial)
+        }
+        #endif
         if let pro = ProRequired(api) { return pro.writeMessage } // #316(印を付けるなど)
         if let limit = PlanLimit(api) { return ErrorCopy.planLimitBody(limit) } // #317
         if api.isAppStopped { return ErrorCopy.appStoppedBody } // #346

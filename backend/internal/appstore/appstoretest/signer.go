@@ -166,3 +166,17 @@ func Monthly(bundleID, productID, otid string, now time.Time) Transaction {
 		SignedDate:            now.UnixMilli(),
 	}
 }
+
+// Consumable is a consumable purchase (a coin pack, #630) bought now.
+func Consumable(bundleID, productID, txid string, now time.Time) Transaction {
+	return Transaction{
+		TransactionID:         txid,
+		OriginalTransactionID: txid,
+		BundleID:              bundleID,
+		ProductID:             productID,
+		Type:                  "Consumable",
+		Environment:           "Sandbox",
+		PurchaseDate:          now.UnixMilli(),
+		SignedDate:            now.UnixMilli(),
+	}
+}

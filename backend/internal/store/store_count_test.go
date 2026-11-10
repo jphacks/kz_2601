@@ -27,6 +27,14 @@ func TestStoreCounter(t *testing.T) {
 				t.Fatal(err)
 			}
 		}
+		if n, err := c.CountApps(ctx, uid); err != nil || n != 0 {
+			t.Fatalf("blank apps are not held: CountApps = %d %v", n, err)
+		}
+		for _, id := range []string{app, app + "-2"} {
+			if _, err := s.CommitVersion(ctx, uid, id, Commit{BaseVersion: 1, DSL: json.RawMessage(`{"v":2}`)}); err != nil {
+				t.Fatal(err)
+			}
+		}
 		if n, err := c.CountApps(ctx, uid); err != nil || n != 2 {
 			t.Fatalf("CountApps = %d %v, want 2", n, err)
 		}
