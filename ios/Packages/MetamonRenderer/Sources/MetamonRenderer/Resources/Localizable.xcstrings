@@ -1684,6 +1684,23 @@
         }
       }
     },
+    "「%@」を削除しますか?" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Delete “%@”?"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "「%@」を削除しますか?"
+          }
+        }
+      }
+    },
     "「曲を探す」から追加できます" : {
       "extractionState" : "manual",
       "localizations" : {

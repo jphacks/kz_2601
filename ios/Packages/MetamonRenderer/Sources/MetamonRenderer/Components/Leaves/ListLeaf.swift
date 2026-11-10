@@ -94,6 +94,8 @@ struct ListLeaf: View {
             #if os(macOS)
             // ⌘C(#1332): フォーカスのある行を右クリックの「コピー」と同じテキストで
             .onCopyCommand { copyCommand(rows: rows, entity: entity) }
+            // ⌫: フォーカスのある行を、確認を挟んでから消す(消せない行では何もしない)
+            .onDeleteCommand { deleteCommand(rows: rows, entity: entity, entityId: entityId) }
             #endif
             .renderCard(padding: 0)
             #if os(macOS)
@@ -192,6 +194,16 @@ struct ListLeaf: View {
                                                   textInputActive: ListRowCopyCommand.textInputActive, rows: rows) else { return [] }
         let text = ListRowCopyText.text(item: c.item, record: row, entity: entity, rt: rt)
         return text.isEmpty ? [] : [NSItemProvider(object: text as NSString)]
+    }
+
+    private func deleteCommand(rows: [Record], entity: Entity?, entityId: String) {
+        guard let row = ListRowDeleteCommand.target(focusedRowId: focusedRowId, textInputActive: ListRowCopyCommand.textInputActive,
+                                                    rows: rows, deletable: { deletable($0, entity: entityId) }) else { return }
+        let titleField = c.item?.title ?? entity?.displayTitleField ?? ""
+        var action = Action(type: .deleteRecord, entity: entityId)
+        action.confirmMessage = ListRowDeleteCommand.confirmMessage(title: rt.display(row[titleField], field: entity?.field(titleField)),
+                                                                    fallback: entity?.name ?? "")
+        Task { await rt.run(action, ctx.actionContext(recordId: row.id)) }
     }
 
     /// 行の写真(item.image)。手元にある画像だけ(https・動画のサムネイルは除く)。名前は写真の項目名

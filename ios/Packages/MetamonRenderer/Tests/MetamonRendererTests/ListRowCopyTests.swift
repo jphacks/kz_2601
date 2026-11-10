@@ -94,6 +94,27 @@ final class ListRowCopyTests: XCTestCase {
                      "入力欄が文字を受けている時は入力欄のコピーに任せる")
     }
 
+    func testDeleteCommandTargetsFocusedDeletableRowOnly() {
+        let rows = [Record(id: "mine", data: [:]), Record(id: "theirs", data: [:])]
+        let deletable: (Record) -> Bool = { $0.id == "mine" }
+        XCTAssertEqual(ListRowDeleteCommand.target(focusedRowId: "mine", textInputActive: false, rows: rows, deletable: deletable)?.id, "mine")
+        XCTAssertNil(ListRowDeleteCommand.target(focusedRowId: "theirs", textInputActive: false, rows: rows, deletable: deletable),
+                     "消せない行(他人の共有の記録など)では何もしない")
+        XCTAssertNil(ListRowDeleteCommand.target(focusedRowId: nil, textInputActive: false, rows: rows, deletable: deletable), "行を選んでいない時は何もしない")
+        XCTAssertNil(ListRowDeleteCommand.target(focusedRowId: "mine", textInputActive: true, rows: rows, deletable: deletable),
+                     "入力欄が文字を受けている時は入力欄の ⌫ に任せる")
+    }
+
+    func testDeleteConfirmMessageUsesTitleOrEntityName() {
+        let saved = LanguagePreference.shared.setting
+        defer { LanguagePreference.shared.setting = saved }
+        LanguagePreference.shared.setting = .ja
+        XCTAssertEqual(ListRowDeleteCommand.confirmMessage(title: " 牛乳 ", fallback: "買い物"), "「牛乳」を削除しますか?")
+        XCTAssertEqual(ListRowDeleteCommand.confirmMessage(title: "", fallback: "買い物"), "「買い物」を削除しますか?", "見出しが空なら entity の名前")
+        LanguagePreference.shared.setting = .en
+        XCTAssertEqual(ListRowDeleteCommand.confirmMessage(title: "Milk", fallback: "Shopping"), "Delete “Milk”?")
+    }
+
     #if os(macOS)
     func testPasteboardRoundTripOnNamedBoard() {
         let board = NSPasteboard(name: NSPasteboard.Name("metamon.test.\(UUID().uuidString)"))
