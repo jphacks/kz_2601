@@ -77,7 +77,7 @@ public struct ComponentRegistry: Sendable {
         r.register(.flashcards) { c, ctx in FlashcardsLeaf(c: c, ctx: ctx) } // #264 審査用ビルドにも入れる(OS の機能を使わない)
         r.register(.routeGuide) { c, ctx in RouteGuideLeaf(c: c, ctx: ctx) }
         r.register(.shareButton) { c, ctx in ShareButtonLeaf(c: c, ctx: ctx) }
-        r.register(.openUrlButton) { c, _ in OpenUrlButtonLeaf(c: c) }
+        r.register(.openUrlButton) { c, ctx in OpenUrlButtonLeaf(c: c, ctx: ctx) }
         r.register(.mapView) { c, ctx in MapViewLeaf(c: c, ctx: ctx) }
         r.register(.locationButton) { c, ctx in LocationButtonLeaf(c: c, ctx: ctx) }
         r.register(.locationPicker) { c, ctx in LocationPickerLeaf(c: c, ctx: ctx) }

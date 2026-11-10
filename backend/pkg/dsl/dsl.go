@@ -445,7 +445,7 @@ type Component struct {
 	Address       string  `json:"address,omitempty"`       // routeGuide: fixed destination (address / place name)
 	Seconds       int     `json:"seconds,omitempty"`       // timerDisplay countdown start / locationTracker auto stop
 	LiveActivity  bool    `json:"liveActivity,omitempty"`  // timerDisplay: mirror to the lock screen / Dynamic Island (#423)
-	ShareTo       string  `json:"shareTo,omitempty"`       // shareButton: any|line|slack|discord (`target` is progressBar's number)
+	ShareTo       string  `json:"shareTo,omitempty"`       // shareButton: any|line|slack|discord|x|mail (`target` is progressBar's number)
 	// input batch (slider / stepper / rating / textEditor). Pointers so that
 	// an explicit 0 round-trips through omitempty. Min/Max are shared with gauge.
 	Min      *float64 `json:"min,omitempty"`      // slider / stepper / gauge
@@ -529,6 +529,10 @@ type Component struct {
 	// photoField: also offer an illustration made on the device (Apple Image
 	// Playground) from the record's title, saved like a picked photo.
 	Illustrate bool `json:"illustrate,omitempty"`
+	// openUrlButton (open_app.go): open an app / service by name instead of
+	// a fixed url; To is the place in it (link, username, address, number).
+	App string `json:"app,omitempty"`
+	To  string `json:"to,omitempty"`
 	// fileImport (file_import.go). Entity / Field / Label are shared.
 	Accept []string       `json:"accept,omitempty"` // csv|text|pdf
 	Map    []ImportColumn `json:"map,omitempty"`    // csv: column header -> field id

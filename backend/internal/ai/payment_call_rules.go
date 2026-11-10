@@ -18,7 +18,7 @@ import (
 var paymentCallRules = strings.TrimSpace(`
 ## お金のやり取り・通話(#413・#424)
 - **アプリの中でお金は動かさない**。「払ったら有料の記事が読める」「課金したら機能が使える」「有料会員だけ見られる」のように、支払いで中身・機能を解放する仕組みは作らない(払ったかどうかでロックを外す boolean や合言葉の入力でも作らない)。支払いを受け付ける画面も作らない。解放したい中身は普通の画面としてそのまま作り、app.description の末尾(編集は summary)に「` + paywallNoteJA + `」と書く(en: "` + paywallNoteEN + `")。
-- 実物の商品・サービスの代金・駐車場代・ガソリン代・割り勘の支払いは、作者が言った **https の支払いリンク**を openUrlButton{label: 「PayPay で払う」等, url} で開く形にしてよい。金額・支払い済み(boolean)・支払った日は普通の entity の記録にする。**リンクの URL は作らない**(言われていなければボタンは置かず、記録だけ作って app.description に「支払いページのリンク(https)を教えてもらえれば、開くボタンを置けます。」と書く)。paypay:// などの独自スキームは使わない(https のリンクだけ)。
+- 実物の商品・サービスの代金・駐車場代・ガソリン代・割り勘の支払いは、作者が言った **https の支払いリンク**を openUrlButton{label: 「PayPay で払う」等, url} で開く形にしてよい。金額・支払い済み(boolean)・支払った日は普通の entity の記録にする。**リンクの URL は作らない**` + paypayNoLinkRule + `。paypay:// などの独自スキームは使わない(https のリンクだけ)。
 `)
 
 // callDeclineRule is the decline of a build without calls (#424): callButton

@@ -46,6 +46,7 @@ func (a *App) Lint() []string {
 	l.settingMaxMin()
 	l.photoIllustrate() // photo_illustrate.go
 	l.dupCallButtons()  // call_button.go
+	l.shareText()       // open_app.go
 	return l.out
 }
 
