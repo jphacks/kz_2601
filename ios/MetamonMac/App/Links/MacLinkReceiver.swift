@@ -2,6 +2,7 @@
 #if !APP_STORE_REVIEW
 import AppKit
 import SwiftUI
+import MetamonRenderer
 
 /// 外から届いた URL を受ける(#975)。ウインドウの根に 1 行で付ける。
 /// - URL スキーム(`tailorit://`)は onOpenURL で届く。Universal Links(https)は iOS と同じく未対応(associated domains が無い)。
@@ -38,8 +39,7 @@ struct MacLinkReceiver: ViewModifier {
     }
 
     private static func copy(_ url: URL) {
-        NSPasteboard.general.clearContents()
-        NSPasteboard.general.setString(url.absoluteString, forType: .string)
+        PlatformPasteboard.setString(url.absoluteString)
     }
 }
 

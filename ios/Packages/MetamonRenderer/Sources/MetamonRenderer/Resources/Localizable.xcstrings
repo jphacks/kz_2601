@@ -2925,6 +2925,23 @@
         }
       }
     },
+    "コピー" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Copy"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "コピー"
+          }
+        }
+      }
+    },
     "システム設定 > Apple Intelligence と Siri でオンにしてください" : {
       "extractionState" : "manual",
       "localizations" : {
