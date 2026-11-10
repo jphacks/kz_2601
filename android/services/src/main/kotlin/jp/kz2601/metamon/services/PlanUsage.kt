@@ -5,8 +5,23 @@ import kotlinx.serialization.Serializable
 import java.time.Instant
 import java.time.ZoneId
 
+/** 使っている量と上限(#317・openapi-appconfig.yaml の `UsageMeter`)。[limit] が null = 数えない */
+@Serializable
+data class UsageMeter(val used: Int = 0, val limit: Int? = null, val remaining: Int? = null) {
+    /** 上限に対する割合(数えない・上限 0 は null) */
+    val fraction: Double? get() = limit?.takeIf { it > 0 }?.let { used.toDouble() / it }
+
+    /** 80% 以上(iOS の `UsageNoticeRules.isNear`) */
+    val isNear: Boolean get() = (fraction ?: 0.0) >= NEAR_THRESHOLD
+
+    companion object {
+        const val NEAR_THRESHOLD = 0.8
+    }
+}
+
 /**
- * `GET /v1/me/usage`(iOS の `MyUsage`・openapi-appconfig.yaml の `MyUsage`)。音声の画面の「今日の残り」に使う分だけ読む。
+ * `GET /v1/me/usage`(iOS の `MyUsage`・openapi-appconfig.yaml の `MyUsage`)。
+ * 音声の画面の「今日の残り」と、設定の「使っている量」(作ったアプリの数)に使う分だけ読む。
  */
 @Serializable
 data class MyUsage(
@@ -16,6 +31,8 @@ data class MyUsage(
     /** 次の 0:00 JST(ISO 8601) */
     val resetAt: String? = null,
     val ai: Ai? = null,
+    /** 作ったアプリの数。数えられなかった時は null */
+    val apps: UsageMeter? = null,
 ) {
     @Serializable
     data class Ai(val used: Int = 0, val limit: Int? = null, val remaining: Int? = null)
@@ -62,7 +79,31 @@ data class RemainingToday(
     }
 }
 
+/** `GET /v1/apps/{appId}/usage`(iOS の `AppUsage`)。払う人のプランで数えた記録・写真 */
+@Serializable
+data class AppUsage(
+    val appId: String = "",
+    /** 払う人のプラン(free | pro) */
+    val plan: String = "free",
+    /** self = 自分のアプリ・creator = 他の人が作ったアプリ */
+    val payer: String = "creator",
+    /** Pro にすると記録か写真の上限が上がる */
+    val upgrade: Boolean = false,
+    val records: UsageMeter? = null,
+    val photos: UsageMeter? = null,
+) {
+    /** 自分のアプリ(作成者)。参加者には量も Pro も出さない */
+    val isMine: Boolean get() = payer == "self"
+
+    companion object {
+        fun decode(json: String): AppUsage = ApiJson.decodeFromString(serializer(), json)
+    }
+}
+
 /** 使用量を読む口(iOS の `PlanUsageSource`・[jp.kz2601.metamon.services.live.HttpAppConfigClient] が実装)。null = サーバーに無い(404) */
 interface PlanUsageSource {
     suspend fun myUsage(): MyUsage?
+
+    /** 今のアプリの記録・写真。既定は読まない(null) */
+    suspend fun appUsage(appId: String): AppUsage? = null
 }

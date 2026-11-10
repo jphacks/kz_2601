@@ -64,6 +64,40 @@ class PlanUsageTest {
     }
 
     @Test
+    fun readsAppCountFromMyUsage() = runBlocking<Unit> {
+        server.enqueue(
+            json(
+                200,
+                """{"plan":"free","tier":"signed_in","resetAt":"2026-11-11T15:00:00Z","ai":null,"apps":{"used":3,"limit":5,"remaining":2},"perApp":{"recordsPerApp":100,"photosPerApp":null}}""",
+            ),
+        )
+        val apps = client.myUsage()!!.apps!!
+        assertEquals(3, apps.used)
+        assertEquals(5, apps.limit)
+    }
+
+    @Test
+    fun readsAppUsage() = runBlocking<Unit> {
+        server.enqueue(
+            json(
+                200,
+                """{"appId":"a1","plan":"free","payer":"self","upgrade":true,"records":{"used":90,"limit":100,"remaining":10},"photos":{"used":2,"limit":null,"remaining":null}}""",
+            ),
+        )
+        val usage = client.appUsage("a1")!!
+        assertEquals("/v1/apps/a1/usage", server.take().path)
+        assertTrue(usage.isMine)
+        assertEquals(90, usage.records!!.used)
+        assertNull(usage.photos!!.limit)
+    }
+
+    @Test
+    fun appUsageWithoutCopyIsNull() = runBlocking<Unit> {
+        server.enqueue(json(404, errorBody("NOT_FOUND")))
+        assertNull(client.appUsage("missing"))
+    }
+
+    @Test
     fun staleAfterResetOrNextJstDay() {
         val reset = Instant.parse("2026-11-11T15:00:00Z")
         val value = RemainingToday(5, 30, reset, observedAt = Instant.parse("2026-11-11T03:00:00Z"))
