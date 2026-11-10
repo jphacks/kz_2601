@@ -48,6 +48,8 @@ import jp.kz2601.metamon.renderer.theme.ReadableWidth
 import jp.kz2601.metamon.runtime.AppRuntime
 import jp.kz2601.metamon.services.GenerateProgress
 import jp.kz2601.metamon.voice.AppConfigVersions
+import jp.kz2601.metamon.voice.ChatHistoryStore
+import jp.kz2601.metamon.voice.ClarifySettings
 import jp.kz2601.metamon.voice.GeneratingView
 import jp.kz2601.metamon.voice.MicButton
 import jp.kz2601.metamon.voice.VoicePhase
@@ -99,13 +101,20 @@ fun MetamonApp(container: AppContainer) {
     val context = LocalContext.current
     val user by container.auth.currentUser.collectAsStateWithLifecycle()
     val buildNow = stringResource(R.string.voice_build_now_utterance)
+    val historyHeader = stringResource(R.string.voice_history_header)
     val vm = viewModel {
+        val clarify = ClarifySettings(context)
         VoiceViewModel(
             transcriber = container.transcriber,
             ai = container.ai,
             appId = { container.appId.current },
             initial = AppDocument(appId = container.appId.current, dsl = container.initialDsl),
             buildNowUtterance = buildNow,
+            clarifyEnabled = { clarify.enabled },
+            autoBuild = { clarify.autoBuild },
+            // 会話の履歴はアプリごとに端末へ(#893)。モックは前の起動の履歴を持ち込まないようメモリだけ
+            chatHistory = ChatHistoryStore(if (container.knobs.mock) null else File(context.filesDir, "chat_history")),
+            historyHeader = historyHeader,
             // 発話・AI の返事を含むので debug だけ(release の logcat に個人の情報を出さない)
             log = { if (BuildConfig.DEBUG) Log.i(AppContainer.TAG, it) },
             // モックはサーバーの版の履歴が無いので端末の履歴だけで戻す

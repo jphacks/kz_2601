@@ -58,6 +58,7 @@ class VoiceViewModelTest {
     private inner class FakeAI : AIClient {
         val morphCalls = mutableListOf<String>()
         val chatCalls = mutableListOf<List<ChatMessage>>()
+        val chatModes = mutableListOf<ChatMode?>()
         var resets = 0
         var progress: List<GenerateProgress> = emptyList()
         var morphError: Throwable? = null
@@ -84,6 +85,7 @@ class VoiceViewModelTest {
 
         override suspend fun chat(appId: String, messages: List<ChatMessage>, locale: String?, mode: ChatMode?): ChatTurn {
             chatCalls += messages
+            chatModes += mode
             return chatTurns.removeFirst().getOrThrow()
         }
 
@@ -96,15 +98,19 @@ class VoiceViewModelTest {
         transcriber: MockSpeechTranscriber = MockSpeechTranscriber(),
         ai: AIClient = FakeAI(),
         clarify: Boolean = false,
-    ) = VoiceViewModel(
-        transcriber = transcriber,
-        ai = ai,
-        appId = { "app-1" },
-        initial = initial,
-        clarifyEnabled = clarify,
+    ): VoiceViewModel {
         // backgroundScope の仕事は advanceUntilIdle が待たないので、同じスケジューラの別のスコープで動かす
-        scope = CoroutineScope(StandardTestDispatcher(testScheduler) + Job()),
-    )
+        val dispatcher = StandardTestDispatcher(testScheduler)
+        return VoiceViewModel(
+            transcriber = transcriber,
+            ai = ai,
+            appId = { "app-1" },
+            initial = initial,
+            clarifyEnabled = { clarify },
+            io = dispatcher,
+            scope = CoroutineScope(dispatcher + Job()),
+        )
+    }
 
     @Test
     fun generateNowSkipsChatEvenWhenClarifyIsOn() = runTest {
@@ -241,7 +247,7 @@ class VoiceViewModelTest {
             ai,
             { "app-1" },
             initial,
-            clarifyEnabled = false,
+            clarifyEnabled = { false },
             scope = CoroutineScope(StandardTestDispatcher(testScheduler) + Job()),
         )
         vm.onMicTap()
@@ -311,7 +317,7 @@ class VoiceViewModelTest {
     @Test
     fun clarifyQuestionThenReadyBuilds() = runTest {
         val ai = FakeAI()
-        ai.chatTurns += Result.success(ChatTurn(kind = ChatTurn.Kind.QUESTION, text = "何を記録しますか?", suggestions = listOf("支出", "収入")))
+        ai.chatTurns += Result.success(ChatTurn(kind = ChatTurn.Kind.QUESTION, text = "何を記録しますか?", suggestions = listOf("支出", "収入"), turn = 1))
         ai.chatTurns += Result.success(ChatTurn(kind = ChatTurn.Kind.READY, text = "まとめました", transcript = "支出を記録する家計簿"))
         val vm = vm(ai = ai, clarify = true)
 
@@ -320,7 +326,7 @@ class VoiceViewModelTest {
         assertEquals(VoicePhase.IDLE, vm.state.value.phase)
         assertEquals(ChatTurn.Kind.QUESTION, vm.state.value.chatTurn?.kind)
         assertEquals(2, vm.state.value.chat.size)
-        assertEquals(1, ai.resets) // 新しい会話は先にサーバー側を消す
+        assertEquals(0, ai.resets) // turn = 1 なら古い会話は残っていない: DELETE しない(iOS の startConversation)
 
         vm.answer("支出")
         runCurrent()
@@ -341,7 +347,7 @@ class VoiceViewModelTest {
     fun clarifyByVoiceAutoBuildsAfterDelay() = runTest {
         val speech = MockSpeechTranscriber(results = listOf(Result.success("水の量")))
         val ai = FakeAI()
-        ai.chatTurns += Result.success(ChatTurn(kind = ChatTurn.Kind.READY, text = "OK", transcript = "毎日の水の量"))
+        ai.chatTurns += Result.success(ChatTurn(kind = ChatTurn.Kind.READY, text = "OK", transcript = "毎日の水の量", turn = 1))
         val vm = vm(speech, ai, clarify = true)
         vm.onMicTap()
         runCurrent()
@@ -358,7 +364,7 @@ class VoiceViewModelTest {
     fun clarifyProposalAndRestart() = runTest {
         val ai = FakeAI()
         val option = ChatOption(title = "シンプル", instruction = "シンプルな家計簿")
-        ai.chatTurns += Result.success(ChatTurn(kind = ChatTurn.Kind.PROPOSAL, text = "案です", options = listOf(option)))
+        ai.chatTurns += Result.success(ChatTurn(kind = ChatTurn.Kind.PROPOSAL, text = "案です", options = listOf(option), turn = 1))
         ai.chatTurns += Result.failure(IOException("down"))
         val vm = vm(ai = ai, clarify = true)
         vm.submit("家計簿")
@@ -366,13 +372,13 @@ class VoiceViewModelTest {
         vm.restartChat()
         runCurrent()
         assertTrue(vm.state.value.chat.isEmpty())
-        assertEquals(2, ai.resets)
+        assertEquals(1, ai.resets)
 
         vm.submit("家計簿")
         runCurrent()
         assertEquals(VoiceError.Request(FailureKind.Offline, VoiceError.Origin.CHAT), vm.state.value.error)
         assertEquals(1, vm.state.value.chat.size) // 発話は残る(もう一度で送り直す)
-        ai.chatTurns += Result.success(ChatTurn(kind = ChatTurn.Kind.PROPOSAL, text = "案です", options = listOf(option)))
+        ai.chatTurns += Result.success(ChatTurn(kind = ChatTurn.Kind.PROPOSAL, text = "案です", options = listOf(option), turn = 1))
         vm.retry()
         runCurrent()
         assertEquals(ChatTurn.Kind.PROPOSAL, vm.state.value.chatTurn?.kind)
@@ -384,7 +390,7 @@ class VoiceViewModelTest {
     @Test
     fun buildNowSendsGoAheadThenBuildsFromHistory() = runTest {
         val ai = FakeAI()
-        ai.chatTurns += Result.success(ChatTurn(kind = ChatTurn.Kind.QUESTION, text = "誰と使いますか?"))
+        ai.chatTurns += Result.success(ChatTurn(kind = ChatTurn.Kind.QUESTION, text = "誰と使いますか?", turn = 1))
         ai.chatTurns += Result.failure(IOException("down"))
         val vm = vm(ai = ai, clarify = true)
         vm.submit("割り勘")
@@ -397,24 +403,47 @@ class VoiceViewModelTest {
     }
 
     @Test
-    fun editAfterGenerateSkipsChat() = runTest {
+    fun editAfterGenerateConsultsFirstThenAppliesNow() = runTest {
         val ai = FakeAI()
         val vm = vm(ai = ai, clarify = true)
-        ai.chatTurns += Result.success(ChatTurn(kind = ChatTurn.Kind.READY, text = "OK", transcript = "家計簿"))
+        ai.chatTurns += Result.success(ChatTurn(kind = ChatTurn.Kind.READY, text = "OK", transcript = "家計簿", turn = 1))
         vm.submit("家計簿")
         runCurrent()
         vm.buildFromChat()
         advanceUntilIdle()
         assertFalse(vm.state.value.isInitial)
 
+        // 作ったアプリの変更も先に相談する(android-058)。聞き返しの間は「このまま反映」
         vm.openVoice()
-        assertTrue(vm.state.value.voiceOpen)
+        ai.chatTurns += Result.success(ChatTurn(kind = ChatTurn.Kind.QUESTION, text = "どの画面を?", turn = 1))
         vm.submit("ダークモードにして")
+        runCurrent()
+        assertEquals(ChatMode.EDIT, ai.chatModes.last())
+        assertEquals(ChatShortcut.APPLY_NOW, ChatShortcut.of(vm.state.value.chatTurn, vm.state.value.chatMode))
+        assertNull("変更の相談では質問 n / 3 を出さない", QuestionProgress.number(vm.state.value.chat, ChatMode.EDIT, ChatTurn.Kind.QUESTION))
+        assertTrue(vm.state.value.voiceOpen)
+
+        vm.applyNow()
         runCurrent()
         assertFalse(vm.state.value.voiceOpen) // 生成が始まったらシートを閉じる
         advanceUntilIdle()
         assertEquals(listOf("家計簿", "ダークモードにして"), ai.morphCalls)
-        assertEquals(1, ai.chatCalls.size)
+    }
+
+    @Test
+    fun editReadyByVoiceWaitsForButton() = runTest {
+        val speech = MockSpeechTranscriber(results = listOf(Result.success("ダークモードにして")))
+        val ai = FakeAI()
+        val vm = vm(speech, ai, clarify = true)
+        vm.adopt(generated)
+        ai.chatTurns += Result.success(ChatTurn(kind = ChatTurn.Kind.READY, text = "OK", transcript = "ダークモード", turn = 1))
+        vm.onMicTap()
+        runCurrent()
+        vm.onMicTap()
+        advanceUntilIdle()
+        // 声だけでも、作ったアプリの変更は自動で作らない(聞き間違いで今のアプリを変えない)
+        assertFalse(vm.state.value.autoBuildPending)
+        assertTrue(ai.morphCalls.isEmpty())
     }
 
     @Test
@@ -457,7 +486,7 @@ class VoiceViewModelTest {
             ai = ai,
             appId = { current },
             initial = initial,
-            clarifyEnabled = false,
+            clarifyEnabled = { false },
             scope = CoroutineScope(StandardTestDispatcher(testScheduler) + Job()),
         )
         vm.generateNow("家計簿")

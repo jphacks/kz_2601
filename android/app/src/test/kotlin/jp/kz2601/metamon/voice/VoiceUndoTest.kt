@@ -87,7 +87,7 @@ class VoiceUndoTest {
         ai = ai,
         appId = { "app-1" },
         initial = initial,
-        clarifyEnabled = false,
+        clarifyEnabled = { false },
         versions = versions,
         scope = CoroutineScope(StandardTestDispatcher(testScheduler) + Job()),
     )

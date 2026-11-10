@@ -17,6 +17,7 @@ import jp.kz2601.metamon.services.TranscriberStatus
 import jp.kz2601.metamon.services.http.FailureKind
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -25,11 +26,14 @@ import kotlinx.coroutines.flow.dropWhile
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+import kotlin.coroutines.CoroutineContext
 
 /**
  * 音声の画面の状態(iOS の `VoiceInputView` の phase + `AppRuntime` の morph / 対話の部分)。
  * 「話す → 文字 → (相談)→ 生成 → 変身」を 1 か所で持つ。画面(Compose)は [state] を描いて操作を渡すだけ。
- * - 新規作成(初期画面)は対話 ON なら先に相談(#75 / #186)。生成後のアプリの変更はすぐ生成する(相談は android-058)
+ * - 対話 ON なら新規作成(初期画面)も作ったアプリの変更も先に相談(#75 / #186)。OFF なら一発で反映
+ * - 会話はアプリごとに端末へ残す(#210・[ChatHistoryStore])。反映・切り替えで閉じた会話も次に開いた時に見せる
  * - 失敗は状態カード(トーストは使わない・H9)
  *
  * @param scope テストで差し替える。null なら viewModelScope
@@ -41,13 +45,21 @@ class VoiceViewModel(
     initial: AppDocument,
     /** generate / chat の locale。null = サーバーが発話から決める(iOS の「自動」) */
     private val locale: () -> String? = { null },
-    private val clarifyEnabled: Boolean = true,
-    private val autoBuild: Boolean = true,
+    /** 相談してから作るか(設定・既定 ON)。毎回読むので設定の切り替えがすぐ効く */
+    private val clarifyEnabled: () -> Boolean = { true },
+    /** 声だけで新しく作っている時、ready で自動で作るか(#160) */
+    private val autoBuild: () -> Boolean = { true },
     /** 「このまま作る」で送る言葉(backend `buildNowPhrases` に一致する UI の言語の文) */
     private val buildNowUtterance: String = "このまま作って",
     private val log: (String) -> Unit = {},
     /** サーバーの版の履歴(undo / redo)。null = 端末の履歴だけ(モック) */
     private val versions: AppVersions? = null,
+    /** アプリごとの会話の履歴(既定はメモリだけ) */
+    private val chatHistory: ChatHistoryStore = ChatHistoryStore(null),
+    /** 過去の変更の要約を AI に渡す時の見出し(UI の言語) */
+    private val historyHeader: String = "(これまでに反映した変更)",
+    /** 履歴の読み書き。順番が入れ替わらないよう 1 本ずつ */
+    private val io: CoroutineContext = Dispatchers.IO.limitedParallelism(1),
     scope: CoroutineScope? = null,
 ) : ViewModel() {
     private val scope: CoroutineScope = scope ?: viewModelScope
@@ -76,6 +88,7 @@ class VoiceViewModel(
             transcriber.status.collect { s -> _state.update { it.copy(voiceAvailable = s !is TranscriberStatus.Unavailable) } }
         }
         this.scope.launch { transcriber.prepare() }
+        reloadHistory(initial.appId)
     }
 
     // MARK: - マイク
@@ -156,7 +169,7 @@ class VoiceViewModel(
         val t = text.trim()
         val s = _state.value
         if (t.isEmpty() || s.isGenerating || s.chatPending) return
-        if (clarifyEnabled && (s.isInitial || s.isChatting)) say(t, source) else generate(t)
+        if (clarifyEnabled()) say(t, source) else generate(t)
     }
 
     /** 相談を飛ばしてすぐ生成する(DEBUG のつまみ `METAMON_AUTO_TRANSCRIPT` 用) */
@@ -187,9 +200,18 @@ class VoiceViewModel(
             _state.update { it.copy(document = doc) }
             return
         }
+        // 今の会話は前のアプリの閉じた会話として残す(iOS の resetChat → archiveLiveChat)
+        val hadChat = s.isChatting
+        if (hadChat) {
+            val archived = ChatHistoryStore.trimmed(s.history + liveEntries(s.chat))
+            persist(s.document.appId, archived)
+            val previous = s.document.appId
+            scope.launch { ai.resetChat(previous) }
+        }
         chatEpoch++
         chatJob?.cancel()
         cancelAutoBuild()
+        lastInput = null
         localHistory.clear()
         redoPoint = null
         val undoable = canUndo(doc)
@@ -197,8 +219,12 @@ class VoiceViewModel(
             it.copy(
                 document = doc, summary = null, chat = emptyList(), chatTurn = null, chatPending = false, transcript = "",
                 summaryAction = null, undone = null, canUndo = undoable, canRedo = false, notice = null,
+                history = emptyList(), restartConfirm = false,
+                phase = if (it.chatPending && it.phase == VoicePhase.SENDING) VoicePhase.IDLE else it.phase,
+                error = if ((it.error as? VoiceError.Request)?.origin == VoiceError.Origin.CHAT) null else it.error,
             )
         }
+        reloadHistory(doc.appId)
     }
 
     /** 生成後のアプリの上で音声のシートを開く(マイク FAB・voiceInput の部品) */
@@ -250,6 +276,7 @@ class VoiceViewModel(
                     return@launch
                 }
                 val hadChat = _state.value.isChatting
+                val history = appliedHistory(_state.value, result.document.version, result.summary)
                 chatEpoch++
                 if (!before.dsl.isVoiceOnly && !result.unchanged) remember(before)
                 redoPoint = null
@@ -268,10 +295,15 @@ class VoiceViewModel(
                         chat = emptyList(),
                         chatTurn = null,
                         chatPending = false,
+                        history = history,
                     )
                 }
+                persist(result.document.appId, history)
                 log("generate ok: version=${result.document.version} mode=${result.mode} unchanged=${result.unchanged}")
-                if (hadChat) scope.launch { ai.resetChat(appId()) }
+                if (hadChat) {
+                    lastInput = null
+                    scope.launch { ai.resetChat(target) }
+                }
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Throwable) {
@@ -386,11 +418,23 @@ class VoiceViewModel(
     /** 質問のチップ(suggestions)をタップした */
     fun answer(text: String) = submit(text, InputSource.TEXT)
 
+    /** 複数選択の質問の「決定」: 選んだチップを「、」でつないで 1 つの答えにする(#220) */
+    fun answerMany(chips: List<String>) {
+        val text = MultiSelect.joinedAnswer(chips)
+        if (text.isNotEmpty()) answer(text)
+    }
+
     /** 案のカードの「これでいく」 */
     fun choose(option: ChatOption) {
-        if (_state.value.chatPending) return
+        val s = _state.value
+        if (s.chatPending || s.isGenerating) return
         val text = option.instructionText.trim()
         if (text.isNotEmpty()) generate(text)
+    }
+
+    /** 複数選択の案の「これでいく(N 件)」: 選んだ案を 1 つにまとめて作る(#220) */
+    fun chooseMany(options: List<ChatOption>) {
+        MultiSelect.combined(options)?.let(::choose)
     }
 
     /** ready の「これでいく」。transcript が無ければこれまでの発話をつなぐ */
@@ -416,8 +460,44 @@ class VoiceViewModel(
         }
     }
 
-    /** 「最初から」 */
+    /** 変更の相談の聞き返し中の「このまま反映」: これまでの指示(答えをもらった質問は除く)で変える */
+    fun applyNow() {
+        val s = _state.value
+        if (!s.isChatting || s.chatPending || s.isGenerating) return
+        val text = fallbackTranscript(s.chat)
+        if (text.isNotEmpty()) generate(text)
+    }
+
+    /**
+     * 「最初から」(iOS の `requestRestartChat`・M9)。これまでの会話(閉じた会話・反映の区切り)があれば
+     * 消してよいかを確かめる。無ければ今の会話だけ消す。
+     */
     fun restartChat() {
+        if (_state.value.history.isNotEmpty()) {
+            _state.update { it.copy(restartConfirm = true) }
+        } else {
+            restartLiveChat()
+        }
+    }
+
+    /** 今の会話だけ消す。これまでの区切りは残す */
+    fun restartLiveChat() {
+        resetLiveChat()
+        val s = _state.value
+        persist(s.document.appId, s.history)
+    }
+
+    /** 確かめた上で「これまでの会話も消す」: 今の会話も、このアプリの履歴も消す(戻せない) */
+    fun clearChatHistory() {
+        resetLiveChat()
+        val appId = _state.value.document.appId
+        _state.update { it.copy(history = emptyList()) }
+        scope.launch(io) { chatHistory.remove(appId) }
+    }
+
+    fun dismissRestartConfirm() = _state.update { it.copy(restartConfirm = false) }
+
+    private fun resetLiveChat() {
         val had = _state.value.isChatting
         chatEpoch++
         chatJob?.cancel()
@@ -428,6 +508,7 @@ class VoiceViewModel(
                 chat = emptyList(),
                 chatTurn = null,
                 chatPending = false,
+                restartConfirm = false,
                 phase = if (it.phase == VoicePhase.SENDING) VoicePhase.IDLE else it.phase,
                 error = if ((it.error as? VoiceError.Request)?.origin == VoiceError.Origin.CHAT) null else it.error,
             )
@@ -446,23 +527,28 @@ class VoiceViewModel(
         _state.update {
             it.copy(chat = it.chat + ChatBubble(fromUser = true, text = text), transcript = "", error = null)
         }
+        persistLive()
     }
 
     /** 今の履歴を送って返事を待つ。失敗は状態カード(origin = chat)で null。 */
     private suspend fun chatRound(): ChatTurn? {
         val epoch = chatEpoch
-        val history = _state.value.chat
+        val s = _state.value
+        val target = appId()
+        val mode = s.chatMode
+        // 過去の変更の要約 + 最後の反映より後 + 今の会話(#210)
+        val messages = ChatContext.messages(s.history, s.chat.map(::message), historyHeader)
         retryAction = { chatJob = scope.launch { chatRound() } }
         _state.update { it.copy(phase = VoicePhase.SENDING, chatPending = true, error = null) }
         return try {
-            // 新しい会話はサーバーに残った古い会話を消してから(iOS は turn で検出してやり直す。ここは先に消す)
-            if (history.size == 1) ai.resetChat(appId())
-            val messages = history.map {
-                ChatMessage(if (it.fromUser) ChatMessage.Role.USER else ChatMessage.Role.ASSISTANT, it.text)
+            val turn = if (messages.size == 1) {
+                startConversation(target, messages, mode)
+            } else {
+                ai.chat(target, messages, locale(), mode)
             }
-            val turn = ai.chat(appId(), messages, locale(), ChatMode.CREATE)
             if (epoch != chatEpoch) return null
-            log("chat: turn=${turn.turn} kind=${turn.kind} text=${turn.text}")
+            // 発話・返事の中身はログに出さない(種類と数だけ)
+            log("chat: mode=$mode turn=${turn.turn} kind=${turn.kind} options=${turn.options?.size ?: 0} multi=${turn.isMultiSelect}")
             _state.update {
                 it.copy(
                     phase = VoicePhase.IDLE,
@@ -471,21 +557,35 @@ class VoiceViewModel(
                     chat = it.chat + ChatBubble(fromUser = false, text = turn.text, kind = turn.kind),
                 )
             }
-            scheduleAutoBuildIfNeeded(turn)
+            persistLive()
+            scheduleAutoBuildIfNeeded(turn, mode)
             turn
         } catch (e: CancellationException) {
             throw e
         } catch (e: Throwable) {
             if (epoch != chatEpoch) return null
-            log("chat failed: $e")
-            showError(VoiceError.Request(FailureKind.classify(e), VoiceError.Origin.CHAT), retry = retryAction)
+            val kind = FailureKind.classify(e)
+            log("chat failed: $kind")
+            showError(VoiceError.Request(kind, VoiceError.Origin.CHAT), retry = retryAction)
             null
         }
     }
 
-    /** 声だけで新規作成を進めていて ready が来たら、少し待ってから作る(#160)。 */
-    private fun scheduleAutoBuildIfNeeded(turn: ChatTurn) {
-        if (!autoBuild || turn.kind != ChatTurn.Kind.READY || lastInput != InputSource.VOICE) return
+    /**
+     * 新しい会話の 1 発目(iOS の `ClarifyFlow.startConversation`)。DELETE を先に待たない。
+     * 1 件だけ送って `turn != 1` なら、サーバーに残った古い会話に追記されている: その時だけ消して送り直す。
+     */
+    private suspend fun startConversation(appId: String, messages: List<ChatMessage>, mode: ChatMode): ChatTurn {
+        val turn = ai.chat(appId, messages, locale(), mode)
+        if (turn.turn == 1) return turn
+        log("chat: stale conversation on server -> cleared and resent")
+        ai.resetChat(appId)
+        return ai.chat(appId, messages, locale(), mode)
+    }
+
+    /** 声だけで新規作成を進めていて ready が来たら、少し待ってから作る(#160)。変更の相談は必ずボタンで。 */
+    private fun scheduleAutoBuildIfNeeded(turn: ChatTurn, mode: ChatMode) {
+        if (!autoBuild() || mode != ChatMode.CREATE || turn.kind != ChatTurn.Kind.READY || lastInput != InputSource.VOICE) return
         val epoch = chatEpoch
         _state.update { it.copy(autoBuildPending = true) }
         autoBuildJob = scope.launch {
@@ -510,6 +610,38 @@ class VoiceViewModel(
             b.fromUser && b.text != buildNowUtterance && !answered
         }
         .joinToString("。") { chat[it].text }
+
+    // MARK: - 会話の履歴(#210・iOS の AppRuntime+ChatHistory)
+
+    private fun reloadHistory(appId: String) {
+        scope.launch {
+            val loaded = withContext(io) { chatHistory.load(appId) }
+            _state.update { if (it.document.appId == appId) it.copy(history = loaded) else it }
+        }
+    }
+
+    /** 反映した所に区切りを入れた履歴(今の会話は閉じた会話に移す)。対話を使っていないアプリには入れない */
+    private fun appliedHistory(s: VoiceUiState, version: Int, summary: String?): List<ChatHistoryEntry> {
+        val archived = s.history + liveEntries(s.chat)
+        if (archived.isEmpty()) return archived
+        return ChatHistoryStore.trimmed(archived + ChatHistoryEntry(ChatHistoryEntry.Kind.APPLIED, summary?.trim().orEmpty(), version))
+    }
+
+    /** 端末に保存する(閉じた会話 + 今の会話)。読み直すと全部が閉じた会話になる */
+    private fun persistLive() {
+        val s = _state.value
+        persist(s.document.appId, s.history + liveEntries(s.chat))
+    }
+
+    private fun persist(appId: String, entries: List<ChatHistoryEntry>) {
+        scope.launch(io) { chatHistory.save(entries, appId) }
+    }
+
+    private fun liveEntries(chat: List<ChatBubble>) = chat.map {
+        ChatHistoryEntry(if (it.fromUser) ChatHistoryEntry.Kind.USER else ChatHistoryEntry.Kind.ASSISTANT, it.text)
+    }
+
+    private fun message(b: ChatBubble) = ChatMessage(if (b.fromUser) ChatMessage.Role.USER else ChatMessage.Role.ASSISTANT, b.text)
 
     // MARK: - 状態カード
 
