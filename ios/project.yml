@@ -295,6 +295,11 @@ targets:
       # 設定の「ライセンス」は iOS と同じ一覧を同梱する(#973)
       - path: Metamon/Resources/ThirdPartyLicenses.json
         buildPhase: resources
+      # 規約・ポリシーは iOS と同じ同梱版をアプリ内で読む(#971)
+      - path: ../docs/legal
+        buildPhase: resources
+        type: group
+        includes: ["privacy-policy.md", "terms.md"]
       # iOS と同じ DSL 例をそのままバンドル(コピーを持たない)
       - path: ../docs/dsl/examples
         buildPhase: resources

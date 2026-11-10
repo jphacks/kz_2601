@@ -119,8 +119,8 @@ private struct MacNotificationSettings: View {
 
 // MARK: - プライバシー(AI への同意・クラッシュ報告・ポリシー・規約)
 
-/// iOS の `PrivacySettingsSection`(#246・#296・#446)と同じ保存先。同意の説明の画面(AIConsentView)は Mac に無いので、
-/// 未同意の時の「説明を読んで同意する」は表示だけ。取り消しは iOS と同じに使える。
+/// iOS の `PrivacySettingsSection`(#246・#296・#446)と同じ保存先。未同意の時の「説明を読んで同意する」は
+/// 同意の説明(`MacAIConsentSheet`・#971)を設定ウィンドウの上に開く。規約・ポリシーは同梱の文書をアプリ内で読む。
 private struct MacPrivacySettings: View {
     private let consent = AIConsentStore.shared
     private let crashReporting = CrashReportingPreference.shared
@@ -128,6 +128,8 @@ private struct MacPrivacySettings: View {
     private let aiButtonMetrics = AIButtonMetricsRecorder.shared
     #endif
     @State private var confirmRevoke = false
+    @State private var showConsent = false
+    @State private var legalDocument: LegalDocument?
 
     var body: some View {
         Form {
@@ -144,13 +146,12 @@ private struct MacPrivacySettings: View {
                     Button("同意を取り消す", role: .destructive) { confirmRevoke = true }
                         .accessibilityIdentifier("settings.aiConsent.revoke")
                 } else {
-                    MacUnavailableSettingRow(title: "説明を読んで同意する")
+                    Button("説明を読んで同意する") { showConsent = true }
+                        .accessibilityIdentifier("settings.aiConsent.grant")
                 }
                 ForEach(LegalDocument.allCases) { doc in
-                    if let url = doc.publicURL {
-                        Link(destination: url) { Label(doc.title, systemImage: doc.systemImage) }
-                            .accessibilityIdentifier("legal.\(doc.rawValue)")
-                    }
+                    Button { legalDocument = doc } label: { Label(doc.title, systemImage: doc.systemImage) }
+                        .accessibilityIdentifier("legal.\(doc.rawValue)")
                 }
             } header: {
                 Text("プライバシー")
@@ -174,6 +175,8 @@ private struct MacPrivacySettings: View {
             #endif
         }
         .formStyle(.grouped)
+        .sheet(isPresented: $showConsent) { MacAIConsentSheet() }
+        .sheet(item: $legalDocument) { MacLegalDocumentSheet(document: $0) }
         .alert("AI への送信の同意を取り消しますか？", isPresented: $confirmRevoke) {
             Button("取り消す", role: .destructive) { consent.revoke() }
             Button("キャンセル", role: .cancel) {}
@@ -187,12 +190,35 @@ private struct MacPrivacySettings: View {
 
 private struct MacDetailSettings: View {
     @State private var showLicenses = false
+    @State private var showTutorial = false // #971
+    #if !APP_STORE_REVIEW
+    @State private var showBetaWelcome = false // #971(β の版だけ)
+    private let betaWelcome = BetaWelcomeStore.shared
+    #endif
     @State private var showSupportDetails = false
     @State private var copiedSupportInfo = false
 
     var body: some View {
         let info = supportInfo
         Form {
+            Section {
+                Button {
+                    showTutorial = true
+                } label: {
+                    Label("使い方を見る", systemImage: "questionmark.circle")
+                }
+                .accessibilityIdentifier("settings.tutorial")
+                #if !APP_STORE_REVIEW
+                if betaWelcome.isBeta {
+                    Button {
+                        showBetaWelcome = true
+                    } label: {
+                        Label("β 版のご案内", systemImage: "testtube.2")
+                    }
+                    .accessibilityIdentifier("settings.betaWelcome")
+                }
+                #endif
+            }
             Section {
                 Link(destination: LegalDocument.contactURL) {
                     Label("お問い合わせ", systemImage: "envelope")
@@ -235,6 +261,20 @@ private struct MacDetailSettings: View {
         }
         .formStyle(.grouped)
         .sheet(isPresented: $showLicenses) { MacLicensesView() }
+        .sheet(isPresented: $showTutorial) {
+            MacTutorialView {
+                FirstRunTutorialStore.shared.markTutorialSeen()
+                showTutorial = false
+            }
+        }
+        #if !APP_STORE_REVIEW
+        .sheet(isPresented: $showBetaWelcome) {
+            MacBetaWelcomeView {
+                betaWelcome.markSeen()
+                showBetaWelcome = false
+            }
+        }
+        #endif
     }
 
     /// Mac はサインイン・音声モデル・接続先・開いているアプリの版を持たないので、バージョンだけ(#279 と同じ並び)。

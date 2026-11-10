@@ -17,6 +17,54 @@
         }
       }
     },
+    "AI が作るので、同じ頼み方でも毎回少し違うものができます。": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Because AI builds the app, the same request can give a slightly different result each time."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "AI が作るので、同じ頼み方でも毎回少し違うものができます。"
+          }
+        }
+      }
+    },
+    "AI との会話の履歴": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Your conversation with the AI"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "AI との会話の履歴"
+          }
+        }
+      }
+    },
+    "AI に送る内容の説明を改めました。もう一度ご確認ください。": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "We've updated what is sent to the AI. Please review it again."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "AI に送る内容の説明を改めました。もう一度ご確認ください。"
+          }
+        }
+      }
+    },
     "AI へのデータ送信": {
       "localizations": {
         "en": {
@@ -29,6 +77,22 @@
           "stringUnit": {
             "state": "translated",
             "value": "AI へのデータ送信"
+          }
+        }
+      }
+    },
+    "AI へのデータ送信について": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "About sending data to AI"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "AI へのデータ送信について"
           }
         }
       }
@@ -97,6 +161,22 @@
         }
       }
     },
+    "Tailor It β へようこそ": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Welcome to the Tailor It beta"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tailor It β へようこそ"
+          }
+        }
+      }
+    },
     "openUrl: url は https か line/slack/discord/tel/mailto/maps のみ": {
       "localizations": {
         "en": {
@@ -109,6 +189,134 @@
           "stringUnit": {
             "state": "translated",
             "value": "openUrl: url は https か line/slack/discord/tel/mailto/maps のみ"
+          }
+        }
+      }
+    },
+    "β の期間中は、作ったアプリや記録が消えることがあります。大事なデータは、ほかの場所にも残してください。": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "During the beta, the apps you make and your records may be erased. Keep a copy of anything important somewhere else."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "β の期間中は、作ったアプリや記録が消えることがあります。大事なデータは、ほかの場所にも残してください。"
+          }
+        }
+      }
+    },
+    "β 版のご案内": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "About the beta"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "β 版のご案内"
+          }
+        }
+      }
+    },
+    "β 版を試していただき、ありがとうございます。使ってみて気づいたことを、ぜひ教えてください。": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Thanks for trying the beta. Please tell us anything you notice while using it."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "β 版を試していただき、ありがとうございます。使ってみて気づいたことを、ぜひ教えてください。"
+          }
+        }
+      }
+    },
+    "「%@」": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "“%@”"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "「%@」"
+          }
+        }
+      }
+    },
+    "「AI で書く」ボタン(文を作る・要約・分類・書き直し・抜き出し・提案)は、押した時だけ送ります。短い答えは、端末の中の AI が使える時は送らず、使えない時だけ最近の記録と入力中の文字(最大 4KB)を送ります。長い答えのボタンは、いつも最大 16KB を送ります。共有のアプリで材料にするのは、自分が入れた記録だけです。": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "\"Write with AI\" buttons (write, summarize, classify, rewrite, extract, suggest) send data only when tapped. Short answers send nothing when on-device AI is available; otherwise they send recent records and the text being entered (up to 4KB). Long-answer buttons always send up to 16KB. In a shared app, only records you added are used."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "「AI で書く」ボタン(文を作る・要約・分類・書き直し・抜き出し・提案)は、押した時だけ送ります。短い答えは、端末の中の AI が使える時は送らず、使えない時だけ最近の記録と入力中の文字(最大 4KB)を送ります。長い答えのボタンは、いつも最大 16KB を送ります。共有のアプリで材料にするのは、自分が入れた記録だけです。"
+          }
+        }
+      }
+    },
+    "「AI で書く」ボタン(文を作る・要約・分類・書き直し・抜き出し・提案)は、端末の中の AI だけで動き、何も送りません。": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "\"Write with AI\" buttons (write, summarize, classify, rewrite, extract, suggest) run only with on-device AI and send nothing."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "「AI で書く」ボタン(文を作る・要約・分類・書き直し・抜き出し・提案)は、端末の中の AI だけで動き、何も送りません。"
+          }
+        }
+      }
+    },
+    "「AI と話す」部品は、送るたびに、そのアプリに保存した自分の会話の直近の発言(最大 20 件・16KB)を送ります。参考にする記録帳が決めてあるアプリでは、その記録帳の自分の記録の新しいもの(最大 20 件・8KB)も送ります。写真は「写真を材料にするボタン」を押した時だけ、縮めた 1 枚(JPEG・長い辺 1024 ピクセル以下)を送ります。音声・動画は送りません。": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The \"AI chat\" part sends the latest turns of your own conversation saved in that app (up to 20 turns, 16KB) each time you send a message. If the app sets a reference list, your own latest records from it (up to 20, 8KB) are also sent. A photo is sent only when you tap a \"photo\" AI button: one downscaled image (JPEG, long edge up to 1024 pixels). Audio and video are never sent."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "「AI と話す」部品は、送るたびに、そのアプリに保存した自分の会話の直近の発言(最大 20 件・16KB)を送ります。参考にする記録帳が決めてあるアプリでは、その記録帳の自分の記録の新しいもの(最大 20 件・8KB)も送ります。写真は「写真を材料にするボタン」を押した時だけ、縮めた 1 枚(JPEG・長い辺 1024 ピクセル以下)を送ります。音声・動画は送りません。"
+          }
+        }
+      }
+    },
+    "あとで": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Not now"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "あとで"
           }
         }
       }
@@ -225,6 +433,38 @@
         }
       }
     },
+    "はじめる": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Get started"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "はじめる"
+          }
+        }
+      }
+    },
+    "まだできないこと": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Not supported yet"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "まだできないこと"
+          }
+        }
+      }
+    },
     "やり直す": {
       "localizations": {
         "en": {
@@ -337,6 +577,38 @@
         }
       }
     },
+    "アプリを作る・直すときに、記録したデータ(数値・メモ・写真など)の中身は送りません。": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "When you build or edit an app, the contents of your records (numbers, notes, photos, etc.) are not sent."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "アプリを作る・直すときに、記録したデータ(数値・メモ・写真など)の中身は送りません。"
+          }
+        }
+      }
+    },
+    "アプリを作る・直すときは、次の内容を Anthropic 社の AI(Claude)に送ります。": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "When you build or edit an app, the following is sent to Anthropic's AI (Claude)."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "アプリを作る・直すときは、次の内容を Anthropic 社の AI(Claude)に送ります。"
+          }
+        }
+      }
+    },
     "アプリを作る・直すときは、話した内容・会話・アプリの設計を Anthropic 社の AI に送ります(記録の中身は送りません)。「AI で書く」ボタンは、押した時だけ送ります(短い答えは端末の中の AI が使えない時だけ最大 4KB、長い答えはいつも最大 16KB)。「AI と話す」部品は直近の会話(最大 20 件・16KB)と、決めてあれば参考の自分の記録(最大 20 件・8KB)を、写真のボタンは縮めた写真 1 枚を送ります。同意を取り消すと、AI を使う機能が使えなくなります(閲覧・記録は使えます)。送信済みの内容は取り消せません。": {
       "localizations": {
         "en": {
@@ -417,6 +689,22 @@
         }
       }
     },
+    "カレンダー・連絡先・銀行など、ほかのアプリやサービスのデータは読み込めません。": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "It can't read data from other apps or services, such as Calendar, Contacts, or your bank."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "カレンダー・連絡先・銀行など、ほかのアプリやサービスのデータは読み込めません。"
+          }
+        }
+      }
+    },
     "キャンセル": {
       "localizations": {
         "en": {
@@ -465,6 +753,22 @@
         }
       }
     },
+    "スキップ": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Skip"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "スキップ"
+          }
+        }
+      }
+    },
     "ソースコード": {
       "localizations": {
         "en": {
@@ -493,6 +797,22 @@
           "stringUnit": {
             "state": "translated",
             "value": "チャットで相談してから作る"
+          }
+        }
+      }
+    },
+    "データについて": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "About your data"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "データについて"
           }
         }
       }
@@ -541,6 +861,70 @@
           "stringUnit": {
             "state": "translated",
             "value": "プライバシーポリシー"
+          }
+        }
+      }
+    },
+    "ボタンを大きくして": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Make the buttons bigger"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ボタンを大きくして"
+          }
+        }
+      }
+    },
+    "マイクをクリックして「家計簿が欲しい」のように話すだけ。文字で入力しても作れます。": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Click the mic and say something like “I want a budget app.” You can also type it."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "マイクをクリックして「家計簿が欲しい」のように話すだけ。文字で入力しても作れます。"
+          }
+        }
+      }
+    },
+    "マイクをクリックして「家計簿をつけたい」のように話すだけ。文字で入力しても用意できます。": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Click the mic and say something like “I want to keep a budget.” You can also type it."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "マイクをクリックして「家計簿をつけたい」のように話すだけ。文字で入力しても用意できます。"
+          }
+        }
+      }
+    },
+    "メモ欄を足して": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Add a notes field"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "メモ欄を足して"
           }
         }
       }
@@ -641,6 +1025,22 @@
         }
       }
     },
+    "今のアプリの設計(画面・項目・アプリ名など)": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The current app design (screens, fields, app name, etc.)"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "今のアプリの設計(画面・項目・アプリ名など)"
+          }
+        }
+      }
+    },
     "今の記録帳の版": {
       "localizations": {
         "en": {
@@ -653,6 +1053,22 @@
           "stringUnit": {
             "state": "translated",
             "value": "今の記録帳の版"
+          }
+        }
+      }
+    },
+    "今の記録帳の画面の形(画面・項目・名前など)": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The current tracker's layout (screens, fields, name, etc.)"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "今の記録帳の画面の形(画面・項目・名前など)"
           }
         }
       }
@@ -685,6 +1101,22 @@
           "stringUnit": {
             "state": "translated",
             "value": "他の人の行動で届く通知"
+          }
+        }
+      }
+    },
+    "使い方を見る": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "How to use"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "使い方を見る"
           }
         }
       }
@@ -753,6 +1185,22 @@
         }
       }
     },
+    "元に戻して": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Undo"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "元に戻して"
+          }
+        }
+      }
+    },
     "元に戻す": {
       "localizations": {
         "en": {
@@ -797,6 +1245,22 @@
           "stringUnit": {
             "state": "translated",
             "value": "先に保存してください"
+          }
+        }
+      }
+    },
+    "入力の画面に「メモ」の欄を足して": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Add a \"Note\" field to the entry form"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "入力の画面に「メモ」の欄を足して"
           }
         }
       }
@@ -961,6 +1425,54 @@
         }
       }
     },
+    "同意して使う": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Agree and continue"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "同意して使う"
+          }
+        }
+      }
+    },
+    "同意しなくても、作ったアプリの閲覧・記録はできます。AI を使う機能だけが使えません。同意は設定からいつでも取り消せます(送信済みの内容は取り消せません)。": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Without consent you can still view and record in your apps; only AI features are unavailable. You can withdraw consent in Settings at any time (data already sent cannot be recalled)."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "同意しなくても、作ったアプリの閲覧・記録はできます。AI を使う機能だけが使えません。同意は設定からいつでも取り消せます(送信済みの内容は取り消せません)。"
+          }
+        }
+      }
+    },
+    "同意しなくても、記録帳の閲覧・記録はできます。AI を使う機能だけが使えません。同意は設定からいつでも取り消せます(送信済みの内容は取り消せません)。": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Without consent you can still view and record in your trackers; only AI features are unavailable. You can withdraw consent in Settings at any time (data already sent cannot be recalled)."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "同意しなくても、記録帳の閲覧・記録はできます。AI を使う機能だけが使えません。同意は設定からいつでも取り消せます(送信済みの内容は取り消せません)。"
+          }
+        }
+      }
+    },
     "同意を取り消す": {
       "localizations": {
         "en": {
@@ -1037,6 +1549,22 @@
           "stringUnit": {
             "state": "translated",
             "value": "声で頼む"
+          }
+        }
+      }
+    },
+    "家計簿アプリを作って": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Make a budget app"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "家計簿アプリを作って"
           }
         }
       }
@@ -1137,6 +1665,22 @@
         }
       }
     },
+    "文書を読み込めませんでした": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Couldn't load the document"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "文書を読み込めませんでした"
+          }
+        }
+      }
+    },
     "新しいアプリ": {
       "localizations": {
         "en": {
@@ -1233,6 +1777,22 @@
         }
       }
     },
+    "最新版をウェブで見る": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "View the latest version on the web"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "最新版をウェブで見る"
+          }
+        }
+      }
+    },
     "未同意": {
       "localizations": {
         "en": {
@@ -1281,6 +1841,38 @@
         }
       }
     },
+    "次へ": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Next"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "次へ"
+          }
+        }
+      }
+    },
+    "毎日の体重を記録して、グラフで見せて": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Log my weight every day and show it as a graph"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "毎日の体重を記録して、グラフで見せて"
+          }
+        }
+      }
+    },
     "版": {
       "localizations": {
         "en": {
@@ -1293,6 +1885,22 @@
           "stringUnit": {
             "state": "translated",
             "value": "版"
+          }
+        }
+      }
+    },
+    "画面がたくさんつながるアプリや、ゲームのように動くアプリは、思った通りにできないことがあります。": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Apps with many connected screens, or game-like apps with motion, may not turn out as you expect."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "画面がたくさんつながるアプリや、ゲームのように動くアプリは、思った通りにできないことがあります。"
           }
         }
       }
@@ -1361,6 +1969,22 @@
         }
       }
     },
+    "筋トレの記録アプリを作って": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Make a workout log app"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "筋トレの記録アプリを作って"
+          }
+        }
+      }
+    },
     "答えがそろったら自動で作る": {
       "localizations": {
         "en": {
@@ -1425,6 +2049,38 @@
         }
       }
     },
+    "記録帳を用意する・直すときに、記録したデータ(数値・メモ・写真など)の中身は送りません。": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "When you set up or adjust a tracker, the contents of your records (numbers, notes, photos, etc.) are not sent."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "記録帳を用意する・直すときに、記録したデータ(数値・メモ・写真など)の中身は送りません。"
+          }
+        }
+      }
+    },
+    "記録帳を用意する・直すときは、次の内容を Anthropic 社の AI(Claude)に送ります。": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "When you set up or adjust a tracker, the following is sent to Anthropic's AI (Claude)."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "記録帳を用意する・直すときは、次の内容を Anthropic 社の AI(Claude)に送ります。"
+          }
+        }
+      }
+    },
     "記録帳を用意する・直すときは、話した内容・会話・記録帳の画面の形を Anthropic 社の AI に送ります(記録の中身は送りません)。「AI で書く」ボタンは端末の中の AI だけで動き、送りません。同意を取り消すと、AI を使う機能が使えなくなります(閲覧・記録は使えます)。送信済みの内容は取り消せません。": {
       "localizations": {
         "en": {
@@ -1485,6 +2141,70 @@
           "stringUnit": {
             "state": "translated",
             "value": "設定を開く"
+          }
+        }
+      }
+    },
+    "試してほしい依頼": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Things to try"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "試してほしい依頼"
+          }
+        }
+      }
+    },
+    "話した内容・入力した文(端末内で文字にしたもの。音声そのものは送りません)": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "What you said or typed (transcribed on this device; audio itself is never sent)"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "話した内容・入力した文(端末内で文字にしたもの。音声そのものは送りません)"
+          }
+        }
+      }
+    },
+    "話すと、アプリができる": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Talk, and an app appears"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "話すと、アプリができる"
+          }
+        }
+      }
+    },
+    "話すと、記録帳が用意できる": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Talk, and your tracker is ready"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "話すと、記録帳が用意できる"
           }
         }
       }
@@ -1565,6 +2285,38 @@
           "stringUnit": {
             "state": "translated",
             "value": "読み上げ"
+          }
+        }
+      }
+    },
+    "送り先: Tailor It のサーバー(Google Cloud)を経由して Anthropic, PBC(米国)へ。送った内容は、アプリを作る・ボタンの文を作る・会話の返事を作るためだけに使います。": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Destination: Anthropic, PBC (USA), via Tailor It's server (Google Cloud). It is used only to build your app, write a button's text or reply in a chat."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "送り先: Tailor It のサーバー(Google Cloud)を経由して Anthropic, PBC(米国)へ。送った内容は、アプリを作る・ボタンの文を作る・会話の返事を作るためだけに使います。"
+          }
+        }
+      }
+    },
+    "送り先: Tailor It のサーバー(Google Cloud)を経由して Anthropic, PBC(米国)へ。送った内容は、記録帳の画面を用意するためだけに使います。": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Destination: Anthropic, PBC (USA), via Tailor It's server (Google Cloud). It is used only to set up your tracker's screens."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "送り先: Tailor It のサーバー(Google Cloud)を経由して Anthropic, PBC(米国)へ。送った内容は、記録帳の画面を用意するためだけに使います。"
           }
         }
       }

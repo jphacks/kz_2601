@@ -9,9 +9,18 @@ import MetamonServices
 struct MetamonMacApp: App {
     private let apps = SampleAppCatalog.load()
 
+    init() {
+        // UI テスト・手元の確認用(DEBUG のみ・iOS と同じ環境変数): METAMON_AI_CONSENT / METAMON_TUTORIAL / METAMON_BETA_WELCOME(#971)
+        AIConsentDebug.applyLaunchOverride()
+        FirstRunTutorialStore.shared.applyLaunchOverride()
+        #if !APP_STORE_REVIEW
+        BetaWelcomeStore.shared.applyLaunchOverride()
+        #endif
+    }
+
     var body: some Scene {
         WindowGroup(id: MacCommands.mainWindowId) {
-            MacLanguageRoot { MacRootView(apps: apps) } // 設定の「言語」で即時切替(#973・iOS と同じ)
+            MacLanguageRoot { MacRootView(apps: apps).macOnboarding() } // 設定の「言語」で即時切替(#973)・初回の案内(#971)
         }
         .defaultSize(width: 1100, height: 720)
         .windowResizability(.contentMinSize)
