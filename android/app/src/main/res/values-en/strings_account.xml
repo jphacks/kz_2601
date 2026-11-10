@@ -17,8 +17,17 @@
     <string name="account_sign_out_title">Sign out?</string>
     <string name="account_sign_out_without_sending">Sign Out Without Sending</string>
     <string name="account_signing_out">Signing out…</string>
-    <string name="account_unsent_after_flush">%1$d records couldn’t be sent. If you sign out without sending, they’ll be lost.</string>
-    <string name="account_unsent_offline">You have %1$d unsent records. You’re offline, so they can’t be sent now. If you sign out without sending, they’ll be lost.</string>
+    <plurals name="account_unsent_after_flush">
+        <item quantity="one">%1$d record couldn’t be sent. If you sign out without sending, it’ll be lost.</item>
+        <item quantity="other">%1$d records couldn’t be sent. If you sign out without sending, they’ll be lost.</item>
+    </plurals>
+    <plurals name="account_unsent_offline">
+        <item quantity="one">You have %1$d unsent record. You’re offline, so it can’t be sent now. If you sign out without sending, it’ll be lost.</item>
+        <item quantity="other">You have %1$d unsent records. You’re offline, so they can’t be sent now. If you sign out without sending, they’ll be lost.</item>
+    </plurals>
     <string name="account_unsent_title">Some records couldn’t be sent</string>
-    <string name="account_unsent_will_send">You have %1$d unsent records. They’ll be sent before you sign out.</string>
+    <plurals name="account_unsent_will_send">
+        <item quantity="one">You have %1$d unsent record. It’ll be sent before you sign out.</item>
+        <item quantity="other">You have %1$d unsent records. They’ll be sent before you sign out.</item>
+    </plurals>
 </resources>

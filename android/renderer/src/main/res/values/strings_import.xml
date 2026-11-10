@@ -11,19 +11,31 @@
     <string name="renderer_import_ok">OK</string>
     <string name="renderer_import_unusable">fileImport: この entity には取り込めません</string>
     <string name="renderer_import_kind_note">PDF・録音ファイルはこの端末ではまだ取り込めません</string>
-    <string name="renderer_import_added">%1$d 件を追加しました</string>
-    <string name="renderer_import_added_partly">%1$d 件を追加しました(%2$d 件は追加できませんでした)</string>
+    <plurals name="renderer_import_added">
+        <item quantity="other">%1$d 件を追加しました</item>
+    </plurals>
+    <plurals name="renderer_import_added_partly">
+        <item quantity="other">%1$d 件を追加しました(%2$d 件は追加できませんでした)</item>
+    </plurals>
     <string name="renderer_import_separator">・</string>
-    <string name="renderer_import_csv_count">「%1$s」に %2$d 件を追加します。</string>
+    <plurals name="renderer_import_csv_count">
+        <item quantity="other">「%1$s」に %2$d 件を追加します。</item>
+    </plurals>
     <string name="renderer_import_csv_used">使う列: %1$s</string>
     <string name="renderer_import_csv_unused">使わない列: %1$s</string>
     <string name="renderer_import_csv_failures">読めない行: %1$d 行(入れません)</string>
-    <string name="renderer_import_csv_over">上限(1 回 %1$d 件・合計 %2$d 件)を超える %3$d 行は入れません</string>
+    <plurals name="renderer_import_csv_over">
+        <item quantity="other">上限(1 回 %1$d 件・合計 %2$d 件)を超える %3$d 行は入れません</item>
+    </plurals>
     <string name="renderer_import_failure_invalid">%1$d 行目: %2$s「%3$s」を読めません</string>
     <string name="renderer_import_failure_required">%1$d 行目: %2$sが空です</string>
     <string name="renderer_import_failure_too_long">%1$d 行目: %2$sが長すぎます</string>
-    <string name="renderer_import_body">「%1$s」から %2$d 文字を「%3$s」に 1 件追加します。</string>
-    <string name="renderer_import_body_truncated">長いので先頭の %1$d 文字だけ入れます。</string>
+    <plurals name="renderer_import_body">
+        <item quantity="other">「%1$s」から %2$d 文字を「%3$s」に 1 件追加します。</item>
+    </plurals>
+    <plurals name="renderer_import_body_truncated">
+        <item quantity="other">長いので先頭の %1$d 文字だけ入れます。</item>
+    </plurals>
     <string name="renderer_import_problem_unsupported">この種類のファイルは取り込めません</string>
     <string name="renderer_import_problem_open">ファイルを開けませんでした</string>
     <string name="renderer_import_problem_too_large">ファイルが大きすぎます(%1$dMB まで)</string>

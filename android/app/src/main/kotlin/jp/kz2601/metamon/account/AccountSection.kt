@@ -21,6 +21,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
@@ -139,7 +140,7 @@ fun AccountSection(container: AppContainer, user: AuthUser, busy: Boolean) {
         is AccountDialog.Unsent -> AlertDialog(
             onDismissRequest = { dialog = null },
             title = { Text(stringResource(R.string.account_unsent_title)) },
-            text = { Text(stringResource(R.string.account_unsent_after_flush, d.count)) },
+            text = { Text(pluralStringResource(R.plurals.account_unsent_after_flush, d.count, d.count)) },
             confirmButton = {
                 TextButton(onClick = { signOut(SignOutFlow.Choice.DISCARD_AND_WIPE) }) {
                     Text(stringResource(R.string.account_sign_out_without_sending), color = MaterialTheme.colorScheme.error)
@@ -183,7 +184,7 @@ fun AccountSection(container: AppContainer, user: AuthUser, busy: Boolean) {
 private fun SignOutDialog(prompt: SignOutFlow.Prompt, isAnonymous: Boolean, onChoose: (SignOutFlow.Choice) -> Unit, onDismiss: () -> Unit) {
     val base = stringResource(if (isAnonymous) R.string.account_sign_out_anonymous else R.string.account_sign_out_signed_in)
     val unsent = (prompt as? SignOutFlow.Prompt.Unsent)?.let {
-        stringResource(if (it.canSend) R.string.account_unsent_will_send else R.string.account_unsent_offline, it.count)
+        pluralStringResource(if (it.canSend) R.plurals.account_unsent_will_send else R.plurals.account_unsent_offline, it.count, it.count)
     }
     AlertDialog(
         onDismissRequest = onDismiss,

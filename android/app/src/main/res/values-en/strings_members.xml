@@ -4,7 +4,10 @@
     <string name="members_admin">Admin</string>
     <string name="members_admin_failed">Couldn\'t change the admin, so it was reverted</string>
     <string name="members_cancel">Cancel</string>
-    <string name="members_count">%1$d people</string>
+    <plurals name="members_count">
+        <item quantity="one">%1$d person</item>
+        <item quantity="other">%1$d people</item>
+    </plurals>
     <string name="members_creator">Creator</string>
     <string name="members_footer">Only the people listed here can see this share\'s records</string>
     <string name="members_full">This share is full (100 people). No one else can join.</string>

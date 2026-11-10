@@ -4,7 +4,9 @@
     <string name="members_admin">管理者</string>
     <string name="members_admin_failed">管理者を変更できませんでした。元に戻しました</string>
     <string name="members_cancel">キャンセル</string>
-    <string name="members_count">%1$d 人</string>
+    <plurals name="members_count">
+        <item quantity="other">%1$d 人</item>
+    </plurals>
     <string name="members_creator">作成者</string>
     <string name="members_footer">この共有の記録を見られるのは、ここにいる人だけです</string>
     <string name="members_full">参加している人が上限(100 人)に達しています。これ以上は参加できません</string>

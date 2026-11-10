@@ -5,7 +5,9 @@
     <string name="play_bracket_bye">不戦勝</string>
     <string name="play_bracket_champion">優勝: %1$s</string>
     <string name="play_bracket_final">決勝</string>
-    <string name="play_bracket_late">開始後に追加された %1$d 人は、この表に入りません</string>
+    <plurals name="play_bracket_late">
+        <item quantity="other">開始後に追加された %1$d 人は、この表に入りません</item>
+    </plurals>
     <string name="play_bracket_locked">先の回戦の結果を取り消してから変えてください</string>
     <string name="play_bracket_lost">負け</string>
     <string name="play_bracket_make_winner">勝者にする</string>

@@ -4,7 +4,10 @@
     <string name="play_bracket_bye">Bye</string>
     <string name="play_bracket_champion">Champion: %1$s</string>
     <string name="play_bracket_final">Final</string>
-    <string name="play_bracket_late">%1$d entrants added after the start are not in this bracket</string>
+    <plurals name="play_bracket_late">
+        <item quantity="one">%1$d entrant added after the start is not in this bracket</item>
+        <item quantity="other">%1$d entrants added after the start are not in this bracket</item>
+    </plurals>
     <string name="play_bracket_locked">Undo the later round\'s result first</string>
     <string name="play_bracket_lost">Lost</string>
     <string name="play_bracket_make_winner">make the winner</string>

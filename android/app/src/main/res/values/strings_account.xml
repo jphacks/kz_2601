@@ -18,8 +18,14 @@
     <string name="account_sign_out_title">ログアウトしますか？</string>
     <string name="account_sign_out_without_sending">送らずにログアウト</string>
     <string name="account_signing_out">ログアウトしています…</string>
-    <string name="account_unsent_after_flush">%1$d 件の記録を送れませんでした。送らずにログアウトすると、この記録は消えます。</string>
-    <string name="account_unsent_offline">まだ送っていない記録が %1$d 件あります。今はオフラインのため送れません。送らずにログアウトすると、この記録は消えます。</string>
+    <plurals name="account_unsent_after_flush">
+        <item quantity="other">%1$d 件の記録を送れませんでした。送らずにログアウトすると、この記録は消えます。</item>
+    </plurals>
+    <plurals name="account_unsent_offline">
+        <item quantity="other">まだ送っていない記録が %1$d 件あります。今はオフラインのため送れません。送らずにログアウトすると、この記録は消えます。</item>
+    </plurals>
     <string name="account_unsent_title">送れなかった記録があります</string>
-    <string name="account_unsent_will_send">まだ送っていない記録が %1$d 件あります。送ってからログアウトします。</string>
+    <plurals name="account_unsent_will_send">
+        <item quantity="other">まだ送っていない記録が %1$d 件あります。送ってからログアウトします。</item>
+    </plurals>
 </resources>

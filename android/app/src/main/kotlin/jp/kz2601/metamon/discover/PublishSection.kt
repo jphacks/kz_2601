@@ -29,6 +29,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
@@ -73,7 +74,7 @@ fun PublishSection(appId: String, appName: String) {
             }
             listing != null -> {
                 Text(
-                    stringResource(R.string.publish_live, listing.installs),
+                    pluralStringResource(R.plurals.publish_live, listing.installs, listing.installs),
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.testTag("publish.live"),
