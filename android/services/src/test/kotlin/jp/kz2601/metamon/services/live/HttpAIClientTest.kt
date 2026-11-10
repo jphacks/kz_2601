@@ -211,6 +211,26 @@ class HttpAIClientTest {
     }
 
     @Test
+    fun capabilitiesAreSentToGenerateAndChat() = runBlocking<Unit> {
+        val caps = ClientCapabilities(
+            allowedComponents = listOf("vstack", "text"),
+            disabledFeatures = listOf("fieldHealth"),
+            supportedFeatures = listOf("singleEntity"),
+        )
+        val client = HttpAIClient(server.metamonHttp(), caps)
+        server.enqueue(json(200, result()))
+        server.enqueue(json(200, """{"kind":"answer","text":"はい","turn":1}"""))
+        client.morph("x", "app1", currentVersion = 0)
+        client.chat("app1", emptyList())
+
+        for (sent in listOf(body(server.take()), body(server.take()))) {
+            assertEquals("""["vstack","text"]""", sent["allowedComponents"].toString())
+            assertEquals("""["fieldHealth"]""", sent["disabledFeatures"].toString())
+            assertEquals("""["singleEntity"]""", sent["supportedFeatures"].toString())
+        }
+    }
+
+    @Test
     fun plainMorphConflictRetriesOnce() = runBlocking<Unit> {
         server.enqueue(json(409, errorBody("version_conflict")))
         server.enqueue(json(409, errorBody("version_conflict")))
