@@ -1,5 +1,6 @@
 package jp.kz2601.metamon.runtime
 
+import jp.kz2601.metamon.R
 import jp.kz2601.metamon.dsl.records.Entity
 import jp.kz2601.metamon.dsl.records.RecordRetention
 import jp.kz2601.metamon.services.consent.KeyValueStore
@@ -76,20 +77,36 @@ class RecordRetentionRunner(
     suspend fun purgeAll(appId: String, entities: List<Entity>): List<String> =
         entities.filter { it.retentionDays != null && purge(appId, it) > 0 }.map { it.id }
 
-    /** 1 つの entity の期限切れを消す(ローカル DB の内容で判定)。消した件数。 */
+    /**
+     * 1 つの entity の期限切れを消す(ローカル DB の内容で判定)。消した件数。
+     * サインインしていない・途中で人が変わった(サインアウト・後片付け)時は消さない(前の人の行を次の人の送信の列に積まない)。
+     */
     suspend fun purge(appId: String, entity: Entity): Int {
         val days = RecordRetention.activeDays(entity, consent.days(appId, entity.id)) ?: return 0
+        val uid = currentUserId() ?: return 0
         val key = "$appId/${entity.id}"
         if (!synchronized(purging) { purging.add(key) }) return 0
         try {
             // 削除待ち・取り消し待ちの行は cached に出ない(通常の削除と重ねない)
             val rows = recordSync.cached(appId, entity.id).map { it.toDsl() }
-            val gone = RecordRetention.expired(rows, entity, days, now(), currentUserId())
-            for (r in gone) recordSync.delete(appId, entity.id, r.id)
-            return gone.size
+            val gone = RecordRetention.expired(rows, entity, days, now(), uid)
+            var count = 0
+            for (r in gone) {
+                if (currentUserId() != uid) break
+                recordSync.delete(appId, entity.id, r.id)
+                count++
+            }
+            return count
         } finally {
             synchronized(purging) { purging.remove(key) }
         }
+    }
+
+    /** ログアウト・別の人のサインイン(#841・iOS は UserDefaults ごと消す)。確認・「あとで」・出している確認を忘れる。 */
+    fun forget() {
+        consent.clear()
+        synchronized(deferred) { deferred.clear() }
+        _prompt.value = null
     }
 
     private fun consented(appId: String, entities: List<Entity>): Map<String, Int> =
@@ -101,15 +118,34 @@ interface RetentionConsentStore {
     fun days(appId: String, entity: String): Int?
 
     fun set(appId: String, entity: String, days: Int)
+
+    /** すべて忘れる(後片付け)。 */
+    fun clear()
 }
 
-/** [KeyValueStore](SharedPreferences)に `retention.consent.<appId>.<entity>` で覚える。 */
+/** [KeyValueStore](SharedPreferences)に `retention.consent.<appId>.<entity>` で覚える。消すために覚えたキーの一覧も持つ。 */
 class KeyValueRetentionConsent(private val store: KeyValueStore) : RetentionConsentStore {
     override fun days(appId: String, entity: String): Int? = store.getInt(key(appId, entity))
 
-    override fun set(appId: String, entity: String, days: Int) = store.putInt(key(appId, entity), days)
+    override fun set(appId: String, entity: String, days: Int) = synchronized(this) {
+        val k = key(appId, entity)
+        val keys = index()
+        if (k !in keys) store.putString(INDEX, (keys + k).joinToString("\n"))
+        store.putInt(k, days)
+    }
+
+    override fun clear() = synchronized(this) {
+        index().forEach(store::remove)
+        store.remove(INDEX)
+    }
+
+    private fun index(): List<String> = store.getString(INDEX)?.split("\n")?.filter { it.isNotEmpty() }.orEmpty()
 
     private fun key(appId: String, entity: String) = "retention.consent.$appId.$entity"
+
+    private companion object {
+        const val INDEX = "retention.consent.keys"
+    }
 }
 
 /** 確認ダイアログの中身(iOS の `RetentionPrompt`)。 */
@@ -118,20 +154,17 @@ data class RetentionPrompt(val appId: String, val version: Int, val items: List<
 
     val id: String get() = "$appId#$version#" + items.joinToString(",") { "${it.entity}=${it.days}" }
 
-    /** 「支出」は30日 … たった記録を自動で消します。 */
-    fun message(english: Boolean): String {
-        val shared = items.any { it.isShared }
-        if (english) {
-            val parts = items.joinToString(", ") { "${it.name}: ${RecordRetention.periodLabel(it.days, english = true)}" }
-            return "Entries older than the period will be deleted automatically ($parts). Deleted entries cannot be restored." +
-                if (shared) " For shared entries, only the ones you added are deleted." else ""
+    /**
+     * 「支出」は30日 … たった記録を自動で消します。文は strings_retention.xml([text] = `Context.getString`)。
+     * [english] は期間の言い方(:dsl の [RecordRetention.periodLabel])にだけ使う。
+     */
+    fun message(english: Boolean, text: (id: Int, args: Array<out Any>) -> String): String {
+        val parts = items.joinToString(text(R.string.retention_message_separator, emptyArray())) {
+            text(R.string.retention_message_item, arrayOf(it.name, RecordRetention.periodLabel(it.days, english)))
         }
-        val parts = items.joinToString("、") { "「${it.name}」は${RecordRetention.periodLabel(it.days)}" }
-        return parts + "たった記録を自動で消します。消えた記録は元に戻せません。" + if (shared) "共有の記録は自分が追加したものだけが消えます。" else ""
+        val shared = if (items.any { it.isShared }) text(R.string.retention_settings_footer_shared, emptyArray()) else ""
+        return text(R.string.retention_message, arrayOf(parts)) + shared
     }
-
-    /** 「自動で消すのをやめる」で送る指示文(声で言うのと同じ・iOS の `removeRetention`)。 */
-    fun stopInstruction(english: Boolean): String = if (english) "Stop deleting entries automatically" else "記録を自動で消すのをやめて"
 
     companion object {
         fun of(appId: String, version: Int, entities: List<Entity>) = RetentionPrompt(

@@ -209,6 +209,7 @@ class AppContainer(
                 consentPrompt.reset()
                 aiButtonMetrics.clearCounts()
                 social?.ageGate?.reset() // 18 歳以上の確認(#877)も人ごと(iOS は UserDefaults ごと消す)
+                runtime.retention?.forget() // 記録の保存期間の確認(#482)も人ごと(iOS は UserDefaults ごと消す)
             },
         )
     }
@@ -478,7 +479,11 @@ class AppContainer(
             aiHost = aiHost,
             authorProfile = authorProfile,
             socialServices = social,
-            retention = RecordRetentionRunner(recordSync, retentionConsent, currentUserId = { auth.currentUser.value?.uid }),
+            // 後片付けを始めたら(ActiveOwner が外れたら)消さない(#841 の OwnerGatedTokens と同じ)
+            retention = RecordRetentionRunner(
+                recordSync, retentionConsent,
+                currentUserId = { activeOwner.uid?.takeIf { it == auth.currentUser.value?.uid } },
+            ),
         ).also { it.dictation = TranscriberDictationHost(transcriber, CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)) }
     }
 
