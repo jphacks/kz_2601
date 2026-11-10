@@ -53,7 +53,7 @@ class DeviceCapabilitiesTest {
     fun supportedFeaturesOfTheStandardBuild() {
         assertEquals(
             listOf(
-                "matching", "notification.when", "singleEntity", "addressedMessages", "aiButton.long", "aiButton.inputPhoto", "aiButton.saveTo",
+                "recordRetention", "matching", "notification.when", "singleEntity", "addressedMessages", "aiButton.long", "aiButton.inputPhoto", "aiButton.saveTo",
                 "action.lookupBook", "feed.v2", "expr.addMinutes", "aiChat.inputEntity", "component.bracket", "progressBar.settingTarget",
             ),
             caps.supportedFeatures,
