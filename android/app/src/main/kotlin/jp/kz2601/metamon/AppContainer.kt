@@ -4,7 +4,9 @@ import android.content.Context
 import android.util.Log
 import jp.kz2601.metamon.dsl.AppDSL
 import jp.kz2601.metamon.dsl.AppDocument
+import jp.kz2601.metamon.runtime.AiTextAccess
 import jp.kz2601.metamon.runtime.AndroidRuntimeHost
+import jp.kz2601.metamon.runtime.AppAiHost
 import jp.kz2601.metamon.runtime.AppDirectory
 import jp.kz2601.metamon.runtime.AppRuntime
 import jp.kz2601.metamon.runtime.RuntimeHost
@@ -237,6 +239,21 @@ class AppContainer(
                 cache = appList,
                 fresh = { id -> AppDocument(appId = id, dsl = initialDsl) },
             ),
+            aiHost = aiHost,
+        )
+    }
+
+    /**
+     * aiButton のホスト(#873)。端末内 AI(Gemini Nano)はまだ入れていないので、いつもオンライン版に回る。
+     * 同意の画面(#053)が入るまで、本物の構成は同意していない扱い(記録の中身を送らない)。モックは同意済み・課金の制限なし。
+     */
+    private val aiHost: AppAiHost by lazy {
+        AppAiHost(
+            ai = ai,
+            appId = { runtime.document.appId },
+            access = { AiTextAccess(consentGranted = knobs.mock, isPro = false, enforced = !knobs.mock) },
+            sharedApp = { runtime.entityModels.any { it.isShared } },
+            isMock = knobs.mock,
         )
     }
 }

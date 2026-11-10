@@ -17,6 +17,7 @@ import jp.kz2601.metamon.dsl.logic.ExternalUrlPolicy
 import jp.kz2601.metamon.renderer.NavigationHost
 import jp.kz2601.metamon.renderer.components.play.RecordWriter
 import jp.kz2601.metamon.renderer.components.play.TimerHost
+import jp.kz2601.metamon.renderer.components.ai.AiHost
 import jp.kz2601.metamon.renderer.form.FormDraft
 import jp.kz2601.metamon.renderer.form.FormPrefill
 import jp.kz2601.metamon.renderer.navigation.NavigationResolver
@@ -101,6 +102,8 @@ class AppRuntime(
     private val recordsRefreshDelayMillis: Long = 250,
     /** 今のアプリの appId の保存・アプリの一覧・新しいアプリ(#881)。null なら appId は固定(モック・テスト) */
     private val directory: AppDirectory? = null,
+    /** aiButton のオンライン版・端末内 AI(#873)。null なら AI ボタンは理由つきで無効 */
+    private val aiHost: AiHost? = null,
 ) : DSLRuntime, NavigationHost, RecordWriter, TimerHost {
     private val _state = MutableStateFlow(RuntimeState(document))
     val state: StateFlow<RuntimeState> = _state.asStateFlow()
@@ -507,6 +510,14 @@ class AppRuntime(
         setRecords(document.appId, entity, list)
         return id
     }
+
+    // AI ボタン(#873)
+
+    override val ai: AiHost? get() = aiHost
+
+    override suspend fun loadRecords(entities: Set<String>) = load(entities)
+
+    override suspend fun addRecord(entity: String, data: Map<String, JSONValue>): Boolean = createRecord(entity, data) != null
 
     /** 一覧から消して「元に戻す」を出す。前の取り消し待ちは時間が来たら送られる。 */
     suspend fun deleteUndoably(entity: String, recordId: String) {
