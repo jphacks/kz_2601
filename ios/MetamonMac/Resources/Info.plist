@@ -67,6 +67,11 @@
 	<!-- musicPlayer(#960): Apple Music の検索と再生(MusicKit の ApplicationMusicPlayer)。文言は iOS と同じ -->
 	<key>NSAppleMusicUsageDescription</key>
 	<string>生成したアプリの音楽プレーヤーで、Apple Music の曲を検索して再生するために使用します。</string>
+	<!-- 現在地(#956)。文言は iOS と同じ。macOS は NSLocationUsageDescription も見るので同じ文にする -->
+	<key>NSLocationWhenInUseUsageDescription</key>
+	<string>生成したアプリで現在地を記録・地図に表示したり、目的地まで道案内したり、保存した場所の近くに着いた時に通知したりするために使います(近くに着いたかは端末の中で判定します)。「記録を開始」を押した時だけ、停止するまで(最長4時間)散歩などの道のりを記録し、その間はアプリを閉じても記録を続けます。</string>
+	<key>NSLocationUsageDescription</key>
+	<string>生成したアプリで現在地を記録・地図に表示したり、目的地まで道案内したり、保存した場所の近くに着いた時に通知したりするために使います(近くに着いたかは端末の中で判定します)。「記録を開始」を押した時だけ、停止するまで(最長4時間)散歩などの道のりを記録し、その間はアプリを閉じても記録を続けます。</string>
 	<!-- ほかの権限の説明(カメラなど)は #931 で足す -->
 </dict>
 </plist>

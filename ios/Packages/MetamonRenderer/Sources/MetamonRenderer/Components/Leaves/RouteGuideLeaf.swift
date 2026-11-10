@@ -247,10 +247,10 @@ struct RouteGuideLeaf: View {
                 Label(L("経路を探しています…"), systemImage: "point.topleft.down.to.point.bottomright.curvepath")
             case .denied:
                 VStack(alignment: .leading, spacing: 4) {
-                    Text(L("位置情報がオフのため案内できません。設定で「このAppの使用中のみ許可」を選んでください"))
+                    Text(LocationPermissionCopy.cannotGuide)
                         .foregroundStyle(RenderTheme.Colors.negative)
                     Button(L("設定を開く")) {
-                        if let url = URL(string: "app-settings:") { openURL(url) }
+                        if let url = LocationPermissionCopy.settingsURL { openURL(url) }
                     }
                     .font(.caption.weight(.semibold))
                 }

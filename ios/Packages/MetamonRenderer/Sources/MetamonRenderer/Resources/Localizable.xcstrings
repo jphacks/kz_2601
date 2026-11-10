@@ -3843,6 +3843,23 @@
         }
       }
     },
+    "位置情報がオフのため案内できません。「システム設定 > プライバシーとセキュリティ > 位置情報サービス」でこのアプリを許可してください" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Location is off, so guidance can’t start. Allow this app in System Settings > Privacy & Security > Location Services."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "位置情報がオフのため案内できません。「システム設定 > プライバシーとセキュリティ > 位置情報サービス」でこのアプリを許可してください"
+          }
+        }
+      }
+    },
     "位置情報がオフのため案内できません。設定で「このAppの使用中のみ許可」を選んでください" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -3860,6 +3877,23 @@
         }
       }
     },
+    "位置情報がオフのため記録できません。「システム設定 > プライバシーとセキュリティ > 位置情報サービス」でこのアプリを許可してください" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Location is off. Allow this app in System Settings > Privacy & Security > Location Services to record."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "位置情報がオフのため記録できません。「システム設定 > プライバシーとセキュリティ > 位置情報サービス」でこのアプリを許可してください"
+          }
+        }
+      }
+    },
     "位置情報がオフのため記録できません。設定で「このAppの使用中のみ許可」を選んでください" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -3873,6 +3907,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "位置情報がオフのため記録できません。設定で「このAppの使用中のみ許可」を選んでください"
+          }
+        }
+      }
+    },
+    "位置情報が許可されていないので近くを探せません。「システム設定 > プライバシーとセキュリティ > 位置情報サービス」でこのアプリを許可するか、探す語を入れてください" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Location access is off, so nearby places can’t be found. Allow this app in System Settings > Privacy & Security > Location Services, or type what to search for."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "位置情報が許可されていないので近くを探せません。「システム設定 > プライバシーとセキュリティ > 位置情報サービス」でこのアプリを許可するか、探す語を入れてください"
           }
         }
       }
@@ -3907,6 +3958,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "位置情報の利用が許可されていません"
+          }
+        }
+      }
+    },
+    "位置情報の利用が許可されていません。「システム設定 > プライバシーとセキュリティ > 位置情報サービス」で許可してください" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Location access is not allowed. Allow it in System Settings > Privacy & Security > Location Services."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "位置情報の利用が許可されていません。「システム設定 > プライバシーとセキュリティ > 位置情報サービス」で許可してください"
           }
         }
       }
