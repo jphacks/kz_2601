@@ -37,6 +37,7 @@ import jp.kz2601.metamon.dsl.AppDSL
 import jp.kz2601.metamon.dsl.AppDocument
 import jp.kz2601.metamon.language.AppLocales
 import jp.kz2601.metamon.permissions.PermissionOffBarHost
+import jp.kz2601.metamon.permissions.ProvideRendererPermissions
 import jp.kz2601.metamon.renderer.DSLView
 import jp.kz2601.metamon.renderer.theme.MetamonRenderTheme
 import jp.kz2601.metamon.renderer.theme.ReadableWidth
@@ -190,7 +191,8 @@ private fun GeneratedApp(state: VoiceUiState, dsl: AppDSL, runtime: AppRuntime, 
                 Text(summary, Modifier.padding(12.dp), style = MaterialTheme.typography.bodyMedium)
             }
         }
-        DSLView(dsl, runtime)
+        // カメラなど部品が使う権限は使う直前にアプリの窓口で聞く(#862)
+        ProvideRendererPermissions { DSLView(dsl, runtime) }
     }
 }
 
