@@ -94,7 +94,16 @@ data class AiTextRequest(
     val length: String? = null,
     /** ボタンがあるアプリ(ホストが付ける) */
     val appId: String? = null,
+    /** aiChat の会話(task chat・古い順・最後は利用者)。null = 会話でない */
+    val messages: List<AiTextMessage>? = null,
+    /** aiChat saveTo の field の形(task chat だけ) */
+    val saveTo: AiTextSaveTo? = null,
+    /** aiChat inputEntity の参考の記録(task chat だけ) */
+    val material: AiTextMaterial? = null,
 ) {
+    /** aiChat の返事の依頼か(端末内 AI を使わない)。答えは要約などと同じく 1 つの文(long は長い文)。 */
+    val isChat: Boolean get() = task == "chat"
+
     /** 同じ依頼に appId を付ける(空なら付けない)。 */
     fun inApp(appId: String): AiTextRequest = copy(appId = appId.ifEmpty { null })
 
@@ -117,6 +126,8 @@ data class AiTextResult(
     val text: String,
     val items: List<String>? = null,
     val fields: List<AiTextField>? = null,
+    /** aiChat saveTo の記録の案(field id → 値・サーバーが型を確かめ済み)。保存は利用者が押した時だけ */
+    val suggest: JsonObject? = null,
 ) {
     companion object {
         /**
@@ -199,6 +210,9 @@ sealed class AiTextError(message: String) : Exception(message) {
 
     /** 材料が多すぎる(413) */
     data object TooLarge : AiTextError("payload_too_large")
+
+    /** aiChat の会話が長すぎる(413・端末で 16 KB に切るので普段は来ない) */
+    data object ChatTooLong : AiTextError("chat_too_long")
 
     /** その他(サーバーのメッセージ・通信の失敗) */
     class Failed(val detail: String) : AiTextError(detail)

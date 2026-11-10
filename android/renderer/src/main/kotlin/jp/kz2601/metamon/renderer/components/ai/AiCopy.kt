@@ -28,6 +28,7 @@ object AiCopy {
         AiTextError.BadOutput -> AiMessage(R.string.ai_error_bad_output)
         AiTextError.Paused -> AiMessage(R.string.ai_error_paused)
         AiTextError.TooLarge -> AiMessage(R.string.ai_error_too_large)
+        AiTextError.ChatTooLong -> AiMessage(R.string.ai_chat_error_too_long)
         // 利用上限などはサーバーの文(日本語)をそのまま出す
         is AiTextError.Failed -> AiMessage(R.string.ai_error_failed, raw = e.detail)
         else -> AiMessage(R.string.ai_error_failed, arg = e.message ?: e.javaClass.simpleName)

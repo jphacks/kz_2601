@@ -17,6 +17,7 @@ import jp.kz2601.metamon.dsl.logic.ExternalUrlPolicy
 import jp.kz2601.metamon.renderer.NavigationHost
 import jp.kz2601.metamon.renderer.components.play.RecordWriter
 import jp.kz2601.metamon.renderer.components.play.TimerHost
+import jp.kz2601.metamon.renderer.components.ai.AiChatPairSaving
 import jp.kz2601.metamon.renderer.components.ai.AiHost
 import jp.kz2601.metamon.renderer.form.FormDraft
 import jp.kz2601.metamon.renderer.form.FormPrefill
@@ -104,7 +105,7 @@ class AppRuntime(
     private val directory: AppDirectory? = null,
     /** aiButton のオンライン版・端末内 AI(#873)。null なら AI ボタンは理由つきで無効 */
     private val aiHost: AiHost? = null,
-) : DSLRuntime, NavigationHost, RecordWriter, TimerHost {
+) : DSLRuntime, NavigationHost, RecordWriter, TimerHost, AiChatPairSaving {
     private val _state = MutableStateFlow(RuntimeState(document))
     val state: StateFlow<RuntimeState> = _state.asStateFlow()
 
@@ -518,6 +519,21 @@ class AppRuntime(
     override suspend fun loadRecords(entities: Set<String>) = load(entities)
 
     override suspend fun addRecord(entity: String, data: Map<String, JSONValue>): Boolean = createRecord(entity, data) != null
+
+    // AI と話す(#874)
+
+    /**
+     * roleField の無い aiChat の 1 往復を対で保存する(iOS の AppRuntime+AIChat)。役は並び順で読むので、
+     * 返事を保存できなければ自分の発言も消す(交互を崩さない)。後でサーバーが片方を断った時の取り消しは子 Issue。
+     */
+    override suspend fun saveAiChatPair(entity: String, user: Map<String, JSONValue>, assistant: Map<String, JSONValue>): Boolean {
+        val appId = document.appId
+        val userId = createRecord(entity, user) ?: return false
+        delay(5) // 作成時刻で並べるので、自分 → AI の順を同じ時刻にしない
+        if (appId == document.appId && createRecord(entity, assistant) != null) return true
+        setRecords(appId, entity, recordSync.delete(appId, entity, userId))
+        return false
+    }
 
     /** 一覧から消して「元に戻す」を出す。前の取り消し待ちは時間が来たら送られる。 */
     suspend fun deleteUndoably(entity: String, recordId: String) {
