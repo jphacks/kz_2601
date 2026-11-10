@@ -40,6 +40,8 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import jp.kz2601.metamon.dsl.AppDSL
 import jp.kz2601.metamon.dsl.AppDocument
 import jp.kz2601.metamon.consent.AiConsentDialog
+import jp.kz2601.metamon.discover.DiscoverHost
+import jp.kz2601.metamon.discover.LocalPublishEnv
 import jp.kz2601.metamon.onboarding.TutorialScreen
 import jp.kz2601.metamon.services.consent.AiConsentStatus
 import jp.kz2601.metamon.feedback.FeedbackComposerHost
@@ -260,6 +262,8 @@ fun MetamonApp(container: AppContainer) {
     var shareTarget by remember { mutableStateOf<ShareTarget?>(null) }
     val issuedShares = remember(wipes) { IssuedShares() }
     val canShare = !container.knobs.mock || container.knobs.mockSharing
+    // 「探す」(#902)。サーバーにつながる構成だけ入口を出す(iOS の canShare)
+    var discoverOpen by rememberSaveable { mutableStateOf(false) }
 
     val openSwitcher = {
         switcherOpen = true
@@ -274,6 +278,11 @@ fun MetamonApp(container: AppContainer) {
                 TextButton(onClick = openSwitcher) { Text(stringResource(R.string.switcher_open)) }
                 TextButton(onClick = { settingsOpen = true }, modifier = Modifier.testTag("settings.open")) {
                     Text(stringResource(R.string.settings_title))
+                }
+                if (container.discover != null) {
+                    TextButton(onClick = { discoverOpen = true }, enabled = !state.isGenerating, modifier = Modifier.testTag("discover.open")) {
+                        Text(stringResource(R.string.discover_entry_short))
+                    }
                 }
                 if (!container.environment.isProduction || container.knobs.mock) {
                     Text(
@@ -393,10 +402,15 @@ fun MetamonApp(container: AppContainer) {
                 if (now.document.appId == target.appId) now.dsl else container.appConfig.fetchDocument(target.appId).document.dsl
             }
         }
-        ShareSheet(target, model, onDismiss = { shareTarget = null })
+        // 下半分の「みんなに公開」(#902)が使う
+        CompositionLocalProvider(LocalPublishEnv provides container.publishEnv.takeIf { canShare }) {
+            ShareSheet(target, model, onDismiss = { shareTarget = null })
+        }
     }
     // シェアリンクから開く・参加する(#901)
     ShareLinkHost(container, canShare)
+    // みんなが作ったアプリを探す・入れる(#902)
+    DiscoverHost(container, discoverOpen, onDismiss = { discoverOpen = false })
 
     if (!state.isInitial && state.voiceOpen) {
         ModalBottomSheet(onDismissRequest = vm::closeVoice, sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)) {
