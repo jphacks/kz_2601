@@ -71,6 +71,7 @@ private struct AppCanvasContent: View {
                 modal(route).frame(minWidth: 640, minHeight: 560)
             }
             .modifier(RuntimeOverlays(runtime: runtime))
+            .macNotificationsOffBar(runtime.notifications) // 通知がオフの時のバー(#965)
             .environment(\.dslRuntime, runtime)
             .environment(\.componentRegistry, ComponentRegistry.standard)
             .focusedSceneValue(\.macAppRuntime, runtime) // メニューの「戻る」・削除の取り消し(#934)

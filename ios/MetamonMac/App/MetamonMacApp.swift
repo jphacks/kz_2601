@@ -15,6 +15,7 @@ struct MetamonMacApp: App {
     @State private var library = MacAppLibrary()
 
     init() {
+        MacNotificationDelegate.install() // 前面でも通知を出す・押されたらそのアプリを開く(#965)
         // UI テスト・手元の確認用(DEBUG のみ・iOS と同じ環境変数): METAMON_AI_CONSENT / METAMON_TUTORIAL / METAMON_BETA_WELCOME(#971)
         AIConsentDebug.applyLaunchOverride()
         FirstRunTutorialStore.shared.applyLaunchOverride()

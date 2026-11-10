@@ -83,16 +83,6 @@ extension AppRuntime {
     }
 }
 
-enum NotificationCopy {
-    /// 今日なら「7:00」、それ以外は「10/26(日) 7:00」(端末の言語の書式)。
-    static func when(_ d: Date, now: Date = .now) -> String {
-        let f = DateFormatter()
-        f.locale = .current
-        f.setLocalizedDateFormatFromTemplate(Calendar.current.isDate(d, inSameDayAs: now) ? "Hm" : "MdEEEHm")
-        return f.string(from: d)
-    }
-}
-
 /// アプリを開いている間に時刻が来た通知もバナーで出す(delegate が無いと前面では表示されない)。
 final class ForegroundNotificationPresenter: NSObject, UNUserNotificationCenterDelegate {
     static let shared = ForegroundNotificationPresenter()
