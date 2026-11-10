@@ -183,7 +183,7 @@ class VoiceViewModel(
 
     /**
      * ランタイムが開いたアプリ(起動時の開き直し・切り替え・新しいアプリ・ホットリロード)に合わせる。生成はしない。
-     * 別のアプリになったら、前のアプリの要約・相談は捨てる。
+     * 別のアプリになったら、前のアプリの要約・相談・元に戻す履歴は捨てる(前のアプリの版を移った先に当てない)。
      */
     fun adopt(doc: AppDocument) {
         val s = _state.value
@@ -195,8 +195,14 @@ class VoiceViewModel(
         chatEpoch++
         chatJob?.cancel()
         cancelAutoBuild()
+        localHistory.clear()
+        redoPoint = null
+        val undoable = canUndo(doc)
         _state.update {
-            it.copy(document = doc, summary = null, chat = emptyList(), chatTurn = null, chatPending = false, transcript = "")
+            it.copy(
+                document = doc, summary = null, chat = emptyList(), chatTurn = null, chatPending = false, transcript = "",
+                summaryAction = null, undone = null, canUndo = undoable, canRedo = false, notice = null,
+            )
         }
     }
 
@@ -353,6 +359,8 @@ class VoiceViewModel(
     }
 
     private fun applyVersion(doc: AppDocument, redo: RedoPoint?, done: UndoAction) {
+        // 戻す間に別のアプリへ切り替わった: 前のアプリの版を移った先に出さない
+        if (doc.appId != _state.value.document.appId) return _state.update { it.copy(undoing = false) }
         redoPoint = redo
         val undoable = canUndo(doc)
         _state.update {

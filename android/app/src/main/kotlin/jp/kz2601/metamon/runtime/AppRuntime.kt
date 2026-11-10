@@ -152,8 +152,19 @@ class AppRuntime(
     /**
      * 同期を始め、前に開いていたアプリを開き直し(保存した DSL を先に出す → サーバーの最新)、画面の entity の記録を読む。
      * インストール直後で話しかける前の画面なら、サーバーの最近のアプリを開く(#276・再インストール後)。
+     *
+     * 1 回だけ走る。画面の作り直し(回転など)で呼び直しても、最初の 1 回の終わりを待つだけ
+     * (「+ 新しいアプリ」の後に回転して最近のアプリへ戻されない・同じ取得を重ねない)。
+     * 中身はランタイムの scope で回すので、呼んだ画面が途中で消えても止まらない。
      */
     suspend fun bootstrap() {
+        val job = bootstrapJob ?: scope.launch { bootstrapOnce() }.also { bootstrapJob = it }
+        job.join()
+    }
+
+    private var bootstrapJob: Job? = null
+
+    private suspend fun bootstrapOnce() {
         recordSync.start()
         if (eventsJob == null) eventsJob = scope.launch { recordSync.events.collect { handle(it) } }
         if (notificationsJob == null) notificationsJob = scope.launch { watchNotifications() }

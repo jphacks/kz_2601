@@ -228,6 +228,31 @@ class AppIdentityTest {
     }
 
     @Test
+    fun bootstrapAgainAfterRecreationKeepsTheNewApp() = runTest {
+        val store = CurrentAppStore(null, minting("fresh-install", "brand-new"))
+        val server = Server().apply {
+            docs["fresh-install"] = AppDocument("fresh-install", 1, voice)
+            docs["mine"] = AppDocument("mine", 5, kakeibo)
+            apps = listOf(AppSummary("mine", "家計簿", 5, updatedAt = "2026-11-10T00:00:00Z"))
+        }
+        val s = setup(store, server)
+        s.rt.bootstrap()
+        settle()
+        s.rt.startNewApp()
+        settle()
+        val fetches = server.fetched.size
+
+        // 画面の作り直し(回転など)で LaunchedEffect がもう一度 bootstrap を呼ぶ
+        s.rt.bootstrap()
+        settle()
+
+        assertEquals("最近のアプリへ戻さない", "brand-new", s.rt.document.appId)
+        assertSame(voice, s.rt.dsl)
+        assertEquals("brand-new", store.current)
+        assertEquals("取得を重ねない", fetches, server.fetched.size)
+    }
+
+    @Test
     fun appsListFallsBackToTheSavedList() = runTest {
         val cache = AppListCache(null)
         val store = CurrentAppStore(null).apply { set("a") }
