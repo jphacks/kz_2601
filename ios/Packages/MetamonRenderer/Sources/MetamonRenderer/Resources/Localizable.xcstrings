@@ -3163,6 +3163,23 @@
         }
       }
     },
+    "ファイルから選ぶ" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Choose from Files"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ファイルから選ぶ"
+          }
+        }
+      }
+    },
     "ファイルが大きすぎます(%lldMB まで)" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -4931,6 +4948,40 @@
         }
       }
     },
+    "写真ライブラリから選ぶ" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Choose from Photos"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "写真ライブラリから選ぶ"
+          }
+        }
+      }
+    },
+    "写真ライブラリかファイルから動画を選びます" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Choose a video from Photos or Files"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "写真ライブラリかファイルから動画を選びます"
+          }
+        }
+      }
+    },
     "写真ライブラリを開きます" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -5165,6 +5216,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "動画なし"
+          }
+        }
+      }
+    },
+    "動画のファイルだけ入れられます" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Only video files can be added"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "動画のファイルだけ入れられます"
           }
         }
       }
