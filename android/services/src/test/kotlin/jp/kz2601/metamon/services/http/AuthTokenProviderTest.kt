@@ -76,4 +76,5 @@ private class TokenAuth(private vararg val values: String) : AuthService {
     override suspend fun signInWithGoogle(googleIdToken: String): AuthUser = error("unused")
     override suspend fun signInWithApple(activity: Activity): AuthUser = error("unused")
     override suspend fun signOut() = Unit
+    override suspend fun deleteCurrentUser() = Unit
 }

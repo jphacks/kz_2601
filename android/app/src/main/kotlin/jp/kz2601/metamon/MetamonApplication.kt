@@ -36,12 +36,13 @@ class MetamonApplication : Application() {
     /**
      * 最初の画面の起動時に 1 回だけ組み立てる(DEBUG のつまみは起動の intent で来るため・#844)。
      * 2 回目以降の [knobs] は無視する(つまみを変える時はアプリを止めてから起動し直す)。
-     * 組み立てた時に記録の同期(#882)を start する。
+     * 組み立てた時に持ち主の見張り(#841)を start する。記録の同期(#882)はサインインして持ち主を受け入れた後に
+     * 見張りが start する(未サインインでは動かさない)。
      */
     fun container(knobs: DebugKnobs): AppContainer =
         built ?: AppContainer.make(this, knobs).also {
             built = it
-            it.recordSync.start()
+            it.accountGuard.start(scope)
             // クラッシュ報告のオン / オフ(設定・#888)を送り先に反映する。付けるのは uid だけ(サインアウト・オフで外す)
             it.crashReporting.activate(it.crashReporter)
             scope.launch { it.auth.currentUser.collect { user -> it.crashReporting.updateUser(user?.uid) } }

@@ -130,4 +130,8 @@ private class FakeAuth(private val failWith: Exception? = null) : AuthService {
     override suspend fun signOut() {
         user.value = null
     }
+
+    override suspend fun deleteCurrentUser() {
+        user.value = null
+    }
 }

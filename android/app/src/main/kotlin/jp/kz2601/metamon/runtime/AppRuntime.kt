@@ -150,7 +150,8 @@ class AppRuntime(
     // 起動
 
     /**
-     * 同期を始め、前に開いていたアプリを開き直し(保存した DSL を先に出す → サーバーの最新)、画面の entity の記録を読む。
+     * 前に開いていたアプリを開き直し(保存した DSL を先に出す → サーバーの最新)、画面の entity の記録を読む。
+     * 記録の同期の start はここではしない(サインインして持ち主を受け入れた後に `AccountGuard` がする・#841)。
      * インストール直後で話しかける前の画面なら、サーバーの最近のアプリを開く(#276・再インストール後)。
      *
      * 1 回だけ走る。画面の作り直し(回転など)で呼び直しても、最初の 1 回の終わりを待つだけ
@@ -165,7 +166,6 @@ class AppRuntime(
     private var bootstrapJob: Job? = null
 
     private suspend fun bootstrapOnce() {
-        recordSync.start()
         if (eventsJob == null) eventsJob = scope.launch { recordSync.events.collect { handle(it) } }
         if (notificationsJob == null) notificationsJob = scope.launch { watchNotifications() }
         if (isIssued(document.appId)) {
@@ -318,6 +318,26 @@ class AppRuntime(
     fun startNewApp() {
         val dir = directory ?: return
         apply(dir.fresh(dir.store.rotate()))
+    }
+
+    /**
+     * ログアウト・アカウント削除・別の人のサインイン(#841・iOS の `wipeLocalData` の画面の分)。
+     * 前の人のアプリ・記録の表示・一覧・「元に戻す」・ホットリロードを捨て、新しい appId の話しかける前の画面に戻す。
+     * 次のサインインで [bootstrap] がもう一度走る。サーバーには何も送らない(記録の DB・送信待ちは `LocalDataWipe` が消す)。
+     */
+    fun resetForAccountChange() {
+        bootstrapJob?.cancel()
+        bootstrapJob = null
+        dropPendingHotReload()
+        hotReloader?.stop()
+        syncingAppId = null
+        lastSavedForm = null
+        entityCache = null
+        _apps.value = emptyList()
+        val next = directory?.let { it.fresh(it.store.rotate()) } ?: document
+        _state.value = RuntimeState(next)
+        _records.value = emptyMap()
+        _navigation.value = NavigationState.initial(next.dsl)
     }
 
     /** インストール直後のサインイン(#276): 話しかける前の画面なら、サーバーの一覧の先頭のアプリを開く。 */

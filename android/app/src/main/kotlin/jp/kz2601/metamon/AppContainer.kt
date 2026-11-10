@@ -22,8 +22,17 @@ import jp.kz2601.metamon.push.PushHost
 import jp.kz2601.metamon.services.AIClient
 import jp.kz2601.metamon.services.AppConfigClient
 import jp.kz2601.metamon.services.AppEnvironment
+import jp.kz2601.metamon.account.AccountGuard
+import jp.kz2601.metamon.account.ActiveOwner
+import jp.kz2601.metamon.account.LocalDataWipe
+import jp.kz2601.metamon.account.OwnerGatedTokens
 import jp.kz2601.metamon.auth.AuthSession
 import jp.kz2601.metamon.consent.ConsentPrompt
+import jp.kz2601.metamon.permissions.PermissionCenter
+import jp.kz2601.metamon.services.account.AccountClient
+import jp.kz2601.metamon.services.account.HttpAccountClient
+import jp.kz2601.metamon.services.account.MockAccountClient
+import jp.kz2601.metamon.services.local.AccountOwnerStore
 import jp.kz2601.metamon.services.AuthService
 import jp.kz2601.metamon.services.CrashReporter
 import jp.kz2601.metamon.services.NoopCrashReporter
@@ -111,6 +120,14 @@ class AppContainer(
     private val host: RuntimeHost,
     /** 他の人の行動で届く通知(#887)。モック・Firebase の無い構成では null(何もしない) */
     val push: PushHost? = null,
+    /** アカウント削除の `DELETE /v1/me`(#841) */
+    val account: AccountClient,
+    /** 端末のデータの持ち主(起動をまたいで覚える・#841) */
+    private val ownerStore: AccountOwnerStore,
+    /** トークンを付けてよい uid(#841)。[accountGuard] が書く */
+    private val activeOwner: ActiveOwner,
+    /** 権限の記録など、端末の設定のうち前の人の分(#841) */
+    private val forgetDeviceState: () -> Unit,
 ) {
     /** 画面の下に出す接続先の名前(モックなら "mock")。 */
     val environmentLabel: String get() = if (knobs.mock) "mock" else environment.name
@@ -124,6 +141,29 @@ class AppContainer(
     /** 前の日までの aiButton の集計を送る(起動・前面に戻った時。送るのは 1 日 1 回) */
     suspend fun flushAiButtonMetrics() {
         aiButtonMetricsSender?.let { aiButtonMetrics.flush(it) }
+    }
+
+    /** ログアウト・アカウント削除を回す scope(画面が消えても途中で止めない・#841)。 */
+    val accountScope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
+
+    /** 端末のデータの後片付け(#841・iOS の `wipeLocalData`)。 */
+    val wipeLocalData: LocalDataWipe by lazy {
+        LocalDataWipe(recordSync, documentCache, appList, resetRuntime = { runtime.resetForAccountChange() }, forgetDeviceState = forgetDeviceState)
+    }
+
+    /**
+     * サインアウト(外からも)・uid が変わった時に必ず後片付けし、記録の同期はサインイン後だけ動かす(#841)。
+     * [MetamonApplication] が start する。画面は [AccountGuard.active] で本体を出す。
+     */
+    val accountGuard: AccountGuard by lazy {
+        AccountGuard(
+            auth = auth,
+            saved = ownerStore,
+            owner = activeOwner,
+            startSync = recordSync::start,
+            stopSync = recordSync::stop,
+            wipe = { wipeLocalData() },
+        )
     }
 
     companion object {
@@ -179,6 +219,10 @@ class AppContainer(
                 documentCache = DocumentCache(null),
                 hotReload = null,
                 host = AndroidRuntimeHost(context.applicationContext),
+                account = MockAccountClient,
+                ownerStore = AccountOwnerStore(File(context.filesDir, "metamon-account-mock")),
+                activeOwner = ActiveOwner(),
+                forgetDeviceState = forgetDeviceState(context),
             )
         }
 
@@ -186,8 +230,10 @@ class AppContainer(
             val firebase = FirebaseBootstrap.configureIfAvailable(context, AppCheckProviders.factory())
             val auth = chooseAuth(firebase) { FirebaseAuthService.createIfConfigured() }
 
-            // backend への Bearer は Firebase の ID トークン(モックなら付けない)
-            val tokens = AuthTokenProvider(auth)
+            // backend への Bearer は Firebase の ID トークン(モックなら付けない)。
+            // 端末のデータの持ち主を受け入れるまでは付けない(前の人の送信待ちを次の人のトークンで送らない・#841)
+            val owner = ActiveOwner()
+            val tokens = OwnerGatedTokens(auth, owner)
             val clientInfo = ClientInfo(version = BuildConfig.VERSION_NAME, build = BuildConfig.VERSION_CODE.toString())
             // アプリ内で選んだ言語(無ければ端末の言語)。リクエストごとに読むので切り替えはすぐ効く(#843)
             val language = { AppLocales.languageCode(context) }
@@ -229,6 +275,10 @@ class AppContainer(
                 hotReload = HotReload(sync, CoroutineScope(SupervisorJob() + Dispatchers.Default)),
                 host = AndroidRuntimeHost(context.applicationContext),
                 push = push,
+                account = HttpAccountClient(appConfigHttp),
+                ownerStore = AccountOwnerStore(File(context.filesDir, "metamon-account")),
+                activeOwner = owner,
+                forgetDeviceState = forgetDeviceState(context),
             )
         }
 
@@ -256,6 +306,9 @@ class AppContainer(
          * backend が android を受けるまで(#918)は送らない。同意(notify-consent)と登録の削除はこれと関係なく動く。
          */
         const val PUSH_DEVICE_REGISTRATION = false
+
+        /** 権限の記録を忘れる(表示の言語は端末の設定なので残す)。 */
+        private fun forgetDeviceState(context: Context): () -> Unit = { PermissionCenter.get(context).forget() }
 
         private fun recordSync(context: Context, client: AppConfigClient, dir: String) = RecordSyncEngine.create(
             client = client,

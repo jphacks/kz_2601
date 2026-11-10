@@ -48,6 +48,7 @@ import jp.kz2601.metamon.push.PushOpen
 import jp.kz2601.metamon.services.push.PushMessage
 import jp.kz2601.metamon.permissions.MicrophoneAccessProvider
 import jp.kz2601.metamon.permissions.PermissionOffBarHost
+import jp.kz2601.metamon.account.AccountMenu
 import jp.kz2601.metamon.auth.RootScreen
 import jp.kz2601.metamon.auth.SignInScreen
 import jp.kz2601.metamon.permissions.ProvideRendererPermissions
@@ -107,10 +108,13 @@ class MainActivity : ComponentActivity() {
     }
 }
 
-/** 未サインインならサインイン画面、サインイン済みなら本体(iOS の `AuthSession.user` で出し分けるのと同じ)。 */
+/**
+ * 未サインインならサインイン画面、サインイン済みなら本体(iOS の `AuthSession.user` で出し分けるのと同じ)。
+ * 見るのは持ち主の見張り(#841)が受け入れた人: 別の人に変わった時は、前の人のデータを消し終わるまで本体を出さない。
+ */
 @Composable
 fun MetamonRoot(container: AppContainer) {
-    val user by container.session.user.collectAsStateWithLifecycle()
+    val user by container.accountGuard.active.collectAsStateWithLifecycle()
     when (RootScreen.of(user)) {
         RootScreen.SignIn -> SignInScreen(container.session)
         RootScreen.App -> MetamonApp(container)
@@ -126,9 +130,11 @@ fun MetamonRoot(container: AppContainer) {
 @Composable
 fun MetamonApp(container: AppContainer) {
     val context = LocalContext.current
-    val user by container.auth.currentUser.collectAsStateWithLifecycle()
+    val user by container.accountGuard.active.collectAsStateWithLifecycle()
+    // 後片付け(#841)のたびに作り直す: 前の人の発話・要約・元に戻すの履歴を次の人に出さない
+    val wipes by container.accountGuard.generation.collectAsStateWithLifecycle()
     val buildNow = stringResource(R.string.voice_build_now_utterance)
-    val vm = viewModel {
+    val vm = viewModel(key = "voice-$wipes") {
         VoiceViewModel(
             transcriber = container.transcriber,
             ai = container.ai,
@@ -212,6 +218,8 @@ fun MetamonApp(container: AppContainer) {
                 TextButton(onClick = { settingsOpen = true }, modifier = Modifier.testTag("settings.open")) {
                     Text(stringResource(R.string.settings_title))
                 }
+                // ログアウト・アカウント削除の入口(最小・#841)。設定の画面(#1144)ができたらそちらへ移す
+                user?.let { AccountMenu(container, it, busy = state.isGenerating) }
                 if (!container.environment.isProduction || container.knobs.mock) {
                     Text(
                         "${container.environmentLabel} / auth=${container.auth.kind} / uid=${user?.uid ?: "-"}",
