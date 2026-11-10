@@ -55,6 +55,7 @@ import jp.kz2601.metamon.voice.ClarifySettings
 import jp.kz2601.metamon.voice.FabPositionStore
 import jp.kz2601.metamon.voice.LaunchVisits
 import jp.kz2601.metamon.voice.SpeechSettings
+import jp.kz2601.metamon.renderer.a11y.TalkBack
 import jp.kz2601.metamon.renderer.components.RemoteImages
 import jp.kz2601.metamon.renderer.components.audio.LocalAudioStore
 import jp.kz2601.metamon.renderer.components.media.VideoCodec
@@ -160,6 +161,8 @@ class AppContainer(
     private val social: SocialServices? = null,
     /** https の画像のキャッシュを消す(#841 の後片付け) */
     private val clearImageCache: () -> Unit = {},
+    /** TalkBack が動いているか(削除の取り消しの時間を延ばす・H8) */
+    private val talkBackRunning: () -> Boolean = { false },
 ) {
     /** 画面の下に出す接続先の名前(モックなら "mock")。 */
     val environmentLabel: String get() = if (knobs.mock) "mock" else environment.name
@@ -276,6 +279,7 @@ class AppContainer(
                 chatHistory = ChatHistoryStore(null),
                 removeLocalMedia = removeLocalMedia(context),
                 clearImageCache = { RemoteImages.wipe(context) },
+                talkBackRunning = { TalkBack.isRunning(context) },
             )
         }
 
@@ -342,6 +346,7 @@ class AppContainer(
                 removeLocalMedia = removeLocalMedia(context),
                 social = SocialServices(HttpMatchingClient(appConfigHttp), HttpModerationClient(appConfigHttp), MatchingAgeGate(prefs)),
                 clearImageCache = { RemoteImages.wipe(context) },
+                talkBackRunning = { TalkBack.isRunning(context) },
             )
         }
 
@@ -460,6 +465,7 @@ class AppContainer(
             aiHost = aiHost,
             authorProfile = authorProfile,
             socialServices = social,
+            undoGraceMillis = { TalkBack.recordUndoMillis(talkBackRunning()) },
         ).also { it.dictation = TranscriberDictationHost(transcriber, CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)) }
     }
 

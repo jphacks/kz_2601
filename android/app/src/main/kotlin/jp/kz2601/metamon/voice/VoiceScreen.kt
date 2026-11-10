@@ -83,6 +83,8 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import jp.kz2601.metamon.R
 import jp.kz2601.metamon.permissions.PermissionCenter
 import jp.kz2601.metamon.permissions.rememberPermissionRequest
+import jp.kz2601.metamon.runtime.UiText
+import jp.kz2601.metamon.runtime.resolve
 import jp.kz2601.metamon.services.ChatMode
 import jp.kz2601.metamon.services.ChatOption
 import jp.kz2601.metamon.services.ChatTurn
@@ -348,20 +350,24 @@ private fun ErrorCardSlot(state: VoiceUiState, vm: VoiceViewModel, onOpenSetting
     ErrorCard(VoiceErrorCopy.of(error), onRetry = vm::retry, onDismiss = vm::dismissError, onOpenSettings = onOpenSettings)
 }
 
+/** 状態カードの本文。上限に達した時は戻る時刻(分からなければ「明日」)を入れる。TalkBack の読み上げにも使う。 */
+fun ErrorCardCopy.bodyText(english: Boolean): UiText {
+    if (body != R.string.voice_rate_body) return UiText.Res(body)
+    val whenText = resetAt?.let {
+        UiText.Raw(
+            DateTimeFormatter.ofPattern(if (english) "MMM d, H:mm" else "M月d日 H:mm", if (english) Locale.US else Locale.JAPAN)
+                .withZone(ZoneId.systemDefault())
+                .format(it),
+        )
+    } ?: UiText.Res(R.string.voice_tomorrow)
+    return UiText.Res(body, whenText)
+}
+
 /** 状態カード(iOS の `ErrorCard`)。 */
 @Composable
 fun ErrorCard(copy: ErrorCardCopy, onRetry: () -> Unit, onDismiss: () -> Unit, onOpenSettings: () -> Unit, modifier: Modifier = Modifier) {
     val english = LocalConfiguration.current.locales[0].language == "en"
-    val body = if (copy.body == R.string.voice_rate_body) {
-        val whenText = copy.resetAt?.let {
-            DateTimeFormatter.ofPattern(if (english) "MMM d, H:mm" else "M月d日 H:mm", if (english) Locale.US else Locale.JAPAN)
-                .withZone(ZoneId.systemDefault())
-                .format(it)
-        } ?: stringResource(R.string.voice_tomorrow)
-        stringResource(copy.body, whenText)
-    } else {
-        stringResource(copy.body)
-    }
+    val body = copy.bodyText(english).resolve()
     OutlinedCard(modifier.fillMaxWidth().padding(vertical = 8.dp)) {
         Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Text(stringResource(copy.title), style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)

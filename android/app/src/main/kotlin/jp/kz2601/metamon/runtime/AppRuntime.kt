@@ -110,8 +110,8 @@ class AppRuntime(
     private val authorName: () -> String? = { null },
     /** サーバーの最新 DSL。投げたら手元の DSL のまま(オフライン) */
     private val restore: (suspend (appId: String) -> AppDocument)? = null,
-    /** 削除を取り消せる時間(M11) */
-    private val undoGraceMillis: Long = 5_000,
+    /** 削除を取り消せる時間(M11)。削除のたびに読む(TalkBack の時は長く・H8) */
+    private val undoGraceMillis: () -> Long = { 5_000 },
     /** 他端末・共有の相手の変更(#883)。null ならホットリロードしない(モック・テスト) */
     private val hotReloader: HotReload? = null,
     /** 最後に取得した DSL(`DocumentCache`)。[restore] が届かない時の起動に使う(#883) */
@@ -776,7 +776,7 @@ class AppRuntime(
     /** 一覧から消して「元に戻す」を出す。前の取り消し待ちは時間が来たら送られる。 */
     suspend fun deleteUndoably(entity: String, recordId: String) {
         val appId = document.appId
-        val (list, ticket) = recordSync.deleteUndoably(appId, entity, recordId, undoGraceMillis)
+        val (list, ticket) = recordSync.deleteUndoably(appId, entity, recordId, undoGraceMillis())
         setRecords(appId, entity, list)
         _state.update { it.copy(recordUndo = ticket) }
     }
