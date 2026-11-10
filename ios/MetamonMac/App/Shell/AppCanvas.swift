@@ -46,11 +46,13 @@ private struct AppCanvasContent: View {
             .modifier(RuntimeOverlays(runtime: runtime))
             .environment(\.dslRuntime, runtime)
             .environment(\.componentRegistry, ComponentRegistry.standard)
+            .focusedSceneValue(\.macAppRuntime, runtime) // メニューの「戻る」・削除の取り消し(#934)
     }
 
     /// モーダルの中にも確認と一言を出す(根の上に重ねるとシートに隠れる・iOS の RootView と同じ理由)
     private func modal(_ route: Route) -> some View {
         ScreenStack(root: route)
+            .background { EscapeToDismiss { runtime.dismissTopModal() } }
             .modifier(RuntimeOverlays(runtime: runtime))
             .environment(\.dslRuntime, runtime)
             .environment(\.componentRegistry, ComponentRegistry.standard)
@@ -132,12 +134,25 @@ private struct UndoDeleteCapsule: View {
     var body: some View {
         HStack(spacing: 12) {
             Text("削除しました").font(.callout)
+            // ⌘Z はメニューの「削除を元に戻す」(MacCommands)が受ける
             Button("元に戻す") { Task { await runtime.undoRecordDelete() } }
-                .keyboardShortcut("z", modifiers: .command)
         }
         .padding(.horizontal, 14).padding(.vertical, 8)
         .background(.regularMaterial, in: Capsule())
         .overlay(Capsule().strokeBorder(.separator))
         .transition(.move(edge: .top).combined(with: .opacity))
+    }
+}
+
+/// Esc でシートを閉じる(Mac の sheet は Esc で閉じないため)。cancelAction なので入力中の変換の取り消しは邪魔しない。
+private struct EscapeToDismiss: View {
+    let dismiss: () -> Void
+
+    var body: some View {
+        Button("閉じる", action: dismiss)
+            .keyboardShortcut(.cancelAction)
+            .opacity(0)
+            .frame(width: 0, height: 0)
+            .accessibilityHidden(true)
     }
 }

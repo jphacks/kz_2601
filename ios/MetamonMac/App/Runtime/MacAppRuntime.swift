@@ -222,6 +222,36 @@ final class MacAppRuntime: RuntimeNavigating {
         }
     }
 
+    // MARK: - メニューの「戻る」・Esc(#934)
+
+    /// 今いちばん上に見えている画面: フルスクリーン → シート → 選択中タブ(無ければ main)の順。
+    private var topStack: String {
+        if fullScreen != nil { return "full" }
+        if sheet != nil { return "sheet" }
+        guard dsl.app.hasTabs else { return "main" }
+        return Route.tabStack(selectedTab.isEmpty ? dsl.initialTab : selectedTab)
+    }
+
+    /// 戻れる画面があるか(シートが開いている・スタックに積まれている)
+    var canGoBack: Bool { sheet != nil || fullScreen != nil || !(paths[topStack] ?? []).isEmpty }
+
+    /// back アクションと同じ: 積まれていれば 1 つ戻り、モーダルの最下層ならモーダルを閉じる。
+    func goBack() {
+        guard canGoBack else { return }
+        close(Route(screen: "", stack: topStack))
+    }
+
+    /// Esc: 開いているモーダル(フルスクリーン → シートの順)を中のスタックごと閉じる。
+    func dismissTopModal() {
+        if fullScreen != nil {
+            fullScreen = nil
+            paths["full"] = nil
+        } else if sheet != nil {
+            sheet = nil
+            paths["sheet"] = nil
+        }
+    }
+
     // MARK: - 削除の取り消し(M11)
 
     func deleteUndoably(entity: String, recordId: String) async {
