@@ -39,6 +39,7 @@ import kotlinx.serialization.json.put
  * - generate: body `{appId, baseVersion?, transcript, mode, locale?, allowedComponents?, disabledFeatures?, supportedFeatures}`
  * - `?stream=1` の SSE で途中経過を読む。使えない時は仮置きを捨てて(`restart` attempt 0)通常の呼び方に戻る
  * - 409(サーバー側の版とずれた)は現行基準で 1 回だけやり直す
+ * - `locale` を渡さない時は選んだ UI の言語(`Accept-Language` と同じ値・#843)を送る。iOS は毎回 UI の言語を渡す
  */
 class HttpAIClient(
     private val http: MetamonHttp,
@@ -112,7 +113,7 @@ class HttpAIClient(
         val body = ChatBody(
             appId = appId,
             messages = messages,
-            locale = locale,
+            locale = locale ?: http.language(),
             mode = mode,
             allowedComponents = capabilities.allowedComponents,
             disabledFeatures = capabilities.disabledFeatures,
@@ -143,7 +144,7 @@ class HttpAIClient(
         baseVersion = baseVersion,
         transcript = transcript,
         mode = mode.wire,
-        locale = locale,
+        locale = locale ?: http.language(),
         allowedComponents = capabilities.allowedComponents,
         disabledFeatures = capabilities.disabledFeatures,
         supportedFeatures = capabilities.supportedFeatures,
