@@ -102,7 +102,7 @@ struct DrawingFieldPanel: View {
     }
 }
 
-/// 全画面のキャンバス。下に ペン / 消しゴム・元に戻す・やり直す・全部消す、上に キャンセル / 完了。
+/// 全画面のキャンバス。下に ペン / 消しゴム・元に戻す・やり直す・全部消す、上に キャンセル / 完了(iOS・Mac 共通)。
 struct DrawingSheet: View {
     let session: DrawingSession
     let title: String
@@ -126,7 +126,7 @@ struct DrawingSheet: View {
                         #if os(iOS)
                         DrawingCanvas(session: session, handle: canvas)
                         #else
-                        MacDrawingCanvas(session: session)
+                        MacDrawingCanvas(session: session, handle: canvas)
                         #endif
                     }
                     .onAppear { canvasSize = geo.size }
@@ -169,24 +169,21 @@ struct DrawingSheet: View {
 
     private var tools: some View {
         HStack(spacing: RenderTheme.Spacing.md) {
-            // Mac はまだペンだけ(消しゴム・元に戻すは #1342)
-            #if os(iOS)
             Picker(L("道具"), selection: Binding(get: { session.tool }, set: { session.tool = $0 })) {
                 Label(L("ペン"), systemImage: "pencil.tip").tag(DrawingSession.Tool.pen)
                 Label(L("消しゴム"), systemImage: "eraser").tag(DrawingSession.Tool.eraser)
             }
             .pickerStyle(.segmented)
             .frame(maxWidth: 160)
-            #endif
             Spacer(minLength: 0)
-            #if os(iOS)
             Button { canvas.undo() } label: { Image(systemName: "arrow.uturn.backward") }
                 .disabled(!canvas.canUndo)
                 .accessibilityLabel(L("元に戻す"))
+                .help(Self.undoHelp)
             Button { canvas.redo() } label: { Image(systemName: "arrow.uturn.forward") }
                 .disabled(!canvas.canRedo)
                 .accessibilityLabel(L("やり直す"))
-            #endif
+                .help(Self.redoHelp)
             Button(role: .destructive) { confirmClear = true } label: { Image(systemName: "trash") }
                 .disabled(session.isEmpty)
                 .accessibilityLabel(L("全部消す"))
@@ -196,6 +193,25 @@ struct DrawingSheet: View {
         .frame(minHeight: 44)
         .padding(.horizontal, RenderTheme.Spacing.md)
         .padding(.vertical, RenderTheme.Spacing.sm)
+    }
+}
+
+extension DrawingSheet {
+    /// Mac はキーも出す(キャンバスにフォーカスがある時に効く)
+    fileprivate static var undoHelp: String {
+        #if os(macOS)
+        L("元に戻す(⌘Z)")
+        #else
+        L("元に戻す")
+        #endif
+    }
+
+    fileprivate static var redoHelp: String {
+        #if os(macOS)
+        L("やり直す(⇧⌘Z)")
+        #else
+        L("やり直す")
+        #endif
     }
 }
 
@@ -219,6 +235,14 @@ final class CanvasHandle {
         view?.undoManager?.removeAllActions()
         refresh()
     }
+
+    #if os(macOS)
+    /// Mac のキャンバス(自分の UndoManager を持つ `MacDrawingView`)をつなぐ。
+    func attach(_ v: MacDrawingView) {
+        view = v
+        refresh()
+    }
+    #endif
 
     fileprivate func refresh() {
         canUndo = view?.undoManager?.canUndo ?? false
@@ -301,31 +325,29 @@ private struct DrawingCanvas: UIViewRepresentable {
 #endif
 
 #if os(macOS)
-/// Mac のキャンバス: マウス・トラックパッドの線を集めて `DrawingSession.drawing` に足す(ペンだけ)。
+/// Mac のキャンバス: マウス・トラックパッドの線を集めて `DrawingSession.drawing` に足す・消しゴムで線ごと消す。
+/// 取り消し / やり直しはキャンバスだけの UndoManager に積む(iOS の `IsolatedCanvasView` と同じ考え)。
 private struct MacDrawingCanvas: NSViewRepresentable {
     let session: DrawingSession
+    let handle: CanvasHandle
 
     func makeCoordinator() -> Coordinator { Coordinator() }
 
     func makeNSView(context: Context) -> MacDrawingView {
-        let v = MacDrawingView()
+        let v = MacDrawingView(session: session, handle: handle)
         v.setAccessibilityElement(true)
         v.setAccessibilityRole(.image)
         v.setAccessibilityLabel(L("手書きのキャンバス"))
         v.setAccessibilityHelp(L("マウスやトラックパッドで描きます"))
-        v.onStroke = { [session, weak v] stroke in
-            session.add(stroke)
-            v?.drawing = session.drawing
-            v?.setAccessibilityValue(session.accessibilityValue)
-        }
         v.drawing = session.drawing
         v.setAccessibilityValue(session.accessibilityValue)
+        handle.attach(v)
         context.coordinator.revision = session.revision
         return v
     }
 
     func updateNSView(_ v: MacDrawingView, context: Context) {
-        // 全部消した時だけキャンバスに戻す
+        // キャンバスの外で絵が変わった時(全部消す・線の追加・消しゴム・取り消し)だけ絵を入れ直す
         if context.coordinator.revision != session.revision {
             context.coordinator.revision = session.revision
             v.drawing = session.drawing
@@ -337,35 +359,117 @@ private struct MacDrawingCanvas: NSViewRepresentable {
 }
 
 /// 描いた線(`PKDrawing` を画像にして)+ 描いている途中の線を出す。原点は左上(PKDrawing と同じ向き)。
+/// キャンバスにフォーカスがある間は ⌘Z / ⇧⌘Z をここで受ける(メニューの「削除を元に戻す」より先。⌥⌘Z は版の取り消しへ通す)。
 final class MacDrawingView: NSView {
-    var onStroke: ((PKStroke) -> Void)?
+    let session: DrawingSession
+    private weak var handle: CanvasHandle?
     var drawing = PKDrawing() {
         didSet { inkImage = nil; needsDisplay = true }
     }
     private var builder: DrawingStrokeBuilder?
+    /// 消しゴムのドラッグ中: 押した時の絵(取り消しを 1 回にまとめる)と前の点
+    private var eraseStart: PKDrawing?
+    private var lastErasePoint: CGPoint?
     private var inkImage: NSImage?
+    /// フォームの入力欄の取り消しと混ざらないよう、キャンバスだけの UndoManager を持つ
+    private let ownUndo = UndoManager()
 
+    init(session: DrawingSession, handle: CanvasHandle) {
+        self.session = session
+        self.handle = handle
+        super.init(frame: .zero)
+        focusRingType = .none
+    }
+
+    @available(*, unavailable)
+    required init?(coder: NSCoder) { fatalError("init(coder:) is not supported") }
+
+    override var undoManager: UndoManager? { ownUndo }
     override var isFlipped: Bool { true }
+    override var acceptsFirstResponder: Bool { true }
     override func acceptsFirstMouse(for event: NSEvent?) -> Bool { true }
+
+    override func viewDidMoveToWindow() {
+        super.viewDidMoveToWindow()
+        // 開いてすぐ ⌘Z が効くよう、キャンバスにフォーカスを置く
+        guard let window else { return }
+        DispatchQueue.main.async { [weak self, weak window] in
+            guard let self, let window, self.window === window else { return }
+            window.makeFirstResponder(self)
+        }
+    }
 
     override func setFrameSize(_ newSize: NSSize) {
         super.setFrameSize(newSize)
         inkImage = nil
     }
 
-    override func mouseDown(with event: NSEvent) {
-        builder = DrawingStrokeBuilder()
-        record(event)
+    override func performKeyEquivalent(with event: NSEvent) -> Bool {
+        guard event.type == .keyDown, window?.firstResponder === self,
+              event.charactersIgnoringModifiers?.lowercased() == "z" else {
+            return super.performKeyEquivalent(with: event)
+        }
+        switch event.modifierFlags.intersection([.command, .shift, .option, .control]) {
+        case [.command]:
+            undo(nil)
+            return true
+        case [.command, .shift]:
+            redo(nil)
+            return true
+        default:
+            return super.performKeyEquivalent(with: event)
+        }
     }
 
-    override func mouseDragged(with event: NSEvent) { record(event) }
+    /// 編集メニューの「元に戻す」/「やり直す」(レスポンダチェーンの undo: / redo:)もキャンバスで受ける
+    @objc func undo(_ sender: Any?) { handle?.undo() }
+    @objc func redo(_ sender: Any?) { handle?.redo() }
+
+    override func mouseDown(with event: NSEvent) {
+        window?.makeFirstResponder(self)
+        switch session.tool {
+        case .pen:
+            builder = DrawingStrokeBuilder()
+            record(event)
+        case .eraser:
+            eraseStart = session.drawing
+            lastErasePoint = nil
+            erase(event)
+        }
+    }
+
+    override func mouseDragged(with event: NSEvent) {
+        if eraseStart != nil { erase(event) } else { record(event) }
+    }
 
     override func mouseUp(with event: NSEvent) {
+        if let start = eraseStart {
+            erase(event)
+            eraseStart = nil
+            lastErasePoint = nil
+            session.finishErasing(from: start, undo: ownUndo)
+            handle?.refresh()
+            return
+        }
         record(event)
         let stroke = builder?.stroke()
         builder = nil
         needsDisplay = true
-        if let stroke { onStroke?(stroke) }
+        if let stroke {
+            session.add(stroke, undo: ownUndo)
+            drawing = session.drawing
+            setAccessibilityValue(session.accessibilityValue)
+            handle?.refresh()
+        }
+    }
+
+    private func erase(_ event: NSEvent) {
+        let p = convert(event.locationInWindow, from: nil)
+        if session.erase(from: lastErasePoint ?? p, to: p) {
+            drawing = session.drawing
+            setAccessibilityValue(session.accessibilityValue)
+        }
+        lastErasePoint = p
     }
 
     private func record(_ event: NSEvent) {

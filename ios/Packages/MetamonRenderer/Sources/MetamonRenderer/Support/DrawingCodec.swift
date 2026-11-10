@@ -69,7 +69,7 @@ final class DrawingSession: Identifiable {
     /// 保存済みの絵(描き足す時の下絵)。「全部消す」で消える。
     var background: PlatformImage?
     var tool: Tool = .pen
-    /// 「全部消す」のたびに増える(キャンバスに空の絵を戻す合図)
+    /// キャンバスの外で絵が変わるたびに増える(全部消す・Mac の線の追加 / 消しゴム / 取り消し)。キャンバスに絵を戻す合図
     private(set) var revision = 0
 
     init(value: JSONValue) {
@@ -85,8 +85,38 @@ final class DrawingSession: Identifiable {
     }
 
     /// Mac のキャンバスで描き終えた線を足す(iOS は PKCanvasView の絵をそのまま入れる)。
-    func add(_ stroke: PKStroke) {
-        drawing.strokes.append(stroke)
+    func add(_ stroke: PKStroke, undo: UndoManager? = nil) {
+        var next = drawing
+        next.strokes.append(stroke)
+        replace(with: next, undo: undo)
+    }
+
+    /// Mac の消しゴム: `from` → `to` を通って触れた線を消す(1 本ごと)。取り消しはドラッグの終わりに
+    /// `finishErasing(from:undo:)` でまとめて 1 回にする。消えた線があれば true。
+    @discardableResult
+    func erase(from: CGPoint, to: CGPoint) -> Bool {
+        let next = DrawingEraser.erase(drawing, from: from, to: to)
+        guard next.strokes.count != drawing.strokes.count else { return false }
+        drawing = next
+        revision += 1
+        return true
+    }
+
+    /// 消しゴムのドラッグ 1 回(押した時の絵 `start` から今まで)を取り消し 1 回として登録する。消えていなければ何もしない。
+    func finishErasing(from start: PKDrawing, undo: UndoManager?) {
+        guard start.strokes.count != drawing.strokes.count else { return }
+        replace(with: drawing, undo: undo, previous: start)
+    }
+
+    /// 絵を置き換え、`undo` に元(`previous`、無ければ今の絵)へ戻す操作を登録する
+    /// (Mac のキャンバスだけの UndoManager。戻した時はやり直しとして登録される)。
+    func replace(with next: PKDrawing, undo: UndoManager?, previous: PKDrawing? = nil) {
+        let before = previous ?? drawing
+        drawing = next
+        revision += 1
+        undo?.registerUndo(withTarget: self) { session in
+            MainActor.assumeIsolated { session.replace(with: before, undo: undo) }
+        }
     }
 
     /// 「全部消す」: 描いた線も下絵も消す。
