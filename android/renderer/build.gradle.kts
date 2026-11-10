@@ -32,6 +32,7 @@ dependencies {
     implementation(libs.androidx.browser)
     implementation(libs.compose.material.icons.core)
     implementation(libs.compose.ui.tooling.preview)
+    implementation(libs.zxing.core)
     debugImplementation(libs.compose.ui.tooling)
 
     testImplementation(libs.junit)
