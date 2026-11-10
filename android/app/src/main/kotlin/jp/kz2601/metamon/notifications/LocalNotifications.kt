@@ -99,14 +99,22 @@ class LocalNotifications private constructor(private val app: Context) {
         applyNow()
     }
 
-    /** 鳴った通知を出す。許可が無ければ出さずに false。 */
-    fun post(identifier: String, title: String, body: String, alarm: Boolean, channel: String = if (alarm) CHANNEL_ALARMS else CHANNEL_REMINDERS): Boolean {
+    /** 鳴った通知を出す。許可が無ければ出さずに false。[appId] があれば押した時にそのアプリを開く(#887)。 */
+    fun post(
+        identifier: String,
+        title: String,
+        body: String,
+        alarm: Boolean,
+        channel: String = if (alarm) CHANNEL_ALARMS else CHANNEL_REMINDERS,
+        appId: String? = null,
+    ): Boolean {
         if (!canPost()) return false
         ensureChannels()
         val id = identifier.hashCode()
         val launch = app.packageManager.getLaunchIntentForPackage(app.packageName)
             ?.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP)
             ?.putExtra(EXTRA_IDENTIFIER, identifier)
+            ?.apply { appId?.let { putExtra(EXTRA_APP_ID, it) } }
         val builder = NotificationCompat.Builder(app, channel)
             .setSmallIcon(R.drawable.ic_notification)
             .setContentTitle(title.ifEmpty { null })
@@ -183,13 +191,14 @@ class LocalNotifications private constructor(private val app: Context) {
         PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
     )
 
-    private fun canPost(): Boolean {
+    fun canPost(): Boolean {
         if (!NotificationManagerCompat.from(app).areNotificationsEnabled()) return false
         return Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU ||
             app.checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) == PackageManager.PERMISSION_GRANTED
     }
 
-    private fun ensureChannels() {
+    /** チャンネルを作る(何度呼んでも良い)。FCM が自分で出す通知もこのチャンネルに入るので起動時にも呼ぶ。 */
+    fun ensureChannels() {
         val manager = app.getSystemService(NotificationManager::class.java)
         manager.createNotificationChannels(
             listOf(
@@ -197,6 +206,8 @@ class LocalNotifications private constructor(private val app: Context) {
                     .apply { description = app.getString(R.string.notification_channel_reminders_description) },
                 NotificationChannel(CHANNEL_CONDITIONS, app.getString(R.string.notification_channel_conditions), NotificationManager.IMPORTANCE_DEFAULT)
                     .apply { description = app.getString(R.string.notification_channel_conditions_description) },
+                NotificationChannel(CHANNEL_OTHERS, app.getString(R.string.push_channel_others), NotificationManager.IMPORTANCE_DEFAULT)
+                    .apply { description = app.getString(R.string.push_channel_others_description) },
                 NotificationChannel(CHANNEL_ALARMS, app.getString(R.string.notification_channel_alarms), NotificationManager.IMPORTANCE_HIGH).apply {
                     description = app.getString(R.string.notification_channel_alarms_description)
                     setSound(
@@ -238,12 +249,16 @@ class LocalNotifications private constructor(private val app: Context) {
         const val CHANNEL_REMINDERS = "reminders"
         const val CHANNEL_CONDITIONS = "conditions"
         const val CHANNEL_ALARMS = "alarms"
+        /** 他の人の行動で届く通知(FCM・#887)。AndroidManifest の既定のチャンネルと同じ値 */
+        const val CHANNEL_OTHERS = "others"
 
         const val EXTRA_IDENTIFIER = "metamon.notification.identifier"
         const val EXTRA_TITLE = "metamon.notification.title"
         const val EXTRA_BODY = "metamon.notification.body"
         const val EXTRA_ALARM = "metamon.notification.alarm"
         const val EXTRA_NOTIFICATION_ID = "metamon.notification.id"
+        /** 押した時に開くアプリ。FCM が自分で出した通知は data のキー(`appId`)がそのまま extra に入る */
+        const val EXTRA_APP_ID = "appId"
 
         private fun dataUri(identifier: String): Uri = Uri.Builder().scheme("metamon-notification").opaquePart(identifier).build()
 

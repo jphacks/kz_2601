@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Notifications caused by other people's actions (FCM, #887) -->
+<resources>
+    <string name="push_channel_others">Activity from others</string>
+    <string name="push_channel_others_description">Alerts when someone else adds a record in a shared app</string>
+    <string name="push_consent_failed">Couldn\'t change this. It has been switched back.</string>
+    <string name="push_consent_footer">Notifications sent when others post in this app. Turn off to stop them from this app.</string>
+    <string name="push_consent_header">Notifications from others</string>
+    <string name="push_consent_toggle">Get notifications from this app</string>
+</resources>

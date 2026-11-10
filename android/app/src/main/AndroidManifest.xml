@@ -65,6 +65,24 @@
                 <action android:name="android.app.action.SCHEDULE_EXACT_ALARM_PERMISSION_STATE_CHANGED" />
             </intent-filter>
         </receiver>
+        <!-- 他の人の行動で届く通知(FCM・#887)。トークンは通知を出せる・サインイン済みの時にだけ取る(自動では作らない) -->
+        <service
+            android:name=".push.MetamonMessagingService"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="com.google.firebase.MESSAGING_EVENT" />
+            </intent-filter>
+        </service>
+        <meta-data
+            android:name="firebase_messaging_auto_init_enabled"
+            android:value="false" />
+        <!-- 裏で届いた notification つきのメッセージは OS が出す。そのチャンネルとアイコン(LocalNotifications.CHANNEL_OTHERS) -->
+        <meta-data
+            android:name="com.google.firebase.messaging.default_notification_channel_id"
+            android:value="others" />
+        <meta-data
+            android:name="com.google.firebase.messaging.default_notification_icon"
+            android:resource="@drawable/ic_notification" />
     </application>
 
 </manifest>
