@@ -24,6 +24,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
@@ -153,7 +154,7 @@ fun ScreenView(
                 Modifier.fillMaxWidth().padding(horizontal = RenderTheme.Spacing.xs, vertical = RenderTheme.Spacing.xs),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                if (canClose) TextButton(onClick = onBack) { Text("戻る") }
+                if (canClose) TextButton(onClick = onBack) { Text(stringResource(R.string.renderer_back)) }
                 Text(
                     screen.title,
                     style = MaterialTheme.typography.titleLarge,

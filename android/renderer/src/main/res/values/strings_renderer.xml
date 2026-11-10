@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 描画器の固定の文言(#843)。文言の正は iOS の MetamonRenderer の Localizable.xcstrings(日本語の元文) -->
+<resources>
+    <string name="renderer_back">戻る</string>
+    <string name="renderer_disclosure_collapsed">閉じています</string>
+    <string name="renderer_disclosure_default_title">詳細</string>
+    <string name="renderer_disclosure_expanded">開いています</string>
+    <string name="renderer_unavailable_here">この端末では使えません</string>
+    <string name="renderer_unavailable_needs_update">アプリを更新すると表示できます</string>
+</resources>
