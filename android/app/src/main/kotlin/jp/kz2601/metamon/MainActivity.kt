@@ -79,8 +79,13 @@ import jp.kz2601.metamon.voice.VoiceViewModel
 import jp.kz2601.metamon.voice.stage.BuildStageHost
 import jp.kz2601.metamon.services.AppSummary
 import jp.kz2601.metamon.services.sharing.IssuedShares
+import jp.kz2601.metamon.services.sharing.MembersModel
+import jp.kz2601.metamon.services.sharing.ShareScope
 import jp.kz2601.metamon.services.sharing.ShareSheetModel
 import jp.kz2601.metamon.settings.SettingsSheet
+import jp.kz2601.metamon.share.LocalShareSheetExtras
+import jp.kz2601.metamon.share.MembersSection
+import jp.kz2601.metamon.share.MembersSheet
 import jp.kz2601.metamon.share.ShareLinkHost
 import jp.kz2601.metamon.share.ShareLinkIntents
 import jp.kz2601.metamon.share.ShareSheet
@@ -268,6 +273,27 @@ fun MetamonApp(container: AppContainer) {
     val canShare = !container.knobs.mock || container.knobs.mockSharing
     // 「探す」(#902)。サーバーにつながる構成だけ入口を出す(iOS の canShare)
     var discoverOpen by rememberSaveable { mutableStateOf(false) }
+    // 参加している人(#903)。入口は共有シートの下と設定
+    var membersTarget by remember { mutableStateOf<ShareTarget?>(null) }
+    val membersClient = container.members.takeIf { canShare }
+    fun loadDsl(appId: String): suspend () -> AppDSL = {
+        val now = runtime.state.value
+        if (now.document.appId == appId) now.dsl else container.appConfig.fetchDocument(appId).document.dsl
+    }
+    fun membersModel(target: ShareTarget) =
+        MembersModel(target.appId, membersClient, isShared = { ShareScope.of(loadDsl(target.appId)()) == ShareScope.MEMBERS }, container.membersStore)
+    // 抜けた後: 別のアプリへ切り替え、一覧から外し、端末の記録・会話の履歴を消す。画面が消えても止めない
+    val onLeftShare = { target: ShareTarget ->
+        shareTarget = null
+        membersTarget = null
+        issuedShares[target.appId] = null
+        container.accountScope.launch {
+            container.leaveCleanup.run(target.appId)
+            val name: Any = target.name.ifEmpty { null } ?: UiText.Res(R.string.share_untitled)
+            runtime.showToast(UiText.Res(R.string.members_left_toast, name))
+        }
+        Unit
+    }
 
     val openSwitcher = {
         switcherOpen = true
@@ -323,6 +349,14 @@ fun MetamonApp(container: AppContainer) {
             busy = state.isGenerating,
             onDismiss = { settingsOpen = false },
             // 一度も作っていないアプリ(version 1)はシェアできない(backend が 400)
+            onMembers = if (membersClient != null && ShareScope.of(runtimeState.dsl) == ShareScope.MEMBERS) {
+                {
+                    settingsOpen = false
+                    membersTarget = ShareTarget(runtimeState.document.appId, runtimeState.dsl.app.name)
+                }
+            } else {
+                null
+            },
             onShare = if (canShare && runtimeState.document.version > 1) {
                 {
                     settingsOpen = false
@@ -401,15 +435,20 @@ fun MetamonApp(container: AppContainer) {
     // アプリの共有シート(#901)。入口は変身一覧の各行と設定
     shareTarget?.let { target ->
         val model = remember(target, issuedShares) {
-            ShareSheetModel(target.appId, container.appConfig.takeIf { canShare }, issuedShares) {
-                val now = runtime.state.value
-                if (now.document.appId == target.appId) now.dsl else container.appConfig.fetchDocument(target.appId).document.dsl
-            }
+            ShareSheetModel(target.appId, container.appConfig.takeIf { canShare }, issuedShares, loadDsl(target.appId))
         }
-        // 下半分の「みんなに公開」(#902)が使う
-        CompositionLocalProvider(LocalPublishEnv provides container.publishEnv.takeIf { canShare }) {
+        val members = remember(target) { membersModel(target) }
+        CompositionLocalProvider(
+            // 下半分の「みんなに公開」(#902)が使う
+            LocalPublishEnv provides container.publishEnv.takeIf { canShare },
+            LocalShareSheetExtras provides { MembersSection(members, onRevokeLink = { model.revoke() }, onLeft = { onLeftShare(target) }, leaveScope = container.accountScope) },
+        ) {
             ShareSheet(target, model, onDismiss = { shareTarget = null })
         }
+    }
+    membersTarget?.let { target ->
+        val members = remember(target) { membersModel(target) }
+        MembersSheet(members, onLeft = { onLeftShare(target) }, onDismiss = { membersTarget = null }, leaveScope = container.accountScope)
     }
     // シェアリンクから開く・参加する(#901)
     ShareLinkHost(container, canShare)

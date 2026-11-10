@@ -142,6 +142,7 @@ fun ShareSheet(target: ShareTarget, model: ShareSheetModel, onDismiss: () -> Uni
                 }
             }
             jp.kz2601.metamon.discover.PublishSection(target.appId, target.name) // 下半分「みんなに公開」(#902)
+            LocalShareSheetExtras.current() // 参加している人など(#903)
         }
     }
 
