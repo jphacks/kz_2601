@@ -46,6 +46,7 @@ import jp.kz2601.metamon.dsl.logic.FlashcardDeck
 import jp.kz2601.metamon.dsl.records.Entity
 import jp.kz2601.metamon.dsl.records.FieldType
 import jp.kz2601.metamon.dsl.records.Record
+import jp.kz2601.metamon.dsl.records.filters
 import jp.kz2601.metamon.renderer.DSLRuntime
 import jp.kz2601.metamon.renderer.R
 import jp.kz2601.metamon.renderer.registry.RenderContext
@@ -217,11 +218,11 @@ object FlashcardRules {
 
     /** toggle の field を boolean で比べる filter が出す側(覚えた = true / まだ = false)。無ければ null。 */
     fun learnedFilter(c: Component): Boolean? =
-        PlayRecords.filters(c).firstNotNullOfOrNull { FlashcardDeck.learnedFilter(it, c.toggle) }
+        c.filters.firstNotNullOfOrNull { FlashcardDeck.learnedFilter(it, c.toggle) }
 
     /** 出題するカード。toggle を比べる filter は「値の無いカード = まだ」で評価するため、ほかの filter だけを当てる。 */
     fun cards(c: Component, runtime: DSLRuntime, all: Map<String, List<Record>>, pending: Map<String, Boolean>): List<Record> {
-        val filters = PlayRecords.filters(c)
+        val filters = c.filters
         val learned = learnedFilter(c)
         val rest = if (learned != null) filters.filter { FlashcardDeck.learnedFilter(it, c.toggle) == null } else filters
         return FlashcardDeck.cards(PlayRecords.filtered(runtime, all, c, rest), c.toggle, learned, pending)

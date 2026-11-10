@@ -27,17 +27,24 @@ object RecordQuery {
     /** 部品の `sort`(生成器の型)→ 集計の型。 */
     fun sort(s: DslSort?): Sort? = s?.let { Sort(it.field, it.direction.wire) }
 
-    /** 部品が見る記録。`followed` は `{"myFollows": true}` を解く uid(読めなければ null = 一致しない)。 */
+    /** 部品が見る記録。[fs] は既定で部品の filter(単体も配列も)。`followed` は `{"myFollows": true}` を解く uid(読めなければ null = 一致しない)。 */
     fun filtered(
         c: Component,
         entity: Entity?,
         evaluator: ExprEvaluator,
         uid: String?,
         followed: Set<String>? = null,
+        fs: List<Filter> = c.filters,
     ): List<Record> {
         val rows = evaluator.viewRecords(c.entity ?: "")
-        val fs = filters(c.filter)
         val out = if (fs.isEmpty()) rows else evaluator.apply(fs.map { it.resolvingFollows(followed).resolvingMe(uid) }, entity, rows)
         return HiddenFields.redact(out, entity)
     }
 }
+
+/**
+ * 部品の filter(iOS の `Component.filters`)。1 件のオブジェクトも配列(AND)も読む([Filter.oneOrMany] と同じ規則)。
+ * JSON から読んだ部品は元の値から、コードで作った部品は生成器の型 `filter` から。
+ */
+val Component.filters: List<Filter>
+    get() = rawFilter?.let(Filter::oneOrMany) ?: RecordQuery.filters(filter)

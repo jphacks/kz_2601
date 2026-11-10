@@ -11,9 +11,11 @@ import jp.kz2601.metamon.dsl.records.Entity
 import jp.kz2601.metamon.dsl.records.Field
 import jp.kz2601.metamon.dsl.records.FieldCoding
 import jp.kz2601.metamon.dsl.records.FieldType
+import jp.kz2601.metamon.dsl.records.Filter
 import jp.kz2601.metamon.dsl.records.JSONValue
 import jp.kz2601.metamon.dsl.records.Record
 import jp.kz2601.metamon.dsl.records.RecordQuery
+import jp.kz2601.metamon.dsl.records.filters
 import jp.kz2601.metamon.renderer.DSLRuntime
 import java.time.Instant
 
@@ -33,9 +35,9 @@ class LeafData(
     /** entity の記録(computed 合成前・filter 前)。 */
     fun records(entity: String): List<Record> = records[entity].orEmpty()
 
-    /** computed を合成し filter を通した記録(hidden は落とす)。 */
-    fun filtered(c: Component): List<Record> =
-        RecordQuery.filtered(c, entity(c.entity), evaluator, runtime.currentUid())
+    /** computed を合成し filter(既定は部品の filter・単体も配列も AND)を通した記録(hidden は落とす)。 */
+    fun filtered(c: Component, filters: List<Filter> = c.filters): List<Record> =
+        RecordQuery.filtered(c, entity(c.entity), evaluator, runtime.currentUid(), fs = filters)
 
     /** computed を合成した記録(filter なし・calendar)。 */
     fun viewRecords(entity: String): List<Record> = evaluator.viewRecords(entity)
