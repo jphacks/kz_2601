@@ -49,9 +49,11 @@ final class MacComposeSession: Identifiable {
     /// 最後の応答(チップ・案・要約カードはこれから決める)
     private(set) var latest: ChatTurn?
     private(set) var phase: Phase = .chatting
+    /// 完成して中央に当てたアプリの id(完成の画面の「元に戻す」・閉じた後の要約のお知らせ・#968)
+    private(set) var resultAppId: String?
     private(set) var sending = false
-    /// 失敗した時の一言(会話の下に出す)
-    private(set) var error: String?
+    /// 失敗の状態カード(#968・会話の下に出す)。分け方と文言は iOS と同じ `ErrorPresentation`
+    private(set) var failure: ErrorPresentation?
     var draft: String
     /// 声で頼む(⇧⌘M・#966)で開いた。シートが出たらすぐ録音を始める(1 回だけ)
     var startsWithVoice = false
@@ -112,7 +114,7 @@ final class MacComposeSession: Identifiable {
         bubbles.append(Bubble(role: .user, text: text))
         selectedChips = []
         selectedOptions = []
-        error = nil
+        failure = nil
         sending = true
         let history = bubbles.map { ChatMessage(role: $0.role, text: $0.text) }
         let mode = mode
@@ -131,7 +133,7 @@ final class MacComposeSession: Identifiable {
                 // 届かなかった発言は履歴から外して入力欄に戻す(送り直しで同じ文が 2 回入らないように)
                 if bubbles.last?.role == .user { bubbles.removeLast() }
                 if draft.isEmpty { draft = text }
-                self.error = L10n.tr("うまく届きませんでした。もう一度送ってください")
+                show(Self.presentation(for: error, transcript: text, origin: .chat))
             }
         }
     }
@@ -188,7 +190,7 @@ final class MacComposeSession: Identifiable {
         guard phase == .chatting, !transcript.isEmpty else { return }
         task?.cancel()
         sending = false
-        error = nil
+        failure = nil
         let job = Job(transcript: transcript, started: .now, script: .init(transcript: transcript))
         withAnimation { phase = .generating(job) }
         MacVoiceOver.announce(L10n.tr("作っています"))
@@ -204,7 +206,7 @@ final class MacComposeSession: Identifiable {
             } catch {
                 guard !Task.isCancelled else { return }
                 withAnimation { phase = .chatting }
-                self.error = L10n.tr("作れませんでした。言い方を変えて、もう一度頼んでください")
+                show(Self.presentation(for: error, transcript: transcript, origin: .generate))
             }
         }
     }
@@ -239,7 +241,10 @@ final class MacComposeSession: Identifiable {
     }
 
     private func complete(_ document: AppDocument, summary: String, unchanged: Bool) {
-        if !unchanged { onResult(document) }
+        if !unchanged {
+            onResult(document)
+            resultAppId = document.appId
+        }
         withAnimation { phase = .finished(summary: summary, unchanged: unchanged) }
         MacVoiceOver.announce(summary)
     }
@@ -249,6 +254,40 @@ final class MacComposeSession: Identifiable {
         task?.cancel()
         withAnimation { phase = .chatting }
     }
+
+    // MARK: - 失敗(#968)
+
+    /// 失敗 → 状態カード。iOS の `ErrorPresentation.from` と同じ分け方。キャンセルは出さない。
+    /// 競合(409)は iOS ではバナー + 最新の取り直しだが、Mac はまだサーバーの版を持たない(#930)ので「もう一度」のカードにする。
+    static func presentation(for error: Error, transcript: String, origin: ErrorPresentation.Origin) -> ErrorPresentation? {
+        let kind = FailureKind.classify(error)
+        if kind == .cancelled { return nil }
+        if (error as? APIError)?.isTextNotAllowed == true {
+            ErrorLog.record(error, context: origin == .chat ? "mac chat" : "mac morph")
+            return ErrorPresentation(kind: .failed(message: ErrorCopy.textNotAllowed), transcript: transcript, origin: origin)
+        }
+        return ErrorPresentation.from(kind, transcript: transcript, origin: origin)
+            ?? ErrorPresentation(kind: .failed(message: ErrorCopy.otherBody), transcript: transcript, origin: origin)
+    }
+
+    private func show(_ presentation: ErrorPresentation?) {
+        guard let presentation else { return }
+        withAnimation { failure = presentation }
+    }
+
+    /// カードの「もう一度」。会話の失敗は入力欄に戻した文(直していればその文)を送り直し、生成の失敗は同じ指示で作り直す
+    func retryFailure() {
+        guard let failure, phase == .chatting, !sending else { return }
+        switch failure.origin {
+        case .chat:
+            if draft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty { send(failure.transcript) } else { sendDraft() }
+        case .generate:
+            build(failure.transcript)
+        }
+    }
+
+    /// カードの「閉じる」
+    func dismissFailure() { withAnimation { failure = nil } }
 
     /// シートを閉じる時。走っている呼び出しを止める
     func close() { task?.cancel() }
