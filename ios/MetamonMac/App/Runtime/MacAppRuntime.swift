@@ -33,8 +33,13 @@ final class MacAppRuntime: RuntimeNavigating {
     /// 一覧の記録を消した直後の「削除しました・元に戻す」(iOS の M11 と同じく数秒は送らない)
     var recordUndo: DeletionTicket?
     static let undoSeconds: Double = 5
+    /// addToCalendar で出す確認シートの中身(`MacAppRuntime+Calendar.swift`・#978)
+    var calendarDraft: CalendarEventDraft?
 
     @ObservationIgnored let recordSync: RecordSyncEngine
+    /// lookupBook の問い合わせ先。appconfig への接続(#930)が来るまでは nil
+    @ObservationIgnored var books: (any BookLookupClient)?
+    @ObservationIgnored var calendarWriter: any CalendarWriting = EventKitCalendarWriter()
     @ObservationIgnored private var savingForms: Set<ObjectIdentifier> = []
 
     init(appId: String, dsl: AppDSL, recordSync: RecordSyncEngine? = nil) {
@@ -202,6 +207,12 @@ final class MacAppRuntime: RuntimeNavigating {
                 return
             }
             NSWorkspace.shared.open(url)
+
+        case .addToCalendar:
+            addToCalendar(action, ctx)
+
+        case .lookupBook:
+            await lookupBook(action, ctx)
 
         default:
             // AI・通知・共有・書き出しなどは Mac ではまだ動かない(後の Issue)

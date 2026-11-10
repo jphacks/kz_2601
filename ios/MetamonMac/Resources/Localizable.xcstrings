@@ -17,6 +17,22 @@
         }
       }
     },
+    "%@(終日)" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ (all day)"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@(終日)"
+          }
+        }
+      }
+    },
     "1日ごとの変化を折れ線グラフで見せて" : {
       "localizations" : {
         "en" : {
@@ -157,6 +173,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Apple でサインイン中"
+          }
+        }
+      }
+    },
+    "ISBN を確かめてください(10 桁か 13 桁)" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Check the ISBN (10 or 13 digits)"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ISBN を確かめてください(10 桁か 13 桁)"
           }
         }
       }
@@ -323,6 +355,38 @@
         }
       }
     },
+    "「%@」の情報を入れました(出典: %@)" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Filled in “%1$@” (source: %2$@)"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "「%@」の情報を入れました(出典: %@)"
+          }
+        }
+      }
+    },
+    "「%@」を入力してください" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Enter %@"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "「%@」を入力してください"
+          }
+        }
+      }
+    },
     "「AI で書く」ボタン(文を作る・要約・分類・書き直し・抜き出し・提案)は、押した時だけ送ります。短い答えは、端末の中の AI が使える時は送らず、使えない時だけ最近の記録と入力中の文字(最大 4KB)を送ります。長い答えのボタンは、いつも最大 16KB を送ります。共有のアプリで材料にするのは、自分が入れた記録だけです。" : {
       "localizations" : {
         "en" : {
@@ -415,6 +479,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "「毎日の支出を記録して、今月の合計を見たい」のように、使い道を書いてください。"
+          }
+        }
+      }
+    },
+    "「追加」を押すと、Mac のカレンダーの既定のカレンダーに入ります。初めての時は、カレンダーへの追加を許可するか聞かれます。" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Click Add to put it in your default calendar in the Calendar app. The first time, you’ll be asked to allow adding events."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "「追加」を押すと、Mac のカレンダーの既定のカレンダーに入ります。初めての時は、カレンダーへの追加を許可するか聞かれます。"
           }
         }
       }
@@ -575,6 +655,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "ここまでの指示でアプリを直します"
+          }
+        }
+      }
+    },
+    "この ISBN の本は見つかりませんでした。手で入力してください" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No book found for this ISBN. Please enter it by hand."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "この ISBN の本は見つかりませんでした。手で入力してください"
           }
         }
       }
@@ -1347,6 +1443,102 @@
         }
       }
     },
+    "カレンダーで開く" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Open in Calendar"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "カレンダーで開く"
+          }
+        }
+      }
+    },
+    "カレンダーに入れる記録が見つかりません" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No record to add to Calendar"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "カレンダーに入れる記録が見つかりません"
+          }
+        }
+      }
+    },
+    "カレンダーに追加" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Add to Calendar"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "カレンダーに追加"
+          }
+        }
+      }
+    },
+    "カレンダーに追加しました" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Added to Calendar"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "カレンダーに追加しました"
+          }
+        }
+      }
+    },
+    "カレンダーに追加できませんでした。カレンダー アプリで既定のカレンダーを確かめてください。" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Couldn’t add it to Calendar. Check the default calendar in the Calendar app."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "カレンダーに追加できませんでした。カレンダー アプリで既定のカレンダーを確かめてください。"
+          }
+        }
+      }
+    },
+    "カレンダーへの追加が許可されていません。システム設定の「プライバシーとセキュリティ」→「カレンダー」で許可してください。" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Adding to Calendar isn’t allowed. Turn it on in System Settings > Privacy & Security > Calendars."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "カレンダーへの追加が許可されていません。システム設定の「プライバシーとセキュリティ」→「カレンダー」で許可してください。"
+          }
+        }
+      }
+    },
     "カレンダー・連絡先・銀行など、ほかのアプリやサービスのデータは読み込めません。" : {
       "localizations" : {
         "en" : {
@@ -1715,6 +1907,22 @@
         }
       }
     },
+    "メモ" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Notes"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "メモ"
+          }
+        }
+      }
+    },
     "メモ欄を足して" : {
       "localizations" : {
         "en" : {
@@ -1887,6 +2095,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "下のタブ"
+          }
+        }
+      }
+    },
+    "予定" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Event"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "予定"
           }
         }
       }
@@ -2175,6 +2399,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "元に戻す"
+          }
+        }
+      }
+    },
+    "先に ISBN を入力してください" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Enter the ISBN first"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "先に ISBN を入力してください"
           }
         }
       }
@@ -2563,6 +2803,22 @@
         }
       }
     },
+    "場所" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Location"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "場所"
+          }
+        }
+      }
+    },
     "声でこのアプリを直す" : {
       "localizations" : {
         "en" : {
@@ -2687,6 +2943,38 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "変更を反映しています…"
+          }
+        }
+      }
+    },
+    "始まる %lld 分前に通知" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Alert %lld min before"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "始まる %lld 分前に通知"
+          }
+        }
+      }
+    },
+    "始まる時に通知" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Alert at start time"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "始まる時に通知"
           }
         }
       }
@@ -3045,6 +3333,22 @@
         }
       }
     },
+    "日時" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Date"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "日時"
+          }
+        }
+      }
+    },
     "時間がかかっています。もう少しだけお待ちください" : {
       "localizations" : {
         "en" : {
@@ -3121,6 +3425,54 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "未同意"
+          }
+        }
+      }
+    },
+    "本の情報の取得は今使えません。手で入力してください" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Book lookup isn't available right now. Please enter it by hand."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "本の情報の取得は今使えません。手で入力してください"
+          }
+        }
+      }
+    },
+    "本の情報はフォームの画面で読み込めます" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Book info can be filled in on a form screen"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "本の情報はフォームの画面で読み込めます"
+          }
+        }
+      }
+    },
+    "本の情報を読み込めません。手で入力してください" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Couldn't load the book info. Please enter it by hand."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "本の情報を読み込めません。手で入力してください"
           }
         }
       }
@@ -3969,6 +4321,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "近くにいる人の端末に、まとめて送れるようにして"
+          }
+        }
+      }
+    },
+    "追加" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Add"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "追加"
           }
         }
       }
