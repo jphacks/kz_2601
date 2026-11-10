@@ -17,6 +17,7 @@ import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
@@ -54,15 +55,23 @@ import jp.kz2601.metamon.renderer.theme.RenderTheme
  */
 @Composable
 fun DSLView(dsl: AppDSL, runtime: DSLRuntime, modifier: Modifier = Modifier) {
-    var nav by remember(dsl) { mutableStateOf(NavigationState.initial(dsl)) }
+    // 遷移の状態はランタイムが持つ(AppRuntime)。無ければ描画器が自前で持つ(プレビュー)
+    val host = runtime.navigationHost
+    var local by remember(dsl) { mutableStateOf(NavigationState.initial(dsl)) }
+    val hosted = host?.navigation?.collectAsState()
+    val nav = hosted?.value ?: local
+    fun setNav(value: NavigationState) {
+        if (host != null) host.setNavigation(value) else local = value
+    }
 
     fun perform(action: Action, from: Route) {
+        if (host != null) return runtime.onAction(action, ActionContext(from))
         when (action.type) {
             ActionType.NAVIGATE -> action.screen?.let {
-                nav = NavigationResolver.navigate(nav, it, Presentation.of(action.presentation?.wire), null, from, dsl)
+                setNav(NavigationResolver.navigate(nav, it, Presentation.of(action.presentation?.wire), null, from, dsl))
             }
-            ActionType.BACK -> nav = NavigationResolver.close(nav, from)
-            else -> runtime.onAction(action, from)
+            ActionType.BACK -> setNav(NavigationResolver.close(nav, from))
+            else -> runtime.onAction(action, ActionContext(from))
         }
     }
 
@@ -70,10 +79,10 @@ fun DSLView(dsl: AppDSL, runtime: DSLRuntime, modifier: Modifier = Modifier) {
     fun stack(stack: String, root: Route) {
         val top = nav.path(stack).lastOrNull() ?: root
         val canClose = NavigationResolver.canClose(nav, top)
-        BackHandler(enabled = canClose) { nav = NavigationResolver.close(nav, top) }
+        BackHandler(enabled = canClose) { setNav(NavigationResolver.close(nav, top)) }
         key(top.id) {
             RouteView(dsl, top, RenderContext(top, runtime) { perform(it, top) }, canClose) {
-                nav = NavigationResolver.close(nav, top)
+                setNav(NavigationResolver.close(nav, top))
             }
         }
     }
@@ -94,7 +103,7 @@ fun DSLView(dsl: AppDSL, runtime: DSLRuntime, modifier: Modifier = Modifier) {
                         selected = nav.selectedTab == t.screen,
                         onClick = {
                             // 選び直したタブは根まで戻す
-                            nav = nav.withPath(Route.tabStack(t.screen), emptyList()).copy(selectedTab = t.screen)
+                            setNav(nav.withPath(Route.tabStack(t.screen), emptyList()).copy(selectedTab = t.screen))
                         },
                         icon = {},
                         label = { Text(t.title, maxLines = 1, overflow = TextOverflow.Ellipsis) },
@@ -106,11 +115,11 @@ fun DSLView(dsl: AppDSL, runtime: DSLRuntime, modifier: Modifier = Modifier) {
 
     nav.sheet?.let { sheet ->
         // 下に引いて閉じた時はシートのスタックごと閉じる
-        SheetHost(onDismiss = { nav = nav.withPath(Route.SHEET, null).copy(sheet = null) }) { stack(Route.SHEET, sheet) }
+        SheetHost(onDismiss = { setNav(nav.withPath(Route.SHEET, null).copy(sheet = null)) }) { stack(Route.SHEET, sheet) }
     }
     nav.fullScreen?.let { full ->
         Dialog(
-            onDismissRequest = { nav = NavigationResolver.close(nav, nav.path(Route.FULL).lastOrNull() ?: full) },
+            onDismissRequest = { setNav(NavigationResolver.close(nav, nav.path(Route.FULL).lastOrNull() ?: full)) },
             properties = DialogProperties(usePlatformDefaultWidth = false),
         ) {
             Box(Modifier.fillMaxSize().background(RenderTheme.colors.canvas)) { stack(Route.FULL, full) }
