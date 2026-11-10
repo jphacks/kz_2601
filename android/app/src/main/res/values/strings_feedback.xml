@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 元に戻す / やり直す・トースト・確認ダイアログ・削除の取り消し(#895)。文言は iOS(UndoCopy・Localizable.xcstrings)に合わせる -->
+<resources>
+    <string name="feedback_cancel">キャンセル</string>
+    <string name="feedback_close">閉じる</string>
+    <string name="feedback_deleted">削除しました</string>
+    <string name="feedback_no_earlier">これ以上前の状態はありません</string>
+    <string name="feedback_redo">やり直す</string>
+    <string name="feedback_redo_failed">やり直せませんでした</string>
+    <string name="feedback_redone">やり直しました</string>
+    <string name="feedback_undo">元に戻す</string>
+    <string name="feedback_undone">元に戻しました</string>
+</resources>
