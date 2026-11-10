@@ -40,6 +40,7 @@ import jp.kz2601.metamon.dsl.fallback
 import jp.kz2601.metamon.dsl.hasTabs
 import jp.kz2601.metamon.dsl.screen
 import jp.kz2601.metamon.renderer.components.UnavailableComponent
+import jp.kz2601.metamon.renderer.components.dashcam.LocalDashcamAppName
 import jp.kz2601.metamon.renderer.components.social.SocialDialogs
 import jp.kz2601.metamon.renderer.components.social.SocialPromptHost
 import jp.kz2601.metamon.renderer.components.lists.LocalScreenLocals
@@ -153,7 +154,10 @@ private fun RouteView(dsl: AppDSL, route: Route, ctx: RenderContext, canClose: B
         UnavailableComponent(jp.kz2601.metamon.dsl.Component(), Modifier.padding(16.dp))
         return
     }
-    ScreenView(screen, ctx, canClose, onBack)
+    // dashcam の映像はアプリごとの置き場に分ける(#872)
+    CompositionLocalProvider(LocalDashcamAppName provides dsl.app.name) {
+        ScreenView(screen, ctx, canClose, onBack)
+    }
 }
 
 /** 画面 1 枚(iOS の `ScreenView`)。`screen.entity` があれば下書きを作り、入力部品と保存に渡す。保存バーは子 Issue で入れる。 */
