@@ -56,6 +56,7 @@ import java.time.format.FormatStyle
  * @param busy 生成中(アカウント削除をさせない)
  * @param remainingToday 音声の画面が最後に読んだ「今日の残り」。[onRefreshUsage] で開いた時に読み直す
  * @param onStopRetention 「自動で消すのをやめる」の指示文を送る(送ったらシートを閉じる)
+ * @param onShowTutorial 「使い方を見る」(#900)。シートを閉じて初回のチュートリアルをもう一度出す
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -67,6 +68,7 @@ fun SettingsSheet(
     isPro: Boolean = false,
     onRefreshUsage: () -> Unit = {},
     onStopRetention: (String) -> Unit = {},
+    onShowTutorial: () -> Unit = {},
 ) {
     LaunchedEffect(Unit) { onRefreshUsage() }
     ModalBottomSheet(
@@ -103,6 +105,11 @@ fun SettingsSheet(
             BlockedUsersSection(container.runtime)
             // 今日の残り(#630)。AI を使うまでは「AI を使うと表示されます」
             RemainingTodaySection(remainingToday, isPro)
+            HorizontalDivider(Modifier.padding(vertical = 8.dp))
+            // 使い方を見る(#900・iOS の settings.tutorial)
+            TextButton(onClick = onShowTutorial, modifier = Modifier.padding(horizontal = 4.dp).testTag("settings.tutorial")) {
+                Text(stringResource(R.string.onboarding_replay))
+            }
             HorizontalDivider(Modifier.padding(vertical = 8.dp))
             var language by remember { mutableStateOf(AppLocales.setting(context)) }
             LanguageSection(language, onSelect = { selected ->

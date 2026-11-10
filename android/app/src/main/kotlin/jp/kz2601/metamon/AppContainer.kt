@@ -34,6 +34,8 @@ import jp.kz2601.metamon.account.MediaTempFiles
 import jp.kz2601.metamon.account.OwnerGatedTokens
 import jp.kz2601.metamon.auth.AuthSession
 import jp.kz2601.metamon.consent.ConsentPrompt
+import jp.kz2601.metamon.onboarding.FirstRunTutorialStore
+import jp.kz2601.metamon.onboarding.TutorialPrompt
 import jp.kz2601.metamon.permissions.PermissionCenter
 import jp.kz2601.metamon.services.account.AccountClient
 import jp.kz2601.metamon.services.account.HttpAccountClient
@@ -164,6 +166,8 @@ class AppContainer(
     private val clearImageCache: () -> Unit = {},
     /** 記録の保存期間を確認した記録(#482・端末ごと)。モックはメモリだけ */
     private val retentionConsent: RetentionConsentStore = KeyValueRetentionConsent(InMemoryKeyValueStore()),
+    /** 初回のチュートリアルと「こう話すと直せます」を見た印(#900)。モックは見た扱いで始める */
+    val tutorial: FirstRunTutorialStore = FirstRunTutorialStore(InMemoryKeyValueStore()).apply { markAllSeen() },
 ) {
     /** 画面の下に出す接続先の名前(モックなら "mock")。 */
     val environmentLabel: String get() = if (knobs.mock) "mock" else environment.name
@@ -173,6 +177,9 @@ class AppContainer(
 
     /** 同意の画面を出す時点(起動時・AI に送る直前・設定から・#888) */
     val consentPrompt = ConsentPrompt(consent)
+
+    /** 初回のチュートリアルを出す時点(同意の後・設定の「使い方を見る」・#900) */
+    val tutorialPrompt = TutorialPrompt(tutorial)
 
     /** 前の日までの aiButton の集計を送る(起動・前面に戻った時。送るのは 1 日 1 回) */
     suspend fun flushAiButtonMetrics() {
@@ -191,6 +198,11 @@ class AppContainer(
             removeLocalMedia = removeLocalMedia,
             clearImageCache = clearImageCache,
             feedCache = feedCache,
+            // チュートリアルと「こう話すと直せます」の印(iOS は LocalWipe.clearDefaults で消える)。次の人には出し直す
+            forgetTutorial = {
+                tutorial.forget()
+                tutorialPrompt.reset()
+            },
             // 同意は人ごと(iOS は UserDefaults ごと消す)。前の人の止めた発話も次の人の同意で送らない
             forgetConsent = {
                 consent.forget()
@@ -347,6 +359,7 @@ class AppContainer(
                 removeLocalMedia = removeLocalMedia(context),
                 social = SocialServices(HttpMatchingClient(appConfigHttp), HttpModerationClient(appConfigHttp), MatchingAgeGate(prefs)),
                 clearImageCache = { RemoteImages.wipe(context) },
+                tutorial = FirstRunTutorialStore(SharedPreferencesKeyValueStore.of(context, FirstRunTutorialStore.PREFS)),
             )
         }
 
