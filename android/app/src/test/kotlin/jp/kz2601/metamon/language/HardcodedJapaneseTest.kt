@@ -52,15 +52,10 @@ class HardcodedJapaneseTest {
         "renderer/src/main/kotlin/jp/kz2601/metamon/renderer/conformance/PlayNodes.kt" to setOf("精算"),
         "renderer/src/main/kotlin/jp/kz2601/metamon/renderer/components/Containers.kt" to setOf("詳細"),
         "renderer/src/main/kotlin/jp/kz2601/metamon/renderer/components/play/BracketLeaf.kt" to setOf("決勝", "準決勝", "準々決勝", "\$round 回戦"),
-        // まだ移していない(一覧・集計の値。適合テストの木と共有。子 Issue で移す)
-        "renderer/src/main/kotlin/jp/kz2601/metamon/renderer/components/lists/ListValues.kt" to setOf(
-            "まだありません", "件数", "\${name}の合計", "\${name}の平均", "\${name}の最小", "\${name}の最大", "件", "データがありません",
-            "\$count 項目。\${maxB.label} の \${format(maxB.value, locale)}",
-            "\$count 項目。最大は \${maxB.label} の \${format(maxB.value, locale)}、最小は \${minB.label} の \${format(minB.value, locale)}",
+        "renderer/src/main/kotlin/jp/kz2601/metamon/renderer/components/lists/ValueLabels.kt" to setOf(
+            "まだありません", "件数", "%sの合計", "%sの平均", "%sの最小", "%sの最大", "件", "データがありません",
+            "%d 項目。%s の %s", "%d 項目。最大は %s の %s、最小は %s の %s", "全員", "参加者",
         ),
-        "renderer/src/main/kotlin/jp/kz2601/metamon/renderer/components/lists/LeafData.kt" to setOf("全員", "参加者"),
-        "renderer/src/main/kotlin/jp/kz2601/metamon/renderer/components/lists/GridTableLeaf.kt" to setOf("(無題)"),
-        "renderer/src/main/kotlin/jp/kz2601/metamon/renderer/form/FormChoices.kt" to setOf("参照先", "選択してください"),
         // まだ移していない(サインインの失敗。OS の文をそのまま出す所と一緒に直す)
         "app/src/main/kotlin/jp/kz2601/metamon/auth/AuthSession.kt" to setOf("サインインできませんでした。もう一度お試しください"),
     )

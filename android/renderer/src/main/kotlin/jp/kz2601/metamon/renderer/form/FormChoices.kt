@@ -28,14 +28,15 @@ object FormChoices {
         return FieldCoding.display(record.data[tf] ?: JSONValue.Null, target.field(tf), now = DSLClock.now())
     }
 
-    fun refEntityName(field: Field, runtime: DSLRuntime): String =
-        field.refEntity?.let { runtime.entityModel(it)?.name } ?: "参照先"
+    /** 参照先の entity の名前。見つからなければ [fallback](「参照先」)。 */
+    fun refEntityName(field: Field, runtime: DSLRuntime, fallback: String): String =
+        field.refEntity?.let { runtime.entityModel(it)?.name } ?: fallback
 
-    /** member の選択肢(保存値 uid, 表示名)。今の値が一覧に無ければ(抜けた人)後ろに残す。 */
-    fun memberOptions(current: String, members: List<FormMember>): List<Pair<String, String>> {
+    /** member の選択肢(保存値 uid, 表示名)。先頭は未選択([placeholder])。今の値が一覧に無ければ(抜けた人)後ろに残す。 */
+    fun memberOptions(current: String, members: List<FormMember>, placeholder: String): List<Pair<String, String>> {
         val listed = members.map { it.uid to it.displayName.ifEmpty { it.uid } }
         val kept = if (current.isEmpty() || members.any { it.uid == current }) emptyList() else listOf(current to current)
-        return listOf("" to "選択してください") + listed + kept
+        return listOf("" to placeholder) + listed + kept
     }
 
     /** computed の値: 行 = 入力中の下書き(金額を打つと「1人あたり」が追従)。計算できなければ null。 */

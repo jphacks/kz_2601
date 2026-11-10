@@ -6,6 +6,7 @@ import jp.kz2601.metamon.dsl.records.Field
 import jp.kz2601.metamon.dsl.records.FieldType
 import jp.kz2601.metamon.dsl.records.JSONValue
 import jp.kz2601.metamon.renderer.components.lists.LeafData
+import jp.kz2601.metamon.renderer.components.lists.ValueLabels
 import jp.kz2601.metamon.renderer.components.social.AuthorNameHost
 import jp.kz2601.metamon.renderer.components.social.ChatThreadSend
 import jp.kz2601.metamon.renderer.registry.ComponentRegistry
@@ -98,7 +99,7 @@ class SocialLeavesTest {
         val data = LeafData(rt, emptyMap())
         val member = Field("who", type = FieldType.MEMBER)
         assertEquals("たろう", data.display(JSONValue.Str("u1"), member))
-        assertEquals(LeafData.MEMBER_FALLBACK, data.display(JSONValue.Str("u2"), member)) // 表示名が空
+        assertEquals(ValueLabels.JAPANESE.member, data.display(JSONValue.Str("u2"), member)) // 表示名が空
         assertEquals("参加者", data.display(JSONValue.Str("gone"), member)) // 名簿に無い(iOS と同じ・#1076)
         assertEquals("", data.display(JSONValue.Null, member))
     }

@@ -8,6 +8,7 @@
     <string name="inputs_needs_form">%1$s requires screen.entity</string>
     <string name="inputs_no_photo">No photo</string>
     <string name="inputs_photo">Photo</string>
+    <string name="inputs_ref_entity">linked item</string>
     <string name="inputs_required">Required</string>
     <string name="inputs_select">Select</string>
     <string name="inputs_split_all">None selected = split among everyone</string>

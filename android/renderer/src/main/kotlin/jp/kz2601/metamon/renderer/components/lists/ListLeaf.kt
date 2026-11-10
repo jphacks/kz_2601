@@ -85,7 +85,7 @@ fun ListLeaf(c: Component, ctx: RenderContext, modifier: Modifier = Modifier) {
     val entity = data.entity(entityId)
     val rows = ListRows.rows(c, data, query)
     if (rows.isEmpty()) {
-        EmptyPlaceholder("tray", c.emptyText ?: LIST_EMPTY_TEXT, modifier)
+        EmptyPlaceholder("tray", c.emptyText ?: data.labels.empty, modifier)
         return
     }
     val toggleField = ListToggle.field(c.item, entity)

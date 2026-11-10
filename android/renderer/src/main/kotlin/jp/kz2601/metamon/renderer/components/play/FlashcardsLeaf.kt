@@ -49,6 +49,8 @@ import jp.kz2601.metamon.dsl.records.Record
 import jp.kz2601.metamon.dsl.records.filters
 import jp.kz2601.metamon.renderer.DSLRuntime
 import jp.kz2601.metamon.renderer.R
+import jp.kz2601.metamon.renderer.components.lists.ValueLabels
+import jp.kz2601.metamon.renderer.components.lists.rememberValueLabels
 import jp.kz2601.metamon.renderer.registry.RenderContext
 import jp.kz2601.metamon.renderer.theme.RenderTheme
 import jp.kz2601.metamon.renderer.theme.SymbolIcon
@@ -150,7 +152,7 @@ private fun CardFace(
     onAnswer: (Boolean) -> Unit,
 ) {
     val field = if (flipped) c.back else c.front
-    val text = FlashcardRules.value(runtime, all, entity, card, field)
+    val text = FlashcardRules.value(runtime, all, entity, card, field, rememberValueLabels())
     val fieldName = field?.let { entity?.field(it)?.name }.orEmpty()
     var drag by remember(card.id) { mutableFloatStateOf(0f) }
     val threshold = with(LocalDensity.current) { 90.dp.toPx() }
@@ -229,8 +231,8 @@ object FlashcardRules {
     }
 
     /** 面に出す文字(空なら「—」)。 */
-    fun value(runtime: DSLRuntime, all: Map<String, List<Record>>, entity: Entity?, r: Record, field: String?): String {
+    fun value(runtime: DSLRuntime, all: Map<String, List<Record>>, entity: Entity?, r: Record, field: String?, labels: ValueLabels = ValueLabels.JAPANESE): String {
         if (field.isNullOrEmpty()) return ""
-        return PlayRecords.display(runtime, all, r[field], entity?.field(field)).ifEmpty { "—" }
+        return PlayRecords.display(runtime, all, r[field], entity?.field(field), labels).ifEmpty { "—" }
     }
 }

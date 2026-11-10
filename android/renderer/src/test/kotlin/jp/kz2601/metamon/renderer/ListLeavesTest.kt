@@ -20,6 +20,7 @@ import jp.kz2601.metamon.renderer.components.lists.ProgressValue
 import jp.kz2601.metamon.renderer.components.lists.StatValue
 import jp.kz2601.metamon.renderer.components.lists.TableCells
 import jp.kz2601.metamon.renderer.components.lists.TimelineRows
+import jp.kz2601.metamon.renderer.components.lists.ValueLabels
 import jp.kz2601.metamon.renderer.registry.ComponentRegistry
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -125,7 +126,7 @@ class ListLeavesTest {
     fun tableAndTimeline() {
         val d = data()
         val table = c("""{"type":"table","entity":"shop","groupBy":"area","columns":[{"field":"area"},{"field":"price","aggregate":"sum"},{"field":"price","aggregate":"avg"},{"field":"name","aggregate":"count"}]}""")
-        assertEquals(listOf("地域", "予算の合計", "予算の平均", "件数"), table.columns.map { TableCells.header(it, shop) })
+        assertEquals(listOf("地域", "予算の合計", "予算の平均", "件数"), table.columns.map { TableCells.header(it, shop, ValueLabels.JAPANESE) })
         assertEquals(
             listOf(listOf("金沢", "¥3,400", "¥1,700", "2"), listOf("富山", "¥1,000", "¥1,000", "1")),
             TableCells.rows(table, d).map { it.texts },
@@ -152,15 +153,43 @@ class ListLeavesTest {
         assertEquals(3.0 to "件", GaugeValue.value(gauge, d))
     }
 
+    /** res の strings_lists.xml から [ValueLabels] を作る(書式の `%1$s` は `%s` に)。 */
+    private fun labels(dir: String): ValueLabels {
+        val xml = java.io.File("src/main/res/$dir/strings_lists.xml").readText()
+        val strings = Regex("""<string name="([^"]+)">([^<]*)</string>""").findAll(xml).associate { it.groupValues[1] to it.groupValues[2] }
+        fun s(name: String) = strings.getValue("lists_$name").replace(Regex("""%\d\$"""), "%")
+        return ValueLabels(
+            empty = s("empty"), count = s("count"), sum = s("sum"), avg = s("avg"), min = s("min"), max = s("max"),
+            countUnit = s("count_unit"), noData = s("no_data"), chartOne = s("chart_summary_one"), chartMany = s("chart_summary_many"),
+            everyone = s("everyone"), member = s("member"),
+        )
+    }
+
+    @Test
+    fun japaneseLabelsMatchStrings() {
+        // 適合テストの描画の木が使う日本語は、画面の日本語(strings_lists.xml)と同じ
+        assertEquals(labels("values"), ValueLabels.JAPANESE)
+    }
+
+    @Test
+    fun englishTableHeaders() {
+        val table = c("""{"type":"table","entity":"shop","groupBy":"area","columns":[{"field":"area"},{"field":"price","aggregate":"sum"},{"field":"price","aggregate":"avg"},{"field":"price","aggregate":"count"}]}""")
+        assertEquals(listOf("地域", "Total 予算", "Avg 予算", "Count"), table.columns.map { TableCells.header(it, shop, labels("values-en")) })
+    }
+
     @Test
     fun chartBucketsAndReadout() {
         val d = data()
         val chart = c("""{"type":"chart","entity":"shop","groupBy":"area","aggregate":"sum","field":"price","kind":"pie"}""")
         val buckets = ChartBuckets.buckets(chart, d)
         assertEquals(listOf("金沢" to 3400.0, "富山" to 1000.0), buckets.map { it.label to it.value })
-        assertEquals("2 項目。最大は 金沢 の 3,400、最小は 富山 の 1,000", ChartReadout.summary(buckets, Locale.JAPAN))
-        assertEquals("1 項目。3月 の 12", ChartReadout.summary(listOf(Aggregator.Bucket("m", "3月", 12.0)), Locale.JAPAN))
-        assertEquals("データがありません", ChartReadout.summary(emptyList()))
+        assertEquals("2 項目。最大は 金沢 の 3,400、最小は 富山 の 1,000", ChartReadout.summary(buckets, ValueLabels.JAPANESE, Locale.JAPAN))
+        assertEquals("1 項目。3月 の 12", ChartReadout.summary(listOf(Aggregator.Bucket("m", "3月", 12.0)), ValueLabels.JAPANESE, Locale.JAPAN))
+        assertEquals("データがありません", ChartReadout.summary(emptyList(), ValueLabels.JAPANESE))
+        val en = labels("values-en")
+        assertEquals("2 items. Highest: 金沢 (3,400). Lowest: 富山 (1,000)", ChartReadout.summary(buckets, en, Locale.US))
+        assertEquals("1 items. 3月: 12", ChartReadout.summary(listOf(Aggregator.Bucket("m", "3月", 12.0)), en, Locale.US))
+        assertEquals("No data yet", ChartReadout.summary(emptyList(), en))
         assertEquals("3月: 12.5", ChartReadout.line("3月", 12.5, Locale.JAPAN))
         assertEquals(0, ChartReadout.index(1000.0, listOf(3400.0, 1000.0)))
         assertEquals(1, ChartReadout.index(4000.0, listOf(3400.0, 1000.0)))

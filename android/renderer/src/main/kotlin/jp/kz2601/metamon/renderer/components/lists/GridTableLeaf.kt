@@ -145,7 +145,8 @@ private fun GridCell(
         FormPrefill.set(layout.prefill(cell))
         ctx.dispatch(action, ActionContext(ctx.route, ctx.form))
     }
-    val titles = rows.map { gridTitle(c, it, entity, data) }
+    val untitled = stringResource(R.string.lists_untitled)
+    val titles = rows.map { gridTitle(c, it, entity, data, untitled) }
     val emptyLabel = stringResource(R.string.lists_cell_empty)
     val addLabel = stringResource(R.string.lists_add)
     val editLabel = stringResource(R.string.lists_edit)
@@ -205,9 +206,9 @@ private fun GridCell(
     }
 }
 
-private fun gridTitle(c: Component, r: Record, entity: Entity?, data: LeafData): String {
+private fun gridTitle(c: Component, r: Record, entity: Entity?, data: LeafData, untitled: String): String {
     val f = c.titleField ?: entity?.displayTitleField
-    return data.text(r, f, entity).ifEmpty { "(無題)" }
+    return data.text(r, f, entity).ifEmpty { untitled }
 }
 
 private fun gridSubtitle(c: Component, r: Record, entity: Entity?, data: LeafData): String? {

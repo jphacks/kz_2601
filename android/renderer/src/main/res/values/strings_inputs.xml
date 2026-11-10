@@ -8,6 +8,7 @@
     <string name="inputs_needs_form">%1$s は screen.entity が必要です</string>
     <string name="inputs_no_photo">写真なし</string>
     <string name="inputs_photo">写真</string>
+    <string name="inputs_ref_entity">参照先</string>
     <string name="inputs_required">入力してください</string>
     <string name="inputs_select">選択してください</string>
     <string name="inputs_split_all">未選択 = 全員で割ります</string>

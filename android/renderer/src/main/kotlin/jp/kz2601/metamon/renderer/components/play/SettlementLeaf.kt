@@ -27,6 +27,8 @@ import jp.kz2601.metamon.dsl.records.Record
 import jp.kz2601.metamon.dsl.records.Settlement
 import jp.kz2601.metamon.renderer.DSLRuntime
 import jp.kz2601.metamon.renderer.R
+import jp.kz2601.metamon.renderer.components.lists.ValueLabels
+import jp.kz2601.metamon.renderer.components.lists.rememberValueLabels
 import jp.kz2601.metamon.renderer.registry.RenderContext
 import jp.kz2601.metamon.renderer.theme.RenderTheme
 import jp.kz2601.metamon.renderer.theme.SymbolIcon
@@ -42,7 +44,7 @@ fun SettlementLeaf(c: Component, ctx: RenderContext, modifier: Modifier = Modifi
     val all by rememberRecords(ctx.runtime)
     val entityId = c.entity.orEmpty()
     val hasMembers = PlayRecords.viewRecords(ctx.runtime, all, entityId).isNotEmpty()
-    val transfers = settlementTransfers(c, ctx.runtime, all)
+    val transfers = settlementTransfers(c, ctx.runtime, all, rememberValueLabels())
     val colors = RenderTheme.colors
     Column(modifier.renderCard(padding = 0.dp)) {
         Row(
@@ -101,14 +103,14 @@ internal fun PlayNote(icon: String, text: String, modifier: Modifier = Modifier)
 }
 
 /** 精算の送金(誰が誰にいくら)。名前は nameField(無ければ entity の見出し・"name")、残高は balanceField(既定 "balance")。 */
-fun settlementTransfers(c: Component, runtime: DSLRuntime, all: Map<String, List<Record>>): List<Settlement.Transfer> {
+fun settlementTransfers(c: Component, runtime: DSLRuntime, all: Map<String, List<Record>>, labels: ValueLabels = ValueLabels.JAPANESE): List<Settlement.Transfer> {
     val entityId = c.entity.orEmpty()
     val entity = runtime.entityModel(entityId)
     val nameField = c.nameField ?: entity?.displayTitleField ?: "name"
     val balanceField = c.balanceField ?: "balance"
     val balances = PlayRecords.viewRecords(runtime, all, entityId).mapNotNull { r ->
         val b = r[balanceField].doubleValue ?: return@mapNotNull null
-        PlayRecords.display(runtime, all, r[nameField], entity?.field(nameField)) to b
+        PlayRecords.display(runtime, all, r[nameField], entity?.field(nameField), labels) to b
     }
     return Settlement.transfers(balances)
 }

@@ -131,7 +131,7 @@ internal fun FieldOverrideRow(c: Component, field: Field, form: FormDraft, ctx: 
             val options = FormChoices.refOptions(field, ctx.runtime)
             LabeledInput(label) {
                 if (options.isEmpty()) {
-                    InputNotice(stringResource(R.string.inputs_add_ref_first, FormChoices.refEntityName(field, ctx.runtime)))
+                    InputNotice(stringResource(R.string.inputs_add_ref_first, FormChoices.refEntityName(field, ctx.runtime, stringResource(R.string.inputs_ref_entity))))
                 } else {
                     MenuSelect(label, form.text(field.id), listOf("" to stringResource(R.string.inputs_select)) + options.map { it.id to it.title }) {
                         form.setText(field.id, it)
@@ -143,7 +143,7 @@ internal fun FieldOverrideRow(c: Component, field: Field, form: FormDraft, ctx: 
             val options = FormChoices.refOptions(field, ctx.runtime)
             LabeledInput(label) {
                 if (options.isEmpty()) {
-                    InputNotice(stringResource(R.string.inputs_add_ref_first, FormChoices.refEntityName(field, ctx.runtime)))
+                    InputNotice(stringResource(R.string.inputs_add_ref_first, FormChoices.refEntityName(field, ctx.runtime, stringResource(R.string.inputs_ref_entity))))
                 } else {
                     val selected = form.selectedIds(field.id).toSet()
                     Column {
@@ -163,7 +163,7 @@ internal fun FieldOverrideRow(c: Component, field: Field, form: FormDraft, ctx: 
                 if (members.isEmpty()) {
                     InputNotice(stringResource(R.string.inputs_members_not_loaded))
                 } else {
-                    MenuSelect(label, form.text(field.id), FormChoices.memberOptions(form.text(field.id), members)) { form.setText(field.id, it) }
+                    MenuSelect(label, form.text(field.id), FormChoices.memberOptions(form.text(field.id), members, stringResource(R.string.inputs_select))) { form.setText(field.id, it) }
                 }
             }
         }

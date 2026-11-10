@@ -14,6 +14,7 @@ import jp.kz2601.metamon.dsl.records.Record
 import jp.kz2601.metamon.dsl.records.filters
 import jp.kz2601.metamon.renderer.DSLRuntime
 import jp.kz2601.metamon.renderer.components.lists.LeafData
+import jp.kz2601.metamon.renderer.components.lists.ValueLabels
 
 /**
  * 計算・遊び系の部品が読む記録。中身は一覧・集計系と同じ [LeafData](iOS の `ComputedValues.swift` に当たる 1 か所)。
@@ -31,9 +32,9 @@ object PlayRecords {
     fun filtered(runtime: DSLRuntime, all: Map<String, List<Record>>, c: Component, filters: List<Filter> = c.filters): List<Record> =
         LeafData(runtime, all).filtered(c, filters)
 
-    /** 表示用の文字列(一覧・集計系と同じ)。 */
-    fun display(runtime: DSLRuntime, all: Map<String, List<Record>>, value: JSONValue, field: Field?): String =
-        LeafData(runtime, all).display(value, field)
+    /** 表示用の文字列(一覧・集計系と同じ)。[labels] は画面なら端末の言語(既定は適合テストの日本語)。 */
+    fun display(runtime: DSLRuntime, all: Map<String, List<Record>>, value: JSONValue, field: Field?, labels: ValueLabels = ValueLabels.JAPANESE): String =
+        LeafData(runtime, all, labels = labels).display(value, field)
 }
 
 /** 表示中の記録(変わると描き直す)。runtime が記録を持たなければ空。 */

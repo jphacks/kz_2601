@@ -76,7 +76,7 @@ fun ChartLeaf(c: Component, ctx: RenderContext, modifier: Modifier = Modifier) {
             color = RenderTheme.colors.brandA,
             maxLines = 1,
         )
-        val summary = listOfNotNull(c.title, ChartReadout.summary(buckets)).joinToString("。")
+        val summary = listOfNotNull(c.title, ChartReadout.summary(buckets, data.labels)).joinToString("。")
         val chartModifier = Modifier.fillMaxWidth().semantics { contentDescription = summary }
         when (c.kind) {
             ComponentKind.PIE -> PieChart(buckets, selected, { selected = it }, chartModifier)
