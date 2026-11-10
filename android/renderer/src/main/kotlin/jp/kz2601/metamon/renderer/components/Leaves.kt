@@ -6,23 +6,20 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Button
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import jp.kz2601.metamon.dsl.Action
 import jp.kz2601.metamon.dsl.ActionType
 import jp.kz2601.metamon.dsl.Component
-import jp.kz2601.metamon.dsl.ComponentStyle
 import jp.kz2601.metamon.dsl.Size
+import jp.kz2601.metamon.renderer.components.actions.ActionButton
+import jp.kz2601.metamon.renderer.components.actions.ActionButtonKind
 import jp.kz2601.metamon.renderer.form.FormDraft
 import jp.kz2601.metamon.renderer.registry.RenderContext
 import jp.kz2601.metamon.renderer.theme.RenderTheme
@@ -41,19 +38,28 @@ fun isButtonVisible(action: Action?, isEditing: Boolean = false, readOnly: Boole
 fun isButtonVisible(action: Action?, form: FormDraft?): Boolean =
     isButtonVisible(action, form?.isEditing ?: false, form?.isReadOnly ?: false, form?.canDelete ?: true)
 
-/** `button`: style(primary | secondary | plain | destructive)。押すと action を実行する。 */
+/** icon 省略時の既定(iOS の `ButtonLeaf.defaultIcon`)。押すと共有・カレンダー・本の検索になるものだけ。 */
+fun buttonDefaultIcon(action: Action?): String? = when (action?.type) {
+    ActionType.EXPORT -> "square.and.arrow.up"
+    ActionType.ADD_TO_CALENDAR -> "calendar.badge.plus"
+    ActionType.LOOKUP_BOOK -> "text.book.closed"
+    else -> null
+}
+
+/**
+ * `button`: style(primary | secondary | destructive | plain・既定 primary)。押すと action を dispatch する
+ * (confirmMessage の確認は runtime が出す)。見た目は iOS の `RenderButtonStyle`([ActionButton])。
+ */
 @Composable
 fun ButtonLeaf(c: Component, ctx: RenderContext, modifier: Modifier = Modifier) {
     if (!isButtonVisible(c.action, ctx.form)) return
-    val label = c.label.orEmpty()
-    val onClick = { c.action?.let(ctx.perform) ?: Unit }
-    val shape = RoundedCornerShape(RenderTheme.Radius.button)
-    val m = modifier.fillMaxWidth()
-    when (c.style) {
-        ComponentStyle.SECONDARY -> OutlinedButton(onClick, m, shape = shape) { Text(label) }
-        ComponentStyle.PLAIN -> TextButton(onClick, m) { Text(label) }
-        else -> Button(onClick, m, shape = shape) { Text(label, fontWeight = FontWeight.SemiBold) }
-    }
+    ActionButton(
+        label = c.label.orEmpty(),
+        kind = ActionButtonKind.of(c.style),
+        onClick = { c.action?.let(ctx.perform) },
+        modifier = modifier,
+        icon = c.icon ?: buttonDefaultIcon(c.action),
+    )
 }
 
 /** 音声の入口(仮)。認識は #359。 */
