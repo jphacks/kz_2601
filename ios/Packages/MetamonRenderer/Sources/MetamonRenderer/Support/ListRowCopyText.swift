@@ -1,3 +1,4 @@
+import Foundation
 import MetamonDSL
 
 /// 一覧の行の「コピー」(#1332)で書くテキスト。行に見えている項目(title / subtitle / trailing)を
@@ -17,6 +18,11 @@ enum ListRowCopyText {
             lines.append(name.isEmpty ? value : "\(name): \(value)")
         }
         return lines.joined(separator: "\n")
+    }
+
+    /// 行を外へドラッグする時(Mac・#1334)に渡すもの。中身はコピーと同じテキスト。空なら何も載せない。
+    static func dragItem(_ text: String) -> NSItemProvider {
+        text.isEmpty ? NSItemProvider() : NSItemProvider(object: text as NSString)
     }
 
     private static let mediaTypes: Set<FieldType> = [.photo, .video, .audio]

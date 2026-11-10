@@ -94,6 +94,20 @@ final class ListRowCopyTests: XCTestCase {
                      "入力欄が文字を受けている時は入力欄のコピーに任せる")
     }
 
+    /// #1334: ドラッグで渡すのはコピーと同じテキスト。空なら何も載せない。
+    func testDragItemCarriesCopyText() async throws {
+        let provider = ListRowCopyText.dragItem("メモ: ランチ\n金額: ¥1,200")
+        XCTAssertTrue(provider.canLoadObject(ofClass: NSString.self))
+        let loaded: String = try await withCheckedThrowingContinuation { cont in
+            _ = provider.loadObject(ofClass: NSString.self) { obj, error in
+                if let s = obj as? NSString { cont.resume(returning: s as String) }
+                else { cont.resume(throwing: error ?? CocoaError(.fileReadUnknown)) }
+            }
+        }
+        XCTAssertEqual(loaded, "メモ: ランチ\n金額: ¥1,200")
+        XCTAssertTrue(ListRowCopyText.dragItem("").registeredTypeIdentifiers.isEmpty)
+    }
+
     #if os(macOS)
     func testPasteboardRoundTripOnNamedBoard() {
         let board = NSPasteboard(name: NSPasteboard.Name("metamon.test.\(UUID().uuidString)"))
