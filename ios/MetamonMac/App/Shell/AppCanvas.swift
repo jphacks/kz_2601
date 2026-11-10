@@ -22,6 +22,8 @@ struct AppCanvas: View {
         }
         .navigationTitle(app.name)
         .task {
+            // 見え直した時(.task は出るたびに走る)に作り直すと、メモリ上の記録が消える
+            guard runtime == nil, !loadFailed else { return }
             do {
                 runtime = MacAppRuntime(appId: app.id, dsl: try app.loadDSL())
             } catch {

@@ -103,8 +103,8 @@ macOS runner は Linux の 10 倍の分単価なので、ubuntu の `ios-changes
 | `ios/Packages/MetamonDSL/**`・DSL のテストデータ(`docs/dsl/**` の一部・テストが読む backend の JSON) | する | DSL / Renderer / Services |
 | `ios/Packages/MetamonRenderer/**`・`docs/dsl/conformance/**`・`docs/dsl/examples/**` | する | Renderer |
 | `ios/Packages/MetamonServices/**` | する | Services |
-| `ios/MetamonMac/**`・`ios/project.yml` | する | なし |
-| `.github/workflows/mac-ci.yml`・develop / main への push(上記のどれかが変更) | する | 全部 |
+| `ios/MetamonMac/**`・`ios/Shared/**`(iOS と共有するランタイムの部品)・`ios/project.yml` | する | なし |
+| `.github/workflows/mac-ci.yml`・`ios/scripts/mac-package-test.sh`・develop / main への push(上記のどれかが変更) | する | 全部 |
 
 - テストは各パッケージのフォルダで `xcodebuild test -destination platform=macOS`(`ios/scripts/mac-package-test.sh <パッケージ名>`)。署名しない・秘密を使わない。
 - 手元で回す時、repo か DerivedData が `~/Desktop`・`~/Documents`・`~/Downloads` の下にあると、テストの実行役が読めずに落ちる(macOS の保護)。repo(clone)と DerivedData(`MAC_DERIVED_DATA`)の両方を保護の外(例: `~/src`)に置く。CI では起きない。
