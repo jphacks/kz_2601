@@ -43,6 +43,7 @@ const (
 	KindPurchase      = "purchase"
 	KindSpendAI       = "spend_ai"
 	KindSpendOverflow = "spend_overflow" // part 3
+	KindSpendSlot     = "spend_slot"     // one app slot (slots.go)
 	KindRefundFailed  = "refund_failed"  // a committed charge given back (part 2)
 	KindRefundApple   = "refund_apple"   // App Store REFUND of a pack (part 4)
 	KindAdjust        = "adjust"         // support
@@ -101,7 +102,9 @@ type Wallet struct {
 	Holds map[string]time.Time `json:"-" firestore:"holds,omitempty"`
 	// Overflow is the owner's opt-in to pay past the server allowance with
 	// coins (PUT /v1/me/coins/settings; part 3 enforces it).
-	Overflow  Overflow  `json:"-" firestore:"overflow"`
+	Overflow Overflow `json:"-" firestore:"overflow"`
+	// AppSlots are the app slots bought (slots.go): never expire, never refunded.
+	AppSlots  int64     `json:"-" firestore:"appSlots,omitempty"`
 	UpdatedAt time.Time `json:"updatedAt,omitzero" firestore:"updatedAt,omitempty"`
 }
 

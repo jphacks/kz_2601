@@ -16,6 +16,9 @@ import (
 // maxJWSBytes bounds the request (a JWSTransaction is ~3-4 KB).
 const maxJWSBytes = 32 << 10
 
+// maxRequestIDLen bounds the requestId of a slot purchase (a UUID is 36).
+const maxRequestIDLen = 128
+
 // Register mounts the authenticated routes on mux (auth and RejectDeleted
 // are applied by the caller, like the other /v1 routes).
 //
@@ -23,6 +26,7 @@ const maxJWSBytes = 32 << 10
 //	GET  /v1/me/coins/ledger?limit=&cursor=   history, newest first
 //	PUT  /v1/me/coins/settings                {"overflow": {"enabled", "monthlyCap"}} (the runner enforces it, part 3)
 //	POST /v1/me/coins/apple                   {"signedTransaction": "<JWS>"} credits a coin pack
+//	POST /v1/me/coins/slot                    {"requestId": "<uuid>"} buys one app slot (idempotent per requestId)
 func Register(mux *http.ServeMux, s *coins.Service) {
 	mux.HandleFunc("GET /v1/me/coins", func(w http.ResponseWriter, r *http.Request) {
 		v, err := s.Wallet(r.Context(), auth.UID(r.Context()), auth.Anonymous(r.Context()))
@@ -74,6 +78,28 @@ func Register(mux *http.ServeMux, s *coins.Service) {
 			httpx.Error(w, http.StatusBadRequest, httpx.CodeBadRequest, err.Error())
 		default:
 			internal(w, r, "settings", err)
+		}
+	})
+	mux.HandleFunc("POST /v1/me/coins/slot", func(w http.ResponseWriter, r *http.Request) {
+		var req struct {
+			RequestID string `json:"requestId"`
+		}
+		if !httpx.DecodeBody(w, r, &req) {
+			return
+		}
+		if req.RequestID == "" || len(req.RequestID) > maxRequestIDLen {
+			httpx.Error(w, http.StatusBadRequest, httpx.CodeBadRequest, "requestId is required (at most 128 characters)")
+			return
+		}
+		p, err := s.BuySlot(r.Context(), auth.UID(r.Context()), auth.Anonymous(r.Context()), req.RequestID)
+		switch {
+		case err == nil:
+			httpx.WriteJSON(w, http.StatusOK, p)
+		case errors.Is(err, coins.ErrSlotsOff):
+			httpx.Error(w, http.StatusNotFound, httpx.CodeNotFound, "app slots are not available")
+		case coins.WriteError(w, err): // 402 coins_insufficient
+		default:
+			internal(w, r, "slot", err)
 		}
 	})
 	mux.HandleFunc("POST /v1/me/coins/apple", func(w http.ResponseWriter, r *http.Request) {

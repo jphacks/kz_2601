@@ -89,6 +89,8 @@ type Config struct {
 	Allowance map[string]int64
 	// Overflow is the block bought per kind past the allowance (overflow.go).
 	Overflow map[string]Block
+	// SlotPrice is the coins of one app slot (slots.go; 0 = cannot be bought).
+	SlotPrice int64
 }
 
 // Defaults that reveal nothing about prices.
@@ -111,6 +113,7 @@ const (
 //	ALLOWANCE_PRO_<KIND>  Pro's monthly allowance: RUNS, RECIPIENTS, WRITES, READS (default 0)
 //	COIN_OVERFLOW_BLOCK_<KIND>  units one overflow block adds (default 0 = no overflow)
 //	COIN_OVERFLOW_PRICE_<KIND>  coins of one overflow block (default 0 = no overflow)
+//	COIN_PRICE_APP_SLOT   coins of one more app to hold (default 0 = slots cannot be bought)
 func ConfigFromEnv(getenv func(string) string) (Config, error) {
 	c := Config{
 		MinPerCall: DefaultMinPerCall,
@@ -142,6 +145,7 @@ func ConfigFromEnv(getenv func(string) string) (Config, error) {
 	num("COIN_MIN_PER_CALL", &c.MinPerCall)
 	num("COIN_INITIAL_GRANT", &c.InitialGrant)
 	num("COIN_PRO_MONTHLY", &c.ProMonthly)
+	num("COIN_PRICE_APP_SLOT", &c.SlotPrice)
 	for _, op := range Ops {
 		var r, e int64
 		num("COIN_RESERVE_"+strings.ToUpper(op), &r)

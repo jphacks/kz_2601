@@ -193,3 +193,30 @@ func errCode(body map[string]any) string {
 	s, _ := e["code"].(string)
 	return s
 }
+
+// POST /v1/me/coins/slot (#630 app slots): idempotent per requestId, 402
+// when short, 404 when slots cannot be bought.
+func TestBuySlotAPI(t *testing.T) {
+	e := newEnv(t, coins.ModeEnforce)
+	if code, _ := e.do(t, "POST", "/v1/me/coins/slot", "u1", map[string]any{"requestId": "r1"}); code != http.StatusNotFound {
+		t.Fatalf("price 0: %d", code)
+	}
+	e.svc.Config.SlotPrice = 2
+	if code, _ := e.do(t, "POST", "/v1/me/coins/slot", "u1", map[string]any{}); code != http.StatusBadRequest {
+		t.Fatalf("no requestId: %d", code)
+	}
+	code, body := e.do(t, "POST", "/v1/me/coins/slot", "u1", map[string]any{"requestId": "r1"})
+	if code != 200 || body["bought"] != true || body["appSlots"] != 1.0 || body["coins"] != 2.0 {
+		t.Fatalf("buy %d %v", code, body)
+	}
+	if w, _ := body["wallet"].(map[string]any); w["available"] != 1.0 || w["appSlots"] != 1.0 {
+		t.Fatalf("wallet %v", body["wallet"])
+	}
+	if code, body = e.do(t, "POST", "/v1/me/coins/slot", "u1", map[string]any{"requestId": "r1"}); code != 200 || body["bought"] != false || body["appSlots"] != 1.0 {
+		t.Fatalf("retry %d %v", code, body)
+	}
+	code, body = e.do(t, "POST", "/v1/me/coins/slot", "u1", map[string]any{"requestId": "r2"})
+	if errBody, _ := body["error"].(map[string]any); code != http.StatusPaymentRequired || errBody["code"] != "coins_insufficient" {
+		t.Fatalf("short %d %v", code, body)
+	}
+}
