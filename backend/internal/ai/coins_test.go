@@ -612,3 +612,65 @@ type downStore struct{ coins.Store }
 func (downStore) Update(context.Context, coins.Keys, func(*coins.Tx) error) error {
 	return fmt.Errorf("firestore unavailable")
 }
+
+// cancelAfter is a Caller that hangs up the client once Claude has answered
+// (the cost is already in the tally).
+type cancelAfter struct {
+	Caller
+	cancel context.CancelFunc
+}
+
+func (c cancelAfter) Complete(ctx context.Context, req Completion) (*Response, error) {
+	res, err := c.Caller.Complete(ctx, req)
+	c.cancel()
+	return res, err
+}
+
+// A client gone after Claude answered never gets the result: the whole
+// hold comes back and nothing is charged (generate, its stream, chat, text).
+func TestCoinsClientGoneReleases(t *testing.T) {
+	cases := []struct {
+		name, path, body, reply string
+		text                    bool
+	}{
+		{name: "generate", path: "/v1/generate", body: createBody},
+		{name: "generate stream", path: "/v1/generate?stream=1", body: createBody},
+		{name: "chat", path: "/v1/chat", body: `{"appId":"a1","messages":[{"role":"user","text":"家計簿"}]}`, reply: questionReply},
+		{name: "text", path: "/v1/text", body: `{"instruction":"励ましの一言"}`, reply: `{"text":"がんばったね"}`, text: true},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			reply := c.reply
+			if reply == "" {
+				reply = string(kakeibo(t))
+			}
+			cc := &costCaller{replies: []string{reply}, usd: 0.25, priced: true}
+			var svc *Service
+			if c.text {
+				svc, _ = textSvc()
+			} else {
+				svc = generateSvc(t, cc)
+			}
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
+			svc.Claude = cancelAfter{Caller: cc, cancel: cancel}
+			cs, _ := coinWallets(coins.ModeEnforce, 100)
+			svc.Coins = cs
+			req := httptest.NewRequest(http.MethodPost, c.path, strings.NewReader(c.body)).WithContext(ctx)
+			bearer(req, "u1")
+			coinHandler(svc).ServeHTTP(httptest.NewRecorder(), req)
+			if cc.n() == 0 {
+				t.Fatal("Claude was not called")
+			}
+			if available(t, cs, "u1") != 100 || reserved(t, cs, "u1") != 0 {
+				t.Fatalf("balance %d reserved %d", available(t, cs, "u1"), reserved(t, cs, "u1"))
+			}
+			ents, _, _ := cs.Ledger(context.Background(), "u1", 20, "")
+			for _, e := range ents {
+				if e.Kind == coins.KindSpendAI {
+					t.Fatalf("charged a result that never reached the client: %+v", e)
+				}
+			}
+		})
+	}
+}

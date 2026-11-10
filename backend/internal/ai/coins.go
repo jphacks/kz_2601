@@ -110,11 +110,13 @@ func (s *Service) reserveCoins(ctx context.Context, p coinPayment) (context.Cont
 // gives it all back; otherwise the call's cost is charged. The charge is
 // returned for the response (nil when nothing was charged in enforce mode,
 // or when it is settled after the response because a Claude call is still
-// running: an early chat reply).
+// running: an early chat reply). A request whose client is already gone
+// (ctx cancelled) never gets the result, so it is released like a failure.
 func (b *coinBill) settle(ctx context.Context, failed bool) CoinCharge {
 	if b == nil {
 		return CoinCharge{}
 	}
+	failed = failed || ctx.Err() != nil
 	ctx = context.WithoutCancel(ctx)
 	if !failed && b.tally.busy() {
 		go func() {
