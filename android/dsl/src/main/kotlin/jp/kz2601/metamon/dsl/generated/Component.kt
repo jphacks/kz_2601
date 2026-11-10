@@ -329,6 +329,9 @@ data class Component(
     /** JSON の type の元の文字列。知らない type([ComponentType.UNKNOWN])でも残る(描画の木・「更新すると表示」に使う)。 */
     @Transient
     val rawType: String = "",
+    /** JSON の filter の元の値。配列(AND)でも残る(読み口は手書きの `Component.filters`)。 */
+    @Transient
+    val rawFilter: JsonElement? = null,
 ) {
     companion object
 }
@@ -342,8 +345,9 @@ internal object ComponentSerializer : KSerializer<Component> {
         val input = decoder as? JsonDecoder ?: return generated.deserialize(decoder)
         val element = input.decodeJsonElement()
         val component = input.json.decodeFromJsonElement(generated, element)
-        val raw = ((element as? JsonObject)?.get("type") as? JsonPrimitive)?.takeIf { it.isString }?.content
-        return if (raw == null) component else component.copy(rawType = raw)
+        val obj = element as? JsonObject
+        val raw = (obj?.get("type") as? JsonPrimitive)?.takeIf { it.isString }?.content
+        return component.copy(rawType = raw ?: component.rawType, rawFilter = obj?.get("filter"))
     }
 
     override fun serialize(encoder: Encoder, value: Component) = generated.serialize(encoder, value)

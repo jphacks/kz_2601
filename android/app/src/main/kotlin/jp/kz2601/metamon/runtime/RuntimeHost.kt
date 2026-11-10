@@ -38,6 +38,12 @@ interface RuntimeHost {
     suspend fun lookupBook(action: Action, context: ActionContext, runtime: AppRuntime): Unit =
         throw HostUnavailableException(ActionType.LOOKUP_BOOK)
 
+    /**
+     * timerDisplay の終了通知(iOS の TimerNotifier)。[endsAtEpochMillis] にその時刻で予約、null なら取り消す。
+     * 既定は何もしない(タイマーは前面で動く)。端末の通知の予約は子 Issue で入れる。
+     */
+    suspend fun timerChanged(key: String, appName: String, timerName: String, endsAtEpochMillis: Long?): Unit = Unit
+
     /** 進行中の表示(iOS の Live Activity。Android は常駐通知を想定・#78)。 */
     suspend fun startActivity(spec: Activity, appId: String): Unit = throw HostUnavailableException(ActionType.START_ACTIVITY)
 

@@ -5,6 +5,17 @@ import jp.kz2601.metamon.dsl.AppDSL
 import jp.kz2601.metamon.dsl.Component
 import jp.kz2601.metamon.dsl.ComponentType
 import jp.kz2601.metamon.dsl.screen
+import jp.kz2601.metamon.dsl.records.FieldCoding
+import jp.kz2601.metamon.renderer.components.lists.ChartBuckets
+import jp.kz2601.metamon.renderer.components.lists.GaugeValue
+import jp.kz2601.metamon.renderer.components.lists.LIST_EMPTY_TEXT
+import jp.kz2601.metamon.renderer.components.lists.LeafData
+import jp.kz2601.metamon.renderer.components.lists.ListRows
+import jp.kz2601.metamon.renderer.components.lists.ListToggle
+import jp.kz2601.metamon.renderer.components.lists.ProgressValue
+import jp.kz2601.metamon.renderer.components.lists.StatValue
+import jp.kz2601.metamon.renderer.components.lists.TableCells
+import jp.kz2601.metamon.renderer.components.lists.TimelineRows
 import jp.kz2601.metamon.renderer.DSLRuntime
 import jp.kz2601.metamon.renderer.NoopDSLRuntime
 import jp.kz2601.metamon.renderer.components.disclosureTitle
@@ -27,14 +38,15 @@ import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.doubleOrNull
 
 /**
  * 適合テスト(#352)の「描画の木」の Android 版。画面を描かずに DSL → 何が・どこに・押すと何が起きるか を JSON にする。
  * 形は docs/dsl/conformance/README.md、iOS の Conformance/RenderTree.swift と同じ。配置は View と同じ関数
  * (`gridPlacement` / `localGridPlacement` / `formBands`)から取る。
  *
- * まだ入れていないもの(子 Issue): toolbar / saveBar・
- * レコードから解決する値(stat / list / chart …)・text の `{{field}}` の差し込み。レジストリに無い Leaf は `unavailable` になる。
+ * まだ入れていないもの(子 Issue): toolbar / saveBar・text の `{{field}}` の差し込み。
+ * 一覧・集計・グラフ(#859)の値は各 Leaf と同じ関数(components/lists/ListValues.kt)から取る。レジストリに無い Leaf は `unavailable` になる。
  *
  * @param available 描ける type(レジストリの登録 ∩ 端末の能力)。外れた既知の type は `unavailable`、知らない type は `unknown`。
  */
@@ -78,7 +90,7 @@ class RenderTree(
         out["state"] = JsonPrimitive(state)
         if (state != "rendered") return JsonObject(out)
 
-        val props = declared(c) + resolved(c) + InputNodes.props(c, form, runtime)
+        val props = declared(c) + resolved(c) + InputNodes.props(c, form, runtime) + PlayNodes.props(c, runtime)
         if (props.isNotEmpty()) out["props"] = JsonObject(props)
         val actions = actions(c)
         if (actions.isNotEmpty()) out["actions"] = JsonArray(actions)
@@ -110,7 +122,21 @@ class RenderTree(
         c.label?.let { put("label", JsonPrimitive(it)) }
         c.message?.let { put("message", JsonPrimitive(it)) }
         c.url?.let { put("url", JsonPrimitive(it)) }
+        c.placeholder?.let { put("placeholder", JsonPrimitive(it)) }
         c.field?.let { put("field", JsonPrimitive(it)) }
+        c.entity?.let { put("entity", JsonPrimitive(it)) }
+        c.aggregate?.let { put("aggregate", JsonPrimitive(it.wire)) }
+        c.format?.let { put("format", JsonPrimitive(it.wire)) }
+        c.groupBy?.let { put("groupBy", JsonPrimitive(it)) }
+        c.bucket?.let { put("bucket", JsonPrimitive(it.wire)) }
+        c.kind?.let { put("kind", JsonPrimitive(it.wire)) }
+        c.unit?.let { put("unit", JsonPrimitive(it)) }
+        c.min?.let { put("min", JsonPrimitive(it)) }
+        c.max?.let { put("max", JsonPrimitive(it)) }
+        c.step?.let { put("step", JsonPrimitive(it)) }
+        // target は数のリテラルだけ(式の目標は resolved の target)
+        (c.target as? JsonPrimitive)?.takeIf { !it.isString && it.doubleOrNull != null }?.let { put("target", it) }
+        c.limit?.let { put("limit", JsonPrimitive(it)) }
         c.expanded?.let { put("expanded", JsonPrimitive(it)) }
     }
 
@@ -124,11 +150,94 @@ class RenderTree(
         ComponentType.LINK -> mapOf("text" to JsonPrimitive(c.linkText()), "opens" to JsonPrimitive(c.linkOpens))
         // フォームのドラフトが入るまで field の値は無い(photoFieldValue)
         ComponentType.IMAGE -> mapOf("hasImage" to JsonPrimitive(photoFieldValue(c, null) != null))
+        ComponentType.STAT -> StatValue.resolve(c, leafData()).let {
+            mapOf("value" to JsonPrimitive(it.text), "unavailable" to JsonPrimitive(it.unavailable))
+        }
+        ComponentType.LIST -> listProps(c, leafData())
+        ComponentType.TABLE -> {
+            val data = leafData()
+            val entity = data.entity(c.entity)
+            mapOf(
+                "columns" to JsonArray(c.columns.map { JsonPrimitive(TableCells.header(it, entity)) }),
+                "rows" to JsonArray(TableCells.rows(c, data).map { r -> JsonArray(r.texts.map(::JsonPrimitive)) }),
+            )
+        }
+        ComponentType.TIMELINE -> {
+            val data = leafData()
+            val entity = data.entity(c.entity)
+            mapOf(
+                "rows" to JsonArray(
+                    TimelineRows.rows(c, data).map { r ->
+                        JsonObject(
+                            buildMap {
+                                put("recordId", JsonPrimitive(r.id))
+                                put("date", JsonPrimitive(data.text(r, c.dateField ?: "", entity)))
+                                put("title", JsonPrimitive(data.text(r, c.titleField ?: "", entity)))
+                                c.subtitleField?.let { data.text(r, it, entity) }?.takeIf { it.isNotEmpty() }?.let { put("subtitle", JsonPrimitive(it)) }
+                            },
+                        )
+                    },
+                ),
+            )
+        }
+        ComponentType.CHART -> mapOf(
+            "buckets" to JsonArray(
+                ChartBuckets.buckets(c, leafData()).map { JsonObject(mapOf("label" to JsonPrimitive(it.label), "value" to JsonPrimitive(it.value))) },
+            ),
+        )
+        ComponentType.PROGRESS_BAR -> {
+            val data = leafData()
+            val raw = ProgressValue.ratio(c, data)
+            val percent = if (ProgressValue.missingTarget(c, data)) FieldCoding.UNAVAILABLE else ProgressValue.percentText(raw, c.tone?.wire)
+            buildMap {
+                put("ratio", JsonPrimitive(raw))
+                put("percent", JsonPrimitive(percent))
+                if (ProgressValue.targetExpr(c) != null) ProgressValue.target(c, data)?.let { put("target", JsonPrimitive(it)) }
+            }
+        }
+        ComponentType.GAUGE -> {
+            val (value, unit) = GaugeValue.value(c, leafData())
+            buildMap {
+                put("value", JsonPrimitive(value))
+                unit?.let { put("unit", JsonPrimitive(it)) }
+            }
+        }
+        // 画面を描かないので検索文字列は空(描く時は ScreenLocals)
+        ComponentType.SEARCH_BAR -> mapOf("query" to JsonPrimitive(""))
         else -> emptyMap()
     }
 
-    private fun actions(c: Component): List<JsonElement> =
-        listOfNotNull(c.action?.let { obj("on" to JsonPrimitive("tap"), "action" to action(it)) })
+    private fun leafData() = LeafData(runtime, runtime.recordsFlow?.value.orEmpty())
+
+    private fun listProps(c: Component, data: LeafData): Map<String, JsonElement> {
+        val entity = data.entity(c.entity)
+        val rows = ListRows.rows(c, data, null)
+        val toggleField = ListToggle.field(c.item, entity)
+        val out = linkedMapOf<String, JsonElement>(
+            "rows" to JsonArray(
+                rows.map { r ->
+                    val t = ListRows.texts(c.item, r, entity, data)
+                    JsonObject(
+                        buildMap {
+                            put("recordId", JsonPrimitive(r.id))
+                            put("title", JsonPrimitive(t.title))
+                            t.subtitle?.let { put("subtitle", JsonPrimitive(it)) }
+                            t.trailing?.let { put("trailing", JsonPrimitive(it)) }
+                            toggleField?.let { f -> put("checked", JsonPrimitive(ListToggle.isOn(r, f.id, ListToggle.isDaily(c.item), emptyMap(), data.now))) }
+                        },
+                    )
+                },
+            ),
+        )
+        if (rows.isEmpty()) out["emptyText"] = JsonPrimitive(c.emptyText ?: LIST_EMPTY_TEXT)
+        return out
+    }
+
+    private fun actions(c: Component): List<JsonElement> = listOfNotNull(
+        c.action?.let { obj("on" to JsonPrimitive("tap"), "action" to action(it)) },
+        c.onItemTap?.let { obj("on" to JsonPrimitive("rowTap"), "action" to action(it)) },
+        c.onDateTap?.let { obj("on" to JsonPrimitive("dateTap"), "action" to action(it)) },
+    )
 
     companion object {
         fun route(r: Route): JsonObject = obj(
