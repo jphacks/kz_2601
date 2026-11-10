@@ -66,6 +66,12 @@ class PermissionCenter private constructor(private val app: Context) {
         return status(permission, activity)
     }
 
+    /** ログアウト・アカウント削除(#841): 覚えた結果を忘れる(OS の許可そのものは OS の設定のまま)。 */
+    fun forget() {
+        prefs.edit().clear().apply()
+        refresh(null)
+    }
+
     /** OS のダイアログで聞く権限名(この版の分)。 */
     fun requestNames(permission: AppPermission): Array<String> = permission.manifestPermissions(SDK).toTypedArray()
 
