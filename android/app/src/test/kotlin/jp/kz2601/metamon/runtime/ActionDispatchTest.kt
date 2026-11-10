@@ -140,8 +140,6 @@ class ActionDispatchTest {
     @Test
     fun deviceActionsWithoutHostShowFixedToast() = runTest {
         val actions = listOf(
-            Action(type = ActionType.FOLLOW),
-            Action(type = ActionType.UNFOLLOW),
             Action(type = ActionType.EXPORT, entity = "memo"),
             Action(type = ActionType.ADD_TO_CALENDAR),
             Action(type = ActionType.LOOKUP_BOOK),
@@ -153,6 +151,15 @@ class ActionDispatchTest {
             val rt = rt()
             rt.run(a, ActionContext(listRoute))
             assertEquals(a.type.wire, RuntimeCopy.UNAVAILABLE_ON_ANDROID, rt.toast)
+        }
+    }
+
+    @Test
+    fun followWithoutTheApiSaysItIsUnavailableInThisApp() = runTest {
+        for (type in listOf(ActionType.FOLLOW, ActionType.UNFOLLOW)) {
+            val rt = rt()
+            rt.run(Action(type = type, entity = "memo"), ActionContext(listRoute))
+            assertEquals(type.wire, FollowCopy.UNAVAILABLE, rt.toast)
         }
     }
 

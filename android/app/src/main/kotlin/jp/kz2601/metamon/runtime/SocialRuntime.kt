@@ -9,6 +9,7 @@ import jp.kz2601.metamon.dsl.records.Record
 import jp.kz2601.metamon.renderer.components.social.ReportReasonOption
 import jp.kz2601.metamon.renderer.components.social.SocialNotice
 import jp.kz2601.metamon.renderer.components.social.SocialPrompt
+import jp.kz2601.metamon.services.follows.FollowsClient
 import jp.kz2601.metamon.services.http.ApiError
 import jp.kz2601.metamon.services.http.FailureKind
 import jp.kz2601.metamon.services.social.MatchingAgeGate
@@ -26,11 +27,12 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
-/** 仲間探し(#507)と通報・ブロック(#321)の API。live の appconfig がある時だけ AppContainer が渡す。 */
+/** 仲間探し(#507)・通報・ブロック(#321)・フォロー(#270)の API。live の appconfig がある時だけ AppContainer が渡す。 */
 class SocialServices(
     val matching: MatchingClient?,
     val moderation: ModerationClient?,
     val ageGate: MatchingAgeGate,
+    val follows: FollowsClient? = null,
 )
 
 /**

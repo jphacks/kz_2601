@@ -87,6 +87,7 @@ import jp.kz2601.metamon.services.live.HttpAIClient
 import jp.kz2601.metamon.services.live.HttpAppConfigClient
 import jp.kz2601.metamon.services.live.HttpDiscoverClient
 import jp.kz2601.metamon.services.live.HttpFeedClient
+import jp.kz2601.metamon.services.live.HttpFollowsClient
 import jp.kz2601.metamon.services.live.HttpMatchingClient
 import jp.kz2601.metamon.services.live.HttpModerationClient
 import jp.kz2601.metamon.services.live.HttpPushDeviceClient
@@ -397,7 +398,12 @@ class AppContainer(
                 retentionConsent = KeyValueRetentionConsent(SharedPreferencesKeyValueStore.of(context, RETENTION_PREFS)),
                 chatHistory = ChatHistoryStore(File(context.filesDir, "chat_history")),
                 removeLocalMedia = removeLocalMedia(context),
-                social = SocialServices(HttpMatchingClient(appConfigHttp), HttpModerationClient(appConfigHttp), MatchingAgeGate(prefs)),
+                social = SocialServices(
+                    HttpMatchingClient(appConfigHttp),
+                    HttpModerationClient(appConfigHttp),
+                    MatchingAgeGate(prefs),
+                    follows = HttpFollowsClient(appConfigHttp),
+                ),
                 clearImageCache = { RemoteImages.wipe(context) },
                 tutorial = FirstRunTutorialStore(SharedPreferencesKeyValueStore.of(context, FirstRunTutorialStore.PREFS)),
                 talkBackRunning = { TalkBack.isRunning(context) },

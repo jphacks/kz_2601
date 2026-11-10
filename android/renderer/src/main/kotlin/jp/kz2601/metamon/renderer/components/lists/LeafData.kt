@@ -17,6 +17,8 @@ import jp.kz2601.metamon.dsl.records.Record
 import jp.kz2601.metamon.dsl.records.RecordQuery
 import jp.kz2601.metamon.dsl.records.filters
 import jp.kz2601.metamon.renderer.DSLRuntime
+import jp.kz2601.metamon.renderer.components.social.followedFor
+import jp.kz2601.metamon.renderer.components.social.follows
 import java.time.Instant
 
 /**
@@ -39,7 +41,7 @@ class LeafData(
 
     /** computed を合成し filter(既定は部品の filter・単体も配列も AND)を通した記録(hidden は落とす)。 */
     fun filtered(c: Component, filters: List<Filter> = c.filters): List<Record> =
-        RecordQuery.filtered(c, entity(c.entity), evaluator, runtime.currentUid(), fs = filters)
+        RecordQuery.filtered(c, entity(c.entity), evaluator, runtime.currentUid(), runtime.followedFor(filters), filters)
 
     /** computed を合成した記録(filter なし・calendar)。 */
     fun viewRecords(entity: String): List<Record> = evaluator.viewRecords(entity)
@@ -94,5 +96,6 @@ fun rememberLeafData(runtime: DSLRuntime): LeafData {
     val flow = runtime.recordsFlow
     val records = flow?.collectAsState()?.value.orEmpty()
     val labels = rememberValueLabels()
-    return remember(runtime, records, labels) { LeafData(runtime, records, labels = labels) }
+    val follows = runtime.follows?.followsVersion?.collectAsState()?.value // {"myFollows": true} の一覧が変わったら描き直す
+    return remember(runtime, records, labels, follows) { LeafData(runtime, records, labels = labels) }
 }
