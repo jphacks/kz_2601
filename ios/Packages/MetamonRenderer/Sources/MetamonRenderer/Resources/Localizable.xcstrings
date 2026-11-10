@@ -5815,6 +5815,40 @@
         }
       }
     },
+    "手書きの画面を開きます。マウスやトラックパッドで描けます" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Opens the drawing screen. Draw with your mouse or trackpad."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "手書きの画面を開きます。マウスやトラックパッドで描けます"
+          }
+        }
+      }
+    },
+    "マウスやトラックパッドで描きます" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Draw with your mouse or trackpad"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "マウスやトラックパッドで描きます"
+          }
+        }
+      }
+    },
     "接続が戻ったら自動で送ります" : {
       "extractionState" : "manual",
       "localizations" : {
