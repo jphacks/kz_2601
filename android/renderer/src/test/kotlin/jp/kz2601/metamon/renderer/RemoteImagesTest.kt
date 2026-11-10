@@ -17,6 +17,7 @@ import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.mockwebserver.MockResponse
 import okhttp3.mockwebserver.MockWebServer
+import okio.buffer
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
@@ -97,6 +98,23 @@ class RemoteImagesTest {
             // https 必須の時は http を読まない
             val strict = OkHttpClient.Builder().addNetworkInterceptor(ImageGuard()).build()
             assertThrows { get(strict) }
+        }
+    }
+
+    /** gzip で小さく送って、解くと上限を超える応答も止める。 */
+    @Test
+    fun guardCountsDecompressedBytes() {
+        MockWebServer().use { server ->
+            val gz = okio.Buffer()
+            okio.GzipSink(gz).buffer().use { it.writeUtf8("x".repeat(5_000)) }
+            assertTrue(gz.size < 1_000)
+            server.enqueue(MockResponse().setBody(gz).addHeader("Content-Encoding", "gzip"))
+            server.enqueue(MockResponse().setBody("x".repeat(500)))
+            server.start()
+            val images = RemoteImages.imageClient(OkHttpClient(), maxBytes = 1_000, requireHttps = false)
+            fun get() = images.newCall(Request.Builder().url(server.url("/a.jpg")).build()).execute().use { it.body.string() }
+            assertThrows { get() }
+            assertEquals(500, get().length)
         }
     }
 

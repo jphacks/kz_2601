@@ -47,18 +47,11 @@ class AndroidSensorSource(context: Context) : SensorSource {
         val m = manager ?: return emptyFlow()
         val sensor = m.getDefaultSensor(sensorType(kind)) ?: return emptyFlow()
         return callbackFlow {
-            val fusion = MotionFusion()
-            val altitude = AltitudeTracker()
+            val frames = SensorFrames(kind)
             val listener = object : SensorEventListener {
                 override fun onSensorChanged(e: SensorEvent) {
-                    val at = e.timestamp / 1_000_000 // 起動からの ns → ms(平滑化の間隔にだけ使う)
-                    val v = Vector3(e.values[0].toDouble(), e.values[1].toDouble(), e.values[2].toDouble())
-                    val frame = when (e.sensor.type) {
-                        Sensor.TYPE_PRESSURE -> kind.value(altitude.update(e.values[0].toDouble(), at))?.let { SensorFrame(it) }
-                        Sensor.TYPE_GYROSCOPE -> fusion.rotation(v).let { s -> kind.value(s)?.let { SensorFrame(it, s) } }
-                        else -> fusion.accelerometer(v, at).let { s -> kind.value(s)?.let { SensorFrame(it, s) } }
-                    }
-                    frame?.let { trySend(it) }
+                    // 起動からの ns → ms(平滑化の間隔にだけ使う)
+                    frames.next(e.sensor.type, e.values, e.timestamp / 1_000_000)?.let { trySend(it) }
                 }
 
                 override fun onAccuracyChanged(sensor: Sensor?, accuracy: Int) = Unit
@@ -76,6 +69,26 @@ class AndroidSensorSource(context: Context) : SensorSource {
             SensorKind.ROTATION -> Sensor.TYPE_GYROSCOPE
             SensorKind.TILT, SensorKind.PITCH, SensorKind.ROLL, SensorKind.ACCELERATION -> Sensor.TYPE_ACCELEROMETER
         }
+    }
+}
+
+/**
+ * SensorEvent の値 → [SensorFrame]。気圧の values は 1 要素しか無い(3 要素を読むと落ちる)ので、
+ * 3 軸として読むのは加速度計・ジャイロの時だけ。足りない値の行は捨てる。
+ */
+internal class SensorFrames(private val kind: SensorKind) {
+    private val fusion = MotionFusion()
+    private val altitude = AltitudeTracker()
+
+    fun next(type: Int, values: FloatArray, atMillis: Long): SensorFrame? {
+        if (type == Sensor.TYPE_PRESSURE) {
+            val hPa = values.firstOrNull() ?: return null
+            return kind.value(altitude.update(hPa.toDouble(), atMillis))?.let { SensorFrame(it) }
+        }
+        if (values.size < 3) return null
+        val v = Vector3(values[0].toDouble(), values[1].toDouble(), values[2].toDouble())
+        val s = if (type == Sensor.TYPE_GYROSCOPE) fusion.rotation(v) else fusion.accelerometer(v, atMillis)
+        return kind.value(s)?.let { SensorFrame(it, s) }
     }
 }
 

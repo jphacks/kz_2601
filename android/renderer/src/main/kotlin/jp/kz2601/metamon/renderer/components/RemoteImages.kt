@@ -57,10 +57,7 @@ object RemoteImages {
     fun install(context: Context, client: OkHttpClient) {
         if (installed != null) return
         val app = context.applicationContext
-        val images = client.newBuilder()
-            .readTimeout(Duration.ofSeconds(20))
-            .addNetworkInterceptor(ImageGuard())
-            .build()
+        val images = imageClient(client)
         val loader = ImageLoader.Builder(app)
             .components { add(OkHttpNetworkFetcherFactory(callFactory = { images })) }
             .memoryCache { MemoryCache.Builder().maxSizePercent(app, MEMORY_PERCENT).build() }
@@ -70,6 +67,16 @@ object RemoteImages {
         installed = loader
         SingletonImageLoader.setSafe { loader }
     }
+
+    /**
+     * 画像用の接続。https の判定はリダイレクトの 1 回ごと(network)、大きさは gzip を解いた後(application)でも数える
+     * (network だけだと圧縮した小さな応答が解くと上限を超えても通る)。
+     */
+    fun imageClient(client: OkHttpClient, maxBytes: Long = MAX_BYTES, requireHttps: Boolean = true): OkHttpClient = client.newBuilder()
+        .readTimeout(Duration.ofSeconds(20))
+        .addInterceptor(ImageGuard(maxBytes, requireHttps))
+        .addNetworkInterceptor(ImageGuard(maxBytes, requireHttps))
+        .build()
 
     /** サインアウト・アカウント削除の後片付け(#841)。メモリとディスクのキャッシュを消す。 */
     fun wipe(context: Context) = wipe(diskDir(context))

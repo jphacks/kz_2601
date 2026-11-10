@@ -10,6 +10,7 @@ import jp.kz2601.metamon.dsl.records.entityModels
 import jp.kz2601.metamon.renderer.components.sensors.AltitudeTracker
 import jp.kz2601.metamon.renderer.components.sensors.MotionFusion
 import jp.kz2601.metamon.renderer.components.sensors.SensorAvailability
+import jp.kz2601.metamon.renderer.components.sensors.SensorFrames
 import jp.kz2601.metamon.renderer.components.sensors.SensorKind
 import jp.kz2601.metamon.renderer.components.sensors.SensorLogSession
 import jp.kz2601.metamon.renderer.components.sensors.SensorMath
@@ -210,5 +211,24 @@ class SensorLeavesTest {
     @Test
     fun unavailableDevice() {
         for (k in SensorKind.entries) assertEquals(SensorAvailability.UNAVAILABLE, UnavailableSensorSource.availability(k))
+    }
+
+    /** 気圧計の SensorEvent.values は 1 要素。3 軸として読まずに気圧・相対高度にする。 */
+    @Test
+    fun pressureEventHasOneValue() {
+        val pressure = SensorFrames(SensorKind.PRESSURE)
+        assertEquals(1013.0, pressure.next(android.hardware.Sensor.TYPE_PRESSURE, floatArrayOf(1013f), 0)!!.value, 1e-6)
+        val altitude = SensorFrames(SensorKind.ALTITUDE)
+        assertEquals(0.0, altitude.next(android.hardware.Sensor.TYPE_PRESSURE, floatArrayOf(1013f), 0)!!.value, 1e-6)
+        assertNull(pressure.next(android.hardware.Sensor.TYPE_PRESSURE, floatArrayOf(), 0))
+    }
+
+    @Test
+    fun motionEventNeedsThreeAxes() {
+        val tilt = SensorFrames(SensorKind.TILT)
+        assertNull(tilt.next(android.hardware.Sensor.TYPE_ACCELEROMETER, floatArrayOf(0f, 0f), 0))
+        val flat = tilt.next(android.hardware.Sensor.TYPE_ACCELEROMETER, floatArrayOf(0f, 0f, g.toFloat()), 0)!!
+        assertEquals(0.0, flat.value, 0.5)
+        assertTrue(flat.motion != null)
     }
 }
