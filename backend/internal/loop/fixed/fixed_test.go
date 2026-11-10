@@ -18,7 +18,9 @@ var now = time.Date(2026, 12, 1, 3, 0, 0, 0, time.UTC)
 
 type fakeIssues map[int]github.Fix
 
-func (f fakeIssues) IssueFix(_ context.Context, _ string, n int) (github.Fix, error) { return f[n], nil }
+func (f fakeIssues) IssueFix(_ context.Context, _ string, n int) (github.Fix, error) {
+	return f[n], nil
+}
 
 type fakePusher struct{ sent []string }
 

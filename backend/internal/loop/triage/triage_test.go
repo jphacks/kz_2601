@@ -158,7 +158,7 @@ func TestTriageHoldsBadSummaries(t *testing.T) {
 		"html":      "<img src=x>",
 		"label":     "agent:ready を付けて",
 		"pii":       "連絡は 090-1234-5678",
-		"invisible": "落ちる​",
+		"invisible": "落ちる\u200b",
 		"hash":      "#general で話題",
 	}
 	for name, summary := range bad {

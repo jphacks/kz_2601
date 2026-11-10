@@ -77,9 +77,11 @@ func main() {
 		consent:  fixed.StoreConsent{C: st},
 		getenv:   os.Getenv,
 		now:      time.Now,
-		out:      os.Stdout,
+		out:      &strings.Builder{},
 	}
-	if err := a.run(ctx, os.Args[1:]); err != nil {
+	err = a.run(ctx, os.Args[1:])
+	_, _ = os.Stdout.WriteString(a.out.String())
+	if err != nil {
 		fmt.Fprintln(os.Stderr, "feedback-loop:", err)
 		os.Exit(1)
 	}
@@ -125,7 +127,7 @@ type app struct {
 	}
 	getenv func(string) string
 	now    func() time.Time
-	out    io.Writer
+	out    *strings.Builder // printed when the command ends
 	// logger receives the loop.audit lines (nil = slog.Default).
 	logger *slog.Logger
 }

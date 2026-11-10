@@ -94,7 +94,7 @@ func TestRatio(t *testing.T) {
 }
 
 func TestCleanDropsInvisible(t *testing.T) {
-	in := "a​b‮c\x07d\ne"
+	in := "a\u200bb\u202ec\x07d\ne"
 	if !HasInvisible(in) {
 		t.Fatal("HasInvisible missed")
 	}
