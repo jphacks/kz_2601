@@ -25,7 +25,7 @@ final class DSLViewDepthTests: XCTestCase {
             .environment(\.componentRegistry, registry)
             .environment(\.dslNestingDepth, outer)
             .frame(width: 390, height: 600)
-        _ = ImageRenderer(content: view).uiImage
+        _ = ImageRenderer(content: view).platformImage
         return seen.leaf
     }
 
