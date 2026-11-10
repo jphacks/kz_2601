@@ -93,7 +93,7 @@ runner は prod で GitHub の変数 `RUNNER_DEPLOY=1` の時だけデプロイ�
 | `PLAN_LIMITS_MODE` | appconfig | 上の 3 つの強制。`enforce` = 403 `plan_limit_reached` / `log` = 止めずにログ `plan_limit.would_block` だけ / `off` = 数えない(#317 の前と同じ)。それ以外の値は起動しない | `enforce` |
 | `AI_FREE_DAILY_BUDGET_USD` | ai | 全体の遮断(#317)。その日(JST)の AI の費用(`ai.usage` の `est_cost_usd` の合計・USD)がこれを超えたら、Pro でない人の generate・chat を 503 `free_plan_paused` で止める(0:00 JST に自動で戻る)。`0` / 無しで無効([rate-limit.md](../backend/rate-limit.md#全体の遮断317)) | 無し(無効) |
 | `AI_FREE_BUDGET_RESUME_DAY` | ai | 上の遮断を手で戻す。`2026-11-07` のように JST の日付を入れると、その日だけ止めない(翌日からはまた効く) | 無し |
-| `COIN_BILLING_MODE` | appconfig(2 段目からは ai も・同じ値にする) | コイン(#630・[630-token-billing.md](../decisions/630-token-billing.md))。`off` = 何も読み書きしない(今のまま)。`log` = 財布と履歴を作り(最初の分・Pro の毎月の分・パックの購入)、AI の呼び出しが引くはずの量はログ `coins.would_spend` / `coins.would_block` に出すだけ。`enforce` = 呼び出しごとにコインを押さえて引き、足りなければ 402 `coins_insufficient`。それ以外の値は起動しない | `off` |
+| `COIN_BILLING_MODE` | appconfig・runner(2 段目からは ai も・同じ値にする) | コイン(#630・[630-token-billing.md](../decisions/630-token-billing.md))。`off` = 何も読み書きしない(今のまま)。`log` = 財布と履歴を作り(最初の分・Pro の毎月の分・パックの購入)、AI の呼び出しが引くはずの量はログ `coins.would_spend` / `coins.would_block` に出すだけ。`enforce` = 呼び出しごとにコインを押さえて引き、足りなければ 402 `coins_insufficient`。それ以外の値は起動しない | `off` |
 | `COIN_PER_USD` | appconfig・ai | 1 回の費用(`est_cost_usd`)をコインに直す率: `ceil(est_cost_usd × COIN_PER_USD)`。**値は非公開の資料で決め、repo に書かない**。`/v1/coins/config` にも出さない | `0`(数えない) |
 | `COIN_MIN_PER_CALL` | appconfig・ai | 数える呼び出し 1 回の最小のコイン | `1` |
 | `COIN_RESERVE_GENERATE` / `_EDIT` / `_CHAT` / `_TEXT` | appconfig・ai | 呼び出しの前に押さえる量(その処理の上の方の費用)。確定は押さえた量を超えない。値は非公開の資料 | `0` |
@@ -102,7 +102,9 @@ runner は prod で GitHub の変数 `RUNNER_DEPLOY=1` の時だけデプロイ�
 | `COIN_INITIAL_GRANT` | appconfig | サインイン済み(匿名でない)アカウントに 1 回だけ足すコイン(最初に財布を読んだ時)。`0` の間は足さず、後で入れると次に読んだ人から足す | `0` |
 | `COIN_PRO_MONTHLY` | appconfig | Pro の請求期間ごとのコイン(期間の終わりに消える・繰り越さない) | `0` |
 | `COIN_HOLD_TTL` | appconfig・ai | 確定されない押さえを戻すまでの時間(`10m` のように書く・1 分以上) | `10m` |
-| `ALLOWANCE_PRO_RUNS` / `_RECIPIENTS` / `_WRITES` / `_READS` | appconfig | Pro の月の枠(#630 の 3 段目で数える)。今は `GET /v1/coins/config` の `allowance` に出すだけ | `0` |
+| `ALLOWANCE_PRO_RUNS` / `_RECIPIENTS` / `_WRITES` / `_READS` | appconfig・runner(同じ値にする) | Pro の作成者ごとの月(JST)の枠(#630 の 3 段目)。runner は `COIN_BILLING_MODE` が `log` / `enforce` の時に実行・通知の宛先・書き込み・読み取りを月ごとに数え(`rateLimits` の `{APP_ENV}_{yyyymm}_ma_{kind}_{uid}`・共有アプリは作成者の分)、`enforce` では枠を超えた分を止める(下のまとまりを買えれば続ける)。`log` は止めずにログ `coins.would_overflow` だけ。`0` = 数えるだけで止めない。`GET /v1/me/coins` の `allowance` に使った量を出す(appconfig は runner と同じ `APP_ENV`・`RATE_LIMIT_COLLECTION` で読む)。日の上限(`RUNNER_LIMIT_*`)は暴走の歯止めとして先に効く | `0` |
+| `COIN_OVERFLOW_BLOCK_RUNS` / `_RECIPIENTS` / `_WRITES` / `_READS` | appconfig・runner(同じ値にする) | 枠を超えた後にコインで買う 1 まとまりで増える量。作成者が「超えた後のコイン払い」を ON にしていて、今月の `spent` + 値段が月の上限以下なら、runner が 1 まとまりずつ買う(台帳 `spend_overflow`・まとまりごとに 1 行・同じまとまりを二重に買わない)。`0` = その種類は買えない(枠で止める) | `0` |
+| `COIN_OVERFLOW_PRICE_RUNS` / `_RECIPIENTS` / `_WRITES` / `_READS` | appconfig・runner(同じ値にする) | 1 まとまりのコイン。**値は非公開の資料で決め、repo に書かない**。`0` = 買えない。`GET /v1/coins/config` の `overflow.blocks` に出す | `0` |
 | `LOG_LEVEL` | 両方 | ログの詳しさ(調査の間だけ `debug` など) | info |
 
 この表に無い変数は、運用で変えないでください。変えたい時は Issue にして、ワークフローか本書に足します。

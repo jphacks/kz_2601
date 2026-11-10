@@ -23,6 +23,11 @@ const (
 	ResultFailed        = "failed"         // tried several times and gave up
 	ResultDisabled      = "disabled"       // the creator turned the rule off
 	ResultOther         = "other"          // an outcome this build does not know
+	// The creator's monthly server allowance (#630): used up with overflow
+	// off, the overflow coin cap reached, or too few coins for a block.
+	ResultAllowanceExhausted = "allowance_exhausted"
+	ResultOverflowCapReached = "overflow_cap_reached"
+	ResultCoinsInsufficient  = "coins_insufficient"
 )
 
 // Outcomes and reasons as the runner writes them (runner.Outcome*,
@@ -39,12 +44,20 @@ const (
 	outcomeSkippedIdle   = "skipped_inactive"
 	outcomeGaveUp        = "gave_up"
 	outcomeSkippedOff    = "skipped_disabled"
+	// quota.OutcomeSkippedAllowance / OverflowCap / Coins (#630)
+	outcomeSkippedAllowance = "skipped_allowance"
+	outcomeSkippedCap       = "skipped_overflow_cap"
+	outcomeSkippedCoins     = "skipped_coins"
 
 	reasonAppHidden      = "app_hidden"
 	reasonOperatorStop   = "operator_stop"
 	reasonRuleRemoved    = "rule_removed"
 	reasonVersionMissing = "version_missing"
 	reasonAppLimit       = "app_limit" // ok, but the app's daily limit cut writes / notifications
+	// ok, but the creator's monthly allowance cut writes / notifications (runner.ReasonAllowance*)
+	reasonAllowance = "allowance_exhausted"
+	reasonCap       = "overflow_cap_reached"
+	reasonCoins     = "coins_insufficient"
 )
 
 // Result is the creator's word for one rule run. notifyPaused: the run was
@@ -54,8 +67,15 @@ func Result(outcome, reason string, notifyPaused bool) string {
 	case "":
 		return ResultNone
 	case outcomeOK:
-		if reason == reasonAppLimit {
+		switch reason {
+		case reasonAppLimit:
 			return ResultLimit
+		case reasonAllowance:
+			return ResultAllowanceExhausted
+		case reasonCap:
+			return ResultOverflowCapReached
+		case reasonCoins:
+			return ResultCoinsInsufficient
 		}
 		if notifyPaused {
 			return ResultNotifyPaused
@@ -77,6 +97,12 @@ func Result(outcome, reason string, notifyPaused bool) string {
 		return ResultFailed
 	case outcomeSkippedOff:
 		return ResultDisabled
+	case outcomeSkippedAllowance:
+		return ResultAllowanceExhausted
+	case outcomeSkippedCap:
+		return ResultOverflowCapReached
+	case outcomeSkippedCoins:
+		return ResultCoinsInsufficient
 	case outcomeSkippedStop:
 		switch reason {
 		case reasonOperatorStop, reasonAppHidden:
