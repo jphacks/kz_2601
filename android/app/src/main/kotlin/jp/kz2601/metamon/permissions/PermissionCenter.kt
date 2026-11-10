@@ -27,9 +27,16 @@ class PermissionCenter private constructor(private val app: Context) {
     val statuses: StateFlow<Map<AppPermission, PermissionStatus>> = _statuses.asStateFlow()
 
     private val declared: Set<String> by lazy {
+        val pm = app.packageManager
         runCatching {
-            app.packageManager.getPackageInfo(app.packageName, PackageManager.PackageInfoFlags.of(PackageManager.GET_PERMISSIONS.toLong()))
-                .requestedPermissions?.toSet()
+            requestedPermissions(
+                SDK,
+                modern = { pm.getPackageInfo(app.packageName, PackageManager.PackageInfoFlags.of(PackageManager.GET_PERMISSIONS.toLong())).requestedPermissions },
+                legacy = {
+                    @Suppress("DEPRECATION")
+                    pm.getPackageInfo(app.packageName, PackageManager.GET_PERMISSIONS).requestedPermissions
+                },
+            )
         }.getOrNull().orEmpty()
     }
 
@@ -89,6 +96,13 @@ class PermissionCenter private constructor(private val app: Context) {
         activity != null && names.any { activity.shouldShowRequestPermissionRationale(it) }
 
     companion object {
+        /**
+         * マニフェストで宣言した権限。`PackageInfoFlags` は 13(API 33)から(minSdk 31 の 12 / 12L で呼ぶと
+         * NoSuchMethodError になり、全部の権限が「使えない」扱いになる)ので、12 / 12L は int の版を使う。
+         */
+        internal fun requestedPermissions(sdkInt: Int, modern: () -> Array<String>?, legacy: () -> Array<String>?): Set<String> =
+            (if (sdkInt >= AppPermission.TIRAMISU) modern() else legacy())?.toSet().orEmpty()
+
         private const val PREFS = "permissions"
         private val SDK = Build.VERSION.SDK_INT
 
