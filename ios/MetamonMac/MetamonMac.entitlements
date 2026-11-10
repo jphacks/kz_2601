@@ -13,5 +13,11 @@
 	<!-- カレンダーに追加(#978): 予定を足す(書き込みだけの許可を求める)。サンドボックスではこのキーが無いと EventKit に届かない -->
 	<key>com.apple.security.personal-information.calendars</key>
 	<true/>
+	<!-- 現在地(#956): locationButton・地図・道案内など。サンドボックスではこのキーが無いと CoreLocation の許可を求められない -->
+	<key>com.apple.security.personal-information.location</key>
+	<true/>
+	<!-- ファイルを取り込む(#956): fileImport で利用者が選んだファイルを読む。書き戻さないので読み取りだけ -->
+	<key>com.apple.security.files.user-selected.read-only</key>
+	<true/>
 </dict>
 </plist>
