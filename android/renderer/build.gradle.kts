@@ -43,6 +43,9 @@ dependencies {
     implementation(libs.compose.ui.tooling.preview)
     implementation(libs.play.services.code.scanner)
     implementation(libs.zxing.core)
+    // fileImport の PDF(#1181)。暗号化した PDF は読まない(iOS の isLocked と同じく断る)ので BouncyCastle は入れない
+    implementation(libs.pdfbox.android) { exclude(group = "org.bouncycastle") }
+    implementation(libs.play.services.mlkit.text.recognition.japanese)
     debugImplementation(libs.compose.ui.tooling)
 
     testImplementation(libs.junit)
