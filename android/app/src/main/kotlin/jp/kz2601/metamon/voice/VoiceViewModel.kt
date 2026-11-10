@@ -714,7 +714,11 @@ class VoiceViewModel(
             _state.update {
                 // 後から届いた古い値では上書きしない
                 val keep = it.remainingToday?.let { cur -> today != null && cur.observedAt.isAfter(today.observedAt) } == true
-                it.copy(remainingToday = if (keep) it.remainingToday else today ?: it.remainingToday, isPro = me.isPro)
+                it.copy(
+                    remainingToday = if (keep) it.remainingToday else today ?: it.remainingToday,
+                    isPro = me.isPro,
+                    myUsage = if (keep) it.myUsage ?: me else me,
+                )
             }
         }
     }

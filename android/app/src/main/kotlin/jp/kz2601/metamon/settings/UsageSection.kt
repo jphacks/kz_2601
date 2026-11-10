@@ -62,21 +62,17 @@ data class UsageSectionModel(val rows: List<Row>, val pro: Boolean) {
 
 /**
  * 設定の「使っている量」(#317・iOS の `UsageSettingsSection`)。作ったアプリの数と、今のアプリの記録・写真(作成者の時だけ)。
- * シートを開くたびに読む。モック・古いサーバー(404)・読めない時は出さない。Android はアプリ内で Pro にできないので、
+ * 自分の分([me])はシートを開いた時に音声の画面が読み直した値(5 分キャッシュ・iOS の `refreshPlanUsage` と同じく 1 か所で読む)。
+ * 今のアプリの分だけここで読む。モック・古いサーバー(404)・読めない時は出さない。Android はアプリ内で Pro にできないので、
  * 無料の時の下書きは iOS の課金の無い版と同じ「使わないものを消すと、空きが増えます」。
  */
 @Composable
-fun UsageSection(container: AppContainer, isPro: Boolean) {
+fun UsageSection(container: AppContainer, me: MyUsage?, isPro: Boolean) {
     val source = if (container.knobs.mock) null else container.appConfig as? PlanUsageSource
     val state = container.runtime.state.collectAsStateWithLifecycle().value
     val appId = state.document.appId.takeUnless { state.dsl.isVoiceOnly }
-    val loaded by produceState<Pair<MyUsage?, AppUsage?>>(null to null, source, appId) {
-        if (source == null) return@produceState
-        val me = readOrNull { source.myUsage() }
-        value = me to null
-        value = me to appId?.let { id -> readOrNull { source.appUsage(id) } }
-    }
-    val model = UsageSectionModel.of(loaded.first, loaded.second, isPro)
+    val app by produceState<AppUsage?>(null, source, appId) { value = loadAppUsage(source, appId) }
+    val model = UsageSectionModel.of(me, app, isPro)
     if (model.rows.isEmpty()) return
 
     Text(
@@ -111,6 +107,10 @@ fun UsageSection(container: AppContainer, isPro: Boolean) {
         modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
     )
 }
+
+/** 今のアプリの記録・写真(`GET /v1/apps/{appId}/usage`)。自分の分(`/v1/me/usage`)はここでは読まない。 */
+internal suspend fun loadAppUsage(source: PlanUsageSource?, appId: String?): AppUsage? =
+    if (source == null || appId == null) null else readOrNull { source.appUsage(appId) }
 
 private suspend fun <T> readOrNull(read: suspend () -> T?): T? = try {
     read()

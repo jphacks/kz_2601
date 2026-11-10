@@ -114,6 +114,7 @@ dependencies {
 
     testImplementation(libs.junit)
     testImplementation(libs.kotlinx.coroutines.test)
+    testImplementation(libs.okhttp.mockwebserver)
 }
 
 // ランタイムのテストは docs/dsl/examples(全 OS 共通の例)をそのまま読む。
