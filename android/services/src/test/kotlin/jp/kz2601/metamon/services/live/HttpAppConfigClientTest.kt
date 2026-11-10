@@ -15,8 +15,11 @@ import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.put
+import jp.kz2601.metamon.services.local.DocumentCache
+import okhttp3.mockwebserver.Dispatcher
 import okhttp3.mockwebserver.MockResponse
 import okhttp3.mockwebserver.MockWebServer
+import okhttp3.mockwebserver.RecordedRequest
 import okhttp3.mockwebserver.SocketPolicy
 import org.junit.After
 import org.junit.Assert.assertEquals
@@ -54,6 +57,33 @@ class HttpAppConfigClientTest {
         assertEquals("家計簿", doc.document.dsl.app.name)
         assertTrue(doc.envelopeJson.contains("\"source\""))
         assertEquals("/v1/apps/app1/dsl", server.take().path)
+    }
+
+    @Test
+    fun fetchedDocumentIsStoredInCache() = runBlocking<Unit> {
+        val cache = DocumentCache(null)
+        server.enqueue(json(200, envelope(7)))
+        HttpAppConfigClient(server.metamonHttp(), cache).fetchDocument("app1")
+        assertEquals(7, cache.load("app1")!!.version)
+    }
+
+    @Test
+    fun documentArrivingAfterWipeIsNotWritten() = runBlocking<Unit> {
+        val cache = DocumentCache(null)
+        val cached = HttpAppConfigClient(server.metamonHttp(), cache)
+        // 取りに行っている間にサインアウトの後片付けが走った
+        server.dispatcher = object : Dispatcher() {
+            override fun dispatch(request: RecordedRequest): MockResponse {
+                runBlocking { cache.removeAll() }
+                return json(if (request.method == "POST") 201 else 200, envelope(8))
+            }
+        }
+        assertEquals(8, cached.fetchDocument("app1").version)
+        assertNull(cache.load("app1"))
+        assertEquals(8, cached.fetchDocumentIfChanged("app1", 7)?.version)
+        assertNull(cache.load("app1"))
+        assertEquals(8, cached.restore("app1", 3).version)
+        assertNull(cache.load("app1"))
     }
 
     @Test

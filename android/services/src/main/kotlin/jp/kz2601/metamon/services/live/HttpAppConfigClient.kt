@@ -80,12 +80,16 @@ class HttpAppConfigClient(
 
     // MARK: DSL
 
-    override suspend fun fetchDocument(appId: String): FetchedDocument = envelope(get(apps(appId, "dsl")))
+    override suspend fun fetchDocument(appId: String): FetchedDocument {
+        val epoch = cache?.epoch
+        return envelope(get(apps(appId, "dsl")), epoch)
+    }
 
     override suspend fun fetchDocumentIfChanged(appId: String, currentVersion: Int): FetchedDocument? {
+        val epoch = cache?.epoch
         val r = http.exchange(HttpRequest("GET", apps(appId, "dsl"), headers = mapOf("If-None-Match" to etag(currentVersion))))
         if (r.status == 304) return null
-        val doc = envelope(http.check(r))
+        val doc = envelope(http.check(r), epoch)
         return doc.takeIf { it.version != currentVersion }
     }
 
@@ -101,9 +105,11 @@ class HttpAppConfigClient(
     override suspend fun listVersions(appId: String): List<VersionSummary> =
         decode<VersionsPage>(get(apps(appId, "versions"), listOf("pageSize" to "50"))).items
 
-    override suspend fun restore(appId: String, version: Int): FetchedDocument =
+    override suspend fun restore(appId: String, version: Int): FetchedDocument {
+        val epoch = cache?.epoch
         // 201 の本文は VersionSummary + 復元後の dsl(DSLEnvelope 互換)
-        envelope(send("POST", apps(appId, "versions", version.toString(), "restore")))
+        return envelope(send("POST", apps(appId, "versions", version.toString(), "restore")), epoch)
+    }
 
     // MARK: 記録
 
@@ -183,9 +189,10 @@ class HttpAppConfigClient(
     private suspend fun send(method: String, path: List<String>, body: String? = null): String =
         http.send(HttpRequest(method, path, body = body))
 
-    private suspend fun envelope(json: String): FetchedDocument {
+    /** [epoch] = 送る前の [DocumentCache.epoch]。その間にサインアウトの後片付けが走っていたら書き戻さない。 */
+    private suspend fun envelope(json: String, epoch: Int?): FetchedDocument {
         val doc = FetchedDocument(AppDocument.decode(json), json)
-        cache?.store(doc)
+        cache?.store(doc.document.appId, doc.envelopeJson, since = epoch)
         return doc
     }
 
