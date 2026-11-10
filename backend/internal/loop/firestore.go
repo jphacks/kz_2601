@@ -33,7 +33,10 @@ type Firestore struct {
 // NewFirestore wraps a client (the binary owns and closes it).
 func NewFirestore(c *firestore.Client) *Firestore { return &Firestore{c: c} }
 
-var _ Store = (*Firestore)(nil)
+var (
+	_ Store        = (*Firestore)(nil)
+	_ NoticeReader = (*Firestore)(nil)
+)
 
 func isNotFound(err error) bool { return status.Code(err) == codes.NotFound }
 
@@ -215,6 +218,39 @@ func (f *Firestore) ListNotices(ctx context.Context, uid string, limit int) ([]N
 		ns = ns[:n]
 	}
 	return ns, nil
+}
+
+// MarkNoticeRead implements NoticeReader.
+func (f *Firestore) MarkNoticeRead(ctx context.Context, uid, id string, at time.Time) (*Notice, error) {
+	ref := f.c.Collection(colNotices).Doc(id)
+	var out Notice
+	err := f.c.RunTransaction(ctx, func(_ context.Context, tx *firestore.Transaction) error {
+		snap, err := tx.Get(ref)
+		if isNotFound(err) {
+			return ErrNotFound
+		}
+		if err != nil {
+			return err
+		}
+		var n Notice
+		if err := snap.DataTo(&n); err != nil {
+			return err
+		}
+		if n.UID != uid {
+			return ErrNotFound
+		}
+		n.ID = id
+		out = n
+		if !n.ReadAt.IsZero() {
+			return nil
+		}
+		out.ReadAt = at
+		return tx.Update(ref, []firestore.Update{{Path: "readAt", Value: at}})
+	})
+	if err != nil {
+		return nil, err
+	}
+	return &out, nil
 }
 
 type cursorDoc struct {

@@ -67,7 +67,7 @@ func TestIngestCommands(t *testing.T) {
 		t.Fatal(err)
 	}
 	out := ta.must(t, "ingest")
-	if !strings.Contains(out, "ingest in_app: fetched 1, new 1") || !strings.Contains(out, "ingest app_store_review: fetched 1, new 1 (held from AI 1)") {
+	if !strings.Contains(out, "ingest in_app: fetched 1, new 1") || !strings.Contains(out, "ingest app_store_review: fetched 1, new 1 (held from AI 0)") { // reviews go to the AI by default (2026-11-10)
 		t.Fatalf("out:\n%s", out)
 	}
 	out = ta.must(t, "ingest-crash", "-issue", "abc", "-type", "SIGABRT", "-count", "12", "-version", "1.4.2")

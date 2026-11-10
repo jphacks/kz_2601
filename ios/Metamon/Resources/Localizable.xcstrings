@@ -3095,6 +3095,23 @@
         }
       }
     },
+    "「直ったら知らせてほしい」は保存できませんでした。設定の「お知らせ」から変えられます。" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "\"Let me know when it's fixed\" couldn't be saved. You can change it in Settings > Notices."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "「直ったら知らせてほしい」は保存できませんでした。設定の「お知らせ」から変えられます。"
+          }
+        }
+      }
+    },
     "「集計」のタブの名前を「グラフ」に変えて" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -3571,6 +3588,23 @@
         }
       }
     },
+    "お知らせ" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Notices"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "お知らせ"
+          }
+        }
+      }
+    },
     "お知らせ: %@" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -3584,6 +3618,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "お知らせ: %@"
+          }
+        }
+      }
+    },
+    "お知らせはありません" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No notices"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "お知らせはありません"
           }
         }
       }
@@ -4302,6 +4353,23 @@
         }
       }
     },
+    "この内容がもとで直った時に、通知でお知らせします。設定の「お知らせ」にはオフでも届きます。" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "We'll send a notification when a fix comes from this feedback. Settings > Notices shows it even when this is off."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "この内容がもとで直った時に、通知でお知らせします。設定の「お知らせ」にはオフでも届きます。"
+          }
+        }
+      }
+    },
     "この内容で作ります" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -4961,6 +5029,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "つながりを解除しました"
+          }
+        }
+      }
+    },
+    "つながる場所で、引っぱって読み込み直してください。" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Pull to reload when you're connected."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "つながる場所で、引っぱって読み込み直してください。"
           }
         }
       }
@@ -6474,6 +6559,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "オフにしていたため動かしませんでした"
+          }
+        }
+      }
+    },
+    "オフにしても、お知らせはこの画面に届きます。" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Even when off, notices still arrive on this screen."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "オフにしても、お知らせはこの画面に届きます。"
           }
         }
       }
@@ -14298,6 +14400,23 @@
         }
       }
     },
+    "未読" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Unread"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "未読"
+          }
+        }
+      }
+    },
     "未送信 %lld 件" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -15467,6 +15586,40 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "直す依頼を入力欄に入れます(まだ送りません)"
+          }
+        }
+      }
+    },
+    "直ったら知らせてほしい" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Let me know when it's fixed"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "直ったら知らせてほしい"
+          }
+        }
+      }
+    },
+    "直った時に通知でも知らせる" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Also notify me when it's fixed"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "直った時に通知でも知らせる"
           }
         }
       }
@@ -17851,6 +18004,23 @@
         }
       }
     },
+    "送ったフィードバックで直ったものがあると、ここでお知らせします。" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "When something you sent feedback about is fixed, we'll let you know here."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "送ったフィードバックで直ったものがあると、ここでお知らせします。"
+          }
+        }
+      }
+    },
     "送った内容(本文と、オンにした添付)は、Tailor It の不具合を直し、改善するために運営者が読みます。Google Cloud(Firestore)に保存し、%lld 日後に消去します。アカウントを削除したときも消去します。第三者には渡しません。" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -18340,6 +18510,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "通知がオフのため、このアプリの通知は届きません"
+          }
+        }
+      }
+    },
+    "通知が許可されていないため、直った時は設定の「お知らせ」でお知らせします。" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Notifications aren't allowed, so we'll let you know in Settings > Notices when it's fixed."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "通知が許可されていないため、直った時は設定の「お知らせ」でお知らせします。"
           }
         }
       }

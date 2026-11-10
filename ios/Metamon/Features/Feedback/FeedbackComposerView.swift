@@ -11,6 +11,8 @@ import MetamonRenderer
 struct FeedbackComposerView: View {
     let context: FeedbackContext
     let client: any FeedbackClient
+    /// 「直ったら知らせてほしい」(#374)。nil(モック)なら出さない
+    var notifyWhenFixed: FeedbackFixedOptIn?
     var onClose: () -> Void
 
     @State private var kind: FeedbackSubmission.Kind = .bug
@@ -19,6 +21,10 @@ struct FeedbackComposerView: View {
     @State private var attachApp = false
     @State private var attachDevice = false
     @State private var agreed = false
+    /// 既定はオフ(同意をはっきりさせるため・#374)
+    @State private var wantsFixedNotice = false
+    /// 「直ったら知らせてほしい」の結果(送信のアラートに添える)
+    @State private var fixedNoticeNote: String?
     @State private var sending = false
     @State private var error: String?
     @State private var receipt: FeedbackReceipt?
@@ -34,6 +40,7 @@ struct FeedbackComposerView: View {
             Form {
                 messageSection
                 attachmentSection
+                if notifyWhenFixed != nil { fixedNoticeSection }
                 consentSection
             }
             .navigationTitle("フィードバック")
@@ -60,7 +67,7 @@ struct FeedbackComposerView: View {
             .alert("送信しました", isPresented: Binding(get: { receipt != nil }, set: { _ in })) {
                 Button("閉じる", action: onClose)
             } message: {
-                Text("ありがとうございます。いただいた内容は改善に使います。")
+                Text(L10n.tr("ありがとうございます。いただいた内容は改善に使います。") + (fixedNoticeNote.map { "\n\n" + $0 } ?? ""))
             }
         }
         .interactiveDismissDisabled(sending || !trimmed.isEmpty)
@@ -159,6 +166,22 @@ struct FeedbackComposerView: View {
         }
     }
 
+    private var fixedNoticeSection: some View {
+        Section {
+            Toggle("直ったら知らせてほしい", isOn: Binding(get: { wantsFixedNotice }, set: changeFixedNotice))
+                .accessibilityIdentifier("feedback.notifyWhenFixed")
+        } footer: {
+            Text("この内容がもとで直った時に、通知でお知らせします。設定の「お知らせ」にはオフでも届きます。")
+        }
+    }
+
+    /// オンにした時だけ通知の許可を聞く(未決定の時だけ OS の確認が出る)。
+    private func changeFixedNotice(_ on: Bool) {
+        wantsFixedNotice = on
+        guard on, let optIn = notifyWhenFixed else { return }
+        Task { _ = await optIn.requestPermissionIfNeeded() }
+    }
+
     private var consentSection: some View {
         Section {
             Text(L10n.tr("送った内容(本文と、オンにした添付)は、Tailor It の不具合を直し、改善するために運営者が読みます。Google Cloud(Firestore)に保存し、\(FeedbackConsent.retentionDays) 日後に消去します。アカウントを削除したときも消去します。第三者には渡しません。"))
@@ -186,11 +209,26 @@ struct FeedbackComposerView: View {
         Task {
             defer { sending = false }
             do {
-                receipt = try await client.send(submission)
+                let sent = try await client.send(submission)
+                if wantsFixedNotice, let optIn = notifyWhenFixed {
+                    fixedNoticeNote = await Self.fixedNoticeNote(optIn)
+                }
+                receipt = sent
             } catch {
                 self.error = Self.message(for: error)
             }
         }
+    }
+
+    /// 送った後に同意を保存し、届かない時だけ一言添える。
+    static func fixedNoticeNote(_ optIn: FeedbackFixedOptIn) async -> String? {
+        guard await optIn.saveConsent() else {
+            return L10n.tr("「直ったら知らせてほしい」は保存できませんでした。設定の「お知らせ」から変えられます。")
+        }
+        guard await optIn.authorization() != .denied else {
+            return L10n.tr("通知が許可されていないため、直った時は設定の「お知らせ」でお知らせします。")
+        }
+        return nil
     }
 
     static func message(for error: Error) -> String {
@@ -210,11 +248,11 @@ enum FeedbackPresenter {
     /// 二重に開かない
     static var isOpen = false
 
-    static func present(context: FeedbackContext, client: any FeedbackClient) {
+    static func present(context: FeedbackContext, client: any FeedbackClient, notices: (any LoopNoticesClient)? = nil) {
         guard !isOpen, let top = topViewController() else { return }
         isOpen = true
         var host: UIViewController?
-        let view = FeedbackComposerView(context: context, client: client) { host?.dismiss(animated: true) }
+        let view = FeedbackComposerView(context: context, client: client, notifyWhenFixed: notices.map { FeedbackFixedOptIn.live(client: $0) }) { host?.dismiss(animated: true) }
             .environment(\.locale, LanguagePreference.shared.locale)
         let controller = UIHostingController(rootView: view)
         host = controller
@@ -253,7 +291,7 @@ struct FeedbackShakeHost: ViewModifier {
     private func open() {
         guard !FeedbackPresenter.isOpen else { return }
         let ctx = FeedbackContext.capture(runtime: rt, screenshot: FeedbackScreenshot.captureWindow())
-        FeedbackPresenter.present(context: ctx, client: services.feedback)
+        FeedbackPresenter.present(context: ctx, client: services.feedback, notices: services.loopNotices)
     }
 }
 

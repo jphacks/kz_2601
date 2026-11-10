@@ -236,6 +236,11 @@ func truncate(s string, n int) string {
 	return string([]rune(s)[:n])
 }
 
+// DefaultAISources is LOOP_AI_SOURCES when unset. App Store reviews are
+// public text and go to the AI like the rest (owner decision 2026-11-10);
+// whether they are fetched at all is LOOP_SOURCE_APPSTORE.
+const DefaultAISources = string(loop.SourceInApp) + "," + string(loop.SourceStoreReview) + "," + string(loop.SourceCrash)
+
 // ParseList splits a comma separated env value into a set.
 func ParseList(v string) map[string]bool {
 	out := map[string]bool{}
@@ -249,11 +254,12 @@ func ParseList(v string) map[string]bool {
 
 // PolicyFromEnv reads LOOP_CONSENT_VERSIONS (default empty: no in-app
 // feedback reaches the AI until the consent text says an AI reads it) and
-// LOOP_AI_SOURCES (default "in_app,crash"; store reviews only when listed).
+// LOOP_AI_SOURCES (default DefaultAISources: every source; in-app feedback
+// still needs an allowed consent version).
 func PolicyFromEnv(getenv func(string) string) Policy {
 	srcs := getenv("LOOP_AI_SOURCES")
 	if srcs == "" {
-		srcs = string(loop.SourceInApp) + "," + string(loop.SourceCrash)
+		srcs = DefaultAISources
 	}
 	p := Policy{ConsentVersions: ParseList(getenv("LOOP_CONSENT_VERSIONS")), AISources: map[loop.Source]bool{}}
 	for s := range ParseList(srcs) {

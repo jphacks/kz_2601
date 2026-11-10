@@ -174,10 +174,26 @@ type Notice struct {
 	ExpiresAt time.Time `firestore:"expiresAt"`
 }
 
+// FeedbackFixedConsentID is the users/{uid}/notifyConsent/{id} document
+// that records a sender's agreement to a push when their feedback is fixed.
+// The app sets it (PUT /v1/me/notify-consent/feedback-fixed); the in-app
+// notice does not need it.
+const FeedbackFixedConsentID = "_feedback_fixed"
+
 // NoticeID is deterministic per (draft, uid): one sender gets one notice per fix.
 func NoticeID(draftID, uid string) string {
 	sum := sha256.Sum256([]byte(draftID + "\x00" + uid))
 	return "ntc_" + hex.EncodeToString(sum[:12])
+}
+
+// NoticeReader is what the app API (GET /v1/me/notices, #374) needs: the
+// caller's notices and marking one read. Memory and Firestore implement it.
+// MarkNoticeRead returns ErrNotFound for a missing notice and for another
+// user's, so a caller cannot tell them apart; marking twice keeps the first
+// readAt.
+type NoticeReader interface {
+	ListNotices(ctx context.Context, uid string, limit int) ([]Notice, error)
+	MarkNoticeRead(ctx context.Context, uid, id string, at time.Time) (*Notice, error)
 }
 
 // ItemQuery filters ListItems.

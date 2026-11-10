@@ -129,7 +129,7 @@ struct SettingsSheet: View {
         #if !APP_STORE_REVIEW
         .coinSheets() // #630 設定の上にお店・プランの比較を重ねる
         .sheet(item: $feedback) { ctx in
-            FeedbackComposerView(context: ctx, client: services.feedback) { feedback = nil }
+            FeedbackComposerView(context: ctx, client: services.feedback, notifyWhenFixed: services.loopNotices.map { FeedbackFixedOptIn.live(client: $0) }) { feedback = nil }
         }
         #endif
         #if DEBUG
@@ -376,6 +376,9 @@ struct SettingsSheet: View {
                 Label("フィードバックを送る", systemImage: "envelope")
             }
             .accessibilityIdentifier("settings.feedback")
+            if let notices = services.loopNotices {
+                NoticesSettingsRow(client: notices) // #374 「あなたの声で直りました」
+            }
         } footer: {
             Text("端末を振っても開けます。何を送るかは送る前に選べます。")
         }

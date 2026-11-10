@@ -33,7 +33,7 @@ tags:
   - { name: matching, description: '仲間探しのアプリの相互承認(#507)。features/matching.md' }
   - { name: members, description: 'scope:shared の参加者(#254)。features/members.md' }
   - { name: metrics, description: 'aiButton の端末内 AI の集計(#446)。docs/analytics/ai-button-metrics.md' }
-  - { name: notifications, description: 'プッシュ通知の端末と受け取りの同意(#269・#339)。features/notifications.md' }
+  - { name: notifications, description: 'プッシュ通知の端末と受け取りの同意(#269・#339)・「あなたの声で直りました」のお知らせ(#374)。features/notifications.md・features/feedback-loop.md' }
   - { name: records }
   - { name: release, description: 'リリース申請(#76)。features/release.md' }
   - { name: sharing, description: 'シェアリンク(#49)と公開カタログ「探す」(#50)。features/sharing.md' }
@@ -1165,6 +1165,73 @@ paths:
         '400': { $ref: '#/components/responses/BadRequest' }
         '401': { $ref: '#/components/responses/Unauthenticated' }
         '403': { $ref: '#/components/responses/NotMember' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /me/notify-consent/feedback-fixed:
+    get:
+      tags: [notifications]
+      summary: 送ったフィードバックが直った時に push でも知らせてよいか(#374)
+      description: |
+        `users/{uid}/notifyConsent/_feedback_fixed` を読む。保存が無い = 無効。
+        `/me/notify-consent/{appId}` より具体的なパスなので、こちらが先に当たる。
+      responses:
+        '200': { description: OK, content: { application/json: { schema: { $ref: '#/components/schemas/FeedbackFixedConsent' } } } }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+    put:
+      tags: [notifications]
+      summary: 送ったフィードバックが直った時の push の同意を変える(#374)
+      description: |
+        `users/{uid}/notifyConsent/_feedback_fixed` に保存(`cmd/feedback-loop fixed` が push の前に読む所)。本人の分だけ(パスに uid は無い)。
+        iOS はフィードバックの画面の「直ったら知らせてほしい」(既定はオフ)をオンにして送った後に `enabled: true` を送る。オフにするのはお知らせの画面から。
+        アプリ内のお知らせ(`GET /me/notices`)は同意なしで作られる。push は `LOOP_NOTIFY_PUSH=on` の時だけ・週 1 回まで。
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [enabled]
+              additionalProperties: false
+              properties:
+                enabled: { type: boolean }
+      responses:
+        '200': { description: OK, content: { application/json: { schema: { $ref: '#/components/schemas/FeedbackFixedConsent' } } } }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+
+  /me/notices:
+    get:
+      tags: [notifications]
+      summary: 自分への「あなたの声で直りました」の一覧(#374)
+      description: |
+        `loop_notices`(`cmd/feedback-loop fixed` が作る)のうち本人の分だけ。新しい順。期限(作成から 90 日)を過ぎたものは出さない。
+        `unreadCount` はすべてのページの未読の数(設定の行のバッジに使う)。
+      parameters: [{ $ref: '#/components/parameters/PageSize' }, { $ref: '#/components/parameters/PageToken' }]
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items, unreadCount]
+                properties:
+                  items: { type: array, items: { $ref: '#/components/schemas/LoopNotice' } }
+                  unreadCount: { type: integer, minimum: 0 }
+                  nextPageToken: { type: string }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+
+  /me/notices/{noticeId}/read:
+    parameters: [{ in: path, name: noticeId, required: true, schema: { type: string, pattern: '^ntc_[0-9a-f]{24}$' } }]
+    post:
+      tags: [notifications]
+      summary: お知らせを既読にする(#374。冪等・最初の readAt を保つ)
+      description: 他の人のお知らせの ID は、無い ID と同じく 404(あるかどうかも分からない)。
+      responses:
+        '200': { description: OK, content: { application/json: { schema: { $ref: '#/components/schemas/LoopNotice' } } } }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
         '404': { $ref: '#/components/responses/NotFound' }
 
   /me/entitlements:
@@ -2506,6 +2573,22 @@ components:
         appId: { type: string }
         allowed: { type: boolean }
         updatedAt: { type: string, format: date-time }
+    FeedbackFixedConsent:
+      type: object
+      required: [enabled]
+      properties:
+        enabled: { type: boolean }
+        updatedAt: { type: string, format: date-time, description: PUT の応答だけ }
+    LoopNotice:
+      type: object
+      description: 「あなたの声で直りました」(#374)。決まった文 + 人が承認した Issue の題名だけ(LLM は書かない・フィードバックの原文は入らない)
+      required: [id, title, body, createdAt]
+      properties:
+        id: { type: string, pattern: '^ntc_[0-9a-f]{24}$' }
+        title: { type: string }
+        body: { type: string }
+        createdAt: { type: string, format: date-time }
+        readAt: { type: string, format: date-time, description: 無い = 未読 }
     ReleaseRequest:
       type: object
       required: [id, appId, name, dslVersion, purpose, status]

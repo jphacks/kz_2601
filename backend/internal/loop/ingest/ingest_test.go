@@ -106,9 +106,10 @@ func TestDefaultPolicyKeepsInAppFromAI(t *testing.T) {
 	if it.AIAllowed || it.HoldReason != loop.HoldConsent {
 		t.Fatalf("default policy let in-app through: %+v", it)
 	}
+	// store reviews go to the AI by default (owner decision 2026-11-10)
 	it = Normalize(Raw{Source: loop.SourceStoreReview, SourceID: "r1", Text: "落ちる"}, p, time.Now())
-	if it.AIAllowed || it.HoldReason != loop.HoldSource {
-		t.Fatalf("default policy let reviews through: %+v", it)
+	if !it.AIAllowed || it.HoldReason != "" {
+		t.Fatalf("default policy held a review: %+v", it)
 	}
 	it = Normalize(Raw{Source: loop.SourceCrash, SourceID: "c1", Text: "クラッシュの急増"}, p, time.Now())
 	if !it.AIAllowed {
@@ -119,6 +120,10 @@ func TestDefaultPolicyKeepsInAppFromAI(t *testing.T) {
 	})
 	if !p.ConsentVersions["feedback-2027-01"] || !p.AISources[loop.SourceStoreReview] || p.AISources[loop.SourceCrash] {
 		t.Fatalf("env policy %+v", p)
+	}
+	// a source left out of LOOP_AI_SOURCES is held
+	if it := Normalize(Raw{Source: loop.SourceCrash, SourceID: "c2", Text: "クラッシュの急増"}, p, time.Now()); it.AIAllowed || it.HoldReason != loop.HoldSource {
+		t.Fatalf("unlisted source went through: %+v", it)
 	}
 }
 

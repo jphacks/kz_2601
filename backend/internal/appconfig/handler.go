@@ -21,6 +21,7 @@ import (
 	"github.com/jphacks/kz_2601/backend/internal/calls"
 	"github.com/jphacks/kz_2601/backend/internal/feeds"
 	"github.com/jphacks/kz_2601/backend/internal/httpx"
+	"github.com/jphacks/kz_2601/backend/internal/loop"
 	"github.com/jphacks/kz_2601/backend/internal/moderation/textfilter"
 	"github.com/jphacks/kz_2601/backend/internal/paid"
 	"github.com/jphacks/kz_2601/backend/internal/plan"
@@ -72,6 +73,8 @@ type Handler struct {
 
 	calls     *calls.Service // voice / video calls (calls.go, #447); nil = off
 	callUsers *feedLimiter
+
+	notices loop.NoticeReader // 「直りました」 (loop_notices.go, #374); nil = next to the store
 }
 
 // routeGroups holds the feature routes. Each feature file registers its own
