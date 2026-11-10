@@ -39,6 +39,13 @@ class PermissionNeedsTest {
     }
 
     @Test
+    fun ドラレコは音を録る時だけマイクも要る() {
+        assertEquals(setOf(CAMERA), PermissionNeeds.of(dsl("""[{"type":"dashcam"}]""")))
+        assertEquals(setOf(CAMERA), PermissionNeeds.of(dsl("""[{"type":"dashcam","audio":false}]""")))
+        assertEquals(setOf(CAMERA, MICROPHONE), PermissionNeeds.of(dsl("""[{"type":"dashcam","audio":true}]""")))
+    }
+
+    @Test
     fun 音声の入口と表示だけの部品は権限を求めない() {
         assertEquals(emptySet<AppPermission>(), PermissionNeeds.of(dsl("""[{"type":"voiceInput"},{"type":"text","text":"x"}]""")))
     }
