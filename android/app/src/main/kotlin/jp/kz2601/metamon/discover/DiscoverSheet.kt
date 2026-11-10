@@ -48,6 +48,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
@@ -65,6 +66,7 @@ import jp.kz2601.metamon.services.discover.PublicApp
 import jp.kz2601.metamon.services.social.ReportReason
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import java.text.BreakIterator
 import jp.kz2601.metamon.renderer.R as RendererR
 
 /**
@@ -253,12 +255,13 @@ private fun PublicAppCard(
     Card(Modifier.fillMaxWidth().testTag("discover.card.${item.id}")) {
         Column(Modifier.padding(12.dp)) {
             Row(verticalAlignment = Alignment.Top) {
+                // 頭文字は飾り(読み上げは名前の行で足りる)
                 Box(
-                    Modifier.size(48.dp).background(MaterialTheme.colorScheme.primary, RoundedCornerShape(12.dp)),
+                    Modifier.size(48.dp).background(MaterialTheme.colorScheme.primary, RoundedCornerShape(12.dp)).clearAndSetSemantics {},
                     contentAlignment = Alignment.Center,
                 ) {
                     Text(
-                        item.name.take(1),
+                        initialOf(item.name),
                         color = MaterialTheme.colorScheme.onPrimary,
                         style = MaterialTheme.typography.titleLarge,
                         fontWeight = FontWeight.Bold,
@@ -399,5 +402,14 @@ val DiscoverFailure.installTextRes: Int
         DiscoverFailure.OFFLINE -> R.string.discover_install_offline
         DiscoverFailure.OTHER -> R.string.discover_install_failed
     }
+
+/** 名前の頭の 1 文字(絵文字・結合文字を途中で切らない。iOS の `prefix(1)` と同じ)。 */
+internal fun initialOf(name: String): String {
+    val text = name.trim()
+    if (text.isEmpty()) return ""
+    val it = BreakIterator.getCharacterInstance().apply { setText(text) }
+    val end = it.next()
+    return if (end == BreakIterator.DONE) text else text.substring(0, end)
+}
 
 private const val SEARCH_DEBOUNCE_MILLIS = 250L

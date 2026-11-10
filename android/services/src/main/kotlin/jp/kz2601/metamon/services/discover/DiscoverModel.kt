@@ -155,18 +155,24 @@ class DiscoverModel(
     /** 掲載者をブロックする(uid はサーバーが引く)。先にその掲載を隠し、成功したら読み直す(他の掲載も消える)。 */
     suspend fun blockPublisher(item: PublicApp): DiscoverModerationResult {
         val moderation = moderation ?: return DiscoverModerationResult.BLOCK_FAILED
-        val before = _state.value.items
+        val before = _state.value
         _state.update { s -> s.copy(items = s.items.filter { it.id != item.id }) }
-        return try {
+        try {
             moderation.blockListing(item.id)
-            search()
-            DiscoverModerationResult.BLOCKED
         } catch (e: CancellationException) {
+            restore(item, before) // シートを閉じて止まった時も隠したままにしない
             throw e
         } catch (_: Exception) {
-            _state.update { it.copy(items = before) }
-            DiscoverModerationResult.BLOCK_FAILED
+            restore(item, before)
+            return DiscoverModerationResult.BLOCK_FAILED
         }
+        search()
+        return DiscoverModerationResult.BLOCKED
+    }
+
+    /** 先に隠した掲載を戻す(その間に条件を変えて読み直していたら、新しい一覧を優先する)。 */
+    private fun restore(item: PublicApp, before: DiscoverState) = _state.update { s ->
+        if (s.query != before.query || s.sort != before.sort || s.items.any { it.id == item.id }) s else s.copy(items = before.items)
     }
 
     companion object {

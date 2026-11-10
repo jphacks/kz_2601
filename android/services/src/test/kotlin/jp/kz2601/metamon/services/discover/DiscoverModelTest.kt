@@ -8,6 +8,7 @@ import jp.kz2601.metamon.services.live.HttpDiscoverClient
 import jp.kz2601.metamon.services.live.HttpModerationClient
 import jp.kz2601.metamon.services.social.ReportReason
 import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.withTimeoutOrNull
 import okhttp3.mockwebserver.MockWebServer
 import org.junit.After
 import org.junit.Assert.assertEquals
@@ -16,6 +17,7 @@ import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
+import java.util.concurrent.TimeUnit
 
 /** 「探す」の検索・カテゴリ・インストール・通報 / ブロック(#902)。口は docs/backend/openapi-appconfig.yaml。 */
 class DiscoverModelTest {
@@ -166,6 +168,16 @@ class DiscoverModelTest {
         server.enqueue(json(500, errorBody("internal")))
         model.search()
         assertEquals(DiscoverModerationResult.BLOCK_FAILED, model.blockPublisher(model.state.value.items[0]))
+        assertEquals(listOf("a1", "a2"), model.state.value.items.map { it.id })
+    }
+
+    @Test
+    fun aBlockCancelledByClosingTheSheetPutsTheListingBack() = runBlocking {
+        server.enqueue(json(200, """{"items":[$KAKEIBO,$KINTORE]}"""))
+        server.enqueue(json(200, "{}").setHeadersDelay(5, TimeUnit.SECONDS))
+        model.search()
+        val done = withTimeoutOrNull(300) { model.blockPublisher(model.state.value.items[0]) }
+        assertNull(done)
         assertEquals(listOf("a1", "a2"), model.state.value.items.map { it.id })
     }
 
