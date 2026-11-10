@@ -142,6 +142,10 @@ func (h *Handler) serveRecords(w http.ResponseWriter, r *http.Request, in record
 		fail(w, apiErr(http.StatusBadRequest, httpx.CodeBadRequest, "unknown sortField").With("field", sortField))
 		return
 	}
+	if err := encryptedQueryField(ent.FieldByID(sortField)); err != nil {
+		fail(w, err)
+		return
+	}
 	pred, err := h.recordFilter(r, cur.ID, ent, in.FilterField, in.FilterOp, in.FilterValue) // follows.go (#270)
 	if err != nil {
 		fail(w, err)
@@ -238,6 +242,9 @@ func buildFilter(ent *dsl.Entity, field, op, value string) (func(*store.Record) 
 	f := ent.FieldByID(field)
 	if f == nil {
 		return nil, apiErr(http.StatusBadRequest, httpx.CodeBadRequest, "unknown filterField").With("field", field)
+	}
+	if err := encryptedQueryField(f); err != nil {
+		return nil, err
 	}
 	switch op {
 	case "today", "thisMonth":
