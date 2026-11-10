@@ -74,6 +74,7 @@ import jp.kz2601.metamon.voice.SpeechSettings
 import jp.kz2601.metamon.renderer.a11y.TalkBack
 import jp.kz2601.metamon.renderer.components.RemoteImages
 import jp.kz2601.metamon.renderer.components.audio.LocalAudioStore
+import jp.kz2601.metamon.renderer.components.dashcam.DashcamStore
 import jp.kz2601.metamon.renderer.components.media.VideoCodec
 import jp.kz2601.metamon.services.http.AuthTokenProvider
 import jp.kz2601.metamon.services.http.ClientInfo
@@ -459,10 +460,11 @@ class AppContainer(
             UpdateGate.forgetDismissals(context) // 閉じたお知らせ(iOS は UserDefaults ごと消す)
         }
 
-        /** 端末内の動画・録音のファイル(どちらもバックアップされない領域)と、撮影・録音の途中で残った一時ファイル。 */
+        /** 端末内の動画・録音・ドラレコのファイルと、撮影・録音の途中で残った一時ファイル。 */
         private fun removeLocalMedia(context: Context): () -> Unit = {
             VideoCodec.store(context).removeAll()
             LocalAudioStore.of(context).removeAll()
+            DashcamStore.removeAll(context.filesDir)
             MediaTempFiles.removeAll(context.cacheDir)
         }
 

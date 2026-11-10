@@ -273,6 +273,18 @@ class DashcamLeavesTest {
         assertEquals(DashcamStoreKey.make("A"), a.root.name)
     }
 
+    @Test
+    fun removeAllClearsEveryApp() {
+        val filesDir = tmp.newFolder("files")
+        val keep = File(filesDir, "other").apply { writeText("x") }
+        val stores = listOf("A", "B").map { DashcamStore(File(filesDir, DashcamStore.DIRECTORY), it).apply { prepare() } }
+        File(stores[0].savedDir, "clip.mp4").writeBytes(ByteArray(10))
+        File(stores[1].loopDir, "clip.mp4").writeBytes(ByteArray(10))
+        DashcamStore.removeAll(filesDir)
+        assertFalse(File(filesDir, DashcamStore.DIRECTORY).exists())
+        assertTrue("置き場の外は残す", keep.exists())
+    }
+
     // MARK: - text
 
     @Test

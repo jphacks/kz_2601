@@ -60,6 +60,11 @@ class DashcamStore(base: File, appName: String) {
         /** 端末の空きがこれを切ったら録画を止める */
         const val MINIMUM_FREE_BYTES = 500_000_000L
 
+        /** 全アプリの置き場(ループ・保存済み)を消す(#841 の後片付け)。 */
+        fun removeAll(filesDir: File) {
+            File(filesDir, DIRECTORY).deleteRecursively()
+        }
+
         /** 録れない理由(null = 録れる)。true = 端末の空きが少ない / false = 保存済みで上限。 */
         fun storageProblem(segments: List<DashcamSegment>, freeBytes: Long?, maxBytes: Long): Boolean? {
             if (freeBytes != null && freeBytes < MINIMUM_FREE_BYTES) return true
