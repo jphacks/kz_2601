@@ -3,7 +3,9 @@ package jp.kz2601.metamon.voice
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -35,7 +37,9 @@ import androidx.compose.material3.Checkbox
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedCard
 import androidx.compose.material3.OutlinedTextField
@@ -82,7 +86,10 @@ import jp.kz2601.metamon.permissions.rememberPermissionRequest
 import jp.kz2601.metamon.services.ChatMode
 import jp.kz2601.metamon.services.ChatOption
 import jp.kz2601.metamon.services.ChatTurn
+import jp.kz2601.metamon.services.RemainingToday
 import jp.kz2601.metamon.services.permissions.AppPermission
+import kotlinx.coroutines.delay
+import java.time.Instant
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import java.util.Calendar
@@ -90,9 +97,15 @@ import java.util.Locale
 
 /** 音声の画面(iOS の `VoiceInputView`)。マイクの権限を確かめてから [VoiceViewModel] に渡す。 */
 @Composable
-fun VoiceRoute(vm: VoiceViewModel, modifier: Modifier = Modifier) {
+fun VoiceRoute(
+    vm: VoiceViewModel,
+    modifier: Modifier = Modifier,
+    /** マイクの長押し = 変身一覧(iOS と同じ)。null なら長押ししない */
+    onMicLongPress: (() -> Unit)? = null,
+) {
     val state by vm.state.collectAsStateWithLifecycle()
     val context = LocalContext.current
+    val returning = remember { LaunchVisits.isReturning(context) }
     // 権限の窓口(#890)に寄せる。理由のダイアログは出さず、断られたら今までどおり状態カードで「設定を開く」
     val askMic = rememberPermissionRequest(AppPermission.MICROPHONE, explain = false) { granted ->
         if (granted) vm.onMicTap() else vm.onPermissionDenied()
@@ -101,10 +114,17 @@ fun VoiceRoute(vm: VoiceViewModel, modifier: Modifier = Modifier) {
         if (state.phase == VoicePhase.LISTENING || !state.voiceAvailable) vm.onMicTap() else askMic()
     }
     // 裏に回ったら録音を捨てる(マイクが点いたまま残らないように)
-    LifecycleEventEffect(Lifecycle.Event.ON_STOP) { vm.onScreenHidden() }
+    LifecycleEventEffect(Lifecycle.Event.ON_STOP) {
+        vm.onScreenHidden()
+        vm.stopSpeech()
+    }
+    // 開いた時に「今日の残り」を読む(5 分は読み直さない)
+    LaunchedEffect(Unit) { vm.refreshUsage() }
     VoiceScreen(
         state = state,
         onMic = onMic,
+        onMicLongPress = onMicLongPress,
+        launchIsReturning = returning,
         vm = vm,
         onOpenSettings = { PermissionCenter.get(context).openSettings(context, AppPermission.MICROPHONE) },
         modifier = modifier,
@@ -118,11 +138,33 @@ fun VoiceScreen(
     vm: VoiceViewModel,
     onOpenSettings: () -> Unit,
     modifier: Modifier = Modifier,
+    onMicLongPress: (() -> Unit)? = null,
+    launchIsReturning: Boolean = false,
 ) {
     var typed by rememberSaveable { mutableStateOf("") }
+    var showTips by rememberSaveable { mutableStateOf(false) }
     val send = { text: String ->
         vm.submit(text)
         typed = ""
+    }
+    val greeting = Greeting.copy(Greeting.context(state.homeEntry, state.isInitial, launchIsReturning))
+    val hour = remember { Calendar.getInstance().get(Calendar.HOUR_OF_DAY) }
+    val title = stringResource(greeting.title)
+    val subtitle = if (greeting.subtitleHasHello) {
+        stringResource(greeting.subtitle, stringResource(Greeting.timeOfDay(hour)))
+    } else {
+        stringResource(greeting.subtitle)
+    }
+    // #43 初期画面の挨拶を読み上げ(相談中・生成中・生成後のシートでは読まない・設定で OFF なら何もしない)
+    LaunchedEffect(state.isInitial, state.showsChat, title) {
+        delay(GREETING_SPEECH_DELAY_MILLIS)
+        if (state.isInitial && !state.showsChat) vm.speakGreeting(title + "\n" + subtitle)
+    }
+    if (showTips) {
+        PromptTipsSheet(onDismiss = { showTips = false }) { text ->
+            showTips = false
+            typed = text
+        }
     }
     Column(modifier.fillMaxSize().imePadding().padding(horizontal = 20.dp)) {
         TopBar(state, onRestart = vm::restartChat)
@@ -137,9 +179,9 @@ fun VoiceScreen(
                 verticalArrangement = Arrangement.spacedBy(16.dp),
             ) {
                 Spacer(Modifier.height(16.dp))
-                Heading(state)
+                Heading(title, subtitle)
                 Spacer(Modifier.height(8.dp))
-                MicButton(state, size = if (state.isInitial) 120.dp else 88.dp, onClick = onMic)
+                MicButton(state, size = if (state.isInitial) 120.dp else 88.dp, onClick = onMic, onLongClick = onMicLongPress)
                 Text(
                     statusText(state),
                     style = MaterialTheme.typography.bodyMedium,
@@ -157,8 +199,9 @@ fun VoiceScreen(
                 TranscriptCard(state)
                 ErrorCardSlot(state, vm, onOpenSettings)
             }
-            if (state.phase.canStart && state.error == null) Examples(state, onPick = send)
+            if (state.phase.canStart && state.error == null) Examples(state, onPick = send, onTips = { showTips = true })
         }
+        RemainingTodayBadge(state)
         Composer(
             text = typed,
             onText = { typed = it },
@@ -191,17 +234,11 @@ private fun TopBar(state: VoiceUiState, onRestart: () -> Unit) {
     }
 }
 
+/** 問いかけ(iOS の `Greeting.copy`: 初回 / 再訪 / 新しいアプリ / 改変で出し分ける) */
 @Composable
-private fun Heading(state: VoiceUiState) {
-    val hour = remember { Calendar.getInstance().get(Calendar.HOUR_OF_DAY) }
-    val title = if (state.isInitial) R.string.voice_title_first else R.string.voice_title_editing
-    val subtitle = if (state.isInitial) {
-        stringResource(R.string.voice_subtitle_first, stringResource(Greeting.timeOfDay(hour)))
-    } else {
-        stringResource(R.string.voice_subtitle_editing)
-    }
+private fun Heading(title: String, subtitle: String) {
     Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        Text(stringResource(title), style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold, textAlign = TextAlign.Center)
+        Text(title, style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold, textAlign = TextAlign.Center)
         Text(subtitle, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant, textAlign = TextAlign.Center)
     }
 }
@@ -217,7 +254,8 @@ private fun statusText(state: VoiceUiState): String = stringResource(
     },
 )
 
-/** マイク(iOS の `MicButton`)。タップで始め、もう一度タップで止める。長押しの変身一覧は android-061。 */
+/** マイク(iOS の `MicButton`)。タップで始め、もう一度タップで止める。長押し([onLongClick])= 変身一覧。 */
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun MicButton(
     state: VoiceUiState,
@@ -226,7 +264,9 @@ fun MicButton(
     modifier: Modifier = Modifier,
     /** 読み上げの説明を差し替える(マイク FAB =「このアプリを変える」) */
     description: String? = null,
+    onLongClick: (() -> Unit)? = null,
 ) {
+    val switcherLabel = stringResource(R.string.voice_fab_switcher)
     val listening = state.phase == VoicePhase.LISTENING
     val busy = state.isBusy
     val colors = MaterialTheme.colorScheme
@@ -249,7 +289,12 @@ fun MicButton(
             .size(size)
             .clip(CircleShape)
             .background(background)
-            .clickable(enabled = listening || (state.phase.canStart && !state.chatPending), onClick = onClick)
+            .combinedClickable(
+                enabled = listening || (state.phase.canStart && !state.chatPending),
+                onClick = onClick,
+                onLongClick = onLongClick?.takeIf { !listening },
+                onLongClickLabel = onLongClick?.let { switcherLabel },
+            )
             .semantics { contentDescription = label },
         contentAlignment = Alignment.Center,
     ) {
@@ -263,7 +308,7 @@ fun MicButton(
 
 /** マイクの形(アイコンのライブラリを足さないよう手で描く)。聞いている間は四角(停止)。 */
 @Composable
-private fun MicGlyph(color: Color, stop: Boolean, modifier: Modifier = Modifier) {
+internal fun MicGlyph(color: Color, stop: Boolean, modifier: Modifier = Modifier) {
     Canvas(modifier) {
         val w = size.width
         val h = size.height
@@ -334,7 +379,7 @@ fun ErrorCard(copy: ErrorCardCopy, onRetry: () -> Unit, onDismiss: () -> Unit, o
 
 /** 例文(#274)。初期画面はカテゴリ → 例、生成後は変更の例。タップで送る(iOS と同じ)。 */
 @Composable
-private fun Examples(state: VoiceUiState, onPick: (String) -> Unit) {
+private fun Examples(state: VoiceUiState, onPick: (String) -> Unit, onTips: () -> Unit) {
     var category by rememberSaveable { mutableStateOf(Greeting.createCategories.first().id) }
     val examples = if (state.isInitial) {
         Greeting.createCategories.first { it.id == category }.examples
@@ -342,11 +387,18 @@ private fun Examples(state: VoiceUiState, onPick: (String) -> Unit) {
         Greeting.editExamples
     }
     Column(Modifier.fillMaxWidth().padding(bottom = 8.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-        Text(
-            stringResource(if (state.isInitial) R.string.voice_examples_label else R.string.voice_edit_examples_label),
-            style = MaterialTheme.typography.labelMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
+        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+            Text(
+                stringResource(if (state.isInitial) R.string.voice_examples_label else R.string.voice_edit_examples_label),
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.weight(1f),
+            )
+            // 頼み方のコツ(#415)。例をタップすると入力欄に入る
+            TextButton(onClick = onTips, modifier = Modifier.testTag("voice.tips")) {
+                Text(stringResource(R.string.voice_tips_title), style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.SemiBold)
+            }
+        }
         if (state.isInitial) {
             Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                 Greeting.createCategories.forEach { c ->
@@ -659,3 +711,139 @@ private fun SettingFooter(text: String) {
         modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp),
     )
 }
+
+// MARK: - 今日の残り・頼み方のコツ・読み上げ(#892)
+
+/** 入力欄の上の小さな「今日の残り N」(iOS の `RemainingTodayBadge`)。少ない時と 0 は目立たせる */
+@Composable
+private fun RemainingTodayBadge(state: VoiceUiState) {
+    val display = RemainingTodayDisplay.of(state.remainingToday, Instant.now(), state.isPro)
+    val (n, emphasized) = when (display) {
+        RemainingTodayDisplay.Hidden -> return
+        is RemainingTodayDisplay.Normal -> display.remaining to false
+        is RemainingTodayDisplay.Low -> display.remaining to true
+        is RemainingTodayDisplay.Exhausted -> 0 to true
+    }
+    val pro = when (display) {
+        is RemainingTodayDisplay.Normal -> display.pro
+        is RemainingTodayDisplay.Low -> display.pro
+        else -> false
+    }
+    val label = stringResource(R.string.voice_remaining_today, n)
+    val withPro = if (pro) stringResource(R.string.voice_remaining_a11y_pro, label) else label
+    val a11y = if (display is RemainingTodayDisplay.Low) stringResource(R.string.voice_remaining_a11y_low, withPro) else withPro
+    val hint = stringResource(
+        R.string.voice_remaining_hint,
+        RemainingToday.Weight.CREATE,
+        RemainingToday.Weight.EDIT,
+        RemainingToday.Weight.CHAT,
+        resetText(state.remainingToday?.resetAt),
+    )
+    Row(
+        Modifier
+            .fillMaxWidth()
+            .padding(top = 4.dp)
+            .semantics(mergeDescendants = true) {
+                contentDescription = a11y
+                stateDescription = hint
+            }
+            .testTag("voice.remainingToday"),
+        horizontalArrangement = Arrangement.spacedBy(6.dp, Alignment.End),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        if (pro) {
+            Surface(shape = RoundedCornerShape(50), color = MaterialTheme.colorScheme.primary) {
+                Text(
+                    "Pro",
+                    style = MaterialTheme.typography.labelSmall,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onPrimary,
+                    modifier = Modifier.padding(horizontal = 6.dp, vertical = 1.dp),
+                )
+            }
+        }
+        Text(
+            label,
+            style = MaterialTheme.typography.labelMedium,
+            fontWeight = if (emphasized) FontWeight.SemiBold else null,
+            color = if (emphasized) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+    }
+}
+
+/** 戻る時刻(上限のカードと同じ書き方)。分からなければ「明日」 */
+@Composable
+private fun resetText(at: Instant?): String {
+    val english = LocalConfiguration.current.locales[0].language == "en"
+    return at?.let {
+        DateTimeFormatter.ofPattern(if (english) "MMM d, H:mm" else "M月d日 H:mm", if (english) Locale.US else Locale.JAPAN)
+            .withZone(ZoneId.systemDefault())
+            .format(it)
+    } ?: stringResource(R.string.voice_tomorrow)
+}
+
+/** 「頼み方のコツ」のシート(iOS の `PromptTipsSheet`)。例をタップすると [onPick] に文を渡す(送らない) */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun PromptTipsSheet(onDismiss: () -> Unit, onPick: (String) -> Unit) {
+    ModalBottomSheet(onDismissRequest = onDismiss, modifier = Modifier.testTag("tips.list")) {
+        val pickHint = stringResource(R.string.voice_tips_pick_hint)
+        LazyColumn(Modifier.fillMaxWidth().padding(horizontal = 20.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+            item {
+                Text(stringResource(R.string.voice_tips_title), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                Text(
+                    stringResource(R.string.voice_tips_intro),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(vertical = 8.dp),
+                )
+            }
+            PromptTips.categories().forEach { category ->
+                item(key = "cat-" + category.id) {
+                    Text(
+                        stringResource(category.title),
+                        style = MaterialTheme.typography.labelLarge,
+                        fontWeight = FontWeight.SemiBold,
+                        color = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.padding(top = 12.dp, bottom = 4.dp).testTag("tips.category.${category.id}"),
+                    )
+                }
+                items(category.tips, key = { it.id }) { tip ->
+                    val text = stringResource(tip.text)
+                    Text(
+                        text,
+                        style = MaterialTheme.typography.bodyMedium,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable(onClickLabel = pickHint) { onPick(text) }
+                            .padding(vertical = 10.dp)
+                            .testTag("tips.example.${tip.id}"),
+                    )
+                }
+            }
+            item { Spacer(Modifier.height(24.dp)) }
+        }
+    }
+}
+
+/** 読み上げの ON / OFF(iOS / Mac の設定の「読み上げ」)。設定の画面に出す */
+@Composable
+fun SpeechSection(settings: SpeechSettings, modifier: Modifier = Modifier) {
+    var enabled by remember { mutableStateOf(settings.enabled) }
+    Column(modifier.fillMaxWidth().testTag("settings.speech")) {
+        Text(
+            stringResource(R.string.voice_speech_section),
+            style = MaterialTheme.typography.labelLarge,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp),
+        )
+        SettingSwitch(stringResource(R.string.voice_speech_setting_title), enabled) {
+            enabled = it
+            settings.enabled = it
+        }
+        SettingFooter(stringResource(R.string.voice_speech_setting_footer))
+    }
+}
+
+/** 画面が出てから挨拶を読むまで(iOS と同じ 0.4 秒) */
+private const val GREETING_SPEECH_DELAY_MILLIS = 400L
