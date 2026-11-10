@@ -8671,23 +8671,6 @@
         }
       }
     },
-    "レシピの選び" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Recipe selection"
-          }
-        },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "レシピの選び"
-          }
-        }
-      }
-    },
     "ログアウト" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -13584,6 +13567,40 @@
         }
       }
     },
+    "最初のコイン" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Starter coins"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "最初のコイン"
+          }
+        }
+      }
+    },
+    "最初のコイン(1 回だけ)" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Starter coins (one time)"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "最初のコイン(1 回だけ)"
+          }
+        }
+      }
+    },
     "最初の画面" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -16916,6 +16933,23 @@
         }
       }
     },
+    "調整" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Adjustment"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "調整"
+          }
+        }
+      }
+    },
     "買ったコイン(期限なし)" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -17762,6 +17796,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "通知がオフのため、このアプリの通知は届きません"
+          }
+        }
+      }
+    },
+    "通知の宛先" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Notification recipients"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "通知の宛先"
           }
         }
       }

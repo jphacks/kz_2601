@@ -3,21 +3,32 @@
 import Foundation
 import MetamonDSL
 
-// コイン課金(#630・docs/decisions/630-token-billing.md「API とエラーコード」)。
-// 契約はまだ固まっていないので、すべて JSONValue から寛容に読む(無い・型が違う項目は nil / 0 にして落ちない)。
+// コイン課金(#630)。契約は docs/backend/openapi-appconfig.yaml の coins(backend/internal/coins)。
+// 読むのは JSONValue から寛容に(無い・型が違う項目は nil / 0 にして落ちない)。
 
-/// 処理の種類(目安 `estimates` のキー)。サーバーのキーは create / edit / chat / aiButton / aiChat / recipe を想定し、
-/// 大文字小文字・`_`・`-` の違いは無視して引く。
+/// 処理の種類(目安 `estimates` のキー・`COIN_ESTIMATE_<OP>`)。サーバーのキーは generate / edit / chat / text。
 public enum CoinOperation: String, CaseIterable, Sendable {
-    case create
+    /// 新しく作る(`/v1/generate`)
+    case generate
+    /// 直す
     case edit
+    /// 作る前の相談
     case chat
-    case aiButton
-    case aiChat
-    case recipe
+    /// アプリの中の AI(aiButton・aiChat の `/v1/text`)
+    case text
+
+    /// 目安を引くキー(大文字小文字・`_`・`-` は無視)。古い名前も受ける
+    var keys: [String] {
+        switch self {
+        case .generate: ["generate", "create"]
+        case .edit: ["edit"]
+        case .chat: ["chat"]
+        case .text: ["text", "aibutton", "aichat"]
+        }
+    }
 }
 
-/// 処理ごとの「約 N コイン」(サーバーが最近の中央値から出す)。
+/// 処理ごとの「約 N コイン」(`GET /v1/coins/config` の `estimates`)。
 public struct CoinEstimates: Equatable, Sendable {
     public var values: [String: Int]
 
@@ -31,8 +42,10 @@ public struct CoinEstimates: Equatable, Sendable {
 
     /// 無い・0 以下は nil(出さない)
     public func coins(for op: CoinOperation) -> Int? {
-        guard let n = values[Self.normalize(op.rawValue)], n > 0 else { return nil }
-        return n
+        for key in op.keys {
+            if let n = values[Self.normalize(key)], n > 0 { return n }
+        }
+        return nil
     }
 
     public var isEmpty: Bool { values.isEmpty }
@@ -40,7 +53,7 @@ public struct CoinEstimates: Equatable, Sendable {
     init(json: JSONValue?) {
         var out: [String: Int] = [:]
         for (k, v) in json?.objectValue ?? [:] {
-            // { "create": 30 } と { "create": { "coins": 30 } } の両方を受ける
+            // { "generate": 30 } と { "generate": { "coins": 30 } } の両方を受ける
             if let n = CoinJSON.int(v) ?? CoinJSON.int(v.objectValue?["coins"]) ?? CoinJSON.int(v.objectValue?["median"]) {
                 out[k] = n
             }
@@ -49,22 +62,31 @@ public struct CoinEstimates: Equatable, Sendable {
     }
 }
 
-/// 残高。買った分(期限なし)と Pro の毎月の分(その月だけ・繰り越さない)を画面で分ける(3.1.1)。
+/// 残高(出どころ別)。引く順番は grant(Pro の毎月の分・繰り越さない)→ initial(最初の分)→ purchased(買った分・期限なし)。
+/// 買った分と毎月の分は画面で分ける(3.1.1)。
 public struct CoinBalance: Equatable, Sendable {
     public var purchased: Int
     public var grant: Int
     public var grantPeriodEnd: Date?
+    public var initial: Int
+    /// 実行中の呼び出しが押さえている分(使える量には入らない)
+    public var reserved: Int
 
-    public init(purchased: Int, grant: Int = 0, grantPeriodEnd: Date? = nil) {
+    public init(purchased: Int, grant: Int = 0, grantPeriodEnd: Date? = nil, initial: Int = 0, reserved: Int = 0) {
         self.purchased = purchased
         self.grant = grant
         self.grantPeriodEnd = grantPeriodEnd
+        self.initial = initial
+        self.reserved = reserved
     }
 
-    public var total: Int { purchased + grant }
+    /// 新しい呼び出しに使える量(画面に出す残高)
+    public var available: Int { purchased + grant + initial }
+    /// available + reserved(履歴の合計と一致)
+    public var total: Int { available + reserved }
 }
 
-/// 枠を超えた後のコイン払い(既定 OFF)と本人が決めた月の上限。
+/// 枠を超えた後のコイン払い(既定 OFF)と本人が決めた月の上限(`PUT /v1/me/coins/settings`)。
 public struct CoinOverflow: Equatable, Sendable {
     public var enabled: Bool
     /// 月のコインの上限。nil = まだ決めていない
@@ -79,16 +101,21 @@ public struct CoinOverflow: Equatable, Sendable {
     }
 }
 
-/// `GET /v1/me/coins`。
+/// `GET /v1/me/coins`(`PUT /v1/me/coins/settings` の応答・`POST /v1/me/coins/apple` の `wallet` も同じ形)。
 public struct CoinWallet: Equatable, Sendable {
+    /// `COIN_BILLING_MODE`(enforce / log / off)。無ければ nil
+    public var mode: String?
     public var balance: CoinBalance
-    /// サーバーの枠(月)。キー = runs / notifications / writes / reads など。上限 nil = 数えない
+    /// サーバーの枠(月)の使った量。サーバーはまだ返さない(#630 の 3 段目)ので、返るまで空 = 出さない
     public var allowance: [String: UsageMeter]
-    public var overflow: CoinOverflow
+    /// nil = サーバーが返さない(設定の UI を出さない)
+    public var overflow: CoinOverflow?
+    /// 財布に目安があれば使う(無ければ公開の設定の目安)
     public var estimates: CoinEstimates
 
-    public init(balance: CoinBalance, allowance: [String: UsageMeter] = [:], overflow: CoinOverflow = .init(),
+    public init(mode: String? = nil, balance: CoinBalance, allowance: [String: UsageMeter] = [:], overflow: CoinOverflow? = nil,
                 estimates: CoinEstimates = .init()) {
+        self.mode = mode
         self.balance = balance
         self.allowance = allowance
         self.overflow = overflow
@@ -98,43 +125,60 @@ public struct CoinWallet: Equatable, Sendable {
     public static func decode(_ data: Data) throws -> CoinWallet {
         let root = try JSONDecoder().decode(JSONValue.self, from: data)
         guard let o = root.objectValue else { throw CoinDecodeError.notAnObject }
-        // 残高は `balance: {purchased, grant, grantPeriodEnd}` と、上に直に並ぶ形の両方を受ける
+        return CoinWallet(object: o)
+    }
+
+    /// `POST /v1/me/coins/apple` の応答(`{credited, transactionId, productId, coins, wallet}`)から財布を読む。
+    /// `wallet` が無ければ上に直に並ぶ形として読む。
+    public static func decodeCredit(_ data: Data) throws -> CoinWallet {
+        let root = try JSONDecoder().decode(JSONValue.self, from: data)
+        guard let o = root.objectValue else { throw CoinDecodeError.notAnObject }
+        return CoinWallet(object: o["wallet"]?.objectValue ?? o)
+    }
+
+    init(object o: [String: JSONValue]) {
+        // 残高は上に直に並ぶ形(サーバー)と `balance: {...}` の両方を受ける
         let b = o["balance"]?.objectValue ?? o
         let balance = CoinBalance(
             purchased: CoinJSON.int(b["purchased"]) ?? 0,
             grant: CoinJSON.int(b["grant"]) ?? 0,
-            grantPeriodEnd: CoinJSON.date(b["grantPeriodEnd"]))
+            grantPeriodEnd: CoinJSON.date(b["grantPeriodEnd"]),
+            initial: CoinJSON.int(b["initial"]) ?? 0,
+            reserved: CoinJSON.int(b["reserved"]) ?? 0)
         var allowance: [String: UsageMeter] = [:]
         for (k, v) in o["allowance"]?.objectValue ?? [:] {
             guard let m = v.objectValue, let used = CoinJSON.int(m["used"]) else { continue }
             allowance[k] = UsageMeter(used: used, limit: CoinJSON.int(m["limit"]), remaining: CoinJSON.int(m["remaining"]))
         }
-        let ov = o["overflow"]?.objectValue ?? [:]
-        let overflow = CoinOverflow(
-            enabled: ov["enabled"]?.boolValue ?? false,
-            monthlyCap: CoinJSON.int(ov["monthlyCap"]),
-            spent: CoinJSON.int(ov["spent"]) ?? CoinJSON.int(ov["spentThisMonth"]) ?? CoinJSON.int(ov["used"]) ?? 0)
-        return CoinWallet(balance: balance, allowance: allowance, overflow: overflow, estimates: CoinEstimates(json: o["estimates"]))
+        let overflow = o["overflow"]?.objectValue.map { ov in
+            CoinOverflow(
+                enabled: ov["enabled"]?.boolValue ?? false,
+                monthlyCap: CoinJSON.int(ov["monthlyCap"]),
+                spent: CoinJSON.int(ov["spent"]) ?? 0)
+        }
+        self.init(mode: o["mode"]?.stringValue, balance: balance, allowance: allowance, overflow: overflow,
+                  estimates: CoinEstimates(json: o["estimates"]))
     }
 }
 
-/// 履歴の 1 行(`GET /v1/me/coins/ledger`)。`delta` は増えれば正・引けば負。
+/// 履歴の 1 行(`GET /v1/me/coins/ledger` の `entries`)。`delta` は増えれば正・引けば負(サーバーの `amount`)。
 public struct CoinLedgerEntry: Equatable, Sendable, Identifiable {
     public var id: String
     public var at: Date?
-    /// purchase | grant | spend | refund | overflow | refund_apple など(知らない種類もそのまま出す)
+    /// grant_initial / grant_monthly / grant_expire / purchase / spend_ai / spend_overflow /
+    /// refund_failed / refund_apple / adjust(知らない種類もそのまま持つ)
     public var kind: String
-    /// create / edit / chat など。無ければ nil
+    /// spend_ai の処理(generate / edit / chat / text)。無ければ nil
     public var operation: String?
-    public var appName: String?
+    public var appId: String?
     public var delta: Int
 
-    public init(id: String, at: Date?, kind: String, operation: String? = nil, appName: String? = nil, delta: Int) {
+    public init(id: String, at: Date?, kind: String, operation: String? = nil, appId: String? = nil, delta: Int) {
         self.id = id
         self.at = at
         self.kind = kind
         self.operation = operation
-        self.appName = appName
+        self.appId = appId
         self.delta = delta
     }
 }
@@ -151,31 +195,31 @@ public struct CoinLedgerPage: Equatable, Sendable {
     public static func decode(_ data: Data) throws -> CoinLedgerPage {
         let root = try JSONDecoder().decode(JSONValue.self, from: data)
         let o = root.objectValue ?? [:]
-        let items = o["items"]?.arrayValue ?? o["entries"]?.arrayValue ?? root.arrayValue ?? []
+        let items = o["entries"]?.arrayValue ?? o["items"]?.arrayValue ?? root.arrayValue ?? []
         var entries: [CoinLedgerEntry] = []
         for (i, item) in items.enumerated() {
             // 1 行読めなくても他の行は出す
             guard let e = item.objectValue,
-                  let delta = CoinJSON.int(e["delta"]) ?? CoinJSON.int(e["amount"]) ?? CoinJSON.int(e["coins"]) else { continue }
-            let at = CoinJSON.date(e["at"]) ?? CoinJSON.date(e["createdAt"])
+                  let delta = CoinJSON.int(e["amount"]) ?? CoinJSON.int(e["delta"]) else { continue }
+            let at = CoinJSON.date(e["at"])
             entries.append(CoinLedgerEntry(
                 id: e["id"]?.stringValue ?? "\(i)-\(at?.timeIntervalSince1970 ?? 0)",
                 at: at,
-                kind: e["kind"]?.stringValue ?? e["type"]?.stringValue ?? "",
-                operation: e["operation"]?.stringValue ?? e["op"]?.stringValue,
-                appName: e["appName"]?.stringValue,
+                kind: e["kind"]?.stringValue ?? "",
+                operation: e["op"]?.stringValue,
+                appId: e["appId"]?.stringValue,
                 delta: delta))
         }
-        let cursor = o["nextCursor"]?.stringValue ?? o["cursor"]?.stringValue
+        let cursor = o["nextCursor"]?.stringValue
         return CoinLedgerPage(entries: entries, nextCursor: (cursor?.isEmpty ?? true) ? nil : cursor)
     }
 }
 
-/// コインのパック(消耗型)。値段は StoreKit から、枚数はサーバーの設定から(どちらもアプリに持たない)。
+/// コインのパック(消耗型)。値段は StoreKit から、枚数はサーバーの設定(`COIN_PACKS`)から(どちらもアプリに持たない)。
 public struct CoinPack: Equatable, Sendable, Identifiable {
     public var productId: String
     public var coins: Int
-    /// おまけの枚数(0 なら印を出さない)
+    /// おまけの枚数。サーバーはまだ返さない(`COIN_PACKS` は productId=coins だけ)ので 0 = 印を出さない
     public var bonusCoins: Int
 
     public init(productId: String, coins: Int, bonusCoins: Int = 0) {
@@ -188,38 +232,42 @@ public struct CoinPack: Equatable, Sendable, Identifiable {
     public var totalCoins: Int { coins + bonusCoins }
 }
 
-/// プランごとの数(表示用)。量は環境変数でサーバーが持つ。無いものは出さない。
+/// プランごとの数(表示用)。量は環境変数でサーバーが持つ。無い・0 のものは出さない。
 public struct CoinPlanNumbers: Equatable, Sendable {
-    /// 毎月のコイン(Pro。その月だけ)
+    /// 毎月のコイン(Pro・`proMonthly`。その月だけ)
     public var monthlyCoins: Int?
-    /// サーバーの枠(月)。キー = runs / notifications / writes / reads など
+    /// 最初に 1 回だけもらえるコイン(サインインしたアカウント・`initialGrant`)
+    public var oneTimeCoins: Int?
+    /// サーバーの枠(月)。キー = runs / recipients / writes / reads
     public var allowance: [String: Int]
 
-    public init(monthlyCoins: Int? = nil, allowance: [String: Int] = [:]) {
+    public init(monthlyCoins: Int? = nil, oneTimeCoins: Int? = nil, allowance: [String: Int] = [:]) {
         self.monthlyCoins = monthlyCoins
+        self.oneTimeCoins = oneTimeCoins
         self.allowance = allowance
     }
 
-    init(json: JSONValue?) {
-        let o = json?.objectValue ?? [:]
-        var allowance: [String: Int] = [:]
-        for (k, v) in o["allowance"]?.objectValue ?? [:] {
-            if let n = CoinJSON.int(v) ?? CoinJSON.int(v.objectValue?["limit"]) { allowance[k] = n }
+    static func allowance(_ json: JSONValue?) -> [String: Int] {
+        var out: [String: Int] = [:]
+        for (k, v) in json?.objectValue ?? [:] {
+            if let n = CoinJSON.int(v) ?? CoinJSON.int(v.objectValue?["limit"]), n > 0 { out[k] = n }
         }
-        self.init(monthlyCoins: CoinJSON.int(o["monthlyCoins"]), allowance: allowance)
+        return out
     }
 }
 
-/// 公開の設定(`GET /v1/coins/config`・サインイン前でも読める想定)。コイン課金を出すかのフラグと、表示に使う数。
+/// 公開の設定(`GET /v1/coins/config`・認証不要)。コイン課金を出すかと、表示に使う数。
 /// 404・読めない時は「出さない」(今の利用者は何も変わらない)。
 public struct CoinPlanConfig: Equatable, Sendable {
-    /// サーバーがコイン課金を有効にしているか(`enabled` か `mode == "enforce"`)。false なら UI を一切出さない
+    /// コインの UI を出すか(`mode == "enforce"` の時だけ。off / log では出さない)
     public var isEnabled: Bool
     public var packs: [CoinPack]
     public var estimates: CoinEstimates
+    /// 無料: 最初のコイン(`initialGrant`)
     public var free: CoinPlanNumbers
+    /// Pro: 毎月のコイン(`proMonthly`)と月の枠(`allowance`)
     public var pro: CoinPlanNumbers
-    /// 超えた後のコイン払いの 1 まとまり(コイン数・実行の回数)
+    /// 超えた後のコイン払いの 1 まとまり(コイン数・実行の回数)。サーバーはまだ返さない(3 段目)ので nil = 出さない
     public var overflowBlockCoins: Int?
     public var overflowBlockRuns: Int?
 
@@ -250,20 +298,20 @@ public struct CoinPlanConfig: Equatable, Sendable {
                   let coins = CoinJSON.int(p["coins"]), coins > 0 else { continue }
             packs.append(CoinPack(productId: id, coins: coins, bonusCoins: max(0, CoinJSON.int(p["bonusCoins"]) ?? 0)))
         }
-        let plans = o["plans"]?.objectValue ?? [:]
+        let positive = { (v: JSONValue?) -> Int? in CoinJSON.int(v).flatMap { $0 > 0 ? $0 : nil } }
         let ov = o["overflow"]?.objectValue ?? [:]
         return CoinPlanConfig(
             isEnabled: enabled,
             packs: packs,
             estimates: CoinEstimates(json: o["estimates"]),
-            free: CoinPlanNumbers(json: plans["free"]),
-            pro: CoinPlanNumbers(json: plans["pro"]),
-            overflowBlockCoins: CoinJSON.int(ov["blockCoins"]),
-            overflowBlockRuns: CoinJSON.int(ov["blockRuns"]))
+            free: CoinPlanNumbers(oneTimeCoins: positive(o["initialGrant"])),
+            pro: CoinPlanNumbers(monthlyCoins: positive(o["proMonthly"]), allowance: CoinPlanNumbers.allowance(o["allowance"])),
+            overflowBlockCoins: positive(ov["blockCoins"]),
+            overflowBlockRuns: positive(ov["blockRuns"]))
     }
 }
 
-/// `PUT /v1/me/coins/settings` の本文。
+/// `PUT /v1/me/coins/settings` の本文(`{"overflow": {"enabled", "monthlyCap"}}`)。
 public struct CoinSettingsUpdate: Encodable, Equatable, Sendable {
     public struct Overflow: Encodable, Equatable, Sendable {
         public var enabled: Bool
@@ -285,7 +333,7 @@ public enum CoinDecodeError: Error, Equatable {
 enum CoinJSON {
     static func int(_ v: JSONValue?) -> Int? {
         switch v {
-        case .number(let n)? where n.isFinite: return Int(n.rounded())
+        case .number(let n)? where n.isFinite && abs(n) < 9e15: return Int(n.rounded())
         case .string(let s)?: return Int(s)
         default: return nil
         }

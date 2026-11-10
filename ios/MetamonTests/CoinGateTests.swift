@@ -49,6 +49,13 @@ final class CoinGateTests: XCTestCase {
         XCTAssertEqual(CoinCopy.signedDelta(30), "+30")
         XCTAssertEqual(CoinCopy.signedDelta(-10), "-10")
         XCTAssertEqual(CoinCopy.operationName("ai_button"), CoinCopy.operationName("aiButton"))
+        // サーバーの名前(backend/internal/coins)
+        XCTAssertEqual(CoinCopy.orderedAllowanceKeys(["reads", "writes", "recipients", "runs"]), ["runs", "recipients", "writes", "reads"])
+        XCTAssertEqual(CoinCopy.operationName("generate"), CoinCopy.operationName("create"))
+        XCTAssertEqual(CoinCopy.operationName("text"), CoinCopy.operationName("aiButton"))
+        for kind in ["grant_initial", "grant_monthly", "grant_expire", "purchase", "spend_ai", "spend_overflow", "refund_failed", "refund_apple", "adjust"] {
+            XCTAssertNotEqual(CoinCopy.ledgerKind(kind), kind, "\(kind) に名前がある")
+        }
     }
 }
 #endif

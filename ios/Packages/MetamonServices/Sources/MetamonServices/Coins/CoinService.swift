@@ -4,9 +4,9 @@ import MetamonDSL
 
 /// コインの口(#630)。appconfig が live の時は `HTTPCoinClient`、それ以外は nil(= コインの UI を出さない)。
 public protocol CoinService: Sendable {
-    /// 公開の設定(フラグ・パックの枚数・目安・プランの数)。404 = まだ無いサーバー → `.disabled`
+    /// 公開の設定(mode・パックの枚数・目安・最初の分・Pro の毎月の分と枠)。404 = まだ無いサーバー → `.disabled`
     func planConfig() async throws -> CoinPlanConfig
-    /// 残高・枠・超えた後のコイン払い・目安
+    /// 残高(出どころ別)・超えた後のコイン払い
     func wallet() async throws -> CoinWallet
     func ledger(cursor: String?) async throws -> CoinLedgerPage
     /// 消耗型の JWS を送って足す。同じ取引は何度送っても 1 回分(冪等)。返り値 = 足した後の残高
@@ -90,7 +90,7 @@ public struct HTTPCoinClient: CoinService {
     public func creditApplePurchase(signedTransaction: String) async throws -> CoinWallet {
         let data = try await HTTP.send("POST", baseURL: baseURL, path: "v1/me/coins/apple",
                                        body: AppleBody(signedTransaction: signedTransaction), token: token, timeout: 20)
-        return try CoinWallet.decode(data)
+        return try CoinWallet.decodeCredit(data)
     }
 
     public func updateSettings(_ update: CoinSettingsUpdate) async throws -> CoinWallet {
@@ -136,30 +136,31 @@ public actor MockCoinService: CoinService {
     }
 
     public func updateSettings(_ update: CoinSettingsUpdate) async throws -> CoinWallet {
-        current.overflow.enabled = update.overflow.enabled
-        current.overflow.monthlyCap = update.overflow.monthlyCap
+        var o = current.overflow ?? CoinOverflow()
+        o.enabled = update.overflow.enabled
+        o.monthlyCap = update.overflow.monthlyCap
+        current.overflow = o
         return current
     }
 
     public static let samplePackIDs = ["jp.kz2601.metamon.coins.small", "jp.kz2601.metamon.coins.medium", "jp.kz2601.metamon.coins.large"]
 
+    // 見た目の確認用の仮の数(本番の量はサーバーの環境変数で決める・この repo には書かない)
     public static let sampleConfig = CoinPlanConfig(
         isEnabled: true,
         packs: [
             CoinPack(productId: samplePackIDs[0], coins: 100),
-            CoinPack(productId: samplePackIDs[1], coins: 300, bonusCoins: 30),
-            CoinPack(productId: samplePackIDs[2], coins: 1000, bonusCoins: 200),
+            CoinPack(productId: samplePackIDs[1], coins: 300),
+            CoinPack(productId: samplePackIDs[2], coins: 1000),
         ],
-        estimates: CoinEstimates(["create": 30, "edit": 10, "chat": 2]),
-        free: CoinPlanNumbers(),
-        pro: CoinPlanNumbers(monthlyCoins: 100, allowance: ["runs": 1000, "notifications": 500, "writes": 10000]),
-        overflowBlockCoins: 10, overflowBlockRuns: 100)
+        estimates: CoinEstimates(["generate": 30, "edit": 10, "chat": 2, "text": 1]),
+        free: CoinPlanNumbers(oneTimeCoins: 50),
+        pro: CoinPlanNumbers(monthlyCoins: 100, allowance: ["runs": 1000, "recipients": 500, "writes": 10000]))
 
     public static let sampleWallet = CoinWallet(
+        mode: "enforce",
         balance: CoinBalance(purchased: 120, grant: 40, grantPeriodEnd: Calendar.current.date(byAdding: .day, value: 20, to: .now)),
-        allowance: ["runs": UsageMeter(used: 320, limit: 1000)],
-        overflow: CoinOverflow(enabled: false, monthlyCap: 100, spent: 0),
-        estimates: CoinEstimates(["create": 30, "edit": 10, "chat": 2]))
+        overflow: CoinOverflow(enabled: false, monthlyCap: 100, spent: 0))
 }
 
 /// コインの口(#630)。nil = コイン課金を使わない(今の利用者は何も変わらない)。

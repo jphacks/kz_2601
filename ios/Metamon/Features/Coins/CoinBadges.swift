@@ -44,7 +44,7 @@ struct CoinBalanceChip: View {
             Image(systemName: CoinSymbol.name)
                 .foregroundStyle(Theme.brandGradient)
             if let wallet = gate.store.wallet {
-                Text(CoinCopy.coins(wallet.balance.total))
+                Text(CoinCopy.coins(wallet.balance.available))
                     .font(.subheadline.weight(.semibold))
                     .monospacedDigit()
                     .foregroundStyle(Theme.Colors.brandText)
@@ -62,7 +62,7 @@ struct CoinBalanceChip: View {
         .background(Theme.Colors.brandA.opacity(0.12), in: Capsule())
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(CoinCopy.balanceTitle)
-        .accessibilityValue(gate.store.wallet.map { CoinCopy.coins($0.balance.total) } ?? "")
+        .accessibilityValue(gate.store.wallet.map { CoinCopy.coins($0.balance.available) } ?? "")
         .accessibilityHint(Text("コインを買う"))
     }
 }
@@ -74,7 +74,7 @@ struct CoinEstimateLine: View {
 
     var body: some View {
         if let n = gate.store.estimate(operation) {
-            let balance = gate.store.wallet?.balance.total
+            let balance = gate.store.wallet?.balance.available
             let short = balance.map { $0 < n } ?? false
             Button { gate.openShop() } label: {
                 HStack(spacing: Theme.Spacing.xs) {

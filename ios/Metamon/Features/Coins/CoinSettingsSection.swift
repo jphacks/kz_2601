@@ -3,7 +3,7 @@ import SwiftUI
 import MetamonRenderer
 import MetamonServices
 
-/// 設定の「コイン」(#630): 残高・今月の枠・「枠を超えたらコインで続ける」(既定 OFF)と月の上限・履歴・お店。
+/// 設定の「コイン」(#630): 残高・今月の枠(サーバーが使った量を返す時だけ)・「枠を超えたらコインで続ける」(既定 OFF)と月の上限・履歴・お店。
 /// サーバーがコイン課金を有効にしていなければ何も出さない。
 struct CoinSettingsSection: View {
     /// 断りから開いた時の説明(枠・上限)
@@ -34,7 +34,10 @@ struct CoinSettingsSection: View {
                 }
             }
             balanceSection
-            overflowSection
+            // 超えた後のコイン払いは、サーバーが財布に `overflow` を返す時だけ出す
+            if wallet?.overflow != nil {
+                overflowSection
+            }
         }
     }
 
@@ -45,6 +48,9 @@ struct CoinSettingsSection: View {
                 LabeledContent(CoinCopy.purchasedTitle) { Text(CoinCopy.coins(b.purchased)).monospacedDigit() }
                 if b.grant > 0 {
                     LabeledContent(CoinCopy.grantTitle(until: b.grantPeriodEnd)) { Text(CoinCopy.coins(b.grant)).monospacedDigit() }
+                }
+                if b.initial > 0 {
+                    LabeledContent(CoinCopy.initialTitle) { Text(CoinCopy.coins(b.initial)).monospacedDigit() }
                 }
             }
             if let wallet {
@@ -93,7 +99,7 @@ struct CoinSettingsSection: View {
                     LabeledContent(L10n.tr("月の上限")) { Text(CoinCopy.coins(cap)).monospacedDigit() }
                 }
                 .accessibilityIdentifier("settings.coins.cap")
-                if let spent = wallet?.overflow.spent {
+                if let spent = wallet?.overflow?.spent {
                     LabeledContent(L10n.tr("今月コインで払った分")) { Text(CoinCopy.coins(spent)).monospacedDigit().foregroundStyle(.secondary) }
                 }
             }
@@ -197,7 +203,7 @@ struct CoinHistoryView: View {
     private func row(_ e: CoinLedgerEntry) -> some View {
         HStack(alignment: .firstTextBaseline) {
             VStack(alignment: .leading, spacing: 2) {
-                Text(verbatim: [CoinCopy.ledgerKind(e.kind), CoinCopy.operationName(e.operation), e.appName]
+                Text(verbatim: [CoinCopy.ledgerKind(e.kind), CoinCopy.operationName(e.operation)]
                     .compactMap { $0 }.filter { !$0.isEmpty }.joined(separator: " · "))
                 if let at = e.at {
                     Text(at.formatted(date: .abbreviated, time: .shortened)).font(.caption).foregroundStyle(.secondary)

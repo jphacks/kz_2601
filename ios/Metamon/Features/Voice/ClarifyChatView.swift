@@ -75,7 +75,7 @@ struct ClarifyChatView: View {
                     #endif
                     RemainingTodayBadge() // #630 今日の残り
                     #if !APP_STORE_REVIEW
-                    CoinEstimateLine(operation: rt.dsl.isVoiceOnly ? .create : .edit) // #630 送る前の「約 N コイン」
+                    CoinEstimateLine(operation: rt.dsl.isVoiceOnly ? .generate : .edit) // #630 送る前の「約 N コイン」
                     #endif
                     inputRow
                 }

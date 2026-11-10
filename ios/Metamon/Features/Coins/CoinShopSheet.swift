@@ -66,7 +66,7 @@ struct CoinShopSheet: View {
                 .foregroundStyle(Theme.brandGradient)
                 .accessibilityHidden(true)
             if let wallet = store.wallet {
-                Text(CoinCopy.coins(wallet.balance.total))
+                Text(CoinCopy.coins(wallet.balance.available))
                     .font(.system(.largeTitle, design: .rounded).weight(.bold))
                     .monospacedDigit()
                     .accessibilityIdentifier("coins.shop.balance")
@@ -93,6 +93,7 @@ struct CoinShopSheet: View {
         VStack(spacing: Theme.Spacing.xs) {
             Text(L10n.tr("\(CoinCopy.purchasedTitle): \(b.purchased)"))
             if b.grant > 0 { Text(L10n.tr("\(CoinCopy.grantTitle(until: b.grantPeriodEnd)): \(b.grant)")) }
+            if b.initial > 0 { Text(L10n.tr("\(CoinCopy.initialTitle): \(b.initial)")) }
         }
         .font(.caption)
         .foregroundStyle(.secondary)

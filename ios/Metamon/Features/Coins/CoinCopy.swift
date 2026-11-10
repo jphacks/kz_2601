@@ -16,6 +16,8 @@ enum CoinCopy {
 
     static var balanceTitle: String { L10n.tr("コインの残高") }
     static var purchasedTitle: String { L10n.tr("買ったコイン(期限なし)") }
+    static var initialTitle: String { L10n.tr("最初のコイン") }
+    static var initialGrantTitle: String { L10n.tr("最初のコイン(1 回だけ)") }
 
     /// Pro の毎月の分(3.1.1: 買った分と分けて「その月の分」と書く)
     static func grantTitle(until: Date?) -> String {
@@ -59,6 +61,7 @@ enum CoinCopy {
     static func allowanceName(_ key: String) -> String? {
         switch key {
         case "runs": L10n.tr("自動の動き")
+        case "recipients": L10n.tr("通知の宛先")
         case "notifications": L10n.tr("通知")
         case "writes": L10n.tr("記録の書き込み")
         case "reads": L10n.tr("記録の読み取り")
@@ -68,7 +71,7 @@ enum CoinCopy {
 
     /// 枠の表示順(サーバーの辞書は順が無い)
     static func orderedAllowanceKeys(_ keys: some Collection<String>) -> [String] {
-        let order = ["runs", "notifications", "writes", "reads"]
+        let order = ["runs", "recipients", "notifications", "writes", "reads"]
         return keys.filter { allowanceName($0) != nil }.sorted { (order.firstIndex(of: $0) ?? 99) < (order.firstIndex(of: $1) ?? 99) }
     }
 
@@ -84,23 +87,24 @@ enum CoinCopy {
     static func ledgerKind(_ kind: String) -> String {
         switch kind {
         case "purchase": L10n.tr("購入")
-        case "grant": L10n.tr("Pro の毎月の分")
-        case "spend": L10n.tr("使った")
-        case "refund": L10n.tr("戻した(失敗)")
+        case "grant_initial": L10n.tr("最初のコイン")
+        case "grant_monthly": L10n.tr("Pro の毎月の分")
+        case "grant_expire": L10n.tr("月の分の終わり")
+        case "spend_ai": L10n.tr("使った")
+        case "spend_overflow": L10n.tr("枠を超えた分")
+        case "refund_failed": L10n.tr("戻した(失敗)")
         case "refund_apple": L10n.tr("返金")
-        case "overflow": L10n.tr("枠を超えた分")
-        case "expire": L10n.tr("月の分の終わり")
+        case "adjust": L10n.tr("調整")
         default: kind
         }
     }
 
     static func operationName(_ op: String?) -> String? {
         switch op.map(CoinEstimates.normalizedKey) ?? "" {
-        case "create": L10n.tr("新しく作る")
+        case "generate", "create": L10n.tr("新しく作る")
         case "edit": L10n.tr("直す")
         case "chat": L10n.tr("相談")
-        case "aibutton", "aichat": L10n.tr("アプリの中の AI")
-        case "recipe": L10n.tr("レシピの選び")
+        case "text", "aibutton", "aichat": L10n.tr("アプリの中の AI")
         default: nil
         }
     }

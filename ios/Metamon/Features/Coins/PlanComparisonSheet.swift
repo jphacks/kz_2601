@@ -100,6 +100,9 @@ struct PlanComparisonSheet: View {
         if let monthly = n.monthlyCoins, monthly > 0 {
             numberRow(L10n.tr("毎月のコイン(繰り越しません)"), value: CoinCopy.coins(monthly))
         }
+        if let once = n.oneTimeCoins, once > 0 {
+            numberRow(CoinCopy.initialGrantTitle, value: CoinCopy.coins(once))
+        }
         ForEach(CoinCopy.orderedAllowanceKeys(n.allowance.keys), id: \.self) { key in
             if let name = CoinCopy.allowanceName(key), let limit = n.allowance[key] {
                 numberRow(name, value: CoinCopy.perMonth(limit))
