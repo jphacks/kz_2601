@@ -18,7 +18,7 @@ struct MetamonMacApp: App {
         .commands { MacCommands() }
 
         Settings {
-            ContentUnavailableView("設定はまだありません", systemImage: "gearshape")
+            MacEmptyState(pose: .tea, title: "設定はまだありません", mascotSize: MacTheme.Mascot.small)
                 .frame(width: 420, height: 260)
         }
     }

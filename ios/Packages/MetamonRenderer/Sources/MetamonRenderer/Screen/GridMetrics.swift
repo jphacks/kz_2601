@@ -53,4 +53,29 @@ public struct GridMetrics: Equatable, Sendable {
             fabInGutter: sideMargin >= fabGutter
         )
     }
+
+    // MARK: - Mac(#938)
+
+    /// Mac のグリッドの外枠の幅の下限・上限。下限は Web の共有ページの最大幅(480px)と同じ、上限は iPad 縦向きの幅の手前
+    public static let minDesktopWidth: CGFloat = 480
+    public static let maxDesktopWidth: CGFloat = 720
+    /// Mac で外枠の幅を高さから決める比率(幅 = 高さ × 3/4)。iPad の縦向き(3:4)と同じ縦長に保つ
+    public static let desktopAspect: CGFloat = 3.0 / 4.0
+
+    /// Mac のウィンドウ(横長で大きさが自由に変わる)の寸法。列は 6 のまま(DSL の area をそのまま読む)。
+    /// - 幅は「高さ × 3/4」を 480〜720 に収め、領域より広ければ中央に寄せる(横に引き伸ばさない)
+    /// - 行の高さは縦向きと同じく高さ ÷ 12。低いウィンドウで iOS の横向きの行の高さ(52)を下回る時はそれで止め、はみ出す分は縦スクロール
+    /// - マイク FAB は中央の列の外(ツールバー)にあるので、余白に FAB を収める計算はしない
+    public static func resolveDesktop(width: CGFloat, height: CGFloat, inset: CGFloat) -> GridMetrics {
+        let preferred = min(max(height * desktopAspect, minDesktopWidth), maxDesktopWidth)
+        let frameWidth = min(width, preferred)
+        let fitted = max(0, height - inset * 2) / CGFloat(GridArea.visibleRows)
+        return GridMetrics(
+            frameWidth: frameWidth,
+            cellW: max(0, frameWidth - inset * 2) / CGFloat(GridArea.columns),
+            cellH: max(landscapeCellHeight, fitted),
+            scrollsVertically: fitted < landscapeCellHeight,
+            fabInGutter: false
+        )
+    }
 }
