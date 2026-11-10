@@ -116,6 +116,8 @@ fun AccountSection(container: AppContainer, user: AuthUser, busy: Boolean) {
         style = MaterialTheme.typography.titleSmall,
         modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
     )
+    // #1101: uid を保ったまま Google / Apple に引き継ぐ(作ったアプリとデータはそのまま)
+    if (user.isAnonymous) AccountLinkSection(session)
     TextButton(
         onClick = { scope.launch { dialog = AccountDialog.SignOut(session.signOutPrompt(recordSync)) } },
         enabled = working == null,

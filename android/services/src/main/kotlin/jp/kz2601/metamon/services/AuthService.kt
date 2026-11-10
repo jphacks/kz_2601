@@ -24,6 +24,15 @@ sealed class AuthError(message: String, cause: Throwable? = null) : Exception(me
 
     /** 削除の前に入り直しが要る(Firebase の requires-recent-login)。 */
     class RequiresRecentLogin(cause: Throwable? = null) : AuthError("requires recent login", cause)
+
+    /** 匿名 → Google / Apple の引き継ぎ(#1101): その資格情報は既に別のアカウントで使われている(credential-already-in-use) */
+    class CredentialAlreadyInUse(cause: Throwable? = null) : AuthError("credential already in use", cause)
+
+    /** 引き継ぎ: 既に Google / Apple でサインイン済み(匿名ではない) */
+    class AlreadyLinked(cause: Throwable? = null) : AuthError("already linked", cause)
+
+    /** [AuthService.switchToPendingAccount] を呼んだが、切り替え先の資格情報が残っていない */
+    class NoPendingAccount : AuthError("no pending account")
 }
 
 /** 認証(iOS の `AuthService`)。実装は Firebase([FirebaseAuthService])かモック([MockAuthService])。 */
@@ -60,5 +69,24 @@ interface AuthService {
     /** 削除の前の入り直し(Apple・Custom Tab)。 */
     suspend fun reauthenticateWithApple(activity: Activity) {
         throw AuthError.Unavailable("reauthenticate is not supported")
+    }
+
+    /**
+     * 匿名の利用者に Google を結びつける(#1101・iOS の `linkWithApple`)。uid は変わらないので、作ったアプリとデータはそのまま。
+     * 既に別のアカウントにある Google アカウントなら [AuthError.CredentialAlreadyInUse](切り替えは [switchToPendingAccount])。
+     * 匿名でなければ [AuthError.AlreadyLinked]。未サインインならそのままサインインする。
+     */
+    suspend fun linkWithGoogle(googleIdToken: String): AuthUser {
+        throw AuthError.Unavailable("link is not supported")
+    }
+
+    /** [linkWithGoogle] の Apple 版(Firebase の `OAuthProvider("apple.com")`・Custom Tab)。 */
+    suspend fun linkWithApple(activity: Activity): AuthUser {
+        throw AuthError.Unavailable("link is not supported")
+    }
+
+    /** [AuthError.CredentialAlreadyInUse] の後、その資格情報の既存アカウントに切り替える。匿名で作ったアプリは引き継がれない(uid が変わる)。 */
+    suspend fun switchToPendingAccount(): AuthUser {
+        throw AuthError.NoPendingAccount()
     }
 }
