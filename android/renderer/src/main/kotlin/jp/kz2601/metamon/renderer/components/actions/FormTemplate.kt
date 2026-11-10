@@ -9,16 +9,15 @@ import jp.kz2601.metamon.renderer.form.FormDraft
 object FormTemplate {
     /**
      * 保存する項目(computed 以外)の `{{id}}` を表示用の文字にする(iOS の `displayText`)。フォームの外ではそのまま。
-     * [raw] = 日時・数値を整形せず保存値のまま(qrCode)。
      */
-    fun fill(text: String, form: FormDraft?, raw: Boolean = false): String {
+    fun fill(text: String, form: FormDraft?): String {
         if (form == null || !text.contains("{{")) return text
         var s = text
         for (f in form.entity.storedFields) {
             val token = "{{${f.id}}}"
             if (!s.contains(token)) continue
             val v = form.values[f.id] ?: JSONValue.Null
-            s = s.replace(token, if (raw) v.displayString else FieldCoding.display(v, f))
+            s = s.replace(token, FieldCoding.display(v, f))
         }
         return s
     }

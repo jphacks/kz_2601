@@ -1,6 +1,13 @@
 package jp.kz2601.metamon.renderer
 
+import jp.kz2601.metamon.dsl.Component
 import jp.kz2601.metamon.dsl.ComponentType
+import jp.kz2601.metamon.dsl.DslJson
+import jp.kz2601.metamon.dsl.expr.Expr
+import jp.kz2601.metamon.dsl.expr.ExprEvaluator
+import jp.kz2601.metamon.dsl.records.FieldCoding
+import jp.kz2601.metamon.dsl.records.Record
+import java.time.Instant
 import jp.kz2601.metamon.dsl.logic.OpenApp
 import jp.kz2601.metamon.dsl.logic.ShareTarget
 import jp.kz2601.metamon.dsl.records.Entity
@@ -154,10 +161,71 @@ class ActionLeavesTest {
     @Test
     fun qrContent() {
         val f = form("name" to "麺屋")
-        assertEquals("店: 麺屋", QrContent.resolve("店: {{name}}", null, f))
-        assertEquals("麺屋", QrContent.resolve(null, "name", f))
-        assertEquals("", QrContent.resolve(null, "name", null))
-        assertEquals("", QrContent.resolve(null, null, f))
+        assertEquals("店: 麺屋", QrContent.resolve("店: {{name}}", null, null, f, noEvaluator))
+        assertEquals("麺屋", QrContent.resolve(null, "name", null, f, noEvaluator))
+        assertEquals("", QrContent.resolve(null, "name", null, null, noEvaluator))
+        assertEquals("", QrContent.resolve(null, null, null, f, noEvaluator))
+    }
+
+    private val noEvaluator: () -> ExprEvaluator = { throw AssertionError("式が無いのに評価器を作った") }
+
+    private val order = Entity(
+        id = "order",
+        fields = listOf(
+            Field("name", type = FieldType.STRING),
+            Field("price", type = FieldType.NUMBER),
+            Field("qty", type = FieldType.NUMBER),
+            Field("start", type = FieldType.DATETIME),
+            Field("total", type = FieldType.NUMBER, computed = Expr.parse("""{"op":"mul","args":[{"ref":"price"},{"ref":"qty"}]}""")),
+            Field("end", type = FieldType.DATETIME, computed = Expr.parse("""{"op":"addMinutes","args":[{"ref":"start"},30]}""")),
+        ),
+    )
+
+    private fun orderEvaluator(vararg records: Record): () -> ExprEvaluator =
+        { ExprEvaluator(listOf(order), { if (it == "order") records.toList() else emptyList() }) }
+
+    private fun orderForm(): FormDraft = FormDraft(order).also { f ->
+        f.values["name"] = JSONValue.Str("らーめん")
+        f.values["price"] = JSONValue.Num(800.0)
+        f.values["qty"] = JSONValue.Num(3.0)
+        f.values["start"] = JSONValue.Str("2026-11-11T01:00:00Z")
+    }
+
+    @Test
+    fun qrContentComputedFieldEvaluatesDraft() {
+        val f = orderForm()
+        val ev = orderEvaluator()
+        assertEquals("2400", QrContent.resolve(null, "total", null, f, ev))
+        assertEquals("合計 2400 円", QrContent.resolve("合計 {{total}} 円", null, null, f, ev))
+        // datetime の computed は RFC3339(時刻を落とさない)
+        val end = FieldCoding.formatDatetime(Instant.parse("2026-11-11T01:30:00Z"))
+        assertEquals(end, QrContent.resolve(null, "end", null, f, ev))
+        // 保存値はそのまま(整形しない)
+        assertEquals("2026-11-11T01:00:00Z", QrContent.resolve(null, "start", null, f, ev))
+        // 下書きを変えると追従する
+        f.values["qty"] = JSONValue.Num(2.0)
+        assertEquals("1600", QrContent.resolve(null, "total", null, f, ev))
+    }
+
+    @Test
+    fun qrContentValueExpr() {
+        val f = orderForm()
+        val concat = Expr.parse("""{"op":"concat","args":["注文: ",{"ref":"name"}," x",{"ref":"total"}]}""")
+        assertEquals("注文: らーめん x2400", QrContent.resolve(null, null, concat, f, orderEvaluator()))
+        // フォームの外: 行なしで評価(集計は読める・ref は空)
+        val count = Expr.parse("""{"agg":"count","entity":"order"}""")
+        val ev = orderEvaluator(Record("a", mapOf()), Record("b", mapOf()))
+        assertEquals("2", QrContent.resolve(null, null, count, null, ev))
+        assertEquals("", QrContent.resolve(null, null, Expr.parse("""{"ref":"name"}"""), null, ev))
+        // text / field が先
+        assertEquals("固定", QrContent.resolve("固定", null, concat, f, orderEvaluator()))
+        assertEquals("らーめん", QrContent.resolve(null, "name", concat, f, orderEvaluator()))
+    }
+
+    @Test
+    fun qrContentReadsComponentValue() {
+        val c = DslJson.decodeFromString(Component.serializer(), """{"type":"qrCode","value":{"op":"add","args":[1,2]}}""")
+        assertEquals("3", QrContent.resolve(c, null, orderEvaluator()))
     }
 
     // webView
