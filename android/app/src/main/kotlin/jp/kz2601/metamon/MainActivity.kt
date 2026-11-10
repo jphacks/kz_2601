@@ -1,6 +1,7 @@
 package jp.kz2601.metamon
 
 import android.content.Context
+import android.content.Intent
 import android.os.Bundle
 import android.util.Log
 import androidx.activity.ComponentActivity
@@ -34,6 +35,7 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.viewmodel.compose.viewModel
 import jp.kz2601.metamon.dsl.AppDSL
 import jp.kz2601.metamon.dsl.AppDocument
@@ -41,6 +43,9 @@ import jp.kz2601.metamon.consent.AiConsentDialog
 import jp.kz2601.metamon.feedback.FeedbackHost
 import jp.kz2601.metamon.feedback.UndoHeaderButtons
 import jp.kz2601.metamon.language.AppLocales
+import jp.kz2601.metamon.notifications.LocalNotifications
+import jp.kz2601.metamon.push.PushOpen
+import jp.kz2601.metamon.services.push.PushMessage
 import jp.kz2601.metamon.permissions.PermissionOffBarHost
 import jp.kz2601.metamon.auth.RootScreen
 import jp.kz2601.metamon.auth.SignInScreen
@@ -74,11 +79,29 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
         val container = (application as MetamonApplication).container(DebugLaunch.knobs(intent))
+        if (savedInstanceState == null) offerPushOpen(intent)
         setContent {
             MetamonRenderTheme {
                 MetamonRoot(container)
             }
         }
+    }
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        offerPushOpen(intent)
+    }
+
+    // 前面へ戻った時に端末の登録を確かめる(通知の許可の画面から戻った時もここ・#887)
+    override fun onResume() {
+        super.onResume()
+        val push = (application as MetamonApplication).builtContainer?.push ?: return
+        lifecycleScope.launch { push.refresh() }
+    }
+
+    /** 通知のタップ(自分で出した通知も、FCM が裏で出した通知も extra の `appId`)。 */
+    private fun offerPushOpen(intent: Intent?) {
+        PushOpen.offer(PushMessage.appId(intent?.getStringExtra(LocalNotifications.EXTRA_APP_ID)))
     }
 }
 
@@ -139,6 +162,15 @@ fun MetamonApp(container: AppContainer) {
     LaunchedEffect(state.document) { runtime.adoptGenerated(state.document) }
     // ランタイムが開いたアプリ(起動時の開き直し・切り替え・ホットリロード)を音声の画面にも映す
     LaunchedEffect(runtimeState.document) { vm.adopt(runtimeState.document) }
+
+    // サインイン(uid の変化)で端末の登録を確かめる(#887)
+    LaunchedEffect(user?.uid) { container.push?.refresh() }
+    // 通知のタップで該当アプリを開く
+    val pushOpen by PushOpen.pending.collectAsStateWithLifecycle()
+    LaunchedEffect(pushOpen) {
+        val appId = PushOpen.consume() ?: return@LaunchedEffect
+        container.push?.open(appId) { openFromNotification(runtime, it) }
+    }
 
     // ヘッドレス E2E 用のつまみ(debug だけ値が入る)。回転などで作り直しても 1 回だけ
     var knobsRan by rememberSaveable { mutableStateOf(false) }
@@ -252,6 +284,15 @@ private fun GeneratedApp(state: VoiceUiState, dsl: AppDSL, runtime: AppRuntime, 
         // カメラなど部品が使う権限は使う直前にアプリの窓口で聞く(#862)
         ProvideRendererPermissions { DSLView(dsl, runtime) }
     }
+}
+
+/**
+ * 通知を押した時に appId のアプリを開く(#887)。今開いているアプリなら何もしない。
+ * 別のアプリへの切り替えは #1069 の `AppRuntime.switchApp`(#1078)につなぐ。この枝には切り替えの口がまだ無い。
+ */
+private fun openFromNotification(runtime: AppRuntime, appId: String) {
+    if (runtime.document.appId == appId) return
+    Log.i(AppContainer.TAG, "push: open requested for another app (switching arrives with #1078)")
 }
 
 /** 生成の途中経過を 1 行にする。今の画面の途中経過は [GeneratingView] が出す(文言の置き場として残す)。 */

@@ -15,6 +15,9 @@ import jp.kz2601.metamon.dsl.decode
 import jp.kz2601.metamon.dsl.fallback
 import jp.kz2601.metamon.dsl.screen
 import jp.kz2601.metamon.language.AppLocales
+import jp.kz2601.metamon.notifications.LocalNotifications
+import jp.kz2601.metamon.push.FcmTokens
+import jp.kz2601.metamon.push.PushHost
 import jp.kz2601.metamon.services.AIClient
 import jp.kz2601.metamon.services.AppConfigClient
 import jp.kz2601.metamon.services.AppEnvironment
@@ -43,6 +46,7 @@ import jp.kz2601.metamon.services.live.FirebaseBootstrap
 import jp.kz2601.metamon.services.live.FirebaseCrashReporter
 import jp.kz2601.metamon.services.live.HttpAIClient
 import jp.kz2601.metamon.services.live.HttpAppConfigClient
+import jp.kz2601.metamon.services.live.HttpPushDeviceClient
 import jp.kz2601.metamon.services.local.AndroidConnectivity
 import jp.kz2601.metamon.services.local.AppListCache
 import jp.kz2601.metamon.services.local.CurrentAppStore
@@ -55,6 +59,10 @@ import jp.kz2601.metamon.services.mock.MockAuthService
 import jp.kz2601.metamon.services.mock.MockSeed
 import jp.kz2601.metamon.services.mock.MockTranscriber
 import jp.kz2601.metamon.services.mock.OfflineSimulatingAppConfigClient
+import jp.kz2601.metamon.services.push.NotifyConsentStore
+import jp.kz2601.metamon.services.push.NotifyConsentToggle
+import jp.kz2601.metamon.services.push.PushDeviceRegistrar
+import jp.kz2601.metamon.services.push.SharedPreferencesPushPrefs
 import jp.kz2601.metamon.services.speech.AndroidSpeechTranscriber
 import jp.kz2601.metamon.services.sync.HotReload
 import jp.kz2601.metamon.services.sync.RealtimeDocumentSync
@@ -100,6 +108,8 @@ class AppContainer(
     /** 他端末・共有の相手の変更(SSE + ポーリングの予備・#883)。モックは null */
     val hotReload: HotReload?,
     private val host: RuntimeHost,
+    /** 他の人の行動で届く通知(#887)。モック・Firebase の無い構成では null(何もしない) */
+    val push: PushHost? = null,
 ) {
     /** 画面の下に出す接続先の名前(モックなら "mock")。 */
     val environmentLabel: String get() = if (knobs.mock) "mock" else environment.name
@@ -194,6 +204,7 @@ class AppContainer(
             // 同意・クラッシュ報告・AI ボタンの集計の置き場(iOS の UserDefaults の鍵と同じ名前・#888)
             val prefs = SharedPreferencesKeyValueStore.of(context, PRIVACY_PREFS)
             val consent = AiConsentStore(prefs)
+            val push = if (firebase) push(context, appConfigHttp, auth, log) else null
 
             return AppContainer(
                 environment = environment,
@@ -216,8 +227,34 @@ class AppContainer(
                 documentCache = documentCache,
                 hotReload = HotReload(sync, CoroutineScope(SupervisorJob() + Dispatchers.Default)),
                 host = AndroidRuntimeHost(context.applicationContext),
+                push = push,
             )
         }
+
+        private fun push(context: Context, http: MetamonHttp, auth: AuthService, log: (String) -> Unit): PushHost {
+            val notifications = LocalNotifications.get(context)
+            // FCM が裏で出す通知もこのチャンネルに入るので先に作る
+            notifications.ensureChannels()
+            val client = HttpPushDeviceClient(http)
+            val prefs = SharedPreferencesPushPrefs(FcmTokens.prefs(context))
+            val consentStore = NotifyConsentStore(prefs)
+            return PushHost(
+                registrar = PushDeviceRegistrar(client, prefs, appVersion = BuildConfig.VERSION_NAME, os = FcmTokens.osName(), log = log),
+                consentStore = consentStore,
+                consent = NotifyConsentToggle(client, consentStore, log = log),
+                uid = { auth.currentUser.value?.uid },
+                canPost = notifications::canPost,
+                fetchToken = FcmTokens::current,
+                registerDevices = PUSH_DEVICE_REGISTRATION,
+                log = log,
+            )
+        }
+
+        /**
+         * FCM のトークンを backend に送るか。今の `PUT /v1/me/devices` は APNs の 16 進のトークンだけを受ける(platform も無い)ので、
+         * backend が android を受けるまで(#918)は送らない。同意(notify-consent)と登録の削除はこれと関係なく動く。
+         */
+        const val PUSH_DEVICE_REGISTRATION = false
 
         private fun recordSync(context: Context, client: AppConfigClient, dir: String) = RecordSyncEngine.create(
             client = client,

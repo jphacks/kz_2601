@@ -49,6 +49,8 @@ firebase-crashlytics = { module = "com.google.firebase:firebase-crashlytics" }
 androidx-credentials = { module = "androidx.credentials:credentials", version.ref = "credentials" }
 androidx-credentials-play-services-auth = { module = "androidx.credentials:credentials-play-services-auth", version.ref = "credentials" }
 googleid = { module = "com.google.android.libraries.identity.googleid:googleid", version.ref = "googleid" }
+# 他の人の行動で届く通知(#887)。版は firebase-bom
+firebase-messaging = { module = "com.google.firebase:firebase-messaging" }
 junit = { module = "junit:junit", version.ref = "junit" }
 zxing-core = { module = "com.google.zxing:core", version.ref = "zxing" }
 okhttp = { module = "com.squareup.okhttp3:okhttp", version.ref = "okhttp" }
