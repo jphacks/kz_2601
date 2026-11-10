@@ -130,7 +130,7 @@ struct LocationPickerSheet: View {
                 .accessibilityIdentifier("locationPicker.search")
             if !query.isEmpty {
                 Button { query = "" } label: { Image(systemName: "xmark.circle.fill").foregroundStyle(.secondary) }
-                    .accessibilityLabel(L("検索を消す"))
+                    .iconButtonLabel(L("検索を消す"))
             }
         }
         .padding(10)

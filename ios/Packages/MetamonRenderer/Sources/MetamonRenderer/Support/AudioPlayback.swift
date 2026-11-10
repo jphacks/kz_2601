@@ -101,8 +101,8 @@ struct AudioPlayButton: View {
             }
             .buttonStyle(.plain)
             .padding(-8)
+            .iconButtonLabel(playing ? L("停止") : L("録音を再生"))
             .disabled(!available)
-            .accessibilityLabel(playing ? L("停止") : L("録音を再生"))
         }
     }
 }

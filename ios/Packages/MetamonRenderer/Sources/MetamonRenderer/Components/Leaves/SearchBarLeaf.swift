@@ -24,7 +24,7 @@ struct SearchBarLeaf: View {
                         Image(systemName: "xmark.circle.fill").foregroundStyle(.tertiary)
                     }
                     .buttonStyle(.plain)
-                    .accessibilityLabel(L("クリア"))
+                    .iconButtonLabel(L("クリア"))
                 }
             }
             .renderInputChrome(focused: focused)

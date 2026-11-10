@@ -36,6 +36,7 @@ public struct ScreenView: View {
                             } label: {
                                 if let icon = tb.icon { Label(tb.label, systemImage: icon) } else { Text(tb.label) }
                             }
+                            .macIconButtonHelp(tb.label, hoverHighlight: false) // Mac のツールバーはアイコンだけになる(#1335)
                         }
                     }
                     // 数値キーパッドには return が無いので、全入力共通でキーボード上に「完了」を出す(#143)
@@ -54,7 +55,7 @@ public struct ScreenView: View {
                             Button { confirmDiscard = true } label: {
                                 Image(systemName: "chevron.backward").fontWeight(.semibold)
                             }
-                            .accessibilityLabel(L("戻る"))
+                            .iconButtonLabel(L("戻る"), hoverHighlight: false)
                             .accessibilityIdentifier("form.back")
                         }
                     }

@@ -170,14 +170,14 @@ struct DrawingSheet: View {
             .frame(maxWidth: 160)
             Spacer(minLength: 0)
             Button { canvas.undo() } label: { Image(systemName: "arrow.uturn.backward") }
+                .iconButtonLabel(L("元に戻す"))
                 .disabled(!canvas.canUndo)
-                .accessibilityLabel(L("元に戻す"))
             Button { canvas.redo() } label: { Image(systemName: "arrow.uturn.forward") }
+                .iconButtonLabel(L("やり直す"))
                 .disabled(!canvas.canRedo)
-                .accessibilityLabel(L("やり直す"))
             Button(role: .destructive) { confirmClear = true } label: { Image(systemName: "trash") }
+                .iconButtonLabel(L("全部消す"))
                 .disabled(session.isEmpty)
-                .accessibilityLabel(L("全部消す"))
                 .accessibilityHint(L("描いた線と前に描いた絵を全部消します"))
         }
         .font(.title3)
