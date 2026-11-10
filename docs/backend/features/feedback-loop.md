@@ -9,9 +9,10 @@
 3. [置き場所](#置き場所)
 4. [コマンド](#コマンド)
 5. [環境変数](#環境変数)
-6. [運用の手順](#運用の手順)
-7. [ループを始める前に人がすること](#ループを始める前に人がすること)
-8. [まだ無いもの](#まだ無いもの)
+6. [アプリで見る](#アプリで見る)
+7. [運用の手順](#運用の手順)
+8. [ループを始める前に人がすること](#ループを始める前に人がすること)
+9. [まだ無いもの](#まだ無いもの)
 
 ## 流れ
 
@@ -41,7 +42,7 @@ flowchart LR
 |---|---|
 | 公開リポジトリの Issue にフィードバックの原文・個人情報・内部の ID を載せない | 下書きは要約と件数だけの決まった形(`internal/loop/draft`)。出口の検査(`draft.Check`)を保存の時・承認の時・投稿の直前に通す。原文と 16 文字以上一致したら出さない |
 | 伏せ字は保存の時に、LLM の前で | `internal/loop/pii`(決まった形: メール・電話・URL・秘密・番号・住所・位置・ID・名前の敬称の形・金額)。`loop_inbox` には伏せ字済みの文しか無い |
-| 同意の版で AI に回すかを決める | `LOOP_CONSENT_VERSIONS` に入った版だけ。既定は空 = アプリ内のフィードバックは AI に回らない |
+| 同意の版で AI に回すかを決める | アプリ内のフィードバックは `LOOP_CONSENT_VERSIONS` に入った版だけ。既定は空 = アプリ内のフィードバックは AI に回らない。ストアのレビュー(公開の文)とクラッシュは同意の版を見ずに AI に回す(2026-11-10 決定) |
 | 伏せ字が多すぎる・出力が外れたら人へ | 本文の 3 割を超える伏せ字・スキーマや検査器 1 に外れた出力・個人情報の疑いは `held`(週の手作業の振り分けへ) |
 | 振り分けの LLM は読んで分類を返すだけ | 道具を渡さない(`ai.Completion` に道具の口が無い)。呼び出しごとの乱数の区切りの中にデータとして入れ、`<` `>` は全角にする。出力はスキーマ + 許可された値 + 要約の検査(URL・メンション・コード・HTML・ラベルらしい文字・個人情報) |
 | 段ごとに止められる・既定は止まっている | `LOOP_<段>=on` の時だけ動く。`loop_control/switches` の `all` / 段が `false` なら止まる。読めなければ止まる |
@@ -51,13 +52,15 @@ flowchart LR
 
 ## 置き場所
 
-すべて `backend/cmd/feedback-loop` だけが読み書きする。クライアント(アプリ)からは読めない(Firestore のルールで許可しないこと)。保存期間はすべて 90 日(`expiresAt`)。元のフィードバックより長くは残さない。
+書くのは `backend/cmd/feedback-loop` だけ。アプリは Firestore を直接読まない(Firestore のルールで許可しないこと)。`loop_notices` だけは appconfig の API(`GET /v1/me/notices`・本人の分だけ)を通して読み、既読の印(`readAt`)を付ける。
+
+保存期間: **元のフィードバック(`feedback/{id}`)は 180 日**(同意文に書いた期間・`store.FeedbackRetention`。変えない)。**ループの写しはすべて 90 日**(`expiresAt`)。写しは元より長くは残さない(元の残りが 90 日より短ければ元と同時に消える)。
 
 | 集まり | 中身 | 消えるとき |
 |---|---|---|
 | `loop_inbox/{lin_…}` | 伏せ字済みの本文・出どころ・版・OS の大きい版・スクショ/DSL の「あり」の印・振り分けの結果。アプリ内は `uid`(LLM には渡さない) | 90 日 / 元の `feedback` が消えた時 / アカウントを削除した時(`purge`) |
 | `loop_drafts/{drf_…}` | Issue の下書き(題名・本文)・状態・承認した人・本文のハッシュ・Issue と PR の番号 | 90 日 |
-| `loop_notices/{ntc_…}` | 「あなたの声で直りました」(決まった文 + 承認された題名)・push したか | 90 日 / アカウントを削除した時 |
+| `loop_notices/{ntc_…}` | 「あなたの声で直りました」(決まった文 + 承認された題名)・push したか・既読(`readAt`・アプリが付ける) | 90 日 / アカウントを削除した時 |
 | `loop_audit/{aud_…}` | 段・操作・人・ID・理由のコード・トークン数 | 90 日 |
 | `loop_control/switches` | 段ごとの停止 | — |
 | `loop_control/usage-YYYY-MM` | 振り分けのトークン数 | — |
@@ -98,7 +101,7 @@ flowchart LR
 | `LOOP_INTAKE` / `LOOP_TRIAGE` / `LOOP_DRAFT` / `LOOP_PUBLISH` / `LOOP_NOTIFY` | 空 = 止まっている | `on` の時だけその段が動く |
 | `LOOP_PAUSED` | 空 | `1` で全段を止める |
 | `LOOP_CONSENT_VERSIONS` | 空 | AI に回してよいアプリ内の同意の版(カンマ区切り) |
-| `LOOP_AI_SOURCES` | `in_app,crash` | AI に回してよい出どころ。ストアのレビューは `app_store_review` を足した時だけ |
+| `LOOP_AI_SOURCES` | `in_app,app_store_review,crash` | AI に回してよい出どころ。既定はすべて(ストアのレビューも回す・2026-11-10 決定)。外した出どころは `held`(`source_not_allowed`)。アプリ内は同意の版の確認も通す |
 | `LOOP_ANTHROPIC_API_KEY` | — | 振り分け専用のキー(アプリの `ANTHROPIC_API_KEY` とは分ける) |
 | `LOOP_TRIAGE_MODEL` | `claude-haiku-5-5` | 振り分けのモデル |
 | `LOOP_MONTHLY_TOKEN_CAP` | `3000000` | 振り分けの月のトークンの上限 |
@@ -107,8 +110,18 @@ flowchart LR
 | `LOOP_ISSUE_REPO` | 空 = dry run | Issue を作るリポジトリ(`owner/name`) |
 | `LOOP_GITHUB_TOKEN` | — | Issue の作成と読み取りだけの権限(GitHub App のインストールのトークン、または fine-grained の PAT の `issues: write`)。マージ・ラベル・コードの権限は持たせない |
 | `LOOP_ISSUE_LABELS` | 空 | 作る Issue に付けるラベル(カンマ区切り)。`agent:ready` は入れない(人が付ける) |
-| `LOOP_NOTIFY_PUSH` | 空 | `on` で「直りました」を push でも送る(本人の同意と週 1 回の上限つき) |
+| `LOOP_NOTIFY_PUSH` | 空 | `on` で「直りました」を push でも送る(本人の同意 `users/{uid}/notifyConsent/_feedback_fixed` と週 1 回の上限つき) |
 | `APNS_AUTH_KEY` / `APNS_KEY_ID` / `APNS_TEAM_ID` / `APNS_TOPIC` / `LOOP_APNS_ENVIRONMENT` | — | push の時だけ。runner と同じ APNs のキー |
+
+## アプリで見る
+
+| もの | どこ |
+|---|---|
+| お知らせの一覧 | iOS の設定 →「お知らせ」(`Features/Notices`)。新しい順・未読の点・引っぱって更新。一覧を閉じた時に見た分を既読にする。設定の行に未読の数のバッジ。API は `GET /v1/me/notices`・`POST /v1/me/notices/{id}/read`(`docs/backend/openapi-appconfig.yaml`・本人の分だけ。他の人の ID は 404) |
+| push の同意 | フィードバックの画面の「直ったら知らせてほしい」(**既定はオフ**)。オンで送った後に `PUT /v1/me/notify-consent/feedback-fixed {enabled: true}` を送り、`users/{uid}/notifyConsent/_feedback_fixed` に入る(`fixed` が push の前に読む所)。通知の許可がまだ決まっていない時だけ OS の確認を出す(拒否済みなら出さない)。オフに戻すのはお知らせの画面のトグル |
+| 審査用の版 | フィードバックと一緒に外す(`docs/ios/review-build.md`)。API は残るが、審査用の版からは呼ばない |
+
+アプリ内のお知らせは同意なしで作る(送り主本人にだけ見える・push はしない)。
 
 ## 運用の手順
 
@@ -160,7 +173,5 @@ go run ./cmd/feedback-loop audit -summary
 | 定期の実行(Cloud Scheduler・workflow) | 足していない。上のコマンドを job にする |
 | Crashlytics を自動で読む | Crashlytics は安く読める API が無い。BigQuery のエクスポート(#296)ができたら `ingest.CrashSource` を実装する。それまでは `ingest-crash` で人が記録 |
 | TestFlight のフィードバック・生成の失敗の急増 | 取り込みの口は同じ形で足せる(`ingest.Fetcher`) |
-| 「直りました」をアプリで見る画面と API | `loop_notices` は作ってある。読む API(`GET /v1/me/notices` など)と iOS の画面は別の Issue |
-| push の同意 | アプリに「直った時に知らせる」の選択が無いので、push は誰にも送られない(`users/{uid}/notifyConsent/_feedback_fixed` を見る)。アプリ内のお知らせは同意なしで作る |
 | 既存の Issue に件数と例を足す案 | 今は束ごとに新しい下書き。開いている下書きには足す |
 | Google の機密データの検出(#367 の選択肢 2-B) | GCP の設定が要るので後で |
