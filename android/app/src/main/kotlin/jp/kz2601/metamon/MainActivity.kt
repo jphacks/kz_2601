@@ -15,7 +15,6 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
@@ -41,8 +40,22 @@ class MainActivity : ComponentActivity() {
 fun MetamonApp(container: AppContainer) {
     val context = LocalContext.current
     val user by container.auth.currentUser.collectAsStateWithLifecycle()
-    val runtime = remember {
-        AppRuntime { Toast.makeText(context, "音声入力は準備中です(#359)", Toast.LENGTH_SHORT).show() }
+    val runtime = container.runtime
+    val state by runtime.state.collectAsStateWithLifecycle()
+
+    LaunchedEffect(runtime) { runtime.bootstrap() }
+    // トースト・音声シートの見た目は描画の Issue で作る。いまは端末のトーストで出す
+    LaunchedEffect(state.toast) {
+        state.toast?.let {
+            Toast.makeText(context, it, Toast.LENGTH_SHORT).show()
+            runtime.dismissToast()
+        }
+    }
+    LaunchedEffect(state.showVoiceSheet) {
+        if (state.showVoiceSheet) {
+            Toast.makeText(context, "音声入力は準備中です(#359)", Toast.LENGTH_SHORT).show()
+            runtime.dismissVoiceSheet()
+        }
     }
 
     LaunchedEffect(container.auth) {
@@ -64,7 +77,7 @@ fun MetamonApp(container: AppContainer) {
         },
     ) { padding ->
         Column(Modifier.fillMaxSize().padding(padding)) {
-            DSLView(container.initialDsl, runtime)
+            DSLView(state.dsl, runtime)
         }
     }
 }

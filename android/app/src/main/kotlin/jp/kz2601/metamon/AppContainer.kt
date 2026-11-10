@@ -4,9 +4,12 @@ import android.content.Context
 import android.os.LocaleList
 import android.util.Log
 import jp.kz2601.metamon.dsl.AppDSL
+import jp.kz2601.metamon.dsl.AppDocument
+import jp.kz2601.metamon.runtime.AndroidRuntimeHost
+import jp.kz2601.metamon.runtime.AppRuntime
+import jp.kz2601.metamon.runtime.RuntimeHost
 import jp.kz2601.metamon.dsl.decode
 import jp.kz2601.metamon.dsl.fallback
-import jp.kz2601.metamon.renderer.DSLRuntime
 import jp.kz2601.metamon.services.AIClient
 import jp.kz2601.metamon.services.AppConfigClient
 import jp.kz2601.metamon.services.AppEnvironment
@@ -36,6 +39,7 @@ class AppContainer(
     val ai: AIClient,
     /** 記録のローカル DB と送信待ちの列(#882)。[MetamonApplication] が start する */
     val recordSync: RecordSyncEngine,
+    private val host: RuntimeHost,
 ) {
     companion object {
         fun make(context: Context): AppContainer {
@@ -72,6 +76,7 @@ class AppContainer(
                     directory = File(context.filesDir, "metamon-records"),
                     scope = CoroutineScope(SupervisorJob() + Dispatchers.Default),
                 ),
+                host = AndroidRuntimeHost(context.applicationContext),
             )
         }
 
@@ -83,9 +88,16 @@ class AppContainer(
             AppDSL.fallback
         }
     }
-}
 
-/** 描画器に渡す能力の実装(iOS の `AppRuntime`)。 */
-class AppRuntime(private val onVoice: (String?) -> Unit) : DSLRuntime {
-    override fun onVoiceInput(componentId: String?) = onVoice(componentId)
+    /** アプリ全体のランタイム(#889)。起動時に 1 つだけ作る。 */
+    val runtime: AppRuntime by lazy {
+        AppRuntime(
+            document = AppDocument(dsl = initialDsl),
+            recordSync = recordSync,
+            scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate),
+            host = host,
+            currentUserId = { auth.currentUser.value?.uid },
+            restore = null, // サーバーの最新 DSL は appId の採番(#360)が入ってから
+        )
+    }
 }
