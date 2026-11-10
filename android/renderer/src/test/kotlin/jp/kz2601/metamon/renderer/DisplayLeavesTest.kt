@@ -96,7 +96,8 @@ class DisplayLeavesTest {
         assertNotNull(SymbolIcons.vector("checkmark"))
         assertNotNull("修飾を外して引く", SymbolIcons.vector("heart.fill"))
         assertNotNull(SymbolIcons.vector("person.crop.circle.fill"))
-        assertNull("無い名前は既定の印", SymbolIcons.vector("refrigerator"))
+        assertNotNull("#842 で埋めた名前", SymbolIcons.vector("refrigerator"))
+        assertNull("無い名前は既定の印", SymbolIcons.vector("no.such.symbol"))
         assertEquals(8.dp, Component(ComponentType.SPACER, size = Size.SMALL).spacerHeight)
         assertEquals(0.dp, Component(ComponentType.SPACER, size = Size.FLEXIBLE).spacerHeight)
     }

@@ -38,9 +38,16 @@ dependencies {
 
 // 適合テストは docs/dsl/conformance/cases(全 OS 共通の期待値)と、case が参照する docs/dsl/examples をそのまま読む。
 val dslDocsDir = rootDir.resolve("../docs/dsl")
+val backendDir = rootDir.resolve("../backend")
 
 tasks.withType<Test>().configureEach {
     inputs.dir(dslDocsDir.resolve("conformance")).withPropertyName("conformanceCases").withPathSensitivity(PathSensitivity.RELATIVE)
     inputs.dir(dslDocsDir.resolve("examples")).withPropertyName("dslExamples").withPathSensitivity(PathSensitivity.RELATIVE)
     systemProperty("metamon.dslDocsDir", dslDocsDir.absolutePath)
+    // アイコンの対応表の漏れ検査(SymbolIconTableTest): 表・backend の AI のカタログ・部品のソースが書く名前を読む。
+    inputs.file(dslDocsDir.resolve("icon-map.json")).withPropertyName("iconMap").withPathSensitivity(PathSensitivity.RELATIVE)
+    inputs.file(dslDocsDir.resolve("dsl.schema.json")).withPropertyName("dslSchema").withPathSensitivity(PathSensitivity.RELATIVE)
+    inputs.files(fileTree(backendDir) { include("**/*.go") }).withPropertyName("backendGo").withPathSensitivity(PathSensitivity.RELATIVE)
+    systemProperty("metamon.backendDir", backendDir.absolutePath)
+    systemProperty("metamon.rendererSrcDir", projectDir.resolve("src/main/kotlin").absolutePath)
 }
