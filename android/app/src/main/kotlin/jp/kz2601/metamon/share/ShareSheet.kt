@@ -66,7 +66,7 @@ data class ShareTarget(val appId: String, val name: String)
 
 /**
  * アプリの共有シート(iOS の `ShareAppSheet` の上半分・#901): リンクの発行・QR・送る(ACTION_SEND)・コピー・取り消し。
- * 「探す」への公開(下半分)は別 Issue。リンクから開く・参加する側(intent-filter・App Links)はまだ無い。
+ * 「探す」への公開(下半分)は別 Issue。リンクから開く・参加する側は [ShareLinkHost](App Links はまだ無い)。
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable

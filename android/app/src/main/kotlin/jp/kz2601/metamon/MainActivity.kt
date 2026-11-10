@@ -74,6 +74,8 @@ import jp.kz2601.metamon.services.AppSummary
 import jp.kz2601.metamon.services.sharing.IssuedShares
 import jp.kz2601.metamon.services.sharing.ShareSheetModel
 import jp.kz2601.metamon.settings.SettingsSheet
+import jp.kz2601.metamon.share.ShareLinkHost
+import jp.kz2601.metamon.share.ShareLinkIntents
 import jp.kz2601.metamon.share.ShareSheet
 import jp.kz2601.metamon.share.ShareTarget
 import jp.kz2601.metamon.switcher.AppSwitcherDialog
@@ -121,9 +123,10 @@ class MainActivity : ComponentActivity() {
         const val NAVIGATION_KEY = "metamon.navigation"
     }
 
-    /** 通知のタップ(自分で出した通知も、FCM が裏で出した通知も extra の `appId`)。 */
+    /** 通知のタップ(自分で出した通知も、FCM が裏で出した通知も extra の `appId`)と、シェアリンク(#901)。 */
     private fun offerPushOpen(intent: Intent?) {
         PushOpen.offer(PushMessage.appId(intent?.getStringExtra(LocalNotifications.EXTRA_APP_ID)))
+        ShareLinkIntents.offer(intent)
     }
 }
 
@@ -351,6 +354,8 @@ fun MetamonApp(container: AppContainer) {
         }
         ShareSheet(target, model, onDismiss = { shareTarget = null })
     }
+    // シェアリンクから開く・参加する(#901)
+    ShareLinkHost(container, canShare)
 
     if (!state.isInitial && state.voiceOpen) {
         ModalBottomSheet(onDismissRequest = vm::closeVoice, sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)) {
