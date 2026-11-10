@@ -1,0 +1,45 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- 計算・遊び系の Leaf(#860)。iOS の Localizable と同じ日本語。 -->
+    <string name="play_bracket_add_entrants">出場者を追加してください</string>
+    <string name="play_bracket_bye">不戦勝</string>
+    <string name="play_bracket_champion">優勝: %1$s</string>
+    <string name="play_bracket_final">決勝</string>
+    <string name="play_bracket_late">開始後に追加された %1$d 人は、この表に入りません</string>
+    <string name="play_bracket_locked">先の回戦の結果を取り消してから変えてください</string>
+    <string name="play_bracket_lost">負け</string>
+    <string name="play_bracket_make_winner">勝者にする</string>
+    <string name="play_bracket_match">%1$s 第 %2$d 試合</string>
+    <string name="play_bracket_need_two">出場者が 2 人以上になると表ができます</string>
+    <string name="play_bracket_quarterfinal">準々決勝</string>
+    <string name="play_bracket_round">%1$d 回戦</string>
+    <string name="play_bracket_semifinal">準決勝</string>
+    <string name="play_bracket_slot">%1$s(相手: %2$s)</string>
+    <string name="play_bracket_tbd">未定</string>
+    <string name="play_bracket_won">勝ち</string>
+    <string name="play_flashcards_again">もう一度</string>
+    <string name="play_flashcards_back">裏</string>
+    <string name="play_flashcards_done">全部終わりました</string>
+    <string name="play_flashcards_empty">カードがありません</string>
+    <string name="play_flashcards_empty_unlearned">覚えていないカードはありません</string>
+    <string name="play_flashcards_flip">めくる</string>
+    <string name="play_flashcards_front">表</string>
+    <string name="play_flashcards_learned">覚えた</string>
+    <string name="play_flashcards_not_yet">まだ</string>
+    <string name="play_flashcards_progress">%1$d / %2$d 枚</string>
+    <string name="play_flashcards_progress_spoken">%2$d 枚中 %1$d 枚目</string>
+    <string name="play_random_default_label">ランダムに決める</string>
+    <string name="play_random_empty">候補がありません</string>
+    <string name="play_random_hint">ボタンを押すと 1 つ選びます</string>
+    <string name="play_random_open">詳しく見る</string>
+    <string name="play_random_untitled">(無題)</string>
+    <string name="play_settlement_empty">メンバーがいません</string>
+    <string name="play_settlement_none">精算は不要です</string>
+    <string name="play_settlement_title">精算</string>
+    <string name="play_settlement_transfer">%1$s から %2$s へ %3$s</string>
+    <string name="play_timer_default_name">タイマー</string>
+    <string name="play_timer_pause">一時停止</string>
+    <string name="play_timer_reset">リセット</string>
+    <string name="play_timer_resume">再開</string>
+    <string name="play_timer_start">開始</string>
+</resources>
