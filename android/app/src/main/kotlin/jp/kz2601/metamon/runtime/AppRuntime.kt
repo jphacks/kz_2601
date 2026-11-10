@@ -4,6 +4,7 @@ import jp.kz2601.metamon.dsl.Action
 import jp.kz2601.metamon.dsl.ActionType
 import jp.kz2601.metamon.dsl.AppDSL
 import jp.kz2601.metamon.dsl.AppDocument
+import jp.kz2601.metamon.dsl.isVoiceOnly
 import jp.kz2601.metamon.dsl.records.Entity
 import jp.kz2601.metamon.dsl.records.entityModels
 import jp.kz2601.metamon.dsl.records.JSONValue
@@ -20,6 +21,7 @@ import jp.kz2601.metamon.renderer.navigation.NavigationResolver
 import jp.kz2601.metamon.renderer.navigation.NavigationState
 import jp.kz2601.metamon.renderer.navigation.Presentation
 import jp.kz2601.metamon.renderer.navigation.Route
+import jp.kz2601.metamon.services.AppSummary
 import jp.kz2601.metamon.services.http.RecordWriteDenial
 import jp.kz2601.metamon.services.local.DeletionTicket
 import jp.kz2601.metamon.services.local.RecordSyncEngine
@@ -95,6 +97,8 @@ class AppRuntime(
     private val cachedDocument: (suspend (appId: String) -> AppDocument?)? = null,
     /** 記録の変化の知らせをまとめる間(連投で取り直しを重ねない) */
     private val recordsRefreshDelayMillis: Long = 250,
+    /** 今のアプリの appId の保存・アプリの一覧・新しいアプリ(#881)。null なら appId は固定(モック・テスト) */
+    private val directory: AppDirectory? = null,
 ) : DSLRuntime, NavigationHost {
     private val _state = MutableStateFlow(RuntimeState(document))
     val state: StateFlow<RuntimeState> = _state.asStateFlow()
@@ -133,11 +137,19 @@ class AppRuntime(
 
     // 起動
 
-    /** 同期を始め、サーバーの最新 DSL に合わせ、画面の entity の記録を読む(ローカル先出し → サーバー)。 */
+    /**
+     * 同期を始め、前に開いていたアプリを開き直し(保存した DSL を先に出す → サーバーの最新)、画面の entity の記録を読む。
+     * インストール直後で話しかける前の画面なら、サーバーの最近のアプリを開く(#276・再インストール後)。
+     */
     suspend fun bootstrap() {
         recordSync.start()
         if (eventsJob == null) eventsJob = scope.launch { recordSync.events.collect { handle(it) } }
-        if (isIssued(document.appId)) restoreFromServer()
+        if (isIssued(document.appId)) {
+            // 再起動しても作ったアプリが残る(iOS の G4)。サーバーの最新は続けて取り直す
+            loadCached(document.appId)?.takeIf { it.appId == document.appId && it.version > document.version }?.let(::apply)
+            restoreFromServer()
+            if (directory?.store?.issuedThisLaunch == true) resumeLatestAppIfEmpty()
+        }
         startHotReload()
         load(dsl.entities.map { it.id }.toSet())
     }
@@ -155,15 +167,10 @@ class AppRuntime(
         } catch (e: CancellationException) {
             throw e
         } catch (_: Exception) {
-            val cached = try {
-                cachedDocument?.invoke(document.appId)
-            } catch (e: CancellationException) {
-                throw e
-            } catch (_: Exception) {
-                null
-            }
+            val cached = loadCached(document.appId)
             if (cached != null && cached.appId == document.appId && cached.version >= document.version) {
-                apply(cached)
+                // 起動時に先に出した版と同じなら描き直さない(見ている画面・遷移を残す)
+                if (cached != document) apply(cached)
                 _state.update { it.copy(offline = true, toast = RuntimeCopy.OFFLINE_RESTORED) }
             } else {
                 // 手元の DSL のまま(状態カードは画面の Issue で出す。ここでは offline だけ立てる)
@@ -172,14 +179,111 @@ class AppRuntime(
         }
     }
 
-    /** DSL を差し替える(別アプリ・生成の結果)。表示中の記録・遷移・モーダルは捨てる。 */
+    private suspend fun loadCached(appId: String): AppDocument? = try {
+        cachedDocument?.invoke(appId)
+    } catch (e: CancellationException) {
+        throw e
+    } catch (_: Exception) {
+        null
+    }
+
+    /** DSL を差し替える(別アプリ・生成の結果)。表示中の記録・遷移・モーダルは捨てる。appId は次の起動のために保存する。 */
     fun apply(doc: AppDocument) {
         val switched = doc.appId != document.appId
         if (switched) dropPendingHotReload()
+        if (isIssued(doc.appId)) directory?.store?.set(doc.appId)
         _state.value = RuntimeState(doc, offline = _state.value.offline)
         _records.value = _state.value.records
         _navigation.value = NavigationState.initial(doc.dsl)
         noteAppliedVersion(doc, switched)
+    }
+
+    // アプリの持ち物(iOS の DeviceAppID・変身一覧・#881)
+
+    private val _apps = MutableStateFlow<List<AppSummary>>(emptyList())
+
+    /** 最後に読んだアプリの一覧(`GET /v1/apps` かオフラインの保存)。 */
+    val apps: StateFlow<List<AppSummary>> = _apps.asStateFlow()
+
+    /** 一覧に出すアプリ(archived・未生成を除き、今のアプリを先頭に)。 */
+    val visibleApps: List<AppSummary> get() = AppSummary.visible(_apps.value, current = document.appId)
+
+    /**
+     * 生成(音声 #995)の結果を受け取る。ai は送った appId で返すので、別の appId なら新しいアプリとして開き、その appId を保存する。
+     * 同じアプリの古い版(ホットリロードが先に新しい版を当てた)は捨てる。
+     */
+    fun adoptGenerated(doc: AppDocument) {
+        if (doc == document) return
+        if (doc.appId == document.appId && doc.version < document.version) return
+        apply(doc)
+    }
+
+    /** `GET /v1/apps`。届かなければ保存した一覧(とトースト)。結果は [apps] にも入れる。 */
+    suspend fun appsList(): List<AppSummary> {
+        val dir = directory ?: return _apps.value
+        try {
+            val list = dir.list()
+            dir.cache.store(list)
+            _apps.value = list
+        } catch (e: CancellationException) {
+            throw e
+        } catch (_: Exception) {
+            val cached = dir.cache.load()
+            if (cached.isNotEmpty()) {
+                _apps.value = cached
+                showToast(RuntimeCopy.APPS_OFFLINE)
+            } else if (_apps.value.isEmpty()) {
+                showToast(RuntimeCopy.APPS_FAILED)
+            }
+        }
+        return _apps.value
+    }
+
+    /**
+     * 別のアプリに切り替える(iOS の `switchApp(to:)`): サーバーの DSL → 届かなければ保存した DSL → [apply]。
+     * appId を保存し、ホットリロードを張り直す。読めなければ今のアプリのまま false。
+     */
+    suspend fun switchApp(appId: String): Boolean {
+        if (appId == document.appId) return true
+        var offline = false
+        val next = try {
+            restore?.invoke(appId)
+        } catch (e: CancellationException) {
+            throw e
+        } catch (_: Exception) {
+            null
+        } ?: loadCached(appId)?.also { offline = true }
+        if (next == null) {
+            showToast(RuntimeCopy.SWITCH_FAILED)
+            return false
+        }
+        apply(next.copy(appId = appId))
+        _state.update { it.copy(offline = offline, toast = RuntimeCopy.switched(next.dsl.app.name, offline)) }
+        scope.launch { load(dsl.entities.map { it.id }.toSet()) }
+        return true
+    }
+
+    /** 「+ 新しいアプリ」: appId を作り直して話しかける前の画面へ(前のアプリはサーバーと一覧に残る)。 */
+    fun startNewApp() {
+        val dir = directory ?: return
+        apply(dir.fresh(dir.store.rotate()))
+    }
+
+    /** インストール直後のサインイン(#276): 話しかける前の画面なら、サーバーの一覧の先頭のアプリを開く。 */
+    private suspend fun resumeLatestAppIfEmpty() {
+        val dir = directory ?: return
+        if (!dsl.isVoiceOnly) return
+        val list = try {
+            dir.list()
+        } catch (e: CancellationException) {
+            throw e
+        } catch (_: Exception) {
+            return
+        }
+        dir.cache.store(list)
+        _apps.value = list
+        val latest = AppSummary.latest(list, excluding = document.appId) ?: return
+        switchApp(latest.id)
     }
 
     // ホットリロード(iOS の startSync / hotReload / setForeground)
@@ -669,7 +773,7 @@ class AppRuntime(
     }
 
     companion object {
-        /** appId の採番(#360)前の仮の appId。サーバーには取りに行かない */
+        /** 仮の appId(:dsl の既定値・テスト)。サーバーには取りに行かない。アプリは [AppDirectory] の保存した appId で始める */
         const val LOCAL_APP_ID = "local"
 
         fun isIssued(appId: String): Boolean = appId != LOCAL_APP_ID

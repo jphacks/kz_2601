@@ -5,6 +5,7 @@ import android.util.Log
 import jp.kz2601.metamon.dsl.AppDSL
 import jp.kz2601.metamon.dsl.AppDocument
 import jp.kz2601.metamon.runtime.AndroidRuntimeHost
+import jp.kz2601.metamon.runtime.AppDirectory
 import jp.kz2601.metamon.runtime.AppRuntime
 import jp.kz2601.metamon.runtime.RuntimeHost
 import jp.kz2601.metamon.dsl.decode
@@ -25,6 +26,8 @@ import jp.kz2601.metamon.services.live.FirebaseBootstrap
 import jp.kz2601.metamon.services.live.HttpAIClient
 import jp.kz2601.metamon.services.live.HttpAppConfigClient
 import jp.kz2601.metamon.services.local.AndroidConnectivity
+import jp.kz2601.metamon.services.local.AppListCache
+import jp.kz2601.metamon.services.local.CurrentAppStore
 import jp.kz2601.metamon.services.local.DocumentCache
 import jp.kz2601.metamon.services.local.RecordSyncEngine
 import jp.kz2601.metamon.services.mock.DslSamples
@@ -57,7 +60,10 @@ class AppContainer(
     val ai: AIClient,
     /** 文字起こし。本物は端末内の認識、モックは決まった文を返す [MockTranscriber] */
     val transcriber: SpeechTranscriber,
-    val appId: DeviceAppId,
+    /** 今のアプリの appId(端末に保存・次の起動で開き直す)。切り替え・新しいアプリはランタイムが書き換える */
+    val appId: CurrentAppStore,
+    /** 最後に取得したアプリの一覧(オフラインの一覧) */
+    val appList: AppListCache,
     val knobs: DebugKnobs,
     /** 記録のローカル DB と送信待ちの列(#882)。[MetamonApplication] が start する */
     val recordSync: RecordSyncEngine,
@@ -104,9 +110,10 @@ class AppContainer(
                 appConfig = records,
                 ai = MockAIClient(samples, delayMillis = delayMillis),
                 transcriber = MockTranscriber(),
-                appId = DeviceAppId(context),
+                // 本物のアプリ・記録と混ざらないよう、モックは別の置き場
+                appId = DeviceAppId.store(context, "metamon-app-mock", migrateLegacy = false),
+                appList = AppListCache(File(context.filesDir, "metamon-app-mock")),
                 knobs = knobs,
-                // 本物の記録と混ざらないよう、モックは別の置き場
                 recordSync = recordSync(context, records, "metamon-records-mock"),
                 documentCache = DocumentCache(null),
                 hotReload = null,
@@ -141,7 +148,8 @@ class AppContainer(
                 ai = HttpAIClient(http(environment.aiBaseUrl), log = log),
                 // 声は端末内だけで文字にする(#354 §3)。端末内が無い端末は文字入力に落とす
                 transcriber = AndroidSpeechTranscriber(context, language = language, log = { Log.i(TAG, it) }),
-                appId = DeviceAppId(context),
+                appId = DeviceAppId.store(context, "metamon-app"),
+                appList = AppListCache(File(context.filesDir, "metamon-app")),
                 knobs = knobs,
                 recordSync = recordSync(context, appConfig, "metamon-records"),
                 documentCache = documentCache,
@@ -193,15 +201,21 @@ class AppContainer(
     /** アプリ全体のランタイム(#889)。起動時に 1 つだけ作る。 */
     val runtime: AppRuntime by lazy {
         AppRuntime(
+            // 前に開いていたアプリの appId で始める。中身は bootstrap が保存した DSL → サーバーの最新の順で当てる
             document = AppDocument(appId = appId.current, dsl = initialDsl),
             recordSync = recordSync,
             scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate),
             host = host,
             currentUserId = { auth.currentUser.value?.uid },
-            // appId の採番(#360)前は "local" のままなので、AppRuntime がサーバーに取りに行かない
             restore = { id -> appConfig.fetchDocument(id).document },
             hotReloader = hotReload,
             cachedDocument = { id -> documentCache.load(id)?.document },
+            directory = AppDirectory(
+                store = appId,
+                list = appConfig::listApps,
+                cache = appList,
+                fresh = { id -> AppDocument(appId = id, dsl = initialDsl) },
+            ),
         )
     }
 }

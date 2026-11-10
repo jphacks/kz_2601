@@ -107,7 +107,35 @@ data class AppSummary(
     val updatedAt: String? = null,
     /** 変身一覧で自分が並べた位置(1 が先頭)。並べ替えていないアプリは null */
     val sortIndex: Int? = null,
-)
+) {
+    val isArchived: Boolean get() = status == "archived"
+
+    /** `GET /dsl` の自動作成(version 1 = 初期状態)のまま一度も生成されていない。一覧には出さない。 */
+    val isBlank: Boolean get() = currentVersion <= 1
+
+    /** [updatedAt] を時刻にしたもの(読めなければ null)。 */
+    val updatedInstant: java.time.Instant? get() = updatedAt?.let { runCatching { java.time.OffsetDateTime.parse(it).toInstant() }.getOrNull() }
+
+    companion object {
+        /**
+         * 一覧に出す並び(iOS の `AppSummary.visible`): archived と未生成(blank)を除く(今のアプリは常に含める)。
+         * - 自分で並べたことがある(どれかに sortIndex がある・#277): sortIndex なしを新しい順で先頭、続けて並べた順
+         * - 無い: 今のアプリを先頭、残りは更新の新しい順
+         */
+        fun visible(apps: List<AppSummary>, current: String?): List<AppSummary> {
+            val kept = apps.distinctBy { it.id }.filter { !it.isArchived && (it.id == current || !it.isBlank) }
+            val newer = compareByDescending<AppSummary> { it.updatedInstant ?: java.time.Instant.MIN }
+            if (kept.any { it.sortIndex != null }) {
+                return kept.sortedWith(compareBy<AppSummary> { it.sortIndex != null }.thenBy { it.sortIndex ?: 0 }.then(newer))
+            }
+            return kept.sortedWith(compareBy<AppSummary> { it.id != current }.then(newer))
+        }
+
+        /** 一覧の先頭のアプリ(今のアプリを除く・iOS の `latestApp`・#276 の開き直し)。 */
+        fun latest(apps: List<AppSummary>, excluding: String): AppSummary? =
+            visible(apps, current = null).firstOrNull { it.id != excluding }
+    }
+}
 
 /** `AppWithDSL`(作成・複製の応答)。 */
 @Serializable

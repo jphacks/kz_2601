@@ -25,6 +25,11 @@ object RuntimeCopy {
     const val NAME_SEPARATOR = "・"
     const val HOT_RELOADED = "最新の内容に更新しました"
     const val OFFLINE_RESTORED = "オフラインです。最後に保存したアプリを表示しています"
+    const val APPS_OFFLINE = "オフラインです。保存済みの変身一覧を表示しています"
+    const val APPS_FAILED = "変身一覧を読み込めませんでした"
+    const val SWITCH_FAILED = "アプリを読み込めませんでした。接続を確認してください"
+
+    fun switched(name: String, offline: Boolean) = "「$name」に変身しました" + if (offline) "(オフライン・キャッシュ)" else ""
 
     fun missingRequired(names: List<String>) = "${names.joinToString(NAME_SEPARATOR)} を入力してください"
 
