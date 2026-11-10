@@ -81,6 +81,25 @@ android/scripts/sync-google-services.sh
 
 Firebase Console に Android アプリ(`jp.kz2601.metamon`・stg を同じプロジェクトにするなら `jp.kz2601.metamon.stg` も)を登録して json を落とすのは人間の作業。
 
+json がある時だけ `google-services` と Crashlytics の Gradle プラグインが当たる(`app/build.gradle.kts`)。json が無いビルドは Firebase を初期化せず、認証は固定 uid のモック・App Check のヘッダ無し・クラッシュ報告無しで動く。
+
+### サインイン(#840)
+
+未サインインならサインイン画面(`app/.../auth/SignInScreen.kt`)を出す。方法は 3 つ。
+
+| 方法 | しくみ | 要る設定 |
+|---|---|---|
+| Google | Credential Manager で Google の ID トークンを取り、Firebase に渡す | Firebase で Google を有効化・アプリの SHA-1 を登録。Web クライアント ID は json の `default_web_client_id`(gradle の `metamon.<flavor>.googleWebClientId` で上書きできる)。無ければボタンを出さない |
+| Apple | Firebase の `OAuthProvider("apple.com")`(Custom Tab) | Firebase で Apple を有効化・Apple の Services ID とリダイレクト URL |
+| 匿名 | Firebase の匿名認証 | Firebase で匿名を有効化 |
+
+backend への `Authorization: Bearer` は Firebase の ID トークン(`AuthTokenProvider`)。`AppContainer.make(context, mockAuth = true)` で Firebase を使わずモックに差し替えられる。
+
+### App Check と Crashlytics
+
+- App Check: release は Play Integrity、debug ビルドは debug provider(`app/src/{debug,release}/.../AppCheckProviders.kt`)。debug のトークンは初回起動時に logcat に出るので Firebase Console に登録する。取れない時はヘッダ無しで送る。
+- Crashlytics: 送るのは SDK が集めるクラッシュの情報と uid だけ。`CrashReporter` に `log`・カスタムキーの口は無い(話した内容・記録・DSL を送らない)。オン / オフの設定は android-053。
+
 ## 版を上げる
 
 版は `gradle/libs.versions.toml` だけで決める。今は compileSdk 36 に合わせて、compileSdk 37 を求める版(Compose 1.12・core 1.19・lifecycle 2.11)を使っていない。SDK の platform 37 を入れたら、compileSdk と一緒に上げる。
