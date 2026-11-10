@@ -301,6 +301,20 @@ fun MetamonApp(container: AppContainer) {
                 settingsOpen = false
                 container.tutorialPrompt.replay()
             },
+            canUndo = state.canUndo && !state.undoing && !state.isGenerating,
+            onUndo = {
+                settingsOpen = false
+                vm.undo(state.document.version)
+            },
+            onPickTip = { text ->
+                settingsOpen = false
+                vm.putDraft(text)
+            },
+            onReset = {
+                settingsOpen = false
+                runtime.startNewApp()
+                vm.noteHomeEntry(Greeting.HomeEntry.HOME)
+            },
         )
     }
     // 設定のシートより後に置く(設定から出した時に上に重ねる)

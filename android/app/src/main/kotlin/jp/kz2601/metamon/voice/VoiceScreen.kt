@@ -160,6 +160,13 @@ fun VoiceScreen(
         delay(GREETING_SPEECH_DELAY_MILLIS)
         if (state.isInitial && !state.showsChat) vm.speakGreeting(title + "\n" + subtitle)
     }
+    // 設定の「頼み方のコツ」で選んだ文(#1161)。入れるだけで送らない
+    LaunchedEffect(state.draft) {
+        state.draft?.let {
+            typed = it
+            vm.consumeDraft()
+        }
+    }
     if (showTips) {
         PromptTipsSheet(onDismiss = { showTips = false }) { text ->
             showTips = false
