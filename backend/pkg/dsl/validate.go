@@ -265,6 +265,7 @@ func (a *App) Validate() error {
 	}
 	checkComputedFields(a.Entities, entities, DailyToggleFields(a), add)
 	checkHiddenFields(a, entities, add)
+	checkEncryptedFields(a, entities, add) // encrypted.go
 	checkMatching(a, add)
 	checkSingleEntities(a, entities, add)
 	checkBookLookups(a, entities, add) // book_lookup.go

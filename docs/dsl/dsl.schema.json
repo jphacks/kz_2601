@@ -336,6 +336,11 @@
           ],
           "description": "この項目を入れる・変えられるのはアプリの管理者だけ(#272)。作った人が最初の管理者で、管理者は参加者を管理者にできる。管理者でない人の保存でこの項目の値が変わるとサーバーが断る(403 admins_only)。管理者は、他の人が作ったレコードでもこの項目だけは変えられる。public / shared の entity の保存する field だけ。",
           "x-usage": "「店長だけが確定できる」「承認は管理者だけ」「担当は管理者が決める」の確定・承認・担当の field に付ける(例 boolean confirmed)。確定のボタンは visibleTo admins と組み合わせる。"
+        },
+        "encrypted": {
+          "type": "boolean",
+          "description": "true で値を端末で暗号化して保存する(#233・Tailor It Pro)。鍵は利用者の iCloud キーチェーンにあり、同じ Apple ID の端末だけが読める。サーバー・AI には暗号文しか届かない。string / text の field だけ。entity がすべて private のアプリだけ(shared / public があるアプリには付けない)。式・filter・sort・集計・serverRules・unique・aiButton の input / {{field}}・aiChat の textField・nearbyShare では使えない。",
+          "x-usage": "「日記を暗号化して保存して」「メモは見られたくない」の本文の field に付ける。"
         }
       }
     },

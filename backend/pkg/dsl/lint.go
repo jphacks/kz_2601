@@ -44,7 +44,8 @@ func (a *App) Lint() []string {
 	l.matchProfileFields() // matching_lint.go
 	l.optionalTitle()
 	l.settingMaxMin()
-	l.photoIllustrate() // photo_illustrate.go
+	l.photoIllustrate()        // photo_illustrate.go
+	l.encryptedNotifications() // encrypted.go
 	return l.out
 }
 
