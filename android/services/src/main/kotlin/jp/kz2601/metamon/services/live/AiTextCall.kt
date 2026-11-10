@@ -24,12 +24,16 @@ internal object AiTextCall {
                     "POST",
                     listOf("v1", "text"),
                     body = ApiJson.encodeToString(AiTextRequest.serializer(), request),
-                    // long は出力が長い(サーバーは 60 秒まで待つ)
-                    timeoutMillis = if (request.isLong) 75_000 else 30_000,
+                    // long は出力が長い(サーバーは 60 秒まで待つ)・会話は送る分だけ長く
+                    timeoutMillis = when {
+                        request.isLong -> 75_000
+                        request.isChat -> 45_000
+                        else -> 30_000
+                    },
                 ),
             )
         } catch (e: ApiError) {
-            throw error(e)
+            throw error(e, chat = request.isChat)
         }
         return parse(json, request) ?: throw AiTextError.BadOutput
     }
@@ -42,10 +46,19 @@ internal object AiTextCall {
         } catch (_: IllegalArgumentException) {
             return null
         }
-        return AiTextResult.normalize(raw.text, raw.items, raw.fields, request)
+        val out = AiTextResult.normalize(raw.text, raw.items, raw.fields, request) ?: return null
+        // aiChat saveTo の記録の案(saveTo を付けた会話だけ受け取る)
+        val suggest = raw.suggest?.takeIf { request.isChat && request.saveTo != null && it.isNotEmpty() }
+        return if (suggest != null) out.copy(suggest = suggest) else out
     }
 
     /** サーバーの失敗を部品が出す理由に寄せる。利用上限(rate_limited)などはサーバーの文をそのまま出す。 */
+    fun error(e: ApiError, chat: Boolean = false): Exception = when {
+        // aiChat: 会話が長すぎる(端末で 16 KB に切って送るので普段は来ない)
+        chat && e.code == ErrorCodes.PAYLOAD_TOO_LARGE -> AiTextError.ChatTooLong
+        else -> error(e)
+    }
+
     fun error(e: ApiError): Exception = when (e.code) {
         ErrorCodes.REFUSED -> AiTextError.Refused
         ErrorCodes.BAD_OUTPUT -> AiTextError.BadOutput
