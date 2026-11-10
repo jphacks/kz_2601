@@ -35,6 +35,7 @@ import jp.kz2601.metamon.consent.LegalLinks
 import jp.kz2601.metamon.language.AppLocales
 import jp.kz2601.metamon.language.LanguageSection
 import jp.kz2601.metamon.push.PushConsentSection
+import jp.kz2601.metamon.renderer.components.social.BlockedUsersSection
 import jp.kz2601.metamon.push.PushHost
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
@@ -65,6 +66,8 @@ fun SettingsSheet(container: AppContainer, onDismiss: () -> Unit) {
                 PushConsentSection(container.push, document.appId, document.dsl)
                 HorizontalDivider(Modifier.padding(vertical = 8.dp))
             }
+            // ブロック中のユーザー(#877)。通報・ブロックが使える時だけ
+            BlockedUsersSection(container.runtime)
             val context = LocalContext.current
             var language by remember { mutableStateOf(AppLocales.setting(context)) }
             LanguageSection(language, onSelect = { selected ->

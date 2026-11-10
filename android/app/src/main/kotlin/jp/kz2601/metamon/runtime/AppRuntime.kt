@@ -8,7 +8,10 @@ import jp.kz2601.metamon.dsl.isVoiceOnly
 import jp.kz2601.metamon.dsl.records.Entity
 import jp.kz2601.metamon.dsl.records.entityModels
 import jp.kz2601.metamon.dsl.records.JSONValue
+import jp.kz2601.metamon.dsl.records.InterestState
 import jp.kz2601.metamon.dsl.records.MarkState
+import jp.kz2601.metamon.dsl.records.MatchBox
+import jp.kz2601.metamon.dsl.records.MatchInterest
 import jp.kz2601.metamon.dsl.records.Record
 import jp.kz2601.metamon.dsl.records.RecordPermission
 import jp.kz2601.metamon.renderer.ActionContext
@@ -21,6 +24,12 @@ import jp.kz2601.metamon.renderer.components.play.TimerHost
 import jp.kz2601.metamon.renderer.components.ai.AiChatPairSaving
 import jp.kz2601.metamon.renderer.components.ai.AiHost
 import jp.kz2601.metamon.renderer.components.social.AuthorNameHost
+import jp.kz2601.metamon.renderer.components.social.BlockedUsersHost
+import jp.kz2601.metamon.renderer.components.social.MatchingHost
+import jp.kz2601.metamon.renderer.components.social.ModerationHost
+import jp.kz2601.metamon.renderer.components.social.ReportReasonOption
+import jp.kz2601.metamon.renderer.components.social.SocialPrompt
+import jp.kz2601.metamon.renderer.components.social.SocialPromptHost
 import jp.kz2601.metamon.renderer.form.FormDraft
 import jp.kz2601.metamon.renderer.form.FormPrefill
 import jp.kz2601.metamon.renderer.navigation.NavigationResolver
@@ -114,7 +123,10 @@ class AppRuntime(
     private val aiHost: AiHost? = null,
     /** 共有アプリへの投稿に出す名前(#875)。null なら名前を聞かず、[authorName] だけを使う(モック・テスト) */
     private val authorProfile: AuthorProfile? = null,
-) : DSLRuntime, NavigationHost, RecordWriter, TimerHost, AiChatPairSaving, AuthorNameHost {
+    /** 仲間探し・通報・ブロック(#877)。null なら出さない(モック・テスト) */
+    socialServices: SocialServices? = null,
+) : DSLRuntime, NavigationHost, RecordWriter, TimerHost, AiChatPairSaving, AuthorNameHost,
+    ModerationHost, MatchingHost, SocialPromptHost, BlockedUsersHost {
     private val _state = MutableStateFlow(RuntimeState(document))
     val state: StateFlow<RuntimeState> = _state.asStateFlow()
 
@@ -179,6 +191,7 @@ class AppRuntime(
             if (directory?.store?.issuedThisLaunch == true) resumeLatestAppIfEmpty()
         }
         startHotReload()
+        scope.launch { social.loadBlockedUsers() }
         load(dsl.entities.map { it.id }.toSet())
     }
 
@@ -241,7 +254,7 @@ class AppRuntime(
         if (switched) dropPendingHotReload()
         if (isIssued(doc.appId)) directory?.store?.set(doc.appId)
         _state.value = RuntimeState(doc, offline = _state.value.offline)
-        _records.value = _state.value.records
+        publishRecords()
         _navigation.value = NavigationState.initial(doc.dsl)
         noteAppliedVersion(doc, switched)
     }
@@ -378,7 +391,7 @@ class AppRuntime(
             offline = previous.offline,
             toast = RuntimeCopy.HOT_RELOADED,
         )
-        _records.value = _state.value.records
+        publishRecords()
         val tab = _navigation.value.selectedTab
         val initial = NavigationState.initial(doc.dsl)
         _navigation.value = if (doc.dsl.app.tabs.any { it.screen == tab }) initial.copy(selectedTab = tab) else initial
@@ -516,14 +529,14 @@ class AppRuntime(
             val fresh = recordSync.pull(appId, entity)
             if (document.appId != appId) return
             _state.update { it.copy(records = it.records + (entity to fresh.map { r -> r.toDsl() }), failed = it.failed - entity) }
-            _records.value = _state.value.records
+            publishRecords()
         } catch (e: CancellationException) {
             throw e
         } catch (_: Exception) {
             if (document.appId != appId) return
             if (_state.value.records[entity].isNullOrEmpty()) {
                 _state.update { it.copy(records = it.records + (entity to emptyList()), failed = it.failed + entity) }
-                _records.value = _state.value.records
+                publishRecords()
             }
         } finally {
             _state.update { it.copy(loading = it.loading - entity) }
@@ -574,6 +587,49 @@ class AppRuntime(
     override fun answerAuthorName(name: String?) {
         authorProfile?.answer(name)
     }
+
+    // 通報・ブロック・仲間探し(#877・iOS の AppRuntime+Moderation / AppRuntime+Matching)
+
+    private val social = SocialRuntime(socialServices, scope, object : SocialRuntime.Env {
+        override val appId: String get() = document.appId
+        override fun currentUid(): String? = currentUserId()
+        override val entities: List<Entity> get() = entityModels
+        override fun entity(id: String): Entity? = entityModel(id)
+        override fun records(entity: String): List<Record> = this@AppRuntime.records(entity)
+        override suspend fun reload(entities: Set<String>) = load(entities, force = true)
+        override fun toast(message: String) = showToast(message)
+        override fun blockedChanged() = publishRecords()
+    })
+
+    /** 描画に渡す記録(ブロックした人の共有の投稿を除く)。 */
+    private fun publishRecords() {
+        _records.value = social.hidingBlocked(_state.value.records)
+    }
+
+    override fun canReport(entity: String, record: Record): Boolean = social.canReport(entity, record)
+    override fun reportRecord(entity: String, record: Record) = social.reportRecord(entity, record)
+    override fun blockAuthor(entity: String, record: Record) = social.blockAuthor(entity, record)
+    override val socialPrompt: StateFlow<SocialPrompt?> get() = social.prompt
+    override fun submitReport(reason: ReportReasonOption) = social.submitReport(reason)
+    override fun confirmBlock() = social.confirmBlock()
+    override fun confirmAdult() = social.confirmAdult()
+    override fun declineAdult() = social.declineAdult()
+    override fun dismissSocialPrompt() = social.dismiss()
+    override val blockedUsers: StateFlow<Map<String, String>>? get() = if (social.moderationAvailable) social.blocked else null
+    override suspend fun unblock(uid: String) = social.unblock(uid)
+    override val matchingVersion: StateFlow<Int> get() = social.version
+    override fun interestState(entity: String, record: Record): InterestState? = social.interestState(entity, record)
+    override fun interestBusy(record: Record): Boolean = social.interestBusy(record)
+    override suspend fun sendInterest(entity: String, record: Record) = social.sendInterest(entity, record)
+    override fun matchItems(box: MatchBox): List<MatchInterest>? = social.matchItems(box)
+    override fun matchLoadFailed(box: MatchBox): Boolean = social.matchLoadFailed(box)
+    override suspend fun refreshMatches(boxes: Set<MatchBox>) {
+        social.loadBlockedUsers()
+        social.refreshMatches(boxes)
+    }
+    override suspend fun acceptInterest(item: MatchInterest) = social.acceptInterest(item)
+    override suspend fun declineInterest(item: MatchInterest, box: MatchBox) = social.declineInterest(item, box)
+    override suspend fun unmatch(item: MatchInterest) = social.unmatch(item)
 
     // AI と話す(#874)
 
@@ -864,7 +920,7 @@ class AppRuntime(
     private fun setRecords(appId: String, entity: String, list: List<StoredRecord>) {
         if (appId != document.appId) return // 読む間に別のアプリへ切り替わった
         _state.update { it.copy(records = it.records + (entity to list.map { r -> r.toDsl() })) }
-        _records.value = _state.value.records
+        publishRecords()
     }
 
     private suspend fun ifCurrent(appId: String, body: suspend () -> Unit) {
