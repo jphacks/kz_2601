@@ -177,9 +177,10 @@ func (s *Service) Join(ctx context.Context, r JoinRequest) (Join, error) {
 	if err != nil {
 		return Join{}, err
 	}
+	at := now.Truncate(time.Second) // whole seconds: iOS reads plain RFC 3339
 	out := Join{URL: s.Config.URL, Token: token, Room: room, Identity: sess.ID, SessionID: sess.ID,
-		ExpiresAt: now.Add(s.Config.TokenTTL), Video: sess.Video, BlockMinutes: s.Config.BlockMinutes,
-		ReservedUntil: now.Add(s.Config.BlockDuration()), PerMinute: s.Config.PerMinute}
+		ExpiresAt: at.Add(s.Config.TokenTTL), Video: sess.Video, BlockMinutes: s.Config.BlockMinutes,
+		ReservedUntil: at.Add(s.Config.BlockDuration()), PerMinute: s.Config.PerMinute}
 	if block != nil && !block.DryRun {
 		out.CoinsReserved = block.Amount
 	}
