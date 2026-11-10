@@ -4,6 +4,9 @@ import android.content.Context
 import android.os.LocaleList
 import android.util.Log
 import jp.kz2601.metamon.dsl.AppDSL
+import jp.kz2601.metamon.dsl.decode
+import jp.kz2601.metamon.dsl.fallback
+import jp.kz2601.metamon.dsl.screen
 import jp.kz2601.metamon.renderer.DSLRuntime
 import jp.kz2601.metamon.services.AIClient
 import jp.kz2601.metamon.services.AppConfigClient
@@ -18,6 +21,8 @@ import jp.kz2601.metamon.services.live.FirebaseAuthService
 import jp.kz2601.metamon.services.live.FirebaseBootstrap
 import jp.kz2601.metamon.services.live.HttpAIClient
 import jp.kz2601.metamon.services.live.HttpAppConfigClient
+import jp.kz2601.metamon.services.local.AndroidConnectivity
+import jp.kz2601.metamon.services.local.RecordSyncEngine
 import jp.kz2601.metamon.services.mock.DslSamples
 import jp.kz2601.metamon.services.mock.InMemoryAppConfigClient
 import jp.kz2601.metamon.services.mock.MockAIClient
@@ -25,6 +30,9 @@ import jp.kz2601.metamon.services.mock.MockAuthService
 import jp.kz2601.metamon.services.mock.MockSeed
 import jp.kz2601.metamon.services.mock.MockTranscriber
 import jp.kz2601.metamon.services.mock.OfflineSimulatingAppConfigClient
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
 import java.io.File
 import java.time.Instant
 
@@ -41,6 +49,8 @@ class AppContainer(
     /** 文字起こし。本物(#359)が入るまでは、モックの構成の時だけある */
     val transcriber: SpeechTranscriber?,
     val knobs: DebugKnobs,
+    /** 記録のローカル DB と送信待ちの列(#882)。[MetamonApplication] が start する */
+    val recordSync: RecordSyncEngine,
 ) {
     /** 画面の下に出す接続先の名前(モックなら "mock")。 */
     val environmentLabel: String get() = if (knobs.mock) "mock" else environment.name
@@ -55,14 +65,14 @@ class AppContainer(
             val samples = DslSamples { name -> runCatching { context.assets.open("$name.json").bufferedReader().use { it.readText() } }.getOrNull() }
             val initialDsl = loadInitialDsl(samples, knobs)
             return if (knobs.mock) {
-                makeMock(environment, samples, initialDsl, knobs)
+                makeMock(context, environment, samples, initialDsl, knobs)
             } else {
                 makeLive(context, environment, initialDsl, knobs)
             }
         }
 
         /** `METAMON_MOCK=1`: 通信しない構成(iOS の `.mock`)。 */
-        private fun makeMock(environment: AppEnvironment, samples: DslSamples, initialDsl: AppDSL, knobs: DebugKnobs): AppContainer {
+        private fun makeMock(context: Context, environment: AppEnvironment, samples: DslSamples, initialDsl: AppDSL, knobs: DebugKnobs): AppContainer {
             Log.i(TAG, "モックの構成で起動します($knobs)")
             val appConfig = InMemoryAppConfigClient(
                 seed = MockSeed.demoRecords(),
@@ -71,14 +81,17 @@ class AppContainer(
                 initialDocument = { appId -> samples.document(DslSamples.INITIAL, appId, 1) },
             )
             val delayMillis = knobs.mockAiDelaySeconds?.let { (it * 1000).toLong() } ?: 1_200
+            val records = offlineIfRequested(appConfig, knobs)
             return AppContainer(
                 environment = environment,
                 auth = MockAuthService(signedIn = true),
                 initialDsl = initialDsl,
-                appConfig = offlineIfRequested(appConfig, knobs),
+                appConfig = records,
                 ai = MockAIClient(samples, delayMillis = delayMillis),
                 transcriber = MockTranscriber(),
                 knobs = knobs,
+                // 本物の記録と混ざらないよう、モックは別の置き場
+                recordSync = recordSync(context, records, "metamon-records-mock"),
             )
         }
 
@@ -97,16 +110,26 @@ class AppContainer(
             fun http(baseUrl: String) = MetamonHttp(baseUrl, tokens, clientInfo, appCheck = null, client = client, device = device)
             val log: (String) -> Unit = { Log.w(TAG, it) }
 
+            val appConfig = offlineIfRequested(HttpAppConfigClient(http(environment.appConfigBaseUrl)), knobs)
+
             return AppContainer(
                 environment = environment,
                 auth = auth,
                 initialDsl = initialDsl,
-                appConfig = offlineIfRequested(HttpAppConfigClient(http(environment.appConfigBaseUrl)), knobs),
+                appConfig = appConfig,
                 ai = HttpAIClient(http(environment.aiBaseUrl), log = log),
                 transcriber = null,
                 knobs = knobs,
+                recordSync = recordSync(context, appConfig, "metamon-records"),
             )
         }
+
+        private fun recordSync(context: Context, client: AppConfigClient, dir: String) = RecordSyncEngine.create(
+            client = client,
+            connectivity = AndroidConnectivity(context),
+            directory = File(context.filesDir, dir),
+            scope = CoroutineScope(SupervisorJob() + Dispatchers.Default),
+        )
 
         /** `METAMON_E2E_OFFLINE_SECONDS=<n>`: 起動から n 秒は記録の API を圏外にする(iOS `RecordSyncFactory`)。 */
         private fun offlineIfRequested(inner: AppConfigClient, knobs: DebugKnobs): AppConfigClient {

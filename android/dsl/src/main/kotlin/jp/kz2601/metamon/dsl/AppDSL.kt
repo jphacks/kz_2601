@@ -1,10 +1,9 @@
 package jp.kz2601.metamon.dsl
 
 import kotlinx.serialization.Serializable
-import kotlinx.serialization.json.JsonObject
 
-// DSL v1(docs/dsl/dsl.schema.json)の Kotlin 表現。iOS の MetamonDSL/Model/AppDocument.swift に合わせる。
-// 骨格(#356)の仮の型。#351 の生成器の出力に置き換える。
+// 型そのもの(AppDSL・Screen・Component など)は generated/ にある(backend/cmd/dslgen がスキーマから作る)。
+// ここは手で書く入口だけ: 封筒・読み込み・最後の手段。
 
 /** appconfig の `DSLEnvelope`(`GET /apps/{appId}/dsl`)。 */
 @Serializable
@@ -19,72 +18,25 @@ data class AppDocument(
     }
 }
 
-/** DSL 本文(schema の root)。 */
-@Serializable
-data class AppDSL(
-    val schemaVersion: Int,
-    val app: AppMeta,
-    val initialScreen: String,
-    /** 骨格では中身を解釈しない(#357 で型を付ける)。 */
-    @Serializable(with = LossyListSerializer::class)
-    val entities: List<JsonObject> = emptyList(),
-    @Serializable(with = LossyListSerializer::class)
-    val screens: List<Screen> = emptyList(),
-) {
-    fun screen(id: String): Screen? = screens.firstOrNull { it.id == id }
+/** DSL 本文を読む。知らない type・キー・値では落とさない(壊れた部品だけ捨てる)。 */
+fun AppDSL.Companion.decode(json: String): AppDSL = DslJson.decodeFromString(AppDSL.serializer(), json)
 
-    /** 初期状態(音声画面だけ)か。 */
-    val isVoiceOnly: Boolean get() = app.voiceEntry == VoiceEntry.FULLSCREEN
+/** 読み込みに失敗した時の最後の手段。 */
+val AppDSL.Companion.fallback: AppDSL get() = FallbackDSL
 
-    companion object {
-        fun decode(json: String): AppDSL = DslJson.decodeFromString(serializer(), json)
-
-        /** 読み込みに失敗した時の最後の手段。 */
-        val fallback: AppDSL = decode(
-            """
-            {"schemaVersion":1,"app":{"name":"Tailor It","voiceEntry":"none"},"initialScreen":"home",
-             "screens":[{"id":"home","title":"Tailor It","components":[{"type":"text","text":"DSL を読み込めませんでした"}]}]}
-            """.trimIndent(),
-        )
-    }
+private val FallbackDSL: AppDSL by lazy {
+    AppDSL.decode(
+        """
+        {"schemaVersion":1,"app":{"name":"Tailor It","voiceEntry":"none"},"initialScreen":"home",
+         "screens":[{"id":"home","title":"Tailor It","components":[{"type":"text","text":"DSL を読み込めませんでした"}]}]}
+        """.trimIndent(),
+    )
 }
 
-@Serializable(with = VoiceEntrySerializer::class)
-enum class VoiceEntry(val wire: String) {
-    FULLSCREEN("fullscreen"),
-    FLOATING("floating"),
-    NONE("none"),
-}
+fun AppDSL.screen(id: String): Screen? = screens.firstOrNull { it.id == id }
 
-internal object VoiceEntrySerializer : LenientEnumSerializer<VoiceEntry>(
-    "jp.kz2601.metamon.dsl.VoiceEntry",
-    VoiceEntry.entries,
-    VoiceEntry::wire,
-    VoiceEntry.FLOATING,
-)
+/** 初期状態(音声画面だけ)か。 */
+val AppDSL.isVoiceOnly: Boolean get() = app.voiceEntry == VoiceEntry.FULLSCREEN
 
-@Serializable
-data class AppMeta(
-    val name: String = "Tailor It",
-    val description: String? = null,
-    val icon: String? = null,
-    val voiceEntry: VoiceEntry = VoiceEntry.FLOATING,
-    /** 2〜5 個ならタブバー表示。 */
-    @Serializable(with = LossyListSerializer::class)
-    val tabs: List<Tab> = emptyList(),
-)
-
-@Serializable
-data class Tab(
-    val screen: String,
-    val title: String,
-    val icon: String? = null,
-)
-
-@Serializable
-data class Screen(
-    val id: String,
-    val title: String = "",
-    @Serializable(with = LossyListSerializer::class)
-    val components: List<Component> = emptyList(),
-)
+/** タブバーを出すか(iOS の `hasTabs`: 2 個以上)。 */
+val AppMeta.hasTabs: Boolean get() = tabs.size >= 2

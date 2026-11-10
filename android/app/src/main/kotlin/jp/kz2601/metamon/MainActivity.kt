@@ -24,7 +24,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import jp.kz2601.metamon.dsl.screen
 import jp.kz2601.metamon.renderer.DSLView
+import jp.kz2601.metamon.renderer.theme.MetamonRenderTheme
 import jp.kz2601.metamon.services.GenerateProgress
 import jp.kz2601.metamon.services.http.FailureKind
 import kotlinx.coroutines.delay
@@ -37,7 +39,7 @@ class MainActivity : ComponentActivity() {
         enableEdgeToEdge()
         val container = (application as MetamonApplication).container(DebugLaunch.knobs(intent))
         setContent {
-            MaterialTheme {
+            MetamonRenderTheme {
                 MetamonApp(container)
             }
         }
