@@ -83,7 +83,7 @@ fun FeedbackComposerHost(container: AppContainer) {
     val scope = rememberCoroutineScope()
     ShakeEffect {
         val activity = context.findActivity() ?: return@ShakeEffect
-        scope.launch { launcher.capture(activity, container) }
+        scope.launch { launcher.capture(activity, container, withOverlays = true) }
     }
     val open by launcher.open.collectAsStateWithLifecycle()
     val sender = remember(container) { FeedbackSender(container.feedback) }
