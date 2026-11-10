@@ -13,6 +13,8 @@
 //	feedback-loop triage-score -labels FILE
 //	feedback-loop draft [-max-new 20]
 //	feedback-loop drafts list|show|edit|approve|reject|publish ...
+//	feedback-loop fixed [-dry-run]
+//	feedback-loop switch show|set ...   feedback-loop audit [-summary]
 //
 // Environment: GOOGLE_CLOUD_PROJECT (required), FIRESTORE_DATABASE,
 // FIRESTORE_EMULATOR_HOST (local: make -C backend run-feedback-loop),
@@ -35,6 +37,7 @@ import (
 	"github.com/jphacks/kz_2601/backend/internal/fsenv"
 	"github.com/jphacks/kz_2601/backend/internal/loop"
 	"github.com/jphacks/kz_2601/backend/internal/loop/draft"
+	"github.com/jphacks/kz_2601/backend/internal/loop/fixed"
 	"github.com/jphacks/kz_2601/backend/internal/loop/ingest"
 	"github.com/jphacks/kz_2601/backend/internal/loop/triage"
 	"github.com/jphacks/kz_2601/backend/internal/store"
@@ -69,6 +72,8 @@ func main() {
 		control:  lf,
 		feedback: st,
 		users:    st,
+		devices:  st,
+		consent:  fixed.StoreConsent{C: st},
 		getenv:   os.Getenv,
 		now:      time.Now,
 		out:      os.Stdout,
@@ -86,6 +91,8 @@ const usageText = `usage: feedback-loop <command> [flags]
   triage-score -labels FILE                  agreement with a human's labels (lines: itemId,category)
   draft [-max-new 20]                        build issue drafts from triaged clusters (private queue)
   drafts list|show|edit|approve|reject|publish   the human review of drafts (see: drafts)
+  fixed [-dry-run]                           tell senders when a merged PR fixed their issue (#374)
+  notices -uid UID                           one user's 「あなたの声で直りました」 notices
   switch show | switch set -by NAME <stage|all> <on|off>   stop switches (#375)
   audit [-since 168h] [-draft ID] [-item ID] [-summary]   the audit log / weekly review
 
@@ -105,9 +112,16 @@ type app struct {
 	model triage.Model
 	// publisher, when set, replaces the GitHub client (tests).
 	publisher draft.Publisher
-	getenv    func(string) string
-	now       func() time.Time
-	out       io.Writer
+	// issues and pusher, when set, replace GitHub and APNs (tests).
+	issues  fixed.Issues
+	pusher  fixed.Pusher
+	consent fixed.Consent
+	devices interface {
+		ListDevices(ctx context.Context, uid string) ([]store.Device, error)
+	}
+	getenv func(string) string
+	now    func() time.Time
+	out    io.Writer
 	// logger receives the loop.audit lines (nil = slog.Default).
 	logger *slog.Logger
 }
@@ -131,6 +145,10 @@ func (a *app) run(ctx context.Context, args []string) error {
 		return a.draftBuild(ctx, rest)
 	case "drafts":
 		return a.drafts(ctx, rest)
+	case "fixed":
+		return a.fixedRun(ctx, rest)
+	case "notices":
+		return a.notices(ctx, rest)
 	case "switch":
 		return a.switches(ctx, rest)
 	case "audit":
