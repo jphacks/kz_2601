@@ -123,11 +123,14 @@ type View struct {
 	GrantPeriodEnd time.Time `json:"grantPeriodEnd,omitzero"`
 	Initial        int64     `json:"initial"`
 	Reserved       int64     `json:"reserved"`
+	// Overflow is the opt-in and this month's spend (spent resets each JST month).
+	Overflow OverflowView `json:"overflow"`
 }
 
 func (s *Service) view(w Wallet) View {
 	return View{Mode: s.Mode(), Total: w.Total(), Available: w.Available(), Purchased: w.Purchased,
-		Grant: w.Grant, GrantPeriodEnd: w.GrantPeriodEnd, Initial: w.Initial, Reserved: w.Reserved}
+		Grant: w.Grant, GrantPeriodEnd: w.GrantPeriodEnd, Initial: w.Initial, Reserved: w.Reserved,
+		Overflow: w.Overflow.view(s.now())}
 }
 
 // Wallet returns uid's balance, applying the grants due (the initial grant
