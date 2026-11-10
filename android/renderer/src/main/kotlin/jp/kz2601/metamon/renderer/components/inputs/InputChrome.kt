@@ -44,7 +44,11 @@ object InputRules {
 
     /** form の field に書く部品(iOS の `RenderTree.formBound`)。form が無いと needsForm、props に value と label を出す。 */
     val formBound: Set<ComponentType> = inputTypes + setOf(
+        ComponentType.AUDIO_RECORDER,
+        ComponentType.LOCATION_BUTTON,
+        ComponentType.LOCATION_PICKER,
         ComponentType.QR_SCANNER,
+        ComponentType.TRANSCRIBE_FIELD,
     )
 
     /** ラベルを `c.label ?: field.name` で補う入力(1 行の器)。他は `c.label` だけ。 */
