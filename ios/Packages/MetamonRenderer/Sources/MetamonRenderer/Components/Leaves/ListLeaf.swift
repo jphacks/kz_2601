@@ -23,6 +23,8 @@ struct ListLeaf: View {
     #if os(macOS)
     /// ⌘C の対象の行(#1332)。クリックか Tab でフォーカスした行
     @FocusState private var focusedRowId: String?
+    /// 行の写真の「画像を保存…」(#1333)
+    @State private var imageToSave: ImageExport.Pending?
     #endif
 
     var body: some View {
@@ -66,6 +68,13 @@ struct ListLeaf: View {
                         .contextMenu {
                             #if os(macOS)
                             Button(L("コピー"), systemImage: "doc.on.doc") { copy(row, entity: entity) }
+                            if let photo = rowImage(row, entity: entity) {
+                                ImageMenuItems(image: photo.image, title: photo.title, copyLabel: L("画像をコピー")) {
+                                    imageToSave = .init(document: ImageFileDocument(image: photo.image),
+                                                        fileName: ImageExport.fileName(title: photo.title, fallback: L("写真"), date: Date()))
+                                }
+                                Divider()
+                            }
                             #endif
                             if deletable(row, entity: entityId) {
                                 Button(L("削除"), systemImage: "trash", role: .destructive) { delete(row, entity: entityId) }
@@ -87,6 +96,9 @@ struct ListLeaf: View {
             .onCopyCommand { copyCommand(rows: rows, entity: entity) }
             #endif
             .renderCard(padding: 0)
+            #if os(macOS)
+            .imageSaveExporter($imageToSave)
+            #endif
             .onChange(of: ids, initial: true) { _, now in markNewRows(now) }
             .sensoryFeedback(.selection, trigger: toggleTaps)
             .task(id: c.item?.interest == true ? entityId : "") { await loadInterestStates() }
@@ -180,6 +192,12 @@ struct ListLeaf: View {
                                                   textInputActive: ListRowCopyCommand.textInputActive, rows: rows) else { return [] }
         let text = ListRowCopyText.text(item: c.item, record: row, entity: entity, rt: rt)
         return text.isEmpty ? [] : [NSItemProvider(object: text as NSString)]
+    }
+
+    /// 行の写真(item.image)。手元にある画像だけ(https・動画のサムネイルは除く)。名前は写真の項目名
+    private func rowImage(_ row: Record, entity: Entity?) -> (image: PlatformImage, title: String)? {
+        guard let field = c.item?.image, VideoValue(row[field]) == nil, let image = PhotoCodec.image(from: row[field]) else { return nil }
+        return (image, entity?.field(field)?.name ?? L("写真"))
     }
     #endif
 

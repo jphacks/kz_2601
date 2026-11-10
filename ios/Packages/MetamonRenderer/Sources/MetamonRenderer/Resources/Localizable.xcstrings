@@ -6852,6 +6852,40 @@
         }
       }
     },
+    "画像をコピー" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Copy Image"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "画像をコピー"
+          }
+        }
+      }
+    },
+    "画像を保存…" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Save Image…"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "画像を保存…"
+          }
+        }
+      }
+    },
     "画面がありません: %@" : {
       "extractionState" : "manual",
       "localizations" : {

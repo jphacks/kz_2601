@@ -48,6 +48,9 @@ struct QrCodeLeaf: View {
             .overlay(RoundedRectangle(cornerRadius: RenderTheme.Radius.inner, style: .continuous).strokeBorder(RenderTheme.Colors.hairline))
             .contextMenuPreviewShape(RoundedRectangle(cornerRadius: RenderTheme.Radius.inner, style: .continuous))
             .contextMenu {
+                #if os(macOS)
+                Button(L("コピー"), systemImage: "doc.on.doc") { PlatformPasteboard.setImage(export) }
+                #endif
                 Button { save(export) } label: { Label(L("写真に保存"), systemImage: "square.and.arrow.down") }
                 ShareLink(item: Image(platformImage: export), preview: SharePreview(caption ?? L("QR コード"), image: Image(platformImage: export))) {
                     Label(L("共有"), systemImage: "square.and.arrow.up")
