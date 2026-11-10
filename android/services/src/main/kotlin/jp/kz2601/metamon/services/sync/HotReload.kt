@@ -74,6 +74,9 @@ class HotReload(
     private var realtimeWasLost = false
     private var job: Job? = null
 
+    /** 張り直すたびに進める。取り消した前の購読から遅れて届いた知らせを見分ける(同じアプリに張り直した時も) */
+    private var generation = 0L
+
     /** 開いているアプリと、当てている版。別のアプリに切り替えた時も呼ぶ。 */
     fun start(appId: String, version: Int) = synchronized(lock) {
         this.appId = appId
@@ -127,12 +130,13 @@ class HotReload(
         if (!foreground) return setRealtime(null)
         setRealtime(false)
         val from = version
+        val gen = ++generation
         job = scope.launch {
-            sync.events(id, from).collect { handle(id, it) }
+            sync.events(id, from).collect { handle(id, gen, it) }
         }
     }
 
-    private suspend fun handle(id: String, update: SyncUpdate) {
+    private suspend fun handle(id: String, gen: Long, update: SyncUpdate) {
         when (update) {
             is SyncUpdate.Document -> {
                 val accepted = synchronized(lock) {
@@ -146,8 +150,8 @@ class HotReload(
             is SyncUpdate.Records -> _recordsChange.emit(RecordsChange.Entity(update.entity))
             is SyncUpdate.Realtime -> {
                 val resumed = synchronized(lock) {
-                    // 止めた・別のアプリに張り直した後に届いた古い知らせは捨てる
-                    if (id != appId || !foreground) return@synchronized false
+                    // 止めた・張り直した後に前の購読から届いた古い知らせは捨てる(cancel は collect の途中では止まらない)
+                    if (gen != generation || id != appId || !foreground || job == null) return@synchronized false
                     val resumed = update.listening && realtimeWasLost
                     realtimeWasLost = !update.listening
                     setRealtime(update.listening)
