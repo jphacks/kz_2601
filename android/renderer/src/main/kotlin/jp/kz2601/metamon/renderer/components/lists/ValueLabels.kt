@@ -24,7 +24,26 @@ data class ValueLabels(
     val chartMany: String,
     val everyone: String,
     val member: String,
+    /** 文と文のあいだ(グラフの見出しと要約)。日本語「。」・英語「. 」 */
+    val sentenceSeparator: String,
+    /** 3 つ以上の名前のあいだ。日本語「、」・英語「, 」 */
+    val listSeparator: String,
+    /** 2 つの名前のあいだ。日本語「、」・英語「 and 」 */
+    val listPair: String,
+    /** 3 つ以上の時の最後の名前の前。日本語「、」・英語「, and 」 */
+    val listLast: String,
 ) {
+    /** 名前を並べる(iOS の ListFormatter と同じ形:「A、B、C」/「A, B, and C」「A and B」)。 */
+    fun joinList(items: List<String>): String = when (items.size) {
+        0 -> ""
+        1 -> items[0]
+        2 -> items[0] + listPair + items[1]
+        else -> items.dropLast(1).joinToString(listSeparator) + listLast + items.last()
+    }
+
+    /** 文をつなぐ(空は飛ばす)。 */
+    fun joinSentences(parts: List<String?>): String = parts.filterNot { it.isNullOrEmpty() }.joinToString(sentenceSeparator)
+
     companion object {
         /** iOS の日本語の元文(適合テストの期待値と同じ)。文言の正は strings_lists.xml。 */
         val JAPANESE = ValueLabels(
@@ -40,6 +59,10 @@ data class ValueLabels(
             chartMany = "%d 項目。最大は %s の %s、最小は %s の %s",
             everyone = "全員",
             member = "参加者",
+            sentenceSeparator = "。",
+            listSeparator = "、",
+            listPair = "、",
+            listLast = "、",
         )
 
         fun from(res: Resources) = ValueLabels(
@@ -55,6 +78,10 @@ data class ValueLabels(
             chartMany = res.getString(R.string.lists_chart_summary_many),
             everyone = res.getString(R.string.lists_everyone),
             member = res.getString(R.string.lists_member),
+            sentenceSeparator = res.getString(R.string.lists_sentence_separator),
+            listSeparator = res.getString(R.string.lists_list_separator),
+            listPair = res.getString(R.string.lists_list_pair),
+            listLast = res.getString(R.string.lists_list_last),
         )
     }
 }

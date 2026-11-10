@@ -157,11 +157,13 @@ class ListLeavesTest {
     private fun labels(dir: String): ValueLabels {
         val xml = java.io.File("src/main/res/$dir/strings_lists.xml").readText()
         val strings = Regex("""<string name="([^"]+)">([^<]*)</string>""").findAll(xml).associate { it.groupValues[1] to it.groupValues[2] }
-        fun s(name: String) = strings.getValue("lists_$name").replace(Regex("""%\d\$"""), "%")
+        // 前後の空白を残すための "…" は外す(Android のリソースと同じ読み方)
+        fun s(name: String) = strings.getValue("lists_$name").removeSurrounding("\"").replace(Regex("""%\d\$"""), "%")
         return ValueLabels(
             empty = s("empty"), count = s("count"), sum = s("sum"), avg = s("avg"), min = s("min"), max = s("max"),
             countUnit = s("count_unit"), noData = s("no_data"), chartOne = s("chart_summary_one"), chartMany = s("chart_summary_many"),
             everyone = s("everyone"), member = s("member"),
+            sentenceSeparator = s("sentence_separator"), listSeparator = s("list_separator"), listPair = s("list_pair"), listLast = s("list_last"),
         )
     }
 
@@ -169,6 +171,24 @@ class ListLeavesTest {
     fun japaneseLabelsMatchStrings() {
         // 適合テストの描画の木が使う日本語は、画面の日本語(strings_lists.xml)と同じ
         assertEquals(labels("values"), ValueLabels.JAPANESE)
+    }
+
+    @Test
+    fun namesAndSentencesJoinByLanguage() {
+        // 日本語は「、」「。」のまま(適合テストの期待値)、英語は iOS の ListFormatter と同じ形
+        val ja = ValueLabels.JAPANESE
+        assertEquals("", ja.joinList(emptyList()))
+        assertEquals("A", ja.joinList(listOf("A")))
+        assertEquals("A、B", ja.joinList(listOf("A", "B")))
+        assertEquals("A、B、C", ja.joinList(listOf("A", "B", "C")))
+        assertEquals("売上。2 項目", ja.joinSentences(listOf("売上", "2 項目")))
+        assertEquals("2 項目", ja.joinSentences(listOf(null, "2 項目")))
+        val en = labels("values-en")
+        assertEquals("A", en.joinList(listOf("A")))
+        assertEquals("A and B", en.joinList(listOf("A", "B")))
+        assertEquals("A, B, and C", en.joinList(listOf("A", "B", "C")))
+        assertEquals("Sales. 2 items", en.joinSentences(listOf("Sales", "2 items")))
+        assertEquals("2 items", en.joinSentences(listOf("", "2 items")))
     }
 
     @Test

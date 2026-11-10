@@ -49,10 +49,10 @@ class LeafData(
         when (field?.type) {
             FieldType.REFS -> {
                 val names = Aggregator.refIds(value).mapNotNull { refTitle(it, field.refEntity) }
-                return if (names.isEmpty()) labels.everyone else names.joinToString("、")
+                return if (names.isEmpty()) labels.everyone else labels.joinList(names)
             }
             FieldType.MEMBER -> return memberName(value.stringValue)
-            FieldType.MEMBERS -> return Aggregator.refIds(value).joinToString("、") { memberName(it) }
+            FieldType.MEMBERS -> return labels.joinList(Aggregator.refIds(value).map { memberName(it) })
             FieldType.REF -> {
                 val id = value.stringValue?.takeIf { it.isNotEmpty() } ?: return ""
                 // enum から ref に変えた後の古い記録は選択肢の名前そのものを持つ(#194)

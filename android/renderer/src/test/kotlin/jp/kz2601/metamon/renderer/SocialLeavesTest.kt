@@ -103,4 +103,15 @@ class SocialLeavesTest {
         assertEquals("参加者", data.display(JSONValue.Str("gone"), member)) // 名簿に無い(iOS と同じ・#1076)
         assertEquals("", data.display(JSONValue.Null, member))
     }
+
+    @Test
+    fun membersJoinByLanguage() {
+        val rt = FakeRuntime(ask = false)
+        val members = Field("who", type = FieldType.MEMBERS)
+        val value = JSONValue.Arr(listOf("u1", "gone", "u2").map { JSONValue.Str(it) })
+        assertEquals("たろう、参加者、参加者", LeafData(rt, emptyMap()).display(value, members))
+        val en = ValueLabels.JAPANESE.copy(member = "Member", listSeparator = ", ", listPair = " and ", listLast = ", and ")
+        assertEquals("たろう, Member, and Member", LeafData(rt, emptyMap(), labels = en).display(value, members))
+        assertEquals("たろう and Member", LeafData(rt, emptyMap(), labels = en).display(JSONValue.Arr(listOf(JSONValue.Str("u1"), JSONValue.Str("u2"))), members))
+    }
 }
