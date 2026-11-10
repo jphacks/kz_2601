@@ -39,6 +39,11 @@ dependencies {
     // videoPlayer の再生
     implementation(libs.media3.exoplayer)
     implementation(libs.media3.ui)
+    // dashcam のループ録画(#872)
+    implementation(libs.camerax.camera2)
+    implementation(libs.camerax.lifecycle)
+    implementation(libs.camerax.video)
+    implementation(libs.camerax.view)
     implementation(libs.compose.material.icons.core)
     implementation(libs.compose.ui.tooling.preview)
     implementation(libs.play.services.code.scanner)
