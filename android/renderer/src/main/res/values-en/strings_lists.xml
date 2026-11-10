@@ -6,7 +6,10 @@
     <string name="lists_cell_empty">Empty</string>
     <string name="lists_chart_empty">No records yet. Add one to see the chart</string>
     <string name="lists_chart_summary_many">%1$d items. Highest: %2$s (%3$s). Lowest: %4$s (%5$s)</string>
-    <string name="lists_chart_summary_one">%1$d items. %2$s: %3$s</string>
+    <plurals name="lists_chart_summary_one">
+        <item quantity="one">%1$d item. %2$s: %3$s</item>
+        <item quantity="other">%1$d items. %2$s: %3$s</item>
+    </plurals>
     <string name="lists_check">Check</string>
     <string name="lists_checked">Checked</string>
     <string name="lists_clear">Clear</string>
@@ -32,7 +35,10 @@
     <string name="lists_open">Open</string>
     <string name="lists_previous_month">Previous month</string>
     <string name="lists_progress">Progress</string>
-    <string name="lists_records_count">%1$d records</string>
+    <plurals name="lists_records_count">
+        <item quantity="one">%1$d record</item>
+        <item quantity="other">%1$d records</item>
+    </plurals>
     <string name="lists_search">Search</string>
     <string name="lists_sentence_separator">". "</string>
     <string name="lists_sum">Total %1$s</string>

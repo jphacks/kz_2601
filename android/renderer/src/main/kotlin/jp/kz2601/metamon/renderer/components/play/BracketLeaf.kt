@@ -28,6 +28,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
@@ -151,7 +152,7 @@ fun BracketLeaf(c: Component, ctx: RenderContext, modifier: Modifier = Modifier)
         }
         if (draw.lateEntrants > 0) {
             Text(
-                stringResource(R.string.play_bracket_late, draw.lateEntrants),
+                pluralStringResource(R.plurals.play_bracket_late, draw.lateEntrants, draw.lateEntrants),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )

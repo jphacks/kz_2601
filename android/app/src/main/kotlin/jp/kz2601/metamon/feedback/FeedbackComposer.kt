@@ -48,6 +48,7 @@ import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
@@ -278,7 +279,7 @@ private fun MessageSection(draft: FeedbackDraft, onChange: (FeedbackDraft) -> Un
         placeholder = { Text(stringResource(R.string.feedback_composer_message_placeholder)) },
         isError = draft.isTooLong,
         supportingText = if (draft.isTooLong) {
-            { Text(stringResource(R.string.feedback_composer_max_length, FeedbackConsent.MAX_MESSAGE_LENGTH)) }
+            { Text(pluralStringResource(R.plurals.feedback_composer_max_length, FeedbackConsent.MAX_MESSAGE_LENGTH, FeedbackConsent.MAX_MESSAGE_LENGTH)) }
         } else {
             null
         },
@@ -359,7 +360,7 @@ private fun AppPreview(app: FeedbackContext.AppSummary) {
 @Composable
 private fun ConsentSection(draft: FeedbackDraft, onChange: (FeedbackDraft) -> Unit) {
     SectionHeader(stringResource(R.string.feedback_composer_consent_header))
-    Text(stringResource(R.string.feedback_composer_consent, FeedbackConsent.RETENTION_DAYS), style = MaterialTheme.typography.bodySmall)
+    Text(pluralStringResource(R.plurals.feedback_composer_consent, FeedbackConsent.RETENTION_DAYS, FeedbackConsent.RETENTION_DAYS), style = MaterialTheme.typography.bodySmall)
     ToggleRow(stringResource(R.string.feedback_composer_agree), draft.agreed, "feedback.agree") { onChange(draft.copy(agreed = it)) }
 }
 

@@ -13,7 +13,9 @@
     <string name="feedback_composer_attach_screenshot">今の画面のスクショ</string>
     <string name="feedback_composer_cancel">キャンセル</string>
     <string name="feedback_composer_close">閉じる</string>
-    <string name="feedback_composer_consent">送った内容(本文と、オンにした添付)は、Tailor It の不具合を直し、改善するために運営者が読みます。Google Cloud(Firestore)に保存し、%1$d 日後に消去します。アカウントを削除したときも消去します。第三者には渡しません。</string>
+    <plurals name="feedback_composer_consent">
+        <item quantity="other">送った内容(本文と、オンにした添付)は、Tailor It の不具合を直し、改善するために運営者が読みます。Google Cloud(Firestore)に保存し、%1$d 日後に消去します。アカウントを削除したときも消去します。第三者には渡しません。</item>
+    </plurals>
     <string name="feedback_composer_consent_header">送る前に</string>
     <string name="feedback_composer_device_app_version">アプリの版</string>
     <string name="feedback_composer_device_language">言語</string>
@@ -30,7 +32,9 @@
     <string name="feedback_composer_kind_idea">要望</string>
     <string name="feedback_composer_kind_other">その他</string>
     <string name="feedback_composer_list_separator">、</string>
-    <string name="feedback_composer_max_length">%1$d 文字までです</string>
+    <plurals name="feedback_composer_max_length">
+        <item quantity="other">%1$d 文字までです</item>
+    </plurals>
     <string name="feedback_composer_message_placeholder">困ったこと・思ったのと違ったこと・欲しい機能など</string>
     <string name="feedback_composer_ok">OK</string>
     <string name="feedback_composer_screenshot_description">送るスクショ</string>

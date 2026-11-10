@@ -74,7 +74,7 @@ data class ValueLabels(
             max = res.getString(R.string.lists_max),
             countUnit = res.getString(R.string.lists_count_unit),
             noData = res.getString(R.string.lists_no_data),
-            chartOne = res.getString(R.string.lists_chart_summary_one),
+            chartOne = res.getQuantityString(R.plurals.lists_chart_summary_one, 1),
             chartMany = res.getString(R.string.lists_chart_summary_many),
             everyone = res.getString(R.string.lists_everyone),
             member = res.getString(R.string.lists_member),

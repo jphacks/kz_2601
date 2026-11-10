@@ -28,6 +28,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalLocale
+import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
@@ -192,7 +193,7 @@ private fun DayCell(date: LocalDate, count: Int, isSelected: Boolean, isToday: B
     val bg = if (isSelected) Brush.linearGradient(listOf(colors.brandFillStart, colors.brandFillEnd)) else Brush.linearGradient(listOf(Color.Transparent, Color.Transparent))
     val day = date.format(label)
     val description = if (isToday) stringResource(R.string.lists_today, day) else day
-    val state = if (count > 0) stringResource(R.string.lists_records_count, count) else stringResource(R.string.lists_no_records)
+    val state = if (count > 0) pluralStringResource(R.plurals.lists_records_count, count, count) else stringResource(R.string.lists_no_records)
     Column(
         Modifier
             .fillMaxWidth()
