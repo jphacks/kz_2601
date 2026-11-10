@@ -6,6 +6,7 @@ import MetamonDSL
 /// - `area` の無い子は「area で使われた最終行の次の行」から全幅で上から積む(フォールバック)。
 /// - 13 行目以降 or フォールバックがはみ出せば画面全体が縦スクロール。voiceInput 画面(初期状態)はスクロールしない。
 /// - 横向き(#625)は `GridMetrics`: 最大幅で中央寄せ・行の高さ固定・画面ごと縦スクロール(voiceInput 画面も)。
+/// - Mac(#938)は `GridMetrics.resolveDesktop`: 高さ × 3/4 の幅(480〜720)で中央寄せ・行の高さは高さ ÷ 12(低い時だけスクロール)。
 /// - 見た目: セル間ギャップ / 画面端余白は `RenderTheme.Spacing`、出現は index × stagger の遅延付きフェード(変身の受け側)。
 /// - 最下段(行 11〜12)の左端(A〜B 列)/ 右端(E〜F 列)に部品があれば、その上端(global 座標)を
 ///   `GridBottomObstructionKey` / `GridBottomTrailingObstructionKey` で上げる(ホストがマイク FAB を上に逃がすため・#83 / #52)。
@@ -32,8 +33,13 @@ public struct GridScreenLayout: View {
     public var body: some View {
         GeometryReader { geo in
             let layoutH = GridLayoutHeight.resolve(current: geo.size.height, stable: stableHeight)
+            #if os(macOS)
+            // Mac は横長で大きさが変わるウィンドウ。縦長の比率の幅で中央に寄せる(#938)
+            let metrics = GridMetrics.resolveDesktop(width: geo.size.width, height: layoutH, inset: inset)
+            #else
             let metrics = GridMetrics.resolve(width: geo.size.width, height: layoutH, inset: inset,
                                               compactHeight: verticalSizeClass == .compact)
+            #endif
             let cellW = metrics.cellW
             let cellH = metrics.cellH
             let placement = screen.gridPlacement
