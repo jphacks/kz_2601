@@ -46,6 +46,7 @@ import jp.kz2601.metamon.onboarding.TutorialScreen
 import jp.kz2601.metamon.services.consent.AiConsentStatus
 import jp.kz2601.metamon.feedback.FeedbackComposerHost
 import jp.kz2601.metamon.feedback.FeedbackHost
+import jp.kz2601.metamon.feedback.HotReloadStatusBadge
 import jp.kz2601.metamon.feedback.TalkBackAnnouncer
 import jp.kz2601.metamon.feedback.UndoHeaderButtons
 import jp.kz2601.metamon.language.AppLocales
@@ -201,6 +202,7 @@ fun MetamonApp(container: AppContainer) {
     val state by vm.state.collectAsStateWithLifecycle()
     val runtime = container.runtime
     val runtimeState by runtime.state.collectAsStateWithLifecycle()
+    val hotReloadStatus by runtime.hotReloadStatus.collectAsStateWithLifecycle()
 
     LaunchedEffect(runtime) { runtime.bootstrap() }
     // AI の質問・返事・完成の要約・状態カード・トーストを出たのと同時に TalkBack に読ませる(H8)
@@ -320,6 +322,8 @@ fun MetamonApp(container: AppContainer) {
                         style = MaterialTheme.typography.labelSmall,
                         modifier = Modifier.padding(8.dp),
                     )
+                    // ホットリロードが SSE か・ポーリングに落ちているか(#1108)
+                    HotReloadStatusBadge(hotReloadStatus)
                 }
             }
         },

@@ -1,5 +1,10 @@
 package jp.kz2601.metamon.services.sync
 
+import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.NonCancellable
+import kotlinx.coroutines.awaitCancellation
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.FlowCollector
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.toList
@@ -7,6 +12,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
+import kotlinx.coroutines.withContext
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -78,6 +84,76 @@ class HotReloadTest {
         assertEquals(1, h.sync.active)
         assertEquals(listOf("app1" to 1, "app1" to 2), h.sync.starts) // 当てた版から張り直す
         assertEquals(listOf<RecordsChange>(RecordsChange.All), h.records) // 背面の間の記録を読み直す
+    }
+
+    @Test
+    fun statusFollowsSubscriptionAndSse() = runTest {
+        val h = harness()
+        assertEquals("張る前は出さない", HotReloadStatus.OFF, h.hot.status.value)
+
+        h.hot.start("app1", 1)
+        runCurrent()
+        assertEquals("SSE の知らせが来るまではポーリング", HotReloadStatus.POLLING, h.hot.status.value)
+
+        h.sync.updates.emit(SyncUpdate.Realtime(true))
+        runCurrent()
+        assertEquals(HotReloadStatus.REALTIME, h.hot.status.value)
+
+        h.sync.updates.emit(SyncUpdate.Realtime(false))
+        runCurrent()
+        assertEquals("切れたらポーリングに落ちる", HotReloadStatus.POLLING, h.hot.status.value)
+
+        h.sync.updates.emit(SyncUpdate.Realtime(true))
+        h.hot.setForeground(false)
+        runCurrent()
+        assertEquals("背面では購読しない", HotReloadStatus.OFF, h.hot.status.value)
+
+        h.hot.setForeground(true)
+        runCurrent()
+        assertEquals("張り直した直後はポーリング", HotReloadStatus.POLLING, h.hot.status.value)
+
+        h.hot.stop()
+        runCurrent()
+        assertEquals(HotReloadStatus.OFF, h.hot.status.value)
+        assertFalse(h.hot.realtime.value)
+    }
+
+    @Test
+    fun lateRealtimeFromCancelledSubscriptionOfSameAppIsIgnored() = runTest {
+        // 取り消しが collect の途中で効かず、前の購読が張り直しの後に知らせを流してしまう場合
+        val release = CompletableDeferred<Unit>()
+        var calls = 0
+        val sync = DocumentSync { _, _ ->
+            val first = calls++ == 0
+            object : Flow<SyncUpdate> {
+                override suspend fun collect(collector: FlowCollector<SyncUpdate>) {
+                    if (first) {
+                        withContext(NonCancellable) { release.await() }
+                        collector.emit(SyncUpdate.Realtime(true))
+                    } else {
+                        awaitCancellation()
+                    }
+                }
+            }
+        }
+        val hot = HotReload(sync, backgroundScope)
+        hot.start("app1", 1)
+        runCurrent()
+        hot.start("app1", 1) // 同じアプリに張り直す
+        runCurrent()
+        release.complete(Unit)
+        runCurrent()
+        assertEquals("前の購読の知らせで REALTIME にしない", HotReloadStatus.POLLING, hot.status.value)
+        assertFalse(hot.realtime.value)
+    }
+
+    @Test
+    fun foregroundWithoutAppStaysOff() = runTest {
+        val h = harness()
+        h.hot.setForeground(false)
+        h.hot.setForeground(true)
+        runCurrent()
+        assertEquals(HotReloadStatus.OFF, h.hot.status.value)
     }
 
     @Test

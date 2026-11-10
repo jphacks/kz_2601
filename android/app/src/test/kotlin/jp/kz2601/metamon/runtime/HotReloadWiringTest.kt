@@ -12,6 +12,7 @@ import jp.kz2601.metamon.services.local.RecordSyncEngine
 import jp.kz2601.metamon.services.local.SyncQueue
 import jp.kz2601.metamon.services.sync.DocumentSync
 import jp.kz2601.metamon.services.sync.HotReload
+import jp.kz2601.metamon.services.sync.HotReloadStatus
 import jp.kz2601.metamon.services.sync.SyncUpdate
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.Flow
@@ -109,7 +110,49 @@ class HotReloadWiringTest {
 
         assertSame(kakeibo, rt.state.value.dsl)
         assertEquals(2, rt.document.version)
-        assertEquals(RuntimeCopy.HOT_RELOADED, rt.toast)
+        // iOS と同じく上部のバナーで知らせる(トーストではない・#1108)
+        assertEquals(RuntimeCopy.HOT_RELOADED, rt.banner?.text)
+        assertNull(rt.toast)
+    }
+
+    @Test
+    fun eachHotReloadShowsANewBannerAndDismissKeepsTheNewerOne() = runTest {
+        val rt = runtime(warikan)
+        rt.bootstrap()
+        settle()
+
+        rt.hotReload(AppDocument(APP, 2, kakeibo))
+        val first = rt.banner!!
+        rt.hotReload(AppDocument(APP, 3, warikan))
+        val second = rt.banner!!
+        assertTrue("続けて更新されたら出し直す", second.id != first.id)
+
+        rt.dismissBanner(first.id)
+        assertEquals("古い回の時間切れでは新しい回を消さない", second, rt.banner)
+        rt.dismissBanner(second.id)
+        assertNull(rt.banner)
+    }
+
+    @Test
+    fun hotReloadStatusShowsRealtimeOrPolling() = runTest {
+        val sync = FakeSync()
+        val rt = runtime(warikan, sync)
+        assertEquals("起動前は出さない", HotReloadStatus.OFF, rt.hotReloadStatus.value)
+        rt.bootstrap()
+        settle()
+        assertEquals(HotReloadStatus.POLLING, rt.hotReloadStatus.value)
+
+        sync.send(SyncUpdate.Realtime(true))
+        settle()
+        assertEquals(HotReloadStatus.REALTIME, rt.hotReloadStatus.value)
+
+        sync.send(SyncUpdate.Realtime(false))
+        settle()
+        assertEquals(HotReloadStatus.POLLING, rt.hotReloadStatus.value)
+
+        rt.setForeground(false)
+        settle()
+        assertEquals(HotReloadStatus.OFF, rt.hotReloadStatus.value)
     }
 
     @Test
@@ -123,6 +166,7 @@ class HotReloadWiringTest {
 
         assertSame(warikan, rt.dsl)
         assertNull(rt.toast)
+        assertNull(rt.banner)
     }
 
     @Test
