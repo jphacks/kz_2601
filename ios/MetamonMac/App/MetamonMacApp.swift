@@ -11,15 +11,14 @@ struct MetamonMacApp: App {
 
     var body: some Scene {
         WindowGroup(id: MacCommands.mainWindowId) {
-            MacRootView(apps: apps)
+            MacLanguageRoot { MacRootView(apps: apps) } // 設定の「言語」で即時切替(#973・iOS と同じ)
         }
         .defaultSize(width: 1100, height: 720)
         .windowResizability(.contentMinSize)
         .commands { MacCommands() }
 
         Settings {
-            MacEmptyState(pose: .tea, title: "設定はまだありません", mascotSize: MacTheme.Mascot.small)
-                .frame(width: 420, height: 260)
+            MacLanguageRoot { MacSettingsView() } // ⌘,(#973)
         }
     }
 }

@@ -292,6 +292,9 @@ targets:
       # 本体のデザイントークンとツルは iOS のファイルをそのまま使う(#935)
       - path: Metamon/App/Theme.swift
       - path: Metamon/App/CraneMascot.swift
+      # 設定の「ライセンス」は iOS と同じ一覧を同梱する(#973)
+      - path: Metamon/Resources/ThirdPartyLicenses.json
+        buildPhase: resources
       # iOS と同じ DSL 例をそのままバンドル(コピーを持たない)
       - path: ../docs/dsl/examples
         buildPhase: resources

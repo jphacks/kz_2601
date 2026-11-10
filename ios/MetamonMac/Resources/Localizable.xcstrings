@@ -17,6 +17,86 @@
         }
       }
     },
+    "AI へのデータ送信": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sending data to AI"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "AI へのデータ送信"
+          }
+        }
+      }
+    },
+    "AI への送信の同意を取り消しますか？": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Withdraw consent to send data to AI?"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "AI への送信の同意を取り消しますか？"
+          }
+        }
+      }
+    },
+    "AI ボタンの利用状況を送る": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Send AI button usage"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "AI ボタンの利用状況を送る"
+          }
+        }
+      }
+    },
+    "Apple でサインイン中": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Signed in with Apple"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Apple でサインイン中"
+          }
+        }
+      }
+    },
+    "Tailor It Pro": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tailor It Pro"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tailor It Pro"
+          }
+        }
+      }
+    },
     "openUrl: url は https か line/slack/discord/tel/mailto/maps のみ": {
       "localizations": {
         "en": {
@@ -45,6 +125,38 @@
           "stringUnit": {
             "state": "translated",
             "value": "お問い合わせ"
+          }
+        }
+      }
+    },
+    "このアプリ": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "This App"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "このアプリ"
+          }
+        }
+      }
+    },
+    "このアプリは上のオープンソースソフトウェアを使っています。": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "This app uses the open source software listed above."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "このアプリは上のオープンソースソフトウェアを使っています。"
           }
         }
       }
@@ -97,6 +209,22 @@
         }
       }
     },
+    "この端末では使えません": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Not available on this device"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "この端末では使えません"
+          }
+        }
+      }
+    },
     "やり直す": {
       "localizations": {
         "en": {
@@ -109,6 +237,22 @@
           "stringUnit": {
             "state": "translated",
             "value": "やり直す"
+          }
+        }
+      }
+    },
+    "アカウント": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Account"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "アカウント"
           }
         }
       }
@@ -145,6 +289,38 @@
         }
       }
     },
+    "アプリが落ちた時に、落ちた場所(プログラムの位置)・端末の機種・OS・アプリの版とユーザー ID を Google の Firebase Crashlytics に送り、不具合を直すのに使います。話した内容・記録・作ったアプリの中身は送りません。": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "When the app crashes, where it crashed (the location in the code), your device model, OS, app version and user ID are sent to Google's Firebase Crashlytics and used to fix bugs. What you say, your records and the contents of your apps are never sent."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "アプリが落ちた時に、落ちた場所(プログラムの位置)・端末の機種・OS・アプリの版とユーザー ID を Google の Firebase Crashlytics に送り、不具合を直すのに使います。話した内容・記録・作ったアプリの中身は送りません。"
+          }
+        }
+      }
+    },
+    "アプリが落ちた時に、落ちた場所(プログラムの位置)・端末の機種・OS・アプリの版とユーザー ID を Google の Firebase Crashlytics に送り、不具合を直すのに使います。話した内容・記録・記録帳の中身は送りません。": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "When the app crashes, where it crashed (the location in the code), your device model, OS, app version and user ID are sent to Google's Firebase Crashlytics and used to fix bugs. What you say, your records and the contents of your trackers are never sent."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "アプリが落ちた時に、落ちた場所(プログラムの位置)・端末の機種・OS・アプリの版とユーザー ID を Google の Firebase Crashlytics に送り、不具合を直すのに使います。話した内容・記録・記録帳の中身は送りません。"
+          }
+        }
+      }
+    },
     "アプリの一覧へ": {
       "localizations": {
         "en": {
@@ -157,6 +333,38 @@
           "stringUnit": {
             "state": "translated",
             "value": "アプリの一覧へ"
+          }
+        }
+      }
+    },
+    "アプリを作る・直すときは、話した内容・会話・アプリの設計を Anthropic 社の AI に送ります(記録の中身は送りません)。「AI で書く」ボタンは、押した時だけ送ります(短い答えは端末の中の AI が使えない時だけ最大 4KB、長い答えはいつも最大 16KB)。「AI と話す」部品は直近の会話(最大 20 件・16KB)と、決めてあれば参考の自分の記録(最大 20 件・8KB)を、写真のボタンは縮めた写真 1 枚を送ります。同意を取り消すと、AI を使う機能が使えなくなります(閲覧・記録は使えます)。送信済みの内容は取り消せません。": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "When you build or edit an app, what you said, the conversation and the app design are sent to Anthropic's AI (the contents of your records are not). \"Write with AI\" buttons send data only when tapped (short answers up to 4KB, only if on-device AI is unavailable; long answers always up to 16KB). The \"AI chat\" part sends the latest conversation (up to 20 turns, 16KB) and, if set, your own reference records (up to 20, 8KB), and a photo button sends one downscaled photo. If you withdraw consent, AI features are disabled (viewing and recording still work). Data already sent cannot be recalled."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "アプリを作る・直すときは、話した内容・会話・アプリの設計を Anthropic 社の AI に送ります(記録の中身は送りません)。「AI で書く」ボタンは、押した時だけ送ります(短い答えは端末の中の AI が使えない時だけ最大 4KB、長い答えはいつも最大 16KB)。「AI と話す」部品は直近の会話(最大 20 件・16KB)と、決めてあれば参考の自分の記録(最大 20 件・8KB)を、写真のボタンは縮めた写真 1 枚を送ります。同意を取り消すと、AI を使う機能が使えなくなります(閲覧・記録は使えます)。送信済みの内容は取り消せません。"
+          }
+        }
+      }
+    },
+    "アプリを作る・直す機能と対話が使えなくなります。もう一度同意すると使えます。": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Making and editing apps, and chat, will be disabled until you agree again."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "アプリを作る・直す機能と対話が使えなくなります。もう一度同意すると使えます。"
           }
         }
       }
@@ -193,6 +401,22 @@
         }
       }
     },
+    "オープンソースソフトウェア": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Open Source Software"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "オープンソースソフトウェア"
+          }
+        }
+      }
+    },
     "キャンセル": {
       "localizations": {
         "en": {
@@ -209,6 +433,166 @@
         }
       }
     },
+    "クラッシュ報告を送る": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Send crash reports"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "クラッシュ報告を送る"
+          }
+        }
+      }
+    },
+    "コピーしました": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Copied"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "コピーしました"
+          }
+        }
+      }
+    },
+    "ソースコード": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Source Code"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ソースコード"
+          }
+        }
+      }
+    },
+    "チャットで相談してから作る": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Chat before building"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "チャットで相談してから作る"
+          }
+        }
+      }
+    },
+    "バージョン": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Version"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "バージョン"
+          }
+        }
+      }
+    },
+    "プライバシー": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Privacy"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "プライバシー"
+          }
+        }
+      }
+    },
+    "プライバシーポリシー": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Privacy Policy"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "プライバシーポリシー"
+          }
+        }
+      }
+    },
+    "ユーザー ID": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "User ID"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ユーザー ID"
+          }
+        }
+      }
+    },
+    "ライセンス": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Licenses"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ライセンス"
+          }
+        }
+      }
+    },
+    "ライセンスを読み込めませんでした": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Could not load the licenses"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ライセンスを読み込めませんでした"
+          }
+        }
+      }
+    },
     "・": {
       "localizations": {
         "en": {
@@ -221,6 +605,102 @@
           "stringUnit": {
             "state": "translated",
             "value": "・"
+          }
+        }
+      }
+    },
+    "一般": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "General"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "一般"
+          }
+        }
+      }
+    },
+    "今のアプリの版": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Current app revision"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "今のアプリの版"
+          }
+        }
+      }
+    },
+    "今の記録帳の版": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Current logbook revision"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "今の記録帳の版"
+          }
+        }
+      }
+    },
+    "今日の残り": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Left today"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "今日の残り"
+          }
+        }
+      }
+    },
+    "他の人の行動で届く通知": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Notifications from other people's activity"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "他の人の行動で届く通知"
+          }
+        }
+      }
+    },
+    "使っている量": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Usage"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "使っている量"
           }
         }
       }
@@ -353,6 +833,22 @@
         }
       }
     },
+    "利用規約": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Terms of Use"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "利用規約"
+          }
+        }
+      }
+    },
     "削除": {
       "localizations": {
         "en": {
@@ -417,6 +913,102 @@
         }
       }
     },
+    "匿名で利用中": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Using anonymously"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "匿名で利用中"
+          }
+        }
+      }
+    },
+    "取り消す": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Withdraw"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "取り消す"
+          }
+        }
+      }
+    },
+    "同意した日時": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Agreed on"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "同意した日時"
+          }
+        }
+      }
+    },
+    "同意を取り消す": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Withdraw consent"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "同意を取り消す"
+          }
+        }
+      }
+    },
+    "同意済み": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Agreed"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "同意済み"
+          }
+        }
+      }
+    },
+    "問い合わせの時は、この内容を伝えてください。": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Please include these details when you contact support."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "問い合わせの時は、この内容を伝えてください。"
+          }
+        }
+      }
+    },
     "声でアプリを作る・直す": {
       "localizations": {
         "en": {
@@ -449,6 +1041,22 @@
         }
       }
     },
+    "対話": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Conversation"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "対話"
+          }
+        }
+      }
+    },
     "左の一覧から選ぶと、ここに表示します。": {
       "localizations": {
         "en": {
@@ -477,6 +1085,22 @@
           "stringUnit": {
             "state": "translated",
             "value": "戻る"
+          }
+        }
+      }
+    },
+    "挨拶と質問を読み上げる": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Read greetings and questions aloud"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "挨拶と質問を読み上げる"
           }
         }
       }
@@ -561,6 +1185,38 @@
         }
       }
     },
+    "新しく作るアプリと質問もこの言語になります。作成済みのアプリの文言は変わりません。": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "New apps and questions will also use this language. Text in apps you already made stays the same."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "新しく作るアプリと質問もこの言語になります。作成済みのアプリの文言は変わりません。"
+          }
+        }
+      }
+    },
+    "新しく用意する記録帳と質問もこの言語になります。用意済みの記録帳の文言は変わりません。": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "New trackers and questions will also use this language. Text in trackers you already set up stays the same."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "新しく用意する記録帳と質問もこの言語になります。用意済みの記録帳の文言は変わりません。"
+          }
+        }
+      }
+    },
     "書き出す": {
       "localizations": {
         "en": {
@@ -577,6 +1233,22 @@
         }
       }
     },
+    "未同意": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Not agreed"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "未同意"
+          }
+        }
+      }
+    },
     "次のアプリ": {
       "localizations": {
         "en": {
@@ -589,6 +1261,38 @@
           "stringUnit": {
             "state": "translated",
             "value": "次のアプリ"
+          }
+        }
+      }
+    },
+    "次の通知": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Upcoming notifications"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "次の通知"
+          }
+        }
+      }
+    },
+    "版": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Version"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "版"
           }
         }
       }
@@ -641,6 +1345,38 @@
         }
       }
     },
+    "端末内の AI が使えるか(非対応の端末・オフ・準備中)と、AI ボタンが答えを出せなかった回数を、ボタンの種類(要約・分類など)ごとに 1 日 1 回まとめて送ります。ユーザー ID・入力した文・記録は送りません。": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Once a day, sends whether on-device AI is available (unsupported device, turned off, or preparing) and how many times AI buttons could not answer, per button type (summarize, classify, etc.). Your user ID, the text you typed, and your records are not sent."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "端末内の AI が使えるか(非対応の端末・オフ・準備中)と、AI ボタンが答えを出せなかった回数を、ボタンの種類(要約・分類など)ごとに 1 日 1 回まとめて送ります。ユーザー ID・入力した文・記録は送りません。"
+          }
+        }
+      }
+    },
+    "答えがそろったら自動で作る": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Build automatically when ready"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "答えがそろったら自動で作る"
+          }
+        }
+      }
+    },
     "続ける": {
       "localizations": {
         "en": {
@@ -653,6 +1389,70 @@
           "stringUnit": {
             "state": "translated",
             "value": "続ける"
+          }
+        }
+      }
+    },
+    "自動": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Automatic"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "自動"
+          }
+        }
+      }
+    },
+    "言語": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Language"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "言語"
+          }
+        }
+      }
+    },
+    "記録帳を用意する・直すときは、話した内容・会話・記録帳の画面の形を Anthropic 社の AI に送ります(記録の中身は送りません)。「AI で書く」ボタンは端末の中の AI だけで動き、送りません。同意を取り消すと、AI を使う機能が使えなくなります(閲覧・記録は使えます)。送信済みの内容は取り消せません。": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "When you set up or adjust a tracker, what you said, the conversation and the tracker's layout are sent to Anthropic's AI (the contents of your records are not). \"Write with AI\" buttons run only with on-device AI and send nothing. If you withdraw consent, AI features are disabled (viewing and recording still work). Data already sent cannot be recalled."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "記録帳を用意する・直すときは、話した内容・会話・記録帳の画面の形を Anthropic 社の AI に送ります(記録の中身は送りません)。「AI で書く」ボタンは端末の中の AI だけで動き、送りません。同意を取り消すと、AI を使う機能が使えなくなります(閲覧・記録は使えます)。送信済みの内容は取り消せません。"
+          }
+        }
+      }
+    },
+    "記録帳を用意する・直す機能と対話が使えなくなります。もう一度同意すると使えます。": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Setting up and adjusting trackers, and chat, will be disabled until you agree again."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "記録帳を用意する・直す機能と対話が使えなくなります。もう一度同意すると使えます。"
           }
         }
       }
@@ -673,22 +1473,6 @@
         }
       }
     },
-    "設定はまだありません": {
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "No Settings Yet"
-          }
-        },
-        "ja": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "設定はまだありません"
-          }
-        }
-      }
-    },
     "設定を開く": {
       "localizations": {
         "en": {
@@ -701,6 +1485,102 @@
           "stringUnit": {
             "state": "translated",
             "value": "設定を開く"
+          }
+        }
+      }
+    },
+    "詳細": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Details"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "詳細"
+          }
+        }
+      }
+    },
+    "詳細(サポート用)": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Details (for support)"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "詳細(サポート用)"
+          }
+        }
+      }
+    },
+    "詳細をコピー": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Copy details"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "詳細をコピー"
+          }
+        }
+      }
+    },
+    "説明を読んで同意する": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Read and agree"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "説明を読んで同意する"
+          }
+        }
+      }
+    },
+    "読み上げ": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Read aloud"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "読み上げ"
+          }
+        }
+      }
+    },
+    "通知": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Notifications"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "通知"
           }
         }
       }
@@ -749,6 +1629,22 @@
           "stringUnit": {
             "state": "translated",
             "value": "開く"
+          }
+        }
+      }
+    },
+    "音声モデル": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Voice model"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "音声モデル"
           }
         }
       }
