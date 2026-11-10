@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="retention_confirm">Delete automatically</string>
+    <string name="retention_later">Later</string>
+    <string name="retention_stop">Stop auto-deleting</string>
+    <string name="retention_title">Delete old entries automatically?</string>
+</resources>

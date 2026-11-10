@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 記録の保存期間の確認(#482・iOS の RetentionPromptHost) -->
+<resources>
+    <string name="retention_confirm">自動で消す</string>
+    <string name="retention_later">あとで</string>
+    <string name="retention_stop">自動で消すのをやめる</string>
+    <string name="retention_title">古い記録を自動で消しますか?</string>
+</resources>
