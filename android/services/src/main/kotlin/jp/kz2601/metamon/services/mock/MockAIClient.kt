@@ -1,5 +1,8 @@
 package jp.kz2601.metamon.services.mock
 
+import jp.kz2601.metamon.dsl.ai.AiTextError
+import jp.kz2601.metamon.dsl.ai.AiTextRequest
+import jp.kz2601.metamon.dsl.ai.AiTextResult
 import jp.kz2601.metamon.services.AIClient
 import jp.kz2601.metamon.services.ChatBrief
 import jp.kz2601.metamon.services.ChatMessage
@@ -141,6 +144,12 @@ class MockAIClient(
     }
 
     override suspend fun resetChat(appId: String) = Unit
+
+    /** `POST /v1/text` のモック(iOS `MockAIClient+Text`)。毎回同じ文を返す。 */
+    override suspend fun text(request: AiTextRequest): AiTextResult {
+        delay(delayMillis / 2)
+        return MockAiText.answer(request) ?: throw AiTextError.BadOutput
+    }
 
     companion object {
         /** 発話 → サンプル名(iOS `MockAIClient.sampleName` と同じ順で見る)。手元に無いサンプルは飛ばす。 */
