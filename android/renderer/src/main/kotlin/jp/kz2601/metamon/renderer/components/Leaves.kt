@@ -2,15 +2,12 @@ package jp.kz2601.metamon.renderer.components
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Button
-import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
@@ -23,50 +20,13 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import jp.kz2601.metamon.dsl.Action
 import jp.kz2601.metamon.dsl.ActionType
-import jp.kz2601.metamon.dsl.Align
 import jp.kz2601.metamon.dsl.Component
 import jp.kz2601.metamon.dsl.ComponentStyle
 import jp.kz2601.metamon.dsl.Size
 import jp.kz2601.metamon.renderer.registry.RenderContext
 import jp.kz2601.metamon.renderer.theme.RenderTheme
-import jp.kz2601.metamon.renderer.theme.colors
 
-// #357 で入れた最小の Leaf。残りの Leaf は子 Issue で 1 部品 1 ファイルで足す。
-
-/** `text`: style(title | headline | body | caption)と align(leading | center | trailing)。 */
-@Composable
-fun TextLeaf(c: Component, modifier: Modifier = Modifier) {
-    val typography = MaterialTheme.typography
-    val style = when (c.style) {
-        ComponentStyle.TITLE -> typography.headlineSmall.copy(fontWeight = FontWeight.Bold)
-        ComponentStyle.HEADLINE -> typography.titleMedium.copy(fontWeight = FontWeight.SemiBold)
-        ComponentStyle.CAPTION -> typography.bodySmall
-        else -> typography.bodyLarge
-    }
-    val align = when (c.align) {
-        Align.CENTER -> TextAlign.Center
-        Align.TRAILING -> TextAlign.End
-        else -> TextAlign.Start
-    }
-    Text(c.text.orEmpty(), modifier.fillMaxWidth(), style = style, textAlign = align)
-}
-
-/** `spacer`: size(small 8 / medium 16 / large 32 / それ以外は 0)。 */
-@Composable
-fun SpacerLeaf(c: Component, modifier: Modifier = Modifier) {
-    val h = when (c.size) {
-        Size.SMALL -> 8.dp
-        Size.MEDIUM -> 16.dp
-        Size.LARGE -> 32.dp
-        else -> 0.dp
-    }
-    Spacer(modifier.height(h))
-}
-
-@Composable
-fun DividerLeaf(modifier: Modifier = Modifier) {
-    HorizontalDivider(modifier, color = RenderTheme.colors.hairline)
-}
+// #357 で入れた最小の Leaf(button・voiceInput)。表示系の Leaf は 1 部品 1 ファイル(TextLeaf.kt など・#857)。
 
 /** button が見えるか(iOS の `ButtonLeaf.isVisible`)。フォームは子 Issue で入れるので、今は新規のフォーム扱い。 */
 fun isButtonVisible(action: Action?, isEditing: Boolean = false, readOnly: Boolean = false): Boolean = when (action?.type) {

@@ -4,7 +4,11 @@ agp = "9.5.1"
 kotlin = "2.4.21"
 composeBom = "2026.06.01"
 activityCompose = "1.12.4"
+# link を Custom Tabs で開く
+browser = "1.9.0"
 coreKtx = "1.18.0"
+# icon / label の Material アイコン(BOM から外れたので版を書く)。対応表は #842 で広げる
+materialIconsCore = "1.7.8"
 lifecycle = "2.10.0"
 kotlinxSerialization = "1.12.0"
 kotlinxCoroutines = "1.11.0"
@@ -16,6 +20,7 @@ okhttp = "5.4.0"
 
 [libraries]
 androidx-core-ktx = { module = "androidx.core:core-ktx", version.ref = "coreKtx" }
+androidx-browser = { module = "androidx.browser:browser", version.ref = "browser" }
 androidx-activity-compose = { module = "androidx.activity:activity-compose", version.ref = "activityCompose" }
 androidx-lifecycle-runtime-compose = { module = "androidx.lifecycle:lifecycle-runtime-compose", version.ref = "lifecycle" }
 androidx-lifecycle-viewmodel-compose = { module = "androidx.lifecycle:lifecycle-viewmodel-compose", version.ref = "lifecycle" }
@@ -24,6 +29,7 @@ compose-ui = { module = "androidx.compose.ui:ui" }
 compose-ui-tooling-preview = { module = "androidx.compose.ui:ui-tooling-preview" }
 compose-ui-tooling = { module = "androidx.compose.ui:ui-tooling" }
 compose-material3 = { module = "androidx.compose.material3:material3" }
+compose-material-icons-core = { module = "androidx.compose.material:material-icons-core", version.ref = "materialIconsCore" }
 kotlinx-serialization-json = { module = "org.jetbrains.kotlinx:kotlinx-serialization-json", version.ref = "kotlinxSerialization" }
 kotlinx-coroutines-core = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-core", version.ref = "kotlinxCoroutines" }
 kotlinx-coroutines-android = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-android", version.ref = "kotlinxCoroutines" }
