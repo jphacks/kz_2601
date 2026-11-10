@@ -38,7 +38,7 @@ object InputRules {
 
     /** field を書く入力(#858 の 12 種 + 写真・手書き #862)。 */
     val inputTypes: Set<ComponentType> =
-        overridable + ComponentType.COLOR_PICKER + ComponentType.DRAWING_FIELD + ComponentType.PHOTO_FIELD
+        overridable + ComponentType.COLOR_PICKER + ComponentType.DRAWING_FIELD + ComponentType.PHOTO_FIELD + ComponentType.VIDEO_FIELD
 
     /** ラベルを `c.label ?: field.name` で補う入力(1 行の器)。他は `c.label` だけ。 */
     val labelFallsBackToFieldName: Set<ComponentType> =

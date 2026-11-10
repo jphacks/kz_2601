@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
     <application>
-        <!-- photoField のカメラ(TakePicture)に渡す保存先(#862)。権限はアプリ側(PermissionCenter)が聞く -->
+        <!-- photoField / videoField のカメラ(TakePicture / ACTION_VIDEO_CAPTURE)に渡す保存先(#862 / #863)。権限はアプリ側(PermissionCenter)が聞く -->
         <provider
             android:name="androidx.core.content.FileProvider"
             android:authorities="${applicationId}.metamon.media"

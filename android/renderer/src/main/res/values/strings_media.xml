@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- 写真と手書き(photoField / drawingField・#862)。文言の正は iOS の Localizable.xcstrings(日本語の元文) -->
+<!-- 写真・手書き・動画(photoField / drawingField・#862、videoField / videoPlayer・#863)。文言の正は iOS の Localizable.xcstrings(日本語の元文) -->
 <resources>
     <string name="media_cancel">キャンセル</string>
     <string name="media_camera_denied_body">カメラの使用が許可されていません。写真から選ぶこともできます。</string>
@@ -36,4 +36,15 @@
     <string name="media_photo_take">撮影</string>
     <string name="media_photo_take_or_pick">写真を撮る / 選ぶ</string>
     <string name="media_photo_unreadable">この写真は読み取れません</string>
+    <string name="media_video">動画</string>
+    <string name="media_video_camera_denied_body">カメラの使用が許可されていません。ライブラリから動画を選ぶこともできます。</string>
+    <string name="media_video_failed">動画を保存できませんでした。もう一度お試しください。</string>
+    <string name="media_video_hint_camera">カメラで動画を撮ります</string>
+    <string name="media_video_hint_choose">動画を撮るかライブラリから選びます</string>
+    <string name="media_video_hint_library">ライブラリから動画を選びます</string>
+    <string name="media_video_none">動画なし</string>
+    <string name="media_video_not_on_device">この端末にはありません</string>
+    <string name="media_video_pick">ライブラリから選ぶ</string>
+    <string name="media_video_saving">動画を保存しています…</string>
+    <string name="media_video_take_or_pick">動画を撮る / 選ぶ</string>
 </resources>
