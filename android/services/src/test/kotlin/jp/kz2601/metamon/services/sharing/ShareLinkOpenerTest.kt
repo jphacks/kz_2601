@@ -35,6 +35,10 @@ class ShareLinkOpenerTest {
 
     private fun opener() = ShareLinkOpener(client, profile)
 
+    /** 型が違ったら中身ごと出す(ClassCastException だと何が返ったか分からない)。 */
+    private inline fun <reified T : ShareOpenResult> ShareOpenResult.expect(): T =
+        this as? T ?: throw AssertionError("expected ${T::class.simpleName} but was $this")
+
     private fun previewJson(sharedData: Boolean, mine: Boolean = false) =
         """{"token":"tok","name":"家族の買い物","description":"","components":["list"],"sharedData":$sharedData,"mine":$mine}"""
 
@@ -103,7 +107,7 @@ class ShareLinkOpenerTest {
     fun sharedDataAppAsksToJoinWithoutImporting() = runBlocking<Unit> {
         server.enqueue(json(200, previewJson(sharedData = true)))
         val result = opener().open("tok")
-        val join = (result as ShareOpenResult.AskToJoin).join
+        val join = result.expect<ShareOpenResult.AskToJoin>().join
         assertEquals("tok", join.token)
         assertEquals("家族の買い物", join.preview.name)
         val req = server.take()
@@ -116,7 +120,7 @@ class ShareLinkOpenerTest {
     fun copyAppIsImportedRightAway() = runBlocking<Unit> {
         server.enqueue(json(200, previewJson(sharedData = false)))
         server.enqueue(json(201, installJson()))
-        val result = opener().open("tok") as ShareOpenResult.Added
+        val result = opener().open("tok").expect<ShareOpenResult.Added>()
         assertEquals("app9", result.app.id)
         assertFalse(result.viaJoin)
         server.take()
@@ -145,12 +149,14 @@ class ShareLinkOpenerTest {
         server.enqueue(json(200, previewJson(sharedData = true)))
         server.enqueue(json(201, installJson(member = true)))
         val o = opener()
-        val join = (o.open("tok") as ShareOpenResult.AskToJoin).join
-        val result = o.join(join, "  たろう  ") as ShareOpenResult.Added
+        val join = o.open("tok").expect<ShareOpenResult.AskToJoin>().join
+        val result = o.join(join, "  たろう  ").expect<ShareOpenResult.Added>()
         assertTrue(result.viaJoin)
         assertTrue(result.app.member)
-        server.take()
-        assertEquals("""{"displayName":"たろう"}""", server.take().body.readUtf8())
+        assertEquals("/v1/shares/tok", server.take().path)
+        val importReq = server.take()
+        assertEquals("/v1/shares/tok/import", importReq.path)
+        assertEquals("""{"displayName":"たろう"}""", importReq.body.readUtf8())
         assertEquals("たろう", profile.name)
         assertEquals("たろう", o.initialDisplayName())
     }
