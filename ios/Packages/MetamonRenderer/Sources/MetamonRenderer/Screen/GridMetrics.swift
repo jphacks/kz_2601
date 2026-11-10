@@ -79,3 +79,15 @@ public struct GridMetrics: Equatable, Sendable {
         )
     }
 }
+
+#if os(macOS)
+import SwiftUI
+
+/// Mac の中央の列(グリッドの外枠)の幅(#1337)。画面下の保存バーを同じ幅に収めるために `GridScreenLayout` が上げる。
+struct GridColumnWidthKey: PreferenceKey {
+    static let defaultValue: CGFloat? = nil
+    static func reduce(value: inout CGFloat?, nextValue: () -> CGFloat?) {
+        value = nextValue() ?? value
+    }
+}
+#endif
