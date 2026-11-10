@@ -11,6 +11,7 @@ import jp.kz2601.metamon.runtime.AppAiHost
 import jp.kz2601.metamon.runtime.AppDirectory
 import jp.kz2601.metamon.runtime.AppRuntime
 import jp.kz2601.metamon.runtime.RuntimeHost
+import jp.kz2601.metamon.runtime.SocialServices
 import jp.kz2601.metamon.runtime.TranscriberDictationHost
 import jp.kz2601.metamon.dsl.decode
 import jp.kz2601.metamon.dsl.fallback
@@ -47,6 +48,8 @@ import jp.kz2601.metamon.services.live.FirebaseBootstrap
 import jp.kz2601.metamon.services.live.FirebaseCrashReporter
 import jp.kz2601.metamon.services.live.HttpAIClient
 import jp.kz2601.metamon.services.live.HttpAppConfigClient
+import jp.kz2601.metamon.services.live.HttpMatchingClient
+import jp.kz2601.metamon.services.live.HttpModerationClient
 import jp.kz2601.metamon.services.live.HttpPushDeviceClient
 import jp.kz2601.metamon.services.local.AndroidConnectivity
 import jp.kz2601.metamon.services.local.AppListCache
@@ -64,6 +67,7 @@ import jp.kz2601.metamon.services.push.NotifyConsentStore
 import jp.kz2601.metamon.services.push.NotifyConsentToggle
 import jp.kz2601.metamon.services.push.PushDeviceRegistrar
 import jp.kz2601.metamon.services.push.SharedPreferencesPushPrefs
+import jp.kz2601.metamon.services.social.MatchingAgeGate
 import jp.kz2601.metamon.services.speech.AndroidSpeechTranscriber
 import jp.kz2601.metamon.services.sync.HotReload
 import jp.kz2601.metamon.services.sync.RealtimeDocumentSync
@@ -111,6 +115,8 @@ class AppContainer(
     private val host: RuntimeHost,
     /** 他の人の行動で届く通知(#887)。モック・Firebase の無い構成では null(何もしない) */
     val push: PushHost? = null,
+    /** 仲間探し・通報・ブロック(#877)。モックは null(出さない) */
+    private val social: SocialServices? = null,
 ) {
     /** 画面の下に出す接続先の名前(モックなら "mock")。 */
     val environmentLabel: String get() = if (knobs.mock) "mock" else environment.name
@@ -229,6 +235,7 @@ class AppContainer(
                 hotReload = HotReload(sync, CoroutineScope(SupervisorJob() + Dispatchers.Default)),
                 host = AndroidRuntimeHost(context.applicationContext),
                 push = push,
+                social = SocialServices(HttpMatchingClient(appConfigHttp), HttpModerationClient(appConfigHttp), MatchingAgeGate(prefs)),
             )
         }
 
@@ -323,6 +330,7 @@ class AppContainer(
                 fresh = { id -> AppDocument(appId = id, dsl = initialDsl) },
             ),
             aiHost = aiHost,
+            socialServices = social,
         ).also { it.dictation = TranscriberDictationHost(transcriber, CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)) }
     }
 
