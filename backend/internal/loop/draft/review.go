@@ -1,0 +1,175 @@
+package draft
+
+import (
+	"context"
+	"errors"
+	"fmt"
+	"strings"
+	"time"
+
+	"github.com/jphacks/kz_2601/backend/internal/loop"
+	"github.com/jphacks/kz_2601/backend/internal/loop/github"
+)
+
+// Publisher creates the issue (github.Client).
+type Publisher interface {
+	CreateIssue(ctx context.Context, repo, title, body string, labels []string) (*github.Issue, error)
+}
+
+// Reviewer is the human side of the queue: every method is run by a person
+// from the CLI (`feedback-loop drafts ...`), named by By.
+type Reviewer struct {
+	Store loop.Store
+	// Publisher and Repo: where an approved draft is posted. Repo "" = dry
+	// run (approve records the decision; nothing is posted).
+	Publisher Publisher
+	Repo      string
+	Labels    []string
+	Now       func() time.Time
+	// BeforePublish, when set, may refuse posting (stop switch, #375).
+	BeforePublish func(ctx context.Context) error
+}
+
+// ErrCheck is a draft that fails the exit check.
+var ErrCheck = errors.New("draft fails the exit check")
+
+func (r *Reviewer) now() time.Time {
+	if r.Now != nil {
+		return r.Now().UTC()
+	}
+	return time.Now().UTC()
+}
+
+func (r *Reviewer) get(ctx context.Context, id string, states ...string) (*loop.Draft, error) {
+	d, err := r.Store.GetDraft(ctx, id)
+	if err != nil {
+		return nil, err
+	}
+	for _, s := range states {
+		if d.Status == s {
+			return d, nil
+		}
+	}
+	return nil, fmt.Errorf("draft %s is %s (needs %s)", id, d.Status, strings.Join(states, " or "))
+}
+
+// CheckDraft runs the exit check against the draft's current items.
+func (r *Reviewer) CheckDraft(ctx context.Context, d *loop.Draft) ([]string, error) {
+	items, err := LoadItems(ctx, r.Store, d.ItemIDs)
+	if err != nil {
+		return nil, err
+	}
+	return Check(d.Title, d.Body, texts(items)), nil
+}
+
+// Edit replaces the title and/or body of a pending draft (the human writes
+// the reproduction steps here). The result must pass the exit check.
+func (r *Reviewer) Edit(ctx context.Context, id, by, title, body string) (*loop.Draft, error) {
+	if strings.TrimSpace(by) == "" {
+		return nil, errors.New("who is editing? (-by)")
+	}
+	d, err := r.get(ctx, id, loop.DraftPending)
+	if err != nil {
+		return nil, err
+	}
+	if title != "" {
+		d.Title = strings.TrimSpace(title)
+	}
+	if body != "" {
+		d.Body = body
+	}
+	reasons, err := r.CheckDraft(ctx, d)
+	if err != nil {
+		return nil, err
+	}
+	if len(reasons) > 0 {
+		return nil, fmt.Errorf("%w: %s", ErrCheck, strings.Join(reasons, ", "))
+	}
+	d.UpdatedAt = r.now()
+	return d, r.Store.PutDraft(ctx, *d)
+}
+
+// Reject closes a pending draft. reason stays in the private queue only.
+func (r *Reviewer) Reject(ctx context.Context, id, by, reason string) (*loop.Draft, error) {
+	if strings.TrimSpace(by) == "" {
+		return nil, errors.New("who is rejecting? (-by)")
+	}
+	d, err := r.get(ctx, id, loop.DraftPending)
+	if err != nil {
+		return nil, err
+	}
+	now := r.now()
+	d.Status, d.ReviewedBy, d.ReviewedAt, d.RejectReason, d.UpdatedAt = loop.DraftRejected, by, now, reason, now
+	return d, r.Store.PutDraft(ctx, *d)
+}
+
+// Approve is 承認 1 (#365): a human says this draft may become an issue. It
+// re-runs the exit check, records who approved and the hash of the text,
+// then posts it when a repo is configured. With no repo it stops at
+// "approved" (dry run); Publish posts it later.
+func (r *Reviewer) Approve(ctx context.Context, id, by string) (*loop.Draft, *github.Issue, error) {
+	if strings.TrimSpace(by) == "" {
+		return nil, nil, errors.New("who is approving? (-by)")
+	}
+	d, err := r.get(ctx, id, loop.DraftPending)
+	if err != nil {
+		return nil, nil, err
+	}
+	reasons, err := r.CheckDraft(ctx, d)
+	if err != nil {
+		return nil, nil, err
+	}
+	if len(reasons) > 0 {
+		return nil, nil, fmt.Errorf("%w: %s", ErrCheck, strings.Join(reasons, ", "))
+	}
+	now := r.now()
+	d.Status, d.ReviewedBy, d.ReviewedAt, d.UpdatedAt = loop.DraftApproved, by, now, now
+	d.BodyHash = BodyHash(d.Title, d.Body)
+	if err := r.Store.PutDraft(ctx, *d); err != nil {
+		return nil, nil, err
+	}
+	if r.Repo == "" {
+		return d, nil, nil
+	}
+	return r.publish(ctx, d)
+}
+
+// Publish posts an approved draft (after a dry run, or a failed post).
+func (r *Reviewer) Publish(ctx context.Context, id string) (*loop.Draft, *github.Issue, error) {
+	d, err := r.get(ctx, id, loop.DraftApproved)
+	if err != nil {
+		return nil, nil, err
+	}
+	if r.Repo == "" {
+		return d, nil, errors.New("no target repository (LOOP_ISSUE_REPO): dry run")
+	}
+	return r.publish(ctx, d)
+}
+
+func (r *Reviewer) publish(ctx context.Context, d *loop.Draft) (*loop.Draft, *github.Issue, error) {
+	if r.BeforePublish != nil {
+		if err := r.BeforePublish(ctx); err != nil {
+			return d, nil, err
+		}
+	}
+	if r.Publisher == nil {
+		return d, nil, errors.New("no publisher configured (LOOP_GITHUB_TOKEN)")
+	}
+	// the text must still be exactly what the human approved
+	if BodyHash(d.Title, d.Body) != d.BodyHash {
+		return d, nil, errors.New("draft changed after approval; approve it again")
+	}
+	reasons, err := r.CheckDraft(ctx, d)
+	if err != nil {
+		return d, nil, err
+	}
+	if len(reasons) > 0 {
+		return d, nil, fmt.Errorf("%w: %s", ErrCheck, strings.Join(reasons, ", "))
+	}
+	iss, err := r.Publisher.CreateIssue(ctx, r.Repo, d.Title, d.Body, r.Labels)
+	if err != nil {
+		return d, nil, err
+	}
+	d.Status, d.IssueRepo, d.IssueNumber, d.UpdatedAt = loop.DraftPublished, r.Repo, iss.Number, r.now()
+	return d, iss, r.Store.PutDraft(ctx, *d)
+}

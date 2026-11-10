@@ -20,6 +20,8 @@ feedback/{id}  # {uid, kind, message, untrusted: true, consentVersion, status, d
 
 **運営の手順**: `gcloud auth application-default login` の後、`GOOGLE_CLOUD_PROJECT=jphacks-kz2601 go run ./cmd/feedback list`(読み取りだけ。書き込みはしない)。`show -out ~/fb <id>` で保存したスクショ・DSL は確認が済んだら消す(リポジトリに入れない)。status を変えるときはコンソールで `feedback/<id>` の `status` を編集する。
 
+**自己改善ループ(#364)**: 伏せ字した写しを `loop_inbox` に取り込み、振り分け・Issue の下書きに使う。原文はループの外に出さない。[feedback-loop.md](feedback-loop.md)。
+
 **セキュリティルール**: クライアントは Firestore を直接読まず API 経由のみ。`feedback` にはスクショ(画面に出ていた個人の情報)が入りうるので、ルールでクライアントからの読み書きを許可しないこと。
 
 ## 環境変数
