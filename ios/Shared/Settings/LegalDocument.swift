@@ -2,7 +2,7 @@ import SwiftUI
 
 /// プライバシーポリシー・利用規約(#246・5.1.1(i))。アプリに同梱した `docs/legal/*.md` を表示し(オフラインでも読める)、
 /// その画面から公開ページ(`publicURL`・App Store Connect にも同じ URL を登録)も開ける。
-/// iOS と Mac で共有(#973)。Mac は同梱していないので公開ページを開く。
+/// iOS と Mac で共有(#973)。Mac も同じ文書を同梱して、アプリ内で読める(#971)。
 enum LegalDocument: String, Identifiable, CaseIterable {
     case privacyPolicy = "privacy-policy"
     case terms

@@ -1,6 +1,6 @@
 import SwiftUI
 
-/// 設定・同意画面から開く行。同梱文書を開き、その画面の上から公開ページへも行ける。
+/// 設定・同意画面から開く行。同梱文書を開き、その画面の上から公開ページへも行ける。iOS と Mac で共有(#971)。
 struct LegalDocumentLink: View {
     let document: LegalDocument
 
@@ -41,7 +41,9 @@ struct LegalDocumentView: View {
             .textSelection(.enabled)
         }
         .navigationTitle(document.title)
+        #if os(iOS)
         .navigationBarTitleDisplayMode(.inline)
+        #endif
         .accessibilityIdentifier("legal.view.\(document.rawValue)")
     }
 }

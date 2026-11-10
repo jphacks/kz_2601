@@ -300,6 +300,11 @@ targets:
       - path: Metamon/Features/Voice/BuildStageView.swift
       - path: Metamon/Features/Voice/GeneratingStage.swift
       - path: Metamon/Features/Tips/PromptTips.swift
+      # 規約・ポリシーは iOS と同じ同梱版をアプリ内で読む(#971)
+      - path: ../docs/legal
+        buildPhase: resources
+        type: group
+        includes: ["privacy-policy.md", "terms.md"]
       # iOS と同じ DSL 例をそのままバンドル(コピーを持たない)
       - path: ../docs/dsl/examples
         buildPhase: resources
