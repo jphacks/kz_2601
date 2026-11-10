@@ -7,9 +7,11 @@ import androidx.credentials.CustomCredential
 import androidx.credentials.GetCredentialRequest
 import androidx.credentials.exceptions.GetCredentialCancellationException
 import androidx.credentials.exceptions.GetCredentialException
+import androidx.credentials.exceptions.NoCredentialException
 import com.google.android.libraries.identity.googleid.GetSignInWithGoogleOption
 import com.google.android.libraries.identity.googleid.GoogleIdTokenCredential
 import jp.kz2601.metamon.BuildConfig
+import jp.kz2601.metamon.R
 import jp.kz2601.metamon.services.AuthError
 
 /** Google サインインの Web クライアント ID(Firebase の OAuth クライアント)。 */
@@ -40,13 +42,17 @@ class CredentialManagerGoogleSignIn(
             CredentialManager.create(activity).getCredential(activity, request)
         } catch (e: GetCredentialCancellationException) {
             throw AuthError.Canceled(e)
-        } catch (e: GetCredentialException) {
-            throw AuthError.Unavailable(e.message ?: "Google でログインできませんでした")
+        } catch (_: NoCredentialException) {
+            // 端末に Google アカウントが無い
+            throw AuthError.Unavailable(activity.getString(R.string.auth_google_no_account))
+        } catch (_: GetCredentialException) {
+            // 例外の文言は英語のことがあるので画面には出さない
+            throw AuthError.Unavailable(activity.getString(R.string.auth_google_failed))
         }
         val credential = result.credential
         if (credential is CustomCredential && credential.type == GoogleIdTokenCredential.TYPE_GOOGLE_ID_TOKEN_CREDENTIAL) {
             return GoogleIdTokenCredential.createFrom(credential.data).idToken
         }
-        throw AuthError.Unavailable("Google の認証情報を受け取れませんでした")
+        throw AuthError.Unavailable(activity.getString(R.string.auth_google_no_credential))
     }
 }

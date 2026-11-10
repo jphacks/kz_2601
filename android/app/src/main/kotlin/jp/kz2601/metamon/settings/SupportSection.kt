@@ -30,6 +30,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalResources
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.heading
@@ -116,11 +117,11 @@ private fun copyToClipboard(context: Context, text: String) {
 /** ライセンスの一覧と本文(iOS の `LicensesView` / `LicenseDetailView`)。設定のシートの上に全画面で重ねる。 */
 @Composable
 private fun LicensesDialog(onDismiss: () -> Unit) {
-    val context = LocalContext.current
+    val resources = LocalResources.current
     val entries by produceState<List<LicenseEntry>?>(initialValue = null) {
         value = withContext(Dispatchers.IO) {
             runCatching {
-                context.resources.openRawResource(R.raw.third_party_licenses).bufferedReader().use { it.readText() }
+                resources.openRawResource(R.raw.third_party_licenses).bufferedReader().use { it.readText() }
             }.getOrNull()?.let(ThirdPartyLicenses::parse) ?: emptyList()
         }
     }

@@ -76,6 +76,13 @@ android {
         buildConfig = true
         resValues = true
     }
+
+    // アプリ内で言語を切り替える(#843)。Play の言語ごとの分割で切り替え先の文言が端末に無い、を防ぐ
+    bundle {
+        language {
+            enableSplit = false
+        }
+    }
 }
 
 dependencies {

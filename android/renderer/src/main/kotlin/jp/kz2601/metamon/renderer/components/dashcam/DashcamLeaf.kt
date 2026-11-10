@@ -214,10 +214,10 @@ private fun Header(title: String, recorder: DashcamRecorder) {
 }
 
 @Composable
-private fun Preview(recorder: DashcamRecorder, impactText: String?, size: Modifier) {
+private fun Preview(recorder: DashcamRecorder, impactText: String?, modifier: Modifier = Modifier) {
     val description = stringResource(R.string.renderer_dashcam_preview)
     Box(
-        size
+        modifier
             .fillMaxWidth()
             .heightIn(min = 120.dp)
             .clip(RoundedCornerShape(RenderTheme.Radius.inner))
