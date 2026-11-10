@@ -319,7 +319,7 @@ class AppContainer(
                 initialDsl = initialDsl,
                 appConfig = appConfig,
                 // 同意が無ければ一切送らない(最後の砦。画面側でも送る前に止めて同意の画面を出す)
-                ai = ConsentGatedAiClient(HttpAIClient(http(environment.aiBaseUrl), log = log)) { consent.isGranted },
+                ai = ConsentGatedAiClient(HttpAIClient(http(environment.aiBaseUrl), capabilities = deviceCapabilities(), log = log)) { consent.isGranted },
                 // 声は端末内だけで文字にする(#354 §3)。端末内が無い端末は文字入力に落とす
                 transcriber = AndroidSpeechTranscriber(context, language = language, log = { Log.i(TAG, it) }),
                 appId = DeviceAppId.store(context, "metamon-app"),
