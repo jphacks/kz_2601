@@ -1,5 +1,6 @@
 package jp.kz2601.metamon.voice
 
+import jp.kz2601.metamon.consent.ConsentPrompt
 import jp.kz2601.metamon.dsl.AppDSL
 import jp.kz2601.metamon.dsl.AppDocument
 import jp.kz2601.metamon.dsl.decode
@@ -15,6 +16,8 @@ import jp.kz2601.metamon.services.SpeechTranscriber
 import jp.kz2601.metamon.services.StreamedComponent
 import jp.kz2601.metamon.services.TranscriberFailure
 import jp.kz2601.metamon.services.TranscriberStatus
+import jp.kz2601.metamon.services.consent.AiConsentStore
+import jp.kz2601.metamon.services.consent.InMemoryKeyValueStore
 import jp.kz2601.metamon.services.http.ApiError
 import jp.kz2601.metamon.services.http.FailureKind
 import jp.kz2601.metamon.services.mock.MockSpeechTranscriber
@@ -105,6 +108,29 @@ class VoiceViewModelTest {
         // backgroundScope の仕事は advanceUntilIdle が待たないので、同じスケジューラの別のスコープで動かす
         scope = CoroutineScope(StandardTestDispatcher(testScheduler) + Job()),
     )
+
+    @Test
+    fun withoutConsentNothingIsSentAndTheHeldUtteranceResumesAfterAgree() = runTest {
+        val consent = AiConsentStore(InMemoryKeyValueStore())
+        val prompt = ConsentPrompt(consent)
+        val ai = FakeAI()
+        val vm = VoiceViewModel(
+            transcriber = MockSpeechTranscriber(),
+            ai = ai,
+            appId = { "app-1" },
+            initial = initial,
+            clarifyEnabled = false,
+            requireConsent = prompt::require,
+            scope = CoroutineScope(StandardTestDispatcher(testScheduler) + Job()),
+        )
+        vm.submit("家計簿")
+        advanceUntilIdle()
+        assertTrue(ai.morphCalls.isEmpty())
+        assertTrue(prompt.visible.value)
+        prompt.agree() // 同意して閉じたら話し直さずに送る(iOS の resumeUtteranceAfterConsent)
+        advanceUntilIdle()
+        assertEquals(listOf("家計簿"), ai.morphCalls)
+    }
 
     @Test
     fun generateNowSkipsChatEvenWhenClarifyIsOn() = runTest {

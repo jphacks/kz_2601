@@ -30,12 +30,14 @@ import androidx.compose.material3.TextButton
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import jp.kz2601.metamon.dsl.AppDSL
 import jp.kz2601.metamon.dsl.AppDocument
+import jp.kz2601.metamon.consent.AiConsentDialog
 import jp.kz2601.metamon.feedback.FeedbackHost
 import jp.kz2601.metamon.feedback.UndoHeaderButtons
 import jp.kz2601.metamon.language.AppLocales
@@ -55,6 +57,7 @@ import jp.kz2601.metamon.voice.VoiceRoute
 import jp.kz2601.metamon.voice.VoiceUiState
 import jp.kz2601.metamon.voice.VoiceViewModel
 import jp.kz2601.metamon.services.AppSummary
+import jp.kz2601.metamon.settings.SettingsSheet
 import jp.kz2601.metamon.switcher.AppSwitcherDialog
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -110,6 +113,8 @@ fun MetamonApp(container: AppContainer) {
             log = { if (BuildConfig.DEBUG) Log.i(AppContainer.TAG, it) },
             // モックはサーバーの版の履歴が無いので端末の履歴だけで戻す
             versions = if (container.knobs.mock) null else AppConfigVersions(container.appConfig),
+            // 未同意なら送らずに同意の画面を出す。同意して閉じたら、止めた 1 件を続けて送る(#888)
+            requireConsent = container.consentPrompt::require,
         )
     }
     val state by vm.state.collectAsStateWithLifecycle()
@@ -117,6 +122,11 @@ fun MetamonApp(container: AppContainer) {
     val runtimeState by runtime.state.collectAsStateWithLifecycle()
 
     LaunchedEffect(runtime) { runtime.bootstrap() }
+    // 初回起動・説明の版が上がった時に 1 回だけ同意の画面を出す(iOS の ConsentHost・#888)
+    LaunchedEffect(Unit) {
+        delay(CONSENT_PROMPT_DELAY_MILLIS)
+        container.consentPrompt.showOnLaunchIfNeeded()
+    }
     // 部品のマイク(onVoiceInput)は音声のシートを開く
     LaunchedEffect(runtimeState.showVoiceSheet) {
         if (runtimeState.showVoiceSheet) {
@@ -150,6 +160,7 @@ fun MetamonApp(container: AppContainer) {
     }
 
     var switcherOpen by remember { mutableStateOf(false) }
+    var settingsOpen by rememberSaveable { mutableStateOf(false) }
     val apps by runtime.apps.collectAsStateWithLifecycle()
     val scope = rememberCoroutineScope()
 
@@ -161,6 +172,9 @@ fun MetamonApp(container: AppContainer) {
                     switcherOpen = true
                     scope.launch { runtime.appsList() }
                 }) { Text(stringResource(R.string.switcher_open)) }
+                TextButton(onClick = { settingsOpen = true }, modifier = Modifier.testTag("settings.open")) {
+                    Text(stringResource(R.string.settings_title))
+                }
                 if (!container.environment.isProduction || container.knobs.mock) {
                     Text(
                         "${container.environmentLabel} / auth=${container.auth.kind} / uid=${user?.uid ?: "-"}",
@@ -191,6 +205,18 @@ fun MetamonApp(container: AppContainer) {
             // 要約と元に戻す・状態カード・トースト・削除の取り消し・確認ダイアログ(#895)
             FeedbackHost(vm, state, runtime, runtimeState)
         }
+    }
+
+    if (settingsOpen) SettingsSheet(container, onDismiss = { settingsOpen = false })
+    // 設定のシートより後に置く(設定から出した時に上に重ねる)
+    val consentVisible by container.consentPrompt.visible.collectAsStateWithLifecycle()
+    if (consentVisible) {
+        val consentState by container.consent.state.collectAsStateWithLifecycle()
+        AiConsentDialog(
+            needsReconsent = consentState.needsReconsent,
+            onAgree = container.consentPrompt::agree,
+            onLater = container.consentPrompt::later,
+        )
     }
 
     if (switcherOpen) {
@@ -235,3 +261,6 @@ internal fun progressText(p: GenerateProgress): String = when (p) {
 }
 
 private const val AUTO_NAV_START_MILLIS = 3_000L
+
+/** 起動の画面が落ち着いてから同意の画面を出す(iOS の ConsentHost と同じ 0.5 秒) */
+private const val CONSENT_PROMPT_DELAY_MILLIS = 500L
