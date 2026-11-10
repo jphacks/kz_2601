@@ -52,7 +52,9 @@ func (m *Memory) ListFeedback(_ context.Context, q FeedbackQuery) ([]Feedback, e
 	out := []Feedback{}
 	for _, fb := range m.feedback {
 		if (q.Since.IsZero() || !fb.CreatedAt.Before(q.Since)) && (q.Status == "" || fb.Status == q.Status) {
-			out = append(out, *cloneFeedback(fb, false))
+			cp := cloneFeedback(fb, false)
+			cp.Listed = fb.Attachments()
+			out = append(out, *cp)
 		}
 	}
 	sortFeedback(out)
