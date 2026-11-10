@@ -171,6 +171,7 @@ enum AIRequestBuilder {
             }.joined(separator: "\n")
         }
         if let input = c.input {
+            guard entity.field(input)?.encrypted != true else { return "" } // #233 backend も断る
             return FieldCoding.display(values[input] ?? .null, field: entity.field(input))
         }
         return describe(entity.storedFields.filter { $0.id != c.output }, value: { values[$0] ?? .null }, separator: "\n")
@@ -188,15 +189,15 @@ enum AIRequestBuilder {
     static func expand(_ template: String, input: String, entity: Entity, values: [String: JSONValue]) -> String {
         AIPlaceholder.replace(template) { id in
             if id == "input" { return input }
-            guard let f = entity.fields.first(where: { $0.id == id }) else { return nil }
+            guard let f = entity.fields.first(where: { $0.id == id }), !f.encrypted else { return nil }
             return FieldCoding.display(values[f.id] ?? .null, field: f)
         }
     }
 
-    /// 「名前: 値」を並べる(写真・位置・空は落とす)。
+    /// 「名前: 値」を並べる(写真・位置・空・暗号化して保存する項目(#233・AI に渡さない)は落とす)。
     static func describe(_ fields: [Field], value: (String) -> JSONValue, separator: String) -> String {
         fields.compactMap { f -> String? in
-            guard f.type != .photo, f.type != .video, f.type != .audio, f.type != .location else { return nil }
+            guard f.type != .photo, f.type != .video, f.type != .audio, f.type != .location, !f.encrypted else { return nil }
             let s = FieldCoding.display(value(f.id), field: f)
             return s.isEmpty ? nil : "\(f.name): \(s)"
         }.joined(separator: separator)

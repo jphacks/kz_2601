@@ -47,6 +47,10 @@ public final class RecordSyncEngine {
     @ObservationIgnored var committing: [UUID: Task<Void, Never>] = [:]
     /// `wipe` ごとに増やす。積む途中で wipe を跨いだ削除は積まない
     @ObservationIgnored var wipeGeneration = 0
+    /// appId → entity → 暗号化して保存する field(#233・`AppDSL.encryptedFields`)。AppRuntime が DSL を読むたびに入れる
+    @ObservationIgnored public var encryptedFields: [String: [String: Set<String>]] = [:]
+    /// 暗号化の鍵と封筒(#233)。テストはメモリの鍵を入れる
+    @ObservationIgnored public var cipher = FieldCipher()
 
     public init(store: RecordStore, queue: SyncQueue, client: any AppConfigClient, connectivity: any ConnectivityMonitor) {
         self.store = store
@@ -194,8 +198,9 @@ public final class RecordSyncEngine {
     }
 
     /// `save` と同じ。書いた行の id も返す(作成なら仮 id `local-<clientId>` = 断られた時の `SyncEvent` の recordId)。
-    public func write(appId: String, entity: String, recordId: String?, data: [String: JSONValue],
+    public func write(appId: String, entity: String, recordId: String?, data plain: [String: JSONValue],
                       author: (uid: String?, name: String?)? = nil) async -> (records: [Record], recordId: String) {
+        let (data, unsaved) = await seal(appId: appId, entity: entity, recordId: recordId, data: plain)
         let written: String
         let now = Self.timestamp.string(from: .now)
         if let recordId, var row = await store.row(appId: appId, entity: entity, recordId: recordId) {
@@ -220,7 +225,31 @@ public final class RecordSyncEngine {
             written = row.recordId
         }
         kick()
+        if let field = unsaved.sorted().first {
+            onEvent?(.rejected(appId: appId, entity: entity, message: FieldCipher.unsavedMessage, field: field, recordId: written))
+        }
         return (await shown(appId: appId, entity: entity), written)
+    }
+
+    /// `Field.encrypted`(#233)の値を暗号化する。鍵はこの entity にまだ読めない暗号文が無い時だけ作る(別の端末の鍵の同期を待つ)。
+    private func seal(appId: String, entity: String, recordId: String?, data: [String: JSONValue]) async
+        -> (data: [String: JSONValue], unsaved: Set<String>) {
+        guard let fields = encryptedFields[appId]?[entity], !fields.isEmpty, !fields.isDisjoint(with: data.keys) else { return (data, []) }
+        let rows = await store.rows(appId: appId, entity: entity)
+        let stored = recordId.flatMap { id in rows.first { $0.isKnown(as: id) }?.data }
+        let hasCiphertext = rows.contains { $0.data.values.contains(where: FieldCipher.isEnvelope) }
+        return cipher.sealed(data, fields: fields, stored: stored, mayCreateKey: !hasCiphertext)
+    }
+
+    /// 表示用: 暗号文を端末で復号する(#233)。鍵は暗号文がある時だけ引く。
+    func opened(_ records: [Record]) -> [Record] {
+        guard records.contains(where: { $0.data.values.contains(where: FieldCipher.isEnvelope) }) else { return records }
+        let key = cipher.keys.load()
+        return records.map { r in
+            var r = r
+            r.data = cipher.opened(r.data, key: key)
+            return r
+        }
     }
 
     /// 印を付ける / 外す(#255)。押した瞬間にローカルの件数と状態を変え、サーバーの `{count, mine}` で確定する。

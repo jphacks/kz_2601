@@ -51,6 +51,13 @@ public struct AppDSL: Decodable, Sendable {
 
     public func screen(_ id: String) -> Screen? { screens.first { $0.id == id } }
     public func entity(_ id: String) -> Entity? { entities.first { $0.id == id } }
+    /// entity id → 暗号化して保存する field id(#233・暗号化の field が無い entity は入れない)。
+    public var encryptedFields: [String: Set<String>] {
+        Dictionary(entities.compactMap { e in
+            let ids = e.encryptedFieldIds
+            return ids.isEmpty ? nil : (e.id, ids)
+        }, uniquingKeysWith: { first, _ in first })
+    }
 
     /// 画面の描画に要る entity(部品が直接使うもの + computed / Stat.value の agg 先 + ref の参照先を推移的に)。
     public func entitiesNeeded(by screen: Screen) -> Set<String> {
@@ -294,6 +301,10 @@ public struct Entity: Decodable, Identifiable, Sendable {
 
     /// hidden(#262)の field id。
     public var hiddenFieldIds: Set<String> { Set(fields.filter(\.hidden).map(\.id)) }
+    /// 暗号化して保存する(#233)string / text の field id。
+    public var encryptedFieldIds: Set<String> {
+        Set(fields.filter { $0.encrypted && ($0.type == .string || $0.type == .text) && !$0.isComputed }.map(\.id))
+    }
 }
 
 public enum FieldType: String, Decodable, Sendable {
@@ -337,6 +348,8 @@ public struct Field: Decodable, Identifiable, Sendable {
     public var hidden: Bool
     /// "admins" = 管理者だけが入れる・変えられる項目(#272)。サーバーが守り、端末は断られた理由を出す。
     public var editableBy: String?
+    /// 値を端末で暗号化して保存する(#233)。レコードには `enc:v1:` の暗号文が入り、表示・編集の時に端末で復号する(`FieldCipher`)。
+    public var encrypted: Bool
 
     public var isComputed: Bool { computed != nil }
     /// 管理者だけが変えられる項目(#272)。
@@ -345,7 +358,7 @@ public struct Field: Decodable, Identifiable, Sendable {
     /// デコードで読むキー全部。スキーマとのずれ検出テスト(#537)が使う。
     static let codingKeyNames = Set(Keys.allCases.map(\.rawValue))
 
-    private enum Keys: String, CodingKey, CaseIterable { case id, name, type, required, options, defaultValue, unit, refEntity, computed, health, hidden, editableBy }
+    private enum Keys: String, CodingKey, CaseIterable { case id, name, type, required, options, defaultValue, unit, refEntity, computed, health, hidden, editableBy, encrypted }
 
     /// 予約値の仮 Field 用(`RecordValue`)。
     init(id: String, name: String, type: FieldType) {
@@ -353,6 +366,7 @@ public struct Field: Decodable, Identifiable, Sendable {
         self.name = name
         self.type = type
         self.hidden = false
+        self.encrypted = false
     }
 
     public init(from decoder: Decoder) throws {
@@ -369,6 +383,7 @@ public struct Field: Decodable, Identifiable, Sendable {
         health = try? c.decodeIfPresent(String.self, forKey: .health)
         hidden = (try? c.decodeIfPresent(Bool.self, forKey: .hidden)) ?? false
         editableBy = try? c.decodeIfPresent(String.self, forKey: .editableBy)
+        encrypted = (try? c.decodeIfPresent(Bool.self, forKey: .encrypted)) ?? false
     }
 }
 
