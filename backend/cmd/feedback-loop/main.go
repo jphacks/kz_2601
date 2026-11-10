@@ -9,6 +9,8 @@
 //
 //	feedback-loop ingest [-source in_app|app_store_review]
 //	feedback-loop ingest-crash -issue ID -type T -count N -version V
+//	feedback-loop triage [-max 200] [-batch 20]
+//	feedback-loop triage-score -labels FILE
 //
 // Environment: GOOGLE_CLOUD_PROJECT (required), FIRESTORE_DATABASE,
 // FIRESTORE_EMULATOR_HOST (local: make -C backend run-feedback-loop),
@@ -30,6 +32,7 @@ import (
 	"github.com/jphacks/kz_2601/backend/internal/fsenv"
 	"github.com/jphacks/kz_2601/backend/internal/loop"
 	"github.com/jphacks/kz_2601/backend/internal/loop/ingest"
+	"github.com/jphacks/kz_2601/backend/internal/loop/triage"
 	"github.com/jphacks/kz_2601/backend/internal/store"
 )
 
@@ -73,6 +76,8 @@ func main() {
 const usageText = `usage: feedback-loop <command> [flags]
   ingest [-source in_app|app_store_review]   copy new feedback into the inbox (masked)
   ingest-crash -issue ID -type T -count N -version V   record one crash spike
+  triage [-max 200] [-batch 20]              classify, cluster and prioritise new items (LLM, no tools)
+  triage-score -labels FILE                  agreement with a human's labels (lines: itemId,category)
 `
 
 // app holds what the commands use (tests build it with in-memory parts).
@@ -82,9 +87,11 @@ type app struct {
 	users    ingest.Users
 	// appStore, when set, replaces the App Store Connect fetcher (tests).
 	appStore ingest.Fetcher
-	getenv   func(string) string
-	now      func() time.Time
-	out      io.Writer
+	// model, when set, replaces the Claude client (tests use a fake).
+	model  triage.Model
+	getenv func(string) string
+	now    func() time.Time
+	out    io.Writer
 }
 
 func (a *app) run(ctx context.Context, args []string) error {
@@ -98,6 +105,10 @@ func (a *app) run(ctx context.Context, args []string) error {
 		return a.ingest(ctx, rest)
 	case "ingest-crash":
 		return a.ingestCrash(ctx, rest)
+	case "triage":
+		return a.triage(ctx, rest)
+	case "triage-score":
+		return a.triageScore(ctx, rest)
 	}
 	_, _ = io.WriteString(a.out, usageText)
 	return fmt.Errorf("unknown command %q", cmd)
