@@ -16,9 +16,8 @@ import androidx.compose.ui.text.style.TextAlign
 import jp.kz2601.metamon.dsl.Align
 import jp.kz2601.metamon.dsl.Component
 import jp.kz2601.metamon.dsl.ComponentStyle
-import jp.kz2601.metamon.dsl.TextHighlightMatcher
 import jp.kz2601.metamon.dsl.TextHighlightStyle
-import jp.kz2601.metamon.dsl.resolvedWords
+import jp.kz2601.metamon.dsl.logic.HighlightWords
 
 /** 蛍光ペンの色(iOS の `Color.yellow.opacity(0.4)`)。ライト / ダークのどちらでも文字が読める薄さ。 */
 private val HighlightMarker = Color(0xFFFFCC00).copy(alpha = 0.4f)
@@ -55,7 +54,7 @@ fun TextLeaf(c: Component, modifier: Modifier = Modifier) {
 fun highlighted(c: Component, fieldValue: String?): AnnotatedString {
     val text = c.text.orEmpty()
     val h = c.highlight ?: return AnnotatedString(text)
-    val ranges = TextHighlightMatcher.ranges(text, h.resolvedWords(fieldValue))
+    val ranges = HighlightWords.ranges(text, HighlightWords.resolve(h.words, h.field, fieldValue))
     if (ranges.isEmpty()) return AnnotatedString(text)
     val span = if (h.style == TextHighlightStyle.BOLD) {
         SpanStyle(fontWeight = FontWeight.Bold)

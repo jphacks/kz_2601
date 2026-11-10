@@ -1,4 +1,4 @@
-package jp.kz2601.metamon.dsl
+package jp.kz2601.metamon.dsl.logic
 
 import org.junit.Assert.assertEquals
 import org.junit.Test
@@ -6,7 +6,7 @@ import org.junit.Test
 /** iOS の TextHighlightTests(照合と語の決め方)の写し。 */
 class TextHighlightsTest {
     private fun marked(text: String, words: List<String>): List<String> =
-        TextHighlightMatcher.ranges(text, words).map { text.substring(it.first, it.last + 1) }
+        HighlightWords.ranges(text, words).map { text.substring(it.first, it.last + 1) }
 
     @Test
     fun matchesCaseWidthAndJapaneseSubstrings() {
@@ -23,15 +23,15 @@ class TextHighlightsTest {
 
     @Test
     fun wordsFromFieldAndCap() {
-        val h = TextHighlight(field = "keywords")
+        fun fromField(value: String?) = HighlightWords.resolve(null, "keywords", value)
         assertEquals(
             "「,」「、」「，」改行で区切り・空と重複は捨てる",
             listOf("TypeError", "undefined", "タイムアウト", "null"),
-            h.resolvedWords("TypeError, undefined、タイムアウト\nnull，null ,  "),
+            fromField("TypeError, undefined、タイムアウト\nnull，null ,  "),
         )
-        assertEquals(emptyList<String>(), h.resolvedWords(null))
+        assertEquals(emptyList<String>(), fromField(null))
         val many = (1..30).joinToString(",") { "w$it" }
-        assertEquals("語は 20 個まで", TEXT_HIGHLIGHT_MAX_WORDS, h.resolvedWords(many).size)
-        assertEquals(listOf("期限"), TextHighlight(words = listOf("期限")).resolvedWords("無視"))
+        assertEquals("語は 20 個まで", HighlightWords.MAX_WORDS, fromField(many).size)
+        assertEquals(listOf("期限"), HighlightWords.resolve(listOf("期限"), null, "無視"))
     }
 }
