@@ -28,9 +28,13 @@ class DeviceCapabilitiesTest {
         // 今 Android で描けない部品(登録を足したらここから消す)
         for (t in listOf(
             ComponentType.MAP_VIEW, ComponentType.ROUTE_GUIDE, ComponentType.LOCATION_TRACKER, ComponentType.HEALTH_STAT,
-            ComponentType.DASHCAM, ComponentType.NEARBY_SHARE, ComponentType.MATCH_LIST, ComponentType.MUSIC_PLAYER,
+            ComponentType.DASHCAM, ComponentType.NEARBY_SHARE,
         )) {
             assertFalse(t.wire, t.wire in caps.allowedComponents)
+        }
+        // この統合で登録した部品(#871・#877・#879)は申告する
+        for (t in listOf(ComponentType.SENSOR_VALUE, ComponentType.MATCH_LIST, ComponentType.MUSIC_PLAYER)) {
+            assertTrue(t.wire, t.wire in caps.allowedComponents)
         }
     }
 
@@ -49,7 +53,7 @@ class DeviceCapabilitiesTest {
     fun supportedFeaturesOfTheStandardBuild() {
         assertEquals(
             listOf(
-                "notification.when", "singleEntity", "addressedMessages", "aiButton.long", "aiButton.inputPhoto", "aiButton.saveTo",
+                "matching", "notification.when", "singleEntity", "addressedMessages", "aiButton.long", "aiButton.inputPhoto", "aiButton.saveTo",
                 "action.lookupBook", "feed.v2", "expr.addMinutes", "aiChat.inputEntity", "component.bracket", "progressBar.settingTarget",
             ),
             caps.supportedFeatures,

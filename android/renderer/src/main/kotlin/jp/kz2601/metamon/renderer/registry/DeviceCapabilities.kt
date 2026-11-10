@@ -30,8 +30,8 @@ data class DeviceCapabilities(
         internal val features: List<Feature> = listOf(
             // 記録の自動削除: 判定(RecordRetention)だけで、消す処理をまだ呼んでいない
             Feature("recordRetention", implemented = false),
-            // 仲間探し: matchList が無い
-            Feature("matching", implemented = false, needs = ComponentType.MATCH_LIST),
+            // 仲間探し(#877): matchList・list の「つながりたい」・通報 / ブロック。iOS の通常の版と同じく送る
+            Feature("matching", implemented = true, needs = ComponentType.MATCH_LIST),
             Feature("notification.when", implemented = true), // ConditionNotifications
             Feature("singleEntity", implemented = true), // ScreenForm・{"setting"}
             // 管理者だけのボタン(visibleTo)が無い
