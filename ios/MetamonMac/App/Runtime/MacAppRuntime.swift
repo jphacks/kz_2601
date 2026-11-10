@@ -12,7 +12,7 @@ import MetamonServices
 ///
 /// サーバーへの接続(appconfig のクライアント・ログイン)は Mac に Firebase がまだ無い(#930)ので、
 /// iOS の `METAMON_MOCK=1` と同じくメモリ上の appconfig(`InMemoryAppConfigClient`)に記録を持つ。
-/// AI・通知・共有・課金など iOS 固有の機能は持たない(未対応のアクションは一言で知らせる)。
+/// ローカル通知は `MacRuntimeNotifications`(#965)。AI・共有・課金など iOS 固有の機能は持たない(未対応のアクションは一言で知らせる)。
 @MainActor
 @Observable
 final class MacAppRuntime: RuntimeNavigating {
@@ -36,6 +36,8 @@ final class MacAppRuntime: RuntimeNavigating {
 
     @ObservationIgnored let recordSync: RecordSyncEngine
     @ObservationIgnored private var savingForms: Set<ObjectIdentifier> = []
+    /// ローカル通知(#965・MacRuntimeNotifications)
+    @ObservationIgnored let notifications = MacRuntimeNotifications()
 
     init(appId: String, dsl: AppDSL, recordSync: RecordSyncEngine? = nil) {
         self.appId = appId
@@ -44,6 +46,7 @@ final class MacAppRuntime: RuntimeNavigating {
         self.recordSync = recordSync ?? Self.mockRecordSync()
         self.recordSync.onEvent = { [weak self] event in self?.handle(event) }
         self.recordSync.start()
+        notifications.start(self)
     }
 
     /// アプリを切り替えるとランタイムごと作り直す(`AppCanvas` の `.id`)。購読のタスクがエンジンを握り続けないよう止める。
@@ -203,8 +206,11 @@ final class MacAppRuntime: RuntimeNavigating {
             }
             NSWorkspace.shared.open(url)
 
+        case .scheduleNotification, .cancelNotification:
+            await notifications.perform(action)
+
         default:
-            // AI・通知・共有・書き出しなどは Mac ではまだ動かない(後の Issue)
+            // AI・共有・書き出しなどは Mac ではまだ動かない(後の Issue)
             toast = L10n.tr("このボタンは Mac ではまだ使えません")
         }
     }

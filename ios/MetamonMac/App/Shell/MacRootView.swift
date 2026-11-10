@@ -64,6 +64,7 @@ struct MacRootView: View {
         .toolbar { ShellToolbar(hasApp: selectedApp != nil, canCompose: compose == nil, newApp: newApp, ask: ask, speak: speak) }
         .frame(minWidth: Self.minWindowSize.width, minHeight: Self.minWindowSize.height)
         .focusedSceneValue(\.shellActions, shellActions)
+        .macNotificationRouting(selection: $selectedAppId, appIds: apps.map(\.id)) // 押された通知のアプリを開く(#965)
         .sheet(item: $compose) { session in
             ComposeSheet(session: session) { compose = nil }
                 .interactiveDismissDisabled(session.isBusy)

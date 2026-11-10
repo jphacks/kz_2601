@@ -2563,6 +2563,22 @@
         }
       }
     },
+    "場所の通知は Mac では使えません" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Location notifications aren't available on Mac"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "場所の通知は Mac では使えません"
+          }
+        }
+      }
+    },
     "声でこのアプリを直す" : {
       "localizations" : {
         "en" : {
@@ -4069,6 +4085,22 @@
         }
       }
     },
+    "通知がオフのため、このアプリの通知は届きません" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Notifications are off, so this app's notifications won't arrive"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "通知がオフのため、このアプリの通知は届きません"
+          }
+        }
+      }
+    },
     "通知の時間を朝7時に変えて" : {
       "localizations" : {
         "en" : {
@@ -4081,6 +4113,38 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "通知の時間を朝7時に変えて"
+          }
+        }
+      }
+    },
+    "通知を予約しました(%@)" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Reminder scheduled (%@)"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "通知を予約しました(%@)"
+          }
+        }
+      }
+    },
+    "通知を予約できませんでした" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Couldn't schedule the notification"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "通知を予約できませんでした"
           }
         }
       }
