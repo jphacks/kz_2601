@@ -5,6 +5,8 @@ import android.util.Log
 import jp.kz2601.metamon.dsl.AppDSL
 import jp.kz2601.metamon.dsl.AppDocument
 import jp.kz2601.metamon.consent.record
+import jp.kz2601.metamon.discover.DiscoverServices
+import jp.kz2601.metamon.discover.PublishEnv
 import jp.kz2601.metamon.runtime.AiTextAccess
 import jp.kz2601.metamon.runtime.AndroidRuntimeHost
 import jp.kz2601.metamon.runtime.AppAiHost
@@ -79,6 +81,7 @@ import jp.kz2601.metamon.services.live.FirebaseBootstrap
 import jp.kz2601.metamon.services.live.FirebaseCrashReporter
 import jp.kz2601.metamon.services.live.HttpAIClient
 import jp.kz2601.metamon.services.live.HttpAppConfigClient
+import jp.kz2601.metamon.services.live.HttpDiscoverClient
 import jp.kz2601.metamon.services.live.HttpFeedClient
 import jp.kz2601.metamon.services.live.HttpMatchingClient
 import jp.kz2601.metamon.services.live.HttpModerationClient
@@ -182,7 +185,12 @@ class AppContainer(
     val feedback: FeedbackClient = MockFeedbackClient(),
     /** 最低対応版とアプリ内のお知らせ(#906)。モックは何もしない(iOS と同じ) */
     val updateGate: UpdateGate = UpdateGate.disabled(InMemoryKeyValueStore()),
+    /** 「探す」と公開(#902)。モックは null(「サーバー接続時のみ使えます」・iOS と同じ) */
+    val discover: DiscoverServices? = null,
 ) {
+    /** 共有シートの「みんなに公開」に渡すもの(#902)。「探す」が無い構成は null */
+    val publishEnv: PublishEnv? by lazy { discover?.let { PublishEnv(it.client, authorProfile) } }
+
     /** フィードバックの画面の出し入れ(設定の入口・端末を振った時) */
     val feedbackComposer = FeedbackComposerLauncher()
 
@@ -386,6 +394,7 @@ class AppContainer(
                 talkBackRunning = { TalkBack.isRunning(context) },
                 feedback = HttpFeedbackClient(appConfigHttp),
                 updateGate = UpdateGate.live(context, environment.appConfigBaseUrl, client, device),
+                discover = DiscoverServices(HttpDiscoverClient(appConfigHttp), HttpModerationClient(appConfigHttp)),
             )
         }
 
