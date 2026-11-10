@@ -89,7 +89,7 @@ struct MacRootView: View {
         }
         .frame(minWidth: Self.minWindowSize.width, minHeight: Self.minWindowSize.height)
         .focusedSceneValue(\.shellActions, shellActions)
-        .macNotificationRouting(selection: $selectedAppId, appIds: apps.map(\.id)) // 押された通知のアプリを開く(#965)
+        .macNotificationRouting(selection: guardedSelection, appIds: apps.map(\.id)) // 押された通知のアプリを開く(#965)。入力中なら確認を通す(#943)
         .background { WindowCloseGuard(discardGuard: discardGuard) } // ⌘W・閉じるボタン(#943)
         .sheet(item: $compose, onDismiss: noteFinishedCompose) { session in
             ComposeSheet(session: session, onClose: { compose = nil }, undo: finishedUndo(session))
