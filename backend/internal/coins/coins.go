@@ -43,6 +43,7 @@ const (
 	KindPurchase      = "purchase"
 	KindSpendAI       = "spend_ai"
 	KindSpendOverflow = "spend_overflow" // part 3
+	KindSpendCall     = "spend_call"     // call minutes (#447, internal/calls)
 	KindRefundFailed  = "refund_failed"  // a committed charge given back (part 2)
 	KindRefundApple   = "refund_apple"   // App Store REFUND of a pack (part 4)
 	KindAdjust        = "adjust"         // support
@@ -268,7 +269,11 @@ func settle(w *Wallet, h *Hold, charge int64, now time.Time) []Entry {
 	w.Initial += back.Initial
 	w.Purchased += back.Purchased
 	if charge > 0 {
-		out = append(out, Entry{ID: "spend_" + h.ID, Kind: KindSpendAI, Amount: -charge,
+		kind := KindSpendAI
+		if h.Op == OpCall {
+			kind = KindSpendCall
+		}
+		out = append(out, Entry{ID: "spend_" + h.ID, Kind: kind, Amount: -charge,
 			Delta: Split{Grant: -spent.Grant, Initial: -spent.Initial, Purchased: -spent.Purchased},
 			Op:    h.Op, AppID: h.AppID, RequestID: h.RequestID, At: now})
 	}

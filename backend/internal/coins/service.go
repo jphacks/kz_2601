@@ -34,8 +34,11 @@ type ReserveRequest struct {
 	RequestID string
 	// Kind picks COIN_RESERVE_<OP>_<KIND> when that is set (TextKinds).
 	Kind string
-	// Max overrides the op's COIN_RESERVE_<OP> when > 0.
+	// Max overrides the op's COIN_RESERVE_<OP> when > 0 (OpCall needs it).
 	Max int64
+	// TTL overrides COIN_HOLD_TTL when > 0 (a call block lives as long as
+	// the block plus a grace).
+	TTL time.Duration
 }
 
 // Usage is the measured cost of a call (ai cost_tally / ai.usage).
@@ -222,7 +225,7 @@ func (s *Service) Reserve(ctx context.Context, r ReserveRequest) (*Hold, error) 
 		return nil, nil
 	}
 	amount, ok := s.Config.Reserve[r.Op]
-	if !ok {
+	if !ok && (r.Op != OpCall || r.Max <= 0) {
 		return nil, fmt.Errorf("%w: %q", ErrUnknownOp, r.Op)
 	}
 	if v, ok := s.Config.Reserve[r.Op+"_"+r.Kind]; ok && r.Kind != "" {
@@ -235,7 +238,11 @@ func (s *Service) Reserve(ctx context.Context, r ReserveRequest) (*Hold, error) 
 		return nil, errors.New("coins: reserve needs a request id")
 	}
 	now := s.now()
-	h := Hold{Op: r.Op, AppID: r.AppID, RequestID: r.RequestID, Amount: amount, ExpireAt: now.Add(s.Config.HoldTTL)}
+	ttl := s.Config.HoldTTL
+	if r.TTL > 0 {
+		ttl = r.TTL
+	}
+	h := Hold{Op: r.Op, AppID: r.AppID, RequestID: r.RequestID, Amount: amount, ExpireAt: now.Add(ttl)}
 	g, err := s.policy(ctx, r.UID, r.Anonymous)
 	if err != nil {
 		return nil, err
@@ -287,6 +294,32 @@ func (s *Service) Commit(ctx context.Context, h *Hold, u Usage) (Charge, error) 
 		return Charge{}, nil
 	}
 	out, w, err := SettleHold(ctx, s.Store, h.UID, h.ID, Settlement{Commit: true, Charge: coins, USD: u.USD}, s.now())
+	if errors.Is(err, ErrNotHeld) {
+		s.log().WarnContext(ctx, EventNotCommitted, append(attrs, slog.String("event", EventNotCommitted))...)
+		return Charge{Balance: w.Available()}, nil
+	}
+	if err != nil {
+		return Charge{}, err
+	}
+	*h = out
+	return Charge{Coins: out.Charged, Balance: w.Available()}, nil
+}
+
+// CommitCoins charges coins (capped at the hold) instead of a USD cost: a
+// call block charged by the minute (#447). Like Commit it is idempotent on a
+// committed hold, logs coins.would_spend for a log-mode hold and does not
+// charge a hold that already expired.
+func (s *Service) CommitCoins(ctx context.Context, h *Hold, coins int64) (Charge, error) {
+	if h == nil {
+		return Charge{}, nil
+	}
+	coins = max(0, min(coins, h.Amount))
+	attrs := []any{slog.String("uid_hash", httpx.UIDHash(h.UID)), slog.String("op", h.Op), slog.Int64("reserved", h.Amount), slog.Int64("coins", coins)}
+	if h.DryRun {
+		s.log().InfoContext(ctx, EventWouldSpend, append(attrs, slog.String("event", EventWouldSpend))...)
+		return Charge{}, nil
+	}
+	out, w, err := SettleHold(ctx, s.Store, h.UID, h.ID, Settlement{Commit: true, Charge: coins}, s.now())
 	if errors.Is(err, ErrNotHeld) {
 		s.log().WarnContext(ctx, EventNotCommitted, append(attrs, slog.String("event", EventNotCommitted))...)
 		return Charge{Balance: w.Available()}, nil

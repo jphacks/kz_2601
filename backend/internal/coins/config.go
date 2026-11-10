@@ -30,6 +30,9 @@ const (
 	OpEdit     = "edit"
 	OpChat     = "chat"
 	OpText     = "text"
+	// OpCall is a block of call minutes (#447, internal/calls). It has no
+	// COIN_RESERVE_<OP>: the caller passes the block as ReserveRequest.Max.
+	OpCall = "call"
 )
 
 // Ops lists the ops in display order.
