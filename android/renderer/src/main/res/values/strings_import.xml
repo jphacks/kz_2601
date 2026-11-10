@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- ファイルの取り込み(fileImport・#865)の文言。英語は values-en。 -->
+<resources>
+    <string name="renderer_import_button">ファイルから取り込む</string>
+    <string name="renderer_import_reading">読み込み中…</string>
+    <string name="renderer_import_adding">追加中 %1$d / %2$d</string>
+    <string name="renderer_import_confirm_title">取り込みますか？</string>
+    <string name="renderer_import_confirm_add">追加する</string>
+    <string name="renderer_import_cancel">キャンセル</string>
+    <string name="renderer_import_problem_title">取り込めませんでした</string>
+    <string name="renderer_import_ok">OK</string>
+    <string name="renderer_import_unusable">fileImport: この entity には取り込めません</string>
+    <string name="renderer_import_kind_note">PDF・録音ファイルはこの端末ではまだ取り込めません</string>
+    <string name="renderer_import_added">%1$d 件を追加しました</string>
+    <string name="renderer_import_added_partly">%1$d 件を追加しました(%2$d 件は追加できませんでした)</string>
+    <string name="renderer_import_separator">・</string>
+    <string name="renderer_import_csv_count">「%1$s」に %2$d 件を追加します。</string>
+    <string name="renderer_import_csv_used">使う列: %1$s</string>
+    <string name="renderer_import_csv_unused">使わない列: %1$s</string>
+    <string name="renderer_import_csv_failures">読めない行: %1$d 行(入れません)</string>
+    <string name="renderer_import_csv_over">上限(1 回 %1$d 件・合計 %2$d 件)を超える %3$d 行は入れません</string>
+    <string name="renderer_import_failure_invalid">%1$d 行目: %2$s「%3$s」を読めません</string>
+    <string name="renderer_import_failure_required">%1$d 行目: %2$sが空です</string>
+    <string name="renderer_import_failure_too_long">%1$d 行目: %2$sが長すぎます</string>
+    <string name="renderer_import_body">「%1$s」から %2$d 文字を「%3$s」に 1 件追加します。</string>
+    <string name="renderer_import_body_truncated">長いので先頭の %1$d 文字だけ入れます。</string>
+    <string name="renderer_import_problem_unsupported">この種類のファイルは取り込めません</string>
+    <string name="renderer_import_problem_open">ファイルを開けませんでした</string>
+    <string name="renderer_import_problem_too_large">ファイルが大きすぎます(%1$dMB まで)</string>
+    <string name="renderer_import_problem_encoding">文字コードを読めませんでした(UTF-8 か Shift_JIS の CSV にしてください)</string>
+    <string name="renderer_import_problem_columns">1 行目の項目名が「%1$s」の項目(%2$s)に合いません</string>
+    <string name="renderer_import_problem_empty_text">文字を読めませんでした</string>
+    <string name="renderer_import_problem_full">これ以上記録を足せません</string>
+    <string name="renderer_import_problem_kind_unavailable">この種類のファイルは、この端末ではまだ取り込めません</string>
+</resources>

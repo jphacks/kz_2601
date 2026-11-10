@@ -15,6 +15,7 @@ import jp.kz2601.metamon.renderer.ActionContext
 import jp.kz2601.metamon.renderer.DSLRuntime
 import jp.kz2601.metamon.dsl.logic.ExternalUrlPolicy
 import jp.kz2601.metamon.renderer.NavigationHost
+import jp.kz2601.metamon.renderer.components.importing.RecordImportHost
 import jp.kz2601.metamon.renderer.components.play.RecordWriter
 import jp.kz2601.metamon.renderer.components.play.TimerHost
 import jp.kz2601.metamon.renderer.form.FormDraft
@@ -101,7 +102,7 @@ class AppRuntime(
     private val recordsRefreshDelayMillis: Long = 250,
     /** 今のアプリの appId の保存・アプリの一覧・新しいアプリ(#881)。null なら appId は固定(モック・テスト) */
     private val directory: AppDirectory? = null,
-) : DSLRuntime, NavigationHost, RecordWriter, TimerHost {
+) : DSLRuntime, NavigationHost, RecordWriter, TimerHost, RecordImportHost {
     private val _state = MutableStateFlow(RuntimeState(document))
     val state: StateFlow<RuntimeState> = _state.asStateFlow()
 
@@ -507,6 +508,12 @@ class AppRuntime(
         setRecords(document.appId, entity, list)
         return id
     }
+
+    // ファイルの取り込み(#865・#1082 の DSLRuntime.addRecord / loadRecords と同じ形)
+
+    override suspend fun addRecord(entity: String, data: Map<String, JSONValue>): Boolean = createRecord(entity, data) != null
+
+    override suspend fun loadRecords(entities: Set<String>) = load(entities)
 
     /** 一覧から消して「元に戻す」を出す。前の取り消し待ちは時間が来たら送られる。 */
     suspend fun deleteUndoably(entity: String, recordId: String) {
