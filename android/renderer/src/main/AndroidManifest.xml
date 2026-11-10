@@ -1,5 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- 現在地(location ボタン・道案内)が使う。聞くのはアプリ側(PermissionCenter)。アプリのマニフェストと同じもの -->
+    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
+    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
     <application>
         <!-- photoField / videoField のカメラ(TakePicture / ACTION_VIDEO_CAPTURE)に渡す保存先(#862 / #863)。権限はアプリ側(PermissionCenter)が聞く -->
         <provider

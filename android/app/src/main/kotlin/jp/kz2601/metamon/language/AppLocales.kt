@@ -6,6 +6,8 @@ import android.content.res.Configuration
 import android.content.res.Resources
 import android.os.Build
 import android.os.LocaleList
+import androidx.annotation.ChecksSdkIntAtLeast
+import androidx.annotation.RequiresApi
 import androidx.core.content.edit
 import java.util.Locale
 
@@ -19,6 +21,7 @@ object AppLocales {
     private const val PREFS = "metamon.language"
     private const val KEY = "appLanguage"
 
+    @get:ChecksSdkIntAtLeast(api = Build.VERSION_CODES.TIRAMISU)
     private val usesLocaleManager: Boolean get() = Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU
 
     fun setting(context: Context): AppLanguage =
@@ -66,6 +69,7 @@ object AppLocales {
 
     private fun systemLocaleList(): LocaleList = Resources.getSystem().configuration.locales
 
+    @RequiresApi(Build.VERSION_CODES.TIRAMISU)
     private fun localeManager(context: Context): LocaleManager = context.getSystemService(LocaleManager::class.java)
 
     private fun prefs(context: Context) = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)

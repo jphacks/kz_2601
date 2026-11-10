@@ -23,6 +23,7 @@ import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
 import kotlin.coroutines.resume
+import kotlin.coroutines.resumeWithException
 
 /**
  * 位置の権限を聞く窓口。:app が権限の窓口(理由 → OS のダイアログ → 設定へ)で差し替える。
@@ -82,6 +83,9 @@ object OneShotLocation {
                 lm.getCurrentLocation(provider, signal, context.mainExecutor) { if (cont.isActive) cont.resume(it) }
             } catch (_: IllegalArgumentException) {
                 if (cont.isActive) cont.resume(null)
+            } catch (e: SecurityException) {
+                // 聞いた後に許可を外された。呼び出し元([request])が「許可が無い」にする
+                if (cont.isActive) cont.resumeWithException(e)
             }
         }
 

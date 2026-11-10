@@ -151,7 +151,7 @@ private suspend fun read(context: Context, uri: Uri, c: Component, entity: Entit
         if (kind == ImportKind.AUDIO) return@withContext ImportStep.Problem(ImportProblem.KindUnavailable)
         val limit = FileImportFlow.byteLimit(kind)
         val bytes = runCatching {
-            resolver.openInputStream(uri)?.use { input -> input.readNBytes(limit + 1) }
+            resolver.openInputStream(uri)?.use { input -> FileImportFlow.readUpTo(input, limit + 1) }
         }.getOrNull() ?: return@withContext ImportStep.Problem(ImportProblem.CannotOpen)
         val existing = FormChoices.records(ctx.runtime, entity.id).size
         FileImportFlow.prepare(bytes, kind, name, c, entity, existing, pdfText = { PdfTextReader.text(context, it) }) { field, ref -> FileImportFlow.refId(ctx.runtime, field, ref) }

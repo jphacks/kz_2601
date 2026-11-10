@@ -21,12 +21,15 @@ import jp.kz2601.metamon.renderer.registry.ComponentRegistry
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.runBlocking
+import org.junit.Assert.assertArrayEquals
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import java.io.ByteArrayInputStream
+import java.io.InputStream
 
 /** fileImport(#865): 選んだファイル → 計画 → 記録の追加、上限、失敗の知らせ(iOS の FileImportLeaf の read / planCSV / planBody / add)。 */
 class FileImportFlowTest {
@@ -210,5 +213,29 @@ class FileImportFlowTest {
         assertEquals(2, FileImportFlow.add(rt, "member", rows) { seen += it })
         assertEquals(listOf(1, 1, 2), seen)
         assertEquals(listOf("A", "C"), rt.added.map { (it.second["name"] as JSONValue.Str).value })
+    }
+
+    @Test
+    fun readUpToStopsAtTheLimitAndAtTheEnd() {
+        val data = ByteArray(20_000) { it.toByte() }
+        assertArrayEquals(data.copyOf(10_001), FileImportFlow.readUpTo(ByteArrayInputStream(data), 10_001))
+        assertArrayEquals(data, FileImportFlow.readUpTo(ByteArrayInputStream(data), 50_000))
+        assertEquals(0, FileImportFlow.readUpTo(ByteArrayInputStream(data), 0).size)
+    }
+
+    @Test
+    fun readUpToKeepsReadingShortReads() {
+        // 1 回に少しずつしか返さない(content:// のストリームに多い)
+        val trickle = object : InputStream() {
+            private var i = 0
+            override fun read(): Int = if (i < 100) i++ else -1
+            override fun read(b: ByteArray, off: Int, len: Int): Int {
+                if (i >= 100) return -1
+                b[off] = i.toByte()
+                i++
+                return 1
+            }
+        }
+        assertEquals(51, FileImportFlow.readUpTo(trickle, 51).size)
     }
 }

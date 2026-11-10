@@ -13,6 +13,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalResources
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -43,12 +44,13 @@ fun RetentionPromptHost(runtime: AppRuntime, busy: Boolean, onStop: (String) -> 
     }
     if (!shown || current == null) return
     val context = LocalContext.current
+    val resources = LocalResources.current
     val english = AppLocales.languageCode(context) == "en"
     AlertDialog(
         onDismissRequest = retention::defer,
         modifier = Modifier.testTag("retention.prompt"),
         title = { Text(stringResource(R.string.retention_title)) },
-        text = { Text(current.message(english) { id, args -> context.getString(id, *args) }) },
+        text = { Text(current.message(english) { id, args -> resources.getString(id, *args) }) },
         confirmButton = {
             TextButton(
                 onClick = {
@@ -62,7 +64,7 @@ fun RetentionPromptHost(runtime: AppRuntime, busy: Boolean, onStop: (String) -> 
             Row {
                 TextButton(onClick = {
                     retention.dismiss()
-                    onStop(context.getString(R.string.retention_stop_instruction)) // 声で言うのと同じ(iOS の `removeRetention`)
+                    onStop(resources.getString(R.string.retention_stop_instruction)) // 声で言うのと同じ(iOS の `removeRetention`)
                 }) { Text(stringResource(R.string.retention_stop)) }
                 TextButton(onClick = retention::defer) { Text(stringResource(R.string.retention_later)) }
             }
