@@ -1,5 +1,8 @@
 import SwiftUI
 import UniformTypeIdentifiers
+#if os(macOS)
+import AppKit
+#endif
 
 /// 画像の「コピー・画像を保存…・共有」(#1333)。保存するデータとファイル名を決める。
 enum ImageExport {
@@ -27,6 +30,12 @@ enum ImageExport {
         let d = cal.dateComponents([.year, .month, .day, .hour, .minute, .second], from: date)
         let stamp = String(format: "%04d-%02d-%02d %02d.%02d.%02d", d.year ?? 0, d.month ?? 0, d.day ?? 0, d.hour ?? 0, d.minute ?? 0, d.second ?? 0)
         return "\(name) \(stamp)"
+    }
+
+    /// ⌘C(Mac)でコピーする画像。画像にフォーカスがあり、入力欄が文字を受けていない時だけ(入力欄のコピーを優先)。
+    static func copyTarget(focused: Bool, textInputActive: Bool, image: PlatformImage?) -> PlatformImage? {
+        guard focused, !textInputActive else { return nil }
+        return image
     }
 
     /// 保存待ちの画像(`.fileExporter` に渡す)。
@@ -94,26 +103,66 @@ extension View {
 }
 
 /// 画像に右クリックの「コピー・画像を保存…・共有」を付ける(画像が無ければ何も付けない)。
+/// クリックか Tab でフォーカスした画像は ⌘C でコピーでき、VoiceOver の操作の一覧にも同じ 3 つを出す。
 private struct ImageContextMenu: ViewModifier {
     let image: PlatformImage?
     let title: String
     @State private var pending: ImageExport.Pending?
+    @FocusState private var focused: Bool
+    @State private var anchor = ShareAnchor()
 
     func body(content: Content) -> some View {
         if let image {
             content
                 .contextMenu {
                     ComponentTalkImageMenuItem() // 画像のメニューが先に出るので、ここにも置く(#1323)
-                    ImageMenuItems(image: image, title: title) {
-                        pending = .init(document: ImageFileDocument(image: image),
-                                        fileName: ImageExport.fileName(title: title, fallback: L("写真"), date: Date()))
-                    }
+                    ImageMenuItems(image: image, title: title) { save(image) }
                 }
+                .focusable()
+                .focused($focused)
+                .simultaneousGesture(TapGesture().onEnded { focused = true })
+                .onCopyCommand {
+                    guard let target = ImageExport.copyTarget(focused: focused, textInputActive: ListRowCopyCommand.textInputActive,
+                                                              image: image) else { return [] }
+                    return [NSItemProvider(object: target)]
+                }
+                .accessibilityAction(named: L("コピー")) { PlatformPasteboard.setImage(image) }
+                .accessibilityAction(named: L("画像を保存…")) { save(image) }
+                .accessibilityAction(named: L("共有")) { anchor.share(image) }
+                .background(ShareAnchorView(anchor: anchor))
                 .imageSaveExporter($pending)
         } else {
             content
         }
     }
+
+    private func save(_ image: PlatformImage) {
+        pending = .init(document: ImageFileDocument(image: image),
+                        fileName: ImageExport.fileName(title: title, fallback: L("写真"), date: Date()))
+    }
+}
+
+/// VoiceOver の「共有」から標準の共有メニューを出す位置(画像の枠)。
+@MainActor
+private final class ShareAnchor {
+    weak var view: NSView?
+
+    func share(_ image: PlatformImage) {
+        guard let view else { return }
+        NSSharingServicePicker(items: [image]).show(relativeTo: view.bounds, of: view, preferredEdge: .minY)
+    }
+}
+
+private struct ShareAnchorView: NSViewRepresentable {
+    let anchor: ShareAnchor
+
+    func makeNSView(context: Context) -> NSView {
+        let view = NSView()
+        anchor.view = view
+        return view
+    }
+
+    func updateNSView(_ nsView: NSView, context: Context) { anchor.view = nsView }
 }
 #endif
 
