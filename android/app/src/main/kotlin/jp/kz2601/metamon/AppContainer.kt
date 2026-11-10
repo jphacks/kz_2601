@@ -4,6 +4,8 @@ import android.content.Context
 import android.os.LocaleList
 import android.util.Log
 import jp.kz2601.metamon.dsl.AppDSL
+import jp.kz2601.metamon.dsl.decode
+import jp.kz2601.metamon.dsl.fallback
 import jp.kz2601.metamon.renderer.DSLRuntime
 import jp.kz2601.metamon.services.AIClient
 import jp.kz2601.metamon.services.AppConfigClient

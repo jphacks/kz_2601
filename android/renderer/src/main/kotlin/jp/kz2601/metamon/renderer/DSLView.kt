@@ -25,6 +25,9 @@ import jp.kz2601.metamon.dsl.AppDSL
 import jp.kz2601.metamon.dsl.Component
 import jp.kz2601.metamon.dsl.ComponentType
 import jp.kz2601.metamon.dsl.Screen
+import jp.kz2601.metamon.dsl.Size
+import jp.kz2601.metamon.dsl.fallback
+import jp.kz2601.metamon.dsl.screen
 
 // 骨格(#356): 最初の画面を縦に並べるだけ。グリッド配置(area)・ナビ・部品のレジストリは #357 で入れる。
 
@@ -81,7 +84,7 @@ fun VoiceInputView(component: Component, runtime: DSLRuntime, modifier: Modifier
             style = MaterialTheme.typography.headlineSmall,
             textAlign = TextAlign.Center,
         )
-        val buttonSize = if (component.size == "large") 120.dp else 72.dp
+        val buttonSize = if (component.size == Size.LARGE) 120.dp else 72.dp
         Button(
             onClick = { runtime.onVoiceInput(component.id) },
             shape = CircleShape,
