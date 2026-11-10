@@ -43,14 +43,13 @@ enum MacFeedbackScreenshot {
     /// 長い辺の上限(px)。iOS と同じ
     static let maxPixels: CGFloat = 1280
 
-    /// 開いているアプリのウインドウ(設定・フィードバックのウインドウは除く)。前にあるものから。
-    static func captureAppWindow(excluding excluded: NSWindow? = nil) -> CGImage? {
-        let candidates = NSApp.orderedWindows.filter { w in
-            w !== excluded && w.isVisible && !w.isMiniaturized && w.canBecomeMain && !(w is NSPanel)
-                && w.identifier?.rawValue.hasPrefix(MacFeedbackCenter.windowId) != true
+    /// 開いているアプリのウインドウ(`MacCommands.mainWindowId` のもの)のうち一番前。設定・フィードバックのウインドウは撮らない。
+    /// アプリのウインドウが無ければ撮らない(スクショの添付は出さない)。
+    static func captureAppWindow() -> CGImage? {
+        let window = NSApp.orderedWindows.first { w in
+            w.isVisible && !w.isMiniaturized && w.identifier?.rawValue.hasPrefix(MacCommands.mainWindowId) == true
         }
-        let main = candidates.first { $0.identifier?.rawValue.hasPrefix(MacCommands.mainWindowId) == true }
-        return (main ?? candidates.first)?.contentView.flatMap { render($0) }
+        return window?.contentView.flatMap { render($0) }
     }
 
     static func render(_ view: NSView) -> CGImage? {
