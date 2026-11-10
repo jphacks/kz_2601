@@ -35,6 +35,10 @@ final class MacAppRuntime: RuntimeNavigating {
     static let undoSeconds: Double = 5
     /// addToCalendar で出す確認シートの中身(`MacAppRuntime+Calendar.swift`・#978)
     var calendarDraft: CalendarEventDraft?
+    /// 保存していない入力を捨てる前の確認(Esc・⌘W・アプリの切り替え・#943)。確認ダイアログと同じ場所に出す
+    var discardRequest: DiscardRequest?
+    /// 描いているフォームの控え(`MacAppRuntime+Discard.swift`)
+    @ObservationIgnored let openForms = OpenFormRegistry()
 
     @ObservationIgnored let recordSync: RecordSyncEngine
     /// lookupBook の問い合わせ先。appconfig への接続(#930)が来るまでは nil
@@ -284,7 +288,7 @@ final class MacAppRuntime: RuntimeNavigating {
     // MARK: - メニューの「戻る」・Esc(#934)
 
     /// 今いちばん上に見えている画面: フルスクリーン → シート → 選択中タブ(無ければ main)の順。
-    private var topStack: String {
+    var topStack: String {
         if fullScreen != nil { return "full" }
         if sheet != nil { return "sheet" }
         guard dsl.app.hasTabs else { return "main" }

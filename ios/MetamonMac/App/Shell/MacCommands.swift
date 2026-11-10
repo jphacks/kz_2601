@@ -70,7 +70,7 @@ struct MacCommands: Commands {
         }
 
         CommandMenu("移動") {
-            Button("戻る") { runtime?.goBack() }
+            Button("戻る") { runtime?.requestGoBack() }
                 .keyboardShortcut("[", modifiers: .command)
                 .disabled(!(runtime?.canGoBack ?? false))
             Divider()

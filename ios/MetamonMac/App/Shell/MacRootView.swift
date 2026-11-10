@@ -33,6 +33,8 @@ struct MacRootView: View {
     @State private var showsTips = false
     /// 画面マップ(#970・シートは中央の AppCanvas が出す)
     @State private var showsScreenMap = false
+    /// 保存していない入力を、アプリの切り替え・ウインドウを閉じる前に確認する(#943)
+    @State private var discardGuard = MacDiscardGuard()
     @Environment(MacVoiceInput.self) private var voice
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
@@ -59,7 +61,7 @@ struct MacRootView: View {
 
     var body: some View {
         NavigationSplitView(columnVisibility: $columnVisibility) {
-            AppSidebar(created: createdApps, examples: exampleApps, selection: $selectedAppId,
+            AppSidebar(created: createdApps, examples: exampleApps, selection: guardedSelection,
                        onOpen: { focus = .canvas }, onDelete: deleteApp)
                 .focused($focus, equals: .sidebar)
                 .navigationSplitViewColumnWidth(min: 180, ideal: 220, max: 320)
@@ -67,7 +69,7 @@ struct MacRootView: View {
             Group {
                 if let app = selectedApp {
                     AppCanvas(app: app, dsl: library.generated[app.id]?.dsl, showsScreenMap: $showsScreenMap,
-                              onTalk: { talk(about: $0) })
+                              onTalk: { talk(about: $0) }, discardGuard: discardGuard)
                         .id("\(app.id)#\(app.version)")
                 } else {
                     MacEmptyState(pose: .point, title: "アプリを選んでください",
@@ -87,6 +89,7 @@ struct MacRootView: View {
         }
         .frame(minWidth: Self.minWindowSize.width, minHeight: Self.minWindowSize.height)
         .focusedSceneValue(\.shellActions, shellActions)
+        .background { WindowCloseGuard(discardGuard: discardGuard) } // ⌘W・閉じるボタン(#943)
         .sheet(item: $compose, onDismiss: noteFinishedCompose) { session in
             ComposeSheet(session: session, onClose: { compose = nil }, undo: finishedUndo(session))
                 .interactiveDismissDisabled(session.isBusy)
@@ -235,6 +238,17 @@ struct MacRootView: View {
         .animation(reduceMotion ? nil : .easeInOut(duration: 0.2), value: notices.summary)
     }
 
+    /// サイドバーの選択。中央のアプリに保存していない入力があれば、確認して「破棄」の時だけ切り替える(#943)
+    private var guardedSelection: Binding<String?> {
+        Binding(get: { selectedAppId }, set: { id in switchApp(to: id) })
+    }
+
+    private func switchApp(to id: String?) {
+        guard id != selectedAppId else { return }
+        showsScreenMap = false // 確認を画面マップのシートの裏に出さない
+        discardGuard.run { selectedAppId = id }
+    }
+
     private var selectedIndex: Int? { apps.firstIndex { $0.id == selectedAppId } }
 
     private var shellActions: ShellActions {
@@ -269,7 +283,7 @@ struct MacRootView: View {
         guard !apps.isEmpty else { return }
         let next = selectedIndex.map { $0 + offset } ?? 0
         guard apps.indices.contains(next) else { return }
-        selectedAppId = apps[next].id
+        switchApp(to: apps[next].id)
     }
 }
 

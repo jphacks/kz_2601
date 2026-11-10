@@ -94,6 +94,16 @@ public enum NavigationResolver {
         return Route(screen: dsl.initialScreen)
     }
 
+    /// `route` の画面が今も出ているか(閉じたシート・戻った画面ではないか)。タブ / main の根は常に出ている(タブを切り替えても入力は残る)。
+    public static func isPresented(_ route: Route, in state: NavigationState, dsl: AppDSL) -> Bool {
+        if state.paths[route.stack]?.contains(route) == true { return true }
+        switch route.stack {
+        case "sheet": return state.sheet == route
+        case "full": return state.fullScreen == route
+        default: return route == rootRoute(of: route.stack, dsl: dsl)
+        }
+    }
+
     static func rootRoute(of stack: String, dsl: AppDSL) -> Route? {
         if stack.hasPrefix("tab:") { return Route(screen: String(stack.dropFirst(4)), stack: stack) }
         if stack == "main" { return Route(screen: dsl.initialScreen) }

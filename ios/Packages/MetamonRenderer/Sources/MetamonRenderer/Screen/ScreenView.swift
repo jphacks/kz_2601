@@ -5,6 +5,8 @@ import MetamonDSL
 public struct ScreenView: View {
     @Environment(\.dslRuntime) private var rt
     @Environment(\.formToolbarAccessory) private var formToolbarAccessory
+    /// Mac: Esc・⌘W・アプリの切り替えの前に入力の有無を見るための控え(iOS は nil)
+    @Environment(\.openForms) private var openForms
     let route: Route
     @State private var form: FormDraft?
     @State private var locals = ScreenLocals()
@@ -63,12 +65,7 @@ public struct ScreenView: View {
                 .navigationBarBackButtonHidden(guardsBack)
                 // M10: シートのフォームに入力があれば、下に払って閉じない(「閉じる」で破棄を確認する)
                 .interactiveDismissDisabled(hasUnsavedInput)
-                .confirmationDialog(L("編集内容を破棄しますか?"), isPresented: $confirmDiscard, titleVisibility: .visible) {
-                    Button(L("破棄"), role: .destructive) { rt.close(route) }
-                    Button(L("編集を続ける"), role: .cancel) {}
-                } message: {
-                    Text(L("保存していない入力は失われます。"))
-                }
+                .discardFormConfirmation(isPresented: $confirmDiscard) { rt.close(route) }
                 .task(id: route) {
                     // 新規フォームは読み込みを待たずに用意する(FormPrefill は数秒で失効するため、通信待ちで落とさない)
                     if route.recordId == nil { setUpForm(screen) } // single(#267)は読み込み後に既存の 1 件へ差し替わる
@@ -108,13 +105,19 @@ public struct ScreenView: View {
     /// `screen.entity` があればドラフトを用意。recordId 付きなら既存レコードをロード(編集モード)。
     private func setUpForm(_ screen: Screen) {
         guard let entityId = screen.entity, let entity = rt.dsl.entity(entityId) else {
-            form = nil
+            replaceForm(with: nil)
             return
         }
         let record = Self.formRecord(entity: entity, recordId: route.recordId, records: rt.records(for: entityId))
         if form == nil || form?.entity.id != entityId || form?.recordId != record?.id {
-            form = Self.makeDraft(entity: entity, record: record, rt: rt)
+            replaceForm(with: Self.makeDraft(entity: entity, record: record, rt: rt))
         }
+    }
+
+    private func replaceForm(with next: FormDraft?) {
+        if let form, form !== next { openForms?.untrack(form) }
+        form = next
+        if let next { openForms?.track(next, at: route) }
     }
 
     /// フォームが編集するレコード。single の entity(#267)は recordId によらず、その 1 件(無ければ nil = 初期値の新規)。
