@@ -23,22 +23,28 @@ import jp.kz2601.metamon.dsl.ActionType
 import jp.kz2601.metamon.dsl.Component
 import jp.kz2601.metamon.dsl.ComponentStyle
 import jp.kz2601.metamon.dsl.Size
+import jp.kz2601.metamon.renderer.form.FormDraft
 import jp.kz2601.metamon.renderer.registry.RenderContext
 import jp.kz2601.metamon.renderer.theme.RenderTheme
 
 // #357 で入れた最小の Leaf(button・voiceInput)。表示系の Leaf は 1 部品 1 ファイル(TextLeaf.kt など・#857)。
 
-/** button が見えるか(iOS の `ButtonLeaf.isVisible`)。フォームは子 Issue で入れるので、今は新規のフォーム扱い。 */
-fun isButtonVisible(action: Action?, isEditing: Boolean = false, readOnly: Boolean = false): Boolean = when (action?.type) {
-    ActionType.DELETE_RECORD -> isEditing
-    ActionType.SAVE_RECORD -> !readOnly
-    else -> true
-}
+/** button が見えるか(iOS の `ButtonLeaf.isVisible`)。 */
+fun isButtonVisible(action: Action?, isEditing: Boolean = false, readOnly: Boolean = false, canDelete: Boolean = true): Boolean =
+    when (action?.type) {
+        ActionType.DELETE_RECORD -> isEditing && canDelete
+        ActionType.SAVE_RECORD -> !readOnly
+        else -> true
+    }
+
+/** フォームの下書きから見えるかを決める(フォームの外は新規のフォーム扱い)。 */
+fun isButtonVisible(action: Action?, form: FormDraft?): Boolean =
+    isButtonVisible(action, form?.isEditing ?: false, form?.isReadOnly ?: false, form?.canDelete ?: true)
 
 /** `button`: style(primary | secondary | plain | destructive)。押すと action を実行する。 */
 @Composable
 fun ButtonLeaf(c: Component, ctx: RenderContext, modifier: Modifier = Modifier) {
-    if (!isButtonVisible(c.action)) return
+    if (!isButtonVisible(c.action, ctx.form)) return
     val label = c.label.orEmpty()
     val onClick = { c.action?.let(ctx.perform) ?: Unit }
     val shape = RoundedCornerShape(RenderTheme.Radius.button)

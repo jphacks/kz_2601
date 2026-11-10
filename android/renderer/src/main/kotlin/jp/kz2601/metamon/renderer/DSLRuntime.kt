@@ -1,6 +1,8 @@
 package jp.kz2601.metamon.renderer
 
 import jp.kz2601.metamon.dsl.Action
+import jp.kz2601.metamon.dsl.records.Entity
+import jp.kz2601.metamon.dsl.records.Record
 import jp.kz2601.metamon.renderer.form.FormDraft
 import jp.kz2601.metamon.renderer.navigation.NavigationState
 import jp.kz2601.metamon.renderer.navigation.Route
@@ -35,7 +37,31 @@ interface DSLRuntime {
 
     /** 遷移をランタイムが持つならその口。null なら描画器が自前で持つ(プレビュー・テスト)。 */
     val navigationHost: NavigationHost? get() = null
+
+    // フォーム(画面ごとの下書きと入力部品が読む)
+
+    /** DSL の entity を記録の型で読んだもの(式の評価・参照先の見出し)。 */
+    val entityModels: List<Entity> get() = emptyList()
+
+    /** null の entity にはフォームを作らない。 */
+    fun entityModel(id: String): Entity? = entityModels.firstOrNull { it.id == id }
+
+    /** 表示中の記録(entity id → 記録)。変わると描き直す。null なら記録なし(新規のフォームだけ)。 */
+    val recordsFlow: StateFlow<Map<String, List<Record>>>? get() = null
+
+    fun canEdit(entity: String, record: Record): Boolean = true
+
+    fun canDelete(entity: String, record: Record): Boolean = true
+
+    /** サインイン中の uid(hidden の項目・members から自分を外す)。 */
+    fun currentUid(): String? = null
+
+    /** 共有データの参加者(member / members の選択肢・iOS の `membersHost.appMembers`)。読めなければ空。 */
+    val formMembers: List<FormMember> get() = emptyList()
 }
+
+/** member / members の選択肢 1 人。保存値は [uid]。 */
+data class FormMember(val uid: String, val displayName: String)
 
 /** 何もしない実装(プレビュー・テスト用)。 */
 object NoopDSLRuntime : DSLRuntime {

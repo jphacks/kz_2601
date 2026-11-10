@@ -4,8 +4,8 @@ import jp.kz2601.metamon.dsl.Action
 import jp.kz2601.metamon.dsl.ActionType
 import jp.kz2601.metamon.dsl.AppDSL
 import jp.kz2601.metamon.dsl.AppDocument
-import jp.kz2601.metamon.dsl.DslJson
 import jp.kz2601.metamon.dsl.records.Entity
+import jp.kz2601.metamon.dsl.records.entityModels
 import jp.kz2601.metamon.dsl.records.JSONValue
 import jp.kz2601.metamon.dsl.records.MarkState
 import jp.kz2601.metamon.dsl.records.Record
@@ -89,6 +89,10 @@ class AppRuntime(
     override val navigation: StateFlow<NavigationState> = _navigation.asStateFlow()
     override val navigationHost: NavigationHost get() = this
 
+    /** 描画器のフォームが読む記録([RuntimeState.records] と同じもの)。 */
+    private val _records = MutableStateFlow<Map<String, List<Record>>>(emptyMap())
+    override val recordsFlow: StateFlow<Map<String, List<Record>>> = _records.asStateFlow()
+
     val document: AppDocument get() = _state.value.document
     val dsl: AppDSL get() = document.dsl
     val toast: String? get() = _state.value.toast
@@ -125,6 +129,7 @@ class AppRuntime(
     /** DSL を差し替える(別アプリ・生成の結果)。表示中の記録・遷移・モーダルは捨てる。 */
     fun apply(doc: AppDocument) {
         _state.value = RuntimeState(doc)
+        _records.value = _state.value.records
         _navigation.value = NavigationState.initial(doc.dsl)
     }
 
@@ -163,18 +168,21 @@ class AppRuntime(
     fun records(entity: String): List<Record> = _state.value.records[entity].orEmpty()
 
     /** DSL の entity(集計・権限・フォームが読む形)。 */
-    fun entityModel(id: String): Entity? {
+    override val entityModels: List<Entity> get() = dsl.entities.mapNotNull { entityModel(it.id) }
+
+    override fun currentUid(): String? = currentUserId()
+
+    override fun entityModel(id: String): Entity? {
         val current = dsl
-        val cache = entityCache?.takeIf { it.first === current }?.second ?: current.entities
-            .mapNotNull { e -> runCatching { Entity.from(DslJson.encodeToJsonElement(jp.kz2601.metamon.dsl.Entity.serializer(), e)) }.getOrNull() }
+        val cache = entityCache?.takeIf { it.first === current }?.second ?: current.entityModels()
             .associateBy { it.id }
             .also { entityCache = current to it }
         return cache[id]
     }
 
-    fun canEdit(entity: String, record: Record): Boolean = RecordPermission.canEdit(record, entityModel(entity), currentUserId())
+    override fun canEdit(entity: String, record: Record): Boolean = RecordPermission.canEdit(record, entityModel(entity), currentUserId())
 
-    fun canDelete(entity: String, record: Record): Boolean = RecordPermission.canDelete(record, entityModel(entity), currentUserId())
+    override fun canDelete(entity: String, record: Record): Boolean = RecordPermission.canDelete(record, entityModel(entity), currentUserId())
 
     suspend fun load(entities: Set<String>, force: Boolean = false) {
         for (e in entities) if (force || _state.value.records[e] == null) refresh(e)
@@ -192,12 +200,14 @@ class AppRuntime(
             val fresh = recordSync.pull(appId, entity)
             if (document.appId != appId) return
             _state.update { it.copy(records = it.records + (entity to fresh.map { r -> r.toDsl() }), failed = it.failed - entity) }
+            _records.value = _state.value.records
         } catch (e: CancellationException) {
             throw e
         } catch (_: Exception) {
             if (document.appId != appId) return
             if (_state.value.records[entity].isNullOrEmpty()) {
                 _state.update { it.copy(records = it.records + (entity to emptyList()), failed = it.failed + entity) }
+                _records.value = _state.value.records
             }
         } finally {
             _state.update { it.copy(loading = it.loading - entity) }
@@ -497,6 +507,7 @@ class AppRuntime(
     private fun setRecords(appId: String, entity: String, list: List<StoredRecord>) {
         if (appId != document.appId) return // 読む間に別のアプリへ切り替わった
         _state.update { it.copy(records = it.records + (entity to list.map { r -> r.toDsl() })) }
+        _records.value = _state.value.records
     }
 
     private suspend fun ifCurrent(appId: String, body: suspend () -> Unit) {
