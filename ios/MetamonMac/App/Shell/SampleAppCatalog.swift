@@ -5,9 +5,15 @@ struct SampleApp: Identifiable, Hashable {
     let id: String
     let name: String
     let description: String?
-    let url: URL
+    /// 同梱の DSL 例の場所。会話で作った・直したアプリ(#967)は nil で、DSL は `MacGeneratedApps` が持つ
+    var url: URL?
+    /// 会話で直すたびに 1 つ上がる(中央のランタイムを作り直す目印)。同梱の例は 0
+    var version = 0
 
-    func loadDSL() throws -> AppDSL { try AppDSL.load(contentsOf: url) }
+    func loadDSL() throws -> AppDSL {
+        guard let url else { throw CocoaError(.fileNoSuchFile) }
+        return try AppDSL.load(contentsOf: url)
+    }
 }
 
 /// バンドルに入れた DSL 例(docs/dsl/examples/*.json)を名前順に読む。読めない JSON は飛ばす。

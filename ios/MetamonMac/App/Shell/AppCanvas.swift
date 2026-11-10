@@ -9,6 +9,8 @@ struct AppCanvas: View {
     @State private var runtime: MacAppRuntime?
     @State private var loadFailed = false
     let app: SampleApp
+    /// 会話で作った・直したアプリの DSL(#967)。nil なら同梱の例を読む
+    var dsl: AppDSL?
 
     var body: some View {
         Group {
@@ -25,7 +27,7 @@ struct AppCanvas: View {
             // 見え直した時(.task は出るたびに走る)に作り直すと、メモリ上の記録が消える
             guard runtime == nil, !loadFailed else { return }
             do {
-                runtime = MacAppRuntime(appId: app.id, dsl: try app.loadDSL())
+                runtime = MacAppRuntime(appId: app.id, dsl: try dsl ?? app.loadDSL())
             } catch {
                 loadFailed = true
             }
