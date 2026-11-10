@@ -169,6 +169,25 @@ class VoiceViewModel(
         return true
     }
 
+    /**
+     * ランタイムが開いたアプリ(起動時の開き直し・切り替え・新しいアプリ・ホットリロード)に合わせる。生成はしない。
+     * 別のアプリになったら、前のアプリの要約・相談は捨てる。
+     */
+    fun adopt(doc: AppDocument) {
+        val s = _state.value
+        if (doc == s.document) return
+        if (doc.appId == s.document.appId) {
+            _state.update { it.copy(document = doc) }
+            return
+        }
+        chatEpoch++
+        chatJob?.cancel()
+        cancelAutoBuild()
+        _state.update {
+            it.copy(document = doc, summary = null, chat = emptyList(), chatTurn = null, chatPending = false, transcript = "")
+        }
+    }
+
     /** 生成後のアプリの上で音声のシートを開く(マイク FAB・voiceInput の部品) */
     fun openVoice() = _state.update { it.copy(voiceOpen = true) }
 
@@ -204,10 +223,17 @@ class VoiceViewModel(
         _state.update {
             it.copy(phase = VoicePhase.SENDING, transcript = text, error = null, progress = null, summary = null, voiceOpen = false)
         }
-        log("generate: appId=${appId()} version=${before.version} transcript=$text")
+        val target = appId()
+        log("generate: appId=$target version=${before.version} transcript=$text")
         generateJob = scope.launch {
             try {
-                val result = ai.morphStreaming(text, appId(), before.version, locale()) { onProgress(it) }
+                val result = ai.morphStreaming(text, target, before.version, locale()) { onProgress(it) }
+                if (appId() != target) {
+                    // 待つ間に別のアプリへ切り替わった: 移った先に前のアプリの結果を出さない(iOS の morph result dropped)
+                    log("generate result dropped: app changed $target → ${appId()}")
+                    _state.update { it.copy(phase = VoicePhase.IDLE, progress = null, transcript = "") }
+                    return@launch
+                }
                 val hadChat = _state.value.isChatting
                 chatEpoch++
                 _state.update {

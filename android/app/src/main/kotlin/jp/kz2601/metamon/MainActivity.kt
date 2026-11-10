@@ -24,8 +24,12 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
+import androidx.compose.foundation.layout.Row
+import androidx.compose.material3.TextButton
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
@@ -47,7 +51,10 @@ import jp.kz2601.metamon.voice.VoicePhase
 import jp.kz2601.metamon.voice.VoiceRoute
 import jp.kz2601.metamon.voice.VoiceUiState
 import jp.kz2601.metamon.voice.VoiceViewModel
+import jp.kz2601.metamon.services.AppSummary
+import jp.kz2601.metamon.switcher.AppSwitcherDialog
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 import java.io.File
 
 class MainActivity : ComponentActivity() {
@@ -109,10 +116,10 @@ fun MetamonApp(container: AppContainer) {
             runtime.dismissVoiceSheet()
         }
     }
-    // 生成・画面の差し替えの結果をランタイムに渡す
-    LaunchedEffect(state.document) {
-        if (state.document != runtime.document) runtime.show(state.document)
-    }
+    // 生成の結果をランタイムに渡す(別の appId なら新しいアプリとして開いて保存し、記録を読む)
+    LaunchedEffect(state.document) { runtime.adoptGenerated(state.document) }
+    // ランタイムが開いたアプリ(起動時の開き直し・切り替え・ホットリロード)を音声の画面にも映す
+    LaunchedEffect(runtimeState.document) { vm.adopt(runtimeState.document) }
 
     LaunchedEffect(container.auth) {
         if (container.auth.currentUser.value == null) {
@@ -141,14 +148,25 @@ fun MetamonApp(container: AppContainer) {
         }
     }
 
+    var switcherOpen by remember { mutableStateOf(false) }
+    val apps by runtime.apps.collectAsStateWithLifecycle()
+    val scope = rememberCoroutineScope()
+
     Scaffold(
         bottomBar = {
-            if (!container.environment.isProduction || container.knobs.mock) {
-                Text(
-                    "${container.environmentLabel} / auth=${container.auth.kind} / uid=${user?.uid ?: "-"}",
-                    style = MaterialTheme.typography.labelSmall,
-                    modifier = Modifier.padding(8.dp),
-                )
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                // アプリの切り替えの入口(最小・iOS は FAB の長押し。見た目は子 Issue)
+                TextButton(onClick = {
+                    switcherOpen = true
+                    scope.launch { runtime.appsList() }
+                }) { Text(stringResource(R.string.switcher_open)) }
+                if (!container.environment.isProduction || container.knobs.mock) {
+                    Text(
+                        "${container.environmentLabel} / auth=${container.auth.kind} / uid=${user?.uid ?: "-"}",
+                        style = MaterialTheme.typography.labelSmall,
+                        modifier = Modifier.padding(8.dp),
+                    )
+                }
             }
         },
     ) { padding ->
@@ -170,6 +188,22 @@ fun MetamonApp(container: AppContainer) {
             }
             if (state.isGenerating) GeneratingView(state, onCancel = vm::cancelGenerate)
         }
+    }
+
+    if (switcherOpen) {
+        AppSwitcherDialog(
+            apps = AppSummary.visible(apps, current = runtimeState.document.appId),
+            currentAppId = runtimeState.document.appId,
+            onSelect = { id ->
+                switcherOpen = false
+                scope.launch { runtime.switchApp(id) }
+            },
+            onNewApp = {
+                switcherOpen = false
+                runtime.startNewApp()
+            },
+            onDismiss = { switcherOpen = false },
+        )
     }
 
     if (!state.isInitial && state.voiceOpen) {
