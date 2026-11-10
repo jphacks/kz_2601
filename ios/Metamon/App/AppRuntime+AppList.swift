@@ -39,6 +39,10 @@ extension AppRuntime {
                 await saveOrder(next, rollbackTo: apps)
             }
         } catch {
+            if let limit = AppLimit(error) { // #630 持てるアプリの数: 置き換えてから複製し直す
+                presentAppLimit(limit) { [weak self] in await self?.duplicateApp(app) }
+                return
+            }
             print("[Metamon] duplicateApp failed: \(error)")
             toast = ErrorCopy.failure(L10n.tr("「\(app.name)」を複製できませんでした"), error, context: "duplicate app")
         }

@@ -2245,6 +2245,23 @@
         }
       }
     },
+    "「%@」から抜けますか?" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Leave \"%@\"?"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "「%@」から抜けますか?"
+          }
+        }
+      }
+    },
     "「%@」ができました" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -4523,6 +4540,23 @@
         }
       }
     },
+    "この端末の一覧から消え、参加している人の記録は見られなくなります。もう一度参加するには、シェアリンクを開き直してください。" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "It's removed from your list and you'll no longer see the shared records. To join again, open the share link again."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "この端末の一覧から消え、参加している人の記録は見られなくなります。もう一度参加するには、シェアリンクを開き直してください。"
+          }
+        }
+      }
+    },
     "この端末は距離・方向の測定に対応していません(iPhone 11 以降・SE を除く)" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -5424,6 +5458,23 @@
         }
       }
     },
+    "まだ開いていません" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Not opened yet"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "まだ開いていません"
+          }
+        }
+      }
+    },
     "まもなく作ります…" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -5998,6 +6049,40 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "アプリの名前・画面の文言・項目の名前が含まれます。記録は含まれません。"
+          }
+        }
+      }
+    },
+    "アプリの枠" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "App slot"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "アプリの枠"
+          }
+        }
+      }
+    },
+    "アプリの枠を 1 つ増やしました(買った枠 %lld 個)" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Added one app slot (%lld bought in total)"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "アプリの枠を 1 つ増やしました(買った枠 %lld 個)"
           }
         }
       }
@@ -8926,6 +9011,23 @@
         }
       }
     },
+    "上限に達しています。どのアプリと置き換えますか?" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "You've reached your app limit. Which app do you want to replace?"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "上限に達しています。どのアプリと置き換えますか?"
+          }
+        }
+      }
+    },
     "上限に達しました" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -10541,6 +10643,23 @@
         }
       }
     },
+    "元に戻せません。このアプリの記録(データ)もすべて消えます。シェアリンクと「探す」への掲載も取り下げ、共有していれば参加している人も使えなくなります。" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "This can't be undone. All of this app's records (data) are deleted too. Its share links and its Discover listing are removed, and if you shared it, the people who joined can no longer use it."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "元に戻せません。このアプリの記録(データ)もすべて消えます。シェアリンクと「探す」への掲載も取り下げ、共有していれば参加している人も使えなくなります。"
+          }
+        }
+      }
+    },
     "元に戻せません。シェアリンクと「探す」への掲載も取り下げます。" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -11255,6 +11374,23 @@
         }
       }
     },
+    "削除して続ける" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Delete and continue"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "削除して続ける"
+          }
+        }
+      }
+    },
     "削除しました" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -11574,6 +11710,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "参加すると"
+          }
+        }
+      }
+    },
+    "参加中" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Joined"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "参加中"
           }
         }
       }
@@ -11999,6 +12152,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "名前なし"
+          }
+        }
+      }
+    },
+    "名前のないアプリ" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Untitled app"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "名前のないアプリ"
           }
         }
       }
@@ -12768,6 +12938,23 @@
         }
       }
     },
+    "抜けて続ける" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Leave and continue"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "抜けて続ける"
+          }
+        }
+      }
+    },
     "抜けられませんでした。元に戻しました" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -12815,6 +13002,91 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "抜けると、参加している人の記録は見られなくなります。もう一度参加するには招待リンクが要ります。"
+          }
+        }
+      }
+    },
+    "持てるアプリの数(%lld 個)に達しました。使わないアプリを削除してから、もう一度お試しください" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "You've reached the number of apps you can keep (%lld). Delete an app you don't use, then try again"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "持てるアプリの数(%lld 個)に達しました。使わないアプリを削除してから、もう一度お試しください"
+          }
+        }
+      }
+    },
+    "持てるアプリの数に達しました" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "You've reached your app limit"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "持てるアプリの数に達しました"
+          }
+        }
+      }
+    },
+    "持てるアプリは %lld 個までです(今 %lld 個)。1 つ削除するか抜けると、続けられます。" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "You can keep up to %1$lld apps (you have %2$lld). Delete or leave one to continue."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "持てるアプリは %lld 個までです(今 %lld 個)。1 つ削除するか抜けると、続けられます。"
+          }
+        }
+      }
+    },
+    "持てるアプリは %lld 個までです(今 %lld 個)。あと %lld 個を削除するか抜けると、続けられます。" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "You can keep up to %1$lld apps (you have %2$lld). Delete or leave %3$lld more to continue."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "持てるアプリは %lld 個までです(今 %lld 個)。あと %lld 個を削除するか抜けると、続けられます。"
+          }
+        }
+      }
+    },
+    "持てるアプリは %lld 個までです。どれかと置き換えると、続けて作れます。" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "You can keep up to %lld apps. Replace one to keep going."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "持てるアプリは %lld 個までです。どれかと置き換えると、続けて作れます。"
           }
         }
       }
@@ -13652,6 +13924,23 @@
         }
       }
     },
+    "最後に開いた: %@" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Last opened %@"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "最後に開いた: %@"
+          }
+        }
+      }
+    },
     "最新" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -13954,6 +14243,40 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "本日の受付を終了しました"
+          }
+        }
+      }
+    },
+    "枠を 1 つ買う(%lld コイン)" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Buy one more slot (%lld coins)"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "枠を 1 つ買う(%lld コイン)"
+          }
+        }
+      }
+    },
+    "枠を買えませんでした" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Couldn't buy a slot"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "枠を買えませんでした"
           }
         }
       }
@@ -15437,6 +15760,23 @@
         }
       }
     },
+    "置き換える" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Replace"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "置き換える"
+          }
+        }
+      }
+    },
     "習慣" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -15518,6 +15858,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "自分だけのアプリと記録"
+          }
+        }
+      }
+    },
+    "自分で作成" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Created by you"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "自分で作成"
           }
         }
       }
