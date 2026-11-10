@@ -12,8 +12,8 @@
 #   | ios/Packages/MetamonDSL/**・DSL のテストデータ(*1) | する               | DSL / Renderer / Services(DSL は全員の依存) |
 #   | ios/Packages/MetamonRenderer/**・docs/dsl の適合テストと例 | する       | Renderer                                 |
 #   | ios/Packages/MetamonServices/**                    | する               | Services                                 |
-#   | ios/MetamonMac/**・ios/project.yml・docs/dsl/examples/** | する         | なし                                     |
-#   | .github/workflows/mac-ci.yml                       | する               | 全部                                     |
+#   | ios/MetamonMac/**・ios/Shared/**・ios/project.yml・docs/dsl/examples/** | する | なし                          |
+#   | .github/workflows/mac-ci.yml・ios/scripts/mac-package-test.sh | する    | 全部                                     |
 #   | 上記以外                                           | しない             | なし(mac-ci は成功で終わる)            |
 #   | develop / main への push(上記のどれかが変更)      | する               | 全部                                     |
 #   (*1) docs/dsl/conformance/expr/**・docs/dsl/dsl.schema.json・docs/dsl/examples/**・テストが読む backend の JSON
@@ -78,11 +78,14 @@ jobs:
               - 'ios/Packages/MetamonServices/**'
             app:
               - 'ios/MetamonMac/**'
+              # iOS と共有するランタイムの部品(#939)。Mac のターゲットにもコンパイルする
+              - 'ios/Shared/**'
               - 'ios/project.yml'
               - 'ios/scripts/select-firebase-plist.sh'
               - 'docs/dsl/examples/**'
             ci:
               - '.github/workflows/mac-ci.yml'
+              - 'ios/scripts/mac-package-test.sh'
 
       - name: 回すテストを決める
         id: plan

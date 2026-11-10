@@ -40,10 +40,16 @@ final class MacAppRuntime: RuntimeNavigating {
     init(appId: String, dsl: AppDSL, recordSync: RecordSyncEngine? = nil) {
         self.appId = appId
         self.dsl = dsl
-        selectedTab = dsl.app.tabs.first?.screen ?? ""
+        selectedTab = dsl.initialTab // iOS と同じ: initialScreen がタブならそのタブから
         self.recordSync = recordSync ?? Self.mockRecordSync()
         self.recordSync.onEvent = { [weak self] event in self?.handle(event) }
         self.recordSync.start()
+    }
+
+    /// アプリを切り替えるとランタイムごと作り直す(`AppCanvas` の `.id`)。購読のタスクがエンジンを握り続けないよう止める。
+    deinit {
+        let engine = recordSync
+        Task { @MainActor in engine.stop() }
     }
 
     /// メモリ上の appconfig + 一時フォルダのローカル DB(アプリを閉じれば消える)。iOS の METAMON_MOCK 相当。
@@ -125,7 +131,21 @@ final class MacAppRuntime: RuntimeNavigating {
                 break
             default:
                 toast = RecordActionSteps.saveFailedMessage
+                // 断られた書き込みは破棄済み(create はローカル行も消えた)。楽観的に出した分をサーバーの内容に戻す
+                if let refused = Self.refusedEntity(event), refused.appId == appId { await refresh(refused.entity) }
             }
+        }
+    }
+
+    private static func refusedEntity(_ event: SyncEvent) -> (appId: String, entity: String)? {
+        switch event {
+        case .forbidden(let appId, let entity, _), .rejected(let appId, let entity, _, _, _),
+             .notMember(let appId, let entity, _), .denied(let appId, let entity, _, _),
+             .proRequired(let appId, let entity, _, _), .planLimit(let appId, let entity, _, _),
+             .appStopped(let appId, let entity, _), .textNotAllowed(let appId, let entity, _, _):
+            return (appId, entity)
+        case .sent, .conflict, .paused, .drained:
+            return nil
         }
     }
 
@@ -259,6 +279,7 @@ final class MacAppRuntime: RuntimeNavigating {
                                                      grace: .seconds(Self.undoSeconds)).ticket
         await reloadLocal(entity)
         withAnimation { recordUndo = ticket }
+        AccessibilityNotification.Announcement(L10n.tr("削除しました")).post() // iOS と同じく VoiceOver に知らせる
     }
 
     func undoRecordDelete() async {

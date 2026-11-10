@@ -20,9 +20,10 @@
 #   | .github/workflows/ios-ci.yml                  | ios-xcode       | ユニットテスト全部(UI 以外)                              |
 #   | 上記以外(ios/README.md, ios/scripts/** 等)    | なし            | なし(ios-ci は成功で終わる)                              |
 #   | develop / main への push(上記のどれかが変更) | ios-xcode       | 全部(UI テスト MetamonUITests を含む)                    |
-#   (*1) ios/Metamon/**, ios/MetamonWidget/**, ios/MetamonTests/**, ios/project.yml, ios/StoreKit/**,
+#   (*1) ios/Metamon/**, ios/Shared/**(Mac と共有・#939), ios/MetamonWidget/**, ios/MetamonTests/**, ios/project.yml, ios/StoreKit/**,
 #        docs/dsl/examples/**(アプリにバンドルされる)
 #   (*2) docs/dsl/conformance/expr/**(Expr の共有テストデータ・#545)も DSL の変更として扱う
+#        ios/scripts/mac-package-test.sh(ios-dsl がテストを回すスクリプト・#928)も DSL の変更として扱う
 #   PR では常に -skip-testing:MetamonUITests(`ui-tests` ラベル時だけ UI テストも足す)。
 #
 # UI テスト(MetamonUITests)を PR で回したい時: PR に `ui-tests` ラベルを付けて、ios-ci の
@@ -80,6 +81,8 @@ jobs:
           filters: |
             dsl:
               - 'ios/Packages/MetamonDSL/**'
+              # ios-dsl ジョブがこのスクリプトでテストを回す(#928)
+              - 'ios/scripts/mac-package-test.sh'
               - 'docs/dsl/conformance/expr/**'
               - 'docs/dsl/dsl.schema.json'    # スキーマだけの変更でも SchemaSwiftKeysTests を回す(#537)
             renderer:
@@ -91,6 +94,8 @@ jobs:
               - 'ios/Packages/MetamonServices/**'
             app:
               - 'ios/Metamon/**'
+              # Mac と共有するランタイムの部品(#939)。iOS のアプリにもコンパイルする
+              - 'ios/Shared/**'
               - 'ios/MetamonWidget/**'
               - 'ios/MetamonTests/**'
               - 'ios/project.yml'
