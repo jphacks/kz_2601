@@ -43,6 +43,7 @@ import androidx.lifecycle.compose.LifecycleEventEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import jp.kz2601.metamon.R
 import jp.kz2601.metamon.dsl.AppDSL
+import jp.kz2601.metamon.notifications.NotificationsFirstAsk
 import jp.kz2601.metamon.services.permissions.AppPermission
 import jp.kz2601.metamon.services.permissions.PermissionNeeds
 import jp.kz2601.metamon.services.permissions.PermissionOffBarModel
@@ -62,6 +63,8 @@ fun PermissionOffBarHost(dsl: AppDSL, appId: String, busy: Boolean, summaryShowi
     val statuses by center.statuses.collectAsStateWithLifecycle()
     LifecycleEventEffect(Lifecycle.Event.ON_RESUME) { center.refresh(activity) }
     val needed = remember(dsl) { PermissionNeeds.of(dsl) }
+    // 通知のあるアプリは、未確認なら開いた時に 1 回だけ聞く(#886)
+    NotificationsFirstAsk(AppPermission.NOTIFICATIONS in needed, appId, busy = busy || summaryShowing)
     var dismissed by rememberSaveable(appId) { mutableStateOf(emptyList<String>()) }
     val shown = PermissionOffBarModel.pick(
         needed = needed,

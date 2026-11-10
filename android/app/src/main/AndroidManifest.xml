@@ -21,6 +21,11 @@
     <uses-permission
         android:name="android.permission.NEARBY_WIFI_DEVICES"
         android:usesPermissionFlags="neverForLocation" />
+    <!-- 生成アプリの通知(#886): 再起動の後に予約し直す -->
+    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
+    <!-- アラーム(alarm: true)だけ正確な時刻で鳴らす。利用者が設定で許可した時だけ使い、無ければ正確でないアラーム。
+         USE_EXACT_ALARM・USE_FULL_SCREEN_INTENT は Play で目覚まし・通話のアプリに限られるので持たない -->
+    <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM" />
     <!-- Health Connect(healthStat)の権限は、その部品と権限の理由の画面を入れる時に足す(#890 の子 Issue) -->
 
     <application
@@ -48,6 +53,18 @@
                 <category android:name="android.intent.category.DEFAULT" />
             </intent-filter>
         </activity>
+        <!-- 生成アプリの通知(#886): 時刻が来た・止めた(自分の PendingIntent だけ)と、再起動・時刻の変更・更新(OS) -->
+        <receiver
+            android:name=".notifications.NotificationReceiver"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="android.intent.action.BOOT_COMPLETED" />
+                <action android:name="android.intent.action.TIME_SET" />
+                <action android:name="android.intent.action.TIMEZONE_CHANGED" />
+                <action android:name="android.intent.action.MY_PACKAGE_REPLACED" />
+                <action android:name="android.app.action.SCHEDULE_EXACT_ALARM_PERMISSION_STATE_CHANGED" />
+            </intent-filter>
+        </receiver>
     </application>
 
 </manifest>
