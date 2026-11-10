@@ -204,6 +204,13 @@ class RenderTree(
         }
         // 画面を描かないので検索文字列は空(描く時は ScreenLocals)
         ComponentType.SEARCH_BAR -> mapOf("query" to JsonPrimitive(""))
+        // aiButton: DSL に書いた値だけ(結果は AI 次第なので木に入れない)
+        ComponentType.AI_BUTTON -> buildMap {
+            c.task?.let { put("task", JsonPrimitive(it.wire)) }
+            c.output?.let { put("output", JsonPrimitive(it)) }
+            c.entity?.let { put("entity", JsonPrimitive(it)) }
+            c.limit?.let { put("limit", JsonPrimitive(it)) }
+        }
         else -> emptyMap()
     }
 

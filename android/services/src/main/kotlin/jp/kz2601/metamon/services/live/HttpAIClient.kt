@@ -3,6 +3,8 @@ package jp.kz2601.metamon.services.live
 import jp.kz2601.metamon.dsl.AppDSL
 import jp.kz2601.metamon.dsl.AppDocument
 import jp.kz2601.metamon.dsl.DslJson
+import jp.kz2601.metamon.dsl.ai.AiTextRequest
+import jp.kz2601.metamon.dsl.ai.AiTextResult
 import jp.kz2601.metamon.services.AIClient
 import jp.kz2601.metamon.services.ChatCapability
 import jp.kz2601.metamon.services.ChatMessage
@@ -134,6 +136,8 @@ class HttpAIClient(
             log("resetChat failed: $e") // サーバー側は 30 分で消える
         }
     }
+
+    override suspend fun text(request: AiTextRequest): AiTextResult = AiTextCall.send(http, request)
 
     // MARK: generate
 
