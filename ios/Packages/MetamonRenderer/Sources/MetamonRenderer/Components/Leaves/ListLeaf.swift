@@ -67,6 +67,7 @@ struct ListLeaf: View {
                         .accessibilityActions {
                             if deletable(row, entity: entityId) { Button(L("削除")) { delete(row, entity: entityId) } }
                         }
+                        .recordDrag { ListRowCopyText.text(item: c.item, record: row, entity: entity, rt: rt) }
                 }
             }
             // 行が少なくてもカードはセルの高さまで伸ばす(#84: 空白の下半分を作らない)。行は上詰め
@@ -206,5 +207,18 @@ struct ListLeaf: View {
         return rows.filter { r in
             fields.contains { rt.display(r[$0], field: entity?.field($0)).localizedCaseInsensitiveContains(q) }
         }
+    }
+}
+
+private extension View {
+    /// 行を外(メモ・Finder・メール)へドラッグするとコピーと同じテキストを渡す(Mac のみ・#1334)。
+    /// Mac のドラッグは少し動かしてから始まるので、行のクリックや中のボタンとはぶつからない。iOS は何もしない。
+    @ViewBuilder
+    func recordDrag(_ text: @escaping () -> String) -> some View {
+        #if os(macOS)
+        onDrag { ListRowCopyText.dragItem(text()) }
+        #else
+        self
+        #endif
     }
 }
