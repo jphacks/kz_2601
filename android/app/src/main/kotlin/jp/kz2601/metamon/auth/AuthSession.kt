@@ -1,6 +1,8 @@
 package jp.kz2601.metamon.auth
 
 import android.app.Activity
+import jp.kz2601.metamon.R
+import jp.kz2601.metamon.runtime.UiText
 import jp.kz2601.metamon.services.AuthError
 import jp.kz2601.metamon.services.AuthService
 import jp.kz2601.metamon.services.AuthUser
@@ -58,8 +60,10 @@ class AuthSession(val service: AuthService, private val beforeSignOut: suspend (
     private val busy = MutableStateFlow(false)
     val isBusy: StateFlow<Boolean> = busy
 
-    private val error = MutableStateFlow<String?>(null)
-    val errorMessage: StateFlow<String?> = error
+    private val error = MutableStateFlow<UiText?>(null)
+
+    /** サインイン画面に出す失敗の文言(画面の言語で解決する)。例外の文言(英語のことがある)は出さない。 */
+    val errorMessage: StateFlow<UiText?> = error
 
     suspend fun signInAnonymously() = perform { service.signInAnonymously() }
 
@@ -141,7 +145,7 @@ class AuthSession(val service: AuthService, private val beforeSignOut: suspend (
 
     suspend fun signOut() {
         runBeforeSignOut()
-        runCatching { service.signOut() }.onFailure { error.value = it.message }
+        runCatching { service.signOut() }.onFailure { error.value = SIGN_OUT_FAILED }
     }
 
     /** 失敗してもサインアウトは続ける(次のサインインで登録し直す)。トークンを止める前に呼ぶ。 */
@@ -197,13 +201,20 @@ class AuthSession(val service: AuthService, private val beforeSignOut: suspend (
         } catch (_: AuthError.Canceled) {
             // 自分で閉じた: 何も出さない
         } catch (e: Exception) {
-            error.value = e.message ?: SIGN_IN_FAILED
+            error.value = failureText(e)
         } finally {
             busy.value = false
         }
     }
 
     companion object {
-        const val SIGN_IN_FAILED = "サインインできませんでした。もう一度お試しください"
+        val SIGN_IN_FAILED: UiText = UiText.Res(R.string.auth_sign_in_failed)
+        val SIGN_OUT_FAILED: UiText = UiText.Res(R.string.auth_sign_out_failed)
+
+        /** [AuthError.Unavailable] だけはアプリが strings から作った文言なのでそのまま出す。ほかは固定の文言。 */
+        internal fun failureText(e: Exception): UiText {
+            val message = (e as? AuthError.Unavailable)?.message
+            return if (message.isNullOrBlank()) SIGN_IN_FAILED else UiText.Raw(message)
+        }
     }
 }

@@ -98,7 +98,8 @@ class AuthSessionTest {
         val session = AuthSession(FakeAuth(failWith = IllegalStateException("network down")))
         session.signInAnonymously()
 
-        assertEquals("network down", session.errorMessage.value)
+        // 例外の文言(英語のことがある)は出さず、strings の文言を画面の言語で出す
+        assertEquals(AuthSession.SIGN_IN_FAILED, session.errorMessage.value)
         assertEquals(RootScreen.SignIn, RootScreen.of(session.user.value))
         assertFalse(session.isBusy.value)
     }
