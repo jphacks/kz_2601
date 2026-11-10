@@ -57,6 +57,9 @@ class RecordRetentionRunner(
         _prompt.value = _prompt.value?.let { p -> p.copy(items = p.items.filterNot { it.entity == entity.id }).takeIf { it.items.isNotEmpty() } }
     }
 
+    /** 確認した期間(設定の行が読む)。未確認なら null。 */
+    fun consentedDays(appId: String, entity: String): Int? = consent.days(appId, entity)
+
     /** 「あとで」: このプロセスの間は聞き直さない(消さない)。 */
     fun defer() {
         val p = _prompt.value ?: return

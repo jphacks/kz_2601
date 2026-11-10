@@ -276,7 +276,17 @@ fun MetamonApp(container: AppContainer) {
         }
     }
 
-    if (settingsOpen) SettingsSheet(container, busy = state.isGenerating, onDismiss = { settingsOpen = false })
+    if (settingsOpen) {
+        SettingsSheet(
+            container,
+            busy = state.isGenerating,
+            onDismiss = { settingsOpen = false },
+            remainingToday = state.remainingToday,
+            isPro = state.isPro,
+            onRefreshUsage = { vm.refreshUsage() },
+            onStopRetention = vm::generateNow,
+        )
+    }
     // 設定のシートより後に置く(設定から出した時に上に重ねる)
     val consentVisible by container.consentPrompt.visible.collectAsStateWithLifecycle()
     if (consentVisible) {

@@ -2,6 +2,11 @@
 <resources>
     <string name="retention_confirm">Delete automatically</string>
     <string name="retention_later">Later</string>
+    <string name="retention_settings_confirm">Confirm and delete automatically</string>
+    <string name="retention_settings_footer">Entries older than the period are deleted automatically, for example when you open it. Deleted entries cannot be restored.</string>
+    <string name="retention_settings_footer_shared">" For shared entries, only the ones you added are deleted."</string>
+    <string name="retention_settings_header">Auto-delete entries</string>
+    <string name="retention_settings_period">%1$s</string>
     <string name="retention_stop">Stop auto-deleting</string>
     <string name="retention_title">Delete old entries automatically?</string>
 </resources>

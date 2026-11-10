@@ -3,6 +3,11 @@
 <resources>
     <string name="retention_confirm">自動で消す</string>
     <string name="retention_later">あとで</string>
+    <string name="retention_settings_confirm">確認して自動で消す</string>
+    <string name="retention_settings_footer">期間を過ぎた記録は、開いた時などに自動で消えます。消えた記録は元に戻せません。</string>
+    <string name="retention_settings_footer_shared">共有の記録は自分が追加したものだけが消えます。</string>
+    <string name="retention_settings_header">記録の自動削除</string>
+    <string name="retention_settings_period">%1$sで消す</string>
     <string name="retention_stop">自動で消すのをやめる</string>
     <string name="retention_title">古い記録を自動で消しますか?</string>
 </resources>

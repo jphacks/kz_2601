@@ -17,6 +17,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -38,6 +39,7 @@ import jp.kz2601.metamon.language.LanguageSection
 import jp.kz2601.metamon.push.PushConsentSection
 import jp.kz2601.metamon.renderer.components.social.BlockedUsersSection
 import jp.kz2601.metamon.push.PushHost
+import jp.kz2601.metamon.services.RemainingToday
 import jp.kz2601.metamon.voice.ClarifySection
 import jp.kz2601.metamon.voice.ClarifySettings
 import jp.kz2601.metamon.voice.SpeechSection
@@ -49,12 +51,24 @@ import java.time.format.FormatStyle
 /**
  * 設定(iOS の SettingsSheet): 相談の ON / OFF(#893 の [ClarifySection])・投稿に表示する名前(#875)・
  * プライバシー(AI へのデータ送信の同意)・クラッシュ報告・AI ボタンの利用状況(#888)・他の人の行動で届く通知(#887 の [PushConsentSection])・
+ * 記録の自動削除(#482 の [RetentionSettingsSection])・今日の残り(#630 の [RemainingTodaySection])・
  * 言語(#843 の [LanguageSection])・アカウント(ログアウト・削除・#841 の [AccountSection])。
  * @param busy 生成中(アカウント削除をさせない)
+ * @param remainingToday 音声の画面が最後に読んだ「今日の残り」。[onRefreshUsage] で開いた時に読み直す
+ * @param onStopRetention 「自動で消すのをやめる」の指示文を送る(送ったらシートを閉じる)
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun SettingsSheet(container: AppContainer, busy: Boolean, onDismiss: () -> Unit) {
+fun SettingsSheet(
+    container: AppContainer,
+    busy: Boolean,
+    onDismiss: () -> Unit,
+    remainingToday: RemainingToday? = null,
+    isPro: Boolean = false,
+    onRefreshUsage: () -> Unit = {},
+    onStopRetention: (String) -> Unit = {},
+) {
+    LaunchedEffect(Unit) { onRefreshUsage() }
     ModalBottomSheet(
         onDismissRequest = onDismiss,
         sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
@@ -80,8 +94,16 @@ fun SettingsSheet(container: AppContainer, busy: Boolean, onDismiss: () -> Unit)
                 PushConsentSection(container.push, document.appId, document.dsl)
                 HorizontalDivider(Modifier.padding(vertical = 8.dp))
             }
+            // 記録の自動削除(#482)。今のアプリに保存期間のある記録がある時だけ
+            RetentionSettingsSection(container.runtime, onStop = { text ->
+                onStopRetention(text)
+                onDismiss()
+            })
             // ブロック中のユーザー(#877)。通報・ブロックが使える時だけ
             BlockedUsersSection(container.runtime)
+            // 今日の残り(#630)。AI を使うまでは「AI を使うと表示されます」
+            RemainingTodaySection(remainingToday, isPro)
+            HorizontalDivider(Modifier.padding(vertical = 8.dp))
             var language by remember { mutableStateOf(AppLocales.setting(context)) }
             LanguageSection(language, onSelect = { selected ->
                 if (selected == language) return@LanguageSection
