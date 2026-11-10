@@ -83,6 +83,10 @@ private struct RuntimeOverlays: ViewModifier {
                 }
                 Button("キャンセル", role: .cancel) {}
             }
+            // addToCalendar(#978): 中身を見せてから書く
+            .sheet(item: calendarShown) { draft in
+                MacCalendarSheet(draft: draft, writer: runtime.calendarWriter) { runtime.calendarDraft = nil }
+            }
             .overlay(alignment: .top) {
                 VStack(spacing: 8) {
                     if active, let message = runtime.toast {
@@ -114,6 +118,10 @@ private struct RuntimeOverlays: ViewModifier {
 
     private var confirmShown: Binding<Bool> {
         Binding(get: { active && runtime.confirm != nil }, set: { if !$0 { runtime.confirm = nil } })
+    }
+
+    private var calendarShown: Binding<CalendarEventDraft?> {
+        Binding(get: { active ? runtime.calendarDraft : nil }, set: { runtime.calendarDraft = $0 })
     }
 }
 
