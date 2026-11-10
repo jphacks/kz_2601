@@ -1276,6 +1276,23 @@
         }
       }
     },
+    "Apple Music へのアクセスが許可されていません。システム設定 > プライバシーとセキュリティ > メディアと Apple Music で Tailor It を許可してください" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Apple Music access isn't allowed. Allow Tailor It in System Settings > Privacy & Security > Media & Apple Music."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Apple Music へのアクセスが許可されていません。システム設定 > プライバシーとセキュリティ > メディアと Apple Music で Tailor It を許可してください"
+          }
+        }
+      }
+    },
     "Apple Music へのアクセスが許可されていません。設定アプリの Tailor It で「メディアと Apple Music」をオンにしてください" : {
       "extractionState" : "manual",
       "localizations" : {
