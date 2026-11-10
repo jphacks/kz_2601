@@ -23,6 +23,26 @@ enum class RootScreen {
     }
 }
 
+/** 引き継ぎ(#1101)の失敗。画面が文言に直す。 */
+sealed interface LinkProblem {
+    /** 既に Google / Apple でサインインしている */
+    data object AlreadyLinked : LinkProblem
+
+    /** 切り替え先の資格情報が残っていない(もう一度サインインから) */
+    data object NoPendingAccount : LinkProblem
+
+    /** そのほか(通信など)。Firebase の英語の文言はそのまま出さない */
+    data object Failed : LinkProblem
+
+    companion object {
+        fun of(e: Exception): LinkProblem = when (e) {
+            is AuthError.AlreadyLinked -> AlreadyLinked
+            is AuthError.NoPendingAccount -> NoPendingAccount
+            else -> Failed
+        }
+    }
+}
+
 /** Credential Manager から Google の ID トークンを取る口(画面側が Activity を持って作る)。 */
 fun interface GoogleIdTokenSource {
     suspend fun idToken(): String
@@ -46,6 +66,78 @@ class AuthSession(val service: AuthService, private val beforeSignOut: suspend (
     suspend fun signInWithGoogle(source: GoogleIdTokenSource) = perform { service.signInWithGoogle(source.idToken()) }
 
     suspend fun signInWithApple(activity: Activity) = perform { service.signInWithApple(activity) }
+
+    private val conflict = MutableStateFlow<String?>(null)
+
+    /**
+     * 匿名 → Google / Apple の引き継ぎ(#1101・iOS の `linkConflict`)で、その資格情報が既に別のアカウントにあった。
+     * 値は入ろうとした方法([AuthUser.GOOGLE] / [AuthUser.APPLE])。切り替えるかを確認する
+     */
+    val linkConflict: StateFlow<String?> = conflict
+
+    private val linkProblem = MutableStateFlow<LinkProblem?>(null)
+
+    /** 引き継ぎの失敗理由(設定に出す。サインイン画面の [errorMessage] とは分ける)。 */
+    val linkError: StateFlow<LinkProblem?> = linkProblem
+
+    /** 引き継ぎ(Google)。@return 引き継げたら true。キャンセル・失敗・既に別アカウント([linkConflict] が立つ)は false */
+    suspend fun linkWithGoogle(source: GoogleIdTokenSource): Boolean =
+        link(AuthUser.GOOGLE) { service.linkWithGoogle(source.idToken()) }
+
+    /** 引き継ぎ(Apple・Custom Tab)。 */
+    suspend fun linkWithApple(activity: Activity): Boolean = link(AuthUser.APPLE) { service.linkWithApple(activity) }
+
+    /** 確認ダイアログを閉じた(切り替えない)。 */
+    fun dismissLinkConflict() {
+        conflict.value = null
+    }
+
+    /**
+     * [linkConflict] の後、その資格情報の既存アカウントへ切り替える。uid が変わるので、匿名の時の端末のデータは
+     * 持ち主の見張り(`AccountGuard`)が消す。通知の登録は新しい uid で前面に戻った時に登録し直す。
+     */
+    suspend fun switchToExistingAccount(): Boolean {
+        if (busy.value) return false
+        conflict.value = null
+        busy.value = true
+        linkProblem.value = null
+        return try {
+            // 匿名の uid に付いた通知の端末の登録を先に消す(サインアウトと同じ・#887)。切り替え後は前の uid のトークンが無い
+            runBeforeSignOut()
+            service.switchToPendingAccount()
+            true
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            linkProblem.value = LinkProblem.of(e)
+            false
+        } finally {
+            busy.value = false
+        }
+    }
+
+    private suspend fun link(provider: String, body: suspend () -> AuthUser): Boolean {
+        if (busy.value) return false
+        busy.value = true
+        linkProblem.value = null
+        conflict.value = null
+        return try {
+            body()
+            true
+        } catch (e: CancellationException) {
+            throw e
+        } catch (_: AuthError.Canceled) {
+            false
+        } catch (_: AuthError.CredentialAlreadyInUse) {
+            conflict.value = provider // 確認ダイアログで伝えるので赤字は出さない
+            false
+        } catch (e: Exception) {
+            linkProblem.value = LinkProblem.of(e)
+            false
+        } finally {
+            busy.value = false
+        }
+    }
 
     suspend fun signOut() {
         runBeforeSignOut()
