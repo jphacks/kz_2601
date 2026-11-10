@@ -54,6 +54,7 @@ import jp.kz2601.metamon.voice.ChatHistoryStore
 import jp.kz2601.metamon.voice.FabPositionStore
 import jp.kz2601.metamon.voice.LaunchVisits
 import jp.kz2601.metamon.voice.SpeechSettings
+import jp.kz2601.metamon.renderer.components.RemoteImages
 import jp.kz2601.metamon.renderer.components.audio.LocalAudioStore
 import jp.kz2601.metamon.renderer.components.media.VideoCodec
 import jp.kz2601.metamon.services.http.AuthTokenProvider
@@ -156,6 +157,8 @@ class AppContainer(
     private val removeLocalMedia: () -> Unit,
     /** 仲間探し・通報・ブロック(#877)。モックは null(出さない) */
     private val social: SocialServices? = null,
+    /** https の画像のキャッシュを消す(#841 の後片付け) */
+    private val clearImageCache: () -> Unit = {},
 ) {
     /** 画面の下に出す接続先の名前(モックなら "mock")。 */
     val environmentLabel: String get() = if (knobs.mock) "mock" else environment.name
@@ -181,6 +184,7 @@ class AppContainer(
             chatHistory = chatHistory,
             authorProfile = authorProfile,
             removeLocalMedia = removeLocalMedia,
+            clearImageCache = clearImageCache,
             feedCache = feedCache,
             // 同意は人ごと(iOS は UserDefaults ごと消す)。前の人の止めた発話も次の人の同意で送らない
             forgetConsent = {
@@ -240,6 +244,8 @@ class AppContainer(
             // モックは端末に残さない・同意済みで始める(設定から取り消して同意の画面を試せる)
             val prefs: KeyValueStore = InMemoryKeyValueStore()
             val consent = AiConsentStore(prefs).apply { grant() }
+            // DSL に書かれた https の画像は外のサーバーなのでモックでも読む
+            RemoteImages.install(context, MetamonHttp.defaultClient())
             return AppContainer(
                 environment = environment,
                 auth = MockAuthService(signedIn = true),
@@ -268,6 +274,7 @@ class AppContainer(
                 authorProfile = AuthorProfile(InMemoryKeyValueStore()),
                 chatHistory = ChatHistoryStore(null),
                 removeLocalMedia = removeLocalMedia(context),
+                clearImageCache = { RemoteImages.wipe(context) },
             )
         }
 
@@ -286,6 +293,8 @@ class AppContainer(
             // App Check: release は Play Integrity・debug は debug provider。Firebase が無ければヘッダ無し
             val appCheck = if (firebase) FirebaseAppCheckTokenProvider.createIfConfigured() else null
             val client = MetamonHttp.defaultClient()
+            // 画像も同じ接続を使う(トークンは付けない)
+            RemoteImages.install(context, client)
             fun http(baseUrl: String) = MetamonHttp(baseUrl, tokens, clientInfo, appCheck = appCheck, client = client, device = device)
             val log: (String) -> Unit = { Log.w(TAG, it) }
 
@@ -331,6 +340,7 @@ class AppContainer(
                 chatHistory = ChatHistoryStore(File(context.filesDir, "chat_history")),
                 removeLocalMedia = removeLocalMedia(context),
                 social = SocialServices(HttpMatchingClient(appConfigHttp), HttpModerationClient(appConfigHttp), MatchingAgeGate(prefs)),
+                clearImageCache = { RemoteImages.wipe(context) },
             )
         }
 

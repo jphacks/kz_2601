@@ -32,6 +32,10 @@ dependencies {
     // photoField のカメラの保存先(FileProvider)
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.browser)
+    // https の画像。通信は :services と同じ OkHttp(版は libs の okhttp に揃える)
+    implementation(libs.coil.compose)
+    implementation(libs.coil.network.okhttp)
+    implementation(libs.okhttp)
     // videoPlayer の再生
     implementation(libs.media3.exoplayer)
     implementation(libs.media3.ui)
@@ -42,6 +46,7 @@ dependencies {
     debugImplementation(libs.compose.ui.tooling)
 
     testImplementation(libs.junit)
+    testImplementation(libs.okhttp.mockwebserver)
 }
 
 // 適合テストは docs/dsl/conformance/cases(全 OS 共通の期待値)と、case が参照する docs/dsl/examples をそのまま読む。
