@@ -42,5 +42,14 @@ struct MetamonMacApp: App {
         Settings {
             MacLanguageRoot { MacSettingsView() } // ⌘,(#973)
         }
+
+        #if !APP_STORE_REVIEW // 審査用ビルドはフィードバックを外す(#319)
+        // ヘルプのメニューと設定の「詳細」から開く(#983)
+        Window("フィードバック", id: MacFeedbackCenter.windowId) {
+            MacLanguageRoot { MacFeedbackWindow() }
+        }
+        .windowResizability(.contentSize)
+        .defaultPosition(.center)
+        #endif
     }
 }
