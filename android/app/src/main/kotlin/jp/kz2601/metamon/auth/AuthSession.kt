@@ -211,7 +211,10 @@ class AuthSession(val service: AuthService, private val beforeSignOut: suspend (
         val SIGN_IN_FAILED: UiText = UiText.Res(R.string.auth_sign_in_failed)
         val SIGN_OUT_FAILED: UiText = UiText.Res(R.string.auth_sign_out_failed)
 
-        /** [AuthError.Unavailable] だけはアプリが strings から作った文言なのでそのまま出す。ほかは固定の文言。 */
+        /**
+         * [AuthError.Unavailable] だけはアプリが strings から作った文言なのでそのまま出す。ほかは固定の文言。
+         * [AuthError.Unsupported](既定の実装の「この操作は無い」)は開発者向けの英語なので固定の文言にする。
+         */
         internal fun failureText(e: Exception): UiText {
             val message = (e as? AuthError.Unavailable)?.message
             return if (message.isNullOrBlank()) SIGN_IN_FAILED else UiText.Raw(message)
