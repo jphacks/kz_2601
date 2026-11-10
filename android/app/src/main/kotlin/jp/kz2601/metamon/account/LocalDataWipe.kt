@@ -1,5 +1,6 @@
 package jp.kz2601.metamon.account
 
+import jp.kz2601.metamon.services.feeds.FeedCache
 import jp.kz2601.metamon.services.local.AppListCache
 import jp.kz2601.metamon.services.local.DocumentCache
 import jp.kz2601.metamon.services.local.RecordSyncEngine
@@ -17,6 +18,7 @@ import jp.kz2601.metamon.voice.ChatHistoryStore
  * - 権限の記録(聞いた結果。[forgetDeviceState] = iOS `LocalWipe.clearDefaults`)
  * - 会話の履歴(#893・[ChatHistoryStore.removeAll] = iOS `ChatHistoryStore.removeAll()`)
  * - 投稿に表示する名前(#875・[AuthorProfile.clear])
+ * - feed の覚えた行(#876・[FeedCache.removeAll] = iOS `FeedCache.removeAll()`)
  * - 端末内の動画(#863)・録音(#1084)のファイル([removeLocalMedia] = iOS `LocalVideoStore` / `LocalAudioStore` の removeAll)
  * - 画面の状態・appId(新しい appId に。[resetRuntime] = iOS `recordUndo = nil`・`resetToInitial()`・`DeviceAppID.set`)
  * - 音声の画面の状態は [AccountGuard.generation] で作り直す(iOS `chatHistory = []`)
@@ -30,6 +32,7 @@ class LocalDataWipe(
     private val chatHistory: ChatHistoryStore? = null,
     private val authorProfile: AuthorProfile? = null,
     private val removeLocalMedia: () -> Unit = {},
+    private val feedCache: FeedCache? = null,
 ) {
     suspend operator fun invoke() {
         recordSync.wipe() // 最初に止める(前の人の送信待ちを次の人に送らない)
@@ -39,6 +42,7 @@ class LocalDataWipe(
         authorProfile?.clear()
         chatHistory?.removeAll()
         removeLocalMedia()
+        feedCache?.removeAll()
         resetRuntime() // 一覧・DSL を消した後に新しい appId へ
     }
 }

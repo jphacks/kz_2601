@@ -120,6 +120,8 @@ class AppContainer(
     val appList: AppListCache,
     /** 外部の公開データ(feed・#876)。モックは null(部品は「読み込めませんでした」・iOS と同じ) */
     val feedHost: FeedHost? = null,
+    /** [feedHost] の覚えた行(#876)。サインアウト・削除で消す。モックは null */
+    private val feedCache: FeedCache? = null,
     val knobs: DebugKnobs,
     /** 記録のローカル DB と送信待ちの列(#882)。[MetamonApplication] が start する */
     val recordSync: RecordSyncEngine,
@@ -169,6 +171,7 @@ class AppContainer(
             chatHistory = chatHistory,
             authorProfile = authorProfile,
             removeLocalMedia = removeLocalMedia,
+            feedCache = feedCache,
         )
     }
 
@@ -277,6 +280,7 @@ class AppContainer(
             val prefs = SharedPreferencesKeyValueStore.of(context, PRIVACY_PREFS)
             val consent = AiConsentStore(prefs)
             val push = if (firebase) push(context, appConfigHttp, auth, log) else null
+            val feedCache = FeedCache(File(context.filesDir, "metamon-feeds"))
 
             return AppContainer(
                 environment = environment,
@@ -294,7 +298,8 @@ class AppContainer(
                 transcriber = AndroidSpeechTranscriber(context, language = language, log = { Log.i(TAG, it) }),
                 appId = DeviceAppId.store(context, "metamon-app"),
                 appList = AppListCache(File(context.filesDir, "metamon-app")),
-                feedHost = AppFeedHost(HttpFeedClient(appConfigHttp), FeedCache(File(context.filesDir, "metamon-feeds"))),
+                feedHost = AppFeedHost(HttpFeedClient(appConfigHttp), feedCache),
+                feedCache = feedCache,
                 knobs = knobs,
                 recordSync = recordSync(context, appConfig, "metamon-records"),
                 documentCache = documentCache,
