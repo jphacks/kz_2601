@@ -16,7 +16,8 @@ info:
       成功時も `X-RateLimit-Limit` / `X-RateLimit-Remaining` / `X-RateLimit-Reset`(Unix 秒)を返す(undo も今日の残りを返す。利用者の上限が 0 = 数えない時は付けない・`docs/backend/rate-limit.md`)。
     - 一時停止(#511): ai に `AI_PAUSED=1` がある間、Claude を呼ぶ `POST /generate`(`mode=undo` を除く)・`POST /chat`・`POST /text` は Claude を呼ばず、上限も数えずに 503 `ai_paused` を返す。`/health`・`DELETE /chat/{appId}` は止めない。`docs/infra/ai-pause.md`
     - 全体の遮断(#317): `AI_FREE_DAILY_BUDGET_USD` を入れると、その日(0:00 JST から)の AI の費用(`ai.usage` の `est_cost_usd` の合計)が超えた後は、Pro でない人の `POST /generate`(`mode=undo` を除く)・`POST /chat` に 503 `free_plan_paused`(`details.reason: daily_budget`・`resumeAt`・`retryAfterSec`、`Retry-After`)。上限を数えた後に判定し、数えた分は返す。Pro と `POST /text` は止めない。既定は無効。`docs/backend/rate-limit.md`
-    - appconfig のプランの上限(#317)に当たった 403 `plan_limit_reached` は、そのまま中継する(新しいアプリを作る generate がアプリの数の上限に当たった時など)。
+    - appconfig のプランの上限(#317)に当たった 403 `plan_limit_reached` は、そのまま中継する。
+    - 新しいアプリを作る generate が持てるアプリの数の上限(#630)に当たった 402 `app_limit_reached` も、`details`(held・limit・canBuySlot・slotCoins・apps など・openapi-appconfig.yaml の AppLimitReached)ごとそのまま中継する。
 servers:
   - url: http://localhost:8081/v1
   - url: https://ai-REPLACE.a.run.app/v1
@@ -357,6 +358,7 @@ components:
                 - ai_paused
                 - allowance_exhausted
                 - app_check_failed
+                - app_limit_reached
                 - appconfig_error
                 - appconfig_unreachable
                 - bad_output

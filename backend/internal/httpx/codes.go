@@ -18,6 +18,9 @@ const CodeAllowanceExhausted = "allowance_exhausted"
 // App Check enforce (#318)
 const CodeAppCheckFailed = "app_check_failed"
 
+// the caller holds as many apps as their plan + bought slots allow (#630 app slots)
+const CodeAppLimitReached = "app_limit_reached"
+
 // the operator force-stopped the app's server features (#346)
 const CodeAppStopped = "app_stopped"
 

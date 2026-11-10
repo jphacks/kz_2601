@@ -129,8 +129,9 @@ func TestMyUsageApps(t *testing.T) {
 	if p, _ := b["perApp"].(map[string]any); p["recordsPerApp"] != float64(2) || p["photosPerApp"] != float64(1) {
 		t.Fatalf("perApp %v", b["perApp"])
 	}
-	if r := u.do("u", http.MethodPost, "/v1/apps", map[string]any{"id": "US-A1"}, nil); r.code != http.StatusCreated {
-		t.Fatalf("create: %d %s", r.code, r.raw)
+	u.ownApp("u", "/v1/apps/US-A1", kakeibo(t))
+	if s, _ := b["appSlots"].(map[string]any); s["base"] != float64(2) || s["purchased"] != float64(0) || s["limit"] != float64(2) || s["canBuySlot"] != false {
+		t.Fatalf("appSlots %v", b["appSlots"])
 	}
 	wantMeter(t, "cached", u.usage("u", "/v1/me/usage")["apps"], 0, 2) // counts lag up to usageCountTTL
 	u.now = u.now.Add(usageCountTTL)
