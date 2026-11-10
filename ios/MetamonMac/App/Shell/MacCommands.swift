@@ -2,7 +2,7 @@ import SwiftUI
 import AppKit
 
 /// メニューバー(#934)。ウインドウの状態は `focusedSceneValue` で受け取り、今の画面に合わせて有効 / 無効を変える。
-/// - ファイル: 新しいアプリ・文字で頼む(会話のシート・#967)・声で頼む(#966 まで押せない)・新しいウインドウ
+/// - ファイル: 新しいアプリ・文字で頼む(会話のシート・#967)・声で頼む(同じシートですぐ録音・#966)・新しいウインドウ
 /// - 編集: 元に戻す(記録を消した直後は削除の取り消し・それ以外は入力欄の取り消し)・やり直す
 /// - 表示: サイドバー(`SidebarCommands`)・ツールバー(`ToolbarCommands`)
 /// - 移動: 戻る・アプリの一覧 / 中央へ・前 / 次のアプリ
@@ -27,9 +27,10 @@ struct MacCommands: Commands {
             Button("新しいウインドウ") { openWindow(id: Self.mainWindowId) }
                 .keyboardShortcut("n", modifiers: [.command, .option])
             Divider()
-            Button("声で頼む") {}
+            // シートが開いている間は押せない(⇧⌘M はシートのマイクが受けて、録音の開始 / 終了になる)
+            Button("声で頼む") { shell?.speak() }
                 .keyboardShortcut("m", modifiers: [.command, .shift])
-                .disabled(true)
+                .disabled(!(shell?.canCompose ?? false))
             Button("文字で頼む") { shell?.ask() }
                 .keyboardShortcut("k", modifiers: .command)
                 .disabled(!(shell?.canCompose ?? false))
@@ -90,6 +91,8 @@ struct ShellActions {
     var newApp: () -> Void
     /// 文字で頼む(中央のアプリを直す・無ければ作る)
     var ask: () -> Void
+    /// 声で頼む(⌘K と同じ相手の会話を開いてすぐ録音・#966)
+    var speak: () -> Void
     var showTips: () -> Void
 }
 

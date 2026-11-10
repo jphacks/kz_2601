@@ -433,6 +433,22 @@
         }
       }
     },
+    "いまは従量制の回線です。通信量が多いので、ほかの回線につないでからがおすすめです。" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "You're on a metered connection. The download is large, so we recommend switching to another network first."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "いまは従量制の回線です。通信量が多いので、ほかの回線につないでからがおすすめです。"
+          }
+        }
+      }
+    },
     "うまく届きませんでした。もう一度送ってください" : {
       "localizations" : {
         "en" : {
@@ -445,6 +461,38 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "うまく届きませんでした。もう一度送ってください"
+          }
+        }
+      }
+    },
+    "うまく聞き取れませんでした。マイクに近づいて、もう一度話してください" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Couldn't catch that. Move closer to the microphone and speak again."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "うまく聞き取れませんでした。マイクに近づいて、もう一度話してください"
+          }
+        }
+      }
+    },
+    "うまく聞き取れませんでした。押してから話し、話し終えたらもう一度押してください" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Couldn't catch that. Press, then speak, and press again when you're done."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "うまく聞き取れませんでした。押してから話し、話し終えたらもう一度押してください"
           }
         }
       }
@@ -493,6 +541,38 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "ここまでの指示でアプリを直します"
+          }
+        }
+      }
+    },
+    "この Mac では、モデルで文字にするのに時間がかかることがあります。" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "On this Mac, turning voice into text with the model may take a while."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "この Mac では、モデルで文字にするのに時間がかかることがあります。"
+          }
+        }
+      }
+    },
+    "この Mac では音声モデルの準備ができるまで声で頼めません。文字で頼んでください" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "On this Mac, voice requests work once the voice model is ready. Please type for now."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "この Mac では音声モデルの準備ができるまで声で頼めません。文字で頼んでください"
           }
         }
       }
@@ -1313,6 +1393,22 @@
         }
       }
     },
+    "システム設定を開く" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Open System Settings"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "システム設定を開く"
+          }
+        }
+      }
+    },
     "スキップ" : {
       "localizations" : {
         "en" : {
@@ -1357,6 +1453,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "タブの順番を入れ替えて、「集計」をいちばん左にして"
+          }
+        }
+      }
+    },
+    "ダウンロード" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Download"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ダウンロード"
           }
         }
       }
@@ -1549,6 +1661,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "マイクをクリックして「家計簿をつけたい」のように話すだけ。文字で入力しても用意できます。"
+          }
+        }
+      }
+    },
+    "マイクを使えません。システム設定 > プライバシーとセキュリティ > マイク で Tailor It を許可してください" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Can't use the microphone. Allow Tailor It in System Settings > Privacy & Security > Microphone."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "マイクを使えません。システム設定 > プライバシーとセキュリティ > マイク で Tailor It を許可してください"
           }
         }
       }
@@ -1789,6 +1917,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "今の記録帳の画面の形(画面・項目・名前など)"
+          }
+        }
+      }
+    },
+    "今は簡易の聞き取りで話せます。音声モデル(約%lldMB)を入れると、より正確に聞き取れます。" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "You can talk now with quick listening. Add the voice model (about %lld MB) for more accurate results."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "今は簡易の聞き取りで話せます。音声モデル(約%lldMB)を入れると、より正確に聞き取れます。"
           }
         }
       }
@@ -2385,6 +2529,38 @@
         }
       }
     },
+    "声でこのアプリを直す" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Fix this app by voice"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "声でこのアプリを直す"
+          }
+        }
+      }
+    },
+    "声でアプリを作る" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Make an app by voice"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "声でアプリを作る"
+          }
+        }
+      }
+    },
     "声でアプリを作る・直す" : {
       "localizations" : {
         "en" : {
@@ -2397,6 +2573,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "声でアプリを作る・直す"
+          }
+        }
+      }
+    },
+    "声で話すには、声を文字にするモデル(約%lldMB)が必要です。\n下の欄に文字で入力すれば、今すぐ作れます。" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Talking needs a voice-to-text model (about %lld MB).\nType in the box below to start right now."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "声で話すには、声を文字にするモデル(約%lldMB)が必要です。\n下の欄に文字で入力すれば、今すぐ作れます。"
           }
         }
       }
@@ -2417,18 +2609,18 @@
         }
       }
     },
-    "声で頼むのは準備中です。今は文字で頼んでください" : {
+    "声で頼む(⇧⌘M)" : {
       "localizations" : {
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Asking by voice is coming soon. For now, please type your request"
+            "value" : "Ask by voice (⇧⌘M)"
           }
         },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "声で頼むのは準備中です。今は文字で頼んでください"
+            "value" : "声で頼む(⇧⌘M)"
           }
         }
       }
@@ -2653,6 +2845,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "文字で頼む"
+          }
+        }
+      }
+    },
+    "文字にしています" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Turning your voice into text"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "文字にしています"
           }
         }
       }
@@ -2993,6 +3201,22 @@
         }
       }
     },
+    "準備中のため簡易の聞き取りです" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Quick listening while the voice model gets ready"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "準備中のため簡易の聞き取りです"
+          }
+        }
+      }
+    },
     "版" : {
       "localizations" : {
         "en" : {
@@ -3121,6 +3345,22 @@
         }
       }
     },
+    "空き容量が足りません(あと約%lldMB 必要です)。不要なファイルを整理してから試してください。" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Not enough storage (about %lld MB more needed). Free up some files and try again."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "空き容量が足りません(あと約%lldMB 必要です)。不要なファイルを整理してから試してください。"
+          }
+        }
+      }
+    },
     "端末内の AI が使えるか(非対応の端末・オフ・準備中)と、AI ボタンが答えを出せなかった回数を、ボタンの種類(要約・分類など)ごとに 1 日 1 回まとめて送ります。ユーザー ID・入力した文・記録は送りません。" : {
       "localizations" : {
         "en" : {
@@ -3229,6 +3469,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "考えています"
+          }
+        }
+      }
+    },
+    "聞いています。話し終えたら、もう一度押してください" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Listening. Press again when you're done."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "聞いています。話し終えたら、もう一度押してください"
           }
         }
       }
@@ -3437,6 +3693,70 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "話した内容・入力した文(端末内で文字にしたもの。音声そのものは送りません)"
+          }
+        }
+      }
+    },
+    "話した声をこの Mac の中で文字にするためのモデルです(約%lldMB・初回のみ)。ダウンロード中も、終わらなくても、文字で頼めばすぐにアプリを作れます。" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "This model turns your voice into text on this Mac (about %lld MB, first time only). While it downloads, or even without it, you can make apps right away by typing."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "話した声をこの Mac の中で文字にするためのモデルです(約%lldMB・初回のみ)。ダウンロード中も、終わらなくても、文字で頼めばすぐにアプリを作れます。"
+          }
+        }
+      }
+    },
+    "話した声をこの Mac の中で文字にするためのモデルです(約%lldMB・初回のみ)。ダウンロード中も、終わらなくても、文字で頼めばすぐに記録帳を用意できます。" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "This model turns your voice into text on this Mac (about %lld MB, first time only). While it downloads, or even without it, you can set up a notebook right away by typing."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "話した声をこの Mac の中で文字にするためのモデルです(約%lldMB・初回のみ)。ダウンロード中も、終わらなくても、文字で頼めばすぐに記録帳を用意できます。"
+          }
+        }
+      }
+    },
+    "話し終えた" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Done speaking"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "話し終えた"
+          }
+        }
+      }
+    },
+    "話し終えた(⇧⌘M)" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Done speaking (⇧⌘M)"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "話し終えた(⇧⌘M)"
           }
         }
       }
@@ -3713,6 +4033,38 @@
         }
       }
     },
+    "録音できませんでした。もう一度お試しください" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Couldn't record. Please try again."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "録音できませんでした。もう一度お試しください"
+          }
+        }
+      }
+    },
+    "録音できませんでした。マイクがつながっているか確かめ、ほかのアプリの録音を終えてから、もう一度お試しください" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Couldn't record. Check that a microphone is connected, stop recording in other apps, and try again."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "録音できませんでした。マイクがつながっているか確かめ、ほかのアプリの録音を終えてから、もう一度お試しください"
+          }
+        }
+      }
+    },
     "閉じる" : {
       "localizations" : {
         "en" : {
@@ -3761,6 +4113,22 @@
         }
       }
     },
+    "音声を聞き取れませんでした。もう一度はっきり話してください" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Could not catch what you said. Please speak clearly and try again."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "音声を聞き取れませんでした。もう一度はっきり話してください"
+          }
+        }
+      }
+    },
     "音声モデル" : {
       "localizations" : {
         "en" : {
@@ -3773,6 +4141,102 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "音声モデル"
+          }
+        }
+      }
+    },
+    "音声モデルをダウンロード" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Download voice model"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "音声モデルをダウンロード"
+          }
+        }
+      }
+    },
+    "音声モデルをダウンロードしますか？" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Download the voice model?"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "音声モデルをダウンロードしますか？"
+          }
+        }
+      }
+    },
+    "音声モデルをダウンロード中 %lld%%(初回のみ約%lldMB)\n待たなくても、下の欄に文字で入力すれば作れます" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Downloading the voice model %1$lld%% (about %2$lld MB, first time only)\nNo need to wait — type in the box below to start"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "音声モデルをダウンロード中 %lld%%(初回のみ約%lldMB)\n待たなくても、下の欄に文字で入力すれば作れます"
+          }
+        }
+      }
+    },
+    "音声モデルを準備中です。少し待ってから、もう一度お試しください" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The voice model is getting ready. Please wait a moment and try again."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "音声モデルを準備中です。少し待ってから、もう一度お試しください"
+          }
+        }
+      }
+    },
+    "音声モデルを読み込み中…(初回は1分ほど)" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Loading the voice model… (about a minute the first time)"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "音声モデルを読み込み中…(初回は1分ほど)"
+          }
+        }
+      }
+    },
+    "音声認識の許可がありません。システム設定 > プライバシーとセキュリティ > 音声認識 で許可するか、音声モデルの準備ができるまで文字で頼んでください" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Speech recognition isn't allowed. Allow it in System Settings > Privacy & Security > Speech Recognition, or type until the voice model is ready."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "音声認識の許可がありません。システム設定 > プライバシーとセキュリティ > 音声認識 で許可するか、音声モデルの準備ができるまで文字で頼んでください"
           }
         }
       }

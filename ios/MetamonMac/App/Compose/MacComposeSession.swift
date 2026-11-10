@@ -53,6 +53,8 @@ final class MacComposeSession: Identifiable {
     /// 失敗した時の一言(会話の下に出す)
     private(set) var error: String?
     var draft: String
+    /// 声で頼む(⇧⌘M・#966)で開いた。シートが出たらすぐ録音を始める(1 回だけ)
+    var startsWithVoice = false
     /// 複数選択の question で選んだチップ・proposal で選んだ案の id
     var selectedChips: [String] = []
     var selectedOptions: [String] = []

@@ -6,6 +6,7 @@ import MetamonDSL
 /// - アプリの切り替え(AppSwitcherSheet) → サイドバー(常に出す・閉じられる)
 /// - 音声 / 文字で頼む(VoiceFab) → ツールバーのボタン + ショートカット。生成したアプリの中の FAB は残す
 ///   文字で頼む(⌘K)・新しいアプリ(⌘N)は会話のシート(#967・ComposeSheet)。作ったアプリは一覧の先頭に足し、直したアプリは差し替える
+///   声で頼む(⇧⌘M・#966)は同じシートを開いてすぐ録音する。文字にした文をそのまま送る
 /// - 設定 → Mac の設定ウインドウ(⌘,)
 /// - 画面の上のお知らせ → 中央の列の上(後の Issue)
 /// キーボード(#934): ⌘1 / ⌘2 でサイドバーと中央を行き来・一覧は ↑↓ で選び Return で中央へ・⌥⌘↑↓ で前 / 次のアプリ。
@@ -24,6 +25,7 @@ struct MacRootView: View {
     @State private var createdIds: [String] = []
     @State private var compose: MacComposeSession?
     @State private var showsTips = false
+    @Environment(MacVoiceInput.self) private var voice
 
     init(apps: [SampleApp]) { bundledApps = apps }
 
@@ -59,13 +61,15 @@ struct MacRootView: View {
             .focusEffectDisabled()
             .focused($focus, equals: .canvas)
         }
-        .toolbar { ShellToolbar(hasApp: selectedApp != nil, newApp: newApp, ask: ask) }
+        .toolbar { ShellToolbar(hasApp: selectedApp != nil, canCompose: compose == nil, newApp: newApp, ask: ask, speak: speak) }
         .frame(minWidth: Self.minWindowSize.width, minHeight: Self.minWindowSize.height)
         .focusedSceneValue(\.shellActions, shellActions)
         .sheet(item: $compose) { session in
             ComposeSheet(session: session) { compose = nil }
                 .interactiveDismissDisabled(session.isBusy)
+                .environment(voice)
         }
+        .task { voice.prepareIfAllowed() } // モデルが端末にあれば読み込む(無ければ起動では聞かない)
         .sheet(isPresented: $showsTips) {
             PromptTipsSheet { tip in
                 showsTips = false
@@ -82,17 +86,21 @@ struct MacRootView: View {
     /// ⌘K: 文字で頼む。中央にアプリがあればそのアプリを直す、無ければ作る
     private func ask() { ask(draft: "") }
 
-    private func ask(draft: String) {
+    /// ⇧⌘M: 声で頼む。⌘K と同じ相手(中央のアプリ・無ければ新しいアプリ)の会話を開き、すぐ録音する
+    private func speak() { ask(draft: "", voice: true) }
+
+    private func ask(draft: String, voice: Bool = false) {
         if let app = selectedApp {
-            open(.edit(appId: app.id, name: app.name, version: app.version), draft: draft)
+            open(.edit(appId: app.id, name: app.name, version: app.version), draft: draft, voice: voice)
         } else {
-            open(.create, draft: draft)
+            open(.create, draft: draft, voice: voice)
         }
     }
 
-    private func open(_ target: MacComposeSession.Target, draft: String) {
+    private func open(_ target: MacComposeSession.Target, draft: String, voice: Bool = false) {
         guard compose == nil else { return }
         let session = MacComposeSession(target: target, draft: draft)
+        session.startsWithVoice = voice
         session.onResult = { document in apply(document, target: target) }
         compose = session
     }
@@ -122,6 +130,7 @@ struct MacRootView: View {
             canCompose: compose == nil,
             newApp: newApp,
             ask: ask,
+            speak: speak,
             showTips: { showsTips = true }
         )
     }
@@ -136,19 +145,21 @@ struct MacRootView: View {
 }
 
 /// ツールバー。ショートカットはメニュー(MacCommands)が持つ。
-/// 新しいアプリ・文字で頼むは会話のシート(#967)。声で頼む(#966)・画面マップ・共有は後の Issue なので今は押せない。
+/// 新しいアプリ・文字で頼む・声で頼むは会話のシート(#967・#966)。画面マップ・共有は後の Issue なので今は押せない。
 struct ShellToolbar: ToolbarContent {
     let hasApp: Bool
+    var canCompose = true
     var newApp: () -> Void = {}
     var ask: () -> Void = {}
+    var speak: () -> Void = {}
 
     var body: some ToolbarContent {
         ToolbarItemGroup(placement: .primaryAction) {
             Button(action: newApp) { Label("新しいアプリ", systemImage: "plus") }
                 .help("新しいアプリを作る")
-            Button {} label: { Label("声で頼む", systemImage: "mic") }
-                .help("声で頼むのは準備中です。今は文字で頼んでください")
-                .disabled(true)
+            Button(action: speak) { Label("声で頼む", systemImage: "mic") }
+                .help(hasApp ? "声でこのアプリを直す" : "声でアプリを作る")
+                .disabled(!canCompose)
             Button(action: ask) { Label("文字で頼む", systemImage: "text.cursor") }
                 .help(hasApp ? "文字でこのアプリを直す" : "文字でアプリを作る")
         }
