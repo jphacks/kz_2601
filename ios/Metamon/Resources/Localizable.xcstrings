@@ -103,6 +103,23 @@
         }
       }
     },
+    "%@: %lld" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$@: %2$lld"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@: %lld"
+          }
+        }
+      }
+    },
     "%@。%@" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -681,6 +698,40 @@
         }
       }
     },
+    "%@を買う" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Buy %@"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@を買う"
+          }
+        }
+      }
+    },
+    "%@を足しました。" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Added %@."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@を足しました。"
+          }
+        }
+      }
+    },
     "%lld / %lld" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -732,6 +783,23 @@
         }
       }
     },
+    "%lld コイン" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld coins"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld コイン"
+          }
+        }
+      }
+    },
     "%lld 人" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -762,6 +830,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "%lld 件の記録を送れませんでした。送らずにログアウトすると、この記録は消えます。"
+          }
+        }
+      }
+    },
+    "%lld 回" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld times"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld 回"
           }
         }
       }
@@ -1106,6 +1191,57 @@
         }
       }
     },
+    "AI で作る・直すは、どのプランでも使うたびにコインを使います。" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "On every plan, creating and editing with AI uses coins each time."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "AI で作る・直すは、どのプランでも使うたびにコインを使います。"
+          }
+        }
+      }
+    },
+    "AI で作る・直す・アプリの中の AI は、使うたびにコインを使います。" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Creating and editing with AI, and in-app AI, use coins each time."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "AI で作る・直す・アプリの中の AI は、使うたびにコインを使います。"
+          }
+        }
+      }
+    },
+    "AI で作る・直す・アプリの中の AI は、使うたびにコインを使います。送る前に目安を出します。" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Creating and editing with AI, and in-app AI, use coins each time. You'll see an estimate before sending."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "AI で作る・直す・アプリの中の AI は、使うたびにコインを使います。送る前に目安を出します。"
+          }
+        }
+      }
+    },
     "AI との会話の履歴" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -1170,6 +1306,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "AI に送る内容の説明を改めました。もう一度ご確認ください。"
+          }
+        }
+      }
+    },
+    "AI はコインで使えます" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Use AI with coins"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "AI はコインで使えます"
           }
         }
       }
@@ -1595,6 +1748,74 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Pro になりました"
+          }
+        }
+      }
+    },
+    "Pro の分(%@ まで・繰り越しません)" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Pro coins (until %@, don't carry over)"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Pro の分(%@ まで・繰り越しません)"
+          }
+        }
+      }
+    },
+    "Pro の枠を超えたら、ON にした時だけコインで続けられます(%lld 回ごとに %lld コイン・月の上限は自分で決めます)" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Past the Pro allowance, you can keep going with coins only if you turn it on (%2$lld coins per %1$lld runs; you set the monthly limit)"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Pro の枠を超えたら、ON にした時だけコインで続けられます(%lld 回ごとに %lld コイン・月の上限は自分で決めます)"
+          }
+        }
+      }
+    },
+    "Pro の枠を超えたら、ON にした時だけコインで続けられます(月の上限は自分で決めます)" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Past the Pro allowance, you can keep going with coins only if you turn it on (you set the monthly limit)"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Pro の枠を超えたら、ON にした時だけコインで続けられます(月の上限は自分で決めます)"
+          }
+        }
+      }
+    },
+    "Pro の毎月の分" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Monthly Pro coins"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Pro の毎月の分"
           }
         }
       }
@@ -3299,6 +3520,23 @@
         }
       }
     },
+    "おまけ +%lld" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bonus +%lld"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "おまけ +%lld"
+          }
+        }
+      }
+    },
     "お問い合わせ" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -3771,6 +4009,40 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "このアプリは上のオープンソースソフトウェアを使っています。"
+          }
+        }
+      }
+    },
+    "このアプリは作った人のコインで動いています。作った人のコインが足りないので、今は使えません。" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "This app runs on its creator's coins. The creator doesn't have enough coins, so it can't be used right now."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "このアプリは作った人のコインで動いています。作った人のコインが足りないので、今は使えません。"
+          }
+        }
+      }
+    },
+    "このアプリは作った人の枠で動いています。作った人の今月の枠が終わったので、今は使えません。" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "This app runs on its creator's allowance. The creator has used up this month's allowance, so it can't be used right now."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "このアプリは作った人の枠で動いています。作った人の今月の枠が終わったので、今は使えません。"
           }
         }
       }
@@ -5101,6 +5373,23 @@
         }
       }
     },
+    "まだ履歴はありません。" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No history yet."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "まだ履歴はありません。"
+          }
+        }
+      }
+    },
     "まだ送っていない記録が %lld 件あります。今はオフラインのため送れません。送らずにログアウトすると、この記録は消えます。" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -5658,6 +5947,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "アプリが落ちた時に、落ちた場所(プログラムの位置)・端末の機種・OS・アプリの版とユーザー ID を Google の Firebase Crashlytics に送り、不具合を直すのに使います。話した内容・記録・記録帳の中身は送りません。"
+          }
+        }
+      }
+    },
+    "アプリの中の AI" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "In-app AI"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "アプリの中の AI"
           }
         }
       }
@@ -6444,6 +6750,159 @@
         }
       }
     },
+    "コイン" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Coins"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "コイン"
+          }
+        }
+      }
+    },
+    "コインが足りません" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Not enough coins"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "コインが足りません"
+          }
+        }
+      }
+    },
+    "コインのパックを取得できませんでした。通信状態を確認してください。" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Couldn't load coin packs. Check your connection."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "コインのパックを取得できませんでした。通信状態を確認してください。"
+          }
+        }
+      }
+    },
+    "コインの履歴" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Coin history"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "コインの履歴"
+          }
+        }
+      }
+    },
+    "コインの残高" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Coin balance"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "コインの残高"
+          }
+        }
+      }
+    },
+    "コインの追加" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Add coins"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "コインの追加"
+          }
+        }
+      }
+    },
+    "コインはアカウントに保存します。買う前に、設定の「アカウント」から Apple でサインインしてください。" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Coins are saved to your account. Before buying, sign in with Apple from “Account” in Settings."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "コインはアカウントに保存します。買う前に、設定の「アカウント」から Apple でサインインしてください。"
+          }
+        }
+      }
+    },
+    "コインを買う" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Buy coins"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "コインを買う"
+          }
+        }
+      }
+    },
+    "コインを足すと続けられます。" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Add coins to continue."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "コインを足すと続けられます。"
+          }
+        }
+      }
+    },
     "コピー" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -7192,6 +7651,23 @@
         }
       }
     },
+    "テスト" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Test"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "テスト"
+          }
+        }
+      }
+    },
     "テスト用にクラッシュさせる" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -7596,6 +8072,40 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "プラン"
+          }
+        }
+      }
+    },
+    "プランとコインを比べる" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Compare plans and coins"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "プランとコインを比べる"
+          }
+        }
+      }
+    },
+    "プランを比べる" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Compare plans"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "プランを比べる"
           }
         }
       }
@@ -8157,6 +8667,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "ルールが今のアプリのデータの形と合っていません"
+          }
+        }
+      }
+    },
+    "レシピの選び" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Recipe selection"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "レシピの選び"
           }
         }
       }
@@ -9062,6 +9589,74 @@
         }
       }
     },
+    "今月の Pro の分(繰り越しません)" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "This month's Pro coins (don't carry over)"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "今月の Pro の分(繰り越しません)"
+          }
+        }
+      }
+    },
+    "今月の%@" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "This month: %@"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "今月の%@"
+          }
+        }
+      }
+    },
+    "今月のコインの上限に着きました" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "You've reached this month's coin limit"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "今月のコインの上限に着きました"
+          }
+        }
+      }
+    },
+    "今月のサーバーの枠を使い切ったので止めました。「枠を超えたらコインで続ける」を ON にすると、決めた上限までコインで続けられます。" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Stopped because this month's server allowance is used up. Turn on “Continue with coins past the allowance” to keep going with coins up to your limit."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "今月のサーバーの枠を使い切ったので止めました。「枠を超えたらコインで続ける」を ON にすると、決めた上限までコインで続けられます。"
+          }
+        }
+      }
+    },
     "今月の合計を、画面のいちばん上に大きく出して" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -9075,6 +9670,40 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "今月の合計を、画面のいちばん上に大きく出して"
+          }
+        }
+      }
+    },
+    "今月の枠を使い切りました" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "This month's allowance is used up"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "今月の枠を使い切りました"
+          }
+        }
+      }
+    },
+    "今月コインで払った分" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Paid with coins this month"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "今月コインで払った分"
           }
         }
       }
@@ -9521,6 +10150,23 @@
         }
       }
     },
+    "使った" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Used"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "使った"
+          }
+        }
+      }
+    },
     "使っている量" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -9691,6 +10337,23 @@
         }
       }
     },
+    "保存しています…" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Saving…"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "保存しています…"
+          }
+        }
+      }
+    },
     "保存するフォームがありません" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -9738,6 +10401,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "保存できませんでした。入力を確認して、もう一度お試しください"
+          }
+        }
+      }
+    },
+    "保存できませんでした。時間をおいて試してください。" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Couldn't save. Please try again later."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "保存できませんでした。時間をおいて試してください。"
           }
         }
       }
@@ -10282,6 +10962,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "共有シートから、いつでも抜けられます"
+          }
+        }
+      }
+    },
+    "共有・オンラインの機能" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sharing and online features"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "共有・オンラインの機能"
           }
         }
       }
@@ -11884,6 +12581,23 @@
         }
       }
     },
+    "履歴を読み込めませんでした。" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Couldn't load history."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "履歴を読み込めませんでした。"
+          }
+        }
+      }
+    },
     "左へ移動" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -11986,6 +12700,23 @@
         }
       }
     },
+    "戻した(失敗)" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Returned (failed)"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "戻した(失敗)"
+          }
+        }
+      }
+    },
     "戻る時刻" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -12016,6 +12747,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "承認待ちです。承認されると自動で Pro になります。"
+          }
+        }
+      }
+    },
+    "承認待ちです。承認されると自動でコインが足されます。" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Waiting for approval. Coins will be added automatically once approved."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "承認待ちです。承認されると自動でコインが足されます。"
           }
         }
       }
@@ -12479,6 +13227,23 @@
         }
       }
     },
+    "新しく作る" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Create"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "新しく作る"
+          }
+        }
+      }
+    },
     "新しく作ると %lld、直すと %lld、相談すると %lld 減ります。%@に戻ります" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -12921,6 +13686,57 @@
         }
       }
     },
+    "月 %lld 回" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld / month"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "月 %lld 回"
+          }
+        }
+      }
+    },
+    "月の上限" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Monthly limit"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "月の上限"
+          }
+        }
+      }
+    },
+    "月の分の終わり" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Monthly coins ended"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "月の分の終わり"
+          }
+        }
+      }
+    },
     "月額の自動更新サブスクリプションです。お支払いは購入の確定時に Apple ID に請求されます。期間終了の 24 時間前までに解約しない限り自動で更新され、更新分は終了前の 24 時間以内に請求されます。解約は App Store のアカウント設定からいつでもできます。" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -13125,6 +13941,40 @@
         }
       }
     },
+    "枠を超えたらコインで続ける" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Continue with coins past the allowance"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "枠を超えたらコインで続ける"
+          }
+        }
+      }
+    },
+    "枠を超えた分" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Past the allowance"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "枠を超えた分"
+          }
+        }
+      }
+    },
     "案%lld" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -13261,6 +14111,40 @@
         }
       }
     },
+    "残り %lld" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld left"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "残り %lld"
+          }
+        }
+      }
+    },
+    "残高を読み込めませんでした" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Couldn't load your balance"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "残高を読み込めませんでした"
+          }
+        }
+      }
+    },
     "毎日、新しいアプリを無制限に作れます" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -13346,6 +14230,23 @@
         }
       }
     },
+    "毎月のコイン(繰り越しません)" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Monthly coins (don't carry over)"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "毎月のコイン(繰り越しません)"
+          }
+        }
+      }
+    },
     "毎週月曜の朝8時にお知らせして" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -13359,6 +14260,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "毎週月曜の朝8時にお知らせして"
+          }
+        }
+      }
+    },
+    "決めた月の上限までコインを使ったので止めました。上限は設定で変えられます。" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Stopped because you reached your monthly coin limit. You can change the limit in Settings."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "決めた月の上限までコインを使ったので止めました。上限は設定で変えられます。"
           }
         }
       }
@@ -14111,6 +15029,23 @@
         }
       }
     },
+    "相談" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Chat"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "相談"
+          }
+        }
+      }
+    },
     "確認して自動で消す" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -14383,6 +15318,40 @@
         }
       }
     },
+    "約 %lld コイン" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "About %lld coins"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "約 %lld コイン"
+          }
+        }
+      }
+    },
+    "約 %lld コイン要りますが、残りは %lld コインです。コインを足すと続けられます。" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "This needs about %1$lld coins, but you have %2$lld left. Add coins to continue."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "約 %lld コイン要りますが、残りは %lld コインです。コインを足すと続けられます。"
+          }
+        }
+      }
+    },
     "細部を整えています…" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -14515,6 +15484,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "自分だけにする"
+          }
+        }
+      }
+    },
+    "自分だけのアプリと記録" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Your own apps and records"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "自分だけのアプリと記録"
           }
         }
       }
@@ -14672,6 +15658,40 @@
         }
       }
     },
+    "自動の動き・通知などのサーバーの枠(月)" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Monthly server allowance for automations, notifications, and more"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "自動の動き・通知などのサーバーの枠(月)"
+          }
+        }
+      }
+    },
+    "自動の動き・通知などの今月の枠を使い切った時、ON なら決めた上限までコインで続けます。OFF なら止めて知らせます。" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "When this month's allowance for automations, notifications, and more runs out: if on, keep going with coins up to your limit; if off, stop and let you know."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "自動の動き・通知などの今月の枠を使い切った時、ON なら決めた上限までコインで続けます。OFF なら止めて知らせます。"
+          }
+        }
+      }
+    },
     "薬の飲み忘れ防止" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -14753,6 +15773,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "複製"
+          }
+        }
+      }
+    },
+    "要る分だけ足せます。買ったコインに期限はありません" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Add only what you need. Purchased coins never expire"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "要る分だけ足せます。買ったコインに期限はありません"
           }
         }
       }
@@ -14978,6 +16015,23 @@
         }
       }
     },
+    "記録の書き込み" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Record writes"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "記録の書き込み"
+          }
+        }
+      }
+    },
     "記録の自動削除" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -14991,6 +16045,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "記録の自動削除"
+          }
+        }
+      }
+    },
+    "記録の読み取り" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Record reads"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "記録の読み取り"
           }
         }
       }
@@ -15845,6 +16916,40 @@
         }
       }
     },
+    "買ったコイン(期限なし)" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Purchased coins (never expire)"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "買ったコイン(期限なし)"
+          }
+        }
+      }
+    },
+    "買ったコインに期限はありません。Pro の毎月のコインはその月だけ使え、繰り越しません。" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Purchased coins never expire. Monthly Pro coins can be used only in that month and don't carry over."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "買ったコインに期限はありません。Pro の毎月のコインはその月だけ使え、繰り越しません。"
+          }
+        }
+      }
+    },
     "質問 %lld / %lld" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -15892,6 +16997,40 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "質問をうまく用意できませんでした"
+          }
+        }
+      }
+    },
+    "購入" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Purchase"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "購入"
+          }
+        }
+      }
+    },
+    "購入できました。コインの反映を待っています(次に開いた時に反映されます)。" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Purchase complete. Waiting for the coins to arrive (they'll appear the next time you open the app)."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "購入できました。コインの反映を待っています(次に開いた時に反映されます)。"
           }
         }
       }
@@ -16066,6 +17205,23 @@
         }
       }
     },
+    "返金" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Refund"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "返金"
+          }
+        }
+      }
+    },
     "追加できる項目がありませんでした" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -16215,6 +17371,40 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "送る DSL をすべて見る"
+          }
+        }
+      }
+    },
+    "送ると約 %lld コインを使います" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sending uses about %lld coins"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "送ると約 %lld コインを使います"
+          }
+        }
+      }
+    },
+    "送ると約 %lld コインを使います。残り %lld コイン" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sending uses about %1$lld coins. %2$lld coins left"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "送ると約 %lld コインを使います。残り %lld コイン"
           }
         }
       }
