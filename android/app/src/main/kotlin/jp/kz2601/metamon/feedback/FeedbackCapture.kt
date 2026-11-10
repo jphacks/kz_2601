@@ -40,25 +40,39 @@ class FeedbackComposerLauncher {
     val isOpen: Boolean get() = _open.value != null || capturing
 
     /** 今の画面を撮り、今のアプリと端末の情報を集めて開く。どれも送るかは本人が選ぶ(既定はすべて送らない)。 */
-    suspend fun capture(activity: Activity, container: AppContainer) {
+    suspend fun capture(activity: Activity, container: AppContainer) = show {
+        val shot = FeedbackScreenshot.capture(activity)
+        val doc = container.runtime.state.value.document
+        val envelope = runCatching { container.documentCache.loadJson(doc.appId) }.getOrNull()
+        val context = FeedbackContext(
+            app = FeedbackContext.appSummary(doc, envelope),
+            device = currentDevice(activity),
+            hasScreenshot = shot != null,
+        )
+        FeedbackOpen(context, shot)
+    }
+
+    /** [close] の回数。撮っている途中に閉じられたら(後片付け・#1315)、撮り終えた分を開かずに捨てる */
+    private var closes = 0
+
+    internal suspend fun show(build: suspend () -> FeedbackOpen) {
         if (isOpen) return
         capturing = true
+        val started = closes
         try {
-            val shot = FeedbackScreenshot.capture(activity)
-            val doc = container.runtime.state.value.document
-            val envelope = runCatching { container.documentCache.loadJson(doc.appId) }.getOrNull()
-            val context = FeedbackContext(
-                app = FeedbackContext.appSummary(doc, envelope),
-                device = currentDevice(activity),
-                hasScreenshot = shot != null,
-            )
-            _open.value = FeedbackOpen(context, shot)
+            val opened = build()
+            if (closes == started) _open.value = opened else opened.screenshot?.recycle()
         } finally {
             capturing = false
         }
     }
 
+    /**
+     * 閉じてスクショを手放す(送らずに閉じた時・後片付け)。スクショはメモリにだけあり、ファイルには書かない。
+     * 画面が描き終える前・送る途中に使っているかもしれないので recycle はしない
+     */
     fun close() {
+        closes++
         _open.value = null
     }
 
