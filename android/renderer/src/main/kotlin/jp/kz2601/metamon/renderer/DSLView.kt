@@ -266,7 +266,7 @@ private fun FormSaveBar(button: ToolbarButton, ctx: RenderContext) {
         },
         icon = when (done) {
             FormSaveResult.SAVED -> "checkmark.circle"
-            FormSaveResult.QUEUED_OFFLINE -> null // 圏外の印は表に無い。文だけ出す
+            FormSaveResult.QUEUED_OFFLINE -> "wifi.slash"
             null -> button.icon ?: "checkmark"
         },
         running = phase == SaveBarPhase.Saving,

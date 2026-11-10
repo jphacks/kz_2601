@@ -166,6 +166,7 @@ internal val symbolMaterialNames: Map<String, String> = mapOf(
     "trophy" to "emoji_events",
     "video" to "videocam",
     "waveform" to "graphic_eq",
+    "wifi.slash" to "wifi_off",
     "wrench" to "build",
     "xmark" to "close",
     "yensign" to "currency_yen",
@@ -297,6 +298,7 @@ internal fun materialVector(name: String): ImageVector? = when (name) {
     "warning" -> Icons.Filled.Warning
     "water_drop" -> Icons.Filled.WaterDrop
     "wb_sunny" -> Icons.Filled.WbSunny
+    "wifi_off" -> Icons.Filled.WifiOff
     else -> null
 }
 
@@ -426,4 +428,5 @@ internal val materialVectorNames: Set<String> = setOf(
     "warning",
     "water_drop",
     "wb_sunny",
+    "wifi_off",
 )
