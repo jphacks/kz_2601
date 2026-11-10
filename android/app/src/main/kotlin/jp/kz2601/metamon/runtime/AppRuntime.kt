@@ -20,6 +20,7 @@ import jp.kz2601.metamon.renderer.components.play.RecordWriter
 import jp.kz2601.metamon.renderer.components.play.TimerHost
 import jp.kz2601.metamon.renderer.components.ai.AiChatPairSaving
 import jp.kz2601.metamon.renderer.components.ai.AiHost
+import jp.kz2601.metamon.renderer.components.social.AuthorNameHost
 import jp.kz2601.metamon.renderer.form.FormDraft
 import jp.kz2601.metamon.renderer.form.FormPrefill
 import jp.kz2601.metamon.renderer.navigation.NavigationResolver
@@ -31,6 +32,7 @@ import jp.kz2601.metamon.services.http.RecordWriteDenial
 import jp.kz2601.metamon.services.local.DeletionTicket
 import jp.kz2601.metamon.services.local.RecordSyncEngine
 import jp.kz2601.metamon.services.local.SyncEvent
+import jp.kz2601.metamon.services.social.AuthorProfile
 import jp.kz2601.metamon.services.sync.HotReload
 import jp.kz2601.metamon.services.sync.RecordsChange
 import kotlinx.coroutines.CancellationException
@@ -110,7 +112,9 @@ class AppRuntime(
     private val directory: AppDirectory? = null,
     /** aiButton のオンライン版・端末内 AI(#873)。null なら AI ボタンは理由つきで無効 */
     private val aiHost: AiHost? = null,
-) : DSLRuntime, NavigationHost, RecordWriter, TimerHost, AiChatPairSaving {
+    /** 共有アプリへの投稿に出す名前(#875)。null なら名前を聞かず、[authorName] だけを使う(モック・テスト) */
+    private val authorProfile: AuthorProfile? = null,
+) : DSLRuntime, NavigationHost, RecordWriter, TimerHost, AiChatPairSaving, AuthorNameHost {
     private val _state = MutableStateFlow(RuntimeState(document))
     val state: StateFlow<RuntimeState> = _state.asStateFlow()
 
@@ -581,6 +585,16 @@ class AppRuntime(
 
     override suspend fun addRecord(entity: String, data: Map<String, JSONValue>): Boolean = createRecord(entity, data) != null
 
+    // 投稿に出す名前(#875・iOS の AppRuntime+Chat)
+
+    /** 共有の entity への初めての投稿で、まだ名前を聞いていなければ聞く。 */
+    override fun needsAuthorName(entity: String): Boolean =
+        authorProfile != null && entityModel(entity)?.isShared == true && !authorProfile.asked
+
+    override fun answerAuthorName(name: String?) {
+        authorProfile?.answer(name)
+    }
+
     // AI と話す(#874)
 
     /**
@@ -857,7 +871,7 @@ class AppRuntime(
         return recordSync.write(
             document.appId, entity, recordId, data.toJson(),
             authorUid = if (shared) currentUserId() else null,
-            authorName = if (shared) authorName() else null,
+            authorName = if (shared) authorName() ?: authorProfile?.name else null,
             shared = shared,
         )
     }
