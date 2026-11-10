@@ -58,14 +58,16 @@ class RecordRetentionRunnerTest {
         return AppDSL.decode(JsonObject(root + ("entities" to JsonArray(entities))).toString())
     }
 
-    private fun TestScope.fixture(uid: String? = "me"): Fixture {
+    private fun TestScope.fixture(uid: String? = "me"): Fixture = fixture { uid }
+
+    private fun TestScope.fixture(uid: () -> String?): Fixture {
         val store = RecordStore(null, EmptyCoroutineContext)
         val client = RuntimeFixture.offlineClient
         val queue = SyncQueue(null, store, client, BackoffPolicy.immediate, sleep = {}, io = EmptyCoroutineContext)
         val engine = RecordSyncEngine(store, queue, client, RuntimeFixture.Offline(), backgroundScope)
         val consent = KeyValueRetentionConsent(InMemoryKeyValueStore())
         lateinit var f: Fixture
-        val runner = RecordRetentionRunner(engine, consent, currentUserId = { uid }, now = { f.clock })
+        val runner = RecordRetentionRunner(engine, consent, currentUserId = uid, now = { f.clock })
         f = Fixture(store, queue, engine, consent, runner, now0)
         return f
     }
@@ -236,6 +238,50 @@ class RecordRetentionRunnerTest {
         runCurrent()
         assertNull(f.runner.prompt.value)
         assertTrue(f.deletes().isEmpty())
+    }
+
+    @Test
+    fun signedOutDeletesNothingEvenPrivate() = runTest {
+        val f = fixture(uid = null)
+        f.seed("old", ageDays = 30)
+        f.consent.set(appId, "workout", 7)
+        assertEquals("サインインしていない(後片付けの途中)時は消さない", 0, f.runner.purge(appId, workout(dsl(7))))
+        assertTrue(f.deletes().isEmpty())
+    }
+
+    @Test
+    fun stopsWhenAccountChangesMidPurge() = runTest {
+        var calls = 0
+        // 1 回目(始め)・2 回目(1 行目の前)は me、その後はサインアウト
+        val f = fixture { if (++calls <= 2) "me" else null }
+        f.seed("a", ageDays = 30)
+        f.seed("b", ageDays = 30)
+        f.consent.set(appId, "workout", 7)
+        assertEquals("人が変わったら残りは消さない", 1, f.runner.purge(appId, workout(dsl(7))))
+        assertEquals(1, f.deletes().size)
+    }
+
+    @Test
+    fun forgetClearsConsentDeferAndPrompt() = runTest {
+        val store = InMemoryKeyValueStore()
+        val consent = KeyValueRetentionConsent(store)
+        consent.set(appId, "workout", 7)
+        consent.set("other-app", "diary", 30)
+        consent.clear()
+        assertNull("前の人の確認を次の人に使わない", consent.days(appId, "workout"))
+        assertNull(consent.days("other-app", "diary"))
+
+        val f = fixture()
+        val entity = workout(dsl(7))
+        f.runner.note(appId, 1, listOf(entity))
+        f.runner.defer()
+        f.consent.set(appId, "workout", 7)
+        f.runner.forget()
+        assertNull(f.consent.days(appId, "workout"))
+        f.runner.note(appId, 1, listOf(entity))
+        assertNotNull("あとでにした分も聞き直す", f.runner.prompt.value)
+        f.runner.forget()
+        assertNull("出していた確認も閉じる", f.runner.prompt.value)
     }
 
     @Test
