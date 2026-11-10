@@ -76,6 +76,7 @@ struct MatchListLeaf: View {
             }
         }
         .contextMenu {
+            ComponentTalkMenuItem(component: c, ctx: ctx) // 行のメニューが先に出るので、ここにも置く(#1323)
             if box == .matches {
                 Button(L("つながりを解除"), systemImage: "person.crop.circle.badge.xmark", role: .destructive) { unmatching = item }
             }

@@ -13,7 +13,7 @@ struct AppCanvas: View {
     var dsl: AppDSL?
     /// 画面マップのシート(#970)。ツールバー・表示メニューが立てる
     var showsScreenMap: Binding<Bool> = .constant(false)
-    /// 画面マップの「この画面について話す」。マップを閉じ終えてから呼ぶ(シートを 2 枚同時に出さない)
+    /// 画面マップの「この画面について話す」・部品の「この部品について話す」(#1323)。マップ・モーダルを閉じ終えてから呼ぶ(シートを 2 枚同時に出さない)
     var onTalk: (ScreenContext) -> Void = { _ in }
     /// ウインドウの入力の見張り(#943)。作ったランタイムを渡す(アプリの切り替え・⌘W の前に確認する)
     var discardGuard: MacDiscardGuard?
@@ -50,7 +50,7 @@ private struct AppCanvasContent: View {
     @Bindable var runtime: MacAppRuntime
     @Binding var showsScreenMap: Bool
     let onTalk: (ScreenContext) -> Void
-    /// マップで「この画面について話す」を押した画面。マップが閉じ終わったら会話を開く
+    /// マップの「この画面について話す」・モーダルの中の部品の「この部品について話す」を押した文脈。マップ・モーダルが閉じ終わったら会話を開く
     @State private var pendingTalk: ScreenContext?
 
     var body: some View {
@@ -71,10 +71,10 @@ private struct AppCanvasContent: View {
                 }
             }
             // Mac の fullScreenCover は無いので sheet で出す(大きめの最小サイズ)
-            .sheet(item: $runtime.sheet) { route in
+            .sheet(item: $runtime.sheet, onDismiss: talkAfterModal) { route in
                 modal(route).frame(minWidth: 420, minHeight: 480)
             }
-            .sheet(item: $runtime.fullScreen) { route in
+            .sheet(item: $runtime.fullScreen, onDismiss: talkAfterModal) { route in
                 modal(route).frame(minWidth: 640, minHeight: 560)
             }
             .modifier(RuntimeOverlays(runtime: runtime))
@@ -82,6 +82,7 @@ private struct AppCanvasContent: View {
             .environment(\.dslRuntime, runtime)
             .environment(\.componentRegistry, ComponentRegistry.standard)
             .environment(\.openForms, runtime.openForms)
+            .environment(\.componentTalk, componentTalk)
             .focusedSceneValue(\.macAppRuntime, runtime) // メニューの「戻る」・削除の取り消し(#934)
     }
 
@@ -89,6 +90,28 @@ private struct AppCanvasContent: View {
         guard let screen = pendingTalk else { return }
         pendingTalk = nil
         onTalk(screen)
+    }
+
+    /// モーダルが閉じ終わった。全画面とシートの両方を閉じた時は、両方が閉じてから開く
+    private func talkAfterModal() {
+        guard runtime.sheet == nil, runtime.fullScreen == nil else { return }
+        talkAfterMap()
+    }
+
+    /// 部品の右クリック・VoiceOver の操作の「この部品について話す」(#1323)
+    private var componentTalk: ComponentTalk {
+        ComponentTalk(title: ScreenMapCopy.talkAboutComponent) { target in talk(about: target) }
+    }
+
+    /// 中央の部品はそのまま会話を開く(入力の確認は `MacRootView` の `discardGuard` が通す・#1364)。
+    /// モーダルの中の部品は、モーダルの入力を確かめてからモーダルを閉じ、閉じ終わったら開く(会話のシートをモーダルに重ねない)
+    private func talk(about target: ComponentTalk.Target) {
+        let screen = ScreenContext(target, dsl: runtime.dsl)
+        guard runtime.sheet != nil || runtime.fullScreen != nil else { return onTalk(screen) }
+        runtime.confirmDiscard(leaving: { $0.stack == "sheet" || $0.stack == "full" }) {
+            pendingTalk = screen
+            while runtime.sheet != nil || runtime.fullScreen != nil { runtime.dismissTopModal() }
+        }
     }
 
     /// モーダルの中にも確認と一言を出す(根の上に重ねるとシートに隠れる・iOS の RootView と同じ理由)
@@ -99,6 +122,7 @@ private struct AppCanvasContent: View {
             .environment(\.dslRuntime, runtime)
             .environment(\.componentRegistry, ComponentRegistry.standard)
             .environment(\.openForms, runtime.openForms)
+            .environment(\.componentTalk, componentTalk)
     }
 }
 

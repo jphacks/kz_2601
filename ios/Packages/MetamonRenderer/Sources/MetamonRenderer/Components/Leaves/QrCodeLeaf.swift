@@ -48,6 +48,7 @@ struct QrCodeLeaf: View {
             .overlay(RoundedRectangle(cornerRadius: RenderTheme.Radius.inner, style: .continuous).strokeBorder(RenderTheme.Colors.hairline))
             .contextMenuPreviewShape(RoundedRectangle(cornerRadius: RenderTheme.Radius.inner, style: .continuous))
             .contextMenu {
+                ComponentTalkMenuItem(component: c, ctx: ctx) // 画像のメニューが先に出るので、ここにも置く(#1323)
                 #if os(macOS)
                 Button(L("コピー"), systemImage: "doc.on.doc") { PlatformPasteboard.setImage(export) }
                 #endif

@@ -4462,6 +4462,23 @@
         }
       }
     },
+    "この部品について話す" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Talk about this component"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "この部品について話す"
+          }
+        }
+      }
+    },
     "これでいく" : {
       "extractionState" : "manual",
       "localizations" : {
