@@ -32,4 +32,24 @@ public enum PlatformPasteboard {
         board.string(forType: .string)
         #endif
     }
+
+    /// 画像を書く(#1333・前の中身は置き換える)。Mac は PNG と TIFF の両方を載せる(貼る側がどちらでも読める)。
+    public static func setImage(_ image: PlatformImage, on board: Board = .general) {
+        #if canImport(UIKit)
+        board.image = image
+        #else
+        board.clearContents()
+        if let png = image.pngData() { board.setData(png, forType: .png) }
+        if let tiff = image.tiffRepresentation { board.setData(tiff, forType: .tiff) }
+        #endif
+    }
+
+    /// 入っている画像。無ければ nil。
+    public static func image(on board: Board = .general) -> PlatformImage? {
+        #if canImport(UIKit)
+        board.image
+        #else
+        NSImage(pasteboard: board)
+        #endif
+    }
 }

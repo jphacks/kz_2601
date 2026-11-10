@@ -44,6 +44,7 @@ struct DrawingFieldPanel: View {
                 .accessibilityLabel(hasDrawing ? L("\(title)(描いた絵あり)") : title)
                 .accessibilityHint(L("手書きの画面を開きます。指や Apple Pencil で描けます"))
                 .accessibilityIdentifier("drawingField.\(field)")
+                .imageContextMenu(picture, title: title)
             if hasDrawing {
                 let layout = typeSize.isAccessibilitySize ? AnyLayout(VStackLayout(spacing: RenderTheme.Spacing.sm)) : AnyLayout(HStackLayout(spacing: RenderTheme.Spacing.sm))
                 layout {

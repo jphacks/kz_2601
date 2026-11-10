@@ -32,14 +32,14 @@ struct PhotoView: View {
     var height: CGFloat
     /// VoiceOver の読み上げ(省略時は「写真」。プレースホルダは「写真なし」)
     var accessibilityLabel: String? = nil
-
-    private var hasPhoto: Bool {
-        PhotoCodec.image(from: value) != nil || (value.stringValue?.hasPrefix("http") ?? false)
-    }
+    /// Mac の右クリックの「コピー・画像を保存…・共有」(#1333)の名前。nil ならメニューを出さない(一覧の行などメニューを持つ親の中)
+    var menuTitle: String? = nil
 
     var body: some View {
+        let decoded = PhotoCodec.image(from: value)
+        let hasPhoto = decoded != nil || (value.stringValue?.hasPrefix("http") ?? false)
         Group {
-            if let img = PhotoCodec.image(from: value) {
+            if let img = decoded {
                 Image(platformImage: img).resizable().scaledToFill()
             } else if let s = value.stringValue, s.hasPrefix("http"), let url = URL(string: s) {
                 AsyncImage(url: url) { $0.resizable().scaledToFill() } placeholder: { Rectangle().fill(.quaternary) }
@@ -62,5 +62,7 @@ struct PhotoView: View {
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(accessibilityLabel ?? (hasPhoto ? L("写真") : L("写真なし")))
         .accessibilityAddTraits(hasPhoto ? .isImage : [])
+        // 手元にある画像だけ(https の読み込み中・動画のサムネイルには出さない)
+        .imageContextMenu(menuTitle == nil || VideoValue(value) != nil ? nil : decoded, title: menuTitle ?? "")
     }
 }

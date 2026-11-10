@@ -20,6 +20,10 @@ struct ListLeaf: View {
     @State private var toggleTaps = 0
     /// 押した直後の印の表示(recordId → 楽観的な状態・#255)。確定したら外す
     @State private var markOverrides: [String: MarkState] = [:]
+    #if os(macOS)
+    /// 行の写真の「画像を保存…」(#1333)
+    @State private var imageToSave: ImageExport.Pending?
+    #endif
 
     var body: some View {
         let entityId = c.entity ?? ""
@@ -58,6 +62,13 @@ struct ListLeaf: View {
                         .contextMenu {
                             #if os(macOS)
                             Button(L("コピー"), systemImage: "doc.on.doc") { copy(row, entity: entity) }
+                            if let photo = rowImage(row, entity: entity) {
+                                ImageMenuItems(image: photo.image, title: photo.title, copyLabel: L("画像をコピー")) {
+                                    imageToSave = .init(document: ImageFileDocument(image: photo.image),
+                                                        fileName: ImageExport.fileName(title: photo.title, fallback: L("写真"), date: Date()))
+                                }
+                                Divider()
+                            }
                             #endif
                             if deletable(row, entity: entityId) {
                                 Button(L("削除"), systemImage: "trash", role: .destructive) { delete(row, entity: entityId) }
@@ -72,6 +83,9 @@ struct ListLeaf: View {
             // 行が少なくてもカードはセルの高さまで伸ばす(#84: 空白の下半分を作らない)。行は上詰め
             .frame(maxHeight: .infinity, alignment: .top)
             .renderCard(padding: 0)
+            #if os(macOS)
+            .imageSaveExporter($imageToSave)
+            #endif
             .onChange(of: ids, initial: true) { _, now in markNewRows(now) }
             .sensoryFeedback(.selection, trigger: toggleTaps)
             .task(id: c.item?.interest == true ? entityId : "") { await loadInterestStates() }
@@ -158,6 +172,14 @@ struct ListLeaf: View {
         guard !text.isEmpty else { return }
         PlatformPasteboard.setString(text)
     }
+
+    #if os(macOS)
+    /// 行の写真(item.image)。手元にある画像だけ(https・動画のサムネイルは除く)。名前は写真の項目名
+    private func rowImage(_ row: Record, entity: Entity?) -> (image: PlatformImage, title: String)? {
+        guard let field = c.item?.image, VideoValue(row[field]) == nil, let image = PhotoCodec.image(from: row[field]) else { return nil }
+        return (image, entity?.field(field)?.name ?? L("写真"))
+    }
+    #endif
 
     private func open(_ row: Record) {
         guard let action = c.onItemTap else { return }
