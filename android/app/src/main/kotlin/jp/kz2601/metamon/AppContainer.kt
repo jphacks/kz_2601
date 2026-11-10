@@ -369,6 +369,8 @@ class AppContainer(
             val consent = AiConsentStore(prefs)
             val push = if (firebase) push(context, appConfigHttp, auth, log) else null
             val feedCache = FeedCache(File(context.filesDir, "metamon-feeds"))
+            // 投稿の通報・ブロック(#877)と掲載の通報・ブロック(#902)は同じ口
+            val moderation = HttpModerationClient(appConfigHttp)
 
             return AppContainer(
                 environment = environment,
@@ -404,7 +406,7 @@ class AppContainer(
                 removeLocalMedia = removeLocalMedia(context),
                 social = SocialServices(
                     HttpMatchingClient(appConfigHttp),
-                    HttpModerationClient(appConfigHttp),
+                    moderation,
                     MatchingAgeGate(prefs),
                     follows = HttpFollowsClient(appConfigHttp),
                 ),
@@ -413,7 +415,7 @@ class AppContainer(
                 talkBackRunning = { TalkBack.isRunning(context) },
                 feedback = HttpFeedbackClient(appConfigHttp),
                 updateGate = UpdateGate.live(context, environment.appConfigBaseUrl, client, device),
-                discover = DiscoverServices(HttpDiscoverClient(appConfigHttp), HttpModerationClient(appConfigHttp)),
+                discover = DiscoverServices(HttpDiscoverClient(appConfigHttp), moderation),
                 members = HttpMembersClient(appConfigHttp),
                 removeAppNotifications = { LocalNotifications.get(context).removeApp(it) },
             )
