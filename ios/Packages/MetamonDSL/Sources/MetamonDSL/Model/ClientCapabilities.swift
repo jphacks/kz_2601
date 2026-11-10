@@ -48,11 +48,13 @@ public enum ClientCapabilities {
     /// progressBar.settingTarget(progressBar の target に {"setting": …}・変えられる目標でバーが動く): 知らない版はバーが空になるので、無い版には生成させない。審査用の版も同じ(端末内の計算だけ)。
     /// photoField.illustrate(端末内の Image Playground でイラストを作る): 知らない版はキーを無視するだけだが、ボタンが出ないので無い版には生成させない。
     /// 審査用の版は Apple Intelligence に頼る作りを審査で確かめにくいので、ボタンをバイナリから外し、キーも送らない。
+    /// field.encrypted(#233・項目を端末で暗号化して保存・鍵は iCloud キーチェーン): 知らない版は平文で保存してしまうので、無い版には生成させない。
+    /// Tailor It Pro の機能なので、App 内課金の無い審査用の版は送らない。
     public static var supportedFeatures: [String] {
         #if APP_STORE_REVIEW
         ["recordRetention", "notification.when", "singleEntity", "notification.near", "aiButton.long", "aiButton.inputPhoto", "aiButton.saveTo", "aiButton.inputFeeds", "aiButton.outputs", "action.lookupBook", "text.highlight", "feed.v2", "expr.addMinutes", "aiChat.inputEntity", "component.bracket", "progressBar.settingTarget"]
         #else
-        ["recordRetention", "matching", "notification.when", "singleEntity", "dataRoles", "addressedMessages", "notification.near", "aiButton.long", "aiButton.inputPhoto", "aiButton.saveTo", "aiButton.inputFeeds", "aiButton.outputs", "action.lookupBook", "text.highlight", "feed.v2", "expr.addMinutes", "aiChat.inputEntity", "component.bracket", "progressBar.settingTarget", "photoField.illustrate"]
+        ["recordRetention", "matching", "notification.when", "singleEntity", "dataRoles", "addressedMessages", "notification.near", "aiButton.long", "aiButton.inputPhoto", "aiButton.saveTo", "aiButton.inputFeeds", "aiButton.outputs", "action.lookupBook", "text.highlight", "feed.v2", "expr.addMinutes", "aiChat.inputEntity", "component.bracket", "progressBar.settingTarget", "photoField.illustrate", "field.encrypted"]
         #endif
     }
 
