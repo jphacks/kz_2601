@@ -169,6 +169,34 @@ func TestJoinReservesCoins(t *testing.T) {
 	}
 }
 
+// A long call renews block after block; the first blocks are settled only
+// at the leave, so their holds must not expire in between.
+func TestSettleChargesEarlierBlocksOfALongCall(t *testing.T) {
+	ctx := context.Background()
+	f := newFixture(t, 2, coins.ModeEnforce, 200)
+	j, err := f.svc.Join(ctx, JoinRequest{UID: "u1", AppID: "a1"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := f.svc.Handle(ctx, Event{Kind: KindJoined, Identity: j.Identity, JoinedAt: f.now}); err != nil {
+		t.Fatal(err)
+	}
+	start := f.now
+	for _, at := range []time.Duration{9 * time.Minute, 19 * time.Minute, 29 * time.Minute} { // a minute before each block ends
+		f.now = start.Add(at)
+		if _, err := f.svc.Join(ctx, JoinRequest{UID: "u1", AppID: "a1", SessionID: j.SessionID}); err != nil {
+			t.Fatalf("renew at %v: %v", at, err)
+		}
+	}
+	f.now = start.Add(35 * time.Minute)
+	if err := f.svc.Handle(ctx, Event{Kind: KindLeft, Identity: j.Identity, At: f.now}); err != nil {
+		t.Fatal(err)
+	}
+	if got := f.balance(t, "u1"); got != 200-70 {
+		t.Fatalf("balance = %d, want %d (35 min × 2 over 4 blocks)", got, 200-70)
+	}
+}
+
 func TestSettleChargesMinutesOnce(t *testing.T) {
 	ctx := context.Background()
 	f := newFixture(t, 2, coins.ModeEnforce, 50)

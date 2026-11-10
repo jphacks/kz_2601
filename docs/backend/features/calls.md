@@ -52,7 +52,7 @@ sequenceDiagram
 | 続ける | アプリは `reservedUntil` の 1 分前に同じ `sessionId` でもう一度呼び、次のまとまりを押さえる。足りなければ 402 で、アプリは通話を出る |
 | 引く | webhook の `participant_left`(または `room_finished`)で、入った時刻から出た時刻まで(始まった分は 1 分)× `COIN_PER_CALL_MINUTE` を、押さえたまとまりの順に、それぞれ押さえた量まで引く(履歴の種類 `spend_call`)。押さえより長い分は引かない(ログ `calls.uncovered_minutes`) |
 | 1 回だけ | 精算は `callSessions/{sessionId}` に `settled`・分・まとまりごとの量を 1 回だけ書く。同じ webhook がもう一度来ても同じ量を確定するだけ(`SettleHold` は確定済みならそのまま) |
-| webhook が来ない | 押さえは `CALL_BLOCK_MINUTES + CALL_HOLD_GRACE` で期限が切れ、全部戻る(利用者に損をさせない側。ログ `coins.hold_expired`) |
+| webhook が来ない | 押さえは `CALL_BLOCK_MINUTES + CALL_HOLD_GRACE` で期限が切れ、全部戻る(利用者に損をさせない側。ログ `coins.hold_expired`)。押さえ直した時は、前のまとまりの期限も新しいまとまりと同じ時刻まで延ばす(精算は出る時なので、長い通話の途中で前のまとまりが戻らないように) |
 | 止める | `COIN_BILLING_MODE=off` なら押さえない・引かない。`log` は押さえず、引くはずの量をログ `coins.would_spend` に出すだけ。`COIN_PER_CALL_MINUTE=0`(既定)なら数えない |
 
 値段(`COIN_PER_CALL_MINUTE`)は非公開の資料で決め、この repo には書かない。

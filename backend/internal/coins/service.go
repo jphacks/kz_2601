@@ -331,6 +331,15 @@ func (s *Service) CommitCoins(ctx context.Context, h *Hold, coins int64) (Charge
 	return Charge{Coins: out.Charged, Balance: w.Available()}, nil
 }
 
+// Extend keeps a held hold until expireAt (a call block still in use when
+// the next block is reserved). Nil and log-mode holds do nothing.
+func (s *Service) Extend(ctx context.Context, h *Hold, expireAt time.Time) error {
+	if h == nil || h.DryRun {
+		return nil
+	}
+	return ExtendHold(ctx, s.Store, h.UID, h.ID, expireAt)
+}
+
 // Release implements Biller: the whole hold goes back (refund_failed in
 // the design: the user got nothing).
 func (s *Service) Release(ctx context.Context, h *Hold) error {

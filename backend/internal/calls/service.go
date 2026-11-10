@@ -42,6 +42,7 @@ const MaxNameRunes = 40
 type Coins interface {
 	Reserve(ctx context.Context, r coins.ReserveRequest) (*coins.Hold, error)
 	CommitCoins(ctx context.Context, h *coins.Hold, n int64) (coins.Charge, error)
+	Extend(ctx context.Context, h *coins.Hold, expireAt time.Time) error
 }
 
 // Service issues room tokens and settles the minutes.
@@ -143,6 +144,10 @@ func (s *Service) Join(ctx context.Context, r JoinRequest) (Join, error) {
 			return Join{}, ErrSessionClosed
 		}
 		sess = got
+		// the earlier blocks are settled only when the caller leaves: keep
+		// their holds as long as the new block's, or they expire mid-call
+		// and their minutes are never charged
+		s.extend(ctx, sess, now.Add(s.Config.BlockDuration()+s.Config.HoldGrace))
 	} else {
 		sess.ID = s.newID()
 	}
@@ -187,6 +192,20 @@ func (s *Service) Join(ctx context.Context, r JoinRequest) (Join, error) {
 	s.log().InfoContext(ctx, EventIssued, slog.String("event", EventIssued), slog.String("uid_hash", httpx.UIDHash(r.UID)),
 		slog.String("appId", r.AppID), slog.Bool("renew", renew), slog.Bool("video", sess.Video), slog.Int64("coins", out.CoinsReserved))
 	return out, nil
+}
+
+// extend keeps the holds of sess's blocks until expireAt (a failure is
+// logged: that block may then go back uncharged).
+func (s *Service) extend(ctx context.Context, sess Session, expireAt time.Time) {
+	if s.Coins == nil {
+		return
+	}
+	for _, b := range sess.Blocks {
+		h := &coins.Hold{ID: b.HoldID, UID: sess.UID, Op: coins.OpCall, Amount: b.Amount, DryRun: b.DryRun}
+		if err := s.Coins.Extend(ctx, h, expireAt); err != nil {
+			s.log().WarnContext(ctx, "calls: extend block hold failed", slog.String("uid_hash", httpx.UIDHash(sess.UID)), slog.Any("error", err))
+		}
+	}
 }
 
 // reserve holds block n of a session (nil when calls are not charged or
