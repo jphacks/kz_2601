@@ -19,7 +19,6 @@
     <string name="voice_build_button">これでいく</string>
     <string name="voice_build_now_button">このまま作る</string>
     <string name="voice_build_now_utterance">このまま作って</string>
-    <string name="voice_building_app">「%1$s」を組み立てています…</string>
     <string name="voice_busy_body">少し時間をおいて、もう一度お試しください</string>
     <string name="voice_busy_title">混み合っています</string>
     <string name="voice_cancel">キャンセル</string>
@@ -65,12 +64,18 @@
     <string name="voice_failed_title">うまく作れませんでした</string>
     <string name="voice_free_paused_body">利用が集中したため、無料プランの機能を一時的に止めています。しばらくしてからもう一度お試しください</string>
     <string name="voice_free_paused_title">無料プランを一時停止しています</string>
+    <string name="voice_gen_badge">変身中</string>
     <string name="voice_gen_building">画面を組み立てています…</string>
     <string name="voice_gen_deciding">必要な画面とデータを決めています…</string>
     <string name="voice_gen_editing">変更を反映しています…</string>
+    <string name="voice_gen_fallback">混み合っています。安全なテンプレートに切り替えています…</string>
     <string name="voice_gen_polishing">細部を整えています…</string>
+    <string name="voice_gen_seconds">%1$d 秒</string>
+    <string name="voice_gen_slow">もう少しかかっています…</string>
+    <string name="voice_gen_stop">中止</string>
     <string name="voice_gen_thinking">どんなアプリにするか考えています…</string>
     <string name="voice_gen_usually">ふつう 10 秒ほど</string>
+    <string name="voice_gen_warning">時間がかかっています。もう少しだけお待ちください</string>
     <string name="voice_hello_day">こんにちは</string>
     <string name="voice_hello_evening">こんばんは</string>
     <string name="voice_hello_morning">おはようございます</string>
@@ -94,6 +99,7 @@
     <string name="voice_plan_limit_title">上限に達しました</string>
     <string name="voice_pro_required_body">この内容には Pro の機能が必要です。言い方を変えて、もう一度お話しください</string>
     <string name="voice_question_progress">質問 %1$d / %2$d</string>
+    <string name="voice_quoted">「%1$s」</string>
     <string name="voice_rate_body">今日の上限に達しました。%1$sからまた使えます</string>
     <string name="voice_rate_title">今日はここまでです</string>
     <string name="voice_ready_title">この内容で作ります</string>

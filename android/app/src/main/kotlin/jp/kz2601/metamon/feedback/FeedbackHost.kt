@@ -55,6 +55,8 @@ import jp.kz2601.metamon.R
 import jp.kz2601.metamon.runtime.AppRuntime
 import jp.kz2601.metamon.runtime.Confirm
 import jp.kz2601.metamon.runtime.RuntimeState
+import jp.kz2601.metamon.ui.CraneMascot
+import jp.kz2601.metamon.ui.CranePose
 import jp.kz2601.metamon.voice.ErrorCard
 import jp.kz2601.metamon.voice.UndoAction
 import jp.kz2601.metamon.voice.UndoNotice
@@ -121,7 +123,10 @@ private val UndoNotice.text: Int
         UndoNotice.REDO_FAILED -> R.string.feedback_redo_failed
     }
 
-/** 変身直後の要約(iOS の summaryCard + `SummaryBannerActionButton`)。修正の直後は「元に戻す」、戻した直後は「やり直す」。 */
+/**
+ * 変身直後の要約(iOS の summaryCard + `SummaryBannerActionButton`)。修正の直後は「元に戻す」、戻した直後は「やり直す」。
+ * 上に払う・タップで閉じる。文字数に応じて 3〜5 秒(ボタン付きは 6 秒)で消える。読み上げ中は長めに出す(#894・H8)。
+ */
 @Composable
 private fun SummaryBanner(state: VoiceUiState, onUndo: (Int?) -> Unit, onRedo: (Int?) -> Unit, onDismiss: () -> Unit) {
     val text = state.summary ?: when (state.undone) {
@@ -129,6 +134,17 @@ private fun SummaryBanner(state: VoiceUiState, onUndo: (Int?) -> Unit, onRedo: (
         UndoAction.REDO -> stringResource(R.string.feedback_redone)
         null -> null
     }
+    val a11y = LocalAccessibilityManager.current
+    if (text != null) {
+        LaunchedEffect(text, state.summaryAction) {
+            val base = if (state.summaryAction == null) maxOf(3_000L, minOf(5_000L, text.length * 1_000L / 12)) else 6_000L
+            delay(a11y?.calculateRecommendedTimeoutMillis(base, containsIcons = false, containsText = true, containsControls = state.summaryAction != null) ?: base)
+            onDismiss()
+        }
+    }
+    var drag by remember { mutableFloatStateOf(0f) }
+    val threshold = with(LocalDensity.current) { SWIPE_DISMISS_DISTANCE.toPx() }
+    val close = stringResource(R.string.feedback_close)
     AnimatedVisibility(
         visible = text != null,
         enter = slideInVertically { -it } + fadeIn(),
@@ -139,11 +155,26 @@ private fun SummaryBanner(state: VoiceUiState, onUndo: (Int?) -> Unit, onRedo: (
             tonalElevation = 3.dp,
             shadowElevation = 2.dp,
             border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
-            modifier = Modifier.fillMaxWidth().padding(top = 12.dp).clickable(onClick = onDismiss)
-                .semantics { liveRegion = LiveRegionMode.Polite },
+            modifier = Modifier.fillMaxWidth().padding(top = 12.dp)
+                .offset { IntOffset(0, drag.roundToInt()) }
+                // 上に払って閉じる(元に戻す付きでも・iOS の swipeToDismiss)
+                .draggable(
+                    orientation = Orientation.Vertical,
+                    state = rememberDraggableState { delta -> drag = (drag + delta).coerceAtMost(0f) },
+                    onDragStopped = {
+                        if (-drag > threshold) onDismiss()
+                        drag = 0f
+                    },
+                )
+                .clickable(onClick = onDismiss)
+                .semantics {
+                    liveRegion = LiveRegionMode.Polite
+                    customActions = listOf(CustomAccessibilityAction(close) { onDismiss(); true })
+                },
         ) {
-            Row(Modifier.padding(horizontal = 16.dp, vertical = 12.dp), verticalAlignment = Alignment.CenterVertically) {
-                Text(text.orEmpty(), Modifier.weight(1f), style = MaterialTheme.typography.bodyMedium)
+            Row(Modifier.padding(horizontal = 12.dp, vertical = 10.dp), verticalAlignment = Alignment.CenterVertically) {
+                CraneMascot(CranePose.JOY, size = 44.dp, sway = 6f)
+                Text(text.orEmpty(), Modifier.weight(1f).padding(start = 10.dp), style = MaterialTheme.typography.bodyMedium)
                 state.summaryAction?.let { action ->
                     val enabled = !state.undoing && !state.isGenerating &&
                         (if (action == UndoAction.UNDO) state.canUndo else state.canRedo)
