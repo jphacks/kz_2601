@@ -56,7 +56,8 @@ struct MacCommands: Commands {
             // 中央のアプリのシート(sheet / fullScreen)が開いている間は出さない(シートを重ねない)
             Button("画面マップ") { shell?.showScreenMap() }
                 .keyboardShortcut("e", modifiers: [.command, .shift])
-                .disabled(!(shell?.canShowScreenMap ?? false) || runtime?.sheet != nil || runtime?.fullScreen != nil)
+                .disabled(!(shell?.canShowScreenMap ?? false) || runtime?.sheet != nil || runtime?.fullScreen != nil
+                           || runtime?.calendarDraft != nil)
         }
 
         CommandMenu("アプリ") {

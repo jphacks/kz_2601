@@ -72,10 +72,12 @@ enum WebLinkPolicy: Equatable {
 
     /// 表示できるのは https だけ。ページ内リンクで他スキーム(tel: / line:// など)に飛ぶ時は allowlist 内なら OS に渡し、それ以外は無視する。
     /// Mac は新しいウインドウで開くリンク(target=_blank)を既定のブラウザに渡す(#961)。iOS は今まで通り。
-    static func decide(_ url: URL?, opensNewWindow: Bool, externalNewWindows: Bool = isMac) -> WebLinkPolicy {
+    /// ブラウザに渡すのはリンクを押した時だけ(`linkActivated`)。スクリプトが開く新しいウインドウは渡さない。
+    static func decide(_ url: URL?, opensNewWindow: Bool, linkActivated: Bool = true,
+                       externalNewWindows: Bool = isMac) -> WebLinkPolicy {
         guard let url, let scheme = url.scheme?.lowercased() else { return .ignore }
         if scheme == "https" || scheme == "http" || scheme == "about" {
-            if externalNewWindows, opensNewWindow, scheme == "https" { return .openExternally(url) }
+            if externalNewWindows, opensNewWindow, scheme == "https" { return linkActivated ? .openExternally(url) : .ignore }
             return .allow
         }
         return ExternalURLPolicy.isAllowed(url) ? .openExternally(url) : .ignore
@@ -193,7 +195,8 @@ extension WebViewRepresentable: NSViewRepresentable {
 
         func webView(_ webView: WKWebView, decidePolicyFor action: WKNavigationAction,
                      decisionHandler: @escaping @MainActor (WKNavigationActionPolicy) -> Void) {
-            switch WebLinkPolicy.decide(action.request.url, opensNewWindow: action.targetFrame == nil) {
+            switch WebLinkPolicy.decide(action.request.url, opensNewWindow: action.targetFrame == nil,
+                                        linkActivated: action.navigationType == .linkActivated) {
             case .allow:
                 decisionHandler(.allow)
             case .openExternally(let url):

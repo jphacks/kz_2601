@@ -40,6 +40,8 @@ final class WebAndFeedMacTests: XCTestCase {
         let https = try XCTUnwrap(URL(string: "https://example.com/blank"))
         XCTAssertEqual(WebLinkPolicy.decide(https, opensNewWindow: true, externalNewWindows: true), .openExternally(https))
         XCTAssertEqual(WebLinkPolicy.decide(https, opensNewWindow: true, externalNewWindows: false), .allow)
+        XCTAssertEqual(WebLinkPolicy.decide(https, opensNewWindow: true, linkActivated: false, externalNewWindows: true), .ignore,
+                       "スクリプトが開くウインドウはブラウザに渡さない")
         let http = try XCTUnwrap(URL(string: "http://example.com/blank"))
         XCTAssertEqual(WebLinkPolicy.decide(http, opensNewWindow: true, externalNewWindows: true), .allow, "http は外に渡さない")
         #if os(macOS)

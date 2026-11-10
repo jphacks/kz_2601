@@ -82,7 +82,7 @@ struct MacRootView: View {
             .focused($focus, equals: .canvas)
         }
         .toolbar {
-            ShellToolbar(hasApp: selectedApp != nil, canCompose: compose == nil, newApp: newApp, ask: ask, speak: speak,
+            ShellToolbar(hasApp: selectedApp != nil, canCompose: canCompose, newApp: newApp, ask: ask, speak: speak,
                          canShowScreenMap: canShowScreenMap, showScreenMap: showScreenMap)
         }
         .frame(minWidth: Self.minWindowSize.width, minHeight: Self.minWindowSize.height)
@@ -144,7 +144,7 @@ struct MacRootView: View {
     }
 
     private func open(_ target: MacComposeSession.Target, draft: String, voice: Bool = false, screen: ScreenContext? = nil) {
-        guard compose == nil else { return }
+        guard canCompose else { return }
         let session = MacComposeSession(target: target, draft: draft)
         session.startsWithVoice = voice
         session.screen = screen
@@ -166,6 +166,9 @@ struct MacRootView: View {
 
     /// 中央にアプリがあり、会話のシートが閉じている時だけ開ける
     private var canShowScreenMap: Bool { selectedApp != nil && compose == nil }
+
+    /// 会話のシートを開ける・版を戻せるか。画面マップのシートが出ている間は開かない(シートを重ねない)
+    private var canCompose: Bool { compose == nil && !showsScreenMap }
 
     private func showScreenMap() {
         guard canShowScreenMap else { return }
@@ -247,9 +250,9 @@ struct MacRootView: View {
                 focus = .sidebar
             },
             focusCanvas: { focus = .canvas },
-            canCompose: compose == nil,
-            canUndoVersion: compose == nil && selectedAppId.map(library.canUndo) == true,
-            canRedoVersion: compose == nil && selectedAppId.map(library.canRedo) == true,
+            canCompose: canCompose,
+            canUndoVersion: canCompose && selectedAppId.map(library.canUndo) == true,
+            canRedoVersion: canCompose && selectedAppId.map(library.canRedo) == true,
             undoVersion: { undoVersion() },
             redoVersion: { redoVersion() },
             newApp: newApp,
