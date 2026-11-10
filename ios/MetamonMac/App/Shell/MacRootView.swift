@@ -148,13 +148,18 @@ struct MacRootView: View {
 
     private func open(_ target: MacComposeSession.Target, draft: String, voice: Bool = false, screen: ScreenContext? = nil) {
         guard canCompose else { return }
-        let session = MacComposeSession(target: target, draft: draft)
-        session.startsWithVoice = voice
-        session.screen = screen
-        session.onResult = { document, envelope in apply(document, envelope: envelope, target: target) }
-        notices.summary = nil // 会話を始めたら前の要約は下げる
-        closingCompose = session
-        compose = session
+        // 会話の結果は中央のアプリを作り直す(直す・作る どちらも)。入力があれば会話を始める前に確認する(#943)。
+        // シートの間は中央に触れないので、ここで「破棄」と答えたら閉じるまで聞き直さない(確認をシートの裏に出さない)
+        discardGuard.run {
+            let session = MacComposeSession(target: target, draft: draft)
+            session.startsWithVoice = voice
+            session.screen = screen
+            session.onResult = { document, envelope in apply(document, envelope: envelope, target: target) }
+            notices.summary = nil // 会話を始めたら前の要約は下げる
+            closingCompose = session
+            compose = session
+            discardGuard.released = true
+        }
     }
 
     /// 結果を中央に当てる。作ったアプリは一覧の先頭に足して選ぶ・直したアプリはその場で差し替える(中央を作り直す)
@@ -188,6 +193,7 @@ struct MacRootView: View {
 
     /// シートが閉じた。完成していたら要約のお知らせを出す(iOS の要約バナーと同じく、直した時は「元に戻す」付き)
     private func noteFinishedCompose() {
+        discardGuard.released = false
         defer { closingCompose = nil }
         guard let session = closingCompose, case .finished(let summary, false) = session.phase,
               let appId = session.resultAppId else { return }
@@ -204,16 +210,23 @@ struct MacRootView: View {
         }
     }
 
+    /// 版を戻す・やり直すと中央のアプリを作り直す。入力があれば先に確認する(#943)
     private func undoVersion(_ appId: String? = nil) {
-        guard let id = appId ?? selectedAppId, library.undo(id) else { return }
-        selectedAppId = id
-        notices.summary = .init(appId: id, text: L10n.tr("元に戻しました"), action: .redo)
+        guard let id = appId ?? selectedAppId, library.canUndo(id) else { return }
+        discardGuard.run {
+            guard library.undo(id) else { return }
+            selectedAppId = id
+            notices.summary = .init(appId: id, text: L10n.tr("元に戻しました"), action: .redo)
+        }
     }
 
     private func redoVersion(_ appId: String? = nil) {
-        guard let id = appId ?? selectedAppId, library.redo(id) else { return }
-        selectedAppId = id
-        notices.summary = .init(appId: id, text: L10n.tr("やり直しました"), action: library.canUndo(id) ? .undo : nil)
+        guard let id = appId ?? selectedAppId, library.canRedo(id) else { return }
+        discardGuard.run {
+            guard library.redo(id) else { return }
+            selectedAppId = id
+            notices.summary = .init(appId: id, text: L10n.tr("やり直しました"), action: library.canUndo(id) ? .undo : nil)
+        }
     }
 
     @ViewBuilder private var noticeBar: some View {
@@ -249,14 +262,17 @@ struct MacRootView: View {
         discardGuard.run { selectedAppId = id }
     }
 
+    /// シート(会話・頼み方の例)を開いている間は ⌥⌘↑↓ で切り替えない。確認がシートの裏に出るため(#943)
+    private var canSwitchApp: Bool { compose == nil && !showsTips }
+
     private var selectedIndex: Int? { apps.firstIndex { $0.id == selectedAppId } }
 
     private var shellActions: ShellActions {
         let index = selectedIndex
         return ShellActions(
             hasSelection: index != nil,
-            canSelectPrevious: (index ?? 0) > 0,
-            canSelectNext: index.map { $0 + 1 < apps.count } ?? !apps.isEmpty,
+            canSelectPrevious: canSwitchApp && (index ?? 0) > 0,
+            canSelectNext: canSwitchApp && (index.map { $0 + 1 < apps.count } ?? !apps.isEmpty),
             selectPrevious: { select(offset: -1) },
             selectNext: { select(offset: 1) },
             focusSidebar: {
@@ -280,7 +296,7 @@ struct MacRootView: View {
 
     /// 前 / 次のアプリ。何も選んでいなければ先頭を選ぶ。
     private func select(offset: Int) {
-        guard !apps.isEmpty else { return }
+        guard canSwitchApp, !apps.isEmpty else { return }
         let next = selectedIndex.map { $0 + offset } ?? 0
         guard apps.indices.contains(next) else { return }
         switchApp(to: apps[next].id)
