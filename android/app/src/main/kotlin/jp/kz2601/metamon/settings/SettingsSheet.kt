@@ -105,6 +105,8 @@ fun SettingsSheet(
             // 今日の残り(#630)。AI を使うまでは「AI を使うと表示されます」
             RemainingTodaySection(remainingToday, isPro)
             HorizontalDivider(Modifier.padding(vertical = 8.dp))
+            UsageSection(container, isPro) // 使っている量(#317・iOS と同じく「今日の残り」の次)
+            HorizontalDivider(Modifier.padding(vertical = 8.dp))
             var language by remember { mutableStateOf(AppLocales.setting(context)) }
             LanguageSection(language, onSelect = { selected ->
                 if (selected == language) return@LanguageSection
