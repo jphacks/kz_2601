@@ -31,22 +31,27 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import jp.kz2601.metamon.AppContainer
 import jp.kz2601.metamon.R
+import jp.kz2601.metamon.account.AccountSection
 import jp.kz2601.metamon.consent.LegalLinks
 import jp.kz2601.metamon.language.AppLocales
 import jp.kz2601.metamon.language.LanguageSection
 import jp.kz2601.metamon.push.PushConsentSection
 import jp.kz2601.metamon.push.PushHost
+import jp.kz2601.metamon.voice.ClarifySection
+import jp.kz2601.metamon.voice.ClarifySettings
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import java.time.format.FormatStyle
 
 /**
- * 最小の設定(iOS の SettingsSheet のうち #888 の分): プライバシー(AI へのデータ送信の同意)・クラッシュ報告・
- * AI ボタンの利用状況・他の人の行動で届く通知(#887 の [PushConsentSection])・言語(#843 の [LanguageSection])。ほかの項目は設定の画面(#898)で足す。
+ * 設定(iOS の SettingsSheet): 相談の ON / OFF(#893 の [ClarifySection])・投稿に表示する名前(#875)・
+ * プライバシー(AI へのデータ送信の同意)・クラッシュ報告・AI ボタンの利用状況(#888)・他の人の行動で届く通知(#887 の [PushConsentSection])・
+ * 言語(#843 の [LanguageSection])・アカウント(ログアウト・削除・#841 の [AccountSection])。
+ * @param busy 生成中(アカウント削除をさせない)
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun SettingsSheet(container: AppContainer, onDismiss: () -> Unit) {
+fun SettingsSheet(container: AppContainer, busy: Boolean, onDismiss: () -> Unit) {
     ModalBottomSheet(
         onDismissRequest = onDismiss,
         sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
@@ -57,6 +62,11 @@ fun SettingsSheet(container: AppContainer, onDismiss: () -> Unit) {
                 Text(stringResource(R.string.settings_title), style = MaterialTheme.typography.titleLarge, modifier = Modifier.weight(1f))
                 TextButton(onClick = onDismiss) { Text(stringResource(R.string.settings_close)) }
             }
+            val context = LocalContext.current
+            ClarifySection(remember { ClarifySettings(context) })
+            HorizontalDivider(Modifier.padding(vertical = 8.dp))
+            AuthorNameSection(container.authorProfile)
+            HorizontalDivider(Modifier.padding(vertical = 8.dp))
             PrivacySection(container)
             HorizontalDivider(Modifier.padding(vertical = 8.dp))
             // 他の人の行動で届く通知(#887)。共有・公開の記録があるアプリだけ
@@ -65,7 +75,6 @@ fun SettingsSheet(container: AppContainer, onDismiss: () -> Unit) {
                 PushConsentSection(container.push, document.appId, document.dsl)
                 HorizontalDivider(Modifier.padding(vertical = 8.dp))
             }
-            val context = LocalContext.current
             var language by remember { mutableStateOf(AppLocales.setting(context)) }
             LanguageSection(language, onSelect = { selected ->
                 if (selected == language) return@LanguageSection
@@ -73,6 +82,11 @@ fun SettingsSheet(container: AppContainer, onDismiss: () -> Unit) {
                 // Android 12 / 12L は開いている画面を作り直す(13+ はシステムがやる)
                 if (AppLocales.set(context, selected)) (context as? Activity)?.recreate()
             })
+            // ログアウト・削除の後は本体の画面ごと消える(後片付けは画面より長く生きる scope で回る)
+            container.accountGuard.active.collectAsStateWithLifecycle().value?.let { user ->
+                HorizontalDivider(Modifier.padding(vertical = 8.dp))
+                AccountSection(container, user, busy = busy)
+            }
         }
     }
 }

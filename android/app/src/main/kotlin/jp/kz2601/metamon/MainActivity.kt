@@ -48,7 +48,6 @@ import jp.kz2601.metamon.push.PushOpen
 import jp.kz2601.metamon.services.push.PushMessage
 import jp.kz2601.metamon.permissions.MicrophoneAccessProvider
 import jp.kz2601.metamon.permissions.PermissionOffBarHost
-import jp.kz2601.metamon.account.AccountMenu
 import jp.kz2601.metamon.auth.RootScreen
 import jp.kz2601.metamon.auth.SignInScreen
 import jp.kz2601.metamon.permissions.ProvideRendererPermissions
@@ -59,7 +58,6 @@ import jp.kz2601.metamon.runtime.AppRuntime
 import jp.kz2601.metamon.runtime.TranscriberDictationHost
 import jp.kz2601.metamon.services.GenerateProgress
 import jp.kz2601.metamon.voice.AppConfigVersions
-import jp.kz2601.metamon.voice.ChatHistoryStore
 import jp.kz2601.metamon.voice.ClarifySettings
 import jp.kz2601.metamon.voice.GeneratingView
 import jp.kz2601.metamon.voice.MicButton
@@ -147,8 +145,8 @@ fun MetamonApp(container: AppContainer) {
             buildNowUtterance = buildNow,
             clarifyEnabled = { clarify.enabled },
             autoBuild = { clarify.autoBuild },
-            // 会話の履歴はアプリごとに端末へ(#893)。モックは前の起動の履歴を持ち込まないようメモリだけ
-            chatHistory = ChatHistoryStore(if (container.knobs.mock) null else File(context.filesDir, "chat_history")),
+            // 会話の履歴はアプリごとに端末へ(#893)。サインアウト・削除で消すので container が持つ
+            chatHistory = container.chatHistory,
             historyHeader = historyHeader,
             // 発話・AI の返事を含むので debug だけ(release の logcat に個人の情報を出さない)
             log = { if (BuildConfig.DEBUG) Log.i(AppContainer.TAG, it) },
@@ -227,8 +225,6 @@ fun MetamonApp(container: AppContainer) {
                 TextButton(onClick = { settingsOpen = true }, modifier = Modifier.testTag("settings.open")) {
                     Text(stringResource(R.string.settings_title))
                 }
-                // ログアウト・アカウント削除の入口(最小・#841)。設定の画面(#1144)ができたらそちらへ移す
-                user?.let { AccountMenu(container, it, busy = state.isGenerating) }
                 if (!container.environment.isProduction || container.knobs.mock) {
                     Text(
                         "${container.environmentLabel} / auth=${container.auth.kind} / uid=${user?.uid ?: "-"}",
@@ -261,7 +257,7 @@ fun MetamonApp(container: AppContainer) {
         }
     }
 
-    if (settingsOpen) SettingsSheet(container, onDismiss = { settingsOpen = false })
+    if (settingsOpen) SettingsSheet(container, busy = state.isGenerating, onDismiss = { settingsOpen = false })
     // 設定のシートより後に置く(設定から出した時に上に重ねる)
     val consentVisible by container.consentPrompt.visible.collectAsStateWithLifecycle()
     if (consentVisible) {

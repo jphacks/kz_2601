@@ -615,7 +615,7 @@ private fun RestartConfirmDialog(vm: VoiceViewModel) {
     )
 }
 
-/** 相談の ON / OFF(iOS の設定の「チャットで相談してから作る」)。設定の画面(#898)ができたらそこへ移す */
+/** 相談の ON / OFF(iOS の設定の「チャットで相談してから作る」)。設定の画面([jp.kz2601.metamon.settings.SettingsSheet])に出す */
 @Composable
 fun ClarifySection(settings: ClarifySettings, modifier: Modifier = Modifier) {
     var enabled by remember { mutableStateOf(settings.enabled) }

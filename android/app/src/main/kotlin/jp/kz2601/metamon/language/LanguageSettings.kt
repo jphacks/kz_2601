@@ -34,8 +34,6 @@ import androidx.compose.ui.unit.dp
 import jp.kz2601.metamon.MainActivity
 import jp.kz2601.metamon.R
 import jp.kz2601.metamon.renderer.theme.MetamonRenderTheme
-import jp.kz2601.metamon.voice.ClarifySection
-import jp.kz2601.metamon.voice.ClarifySettings
 
 /**
  * 表示言語の選択(iOS の設定の「言語」・#843)。設定の画面(#898)ができたらそこに置く。
@@ -97,8 +95,6 @@ class LanguageSettingsActivity : ComponentActivity() {
                             selected = language
                             if (AppLocales.set(this@LanguageSettingsActivity, language)) restartApp()
                         })
-                        // 相談の ON / OFF(#893)。設定の画面(#898)ができたらそこへ移す
-                        ClarifySection(remember { ClarifySettings(this@LanguageSettingsActivity) })
                     }
                 }
             }

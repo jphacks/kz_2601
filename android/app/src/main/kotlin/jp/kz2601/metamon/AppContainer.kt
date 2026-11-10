@@ -46,6 +46,10 @@ import jp.kz2601.metamon.services.consent.HttpAiButtonMetricsSender
 import jp.kz2601.metamon.services.consent.InMemoryKeyValueStore
 import jp.kz2601.metamon.services.consent.KeyValueStore
 import jp.kz2601.metamon.services.consent.SharedPreferencesKeyValueStore
+import jp.kz2601.metamon.services.social.AuthorProfile
+import jp.kz2601.metamon.voice.ChatHistoryStore
+import jp.kz2601.metamon.renderer.components.audio.LocalAudioStore
+import jp.kz2601.metamon.renderer.components.media.VideoCodec
 import jp.kz2601.metamon.services.http.AuthTokenProvider
 import jp.kz2601.metamon.services.http.ClientInfo
 import jp.kz2601.metamon.services.http.DeviceContext
@@ -128,6 +132,12 @@ class AppContainer(
     private val activeOwner: ActiveOwner,
     /** 権限の記録など、端末の設定のうち前の人の分(#841) */
     private val forgetDeviceState: () -> Unit,
+    /** 共有アプリへの投稿に出す名前(#875)。設定で決め、サインアウト・削除で消す */
+    val authorProfile: AuthorProfile,
+    /** アプリごとの会話の履歴(#893)。モックはメモリだけ */
+    val chatHistory: ChatHistoryStore,
+    /** 端末内の動画(#863)・録音(#1084)のファイルを全部消す(#841 の後片付け) */
+    private val removeLocalMedia: () -> Unit,
 ) {
     /** 画面の下に出す接続先の名前(モックなら "mock")。 */
     val environmentLabel: String get() = if (knobs.mock) "mock" else environment.name
@@ -148,7 +158,12 @@ class AppContainer(
 
     /** 端末のデータの後片付け(#841・iOS の `wipeLocalData`)。 */
     val wipeLocalData: LocalDataWipe by lazy {
-        LocalDataWipe(recordSync, documentCache, appList, resetRuntime = { runtime.resetForAccountChange() }, forgetDeviceState = forgetDeviceState)
+        LocalDataWipe(
+            recordSync, documentCache, appList, resetRuntime = { runtime.resetForAccountChange() }, forgetDeviceState = forgetDeviceState,
+            chatHistory = chatHistory,
+            authorProfile = authorProfile,
+            removeLocalMedia = removeLocalMedia,
+        )
     }
 
     /**
@@ -223,6 +238,10 @@ class AppContainer(
                 ownerStore = AccountOwnerStore(File(context.filesDir, "metamon-account-mock")),
                 activeOwner = ActiveOwner(),
                 forgetDeviceState = forgetDeviceState(context),
+                // モックは端末に残さない(前の起動の名前・履歴を持ち込まない)
+                authorProfile = AuthorProfile(InMemoryKeyValueStore()),
+                chatHistory = ChatHistoryStore(null),
+                removeLocalMedia = removeLocalMedia(context),
             )
         }
 
@@ -279,6 +298,9 @@ class AppContainer(
                 ownerStore = AccountOwnerStore(File(context.filesDir, "metamon-account")),
                 activeOwner = owner,
                 forgetDeviceState = forgetDeviceState(context),
+                authorProfile = AuthorProfile(SharedPreferencesKeyValueStore.of(context, AUTHOR_PREFS)),
+                chatHistory = ChatHistoryStore(File(context.filesDir, "chat_history")),
+                removeLocalMedia = removeLocalMedia(context),
             )
         }
 
@@ -309,6 +331,12 @@ class AppContainer(
 
         /** 権限の記録を忘れる(表示の言語は端末の設定なので残す)。 */
         private fun forgetDeviceState(context: Context): () -> Unit = { PermissionCenter.get(context).forget() }
+
+        /** 端末内の動画・録音のファイル(どちらもバックアップされない領域)。 */
+        private fun removeLocalMedia(context: Context): () -> Unit = {
+            VideoCodec.store(context).removeAll()
+            LocalAudioStore.of(context).removeAll()
+        }
 
         private fun recordSync(context: Context, client: AppConfigClient, dir: String) = RecordSyncEngine.create(
             client = client,
@@ -355,6 +383,7 @@ class AppContainer(
 
         /** 同意・クラッシュ報告・AI ボタンの集計(#888) */
         private const val PRIVACY_PREFS = "metamon-privacy"
+        private const val AUTHOR_PREFS = "metamon-author"
     }
 
     /** アプリ全体のランタイム(#889)。起動時に 1 つだけ作る。 */
@@ -376,6 +405,7 @@ class AppContainer(
                 fresh = { id -> AppDocument(appId = id, dsl = initialDsl) },
             ),
             aiHost = aiHost,
+            authorProfile = authorProfile,
         ).also { it.dictation = TranscriberDictationHost(transcriber, CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)) }
     }
 

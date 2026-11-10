@@ -1,15 +1,13 @@
 package jp.kz2601.metamon.account
 
 import android.app.Activity
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.DropdownMenu
-import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -22,6 +20,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
@@ -44,11 +43,11 @@ private sealed interface AccountDialog {
 }
 
 /**
- * アカウントの入口(最小・#841)。ログアウトとアカウント削除。設定の画面(#1144)ができたらそちらへ移す。
+ * 設定の画面(#1144)の「アカウント」(#841・iOS の `AccountSettingsSection`)。ログアウトとアカウント削除。
  * @param busy 生成中(iOS の `canDelete` と同じく削除させない)
  */
 @Composable
-fun AccountMenu(container: AppContainer, user: AuthUser, busy: Boolean) {
+fun AccountSection(container: AppContainer, user: AuthUser, busy: Boolean) {
     val context = LocalContext.current
     val activity = context as? Activity
     val scope = rememberCoroutineScope()
@@ -57,7 +56,6 @@ fun AccountMenu(container: AppContainer, user: AuthUser, busy: Boolean) {
     val session = container.session
     val recordSync = container.recordSync
     val guard = container.accountGuard
-    var expanded by remember { mutableStateOf(false) }
     var dialog by remember { mutableStateOf<AccountDialog?>(null) }
     var working by remember { mutableStateOf<Int?>(null) } // 進行中の文言
     val unknownError = stringResource(R.string.account_sign_out_failed)
@@ -113,30 +111,25 @@ fun AccountMenu(container: AppContainer, user: AuthUser, busy: Boolean) {
         }
     }
 
-    Box {
-        TextButton(onClick = { expanded = true }, enabled = working == null) { Text(stringResource(R.string.account_menu)) }
-        DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
-            DropdownMenuItem(
-                text = { Text(stringResource(R.string.account_sign_out)) },
-                onClick = {
-                    expanded = false
-                    scope.launch { dialog = AccountDialog.SignOut(session.signOutPrompt(recordSync)) }
-                },
-            )
-            DropdownMenuItem(
-                text = {
-                    Text(
-                        stringResource(R.string.account_delete),
-                        color = if (busy) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.error,
-                    )
-                },
-                enabled = !busy,
-                onClick = {
-                    expanded = false
-                    dialog = AccountDialog.Delete
-                },
-            )
-        }
+    Text(
+        stringResource(R.string.account_menu),
+        style = MaterialTheme.typography.titleSmall,
+        modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+    )
+    TextButton(
+        onClick = { scope.launch { dialog = AccountDialog.SignOut(session.signOutPrompt(recordSync)) } },
+        enabled = working == null,
+        modifier = Modifier.padding(horizontal = 4.dp).testTag("settings.account.signOut"),
+    ) { Text(stringResource(R.string.account_sign_out)) }
+    TextButton(
+        onClick = { dialog = AccountDialog.Delete },
+        enabled = working == null && !busy,
+        modifier = Modifier.padding(horizontal = 4.dp).testTag("settings.account.delete"),
+    ) {
+        Text(
+            stringResource(R.string.account_delete),
+            color = if (busy) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.error,
+        )
     }
 
     when (val d = dialog) {

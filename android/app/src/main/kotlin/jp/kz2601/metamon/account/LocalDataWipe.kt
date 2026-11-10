@@ -3,6 +3,8 @@ package jp.kz2601.metamon.account
 import jp.kz2601.metamon.services.local.AppListCache
 import jp.kz2601.metamon.services.local.DocumentCache
 import jp.kz2601.metamon.services.local.RecordSyncEngine
+import jp.kz2601.metamon.services.social.AuthorProfile
+import jp.kz2601.metamon.voice.ChatHistoryStore
 
 /**
  * この端末に残る前の人のデータを全部消す(#841・iOS の `AppRuntime.wipeLocalData`)。サーバーには何も送らない。
@@ -13,6 +15,9 @@ import jp.kz2601.metamon.services.local.RecordSyncEngine
  * - 保存した DSL([DocumentCache.removeAll] = iOS `DocumentCache.shared.removeAll()`)
  * - アプリの一覧([AppListCache.clear] = iOS `DocumentCache` の一覧・`apps = []`)
  * - 権限の記録(聞いた結果。[forgetDeviceState] = iOS `LocalWipe.clearDefaults`)
+ * - 会話の履歴(#893・[ChatHistoryStore.removeAll] = iOS `ChatHistoryStore.removeAll()`)
+ * - 投稿に表示する名前(#875・[AuthorProfile.clear])
+ * - 端末内の動画(#863)・録音(#1084)のファイル([removeLocalMedia] = iOS `LocalVideoStore` / `LocalAudioStore` の removeAll)
  * - 画面の状態・appId(新しい appId に。[resetRuntime] = iOS `recordUndo = nil`・`resetToInitial()`・`DeviceAppID.set`)
  * - 音声の画面の状態は [AccountGuard.generation] で作り直す(iOS `chatHistory = []`)
  */
@@ -22,12 +27,18 @@ class LocalDataWipe(
     private val appList: AppListCache,
     private val resetRuntime: () -> Unit,
     private val forgetDeviceState: () -> Unit,
+    private val chatHistory: ChatHistoryStore? = null,
+    private val authorProfile: AuthorProfile? = null,
+    private val removeLocalMedia: () -> Unit = {},
 ) {
     suspend operator fun invoke() {
         recordSync.wipe() // 最初に止める(前の人の送信待ちを次の人に送らない)
         documentCache.removeAll()
         appList.clear()
         forgetDeviceState()
+        authorProfile?.clear()
+        chatHistory?.removeAll()
+        removeLocalMedia()
         resetRuntime() // 一覧・DSL を消した後に新しい appId へ
     }
 }
