@@ -138,6 +138,8 @@ public struct ComponentRegistry: Sendable {
         r.register(.audioRecorder) { c, ctx in AudioRecorderLeaf(c: c, ctx: ctx) }
         // leaf(仲間探しの届いた人・つながった人・#507)。共有と一緒に外す
         r.register(.matchList) { c, ctx in MatchListLeaf(c: c, ctx: ctx) }
+        // leaf(通話・#447)。共有と一緒に外す
+        r.register(.callButton) { c, _ in CallButtonLeaf(c: c) }
         // leaf(外部の公開データ・#348)。外部の Web の内容を出すので外す
         r.register(.feed) { c, _ in FeedLeaf(c: c) }
         #endif

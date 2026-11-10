@@ -75,6 +75,8 @@ public enum ComponentType: String, Decodable, Sendable, CaseIterable {
     case flashcards
     // leaf(外部の公開データ・#348)。title / limit / emptyText は共用。appconfig が許可リストの出どころだけから取る
     case feed
+    // leaf(共有のアプリの参加者どうしの音声・ビデオ通話・#447)。label は共用
+    case callButton
     case unknown
 
     public init(from decoder: Decoder) throws { self = Lenient.decode(Self.self, from: decoder, fallback: .unknown) }
@@ -260,6 +262,9 @@ public struct Component: Decodable, Identifiable, Sendable {
     public var near: String?           // current(既定)
     public var addressField: String?   // placeSearch / locationButton: 住所の string / text field
     public var pins: Bool?             // placeSearch: 結果を小さな地図のピンでも出す
+    // callButton(#447)。label は共用
+    public var video: Bool?            // カメラも使う(nil / false = 音声だけ)
+    public var room: String?           // アプリの中の部屋の名前(nil = アプリの部屋)
 
     /// デコードで読むキー全部。スキーマとのずれ検出テスト(#537)が使う。
     static let codingKeyNames = Set(Keys.allCases.map(\.rawValue))
@@ -288,6 +293,7 @@ public struct Component: Decodable, Identifiable, Sendable {
         case visibleTo, highlight
         case provider, region, feedId
         case query, category, near, addressField, pins
+        case video, room
     }
 
     public init(from decoder: Decoder) throws {
@@ -421,6 +427,8 @@ public struct Component: Decodable, Identifiable, Sendable {
         near = try? c.decodeIfPresent(String.self, forKey: .near)
         addressField = try? c.decodeIfPresent(String.self, forKey: .addressField)
         pins = try? c.decodeIfPresent(Bool.self, forKey: .pins)
+        video = try? c.decodeIfPresent(Bool.self, forKey: .video)
+        room = try? c.decodeIfPresent(String.self, forKey: .room)
     }
 }
 

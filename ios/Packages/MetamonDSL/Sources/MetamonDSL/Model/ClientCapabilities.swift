@@ -14,7 +14,8 @@ public enum ClientCapabilities {
     }
 
     /// 審査用ビルドでバイナリから外す部品(Renderer の登録もしない)。feed(#348)は外部の Web の内容を出すので外す。aiChat はオンライン AI(POST /v1/text)だけで動き、審査用の版はそれを持たない(#452 G4)ので外す。
-    public static let reviewExcludedComponents: Set<ComponentType> = [.healthStat, .locationTracker, .nearbyShare, .dashcam, .sensorValue, .audioRecorder, .webView, .chatThread, .matchList, .feed, .aiChat]
+    /// callButton(#447・通話)は共有と一緒に外す(マイク・カメラで他の人とつながる。審査メモの説明が要る)。
+    public static let reviewExcludedComponents: Set<ComponentType> = [.healthStat, .locationTracker, .nearbyShare, .dashcam, .sensorValue, .audioRecorder, .webView, .chatThread, .matchList, .feed, .aiChat, .callButton]
     /// 審査用ビルドで無効にする機能。fieldHealth = Field.health(HealthKit への書き込み)、cameraCapture = photoField / videoField の撮影、
     /// sharedData = entity の scope shared / public(他の人と同じ記録を見る作り・#451 G2。backend が private に直す)。
     public static let reviewDisabledFeatures = ["fieldHealth", "cameraCapture", "sharedData"]
@@ -48,11 +49,12 @@ public enum ClientCapabilities {
     /// progressBar.settingTarget(progressBar の target に {"setting": …}・変えられる目標でバーが動く): 知らない版はバーが空になるので、無い版には生成させない。審査用の版も同じ(端末内の計算だけ)。
     /// photoField.illustrate(端末内の Image Playground でイラストを作る): 知らない版はキーを無視するだけだが、ボタンが出ないので無い版には生成させない。
     /// 審査用の版は Apple Intelligence に頼る作りを審査で確かめにくいので、ボタンをバイナリから外し、キーも送らない。
+    /// component.callButton(#447・通話): 知らない版は描けないので、無い版には生成させない。審査用の版は部品ごと外し、キーも送らない。
     public static var supportedFeatures: [String] {
         #if APP_STORE_REVIEW
         ["recordRetention", "notification.when", "singleEntity", "notification.near", "aiButton.long", "aiButton.inputPhoto", "aiButton.saveTo", "aiButton.inputFeeds", "aiButton.outputs", "action.lookupBook", "text.highlight", "feed.v2", "expr.addMinutes", "aiChat.inputEntity", "component.bracket", "progressBar.settingTarget"]
         #else
-        ["recordRetention", "matching", "notification.when", "singleEntity", "dataRoles", "addressedMessages", "notification.near", "aiButton.long", "aiButton.inputPhoto", "aiButton.saveTo", "aiButton.inputFeeds", "aiButton.outputs", "action.lookupBook", "text.highlight", "feed.v2", "expr.addMinutes", "aiChat.inputEntity", "component.bracket", "progressBar.settingTarget", "photoField.illustrate"]
+        ["recordRetention", "matching", "notification.when", "singleEntity", "dataRoles", "addressedMessages", "notification.near", "aiButton.long", "aiButton.inputPhoto", "aiButton.saveTo", "aiButton.inputFeeds", "aiButton.outputs", "action.lookupBook", "text.highlight", "feed.v2", "expr.addMinutes", "aiChat.inputEntity", "component.bracket", "progressBar.settingTarget", "photoField.illustrate", "component.callButton"]
         #endif
     }
 
