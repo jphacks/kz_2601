@@ -22,7 +22,11 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import jp.kz2601.metamon.dsl.Action
+import jp.kz2601.metamon.dsl.ActionType
+import jp.kz2601.metamon.dsl.Align
 import jp.kz2601.metamon.dsl.Component
+import jp.kz2601.metamon.dsl.ComponentStyle
+import jp.kz2601.metamon.dsl.Size
 import jp.kz2601.metamon.renderer.registry.RenderContext
 import jp.kz2601.metamon.renderer.theme.RenderTheme
 import jp.kz2601.metamon.renderer.theme.colors
@@ -34,14 +38,14 @@ import jp.kz2601.metamon.renderer.theme.colors
 fun TextLeaf(c: Component, modifier: Modifier = Modifier) {
     val typography = MaterialTheme.typography
     val style = when (c.style) {
-        "title" -> typography.headlineSmall.copy(fontWeight = FontWeight.Bold)
-        "headline" -> typography.titleMedium.copy(fontWeight = FontWeight.SemiBold)
-        "caption" -> typography.bodySmall
+        ComponentStyle.TITLE -> typography.headlineSmall.copy(fontWeight = FontWeight.Bold)
+        ComponentStyle.HEADLINE -> typography.titleMedium.copy(fontWeight = FontWeight.SemiBold)
+        ComponentStyle.CAPTION -> typography.bodySmall
         else -> typography.bodyLarge
     }
     val align = when (c.align) {
-        "center" -> TextAlign.Center
-        "trailing" -> TextAlign.End
+        Align.CENTER -> TextAlign.Center
+        Align.TRAILING -> TextAlign.End
         else -> TextAlign.Start
     }
     Text(c.text.orEmpty(), modifier.fillMaxWidth(), style = style, textAlign = align)
@@ -51,9 +55,9 @@ fun TextLeaf(c: Component, modifier: Modifier = Modifier) {
 @Composable
 fun SpacerLeaf(c: Component, modifier: Modifier = Modifier) {
     val h = when (c.size) {
-        "small" -> 8.dp
-        "medium" -> 16.dp
-        "large" -> 32.dp
+        Size.SMALL -> 8.dp
+        Size.MEDIUM -> 16.dp
+        Size.LARGE -> 32.dp
         else -> 0.dp
     }
     Spacer(modifier.height(h))
@@ -66,8 +70,8 @@ fun DividerLeaf(modifier: Modifier = Modifier) {
 
 /** button が見えるか(iOS の `ButtonLeaf.isVisible`)。フォームは子 Issue で入れるので、今は新規のフォーム扱い。 */
 fun isButtonVisible(action: Action?, isEditing: Boolean = false, readOnly: Boolean = false): Boolean = when (action?.type) {
-    "deleteRecord" -> isEditing
-    "saveRecord" -> !readOnly
+    ActionType.DELETE_RECORD -> isEditing
+    ActionType.SAVE_RECORD -> !readOnly
     else -> true
 }
 
@@ -80,8 +84,8 @@ fun ButtonLeaf(c: Component, ctx: RenderContext, modifier: Modifier = Modifier) 
     val shape = RoundedCornerShape(RenderTheme.Radius.button)
     val m = modifier.fillMaxWidth()
     when (c.style) {
-        "secondary" -> OutlinedButton(onClick, m, shape = shape) { Text(label) }
-        "plain" -> TextButton(onClick, m) { Text(label) }
+        ComponentStyle.SECONDARY -> OutlinedButton(onClick, m, shape = shape) { Text(label) }
+        ComponentStyle.PLAIN -> TextButton(onClick, m) { Text(label) }
         else -> Button(onClick, m, shape = shape) { Text(label, fontWeight = FontWeight.SemiBold) }
     }
 }
@@ -99,7 +103,7 @@ fun VoiceInputLeaf(c: Component, ctx: RenderContext, modifier: Modifier = Modifi
             style = MaterialTheme.typography.headlineSmall,
             textAlign = TextAlign.Center,
         )
-        val buttonSize = if (c.size == "large") 120.dp else 72.dp
+        val buttonSize = if (c.size == Size.LARGE) 120.dp else 72.dp
         Button(
             onClick = { ctx.runtime.onVoiceInput(c.id) },
             shape = CircleShape,

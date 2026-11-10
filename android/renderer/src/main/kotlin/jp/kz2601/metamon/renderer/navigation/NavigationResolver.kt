@@ -1,6 +1,7 @@
 package jp.kz2601.metamon.renderer.navigation
 
 import jp.kz2601.metamon.dsl.AppDSL
+import jp.kz2601.metamon.dsl.hasTabs
 
 // 画面遷移(Compose に依存しない)。iOS の Host/Route.swift・NavigationResolver.swift と同じ規則。
 

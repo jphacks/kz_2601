@@ -37,3 +37,6 @@ fun AppDSL.screen(id: String): Screen? = screens.firstOrNull { it.id == id }
 
 /** 初期状態(音声画面だけ)か。 */
 val AppDSL.isVoiceOnly: Boolean get() = app.voiceEntry == VoiceEntry.FULLSCREEN
+
+/** タブバーを出すか(iOS の `hasTabs`: 2 個以上)。 */
+val AppMeta.hasTabs: Boolean get() = tabs.size >= 2

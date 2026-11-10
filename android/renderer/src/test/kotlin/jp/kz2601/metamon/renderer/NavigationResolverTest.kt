@@ -1,6 +1,7 @@
 package jp.kz2601.metamon.renderer
 
 import jp.kz2601.metamon.dsl.AppDSL
+import jp.kz2601.metamon.dsl.decode
 import jp.kz2601.metamon.renderer.navigation.NavigationResolver
 import jp.kz2601.metamon.renderer.navigation.NavigationState
 import jp.kz2601.metamon.renderer.navigation.Presentation

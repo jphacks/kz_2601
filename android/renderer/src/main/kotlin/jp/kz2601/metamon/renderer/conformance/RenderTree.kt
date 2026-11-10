@@ -4,6 +4,7 @@ import jp.kz2601.metamon.dsl.Action
 import jp.kz2601.metamon.dsl.AppDSL
 import jp.kz2601.metamon.dsl.Component
 import jp.kz2601.metamon.dsl.ComponentType
+import jp.kz2601.metamon.dsl.screen
 import jp.kz2601.metamon.renderer.components.disclosureTitle
 import jp.kz2601.metamon.renderer.components.gridColumns
 import jp.kz2601.metamon.renderer.components.isButtonVisible
@@ -125,14 +126,14 @@ class RenderTree(private val dsl: AppDSL, private val available: Set<String>) {
 
         fun action(a: Action): JsonObject = JsonObject(
             buildMap {
-                put("type", JsonPrimitive(a.type))
+                put("type", JsonPrimitive(a.type.wire))
                 a.screen?.let { put("screen", JsonPrimitive(it)) }
-                a.presentation?.let { put("presentation", JsonPrimitive(it)) }
+                a.presentation?.let { put("presentation", JsonPrimitive(it.wire)) }
                 a.prefillRef?.let { put("prefillRef", JsonPrimitive(it)) }
                 a.entity?.let { put("entity", JsonPrimitive(it)) }
                 a.url?.let { put("url", JsonPrimitive(it)) }
                 a.confirmMessage?.let { put("confirmMessage", JsonPrimitive(it)) }
-                a.format?.let { put("format", JsonPrimitive(it)) }
+                a.format?.let { put("format", JsonPrimitive(it.wire)) }
                 a.notificationId?.let { put("notificationId", JsonPrimitive(it)) }
             },
         )

@@ -1,6 +1,9 @@
 package jp.kz2601.metamon.renderer
 
+import jp.kz2601.metamon.dsl.ActionType
 import jp.kz2601.metamon.dsl.AppDSL
+import jp.kz2601.metamon.dsl.decode
+import jp.kz2601.metamon.dsl.screen
 import jp.kz2601.metamon.dsl.ComponentType
 import jp.kz2601.metamon.dsl.DslJson
 import jp.kz2601.metamon.renderer.conformance.RenderTree
@@ -127,13 +130,13 @@ class ConformanceTest {
             else -> return null
         }
         return when (action.type) {
-            "navigate" -> {
+            ActionType.NAVIGATE -> {
                 if (action.prefillRef != null) return null
                 val to = action.screen ?: return nav to true
-                NavigationResolver.navigate(nav, to, Presentation.of(action.presentation), null, route, dsl) to true
+                NavigationResolver.navigate(nav, to, Presentation.of(action.presentation?.wire), null, route, dsl) to true
             }
-            "back" -> NavigationResolver.close(nav, route) to true
-            "saveRecord", "deleteRecord", "resetForm", "follow", "unfollow" -> null
+            ActionType.BACK -> NavigationResolver.close(nav, route) to true
+            ActionType.SAVE_RECORD, ActionType.DELETE_RECORD, ActionType.RESET_FORM, ActionType.FOLLOW, ActionType.UNFOLLOW -> null
             // OS の機能に頼むもの(URL・通知・書き出し…)は遷移しない
             else -> nav to true
         }

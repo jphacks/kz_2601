@@ -30,8 +30,12 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import jp.kz2601.metamon.dsl.Action
+import jp.kz2601.metamon.dsl.ActionType
 import jp.kz2601.metamon.dsl.AppDSL
 import jp.kz2601.metamon.dsl.Screen
+import jp.kz2601.metamon.dsl.fallback
+import jp.kz2601.metamon.dsl.hasTabs
+import jp.kz2601.metamon.dsl.screen
 import jp.kz2601.metamon.renderer.components.UnavailableComponent
 import jp.kz2601.metamon.renderer.layout.isVoiceScreen
 import jp.kz2601.metamon.renderer.navigation.NavigationResolver
@@ -54,10 +58,10 @@ fun DSLView(dsl: AppDSL, runtime: DSLRuntime, modifier: Modifier = Modifier) {
 
     fun perform(action: Action, from: Route) {
         when (action.type) {
-            "navigate" -> action.screen?.let {
-                nav = NavigationResolver.navigate(nav, it, Presentation.of(action.presentation), null, from, dsl)
+            ActionType.NAVIGATE -> action.screen?.let {
+                nav = NavigationResolver.navigate(nav, it, Presentation.of(action.presentation?.wire), null, from, dsl)
             }
-            "back" -> nav = NavigationResolver.close(nav, from)
+            ActionType.BACK -> nav = NavigationResolver.close(nav, from)
             else -> runtime.onAction(action, from)
         }
     }

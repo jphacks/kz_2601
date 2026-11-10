@@ -32,6 +32,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import jp.kz2601.metamon.dsl.Component
 import jp.kz2601.metamon.dsl.ComponentType
+import jp.kz2601.metamon.dsl.ItemWidth
+import jp.kz2601.metamon.dsl.Spacing
 import jp.kz2601.metamon.renderer.layout.localGridPlacement
 import jp.kz2601.metamon.renderer.registry.RenderContext
 import jp.kz2601.metamon.renderer.screen.LocalGrid
@@ -43,9 +45,9 @@ import jp.kz2601.metamon.renderer.theme.renderCard
 /** container の `spacing`(none | small | medium | large)。 */
 val Component.containerSpacing: Dp
     get() = when (spacing) {
-        "none" -> 0.dp
-        "small" -> 6.dp
-        "large" -> 24.dp
+        Spacing.NONE -> 0.dp
+        Spacing.SMALL -> 6.dp
+        Spacing.LARGE -> 24.dp
         else -> 12.dp
     }
 
@@ -147,8 +149,8 @@ fun DisclosureContainer(c: Component, ctx: RenderContext, modifier: Modifier = M
 /** carousel の 1 枚の幅(small 40% / medium 70% / large 90%)。 */
 val Component.carouselWidthRatio: Float
     get() = when (itemWidth) {
-        "small" -> 0.4f
-        "large" -> 0.9f
+        ItemWidth.SMALL -> 0.4f
+        ItemWidth.LARGE -> 0.9f
         else -> 0.7f
     }
 
