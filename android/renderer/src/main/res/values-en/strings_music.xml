@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Music component (musicPlayer fallback, #879). -->
+<resources>
+    <string name="music_title_default">Music</string>
+    <string name="music_unavailable">Apple Music can\'t play on this device. You can look up a song in a music app.</string>
+    <string name="music_song_title">Song title</string>
+    <string name="music_artist">Artist (optional)</string>
+    <string name="music_search">Find in a music app</string>
+    <string name="music_search_note">Opens a Spotify search (in the browser if the app isn\'t installed). Playback can\'t be controlled here.</string>
+    <string name="music_recent">Songs you looked up</string>
+    <string name="music_open">Open</string>
+</resources>
