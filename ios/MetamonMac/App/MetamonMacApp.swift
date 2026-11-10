@@ -15,6 +15,9 @@ struct MetamonMacApp: App {
         WindowGroup(id: MacCommands.mainWindowId) {
             MacRootView(apps: apps)
                 .environment(voice)
+                #if !APP_STORE_REVIEW
+                .modifier(MacLinkReceiver()) // tailorit:// と共有のリンク(#975)
+                #endif
         }
         .defaultSize(width: 1100, height: 720)
         .windowResizability(.contentMinSize)

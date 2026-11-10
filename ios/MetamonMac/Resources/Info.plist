@@ -29,6 +29,19 @@
 	<key>ITSAppUsesNonExemptEncryption</key>
 	<false/>
 
+	<!-- 共有のリンク tailorit://import/<token>(#975)。iOS の Info.plist と同じ名前・スキーム -->
+	<key>CFBundleURLTypes</key>
+	<array>
+		<dict>
+			<key>CFBundleURLName</key>
+			<string>jp.kz2601.metamon.share</string>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<string>tailorit</string>
+			</array>
+		</dict>
+	</array>
+
 	<!-- バックエンド URL(iOS の Info.plist と同じキー・同じ build setting) -->
 	<key>MetamonAIBaseURL</key>
 	<string>$(METAMON_AI_BASE_URL)</string>

@@ -33,6 +33,38 @@
         }
       }
     },
+    "Mac ではまだ共有のアプリを開けません" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Shared apps can't be opened on Mac yet"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mac ではまだ共有のアプリを開けません"
+          }
+        }
+      }
+    },
+    "OK" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "OK"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "OK"
+          }
+        }
+      }
+    },
     "QRコードを読み取って記録できるようにして" : {
       "localizations" : {
         "en" : {
@@ -993,6 +1025,22 @@
         }
       }
     },
+    "リンクをコピー" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Copy Link"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "リンクをコピー"
+          }
+        }
+      }
+    },
     "・" : {
       "localizations" : {
         "en" : {
@@ -1357,6 +1405,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "共有(家族だけ / みんなに公開)"
+          }
+        }
+      }
+    },
+    "共有されたアプリは、今は iPhone の Tailor It で開けます。このリンクを iPhone で開いてください。" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "For now, shared apps open in Tailor It on iPhone. Please open this link on your iPhone."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "共有されたアプリは、今は iPhone の Tailor It で開けます。このリンクを iPhone で開いてください。"
           }
         }
       }
