@@ -96,13 +96,13 @@ runner は prod で GitHub の変数 `RUNNER_DEPLOY=1` の時だけデプロイ�
 | `COIN_BILLING_MODE` | appconfig・ai(同じ値にする) | コイン(#630・[630-token-billing.md](../decisions/630-token-billing.md))。`off` = 何も読み書きしない(今のまま)。`log` = 財布と履歴を作り(最初の分・Pro の毎月の分・パックの購入)、AI の呼び出し(generate・chat・text)が引くはずの量はログ `coins.would_spend` / `coins.would_block` に出すだけ(止めない)。`enforce` = 呼び出しごとに Claude の前にコインを押さえ、終わったら実費(押さえた量まで)を引き、失敗は戻す。足りなければ 402 `coins_insufficient`、同じ `X-Request-Id` の再送は 409 `duplicate_request`。それ以外の値は起動しない | `off` |
 | `COIN_PER_USD` | appconfig・ai | 1 回の費用(`est_cost_usd`)をコインに直す率: `ceil(est_cost_usd × COIN_PER_USD)`。**値は非公開の資料で決め、repo に書かない**。`/v1/coins/config` にも出さない | `0`(数えない) |
 | `COIN_MIN_PER_CALL` | appconfig・ai | 数える呼び出し 1 回の最小のコイン | `1` |
-| `COIN_RESERVE_GENERATE` / `_EDIT` / `_CHAT` / `_TEXT` | appconfig・ai | 呼び出しの前に押さえる量(その処理の上の方の費用)。確定は押さえた量を超えない。値は非公開の資料 | `0` |
+| `COIN_RESERVE_GENERATE` / `_EDIT` / `_CHAT` / `_TEXT` | appconfig・ai | 呼び出しの前に押さえる量(その処理の上の方の費用)。確定は押さえた量を超えない。`COIN_BILLING_MODE=enforce` の時は 4 つとも 1 以上でないと ai が起動しない(0 のままだとその処理から引けない)。値は非公開の資料 | `0` |
 | `COIN_RESERVE_TEXT_TASK` / `_TEXT_LONG` / `_TEXT_IMAGE` | ai | `/v1/text` の重い呼び出し(task・長文と aiChat・写真)だけ別に押さえる量。重さと同じ順で大きい方を使う。履歴の処理は `text` のまま。値は非公開の資料 | 無し(`COIN_RESERVE_TEXT`) |
 | `COIN_ESTIMATE_GENERATE` / `_EDIT` / `_CHAT` / `_TEXT` | appconfig | 押す前に出す「約 N コイン」(`GET /v1/coins/config` の `estimates`)。`0` は出さない | `0` |
 | `COIN_PACKS` | appconfig | コインのパック(消耗型)の `商品id=枚数` をカンマ区切り(例の形: `<id>=<枚数>,<id>=<枚数>`)。この id だけを `POST /v1/me/coins/apple` で受ける(bundle id・環境は `APPSTORE_*` と同じ)。値は非公開の資料・App Store Connect | 無し(売らない) |
 | `COIN_INITIAL_GRANT` | appconfig・ai(同じ値にする) | サインイン済み(匿名でない)アカウントに 1 回だけ足すコイン(最初に財布を読んだ時。ai は AI の呼び出しで押さえる時に読む)。`0` の間は足さず、後で入れると次に読んだ人から足す | `0` |
 | `COIN_PRO_MONTHLY` | appconfig・ai(同じ値にする) | Pro の請求期間ごとのコイン(期間の終わりに消える・繰り越さない) | `0` |
-| `COIN_HOLD_TTL` | appconfig・ai | 確定されない押さえを戻すまでの時間(`10m` のように書く・1 分以上) | `10m` |
+| `COIN_HOLD_TTL` | appconfig・ai | 確定されない押さえを戻すまでの時間(`10m` のように書く・1 分以上)。過ぎた押さえは、その人の残高を次に読んだ時(残高の取得・次の押さえ)に戻す | `10m` |
 | `ALLOWANCE_PRO_RUNS` / `_RECIPIENTS` / `_WRITES` / `_READS` | appconfig | Pro の月の枠(#630 の 3 段目で数える)。今は `GET /v1/coins/config` の `allowance` に出すだけ | `0` |
 | `LOG_LEVEL` | 両方 | ログの詳しさ(調査の間だけ `debug` など) | info |
 

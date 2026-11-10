@@ -18,6 +18,9 @@ import (
 // holds, charges and releases. A run without Firestore keeps them in memory.
 func newCoins(client *firestore.Client) *coins.Service {
 	cfg, err := coins.ConfigFromEnv(os.Getenv)
+	if err == nil {
+		err = cfg.CheckReserves() // the ai holds: a 0 hold would never charge
+	}
 	if err != nil {
 		log.Fatalf("ai: %v", err)
 	}
