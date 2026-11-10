@@ -104,6 +104,15 @@ runner は prod で GitHub の変数 `RUNNER_DEPLOY=1` の時だけデプロイ�
 | `COIN_PRO_MONTHLY` | appconfig・ai(同じ値にする) | Pro の請求期間ごとのコイン(期間の終わりに消える・繰り越さない) | `0` |
 | `COIN_HOLD_TTL` | appconfig・ai | 確定されない押さえを戻すまでの時間(`10m` のように書く・1 分以上) | `10m` |
 | `ALLOWANCE_PRO_RUNS` / `_RECIPIENTS` / `_WRITES` / `_READS` | appconfig | Pro の月の枠(#630 の 3 段目で数える)。今は `GET /v1/coins/config` の `allowance` に出すだけ | `0` |
+| `CALLS_ENABLED` | appconfig・ai(同じ値にする) | 通話(#447・[calls.md](../backend/features/calls.md))を動かす(`1` / `true`)。appconfig は `POST /v1/apps/{appId}/calls/token` と LiveKit の webhook を出し、ai は callButton を作る。止めている間 appconfig は 404 `calls_disabled`、ai は「通話はできない」と答える。on なのに `LIVEKIT_*` が無いと appconfig は起動しない | 無し(止める) |
+| `LIVEKIT_URL` | appconfig | LiveKit Cloud のプロジェクトの接続先(`wss://<project>.livekit.cloud`)。アプリに返す | 無し |
+| `LIVEKIT_API_KEY` / `LIVEKIT_API_SECRET` | appconfig | LiveKit の API キーと秘密(トークンの署名と webhook の確認)。**Secret Manager に置き、repo・ログ・Issue に書かない**(下の「シークレット」) | 無し |
+| `COIN_PER_CALL_MINUTE` | appconfig | 通話 1 分のコイン(呼び出した本人の財布から引く・#630)。値は非公開の資料 | `0`(数えない) |
+| `CALL_BLOCK_MINUTES` | appconfig | 1 回のトークンで押さえる分(この分の前にアプリがもう一度押さえる)。1〜240 | `30` |
+| `CALL_HOLD_GRACE` | appconfig | 押さえの期限に足す時間(webhook の遅れの分)。webhook が来なければまとまり + これで戻る | `10m` |
+| `CALL_TOKEN_TTL` | appconfig | トークンで部屋に入れる時間(1m〜1h) | `10m` |
+| `CALL_MAX_PARTICIPANTS` | appconfig | 1 つの部屋の人数(2〜50) | `8` |
+| `CALL_TOKENS_PER_HOUR` | appconfig | 1 人が 1 時間にトークンを取れる回数(`0` = 数えない) | `30` |
 | `LOG_LEVEL` | 両方 | ログの詳しさ(調査の間だけ `debug` など) | info |
 
 この表に無い変数は、運用で変えないでください。変えたい時は Issue にして、ワークフローか本書に足します。
@@ -175,6 +184,7 @@ ai の `ANTHROPIC_API_KEY` は `--set-secrets` のまま(全置換)にします�
 - 良い所: ワークフローから外したシークレットは次のデプロイで外れる。要らなくなった鍵の参照が残り続けない。
 - 困る所: gcloud で手で足したシークレット参照は次のデプロイで消える。ずっと要るシークレットはワークフローに書く。
 - appconfig にはシークレットのフラグを付けていないので、デプロイは appconfig のシークレット参照を変えません。
+- 通話(#447)の `LIVEKIT_API_KEY` / `LIVEKIT_API_SECRET` は Secret Manager に置き、appconfig に参照として付けます(`CALLS_ENABLED` を入れる前に。ワークフローに足すか手で付けるかは人が決める)。
 
 ## ワークフローから変数を外す時
 

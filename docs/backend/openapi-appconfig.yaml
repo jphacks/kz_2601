@@ -22,6 +22,7 @@ tags:
   - { name: account, description: 'アカウント削除(#119)。features/account-deletion.md' }
   - { name: apps }
   - { name: automations, description: '作成者向けの「自動の動き」の見える化(#347)。features/automations.md' }
+  - { name: calls, description: '共有のアプリの参加者どうしの音声・ビデオ通話(#447)。中継は LiveKit Cloud。`CALLS_ENABLED`(既定 off)の後ろ。features/calls.md' }
   - { name: coins, description: 'コイン(#630・docs/decisions/630-token-billing.md)。残高・履歴・パック(消耗型)の購入の検証。`COIN_BILLING_MODE`(off / log / enforce・既定 off)の後ろ' }
   - { name: dsl }
   - { name: entities }
@@ -1293,6 +1294,61 @@ paths:
               schema: { $ref: '#/components/schemas/Error' }
               example: { error: { code: invalid_transaction, message: 'the signed transaction could not be verified', details: { reason: not_consumable } } }
 
+  /apps/{appId}/calls/token:
+    parameters: [{ $ref: '#/components/parameters/AppId' }]
+    post:
+      tags: [calls]
+      summary: 通話の部屋に入るトークン(#447)
+      description: |
+        公開済みの DSL に `callButton` がある共有のアプリ(public / shared の entity がある)の部屋 `app:{appId}`(`room` を付けた部品は `app:{appId}:{room}`)に入る LiveKit のアクセストークンを出す。
+        - 出すのはアプリの作成者と参加者(共有リンクで参加した人)だけ(それ以外は 403 `not_member`)。公開カタログで入れただけの人も参加者でなければ 403
+        - 権限: 部屋に入る・聞く・マイクを出す。カメラは部品が `video: true` で、body も `video: true` の時だけ。データの送信・自分の metadata の変更はできない。部屋の人数の上限は `CALL_MAX_PARTICIPANTS`
+        - トークンは `CALL_TOKEN_TTL`(既定 10 分)の間だけ入るのに使える。`identity` は `sessionId`(この人の通話 1 回)
+        - コイン(#630): `COIN_PER_CALL_MINUTE` × `CALL_BLOCK_MINUTES` を**呼び出した人自身の財布**から押さえる(`COIN_BILLING_MODE=enforce` の時。0 なら押さえない)。続けて話す時は `reservedUntil` の前に同じ `sessionId` でもう一度呼ぶ(次のまとまりを押さえる)。足りなければ 402 `coins_insufficient`(`details.payer: self`)で、アプリは通話を出る
+        - 精算は LiveKit の webhook(`POST /calls/webhook`)で、入ってから出るまでの分(始まった分は 1 分)× `COIN_PER_CALL_MINUTE` を押さえた分の中で 1 回だけ引く。webhook が来なければ押さえた分は期限(まとまり + `CALL_HOLD_GRACE`)で戻る
+        - 1 時間に `CALL_TOKENS_PER_HOUR` 回まで(超えると 429)
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              properties:
+                room: { type: string, pattern: '^[a-z0-9][a-z0-9_-]{0,31}$', description: 'callButton の room(省略 = アプリの部屋)' }
+                video: { type: boolean, description: 'カメラも使う(部品が video: true の時だけ効く)' }
+                name: { type: string, maxLength: 40, description: 'ほかの人のタイルに出す名前(40 文字で切る)' }
+                sessionId: { type: string, description: '続けて話す時(次のまとまりを押さえる)。前の応答の sessionId' }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/CallJoin' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '402': { $ref: '#/components/responses/CoinsPaymentRequired' }
+        '403': { $ref: '#/components/responses/NotMember' }
+        '404': { description: '通話が off(`details.reason: calls_disabled`)・共有のアプリでない(`no_shared_data`)・その部屋の callButton が無い(`no_call_button`)・続けようとした通話が終わっている(`call_ended`)', content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+        '410': { description: 退会済み(`account_deleted`), content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+        '429': { description: 1 時間の上限。`Retry-After` と details(scope=user・limit・retryAfterSec), content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+
+  /calls/webhook:
+    post:
+      tags: [calls]
+      security: []
+      summary: LiveKit の webhook の受け口(#447)・認証不要
+      description: |
+        LiveKit Cloud がこの URL に送る(プロジェクトの設定で登録する)。Firebase の認証・App Check は無し。`Authorization` の JWT(API キーと秘密で署名・本文の sha256 を含む)を LiveKit の SDK で確かめる。違えば 401 `unauthenticated`。
+        - `participant_joined`: 入った時刻を残す
+        - `participant_left`: 分を数えてコインを精算する(1 回だけ・同じ event がもう一度来ても同じ量を確定するだけ)
+        - `room_finished`: まだ精算していない人を全部精算する
+        - ほかの event は何もしない。204 で LiveKit は再送をやめる。500 は再送される
+        `CALLS_ENABLED` が off の時は 404(登録しない)。
+      responses:
+        '204': { description: 処理した(または何もしない event) }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '500': { description: 一時的な失敗(LiveKit が再送する), content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+
   /coins/config:
     get:
       tags: [coins]
@@ -1908,6 +1964,21 @@ components:
             message: { type: string }
             details: { type: object, additionalProperties: true }
             requestId: { type: string }
+    CallJoin:
+      type: object
+      required: [url, token, room, identity, sessionId, expiresAt, video, blockMinutes, reservedUntil, coinsReserved, coinsPerMinute]
+      properties:
+        url: { type: string, description: 'LiveKit の接続先(`LIVEKIT_URL`・wss://)' }
+        token: { type: string, description: 'LiveKit のアクセストークン(JWT)。ログ・画面に出さない' }
+        room: { type: string, example: 'app:app_01HXYZ' }
+        identity: { type: string, description: 'LiveKit の participant identity(= sessionId)' }
+        sessionId: { type: string, description: '続けて話す時にもう一度送る' }
+        expiresAt: { type: string, format: date-time, description: 'このトークンで入れる期限' }
+        video: { type: boolean, description: 'カメラを出してよい' }
+        blockMinutes: { type: integer, description: '1 回で押さえる分(`CALL_BLOCK_MINUTES`)' }
+        reservedUntil: { type: string, format: date-time, description: 'この時刻の前に sessionId でもう一度呼ぶ' }
+        coinsReserved: { type: integer, description: 'このまとまりで押さえたコイン(0 = 数えない・log / off)' }
+        coinsPerMinute: { type: integer, description: '`COIN_PER_CALL_MINUTE`(0 = 数えない)' }
     CoinConfig:
       type: object
       required: [mode, packs, estimates, initialGrant, proMonthly, allowance]
