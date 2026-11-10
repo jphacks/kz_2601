@@ -2,6 +2,7 @@ package jp.kz2601.metamon.services.http
 
 import okhttp3.mockwebserver.MockResponse
 import okhttp3.mockwebserver.MockWebServer
+import java.net.InetAddress
 import java.util.concurrent.TimeUnit
 
 /** 呼ばれるたびに順にトークンを返す(forceRefresh で次へ進む)。 */
@@ -30,13 +31,20 @@ class FakeAppCheck(private vararg val values: String?) : AppCheckTokenProvider {
 val testClientInfo = ClientInfo(version = "0.1.0", build = "7")
 val testDevice = DeviceContext(timeZone = { "Asia/Tokyo" }, language = { "ja" })
 
+/**
+ * 待ち受けているアドレス(127.0.0.1)そのものの URL。`url()` の localhost は ::1 にも引け、OkHttp 5 は ::1 を先に試すので、
+ * 同じ番号で ::1 を開いている別プロセスにつながることがある。
+ */
+fun MockWebServer.baseUrl(): String =
+    url("/").newBuilder().host(InetAddress.getByName(hostName).hostAddress).build().toString()
+
 fun MockWebServer.metamonHttp(
     tokens: TokenProvider = FakeTokens("token-1"),
     appCheck: AppCheckTokenProvider? = null,
     sleeps: MutableList<Long> = mutableListOf(),
     retry: RetryPolicy = RetryPolicy(),
 ): MetamonHttp = MetamonHttp(
-    baseUrl = url("/").toString(),
+    baseUrl = baseUrl(),
     tokens = tokens,
     clientInfo = testClientInfo,
     appCheck = appCheck,
