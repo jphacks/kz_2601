@@ -126,6 +126,7 @@ final class MacRuntimeNotifications {
         guard let runtime = liveRuntime else { return }
         let specs = self.specs
         let recs = await records(for: Set(specs.compactMap(\.recordEntity)), runtime)
+        guard liveRuntime != nil else { return } // 読んでいる間に消された: 消した予約を戻さない
         let result = await scheduler.sync(appId: runtime.appId, specs: specs, records: recs)
         handle(result, hasSpecs: !specs.isEmpty)
     }
@@ -163,6 +164,7 @@ final class MacRuntimeNotifications {
         let specs = dsl.app.notifications.filter(\.isConditional)
         guard !specs.isEmpty else { return }
         let recs = await records(for: Set(dsl.entities.map(\.id)), runtime)
+        guard liveRuntime != nil else { return } // 読んでいる間に消された: 消したアプリの通知を出さない
         let current = ConditionNotifications.evaluate(specs, dsl: dsl, records: recs)
         let fire = await ConditionNotificationStore.shared.update(appId: runtime.appId, current: current)
         for spec in specs where fire.contains(spec.id) {
