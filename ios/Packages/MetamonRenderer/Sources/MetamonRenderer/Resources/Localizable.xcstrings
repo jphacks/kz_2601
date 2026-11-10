@@ -5101,6 +5101,23 @@
         }
       }
     },
+    "コピー" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Copy"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "コピー"
+          }
+        }
+      }
+    },
     "削除" : {
       "extractionState" : "manual",
       "localizations" : {
