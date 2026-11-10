@@ -246,7 +246,7 @@ public final class AppleOnDeviceTranscriber: ProvisionalTranscriber {
         diag.transcriptLength = text.count
         if text.isEmpty { diag.failure = "emptyTranscript" }
         lastDiagnostics = diag
-        log("transcribe result text=\"\(text)\"")
+        log("transcribe result chars=\(text.count)") // 話した内容はログに出さない
         return text
     }
 
