@@ -52,6 +52,8 @@ SPDX_BY_NAME = {
     "apache-2.0": "Apache-2.0",
     "apache 2.0": "Apache-2.0",
     "bsd-3-clause": "BSD-3-Clause",
+    "mit license": "MIT",
+    "mit": "MIT",
 }
 TERMS = {
     "android software development kit license",
@@ -65,6 +67,10 @@ TEXT_FILES = {
     ("Apache-2.0", None): "Apache-2.0.txt",
     # datastore-preferences-external-protobuf は protobuf-java を中に取り込んだもの(本文は protobuf の LICENSE)
     ("BSD-3-Clause", "androidx.datastore"): "protobuf-BSD-3-Clause.txt",
+    # camera-core は libyuv を中に取り込んでいる(POM の 2 つ目のライセンス)
+    ("BSD-3-Clause", "androidx.camera"): "libyuv-BSD-3-Clause.txt",
+    # checker-qual(guava から来る)。本文は jar の META-INF/LICENSE.txt
+    ("MIT", "org.checkerframework"): "checker-qual-MIT.txt",
 }
 
 DEP_RE = re.compile(r"--- ([^\s:]+):([^\s:]+)(?::(\S+))?(?: -> (\S+))?")
@@ -136,11 +142,17 @@ def pom_url(group, artifact, version):
     return url or None
 
 
+def normalize(name):
+    """表記の揺れ(大文字小文字・空白・先頭の "The ")だけ吸収する。種類は広げない。"""
+    return re.sub(r"^the ", "", re.sub(r"\s+", " ", name).strip().lower())
+
+
 def classify(name):
-    key = name.lower()
-    if key in SPDX_BY_NAME:
-        return SPDX_BY_NAME[key], True
-    if key in TERMS:
+    key = normalize(name)
+    spdx = {normalize(k): v for k, v in SPDX_BY_NAME.items()}
+    if key in spdx:
+        return spdx[key], True
+    if key in {normalize(t) for t in TERMS}:
         return name, False
     return None, False
 
@@ -177,17 +189,20 @@ def build(report):
         if not licenses:
             errors.append(f"{group}:{artifact}:{version} のライセンスが POM にありません")
             continue
-        name, url = licenses[0]
-        license_id, oss = classify(name)
-        if license_id is None:
-            errors.append(f"{group}:{artifact}:{version} のライセンス「{name}」を判定できません(SPDX_BY_NAME / TERMS に足す)")
-            continue
-        entry = groups.setdefault((group, license_id), {
-            "artifacts": {}, "oss": oss, "terms_url": None if oss else url, "notices": [], "url": None,
-        })
-        entry["artifacts"][artifact] = version
-        entry["url"] = entry["url"] or pom_url(group, artifact, version)
-        entry["notices"] += archive_notices(group, artifact, version)
+        # 複数あれば全部出す(camera-core は Apache-2.0 と、取り込んだ libyuv の BSD-3-Clause)
+        notices = archive_notices(group, artifact, version)
+        for name, url in licenses:
+            license_id, oss = classify(name)
+            if license_id is None:
+                errors.append(f"{group}:{artifact}:{version} のライセンス「{name}」を判定できません(SPDX_BY_NAME / TERMS に足す)")
+                continue
+            entry = groups.setdefault((group, license_id), {
+                "artifacts": {}, "oss": oss, "terms_url": None if oss else url, "notices": [], "url": None,
+            })
+            entry["artifacts"][artifact] = version
+            entry["url"] = entry["url"] or pom_url(group, artifact, version)
+            entry["notices"] += notices
+            notices = []  # 同じ AAR の表示は 1 回だけ
 
     multi = {}
     for group, license_id in groups:
