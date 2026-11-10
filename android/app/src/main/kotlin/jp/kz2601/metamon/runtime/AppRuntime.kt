@@ -14,6 +14,8 @@ import jp.kz2601.metamon.renderer.ActionContext
 import jp.kz2601.metamon.renderer.DSLRuntime
 import jp.kz2601.metamon.renderer.ExternalUrlPolicy
 import jp.kz2601.metamon.renderer.NavigationHost
+import jp.kz2601.metamon.renderer.components.play.RecordWriter
+import jp.kz2601.metamon.renderer.components.play.TimerHost
 import jp.kz2601.metamon.renderer.form.FormDraft
 import jp.kz2601.metamon.renderer.form.FormPrefill
 import jp.kz2601.metamon.renderer.navigation.NavigationResolver
@@ -81,7 +83,7 @@ class AppRuntime(
     private val restore: (suspend (appId: String) -> AppDocument)? = null,
     /** 削除を取り消せる時間(M11) */
     private val undoGraceMillis: Long = 5_000,
-) : DSLRuntime, NavigationHost {
+) : DSLRuntime, NavigationHost, RecordWriter, TimerHost {
     private val _state = MutableStateFlow(RuntimeState(document))
     val state: StateFlow<RuntimeState> = _state.asStateFlow()
 
@@ -220,8 +222,8 @@ class AppRuntime(
         }
     }
 
-    /** 一覧のワンタップ更新(list.item.toggle)。表示中に無い記録は保存しない。 */
-    suspend fun updateRecord(entity: String, recordId: String, data: Map<String, JSONValue>): Boolean {
+    /** 一覧のワンタップ更新(list.item.toggle)・トーナメントの勝者・単語カードの結果。表示中に無い記録は保存しない。 */
+    override suspend fun updateRecord(entity: String, recordId: String, data: Map<String, JSONValue>): Boolean {
         val current = record(entity, recordId) ?: return false
         if (!canEdit(entity, current)) {
             showToast(RuntimeCopy.READ_ONLY)
@@ -229,6 +231,14 @@ class AppRuntime(
         }
         setRecords(document.appId, entity, recordSync.save(document.appId, entity, recordId, data.toJson()))
         return true
+    }
+
+    override fun notifyReadOnly(entity: String) = showToast(RuntimeCopy.READ_ONLY)
+
+    /** timerDisplay の終了通知(端末の予約は [RuntimeHost.timerChanged])。 */
+    override fun timerChanged(key: String, name: String, endsAtEpochMillis: Long?) {
+        val appId = document.appId
+        scope.launch { host.timerChanged("$appId/$key", dsl.app.name, name, endsAtEpochMillis) }
     }
 
     /** フォームを通さず 1 件足す。作った行の id(仮 id)。entity が無ければ null。 */
