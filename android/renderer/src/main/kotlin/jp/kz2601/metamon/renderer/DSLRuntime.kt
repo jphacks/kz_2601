@@ -2,6 +2,7 @@ package jp.kz2601.metamon.renderer
 
 import jp.kz2601.metamon.dsl.Action
 import jp.kz2601.metamon.dsl.records.Entity
+import jp.kz2601.metamon.renderer.components.audio.DictationHost
 import jp.kz2601.metamon.dsl.records.JSONValue
 import jp.kz2601.metamon.dsl.records.Record
 import jp.kz2601.metamon.renderer.form.FormDraft
@@ -32,6 +33,9 @@ interface NavigationHost {
 interface DSLRuntime {
     /** voiceInput が押された。音声認識は #359 で入れる。 */
     fun onVoiceInput(componentId: String?)
+
+    /** transcribeField が声を文字にする口(本体の音声入力と同じ認識器・#864)。null なら「この画面では使えません」。 */
+    val dictation: DictationHost? get() = null
 
     /** アクション。[navigationHost] があれば navigate / back もここへ来る。既定は何もしない。 */
     fun onAction(action: Action, context: ActionContext) = Unit
