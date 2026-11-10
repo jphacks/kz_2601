@@ -12,6 +12,7 @@ import jp.kz2601.metamon.runtime.AppDirectory
 import jp.kz2601.metamon.runtime.AppFeedHost
 import jp.kz2601.metamon.runtime.AppRuntime
 import jp.kz2601.metamon.runtime.RuntimeHost
+import jp.kz2601.metamon.runtime.SocialServices
 import jp.kz2601.metamon.runtime.TranscriberDictationHost
 import jp.kz2601.metamon.dsl.decode
 import jp.kz2601.metamon.dsl.fallback
@@ -63,6 +64,8 @@ import jp.kz2601.metamon.services.live.FirebaseCrashReporter
 import jp.kz2601.metamon.services.live.HttpAIClient
 import jp.kz2601.metamon.services.live.HttpAppConfigClient
 import jp.kz2601.metamon.services.live.HttpFeedClient
+import jp.kz2601.metamon.services.live.HttpMatchingClient
+import jp.kz2601.metamon.services.live.HttpModerationClient
 import jp.kz2601.metamon.services.live.HttpPushDeviceClient
 import jp.kz2601.metamon.services.local.AndroidConnectivity
 import jp.kz2601.metamon.services.local.AppListCache
@@ -82,6 +85,7 @@ import jp.kz2601.metamon.services.push.NotifyConsentStore
 import jp.kz2601.metamon.services.push.NotifyConsentToggle
 import jp.kz2601.metamon.services.push.PushDeviceRegistrar
 import jp.kz2601.metamon.services.push.SharedPreferencesPushPrefs
+import jp.kz2601.metamon.services.social.MatchingAgeGate
 import jp.kz2601.metamon.services.speech.AndroidSpeechTranscriber
 import jp.kz2601.metamon.services.sync.HotReload
 import jp.kz2601.metamon.services.sync.RealtimeDocumentSync
@@ -147,6 +151,8 @@ class AppContainer(
     val chatHistory: ChatHistoryStore,
     /** 端末内の動画(#863)・録音(#1084)のファイルを全部消す(#841 の後片付け) */
     private val removeLocalMedia: () -> Unit,
+    /** 仲間探し・通報・ブロック(#877)。モックは null(出さない) */
+    private val social: SocialServices? = null,
 ) {
     /** 画面の下に出す接続先の名前(モックなら "mock")。 */
     val environmentLabel: String get() = if (knobs.mock) "mock" else environment.name
@@ -320,6 +326,7 @@ class AppContainer(
                 authorProfile = AuthorProfile(SharedPreferencesKeyValueStore.of(context, AUTHOR_PREFS)),
                 chatHistory = ChatHistoryStore(File(context.filesDir, "chat_history")),
                 removeLocalMedia = removeLocalMedia(context),
+                social = SocialServices(HttpMatchingClient(appConfigHttp), HttpModerationClient(appConfigHttp), MatchingAgeGate(prefs)),
             )
         }
 
@@ -432,6 +439,7 @@ class AppContainer(
             ),
             aiHost = aiHost,
             authorProfile = authorProfile,
+            socialServices = social,
         ).also { it.dictation = TranscriberDictationHost(transcriber, CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)) }
     }
 
