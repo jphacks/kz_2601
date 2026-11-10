@@ -9,7 +9,6 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.BorderStroke
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.Orientation
 import androidx.compose.foundation.gestures.draggable
 import androidx.compose.foundation.gestures.rememberDraggableState
@@ -23,7 +22,6 @@ import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
@@ -34,6 +32,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -57,8 +56,6 @@ import jp.kz2601.metamon.runtime.Confirm
 import jp.kz2601.metamon.runtime.RuntimeState
 import jp.kz2601.metamon.runtime.UiText
 import jp.kz2601.metamon.runtime.resolve
-import jp.kz2601.metamon.ui.CraneMascot
-import jp.kz2601.metamon.ui.CranePose
 import jp.kz2601.metamon.voice.ErrorCard
 import jp.kz2601.metamon.voice.UndoAction
 import jp.kz2601.metamon.voice.UndoNotice
@@ -88,9 +85,8 @@ fun BoxScope.FeedbackHost(vm: VoiceViewModel, state: VoiceUiState, runtime: AppR
 
     if (!state.isInitial) {
         Column(Modifier.align(Alignment.TopCenter).fillMaxWidth().padding(horizontal = 12.dp)) {
-            SummaryBanner(state, onUndo = vm::undo, onRedo = vm::redo, onDismiss = vm::dismissSummary)
-            // ホットリロードの「最新の内容に更新しました」(#1108)
-            RuntimeBannerView(runtimeState.banner, onDismiss = runtime::dismissBanner)
+            // 変身の要約とホットリロードの「最新の内容に更新しました」(#1108)は 1 枠で、後から来た方に置き換える(#1320)
+            TopBannerSlot(vm, state, runtime, runtimeState)
             // シートを閉じた後の失敗(生成は送るとシートを閉じる)。シートの中ではシートが出す
             val error = state.error
             if (error != null && !state.voiceOpen) {
@@ -128,70 +124,51 @@ private val UndoNotice.text: Int
     }
 
 /**
- * 変身直後の要約(iOS の summaryCard + `SummaryBannerActionButton`)。修正の直後は「元に戻す」、戻した直後は「やり直す」。
- * 上に払う・タップで閉じる。文字数に応じて 3〜5 秒(ボタン付きは 6 秒)で消える。読み上げ中は長めに出す(#894・H8)。
+ * 上部のバナーの枠(iOS の summaryBanner)。変身の要約(修正の直後は「元に戻す」、戻した直後は「やり直す」・iOS の
+ * `SummaryBannerActionButton`)とホットリロードの知らせを [TopBannerQueue] で 1 つに絞り、置き換えられた方は閉じる。
  */
 @Composable
-private fun SummaryBanner(state: VoiceUiState, onUndo: (Int?) -> Unit, onRedo: (Int?) -> Unit, onDismiss: () -> Unit) {
-    val text = state.summary ?: when (state.undone) {
+private fun TopBannerSlot(vm: VoiceViewModel, state: VoiceUiState, runtime: AppRuntime, runtimeState: RuntimeState) {
+    val summaryText = state.summary ?: when (state.undone) {
         UndoAction.UNDO -> stringResource(R.string.feedback_undone)
         UndoAction.REDO -> stringResource(R.string.feedback_redone)
         null -> null
     }
-    val a11y = LocalAccessibilityManager.current
-    val talkBack = rememberTalkBackRunning()
-    if (text != null) {
-        LaunchedEffect(text, state.summaryAction) {
-            val base = if (state.summaryAction == null) maxOf(3_000L, minOf(5_000L, text.length * 1_000L / 12)) else 6_000L
-            val recommended = a11y?.calculateRecommendedTimeoutMillis(base, containsIcons = false, containsText = true, containsControls = state.summaryAction != null) ?: base
-            delay(maxOf(recommended, TalkBack.holdMillis(base, talkBack)))
-            onDismiss()
+    val summaryKey = summaryText?.let { it to state.summaryAction }
+    val hotReload = runtimeState.banner
+    val queue = remember { TopBannerQueue() }
+    val pick = queue.pick(mapOf(TopBannerQueue.Source.SUMMARY to summaryKey, TopBannerQueue.Source.HOT_RELOAD to hotReload?.id))
+    val currentSummaryKey by rememberUpdatedState(summaryKey)
+    val dismiss: (TopBannerItem) -> Unit = { item ->
+        when (item.source) {
+            TopBannerQueue.Source.SUMMARY -> if (item.key == currentSummaryKey) vm.dismissSummary()
+            TopBannerQueue.Source.HOT_RELOAD -> runtime.dismissBanner(item.key as Long)
         }
     }
-    var drag by remember { mutableFloatStateOf(0f) }
-    val threshold = with(LocalDensity.current) { SWIPE_DISMISS_DISTANCE.toPx() }
-    val close = stringResource(R.string.feedback_close)
-    AnimatedVisibility(
-        visible = text != null,
-        enter = slideInVertically { -it } + fadeIn(),
-        exit = slideOutVertically { -it } + fadeOut(),
-    ) {
-        Surface(
-            shape = RoundedCornerShape(16.dp),
-            tonalElevation = 3.dp,
-            shadowElevation = 2.dp,
-            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
-            modifier = Modifier.fillMaxWidth().padding(top = 12.dp)
-                .offset { IntOffset(0, drag.roundToInt()) }
-                // 上に払って閉じる(元に戻す付きでも・iOS の swipeToDismiss)
-                .draggable(
-                    orientation = Orientation.Vertical,
-                    state = rememberDraggableState { delta -> drag = (drag + delta).coerceAtMost(0f) },
-                    onDragStopped = {
-                        if (-drag > threshold) onDismiss()
-                        drag = 0f
-                    },
-                )
-                .clickable(onClick = onDismiss)
-                // 読み上げは TalkBackAnnouncer が出したのと同時に行う(liveRegion と二重に読まない)
-                .semantics { customActions = listOf(CustomAccessibilityAction(close) { onDismiss(); true }) },
-        ) {
-            Row(Modifier.padding(horizontal = 12.dp, vertical = 10.dp), verticalAlignment = Alignment.CenterVertically) {
-                CraneMascot(CranePose.JOY, size = 44.dp, sway = 6f)
-                Text(text.orEmpty(), Modifier.weight(1f).padding(start = 10.dp), style = MaterialTheme.typography.bodyMedium)
-                state.summaryAction?.let { action ->
-                    val enabled = !state.undoing && !state.isGenerating &&
-                        (if (action == UndoAction.UNDO) state.canUndo else state.canRedo)
-                    // 押した時点の版を送る(連打の 2 回目を捨てる)
-                    val version = state.document.version
-                    CapsuleButton(
-                        label = stringResource(if (action == UndoAction.UNDO) R.string.feedback_undo else R.string.feedback_redo),
-                        enabled = enabled,
-                        onClick = { if (action == UndoAction.UNDO) onUndo(version) else onRedo(version) },
-                    )
-                }
+    val item = when (pick.shown) {
+        TopBannerQueue.Source.SUMMARY -> summaryKey?.let { TopBannerItem(TopBannerQueue.Source.SUMMARY, it, it.first, state.summaryAction) }
+        TopBannerQueue.Source.HOT_RELOAD -> hotReload?.let { TopBannerItem(TopBannerQueue.Source.HOT_RELOAD, it.id, it.text.resolve()) }
+        null -> null
+    }
+    // 置き換えられた方は閉じる(後で戻ってこない)
+    LaunchedEffect(pick.superseded, summaryKey, hotReload?.id) {
+        for (source in pick.superseded) {
+            when (source) {
+                TopBannerQueue.Source.SUMMARY -> summaryKey?.let { dismiss(TopBannerItem(source, it, it.first)) }
+                TopBannerQueue.Source.HOT_RELOAD -> hotReload?.let { dismiss(TopBannerItem(source, it.id, "")) }
             }
         }
+    }
+    TopBanner(item, onDismiss = dismiss) { action ->
+        val enabled = !state.undoing && !state.isGenerating &&
+            (if (action == UndoAction.UNDO) state.canUndo else state.canRedo)
+        // 押した時点の版を送る(連打の 2 回目を捨てる)
+        val version = state.document.version
+        CapsuleButton(
+            label = stringResource(if (action == UndoAction.UNDO) R.string.feedback_undo else R.string.feedback_redo),
+            enabled = enabled,
+            onClick = { if (action == UndoAction.UNDO) vm.undo(version) else vm.redo(version) },
+        )
     }
 }
 
@@ -342,7 +319,6 @@ private fun ConfirmDialog(confirm: Confirm, runtime: AppRuntime) {
 
 private const val TOAST_MILLIS = 3_000L
 
-private val SWIPE_DISMISS_DISTANCE = 40.dp
 
 /** マイク FAB(64dp + 余白 20dp)の上に出す(被せない) */
 private val TOAST_BOTTOM_INSET = 100.dp
