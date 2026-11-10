@@ -52,12 +52,12 @@ import java.time.format.DateTimeFormatter
 import java.time.format.FormatStyle
 
 /**
- * 設定(iOS の SettingsSheet): 相談の ON / OFF(#893 の [ClarifySection])・投稿に表示する名前(#875)・
- * プライバシー(AI へのデータ送信の同意)・クラッシュ報告・AI ボタンの利用状況(#888)・他の人の行動で届く通知(#887 の [PushConsentSection])・
- * 記録の自動削除(#482 の [RetentionSettingsSection])・今日の残り(#630 の [RemainingTodaySection])・
- * アプリ(元に戻す・使い方・頼み方のコツ・リセット・#898 の [AppActionsSection])・データ(同期の状態・#898 の [SyncStatusSection])・
- * 言語(#843 の [LanguageSection])・お問い合わせ・ライセンス・詳細(サポート用)(#898 の [SupportSection])・
- * アカウント(ログアウト・削除・#841 の [AccountSection])。
+ * 設定(iOS の SettingsSheet と同じ並び): 共有(#901)・投稿に表示する名前(#875)・ブロック中のユーザー(#877)・
+ * 今日の残り(#630 の [RemainingTodaySection])・言語(#843 の [LanguageSection])・相談の ON / OFF(#893 の [ClarifySection])・読み上げ(#892)・
+ * アプリ(元に戻す・使い方・頼み方のコツ・リセット・#898 の [AppActionsSection])・他の人の行動で届く通知(#887 の [PushConsentSection])・
+ * 記録の自動削除(#482 の [RetentionSettingsSection])・データ(同期の状態・#898 の [SyncStatusSection])・
+ * プライバシー(AI へのデータ送信の同意)・クラッシュ報告・AI ボタンの利用状況(#888)・
+ * お問い合わせ・ライセンス・詳細(サポート用)(#898 の [SupportSection])・アカウント(ログアウト・削除・#841 の [AccountSection])。
  * @param busy 生成中(アカウント削除をさせない)
  * @param remainingToday 音声の画面が最後に読んだ「今日の残り」。[onRefreshUsage] で開いた時に読み直す
  * @param onStopRetention 「自動で消すのをやめる」の指示文を送る(送ったらシートを閉じる)
@@ -96,34 +96,28 @@ fun SettingsSheet(
                 TextButton(onClick = onDismiss) { Text(stringResource(R.string.settings_close)) }
             }
             val context = LocalContext.current
-            ClarifySection(remember { ClarifySettings(context) })
-            // 挨拶・AI の質問・完成の要約の読み上げ(#892・既定 OFF)
-            SpeechSection(remember { SpeechSettings(context) })
-            HorizontalDivider(Modifier.padding(vertical = 8.dp))
+            val runtimeState = container.runtime.state.collectAsStateWithLifecycle().value
+            // 節の並びは iOS の `SettingsSheet.body` と同じ(アカウントの削除は Android では一番下の AccountSection に入っている)
             ShareSettingsRow(onShare) // 今のアプリの共有シート(#901)。使えない時は出さない
             AuthorNameSection(container.authorProfile)
-            HorizontalDivider(Modifier.padding(vertical = 8.dp))
-            PrivacySection(container)
-            HorizontalDivider(Modifier.padding(vertical = 8.dp))
-            // 他の人の行動で届く通知(#887)。共有・公開の記録があるアプリだけ
-            val document = container.runtime.state.collectAsStateWithLifecycle().value.document
-            if (container.push != null && PushHost.canSetConsent(document.dsl)) {
-                PushConsentSection(container.push, document.appId, document.dsl)
-                HorizontalDivider(Modifier.padding(vertical = 8.dp))
-            }
-            // 記録の自動削除(#482)。今のアプリに保存期間のある記録がある時だけ
-            RetentionSettingsSection(container.runtime, onStop = { text ->
-                onStopRetention(text)
-                onDismiss()
-            })
             // ブロック中のユーザー(#877)。通報・ブロックが使える時だけ
             BlockedUsersSection(container.runtime)
             // 今日の残り(#630)。AI を使うまでは「AI を使うと表示されます」
             RemainingTodaySection(remainingToday, isPro)
             HorizontalDivider(Modifier.padding(vertical = 8.dp))
+            var language by remember { mutableStateOf(AppLocales.setting(context)) }
+            LanguageSection(language, onSelect = { selected ->
+                if (selected == language) return@LanguageSection
+                language = selected
+                // Android 12 / 12L は開いている画面を作り直す(13+ はシステムがやる)
+                if (AppLocales.set(context, selected)) (context as? Activity)?.recreate()
+            })
+            HorizontalDivider(Modifier.padding(vertical = 8.dp))
+            ClarifySection(remember { ClarifySettings(context) })
+            // 挨拶・AI の質問・完成の要約の読み上げ(#892・既定 OFF)
+            SpeechSection(remember { SpeechSettings(context) })
             HorizontalDivider(Modifier.padding(vertical = 8.dp))
             // アプリ(#898・iOS の appSection): 元に戻す・画面マップ・自動の動き・使い方を見る(#900)・頼み方のコツ・リセット
-            val runtimeState = container.runtime.state.collectAsStateWithLifecycle().value
             AppActionsSection(
                 AppActionsState(
                     appName = runtimeState.dsl.app.name,
@@ -139,16 +133,20 @@ fun SettingsSheet(
                 onReset = onReset,
             )
             HorizontalDivider(Modifier.padding(vertical = 8.dp))
+            // 他の人の行動で届く通知(#887)。共有・公開の記録があるアプリだけ
+            if (container.push != null && PushHost.canSetConsent(runtimeState.document.dsl)) {
+                PushConsentSection(container.push, runtimeState.document.appId, runtimeState.document.dsl)
+                HorizontalDivider(Modifier.padding(vertical = 8.dp))
+            }
+            // 記録の自動削除(#482)。今のアプリに保存期間のある記録がある時だけ
+            RetentionSettingsSection(container.runtime, onStop = { text ->
+                onStopRetention(text)
+                onDismiss()
+            })
             // データ(#898 / #990・iOS の syncSection): 同期の状態と「今すぐ同期」
             SyncStatusSection(container.recordSync)
             HorizontalDivider(Modifier.padding(vertical = 8.dp))
-            var language by remember { mutableStateOf(AppLocales.setting(context)) }
-            LanguageSection(language, onSelect = { selected ->
-                if (selected == language) return@LanguageSection
-                language = selected
-                // Android 12 / 12L は開いている画面を作り直す(13+ はシステムがやる)
-                if (AppLocales.set(context, selected)) (context as? Activity)?.recreate()
-            })
+            PrivacySection(container)
             HorizontalDivider(Modifier.padding(vertical = 8.dp))
             // お問い合わせ・ライセンス・詳細(サポート用)(#898・iOS の supportSection)
             SupportSection(remember(runtimeState.document.version) { supportInfo(context, container, runtimeState.document.version) })

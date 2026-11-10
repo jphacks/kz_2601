@@ -50,6 +50,9 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import jp.kz2601.metamon.R
+import jp.kz2601.metamon.renderer.a11y.TalkBack
+import jp.kz2601.metamon.renderer.a11y.rememberAnnouncer
+import jp.kz2601.metamon.renderer.a11y.rememberTalkBackRunning
 import jp.kz2601.metamon.renderer.components.actions.QrMatrix
 import jp.kz2601.metamon.renderer.components.actions.bitmap
 import jp.kz2601.metamon.services.Share
@@ -75,6 +78,9 @@ fun ShareSheet(target: ShareTarget, model: ShareSheetModel, onDismiss: () -> Uni
     val scope = rememberCoroutineScope()
     val context = LocalContext.current
     var confirmRevoke by rememberSaveable { mutableStateOf(false) }
+    // 知らせ・失敗は出たのと同時に TalkBack にも読ませる(H8)。TalkBack の時は知らせを長く出す
+    val announce = rememberAnnouncer()
+    val talkBack = rememberTalkBackRunning()
     LaunchedEffect(model) { model.load() }
 
     val name = target.name.ifEmpty { stringResource(R.string.share_untitled) }
@@ -106,7 +112,9 @@ fun ShareSheet(target: ShareTarget, model: ShareSheetModel, onDismiss: () -> Uni
                     onRevoke = { confirmRevoke = true },
                 )
                 failure != null -> Column(Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
-                    Text(stringResource(failure.textRes), textAlign = TextAlign.Center, modifier = Modifier.testTag("share.error"))
+                    val text = stringResource(failure.textRes)
+                    LaunchedEffect(failure) { announce(text) }
+                    Text(text, textAlign = TextAlign.Center, modifier = Modifier.testTag("share.error"))
                     if (failure != ShareFailure.UNAVAILABLE) {
                         OutlinedButton(onClick = { scope.launch { model.issue() } }, modifier = Modifier.padding(top = 8.dp)) {
                             Text(stringResource(R.string.share_retry))
@@ -119,15 +127,17 @@ fun ShareSheet(target: ShareTarget, model: ShareSheetModel, onDismiss: () -> Uni
                 }
             }
             state.notice?.let { notice ->
+                val text = stringResource(notice.textRes)
                 Text(
-                    stringResource(notice.textRes),
+                    text,
                     style = MaterialTheme.typography.bodySmall,
                     color = if (notice == ShareNotice.REVOKE_FAILED) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.fillMaxWidth().padding(top = 12.dp).testTag("share.notice"),
                     textAlign = TextAlign.Center,
                 )
                 LaunchedEffect(notice) {
-                    delay(NOTICE_MILLIS)
+                    announce(text)
+                    delay(TalkBack.holdMillis(NOTICE_MILLIS, talkBack))
                     model.consumeNotice()
                 }
             }

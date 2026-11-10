@@ -13,7 +13,11 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -23,6 +27,7 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import jp.kz2601.metamon.R
+import jp.kz2601.metamon.renderer.a11y.rememberAnnouncer
 import jp.kz2601.metamon.services.local.RecordSyncEngine
 
 /** 設定の「同期」の行の中身(iOS の `SettingsSheet.syncLabel` / `syncColor`)。 */
@@ -59,6 +64,16 @@ fun SyncStatusSection(sync: RecordSyncEngine) {
     val status by sync.status.collectAsStateWithLifecycle()
     val pending by sync.pendingCount.collectAsStateWithLifecycle()
     val row = SyncStatusRow.of(status)
+    val statusText = if (row.count != null) stringResource(row.label, row.count) else stringResource(row.label)
+    // 「今すぐ同期」を押した後、送り終えた(最新・オフライン)ら TalkBack に読ませる(H8)。開いただけでは読まない
+    val announce = rememberAnnouncer()
+    var requested by rememberSaveable { mutableStateOf(false) }
+    LaunchedEffect(requested, row.tone) {
+        if (requested && row.tone != SyncStatusRow.Tone.PENDING) {
+            announce(statusText)
+            requested = false
+        }
+    }
     SettingsHeader(stringResource(R.string.settings_sync_header))
     Row(
         Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp).semantics(mergeDescendants = true) {}.testTag("settings.sync"),
@@ -68,7 +83,7 @@ fun SyncStatusSection(sync: RecordSyncEngine) {
         Text(stringResource(R.string.settings_sync), modifier = Modifier.weight(1f))
         Box(Modifier.size(8.dp).background(row.tone.color(), CircleShape))
         Text(
-            if (row.count != null) stringResource(row.label, row.count) else stringResource(row.label),
+            statusText,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             modifier = Modifier.testTag("settings.sync.status"),
         )
@@ -76,7 +91,10 @@ fun SyncStatusSection(sync: RecordSyncEngine) {
     // オンライン・未送信は status に入っている(到達性は status が Offline かで分かる)
     val online = status !is RecordSyncEngine.Status.Offline
     TextButton(
-        onClick = sync::syncNow,
+        onClick = {
+            requested = true
+            sync.syncNow()
+        },
         enabled = SyncStatusRow.canSyncNow(online, pending),
         modifier = Modifier.padding(horizontal = 4.dp).testTag("settings.sync.now"),
     ) { Text(stringResource(R.string.settings_sync_now)) }

@@ -40,6 +40,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import jp.kz2601.metamon.R
+import jp.kz2601.metamon.renderer.a11y.rememberAnnouncer
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
@@ -57,6 +58,8 @@ fun SupportSection(info: SupportInfo) {
     var copied by rememberSaveable { mutableStateOf(false) }
     var licensesOpen by rememberSaveable { mutableStateOf(false) }
     val labels = SupportInfo.Field.entries.associateWith { supportLabel(it) }
+    val announce = rememberAnnouncer()
+    val copiedText = stringResource(R.string.settings_support_copied)
 
     TextButton(
         onClick = { runCatching { context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(CONTACT_URL))) } },
@@ -87,6 +90,7 @@ fun SupportSection(info: SupportInfo) {
             onClick = {
                 copyToClipboard(context, info.clipboardText { labels.getValue(it) })
                 copied = true
+                announce(copiedText) // TalkBack にも「コピーしました」を読ませる(H8)
             },
             modifier = Modifier.padding(horizontal = 4.dp).testTag("settings.supportDetails.copy"),
         ) { Text(stringResource(if (copied) R.string.settings_support_copied else R.string.settings_support_copy)) }
