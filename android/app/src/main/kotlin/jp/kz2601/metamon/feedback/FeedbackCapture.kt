@@ -4,10 +4,17 @@ import android.app.Activity
 import android.content.Context
 import android.content.ContextWrapper
 import android.graphics.Bitmap
+import android.graphics.Canvas
+import android.graphics.Color
+import android.graphics.Paint
+import android.graphics.Rect
 import android.os.Build
 import android.os.Handler
 import android.os.Looper
 import android.view.PixelCopy
+import android.view.View
+import android.view.WindowManager
+import android.view.inspector.WindowInspector
 import jp.kz2601.metamon.AppContainer
 import jp.kz2601.metamon.BuildConfig
 import jp.kz2601.metamon.language.AppLocales
@@ -39,12 +46,12 @@ class FeedbackComposerLauncher {
 
     val isOpen: Boolean get() = _open.value != null || capturing
 
-    /** 今の画面を撮り、今のアプリと端末の情報を集めて開く。どれも送るかは本人が選ぶ(既定はすべて送らない)。 */
-    suspend fun capture(activity: Activity, container: AppContainer) {
+    /** 今の画面を撮り([withOverlays] は振った時だけ true)、今のアプリと端末の情報を集めて開く。どれも送るかは本人が選ぶ(既定はすべて送らない)。 */
+    suspend fun capture(activity: Activity, container: AppContainer, withOverlays: Boolean = false) {
         if (isOpen) return
         capturing = true
         try {
-            val shot = FeedbackScreenshot.capture(activity)
+            val shot = FeedbackScreenshot.capture(activity, withOverlays)
             val doc = container.runtime.state.value.document
             val envelope = runCatching { container.documentCache.loadJson(doc.appId) }.getOrNull()
             val context = FeedbackContext(
@@ -81,9 +88,10 @@ object FeedbackScreenshot {
 
     /**
      * Activity の窓を PixelCopy で撮る(他のアプリ・システムの画面は写らない)。
-     * 設定のシート・ダイアログは別の窓なので写らない(iOS の設定から開いた時と同じく、下のアプリの画面になる)。
+     * [withOverlays] が true なら、上に出ているこのアプリのシート・ダイアログ(別の窓)も重ねる(振った時・iOS の `captureWindow()`)。
+     * false なら Activity の窓だけ(設定から開いた時・シートの下のアプリの画面)。
      */
-    suspend fun capture(activity: Activity): Bitmap? {
+    suspend fun capture(activity: Activity, withOverlays: Boolean = false): Bitmap? {
         val window = activity.window ?: return null
         val view = window.decorView
         if (view.width <= 0 || view.height <= 0) return null
@@ -97,7 +105,62 @@ object FeedbackScreenshot {
             full.recycle()
             return null
         }
+        if (withOverlays) runCatching { drawOverlays(activity, view, full) }
         return shrink(full, MAX_PIXELS)
+    }
+
+    /** Activity の窓より後に足された、このアプリの窓(シート・ダイアログ・ポップアップ)を順に重ねる。 */
+    private suspend fun drawOverlays(activity: Activity, base: View, into: Bitmap) {
+        val roots = WindowInspector.getGlobalWindowViews()
+        val index = roots.indexOf(base)
+        if (index < 0) return
+        val overlays = roots.drop(index + 1).filter { it.isAttachedToWindow && it.isShown && it.context.findActivity() === activity }
+        if (overlays.isEmpty()) return
+        val baseLoc = IntArray(2).also(base::getLocationOnScreen)
+        val layers = overlays.map { root ->
+            val loc = IntArray(2).also(root::getLocationOnScreen)
+            val lp = root.layoutParams as? WindowManager.LayoutParams
+            WindowLayer(
+                left = loc[0],
+                top = loc[1],
+                width = root.width,
+                height = root.height,
+                secure = lp != null && lp.flags and WindowManager.LayoutParams.FLAG_SECURE != 0,
+                dimBehind = if (lp != null && lp.flags and WindowManager.LayoutParams.FLAG_DIM_BEHIND != 0) lp.dimAmount else 0f,
+            )
+        }
+        val canvas = Canvas(into)
+        for (step in OverlayPlan.plan(baseLoc[0], baseLoc[1], into.width, into.height, layers)) {
+            when (step) {
+                is OverlayPlan.Step.Dim -> canvas.drawColor(Color.argb((step.alpha * 255).roundToInt(), 0, 0, 0))
+                is OverlayPlan.Step.Draw -> {
+                    val root = overlays[step.index]
+                    val shot = copyWindow(root) ?: continue
+                    val dst = Rect(step.dx, step.dy, step.dx + root.width, step.dy + root.height)
+                    canvas.drawBitmap(shot, null, dst, Paint(Paint.FILTER_BITMAP_FLAG))
+                    shot.recycle()
+                }
+            }
+        }
+    }
+
+    /** 1 つの窓を撮る。34 以上は PixelCopy、それより前は View を描く(描けなければ写さない)。 */
+    private suspend fun copyWindow(root: View): Bitmap? {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
+            return suspendCancellableCoroutine { cont ->
+                runCatching {
+                    val request = PixelCopy.Request.Builder.ofWindow(root).build()
+                    PixelCopy.request(request, root.context.mainExecutor) { result ->
+                        cont.resume(if (result.status == PixelCopy.SUCCESS) result.bitmap else null)
+                    }
+                }.onFailure { cont.resume(null) }
+            }
+        }
+        return runCatching {
+            val bmp = Bitmap.createBitmap(root.width, root.height, Bitmap.Config.ARGB_8888)
+            runCatching { root.draw(Canvas(bmp)) }.onFailure { bmp.recycle() }.getOrThrow()
+            bmp
+        }.getOrNull()
     }
 
     private fun shrink(bitmap: Bitmap, maxPixels: Int): Bitmap {
