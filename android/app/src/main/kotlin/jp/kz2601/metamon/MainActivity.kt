@@ -36,6 +36,7 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import jp.kz2601.metamon.dsl.AppDSL
 import jp.kz2601.metamon.dsl.AppDocument
 import jp.kz2601.metamon.language.AppLocales
+import jp.kz2601.metamon.permissions.PermissionOffBarHost
 import jp.kz2601.metamon.renderer.DSLView
 import jp.kz2601.metamon.renderer.theme.MetamonRenderTheme
 import jp.kz2601.metamon.renderer.theme.ReadableWidth
@@ -158,7 +159,7 @@ fun MetamonApp(container: AppContainer) {
             } else {
                 // 横向き・タブレット・折りたたみでは幅を絞って中央に寄せる(iOS の readableWidth・#842)。
                 ReadableWidth {
-                    GeneratedApp(state, runtimeState.dsl, runtime, onDismissSummary = vm::dismissSummary)
+                    GeneratedApp(state, runtimeState.dsl, runtime, appId = runtimeState.document.appId, onDismissSummary = vm::dismissSummary)
                 }
                 MicButton(
                     state.copy(phase = VoicePhase.IDLE),
@@ -180,8 +181,10 @@ fun MetamonApp(container: AppContainer) {
 }
 
 @Composable
-private fun GeneratedApp(state: VoiceUiState, dsl: AppDSL, runtime: AppRuntime, onDismissSummary: () -> Unit) {
+private fun GeneratedApp(state: VoiceUiState, dsl: AppDSL, runtime: AppRuntime, appId: String, onDismissSummary: () -> Unit) {
     Column(Modifier.fillMaxSize()) {
+        // 部品が使う権限が断られていたら上に「オフ」のバー(#890・iOS の NotificationsOffBar)
+        PermissionOffBarHost(dsl, appId, busy = state.isGenerating, summaryShowing = state.summary != null)
         state.summary?.let { summary ->
             OutlinedCard(Modifier.fillMaxWidth().padding(12.dp).clickable(onClick = onDismissSummary)) {
                 Text(summary, Modifier.padding(12.dp), style = MaterialTheme.typography.bodyMedium)
