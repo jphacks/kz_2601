@@ -20,12 +20,11 @@ object PermissionNeeds {
         return out
     }
 
-    /** 部品 1 つが要る権限。音声の入口(voiceInput)は音声のシートが自前で案内するので含めない。 */
+    /** 部品 1 つが要る権限。音声の入口(voiceInput)は音声のシートが自前で案内するので含めない。qrScanner は Google Code Scanner が読むので要らない(#866)。 */
     fun of(component: Component): Set<AppPermission> = when (component.type) {
         ComponentType.AUDIO_RECORDER, ComponentType.TRANSCRIBE_FIELD -> setOf(AppPermission.MICROPHONE)
         ComponentType.PHOTO_FIELD, ComponentType.VIDEO_FIELD ->
             if (component.source == Source.LIBRARY) emptySet() else setOf(AppPermission.CAMERA)
-        ComponentType.QR_SCANNER -> setOf(AppPermission.CAMERA)
         ComponentType.DASHCAM -> setOf(AppPermission.CAMERA, AppPermission.MICROPHONE)
         ComponentType.LOCATION_BUTTON, ComponentType.ROUTE_GUIDE, ComponentType.LOCATION_TRACKER -> setOf(AppPermission.LOCATION)
         ComponentType.NEARBY_SHARE -> setOf(AppPermission.NEARBY)

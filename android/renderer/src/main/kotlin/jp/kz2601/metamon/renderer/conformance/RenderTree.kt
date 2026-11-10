@@ -111,7 +111,7 @@ class RenderTree(
         InputNodes.state(c, form, runtime)?.let { return it }
         if (c.type.wire !in available) return if (c.type == ComponentType.UNKNOWN) "unknown" else "unavailable"
         if (c.type == ComponentType.BUTTON && !isButtonVisible(c.action, form)) return "hidden"
-        if (c.type in InputRules.inputTypes && (form == null || c.field == null)) return "needsForm"
+        if (c.type in InputRules.formBound && (form == null || c.field == null)) return "needsForm"
         return "rendered"
     }
 

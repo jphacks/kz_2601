@@ -40,6 +40,11 @@ object InputRules {
     val inputTypes: Set<ComponentType> =
         overridable + ComponentType.COLOR_PICKER + ComponentType.DRAWING_FIELD + ComponentType.PHOTO_FIELD
 
+    /** form の field に書く部品(iOS の `RenderTree.formBound`)。form が無いと needsForm、props に value と label を出す。 */
+    val formBound: Set<ComponentType> = inputTypes + setOf(
+        ComponentType.QR_SCANNER,
+    )
+
     /** ラベルを `c.label ?: field.name` で補う入力(1 行の器)。他は `c.label` だけ。 */
     val labelFallsBackToFieldName: Set<ComponentType> =
         setOf(ComponentType.TOGGLE, ComponentType.DATE_PICKER, ComponentType.COLOR_PICKER, ComponentType.STEPPER, ComponentType.TIME_PICKER)
