@@ -2,6 +2,7 @@ package jp.kz2601.metamon.permissions
 
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
+import jp.kz2601.metamon.renderer.components.location.LocalLocationPermission
 import jp.kz2601.metamon.renderer.components.media.LocalCameraPermission
 import jp.kz2601.metamon.services.permissions.AppPermission
 
@@ -10,6 +11,7 @@ import jp.kz2601.metamon.services.permissions.AppPermission
 fun ProvideRendererPermissions(content: @Composable () -> Unit) {
     CompositionLocalProvider(
         LocalCameraPermission provides { onResult -> rememberPermissionRequest(AppPermission.CAMERA, onResult = onResult) },
+        LocalLocationPermission provides { onResult -> rememberPermissionRequest(AppPermission.LOCATION, onResult = onResult) },
         content = content,
     )
 }
