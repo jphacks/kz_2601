@@ -32,7 +32,7 @@
     <string name="runtime_rejected_generic">Couldn\'t save. Check your entries and try again</string>
     <string name="runtime_save_failed">Couldn\'t save. Check your connection and try again</string>
     <string name="runtime_save_parent_first">Save this first</string>
-    <string name="runtime_save_parent_first_named">Save “%1$s” first</string>
+    <string name="runtime_save_parent_first_named">Save the %1$s first</string>
     <string name="runtime_switch_failed">Couldn\'t load the app. Check your connection</string>
     <string name="runtime_switched">Switched to “%1$s”</string>
     <string name="runtime_switched_offline">Switched to “%1$s” (offline, cached)</string>
