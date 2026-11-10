@@ -133,6 +133,12 @@ class AppRuntime(
         _navigation.value = NavigationState.initial(doc.dsl)
     }
 
+    /** [apply] して、その DSL の entity の記録を読む(生成・差し替えの結果はここを通す。読まないと一覧が空のまま)。 */
+    suspend fun show(doc: AppDocument) {
+        apply(doc)
+        load(doc.dsl.entities.map { it.id }.toSet())
+    }
+
     // DSLRuntime
 
     override fun onVoiceInput(componentId: String?) {

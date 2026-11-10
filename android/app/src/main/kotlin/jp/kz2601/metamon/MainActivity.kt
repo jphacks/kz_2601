@@ -23,6 +23,9 @@ import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
@@ -83,7 +86,8 @@ fun MetamonApp(container: AppContainer) {
             appId = { container.appId.current },
             initial = AppDocument(appId = container.appId.current, dsl = container.initialDsl),
             buildNowUtterance = buildNow,
-            log = { Log.i(AppContainer.TAG, it) },
+            // 発話・AI の返事を含むので debug だけ(release の logcat に個人の情報を出さない)
+            log = { if (BuildConfig.DEBUG) Log.i(AppContainer.TAG, it) },
         )
     }
     val state by vm.state.collectAsStateWithLifecycle()
@@ -107,7 +111,7 @@ fun MetamonApp(container: AppContainer) {
     }
     // 生成・画面の差し替えの結果をランタイムに渡す
     LaunchedEffect(state.document) {
-        if (state.document != runtime.document) runtime.apply(state.document)
+        if (state.document != runtime.document) runtime.show(state.document)
     }
 
     LaunchedEffect(container.auth) {
@@ -117,8 +121,11 @@ fun MetamonApp(container: AppContainer) {
         }
     }
 
-    // ヘッドレス E2E 用のつまみ(debug だけ値が入る)
+    // ヘッドレス E2E 用のつまみ(debug だけ値が入る)。回転などで作り直しても 1 回だけ
+    var knobsRan by rememberSaveable { mutableStateOf(false) }
     LaunchedEffect(vm) {
+        if (knobsRan) return@LaunchedEffect
+        knobsRan = true
         val knobs = container.knobs
         knobs.autoTranscript?.let { vm.generateNow(it) }
         if (knobs.autoNav.isEmpty()) return@LaunchedEffect
