@@ -292,6 +292,11 @@ targets:
       # 本体のデザイントークンとツルは iOS のファイルをそのまま使う(#935)
       - path: Metamon/App/Theme.swift
       - path: Metamon/App/CraneMascot.swift
+      # 作る・直す会話(#967): 組み上げの演出・生成中の段階の文言・頼み方のコツは iOS のファイルをそのまま使う
+      - path: Metamon/Features/Voice/BuildChoreography.swift
+      - path: Metamon/Features/Voice/BuildStageView.swift
+      - path: Metamon/Features/Voice/GeneratingStage.swift
+      - path: Metamon/Features/Tips/PromptTips.swift
       # iOS と同じ DSL 例をそのままバンドル(コピーを持たない)
       - path: ../docs/dsl/examples
         buildPhase: resources
