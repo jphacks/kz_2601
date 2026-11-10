@@ -211,7 +211,7 @@ private fun PartTray(kinds: List<PartKind>, picking: PartKind?, reduceMotion: Bo
                 val shape = RoundedCornerShape(9.dp)
                 Box(
                     Modifier
-                        .offset(y = (-6).dp * lift)
+                        .offset { IntOffset(0, ((-6).dp * lift).roundToPx()) }
                         .scale(1f + 0.15f * lift)
                         .size(34.dp)
                         .clip(shape)

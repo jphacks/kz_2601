@@ -1,7 +1,6 @@
 package jp.kz2601.metamon.services.speech
 
 import android.Manifest
-import android.annotation.TargetApi
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
@@ -13,6 +12,7 @@ import android.speech.RecognitionSupport
 import android.speech.RecognitionSupportCallback
 import android.speech.RecognizerIntent
 import android.speech.SpeechRecognizer
+import androidx.annotation.RequiresApi
 import jp.kz2601.metamon.services.SpeechTranscriber
 import jp.kz2601.metamon.services.TranscriberFailure
 import jp.kz2601.metamon.services.TranscriberStatus
@@ -81,7 +81,7 @@ class AndroidSpeechTranscriber(
         withContext(Dispatchers.Main.immediate) { _status.value = checkSupport() }
     }
 
-    @TargetApi(Build.VERSION_CODES.TIRAMISU)
+    @RequiresApi(Build.VERSION_CODES.TIRAMISU)
     private suspend fun checkSupport(): TranscriberStatus {
         val tag = speechLanguageTag(language())
         val probe = SpeechRecognizer.createOnDeviceSpeechRecognizer(context)

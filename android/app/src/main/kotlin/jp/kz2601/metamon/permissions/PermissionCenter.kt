@@ -20,25 +20,25 @@ import kotlinx.coroutines.flow.asStateFlow
  * 権限の窓口(#890)。権限ごとの状態(未確認・許可・拒否・二度と聞かない)を持ち、聞いた結果を覚える。
  * 判定の中身は [PermissionRules](JVM テスト)。Compose からは [rememberPermissionRequest] で聞く。
  */
-class PermissionCenter private constructor(private val app: Context) {
-    private val prefs = app.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+class PermissionCenter private constructor(private val appContext: Context) {
+    private val prefs = appContext.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
     private val _statuses = MutableStateFlow<Map<AppPermission, PermissionStatus>>(emptyMap())
 
     /** 全権限の今の状態。画面に戻った時([refresh])に取り直す。 */
     val statuses: StateFlow<Map<AppPermission, PermissionStatus>> = _statuses.asStateFlow()
 
     private val declared: Set<String> by lazy {
-        val pm = app.packageManager
+        val pm = appContext.packageManager
         runCatching {
             requestedPermissions(
                 SDK,
                 // 13+ の時だけ呼ばれる([requestedPermissions] が版を見る。テストのため版を引数で渡すので lint が追えない)
                 modern = @SuppressLint("NewApi") {
-                    pm.getPackageInfo(app.packageName, PackageManager.PackageInfoFlags.of(PackageManager.GET_PERMISSIONS.toLong())).requestedPermissions
+                    pm.getPackageInfo(appContext.packageName, PackageManager.PackageInfoFlags.of(PackageManager.GET_PERMISSIONS.toLong())).requestedPermissions
                 },
                 legacy = {
                     @Suppress("DEPRECATION")
-                    pm.getPackageInfo(app.packageName, PackageManager.GET_PERMISSIONS).requestedPermissions
+                    pm.getPackageInfo(appContext.packageName, PackageManager.GET_PERMISSIONS).requestedPermissions
                 },
             )
         }.getOrNull().orEmpty()
@@ -52,7 +52,7 @@ class PermissionCenter private constructor(private val app: Context) {
     fun status(permission: AppPermission, activity: Activity?): PermissionStatus {
         val names = permission.manifestPermissions(SDK)
         if (permission == AppPermission.NOTIFICATIONS) {
-            val enabled = NotificationManagerCompat.from(app).areNotificationsEnabled()
+            val enabled = NotificationManagerCompat.from(appContext).areNotificationsEnabled()
             return PermissionRules.resolveNotifications(SDK, enabled) { runtimeStatus(permission, names, activity) }
         }
         // マニフェストに無い権限は聞けない(その部品がまだ無い)。バーも出さない
@@ -82,7 +82,7 @@ class PermissionCenter private constructor(private val app: Context) {
     /** 「設定を開く」の行き先。通知は通知の設定、ヘルスコネクトはその設定、ほかはアプリの情報。 */
     fun settingsIntent(permission: AppPermission): Intent = when (permission) {
         AppPermission.NOTIFICATIONS -> Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS)
-            .putExtra(Settings.EXTRA_APP_PACKAGE, app.packageName)
+            .putExtra(Settings.EXTRA_APP_PACKAGE, appContext.packageName)
         else -> appDetailsIntent()
     }.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
 
@@ -92,7 +92,7 @@ class PermissionCenter private constructor(private val app: Context) {
             .onFailure { runCatching { context.startActivity(appDetailsIntent().addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) } }
     }
 
-    private fun appDetailsIntent() = Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.fromParts("package", app.packageName, null))
+    private fun appDetailsIntent() = Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.fromParts("package", appContext.packageName, null))
 
     private fun runtimeStatus(permission: AppPermission, names: List<String>, activity: Activity?): PermissionStatus {
         val granted = permission.isGranted(names.associateWith(::isGranted), SDK)
@@ -100,7 +100,7 @@ class PermissionCenter private constructor(private val app: Context) {
         return PermissionRules.resolve(granted, stored, shouldShowRationale(names, activity))
     }
 
-    private fun isGranted(name: String) = app.checkSelfPermission(name) == PackageManager.PERMISSION_GRANTED
+    private fun isGranted(name: String) = appContext.checkSelfPermission(name) == PackageManager.PERMISSION_GRANTED
 
     private fun shouldShowRationale(names: List<String>, activity: Activity?) =
         activity != null && names.any { activity.shouldShowRequestPermissionRationale(it) }

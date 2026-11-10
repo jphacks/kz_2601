@@ -4,5 +4,6 @@
     <string name="auth_anonymous">ログインせずに使う(匿名)</string>
     <string name="auth_apple">Apple でログイン</string>
     <string name="auth_google">Google でログイン</string>
+    <string name="auth_google_no_account">この端末に Google アカウントがありません。端末の設定で追加してから、もう一度お試しください</string>
     <string name="auth_tagline">話しかけるだけで、アプリが生まれ変わる</string>
 </resources>

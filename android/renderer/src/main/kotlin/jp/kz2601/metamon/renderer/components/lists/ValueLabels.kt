@@ -4,7 +4,7 @@ import android.content.res.Resources
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.platform.LocalConfiguration
-import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalResources
 import jp.kz2601.metamon.renderer.R
 
 /**
@@ -89,7 +89,7 @@ data class ValueLabels(
 /** 端末(アプリ)の言語の [ValueLabels]。言語が変わると作り直す。 */
 @Composable
 fun rememberValueLabels(): ValueLabels {
-    val context = LocalContext.current
+    val resources = LocalResources.current
     val config = LocalConfiguration.current
-    return remember(context, config) { ValueLabels.from(context.resources) }
+    return remember(resources, config) { ValueLabels.from(resources) }
 }

@@ -12,6 +12,7 @@ import androidx.compose.material3.rememberTimePickerState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -40,7 +41,7 @@ import java.time.ZonedDateTime
 @Composable
 fun DatePickerLeaf(c: Component, ctx: RenderContext, modifier: Modifier = Modifier) = FormInput(c, ctx, modifier) { form, field ->
     val includeTime = c.includeTime ?: (form.entity.field(field)?.type == FieldType.DATETIME)
-    var step by remember { mutableStateOf(0) } // 0: 閉じる・1: 日付・2: 時刻
+    var step by remember { mutableIntStateOf(0) } // 0: 閉じる・1: 日付・2: 時刻
     val at = form.date(field)
     InputRow(InputRules.label(c, form).orEmpty()) {
         TextButton(onClick = { step = 1 }) { Text(DateInput.text(at, includeTime, LocalLocale.current.platformLocale)) }
