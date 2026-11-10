@@ -7,8 +7,10 @@ import jp.kz2601.metamon.services.http.json
 import jp.kz2601.metamon.services.http.metamonHttp
 import jp.kz2601.metamon.services.local.DocumentCache
 import kotlinx.coroutines.runBlocking
+import okhttp3.mockwebserver.Dispatcher
 import okhttp3.mockwebserver.MockResponse
 import okhttp3.mockwebserver.MockWebServer
+import okhttp3.mockwebserver.RecordedRequest
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
@@ -80,6 +82,23 @@ class HttpAIClientCacheTest {
         expectApiError { client.morph("y", "app1", 3) }
 
         assertEquals(3, DocumentCache(dir).load("app1")!!.document.version)
+    }
+
+    @Test
+    fun resultArrivingAfterWipeIsNotWritten() = runBlocking<Unit> {
+        val cache = DocumentCache(dir)
+        val wiping = HttpAIClient(server.metamonHttp(), cache = cache)
+        // 送っている間にサインアウトの後片付けが走った
+        server.dispatcher = object : Dispatcher() {
+            override fun dispatch(request: RecordedRequest): MockResponse {
+                runBlocking { cache.removeAll() }
+                return json(200, result(version = 9))
+            }
+        }
+        wiping.morph("x", "app1", 0)
+
+        assertNull(cache.load("app1"))
+        assertNull(DocumentCache(dir).load("app1"))
     }
 
     @Test

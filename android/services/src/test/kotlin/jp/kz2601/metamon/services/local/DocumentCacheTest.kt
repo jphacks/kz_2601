@@ -43,6 +43,17 @@ class DocumentCacheTest {
     }
 
     @Test
+    fun storeStartedBeforeRemoveAllIsDropped() = runBlocking {
+        val cache = DocumentCache(tmp.newFolder())
+        val before = cache.epoch
+        cache.removeAll()
+        cache.store("app1", envelope(2), since = before)
+        assertNull(cache.loadJson("app1"))
+        cache.store("app1", envelope(2), since = cache.epoch)
+        assertEquals(2, cache.load("app1")!!.version)
+    }
+
+    @Test
     fun ignoresEnvelopeWithoutVersion() = runBlocking {
         val cache = DocumentCache(tmp.newFolder())
         cache.store("app1", "{\"appId\":\"app1\"}")
