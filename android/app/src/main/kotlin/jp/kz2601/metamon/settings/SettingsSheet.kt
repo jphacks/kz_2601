@@ -40,6 +40,7 @@ import jp.kz2601.metamon.push.PushConsentSection
 import jp.kz2601.metamon.renderer.components.social.BlockedUsersSection
 import jp.kz2601.metamon.push.PushHost
 import jp.kz2601.metamon.services.RemainingToday
+import jp.kz2601.metamon.share.ShareSettingsRow
 import jp.kz2601.metamon.voice.ClarifySection
 import jp.kz2601.metamon.voice.ClarifySettings
 import jp.kz2601.metamon.voice.SpeechSection
@@ -63,6 +64,7 @@ fun SettingsSheet(
     container: AppContainer,
     busy: Boolean,
     onDismiss: () -> Unit,
+    onShare: (() -> Unit)? = null,
     remainingToday: RemainingToday? = null,
     isPro: Boolean = false,
     onRefreshUsage: () -> Unit = {},
@@ -84,6 +86,7 @@ fun SettingsSheet(
             // 挨拶・AI の質問・完成の要約の読み上げ(#892・既定 OFF)
             SpeechSection(remember { SpeechSettings(context) })
             HorizontalDivider(Modifier.padding(vertical = 8.dp))
+            ShareSettingsRow(onShare) // 今のアプリの共有シート(#901)。使えない時は出さない
             AuthorNameSection(container.authorProfile)
             HorizontalDivider(Modifier.padding(vertical = 8.dp))
             PrivacySection(container)

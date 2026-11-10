@@ -71,7 +71,11 @@ import jp.kz2601.metamon.voice.VoiceUiState
 import jp.kz2601.metamon.voice.VoiceViewModel
 import jp.kz2601.metamon.voice.stage.BuildStageHost
 import jp.kz2601.metamon.services.AppSummary
+import jp.kz2601.metamon.services.sharing.IssuedShares
+import jp.kz2601.metamon.services.sharing.ShareSheetModel
 import jp.kz2601.metamon.settings.SettingsSheet
+import jp.kz2601.metamon.share.ShareSheet
+import jp.kz2601.metamon.share.ShareTarget
 import jp.kz2601.metamon.switcher.AppSwitcherDialog
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -232,6 +236,10 @@ fun MetamonApp(container: AppContainer) {
     var settingsOpen by rememberSaveable { mutableStateOf(false) }
     val apps by runtime.apps.collectAsStateWithLifecycle()
     val scope = rememberCoroutineScope()
+    // 共有シート(#901)。発行したリンクは人が変わる(wipes)まで覚える。モックは mockSharing の時だけ
+    var shareTarget by remember { mutableStateOf<ShareTarget?>(null) }
+    val issuedShares = remember(wipes) { IssuedShares() }
+    val canShare = !container.knobs.mock || container.knobs.mockSharing
 
     val openSwitcher = {
         switcherOpen = true
@@ -281,6 +289,15 @@ fun MetamonApp(container: AppContainer) {
             container,
             busy = state.isGenerating,
             onDismiss = { settingsOpen = false },
+            // 一度も作っていないアプリ(version 1)はシェアできない(backend が 400)
+            onShare = if (canShare && runtimeState.document.version > 1) {
+                {
+                    settingsOpen = false
+                    shareTarget = ShareTarget(runtimeState.document.appId, runtimeState.dsl.app.name)
+                }
+            } else {
+                null
+            },
             remainingToday = state.remainingToday,
             isPro = state.isPro,
             onRefreshUsage = { vm.refreshUsage() },
@@ -315,7 +332,24 @@ fun MetamonApp(container: AppContainer) {
                 vm.noteHomeEntry(Greeting.HomeEntry.NEW_APP) // 挨拶を「新しいアプリですね」に
             },
             onDismiss = { switcherOpen = false },
+            onShare = if (canShare) { app ->
+                switcherOpen = false
+                shareTarget = ShareTarget(app.id, app.name)
+            } else {
+                null
+            },
         )
+    }
+
+    // アプリの共有シート(#901)。入口は変身一覧の各行と設定
+    shareTarget?.let { target ->
+        val model = remember(target, issuedShares) {
+            ShareSheetModel(target.appId, container.appConfig.takeIf { canShare }, issuedShares) {
+                val now = runtime.state.value
+                if (now.document.appId == target.appId) now.dsl else container.appConfig.fetchDocument(target.appId).document.dsl
+            }
+        }
+        ShareSheet(target, model, onDismiss = { shareTarget = null })
     }
 
     if (!state.isInitial && state.voiceOpen) {
