@@ -74,4 +74,7 @@ class FabPositionStore(context: Context) {
     var hideHintShown: Boolean
         get() = prefs.getBoolean("fab.hideHintShown", false)
         set(value) = prefs.edit().putBoolean("fab.hideHintShown", value).apply()
+
+    /** サインアウト・アカウント削除(#841)。iOS も `fab.*` を UserDefaults ごと消す */
+    fun clear() = prefs.edit().clear().apply()
 }

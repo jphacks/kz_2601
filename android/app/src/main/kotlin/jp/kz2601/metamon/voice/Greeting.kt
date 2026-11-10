@@ -92,6 +92,14 @@ object LaunchVisits {
         }
     }
 
+    /**
+     * 訪問回数を消す(#841・iOS の `LocalWipe` も `metamon.visitCount` を消す)。
+     * この起動の判定(cached)は iOS の `launchIsReturning` と同じく変えない。
+     */
+    fun forget(context: Context) {
+        context.applicationContext.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit().clear().apply()
+    }
+
     /** それまでの訪問回数から再訪かを決める */
     internal fun note(previousVisits: Int): Boolean = previousVisits > 0
 }

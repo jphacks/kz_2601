@@ -51,6 +51,9 @@ import jp.kz2601.metamon.services.consent.KeyValueStore
 import jp.kz2601.metamon.services.consent.SharedPreferencesKeyValueStore
 import jp.kz2601.metamon.services.social.AuthorProfile
 import jp.kz2601.metamon.voice.ChatHistoryStore
+import jp.kz2601.metamon.voice.FabPositionStore
+import jp.kz2601.metamon.voice.LaunchVisits
+import jp.kz2601.metamon.voice.SpeechSettings
 import jp.kz2601.metamon.renderer.components.audio.LocalAudioStore
 import jp.kz2601.metamon.renderer.components.media.VideoCodec
 import jp.kz2601.metamon.services.http.AuthTokenProvider
@@ -184,6 +187,7 @@ class AppContainer(
                 consent.forget()
                 consentPrompt.reset()
                 aiButtonMetrics.clearCounts()
+                social?.ageGate?.reset() // 18 歳以上の確認(#877)も人ごと(iOS は UserDefaults ごと消す)
             },
         )
     }
@@ -362,6 +366,10 @@ class AppContainer(
         private fun forgetDeviceState(context: Context): () -> Unit = {
             PermissionCenter.get(context).forget()
             LocalNotifications.get(context).removeAll()
+            // 音声の画面の設定(#892)。iOS は UserDefaults ごと消す(表示の言語などの残すキーには入っていない)
+            SpeechSettings(context).clear()
+            LaunchVisits.forget(context)
+            FabPositionStore(context).clear()
         }
 
         /** 端末内の動画・録音のファイル(どちらもバックアップされない領域)と、撮影・録音の途中で残った一時ファイル。 */

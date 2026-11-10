@@ -74,6 +74,9 @@ class SpeechSettings(context: Context) {
         get() = prefs.getBoolean(KEY_ENABLED, false)
         set(value) = prefs.edit().putBoolean(KEY_ENABLED, value).apply()
 
+    /** サインアウト・アカウント削除(#841)。iOS も `metamon.speech.enabled` を消す(既定の OFF に戻る) */
+    fun clear() = prefs.edit().clear().apply()
+
     private companion object {
         const val PREFS = "metamon.speech"
         const val KEY_ENABLED = "metamon.speech.enabled"

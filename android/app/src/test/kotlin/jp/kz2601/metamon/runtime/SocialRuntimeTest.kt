@@ -108,7 +108,10 @@ class SocialRuntimeTest {
     private val matching = FakeMatching()
     private val ageGate = MatchingAgeGate(InMemoryKeyValueStore())
 
-    private suspend fun TestScope.rt(services: SocialServices? = SocialServices(matching, moderation, ageGate)): AppRuntime {
+    private suspend fun TestScope.rt(
+        services: SocialServices? = SocialServices(matching, moderation, ageGate),
+        uid: () -> String? = { "me" },
+    ): AppRuntime {
         val store = RecordStore(null, EmptyCoroutineContext)
         val client = RuntimeFixture.offlineClient
         val queue = SyncQueue(null, store, client, BackoffPolicy.immediate, sleep = {}, io = EmptyCoroutineContext)
@@ -116,7 +119,7 @@ class SocialRuntimeTest {
         // 他の人(other)の投稿と自分(me)のプロフィール
         engine.write(appId, "profiles", null, JsonObject(mapOf("name" to JsonPrimitive("はなこ"))), "other", "はなこ", shared = true)
         engine.write(appId, "profiles", null, JsonObject(mapOf("name" to JsonPrimitive("自分"))), "me", "自分", shared = true)
-        val rt = AppRuntime(AppDocument(appId, 1, dsl), engine, backgroundScope, currentUserId = { "me" }, socialServices = services)
+        val rt = AppRuntime(AppDocument(appId, 1, dsl), engine, backgroundScope, currentUserId = uid, socialServices = services)
         rt.load(setOf("profiles"))
         return rt
     }
@@ -189,6 +192,28 @@ class SocialRuntimeTest {
         val rt = rt()
         rt.refreshMatches(setOf(MatchBox.INCOMING)) // ブロック一覧も読む
         assertEquals(listOf("me"), rt.shown())
+    }
+
+    @Test
+    fun anotherPersonIsNotHiddenByThePreviousBlocksAndSignOutForgetsThem() = runTest(UnconfinedTestDispatcher()) {
+        moderation.blocked = listOf(BlockedUser("other", "はなこ"))
+        var uid: String? = "me"
+        val rt = rt(uid = { uid })
+        rt.refreshMatches(setOf(MatchBox.INCOMING))
+        assertEquals(listOf("me"), rt.shown())
+        assertNull(rt.interestState("profiles", rt.other()))
+
+        // 別の人になった直後(一覧を読み直す前)も、前の人のブロックで候補を隠さない
+        uid = "someone"
+        assertEquals(InterestState.NONE, rt.interestState("profiles", rt.other()))
+
+        // 後片付けでブロック一覧を捨て、次の人の分は読み直す
+        rt.resetForAccountChange()
+        assertTrue(rt.blockedUsers!!.value.isEmpty())
+        moderation.blocked = listOf(BlockedUser("x", "たろう"))
+        uid = "me"
+        rt.refreshMatches(setOf(MatchBox.INCOMING))
+        assertEquals(mapOf("x" to "たろう"), rt.blockedUsers!!.value)
     }
 
     @Test

@@ -72,6 +72,9 @@ class SocialRuntime(
     val blocked: StateFlow<Map<String, String>> = _blocked.asStateFlow()
     private var blockedLoadedFor: String? = null
 
+    /** [blocked] が誰の一覧か。サインインし直した人には前の人のブロックで隠さない。 */
+    private var blockedOwner: String? = null
+
     private val _version = MutableStateFlow(0)
 
     /** 一覧・送信中・ブロックが変わるたびに進む(MatchingHost.matchingVersion)。 */
@@ -143,15 +146,18 @@ class SocialRuntime(
         moderating = null
         _prompt.value = null
         setBlocked(_blocked.value + (uid to (req.authorName ?: "")))
+        val owner = blockedOwner
         scope.launch {
             _prompt.value = try {
                 val user = client.block(uid, req.authorName)
+                if (blockedOwner != owner) return@launch // 送っている間にサインアウトした
                 setBlocked(_blocked.value - uid + (user.uid to user.name))
                 stores.values.forEach { it.forget(user.uid) }
                 SocialPrompt.Notice(SocialNotice.BLOCKED, user.name.ifEmpty { req.authorName })
             } catch (e: CancellationException) {
                 throw e
             } catch (_: Exception) {
+                if (blockedOwner != owner) return@launch
                 setBlocked(_blocked.value - uid)
                 SocialPrompt.Notice(SocialNotice.BLOCK_FAILED)
             }
@@ -186,15 +192,39 @@ class SocialRuntime(
         } catch (_: Exception) {
             return
         }
+        if (env.currentUid() != me) return // 読んでいる間に別の人になった
         setBlocked(users.associate { it.uid to it.name })
         blockedLoadedFor = me
     }
 
     /** 共有の entity から、ブロック中の人の投稿を除く(描画に渡す記録)。 */
     fun hidingBlocked(records: Map<String, List<Record>>): Map<String, List<Record>> =
-        hidingBlocked(records, _blocked.value) { env.entity(it)?.isShared == true }
+        hidingBlocked(records, activeBlocked()) { env.entity(it)?.isShared == true }
+
+    /** 今サインインしている人のブロック一覧(前の人の分は使わない)。 */
+    private fun activeBlocked(): Map<String, String> {
+        val owner = blockedOwner ?: return emptyMap()
+        return if (owner == env.currentUid()) _blocked.value else emptyMap()
+    }
+
+    /**
+     * サインアウト・アカウント削除・別の人のサインイン(#841 の後片付け)。前の人のブロック一覧・仲間探しの一覧・
+     * 出している確認を捨てる。次の人の一覧は次の [loadBlockedUsers] で読み直す。
+     */
+    fun forget() {
+        moderating = null
+        pendingInterest = null
+        _prompt.value = null
+        stores.clear()
+        blockedLoadedFor = null
+        blockedOwner = null
+        _blocked.value = emptyMap()
+        _version.update { it + 1 }
+        env.blockedChanged()
+    }
 
     private fun setBlocked(next: Map<String, String>) {
+        blockedOwner = env.currentUid()
         _blocked.value = next
         _version.update { it + 1 }
         env.blockedChanged()
@@ -218,7 +248,7 @@ class SocialRuntime(
         val store = store ?: return null
         if (env.entity(entity)?.isMatchProfile != true) return null
         val author = record.author?.takeIf { it.isNotEmpty() } ?: return null
-        if (author == env.currentUid() || author in _blocked.value) return null
+        if (author == env.currentUid() || author in activeBlocked()) return null
         return store.state(author)
     }
 
@@ -242,7 +272,7 @@ class SocialRuntime(
 
     fun matchItems(box: MatchBox): List<MatchInterest>? {
         val items = store?.items(box) ?: return null
-        val blocked = _blocked.value
+        val blocked = activeBlocked()
         return if (blocked.isEmpty()) items else items.filter { it.uid !in blocked }
     }
 

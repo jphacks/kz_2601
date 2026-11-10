@@ -358,6 +358,7 @@ class AppRuntime(
         lastSavedForm = null
         entityCache = null
         _apps.value = emptyList()
+        social.forget() // 前の人のブロックで次の人の投稿を隠さない(#877)
         val next = directory?.let { it.fresh(it.store.rotate()) } ?: document
         _state.value = RuntimeState(next)
         _records.value = emptyMap()
