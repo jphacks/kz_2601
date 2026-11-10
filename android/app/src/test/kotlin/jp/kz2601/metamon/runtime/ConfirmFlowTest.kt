@@ -1,5 +1,6 @@
 package jp.kz2601.metamon.runtime
 
+import jp.kz2601.metamon.R
 import jp.kz2601.metamon.dsl.Action
 import jp.kz2601.metamon.dsl.ActionType
 import jp.kz2601.metamon.dsl.AppDSL
@@ -36,7 +37,7 @@ class ConfirmFlowTest {
         rt.run(Action(type = ActionType.NAVIGATE, screen = "done", confirmMessage = "移りますか?"), ActionContext(listRoute))
         val confirm = rt.state.value.confirm
         assertNotNull(confirm)
-        assertEquals("開く", confirm!!.primaryLabel)
+        assertEquals(R.string.runtime_confirm_open, confirm!!.primaryLabel)
         assertFalse(confirm.isDestructive)
         assertTrue("確認の前は進まない", rt.navigation.value.path(Route.MAIN).isEmpty())
 

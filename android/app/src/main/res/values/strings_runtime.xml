@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- AppRuntime のトースト・確認の主ボタン(#1062・#1160)。文言は iOS(Localizable.xcstrings)に合わせる -->
+<resources>
+    <string name="runtime_admins_only">管理者だけができる操作です</string>
+    <string name="runtime_admins_only_field">「%1$s」は管理者だけが変更できます</string>
+    <string name="runtime_app_stopped">このアプリの自動の動きは運営が止めています。この変更は保存できませんでした</string>
+    <string name="runtime_apps_failed">変身一覧を読み込めませんでした</string>
+    <string name="runtime_apps_offline">オフラインです。保存済みの変身一覧を表示しています</string>
+    <string name="runtime_author_name">表示名</string>
+    <string name="runtime_confirm_continue">続ける</string>
+    <string name="runtime_confirm_delete">削除</string>
+    <string name="runtime_confirm_export">書き出す</string>
+    <string name="runtime_confirm_open">開く</string>
+    <string name="runtime_confirm_reset">入力を消す</string>
+    <string name="runtime_confirm_save">保存</string>
+    <string name="runtime_conflict">他の端末で変更されていたため、サーバーの内容に合わせました</string>
+    <string name="runtime_duplicate">同じ内容の記録がもうあります</string>
+    <string name="runtime_duplicate_fields">「%1$s」が同じ記録がもうあります</string>
+    <string name="runtime_failed">うまくいきませんでした</string>
+    <string name="runtime_hot_reloaded">最新の内容に更新しました</string>
+    <string name="runtime_missing_required">%1$s を入力してください</string>
+    <string name="runtime_no_form">保存するフォームがありません</string>
+    <string name="runtime_not_member">この共有に参加していません。招待リンクから参加してください</string>
+    <string name="runtime_notification_failed">通知を予約できませんでした</string>
+    <string name="runtime_notification_scheduled">通知を予約しました(%1$s)</string>
+    <string name="runtime_offline_restored">オフラインです。最後に保存したアプリを表示しています</string>
+    <string name="runtime_one_per_person">1 人 1 件までです。もう登録しています</string>
+    <string name="runtime_open_url_rejected">openUrl: url は https か line/slack/discord/tel/mailto/maps のみ</string>
+    <string name="runtime_paused">送信に失敗しました(未送信 %1$d 件)。接続を確認してください</string>
+    <string name="runtime_read_only">このデータは作った人だけが変更できます</string>
+    <string name="runtime_rejected_field">保存できませんでした。「%1$s」の入力を確認してください</string>
+    <string name="runtime_rejected_generic">保存できませんでした。入力を確認して、もう一度お試しください</string>
+    <string name="runtime_save_failed">保存できませんでした。通信を確かめてもう一度お試しください</string>
+    <string name="runtime_save_parent_first">先に保存してください</string>
+    <string name="runtime_save_parent_first_named">先に「%1$s」を保存してください</string>
+    <string name="runtime_switch_failed">アプリを読み込めませんでした。接続を確認してください</string>
+    <string name="runtime_switched">「%1$s」に変身しました</string>
+    <string name="runtime_switched_offline">「%1$s」に変身しました(オフライン・キャッシュ)</string>
+    <string name="runtime_text_not_allowed">表示できない言葉が含まれています</string>
+    <string name="runtime_text_not_allowed_field">「%1$s」に表示できない言葉が含まれています</string>
+    <string name="runtime_unavailable_on_android">この機能は Android ではまだ使えません</string>
+    <string name="runtime_unknown_action">未対応のアクション: %1$s</string>
+</resources>

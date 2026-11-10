@@ -1,5 +1,6 @@
 package jp.kz2601.metamon.runtime
 
+import androidx.annotation.StringRes
 import jp.kz2601.metamon.dsl.Action
 import jp.kz2601.metamon.dsl.ActionType
 import jp.kz2601.metamon.dsl.AppDSL
@@ -67,7 +68,7 @@ import jp.kz2601.metamon.services.Record as StoredRecord
 /** 確認ダイアログ(confirmMessage 付きのアクション)。主ボタンで [perform]。 */
 class Confirm(
     val message: String,
-    val primaryLabel: String,
+    @StringRes val primaryLabel: Int,
     val isDestructive: Boolean,
     internal val perform: suspend () -> Unit,
 )
@@ -78,7 +79,7 @@ data class RuntimeState(
     val records: Map<String, List<Record>> = emptyMap(),
     val loading: Set<String> = emptySet(),
     val failed: Set<String> = emptySet(),
-    val toast: String? = null,
+    val toast: UiText? = null,
     val confirm: Confirm? = null,
     val showVoiceSheet: Boolean = false,
     /** 「削除しました・元に戻す」(M11) */
@@ -140,7 +141,7 @@ class AppRuntime(
 
     val document: AppDocument get() = _state.value.document
     val dsl: AppDSL get() = document.dsl
-    val toast: String? get() = _state.value.toast
+    val toast: UiText? get() = _state.value.toast
 
     private var entityCache: Pair<AppDSL, Map<String, Entity>>? = null
     private val savingForms = mutableSetOf<FormDraft>()
@@ -608,7 +609,7 @@ class AppRuntime(
 
     fun dismissVoiceSheet() = _state.update { it.copy(showVoiceSheet = false) }
 
-    fun showToast(message: String) = _state.update { it.copy(toast = message) }
+    fun showToast(message: UiText) = _state.update { it.copy(toast = message) }
 
     suspend fun confirmAccepted() {
         val confirm = _state.value.confirm ?: return
@@ -723,7 +724,7 @@ class AppRuntime(
         override fun entity(id: String): Entity? = entityModel(id)
         override fun records(entity: String): List<Record> = this@AppRuntime.records(entity)
         override suspend fun reload(entities: Set<String>) = load(entities, force = true)
-        override fun toast(message: String) = showToast(message)
+        override fun toast(message: UiText) = showToast(message)
         override fun blockedChanged() = publishRecords()
     })
 
@@ -920,7 +921,7 @@ class AppRuntime(
     }
 
     /** prefillRef の親が未保存。 */
-    fun unsavedParentToast(ctx: ActionContext): String = RuntimeCopy.saveParentFirst(ctx.form?.entity?.name.orEmpty())
+    fun unsavedParentToast(ctx: ActionContext): UiText = RuntimeCopy.saveParentFirst(ctx.form?.entity?.name.orEmpty())
 
     private suspend fun attempt(type: ActionType, body: suspend () -> Unit) {
         try {
@@ -937,19 +938,19 @@ class AppRuntime(
     // 書き込みの拒否
 
     /** 同期で保存が弾かれた時。項目が分かれば DSL の名前で出す(英語の field id・サーバーの文は出さない)。 */
-    fun rejectedToast(entity: String, field: String?, message: String): String {
+    fun rejectedToast(entity: String, field: String?, message: String): UiText {
         field ?: return RuntimeCopy.REJECTED_GENERIC
         return RuntimeCopy.rejected(entityModel(entity)?.fields?.firstOrNull { it.id == field }?.name ?: field)
     }
 
-    fun textNotAllowedToast(entity: String?, field: String?): String {
+    fun textNotAllowedToast(entity: String?, field: String?): UiText {
         field ?: return RuntimeCopy.TEXT_NOT_ALLOWED
-        if (field == "authorName") return RuntimeCopy.textNotAllowed("表示名")
+        if (field == "authorName") return RuntimeCopy.textNotAllowed(RuntimeCopy.AUTHOR_NAME)
         val name = entity?.let { entityModel(it) }?.fields?.firstOrNull { it.id == field }?.name ?: return RuntimeCopy.TEXT_NOT_ALLOWED
         return RuntimeCopy.textNotAllowed(name)
     }
 
-    fun denialMessage(denial: RecordWriteDenial, entity: String): String {
+    fun denialMessage(denial: RecordWriteDenial, entity: String): UiText {
         val ent = entityModel(entity)
         fun name(id: String) = ent?.fields?.firstOrNull { it.id == id }?.name
         return when (denial) {
@@ -963,7 +964,7 @@ class AppRuntime(
     }
 
     /** 人に出す 1 文。OS・サーバーの文は出さない。 */
-    fun message(error: Throwable, entity: String?): String {
+    fun message(error: Throwable, entity: String?): UiText {
         RecordWriteDenial.from(error)?.let { d -> entity?.let { return denialMessage(d, it) } }
         return RuntimeCopy.FAILED
     }

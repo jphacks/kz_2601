@@ -1,5 +1,6 @@
 package jp.kz2601.metamon.runtime
 
+import jp.kz2601.metamon.R
 import jp.kz2601.metamon.dsl.Action
 import jp.kz2601.metamon.dsl.ActionType
 import jp.kz2601.metamon.dsl.AppDSL
@@ -56,7 +57,7 @@ class ActionDispatchTest {
     fun unknownActionShowsToast() = runTest {
         val rt = rt()
         rt.run(Action(type = ActionType.UNKNOWN), ActionContext(listRoute))
-        assertTrue(rt.toast!!.startsWith("未対応のアクション: "))
+        assertEquals(R.string.runtime_unknown_action, (rt.toast as UiText.Res).id)
     }
 
     @Test
@@ -86,7 +87,7 @@ class ActionDispatchTest {
     fun saveWithoutFormShowsToast() = runTest {
         val rt = rt()
         rt.run(Action(type = ActionType.SAVE_RECORD, entity = "memo"), ActionContext(listRoute))
-        assertEquals("保存するフォームがありません", rt.toast)
+        assertEquals(RuntimeCopy.NO_FORM, rt.toast)
     }
 
     @Test
@@ -98,7 +99,7 @@ class ActionDispatchTest {
         rt.run(Action(type = ActionType.DELETE_RECORD, entity = "memo", confirmMessage = "消しますか?"), ActionContext(listRoute, recordId = id))
         val confirm = rt.state.value.confirm
         assertNotNull(confirm)
-        assertEquals("削除", confirm!!.primaryLabel)
+        assertEquals(R.string.runtime_confirm_delete, confirm!!.primaryLabel)
         assertTrue(confirm.isDestructive)
         assertEquals("確認の前は消さない", 1, rt.records("memo").size)
 
@@ -151,7 +152,7 @@ class ActionDispatchTest {
         for (a in actions) {
             val rt = rt()
             rt.run(a, ActionContext(listRoute))
-            assertEquals(a.type.wire, "この機能は Android ではまだ使えません", rt.toast)
+            assertEquals(a.type.wire, RuntimeCopy.UNAVAILABLE_ON_ANDROID, rt.toast)
         }
     }
 
@@ -162,9 +163,9 @@ class ActionDispatchTest {
         }
         val rt = rt(host)
         rt.run(Action(type = ActionType.SCHEDULE_NOTIFICATION, notification = Notification(id = "ok", title = "t", body = "b")), ActionContext(listRoute))
-        assertEquals("通知を予約しました(明日 9:00)", rt.toast)
+        assertEquals(RuntimeCopy.notificationScheduled("明日 9:00"), rt.toast)
         rt.run(Action(type = ActionType.SCHEDULE_NOTIFICATION, notification = Notification(id = "ng", title = "t", body = "b")), ActionContext(listRoute))
-        assertEquals("通知を予約できませんでした", rt.toast)
+        assertEquals(RuntimeCopy.NOTIFICATION_FAILED, rt.toast)
     }
 
     @Test
@@ -179,7 +180,7 @@ class ActionDispatchTest {
 
         assertNull("「保存しました」を取り消す", draft.lastSaveResult)
         assertTrue(draft.hasUnsavedChanges)
-        assertEquals("保存できませんでした。「本文」の入力を確認してください", rt.toast)
+        assertEquals(RuntimeCopy.rejected("本文"), rt.toast)
     }
 
     @Test

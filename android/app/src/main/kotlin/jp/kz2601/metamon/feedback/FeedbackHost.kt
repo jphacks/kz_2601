@@ -55,6 +55,8 @@ import jp.kz2601.metamon.R
 import jp.kz2601.metamon.runtime.AppRuntime
 import jp.kz2601.metamon.runtime.Confirm
 import jp.kz2601.metamon.runtime.RuntimeState
+import jp.kz2601.metamon.runtime.UiText
+import jp.kz2601.metamon.runtime.resolve
 import jp.kz2601.metamon.ui.CraneMascot
 import jp.kz2601.metamon.ui.CranePose
 import jp.kz2601.metamon.voice.ErrorCard
@@ -80,7 +82,7 @@ fun BoxScope.FeedbackHost(vm: VoiceViewModel, state: VoiceUiState, runtime: AppR
     // undo / redo の結果は 1 つのトーストの枠に流す
     LaunchedEffect(state.notice) {
         val notice = state.notice ?: return@LaunchedEffect
-        runtime.showToast(context.getString(notice.text))
+        runtime.showToast(UiText.Res(notice.text))
         vm.dismissNotice()
     }
 
@@ -229,7 +231,7 @@ private fun CapsuleButton(label: String, enabled: Boolean, onClick: () -> Unit) 
 
 /** 下部のトースト(iOS の ToastHost)。3 秒で消え、下に払っても閉じる。読み上げ中は長めに出す。 */
 @Composable
-private fun RuntimeToast(runtime: AppRuntime, message: String?) {
+private fun RuntimeToast(runtime: AppRuntime, message: UiText?) {
     val a11y = LocalAccessibilityManager.current
     if (message != null) {
         LaunchedEffect(message) {
@@ -240,7 +242,7 @@ private fun RuntimeToast(runtime: AppRuntime, message: String?) {
     AnimatedVisibility(visible = message != null, enter = slideInVertically { it } + fadeIn(), exit = slideOutVertically { it } + fadeOut()) {
         val close = stringResource(R.string.feedback_close)
         ToastCapsule(onDismiss = runtime::dismissToast, dismissLabel = close) {
-            Text(message.orEmpty(), style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.Medium, textAlign = TextAlign.Center)
+            Text(message?.resolve().orEmpty(), style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.Medium, textAlign = TextAlign.Center)
         }
     }
 }
@@ -321,7 +323,7 @@ private fun ConfirmDialog(confirm: Confirm, runtime: AppRuntime) {
         confirmButton = {
             TextButton(onClick = { scope.launch { runtime.confirmAccepted() } }) {
                 Text(
-                    confirm.primaryLabel,
+                    stringResource(confirm.primaryLabel),
                     color = if (confirm.isDestructive) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary,
                     fontWeight = FontWeight.SemiBold,
                 )

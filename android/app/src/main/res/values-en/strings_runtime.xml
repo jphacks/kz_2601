@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- AppRuntime のトースト・確認の主ボタン(#1062・#1160)。文言は iOS(Localizable.xcstrings)に合わせる -->
+<resources>
+    <string name="runtime_admins_only">Only admins can do this</string>
+    <string name="runtime_admins_only_field">Only admins can change “%1$s”</string>
+    <string name="runtime_app_stopped">The operators have stopped this app\'s automations. This change wasn\'t saved</string>
+    <string name="runtime_apps_failed">Couldn\'t load your apps</string>
+    <string name="runtime_apps_offline">You\'re offline. Showing your saved apps</string>
+    <string name="runtime_author_name">Display name</string>
+    <string name="runtime_confirm_continue">Continue</string>
+    <string name="runtime_confirm_delete">Delete</string>
+    <string name="runtime_confirm_export">Export</string>
+    <string name="runtime_confirm_open">Open</string>
+    <string name="runtime_confirm_reset">Clear</string>
+    <string name="runtime_confirm_save">Save</string>
+    <string name="runtime_conflict">It was changed on another device, so we synced to the server version</string>
+    <string name="runtime_duplicate">A record with the same details already exists</string>
+    <string name="runtime_duplicate_fields">A record with the same “%1$s” already exists</string>
+    <string name="runtime_failed">Something went wrong</string>
+    <string name="runtime_hot_reloaded">Updated to the latest version</string>
+    <string name="runtime_missing_required">Please fill in %1$s</string>
+    <string name="runtime_no_form">There\'s no form to save</string>
+    <string name="runtime_not_member">You haven\'t joined this share. Join from an invite link.</string>
+    <string name="runtime_notification_failed">Couldn\'t schedule the notification</string>
+    <string name="runtime_notification_scheduled">Reminder scheduled (%1$s)</string>
+    <string name="runtime_offline_restored">You\'re offline. Showing the last saved app</string>
+    <string name="runtime_one_per_person">One per person. You\'ve already added one</string>
+    <string name="runtime_open_url_rejected">openUrl: url must be https or line/slack/discord/tel/mailto/maps</string>
+    <string name="runtime_paused">Couldn\'t send (%1$d unsent). Check your connection</string>
+    <string name="runtime_read_only">Only the person who created this can change it</string>
+    <string name="runtime_rejected_field">Couldn\'t save. Check the “%1$s” field</string>
+    <string name="runtime_rejected_generic">Couldn\'t save. Check your entries and try again</string>
+    <string name="runtime_save_failed">Couldn\'t save. Check your connection and try again</string>
+    <string name="runtime_save_parent_first">Save this first</string>
+    <string name="runtime_save_parent_first_named">Save “%1$s” first</string>
+    <string name="runtime_switch_failed">Couldn\'t load the app. Check your connection</string>
+    <string name="runtime_switched">Switched to “%1$s”</string>
+    <string name="runtime_switched_offline">Switched to “%1$s” (offline, cached)</string>
+    <string name="runtime_text_not_allowed">This contains words that can\'t be shown</string>
+    <string name="runtime_text_not_allowed_field">“%1$s” contains words that can\'t be shown</string>
+    <string name="runtime_unavailable_on_android">This feature isn\'t available on Android yet</string>
+    <string name="runtime_unknown_action">Unsupported action: %1$s</string>
+</resources>

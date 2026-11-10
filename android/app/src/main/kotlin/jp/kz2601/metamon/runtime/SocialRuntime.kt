@@ -1,5 +1,6 @@
 package jp.kz2601.metamon.runtime
 
+import jp.kz2601.metamon.R
 import jp.kz2601.metamon.dsl.records.Entity
 import jp.kz2601.metamon.dsl.records.InterestState
 import jp.kz2601.metamon.dsl.records.MatchBox
@@ -57,7 +58,7 @@ class SocialRuntime(
 
         suspend fun reload(entities: Set<String>)
 
-        fun toast(message: String)
+        fun toast(message: UiText)
 
         /** ブロック中の人が変わった(描画に渡す記録を作り直す)。 */
         fun blockedChanged()
@@ -396,7 +397,7 @@ class SocialRuntime(
         }
 
         /** 仲間探しの失敗の一言(iOS の `matchingErrorText`)。 */
-        fun errorText(error: Throwable): String {
+        fun errorText(error: Throwable): UiText {
             val api = error as? ApiError
             if (api?.reason == MatchingReason.BLOCKED) return SocialCopy.UNBLOCK_TO_SEND
             if (api?.field == "fromRecordId") return SocialCopy.PROFILE_NOT_SENT
@@ -415,18 +416,18 @@ class SocialRuntime(
     }
 }
 
-/** 仲間探し・ブロックのトースト(iOS の L10n キーと同じ日本語。AppRuntime の他のトーストと同じく日本語だけ)。 */
+/** 仲間探し・ブロックのトースト(iOS の L10n キーと同じ)。文は strings_matching.xml。 */
 object SocialCopy {
-    const val PROFILE_FIRST = "先に自分のプロフィールを書いてください"
-    const val UNMATCHED = "つながりを解除しました"
-    const val UNDER_18 = "18 歳未満の方は「つながりたい」を使えません"
-    const val CONNECTED = "つながりました。連絡先が見られます"
-    const val UNBLOCK_TO_SEND = "ブロックを解除してから送れます"
-    const val PROFILE_NOT_SENT = "プロフィールの送信が終わってから送れます"
-    const val OFFLINE = "オフラインのあいだは送れません"
-    const val TRY_AGAIN = "うまくいきませんでした。もう一度お試しください"
-    const val DAILY_LIMIT = "今日はこれ以上送れません。明日またお試しください"
-    const val MATCHING_UNAVAILABLE = "このアプリでは今は仲間探しを使えません"
-    const val NOT_FOUND = "相手が見つかりませんでした。一覧を更新してください"
-    const val UNBLOCK_FAILED = "解除できませんでした"
+    val PROFILE_FIRST = UiText.Res(R.string.matching_profile_first)
+    val UNMATCHED = UiText.Res(R.string.matching_unmatched)
+    val UNDER_18 = UiText.Res(R.string.matching_under_18)
+    val CONNECTED = UiText.Res(R.string.matching_connected)
+    val UNBLOCK_TO_SEND = UiText.Res(R.string.matching_unblock_to_send)
+    val PROFILE_NOT_SENT = UiText.Res(R.string.matching_profile_not_sent)
+    val OFFLINE = UiText.Res(R.string.matching_offline)
+    val TRY_AGAIN = UiText.Res(R.string.matching_try_again)
+    val DAILY_LIMIT = UiText.Res(R.string.matching_daily_limit)
+    val MATCHING_UNAVAILABLE = UiText.Res(R.string.matching_unavailable)
+    val NOT_FOUND = UiText.Res(R.string.matching_not_found)
+    val UNBLOCK_FAILED = UiText.Res(R.string.matching_unblock_failed)
 }
