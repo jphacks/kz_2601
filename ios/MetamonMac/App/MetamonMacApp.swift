@@ -8,6 +8,8 @@ import MetamonServices
 /// Firebase は #930、権限の説明は #931 で足す。
 @main
 struct MetamonMacApp: App {
+    /// ⌘Q の前に保存していない入力を確かめる(#943)
+    @NSApplicationDelegateAdaptor(MacAppDelegate.self) private var appDelegate
     private let apps = SampleAppCatalog.load()
     /// 声で頼む(#966)。マイクは 1 つなのでウインドウをまたいで 1 つだけ持つ
     @State private var voice = MacVoiceInput()
