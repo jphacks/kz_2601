@@ -23,7 +23,7 @@ struct PickerLeaf: View {
                         .accessibilityLabel(c.label ?? "")
                 }
             case "wheel":
-                picker.pickerStyle(.wheel).frame(height: 120)
+                picker.wheelPickerStyle().frame(height: 120)
             default:
                 // menu は List/Form の外ではラベルを描かないので、他の入力と同じく上にラベルを出す
                 LabeledInput(label: c.label) {

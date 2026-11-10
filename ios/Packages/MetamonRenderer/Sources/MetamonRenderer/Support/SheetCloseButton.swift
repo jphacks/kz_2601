@@ -38,7 +38,7 @@ public struct SheetCloseToolbarItem: ToolbarContent {
     }
 
     public var body: some ToolbarContent {
-        ToolbarItem(placement: .topBarTrailing) {
+        ToolbarItem(placement: .platformTrailing) {
             SheetCloseButton(identifier: identifier, action: action)
         }
     }

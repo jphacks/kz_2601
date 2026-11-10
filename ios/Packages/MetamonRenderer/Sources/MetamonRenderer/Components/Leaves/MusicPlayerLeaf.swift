@@ -345,7 +345,7 @@ struct MusicSearchSheet: View {
             .searchable(text: $term, prompt: L("曲名・アーティスト"))
             .onSubmit(of: .search) { Task { await runSearch() } }
             .navigationTitle(L("曲を探す"))
-            .navigationBarTitleDisplayMode(.inline)
+            .inlineNavigationTitle()
             .toolbar {
                 SheetCloseToolbarItem { dismiss() }
             }

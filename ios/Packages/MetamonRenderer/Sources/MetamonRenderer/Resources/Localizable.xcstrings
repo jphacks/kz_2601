@@ -1786,6 +1786,23 @@
         }
       }
     },
+    "この Mac では使えません" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Not available on this Mac"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "この Mac では使えません"
+          }
+        }
+      }
+    },
     "このセンサーはこの端末では使えません" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -2649,6 +2666,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "オンラインの AI で処理し、結果を入力欄に入れます"
+          }
+        }
+      }
+    },
+    "カメラ" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Camera"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "カメラ"
           }
         }
       }
@@ -7562,6 +7596,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "読み上げる内容がまだありません"
+          }
+        }
+      }
+    },
+    "読み取り結果を手入力" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Enter the scanned text"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "読み取り結果を手入力"
           }
         }
       }

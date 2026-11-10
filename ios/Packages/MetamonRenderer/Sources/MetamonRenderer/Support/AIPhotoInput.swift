@@ -1,4 +1,8 @@
+#if canImport(UIKit)
 import UIKit
+#else
+import AppKit
+#endif
 import MetamonDSL
 
 /// aiButton `inputPhoto`: フォームの写真 1 枚を縮めて `POST /v1/text` の `image` に付ける(オンライン AI だけ)。
@@ -50,7 +54,7 @@ enum AIPhotoInput {
     }
 
     /// 品質を下げ、それでも大きければ辺を縮めて、上限に収まる JPEG の base64 を返す。
-    static func jpegBase64(from image: UIImage, maxSide: CGFloat = CGFloat(AITextLimits.maxImageSide),
+    static func jpegBase64(from image: PlatformImage, maxSide: CGFloat = CGFloat(AITextLimits.maxImageSide),
                            maxBase64: Int = AITextLimits.maxImageBase64) -> String? {
         var side = maxSide
         while side >= 256 {
@@ -66,7 +70,7 @@ enum AIPhotoInput {
     }
 
     /// photo field の値(data URL / https)から画像を取り出す。https は写真の置き場(`allowedHosts`)だけ・10 MB まで読む。
-    static func image(from value: JSONValue) async throws -> UIImage {
+    static func image(from value: JSONValue) async throws -> PlatformImage {
         if let img = PhotoCodec.image(from: value) { return img }
         guard let s = value.stringValue, s.lowercased().hasPrefix("https://") else { throw PhotoError.unreadable }
         guard let url = URL(string: s), isAllowed(url) else { throw PhotoError.untrustedSource }
@@ -82,7 +86,7 @@ enum AIPhotoInput {
         } catch {
             throw PhotoError.unreadable
         }
-        guard let img = UIImage(data: data) else { throw PhotoError.unreadable }
+        guard let img = PlatformImage(data: data) else { throw PhotoError.unreadable }
         return img
     }
 

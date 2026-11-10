@@ -1,6 +1,10 @@
 import SwiftUI
 import PhotosUI
+#if canImport(UIKit)
 import UIKit
+#else
+import AppKit
+#endif
 import MetamonDSL
 
 /// `photoField`(P0 カメラ): source(camera|library|both)に応じて実機カメラ / 写真選択 / 二択ダイアログ。
@@ -97,7 +101,7 @@ struct PhotoFieldLeaf: View {
             Button(L("写真から選ぶ")) { showLibrary = true }
             Button(L("キャンセル"), role: .cancel) {}
         }
-        .fullScreenCover(isPresented: $showCamera) {
+        .platformFullScreenCover(isPresented: $showCamera) {
             CameraPicker { image in
                 if let encoded = PhotoCodec.dataURL(from: image) { setPhoto(encoded, form: form, field: field) }
             }
@@ -117,7 +121,7 @@ struct PhotoFieldLeaf: View {
         #if !APP_STORE_REVIEW
         .alert(L("カメラを使えません"), isPresented: $showDenied) {
             Button(L("設定を開く")) {
-                if let url = URL(string: UIApplication.openSettingsURLString) { openURL(url) }
+                if let url = PlatformSystem.appSettingsURL { openURL(url) }
             }
             Button(L("写真から選ぶ")) { showLibrary = true }
             Button(L("キャンセル"), role: .cancel) {}

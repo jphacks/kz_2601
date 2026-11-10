@@ -56,7 +56,11 @@ extension Color {
     /// "#RRGGBB"(不透明度は捨てる)。
     var hexString: String {
         var r: CGFloat = 0, g: CGFloat = 0, b: CGFloat = 0, a: CGFloat = 0
+        #if canImport(UIKit)
         UIColor(self).getRed(&r, green: &g, blue: &b, alpha: &a)
+        #else
+        (NSColor(self).usingColorSpace(.sRGB) ?? .black).getRed(&r, green: &g, blue: &b, alpha: &a)
+        #endif
         let to255 = { (v: CGFloat) in Int((Swift.max(0, Swift.min(1, v)) * 255).rounded()) }
         return String(format: "#%02X%02X%02X", to255(r), to255(g), to255(b))
     }

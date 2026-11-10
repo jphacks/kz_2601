@@ -22,13 +22,13 @@ public struct ScreenView: View {
                 .modifier(FormSaveBar(screen: screen, ctx: ctx)) // saveRecord は画面下の固定バーへ(#89)
                 .modifier(PublicFormNotice(screen: screen)) // #253 公開の entity のフォームに「誰でも見られます」
                 .navigationTitle(screen.title)
-                .navigationBarTitleDisplayMode(.inline)
+                .inlineNavigationTitle()
                 .toolbar {
                     // フォーム画面はホストの FAB を隠す代わりに、ナビバー右上(DSL のボタンより左)に小さな入口を置く(#83)
                     if screen.entity != nil, let accessory = formToolbarAccessory {
-                        ToolbarItem(placement: .topBarTrailing) { accessory }
+                        ToolbarItem(placement: .platformTrailing) { accessory }
                     }
-                    ToolbarItemGroup(placement: .topBarTrailing) {
+                    ToolbarItemGroup(placement: .platformTrailing) {
                         // 同じフォームを開く button がある画面では右上の＋を出さない(#416)
                         ForEach(DuplicateAddControl.toolbar(of: screen, in: rt.dsl).filter { tb in !FormSaveBar.pinned(in: screen).contains { $0.id == tb.id } && ButtonLeaf.isVisible(action: tb.action, form: form) }) { tb in
                             Button {
@@ -50,7 +50,7 @@ public struct ScreenView: View {
                     }
                     // M10: 積まれたフォームに入力があれば、標準の戻るの代わりに確認付きの戻るを出す
                     if guardsBack {
-                        ToolbarItem(placement: .topBarLeading) {
+                        ToolbarItem(placement: .platformLeading) {
                             Button { confirmDiscard = true } label: {
                                 Image(systemName: "chevron.backward").fontWeight(.semibold)
                             }

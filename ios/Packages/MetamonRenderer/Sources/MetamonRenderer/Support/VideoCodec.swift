@@ -1,5 +1,9 @@
 import AVFoundation
+#if canImport(UIKit)
 import UIKit
+#else
+import AppKit
+#endif
 import MetamonDSL
 
 /// 撮影・選択した動画を端末内に保存し、video field の値(`VideoValue`)を作る(#206)。
@@ -29,7 +33,7 @@ public enum VideoCodec {
         gen.appliesPreferredTrackTransform = true
         gen.maximumSize = CGSize(width: thumbnailMaxSide, height: thumbnailMaxSide)
         guard let cg = try? await gen.image(at: .zero).image else { return nil }
-        return PhotoCodec.dataURL(from: UIImage(cgImage: cg), maxSide: thumbnailMaxSide, quality: 0.5)
+        return PhotoCodec.dataURL(from: PlatformImage(cgImage: cg), maxSide: thumbnailMaxSide, quality: 0.5)
     }
 
     private static func export(_ asset: AVAsset, to dest: URL, limit: Double) async throws {

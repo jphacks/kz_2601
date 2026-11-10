@@ -1,5 +1,9 @@
 import Foundation
+#if canImport(UIKit)
 import UIKit
+#else
+import AppKit
+#endif
 import MetamonDSL
 
 /// 入力欄の文字を「送る」時の共通処理(#627)。
@@ -49,25 +53,42 @@ extension KeyboardState {
     /// 今フォーカスのある入力欄で変換中の文字を確定させ、その全文を返す(入力欄が無ければ nil)。
     /// バインディングは確定より遅れて更新されるので、送る文字は入力欄から直接読む。
     public static func takeFocusedText() -> String? {
+        #if os(macOS)
+        guard let text = focusedTextView() else { return nil }
+        text.unmarkText()
+        return text.string
+        #else
         guard let input = focusedTextInput() else { return nil }
         input.unmarkText()
         guard let range = input.textRange(from: input.beginningOfDocument, to: input.endOfDocument) else { return nil }
         return input.text(in: range)
+        #endif
     }
 
     /// 今フォーカスのある入力欄を空にする。編集として入れるので、キーボードの予測・変換の文脈も空になる。
     public static func clearFocusedText() {
+        #if os(macOS)
+        guard let text = focusedTextView(), !text.string.isEmpty else { return }
+        text.unmarkText()
+        text.selectAll(nil)
+        text.insertText("", replacementRange: NSRange(location: 0, length: (text.string as NSString).length))
+        #else
         guard let input = focusedTextInput() else { return }
         input.unmarkText()
         guard let range = input.textRange(from: input.beginningOfDocument, to: input.endOfDocument),
               !range.isEmpty else { return }
         input.replace(range, withText: "")
+        #endif
     }
 
     /// フォームを読む前: 変換中の文字を確定させてキーボードを閉じ、確定した文字がバインディングに届くのを 1 ループ待つ。
     /// キーボードを閉じると入力の途中(変換・音声入力)が終わるので、保存やリセットの後に書き戻されない。
     public static func finishEditing() async {
+        #if os(macOS)
+        guard focusedTextView() != nil else { return }
+        #else
         guard focusedTextInput() != nil else { return }
+        #endif
         commitMarkedText()
         dismiss()
         await withCheckedContinuation { (c: CheckedContinuation<Void, Never>) in
@@ -75,6 +96,12 @@ extension KeyboardState {
         }
     }
 
+    #if os(macOS)
+    /// 今フォーカスのある入力欄(TextField はキーウィンドウのフィールドエディタ・TextEditor は NSTextView そのもの)。
+    static func focusedTextView() -> NSTextView? {
+        NSApp?.keyWindow?.firstResponder as? NSTextView
+    }
+    #else
     private static func focusedTextInput() -> (UIView & UITextInput)? {
         let windows = UIApplication.shared.connectedScenes.compactMap { ($0 as? UIWindowScene)?.keyWindow }
         for window in windows {
@@ -93,4 +120,5 @@ extension KeyboardState {
         }
         return nil
     }
+    #endif
 }
