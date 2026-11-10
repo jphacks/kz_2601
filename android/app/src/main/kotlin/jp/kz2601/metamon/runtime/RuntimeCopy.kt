@@ -23,6 +23,8 @@ object RuntimeCopy {
     const val UNDO = "元に戻す"
     const val UNAVAILABLE_ON_ANDROID = "この機能は Android ではまだ使えません"
     const val NAME_SEPARATOR = "・"
+    const val HOT_RELOADED = "最新の内容に更新しました"
+    const val OFFLINE_RESTORED = "オフラインです。最後に保存したアプリを表示しています"
 
     fun missingRequired(names: List<String>) = "${names.joinToString(NAME_SEPARATOR)} を入力してください"
 

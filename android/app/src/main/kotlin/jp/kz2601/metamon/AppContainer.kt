@@ -23,8 +23,13 @@ import jp.kz2601.metamon.services.live.FirebaseBootstrap
 import jp.kz2601.metamon.services.live.HttpAIClient
 import jp.kz2601.metamon.services.live.HttpAppConfigClient
 import jp.kz2601.metamon.services.local.AndroidConnectivity
+import jp.kz2601.metamon.services.local.DocumentCache
 import jp.kz2601.metamon.services.local.RecordSyncEngine
 import jp.kz2601.metamon.services.mock.MockAuthService
+import jp.kz2601.metamon.services.sync.HotReload
+import jp.kz2601.metamon.services.sync.RealtimeDocumentSync
+import jp.kz2601.metamon.services.sync.SseChangeEventSource
+import jp.kz2601.metamon.services.sync.asDocumentFetcher
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -39,6 +44,10 @@ class AppContainer(
     val ai: AIClient,
     /** 記録のローカル DB と送信待ちの列(#882)。[MetamonApplication] が start する */
     val recordSync: RecordSyncEngine,
+    /** 最後に取得した DSL(オフライン起動・#883)。appconfig が取得のたびに入れる */
+    val documentCache: DocumentCache,
+    /** 他端末・共有の相手の変更(SSE + ポーリングの予備・#883) */
+    val hotReload: HotReload,
     private val host: RuntimeHost,
 ) {
     companion object {
@@ -62,7 +71,10 @@ class AppContainer(
             fun http(baseUrl: String) = MetamonHttp(baseUrl, tokens, clientInfo, appCheck = null, client = client, device = device)
             val log: (String) -> Unit = { Log.w("Metamon", it) }
 
-            val appConfig = HttpAppConfigClient(http(environment.appConfigBaseUrl))
+            val documentCache = DocumentCache(File(context.filesDir, "metamon-dsl"))
+            val appConfigHttp = http(environment.appConfigBaseUrl)
+            val appConfig = HttpAppConfigClient(appConfigHttp, cache = documentCache)
+            val sync = RealtimeDocumentSync(appConfig.asDocumentFetcher(), SseChangeEventSource(appConfigHttp), log = log)
 
             return AppContainer(
                 environment = environment,
@@ -76,6 +88,8 @@ class AppContainer(
                     directory = File(context.filesDir, "metamon-records"),
                     scope = CoroutineScope(SupervisorJob() + Dispatchers.Default),
                 ),
+                documentCache = documentCache,
+                hotReload = HotReload(sync, CoroutineScope(SupervisorJob() + Dispatchers.Default)),
                 host = AndroidRuntimeHost(context.applicationContext),
             )
         }
@@ -97,7 +111,10 @@ class AppContainer(
             scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate),
             host = host,
             currentUserId = { auth.currentUser.value?.uid },
-            restore = null, // サーバーの最新 DSL は appId の採番(#360)が入ってから
+            // appId の採番(#360)前は "local" のままなので、AppRuntime がサーバーに取りに行かない
+            restore = { appId -> appConfig.fetchDocument(appId).document },
+            hotReloader = hotReload,
+            cachedDocument = { appId -> documentCache.load(appId)?.document },
         )
     }
 }

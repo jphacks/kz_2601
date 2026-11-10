@@ -24,12 +24,17 @@ import jp.kz2601.metamon.services.http.RecordWriteDenial
 import jp.kz2601.metamon.services.local.DeletionTicket
 import jp.kz2601.metamon.services.local.RecordSyncEngine
 import jp.kz2601.metamon.services.local.SyncEvent
+import jp.kz2601.metamon.services.sync.HotReload
+import jp.kz2601.metamon.services.sync.RecordsChange
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
@@ -56,6 +61,8 @@ data class RuntimeState(
     val showVoiceSheet: Boolean = false,
     /** 「削除しました・元に戻す」(M11) */
     val recordUndo: DeletionTicket? = null,
+    /** 起動時にサーバーへ届かなかった(手元・保存済みの DSL を表示中)。つながって取り直せたら false */
+    val offline: Boolean = false,
 ) {
     val dsl: AppDSL get() = document.dsl
 }
@@ -66,7 +73,8 @@ data class RuntimeState(
  *
  * - 記録: [RecordSyncEngine](ローカル DB に即反映・送信は列)
  * - 遷移: [NavigationResolver]
- * - 起動: キャッシュ → サーバーから復元([restore])→ 同期の開始
+ * - 起動: サーバーから復元([restore])。届かなければ保存した DSL([cachedDocument])→ ホットリロードの開始
+ * - ホットリロード: [HotReload] の新しい DSL で描き直し、記録の変化で該当 entity を取り直す。前面・背面は [setForeground]
  */
 class AppRuntime(
     document: AppDocument,
@@ -81,6 +89,12 @@ class AppRuntime(
     private val restore: (suspend (appId: String) -> AppDocument)? = null,
     /** 削除を取り消せる時間(M11) */
     private val undoGraceMillis: Long = 5_000,
+    /** 他端末・共有の相手の変更(#883)。null ならホットリロードしない(モック・テスト) */
+    private val hotReloader: HotReload? = null,
+    /** 最後に取得した DSL(`DocumentCache`)。[restore] が届かない時の起動に使う(#883) */
+    private val cachedDocument: (suspend (appId: String) -> AppDocument?)? = null,
+    /** 記録の変化の知らせをまとめる間(連投で取り直しを重ねない) */
+    private val recordsRefreshDelayMillis: Long = 250,
 ) : DSLRuntime, NavigationHost {
     private val _state = MutableStateFlow(RuntimeState(document))
     val state: StateFlow<RuntimeState> = _state.asStateFlow()
@@ -98,6 +112,16 @@ class AppRuntime(
     private val savingLock = Mutex()
     private var eventsJob: Job? = null
 
+    // ホットリロード(#883)
+    private var hotReloadJobs: List<Job> = emptyList()
+    private var syncingAppId: String? = null
+    private var foreground = true
+
+    /** 入力中で差し替えを待たせている DSL(閉じたら当てる・最新の 1 件だけ)。 */
+    private var pendingHotReload: AppDocument? = null
+    private var pendingHotReloadJob: Job? = null
+    private val recordsRefreshJobs = mutableMapOf<String, Job>()
+
     /** 最後に保存したフォーム。サーバーが断ったら「保存しました」を取り消す */
     private var lastSavedForm: SavedForm? = null
 
@@ -109,24 +133,153 @@ class AppRuntime(
     suspend fun bootstrap() {
         recordSync.start()
         if (eventsJob == null) eventsJob = scope.launch { recordSync.events.collect { handle(it) } }
-        restore?.let { fetch ->
-            try {
-                val remote = fetch(document.appId)
-                if (remote.version > document.version || (remote.version == document.version && document.version == 0)) apply(remote)
+        if (isIssued(document.appId)) restoreFromServer()
+        startHotReload()
+        load(dsl.entities.map { it.id }.toSet())
+    }
+
+    /**
+     * サーバーの最新 DSL に合わせる(iOS の `restoreFromServer`)。進んでいれば差し替え、遅れていれば今の表示のまま。
+     * 届かなければ保存した DSL(手元と同じか新しい版)を出して「オフライン」を知らせる。
+     */
+    suspend fun restoreFromServer() {
+        val fetch = restore ?: return
+        try {
+            val remote = fetch(document.appId)
+            _state.update { it.copy(offline = false) }
+            if (remote.version > document.version || (remote.version == document.version && document.version == 0)) apply(remote)
+        } catch (e: CancellationException) {
+            throw e
+        } catch (_: Exception) {
+            val cached = try {
+                cachedDocument?.invoke(document.appId)
             } catch (e: CancellationException) {
                 throw e
             } catch (_: Exception) {
-                // 手元の DSL のまま(通信断はトーストしない。画面内の表示に任せる)
+                null
+            }
+            if (cached != null && cached.appId == document.appId && cached.version >= document.version) {
+                apply(cached)
+                _state.update { it.copy(offline = true, toast = RuntimeCopy.OFFLINE_RESTORED) }
+            } else {
+                // 手元の DSL のまま(状態カードは画面の Issue で出す。ここでは offline だけ立てる)
+                _state.update { it.copy(offline = true) }
             }
         }
-        load(dsl.entities.map { it.id }.toSet())
     }
 
     /** DSL を差し替える(別アプリ・生成の結果)。表示中の記録・遷移・モーダルは捨てる。 */
     fun apply(doc: AppDocument) {
-        _state.value = RuntimeState(doc)
+        val switched = doc.appId != document.appId
+        if (switched) dropPendingHotReload()
+        _state.value = RuntimeState(doc, offline = _state.value.offline)
         _navigation.value = NavigationState.initial(doc.dsl)
+        noteAppliedVersion(doc, switched)
     }
+
+    // ホットリロード(iOS の startSync / hotReload / setForeground)
+
+    /** 前面・背面(ProcessLifecycleOwner の onStart / onStop)。背面では購読を止め、戻ったら張り直して読み直す。 */
+    fun setForeground(active: Boolean) {
+        if (foreground == active) return
+        foreground = active
+        recordSync.setForeground(active)
+        if (!active) _state.update { it.copy(recordUndo = null) } // 背面では削除を送り切るので戻せない
+        hotReloader?.setForeground(active)
+    }
+
+    /** 他端末・ai 直叩きで進んだ DSL を当てる。操作中(シート・push 先・音声シート)なら閉じるまで待ち、最新の 1 件だけ当てる。 */
+    fun hotReload(doc: AppDocument) {
+        if (doc.appId != document.appId || doc.version <= document.version) return
+        if (isInteracting(_navigation.value, _state.value)) {
+            if (doc.version > (pendingHotReload?.version ?: 0)) pendingHotReload = doc
+            if (pendingHotReloadJob == null) {
+                pendingHotReloadJob = scope.launch {
+                    combine(_navigation, _state) { n, s -> isInteracting(n, s) }.first { !it }
+                    val pending = pendingHotReload
+                    pendingHotReload = null
+                    pendingHotReloadJob = null
+                    pending?.let(::hotReload)
+                }
+            }
+            return
+        }
+        // 記録・選択中のタブは残す(画面構成だけ描き直す)。新しい entity は読みに行く
+        val keep = doc.dsl.entities.map { it.id }.toSet()
+        val previous = _state.value
+        _state.value = RuntimeState(
+            document = doc,
+            records = previous.records.filterKeys { it in keep },
+            failed = previous.failed.intersect(keep),
+            offline = previous.offline,
+            toast = RuntimeCopy.HOT_RELOADED,
+        )
+        val tab = _navigation.value.selectedTab
+        val initial = NavigationState.initial(doc.dsl)
+        _navigation.value = if (doc.dsl.app.tabs.any { it.screen == tab }) initial.copy(selectedTab = tab) else initial
+        noteAppliedVersion(doc, switched = false)
+        scope.launch { load(keep) }
+    }
+
+    /** 記録の変化。表示中の entity だけ取り直す(未表示は画面が開いた時に読む)。 */
+    fun recordsChanged(change: RecordsChange) {
+        when (change) {
+            is RecordsChange.Entity -> scheduleRecordsRefresh(change.entity)
+            RecordsChange.All -> _state.value.records.keys.forEach(::scheduleRecordsRefresh)
+        }
+    }
+
+    private fun startHotReload() {
+        val hr = hotReloader ?: return
+        if (hotReloadJobs.isEmpty()) {
+            hotReloadJobs = listOf(
+                scope.launch { hr.documents.collect { hotReload(it.document) } },
+                scope.launch { hr.recordsChange.collect { recordsChanged(it) } },
+            )
+        }
+        val appId = document.appId
+        if (!isIssued(appId)) return
+        syncingAppId = appId
+        hr.start(appId, document.version)
+    }
+
+    /** 自分で当てた版を [HotReload] に知らせる。別アプリなら張り直す。 */
+    private fun noteAppliedVersion(doc: AppDocument, switched: Boolean) {
+        val hr = hotReloader ?: return
+        if (hotReloadJobs.isEmpty()) return // 起動前(bootstrap が張る)
+        when {
+            !isIssued(doc.appId) -> if (syncingAppId != null) {
+                syncingAppId = null
+                hr.stop()
+            }
+            switched || syncingAppId != doc.appId -> {
+                syncingAppId = doc.appId
+                hr.start(doc.appId, doc.version)
+            }
+            else -> hr.noteVersion(doc.version)
+        }
+    }
+
+    private fun scheduleRecordsRefresh(entity: String) {
+        if (_state.value.records[entity] == null) return
+        recordsRefreshJobs.remove(entity)?.cancel()
+        recordsRefreshJobs[entity] = scope.launch {
+            delay(recordsRefreshDelayMillis)
+            recordsRefreshJobs.remove(entity)
+            refresh(entity)
+        }
+    }
+
+    private fun dropPendingHotReload() {
+        pendingHotReload = null
+        pendingHotReloadJob?.cancel()
+        pendingHotReloadJob = null
+        recordsRefreshJobs.values.forEach { it.cancel() }
+        recordsRefreshJobs.clear()
+    }
+
+    private fun isInteracting(n: NavigationState, s: RuntimeState): Boolean =
+        n.sheet != null || n.fullScreen != null || s.showVoiceSheet || n.paths.values.any { it.isNotEmpty() }
 
     // DSLRuntime
 
@@ -504,6 +657,11 @@ class AppRuntime(
     }
 
     companion object {
+        /** appId の採番(#360)前の仮の appId。サーバーには取りに行かない */
+        const val LOCAL_APP_ID = "local"
+
+        fun isIssued(appId: String): Boolean = appId != LOCAL_APP_ID
+
         fun refusedWrite(event: SyncEvent): Triple<String, String, String?>? = when (event) {
             is SyncEvent.Forbidden -> Triple(event.appId, event.entity, event.recordId)
             is SyncEvent.Rejected -> Triple(event.appId, event.entity, event.recordId)
