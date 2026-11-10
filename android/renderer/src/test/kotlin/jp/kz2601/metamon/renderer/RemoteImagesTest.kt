@@ -52,6 +52,21 @@ class RemoteImagesTest {
         assertTrue(PhotoValue.hasPhoto("https://example.com/a.jpg"))
     }
 
+    @Test
+    fun recordPhotoValue() {
+        // 一覧の行の写真(item.image)は記録の値をそのまま読む。動画はサムネイル
+        val jpeg = "data:image/jpeg;base64,/9j/4AAQ"
+        assertEquals(jpeg, PhotoValue.of(JSONValue.Str(jpeg)))
+        assertEquals("https://example.com/a.jpg", PhotoValue.of(JSONValue.Str("https://example.com/a.jpg")))
+        assertEquals(jpeg, PhotoValue.of(JSONValue.Str("video:clip-1|$jpeg")))
+        assertNull(PhotoValue.of(JSONValue.Str("video:clip-1")))
+        assertNull(PhotoValue.of(JSONValue.Str("http://example.com/a.jpg")))
+        assertNull(PhotoValue.of(JSONValue.Str("")))
+        assertNull(PhotoValue.of(JSONValue.Num(1.0)))
+        assertNull(PhotoValue.of(JSONValue.Null))
+        assertNull(PhotoValue.of(null))
+    }
+
     private val entity = Entity(id = "profile", fields = listOf(Field("photo", type = FieldType.PHOTO), Field("name")))
 
     private fun ctx(vararg values: Pair<String, JSONValue>): RenderContext {

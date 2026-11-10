@@ -62,6 +62,16 @@ object PhotoValue {
 
     /** 写真があるか(iOS の PhotoView.hasPhoto)。 */
     fun hasPhoto(value: String?): Boolean = dataBytes(value) != null || isRemote(value)
+
+    /**
+     * 記録・下書きの値 → 描く写真(data URL / https)。video field の値はサムネイル(iOS の PhotoCodec)。
+     * 文字列でない・写真でない値は null。
+     */
+    fun of(value: JSONValue?): String? {
+        val raw = (value as? JSONValue.Str)?.value ?: return null
+        val photo = if (raw.startsWith(VideoValue.PREFIX)) VideoValue.parse(raw)?.thumbnail else raw
+        return photo?.takeIf { hasPhoto(it) }
+    }
 }
 
 /** avatar のイニシャル。「山田 太郎」→「山太」、英字 1 語は先頭 2 文字を大文字、日本語 1 語は 1 文字(iOS と同じ)。 */
@@ -89,9 +99,7 @@ private fun rememberPhoto(value: String?): ImageBitmap? = remember(value) {
  */
 internal fun photoFieldValue(c: Component, ctx: RenderContext?): String? {
     val field = c.field ?: return null
-    val raw = (ctx?.form?.values?.get(field) as? JSONValue.Str)?.value ?: return null
-    val value = if (raw.startsWith(VideoValue.PREFIX)) VideoValue.parse(raw)?.thumbnail else raw
-    return value?.takeIf { PhotoValue.hasPhoto(it) }
+    return PhotoValue.of(ctx?.form?.values?.get(field))
 }
 
 /** `avatar`: 円の画像。優先順: photo field → `image`(data URL / https)→ `name` のイニシャル → 人のアイコン。読み上げは name。 */

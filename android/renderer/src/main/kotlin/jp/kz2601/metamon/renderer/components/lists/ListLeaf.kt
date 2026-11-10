@@ -58,6 +58,8 @@ import jp.kz2601.metamon.dsl.records.Record
 import jp.kz2601.metamon.dsl.records.MatchBox
 import jp.kz2601.metamon.renderer.ActionContext
 import jp.kz2601.metamon.renderer.R
+import jp.kz2601.metamon.renderer.components.PhotoValue
+import jp.kz2601.metamon.renderer.components.PhotoView
 import jp.kz2601.metamon.renderer.components.social.InterestButton
 import jp.kz2601.metamon.renderer.components.social.MatchingHost
 import jp.kz2601.metamon.renderer.components.social.interestTitle
@@ -156,7 +158,8 @@ private fun separatorInset(item: ListItem?): androidx.compose.ui.unit.Dp {
 }
 
 /**
- * 一覧の 1 行(title / subtitle / trailing / icon)。iOS の `ListRow`。
+ * 一覧の 1 行(title / subtitle / trailing / image / icon)。iOS の `ListRow`。
+ * 先頭は 写真(`item.image`)> アイコン > カテゴリ色の点。
  * 読み上げは行 1 要素で「title, subtitle, trailing」。チェックの状態は stateDescription、チェック・削除は行の操作。
  */
 @OptIn(ExperimentalFoundationApi::class)
@@ -180,6 +183,7 @@ internal fun ListRow(
     onLongPress: (() -> Unit)? = null,
 ) {
     val texts = ListRows.texts(item, record, entity, data)
+    val imageField = item?.image
     val checked = toggleOn == true
     var menu by remember { mutableStateOf(false) }
     val trailingNumeric = item?.trailing?.let { entity?.field(it)?.type?.isNumeric } ?: false
@@ -220,6 +224,8 @@ internal fun ListRow(
         ) {
             if (toggleOn != null) CheckCircle(toggleOn, toggleEnabled, onToggle)
             when {
+                // 写真(#1224): 52dp 角丸のサムネ。読み上げは行 1 要素の文字だけ(iOS の ListRow と同じく装飾扱い)
+                imageField != null -> PhotoView(PhotoValue.of(record[imageField]), 52.dp, Modifier.size(52.dp))
                 item?.icon != null -> Box(
                     Modifier.size(36.dp).background(RenderTheme.colors.brandSoft, RoundedCornerShape(RenderTheme.Radius.inner)),
                     contentAlignment = Alignment.Center,
