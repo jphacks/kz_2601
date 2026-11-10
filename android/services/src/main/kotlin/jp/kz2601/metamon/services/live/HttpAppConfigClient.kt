@@ -16,6 +16,7 @@ import jp.kz2601.metamon.services.VersionSummary
 import jp.kz2601.metamon.services.http.ApiJson
 import jp.kz2601.metamon.services.http.HttpRequest
 import jp.kz2601.metamon.services.http.MetamonHttp
+import jp.kz2601.metamon.services.local.DocumentCache
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.decodeFromString
 import kotlinx.serialization.json.JsonArray
@@ -30,8 +31,13 @@ import java.io.IOException
  * - `GET /dsl` は `ETag: "<version>"`。`If-None-Match` で 304 なら変化なし
  * - DSL の書き込みは `If-Match: "<baseVersion>"` 必須(無いと 412・ずれると 409)
  * - 一覧は `pageSize` 200 × 最大 5 ページ
+ * - 取得した DSL の封筒は [DocumentCache] に入れる(#883)
  */
-class HttpAppConfigClient(private val http: MetamonHttp) : AppConfigClient {
+class HttpAppConfigClient(
+    private val http: MetamonHttp,
+    /** 取得・復元した DSL の封筒を入れる(オフライン起動の復元用・iOS と同じ)。null なら入れない */
+    private val cache: DocumentCache? = null,
+) : AppConfigClient {
 
     @Serializable
     private data class AppsPage(val items: List<AppSummary> = emptyList(), val nextPageToken: String? = null)
@@ -157,7 +163,11 @@ class HttpAppConfigClient(private val http: MetamonHttp) : AppConfigClient {
     private suspend fun send(method: String, path: List<String>, body: String? = null): String =
         http.send(HttpRequest(method, path, body = body))
 
-    private fun envelope(json: String) = FetchedDocument(AppDocument.decode(json), json)
+    private suspend fun envelope(json: String): FetchedDocument {
+        val doc = FetchedDocument(AppDocument.decode(json), json)
+        cache?.store(doc)
+        return doc
+    }
 
     private inline fun <reified T> decode(json: String): T = ApiJson.decodeFromString(json)
 
