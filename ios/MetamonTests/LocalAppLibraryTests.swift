@@ -1,0 +1,64 @@
+import XCTest
+import MetamonDSL
+import MetamonServices
+@testable import Metamon
+
+/// 端末だけに置く作ったアプリの一覧(#969・Mac)。一覧・DSL・今のアプリの保存と、生成の結果の封筒。
+final class LocalAppLibraryTests: XCTestCase {
+    private var dir: URL!
+    private var defaults: UserDefaults!
+    private var suite: String!
+
+    override func setUp() {
+        dir = FileManager.default.temporaryDirectory.appendingPathComponent("local-app-library-\(UUID().uuidString)")
+        suite = "LocalAppLibraryTests-\(UUID().uuidString)"
+        defaults = UserDefaults(suiteName: suite)
+    }
+
+    override func tearDown() {
+        try? FileManager.default.removeItem(at: dir)
+        defaults.removePersistentDomain(forName: suite)
+    }
+
+    private var library: LocalAppLibrary {
+        LocalAppLibrary(list: AppListCache(directory: dir), documents: DocumentCache(directory: dir), defaults: defaults)
+    }
+
+    func testMockMorphReturnsEnvelopeThatDecodesToTheSameApp() async throws {
+        let result = try await MockAIClient(delay: .zero).morph(transcript: "家計簿のアプリ", appId: "mac-1", currentVersion: 0)
+        let envelope = try XCTUnwrap(result.envelope)
+        let decoded = try AppDocument.decode(envelope)
+        XCTAssertEqual(decoded.appId, "mac-1")
+        XCTAssertEqual(decoded.version, result.document.version)
+        XCTAssertEqual(decoded.dsl.app.name, result.document.dsl.app.name)
+    }
+
+    func testSavedListReloadsInOrderWithRenamedName() async throws {
+        let a = try await MockAIClient(delay: .zero).morph(transcript: "家計簿のアプリ", appId: "a", currentVersion: 0)
+        let b = try await MockAIClient(delay: .zero).morph(transcript: "買い物リストのアプリ", appId: "b", currentVersion: 0)
+        let renamed = try XCTUnwrap(DocumentEnvelope.renamed(try XCTUnwrap(a.envelope), to: "仕事の家計簿"))
+        library.store(appId: "a", envelope: renamed)
+        library.store(appId: "b", envelope: try XCTUnwrap(b.envelope))
+        library.save(LocalAppLibrary.summaries([("b", b.document.dsl.app.name, 1), ("a", "仕事の家計簿", 1), ("gone", "消えた", 1)]))
+
+        let entries = library.load()
+        XCTAssertEqual(entries.map(\.summary.id), ["b", "a"]) // DSL の無い "gone" は外す
+        XCTAssertEqual(entries.map(\.summary.sortIndex), [1, 2])
+        XCTAssertEqual(entries[1].document.dsl.app.name, "仕事の家計簿")
+    }
+
+    func testCurrentAppIsKeptAndClearedOnRemove() {
+        library.currentAppId = "a"
+        XCTAssertEqual(library.currentAppId, "a")
+        XCTAssertEqual(LocalAppLibrary.reopen(library.currentAppId, among: ["b", "a"]), "a")
+        XCTAssertNil(LocalAppLibrary.reopen("x", among: ["b", "a"]))
+        library.remove(appId: "a")
+        XCTAssertNil(library.currentAppId)
+    }
+
+    func testNeighborAfterDelete() {
+        XCTAssertEqual(LocalAppLibrary.neighbor(deleting: "a", in: ["a", "b", "c"]), "b")
+        XCTAssertEqual(LocalAppLibrary.neighbor(deleting: "c", in: ["a", "b", "c"]), "b")
+        XCTAssertNil(LocalAppLibrary.neighbor(deleting: "a", in: ["a"]))
+    }
+}

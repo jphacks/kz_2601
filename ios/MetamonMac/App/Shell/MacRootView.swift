@@ -12,6 +12,7 @@ import MetamonDSL
 /// - 生成したアプリの版の「元に戻す / やり直す」(#968)→「アプリ」メニュー(⌥⌘Z / ⇧⌥⌘Z)・完成の画面・要約のお知らせ。
 ///   ⌘Z / ⇧⌘Z は入力欄と記録の削除の取り消し(編集メニュー)のまま
 /// キーボード(#934): ⌘1 / ⌘2 でサイドバーと中央を行き来・一覧は ↑↓ で選び Return で中央へ・⌥⌘↑↓ で前 / 次のアプリ。
+/// 一覧(#969): 「作ったアプリ」(端末に残す・名前の変更 / 削除 / 並べ替え)と「同梱の例」に分ける。起動時は前に開いていたアプリを開き直す。
 struct MacRootView: View {
     enum Pane: Hashable { case sidebar, canvas }
 
@@ -21,8 +22,8 @@ struct MacRootView: View {
     @SceneStorage("selectedAppId") private var selectedAppId: String?
     @State private var columnVisibility = NavigationSplitViewVisibility.all
     @FocusState private var focus: Pane?
-    /// 会話で作った・直したアプリの DSL と版の履歴(#967・#968)
-    @State private var library = MacAppLibrary()
+    /// 会話で作った・直したアプリの DSL と版の履歴(#967・#968)・作ったアプリの一覧(#969)
+    @Environment(MacAppLibrary.self) private var library
     /// 完成の後のお知らせ(#968)
     @State private var notices = MacPostBuildNotices()
     @State private var compose: MacComposeSession?
@@ -34,11 +35,18 @@ struct MacRootView: View {
 
     init(apps: [SampleApp]) { bundledApps = apps }
 
-    /// 一覧に出すアプリ: 作ったアプリ(新しい順)+ 同梱の例(直したものは差し替え)
-    private var apps: [SampleApp] {
+    /// 作ったアプリ(一覧の並び)
+    private var createdApps: [SampleApp] {
         library.createdIds.compactMap { id in library.generated[id].map { Self.entry(id: id, $0) } }
-            + bundledApps.map { app in library.generated[app.id].map { Self.entry(id: app.id, $0) } ?? app }
     }
+
+    /// 同梱の例(直したものは差し替え)
+    private var exampleApps: [SampleApp] {
+        bundledApps.map { app in library.generated[app.id].map { Self.entry(id: app.id, $0) } ?? app }
+    }
+
+    /// 一覧に出す順: 作ったアプリ → 同梱の例
+    private var apps: [SampleApp] { createdApps + exampleApps }
 
     private static func entry(id: String, _ document: AppDocument) -> SampleApp {
         SampleApp(id: id, name: document.dsl.app.name, description: document.dsl.app.description, url: nil, version: document.version)
@@ -48,7 +56,8 @@ struct MacRootView: View {
 
     var body: some View {
         NavigationSplitView(columnVisibility: $columnVisibility) {
-            AppSidebar(apps: apps, selection: $selectedAppId) { focus = .canvas }
+            AppSidebar(created: createdApps, examples: exampleApps, selection: $selectedAppId,
+                       onOpen: { focus = .canvas }, onDelete: deleteApp)
                 .focused($focus, equals: .sidebar)
                 .navigationSplitViewColumnWidth(min: 180, ideal: 220, max: 320)
         } detail: {
@@ -76,12 +85,34 @@ struct MacRootView: View {
                 .environment(voice)
         }
         .task { voice.prepareIfAllowed() } // モデルが端末にあれば読み込む(無ければ起動では聞かない)
+        .onAppear(perform: reopenLastApp)
+        .onChange(of: selectedAppId) { _, id in
+            if let id { library.lastAppId = id }
+        }
         .sheet(isPresented: $showsTips) {
             PromptTipsSheet { tip in
                 showsTips = false
                 ask(draft: tip)
             }
         }
+    }
+
+    // MARK: - 一覧(#969)
+
+    /// 起動時: ウインドウが覚えている選択(SceneStorage)が無い・もう無いアプリなら、前に開いていたアプリを開き直す
+    private func reopenLastApp() {
+        let ids = apps.map(\.id)
+        if let id = selectedAppId, ids.contains(id) { return }
+        selectedAppId = LocalAppLibrary.reopen(library.lastAppId, among: ids)
+    }
+
+    /// 作ったアプリを消す(確認はサイドバーで済んでいる)。開いていたら一覧で隣のアプリへ移る
+    private func deleteApp(_ id: String) {
+        let name = library.generated[id]?.dsl.app.name ?? ""
+        if selectedAppId == id { selectedAppId = LocalAppLibrary.neighbor(deleting: id, in: apps.map(\.id)) }
+        if notices.summary?.appId == id { notices.summary = nil }
+        library.delete(id)
+        MacVoiceOver.announce(L10n.tr("「\(name)」を削除しました"))
     }
 
     // MARK: - 作る・直す(#967)
@@ -107,15 +138,15 @@ struct MacRootView: View {
         guard compose == nil else { return }
         let session = MacComposeSession(target: target, draft: draft)
         session.startsWithVoice = voice
-        session.onResult = { document in apply(document, target: target) }
+        session.onResult = { document, envelope in apply(document, envelope: envelope, target: target) }
         notices.summary = nil // 会話を始めたら前の要約は下げる
         closingCompose = session
         compose = session
     }
 
     /// 結果を中央に当てる。作ったアプリは一覧の先頭に足して選ぶ・直したアプリはその場で差し替える(中央を作り直す)
-    private func apply(_ document: AppDocument, target: MacComposeSession.Target) {
-        library.apply(document, created: target == .create)
+    private func apply(_ document: AppDocument, envelope: Data?, target: MacComposeSession.Target) {
+        library.apply(document, envelope: envelope, created: target == .create)
         selectedAppId = document.appId
     }
 
