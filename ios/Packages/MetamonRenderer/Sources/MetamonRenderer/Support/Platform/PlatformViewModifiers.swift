@@ -84,4 +84,14 @@ extension View {
         self
         #endif
     }
+
+    /// Mac: 見出しとして VoiceOver に伝える(ローターの「見出し」で飛べる・#937)。iOS は今までどおり何もしない。
+    @ViewBuilder
+    func macAccessibilityHeading() -> some View {
+        #if os(macOS)
+        accessibilityAddTraits(.isHeader)
+        #else
+        self
+        #endif
+    }
 }
