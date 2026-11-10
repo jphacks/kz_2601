@@ -20,6 +20,7 @@ import jp.kz2601.metamon.services.http.HttpRequest
 import jp.kz2601.metamon.services.http.HttpResponse
 import jp.kz2601.metamon.services.http.MetamonHttp
 import jp.kz2601.metamon.services.http.SseParser
+import jp.kz2601.metamon.services.local.DocumentCache
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.currentCoroutineContext
@@ -42,12 +43,14 @@ import kotlinx.serialization.json.put
  * - `?stream=1` の SSE で途中経過を読む。使えない時は仮置きを捨てて(`restart` attempt 0)通常の呼び方に戻る
  * - 409(サーバー側の版とずれた)は現行基準で 1 回だけやり直す
  * - `locale` を渡さない時は選んだ UI の言語(`Accept-Language` と同じ値・#843)を送る。iOS は毎回 UI の言語を渡す
+ * - 結果は [cache] にも入れる(appconfig から取り直さなくてもオフラインで起動できる・#1020)
  */
 class HttpAIClient(
     private val http: MetamonHttp,
     private val capabilities: ClientCapabilities = ClientCapabilities(),
     private val timeoutMillis: Long = 45_000,
     private val log: (String) -> Unit = {},
+    private val cache: DocumentCache? = null,
 ) : AIClient {
 
     @Serializable
@@ -90,7 +93,7 @@ class HttpAIClient(
         } catch (e: ApiError) {
             if (e.status != 409) throw e
             generate(body.copy(baseVersion = null))
-        }
+        }.also { remember(it) }
     }
 
     override suspend fun morphStreaming(
@@ -108,7 +111,12 @@ class HttpAIClient(
             if (e.status != 409) throw e
             progress(GenerateProgress.Restart(0))
             generateStreaming(body.copy(baseVersion = null), progress)
-        }
+        }.also { remember(it) }
+    }
+
+    /** iOS の `GenerateStream.finish`。保存に失敗しても生成は成功のまま(DocumentCache が飲み込む)。 */
+    private suspend fun remember(result: MorphResult) {
+        cache?.store(result.document.appId, result.envelopeJson)
     }
 
     override suspend fun chat(appId: String, messages: List<ChatMessage>, locale: String?, mode: ChatMode?): ChatTurn {
