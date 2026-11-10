@@ -12,6 +12,9 @@ public protocol CoinService: Sendable {
     /// 消耗型の JWS を送って足す。同じ取引は何度送っても 1 回分(冪等)。返り値 = 足した後の残高
     func creditApplePurchase(signedTransaction: String) async throws -> CoinWallet
     func updateSettings(_ update: CoinSettingsUpdate) async throws -> CoinWallet
+    /// 持てるアプリの枠を 1 つ買う(`POST /v1/me/coins/slot`)。同じ `requestId` は何度送っても 1 回分(冪等)。
+    /// 足りなければ 402 `coins_insufficient`(`CoinDenial`)、買えないサーバーは 404
+    func buyAppSlot(requestId: String) async throws -> CoinSlotPurchase
 }
 
 /// 402 のコインの断り(`coins_insufficient` / `allowance_exhausted` / `overflow_cap_reached`)。
@@ -64,6 +67,7 @@ public struct HTTPCoinClient: CoinService {
     }
 
     private struct AppleBody: Encodable { var signedTransaction: String }
+    private struct SlotBody: Encodable { var requestId: String }
 
     public func planConfig() async throws -> CoinPlanConfig {
         do {
@@ -97,6 +101,12 @@ public struct HTTPCoinClient: CoinService {
         let data = try await HTTP.send("PUT", baseURL: baseURL, path: "v1/me/coins/settings", body: update, token: token, timeout: 15)
         return try CoinWallet.decode(data)
     }
+
+    public func buyAppSlot(requestId: String) async throws -> CoinSlotPurchase {
+        let data = try await HTTP.send("POST", baseURL: baseURL, path: "v1/me/coins/slot",
+                                       body: SlotBody(requestId: requestId), token: token, timeout: 20)
+        return try CoinSlotPurchase.decode(data)
+    }
 }
 
 /// 端末だけで動くコイン(UI テスト・`METAMON_COINS=1` のシミュレータ確認用)。数は見た目の確認用の仮の値。
@@ -105,6 +115,7 @@ public actor MockCoinService: CoinService {
     private var current: CoinWallet
     private var entries: [CoinLedgerEntry] = []
     private var credited: Set<String> = []
+    private var boughtSlots: Set<String> = []
     /// 送られた取引(テスト用)
     public private(set) var creditCalls: [String] = []
     /// true なら足すのに失敗する(取引を finish しないことの確認用)
@@ -133,6 +144,21 @@ public actor MockCoinService: CoinService {
         current.balance.purchased += coins
         entries.append(CoinLedgerEntry(id: key, at: .now, kind: "purchase", delta: coins))
         return current
+    }
+
+    public func buyAppSlot(requestId: String) async throws -> CoinSlotPurchase {
+        let price = config.appSlotCoins ?? 0
+        guard price > 0 else { throw APIError.server(status: 404, code: "not_found", message: "app slots are not available") }
+        if boughtSlots.contains(requestId) { return CoinSlotPurchase(bought: false, appSlots: current.appSlots, coins: price, wallet: current) }
+        guard current.balance.available >= price else {
+            throw APIError.server(status: 402, code: CoinDenial.Kind.coinsInsufficient.rawValue, message: "not enough coins",
+                                  details: ["required": .number(Double(price)), "balance": .number(Double(current.balance.available)), "payer": .string("self")])
+        }
+        boughtSlots.insert(requestId)
+        current.balance.purchased -= price
+        current.appSlots += 1
+        entries.append(CoinLedgerEntry(id: "slot-" + requestId, at: .now, kind: "spend_slot", delta: -price))
+        return CoinSlotPurchase(bought: true, appSlots: current.appSlots, coins: price, wallet: current)
     }
 
     public func updateSettings(_ update: CoinSettingsUpdate) async throws -> CoinWallet {

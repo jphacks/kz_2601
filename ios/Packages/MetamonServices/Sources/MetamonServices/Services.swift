@@ -168,6 +168,8 @@ public enum FailureKind: Equatable, Sendable {
     case freePlanPaused(resumeAt: Date?)
     /// プランの上限(#317・403 `plan_limit_reached`)。作成者なら Pro への導線、参加者なら作った人に知らせる案内
     case planLimit(PlanLimit)
+    /// 持てるアプリの数の上限(#630・402 `app_limit_reached`)。どれかと置き換えるか枠を買えば、同じ操作をやり直せる
+    case appLimit(AppLimit)
     /// 運営がアプリの自動の動きを止めている(#346・403 `app_stopped`)
     case appStopped
     /// 混雑・一時障害(429 / 500 / 502 / 503)。`retryAfter` はサーバー指示の待ち秒
@@ -201,6 +203,7 @@ public enum FailureKind: Equatable, Sendable {
             if api.isAIPaused { return .aiPaused }
             if api.isFreePlanPaused { return .freePlanPaused(resumeAt: api.resumeAt) }
             if let limit = PlanLimit(api) { return .planLimit(limit) }
+            if let limit = AppLimit(api) { return .appLimit(limit) }
             if api.isAppStopped { return .appStopped }
             switch api.status {
             case 401: return .sessionExpired
