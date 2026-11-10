@@ -18,6 +18,7 @@ import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.withLink
 import androidx.compose.ui.text.withStyle
 import jp.kz2601.metamon.dsl.Component
+import jp.kz2601.metamon.dsl.logic.ExternalUrlPolicy
 import jp.kz2601.metamon.renderer.theme.RenderTheme
 import jp.kz2601.metamon.renderer.theme.colors
 

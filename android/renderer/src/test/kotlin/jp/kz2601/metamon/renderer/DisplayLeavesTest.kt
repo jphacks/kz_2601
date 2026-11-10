@@ -5,7 +5,7 @@ import jp.kz2601.metamon.dsl.ComponentType
 import jp.kz2601.metamon.dsl.Size
 import jp.kz2601.metamon.dsl.TextHighlight
 import jp.kz2601.metamon.dsl.TextHighlightStyle
-import jp.kz2601.metamon.renderer.components.ExternalUrlPolicy
+import jp.kz2601.metamon.dsl.logic.ExternalUrlPolicy
 import jp.kz2601.metamon.renderer.components.InlineMarkdown
 import jp.kz2601.metamon.renderer.components.InlineMarkdown.Span
 import jp.kz2601.metamon.renderer.components.PhotoValue

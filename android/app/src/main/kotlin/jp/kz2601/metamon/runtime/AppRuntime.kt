@@ -13,7 +13,7 @@ import jp.kz2601.metamon.dsl.records.Record
 import jp.kz2601.metamon.dsl.records.RecordPermission
 import jp.kz2601.metamon.renderer.ActionContext
 import jp.kz2601.metamon.renderer.DSLRuntime
-import jp.kz2601.metamon.renderer.ExternalUrlPolicy
+import jp.kz2601.metamon.dsl.logic.ExternalUrlPolicy
 import jp.kz2601.metamon.renderer.NavigationHost
 import jp.kz2601.metamon.renderer.components.play.RecordWriter
 import jp.kz2601.metamon.renderer.components.play.TimerHost
