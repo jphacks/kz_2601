@@ -43,15 +43,16 @@ class CredentialManagerGoogleSignIn(
         } catch (e: GetCredentialCancellationException) {
             throw AuthError.Canceled(e)
         } catch (_: NoCredentialException) {
-            // 端末に Google アカウントが無い。英語の例外の文言は出さない
+            // 端末に Google アカウントが無い
             throw AuthError.Unavailable(activity.getString(R.string.auth_google_no_account))
-        } catch (e: GetCredentialException) {
-            throw AuthError.Unavailable(e.message ?: "Google でログインできませんでした")
+        } catch (_: GetCredentialException) {
+            // 例外の文言は英語のことがあるので画面には出さない
+            throw AuthError.Unavailable(activity.getString(R.string.auth_google_failed))
         }
         val credential = result.credential
         if (credential is CustomCredential && credential.type == GoogleIdTokenCredential.TYPE_GOOGLE_ID_TOKEN_CREDENTIAL) {
             return GoogleIdTokenCredential.createFrom(credential.data).idToken
         }
-        throw AuthError.Unavailable("Google の認証情報を受け取れませんでした")
+        throw AuthError.Unavailable(activity.getString(R.string.auth_google_no_credential))
     }
 }

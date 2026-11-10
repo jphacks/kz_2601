@@ -4,6 +4,8 @@
     <string name="auth_anonymous">Use without signing in (anonymous)</string>
     <string name="auth_apple">Sign in with Apple</string>
     <string name="auth_google">Sign in with Google</string>
+    <string name="auth_google_failed">Couldn’t sign in with Google. Please try again</string>
     <string name="auth_google_no_account">There’s no Google account on this device. Add one in Settings, then try again</string>
+    <string name="auth_google_no_credential">Couldn’t get your Google sign-in details. Please try again</string>
     <string name="auth_tagline">Just talk, and the app transforms</string>
 </resources>
