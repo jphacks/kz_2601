@@ -18,11 +18,16 @@ import (
 // Coin billing of the AI calls (#630, docs/decisions/630-token-billing.md).
 // COIN_BILLING_MODE: off = nothing here runs; log = the would-be charge is
 // logged (coins.would_spend / coins.would_block) and nothing blocks;
-// enforce = a hold (COIN_RESERVE_<OP>) is taken from the payer before any
+// enforce = a hold (COIN_RESERVE_<OP>) is taken from the caller before any
 // Claude call (402 coins_insufficient when short), the call's cost
 // (cost_tally, est_cost_usd) is charged at the end, capped at the hold, and
 // a failure gives the whole hold back. The rate limits, the creator-paid caps
 // and the global budget stay as runaway limits next to it.
+//
+// The AI is always paid by its caller, inside a shared app too: a creator's
+// Pro may let a participant use the AI (gateText) but never pays the
+// participant's coins. Server costs (runner, notifications, storage) stay
+// with the creator.
 
 // CoinBiller is the coin wallet (*coins.Service).
 type CoinBiller interface {
@@ -30,11 +35,8 @@ type CoinBiller interface {
 	Mode() coins.Mode
 }
 
-// Payers in 402 details.payer.
-const (
-	payerSelf    = "self"
-	payerCreator = "creator"
-)
+// payerSelf is 402 details.payer: the AI is always paid by the caller.
+const payerSelf = "self"
 
 // coinSettleTimeout bounds the charge / release writes after the call.
 const coinSettleTimeout = 5 * time.Second
@@ -49,15 +51,13 @@ type coinBill struct {
 	s     *Service
 	hold  *coins.Hold
 	tally *costTally
-	payer string
 }
 
-// coinPayment is who pays a call.
+// coinPayment is who pays a call: always the caller.
 type coinPayment struct {
 	op, kind, appID string
-	uid             string // the payer
+	uid             string // the caller
 	anonymous       bool
-	creator         bool // a shared app's creator pays (details.payer)
 }
 
 // reserveCoins takes the hold of p before any Claude call and returns ctx
@@ -86,12 +86,8 @@ func (s *Service) reserveCoins(ctx context.Context, p coinPayment) (context.Cont
 	var short *coins.InsufficientError
 	switch {
 	case errors.As(err, &short):
-		payer := payerSelf
-		if p.creator {
-			payer = payerCreator
-		}
 		return ctx, nil, &Error{Status: http.StatusPaymentRequired, Code: httpx.CodeCoinsInsufficient, Message: "not enough coins",
-			Details: map[string]any{"required": short.Required, "balance": short.Balance, "payer": payer}}
+			Details: map[string]any{"required": short.Required, "balance": short.Balance, "payer": payerSelf}}
 	case err != nil && enforce:
 		s.logger().ErrorContext(ctx, "ai: coin hold failed", slog.Any("error", err), slog.String("op", p.op))
 		return ctx, nil, &Error{Status: http.StatusInternalServerError, Code: httpx.CodeInternal, Message: "coin wallet unavailable"}
@@ -107,11 +103,7 @@ func (s *Service) reserveCoins(ctx context.Context, p coinPayment) (context.Cont
 			Details: map[string]any{"status": h.Status}}
 	}
 	ctx = withCostTally(ctx)
-	payer := payerSelf
-	if p.creator {
-		payer = payerCreator
-	}
-	return ctx, &coinBill{s: s, hold: h, tally: tallyOf(ctx), payer: payer}, nil
+	return ctx, &coinBill{s: s, hold: h, tally: tallyOf(ctx)}, nil
 }
 
 // settle closes the hold: a failed call or one without any Claude call
@@ -202,14 +194,11 @@ func callerPayment(ctx context.Context, op, appID string) coinPayment {
 }
 
 // textPayment is who pays a /v1/text request gateText let through: the
-// shared app's creator when gateText marked the call creator-paid, the
-// caller otherwise.
+// caller, also when the creator's Pro let a shared app's participant in
+// (payerOf decides access and the creator-paid caps, not the coins).
 func textPayment(ctx context.Context, req TextRequest) coinPayment {
 	p := callerPayment(ctx, coins.OpText, req.AppID)
 	p.kind = textCoinKind(req)
-	if creator := payerOf(ctx); creator != "" {
-		p.uid, p.anonymous, p.creator = creator, false, true
-	}
 	return p
 }
 

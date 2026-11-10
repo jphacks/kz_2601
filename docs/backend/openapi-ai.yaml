@@ -214,7 +214,7 @@ paths:
         - `task` (summarize / classify / rewrite / extract / suggest) を付けると、端末内 AI が無い端末での aiButton の要約などのオンライン版。input 必須・instruction 任意・shape は line だけ・classify は options 2〜20 個。重さ 2 (`RATE_LIMIT_WEIGHT_TEXT_TASK`)・出力 1000 トークン。答えは text 1 つ (行は残す・1200 字で切る)、classify は候補のどれか 1 つ (docs/backend/features/text.md)
         - `length: long` (aiButton の長文) は、generate (shape line だけ) と classify 以外の task で使える。input 16384 バイト・出力 1500 トークン・答えは text 1 つ (段落は残す・3000 字で切る)・応答に `length: long`。重さ 3 (`RATE_LIMIT_WEIGHT_TEXT_LONG`・task / 写真の重さと大きい方)。Pro の確認は他と同じ。iOS は long では端末内 AI を使わず、いつもここを呼ぶ
         - `image` (aiButton の inputPhoto) は写真 1 枚。JPEG (`mediaType: image/jpeg`)・長い辺 1024px 以下・base64 400 KB (409600 文字) 以下。超えると 413、JPEG でない・base64 でない・大きすぎる画像は 400。サーバーが `AI_TEXT_IMAGE=1` でなければ 403 `forbidden`。task は何でもよく、task 付きでも input は任意 (写真だけでよい)。本文の上限は写真の分だけ広い (約 433 KB)。重さ 3 (`RATE_LIMIT_WEIGHT_TEXT_IMAGE`・task / length の重さと大きい方)。写真のバイト列はどのログにも出さない
-        - コイン (#630・`COIN_BILLING_MODE=enforce`): Pro の確認の後、Claude を呼ぶ前に払う人の財布から押さえる。払う人は、上の「作成者が払う」に当たる時は**作成者**、それ以外は呼び出した人。押さえる量は `COIN_RESERVE_TEXT`、写真・長文 (aiChat も)・task は設定があれば `COIN_RESERVE_TEXT_IMAGE` / `_LONG` / `_TASK` (重さと同じ順で大きい方)。足りなければ 402 `coins_insufficient` (`details.payer` = self / creator。creator の時は利用上限と作成者が払う回数を戻す。iOS は参加者に購入画面を出さず「作成者のコインが足りません」と案内する)。引いた量は `meta.coins`・`meta.coinsBalance` と `X-Coins-Charged` / `X-Coins-Balance` (払う人の残高)。失敗は全部戻す。同じ `X-Request-Id` は 409 `duplicate_request`。log は引くはずの量をログに出すだけ
+        - コイン (#630・`COIN_BILLING_MODE=enforce`): Pro の確認の後、Claude を呼ぶ前に**呼び出した人**の財布から押さえる。上の「作成者が払う」(作成者の Pro で通る) 時も、コインは呼び出した人 (参加者) から引く (作成者のコインは使わない)。押さえる量は `COIN_RESERVE_TEXT`、写真・長文 (aiChat も)・task は設定があれば `COIN_RESERVE_TEXT_IMAGE` / `_LONG` / `_TASK` (重さと同じ順で大きい方)。足りなければ 402 `coins_insufficient` (`details.payer` = self。利用上限と作成者の Pro で通った回数は戻す)。引いた量は `meta.coins`・`meta.coinsBalance` と `X-Coins-Charged` / `X-Coins-Balance` (呼び出した人の残高)。失敗は全部戻す。同じ `X-Request-Id` は 409 `duplicate_request`。log は引くはずの量をログに出すだけ
       requestBody:
         required: true
         content:
@@ -315,7 +315,7 @@ components:
     CoinsPaymentRequired:
       description: |
         コインで払えない(#630・`COIN_BILLING_MODE=enforce` の時だけ返す。off / log では返さない)。generate・chat・text が Claude を呼ぶ前に返す(Claude は呼ばず、利用上限も数えない)。
-        - `coins_insufficient`: 払う人(本人 / 共有アプリの作成者)のコインが押さえる量(`COIN_RESERVE_<OP>`)より少ない(`details.required`・`details.balance`・`details.payer` = self / creator)
+        - `coins_insufficient`: 呼び出した人のコインが押さえる量(`COIN_RESERVE_<OP>`)より少ない(`details.required`・`details.balance`・`details.payer`)。AI はいつも使う人が払うので、ai では `details.payer` はいつも `self`(共有アプリの参加者も。作成者のコインは使わない)
         - `allowance_exhausted` / `overflow_cap_reached`: サーバーの枠(3 段目)。ai では返さない予定だが、コードは共通
       content:
         application/json:
@@ -331,7 +331,7 @@ components:
             pro:
               value: { error: { code: pro_required, message: 'this needs Tailor It Pro: onlineAI', details: { features: [{ id: onlineAI }] } } }
             coins:
-              value: { error: { code: coins_insufficient, message: 'not enough coins', details: { required: 5, balance: 2, payer: creator } } }
+              value: { error: { code: coins_insufficient, message: 'not enough coins', details: { required: 5, balance: 2, payer: self } } }
     DuplicateRequest:
       description: |
         `duplicate_request` (#630・`COIN_BILLING_MODE=enforce` の時だけ)。同じ人の前の呼び出しと同じ `X-Request-Id` で、その分のコインは既に押さえた・引いた・戻した。Claude は呼ばず何も引かない。やり直すなら新しい id で送る (`details.status` = held / committed / released / expired)
@@ -530,7 +530,7 @@ components:
       description: '#630。この呼び出しで引いたコイン (`COIN_BILLING_MODE=enforce` で引いた時だけ。off / log・失敗・後から引く時は省く)。iOS は残高を読み直す'
     CoinsBalance:
       type: integer
-      description: '#630。引いた後の払う人の使える残高 (coins と同じ時だけ入る。共有アプリで作成者が払った時は作成者の残高)'
+      description: '#630。引いた後の呼び出した人の使える残高 (coins と同じ時だけ入る。共有アプリの参加者も自分の残高)'
     GenerateRequest:
       type: object
       required: [appId, text]

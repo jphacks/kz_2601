@@ -488,10 +488,11 @@ func TestCoinsTextFailureReleases(t *testing.T) {
 	}
 }
 
-// A participant's in-app AI of a shared app is charged to the creator; a
-// creator short of coins is a 402 with payer creator and no Claude call,
+// A participant's in-app AI of a shared app is charged to the participant
+// (the caller), never to the creator whose Pro lets the participant in; a
+// participant short of coins is a 402 with payer self and no Claude call,
 // and the creator-paid count comes back.
-func TestCoinsTextCreatorPays(t *testing.T) {
+func TestCoinsTextCallerPaysInSharedApp(t *testing.T) {
 	m := store.NewMemory()
 	proApp, _ := sharedAppFixture(t, m, "")
 	cc := &costCaller{replies: []string{`{"text":"ok"}`}, usd: 0.03125, priced: true}
@@ -504,10 +505,10 @@ func TestCoinsTextCreatorPays(t *testing.T) {
 	h := coinHandler(svc)
 	body := `{"instruction":"励ましの一言","appId":"` + proApp + `"}`
 
-	// the creator cannot pay: 402 payer creator, the app's daily count is not used up
+	// the participant cannot pay: 402 payer self, the app's daily count is not used up
 	cs.Config.Reserve = map[string]int64{coins.OpText: 50}
 	rec := coinPost(t, h, "/v1/text", "member", "", body)
-	if rec.Code != http.StatusPaymentRequired || errCode(t, rec) != httpx.CodeCoinsInsufficient || errDetails(t, rec.Body.Bytes())["payer"] != "creator" || cc.n() != 0 {
+	if rec.Code != http.StatusPaymentRequired || errCode(t, rec) != httpx.CodeCoinsInsufficient || errDetails(t, rec.Body.Bytes())["payer"] != "self" || cc.n() != 0 {
 		t.Fatalf("%d %s", rec.Code, rec.Body.String())
 	}
 	cs.Config.Reserve = testCoinReserve
@@ -515,8 +516,24 @@ func TestCoinsTextCreatorPays(t *testing.T) {
 	if rec.Code != http.StatusOK {
 		t.Fatalf("after the 402 the daily count must be back: %d %s", rec.Code, rec.Body.String())
 	}
-	if available(t, cs, "pro-owner") != 16 || available(t, cs, "member") != 20 {
-		t.Fatalf("creator %d member %d", available(t, cs, "pro-owner"), available(t, cs, "member"))
+	if m := metaOf(t, rec.Body.Bytes()); m.Meta.CoinsBalance == nil || *m.Meta.CoinsBalance != 16 {
+		t.Fatalf("meta: %s", rec.Body.String())
+	}
+	if available(t, cs, "member") != 16 || available(t, cs, "pro-owner") != 20 || reserved(t, cs, "pro-owner") != 0 {
+		t.Fatalf("member %d creator %d (reserved %d)", available(t, cs, "member"), available(t, cs, "pro-owner"), reserved(t, cs, "pro-owner"))
+	}
+}
+
+// An anonymous caller has no initial grant: in enforce mode its AI is a 402
+// payer self (docs/decisions/630-token-billing.md: no free path).
+func TestCoinsAnonymousCallerShort(t *testing.T) {
+	svc, _ := textSvc()
+	cs, _ := coinWallets(coins.ModeEnforce, 100)
+	svc.Coins = cs
+	_, bill, err := svc.reserveCoins(context.Background(), coinPayment{op: coins.OpText, uid: "anon", anonymous: true})
+	e := asError(err)
+	if bill != nil || err == nil || e.Status != http.StatusPaymentRequired || e.Code != httpx.CodeCoinsInsufficient || e.Details["payer"] != payerSelf {
+		t.Fatalf("bill %v err %v", bill, err)
 	}
 }
 

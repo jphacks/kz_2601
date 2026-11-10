@@ -424,7 +424,7 @@ func textHandler(svc *Service) http.Handler {
 			svc.writeErr(w, r, err)
 			return
 		}
-		// #630: the payer (the caller, or the creator gateText chose) holds coins first
+		// #630: the caller holds coins first (a shared app's participant too)
 		ctx, bill, err := svc.reserveCoins(ctx, textPayment(ctx, req))
 		if err != nil {
 			refuseBeforeClaude(ctx) // no Claude call: the units and the creator-paid count come back
