@@ -264,10 +264,10 @@ func SharePage(s store.Store) http.HandlerFunc {
 		page := webPage{StoreURL: AppStoreURL}
 		lang := shareLang(r.Header.Get("Accept-Language"))
 		tok := r.PathValue("token")
-		if idRe.MatchString(tok) {
+		if validShareToken(tok) {
 			if sh, err := s.GetShare(r.Context(), tok); err == nil && !sh.Revoked && !shareHidden(r.Context(), s, sh) {
 				page = buildWebPage(sh.Name, sh.DSL, nil)         // nil RecordPeek: no records (#253)
-				page.ImportURL = template.URL(ImportScheme + tok) // #nosec G203 -- tok matched idRe
+				page.ImportURL = template.URL(ImportScheme + tok) // #nosec G203 -- tok matched validShareToken
 				page.PageURL = webBase(r) + "/s/" + tok
 			}
 		}
