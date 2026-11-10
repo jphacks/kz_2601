@@ -4,6 +4,7 @@ import jp.kz2601.metamon.dsl.AppDSL
 import jp.kz2601.metamon.dsl.AppDocument
 import jp.kz2601.metamon.dsl.decode
 import jp.kz2601.metamon.dsl.records.entityModels
+import jp.kz2601.metamon.retention.RetentionStrings
 import jp.kz2601.metamon.services.consent.InMemoryKeyValueStore
 import jp.kz2601.metamon.services.local.BackoffPolicy
 import jp.kz2601.metamon.services.local.LocalRecord
@@ -287,8 +288,20 @@ class RecordRetentionRunnerTest {
     @Test
     fun promptMessageMatchesIos() {
         val p = RetentionPrompt(appId, 1, listOf(RetentionPrompt.Item("e", "日記", 7, isShared = true)))
-        assertEquals("「日記」は1週間たった記録を自動で消します。消えた記録は元に戻せません。共有の記録は自分が追加したものだけが消えます。", p.message(english = false))
-        assertTrue(p.message(english = true).startsWith("Entries older than the period will be deleted automatically (日記: 1 week)."))
+        assertEquals(
+            "「日記」は1週間たった記録を自動で消します。消えた記録は元に戻せません。共有の記録は自分が追加したものだけが消えます。",
+            p.message(english = false, RetentionStrings.resolver(english = false)),
+        )
+        assertEquals(
+            "Entries older than the period will be deleted automatically (Diary: 1 week). Deleted entries cannot be restored. For shared entries, only the ones you added are deleted.",
+            p.copy(items = listOf(RetentionPrompt.Item("e", "Diary", 7, isShared = true))).message(english = true, RetentionStrings.resolver(english = true)),
+        )
+        val two = RetentionPrompt(appId, 1, listOf(RetentionPrompt.Item("a", "支出", 30, false), RetentionPrompt.Item("b", "日記", 7, false)))
+        assertEquals("「支出」は30日、「日記」は1週間たった記録を自動で消します。消えた記録は元に戻せません。", two.message(false, RetentionStrings.resolver(false)))
+        assertEquals(
+            "Entries older than the period will be deleted automatically (支出: 30 days, 日記: 1 week). Deleted entries cannot be restored.",
+            two.message(true, RetentionStrings.resolver(true)),
+        )
     }
 
     private companion object {

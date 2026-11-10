@@ -1,8 +1,10 @@
 package jp.kz2601.metamon.settings
 
+import jp.kz2601.metamon.R
 import jp.kz2601.metamon.dsl.AppDSL
 import jp.kz2601.metamon.dsl.AppDocument
 import jp.kz2601.metamon.dsl.decode
+import jp.kz2601.metamon.retention.RetentionStrings
 import jp.kz2601.metamon.runtime.AppRuntime
 import jp.kz2601.metamon.runtime.KeyValueRetentionConsent
 import jp.kz2601.metamon.runtime.RecordRetentionRunner
@@ -114,8 +116,11 @@ class RetentionSettingsRowTest {
 
     @Test
     fun stopInstructionNamesTheEntity() {
-        assertEquals("「筋トレ」の記録を自動で消すのをやめて", RetentionSettingsRow.stopInstruction("筋トレ", english = false))
-        assertEquals("Stop deleting Workout entries automatically", RetentionSettingsRow.stopInstruction("Workout", english = true))
+        // iOS の `removeRetention(entityName:)` と同じ文
+        assertEquals("「筋トレ」の記録を自動で消すのをやめて", RetentionStrings.text(R.string.retention_stop_instruction_entity, false, "筋トレ"))
+        assertEquals("Stop deleting Workout entries automatically", RetentionStrings.text(R.string.retention_stop_instruction_entity, true, "Workout"))
+        assertEquals("記録を自動で消すのをやめて", RetentionStrings.text(R.string.retention_stop_instruction, false))
+        assertEquals("Stop deleting entries automatically", RetentionStrings.text(R.string.retention_stop_instruction, true))
     }
 
     private companion object {

@@ -42,10 +42,6 @@ data class RetentionSettingsRow(
                 val active = RecordRetention.activeDays(e, consented(e.id)) != null
                 RetentionSettingsRow(e.id, e.name, days, e.isShared, active)
             }
-
-        /** 「自動で消すのをやめる」で送る指示文(iOS の `removeRetention(entityName:)`)。 */
-        fun stopInstruction(name: String, english: Boolean): String =
-            if (english) "Stop deleting $name entries automatically" else "「$name」の記録を自動で消すのをやめて"
     }
 }
 
@@ -64,7 +60,8 @@ fun RetentionSettingsSection(runtime: AppRuntime, onStop: (String) -> Unit) {
         RetentionSettingsRow.of(runtime.entityModels) { retention.consentedDays(document.appId, it) }
     }
     if (rows.isEmpty()) return
-    val english = AppLocales.languageCode(LocalContext.current) == "en"
+    val context = LocalContext.current
+    val english = AppLocales.languageCode(context) == "en"
 
     Text(
         stringResource(R.string.retention_settings_header),
@@ -94,7 +91,8 @@ fun RetentionSettingsSection(runtime: AppRuntime, onStop: (String) -> Unit) {
             TextButton(
                 onClick = {
                     retention.dismiss()
-                    onStop(RetentionSettingsRow.stopInstruction(row.name, english))
+                    // 声で言うのと同じ指示文(iOS の `removeRetention(entityName:)`)
+                    onStop(context.getString(R.string.retention_stop_instruction_entity, row.name))
                 },
                 modifier = Modifier.padding(horizontal = 4.dp).testTag("settings.retention.${row.entity}.stop"),
             ) { Text(stringResource(R.string.retention_stop), color = MaterialTheme.colorScheme.error) }

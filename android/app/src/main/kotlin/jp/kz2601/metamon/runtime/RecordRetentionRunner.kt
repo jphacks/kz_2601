@@ -1,5 +1,6 @@
 package jp.kz2601.metamon.runtime
 
+import jp.kz2601.metamon.R
 import jp.kz2601.metamon.dsl.records.Entity
 import jp.kz2601.metamon.dsl.records.RecordRetention
 import jp.kz2601.metamon.services.consent.KeyValueStore
@@ -153,20 +154,17 @@ data class RetentionPrompt(val appId: String, val version: Int, val items: List<
 
     val id: String get() = "$appId#$version#" + items.joinToString(",") { "${it.entity}=${it.days}" }
 
-    /** 「支出」は30日 … たった記録を自動で消します。 */
-    fun message(english: Boolean): String {
-        val shared = items.any { it.isShared }
-        if (english) {
-            val parts = items.joinToString(", ") { "${it.name}: ${RecordRetention.periodLabel(it.days, english = true)}" }
-            return "Entries older than the period will be deleted automatically ($parts). Deleted entries cannot be restored." +
-                if (shared) " For shared entries, only the ones you added are deleted." else ""
+    /**
+     * 「支出」は30日 … たった記録を自動で消します。文は strings_retention.xml([text] = `Context.getString`)。
+     * [english] は期間の言い方(:dsl の [RecordRetention.periodLabel])にだけ使う。
+     */
+    fun message(english: Boolean, text: (id: Int, args: Array<out Any>) -> String): String {
+        val parts = items.joinToString(text(R.string.retention_message_separator, emptyArray())) {
+            text(R.string.retention_message_item, arrayOf(it.name, RecordRetention.periodLabel(it.days, english)))
         }
-        val parts = items.joinToString("、") { "「${it.name}」は${RecordRetention.periodLabel(it.days)}" }
-        return parts + "たった記録を自動で消します。消えた記録は元に戻せません。" + if (shared) "共有の記録は自分が追加したものだけが消えます。" else ""
+        val shared = if (items.any { it.isShared }) text(R.string.retention_settings_footer_shared, emptyArray()) else ""
+        return text(R.string.retention_message, arrayOf(parts)) + shared
     }
-
-    /** 「自動で消すのをやめる」で送る指示文(声で言うのと同じ・iOS の `removeRetention`)。 */
-    fun stopInstruction(english: Boolean): String = if (english) "Stop deleting entries automatically" else "記録を自動で消すのをやめて"
 
     companion object {
         fun of(appId: String, version: Int, entities: List<Entity>) = RetentionPrompt(
