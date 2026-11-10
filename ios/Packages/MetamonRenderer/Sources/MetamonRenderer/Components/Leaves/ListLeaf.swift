@@ -20,6 +20,10 @@ struct ListLeaf: View {
     @State private var toggleTaps = 0
     /// 押した直後の印の表示(recordId → 楽観的な状態・#255)。確定したら外す
     @State private var markOverrides: [String: MarkState] = [:]
+    #if os(macOS)
+    /// ⌘C の対象の行(#1332)。クリックか Tab でフォーカスした行
+    @FocusState private var focusedRowId: String?
+    #endif
 
     var body: some View {
         let entityId = c.entity ?? ""
@@ -50,7 +54,11 @@ struct ListLeaf: View {
                             accessory: interestAccessory(row, entity: entityId))
                         .background(highlightedId == row.id ? RenderTheme.Colors.brandSoft : Color.clear)
                         .contentShape(Rectangle())
-                        .onTapGesture { open(row) }
+                        .onTapGesture { focusRow(row); open(row) }
+                        #if os(macOS)
+                        .focusable()
+                        .focused($focusedRowId, equals: row.id)
+                        #endif
                         // VoiceOver: onTapGesture は読まれないので、行をボタンとして宣言しダブルタップで同じ遷移を実行
                         .accessibilityAddTraits(c.onItemTap != nil ? .isButton : [])
                         .accessibilityHint(c.onItemTap != nil ? L("ダブルタップで開きます") : "")
@@ -65,12 +73,19 @@ struct ListLeaf: View {
                             ModerationMenuItems(entity: entityId, record: row)
                         }
                         .accessibilityActions {
+                            #if os(macOS)
+                            Button(L("コピー")) { copy(row, entity: entity) }
+                            #endif
                             if deletable(row, entity: entityId) { Button(L("削除")) { delete(row, entity: entityId) } }
                         }
                 }
             }
             // 行が少なくてもカードはセルの高さまで伸ばす(#84: 空白の下半分を作らない)。行は上詰め
             .frame(maxHeight: .infinity, alignment: .top)
+            #if os(macOS)
+            // ⌘C(#1332): フォーカスのある行を右クリックの「コピー」と同じテキストで
+            .onCopyCommand { copyCommand(rows: rows, entity: entity) }
+            #endif
             .renderCard(padding: 0)
             .onChange(of: ids, initial: true) { _, now in markNewRows(now) }
             .sensoryFeedback(.selection, trigger: toggleTaps)
@@ -157,6 +172,22 @@ struct ListLeaf: View {
         let text = ListRowCopyText.text(item: c.item, record: row, entity: entity, rt: rt)
         guard !text.isEmpty else { return }
         PlatformPasteboard.setString(text)
+    }
+
+    #if os(macOS)
+    private func copyCommand(rows: [Record], entity: Entity?) -> [NSItemProvider] {
+        guard let row = ListRowCopyCommand.target(focusedRowId: focusedRowId,
+                                                  textInputActive: ListRowCopyCommand.textInputActive, rows: rows) else { return [] }
+        let text = ListRowCopyText.text(item: c.item, record: row, entity: entity, rt: rt)
+        return text.isEmpty ? [] : [NSItemProvider(object: text as NSString)]
+    }
+    #endif
+
+    /// クリックした行を ⌘C の対象にする(Mac)。
+    private func focusRow(_ row: Record) {
+        #if os(macOS)
+        focusedRowId = row.id
+        #endif
     }
 
     private func open(_ row: Record) {
