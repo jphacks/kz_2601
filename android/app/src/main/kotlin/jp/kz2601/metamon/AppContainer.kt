@@ -9,6 +9,7 @@ import jp.kz2601.metamon.runtime.AiTextAccess
 import jp.kz2601.metamon.runtime.AndroidRuntimeHost
 import jp.kz2601.metamon.runtime.AppAiHost
 import jp.kz2601.metamon.runtime.AppDirectory
+import jp.kz2601.metamon.runtime.AppFeedHost
 import jp.kz2601.metamon.runtime.AppRuntime
 import jp.kz2601.metamon.runtime.RuntimeHost
 import jp.kz2601.metamon.runtime.TranscriberDictationHost
@@ -47,11 +48,14 @@ import jp.kz2601.metamon.services.live.FirebaseBootstrap
 import jp.kz2601.metamon.services.live.FirebaseCrashReporter
 import jp.kz2601.metamon.services.live.HttpAIClient
 import jp.kz2601.metamon.services.live.HttpAppConfigClient
+import jp.kz2601.metamon.services.live.HttpFeedClient
 import jp.kz2601.metamon.services.live.HttpPushDeviceClient
 import jp.kz2601.metamon.services.local.AndroidConnectivity
 import jp.kz2601.metamon.services.local.AppListCache
 import jp.kz2601.metamon.services.local.CurrentAppStore
 import jp.kz2601.metamon.services.local.DocumentCache
+import jp.kz2601.metamon.services.feeds.FeedCache
+import jp.kz2601.metamon.renderer.components.feed.FeedHost
 import jp.kz2601.metamon.services.local.RecordSyncEngine
 import jp.kz2601.metamon.services.mock.DslSamples
 import jp.kz2601.metamon.services.mock.InMemoryAppConfigClient
@@ -101,6 +105,8 @@ class AppContainer(
     val appId: CurrentAppStore,
     /** 最後に取得したアプリの一覧(オフラインの一覧) */
     val appList: AppListCache,
+    /** 外部の公開データ(feed・#876)。モックは null(部品は「読み込めませんでした」・iOS と同じ) */
+    val feedHost: FeedHost? = null,
     val knobs: DebugKnobs,
     /** 記録のローカル DB と送信待ちの列(#882)。[MetamonApplication] が start する */
     val recordSync: RecordSyncEngine,
@@ -223,6 +229,7 @@ class AppContainer(
                 transcriber = AndroidSpeechTranscriber(context, language = language, log = { Log.i(TAG, it) }),
                 appId = DeviceAppId.store(context, "metamon-app"),
                 appList = AppListCache(File(context.filesDir, "metamon-app")),
+                feedHost = AppFeedHost(HttpFeedClient(appConfigHttp), FeedCache(File(context.filesDir, "metamon-feeds"))),
                 knobs = knobs,
                 recordSync = recordSync(context, appConfig, "metamon-records"),
                 documentCache = documentCache,

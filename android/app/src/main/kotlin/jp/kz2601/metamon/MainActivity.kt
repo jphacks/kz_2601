@@ -19,6 +19,7 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -52,6 +53,7 @@ import jp.kz2601.metamon.auth.RootScreen
 import jp.kz2601.metamon.auth.SignInScreen
 import jp.kz2601.metamon.permissions.ProvideRendererPermissions
 import jp.kz2601.metamon.renderer.DSLView
+import jp.kz2601.metamon.renderer.components.feed.LocalFeedHost
 import jp.kz2601.metamon.renderer.theme.MetamonRenderTheme
 import jp.kz2601.metamon.renderer.theme.ReadableWidth
 import jp.kz2601.metamon.runtime.AppRuntime
@@ -113,7 +115,7 @@ fun MetamonRoot(container: AppContainer) {
     val user by container.session.user.collectAsStateWithLifecycle()
     when (RootScreen.of(user)) {
         RootScreen.SignIn -> SignInScreen(container.session)
-        RootScreen.App -> MetamonApp(container)
+        RootScreen.App -> CompositionLocalProvider(LocalFeedHost provides container.feedHost) { MetamonApp(container) }
     }
 }
 
