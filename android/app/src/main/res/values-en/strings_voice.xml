@@ -17,7 +17,6 @@
     <string name="voice_build_button">Go with this</string>
     <string name="voice_build_now_button">Just build it</string>
     <string name="voice_build_now_utterance">Just build it</string>
-    <string name="voice_building_app">Building “%1$s”…</string>
     <string name="voice_busy_body">Please wait a moment and try again</string>
     <string name="voice_busy_title">We\'re busy right now</string>
     <string name="voice_cancel">Cancel</string>
@@ -56,12 +55,18 @@
     <string name="voice_failed_title">Couldn\'t make the app</string>
     <string name="voice_free_paused_body">Demand is high, so free plan features are paused for now. Please try again later</string>
     <string name="voice_free_paused_title">The free plan is paused</string>
+    <string name="voice_gen_badge">Transforming</string>
     <string name="voice_gen_building">Putting the screens together…</string>
     <string name="voice_gen_deciding">Deciding the screens and data it needs…</string>
     <string name="voice_gen_editing">Applying your change…</string>
+    <string name="voice_gen_fallback">We\'re busy. Switching to a safe template…</string>
     <string name="voice_gen_polishing">Polishing the details…</string>
+    <string name="voice_gen_seconds">%1$d s</string>
+    <string name="voice_gen_slow">This is taking a bit longer…</string>
+    <string name="voice_gen_stop">Stop</string>
     <string name="voice_gen_thinking">Thinking about what kind of app to make…</string>
     <string name="voice_gen_usually">Usually about 10 s</string>
+    <string name="voice_gen_warning">It\'s taking a while. Just a little longer</string>
     <string name="voice_hello_day">Hello</string>
     <string name="voice_hello_evening">Good evening</string>
     <string name="voice_hello_morning">Good morning</string>
@@ -78,6 +83,7 @@
     <string name="voice_plan_limit_body">What this app can store has reached its limit. Delete what you don\'t use to keep going</string>
     <string name="voice_plan_limit_title">Limit reached</string>
     <string name="voice_pro_required_body">This needs Pro features. Try saying it a different way</string>
+    <string name="voice_quoted">“%1$s”</string>
     <string name="voice_rate_body">You\'ve reached today\'s limit. You can continue from %1$s</string>
     <string name="voice_rate_title">That\'s all for today</string>
     <string name="voice_ready_title">Here\'s what I\'ll build</string>
