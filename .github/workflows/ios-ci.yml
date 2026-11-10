@@ -10,7 +10,7 @@
 # 変更の判定(dorny/paths-filter)→ 回すもの:
 #   | 変わった場所                                  | ジョブ          | テスト                                                    |
 #   |-----------------------------------------------|-----------------|-----------------------------------------------------------|
-#   | ios/Packages/MetamonDSL/** だけ(*2)           | ios-dsl         | `swift test`(MetamonDSLTests)。アプリのビルド・シミュレータ無し |
+#   | ios/Packages/MetamonDSL/** だけ(*2)           | ios-dsl         | macOS の `xcodebuild test`(MetamonDSLTests)。アプリのビルド・シミュレータ無し |
 #   | MetamonDSL + 他の iOS 変更                    | ios-xcode       | DSL / Renderer / Services / MetamonTests(DSL は全員の依存) |
 #   | ios/Packages/MetamonRenderer/**               | ios-xcode       | MetamonRendererTests + MetamonTests                       |
 #   | docs/dsl/conformance/**・docs/dsl/examples/** | ios-xcode       | MetamonRendererTests(適合テスト #352)+ MetamonTests      |
@@ -160,7 +160,7 @@ jobs:
 
           ui="${UI_LABEL:-false}"
 
-          # PR で DSL だけ(ラベル無し): macOS の swift test だけ
+          # PR で DSL だけ(ラベル無し): macOS の DSL テストだけ
           if [ "$DSL" = "true" ] && [ "$others" != "true" ] && [ "$ui" != "true" ]; then
             emit dsl "" true
             exit 0
@@ -194,7 +194,7 @@ jobs:
           fi
           emit xcode "${args# }" true
 
-  # DSL だけの変更: Foundation のみなので macOS の swift test で足りる(シミュレータ・アプリのビルド不要)
+  # DSL だけの変更: Foundation のみなので macOS のテストで足りる(シミュレータ・アプリのビルド不要)
   ios-dsl:
     name: ios-dsl
     needs: ios-changes
@@ -213,17 +213,26 @@ jobs:
           if [ -n "$latest" ]; then sudo xcode-select -s "$latest"; fi
           xcodebuild -version
 
-      - name: SwiftPM ビルドキャッシュ
+      - name: DerivedData キャッシュ
         uses: actions/cache@v6
         with:
-          path: ios/Packages/MetamonDSL/.build
-          key: dsl-build-${{ runner.os }}-${{ hashFiles('ios/Packages/MetamonDSL/**/*.swift') }}
+          path: ios/DerivedData-mac
+          key: dsl-dd-${{ runner.os }}-${{ hashFiles('ios/Packages/MetamonDSL/**/*.swift') }}
           restore-keys: |
-            dsl-build-${{ runner.os }}-
+            dsl-dd-${{ runner.os }}-
 
-      - name: swift test (MetamonDSL)
-        working-directory: ios/Packages/MetamonDSL
-        run: swift test --parallel
+      # `swift test` は文字列カタログを訳さず英語の文言のテストが落ちるので xcodebuild test(macOS)で回す(#928)
+      - name: xcodebuild test (MetamonDSL・macOS)
+        run: ios/scripts/mac-package-test.sh MetamonDSL
+
+      - name: テスト結果をアップロード(失敗時)
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: ios-dsl-test-results
+          path: ios/TestResults-mac
+          if-no-files-found: ignore
+          retention-days: 3
 
   ios-xcode:
     name: ios-xcode
