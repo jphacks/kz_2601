@@ -8,6 +8,7 @@ import MetamonServices
 /// アプリを作る・直す会話(#967)の状態。iOS の `AppRuntime+Clarify` / `AppRuntime+BuildStage` の Mac 版。
 /// 判断は iOS と同じ `ClarifyFlow`(何を出すか)・`MultiSelect`(複数選択)・`BuildChoreography`(組み上げ)を使う。
 /// AI は Mac に Firebase が無い間(#930)は `MockAIClient`(iOS の METAMON_MOCK と同じ・同梱の DSL 例を返す)。
+/// AI に送る前に同意(#246・5.1.2(i))を確かめる。無ければ送らずに同意の説明を出し、同意したら止めた 1 件を送る(iOS の `requireAIConsent`)。
 /// 流れ: 頼む(文字)→ 聞き返し・案(chat)→「これでいく」→ 生成中(組み立て台・経過秒)→ 組み上げ → 完成の要約。
 @MainActor
 @Observable
@@ -59,9 +60,19 @@ final class MacComposeSession: Identifiable {
     var selectedChips: [String] = []
     var selectedOptions: [String] = []
 
+    /// 同意を待って止めた 1 件(iOS の `utteranceAwaitingConsent`)。同意したら送り直す・「あとで」なら捨てる
+    enum Held: Equatable {
+        case message(String)
+        case build(String)
+    }
+    private(set) var heldForConsent: Held?
+    /// 同意の説明を出す(ComposeSheet がシートで出す)
+    var needsConsent = false
+
     @ObservationIgnored private let ai: any AIClient
     @ObservationIgnored private let appId: String
     @ObservationIgnored private let reduceMotion: () -> Bool
+    @ObservationIgnored private let isConsentGranted: () -> Bool
     @ObservationIgnored private var task: Task<Void, Never>?
     /// 結果を中央に当てる(MacRootView がアプリの一覧を差し替える)
     @ObservationIgnored var onResult: (AppDocument) -> Void = { _ in }
@@ -83,15 +94,47 @@ final class MacComposeSession: Identifiable {
     var offer: ClarifyFlow.Offer { latest.map(ClarifyFlow.offer(for:)) ?? .none }
     var shortcut: ClarifyFlow.Shortcut { bubbles.isEmpty ? .none : ClarifyFlow.shortcut(for: latest, mode: mode) }
 
-    init(target: Target, draft: String = "", ai: any AIClient = MockAIClient(),
-         reduceMotion: @escaping () -> Bool = { NSWorkspace.shared.accessibilityDisplayShouldReduceMotion }) {
+    init(target: Target, draft: String = "", ai: any AIClient = MacComposeSession.gatedAI(),
+         reduceMotion: @escaping () -> Bool = { NSWorkspace.shared.accessibilityDisplayShouldReduceMotion },
+         isConsentGranted: @escaping () -> Bool = { AIConsentStore.shared.isGranted }) {
         self.target = target
         self.draft = draft
         self.ai = ai
         self.reduceMotion = reduceMotion
+        self.isConsentGranted = isConsentGranted
         switch target {
         case .create: appId = "mac-\(UUID().uuidString.prefix(8).lowercased())"
         case .edit(let id, _, _): appId = id
+        }
+    }
+
+    /// Mac の AI。同意が無ければどの入口からも送らないよう `ConsentGatedAIClient` で包む(最後の砦・iOS の MetamonApp と同じ)
+    static func gatedAI(base: any AIClient = MockAIClient()) -> any AIClient {
+        ConsentGatedAIClient(base: base) { AIConsentStore.isGranted(in: .standard) }
+    }
+
+    // MARK: - 同意(#246)
+
+    /// AI に送る直前に呼ぶ。未同意なら 1 件を止めて同意の説明を出し、false(送らない)
+    private func requireConsent(_ held: Held) -> Bool {
+        if isConsentGranted() { return true }
+        heldForConsent = held
+        needsConsent = true
+        return false
+    }
+
+    /// 同意の説明が閉じた時。同意していれば止めた 1 件を送る。「あとで」なら送らず、書いた文は入力欄に戻す
+    func resumeAfterConsent() {
+        needsConsent = false
+        guard let held = heldForConsent else { return }
+        heldForConsent = nil
+        guard isConsentGranted() else {
+            if case .message(let text) = held, draft.isEmpty { draft = text }
+            return
+        }
+        switch held {
+        case .message(let text): send(text)
+        case .build(let transcript): build(transcript)
         }
     }
 
@@ -107,7 +150,7 @@ final class MacComposeSession: Identifiable {
 
     /// 1 発言を送る。1 発目は `ClarifyFlow.startConversation`(前の会話に混ざらない)、2 発目からは全履歴。
     func send(_ text: String) {
-        guard !sending, phase == .chatting else { return }
+        guard !sending, phase == .chatting, requireConsent(.message(text)) else { return }
         let first = bubbles.isEmpty
         bubbles.append(Bubble(role: .user, text: text))
         selectedChips = []
@@ -130,6 +173,8 @@ final class MacComposeSession: Identifiable {
                 guard !Task.isCancelled else { return }
                 // 届かなかった発言は履歴から外して入力欄に戻す(送り直しで同じ文が 2 回入らないように)
                 if bubbles.last?.role == .user { bubbles.removeLast() }
+                // 送る途中で同意を取り消した時(包みが止めた): 同意の説明を出して、同意したら送り直す
+                if error as? AIConsentError == .notGranted { _ = requireConsent(.message(text)); return }
                 if draft.isEmpty { draft = text }
                 self.error = L10n.tr("うまく届きませんでした。もう一度送ってください")
             }
@@ -185,7 +230,7 @@ final class MacComposeSession: Identifiable {
     // MARK: - 生成
 
     func build(_ transcript: String) {
-        guard phase == .chatting, !transcript.isEmpty else { return }
+        guard phase == .chatting, !transcript.isEmpty, requireConsent(.build(transcript)) else { return }
         task?.cancel()
         sending = false
         error = nil
@@ -204,6 +249,7 @@ final class MacComposeSession: Identifiable {
             } catch {
                 guard !Task.isCancelled else { return }
                 withAnimation { phase = .chatting }
+                if error as? AIConsentError == .notGranted { _ = requireConsent(.build(transcript)); return }
                 self.error = L10n.tr("作れませんでした。言い方を変えて、もう一度頼んでください")
             }
         }
