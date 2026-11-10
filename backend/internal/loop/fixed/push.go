@@ -3,15 +3,16 @@ package fixed
 import (
 	"context"
 
+	"github.com/jphacks/kz_2601/backend/internal/loop"
 	"github.com/jphacks/kz_2601/backend/internal/runner/notify"
 	"github.com/jphacks/kz_2601/backend/internal/store"
 )
 
 // ConsentAppID is the users/{uid}/notifyConsent/{id} document that records a
-// sender's agreement to this push. Nothing in the app sets it yet, so no
-// push is sent until the app asks (a product decision: docs/backend/
-// features/feedback-loop.md). The in-app notice does not need it.
-const ConsentAppID = "_feedback_fixed"
+// sender's agreement to this push. The app sets it from the feedback
+// composer's 「直ったら知らせてほしい」 (off by default) through
+// PUT /v1/me/notify-consent/feedback-fixed. The in-app notice does not need it.
+const ConsentAppID = loop.FeedbackFixedConsentID
 
 // AppName is shown as the sender of the push.
 const AppName = "Tailor It"

@@ -21,7 +21,10 @@ func NewMemory() *Memory {
 	return &Memory{items: map[string]Item{}, drafts: map[string]Draft{}, notices: map[string]Notice{}, cursors: map[Source]time.Time{}}
 }
 
-var _ Store = (*Memory)(nil)
+var (
+	_ Store        = (*Memory)(nil)
+	_ NoticeReader = (*Memory)(nil)
+)
 
 func limitOr(n, def int) int {
 	if n <= 0 {
@@ -167,6 +170,21 @@ func (m *Memory) ListNotices(_ context.Context, uid string, limit int) ([]Notice
 		out = out[:n]
 	}
 	return out, nil
+}
+
+// MarkNoticeRead implements NoticeReader.
+func (m *Memory) MarkNoticeRead(_ context.Context, uid, id string, at time.Time) (*Notice, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	n, ok := m.notices[id]
+	if !ok || n.UID != uid {
+		return nil, ErrNotFound
+	}
+	if n.ReadAt.IsZero() {
+		n.ReadAt = at
+		m.notices[id] = n
+	}
+	return &n, nil
 }
 
 // Cursor implements Store.

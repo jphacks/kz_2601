@@ -106,6 +106,27 @@ func testStore(t *testing.T, s Store, sfx string) {
 	if len(ns) != 1 || ns[0].ID != n.ID {
 		t.Fatalf("notices %+v", ns)
 	}
+	// mark read: only the owner; the first readAt stays
+	nr := s.(NoticeReader)
+	if _, err := nr.MarkNoticeRead(ctx, "other"+sfx, n.ID, now); err != ErrNotFound {
+		t.Fatalf("other user marked: %v", err)
+	}
+	if _, err := nr.MarkNoticeRead(ctx, uid, "ntc_missing"+sfx, now); err != ErrNotFound {
+		t.Fatalf("missing marked: %v", err)
+	}
+	read, err := nr.MarkNoticeRead(ctx, uid, n.ID, now)
+	must(err)
+	if !read.ReadAt.Equal(now) || read.ID != n.ID || read.Title != n.Title {
+		t.Fatalf("marked %+v", read)
+	}
+	read, err = nr.MarkNoticeRead(ctx, uid, n.ID, now.Add(time.Hour))
+	must(err)
+	if !read.ReadAt.Equal(now) {
+		t.Fatalf("second mark moved readAt: %v", read.ReadAt)
+	}
+	if ns, _ = s.ListNotices(ctx, uid, 10); len(ns) != 1 || !ns[0].ReadAt.Equal(now) {
+		t.Fatalf("read not stored: %+v", ns)
+	}
 
 	src := Source("test-" + sfx)
 	c, err := s.Cursor(ctx, src)

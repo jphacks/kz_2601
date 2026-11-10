@@ -83,6 +83,10 @@ var wantRoutes = []string{
 	"PUT /v1/apps/{appId}/follows/{uid}",
 	"PUT /v1/me/devices/{installationId}",
 	"PUT /v1/me/notify-consent/{appId}",
+	"GET /v1/me/notices",
+	"GET /v1/me/notify-consent/feedback-fixed",
+	"POST /v1/me/notices/{noticeId}/read",
+	"PUT /v1/me/notify-consent/feedback-fixed",
 }
 
 // handleFuncPatterns collects every mux.HandleFunc pattern in the package sources.
