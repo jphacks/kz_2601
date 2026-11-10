@@ -104,6 +104,10 @@
     <string name="voice_plan_limit_body">What this app can store has reached its limit. Delete what you don\'t use to keep going</string>
     <string name="voice_plan_limit_title">Limit reached</string>
     <string name="voice_pro_required_body">This needs Pro features. Try saying it a different way</string>
+    <string name="voice_progress_app">Building “%1$s”</string>
+    <string name="voice_progress_app_tabs">Building “%1$s” (%2$s)</string>
+    <string name="voice_progress_component">Part %1$d: %2$s</string>
+    <string name="voice_progress_restart">Starting over</string>
     <string name="voice_question_progress">Question %1$d of %2$d</string>
     <string name="voice_quoted">“%1$s”</string>
     <string name="voice_rate_body">You\'ve reached today\'s limit. You can continue from %1$s</string>

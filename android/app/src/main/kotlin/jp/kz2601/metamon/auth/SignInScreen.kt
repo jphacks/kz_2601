@@ -22,11 +22,13 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import jp.kz2601.metamon.R
 import kotlinx.coroutines.launch
 
 /** 起動時にサインインしていなければ出す画面(iOS の `SignInView`)。Google・Apple・匿名。 */
@@ -48,7 +50,7 @@ fun SignInScreen(session: AuthSession) {
             Spacer(Modifier.weight(1f))
             Text("Tailor It", fontSize = 40.sp, fontWeight = FontWeight.Bold)
             Text(
-                "話しかけるだけで、アプリが生まれ変わる",
+                stringResource(R.string.auth_tagline),
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 textAlign = TextAlign.Center,
@@ -61,17 +63,17 @@ fun SignInScreen(session: AuthSession) {
                     onClick = { scope.launch { session.signInWithGoogle(CredentialManagerGoogleSignIn(activity, webClientId)) } },
                     enabled = !busy,
                     modifier = Modifier.fillMaxWidth().height(52.dp),
-                ) { Text("Google でログイン") }
+                ) { Text(stringResource(R.string.auth_google)) }
             }
             if (activity != null) {
                 OutlinedButton(
                     onClick = { scope.launch { session.signInWithApple(activity) } },
                     enabled = !busy,
                     modifier = Modifier.fillMaxWidth().height(52.dp),
-                ) { Text("Apple でログイン") }
+                ) { Text(stringResource(R.string.auth_apple)) }
             }
             TextButton(onClick = { scope.launch { session.signInAnonymously() } }, enabled = !busy) {
-                Text("ログインせずに使う(匿名)", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text(stringResource(R.string.auth_anonymous), color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
             message?.let {
                 Text(it, color = MaterialTheme.colorScheme.error, textAlign = TextAlign.Center)

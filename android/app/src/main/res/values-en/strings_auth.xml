@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- サインインの画面(#1062)。文言は iOS(Localizable.xcstrings)に合わせる -->
+<resources>
+    <string name="auth_anonymous">Use without signing in (anonymous)</string>
+    <string name="auth_apple">Sign in with Apple</string>
+    <string name="auth_google">Sign in with Google</string>
+    <string name="auth_tagline">Just talk, and the app transforms</string>
+</resources>

@@ -104,6 +104,10 @@
     <string name="voice_plan_limit_body">このアプリで使える量が上限に達しました。使わないものを消すと、続けて使えます</string>
     <string name="voice_plan_limit_title">上限に達しました</string>
     <string name="voice_pro_required_body">この内容には Pro の機能が必要です。言い方を変えて、もう一度お話しください</string>
+    <string name="voice_progress_app">「%1$s」を作っています</string>
+    <string name="voice_progress_app_tabs">「%1$s」を作っています(%2$s)</string>
+    <string name="voice_progress_component">部品 %1$d: %2$s</string>
+    <string name="voice_progress_restart">やり直しています</string>
     <string name="voice_question_progress">質問 %1$d / %2$d</string>
     <string name="voice_quoted">「%1$s」</string>
     <string name="voice_rate_body">今日の上限に達しました。%1$sからまた使えます</string>
