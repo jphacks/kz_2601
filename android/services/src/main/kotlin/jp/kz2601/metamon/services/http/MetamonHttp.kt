@@ -94,6 +94,9 @@ class MetamonHttp(
 ) {
     val baseUrl: HttpUrl = baseUrl.toHttpUrl()
 
+    /** いまの UI の言語("ja" | "en")。`Accept-Language` と生成・相談の `locale` に使う(#843)。 */
+    fun language(): String = device.language()
+
     fun url(req: HttpRequest): HttpUrl = baseUrl.newBuilder().apply {
         req.path.forEach { addPathSegment(it) }
         req.query.forEach { (k, v) -> addQueryParameter(k, v) }

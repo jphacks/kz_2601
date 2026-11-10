@@ -1,5 +1,6 @@
 package jp.kz2601.metamon.renderer.components
 
+import androidx.annotation.StringRes
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.defaultMinSize
@@ -14,6 +15,7 @@ import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.compositionLocalOf
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.testTag
@@ -21,6 +23,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import jp.kz2601.metamon.dsl.Component
 import jp.kz2601.metamon.dsl.ComponentType
+import jp.kz2601.metamon.renderer.R
 import jp.kz2601.metamon.renderer.registry.LocalComponentRegistry
 import jp.kz2601.metamon.renderer.registry.RenderContext
 import jp.kz2601.metamon.renderer.theme.RenderTheme
@@ -43,12 +46,12 @@ fun DSLComponent(component: Component, ctx: RenderContext, modifier: Modifier = 
 }
 
 /** 描けない理由(iOS の `UnavailableComponent.Reason`)。 */
-enum class UnavailableReason(val message: String) {
+enum class UnavailableReason(@StringRes val message: Int) {
     /** この版が知らない type(新しい版の DSL)。 */
-    NEEDS_UPDATE("アプリを更新すると表示できます"),
+    NEEDS_UPDATE(R.string.renderer_unavailable_needs_update),
 
     /** type は知っているが、このビルド・端末では描けない。 */
-    UNAVAILABLE_HERE("この端末では使えません"),
+    UNAVAILABLE_HERE(R.string.renderer_unavailable_here),
     ;
 
     companion object {
@@ -60,19 +63,19 @@ enum class UnavailableReason(val message: String) {
 /** レジストリに無い部品の場所に出す控えめな枠(#536)。グリッドに穴を開けず、理由だけ短く出す。部品名は出さない。 */
 @Composable
 fun UnavailableComponent(component: Component, modifier: Modifier = Modifier) {
-    val reason = UnavailableReason.of(component)
+    val message = stringResource(UnavailableReason.of(component).message)
     Column(
         modifier
             .fillMaxWidth()
             .defaultMinSize(minHeight = 44.dp)
             .border(1.dp, RenderTheme.colors.hairline, RoundedCornerShape(RenderTheme.Radius.inner))
             .padding(RenderTheme.Spacing.sm)
-            .semantics { contentDescription = reason.message; testTag = "component.unavailable" },
+            .semantics { contentDescription = message; testTag = "component.unavailable" },
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center,
     ) {
         Text(
-            reason.message,
+            message,
             style = MaterialTheme.typography.labelSmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             textAlign = TextAlign.Center,

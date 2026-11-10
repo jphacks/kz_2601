@@ -1,7 +1,6 @@
 package jp.kz2601.metamon
 
 import android.content.Context
-import android.os.LocaleList
 import android.util.Log
 import jp.kz2601.metamon.dsl.AppDSL
 import jp.kz2601.metamon.dsl.AppDocument
@@ -11,6 +10,7 @@ import jp.kz2601.metamon.runtime.RuntimeHost
 import jp.kz2601.metamon.dsl.decode
 import jp.kz2601.metamon.dsl.fallback
 import jp.kz2601.metamon.dsl.screen
+import jp.kz2601.metamon.language.AppLocales
 import jp.kz2601.metamon.services.AIClient
 import jp.kz2601.metamon.services.AppConfigClient
 import jp.kz2601.metamon.services.AppEnvironment
@@ -108,10 +108,8 @@ class AppContainer(
 
             val tokens = AuthTokenProvider(auth)
             val clientInfo = ClientInfo(version = BuildConfig.VERSION_NAME, build = BuildConfig.VERSION_CODE.toString())
-            val language = {
-                val locales = LocaleList.getDefault()
-                ClientInfo.languageCode((0 until locales.size()).map(locales::get))
-            }
+            // アプリ内で選んだ言語(無ければ端末の言語)。リクエストごとに読むので切り替えはすぐ効く(#843)
+            val language = { AppLocales.languageCode(context) }
             val device = DeviceContext(language = language)
             // App Check(Play Integrity)はまだ無い: ヘッダ無しで送る(backend が enforce の環境では 401 になる)
             val client = MetamonHttp.defaultClient()
