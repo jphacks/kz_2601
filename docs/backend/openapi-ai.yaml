@@ -304,6 +304,15 @@ components:
               code: rate_limited
               message: 今日の利用上限(30)に達しました。10月26日 0:00からまた使えます。サインインすると上限が増えます。
               details: { scope: user, tier: anonymous, limit: 30, used: 29, remaining: 1, resetAt: '2026-10-25T15:00:00Z', retryAfterSec: 3600 }
+    CoinsPaymentRequired:
+      description: |
+        コインで払えない(#630・`COIN_BILLING_MODE=enforce` の時だけ返す。off / log では返さない)。generate・chat・text に付けるのは #630 の 2 段目(この契約では定義だけ)。
+        - `coins_insufficient`: 払う人(本人 / 共有アプリの作成者)のコインが押さえる量(`COIN_RESERVE_<OP>`)より少ない(`details.required`・`details.balance`・`details.payer` = self / creator)
+        - `allowance_exhausted` / `overflow_cap_reached`: サーバーの枠(3 段目)。ai では返さない予定だが、コードは共通
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+          example: { error: { code: coins_insufficient, message: 'not enough coins', details: { required: 5, balance: 2, payer: self } } }
     ProRequired:
       description: |
         Tailor It Pro が要る (#316)。`code: pro_required`、`details.features` は要る有料の機能 (`PaidFeature`)。iOS は課金画面を出す。
@@ -346,17 +355,20 @@ components:
               enum:
                 - account_deleted
                 - ai_paused
+                - allowance_exhausted
                 - app_check_failed
                 - appconfig_error
                 - appconfig_unreachable
                 - bad_output
                 - bad_request
+                - coins_insufficient
                 - forbidden
                 - free_plan_paused
                 - generation_failed
                 - internal
                 - invalid_dsl
                 - not_found
+                - overflow_cap_reached
                 - payload_too_large
                 - plan_limit_reached
                 - pro_required
