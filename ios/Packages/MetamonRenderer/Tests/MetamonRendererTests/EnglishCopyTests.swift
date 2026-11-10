@@ -36,5 +36,6 @@ final class EnglishCopyTests: XCTestCase {
 
     func testMusicCopyIsEnglish() {
         XCTAssertEqual(MusicAvailability.noSubscription.message, "Playing songs needs an Apple Music subscription")
+        XCTAssertEqual(L("システム設定を開く"), "Open System Settings")
     }
 }

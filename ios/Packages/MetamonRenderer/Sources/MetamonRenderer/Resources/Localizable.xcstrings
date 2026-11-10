@@ -2976,6 +2976,23 @@
         }
       }
     },
+    "システム設定を開く" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Open System Settings"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "システム設定を開く"
+          }
+        }
+      }
+    },
     "シミュレータ用: 読み取り結果を手入力" : {
       "extractionState" : "manual",
       "localizations" : {

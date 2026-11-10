@@ -20,4 +20,17 @@ final class MusicSessionDefaultTests: XCTestCase {
         XCTAssertFalse(message.contains("System Settings") || message.contains("システム設定"), message)
         #endif
     }
+
+    /// #1377: Mac で断られた時だけ「メディアと Apple Music」の画面を開ける。iOS は出さない。
+    func testSettingsURLOnlyForDeniedOnMac() {
+        #if os(macOS)
+        XCTAssertEqual(MusicAvailability.denied.settingsURL?.absoluteString,
+                       "x-apple.systempreferences:com.apple.preference.security?Privacy_Media")
+        #else
+        XCTAssertNil(MusicAvailability.denied.settingsURL)
+        #endif
+        for a in [MusicAvailability.notDetermined, .ready, .restricted, .noSubscription, .unavailable] {
+            XCTAssertNil(a.settingsURL)
+        }
+    }
 }
