@@ -55,10 +55,12 @@ type Triager struct {
 	// BeforeCall, when set, may refuse a call (stop switch, monthly budget:
 	// #375). A non-nil error stops the run before the call.
 	BeforeCall func(ctx context.Context) error
-	// AfterCall, when set, receives each call's usage (budget, audit).
-	AfterCall func(ctx context.Context, u Usage)
-	// OnItem, when set, is called for each item whose status changed.
-	OnItem func(ctx context.Context, it loop.Item)
+	// AfterCall, when set, receives each call's usage (budget, audit). An
+	// error stops the run.
+	AfterCall func(ctx context.Context, u Usage, callErr error) error
+	// OnItem, when set, is called for each item whose status changed. An
+	// error stops the run.
+	OnItem func(ctx context.Context, it loop.Item) error
 	// nonce is set by tests; "" = random per call.
 	nonce string
 }
@@ -165,7 +167,9 @@ func (t *Triager) call(ctx context.Context, chunk []group, clusters []string, re
 	res.Usage.InputTokens += usage.InputTokens
 	res.Usage.OutputTokens += usage.OutputTokens
 	if t.AfterCall != nil {
-		t.AfterCall(ctx, usage)
+		if aerr := t.AfterCall(ctx, usage, err); aerr != nil {
+			return aerr
+		}
 	}
 	if err != nil {
 		// the call failed: leave the items new for the next run
@@ -244,7 +248,7 @@ func (t *Triager) update(ctx context.Context, it loop.Item) error {
 		return err
 	}
 	if t.OnItem != nil {
-		t.OnItem(ctx, it)
+		return t.OnItem(ctx, it)
 	}
 	return nil
 }

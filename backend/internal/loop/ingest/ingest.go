@@ -83,8 +83,9 @@ type Runner struct {
 	Policy Policy
 	Users  Users // nil = no deletion check (sources without a uid)
 	Now    func() time.Time
-	// OnItem, when set, is called for each stored item (audit, #375).
-	OnItem func(ctx context.Context, it loop.Item)
+	// OnItem, when set, is called for each stored item (audit, #375). An
+	// error stops the run.
+	OnItem func(ctx context.Context, it loop.Item) error
 	// Overlap re-reads this much before the cursor (late writes). Default 1h.
 	Overlap time.Duration
 }
@@ -150,7 +151,9 @@ func (r *Runner) Run(ctx context.Context, f Fetcher) (Stats, error) {
 			st.Held++
 		}
 		if r.OnItem != nil {
-			r.OnItem(ctx, it)
+			if err := r.OnItem(ctx, it); err != nil {
+				return st, err
+			}
 		}
 	}
 	if high.After(cursor) {

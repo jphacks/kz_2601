@@ -25,6 +25,7 @@ import (
 	"flag"
 	"fmt"
 	"io"
+	"log/slog"
 	"os"
 	"os/signal"
 	"strings"
@@ -62,8 +63,10 @@ func main() {
 	}
 	defer func() { _ = st.Close() }()
 	fmt.Fprintln(os.Stderr, "feedback-loop: firestore", target.String())
+	lf := loop.NewFirestore(st.Client())
 	a := &app{
-		loop:     loop.NewFirestore(st.Client()),
+		loop:     lf,
+		control:  lf,
 		feedback: st,
 		users:    st,
 		getenv:   os.Getenv,
@@ -83,11 +86,17 @@ const usageText = `usage: feedback-loop <command> [flags]
   triage-score -labels FILE                  agreement with a human's labels (lines: itemId,category)
   draft [-max-new 20]                        build issue drafts from triaged clusters (private queue)
   drafts list|show|edit|approve|reject|publish   the human review of drafts (see: drafts)
+  switch show | switch set -by NAME <stage|all> <on|off>   stop switches (#375)
+  audit [-since 168h] [-draft ID] [-item ID] [-summary]   the audit log / weekly review
+
+Every automatic stage runs only while LOOP_<STAGE>=on (intake, triage, draft,
+publish, notify) and loop_control/switches does not say off.
 `
 
 // app holds what the commands use (tests build it with in-memory parts).
 type app struct {
 	loop     loop.Store
+	control  loop.Control
 	feedback store.FeedbackReader
 	users    ingest.Users
 	// appStore, when set, replaces the App Store Connect fetcher (tests).
@@ -99,6 +108,8 @@ type app struct {
 	getenv    func(string) string
 	now       func() time.Time
 	out       io.Writer
+	// logger receives the loop.audit lines (nil = slog.Default).
+	logger *slog.Logger
 }
 
 func (a *app) run(ctx context.Context, args []string) error {
@@ -120,19 +131,54 @@ func (a *app) run(ctx context.Context, args []string) error {
 		return a.draftBuild(ctx, rest)
 	case "drafts":
 		return a.drafts(ctx, rest)
+	case "switch":
+		return a.switches(ctx, rest)
+	case "audit":
+		return a.audit(ctx, rest)
 	}
 	_, _ = io.WriteString(a.out, usageText)
 	return fmt.Errorf("unknown command %q", cmd)
 }
 
+func (a *app) gate() *loop.Gate {
+	return &loop.Gate{Control: a.control, Getenv: a.getenv, Now: a.now, Logger: a.logger}
+}
+
+// allow checks a stage's switches and records a refusal.
+func (a *app) allow(ctx context.Context, stage string) error {
+	g := a.gate()
+	if err := g.Allow(ctx, stage); err != nil {
+		return g.Stopped(ctx, stage, err)
+	}
+	return nil
+}
+
 func (a *app) runner() *ingest.Runner {
-	return &ingest.Runner{Store: a.loop, Policy: ingest.PolicyFromEnv(a.getenv), Users: a.users, Now: a.now}
+	g := a.gate()
+	return &ingest.Runner{Store: a.loop, Policy: ingest.PolicyFromEnv(a.getenv), Users: a.users, Now: a.now,
+		OnItem: func(ctx context.Context, it loop.Item) error { return g.Record(ctx, ingestEvent(it)) }}
+}
+
+// ingestEvent is the audit event of one stored item. The feedback id is
+// kept here (private) so a feedback can be followed to its issue (#375).
+func ingestEvent(it loop.Item) loop.Event {
+	e := loop.Event{Stage: loop.StageIntake, Action: "ingested", ItemID: it.ID, Reason: string(it.Source)}
+	if it.Source == loop.SourceInApp {
+		e.FeedbackID = it.SourceID
+	}
+	if it.Status == loop.ItemHeld {
+		e.Action, e.Reason = "held", it.HoldReason
+	}
+	return e
 }
 
 func (a *app) ingest(ctx context.Context, args []string) error {
 	fs := flag.NewFlagSet("ingest", flag.ContinueOnError)
 	only := fs.String("source", "", "only this source (in_app / app_store_review); default all that are on")
 	if err := fs.Parse(args); err != nil {
+		return err
+	}
+	if err := a.allow(ctx, loop.StageIntake); err != nil {
 		return err
 	}
 	var fetchers []ingest.Fetcher
@@ -192,6 +238,9 @@ func (a *app) ingestCrash(ctx context.Context, args []string) error {
 	if *issue == "" || *count <= 0 || *version == "" {
 		return errors.New("ingest-crash needs -issue, -count > 0 and -version")
 	}
+	if err := a.allow(ctx, loop.StageIntake); err != nil {
+		return err
+	}
 	spike := ingest.CrashSpike{IssueID: strings.TrimSpace(*issue), Type: strings.TrimSpace(*typ), Count: *count,
 		AppVersion: strings.TrimSpace(*version), At: a.now().UTC()}
 	// a hand-recorded spike is not bound by the source cursor
@@ -199,6 +248,11 @@ func (a *app) ingestCrash(ctx context.Context, args []string) error {
 	created, err := a.loop.PutItem(ctx, it)
 	if err != nil {
 		return err
+	}
+	if created {
+		if err := a.gate().Record(ctx, ingestEvent(it)); err != nil {
+			return err
+		}
 	}
 	fmt.Fprintf(a.out, "ingest-crash: %s created=%v\n", it.ID, created)
 	return nil

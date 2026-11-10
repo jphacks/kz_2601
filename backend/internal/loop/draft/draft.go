@@ -34,10 +34,12 @@ type Builder struct {
 	Now   func() time.Time
 	// MaxNew bounds new drafts per run (#365: 1 週の下書きの数に上限). Default 20.
 	MaxNew int
-	// OnDraft, when set, is called for each draft created or extended.
-	OnDraft func(ctx context.Context, d loop.Draft, created bool)
-	// OnItem, when set, is called for each item whose status changed.
-	OnItem func(ctx context.Context, it loop.Item)
+	// OnDraft, when set, is called for each draft created or extended. An
+	// error stops the run.
+	OnDraft func(ctx context.Context, d loop.Draft, created bool) error
+	// OnItem, when set, is called for each item whose status changed. An
+	// error stops the run.
+	OnItem func(ctx context.Context, it loop.Item) error
 }
 
 // Result counts one run.
@@ -127,7 +129,9 @@ func (b *Builder) Run(ctx context.Context) (Result, error) {
 			res.Created++
 		}
 		if b.OnDraft != nil {
-			b.OnDraft(ctx, d, !exists)
+			if err := b.OnDraft(ctx, d, !exists); err != nil {
+				return res, err
+			}
 		}
 		for _, it := range newItems {
 			it.Status, it.DraftID = loop.ItemDrafted, d.ID
@@ -145,7 +149,7 @@ func (b *Builder) updateItem(ctx context.Context, it loop.Item) error {
 		return err
 	}
 	if b.OnItem != nil {
-		b.OnItem(ctx, it)
+		return b.OnItem(ctx, it)
 	}
 	return nil
 }

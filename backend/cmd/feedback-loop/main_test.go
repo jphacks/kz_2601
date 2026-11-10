@@ -2,6 +2,8 @@ package main
 
 import (
 	"context"
+	"io"
+	"log/slog"
 	"strings"
 	"testing"
 	"time"
@@ -29,16 +31,24 @@ type testApp struct {
 	*app
 	fs  *store.Memory
 	ls  *loop.Memory
+	ctl *loop.MemoryControl
 	buf *strings.Builder
 	env env
 }
 
+// newTestApp turns every stage on unless e says otherwise.
 func newTestApp(t *testing.T, e env) *testApp {
 	t.Helper()
-	fs, ls, buf := store.NewMemory(), loop.NewMemory(), &strings.Builder{}
+	for _, s := range loop.Stages {
+		if _, ok := e[loop.EnvName(s)]; !ok {
+			e[loop.EnvName(s)] = "on"
+		}
+	}
+	fs, ls, ctl, buf := store.NewMemory(), loop.NewMemory(), loop.NewMemoryControl(), &strings.Builder{}
 	now := time.Date(2026, 11, 10, 3, 0, 0, 0, time.UTC)
-	a := &app{loop: ls, feedback: fs, users: fs, getenv: e.get, now: func() time.Time { return now }, out: buf}
-	return &testApp{app: a, fs: fs, ls: ls, buf: buf, env: e}
+	a := &app{loop: ls, control: ctl, feedback: fs, users: fs, getenv: e.get, now: func() time.Time { return now }, out: buf,
+		logger: slog.New(slog.NewTextHandler(io.Discard, nil))}
+	return &testApp{app: a, fs: fs, ls: ls, ctl: ctl, buf: buf, env: e}
 }
 
 func (ta *testApp) must(t *testing.T, args ...string) string {

@@ -44,11 +44,41 @@ func (a *app) triage(ctx context.Context, args []string) error {
 	if err := fs.Parse(args); err != nil {
 		return err
 	}
+	g := a.gate()
+	if err := g.AllowLLM(ctx); err != nil {
+		return g.Stopped(ctx, loop.StageTriage, err)
+	}
 	m, err := a.triageModel()
 	if err != nil {
 		return err
 	}
-	t := &triage.Triager{Store: a.loop, Model: m, Batch: *batch, MaxItems: *maxItems, Now: a.now}
+	t := &triage.Triager{Store: a.loop, Model: m, Batch: *batch, MaxItems: *maxItems, Now: a.now,
+		// re-checked before every call: a switch flipped mid-run, or the
+		// monthly cap reached, stops the next call
+		BeforeCall: func(ctx context.Context) error {
+			if err := g.AllowLLM(ctx); err != nil {
+				return g.Stopped(ctx, loop.StageTriage, err)
+			}
+			return nil
+		},
+		AfterCall: func(ctx context.Context, u triage.Usage, callErr error) error {
+			if _, err := a.control.AddUsage(ctx, loop.Month(a.now()), u.Total()); err != nil {
+				return err
+			}
+			e := loop.Event{Stage: loop.StageTriage, Action: "llm_call", Tokens: u.Total()}
+			if callErr != nil {
+				e.Action, e.Reason = "llm_call_failed", "error"
+			}
+			return g.Record(ctx, e)
+		},
+		OnItem: func(ctx context.Context, it loop.Item) error {
+			e := loop.Event{Stage: loop.StageTriage, Action: it.Status, ItemID: it.ID, Reason: it.HoldReason}
+			if it.Status == loop.ItemTriaged || it.Status == loop.ItemSpam {
+				e.Reason = it.Category + "/" + it.Priority
+			}
+			return g.Record(ctx, e)
+		},
+	}
 	res, err := t.Run(ctx)
 	if err != nil {
 		return err

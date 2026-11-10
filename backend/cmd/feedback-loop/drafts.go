@@ -29,7 +29,23 @@ func (a *app) draftBuild(ctx context.Context, args []string) error {
 	if err := fs.Parse(args); err != nil {
 		return err
 	}
-	res, err := (&draft.Builder{Store: a.loop, Now: a.now, MaxNew: *maxNew}).Run(ctx)
+	if err := a.allow(ctx, loop.StageDraft); err != nil {
+		return err
+	}
+	g := a.gate()
+	b := &draft.Builder{Store: a.loop, Now: a.now, MaxNew: *maxNew,
+		OnDraft: func(ctx context.Context, d loop.Draft, created bool) error {
+			action := "draft_extended"
+			if created {
+				action = "draft_created"
+			}
+			return g.Record(ctx, loop.Event{Stage: loop.StageDraft, Action: action, DraftID: d.ID, Reason: d.Priority})
+		},
+		OnItem: func(ctx context.Context, it loop.Item) error {
+			return g.Record(ctx, loop.Event{Stage: loop.StageDraft, Action: it.Status, ItemID: it.ID, DraftID: it.DraftID, Reason: it.HoldReason})
+		},
+	}
+	res, err := b.Run(ctx)
 	if err != nil {
 		return err
 	}
@@ -38,7 +54,8 @@ func (a *app) draftBuild(ctx context.Context, args []string) error {
 }
 
 func (a *app) reviewer() (*draft.Reviewer, error) {
-	r := &draft.Reviewer{Store: a.loop, Now: a.now, Repo: strings.TrimSpace(a.getenv(envIssueRepo))}
+	r := &draft.Reviewer{Store: a.loop, Now: a.now, Repo: strings.TrimSpace(a.getenv(envIssueRepo)),
+		BeforePublish: func(ctx context.Context) error { return a.allow(ctx, loop.StagePublish) }}
 	if r.Repo != "" && !github.ValidRepo(r.Repo) {
 		return nil, fmt.Errorf("%s must be owner/name", envIssueRepo)
 	}
@@ -115,6 +132,9 @@ func (a *app) drafts(ctx context.Context, args []string) error {
 		if err != nil {
 			return err
 		}
+		if err := a.gate().Record(ctx, loop.Event{Stage: loop.StageDraft, Action: "draft_edited", Actor: *by, DraftID: d.ID}); err != nil {
+			return err
+		}
 		fmt.Fprintf(a.out, "edited %s\n", d.ID)
 		return nil
 	case "reject":
@@ -122,22 +142,41 @@ func (a *app) drafts(ctx context.Context, args []string) error {
 		if err != nil {
 			return err
 		}
+		if err := a.gate().Record(ctx, loop.Event{Stage: loop.StageDraft, Action: "draft_rejected", Actor: *by, DraftID: d.ID}); err != nil {
+			return err
+		}
 		fmt.Fprintf(a.out, "rejected %s\n", d.ID)
 		return nil
 	case "approve":
 		d, iss, err := r.Approve(ctx, id, *by)
-		return a.afterPost("approved", d, iss, err)
+		if d != nil && d.Status != loop.DraftPending {
+			// the approval stands even if posting failed afterwards
+			if rerr := a.gate().Record(ctx, loop.Event{Stage: loop.StageDraft, Action: "draft_approved", Actor: *by, DraftID: d.ID, BodyHash: d.BodyHash}); rerr != nil {
+				return errors.Join(err, rerr)
+			}
+		}
+		return a.afterPost(ctx, "approved", *by, d, iss, err)
 	case "publish":
 		d, iss, err := r.Publish(ctx, id)
-		return a.afterPost("published", d, iss, err)
+		return a.afterPost(ctx, "published", *by, d, iss, err)
 	}
 	_, _ = fmt.Fprint(a.out, draftsUsage)
 	return fmt.Errorf("unknown drafts command %q", sub)
 }
 
-func (a *app) afterPost(verb string, d *loop.Draft, iss *github.Issue, err error) error {
+func (a *app) afterPost(ctx context.Context, verb, by string, d *loop.Draft, iss *github.Issue, err error) error {
 	if err != nil {
 		return err
+	}
+	if iss != nil {
+		actor := by
+		if actor == "" {
+			actor = loop.ActorLoop
+		}
+		if err := a.gate().Record(ctx, loop.Event{Stage: loop.StagePublish, Action: "issue_created", Actor: actor, DraftID: d.ID,
+			IssueRepo: d.IssueRepo, Issue: d.IssueNumber, BodyHash: d.BodyHash}); err != nil {
+			return err
+		}
 	}
 	if iss == nil {
 		fmt.Fprintf(a.out, "%s %s (dry run: %s is not set, nothing was posted). This is the issue that would be created:\n\n", verb, d.ID, envIssueRepo)
