@@ -29,8 +29,8 @@ struct MacRootView: View {
                 if let app = selectedApp {
                     AppCanvas(app: app).id(app.id)
                 } else {
-                    ContentUnavailableView("アプリを選んでください", systemImage: "sidebar.left",
-                                           description: Text("左の一覧から選ぶと、ここに表示します。"))
+                    MacEmptyState(pose: .point, title: "アプリを選んでください",
+                                  message: "左の一覧から選ぶと、ここに表示します。")
                 }
             }
             .frame(minWidth: 480, minHeight: 400)
