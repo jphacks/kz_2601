@@ -32,6 +32,21 @@ final class MacRuntimeNotifications {
 
     private var scheduler: any NotificationScheduler { Self.scheduler }
 
+    /// 消したアプリ(#1324)。開いていたランタイムの遅れた予約し直しで、消した予約を戻さない(appId は使い回さない)
+    private static var removedAppIds: Set<String> = []
+
+    /// アプリを消した時: そのアプリの通知とタイマーの予約を消す(iOS の削除と同じ `AppNotificationCleanup`)。
+    static func removeApp(_ appId: String) async {
+        removedAppIds.insert(appId)
+        await AppNotificationCleanup.removeApp(appId, notifications: scheduler)
+    }
+
+    /// 見ているランタイム。消したアプリなら nil(何も予約しない)
+    private var liveRuntime: MacAppRuntime? {
+        guard let runtime, !Self.removedAppIds.contains(runtime.appId) else { return nil }
+        return runtime
+    }
+
     /// ランタイムを作った時に 1 回。
     func start(_ runtime: MacAppRuntime) {
         self.runtime = runtime
@@ -54,7 +69,7 @@ final class MacRuntimeNotifications {
     // MARK: - ボタン
 
     func perform(_ action: Action) async {
-        guard let runtime else { return }
+        guard let runtime = liveRuntime else { return }
         switch action.type {
         case .scheduleNotification:
             guard let spec = action.notification else { return }
@@ -108,15 +123,16 @@ final class MacRuntimeNotifications {
     }
 
     func syncNow() async {
-        guard let runtime else { return }
+        guard let runtime = liveRuntime else { return }
         let specs = self.specs
         let recs = await records(for: Set(specs.compactMap(\.recordEntity)), runtime)
+        guard liveRuntime != nil else { return } // 読んでいる間に消された: 消した予約を戻さない
         let result = await scheduler.sync(appId: runtime.appId, specs: specs, records: recs)
         handle(result, hasSpecs: !specs.isEmpty)
     }
 
     func refresh() async {
-        guard let runtime else { return }
+        guard let runtime = liveRuntime else { return }
         let result = await scheduler.refresh(appId: runtime.appId)
         handle(result, hasSpecs: !specs.isEmpty)
     }
@@ -143,11 +159,12 @@ final class MacRuntimeNotifications {
 
     /// iOS と同じ: 未表示の entity は端末内 DB から読む(読み込み前の空で評価して誤って鳴らさない)。
     func checkConditionsNow() async {
-        guard let runtime else { return }
+        guard let runtime = liveRuntime else { return }
         let dsl = runtime.dsl
         let specs = dsl.app.notifications.filter(\.isConditional)
         guard !specs.isEmpty else { return }
         let recs = await records(for: Set(dsl.entities.map(\.id)), runtime)
+        guard liveRuntime != nil else { return } // 読んでいる間に消された: 消したアプリの通知を出さない
         let current = ConditionNotifications.evaluate(specs, dsl: dsl, records: recs)
         let fire = await ConditionNotificationStore.shared.update(appId: runtime.appId, current: current)
         for spec in specs where fire.contains(spec.id) {
