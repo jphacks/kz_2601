@@ -21,6 +21,8 @@
 | `android/dsl/**` だけ(PR) | `android-light` | `./gradlew :dsl:test` |
 | `docs/dsl/conformance/expr/**` だけ | `android-light` | `./gradlew :dsl:test` |
 | `docs/dsl/icon-map.json`・backend の `*.go`(テスト以外) | `android-light` | `:renderer` の `SymbolIconTableTest` |
+| iOS の `ClientCapabilities.swift` | `android-light` | `:renderer` の `DeviceCapabilitiesTest` |
+| iOS の `Localizable.xcstrings` | `android-light` | `:app` の `RuntimeCopyIosEnglishTest` |
 | それ以外の `android/**`・`docs/dsl/conformance/**`・`docs/dsl/examples/**`・`docs/dsl/dsl.schema.json`・このワークフロー | `android-build` | `./gradlew test assembleStgDebug` + lint(非ブロッキング) |
 | develop / main への push で `android/dsl/**` を含む | `android-build` | 同上 |
 | 上記以外 | なし | なし(`android-ci` は成功で終わる) |

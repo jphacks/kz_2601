@@ -7,6 +7,8 @@
 #   | android/dsl/** だけ(PR)                               | light | :dsl:test                                        |
 #   | docs/dsl/conformance/expr/** だけ                      | light | :dsl:test(Expr の共有テストデータ #545)         |
 #   | docs/dsl/icon-map.json・backend の *.go(テスト以外)   | light | SymbolIconTableTest(アイコン表の漏れ検査)      |
+#   | iOS の ClientCapabilities.swift                         | light | DeviceCapabilitiesTest(機能のキーの突き合わせ)  |
+#   | iOS の Localizable.xcstrings                            | light | RuntimeCopyIosEnglishTest(英語の文言の突き合わせ)|
 #   | それ以外の android/**(*.md 以外)                      | full  | test・assembleStgDebug・lint(非ブロッキング)   |
 #   | docs/dsl/conformance/**(適合テスト #352)・examples/**・dsl.schema.json | full | 同上            |
 #   | .github/workflows/android-ci.yml                       | full  | 同上                                             |
@@ -74,6 +76,11 @@ jobs:
             icons:
               - '{docs/dsl/icon-map.json,backend/**/*.go}'
               - '!backend/**/*_test.go'
+            # Android のテストが読む iOS のファイル(DeviceCapabilitiesTest・RuntimeCopyIosEnglishTest)
+            ioscaps:
+              - 'ios/Packages/MetamonDSL/Sources/MetamonDSL/Model/ClientCapabilities.swift'
+            iosstrings:
+              - 'ios/Metamon/Resources/Localizable.xcstrings'
             workflow:
               - '.github/workflows/android-ci.yml'
 
@@ -87,6 +94,8 @@ jobs:
           DOCS: ${{ steps.filter.outputs.docs }}
           SCHEMA: ${{ steps.filter.outputs.schema }}
           ICONS: ${{ steps.filter.outputs.icons }}
+          IOSCAPS: ${{ steps.filter.outputs.ioscaps }}
+          IOSSTRINGS: ${{ steps.filter.outputs.iosstrings }}
           WORKFLOW: ${{ steps.filter.outputs.workflow }}
         run: |
           set -eu
@@ -99,8 +108,19 @@ jobs:
             if [ "$DSL" = true ] || [ "$EXPR" = true ]; then
               tasks=":dsl:test"
             fi
+            # 同じタスクを 2 回並べないよう、:renderer の --tests はまとめて 1 回にする
+            renderer=""
             if [ "$ICONS" = true ]; then
-              tasks="${tasks} :renderer:testDebugUnitTest --tests jp.kz2601.metamon.renderer.theme.SymbolIconTableTest"
+              renderer="${renderer} --tests jp.kz2601.metamon.renderer.theme.SymbolIconTableTest"
+            fi
+            if [ "$IOSCAPS" = true ]; then
+              renderer="${renderer} --tests jp.kz2601.metamon.renderer.DeviceCapabilitiesTest"
+            fi
+            if [ -n "$renderer" ]; then
+              tasks="${tasks} :renderer:testDebugUnitTest${renderer}"
+            fi
+            if [ "$IOSSTRINGS" = true ]; then
+              tasks="${tasks} :app:testStgDebugUnitTest --tests jp.kz2601.metamon.language.RuntimeCopyIosEnglishTest"
             fi
             [ -n "$tasks" ] && mode=light
           fi
