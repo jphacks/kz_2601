@@ -9,5 +9,6 @@ class MetamonApplication : Application() {
     override fun onCreate() {
         super.onCreate()
         container = AppContainer.make(this)
+        container.recordSync.start()
     }
 }
