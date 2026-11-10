@@ -3,9 +3,17 @@
 
 package jp.kz2601.metamon.dsl
 
+import kotlinx.serialization.ExperimentalSerializationApi
+import kotlinx.serialization.KSerializer
+import kotlinx.serialization.KeepGeneratedSerializer
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.Transient
+import kotlinx.serialization.encoding.Decoder
+import kotlinx.serialization.encoding.Encoder
+import kotlinx.serialization.json.JsonDecoder
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
 
 /** 部品の種類(Container の enum と Leaf の const)。知らない値は [UNKNOWN]。 */
 @Serializable(with = ComponentTypeSerializer::class)
@@ -99,7 +107,9 @@ internal object ComponentTypeSerializer : LenientEnumSerializer<ComponentType>(
 )
 
 /** 部品 1 つ。全部品のキーを平らに持つ(#351 §7)。部品ごとに使えるキーは [DslKeys.component]。 */
-@Serializable
+@OptIn(ExperimentalSerializationApi::class)
+@KeepGeneratedSerializer
+@Serializable(with = ComponentSerializer::class)
 data class Component(
     val type: ComponentType = ComponentType.UNKNOWN,
     @Serializable(with = LenientStringSerializer::class)
@@ -316,6 +326,25 @@ data class Component(
     val region: String? = null,
     @Serializable(with = LenientStringSerializer::class)
     val feedId: String? = null,
+    /** JSON の type の元の文字列。知らない type([ComponentType.UNKNOWN])でも残る(描画の木・「更新すると表示」に使う)。 */
+    @Transient
+    val rawType: String = "",
 ) {
     companion object
+}
+
+@OptIn(ExperimentalSerializationApi::class)
+internal object ComponentSerializer : KSerializer<Component> {
+    private val generated: KSerializer<Component> = Component.generatedSerializer()
+    override val descriptor = generated.descriptor
+
+    override fun deserialize(decoder: Decoder): Component {
+        val input = decoder as? JsonDecoder ?: return generated.deserialize(decoder)
+        val element = input.decodeJsonElement()
+        val component = input.json.decodeFromJsonElement(generated, element)
+        val raw = ((element as? JsonObject)?.get("type") as? JsonPrimitive)?.takeIf { it.isString }?.content
+        return if (raw == null) component else component.copy(rawType = raw)
+    }
+
+    override fun serialize(encoder: Encoder, value: Component) = generated.serialize(encoder, value)
 }

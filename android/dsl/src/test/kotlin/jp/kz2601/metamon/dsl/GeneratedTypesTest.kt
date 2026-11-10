@@ -150,6 +150,8 @@ class GeneratedTypesTest {
         val card = dsl.screens.single().components.single()
         assertTrue(card.type.isContainer)
         assertEquals(listOf(ComponentType.TEXT, ComponentType.UNKNOWN), card.children.map { it.type })
+        assertEquals(listOf("text", "newThing"), card.children.map { it.rawType })
+        assertEquals("card", card.rawType)
     }
 
     // ---- helpers -----------------------------------------------------------

@@ -59,17 +59,17 @@ func (g *generator) renderModels() string {
 			continue
 		}
 		body.WriteString("\n")
-		body.WriteString(g.renderClass(c))
+		body.WriteString(g.renderClass(c, "@Serializable", nil))
 	}
 	b.WriteString(body.String())
 	b.WriteString(g.renderLenientObjects(false))
 	return b.String()
 }
 
-func (g *generator) renderClass(c *class) string {
+func (g *generator) renderClass(c *class, annotations string, extra []string) string {
 	var b strings.Builder
-	b.WriteString("@Serializable\n")
-	if len(c.props) == 0 {
+	b.WriteString(annotations + "\n")
+	if len(c.props) == 0 && len(extra) == 0 {
 		fmt.Fprintf(&b, "class %s", c.name)
 	} else {
 		fmt.Fprintf(&b, "data class %s(\n", c.name)
@@ -77,6 +77,9 @@ func (g *generator) renderClass(c *class) string {
 			for _, line := range g.propLines(c, p) {
 				b.WriteString("    " + line + "\n")
 			}
+		}
+		for _, line := range extra {
+			b.WriteString("    " + line + "\n")
 		}
 		b.WriteString(")")
 	}
@@ -202,9 +205,17 @@ func (g *generator) renderComponent() string {
 	var b strings.Builder
 	b.WriteString(header)
 	b.WriteString(imports(
+		"kotlinx.serialization.ExperimentalSerializationApi",
+		"kotlinx.serialization.KSerializer",
+		"kotlinx.serialization.KeepGeneratedSerializer",
 		"kotlinx.serialization.Serializable",
+		"kotlinx.serialization.Transient",
+		"kotlinx.serialization.encoding.Decoder",
+		"kotlinx.serialization.encoding.Encoder",
+		"kotlinx.serialization.json.JsonDecoder",
 		"kotlinx.serialization.json.JsonElement",
 		"kotlinx.serialization.json.JsonObject",
+		"kotlinx.serialization.json.JsonPrimitive",
 	))
 	b.WriteString("\n/** 部品の種類(Container の enum と Leaf の const)。知らない値は [UNKNOWN]。 */\n")
 	b.WriteString("@Serializable(with = ComponentTypeSerializer::class)\n")
@@ -220,7 +231,14 @@ func (g *generator) renderComponent() string {
 	b.WriteString("    UNKNOWN(\"\"),\n}\n")
 	b.WriteString(enumSerializer("ComponentType", "UNKNOWN"))
 	b.WriteString("\n/** 部品 1 つ。全部品のキーを平らに持つ(#351 §7)。部品ごとに使えるキーは [DslKeys.component]。 */\n")
-	b.WriteString(g.renderClass(g.byName[componentName]))
+	b.WriteString(g.renderClass(g.byName[componentName],
+		"@OptIn(ExperimentalSerializationApi::class)\n@KeepGeneratedSerializer\n@Serializable(with = ComponentSerializer::class)",
+		[]string{
+			"/** JSON の type の元の文字列。知らない type([ComponentType.UNKNOWN])でも残る(描画の木・「更新すると表示」に使う)。 */",
+			"@Transient",
+			`val rawType: String = "",`,
+		}))
+	b.WriteString(componentSerializer)
 	b.WriteString(g.renderLenientObjects(true))
 	return b.String()
 }
@@ -439,3 +457,23 @@ func (g *generator) renderKeys() string {
 	b.WriteString("}\n")
 	return b.String()
 }
+
+// componentSerializer reads with the plugin serializer, then keeps the raw
+// type string (iOS Component.rawType).
+const componentSerializer = `
+@OptIn(ExperimentalSerializationApi::class)
+internal object ComponentSerializer : KSerializer<Component> {
+    private val generated: KSerializer<Component> = Component.generatedSerializer()
+    override val descriptor = generated.descriptor
+
+    override fun deserialize(decoder: Decoder): Component {
+        val input = decoder as? JsonDecoder ?: return generated.deserialize(decoder)
+        val element = input.decodeJsonElement()
+        val component = input.json.decodeFromJsonElement(generated, element)
+        val raw = ((element as? JsonObject)?.get("type") as? JsonPrimitive)?.takeIf { it.isString }?.content
+        return if (raw == null) component else component.copy(rawType = raw)
+    }
+
+    override fun serialize(encoder: Encoder, value: Component) = generated.serialize(encoder, value)
+}
+`
