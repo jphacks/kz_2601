@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- アプリの共有シート(リンクの発行・送る・QR・取り消し・#901)。文言は iOS の ShareAppSheet から -->
+<resources>
+    <string name="share_action">シェア</string>
+    <string name="share_close">閉じる</string>
+    <string name="share_copied">コピーしました</string>
+    <string name="share_copy">リンクをコピー</string>
+    <string name="share_creating">リンクを作成中</string>
+    <string name="share_failure_blank">まだ中身の無いアプリはシェアできません。声で作ってからシェアしてください</string>
+    <string name="share_failure_generic">リンクを作れませんでした</string>
+    <string name="share_failure_not_member">この共有に参加していません。招待リンクから参加してください</string>
+    <string name="share_failure_offline">リンクを作れませんでした。通信できる所でもう一度お試しください</string>
+    <string name="share_failure_unavailable">シェアはサーバー接続時のみ使えます</string>
+    <string name="share_qr_caption">カメラで読み取ると Tailor It で開きます</string>
+    <string name="share_qr_label">シェア用 QR コード</string>
+    <string name="share_retry">もう一度</string>
+    <string name="share_revoke">リンクを取り消す</string>
+    <string name="share_revoke_cancel">やめる</string>
+    <string name="share_revoke_confirm">取り消す</string>
+    <string name="share_revoke_failed">取り消せませんでした</string>
+    <string name="share_revoke_message">このリンクと QR コードはもう開けなくなります。参加済みの人はそのまま使えます。新しいリンクを作り直します。</string>
+    <string name="share_revoke_title">リンクを取り消しますか?</string>
+    <string name="share_revoked">リンクを取り消しました。もう開けません</string>
+    <string name="share_scope_copy">受け取った人は自分のアプリとして使えます(記録は共有されません)</string>
+    <string name="share_scope_members">受け取った人はリンクから参加して、記録を一緒に使えます</string>
+    <string name="share_scope_public">受け取った人もみんなの投稿が見られます</string>
+    <string name="share_send">リンクを送る</string>
+    <string name="share_send_message">Tailor It で「%1$s」を使ってみて\n%2$s</string>
+    <string name="share_settings_footer">リンクや QR コードで、いま使っているアプリをほかの人に渡せます</string>
+    <string name="share_settings_row">このアプリをシェア</string>
+    <string name="share_title">「%1$s」をシェア</string>
+    <string name="share_untitled">このアプリ</string>
+</resources>
