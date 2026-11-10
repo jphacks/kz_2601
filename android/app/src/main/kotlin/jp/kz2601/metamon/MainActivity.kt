@@ -22,6 +22,7 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import jp.kz2601.metamon.renderer.DSLView
 import jp.kz2601.metamon.renderer.theme.MetamonRenderTheme
+import jp.kz2601.metamon.renderer.theme.ReadableWidth
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -63,8 +64,11 @@ fun MetamonApp(container: AppContainer) {
             }
         },
     ) { padding ->
-        Column(Modifier.fillMaxSize().padding(padding)) {
-            DSLView(container.initialDsl, runtime)
+        // 横向き・タブレット・折りたたみでは幅を絞って中央に寄せる(iOS の readableWidth・#842)。
+        ReadableWidth(Modifier.padding(padding)) {
+            Column(Modifier.fillMaxSize()) {
+                DSLView(container.initialDsl, runtime)
+            }
         }
     }
 }
