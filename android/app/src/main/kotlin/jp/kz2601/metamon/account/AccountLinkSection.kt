@@ -34,9 +34,10 @@ import kotlinx.coroutines.launch
  * 匿名の人に出す「Google / Apple で続けて引き継ぐ」(#1101・iOS の `AppleLinkButton` と設定のフッター)。
  * Firebase の link なので uid は変わらず、作ったアプリとデータはそのまま。既に別のアカウントにある資格情報なら切り替えるかを確認する。
  * 切り替えると uid が変わり、匿名の時の端末のデータは持ち主の見張り(`AccountGuard`)が消す。
+ * [enabled] はサインアウト・削除の最中に false(重ねない)。
  */
 @Composable
-fun AccountLinkSection(session: AuthSession) {
+fun AccountLinkSection(session: AuthSession, enabled: Boolean = true) {
     val context = LocalContext.current
     val activity = context as? Activity
     val scope = rememberCoroutineScope()
@@ -62,7 +63,7 @@ fun AccountLinkSection(session: AuthSession) {
                         }
                     }
                 },
-                enabled = !busy,
+                enabled = enabled && !busy,
                 modifier = Modifier.fillMaxWidth().testTag("settings.account.linkGoogle"),
             ) { Text(stringResource(R.string.account_link_google)) }
         }
@@ -73,7 +74,7 @@ fun AccountLinkSection(session: AuthSession) {
                         if (session.linkWithApple(activity)) Toast.makeText(context, doneApple, Toast.LENGTH_LONG).show()
                     }
                 },
-                enabled = !busy,
+                enabled = enabled && !busy,
                 modifier = Modifier.fillMaxWidth().testTag("settings.account.linkApple"),
             ) { Text(stringResource(R.string.account_link_apple)) }
         }

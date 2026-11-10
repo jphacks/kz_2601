@@ -72,6 +72,18 @@ class AccountLinkSessionTest {
     }
 
     @Test
+    fun switchUnregistersPushOfAnonymousUidFirst() = runTest {
+        val auth = LinkAuth(linkFailure = AuthError.CredentialAlreadyInUse())
+        val uidAtUnregister = mutableListOf<String?>()
+        val session = AuthSession(auth, beforeSignOut = { uidAtUnregister += auth.currentUser.value?.uid })
+        session.linkWithGoogle { "t" }
+        assertTrue("引き継ぎ(uid そのまま)では消さない", uidAtUnregister.isEmpty())
+
+        assertTrue(session.switchToExistingAccount())
+        assertEquals("切り替えの前に匿名の uid の登録を消す", listOf<String?>("anon"), uidAtUnregister)
+    }
+
+    @Test
     fun dismissConflictStaysAnonymous() = runTest {
         val session = AuthSession(LinkAuth(linkFailure = AuthError.CredentialAlreadyInUse()))
         session.linkWithGoogle { "t" }

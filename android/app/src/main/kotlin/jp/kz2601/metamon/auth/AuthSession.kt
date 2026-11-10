@@ -94,7 +94,7 @@ class AuthSession(val service: AuthService, private val beforeSignOut: suspend (
 
     /**
      * [linkConflict] の後、その資格情報の既存アカウントへ切り替える。uid が変わるので、匿名の時の端末のデータは
-     * 持ち主の見張り(`AccountGuard`)が消す。
+     * 持ち主の見張り(`AccountGuard`)が消す。通知の登録は新しい uid で前面に戻った時に登録し直す。
      */
     suspend fun switchToExistingAccount(): Boolean {
         if (busy.value) return false
@@ -102,6 +102,8 @@ class AuthSession(val service: AuthService, private val beforeSignOut: suspend (
         busy.value = true
         linkProblem.value = null
         return try {
+            // 匿名の uid に付いた通知の端末の登録を先に消す(サインアウトと同じ・#887)。切り替え後は前の uid のトークンが無い
+            runBeforeSignOut()
             service.switchToPendingAccount()
             true
         } catch (e: CancellationException) {

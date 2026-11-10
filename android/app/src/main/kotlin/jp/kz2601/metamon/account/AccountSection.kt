@@ -117,10 +117,10 @@ fun AccountSection(container: AppContainer, user: AuthUser, busy: Boolean) {
         modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
     )
     // #1101: uid を保ったまま Google / Apple に引き継ぐ(作ったアプリとデータはそのまま)
-    if (user.isAnonymous) AccountLinkSection(session)
+    if (user.isAnonymous) AccountLinkSection(session, enabled = working == null)
     TextButton(
         onClick = { scope.launch { dialog = AccountDialog.SignOut(session.signOutPrompt(recordSync)) } },
-        enabled = working == null,
+        enabled = working == null && !busy, // 引き継ぎ・切り替えの最中にサインアウトを重ねない
         modifier = Modifier.padding(horizontal = 4.dp).testTag("settings.account.signOut"),
     ) { Text(stringResource(R.string.account_sign_out)) }
     TextButton(
