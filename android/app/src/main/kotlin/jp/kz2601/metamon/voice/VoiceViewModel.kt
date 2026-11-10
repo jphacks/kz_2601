@@ -3,6 +3,7 @@ package jp.kz2601.metamon.voice
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import jp.kz2601.metamon.dsl.AppDocument
+import jp.kz2601.metamon.dsl.isVoiceOnly
 import jp.kz2601.metamon.dsl.screen
 import jp.kz2601.metamon.services.AIClient
 import jp.kz2601.metamon.services.ChatMessage
@@ -45,6 +46,8 @@ class VoiceViewModel(
     /** 「このまま作る」で送る言葉(backend `buildNowPhrases` に一致する UI の言語の文) */
     private val buildNowUtterance: String = "このまま作って",
     private val log: (String) -> Unit = {},
+    /** サーバーの版の履歴(undo / redo)。null = 端末の履歴だけ(モック) */
+    private val versions: AppVersions? = null,
     scope: CoroutineScope? = null,
 ) : ViewModel() {
     private val scope: CoroutineScope = scope ?: viewModelScope
@@ -63,6 +66,10 @@ class VoiceViewModel(
 
     /** 状態カードの「もう一度」でやり直す操作 */
     private var retryAction: (() -> Unit)? = null
+
+    /** 端末の版の履歴(サーバーが履歴を返せない時の undo) */
+    private val localHistory = ArrayDeque<AppDocument>()
+    private var redoPoint: RedoPoint? = null
 
     init {
         this.scope.launch {
@@ -196,7 +203,9 @@ class VoiceViewModel(
         _state.update { it.copy(voiceOpen = false) }
     }
 
-    fun dismissSummary() = _state.update { it.copy(summary = null) }
+    fun dismissSummary() = _state.update { it.copy(summary = null, summaryAction = null, undone = null) }
+
+    fun dismissNotice() = _state.update { it.copy(notice = null) }
 
     fun dismissError() = _state.update {
         it.copy(error = null, phase = if (it.phase == VoicePhase.ERROR) VoicePhase.IDLE else it.phase)
@@ -236,11 +245,18 @@ class VoiceViewModel(
                 }
                 val hadChat = _state.value.isChatting
                 chatEpoch++
+                if (!before.dsl.isVoiceOnly && !result.unchanged) remember(before)
+                redoPoint = null
+                val undoable = canUndo(result.document)
                 _state.update {
                     it.copy(
                         phase = VoicePhase.DONE,
                         document = result.document,
                         summary = result.summary?.trim()?.ifEmpty { null },
+                        summaryAction = if (undoable) UndoAction.UNDO else null,
+                        undone = null,
+                        canUndo = undoable,
+                        canRedo = false,
                         progress = null,
                         transcript = "",
                         chat = emptyList(),
@@ -270,6 +286,92 @@ class VoiceViewModel(
         }
         s.copy(phase = VoicePhase.GENERATING, progress = next)
     }
+
+    // MARK: - 元に戻す / やり直す(#895・iOS の `AppRuntime.undo` / `redo`)
+
+    /**
+     * 直前の版に戻す。サーバーの履歴(`GET /versions` → `POST /versions/{n}/restore`)が使えなければ端末の履歴。
+     * [expectedVersion] はボタンを押した時点の版。押した後に版が変わっていたら(連打の 2 回目など)何もしない。
+     */
+    fun undo(expectedVersion: Int? = null) {
+        val s = _state.value
+        if (s.undoing || s.isGenerating || (expectedVersion != null && expectedVersion != s.document.version)) return
+        val before = s.document
+        _state.update { it.copy(undoing = true, notice = null) }
+        scope.launch {
+            versions?.let { store ->
+                try {
+                    val list = store.versions(appId())
+                    val current = list.firstOrNull()
+                    if (current != null) {
+                        val target = list.firstOrNull { it < current } ?: return@launch finishUndo(UndoNotice.NO_EARLIER)
+                        val doc = store.restore(appId(), target)
+                        log("undo ok: restored $target -> version ${doc.version}")
+                        // restore は新しい版を作るので、「やり直す」は戻す前の版(current)をもう一度 restore すればよい
+                        return@launch applyVersion(doc, RedoPoint(current, before, viaServer = true), UndoAction.UNDO)
+                    }
+                } catch (e: CancellationException) {
+                    throw e
+                } catch (e: Throwable) {
+                    log("undo via server failed, falling back to local history: $e")
+                }
+            }
+            val previous = localHistory.removeLastOrNull() ?: return@launch finishUndo(UndoNotice.NO_EARLIER)
+            applyVersion(previous, RedoPoint(before.version, before, viaServer = false), UndoAction.UNDO)
+        }
+    }
+
+    /** 戻す前の版に戻る。サーバー経由で戻したならその版を restore、端末の履歴で戻したなら当て直す。 */
+    fun redo(expectedVersion: Int? = null) {
+        val s = _state.value
+        val point = redoPoint ?: return
+        if (s.undoing || s.isGenerating || (expectedVersion != null && expectedVersion != s.document.version)) return
+        val current = s.document
+        _state.update { it.copy(undoing = true, notice = null) }
+        scope.launch {
+            if (point.viaServer) {
+                val doc = try {
+                    versions?.restore(appId(), point.version) ?: return@launch finishUndo(UndoNotice.REDO_FAILED)
+                } catch (e: CancellationException) {
+                    throw e
+                } catch (e: Throwable) {
+                    log("redo failed: $e")
+                    return@launch finishUndo(UndoNotice.REDO_FAILED)
+                }
+                applyVersion(doc, null, UndoAction.REDO)
+            } else {
+                remember(current)
+                applyVersion(point.document, null, UndoAction.REDO)
+            }
+        }
+    }
+
+    private fun applyVersion(doc: AppDocument, redo: RedoPoint?, done: UndoAction) {
+        redoPoint = redo
+        val undoable = canUndo(doc)
+        _state.update {
+            it.copy(
+                document = doc,
+                undoing = false,
+                summary = null,
+                undone = done,
+                summaryAction = if (redo != null) UndoAction.REDO else if (undoable) UndoAction.UNDO else null,
+                canUndo = undoable,
+                canRedo = redo != null,
+                error = null,
+            )
+        }
+    }
+
+    private fun finishUndo(notice: UndoNotice) = _state.update { it.copy(undoing = false, notice = notice) }
+
+    private fun remember(doc: AppDocument) {
+        localHistory.addLast(doc)
+        while (localHistory.size > LOCAL_HISTORY_LIMIT) localHistory.removeFirst()
+    }
+
+    private fun canUndo(doc: AppDocument): Boolean =
+        !doc.dsl.isVoiceOnly && ((versions != null && doc.version > 1) || localHistory.isNotEmpty())
 
     // MARK: - 相談(chat_first・iOS の AppRuntime+Clarify)
 
@@ -423,5 +525,8 @@ class VoiceViewModel(
     companion object {
         /** ready を見せてから自動で作るまで(iOS の `ClarifyFlow.autoBuildDelay`) */
         const val AUTO_BUILD_DELAY_MS = 1_500L
+
+        /** 端末に覚えておく版の数 */
+        const val LOCAL_HISTORY_LIMIT = 20
     }
 }

@@ -3,11 +3,9 @@ package jp.kz2601.metamon
 import android.content.Context
 import android.os.Bundle
 import android.util.Log
-import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
@@ -16,7 +14,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
-import androidx.compose.material3.OutlinedCard
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.rememberModalBottomSheetState
@@ -39,6 +36,8 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import jp.kz2601.metamon.dsl.AppDSL
 import jp.kz2601.metamon.dsl.AppDocument
+import jp.kz2601.metamon.feedback.FeedbackHost
+import jp.kz2601.metamon.feedback.UndoHeaderButtons
 import jp.kz2601.metamon.language.AppLocales
 import jp.kz2601.metamon.permissions.PermissionOffBarHost
 import jp.kz2601.metamon.renderer.DSLView
@@ -46,6 +45,7 @@ import jp.kz2601.metamon.renderer.theme.MetamonRenderTheme
 import jp.kz2601.metamon.renderer.theme.ReadableWidth
 import jp.kz2601.metamon.runtime.AppRuntime
 import jp.kz2601.metamon.services.GenerateProgress
+import jp.kz2601.metamon.voice.AppConfigVersions
 import jp.kz2601.metamon.voice.GeneratingView
 import jp.kz2601.metamon.voice.MicButton
 import jp.kz2601.metamon.voice.VoicePhase
@@ -96,6 +96,8 @@ fun MetamonApp(container: AppContainer) {
             buildNowUtterance = buildNow,
             // 発話・AI の返事を含むので debug だけ(release の logcat に個人の情報を出さない)
             log = { if (BuildConfig.DEBUG) Log.i(AppContainer.TAG, it) },
+            // モックはサーバーの版の履歴が無いので端末の履歴だけで戻す
+            versions = if (container.knobs.mock) null else AppConfigVersions(container.appConfig),
         )
     }
     val state by vm.state.collectAsStateWithLifecycle()
@@ -103,13 +105,6 @@ fun MetamonApp(container: AppContainer) {
     val runtimeState by runtime.state.collectAsStateWithLifecycle()
 
     LaunchedEffect(runtime) { runtime.bootstrap() }
-    // トースト・音声シートの見た目は描画の Issue で作る。いまは端末のトーストで出す
-    LaunchedEffect(runtimeState.toast) {
-        runtimeState.toast?.let {
-            Toast.makeText(context, it, Toast.LENGTH_SHORT).show()
-            runtime.dismissToast()
-        }
-    }
     // 部品のマイク(onVoiceInput)は音声のシートを開く
     LaunchedEffect(runtimeState.showVoiceSheet) {
         if (runtimeState.showVoiceSheet) {
@@ -177,7 +172,7 @@ fun MetamonApp(container: AppContainer) {
             } else {
                 // 横向き・タブレット・折りたたみでは幅を絞って中央に寄せる(iOS の readableWidth・#842)。
                 ReadableWidth {
-                    GeneratedApp(state, runtimeState.dsl, runtime, appId = runtimeState.document.appId, onDismissSummary = vm::dismissSummary)
+                    GeneratedApp(state, runtimeState.dsl, runtime, appId = runtimeState.document.appId)
                 }
                 MicButton(
                     state.copy(phase = VoicePhase.IDLE),
@@ -188,6 +183,8 @@ fun MetamonApp(container: AppContainer) {
                 )
             }
             if (state.isGenerating) GeneratingView(state, onCancel = vm::cancelGenerate)
+            // 要約と元に戻す・状態カード・トースト・削除の取り消し・確認ダイアログ(#895)
+            FeedbackHost(vm, state, runtime, runtimeState)
         }
     }
 
@@ -209,21 +206,17 @@ fun MetamonApp(container: AppContainer) {
 
     if (!state.isInitial && state.voiceOpen) {
         ModalBottomSheet(onDismissRequest = vm::closeVoice, sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)) {
+            UndoHeaderButtons(state, vm)
             VoiceRoute(vm, Modifier.fillMaxWidth())
         }
     }
 }
 
 @Composable
-private fun GeneratedApp(state: VoiceUiState, dsl: AppDSL, runtime: AppRuntime, appId: String, onDismissSummary: () -> Unit) {
+private fun GeneratedApp(state: VoiceUiState, dsl: AppDSL, runtime: AppRuntime, appId: String) {
     Column(Modifier.fillMaxSize()) {
-        // 部品が使う権限が断られていたら上に「オフ」のバー(#890・iOS の NotificationsOffBar)
+        // 部品が使う権限が断られていたら上に「オフ」のバー(#890・iOS の NotificationsOffBar)。要約は FeedbackHost が出す(#895)
         PermissionOffBarHost(dsl, appId, busy = state.isGenerating, summaryShowing = state.summary != null)
-        state.summary?.let { summary ->
-            OutlinedCard(Modifier.fillMaxWidth().padding(12.dp).clickable(onClick = onDismissSummary)) {
-                Text(summary, Modifier.padding(12.dp), style = MaterialTheme.typography.bodyMedium)
-            }
-        }
         DSLView(dsl, runtime)
     }
 }
