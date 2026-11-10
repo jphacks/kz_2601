@@ -40,6 +40,7 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import jp.kz2601.metamon.dsl.AppDSL
 import jp.kz2601.metamon.dsl.AppDocument
 import jp.kz2601.metamon.consent.AiConsentDialog
+import jp.kz2601.metamon.feedback.FeedbackComposerHost
 import jp.kz2601.metamon.feedback.FeedbackHost
 import jp.kz2601.metamon.feedback.UndoHeaderButtons
 import jp.kz2601.metamon.language.AppLocales
@@ -287,6 +288,8 @@ fun MetamonApp(container: AppContainer) {
             onLater = container.consentPrompt::later,
         )
     }
+    // フィードバックの画面(#319)と端末を振って開く仕組み。設定から開いた時に上に重ねる
+    FeedbackComposerHost(container)
 
     if (switcherOpen) {
         AppSwitcherDialog(

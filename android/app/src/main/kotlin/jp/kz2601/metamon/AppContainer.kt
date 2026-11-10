@@ -41,6 +41,10 @@ import jp.kz2601.metamon.services.CrashReporter
 import jp.kz2601.metamon.services.NoopCrashReporter
 import jp.kz2601.metamon.services.SpeechTranscriber
 import jp.kz2601.metamon.services.consent.AiButtonMetricsRecorder
+import jp.kz2601.metamon.feedback.FeedbackComposerLauncher
+import jp.kz2601.metamon.services.feedback.FeedbackClient
+import jp.kz2601.metamon.services.feedback.HttpFeedbackClient
+import jp.kz2601.metamon.services.feedback.MockFeedbackClient
 import jp.kz2601.metamon.services.consent.AiButtonMetricsSender
 import jp.kz2601.metamon.services.consent.AiConsentStore
 import jp.kz2601.metamon.services.consent.ConsentGatedAiClient
@@ -160,7 +164,12 @@ class AppContainer(
     private val social: SocialServices? = null,
     /** https の画像のキャッシュを消す(#841 の後片付け) */
     private val clearImageCache: () -> Unit = {},
+    /** アプリ内のフィードバックの送り先(`POST /v1/feedback`・#319)。モックは送った内容を覚えるだけ */
+    val feedback: FeedbackClient = MockFeedbackClient(),
 ) {
+    /** フィードバックの画面の出し入れ(設定の入口・端末を振った時) */
+    val feedbackComposer = FeedbackComposerLauncher()
+
     /** 画面の下に出す接続先の名前(モックなら "mock")。 */
     val environmentLabel: String get() = if (knobs.mock) "mock" else environment.name
 
@@ -342,6 +351,7 @@ class AppContainer(
                 removeLocalMedia = removeLocalMedia(context),
                 social = SocialServices(HttpMatchingClient(appConfigHttp), HttpModerationClient(appConfigHttp), MatchingAgeGate(prefs)),
                 clearImageCache = { RemoteImages.wipe(context) },
+                feedback = HttpFeedbackClient(appConfigHttp),
             )
         }
 

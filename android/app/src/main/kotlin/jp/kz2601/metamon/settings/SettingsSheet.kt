@@ -72,6 +72,7 @@ fun SettingsSheet(container: AppContainer, busy: Boolean, onDismiss: () -> Unit)
             HorizontalDivider(Modifier.padding(vertical = 8.dp))
             AuthorNameSection(container.authorProfile)
             HorizontalDivider(Modifier.padding(vertical = 8.dp))
+            jp.kz2601.metamon.feedback.FeedbackSettingsSection(container) // #319 フィードバックを送る(下に区切り線まで出す)
             PrivacySection(container)
             HorizontalDivider(Modifier.padding(vertical = 8.dp))
             // 他の人の行動で届く通知(#887)。共有・公開の記録があるアプリだけ
