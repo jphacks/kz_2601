@@ -33,7 +33,7 @@ data class DeviceCapabilities(
             Feature("matching", implemented = true, needs = ComponentType.MATCH_LIST),
             Feature("notification.when", implemented = true), // ConditionNotifications
             Feature("singleEntity", implemented = true), // ScreenForm・{"setting"}
-            // 管理者だけのボタン(visibleTo)が無い
+            // 管理者かは AppMembersStore で分かる(#903)が、visibleTo のボタンの出し分けが無い(#1089)
             Feature("dataRoles", implemented = false),
             Feature("addressedMessages", implemented = true), // members の選択(ChoiceLeaves)
             // 場所の通知: 計画と登録までで、見張り(Geofencing)が無い

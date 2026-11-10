@@ -17,6 +17,7 @@ import jp.kz2601.metamon.dsl.records.Record
 import jp.kz2601.metamon.dsl.records.RecordPermission
 import jp.kz2601.metamon.renderer.ActionContext
 import jp.kz2601.metamon.renderer.DSLRuntime
+import jp.kz2601.metamon.renderer.FormMember
 import jp.kz2601.metamon.renderer.components.audio.DictationHost
 import jp.kz2601.metamon.dsl.logic.ExternalUrlPolicy
 import jp.kz2601.metamon.renderer.NavigationHost
@@ -38,6 +39,7 @@ import jp.kz2601.metamon.renderer.navigation.NavigationState
 import jp.kz2601.metamon.renderer.navigation.Presentation
 import jp.kz2601.metamon.renderer.navigation.Route
 import jp.kz2601.metamon.services.AppSummary
+import jp.kz2601.metamon.services.sharing.AppMembersStore
 import jp.kz2601.metamon.services.http.RecordWriteDenial
 import jp.kz2601.metamon.services.local.DeletionTicket
 import jp.kz2601.metamon.services.local.RecordSyncEngine
@@ -128,6 +130,8 @@ class AppRuntime(
     socialServices: SocialServices? = null,
     /** 記録の保存期間(#482)。null なら自動で消さない(モック・テスト) */
     val retention: RecordRetentionRunner? = null,
+    /** 共有アプリの参加者と自分が管理者か(#903)。null なら読まない(モック・テスト) */
+    val members: AppMembersStore? = null,
 ) : DSLRuntime, NavigationHost, RecordWriter, TimerHost, AiChatPairSaving, AuthorNameHost,
     ModerationHost, MatchingHost, SocialPromptHost, BlockedUsersHost {
     private val _state = MutableStateFlow(RuntimeState(document))
@@ -266,6 +270,7 @@ class AppRuntime(
         _navigation.value = NavigationState.initial(doc.dsl)
         noteAppliedVersion(doc, switched)
         sweepRetention(noteDsl = true) // #482 保存期間の確認と期限切れの削除
+        members?.note(doc.appId, doc.dsl)
     }
 
     // アプリの持ち物(iOS の DeviceAppID・変身一覧・#881)
@@ -363,6 +368,7 @@ class AppRuntime(
         lastSavedForm = null
         entityCache = null
         _apps.value = emptyList()
+        members?.clear() // 前の人の参加者・管理者を次の人に見せない
         social.forget() // 前の人のブロックで次の人の投稿を隠さない(#877)
         val next = directory?.let { it.fresh(it.store.rotate()) } ?: document
         _state.value = RuntimeState(next)
@@ -644,7 +650,17 @@ class AppRuntime(
 
     override fun canEdit(entity: String, record: Record): Boolean = RecordPermission.canEdit(record, entityModel(entity), currentUserId())
 
-    override fun canDelete(entity: String, record: Record): Boolean = RecordPermission.canDelete(record, entityModel(entity), currentUserId())
+    override fun canDelete(entity: String, record: Record): Boolean =
+        RecordPermission.canDelete(record, entityModel(entity), currentUserId(), isAppAdmin)
+
+    /** 今のアプリで自分が管理者か(#272)。null = 分からない(読む前・読めなかった) */
+    val isAppAdmin: Boolean? get() = members?.get(document.appId)?.isAdmin
+
+    override val formMembers: List<FormMember>
+        get() = members?.get(document.appId)?.members.orEmpty().map { FormMember(it.uid, it.displayName) }
+
+    /** 一覧から外す(共有から抜けた後・#903)。保存した一覧はそのまま(次の取得で消える) */
+    fun forgetApp(appId: String) = _apps.update { list -> list.filter { it.id != appId } }
 
     suspend fun load(entities: Set<String>, force: Boolean = false) {
         for (e in entities) if (force || _state.value.records[e] == null) refresh(e)

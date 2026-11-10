@@ -42,6 +42,7 @@ import jp.kz2601.metamon.push.PushConsentSection
 import jp.kz2601.metamon.renderer.components.social.BlockedUsersSection
 import jp.kz2601.metamon.push.PushHost
 import jp.kz2601.metamon.services.RemainingToday
+import jp.kz2601.metamon.share.MembersSettingsRow
 import jp.kz2601.metamon.share.ShareSettingsRow
 import jp.kz2601.metamon.voice.ClarifySection
 import jp.kz2601.metamon.voice.ClarifySettings
@@ -74,6 +75,8 @@ fun SettingsSheet(
     busy: Boolean,
     onDismiss: () -> Unit,
     onShare: (() -> Unit)? = null,
+    /** 今のアプリの「参加している人」(#903)。共有の記録が無いアプリ・使えない構成では null */
+    onMembers: (() -> Unit)? = null,
     remainingToday: RemainingToday? = null,
     isPro: Boolean = false,
     onRefreshUsage: () -> Unit = {},
@@ -99,6 +102,7 @@ fun SettingsSheet(
             val runtimeState = container.runtime.state.collectAsStateWithLifecycle().value
             // 節の並びは iOS の `SettingsSheet.body` と同じ(アカウントの削除は Android では一番下の AccountSection に入っている)
             ShareSettingsRow(onShare) // 今のアプリの共有シート(#901)。使えない時は出さない
+            MembersSettingsRow(onMembers) // 参加している人(#903)
             AuthorNameSection(container.authorProfile)
             // ブロック中のユーザー(#877)。通報・ブロックが使える時だけ
             BlockedUsersSection(container.runtime)

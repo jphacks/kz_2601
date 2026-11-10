@@ -141,6 +141,7 @@ fun ShareSheet(target: ShareTarget, model: ShareSheetModel, onDismiss: () -> Uni
                     model.consumeNotice()
                 }
             }
+            LocalShareSheetExtras.current() // 参加している人など(#903)
         }
     }
 

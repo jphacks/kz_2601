@@ -22,6 +22,10 @@ import jp.kz2601.metamon.dsl.fallback
 import jp.kz2601.metamon.dsl.screen
 import jp.kz2601.metamon.language.AppLocales
 import jp.kz2601.metamon.notifications.LocalNotifications
+import jp.kz2601.metamon.services.sharing.AppMembersStore
+import jp.kz2601.metamon.services.sharing.HttpMembersClient
+import jp.kz2601.metamon.services.sharing.LeaveCleanup
+import jp.kz2601.metamon.services.sharing.MembersClient
 import jp.kz2601.metamon.push.FcmTokens
 import jp.kz2601.metamon.push.PushHost
 import jp.kz2601.metamon.services.AIClient
@@ -108,6 +112,7 @@ import jp.kz2601.metamon.services.sync.SseChangeEventSource
 import jp.kz2601.metamon.services.sync.asDocumentFetcher
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import kotlinx.coroutines.SupervisorJob
 import java.io.File
 import java.time.Instant
@@ -178,6 +183,10 @@ class AppContainer(
     private val talkBackRunning: () -> Boolean = { false },
     /** アプリ内のフィードバックの送り先(`POST /v1/feedback`・#319)。モックは送った内容を覚えるだけ */
     val feedback: FeedbackClient = MockFeedbackClient(),
+    /** 共有アプリの参加者(#903)。モックは null(参加者の欄を出さない) */
+    val members: MembersClient? = null,
+    /** そのアプリの通知を消す(共有から抜けた後・#903) */
+    private val removeAppNotifications: (String) -> Unit = {},
 ) {
     /** フィードバックの画面の出し入れ(設定の入口・端末を振った時) */
     val feedbackComposer = FeedbackComposerLauncher()
@@ -377,6 +386,8 @@ class AppContainer(
                 tutorial = FirstRunTutorialStore(SharedPreferencesKeyValueStore.of(context, FirstRunTutorialStore.PREFS)),
                 talkBackRunning = { TalkBack.isRunning(context) },
                 feedback = HttpFeedbackClient(appConfigHttp),
+                members = HttpMembersClient(appConfigHttp),
+                removeAppNotifications = { LocalNotifications.get(context).removeApp(it) },
             )
         }
 
@@ -475,6 +486,27 @@ class AppContainer(
         private const val RETENTION_PREFS = "metamon-retention"
     }
 
+    /** 今のアプリの参加者と自分が管理者か(#903)。部品の member の選択肢・管理者の削除が読む */
+    val membersStore = AppMembersStore(members, CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate))
+
+    /** 共有から抜けた後: 別のアプリへ切り替え、一覧から外し、自分のコピーと端末の記録・会話の履歴・通知を消す(#903) */
+    val leaveCleanup: LeaveCleanup by lazy {
+        LeaveCleanup(
+            currentAppId = { runtime.document.appId },
+            apps = { runtime.appsList() },
+            switchApp = { runtime.switchApp(it) },
+            startNewApp = { runtime.startNewApp() },
+            hideApp = { runtime.forgetApp(it) },
+            deleteCopy = { appConfig.deleteApp(it) },
+            purgeLocal = { id ->
+                recordSync.purge(id)
+                documentCache.remove(id)
+                withContext(Dispatchers.IO) { chatHistory.remove(id) }
+                removeAppNotifications(id)
+            },
+        )
+    }
+
     /** アプリ全体のランタイム(#889)。起動時に 1 つだけ作る。 */
     val runtime: AppRuntime by lazy {
         AppRuntime(
@@ -502,6 +534,7 @@ class AppContainer(
                 currentUserId = { activeOwner.uid?.takeIf { it == auth.currentUser.value?.uid } },
             ),
             undoGraceMillis = { TalkBack.recordUndoMillis(talkBackRunning()) },
+            members = membersStore,
         ).also { it.dictation = TranscriberDictationHost(transcriber, CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)) }
     }
 
