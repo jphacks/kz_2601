@@ -35,6 +35,11 @@ const (
 // Ops lists the ops in display order.
 var Ops = []string{OpGenerate, OpEdit, OpChat, OpText}
 
+// TextKinds are the heavier /v1/text calls that may hold their own amount
+// (COIN_RESERVE_TEXT_<KIND>, like the rate limit weights); unset = the TEXT
+// hold. The ledger op stays "text".
+var TextKinds = []string{"task", "long", "image"}
+
 // Allowance kinds shown by the config endpoint (ALLOWANCE_PRO_<KIND>; the
 // counting is part 3).
 var AllowanceKinds = []string{"runs", "recipients", "writes", "reads"}
@@ -81,6 +86,7 @@ const (
 //	COIN_PER_USD          coins per USD of est_cost_usd (default 0 = not counted)
 //	COIN_MIN_PER_CALL     least coins a counted call costs (default 1)
 //	COIN_RESERVE_<OP>     hold per op: GENERATE, EDIT, CHAT, TEXT (default 0)
+//	COIN_RESERVE_TEXT_<KIND>  hold of a /v1/text kind: TASK, LONG (aiChat too), IMAGE (unset = TEXT's)
 //	COIN_ESTIMATE_<OP>    "about N coins" shown per op (default 0 = not shown)
 //	COIN_PACKS            productId=coins,... consumables (default none)
 //	COIN_INITIAL_GRANT    one-time coins of a signed-in account (default 0)
@@ -122,6 +128,15 @@ func ConfigFromEnv(getenv func(string) string) (Config, error) {
 		num("COIN_RESERVE_"+strings.ToUpper(op), &r)
 		num("COIN_ESTIMATE_"+strings.ToUpper(op), &e)
 		c.Reserve[op], c.Estimates[op] = r, e
+	}
+	for _, k := range TextKinds {
+		key := "COIN_RESERVE_TEXT_" + strings.ToUpper(k)
+		if strings.TrimSpace(getenv(key)) == "" {
+			continue
+		}
+		var r int64
+		num(key, &r)
+		c.Reserve[OpText+"_"+k] = r
 	}
 	for _, k := range AllowanceKinds {
 		var a int64
