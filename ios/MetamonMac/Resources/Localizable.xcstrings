@@ -510,6 +510,40 @@
         }
       }
     },
+    "「%@」を削除しました" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Deleted “%@”"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "「%@」を削除しました"
+          }
+        }
+      }
+    },
+    "「%@」を削除しますか?" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Delete “%@”?"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "「%@」を削除しますか?"
+          }
+        }
+      }
+    },
     "「AI で書く」ボタン(文を作る・要約・分類・書き直し・抜き出し・提案)は、押した時だけ送ります。短い答えは、端末の中の AI が使える時は送らず、使えない時だけ最近の記録と入力中の文字(最大 4KB)を送ります。長い答えのボタンは、いつも最大 16KB を送ります。共有のアプリで材料にするのは、自分が入れた記録だけです。" : {
       "localizations" : {
         "en" : {
@@ -1646,6 +1680,23 @@
         }
       }
     },
+    "アプリの一覧と画面の上に出る名前です(%lld文字まで)。" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Shown in the app list and at the top of the app (up to %lld characters)."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "アプリの一覧と画面の上に出る名前です(%lld文字まで)。"
+          }
+        }
+      }
+    },
     "アプリの一覧へ" : {
       "localizations" : {
         "en" : {
@@ -1658,6 +1709,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "アプリの一覧へ"
+          }
+        }
+      }
+    },
+    "アプリの名前" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "App name"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "アプリの名前"
           }
         }
       }
@@ -2521,6 +2589,23 @@
         }
       }
     },
+    "上へ移動" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Move Up"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "上へ移動"
+          }
+        }
+      }
+    },
     "上限に達しました" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -2566,6 +2651,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "下のタブ"
+          }
+        }
+      }
+    },
+    "下へ移動" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Move Down"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "下へ移動"
           }
         }
       }
@@ -2762,6 +2864,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "他の人の行動で届く通知"
+          }
+        }
+      }
+    },
+    "作ったアプリ" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Apps you made"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "作ったアプリ"
           }
         }
       }
@@ -2990,6 +3109,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "元に戻す"
+          }
+        }
+      }
+    },
+    "元に戻せません。" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "This can't be undone."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "元に戻せません。"
           }
         }
       }
@@ -3223,6 +3359,23 @@
         }
       }
     },
+    "削除…" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Delete…"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "削除…"
+          }
+        }
+      }
+    },
     "削除しました" : {
       "localizations" : {
         "en" : {
@@ -3431,6 +3584,57 @@
         }
       }
     },
+    "同梱の例" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Examples"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "同梱の例"
+          }
+        }
+      }
+    },
+    "名前を変える" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Rename"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "名前を変える"
+          }
+        }
+      }
+    },
+    "名前を変える…" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Rename…"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "名前を変える…"
+          }
+        }
+      }
+    },
     "問い合わせの時は、この内容を伝えてください。" : {
       "localizations" : {
         "en" : {
@@ -3571,6 +3775,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "変えられませんでした"
+          }
+        }
+      }
+    },
+    "変更" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Change"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "変更"
           }
         }
       }

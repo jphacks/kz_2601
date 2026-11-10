@@ -86,7 +86,8 @@ final class MacComposeSession: Identifiable {
     @ObservationIgnored private let isConsentGranted: @MainActor () -> Bool
     @ObservationIgnored private var task: Task<Void, Never>?
     /// 結果を中央に当てる(MacRootView がアプリの一覧を差し替える)
-    @ObservationIgnored var onResult: (AppDocument) -> Void = { _ in }
+    /// 2 つ目は端末に残す形(封筒・#969)
+    @ObservationIgnored var onResult: (AppDocument, Data?) -> Void = { _, _ in }
 
     var mode: ChatMode {
         if case .edit = target { return .edit }
@@ -312,7 +313,9 @@ final class MacComposeSession: Identifiable {
         var document = result.document
         document.appId = appId
         let summary = result.summary ?? L10n.tr("できあがりました")
-        let done: () -> Void = { [weak self] in self?.complete(document, summary: summary, unchanged: result.unchanged) }
+        let done: () -> Void = { [weak self] in
+            self?.complete(document, envelope: result.envelope, summary: summary, unchanged: result.unchanged)
+        }
         guard mode == .create, !result.unchanged else { done(); return }
         let plan = BuildChoreography.AssemblyPlan.make(for: document.dsl, reduceMotion: reduceMotion(), shown: job.live.parts)
         phase = .revealing(job, plan)
@@ -330,9 +333,9 @@ final class MacComposeSession: Identifiable {
         done()
     }
 
-    private func complete(_ document: AppDocument, summary: String, unchanged: Bool) {
+    private func complete(_ document: AppDocument, envelope: Data?, summary: String, unchanged: Bool) {
         if !unchanged {
-            onResult(document)
+            onResult(document, envelope)
             resultAppId = document.appId
         }
         withAnimation { phase = .finished(summary: summary, unchanged: unchanged) }
