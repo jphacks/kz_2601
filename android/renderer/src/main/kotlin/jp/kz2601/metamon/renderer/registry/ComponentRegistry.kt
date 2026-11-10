@@ -30,6 +30,7 @@ import jp.kz2601.metamon.renderer.components.TextLeaf
 import jp.kz2601.metamon.renderer.components.VStackContainer
 import jp.kz2601.metamon.renderer.components.VoiceInputLeaf
 import jp.kz2601.metamon.renderer.components.inputs.registerInputLeaves
+import jp.kz2601.metamon.renderer.components.lists.registerListLeaves
 import jp.kz2601.metamon.renderer.components.play.registerPlayLeaves
 import jp.kz2601.metamon.renderer.form.FormDraft
 import jp.kz2601.metamon.renderer.navigation.Route
@@ -92,6 +93,8 @@ class ComponentRegistry private constructor(private val builders: Map<String, Co
             register(ComponentType.GRID) { c, ctx, m -> GridContainer(c, ctx, m) }
             // input(12)・登録は components/inputs/InputLeaves.kt
             registerInputLeaves()
+            // leaf: 一覧・集計・グラフ(10・#859)・登録は components/lists/ListLeaves.kt
+            registerListLeaves()
             registerPlayLeaves() // leaf: 計算・遊び(5・#860)・components/play/PlayLeaves.kt
             // leaf: 表示(11・#857)
             register(ComponentType.TEXT) { c, _, m -> TextLeaf(c, m) }

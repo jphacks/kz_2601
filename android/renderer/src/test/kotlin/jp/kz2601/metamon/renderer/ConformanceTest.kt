@@ -49,6 +49,7 @@ import java.util.Locale
  * #357 で比べるもの: 画面の id・title・route・layout、部品の id・type・cell・stacked・band・localGrid・children、
  * Container 7 種と Android に登録済みの Leaf の state・props・actions、遷移だけの操作(tap / tapToolbar / back)の後の top と画面。
  * #858 で足したもの: フォーム画面の `form`(下書きの値)と入力 12 種の state(hidden / needsForm)・props(束縛中の値)。
+ * #859 で足したもの: 一覧・集計・グラフ 10 種の props(記録から解決した行・値・棒)と rowTap / dateTap の actions。
  *
  * skip(数だけ出して赤にしない): まだ無い Leaf の state・props・actions(`unavailable` / `unknown` の state は比べる)、
  * toolbar・saveBar、フォーム・レコードに触れる操作(input・保存・削除・行タップ・prefillRef …)とその後の step。

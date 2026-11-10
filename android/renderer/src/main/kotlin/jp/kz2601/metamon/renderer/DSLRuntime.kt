@@ -2,6 +2,7 @@ package jp.kz2601.metamon.renderer
 
 import jp.kz2601.metamon.dsl.Action
 import jp.kz2601.metamon.dsl.records.Entity
+import jp.kz2601.metamon.dsl.records.JSONValue
 import jp.kz2601.metamon.dsl.records.Record
 import jp.kz2601.metamon.renderer.form.FormDraft
 import jp.kz2601.metamon.renderer.navigation.NavigationState
@@ -52,6 +53,9 @@ interface DSLRuntime {
     fun canEdit(entity: String, record: Record): Boolean = true
 
     fun canDelete(entity: String, record: Record): Boolean = true
+
+    /** 一覧のワンタップ更新(list.item.toggle)。保存できたら true。既定は保存しない。 */
+    suspend fun updateRecord(entity: String, recordId: String, data: Map<String, JSONValue>): Boolean = false
 
     /** サインイン中の uid(hidden の項目・members から自分を外す)。 */
     fun currentUid(): String? = null
