@@ -103,6 +103,7 @@ private struct ImageContextMenu: ViewModifier {
         if let image {
             content
                 .contextMenu {
+                    ComponentTalkImageMenuItem() // 画像のメニューが先に出るので、ここにも置く(#1323)
                     ImageMenuItems(image: image, title: title) {
                         pending = .init(document: ImageFileDocument(image: image),
                                         fileName: ImageExport.fileName(title: title, fallback: L("写真"), date: Date()))

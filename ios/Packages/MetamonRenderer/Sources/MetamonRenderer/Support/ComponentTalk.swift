@@ -67,6 +67,18 @@ public extension EnvironmentValues {
     }
 }
 
+private struct ComponentTalkTargetKey: EnvironmentKey {
+    static let defaultValue: ComponentTalk.Target? = nil
+}
+
+extension EnvironmentValues {
+    /// いちばん内側の部品の話す先。部品の中の画像のメニュー(`imageContextMenu`)が先頭に「この部品について話す」を置くのに使う
+    var componentTalkTarget: ComponentTalk.Target? {
+        get { self[ComponentTalkTargetKey.self] }
+        set { self[ComponentTalkTargetKey.self] = newValue }
+    }
+}
+
 /// `DSLView` が部品ごとに付ける: 右クリックのメニューと VoiceOver の操作。
 struct ComponentTalkMenu: ViewModifier {
     @Environment(\.componentTalk) private var talk
@@ -78,6 +90,7 @@ struct ComponentTalkMenu: ViewModifier {
             let run = { talk.perform(ComponentTalk.target(component, route: ctx.route)) }
             if ComponentTalk.offersMenu(for: component.type) {
                 content
+                    .environment(\.componentTalkTarget, ComponentTalk.target(component, route: ctx.route))
                     .contextMenu { Button(talk.title, systemImage: ComponentTalkMenuItem.icon, action: run) }
                     .accessibilityAction(named: Text(talk.title), run)
             } else {
@@ -101,6 +114,19 @@ struct ComponentTalkMenuItem: View {
     var body: some View {
         if let talk {
             Button(talk.title, systemImage: Self.icon) { talk.perform(ComponentTalk.target(component, route: ctx.route)) }
+            Divider()
+        }
+    }
+}
+
+/// 部品の中の画像の右クリック(#1333)は部品のメニューより先に出るので、その先頭に置く。部品の外(ホストの画面)では何も出さない
+struct ComponentTalkImageMenuItem: View {
+    @Environment(\.componentTalk) private var talk
+    @Environment(\.componentTalkTarget) private var target
+
+    var body: some View {
+        if let talk, let target {
+            Button(talk.title, systemImage: ComponentTalkMenuItem.icon) { talk.perform(target) }
             Divider()
         }
     }
