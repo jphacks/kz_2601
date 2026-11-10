@@ -7,7 +7,7 @@ activityCompose = "1.12.4"
 # link を Custom Tabs で開く
 browser = "1.9.0"
 coreKtx = "1.18.0"
-# icon / label の Material アイコン(BOM から外れたので版を書く)。対応表は #842 で広げる
+# icon / label の Material アイコン(BOM から外れたので版を書く)。extended の絵は scripts/gen-symbol-icons.py で必要な分だけ取り込む(#842)
 materialIconsCore = "1.7.8"
 lifecycle = "2.10.0"
 kotlinxSerialization = "1.12.0"
