@@ -36,7 +36,6 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.viewmodel.compose.viewModel
 import jp.kz2601.metamon.dsl.AppDSL
 import jp.kz2601.metamon.dsl.AppDocument
@@ -57,6 +56,7 @@ import jp.kz2601.metamon.renderer.components.feed.LocalFeedHost
 import jp.kz2601.metamon.renderer.theme.MetamonRenderTheme
 import jp.kz2601.metamon.renderer.theme.ReadableWidth
 import jp.kz2601.metamon.runtime.AppRuntime
+import jp.kz2601.metamon.runtime.NavigationSnapshot
 import jp.kz2601.metamon.runtime.TranscriberDictationHost
 import jp.kz2601.metamon.services.GenerateProgress
 import jp.kz2601.metamon.voice.AppConfigVersions
@@ -84,7 +84,7 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
         val container = (application as MetamonApplication).container(DebugLaunch.knobs(intent))
-        if (savedInstanceState == null) offerPushOpen(intent)
+        if (savedInstanceState == null) offerPushOpen(intent) else restoreNavigation(container, savedInstanceState)
         setContent {
             MetamonRenderTheme {
                 MicrophoneAccessProvider { MetamonRoot(container) }
@@ -97,11 +97,21 @@ class MainActivity : ComponentActivity() {
         offerPushOpen(intent)
     }
 
-    // 前面へ戻った時に端末の登録を確かめる(通知の許可の画面から戻った時もここ・#887)
-    override fun onResume() {
-        super.onResume()
-        val push = (application as MetamonApplication).builtContainer?.push ?: return
-        lifecycleScope.launch { push.refresh() }
+    // 前面・背面の処理(送信待ち・取り直し・通知の登録など)は MetamonApplication の AppForeground が持つ(#891)
+
+    // プロセスが落とされても、戻った時に同じアプリの同じ画面を開く(#891)。記録・フォームの下書き・音声の画面は初めの状態に戻す
+    private fun restoreNavigation(container: AppContainer, savedInstanceState: Bundle?) {
+        container.runtime.offerNavigationRestore(NavigationSnapshot.decode(savedInstanceState?.getString(NAVIGATION_KEY)))
+    }
+
+    override fun onSaveInstanceState(outState: Bundle) {
+        super.onSaveInstanceState(outState)
+        val snapshot = (application as MetamonApplication).builtContainer?.runtime?.navigationSnapshot() ?: return
+        outState.putString(NAVIGATION_KEY, snapshot.encode())
+    }
+
+    private companion object {
+        const val NAVIGATION_KEY = "metamon.navigation"
     }
 
     /** 通知のタップ(自分で出した通知も、FCM が裏で出した通知も extra の `appId`)。 */

@@ -11,15 +11,18 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
+import jp.kz2601.metamon.MetamonApplication
 import jp.kz2601.metamon.R
 import jp.kz2601.metamon.services.permissions.AppPermission
 import jp.kz2601.metamon.services.permissions.PermissionRules
 import jp.kz2601.metamon.services.permissions.PermissionStatus
 import jp.kz2601.metamon.services.permissions.PermissionStep
+import kotlinx.coroutines.launch
 
 /**
  * 使う直前に権限を聞く関数を返す(iOS: 使う直前に理由 → OS のダイアログ。断られた後は「設定を開く」)。
@@ -33,10 +36,15 @@ fun rememberPermissionRequest(permission: AppPermission, explain: Boolean = true
     val activity = LocalActivity.current
     val center = remember(context) { PermissionCenter.get(context) }
     val callback by rememberUpdatedState(onResult)
+    val scope = rememberCoroutineScope()
     var dialog by remember { mutableStateOf<PermissionStep?>(null) }
     var before by remember { mutableStateOf(PermissionStatus.NOT_ASKED) }
     val launcher = rememberLauncherForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { results ->
         val after = center.record(permission, results, before, activity)
+        // アプリ内の OS のダイアログはプロセスの前面・背面を通らないので、通知の許可はここで端末の登録を確かめる(#887・#891)
+        if (permission == AppPermission.NOTIFICATIONS && after == PermissionStatus.GRANTED) {
+            (context.applicationContext as? MetamonApplication)?.builtContainer?.push?.let { scope.launch { it.refresh() } }
+        }
         callback(after == PermissionStatus.GRANTED)
     }
     val ask = {
