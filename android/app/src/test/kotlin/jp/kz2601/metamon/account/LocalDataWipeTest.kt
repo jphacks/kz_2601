@@ -40,6 +40,7 @@ class LocalDataWipeTest {
         val feedDir = tmp.newFolder("metamon-feeds").apply { resolve("x.json").writeText("{}") }
         val feeds = FeedCache(feedDir, io = EmptyCoroutineContext)
         var resets = 0
+        var consentForgotten = 0
 
         LocalDataWipe(
             engine, DocumentCache(null, EmptyCoroutineContext), AppListCache(null),
@@ -49,6 +50,7 @@ class LocalDataWipeTest {
             authorProfile = profile,
             removeLocalMedia = { video.parentFile?.deleteRecursively() },
             feedCache = feeds,
+            forgetConsent = { consentForgotten++ },
         )()
 
         assertTrue(history.load("app-of-a").isEmpty())
@@ -57,5 +59,22 @@ class LocalDataWipeTest {
         assertFalse(video.exists())
         assertFalse(feedDir.exists())
         assertEquals(1, resets)
+        assertEquals(1, consentForgotten)
+    }
+
+    @Test
+    fun removesLeftoverCaptureAndRecordingTempFiles() {
+        val cache = tmp.newFolder("cache")
+        val photo = cache.resolve("metamon_photos").apply { mkdirs() }.resolve("capture-1.jpg").apply { writeText("x") }
+        val video = cache.resolve("metamon_videos").apply { mkdirs() }.resolve("capture-1.mp4").apply { writeText("x") }
+        val rec = cache.resolve("metamon-rec-abc.m4a").apply { writeText("x") }
+        val other = cache.resolve("autonav-step").apply { writeText("x") }
+
+        MediaTempFiles.removeAll(cache)
+
+        assertFalse(photo.exists())
+        assertFalse(video.exists())
+        assertFalse(rec.exists())
+        assertTrue("関係ない cache は残す", other.exists())
     }
 }

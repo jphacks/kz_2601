@@ -48,6 +48,11 @@ class ConsentPrompt(private val store: AiConsentStore) {
         close()
     }
 
+    /** 後片付け(#841)。前の人の止めた 1 件を、次の人の同意で送らない。 */
+    fun reset() {
+        close()
+    }
+
     private fun close(): (() -> Unit)? {
         _visible.value = false
         return awaiting.also { awaiting = null }

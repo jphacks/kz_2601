@@ -109,6 +109,12 @@ class AiButtonMetricsRecorder(
         }
     }
 
+    /** 貯めた数だけ消す(サインアウト・削除・#841)。オン / オフの選択は本人の設定なので残す(iOS の `preservedKeys`)。 */
+    fun clearCounts() = synchronized(lock) {
+        buckets = emptyMap()
+        save()
+    }
+
     /** ボタンを出した時の可用性(その日の最後の値を送る)。 */
     fun recordShown(availability: String) = update { b ->
         val a = AiButtonMetricLabels.availability(availability)

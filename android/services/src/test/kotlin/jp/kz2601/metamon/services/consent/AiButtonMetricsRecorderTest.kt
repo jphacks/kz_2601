@@ -148,4 +148,24 @@ class AiButtonMetricsRecorderTest {
             server.shutdown()
         }
     }
+
+    @Test
+    fun clearCountsDropsBucketsButKeepsTheOptOut() {
+        val r = recorder()
+        r.setEnabled(false)
+        r.setEnabled(true)
+        r.recordRan("summarize", null)
+        r.setEnabled(false)
+        r.clearCounts()
+        nextDay()
+        assertEquals(null, r.pendingReport())
+        assertEquals(false, recorder().isEnabled)
+
+        val on = recorder().apply { setEnabled(true) }
+        on.recordRan("summarize", null)
+        on.clearCounts()
+        nextDay()
+        assertEquals(null, on.pendingReport())
+        assertEquals(null, recorder().pendingReport())
+    }
 }

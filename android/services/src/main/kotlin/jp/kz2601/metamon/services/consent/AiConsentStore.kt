@@ -61,6 +61,18 @@ class AiConsentStore(
         _state.value = read()
     }
 
+    /**
+     * サインアウト・アカウント削除・別の人のサインイン(#841)。同意は人ごとなので、説明を出した印ごと忘れる
+     * (iOS は `LocalWipe.clearDefaults` が同じ鍵を消す)。次の人には起動時に説明を出し直す。
+     */
+    fun forget() {
+        store.remove(VERSION_KEY)
+        store.remove(DATE_KEY)
+        store.remove(PROMPTED_KEY)
+        store.remove(PROMPTED_VERSION_KEY)
+        _state.value = read()
+    }
+
     /** 保存先を直接消した後(アカウント削除など)に、状態を保存先に合わせ直す。 */
     fun reload() {
         _state.value = read()

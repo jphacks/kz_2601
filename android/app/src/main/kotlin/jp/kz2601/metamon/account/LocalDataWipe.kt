@@ -20,6 +20,8 @@ import jp.kz2601.metamon.voice.ChatHistoryStore
  * - 投稿に表示する名前(#875・[AuthorProfile.clear])
  * - feed の覚えた行(#876・[FeedCache.removeAll] = iOS `FeedCache.removeAll()`)
  * - 端末内の動画(#863)・録音(#1084)のファイル([removeLocalMedia] = iOS `LocalVideoStore` / `LocalAudioStore` の removeAll)
+ * - AI への同意・同意の前に止めた 1 件・aiButton の貯めた数([forgetConsent] = iOS `LocalWipe.clearDefaults` + `aiConsent.reload()`)
+ * - 生成アプリの通知の予約・出ている通知([forgetDeviceState] の中 = iOS `notifications.removeAll()`)
  * - 画面の状態・appId(新しい appId に。[resetRuntime] = iOS `recordUndo = nil`・`resetToInitial()`・`DeviceAppID.set`)
  * - 音声の画面の状態は [AccountGuard.generation] で作り直す(iOS `chatHistory = []`)
  */
@@ -33,12 +35,14 @@ class LocalDataWipe(
     private val authorProfile: AuthorProfile? = null,
     private val removeLocalMedia: () -> Unit = {},
     private val feedCache: FeedCache? = null,
+    private val forgetConsent: () -> Unit = {},
 ) {
     suspend operator fun invoke() {
         recordSync.wipe() // 最初に止める(前の人の送信待ちを次の人に送らない)
         documentCache.removeAll()
         appList.clear()
         forgetDeviceState()
+        forgetConsent()
         authorProfile?.clear()
         chatHistory?.removeAll()
         removeLocalMedia()

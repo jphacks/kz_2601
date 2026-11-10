@@ -99,6 +99,17 @@ class LocalNotifications private constructor(private val app: Context) {
         applyNow()
     }
 
+    /**
+     * 全アプリの予約・条件の前回値・出ている通知を消す(サインアウト・削除・別の人のサインイン・#841)。
+     * iOS の `notifications.removeAll()` + `removeAllPending/DeliveredNotifications`。消さないと前の人の通知が鳴り、再起動でも予約し直される。
+     */
+    fun removeAll() = synchronized(this) {
+        (scheduled() + registry().all.map { it.identifier }).forEach(::cancelAlarm)
+        prefs.edit().remove(KEY_REGISTRY).remove(KEY_SCHEDULED).remove(KEY_CONDITIONS).commit()
+        runCatching { NotificationManagerCompat.from(app).cancelAll() }
+        Unit
+    }
+
     /** 鳴った通知を出す。許可が無ければ出さずに false。[appId] があれば押した時にそのアプリを開く(#887)。 */
     fun post(
         identifier: String,

@@ -26,6 +26,7 @@ import jp.kz2601.metamon.services.AppEnvironment
 import jp.kz2601.metamon.account.AccountGuard
 import jp.kz2601.metamon.account.ActiveOwner
 import jp.kz2601.metamon.account.LocalDataWipe
+import jp.kz2601.metamon.account.MediaTempFiles
 import jp.kz2601.metamon.account.OwnerGatedTokens
 import jp.kz2601.metamon.auth.AuthSession
 import jp.kz2601.metamon.consent.ConsentPrompt
@@ -172,6 +173,12 @@ class AppContainer(
             authorProfile = authorProfile,
             removeLocalMedia = removeLocalMedia,
             feedCache = feedCache,
+            // 同意は人ごと(iOS は UserDefaults ごと消す)。前の人の止めた発話も次の人の同意で送らない
+            forgetConsent = {
+                consent.forget()
+                consentPrompt.reset()
+                aiButtonMetrics.clearCounts()
+            },
         )
     }
 
@@ -341,13 +348,20 @@ class AppContainer(
          */
         const val PUSH_DEVICE_REGISTRATION = false
 
-        /** 権限の記録を忘れる(表示の言語は端末の設定なので残す)。 */
-        private fun forgetDeviceState(context: Context): () -> Unit = { PermissionCenter.get(context).forget() }
+        /**
+         * 権限の記録と生成アプリの通知の予約(#886)を忘れる(表示の言語は端末の設定なので残す)。
+         * 通知の予約は前の人の記録から作った文面を持ち、残すとサインアウト後・次の人にも鳴る(iOS は removeAll する)。
+         */
+        private fun forgetDeviceState(context: Context): () -> Unit = {
+            PermissionCenter.get(context).forget()
+            LocalNotifications.get(context).removeAll()
+        }
 
-        /** 端末内の動画・録音のファイル(どちらもバックアップされない領域)。 */
+        /** 端末内の動画・録音のファイル(どちらもバックアップされない領域)と、撮影・録音の途中で残った一時ファイル。 */
         private fun removeLocalMedia(context: Context): () -> Unit = {
             VideoCodec.store(context).removeAll()
             LocalAudioStore.of(context).removeAll()
+            MediaTempFiles.removeAll(context.cacheDir)
         }
 
         private fun recordSync(context: Context, client: AppConfigClient, dir: String) = RecordSyncEngine.create(
