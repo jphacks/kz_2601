@@ -566,9 +566,21 @@
       "extractionState" : "manual",
       "localizations" : {
         "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "%lld records"
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld record"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld records"
+                }
+              }
+            }
           }
         },
         "ja" : {
@@ -617,9 +629,21 @@
       "extractionState" : "manual",
       "localizations" : {
         "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Added %lld records"
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Added %lld record"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Added %lld records"
+                }
+              }
+            }
           }
         },
         "ja" : {
@@ -636,7 +660,29 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Added %1$lld records (%2$lld couldn't be added)"
+            "value" : "%#@count@"
+          },
+          "substitutions" : {
+            "count" : {
+              "argNum" : 1,
+              "formatSpecifier" : "lld",
+              "variations" : {
+                "plural" : {
+                  "one" : {
+                    "stringUnit" : {
+                      "state" : "translated",
+                      "value" : "Added %arg record (%2$lld couldn't be added)"
+                    }
+                  },
+                  "other" : {
+                    "stringUnit" : {
+                      "state" : "translated",
+                      "value" : "Added %arg records (%2$lld couldn't be added)"
+                    }
+                  }
+                }
+              }
+            }
           }
         },
         "ja" : {
@@ -668,9 +714,21 @@
       "extractionState" : "manual",
       "localizations" : {
         "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "%lld times"
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld time"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld times"
+                }
+              }
+            }
           }
         },
         "ja" : {
@@ -789,7 +847,29 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "%lld items. %@: %@"
+            "value" : "%#@count@"
+          },
+          "substitutions" : {
+            "count" : {
+              "argNum" : 1,
+              "formatSpecifier" : "lld",
+              "variations" : {
+                "plural" : {
+                  "one" : {
+                    "stringUnit" : {
+                      "state" : "translated",
+                      "value" : "%arg item. %2$@: %3$@"
+                    }
+                  },
+                  "other" : {
+                    "stringUnit" : {
+                      "state" : "translated",
+                      "value" : "%arg items. %2$@: %3$@"
+                    }
+                  }
+                }
+              }
+            }
           }
         },
         "ja" : {
@@ -821,9 +901,21 @@
       "extractionState" : "manual",
       "localizations" : {
         "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Filled %lld fields. Check them and save."
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Filled %lld field. Check it and save."
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Filled %lld fields. Check them and save."
+                }
+              }
+            }
           }
         },
         "ja" : {
@@ -874,7 +966,29 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "%lld points · auto-stops in %lld min"
+            "value" : "%#@count@"
+          },
+          "substitutions" : {
+            "count" : {
+              "argNum" : 1,
+              "formatSpecifier" : "lld",
+              "variations" : {
+                "plural" : {
+                  "one" : {
+                    "stringUnit" : {
+                      "state" : "translated",
+                      "value" : "%arg point · auto-stops in %2$lld min"
+                    }
+                  },
+                  "other" : {
+                    "stringUnit" : {
+                      "state" : "translated",
+                      "value" : "%arg points · auto-stops in %2$lld min"
+                    }
+                  }
+                }
+              }
+            }
           }
         },
         "ja" : {
@@ -1622,7 +1736,29 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Add 1 record to \"%3$@\" with %2$lld characters from \"%1$@\"."
+            "value" : "%#@count@"
+          },
+          "substitutions" : {
+            "count" : {
+              "argNum" : 2,
+              "formatSpecifier" : "lld",
+              "variations" : {
+                "plural" : {
+                  "one" : {
+                    "stringUnit" : {
+                      "state" : "translated",
+                      "value" : "Add 1 record to \"%3$@\" with %arg character from \"%1$@\"."
+                    }
+                  },
+                  "other" : {
+                    "stringUnit" : {
+                      "state" : "translated",
+                      "value" : "Add 1 record to \"%3$@\" with %arg characters from \"%1$@\"."
+                    }
+                  }
+                }
+              }
+            }
           }
         },
         "ja" : {
@@ -1656,7 +1792,29 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Add %2$lld records to \"%1$@\"."
+            "value" : "%#@count@"
+          },
+          "substitutions" : {
+            "count" : {
+              "argNum" : 2,
+              "formatSpecifier" : "lld",
+              "variations" : {
+                "plural" : {
+                  "one" : {
+                    "stringUnit" : {
+                      "state" : "translated",
+                      "value" : "Add %arg record to \"%1$@\"."
+                    }
+                  },
+                  "other" : {
+                    "stringUnit" : {
+                      "state" : "translated",
+                      "value" : "Add %arg records to \"%1$@\"."
+                    }
+                  }
+                }
+              }
+            }
           }
         },
         "ja" : {
@@ -3713,7 +3871,29 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "%3$lld rows over the limit (%1$lld per import, %2$lld in total) are skipped"
+            "value" : "%#@count@"
+          },
+          "substitutions" : {
+            "count" : {
+              "argNum" : 3,
+              "formatSpecifier" : "lld",
+              "variations" : {
+                "plural" : {
+                  "one" : {
+                    "stringUnit" : {
+                      "state" : "translated",
+                      "value" : "%arg row over the limit (%1$lld per import, %2$lld in total) is skipped"
+                    }
+                  },
+                  "other" : {
+                    "stringUnit" : {
+                      "state" : "translated",
+                      "value" : "%arg rows over the limit (%1$lld per import, %2$lld in total) are skipped"
+                    }
+                  }
+                }
+              }
+            }
           }
         },
         "ja" : {
@@ -7349,9 +7529,21 @@
       "extractionState" : "manual",
       "localizations" : {
         "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "%lld strokes"
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld stroke"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld strokes"
+                }
+              }
+            }
           }
         },
         "ja" : {
@@ -7638,9 +7830,21 @@
       "extractionState" : "manual",
       "localizations" : {
         "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "%lld records"
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld record"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld records"
+                }
+              }
+            }
           }
         },
         "ja" : {
@@ -8233,9 +8437,21 @@
       "extractionState" : "manual",
       "localizations" : {
         "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Finds a nearby device and sends %lld records"
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Finds a nearby device and sends %lld record"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Finds a nearby device and sends %lld records"
+                }
+              }
+            }
           }
         },
         "ja" : {
@@ -8573,9 +8789,21 @@
       "extractionState" : "manual",
       "localizations" : {
         "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "The recording is too long (up to %lld minutes). Choose a shorter part"
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "The recording is too long (up to %lld minute). Choose a shorter part"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "The recording is too long (up to %lld minutes). Choose a shorter part"
+                }
+              }
+            }
           }
         },
         "ja" : {
@@ -8726,9 +8954,21 @@
       "extractionState" : "manual",
       "localizations" : {
         "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "It's long, so only the first %lld characters are kept."
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "It's long, so only the first %lld character is kept."
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "It's long, so only the first %lld characters are kept."
+                }
+              }
+            }
           }
         },
         "ja" : {
@@ -8879,9 +9119,21 @@
       "extractionState" : "manual",
       "localizations" : {
         "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "%lld entrants added after the start are not in this bracket"
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld entrant added after the start is not in this bracket"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld entrants added after the start are not in this bracket"
+                }
+              }
+            }
           }
         },
         "ja" : {
