@@ -45,6 +45,7 @@ func (a *App) Lint() []string {
 	l.optionalTitle()
 	l.settingMaxMin()
 	l.photoIllustrate() // photo_illustrate.go
+	l.shareText()       // open_app.go
 	return l.out
 }
 

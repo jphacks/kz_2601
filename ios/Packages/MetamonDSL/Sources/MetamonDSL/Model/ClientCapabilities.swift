@@ -48,11 +48,13 @@ public enum ClientCapabilities {
     /// progressBar.settingTarget(progressBar の target に {"setting": …}・変えられる目標でバーが動く): 知らない版はバーが空になるので、無い版には生成させない。審査用の版も同じ(端末内の計算だけ)。
     /// photoField.illustrate(端末内の Image Playground でイラストを作る): 知らない版はキーを無視するだけだが、ボタンが出ないので無い版には生成させない。
     /// 審査用の版は Apple Intelligence に頼る作りを審査で確かめにくいので、ボタンをバイナリから外し、キーも送らない。
+    /// openUrlButton.app(openUrlButton の app / to・shareButton の shareTo x / mail): 知らない版は url の無いボタンを描けないので、無い版には生成させない。
+    /// 審査用の版も送る(公開されているリンクを Safari / そのアプリで開くだけ)。
     public static var supportedFeatures: [String] {
         #if APP_STORE_REVIEW
-        ["recordRetention", "notification.when", "singleEntity", "notification.near", "aiButton.long", "aiButton.inputPhoto", "aiButton.saveTo", "aiButton.inputFeeds", "aiButton.outputs", "action.lookupBook", "text.highlight", "feed.v2", "expr.addMinutes", "aiChat.inputEntity", "component.bracket", "progressBar.settingTarget"]
+        ["recordRetention", "notification.when", "singleEntity", "notification.near", "aiButton.long", "aiButton.inputPhoto", "aiButton.saveTo", "aiButton.inputFeeds", "aiButton.outputs", "action.lookupBook", "text.highlight", "feed.v2", "expr.addMinutes", "aiChat.inputEntity", "component.bracket", "progressBar.settingTarget", "openUrlButton.app"]
         #else
-        ["recordRetention", "matching", "notification.when", "singleEntity", "dataRoles", "addressedMessages", "notification.near", "aiButton.long", "aiButton.inputPhoto", "aiButton.saveTo", "aiButton.inputFeeds", "aiButton.outputs", "action.lookupBook", "text.highlight", "feed.v2", "expr.addMinutes", "aiChat.inputEntity", "component.bracket", "progressBar.settingTarget", "photoField.illustrate"]
+        ["recordRetention", "matching", "notification.when", "singleEntity", "dataRoles", "addressedMessages", "notification.near", "aiButton.long", "aiButton.inputPhoto", "aiButton.saveTo", "aiButton.inputFeeds", "aiButton.outputs", "action.lookupBook", "text.highlight", "feed.v2", "expr.addMinutes", "aiChat.inputEntity", "component.bracket", "progressBar.settingTarget", "photoField.illustrate", "openUrlButton.app"]
         #endif
     }
 

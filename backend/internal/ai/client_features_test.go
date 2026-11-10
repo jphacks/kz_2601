@@ -12,7 +12,7 @@ import (
 // featuresDoc uses every clientFeature once: aiButton long / inputPhoto /
 // saveTo / inputFeeds / outputs, lookupBook (button and toolbar), text {{field}} + highlight, a
 // warnings feed, addMinutes, aiChat inputEntity, bracket, a progressBar setting
-// target and photoField illustrate.
+// target, photoField illustrate and openUrlButton app + shareButton shareTo x.
 const featuresDoc = `{"schemaVersion":1,"app":{"name":"本","description":"d","icon":"book","voiceEntry":"fullscreen"},"initialScreen":"home",
 "entities":[
  {"id":"player","name":"出場者","titleField":"name","fields":[{"id":"name","name":"名前","type":"string"},{"id":"wins","name":"勝ち上がり","type":"integer"}]},
@@ -43,7 +43,9 @@ const featuresDoc = `{"schemaVersion":1,"app":{"name":"本","description":"d","i
   {"type":"photoField","field":"photo","source":"library","illustrate":true},
   {"type":"aiButton","task":"extract","inputPhoto":"photo","output":"note","label":"写真を読む"},
   {"type":"text","text":"{{body}}","highlight":{"field":"keywords"}},
-  {"type":"text","text":"本の記録"}],
+  {"type":"text","text":"本の記録"},
+  {"type":"openUrlButton","app":"paypay","label":"PayPay で払う"},
+  {"type":"shareButton","text":"{{title}} を読んだ","shareTo":"x"}],
   "toolbar":[{"label":"保存","action":{"type":"saveRecord","entity":"book"}},{"label":"ISBN","action":{"type":"lookupBook","bookLookup":{"isbnField":"isbn","titleField":"title"}}}]},
  {"id":"talk","title":"相談","components":[
   {"type":"aiChat","area":"A1:F12","entity":"turn","textField":"text","roleField":"role","persona":"本の記録を読んで話す相手","inputEntity":"book","limit":5}]}]}`
@@ -81,6 +83,7 @@ func TestClientFeaturesRestriction(t *testing.T) {
 		FeatureBracket:               {"## トーナメント表(bracket)", `"#/$defs/Bracket"`, 1, `"bracket"`},
 		FeatureProgressSettingTarget: {`progressBar は target {"setting":"<fieldId>"} で目標を読める`, "A goal the user edits", 1, `{"setting"`},
 		FeatureIllustrate:            {"photoField に illustrate: true", "PhotoField.illustrate", 1, `"illustrate"`},
+		FeatureOpenApp:               {"「開く」と「送る」で作る", "OpenUrlButton.app", 2, `"paypay"`},
 	}
 	if len(gone) != len(clientFeatures) {
 		t.Fatalf("test covers %d of %d features", len(gone), len(clientFeatures))

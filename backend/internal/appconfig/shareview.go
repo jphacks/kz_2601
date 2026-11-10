@@ -323,6 +323,9 @@ func (r *webRenderer) node(s *dsl.Screen, c *dsl.Component, depth int) (webNode,
 		n.Style = "secondary"
 	case dsl.CompButton, dsl.CompShareButton, dsl.CompOpenURLButton:
 		n.Kind, n.Label, n.Style = "button", clip(c.Label, 40), c.Style // no label: "share" (shareButton)
+		if n.Label == "" && c.App != "" {
+			n.Label = openAppNames[c.App] // openUrlButton app: the service's name, never its link
+		}
 	case dsl.CompLink:
 		n.Kind, n.Text, n.Href = "link", clip(c.Text, 80), safeHref(c.URL)
 	case dsl.CompFlashcards: // #264: the field names only (no cards), the deck is in the app
@@ -446,4 +449,11 @@ func clip(s string, n int) string {
 		return s
 	}
 	return string([]rune(s)[:n-1]) + "…"
+}
+
+// openAppNames labels an openUrlButton app without label on the web view
+// (iOS shows 「PayPay を開く」 etc.; the page needs only the name, never the link).
+var openAppNames = map[string]string{
+	"paypay": "PayPay", "line": "LINE", "slack": "Slack", "discord": "Discord", "x": "X",
+	"instagram": "Instagram", "maps": "Maps", "mail": "Mail", "phone": "Tel",
 }

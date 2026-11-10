@@ -3054,7 +3054,7 @@
         },
         "text": {
           "type": "string",
-          "description": "共有する文面。screen.entity がある画面では `{{fieldId}}` をフォームの現在値で置換する。"
+          "description": "共有する文面(1000 文字まで)。screen.entity がある画面では `{{fieldId}}` をフォームの現在値で置換する(例: \"{{title}} {{amount}}円\")。"
         },
         "field": {
           "type": "string",
@@ -3072,21 +3072,21 @@
             "any",
             "line",
             "slack",
-            "discord"
+            "discord",
+            "x",
+            "mail"
           ],
-          "description": "送り先の preset(既定 any = OS 共有シート)。line は LINE の共有画面を直接開く(未インストールなら Web 版)。slack / discord は共有シートを開き、文面をチャンネル投稿向けのプレーンテキストに整える。(`target` は progressBar の数値キーなので別名)"
+          "description": "送り先の preset(既定 any = OS 共有シート)。line は LINE の共有画面(https://line.me/R/share)、x は X の投稿画面(https://x.com/intent/tweet)、mail はメールの新規作成(mailto: の本文)を直接開く(写真は送れないので文面だけ)。slack / discord は共有シートを開き、文面をチャンネル投稿向けのプレーンテキストに整える。(`target` は progressBar の数値キーなので別名)"
         }
       },
-      "description": "文面と(任意で)写真を他のアプリや友人に送るボタン。`shareTo` で送り先を選べる: 「LINE で送りたい」→ shareTo line、「Slack に投げたい」→ slack、「Discord に」→ discord、指定が無ければ any(OS 共有シート)。日記の 1 件・記録のスコア・写真メモ・記事リンクを共有したいアプリで選ぶ。",
+      "description": "文面と(任意で)写真を他のアプリや友人に送るボタン。`shareTo` で送り先を選べる: 「LINE で送りたい」→ shareTo line、「X に投稿」→ x、「メールで送る」→ mail、「Slack に投げたい」→ slack、「Discord に」→ discord、指定が無ければ any(OS 共有シート)。日記の 1 件・記録のスコア・割り勘の結果・写真メモ・記事リンクを共有したいアプリで選ぶ。",
       "x-usage": "小さく画面下部の半幅(A11:C12)に、別のボタンと並べる。送り先ごとにボタンを分ける時は hstack か grid の子に shareTo 違いで並べる。`field` や `{{...}}` を使う時だけ screen.entity が必要。"
     },
     "OpenUrlButton": {
       "type": "object",
       "additionalProperties": false,
       "required": [
-        "type",
-        "label",
-        "url"
+        "type"
       ],
       "properties": {
         "type": {
@@ -3104,7 +3104,26 @@
         "url": {
           "type": "string",
           "format": "uri",
-          "description": "開く URL。https のほか、他アプリ起動用のカスタムスキーム line:// slack:// discord:// tel: mailto: maps: comgooglemaps:// を使える(それ以外のスキームは不可)。"
+          "description": "開く URL(app とどちらか 1 つ)。https のほか、他アプリ起動用のカスタムスキーム line:// slack:// discord:// tel: mailto: maps: comgooglemaps:// を使える(それ以外のスキームは不可)。"
+        },
+        "app": {
+          "type": "string",
+          "enum": [
+            "paypay",
+            "line",
+            "slack",
+            "discord",
+            "x",
+            "instagram",
+            "maps",
+            "mail",
+            "phone"
+          ],
+          "description": "url の代わりに開くアプリ・サービスの名前(url とどちらか 1 つ)。iOS が公開されている形のリンクを作り、アプリが無ければ公式サイトを開く。label を省くと「PayPay を開く」などの既定の文言。"
+        },
+        "to": {
+          "type": "string",
+          "description": "任意: app の中で開く先(300 文字まで)。paypay = 作者が言った PayPay の支払い・請求リンク(https・paypay.ne.jp)、line = line.me / lin.ee のリンク(公式アカウント・友だち追加)、slack = *.slack.com のリンク、discord = discord.com / discord.gg のリンク(招待)、x / instagram = ユーザー名(@name)、maps = 場所の名前・住所、mail = メールアドレス、phone = 電話番号(phone は必須)。screen.entity の画面では `{{fieldId}}` でそのレコードの値(住所・電話番号)。リンク・番号・アドレスは作らない(言われた物だけ)。"
         },
         "icon": {
           "type": "string"
@@ -3118,8 +3137,8 @@
           ]
         }
       },
-      "description": "固定 URL を開くリンクボタン(公式サイト・地図検索・レシピページ・電話・メール・LINE/Slack/Discord アプリの起動など)。button + openUrl アクションと同じ意味だが短く書け、リンク風に描画される。静的な外部リンクに選ぶ。サイトをアプリ内に埋め込むなら webView。",
-      "x-usage": "画面下部の帯(A11:F12)か card/section の子として置く。「地図で開く」は maps:?q=<場所>、「電話する」は tel:<番号>、「LINE を開く」は line://。他の主要ボタンと見た目を揃えたい時は button + openUrl を使う。"
+      "description": "URL か他のアプリを開くリンクボタン(公式サイト・地図・電話・メール・PayPay・LINE・Slack・Discord・X・Instagram)。決まったサービスを開くなら app(+ to)、それ以外のサイトは url。button + openUrl アクションと同じ意味だが短く書け、リンク風に描画される。文面を送るのは shareButton、サイトをアプリ内に埋め込むなら webView。",
+      "x-usage": "画面下部の帯(A11:F12)か card/section の子として置く。「PayPay で払う」は {app: paypay, to: 支払いリンク}(リンクが無ければ to を省く)、「地図で開く」は {app: maps, to: \"{{address}}\"}、「電話する」は {app: phone, to: \"{{phone}}\"}、「Slack を開く」は {app: slack}。他の主要ボタンと見た目を揃えたい時は button + openUrl を使う。"
     },
     "MapView": {
       "type": "object",

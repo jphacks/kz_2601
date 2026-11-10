@@ -2,7 +2,7 @@ import SwiftUI
 import MetamonDSL
 
 /// `shareButton`: `text` の `{{fieldId}}` をフォーム値で置換し、`field` が photo なら画像も共有する。
-/// `shareTo` preset: any = OS 共有シート(ShareLink)/ line = LINE の共有 URL を `openURL`(未インストールなら Web 版)/
+/// `shareTo` preset: any = OS 共有シート(ShareLink)/ line・x・mail = 共有 URL(LINE の共有画面・X の投稿画面・mailto:)を `openURL`(写真は渡せない)/
 /// slack・discord = 公式の汎用共有スキームが無いので共有シートを開き、文面をチャンネル向けのプレーンテキストに整える(Webhook 投稿は #37 中版)。
 struct ShareButtonLeaf: View {
     @Environment(\.openURL) private var openURL
@@ -38,8 +38,8 @@ struct ShareButtonLeaf: View {
 
     var body: some View {
         Group {
-            if target == .line, let url = ShareTarget.lineShareURL(text: text) {
-                // LINE は写真を URL で渡せないので文面のみ。
+            if let url = target.directURL(text: text) {
+                // LINE・X・メールは写真を URL で渡せないので文面のみ。
                 Button { openURL(url) } label: { buttonLabel }
             } else if let img = photo {
                 ShareLink(item: Image(uiImage: img), message: Text(text), preview: SharePreview(text, image: Image(uiImage: img))) {
