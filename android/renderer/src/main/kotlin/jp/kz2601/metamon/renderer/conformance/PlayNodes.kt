@@ -16,7 +16,7 @@ import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 
-/** 描画の木のうち、計算・遊び系の Leaf 5 種(#860)の部分(iOS の RenderTree.swift の declared / resolved / actions)。 */
+/** 描画の木のうち、計算・遊び系の Leaf 5 種(#860)の部分(iOS の RenderTree.swift の declared / resolved)。 */
 object PlayNodes {
     val types = setOf(
         ComponentType.BRACKET,
@@ -26,12 +26,11 @@ object PlayNodes {
         ComponentType.TIMER_DISPLAY,
     )
 
-    /** DSL に書いた値(entity / mode / seconds)+ 記録から解決した値。5 種でなければ空。 */
+    /** DSL に書いた値(mode / seconds)+ 記録から解決した値。5 種でなければ空(entity と rowTap は RenderTree の共通部分が出す)。 */
     fun props(c: Component, runtime: DSLRuntime): Map<String, JsonElement> {
         if (c.type !in types) return emptyMap()
         val all = runtime.recordsFlow?.value.orEmpty()
         val p = LinkedHashMap<String, JsonElement>()
-        c.entity?.let { p["entity"] = JsonPrimitive(it) }
         c.mode?.let { p["mode"] = JsonPrimitive(it.wire) }
         c.seconds?.let { p["seconds"] = JsonPrimitive(it.toDouble()) }
         when (c.type) {
@@ -48,13 +47,6 @@ object PlayNodes {
             else -> Unit
         }
         return p
-    }
-
-    /** 一覧の行に当たるタップ(randomPicker の結果)。 */
-    fun actions(c: Component): List<JsonElement> {
-        if (c.type !in types) return emptyList()
-        val a = c.onItemTap ?: return emptyList()
-        return listOf(JsonObject(mapOf("on" to JsonPrimitive("rowTap"), "action" to RenderTree.action(a))))
     }
 
     /** 開いた直後の山札(filter → 登録順)。1 枚目が表で出る。 */
