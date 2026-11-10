@@ -5,9 +5,10 @@ import android.location.Address
 import android.location.Geocoder
 import android.os.Build
 import jp.kz2601.metamon.renderer.components.location.LocationButtonRules
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.asExecutor
 import kotlinx.coroutines.suspendCancellableCoroutine
-import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
 import kotlin.coroutines.resume
 
@@ -35,12 +36,22 @@ object RouteGeocoder {
                         )
                     }
                 } else {
-                    withContext(Dispatchers.IO) {
-                        @Suppress("DEPRECATION")
-                        geocoder.getFromLocationName(address, 1).orEmpty()
+                    // 同期の呼び出しは止められないので、待つのをやめられる形で別スレッドに出す(時間切れ・キャンセルを効かせる)
+                    suspendCancellableCoroutine<List<Address>?> { cont ->
+                        Dispatchers.IO.asExecutor().execute {
+                            val r = try {
+                                @Suppress("DEPRECATION")
+                                geocoder.getFromLocationName(address, 1).orEmpty()
+                            } catch (_: Exception) {
+                                null
+                            }
+                            if (cont.isActive) cont.resume(r)
+                        }
                     }
                 }
             }
+        } catch (e: CancellationException) {
+            throw e
         } catch (_: Exception) {
             null
         }
