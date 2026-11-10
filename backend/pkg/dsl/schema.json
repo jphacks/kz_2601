@@ -894,6 +894,9 @@
         },
         {
           "$ref": "#/$defs/Feed"
+        },
+        {
+          "$ref": "#/$defs/CallButton"
         }
       ]
     },
@@ -5458,6 +5461,39 @@
       },
       "description": "外部の公開データの読み取り専用の一覧(#348)。サーバーが運営の許可した出どころ(気象庁の天気予報・内閣府の祝日・許可したお知らせのフィード)だけから取り、端末は直接外へ出ない。日付・見出し・天気のアイコン・最高 / 最低気温・降水確率・出典を行で出す。記録は作らず保存もしない(読むだけ)。「天気予報」「明日の天気」「次の祝日」「祝日の一覧」「お知らせ・新着ニュース」の時に使う。任意の URL・任意のサイトの読み込み・外部への送信はできない。",
       "x-usage": "天気: feed{provider: weather, region: 地域のコード, title: 〇〇の天気, limit: 3〜7}(例 A1:F5)。警報: feed{provider: warnings, region}。気圧・頭痛: feed{provider: pressure, region, limit: 8}。祝日: feed{provider: holidays, title: 次の祝日, limit: 5}。お知らせ: feed{provider: rss, feedId: 許可された id, limit: 10}。論文: feed{provider: arxiv, feedId: cs.AI}。国会: feed{provider: diet, query: 語}。地域が分からない天気の依頼は東京都(130000)にして summary で地域を変えられると伝える。entity・保存ボタン・フォームは作らない。"
+    },
+    "CallButton": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "type"
+      ],
+      "properties": {
+        "type": {
+          "const": "callButton"
+        },
+        "id": {
+          "$ref": "#/$defs/Id"
+        },
+        "area": {
+          "$ref": "#/$defs/Area"
+        },
+        "label": {
+          "type": "string",
+          "description": "ボタンの文字(省略 = 「通話に参加」)。"
+        },
+        "video": {
+          "type": "boolean",
+          "description": "true でカメラも使える(ビデオ通話)。省略 = 音声だけ。"
+        },
+        "room": {
+          "type": "string",
+          "pattern": "^[a-z0-9][a-z0-9_-]{0,31}$",
+          "description": "アプリの中で部屋を分ける時の名前(例: lobby・team-a)。省略 = アプリの部屋 1 つ。"
+        }
+      },
+      "description": "みんなで使うアプリ(scope shared / public の entity があるアプリ)の参加者どうしの音声通話(video: true でビデオ通話)。押すと通話の画面を開き、同じ部屋に入っている参加者と話せる。着信(呼び出し)は無いので、相手もアプリを開いて同じボタンを押す。使った分は使った人のコインで払う。自分だけのアプリ(共有しない)では使えない。",
+      "x-usage": "共有のアプリのホームの下の帯(例 A11:F12)か card の子に 1 つ置く。部屋を分けたい時だけ room を付ける。"
     }
   }
 }
