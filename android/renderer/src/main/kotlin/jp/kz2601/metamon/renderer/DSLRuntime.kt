@@ -3,6 +3,7 @@ package jp.kz2601.metamon.renderer
 import jp.kz2601.metamon.dsl.Action
 import jp.kz2601.metamon.dsl.records.Entity
 import jp.kz2601.metamon.dsl.records.Record
+import jp.kz2601.metamon.renderer.components.media.PhotoReader
 import jp.kz2601.metamon.renderer.form.FormDraft
 import jp.kz2601.metamon.renderer.navigation.NavigationState
 import jp.kz2601.metamon.renderer.navigation.Route
@@ -58,6 +59,9 @@ interface DSLRuntime {
 
     /** 共有データの参加者(member / members の選択肢・iOS の `membersHost.appMembers`)。読めなければ空。 */
     val formMembers: List<FormMember> get() = emptyList()
+
+    /** photoField.analyze の端末内の読み取り(#862)。null なら analyze は無視して写真の入力として動く。 */
+    val photoReader: PhotoReader? get() = null
 }
 
 /** member / members の選択肢 1 人。保存値は [uid]。 */

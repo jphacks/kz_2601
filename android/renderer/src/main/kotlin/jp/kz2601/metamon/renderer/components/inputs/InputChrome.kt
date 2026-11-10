@@ -29,15 +29,16 @@ import jp.kz2601.metamon.renderer.theme.colors
 
 /** 入力部品の描き分け(iOS の `RenderTree.state` と `FormFieldOverride`)。View と適合テストの木が同じ規則を使う。 */
 object InputRules {
-    /** 入力 12 種(この Issue で登録するもの)。 */
-    val inputTypes: Set<ComponentType> = setOf(
+    /** 束縛する field の型で描き替える入力(11 種・iOS の `FormFieldOverride.inputTypes`)。 */
+    val overridable: Set<ComponentType> = setOf(
         ComponentType.TEXT_FIELD, ComponentType.NUMBER_FIELD, ComponentType.TEXT_EDITOR, ComponentType.SECURE_FIELD,
         ComponentType.TOGGLE, ComponentType.PICKER, ComponentType.DATE_PICKER, ComponentType.TIME_PICKER,
-        ComponentType.SLIDER, ComponentType.STEPPER, ComponentType.COLOR_PICKER, ComponentType.RATING,
+        ComponentType.SLIDER, ComponentType.STEPPER, ComponentType.RATING,
     )
 
-    /** 束縛する field の型で描き替える入力(colorPicker 以外の 11 種・iOS の `FormFieldOverride.inputTypes`)。 */
-    val overridable: Set<ComponentType> = inputTypes - ComponentType.COLOR_PICKER
+    /** field を書く入力(#858 の 12 種 + 写真・手書き #862)。 */
+    val inputTypes: Set<ComponentType> =
+        overridable + ComponentType.COLOR_PICKER + ComponentType.DRAWING_FIELD + ComponentType.PHOTO_FIELD
 
     /** ラベルを `c.label ?: field.name` で補う入力(1 行の器)。他は `c.label` だけ。 */
     val labelFallsBackToFieldName: Set<ComponentType> =

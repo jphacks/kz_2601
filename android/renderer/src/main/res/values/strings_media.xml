@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 写真と手書き(photoField / drawingField・#862)。文言の正は iOS の Localizable.xcstrings(日本語の元文) -->
+<resources>
+    <string name="media_cancel">キャンセル</string>
+    <string name="media_camera_denied_body">カメラの使用が許可されていません。写真から選ぶこともできます。</string>
+    <string name="media_camera_denied_title">カメラを使えません</string>
+    <string name="media_delete">削除</string>
+    <string name="media_delete_named">%1$sを削除</string>
+    <string name="media_drawing_a11y_has">%1$s(描いた絵あり)</string>
+    <string name="media_drawing_canvas">手書きのキャンバス</string>
+    <string name="media_drawing_clear">全部消す</string>
+    <string name="media_drawing_clear_body">描いた線と前に描いた絵を全部消します</string>
+    <string name="media_drawing_clear_title">全部消しますか?</string>
+    <string name="media_drawing_discard">保存せずに閉じる</string>
+    <string name="media_drawing_discard_title">描いた線を保存せずに閉じますか?</string>
+    <string name="media_drawing_done">完了</string>
+    <string name="media_drawing_eraser">消しゴム</string>
+    <string name="media_drawing_hint">手書きの画面を開きます。指で描けます</string>
+    <string name="media_drawing_more">描き足す</string>
+    <string name="media_drawing_pen">ペン</string>
+    <string name="media_drawing_redo">やり直す</string>
+    <string name="media_drawing_tap">タップして描く</string>
+    <string name="media_drawing_title">手書き</string>
+    <string name="media_drawing_undo">元に戻す</string>
+    <string name="media_photo">写真</string>
+    <string name="media_photo_attached">%1$s(添付済み)</string>
+    <string name="media_photo_hint_camera">カメラを開きます</string>
+    <string name="media_photo_hint_choose">カメラか写真ライブラリを選びます</string>
+    <string name="media_photo_hint_library">写真ライブラリを開きます</string>
+    <string name="media_photo_pick">写真から選ぶ</string>
+    <string name="media_photo_read_again">もう一度読み取る</string>
+    <string name="media_photo_read_done">端末内の AI が読み取りました。確認して保存してください</string>
+    <string name="media_photo_read_missed">読み取れなかった項目: %1$s</string>
+    <string name="media_photo_reading">AI で読み取っています…</string>
+    <string name="media_photo_retake">撮り直す</string>
+    <string name="media_photo_take">撮影</string>
+    <string name="media_photo_take_or_pick">写真を撮る / 選ぶ</string>
+    <string name="media_photo_unreadable">この写真は読み取れません</string>
+</resources>
