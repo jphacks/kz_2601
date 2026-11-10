@@ -6,7 +6,7 @@ import AppKit
 /// - 編集: 元に戻す(記録を消した直後は削除の取り消し・それ以外は入力欄の取り消し)・やり直す
 /// - アプリ: 生成したアプリの版の「変更を元に戻す」(⌥⌘Z)・「変更をやり直す」(⇧⌥⌘Z)(#968)。
 ///   ⌘Z / ⇧⌘Z は入力欄と記録の削除に使っているので、版の取り消しは別のキーにする
-/// - 表示: サイドバー(`SidebarCommands`)・ツールバー(`ToolbarCommands`)
+/// - 表示: サイドバー(`SidebarCommands`)・ツールバー(`ToolbarCommands`)・画面マップ(⇧⌘E・#970)
 /// - 移動: 戻る・アプリの一覧 / 中央へ・前 / 次のアプリ
 /// - ヘルプ: 頼み方のコツ(#967)・お問い合わせ
 struct MacCommands: Commands {
@@ -49,6 +49,14 @@ struct MacCommands: Commands {
             }
             Button("やり直す") { NSApp.sendAction(Selector(("redo:")), to: nil, from: nil) }
                 .keyboardShortcut("z", modifiers: [.command, .shift])
+        }
+
+        CommandGroup(after: .toolbar) {
+            Divider()
+            // 中央のアプリのシート(sheet / fullScreen)が開いている間は出さない(シートを重ねない)
+            Button("画面マップ") { shell?.showScreenMap() }
+                .keyboardShortcut("e", modifiers: [.command, .shift])
+                .disabled(!(shell?.canShowScreenMap ?? false) || runtime?.sheet != nil || runtime?.fullScreen != nil)
         }
 
         CommandMenu("アプリ") {
@@ -110,6 +118,9 @@ struct ShellActions {
     /// 声で頼む(⌘K と同じ相手の会話を開いてすぐ録音・#966)
     var speak: () -> Void
     var showTips: () -> Void
+    /// 画面マップ(#970)を開けるか(中央にアプリがあり、会話のシートが閉じている)
+    var canShowScreenMap: Bool = false
+    var showScreenMap: () -> Void = {}
 }
 
 private struct ShellActionsKey: FocusedValueKey {

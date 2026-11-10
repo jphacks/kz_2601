@@ -12,6 +12,7 @@ import MetamonDSL
 /// - 生成したアプリの版の「元に戻す / やり直す」(#968)→「アプリ」メニュー(⌥⌘Z / ⇧⌥⌘Z)・完成の画面・要約のお知らせ。
 ///   ⌘Z / ⇧⌘Z は入力欄と記録の削除の取り消し(編集メニュー)のまま
 /// キーボード(#934): ⌘1 / ⌘2 でサイドバーと中央を行き来・一覧は ↑↓ で選び Return で中央へ・⌥⌘↑↓ で前 / 次のアプリ。
+/// 画面マップ(#970): ツールバー・表示メニュー(⇧⌘E)からシートで出す。開く → 中央でその画面へ、話す → その画面を文脈にした会話(⌘K と同じシート)。
 /// 一覧(#969): 「作ったアプリ」(端末に残す・名前の変更 / 削除 / 並べ替え)と「同梱の例」に分ける。起動時は前に開いていたアプリを開き直す。
 struct MacRootView: View {
     enum Pane: Hashable { case sidebar, canvas }
@@ -30,6 +31,8 @@ struct MacRootView: View {
     /// 閉じた会話のシート(閉じた後に完成の要約を出すため・#968)
     @State private var closingCompose: MacComposeSession?
     @State private var showsTips = false
+    /// 画面マップ(#970・シートは中央の AppCanvas が出す)
+    @State private var showsScreenMap = false
     @Environment(MacVoiceInput.self) private var voice
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
@@ -63,7 +66,9 @@ struct MacRootView: View {
         } detail: {
             Group {
                 if let app = selectedApp {
-                    AppCanvas(app: app, dsl: library.generated[app.id]?.dsl).id("\(app.id)#\(app.version)")
+                    AppCanvas(app: app, dsl: library.generated[app.id]?.dsl, showsScreenMap: $showsScreenMap,
+                              onTalk: { talk(about: $0) })
+                        .id("\(app.id)#\(app.version)")
                 } else {
                     MacEmptyState(pose: .point, title: "アプリを選んでください",
                                   message: "左の一覧から選ぶと、ここに表示します。")
@@ -76,7 +81,10 @@ struct MacRootView: View {
             .focusEffectDisabled()
             .focused($focus, equals: .canvas)
         }
-        .toolbar { ShellToolbar(hasApp: selectedApp != nil, canCompose: compose == nil, newApp: newApp, ask: ask, speak: speak) }
+        .toolbar {
+            ShellToolbar(hasApp: selectedApp != nil, canCompose: compose == nil, newApp: newApp, ask: ask, speak: speak,
+                         canShowScreenMap: canShowScreenMap, showScreenMap: showScreenMap)
+        }
         .frame(minWidth: Self.minWindowSize.width, minHeight: Self.minWindowSize.height)
         .focusedSceneValue(\.shellActions, shellActions)
         .sheet(item: $compose, onDismiss: noteFinishedCompose) { session in
@@ -88,6 +96,7 @@ struct MacRootView: View {
         .onAppear(perform: reopenLastApp)
         .onChange(of: selectedAppId) { _, id in
             if let id { library.lastAppId = id }
+            showsScreenMap = false
         }
         .sheet(isPresented: $showsTips) {
             PromptTipsSheet { tip in
@@ -134,10 +143,11 @@ struct MacRootView: View {
         }
     }
 
-    private func open(_ target: MacComposeSession.Target, draft: String, voice: Bool = false) {
+    private func open(_ target: MacComposeSession.Target, draft: String, voice: Bool = false, screen: ScreenContext? = nil) {
         guard compose == nil else { return }
         let session = MacComposeSession(target: target, draft: draft)
         session.startsWithVoice = voice
+        session.screen = screen
         session.onResult = { document, envelope in apply(document, envelope: envelope, target: target) }
         notices.summary = nil // 会話を始めたら前の要約は下げる
         closingCompose = session
@@ -150,6 +160,22 @@ struct MacRootView: View {
         // 最初のアプリの印(iOS と同じ `hasShownEditHint`)。β の案内(`MacOnboarding`)は次の起動でこれを見て 1 回出す
         if target == .create { FirstRunTutorialStore.shared.markEditHintShown() }
         selectedAppId = document.appId
+    }
+
+    // MARK: - 画面マップ(#970)
+
+    /// 中央にアプリがあり、会話のシートが閉じている時だけ開ける
+    private var canShowScreenMap: Bool { selectedApp != nil && compose == nil }
+
+    private func showScreenMap() {
+        guard canShowScreenMap else { return }
+        showsScreenMap = true
+    }
+
+    /// マップの「この画面について話す」: 中央のアプリを直す会話を、その画面を文脈にして開く
+    private func talk(about screen: ScreenContext) {
+        guard let app = selectedApp else { return }
+        open(.edit(appId: app.id, name: app.name, version: app.version), draft: "", screen: screen)
     }
 
     // MARK: - 完成の後のお知らせ・版の取り消し(#968)
@@ -229,7 +255,9 @@ struct MacRootView: View {
             newApp: newApp,
             ask: ask,
             speak: speak,
-            showTips: { showsTips = true }
+            showTips: { showsTips = true },
+            canShowScreenMap: canShowScreenMap,
+            showScreenMap: showScreenMap
         )
     }
 
@@ -243,13 +271,15 @@ struct MacRootView: View {
 }
 
 /// ツールバー。ショートカットはメニュー(MacCommands)が持つ。
-/// 新しいアプリ・文字で頼む・声で頼むは会話のシート(#967・#966)。画面マップ・共有は後の Issue なので今は押せない。
+/// 新しいアプリ・文字で頼む・声で頼むは会話のシート(#967・#966)。画面マップはシート(#970)。共有は後の Issue なので今は押せない。
 struct ShellToolbar: ToolbarContent {
     let hasApp: Bool
     var canCompose = true
     var newApp: () -> Void = {}
     var ask: () -> Void = {}
     var speak: () -> Void = {}
+    var canShowScreenMap = false
+    var showScreenMap: () -> Void = {}
 
     var body: some ToolbarContent {
         ToolbarItemGroup(placement: .primaryAction) {
@@ -262,9 +292,9 @@ struct ShellToolbar: ToolbarContent {
                 .help(hasApp ? "文字でこのアプリを直す" : "文字でアプリを作る")
         }
         ToolbarItemGroup(placement: .secondaryAction) {
-            Button {} label: { Label("画面マップ", systemImage: "map") }
+            Button(action: showScreenMap) { Label("画面マップ", systemImage: "map") }
                 .help("画面のつながりを見る")
-                .disabled(true)
+                .disabled(!canShowScreenMap)
             Button {} label: { Label("共有", systemImage: "square.and.arrow.up") }
                 .help("このアプリを共有する")
                 .disabled(true)

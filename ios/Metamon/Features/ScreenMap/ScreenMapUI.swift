@@ -32,13 +32,6 @@ final class ScreenMapUI {
     }
 }
 
-struct ScreenContext: Equatable {
-    var id: String
-    var title: String
-    /// 部品から開いたシートの AI ボタンで押した時の部品(#629)
-    var component: AIButtonComponent?
-}
-
 extension AppRuntime {
     /// 画面マップで選んだ画面を文脈にして edit を送る。API の契約は変えず、transcript の先頭に「画面「B」(id: b)で: 」を付ける。
     /// 「元に戻して」等の意図は付ける前の文で判定する(文脈付きでも undo / 切替はそのまま効く)。
@@ -50,20 +43,6 @@ extension AppRuntime {
         }
         await generate(ScreenMapCopy.contextPrefix(screen) + text)
     }
-}
-
-enum ScreenMapCopy {
-    static func contextPrefix(_ s: ScreenContext) -> String {
-        if let c = s.component { return L10n.tr("画面「\(s.title)」(id: \(s.id))の部品「\(c.label)」(id: \(c.id))で: ") }
-        return L10n.tr("画面「\(s.title)」(id: \(s.id))で: ")
-    }
-
-    /// 音声シートの上のチップの文言。
-    static func chipText(_ s: ScreenContext) -> String {
-        if let c = s.component { return L10n.tr("画面「\(s.title)」の「\(c.label)」について話す") }
-        return L10n.tr("画面「\(s.title)」について話す")
-    }
-    static var title: String { L10n.tr("画面マップ") }
 }
 
 extension View {

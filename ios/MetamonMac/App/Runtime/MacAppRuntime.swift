@@ -283,6 +283,17 @@ final class MacAppRuntime: RuntimeNavigating {
         }
     }
 
+    // MARK: - 画面マップ(#970)
+
+    /// 今いちばん上に見えている画面の id(画面マップを開いた時に選んでおく)
+    var currentScreen: String { NavigationResolver.top(navigationState, dsl: dsl).screen }
+
+    /// 画面マップから画面を開く。モーダルを閉じ、根(タブ)から矢印をたどって開く(戻るで来た道を戻れる)
+    func reveal(screen: String) {
+        guard let next = NavigationResolver.reveal(screen, graph: ScreenGraph(dsl: dsl), dsl: dsl, from: navigationState) else { return }
+        setNavigation(next)
+    }
+
     // MARK: - 削除の取り消し(M11)
 
     func deleteUndoably(entity: String, recordId: String) async {

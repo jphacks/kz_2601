@@ -54,6 +54,10 @@ struct ComposeSheet: View {
                 if case .edit(_, let name, _) = session.target {
                     Text(name).font(.subheadline).foregroundStyle(.secondary).lineLimit(1)
                 }
+                if let screen = session.screen, session.mode == .edit {
+                    ScreenContextChip(screen: screen) { session.screen = nil }
+                        .padding(.top, 4)
+                }
             }
             Spacer()
             Button(action: close) { Image(systemName: "xmark.circle.fill").font(.title3) }
@@ -71,6 +75,32 @@ struct ComposeSheet: View {
         voice.cancel()
         session.close()
         onClose()
+    }
+}
+
+/// 画面マップから開いた時の「画面「B」について話す」(#970・iOS の ScreenContextChip)。× で文脈を外す
+private struct ScreenContextChip: View {
+    let screen: ScreenContext
+    let remove: () -> Void
+
+    var body: some View {
+        HStack(spacing: 6) {
+            Image(systemName: "point.3.connected.trianglepath.dotted")
+                .foregroundStyle(Theme.brandGradient)
+                .accessibilityHidden(true)
+            Text(ScreenMapCopy.chipText(screen))
+                .font(.callout.weight(.semibold))
+                .lineLimit(1)
+            Button(action: remove) { Image(systemName: "xmark.circle.fill").foregroundStyle(.secondary) }
+                .buttonStyle(.plain)
+                .help("画面の指定を外す")
+                .accessibilityLabel("画面の指定を外す")
+        }
+        .padding(.horizontal, 10)
+        .padding(.vertical, 4)
+        .background(Theme.Colors.surface, in: Capsule())
+        .overlay(Capsule().strokeBorder(Theme.brandGradient, lineWidth: 1.5))
+        .accessibilityIdentifier("compose.screenContext")
     }
 }
 

@@ -1025,6 +1025,7 @@ Info.plist: `NSLocalNetworkUsageDescription` と `NSBonjourServices`(`_tailorit-
 - **描画**(`Metamon/Features/ScreenMap/`): カードは段ごとに中央揃え、幅に収まらなければ横スクロール。矢印は Canvas。下向きは直線、上向き・往復は進行方向の左へ曲げ、同じ段どうしはカードの下を回す
 - **この画面について話す**: カードを選ぶと出入りの一覧とボタン。押すと `ScreenMapUI.context` をセットして音声シートを開き、上部にチップ「画面「B」について話す」(× で外す)。送信時に **transcript の先頭へ「画面「B」(id: b)で: 」を付ける**(API の契約は変えない。「元に戻して」等の意図判定は付ける前の文で行う)。文脈は 1 回送ると消える
 - 確認: `METAMON_INITIAL_EXAMPLE=navigation METAMON_AUTO_SCREEN_MAP=b`(画面 b を選んだ状態で開く)、`METAMON_AUTO_SCREEN_MAP_TALK=1` で音声シートまで進む
+- **Mac(#970)**: 文脈・文言・カードの並べ方・矢印は `ios/Shared/ScreenMap/ScreenMapLayout.swift` で iOS と共有。矢印キーの移動(`ScreenGraph.neighbor`)とマップから画面を開く(`NavigationResolver.reveal`: 根から最短の矢印を `navigate` でたどる)は `ScreenGraph+Navigation.swift`(`ScreenGraphNavigationTests`)。見た目は `ios/MetamonMac/App/ScreenMap/MacScreenMapView.swift`(ツールバー・表示メニュー ⇧⌘E からシート)
 
 ## 21. キーボードの扱い(#143)
 
