@@ -5,9 +5,11 @@ import MetamonServices
 /// 作る・直す会話のシート(#967)。中央の列の上に出すので、直す時は後ろのアプリが見えたまま話せる。
 /// iOS の ClarifyChatView(吹き出し・チップ・案・要約カード)・GeneratingView(生成中)・組み上げを 1 枚にまとめた。
 /// キーボード: 入力欄で Return = 送る・Esc = 閉じる・「これでいく」は ⌘Return。チップと案は Tab で回ってスペースで押せる。
+/// 声で頼む(#966): 入力欄の横のマイク・⇧⌘M で録音 → もう一度で止めて文字にし、そのまま送る。
 struct ComposeSheet: View {
     @Bindable var session: MacComposeSession
     var onClose: () -> Void
+    @Environment(MacVoiceInput.self) private var voice
 
     static let size = CGSize(width: 560, height: 620)
 
@@ -28,6 +30,8 @@ struct ComposeSheet: View {
         }
         .frame(minWidth: Self.size.width, idealWidth: Self.size.width, minHeight: Self.size.height, idealHeight: Self.size.height)
         .background(.background)
+        .modifier(MacModelDownloadConfirm())
+        .onDisappear { voice.cancel() } // 録音中に閉じたら録音を捨てる
     }
 
     private var title: LocalizedStringKey {
@@ -58,6 +62,7 @@ struct ComposeSheet: View {
     }
 
     private func close() {
+        voice.cancel()
         session.close()
         onClose()
     }
@@ -67,6 +72,7 @@ struct ComposeSheet: View {
 
 private struct ComposeChat: View {
     @Bindable var session: MacComposeSession
+    @Environment(MacVoiceInput.self) private var voice
     @FocusState private var inputFocused: Bool
     @State private var showsTips = false
 
@@ -100,9 +106,24 @@ private struct ComposeChat: View {
                 }
             }
             Divider()
+            MacVoiceStatus()
             inputBar
         }
-        .onAppear { inputFocused = true }
+        .onAppear {
+            inputFocused = true
+            // ⇧⌘M(声で頼む)で開いた時はすぐ録音を始める
+            if session.startsWithVoice {
+                session.startsWithVoice = false
+                voice.toggle(deliver: deliver)
+            }
+        }
+    }
+
+    /// 文字にした文を(書きかけがあればその後ろに足して)送る。送っている途中なら入力欄に足すだけ(送るのは本人が Return)
+    private func deliver(_ text: String) {
+        let typed = session.draft.trimmingCharacters(in: .whitespacesAndNewlines)
+        session.draft = typed.isEmpty ? text : typed + " " + text
+        if session.phase == .chatting, !session.sending { session.sendDraft() }
     }
 
     private var greeting: some View {
@@ -156,7 +177,8 @@ private struct ComposeChat: View {
                 .lineLimit(1...4)
                 .focused($inputFocused)
                 .onSubmit { session.sendDraft() }
-                .disabled(session.sending)
+                .disabled(session.sending || voice.isBusy)
+            MacMicButton(disabled: session.sending, deliver: deliver)
             Button {
                 showsTips = true
             } label: {

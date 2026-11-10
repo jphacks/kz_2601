@@ -8,10 +8,13 @@ import MetamonServices
 @main
 struct MetamonMacApp: App {
     private let apps = SampleAppCatalog.load()
+    /// 声で頼む(#966)。マイクは 1 つなのでウインドウをまたいで 1 つだけ持つ
+    @State private var voice = MacVoiceInput()
 
     var body: some Scene {
         WindowGroup(id: MacCommands.mainWindowId) {
             MacRootView(apps: apps)
+                .environment(voice)
         }
         .defaultSize(width: 1100, height: 720)
         .windowResizability(.contentMinSize)
