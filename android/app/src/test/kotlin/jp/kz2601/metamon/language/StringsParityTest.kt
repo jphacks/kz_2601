@@ -12,6 +12,7 @@ import javax.xml.parsers.DocumentBuilderFactory
  * - キーが両方にある(translatable="false" は日本語だけで良い)
  * - 書式の引数(%1$s など)が揃っている
  * - locales_config.xml の言語と values-* が揃っている
+ * - 同じキーを 2 つのモジュールに書いていない
  */
 class StringsParityTest {
     /** Gradle の単体テストはモジュールの場所で動く(android/app)。 */
@@ -62,6 +63,22 @@ class StringsParityTest {
                 problems += "${module.name}: translatable=false なのに英語がある $it"
             }
             en.filter { it.value.text.isBlank() }.keys.forEach { problems += "${module.name}: 英語が空 $it" }
+        }
+        assertEquals(problems.joinToString("\n"), emptyList<String>(), problems)
+    }
+
+    /** 別のモジュールで同じキーを書くと、結合した時に片方が黙って上書きされる(app が勝つ)。 */
+    @Test
+    fun noKeyIsDefinedInTwoModules() {
+        val problems = mutableListOf<String>()
+        for (dir in listOf("values", "values-en")) {
+            val owners = mutableMapOf<String, MutableList<String>>()
+            for (module in modules) {
+                val res = File(module, "src/main/res/$dir")
+                if (!res.isDirectory) continue
+                strings(res).keys.forEach { owners.getOrPut(it) { mutableListOf() } += module.name }
+            }
+            owners.filterValues { it.size > 1 }.forEach { (key, mods) -> problems += "$dir: $key が $mods の両方にある" }
         }
         assertEquals(problems.joinToString("\n"), emptyList<String>(), problems)
     }
