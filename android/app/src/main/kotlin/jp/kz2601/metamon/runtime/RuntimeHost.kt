@@ -3,7 +3,9 @@ package jp.kz2601.metamon.runtime
 import jp.kz2601.metamon.dsl.Action
 import jp.kz2601.metamon.dsl.ActionType
 import jp.kz2601.metamon.dsl.Activity
+import jp.kz2601.metamon.dsl.AppDSL
 import jp.kz2601.metamon.dsl.Notification
+import jp.kz2601.metamon.dsl.records.Record
 import jp.kz2601.metamon.renderer.ActionContext
 
 /** 端末の機能がまだ無い(Android で未実装)。AppRuntime が決まったトーストにする。 */
@@ -22,6 +24,12 @@ interface RuntimeHost {
         throw HostUnavailableException(ActionType.SCHEDULE_NOTIFICATION)
 
     suspend fun cancelNotification(id: String, appId: String): Unit = throw HostUnavailableException(ActionType.CANCEL_NOTIFICATION)
+
+    /**
+     * DSL の読み込み・記録の保存・削除・同期の後(まとめて 1 回)。`app.notifications[]` の予約し直しと条件の通知の評価(#886)。
+     * 既定は何もしない(通知の無いホスト)。
+     */
+    suspend fun notificationsChanged(appId: String, dsl: AppDSL, records: Map<String, List<Record>>) {}
 
     /** フォローする / 外す(#270)。 */
     suspend fun follow(action: Action, context: ActionContext, on: Boolean): Unit =

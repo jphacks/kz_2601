@@ -26,10 +26,15 @@ import jp.kz2601.metamon.services.local.RecordSyncEngine
 import jp.kz2601.metamon.services.local.SyncEvent
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.FlowPreview
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.debounce
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
@@ -101,6 +106,7 @@ class AppRuntime(
     private val savingForms = mutableSetOf<FormDraft>()
     private val savingLock = Mutex()
     private var eventsJob: Job? = null
+    private var notificationsJob: Job? = null
 
     /** 最後に保存したフォーム。サーバーが断ったら「保存しました」を取り消す */
     private var lastSavedForm: SavedForm? = null
@@ -113,6 +119,7 @@ class AppRuntime(
     suspend fun bootstrap() {
         recordSync.start()
         if (eventsJob == null) eventsJob = scope.launch { recordSync.events.collect { handle(it) } }
+        if (notificationsJob == null) notificationsJob = scope.launch { watchNotifications() }
         restore?.let { fetch ->
             try {
                 val remote = fetch(document.appId)
@@ -124,6 +131,26 @@ class AppRuntime(
             }
         }
         load(dsl.entities.map { it.id }.toSet())
+    }
+
+    /**
+     * 通知(#886): DSL の読み込み・記録の保存・削除・同期が続いても 400ms まとめて 1 回、予約し直しと条件の評価を host に頼む。
+     * 通知の無い DSL では何もしない。
+     */
+    @OptIn(FlowPreview::class)
+    private suspend fun watchNotifications() {
+        combine(_state.map { it.document }.distinctUntilChanged(), _records) { doc, recs -> doc to recs }
+            .debounce(400)
+            .collect { (doc, recs) ->
+                if (doc.dsl.app.notifications.isEmpty()) return@collect
+                try {
+                    host.notificationsChanged(doc.appId, doc.dsl, recs)
+                } catch (e: CancellationException) {
+                    throw e
+                } catch (_: Exception) {
+                    // 予約に失敗しても画面は止めない(次の変化で予約し直す)
+                }
+            }
     }
 
     /** DSL を差し替える(別アプリ・生成の結果)。表示中の記録・遷移・モーダルは捨てる。 */
