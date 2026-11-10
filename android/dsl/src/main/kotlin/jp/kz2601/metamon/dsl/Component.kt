@@ -110,6 +110,19 @@ data class Component(
     val prompt: String? = null,
     /** small | medium | large */
     val size: String? = null,
+    /** text の書体(title | headline | body | caption)・button の種類など。 */
+    val style: String? = null,
+    /** text の寄せ(leading | center | trailing)。 */
+    val align: String? = null,
+    val action: Action? = null,
+    /** container の間隔: none | small | medium | large */
+    val spacing: String? = null,
+    /** disclosure の初期の開閉。 */
+    val expanded: Boolean? = null,
+    /** carousel の 1 枚の幅: small | medium | large */
+    val itemWidth: String? = null,
+    /** grid の列数(2〜4)。 */
+    val columnCount: Int? = null,
     @Serializable(with = LossyListSerializer::class)
     val children: List<Component> = emptyList(),
 )

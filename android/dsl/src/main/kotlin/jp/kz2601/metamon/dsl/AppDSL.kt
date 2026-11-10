@@ -72,7 +72,10 @@ data class AppMeta(
     /** 2〜5 個ならタブバー表示。 */
     @Serializable(with = LossyListSerializer::class)
     val tabs: List<Tab> = emptyList(),
-)
+) {
+    /** タブバーを出すか(iOS の `hasTabs`: 2 個以上)。 */
+    val hasTabs: Boolean get() = tabs.size >= 2
+}
 
 @Serializable
 data class Tab(
@@ -85,6 +88,34 @@ data class Tab(
 data class Screen(
     val id: String,
     val title: String = "",
+    /** 付いていればフォーム画面(この entity のレコードを編集する)。 */
+    val entity: String? = null,
+    /** ナビバーの右のボタン。 */
+    @Serializable(with = LossyListSerializer::class)
+    val toolbar: List<ToolbarButton> = emptyList(),
     @Serializable(with = LossyListSerializer::class)
     val components: List<Component> = emptyList(),
+)
+
+@Serializable
+data class ToolbarButton(
+    val label: String,
+    val icon: String? = null,
+    val action: Action,
+)
+
+/** ボタン・toolbar・一覧の行から実行する副作用(schema の Action)。#357 では遷移に要るものだけ。 */
+@Serializable
+data class Action(
+    /** navigate / back / saveRecord / … 。知らない値もそのまま持つ。 */
+    val type: String,
+    val screen: String? = null,
+    /** push | sheet | fullScreen */
+    val presentation: String? = null,
+    val entity: String? = null,
+    val url: String? = null,
+    val confirmMessage: String? = null,
+    val prefillRef: String? = null,
+    val format: String? = null,
+    val notificationId: String? = null,
 )
