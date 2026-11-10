@@ -3,6 +3,7 @@ package jp.kz2601.metamon.voice
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import jp.kz2601.metamon.dsl.AppDocument
+import jp.kz2601.metamon.dsl.screen
 import jp.kz2601.metamon.services.AIClient
 import jp.kz2601.metamon.services.ChatMessage
 import jp.kz2601.metamon.services.ChatMode
@@ -149,6 +150,23 @@ class VoiceViewModel(
         val s = _state.value
         if (t.isEmpty() || s.isGenerating || s.chatPending) return
         if (clarifyEnabled && (s.isInitial || s.isChatting)) say(t, source) else generate(t)
+    }
+
+    /** 相談を飛ばしてすぐ生成する(DEBUG のつまみ `METAMON_AUTO_TRANSCRIPT` 用) */
+    fun generateNow(text: String) {
+        val t = text.trim()
+        if (t.isNotEmpty()) generate(t)
+    }
+
+    /**
+     * 今のアプリの最初の画面を差し替える(DEBUG のつまみ `METAMON_AUTO_NAV` 用・遷移 #357 が入るまで)。
+     * その画面が無ければ何もせず false。
+     */
+    fun showScreen(screenId: String): Boolean {
+        val dsl = _state.value.document.dsl
+        if (dsl.screen(screenId) == null) return false
+        _state.update { it.copy(document = it.document.copy(dsl = it.document.dsl.copy(initialScreen = screenId))) }
+        return true
     }
 
     /** 生成後のアプリの上で音声のシートを開く(マイク FAB・voiceInput の部品) */
