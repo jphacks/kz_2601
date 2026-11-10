@@ -14,7 +14,6 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
-import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -61,6 +60,7 @@ import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import jp.kz2601.metamon.AppContainer
 import jp.kz2601.metamon.R
+import jp.kz2601.metamon.renderer.layout.imePaddingExcludingBelow
 import jp.kz2601.metamon.services.feedback.FeedbackConsent
 import jp.kz2601.metamon.services.feedback.FeedbackContext
 import jp.kz2601.metamon.services.feedback.FeedbackDraft
@@ -226,7 +226,7 @@ private fun FeedbackComposerDialog(open: FeedbackOpen, sender: FeedbackSender, o
             },
         ) { padding ->
             Column(
-                Modifier.padding(padding).fillMaxSize().imePadding().verticalScroll(rememberScrollState()).padding(16.dp),
+                Modifier.padding(padding).fillMaxSize().imePaddingExcludingBelow().verticalScroll(rememberScrollState()).padding(16.dp),
                 verticalArrangement = Arrangement.spacedBy(12.dp),
             ) {
                 MessageSection(draft) { draft = it }
