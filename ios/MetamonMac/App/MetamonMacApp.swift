@@ -24,8 +24,16 @@ struct MetamonMacApp: App {
 
     var body: some Scene {
         WindowGroup(id: MacCommands.mainWindowId) {
-            // 設定の「言語」で即時切替(#973)・初回の案内(#971)・声で頼む(#966)
-            MacLanguageRoot { MacRootView(apps: apps).macOnboarding().environment(voice).environment(library) }
+            // 設定の「言語」で即時切替(#973)・初回の案内(#971)・声で頼む(#966)・tailorit:// と共有のリンク(#975)
+            MacLanguageRoot {
+                MacRootView(apps: apps)
+                    .macOnboarding()
+                    .environment(voice)
+                    .environment(library)
+                    #if !APP_STORE_REVIEW
+                    .modifier(MacLinkReceiver())
+                    #endif
+            }
         }
         .defaultSize(width: 1100, height: 720)
         .windowResizability(.contentMinSize)
