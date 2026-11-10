@@ -28,7 +28,7 @@ class AppDSLDecodeTest {
         assertEquals("mic", mic.id)
         assertEquals("A1:F12", mic.area)
         assertEquals("どんなアプリが欲しい？", mic.prompt)
-        assertEquals("large", mic.size)
+        assertEquals(Size.LARGE, mic.size)
     }
 
     @Test
