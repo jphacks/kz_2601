@@ -26,6 +26,7 @@ var (
 var aiRelayedCodes = []string{
 	CodeAccountDeleted,
 	CodeAppCheckFailed,
+	CodeAppLimitReached,
 	CodeBadRequest,
 	CodeForbidden,
 	CodeInternal,

@@ -112,14 +112,17 @@ public struct CoinWallet: Equatable, Sendable {
     public var overflow: CoinOverflow?
     /// 財布に目安があれば使う(無ければ公開の設定の目安)
     public var estimates: CoinEstimates
+    /// コインで買った持てるアプリの枠(期限なし・#630)
+    public var appSlots: Int
 
     public init(mode: String? = nil, balance: CoinBalance, allowance: [String: UsageMeter] = [:], overflow: CoinOverflow? = nil,
-                estimates: CoinEstimates = .init()) {
+                estimates: CoinEstimates = .init(), appSlots: Int = 0) {
         self.mode = mode
         self.balance = balance
         self.allowance = allowance
         self.overflow = overflow
         self.estimates = estimates
+        self.appSlots = appSlots
     }
 
     public static func decode(_ data: Data) throws -> CoinWallet {
@@ -157,7 +160,30 @@ public struct CoinWallet: Equatable, Sendable {
                 spent: CoinJSON.int(ov["spent"]) ?? 0)
         }
         self.init(mode: o["mode"]?.stringValue, balance: balance, allowance: allowance, overflow: overflow,
-                  estimates: CoinEstimates(json: o["estimates"]))
+                  estimates: CoinEstimates(json: o["estimates"]), appSlots: max(0, CoinJSON.int(o["appSlots"]) ?? 0))
+    }
+}
+
+/// `POST /v1/me/coins/slot` の応答(`{bought, appSlots, coins, wallet}`)。
+public struct CoinSlotPurchase: Equatable, Sendable {
+    /// false = この requestId は買い済み(何も引いていない)
+    public var bought: Bool
+    public var appSlots: Int
+    public var coins: Int
+    public var wallet: CoinWallet
+
+    public init(bought: Bool, appSlots: Int, coins: Int, wallet: CoinWallet) {
+        self.bought = bought
+        self.appSlots = appSlots
+        self.coins = coins
+        self.wallet = wallet
+    }
+
+    public static func decode(_ data: Data) throws -> CoinSlotPurchase {
+        let root = try JSONDecoder().decode(JSONValue.self, from: data)
+        guard let o = root.objectValue else { throw CoinDecodeError.notAnObject }
+        return CoinSlotPurchase(bought: o["bought"]?.boolValue ?? false, appSlots: CoinJSON.int(o["appSlots"]) ?? 0,
+                                coins: CoinJSON.int(o["coins"]) ?? 0, wallet: CoinWallet(object: o["wallet"]?.objectValue ?? [:]))
     }
 }
 
@@ -270,10 +296,13 @@ public struct CoinPlanConfig: Equatable, Sendable {
     /// 超えた後のコイン払いの 1 まとまり(コイン数・実行の回数)。サーバーはまだ返さない(3 段目)ので nil = 出さない
     public var overflowBlockCoins: Int?
     public var overflowBlockRuns: Int?
+    /// 持てるアプリの枠 1 つのコイン(`appSlotCoins`・#630)。nil = 枠を買えない
+    public var appSlotCoins: Int?
 
     public init(isEnabled: Bool, packs: [CoinPack] = [], estimates: CoinEstimates = .init(),
                 free: CoinPlanNumbers = .init(), pro: CoinPlanNumbers = .init(),
-                overflowBlockCoins: Int? = nil, overflowBlockRuns: Int? = nil) {
+                overflowBlockCoins: Int? = nil, overflowBlockRuns: Int? = nil, appSlotCoins: Int? = nil) {
+        self.appSlotCoins = appSlotCoins
         self.isEnabled = isEnabled
         self.packs = packs
         self.estimates = estimates
@@ -307,7 +336,8 @@ public struct CoinPlanConfig: Equatable, Sendable {
             free: CoinPlanNumbers(oneTimeCoins: positive(o["initialGrant"])),
             pro: CoinPlanNumbers(monthlyCoins: positive(o["proMonthly"]), allowance: CoinPlanNumbers.allowance(o["allowance"])),
             overflowBlockCoins: positive(ov["blockCoins"]),
-            overflowBlockRuns: positive(ov["blockRuns"]))
+            overflowBlockRuns: positive(ov["blockRuns"]),
+            appSlotCoins: positive(o["appSlotCoins"]))
     }
 }
 

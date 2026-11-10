@@ -160,6 +160,7 @@ usage/{uid}_{yyyymm}              {runs, recipients, writes, reads, warned80, wa
 | `GET /v1/me/coins/ledger?cursor=` | 履歴(日時・種類・処理・アプリ名・増減) |
 | `POST /v1/me/coins/apple` | 消耗型の JWS を検証して足す。`transactionId` が既にあれば何もせず今の残高を返す(冪等) |
 | `PUT /v1/me/coins/settings` | `overflow.enabled`・`overflow.monthlyCap` |
+| `POST /v1/me/coins/slot` | 持てるアプリの枠を 1 つ買う(`requestId` ごとに 1 回・期限なし・`COIN_PRICE_APP_SLOT`)。オーナーの決定(2026-11-10)。持てる数は無料 2・Pro 5(`docs/backend/rate-limit.md` の「持てるアプリの数」) |
 | `PUT /v1/apps/{appId}/ai-payer` | 共有アプリの作成者の設定(上の表) |
 
 | コード | HTTP | 意味 |
@@ -167,6 +168,7 @@ usage/{uid}_{yyyymm}              {runs, recipients, writes, reads, warned80, wa
 | `coins_insufficient` | 402 | 払う人のコインが予約の量より少ない(`details.required`・`balance`・`payer`) |
 | `allowance_exhausted` | 402 | サーバーの枠を使い切り、超えた後のコイン払いが OFF(appconfig の書き込み・件数) |
 | `overflow_cap_reached` | 402 | 超えた後のコイン払いが月の上限に着いた |
+| `app_limit_reached` | 402 | 持てるアプリの数(プランの数 + 買った枠)に達した。`details` に持っているアプリと、枠を買えるか |
 | `pro_required` | 402 | 今のまま(有料の機能) |
 | `rate_limited` | 429 | 今のまま(暴走の歯止め) |
 | `free_plan_paused` / `ai_paused` | 503 | 今のまま(全体の予算・止め弁) |

@@ -96,6 +96,7 @@ struct MetamonApp: App {
                         .transition(.opacity)
                 } else {
                     RootView()
+                        .appLimitSheets()                           // 持てるアプリの数の置き換え(#630・下の environment を受ける)
                         .environment(runtime)                       // アプリ本体の View(RootView / VoiceInputView)向け
                         .environment(\.dslRuntime, runtime)         // Renderer 向け(DSLRuntime protocol)
                         .environment(\.componentRegistry, Self.componentRegistry)

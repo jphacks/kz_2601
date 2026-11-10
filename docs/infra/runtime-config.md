@@ -87,7 +87,7 @@ runner は prod で GitHub の変数 `RUNNER_DEPLOY=1` の時だけデプロイ�
 | `AI_SERVER_RULES` | ai | `1` で、「自動の動き」を頼む発話の時に serverRules(自動の動き)を作る呼び出しを足す(#343)。runner と `RUNNER_OUTBOX` が動いていない環境で入れると、作れても動かないルールができる。入れるのは `RUNNER_OUTBOX=1` と同じ時([runner.md](runner.md))。入れると、生成と相談の指示文の「サーバーからのプッシュ通知はできない」も「後の工程で作る・作れる(作成者の Pro)」に替わる(共有データの無い版と「この機能なしで作る」は替えない・`internal/ai/server_push_wording.go`) | 無し(作らない) |
 | `AI_ON_DEMAND_RULES` | ai | 過去の JPHACKS 作品の作り方(`jphacks_products*_rules.go` の 28 項目・約 21 KB)を、キャッシュする共通部分から外し、要る時だけキャッシュの後ろの別のブロックで送る(`internal/ai/on_demand_rules.go`)。送る項目は「きっかけの言葉に当たったもの(編集では今のアプリの部品・名前も)」と「小さなモデルの振り分け(`AI_RECIPE_MODEL`・最大 1.5 秒待つ。間に合わない・失敗した時は言葉だけ)」を合わせたもの。`0` で止めて、前と同じく全部を毎回送る(送る内容はバイト単位で前と同じ)。作り方が抜けた・作りが変わったと思ったら、まず `0` にして比べる | 無し(使う) |
 | `AI_RECIPE_MODEL` | ai | 上の振り分けに使うモデル。呼び出しは `ai.usage` に `operation=recipes` で 1 行ずつ出る | `claude-haiku-5-5` |
-| `PLAN_FREE_APPS` / `PLAN_PRO_APPS` | appconfig | プランごとの上限(#317)。1 人が作れるアプリの数(共有のアプリを入れるのは数えない)。`0` で数えない([rate-limit.md](../backend/rate-limit.md#プランごとの上限317)) | 100 / 1000 |
+| `PLAN_FREE_APPS` / `PLAN_PRO_APPS` | appconfig | プランごとの上限(#317・#630)。1 人が持てるアプリの数(自分で作ったもの + 参加した共有のアプリ。空のアプリは数えない)。コインで買った枠(`COIN_PRICE_APP_SLOT`)がこの上に足される。`0` で数えない([rate-limit.md](../backend/rate-limit.md#持てるアプリの数630)) | 2 / 5 |
 | `PLAN_FREE_RECORDS_PER_APP` / `PLAN_PRO_RECORDS_PER_APP` | appconfig | 1 つのアプリのレコードの件数(その人が見える分: 自分の分 + 共有の分)。共有のアプリは作成者のプランで数える。`0` で数えない | 5000 / 50000 |
 | `PLAN_FREE_PHOTOS_PER_APP` / `PLAN_PRO_PHOTOS_PER_APP` | appconfig | 1 つのアプリの写真の枚数(1 枚 300 KB まで = 容量の上限)。`0` で数えない | 500 / 5000 |
 | `PLAN_LIMITS_MODE` | appconfig | 上の 3 つの強制。`enforce` = 403 `plan_limit_reached` / `log` = 止めずにログ `plan_limit.would_block` だけ / `off` = 数えない(#317 の前と同じ)。それ以外の値は起動しない | `enforce` |
@@ -101,6 +101,7 @@ runner は prod で GitHub の変数 `RUNNER_DEPLOY=1` の時だけデプロイ�
 | `COIN_PACKS` | appconfig | コインのパック(消耗型)の `商品id=枚数` をカンマ区切り(例の形: `<id>=<枚数>,<id>=<枚数>`)。この id だけを `POST /v1/me/coins/apple` で受ける(bundle id・環境は `APPSTORE_*` と同じ)。値は非公開の資料・App Store Connect | 無し(売らない) |
 | `COIN_INITIAL_GRANT` | appconfig | サインイン済み(匿名でない)アカウントに 1 回だけ足すコイン(最初に財布を読んだ時)。`0` の間は足さず、後で入れると次に読んだ人から足す | `0` |
 | `COIN_PRO_MONTHLY` | appconfig | Pro の請求期間ごとのコイン(期間の終わりに消える・繰り越さない) | `0` |
+| `COIN_PRICE_APP_SLOT` | appconfig | 持てるアプリの枠 1 つのコイン(`POST /v1/me/coins/slot`・期限なし・#630)。**値は非公開の資料で決め、repo に書かない**。`0` = 枠を買えない。`COIN_BILLING_MODE=enforce` の時だけ買える(`log` は前に買った枠を数えるだけ・`off` は何も読まない)。`GET /v1/coins/config` の `appSlotCoins` に出す | `0` |
 | `COIN_HOLD_TTL` | appconfig・ai | 確定されない押さえを戻すまでの時間(`10m` のように書く・1 分以上) | `10m` |
 | `ALLOWANCE_PRO_RUNS` / `_RECIPIENTS` / `_WRITES` / `_READS` | appconfig・runner(同じ値にする) | Pro の作成者ごとの月(JST)の枠(#630 の 3 段目)。runner は `COIN_BILLING_MODE` が `log` / `enforce` の時に実行・通知の宛先・書き込み・読み取りを月ごとに数え(`rateLimits` の `{APP_ENV}_{yyyymm}_ma_{kind}_{uid}`・共有アプリは作成者の分)、`enforce` では枠を超えた分を止める(下のまとまりを買えれば続ける)。`log` は止めずにログ `coins.would_overflow` だけ。`0` = 数えるだけで止めない。`GET /v1/me/coins` の `allowance` に使った量を出す(appconfig は runner と同じ `APP_ENV`・`RATE_LIMIT_COLLECTION` で読む)。日の上限(`RUNNER_LIMIT_*`)は暴走の歯止めとして先に効く | `0` |
 | `COIN_OVERFLOW_BLOCK_RUNS` / `_RECIPIENTS` / `_WRITES` / `_READS` | appconfig・runner(同じ値にする) | 枠を超えた後にコインで買う 1 まとまりで増える量。作成者が「超えた後のコイン払い」を ON にしていて、今月の `spent` + 値段が月の上限以下なら、runner が 1 まとまりずつ買う(台帳 `spend_overflow`・まとまりごとに 1 行・同じまとまりを二重に買わない)。`0` = その種類は買えない(枠で止める) | `0` |

@@ -63,10 +63,12 @@ func main() {
 	}
 	logger.Info("text filter", slog.String("mode", string(textMode)))
 	limits := planLimits(logger) // #317
-	api := appconfig.New(st, appconfig.WithPro(pro), appconfig.WithProMode(proMode), appconfig.WithPlanLimits(limits), appconfig.WithTextFilter(textMode), usage(st, logger))
-	entitlement.Register(api, ents) // Pro (#314)
 	cs := newCoins(st, ents, logger)
-	coinsapi.Register(api, cs) // coins (#630)
+	api := appconfig.New(st, appconfig.WithPro(pro), appconfig.WithProMode(proMode), appconfig.WithPlanLimits(limits),
+		appconfig.WithAppSlots(cs), // coin-bought app slots raise the held-app limit (#630)
+		appconfig.WithTextFilter(textMode), usage(st, logger))
+	entitlement.Register(api, ents) // Pro (#314)
+	coinsapi.Register(api, cs)      // coins (#630)
 	handler := newHandler(authed, logger, api, appconfig.SharePage(st), appStoreNotifications(ents, logger), coinsapi.Public(cs.Config))
 	server := &http.Server{
 		Handler:           handler,

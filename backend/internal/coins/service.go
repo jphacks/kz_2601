@@ -134,12 +134,15 @@ type View struct {
 	// Allowance is this JST month's use of Pro's server allowance per kind
 	// (runs / recipients / writes / reads; part 3). Omitted when not read.
 	Allowance map[string]AllowanceUse `json:"allowance,omitempty"`
+	// AppSlots are the app slots bought (slots.go); the held apps and the
+	// limit are in GET /v1/me/usage (apps / appSlots).
+	AppSlots int64 `json:"appSlots"`
 }
 
 func (s *Service) view(w Wallet) View {
 	return View{Mode: s.Mode(), Total: w.Total(), Available: w.Available(), Purchased: w.Purchased,
 		Grant: w.Grant, GrantPeriodEnd: w.GrantPeriodEnd, Initial: w.Initial, Reserved: w.Reserved,
-		Overflow: w.Overflow.view(s.now())}
+		Overflow: w.Overflow.view(s.now()), AppSlots: w.AppSlots}
 }
 
 // Wallet returns uid's balance, applying the grants due (the initial grant
@@ -387,6 +390,9 @@ type PublicConfig struct {
 	// (only kinds whose block is on). BlockRuns / BlockCoins repeat the runs
 	// block for the iOS plan sheet.
 	Overflow PublicOverflow `json:"overflow"`
+	// AppSlotCoins is the coins of one more app to hold (COIN_PRICE_APP_SLOT;
+	// omitted when slots cannot be bought).
+	AppSlotCoins int64 `json:"appSlotCoins,omitempty"`
 }
 
 // PublicOverflow is PublicConfig.overflow.
@@ -424,6 +430,10 @@ func (c Config) Public() PublicConfig {
 	if b := ov.Blocks[KindRuns]; b.On() {
 		ov.BlockRuns, ov.BlockCoins = b.Size, b.Coins
 	}
+	slot := int64(0)
+	if mode == ModeEnforce {
+		slot = c.SlotPrice
+	}
 	return PublicConfig{Mode: mode, Packs: packs, Estimates: nz(c.Estimates), InitialGrant: c.InitialGrant, ProMonthly: c.ProMonthly,
-		Allowance: nz(c.Allowance), Overflow: ov}
+		Allowance: nz(c.Allowance), Overflow: ov, AppSlotCoins: slot}
 }

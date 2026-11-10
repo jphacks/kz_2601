@@ -6,6 +6,7 @@ package appconfig
 
 import (
 	"encoding/json"
+	"errors"
 	"log/slog"
 	"net/http"
 	"strings"
@@ -72,7 +73,7 @@ func (h *Handler) rename(r *http.Request, id, name string) error {
 	if err != nil {
 		return err
 	}
-	_, err = h.store.CommitVersion(r.Context(), uidOf(r), id, store.Commit{
+	_, err = h.commit(r, id, store.Commit{
 		BaseVersion: cur.CurrentVersion, DSL: next, Name: name, Patch: ops,
 		Source: &store.Source{Kind: "manual", Mode: "patch", Summary: "名前を「" + name + "」に変更"}, Publish: pub,
 		Events: h.rulesChanged(r, id, cur.DSL, app),
@@ -124,10 +125,6 @@ func (h *Handler) duplicateApp(w http.ResponseWriter, r *http.Request) {
 		fail(w, err)
 		return
 	}
-	if err := h.checkAppLimit(r); err != nil { // #317
-		fail(w, err)
-		return
-	}
 	v, err := h.seedCopy(r, newID, raw, name, &store.Source{Kind: "import", Mode: "full", Summary: "「" + src.Name + "」を複製"})
 	if err != nil {
 		fail(w, err)
@@ -146,21 +143,33 @@ func (h *Handler) duplicateApp(w http.ResponseWriter, r *http.Request) {
 }
 
 // seedCopy creates id at version 1 (initial DSL) and commits raw as version 2,
-// so iOS does not treat the copy as a blank, never-generated app.
+// so iOS does not treat the copy as a blank, never-generated app. The copy
+// is a new held app (#630): checked before, and again in the commit; a copy
+// that loses the last slot to a concurrent request removes its blank.
 func (h *Handler) seedCopy(r *http.Request, id string, raw json.RawMessage, name string, src *store.Source) (*store.Version, error) {
+	if err := h.checkAppLimit(r); err != nil {
+		return nil, err
+	}
 	init := dsl.Initial()
 	initRaw, err := json.Marshal(init)
 	if err != nil {
 		return nil, err
 	}
-	if _, _, err := h.store.EnsureApp(r.Context(), uidOf(r), id, initRaw, init.App.Name); err != nil {
+	_, created, err := h.store.EnsureApp(r.Context(), uidOf(r), id, initRaw, init.App.Name)
+	if err != nil {
 		return nil, err
 	}
 	var next dsl.App
 	_ = json.Unmarshal(raw, &next) // only read for its time-triggered rules
-	v, err := h.store.CommitVersion(r.Context(), uidOf(r), id, store.Commit{BaseVersion: 1, DSL: raw, Name: name, Source: src,
+	v, err := h.commit(r, id, store.Commit{BaseVersion: 1, DSL: raw, Name: name, Source: src,
 		Events: h.rulesChanged(r, id, nil, &next)})
 	if err != nil {
+		var ae *apiError
+		if created && errors.As(err, &ae) && ae.code == httpx.CodeAppLimitReached {
+			if _, perr := h.store.PurgeApp(r.Context(), uidOf(r), id); perr != nil {
+				slog.WarnContext(r.Context(), "appconfig: removing the blank copy failed", slog.String("appId", id), slog.Any("error", perr))
+			}
+		}
 		return nil, mapStoreErr(err, "app")
 	}
 	return v, nil

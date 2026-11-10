@@ -106,6 +106,7 @@ struct VoiceInputView: View {
         #if !APP_STORE_REVIEW
         .coinSheets() // #630 音声シートの上にお店を重ねる(コインが足りない 402・「約 N コイン」から)
         #endif
+        .appLimitSheets() // #630 持てるアプリの数に達した時の置き換えシート
         .sheet(isPresented: $showSettings) { SettingsSheet() }
         .sheet(isPresented: $showTips) {
             PromptTipsSheet { text in

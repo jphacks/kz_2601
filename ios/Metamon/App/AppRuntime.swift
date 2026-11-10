@@ -697,7 +697,7 @@ final class AppRuntime: DSLRuntime {
             print("[Metamon] morph failed: \(failure) (\(error))")
             withAnimation(.easeInOut(duration: 0.3)) { morphJob = nil }
             switch failure { // H3・M3: 上限・無料プランの停止でも会話は消さない(カードから次の一手)
-            case .rateLimited, .planLimit, .freePlanPaused: keepChatAfterStop = true
+            case .rateLimited, .planLimit, .appLimit, .freePlanPaused: keepChatAfterStop = true
             default: break
             }
             await present(failure, transcript: text)
@@ -747,6 +747,11 @@ final class AppRuntime: DSLRuntime {
         case .sessionExpired:
             withAnimation(.easeInOut(duration: 0.3)) { errorCard = ErrorPresentation.from(failure, transcript: transcript) }
             onSessionExpired?()
+        case .appLimit:
+            // #630: カードを残し(閉じても「置き換える」で開き直せる)、置き換えシートをすぐ出す
+            guard let card = ErrorPresentation.from(failure, transcript: transcript) else { return }
+            withAnimation(.easeInOut(duration: 0.3)) { errorCard = card }
+            handle(.replaceApp, of: card)
         default:
             withAnimation(.easeInOut(duration: 0.3)) { errorCard = ErrorPresentation.from(failure, transcript: transcript) }
         }
@@ -775,6 +780,17 @@ final class AppRuntime: DSLRuntime {
             #else
             break // 審査用の版はこのボタンを出さない(`ErrorPresentation.rateLimitPrimary`)
             #endif
+        case .replaceApp:
+            guard case .appLimit(let limit) = card.kind else { return }
+            presentAppLimit(limit) { [weak self] in
+                guard let self, self.errorCard == card else { return } // 待っている間に閉じた・話し直した
+                withAnimation(.easeInOut(duration: 0.3)) { self.errorCard = nil }
+                if card.origin == .chat {
+                    self.retryChat()
+                } else if !card.transcript.isEmpty {
+                    await self.sendMetered(card.transcript)
+                }
+            }
         }
     }
 

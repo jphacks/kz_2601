@@ -76,7 +76,7 @@ paths:
           content: { application/json: { schema: { $ref: '#/components/schemas/AppWithDSL' } } }
         '400': { $ref: '#/components/responses/BadRequest' }
         '422': { $ref: '#/components/responses/InvalidDSL' }
-        '402': { $ref: '#/components/responses/ProRequired' }
+        '402': { $ref: '#/components/responses/ProRequiredOrAppLimit' }
 
   /apps/{appId}:
     parameters: [{ $ref: '#/components/parameters/AppId' }]
@@ -172,7 +172,7 @@ paths:
           content: { application/json: { schema: { $ref: '#/components/schemas/AppWithDSL' } } }
         '400': { $ref: '#/components/responses/BadRequest' }
         '404': { $ref: '#/components/responses/NotFound' }
-        '402': { $ref: '#/components/responses/ProRequired' }
+        '402': { $ref: '#/components/responses/ProRequiredOrAppLimit' }
 
   /apps/{appId}/automations:
     parameters: [{ $ref: '#/components/parameters/AppId' }]
@@ -243,6 +243,7 @@ paths:
             Cache-Control: { schema: { type: string }, description: 'no-cache' }
           content: { application/json: { schema: { $ref: '#/components/schemas/DSLEnvelope' } } }
         '304': { description: Not Modified }
+        '402': { $ref: '#/components/responses/AppLimitReached' }
         '404': { $ref: '#/components/responses/NotFound' }
     patch:
       tags: [dsl]
@@ -286,7 +287,7 @@ paths:
         '409': { $ref: '#/components/responses/VersionConflict' }
         '412': { description: 'If-Match ヘッダ欠落', content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
         '422': { $ref: '#/components/responses/InvalidDSL' }
-        '402': { $ref: '#/components/responses/ProRequired' }
+        '402': { $ref: '#/components/responses/ProRequiredOrAppLimit' }
     put:
       tags: [dsl]
       summary: 'DSL 全体を置き換えて新バージョン作成 — 初回生成 / create モード / フォールバック用 (確定)'
@@ -319,7 +320,7 @@ paths:
         '409': { $ref: '#/components/responses/VersionConflict' }
         '412': { description: 'If-Match ヘッダ欠落', content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
         '422': { $ref: '#/components/responses/InvalidDSL' }
-        '402': { $ref: '#/components/responses/ProRequired' }
+        '402': { $ref: '#/components/responses/ProRequiredOrAppLimit' }
 
   /apps/{appId}/versions:
     parameters: [{ $ref: '#/components/parameters/AppId' }]
@@ -363,7 +364,7 @@ paths:
           headers: { ETag: { $ref: '#/components/headers/ETag' } }
           content: { application/json: { schema: { $ref: '#/components/schemas/RestoreResult' } } }
         '404': { $ref: '#/components/responses/NotFound' }
-        '402': { $ref: '#/components/responses/ProRequired' }
+        '402': { $ref: '#/components/responses/ProRequiredOrAppLimit' }
 
   /apps/{appId}/entities:
     parameters: [{ $ref: '#/components/parameters/AppId' }]
@@ -680,6 +681,7 @@ paths:
                 displayName: { type: string, maxLength: 64, description: '参加者一覧に出す名前(任意・scope:shared のアプリだけで使う)' }
       responses:
         '201': { description: Imported, content: { application/json: { schema: { $ref: '#/components/schemas/InstallResult' } } } }
+        '402': { $ref: '#/components/responses/AppLimitReached' }
         '422': { $ref: '#/components/responses/TextNotAllowed' }
         '403': { description: 'リンクの発行者が参加者でない(inviter_left) / 参加者が上限(members_full)', content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
         '403': { $ref: '#/components/responses/Unpublished' }
@@ -783,6 +785,7 @@ paths:
         installs は uid ごとに 1 回だけ +1(掲載者本人は数えない・`public_apps/{id}/installs/{uid}` に記録・#154)。
       responses:
         '201': { description: Installed, content: { application/json: { schema: { $ref: '#/components/schemas/InstallResult' } } } }
+        '402': { $ref: '#/components/responses/AppLimitReached' }
         '403': { $ref: '#/components/responses/Unpublished' }
         '404': { $ref: '#/components/responses/NotFound' }
 
@@ -1066,7 +1069,8 @@ paths:
         「今日の残り N」「上限に近い」を、依頼が断られる前に出すための読み取り。本人の分だけ(パスに uid は無い)。
         - `ai`: 生成・チャット・text の合計(1 つの枠・単位は重み。新規 3・修正 2・チャット 1・text 1・text の要約など 2 は `weights`)。ai が数える `rateLimits/{env}_{日付}_uid_{uid}` をそのまま読む(1 回の読み取り・キャッシュしない)。`limit` / `remaining` は ai の `X-RateLimit-Limit` / `-Remaining` と同じ(匿名 30・サインイン 60・Pro 300)。返した分(#548)はすぐ入る(ヘッダーは次の依頼から)
         - `ai` が null: この appconfig が数えている所を読めない(`RATE_LIMIT_STORE=memory`・読み取りの失敗)。iOS は今までどおりヘッダーの値を使う
-        - `apps`: 自分のアプリの数と上限(共有のアプリを入れたのは数えない)。最大 30 秒遅れる(インスタンスごとのキャッシュ)
+        - `apps`: 持っているアプリの数(自分で作ったもの + 参加した共有のアプリ・空のアプリは数えない)と上限(プランの数 + 買った枠)。最大 30 秒遅れる(インスタンスごとのキャッシュ)
+        - `appSlots`: `apps.limit` の内訳(`base` + `purchased`)と、今 1 つ買えるか(`canBuySlot`・`slotCoins`)。数えない時は null
         - `perApp`: 自分のプランの、アプリごとの上限(記録・写真)。実際の数は `GET /apps/{appId}/usage`
         - `limit` / `remaining` が null = 数えない(環境変数 0・`PLAN_LIMITS_MODE=off`)。`resetAt` は次の 0:00 JST
       responses:
@@ -1316,6 +1320,44 @@ paths:
             application/json:
               schema: { $ref: '#/components/schemas/Error' }
               example: { error: { code: invalid_transaction, message: 'the signed transaction could not be verified', details: { reason: not_consumable } } }
+
+  /me/coins/slot:
+    post:
+      tags: [coins]
+      summary: 持てるアプリの枠を 1 つコインで買う(#630)
+      description: |
+        `COIN_PRICE_APP_SLOT` コインで、持てるアプリの数を 1 つ増やす(期限なし・プランを変えても残る)。引く順番は他の支払いと同じ(grant → initial → purchased)。
+        - **冪等**: `requestId`(iOS が押すたびに作る UUID・送り直しは同じ値)ごとに 1 回。同じ `requestId` の 2 回目は `bought: false` で今の枠を返し、コインを引かない
+        - 財布の `appSlots`・台帳の `spend_slot` の行・冪等の記録(`coinReservations`)を 1 つのトランザクションで書く
+        - `COIN_BILLING_MODE=enforce` かつ `COIN_PRICE_APP_SLOT` > 0 の時だけ。それ以外は 404(log では前に買った枠は数えるが、新しくは買えない)
+        - 上限に達していなくても買える
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [requestId]
+              properties:
+                requestId: { type: string, maxLength: 128 }
+      responses:
+        '200':
+          description: 買った後(または買い済み)の状態
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [bought, appSlots, coins, wallet]
+                properties:
+                  bought: { type: boolean, description: false = この requestId は買い済み(何も引いていない) }
+                  appSlots: { type: integer, description: 買った枠の合計 }
+                  coins: { type: integer, description: 1 枠のコイン }
+                  wallet: { $ref: '#/components/schemas/CoinWallet' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '402': { $ref: '#/components/responses/CoinsPaymentRequired' }
+        '404': { description: '枠を買えない(`COIN_BILLING_MODE` が enforce でない・`COIN_PRICE_APP_SLOT` が 0)', content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+        '410': { description: 退会済み(`account_deleted`), content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
 
   /coins/config:
     get:
@@ -1794,6 +1836,25 @@ components:
         application/json:
           schema: { $ref: '#/components/schemas/Error' }
           example: { error: { code: pro_required, message: 'this needs Tailor It Pro: sharedData', details: { features: [{ id: sharedData, title: みんなで共有するデータ, reason: みんなで書き込むデータはクラウドに保存して全員の端末に同期するため、サーバーの費用がかかります。 }], reason: creator_needs_pro } } }
+    AppLimitReached:
+      description: |
+        持てるアプリの数の上限(#630・オーナー決定 2026-11-10・docs/backend/rate-limit.md の「持てるアプリの数」)。402 `app_limit_reached`。
+        - 持てるアプリ = 一覧に出るアプリ(自分で作ったもの + 参加した共有のアプリ)。version 1 のまま(一度も生成していない空のアプリ)は数えない
+        - 上限 = プランの数(`PLAN_FREE_APPS` / `PLAN_PRO_APPS`・無料 2 / Pro 5)+ コインで買った枠(`POST /me/coins/slot`)
+        - 返す所: 新しいアプリになる時(新しい appId の最初の `GET /dsl`・`POST /apps`・duplicate・シェアリンクの取り込み・「探す」から入れる)と、空のアプリが最初に生成される保存(PUT / PATCH /dsl・restore)。後者は同じトランザクションで数えるので、同時の依頼でも上限を超えない
+        - details: `resource: apps`・`plan`・`held`(今持っている数)・`limit`・`base`(プランの数)・`purchasedSlots`・`canBuySlot`(今 1 つ買える: `COIN_BILLING_MODE=enforce` かつ `COIN_PRICE_APP_SLOT` > 0)・`slotCoins`・`balance`(使えるコイン・enforce の時だけ)・`upgrade`(Pro にすると上がる)・`apps`(持っているアプリ `{id, name, mine, updatedAt}`。`mine: false` は参加した共有のアプリ = 抜ける。最大 100 件・読めない時は null)
+        - iOS は「どのアプリと置き換えますか?」を出し、消す(自分のアプリ)/ 抜ける(参加したアプリ)/ 枠を買う のあとで同じ操作をやり直す
+        - `PLAN_LIMITS_MODE=log` / `off` の時は返さない
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+          example: { error: { code: app_limit_reached, message: '持てるアプリの数(2 個)に達しました。使わないアプリを削除するか、共有のアプリから抜けると、新しく作ったり参加したりできます。', details: { resource: apps, plan: free, held: 2, limit: 2, base: 2, purchasedSlots: 0, canBuySlot: false, slotCoins: 0, balance: 0, upgrade: true, apps: [{ id: app_1, name: 家計簿, mine: true, updatedAt: '2026-11-10T00:00:00Z' }, { id: app_2, name: 家族の買い物, mine: false, updatedAt: '2026-11-09T00:00:00Z' }] } } }
+    ProRequiredOrAppLimit:
+      description: |
+        `pro_required`(上の ProRequired)か、新しいアプリが持てるアプリの数を超える `app_limit_reached`(AppLimitReached)。
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
     CoinsPaymentRequired:
       description: |
         コインで払えない(#630・`COIN_BILLING_MODE=enforce` の時だけ返す。off / log では返さない)。
@@ -1807,7 +1868,7 @@ components:
     PlanLimitReached:
       description: |
         プランの上限 (#317・docs/backend/rate-limit.md の「プランごとの上限」)。403 `plan_limit_reached`。払う人のプランで数える: 自分のアプリは呼び出した人、他の人が作ったアプリは作成者。
-        - アプリの数: 自分の新しいアプリ (POST /apps・新しい appId の最初の読み込み・duplicate)。共有のアプリを入れるのは数えない
+        - アプリの数は #630 から 402 `app_limit_reached`(AppLimitReached)。ここでは返さない
         - レコードの件数 / アプリ: レコードの作成 (single の entity は数えない)。その人が見えるレコード (自分の分 + 共有の分) の全 entity の合計
         - 写真の枚数 / アプリ: 写真の項目が空から入る作成・更新 (差し替えは数えない)
         - details: `resource` (apps / recordsPerApp / photosPerApp)・`plan` (free / pro)・`limit`・`used`・`upgrade` (Pro にすると上限が上がる)。`reason: creator_plan_limit` は作成者のプランの上限 (参加者には課金画面ではなく案内を出す)
@@ -1908,6 +1969,7 @@ components:
                 - account_deleted
                 - allowance_exhausted
                 - app_check_failed
+                - app_limit_reached
                 - app_stopped
                 - bad_request
                 - coins_insufficient
@@ -1965,6 +2027,7 @@ components:
                   coins: { type: integer, description: '1 まとまりのコイン(`COIN_OVERFLOW_PRICE_<KIND>`)' }
             blockRuns: { type: integer, description: 'runs の 1 まとまりの回数(blocks.runs.size と同じ。無ければ省く)' }
             blockCoins: { type: integer, description: 'runs の 1 まとまりのコイン(blocks.runs.coins と同じ。無ければ省く)' }
+        appSlotCoins: { type: integer, description: 'アプリの枠 1 つのコイン(`COIN_PRICE_APP_SLOT`)。買えない時(0・enforce 以外)は省く' }
     CoinCredit:
       type: object
       required: [credited, transactionId, productId, coins, wallet]
@@ -2016,6 +2079,7 @@ components:
         grantPeriodEnd: { type: string, format: date-time, description: 毎月の分の期限(Pro の請求期間の終わり)。無ければ省略 }
         initial: { type: integer, description: 最初の分 }
         reserved: { type: integer, description: 実行中の呼び出しが押さえている分 }
+        appSlots: { type: integer, description: 'コインで買ったアプリの枠(#630・期限なし)。持っている数と上限は `GET /me/usage` の `apps` / `appSlots`' }
         overflow:
           type: object
           required: [enabled, monthlyCap, spent]
@@ -2345,6 +2409,18 @@ components:
                         textLong: { type: integer, description: aiButton の length long の重さ }
                         textImage: { type: integer, description: aiButton の inputPhoto (写真つき) の重さ }
         apps: { oneOf: [{ $ref: '#/components/schemas/UsageMeter' }, { type: 'null' }], description: 数えられなかった時は null }
+        appSlots:
+          description: 持てるアプリの上限の内訳(#630)。数えない時は null
+          oneOf:
+            - type: 'null'
+            - type: object
+              required: [base, purchased, limit, canBuySlot, slotCoins]
+              properties:
+                base: { type: integer, description: プランの数(PLAN_FREE_APPS / PLAN_PRO_APPS) }
+                purchased: { type: integer, description: コインで買った枠(期限なし) }
+                limit: { type: integer, description: base + purchased }
+                canBuySlot: { type: boolean, description: '今 1 つ買える(`COIN_BILLING_MODE=enforce` かつ `COIN_PRICE_APP_SLOT` > 0)' }
+                slotCoins: { type: integer, description: 1 枠のコイン(買えない時は 0) }
         perApp:
           type: object
           properties:
