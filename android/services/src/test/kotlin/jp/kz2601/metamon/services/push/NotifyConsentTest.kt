@@ -24,6 +24,20 @@ class NotifyConsentTest {
     }
 
     @Test
+    fun forgetAccountClearsConsentAndRegistrationButKeepsInstallationId() {
+        val prefs = InMemoryPushPrefs()
+        prefs.putString(PushDeviceRegistrar.INSTALLATION_ID_KEY, "install-1")
+        prefs.putString(PushDeviceRegistrar.LAST_SENT_KEY, "fp")
+        NotifyConsentStore(prefs).set(true, "uid-1", "app-1")
+
+        prefs.forgetAccount()
+
+        assertFalse(NotifyConsentStore(prefs).allowed("uid-1", "app-1"))
+        assertNull(prefs.getString(PushDeviceRegistrar.LAST_SENT_KEY))
+        assertEquals(setOf(PushDeviceRegistrar.INSTALLATION_ID_KEY), prefs.keys())
+    }
+
+    @Test
     fun changeShowsTheNewValueFirstAndSavesOnSuccess() = runTest {
         val seen = mutableListOf<NotifyConsentToggle.State>()
         val end = toggle.change(true, "uid-1", "app-1") { seen += it }

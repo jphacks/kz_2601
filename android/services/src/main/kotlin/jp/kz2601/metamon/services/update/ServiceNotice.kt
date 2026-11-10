@@ -74,6 +74,9 @@ class NoticeDismissals(private val store: KeyValueStore) {
         store.putString(KEY, list.joinToString(SEPARATOR))
     }
 
+    /** 後片付け(#841)。iOS は UserDefaults ごと消す。 */
+    fun clear() = store.remove(KEY)
+
     val ids: List<String> get() = store.getString(KEY)?.split(SEPARATOR)?.filter { it.isNotEmpty() }.orEmpty()
 
     companion object {
