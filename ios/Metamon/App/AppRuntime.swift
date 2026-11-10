@@ -679,6 +679,14 @@ final class AppRuntime: DSLRuntime {
             if gatePaid { await gatePaidGeneration(before: previous) } // #414
         } catch {
             guard document.appId == previous.appId else { return } // 移った先に前のアプリの失敗を出さない
+            #if !APP_STORE_REVIEW
+            // #630: コインが足りない → お店・枠を使い切った → コインの設定。会話は残す(買ってから送り直せる)
+            if !interruptedByOffline, let denial = CoinDenial(error), CoinGate.shared.handle(denial) {
+                withAnimation(.easeInOut(duration: 0.3)) { morphJob = nil }
+                keepChatAfterStop = true
+                return
+            }
+            #endif
             if !interruptedByOffline, let pro = ProRequired(error) { // #316: 有料の機能が入るので保存されなかった
                 withAnimation(.easeInOut(duration: 0.3)) { morphJob = nil }
                 await presentProRequired(pro, transcript: text, gatePaid: gatePaid)
@@ -1444,6 +1452,12 @@ final class AppRuntime: DSLRuntime {
         guard let api = error as? APIError else { return ErrorCopy.failure(L10n.tr("うまくいきませんでした"), error, context: "action") }
         if let denial = SharedAccessDenial(api) { return denial.message } // #254
         if let denial = RecordWriteDenial(api), let entity { return denialMessage(denial, entity: entity) } // #272 #273
+        #if !APP_STORE_REVIEW
+        if let denial = CoinDenial(api) { // #630 書き込みの枠・コイン。自分が払う時はお店 / コインの設定も開く
+            CoinGate.shared.handle(denial)
+            return CoinCopy.denialBody(denial)
+        }
+        #endif
         if let pro = ProRequired(api) { return pro.writeMessage } // #316(印を付けるなど)
         if let limit = PlanLimit(api) { return ErrorCopy.planLimitBody(limit) } // #317
         if api.isAppStopped { return ErrorCopy.appStoppedBody } // #346
