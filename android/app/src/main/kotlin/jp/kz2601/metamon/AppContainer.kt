@@ -1,13 +1,22 @@
 package jp.kz2601.metamon
 
 import android.content.Context
+import android.os.LocaleList
 import android.util.Log
 import jp.kz2601.metamon.dsl.AppDSL
 import jp.kz2601.metamon.renderer.DSLRuntime
+import jp.kz2601.metamon.services.AIClient
+import jp.kz2601.metamon.services.AppConfigClient
 import jp.kz2601.metamon.services.AppEnvironment
 import jp.kz2601.metamon.services.AuthService
+import jp.kz2601.metamon.services.http.AuthTokenProvider
+import jp.kz2601.metamon.services.http.ClientInfo
+import jp.kz2601.metamon.services.http.DeviceContext
+import jp.kz2601.metamon.services.http.MetamonHttp
 import jp.kz2601.metamon.services.live.FirebaseAuthService
 import jp.kz2601.metamon.services.live.FirebaseBootstrap
+import jp.kz2601.metamon.services.live.HttpAIClient
+import jp.kz2601.metamon.services.live.HttpAppConfigClient
 import jp.kz2601.metamon.services.mock.MockAuthService
 
 /** 手書きの組み立て 1 か所(#354 §5。Hilt は使わない・iOS の `BuildConfig.make` と同じ形)。 */
@@ -15,6 +24,8 @@ class AppContainer(
     val environment: AppEnvironment,
     val auth: AuthService,
     val initialDsl: AppDSL,
+    val appConfig: AppConfigClient,
+    val ai: AIClient,
 ) {
     companion object {
         fun make(context: Context): AppContainer {
@@ -25,7 +36,25 @@ class AppContainer(
             )
             FirebaseBootstrap.configureIfAvailable(context)
             val auth = FirebaseAuthService.createIfConfigured() ?: MockAuthService(signedIn = true)
-            return AppContainer(environment, auth, loadInitialDsl(context))
+
+            val tokens = AuthTokenProvider(auth)
+            val clientInfo = ClientInfo(version = BuildConfig.VERSION_NAME, build = BuildConfig.VERSION_CODE.toString())
+            val device = DeviceContext(language = {
+                val locales = LocaleList.getDefault()
+                ClientInfo.languageCode((0 until locales.size()).map(locales::get))
+            })
+            // App Check(Play Integrity)はまだ無い: ヘッダ無しで送る(backend が enforce の環境では 401 になる)
+            val client = MetamonHttp.defaultClient()
+            fun http(baseUrl: String) = MetamonHttp(baseUrl, tokens, clientInfo, appCheck = null, client = client, device = device)
+            val log: (String) -> Unit = { Log.w("Metamon", it) }
+
+            return AppContainer(
+                environment = environment,
+                auth = auth,
+                initialDsl = loadInitialDsl(context),
+                appConfig = HttpAppConfigClient(http(environment.appConfigBaseUrl)),
+                ai = HttpAIClient(http(environment.aiBaseUrl), log = log),
+            )
         }
 
         /** 同梱の docs/dsl/examples/initial.json(話しかける前の画面)。 */

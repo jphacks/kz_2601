@@ -19,7 +19,7 @@ iOS の `Metamon{DSL,Renderer,Services}` + アプリ本体と 1 対 1。依存�
 |---|---|---|---|
 | `:dsl` | 純 Kotlin(JVM) | `MetamonDSL` | DSL の型と読み込み(kotlinx.serialization)。知らない type・キー・値で落とさない |
 | `:renderer` | Android ライブラリ + Compose | `MetamonRenderer` | DSL を描く。`:services` は知らず、能力は `DSLRuntime` で受ける |
-| `:services` | Android ライブラリ | `MetamonServices` | 認証(Firebase / モック)・接続先 |
+| `:services` | Android ライブラリ | `MetamonServices` | 認証(Firebase / モック)・接続先・HTTP(OkHttp + kotlinx.serialization)・appconfig / ai のクライアント |
 | `:app` | Android アプリ | `ios/Metamon` | 起動・組み立て(`AppContainer`)・flavor |
 
 `:dsl` の型は仮の手書き。#351 の生成器(`backend/cmd/dslgen`)ができたら、その出力に置き換える。
