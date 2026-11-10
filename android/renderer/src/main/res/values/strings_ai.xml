@@ -1,0 +1,49 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- aiButton の文言(#873)。文言の正は iOS の MetamonRenderer の Localizable.xcstrings(日本語の元文) -->
+<resources>
+    <string name="ai_done_on_device">端末内の AI が入力しました。確認して保存してください</string>
+    <string name="ai_done_online">オンラインの AI が入力しました。確認して保存してください</string>
+    <string name="ai_error_bad_config">この AI ボタンの設定が正しくありません</string>
+    <string name="ai_error_bad_output">AI の答えを読み取れませんでした。もう一度お試しください</string>
+    <string name="ai_error_creator_needs_pro">この機能は今は使えません。アプリを作った人に知らせてください</string>
+    <string name="ai_error_empty_input">先に入力してください</string>
+    <string name="ai_error_failed">AI の処理に失敗しました(%1$s)</string>
+    <string name="ai_error_needs_consent">AI へのデータ送信に同意すると使えます</string>
+    <string name="ai_error_needs_pro">この端末ではオンラインの AI を使います。Tailor It Pro で使えます</string>
+    <string name="ai_error_no_options">分類の候補がありません</string>
+    <string name="ai_error_no_own_records">AI に渡せるのは自分が書いた記録だけです</string>
+    <string name="ai_error_no_records">先に記録を追加してください</string>
+    <string name="ai_error_paused">AI を一時的に止めています。しばらくしてからもう一度お試しください</string>
+    <string name="ai_error_refused">この内容は AI が書けませんでした</string>
+    <string name="ai_error_too_large">材料の記録が多すぎます。記録を減らしてからお試しください</string>
+    <string name="ai_generate_again">もう一度</string>
+    <string name="ai_generate_filled">入力欄にも入れました。確認して保存してください</string>
+    <string name="ai_generate_label">AI に書いてもらう</string>
+    <string name="ai_generate_online">オンラインの AI が書きました</string>
+    <string name="ai_hint_on_device">端末内の AI で処理し、結果を入力欄に入れます</string>
+    <string name="ai_hint_online">オンラインの AI で処理し、結果を入力欄に入れます</string>
+    <string name="ai_label_classify">AI で分類</string>
+    <string name="ai_label_default">AI で処理</string>
+    <string name="ai_label_extract">AI で抜き出す</string>
+    <string name="ai_label_rewrite">AI で書き直す</string>
+    <string name="ai_label_suggest">AI に提案してもらう</string>
+    <string name="ai_label_summarize">AI で要約</string>
+    <string name="ai_needs_form">この AI ボタンは記録のフォームの画面で使えます</string>
+    <string name="ai_reason_device_not_eligible">端末内の AI(Gemini Nano)に対応していない端末です</string>
+    <string name="ai_reason_long_only_online">長い文章はオンラインの AI だけで書けます(この版では使えません)</string>
+    <string name="ai_reason_model_not_ready">AI モデルを準備中です。しばらくしてから再度お試しください</string>
+    <string name="ai_reason_not_enabled">端末の設定で AI の機能をオンにしてください</string>
+    <string name="ai_reason_os_too_old">Android の更新が必要です</string>
+    <string name="ai_reason_other">端末内の AI を利用できません</string>
+    <string name="ai_reason_photo_only_online">写真を読むのはオンラインの AI だけです(この版では使えません)</string>
+    <string name="ai_save">保存</string>
+    <string name="ai_save_added">%1$d 件を追加しました</string>
+    <string name="ai_save_added_partial">%1$d 件を追加しました(%2$d 件は追加できませんでした)</string>
+    <string name="ai_save_all">全部保存</string>
+    <string name="ai_save_failed">保存できませんでした</string>
+    <string name="ai_save_full">これ以上記録を足せません</string>
+    <string name="ai_saved">保存済み</string>
+    <string name="ai_thinking">AI が考えています…</string>
+    <string name="ai_unavailable">この端末では AI を使えません: %1$s</string>
+    <string name="ai_unavailable_title">この端末では AI を使えません</string>
+</resources>

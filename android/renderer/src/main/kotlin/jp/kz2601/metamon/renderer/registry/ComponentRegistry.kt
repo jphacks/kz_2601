@@ -29,6 +29,7 @@ import jp.kz2601.metamon.renderer.components.SpacerLeaf
 import jp.kz2601.metamon.renderer.components.TextLeaf
 import jp.kz2601.metamon.renderer.components.VStackContainer
 import jp.kz2601.metamon.renderer.components.VoiceInputLeaf
+import jp.kz2601.metamon.renderer.components.ai.registerAiLeaves
 import jp.kz2601.metamon.renderer.components.inputs.registerInputLeaves
 import jp.kz2601.metamon.renderer.form.FormDraft
 import jp.kz2601.metamon.renderer.navigation.Route
@@ -103,6 +104,8 @@ class ComponentRegistry private constructor(private val builders: Map<String, Co
             register(ComponentType.SPACER) { c, _, m -> SpacerLeaf(c, m) }
             register(ComponentType.LINK) { c, _, m -> LinkLeaf(c, m) }
             register(ComponentType.EMPTY_STATE) { c, _, m -> EmptyStateLeaf(c, m) }
+            // leaf: AI・登録は components/ai/AiLeaves.kt
+            registerAiLeaves()
             // leaf: その他
             register(ComponentType.BUTTON) { c, ctx, m -> ButtonLeaf(c, ctx, m) }
             register(ComponentType.VOICE_INPUT) { c, ctx, m -> VoiceInputLeaf(c, ctx, m) }

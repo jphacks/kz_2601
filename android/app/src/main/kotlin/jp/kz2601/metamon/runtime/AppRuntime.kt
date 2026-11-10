@@ -14,6 +14,7 @@ import jp.kz2601.metamon.renderer.ActionContext
 import jp.kz2601.metamon.renderer.DSLRuntime
 import jp.kz2601.metamon.renderer.ExternalUrlPolicy
 import jp.kz2601.metamon.renderer.NavigationHost
+import jp.kz2601.metamon.renderer.components.ai.AiHost
 import jp.kz2601.metamon.renderer.form.FormDraft
 import jp.kz2601.metamon.renderer.form.FormPrefill
 import jp.kz2601.metamon.renderer.navigation.NavigationResolver
@@ -81,6 +82,8 @@ class AppRuntime(
     private val restore: (suspend (appId: String) -> AppDocument)? = null,
     /** 削除を取り消せる時間(M11) */
     private val undoGraceMillis: Long = 5_000,
+    /** aiButton のオンライン版・端末内 AI(#873)。null なら AI ボタンは理由つきで無効 */
+    private val aiHost: AiHost? = null,
 ) : DSLRuntime, NavigationHost {
     private val _state = MutableStateFlow(RuntimeState(document))
     val state: StateFlow<RuntimeState> = _state.asStateFlow()
@@ -238,6 +241,14 @@ class AppRuntime(
         setRecords(document.appId, entity, list)
         return id
     }
+
+    // AI ボタン(#873)
+
+    override val ai: AiHost? get() = aiHost
+
+    override suspend fun loadRecords(entities: Set<String>) = load(entities)
+
+    override suspend fun addRecord(entity: String, data: Map<String, JSONValue>): Boolean = createRecord(entity, data) != null
 
     /** 一覧から消して「元に戻す」を出す。前の取り消し待ちは時間が来たら送られる。 */
     suspend fun deleteUndoably(entity: String, recordId: String) {
