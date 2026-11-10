@@ -5,6 +5,7 @@
     <string name="renderer_disclosure_collapsed">閉じています</string>
     <string name="renderer_disclosure_default_title">詳細</string>
     <string name="renderer_disclosure_expanded">開いています</string>
+    <string name="renderer_form_read_only">このデータは作った人だけが変更できます</string>
     <string name="renderer_unavailable_here">この端末では使えません</string>
     <string name="renderer_unavailable_needs_update">アプリを更新すると表示できます</string>
 </resources>
