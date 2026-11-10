@@ -94,4 +94,46 @@ extension View {
         self
         #endif
     }
+
+    /// アイコンだけのボタンの名前(#1335)。VoiceOver の名前を付け、Mac では同じ文言をヘルプのタグ(ホバーの説明)にし、
+    /// `hoverHighlight` ならホバー中に背景を薄く敷く(borderless のボタンに近い見た目)。iOS は `accessibilityLabel` だけ。
+    func iconButtonLabel(_ label: String, hoverHighlight: Bool = true) -> some View {
+        accessibilityLabel(label).macIconButtonHelp(label, hoverHighlight: hoverHighlight)
+    }
+
+    /// `iconButtonLabel` の Mac の部分だけ(名前は `Label` や行の操作が既に持つボタン用)。iOS は何もしない。
+    func macIconButtonHelp(_ label: String, hoverHighlight: Bool = true) -> some View {
+        modifier(MacIconButtonHelp(label: label, hoverHighlight: hoverHighlight))
+    }
+}
+
+/// Mac のヘルプのタグとホバーの背景。「視差効果を減らす」の時は背景をアニメーションさせずに切り替える(#937)。
+private struct MacIconButtonHelp: ViewModifier {
+    let label: String
+    let hoverHighlight: Bool
+    #if os(macOS)
+    @State private var hovering = false
+    @Environment(\.isEnabled) private var isEnabled
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    #endif
+
+    func body(content: Content) -> some View {
+        #if os(macOS)
+        content
+            .help(label)
+            .background {
+                if hoverHighlight {
+                    RoundedRectangle(cornerRadius: 6, style: .continuous)
+                        .fill(Color.primary.opacity(hovering && isEnabled ? 0.08 : 0))
+                        .padding(-4)
+                }
+            }
+            .onHover { inside in
+                guard hoverHighlight else { return }
+                if reduceMotion { hovering = inside } else { withAnimation(.easeOut(duration: 0.12)) { hovering = inside } }
+            }
+        #else
+        content
+        #endif
+    }
 }

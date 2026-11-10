@@ -172,8 +172,8 @@ struct AiChatLeaf: View {
             }
             .buttonStyle(.plain)
             .foregroundStyle(canSend ? AnyShapeStyle(RenderTheme.brandFill) : AnyShapeStyle(.tertiary))
+            .iconButtonLabel(L("送信"))
             .disabled(!canSend)
-            .accessibilityLabel(L("送信"))
             .accessibilityIdentifier("aiChat.send")
         }
         .padding(.leading, ChatInputInset.leading(bar: barFrame, fab: fabFrame))
@@ -211,8 +211,8 @@ struct AiChatLeaf: View {
             }
             .buttonStyle(.plain)
             .foregroundStyle(mic == .stop ? AnyShapeStyle(.red) : (mic.enabled ? AnyShapeStyle(RenderTheme.brandFill) : AnyShapeStyle(.tertiary)))
+            .iconButtonLabel(Self.micLabel(mic, voiceOver: PlatformSystem.isVoiceOverRunning))
             .disabled(!mic.enabled)
-            .accessibilityLabel(Self.micLabel(mic, voiceOver: PlatformSystem.isVoiceOverRunning))
             .accessibilityHint(mic == .start ? L("話した言葉が入力欄に入ります。確かめてから送れます") : "")
             .accessibilityIdentifier("aiChat.mic")
         }
@@ -473,8 +473,8 @@ private struct AiChatBubble: View {
                     }
                     .buttonStyle(.plain)
                     .foregroundStyle(.secondary)
+                    .iconButtonLabel(speaking ? L("止める") : L("読み上げる"))
                     .disabled(!canSpeak && !speaking)
-                    .accessibilityLabel(speaking ? L("止める") : L("読み上げる"))
                     .accessibilityIdentifier("aiChat.speak")
                 }
             }

@@ -215,7 +215,7 @@ struct RouteGuideLeaf: View {
             }
             .buttonStyle(RenderButtonStyle(kind: .secondary))
             .frame(maxWidth: 64)
-            .accessibilityLabel(voiceOn ? L("音声案内をオフにする") : L("音声案内をオンにする"))
+            .iconButtonLabel(voiceOn ? L("音声案内をオフにする") : L("音声案内をオンにする"), hoverHighlight: false)
             .accessibilityIdentifier("routeGuide.voice")
             if session.phase == .idle {
                 Button {

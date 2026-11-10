@@ -71,9 +71,9 @@ struct CarouselContainer: View {
     private var pager: some View {
         HStack(spacing: RenderTheme.Spacing.md) {
             Button { _ = go(-1) } label: { Image(systemName: "chevron.left") }
+                .iconButtonLabel(L("前へ"))
+                .help(L("前へ")) // iPad のポインタ用に iOS でも残す
                 .disabled(!CarouselPaging.canGoBack(page, count: count))
-                .accessibilityLabel(L("前へ"))
-                .help(L("前へ"))
             HStack(spacing: 6) {
                 ForEach(0..<count, id: \.self) { i in
                     Circle()
@@ -95,9 +95,9 @@ struct CarouselContainer: View {
                 }
             }
             Button { _ = go(1) } label: { Image(systemName: "chevron.right") }
-                .disabled(!CarouselPaging.canGoForward(page, count: count))
-                .accessibilityLabel(L("次へ"))
+                .iconButtonLabel(L("次へ"))
                 .help(L("次へ"))
+                .disabled(!CarouselPaging.canGoForward(page, count: count))
         }
         .buttonStyle(.borderless)
         .font(.callout.weight(.semibold))

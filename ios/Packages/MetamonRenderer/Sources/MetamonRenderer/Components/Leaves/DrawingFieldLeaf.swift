@@ -177,16 +177,18 @@ struct DrawingSheet: View {
             .frame(maxWidth: 160)
             Spacer(minLength: 0)
             Button { canvas.undo() } label: { Image(systemName: "arrow.uturn.backward") }
-                .disabled(!canvas.canUndo)
+                // 名前は短く、ヘルプのタグは Mac でキーも出す
                 .accessibilityLabel(L("元に戻す"))
-                .help(Self.undoHelp)
+                .macIconButtonHelp(Self.undoHelp)
+                .disabled(!canvas.canUndo)
             Button { canvas.redo() } label: { Image(systemName: "arrow.uturn.forward") }
-                .disabled(!canvas.canRedo)
+                // 名前は短く、ヘルプのタグは Mac でキーも出す
                 .accessibilityLabel(L("やり直す"))
-                .help(Self.redoHelp)
+                .macIconButtonHelp(Self.redoHelp)
+                .disabled(!canvas.canRedo)
             Button(role: .destructive) { confirmClear = true } label: { Image(systemName: "trash") }
+                .iconButtonLabel(L("全部消す"))
                 .disabled(session.isEmpty)
-                .accessibilityLabel(L("全部消す"))
                 .accessibilityHint(L("描いた線と前に描いた絵を全部消します"))
         }
         .font(.title3)
