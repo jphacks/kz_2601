@@ -6,8 +6,10 @@
     <string name="account_delete_confirm">削除する</string>
     <string name="account_delete_failed">アカウントを削除できませんでした</string>
     <string name="account_delete_message">アカウントとすべてのアプリが使えなくなります。元に戻せません。\n\n作ったアプリが使えなくなり、共有リンクと「探す」への掲載も取り下げます。この端末のデータも消えます。ほかの人と共有しているアプリへの投稿は残ります。</string>
+    <string name="account_delete_requires_recent_login">もう一度サインインしてから削除してください</string>
     <string name="account_delete_title">アカウントを削除しますか？</string>
     <string name="account_deleting">削除しています…</string>
+    <string name="account_failed_try_again">少し待ってから、もう一度お試しください</string>
     <string name="account_menu">アカウント</string>
     <string name="account_ok">OK</string>
     <string name="account_send_then_sign_out">送ってからログアウト</string>
