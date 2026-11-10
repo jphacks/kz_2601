@@ -48,26 +48,34 @@ class AuthSession(val service: AuthService, private val beforeSignOut: suspend (
     suspend fun signInWithApple(activity: Activity) = perform { service.signInWithApple(activity) }
 
     suspend fun signOut() {
+        runBeforeSignOut()
+        runCatching { service.signOut() }.onFailure { error.value = it.message }
+    }
+
+    /** 失敗してもサインアウトは続ける(次のサインインで登録し直す)。トークンを止める前に呼ぶ。 */
+    private suspend fun runBeforeSignOut() {
         try {
             beforeSignOut()
         } catch (e: CancellationException) {
             throw e
         } catch (_: Exception) {
-            // 登録が消せなくてもサインアウトはする(次のサインインで登録し直す)
         }
-        runCatching { service.signOut() }.onFailure { error.value = it.message }
     }
 
     /**
      * ログアウト(#841・iOS の `signOutAndWipe`)。取り消し待ちの削除は今のアカウントで送る扱いにしてから、
-     * [SignOutFlow] で(送ってから)端末のデータを消してサインアウトする。
+     * [SignOutFlow] で(送ってから)通知の登録 → 端末のデータの順に消してサインアウトする。
      * @return [SignOutFlow.Outcome.Unsent] なら送り切れず、何も消していない(サインインしたまま)
      */
     suspend fun signOutAndWipe(
         choice: SignOutFlow.Choice,
         recordSync: RecordSyncEngine,
         wipe: suspend () -> Unit,
-    ): SignOutFlow.Outcome = SignOutFlow.run(choice, service, flush = { recordSync.flush() }, wipeLocal = wipe)
+    ): SignOutFlow.Outcome = SignOutFlow.run(choice, service, flush = { recordSync.flush() }, wipeLocal = {
+        // 通知の登録を先に消す(後片付けがトークンを止めるので、その前)・#887
+        runBeforeSignOut()
+        wipe()
+    })
 
     /** ログアウトの確認に出す内容(取り消し待ちの削除も未送信に数える)。 */
     suspend fun signOutPrompt(recordSync: RecordSyncEngine): SignOutFlow.Prompt {
@@ -81,6 +89,8 @@ class AuthSession(val service: AuthService, private val beforeSignOut: suspend (
      * @param reauthenticate 入り直せたら true。匿名・キャンセルは false
      */
     suspend fun deleteAccount(account: AccountClient, reauthenticate: suspend () -> Boolean, wipe: suspend () -> Unit) {
+        // 通知の登録はアカウントを消す前に消す(消した後はトークンが通らない)・#887
+        runBeforeSignOut()
         AccountDeletionFlow.run(account, service, reauthenticate = reauthenticate, wipeLocal = wipe)
     }
 

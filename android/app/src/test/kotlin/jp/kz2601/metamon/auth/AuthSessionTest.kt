@@ -5,6 +5,12 @@ import jp.kz2601.metamon.AppContainer
 import jp.kz2601.metamon.services.AuthError
 import jp.kz2601.metamon.services.AuthService
 import jp.kz2601.metamon.services.AuthUser
+import jp.kz2601.metamon.runtime.RuntimeFixture
+import jp.kz2601.metamon.services.account.SignOutFlow
+import jp.kz2601.metamon.services.local.BackoffPolicy
+import jp.kz2601.metamon.services.local.RecordStore
+import jp.kz2601.metamon.services.local.RecordSyncEngine
+import jp.kz2601.metamon.services.local.SyncQueue
 import jp.kz2601.metamon.services.mock.MockAuthService
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -15,6 +21,7 @@ import org.junit.Assert.assertNull
 import org.junit.Assert.assertSame
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import kotlin.coroutines.EmptyCoroutineContext
 
 /** サインイン状態での画面の出し分けと、モックへの落とし方(#840)。 */
 class AuthSessionTest {
@@ -44,6 +51,24 @@ class AuthSessionTest {
 
         // 登録を消す時はまだサインイン中(uid がある)。消せなくてもサインアウトする
         assertEquals(listOf(MockAuthService.FIXED_UID), calls)
+        assertEquals(RootScreen.SignIn, RootScreen.of(session.user.value))
+    }
+
+    @Test
+    fun signOutAndWipeUnregistersPushBeforeWipingWhileSignedIn() = runTest {
+        val auth = MockAuthService(signedIn = true)
+        val calls = mutableListOf<String>()
+        val session = AuthSession(auth, beforeSignOut = { calls += "unregister:${auth.currentUser.value?.uid}" })
+        val store = RecordStore(null, EmptyCoroutineContext)
+        val client = RuntimeFixture.offlineClient
+        val queue = SyncQueue(null, store, client, BackoffPolicy.immediate, sleep = {}, io = EmptyCoroutineContext)
+        val engine = RecordSyncEngine(store, queue, client, RuntimeFixture.Offline(), backgroundScope)
+
+        val outcome = session.signOutAndWipe(SignOutFlow.Choice.DISCARD_AND_WIPE, engine, wipe = { calls += "wipe" })
+
+        // 通知の登録はサインイン中・後片付け(トークンを止める)より前に消す
+        assertEquals(SignOutFlow.Outcome.SignedOut, outcome)
+        assertEquals(listOf("unregister:${MockAuthService.FIXED_UID}", "wipe"), calls)
         assertEquals(RootScreen.SignIn, RootScreen.of(session.user.value))
     }
 

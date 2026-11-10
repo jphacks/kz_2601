@@ -125,8 +125,9 @@ class VoiceViewModelTest {
             ai = ai,
             appId = { "app-1" },
             initial = initial,
-            clarifyEnabled = false,
+            clarifyEnabled = { false },
             requireConsent = prompt::require,
+            io = StandardTestDispatcher(testScheduler),
             scope = CoroutineScope(StandardTestDispatcher(testScheduler) + Job()),
         )
         vm.submit("家計簿")
