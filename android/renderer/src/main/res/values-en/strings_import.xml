@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- File import (fileImport, #865). -->
+<resources>
+    <string name="renderer_import_button">Import from File</string>
+    <string name="renderer_import_reading">Reading…</string>
+    <string name="renderer_import_adding">Adding %1$d / %2$d</string>
+    <string name="renderer_import_confirm_title">Import this file?</string>
+    <string name="renderer_import_confirm_add">Add</string>
+    <string name="renderer_import_cancel">Cancel</string>
+    <string name="renderer_import_problem_title">Couldn\'t Import</string>
+    <string name="renderer_import_ok">OK</string>
+    <string name="renderer_import_unusable">fileImport: records can\'t be imported into this entity</string>
+    <string name="renderer_import_kind_note">PDF and audio files can\'t be imported on this device yet</string>
+    <string name="renderer_import_added">Added %1$d records</string>
+    <string name="renderer_import_added_partly">Added %1$d records (%2$d couldn\'t be added)</string>
+    <string name="renderer_import_separator">, </string>
+    <string name="renderer_import_csv_count">Add %2$d records to \"%1$s\".</string>
+    <string name="renderer_import_csv_used">Columns used: %1$s</string>
+    <string name="renderer_import_csv_unused">Columns not used: %1$s</string>
+    <string name="renderer_import_csv_failures">Unreadable rows: %1$d (skipped)</string>
+    <string name="renderer_import_csv_over">%3$d rows over the limit (%1$d per import, %2$d in total) will be skipped</string>
+    <string name="renderer_import_failure_invalid">Row %1$d: can\'t read %2$s \"%3$s\"</string>
+    <string name="renderer_import_failure_required">Row %1$d: %2$s is empty</string>
+    <string name="renderer_import_failure_too_long">Row %1$d: %2$s is too long</string>
+    <string name="renderer_import_body">Add 1 record with %2$d characters from \"%1$s\" to \"%3$s\".</string>
+    <string name="renderer_import_body_truncated">It\'s long, so only the first %1$d characters will be added.</string>
+    <string name="renderer_import_problem_unsupported">This type of file can\'t be imported</string>
+    <string name="renderer_import_problem_open">Couldn\'t open the file</string>
+    <string name="renderer_import_problem_too_large">The file is too large (up to %1$d MB)</string>
+    <string name="renderer_import_problem_encoding">Couldn\'t read the text encoding (use a UTF-8 or Shift_JIS CSV)</string>
+    <string name="renderer_import_problem_columns">The first row doesn\'t match the fields of \"%1$s\" (%2$s)</string>
+    <string name="renderer_import_problem_empty_text">Couldn\'t read any text</string>
+    <string name="renderer_import_problem_full">No more records can be added</string>
+    <string name="renderer_import_problem_kind_unavailable">This type of file can\'t be imported on this device yet</string>
+</resources>
