@@ -129,6 +129,26 @@ func SettleHold(ctx context.Context, st Store, uid, id string, s Settlement, now
 	return out, w, err
 }
 
+// ExtendHold moves uid's held hold id to expire at expireAt (never earlier).
+// A closed or unknown hold is left as is.
+func ExtendHold(ctx context.Context, st Store, uid, id string, expireAt time.Time) error {
+	expireAt = storedTime(expireAt)
+	return st.Update(ctx, Keys{UID: uid, HoldID: id}, func(tx *Tx) error {
+		h := tx.Hold
+		if h == nil || h.Status != HoldHeld || !expireAt.After(h.ExpireAt) {
+			return nil
+		}
+		nh := *h
+		nh.ExpireAt = expireAt
+		if tx.Wallet.Holds == nil {
+			tx.Wallet.Holds = map[string]time.Time{}
+		}
+		tx.Wallet.Holds[id] = expireAt
+		tx.WalletDirty, tx.Hold, tx.HoldDirty = true, &nh, true
+		return nil
+	})
+}
+
 // CreditPurchase adds p.Coins to uid's purchased coins once per
 // p.TransactionID. credited is false when it was already credited to uid;
 // another uid is ErrOwnedByOther.

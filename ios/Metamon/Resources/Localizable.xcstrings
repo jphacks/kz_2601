@@ -3945,6 +3945,23 @@
         }
       }
     },
+    "このアプリに参加している人だけが通話できます" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Only people who joined this app can call"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "このアプリに参加している人だけが通話できます"
+          }
+        }
+      }
+    },
     "このアプリの写真" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -4608,6 +4625,23 @@
         }
       }
     },
+    "この通話には入れません" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "You can't join this call"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "この通話には入れません"
+          }
+        }
+      }
+    },
     "これでいく" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -4744,6 +4778,23 @@
         }
       }
     },
+    "しばらくしてからもう一度お試しください" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Please try again in a little while"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "しばらくしてからもう一度お試しください"
+          }
+        }
+      }
+    },
     "しばらく開かれていないため休んでいます(開くと再開します)" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -4859,6 +4910,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "たとえば、こんな変更"
+          }
+        }
+      }
+    },
+    "つないでいます…" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Connecting…"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "つないでいます…"
           }
         }
       }
@@ -6682,6 +6750,40 @@
         }
       }
     },
+    "カメラを使う" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Turn on camera"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "カメラを使う"
+          }
+        }
+      }
+    },
+    "カメラを止める" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Turn off camera"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "カメラを止める"
+          }
+        }
+      }
+    },
     "カメラ・写真" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -6848,6 +6950,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "コイン"
+          }
+        }
+      }
+    },
+    "コインが足りないため、通話を続けられません" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "You don't have enough coins to continue the call"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "コインが足りないため、通話を続けられません"
           }
         }
       }
@@ -8463,6 +8582,40 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "マイクを使えません"
+          }
+        }
+      }
+    },
+    "ミュート" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mute"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ミュート"
+          }
+        }
+      }
+    },
+    "ミュートを解除" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Unmute"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ミュートを解除"
           }
         }
       }
@@ -15828,6 +15981,23 @@
         }
       }
     },
+    "自分" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "You"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "自分"
+          }
+        }
+      }
+    },
     "自分だけにする" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -17664,6 +17834,23 @@
         }
       }
     },
+    "退出" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Leave"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "退出"
+          }
+        }
+      }
+    },
     "送った内容(本文と、オンにした添付)は、Tailor It の不具合を直し、改善するために運営者が読みます。Google Cloud(Firestore)に保存し、%lld 日後に消去します。アカウントを削除したときも消去します。第三者には渡しません。" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -18255,6 +18442,57 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "通知を送れませんでした"
+          }
+        }
+      }
+    },
+    "通話につながりませんでした" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Couldn't connect to the call"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "通話につながりませんでした"
+          }
+        }
+      }
+    },
+    "通話は今使えません" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Calls aren't available right now"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "通話は今使えません"
+          }
+        }
+      }
+    },
+    "通話を終えました" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The call has ended"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "通話を終えました"
           }
         }
       }

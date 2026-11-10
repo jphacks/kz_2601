@@ -45,6 +45,7 @@ func (a *App) Lint() []string {
 	l.optionalTitle()
 	l.settingMaxMin()
 	l.photoIllustrate() // photo_illustrate.go
+	l.dupCallButtons()  // call_button.go
 	return l.out
 }
 

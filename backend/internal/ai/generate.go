@@ -201,6 +201,9 @@ type Service struct {
 	// NoBookLookup: the book lookup is off on appconfig (BOOK_LOOKUP_ENABLED
 	// unset), so the AI does not generate lookupBook (clientRestriction).
 	NoBookLookup bool
+	// NoCalls: appconfig has CALLS_ENABLED off (#447), so the AI does not
+	// generate callButton and declines calls (clientRestriction).
+	NoCalls bool
 	// OnDemandRules sends the JPHACKS product recipes only when the request
 	// needs them: keywords + the selector call (on_demand_rules.go; cmd/ai: on
 	// unless AI_ON_DEMAND_RULES=0). Off = the whole systemPrompt, as before.

@@ -273,7 +273,8 @@ func (r Restriction) offKey() string {
 // clientRestriction is the request's restriction plus the server switches:
 // with AI_TEXT_IMAGE off, inputPhoto would answer 403; with the book lookup
 // off on appconfig (openBD terms, BOOK_LOOKUP_ENABLED), lookupBook would
-// answer 503. Neither is generated then.
+// answer 503; with CALLS_ENABLED off, a callButton could not join. None is
+// generated then.
 func (s *Service) clientRestriction(allowed, disabled, supported []string) Restriction {
 	r := NewClientRestriction(allowed, disabled, supported)
 	if !s.TextImage {
@@ -281,6 +282,9 @@ func (s *Service) clientRestriction(allowed, disabled, supported []string) Restr
 	}
 	if s.NoBookLookup {
 		r = r.withFeatureOff(FeatureLookupBook)
+	}
+	if s.NoCalls {
+		r = r.withFeatureOff(FeatureCallButton)
 	}
 	return r
 }

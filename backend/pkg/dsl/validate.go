@@ -697,6 +697,8 @@ func (a *App) Validate() error {
 				checkBracket(where, c, entities, add) // bracket.go
 			case CompFeed:
 				checkFeed(where, c, add) // feed.go
+			case CompCallButton:
+				checkCallButton(where, c, a, add) // call_button.go
 			default:
 				add("%s: unknown component type %q", where, c.Type)
 			}
