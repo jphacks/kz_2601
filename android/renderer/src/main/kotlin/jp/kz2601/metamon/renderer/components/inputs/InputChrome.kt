@@ -36,6 +36,11 @@ object InputRules {
         ComponentType.SLIDER, ComponentType.STEPPER, ComponentType.COLOR_PICKER, ComponentType.RATING,
     )
 
+    /** form の field に書く部品(iOS の `RenderTree.formBound`)。form が無いと needsForm、props に value と label を出す。 */
+    val formBound: Set<ComponentType> = inputTypes + setOf(
+        ComponentType.QR_SCANNER,
+    )
+
     /** 束縛する field の型で描き替える入力(colorPicker 以外の 11 種・iOS の `FormFieldOverride.inputTypes`)。 */
     val overridable: Set<ComponentType> = inputTypes - ComponentType.COLOR_PICKER
 
