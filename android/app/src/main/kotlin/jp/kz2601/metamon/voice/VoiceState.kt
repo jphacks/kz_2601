@@ -60,6 +60,18 @@ data class VoiceUiState(
     val progress: BuildProgress? = null,
     /** 直近の生成の一文要約(無ければ null) */
     val summary: String? = null,
+    /** 要約のバナーに添える「元に戻す」/「やり直す」(#895) */
+    val summaryAction: UndoAction? = null,
+    /** 直前にやったのが undo / redo(バナーの「元に戻しました」/「やり直しました」) */
+    val undone: UndoAction? = null,
+    /** 「元に戻す」を押せる(作ったアプリで、サーバーに前の版があるか端末の履歴がある) */
+    val canUndo: Boolean = false,
+    /** 戻した直後だけ true。新しい版が当たったら false */
+    val canRedo: Boolean = false,
+    /** 戻している・やり直している最中(ボタンを押せなくする) */
+    val undoing: Boolean = false,
+    /** undo / redo の結果のトースト */
+    val notice: UndoNotice? = null,
     val error: VoiceError? = null,
     val chat: List<ChatBubble> = emptyList(),
     val chatTurn: ChatTurn? = null,
