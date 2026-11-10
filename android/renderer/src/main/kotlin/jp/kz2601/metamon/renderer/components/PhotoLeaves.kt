@@ -14,6 +14,8 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.MutableState
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -29,8 +31,12 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import coil3.compose.AsyncImage
+import coil3.compose.AsyncImagePainter
 import jp.kz2601.metamon.dsl.Component
 import jp.kz2601.metamon.dsl.Height
+import jp.kz2601.metamon.dsl.records.JSONValue
+import jp.kz2601.metamon.dsl.records.VideoValue
 import jp.kz2601.metamon.renderer.registry.RenderContext
 import jp.kz2601.metamon.renderer.theme.RenderTheme
 import jp.kz2601.metamon.renderer.theme.SymbolIcon
@@ -39,8 +45,7 @@ import jp.kz2601.metamon.renderer.theme.symbolSize
 import java.util.Base64
 
 // avatar / image。写真の値は photo field と同じ表現("data:image/jpeg;base64,…" か https の URL。iOS の PhotoCodec)。
-// フォームのドラフト(field の値)は子 Issue で入る。それまで field の値は無い扱い。
-// https の画像の読み込み(Coil など)も子 Issue。それまで https は枠だけ出す。
+// https は [RemoteImages](Coil)で読む。読み込み中は枠の地の色だけ(iOS の placeholder)、失敗は「写真なし」の枠。
 
 object PhotoValue {
     /** data URL の中身のバイト列。data URL でなければ null。 */
@@ -50,7 +55,8 @@ object PhotoValue {
         return runCatching { Base64.getMimeDecoder().decode(value.substring(comma + 1)) }.getOrNull()?.takeIf { it.isNotEmpty() }
     }
 
-    fun isRemote(value: String?): Boolean = value?.startsWith("http") == true
+    /** 読み込んでよい https の URL か([RemoteImages.loadableUrl])。http などは写真なし扱い。 */
+    fun isRemote(value: String?): Boolean = RemoteImages.loadableUrl(value) != null
 
     /** 写真があるか(iOS の PhotoView.hasPhoto)。 */
     fun hasPhoto(value: String?): Boolean = dataBytes(value) != null || isRemote(value)
@@ -75,9 +81,16 @@ private fun rememberPhoto(value: String?): ImageBitmap? = remember(value) {
     }
 }
 
-/** 写真の値(form の field)。Android はまだフォームのドラフトが無いので null。 */
-@Suppress("UNUSED_PARAMETER")
-internal fun photoFieldValue(c: Component, ctx: RenderContext?): String? = null
+/**
+ * 部品の `field` が指すフォームの下書きの写真(iOS の `ctx.form?.values[field]`)。data URL / https の文字列。
+ * video field の値はサムネイル(iOS の PhotoCodec と同じ)。空・写真でない値は null。
+ */
+internal fun photoFieldValue(c: Component, ctx: RenderContext?): String? {
+    val field = c.field ?: return null
+    val raw = (ctx?.form?.values?.get(field) as? JSONValue.Str)?.value ?: return null
+    val value = if (raw.startsWith(VideoValue.PREFIX)) VideoValue.parse(raw)?.thumbnail else raw
+    return value?.takeIf { PhotoValue.hasPhoto(it) }
+}
 
 /** `avatar`: 円の画像。優先順: photo field → `image`(data URL / https)→ `name` のイニシャル → 人のアイコン。読み上げは name。 */
 @Composable
@@ -85,6 +98,7 @@ fun AvatarLeaf(c: Component, ctx: RenderContext, modifier: Modifier = Modifier) 
     val diameter = c.symbolSize * 1.8f
     val value = photoFieldValue(c, ctx) ?: c.image
     val bitmap = rememberPhoto(value)
+    val remote = if (bitmap == null) RemoteImages.loadableUrl(value) else null
     val colors = RenderTheme.colors
     Box(
         modifier.fillMaxWidth().clearAndSetSemantics {
@@ -102,16 +116,21 @@ fun AvatarLeaf(c: Component, ctx: RenderContext, modifier: Modifier = Modifier) 
             contentAlignment = Alignment.Center,
         ) {
             val initials = avatarInitials(c.name)
+            // https は読み込み中・失敗の間イニシャルを出す(iOS の placeholder)
+            val phase = remote?.let { rememberRemotePhase(it) }
             when {
                 bitmap != null -> Image(bitmap, null, Modifier.fillMaxSize(), contentScale = ContentScale.Crop)
-                initials.isNotEmpty() -> Text(
-                    initials,
-                    color = colors.brandText,
-                    fontSize = (diameter.value * 0.4f).sp,
-                    fontWeight = FontWeight.SemiBold,
-                )
-                else -> SymbolIcon("person.fill", diameter * 0.45f, colors.brandA.copy(alpha = 0.7f))
+                phase?.value != RemotePhase.LOADED -> when {
+                    initials.isNotEmpty() -> Text(
+                        initials,
+                        color = colors.brandText,
+                        fontSize = (diameter.value * 0.4f).sp,
+                        fontWeight = FontWeight.SemiBold,
+                    )
+                    else -> SymbolIcon("person.fill", diameter * 0.45f, colors.brandA.copy(alpha = 0.7f))
+                }
             }
+            if (remote != null && phase != null) RemoteImage(remote, phase)
         }
     }
 }
@@ -134,7 +153,10 @@ fun ImageLeaf(c: Component, ctx: RenderContext, modifier: Modifier = Modifier) {
 @Composable
 fun PhotoView(value: String?, height: Dp, modifier: Modifier = Modifier) {
     val bitmap = rememberPhoto(value)
-    val has = PhotoValue.hasPhoto(value)
+    val remote = if (bitmap == null) RemoteImages.loadableUrl(value) else null
+    val phase = remote?.let { rememberRemotePhase(it) }
+    // 読めなかった https は「写真なし」と同じ枠・読み上げ
+    val has = bitmap != null || (remote != null && phase?.value != RemotePhase.FAILED)
     Box(
         modifier
             .fillMaxWidth()
@@ -149,8 +171,34 @@ fun PhotoView(value: String?, height: Dp, modifier: Modifier = Modifier) {
     ) {
         if (bitmap != null) {
             Image(bitmap, null, Modifier.fillMaxSize(), contentScale = ContentScale.Crop)
-        } else if (!has) {
-            SymbolIcon("photo", 28.dp, MaterialTheme.colorScheme.onSurfaceVariant)
+        } else if (remote != null && phase != null) {
+            // 読み込み中は地の色だけ(スケルトン)
+            RemoteImage(remote, phase)
         }
+        if (!has) SymbolIcon("photo", 28.dp, MaterialTheme.colorScheme.onSurfaceVariant)
     }
+}
+
+/** https の画像の状態。 */
+internal enum class RemotePhase { LOADING, LOADED, FAILED }
+
+@Composable
+private fun rememberRemotePhase(url: String): MutableState<RemotePhase> = remember(url) { mutableStateOf(RemotePhase.LOADING) }
+
+/** https の画像を枠いっぱいに切り抜いて描き、状態を [phase] に返す。 */
+@Composable
+private fun RemoteImage(url: String, phase: MutableState<RemotePhase>) {
+    AsyncImage(
+        model = url,
+        contentDescription = null,
+        modifier = Modifier.fillMaxSize(),
+        contentScale = ContentScale.Crop,
+        onState = { state ->
+            phase.value = when (state) {
+                is AsyncImagePainter.State.Success -> RemotePhase.LOADED
+                is AsyncImagePainter.State.Error -> RemotePhase.FAILED
+                else -> RemotePhase.LOADING
+            }
+        },
+    )
 }
