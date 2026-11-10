@@ -56,6 +56,7 @@ struct ListLeaf: View {
                         .accessibilityHint(c.onItemTap != nil ? L("ダブルタップで開きます") : "")
                         .accessibilityAction { open(row) }
                         .contextMenu {
+                            ComponentTalkMenuItem(component: c, ctx: ctx) // 行のメニューが先に出るので、ここにも置く(#1323)
                             #if os(macOS)
                             Button(L("コピー"), systemImage: "doc.on.doc") { copy(row, entity: entity) }
                             #endif

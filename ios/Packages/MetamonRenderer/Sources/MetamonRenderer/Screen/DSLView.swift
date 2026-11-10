@@ -24,6 +24,7 @@ public struct DSLView: View {
         } else {
             content
                 .modifier(RequiredFieldMark(component: component, ctx: ctx))
+                .modifier(ComponentTalkMenu(component: component, ctx: ctx)) // Mac の「この部品について話す」(#1323)
                 .environment(\.dslNestingDepth, depth + 1)
         }
     }

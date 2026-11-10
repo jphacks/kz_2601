@@ -48,6 +48,7 @@ struct QrCodeLeaf: View {
             .overlay(RoundedRectangle(cornerRadius: RenderTheme.Radius.inner, style: .continuous).strokeBorder(RenderTheme.Colors.hairline))
             .contextMenuPreviewShape(RoundedRectangle(cornerRadius: RenderTheme.Radius.inner, style: .continuous))
             .contextMenu {
+                ComponentTalkMenuItem(component: c, ctx: ctx) // 画像のメニューが先に出るので、ここにも置く(#1323)
                 Button { save(export) } label: { Label(L("写真に保存"), systemImage: "square.and.arrow.down") }
                 ShareLink(item: Image(platformImage: export), preview: SharePreview(caption ?? L("QR コード"), image: Image(platformImage: export))) {
                     Label(L("共有"), systemImage: "square.and.arrow.up")

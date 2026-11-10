@@ -4149,6 +4149,23 @@
         }
       }
     },
+    "この部品について話す" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Talk about this component"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "この部品について話す"
+          }
+        }
+      }
+    },
     "この端末では AI を端末内で動かせないため、サーバーの AI を使います。" : {
       "extractionState" : "manual",
       "localizations" : {

@@ -1,5 +1,6 @@
 import SwiftUI
 import MetamonRenderer
+import MetamonDSL
 
 /// 画面マップ(#116)の UIKit / AppKit に依存しない部分。iOS の `ScreenMapSheet` と Mac の `MacScreenMapView`(#970)が共有する:
 /// 「この画面について話す」の文脈・文言・カードの並べ方・矢印の形。
@@ -10,6 +11,13 @@ struct ScreenContext: Equatable {
     var title: String
     /// 部品から開いたシートの AI ボタンで押した時の部品(#629)
     var component: AIButtonComponent?
+}
+
+extension ScreenContext {
+    /// Mac の部品の右クリック「この部品について話す」(#1323)の文脈。画面の名前は DSL の title(空なら id)
+    init(_ target: ComponentTalk.Target, dsl: AppDSL) {
+        self.init(id: target.screen, title: target.screenTitle(in: dsl), component: target.component)
+    }
 }
 
 enum ScreenMapCopy {
@@ -25,6 +33,9 @@ enum ScreenMapCopy {
     }
 
     static var title: String { L10n.tr("画面マップ") }
+
+    /// 部品の右クリック・VoiceOver の操作の「この部品について話す」(#1323・Mac)
+    static var talkAboutComponent: String { L10n.tr("この部品について話す") }
 
     /// 遷移 1 本を言葉にする(詳細の「ここから行ける」「ここへ来られる」)。
     static func describe(_ e: ScreenGraph.Edge) -> String {
