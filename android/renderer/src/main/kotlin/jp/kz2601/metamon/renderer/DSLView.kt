@@ -1,110 +1,173 @@
 package jp.kz2601.metamon.renderer
 
-import androidx.compose.foundation.layout.Arrangement
+import androidx.activity.compose.BackHandler
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.material3.Button
-import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedCard
+import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.NavigationBar
+import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
+import jp.kz2601.metamon.dsl.Action
 import jp.kz2601.metamon.dsl.AppDSL
-import jp.kz2601.metamon.dsl.Component
-import jp.kz2601.metamon.dsl.ComponentType
 import jp.kz2601.metamon.dsl.Screen
+import jp.kz2601.metamon.renderer.components.UnavailableComponent
+import jp.kz2601.metamon.renderer.layout.isVoiceScreen
+import jp.kz2601.metamon.renderer.navigation.NavigationResolver
+import jp.kz2601.metamon.renderer.navigation.NavigationState
+import jp.kz2601.metamon.renderer.navigation.Presentation
+import jp.kz2601.metamon.renderer.navigation.Route
+import jp.kz2601.metamon.renderer.registry.RenderContext
+import jp.kz2601.metamon.renderer.screen.GridScreenLayout
+import jp.kz2601.metamon.renderer.theme.MetamonRenderTheme
+import jp.kz2601.metamon.renderer.theme.colors
+import jp.kz2601.metamon.renderer.theme.RenderTheme
 
-// 骨格(#356): 最初の画面を縦に並べるだけ。グリッド配置(area)・ナビ・部品のレジストリは #357 で入れる。
-
-/** DSL の最初の画面を描く。 */
+/**
+ * DSL のアプリ全体を描く(iOS の `DSLNavigationRoot`)。タブ(2 個以上)・main のスタック・シート・全画面を持ち、
+ * navigate / back は描画器の中で解決する(`NavigationResolver`)。それ以外のアクションは [DSLRuntime.onAction] へ。
+ */
 @Composable
 fun DSLView(dsl: AppDSL, runtime: DSLRuntime, modifier: Modifier = Modifier) {
-    val screen = dsl.screen(dsl.initialScreen) ?: dsl.screens.firstOrNull()
+    var nav by remember(dsl) { mutableStateOf(NavigationState.initial(dsl)) }
+
+    fun perform(action: Action, from: Route) {
+        when (action.type) {
+            "navigate" -> action.screen?.let {
+                nav = NavigationResolver.navigate(nav, it, Presentation.of(action.presentation), null, from, dsl)
+            }
+            "back" -> nav = NavigationResolver.close(nav, from)
+            else -> runtime.onAction(action, from)
+        }
+    }
+
+    @Composable
+    fun stack(stack: String, root: Route) {
+        val top = nav.path(stack).lastOrNull() ?: root
+        val canClose = NavigationResolver.canClose(nav, top)
+        BackHandler(enabled = canClose) { nav = NavigationResolver.close(nav, top) }
+        key(top.id) {
+            RouteView(dsl, top, RenderContext(top, runtime) { perform(it, top) }, canClose) {
+                nav = NavigationResolver.close(nav, top)
+            }
+        }
+    }
+
+    Column(modifier.fillMaxSize().background(RenderTheme.colors.canvas)) {
+        Box(Modifier.weight(1f)) {
+            if (dsl.app.hasTabs) {
+                val tab = nav.selectedTab
+                stack(Route.tabStack(tab), Route(tab, stack = Route.tabStack(tab)))
+            } else {
+                stack(Route.MAIN, Route(dsl.initialScreen))
+            }
+        }
+        if (dsl.app.hasTabs) {
+            NavigationBar {
+                dsl.app.tabs.forEach { t ->
+                    NavigationBarItem(
+                        selected = nav.selectedTab == t.screen,
+                        onClick = {
+                            // 選び直したタブは根まで戻す
+                            nav = nav.withPath(Route.tabStack(t.screen), emptyList()).copy(selectedTab = t.screen)
+                        },
+                        icon = {},
+                        label = { Text(t.title, maxLines = 1, overflow = TextOverflow.Ellipsis) },
+                    )
+                }
+            }
+        }
+    }
+
+    nav.sheet?.let { sheet ->
+        // 下に引いて閉じた時はシートのスタックごと閉じる
+        SheetHost(onDismiss = { nav = nav.withPath(Route.SHEET, null).copy(sheet = null) }) { stack(Route.SHEET, sheet) }
+    }
+    nav.fullScreen?.let { full ->
+        Dialog(
+            onDismissRequest = { nav = NavigationResolver.close(nav, nav.path(Route.FULL).lastOrNull() ?: full) },
+            properties = DialogProperties(usePlatformDefaultWidth = false),
+        ) {
+            Box(Modifier.fillMaxSize().background(RenderTheme.colors.canvas)) { stack(Route.FULL, full) }
+        }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun SheetHost(onDismiss: () -> Unit, content: @Composable () -> Unit) {
+    ModalBottomSheet(onDismissRequest = onDismiss, containerColor = RenderTheme.colors.canvas) {
+        Box(Modifier.fillMaxWidth().heightIn(min = 320.dp).fillMaxSize()) { content() }
+    }
+}
+
+/** route の画面 1 枚。見出しの行(戻る・タイトル・toolbar)+ グリッド。 */
+@Composable
+private fun RouteView(dsl: AppDSL, route: Route, ctx: RenderContext, canClose: Boolean, onBack: () -> Unit) {
+    val screen = dsl.screen(route.screen) ?: dsl.screens.firstOrNull()
     if (screen == null) {
-        UnsupportedComponent("画面がありません", modifier)
+        UnavailableComponent(jp.kz2601.metamon.dsl.Component(), Modifier.padding(16.dp))
         return
     }
-    ScreenView(screen, runtime, modifier)
+    ScreenView(screen, ctx, canClose, onBack)
 }
 
+/** 画面 1 枚(iOS の `ScreenView`)。フォーム・保存バーは子 Issue で入れる。 */
 @Composable
-fun ScreenView(screen: Screen, runtime: DSLRuntime, modifier: Modifier = Modifier) {
-    Column(
-        modifier = modifier.fillMaxSize().padding(16.dp),
-        verticalArrangement = Arrangement.spacedBy(12.dp),
-    ) {
-        if (screen.title.isNotEmpty()) {
-            Text(screen.title, style = MaterialTheme.typography.headlineSmall)
+fun ScreenView(
+    screen: Screen,
+    ctx: RenderContext,
+    canClose: Boolean = false,
+    onBack: () -> Unit = {},
+    modifier: Modifier = Modifier,
+) {
+    Column(modifier.fillMaxSize()) {
+        val showsHeader = !screen.isVoiceScreen && (screen.title.isNotEmpty() || canClose || screen.toolbar.isNotEmpty())
+        if (showsHeader) {
+            Row(
+                Modifier.fillMaxWidth().padding(horizontal = RenderTheme.Spacing.xs, vertical = RenderTheme.Spacing.xs),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                if (canClose) TextButton(onClick = onBack) { Text("戻る") }
+                Text(
+                    screen.title,
+                    style = MaterialTheme.typography.titleLarge,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.weight(1f).padding(horizontal = RenderTheme.Spacing.sm),
+                )
+                screen.toolbar.forEach { tb -> TextButton(onClick = { ctx.perform(tb.action) }) { Text(tb.label) } }
+            }
         }
-        screen.components.forEach { ComponentView(it, runtime) }
-    }
-}
-
-@Composable
-fun ComponentView(component: Component, runtime: DSLRuntime, modifier: Modifier = Modifier) {
-    when {
-        component.type == ComponentType.VOICE_INPUT -> VoiceInputView(component, runtime, modifier)
-        component.type == ComponentType.TEXT -> Text(component.text.orEmpty(), modifier)
-        component.type == ComponentType.DIVIDER -> HorizontalDivider(modifier)
-        component.type == ComponentType.SPACER -> Spacer(modifier.height(16.dp))
-        component.type.isContainer -> Column(modifier, verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            component.title?.let { Text(it, style = MaterialTheme.typography.titleMedium) }
-            component.children.forEach { ComponentView(it, runtime) }
-        }
-        component.type == ComponentType.UNKNOWN -> UnsupportedComponent("アプリを更新すると表示されます", modifier)
-        else -> UnsupportedComponent("「${component.type.wire}」は Android ではまだ使えません", modifier)
-    }
-}
-
-/** 音声の入口(仮)。認識は #359。 */
-@Composable
-fun VoiceInputView(component: Component, runtime: DSLRuntime, modifier: Modifier = Modifier) {
-    Column(
-        modifier = modifier.fillMaxWidth().padding(vertical = 48.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(24.dp),
-    ) {
-        Text(
-            component.prompt ?: "話しかけてください",
-            style = MaterialTheme.typography.headlineSmall,
-            textAlign = TextAlign.Center,
-        )
-        val buttonSize = if (component.size == "large") 120.dp else 72.dp
-        Button(
-            onClick = { runtime.onVoiceInput(component.id) },
-            shape = CircleShape,
-            modifier = Modifier.size(buttonSize),
-        ) {
-            Text("話す", style = MaterialTheme.typography.titleMedium)
-        }
-    }
-}
-
-@Composable
-private fun UnsupportedComponent(message: String, modifier: Modifier = Modifier) {
-    OutlinedCard(modifier.fillMaxWidth()) {
-        Box(Modifier.padding(12.dp)) {
-            Text(message, style = MaterialTheme.typography.bodySmall)
-        }
+        GridScreenLayout(screen, ctx, Modifier.weight(1f))
     }
 }
 
 @Preview(showBackground = true)
 @Composable
 private fun DSLViewPreview() {
-    MaterialTheme {
+    MetamonRenderTheme {
         DSLView(AppDSL.fallback, NoopDSLRuntime)
     }
 }
