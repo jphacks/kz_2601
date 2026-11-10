@@ -58,12 +58,12 @@ import jp.kz2601.metamon.runtime.AppRuntime
 import jp.kz2601.metamon.runtime.TranscriberDictationHost
 import jp.kz2601.metamon.services.GenerateProgress
 import jp.kz2601.metamon.voice.AppConfigVersions
-import jp.kz2601.metamon.voice.GeneratingView
 import jp.kz2601.metamon.voice.MicButton
 import jp.kz2601.metamon.voice.VoicePhase
 import jp.kz2601.metamon.voice.VoiceRoute
 import jp.kz2601.metamon.voice.VoiceUiState
 import jp.kz2601.metamon.voice.VoiceViewModel
+import jp.kz2601.metamon.voice.stage.BuildStageHost
 import jp.kz2601.metamon.services.AppSummary
 import jp.kz2601.metamon.settings.SettingsSheet
 import jp.kz2601.metamon.switcher.AppSwitcherDialog
@@ -223,22 +223,24 @@ fun MetamonApp(container: AppContainer) {
         },
     ) { padding ->
         Box(Modifier.fillMaxSize().padding(padding)) {
-            if (state.isInitial) {
-                VoiceRoute(vm)
-            } else {
-                // 横向き・タブレット・折りたたみでは幅を絞って中央に寄せる(iOS の readableWidth・#842)。
-                ReadableWidth {
-                    GeneratedApp(state, runtimeState.dsl, runtime, appId = runtimeState.document.appId)
+            // 生成中の組み立て台・変わった部品の印・完成の後のお知らせ(#894)
+            BuildStageHost(state, onCancel = vm::cancelGenerate, onOpenVoice = vm::openVoice) {
+                if (state.isInitial) {
+                    VoiceRoute(vm)
+                } else {
+                    // 横向き・タブレット・折りたたみでは幅を絞って中央に寄せる(iOS の readableWidth・#842)。
+                    ReadableWidth {
+                        GeneratedApp(state, runtimeState.dsl, runtime, appId = runtimeState.document.appId)
+                    }
+                    MicButton(
+                        state.copy(phase = VoicePhase.IDLE),
+                        size = 64.dp,
+                        onClick = vm::openVoice,
+                        description = stringResource(R.string.voice_change_this_app),
+                        modifier = Modifier.align(Alignment.BottomEnd).padding(20.dp),
+                    )
                 }
-                MicButton(
-                    state.copy(phase = VoicePhase.IDLE),
-                    size = 64.dp,
-                    onClick = vm::openVoice,
-                    description = stringResource(R.string.voice_change_this_app),
-                    modifier = Modifier.align(Alignment.BottomEnd).padding(20.dp),
-                )
             }
-            if (state.isGenerating) GeneratingView(state, onCancel = vm::cancelGenerate)
             // 要約と元に戻す・状態カード・トースト・削除の取り消し・確認ダイアログ(#895)
             FeedbackHost(vm, state, runtime, runtimeState)
         }
@@ -299,7 +301,7 @@ private suspend fun openFromNotification(runtime: AppRuntime, appId: String) {
     if (!runtime.switchApp(appId)) Log.i(AppContainer.TAG, "push: could not open the app from the notification")
 }
 
-/** 生成の途中経過を 1 行にする。今の画面の途中経過は [GeneratingView] が出す(文言の置き場として残す)。 */
+/** 生成の途中経過を 1 行にする。今の画面の途中経過は [BuildStageHost] が出す(文言の置き場として残す)。 */
 internal fun progressText(p: GenerateProgress): String = when (p) {
     is GenerateProgress.App -> "「${p.name}」を作っています" + if (p.tabs.isEmpty()) "" else "(${p.tabs.joinToString("・")})"
     is GenerateProgress.Summary -> p.text
