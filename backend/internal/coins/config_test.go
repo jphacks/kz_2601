@@ -111,3 +111,39 @@ func TestWriteError(t *testing.T) {
 		t.Error("other errors are not written")
 	}
 }
+
+// enforce with an op's hold left at 0 would charge that op nothing:
+// CheckReserves names it. log / off do not need the reserves.
+func TestCheckReserves(t *testing.T) {
+	all := map[string]string{"COIN_BILLING_MODE": "enforce",
+		"COIN_RESERVE_GENERATE": "1", "COIN_RESERVE_EDIT": "1", "COIN_RESERVE_CHAT": "1", "COIN_RESERVE_TEXT": "1"}
+	check := func(m map[string]string) error {
+		t.Helper()
+		c, err := ConfigFromEnv(env(m))
+		if err != nil {
+			t.Fatalf("%v: %v", m, err)
+		}
+		return c.CheckReserves()
+	}
+	if err := check(all); err != nil {
+		t.Fatalf("all set: %v", err)
+	}
+	for _, op := range Ops {
+		key := "COIN_RESERVE_" + strings.ToUpper(op)
+		for _, v := range []string{"", "0"} {
+			m := map[string]string{}
+			for k, x := range all {
+				m[k] = x
+			}
+			m[key] = v
+			if err := check(m); err == nil || !strings.Contains(err.Error(), key) {
+				t.Errorf("%s=%q under enforce: %v", key, v, err)
+			}
+		}
+	}
+	for _, mode := range []string{"", "off", "log"} {
+		if err := check(map[string]string{"COIN_BILLING_MODE": mode}); err != nil {
+			t.Errorf("mode %q without reserves: %v", mode, err)
+		}
+	}
+}

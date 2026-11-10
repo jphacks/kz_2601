@@ -142,6 +142,27 @@ func ConfigFromEnv(getenv func(string) string) (Config, error) {
 	return c, nil
 }
 
+// CheckReserves is for the process that holds coins (the ai): under enforce
+// a charge is capped at the hold, so an op whose COIN_RESERVE_<OP> is left
+// at 0 would never be charged. It should refuse to start rather than run
+// that op free. Other processes (appconfig, runner) never hold and do not
+// need the reserves.
+func (c Config) CheckReserves() error {
+	if c.Mode != ModeEnforce {
+		return nil
+	}
+	var missing []string
+	for _, op := range Ops {
+		if c.Reserve[op] <= 0 {
+			missing = append(missing, "COIN_RESERVE_"+strings.ToUpper(op))
+		}
+	}
+	if len(missing) > 0 {
+		return fmt.Errorf("COIN_BILLING_MODE=enforce needs %s > 0", strings.Join(missing, ", "))
+	}
+	return nil
+}
+
 func nonNegative(getenv func(string) string, key string, dst *int64) error {
 	v := strings.TrimSpace(getenv(key))
 	if v == "" {
