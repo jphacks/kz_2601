@@ -146,6 +146,7 @@ fun SettingsSheet(
             // データ(#898 / #990・iOS の syncSection): 同期の状態と「今すぐ同期」
             SyncStatusSection(container.recordSync)
             HorizontalDivider(Modifier.padding(vertical = 8.dp))
+            jp.kz2601.metamon.feedback.FeedbackSettingsSection(container) // #319 フィードバックを送る(下に区切り線まで出す)
             PrivacySection(container)
             HorizontalDivider(Modifier.padding(vertical = 8.dp))
             // お問い合わせ・ライセンス・詳細(サポート用)(#898・iOS の supportSection)

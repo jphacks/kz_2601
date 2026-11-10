@@ -42,6 +42,7 @@ import jp.kz2601.metamon.dsl.AppDocument
 import jp.kz2601.metamon.consent.AiConsentDialog
 import jp.kz2601.metamon.onboarding.TutorialScreen
 import jp.kz2601.metamon.services.consent.AiConsentStatus
+import jp.kz2601.metamon.feedback.FeedbackComposerHost
 import jp.kz2601.metamon.feedback.FeedbackHost
 import jp.kz2601.metamon.feedback.TalkBackAnnouncer
 import jp.kz2601.metamon.feedback.UndoHeaderButtons
@@ -355,6 +356,8 @@ fun MetamonApp(container: AppContainer) {
 
     // 記録の保存期間の確認(#482)。生成中・音声のシートの間は待つ
     RetentionPromptHost(runtime, busy = state.isGenerating || state.voiceOpen, onStop = vm::generateNow)
+    // フィードバックの画面(#319)と端末を振って開く仕組み。設定から開いた時に上に重ねる
+    FeedbackComposerHost(container)
 
     if (switcherOpen) {
         AppSwitcherDialog(
