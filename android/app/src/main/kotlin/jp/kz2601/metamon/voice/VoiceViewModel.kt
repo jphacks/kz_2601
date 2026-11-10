@@ -11,6 +11,7 @@ import jp.kz2601.metamon.services.ChatMode
 import jp.kz2601.metamon.services.ChatOption
 import jp.kz2601.metamon.services.ChatTurn
 import jp.kz2601.metamon.services.GenerateProgress
+import jp.kz2601.metamon.services.PlanUsageSource
 import jp.kz2601.metamon.services.SpeechTranscriber
 import jp.kz2601.metamon.services.TranscriberFailure
 import jp.kz2601.metamon.services.TranscriberStatus
@@ -27,6 +28,8 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import java.time.Duration
+import java.time.Instant
 import kotlin.coroutines.CoroutineContext
 
 /**
@@ -64,6 +67,11 @@ class VoiceViewModel(
     private val historyHeader: String = "(これまでに反映した変更)",
     /** 履歴の読み書き。順番が入れ替わらないよう 1 本ずつ */
     private val io: CoroutineContext = Dispatchers.IO.limitedParallelism(1),
+    /** 挨拶・AI の質問・完成の要約の読み上げ(#43・設定で ON の時だけ読む) */
+    private val speech: SpeechReader = SpeechReader.NONE,
+    /** 「今日の残り」を読む口(`GET /v1/me/usage`)。null = 出さない(モック) */
+    private val usage: PlanUsageSource? = null,
+    private val clock: () -> Instant = Instant::now,
     scope: CoroutineScope? = null,
 ) : ViewModel() {
     private val scope: CoroutineScope = scope ?: viewModelScope
@@ -86,6 +94,10 @@ class VoiceViewModel(
     /** 端末の版の履歴(サーバーが履歴を返せない時の undo) */
     private val localHistory = ArrayDeque<AppDocument>()
     private var redoPoint: RedoPoint? = null
+
+    /** 使用量を最後に読んだ時刻(5 分は読み直さない・iOS の PlanUsageStore と同じ) */
+    private var usageReadAt: Instant? = null
+    private var usageJob: Job? = null
 
     init {
         this.scope.launch {
@@ -113,17 +125,21 @@ class VoiceViewModel(
         if (_state.value.phase != VoicePhase.LISTENING) return
         transcriber.cancelRecording()
         stopListenJobs()
+        speech.recordingFinished()
         _state.update { it.copy(phase = VoicePhase.IDLE, partial = "") }
     }
 
     private fun startListening() {
         clearVoiceError()
+        // 読み上げ中なら即止め、録音が終わるまで読まない(TTS の音をマイクが拾わない)
+        speech.stopForRecording()
         scope.launch {
             try {
                 transcriber.startRecording()
             } catch (e: CancellationException) {
                 throw e
             } catch (e: TranscriberFailure) {
+                speech.recordingFinished()
                 showError(VoiceError.Voice(e), retry = null)
                 return@launch
             }
@@ -151,6 +167,8 @@ class VoiceViewModel(
             } catch (e: TranscriberFailure) {
                 showError(VoiceError.Voice(e), retry = null)
                 return@launch
+            } finally {
+                speech.recordingFinished()
             }
             if (text.isEmpty()) {
                 showError(VoiceError.Voice(TranscriberFailure.NotHeard), retry = null)
@@ -306,6 +324,8 @@ class VoiceViewModel(
                 }
                 persist(result.document.appId, history)
                 log("generate ok: version=${result.document.version} mode=${result.mode} unchanged=${result.unchanged}")
+                _state.value.summary?.let { speech.speak(it) } // #43 完成の要約(OFF なら何もしない)
+                refreshUsage(force = true)
                 if (hadChat) {
                     lastInput = null
                     scope.launch { ai.resetChat(target) }
@@ -565,6 +585,8 @@ class VoiceViewModel(
                 )
             }
             persistLive()
+            speech.speak(turn.text) // #43 AI の質問(録音中・OFF なら読まない)
+            refreshUsage(force = true)
             scheduleAutoBuildIfNeeded(turn, mode)
             turn
         } catch (e: CancellationException) {
@@ -650,6 +672,47 @@ class VoiceViewModel(
 
     private fun message(b: ChatBubble) = ChatMessage(if (b.fromUser) ChatMessage.Role.USER else ChatMessage.Role.ASSISTANT, b.text)
 
+    // MARK: - 挨拶・今日の残り(#892)
+
+    /** 初期画面に来た経路(挨拶の出し分け)。切り替えの「+ 新しいアプリ」など */
+    fun noteHomeEntry(entry: Greeting.HomeEntry) = _state.update { it.copy(homeEntry = entry) }
+
+    /** 初期画面の挨拶を読む(相談中・生成中は読まない)。読んだら true */
+    fun speakGreeting(text: String): Boolean {
+        val s = _state.value
+        if (!s.isInitial || s.isChatting || s.isBusy || s.phase == VoicePhase.LISTENING) return false
+        return speech.speak(text)
+    }
+
+    /** 画面を離れた・設定で切った時に読み上げを止める */
+    fun stopSpeech() = speech.stop()
+
+    /** 「今日の残り」を読み直す。[force] でなければ 5 分は読み直さない。読めなければ前の値のまま */
+    fun refreshUsage(force: Boolean = false) {
+        val source = usage ?: return
+        val now = clock()
+        val last = usageReadAt
+        if (!force && last != null && Duration.between(last, now) < USAGE_TTL) return
+        if (usageJob?.isActive == true) return
+        usageReadAt = now
+        usageJob = scope.launch {
+            val me = try {
+                source.myUsage()
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Throwable) {
+                log("usage failed: ${e.javaClass.simpleName}")
+                return@launch
+            } ?: return@launch
+            val today = me.remainingToday(observedAt = now)
+            _state.update {
+                // 後から届いた古い値では上書きしない
+                val keep = it.remainingToday?.let { cur -> today != null && cur.observedAt.isAfter(today.observedAt) } == true
+                it.copy(remainingToday = if (keep) it.remainingToday else today ?: it.remainingToday, isPro = me.isPro)
+            }
+        }
+    }
+
     // MARK: - 状態カード
 
     private fun showError(error: VoiceError, retry: (() -> Unit)?) {
@@ -667,6 +730,7 @@ class VoiceViewModel(
 
     override fun onCleared() {
         transcriber.cancelRecording()
+        speech.stop()
     }
 
     companion object {
@@ -675,5 +739,8 @@ class VoiceViewModel(
 
         /** 端末に覚えておく版の数 */
         const val LOCAL_HISTORY_LIMIT = 20
+
+        /** 使用量を読み直すまで */
+        val USAGE_TTL: Duration = Duration.ofMinutes(5)
     }
 }
