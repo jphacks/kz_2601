@@ -138,16 +138,32 @@ global は数える時に分割の 10 個と分割前の 1 個を読むので、
 | 上限 | 無料 | Pro | 環境変数 | 数える所 |
 | --- | --- | --- | --- | --- |
 | 生成・チャット / 日(単位・上の「重さ」) | 60(匿名は 30) | 300 | `RATE_LIMIT_USER_DAILY`(`_ANON_DAILY`)/ `RATE_LIMIT_PRO_DAILY` | ai(429 `rate_limited`) |
-| アプリの数 / 人 | 100 | 1000 | `PLAN_FREE_APPS` / `PLAN_PRO_APPS` | appconfig: 自分の新しいアプリ(`POST /apps`・新しい appId の最初の読み込み・複製)。共有のアプリを入れるのは数えない |
+| 持てるアプリの数 / 人 | 2 | 5 | `PLAN_FREE_APPS` / `PLAN_PRO_APPS` | appconfig: 自分で作ったもの + 参加した共有のアプリ。コインで買った枠を足す。下の「[持てるアプリの数](#持てるアプリの数630)」 |
 | レコードの件数 / アプリ | 5000 | 50000 | `PLAN_FREE_RECORDS_PER_APP` / `PLAN_PRO_RECORDS_PER_APP` | appconfig: レコードの作成。その人が見える分(自分の分 + 共有の分)の全 entity の合計。single の entity は数えない |
 | 写真の枚数 / アプリ(= 容量) | 500(約 150 MB) | 5000(約 1.5 GB) | `PLAN_FREE_PHOTOS_PER_APP` / `PLAN_PRO_PHOTOS_PER_APP` | appconfig: 写真の項目が空から入る作成・更新(差し替えは数えない)。1 枚は 300 KB まで(レコード 1 件の上限)なので、枚数で容量を抑える |
 
-- **既定は緩い**(今の使い方では当たらない)。暴走だけを止める値で、本当の値は #298 の 1 人あたりの費用と #325 の価格から人が決める。
+- **持てるアプリの数はオーナーの決定(2026-11-10)**: 無料 2・Pro 5。それ以外の**既定は緩い**(今の使い方では当たらない)。暴走だけを止める値で、本当の値は #298 の 1 人あたりの費用と #325 の価格から人が決める。
 - **誰のプランで数えるか**: 自分のアプリは呼び出した人、他の人が作ったアプリ(共有のアプリの参加者)は作成者。作った人が払い、参加者は無料(`docs/00_decisions.md`「課金・Pro」)。Pro は ai と同じ検証済みの権利(`users/{uid}/entitlements/pro`)。
 - **強制の段階**: `PLAN_LIMITS_MODE` = `enforce`(既定)/ `log`(止めずに `plan_limit.would_block` を出すだけ)/ `off`。`PRO_GATE_MODE` と同じ考えで、出す時は `log` で量を見てから `enforce`。`plan_limit.would_block` は止めた時(enforce)も出る(`blocked`・`plan`・`resource`・`uid_hash`・`used`・`limit`)。
 - **数え方**: Firestore の count 集計(1000 件で読み 1 回)。レコードの作成のたびに entity の数だけ、写真が入る時は写真の項目の数だけ増える。数えるのに失敗した時は通す(保存を止めるほどのものではない)。
-- **超えた時**: 403 `plan_limit_reached`。`details` は `resource`(`apps` / `recordsPerApp` / `photosPerApp`)・`plan`(`free` / `pro`)・`limit`・`used`・`upgrade`(Pro にすると上がる)・`reason: creator_plan_limit`(作成者のプランの上限。参加者は払えないので課金画面ではなく案内を出す。`pro_required` の `creator_needs_pro` と同じ考え)。ai の generate が新しいアプリで当たった時もそのまま中継する。
+- **超えた時**(記録・写真): 403 `plan_limit_reached`。アプリの数は 402 `app_limit_reached`(下)。`details` は `resource`(`apps` / `recordsPerApp` / `photosPerApp`)・`plan`(`free` / `pro`)・`limit`・`used`・`upgrade`(Pro にすると上がる)・`reason: creator_plan_limit`(作成者のプランの上限。参加者は払えないので課金画面ではなく案内を出す。`pro_required` の `creator_needs_pro` と同じ考え)。ai の generate が新しいアプリで当たった時もそのまま中継する。
 - 消すと空きができる(数は今の件数で、累計ではない)。上限を下げても、もうあるものは消さない(新しく足すのが止まるだけ)。
+
+## 持てるアプリの数(#630)
+
+オーナーの決定(2026-11-10): 1 人が**持てる**アプリは無料 2・Pro 5。足りなければコインで枠を 1 つずつ買える(期限なし)。コードは `backend/internal/appconfig/app_slots.go`・`backend/internal/coins/slots.go`。
+
+| 項目 | 中身 |
+| --- | --- |
+| 数えるもの | `users/{uid}/apps` のうち version が 1 より大きいもの = 一覧に出るアプリ。自分で作ったもの・複製・シェアリンクや「探す」から入れたもの・参加した共有のアプリ(`joined`)を全部数える。version 1 のまま(新しい appId を開いただけで一度も生成していない空のアプリ・iOS の `isBlank`)は数えない |
+| 上限 | プランの数(`PLAN_FREE_APPS` / `PLAN_PRO_APPS`)+ コインで買った枠(財布の `appSlots`) |
+| 止める所(前もって) | 新しいアプリになる時に数える: 新しい appId の最初の `GET /dsl`(ai の generate もここを通るので、生成の前に止まる)・`POST /apps`・duplicate・`POST /shares/{token}/import`・`POST /public-apps/{id}/install`。もう持っているアプリ(参加済みの共有アプリを開き直す等)は数えない |
+| 止める所(確実に) | 空のアプリが最初の版になる保存(PUT / PATCH /dsl・restore・複製と取り込みの 2 版目)で、**同じトランザクション**の中で数える(`store.Commit.HeldLimit`)。`users/{uid}` の `heldAppsAt` を読んで書くので、同じ人の 2 つの依頼は順番になり、2 つめは 1 つめの分を数える。同時に 2 つ作っても上限を超えない。複製・取り込みが ここで負けたら、作りかけの空のアプリを消す |
+| 超えた時 | 402 `app_limit_reached`。`details`: `held`・`limit`・`base`・`purchasedSlots`・`canBuySlot`・`slotCoins`・`balance`・`upgrade`・`apps`(`{id, name, mine, updatedAt}`)。ai は `details` ごと中継する |
+| 置き換え | iOS は「上限に達しています。どのアプリと置き換えますか?」を出す。自分のアプリは削除(データも消える・共有していれば参加者からも消える)、参加したアプリは抜ける(参加者から外れて自分の写しを消す)。そのあと同じ操作をやり直す |
+| 枠を買う | `POST /v1/me/coins/slot`(`requestId` ごとに 1 回・冪等)。`COIN_PRICE_APP_SLOT` コイン(値は repo に書かない)。台帳は `spend_slot`。`COIN_BILLING_MODE=enforce` かつ値段 > 0 の時だけ。`log` は前に買った枠を数えるだけ・`off` は財布を読まない(プランの数だけ) |
+| 強制の段階 | `PLAN_LIMITS_MODE`(上と同じ)。`log` は止めずに `plan_limit.would_block`(`resource: apps`)を出すだけ |
+| 上限を下げた時 | もう持っているアプリは消さない。新しく持つのが止まるだけ(置き換えれば作れる) |
 
 ## 今の使用量(#317・#630)
 
@@ -155,7 +171,7 @@ iOS が「今日の残り N」「上限に近い」を、断られる前に出�
 
 | API | 返すもの | 読み取りの費用 |
 | --- | --- | --- |
-| `GET /v1/me/usage` | `plan`・`tier`・`resetAt`(次の 0:00 JST)・`ai`(生成・チャット・text の今日の合計: `used` / `limit` / `remaining` と `weights`)・`apps`(自分のアプリの数と上限)・`perApp`(自分のプランのアプリごとの上限) | `ai` は上の「数える場所」の `uid` のドキュメントを 1 回読む(キャッシュしない)。`apps` は count 集計 1 回を、インスタンスごとに 30 秒キャッシュ |
+| `GET /v1/me/usage` | `plan`・`tier`・`resetAt`(次の 0:00 JST)・`ai`(生成・チャット・text の今日の合計: `used` / `limit` / `remaining` と `weights`)・`apps`(持っているアプリの数と上限 = プランの数 + 買った枠)・`appSlots`(上限の内訳と、枠を買えるか)・`perApp`(自分のプランのアプリごとの上限) | `ai` は上の「数える場所」の `uid` のドキュメントを 1 回読む(キャッシュしない)。`apps` は count 集計 1 回を、インスタンスごとに 30 秒キャッシュ |
 | `GET /v1/apps/{appId}/usage` | このアプリの `records` / `photos`(`used` / `limit` / `remaining`)・払う人の `plan`・`payer`(`self` / `creator`)・`upgrade` | entity ごと(+ 写真の項目ごと)の count 集計。(呼び出した人・アプリ・版)ごとに 30 秒キャッシュ |
 
 - **2 本に分けた理由**: 記録・写真はアプリごとで、数えるのに entity の数だけ集計が要る。既存の API もアプリのものは `/v1/apps/{appId}/...`、自分のものは `/v1/me/...` に置いている。一覧や設定で `/v1/me/usage` を、アプリを開いた時に `/v1/apps/{appId}/usage` を呼ぶ想定。
@@ -191,7 +207,7 @@ iOS の表示は別の PR(#669 が `ErrorCopy` を変えているため、その
 | --- | --- | --- |
 | 生成の残りが少ない(残り 2 割以下) | `X-RateLimit-Remaining` / `Limit` | 今日の生成はあと {n} 回分です。0:00 にまた増えます。 |
 | 生成の上限(無料) | 429 `rate_limited`・`tier` が `signed_in` | 今日の生成の上限に達しました。0:00 からまた使えます。Tailor It Pro にすると 1 日に使える回数が増えます。 |
-| アプリの数の上限 | 403 `plan_limit_reached`・`resource: apps`・`upgrade: true` | 無料プランで作れるアプリ({limit} 個)がいっぱいです。使わないアプリを消すか、Tailor It Pro にすると作れる数が増えます。 |
+| 持てるアプリの数の上限 | 402 `app_limit_reached`(#630) | 上限に達しています。どのアプリと置き換えますか?(持っているアプリを並べ、消す / 抜ける。`canBuySlot` なら「枠を 1 つ買う(N コイン)」も出す) |
 | レコードの件数の上限 | `resource: recordsPerApp` | このアプリに保存できるデータ({limit} 件)がいっぱいです。古いデータを消すか、Tailor It Pro にすると上限が上がります。 |
 | 写真の上限 | `resource: photosPerApp` | このアプリに保存できる写真({limit} 枚)がいっぱいです。古い写真を消すか、Tailor It Pro にすると上限が上がります。 |
 | Pro でも上限 | `upgrade: false`・`plan: pro` | {件数 / 枚数}の上限に達しました。古いものを消すと続けて保存できます。 |
