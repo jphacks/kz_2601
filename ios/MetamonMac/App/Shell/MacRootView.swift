@@ -109,6 +109,8 @@ struct MacRootView: View {
     private func apply(_ document: AppDocument, target: MacComposeSession.Target) {
         generated[document.appId] = document
         if target == .create, !createdIds.contains(document.appId) { createdIds.insert(document.appId, at: 0) }
+        // 最初のアプリの印(iOS と同じ `hasShownEditHint`)。β の案内(`MacOnboarding`)は次の起動でこれを見て 1 回出す
+        if target == .create { FirstRunTutorialStore.shared.markEditHintShown() }
         selectedAppId = document.appId
     }
 

@@ -25,7 +25,9 @@ struct PromptTipsList: View {
     var body: some View {
         List {
             Section {
-                Text(PromptTips.intro).foregroundStyle(.secondary)
+                // iOS の `PromptTips.intro`(「タップ」)ではなく Mac の文(Mac の xcstrings に日英がある)
+                Text("できた画面に向かって、こう頼むと思いどおりに直せます。例を押すと入力欄に入るので、言葉を足してから送ってください。")
+                    .foregroundStyle(.secondary)
             }
             ForEach(categories) { category in
                 Section {

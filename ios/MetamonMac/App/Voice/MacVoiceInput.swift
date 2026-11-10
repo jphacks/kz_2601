@@ -32,6 +32,8 @@ final class MacVoiceInput {
     @ObservationIgnored private var askedThisLaunch = false
     /// 声で頼んだ時の確認か(確認の後に録音を続ける)。案内のボタンから開いた時は false
     @ObservationIgnored private var recordsAfterConfirm = false
+    /// 録音の回。`cancel()` で進め、待っている間に捨てられた録音・文字を後から使わない
+    @ObservationIgnored private var attempt = 0
 
     init(transcriber: (any SpeechTranscriber)? = nil,
          defaults: UserDefaults = .standard,
@@ -152,10 +154,14 @@ final class MacVoiceInput {
     private func start() async {
         guard state == .idle else { return }
         state = .recording
+        let current = attempt
         do {
             try await transcriber.startRecording()
+            // マイクの許可を待つ間に閉じられた(cancel 済み): 始まったマイクをすぐ止める
+            guard current == attempt else { transcriber.cancelRecording(); return }
             MacVoiceOver.announce(MacVoiceCopy.listening)
         } catch {
+            guard current == attempt else { return }
             state = .idle
             report(error)
         }
@@ -164,24 +170,29 @@ final class MacVoiceInput {
     private func finish(deliver: (String) -> Void) async {
         guard state == .recording else { return }
         state = .transcribing
-        defer { state = .idle }
+        let current = attempt
+        defer { if current == attempt { state = .idle } }
         do {
             let text = try await transcriber.stopAndTranscribe().trimmingCharacters(in: .whitespacesAndNewlines)
+            // 文字にしている間に閉じられた(cancel 済み): 閉じた会話に送らない
+            guard current == attempt else { return }
             guard !text.isEmpty else {
                 failure = L10n.tr("音声を聞き取れませんでした。もう一度はっきり話してください")
                 return
             }
             deliver(text)
         } catch {
+            guard current == attempt else { return }
             report(error)
         }
     }
 
-    /// 録音を捨てる(シートを閉じた時など)
+    /// 録音を捨てる(シートを閉じた時など)。録音の開始待ち・文字にしている途中も捨てる
     func cancel() {
         recordsAfterConfirm = false
-        guard state == .recording else { return }
-        transcriber.cancelRecording()
+        guard state != .idle else { return }
+        attempt += 1
+        if state == .recording { transcriber.cancelRecording() }
         state = .idle
     }
 
