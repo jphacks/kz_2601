@@ -5,11 +5,16 @@ import MetamonDSL
 /// `safeAreaInset` なのでセル内スクロールの外に常に見え、キーボードが出てもその上に逃げる。
 /// 押下中はスピナー、書き込めたら 0.6 秒チェック(オフラインなら送信待ちの旨)を見せてから元に戻る(画面が閉じればそのまま消える)。
 /// 他人の共有レコード(#249・`FormDraft.isReadOnly`)ではボタンの代わりに「作った人だけが変更できます」を出す。
+/// Mac(#1337)はウィンドウの下のまま、中身を中央の列(`GridColumnWidthKey`)の幅に収め、ボタンは文字の幅で右下に寄せる。
 struct FormSaveBar: ViewModifier {
     @Environment(\.dslRuntime) private var rt
     let screen: Screen
     let ctx: RenderContext
     @State private var phase: Phase = .idle
+    #if os(macOS)
+    /// 中央の列の幅(グリッドの外枠)。届くまでは Mac の上限の幅
+    @State private var columnWidth = GridMetrics.maxDesktopWidth
+    #endif
     private let keyboard = KeyboardState.shared
 
     private enum Phase: Equatable { case idle, saving, done(FormSaveResult) }
@@ -31,6 +36,9 @@ struct FormSaveBar: ViewModifier {
     func body(content: Content) -> some View {
         let pinned = Self.pinned(in: screen)
         content
+            #if os(macOS)
+            .onPreferenceChange(GridColumnWidthKey.self) { if let width = $0 { columnWidth = width } }
+            #endif
             .safeAreaInset(edge: .bottom, spacing: 0) {
                 if ctx.form?.isReadOnly == true, Self.hasSave(in: screen) {
                     readOnlyNotice
@@ -65,9 +73,18 @@ struct FormSaveBar: ViewModifier {
                         .minimumScaleFactor(0.8)
                 }
             }
+            #if os(macOS)
+            .frame(minWidth: Self.macMinButtonWidth)
+            #else
             .frame(maxWidth: .infinity)
+            #endif
         }
         .buttonStyle(RenderButtonStyle(kind: .primary))
+        #if os(macOS)
+        .fixedSize(horizontal: true, vertical: false) // 横長のウィンドウで幅いっぱいに伸ばさない
+        .frame(maxWidth: columnWidth - RenderTheme.Spacing.screenInset * 2, alignment: .trailing)
+        .frame(maxWidth: .infinity)
+        #endif
         .disabled(phase != .idle)
         .animation(RenderTheme.Motion.select, value: phase)
         .sensoryFeedback(.success, trigger: phase) { _, new in if case .done = new { true } else { false } }
@@ -89,6 +106,9 @@ struct FormSaveBar: ViewModifier {
         Label(L("このデータは作った人だけが変更できます"), systemImage: "lock")
             .font(.subheadline)
             .foregroundStyle(.secondary)
+            #if os(macOS)
+            .frame(maxWidth: columnWidth - RenderTheme.Spacing.screenInset * 2)
+            #endif
             .frame(maxWidth: .infinity)
             .padding(.horizontal, RenderTheme.Spacing.screenInset)
             .padding(.vertical, RenderTheme.Spacing.md)
@@ -99,6 +119,11 @@ struct FormSaveBar: ViewModifier {
             }
             .accessibilityIdentifier("form.readOnly")
     }
+
+    #if os(macOS)
+    /// Mac の保存ボタンの最小の幅(短い文言でも押しやすい大きさ)
+    static let macMinButtonWidth: CGFloat = 120
+    #endif
 
     private func run(_ action: Action) async {
         phase = .saving

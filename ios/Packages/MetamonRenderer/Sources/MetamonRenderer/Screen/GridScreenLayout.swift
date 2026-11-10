@@ -111,6 +111,9 @@ public struct GridScreenLayout: View {
             // 横向きはグリッドがスクロールするので「最下段の上端」で FAB を押し上げない(余白か末尾の余白で避ける)
             .preference(key: GridBottomObstructionKey.self, value: metrics.scrollsVertically ? [:] : bottomObstruction(geo: geo, cellH: cellH, placed: placement.placed.map(\.area)))
             .preference(key: GridBottomTrailingObstructionKey.self, value: metrics.scrollsVertically ? [:] : bottomObstruction(geo: geo, cellH: cellH, placed: placement.placed.map(\.area), side: .trailing))
+            #if os(macOS)
+            .preference(key: GridColumnWidthKey.self, value: metrics.frameWidth) // 保存バーを中央の列に揃える(#1337)
+            #endif
         }
         .background {
             GeometryReader { full in

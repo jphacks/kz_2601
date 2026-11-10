@@ -40,11 +40,14 @@ public struct ScreenView: View {
                             }
                         }
                     }
-                    // 数値キーパッドには return が無いので、全入力共通でキーボード上に「完了」を出す(#143)
+                    // 数値キーパッドには return が無いので、全入力共通でキーボード上に「完了」を出す(#143)。
+                    // Mac はソフトキーボードが無い(.keyboard は Touch Bar に出てしまう)ので出さない(#1337)
+                    #if os(iOS)
                     ToolbarItemGroup(placement: .keyboard) {
                         Spacer()
                         Button(L("完了")) { KeyboardState.dismiss() }.fontWeight(.semibold)
                     }
+                    #endif
                     if route.stack == "sheet" || route.stack == "full", (rt.paths[route.stack] ?? []).isEmpty {
                         SheetCloseToolbarItem {
                             if hasUnsavedInput { confirmDiscard = true } else { rt.close(route) }
