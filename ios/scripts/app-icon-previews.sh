@@ -1,0 +1,29 @@
+#!/bin/zsh
+# 設定の「アイコン」画面のプレビュー(AppIconPreview*.imageset・180px)を、各 AppIcon*.appiconset の 1024px から作り直す(#232)。
+# アプリアイコンの絵を差し替えたら実行する。docs/ios/alternate-icons.md
+set -euo pipefail
+A="${0:A:h}/../Metamon/Resources/Assets.xcassets"
+for set in "$A"/AppIcon*.appiconset; do
+  name="${${set:t}%.appiconset}"            # AppIcon / AppIcon-Dark …
+  suffix="${name#AppIcon}"                  # "" / -Dark …
+  src="$set/$name-1024.png"
+  [[ -f "$src" ]] || { echo "missing: $src" >&2; exit 1; }
+  out="$A/AppIconPreview$suffix.imageset"
+  mkdir -p "$out"
+  sips -z 180 180 "$src" --out "$out/AppIconPreview$suffix.png" >/dev/null
+  cat > "$out/Contents.json" <<EOF
+{
+  "images" : [
+    {
+      "filename" : "AppIconPreview$suffix.png",
+      "idiom" : "universal"
+    }
+  ],
+  "info" : {
+    "author" : "xcode",
+    "version" : 1
+  }
+}
+EOF
+  echo "updated: ${out:t}"
+done
