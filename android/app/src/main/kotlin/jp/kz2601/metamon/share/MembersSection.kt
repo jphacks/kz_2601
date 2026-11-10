@@ -46,6 +46,7 @@ import jp.kz2601.metamon.services.sharing.MembersFailure
 import jp.kz2601.metamon.services.sharing.MembersModel
 import jp.kz2601.metamon.services.sharing.MembersPhase
 import jp.kz2601.metamon.services.sharing.SharedMember
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
 
 /** 共有シートの下に足す欄(参加している人・#903)。共有シートは呼び出し側が渡したものを描くだけ。 */
@@ -56,9 +57,10 @@ val LocalShareSheetExtras: ProvidableCompositionLocal<@Composable () -> Unit> = 
  * 作成者は各行に「外す」、管理者は「管理者にする / 外す」、参加者は「この共有から抜ける」。外す・抜けるは確認を取る。
  * @param onRevokeLink 外した後の「リンクを取り消す」。null なら誘導の文だけ出す
  * @param onLeft 抜けられた後(呼び出し側がシートを閉じ、別のアプリへ切り替えて後片付けする)
+ * @param leaveScope 抜ける通信を走らせる scope。シートを閉じても止めない(止めると抜けたのに後片付けされない)
  */
 @Composable
-fun MembersSection(model: MembersModel, onRevokeLink: (suspend () -> Unit)?, onLeft: () -> Unit) {
+fun MembersSection(model: MembersModel, onRevokeLink: (suspend () -> Unit)?, onLeft: () -> Unit, leaveScope: CoroutineScope? = null) {
     val state by model.state.collectAsStateWithLifecycle()
     val scope = rememberCoroutineScope()
     val announce = rememberAnnouncer()
@@ -142,9 +144,10 @@ fun MembersSection(model: MembersModel, onRevokeLink: (suspend () -> Unit)?, onL
             tag = "members.leave.confirm",
             onDismiss = { confirmLeave = false },
         ) {
-            scope.launch {
-                failure = model.leave()
-                if (failure == null) onLeft()
+            (leaveScope ?: scope).launch {
+                val result = model.leave()
+                failure = result
+                if (result == null) onLeft()
             }
         }
     }
@@ -153,7 +156,7 @@ fun MembersSection(model: MembersModel, onRevokeLink: (suspend () -> Unit)?, onL
 /** 設定の「参加している人」から開くシート(共有シートと同じ欄だけ)。 */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun MembersSheet(model: MembersModel, onLeft: () -> Unit, onDismiss: () -> Unit) {
+fun MembersSheet(model: MembersModel, onLeft: () -> Unit, onDismiss: () -> Unit, leaveScope: CoroutineScope? = null) {
     ModalBottomSheet(
         onDismissRequest = onDismiss,
         sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
@@ -164,7 +167,7 @@ fun MembersSheet(model: MembersModel, onLeft: () -> Unit, onDismiss: () -> Unit)
                 Spacer(Modifier.weight(1f))
                 TextButton(onClick = onDismiss) { Text(stringResource(R.string.share_close)) }
             }
-            MembersSection(model, onRevokeLink = null, onLeft = onLeft)
+            MembersSection(model, onRevokeLink = null, onLeft = onLeft, leaveScope = leaveScope)
         }
     }
 }
@@ -210,13 +213,17 @@ private fun MemberRow(member: SharedMember, canRemove: Boolean, canSetAdmin: Boo
                 Text(badges.joinToString("  "), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
         }
+        val name = member.label()
         if (canSetAdmin) {
-            TextButton(onClick = onToggleAdmin, modifier = Modifier.testTag("members.admin")) {
+            // 読み上げでどの人の操作か分かるように名前を添える
+            val adminLabel = stringResource(if (member.isAdmin) R.string.members_remove_admin_label else R.string.members_make_admin_label, name)
+            TextButton(onClick = onToggleAdmin, modifier = Modifier.semantics { contentDescription = adminLabel }.testTag("members.admin")) {
                 Text(stringResource(if (member.isAdmin) R.string.members_remove_admin else R.string.members_make_admin))
             }
         }
         if (canRemove) {
-            TextButton(onClick = onRemove, modifier = Modifier.testTag("members.remove")) {
+            val removeLabel = stringResource(R.string.members_remove_label, name)
+            TextButton(onClick = onRemove, modifier = Modifier.semantics { contentDescription = removeLabel }.testTag("members.remove")) {
                 Text(stringResource(R.string.members_remove), color = MaterialTheme.colorScheme.error)
             }
         }

@@ -19,11 +19,14 @@
     <string name="members_load_failed">Couldn\'t load the members</string>
     <string name="members_loading">Loading</string>
     <string name="members_make_admin">Make admin</string>
+    <string name="members_make_admin_label">Make %1$s an admin</string>
     <string name="members_no_name">No name</string>
     <string name="members_offline">Couldn\'t connect, so it was reverted. Try again where you have a connection.</string>
     <string name="members_remove">Remove</string>
     <string name="members_remove_admin">Remove admin</string>
+    <string name="members_remove_admin_label">Remove %1$s as admin</string>
     <string name="members_remove_failed">Couldn\'t remove them, so the list was restored</string>
+    <string name="members_remove_label">Remove %1$s</string>
     <string name="members_remove_message">They will no longer see this share\'s records. The app on their device and the records they added stay.</string>
     <string name="members_remove_title">Remove “%1$s”?</string>
     <string name="members_removed_notice">Removed “%1$s”. Your share link still works, so they could join again with it. Turn off the link too?</string>

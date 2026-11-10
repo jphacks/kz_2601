@@ -281,7 +281,8 @@ fun MetamonApp(container: AppContainer) {
         issuedShares[target.appId] = null
         container.accountScope.launch {
             container.leaveCleanup.run(target.appId)
-            runtime.showToast(UiText.Res(R.string.members_left_toast, listOf(target.name)))
+            val name: Any = target.name.ifEmpty { null } ?: UiText.Res(R.string.share_untitled)
+            runtime.showToast(UiText.Res(R.string.members_left_toast, name))
         }
         Unit
     }
@@ -425,14 +426,14 @@ fun MetamonApp(container: AppContainer) {
         }
         val members = remember(target) { membersModel(target) }
         CompositionLocalProvider(
-            LocalShareSheetExtras provides { MembersSection(members, onRevokeLink = { model.revoke() }, onLeft = { onLeftShare(target) }) },
+            LocalShareSheetExtras provides { MembersSection(members, onRevokeLink = { model.revoke() }, onLeft = { onLeftShare(target) }, leaveScope = container.accountScope) },
         ) {
             ShareSheet(target, model, onDismiss = { shareTarget = null })
         }
     }
     membersTarget?.let { target ->
         val members = remember(target) { membersModel(target) }
-        MembersSheet(members, onLeft = { onLeftShare(target) }, onDismiss = { membersTarget = null })
+        MembersSheet(members, onLeft = { onLeftShare(target) }, onDismiss = { membersTarget = null }, leaveScope = container.accountScope)
     }
     // シェアリンクから開く・参加する(#901)
     ShareLinkHost(container, canShare)

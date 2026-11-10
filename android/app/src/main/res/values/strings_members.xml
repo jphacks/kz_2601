@@ -19,11 +19,14 @@
     <string name="members_load_failed">参加している人を読み込めませんでした</string>
     <string name="members_loading">読み込み中</string>
     <string name="members_make_admin">管理者にする</string>
+    <string name="members_make_admin_label">「%1$s」を管理者にする</string>
     <string name="members_no_name">名前なし</string>
     <string name="members_offline">通信できなかったので、元に戻しました。通信できる所でもう一度お試しください</string>
     <string name="members_remove">外す</string>
     <string name="members_remove_admin">管理者から外す</string>
+    <string name="members_remove_admin_label">「%1$s」を管理者から外す</string>
     <string name="members_remove_failed">外せませんでした。元に戻しました</string>
+    <string name="members_remove_label">「%1$s」を外す</string>
     <string name="members_remove_message">外した人は、この共有の記録を見られなくなります。その人の端末のアプリと、これまでの記録は残ります。</string>
     <string name="members_remove_title">「%1$s」を外しますか?</string>
     <string name="members_removed_notice">「%1$s」を外しました。あなたのシェアリンクはまだ使えるので、そのリンクからまた参加できます。リンクも止めますか?</string>

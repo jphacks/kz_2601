@@ -1,6 +1,9 @@
 package jp.kz2601.metamon.runtime
 
 import androidx.annotation.StringRes
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
 import jp.kz2601.metamon.dsl.Action
 import jp.kz2601.metamon.dsl.ActionType
 import jp.kz2601.metamon.dsl.AppDSL
@@ -653,11 +656,21 @@ class AppRuntime(
     override fun canDelete(entity: String, record: Record): Boolean =
         RecordPermission.canDelete(record, entityModel(entity), currentUserId(), isAppAdmin)
 
+    /**
+     * 参加者の写し(Compose のスナップショット)。部品は描く時に [formMembers]・[canDelete] を読むだけなので、
+     * 届いた後に描き直されるよう StateFlow をここへ写す(写さないと「参加者を読み込めていません」のまま残る)。
+     */
+    private var memberEntries by mutableStateOf<Map<String, AppMembersStore.Entry>>(emptyMap())
+
+    init {
+        members?.let { store -> scope.launch { store.entries.collect { memberEntries = it } } }
+    }
+
     /** 今のアプリで自分が管理者か(#272)。null = 分からない(読む前・読めなかった) */
-    val isAppAdmin: Boolean? get() = members?.get(document.appId)?.isAdmin
+    val isAppAdmin: Boolean? get() = memberEntries[document.appId]?.isAdmin
 
     override val formMembers: List<FormMember>
-        get() = members?.get(document.appId)?.members.orEmpty().map { FormMember(it.uid, it.displayName) }
+        get() = memberEntries[document.appId]?.members.orEmpty().map { FormMember(it.uid, it.displayName) }
 
     /** 一覧から外す(共有から抜けた後・#903)。保存した一覧はそのまま(次の取得で消える) */
     fun forgetApp(appId: String) = _apps.update { list -> list.filter { it.id != appId } }
