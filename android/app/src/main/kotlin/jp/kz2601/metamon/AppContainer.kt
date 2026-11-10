@@ -15,14 +15,19 @@ import jp.kz2601.metamon.language.AppLocales
 import jp.kz2601.metamon.services.AIClient
 import jp.kz2601.metamon.services.AppConfigClient
 import jp.kz2601.metamon.services.AppEnvironment
+import jp.kz2601.metamon.auth.AuthSession
 import jp.kz2601.metamon.services.AuthService
+import jp.kz2601.metamon.services.CrashReporter
+import jp.kz2601.metamon.services.NoopCrashReporter
 import jp.kz2601.metamon.services.SpeechTranscriber
 import jp.kz2601.metamon.services.http.AuthTokenProvider
 import jp.kz2601.metamon.services.http.ClientInfo
 import jp.kz2601.metamon.services.http.DeviceContext
 import jp.kz2601.metamon.services.http.MetamonHttp
+import jp.kz2601.metamon.services.live.FirebaseAppCheckTokenProvider
 import jp.kz2601.metamon.services.live.FirebaseAuthService
 import jp.kz2601.metamon.services.live.FirebaseBootstrap
+import jp.kz2601.metamon.services.live.FirebaseCrashReporter
 import jp.kz2601.metamon.services.live.HttpAIClient
 import jp.kz2601.metamon.services.live.HttpAppConfigClient
 import jp.kz2601.metamon.services.local.AndroidConnectivity
@@ -55,6 +60,8 @@ import java.time.Instant
 class AppContainer(
     val environment: AppEnvironment,
     val auth: AuthService,
+    /** クラッシュ報告(Firebase が無ければ何もしない) */
+    val crashReporter: CrashReporter,
     val initialDsl: AppDSL,
     val appConfig: AppConfigClient,
     val ai: AIClient,
@@ -76,7 +83,13 @@ class AppContainer(
     /** 画面の下に出す接続先の名前(モックなら "mock")。 */
     val environmentLabel: String get() = if (knobs.mock) "mock" else environment.name
 
+    /** サインイン状態(未サインインならサインイン画面) */
+    val session = AuthSession(auth)
+
     companion object {
+        /**
+         * `knobs.mock` なら Firebase を使わず固定 uid のモック認証・通信しない構成で組む(iOS の `METAMON_MOCK`・#992)。
+         */
         fun make(context: Context, knobs: DebugKnobs = DebugKnobs.NONE): AppContainer {
             val environment = AppEnvironment(
                 name = BuildConfig.METAMON_ENV,
@@ -106,6 +119,7 @@ class AppContainer(
             return AppContainer(
                 environment = environment,
                 auth = MockAuthService(signedIn = true),
+                crashReporter = NoopCrashReporter,
                 initialDsl = initialDsl,
                 appConfig = records,
                 ai = MockAIClient(samples, delayMillis = delayMillis),
@@ -122,17 +136,19 @@ class AppContainer(
         }
 
         private fun makeLive(context: Context, environment: AppEnvironment, initialDsl: AppDSL, knobs: DebugKnobs): AppContainer {
-            FirebaseBootstrap.configureIfAvailable(context)
-            val auth = FirebaseAuthService.createIfConfigured() ?: MockAuthService(signedIn = true)
+            val firebase = FirebaseBootstrap.configureIfAvailable(context, AppCheckProviders.factory())
+            val auth = chooseAuth(firebase) { FirebaseAuthService.createIfConfigured() }
 
+            // backend への Bearer は Firebase の ID トークン(モックなら付けない)
             val tokens = AuthTokenProvider(auth)
             val clientInfo = ClientInfo(version = BuildConfig.VERSION_NAME, build = BuildConfig.VERSION_CODE.toString())
             // アプリ内で選んだ言語(無ければ端末の言語)。リクエストごとに読むので切り替えはすぐ効く(#843)
             val language = { AppLocales.languageCode(context) }
             val device = DeviceContext(language = language)
-            // App Check(Play Integrity)はまだ無い: ヘッダ無しで送る(backend が enforce の環境では 401 になる)
+            // App Check: release は Play Integrity・debug は debug provider。Firebase が無ければヘッダ無し
+            val appCheck = if (firebase) FirebaseAppCheckTokenProvider.createIfConfigured() else null
             val client = MetamonHttp.defaultClient()
-            fun http(baseUrl: String) = MetamonHttp(baseUrl, tokens, clientInfo, appCheck = null, client = client, device = device)
+            fun http(baseUrl: String) = MetamonHttp(baseUrl, tokens, clientInfo, appCheck = appCheck, client = client, device = device)
             val log: (String) -> Unit = { Log.w(TAG, it) }
 
             val documentCache = DocumentCache(File(context.filesDir, "metamon-dsl"))
@@ -143,6 +159,7 @@ class AppContainer(
             return AppContainer(
                 environment = environment,
                 auth = auth,
+                crashReporter = (if (firebase) FirebaseCrashReporter.createIfConfigured() else null) ?: NoopCrashReporter,
                 initialDsl = initialDsl,
                 appConfig = appConfig,
                 ai = HttpAIClient(http(environment.aiBaseUrl), log = log),
@@ -171,6 +188,10 @@ class AppContainer(
             Log.i(TAG, "起動から ${seconds} 秒は圏外の扱いにします")
             return OfflineSimulatingAppConfigClient(inner, offlineUntil = Instant.now().plusMillis((seconds * 1000).toLong()))
         }
+
+        /** Firebase が使えれば Firebase の認証、使えなければ(json 無し・モックの構成)固定 uid のモック。 */
+        internal fun chooseAuth(firebaseConfigured: Boolean, firebase: () -> AuthService?): AuthService =
+            (if (firebaseConfigured) firebase() else null) ?: MockAuthService(signedIn = true)
 
         /**
          * 最初に描く DSL。つまみ(`METAMON_INITIAL_DSL_PATH` > `METAMON_INITIAL_EXAMPLE`)が無ければ

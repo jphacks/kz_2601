@@ -40,6 +40,8 @@ import jp.kz2601.metamon.feedback.FeedbackHost
 import jp.kz2601.metamon.feedback.UndoHeaderButtons
 import jp.kz2601.metamon.language.AppLocales
 import jp.kz2601.metamon.permissions.PermissionOffBarHost
+import jp.kz2601.metamon.auth.RootScreen
+import jp.kz2601.metamon.auth.SignInScreen
 import jp.kz2601.metamon.renderer.DSLView
 import jp.kz2601.metamon.renderer.theme.MetamonRenderTheme
 import jp.kz2601.metamon.renderer.theme.ReadableWidth
@@ -70,9 +72,19 @@ class MainActivity : ComponentActivity() {
         val container = (application as MetamonApplication).container(DebugLaunch.knobs(intent))
         setContent {
             MetamonRenderTheme {
-                MetamonApp(container)
+                MetamonRoot(container)
             }
         }
+    }
+}
+
+/** 未サインインならサインイン画面、サインイン済みなら本体(iOS の `AuthSession.user` で出し分けるのと同じ)。 */
+@Composable
+fun MetamonRoot(container: AppContainer) {
+    val user by container.session.user.collectAsStateWithLifecycle()
+    when (RootScreen.of(user)) {
+        RootScreen.SignIn -> SignInScreen(container.session)
+        RootScreen.App -> MetamonApp(container)
     }
 }
 
@@ -116,13 +128,6 @@ fun MetamonApp(container: AppContainer) {
     LaunchedEffect(state.document) { runtime.adoptGenerated(state.document) }
     // ランタイムが開いたアプリ(起動時の開き直し・切り替え・ホットリロード)を音声の画面にも映す
     LaunchedEffect(runtimeState.document) { vm.adopt(runtimeState.document) }
-
-    LaunchedEffect(container.auth) {
-        if (container.auth.currentUser.value == null) {
-            runCatching { container.auth.signInAnonymously() }
-                .onFailure { Log.w(AppContainer.TAG, "匿名サインインに失敗", it) }
-        }
-    }
 
     // ヘッドレス E2E 用のつまみ(debug だけ値が入る)。回転などで作り直しても 1 回だけ
     var knobsRan by rememberSaveable { mutableStateOf(false) }

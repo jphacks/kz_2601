@@ -4,9 +4,15 @@ import android.app.Application
 import androidx.lifecycle.DefaultLifecycleObserver
 import androidx.lifecycle.LifecycleOwner
 import androidx.lifecycle.ProcessLifecycleOwner
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.launch
 
 class MetamonApplication : Application() {
     private var built: AppContainer? = null
+
+    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
 
     override fun onCreate() {
         super.onCreate()
@@ -32,5 +38,7 @@ class MetamonApplication : Application() {
         built ?: AppContainer.make(this, knobs).also {
             built = it
             it.recordSync.start()
+            // クラッシュ報告に付けるのは uid だけ(サインアウトで外す)
+            scope.launch { it.auth.currentUser.collect { user -> it.crashReporter.setUserId(user?.uid) } }
         }
 }

@@ -1,11 +1,15 @@
 package jp.kz2601.metamon.services.mock
 
+import android.app.Activity
 import jp.kz2601.metamon.services.AuthService
 import jp.kz2601.metamon.services.AuthUser
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 
-/** google-services.json が無い時の認証(固定 uid・トークン無し)。iOS の `MockAuthService` と同じ。 */
+/**
+ * google-services.json が無い時・モックの構成の時の認証(固定 uid・トークン無し)。iOS の `MockAuthService` と同じ。
+ * どの方法で入っても同じ固定 uid になる。
+ */
 class MockAuthService(signedIn: Boolean = true) : AuthService {
     override val kind: String = "mock"
 
@@ -13,6 +17,10 @@ class MockAuthService(signedIn: Boolean = true) : AuthService {
     override val currentUser: StateFlow<AuthUser?> = user
 
     override suspend fun signInAnonymously(): AuthUser = fixedUser.also { user.value = it }
+
+    override suspend fun signInWithGoogle(googleIdToken: String): AuthUser = fixedUser.also { user.value = it }
+
+    override suspend fun signInWithApple(activity: Activity): AuthUser = fixedUser.also { user.value = it }
 
     override suspend fun idToken(forceRefresh: Boolean): String? = null
 
