@@ -89,6 +89,8 @@ fun BoxScope.FeedbackHost(vm: VoiceViewModel, state: VoiceUiState, runtime: AppR
     if (!state.isInitial) {
         Column(Modifier.align(Alignment.TopCenter).fillMaxWidth().padding(horizontal = 12.dp)) {
             SummaryBanner(state, onUndo = vm::undo, onRedo = vm::redo, onDismiss = vm::dismissSummary)
+            // ホットリロードの「最新の内容に更新しました」(#1108)
+            RuntimeBannerView(runtimeState.banner, onDismiss = runtime::dismissBanner)
             // シートを閉じた後の失敗(生成は送るとシートを閉じる)。シートの中ではシートが出す
             val error = state.error
             if (error != null && !state.voiceOpen) {

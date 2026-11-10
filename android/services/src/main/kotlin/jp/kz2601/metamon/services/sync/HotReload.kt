@@ -21,6 +21,18 @@ sealed interface RecordsChange {
     data object All : RecordsChange
 }
 
+/** 画面に出すホットリロードのつながり方(#1108)。 */
+enum class HotReloadStatus {
+    /** 購読していない(背面・未発行のアプリ・モック) */
+    OFF,
+
+    /** SSE の購読が稼働中 */
+    REALTIME,
+
+    /** SSE がつながっていない間。ポーリングで拾っている */
+    POLLING,
+}
+
 /**
  * 開いているアプリのホットリロードを回す(iOS の `AppRuntime.startSync` / `setForeground` の :services 側)。
  * 画面(:app の runtime)は [documents] と [recordsChange] を集めて当てるだけにする(つなぎ込みは別 Issue)。
@@ -50,6 +62,11 @@ class HotReload(
     /** SSE の購読が稼働中か。false の間はポーリングで拾っている(画面の「リアルタイム」表示用)。 */
     val realtime: StateFlow<Boolean> = _realtime.asStateFlow()
 
+    private val _status = MutableStateFlow(HotReloadStatus.OFF)
+
+    /** 購読しているか・SSE かポーリングか(画面の「リアルタイム / ポーリング中」の表示用・#1108)。 */
+    val status: StateFlow<HotReloadStatus> = _status.asStateFlow()
+
     private val lock = Any()
     private var appId: String? = null
     private var version = 0
@@ -69,7 +86,7 @@ class HotReload(
         appId = null
         job?.cancel()
         job = null
-        _realtime.value = false
+        setRealtime(null)
     }
 
     /** 自分で当てた版(生成・保存・復元)。同じ版を他から受けても流さない。 */
@@ -89,15 +106,26 @@ class HotReload(
         } else {
             job?.cancel()
             job = null
-            _realtime.value = false
+            setRealtime(null)
+        }
+    }
+
+    /** null = 購読していない。購読を張った直後は SSE の稼働の知らせが来るまでポーリング扱い。 */
+    private fun setRealtime(listening: Boolean?) {
+        _realtime.value = listening == true
+        _status.value = when (listening) {
+            null -> HotReloadStatus.OFF
+            true -> HotReloadStatus.REALTIME
+            false -> HotReloadStatus.POLLING
         }
     }
 
     private fun restart() {
         job?.cancel()
         job = null
-        val id = appId ?: return
-        if (!foreground) return
+        val id = appId ?: return setRealtime(null)
+        if (!foreground) return setRealtime(null)
+        setRealtime(false)
         val from = version
         job = scope.launch {
             sync.events(id, from).collect { handle(id, it) }
@@ -118,9 +146,11 @@ class HotReload(
             is SyncUpdate.Records -> _recordsChange.emit(RecordsChange.Entity(update.entity))
             is SyncUpdate.Realtime -> {
                 val resumed = synchronized(lock) {
+                    // 止めた・別のアプリに張り直した後に届いた古い知らせは捨てる
+                    if (id != appId || !foreground) return@synchronized false
                     val resumed = update.listening && realtimeWasLost
                     realtimeWasLost = !update.listening
-                    _realtime.value = update.listening
+                    setRealtime(update.listening)
                     resumed
                 }
                 // 切れていた間の他の人の投稿を取りこぼさない

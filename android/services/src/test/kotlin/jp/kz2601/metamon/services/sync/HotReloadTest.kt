@@ -81,6 +81,47 @@ class HotReloadTest {
     }
 
     @Test
+    fun statusFollowsSubscriptionAndSse() = runTest {
+        val h = harness()
+        assertEquals("張る前は出さない", HotReloadStatus.OFF, h.hot.status.value)
+
+        h.hot.start("app1", 1)
+        runCurrent()
+        assertEquals("SSE の知らせが来るまではポーリング", HotReloadStatus.POLLING, h.hot.status.value)
+
+        h.sync.updates.emit(SyncUpdate.Realtime(true))
+        runCurrent()
+        assertEquals(HotReloadStatus.REALTIME, h.hot.status.value)
+
+        h.sync.updates.emit(SyncUpdate.Realtime(false))
+        runCurrent()
+        assertEquals("切れたらポーリングに落ちる", HotReloadStatus.POLLING, h.hot.status.value)
+
+        h.sync.updates.emit(SyncUpdate.Realtime(true))
+        h.hot.setForeground(false)
+        runCurrent()
+        assertEquals("背面では購読しない", HotReloadStatus.OFF, h.hot.status.value)
+
+        h.hot.setForeground(true)
+        runCurrent()
+        assertEquals("張り直した直後はポーリング", HotReloadStatus.POLLING, h.hot.status.value)
+
+        h.hot.stop()
+        runCurrent()
+        assertEquals(HotReloadStatus.OFF, h.hot.status.value)
+        assertFalse(h.hot.realtime.value)
+    }
+
+    @Test
+    fun foregroundWithoutAppStaysOff() = runTest {
+        val h = harness()
+        h.hot.setForeground(false)
+        h.hot.setForeground(true)
+        runCurrent()
+        assertEquals(HotReloadStatus.OFF, h.hot.status.value)
+    }
+
+    @Test
     fun realtimeRecoveryAsksToReloadRecords() = runTest {
         val h = harness()
         h.hot.start("app1", 1)

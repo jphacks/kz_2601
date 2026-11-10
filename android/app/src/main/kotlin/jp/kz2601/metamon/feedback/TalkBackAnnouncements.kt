@@ -45,12 +45,14 @@ object TalkBackAnnouncements {
         return out.filter { it !is UiText.Raw || it.text.isNotBlank() }
     }
 
-    /** 生成したアプリの上: トースト、「削除しました・元に戻す」 */
+    /** 生成したアプリの上: トースト、上部のバナー(ホットリロード #1108)、「削除しました・元に戻す」 */
     fun runtime(old: RuntimeState?, new: RuntimeState): List<UiText> {
         if (old == null) return emptyList()
         val out = mutableListOf<UiText>()
         val toast = new.toast
         if (toast != null && toast != old.toast) out += toast
+        val banner = new.banner
+        if (banner != null && banner.id != old.banner?.id) out += banner.text
         val undo = new.recordUndo
         if (undo != null && undo.id != old.recordUndo?.id) out += UiText.Res(R.string.feedback_deleted)
         return out
