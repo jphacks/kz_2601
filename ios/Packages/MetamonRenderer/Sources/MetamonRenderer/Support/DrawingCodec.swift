@@ -78,6 +78,17 @@ final class DrawingSession: Identifiable {
 
     var isEmpty: Bool { drawing.strokes.isEmpty && background == nil }
 
+    /// VoiceOver で読むキャンバスの値(iOS・Mac 共通)。
+    var accessibilityValue: String {
+        let n = drawing.strokes.count
+        return n == 0 ? L("何も描いていません") : L("線 \(n) 本")
+    }
+
+    /// Mac のキャンバスで描き終えた線を足す(iOS は PKCanvasView の絵をそのまま入れる)。
+    func add(_ stroke: PKStroke) {
+        drawing.strokes.append(stroke)
+    }
+
     /// 「全部消す」: 描いた線も下絵も消す。
     func clear() {
         drawing = PKDrawing()

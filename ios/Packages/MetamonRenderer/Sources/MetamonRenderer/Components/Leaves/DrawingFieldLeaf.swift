@@ -42,7 +42,7 @@ struct DrawingFieldPanel: View {
             Button { open() } label: { preview }
                 .buttonStyle(.plain)
                 .accessibilityLabel(hasDrawing ? L("\(title)(描いた絵あり)") : title)
-                .accessibilityHint(L("手書きの画面を開きます。指や Apple Pencil で描けます"))
+                .accessibilityHint(Self.openHint)
                 .accessibilityIdentifier("drawingField.\(field)")
             if hasDrawing {
                 let layout = typeSize.isAccessibilitySize ? AnyLayout(VStackLayout(spacing: RenderTheme.Spacing.sm)) : AnyLayout(HStackLayout(spacing: RenderTheme.Spacing.sm))
@@ -92,6 +92,14 @@ struct DrawingFieldPanel: View {
     private func open() {
         session = DrawingSession(value: value)
     }
+
+    private static var openHint: String {
+        #if os(iOS)
+        L("手書きの画面を開きます。指や Apple Pencil で描けます")
+        #else
+        L("手書きの画面を開きます。マウスやトラックパッドで描けます")
+        #endif
+    }
 }
 
 /// 全画面のキャンバス。下に ペン / 消しゴム・元に戻す・やり直す・全部消す、上に キャンセル / 完了。
@@ -118,8 +126,7 @@ struct DrawingSheet: View {
                         #if os(iOS)
                         DrawingCanvas(session: session, handle: canvas)
                         #else
-                        // TODO mac-032: Mac の手書き(PKCanvasView が無いのでマウス / トラックパッドの線を PKDrawing に入れる)
-                        MacUnavailableView(feature: L("手書き"))
+                        MacDrawingCanvas(session: session)
                         #endif
                     }
                     .onAppear { canvasSize = geo.size }
@@ -162,19 +169,24 @@ struct DrawingSheet: View {
 
     private var tools: some View {
         HStack(spacing: RenderTheme.Spacing.md) {
+            // Mac はまだペンだけ(消しゴム・元に戻すは #1342)
+            #if os(iOS)
             Picker(L("道具"), selection: Binding(get: { session.tool }, set: { session.tool = $0 })) {
                 Label(L("ペン"), systemImage: "pencil.tip").tag(DrawingSession.Tool.pen)
                 Label(L("消しゴム"), systemImage: "eraser").tag(DrawingSession.Tool.eraser)
             }
             .pickerStyle(.segmented)
             .frame(maxWidth: 160)
+            #endif
             Spacer(minLength: 0)
+            #if os(iOS)
             Button { canvas.undo() } label: { Image(systemName: "arrow.uturn.backward") }
                 .disabled(!canvas.canUndo)
                 .accessibilityLabel(L("元に戻す"))
             Button { canvas.redo() } label: { Image(systemName: "arrow.uturn.forward") }
                 .disabled(!canvas.canRedo)
                 .accessibilityLabel(L("やり直す"))
+            #endif
             Button(role: .destructive) { confirmClear = true } label: { Image(systemName: "trash") }
                 .disabled(session.isEmpty)
                 .accessibilityLabel(L("全部消す"))
@@ -265,8 +277,7 @@ private struct DrawingCanvas: UIViewRepresentable {
     }
 
     @MainActor static func updateValue(_ v: UIView, session: DrawingSession) {
-        let n = session.drawing.strokes.count
-        v.accessibilityValue = n == 0 ? L("何も描いていません") : L("線 \(n) 本")
+        v.accessibilityValue = session.accessibilityValue
     }
 
     @MainActor
@@ -285,6 +296,112 @@ private struct DrawingCanvas: UIViewRepresentable {
             handle.refresh()
             DrawingCanvas.updateValue(canvasView, session: session)
         }
+    }
+}
+#endif
+
+#if os(macOS)
+/// Mac のキャンバス: マウス・トラックパッドの線を集めて `DrawingSession.drawing` に足す(ペンだけ)。
+private struct MacDrawingCanvas: NSViewRepresentable {
+    let session: DrawingSession
+
+    func makeCoordinator() -> Coordinator { Coordinator() }
+
+    func makeNSView(context: Context) -> MacDrawingView {
+        let v = MacDrawingView()
+        v.setAccessibilityElement(true)
+        v.setAccessibilityRole(.image)
+        v.setAccessibilityLabel(L("手書きのキャンバス"))
+        v.setAccessibilityHelp(L("マウスやトラックパッドで描きます"))
+        v.onStroke = { [session, weak v] stroke in
+            session.add(stroke)
+            v?.drawing = session.drawing
+            v?.setAccessibilityValue(session.accessibilityValue)
+        }
+        v.drawing = session.drawing
+        v.setAccessibilityValue(session.accessibilityValue)
+        context.coordinator.revision = session.revision
+        return v
+    }
+
+    func updateNSView(_ v: MacDrawingView, context: Context) {
+        // 全部消した時だけキャンバスに戻す
+        if context.coordinator.revision != session.revision {
+            context.coordinator.revision = session.revision
+            v.drawing = session.drawing
+        }
+        v.setAccessibilityValue(session.accessibilityValue)
+    }
+
+    final class Coordinator { var revision = 0 }
+}
+
+/// 描いた線(`PKDrawing` を画像にして)+ 描いている途中の線を出す。原点は左上(PKDrawing と同じ向き)。
+final class MacDrawingView: NSView {
+    var onStroke: ((PKStroke) -> Void)?
+    var drawing = PKDrawing() {
+        didSet { inkImage = nil; needsDisplay = true }
+    }
+    private var builder: DrawingStrokeBuilder?
+    private var inkImage: NSImage?
+
+    override var isFlipped: Bool { true }
+    override func acceptsFirstMouse(for event: NSEvent?) -> Bool { true }
+
+    override func setFrameSize(_ newSize: NSSize) {
+        super.setFrameSize(newSize)
+        inkImage = nil
+    }
+
+    override func mouseDown(with event: NSEvent) {
+        builder = DrawingStrokeBuilder()
+        record(event)
+    }
+
+    override func mouseDragged(with event: NSEvent) { record(event) }
+
+    override func mouseUp(with event: NSEvent) {
+        record(event)
+        let stroke = builder?.stroke()
+        builder = nil
+        needsDisplay = true
+        if let stroke { onStroke?(stroke) }
+    }
+
+    private func record(_ event: NSEvent) {
+        guard builder != nil else { return }
+        let p = convert(event.locationInWindow, from: nil)
+        // 筆圧はペンタブレットの時だけ(マウスは押している間ずっと 1)
+        let pressure: CGFloat? = event.subtype == .tabletPoint ? CGFloat(event.pressure) : nil
+        builder?.add(p, time: event.timestamp, pressure: pressure)
+        needsDisplay = true
+    }
+
+    override func draw(_ dirtyRect: NSRect) {
+        if !drawing.strokes.isEmpty {
+            if inkImage == nil {
+                // 保存する絵と同じく白地に黒(ダークモードでインクを反転させない)
+                let scale = window?.backingScaleFactor ?? 2
+                (NSAppearance(named: .aqua) ?? NSAppearance.currentDrawing()).performAsCurrentDrawingAppearance {
+                    inkImage = drawing.image(from: bounds, scale: scale)
+                }
+            }
+            inkImage?.drawUpright(in: bounds)
+        }
+        guard let builder, let first = builder.locations.first else { return }
+        NSColor.black.set()
+        let width = builder.points.last.map { $0.size.width } ?? DrawingStrokeBuilder.penWidth
+        if builder.locations.count == 1 {
+            NSBezierPath(ovalIn: CGRect(x: first.x - width / 2, y: first.y - width / 2, width: width, height: width)).fill()
+            return
+        }
+        let path = NSBezierPath()
+        path.lineWidth = width
+        path.lineCapStyle = .round
+        path.lineJoinStyle = .round
+        path.move(to: first)
+        for p in builder.locations.dropFirst() { path.line(to: p) }
+        path.stroke()
     }
 }
 #endif
