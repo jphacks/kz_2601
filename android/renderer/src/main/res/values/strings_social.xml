@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- みんなで使う部品(#875・iOS の ChatThreadLeaf / ModerationMenuItems / AuthorNamePromptModifier)。名前順。 -->
+<resources>
+    <string name="social_anonymous">匿名</string>
+    <string name="social_author_name_anonymous">匿名で投稿</string>
+    <string name="social_author_name_message">ほかの人の一覧にこの名前が表示されます。Google アカウントの名前やメールアドレスは表示しません。あとから設定で変えられます。</string>
+    <string name="social_author_name_placeholder">ニックネーム</string>
+    <string name="social_author_name_post">この名前で投稿</string>
+    <string name="social_author_name_title">投稿に表示する名前</string>
+    <string name="social_block">投稿者をブロック</string>
+    <string name="social_chat_empty">まだメッセージはありません</string>
+    <string name="social_chat_me">自分</string>
+    <string name="social_chat_other">相手</string>
+    <string name="social_chat_photo">写真</string>
+    <string name="social_chat_placeholder">メッセージ</string>
+    <string name="social_chat_send">送信</string>
+    <string name="social_report">通報する</string>
+</resources>
