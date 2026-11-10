@@ -41,8 +41,13 @@ APP_ENTRY = {
 
 # パッケージの直下以外にある、アプリにリンクされる部分の表示(identity → チェックアウト内の相対パス)。
 # Crashlytics/LICENSE は libunwind 由来の dwarf.h の著作権表示(HP)を含む。
+# client-sdk-swift(LiveKit・#447)は nanopb(Zlib)を同梱してコンパイルし、画面共有の一部は react-native-webrtc(MIT)由来。
+# webrtc-xcframework のリポジトリの LICENSE は包みの MIT だけなので、バイナリ(WebRTC 本体・BSD-3-Clause)の LICENSE を
+# 同じ SourcePackages の artifacts から足す(checkouts の隣)。
 EXTRA_NOTICES = {
+    "client-sdk-swift": ["Sources/CLiveKitProto/LICENSE-nanopb.txt", "Sources/LiveKit/Broadcast/NOTICE"],
     "firebase-ios-sdk": ["Crashlytics/LICENSE"],
+    "webrtc-xcframework": ["../../artifacts/webrtc-xcframework/LiveKitWebRTC/LiveKitWebRTC.xcframework/LICENSE"],
 }
 
 LICENSE_FILE_RE = re.compile(r"^(LICEN[CS]E|COPYING)(\.(txt|md))?$", re.IGNORECASE)
