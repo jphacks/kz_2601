@@ -11,6 +11,8 @@
 //	feedback-loop ingest-crash -issue ID -type T -count N -version V
 //	feedback-loop triage [-max 200] [-batch 20]
 //	feedback-loop triage-score -labels FILE
+//	feedback-loop draft [-max-new 20]
+//	feedback-loop drafts list|show|edit|approve|reject|publish ...
 //
 // Environment: GOOGLE_CLOUD_PROJECT (required), FIRESTORE_DATABASE,
 // FIRESTORE_EMULATOR_HOST (local: make -C backend run-feedback-loop),
@@ -31,6 +33,7 @@ import (
 
 	"github.com/jphacks/kz_2601/backend/internal/fsenv"
 	"github.com/jphacks/kz_2601/backend/internal/loop"
+	"github.com/jphacks/kz_2601/backend/internal/loop/draft"
 	"github.com/jphacks/kz_2601/backend/internal/loop/ingest"
 	"github.com/jphacks/kz_2601/backend/internal/loop/triage"
 	"github.com/jphacks/kz_2601/backend/internal/store"
@@ -78,6 +81,8 @@ const usageText = `usage: feedback-loop <command> [flags]
   ingest-crash -issue ID -type T -count N -version V   record one crash spike
   triage [-max 200] [-batch 20]              classify, cluster and prioritise new items (LLM, no tools)
   triage-score -labels FILE                  agreement with a human's labels (lines: itemId,category)
+  draft [-max-new 20]                        build issue drafts from triaged clusters (private queue)
+  drafts list|show|edit|approve|reject|publish   the human review of drafts (see: drafts)
 `
 
 // app holds what the commands use (tests build it with in-memory parts).
@@ -88,10 +93,12 @@ type app struct {
 	// appStore, when set, replaces the App Store Connect fetcher (tests).
 	appStore ingest.Fetcher
 	// model, when set, replaces the Claude client (tests use a fake).
-	model  triage.Model
-	getenv func(string) string
-	now    func() time.Time
-	out    io.Writer
+	model triage.Model
+	// publisher, when set, replaces the GitHub client (tests).
+	publisher draft.Publisher
+	getenv    func(string) string
+	now       func() time.Time
+	out       io.Writer
 }
 
 func (a *app) run(ctx context.Context, args []string) error {
@@ -109,6 +116,10 @@ func (a *app) run(ctx context.Context, args []string) error {
 		return a.triage(ctx, rest)
 	case "triage-score":
 		return a.triageScore(ctx, rest)
+	case "draft":
+		return a.draftBuild(ctx, rest)
+	case "drafts":
+		return a.drafts(ctx, rest)
 	}
 	_, _ = io.WriteString(a.out, usageText)
 	return fmt.Errorf("unknown command %q", cmd)
