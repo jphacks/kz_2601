@@ -37,6 +37,7 @@ import jp.kz2601.metamon.consent.ConsentPrompt
 import jp.kz2601.metamon.onboarding.FirstRunTutorialStore
 import jp.kz2601.metamon.onboarding.TutorialPrompt
 import jp.kz2601.metamon.permissions.PermissionCenter
+import jp.kz2601.metamon.share.ShareLinkIntents
 import jp.kz2601.metamon.services.account.AccountClient
 import jp.kz2601.metamon.services.account.HttpAccountClient
 import jp.kz2601.metamon.services.account.MockAccountClient
@@ -238,7 +239,11 @@ class AppContainer(
             owner = activeOwner,
             startSync = recordSync::start,
             stopSync = recordSync::stop,
-            wipe = { wipeLocalData() },
+            wipe = {
+                wipeLocalData()
+                feedbackComposer.close() // 前の人の画面のスクショ・アプリを次の人の画面に出さない
+            },
+            onSignedOut = { ShareLinkIntents.inbox.clear() },
         )
     }
 

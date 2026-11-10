@@ -36,6 +36,11 @@ class ShareLinkInbox {
         return _pending.getAndUpdate { null }
     }
 
+    /** 保留を捨てる(サインアウト: 前の人が受けたリンクを次の人が開かない)。 */
+    fun clear() {
+        _pending.value = null
+    }
+
     companion object {
         /**
          * 開いてよいか: サインイン済み・起動の読み込みが済み・AI の同意の画面を出し終えた(出す予定も無い)。

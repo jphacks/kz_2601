@@ -68,6 +68,15 @@ class ShareLinkOpenerTest {
     }
 
     @Test
+    fun clearDropsTheHeldLink() {
+        val inbox = ShareLinkInbox()
+        inbox.receive("tailorit://import/of-a")
+        inbox.clear()
+        assertNull(inbox.pending.value)
+        assertNull(inbox.take(ready = true))
+    }
+
+    @Test
     fun inboxIgnoresOtherUrlsAndKeepsTheLatestLink() {
         val inbox = ShareLinkInbox()
         assertFalse(inbox.receive(null))

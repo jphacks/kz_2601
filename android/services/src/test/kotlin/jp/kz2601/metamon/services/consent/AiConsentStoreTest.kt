@@ -62,9 +62,12 @@ class AiConsentStoreTest {
         assertFalse(s.isGranted)
         assertTrue(s.state.value.needsReconsent)
         assertTrue(s.shouldPromptOnLaunch)
+        val before = s.state.value
         s.markPrompted() // 新しい版の説明を出した(「あとで」)
         assertTrue(s.state.value.needsReconsent)
         assertFalse(s.shouldPromptOnLaunch)
+        // state は変わらない(流れない)。shouldPromptOnLaunch を state をキーに覚えてはいけない(ShareLinkHost)
+        assertEquals(before, s.state.value)
         s.grant()
         assertTrue(s.isGranted)
         assertFalse(s.state.value.needsReconsent)

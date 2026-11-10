@@ -24,7 +24,8 @@ object ShareLinks {
         val m = Regex("^([A-Za-z][A-Za-z0-9+.-]*)://([^/?#]*)/([^/?#]*)").find(url) ?: return null
         val (scheme, host, token) = m.destructured
         if (!scheme.equals(SCHEME, ignoreCase = true) || !host.equals(HOST, ignoreCase = true)) return null
-        return token.takeIf { TOKEN.matches(it) }
+        // 点だけのものは除く(発行されるトークンは base64url)
+        return token.takeIf { TOKEN.matches(it) && it.any { c -> c != '.' } }
     }
 
     fun appUrl(token: String): String = "$SCHEME://$HOST/$token"

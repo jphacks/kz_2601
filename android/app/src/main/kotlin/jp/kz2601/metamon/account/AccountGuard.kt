@@ -49,6 +49,11 @@ class AccountGuard(
     private val startSync: () -> Unit,
     private val stopSync: () -> Unit,
     private val wipe: suspend () -> Unit,
+    /**
+     * サインイン中の人がサインアウトした時(後片付けの有無によらず)。その人が受けて開かずにいたものを捨てる。
+     * 起動時のサインインしていない状態では呼ばない(サインイン画面の上で受けたものは次にサインインした人のもの)
+     */
+    private val onSignedOut: () -> Unit = {},
 ) {
     private val _active = MutableStateFlow<AuthUser?>(null)
 
@@ -72,9 +77,11 @@ class AccountGuard(
     internal suspend fun reconcile(user: AuthUser?) = lock.withLock {
         val uid = user?.uid
         if (uid == null) {
+            val wasSignedIn = owner.uid != null || _active.value != null
             owner.uid = null
             stopSync()
             _active.value = null
+            if (wasSignedIn) onSignedOut()
             if (saved.uid != null) wipeLocked()
             return@withLock
         }
@@ -100,6 +107,7 @@ class AccountGuard(
     suspend fun wipeForSignOut() = lock.withLock {
         owner.uid = null
         stopSync()
+        onSignedOut()
         wipeLocked()
     }
 

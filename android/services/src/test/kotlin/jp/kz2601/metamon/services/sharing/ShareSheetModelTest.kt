@@ -173,6 +173,9 @@ class ShareSheetModelTest {
         assertNull(ShareLinks.token("tailorit://other/abc"))
         assertNull(ShareLinks.token("tailorit://import/"))
         assertNull(ShareLinks.token("tailorit://import/a b"))
+        assertNull(ShareLinks.token("tailorit://import/.."))
+        assertNull(ShareLinks.token("tailorit://import/."))
+        assertEquals("a.b", ShareLinks.token("tailorit://import/a.b"))
         assertNull(ShareLinks.token("tailorit://import/" + "a".repeat(129)))
         assertEquals("tailorit://import/tok", ShareLinks.appUrl("tok"))
 

@@ -55,7 +55,14 @@ object ShareLinkIntents {
     val inbox = ShareLinkInbox()
 
     fun offer(intent: Intent?) {
-        if (intent?.action == Intent.ACTION_VIEW) inbox.receive(intent.dataString)
+        intent ?: return
+        offer(intent.action, intent.dataString, intent.flags)
+    }
+
+    /** 最近使ったアプリから開き直した時は、前に開いたリンクの intent がもう一度届くので開かない。 */
+    internal fun offer(action: String?, data: String?, flags: Int): Boolean {
+        if (action != Intent.ACTION_VIEW || flags and Intent.FLAG_ACTIVITY_LAUNCHED_FROM_HISTORY != 0) return false
+        return inbox.receive(data)
     }
 }
 
@@ -87,7 +94,8 @@ fun ShareLinkHost(container: AppContainer, canShare: Boolean) {
         signedIn = user != null,
         bootstrapped = bootstrapped,
         consentShowing = consentShowing,
-        consentPending = remember(consentState) { container.consent.shouldPromptOnLaunch },
+        // 状態の値が変わらない「あとで」(出し直しの版で後回し)もあるので、覚えずに毎回読む
+        consentPending = consentState.let { container.consent.shouldPromptOnLaunch },
     )
     LaunchedEffect(ready, pending) {
         val token = ShareLinkIntents.inbox.take(ready) ?: return@LaunchedEffect
