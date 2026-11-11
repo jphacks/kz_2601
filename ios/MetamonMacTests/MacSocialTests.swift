@@ -83,13 +83,13 @@ final class MacSocialTests: XCTestCase {
     }
 
     private func runtime(_ fake: FakeSocial?, server: InMemoryAppConfigClient = InMemoryAppConfigClient(),
-                         uid: String? = "u-me") async throws -> MacAppRuntime {
+                         uid: String? = "u-me", online: Bool = true) async throws -> MacAppRuntime {
         let dsl = try JSONDecoder().decode(AppDSL.self, from: Data(Self.json.utf8))
         let dir = FileManager.default.temporaryDirectory.appendingPathComponent("mac-social-\(UUID().uuidString)")
         addTeardownBlock { try? FileManager.default.removeItem(at: dir) }
         let store = RecordStore(directory: dir)
         let engine = RecordSyncEngine(store: store, queue: SyncQueue(directory: nil, store: store, client: server),
-                                      client: server, connectivity: ManualConnectivity(online: true))
+                                      client: server, connectivity: ManualConnectivity(online: online))
         let rt = MacAppRuntime(appId: "social-\(UUID().uuidString.prefix(6))", dsl: dsl, recordSync: engine,
                                ai: MockAIClient(delay: .zero), isAIConsentGranted: { false })
         rt.social = MacSocial(currentUserId: { uid }, members: fake, moderation: fake, matching: fake,
@@ -100,7 +100,8 @@ final class MacSocialTests: XCTestCase {
     // MARK: 会話(chatThread の送信)
 
     func testChatPostOnSharedEntityCarriesMyUID() async throws {
-        let rt = try await runtime(FakeSocial())
+        // オンラインだと送信後にモックサーバーの行(作者は別の uid)へ置き換わりうる。ローカルの作者を見るのでオフラインで作る
+        let rt = try await runtime(FakeSocial(), online: false)
         XCTAssertNotNil((rt as any DSLRuntime) as? any RecordPosting, "chatThread が送信の口として見つける")
         let ok = await rt.postRecord(entity: "msg", data: ["text": "やあ"])
         XCTAssertTrue(ok)
@@ -140,7 +141,9 @@ final class MacSocialTests: XCTestCase {
     }
 
     func testMarkUnsentPostTellsWhy() async throws {
-        let rt = try await runtime(FakeSocial())
+        // オンラインだと作成直後に同期キューが裏で流れ、仮 id の行が先に送信済みへ置き換わることがある(不安定の原因)。
+        // 未送信のまま確かめるためオフラインで作る(未送信の判定はオフラインより先)
+        let rt = try await runtime(FakeSocial(), online: false)
         let created = await rt.createRecordId(entity: "msg", data: ["text": "送信前"])
         let id = try XCTUnwrap(created)
         let state = await rt.toggleMark(entity: "msg", recordId: id, mark: "like")
@@ -256,7 +259,9 @@ final class MacSocialTests: XCTestCase {
 
     func testInterestAsksAgeFirstThenSends() async throws {
         let fake = FakeSocial()
-        let rt = try await runtime(fake)
+        // オンラインだと裏の同期でプロフィールがモックサーバーの行(作者 mock の uid)に置き換わり、
+        // 「自分のプロフィール」が見つからなくなる(不安定の原因)。仲間探しは同期と無関係なのでオフラインで作る
+        let rt = try await runtime(fake, online: false)
         _ = await rt.postRecord(entity: "profile", data: ["hobby": "囲碁"])
         XCTAssertEqual(rt.interestState(entity: "profile", record: taroProfile), InterestState.none)
         XCTAssertNil(rt.interestState(entity: "profile", record: Record(id: "x", data: [:], author: "u-me")), "自分の行には出さない")
