@@ -60,6 +60,21 @@ public enum SyncEvent: Sendable, Equatable {
     case textNotAllowed(appId: String, entity: String, field: String?, recordId: String? = nil)
 }
 
+extension SyncEvent {
+    /// サーバーが書き込みを断った(操作を破棄した)イベントなら、その書き込み先。送れた・競合・停止などは nil。
+    public var refusedWrite: (appId: String, entity: String, recordId: String?)? {
+        switch self {
+        case .forbidden(let appId, let entity, let id), .rejected(let appId, let entity, _, _, let id),
+             .notMember(let appId, let entity, let id), .denied(let appId, let entity, _, let id),
+             .proRequired(let appId, let entity, _, let id), .planLimit(let appId, let entity, _, let id),
+             .appStopped(let appId, let entity, let id), .textNotAllowed(let appId, let entity, _, let id):
+            return (appId, entity, id)
+        case .sent, .conflict, .paused, .drained:
+            return nil
+        }
+    }
+}
+
 /// 指数バックオフ: base × multiplier^(attempt-1)。attempt は 1 始まり。
 public struct BackoffPolicy: Sendable, Equatable {
     public var base: Duration
