@@ -94,6 +94,7 @@ fun BoxScope.FeedbackHost(vm: VoiceViewModel, state: VoiceUiState, runtime: AppR
                     VoiceErrorCopy.of(error),
                     onRetry = vm::retry,
                     onDismiss = vm::dismissError,
+                    onUpgrade = vm.upgradeHandler(),
                     onOpenSettings = {
                         context.startActivity(
                             Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.fromParts("package", context.packageName, null))

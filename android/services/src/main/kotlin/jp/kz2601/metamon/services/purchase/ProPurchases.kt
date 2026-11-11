@@ -16,6 +16,9 @@ object ProProducts {
     /** 月額の定期購入(自動更新) */
     const val MONTHLY = "jp.kz2601.metamon.pro.monthly"
     val ALL = listOf(MONTHLY)
+
+    /** 無料で 1 日に新規作成できるアプリの数(iOS の `ProProducts.dailyFreeCreations`) */
+    const val DAILY_FREE_CREATIONS = 3
 }
 
 /**

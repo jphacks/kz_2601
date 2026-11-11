@@ -29,16 +29,21 @@ interface ProBilling {
 }
 
 /** 課金画面を開いた理由(iOS の `PaywallReason`)。見出しと「閉じるとどうなるか」が変わる */
-enum class PaywallReason {
-    SETTINGS,
-    AI_TEXT,
-    AI_CHAT,
+sealed interface PaywallReason {
+    /** 設定の「Pro にする」・プランの上限のカード(#317) */
+    data object SETTINGS : PaywallReason
 
-    /** 今日の無料作成を使い切った(#1261) */
-    LIMIT_REACHED,
+    /** オンラインの AI で書く(#873) */
+    data object AI_TEXT : PaywallReason
 
-    /** 新しく作るアプリに有料の機能が入る(402 `pro_required`・#1261) */
-    PAID_FEATURE,
+    /** AI と話す部品(#873) */
+    data object AI_CHAT : PaywallReason
+
+    /** 今日の上限のカードの「Pro にする」(iOS の `limitReached`) */
+    data object LIMIT_REACHED : PaywallReason
+
+    /** 共有・オンラインなどの有料機能(iOS の `paidFeature`)。[features] が空なら「みんなで共有するデータ」 */
+    data class PaidFeatures(val features: List<PaidFeature> = emptyList()) : PaywallReason
 }
 
 /** 課金画面の下に出す知らせ */
@@ -53,8 +58,6 @@ data class ProUiState(
     val message: ProMessage? = null,
     /** 出している課金画面。null = 出していない */
     val paywall: PaywallReason? = null,
-    /** [PaywallReason.PAID_FEATURE] の時に要る機能(空なら「みんなで共有するデータ」) */
-    val paywallFeatures: List<PaidFeature> = emptyList(),
 )
 
 /**
@@ -112,19 +115,19 @@ class ProStore(
         usage?.record()
     }
 
-    override suspend fun requestPro(features: List<PaidFeature>): Boolean = requestPro(PaywallReason.PAID_FEATURE, features)
+    override suspend fun requestPro(features: List<PaidFeature>): Boolean = requestPro(PaywallReason.PaidFeatures(features))
 
     /**
      * 課金画面を出し、閉じるまで待つ。戻り値 = 閉じた時に Pro か(買った・復元した)。Pro ならすぐ true。
      * 前の課金画面が開いていれば、それは閉じた扱いにする。課金画面を出せない構成は false。
      */
-    suspend fun requestPro(reason: PaywallReason, features: List<PaidFeature> = emptyList()): Boolean {
+    suspend fun requestPro(reason: PaywallReason): Boolean {
         if (isPro) return true
         if (!isAvailable) return false
         finishWaiter()
         val done = CompletableDeferred<Boolean>()
         waiter = done
-        _state.update { it.copy(paywall = reason, paywallFeatures = features, message = null) }
+        _state.update { it.copy(paywall = reason, message = null) }
         scope.launch { loadOffer() }
         return done.await()
     }
@@ -138,12 +141,12 @@ class ProStore(
     /** AI ボタンなどで Pro が要る時(iOS の `requestPro`)。開いたら商品を読む */
     fun requestPaywall(reason: PaywallReason) {
         if (!isAvailable) return
-        _state.update { it.copy(paywall = reason, paywallFeatures = emptyList(), message = null) }
+        _state.update { it.copy(paywall = reason, message = null) }
         scope.launch { loadOffer() }
     }
 
     fun dismissPaywall() {
-        _state.update { it.copy(paywall = null, paywallFeatures = emptyList(), message = null) }
+        _state.update { it.copy(paywall = null, message = null) }
         finishWaiter()
     }
 

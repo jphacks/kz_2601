@@ -37,7 +37,7 @@ internal fun HeldBuildCard(held: HeldBuild, busy: Boolean, vm: VoiceViewModel) {
                 is HeldBuild.ProRequired -> stringResource(
                     R.string.held_paid_headline,
                     held.features.map { it.title }.filter { it.isNotEmpty() }.joinToString("・")
-                        .ifEmpty { stringResource(R.string.paywall_feature_shared_data) },
+                        .ifEmpty { stringResource(R.string.paywall_shared_data) },
                 )
             }
             Row(verticalAlignment = Alignment.Top) {

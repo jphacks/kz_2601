@@ -30,6 +30,11 @@ data class DebugKnobs(
     val iapEnforce: Boolean = false,
     /** `METAMON_IAP_FREE_LIMIT=<n>`: 1 日の無料作成の回数を上書き(確認用) */
     val iapFreeLimit: Int? = null,
+    /**
+     * `METAMON_ACCOUNT_LINK_PROMPTED=1|0`: 引き継ぎの案内(#1316)を出した扱いにする / 出していない扱いに戻す
+     * (iOS の起動引数 `-metamon.accountLinkPrompted YES|NO`)。前のテストで作ったアプリの案内が画面を塞がないように
+     */
+    val accountLinkPrompted: Boolean? = null,
 ) {
     data class AutoNavStep(val screen: String, val presentation: String? = null) {
         override fun toString(): String = presentation?.let { "$screen:$it" } ?: screen

@@ -36,6 +36,7 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import jp.kz2601.metamon.R
 import jp.kz2601.metamon.consent.LegalLinks
+import jp.kz2601.metamon.services.http.PaidFeature
 import jp.kz2601.metamon.services.purchase.ProProducts
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -81,24 +82,19 @@ fun PaywallSheet(pro: ProStore, reason: PaywallReason, onDismiss: () -> Unit) {
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
             Text("Tailor It Pro", style = MaterialTheme.typography.headlineMedium.copy(fontWeight = FontWeight.Bold))
-            // 見出しの差し込み: 無料作成の回数 / 有料の機能の名前(他の理由の文言は %1 を持たないので無視される)
-            val featureNames = state.paywallFeatures.map { it.title }.filter { it.isNotEmpty() }.joinToString("・")
-                .ifEmpty { stringResource(R.string.paywall_feature_shared_data) }
-            val headlineArg: Any = if (reason == PaywallReason.LIMIT_REACHED) pro.dailyFreeLimit else featureNames
             Text(
-                stringResource(PaywallCopy.headline(reason), headlineArg),
+                PaywallCopy.headlineText(reason, pro.dailyFreeLimit),
                 style = MaterialTheme.typography.titleMedium,
                 textAlign = TextAlign.Center,
                 modifier = Modifier.testTag("paywall.headline"),
             )
-            // 有料の機能はサーバーが返した理由があればそれを出す(iOS の featureReasons)
-            val reasons = state.paywallFeatures.map { it.reason }.filter { it.isNotEmpty() }
-            if (reason == PaywallReason.PAID_FEATURE && reasons.isNotEmpty()) {
-                reasons.forEach { Text(it, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant) }
-            } else {
-                PaywallCopy.reason(reason)?.let {
-                    Text(stringResource(it), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                }
+            PaywallCopy.reasonLines(reason).forEach {
+                Text(
+                    it,
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.testTag("paywall.reason"),
+                )
             }
             if (state.isPro) {
                 ProBadge(justPurchased = reason != PaywallReason.SETTINGS)
@@ -213,21 +209,40 @@ object PaywallCopy {
         PaywallReason.AI_TEXT -> R.string.paywall_headline_ai_text
         PaywallReason.AI_CHAT -> R.string.paywall_headline_ai_chat
         PaywallReason.LIMIT_REACHED -> R.string.paywall_headline_limit_reached
-        PaywallReason.PAID_FEATURE -> R.string.paywall_headline_paid_feature
+        is PaywallReason.PaidFeatures -> R.string.paywall_headline_paid_feature
+    }
+
+    @Composable
+    fun headlineText(reason: PaywallReason, dailyFreeLimit: Int = ProProducts.DAILY_FREE_CREATIONS): String = when (reason) {
+        PaywallReason.LIMIT_REACHED -> stringResource(headline(reason), dailyFreeLimit)
+        is PaywallReason.PaidFeatures -> stringResource(headline(reason), featureNames(reason.features) ?: stringResource(R.string.paywall_shared_data))
+        else -> stringResource(headline(reason))
+    }
+
+    /** カードと同じ機能名(backend の title)。名前が無ければ null(呼び出し側で「みんなで共有するデータ」) */
+    fun featureNames(features: List<PaidFeature>): String? =
+        features.map { it.title }.filter { it.isNotEmpty() }.takeIf { it.isNotEmpty() }?.joinToString("・")
+
+    /** 有料機能の理由(backend の reason)。無ければ共有のデータの費用の説明 */
+    fun featureReasons(features: List<PaidFeature>): List<String> = features.map { it.reason }.filter { it.isNotEmpty() }
+
+    @Composable
+    fun reasonLines(reason: PaywallReason): List<String> = when (reason) {
+        is PaywallReason.PaidFeatures -> featureReasons(reason.features).ifEmpty { listOf(stringResource(R.string.paywall_reason_shared_data)) }
+        else -> listOfNotNull(this.reason(reason)?.let { stringResource(it) })
     }
 
     fun reason(reason: PaywallReason): Int? = when (reason) {
-        PaywallReason.SETTINGS, PaywallReason.LIMIT_REACHED -> null
         PaywallReason.AI_TEXT -> R.string.paywall_reason_ai_text
         PaywallReason.AI_CHAT -> R.string.paywall_reason_ai_chat
-        PaywallReason.PAID_FEATURE -> R.string.paywall_reason_shared_data
+        PaywallReason.SETTINGS, PaywallReason.LIMIT_REACHED, is PaywallReason.PaidFeatures -> null
     }
 
     fun closeNote(reason: PaywallReason): Int? = when (reason) {
-        PaywallReason.SETTINGS, PaywallReason.LIMIT_REACHED -> null
         PaywallReason.AI_TEXT -> R.string.paywall_close_ai_text
         PaywallReason.AI_CHAT -> R.string.paywall_close_ai_chat
-        PaywallReason.PAID_FEATURE -> R.string.paywall_close_paid_feature
+        is PaywallReason.PaidFeatures -> R.string.paywall_close_paid_feature
+        PaywallReason.SETTINGS, PaywallReason.LIMIT_REACHED -> null
     }
 
     fun message(m: ProMessage): Int = when (m) {

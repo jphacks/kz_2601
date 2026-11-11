@@ -45,6 +45,7 @@ import jp.kz2601.metamon.services.AIClient
 import jp.kz2601.metamon.services.AppConfigClient
 import jp.kz2601.metamon.services.AppEnvironment
 import jp.kz2601.metamon.account.AccountGuard
+import jp.kz2601.metamon.account.AccountLinkPrompt
 import jp.kz2601.metamon.account.ActiveOwner
 import jp.kz2601.metamon.account.LocalDataWipe
 import jp.kz2601.metamon.account.MediaTempFiles
@@ -62,6 +63,8 @@ import jp.kz2601.metamon.services.local.AccountOwnerStore
 import jp.kz2601.metamon.services.AuthService
 import jp.kz2601.metamon.services.CrashReporter
 import jp.kz2601.metamon.services.NoopCrashReporter
+import jp.kz2601.metamon.services.RemainingToday
+import jp.kz2601.metamon.services.RemainingTodayStore
 import jp.kz2601.metamon.services.SpeechTranscriber
 import jp.kz2601.metamon.services.consent.AiButtonMetricsRecorder
 import jp.kz2601.metamon.feedback.FeedbackComposerLauncher
@@ -204,6 +207,8 @@ class AppContainer(
     private val retentionConsent: RetentionConsentStore = KeyValueRetentionConsent(InMemoryKeyValueStore()),
     /** 初回のチュートリアルと「こう話すと直せます」を見た印(#900)。モックは見た扱いで始める */
     val tutorial: FirstRunTutorialStore = FirstRunTutorialStore(InMemoryKeyValueStore()).apply { markAllSeen() },
+    /** 「作ったアプリを残しておきませんか」を出した印(#1316・端末ごと)。モックはメモリだけ */
+    private val accountLinkStore: KeyValueStore = InMemoryKeyValueStore(),
     /** TalkBack が動いているか(削除の取り消しの時間を延ばす・H8) */
     private val talkBackRunning: () -> Boolean = { false },
     /** アプリ内のフィードバックの送り先(`POST /v1/feedback`・#319)。モックは送った内容を覚えるだけ */
@@ -224,6 +229,8 @@ class AppContainer(
     private val playBilling: ((PlayBilling.Listener) -> PlayBilling)? = null,
     /** 今日の新規作成の回数(#1261・端末ごと)。モックはメモリだけ */
     private val creationUsage: CreationUsageStore = CreationUsageStore(InMemoryKeyValueStore()),
+    /** 最後に分かった「今日の残り」(ai の応答のヘッダーから入る・#1203)。モックは入らない */
+    val remainingToday: RemainingTodayStore = RemainingTodayStore(),
 ) {
     /** 共有シートの「みんなに公開」に渡すもの(#902)。「探す」が無い構成は null */
     val publishEnv: PublishEnv? by lazy { discover?.let { PublishEnv(it.client, authorProfile) } }
@@ -262,6 +269,15 @@ class AppContainer(
     /** 初回のチュートリアルを出す時点(同意の後・設定の「使い方を見る」・#900) */
     val tutorialPrompt = TutorialPrompt(tutorial)
 
+    /** 匿名で最初のアプリを作った次の起動の引き継ぎの案内(#1316)。つまみ `METAMON_ACCOUNT_LINK_PROMPTED` で出した扱いにできる */
+    val accountLinkPrompt = AccountLinkPrompt(accountLinkStore).apply {
+        when (knobs.accountLinkPrompted) {
+            true -> markOffered()
+            false -> forget()
+            null -> Unit
+        }
+    }
+
     /** 前の日までの aiButton の集計を送る(起動・前面に戻った時。送るのは 1 日 1 回) */
     suspend fun flushAiButtonMetrics() {
         aiButtonMetricsSender?.let { aiButtonMetrics.flush(it) }
@@ -284,12 +300,14 @@ class AppContainer(
             forgetTutorial = {
                 tutorial.forget()
                 tutorialPrompt.reset()
+                accountLinkPrompt.forget() // 引き継ぎの案内(#1316)も iOS と同じく次の人に出し直す
             },
             // 同意は人ごと(iOS は UserDefaults ごと消す)。前の人の止めた発話も次の人の同意で送らない
             forgetConsent = {
                 consent.forget()
                 consentPrompt.reset()
                 pro.reset() // Pro の状態と送った購入の記録も人ごと(次の人はサーバーに聞き直す)
+                remainingToday.clear() // 前の人の「今日の残り」を出さない
                 aiButtonMetrics.clearCounts()
                 social?.ageGate?.reset() // 18 歳以上の確認(#877)も人ごと(iOS は UserDefaults ごと消す)
                 runtime.retention?.forget() // 記録の保存期間の確認(#482)も人ごと(iOS は UserDefaults ごと消す)
@@ -404,7 +422,10 @@ class AppContainer(
             val client = MetamonHttp.defaultClient()
             // 画像も同じ接続を使う(トークンは付けない)
             RemoteImages.install(context, client)
-            fun http(baseUrl: String) = MetamonHttp(baseUrl, tokens, clientInfo, appCheck = appCheck, client = client, device = device)
+            fun http(baseUrl: String, remainingSink: ((RemainingToday) -> Unit)? = null) =
+                MetamonHttp(baseUrl, tokens, clientInfo, appCheck = appCheck, client = client, device = device, remainingSink = remainingSink)
+            // ai の応答の `X-RateLimit-*` から「今日の残り」を入れる(iOS の HTTP.noteRemaining・#1203)
+            val remainingToday = RemainingTodayStore()
             val log: (String) -> Unit = { Log.w(TAG, it) }
 
             val documentCache = DocumentCache(File(context.filesDir, "metamon-dsl"))
@@ -430,7 +451,7 @@ class AppContainer(
                 initialDsl = initialDsl,
                 appConfig = appConfig,
                 // 同意が無ければ一切送らない(最後の砦。画面側でも送る前に止めて同意の画面を出す)
-                ai = ConsentGatedAiClient(HttpAIClient(http(environment.aiBaseUrl), capabilities = deviceCapabilities(), log = log, cache = documentCache)) { consent.isGranted },
+                ai = ConsentGatedAiClient(HttpAIClient(http(environment.aiBaseUrl, remainingToday::record), capabilities = deviceCapabilities(), log = log, cache = documentCache)) { consent.isGranted },
                 // 声は端末内だけで文字にする(#354 §3)。端末内が無い端末は文字入力に落とす
                 transcriber = AndroidSpeechTranscriber(context, language = language, log = { Log.i(TAG, it) }),
                 audioFiles = WhisperAudioFileHost.create(context, CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate), language),
@@ -460,6 +481,7 @@ class AppContainer(
                 ),
                 clearImageCache = { RemoteImages.wipe(context) },
                 tutorial = FirstRunTutorialStore(SharedPreferencesKeyValueStore.of(context, FirstRunTutorialStore.PREFS)),
+                accountLinkStore = SharedPreferencesKeyValueStore.of(context, AccountLinkPrompt.PREFS),
                 talkBackRunning = { TalkBack.isRunning(context) },
                 feedback = HttpFeedbackClient(appConfigHttp),
                 updateGate = UpdateGate.live(context, environment.appConfigBaseUrl, client, device),
@@ -471,6 +493,7 @@ class AppContainer(
                 entitlements = HttpEntitlementClient(appConfigHttp),
                 playBilling = { PlayBilling(context, it) },
                 creationUsage = CreationUsageStore(SharedPreferencesKeyValueStore.of(context, CREATION_PREFS)),
+                remainingToday = remainingToday,
             )
         }
 
@@ -528,6 +551,8 @@ class AppContainer(
             connectivity = AndroidConnectivity(context),
             directory = File(context.filesDir, dir),
             scope = CoroutineScope(SupervisorJob() + Dispatchers.Default),
+            // 記録を消したら、その記録の動画ファイルも消す(#1201)
+            videos = VideoCodec.store(context),
         )
 
         /** `METAMON_E2E_OFFLINE_SECONDS=<n>`: 起動から n 秒は記録の API を圏外にする(iOS `RecordSyncFactory`)。 */

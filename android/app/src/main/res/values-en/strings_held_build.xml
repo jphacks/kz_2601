@@ -8,8 +8,4 @@
     <string name="held_paid_headline">“%1$s” requires Tailor It Pro</string>
     <string name="held_paid_without">Build without this feature</string>
     <string name="paywall_close_paid_feature">If you close this, it won\'t be made this way.</string>
-    <string name="paywall_feature_shared_data">Shared data</string>
-    <string name="paywall_headline_limit_reached">You\'ve used today\'s free new apps (%1$d)</string>
-    <string name="paywall_headline_paid_feature">“%1$s” requires Tailor It Pro</string>
-    <string name="paywall_reason_shared_data">Data that everyone writes is stored in the cloud and synced to every device, which costs server resources.</string>
 </resources>

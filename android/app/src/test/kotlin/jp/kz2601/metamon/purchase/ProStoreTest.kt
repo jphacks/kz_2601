@@ -189,11 +189,10 @@ class ProStoreTest {
         val s = metered(CreationUsageStore(InMemoryKeyValueStore()))
         val features = listOf(PaidFeature("sharedData", "共有"))
         val result = async(Dispatchers.Unconfined) { s.requestPro(features) }
-        assertEquals(PaywallReason.PAID_FEATURE, s.state.value.paywall)
-        assertEquals(features, s.state.value.paywallFeatures)
+        assertEquals(PaywallReason.PaidFeatures(features), s.state.value.paywall)
         s.dismissPaywall()
         assertFalse(result.await())
-        assertTrue(s.state.value.paywallFeatures.isEmpty())
+        assertNull(s.state.value.paywall)
 
         val none = store(FakeServer(), billing = null)
         assertFalse("課金画面を出せない構成は買えない", none.requestPro(features))

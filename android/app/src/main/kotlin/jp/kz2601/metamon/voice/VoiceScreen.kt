@@ -83,6 +83,7 @@ import jp.kz2601.metamon.R
 import jp.kz2601.metamon.ReviewBuild
 import jp.kz2601.metamon.permissions.PermissionCenter
 import jp.kz2601.metamon.permissions.rememberPermissionRequest
+import jp.kz2601.metamon.purchase.PaywallReason
 import jp.kz2601.metamon.renderer.layout.imePaddingExcludingBelow
 import jp.kz2601.metamon.runtime.UiText
 import jp.kz2601.metamon.runtime.resolve
@@ -355,7 +356,7 @@ private fun TranscriptCard(state: VoiceUiState) {
 @Composable
 private fun ErrorCardSlot(state: VoiceUiState, vm: VoiceViewModel, onOpenSettings: () -> Unit) {
     val error = state.error ?: return
-    ErrorCard(VoiceErrorCopy.of(error), onRetry = vm::retry, onDismiss = vm::dismissError, onOpenSettings = onOpenSettings)
+    ErrorCard(VoiceErrorCopy.of(error), onRetry = vm::retry, onDismiss = vm::dismissError, onOpenSettings = onOpenSettings, onUpgrade = vm.upgradeHandler())
 }
 
 /** 状態カードの本文。上限に達した時は戻る時刻(分からなければ「明日」)を入れる。TalkBack の読み上げにも使う。 */
@@ -373,7 +374,15 @@ fun ErrorCardCopy.bodyText(english: Boolean): UiText {
 
 /** 状態カード(iOS の `ErrorCard`)。 */
 @Composable
-fun ErrorCard(copy: ErrorCardCopy, onRetry: () -> Unit, onDismiss: () -> Unit, onOpenSettings: () -> Unit, modifier: Modifier = Modifier) {
+fun ErrorCard(
+    copy: ErrorCardCopy,
+    onRetry: () -> Unit,
+    onDismiss: () -> Unit,
+    onOpenSettings: () -> Unit,
+    modifier: Modifier = Modifier,
+    /** 「Pro にする」(#1103)。null = 課金を持たない構成なので出さない */
+    onUpgrade: ((PaywallReason) -> Unit)? = null,
+) {
     val english = LocalConfiguration.current.locales[0].language == "en"
     val body = copy.bodyText(english).resolve()
     OutlinedCard(modifier.fillMaxWidth().padding(vertical = 8.dp)) {
@@ -381,8 +390,12 @@ fun ErrorCard(copy: ErrorCardCopy, onRetry: () -> Unit, onDismiss: () -> Unit, o
             Text(stringResource(copy.title), style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
             Text(body, style = MaterialTheme.typography.bodyMedium)
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                val upgrade = copy.upgrade
                 when {
                     copy.openSettings -> Button(onClick = onOpenSettings) { Text(stringResource(R.string.voice_open_settings)) }
+                    upgrade != null && onUpgrade != null -> Button(onClick = { onUpgrade(upgrade) }, modifier = Modifier.testTag("errorCard.upgradePro")) {
+                        Text(stringResource(R.string.voice_upgrade_pro))
+                    }
                     copy.retry -> Button(onClick = onRetry) { Text(stringResource(R.string.voice_retry)) }
                 }
                 TextButton(onClick = onDismiss) { Text(stringResource(R.string.voice_dismiss)) }
