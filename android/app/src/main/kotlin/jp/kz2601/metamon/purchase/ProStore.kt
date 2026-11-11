@@ -2,12 +2,15 @@ package jp.kz2601.metamon.purchase
 
 import android.app.Activity
 import jp.kz2601.metamon.services.http.PaidFeature
+import jp.kz2601.metamon.services.purchase.CreationQuota
+import jp.kz2601.metamon.services.purchase.CreationUsageStore
 import jp.kz2601.metamon.services.purchase.EntitlementClient
 import jp.kz2601.metamon.services.purchase.PlayPurchase
 import jp.kz2601.metamon.services.purchase.PlayPurchaseRules
 import jp.kz2601.metamon.services.purchase.ProAccountToken
 import jp.kz2601.metamon.services.purchase.ProProducts
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -62,6 +65,10 @@ data class ProUiState(
  * - Pro かどうかはサーバー(`GET /v1/me/entitlements`)の答え。iOS で買った Pro も同じアカウントなら効く
  * - Play で買ったら購入をサーバーに送り(`POST /v1/me/entitlements/google`・backend は未実装)、確かめられた後だけ承認する
  * - モックは Play に触れず、購入はその場で Pro になる(iOS のモックと同じ)
+ * - 新規作成の無料枠(#1261・iOS の `ProGate.admitNewApp`): 回数は端末で数え、Pro はサーバーの答え
+ *
+ * @param usage 今日の新規作成の回数。null なら数えない(枠を見ない)
+ * @param enforceLimit 無料枠を効かせるか(iOS の `isEnforced`。debug は既定で切り、つまみ `METAMON_IAP_ENFORCE=1` で効かせる)
  */
 class ProStore(
     private val entitlements: EntitlementClient?,
@@ -70,7 +77,10 @@ class ProStore(
     private val scope: CoroutineScope,
     private val mock: Boolean = false,
     private val log: (String) -> Unit = {},
-) {
+    private val usage: CreationUsageStore? = null,
+    private val quota: CreationQuota = CreationQuota(),
+    private val enforceLimit: Boolean = false,
+) : CreationGate {
     private val _state = MutableStateFlow(ProUiState())
     val state: StateFlow<ProUiState> = _state.asStateFlow()
 
@@ -83,6 +93,51 @@ class ProStore(
     private val submitted = mutableSetOf<String>()
     private val syncing = Mutex()
 
+    /** [requestPro] で課金画面が閉じるのを待っている側 */
+    private var waiter: CompletableDeferred<Boolean>? = null
+
+    override val dailyFreeLimit: Int get() = quota.dailyFreeLimit
+
+    /** 今日の無料枠の判定(Pro・制限を切っている間は数えない) */
+    val decision: CreationQuota.Decision
+        get() = quota.decide(used = usage?.used() ?: 0, isPro = isPro, limitDisabled = usage == null || !enforceLimit)
+
+    /** 新規作成の前。枠切れなら課金画面を出し、閉じるまで待つ。戻り値 = 作ってよいか(枠がある・買った) */
+    override suspend fun admitNewApp(): Boolean {
+        if (decision != CreationQuota.Decision.Blocked) return true
+        log("IAP: daily free limit reached → paywall")
+        val bought = requestPro(PaywallReason.LIMIT_REACHED)
+        return bought || decision != CreationQuota.Decision.Blocked
+    }
+
+    /** 新規作成ができた時(失敗・取り消しは数えない)。Pro・制限を切っている間も記録だけはする */
+    override fun recordNewApp() {
+        usage?.record()
+    }
+
+    override suspend fun requestPro(features: List<PaidFeature>): Boolean = requestPro(PaywallReason.PaidFeatures(features))
+
+    /**
+     * 課金画面を出し、閉じるまで待つ。戻り値 = 閉じた時に Pro か(買った・復元した)。Pro ならすぐ true。
+     * 前の課金画面が開いていれば、それは閉じた扱いにする。課金画面を出せない構成は false。
+     */
+    suspend fun requestPro(reason: PaywallReason): Boolean {
+        if (isPro) return true
+        if (!isAvailable) return false
+        finishWaiter()
+        val done = CompletableDeferred<Boolean>()
+        waiter = done
+        _state.update { it.copy(paywall = reason, message = null) }
+        scope.launch { loadOffer() }
+        return done.await()
+    }
+
+    private fun finishWaiter() {
+        val w = waiter
+        waiter = null
+        w?.complete(isPro)
+    }
+
     /** AI ボタンなどで Pro が要る時(iOS の `requestPro`)。開いたら商品を読む */
     fun requestPaywall(reason: PaywallReason) {
         if (!isAvailable) return
@@ -90,7 +145,10 @@ class ProStore(
         scope.launch { loadOffer() }
     }
 
-    fun dismissPaywall() = _state.update { it.copy(paywall = null, message = null) }
+    fun dismissPaywall() {
+        _state.update { it.copy(paywall = null, message = null) }
+        finishWaiter()
+    }
 
     /** サインインの後・起動時: サーバーの Pro を読み、送れていない Play の購入を送る */
     suspend fun refresh() {
@@ -161,6 +219,8 @@ class ProStore(
     fun reset() {
         submitted.clear()
         _state.value = ProUiState()
+        finishWaiter()
+        usage?.reset() // 今日の作成回数も人ごと(iOS は LocalWipe で消える)
     }
 
     private suspend fun readServer() {

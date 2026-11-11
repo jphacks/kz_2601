@@ -83,7 +83,7 @@ fun PaywallSheet(pro: ProStore, reason: PaywallReason, onDismiss: () -> Unit) {
         ) {
             Text("Tailor It Pro", style = MaterialTheme.typography.headlineMedium.copy(fontWeight = FontWeight.Bold))
             Text(
-                PaywallCopy.headlineText(reason),
+                PaywallCopy.headlineText(reason, pro.dailyFreeLimit),
                 style = MaterialTheme.typography.titleMedium,
                 textAlign = TextAlign.Center,
                 modifier = Modifier.testTag("paywall.headline"),
@@ -213,8 +213,8 @@ object PaywallCopy {
     }
 
     @Composable
-    fun headlineText(reason: PaywallReason): String = when (reason) {
-        PaywallReason.LIMIT_REACHED -> stringResource(headline(reason), ProProducts.DAILY_FREE_CREATIONS)
+    fun headlineText(reason: PaywallReason, dailyFreeLimit: Int = ProProducts.DAILY_FREE_CREATIONS): String = when (reason) {
+        PaywallReason.LIMIT_REACHED -> stringResource(headline(reason), dailyFreeLimit)
         is PaywallReason.PaidFeatures -> stringResource(headline(reason), featureNames(reason.features) ?: stringResource(R.string.paywall_shared_data))
         else -> stringResource(headline(reason))
     }
@@ -241,7 +241,8 @@ object PaywallCopy {
     fun closeNote(reason: PaywallReason): Int? = when (reason) {
         PaywallReason.AI_TEXT -> R.string.paywall_close_ai_text
         PaywallReason.AI_CHAT -> R.string.paywall_close_ai_chat
-        PaywallReason.SETTINGS, PaywallReason.LIMIT_REACHED, is PaywallReason.PaidFeatures -> null
+        is PaywallReason.PaidFeatures -> R.string.paywall_close_paid_feature
+        PaywallReason.SETTINGS, PaywallReason.LIMIT_REACHED -> null
     }
 
     fun message(m: ProMessage): Int = when (m) {
