@@ -79,8 +79,10 @@ op の `Check` は引数の値を確かめる(appconfig と runner の両方で�
 | `notion` の `queryDatabase` / `addRow`(データベースを見る・足す・#1497) | 無料・OAuth(`runs` だけ)・`addRow` は書く(確認必須) | `queryDatabase(databaseId, limit?, subtitleProperty?, valueProperty?)`・`addRow(databaseId, title, properties?)` | `https://api.notion.com` だけ | なし | `EXT_NOTION_ENABLED=1`・`EXT_NOTION_CLIENT_ID` / `_CLIENT_SECRET` |
 | `notion` の `updateProperties`(ページのプロパティを直す・#1680) | 無料・OAuth(`runs` だけ)・書く(確認必須) | `updateProperties(pageId, properties)`。`pageId` は 32 桁の 16 進(ハイフン有り無しどちらも)。`properties` は「プロパティ名 → 値」の JSON(1〜20 個・8 KiB まで)。直せる型は `title`・`rich_text`・`number`・`select`・`checkbox`・`date` だけで、ほか(`status`・`relation`・`people` など)・ページに無い名前・型に合わない値は Notion に送らず 400 `bad_request`。値の読み方はページの型で決める(ページを 1 回読んでから直す)。同じ値でやり直しても変わらない。答えは `resultId`(ページ id)と 1 件(見出し = タイトル・リンク) | 同上 | なし | 同上 |
 | `notion` の `pageText`(ページの本文を読む・#1680) | 無料・OAuth(`runs` だけ) | `pageText(pageId)`。ページの一番上の段のブロックを文字だけにする(見出し・段落・引用・コールアウト・トグル・コード・箇条書き `•`・番号付き `1.`・ToDo `☑` / `☐`・子ページの名前・区切り `---`。画像や表など文字の無いもの・入れ子の中身は読まない)。答えは 1 件(見出し = ページのタイトル・値 = 本文・リンク)。本文は 64 KiB(`MaxBody` の 1/16)か 5 回の読み出し(500 ブロック)で切り、切った時は末尾に `…` | 同上 | なし | 同上 |
+| `youtube` の `channelStats`(チャンネルの公開の数字・YouTube Data API v3・#1699) | 無料・運営の鍵(`runs` だけ。YouTube の 1 日の割り当てで 1 回 1 単位) | `channelStats(channel)`。`channel` はチャンネル id(`UC` + 22 文字)か `@ハンドル`(3〜30 文字・文字と数字と `.` `_` `-`)。答えは 1 件(見出し = チャンネル名・値 = 「登録者 n 人」・補足 = 「動画 n 本・再生 n 回」・リンク = チャンネル)。数は API の値をそのまま 3 桁区切りで出す(丸めない・作り直さない)。登録者を隠しているチャンネルは「登録者 非公開」。無いチャンネルは 400 `bad_request`。出典「YouTube」を出す(下の「YouTube の規約」)。AI に選ばせる決まり(`prompt.go`・`catalog.go`)はまだ | `https://www.googleapis.com` だけ(`/youtube/v3/channels`)・鍵は `X-Goog-Api-Key` ヘッダー | 1 時間 | `EXT_YOUTUBE_ENABLED=1`・`EXT_YOUTUBE_API_KEY` |
+| `youtube` の `latestVideos`(チャンネルの新しい動画・#1699) | 同上(1 回 2 単位: チャンネル + アップロードの再生リスト。`search` の 100 単位は使わない) | `latestVideos(channel, limit?)`。`channel` は同上・`limit` 1〜20(既定 5)。行は公開の動画だけ・新しい順(見出し = 題・補足 = 公開の日時(日本時間)・リンク = 動画)。動画が 1 本も無いチャンネルは 0 行 | 同上(`/youtube/v3/channels`・`/youtube/v3/playlistItems`) | 30 分 | 同上 |
 
-Todoist の `complete`・`projects`・`project` / `label` と Notion の `updateProperties`・`pageText` は runner の op だけ。生成アプリから呼ぶ部品と AI に選ばせる決まり(`prompt.go`・`catalog.go`・`docs/dsl`)は #1643 の判断の後に足す。
+Todoist の `complete`・`projects`・`project` / `label` と Notion の `updateProperties`・`pageText` と YouTube の `channelStats`・`latestVideos` は runner の op だけ。生成アプリから呼ぶ部品と AI に選ばせる決まり(`prompt.go`・`catalog.go`・`docs/dsl`)は #1643 の判断の後に足す。
 
 provider が 404 / 422(持っていない通貨・日)を返した時は 400 `bad_request`(`runs` は戻す)。429 / 5xx は 502 `upstream_unavailable`。
 
@@ -92,6 +94,20 @@ provider が 404 / 422(持っていない通貨・日)を返した時は 400 `ba
 |---|---|
 | 黄砂(気象庁の黄砂情報) | 予測図が画像で出るだけで、数値で読める公式の API・使い方の決まり(仕様と規約)が無い。画像を読み取るのは壊れやすく、出典の決まりの外になる。数値の公式の出どころができたら入れ直す |
 | 環境省「そらまめ君」(大気汚染物質広域監視システム) | 公式の API の仕様が無く、画面とデータのダウンロードだけ。機械から呼ぶ使い方の規約も無いので、runner から定期に読む形にできない。PM2.5 は上の `airQuality` で見る |
+
+
+### YouTube の規約(#1699)
+
+[YouTube API サービス利用規約](https://developers.google.com/youtube/terms/api-services-terms-of-service)と[開発者ポリシー](https://developers.google.com/youtube/terms/developer-policies)(2026-11-12 に読んだ)から、`youtube` を出す時に守ること。
+
+| 決まり | 中身 | この作りでの扱い |
+|---|---|---|
+| 出どころを見せる(規約 10.3・ポリシー III.F.2) | YouTube の中身を出す画面は、YouTube が出どころだと分かるように YouTube のブランド(Branding Guidelines)を出す。他の出どころとまとめた 1 つの出典にしない | 出典「YouTube」(`YouTubeAttribution`)を数字・行のそばに出す。ロゴの出し方は部品(#1643)と iOS で決める |
+| 数字をそのまま出す(ポリシー III.E.4.h・III.E.4.f) | API の数字を、自分で計算した別の数字に置き換えない。出すのは手に入る一番新しい値。過去の値は「いつの値か」を添えるなら出せる | 数は API の値をそのまま(3 桁区切りだけ)。隠された登録者は出さない |
+| 持つ期間(ポリシー III.E.4.b・c・d・e) | 許可されていないデータ(運営の鍵で読む公開の数字)は 30 日まで。統計(登録者の数など)も 30 日を超えて持たない。持つ間も今の値に合わせる努力をする | キャッシュは 1 時間 / 30 分だけ。**生成アプリが毎日の登録者を記録して 30 日より長く持つのは規約の外**。推移を出す部品は 30 日で古い記録を消す形にする(#1643 で決める) |
+| 規約へのリンク(ポリシー III.A.1) | YouTube の利用規約(https://www.youtube.com/t/terms)へのリンクを出す | 部品と iOS の作業(#1643)。`docs/legal` にも書く(人の作業) |
+| プライバシーポリシー(規約 7・ポリシー III.A.2) | YouTube API サービスを使うと書き、Google のプライバシーポリシー(https://policies.google.com/privacy)へリンクする | 人の作業(`docs/legal`) |
+| 割り当て(規約 15・ポリシー III.D.3) | 割り当てを超えない・避けない。増やすには API Compliance Audit。認められた使い道にだけ使う | 1 回 1〜2 単位。回数の上限 `EXT_GLOBAL_DAILY_YOUTUBE` を 1 日の割り当てに合わせる(上限は回数で数えるので、`latestVideos` を 2 単位として見積もる・人の作業) |
 
 ## 呼び出しの流れと数え方
 
@@ -221,3 +237,4 @@ DSL に `externalCall` / `externalList` があるかの確かめは、DSL の子
 - 各社の鍵・OAuth のクライアント(Secret Manager・`EXT_<PROVIDER>_*`)と、原価・押さえの量(非公開の資料から env)。
 - 回数の上限の値(`EXT_LIMIT_*`・`EXT_GLOBAL_DAILY*`)を各社の割り当てに合わせて runner の env に入れる(非公開の資料から。入れなければコードの既定)。
 - プライバシーポリシー・利用規約(`docs/legal`)に外の API への送信とトークンの保管・消し方を書く。
+- YouTube(#1699): Google Cloud で YouTube Data API v3 を有効にし、鍵(使える API を YouTube Data API v3 だけに絞る)を Secret Manager の `EXT_YOUTUBE_API_KEY` に入れる。1 日の割り当て(Cloud Console の Quotas)を確かめて `EXT_GLOBAL_DAILY_YOUTUBE` を合わせる。上の「YouTube の規約」を読み直し、プライバシーポリシーに YouTube API サービスの利用と Google のプライバシーポリシーへのリンク、アプリに YouTube の利用規約へのリンクを足す。
