@@ -275,7 +275,7 @@ struct MacSummaryNoticeBar: View {
         .padding(.horizontal, 14).padding(.vertical, 8)
         .macRaisedSurface(in: Capsule()) // 透明度を下げる・コントラストを上げる(#1206)
         .frame(maxWidth: 560)
-        .transition(.move(edge: .top).combined(with: .opacity))
+        .macTopTransition()
         .accessibilityElement(children: .contain)
     }
 }
@@ -312,7 +312,7 @@ struct MacEditHintBar: View {
         .padding(.horizontal, 16).padding(.vertical, 12)
         .macRaisedSurface(in: RoundedRectangle(cornerRadius: 14, style: .continuous)) // #1206
         .frame(maxWidth: 560)
-        .transition(.move(edge: .top).combined(with: .opacity))
+        .macTopTransition()
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier("editHint.card")
     }
@@ -339,7 +339,7 @@ struct MacNewItemsBar: View {
         .padding(.horizontal, 14).padding(.vertical, 8)
         .macRaisedSurface(in: Capsule())
         .frame(maxWidth: 560)
-        .transition(.move(edge: .top).combined(with: .opacity))
+        .macTopTransition()
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier("newItems.banner")
     }
@@ -372,7 +372,7 @@ struct MacUsageNoticeBar: View {
         .padding(.horizontal, 14).padding(.vertical, 8)
         .macRaisedSurface(in: Capsule())
         .frame(maxWidth: 560)
-        .transition(.move(edge: .top).combined(with: .opacity))
+        .macTopTransition()
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier("usage.notice.\(notice.resource.rawValue)")
     }
@@ -411,7 +411,7 @@ struct MacServiceNoticeBar: View {
         .padding(.horizontal, 14).padding(.vertical, 8)
         .macRaisedSurface(in: RoundedRectangle(cornerRadius: 10, style: .continuous))
         .frame(maxWidth: 560)
-        .transition(.move(edge: .top).combined(with: .opacity))
+        .macTopTransition()
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier("notice.banner")
     }

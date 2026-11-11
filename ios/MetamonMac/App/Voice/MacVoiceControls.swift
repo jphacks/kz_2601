@@ -6,6 +6,7 @@ import MetamonServices
 /// 長く押した時は、離したら止めて送る(#1220)。VoiceOver・キーボードの操作は押して開始・もう一度で終了。
 struct MacMicButton: View {
     @Environment(MacVoiceInput.self) private var voice
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     let disabled: Bool
     let deliver: (String) -> Void
     @State private var gesture = HoldToTalkGesture()
@@ -45,7 +46,7 @@ struct MacMicButton: View {
             Image(systemName: "mic").font(.title3)
         case .recording:
             Image(systemName: "stop.circle.fill").font(.title2).foregroundStyle(.red)
-                .symbolEffect(.pulse, options: .repeating)
+                .symbolEffect(.pulse, options: .repeating, isActive: !reduceMotion) // 動きを減らす時は点滅させない(#937)
         case .transcribing:
             ProgressView().controlSize(.small)
         }

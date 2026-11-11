@@ -165,13 +165,13 @@ private struct ComposeChat: View {
                 }
                 .onAppear { proxy.scrollTo("bottom", anchor: .bottom) } // 続きから話す(#1211)
                 .onChange(of: session.bubbles.count) {
-                    withAnimation { proxy.scrollTo("bottom", anchor: .bottom) }
+                    withMacAnimation { proxy.scrollTo("bottom", anchor: .bottom) }
                 }
                 .onChange(of: session.sending) {
-                    withAnimation { proxy.scrollTo("bottom", anchor: .bottom) }
+                    withMacAnimation { proxy.scrollTo("bottom", anchor: .bottom) }
                 }
                 .onChange(of: session.failure?.id) {
-                    withAnimation { proxy.scrollTo("bottom", anchor: .bottom) }
+                    withMacAnimation { proxy.scrollTo("bottom", anchor: .bottom) }
                 }
             }
             Divider()

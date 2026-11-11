@@ -274,11 +274,11 @@ private struct MacNotificationsOffBar: ViewModifier {
             .safeAreaInset(edge: .top, spacing: 0) {
                 if visible {
                     bar
-                        .transition(.move(edge: .top).combined(with: .opacity))
+                        .macTopTransition()
                         .onAppear { MacVoiceOver.announce(Self.message) }
                 }
             }
-            .animation(.easeInOut(duration: 0.25), value: visible)
+            .macAnimation(.easeInOut(duration: 0.25), value: visible)
     }
 
     private static var message: String { L10n.tr("通知がオフのため、このアプリの通知は届きません") }

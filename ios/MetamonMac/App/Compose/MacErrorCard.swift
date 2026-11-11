@@ -81,7 +81,7 @@ struct MacErrorCard: View {
         .accessibilityElement(children: .contain)
         .accessibilityLabel(presentation.announcement)
         .task(id: presentation.id) {
-            MacVoiceOver.announce(presentation.announcement)
+            MacVoiceOver.announce(.failure(presentation.announcement))
             replacing = appLimit // iOS と同じく、断られたらすぐ置き換えシートを出す(閉じてもカードの「置き換える」で開き直せる)
         }
         .sheet(item: Binding(get: { replacing.map(LimitItem.init) }, set: { if $0 == nil { replacing = nil } })) { item in

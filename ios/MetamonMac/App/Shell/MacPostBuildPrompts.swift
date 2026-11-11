@@ -37,7 +37,7 @@ struct MacPublicDataBar: View {
         .padding(.horizontal, 16).padding(.vertical, 12)
         .macRaisedSurface(in: RoundedRectangle(cornerRadius: 14, style: .continuous))
         .frame(maxWidth: 560)
-        .transition(.move(edge: .top).combined(with: .opacity))
+        .macTopTransition()
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier("publicData.card")
     }
@@ -79,7 +79,7 @@ struct MacRetentionBar: View {
         .padding(.horizontal, 16).padding(.vertical, 12)
         .macRaisedSurface(in: RoundedRectangle(cornerRadius: 14, style: .continuous))
         .frame(maxWidth: 560)
-        .transition(.move(edge: .top).combined(with: .opacity))
+        .macTopTransition()
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier("retention.card")
     }

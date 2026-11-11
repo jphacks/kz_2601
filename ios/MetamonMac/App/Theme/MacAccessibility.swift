@@ -167,4 +167,96 @@ enum MacTextZoom {
     static func setStep(_ step: Int, in defaults: UserDefaults) {
         defaults.set(clamped(step), forKey: storageKey)
     }
+
+    /// 本文(body)の大きさの、実際のサイズ(17pt)に対する割合。設定の選択肢に出す(#937)。
+    /// 値は iOS の Dynamic Type の body の pt(xSmall 14 … accessibility3 40)
+    static let bodyPoints: [Double] = [14, 15, 16, 17, 19, 21, 23, 28, 33, 40]
+
+    static func percent(at step: Int) -> Int {
+        Int((bodyPoints[clamped(step)] / bodyPoints[defaultStep] * 100).rounded())
+    }
+}
+
+/// 「視差効果を減らす」(#937)。殻の出し入れ・場面の切り替えを、動かさずにその場で変える。
+/// View の中は `@Environment(\.accessibilityReduceMotion)`、View の外(会話のセッションなど)は `systemReduceMotion` で読む。
+@MainActor
+enum MacMotion {
+    /// system の設定。テストで差し替える。
+    static var systemReduceMotion: () -> Bool = { NSWorkspace.shared.accessibilityDisplayShouldReduceMotion }
+
+    /// 動きを減らす時は nil(アニメーション無しで変える)
+    static func animation(_ base: Animation? = .default, reduceMotion: Bool) -> Animation? {
+        reduceMotion ? nil : base
+    }
+
+    /// 上から滑り込む一言・バーの出し入れ。動きを減らす時はその場で薄く出す
+    static func topTransition(reduceMotion: Bool) -> AnyTransition {
+        reduceMotion ? .opacity : .move(edge: .top).combined(with: .opacity)
+    }
+}
+
+/// `withAnimation` の代わり。「視差効果を減らす」の時はアニメーション無しで変える(#937)
+@MainActor
+func withMacAnimation<Result>(_ animation: Animation? = .default, _ body: () throws -> Result) rethrows -> Result {
+    try withAnimation(MacMotion.animation(animation, reduceMotion: MacMotion.systemReduceMotion()), body)
+}
+
+private struct MacTopTransition: ViewModifier {
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
+    func body(content: Content) -> some View {
+        content.transition(MacMotion.topTransition(reduceMotion: reduceMotion))
+    }
+}
+
+private struct MacMotionAnimation<V: Equatable>: ViewModifier {
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    let animation: Animation?
+    let value: V
+
+    func body(content: Content) -> some View {
+        content.animation(MacMotion.animation(animation, reduceMotion: reduceMotion), value: value)
+    }
+}
+
+/// 中央の列のようにフォーカスを受ける広い面の輪(#937)。クリックで入った時は出さず、
+/// フルキーボードアクセス(システム設定 > キーボード > キーボードナビゲーション)が有効な時だけ描く。
+@MainActor
+enum MacFocusRing {
+    static var fullKeyboardAccess: () -> Bool = { NSApp?.isFullKeyboardAccessEnabled ?? false }
+
+    static func isVisible(focused: Bool, fullKeyboardAccess: Bool) -> Bool { focused && fullKeyboardAccess }
+}
+
+private struct MacPaneFocusRing: ViewModifier {
+    let focused: Bool
+
+    func body(content: Content) -> some View {
+        content.overlay {
+            if MacFocusRing.isVisible(focused: focused, fullKeyboardAccess: MacFocusRing.fullKeyboardAccess()) {
+                RoundedRectangle(cornerRadius: 6, style: .continuous)
+                    .strokeBorder(Color(nsColor: .keyboardFocusIndicatorColor), lineWidth: 3)
+                    .padding(2)
+                    .allowsHitTesting(false)
+                    .accessibilityHidden(true)
+            }
+        }
+    }
+}
+
+extension View {
+    /// 広い面のフォーカスの輪。`.focusEffectDisabled()` と組にして使う(#937)
+    func macPaneFocusRing(_ focused: Bool) -> some View {
+        modifier(MacPaneFocusRing(focused: focused))
+    }
+
+    /// 一言・バーの出し入れ(上から)。「視差効果を減らす」の時は薄く出すだけ(#937)
+    func macTopTransition() -> some View {
+        modifier(MacTopTransition())
+    }
+
+    /// `.animation(_:value:)` の代わり。「視差効果を減らす」の時は動かさない(#937)
+    func macAnimation<V: Equatable>(_ animation: Animation? = .default, value: V) -> some View {
+        modifier(MacMotionAnimation(animation: animation, value: value))
+    }
 }

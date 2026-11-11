@@ -53,6 +53,8 @@ private struct MacGeneralSettings: View {
     // 対話(#75 / #160)。iOS と同じ保存先(`ClarifySettings`)。会話のシート(#967)が開く時に読む
     @State private var clarifyEnabled = ClarifySettings.enabled
     @State private var clarifyAutoBuild = ClarifySettings.autoBuild
+    /// 作ったアプリの文字の大きさ(#937)。表示メニューの ⌘+ / ⌘- / ⌘0 と同じ保存先
+    @AppStorage(MacTextZoom.storageKey) private var zoomStep = MacTextZoom.defaultStep
 
     var body: some View {
         @Bindable var language = LanguagePreference.shared
@@ -87,6 +89,20 @@ private struct MacGeneralSettings: View {
                                   review: "新しい記録帳を声だけで相談している時は、内容がそろうと少し待ってから自動で用意し始めます。用意した記録帳の変更は、意図しない変更を防ぐため必ず「これでいく」を押してから反映します。"))
                 }
             }
+            // 文字の大きさ(#937)。Mac に Dynamic Type は無いので、作ったアプリの文字の段をここと表示メニューで選ぶ
+            Section {
+                Picker("文字の大きさ", selection: Binding(get: { MacTextZoom.clamped(zoomStep) },
+                                                    set: { zoomStep = MacTextZoom.clamped($0) })) {
+                    ForEach(MacTextZoom.steps.indices, id: \.self) { step in
+                        zoomLabel(step).tag(step)
+                    }
+                }
+                .accessibilityIdentifier("settings.textZoom")
+            } header: {
+                Text("表示")
+            } footer: {
+                Text("作ったアプリの文字の大きさです。表示メニューの「拡大」(⌘+)・「縮小」(⌘-)・「実際のサイズ」(⌘0)でも変えられます。")
+            }
             // 声で頼むのマイク(#1221)
             MacInputDeviceSection()
             // 読み上げ(#1210・#1216)。iOS と同じ保存先(metamon.speech.enabled)。Mac が読むのは完成の要約だけ
@@ -101,6 +117,12 @@ private struct MacGeneralSettings: View {
             }
         }
         .formStyle(.grouped)
+    }
+
+    private func zoomLabel(_ step: Int) -> Text {
+        let percent = Text(verbatim: "\(MacTextZoom.percent(at: step))%")
+        guard MacTextZoom.isActualSize(step) else { return percent }
+        return Text("標準") + Text(verbatim: " (") + percent + Text(verbatim: ")")
     }
 }
 
