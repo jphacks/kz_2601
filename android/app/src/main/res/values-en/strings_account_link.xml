@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="account_link_already_linked">You\'re already signed in</string>
+    <string name="account_link_apple">Continue with Apple</string>
+    <string name="account_link_conflict_apple_title">This Apple ID is used by another account</string>
+    <string name="account_link_conflict_apple_message">Switching opens the apps made with that Apple ID. Apps you made anonymously won\'t carry over and will no longer be visible on this device.</string>
+    <string name="account_link_conflict_google_title">This Google account is used by another account</string>
+    <string name="account_link_conflict_google_message">Switching opens the apps made with that Google account. Apps you made anonymously won\'t carry over and will no longer be visible on this device.</string>
+    <string name="account_link_done_apple">Linked to Apple. You can come back with the same Apple ID after changing phones</string>
+    <string name="account_link_done_google">Linked to Google. You can come back with the same Google account after changing phones</string>
+    <string name="account_link_failed">Couldn\'t link your account. Please try again</string>
+    <string name="account_link_footer">Sign in with Google or Apple to keep your apps and data. If you stay anonymous and delete the app or change phones, you can\'t get back to your apps.</string>
+    <string name="account_link_google">Continue with Google</string>
+    <string name="account_link_no_pending">Please sign in again</string>
+    <string name="account_link_status_anonymous">You\'re using it anonymously</string>
+    <string name="account_link_switch">Switch to that account</string>
+</resources>

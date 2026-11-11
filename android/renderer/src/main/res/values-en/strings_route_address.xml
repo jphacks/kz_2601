@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Route guidance: address to coordinates (#1350). -->
+<resources>
+    <string name="renderer_route_address_not_found">Couldn\'t find “%1$s”</string>
+</resources>
