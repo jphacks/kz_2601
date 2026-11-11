@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <!-- Load states of list / table / timeline / chart (#1116, iOS EmptyPlaceholder) -->
+    <!-- Load states of list / table / timeline / chart / calendar / gridTable / stat (#1116, iOS EmptyPlaceholder) -->
     <string name="load_state_loading">Loading…</string>
     <string name="load_state_unavailable">Couldn\'t load</string>
     <string name="load_state_retry">Retry</string>
