@@ -42,6 +42,29 @@
 		</dict>
 	</array>
 
+	<!-- サービスメニューの「Tailor It に送る」(#1849)。ほかのアプリで選んだ文字を会話の入力欄に入れる(MacTextServiceProvider)。
+	     英語のメニュー名は ServicesMenu.xcstrings(キーは NSMenuItem の default)。NSRequiredContext を空で置くと初めから有効になる -->
+	<key>NSServices</key>
+	<array>
+		<dict>
+			<key>NSMenuItem</key>
+			<dict>
+				<key>default</key>
+				<string>Tailor It に送る</string>
+			</dict>
+			<key>NSMessage</key>
+			<string>sendToTailorIt</string>
+			<key>NSPortName</key>
+			<string>$(PRODUCT_NAME)</string>
+			<key>NSRequiredContext</key>
+			<dict/>
+			<key>NSSendTypes</key>
+			<array>
+				<string>public.utf8-plain-text</string>
+			</array>
+		</dict>
+	</array>
+
 	<!-- バックエンド URL(iOS の Info.plist と同じキー・同じ build setting) -->
 	<key>MetamonAIBaseURL</key>
 	<string>$(METAMON_AI_BASE_URL)</string>

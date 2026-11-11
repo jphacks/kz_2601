@@ -14462,6 +14462,22 @@
         }
       }
     },
+    "送る文字がありません。文字を選んでからもう一度お試しください。" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "There's no text to send. Select some text and try again."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "送る文字がありません。文字を選んでからもう一度お試しください。"
+          }
+        }
+      }
+    },
     "送れなかった記録があります" : {
       "extractionState" : "manual",
       "localizations" : {
