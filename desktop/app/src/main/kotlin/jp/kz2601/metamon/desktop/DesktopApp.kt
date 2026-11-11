@@ -41,6 +41,15 @@ import jp.kz2601.metamon.dsl.Component
 import jp.kz2601.metamon.dsl.ComponentType
 import jp.kz2601.metamon.dsl.Entity
 import jp.kz2601.metamon.dsl.screen
+import jp.kz2601.metamon.desktop.io.DesktopIo
+import jp.kz2601.metamon.desktop.io.FileImportLeaf
+import jp.kz2601.metamon.desktop.io.IoOverlay
+import jp.kz2601.metamon.desktop.io.ListIoBar
+import jp.kz2601.metamon.desktop.io.MediaFieldLeaf
+import jp.kz2601.metamon.desktop.io.ioDropTarget
+import jp.kz2601.metamon.desktop.io.previewKey
+import jp.kz2601.metamon.desktop.io.rememberDesktopIo
+import androidx.compose.ui.input.key.onPreviewKeyEvent
 import java.awt.Desktop
 import java.net.URI
 
@@ -53,6 +62,7 @@ private class ScreenScope(
     val store: MockStore,
     val perform: (Action, String?) -> Unit,
     val entityOf: (String?) -> Entity?,
+    val io: DesktopIo,
 )
 
 /** DSL を 1 本読み、スタックで画面を積んで描く(骨格: grid の配置はせず DSL の順に縦に積む)。 */
@@ -62,6 +72,7 @@ fun DesktopApp(dsl: AppDSL) {
     var stack by remember { mutableStateOf(listOf(NavEntry(dsl.initialScreen, null, 0))) }
     var nextKey by remember { mutableStateOf(1) }
     var message by remember { mutableStateOf<String?>(null) }
+    val io = rememberDesktopIo(dsl, { store }, { store = it })
 
     val top = stack.last()
     val screen = dsl.screen(top.screenId) ?: dsl.screens.firstOrNull() ?: return
@@ -106,12 +117,14 @@ fun DesktopApp(dsl: AppDSL) {
                 pop()
             }
             ActionType.OPEN_URL -> action.url?.let(::openBrowser)
+            ActionType.EXPORT -> io.export(action, screen.entity)
             else -> message = "デスクトップ版ではまだ使えない操作: ${action.rawType.ifEmpty { action.type.name }}"
         }
     }
 
-    val scope = ScreenScope(entity, draft, store, ::perform, entityOf)
-    Surface(Modifier.fillMaxSize()) {
+    val scope = ScreenScope(entity, draft, store, ::perform, entityOf, io)
+    Surface(Modifier.fillMaxSize().ioDropTarget(io, { screen.components }, { draft }).onPreviewKeyEvent(io.previewKey({ screen.components }, { draft }))) {
+        IoOverlay(io)
         Column(Modifier.fillMaxSize()) {
             Row(Modifier.fillMaxWidth().padding(8.dp), verticalAlignment = Alignment.CenterVertically) {
                 if (stack.size > 1) TextButton(onClick = ::pop) { Text("戻る") }
@@ -120,6 +133,7 @@ fun DesktopApp(dsl: AppDSL) {
             }
             HorizontalDivider()
             message?.let { Text(it, color = MaterialTheme.colorScheme.error, modifier = Modifier.padding(12.dp)) }
+            io.notice?.let { Text(it, modifier = Modifier.padding(12.dp)) }
             Column(
                 Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(16.dp),
                 verticalArrangement = Arrangement.spacedBy(12.dp),
@@ -146,6 +160,8 @@ private fun Node(c: Component, s: ScreenScope) {
         ComponentType.BUTTON -> Button(onClick = { c.action?.let { s.perform(it, null) } }) { Text(c.label ?: c.title ?: c.text.orEmpty()) }
         ComponentType.LINK -> TextButton(onClick = { c.url?.let(::openBrowser) }) { Text(c.text ?: c.label ?: c.url.orEmpty()) }
         ComponentType.LIST -> ListLeaf(c, s)
+        ComponentType.FILE_IMPORT -> FileImportLeaf(c, s.io)
+        ComponentType.PHOTO_FIELD, ComponentType.VIDEO_FIELD -> MediaFieldLeaf(c, fieldLabel(c, s), s.draft)
         ComponentType.TEXT_FIELD, ComponentType.NUMBER_FIELD, ComponentType.TEXT_EDITOR, ComponentType.SECURE_FIELD -> {
             val field = c.field ?: return
             OutlinedTextField(
@@ -208,6 +224,7 @@ private fun Box1(modifier: Modifier, content: @Composable () -> Unit) {
 private fun ListLeaf(c: Component, s: ScreenScope) {
     val entity = s.entityOf(c.entity)
     val rows = c.entity?.let { s.store.list(it) }.orEmpty()
+    c.entity?.let { ListIoBar(it, s.io) }
     if (rows.isEmpty()) {
         Text(c.emptyText ?: "まだありません", color = Color.Gray)
         return

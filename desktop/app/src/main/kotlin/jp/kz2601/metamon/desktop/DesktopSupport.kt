@@ -1,5 +1,6 @@
 package jp.kz2601.metamon.desktop
 
+import jp.kz2601.metamon.desktop.io.IoLeaves
 import jp.kz2601.metamon.dsl.AppDSL
 import jp.kz2601.metamon.dsl.Component
 import jp.kz2601.metamon.dsl.ComponentType
@@ -34,7 +35,7 @@ object DesktopLeaves {
     /** 適合テストの `state`(rendered / unavailable / unknown)。hidden・needsForm はまだ見ない。 */
     fun state(c: Component): String = when {
         c.type == ComponentType.UNKNOWN -> "unknown"
-        c.type in containers || c.type in leaves -> "rendered"
+        c.type in containers || c.type in leaves || c.type in IoLeaves.types -> "rendered"
         else -> "unavailable"
     }
 
