@@ -217,22 +217,22 @@ private struct RuntimeOverlays: ViewModifier {
             .overlay(alignment: .top) {
                 VStack(spacing: 8) {
                     if active, let message = runtime.toast {
-                        ToastCapsule(text: message) { withAnimation { runtime.toast = nil } }
+                        ToastCapsule(text: message) { withMacAnimation { runtime.toast = nil } }
                             .task(id: message) {
                                 // 出したのと同時に VoiceOver で読み、VoiceOver の時は長く出しておく(#937・iOS の H8 と同じ)
-                                MacVoiceOver.announce(message)
+                                MacVoiceOver.announce(.message(message))
                                 try? await Task.sleep(for: .seconds(MacVoiceOver.holdSeconds(3)))
                                 guard !Task.isCancelled, runtime.toast == message else { return }
-                                withAnimation { runtime.toast = nil }
+                                withMacAnimation { runtime.toast = nil }
                             }
                     }
                     if active, let undo = runtime.recordUndo {
                         UndoDeleteCapsule(runtime: runtime)
                             .task(id: undo.id) {
-                                MacVoiceOver.announce(String(localized: "削除しました"))
+                                MacVoiceOver.announce(.recordDeleted)
                                 try? await Task.sleep(for: .seconds(MacAppRuntime.undoSeconds))
                                 guard !Task.isCancelled, runtime.recordUndo == undo else { return }
-                                withAnimation { runtime.recordUndo = nil }
+                                withMacAnimation { runtime.recordUndo = nil }
                             }
                     }
                 }
@@ -280,7 +280,7 @@ private struct ToastCapsule: View {
         }
         .padding(.horizontal, 14).padding(.vertical, 8)
         .macRaisedSurface(in: Capsule()) // 透明度を下げる・コントラストを上げる(#1206)
-        .transition(.move(edge: .top).combined(with: .opacity))
+        .macTopTransition()
         .accessibilityElement(children: .combine)
     }
 }
@@ -296,7 +296,7 @@ private struct UndoDeleteCapsule: View {
         }
         .padding(.horizontal, 14).padding(.vertical, 8)
         .macRaisedSurface(in: Capsule()) // 透明度を下げる・コントラストを上げる(#1206)
-        .transition(.move(edge: .top).combined(with: .opacity))
+        .macTopTransition()
     }
 }
 

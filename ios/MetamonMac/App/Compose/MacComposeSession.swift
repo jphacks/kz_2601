@@ -314,8 +314,8 @@ final class MacComposeSession: Identifiable {
         sending = false
         failure = nil
         let job = Job(transcript: transcript, started: .now, script: .init(transcript: transcript))
-        withAnimation { phase = .generating(job) }
-        MacVoiceOver.announce(L10n.tr("作っています"))
+        withMacAnimation { phase = .generating(job) }
+        MacVoiceOver.announce(.building)
         let version = editVersion
         let instruction = Self.instruction(transcript, about: mode == .edit ? screen : nil)
         task = Task { [ai, appId] in
@@ -328,7 +328,7 @@ final class MacComposeSession: Identifiable {
                 await finish(result, job: job)
             } catch {
                 guard !Task.isCancelled else { return }
-                withAnimation { phase = .chatting }
+                withMacAnimation { phase = .chatting }
                 if error as? AIConsentError == .notGranted { _ = requireConsent(.build(transcript)); return }
                 if FailureKind.classify(error) == .conflict, let onConflict, let latest = await onConflict() {
                     // 別の端末で直されていた: 最新に合わせ、カードの「もう一度」は取り直した版で送り直す(iOS のバナーと同じ文言)
@@ -385,14 +385,14 @@ final class MacComposeSession: Identifiable {
             onResult(document, envelope)
             resultAppId = document.appId
         }
-        withAnimation { phase = .finished(summary: summary, unchanged: unchanged) }
-        MacVoiceOver.announce(summary)
+        withMacAnimation { phase = .finished(summary: summary, unchanged: unchanged) }
+        MacVoiceOver.announce(.built(summary: summary, appName: document.dsl.app.name, created: mode == .create))
     }
 
     /// 生成中の「やめる」。会話に戻る(中央は変えない)
     func cancelBuild() {
         task?.cancel()
-        withAnimation { phase = .chatting }
+        withMacAnimation { phase = .chatting }
     }
 
     // MARK: - 会話の履歴(#1211・iOS の `AppRuntime+ChatHistory`)
@@ -481,7 +481,7 @@ final class MacComposeSession: Identifiable {
 
     private func show(_ presentation: ErrorPresentation?) {
         guard let presentation else { return }
-        withAnimation { failure = presentation }
+        withMacAnimation { failure = presentation }
     }
 
     /// カードの「もう一度」。会話の失敗は入力欄に戻した文(直していればその文)を送り直し、生成の失敗は同じ指示で作り直す
@@ -496,7 +496,7 @@ final class MacComposeSession: Identifiable {
     }
 
     /// カードの「閉じる」
-    func dismissFailure() { withAnimation { failure = nil } }
+    func dismissFailure() { withMacAnimation { failure = nil } }
 
     /// シートを閉じる時。走っている呼び出しを止める
     func close() {

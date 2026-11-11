@@ -148,6 +148,8 @@ struct MacRootView: View {
             .focusable()
             .focusEffectDisabled()
             .focused($focus, equals: .canvas)
+            // 列全体の既定の輪は消し、キーボードで来た時だけ内側に輪を描く(フルキーボードアクセス・#937)
+            .macPaneFocusRing(focus == .canvas)
         }
         .searchable(text: $searchText, placement: .sidebar, prompt: Text("アプリを探す"))
         .modifier(SidebarSearchFocus(focused: $searchFocused))
@@ -327,7 +329,7 @@ struct MacRootView: View {
         }
         thumbs.remove(appId: id)
         Task { await MacRuntimeNotifications.removeApp(id) } // そのアプリの通知とタイマーの予約(#1324)
-        MacVoiceOver.announce(L10n.tr("「\(name)」を削除しました"))
+        MacVoiceOver.announce(.appDeleted(name: name))
     }
 
     #if !APP_STORE_REVIEW
@@ -361,7 +363,7 @@ struct MacRootView: View {
             return
         }
         guard let name = library.duplicate(id, bundled: bundledApps.first { $0.id == id }) else { return }
-        MacVoiceOver.announce(L10n.tr("「\(name)」を作りました"))
+        MacVoiceOver.announce(.appCreated(name: name))
     }
 
     /// 会話で直した同梱の例を元に戻す(#1283)。開いていれば中央を作り直すので、入力があれば先に確認する(#943)
@@ -371,7 +373,7 @@ struct MacRootView: View {
             if notices.summary?.appId == id { notices.summary = nil }
             library.resetExample(id)
             thumbs.remove(appId: id) // 写しも撮り直す
-            MacVoiceOver.announce(L10n.tr("「\(name)」を元の例に戻しました"))
+            MacVoiceOver.announce(.appRestored(name: name))
         }
     }
 
@@ -587,16 +589,16 @@ struct MacRootView: View {
                                     canRedo: library.canRedo(summary.appId),
                                     undo: { undoVersion(summary.appId) },
                                     redo: { redoVersion(summary.appId) },
-                                    dismiss: { withAnimation { notices.dismissActive() } })
+                                    dismiss: { withMacAnimation { notices.dismissActive() } })
                     .task(id: summary.id) {
                         MacVoiceOver.announce(summary.text)
                         try? await Task.sleep(for: .seconds(MacPostBuildNotices.holdSeconds(summary)))
                         guard !Task.isCancelled, notices.summary == summary else { return }
-                        withAnimation { notices.dismissActive() }
+                        withMacAnimation { notices.dismissActive() }
                     }
             } else if compose == nil, notices.active == .publicData, let publicData = notices.publicData {
                 MacPublicDataBar(notice: publicData) { choice in
-                    let text = withAnimation {
+                    let text = withMacAnimation {
                         notices.resolvePublicData(choice, currentAppId: selectedApp?.id,
                                                   currentVersion: library.generated[publicData.appId]?.version)
                     }
@@ -606,38 +608,38 @@ struct MacRootView: View {
             } else if compose == nil, notices.active == .retention, let retention = notices.retention {
                 MacRetentionBar(prompt: retention,
                                 confirm: {
-                                    if let appId = withAnimation(.default, { notices.confirmRetention() }) { notifyRetentionConfirmed(appId) }
+                                    if let appId = withMacAnimation(.default, { notices.confirmRetention() }) { notifyRetentionConfirmed(appId) }
                                 },
                                 stop: {
-                                    if let text = withAnimation(.default, { notices.stopRetention() }) { sendFix(text) }
+                                    if let text = withMacAnimation(.default, { notices.stopRetention() }) { sendFix(text) }
                                 },
-                                later: { withAnimation { notices.deferRetention() } })
+                                later: { withMacAnimation { notices.deferRetention() } })
                     .task(id: retention.id) { MacVoiceOver.announce(L10n.tr("古い記録を自動で消しますか?")) }
             } else if compose == nil, notices.active == .editHint {
                 MacEditHintBar(ask: {
-                                   withAnimation { notices.dismissActive() }
+                                   withMacAnimation { notices.dismissActive() }
                                    ask()
                                },
-                               dismiss: { withAnimation { notices.dismissActive() } })
+                               dismiss: { withMacAnimation { notices.dismissActive() } })
                     .task { MacVoiceOver.announce(L10n.tr("こう頼むと直せます")) }
             } else if compose == nil, notices.top == .newItems, let newItems = notices.newItems {
-                MacNewItemsBar(notice: newItems, dismiss: { withAnimation { notices.dismissActive() } })
+                MacNewItemsBar(notice: newItems, dismiss: { withMacAnimation { notices.dismissActive() } })
                     .task(id: newItems.id) {
                         // VoiceOver へは 1 回だけ(読み上げの声 #1210 は要約だけ・重ねない)
                         MacVoiceOver.announce(L10n.tr("新着 \(newItems.count) 件"))
                         try? await Task.sleep(for: .seconds(MacVoiceOver.holdSeconds(6)))
                         guard !Task.isCancelled, notices.newItems == newItems else { return }
-                        withAnimation { notices.dismissActive() }
+                        withMacAnimation { notices.dismissActive() }
                     }
             } else if compose == nil, notices.top == .usage, let usage = notices.usage {
                 MacUsageNoticeBar(notice: usage, upgrade: usageUpgrade(usage),
-                                  dismiss: { withAnimation { notices.dismissActive() } })
+                                  dismiss: { withMacAnimation { notices.dismissActive() } })
                     .task(id: usage.id) {
                         notices.markUsageShown(uid: MacAccount.shared.session.user?.uid) // 見えた時点で数える
                         MacVoiceOver.announce(UsageCopy.notice(usage))
                         try? await Task.sleep(for: .seconds(MacVoiceOver.holdSeconds(8)))
                         guard !Task.isCancelled, notices.usage == usage else { return }
-                        withAnimation { notices.dismissActive() }
+                        withMacAnimation { notices.dismissActive() }
                     }
             }
         }
@@ -654,7 +656,7 @@ struct MacRootView: View {
     /// サービスのお知らせ(#333)。列を押し下げる段に、閉じるまで出す(iOS の `UpdateGateModifier` と同じ)
     @ViewBuilder private var serviceNoticeBar: some View {
         if let notice = notices.visibleService {
-            MacServiceNoticeBar(notice: notice, dismiss: { withAnimation { notices.dismissService() } })
+            MacServiceNoticeBar(notice: notice, dismiss: { withMacAnimation { notices.dismissService() } })
                 .padding(.top, 12)
                 .padding(.horizontal, 16)
                 .task(id: notice.id) {
@@ -715,7 +717,7 @@ struct MacRootView: View {
         #else
         guard UsageCopy.showsProButton(notice, isPro: RemainingTodayPlan.isPro) else { return nil }
         return {
-            withAnimation { notices.dismissActive() }
+            withMacAnimation { notices.dismissActive() }
             MacPro.shared.requestPro(.planLimit)
         }
         #endif

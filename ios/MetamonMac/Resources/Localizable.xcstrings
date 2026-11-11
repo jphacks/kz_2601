@@ -8046,6 +8046,22 @@
         }
       }
     },
+    "作ったアプリの文字の大きさです。表示メニューの「拡大」(⌘+)・「縮小」(⌘-)・「実際のサイズ」(⌘0)でも変えられます。" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Text size for your apps. You can also use Zoom In (⌘+), Zoom Out (⌘-) and Actual Size (⌘0) in the View menu."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "作ったアプリの文字の大きさです。表示メニューの「拡大」(⌘+)・「縮小」(⌘-)・「実際のサイズ」(⌘0)でも変えられます。"
+          }
+        }
+      }
+    },
     "作っています" : {
       "localizations" : {
         "en" : {
@@ -8324,6 +8340,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "保存したら、一覧の画面に自動で戻るようにして"
+          }
+        }
+      }
+    },
+    "保存しました" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Saved"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "保存しました"
           }
         }
       }
@@ -10847,6 +10880,22 @@
         }
       }
     },
+    "文字の大きさ" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Text size"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "文字の大きさ"
+          }
+        }
+      }
+    },
     "文字起こしできませんでした" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -11673,6 +11722,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "本日の受付を終了しました"
+          }
+        }
+      }
+    },
+    "標準" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Default"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "標準"
           }
         }
       }
@@ -12944,6 +13009,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "薬の飲み忘れ防止"
+          }
+        }
+      }
+    },
+    "表示" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Display"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "表示"
           }
         }
       }

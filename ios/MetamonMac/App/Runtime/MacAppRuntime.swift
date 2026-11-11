@@ -338,7 +338,11 @@ final class MacAppRuntime: RuntimeNavigating {
         }
         switch await book.save(entity: entity, form: form, recordId: recordId, canEdit: { self.canEdit(entity: $0, record: $1) }) {
         case .readOnly: notifyReadOnly(entity: entity)
-        case .saved, .unchanged: leaveAfterSave(action, ctx) // 何も変えずに保存したら書かずに画面だけ進める(M10)
+        case .saved:
+            // 保存の後は画面が閉じる・進むので、VoiceOver には先に結果を伝える(#937)
+            MacVoiceOver.announce(.saved)
+            leaveAfterSave(action, ctx)
+        case .unchanged: leaveAfterSave(action, ctx) // 何も変えずに保存したら書かずに画面だけ進める(M10)
         case .inFlight: break // 保存ボタンの連打
         }
     }
@@ -398,13 +402,12 @@ final class MacAppRuntime: RuntimeNavigating {
 
     func deleteUndoably(entity: String, recordId: String) async {
         let ticket = await book.deleteUndoably(entity: entity, recordId: recordId, grace: .seconds(Self.undoSeconds))
-        withAnimation { recordUndo = ticket }
-        AccessibilityNotification.Announcement(L10n.tr("削除しました")).post() // iOS と同じく VoiceOver に知らせる
+        withMacAnimation { recordUndo = ticket } // 「削除しました」の読み上げは AppCanvas の取り消しの一言が出す(二重に読まない・#937)
     }
 
     func undoRecordDelete() async {
         guard let ticket = recordUndo else { return }
-        withAnimation { recordUndo = nil }
+        withMacAnimation { recordUndo = nil }
         await book.undoDelete(ticket)
     }
 }
