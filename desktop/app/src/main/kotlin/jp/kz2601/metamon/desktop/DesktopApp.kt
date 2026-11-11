@@ -319,6 +319,7 @@ private fun NodeContent(c: Component, s: ScreenScope) {
         }
         in DATA_LEAVES -> DataLeaf(c, s.dataEnv)
         ComponentType.FILE_IMPORT -> FileImportLeaf(c, s.io)
+        in PlayLeaves.types -> PlayLeaf(c, s.session, s.route, s.form, s.data, s.perform)
         in InputLeaves.types -> InputNode(c, s)
         else -> Text(
             Strings.format(if (c.type == ComponentType.UNKNOWN) "desktop_unknown_component" else "desktop_unsupported_component", DesktopLeaves.typeName(c)),

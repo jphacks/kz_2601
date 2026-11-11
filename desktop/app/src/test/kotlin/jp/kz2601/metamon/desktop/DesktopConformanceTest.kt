@@ -64,7 +64,16 @@ class DesktopConformanceTest {
         "gridTable" to listOf("entity", "title"),
         "feed" to listOf("title", "limit"),
         "matchList" to listOf("entity", "show", "title"),
+        "settlement" to listOf("title", "transfers"),
+        "bracket" to listOf("title", "rounds", "champion"),
+        "flashcards" to listOf("cards", "progress"),
+        "randomPicker" to listOf("title", "label"),
+        "timerDisplay" to listOf("mode", "seconds", "label"),
+        "qrCode" to listOf("text", "label"),
     )
+
+    /** 今の case の保存した記録(計算・遊びの部品が computed を足す前の値を読む)。 */
+    private var raw: (String) -> List<Record> = { emptyList() }
 
     private data class Got(val c: Component, val area: GridArea?, val stacked: Boolean, val band: Int?)
 
@@ -96,6 +105,7 @@ class DesktopConformanceTest {
                 val records = (case["records"] as? JsonObject).orEmpty().mapValues { (_, v) -> (v as JsonArray).map(Record::from) }
                 val uid = device?.str("userId") ?: "me"
                 val data = LeafData(dsl.entityModels(), { records[it].orEmpty() }, uid)
+                raw = { records[it].orEmpty() }
                 val models = dsl.entityModels()
                 for (s in expected["screens"] as JsonArray) {
                     s as JsonObject
@@ -311,6 +321,7 @@ class DesktopConformanceTest {
         fun putText(k: String, v: String?) {
             v?.let { put(k, JsonPrimitive(it)) }
         }
+        putAll(PlayLeaves.props(c, data, raw))
         when (c.type.wire) {
             "text", "markdown" -> putText("text", c.text)
             "label", "badge" -> putText("text", c.text ?: c.label)
