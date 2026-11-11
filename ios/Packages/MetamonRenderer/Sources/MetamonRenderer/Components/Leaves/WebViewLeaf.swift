@@ -35,11 +35,11 @@ struct WebViewLeaf: View {
     private func toolbar(_ url: URL) -> some View {
         HStack(spacing: 12) {
             Button { state.goBack?() } label: { Image(systemName: "chevron.backward") }
+                .iconButtonLabel(L("前のページ"))
                 .disabled(!state.canGoBack)
-                .accessibilityLabel(L("前のページ"))
             Button { state.goForward?() } label: { Image(systemName: "chevron.forward") }
+                .iconButtonLabel(L("次のページ"))
                 .disabled(!state.canGoForward)
-                .accessibilityLabel(L("次のページ"))
             Text(c.title ?? state.pageTitle)
                 .font(.subheadline.weight(.medium))
                 .lineLimit(1)
@@ -47,12 +47,11 @@ struct WebViewLeaf: View {
             Button { state.reload?() } label: {
                 Image(systemName: state.isLoading ? "xmark" : "arrow.clockwise")
             }
-            .accessibilityLabel(state.isLoading ? L("読み込みを止める") : L("再読み込み"))
+            .iconButtonLabel(state.isLoading ? L("読み込みを止める") : L("再読み込み"))
             #if os(macOS)
             // Mac(#961): 今のページを既定のブラウザで開く(NSWorkspace)。
             Button { PlatformSystem.open(state.currentURL ?? url) } label: { Image(systemName: "safari") }
-                .help(L("ブラウザで開く"))
-                .accessibilityLabel(L("ブラウザで開く"))
+                .iconButtonLabel(L("ブラウザで開く"))
             #endif
         }
         .buttonStyle(.plain)

@@ -51,8 +51,9 @@ struct PhotoFieldLeaf: View {
             if hasPhoto {
                 if wantsPose, let pose, let decoded {
                     PosePhotoView(image: decoded, pose: pose, height: 200)
+                        .imageContextMenu(decoded, title: c.label ?? L("写真"))
                 } else {
-                    PhotoView(value: value, height: 160, accessibilityLabel: L("\(c.label ?? L("写真"))(添付済み)"))
+                    PhotoView(value: value, height: 160, accessibilityLabel: L("\(c.label ?? L("写真"))(添付済み)"), menuTitle: c.label ?? L("写真"))
                 }
                 HStack(spacing: RenderTheme.Spacing.sm) {
                     Button { start() } label: {

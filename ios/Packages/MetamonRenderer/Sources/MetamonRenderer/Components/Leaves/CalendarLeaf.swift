@@ -51,7 +51,7 @@ struct CalendarLeaf: View {
             }
             Spacer()
             Button { shift(-1) } label: { Image(systemName: "chevron.left").font(.body.weight(.semibold)).frame(minWidth: 32, minHeight: 32) }
-                .accessibilityLabel(L("前の月"))
+                .iconButtonLabel(L("前の月"))
             Text(month.formatted(.dateTime.year().month(.wide).locale(LanguagePreference.shared.locale)))
                 .font(.headline.monospacedDigit())
                 .lineLimit(1)
@@ -59,7 +59,7 @@ struct CalendarLeaf: View {
                 .frame(minWidth: 110)
                 .accessibilityAddTraits(.isHeader)
             Button { shift(1) } label: { Image(systemName: "chevron.right").font(.body.weight(.semibold)).frame(minWidth: 32, minHeight: 32) }
-                .accessibilityLabel(L("次の月"))
+                .iconButtonLabel(L("次の月"))
         }
         .buttonStyle(.plain)
         .foregroundStyle(.primary)

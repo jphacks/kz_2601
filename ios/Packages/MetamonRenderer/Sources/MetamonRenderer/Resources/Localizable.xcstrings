@@ -2585,6 +2585,23 @@
         }
       }
     },
+    "やり直す(⇧⌘Z)" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Redo (⇧⌘Z)"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "やり直す(⇧⌘Z)"
+          }
+        }
+      }
+    },
     "アプリを更新すると表示できます" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -4400,6 +4417,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "元に戻す"
+          }
+        }
+      }
+    },
+    "元に戻す(⌘Z)" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Undo (⌘Z)"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "元に戻す(⌘Z)"
           }
         }
       }
@@ -6814,6 +6848,40 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "現在地を記録"
+          }
+        }
+      }
+    },
+    "画像をコピー" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Copy Image"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "画像をコピー"
+          }
+        }
+      }
+    },
+    "画像を保存…" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Save Image…"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "画像を保存…"
           }
         }
       }

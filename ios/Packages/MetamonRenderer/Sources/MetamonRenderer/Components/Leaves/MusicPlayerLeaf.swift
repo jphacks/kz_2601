@@ -143,7 +143,7 @@ struct MusicPlayerLeaf: View {
         }
         .buttonStyle(.plain)
         .foregroundStyle(RenderTheme.Colors.brandA)
-        .accessibilityLabel(label)
+        .iconButtonLabel(label)
     }
 
     private var lists: some View {
@@ -306,7 +306,7 @@ struct MusicSearchSheet: View {
                                     Image(systemName: "plus.circle.fill").font(.title3)
                                 }
                                 .buttonStyle(.borderless)
-                                .accessibilityLabel(L("再生待ちに追加"))
+                                .iconButtonLabel(L("再生待ちに追加"))
                             }
                             if requests {
                                 Button {
@@ -315,7 +315,7 @@ struct MusicSearchSheet: View {
                                     Image(systemName: "paperplane.fill").font(.title3)
                                 }
                                 .buttonStyle(.borderless)
-                                .accessibilityLabel(L("近くの人にリクエスト"))
+                                .iconButtonLabel(L("近くの人にリクエスト"))
                             }
                         }
                     }

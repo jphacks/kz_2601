@@ -35,6 +35,8 @@ struct MacRootView: View {
     @State private var showsScreenMap = false
     /// 保存していない入力を、アプリの切り替え・ウインドウを閉じる前に確認する(#943)
     @State private var discardGuard = MacDiscardGuard()
+    /// シートの間に押された通知の切り替え先。シートを閉じてから確認を通して切り替える(#943)
+    @State private var notificationSwitch = SheetDeferredSwitch()
     @Environment(MacVoiceInput.self) private var voice
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
@@ -89,7 +91,7 @@ struct MacRootView: View {
         }
         .frame(minWidth: Self.minWindowSize.width, minHeight: Self.minWindowSize.height)
         .focusedSceneValue(\.shellActions, shellActions)
-        .macNotificationRouting(selection: guardedSelection, appIds: apps.map(\.id)) // 押された通知のアプリを開く(#965)。入力中なら確認を通す(#943)
+        .macNotificationRouting(selection: notificationSelection, appIds: apps.map(\.id)) // 押された通知のアプリを開く(#965)。入力中なら確認を通す・シートの間は閉じるまで待つ(#943)
         .background { WindowCloseGuard(discardGuard: discardGuard) } // ⌘W・閉じるボタン(#943)
         .sheet(item: $compose, onDismiss: noteFinishedCompose) { session in
             ComposeSheet(session: session, onClose: { compose = nil }, undo: finishedUndo(session))
@@ -107,7 +109,7 @@ struct MacRootView: View {
             if let id { library.lastAppId = id }
             showsScreenMap = false
         }
-        .sheet(isPresented: $showsTips) {
+        .sheet(isPresented: $showsTips, onDismiss: switchAfterSheet) {
             PromptTipsSheet { tip in
                 showsTips = false
                 ask(draft: tip)
@@ -201,7 +203,10 @@ struct MacRootView: View {
     /// シートが閉じた。完成していたら要約のお知らせを出す(iOS の要約バナーと同じく、直した時は「元に戻す」付き)
     private func noteFinishedCompose() {
         discardGuard.released = false
-        defer { closingCompose = nil }
+        defer {
+            closingCompose = nil
+            switchAfterSheet()
+        }
         guard let session = closingCompose, case .finished(let summary, false) = session.phase,
               let appId = session.resultAppId else { return }
         notices.summary = .init(appId: appId, text: summary, action: library.canUndo(appId) ? .undo : nil)
@@ -270,6 +275,20 @@ struct MacRootView: View {
 
     /// シート(会話・頼み方の例)を開いている間は ⌥⌘↑↓ で切り替えない。確認がシートの裏に出るため(#943)
     private var canSwitchApp: Bool { compose == nil && !showsTips }
+
+    /// 押された通知の切り替え先。シートの間は覚えておき、閉じた後に `switchAfterSheet` で切り替える(#943)
+    private var notificationSelection: Binding<String?> {
+        Binding(get: { selectedAppId }, set: { id in
+            guard let id, let now = notificationSwitch.request(id, sheetOpen: !canSwitchApp) else { return }
+            switchApp(to: now)
+        })
+    }
+
+    /// シートを閉じた。待っていた通知の切り替えがあれば、確認を通して切り替える
+    private func switchAfterSheet() {
+        guard let id = notificationSwitch.sheetClosed(sheetOpen: !canSwitchApp), apps.contains(where: { $0.id == id }) else { return }
+        switchApp(to: id)
+    }
 
     private var selectedIndex: Int? { apps.firstIndex { $0.id == selectedAppId } }
 

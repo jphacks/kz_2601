@@ -99,7 +99,7 @@ struct ChatThreadLeaf: View {
                 }
                 .buttonStyle(.plain)
                 .foregroundStyle(RenderTheme.Colors.brandText)
-                .accessibilityLabel(L("写真を選ぶ"))
+                .iconButtonLabel(L("写真を選ぶ"))
                 .accessibilityIdentifier("chatThread.photo")
             }
             VStack(alignment: .leading, spacing: RenderTheme.Spacing.sm) {
@@ -121,8 +121,8 @@ struct ChatThreadLeaf: View {
             }
             .buttonStyle(.plain)
             .foregroundStyle(canSend ? AnyShapeStyle(RenderTheme.brandFill) : AnyShapeStyle(.tertiary))
+            .iconButtonLabel(L("送信"))
             .disabled(!canSend)
-            .accessibilityLabel(L("送信"))
             .accessibilityIdentifier("chatThread.send")
         }
         // マイク FAB が入力欄の左に重なる時だけ、その分を空ける(キーボード表示中は FAB が隠れるので 0)
@@ -151,7 +151,7 @@ struct ChatThreadLeaf: View {
             }
             .buttonStyle(.plain)
             .padding(4)
-            .accessibilityLabel(L("写真を外す"))
+            .iconButtonLabel(L("写真を外す"))
         }
     }
 

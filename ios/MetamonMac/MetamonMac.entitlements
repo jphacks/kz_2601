@@ -16,8 +16,8 @@
 	<!-- 現在地(#956): locationButton・地図・道案内など。サンドボックスではこのキーが無いと CoreLocation の許可を求められない -->
 	<key>com.apple.security.personal-information.location</key>
 	<true/>
-	<!-- ファイルを取り込む(#956): fileImport で利用者が選んだファイルを読む。書き戻さないので読み取りだけ -->
-	<key>com.apple.security.files.user-selected.read-only</key>
+	<!-- 利用者が選んだファイル: 取り込む(#956・fileImport)と、画像を保存…(#1333・保存パネルで選んだ場所へ書く) -->
+	<key>com.apple.security.files.user-selected.read-write</key>
 	<true/>
 </dict>
 </plist>
