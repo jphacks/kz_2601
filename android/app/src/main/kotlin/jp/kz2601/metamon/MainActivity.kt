@@ -80,6 +80,7 @@ import jp.kz2601.metamon.retention.RetentionPromptHost
 import jp.kz2601.metamon.retention.retentionPending
 import jp.kz2601.metamon.runtime.AppRuntime
 import jp.kz2601.metamon.runtime.NavigationSnapshot
+import jp.kz2601.metamon.runtime.ProvideAiChatVoice
 import jp.kz2601.metamon.runtime.TranscriberDictationHost
 import jp.kz2601.metamon.runtime.UiText
 import jp.kz2601.metamon.services.GenerateProgress
@@ -667,7 +668,8 @@ private fun GeneratedApp(state: VoiceUiState, dsl: AppDSL, runtime: AppRuntime, 
         // 部品が使う権限が断られていたら上に「オフ」のバー(#890・iOS の NotificationsOffBar)。要約は FeedbackHost が出す(#895)
         PermissionOffBarHost(dsl, appId, busy = state.isGenerating, summaryShowing = state.summary != null)
         // カメラなど部品が使う権限は使う直前にアプリの窓口で聞く(#862)
-        ProvideRendererPermissions { DSLView(dsl, runtime) }
+        // aiChat の話して入力・読み上げ(#1168)
+        ProvideRendererPermissions { ProvideAiChatVoice(runtime.dictation) { DSLView(dsl, runtime) } }
     }
 }
 
