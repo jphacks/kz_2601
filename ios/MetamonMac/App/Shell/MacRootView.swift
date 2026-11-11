@@ -44,6 +44,8 @@ struct MacRootView: View {
     /// 閉じた会話のシート(閉じた後に完成の要約を出すため・#968)
     @State private var closingCompose: MacComposeSession?
     @State private var showsTips = false
+    /// 中央のアプリの設定(記録の自動削除・自動の動き・#979)。設定ウインドウはアプリに属さないので、アプリごとの設定はこのシートに置く
+    @State private var showsAppSettings = false
     /// サイドバーの行の写し(#1281)
     @State private var thumbs = MacAppThumbnailStore.shared
     @State private var thumbAnchor = MacThumbnailAnchor()
@@ -145,7 +147,8 @@ struct MacRootView: View {
         .toolbar {
             ShellToolbar(hasApp: selectedApp != nil, canCompose: canCompose, newApp: newApp, ask: ask, speak: speak,
                          canShowScreenMap: canShowScreenMap, showScreenMap: showScreenMap,
-                         canShare: canShare, share: openShare)
+                         canShare: canShare, share: openShare,
+                         canShowAppSettings: canShowScreenMap, showAppSettings: { showsAppSettings = true })
         }
         .frame(minWidth: Self.minWindowSize.width, minHeight: Self.minWindowSize.height)
         .focusedSceneValue(\.shellActions, shellActions)
@@ -223,6 +226,22 @@ struct MacRootView: View {
             }
         }
         #endif
+        .sheet(isPresented: $showsAppSettings, onDismiss: switchAfterSheet) {
+            if let app = selectedApp, let dsl = library.generated[app.id]?.dsl ?? (try? app.loadDSL()) {
+                MacAppSettingsSheet(appId: app.id, appName: app.name, dsl: dsl,
+                                    keepsRecords: library.isCreated(app.id),
+                                    isOnServer: library.isCreated(app.id) && library.isOnServer(app.id),
+                                    onConfirmRetention: { notifyRetentionConfirmed(app.id) },
+                                    onRequest: { text, send in
+                                        showsAppSettings = false
+                                        Task { @MainActor in
+                                            try? await Task.sleep(for: .milliseconds(600)) // シートが閉じてから(重ねない)
+                                            if send { sendFix(text) } else { ask(draft: text) }
+                                        }
+                                    },
+                                    onClose: { showsAppSettings = false })
+            }
+        }
         .sheet(isPresented: $showsTips, onDismiss: switchAfterSheet) {
             PromptTipsSheet { tip in
                 showsTips = false
@@ -354,7 +373,19 @@ struct MacRootView: View {
         }
     }
 
-    private func open(_ target: MacComposeSession.Target, draft: String, voice: Bool = false, screen: ScreenContext? = nil) {
+    /// 公開の確認・保存期間の「やめる」の直す指示を、中央のアプリを直す会話で送る(iOS の `generate(text)` と同じく相談を挟まず作る)
+    private func sendFix(_ instruction: String) {
+        guard let app = selectedApp else { return }
+        open(.edit(appId: app.id, name: app.name, version: app.version), draft: "", build: instruction)
+    }
+
+    /// 保存期間を確認した: 開いているランタイムが期限切れを消す(#482)
+    private func notifyRetentionConfirmed(_ appId: String) {
+        NotificationCenter.default.post(name: MacAppRuntime.retentionConfirmed, object: appId)
+    }
+
+    private func open(_ target: MacComposeSession.Target, draft: String, voice: Bool = false, screen: ScreenContext? = nil,
+                      build: String? = nil) {
         guard canCompose else { return }
         // 会話の結果は中央のアプリを作り直す(直す・作る どちらも)。入力があれば会話を始める前に確認する(#943)。
         // シートの間は中央に触れないので、ここで「破棄」と答えたら閉じるまで聞き直さない(確認をシートの裏に出さない)
@@ -372,6 +403,7 @@ struct MacRootView: View {
             closingCompose = session
             compose = session
             discardGuard.released = true
+            if let build { session.build(build) }
         }
     }
 
@@ -463,6 +495,9 @@ struct MacRootView: View {
         guard let session = closingCompose, case .finished(let summary, false) = session.phase,
               let appId = session.resultAppId else { return }
         notices.summary = .init(appId: appId, text: summary, action: library.canUndo(appId) ? .undo : nil)
+        if let data = session.resultPublicData { // 公開の確認(#253)は要約が閉じてから
+            notices.notePublicData(data.fields, appId: appId, version: data.version)
+        }
         MacSpeechReader.shared.speak(summary) // #1210(設定 OFF・VoiceOver の時は喋らない)
     }
 
@@ -523,6 +558,25 @@ struct MacRootView: View {
                         guard !Task.isCancelled, notices.summary == summary else { return }
                         withAnimation { notices.dismissActive() }
                     }
+            } else if compose == nil, notices.active == .publicData, let publicData = notices.publicData {
+                MacPublicDataBar(notice: publicData) { choice in
+                    let text = withAnimation {
+                        notices.resolvePublicData(choice, currentAppId: selectedApp?.id,
+                                                  currentVersion: library.generated[publicData.appId]?.version)
+                    }
+                    if let text { sendFix(text) }
+                }
+                .task(id: publicData.id) { MacVoiceOver.announce(L10n.tr("個人の情報も公開されます")) }
+            } else if compose == nil, notices.active == .retention, let retention = notices.retention {
+                MacRetentionBar(prompt: retention,
+                                confirm: {
+                                    if let appId = withAnimation(.default, { notices.confirmRetention() }) { notifyRetentionConfirmed(appId) }
+                                },
+                                stop: {
+                                    if let text = withAnimation(.default, { notices.stopRetention() }) { sendFix(text) }
+                                },
+                                later: { withAnimation { notices.deferRetention() } })
+                    .task(id: retention.id) { MacVoiceOver.announce(L10n.tr("古い記録を自動で消しますか?")) }
             } else if compose == nil, notices.active == .editHint {
                 MacEditHintBar(ask: {
                                    withAnimation { notices.dismissActive() }
@@ -555,6 +609,8 @@ struct MacRootView: View {
         .padding(.horizontal, 16)
         .animation(reduceMotion ? nil : .easeInOut(duration: 0.2), value: notices.summary)
         .animation(reduceMotion ? nil : .easeInOut(duration: 0.2), value: notices.showsEditHint)
+        .animation(reduceMotion ? nil : .easeInOut(duration: 0.2), value: notices.publicData)
+        .animation(reduceMotion ? nil : .easeInOut(duration: 0.2), value: notices.retention)
         .animation(reduceMotion ? nil : .easeInOut(duration: 0.2), value: notices.newItems)
         .animation(reduceMotion ? nil : .easeInOut(duration: 0.2), value: notices.usage)
     }
@@ -581,6 +637,12 @@ struct MacRootView: View {
     /// 中央のアプリを開いた時の新着(#268)と上限(#317)。iOS と同じく上限は開いた直後のバナーと重ねないよう少し待つ
     private func checkAppNotices() async {
         notices.usage = nil
+        // 保存期間の確認(#482): 記録を端末に残す作ったアプリだけ(同梱の例の記録は一時フォルダ)。確認は端末ごと・アプリごと
+        if let app = selectedApp, library.isCreated(app.id), let document = library.generated[app.id] {
+            notices.noteRetention(appId: app.id, version: document.version, dsl: document.dsl)
+        } else {
+            notices.retention = nil
+        }
         guard let app = selectedApp, library.isCreated(app.id), library.isOnServer(app.id) else {
             notices.newItems = nil
             return
@@ -730,6 +792,8 @@ struct ShellToolbar: ToolbarContent {
     var showScreenMap: () -> Void = {}
     var canShare = false
     var share: () -> Void = {}
+    var canShowAppSettings = false
+    var showAppSettings: () -> Void = {}
 
     var body: some ToolbarContent {
         ToolbarItemGroup(placement: .primaryAction) {
@@ -748,6 +812,9 @@ struct ShellToolbar: ToolbarContent {
             Button(action: share) { Label("共有", systemImage: "square.and.arrow.up") }
                 .help(shareHelp)
                 .disabled(!canShare)
+            Button(action: showAppSettings) { Label("このアプリの設定", systemImage: "slider.horizontal.3") }
+                .help("記録の自動削除・自動の動きなど、このアプリの設定を開く")
+                .disabled(!canShowAppSettings)
             SettingsLink { Label("設定", systemImage: "gearshape") }
                 .help("設定を開く")
         }
