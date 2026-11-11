@@ -22,6 +22,7 @@ import jp.kz2601.metamon.services.TranscriberStatus
 import jp.kz2601.metamon.services.http.FailureKind
 import jp.kz2601.metamon.services.http.PaidFeature
 import jp.kz2601.metamon.services.http.RateLimitInfo
+import jp.kz2601.metamon.services.privacy.PublicDataPrompt
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -262,6 +263,26 @@ class VoiceViewModel(
         if (t.isNotEmpty()) generate(t)
     }
 
+    /** 公開の記録の確認(#899)の「公開のままにする」: 何もしない */
+    fun keepPublic() = _state.update { it.copy(publicDataPrompt = null) }
+
+    /** 「この欄を消す」: 既存の修正(generate)に指示文を送る。出した時の版から変わっていたら送らない(iOS の `removePublicPersonalFields`) */
+    fun removePublicPersonalFields(english: Boolean) {
+        takePublicDataPrompt()?.let { generate(it.removeInstruction(english)) }
+    }
+
+    /** 「自分だけにする」: 既存の修正に指示文を送る(iOS の `makePublicDataPrivate`) */
+    fun makePublicDataPrivate(english: Boolean) {
+        takePublicDataPrompt()?.let { generate(it.privateInstruction(english)) }
+    }
+
+    private fun takePublicDataPrompt(): PublicDataPrompt? {
+        val s = _state.value
+        val prompt = s.publicDataPrompt ?: return null
+        _state.update { it.copy(publicDataPrompt = null) }
+        return prompt.takeIf { it.version == s.document.version }
+    }
+
     /**
      * ランタイムが開いたアプリ(起動時の開き直し・切り替え・新しいアプリ・ホットリロード)に合わせる。生成はしない。
      * 別のアプリになったら、前のアプリの要約・相談・元に戻す履歴は捨てる(前のアプリの版を移った先に当てない)。
@@ -292,7 +313,7 @@ class VoiceViewModel(
             it.copy(
                 document = doc, summary = null, chat = emptyList(), chatTurn = null, chatPending = false, transcript = "",
                 summaryAction = null, undone = null, canUndo = undoable, canRedo = false, notice = null,
-                history = emptyList(), restartConfirm = false, heldBuild = null,
+                history = emptyList(), restartConfirm = false, heldBuild = null, publicDataPrompt = null,
                 phase = if (it.chatPending && it.phase == VoicePhase.SENDING) VoicePhase.IDLE else it.phase,
                 error = if ((it.error as? VoiceError.Request)?.origin == VoiceError.Origin.CHAT) null else it.error,
             )
@@ -414,8 +435,10 @@ class VoiceViewModel(
                         chatTurn = null,
                         chatPending = false,
                         history = history,
+                        publicDataPrompt = PublicDataPrompt.fromMeta(result.publicPersonalData, result.document.version),
                     )
                 }
+                _state.value.publicDataPrompt?.let { p -> log("public personal data: ${p.fields.map { "${it.entity}.${it.field}(${it.kind})" }}") }
                 persist(result.document.appId, history)
                 if (metered && !result.document.dsl.isVoiceOnly) creationGate?.recordNewApp()
                 log("generate ok: version=${result.document.version} mode=${result.mode} unchanged=${result.unchanged}")

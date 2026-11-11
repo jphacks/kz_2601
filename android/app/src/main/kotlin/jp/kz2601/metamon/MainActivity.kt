@@ -80,6 +80,7 @@ import jp.kz2601.metamon.renderer.screen.FabCoordinator
 import jp.kz2601.metamon.renderer.screen.LocalFabCoordinator
 import jp.kz2601.metamon.renderer.theme.MetamonRenderTheme
 import jp.kz2601.metamon.renderer.theme.ReadableWidth
+import jp.kz2601.metamon.privacy.PublicDataPromptHost
 import jp.kz2601.metamon.retention.RetentionPromptHost
 import jp.kz2601.metamon.retention.retentionPending
 import jp.kz2601.metamon.runtime.AppRuntime
@@ -254,10 +255,14 @@ fun MetamonApp(container: AppContainer) {
     // 保存期間の確認が待っているか(完成の後のお知らせの順番・#1271)
     val retentionWaiting = retentionPending(runtime)
     // 課金画面を出している間は、後ろのお知らせ(位置語の印・保存期間・直し方の例)を待たせる(#1198)。
-    // 引き継ぎの案内(#1316)は出している間だけ印を立てる。公開の記録の確認は Android に画面がまだ無い
+    // 引き継ぎの案内(#1316)は出している間だけ印を立てる。公開の記録の確認(#899)は待っている間
     val proState by container.pro.state.collectAsStateWithLifecycle()
     val accountLinkVisible by container.accountLinkPrompt.visible.collectAsStateWithLifecycle()
-    val noticeWaiting = PostBuildWaiting(paywall = proState.paywall != null, accountLink = accountLinkVisible)
+    val noticeWaiting = PostBuildWaiting(
+        paywall = proState.paywall != null,
+        publicData = state.publicDataPrompt != null,
+        accountLink = accountLinkVisible,
+    )
     val runtimeState by runtime.state.collectAsStateWithLifecycle()
     val hotReloadStatus by runtime.hotReloadStatus.collectAsStateWithLifecycle()
 
@@ -556,6 +561,15 @@ fun MetamonApp(container: AppContainer) {
         blocked = state.isGenerating || state.voiceOpen || consentVisible || tutorialVisible || settingsOpen || switcherOpen ||
             discoverOpen || shareTarget != null || membersTarget != null ||
             !BuildStageState.isAccountLinkTurn(state, retentionWaiting, noticeWaiting),
+    )
+    // 生成直後の「個人の情報も公開されます」の確認(#253・#899)。要約の後・保存期間の確認の前で、生成中・音声のシートの間は待つ
+    PublicDataPromptHost(
+        prompt = state.publicDataPrompt,
+        busy = state.isGenerating || state.voiceOpen,
+        turn = BuildStageState.isPublicDataTurn(state, retentionWaiting, noticeWaiting),
+        onRemove = vm::removePublicPersonalFields,
+        onPrivate = vm::makePublicDataPrivate,
+        onKeep = vm::keepPublic,
     )
     // 記録の保存期間の確認(#482)。完成の後のお知らせの順番(要約の後・#1271)で、生成中・音声のシートの間は待つ
     RetentionPromptHost(

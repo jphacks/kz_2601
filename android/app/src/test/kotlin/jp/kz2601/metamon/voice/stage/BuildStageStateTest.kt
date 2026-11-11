@@ -189,6 +189,18 @@ class BuildStageStateTest {
     }
 
     @Test
+    fun publicDataTurnAfterSummaryAndPaywall() {
+        // #899: 公開の記録の確認は 要約・課金画面が閉じてから、保存期間の確認より先
+        val done = initial().copy(phase = VoicePhase.DONE, document = AppDocument("app1", 1, app(a)), summary = "できました")
+        val closed = done.copy(summary = null)
+        val waiting = PostBuildWaiting(publicData = true)
+        assertFalse("要約の間は出さない", BuildStageState.isPublicDataTurn(done, retentionPending = true, waiting = waiting))
+        assertFalse("課金画面の間は出さない", BuildStageState.isPublicDataTurn(closed, retentionPending = false, waiting = waiting.copy(paywall = true)))
+        assertTrue("保存期間の確認より先", BuildStageState.isPublicDataTurn(closed, retentionPending = true, waiting = waiting))
+        assertTrue("引き継ぎを待たせる", BuildStageState.isPublicDataTurn(closed, retentionPending = false, waiting = waiting.copy(accountLink = true)))
+    }
+
+    @Test
     fun anchorClearsWhenSummaryCloses() {
         val s = BuildStageState()
         s.update(initial().copy(phase = VoicePhase.SENDING, transcript = "x"), 0, reduceMotion = false)

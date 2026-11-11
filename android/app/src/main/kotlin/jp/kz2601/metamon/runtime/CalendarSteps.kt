@@ -4,7 +4,7 @@ import jp.kz2601.metamon.R
 import jp.kz2601.metamon.dsl.Action
 import jp.kz2601.metamon.dsl.logic.CalendarEventDraft
 import jp.kz2601.metamon.dsl.logic.CalendarEventPlan
-import jp.kz2601.metamon.dsl.logic.CalendarEventRequest
+import jp.kz2601.metamon.dsl.logic.request
 import jp.kz2601.metamon.dsl.records.JSONValue
 import jp.kz2601.metamon.renderer.ActionContext
 import java.time.ZoneId
@@ -34,16 +34,7 @@ object CalendarSteps {
             ctx.recordId != null -> runtime.records(entityId).firstOrNull { it.id == ctx.recordId }?.data
             else -> null
         } ?: return Draft.Invalid(NO_RECORD)
-        val request = CalendarEventRequest(
-            startField = spec.startField,
-            endField = spec.endField,
-            durationMinutes = spec.durationMinutes,
-            titleField = spec.titleField,
-            locationField = spec.locationField,
-            notesField = spec.notesField,
-            alertMinutes = spec.alertMinutes,
-        )
-        return when (val r = CalendarEventPlan.build(request, entity, data)) {
+        return when (val r = CalendarEventPlan.build(spec.request, entity, data)) {
             is CalendarEventPlan.Result.Success -> Draft.Ready(r.draft)
             is CalendarEventPlan.Result.NoStart -> Draft.Invalid(UiText.Res(R.string.host_calendar_no_start, r.fieldName))
         }
