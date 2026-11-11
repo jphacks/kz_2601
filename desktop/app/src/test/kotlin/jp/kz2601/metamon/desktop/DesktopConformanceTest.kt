@@ -1,5 +1,7 @@
 package jp.kz2601.metamon.desktop
 
+import jp.kz2601.metamon.desktop.i18n.Lang
+import jp.kz2601.metamon.desktop.i18n.Strings
 import jp.kz2601.metamon.dsl.AppDSL
 import jp.kz2601.metamon.dsl.Component
 import jp.kz2601.metamon.dsl.decode
@@ -84,6 +86,7 @@ class DesktopConformanceTest {
         var steps = 0
         val compared = sortedMapOf<String, Int>()
         val zone = FieldCoding.zone
+        val lang = Strings.lang
         try {
             for (dir in cases) {
                 val case = Json.parseToJsonElement(dir.resolve("case.json").readText()) as JsonObject
@@ -97,6 +100,8 @@ class DesktopConformanceTest {
                 val device = case["device"] as? JsonObject
                 DSLClock.fixed = OffsetDateTime.parse(device?.str("now") ?: "2026-11-12T12:00:00+09:00").toInstant()
                 FieldCoding.zone = ZoneId.of(device?.str("timeZone") ?: "Asia/Tokyo")
+                // en* の case は英語の UI で比べる(#1759)
+                Strings.lang = Lang.resolve(device?.str("locale") ?: "ja_JP")
                 val records = (case["records"] as? JsonObject).orEmpty().mapValues { (_, v) -> (v as JsonArray).map(Record::from) }
                 val uid = device?.str("userId") ?: "me"
                 val data = LeafData(dsl.entityModels(), { records[it].orEmpty() }, uid)
@@ -129,6 +134,7 @@ class DesktopConformanceTest {
         } finally {
             DSLClock.fixed = null
             FieldCoding.zone = zone
+            Strings.lang = lang
         }
         if (failures.isNotEmpty()) fail("${failures.size} 件が違う:\n" + failures.joinToString("\n"))
         println("desktop conformance: ${cases.size} cases / $screens screens / $steps steps OK / props compared: $compared")

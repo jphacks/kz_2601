@@ -1,5 +1,6 @@
 package jp.kz2601.metamon.desktop
 
+import jp.kz2601.metamon.desktop.i18n.Strings
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -278,7 +279,7 @@ fun DesktopSession.updateRecord(entity: String, id: String, patch: Map<String, J
     val row = store.find(entity, id) ?: return false
     val record = records(entity).firstOrNull { it.id == id } ?: return false
     if (!RecordPermission.canEdit(record, entityModel(entity), uid)) {
-        message = "このデータは作った人だけが変更できます"
+        message = Strings["runtime_read_only"]
         return false
     }
     val next = row.data.toMutableMap()

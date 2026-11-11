@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- デスクトップ版にしか無い文言(#1759)。Android と同じ形。Android にある文言は Android のキーをそのまま使う -->
+<resources>
+    <string name="desktop_a11y_chart">グラフ: %1$s</string>
+    <string name="desktop_a11y_image">画像</string>
+    <string name="desktop_a11y_rating">%1$s %2$d / %3$d</string>
+    <string name="desktop_book_searching">本の情報を探しています…</string>
+    <string name="desktop_calendar_month_pattern">y年M月</string>
+    <string name="desktop_calendar_opened">予定を開きました(%1$s)</string>
+    <string name="desktop_calendar_write_failed">予定を書き出せませんでした</string>
+    <string name="desktop_calendar_written">予定を書き出しました: %1$s</string>
+    <string name="desktop_chart_empty">まだデータがありません</string>
+    <string name="desktop_close">閉じる</string>
+    <string name="desktop_export_clipboard">(表はクリップボードにも入れました)</string>
+    <string name="desktop_export_done">%1$d 件を書き出しました: %2$s</string>
+    <string name="desktop_feed_offline">フィードはデスクトップ版ではまだ取得しません</string>
+    <string name="desktop_image_none">画像なし</string>
+    <string name="desktop_input_needs_form">この入力はフォームの画面で使えます</string>
+    <string name="desktop_list_empty">まだありません</string>
+    <string name="desktop_list_separator">、</string>
+    <string name="desktop_match_offline">仲間探しのつながりはサインインした後に出ます</string>
+    <string name="desktop_notification_now">今</string>
+    <string name="desktop_notification_scheduled">通知を予約しました(%1$s・アプリを開いている間だけ)</string>
+    <string name="desktop_print">印刷</string>
+    <string name="desktop_print_cancelled">印刷をやめました</string>
+    <string name="desktop_print_dialog">印刷…</string>
+    <string name="desktop_print_failed">印刷できませんでした</string>
+    <string name="desktop_print_no_printer">プリンターが見つかりません</string>
+    <string name="desktop_print_page">%1$d 頁目</string>
+    <string name="desktop_print_page_of">%1$d / %2$d 頁(A4 縦)</string>
+    <string name="desktop_print_sent">%1$d 頁を印刷に送りました</string>
+    <string name="desktop_print_title">印刷: %1$s</string>
+    <string name="desktop_tray_unavailable">このパソコンでは通知を出せません(トレイがありません)</string>
+    <string name="desktop_unavailable_activity">進行中の表示(ライブアクティビティ)はこのパソコンでは使えません</string>
+    <string name="desktop_unavailable_follow">フォローはデスクトップ版ではまだ使えません(サインインが要ります)</string>
+    <string name="desktop_unavailable_voice">音声で変える操作はデスクトップ版ではまだ使えません</string>
+    <string name="desktop_unknown_component">知らない部品: %1$s</string>
+    <string name="desktop_unsupported_component">デスクトップ版ではまだ使えない部品: %1$s</string>
+    <string name="desktop_url_failed">URL を開けませんでした</string>
+    <string name="desktop_url_unsupported">このパソコンでは URL を開けません: %1$s</string>
+    <string name="desktop_window_title">Tailor It — %1$s</string>
+</resources>

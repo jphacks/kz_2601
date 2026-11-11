@@ -28,6 +28,9 @@ TAILORIT_API=stg TAILORIT_DEV_TOKEN=<Firebase の ID トークン> ./gradlew :de
 - 遷移: push はウィンドウの中で積み、sheet はウィンドウ内のダイアログ、fullScreen はウィンドウ全体に重ねる。タブは下に並べる。confirmMessage は確認ダイアログ。規則は Android と同じ `NavigationResolver`・`FormDraft`(`android/renderer` のソースをビルド時に取り込む。`android/` は変えない)。
 - アクション: 保存・削除・resetForm はメモリの中のモック。openUrl はブラウザ、addToCalendar は .ics を書き出して既定のカレンダーで開く、export は CSV か PDF(format)をダウンロードに書き出し、表を TSV でクリップボードにも入れる、scheduleNotification はトレイの通知(起動中だけ)、lookupBook はモックの本(`TAILORIT_API_BASE` を付けると `POST /v1/lookup/book`)。openVoice・startActivity・endActivity・follow は「使えない」旨を出す。
 - サインイン・通信はまだ無い。
+- 言語: OS の言語が日本語なら日本語、それ以外は英語。`TAILORIT_LANG=en`(または `-Dtailorit.lang=en`)で替えられる。文言は Android の `strings*.xml` をビルド時にそのまま同梱し、同じキーで引く(引けなければ英語 → 日本語)。
+- 明暗: OS のダークモードに従う(Windows はレジストリ、Linux は freedesktop の color-scheme か GNOME の設定、起動中の切り替えも 5 秒ごとに追う)。`TAILORIT_THEME=light / dark` で固定できる。
+- 読み上げ: 見出し・タブ(選択中)・ダイアログの名前・知らせ(live region)・絵で描く部品(グラフ・進み具合・メーター・星・画像)の説明を付けている。Windows は Java Access Bridge を通す(`jabswitch -enable` が要る)。Linux の Orca は JDK に橋渡しが無く、まだ読めない。
 - ファイル: `fileImport` で CSV(取り込みの確認を出す)・テキスト・PDF(本文)を取り込む。
 - ドラッグ & ドロップ: 画面に写真・動画・CSV・テキスト・PDF を落とすと、photoField / videoField / fileImport / list に振り分ける。写真は外へ引き出せる。
 - クリップボード: 一覧の「表をコピー」で表計算に貼れる TSV、「表を貼り付け」で表計算の行を取り込む。画像は Ctrl+V で photoField へ。
@@ -46,4 +49,6 @@ TAILORIT_API=stg TAILORIT_DEV_TOKEN=<Firebase の ID トークン> ./gradlew :de
 | `app/src/main/kotlin/.../desktop/net/` | 接続先の設定(既定はモック)・`X-Client-Platform: windows / linux / macos`・User-Agent |
 | `app/src/main/kotlin/.../desktop/store/` | 端末の保存。`%APPDATA%\TailorIt`・`$XDG_DATA_HOME/tailorit`(無ければ `~/.local/share/tailorit`)・`~/Library/Application Support/TailorIt` に設定・同意・記録・送信待ち・DSL を JSON で置く。サインアウトで消す |
 | `app/src/main/kotlin/.../desktop/io/` | 取り込み・書き出し・ドラッグ & ドロップ・クリップボード(PDF は Apache PDFBox) |
+| `app/src/main/kotlin/.../desktop/i18n/`・`app/src/main/resources/i18n/desktop/` | 文言。Android の `renderer`・`app` の `values`(日本語)・`values-en`(英語)をビルド時に `i18n/` へ同梱して読む。デスクトップだけの文言は同じ形の XML(キーは `desktop_`) |
+| `app/src/main/kotlin/.../desktop/theme/`・`A11y.kt` | OS に従う明暗・読み上げの説明 |
 | `app/src/test/kotlin/.../desktop/DesktopConformanceTest.kt` | 全 OS 共通の適合テストのうち、今比べられる部分(画面・入力の値とラベル・操作の steps) |
