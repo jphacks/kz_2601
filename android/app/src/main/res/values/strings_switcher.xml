@@ -8,4 +8,7 @@
     <string name="switcher_open">アプリ一覧</string>
     <string name="switcher_title">変身一覧</string>
     <string name="switcher_untitled">名前なし</string>
+    <string name="voice_intent_already_current">いま使っているのが「%1$s」です</string>
+    <string name="voice_intent_switch_ambiguous">「%1$s」に近いアプリが複数あります。一覧から選んでください</string>
+    <string name="voice_intent_switch_not_found">「%1$s」というアプリは見つかりませんでした</string>
 </resources>
