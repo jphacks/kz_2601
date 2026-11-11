@@ -183,6 +183,27 @@ final class ConnectedServicesTests: XCTestCase {
         XCTAssertEqual(model.message, "つなげませんでした。もう一度試してください。")
     }
 
+    /// 読めない戻り先・頼んだのと別の provider の ok は成功扱いにしない
+    func testUnexpectedCallbackShowsMessage() async {
+        let failed = "つなげませんでした。もう一度試してください。"
+        for back in ["tailorit://import/abc", "tailorit://connected?provider=notion&status=ok", "tailorit://connected?status=ok"] {
+            let model = ConnectedServicesModel()
+            await model.connect("todoist", client: StubStartClient()) { _ in URL(string: back)! }
+            XCTAssertEqual(model.message, failed, back)
+        }
+        let model = ConnectedServicesModel()
+        await model.connect("todoist", client: StubStartClient()) { _ in URL(string: "tailorit://connected?provider=todoist&status=ok")! }
+        XCTAssertNil(model.message)
+    }
+
+    func testCallbackSucceededOnlyForSameProvider() {
+        XCTAssertTrue(ConnectCallback.ok(provider: "todoist").succeeded(for: "todoist"))
+        XCTAssertFalse(ConnectCallback.ok(provider: "notion").succeeded(for: "todoist"))
+        XCTAssertFalse(ConnectCallback.ok(provider: nil).succeeded(for: "todoist"))
+        XCTAssertFalse(ConnectCallback.error(provider: "todoist").succeeded(for: "todoist"))
+        XCTAssertFalse(ConnectCallback.invalid.succeeded(for: "todoist"))
+    }
+
     func testUserCancelIsSilent() async {
         let model = ConnectedServicesModel()
         await model.connect("todoist", client: StubStartClient()) { _ in

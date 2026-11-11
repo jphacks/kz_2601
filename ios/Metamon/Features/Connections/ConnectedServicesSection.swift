@@ -114,7 +114,8 @@ struct ConnectedServicesSection: View {
         let webAuth = webAuth
         Task {
             await model.connect(provider, client: services.external) { url in
-                try await webAuth.authenticate(using: url, callbackURLScheme: ConnectCallback.scheme)
+                // 前にサインインしていた人のブラウザのログインを使い回さない
+                try await webAuth.authenticate(using: url, callbackURLScheme: ConnectCallback.scheme, preferredBrowserSession: .ephemeral)
             }
         }
     }

@@ -122,6 +122,12 @@ enum ConnectCallback: Equatable {
         default: return .invalid
         }
     }
+
+    /// 頼んだ provider の `ok` だけを成功とみなす(読めない戻り先・別の provider は失敗)
+    func succeeded(for provider: String) -> Bool {
+        if case .ok(let p) = self { return p == provider }
+        return false
+    }
 }
 
 /// 「つないだサービス」の状態と操作。View から独立させてテストする。
@@ -156,7 +162,7 @@ final class ConnectedServicesModel {
             let url = try await client.startConnection(provider: provider, scopes: nil)
             if !MockExternalServicesClient.isMockAuthURL(url) {
                 let back = try await authenticate(url)
-                if case .error = ConnectCallback.parse(back) { message = L10n.tr("つなげませんでした。もう一度試してください。") }
+                if !ConnectCallback.parse(back).succeeded(for: provider) { message = L10n.tr("つなげませんでした。もう一度試してください。") }
             }
         } catch {
             if Self.isUserCancel(error) {

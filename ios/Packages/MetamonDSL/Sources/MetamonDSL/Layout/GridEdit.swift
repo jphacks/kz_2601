@@ -64,6 +64,9 @@ public struct GridEditDraft: Equatable, Sendable {
         public var original: GridArea
         public var area: GridArea
         public var removed = false
+        /// 読み上げに使う部品の種類と見出し(title → label → text → placeholder の最初の空でないもの)
+        public var type: ComponentType = .unknown
+        public var title: String?
 
         public var id: String { componentId }
         public var changed: Bool { removed || area != original }
@@ -82,7 +85,9 @@ public struct GridEditDraft: Equatable, Sendable {
         componentCount = screen.components.count
         items = screen.components.enumerated().compactMap { i, c in
             guard let text = c.area, let a = c.gridArea else { return nil }
-            return Item(index: i, componentId: c.id, originalText: text, original: a, area: a)
+            let title = [c.title, c.label, c.text, c.placeholder]
+                .lazy.compactMap { $0?.trimmingCharacters(in: .whitespacesAndNewlines) }.first { !$0.isEmpty }
+            return Item(index: i, componentId: c.id, originalText: text, original: a, area: a, type: c.type, title: title)
         }
     }
 
