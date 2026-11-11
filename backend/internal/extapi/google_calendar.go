@@ -458,7 +458,9 @@ func gcalEventID(requestID string) string {
 // decodes the answer.
 // 401 is a token Google no longer takes (ErrInvalidGrant: the connection
 // turns to error); a missing scope is ErrNotConnected (connect again with
-// it); 429 / 5xx / rate limits are retryable provider errors.
+// it); 429 / 5xx are retryable provider errors, and so is a quota 403
+// (rateLimitExceeded, quotaExceeded, ...: turned into 429); an API not
+// enabled is errGoogleAPIDisabled; any other 403 stays a 403.
 func (g *googleCalendar) do(ctx context.Context, t *Token, method, path string, body []byte, ctype string, out any) error {
 	if t == nil || t.AccessToken == "" {
 		return ErrNotConnected
@@ -487,6 +489,37 @@ func (g *googleCalendar) do(ctx context.Context, t *Token, method, path string, 
 		}
 		return nil
 	}
+	reasons := googleErrorReasons(b)
+	switch {
+	case resp.StatusCode == http.StatusUnauthorized:
+		return ErrInvalidGrant
+	case resp.StatusCode == http.StatusForbidden && googleHas(reasons, googleScopeReasons...):
+		return ErrNotConnected
+	case resp.StatusCode == http.StatusForbidden && googleHas(reasons, googleRateReasons...):
+		// a quota answered as 403 is the provider's 429 (the provider pauses)
+		return &ProviderError{Status: http.StatusTooManyRequests, Retryable: true, Err: errors.New("rate limited")}
+	case resp.StatusCode == http.StatusForbidden && googleHas(reasons, googleDisabledReasons...):
+		return &ProviderError{Status: resp.StatusCode, Err: fmt.Errorf("%s: %w", g.id, errGoogleAPIDisabled)}
+	}
+	return &ProviderError{Status: resp.StatusCode, Retryable: resp.StatusCode == 429 || resp.StatusCode >= 500,
+		Err: fmt.Errorf("%s %s", g.id, strings.Join(reasons, ","))}
+}
+
+// Google error reasons (error.status, error.details[].reason,
+// error.errors[].reason) by what they mean.
+var (
+	googleScopeReasons    = []string{"insufficientPermissions", "ACCESS_TOKEN_SCOPE_INSUFFICIENT"}
+	googleRateReasons     = []string{"rateLimitExceeded", "userRateLimitExceeded", "quotaExceeded", "dailyLimitExceeded", "RATE_LIMIT_EXCEEDED", "RESOURCE_EXHAUSTED"}
+	googleDisabledReasons = []string{"accessNotConfigured", "SERVICE_DISABLED"}
+)
+
+// errGoogleAPIDisabled is a 403 for an API not enabled on our Google Cloud
+// project: our setup, not the person's connection (upstream_unavailable).
+var errGoogleAPIDisabled = errors.New("the API is not enabled for this project")
+
+// googleErrorReasons reads the reasons of a Google error answer (empty ones
+// left out). Only the codes are kept, never the message.
+func googleErrorReasons(body []byte) []string {
 	var e struct {
 		Error struct {
 			Status  string `json:"status"`
@@ -498,7 +531,7 @@ func (g *googleCalendar) do(ctx context.Context, t *Token, method, path string, 
 			} `json:"errors"`
 		} `json:"error"`
 	}
-	_ = json.Unmarshal(b, &e)
+	_ = json.Unmarshal(body, &e)
 	reasons := []string{e.Error.Status}
 	for _, d := range e.Error.Details {
 		reasons = append(reasons, d.Reason)
@@ -506,17 +539,9 @@ func (g *googleCalendar) do(ctx context.Context, t *Token, method, path string, 
 	for _, d := range e.Error.Errors {
 		reasons = append(reasons, d.Reason)
 	}
-	has := func(rs ...string) bool {
-		return slices.ContainsFunc(reasons, func(r string) bool { return slices.Contains(rs, r) })
-	}
-	switch {
-	case resp.StatusCode == http.StatusUnauthorized:
-		return ErrInvalidGrant
-	case resp.StatusCode == http.StatusForbidden && has("insufficientPermissions", "ACCESS_TOKEN_SCOPE_INSUFFICIENT"):
-		return ErrNotConnected
-	case resp.StatusCode == http.StatusForbidden && has("rateLimitExceeded", "userRateLimitExceeded", "quotaExceeded", "RATE_LIMIT_EXCEEDED"):
-		return &ProviderError{Status: resp.StatusCode, Retryable: true, Err: errors.New("rate limited")}
-	}
-	return &ProviderError{Status: resp.StatusCode, Retryable: resp.StatusCode == 429 || resp.StatusCode >= 500,
-		Err: fmt.Errorf("%s %s", g.id, strings.Join(slices.DeleteFunc(reasons, func(r string) bool { return r == "" }), ","))}
+	return slices.DeleteFunc(reasons, func(r string) bool { return r == "" })
+}
+
+func googleHas(reasons []string, want ...string) bool {
+	return slices.ContainsFunc(reasons, func(r string) bool { return slices.Contains(want, r) })
 }

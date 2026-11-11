@@ -66,6 +66,24 @@ func testStore(t *testing.T, s Store, sfx string) {
 	if !found {
 		t.Fatal("triaged item not listed")
 	}
+	for _, q := range []ItemQuery{{Source: SourceStoreReview, Limit: 500}, {Status: ItemTriaged, Source: SourceTestFlight, Limit: 500}} {
+		other, err := s.ListItems(ctx, q)
+		must(err)
+		for _, x := range other {
+			if x.ID == it.ID || x.Source != q.Source {
+				t.Fatalf("source filter %+v returned %s (%s)", q, x.ID, x.Source)
+			}
+		}
+	}
+	bySrc, err := s.ListItems(ctx, ItemQuery{Status: ItemTriaged, Source: SourceInApp, Limit: 500})
+	must(err)
+	found = false
+	for _, x := range bySrc {
+		found = found || x.ID == it.ID
+	}
+	if !found {
+		t.Fatal("in_app item not listed by source")
+	}
 	if err := s.UpdateItem(ctx, Item{ID: "lin_missing" + sfx}); err != ErrNotFound {
 		t.Fatalf("update missing: %v", err)
 	}

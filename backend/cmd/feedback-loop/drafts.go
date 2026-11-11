@@ -60,6 +60,10 @@ func (a *app) reviewer() (*draft.Reviewer, error) {
 		return nil, fmt.Errorf("%s must be owner/name", envIssueRepo)
 	}
 	for l := range ingest.ParseList(a.getenv(envIssueLabels)) {
+		// agent:* starts an agent (#370); only a person adds it, never the loop.
+		if strings.HasPrefix(strings.ToLower(strings.TrimSpace(l)), "agent:") {
+			return nil, fmt.Errorf("refusing to start: %s must not contain %q (a person adds agent:* labels, the loop never does)", envIssueLabels, l)
+		}
 		r.Labels = append(r.Labels, l)
 	}
 	sort.Strings(r.Labels)

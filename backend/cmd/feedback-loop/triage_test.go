@@ -74,3 +74,43 @@ func TestTriageNeedsLoopKey(t *testing.T) {
 		t.Fatalf("err %v", err)
 	}
 }
+
+const labelledSet = "../../internal/loop/triage/eval/testdata/labeled.jsonl"
+
+func TestTriageEvalCommand(t *testing.T) {
+	ta := newTestApp(t, env{})
+	out := ta.must(t, "triage-eval", "-set", labelledSet)
+	if !strings.Contains(out, "28 cases") || !strings.Contains(out, "category: 26/28") {
+		t.Fatalf("out %s", out)
+	}
+	// rules is offline: no tokens counted
+	if used, _ := ta.ctl.Usage(context.Background(), loop.Month(ta.now())); used != 0 {
+		t.Fatalf("usage %d", used)
+	}
+	// nothing reaches the loop's store
+	if items, _ := ta.ls.ListItems(context.Background(), loop.ItemQuery{}); len(items) != 0 {
+		t.Fatalf("items written: %d", len(items))
+	}
+
+	// -model ai uses the (fake) triage model and counts its tokens
+	fm := &fakeModel{category: "bug", cluster: "all", summary: "落ちる。"}
+	ta.model = fm
+	out = ta.must(t, "triage-eval", "-set", labelledSet, "-model", "ai")
+	if fm.calls == 0 || !strings.Contains(out, "category: 12/28") {
+		t.Fatalf("calls %d out %s", fm.calls, out)
+	}
+	if used, _ := ta.ctl.Usage(context.Background(), loop.Month(ta.now())); used == 0 {
+		t.Fatal("ai eval tokens not counted")
+	}
+}
+
+func TestTriageEvalAIRespectsSwitch(t *testing.T) {
+	ta := newTestApp(t, env{"LOOP_TRIAGE": ""})
+	ta.model = &fakeModel{category: "bug", cluster: "all", summary: "落ちる。"}
+	if err := ta.run(context.Background(), []string{"triage-eval", "-set", labelledSet, "-model", "ai"}); err == nil {
+		t.Fatal("ai eval ran with the triage stage off")
+	}
+	if err := ta.run(context.Background(), []string{"triage-eval", "-set", labelledSet, "-model", "nope"}); err == nil {
+		t.Fatal("unknown model accepted")
+	}
+}

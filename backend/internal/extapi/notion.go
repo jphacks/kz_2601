@@ -67,8 +67,8 @@ var notionHosts = []string{"https://api.notion.com"}
 func init() {
 	register(Provider{ID: Notion, Billing: BillingFree, NeedsOAuth: true, NameJa: "Notion", NameEn: "Notion",
 		Ops: []OpSpec{
-			{Name: "queryDatabase", Args: []string{"databaseId", "limit", "subtitleProperty", "valueProperty"}},
-			{Name: "addRow", Write: true, Args: []string{"databaseId", "title", "properties"}},
+			{Name: "queryDatabase", Args: []string{"databaseId", "limit", "subtitleProperty", "valueProperty"}, Check: checkNotionQuery},
+			{Name: "addRow", Write: true, Args: []string{"databaseId", "title", "properties"}, Check: checkNotionAdd},
 			{Name: "updateProperties", Write: true, Args: []string{"pageId", "properties"}, Check: checkNotionUpdate},
 			{Name: "pageText", Args: []string{"pageId"}, Check: checkNotionPageText},
 		},
@@ -441,24 +441,35 @@ func (c *notion) dataSource(ctx context.Context, t *Token, databaseID string) (s
 // queryDatabase lists a database's rows (its first data source), the most
 // recently edited first, one page of limit (default 20). subtitleProperty /
 // valueProperty name the properties shown under the title / on the right.
-func (c *notion) queryDatabase(ctx context.Context, in Input) (Output, error) {
-	dbID, err := notionID("databaseId", in.Args["databaseId"])
-	if err != nil {
-		return Output{}, err
+// notionQueryArgs reads queryDatabase's arguments.
+func notionQueryArgs(a map[string]string) (dbID string, n int, sub, val string, err error) {
+	if dbID, err = notionID("databaseId", a["databaseId"]); err != nil {
+		return "", 0, "", "", err
 	}
-	n := notionDefaultLimit
-	if v := in.Args["limit"]; v != "" {
+	n = notionDefaultLimit
+	if v := a["limit"]; v != "" {
 		x, err := strconv.Atoi(v)
 		if err != nil || x < 1 || x > notionMaxLimit {
-			return Output{}, fmt.Errorf("%w: limit must be 1-%d", ErrUnknown, notionMaxLimit)
+			return "", 0, "", "", fmt.Errorf("%w: limit must be 1-%d", ErrUnknown, notionMaxLimit)
 		}
 		n = x
 	}
-	sub, err := notionPropName("subtitleProperty", in.Args["subtitleProperty"])
-	if err != nil {
-		return Output{}, err
+	if sub, err = notionPropName("subtitleProperty", a["subtitleProperty"]); err != nil {
+		return "", 0, "", "", err
 	}
-	val, err := notionPropName("valueProperty", in.Args["valueProperty"])
+	if val, err = notionPropName("valueProperty", a["valueProperty"]); err != nil {
+		return "", 0, "", "", err
+	}
+	return dbID, n, sub, val, nil
+}
+
+func checkNotionQuery(a map[string]string) error {
+	_, _, _, _, err := notionQueryArgs(a)
+	return err
+}
+
+func (c *notion) queryDatabase(ctx context.Context, in Input) (Output, error) {
+	dbID, n, sub, val, err := notionQueryArgs(in.Args)
 	if err != nil {
 		return Output{}, err
 	}
@@ -499,15 +510,7 @@ type notionSchema map[string]struct {
 // the request id is remembered on this instance for 10 minutes, so a
 // retried request makes no second row.
 func (c *notion) addRow(ctx context.Context, in Input) (Output, error) {
-	dbID, err := notionID("databaseId", in.Args["databaseId"])
-	if err != nil {
-		return Output{}, err
-	}
-	title, err := gcalText("title", in.Args["title"], notionMaxText, true)
-	if err != nil {
-		return Output{}, err
-	}
-	props, err := notionProps(in.Args["properties"], false)
+	dbID, title, props, err := notionAddArgs(in.Args)
 	if err != nil {
 		return Output{}, err
 	}
@@ -567,6 +570,26 @@ func (c *notion) addRow(ctx context.Context, in Input) (Output, error) {
 		}
 		return Output{ResultID: page.ID, Item: &row}, nil
 	})
+}
+
+// notionAddArgs reads addRow's arguments (the property types are checked
+// against the database's schema later).
+func notionAddArgs(a map[string]string) (dbID, title string, props map[string]any, err error) {
+	if dbID, err = notionID("databaseId", a["databaseId"]); err != nil {
+		return "", "", nil, err
+	}
+	if title, err = gcalText("title", a["title"], notionMaxText, true); err != nil {
+		return "", "", nil, err
+	}
+	if props, err = notionProps(a["properties"], false); err != nil {
+		return "", "", nil, err
+	}
+	return dbID, title, props, nil
+}
+
+func checkNotionAdd(a map[string]string) error {
+	_, _, _, err := notionAddArgs(a)
+	return err
 }
 
 // notionProps reads a properties argument: a JSON object of property name

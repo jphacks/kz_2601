@@ -12,6 +12,7 @@ import (
 	"github.com/jphacks/kz_2601/backend/internal/ai"
 	"github.com/jphacks/kz_2601/backend/internal/loop"
 	"github.com/jphacks/kz_2601/backend/internal/loop/triage"
+	"github.com/jphacks/kz_2601/backend/internal/loop/triage/eval"
 )
 
 // Env of the triage model. The key is the loop's own (#365 decision 7: not
@@ -88,6 +89,60 @@ func (a *app) triage(ctx context.Context, args []string) error {
 	if res.Stopped != "" {
 		fmt.Fprintf(a.out, "triage: stopped early: %s\n", res.Stopped)
 	}
+	return nil
+}
+
+// triageEval runs triage on a hand-labelled set in memory (nothing is
+// written to Firestore) and prints the agreement. It reports; it does not
+// fail on a low score. -model ai calls the loop's model under the triage
+// switch and the monthly cap; -model rules (default) is offline.
+func (a *app) triageEval(ctx context.Context, args []string) error {
+	fs := flag.NewFlagSet("triage-eval", flag.ContinueOnError)
+	path := fs.String("set", "", "labelled set (JSON lines: id, text, category, priority, bundle)")
+	model := fs.String("model", "rules", "rules (offline keyword baseline) or ai (the triage model)")
+	if err := fs.Parse(args); err != nil {
+		return err
+	}
+	if *path == "" {
+		return errors.New("triage-eval needs -set")
+	}
+	f, err := os.Open(*path)
+	if err != nil {
+		return err
+	}
+	defer func() { _ = f.Close() }()
+	cases, err := eval.Load(f)
+	if err != nil {
+		return fmt.Errorf("%s: %w", *path, err)
+	}
+	var m triage.Model
+	switch *model {
+	case "rules":
+		m = eval.Rules{}
+	case "ai":
+		g := a.gate()
+		if err := g.AllowLLM(ctx); err != nil {
+			return g.Stopped(ctx, loop.StageTriage, err)
+		}
+		if m, err = a.triageModel(); err != nil {
+			return err
+		}
+	default:
+		return fmt.Errorf("unknown -model %q (rules or ai)", *model)
+	}
+	rep, err := eval.Run(ctx, m, cases)
+	if t := rep.Usage.Total(); t > 0 {
+		if _, uerr := a.control.AddUsage(ctx, loop.Month(a.now()), t); uerr != nil {
+			return uerr
+		}
+		if rerr := a.gate().Record(ctx, loop.Event{Stage: loop.StageTriage, Action: "eval_call", Tokens: t}); rerr != nil {
+			return rerr
+		}
+	}
+	if err != nil {
+		return err
+	}
+	a.out.WriteString(rep.String())
 	return nil
 }
 
