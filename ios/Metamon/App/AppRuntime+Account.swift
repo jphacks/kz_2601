@@ -16,6 +16,8 @@ extension AppRuntime {
         DocumentCache.shared.removeAll()                // DSL キャッシュとアプリ一覧(metamon-dsl)
         AppThumbnailStore.shared.removeAll()            // 変身一覧のサムネ(metamon-thumbs)
         ExportFiles.removeAll()                         // 書き出した CSV / PDF(#421・記録の写し)
+        RemoteImageLoader.removeAllCached()             // https の画像のキャッシュ(#1265・前の人が見た画像を残さない)
+        URLCache.shared.removeAllCachedResponses()      // 共有の URL キャッシュも
         WidgetSnapshot.defaults?.removePersistentDomain(forName: WidgetSnapshot.appGroupID) // App Group(ウィジェット)
         WidgetCenter.shared.reloadAllTimelines()
         LiveActivities.enqueue { await LiveActivities.endAll() } // ロック画面・Dynamic Island(#423)
