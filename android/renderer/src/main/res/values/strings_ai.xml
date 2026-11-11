@@ -37,8 +37,12 @@
     <string name="ai_reason_other">端末内の AI を利用できません</string>
     <string name="ai_reason_photo_only_online">写真を読むのはオンラインの AI だけです(この版では使えません)</string>
     <string name="ai_save">保存</string>
-    <string name="ai_save_added">%1$d 件を追加しました</string>
-    <string name="ai_save_added_partial">%1$d 件を追加しました(%2$d 件は追加できませんでした)</string>
+    <plurals name="ai_save_added">
+        <item quantity="other">%1$d 件を追加しました</item>
+    </plurals>
+    <plurals name="ai_save_added_partial">
+        <item quantity="other">%1$d 件を追加しました(%2$d 件は追加できませんでした)</item>
+    </plurals>
     <string name="ai_save_all">全部保存</string>
     <string name="ai_save_failed">保存できませんでした</string>
     <string name="ai_save_full">これ以上記録を足せません</string>

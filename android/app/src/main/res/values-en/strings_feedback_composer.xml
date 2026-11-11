@@ -13,7 +13,10 @@
     <string name="feedback_composer_attach_screenshot">Screenshot of the current screen</string>
     <string name="feedback_composer_cancel">Cancel</string>
     <string name="feedback_composer_close">Close</string>
-    <string name="feedback_composer_consent">What you send (the text and the attachments you turned on) is read by the operator to fix bugs and improve Tailor It. It is stored on Google Cloud (Firestore) and erased after %1$d days, or when you delete your account. It is not shared with third parties.</string>
+    <plurals name="feedback_composer_consent">
+        <item quantity="one">What you send (the text and the attachments you turned on) is read by the operator to fix bugs and improve Tailor It. It is stored on Google Cloud (Firestore) and erased after %1$d day, or when you delete your account. It is not shared with third parties.</item>
+        <item quantity="other">What you send (the text and the attachments you turned on) is read by the operator to fix bugs and improve Tailor It. It is stored on Google Cloud (Firestore) and erased after %1$d days, or when you delete your account. It is not shared with third parties.</item>
+    </plurals>
     <string name="feedback_composer_consent_header">Before sending</string>
     <string name="feedback_composer_device_app_version">App version</string>
     <string name="feedback_composer_device_language">Language</string>
@@ -30,7 +33,10 @@
     <string name="feedback_composer_kind_idea">Request</string>
     <string name="feedback_composer_kind_other">Other</string>
     <string name="feedback_composer_list_separator">", "</string>
-    <string name="feedback_composer_max_length">Up to %1$d characters</string>
+    <plurals name="feedback_composer_max_length">
+        <item quantity="one">Up to %1$d character</item>
+        <item quantity="other">Up to %1$d characters</item>
+    </plurals>
     <string name="feedback_composer_message_placeholder">Problems, things that didn\'t turn out as expected, features you\'d like…</string>
     <string name="feedback_composer_ok">OK</string>
     <string name="feedback_composer_screenshot_description">Screenshot to send</string>

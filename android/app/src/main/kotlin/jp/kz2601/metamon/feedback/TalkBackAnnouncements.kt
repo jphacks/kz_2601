@@ -5,7 +5,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.ui.platform.LocalConfiguration
-import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalResources
 import jp.kz2601.metamon.R
 import jp.kz2601.metamon.renderer.a11y.rememberAnnouncer
 import jp.kz2601.metamon.runtime.RuntimeState
@@ -73,7 +73,7 @@ object TalkBackAnnouncements {
 /** 音声の画面とランタイムの状態を見て、新しく出た知らせを TalkBack に読ませる。読む文はログに出さない。 */
 @Composable
 fun TalkBackAnnouncer(voice: StateFlow<VoiceUiState>, runtime: StateFlow<RuntimeState>) {
-    val resources = LocalContext.current.resources
+    val resources by rememberUpdatedState(LocalResources.current)
     val english by rememberUpdatedState(LocalConfiguration.current.locales[0].language == "en")
     val announce = rememberAnnouncer()
     LaunchedEffect(voice, announce) {

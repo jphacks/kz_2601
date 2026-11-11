@@ -3,8 +3,12 @@
 <resources>
     <string name="discover_anonymous">匿名</string>
     <string name="discover_block">公開した人をブロック</string>
-    <string name="discover_byline">%1$s ・ %2$d 人が利用</string>
-    <string name="discover_byline_mine">%1$s ・ %2$d 人が利用 ・ あなたの公開</string>
+    <plurals name="discover_byline">
+        <item quantity="other">%1$s ・ %2$d 人が利用</item>
+    </plurals>
+    <plurals name="discover_byline_mine">
+        <item quantity="other">%1$s ・ %2$d 人が利用 ・ あなたの公開</item>
+    </plurals>
     <string name="discover_categories">カテゴリ</string>
     <string name="discover_category_all">すべて</string>
     <string name="discover_close">閉じる</string>
@@ -55,7 +59,9 @@
     <string name="publish_field_tags">タグ</string>
     <string name="publish_header">みんなに公開</string>
     <string name="publish_intro">「探す」から誰でも見つけてインストールできるようになります</string>
-    <string name="publish_live">「探す」に公開中・%1$d 人がインストール</string>
+    <plurals name="publish_live">
+        <item quantity="other">「探す」に公開中・%1$d 人がインストール</item>
+    </plurals>
     <string name="publish_published">「探す」に公開しました</string>
     <string name="publish_tags_label">タグ(スペース区切り・任意)</string>
     <string name="publish_tags_placeholder">例: 健康 習慣</string>

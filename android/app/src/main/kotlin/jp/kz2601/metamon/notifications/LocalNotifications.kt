@@ -16,6 +16,7 @@ import android.text.format.DateFormat
 import android.util.Log
 import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
+import androidx.core.content.edit
 import jp.kz2601.metamon.R
 import jp.kz2601.metamon.dsl.AppDSL
 import jp.kz2601.metamon.dsl.DslJson
@@ -44,9 +45,9 @@ import java.util.Locale
  * - 場所の通知(near)は計画と登録までで、見張り(Geofencing)はまだ無い(子 Issue)。
  * 計画の中身は :services の純粋関数(JVM テスト)。ここは Android の部品に渡すだけ。
  */
-class LocalNotifications private constructor(private val app: Context) {
-    private val prefs = app.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
-    private val alarms = app.getSystemService(AlarmManager::class.java)
+class LocalNotifications private constructor(private val appContext: Context) {
+    private val prefs = appContext.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+    private val alarms = appContext.getSystemService(AlarmManager::class.java)
     private val zone: ZoneId get() = FieldCoding.zone
 
     /** `app.notifications[]` をそのアプリ分として置き換えて予約し直す。 */
@@ -104,8 +105,9 @@ class LocalNotifications private constructor(private val app: Context) {
      */
     fun removeAll() = synchronized(this) {
         (scheduled() + registry().all.map { it.identifier }).forEach(::cancelAlarm)
-        prefs.edit().remove(KEY_REGISTRY).remove(KEY_SCHEDULED).remove(KEY_CONDITIONS).commit()
-        runCatching { NotificationManagerCompat.from(app).cancelAll() }
+        // 次の人に残さないよう、すぐ書く
+        prefs.edit(commit = true) { remove(KEY_REGISTRY).remove(KEY_SCHEDULED).remove(KEY_CONDITIONS) }
+        runCatching { NotificationManagerCompat.from(appContext).cancelAll() }
         Unit
     }
 
@@ -121,29 +123,29 @@ class LocalNotifications private constructor(private val app: Context) {
         if (!canPost()) return false
         ensureChannels()
         val id = identifier.hashCode()
-        val launch = app.packageManager.getLaunchIntentForPackage(app.packageName)
+        val launch = appContext.packageManager.getLaunchIntentForPackage(appContext.packageName)
             ?.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP)
             ?.putExtra(EXTRA_IDENTIFIER, identifier)
             ?.apply { appId?.let { putExtra(EXTRA_APP_ID, it) } }
-        val builder = NotificationCompat.Builder(app, channel)
+        val builder = NotificationCompat.Builder(appContext, channel)
             .setSmallIcon(R.drawable.ic_notification)
             .setContentTitle(title.ifEmpty { null })
             .setContentText(body.ifEmpty { null })
             .setStyle(NotificationCompat.BigTextStyle().bigText(body))
             .setAutoCancel(true)
             .setPriority(if (alarm) NotificationCompat.PRIORITY_MAX else NotificationCompat.PRIORITY_DEFAULT)
-        launch?.let { builder.setContentIntent(PendingIntent.getActivity(app, id, it, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)) }
+        launch?.let { builder.setContentIntent(PendingIntent.getActivity(appContext, id, it, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)) }
         if (alarm) {
             // 全画面の通知(USE_FULL_SCREEN_INTENT)は Play の制約で使わない。止めるまで音をくり返す通知にする
             builder.setCategory(NotificationCompat.CATEGORY_ALARM)
                 .setContentTitle(AlarmPlanner.title(PlannedNotification(identifier, title, body, PlannedNotification.Trigger.At(0))))
-                .addAction(0, app.getString(R.string.notification_alarm_stop), stopIntent(id))
+                .addAction(0, appContext.getString(R.string.notification_alarm_stop), stopIntent(id))
                 .setDeleteIntent(stopIntent(id))
         }
         val n = builder.build()
         if (alarm) n.flags = n.flags or android.app.Notification.FLAG_INSISTENT
         return try {
-            NotificationManagerCompat.from(app).notify(id, n)
+            NotificationManagerCompat.from(appContext).notify(id, n)
             true
         } catch (_: SecurityException) {
             false // canPost() の後に許可を外された
@@ -155,7 +157,7 @@ class LocalNotifications private constructor(private val app: Context) {
     /** 「明日 9:00」の言い方(今日なら時刻だけ)。 */
     fun whenText(at: Instant, now: Instant = Instant.now()): String {
         val today = at.atZone(zone).toLocalDate() == now.atZone(zone).toLocalDate()
-        val locale = app.resources.configuration.locales[0] ?: Locale.getDefault()
+        val locale = appContext.resources.configuration.locales[0] ?: Locale.getDefault()
         val pattern = DateFormat.getBestDateTimePattern(locale, if (today) "Hm" else "MdEEEHm")
         return java.time.format.DateTimeFormatter.ofPattern(pattern, locale).withZone(zone).format(at)
     }
@@ -174,7 +176,7 @@ class LocalNotifications private constructor(private val app: Context) {
     }
 
     private fun setAlarm(p: PlannedNotification, at: Instant): Boolean {
-        val pi = PendingIntent.getBroadcast(app, 0, fireIntent(p), PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
+        val pi = PendingIntent.getBroadcast(appContext, 0, fireIntent(p), PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
         val ms = at.toEpochMilli()
         return runCatching {
             if (p.isAlarm && alarms.canScheduleExactAlarms()) {
@@ -186,14 +188,14 @@ class LocalNotifications private constructor(private val app: Context) {
     }
 
     private fun cancelAlarm(identifier: String) {
-        val intent = Intent(app, NotificationReceiver::class.java).setAction(NotificationReceiver.ACTION_FIRE).setData(dataUri(identifier))
-        PendingIntent.getBroadcast(app, 0, intent, PendingIntent.FLAG_NO_CREATE or PendingIntent.FLAG_IMMUTABLE)?.let {
+        val intent = Intent(appContext, NotificationReceiver::class.java).setAction(NotificationReceiver.ACTION_FIRE).setData(dataUri(identifier))
+        PendingIntent.getBroadcast(appContext, 0, intent, PendingIntent.FLAG_NO_CREATE or PendingIntent.FLAG_IMMUTABLE)?.let {
             alarms.cancel(it)
             it.cancel()
         }
     }
 
-    private fun fireIntent(p: PlannedNotification) = Intent(app, NotificationReceiver::class.java)
+    private fun fireIntent(p: PlannedNotification) = Intent(appContext, NotificationReceiver::class.java)
         .setAction(NotificationReceiver.ACTION_FIRE)
         .setData(dataUri(p.identifier))
         .putExtra(EXTRA_IDENTIFIER, p.identifier)
@@ -202,31 +204,31 @@ class LocalNotifications private constructor(private val app: Context) {
         .putExtra(EXTRA_ALARM, p.isAlarm)
 
     private fun stopIntent(notificationId: Int): PendingIntent = PendingIntent.getBroadcast(
-        app,
+        appContext,
         notificationId,
-        Intent(app, NotificationReceiver::class.java).setAction(NotificationReceiver.ACTION_STOP).putExtra(EXTRA_NOTIFICATION_ID, notificationId),
+        Intent(appContext, NotificationReceiver::class.java).setAction(NotificationReceiver.ACTION_STOP).putExtra(EXTRA_NOTIFICATION_ID, notificationId),
         PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
     )
 
     fun canPost(): Boolean {
-        if (!NotificationManagerCompat.from(app).areNotificationsEnabled()) return false
+        if (!NotificationManagerCompat.from(appContext).areNotificationsEnabled()) return false
         return Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU ||
-            app.checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) == PackageManager.PERMISSION_GRANTED
+            appContext.checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) == PackageManager.PERMISSION_GRANTED
     }
 
     /** チャンネルを作る(何度呼んでも良い)。FCM が自分で出す通知もこのチャンネルに入るので起動時にも呼ぶ。 */
     fun ensureChannels() {
-        val manager = app.getSystemService(NotificationManager::class.java)
+        val manager = appContext.getSystemService(NotificationManager::class.java)
         manager.createNotificationChannels(
             listOf(
-                NotificationChannel(CHANNEL_REMINDERS, app.getString(R.string.notification_channel_reminders), NotificationManager.IMPORTANCE_DEFAULT)
-                    .apply { description = app.getString(R.string.notification_channel_reminders_description) },
-                NotificationChannel(CHANNEL_CONDITIONS, app.getString(R.string.notification_channel_conditions), NotificationManager.IMPORTANCE_DEFAULT)
-                    .apply { description = app.getString(R.string.notification_channel_conditions_description) },
-                NotificationChannel(CHANNEL_OTHERS, app.getString(R.string.push_channel_others), NotificationManager.IMPORTANCE_DEFAULT)
-                    .apply { description = app.getString(R.string.push_channel_others_description) },
-                NotificationChannel(CHANNEL_ALARMS, app.getString(R.string.notification_channel_alarms), NotificationManager.IMPORTANCE_HIGH).apply {
-                    description = app.getString(R.string.notification_channel_alarms_description)
+                NotificationChannel(CHANNEL_REMINDERS, appContext.getString(R.string.notification_channel_reminders), NotificationManager.IMPORTANCE_DEFAULT)
+                    .apply { description = appContext.getString(R.string.notification_channel_reminders_description) },
+                NotificationChannel(CHANNEL_CONDITIONS, appContext.getString(R.string.notification_channel_conditions), NotificationManager.IMPORTANCE_DEFAULT)
+                    .apply { description = appContext.getString(R.string.notification_channel_conditions_description) },
+                NotificationChannel(CHANNEL_OTHERS, appContext.getString(R.string.push_channel_others), NotificationManager.IMPORTANCE_DEFAULT)
+                    .apply { description = appContext.getString(R.string.push_channel_others_description) },
+                NotificationChannel(CHANNEL_ALARMS, appContext.getString(R.string.notification_channel_alarms), NotificationManager.IMPORTANCE_HIGH).apply {
+                    description = appContext.getString(R.string.notification_channel_alarms_description)
                     setSound(
                         RingtoneManager.getDefaultUri(RingtoneManager.TYPE_ALARM),
                         AudioAttributes.Builder().setUsage(AudioAttributes.USAGE_ALARM).setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION).build(),

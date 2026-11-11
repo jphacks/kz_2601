@@ -36,8 +36,14 @@
     <string name="ai_reason_other">On-device AI isn\'t available</string>
     <string name="ai_reason_photo_only_online">Only online AI can read photos (not available in this version)</string>
     <string name="ai_save">Save</string>
-    <string name="ai_save_added">Added %1$d records</string>
-    <string name="ai_save_added_partial">Added %1$d records (%2$d couldn\'t be added)</string>
+    <plurals name="ai_save_added">
+        <item quantity="one">Added %1$d record</item>
+        <item quantity="other">Added %1$d records</item>
+    </plurals>
+    <plurals name="ai_save_added_partial">
+        <item quantity="one">Added %1$d record (%2$d couldn\'t be added)</item>
+        <item quantity="other">Added %1$d records (%2$d couldn\'t be added)</item>
+    </plurals>
     <string name="ai_save_all">Save all</string>
     <string name="ai_save_failed">Couldn\'t save</string>
     <string name="ai_save_full">No more records can be added</string>

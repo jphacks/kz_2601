@@ -29,6 +29,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import jp.kz2601.metamon.R
+import jp.kz2601.metamon.runtime.resolve
 import kotlinx.coroutines.launch
 
 /** 起動時にサインインしていなければ出す画面(iOS の `SignInView`)。Google・Apple・匿名。 */
@@ -76,7 +77,7 @@ fun SignInScreen(session: AuthSession) {
                 Text(stringResource(R.string.auth_anonymous), color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
             message?.let {
-                Text(it, color = MaterialTheme.colorScheme.error, textAlign = TextAlign.Center)
+                Text(it.resolve(), color = MaterialTheme.colorScheme.error, textAlign = TextAlign.Center)
             }
         }
         if (busy) CircularProgressIndicator(Modifier.align(Alignment.Center))

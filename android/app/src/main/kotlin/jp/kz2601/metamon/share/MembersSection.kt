@@ -34,6 +34,7 @@ import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
@@ -190,7 +191,7 @@ fun MembersSettingsRow(onOpen: (() -> Unit)?) {
 private fun Title(count: Int?) {
     Row(verticalAlignment = Alignment.CenterVertically) {
         Text(stringResource(R.string.members_title), style = MaterialTheme.typography.titleMedium, modifier = Modifier.weight(1f))
-        count?.let { Text(stringResource(R.string.members_count, it), style = MaterialTheme.typography.bodyMedium) }
+        count?.let { Text(pluralStringResource(R.plurals.members_count, it, it), style = MaterialTheme.typography.bodyMedium) }
     }
 }
 

@@ -10,15 +10,15 @@ internal object FileImportCopy {
     fun message(res: Resources, m: ImportMessage): String = when (m) {
         is ImportMessage.Csv -> csv(res, m)
         is ImportMessage.Body -> buildList {
-            add(res.getString(R.string.renderer_import_body, m.fileName, m.characters, m.entityName))
-            if (m.truncated) add(res.getString(R.string.renderer_import_body_truncated, m.characters))
+            add(res.getQuantityString(R.plurals.renderer_import_body, m.characters, m.fileName, m.characters, m.entityName))
+            if (m.truncated) add(res.getQuantityString(R.plurals.renderer_import_body_truncated, m.characters, m.characters))
         }.joinToString("\n")
     }
 
     /** 足す件数・使う列・使わない列(8 つまで)・読めない行(最初の 3 つ)・上限で入れない行。 */
     private fun csv(res: Resources, m: ImportMessage.Csv): String {
         val sep = res.getString(R.string.renderer_import_separator)
-        val lines = mutableListOf(res.getString(R.string.renderer_import_csv_count, m.entityName, m.count))
+        val lines = mutableListOf(res.getQuantityString(R.plurals.renderer_import_csv_count, m.count, m.entityName, m.count))
         val used = m.used.joinToString(sep) { (column, field) -> if (column == field) column else "$column→$field" }
         lines += res.getString(R.string.renderer_import_csv_used, used)
         val unused = m.unused.take(8).joinToString(sep)
@@ -28,7 +28,9 @@ internal object FileImportCopy {
             m.failures.take(3).forEach { lines += "・" + failure(res, it) }
         }
         if (m.overLimit > 0) {
-            lines += res.getString(R.string.renderer_import_csv_over, RecordImport.MAX_ROWS, RecordImport.MAX_RECORDS_PER_ENTITY, m.overLimit)
+            lines += res.getQuantityString(
+                R.plurals.renderer_import_csv_over, m.overLimit, RecordImport.MAX_ROWS, RecordImport.MAX_RECORDS_PER_ENTITY, m.overLimit,
+            )
         }
         return lines.joinToString("\n")
     }
@@ -54,6 +56,6 @@ internal object FileImportCopy {
     }
 
     fun result(res: Resources, added: Int, total: Int): String =
-        if (added == total) res.getString(R.string.renderer_import_added, added)
-        else res.getString(R.string.renderer_import_added_partly, added, total - added)
+        if (added == total) res.getQuantityString(R.plurals.renderer_import_added, added, added)
+        else res.getQuantityString(R.plurals.renderer_import_added_partly, added, added, total - added)
 }

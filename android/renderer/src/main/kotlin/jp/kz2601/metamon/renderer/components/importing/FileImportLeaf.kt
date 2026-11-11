@@ -19,6 +19,7 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalResources
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import jp.kz2601.metamon.dsl.Component
@@ -45,6 +46,7 @@ import kotlinx.coroutines.withContext
 @Composable
 fun FileImportLeaf(c: Component, ctx: RenderContext, modifier: Modifier = Modifier) {
     val context = LocalContext.current
+    val resources = LocalResources.current
     val scope = rememberCoroutineScope()
     val runtime = ctx.runtime
     val entity = c.entity?.let { runtime.entityModel(it) }
@@ -107,7 +109,7 @@ fun FileImportLeaf(c: Component, ctx: RenderContext, modifier: Modifier = Modifi
     }
 
     pending?.let { step ->
-        val res = context.resources
+        val res = resources
         AlertDialog(
             onDismissRequest = { pending = null },
             title = { Text(stringResource(R.string.renderer_import_confirm_title)) },
@@ -131,7 +133,7 @@ fun FileImportLeaf(c: Component, ctx: RenderContext, modifier: Modifier = Modifi
         AlertDialog(
             onDismissRequest = { problem = null },
             title = { Text(stringResource(R.string.renderer_import_problem_title)) },
-            text = { Text(FileImportCopy.problem(context.resources, pr)) },
+            text = { Text(FileImportCopy.problem(resources, pr)) },
             confirmButton = { TextButton(onClick = { problem = null }) { Text(stringResource(R.string.renderer_import_ok)) } },
         )
     }

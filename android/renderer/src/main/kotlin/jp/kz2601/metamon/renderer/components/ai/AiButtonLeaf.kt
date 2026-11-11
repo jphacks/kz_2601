@@ -26,6 +26,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
@@ -227,8 +228,8 @@ private fun AiSaveToList(saveTo: AiSaveTo, items: List<String>, ctx: RenderConte
         status?.let { o ->
             val text = when {
                 o.full -> stringResource(R.string.ai_save_full)
-                o.notAdded == 0 -> stringResource(R.string.ai_save_added, o.added)
-                else -> stringResource(R.string.ai_save_added_partial, o.added, o.notAdded)
+                o.notAdded == 0 -> pluralStringResource(R.plurals.ai_save_added, o.added, o.added)
+                else -> pluralStringResource(R.plurals.ai_save_added_partial, o.added, o.added, o.notAdded)
             }
             Caption(text, isError = failed.isNotEmpty())
         }

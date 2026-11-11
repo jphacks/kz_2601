@@ -47,6 +47,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
@@ -271,7 +272,7 @@ private fun PublicAppCard(
                     Text(item.name, style = MaterialTheme.typography.titleMedium, maxLines = 1, overflow = TextOverflow.Ellipsis)
                     val author = item.authorName.ifEmpty { stringResource(R.string.discover_anonymous) }
                     Text(
-                        stringResource(if (item.mine) R.string.discover_byline_mine else R.string.discover_byline, author, item.installs),
+                        pluralStringResource(if (item.mine) R.plurals.discover_byline_mine else R.plurals.discover_byline, item.installs, author, item.installs),
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         maxLines = 1,

@@ -159,9 +159,15 @@ class ListLeavesTest {
         val strings = Regex("""<string name="([^"]+)">([^<]*)</string>""").findAll(xml).associate { it.groupValues[1] to it.groupValues[2] }
         // 前後の空白を残すための "…" は外す(Android のリソースと同じ読み方)
         fun s(name: String) = strings.getValue("lists_$name").removeSurrounding("\"").replace(Regex("""%\d\$"""), "%")
+        // plurals は 1 件の形(英語は one・日本語は other だけ)。Android の getQuantityString(id, 1) と同じ選び方
+        fun one(name: String): String {
+            val items = Regex("""<plurals name="lists_$name">(.*?)</plurals>""", RegexOption.DOT_MATCHES_ALL).find(xml)!!.groupValues[1]
+            val forms = Regex("""<item quantity="(\w+)">([^<]*)</item>""").findAll(items).associate { it.groupValues[1] to it.groupValues[2] }
+            return (forms["one"] ?: forms.getValue("other")).replace(Regex("""%\d\$"""), "%")
+        }
         return ValueLabels(
             empty = s("empty"), count = s("count"), sum = s("sum"), avg = s("avg"), min = s("min"), max = s("max"),
-            countUnit = s("count_unit"), noData = s("no_data"), chartOne = s("chart_summary_one"), chartMany = s("chart_summary_many"),
+            countUnit = s("count_unit"), noData = s("no_data"), chartOne = one("chart_summary_one"), chartMany = s("chart_summary_many"),
             everyone = s("everyone"), member = s("member"),
             sentenceSeparator = s("sentence_separator"), listSeparator = s("list_separator"), listPair = s("list_pair"), listLast = s("list_last"),
         )
@@ -208,7 +214,7 @@ class ListLeavesTest {
         assertEquals("データがありません", ChartReadout.summary(emptyList(), ValueLabels.JAPANESE))
         val en = labels("values-en")
         assertEquals("2 items. Highest: 金沢 (3,400). Lowest: 富山 (1,000)", ChartReadout.summary(buckets, en, Locale.US))
-        assertEquals("1 items. 3月: 12", ChartReadout.summary(listOf(Aggregator.Bucket("m", "3月", 12.0)), en, Locale.US))
+        assertEquals("1 item. 3月: 12", ChartReadout.summary(listOf(Aggregator.Bucket("m", "3月", 12.0)), en, Locale.US))
         assertEquals("No data yet", ChartReadout.summary(emptyList(), en))
         assertEquals("3月: 12.5", ChartReadout.line("3月", 12.5, Locale.JAPAN))
         assertEquals(0, ChartReadout.index(1000.0, listOf(3400.0, 1000.0)))

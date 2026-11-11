@@ -4,7 +4,7 @@ import android.content.res.Resources
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.platform.LocalConfiguration
-import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalResources
 import jp.kz2601.metamon.renderer.R
 
 /**
@@ -74,7 +74,7 @@ data class ValueLabels(
             max = res.getString(R.string.lists_max),
             countUnit = res.getString(R.string.lists_count_unit),
             noData = res.getString(R.string.lists_no_data),
-            chartOne = res.getString(R.string.lists_chart_summary_one),
+            chartOne = res.getQuantityString(R.plurals.lists_chart_summary_one, 1),
             chartMany = res.getString(R.string.lists_chart_summary_many),
             everyone = res.getString(R.string.lists_everyone),
             member = res.getString(R.string.lists_member),
@@ -89,7 +89,7 @@ data class ValueLabels(
 /** 端末(アプリ)の言語の [ValueLabels]。言語が変わると作り直す。 */
 @Composable
 fun rememberValueLabels(): ValueLabels {
-    val context = LocalContext.current
+    val resources = LocalResources.current
     val config = LocalConfiguration.current
-    return remember(context, config) { ValueLabels.from(context.resources) }
+    return remember(resources, config) { ValueLabels.from(resources) }
 }

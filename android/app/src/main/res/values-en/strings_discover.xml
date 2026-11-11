@@ -3,8 +3,14 @@
 <resources>
     <string name="discover_anonymous">Anonymous</string>
     <string name="discover_block">Block publisher</string>
-    <string name="discover_byline">%1$s · %2$d users</string>
-    <string name="discover_byline_mine">%1$s · %2$d users · Published by you</string>
+    <plurals name="discover_byline">
+        <item quantity="one">%1$s · %2$d user</item>
+        <item quantity="other">%1$s · %2$d users</item>
+    </plurals>
+    <plurals name="discover_byline_mine">
+        <item quantity="one">%1$s · %2$d user · Published by you</item>
+        <item quantity="other">%1$s · %2$d users · Published by you</item>
+    </plurals>
     <string name="discover_categories">Categories</string>
     <string name="discover_category_all">All</string>
     <string name="discover_close">Close</string>
@@ -55,7 +61,10 @@
     <string name="publish_field_tags">Tags</string>
     <string name="publish_header">Publish to everyone</string>
     <string name="publish_intro">Anyone can find and install it from Discover</string>
-    <string name="publish_live">Published on Discover · %1$d installs</string>
+    <plurals name="publish_live">
+        <item quantity="one">Published on Discover · %1$d install</item>
+        <item quantity="other">Published on Discover · %1$d installs</item>
+    </plurals>
     <string name="publish_published">Published on Discover</string>
     <string name="publish_tags_label">Tags (space-separated, optional)</string>
     <string name="publish_tags_placeholder">e.g. health habits</string>

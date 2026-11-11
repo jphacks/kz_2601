@@ -6,7 +6,9 @@
     <string name="lists_cell_empty">空き</string>
     <string name="lists_chart_empty">まだ記録がありません。記録するとグラフになります</string>
     <string name="lists_chart_summary_many">%1$d 項目。最大は %2$s の %3$s、最小は %4$s の %5$s</string>
-    <string name="lists_chart_summary_one">%1$d 項目。%2$s の %3$s</string>
+    <plurals name="lists_chart_summary_one">
+        <item quantity="other">%1$d 項目。%2$s の %3$s</item>
+    </plurals>
     <string name="lists_check">チェックする</string>
     <string name="lists_checked">チェック済み</string>
     <string name="lists_clear">クリア</string>
@@ -32,7 +34,9 @@
     <string name="lists_open">開く</string>
     <string name="lists_previous_month">前の月</string>
     <string name="lists_progress">進捗</string>
-    <string name="lists_records_count">記録%1$d件</string>
+    <plurals name="lists_records_count">
+        <item quantity="other">記録%1$d件</item>
+    </plurals>
     <string name="lists_search">検索</string>
     <string name="lists_sentence_separator">。</string>
     <string name="lists_sum">%1$sの合計</string>
