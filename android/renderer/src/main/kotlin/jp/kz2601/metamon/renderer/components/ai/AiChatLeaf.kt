@@ -49,6 +49,8 @@ import jp.kz2601.metamon.dsl.ai.AiChat
 import jp.kz2601.metamon.renderer.R
 import jp.kz2601.metamon.renderer.a11y.TalkBack
 import jp.kz2601.metamon.renderer.a11y.rememberAnnouncer
+import jp.kz2601.metamon.renderer.components.audio.DictationException
+import jp.kz2601.metamon.renderer.components.audio.DictationFailure
 import jp.kz2601.metamon.renderer.components.play.rememberRecords
 import jp.kz2601.metamon.renderer.registry.RenderContext
 import jp.kz2601.metamon.renderer.theme.RenderTheme
@@ -237,8 +239,9 @@ fun AiChatLeaf(c: Component, ctx: RenderContext, modifier: Modifier = Modifier) 
                             }
                         } catch (e: CancellationException) {
                             throw e
-                        } catch (_: Exception) {
-                            error = AiMessage(R.string.ai_chat_mic_failed)
+                        } catch (e: Exception) {
+                            val denied = (e as? DictationException)?.failure == DictationFailure.MIC_DENIED
+                            error = AiMessage(if (denied) R.string.renderer_audio_mic_denied else R.string.ai_chat_mic_failed)
                             phase = DictationPhase.IDLE
                         }
                     }
