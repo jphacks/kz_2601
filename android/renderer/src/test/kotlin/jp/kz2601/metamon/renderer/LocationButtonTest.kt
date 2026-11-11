@@ -43,10 +43,11 @@ class LocationButtonTest {
         assertTrue(ComponentType.LOCATION_BUTTON.wire in DeviceCapabilities.of().allowedComponents)
         assertTrue(ComponentType.LOCATION_BUTTON in InputRules.formBound)
         assertFalse(ComponentType.LOCATION_BUTTON in InputRules.overridable)
-        // 地図の提供元が決まるまで描かない
-        for (t in listOf(ComponentType.LOCATION_PICKER, ComponentType.PLACE_SEARCH, ComponentType.MAP_VIEW)) {
-            assertFalse(t.wire, t.wire in ComponentRegistry.standard.registeredTypes)
+        // 地図(MapLibre)は入れた。場所の検索は検索の API が無いのでまだ描かない
+        for (t in listOf(ComponentType.LOCATION_PICKER, ComponentType.MAP_VIEW)) {
+            assertTrue(t.wire, t.wire in ComponentRegistry.standard.registeredTypes)
         }
+        assertFalse(ComponentType.PLACE_SEARCH.wire in ComponentRegistry.standard.registeredTypes)
     }
 
     @Test
