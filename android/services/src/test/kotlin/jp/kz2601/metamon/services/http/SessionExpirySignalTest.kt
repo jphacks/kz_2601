@@ -11,6 +11,7 @@ import org.junit.Test
 class SessionExpirySignalTest {
     private lateinit var server: MockWebServer
     private var fired = 0
+    private val uids = mutableListOf<String?>()
 
     @Before
     fun setUp() {
@@ -80,9 +81,31 @@ class SessionExpirySignalTest {
     @Test
     fun signalForwardsToTheListenerInstalledLater() {
         val signal = SessionExpirySignal()
-        signal.fire() // 受け手が無ければ何もしない
-        signal.listener = { fired++ }
-        signal.fire()
+        signal.fire("uid-a") // 受け手が無ければ何もしない
+        signal.listener = { fired++; uids += it }
+        signal.fire("uid-a")
         assertEquals(1, fired)
+        assertEquals(listOf<String?>("uid-a"), uids)
+    }
+
+    @Test
+    fun firesWithTheUidReadWhenTheRequestWasSent() = runBlocking<Unit> {
+        server.enqueue(json(401, errorBody("unauthenticated")))
+        server.enqueue(json(401, errorBody("unauthenticated")))
+        // 応答を待つ間に別の人へ替わった(取り直しの時点で uid-b)。知らせるのは送った時の uid-a
+        val tokens = object : TokenProvider {
+            var uid = "uid-a"
+
+            override suspend fun idToken(forceRefresh: Boolean): String {
+                if (forceRefresh) uid = "uid-b"
+                return "id-$uid"
+            }
+
+            override fun subject(): String = uid
+        }
+
+        expectApiError { server.metamonHttp(tokens = tokens, onSessionExpired = { uids += it }).send(post()) }
+
+        assertEquals(listOf<String?>("uid-a"), uids)
     }
 }
