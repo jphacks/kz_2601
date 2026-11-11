@@ -34,6 +34,7 @@ import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -70,6 +71,7 @@ import jp.kz2601.metamon.services.feedback.FeedbackSubmission
 import jp.kz2601.metamon.services.http.FailureKind
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
@@ -85,6 +87,15 @@ fun FeedbackComposerHost(container: AppContainer) {
     ShakeEffect {
         val activity = context.findActivity() ?: return@ShakeEffect
         scope.launch { launcher.capture(activity, container, withOverlays = true) }
+    }
+    // ヘッドレス E2E・画面のテスト(#1314・iOS の METAMON_AUTO_FEEDBACK): 指定の秒数後に、振った時と同じく開く。debug だけ値が入る
+    container.knobs.autoFeedbackSeconds?.let { seconds ->
+        LaunchedEffect(launcher) {
+            if (!launcher.claimAutoOpen()) return@LaunchedEffect
+            delay((seconds * 1000).toLong())
+            val activity = context.findActivity() ?: return@LaunchedEffect
+            launcher.capture(activity, container, withOverlays = true)
+        }
     }
     val open by launcher.open.collectAsStateWithLifecycle()
     val sender = remember(container) { FeedbackSender(container.feedback) }
