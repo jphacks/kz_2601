@@ -31,6 +31,8 @@ class FormDraft(val entity: Entity, record: Record? = null) {
         private set
     var flagCount by mutableIntStateOf(0)
         private set
+    /** スクロールしてフォーカスを移す field(M10)。押すたびに null を挟んで同じ欄にも移す。 */
+    var attentionField: String? by mutableStateOf(null)
     var saveCount by mutableIntStateOf(0)
         private set
     var lastSaveResult: FormSaveResult? by mutableStateOf(null)

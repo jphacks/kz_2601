@@ -74,6 +74,20 @@ import jp.kz2601.metamon.renderer.form.FormSaveResult
 import jp.kz2601.metamon.renderer.screen.SaveBarFeedback
 import jp.kz2601.metamon.renderer.screen.SaveBarPhase
 import kotlinx.coroutines.launch
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.SheetValue
+import androidx.compose.material3.rememberModalBottomSheetState
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.compositionLocalOf
+import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.ui.platform.LocalContext
+import jp.kz2601.metamon.renderer.form.DiscardGuard
+import jp.kz2601.metamon.renderer.form.FormDraft
+import jp.kz2601.metamon.renderer.form.RequiredFieldFocus
+import kotlinx.coroutines.delay
+
+/** 今の画面のフォームを控える先(DSLView が入れる)。null なら破棄の確認をしない(プレビュー単体の ScreenView)。 */
+val LocalDiscardGuard = compositionLocalOf<DiscardGuard?> { null }
 
 /**
  * DSL のアプリ全体を描く(iOS の `DSLNavigationRoot`)。タブ(2 個以上)・main のスタック・シート・全画面を持ち、
@@ -89,6 +103,8 @@ fun DSLView(dsl: AppDSL, runtime: DSLRuntime, modifier: Modifier = Modifier) {
     fun setNav(value: NavigationState) {
         if (host != null) host.setNavigation(value) else local = value
     }
+    // M10: 保存していない入力のある画面を離れる前の確認(戻る・シートを閉じる・タブの切り替え)
+    val discard = remember(dsl) { DiscardGuard() }
 
     fun perform(action: Action, at: ActionContext) {
         if (host != null) return runtime.onAction(action, at)
@@ -106,60 +122,96 @@ fun DSLView(dsl: AppDSL, runtime: DSLRuntime, modifier: Modifier = Modifier) {
     fun stack(stack: String, root: Route) {
         val top = nav.path(stack).lastOrNull() ?: root
         val canClose = NavigationResolver.canClose(nav, top)
-        BackHandler(enabled = canClose) { setNav(NavigationResolver.close(nav, top)) }
+        fun close() = discard.request(stack) { setNav(NavigationResolver.close(nav, top)) }
+        BackHandler(enabled = canClose) { close() } // 予測型の戻るも、払い終えた時にここへ来る
         key(top.id) {
-            RouteView(dsl, top, RenderContext(top, runtime) { a, at -> perform(a, at) }, canClose) {
-                setNav(NavigationResolver.close(nav, top))
-            }
+            RouteView(dsl, top, RenderContext(top, runtime) { a, at -> perform(a, at) }, canClose) { close() }
         }
     }
 
-    Column(modifier.fillMaxSize().background(RenderTheme.colors.canvas)) {
-        Box(Modifier.weight(1f)) {
-            if (dsl.app.hasTabs) {
-                val tab = nav.selectedTab
-                stack(Route.tabStack(tab), Route(tab, stack = Route.tabStack(tab)))
-            } else {
-                stack(Route.MAIN, Route(dsl.initialScreen))
+    CompositionLocalProvider(LocalDiscardGuard provides discard) {
+        Column(modifier.fillMaxSize().background(RenderTheme.colors.canvas)) {
+            Box(Modifier.weight(1f)) {
+                if (dsl.app.hasTabs) {
+                    val tab = nav.selectedTab
+                    stack(Route.tabStack(tab), Route(tab, stack = Route.tabStack(tab)))
+                } else {
+                    stack(Route.MAIN, Route(dsl.initialScreen))
+                }
             }
-        }
-        if (dsl.app.hasTabs) {
-            NavigationBar {
-                dsl.app.tabs.forEach { t ->
-                    NavigationBarItem(
-                        selected = nav.selectedTab == t.screen,
-                        onClick = {
-                            // 選び直したタブは根まで戻す
-                            setNav(nav.withPath(Route.tabStack(t.screen), emptyList()).copy(selectedTab = t.screen))
-                        },
-                        icon = {},
-                        label = { Text(t.title, maxLines = 1, overflow = TextOverflow.Ellipsis) },
-                    )
+            if (dsl.app.hasTabs) {
+                NavigationBar {
+                    dsl.app.tabs.forEach { t ->
+                        NavigationBarItem(
+                            selected = nav.selectedTab == t.screen,
+                            onClick = {
+                                // 選び直したタブは根まで戻す。今の画面は消える(入力も消える)ので、入力があれば確かめる
+                                discard.request(Route.tabStack(nav.selectedTab)) {
+                                    setNav(nav.withPath(Route.tabStack(t.screen), emptyList()).copy(selectedTab = t.screen))
+                                }
+                            },
+                            icon = {},
+                            label = { Text(t.title, maxLines = 1, overflow = TextOverflow.Ellipsis) },
+                        )
+                    }
                 }
             }
         }
-    }
 
-    nav.sheet?.let { sheet ->
-        // 下に引いて閉じた時はシートのスタックごと閉じる
-        SheetHost(onDismiss = { setNav(nav.withPath(Route.SHEET, null).copy(sheet = null)) }) { stack(Route.SHEET, sheet) }
-    }
-    nav.fullScreen?.let { full ->
-        Dialog(
-            onDismissRequest = { setNav(NavigationResolver.close(nav, nav.path(Route.FULL).lastOrNull() ?: full)) },
-            properties = DialogProperties(usePlatformDefaultWidth = false),
-        ) {
-            Box(Modifier.fillMaxSize().background(RenderTheme.colors.canvas)) { stack(Route.FULL, full) }
+        nav.sheet?.let { sheet ->
+            // 下に引いて閉じた時はシートのスタックごと閉じる
+            SheetHost(
+                onDismiss = { setNav(nav.withPath(Route.SHEET, null).copy(sheet = null)) },
+                guard = discard,
+            ) { stack(Route.SHEET, sheet) }
         }
+        nav.fullScreen?.let { full ->
+            Dialog(
+                onDismissRequest = {
+                    discard.request(Route.FULL) { setNav(NavigationResolver.close(nav, nav.path(Route.FULL).lastOrNull() ?: full)) }
+                },
+                properties = DialogProperties(usePlatformDefaultWidth = false),
+            ) {
+                Box(Modifier.fillMaxSize().background(RenderTheme.colors.canvas)) { stack(Route.FULL, full) }
+            }
+        }
+        // 通報・ブロック・18 歳以上の確認(#877)。窓なのでシート・全画面の上にも出る
+        (runtime as? SocialPromptHost)?.let { SocialDialogs(it) }
+        if (discard.pending != null) DiscardDialog(discard)
     }
-    // 通報・ブロック・18 歳以上の確認(#877)。窓なのでシート・全画面の上にも出る
-    (runtime as? SocialPromptHost)?.let { SocialDialogs(it) }
+}
+
+/** 保存していない入力を破棄するかの確認(M10・iOS の `discardFormConfirmation` と同じ文言)。窓なのでシートの上にも出る。 */
+@Composable
+private fun DiscardDialog(guard: DiscardGuard) {
+    AlertDialog(
+        onDismissRequest = guard::keepEditing,
+        title = { Text(stringResource(R.string.renderer_discard_title)) },
+        text = { Text(stringResource(R.string.renderer_discard_message)) },
+        confirmButton = {
+            TextButton(onClick = guard::discard) {
+                Text(stringResource(R.string.renderer_discard_confirm), color = MaterialTheme.colorScheme.error)
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = guard::keepEditing) { Text(stringResource(R.string.renderer_discard_keep_editing)) }
+        },
+    )
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun SheetHost(onDismiss: () -> Unit, content: @Composable () -> Unit) {
-    ModalBottomSheet(onDismissRequest = onDismiss, containerColor = RenderTheme.colors.canvas) {
+private fun SheetHost(onDismiss: () -> Unit, guard: DiscardGuard, content: @Composable () -> Unit) {
+    val dismiss by rememberUpdatedState(onDismiss)
+    // 入力があれば、下に払っても・戻るでも閉じずに確認を出す(iOS の interactiveDismissDisabled + 閉じるの確認)
+    val state = rememberModalBottomSheetState(
+        confirmValueChange = { value ->
+            if (value != SheetValue.Hidden || !guard.needsConfirm(Route.SHEET)) return@rememberModalBottomSheetState true
+            guard.request(Route.SHEET) { dismiss() }
+            false
+        },
+    )
+    ModalBottomSheet(onDismissRequest = { dismiss() }, sheetState = state, containerColor = RenderTheme.colors.canvas) {
         Box(Modifier.fillMaxWidth().heightIn(min = 320.dp).fillMaxSize()) { content() }
     }
 }
@@ -190,6 +242,15 @@ fun ScreenView(
 ) {
     val form = rememberScreenForm(screen, screenCtx.route, screenCtx.runtime)
     val ctx = remember(screenCtx, form, screen) { screenCtx.withForm(form).withScreen(screen) }
+    val guard = LocalDiscardGuard.current
+    if (guard != null && form != null) {
+        val stack = screenCtx.route.stack
+        DisposableEffect(guard, stack, form) {
+            guard.track(stack, form)
+            onDispose { guard.untrack(stack, form) }
+        }
+    }
+    if (form != null) RequiredFieldAttention(screen, form, ctx)
     val toolbar = ScreenToolbar.header(screen, dsl, form)
     Column(modifier.fillMaxSize()) {
         val showsHeader = !screen.isVoiceScreen && (screen.title.isNotEmpty() || canClose || toolbar.isNotEmpty())
@@ -225,6 +286,25 @@ fun ScreenView(
             is ScreenToolbar.SaveBar.Save -> FormSaveBar(bar.button, ctx)
             null -> Unit
         }
+    }
+}
+
+/**
+ * 保存で弾かれたら、画面で最初の空の必須欄へスクロールしてフォーカスし、TalkBack に「○○ を入力してください」と読ませる
+ * (M10・iOS の `RequiredFieldScroller`)。欄の側は `FormInput` が [FormDraft.attentionField] を見て動く。
+ */
+@Composable
+private fun RequiredFieldAttention(screen: Screen, form: FormDraft, ctx: RenderContext) {
+    val announce = rememberAnnouncer()
+    val context = LocalContext.current
+    val count = form.flagCount
+    LaunchedEffect(form, count) {
+        if (count == 0) return@LaunchedEffect
+        form.attentionField = null // 同じ欄でも、押すたびにフォーカスを戻す
+        val field = RequiredFieldFocus.firstFlagged(screen, form, ctx.runtime.currentUid()) ?: return@LaunchedEffect
+        delay(RequiredFieldFocus.SETTLE_MILLIS)
+        form.attentionField = field
+        announce(context.getString(R.string.renderer_required_fill_in, form.entity.field(field)?.name ?: field))
     }
 }
 

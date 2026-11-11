@@ -8,12 +8,18 @@ import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.relocation.BringIntoViewRequester
+import androidx.compose.foundation.relocation.bringIntoViewRequester
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.semantics
@@ -90,7 +96,21 @@ fun FormInput(c: Component, ctx: RenderContext, modifier: Modifier, content: @Co
     }
     form!!
     val override = InputRules.override(c, form)
-    Column(modifier.fillMaxWidth().semantics { testTag = "field.${c.field}" }) {
+    val bring = remember { BringIntoViewRequester() }
+    val focus = remember { FocusRequester() }
+    val attention = form.attentionField
+    // 保存で弾かれた最初の空の必須欄なら、見える所へ出して中の入力にフォーカスする(M10)
+    LaunchedEffect(attention) {
+        if (attention == null || attention != c.field) return@LaunchedEffect
+        bring.bringIntoView()
+        runCatching { focus.requestFocus() } // 押せる物が無い欄(読むだけの上書き)では何もしない
+    }
+    Column(
+        modifier.fillMaxWidth()
+            .bringIntoViewRequester(bring)
+            .focusRequester(focus)
+            .semantics { testTag = "field.${c.field}" },
+    ) {
         if (override != null) FieldOverrideRow(c, override, form, ctx) else content(form, c.field!!)
         if (form.isFlagged(c.field!!)) {
             Text(
