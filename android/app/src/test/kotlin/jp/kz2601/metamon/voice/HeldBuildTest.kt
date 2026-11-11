@@ -7,6 +7,8 @@ import jp.kz2601.metamon.purchase.CreationGate
 import jp.kz2601.metamon.services.AIClient
 import jp.kz2601.metamon.services.ChatMessage
 import jp.kz2601.metamon.services.ChatMode
+import jp.kz2601.metamon.services.ChatOption
+import jp.kz2601.metamon.services.ChatPaidFeature
 import jp.kz2601.metamon.services.ChatTurn
 import jp.kz2601.metamon.services.GenerateMode
 import jp.kz2601.metamon.services.GenerateProgress
@@ -92,6 +94,7 @@ class HeldBuildTest {
         var buy = false
         var admits = 0
         var recorded = 0
+        override var isPro = false
         val proRequests = mutableListOf<List<PaidFeature>>()
         override val dailyFreeLimit: Int = 3
 
@@ -251,5 +254,137 @@ class HeldBuildTest {
         assertEquals(1, gate.proRequests.size)
         assertEquals(2, ai.morphCalls.size)
         assertTrue(vm.state.value.error != null)
+    }
+
+    // MARK: - 相談の「これでいく」の有料の機能の確認(#1175・iOS の PaidFeatureCheck / holdForPaidConfirm)
+
+    private val shared = listOf(ChatPaidFeature(id = "sharedData", title = "みんなで共有するデータ", reason = "共有には Pro が要ります"))
+
+    private fun paidReady(free: String? = "ひとりで使う掲示板") = ChatTurn(
+        kind = ChatTurn.Kind.READY, text = "作ります", turn = 1, transcript = "みんなで使う掲示板",
+        requiresPro = true, paidFeatures = shared, freeTranscript = free,
+    )
+
+    @Test
+    fun paidReadyShowsTheConfirmCardAndBuildsTheFreeVersion() = runTest {
+        val ai = FakeAI(built).apply { turns += paidReady() }
+        val gate = FakeGate()
+        val vm = vm(ai, gate)
+        vm.submit("掲示板")
+        advanceUntilIdle()
+        vm.buildFromChat()
+        advanceUntilIdle()
+
+        assertTrue("確認の前には送らない", ai.morphCalls.isEmpty())
+        val held = vm.state.value.heldBuild as HeldBuild.ProRequired
+        assertEquals("みんなで使う掲示板", held.text)
+        assertEquals(listOf("みんなで共有するデータ"), held.features.map { it.title })
+        assertTrue(vm.state.value.isChatting)
+
+        vm.buildWithoutPaidFeatures()
+        advanceUntilIdle()
+        assertEquals("サーバーの無料版の依頼文で作る", listOf("ひとりで使う掲示板"), ai.morphCalls)
+        assertEquals(built, vm.state.value.document)
+        assertEquals(1, gate.recorded)
+    }
+
+    @Test
+    fun paidReadyBuyBuildsWithThePaidFeatures() = runTest {
+        val ai = FakeAI(built).apply { turns += paidReady() }
+        val gate = FakeGate().apply { buy = true }
+        val vm = vm(ai, gate)
+        vm.submit("掲示板")
+        advanceUntilIdle()
+        vm.buildFromChat()
+        advanceUntilIdle()
+        vm.purchaseAndBuild()
+        advanceUntilIdle()
+        assertEquals(listOf("sharedData"), gate.proRequests.single().map { it.id })
+        assertEquals(listOf("みんなで使う掲示板"), ai.morphCalls)
+        assertEquals(built, vm.state.value.document)
+    }
+
+    @Test
+    fun paidReadyWithoutFreeTextFallsBackToTheSuffix() = runTest {
+        val ai = FakeAI(built).apply { turns += paidReady(free = null) }
+        val vm = vm(ai, FakeGate())
+        vm.submit("掲示板")
+        advanceUntilIdle()
+        vm.buildFromChat()
+        advanceUntilIdle()
+        vm.buildWithoutPaidFeatures()
+        advanceUntilIdle()
+        assertEquals(listOf("みんなで使う掲示板\n" + PaidFeatureCheck.FALLBACK_FREE_SUFFIX), ai.morphCalls)
+    }
+
+    @Test
+    fun proSkipsTheConfirmCard() = runTest {
+        val ai = FakeAI(built).apply { turns += paidReady() }
+        val vm = vm(ai, FakeGate().apply { isPro = true })
+        vm.submit("掲示板")
+        advanceUntilIdle()
+        vm.buildFromChat()
+        advanceUntilIdle()
+        assertNull(vm.state.value.heldBuild)
+        assertEquals(listOf("みんなで使う掲示板"), ai.morphCalls)
+    }
+
+    @Test
+    fun paidOptionShowsTheConfirmCardAndFreeUsesFreeInstruction() = runTest {
+        val proposal = ChatTurn(
+            kind = ChatTurn.Kind.PROPOSAL, text = "どれにしますか", turn = 1,
+            options = listOf(
+                ChatOption(title = "みんなで", instruction = "みんなで使う掲示板", requiresPro = true, paidFeatures = shared, freeInstruction = "ひとりで使う掲示板"),
+                ChatOption(title = "ひとりで", instruction = "ひとりで使うメモ"),
+            ),
+        )
+        val ai = FakeAI(built).apply { turns += proposal }
+        val gate = FakeGate()
+        val vm = vm(ai, gate)
+        vm.submit("掲示板")
+        advanceUntilIdle()
+        vm.choose(proposal.options!![0])
+        advanceUntilIdle()
+        assertTrue(ai.morphCalls.isEmpty())
+        assertTrue(vm.state.value.heldBuild is HeldBuild.ProRequired)
+
+        vm.buildWithoutPaidFeatures()
+        advanceUntilIdle()
+        assertEquals(listOf("ひとりで使う掲示板"), ai.morphCalls)
+    }
+
+    @Test
+    fun freeOptionBuildsRightAway() = runTest {
+        val proposal = ChatTurn(
+            kind = ChatTurn.Kind.PROPOSAL, text = "どれにしますか", turn = 1,
+            options = listOf(ChatOption(title = "ひとりで", instruction = "ひとりで使うメモ")),
+        )
+        val ai = FakeAI(built).apply { turns += proposal }
+        val vm = vm(ai, FakeGate())
+        vm.submit("メモ")
+        advanceUntilIdle()
+        vm.choose(proposal.options!![0])
+        advanceUntilIdle()
+        assertNull(vm.state.value.heldBuild)
+        assertEquals(listOf("ひとりで使うメモ"), ai.morphCalls)
+    }
+
+    @Test
+    fun paidEditBoughtIsNotCountedAsANewApp() = runTest {
+        val ai = FakeAI(built.copy(version = 3)).apply {
+            turns += paidReady().copy(transcript = "みんなで書ける欄を足す", freeTranscript = null)
+        }
+        val gate = FakeGate().apply { buy = true }
+        val vm = vm(ai, gate)
+        vm.adopt(built)
+        vm.submit("みんなで書けるように")
+        advanceUntilIdle()
+        vm.buildFromChat()
+        advanceUntilIdle()
+        assertTrue(vm.state.value.heldBuild is HeldBuild.ProRequired)
+        vm.purchaseAndBuild()
+        advanceUntilIdle()
+        assertEquals(listOf("みんなで書ける欄を足す"), ai.morphCalls)
+        assertEquals("変更は数えない", 0, gate.recorded)
     }
 }

@@ -130,9 +130,12 @@ sealed interface HeldBuild {
     /** 今日の無料作成を使い切った(課金画面を閉じた)。「続きから作る」 */
     data class LimitReached(override val text: String, val dailyFreeLimit: Int) : HeldBuild
 
-    /** サーバーが 402 `pro_required` で止めた(課金画面を閉じた)。「Pro にする」/「この機能なしで作る」 */
-    data class ProRequired(override val text: String, val features: List<PaidFeature>) : HeldBuild {
-        /** 有料の機能を外して作る依頼文 */
-        val freeText: String get() = text + "\n" + PaidFeatureCheck.FALLBACK_FREE_SUFFIX
+    /**
+     * サーバーが 402 `pro_required` で止めた(課金画面を閉じた)か、相談の「これでいく」の案が有料の機能を含む(#1175・iOS の `PaidConfirmation`)。
+     * 「Pro にする」/「この機能なしで作る」。[free] はサーバーが返した無料版の依頼文(freeInstruction / freeTranscript)。
+     */
+    data class ProRequired(override val text: String, val features: List<PaidFeature>, val free: String? = null) : HeldBuild {
+        /** 有料の機能を外して作る依頼文(サーバーが返さなければ有料の機能を抜く指示を足す) */
+        val freeText: String get() = free?.trim()?.ifEmpty { null } ?: (text + "\n" + PaidFeatureCheck.FALLBACK_FREE_SUFFIX)
     }
 }

@@ -11,6 +11,7 @@ import jp.kz2601.metamon.services.AIClient
 import jp.kz2601.metamon.services.ChatMessage
 import jp.kz2601.metamon.services.ChatMode
 import jp.kz2601.metamon.services.ChatOption
+import jp.kz2601.metamon.services.ChatPaidFeature
 import jp.kz2601.metamon.services.ChatTurn
 import jp.kz2601.metamon.services.GenerateProgress
 import jp.kz2601.metamon.services.PlanUsageSource
@@ -19,6 +20,7 @@ import jp.kz2601.metamon.services.SpeechTranscriber
 import jp.kz2601.metamon.services.TranscriberFailure
 import jp.kz2601.metamon.services.TranscriberStatus
 import jp.kz2601.metamon.services.http.FailureKind
+import jp.kz2601.metamon.services.http.PaidFeature
 import jp.kz2601.metamon.services.http.RateLimitInfo
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
@@ -478,8 +480,22 @@ class VoiceViewModel(
         generateJob = scope.launch {
             if (!gate.requestPro(held.features)) return@launch
             if (_state.value.heldBuild != held) return@launch
-            startGenerate(held.text, metered = true, paidRetry = true)
+            // 変更の相談から出したカード(#1175)は新規作成ではないので数えない
+            startGenerate(held.text, metered = _state.value.isInitial, paidRetry = true)
         }
+    }
+
+    /**
+     * 相談の「これでいく」の前に、有料の機能を含む案なら作らずに確認カードを出す(#1175・iOS の `holdForPaidConfirm`)。
+     * Pro・審査用の版([creationGate] が null)・古い backend(requiresPro が無い)では出さない。出したら true。
+     */
+    private fun holdForPaidConfirm(requiresPro: Boolean?, features: List<ChatPaidFeature>?, text: String, free: String?): Boolean {
+        val gate = creationGate ?: return false
+        if (requiresPro != true || gate.isPro || !_state.value.isChatting) return false
+        cancelAutoBuild()
+        log("paid feature confirm: features=${features.orEmpty().map { it.id }}")
+        holdBuild(HeldBuild.ProRequired(text, features.orEmpty().map { PaidFeature(it.id, it.title.orEmpty(), it.reason) }, free))
+        return true
     }
 
     /** 402 のカードの「この機能なしで作る」 */
@@ -609,7 +625,9 @@ class VoiceViewModel(
         val s = _state.value
         if (s.chatPending || s.isGenerating) return
         val text = option.instructionText.trim()
-        if (text.isNotEmpty()) generate(text)
+        if (text.isEmpty()) return
+        if (holdForPaidConfirm(option.requiresPro, option.paidFeatures, text, option.freeInstruction)) return
+        generate(text)
     }
 
     /** 複数選択の案の「これでいく(N 件)」: 選んだ案を 1 つにまとめて作る(#220) */
@@ -620,8 +638,17 @@ class VoiceViewModel(
     /** ready の「これでいく」。transcript が無ければこれまでの発話をつなぐ */
     fun buildFromChat() {
         val s = _state.value
-        val text = s.chatTurn?.transcript?.trim()?.ifEmpty { null } ?: fallbackTranscript(s.chat)
-        if (text.isNotEmpty()) generate(text)
+        val transcript = s.chatTurn?.transcript?.trim()?.ifEmpty { null }
+        val text = transcript ?: fallbackTranscript(s.chat)
+        if (text.isEmpty()) return
+        // ready の transcript で作る時だけ確かめる(予備の依頼文には判定の材料が無い・iOS と同じ)
+        val turn = s.chatTurn
+        if (transcript != null && turn?.kind == ChatTurn.Kind.READY &&
+            holdForPaidConfirm(turn.requiresPro, turn.paidFeatures, text, turn.freeTranscript)
+        ) {
+            return
+        }
+        generate(text)
     }
 
     /** 「このまま作る」: ready でなければ go-ahead 語を送り、返事を待って作る(返事が来なくてもこれまでの発話で作る) */

@@ -10,6 +10,9 @@ interface CreationGate {
     /** 1 日の無料作成の回数(カードの見出しに出す) */
     val dailyFreeLimit: Int
 
+    /** 今 Pro か(相談の「これでいく」で有料の機能の確認カードを出すかに使う・#1175) */
+    val isPro: Boolean get() = false
+
     /** 新規作成の前。枠切れなら課金画面を出し、閉じるまで待つ。戻り値 = 作ってよいか */
     suspend fun admitNewApp(): Boolean
 
