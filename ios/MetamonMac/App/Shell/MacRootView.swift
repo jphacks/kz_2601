@@ -1,5 +1,6 @@
 import SwiftUI
 import MetamonDSL
+import MetamonRenderer
 
 /// Mac の画面の骨格(#933): 左にアプリの一覧・中央に選んだアプリ・上にツールバー。
 /// iOS で sheet だった本体の画面の出し方:
@@ -37,6 +38,8 @@ struct MacRootView: View {
     @State private var discardGuard = MacDiscardGuard()
     /// シートの間に押された通知の切り替え先。シートを閉じてから確認を通して切り替える(#943)
     @State private var notificationSwitch = SheetDeferredSwitch()
+    /// 会話で直した直後に光らせる部品(#626・#1337)。iOS と同じく出現が済んだ頃(2 秒)に消す
+    @State private var highlight: (canvas: String, value: ChangeHighlight)?
     @Environment(MacVoiceInput.self) private var voice
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
@@ -72,7 +75,8 @@ struct MacRootView: View {
                 if let app = selectedApp {
                     AppCanvas(app: app, dsl: library.generated[app.id]?.dsl, showsScreenMap: $showsScreenMap,
                               onTalk: { talk(about: $0) }, discardGuard: discardGuard)
-                        .id("\(app.id)#\(app.version)")
+                        .environment(\.changeHighlight, highlight?.canvas == Self.canvasKey(app) ? highlight?.value ?? .none : .none)
+                        .id(Self.canvasKey(app))
                 } else {
                     MacEmptyState(pose: .point, title: "アプリを選んでください",
                                   message: "左の一覧から選ぶと、ここに表示します。")
@@ -173,10 +177,32 @@ struct MacRootView: View {
 
     /// 結果を中央に当てる。作ったアプリは一覧の先頭に足して選ぶ・直したアプリはその場で差し替える(中央を作り直す)
     private func apply(_ document: AppDocument, envelope: Data?, target: MacComposeSession.Target) {
+        let previous = target == .create ? nil
+            : library.generated[document.appId]?.dsl ?? (try? apps.first(where: { $0.id == document.appId })?.loadDSL())
         library.apply(document, envelope: envelope, created: target == .create)
+        showChangeHighlight(previous: previous, next: document)
         // 最初のアプリの印(iOS と同じ `hasShownEditHint`)。β の案内(`MacOnboarding`)は次の起動でこれを見て 1 回出す
         if target == .create { FirstRunTutorialStore.shared.markEditHintShown() }
         selectedAppId = document.appId
+    }
+
+    /// 中央のアプリを作り直す印(版が変わったら作り直す)
+    private static func canvasKey(_ app: SampleApp) -> String { "\(app.id)#\(app.version)" }
+
+    /// 直した結果で変わった部品を光らせる(iOS の `buildStagePlan` の edit と同じ判定)。作った・元に戻した時は光らせない
+    private func showChangeHighlight(previous: AppDSL?, next: AppDocument) {
+        guard let previous, !previous.isVoiceOnly else {
+            highlight = nil
+            return
+        }
+        let value = BuildChoreography.editHighlight(old: previous, new: next.dsl)
+        let canvas = "\(next.appId)#\(next.version)"
+        highlight = value.isEmpty ? nil : (canvas, value)
+        guard !value.isEmpty else { return }
+        Task { @MainActor in
+            try? await Task.sleep(for: .seconds(2))
+            if highlight?.canvas == canvas, highlight?.value == value { highlight = nil } // 後でタブを開いた時に光らせ直さない
+        }
     }
 
     // MARK: - 画面マップ(#970)

@@ -87,9 +87,21 @@
     "%lld 文字までです" : {
       "localizations" : {
         "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Up to %lld characters"
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Up to %lld character"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Up to %lld characters"
+                }
+              }
+            }
           }
         },
         "ja" : {
@@ -104,9 +116,21 @@
       "extractionState" : "manual",
       "localizations" : {
         "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Please wait about %lld seconds and try again"
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Please wait about %lld second and try again"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Please wait about %lld seconds and try again"
+                }
+              }
+            }
           }
         },
         "ja" : {
@@ -1639,6 +1663,23 @@
         }
       }
     },
+    "この部品について話す" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Talk about this component"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "この部品について話す"
+          }
+        }
+      }
+    },
     "これでいく" : {
       "localizations" : {
         "en" : {
@@ -2180,9 +2221,21 @@
       "extractionState" : "manual",
       "localizations" : {
         "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Shown in the app list and at the top of the app (up to %lld characters)."
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Shown in the app list and at the top of the app (up to %lld character)."
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Shown in the app list and at the top of the app (up to %lld characters)."
+                }
+              }
+            }
           }
         },
         "ja" : {
@@ -6995,9 +7048,21 @@
     "送った内容(本文と、オンにした添付)は、Tailor It の不具合を直し、改善するために運営者が読みます。Google Cloud(Firestore)に保存し、%lld 日後に消去します。アカウントを削除したときも消去します。第三者には渡しません。" : {
       "localizations" : {
         "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "What you send (the text and the attachments you turned on) is read by the operator to fix bugs and improve Tailor It. It is stored on Google Cloud (Firestore) and erased after %lld days, or when you delete your account. It is not shared with third parties."
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "What you send (the text and the attachments you turned on) is read by the operator to fix bugs and improve Tailor It. It is stored on Google Cloud (Firestore) and erased after %lld day, or when you delete your account. It is not shared with third parties."
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "What you send (the text and the attachments you turned on) is read by the operator to fix bugs and improve Tailor It. It is stored on Google Cloud (Firestore) and erased after %lld days, or when you delete your account. It is not shared with third parties."
+                }
+              }
+            }
           }
         },
         "ja" : {

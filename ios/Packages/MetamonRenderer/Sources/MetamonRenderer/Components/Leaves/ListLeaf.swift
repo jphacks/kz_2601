@@ -66,6 +66,7 @@ struct ListLeaf: View {
                         .accessibilityHint(c.onItemTap != nil ? L("ダブルタップで開きます") : "")
                         .accessibilityAction { open(row) }
                         .contextMenu {
+                            ComponentTalkMenuItem(component: c, ctx: ctx) // 行のメニューが先に出るので、ここにも置く(#1323)
                             #if os(macOS)
                             Button(L("コピー"), systemImage: "doc.on.doc") { copy(row, entity: entity) }
                             if let photo = rowImage(row, entity: entity) {
@@ -87,6 +88,7 @@ struct ListLeaf: View {
                             #endif
                             if deletable(row, entity: entityId) { Button(L("削除")) { delete(row, entity: entityId) } }
                         }
+                        .recordDrag { ListRowCopyText.text(item: c.item, record: row, entity: entity, rt: rt) }
                 }
             }
             // 行が少なくてもカードはセルの高さまで伸ばす(#84: 空白の下半分を作らない)。行は上詰め
@@ -94,6 +96,8 @@ struct ListLeaf: View {
             #if os(macOS)
             // ⌘C(#1332): フォーカスのある行を右クリックの「コピー」と同じテキストで
             .onCopyCommand { copyCommand(rows: rows, entity: entity) }
+            // ⌫: フォーカスのある行を、確認を挟んでから消す(消せない行では何もしない)
+            .onDeleteCommand { deleteCommand(rows: rows, entity: entity, entityId: entityId) }
             #endif
             .renderCard(padding: 0)
             #if os(macOS)
@@ -194,6 +198,16 @@ struct ListLeaf: View {
         return text.isEmpty ? [] : [NSItemProvider(object: text as NSString)]
     }
 
+    private func deleteCommand(rows: [Record], entity: Entity?, entityId: String) {
+        guard let row = ListRowDeleteCommand.target(focusedRowId: focusedRowId, textInputActive: ListRowCopyCommand.textInputActive,
+                                                    rows: rows, deletable: { deletable($0, entity: entityId) }) else { return }
+        let titleField = c.item?.title ?? entity?.displayTitleField ?? ""
+        var action = Action(type: .deleteRecord, entity: entityId)
+        action.confirmMessage = ListRowDeleteCommand.confirmMessage(title: rt.display(row[titleField], field: entity?.field(titleField)),
+                                                                    fallback: entity?.name ?? "")
+        Task { await rt.run(action, ctx.actionContext(recordId: row.id)) }
+    }
+
     /// 行の写真(item.image)。手元にある画像だけ(https・動画のサムネイルは除く)。名前は写真の項目名
     private func rowImage(_ row: Record, entity: Entity?) -> (image: PlatformImage, title: String)? {
         guard let field = c.item?.image, VideoValue(row[field]) == nil, let image = PhotoCodec.image(from: row[field]) else { return nil }
@@ -255,5 +269,18 @@ struct ListLeaf: View {
         return rows.filter { r in
             fields.contains { rt.display(r[$0], field: entity?.field($0)).localizedCaseInsensitiveContains(q) }
         }
+    }
+}
+
+private extension View {
+    /// 行を外(メモ・Finder・メール)へドラッグするとコピーと同じテキストを渡す(Mac のみ・#1334)。
+    /// Mac のドラッグは少し動かしてから始まるので、行のクリックや中のボタンとはぶつからない。iOS は何もしない。
+    @ViewBuilder
+    func recordDrag(_ text: @escaping () -> String) -> some View {
+        #if os(macOS)
+        onDrag { ListRowCopyText.dragItem(text()) }
+        #else
+        self
+        #endif
     }
 }

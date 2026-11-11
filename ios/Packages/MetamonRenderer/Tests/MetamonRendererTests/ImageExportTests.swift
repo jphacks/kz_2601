@@ -55,6 +55,14 @@ final class ImageExportTests: XCTestCase {
         XCTAssertEqual(Array(try XCTUnwrap(doc.jpeg).prefix(2)), [0xFF, 0xD8])
     }
 
+    func testCopyCommandOnlyWhenImageFocused() {
+        let image = sample()
+        XCTAssertTrue(ImageExport.copyTarget(focused: true, textInputActive: false, image: image) === image)
+        XCTAssertNil(ImageExport.copyTarget(focused: false, textInputActive: false, image: image), "フォーカスが無い画像はコピーしない")
+        XCTAssertNil(ImageExport.copyTarget(focused: true, textInputActive: true, image: image), "入力欄が文字を受けている時は入力欄のコピーを優先")
+        XCTAssertNil(ImageExport.copyTarget(focused: true, textInputActive: false, image: nil), "手元に画像が無い時は何もしない")
+    }
+
     #if os(macOS)
     func testPasteboardImageRoundTripReplacesPreviousContents() throws {
         let board = NSPasteboard(name: NSPasteboard.Name("metamon.test.\(UUID().uuidString)"))
