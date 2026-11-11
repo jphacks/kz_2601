@@ -1,6 +1,7 @@
 import SwiftUI
 import MetamonDSL
 import MetamonRenderer
+import MetamonServices
 
 /// 中央: 選んだアプリを Renderer で描く。タブ / 単一スタックは `DSLNavigationRoot`、sheet / fullScreen はここで重ねる。
 /// 確認ダイアログは `.confirmationDialog`、一言(toast)と「削除しました・元に戻す」は中央の列の上に出す(#939)。
@@ -15,6 +16,8 @@ struct AppCanvas: View {
     var dsl: AppDSL?
     /// 作ったアプリ(#969)。記録を端末に残す(#1284)。同梱の例は今まで通り一時フォルダ
     var keepsRecords = false
+    /// サーバーにある作ったアプリの記録の読み書き先(#1284 の続き)。nil なら端末だけ(`MacRecordVault`)
+    var server: (any AppConfigClient)?
     /// 画面マップのシート(#970)。ツールバー・表示メニューが立てる
     var showsScreenMap: Binding<Bool> = .constant(false)
     /// 画面マップの「この画面について話す」・部品の「この部品について話す」(#1323)。マップ・モーダルを閉じ終えてから呼ぶ(シートを 2 枚同時に出さない)
@@ -40,8 +43,11 @@ struct AppCanvas: View {
                 return
             }
             do {
-                let sync = keepsRecords ? MacRecordVault.recordSync(appId: app.id) : nil
-                let created = MacAppRuntime(appId: app.id, dsl: try dsl ?? app.loadDSL(), recordSync: sync, dictation: voice?.dictation)
+                let appDSL = try dsl ?? app.loadDSL()
+                let sync = keepsRecords ? MacRecordVault.recordSync(appId: app.id, server: server) : nil
+                // 暗号化して保存する項目(#233): サーバーに送る時だけ iOS と同じく端末の鍵で包む(端末だけの記録は包まない)
+                if server != nil { sync?.encryptedFields[app.id] = appDSL.encryptedFields }
+                let created = MacAppRuntime(appId: app.id, dsl: appDSL, recordSync: sync, dictation: voice?.dictation)
                 runtime = created
                 discardGuard?.runtime = created
             } catch {

@@ -26,7 +26,8 @@ enum MacFirebase {
 
 /// Mac の DI の入口(#930)。iOS の `BuildConfig.make` の Mac 版で、Mac が使う分(ログイン・AI・フィードバック)だけ組み立てる。
 /// Firebase が初期化済み・ai の URL がある・`METAMON_MOCK=1` でない時だけ本物。それ以外はモック(今までの Mac と同じ)。
-/// 記録(appconfig)は Mac ではまだメモリ上(`MacAppRuntime.mockRecordSync`)。
+/// appconfig(記録・版・共有など)は、本物の AI に加えて appconfig の URL がある時だけ本物(`appConfig`)。
+/// 無い時、作ったアプリの記録は端末だけ(`MacRecordVault`・#1517 の `LocalAppConfigClient`)。
 final class MacServices: @unchecked Sendable {
     static let shared = MacServices.make()
 
@@ -37,14 +38,27 @@ final class MacServices: @unchecked Sendable {
     let feedback: any FeedbackClient
     /// Firebase につながっている(サインイン・本物の AI)。false ならサインインの入口を出さない
     let isLive: Bool
+    /// サーバーの appconfig(#1284 の続き)。本物の AI が作ったアプリはサーバーに保存されるので、その記録はここに読み書きする。
+    /// nil(モック・appconfig の URL 無し)なら作ったアプリは端末だけ
+    let appConfig: (any AppConfigClient)?
+    /// appconfig の URL(本の情報・feed など appconfig の別の口が使う)。`appConfig` と同じく live の時だけ
+    let appConfigURL: URL?
 
-    init(auth: any AuthService, ai: any AIClient, feedback: any FeedbackClient, isLive: Bool) {
+    init(auth: any AuthService, ai: any AIClient, feedback: any FeedbackClient, isLive: Bool, appConfigURL: URL? = nil,
+         token: (any TokenProvider)? = nil) {
         self.auth = auth
-        self.token = isLive ? AuthTokenProvider(auth: auth) : NoAuthTokenProvider()
+        let token = token ?? (isLive ? AuthTokenProvider(auth: auth) : NoAuthTokenProvider())
+        self.token = token
         self.ai = ai
         self.feedback = feedback
         self.isLive = isLive
+        let url = isLive ? appConfigURL : nil
+        self.appConfigURL = url
+        appConfig = url.map { HTTPAppConfigClient(baseURL: $0, token: token) }
     }
+
+    /// 作ったアプリをサーバーに置くか(本物の AI と appconfig の両方がある)。false なら記録は端末だけ
+    var keepsAppsOnServer: Bool { appConfig != nil }
 
     static func make(bundle: Bundle = .main, environment: [String: String] = ProcessInfo.processInfo.environment) -> MacServices {
         let forceMock = environment["METAMON_MOCK"] == "1"
@@ -56,7 +70,8 @@ final class MacServices: @unchecked Sendable {
             #else
             let feedback: any FeedbackClient = appConfigURL.map { HTTPFeedbackClient(baseURL: $0, token: token) } ?? MockFeedbackClient()
             #endif
-            return MacServices(auth: auth, ai: HTTPAIClient(baseURL: aiURL, token: token), feedback: feedback, isLive: true)
+            return MacServices(auth: auth, ai: HTTPAIClient(baseURL: aiURL, token: token), feedback: feedback, isLive: true,
+                               appConfigURL: appConfigURL, token: token)
         }
         if !forceMock { print("[Metamon] Mac: Firebase 未初期化か ai の URL が無いため、AI とログインはモックで起動します") }
         return MacServices(auth: MockAuthService(signedIn: true), ai: MockAIClient(), feedback: MockFeedbackClient(), isLive: false)
