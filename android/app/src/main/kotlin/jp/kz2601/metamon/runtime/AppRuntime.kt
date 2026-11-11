@@ -30,6 +30,7 @@ import jp.kz2601.metamon.renderer.components.nearby.NearbyHost
 import jp.kz2601.metamon.renderer.components.nearby.NearbyPassbyController
 import jp.kz2601.metamon.renderer.components.play.RecordWriter
 import jp.kz2601.metamon.renderer.components.play.TimerHost
+import jp.kz2601.metamon.renderer.components.play.TimerRun
 import jp.kz2601.metamon.renderer.components.ai.AiChatPairSaving
 import jp.kz2601.metamon.renderer.components.ai.AiHost
 import jp.kz2601.metamon.renderer.components.social.AuthorNameHost
@@ -776,6 +777,12 @@ class AppRuntime(
         val appId = document.appId
         scope.launch { host.timerChanged("$appId/$key", dsl.app.name, name, endsAtEpochMillis) }
     }
+
+    override fun loadTimer(key: String): TimerRun? = host.loadTimer("${document.appId}/$key")
+
+    override fun saveTimer(key: String, run: TimerRun) = host.saveTimer("${document.appId}/$key", run)
+
+    override fun timerVisible(key: String, visible: Boolean) = host.timerVisible("${document.appId}/$key", visible)
 
     /** フォームを通さず 1 件足す。作った行の id(仮 id)。entity が無ければ null。 */
     suspend fun createRecord(entity: String, data: Map<String, JSONValue>): String? {

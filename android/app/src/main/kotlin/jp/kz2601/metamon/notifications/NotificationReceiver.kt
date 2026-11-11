@@ -8,7 +8,7 @@ import com.google.android.gms.location.Geofence
 import com.google.android.gms.location.GeofencingEvent
 
 /**
- * 予約した時刻が来た(AlarmManager)・場所に着いた(Geofencing)・アラームを止めた・再起動 / 時刻の変更 / アプリの更新(OS)を受ける(#886)。
+ * 予約した時刻が来た(AlarmManager)・タイマーが終わった(#1128)・場所に着いた(Geofencing)・アラームを止めた・再起動 / 時刻の変更 / アプリの更新(OS)を受ける(#886)。
  * 鳴ったら出して、空いた枠と次の回を予約し直す。OS の知らせでは全件を置き直す(再起動で AlarmManager の予約は消える)。
  */
 class NotificationReceiver : BroadcastReceiver() {
@@ -25,6 +25,7 @@ class NotificationReceiver : BroadcastReceiver() {
                 )
                 notifications.refresh()
             }
+            ACTION_TIMER -> TimerAlarms.get(context).fired(intent.getStringExtra(TimerAlarms.EXTRA_KEY) ?: return)
             ACTION_GEOFENCE -> {
                 val event = GeofencingEvent.fromIntent(intent) ?: return
                 if (event.hasError() || event.geofenceTransition != Geofence.GEOFENCE_TRANSITION_ENTER) return
@@ -39,12 +40,17 @@ class NotificationReceiver : BroadcastReceiver() {
             Intent.ACTION_TIMEZONE_CHANGED,
             Intent.ACTION_MY_PACKAGE_REPLACED,
             ACTION_EXACT_ALARM_PERMISSION_CHANGED,
-            -> notifications.refresh()
+            -> {
+                notifications.refresh()
+                TimerAlarms.get(context).refresh()
+            }
         }
     }
 
     companion object {
         const val ACTION_FIRE = "jp.kz2601.metamon.notifications.FIRE"
+        /** timerDisplay の終了(#1128) */
+        const val ACTION_TIMER = "jp.kz2601.metamon.notifications.TIMER"
         const val ACTION_STOP = "jp.kz2601.metamon.notifications.STOP"
         const val ACTION_GEOFENCE = "jp.kz2601.metamon.notifications.GEOFENCE"
         private const val ACTION_EXACT_ALARM_PERMISSION_CHANGED = "android.app.action.SCHEDULE_EXACT_ALARM_PERMISSION_STATE_CHANGED"

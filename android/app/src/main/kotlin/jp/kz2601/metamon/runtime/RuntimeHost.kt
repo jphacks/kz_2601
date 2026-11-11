@@ -7,6 +7,7 @@ import jp.kz2601.metamon.dsl.AppDSL
 import jp.kz2601.metamon.dsl.Notification
 import jp.kz2601.metamon.dsl.records.Record
 import jp.kz2601.metamon.renderer.ActionContext
+import jp.kz2601.metamon.renderer.components.play.TimerRun
 
 /** 端末の機能がまだ無い(Android で未実装)。AppRuntime が決まったトーストにする。 */
 class HostUnavailableException(val type: ActionType) : Exception("unavailable: ${type.wire}")
@@ -44,9 +45,17 @@ interface RuntimeHost {
 
     /**
      * timerDisplay の終了通知(iOS の TimerNotifier)。[endsAtEpochMillis] にその時刻で予約、null なら取り消す。
-     * 既定は何もしない(タイマーは前面で動く)。端末の通知の予約は子 Issue で入れる。
+     * 既定は何もしない(タイマーは前面で動く)。Android は [AndroidRuntimeHost] が AlarmManager に置く(#1128)。
      */
     suspend fun timerChanged(key: String, appName: String, timerName: String, endsAtEpochMillis: Long?): Unit = Unit
+
+    /** timerDisplay の走行状態(iOS の TimerRunStore)。プロセスが終わっても残す。既定は持たない。 */
+    fun loadTimer(key: String): TimerRun? = null
+
+    fun saveTimer(key: String, run: TimerRun) {}
+
+    /** そのタイマーが前面で見えているか(iOS の TimerVisibility)。見えている間は終了のバナーを出さない。 */
+    fun timerVisible(key: String, visible: Boolean) {}
 
     /** 進行中の表示(iOS の Live Activity。Android は常駐通知を想定・#78)。 */
     suspend fun startActivity(spec: Activity, appId: String): Unit = throw HostUnavailableException(ActionType.START_ACTIVITY)

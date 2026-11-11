@@ -43,6 +43,8 @@ import androidx.lifecycle.compose.LifecycleEventEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import jp.kz2601.metamon.R
 import jp.kz2601.metamon.dsl.AppDSL
+import jp.kz2601.metamon.notifications.ExactAlarmFirstAsk
+import jp.kz2601.metamon.notifications.ExactAlarmPrompt
 import jp.kz2601.metamon.notifications.NotificationsFirstAsk
 import jp.kz2601.metamon.notifications.PlacesFirstAsk
 import jp.kz2601.metamon.services.permissions.AppPermission
@@ -68,6 +70,9 @@ fun PermissionOffBarHost(dsl: AppDSL, appId: String, busy: Boolean, summaryShowi
     NotificationsFirstAsk(AppPermission.NOTIFICATIONS in needed, appId, busy = busy || summaryShowing)
     // 場所に着いたら知らせる(near)のあるアプリは、通知の後に位置 → 裏での位置の 2 段で聞く
     PlacesFirstAsk(AppPermission.BACKGROUND_LOCATION in needed, appId, busy = busy || summaryShowing)
+    // アラーム・countdown のタイマーがあるアプリは、正確なアラームが許可されていなければ 1 回だけ案内する(#1123)
+    val exactNeeded = remember(dsl) { ExactAlarmPrompt.needed(dsl) }
+    ExactAlarmFirstAsk(exactNeeded, busy = busy || summaryShowing)
     var dismissed by rememberSaveable(appId) { mutableStateOf(emptyList<String>()) }
     val shown = PermissionOffBarModel.pick(
         needed = needed,
