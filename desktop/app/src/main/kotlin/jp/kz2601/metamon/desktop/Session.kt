@@ -2,6 +2,7 @@ package jp.kz2601.metamon.desktop
 
 import jp.kz2601.metamon.desktop.i18n.Strings
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import jp.kz2601.metamon.dsl.Action
@@ -110,18 +111,10 @@ class DesktopSession(
     }
 
     /** 検索欄の文字(route ごと)。 */
-    fun queries(route: Route): MutableMap<String, String> = queries.getOrPut(route.id) { HashMap() }
+    fun queries(route: Route): MutableMap<String, String> = queries.getOrPut(route.id) { mutableStateMapOf() }
 
     /** `list` の行(filter → sort → 検索)。iOS の `ListLeaf.rows`。 */
-    fun rows(c: Component, query: String?): List<Record> {
-        val data = leafData()
-        val entity = data.entity(c.entity)
-        val sorted = Aggregator.sorted(data.filtered(c), RecordQuery.sort(c.sort), entity)
-        if (c.searchField == null) return sorted
-        val q = query?.trim()?.takeIf { it.isNotEmpty() } ?: return sorted
-        val fields = listOfNotNull(c.item?.title ?: entity?.titleField, c.item?.subtitle)
-        return sorted.filter { r -> fields.any { f -> FieldCoding.display(r[f], entity?.field(f)).contains(q, ignoreCase = true) } }
-    }
+    fun rows(c: Component, query: String?): List<Record> = ListRows.rows(c, leafData(), query)
 
     /** 押せるか: rendered / hidden / needsForm / unknown(iOS の「全部品が登録済み」の規則)。 */
     fun tapState(c: Component, form: FormDraft?): String {

@@ -1,0 +1,177 @@
+# Windows・Linux のデスクトップ版(desktop/・Compose Multiplatform Desktop)の CI(#1757)。
+# PR が Open(非Draft) / develop・main への push / 手動(workflow_dispatch)で発火。
+#
+# 変更の判定(dorny/paths-filter)→ 回すもの:
+#   | 変わった場所                                                    | テスト(ubuntu・windows)   | 配布物(deb・msi)          |
+#   |-----------------------------------------------------------------|----------------------------|-----------------------------|
+#   | desktop/**(*.md 以外)                                          | :desktop:test :dsl:test    | push・手動の時だけ          |
+#   | android/dsl/**(*.md 以外)・android/gradle/libs.versions.toml   | 同上                       | 同上                        |
+#   | docs/dsl/{conformance,examples}/**(適合テストと同梱の例)      | 同上                       | 同上                        |
+#   | .github/workflows/desktop-ci.yml                                | 同上                       | 同上                        |
+#   | 上記以外                                                        | なし(desktop-ci は成功)  | なし                        |
+#   | workflow_dispatch                                               | 必ず回す                   | 作る                        |
+#
+# 設計メモ:
+# - workflow レベルの `paths:` は使わない(android-ci.yml と同じ理由: required check が永遠に待ちになる)。
+# - 集約ジョブ `desktop-ci` を required check にできる形。登録は人。
+# - 配布物は jpackage の既定の形(Linux は deb・Windows は msi)。rpm は ubuntu に rpmbuild が無いので作らない。
+#   署名しない・秘密は使わない(署名は #1755 で人が決める)。
+# - Gradle のキャッシュは setup-gradle がジョブ・OS ごとに分ける(android-ci とは別のキャッシュ)。PR は読むだけ。
+# - Windows は gradlew.bat を使う(checkout が改行を CRLF にしても動くように)。
+name: desktop-ci
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+  push:
+    branches: [develop, main]
+  workflow_dispatch:
+
+concurrency:
+  group: desktop-ci-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+permissions:
+  contents: read
+  pull-requests: read
+
+jobs:
+  desktop-changes:
+    name: desktop-changes
+    if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    outputs:
+      run: ${{ steps.plan.outputs.run }}
+      package: ${{ steps.plan.outputs.package }}
+    steps:
+      - uses: actions/checkout@v7
+
+      # every: 1 つのフィルタの中のパターンを全部満たすファイルだけ数える(! の除外を効かせるため)
+      - uses: dorny/paths-filter@v4
+        id: filter
+        if: github.event_name != 'workflow_dispatch'
+        with:
+          predicate-quantifier: every
+          filters: |
+            desktop:
+              - 'desktop/**'
+              - '!desktop/**/*.md'
+            dsl:
+              - 'android/dsl/**'
+              - '!android/**/*.md'
+            versions:
+              - 'android/gradle/libs.versions.toml'
+            docs:
+              - 'docs/dsl/{conformance,examples}/**'
+            workflow:
+              - '.github/workflows/desktop-ci.yml'
+
+      - name: 回すものを決める
+        id: plan
+        env:
+          EVENT: ${{ github.event_name }}
+          DESKTOP: ${{ steps.filter.outputs.desktop }}
+          DSL: ${{ steps.filter.outputs.dsl }}
+          VERSIONS: ${{ steps.filter.outputs.versions }}
+          DOCS: ${{ steps.filter.outputs.docs }}
+          WORKFLOW: ${{ steps.filter.outputs.workflow }}
+        run: |
+          set -eu
+          run=false
+          if [ "$EVENT" = workflow_dispatch ]; then
+            run=true
+          else
+            for v in "$DESKTOP" "$DSL" "$VERSIONS" "$DOCS" "$WORKFLOW"; do
+              if [ "$v" = true ]; then run=true; fi
+            done
+          fi
+          package=false
+          if [ "$run" = true ] && [ "$EVENT" != pull_request ]; then
+            package=true
+          fi
+          echo "::notice::desktop-ci plan: run=${run} package=${package}"
+          echo "run=${run}" >> "$GITHUB_OUTPUT"
+          echo "package=${package}" >> "$GITHUB_OUTPUT"
+
+  desktop-build:
+    name: desktop-build (${{ matrix.os }})
+    needs: desktop-changes
+    if: needs.desktop-changes.outputs.run == 'true'
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            gradlew: ./gradlew
+            package_task: :desktop:packageDeb
+            package_dir: deb
+          - os: windows-latest
+            gradlew: .\gradlew.bat
+            package_task: :desktop:packageMsi
+            package_dir: msi
+    defaults:
+      run:
+        working-directory: desktop
+    steps:
+      - uses: actions/checkout@v7
+      # README の前提: JDK 17 以上。jpackage が入っている temurin の JDK を使う
+      - uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: gradle/actions/setup-gradle@v6
+        with:
+          cache-read-only: ${{ github.event_name == 'pull_request' }}
+
+      - name: test(:desktop・:dsl)
+        run: ${{ matrix.gradlew }} :desktop:test :dsl:test --console=plain
+
+      - name: 配布物を作る
+        if: needs.desktop-changes.outputs.package == 'true'
+        run: ${{ matrix.gradlew }} ${{ matrix.package_task }} --console=plain
+
+      - name: 配布物を残す
+        if: needs.desktop-changes.outputs.package == 'true'
+        uses: actions/upload-artifact@v7
+        with:
+          name: desktop-${{ matrix.package_dir }}
+          path: desktop/app/build/compose/binaries/main/${{ matrix.package_dir }}/
+          retention-days: 7
+          if-no-files-found: error
+
+      - name: テストの結果を残す
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: desktop-test-reports-${{ matrix.os }}
+          path: |
+            desktop/app/build/reports/tests/
+            desktop/build/dsl/reports/tests/
+          retention-days: 7
+          if-no-files-found: ignore
+
+  # required check。ジョブがスキップでも成功、失敗/キャンセルなら失敗。
+  desktop-ci:
+    name: desktop-ci
+    needs: [desktop-changes, desktop-build]
+    if: always() && (github.event_name != 'pull_request' || github.event.pull_request.draft == false)
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    steps:
+      - name: 結果を集約
+        env:
+          CHANGES: ${{ needs.desktop-changes.result }}
+          BUILD: ${{ needs.desktop-build.result }}
+        run: |
+          echo "desktop-changes=${CHANGES} desktop-build=${BUILD}"
+          if [ "$CHANGES" != success ]; then
+            echo "::error::desktop-changes が ${CHANGES}"
+            exit 1
+          fi
+          case "$BUILD" in
+            success|skipped) ;;
+            *) echo "::error::desktop-build が ${BUILD}"; exit 1 ;;
+          esac
