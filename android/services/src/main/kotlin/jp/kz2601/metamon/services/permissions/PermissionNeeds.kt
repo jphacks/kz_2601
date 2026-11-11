@@ -4,6 +4,7 @@ import jp.kz2601.metamon.dsl.Action
 import jp.kz2601.metamon.dsl.ActionType
 import jp.kz2601.metamon.dsl.AppDSL
 import jp.kz2601.metamon.dsl.Component
+import jp.kz2601.metamon.dsl.ComponentMode
 import jp.kz2601.metamon.dsl.ComponentType
 import jp.kz2601.metamon.dsl.Source
 
@@ -30,6 +31,8 @@ object PermissionNeeds {
         ComponentType.LOCATION_BUTTON, ComponentType.ROUTE_GUIDE, ComponentType.LOCATION_TRACKER -> setOf(AppPermission.LOCATION)
         ComponentType.NEARBY_SHARE -> setOf(AppPermission.NEARBY)
         ComponentType.HEALTH_STAT -> setOf(AppPermission.HEALTH)
+        // 終わったら通知で知らせる(#1128)。stopwatch は通知しない
+        ComponentType.TIMER_DISPLAY -> if (component.mode == ComponentMode.COUNTDOWN) setOf(AppPermission.NOTIFICATIONS) else emptySet()
         else -> emptySet()
     }
 

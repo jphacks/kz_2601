@@ -33,7 +33,9 @@ import jp.kz2601.metamon.dsl.decode
 import jp.kz2601.metamon.dsl.fallback
 import jp.kz2601.metamon.dsl.screen
 import jp.kz2601.metamon.language.AppLocales
+import jp.kz2601.metamon.notifications.ExactAlarmPrompt
 import jp.kz2601.metamon.notifications.LocalNotifications
+import jp.kz2601.metamon.notifications.TimerAlarms
 import jp.kz2601.metamon.services.sharing.AppMembersStore
 import jp.kz2601.metamon.services.purchase.EntitlementClient
 import jp.kz2601.metamon.services.purchase.HttpEntitlementClient
@@ -447,7 +449,10 @@ class AppContainer(
                 talkBackRunning = { TalkBack.isRunning(context) },
                 nearbyEnv = NearbyEnv.of(context, mock = true),
                 thumbnails = AppThumbnailStore(File(context.filesDir, "metamon-thumbs-mock")),
-                forgetAppNotifications = { LocalNotifications.get(context).removeApp(it) },
+                forgetAppNotifications = {
+                    LocalNotifications.get(context).removeApp(it)
+                    TimerAlarms.get(context).removeApp(it) // タイマーの走行状態と終了通知(#1128)
+                },
                 releaseClient = if (ReviewBuild.enabled) null else MockReleaseRequestClient(),
             )
         }
@@ -542,7 +547,10 @@ class AppContainer(
                 // 審査用の版(#1275)はリリース申請を出さない(iOS の APP_STORE_REVIEW と同じ)
                 releaseClient = if (ReviewBuild.enabled) null else HttpReleaseRequestClient(appConfigHttp),
                 thumbnails = AppThumbnailStore(File(context.filesDir, "metamon-thumbs")),
-                forgetAppNotifications = { LocalNotifications.get(context).removeApp(it) },
+                forgetAppNotifications = {
+                    LocalNotifications.get(context).removeApp(it)
+                    TimerAlarms.get(context).removeApp(it) // タイマーの走行状態と終了通知(#1128)
+                },
                 creationUsage = CreationUsageStore(SharedPreferencesKeyValueStore.of(context, CREATION_PREFS)),
                 remainingToday = remainingToday,
             )
@@ -580,6 +588,8 @@ class AppContainer(
         private fun forgetDeviceState(context: Context): () -> Unit = {
             PermissionCenter.get(context).forget()
             LocalNotifications.get(context).removeAll()
+            TimerAlarms.get(context).removeAll() // タイマーの走行状態と終了通知(#1128・iOS は UserDefaults ごと消す)
+            ExactAlarmPrompt.of(context).forget() // 正確なアラームの案内を出した印(#1123)
             // 音声の画面の設定(#892)。iOS は UserDefaults ごと消す(表示の言語などの残すキーには入っていない)
             SpeechSettings(context).clear()
             LaunchVisits.forget(context)

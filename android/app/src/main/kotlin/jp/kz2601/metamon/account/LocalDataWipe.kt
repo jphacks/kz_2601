@@ -26,6 +26,7 @@ import jp.kz2601.metamon.voice.ChatHistoryStore
  * - チュートリアルと「こう話すと直せます」を見た印(#900・[forgetTutorial] = iOS `LocalWipe.clearDefaults` + `tutorial.reload()`)
  * - 他の人の行動で届く通知の同意の控え・登録の控え(installationId は残す)・閉じたお知らせ([forgetDeviceState] の中 = iOS `LocalWipe.clearDefaults`)
  * - 生成アプリの通知の予約・出ている通知([forgetDeviceState] の中 = iOS `notifications.removeAll()`)
+ * - タイマーの走行状態と終了通知の予約・正確なアラームの案内を出した印(#1128・#1123・[forgetDeviceState] の中 = iOS `LocalWipe.clearDefaults`)
  * - https の画像のキャッシュ(メモリ・ディスク。[clearImageCache] = iOS は URLCache)
  * - 切り替え一覧のサムネ(#1199・[AppThumbnailStore.removeAll] = iOS `AppThumbnailStore.shared.removeAll()`)
  * - 画面の状態・appId(新しい appId に。[resetRuntime] = iOS `recordUndo = nil`・`resetToInitial()`・`DeviceAppID.set`)

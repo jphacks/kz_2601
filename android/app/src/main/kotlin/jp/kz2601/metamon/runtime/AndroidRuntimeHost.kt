@@ -15,8 +15,11 @@ import jp.kz2601.metamon.dsl.Notification
 import jp.kz2601.metamon.dsl.logic.RecordExport
 import jp.kz2601.metamon.dsl.records.Record
 import jp.kz2601.metamon.notifications.LocalNotifications
+import jp.kz2601.metamon.notifications.TimerAlarms
+import jp.kz2601.metamon.notifications.TimerVisibility
 import jp.kz2601.metamon.renderer.ActionContext
 import jp.kz2601.metamon.renderer.components.lists.ValueLabels
+import jp.kz2601.metamon.renderer.components.play.TimerRun
 import jp.kz2601.metamon.services.books.BookLookupClient
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -48,6 +51,17 @@ class AndroidRuntimeHost(
     override suspend fun cancelNotification(id: String, appId: String) = withContext(Dispatchers.IO) {
         notifications.cancel(id, appId)
     }
+
+    private val timers by lazy { TimerAlarms.get(context) }
+
+    override suspend fun timerChanged(key: String, appName: String, timerName: String, endsAtEpochMillis: Long?) =
+        withContext(Dispatchers.IO) { timers.changed(key, appName, timerName, endsAtEpochMillis) }
+
+    override fun loadTimer(key: String): TimerRun? = timers.load(key)
+
+    override fun saveTimer(key: String, run: TimerRun) = timers.save(key, run)
+
+    override fun timerVisible(key: String, visible: Boolean) = TimerVisibility.set(key, visible)
 
     override suspend fun notificationsChanged(appId: String, dsl: AppDSL, records: Map<String, List<Record>>) = withContext(Dispatchers.IO) {
         notifications.onRecordsChanged(appId, dsl, records)

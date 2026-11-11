@@ -34,6 +34,12 @@ class PermissionNeedsTest {
     }
 
     @Test
+    fun countdownのタイマーは終了の通知が要る_stopwatchは要らない() {
+        assertEquals(setOf(NOTIFICATIONS), PermissionNeeds.of(dsl("""[{"type":"timerDisplay","id":"t","mode":"countdown","seconds":60}]""")))
+        assertEquals(emptySet<AppPermission>(), PermissionNeeds.of(dsl("""[{"type":"timerDisplay","id":"t","mode":"stopwatch"}]""")))
+    }
+
+    @Test
     fun 写真をライブラリからだけ選ぶならカメラは要らない() {
         assertEquals(emptySet<AppPermission>(), PermissionNeeds.of(dsl("""[{"type":"photoField","field":"p","source":"library"}]""")))
     }
