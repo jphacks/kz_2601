@@ -67,6 +67,11 @@ class WhisperAudioFileHost(
         }
     }
 
+    /** 読み込んだモデルをメモリから外す(メモリ不足・サインアウト)。文字にしている途中なら終わってから。 */
+    fun releaseModel() {
+        scope.launch { transcriber.unload() }
+    }
+
     companion object {
         /** 端末のアプリの領域(no_backup: 端末のバックアップに 60MB を載せない)に置く。 */
         fun create(context: Context, scope: CoroutineScope, language: () -> String): WhisperAudioFileHost {
