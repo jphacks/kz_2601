@@ -3,6 +3,7 @@ package extapi
 import (
 	"context"
 	"errors"
+	"fmt"
 	"net/url"
 	"strconv"
 	"strings"
@@ -17,7 +18,8 @@ import (
 //	fakeOauth  free, OAuth      ops listEvents, createEvent(title) EXT_FAKE_OAUTH_ENABLED=1
 //
 // Every op takes fail=5xx | 429 | 4xx | timeout | grant to fail the way a provider does
-// (4xx is billable: the provider charged it).
+// (4xx is billable: the provider charged it), or fail=args to refuse its
+// arguments before calling the provider (bad_request).
 const (
 	FakeFree  = "fakeFree"
 	FakePaid  = "fakePaid"
@@ -82,6 +84,8 @@ func fakeOp(f func(Input) Output) Operation {
 			return Output{}, ctx.Err()
 		case "grant":
 			return Output{}, ErrInvalidGrant
+		case "args":
+			return Output{}, fmt.Errorf("%w: fake bad argument", ErrUnknown)
 		}
 		return f(in), nil
 	})

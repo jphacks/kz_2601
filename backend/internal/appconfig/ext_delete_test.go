@@ -8,6 +8,7 @@ import (
 	"strings"
 	"sync"
 	"testing"
+	"time"
 
 	"github.com/jphacks/kz_2601/backend/internal/auth"
 	"github.com/jphacks/kz_2601/backend/internal/extapi"
@@ -74,5 +75,42 @@ func TestDeleteMeRunnerFailure(t *testing.T) {
 	srv.Close()
 	if r := e.do("other", http.MethodDelete, "/v1/me", nil, nil); r.code != http.StatusNoContent {
 		t.Fatalf("delete with no runner: %d %s", r.code, r.raw)
+	}
+}
+
+// A slow runner does not keep the person waiting: DELETE /v1/me answers
+// after revokeWait, and the runner's call goes on to the end (not cancelled).
+func TestDeleteMeSlowRunner(t *testing.T) {
+	t.Setenv("FIREBASE_AUTH_EMULATOR_HOST", "localhost:9099")
+	oldWait := revokeWait
+	revokeWait = 50 * time.Millisecond
+	t.Cleanup(func() { revokeWait = oldWait })
+
+	release := make(chan struct{})
+	finished := make(chan error, 1)
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		<-release
+		finished <- r.Context().Err()
+		httpx.WriteJSON(w, http.StatusOK, map[string]int{"revoked": 1})
+	}))
+	t.Cleanup(srv.Close)
+
+	st := store.NewMemory()
+	e := &env{t: t, h: auth.Middleware(nil, auth.ModeDev)(RejectDeleted(st, New(st, WithExt(&extapi.Client{BaseURL: srv.URL, HTTP: srv.Client()}))))}
+	start := time.Now()
+	if r := e.do("leaver", http.MethodDelete, "/v1/me", nil, nil); r.code != http.StatusNoContent {
+		t.Fatalf("delete: %d %s", r.code, r.raw)
+	}
+	if d := time.Since(start); d > 2*time.Second {
+		t.Fatalf("delete waited %v for the runner", d)
+	}
+	close(release)
+	select {
+	case err := <-finished:
+		if err != nil {
+			t.Fatalf("the runner's call was cancelled: %v", err)
+		}
+	case <-time.After(5 * time.Second):
+		t.Fatal("the runner's call never finished")
 	}
 }

@@ -348,6 +348,11 @@ func (s *Service) Call(ctx context.Context, r CallRequest) (res CallResult, err 
 		if hold != nil {
 			release()
 		}
+		if errors.Is(err, ErrUnknown) {
+			// the op refused the arguments before calling the provider
+			// (bad_request): the limits are given back too
+			s.refundLimits(ctx, p.ID, lc)
+		}
 		giveBackRuns()
 		if errors.Is(err, ErrInvalidGrant) && s.Conns != nil {
 			_ = s.Conns.MarkError(context.WithoutCancel(ctx), who, p.ID, sealed)
