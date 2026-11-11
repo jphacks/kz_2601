@@ -22,6 +22,8 @@ import jp.kz2601.metamon.nearby.NearbyShareController
 import jp.kz2601.metamon.renderer.ActionContext
 import jp.kz2601.metamon.renderer.components.media.PhotoReader
 import jp.kz2601.metamon.renderer.DSLRuntime
+import jp.kz2601.metamon.renderer.form.FormDraftRestore
+import jp.kz2601.metamon.renderer.form.FormDraftStorage
 import jp.kz2601.metamon.renderer.EntityLoadState
 import jp.kz2601.metamon.renderer.components.lists.LeafData
 import jp.kz2601.metamon.renderer.FormMember
@@ -157,6 +159,8 @@ class AppRuntime(
     val retention: RecordRetentionRunner? = null,
     /** 共有アプリの参加者と自分が管理者か(#903)。null なら読まない(モック・テスト) */
     val members: AppMembersStore? = null,
+    /** プロセスが落とされた後に戻すフォームの書きかけ(#1185)。既定は端末に残さない(テスト) */
+    override val formDrafts: FormDraftRestore = FormDraftRestore(FormDraftStorage.InMemory()),
 ) : DSLRuntime, NavigationHost, RecordWriter, TimerHost, AiChatPairSaving, AuthorNameHost,
     ModerationHost, MatchingHost, SocialPromptHost, BlockedUsersHost, FollowsHost, NearbyHost, MarksHost {
     private val _state = MutableStateFlow(RuntimeState(document))
@@ -582,8 +586,17 @@ class AppRuntime(
 
     private fun applyNavigationRestore(snapshot: NavigationSnapshot) {
         val doc = document
-        if (_navigation.value != NavigationState.initial(doc.dsl)) return
-        snapshot.restoreIn(doc.appId, doc.dsl)?.let { _navigation.value = it }
+        val restored = snapshot.restoreIn(doc.appId, doc.dsl)
+        if (_navigation.value == NavigationState.initial(doc.dsl)) restored?.let { _navigation.value = it }
+        // 同じ画面に戻れた時だけフォームの書きかけを当てる(#1185)。戻れなければ捨てる
+        if (restored != null && _navigation.value == restored) formDrafts.arm(doc.appId) else formDrafts.clear()
+    }
+
+    /** 開いているフォームの書きかけを端末に置く(Activity の保存状態を書く時・#1185)。話しかける前の画面では置かない。 */
+    fun persistFormDrafts() {
+        val doc = document
+        if (doc.dsl.isVoiceOnly) return formDrafts.clear()
+        formDrafts.persist(doc.appId)
     }
 
     /** 他端末・ai 直叩きで進んだ DSL を当てる。操作中(シート・push 先・音声シート)なら閉じるまで待ち、最新の 1 件だけ当てる。 */
@@ -1113,6 +1126,7 @@ class AppRuntime(
             val (list, written) = write(entity, recordId, form.payload)
             setRecords(appId, entity, list)
             form.markSaved(queuedOffline = !recordSync.isOnline)
+            formDrafts.forget(form) // 保存したら端末の書きかけも消す(#1185)
             lastSavedForm = SavedForm(appId, entity, written, form)
             sweepRetention(entity) // #482 保存の後
         } finally {

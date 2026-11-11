@@ -8,12 +8,16 @@ import androidx.compose.runtime.setValue
  * 保存していない入力を失わせる操作(戻る・シートを閉じる・タブの切り替え)の前の確認(M10・iOS の `ScreenView.guardsDiscard`)。
  * スタックごとに今出ているフォームを控え、入力が変わっていれば [pending] に操作を預けて確認を出す。変わっていなければすぐ実行。
  */
-class DiscardGuard {
+class DiscardGuard(
+    /** 「破棄」で捨てたフォーム(端末に置いた書きかけも消す・#1185)。 */
+    private val onDiscard: (FormDraft) -> Unit = {},
+) {
     private val forms = mutableMapOf<String, FormDraft>()
 
     /** 「破棄」を押したら実行する操作。null なら確認は出ていない。 */
     var pending: (() -> Unit)? by mutableStateOf(null)
         private set
+    private var pendingStack: String? = null
 
     fun track(stack: String, form: FormDraft) {
         forms[stack] = form
@@ -29,7 +33,10 @@ class DiscardGuard {
     /** [stack] の画面を離れる操作。確認が要れば預け、要らなければすぐ実行する。確認が出ている間の 2 回目は受けない。 */
     fun request(stack: String, action: () -> Unit) {
         if (!needsConfirm(stack)) return action()
-        if (pending == null) pending = action
+        if (pending == null) {
+            pending = action
+            pendingStack = stack
+        }
     }
 
     /** 複数のスタックをまとめて離れる操作(画面マップ: シート・全画面・今のタブ)。どれかに入力があれば確認する。 */
@@ -42,12 +49,15 @@ class DiscardGuard {
     fun discard() {
         val action = pending ?: return
         pending = null
+        pendingStack?.let { forms[it] }?.let(onDiscard)
+        pendingStack = null
         action()
     }
 
     /** 「編集を続ける」・窓の外を押した。 */
     fun keepEditing() {
         pending = null
+        pendingStack = null
     }
 
     companion object {

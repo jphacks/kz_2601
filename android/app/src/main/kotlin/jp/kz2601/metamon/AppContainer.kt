@@ -12,6 +12,8 @@ import jp.kz2601.metamon.nearby.NearbySettings
 import jp.kz2601.metamon.nearby.NearbyShareController
 import jp.kz2601.metamon.nearby.PassbyController
 import jp.kz2601.metamon.discover.PublishEnv
+import jp.kz2601.metamon.renderer.form.FormDraftRestore
+import jp.kz2601.metamon.renderer.form.FormDraftStorage
 import jp.kz2601.metamon.renderer.components.location.LocationTracking
 import jp.kz2601.metamon.renderer.components.sensors.MockSensorSource
 import jp.kz2601.metamon.renderer.components.sensors.SensorSource
@@ -273,6 +275,8 @@ class AppContainer(
     val thumbnails: AppThumbnailStore = AppThumbnailStore(null),
     /** 1 つのアプリの通知の予約・出ている通知を消す(アプリ削除・#896)。既定は何もしない(テスト) */
     private val forgetAppNotifications: (String) -> Unit = {},
+    /** プロセスが落とされた後に戻すフォームの書きかけ(#1185)。既定は端末に残さない(テスト) */
+    private val formDraftStorage: FormDraftStorage = FormDraftStorage.InMemory(),
     /** 「トークンを取り直しても 401」の知らせ(#1102)。モックは null(通信しない) */
     private val sessionExpiry: SessionExpirySignal? = null,
     /** ホーム画面のウィジェットの中身(#912)。既定は端末に残さない(テスト) */
@@ -302,6 +306,7 @@ class AppContainer(
             recordSync, documentCache, thumbnails, chatHistory, forgetAppNotifications,
             stopLocationTracking = { LocationTracking.stopAndAwait(it) },
             forgetWidget = widget::forgetApp,
+            forgetFormDrafts = { runtime.formDrafts.forgetApp(it) },
         )
     }
 
@@ -392,6 +397,7 @@ class AppContainer(
             closeFeedback = feedbackComposer::close,
             stopLocationTracking = { LocationTracking.stopAndAwait(null) },
             clearWidget = widget::clear,
+            forgetFormDrafts = { runtime.formDrafts.clear() },
             // チュートリアルと「こう話すと直せます」の印(iOS は LocalWipe.clearDefaults で消える)。次の人には出し直す
             forgetTutorial = {
                 tutorial.forget()
@@ -513,6 +519,7 @@ class AppContainer(
                 widgetStore = WidgetSnapshotStore.of(context),
                 widgetLabels = { ValueLabels.from(context.resources) },
                 onWidgetChanged = WidgetRefresh.requester(context),
+                formDraftStorage = FormDraftStorage.OnDisk(File(context.filesDir, "metamon-form-drafts-mock.json")),
                 forgetAppNotifications = {
                     LocalNotifications.get(context).removeApp(it)
                     TimerAlarms.get(context).removeApp(it) // タイマーの走行状態と終了通知(#1128)
@@ -625,6 +632,7 @@ class AppContainer(
                 widgetStore = WidgetSnapshotStore.of(context),
                 widgetLabels = { ValueLabels.from(context.resources) },
                 onWidgetChanged = WidgetRefresh.requester(context),
+                formDraftStorage = FormDraftStorage.OnDisk(File(context.filesDir, "metamon-form-drafts.json")),
                 forgetAppNotifications = {
                     LocalNotifications.get(context).removeApp(it)
                     TimerAlarms.get(context).removeApp(it) // タイマーの走行状態と終了通知(#1128)
@@ -779,6 +787,7 @@ class AppContainer(
             ),
             undoGraceMillis = { TalkBack.recordUndoMillis(talkBackRunning()) },
             members = membersStore,
+            formDrafts = FormDraftRestore(formDraftStorage),
         ).also {
             it.dictation = TranscriberDictationHost(transcriber, CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate))
             it.audioFileTranscription = audioFiles
