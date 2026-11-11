@@ -115,6 +115,7 @@ import jp.kz2601.metamon.share.MembersSection
 import jp.kz2601.metamon.share.MembersSheet
 import jp.kz2601.metamon.share.ShareLinkHost
 import jp.kz2601.metamon.share.ShareLinkIntents
+import jp.kz2601.metamon.widget.WidgetLink
 import jp.kz2601.metamon.share.ShareSheet
 import jp.kz2601.metamon.share.ShareTarget
 import jp.kz2601.metamon.switcher.AppListEditor
@@ -176,6 +177,7 @@ class MainActivity : ComponentActivity() {
     /** 通知のタップ(自分で出した通知も、FCM が裏で出した通知も extra の `appId`)と、シェアリンク(#901)。 */
     private fun offerPushOpen(intent: Intent?) {
         PushOpen.offer(PushMessage.appId(intent?.getStringExtra(LocalNotifications.EXTRA_APP_ID)))
+        WidgetLink.offer(intent?.action, intent?.dataString) // ホーム画面のウィジェットから(#912)
         if (!ReviewBuild.enabled) ShareLinkIntents.offer(intent) // 審査用の版はシェアリンクを開かない(#1275)
     }
 }
@@ -317,6 +319,12 @@ fun MetamonApp(container: AppContainer) {
     LaunchedEffect(pushOpen) {
         val appId = PushOpen.consume() ?: return@LaunchedEffect
         container.push?.open(appId) { openFromNotification(runtime, it) }
+    }
+    // ホーム画面のウィジェットのタップでそのアプリを開く(#912)
+    val widgetOpen by WidgetLink.pending.collectAsStateWithLifecycle()
+    LaunchedEffect(widgetOpen) {
+        val appId = WidgetLink.consume() ?: return@LaunchedEffect
+        openFromNotification(runtime, appId)
     }
 
     // ヘッドレス E2E 用のつまみ(debug だけ値が入る)。回転などで作り直しても 1 回だけ

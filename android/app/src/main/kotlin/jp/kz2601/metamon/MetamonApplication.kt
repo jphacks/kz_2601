@@ -25,6 +25,7 @@ class MetamonApplication : Application() {
         ProcessLifecycleOwner.get().lifecycle.addObserver(object : DefaultLifecycleObserver {
             override fun onStart(owner: LifecycleOwner) {
                 foreground?.setForeground(true)
+                built?.refreshWidget() // 日付が変わっていれば「直近 7 日」を進める(#912)
             }
 
             override fun onStop(owner: LifecycleOwner) {
@@ -55,6 +56,7 @@ class MetamonApplication : Application() {
             foreground = AppForeground(scope, it.foregroundSteps(), log = { line -> Log.w(AppContainer.TAG, line) }).apply { markForeground() }
             it.accountGuard.start(scope)
             it.startSessionExpiry(scope) // トークンを取り直しても 401 ならサインイン画面へ(#1102)
+            it.startWidget(scope) // DSL の適用・記録の変化でホーム画面のウィジェットを書き直す(#912)
             // クラッシュ報告のオン / オフ(設定・#888)を送り先に反映する。付けるのは uid だけ(サインアウト・オフで外す)
             it.crashReporting.activate(it.crashReporter)
             scope.launch { it.auth.currentUser.collect { user -> it.crashReporting.updateUser(user?.uid) } }

@@ -68,6 +68,9 @@ import jp.kz2601.metamon.onboarding.TutorialPrompt
 import jp.kz2601.metamon.permissions.PermissionCenter
 import jp.kz2601.metamon.share.ShareLinkIntents
 import jp.kz2601.metamon.switcher.AppThumbnailStore
+import jp.kz2601.metamon.widget.WidgetSnapshotStore
+import jp.kz2601.metamon.widget.WidgetSnapshotWriter
+import jp.kz2601.metamon.renderer.components.lists.ValueLabels
 import jp.kz2601.metamon.services.account.AccountClient
 import jp.kz2601.metamon.services.account.HttpAccountClient
 import jp.kz2601.metamon.services.account.MockAccountClient
@@ -161,6 +164,9 @@ import jp.kz2601.metamon.update.InAppUpdater
 import jp.kz2601.metamon.update.PlayAppUpdates
 import jp.kz2601.metamon.update.UpdateGate
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.map
+import jp.kz2601.metamon.widget.WidgetRefresh
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
@@ -269,7 +275,25 @@ class AppContainer(
     private val forgetAppNotifications: (String) -> Unit = {},
     /** 「トークンを取り直しても 401」の知らせ(#1102)。モックは null(通信しない) */
     private val sessionExpiry: SessionExpirySignal? = null,
+    /** ホーム画面のウィジェットの中身(#912)。既定は端末に残さない(テスト) */
+    val widgetStore: WidgetSnapshotStore = WidgetSnapshotStore(),
+    /** ウィジェットの値の文言(件など・端末の言語)。既定は iOS の日本語(テスト) */
+    private val widgetLabels: () -> ValueLabels = { ValueLabels.JAPANESE },
+    /** ウィジェットの中身が変わった時に描き直しを頼む。既定は何もしない(テスト) */
+    private val onWidgetChanged: () -> Unit = {},
 ) {
+    /** ホーム画面のウィジェットの中身を書く(#912)。[startWidget] で DSL・記録の変化を見張る。 */
+    val widget = WidgetSnapshotWriter(widgetStore, widgetLabels, onWidgetChanged)
+
+    /** DSL の適用・記録の変化でウィジェットを書き直す。[MetamonApplication] が 1 回だけ呼ぶ。 */
+    fun startWidget(scope: CoroutineScope) =
+        widget.start(scope, runtime, runtime.state.map { it.document }.distinctUntilChanged(), runtime.recordsFlow, runtime.loadStatesFlow)
+
+    /** 前面に戻った時(日付が変わって「直近 7 日」がずれる)。 */
+    fun refreshWidget() {
+        widget.write(runtime.document, runtime, runtime.recordsFlow.value, runtime.loadStatesFlow.value)
+    }
+
     /** 削除したアプリの端末のデータを消す([LocalAppForget])。サーバーの削除が済んでから呼ぶ。 */
     suspend fun forgetAppLocally(appId: String) = forgetApp(appId)
 
@@ -277,6 +301,7 @@ class AppContainer(
         LocalAppForget(
             recordSync, documentCache, thumbnails, chatHistory, forgetAppNotifications,
             stopLocationTracking = { LocationTracking.stopAndAwait(it) },
+            forgetWidget = widget::forgetApp,
         )
     }
 
@@ -366,6 +391,7 @@ class AppContainer(
             thumbnails = thumbnails,
             closeFeedback = feedbackComposer::close,
             stopLocationTracking = { LocationTracking.stopAndAwait(null) },
+            clearWidget = widget::clear,
             // チュートリアルと「こう話すと直せます」の印(iOS は LocalWipe.clearDefaults で消える)。次の人には出し直す
             forgetTutorial = {
                 tutorial.forget()
@@ -484,6 +510,9 @@ class AppContainer(
                 talkBackRunning = { TalkBack.isRunning(context) },
                 nearbyEnv = NearbyEnv.of(context, mock = true),
                 thumbnails = AppThumbnailStore(File(context.filesDir, "metamon-thumbs-mock")),
+                widgetStore = WidgetSnapshotStore.of(context),
+                widgetLabels = { ValueLabels.from(context.resources) },
+                onWidgetChanged = WidgetRefresh.requester(context),
                 forgetAppNotifications = {
                     LocalNotifications.get(context).removeApp(it)
                     TimerAlarms.get(context).removeApp(it) // タイマーの走行状態と終了通知(#1128)
@@ -593,6 +622,9 @@ class AppContainer(
                 // 審査用の版(#1275)はリリース申請を出さない(iOS の APP_STORE_REVIEW と同じ)
                 releaseClient = if (ReviewBuild.enabled) null else HttpReleaseRequestClient(appConfigHttp),
                 thumbnails = AppThumbnailStore(File(context.filesDir, "metamon-thumbs")),
+                widgetStore = WidgetSnapshotStore.of(context),
+                widgetLabels = { ValueLabels.from(context.resources) },
+                onWidgetChanged = WidgetRefresh.requester(context),
                 forgetAppNotifications = {
                     LocalNotifications.get(context).removeApp(it)
                     TimerAlarms.get(context).removeApp(it) // タイマーの走行状態と終了通知(#1128)
