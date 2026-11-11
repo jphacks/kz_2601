@@ -5,6 +5,7 @@ import androidx.lifecycle.viewModelScope
 import jp.kz2601.metamon.dsl.AppDocument
 import jp.kz2601.metamon.dsl.isVoiceOnly
 import jp.kz2601.metamon.dsl.screen
+import jp.kz2601.metamon.purchase.PaywallReason
 import jp.kz2601.metamon.services.AIClient
 import jp.kz2601.metamon.services.ChatMessage
 import jp.kz2601.metamon.services.ChatMode
@@ -72,6 +73,8 @@ class VoiceViewModel(
     /** 「今日の残り」を読む口(`GET /v1/me/usage`)。null = 出さない(モック) */
     private val usage: PlanUsageSource? = null,
     private val clock: () -> Instant = Instant::now,
+    /** 状態カードの「Pro にする」で課金画面を開く(#1103)。null = 課金を持たない構成(カードにボタンを出さない) */
+    private val requestPaywall: ((PaywallReason) -> Unit)? = null,
     scope: CoroutineScope? = null,
 ) : ViewModel() {
     private val scope: CoroutineScope = scope ?: viewModelScope
@@ -270,6 +273,15 @@ class VoiceViewModel(
 
     fun dismissError() = _state.update {
         it.copy(error = null, phase = if (it.phase == VoicePhase.ERROR) VoicePhase.IDLE else it.phase)
+    }
+
+    /** 状態カードの「Pro にする」の行き先。課金を持たない構成では null */
+    fun upgradeHandler(): ((PaywallReason) -> Unit)? = requestPaywall?.let { open -> { reason -> upgrade(reason, open) } }
+
+    /** 上限のカードの「Pro にする」(iOS の `upgradeFromRateLimit`)。カードは閉じずに課金画面を開く */
+    private fun upgrade(reason: PaywallReason, open: (PaywallReason) -> Unit) {
+        log("[Metamon] IAP: paywall from error card reason=$reason")
+        open(reason)
     }
 
     fun retry() {
