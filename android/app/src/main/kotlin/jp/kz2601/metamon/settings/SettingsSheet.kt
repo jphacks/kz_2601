@@ -141,6 +141,15 @@ fun SettingsSheet(
                     onDismiss()
                 })
             }
+            var automationsOpen by rememberSaveable { mutableStateOf(false) }
+            val automations = container.automations
+            if (automationsOpen && automations != null) {
+                // 自動の動き(#905)。「直しますか?」は依頼を入力欄に入れて設定ごと閉じる(頼み方のコツと同じ)
+                AutomationsSheet(runtimeState.document.appId, automations, onDismiss = { automationsOpen = false }, onFix = { text ->
+                    automationsOpen = false
+                    onPickTip(text)
+                })
+            }
             // アプリ(#898・iOS の appSection): 元に戻す・画面マップ・自動の動き・使い方を見る(#900)・頼み方のコツ・リセット
             AppActionsSection(
                 AppActionsState(
@@ -153,6 +162,7 @@ fun SettingsSheet(
                 ),
                 onUndo = onUndo,
                 onOpenScreenMap = { screenMapOpen = true },
+                onOpenAutomations = automations?.let { { automationsOpen = true } },
                 onShowTutorial = onShowTutorial,
                 onPickTip = onPickTip,
                 onReset = onReset,
