@@ -38,6 +38,8 @@ struct MacRootView: View {
     private let draftRequest = MacDraftRequest.shared
     /// 完成の後のお知らせ(#968)
     @State private var notices = MacPostBuildNotices()
+    /// 最低対応版と強制アップデート(#981)。サービスのお知らせと同じ応答で判定する
+    @State private var updateGate = MacUpdateGate()
     /// 前面に戻った回数。新着・上限のお知らせを数え直す(#1058)
     @State private var noticeCheck = 0
     @State private var compose: MacComposeSession?
@@ -151,6 +153,7 @@ struct MacRootView: View {
         .focusedSceneValue(\.shellActions, shellActions)
         .macNotificationRouting(selection: notificationSelection, appIds: apps.map(\.id)) // 押された通知のアプリを開く(#965)。入力中なら確認を通す・シートの間は閉じるまで待つ(#943)
         .background { WindowCloseGuard(discardGuard: discardGuard) } // ⌘W・閉じるボタン(#943)
+        .modifier(MacUpdateGateModifier(gate: updateGate)) // 古い版は閉じられない更新のシート(#981)
         #if !APP_STORE_REVIEW
         .onChange(of: shareFlow.adopted?.id) { adoptShared() }
         // フィードバックに添える今のアプリ(#1330)。サーバーにあるアプリの時だけ(選択・版・保存先が変わったら入れ替える)
@@ -598,10 +601,16 @@ struct MacRootView: View {
         notices.offerUsage(MacPostBuildNotices.usageCandidates(app: usage, me: me), uid: uid)
     }
 
-    /// サービスのお知らせ(#333)を読む。appconfig につながっていない時は何もしない(fail open)
+    /// サービスのお知らせ(#333)と Mac の最低対応版(#981)を 1 回で読む。appconfig につながっていない時は何もしない(fail open)
     private func checkServiceNotice() async {
+        #if DEBUG
+        updateGate.applyDebugOverride() // METAMON_FORCE_UPDATE の見た目の確認(通信なしでも出す)
+        #endif
         guard let url = MacServices.shared.appConfigURL else { return }
-        await notices.checkService(checker: UpdateChecker(client: HTTPClientConfigClient(baseURL: url)))
+        let result = await MacUpdateGate.checker(baseURL: url).check()
+        guard !Task.isCancelled else { return }
+        notices.updateService(result.notice)
+        updateGate.apply(result)
     }
 
     /// 上限のお知らせの「Pro にする」。Pro・審査用の版・上がらない上限では出さない

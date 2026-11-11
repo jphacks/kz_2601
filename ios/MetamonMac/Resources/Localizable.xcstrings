@@ -822,6 +822,40 @@
         }
       }
     },
+    "Mac App Store で最新の版にアップデートできます。" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "You can update to the latest version on the Mac App Store."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mac App Store で最新の版にアップデートできます。"
+          }
+        }
+      }
+    },
+    "Mac App Store を開く" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Open Mac App Store"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mac App Store を開く"
+          }
+        }
+      }
+    },
     "OK" : {
       "localizations" : {
         "en" : {
@@ -1134,6 +1168,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Tailor It β へようこそ"
+          }
+        }
+      }
+    },
+    "Tailor It を終了" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Quit Tailor It"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tailor It を終了"
           }
         }
       }
@@ -2761,6 +2812,23 @@
         }
       }
     },
+    "この版の Tailor It は使えなくなりました。Mac App Store から最新の版にアップデートしてください。" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "This version of Tailor It is no longer supported. Please update to the latest version from the Mac App Store."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "この版の Tailor It は使えなくなりました。Mac App Store から最新の版にアップデートしてください。"
+          }
+        }
+      }
+    },
     "この画像をそのまま送ります。個人の情報(名前・金額・連絡先など)が写っていないか確かめてください。" : {
       "localizations" : {
         "en" : {
@@ -3979,6 +4047,40 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "アカウントを削除できませんでした"
+          }
+        }
+      }
+    },
+    "アップデート" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Update"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "アップデート"
+          }
+        }
+      }
+    },
+    "アップデートしてください" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Please update"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "アップデートしてください"
           }
         }
       }
@@ -9122,6 +9224,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "新しいウインドウ"
+          }
+        }
+      }
+    },
+    "新しい版があります" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "A new version is available"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "新しい版があります"
           }
         }
       }
