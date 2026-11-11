@@ -54,6 +54,7 @@ class MetamonApplication : Application() {
             built = it
             foreground = AppForeground(scope, it.foregroundSteps(), log = { line -> Log.w(AppContainer.TAG, line) }).apply { markForeground() }
             it.accountGuard.start(scope)
+            it.startSessionExpiry(scope) // トークンを取り直しても 401 ならサインイン画面へ(#1102)
             // クラッシュ報告のオン / オフ(設定・#888)を送り先に反映する。付けるのは uid だけ(サインアウト・オフで外す)
             it.crashReporting.activate(it.crashReporter)
             scope.launch { it.auth.currentUser.collect { user -> it.crashReporting.updateUser(user?.uid) } }

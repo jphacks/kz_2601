@@ -40,4 +40,6 @@
     <string name="runtime_text_not_allowed_field">「%1$s」に表示できない言葉が含まれています</string>
     <string name="runtime_unavailable_on_android">この機能は Android ではまだ使えません</string>
     <string name="runtime_unknown_action">未対応のアクション: %1$s</string>
+    <string name="runtime_unreachable_body">接続を確認してください。つながると自動で読み込み直します</string>
+    <string name="runtime_unreachable_title">サーバーに接続できません</string>
 </resources>

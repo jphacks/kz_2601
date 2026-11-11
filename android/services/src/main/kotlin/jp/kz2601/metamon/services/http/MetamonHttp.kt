@@ -94,6 +94,8 @@ class MetamonHttp(
     private val clock: () -> Instant = Instant::now,
     /** 応答の `X-RateLimit-*` から読んだ「今日の残り」の行き先(iOS の `HTTP.noteRemaining`・#1203)。ai だけに付ける */
     private val remainingSink: ((RemainingToday) -> Unit)? = null,
+    /** ID トークンを取り直しても 401 だった(iOS の `sessionExpired`・#1102)。サインイン画面に戻す口 */
+    private val onSessionExpired: (() -> Unit)? = null,
 ) {
     val baseUrl: HttpUrl = baseUrl.toHttpUrl()
 
@@ -130,6 +132,8 @@ class MetamonHttp(
                 bearer = fresh
                 r = perform(req, bearer, check)
             }
+            // 取り直しても(取り直せなくても)401 = セッション切れ。トークンを付けていない(未サインイン)時は呼ばない
+            if (r.status == 401 && !isAppCheckRejection(r)) onSessionExpired?.invoke()
         }
         if (r.status == 429) {
             val wait = retryAfterSeconds(r) ?: retry.defaultRetryAfterSeconds
