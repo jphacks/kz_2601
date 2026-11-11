@@ -2,7 +2,7 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
-	<!-- 審査用の版(Review)。MetamonMac.entitlements から Associated Domains(共有のリンク・#1286)とプッシュ(aps-environment・#982)を外したもの。
+	<!-- 審査用の版(Review)。MetamonMac.entitlements から Associated Domains(共有のリンク・#1286)・近くの人に送る(#964)の受ける側の通信(network.server)・プッシュ(aps-environment・#982)を外したもの。
 	     ほかのキーを足す・消す時は MetamonMac.entitlements と揃える -->
 	<!-- Mac App Store に必須のサンドボックスと、通信(backend・音声モデルの取得)・マイク。カメラなどは各 Issue で足す -->
 	<key>com.apple.security.app-sandbox</key>

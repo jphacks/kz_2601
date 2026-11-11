@@ -6,7 +6,7 @@ import MetamonDSL
 struct PromptTipsList: View {
     var onPick: (String) -> Void
 
-    /// Mac で使える機能。共有・近くの端末・ヘルスケア・道のりの記録は Mac ではまだ無い(撮影は #1043 で使える)
+    /// Mac で使える機能。共有・ヘルスケア・道のりの記録は Mac ではまだ無い(撮影は #1043・近くの人に送るは #964 で使える)
     static let availability = PromptTips.Availability.from(
         allowedComponents: ClientCapabilities.allowedComponents,
         disabledFeatures: ClientCapabilities.disabledFeatures, sharing: false)
@@ -20,7 +20,7 @@ struct PromptTipsList: View {
         .filter { !$0.tips.isEmpty }
     }
 
-    private static let unavailableOnMac: Set<PromptTips.Feature> = [.nearby, .health, .locationTracking]
+    static let unavailableOnMac: Set<PromptTips.Feature> = [.health, .locationTracking]
 
     var body: some View {
         List {

@@ -327,6 +327,9 @@ targets:
       - path: Metamon/Features/Share/SharedAccessCopy.swift
       # 設定の「つないだサービス」(#1714): 一覧の並べ方・戻り先の読み方・つなぐ / 切るの状態は iOS のファイルをそのまま使う
       - path: Metamon/Features/Connections/ConnectedServices.swift
+      # 近くの人に送る(#964): MultipeerConnectivity の通信は iOS のファイルをそのまま使う(iPhone・iPad と送り合える)。
+      # すれ違い通信(passby)は NearbyInteraction・持ち歩く前提なので Mac には入れない(「この Mac では使えません」)
+      - path: Metamon/Features/Nearby/NearbyService.swift
       # ショートカット・Siri・Spotlight(App Intents・#1034): Intent の型・Query・フレーズは iOS のファイルをそのまま使う。
       # 本体との橋渡し(IntentHost)だけ Mac 用(MetamonMac/App/Intents/MacIntentHost.swift)。iOS の IntentHost.swift は AppRuntime を使うので入れない
       - path: Metamon/Features/Intents/TailorItIntents.swift

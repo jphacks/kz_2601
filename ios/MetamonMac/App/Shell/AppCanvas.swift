@@ -128,6 +128,9 @@ private struct AppCanvasContent: View {
                 modal(route).dynamicTypeSize(textSize).frame(minWidth: 640, minHeight: 560)
             }
             .modifier(RuntimeOverlays(runtime: runtime))
+            #if !APP_STORE_REVIEW
+            .modifier(MacNearbyLifecycle(runtime: runtime)) // 近くの人に送る(#964): 前面のウインドウで受け取る
+            #endif
             // 記録の写真・動画・録音を Quick Look で見る(#1850)。パネルは 1 つなので根にだけ付ける
             .quickLookPreview($runtime.quickLookURL, in: runtime.quickLookItems)
             .modifier(QuickLookSpaceKey(runtime: runtime))
@@ -236,6 +239,8 @@ private struct RuntimeOverlays: ViewModifier {
             #if !APP_STORE_REVIEW
             // 通報・ブロック・18 歳以上の確認(#963)
             .modifier(MacSocialDialogs(runtime: runtime, active: active))
+            // 近くの人に送る(#964): 相手選びのシートと受け取りの確認
+            .modifier(MacNearbySheets(runtime: runtime, active: active))
             #endif
             .overlay(alignment: .top) {
                 VStack(spacing: 8) {
