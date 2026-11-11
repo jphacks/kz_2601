@@ -5238,6 +5238,23 @@
         }
       }
     },
+    "捨てる" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Discard"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "捨てる"
+          }
+        }
+      }
+    },
     "接続がありません。つながる場所でもう一度送ってください。" : {
       "localizations" : {
         "en" : {
@@ -5647,6 +5664,23 @@
         }
       }
     },
+    "書いた内容を捨てますか?" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Discard what you wrote?"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "書いた内容を捨てますか?"
+          }
+        }
+      }
+    },
     "書き出す" : {
       "localizations" : {
         "en" : {
@@ -5659,6 +5693,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "書き出す"
+          }
+        }
+      }
+    },
+    "書き続ける" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Keep Writing"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "書き続ける"
           }
         }
       }
@@ -7133,6 +7184,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "送った内容(本文と、オンにした添付)は、Tailor It の不具合を直し、改善するために運営者が読みます。Google Cloud(Firestore)に保存し、%lld 日後に消去します。アカウントを削除したときも消去します。第三者には渡しません。"
+          }
+        }
+      }
+    },
+    "送っていないフィードバックは残りません。" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Feedback you haven't sent won't be kept."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "送っていないフィードバックは残りません。"
           }
         }
       }
