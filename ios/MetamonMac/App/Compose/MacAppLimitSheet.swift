@@ -14,6 +14,29 @@ extension EnvironmentValues {
     @Entry var macAppReplace: MacAppReplaceContext?
 }
 
+/// プランごとの持てるアプリの数(#630)。サーバーの `PLAN_FREE_APPS` / `PLAN_PRO_APPS` の既定と同じ(docs/backend/rate-limit.md)。
+/// Mac はサーバーにつながっていない(#930)ので、複製など端末だけで足す時にこの数で確かめる
+enum MacPlanApps {
+    static let free = 2
+    static let pro = 5
+
+    /// 今のプランの数。審査用ビルドは課金を持たないので無料の数
+    @MainActor static var current: Int {
+        #if APP_STORE_REVIEW
+        free
+        #else
+        MacPro.shared.isPro ? pro : free
+        #endif
+    }
+}
+
+/// 置き換えシートの表示要求(上限 1 件 + 1 つ空いた後にやり直す操作)
+struct MacAppLimitRequest: Identifiable {
+    let id = UUID()
+    var limit: AppLimit
+    var retry: @MainActor () -> Void
+}
+
 /// 持てるアプリの数の上限(#630・402 `app_limit_reached`)の置き換えシート(iOS の `AppLimitSheet` の Mac 版)。
 /// どれかを削除すると(確認を挟む)、閉じて元の操作をやり直す。並びと文言は iOS と同じ `AppReplacePlan` / `AppLimitCopy`。
 /// Mac はサーバーにつながっていない(#930)ので、消せるのはこの Mac で作ったアプリだけ。共有から抜ける・枠を買う(コイン)は出さない。

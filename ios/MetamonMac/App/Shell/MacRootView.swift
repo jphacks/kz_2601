@@ -49,6 +49,8 @@ struct MacRootView: View {
     @State private var discardGuard = MacDiscardGuard()
     /// シートの間に押された通知の切り替え先。シートを閉じてから確認を通して切り替える(#943)
     @State private var notificationSwitch = SheetDeferredSwitch()
+    /// 複製で持てるアプリの数に達した時の置き換えシート(#630)
+    @State private var appLimit: MacAppLimitRequest?
     /// 会話で直した直後に光らせる部品(#626・#1337)。iOS と同じく出現が済んだ頃(2 秒)に消す
     @State private var highlight: (canvas: String, value: ChangeHighlight)?
     @Environment(MacVoiceInput.self) private var voice
@@ -148,6 +150,9 @@ struct MacRootView: View {
             if let id { library.lastAppId = id }
             showsScreenMap = false
         }
+        .sheet(item: $appLimit) { request in
+            MacAppLimitSheet(limit: request.limit, context: appReplaceContext, onFreed: request.retry)
+        }
         .sheet(isPresented: $showsTips, onDismiss: switchAfterSheet) {
             PromptTipsSheet { tip in
                 showsTips = false
@@ -185,8 +190,13 @@ struct MacRootView: View {
         MacVoiceOver.announce(L10n.tr("「\(name)」を削除しました"))
     }
 
-    /// 複製する(#1285)。iOS と同じく切り替えずに知らせる
+    /// 複製する(#1285)。iOS と同じく切り替えずに知らせる。
+    /// 持てるアプリの数に達していれば、作る時と同じ置き換えシートを出し、1 つ空いたら複製し直す(#630・iOS の `duplicateApp`)
     private func duplicateApp(_ id: String) {
+        if let limit = library.limitForAdding(planApps: MacPlanApps.current) {
+            appLimit = MacAppLimitRequest(limit: limit) { duplicateApp(id) }
+            return
+        }
         guard let name = library.duplicate(id, bundled: bundledApps.first { $0.id == id }) else { return }
         MacVoiceOver.announce(L10n.tr("「\(name)」を作りました"))
     }
