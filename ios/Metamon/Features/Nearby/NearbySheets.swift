@@ -143,7 +143,12 @@ struct NearbySendSheet: View {
                 } header: {
                     Text("近くの端末")
                 } footer: {
-                    Text("相手も Tailor It で同じアプリを開いていると表示されます。相手が「受け取る」を押すと届きます。")
+                    VStack(alignment: .leading, spacing: 6) {
+                        Text("相手も Tailor It で同じアプリを開いていると表示されます。相手が「受け取る」を押すと届きます。")
+                        // 同じ OS どうしだけつながる(iOS は MultipeerConnectivity・Android は Nearby Connections)
+                        Text("Android の端末とはつながりません(iPhone どうしで送り合えます)")
+                            .accessibilityIdentifier("nearby.send.androidNote")
+                    }
                 }
                 if let status = statusRow {
                     Section { status }

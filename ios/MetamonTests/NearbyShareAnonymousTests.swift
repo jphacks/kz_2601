@@ -65,5 +65,13 @@ final class NearbyShareAnonymousTests: XCTestCase {
         XCTAssertTrue(defaults.bool(forKey: "passby.anonymous"))
         XCTAssertEqual(service.myName, NearbyLimits.anonymousName)
     }
+
+    /// 送るシートの「Android とはつながりません」に英訳がある(Android の nearby_ios_not_supported と対)
+    func testSendSheetAndroidNoteHasEnglish() throws {
+        let path = try XCTUnwrap(Bundle(for: AppRuntime.self).path(forResource: "en", ofType: "lproj"))
+        let en = try XCTUnwrap(Bundle(path: path))
+        XCTAssertEqual(en.localizedString(forKey: "Android の端末とはつながりません(iPhone どうしで送り合えます)", value: nil, table: nil),
+                       "Can't connect to Android devices (works between iPhones)")
+    }
 }
 #endif

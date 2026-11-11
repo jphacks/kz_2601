@@ -1572,6 +1572,23 @@
         }
       }
     },
+    "Android の端末とはつながりません(iPhone どうしで送り合えます)" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Can't connect to Android devices (works between iPhones)"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Android の端末とはつながりません(iPhone どうしで送り合えます)"
+          }
+        }
+      }
+    },
     "App Store で最新の版にアップデートできます。" : {
       "extractionState" : "manual",
       "localizations" : {
