@@ -3,7 +3,16 @@
     <!-- 現在地(location ボタン・道案内)が使う。聞くのはアプリ側(PermissionCenter)。アプリのマニフェストと同じもの -->
     <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
     <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
+    <!-- 位置の記録(locationTracker・#869): 前面で開始する Foreground Service(type location)。使用中の位置の許可だけで裏でも続くので
+         ACCESS_BACKGROUND_LOCATION は使わない。通知(13+)は記録中の常時通知に使う。Play Console の申告はアプリ側(人の作業) -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_LOCATION" />
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <application>
+        <service
+            android:name="jp.kz2601.metamon.renderer.components.location.LocationTrackingService"
+            android:exported="false"
+            android:foregroundServiceType="location" />
         <!-- photoField / videoField のカメラ(TakePicture / ACTION_VIDEO_CAPTURE)に渡す保存先(#862 / #863)。権限はアプリ側(PermissionCenter)が聞く -->
         <provider
             android:name="androidx.core.content.FileProvider"

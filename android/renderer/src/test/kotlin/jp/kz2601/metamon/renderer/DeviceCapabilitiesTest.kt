@@ -34,7 +34,6 @@ class DeviceCapabilitiesTest {
         // 今 Android で描けない部品(登録を足したらここから消す)
         for (t in listOf(
             ComponentType.PLACE_SEARCH,
-            ComponentType.LOCATION_TRACKER,
             ComponentType.HEALTH_STAT,
         )) {
             assertFalse(t.wire, t.wire in caps.allowedComponents)
@@ -48,6 +47,7 @@ class DeviceCapabilitiesTest {
             ComponentType.MATCH_LIST,
             ComponentType.ROUTE_GUIDE,
             ComponentType.LOCATION_BUTTON,
+            ComponentType.LOCATION_TRACKER, // #869
             // 送受信(#1382)とすれ違い(#1383)がそろった
             ComponentType.NEARBY_SHARE,
         )) {
