@@ -19,6 +19,8 @@ kotlin {
 
 dependencies {
     implementation(project(":dsl"))
+    // API クライアント・記録の保存・送信待ち(android/services と同じソース・#1748 #1754)
+    implementation(project(":services"))
     implementation(compose.desktop.currentOs)
     implementation(compose.material3)
     implementation(libs.zxing.core)
@@ -26,6 +28,8 @@ dependencies {
     implementation("org.apache.pdfbox:pdfbox:3.0.3")
 
     testImplementation(libs.junit)
+    testImplementation(libs.kotlinx.coroutines.test)
+    testImplementation(libs.okhttp.mockwebserver)
 }
 
 val dslDocsDir = rootDir.resolve("../docs/dsl")
@@ -54,6 +58,14 @@ val syncSharedRenderer by tasks.registering(Sync::class) {
     into(layout.buildDirectory.dir("generated/sharedRenderer"))
 }
 kotlin.sourceSets.named("main") { kotlin.srcDir(syncSharedRenderer) }
+
+// 手元の確かめ: TAILORIT_API=stg TAILORIT_DEV_TOKEN=<ID トークン> ./gradlew :desktop:listApps(stg のアプリの一覧を出す)
+tasks.register<JavaExec>("listApps") {
+    group = "verification"
+    description = "stg の appconfig からアプリの一覧を出す(手元の確かめ用・#1748)"
+    classpath = sourceSets["main"].runtimeClasspath
+    mainClass.set("jp.kz2601.metamon.desktop.net.ListAppsKt")
+}
 
 compose.desktop {
     application {
