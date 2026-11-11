@@ -203,6 +203,40 @@
         }
       }
     },
+    "%@が上限に近づいています(%@)" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$@ is nearing its limit (%2$@)"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@が上限に近づいています(%@)"
+          }
+        }
+      }
+    },
+    "%@が上限に達しています(%@)" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$@ has reached its limit (%2$@)"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@が上限に達しています(%@)"
+          }
+        }
+      }
+    },
     "%@が上限に達しました。作った人に知らせてください" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -950,6 +984,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Pro にすると、無料プランの上限が増えます"
+          }
+        }
+      }
+    },
+    "Pro にすると上限が増えます" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Go Pro to raise the limit"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Pro にすると上限が増えます"
           }
         }
       }
@@ -2027,6 +2078,40 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "お問い合わせ"
+          }
+        }
+      }
+    },
+    "お知らせ: %@" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Notice: %@"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "お知らせ: %@"
+          }
+        }
+      }
+    },
+    "お知らせを閉じる" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Dismiss notice"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "お知らせを閉じる"
           }
         }
       }
@@ -3401,6 +3486,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "ほかのアプリの通話や録音を終えてから、もう一度お試しください"
+          }
+        }
+      }
+    },
+    "ほかの人が追加・更新しました" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Added or updated by others"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ほかの人が追加・更新しました"
           }
         }
       }
@@ -9157,6 +9259,23 @@
         }
       }
     },
+    "新着 %lld 件" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld new"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "新着 %lld 件"
+          }
+        }
+      }
+    },
     "日付のタップ" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -11131,6 +11250,23 @@
         }
       }
     },
+    "詳しく見る" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Learn more"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "詳しく見る"
+          }
+        }
+      }
+    },
     "詳細" : {
       "localizations" : {
         "en" : {
@@ -11829,6 +11965,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "部品のタップ"
+          }
+        }
+      }
+    },
+    "重要なお知らせ: %@" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Important notice: %@"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "重要なお知らせ: %@"
           }
         }
       }
