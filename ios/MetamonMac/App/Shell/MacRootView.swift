@@ -162,6 +162,7 @@ struct MacRootView: View {
         .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
             Task { await refreshServerApps() }
         }
+        .onDisappear { MacSpeechReader.shared.stop() } // ウインドウを閉じたら読み上げを止める(#1210)
         .onAppear {
             reopenLastApp()
             // self ごと捕まえると見張り(State)との循環で残るので、シートの Binding だけ渡す
@@ -351,6 +352,7 @@ struct MacRootView: View {
                 session.onConflict = { await library.refreshFromServer(appId) }
             }
             notices.summary = nil // 会話を始めたら前の要約は下げる
+            MacSpeechReader.shared.stop() // 読み上げも止める(#1210)
             closingCompose = session
             compose = session
             discardGuard.released = true
@@ -426,6 +428,7 @@ struct MacRootView: View {
         guard let session = closingCompose, case .finished(let summary, false) = session.phase,
               let appId = session.resultAppId else { return }
         notices.summary = .init(appId: appId, text: summary, action: library.canUndo(appId) ? .undo : nil)
+        MacSpeechReader.shared.speak(summary) // #1210(設定 OFF・VoiceOver の時は喋らない)
     }
 
     /// 完成の画面の「元に戻す」。戻せる版がある時だけ
