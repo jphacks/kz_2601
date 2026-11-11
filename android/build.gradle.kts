@@ -1,0 +1,9 @@
+// 版は gradle/libs.versions.toml。ここではプラグインを読み込むだけ(各モジュールで apply する)。
+plugins {
+    alias(libs.plugins.android.application) apply false
+    alias(libs.plugins.android.library) apply false
+    alias(libs.plugins.kotlin.jvm) apply false
+    alias(libs.plugins.kotlin.compose) apply false
+    alias(libs.plugins.kotlin.serialization) apply false
+    alias(libs.plugins.google.services) apply false
+}
