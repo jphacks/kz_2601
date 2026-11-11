@@ -100,7 +100,8 @@ final class MacSocialTests: XCTestCase {
     // MARK: 会話(chatThread の送信)
 
     func testChatPostOnSharedEntityCarriesMyUID() async throws {
-        let rt = try await runtime(FakeSocial())
+        // オンラインだと送信後にモックサーバーの行(作者は別の uid)へ置き換わりうる。ローカルの作者を見るのでオフラインで作る
+        let rt = try await runtime(FakeSocial(), online: false)
         XCTAssertNotNil((rt as any DSLRuntime) as? any RecordPosting, "chatThread が送信の口として見つける")
         let ok = await rt.postRecord(entity: "msg", data: ["text": "やあ"])
         XCTAssertTrue(ok)
@@ -258,7 +259,9 @@ final class MacSocialTests: XCTestCase {
 
     func testInterestAsksAgeFirstThenSends() async throws {
         let fake = FakeSocial()
-        let rt = try await runtime(fake)
+        // オンラインだと裏の同期でプロフィールがモックサーバーの行(作者 mock の uid)に置き換わり、
+        // 「自分のプロフィール」が見つからなくなる(不安定の原因)。仲間探しは同期と無関係なのでオフラインで作る
+        let rt = try await runtime(fake, online: false)
         _ = await rt.postRecord(entity: "profile", data: ["hobby": "囲碁"])
         XCTAssertEqual(rt.interestState(entity: "profile", record: taroProfile), InterestState.none)
         XCTAssertNil(rt.interestState(entity: "profile", record: Record(id: "x", data: [:], author: "u-me")), "自分の行には出さない")
