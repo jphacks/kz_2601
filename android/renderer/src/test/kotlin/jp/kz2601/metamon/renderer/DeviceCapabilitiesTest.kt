@@ -15,8 +15,8 @@ class DeviceCapabilitiesTest {
 
     @Test
     fun allowedComponentsAreExactlyTheRegisteredTypes() {
-        val pending = DeviceCapabilities.PENDING.map { it.wire }.toSet()
-        assertEquals(ComponentRegistry.standard.registeredTypes - pending, caps.allowedComponents.toSet())
+        val hidden = (DeviceCapabilities.PENDING + DeviceCapabilities.FALLBACK_ONLY).map { it.wire }.toSet()
+        assertEquals(ComponentRegistry.standard.registeredTypes - hidden, caps.allowedComponents.toSet())
         assertEquals(caps.allowedComponents.size, caps.allowedComponents.toSet().size)
         assertFalse(ComponentType.UNKNOWN.wire in caps.allowedComponents)
     }
@@ -43,12 +43,20 @@ class DeviceCapabilitiesTest {
             ComponentType.SENSOR_VALUE,
             ComponentType.DASHCAM,
             ComponentType.MATCH_LIST,
-            ComponentType.MUSIC_PLAYER,
             ComponentType.ROUTE_GUIDE,
             ComponentType.LOCATION_BUTTON,
         )) {
             assertTrue(t.wire, t.wire in caps.allowedComponents)
         }
+    }
+
+    /** #1267: musicPlayer は代わりの表示だけ(描画器には登録する)なので申告しない。 */
+    @Test
+    fun fallbackOnlyPartsAreRegisteredButNotDeclared() {
+        assertTrue(ComponentType.MUSIC_PLAYER.wire in ComponentRegistry.standard.registeredTypes)
+        assertFalse(ComponentType.MUSIC_PLAYER.wire in caps.allowedComponents)
+        val music = ComponentRegistry.build { register(ComponentType.MUSIC_PLAYER) { _, _, _ -> } }
+        assertEquals(emptyList<String>(), DeviceCapabilities.allowedComponents(music))
     }
 
     @Test
