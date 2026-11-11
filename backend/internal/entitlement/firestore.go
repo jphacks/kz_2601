@@ -3,6 +3,7 @@ package entitlement
 import (
 	"context"
 	"errors"
+	"strings"
 	"time"
 
 	"cloud.google.com/go/firestore"
@@ -16,6 +17,7 @@ const (
 	entitlementsCollection = "entitlements"
 	proDoc                 = "pro"
 	bindingsCollection     = "appstore_transactions"
+	playBindingsCollection = "googleplay_purchases"
 )
 
 // Firestore is the production Store (same database as appconfig).
@@ -31,7 +33,12 @@ func (f *Firestore) proRef(uid string) *firestore.DocumentRef {
 	return f.c.Collection("users").Doc(uid).Collection(entitlementsCollection).Doc(proDoc)
 }
 
+// bindingRef is appstore_transactions/{otid}, or googleplay_purchases/{hash}
+// for a PlayKey.
 func (f *Firestore) bindingRef(otid string) *firestore.DocumentRef {
+	if h, ok := strings.CutPrefix(otid, playKeyPrefix); ok {
+		return f.c.Collection(playBindingsCollection).Doc(h)
+	}
 	return f.c.Collection(bindingsCollection).Doc(otid)
 }
 
@@ -65,6 +72,9 @@ func proData(p Pro) map[string]any {
 	}
 	if !p.SignedAt.IsZero() {
 		m["signedAt"] = p.SignedAt
+	}
+	if p.Platform != "" {
+		m["platform"] = p.Platform
 	}
 	return m
 }
@@ -165,17 +175,10 @@ func (f *Firestore) PurgeUser(ctx context.Context, uid string) (int, error) {
 	if err := collect(f.c.Collection("users").Doc(uid).Collection(entitlementsCollection).DocumentRefs(ctx)); err != nil {
 		return 0, err
 	}
-	it := f.c.Collection(bindingsCollection).Where("uid", "==", uid).Documents(ctx)
-	defer it.Stop()
-	for {
-		s, err := it.Next()
-		if errors.Is(err, iterator.Done) {
-			break
-		}
-		if err != nil {
+	for _, col := range []string{bindingsCollection, playBindingsCollection} {
+		if err := collectOwned(ctx, f.c.Collection(col), uid, &refs); err != nil {
 			return 0, err
 		}
-		refs = append(refs, s.Ref)
 	}
 	n := 0
 	for _, r := range refs {
@@ -185,4 +188,20 @@ func (f *Firestore) PurgeUser(ctx context.Context, uid string) (int, error) {
 		n++
 	}
 	return n, nil
+}
+
+// collectOwned appends the bindings in col whose uid is uid.
+func collectOwned(ctx context.Context, col *firestore.CollectionRef, uid string, refs *[]*firestore.DocumentRef) error {
+	it := col.Where("uid", "==", uid).Documents(ctx)
+	defer it.Stop()
+	for {
+		s, err := it.Next()
+		if errors.Is(err, iterator.Done) {
+			return nil
+		}
+		if err != nil {
+			return err
+		}
+		*refs = append(*refs, s.Ref)
+	}
 }

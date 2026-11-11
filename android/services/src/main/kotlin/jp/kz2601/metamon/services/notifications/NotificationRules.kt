@@ -116,6 +116,15 @@ data class NotificationRegistry(val table: Map<String, List<PlannedNotification>
 
     fun removeApp(appId: String) = NotificationRegistry(table - appId - (appId + ACTION))
 
+    /**
+     * このアプリの次の通知(近い順・#1124)。全アプリから近い順に [limit] 件選んだ中の自分の分だけ
+     * (iOS の `NotificationSyncResult.upcoming`。上限で予約から外れた分は出さない)。場所の通知は時刻が無いので入らない。
+     */
+    fun upcoming(appId: String, now: Instant, zone: java.time.ZoneId, limit: Int = NotificationPlanner.LIMIT): List<Pair<PlannedNotification, Instant>> {
+        val mine = planned(appId).mapTo(HashSet()) { it.identifier }
+        return NotificationPlanner.select(all, now, zone, limit).filter { it.first.identifier in mine }
+    }
+
     /** 過ぎた 1 回きりを捨てる(場所の通知は時刻が無いので残す)。 */
     fun pruned(now: Instant, zone: java.time.ZoneId): NotificationRegistry =
         NotificationRegistry(table.mapValues { (_, list) -> list.filter { it.isRegion || it.nextFire(now, zone) != null } })

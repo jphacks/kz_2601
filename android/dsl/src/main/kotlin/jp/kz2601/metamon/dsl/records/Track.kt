@@ -13,7 +13,7 @@ import kotlin.math.sqrt
 /**
  * 位置の記録(`locationTracker`・#168)の点列と、stat の `distance` / `duration` の集計(iOS の Records/Track.swift の集計の部分)。
  * 1 点 = 1 レコード(location field "lat,lng" + 日時 field)。時刻順に並べ、10 分以上空いた所は別の記録として繋がない。
- * 記録中の間引き・自動停止は locationTracker を入れる時に足す。
+ * 記録中の間引き([shouldKeep])・自動停止([autoStopSeconds])は iOS の Track.swift の写し(#869)。
  */
 object Track {
     data class Point(val lat: Double, val lng: Double, val date: Instant)
@@ -84,6 +84,22 @@ object Track {
             String.format(Locale.ROOT, "%d:%02d", s / 60, s % 60)
         }
     }
+
+    /** 保存する "lat,lng"(小数 6 桁・言語に依存しない)。 */
+    fun encode(lat: Double, lng: Double): String = String.format(Locale.ROOT, "%.6f,%.6f", lat, lng)
+
+    /**
+     * 記録中に届いた位置を保存するか: 精度が悪い点(> 50 m・負)は捨て、前に保存した点から [minDistance] 以上動いた時か
+     * [maxIntervalSeconds] 以上経った時だけ保存する(止まっている間に点を溜めない)。
+     */
+    fun shouldKeep(p: Point, accuracy: Double, last: Point?, minDistance: Double = 25.0, maxIntervalSeconds: Double = 300.0): Boolean {
+        if (accuracy < 0 || accuracy > 50) return false
+        if (last == null) return true
+        return distance(last, p) >= minDistance || seconds(last.date, p.date) >= maxIntervalSeconds
+    }
+
+    /** 自動停止までの秒数: 省略 1 時間、5 分〜4 時間に丸める(付け忘れで一晩中 GPS を使わない)。 */
+    fun autoStopSeconds(seconds: Int?): Int = (seconds ?: 3600).coerceIn(300, 14_400)
 
     fun format(op: String?, value: Double): String = if (op == "duration") formatDuration(value) else formatDistance(value)
 

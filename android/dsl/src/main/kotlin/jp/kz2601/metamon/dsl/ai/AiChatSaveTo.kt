@@ -1,8 +1,6 @@
 package jp.kz2601.metamon.dsl.ai
 
 import jp.kz2601.metamon.dsl.AIChatSaveTo
-import jp.kz2601.metamon.dsl.Component
-import jp.kz2601.metamon.dsl.DslJson
 import jp.kz2601.metamon.dsl.expr.DSLClock
 import jp.kz2601.metamon.dsl.logic.RecordImport
 import jp.kz2601.metamon.dsl.records.Entity
@@ -10,16 +8,7 @@ import jp.kz2601.metamon.dsl.records.Field
 import jp.kz2601.metamon.dsl.records.FieldCoding
 import jp.kz2601.metamon.dsl.records.FieldType
 import jp.kz2601.metamon.dsl.records.JSONValue
-import kotlinx.serialization.json.JsonObject
 import java.time.Instant
-
-/** aiChat の `saveTo`(aiButton の saveTo と同じキーなので JSON のまま持っている)。形が違えば null。 */
-val Component.chatSaveTo: AIChatSaveTo?
-    get() {
-        val o = saveTo as? JsonObject ?: return null
-        if (o["fields"] == null) return null
-        return runCatching { DslJson.decodeFromJsonElement(AIChatSaveTo.serializer(), o) }.getOrNull()
-    }
 
 /**
  * `aiChat.saveTo`: 話しかけて記録する(「今日カレー食べた」→ 食事の記録の案)。iOS の `AIChatSaveTo`。検証は backend `dsl/ai_chat_save_to.go`。

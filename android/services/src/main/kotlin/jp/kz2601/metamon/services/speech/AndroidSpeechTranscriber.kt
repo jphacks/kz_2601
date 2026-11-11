@@ -55,6 +55,9 @@ class AndroidSpeechTranscriber(
     private val _listening = MutableStateFlow(false)
     override val listening: StateFlow<Boolean> = _listening
 
+    private val _level = MutableStateFlow(0f)
+    override val level: StateFlow<Float> = _level
+
     private var recognizer: SpeechRecognizer? = null
     private var result: CompletableDeferred<Outcome>? = null
     private var startedAt = 0L
@@ -186,6 +189,7 @@ class AndroidSpeechTranscriber(
         recognizer = null
         result = null
         _listening.value = false
+        _level.value = 0f
         if (_status.value == TranscriberStatus.Recognizing) _status.value = TranscriberStatus.Ready
     }
 
@@ -194,6 +198,7 @@ class AndroidSpeechTranscriber(
             if (endedAt == 0L) endedAt = SystemClock.elapsedRealtime()
             deferred.complete(outcome)
             _listening.value = false
+            _level.value = 0f
         }
 
         override fun onReadyForSpeech(params: Bundle?) = Unit
@@ -203,6 +208,7 @@ class AndroidSpeechTranscriber(
 
         override fun onRmsChanged(rmsdB: Float) {
             if (rmsdB > SpeechErrorMapping.SPEECH_RMS_DB) heardSpeech = true
+            if (_listening.value) _level.value = VoiceLevel.smooth(_level.value, VoiceLevel.fromRmsDb(rmsdB))
         }
 
         override fun onBufferReceived(buffer: ByteArray?) = Unit

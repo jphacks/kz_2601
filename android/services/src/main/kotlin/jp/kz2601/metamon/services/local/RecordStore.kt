@@ -106,6 +106,20 @@ class RecordStore(
         t.firstOrNull { it.recordId == recordId } ?: t.firstOrNull { it.isKnownAs(recordId) }
     }
 
+    /** 端末内の全行(読み込んだ表 + まだ読んでいない entity のファイル)。消してよい動画・録音のファイルを決める(#1098)。 */
+    suspend fun allRows(): List<LocalRecord> = lock.withLock {
+        val loaded = tables.values.flatten()
+        val dir = directory ?: return@withLock loaded
+        val onDisk = withContext(io) {
+            dir.listFiles()?.filter { it.isDirectory }.orEmpty().flatMap { appDir ->
+                appDir.listFiles()?.filter { it.extension == "json" }.orEmpty().flatMap { f ->
+                    runCatching { json.decodeFromString(rowsSerializer, f.readText()) }.getOrElse { emptyList() }
+                }
+            }
+        }
+        loaded + onDisk.filter { "${it.appId}/${it.entity}" !in tables }
+    }
+
     /** 未送信の行数(appId 単位)。読み込んだ entity だけ数える。 */
     suspend fun pendingCount(appId: String): Int = lock.withLock {
         tables.filterKeys { it.startsWith("$appId/") }.values.flatten().count { it.pendingOp != PendingOp.NONE }

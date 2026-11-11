@@ -10,6 +10,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
@@ -26,6 +27,9 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import jp.kz2601.metamon.dsl.Component
 import jp.kz2601.metamon.dsl.ComponentMode
 import jp.kz2601.metamon.dsl.records.JSONValue
@@ -80,20 +84,39 @@ data class TimerRun(val base: Int = 0, val startedAtMillis: Long? = null) {
  * `timerDisplay`: ストップウォッチ(mode=stopwatch・カウントアップ)/ タイマー(mode=countdown・`seconds` から 0 へ)。
  * 開始 / 一時停止 / リセット。一時停止・終了時に経過秒を `field` へ書く(フォーム画面のみ)。iOS の TimerDisplayLeaf。
  *
- * Android は前面で動く: 走行状態は画面の保存状態(回転・背面)に持ち、経過は開始時刻から出し直す。
- * countdown の終了通知は runtime が [TimerHost] なら予約を頼む(端末の通知の予約は子 Issue)。
+ * 走行状態は画面の保存状態(回転・背面)と runtime の保存([TimerHost.saveTimer]・アプリを終了しても残る)に持ち、経過は開始時刻から出し直す。
+ * countdown の終了通知は runtime が [TimerHost] なら予約を頼む。前面で見えている間はバナーを出さない。
  */
 @Composable
 fun TimerDisplayLeaf(c: Component, ctx: RenderContext, modifier: Modifier = Modifier) {
     val isCountdown = c.mode == ComponentMode.COUNTDOWN
     val total = maxOf(c.seconds ?: 0, 0)
     val key = "${ctx.route.screen}/${c.id.orEmpty()}"
-    var run by rememberSaveable(key, stateSaver = TimerRun.saver) { mutableStateOf(TimerRun()) }
+    val host = ctx.runtime as? TimerHost
+    var run by rememberSaveable(key, stateSaver = TimerRun.saver) { mutableStateOf(host?.loadTimer(key) ?: TimerRun()) }
     var elapsed by rememberSaveable(key) { mutableIntStateOf(run.elapsed(System.currentTimeMillis(), if (isCountdown) total else null)) }
     val shown = if (isCountdown) maxOf(total - elapsed, 0) else elapsed
     val finished = isCountdown && elapsed >= total
     val name = c.label?.takeIf { it.isNotEmpty() } ?: stringResource(R.string.play_timer_default_name)
-    val host = ctx.runtime as? TimerHost
+
+    // アプリを終了しても残す(次に開いた時に残り時間を出し直す・#1128)
+    LaunchedEffect(run, key) { host?.saveTimer(key, run) }
+    val lifecycle = LocalLifecycleOwner.current.lifecycle
+    DisposableEffect(key, lifecycle, host) {
+        var visible = false
+        val observer = LifecycleEventObserver { _, _ ->
+            val now = lifecycle.currentState.isAtLeast(Lifecycle.State.RESUMED)
+            if (now != visible) {
+                visible = now
+                host?.timerVisible(key, now)
+            }
+        }
+        lifecycle.addObserver(observer)
+        onDispose {
+            lifecycle.removeObserver(observer)
+            if (visible) host?.timerVisible(key, false)
+        }
+    }
 
     fun notify(next: TimerRun) {
         host?.timerChanged(key, name, TimerRun.notificationAt(isCountdown, next, total, System.currentTimeMillis()))

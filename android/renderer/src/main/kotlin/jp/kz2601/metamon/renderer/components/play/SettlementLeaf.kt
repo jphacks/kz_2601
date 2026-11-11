@@ -27,6 +27,7 @@ import jp.kz2601.metamon.dsl.records.Record
 import jp.kz2601.metamon.dsl.records.Settlement
 import jp.kz2601.metamon.renderer.DSLRuntime
 import jp.kz2601.metamon.renderer.R
+import jp.kz2601.metamon.renderer.components.lists.LeafData
 import jp.kz2601.metamon.renderer.components.lists.ValueLabels
 import jp.kz2601.metamon.renderer.components.lists.rememberValueLabels
 import jp.kz2601.metamon.renderer.registry.RenderContext
@@ -43,7 +44,7 @@ import jp.kz2601.metamon.renderer.theme.renderCard
 fun SettlementLeaf(c: Component, ctx: RenderContext, modifier: Modifier = Modifier) {
     val all by rememberRecords(ctx.runtime)
     val entityId = c.entity.orEmpty()
-    val hasMembers = PlayRecords.viewRecords(ctx.runtime, all, entityId).isNotEmpty()
+    val hasMembers = LeafData(ctx.runtime, all).visibleRecords(entityId).isNotEmpty()
     val transfers = settlementTransfers(c, ctx.runtime, all, rememberValueLabels())
     val colors = RenderTheme.colors
     Column(modifier.renderCard(padding = 0.dp)) {
@@ -108,9 +109,9 @@ fun settlementTransfers(c: Component, runtime: DSLRuntime, all: Map<String, List
     val entity = runtime.entityModel(entityId)
     val nameField = c.nameField ?: entity?.displayTitleField ?: "name"
     val balanceField = c.balanceField ?: "balance"
-    val balances = PlayRecords.viewRecords(runtime, all, entityId).mapNotNull { r ->
+    val balances = LeafData(runtime, all).visibleRecords(entityId).mapNotNull { r ->
         val b = r[balanceField].doubleValue ?: return@mapNotNull null
-        PlayRecords.display(runtime, all, r[nameField], entity?.field(nameField), labels) to b
+        LeafData(runtime, all, labels = labels).display(r[nameField], entity?.field(nameField)) to b
     }
     return Settlement.transfers(balances)
 }

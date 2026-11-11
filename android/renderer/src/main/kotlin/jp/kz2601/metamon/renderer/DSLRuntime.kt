@@ -3,11 +3,14 @@ package jp.kz2601.metamon.renderer
 import jp.kz2601.metamon.dsl.Action
 import jp.kz2601.metamon.dsl.records.Entity
 import jp.kz2601.metamon.renderer.components.audio.DictationHost
+import jp.kz2601.metamon.renderer.components.importing.AudioFileTranscriptionHost
 import jp.kz2601.metamon.dsl.records.JSONValue
 import jp.kz2601.metamon.dsl.records.Record
 import jp.kz2601.metamon.renderer.components.ai.AiHost
 import jp.kz2601.metamon.renderer.components.media.PhotoReader
+import jp.kz2601.metamon.renderer.form.DiscardGuard
 import jp.kz2601.metamon.renderer.form.FormDraft
+import jp.kz2601.metamon.renderer.form.FormDraftRestore
 import jp.kz2601.metamon.renderer.navigation.NavigationState
 import jp.kz2601.metamon.renderer.navigation.Route
 import kotlinx.coroutines.flow.StateFlow
@@ -29,6 +32,9 @@ interface NavigationHost {
     val navigation: StateFlow<NavigationState>
 
     fun setNavigation(next: NavigationState)
+
+    /** 描いている DSLView の破棄の確認(DSLView が入れ、離れたら外す)。外からの遷移(画面マップ)はこれを通す。 */
+    var discardGuard: DiscardGuard?
 }
 
 /** 描画器が使う能力。:app の AppRuntime が実装する(iOS の `DSLRuntime`)。:renderer は :services を知らない。 */
@@ -38,6 +44,9 @@ interface DSLRuntime {
 
     /** transcribeField が声を文字にする口(本体の音声入力と同じ認識器・#864)。null なら「この画面では使えません」。 */
     val dictation: DictationHost? get() = null
+
+    /** fileImport の録音ファイルを端末内で文字にする口(whisper.cpp・#1180)。null なら「この画面では録音ファイルを文字にできません」。 */
+    val audioFileTranscription: AudioFileTranscriptionHost? get() = null
 
     /** アクション。[navigationHost] があれば navigate / back もここへ来る。既定は何もしない。 */
     fun onAction(action: Action, context: ActionContext) = Unit
@@ -59,6 +68,12 @@ interface DSLRuntime {
     /** 表示中の記録(entity id → 記録)。変わると描き直す。null なら記録なし(新規のフォームだけ)。 */
     val recordsFlow: StateFlow<Map<String, List<Record>>>? get() = null
 
+    /** entity ごとの読み込み状態(#1116)。null か地図に無い entity は [EntityLoadState.LOADED](プレビュー・テスト)。 */
+    val loadStatesFlow: StateFlow<Map<String, EntityLoadState>>? get() = null
+
+    /** 「読み込めませんでした」の再試行。サーバーへ取り直す。既定は [loadRecords]。 */
+    suspend fun retryRecords(entities: Set<String>) = loadRecords(entities)
+
     fun canEdit(entity: String, record: Record): Boolean = true
 
     fun canDelete(entity: String, record: Record): Boolean = true
@@ -66,11 +81,17 @@ interface DSLRuntime {
     /** 一覧のワンタップ更新(list.item.toggle)。保存できたら true。既定は保存しない。 */
     suspend fun updateRecord(entity: String, recordId: String, data: Map<String, JSONValue>): Boolean = false
 
+    /** 今開いているアプリの appId(位置の記録が開始した時のアプリにだけ点を足す)。null なら分からない(プレビュー・テスト)。 */
+    val currentAppId: String? get() = null
+
     /** サインイン中の uid(hidden の項目・members から自分を外す)。 */
     fun currentUid(): String? = null
 
     /** 共有データの参加者(member / members の選択肢・iOS の `membersHost.appMembers`)。読めなければ空。 */
     val formMembers: List<FormMember> get() = emptyList()
+
+    /** 自分が今のアプリの管理者か(#272・visibleTo のボタン)。分からない間は null(ボタンは出し、サーバーが判定する)。 */
+    val viewerIsAdmin: Boolean? get() = null
 
     // AI ボタン(#873)
 
@@ -84,6 +105,9 @@ interface DSLRuntime {
     suspend fun addRecord(entity: String, data: Map<String, JSONValue>): Boolean = false
     /** photoField.analyze の端末内の読み取り(#862)。null なら analyze は無視して写真の入力として動く。 */
     val photoReader: PhotoReader? get() = null
+
+    /** プロセスが落とされた後にフォームの書きかけを戻す口(#1185)。null なら戻さない(プレビュー・テスト)。 */
+    val formDrafts: FormDraftRestore? get() = null
 }
 
 /** member / members の選択肢 1 人。保存値は [uid]。 */

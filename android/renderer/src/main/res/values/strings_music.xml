@@ -6,7 +6,11 @@
     <string name="music_song_title">曲名</string>
     <string name="music_artist">アーティスト(任意)</string>
     <string name="music_search">音楽アプリで探す</string>
-    <string name="music_search_note">Spotify の検索を開きます(アプリが無ければブラウザ)。再生の操作はできません。</string>
+    <string name="music_search_note_spotify">Spotify の検索を開きます(アプリが無ければブラウザ)。再生の操作はできません。</string>
+    <string name="music_search_note_youtube_music">YouTube Music の検索を開きます(アプリが無ければブラウザ)。再生の操作はできません。</string>
+    <string name="music_service">開く音楽アプリ</string>
+    <string name="music_service_spotify" translatable="false">Spotify</string>
+    <string name="music_service_youtube_music" translatable="false">YouTube Music</string>
     <string name="music_recent">探した曲</string>
     <string name="music_open">開く</string>
 </resources>

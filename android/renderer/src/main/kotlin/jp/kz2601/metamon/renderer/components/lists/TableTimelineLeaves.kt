@@ -78,7 +78,7 @@ fun TableLeaf(c: Component, ctx: RenderContext, modifier: Modifier = Modifier) {
                 }
             }
         }
-        if (rows.isEmpty()) EmptyPlaceholder("tablecells", data.labels.empty)
+        if (rows.isEmpty()) RecordsPlaceholderView(data, c.entity, "tablecells", data.labels.empty)
     }
 }
 
@@ -89,7 +89,7 @@ fun TimelineLeaf(c: Component, ctx: RenderContext, modifier: Modifier = Modifier
     val entity = data.entity(c.entity)
     val rows = TimelineRows.rows(c, data)
     if (rows.isEmpty()) {
-        EmptyPlaceholder("clock", data.labels.empty, modifier)
+        RecordsPlaceholderView(data, c.entity, "clock", data.labels.empty, modifier)
         return
     }
     val colors = RenderTheme.colors

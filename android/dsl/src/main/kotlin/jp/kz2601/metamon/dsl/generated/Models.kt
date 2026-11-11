@@ -3,9 +3,17 @@
 
 package jp.kz2601.metamon.dsl
 
+import kotlinx.serialization.ExperimentalSerializationApi
+import kotlinx.serialization.KSerializer
+import kotlinx.serialization.KeepGeneratedSerializer
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.Transient
+import kotlinx.serialization.encoding.Decoder
+import kotlinx.serialization.encoding.Encoder
+import kotlinx.serialization.json.JsonDecoder
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
 
 @Serializable
 data class AppDSL(
@@ -183,7 +191,9 @@ data class ToolbarButton(
     companion object
 }
 
-@Serializable
+@OptIn(ExperimentalSerializationApi::class)
+@KeepGeneratedSerializer
+@Serializable(with = ActionSerializer::class)
 data class Action(
     val type: ActionType = ActionType.UNKNOWN,
     @Serializable(with = LenientStringSerializer::class)
@@ -214,6 +224,9 @@ data class Action(
     val calendarEvent: CalendarEvent? = null,
     @Serializable(with = ActionBookLookupLenientSerializer::class)
     val bookLookup: ActionBookLookup? = null,
+    /** JSON の type の元の文字列。知らない type([ActionType.UNKNOWN])でも残る(「未対応のアクション: <type>」に使う)。コードで作った時は [type] の文字列(iOS と同じ)。 */
+    @Transient
+    val rawType: String = type.wire,
 ) {
     companion object
 }
@@ -657,6 +670,22 @@ data class FilterMyFollows(
     val myFollows: JsonElement? = null,
 ) {
     companion object
+}
+
+@OptIn(ExperimentalSerializationApi::class)
+internal object ActionSerializer : KSerializer<Action> {
+    private val generated: KSerializer<Action> = Action.generatedSerializer()
+    override val descriptor = generated.descriptor
+
+    override fun deserialize(decoder: Decoder): Action {
+        val input = decoder as? JsonDecoder ?: return generated.deserialize(decoder)
+        val element = input.decodeJsonElement()
+        val action = input.json.decodeFromJsonElement(generated, element)
+        val raw = ((element as? JsonObject)?.get("type") as? JsonPrimitive)?.takeIf { it.isString }?.content
+        return action.copy(rawType = raw ?: action.rawType)
+    }
+
+    override fun serialize(encoder: Encoder, value: Action) = generated.serialize(encoder, value)
 }
 
 internal object ActionLenientSerializer : LenientObjectSerializer<Action>(Action.serializer())

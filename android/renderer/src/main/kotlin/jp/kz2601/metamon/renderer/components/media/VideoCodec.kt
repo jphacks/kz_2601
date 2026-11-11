@@ -7,21 +7,64 @@ import android.media.MediaFormat
 import android.media.MediaMetadataRetriever
 import android.media.MediaMuxer
 import android.net.Uri
+import android.os.Handler
+import android.os.Looper
+import androidx.media3.common.MediaItem
+import androidx.media3.common.MimeTypes
+import androidx.media3.common.util.UnstableApi
+import androidx.media3.effect.Presentation
+import androidx.media3.transformer.Composition
+import androidx.media3.transformer.DefaultEncoderFactory
+import androidx.media3.transformer.EditedMediaItem
+import androidx.media3.transformer.Effects
+import androidx.media3.transformer.ExportException
+import androidx.media3.transformer.ExportResult
+import androidx.media3.transformer.Transformer
+import androidx.media3.transformer.VideoEncoderSettings
 import jp.kz2601.metamon.dsl.records.LocalVideoStore
 import jp.kz2601.metamon.dsl.records.VideoValue
 import java.io.File
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.suspendCancellableCoroutine
 import java.nio.ByteBuffer
+import kotlin.coroutines.resume
+import kotlin.coroutines.resumeWithException
 import kotlin.math.max
+import kotlin.math.min
 
 /**
  * 撮った・選んだ動画を端末内に保存し、video field の値を作る(iOS の `VideoCodec`)。
- * - mp4 に詰め直して(再エンコードはしない)先頭 `maxDuration` 秒で切る。詰め直せない形式は上限内ならそのまま写す
+ * - 中くらいの画質(iOS の `AVAssetExportPresetMediumQuality` に合わせ、短辺 480・映像 1 Mbps の H.264)の mp4 に
+ *   書き直し、先頭 `maxDuration` 秒で切る(#1202)。もともと小さい動画は書き直さない
+ * - 書き直せなければ mp4 に詰め直す(再エンコードしない)。詰め直せない形式は上限内ならそのまま写す
  * - 1 フレーム目を 320px・品質 50 の data URL にしてサムネイルにする
  * 計算だけの部分は android.* に触れない(JVM テスト)。
  */
 object VideoCodec {
     const val DEFAULT_MAX_DURATION = 60
     const val THUMBNAIL_MAX_SIDE = 320
+
+    /** 書き直しの短辺(px)と映像のビットレート(bps)。iOS の MediumQuality と同じくらいの大きさになる値。 */
+    const val TARGET_SHORT_SIDE = 480
+    const val TARGET_VIDEO_BITRATE = 1_000_000
+
+    /** 書き直し方。[shortSide] が null なら縮めない。 */
+    data class EncodePlan(val shortSide: Int?, val videoBitrate: Int)
+
+    /**
+     * 元の大きさ・ビットレートから書き直し方を決める。null なら書き直さない(短辺も
+     * ビットレートも目標以下と分かっている時)。大きさが分からなければ縮めずにビットレートだけ下げる。
+     */
+    fun encodePlan(width: Int?, height: Int?, sourceBitrate: Int?): EncodePlan? {
+        val shortSide = if (width != null && height != null && width > 0 && height > 0) min(width, height) else null
+        val bitrate = sourceBitrate?.takeIf { it > 0 }
+        val small = shortSide != null && shortSide <= TARGET_SHORT_SIDE
+        if (small && bitrate != null && bitrate <= TARGET_VIDEO_BITRATE) return null
+        return EncodePlan(
+            shortSide = if (shortSide != null && !small) TARGET_SHORT_SIDE else null,
+            videoBitrate = bitrate?.let { min(it, TARGET_VIDEO_BITRATE) } ?: TARGET_VIDEO_BITRATE,
+        )
+    }
 
     /** 長さの上限(秒)。省略は 60 秒・1 秒未満は 1 秒(iOS と同じ)。 */
     fun limitSeconds(maxDuration: Int?): Int = max(1, maxDuration ?: DEFAULT_MAX_DURATION)
@@ -42,11 +85,23 @@ object VideoCodec {
     fun tempFile(context: Context, prefix: String): File =
         File(context.cacheDir, "metamon_videos").apply { mkdirs() }.let { File(it, "$prefix-${System.currentTimeMillis()}.mp4") }
 
-    /** 動画 → 値。重いので IO のスレッドで呼ぶ。失敗したら例外。 */
-    fun ingest(context: Context, source: Uri, maxDuration: Int?, store: LocalVideoStore = store(context)): VideoValue {
+    /** 動画 → 値。重いので IO のスレッドで呼ぶ。失敗したら例外。取り消すと書き直しも止める。 */
+    suspend fun ingest(context: Context, source: Uri, maxDuration: Int?, store: LocalVideoStore = store(context)): VideoValue {
         val tmp = tempFile(context, "ingest")
         try {
-            val remuxed = runCatching { remux(context, source, tmp, limitMicros(maxDuration)) }.isSuccess
+            val limitUs = limitMicros(maxDuration)
+            val info = sourceInfo(context, source)
+            val plan = encodePlan(info?.first, info?.second, info?.third)
+            val encoded = plan != null && try {
+                transcode(context, source, tmp, plan, limitUs / 1_000)
+                true
+            } catch (e: CancellationException) {
+                throw e
+            } catch (_: Exception) {
+                tmp.delete()
+                false
+            }
+            val remuxed = encoded || runCatching { remux(context, source, tmp, limitUs) }.isSuccess
             if (!remuxed) {
                 tmp.delete()
                 check(canCopyAsIs(durationMs(context, source), maxDuration)) { "詰め直せず、上限を超えているか長さが分からない" }
@@ -60,6 +115,56 @@ object VideoCodec {
             tmp.delete()
         }
     }
+
+    /** Media3 Transformer で H.264 / [plan] の大きさ・ビットレートに書き直す。Transformer はメインの Looper で動かす。 */
+    @androidx.annotation.OptIn(UnstableApi::class)
+    private suspend fun transcode(context: Context, source: Uri, dest: File, plan: EncodePlan, limitMs: Long) {
+        val main = Handler(Looper.getMainLooper())
+        suspendCancellableCoroutine { cont ->
+            var transformer: Transformer? = null
+            main.post {
+                if (!cont.isActive) return@post
+                val encoder = DefaultEncoderFactory.Builder(context)
+                    .setRequestedVideoEncoderSettings(VideoEncoderSettings.Builder().setBitrate(plan.videoBitrate).build())
+                    .setEnableFallback(true)
+                    .build()
+                val t = Transformer.Builder(context)
+                    .setLooper(Looper.getMainLooper())
+                    .setVideoMimeType(MimeTypes.VIDEO_H264)
+                    .setEncoderFactory(encoder)
+                    .addListener(object : Transformer.Listener {
+                        override fun onCompleted(composition: Composition, exportResult: ExportResult) {
+                            if (cont.isActive) cont.resume(Unit)
+                        }
+
+                        override fun onError(composition: Composition, exportResult: ExportResult, exportException: ExportException) {
+                            if (cont.isActive) cont.resumeWithException(exportException)
+                        }
+                    })
+                    .build()
+                transformer = t
+                val item = MediaItem.Builder()
+                    .setUri(source)
+                    .setClippingConfiguration(MediaItem.ClippingConfiguration.Builder().setEndPositionMs(limitMs).build())
+                    .build()
+                val effects = plan.shortSide?.let { Effects(emptyList(), listOf(Presentation.createForShortSide(it))) } ?: Effects.EMPTY
+                t.start(EditedMediaItem.Builder(item).setEffects(effects).build(), dest.absolutePath)
+            }
+            cont.invokeOnCancellation { main.post { transformer?.cancel() } }
+        }
+    }
+
+    /** 元の動画の幅・高さ・ビットレート。読めなければ null。 */
+    private fun sourceInfo(context: Context, source: Uri): Triple<Int?, Int?, Int?>? = runCatching {
+        MediaMetadataRetriever().use { r ->
+            r.setDataSource(context, source)
+            Triple(
+                r.extractMetadata(MediaMetadataRetriever.METADATA_KEY_VIDEO_WIDTH)?.toIntOrNull(),
+                r.extractMetadata(MediaMetadataRetriever.METADATA_KEY_VIDEO_HEIGHT)?.toIntOrNull(),
+                r.extractMetadata(MediaMetadataRetriever.METADATA_KEY_BITRATE)?.toIntOrNull(),
+            )
+        }
+    }.getOrNull()
 
     /** 映像と音声の track を mp4 に詰め直し、[limitUs] より後の sample を捨てる。 */
     private fun remux(context: Context, source: Uri, dest: File, limitUs: Long) {

@@ -15,9 +15,15 @@ class DeviceCapabilitiesTest {
 
     @Test
     fun allowedComponentsAreExactlyTheRegisteredTypes() {
-        assertEquals(ComponentRegistry.standard.registeredTypes, caps.allowedComponents.toSet())
+        val hidden = (DeviceCapabilities.PENDING + DeviceCapabilities.FALLBACK_ONLY).map { it.wire }.toSet()
+        assertEquals(ComponentRegistry.standard.registeredTypes - hidden, caps.allowedComponents.toSet())
         assertEquals(caps.allowedComponents.size, caps.allowedComponents.toSet().size)
         assertFalse(ComponentType.UNKNOWN.wire in caps.allowedComponents)
+    }
+
+    @Test
+    fun nothingIsPending() {
+        assertTrue(DeviceCapabilities.PENDING.isEmpty())
     }
 
     @Test
@@ -28,9 +34,7 @@ class DeviceCapabilitiesTest {
         // 今 Android で描けない部品(登録を足したらここから消す)
         for (t in listOf(
             ComponentType.PLACE_SEARCH,
-            ComponentType.LOCATION_TRACKER,
             ComponentType.HEALTH_STAT,
-            ComponentType.NEARBY_SHARE,
         )) {
             assertFalse(t.wire, t.wire in caps.allowedComponents)
         }
@@ -41,12 +45,23 @@ class DeviceCapabilitiesTest {
             ComponentType.SENSOR_VALUE,
             ComponentType.DASHCAM,
             ComponentType.MATCH_LIST,
-            ComponentType.MUSIC_PLAYER,
             ComponentType.ROUTE_GUIDE,
             ComponentType.LOCATION_BUTTON,
+            ComponentType.LOCATION_TRACKER, // #869
+            // 送受信(#1382)とすれ違い(#1383)がそろった
+            ComponentType.NEARBY_SHARE,
         )) {
             assertTrue(t.wire, t.wire in caps.allowedComponents)
         }
+    }
+
+    /** #1267: musicPlayer は代わりの表示だけ(描画器には登録する)なので申告しない。 */
+    @Test
+    fun fallbackOnlyPartsAreRegisteredButNotDeclared() {
+        assertTrue(ComponentType.MUSIC_PLAYER.wire in ComponentRegistry.standard.registeredTypes)
+        assertFalse(ComponentType.MUSIC_PLAYER.wire in caps.allowedComponents)
+        val music = ComponentRegistry.build { register(ComponentType.MUSIC_PLAYER) { _, _, _ -> } }
+        assertEquals(emptyList<String>(), DeviceCapabilities.allowedComponents(music))
     }
 
     @Test
@@ -64,8 +79,9 @@ class DeviceCapabilitiesTest {
     fun supportedFeaturesOfTheStandardBuild() {
         assertEquals(
             listOf(
-                "recordRetention", "matching", "notification.when", "singleEntity", "addressedMessages", "aiButton.long", "aiButton.inputPhoto", "aiButton.saveTo",
-                "action.lookupBook", "feed.v2", "expr.addMinutes", "aiChat.inputEntity", "component.bracket", "progressBar.settingTarget",
+                "recordRetention", "matching", "notification.when", "singleEntity", "dataRoles", "addressedMessages", "notification.near", "aiButton.long", "aiButton.inputPhoto",
+                "aiButton.saveTo", "aiButton.inputFeeds", "aiButton.outputs", "action.lookupBook", "text.highlight", "feed.v2", "expr.addMinutes", "aiChat.inputEntity", "component.bracket", "progressBar.settingTarget",
+                "openUrlButton.app",
             ),
             caps.supportedFeatures,
         )

@@ -62,6 +62,17 @@ func TestGenerateIsDeterministic(t *testing.T) {
 	}
 }
 
+// Action built in code keeps its type as rawType (iOS Action.init sets rawType = type.rawValue).
+func TestActionRawTypeDefaultsToWire(t *testing.T) {
+	files, err := Generate(dsl.SchemaJSON())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(files["Models.kt"], "val rawType: String = type.wire,") {
+		t.Error("Action.rawType should default to type.wire")
+	}
+}
+
 // Container types agree with the Go catalog (dsl.ContainerTypes).
 func TestContainerTypesMatchGoCatalog(t *testing.T) {
 	g, err := newGenerator(dsl.SchemaJSON())

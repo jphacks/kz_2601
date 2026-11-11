@@ -49,6 +49,7 @@ import jp.kz2601.metamon.dsl.records.Record
 import jp.kz2601.metamon.dsl.records.filters
 import jp.kz2601.metamon.renderer.DSLRuntime
 import jp.kz2601.metamon.renderer.R
+import jp.kz2601.metamon.renderer.components.lists.LeafData
 import jp.kz2601.metamon.renderer.components.lists.ValueLabels
 import jp.kz2601.metamon.renderer.components.lists.rememberValueLabels
 import jp.kz2601.metamon.renderer.registry.RenderContext
@@ -227,12 +228,12 @@ object FlashcardRules {
         val filters = c.filters
         val learned = learnedFilter(c)
         val rest = if (learned != null) filters.filter { FlashcardDeck.learnedFilter(it, c.toggle) == null } else filters
-        return FlashcardDeck.cards(PlayRecords.filtered(runtime, all, c, rest), c.toggle, learned, pending)
+        return FlashcardDeck.cards(LeafData(runtime, all).filtered(c, rest), c.toggle, learned, pending)
     }
 
     /** 面に出す文字(空なら「—」)。 */
     fun value(runtime: DSLRuntime, all: Map<String, List<Record>>, entity: Entity?, r: Record, field: String?, labels: ValueLabels = ValueLabels.JAPANESE): String {
         if (field.isNullOrEmpty()) return ""
-        return PlayRecords.display(runtime, all, r[field], entity?.field(field), labels).ifEmpty { "—" }
+        return LeafData(runtime, all, labels = labels).display(r[field], entity?.field(field)).ifEmpty { "—" }
     }
 }

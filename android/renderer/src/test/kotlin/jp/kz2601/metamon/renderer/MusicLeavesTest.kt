@@ -5,6 +5,7 @@ import jp.kz2601.metamon.dsl.ComponentType
 import jp.kz2601.metamon.dsl.decode
 import jp.kz2601.metamon.dsl.logic.ExternalUrlPolicy
 import jp.kz2601.metamon.renderer.components.music.MusicSearch
+import jp.kz2601.metamon.renderer.components.music.MusicService
 import jp.kz2601.metamon.renderer.components.music.MusicSong
 import jp.kz2601.metamon.renderer.conformance.RenderTree
 import jp.kz2601.metamon.renderer.navigation.rootRouteFor
@@ -93,6 +94,37 @@ class MusicLeavesTest {
             assertNotNull(ExternalUrlPolicy.openable(url))
             assertTrue("区間の外に出ない: $url", url.removePrefix("https://open.spotify.com/search/").none { it in "/?# " })
         }
+    }
+
+    @Test
+    fun youtubeMusicSearchUsesEncodedQuery() {
+        // #1164: YouTube Music も選べる。クエリの値なので & = + も符号化し、空白は %20
+        assertEquals(
+            "https://music.youtube.com/search?q=Let%20It%20Be%20The%20Beatles",
+            MusicSearch.searchUrl(MusicSong("Let It Be", "The Beatles"), MusicService.YOUTUBE_MUSIC),
+        )
+        assertEquals(
+            "https://music.youtube.com/search?q=Rock%26Roll%3Dx%2By%23z",
+            MusicSearch.searchUrl(MusicSong("Rock&Roll=x+y#z"), MusicService.YOUTUBE_MUSIC),
+        )
+        assertEquals(
+            "https://music.youtube.com/search?q=%E5%A4%9C%E3%81%AB%E9%A7%86%E3%81%91%E3%82%8B",
+            MusicSearch.searchUrl(MusicSong("夜に駆ける"), MusicService.YOUTUBE_MUSIC),
+        )
+        assertNull(MusicSearch.searchUrl(MusicSong(" "), MusicService.YOUTUBE_MUSIC))
+    }
+
+    @Test
+    fun everyServiceUrlIsOpenableAndStaysInItsQuery() {
+        for (t in listOf("javascript:alert(1)", "intent://x#Intent;end", "a&q=evil", "\u0000\n")) {
+            val url = MusicSearch.searchUrl(MusicSong(t), MusicService.YOUTUBE_MUSIC)!!
+            assertTrue(url.startsWith("https://music.youtube.com/search?q="))
+            assertNotNull(ExternalUrlPolicy.openable(url))
+            assertTrue("値の外に出ない: $url", url.removePrefix("https://music.youtube.com/search?q=").none { it in "/?#&=+ " })
+        }
+        // 既定は iOS と同じ Spotify
+        assertEquals(MusicService.SPOTIFY, MusicSearch.DEFAULT_SERVICE)
+        assertEquals(MusicSearch.searchUrl(MusicSong("x")), MusicSearch.searchUrl(MusicSong("x"), MusicService.SPOTIFY))
     }
 
     @Test

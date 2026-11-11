@@ -130,6 +130,77 @@ class BuildStageStateTest {
     }
 
     @Test
+    fun retentionWaitsForSummaryAndEditHintWaitsForRetention() {
+        // iOS の順番: 要約 → 保存期間の確認 → 直し方の例(#1271)
+        assertEquals(
+            setOf(PostBuildNotice.SUMMARY, PostBuildNotice.RETENTION, PostBuildNotice.EDIT_HINT),
+            PostBuildNotice.pending(summary = true, retention = true, editHint = true),
+        )
+        assertEquals(emptySet<PostBuildNotice>(), PostBuildNotice.pending(summary = false))
+
+        val hints = Hints()
+        val s = BuildStageState(hints.store)
+        s.update(initial().copy(phase = VoicePhase.SENDING, transcript = "x"), 0, reduceMotion = false)
+        val done = initial().copy(phase = VoicePhase.DONE, document = AppDocument("app1", 1, app(a)), summary = "できました")
+        s.update(done, 1, reduceMotion = false)
+        val closed = done.copy(summary = null)
+
+        assertEquals("要約が先", PostBuildNotice.SUMMARY, s.currentNotice(done, retentionPending = true))
+        assertFalse("要約の間は保存期間を出さない", BuildStageState.isRetentionTurn(done, retentionPending = true))
+        assertEquals("要約が閉じたら保存期間", PostBuildNotice.RETENTION, s.currentNotice(closed, retentionPending = true))
+        assertTrue(BuildStageState.isRetentionTurn(closed, retentionPending = true))
+        assertFalse("確認が無ければ番は来ない", BuildStageState.isRetentionTurn(closed, retentionPending = false))
+        assertEquals("確認が閉じたら直し方の例", PostBuildNotice.EDIT_HINT, s.currentNotice(closed, retentionPending = false))
+    }
+
+    @Test
+    fun allSixNoticesComeOneAtATimeInIOSOrder() {
+        // iOS の順番: 課金画面 → 要約 → 公開の記録 → 保存期間 → 直し方の例 → 引き継ぎ(#1198)
+        val all = PostBuildWaiting(paywall = true, publicData = true, accountLink = true)
+        var pending = PostBuildNotice.pending(summary = true, retention = true, editHint = true, waiting = all)
+        assertEquals(PostBuildNotice.entries.toSet(), pending)
+        val shown = mutableListOf<PostBuildNotice>()
+        while (true) {
+            val now = PostBuildNotice.current(pending) ?: break
+            shown += now
+            pending = pending - now
+        }
+        assertEquals(PostBuildNotice.entries.toList(), shown)
+        assertEquals(setOf(PostBuildNotice.ACCOUNT_LINK), PostBuildNotice.pending(summary = false, waiting = PostBuildWaiting(accountLink = true)))
+    }
+
+    @Test
+    fun paywallAndPublicDataGoBeforeRetentionAndEditHint() {
+        val hints = Hints()
+        val s = BuildStageState(hints.store)
+        s.update(initial().copy(phase = VoicePhase.SENDING, transcript = "x"), 0, reduceMotion = false)
+        val done = initial().copy(phase = VoicePhase.DONE, document = AppDocument("app1", 1, app(a)), summary = "できました")
+        s.update(done, 1, reduceMotion = false)
+        val closed = done.copy(summary = null)
+        val paywall = PostBuildWaiting(paywall = true)
+
+        assertEquals("課金画面が要約より先", PostBuildNotice.PAYWALL, s.currentNotice(done, retentionPending = true, waiting = paywall))
+        assertFalse("課金画面の間は保存期間を出さない", BuildStageState.isRetentionTurn(closed, retentionPending = true, waiting = paywall))
+        val publicData = PostBuildWaiting(publicData = true)
+        assertEquals("公開の記録は保存期間より先", PostBuildNotice.PUBLIC_DATA, s.currentNotice(closed, retentionPending = true, waiting = publicData))
+        assertFalse(BuildStageState.isRetentionTurn(closed, retentionPending = true, waiting = publicData))
+        assertTrue("引き継ぎは保存期間を待たせない", BuildStageState.isRetentionTurn(closed, retentionPending = true, waiting = PostBuildWaiting(accountLink = true)))
+        assertEquals("直し方の例は引き継ぎより先", PostBuildNotice.EDIT_HINT, s.currentNotice(closed, waiting = PostBuildWaiting(accountLink = true)))
+    }
+
+    @Test
+    fun publicDataTurnAfterSummaryAndPaywall() {
+        // #899: 公開の記録の確認は 要約・課金画面が閉じてから、保存期間の確認より先
+        val done = initial().copy(phase = VoicePhase.DONE, document = AppDocument("app1", 1, app(a)), summary = "できました")
+        val closed = done.copy(summary = null)
+        val waiting = PostBuildWaiting(publicData = true)
+        assertFalse("要約の間は出さない", BuildStageState.isPublicDataTurn(done, retentionPending = true, waiting = waiting))
+        assertFalse("課金画面の間は出さない", BuildStageState.isPublicDataTurn(closed, retentionPending = false, waiting = waiting.copy(paywall = true)))
+        assertTrue("保存期間の確認より先", BuildStageState.isPublicDataTurn(closed, retentionPending = true, waiting = waiting))
+        assertTrue("引き継ぎを待たせる", BuildStageState.isPublicDataTurn(closed, retentionPending = false, waiting = waiting.copy(accountLink = true)))
+    }
+
+    @Test
     fun anchorClearsWhenSummaryCloses() {
         val s = BuildStageState()
         s.update(initial().copy(phase = VoicePhase.SENDING, transcript = "x"), 0, reduceMotion = false)

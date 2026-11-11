@@ -1,5 +1,8 @@
 package jp.kz2601.metamon.renderer.components.social
 
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.PickVisualMediaRequest
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -19,6 +22,7 @@ import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Send
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.DropdownMenu
@@ -38,6 +42,8 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.clearAndSetSemantics
@@ -53,10 +59,15 @@ import jp.kz2601.metamon.renderer.R
 import jp.kz2601.metamon.renderer.components.PhotoValue
 import jp.kz2601.metamon.renderer.components.PhotoView
 import jp.kz2601.metamon.renderer.components.lists.EmptyPlaceholder
+import jp.kz2601.metamon.renderer.components.media.PhotoCodec
+import jp.kz2601.metamon.renderer.theme.SymbolIcon
+import jp.kz2601.metamon.renderer.theme.colors
 import jp.kz2601.metamon.renderer.components.lists.rememberLeafData
 import jp.kz2601.metamon.renderer.registry.RenderContext
 import jp.kz2601.metamon.renderer.theme.RenderTheme
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneId
@@ -68,7 +79,7 @@ import java.util.Locale
  * 下の入力欄で送ると [DSLRuntime.addRecord] で `entity` に 1 件保存する(ローカル DB に即反映・同期キューが送る)。
  * 他の人のメッセージはホットリロード(#1064)の records の知らせで runtime が取り直し、[DSLRuntime.recordsFlow] から届く。
  * 共有アプリへの初めての投稿は [AuthorNameHost] が名前を聞く。他人の吹き出しの長押しで通報・ブロック([ModerationHost])。
- * 写真を添えて送るのは子 Issue(届いた写真は出す)。
+ * photoField がある時は入力欄の左の写真ボタンからライブラリで選び、添付の見本(外すボタン付き)を出して一緒に送る(写真だけでも送れる)。
  */
 @Composable
 fun ChatThreadLeaf(c: Component, ctx: RenderContext, modifier: Modifier = Modifier) {
@@ -85,16 +96,22 @@ fun ChatThreadLeaf(c: Component, ctx: RenderContext, modifier: Modifier = Modifi
     val uid = rt.currentUid()
 
     var draft by remember { mutableStateOf("") }
+    var photo by remember { mutableStateOf<String?>(null) }
     var sending by remember { mutableStateOf(false) }
     var asking by remember { mutableStateOf<ChatThreadSend.Pending?>(null) }
 
     LaunchedEffect(entity.id) { rt.loadRecords(setOf(entity.id)) }
 
+    fun restore(p: ChatThreadSend.Pending) {
+        if (draft.isEmpty()) draft = p.text
+        if (photo == null) photo = p.photo
+    }
+
     fun post(p: ChatThreadSend.Pending, name: ChatThreadSend.NameAnswer?) {
         sending = true
         scope.launch {
             val ok = ChatThreadSend.post(rt, entity.id, p.data, name)
-            if (!ok && draft.isEmpty()) draft = p.text // 送れなかった文を入力欄に戻す
+            if (!ok) restore(p) // 送れなかった文と写真を入力欄に戻す
             sending = false
         }
     }
@@ -102,14 +119,16 @@ fun ChatThreadLeaf(c: Component, ctx: RenderContext, modifier: Modifier = Modifi
     fun send() {
         if (sending) return
         val text = draft
-        when (val plan = ChatThreadSend.plan(rt, entity, text, textField, c.photoField)) {
+        when (val plan = ChatThreadSend.plan(rt, entity, text, textField, c.photoField, photo)) {
             ChatThreadSend.Plan.Empty -> Unit
             is ChatThreadSend.Plan.AskName -> {
                 draft = ""
+                photo = null
                 asking = plan.pending
             }
             is ChatThreadSend.Plan.Send -> {
                 draft = ""
+                photo = null
                 post(plan.pending, null)
             }
         }
@@ -147,14 +166,18 @@ fun ChatThreadLeaf(c: Component, ctx: RenderContext, modifier: Modifier = Modifi
             }
         }
         Row(verticalAlignment = Alignment.Bottom, horizontalArrangement = Arrangement.spacedBy(RenderTheme.Spacing.sm)) {
-            OutlinedTextField(
-                value = draft,
-                onValueChange = { draft = it },
-                modifier = Modifier.weight(1f).testTag("chatThread.input"),
-                placeholder = { Text(c.placeholder?.takeIf { it.isNotEmpty() } ?: stringResource(R.string.social_chat_placeholder)) },
-                maxLines = 4,
-            )
-            IconButton(onClick = ::send, enabled = !sending && draft.isNotBlank(), modifier = Modifier.testTag("chatThread.send")) {
+            if (c.photoField != null) ChatPhotoButton(enabled = !sending) { photo = it }
+            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(RenderTheme.Spacing.sm)) {
+                photo?.let { AttachedPhoto(it, onRemove = { photo = null }) }
+                OutlinedTextField(
+                    value = draft,
+                    onValueChange = { draft = it },
+                    modifier = Modifier.fillMaxWidth().testTag("chatThread.input"),
+                    placeholder = { Text(c.placeholder?.takeIf { it.isNotEmpty() } ?: stringResource(R.string.social_chat_placeholder)) },
+                    maxLines = 4,
+                )
+            }
+            IconButton(onClick = ::send, enabled = ChatThreadSend.canSend(sending, draft, photo), modifier = Modifier.testTag("chatThread.send")) {
                 Icon(Icons.Filled.Send, contentDescription = stringResource(R.string.social_chat_send))
             }
         }
@@ -169,7 +192,7 @@ fun ChatThreadLeaf(c: Component, ctx: RenderContext, modifier: Modifier = Modifi
             onDismiss = {
                 // 閉じただけなら送らずに入力欄へ戻す(名前を聞いたことにもしない)
                 asking = null
-                if (draft.isEmpty()) draft = p.text
+                restore(p)
             },
         )
     }
@@ -177,7 +200,8 @@ fun ChatThreadLeaf(c: Component, ctx: RenderContext, modifier: Modifier = Modifi
 
 /** 送るかどうか・名前を聞くか(iOS の ChatThreadLeaf.send と AppRuntime.postRecord)。描画から切り離して JVM で試す。 */
 object ChatThreadSend {
-    data class Pending(val text: String, val data: Map<String, JSONValue>)
+    /** [photo] は添えた写真(data URL)。送れなかった時に入力欄へ戻す。 */
+    data class Pending(val text: String, val data: Map<String, JSONValue>, val photo: String? = null)
 
     /** 名前の答え。[name] が null なら「匿名で投稿」。 */
     data class NameAnswer(val name: String?)
@@ -191,9 +215,12 @@ object ChatThreadSend {
     fun plan(rt: DSLRuntime, entity: Entity, text: String, textField: String, photoField: String?, photo: String? = null): Plan {
         val skip = listOfNotNull(textField, photoField)
         val data = ChatThread.message(text, photo, textField, photoField, ChatThread.defaultData(entity, skip)) ?: return Plan.Empty
-        val pending = Pending(text, data)
+        val pending = Pending(text, data, photo?.takeIf { photoField != null && it.isNotEmpty() })
         return if ((rt as? AuthorNameHost)?.needsAuthorName(entity.id) == true) Plan.AskName(pending) else Plan.Send(pending)
     }
+
+    /** 送信を押せるか: 送っている間は押せない。文字か写真のどちらかがあれば押せる(iOS の `canSend`)。 */
+    fun canSend(sending: Boolean, text: String, photo: String?): Boolean = !sending && (text.isNotBlank() || !photo.isNullOrEmpty())
 
     /** 名前を聞いた後なら答えを先に残してから 1 件足す(名前は送る行に付く)。 */
     suspend fun post(rt: DSLRuntime, entity: String, data: Map<String, JSONValue>, answer: NameAnswer?): Boolean {
@@ -332,3 +359,44 @@ private fun AuthorNameDialog(onPost: (String?) -> Unit, onDismiss: () -> Unit) {
 
 /** 名前の長さの上限(:services の AuthorProfile.MAX_LENGTH と同じ・iOS も 20)。 */
 private const val AUTHOR_NAME_MAX = 20
+
+/** 入力欄の左の写真ボタン。ライブラリで選んだ 1 枚を photoField と同じ縮小の data URL にして返す。 */
+@Composable
+private fun ChatPhotoButton(enabled: Boolean, onPicked: (String) -> Unit) {
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+    val picker = rememberLauncherForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri ->
+        if (uri != null) {
+            scope.launch {
+                withContext(Dispatchers.IO) { PhotoCodec.dataUrl(context, uri) }?.let(onPicked)
+            }
+        }
+    }
+    IconButton(
+        onClick = { picker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)) },
+        enabled = enabled,
+        modifier = Modifier.testTag("chatThread.photo"),
+    ) {
+        val label = stringResource(R.string.social_chat_photo_choose)
+        Box(Modifier.clearAndSetSemantics { contentDescription = label }) {
+            SymbolIcon("photo", 24.dp, if (enabled) RenderTheme.colors.brandText else MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+    }
+}
+
+/** 添付する写真の見本と外すボタン(iOS の `attachedPhoto`)。 */
+@Composable
+private fun AttachedPhoto(value: String, onRemove: () -> Unit) {
+    val label = stringResource(R.string.social_chat_photo_attached)
+    Box(Modifier.size(width = 96.dp, height = 72.dp).testTag("chatThread.attachedPhoto")) {
+        PhotoView(value, 72.dp, Modifier.size(width = 96.dp, height = 72.dp).clearAndSetSemantics { contentDescription = label })
+        IconButton(onClick = onRemove, modifier = Modifier.align(Alignment.TopEnd).size(32.dp).testTag("chatThread.removePhoto")) {
+            Icon(
+                Icons.Filled.Close,
+                contentDescription = stringResource(R.string.social_chat_photo_remove),
+                tint = Color.White,
+                modifier = Modifier.size(22.dp).background(Color.Black.copy(alpha = 0.6f), RoundedCornerShape(50)).padding(3.dp),
+            )
+        }
+    }
+}

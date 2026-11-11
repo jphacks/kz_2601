@@ -12,6 +12,7 @@ internal object FileImportCopy {
         is ImportMessage.Body -> buildList {
             add(res.getQuantityString(R.plurals.renderer_import_body, m.characters, m.fileName, m.characters, m.entityName))
             if (m.truncated) add(res.getQuantityString(R.plurals.renderer_import_body_truncated, m.characters, m.characters))
+            m.note?.let { add(it) }
         }.joinToString("\n")
     }
 

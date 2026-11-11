@@ -2,11 +2,11 @@ package jp.kz2601.metamon.renderer.components.importing
 
 import jp.kz2601.metamon.dsl.Accept
 import jp.kz2601.metamon.dsl.Component
-import jp.kz2601.metamon.dsl.logic.CsvColumnMapping
 import jp.kz2601.metamon.dsl.logic.CsvReader
 import jp.kz2601.metamon.dsl.logic.ImportPlan
 import jp.kz2601.metamon.dsl.logic.ImportRowFailure
 import jp.kz2601.metamon.dsl.logic.RecordImport
+import jp.kz2601.metamon.dsl.logic.csvMappings
 import jp.kz2601.metamon.dsl.records.Entity
 import jp.kz2601.metamon.dsl.records.Field
 import jp.kz2601.metamon.dsl.records.JSONValue
@@ -15,7 +15,7 @@ import jp.kz2601.metamon.renderer.form.FormChoices
 import java.io.ByteArrayOutputStream
 import java.io.InputStream
 
-/** 読むファイルの種類。Android でまだ読めないのは録音だけ([FileImportFlow.unavailableKinds])。 */
+/** 読むファイルの種類。録音は文字起こしの口([AudioFileTranscriptionHost])がある時だけ読む。 */
 enum class ImportKind { CSV, TEXT, PDF, AUDIO }
 
 /** 確認の文の材料(文言は [FileImportCopy])。 */
@@ -30,7 +30,14 @@ sealed interface ImportMessage {
         val overLimit: Int,
     ) : ImportMessage
 
-    data class Body(val fileName: String, val entityName: String, val characters: Int, val truncated: Boolean) : ImportMessage
+    /** [note] は録音の長さなど、確認の文の最後に足す一言 */
+    data class Body(
+        val fileName: String,
+        val entityName: String,
+        val characters: Int,
+        val truncated: Boolean,
+        val note: String? = null,
+    ) : ImportMessage
 }
 
 /** 取り込めない理由(文言は [FileImportCopy])。 */
@@ -43,10 +50,10 @@ sealed interface ImportProblem {
     /** 当たる列はあるが、足せる行が 1 つも無い(読めない行・上限) */
     data class NothingToAdd(val summary: ImportMessage.Csv) : ImportProblem
     data object EmptyText : ImportProblem
-    /** PDF から文字を 1 つも取り出せない(壊れている・暗号化・文字認識もできない) */
+    /** PDF から文字を 1 つも取り出せない(壊れている・開くパスワードが要る・文字認識もできない) */
     data object PdfUnreadable : ImportProblem
     data object Full : ImportProblem
-    /** 録音: この端末ではまだ読めない */
+    /** 録音: この画面・端末では文字にできない */
     data object KindUnavailable : ImportProblem
 }
 
@@ -61,18 +68,19 @@ sealed interface ImportStep {
  * ファイルは読むだけで、送らない・コピーしない・残さない。
  */
 object FileImportFlow {
-    /** Android ではまだ読めない種類(録音の文字起こし・#1180)。 */
-    val unavailableKinds = setOf(Accept.AUDIO)
-
     private val csvMimes = listOf("text/csv", "text/comma-separated-values", "application/csv")
     private val textExtensions = setOf("txt", "text", "md", "markdown")
 
-    /** OpenDocument に渡す MIME。CSV は「text/plain」「Excel」と名乗る保存先が多いのでそれも出す(読む前に [kind] で弾く)。 */
-    fun mimeTypes(accept: List<Accept>): List<String> {
+    /**
+     * OpenDocument に渡す MIME。CSV は「text/plain」「Excel」と名乗る保存先が多いのでそれも出す(読む前に [kind] で弾く)。
+     * 録音は [audio](文字起こしの口がある)の時だけ。
+     */
+    fun mimeTypes(accept: List<Accept>, audio: Boolean = false): List<String> {
         val out = linkedSetOf<String>()
         if (Accept.CSV in accept) out += csvMimes + listOf("application/vnd.ms-excel", "text/plain")
         if (Accept.TEXT in accept) out += listOf("text/plain", "text/markdown")
         if (Accept.PDF in accept) out += "application/pdf"
+        if (audio && Accept.AUDIO in accept) out += "audio/*"
         return out.toList()
     }
 
@@ -83,7 +91,7 @@ object FileImportFlow {
         if (Accept.CSV in accept && (ext == "csv" || mime in csvMimes)) return ImportKind.CSV
         if (Accept.PDF in accept && (ext == "pdf" || mime == "application/pdf")) return ImportKind.PDF
         if (Accept.TEXT in accept && (ext in textExtensions || mime == "text/plain" || mime == "text/markdown")) return ImportKind.TEXT
-        if (Accept.AUDIO in accept && mime?.startsWith("audio/") == true) return ImportKind.AUDIO
+        if (Accept.AUDIO in accept && AudioFileImport.isAudio(fileName, mime)) return ImportKind.AUDIO
         return null
     }
 
@@ -105,8 +113,8 @@ object FileImportFlow {
     }
 
     /** 使える部品か: entity があり、public でも single でもなく、この端末で読める種類が 1 つはある。 */
-    fun usable(c: Component, entity: Entity?): Boolean =
-        entity != null && entity.scope != "public" && !entity.single && mimeTypes(c.accept).isNotEmpty()
+    fun usable(c: Component, entity: Entity?, audio: Boolean = false): Boolean =
+        entity != null && entity.scope != "public" && !entity.single && mimeTypes(c.accept, audio).isNotEmpty()
 
     /** 読んだバイト列 → 確認する中身(または理由)。`existing` は今の件数。`pdfText` は PDF の本文の取り出し(端末では [PdfTextReader])。 */
     fun prepare(
@@ -130,6 +138,7 @@ object FileImportFlow {
                 val text = pdfText(bytes)
                 if (text.isNullOrBlank()) ImportStep.Problem(ImportProblem.PdfUnreadable) else planText(text, fileName, c, entity, existing)
             }
+            // 録音はバイト列でなく [AudioFileTranscriptionHost] で読む(部品が先に分ける)
             ImportKind.AUDIO -> ImportStep.Problem(ImportProblem.KindUnavailable)
         }
     }
@@ -143,7 +152,7 @@ object FileImportFlow {
         refId: (Field, String) -> String?,
     ): ImportStep {
         val text = CsvReader.decode(bytes) ?: return ImportStep.Problem(ImportProblem.Encoding)
-        val map = c.map.map { CsvColumnMapping(it.column, it.field) }
+        val map = c.map.csvMappings
         val plan = RecordImport.plan(CsvReader.parse(text), entity, map, existing, refId = refId)
         if (plan.matched.isEmpty()) {
             return ImportStep.Problem(ImportProblem.NoMatchingColumns(entity.name, entity.storedFields.map { it.name }))
@@ -153,8 +162,8 @@ object FileImportFlow {
         return ImportStep.Confirm(fileName, plan.rows, summary)
     }
 
-    /** 本文を `field` に入れた 1 件。 */
-    fun planText(text: String, fileName: String, c: Component, entity: Entity, existing: Int): ImportStep {
+    /** 本文を `field` に入れた 1 件。[note] は確認の文の最後に足す一言(録音の長さ)。 */
+    fun planText(text: String, fileName: String, c: Component, entity: Entity, existing: Int, note: String? = null): ImportStep {
         val field = c.field
         val made = if (existing < RecordImport.MAX_RECORDS_PER_ENTITY && field != null) {
             RecordImport.bodyRecord(text, fileName, entity, field)
@@ -164,7 +173,7 @@ object FileImportFlow {
         if (made == null) return ImportStep.Problem(ImportProblem.Full)
         val body = (made.data[field] as? JSONValue.Str)?.value.orEmpty()
         val chars = body.codePointCount(0, body.length)
-        return ImportStep.Confirm(fileName, listOf(made.data), ImportMessage.Body(fileName, entity.name, chars, made.truncated))
+        return ImportStep.Confirm(fileName, listOf(made.data), ImportMessage.Body(fileName, entity.name, chars, made.truncated, note))
     }
 
     private fun summary(plan: ImportPlan, entity: Entity) =

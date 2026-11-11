@@ -29,6 +29,24 @@ object FabDock {
         return Snap(side, edge(centerX) <= threshold || edge(predictedCenterX) <= threshold)
     }
 
+    /**
+     * 弾いた先の中心 x(iOS の `predictedEndTranslation`)。指を離した時の速さ([velocityX] px/秒)のまま
+     * UIScrollView の通常の減速(1 ms ごとに 0.998 倍)で止まるまで進んだ位置。
+     */
+    fun predictedCenterX(centerX: Float, velocityX: Float): Float = centerX + velocityX * PROJECTION_SECONDS
+
+    /** 1000 / (1 - 0.998) / 1000 × 0.998 ≒ 0.5 秒分 */
+    const val PROJECTION_SECONDS = 0.499f
+
+    /**
+     * 自動の下端距離(iOS の `Theme.Layout.fabBottomInset`)。吸着した側の最下段に部品があれば([obstructionTop]・ルート座標 y)、
+     * その上端より [gap] 上に逃がす。[areaBottom] は FAB を置く領域の下端(ルート座標 y)。
+     */
+    fun autoInset(base: Float, obstructionTop: Float?, areaBottom: Float, gap: Float): Float {
+        if (obstructionTop == null || areaBottom <= 0f) return base
+        return maxOf(base, areaBottom - obstructionTop + gap)
+    }
+
     /** 取っ手を内側(左の取っ手なら右)へ [revealDistance] 以上引いたら戻す */
     fun shouldReveal(translationX: Float, side: FabSide, revealDistance: Float): Boolean =
         (if (side == FabSide.LEFT) translationX else -translationX) >= revealDistance

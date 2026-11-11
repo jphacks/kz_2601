@@ -13,7 +13,7 @@
     <string name="account_ok">OK</string>
     <string name="account_send_then_sign_out">Send, Then Sign Out</string>
     <string name="account_sign_out">Sign Out</string>
-    <string name="account_sign_out_anonymous">Data on this device will be erased, and you can’t return to this anonymous account. You won’t be able to open the apps and records you made.</string>
+    <string name="account_sign_out_anonymous">Data on this device will be erased, and you can’t return to this anonymous account. You won’t be able to open the apps and records you made. To keep them, use “Continue with Google” or “Continue with Apple” first.</string>
     <string name="account_sign_out_failed">Couldn’t sign out</string>
     <string name="account_sign_out_signed_in">Data on this device will be erased. Sign in again to get back the apps you made and the records already sent.</string>
     <string name="account_sign_out_title">Sign out?</string>

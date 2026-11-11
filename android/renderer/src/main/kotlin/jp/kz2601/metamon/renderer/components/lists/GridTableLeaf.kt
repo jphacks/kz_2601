@@ -104,6 +104,18 @@ fun GridTableLeaf(c: Component, ctx: RenderContext, modifier: Modifier = Modifie
                 }
             }
         }
+        // 取得失敗は空のマス目の下に再試行、初回の読み込み中は骨組み(#1116・iOS の GridTableLeaf)
+        GridTableNotice.of(data, c)?.let { InlineRecordsState(it, data.runtime, c.entity) }
+    }
+}
+
+/** gridTable のマス目の下に出す読み込み状態(テストする)。空のマス目はそのまま「空」の表示なので出さない。 */
+object GridTableNotice {
+    fun of(data: LeafData, c: Component): RecordsPlaceholder? = when (data.placeholder(c.entity)) {
+        // 手元の記録があっても取り直せなかったことは知らせる(iOS と同じ)
+        RecordsPlaceholder.UNAVAILABLE -> RecordsPlaceholder.UNAVAILABLE
+        RecordsPlaceholder.SKELETON -> RecordsPlaceholder.SKELETON.takeIf { data.records(c.entity.orEmpty()).isEmpty() }
+        RecordsPlaceholder.EMPTY -> null
     }
 }
 

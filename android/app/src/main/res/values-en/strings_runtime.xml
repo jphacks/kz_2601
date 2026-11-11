@@ -21,6 +21,7 @@
     <string name="runtime_missing_required">Please fill in %1$s</string>
     <string name="runtime_no_form">There\'s no form to save</string>
     <string name="runtime_not_member">You haven\'t joined this share. Join from an invite link.</string>
+    <string name="runtime_activity_notifications_off">Notifications are off, so the ongoing status can\'t be shown (Settings &gt; Notifications)</string>
     <string name="runtime_notification_failed">Couldn\'t schedule the notification</string>
     <string name="runtime_notification_scheduled">Reminder scheduled (%1$s)</string>
     <string name="runtime_offline_restored">You\'re offline. Showing the last saved app</string>
@@ -40,4 +41,6 @@
     <string name="runtime_text_not_allowed_field">“%1$s” contains words that can\'t be shown</string>
     <string name="runtime_unavailable_on_android">This feature isn\'t available on Android yet</string>
     <string name="runtime_unknown_action">Unsupported action: %1$s</string>
+    <string name="runtime_unreachable_body">Check your connection. The app will reload automatically once you\'re back online</string>
+    <string name="runtime_unreachable_title">Can\'t connect to the server</string>
 </resources>
