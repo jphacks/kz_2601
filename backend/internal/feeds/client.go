@@ -38,6 +38,16 @@ type Endpoints struct {
 	RSS         map[string]RSSFeed
 	Arxiv       string // + "?search_query=cat:{category}&..." (dsl.ArxivCategories)
 	Diet        string // + "?any={q}&..." (国会会議録 speech search)
+	Status      map[string]StatusPage
+}
+
+// StatusPage is one allowlisted public status page (Atlassian Statuspage
+// summary.json). Adding one is a reviewed change here and in dsl.StatusPages
+// (TestStatusAllowlistMatchesDSL keeps them equal).
+type StatusPage struct {
+	Name    string // the service, shown in the title
+	URL     string // https, fixed: {SiteURL}/api/v2/summary.json
+	SiteURL string // the human status page; attribution and the incident links
 }
 
 // DefaultEndpoints are the production sources (terms checked 2026-11-06,
@@ -55,10 +65,20 @@ func DefaultEndpoints() Endpoints {
 		},
 		Arxiv: "https://export.arxiv.org/api/query",
 		Diet:  "https://kokkai.ndl.go.jp/api/speech",
+		Status: map[string]StatusPage{
+			"claude":     {Name: "Claude(Anthropic)", URL: "https://status.claude.com/api/v2/summary.json", SiteURL: "https://status.claude.com"},
+			"cloudflare": {Name: "Cloudflare", URL: "https://www.cloudflarestatus.com/api/v2/summary.json", SiteURL: "https://www.cloudflarestatus.com"},
+			"github":     {Name: "GitHub", URL: "https://www.githubstatus.com/api/v2/summary.json", SiteURL: "https://www.githubstatus.com"},
+			"vercel":     {Name: "Vercel", URL: "https://www.vercel-status.com/api/v2/summary.json", SiteURL: "https://www.vercel-status.com"},
+		},
 	}
 }
 
 const pdl = "公共データ利用規約(第1.0版)"
+
+// statusLicense: each company publishes the status API for programmatic
+// access; the app is not endorsed by them.
+const statusLicense = "各社が公開する status の API・各社の承認や提携はありません"
 
 func (ep Endpoints) source(q Query) Source {
 	switch q.Provider {
@@ -74,6 +94,9 @@ func (ep Endpoints) source(q Query) Source {
 		return Source{Name: "arXiv.org", URL: "https://arxiv.org/list/" + q.FeedID + "/recent", License: "論文の情報は CC0 1.0・arXiv の承認や提携はありません"}
 	case dsl.FeedDiet:
 		return Source{Name: "国立国会図書館 国会会議録検索システム", URL: "https://kokkai.ndl.go.jp/", License: "検索用 API・発言の著作権は各発言者"}
+	case dsl.FeedStatus:
+		p := ep.Status[q.FeedID]
+		return Source{Name: p.Name + " の status ページ", URL: p.SiteURL, License: statusLicense}
 	}
 	f := ep.RSS[q.FeedID]
 	return Source{Name: f.Publisher + "ホームページ", URL: f.SiteURL, License: pdl}
@@ -129,6 +152,9 @@ func (ep Endpoints) hosts() map[string]bool {
 	}
 	add(ep.Arxiv)
 	add(ep.Diet)
+	for _, p := range ep.Status {
+		add(p.URL)
+	}
 	return out
 }
 
