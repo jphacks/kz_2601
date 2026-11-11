@@ -73,6 +73,12 @@ interface AppConfigClient {
 
     suspend fun deleteRecord(appId: String, entity: String, id: String)
 
+    /**
+     * `DELETE .../records?confirm=true`(エンティティの全記録の削除・デモのやり直し用)。
+     * public/shared は自分の投稿だけ消える。`deleteBy: admins` で管理者でなければ 403 `admins_only`。
+     */
+    suspend fun deleteAllRecords(appId: String, entity: String)
+
     /** `PUT` / `DELETE .../records/{id}/marks/{mark}`(#255)。 */
     suspend fun setMark(appId: String, entity: String, id: String, mark: String, on: Boolean): MarkState
 

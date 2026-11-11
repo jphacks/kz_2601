@@ -54,6 +54,8 @@ class FakeRecordsClient : AppConfigClient {
         server.removeAll { it.id == id }
     }
 
+    override suspend fun deleteAllRecords(appId: String, entity: String) = TODO()
+
     override suspend fun setMark(appId: String, entity: String, id: String, mark: String, on: Boolean): MarkState {
         gate()
         return MarkState(count = if (on) 1 else 0, mine = on)

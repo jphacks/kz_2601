@@ -64,6 +64,11 @@ class OfflineSimulatingAppConfigClient(
         inner.deleteRecord(appId, entity, id)
     }
 
+    override suspend fun deleteAllRecords(appId: String, entity: String) {
+        gate("delete-all $entity")
+        inner.deleteAllRecords(appId, entity)
+    }
+
     override suspend fun setMark(appId: String, entity: String, id: String, mark: String, on: Boolean): MarkState {
         gate("mark $entity/$id $mark $on")
         return inner.setMark(appId, entity, id, mark, on)

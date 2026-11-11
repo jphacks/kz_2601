@@ -102,6 +102,17 @@ class InMemoryAppConfigClientTest {
     }
 
     @Test
+    fun deleteAllRecordsClearsOnlyThatEntity() = runTest {
+        val c = client()
+        c.createRecord("a", "memo", data, clientId = "m1")
+        val memos = c.listRecords("a", "memo").size
+        c.deleteAllRecords("a", "expense")
+        assertEquals(0, c.listRecords("a", "expense").size)
+        assertEquals(memos, c.listRecords("a", "memo").size)
+        c.deleteAllRecords("a", "unknown") // 無い entity でも落ちない
+    }
+
+    @Test
     fun putDocumentChecksVersion() = runTest {
         val c = client()
         val doc = c.fetchDocument("a")
@@ -157,6 +168,25 @@ class OfflineSimulatingAppConfigClientTest {
         assertFalse(c.isOffline)
         c.createRecord("a", "memo", JsonObject(emptyMap()), clientId = "c1")
         assertEquals(listOf("drop create memo c1", "pass create memo c1"), c.log.toList())
+    }
+
+    @Test
+    fun dropsDeleteAllWhileOffline() = runTest {
+        val inner = InMemoryAppConfigClient(initialDocument = { testSamples.document(DslSamples.INITIAL, it, 1) })
+        inner.createRecord("a", "memo", JsonObject(emptyMap()), clientId = "c1")
+        val c = OfflineSimulatingAppConfigClient(inner)
+        c.setOffline(true)
+        try {
+            c.deleteAllRecords("a", "memo")
+            fail("圏外のはず")
+        } catch (e: Exception) {
+            assertEquals(FailureKind.Offline, FailureKind.classify(e))
+        }
+        assertEquals(1, inner.listRecords("a", "memo").size)
+        c.setOffline(false)
+        c.deleteAllRecords("a", "memo")
+        assertEquals(0, inner.listRecords("a", "memo").size)
+        assertEquals(listOf("drop delete-all memo", "pass delete-all memo"), c.log.toList())
     }
 }
 
