@@ -66,7 +66,7 @@ flowchart LR
 | `loop_control/usage-YYYY-MM` | 振り分けのトークン数 | — |
 | `loop_control/cursor-{source}` | 取り込みの続きの位置 | — |
 
-スクショと DSL はループに入れない。クラッシュは種類・件数・版だけ。ストアのレビューはニックネームと国を捨てる。TestFlight はコメント・ビルド番号・OS の大きい版・日時だけを API に頼む(メール・名前・テスター・端末・スクショ・クラッシュログは取らない)。
+スクショと DSL はループに入れない。クラッシュは種類・件数・版だけ。生成の失敗はコードと件数だけ。ストアのレビューはニックネームと国を捨てる。TestFlight はコメント・ビルド番号・OS の大きい版・日時だけを API に頼む(メール・名前・テスター・端末・スクショ・クラッシュログは取らない)。
 
 ## コマンド
 
@@ -74,7 +74,7 @@ flowchart LR
 
 | コマンド | 段 | すること |
 |---|---|---|
-| `ingest [-source in_app\|app_store_review\|testflight]` | intake | 新しいフィードバックを伏せ字して `loop_inbox` へ。ストアのレビューは `LOOP_SOURCE_APPSTORE=on`、TestFlight は `LOOP_SOURCE_TESTFLIGHT=on` の時だけ |
+| `ingest [-source in_app\|app_store_review\|testflight\|gen_failure]` | intake | 新しいフィードバックを伏せ字して `loop_inbox` へ。ストアのレビューは `LOOP_SOURCE_APPSTORE=on`、TestFlight は `LOOP_SOURCE_TESTFLIGHT=on`、生成の失敗の急増は `LOOP_SOURCE_GENFAIL=on` の時だけ |
 | `ingest-crash -issue ID -type T -count N -version V` | intake | Crashlytics の急増を 1 件として記録(人が Crashlytics の画面を見て打つ) |
 | `triage [-max 200] [-batch 20]` | triage | 新しい項目を分類(`bug` / `feature` / `question` / `praise` / `spam`)・束ね・優先度(P1〜P3)付け。同じ文は 1 回だけ送る |
 | `triage-score -labels FILE` | — | 人が付けた正解(1 行 `itemId,category`)との一致率(#376 の完了の条件: 8 割) |
@@ -107,6 +107,7 @@ flowchart LR
 | `LOOP_MONTHLY_TOKEN_CAP` | `3000000` | 振り分けの月のトークンの上限 |
 | `LOOP_SOURCE_APPSTORE` | 空 | `on` でストアのレビューを取り込む |
 | `LOOP_SOURCE_TESTFLIGHT` | 空 | `on` で TestFlight のフィードバック(スクショ付き・クラッシュの送信)を取り込む。キーは下の `LOOP_ASC_*` を共用。既定の `LOOP_AI_SOURCES` に入っていないので、AI に回すなら `testflight` を足す |
+| `LOOP_SOURCE_GENFAIL` | 空 | `on` で生成の失敗の急増を取り込む。`LOOP_GENFAIL_LOGS`(`gcloud logging read --format=json` で書き出したファイル・カンマ区切り。`cmd/ai-session-report -logs` と同じ形)の `ai.generate` の行から、失敗のコード(`outcome:failed` / `outcome:refused` / `error:<error_code>` / `retry:<retry_reasons>` / `validation:<validation_codes>`)ごとに、直近 `LOOP_GENFAIL_WINDOW`(既定 `24h`)の割合をその前の `LOOP_GENFAIL_BASELINE`(既定 `168h`)と比べる。件数が `LOOP_GENFAIL_MIN_COUNT`(既定 5)以上・割合が `LOOP_GENFAIL_MIN_RATE`(既定 0.05)以上・基準の `LOOP_GENFAIL_FACTOR`(既定 2)倍以上なら、コード 1 つ・1 日に 1 件。項目はコードと件数だけ(入力文・uid・アプリの id・ハッシュは持たない)。既定の `LOOP_AI_SOURCES` に入っていないので、AI に回すなら `gen_failure` を足す |
 | `LOOP_ASC_ISSUER_ID` / `LOOP_ASC_KEY_ID` / `LOOP_ASC_PRIVATE_KEY` / `LOOP_ASC_APP_ID` | — | App Store Connect API のキー(役割は Customer Support で足りる)。鍵は `.p8` の中身そのもの |
 | `LOOP_ISSUE_REPO` | 空 = dry run | Issue を作るリポジトリ(`owner/name`) |
 | `LOOP_GITHUB_TOKEN` | — | Issue の作成・コメント・読み取りだけの権限(GitHub App のインストールのトークン、または fine-grained の PAT の `issues: write`)。マージ・ラベル・コードの権限は持たせない |
@@ -189,5 +190,5 @@ go run ./cmd/feedback-loop audit -summary
 |---|---|
 | 定期の実行(Cloud Scheduler・workflow) | 足していない。上のコマンドを job にする |
 | Crashlytics を自動で読む | Crashlytics は安く読める API が無い。BigQuery のエクスポート(#296)ができたら `ingest.CrashSource` を実装する。それまでは `ingest-crash` で人が記録 |
-| 生成の失敗の急増 | 取り込みの口は同じ形で足せる(`ingest.Fetcher`) |
+| 生成の失敗の急増を自動で読む | 今はログを人が `gcloud logging read` で書き出して `LOOP_GENFAIL_LOGS` に渡す。Logging API か BigQuery から読む時は `ingest.GenLogSource` を実装する |
 | Google の機密データの検出(#367 の選択肢 2-B) | GCP の設定が要るので後で |

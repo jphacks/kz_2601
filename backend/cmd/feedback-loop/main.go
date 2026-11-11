@@ -7,7 +7,7 @@
 // Operations, environment and the order of the steps:
 // docs/backend/features/feedback-loop.md.
 //
-//	feedback-loop ingest [-source in_app|app_store_review|testflight]
+//	feedback-loop ingest [-source in_app|app_store_review|testflight|gen_failure]
 //	feedback-loop ingest-crash -issue ID -type T -count N -version V
 //	feedback-loop triage [-max 200] [-batch 20]
 //	feedback-loop triage-score -labels FILE
@@ -88,7 +88,7 @@ func main() {
 }
 
 const usageText = `usage: feedback-loop <command> [flags]
-  ingest [-source in_app|app_store_review|testflight]   copy new feedback into the inbox (masked)
+  ingest [-source in_app|app_store_review|testflight|gen_failure]   copy new feedback into the inbox (masked)
   ingest-crash -issue ID -type T -count N -version V   record one crash spike
   triage [-max 200] [-batch 20]              classify, cluster and prioritise new items (LLM, no tools)
   triage-score -labels FILE                  agreement with a human's labels (lines: itemId,category)
@@ -202,7 +202,7 @@ func ingestEvent(it loop.Item) loop.Event {
 
 func (a *app) ingest(ctx context.Context, args []string) error {
 	fs := flag.NewFlagSet("ingest", flag.ContinueOnError)
-	only := fs.String("source", "", "only this source (in_app / app_store_review / testflight); default all that are on")
+	only := fs.String("source", "", "only this source (in_app / app_store_review / testflight / gen_failure); default all that are on")
 	if err := fs.Parse(args); err != nil {
 		return err
 	}
@@ -220,6 +220,7 @@ func (a *app) ingest(ctx context.Context, args []string) error {
 	}{
 		{loop.SourceStoreReview, ingest.ErrAppStoreOff, a.appStoreFetcher},
 		{loop.SourceTestFlight, ingest.ErrTestFlightOff, a.testFlightFetcher},
+		{loop.SourceGenFailure, ingest.ErrGenFailOff, a.genFailFetcher},
 	}
 	for _, o := range optional {
 		if *only != "" && *only != string(o.src) {
@@ -277,6 +278,15 @@ func (a *app) testFlightFetcher() (ingest.Fetcher, error) {
 		return nil, err
 	}
 	return ingest.TestFlightFeedback{Cfg: cfg}, nil
+}
+
+func (a *app) genFailFetcher() (ingest.Fetcher, error) {
+	g, err := ingest.GenFailConfigFromEnv(a.getenv)
+	if err != nil {
+		return nil, err
+	}
+	g.Now = a.now
+	return g, nil
 }
 
 func (a *app) ingestCrash(ctx context.Context, args []string) error {

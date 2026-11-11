@@ -2,8 +2,12 @@ package main
 
 import (
 	"context"
+	"errors"
+	"fmt"
 	"io"
 	"log/slog"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 	"time"
@@ -119,6 +123,42 @@ func TestIngestTestFlight(t *testing.T) {
 	ta.testFlight = nil
 	if err := ta.run(context.Background(), []string{"ingest", "-source", "testflight"}); err == nil || !strings.Contains(err.Error(), ingest.EnvTestFlightOn) {
 		t.Fatalf("missing key: %v", err)
+	}
+}
+
+func TestIngestGenFailure(t *testing.T) {
+	ta := newTestApp(t, env{})
+	// hand-written export: 20 ai.generate lines in the last day, 6 failed
+	var b strings.Builder
+	for i := 0; i < 20; i++ {
+		outcome := `"outcome":"validated"`
+		if i < 6 {
+			outcome = `"outcome":"failed","error_code":"generation_failed"`
+		}
+		fmt.Fprintf(&b, `{"time":"%s","event":"ai.generate",%s,"uid_hash":"u_x"}`+"\n", ta.now().Add(-time.Duration(i+1)*time.Minute).Format(time.RFC3339), outcome)
+	}
+	path := filepath.Join(t.TempDir(), "gen.jsonl")
+	if err := os.WriteFile(path, []byte(b.String()), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	ta.env[ingest.EnvGenFailLogs] = path
+	if out := ta.must(t, "ingest"); strings.Contains(out, "gen_failure") { // off by default
+		t.Fatalf("gen_failure ran while off: %s", out)
+	}
+	if err := ta.run(context.Background(), []string{"ingest", "-source", "gen_failure"}); !errors.Is(err, ingest.ErrGenFailOff) {
+		t.Fatalf("explicit source while off: %v", err)
+	}
+	ta.env[ingest.EnvGenFailOn] = "on"
+	out := ta.must(t, "ingest", "-source", "gen_failure")
+	if !strings.Contains(out, "ingest gen_failure: fetched 2, new 2 (held from AI 2)") || strings.Contains(out, "in_app") { // not in LOOP_AI_SOURCES by default
+		t.Fatalf("out:\n%s", out)
+	}
+	if out := ta.must(t, "ingest"); !strings.Contains(out, "ingest gen_failure: fetched 2, new 0") {
+		t.Fatalf("second run: %s", out)
+	}
+	delete(ta.env, ingest.EnvGenFailLogs)
+	if err := ta.run(context.Background(), []string{"ingest"}); err == nil || !strings.Contains(err.Error(), ingest.EnvGenFailLogs) {
+		t.Fatalf("on without logs: %v", err)
 	}
 }
 

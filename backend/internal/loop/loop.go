@@ -43,6 +43,7 @@ const (
 	SourceStoreReview Source = "app_store_review" // App Store Connect customer reviews
 	SourceCrash       Source = "crash"            // a crash spike, recorded as one item (#296)
 	SourceTestFlight  Source = "testflight"       // TestFlight beta feedback (screenshot and crash submissions)
+	SourceGenFailure  Source = "gen_failure"      // a spike of one AI generation failure code, recorded as one item (#297)
 )
 
 // Item statuses.
