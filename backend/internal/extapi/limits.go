@@ -128,7 +128,6 @@ func (e *LimitError) RetryAfterSec() int {
 type limiter struct {
 	store    ratelimit.Store
 	fallback ratelimit.Store
-	log      *slog.Logger
 
 	mu     sync.Mutex
 	paused map[string]time.Time

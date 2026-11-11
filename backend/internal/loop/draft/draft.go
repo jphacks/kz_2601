@@ -52,6 +52,7 @@ type Result struct {
 	Extended int
 	Items    int
 	Held     int // clusters whose draft failed the exit check
+	Attached int // items that predate the filed issue, added to it without a comment
 	Capped   int // clusters left for the next run (MaxNew)
 }
 
@@ -116,6 +117,27 @@ func (b *Builder) Run(ctx context.Context) (Result, error) {
 			d = loop.Draft{ID: newID(), ClusterKey: key, Status: loop.DraftPending, CreatedAt: now, ExpiresAt: now.Add(loop.Retention)}
 		}
 		t := filed[key]
+		if t.Number > 0 {
+			// a comment carries only what arrived after the issue was
+			// published; earlier reports belong to the filed issue
+			fresh, earlier := splitAt(all, t.At)
+			if len(earlier) > 0 {
+				if err := b.attach(ctx, t, earlier, &res); err != nil {
+					return res, err
+				}
+			}
+			if len(fresh) == 0 {
+				if exists {
+					d.Status, d.RejectReason, d.ItemIDs, d.UpdatedAt = loop.DraftRejected, "nothing new since the issue was published", nil, now
+					if err := b.Store.PutDraft(ctx, d); err != nil {
+						return res, err
+					}
+				}
+				continue
+			}
+			all = fresh
+			newItems, _ = splitAt(newItems, t.At)
+		}
 		d.AppendRepo, d.AppendIssue = t.Repo, t.Number
 		fill(&d, all, now)
 		if reasons := Check(d.Title, d.Body, texts(all)); len(reasons) > 0 {
@@ -164,6 +186,48 @@ func (b *Builder) updateItem(ctx context.Context, it loop.Item) error {
 	return nil
 }
 
+// attach adds items that arrived before the filed issue was published to
+// that issue's draft, so their senders are told when it is fixed, without
+// posting them as new reports.
+func (b *Builder) attach(ctx context.Context, t Filed, items []loop.Item, res *Result) error {
+	fd, err := b.Store.GetDraft(ctx, t.DraftID)
+	if err != nil {
+		return err
+	}
+	for _, it := range items {
+		if !slices.Contains(fd.ItemIDs, it.ID) {
+			fd.ItemIDs = append(fd.ItemIDs, it.ID)
+		}
+	}
+	if err := b.Store.PutDraft(ctx, *fd); err != nil {
+		return err
+	}
+	for _, it := range items {
+		it.Status, it.DraftID = loop.ItemDrafted, fd.ID
+		if err := b.updateItem(ctx, it); err != nil {
+			return err
+		}
+		res.Attached++
+	}
+	return nil
+}
+
+// splitAt splits items into those ingested at or after at and the rest.
+func splitAt(items []loop.Item, at time.Time) (after, before []loop.Item) {
+	for _, it := range items {
+		when := it.IngestedAt
+		if when.IsZero() {
+			when = it.CreatedAt
+		}
+		if !when.Before(at) {
+			after = append(after, it)
+		} else {
+			before = append(before, it)
+		}
+	}
+	return after, before
+}
+
 func (b *Builder) load(ctx context.Context, ids []string) ([]loop.Item, error) {
 	return LoadItems(ctx, b.Store, ids)
 }
@@ -172,29 +236,55 @@ func (b *Builder) load(ctx context.Context, ids []string) ([]loop.Item, error) {
 type Filed struct {
 	Repo   string
 	Number int
+	// DraftID is the newest published draft of the issue; At is when the
+	// issue itself was published.
+	DraftID string
+	At      time.Time
+}
+
+type issueKey struct {
+	repo string
+	n    int
+}
+
+// publishedAt is when d was posted (older drafts have no PublishedAt).
+func publishedAt(d loop.Draft) time.Time {
+	switch {
+	case !d.PublishedAt.IsZero():
+		return d.PublishedAt
+	case !d.ReviewedAt.IsZero():
+		return d.ReviewedAt
+	}
+	return d.CreatedAt
 }
 
 // FiledIssues maps each cluster key to the newest published issue of that
-// cluster that is not fixed yet. A fixed cluster that comes back gets a new
-// issue (it is a regression, not more of the same).
+// cluster that is still open as far as the loop knows (not fixed, not seen
+// closed). A fixed or closed cluster that comes back gets a new issue (it is
+// a regression or was set aside, not more of the same).
 func FiledIssues(ctx context.Context, s loop.Store) (map[string]Filed, error) {
 	ds, err := s.ListDrafts(ctx, loop.DraftQuery{Status: loop.DraftPublished, Limit: 500})
 	if err != nil {
 		return nil, err
 	}
 	out := map[string]Filed{}
-	fixed := map[Filed]bool{}
+	done := map[issueKey]bool{}
+	first := map[issueKey]time.Time{}
 	for _, d := range ds {
-		if d.IssueNumber > 0 && !d.FixedAt.IsZero() {
-			fixed[Filed{d.IssueRepo, d.IssueNumber}] = true
+		k := issueKey{d.IssueRepo, d.IssueNumber}
+		if d.IssueNumber > 0 && (!d.FixedAt.IsZero() || !d.ClosedAt.IsZero()) {
+			done[k] = true
+		}
+		if at := publishedAt(d); first[k].IsZero() || at.Before(first[k]) {
+			first[k] = at
 		}
 	}
 	for _, d := range ds { // newest first
-		f := Filed{d.IssueRepo, d.IssueNumber}
-		if _, seen := out[d.ClusterKey]; seen || d.ClusterKey == "" || f.Number <= 0 || fixed[f] {
+		k := issueKey{d.IssueRepo, d.IssueNumber}
+		if _, seen := out[d.ClusterKey]; seen || d.ClusterKey == "" || k.n <= 0 || done[k] {
 			continue
 		}
-		out[d.ClusterKey] = f
+		out[d.ClusterKey] = Filed{Repo: k.repo, Number: k.n, DraftID: d.ID, At: first[k]}
 	}
 	return out, nil
 }

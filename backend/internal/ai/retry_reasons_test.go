@@ -2,11 +2,13 @@ package ai
 
 import (
 	"context"
+	"errors"
 	"strings"
 	"testing"
 
 	"github.com/jphacks/kz_2601/backend/internal/appconfigclient"
 	"github.com/jphacks/kz_2601/backend/internal/auth"
+	"github.com/jphacks/kz_2601/backend/pkg/dsl"
 )
 
 // A create rejected by validation, then accepted, logs retry_reasons=validation
@@ -31,7 +33,8 @@ func TestGenerateLog_RetryReasonsCreate(t *testing.T) {
 }
 
 // An edit whose patches fail twice falls back to a full rewrite: every
-// rejected attempt is labeled, in order.
+// rejected attempt is labeled, in order. A patch that does not apply is
+// invalid output, not a validation failure.
 func TestGenerateLog_RetryReasonsEditDowngrade(t *testing.T) {
 	kb := kakeibo(t)
 	store := appconfigclient.NewMemory()
@@ -48,7 +51,7 @@ func TestGenerateLog_RetryReasonsEditDowngrade(t *testing.T) {
 	if m["outcome"] != GenRegenerated || m["downgraded_to_full"] != true {
 		t.Fatalf("line: %v", m)
 	}
-	want := RetryInvalidOutput + "," + RetryValidation + "," + RetryValidation
+	want := RetryInvalidOutput + "," + RetryInvalidOutput + "," + RetryInvalidOutput
 	if m["retry_reasons"] != want {
 		t.Fatalf("retry_reasons = %v, want %s", m["retry_reasons"], want)
 	}
@@ -68,5 +71,31 @@ func TestGenerateLog_NoRetryReasons(t *testing.T) {
 	})
 	if _, ok := m["retry_reasons"]; ok {
 		t.Fatalf("line: %v", m)
+	}
+}
+
+// retryReason: patch_* codes only = invalid_output; any other code (or a mix)
+// = validation; max_tokens wins.
+func TestRetryReasonPatchCodes(t *testing.T) {
+	_, _, patchErr := dsl.ApplyPatch([]byte(`{}`), nil) // patch_empty
+	var ve *dsl.ValidationError
+	if !errors.As(patchErr, &ve) || ve.Codes()[0] != dsl.CodePatchEmpty {
+		t.Fatalf("patch error %v", patchErr)
+	}
+	if got := retryReason(patchErr, nil); got != RetryInvalidOutput {
+		t.Fatalf("patch_empty: %s", got)
+	}
+	_, valErr := dsl.Parse([]byte(`{"version":1}`))
+	if !errors.As(valErr, &ve) || patchOnly(ve.Codes()) {
+		t.Fatalf("validation error %v", valErr)
+	}
+	if got := retryReason(valErr, nil); got != RetryValidation {
+		t.Fatalf("validation: %s", got)
+	}
+	if got := retryReason(patchErr, &Response{StopReason: "max_tokens"}); got != RetryTruncated {
+		t.Fatalf("truncated: %s", got)
+	}
+	if patchOnly(nil) || !patchOnly([]string{dsl.CodePatchApply, dsl.CodePatchInvalid}) || patchOnly([]string{dsl.CodePatchApply, "schema_required"}) {
+		t.Fatal("patchOnly")
 	}
 }

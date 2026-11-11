@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"strings"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -79,7 +80,7 @@ func TestCallLimits(t *testing.T) {
 			}
 			// the blocked call charged nothing: still blocked a moment later
 			e.c.t = e.c.t.Add(time.Minute)
-			limitErr(t, do(c.blocked))
+			_ = limitErr(t, do(c.blocked))
 			e.c.t = e.c.t.Add(c.advance - time.Minute)
 			if err := do(c.blocked); err != nil {
 				t.Fatalf("after the reset: %v", err)
@@ -97,7 +98,7 @@ func TestCallLimitsPerProvider(t *testing.T) {
 	if _, err := e.call(e.req(FakeFree, "listItems", nil)); err != nil {
 		t.Fatal(err)
 	}
-	limitErr(t, func() error { _, err := e.call(e.req(FakeFree, "listItems", nil)); return err }())
+	_ = limitErr(t, func() error { _, err := e.call(e.req(FakeFree, "listItems", nil)); return err }())
 	if _, err := e.call(e.req(FakePaid, "echo", map[string]string{"text": "a", "costUsd": "0.01"})); err != nil {
 		t.Fatalf("other provider: %v", err)
 	}
@@ -116,6 +117,9 @@ func TestCallLimitsRefund(t *testing.T) {
 		{"coins insufficient", func(e *env) CallRequest {
 			return e.req(FakePaid, "echo", map[string]string{"text": "a", "costUsd": "0.01"})
 		}, ReasonCoinsInsufficient, false},
+		{"op refuses the arguments", func(e *env) CallRequest {
+			return e.req(FakeFree, "listItems", map[string]string{"fail": "args"})
+		}, ReasonBadRequest, false},
 		{"provider 5xx", func(e *env) CallRequest {
 			return e.req(FakeFree, "listItems", map[string]string{"fail": "5xx"})
 		}, ReasonUpstream, true},
@@ -247,7 +251,7 @@ func TestCallLimitsStoreFallback(t *testing.T) {
 	if _, err := e.call(e.req(FakeFree, "listItems", nil)); err != nil {
 		t.Fatal(err)
 	}
-	limitErr(t, func() error { _, err := e.call(e.req(FakeFree, "listItems", nil)); return err }())
+	_ = limitErr(t, func() error { _, err := e.call(e.req(FakeFree, "listItems", nil)); return err }())
 }
 
 type failingStore struct{}
@@ -311,4 +315,53 @@ func TestLimitsFromEnv(t *testing.T) {
 			t.Fatalf("a default is off: %+v", DefaultLimits)
 		}
 	}
+}
+
+// A bad lat / lng (or forecast limit) is refused at CheckArgs, before any
+// limit is counted and before the API is called.
+func TestOpenWeatherBadArgsKeepLimits(t *testing.T) {
+	var status atomic.Int64
+	status.Store(200)
+	var seen atomic.Value
+	srv := owServer(t, &status, &seen)
+	e := newEnv(t, opts{cfg: func(c *Config) {
+		c.Enabled[OpenWeather] = true
+		c.Secrets = map[string]Secrets{OpenWeather: {APIKey: owTestKey}}
+		c.Limits = map[string]Limits{OpenWeather: {UserHourly: 1, AppHourly: 1, GlobalDaily: 1}}
+	}})
+	e.svc.ops[OpenWeather] = owOps(t, srv)
+	p, _ := Lookup(OpenWeather)
+	bad := []struct {
+		op   string
+		args map[string]string
+	}{
+		{"current", map[string]string{}},
+		{"current", map[string]string{"lat": "95", "lng": "139"}},
+		{"airQuality", map[string]string{"lat": "35"}},
+		{"airQuality", map[string]string{"lat": "0x1", "lng": "1"}},
+		{"forecast", map[string]string{"lat": "35", "lng": "139e0"}},
+		{"forecast", map[string]string{"lat": "35", "lng": "139", "limit": "41"}},
+		{"forecast", map[string]string{"lat": "35", "lng": "139", "limit": "0"}},
+	}
+	for _, b := range bad {
+		if _, err := p.CheckArgs(b.op, b.args); Reason(err) != ReasonBadRequest {
+			t.Fatalf("CheckArgs %s %v: %v", b.op, b.args, err)
+		}
+		for range 3 {
+			if _, err := e.call(e.req(OpenWeather, b.op, b.args)); Reason(err) != ReasonBadRequest {
+				t.Fatalf("%s %v: %s (%v)", b.op, b.args, Reason(err), err)
+			}
+		}
+	}
+	if seen.Load() != nil {
+		t.Fatal("a bad argument reached the API")
+	}
+	// the one allowed call of each limit is still there
+	if _, err := e.call(e.req(OpenWeather, "forecast", map[string]string{"lat": "36.5", "lng": "136.6", "limit": "2"})); err != nil {
+		t.Fatalf("good call after bad ones: %v", err)
+	}
+	_ = limitErr(t, func() error {
+		_, err := e.call(e.req(OpenWeather, "current", map[string]string{"lat": "36.5", "lng": "136.6"}))
+		return err
+	}())
 }
