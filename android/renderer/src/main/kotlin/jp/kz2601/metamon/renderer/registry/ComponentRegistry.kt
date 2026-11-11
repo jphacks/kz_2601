@@ -127,7 +127,7 @@ class ComponentRegistry private constructor(private val builders: Map<String, Co
             registerImportLeaves() // leaf: ファイルの取り込み(#865)・components/importing/ImportLeaves.kt
             registerSocialLeaves() // leaf: みんなで話す(#875)・components/social/SocialLeaves.kt
             // leaf: 表示(11・#857)
-            register(ComponentType.TEXT) { c, _, m -> TextLeaf(c, m) }
+            register(ComponentType.TEXT) { c, ctx, m -> TextLeaf(c, ctx, m) }
             register(ComponentType.LABEL) { c, _, m -> LabelLeaf(c, m) }
             register(ComponentType.ICON) { c, _, m -> IconLeaf(c, m) }
             register(ComponentType.MARKDOWN) { c, _, m -> MarkdownLeaf(c, m) }
