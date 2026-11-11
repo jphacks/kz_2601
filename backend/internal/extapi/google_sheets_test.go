@@ -84,6 +84,13 @@ func newFakeSheets(t *testing.T) (*fakeSheets, gcalWire) {
 		case "limited":
 			gerr(w, 429, "rateLimitExceeded")
 			return
+		case "daily":
+			gerr(w, 403, "dailyLimitExceeded")
+			return
+		case "disabled":
+			writeJSON(w, 403, map[string]any{"error": map[string]any{"code": 403, "status": "PERMISSION_DENIED",
+				"errors": []map[string]string{{"reason": "accessNotConfigured"}}}})
+			return
 		case "busy":
 			gerr(w, 503, "backendError")
 			return
@@ -307,7 +314,8 @@ func TestGoogleSheetsArgs(t *testing.T) {
 	}
 }
 
-// 401 → the connection turns to error; 403 → connect again; 404 (a file
+// 401 → the connection turns to error; a scope 403 → connect again; another
+// 403 or 404 (a file
 // not picked) and 400 → 400 bad_request; 429 / 5xx / rate-limit 403 → 502
 // upstream_unavailable.
 func TestGoogleSheetsErrors(t *testing.T) {
@@ -323,16 +331,26 @@ func TestGoogleSheetsErrors(t *testing.T) {
 	if err := read("dead", nil); !errors.Is(err, ErrInvalidGrant) {
 		t.Fatalf("401: %v", err)
 	}
-	for _, tok := range []string{"narrow", "forbidden"} {
-		if err := read(tok, nil); !errors.Is(err, ErrNotConnected) || Reason(err) != ReasonNotConnected {
-			t.Fatalf("403 %s: %v", tok, err)
-		}
+	// only a missing scope asks to connect again; no access to the item is
+	// bad_request, an API not enabled on our project upstream_unavailable
+	if err := read("narrow", nil); !errors.Is(err, ErrNotConnected) || Reason(err) != ReasonNotConnected {
+		t.Fatalf("403 scope: %v", err)
 	}
-	for _, tok := range []string{"limited", "busy", "quota"} {
+	if err := read("forbidden", nil); errors.Is(err, ErrNotConnected) || Reason(err) != ReasonBadRequest {
+		t.Fatalf("403 forbidden: %v", err)
+	}
+	if err := read("disabled", nil); errors.Is(err, ErrNotConnected) || Reason(err) != ReasonUpstream {
+		t.Fatalf("403 accessNotConfigured: %v", err)
+	}
+	for _, tok := range []string{"limited", "busy", "quota", "daily"} {
 		err := read(tok, nil)
 		var pe *ProviderError
 		if !errors.As(err, &pe) || !pe.Retryable || Reason(err) != ReasonUpstream {
 			t.Fatalf("%s: %v", tok, err)
+		}
+		// a quota 403 is the provider's 429: it pauses the provider
+		if tok != "busy" && !upstreamLimited(err) {
+			t.Fatalf("%s is not a 429: %v", tok, err)
 		}
 	}
 	other := strings.Repeat("Z", 30)

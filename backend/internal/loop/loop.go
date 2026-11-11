@@ -213,6 +213,7 @@ type NoticeReader interface {
 // ItemQuery filters ListItems.
 type ItemQuery struct {
 	Status string // "" = any
+	Source Source // "" = any
 	Limit  int    // <= 0 = 100
 }
 
