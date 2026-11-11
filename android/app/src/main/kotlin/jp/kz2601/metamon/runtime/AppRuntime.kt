@@ -21,6 +21,7 @@ import jp.kz2601.metamon.dsl.records.RecordPermission
 import jp.kz2601.metamon.nearby.NearbyShareController
 import jp.kz2601.metamon.renderer.ActionContext
 import jp.kz2601.metamon.renderer.DSLRuntime
+import jp.kz2601.metamon.renderer.EntityLoadState
 import jp.kz2601.metamon.renderer.components.lists.LeafData
 import jp.kz2601.metamon.renderer.FormMember
 import jp.kz2601.metamon.renderer.components.audio.DictationHost
@@ -166,6 +167,10 @@ class AppRuntime(
     /** 描画器のフォームが読む記録([RuntimeState.records] と同じもの)。 */
     private val _records = MutableStateFlow<Map<String, List<Record>>>(emptyMap())
     override val recordsFlow: StateFlow<Map<String, List<Record>>> = _records.asStateFlow()
+
+    /** entity ごとの読み込み状態(#1116)。[RuntimeState] の records / loading / failed から作る。 */
+    private val _loadStates = MutableStateFlow(loadStatesOf(_state.value))
+    override val loadStatesFlow: StateFlow<Map<String, EntityLoadState>> = _loadStates.asStateFlow()
 
     val document: AppDocument get() = _state.value.document
     val dsl: AppDSL get() = document.dsl
@@ -424,6 +429,7 @@ class AppRuntime(
         val next = directory?.let { it.fresh(it.store.rotate()) } ?: document
         _state.value = RuntimeState(next)
         _records.value = emptyMap()
+        publishLoadStates()
         _navigation.value = NavigationState.initial(next.dsl)
     }
 
@@ -769,6 +775,7 @@ class AppRuntime(
             if (cached.isNotEmpty()) setRecords(appId, entity, cached)
         }
         _state.update { it.copy(loading = it.loading + entity) }
+        publishLoadStates()
         try {
             val fresh = recordSync.pull(appId, entity)
             if (document.appId != appId) return
@@ -784,6 +791,7 @@ class AppRuntime(
             }
         } finally {
             _state.update { it.copy(loading = it.loading - entity) }
+            publishLoadStates()
         }
         sweepRetention(entity) // #482 サーバーから届いた期限切れ(別の端末で作った自分の記録など)
     }
@@ -848,6 +856,8 @@ class AppRuntime(
 
     override suspend fun loadRecords(entities: Set<String>) = load(entities)
 
+    override suspend fun retryRecords(entities: Set<String>) = load(entities, force = true)
+
     override suspend fun addRecord(entity: String, data: Map<String, JSONValue>): Boolean = createRecord(entity, data) != null
 
     override val currentAppId: String get() = document.appId
@@ -878,7 +888,15 @@ class AppRuntime(
     /** 描画に渡す記録(ブロックした人の共有の投稿を除く)。 */
     private fun publishRecords() {
         _records.value = social.hidingBlocked(_state.value.records)
+        publishLoadStates()
     }
+
+    private fun publishLoadStates() {
+        _loadStates.value = loadStatesOf(_state.value)
+    }
+
+    private fun loadStatesOf(s: RuntimeState): Map<String, EntityLoadState> =
+        EntityLoadState.all(s.records, s.loading, s.failed, s.document.dsl.entities.map { it.id }.toSet())
 
     override fun canReport(entity: String, record: Record): Boolean = social.canReport(entity, record)
     override fun reportRecord(entity: String, record: Record) = social.reportRecord(entity, record)

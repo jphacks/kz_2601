@@ -89,7 +89,7 @@ fun ListLeaf(c: Component, ctx: RenderContext, modifier: Modifier = Modifier) {
     val entity = data.entity(entityId)
     val rows = ListRows.rows(c, data, query)
     if (rows.isEmpty()) {
-        EmptyPlaceholder("tray", c.emptyText ?: data.labels.empty, modifier)
+        RecordsPlaceholderView(data, c.entity, "tray", c.emptyText ?: data.labels.empty, modifier)
         return
     }
     val toggleField = ListToggle.field(c.item, entity)
@@ -318,7 +318,7 @@ private fun CheckCircle(on: Boolean, enabled: Boolean, onToggle: (() -> Unit)?) 
     }
 }
 
-/** 空の一覧・表・時系列・グラフの案内(iOS の `EmptyPlaceholder` の「空」の形)。読み込み中・取得失敗の形はホストの読み込み状態が入ってから。 */
+/** 空の一覧・表・時系列・グラフの案内(iOS の `EmptyPlaceholder` の「空」の形)。読み込み中・取得失敗は [RecordsPlaceholderView]。 */
 @Composable
 internal fun EmptyPlaceholder(icon: String, text: String, modifier: Modifier = Modifier) {
     Column(
