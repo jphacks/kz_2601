@@ -157,6 +157,54 @@ internal val Icons.Filled.AcUnit: ImageVector
 
 private var _acUnit: ImageVector? = null
 
+internal val Icons.Filled.AccountBalance: ImageVector
+    get() {
+        if (_accountBalance != null) {
+            return _accountBalance!!
+        }
+        _accountBalance = materialIcon(name = "Filled.AccountBalance") {
+            materialPath {
+                moveTo(4.0f, 10.0f)
+                horizontalLineToRelative(3.0f)
+                verticalLineToRelative(7.0f)
+                horizontalLineToRelative(-3.0f)
+                close()
+            }
+            materialPath {
+                moveTo(10.5f, 10.0f)
+                horizontalLineToRelative(3.0f)
+                verticalLineToRelative(7.0f)
+                horizontalLineToRelative(-3.0f)
+                close()
+            }
+            materialPath {
+                moveTo(2.0f, 19.0f)
+                horizontalLineToRelative(20.0f)
+                verticalLineToRelative(3.0f)
+                horizontalLineToRelative(-20.0f)
+                close()
+            }
+            materialPath {
+                moveTo(17.0f, 10.0f)
+                horizontalLineToRelative(3.0f)
+                verticalLineToRelative(7.0f)
+                horizontalLineToRelative(-3.0f)
+                close()
+            }
+            materialPath {
+                moveTo(12.0f, 1.0f)
+                lineToRelative(-10.0f, 5.0f)
+                lineToRelative(0.0f, 2.0f)
+                lineToRelative(20.0f, 0.0f)
+                lineToRelative(0.0f, -2.0f)
+                close()
+            }
+        }
+        return _accountBalance!!
+    }
+
+private var _accountBalance: ImageVector? = null
+
 internal val Icons.Filled.AlternateEmail: ImageVector
     get() {
         if (_alternateEmail != null) {
@@ -3113,6 +3161,52 @@ internal val Icons.Filled.School: ImageVector
 
 private var _school: ImageVector? = null
 
+internal val Icons.Filled.ScreenRotation: ImageVector
+    get() {
+        if (_screenRotation != null) {
+            return _screenRotation!!
+        }
+        _screenRotation = materialIcon(name = "Filled.ScreenRotation") {
+            materialPath {
+                moveTo(16.48f, 2.52f)
+                curveToRelative(3.27f, 1.55f, 5.61f, 4.72f, 5.97f, 8.48f)
+                horizontalLineToRelative(1.5f)
+                curveTo(23.44f, 4.84f, 18.29f, 0.0f, 12.0f, 0.0f)
+                lineToRelative(-0.66f, 0.03f)
+                lineToRelative(3.81f, 3.81f)
+                lineToRelative(1.33f, -1.32f)
+                close()
+                moveTo(10.23f, 1.75f)
+                curveToRelative(-0.59f, -0.59f, -1.54f, -0.59f, -2.12f, 0.0f)
+                lineTo(1.75f, 8.11f)
+                curveToRelative(-0.59f, 0.59f, -0.59f, 1.54f, 0.0f, 2.12f)
+                lineToRelative(12.02f, 12.02f)
+                curveToRelative(0.59f, 0.59f, 1.54f, 0.59f, 2.12f, 0.0f)
+                lineToRelative(6.36f, -6.36f)
+                curveToRelative(0.59f, -0.59f, 0.59f, -1.54f, 0.0f, -2.12f)
+                lineTo(10.23f, 1.75f)
+                close()
+                moveTo(14.83f, 21.19f)
+                lineTo(2.81f, 9.17f)
+                lineToRelative(6.36f, -6.36f)
+                lineToRelative(12.02f, 12.02f)
+                lineToRelative(-6.36f, 6.36f)
+                close()
+                moveTo(7.52f, 21.48f)
+                curveTo(4.25f, 19.94f, 1.91f, 16.76f, 1.55f, 13.0f)
+                lineTo(0.05f, 13.0f)
+                curveTo(0.56f, 19.16f, 5.71f, 24.0f, 12.0f, 24.0f)
+                lineToRelative(0.66f, -0.03f)
+                lineToRelative(-3.81f, -3.81f)
+                lineToRelative(-1.33f, 1.32f)
+                close()
+            }
+        }
+        return _screenRotation!!
+    }
+
+private var _screenRotation: ImageVector? = null
+
 internal val Icons.Filled.Smartphone: ImageVector
     get() {
         if (_smartphone != null) {
@@ -3497,6 +3591,29 @@ internal val Icons.Filled.Tag: ImageVector
 
 private var _tag: ImageVector? = null
 
+internal val Icons.Filled.Terrain: ImageVector
+    get() {
+        if (_terrain != null) {
+            return _terrain!!
+        }
+        _terrain = materialIcon(name = "Filled.Terrain") {
+            materialPath {
+                moveTo(14.0f, 6.0f)
+                lineToRelative(-3.75f, 5.0f)
+                lineToRelative(2.85f, 3.8f)
+                lineToRelative(-1.6f, 1.2f)
+                curveTo(9.81f, 13.75f, 7.0f, 10.0f, 7.0f, 10.0f)
+                lineToRelative(-6.0f, 8.0f)
+                horizontalLineToRelative(22.0f)
+                lineTo(14.0f, 6.0f)
+                close()
+            }
+        }
+        return _terrain!!
+    }
+
+private var _terrain: ImageVector? = null
+
 internal val Icons.Filled.TextFields: ImageVector
     get() {
         if (_textFields != null) {
@@ -3833,6 +3950,29 @@ internal val Icons.Filled.WaterDrop: ImageVector
     }
 
 private var _waterDrop: ImageVector? = null
+
+internal val Icons.Filled.WbCloudy: ImageVector
+    get() {
+        if (_wbCloudy != null) {
+            return _wbCloudy!!
+        }
+        _wbCloudy = materialIcon(name = "Filled.WbCloudy") {
+            materialPath {
+                moveTo(19.36f, 10.04f)
+                curveTo(18.67f, 6.59f, 15.64f, 4.0f, 12.0f, 4.0f)
+                curveTo(9.11f, 4.0f, 6.6f, 5.64f, 5.35f, 8.04f)
+                curveTo(2.34f, 8.36f, 0.0f, 10.91f, 0.0f, 14.0f)
+                curveToRelative(0.0f, 3.31f, 2.69f, 6.0f, 6.0f, 6.0f)
+                horizontalLineToRelative(13.0f)
+                curveToRelative(2.76f, 0.0f, 5.0f, -2.24f, 5.0f, -5.0f)
+                curveToRelative(0.0f, -2.64f, -2.05f, -4.78f, -4.64f, -4.96f)
+                close()
+            }
+        }
+        return _wbCloudy!!
+    }
+
+private var _wbCloudy: ImageVector? = null
 
 internal val Icons.Filled.WbSunny: ImageVector
     get() {

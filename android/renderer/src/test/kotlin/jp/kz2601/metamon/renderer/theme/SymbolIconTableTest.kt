@@ -1,5 +1,8 @@
 package jp.kz2601.metamon.renderer.theme
 
+import jp.kz2601.metamon.renderer.components.feed.FeedFormat
+import jp.kz2601.metamon.renderer.components.sensors.SensorKind
+import jp.kz2601.metamon.renderer.components.sensors.SensorRules
 import jp.kz2601.metamon.renderer.theme.icons.materialVector
 import jp.kz2601.metamon.renderer.theme.icons.materialVectorNames
 import jp.kz2601.metamon.renderer.theme.icons.symbolMaterialNames
@@ -50,6 +53,25 @@ class SymbolIconTableTest {
         val names = listOf("gamecontroller", "yensign.circle", "at", "calendar.badge.plus", "text.book.closed", "bubble.left.fill")
         val missing = names.filter { SymbolIcons.vector(it) == null }
         assertTrue("表に無い既定アイコン: $missing", missing.isEmpty())
+    }
+
+    /** feed の空・失敗の絵(#1179)と天気の行の絵(サーバーの setCode)。丸に落ちない。 */
+    @Test
+    fun feedIconsDraw() {
+        val providers = listOf("weather", "holidays", "warnings", "pressure", "arxiv", "diet", null)
+        val names = providers.map { FeedFormat.icon(it) } + listOf("sun.max", "cloud", "cloud.rain", "cloud.snow")
+        val missing = names.filter { SymbolIcons.vector(it) == null }
+        assertTrue("表に無い feed の絵: $missing", missing.isEmpty())
+    }
+
+    /** センサーの見出しの印(#1194・iOS の SensorValueLeaf と同じ名前)。 */
+    @Test
+    fun sensorIconsDrawWithIosNames() {
+        assertEquals("gyroscope", SensorRules.icon(SensorKind.ROTATION))
+        assertEquals("barometer", SensorRules.icon(SensorKind.PRESSURE))
+        assertEquals("mountain.2", SensorRules.icon(SensorKind.ALTITUDE))
+        val missing = SensorKind.entries.map { SensorRules.icon(it) }.filter { SymbolIcons.vector(it) == null }
+        assertTrue("表に無いセンサーの印: $missing", missing.isEmpty())
     }
 
     @Test

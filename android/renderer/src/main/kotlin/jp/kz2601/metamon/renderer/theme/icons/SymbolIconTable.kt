@@ -51,12 +51,14 @@ internal val symbolMaterialNames: Map<String, String> = mapOf(
     "arrow.up.right.square" to "open_in_new",
     "arrow.uturn.left" to "undo",
     "at" to "alternate_email",
+    "barometer" to "speed",
     "bell" to "notifications",
     "book" to "menu_book",
     "book.closed" to "book",
     "bookmark" to "bookmark",
     "bubble.left" to "chat_bubble",
     "bubble.left.and.bubble.right" to "forum",
+    "building.columns" to "account_balance",
     "calendar" to "calendar_month",
     "calendar.badge.checkmark" to "event_available",
     "calendar.badge.clock" to "event",
@@ -78,6 +80,7 @@ internal val symbolMaterialNames: Map<String, String> = mapOf(
     "cloud" to "cloud",
     "cloud.rain" to "umbrella",
     "cloud.snow" to "ac_unit",
+    "cloud.sun" to "wb_cloudy",
     "cup.and.saucer" to "coffee",
     "doc" to "description",
     "doc.text" to "description",
@@ -103,6 +106,7 @@ internal val symbolMaterialNames: Map<String, String> = mapOf(
     "gearshape" to "settings",
     "globe" to "public",
     "graduationcap" to "school",
+    "gyroscope" to "screen_rotation",
     "hand.raised" to "pan_tool",
     "hand.thumbsup" to "thumb_up",
     "heart" to "favorite_border",
@@ -122,6 +126,7 @@ internal val symbolMaterialNames: Map<String, String> = mapOf(
     "mappin" to "location_on",
     "mappin.and.ellipse" to "location_on",
     "mic" to "mic",
+    "mountain.2" to "terrain",
     "newspaper" to "newspaper",
     "note.text" to "notes",
     "number" to "tag",
@@ -180,6 +185,7 @@ internal val symbolMaterialNames: Map<String, String> = mapOf(
 internal fun materialVector(name: String): ImageVector? = when (name) {
     "abc" -> Icons.Filled.Abc
     "ac_unit" -> Icons.Filled.AcUnit
+    "account_balance" -> Icons.Filled.AccountBalance
     "account_circle" -> Icons.Filled.AccountCircle
     "add" -> Icons.Filled.Add
     "add_circle" -> Icons.Filled.AddCircle
@@ -278,6 +284,7 @@ internal fun materialVector(name: String): ImageVector? = when (name) {
     "scale" -> Icons.Filled.Scale
     "schedule" -> Icons.Filled.Schedule
     "school" -> Icons.Filled.School
+    "screen_rotation" -> Icons.Filled.ScreenRotation
     "search" -> Icons.Filled.Search
     "send" -> Icons.AutoMirrored.Filled.Send
     "settings" -> Icons.Filled.Settings
@@ -293,6 +300,7 @@ internal fun materialVector(name: String): ImageVector? = when (name) {
     "sync" -> Icons.Filled.Sync
     "table_chart" -> Icons.Filled.TableChart
     "tag" -> Icons.Filled.Tag
+    "terrain" -> Icons.Filled.Terrain
     "text_fields" -> Icons.Filled.TextFields
     "thumb_up" -> Icons.Filled.ThumbUp
     "timer" -> Icons.Filled.Timer
@@ -304,6 +312,7 @@ internal fun materialVector(name: String): ImageVector? = when (name) {
     "visibility" -> Icons.Filled.Visibility
     "warning" -> Icons.Filled.Warning
     "water_drop" -> Icons.Filled.WaterDrop
+    "wb_cloudy" -> Icons.Filled.WbCloudy
     "wb_sunny" -> Icons.Filled.WbSunny
     "wifi_off" -> Icons.Filled.WifiOff
     else -> null
@@ -313,6 +322,7 @@ internal fun materialVector(name: String): ImageVector? = when (name) {
 internal val materialVectorNames: Set<String> = setOf(
     "abc",
     "ac_unit",
+    "account_balance",
     "account_circle",
     "add",
     "add_circle",
@@ -411,6 +421,7 @@ internal val materialVectorNames: Set<String> = setOf(
     "scale",
     "schedule",
     "school",
+    "screen_rotation",
     "search",
     "send",
     "settings",
@@ -426,6 +437,7 @@ internal val materialVectorNames: Set<String> = setOf(
     "sync",
     "table_chart",
     "tag",
+    "terrain",
     "text_fields",
     "thumb_up",
     "timer",
@@ -437,6 +449,7 @@ internal val materialVectorNames: Set<String> = setOf(
     "visibility",
     "warning",
     "water_drop",
+    "wb_cloudy",
     "wb_sunny",
     "wifi_off",
 )
