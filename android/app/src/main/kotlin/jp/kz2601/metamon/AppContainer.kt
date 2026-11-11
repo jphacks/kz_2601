@@ -105,6 +105,7 @@ import jp.kz2601.metamon.voice.FabPositionStore
 import jp.kz2601.metamon.voice.LaunchVisits
 import jp.kz2601.metamon.voice.SpeechSettings
 import jp.kz2601.metamon.renderer.a11y.TalkBack
+import jp.kz2601.metamon.renderer.components.actions.ShareImages
 import jp.kz2601.metamon.renderer.components.RemoteImages
 import jp.kz2601.metamon.renderer.components.audio.LocalAudioStore
 import jp.kz2601.metamon.renderer.components.dashcam.DashcamStore
@@ -639,6 +640,7 @@ class AppContainer(
             DashcamStore.removeAll(context.filesDir)
             MediaTempFiles.removeAll(context.cacheDir)
             ExportSteps.removeAll(context.cacheDir)
+            ShareImages.removeAll(context.cacheDir) // 共有した写真・QR の一時ファイル(#1086)
         }
 
         private fun recordSync(context: Context, client: AppConfigClient, dir: String) = RecordSyncEngine.create(

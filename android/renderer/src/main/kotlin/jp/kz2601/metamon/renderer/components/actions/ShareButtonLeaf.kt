@@ -8,6 +8,7 @@ import androidx.compose.ui.res.stringResource
 import jp.kz2601.metamon.dsl.Component
 import jp.kz2601.metamon.dsl.logic.ShareTarget
 import jp.kz2601.metamon.renderer.R
+import jp.kz2601.metamon.renderer.components.PhotoValue
 import jp.kz2601.metamon.renderer.form.FormDraft
 import jp.kz2601.metamon.renderer.registry.RenderContext
 
@@ -22,10 +23,14 @@ sealed interface ShareAction {
     /** any・slack・discord: OS の共有シート。 */
     data class Sheet(val text: String) : ShareAction
 
+    /** any・slack・discord で `field` が写真(data URL)の時: 写真と文面を共有シートで(#1086)。 */
+    data class Photo(val text: String, val dataUrl: String) : ShareAction
+
     companion object {
         fun of(target: ShareTarget, text: String?, field: String?, form: FormDraft?): ShareAction {
             val body = target.format(FormTemplate.shareText(text, field, form))
-            return target.directUrl(body)?.let { Direct(it, body) } ?: Sheet(body)
+            target.directUrl(body)?.let { return Direct(it, body) }
+            return ShareImages.photoDataUrl(field, form)?.let { Photo(body, it) } ?: Sheet(body)
         }
     }
 }
@@ -43,7 +48,7 @@ internal fun ShareTarget.labelRes(): Int = when (this) {
 /**
  * `shareButton`: text の `{{fieldId}}` を下書きの値で埋めて送る。shareTo: any = 共有シート / line・x・mail = 直接の URL /
  * slack・discord = 共有シート(文面を Markdown 記号なしに整える)。見た目は secondary(iOS と同じ)。
- * 写真(field が photo)の共有はまだ(文面だけ送る)。
+ * field が photo(data URL)なら写真も共有シートに載せる(#1086・LINE・X・メールは URL なので文面だけ)。
  */
 @Composable
 fun ShareButtonLeaf(c: Component, ctx: RenderContext, modifier: Modifier = Modifier) {
@@ -57,6 +62,9 @@ fun ShareButtonLeaf(c: Component, ctx: RenderContext, modifier: Modifier = Modif
             when (val a = ShareAction.of(target, c.text, c.field, ctx.form)) {
                 is ShareAction.Direct -> if (!openExternal(context, listOf(a.url), preferApp = true)) shareText(context, a.text, label)
                 is ShareAction.Sheet -> shareText(context, a.text, label)
+                is ShareAction.Photo -> PhotoValue.dataBytes(a.dataUrl)
+                    ?.let { shareImage(context, it, ShareImages.PHOTO_FILE, ShareImages.JPEG, a.text, label) }
+                    ?: shareText(context, a.text, label)
             }
         },
         modifier = modifier,
