@@ -12,6 +12,9 @@
 	<!-- 声で頼む(#966): マイク。サンドボックスとハードンドランタイムの両方がこのキーを見る -->
 	<key>com.apple.security.device.audio-input</key>
 	<true/>
+	<!-- 写真・動画の撮影(#1043)と QR の読み取り(#1045): 内蔵 / 連係 / 外付けカメラ。サンドボックスではこのキーが無いと AVCaptureDevice に届かない -->
+	<key>com.apple.security.device.camera</key>
+	<true/>
 	<!-- カレンダーに追加(#978): 予定を足す(書き込みだけの許可を求める)。サンドボックスではこのキーが無いと EventKit に届かない -->
 	<key>com.apple.security.personal-information.calendars</key>
 	<true/>

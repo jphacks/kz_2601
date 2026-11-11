@@ -35,6 +35,23 @@
         }
       }
     },
+    "NSCameraUsageDescription" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Used in the apps you build to take and record photos and videos, and to read QR codes."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "生成したアプリで写真や動画を撮影・記録したり、QR コードを読み取ったりするために、カメラを使用します。"
+          }
+        }
+      }
+    },
     "NSLocationUsageDescription" : {
       "extractionState" : "manual",
       "localizations" : {

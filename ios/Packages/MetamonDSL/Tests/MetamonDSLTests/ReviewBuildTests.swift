@@ -55,7 +55,7 @@ final class ReviewBuildTests: XCTestCase {
         XCTAssertEqual(ClientCapabilities.macUnavailableComponents, [.healthStat, .sensorValue, .locationTracker, .dashcam])
         XCTAssertTrue(mac.isDisjoint(with: ClientCapabilities.macUnavailableComponents.map(\.rawValue)))
         XCTAssertEqual(mac.count, ClientCapabilities.allComponents.count - ClientCapabilities.macUnavailableComponents.count)
-        XCTAssertEqual(ClientCapabilities.disabledFeatures(macOS: true, review: false), ["fieldHealth", "cameraCapture"])
+        XCTAssertEqual(ClientCapabilities.disabledFeatures(macOS: true, review: false), ["fieldHealth"])
         XCTAssertEqual(ClientCapabilities.disabledFeatures(macOS: true, review: true), ["fieldHealth", "cameraCapture", "sharedData"])
         let macReview = Set(ClientCapabilities.allowedComponents(macOS: true, review: true))
         XCTAssertTrue(macReview.isDisjoint(with: ClientCapabilities.reviewExcludedComponents.map(\.rawValue)))
