@@ -25,6 +25,7 @@ import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.onKeyEvent
 import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.input.key.type
+import jp.kz2601.metamon.desktop.i18n.Strings
 import jp.kz2601.metamon.dsl.Action
 import jp.kz2601.metamon.dsl.ActionType
 import jp.kz2601.metamon.dsl.AppDSL
@@ -37,26 +38,26 @@ import jp.kz2601.metamon.renderer.navigation.NavigationResolver
 
 // キーボードだけで使う(#1765): ショートカット・コマンドパレット(CommandPalette.kt)・F1 の一覧。
 
-/** キーボードまわりの文言(あとで i18n に移す)。 */
+/** キーボードまわりの文言(i18n の desktop_keys_*)。 */
 object KeyboardText {
-    const val PALETTE = "コマンドパレット"
-    const val NEW = "新規"
-    const val SAVE = "保存"
-    const val SEARCH = "検索"
-    const val DELETE = "削除"
-    const val CLOSE = "閉じる / 戻る"
-    const val HELP = "ショートカット一覧"
-    const val PRINT = "印刷"
-    const val DELETE_CONFIRM = "削除しますか？"
-    const val NO_NEW = "この画面には新規がありません"
-    const val NO_SAVE = "この画面には保存するフォームがありません"
-    const val PALETTE_PLACEHOLDER = "画面・アクション・アプリを名前で探す"
-    const val PALETTE_EMPTY = "見つかりません"
-    const val KIND_ACTION = "アクション"
-    const val KIND_SCREEN = "画面"
-    const val KIND_APP = "アプリ"
-    const val HELP_CLOSE = "閉じる"
-    const val HELP_TAB = "Tab / Shift+Tab で部品を行 → 列の順に移る。Enter / Space で押す"
+    val PALETTE get() = Strings["desktop_keys_palette"]
+    val NEW get() = Strings["desktop_keys_new"]
+    val SAVE get() = Strings["desktop_keys_save"]
+    val SEARCH get() = Strings["desktop_keys_search"]
+    val DELETE get() = Strings["desktop_keys_delete"]
+    val CLOSE get() = Strings["desktop_keys_close"]
+    val HELP get() = Strings["desktop_keys_help"]
+    val PRINT get() = Strings["desktop_print"]
+    val DELETE_CONFIRM get() = Strings["desktop_keys_delete_confirm"]
+    val NO_NEW get() = Strings["desktop_keys_no_new"]
+    val NO_SAVE get() = Strings["desktop_keys_no_save"]
+    val PALETTE_PLACEHOLDER get() = Strings["desktop_keys_palette_placeholder"]
+    val PALETTE_EMPTY get() = Strings["desktop_keys_palette_empty"]
+    val KIND_ACTION get() = Strings["desktop_keys_kind_action"]
+    val KIND_SCREEN get() = Strings["desktop_keys_kind_screen"]
+    val KIND_APP get() = Strings["desktop_keys_kind_app"]
+    val HELP_CLOSE get() = Strings["desktop_close"]
+    val HELP_TAB get() = Strings["desktop_keys_help_tab"]
 }
 
 /** キーの決まりを分ける OS。Windows・Linux は Ctrl、macOS は ⌘。 */
@@ -77,15 +78,18 @@ enum class HostOs {
 }
 
 /** ショートカット。[bubble] は入力欄に先に渡す物(Esc・Delete・F1)。他は入力欄より先に取る。 */
-enum class Shortcut(val title: String, val bubble: Boolean = false) {
-    PALETTE(KeyboardText.PALETTE),
-    NEW(KeyboardText.NEW),
-    SAVE(KeyboardText.SAVE),
-    SEARCH(KeyboardText.SEARCH),
-    DELETE(KeyboardText.DELETE, bubble = true),
-    CLOSE(KeyboardText.CLOSE, bubble = true),
-    PRINT(KeyboardText.PRINT),
-    HELP(KeyboardText.HELP, bubble = true),
+enum class Shortcut(private val text: () -> String, val bubble: Boolean = false) {
+    PALETTE({ KeyboardText.PALETTE }),
+    NEW({ KeyboardText.NEW }),
+    SAVE({ KeyboardText.SAVE }),
+    SEARCH({ KeyboardText.SEARCH }),
+    DELETE({ KeyboardText.DELETE }, bubble = true),
+    CLOSE({ KeyboardText.CLOSE }, bubble = true),
+    PRINT({ KeyboardText.PRINT }),
+    HELP({ KeyboardText.HELP }, bubble = true),
+    ;
+
+    val title: String get() = text()
 }
 
 /** 押したキー(KeyEvent から作る・テストでは直に作る)。 */

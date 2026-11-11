@@ -52,10 +52,15 @@ class PaletteCommand(
     val hint: String? = null,
     val run: () -> Unit,
 ) {
-    enum class Kind(val label: String) {
-        ACTION(KeyboardText.KIND_ACTION),
-        SCREEN(KeyboardText.KIND_SCREEN),
-        APP(KeyboardText.KIND_APP),
+    enum class Kind {
+        ACTION, SCREEN, APP;
+
+        val label: String
+            get() = when (this) {
+                ACTION -> KeyboardText.KIND_ACTION
+                SCREEN -> KeyboardText.KIND_SCREEN
+                APP -> KeyboardText.KIND_APP
+            }
     }
 
     override fun toString(): String = "$kind:$title"
