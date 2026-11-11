@@ -85,7 +85,7 @@ struct MacRootView: View {
         } detail: {
             Group {
                 if let app = selectedApp {
-                    AppCanvas(app: app, dsl: library.generated[app.id]?.dsl, showsScreenMap: $showsScreenMap,
+                    AppCanvas(app: app, dsl: library.generated[app.id]?.dsl, keepsRecords: library.isCreated(app.id), showsScreenMap: $showsScreenMap,
                               onTalk: { talk(about: $0) }, discardGuard: discardGuard)
                         .environment(\.changeHighlight, highlight?.canvas == Self.canvasKey(app) ? highlight?.value ?? .none : .none)
                         .id(Self.canvasKey(app))
@@ -177,6 +177,7 @@ struct MacRootView: View {
         if selectedAppId == id { selectedAppId = LocalAppLibrary.neighbor(deleting: id, in: apps.map(\.id)) }
         if notices.summary?.appId == id { notices.summary = nil }
         library.delete(id)
+        MacRecordVault.purge(appId: id) // 記録も消す(#1284)
         thumbs.remove(appId: id)
         Task { await MacRuntimeNotifications.removeApp(id) } // そのアプリの通知とタイマーの予約(#1324)
         MacVoiceOver.announce(L10n.tr("「\(name)」を削除しました"))
