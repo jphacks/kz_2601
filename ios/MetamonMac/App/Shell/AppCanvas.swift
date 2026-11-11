@@ -13,6 +13,8 @@ struct AppCanvas: View {
     let app: SampleApp
     /// 会話で作った・直したアプリの DSL(#967)。nil なら同梱の例を読む
     var dsl: AppDSL?
+    /// 作ったアプリ(#969)。記録を端末に残す(#1284)。同梱の例は今まで通り一時フォルダ
+    var keepsRecords = false
     /// 画面マップのシート(#970)。ツールバー・表示メニューが立てる
     var showsScreenMap: Binding<Bool> = .constant(false)
     /// 画面マップの「この画面について話す」・部品の「この部品について話す」(#1323)。マップ・モーダルを閉じ終えてから呼ぶ(シートを 2 枚同時に出さない)
@@ -38,7 +40,8 @@ struct AppCanvas: View {
                 return
             }
             do {
-                let created = MacAppRuntime(appId: app.id, dsl: try dsl ?? app.loadDSL(), dictation: voice?.dictation)
+                let sync = keepsRecords ? MacRecordVault.recordSync(appId: app.id) : nil
+                let created = MacAppRuntime(appId: app.id, dsl: try dsl ?? app.loadDSL(), recordSync: sync, dictation: voice?.dictation)
                 runtime = created
                 discardGuard?.runtime = created
             } catch {
