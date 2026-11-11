@@ -61,6 +61,26 @@ final class SignOutWipeTests: XCTestCase {
         XCTAssertEqual(keep.map { d.object(forKey: $0) as? NSObject }, keptValues, "言語・送信のオプトアウト・移行の印は残す")
     }
 
+    #if !APP_STORE_REVIEW
+    /// #1318: feed の覚えた行(前の人の問い合わせの結果)も消す。
+    func testWipeClearsRememberedFeedRows() async throws {
+        struct OneRow: FeedClient {
+            func feed(_ query: FeedQuery) async throws -> FeedResult {
+                FeedResult(provider: query.provider, title: "前の人の検索", items: [], source: FeedSource(name: "n", url: "https://x", license: "l"))
+            }
+        }
+        let q = FeedQuery(provider: "diet", q: "前の人の検索語")
+        defer { FeedCache.shared.reset() }
+        _ = try await FeedCache.shared.load(q, force: false, client: OneRow())
+        XCTAssertNotNil(FeedCache.shared.cached(q))
+
+        let rt = AppRuntime(document: try DSLExamples.document("kakeibo", version: 1), services: BuildConfig.make(environment: .mock))
+        await rt.wipeLocalData()
+
+        XCTAssertNil(FeedCache.shared.cached(q), "前の人の feed の行を残さない")
+    }
+    #endif
+
     func testPreservedKeysAreTheThreeSettingsPlusDeviceMarks() {
         XCTAssertEqual(LocalWipe.preservedKeys, [
             "metamon.appLanguage",
