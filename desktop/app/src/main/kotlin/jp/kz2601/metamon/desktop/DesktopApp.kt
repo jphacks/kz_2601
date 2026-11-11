@@ -2,6 +2,12 @@ package jp.kz2601.metamon.desktop
 
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.offset
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -33,7 +39,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import jp.kz2601.metamon.dsl.Screen
 import jp.kz2601.metamon.dsl.Action
 import jp.kz2601.metamon.dsl.ActionType
 import jp.kz2601.metamon.dsl.AppDSL
@@ -53,13 +61,14 @@ private class ScreenScope(
     val store: MockStore,
     val perform: (Action, String?) -> Unit,
     val entityOf: (String?) -> Entity?,
+    val data: LeafData,
 )
 
-/** DSL を 1 本読み、スタックで画面を積んで描く(骨格: grid の配置はせず DSL の順に縦に積む)。 */
+/** DSL を 1 本読み、スタックで画面を積んで描く。画面は 6 列のグリッド(フォームは段)に並べる。 */
 @Composable
-fun DesktopApp(dsl: AppDSL) {
-    var store by remember { mutableStateOf(MockStore()) }
-    var stack by remember { mutableStateOf(listOf(NavEntry(dsl.initialScreen, null, 0))) }
+fun DesktopApp(dsl: AppDSL, initialStore: MockStore = MockStore(), startScreen: String? = null) {
+    var store by remember { mutableStateOf(initialStore) }
+    var stack by remember { mutableStateOf(listOf(NavEntry(startScreen ?: dsl.initialScreen, null, 0))) }
     var nextKey by remember { mutableStateOf(1) }
     var message by remember { mutableStateOf<String?>(null) }
 
@@ -110,7 +119,8 @@ fun DesktopApp(dsl: AppDSL) {
         }
     }
 
-    val scope = ScreenScope(entity, draft, store, ::perform, entityOf)
+    val leafData = remember(store) { LeafData.of(dsl, store) }
+    val scope = ScreenScope(entity, draft, store, ::perform, entityOf, leafData)
     Surface(Modifier.fillMaxSize()) {
         Column(Modifier.fillMaxSize()) {
             Row(Modifier.fillMaxWidth().padding(8.dp), verticalAlignment = Alignment.CenterVertically) {
@@ -120,12 +130,82 @@ fun DesktopApp(dsl: AppDSL) {
             }
             HorizontalDivider()
             message?.let { Text(it, color = MaterialTheme.colorScheme.error, modifier = Modifier.padding(12.dp)) }
-            Column(
-                Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(16.dp),
-                verticalArrangement = Arrangement.spacedBy(12.dp),
-            ) {
-                screen.components.forEach { Node(it, scope) }
+            GridScreen(screen, scope)
+        }
+    }
+}
+
+private val GAP = 8.dp
+private val INSET = 16.dp
+
+/**
+ * 画面グリッド(iOS の GridScreenLayout・Android の screen/GridScreenLayout.kt)。
+ * area のある部品は 6 列 × 行の矩形に絶対配置、area の無い部品はその下に全幅で積む。フォーム画面は段ごとに中身の高さで積む。
+ * ウィンドウが広い時は幅を止めて中央に寄せ、低い時は画面ごと縦にスクロールする。
+ */
+@Composable
+private fun GridScreen(screen: Screen, s: ScreenScope) {
+    BoxWithConstraints(Modifier.fillMaxSize()) {
+        val m = DesktopGridMetrics.resolve(maxWidth.value, maxHeight.value, INSET.value)
+        val cellW = m.cellW.dp
+        val cellH = m.cellH.dp
+        val placement = screen.gridPlacement
+        Box(Modifier.fillMaxSize().verticalScroll(rememberScrollState()), contentAlignment = Alignment.TopCenter) {
+            Column(Modifier.width(m.frameWidth.dp).padding(INSET), verticalArrangement = Arrangement.spacedBy(GAP)) {
+                if (screen.isFormLayout) {
+                    FormBands(placement.placed, cellW, cellH, s)
+                } else if (placement.placed.isNotEmpty()) {
+                    PlacedGrid(placement.placed, cellW, cellH, placement.lastRow, s)
+                }
+                placement.stacked.forEach { Node(it, s) }
             }
+        }
+    }
+}
+
+/** 矩形に絶対配置。中身がはみ出す部品はセルの内側でスクロールする。 */
+@Composable
+private fun PlacedGrid(placed: List<Placed>, cellW: Dp, cellH: Dp, rows: Int, s: ScreenScope) {
+    Box(Modifier.fillMaxWidth().height(cellH * rows)) {
+        placed.forEach { (c, a) ->
+            Box(
+                Modifier
+                    .offset(x = cellW * a.col1 + GAP / 2, y = cellH * (a.row1 - 1) + GAP / 2)
+                    .size(width = cellW * a.colSpan - GAP, height = cellH * a.rowSpan - GAP)
+                    .verticalScroll(rememberScrollState()),
+            ) { Node(c, s) }
+        }
+    }
+}
+
+/** フォーム画面: 行が重なる部品を 1 段にまとめ、段ごとに上から積む。横位置・幅は area のまま。 */
+@Composable
+private fun FormBands(placed: List<Placed>, cellW: Dp, cellH: Dp, s: ScreenScope) {
+    val bands = formBands(placed)
+    bands.forEachIndexed { i, band ->
+        val detached = band.isDetached(bands.getOrNull(i - 1))
+        Box(Modifier.fillMaxWidth().padding(top = if (detached) 16.dp else 0.dp)) {
+            band.items.forEach { (c, a) ->
+                val m = Modifier.offset(x = cellW * a.col1 + GAP / 2).width(cellW * a.colSpan - GAP)
+                Box(if (c.type in DISPLAY_LEAVES) m.heightIn(min = cellH * 2) else m) { Node(c, s) }
+            }
+        }
+    }
+}
+
+/** Container の子。子が全員 area を持つ card / section / vstack はローカルグリッド(段で流す)。 */
+@Composable
+private fun LocalGridOrChildren(c: Component, s: ScreenScope, modifier: Modifier = Modifier) {
+    val local = c.localGridPlacement
+    if (local == null) {
+        Children(c, s, modifier)
+        return
+    }
+    BoxWithConstraints(modifier.fillMaxWidth()) {
+        val cellW = maxWidth / GridArea.COLUMNS
+        Column(verticalArrangement = Arrangement.spacedBy(GAP)) {
+            c.title?.let { Text(it, style = MaterialTheme.typography.titleMedium) }
+            FormBands(local, cellW, 40.dp, s)
         }
     }
 }
@@ -136,10 +216,24 @@ private fun Node(c: Component, s: ScreenScope) {
         ComponentType.HSTACK -> Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
             c.children.forEach { Box1(Modifier.weight(1f)) { Node(it, s) } }
         }
-        ComponentType.CARD -> Card(Modifier.fillMaxWidth()) { Children(c, s, Modifier.padding(12.dp)) }
-        in DesktopLeaves.containers -> Children(c, s)
-        ComponentType.TEXT, ComponentType.MARKDOWN -> Text(c.text.orEmpty())
-        ComponentType.LABEL, ComponentType.BADGE -> Text(c.label ?: c.text.orEmpty(), style = MaterialTheme.typography.labelLarge)
+        ComponentType.CARD -> Card(Modifier.fillMaxWidth()) { LocalGridOrChildren(c, s, Modifier.padding(12.dp)) }
+        in DesktopLeaves.containers -> LocalGridOrChildren(c, s)
+        ComponentType.TEXT -> Text(c.text.orEmpty())
+        ComponentType.MARKDOWN -> MarkdownLeaf(c.text.orEmpty())
+        ComponentType.LABEL -> Text(c.label ?: c.text.orEmpty(), style = MaterialTheme.typography.labelLarge)
+        ComponentType.BADGE -> BadgeLeaf(c)
+        ComponentType.IMAGE -> ImageLeaf(c, c.field?.let { s.draft[it] })
+        ComponentType.AVATAR -> AvatarLeaf(c, c.field?.let { s.draft[it] })
+        ComponentType.STAT -> StatLeaf(c, s.data)
+        ComponentType.CHART -> ChartLeaf(c, s.data)
+        ComponentType.PROGRESS_BAR -> ProgressLeaf(c, s.data)
+        ComponentType.GAUGE -> GaugeLeaf(c, s.data)
+        ComponentType.CALENDAR -> CalendarLeaf(c, s.data, c.onDateTap?.let { a -> { _ -> s.perform(a, null) } })
+        ComponentType.RATING -> {
+            val field = c.field
+            val value = field?.let { s.draft[it]?.toDoubleOrNull()?.toInt() } ?: (c.value as? jp.kz2601.metamon.dsl.ExprNumber)?.value?.toInt() ?: 0
+            RatingLeaf(c, value, if (field != null) fieldLabel(c, s) else c.label, field?.let { f -> { n: Int -> s.draft[f] = n.toString() } })
+        }
         ComponentType.EMPTY_STATE -> Text(c.title ?: c.message ?: c.text.orEmpty(), color = Color.Gray)
         ComponentType.SPACER -> Spacer(Modifier.height(8.dp))
         ComponentType.DIVIDER -> HorizontalDivider()
