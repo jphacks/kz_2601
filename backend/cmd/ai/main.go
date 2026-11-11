@@ -93,6 +93,7 @@ func main() {
 		LintRetry:       os.Getenv("AI_LINT_RETRY") == "1",   // off: lint warnings are reported only
 		TextImage:       os.Getenv("AI_TEXT_IMAGE") == "1",   // aiButton inputPhoto; off until the privacy policy names photos
 		NoBookLookup:    !books.EnabledFromEnv(os.Getenv),    // lookupBook only while appconfig has BOOK_LOOKUP_ENABLED (openBD terms)
+		NoCalls:         !ai.CallsEnabled(os.Getenv),         // callButton only while appconfig has CALLS_ENABLED (#447)
 		Logger:          claude.Logger,                       // ai.generate per request (#322)
 		// clarify turn (#147): its own model/effort/thinking; empty = ai.DefaultChat*
 		ChatConfig: ai.ChatConfig{
@@ -127,6 +128,10 @@ func main() {
 	svc.CreatorPaid = &ai.CreatorPaidCap{Daily: creatorDaily, MemberDaily: creatorMemberDaily, Env: os.Getenv("APP_ENV")}
 	if fsClient != nil && os.Getenv("RATE_LIMIT_STORE") != "memory" {
 		svc.CreatorPaid.Store = ratelimit.NewFirestore(fsClient, os.Getenv("RATE_LIMIT_COLLECTION"))
+	}
+	// COIN_BILLING_MODE (#630): generate / chat / text hold and charge coins
+	if cs := newCoins(fsClient); cs != nil {
+		svc.Coins = cs
 	}
 	// AI_PAUSED=1 stops only the Claude-calling routes with 503 ai_paused,
 	// before the rate limiter (#511). docs/infra/ai-pause.md

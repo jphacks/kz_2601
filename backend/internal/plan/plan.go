@@ -3,7 +3,8 @@
 //
 // The AI units per day are enforced by internal/ratelimit (RATE_LIMIT_*);
 // they are read into the table so every limit is listed in one place.
-// Apps, records and photos are enforced by appconfig when it saves.
+// Apps, records and photos are enforced by appconfig when it saves (apps:
+// 402 app_limit_reached, appconfig/app_slots.go).
 //
 // The plan is the payer's: the caller for its own apps, the app's creator for
 // an app someone else made (the creator pays, participants use it for free:
@@ -42,7 +43,10 @@ type Limits struct {
 	// AIUnitsDaily is the ratelimit units per day (signed-in user / Pro).
 	// Shown here; ratelimit enforces it.
 	AIUnitsDaily int
-	// Apps a user may create (own apps; installed shared apps are not counted).
+	// Apps a user may hold (#630 app slots): the apps in their list, both the
+	// ones they created and the shared ones they joined (users/{uid}/apps past
+	// version 1; a blank, never-generated app is not counted). Coin-bought
+	// slots (coins.Wallet.AppSlots) are added on top.
 	Apps int
 	// RecordsPerApp is the records one user sees in one app: its own records
 	// plus the app's shared ones, across every entity.
@@ -85,17 +89,19 @@ func (t Table) Allows(p Plan, resource string, used int) bool {
 	return limit <= 0 || used < limit
 }
 
-// Default is loose on purpose: it only stops runaway use until the values are
-// set from the measured cost (#298) and the price (#325).
+// Default: the held apps are the owner's decision of 2026-11-10 (free 2, Pro
+// 5; more with coin-bought slots). The rest is loose on purpose: it only
+// stops runaway use until the values are set from the measured cost (#298)
+// and the price (#325).
 var Default = Table{
-	Free: Limits{AIUnitsDaily: ratelimit.DefaultLimits.SignedIn, Apps: 100, RecordsPerApp: 5000, PhotosPerApp: 500},
-	Pro:  Limits{AIUnitsDaily: ratelimit.DefaultLimits.Pro, Apps: 1000, RecordsPerApp: 50000, PhotosPerApp: 5000},
+	Free: Limits{AIUnitsDaily: ratelimit.DefaultLimits.SignedIn, Apps: 2, RecordsPerApp: 5000, PhotosPerApp: 500},
+	Pro:  Limits{AIUnitsDaily: ratelimit.DefaultLimits.Pro, Apps: 5, RecordsPerApp: 50000, PhotosPerApp: 5000},
 	Mode: ModeEnforce,
 }
 
 // FromEnv reads the table (unset = Default; 0 = not counted):
 //
-//	PLAN_FREE_APPS / PLAN_PRO_APPS                       (100 / 1000)
+//	PLAN_FREE_APPS / PLAN_PRO_APPS                       (2 / 5)
 //	PLAN_FREE_RECORDS_PER_APP / PLAN_PRO_RECORDS_PER_APP (5000 / 50000)
 //	PLAN_FREE_PHOTOS_PER_APP / PLAN_PRO_PHOTOS_PER_APP   (500 / 5000)
 //	PLAN_LIMITS_MODE                                     enforce | log | off
@@ -186,7 +192,7 @@ func (m Mode) Stop(ctx context.Context, p Plan, resource, payer string, used, li
 // caller uses someone else's app, whose creator's plan ran out.
 func Message(resource string, limit int, upgrade, byCreator bool) string {
 	what := map[string]string{
-		Apps:          fmt.Sprintf("作れるアプリの数(%d 個)", limit),
+		Apps:          fmt.Sprintf("持てるアプリの数(%d 個)", limit),
 		RecordsPerApp: fmt.Sprintf("このアプリに保存できるデータの件数(%d 件)", limit),
 		PhotosPerApp:  fmt.Sprintf("このアプリに保存できる写真の枚数(%d 枚)", limit),
 	}[resource]

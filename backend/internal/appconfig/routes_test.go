@@ -49,6 +49,7 @@ var wantRoutes = []string{
 	"GET /v1/apps/{appId}/versions/{version}",
 	"GET /v1/feeds/{provider}",
 	"GET /v1/lookup/book",
+	"GET /v1/me/age-confirmation",
 	"GET /v1/me/blocks",
 	"GET /v1/me/usage",
 	"GET /v1/public-apps",
@@ -59,6 +60,7 @@ var wantRoutes = []string{
 	"PATCH /v1/apps/{appId}/entities/{entityId}/records/{recordId}",
 	"PATCH /v1/apps/{appId}/members/{uid}",
 	"POST /v1/apps",
+	"POST /v1/apps/{appId}/calls/token",
 	"POST /v1/apps/{appId}/duplicate",
 	"POST /v1/apps/{appId}/entities/{entityId}/records",
 	"POST /v1/apps/{appId}/entities/{entityId}/records/query",
@@ -81,8 +83,13 @@ var wantRoutes = []string{
 	"PUT /v1/apps/{appId}/dsl",
 	"PUT /v1/apps/{appId}/entities/{entityId}/records/{recordId}/marks/{markId}",
 	"PUT /v1/apps/{appId}/follows/{uid}",
+	"PUT /v1/me/age-confirmation",
 	"PUT /v1/me/devices/{installationId}",
 	"PUT /v1/me/notify-consent/{appId}",
+	"GET /v1/me/notices",
+	"GET /v1/me/notify-consent/feedback-fixed",
+	"POST /v1/me/notices/{noticeId}/read",
+	"PUT /v1/me/notify-consent/feedback-fixed",
 }
 
 // handleFuncPatterns collects every mux.HandleFunc pattern in the package sources.

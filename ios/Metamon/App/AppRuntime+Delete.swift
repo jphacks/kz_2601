@@ -16,12 +16,14 @@ extension AppRuntime {
         L10n.pick(L10n.tr("アプリを作っている間は削除できません。"), review: L10n.tr("記録帳を用意している間は削除できません。"))
     }
 
-    func deleteApp(_ app: AppSummary) async {
+    /// true = 消えた(持てるアプリの置き換え・#630 が続けるかを決める)
+    @discardableResult
+    func deleteApp(_ app: AppSummary) async -> Bool {
         guard canDelete else { // 確認を出した後に生成が始まった
             toast = Self.deleteBlockedReason
-            return
+            return false
         }
-        guard !appDeletion.hidden.contains(app.id) else { return } // 二度押し
+        guard !appDeletion.hidden.contains(app.id) else { return false } // 二度押し
         let fallback = AppDeletion.fallback(deleting: app.id, current: document.appId, apps: apps)
         do {
             try await appDeletion.run(app.id, delete: {
@@ -33,7 +35,7 @@ extension AppRuntime {
         } catch {
             print("[Metamon] deleteApp failed: \(error)")
             toast = ErrorCopy.failure(L10n.tr("「\(app.name)」を削除できませんでした"), error, context: "delete app")
-            return
+            return false
         }
         await recordSync.purge(appId: app.id)
         LiveActivities.enqueue { await LiveActivities.end(appId: app.id) } // ロック画面・Dynamic Island(#423)
@@ -43,6 +45,7 @@ extension AppRuntime {
         chatHistoryStore.remove(appId: app.id)          // チャット履歴(#210)
         toast = L10n.tr("「\(app.name)」を削除しました")
         print("[Metamon] deleted app: \(app.id) fallback=\(String(describing: fallback))")
+        return true
     }
 
     /// 使用中のアプリ `appId` から離れる。切り替え先を読めなかった(オフライン等)ら初期画面へ。

@@ -39,6 +39,7 @@ struct DiscoverSheet: View {
             }
         }
         .presentationDetents([.large])
+        .appLimitSheets() // #630 入れる時に持てるアプリの数に達したら、この上で置き換える
         .task(id: "\(sort)|\(query)|\(moderation.blockCount)") { await search() } // ブロックしたら読み直す(#321)
         .modifier(ModerationDialogs(discover: true))
     }

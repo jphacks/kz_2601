@@ -22,6 +22,10 @@ extension AppRuntime {
         LocalWipe.clearDefaults(.standard, domain: Bundle.main.bundleIdentifier)
         RemainingTodayStore.shared.clear()              // 今日の残り(#630・前のアカウントの数を出さない)
         PlanUsageStore.shared.clear()                   // 使っている量(#317)
+        #if !APP_STORE_REVIEW
+        CoinGate.shared.clear()                         // コインの残高(#630・前のアカウントの数を出さない)
+        MatchingUI.shared.wipe()                        // 仲間探しの 18 歳以上の申告を送った記録・一覧(#507)
+        #endif
         aiConsent?.reload()                             // 同意(#246)・チュートリアル(#274)の画面の状態を消した後に合わせる
         tutorial?.reload()
         let center = UNUserNotificationCenter.current()

@@ -159,6 +159,9 @@ func (h *HTTP) do(ctx context.Context, method, path string, headers map[string]s
 		if f, ok := e.Error.Details["features"]; ok {
 			ae.Details = map[string]any{"features": f}
 		}
+		if ae.Code == httpx.CodeAppLimitReached { // #630: iOS offers to replace a held app from these
+			ae.Details = e.Error.Details
+		}
 		return ae
 	}
 	if out != nil && len(data) > 0 {

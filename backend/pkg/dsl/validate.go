@@ -265,6 +265,7 @@ func (a *App) Validate() error {
 	}
 	checkComputedFields(a.Entities, entities, DailyToggleFields(a), add)
 	checkHiddenFields(a, entities, add)
+	checkEncryptedFields(a, entities, add) // encrypted.go
 	checkMatching(a, add)
 	checkSingleEntities(a, entities, add)
 	checkBookLookups(a, entities, add) // book_lookup.go
@@ -419,6 +420,9 @@ func (a *App) Validate() error {
 				checkComponentPeriodFilter(where, c, entities, add)
 			}
 			checkPhotoIllustrate(where, c, add) // photo_illustrate.go
+			if c.Type != CompOpenURLButton && (c.App != "" || c.To != "") {
+				add("%s: app / to are only for openUrlButton", where)
+			}
 			switch c.Type {
 			case CompText:
 				checkText(where, c, formEntity, add) // text_highlight.go
@@ -527,7 +531,7 @@ func (a *App) Validate() error {
 					add("%s: shareButton needs text", where)
 				}
 				if !ShareTargets[c.ShareTo] {
-					add("%s: shareButton shareTo %q must be one of any|line|slack|discord", where, c.ShareTo)
+					add("%s: shareButton shareTo %q must be one of any|line|slack|discord|x|mail", where, c.ShareTo)
 				}
 				if c.Field != "" {
 					if formEntity == nil {
@@ -537,11 +541,7 @@ func (a *App) Validate() error {
 					}
 				}
 			case CompOpenURLButton:
-				if c.Label == "" || c.URL == "" {
-					add("%s: openUrlButton needs label and url", where)
-				} else if !isOpenableURL(c.URL) {
-					add("%s: openUrlButton url %q must be https or one of the schemes %s", where, c.URL, strings.Join(OpenURLSchemes, ", "))
-				}
+				checkOpenURLButton(where, c, formEntity, add) // open_app.go
 			case CompWebView:
 				if !strings.HasPrefix(c.URL, "https://") {
 					add("%s: webView url %q must be an https URL", where, c.URL)
@@ -697,6 +697,8 @@ func (a *App) Validate() error {
 				checkBracket(where, c, entities, add) // bracket.go
 			case CompFeed:
 				checkFeed(where, c, add) // feed.go
+			case CompCallButton:
+				checkCallButton(where, c, a, add) // call_button.go
 			default:
 				add("%s: unknown component type %q", where, c.Type)
 			}
@@ -821,7 +823,7 @@ func isHTTPURL(s string) bool {
 }
 
 // ShareTargets are the shareButton.shareTo presets ("" = any, the OS share sheet).
-var ShareTargets = map[string]bool{"": true, "any": true, "line": true, "slack": true, "discord": true}
+var ShareTargets = map[string]bool{"": true, "any": true, "line": true, "slack": true, "discord": true, "x": true, "mail": true}
 
 // OpenURLSchemes is the allowlist of non-https schemes an openUrlButton may
 // launch (other apps / system handlers). Keep in sync with the iOS

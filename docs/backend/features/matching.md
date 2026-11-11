@@ -112,7 +112,7 @@ match_quota/{uid}   {day, n}  送った回数(JST の 1 日ごと)
 | 写真 | プロフィールに写真・動画を置かない(知らない人が見る) | `Validate` |
 | 連絡先 | つながるまで見せない。連絡先は `matched` の entity にだけ書く | サーバーの絞り込み・AI の規則・lint(下)・ai-eval `matchSafe` |
 | 年齢・性別・学校・本名 | プロフィールに入れない | AI の規則・lint(下)・ai-eval `matchSafe` |
-| 18 歳未満 | 送る・承認するには本人の「18 歳以上」の確認(`ageConfirmed: true`)が要る。年齢そのものは保存しない。中高生の仲間探しは match を使わず招待制の shared にする | サーバー(400 `age_unconfirmed`)・AI の規則 |
+| 18 歳未満 | 送る・承認するには本人の「18 歳以上」の確認(`ageConfirmed: true`)が要る。サーバーは申告したことだけを `users/{uid}.ageConfirmedAt` に記録する(`PUT /v1/me/age-confirmation`・送る / 承認する時の `true` でも記録)。申告の無い人には、interests・matches の一覧とプロフィールの投稿が 400 `age_unconfirmed`、プロフィール・連絡先の records は自分の分だけ。確認の前に申告の無い人が作ったプロフィールは、本人が申告するまで本人以外の一覧・取得・送る先に出さない(プロフィールの記録の `ownerAgeConfirmed`。申告した時に本人のプロフィールに付ける。付いていない記録だけ作者の `users/{uid}` を読む。前からある記録には [matching-age-backfill.md](../../infra/matching-age-backfill.md) で付ける)。年齢そのものは保存しない。中高生の仲間探しは match を使わず招待制の shared にする | サーバー(400 `age_unconfirmed`)・AI の規則 |
 | 断られたことを知らせない | 見送り・ブロックされた送信も、送った人には pending のまま | `pairView` |
 | しつこい送信 | 見送られた相手への送り直しは届かない。1 人 1 日 30 回まで(送り直しも数える) | ペアの状態・`match_quota` |
 | ブロック | #321 のブロックを両方向に効かせる | `BlockedEither` |

@@ -94,6 +94,7 @@ enum class ComponentType(val wire: String, val isContainer: Boolean = false) {
     MATCH_LIST("matchList"),
     FLASHCARDS("flashcards"),
     FEED("feed"),
+    CALL_BUTTON("callButton"),
 
     /** 知らない type(新しい版の部品)。描画器は「更新すると表示」の枠を出す(#351 §5)。 */
     UNKNOWN(""),
@@ -227,6 +228,9 @@ data class Component(
     @Serializable(with = GridTableRowRangeLenientSerializer::class)
     val rowRange: GridTableRowRange? = null,
     val shareTo: ShareTo? = null,
+    val app: App? = null,
+    @Serializable(with = LenientStringSerializer::class)
+    val to: String? = null,
     @Serializable(with = LenientStringSerializer::class)
     val locationField: String? = null,
     val zoom: Zoom? = null,
@@ -326,6 +330,10 @@ data class Component(
     val region: String? = null,
     @Serializable(with = LenientStringSerializer::class)
     val feedId: String? = null,
+    @Serializable(with = LenientBooleanSerializer::class)
+    val video: Boolean? = null,
+    @Serializable(with = LenientStringSerializer::class)
+    val room: String? = null,
     /** JSON の type の元の文字列。知らない type([ComponentType.UNKNOWN])でも残る(描画の木・「更新すると表示」に使う)。 */
     @Transient
     val rawType: String = "",

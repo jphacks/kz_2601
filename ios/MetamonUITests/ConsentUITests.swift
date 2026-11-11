@@ -41,6 +41,7 @@ final class ConsentUITests: XCTestCase {
         agree.tap()
         XCTAssertTrue(waitGone(agree), "同意しても閉じない")
         XCTAssertTrue(app.buttons["voice.fab"].waitForExistence(timeout: 30), "同意後に、同意の前に送ろうとした 1 件で生成されない")
+        XCTAssertFalse(agree.exists, "同意したのにまた同意の画面が出た")
         attach("consent-after-generate")
     }
 
