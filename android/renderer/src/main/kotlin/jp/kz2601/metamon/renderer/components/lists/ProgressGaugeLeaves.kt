@@ -20,6 +20,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
@@ -34,6 +35,7 @@ import androidx.compose.ui.unit.dp
 import jp.kz2601.metamon.dsl.Component
 import jp.kz2601.metamon.dsl.records.Aggregator
 import jp.kz2601.metamon.dsl.records.FieldCoding
+import jp.kz2601.metamon.renderer.EntityLoadState
 import jp.kz2601.metamon.renderer.R
 import jp.kz2601.metamon.renderer.registry.RenderContext
 import jp.kz2601.metamon.renderer.theme.LocalReduceMotion
@@ -49,18 +51,22 @@ import kotlin.math.abs
 @Composable
 fun ProgressBarLeaf(c: Component, ctx: RenderContext, modifier: Modifier = Modifier) {
     val data = rememberLeafData(ctx.runtime)
-    val raw = ProgressValue.ratio(c, data)
+    // 読み込み中・取得失敗は「0%」ではなく「—」(#1116・iOS の isUnavailable)
+    val load = AggregateLoad.of(c, data)
+    val settled = load == EntityLoadState.LOADED
+    val raw = if (settled) ProgressValue.ratio(c, data) else 0.0
     val tone = c.tone?.wire
-    val percent = if (ProgressValue.missingTarget(c, data)) FieldCoding.UNAVAILABLE else ProgressValue.percentText(raw, tone)
+    val percent = if (!settled || ProgressValue.missingTarget(c, data)) FieldCoding.UNAVAILABLE else ProgressValue.percentText(raw, tone)
     val colors = RenderTheme.colors
     val level = ProgressValue.level(raw, tone)
-    val textColor = when (level) {
-        ProgressValue.Level.NORMAL -> colors.brandText
-        ProgressValue.Level.SUCCESS -> colors.positive
-        ProgressValue.Level.OVER -> colors.negative
+    val textColor = when {
+        !settled -> colors.tertiaryLabel
+        level == ProgressValue.Level.NORMAL -> colors.brandText
+        level == ProgressValue.Level.SUCCESS -> colors.positive
+        else -> colors.negative
     }
-    val fill = when (level) {
-        ProgressValue.Level.NORMAL -> Brush.horizontalGradient(listOf(colors.brandFillStart, colors.brandFillEnd))
+    val fill = when {
+        level == ProgressValue.Level.NORMAL && settled -> Brush.horizontalGradient(listOf(colors.brandFillStart, colors.brandFillEnd))
         else -> Brush.horizontalGradient(listOf(textColor, textColor))
     }
     val ratio by animateFloatAsState(
@@ -69,10 +75,11 @@ fun ProgressBarLeaf(c: Component, ctx: RenderContext, modifier: Modifier = Modif
         label = "progress",
     )
     val progressLabel = c.label ?: stringResource(R.string.lists_progress)
+    val progressState = loadStateDescription(load) ?: percent
     Column(
         modifier.renderCard().clearAndSetSemantics {
             contentDescription = progressLabel
-            stateDescription = percent
+            stateDescription = progressState
         },
         verticalArrangement = Arrangement.spacedBy(6.dp),
     ) {
@@ -82,7 +89,7 @@ fun ProgressBarLeaf(c: Component, ctx: RenderContext, modifier: Modifier = Modif
                 Text(percent, style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.SemiBold, fontFeatureSettings = "tnum"), color = textColor)
             }
         }
-        Box(Modifier.fillMaxWidth().height(10.dp).background(colors.surfaceElevated, CircleShape)) {
+        Box(Modifier.fillMaxWidth().height(10.dp).loadingPulse(load).background(colors.surfaceElevated, CircleShape)) {
             Box(Modifier.fillMaxHeight().fillMaxWidth(ratio).background(fill, CircleShape))
         }
     }
@@ -94,12 +101,16 @@ fun GaugeLeaf(c: Component, ctx: RenderContext, modifier: Modifier = Modifier) {
     val data = rememberLeafData(ctx.runtime)
     val lo = c.min ?: 0.0
     val hi = (c.max ?: 1.0).let { if (it > lo) it else lo + 1 }
-    val (value, unit) = GaugeValue.value(c, data)
+    val load = AggregateLoad.of(c, data)
+    val settled = load == EntityLoadState.LOADED
+    val (aggregated, unit) = GaugeValue.value(c, data)
+    // 読み込み中・取得失敗は 0 ではなく「—」で針を出さない(#1116・iOS の GaugeLeaf)
+    val value = if (settled) aggregated else lo
     val clamped = value.coerceIn(lo, hi)
-    val valueText = Aggregator.format(value, null, null)
+    val valueText = if (settled) Aggregator.format(value, null, null) else FieldCoding.UNAVAILABLE
     val title = c.label?.let { l -> unit?.let { "$l ($it)" } ?: l }
     val gaugeLabel = title ?: stringResource(R.string.lists_gauge)
-    val gaugeState = stringResource(R.string.lists_gauge_range, valueText, compact(lo), compact(hi))
+    val gaugeState = loadStateDescription(load) ?: stringResource(R.string.lists_gauge_range, valueText, compact(lo), compact(hi))
     val colors = RenderTheme.colors
     Column(
         modifier.renderCard().clearAndSetSemantics {
@@ -110,7 +121,7 @@ fun GaugeLeaf(c: Component, ctx: RenderContext, modifier: Modifier = Modifier) {
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
-        Box(Modifier.size(112.dp), contentAlignment = Alignment.Center) {
+        Box(Modifier.size(112.dp).loadingPulse(load), contentAlignment = Alignment.Center) {
             Canvas(Modifier.size(104.dp)) {
                 val stroke = 10.dp.toPx()
                 val arc = Size(size.width - stroke, size.height - stroke)
@@ -124,7 +135,11 @@ fun GaugeLeaf(c: Component, ctx: RenderContext, modifier: Modifier = Modifier) {
                 )
             }
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                Text(valueText, style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.SemiBold, fontFeatureSettings = "tnum"))
+                Text(
+                    valueText,
+                    style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.SemiBold, fontFeatureSettings = "tnum"),
+                    color = if (settled) MaterialTheme.colorScheme.onSurface else colors.tertiaryLabel,
+                )
                 Row(horizontalArrangement = Arrangement.spacedBy(18.dp)) {
                     Text(compact(lo), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     Text(compact(hi), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
@@ -134,6 +149,19 @@ fun GaugeLeaf(c: Component, ctx: RenderContext, modifier: Modifier = Modifier) {
         title?.let { Text(it, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1) }
     }
 }
+
+/** 読み込み中・取得失敗の読み上げ(読めた時は null で値を読む)。 */
+@Composable
+private fun loadStateDescription(load: EntityLoadState): String? = when (load) {
+    EntityLoadState.LOADING -> stringResource(R.string.load_state_loading)
+    EntityLoadState.UNAVAILABLE -> stringResource(R.string.lists_unavailable)
+    EntityLoadState.LOADED -> null
+}
+
+/** 読み込み中だけ骨組みと同じ明滅。 */
+@Composable
+private fun Modifier.loadingPulse(load: EntityLoadState): Modifier =
+    if (load == EntityLoadState.LOADING) alpha(skeletonPulse()) else this
 
 /** 端の目盛り: 大きい値は 30K のように短く。 */
 internal fun compact(v: Double): String {

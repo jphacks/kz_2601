@@ -97,6 +97,12 @@ struct NearbyPassbyLeaf: View {
             .font(.caption)
             .foregroundStyle(.secondary)
             .fixedSize(horizontal: false, vertical: true)
+        // 同じ OS どうしだけつながる(近くの人に送るシートと同じ文)
+        Label(L("Android の端末とはつながりません(iPhone どうしで送り合えます)"), systemImage: "info.circle")
+            .font(.caption)
+            .foregroundStyle(.secondary)
+            .fixedSize(horizontal: false, vertical: true)
+            .accessibilityIdentifier("passby.androidNote")
         if let notice = host.notice {
             Label(notice, systemImage: "exclamationmark.triangle")
                 .font(.caption)

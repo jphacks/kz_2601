@@ -111,7 +111,8 @@ struct AppleLinkButton: View {
         .alert("この Apple ID は別のアカウントで使われています", isPresented: $session.linkConflict) {
             Button("そのアカウントに切り替える", role: .destructive) {
                 Task {
-                    guard await session.switchToExistingAppleAccount() else { return }
+                    guard await session.switchToExistingAppleAccount(beforeSwitch: { await rt.unregisterPushDevice() },
+                                                                     afterFailedSwitch: { await rt.registerPushDevice() }) else { return }
                     await rt.adoptSwitchedAccount()
                     onLinked()
                 }

@@ -2,15 +2,21 @@ package jp.kz2601.metamon.renderer.components.ai
 
 import jp.kz2601.metamon.dsl.Component
 import jp.kz2601.metamon.dsl.Length
+import jp.kz2601.metamon.dsl.Screen
 import jp.kz2601.metamon.dsl.Task
+import jp.kz2601.metamon.dsl.ai.AiOutputs
 import jp.kz2601.metamon.dsl.ai.AiSaveTo
 import jp.kz2601.metamon.dsl.ai.AiTextError
 import jp.kz2601.metamon.dsl.ai.AiTextResult
+import jp.kz2601.metamon.dsl.ai.AiTextShape
 import jp.kz2601.metamon.dsl.records.Entity
+import jp.kz2601.metamon.dsl.records.FieldCoding
 import jp.kz2601.metamon.dsl.records.HiddenFields
 import jp.kz2601.metamon.dsl.records.JSONValue
 import jp.kz2601.metamon.dsl.records.Record
 import jp.kz2601.metamon.renderer.DSLRuntime
+import jp.kz2601.metamon.renderer.components.feed.FeedHost
+import jp.kz2601.metamon.renderer.components.feed.feeds
 import jp.kz2601.metamon.renderer.form.FormDraft
 import kotlinx.coroutines.CancellationException
 
@@ -53,19 +59,60 @@ object AiButtonRun {
         }
     }
 
-    /** generate: 結果を返す。フォームがあり output があればドラフトにも入れる。 */
-    suspend fun generate(c: Component, form: FormDraft?, runtime: DSLRuntime, locale: String, route: AiRoute = route(c, runtime)): AiTextResult {
+    /**
+     * generate: 結果を返す。フォームがあり output があればドラフトにも入れる。
+     * inputFeeds があれば [screen] の feed の行を [feeds] から取って材料に足す([AiFeedInput])。
+     */
+    suspend fun generate(
+        c: Component,
+        form: FormDraft?,
+        runtime: DSLRuntime,
+        locale: String,
+        route: AiRoute = route(c, runtime),
+        screen: Screen? = null,
+        feeds: FeedHost? = runtime.feeds,
+    ): AiTextResult {
         if (route is AiRoute.Unavailable) throw AiTextError.Unsupported
         return metered(runtime, route, Task.GENERATE.wire) {
             val (source, records) = inputRecords(c, runtime, route)
             val values = form?.let { formValues(it, runtime) }.orEmpty()
-            val request = AiGenerateBuilder.build(c, form?.entity, values, source, records, locale)
+            val built = AiGenerateBuilder.build(c, form?.entity, values, source, records, locale)
+            val request = AiFeedInput.attach(c, screen, feeds, built) // inputFeeds: 画面の feed の行
             val host = runtime.ai ?: throw AiTextError.Unsupported
             val out = if (route == AiRoute.OnDevice) host.onDevice.generate(request) else host.generateText(request)
             val output = c.output
             if (output != null && form != null) form.values[output] = JSONValue.Str(out.text)
             out
         }
+    }
+
+    /** outputs で入れた結果。[filled] は今回の項目(読めなかったものも)。 */
+    data class OutputsFill(val filled: List<AiOutputs.Fill>, val applied: AiOutputs.Applied) {
+        val missed: List<AiOutputs.Fill> get() = filled.filter { it.value == null }
+    }
+
+    /**
+     * outputs(iOS の AiGenerateLeaf.fillOutputs): 結果の各項目を field の型に直してドラフトに入れる。空の field だけに入れ、
+     * 利用者が入れた値は上書きしない(新規で開いたままの初期値と、前回 AI が入れたままの値 [previous] は入れ替える)。
+     * 読めない項目は触らない。入れた値は [previous] に覚える。fields + outputs でなければ null。
+     */
+    fun fillOutputs(c: Component, out: AiTextResult, form: FormDraft, previous: MutableMap<String, JSONValue>): OutputsFill? {
+        val outputs = AiOutputs.from(c.outputs)?.takeIf { it.isNotEmpty() }
+        if (out.shape != AiTextShape.FIELDS || outputs == null) return null
+        val filled = AiOutputs.fills(out.fields.orEmpty(), outputs, form.entity)
+        val values = form.values.toMutableMap()
+        val applied = AiOutputs.apply(filled, values) { id, cur ->
+            if (previous[id] == cur) return@apply true
+            if (form.isEditing) return@apply false
+            val f = form.entity.field(id) ?: return@apply false
+            FieldCoding.normalize(cur, f) == form.baselineValue(id) // 新規で開いたままの初期値
+        }
+        for (f in applied.applied) {
+            val v = values[f.field] ?: continue
+            form.values[f.field] = v
+            previous[f.field] = v
+        }
+        return OutputsFill(filled, applied)
     }
 
     /** 保存の結果。[saved] / [failed] は items の位置。 */

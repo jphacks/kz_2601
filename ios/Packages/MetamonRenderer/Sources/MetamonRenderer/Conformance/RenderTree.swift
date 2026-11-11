@@ -283,6 +283,23 @@ public struct RenderTree {
         case .image:
             let value = c.field.flatMap { ctx.form?.values[$0] } ?? .null
             return ["hasImage": .bool(!value.isNull)]
+        case .aiChat:
+            // DSL の値と会話の並び(AiChatLeaf と同じ: 自分の記録だけ・古い順・roleField が無ければ交互)。返事は AI 次第なので入れない
+            var p: [String: JSONValue] = [:]
+            if let v = c.textField { p["textField"] = .string(v) }
+            if let v = c.roleField { p["roleField"] = .string(v) }
+            if let v = c.chatSaveTo { p["saveTo"] = .object(["entity": .string(v.entity)]) }
+            if let v = c.inputEntity { p["inputEntity"] = .string(v) }
+            if let entityId = c.entity, let textField = c.textField {
+                let turns = rt.dsl.entity(entityId).map { entity in
+                    AIChat.turns(AIChat.own(rt.viewRecords(for: entity.id), uid: rt.currentUserId, shared: entity.isShared),
+                                 textField: textField, roleField: c.roleField)
+                } ?? []
+                p["turns"] = .array(turns.map {
+                    .object(["recordId": .string($0.id), "role": .string($0.role.rawValue), "text": .string($0.text)])
+                })
+            }
+            return p
         default:
             return [:]
         }

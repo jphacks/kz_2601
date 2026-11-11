@@ -7,7 +7,11 @@
 //	appstore_transactions/{originalTxId}     {uid, productId, environment, boundAt, updatedAt}
 //
 // The second document binds one App Store subscription to one uid (see
-// Service.SubmitApple for the policy). The ai rate limiter reads the first one
+// Service.SubmitApple for the policy). Google Play purchases (Android) use
+//
+//	googleplay_purchases/{sha256(purchaseToken)}  {uid, productId, environment, boundAt, updatedAt}
+//
+// the same way (Service.SubmitGoogle, google.go). The ai rate limiter reads the first one
 // through ProChecker (#449).
 //
 // Seam for #315 (App Store Server Notifications v2 / Server API): a notification
@@ -44,6 +48,8 @@ type Pro struct {
 	// SignedAt is Apple's signedDate of the stored transaction: an older
 	// signing of the same transaction never replaces it (#315).
 	SignedAt time.Time `json:"-" firestore:"signedAt,omitempty"`
+	// Platform is PlatformGooglePlay for a Play purchase ("" = App Store).
+	Platform string `json:"platform,omitempty" firestore:"platform,omitempty"`
 
 	// renewalKnown: GraceExpiresAt / WillRenew come from a renewal info
 	// (otherwise merge keeps the stored ones). Not stored.

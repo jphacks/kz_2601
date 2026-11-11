@@ -166,6 +166,33 @@ class ShareSheetModelTest {
     // MARK: リンクの形
 
     @Test
+    fun webLinkForms() {
+        // iOS の SharingTests.testShareURLTokenFromUniversalLink と同じ例
+        assertEquals("AbC_12-x", ShareLinks.token("https://tailor-it.app/s/AbC_12-x"))
+        assertEquals("tok", ShareLinks.token("https://Tailor-It.app/s/tok"))
+        assertEquals("tok", ShareLinks.token("HTTPS://tailor-it.app/s/tok"))
+        assertEquals("tok", ShareLinks.token("https://tailor-it.app/s/tok/"))
+        assertEquals("tok", ShareLinks.token("https://tailor-it.app/s/tok?utm_source=x"))
+        assertEquals("tok", ShareLinks.token("https://tailor-it.app/s/tok#x"))
+        listOf(
+            "https://tailor-it.app/s/",
+            "https://tailor-it.app/s",
+            "https://tailor-it.app/s/tok/extra",
+            "https://tailor-it.app/terms",
+            "https://tailor-it.app/x/tok",
+            "https://tailor-it.app:8443/s/tok",
+            "http://tailor-it.app/s/tok",
+            "https://www.tailor-it.app/s/tok",
+            "https://tailor-it.app.evil.example/s/tok",
+            "https://user@tailor-it.app/s/tok",
+            "https://evil.example/s/tok",
+            "https://tailor-it.app/s/a%2Fb",
+            "https://tailor-it.app/s/a%20b",
+            "https://tailor-it.app/s/..",
+        ).forEach { assertNull(it, ShareLinks.token(it)) }
+    }
+
+    @Test
     fun linkForms() {
         assertEquals("abc-_9", ShareLinks.token("tailorit://import/abc-_9"))
         assertEquals("abc", ShareLinks.token("TAILORIT://Import/abc"))

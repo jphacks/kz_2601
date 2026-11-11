@@ -16,7 +16,8 @@ data class AiTextAccess(val consentGranted: Boolean, val isPro: Boolean, val enf
 /**
  * aiButton のホスト側(iOS の AppRuntime+AIText / +AIButtonMetrics)。
  * 端末内 AI が使えない時だけ `POST /v1/text` を呼ぶ。判定は [AiTextGate](同意 → Pro)。断る時は理由の [AiTextError] を投げ、部品が文言を出す。
- * 同意が無い時は [onNeedsConsent] で同意の画面を出す(iOS の `requireAIConsent`・#888)。課金画面(#073)はまだ無いので理由だけ返す。
+ * 同意が無い時は [onNeedsConsent] で同意の画面を出す(iOS の `requireAIConsent`・#888)。
+ * Pro が要る時(端末の判定・サーバーの 402)は [onNeedsPro] で課金画面を出す(iOS の `requestProForAIText`)。
  */
 class AppAiHost(
     private val ai: AIClient,
@@ -30,6 +31,8 @@ class AppAiHost(
     private val metrics: (AiButtonMetric) -> Unit = {},
     /** 同意が要る時に同意の画面を出す(#888) */
     private val onNeedsConsent: () -> Unit = {},
+    /** Pro が要る時に課金画面を出す。引数は aiChat(会話)か */
+    private val onNeedsPro: (chat: Boolean) -> Unit = {},
 ) : AiHost {
     override val supportsOnlineText: Boolean get() = true
 
@@ -40,8 +43,17 @@ class AppAiHost(
                 onNeedsConsent()
                 throw AiTextError.NeedsConsent
             }
-            AiTextGate.Decision.NEEDS_PRO -> throw AiTextError.NeedsPro
-            AiTextGate.Decision.SEND -> ai.text(request.inApp(appId()))
+            AiTextGate.Decision.NEEDS_PRO -> {
+                onNeedsPro(request.isChat)
+                throw AiTextError.NeedsPro
+            }
+            AiTextGate.Decision.SEND -> try {
+                ai.text(request.inApp(appId()))
+            } catch (e: AiTextError.NeedsPro) {
+                // サーバーが 402 pro_required(端末の Pro の判定が古いなど)。作成者の Pro が要る時(CreatorNeedsPro)は画面を出さない
+                onNeedsPro(request.isChat)
+                throw e
+            }
         }
     }
 

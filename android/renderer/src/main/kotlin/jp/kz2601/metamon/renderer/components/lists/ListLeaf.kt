@@ -1,8 +1,11 @@
 package jp.kz2601.metamon.renderer.components.lists
 
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -34,6 +37,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.CustomAccessibilityAction
 import androidx.compose.ui.semantics.clearAndSetSemantics
@@ -54,6 +59,8 @@ import jp.kz2601.metamon.dsl.ListItem
 import jp.kz2601.metamon.dsl.expr.DSLClock
 import jp.kz2601.metamon.dsl.records.Entity
 import jp.kz2601.metamon.dsl.records.FieldType
+import jp.kz2601.metamon.dsl.records.Mark
+import jp.kz2601.metamon.dsl.records.MarkState
 import jp.kz2601.metamon.dsl.records.Record
 import jp.kz2601.metamon.dsl.records.MatchBox
 import jp.kz2601.metamon.renderer.ActionContext
@@ -61,14 +68,18 @@ import jp.kz2601.metamon.renderer.R
 import jp.kz2601.metamon.renderer.components.PhotoValue
 import jp.kz2601.metamon.renderer.components.PhotoView
 import jp.kz2601.metamon.renderer.components.social.InterestButton
+import jp.kz2601.metamon.renderer.components.social.MarksHost
 import jp.kz2601.metamon.renderer.components.social.MatchingHost
 import jp.kz2601.metamon.renderer.components.social.ModerationHost
 import jp.kz2601.metamon.renderer.components.social.interestTitle
 import jp.kz2601.metamon.renderer.registry.RenderContext
+import jp.kz2601.metamon.renderer.screen.ScreenToolbar
+import jp.kz2601.metamon.renderer.theme.LocalReduceMotion
 import jp.kz2601.metamon.renderer.theme.RenderTheme
 import jp.kz2601.metamon.renderer.theme.SymbolIcon
 import jp.kz2601.metamon.renderer.theme.colors
 import jp.kz2601.metamon.renderer.theme.renderCard
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
 /**
@@ -79,7 +90,7 @@ import kotlinx.coroutines.launch
  * - `item.toggle`(#108): 行頭の丸で boolean を反転して即保存(楽観的 UI。失敗したら戻す)
  * - 行は 1 枚のカードに積み、行間は hairline。グリッドのセルが縦スクロールを持つので LazyColumn にはしない
  * - `item.interest`(#877): 仲間探しのプロフィールの行の右端に「つながりたい」([MatchingHost] を持つ runtime だけ)
- * 印(いいね)は、共有まわりの能力(android-068)が入るまで出さない(Issue #859 の備考)。
+ * - `item.mark`(#255): 共有の entity の行の右端に印(いいね・保存)。押した瞬間に件数と塗りを変え、返事で確定・失敗で戻す([MarksHost] を持つ runtime だけ)
  */
 @Composable
 fun ListLeaf(c: Component, ctx: RenderContext, modifier: Modifier = Modifier) {
@@ -88,8 +99,18 @@ fun ListLeaf(c: Component, ctx: RenderContext, modifier: Modifier = Modifier) {
     val entityId = c.entity ?: ""
     val entity = data.entity(entityId)
     val rows = ListRows.rows(c, data, query)
+    val highlighted = rememberNewRowHighlight(rows.map { it.id })
     if (rows.isEmpty()) {
-        EmptyPlaceholder("tray", c.emptyText ?: data.labels.empty, modifier)
+        val dsl = LocalAppDsl.current
+        val add = remember(entityId, ctx.screen, dsl) {
+            val screen = ctx.screen
+            if (screen == null || dsl == null) null else ScreenToolbar.emptyListAdd(entityId, screen, dsl)
+        }
+        RecordsPlaceholderView(
+            data, c.entity, "tray", c.emptyText ?: data.labels.empty, modifier,
+            onAdd = add?.let { a -> { ctx.perform(a) } },
+            showsAddHint = true,
+        )
         return
     }
     val toggleField = ListToggle.field(c.item, entity)
@@ -98,6 +119,9 @@ fun ListLeaf(c: Component, ctx: RenderContext, modifier: Modifier = Modifier) {
     val today = DSLClock.now()
     val matching = (ctx.runtime as? MatchingHost)?.takeIf { c.item?.interest == true }
     val moderation = ctx.runtime as? ModerationHost
+    val marksHost = ctx.runtime as? MarksHost
+    val mark = marksHost?.let { ListMarks.mark(c.item?.mark, entity) }
+    val markOverrides = remember { mutableStateMapOf<String, MarkState>() }
     matching?.matchingVersion?.collectAsState()?.value // 送った・つながったで描き直す
     if (matching != null) LaunchedEffect(entityId) { matching.refreshMatches(MatchBox.entries.toSet()) }
     Column(modifier.renderCard(padding = 0.dp)) {
@@ -125,7 +149,22 @@ fun ListLeaf(c: Component, ctx: RenderContext, modifier: Modifier = Modifier) {
             val sendInterest = { scope.launch { matching?.sendInterest(entityId, row) }; Unit }
             val interestLabel = interest?.let { interestTitle(it) }
             val interestBusy = matching?.interestBusy(row) ?: false
+            val onMark: (() -> Unit)? = mark?.let { m ->
+                {
+                    val sent = ListMarks.tap(markOverrides, row, m.id)
+                    scope.launch {
+                        marksHost?.toggleMark(entityId, row.id, m.id)
+                        ListMarks.settle(markOverrides, row.id, sent)
+                    }
+                }
+            }
+            val highlight by animateColorAsState(
+                if (highlighted == row.id) RenderTheme.colors.brandSoft else Color.Transparent,
+                tween(durationMillis = if (highlighted == row.id) 200 else 400),
+                label = "newRow",
+            )
             ListRow(
+                modifier = Modifier.background(highlight),
                 item = c.item,
                 record = row,
                 entity = entity,
@@ -142,6 +181,9 @@ fun ListLeaf(c: Component, ctx: RenderContext, modifier: Modifier = Modifier) {
                 },
                 onReport = if (ListRowMenu.Item.REPORT in menuItems) ({ moderation?.reportRecord(entityId, row) }) else null,
                 onBlock = if (ListRowMenu.Item.BLOCK in menuItems) ({ moderation?.blockAuthor(entityId, row) }) else null,
+                mark = mark,
+                markState = mark?.let { ListMarks.shown(markOverrides, row, it.id) },
+                onMark = onMark,
                 accessory = interest?.let { st -> { InterestButton(st, interestBusy, sendInterest) } },
                 accessoryActions = if (interest?.tappable == true && interestLabel != null && !interestBusy) {
                     listOf(CustomAccessibilityAction(interestLabel) { sendInterest(); true })
@@ -151,6 +193,27 @@ fun ListLeaf(c: Component, ctx: RenderContext, modifier: Modifier = Modifier) {
             )
         }
     }
+}
+
+/**
+ * 保存で増えた行(前回描いた id に無い行)の id を [NewRowHighlight.MILLIS] の間だけ返す(iOS の `markNewRows`・#1118)。
+ * 初回の描画・空からの初回ロード・動きを減らす設定では光らせない。
+ */
+@Composable
+private fun rememberNewRowHighlight(ids: List<String>): String? {
+    val reduceMotion = LocalReduceMotion.current
+    val seen = remember { arrayOfNulls<Set<String>>(1) }
+    var highlighted by remember { mutableStateOf<String?>(null) }
+    LaunchedEffect(ids) {
+        NewRowHighlight.fresh(seen[0], ids, reduceMotion)?.let { highlighted = it }
+        seen[0] = ids.toSet()
+    }
+    LaunchedEffect(highlighted) {
+        val id = highlighted ?: return@LaunchedEffect
+        delay(NewRowHighlight.MILLIS)
+        if (highlighted == id) highlighted = null
+    }
+    return highlighted
 }
 
 /** 先頭のアイコン / 画像の幅ぶん区切り線を内側に寄せる。 */
@@ -171,6 +234,7 @@ private fun separatorInset(item: ListItem?): androidx.compose.ui.unit.Dp {
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
 internal fun ListRow(
+    modifier: Modifier = Modifier,
     item: ListItem?,
     record: Record,
     entity: Entity?,
@@ -190,6 +254,10 @@ internal fun ListRow(
     /** 他人の共有の記録の通報・ブロック(#1196)。長押しのメニューと読み上げの行の操作に出す */
     onReport: (() -> Unit)? = null,
     onBlock: (() -> Unit)? = null,
+    /** 行の右端の印(#255)。mark と markState の両方があれば描く */
+    mark: Mark? = null,
+    markState: MarkState? = null,
+    onMark: (() -> Unit)? = null,
 ) {
     val texts = ListRows.texts(item, record, entity, data)
     val imageField = item?.image
@@ -207,14 +275,27 @@ internal fun ListRow(
     val reportLabel = stringResource(R.string.social_report)
     val blockLabel = stringResource(R.string.social_block)
     val hasMenu = onDelete != null || onReport != null || onBlock != null
+    val markValue = if (mark != null && markState != null) {
+        stringResource(if (markState.mine) R.string.lists_mark_count_mine else R.string.lists_mark_count, mark.label, markState.count)
+    } else {
+        null
+    }
+    val markActionLabel = if (mark != null && markState != null) {
+        stringResource(if (markState.mine) R.string.lists_mark_remove else R.string.lists_mark_add, mark.label)
+    } else {
+        null
+    }
+    // 「チェック済み, いいね 2 件・付けています」(iOS の accessibilityValue)
+    val rowState = listOfNotNull(toggleState, markValue).joinToString(", ").ifEmpty { null }
     val actions = buildList {
         if (onToggle != null) add(CustomAccessibilityAction(toggleLabel) { onToggle(); true })
+        if (onMark != null && markActionLabel != null) add(CustomAccessibilityAction(markActionLabel) { onMark(); true })
         if (onDelete != null) add(CustomAccessibilityAction(deleteLabel) { onDelete(); true })
         if (onReport != null) add(CustomAccessibilityAction(reportLabel) { onReport(); true })
         if (onBlock != null) add(CustomAccessibilityAction(blockLabel) { onBlock(); true })
         addAll(accessoryActions)
     }
-    Box {
+    Box(modifier) {
         Row(
             Modifier
                 .fillMaxWidth()
@@ -225,7 +306,7 @@ internal fun ListRow(
                 )
                 .clearAndSetSemantics {
                     contentDescription = label
-                    toggleState?.let { stateDescription = it }
+                    rowState?.let { stateDescription = it }
                     if (onTap != null) {
                         role = Role.Button
                         onClick(openLabel) { onTap(); true }
@@ -268,6 +349,7 @@ internal fun ListRow(
                     maxLines = 1,
                 )
             }
+            if (mark != null && markState != null) MarkButton(mark, markState, onMark)
             accessory?.invoke()
             if (showsChevron) SymbolIcon("chevron.right", 16.dp, RenderTheme.colors.tertiaryLabel)
         }
@@ -306,6 +388,34 @@ internal fun ListRow(
     }
 }
 
+/**
+ * 印のトグル(iOS の `ListRow.markButton`)。行タップとは別のボタン。付けると塗り + 色、件数は 1 以上で出す。
+ * 読み上げは行 1 要素の状態と行の操作で行う(ここは clearAndSetSemantics の中なので読まれない)。
+ */
+@Composable
+private fun MarkButton(mark: Mark, state: MarkState, onMark: (() -> Unit)?) {
+    val tint by animateColorAsState(if (state.mine) markColor(mark) else RenderTheme.colors.secondaryLabel, label = "mark")
+    Row(
+        Modifier
+            .clip(RoundedCornerShape(RenderTheme.Radius.inner))
+            .clickable(enabled = onMark != null) { onMark?.invoke() }
+            .padding(horizontal = 6.dp, vertical = 10.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(4.dp),
+    ) {
+        SymbolIcon(ListMarks.symbol(mark.icon, state.mine), 22.dp, tint)
+        if (state.count > 0) Text("${state.count}", style = MaterialTheme.typography.bodyMedium, color = tint)
+    }
+}
+
+/** いいねは赤系、お気に入りは橙、それ以外はブランド色(iOS の `ListRow.markColor`)。 */
+@Composable
+private fun markColor(mark: Mark): Color = when (mark.icon) {
+    "heart" -> Color(0xFFE91E63)
+    "star" -> Color(0xFFFF9800)
+    else -> RenderTheme.colors.brandA
+}
+
 /** 行頭のチェック丸。行タップとは別のボタン(48dp の当たり判定)。読み上げは行の操作で行う。 */
 @Composable
 private fun CheckCircle(on: Boolean, enabled: Boolean, onToggle: (() -> Unit)?) {
@@ -318,7 +428,7 @@ private fun CheckCircle(on: Boolean, enabled: Boolean, onToggle: (() -> Unit)?) 
     }
 }
 
-/** 空の一覧・表・時系列・グラフの案内(iOS の `EmptyPlaceholder` の「空」の形)。読み込み中・取得失敗の形はホストの読み込み状態が入ってから。 */
+/** 空の一覧・表・時系列・グラフの案内(iOS の `EmptyPlaceholder` の「空」の形)。読み込み中・取得失敗は [RecordsPlaceholderView]。 */
 @Composable
 internal fun EmptyPlaceholder(icon: String, text: String, modifier: Modifier = Modifier) {
     Column(

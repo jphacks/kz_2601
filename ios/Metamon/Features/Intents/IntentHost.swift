@@ -54,6 +54,7 @@ final class IntentHost {
     }
 
     private func perform(_ action: Pending) async {
+        await SplashPresence.shared.waitUntilHidden() // 通知・Siri から開いた時もスプラッシュの後に
         guard let runtime else { return }
         switch action {
         case .open(let appId): await runtime.openFromIntent(appId: appId)

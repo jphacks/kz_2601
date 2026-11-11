@@ -378,12 +378,12 @@ object SensorRules {
         return if (hi > lo) lo..hi else d
     }
 
-    /** 見出しの印(icon-map にある名前だけ)。 */
+    /** 見出しの印(iOS の SensorValueLeaf と同じ名前・icon-map にある名前だけ)。 */
     fun icon(kind: SensorKind): String = when (kind) {
         SensorKind.TILT, SensorKind.PITCH, SensorKind.ROLL -> "level"
         SensorKind.ACCELERATION -> "waveform"
-        SensorKind.ROTATION -> "arrow.triangle.2.circlepath"
-        SensorKind.PRESSURE -> "gauge.with.dots.needle.33percent"
-        SensorKind.ALTITUDE -> "arrow.up.right"
+        SensorKind.ROTATION -> "gyroscope"
+        SensorKind.PRESSURE -> "barometer"
+        SensorKind.ALTITUDE -> "mountain.2"
     }
 }

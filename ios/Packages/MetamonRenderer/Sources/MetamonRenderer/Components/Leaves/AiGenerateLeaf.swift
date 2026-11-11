@@ -12,6 +12,7 @@ struct AiGenerateLeaf: View {
     @State private var busy = false
     @State private var result: AITextResult?
     @State private var usedOnline = false
+    @State private var notice: AIUnavailableNotice? // #1640: 使えない時に押したら理由を出す
     @State private var error: String?
     @State private var runs = 0
     @State private var filled: [AIOutputs.Fill] = [] // outputs: 今回の項目(読めなかったものも)
@@ -26,7 +27,7 @@ struct AiGenerateLeaf: View {
     var body: some View {
         VStack(alignment: .leading, spacing: RenderTheme.Spacing.sm) {
             Button {
-                Task { await run() }
+                if let n = tapNotice() { notice = n } else { Task { await run() } }
             } label: {
                 HStack(spacing: RenderTheme.Spacing.sm) {
                     if busy {
@@ -38,9 +39,10 @@ struct AiGenerateLeaf: View {
                 }
                 .frame(maxWidth: .infinity)
             }
-            .buttonStyle(RenderButtonStyle(kind: .secondary))
-            .disabled(busy || isUnavailable)
+            .buttonStyle(RenderButtonStyle(kind: .secondary, dimmed: isUnavailable))
+            .disabled(busy) // 使えない時も押せる(押すと理由のアラート・#1640)
             .accessibilityIdentifier("aiGenerate.\(c.id)")
+            .accessibilityHint(route.unavailableNotice?.message ?? "")
             if let result, result.shape == .list, let saveTo = c.saveTo {
                 AiSaveToList(c: c, saveTo: saveTo, items: result.items ?? []) // 1 項目 = 1 件(押した時だけ保存)
                     .id(runs) // 新しい結果は「保存済み」を持ち越さない
@@ -51,6 +53,7 @@ struct AiGenerateLeaf: View {
             }
             caption
         }
+        .aiUnavailableAlert($notice)
         .task { refreshAvailability() }
         .onChange(of: scenePhase) { _, phase in
             if phase == .active { refreshAvailability() }
@@ -118,6 +121,12 @@ struct AiGenerateLeaf: View {
         if !names.isEmpty {
             AccessibilityNotification.Announcement(L("入力欄に入れました: \(names.joined(separator: "、"))")).post()
         }
+    }
+
+    /// 押した時点の状態で判定し、使えなければ理由を返す(何もせずに戻らない・#1640)。
+    private func tapNotice() -> AIUnavailableNotice? {
+        availability = AIAvailability.current
+        return route.unavailableNotice
     }
 
     private func refreshAvailability() {

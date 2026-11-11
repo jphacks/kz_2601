@@ -149,6 +149,11 @@ class InMemoryAppConfigClient(
         mutex.withLock { tables[entity]?.removeAll { it.id == id } }
     }
 
+    /** モックは利用者が 1 人なので、その entity の記録を全部消す。 */
+    override suspend fun deleteAllRecords(appId: String, entity: String) {
+        mutex.withLock { tables[entity]?.clear() }
+    }
+
     /** 印(#255)。モックは利用者が 1 人なので、その 1 人分だけ増減する。 */
     override suspend fun setMark(appId: String, entity: String, id: String, mark: String, on: Boolean): MarkState = mutex.withLock {
         val rows = tables[entity] ?: notFound("record")

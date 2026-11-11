@@ -3,6 +3,8 @@ package jp.kz2601.metamon.runtime
 import jp.kz2601.metamon.dsl.AppDSL
 import jp.kz2601.metamon.dsl.AppDocument
 import jp.kz2601.metamon.dsl.decode
+import jp.kz2601.metamon.renderer.form.FormDraftRestore
+import jp.kz2601.metamon.renderer.form.FormDraftStorage
 import jp.kz2601.metamon.services.AppConfigClient
 import jp.kz2601.metamon.services.local.BackoffPolicy
 import jp.kz2601.metamon.services.local.ConnectivityMonitor
@@ -40,11 +42,15 @@ object RuntimeFixture {
         appId: String = "test-app",
         host: RuntimeHost = UnavailableHost,
         uid: String? = null,
+        formDrafts: FormDraftStorage = FormDraftStorage.InMemory(),
     ): AppRuntime {
         val store = RecordStore(null, EmptyCoroutineContext)
         val client = offlineClient
         val queue = SyncQueue(null, store, client, BackoffPolicy.immediate, sleep = {}, io = EmptyCoroutineContext)
         val engine = RecordSyncEngine(store, queue, client, Offline(), backgroundScope)
-        return AppRuntime(AppDocument(appId, 1, dsl), engine, backgroundScope, host, currentUserId = { uid })
+        return AppRuntime(
+            AppDocument(appId, 1, dsl), engine, backgroundScope, host, currentUserId = { uid },
+            formDrafts = FormDraftRestore(formDrafts),
+        )
     }
 }

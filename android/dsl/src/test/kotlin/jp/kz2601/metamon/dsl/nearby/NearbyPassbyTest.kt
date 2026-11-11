@@ -169,9 +169,48 @@ class NearbyPassbyTest {
         assertEquals(ToggleOutcome.ASK_CONSENT, NearbyPassby.toggle(true, 0))
         assertEquals(ToggleOutcome.START, NearbyPassby.toggle(true, NearbyPassby.CONSENT_VERSION))
         assertEquals(ToggleOutcome.STOP, NearbyPassby.toggle(false, null))
-        val text = NearbyPassby.consentText(listOf("名前", "趣味"))
+        assertEquals("同意文が変わったら同意を取り直す", ToggleOutcome.ASK_CONSENT, NearbyPassby.toggle(true, 1))
+        val text = NearbyPassby.consentText(listOf("名前", "趣味"), name = "太郎")
         assertTrue(text.contains("「名前」「趣味」"))
+        assertTrue("相手に渡る名前を見せる", text.contains("表示名: 太郎"))
         assertTrue(text.contains("裏に回すと止まります"))
+        assertTrue(NearbyPassby.consentText(emptyList(), name = "近くの人").contains("送る項目がありません"))
+    }
+
+    @Test fun anonymousSendsFixedName() {
+        assertEquals(NearbyLimits.ANONYMOUS_NAME, NearbyLimits.publicName("山田太郎", anonymous = true))
+        assertEquals("山田太郎", NearbyLimits.publicName("  山田太郎 ", anonymous = false))
+        assertEquals("空の名前も匿名と同じ", NearbyLimits.ANONYMOUS_NAME, NearbyLimits.publicName("   ", anonymous = false))
+        assertEquals(NearbyLimits.MAX_NAME_LENGTH, NearbyLimits.publicName("あ".repeat(100), anonymous = false).length)
+        assertEquals("近くの人", NearbyLimits.displayName(NearbyLimits.ANONYMOUS_NAME))
+        // 匿名の印は見る側の言語で出す(訳はアプリのリソースから渡す)
+        assertEquals("Someone nearby", NearbyLimits.displayName(NearbyLimits.ANONYMOUS_NAME, anonymousLabel = "Someone nearby"))
+        assertEquals("Someone nearby", NearbyLimits.displayName("  ", anonymousLabel = "Someone nearby"))
+        assertEquals("Taro", NearbyLimits.displayName("Taro", anonymousLabel = "Someone nearby"))
+    }
+
+    @Test fun receiveLimits() {
+        val hello = NearbyPassby.Hello(app = NearbyPassby.appTag("a"), senderId = "s1", name = "名".repeat(200))
+        assertEquals("名前は切り詰める", NearbyLimits.MAX_NAME_LENGTH, NearbyPassby.decodeHello(NearbyPassby.encode(hello))?.name?.length)
+        val longId = NearbyPassby.Hello(app = "x", senderId = "s".repeat(NearbyLimits.MAX_ID_LENGTH + 1), name = "n")
+        assertNull("senderId が長すぎる申し出は断る", NearbyPassby.decodeHello(NearbyPassby.encode(longId)))
+        assertNull("大きすぎる申し出は読まない", NearbyPassby.decodeHello(ByteArray(NearbyPassby.MAX_HELLO_BYTES + 1) { 0x20 }))
+        assertNull(NearbyPassby.decodeHello(NearbyPassby.encode(NearbyPassby.Hello(app = "x", senderId = "", name = "n"))))
+
+        val p = NearbyPassby.Payload(1, "s2", "  ", "profile", listOf(Item("r", d("name" to "a"))))
+        assertEquals(NearbyLimits.ANONYMOUS_NAME, p.validated()?.name)
+        val many = p.copy(records = (0..NearbyPassby.MAX_RECORDS).map { Item("r$it", d("name" to "a")) })
+        assertNull("送る側の上限を超える件数は捨てる", many.validated())
+        assertNull(p.copy(senderId = "s".repeat(NearbyLimits.MAX_ID_LENGTH + 1)).validated())
+        assertTrue("受け取る上限は送る上限より大きい", NearbyPassby.MAX_RECEIVE_BYTES > NearbyPassby.MAX_BYTES)
+        assertNull("大きすぎる 1 通は読まない", NearbyPassby.decodePayload(ByteArray(NearbyPassby.MAX_RECEIVE_BYTES + 1) { 0x20 }))
+
+        val (_, entity, config) = fixture()
+        val longIds = NearbyPassby.Payload(
+            1, "s2", "n", "profile",
+            listOf(Item("r".repeat(NearbyLimits.MAX_ID_LENGTH + 1), d("name" to "長い id")), Item("ok", d("name" to "普通"))),
+        )
+        assertEquals("記録の id が長すぎるものは捨てる", listOf("ok"), NearbyPassby.sanitize(longIds, entity, config).map { it.id })
     }
 
     @Test fun appTagAndFormatting() {
@@ -200,7 +239,7 @@ class NearbyPassbyTest {
         val p = NearbyPassby.decodePayload(
             """{"entityId":"profile","name":"花子","records":[{"data":{"name":"花子"},"id":"a","x":1}],"senderId":"s2","v":1,"y":2}""".toByteArray(),
         )
-        assertEquals(listOf(Item("a", d("name" to "花子"))), p.records)
-        assertTrue(runCatching { NearbyPassby.decodePayload("""{"entityId":"p","name":"n","records":[{"id":"a"}],"senderId":"s","v":1}""".toByteArray()) }.isFailure)
+        assertEquals(listOf(Item("a", d("name" to "花子"))), p?.records)
+        assertNull(NearbyPassby.decodePayload("""{"entityId":"p","name":"n","records":[{"id":"a"}],"senderId":"s","v":1}""".toByteArray()))
     }
 }

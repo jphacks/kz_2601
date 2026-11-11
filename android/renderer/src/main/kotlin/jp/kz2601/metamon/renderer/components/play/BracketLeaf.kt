@@ -48,6 +48,7 @@ import jp.kz2601.metamon.dsl.records.JSONValue
 import jp.kz2601.metamon.dsl.records.Record
 import jp.kz2601.metamon.renderer.DSLRuntime
 import jp.kz2601.metamon.renderer.R
+import jp.kz2601.metamon.renderer.components.lists.LeafData
 import jp.kz2601.metamon.renderer.components.lists.ValueLabels
 import jp.kz2601.metamon.renderer.components.lists.rememberValueLabels
 import jp.kz2601.metamon.renderer.registry.RenderContext
@@ -85,7 +86,7 @@ fun BracketLeaf(c: Component, ctx: RenderContext, modifier: Modifier = Modifier)
                 return
             }
             is BracketDraw.TapResult.Update -> {
-                val records = PlayRecords.records(all, entityId)
+                val records = all[entityId].orEmpty()
                 val started = BracketRules.startedField(c, entity)
                 val starts = draw.startWrites(
                     result.wins, records, winsField, started, pending.toMap(),
@@ -284,7 +285,7 @@ object BracketRules {
     fun draw(c: Component, runtime: DSLRuntime, all: Map<String, List<Record>>, pending: Map<String, Int>): BracketDraw {
         val entity = runtime.entityModel(c.entity.orEmpty())
         return BracketDraw(
-            PlayRecords.records(all, c.entity.orEmpty()),
+            all[c.entity.orEmpty()].orEmpty(),
             c.winsField.orEmpty(),
             c.seedField,
             startedField(c, entity),
@@ -296,7 +297,7 @@ object BracketRules {
     fun name(c: Component, runtime: DSLRuntime, all: Map<String, List<Record>>, r: Record, labels: ValueLabels = ValueLabels.JAPANESE): String {
         val f = c.titleField?.takeIf { it.isNotEmpty() } ?: return r.id
         val entity = runtime.entityModel(c.entity.orEmpty())
-        return PlayRecords.display(runtime, all, r[f], entity?.field(f), labels).ifEmpty { FieldCoding.UNAVAILABLE }
+        return LeafData(runtime, all, labels = labels).display(r[f], entity?.field(f)).ifEmpty { FieldCoding.UNAVAILABLE }
     }
 
     /** 勝ち数を保存できる field(integer・computed でない)。条件を満たさなければ null(表示だけ)。 */

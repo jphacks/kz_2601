@@ -35,8 +35,12 @@
 	<string>$(CURRENT_PROJECT_VERSION)</string>
 	<key>ITSAppUsesNonExemptEncryption</key>
 	<false/>
+	<!-- 起動画面は SplashView の最初のコマ(無地の紺)と同じ色にして、つなぎ目を見せない -->
 	<key>UILaunchScreen</key>
-	<dict/>
+	<dict>
+		<key>UIColorName</key>
+		<string>LaunchBackground</string>
+	</dict>
 	<!-- 横向き(左右)も使える(#625)。上下逆さまは無し。iPad は対象外(TARGETED_DEVICE_FAMILY = 1) -->
 	<key>UISupportedInterfaceOrientations</key>
 	<array>

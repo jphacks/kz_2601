@@ -6,9 +6,9 @@ import jp.kz2601.metamon.dsl.logic.BracketDraw
 import jp.kz2601.metamon.dsl.logic.FlashcardDeck
 import jp.kz2601.metamon.dsl.records.Record
 import jp.kz2601.metamon.renderer.DSLRuntime
+import jp.kz2601.metamon.renderer.components.lists.LeafData
 import jp.kz2601.metamon.renderer.components.play.BracketRules
 import jp.kz2601.metamon.renderer.components.play.FlashcardRules
-import jp.kz2601.metamon.renderer.components.play.PlayRecords
 import jp.kz2601.metamon.renderer.components.play.settlementTransfers
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
@@ -54,7 +54,7 @@ object PlayNodes {
         val entity = runtime.entityModel(c.entity.orEmpty())
         val toggle = FlashcardRules.toggleField(c, entity)
         val cards = FlashcardRules.cards(c, runtime, all, emptyMap())
-        fun text(r: Record, f: String?) = PlayRecords.display(runtime, all, r[f.orEmpty()], entity?.field(f.orEmpty()))
+        fun text(r: Record, f: String?) = LeafData(runtime, all).display(r[f.orEmpty()], entity?.field(f.orEmpty()))
         val (position, total) = FlashcardDeck().progress(cards)
         return mapOf(
             "cards" to JsonArray(
@@ -79,7 +79,7 @@ object PlayNodes {
         val entity = runtime.entityModel(c.entity.orEmpty())
         val f = c.titleField.orEmpty()
         fun entrant(r: Record?): JsonElement = r?.let {
-            JsonObject(mapOf("recordId" to JsonPrimitive(it.id), "title" to JsonPrimitive(PlayRecords.display(runtime, all, it[f], entity?.field(f)))))
+            JsonObject(mapOf("recordId" to JsonPrimitive(it.id), "title" to JsonPrimitive(LeafData(runtime, all).display(it[f], entity?.field(f)))))
         } ?: JsonNull
         val rounds = draw.rounds.mapIndexed { i, matches ->
             JsonObject(

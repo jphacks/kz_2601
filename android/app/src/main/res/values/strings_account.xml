@@ -14,7 +14,7 @@
     <string name="account_ok">OK</string>
     <string name="account_send_then_sign_out">送ってからログアウト</string>
     <string name="account_sign_out">ログアウト</string>
-    <string name="account_sign_out_anonymous">この端末のデータが消え、匿名のアカウントには戻れません。作ったアプリと記録も開けなくなります。</string>
+    <string name="account_sign_out_anonymous">この端末のデータが消え、匿名のアカウントには戻れません。作ったアプリと記録も開けなくなります。残したい時は、先に「Google で続ける」か「Apple で続ける」で引き継いでください。</string>
     <string name="account_sign_out_failed">ログアウトできませんでした</string>
     <string name="account_sign_out_signed_in">この端末のデータは消えます。もう一度サインインすると、作ったアプリと送り済みの記録は戻ります。</string>
     <string name="account_sign_out_title">ログアウトしますか？</string>

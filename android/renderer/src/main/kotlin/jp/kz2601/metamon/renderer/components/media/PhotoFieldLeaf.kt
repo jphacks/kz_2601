@@ -74,6 +74,7 @@ private fun PhotoFieldPanel(c: Component, ctx: RenderContext, form: FormDraft, f
     val hasPhoto = PhotoValue.hasPhoto(value)
     val title = c.label?.takeIf { it.isNotEmpty() } ?: stringResource(R.string.media_photo)
     val reader = ctx.runtime.photoReader?.takeIf { c.analyze.isNotEmpty() }
+    val describePrefix = stringResource(R.string.media_photo_describe_prefix)
 
     var showChooser by remember { mutableStateOf(false) }
     var showDenied by remember { mutableStateOf(false) }
@@ -91,7 +92,7 @@ private fun PhotoFieldPanel(c: Component, ctx: RenderContext, form: FormDraft, f
         reading = true
         readStatus = null
         scope.launch {
-            val out = runCatching { PhotoReading.apply(reader.clues(bytes, c.analyze), c.analyze, form.entity) }
+            val out = runCatching { PhotoReading.apply(reader.clues(bytes, c.analyze), c.analyze, form.entity, describePrefix = describePrefix) }
                 .getOrElse { PhotoReadOutcome(missed = c.analyze.map { it.into }) }
             out.values.forEach { (id, v) -> form.values[id] = v }
             readStatus = ReadStatus.Done(out.missed.map { form.entity.field(it)?.name ?: it })

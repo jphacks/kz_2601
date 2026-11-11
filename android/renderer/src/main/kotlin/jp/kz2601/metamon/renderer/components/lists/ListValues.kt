@@ -5,6 +5,8 @@ import jp.kz2601.metamon.dsl.ExprNumber
 import jp.kz2601.metamon.dsl.ListItem
 import jp.kz2601.metamon.dsl.Resets
 import jp.kz2601.metamon.dsl.TableColumn
+import jp.kz2601.metamon.dsl.targetExpr
+import jp.kz2601.metamon.dsl.targetNumber
 import jp.kz2601.metamon.dsl.expr.DailyCheck
 import jp.kz2601.metamon.dsl.expr.Expr
 import jp.kz2601.metamon.dsl.expr.ExprValue
@@ -19,10 +21,7 @@ import jp.kz2601.metamon.dsl.records.RecordQuery
 import jp.kz2601.metamon.dsl.records.Sort
 import jp.kz2601.metamon.dsl.records.TableGrouping
 import jp.kz2601.metamon.dsl.records.Track
-import kotlinx.serialization.json.JsonElement
-import kotlinx.serialization.json.JsonNull
-import kotlinx.serialization.json.JsonPrimitive
-import kotlinx.serialization.json.doubleOrNull
+import jp.kz2601.metamon.renderer.EntityLoadState
 import java.math.BigDecimal
 import java.math.RoundingMode
 import java.text.DecimalFormat
@@ -153,7 +152,11 @@ object TimelineRows {
 
 /** `stat`: 表示する値(書式後の文字, 取得失敗)。iOS の `StatLeaf.resolve`。 */
 object StatValue {
-    data class Resolved(val text: String, val unavailable: Boolean)
+    /** [loading]: 初回の読み込み中(0 を見せず「—」の骨組み)。[unavailable]: 取得失敗・評価できない(「—」)。 */
+    data class Resolved(val text: String, val unavailable: Boolean, val loading: Boolean = false)
+
+    private val LOADING = Resolved(FieldCoding.UNAVAILABLE, unavailable = false, loading = true)
+    private val UNAVAILABLE = Resolved(FieldCoding.UNAVAILABLE, unavailable = true)
 
     /** `value`(Expr)で値を出すモード(aggregate 指定が優先)。 */
     fun isValueMode(c: Component): Boolean = c.aggregate == null && c.value != null
@@ -164,6 +167,12 @@ object StatValue {
     private fun aggregateValue(c: Component, data: LeafData, locale: Locale): Resolved {
         val entity = data.entity(c.entity)
         val rows = data.filtered(c)
+        // 起動直後に「¥0 → ¥480」と跳ねない・取得失敗を「¥0」と見せない(#1116・iOS の aggregateValue)
+        when (AggregateLoad.of(c.entity, rows, data)) {
+            EntityLoadState.LOADING -> return LOADING
+            EntityLoadState.UNAVAILABLE -> return UNAVAILABLE
+            EntityLoadState.LOADED -> Unit
+        }
         val op = c.aggregate?.wire
         val fieldDef = c.field?.let { entity?.field(it) }
         if (Track.isTrackAggregate(op)) {
@@ -181,14 +190,38 @@ object StatValue {
 
     /** value モード(#101): 行コンテキスト無しで Expr を評価。評価できなければ「—」。 */
     private fun exprValue(c: Component, data: LeafData, locale: Locale): Resolved {
-        val expr = RecordQuery.expr(c.value) ?: return Resolved(FieldCoding.UNAVAILABLE, true)
-        val v = data.evaluator.evaluate(expr) ?: return Resolved(FieldCoding.UNAVAILABLE, true)
+        val expr = RecordQuery.expr(c.value) ?: return UNAVAILABLE
+        val entities = expr.referencedEntities
+        if (entities.any { data.loadState(it) == EntityLoadState.LOADING && data.records(it).isEmpty() }) return LOADING
+        if (entities.any { data.records(it).isEmpty() && data.loadState(it) == EntityLoadState.UNAVAILABLE }) return UNAVAILABLE
+        val v = data.evaluator.evaluate(expr) ?: return UNAVAILABLE
         return when (v) {
             // percent の value は比率(0〜1)。100 倍は Aggregator.format が持つ
             is ExprValue.Number -> Resolved(Aggregator.format(v.value, c.format?.wire, c.unit, locale), false)
             else -> Resolved(v.text, false)
         }
     }
+}
+
+/**
+ * stat / progressBar / gauge の集計の読み込み状態(#1116)。iOS の `StatLeaf.aggregateValue`・`ProgressBarLeaf.isUnavailable`。
+ * - 読み込み中で手元に記録が 1 件も無い → LOADING(0 を見せない)
+ * - 取得失敗で絞り込んだ記録が 0 件 → UNAVAILABLE(「—」。手元に記録があれば通常どおり集計)
+ */
+object AggregateLoad {
+    fun of(entity: String?, rows: List<Record>, data: LeafData): EntityLoadState {
+        if (entity.isNullOrEmpty()) return EntityLoadState.LOADED
+        val state = data.loadState(entity)
+        return when {
+            state == EntityLoadState.LOADING && data.records(entity).isEmpty() -> EntityLoadState.LOADING
+            state == EntityLoadState.UNAVAILABLE && rows.isEmpty() -> EntityLoadState.UNAVAILABLE
+            else -> EntityLoadState.LOADED
+        }
+    }
+
+    /** progressBar / gauge: `value` のリテラルなら記録を読まないので常に読めた扱い。 */
+    fun of(c: Component, data: LeafData): EntityLoadState =
+        if (ProgressValue.literal(c) != null) EntityLoadState.LOADED else of(c.entity, data.filtered(c), data)
 }
 
 /** `progressBar`: 比率と表示。iOS の `ProgressBarLeaf`。 */
@@ -212,24 +245,17 @@ object ProgressValue {
     fun literal(c: Component): Double? = (c.value as? ExprNumber)?.value
 
     /** `target` が式({"setting"} など)か。 */
-    fun targetExpr(c: Component): Expr? {
-        val t = c.target ?: return null
-        if (t is JsonPrimitive && !t.isString && t.doubleOrNull != null) return null
-        if (t == JsonNull) return null
-        return runCatching { Expr.from(t) }.getOrNull()
-    }
-
-    private fun targetLiteral(t: JsonElement?): Double? = (t as? JsonPrimitive)?.takeIf { !it.isString }?.doubleOrNull
+    fun targetExpr(c: Component): Expr? = c.targetExpr
 
     /** entity モードの分母: 数値の `target`、または式の今の値。0 以下・空は null。 */
     fun target(c: Component, data: LeafData): Double? {
-        val t = targetLiteral(c.target) ?: targetExpr(c)?.let { data.evaluator.evaluate(it)?.number } ?: return null
+        val t = c.targetNumber ?: targetExpr(c)?.let { data.evaluator.evaluate(it)?.number } ?: return null
         return t.takeIf { it.isFinite() && it > 0 }
     }
 
     /** 目標を式で読むのに、その値が空・0 以下。 */
     fun missingTarget(c: Component, data: LeafData): Boolean =
-        literal(c) == null && c.entity != null && targetLiteral(c.target) == null && targetExpr(c) != null && target(c, data) == null
+        literal(c) == null && c.entity != null && c.targetNumber == null && targetExpr(c) != null && target(c, data) == null
 
     /** 比率(1 を超えてもよい)。 */
     fun ratio(c: Component, data: LeafData): Double {
@@ -277,6 +303,9 @@ object ChartReadout {
 
     /** 「3月: 12」 */
     fun line(label: String, value: Double, locale: Locale = Locale.getDefault()): String = "$label: ${format(value, locale)}"
+
+    /** 棒・点・扇 1 つの読み上げ「3月, 12」(iOS の accessibilityLabel + accessibilityValue・#1118)。 */
+    fun point(label: String, value: Double, locale: Locale = Locale.getDefault()): String = "$label, ${format(value, locale)}"
 
     /** 扇の累積値 → その扇の位置。 */
     fun index(cumulative: Double, values: List<Double>): Int? {

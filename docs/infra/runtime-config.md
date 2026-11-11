@@ -81,6 +81,14 @@ runner は prod で GitHub の変数 `RUNNER_DEPLOY=1` の時だけデプロイ�
 | `APNS_AUTH_KEY` | runner(prod だけ) | APNs の鍵(.p8 の中身)。**Secret Manager の `APNS_AUTH_KEY` から deploy-cloudrun.yml が注入する**(GitHub の変数 `RUNNER_APNS=1` の時だけ)。env に直接書かない。無ければ通知はログに形を出すだけ | 無し(ログだけ) |
 | `RUNNER_APNS_ENVIRONMENT` | runner(prod だけ) | `production` / `sandbox`。送る APNs の宛先と、送る端末の `environment`。TestFlight・App Store の版は production、Xcode から入れた開発署名の版は sandbox。1 つの runner はどちらか片方だけに送る。iOS の構成との対応: Release(`aps-environment` = production)→ `https://api.push.apple.com`、Debug / Staging(development)→ `https://api.sandbox.push.apple.com`(`backend/internal/runner/notify/apns` の `HostProduction` / `HostDevelopment`)。Review(審査用)は通知を外していて `aps-environment` が無い。runner は prod だけなので、stg の backend を向く Debug / Staging の版には今は届かない(`ios/project.yml` の `METAMON_APS_ENV`) | `production` |
 | `RUNNER_AUTO_NOTIFY_PAUSE_REPORTERS` | runner(prod だけ) | 1 つのアプリ(アプリそのもの・その中の投稿)を 24 時間でこの人数(別々の人)が通報したら、そのアプリの通知を自動で一時停止する(#339・#346)。止めるのは通知だけ(非公開化などは人)。`0` で自動では止めない | 3 |
+| `EXT_DISABLED` | runner | `1` で外の API(#1493)を全部止める(止め弁)。止めた間の呼び出しは 503 `ext_unavailable`。数えない・コインも引かない([external-apis.md](../backend/features/external-apis.md)) | 無し(止めない) |
+| `EXT_<PROVIDER>_ENABLED` | runner | `1` で外の API の provider を 1 つ入れる(`GOOGLE_CALENDAR` などの大文字)。偽の provider(`FAKE_FREE` / `FAKE_PAID` / `FAKE_OAUTH`)は stg とローカルだけで、`APP_ENV=production` では入れても動かない | 無し(off) |
+| `EXT_TOKEN_KMS_KEY` | runner | 利用者ごとの OAuth のトークンを暗号化する Cloud KMS の鍵(`projects/…/cryptoKeys/…`)。無いと OAuth の要る provider は動かない(エミュレータでは使い捨ての鍵) | 無し |
+| `EXT_OAUTH_CALLBACK_BASE` / `EXT_OAUTH_APP_RETURN` | runner | OAuth の戻り先の runner の https の頭(`/oauth/callback/{provider}` を足す)/ 戻った後に端末へ返す先。前者が無いと OAuth の要る provider は動かない | 無し / `tailorit://connected` |
+| `EXT_COST_USD_<PROVIDER>_<OP>` / `COIN_RESERVE_EXT_<PROVIDER>` | runner | 有料の API の 1 回の原価(USD・op が量を返さない時)/ 押さえるコイン。`COIN_BILLING_MODE=enforce` で押さえが 0 の有料の provider は動かない。値は非公開の資料 | `0` / `0` |
+| `EXT_TIMEOUT` / `EXT_MAX_CONCURRENT` | runner | 外の API の 1 回の時間切れ / 1 台で同時に呼ぶ数(超えたら 503 `ext_busy`) | `8s` / `8` |
+| `EXT_RUNNER_URL` | appconfig | 外の API(#1493)で呼ぶ runner の頭(`https://…`。ローカルは `http://localhost:…`)。https の時はその URL を audience にした ID トークンを付ける(runner の invoker に appconfig の SA が要る)。無いと `/v1/apps/{appId}/ext/*`・`/v1/me/connections/*` は 503 `ext_unavailable`(一覧は空) | 無し(off) |
+| `EXT_USER_PER_HOUR` | appconfig | 外の API を 1 人が 1 時間に呼べる回数(超えると 429 `rate_limited`)。`0` で数えない | `120` |
 | `RUNNER_AUTO_NOTIFY_PAUSE_FOR` | runner(prod だけ) | 上の自動の一時停止の長さ。`48h` のように書く。1 時間未満は起動しない。運営が `moderate resume-notify` で先に解ける([incident-runbook.md 手順 F](../ops/incident-runbook.md#13-手順-f-悪用自動の動き)) | `72h` |
 | `RUNNER_NOTIFY_PAUSED` | runner(prod だけ) | `1`(`true` / `on` も可)で通知だけを全体で止める(#339・#346)。ルールは動き、書き込みはする。止めている間の通知は後から送らない | 無し(止めない) |
 | `RUNNER_PAUSED` | runner(prod だけ) | `1`(`true` / `on` も可)で自動の動きを全体で止める(#337 の停止スイッチの「全体」)。止めている間に取り出したきっかけは `skipped_paused` で終わらせ、再開しても後からまとめて実行しない | 無し(止めない) |

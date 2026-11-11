@@ -9,6 +9,9 @@ import jp.kz2601.metamon.services.RemainingToday
 import jp.kz2601.metamon.services.StreamedComponent
 import jp.kz2601.metamon.services.TranscriberFailure
 import jp.kz2601.metamon.services.http.FailureKind
+import jp.kz2601.metamon.services.http.PaidFeature
+import jp.kz2601.metamon.services.privacy.PublicDataPrompt
+import jp.kz2601.metamon.services.purchase.PaidFeatureCheck
 
 /**
  * 「話す → 文字 → 生成 → 変身」の段階(#359)。
@@ -58,6 +61,10 @@ data class VoiceUiState(
     val phase: VoicePhase = VoicePhase.IDLE,
     /** 録音中の途中の聞き取り */
     val partial: String = "",
+    /** 録音中の声の大きさ 0..1(#1014・マイクの周りの輪) */
+    val inputLevel: Float = 0f,
+    /** 認識器が無音で自分から止まった時の聞き取り。送る前に確かめる(#1014・null = 確認なし) */
+    val pendingVoice: String? = null,
     /** 送った(送る)依頼文。生成中の表示に使う */
     val transcript: String = "",
     val progress: BuildProgress? = null,
@@ -99,6 +106,10 @@ data class VoiceUiState(
     val myUsage: MyUsage? = null,
     /** 入力欄に入れる文(設定の「頼み方のコツ」で選んだ例・#1161)。入れたら [VoiceViewModel.consumeDraft] で消す */
     val draft: String? = null,
+    /** 無料枠切れ・402 で作らずに止めた新規作成(#1261)。会話の下にカードを出す */
+    val heldBuild: HeldBuild? = null,
+    /** 生成で個人の情報が「誰でも見られる」記録に入った時の確認(#253・#899)。サーバーが `meta.publicPersonalData` を返した時だけ */
+    val publicDataPrompt: PublicDataPrompt? = null,
 ) {
     /** 初期状態(音声画面だけ)= 新規作成 */
     val isInitial: Boolean get() = document.dsl.isVoiceOnly
@@ -114,4 +125,24 @@ data class VoiceUiState(
     val isGenerating: Boolean get() = (phase == VoicePhase.SENDING && !chatPending) || phase == VoicePhase.GENERATING
 
     val isBusy: Boolean get() = phase == VoicePhase.TRANSCRIBING || phase == VoicePhase.SENDING || phase == VoicePhase.GENERATING
+}
+
+/**
+ * 作らずに止めた新規作成(#1261・iOS の `HeldBuild` / `PaidConfirmation`)。会話は消さずに残し、同じ依頼で続きから作る。
+ * [text] は作るはずだった依頼文(ready の transcript / 案の instruction)。
+ */
+sealed interface HeldBuild {
+    val text: String
+
+    /** 今日の無料作成を使い切った(課金画面を閉じた)。「続きから作る」 */
+    data class LimitReached(override val text: String, val dailyFreeLimit: Int) : HeldBuild
+
+    /**
+     * サーバーが 402 `pro_required` で止めた(課金画面を閉じた)か、相談の「これでいく」の案が有料の機能を含む(#1175・iOS の `PaidConfirmation`)。
+     * 「Pro にする」/「この機能なしで作る」。[free] はサーバーが返した無料版の依頼文(freeInstruction / freeTranscript)。
+     */
+    data class ProRequired(override val text: String, val features: List<PaidFeature>, val free: String? = null) : HeldBuild {
+        /** 有料の機能を外して作る依頼文(サーバーが返さなければ有料の機能を抜く指示を足す) */
+        val freeText: String get() = free?.trim()?.ifEmpty { null } ?: (text + "\n" + PaidFeatureCheck.FALLBACK_FREE_SUFFIX)
+    }
 }

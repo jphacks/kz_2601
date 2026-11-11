@@ -61,6 +61,13 @@ class ActionDispatchTest {
     }
 
     @Test
+    fun unknownActionToastNamesRawType() = runTest {
+        val rt = rt()
+        rt.run(Action(type = ActionType.UNKNOWN, rawType = "teleport"), ActionContext(listRoute))
+        assertEquals(UiText.Res(R.string.runtime_unknown_action, listOf("teleport")), rt.toast)
+    }
+
+    @Test
     fun navigateAndBack() = runTest {
         val rt = rt()
         rt.run(Action(type = ActionType.NAVIGATE, screen = "done"), ActionContext(listRoute))

@@ -26,6 +26,8 @@ fun stringProperty(name: String): String = (findProperty(name) as String?).orEmp
 android {
     namespace = "jp.kz2601.metamon"
     compileSdk = 36
+    // :whisper と同じ NDK。無いと .so の strip ができず、デバッグ情報付きのまま APK に入る(whisper だけで 1 ABI 14MB)
+    ndkVersion = "27.0.12077973"
 
     defaultConfig {
         applicationId = "jp.kz2601.metamon"
@@ -33,6 +35,10 @@ android {
         targetSdk = 36
         versionCode = 1
         versionName = "0.1.0"
+        // Play の審査用の版(#1275・iOS の APP_STORE_REVIEW)。-Pmetamon.playReview=true の時だけ共有・探すの入口を外す
+        buildConfigField("boolean", "PLAY_REVIEW", (stringProperty("metamon.playReview") == "true").toString())
+        // 画面のテスト(src/androidTest・#1314)。端末かエミュレータで connectedStgDebugAndroidTest
+        testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 
     // 接続先は iOS の ios/project.yml(METAMON_AI_BASE_URL / METAMON_APPCONFIG_BASE_URL)と同じ。
@@ -56,6 +62,16 @@ android {
             buildConfigField("String", "APPCONFIG_BASE_URL", "\"https://appconfig-prod-378953239426.asia-northeast1.run.app\"")
             resValue("string", "app_name", "Tailor It")
             buildConfigField("String", "GOOGLE_WEB_CLIENT_ID", "\"${stringProperty("metamon.prod.googleWebClientId")}\"")
+        }
+    }
+
+    // release は R8 で縮小・難読化し、使わないリソースも落とす(#1134)。debug はそのまま。
+    // AGP は flavor ごとに minify を切り替えられないので stgRelease も同じ(配る前に stg で R8 後の挙動を確かめられる)
+    buildTypes {
+        getByName("release") {
+            isMinifyEnabled = true
+            isShrinkResources = true
+            proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
         }
     }
 
@@ -89,6 +105,8 @@ dependencies {
     implementation(project(":dsl"))
     implementation(project(":renderer"))
     implementation(project(":services"))
+    // fileImport の録音ファイルの端末内の文字起こし(whisper.cpp・#1180)
+    implementation(project(":whisper"))
 
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.activity.compose)
@@ -112,10 +130,29 @@ dependencies {
     implementation(libs.googleid)
     implementation(libs.firebase.messaging)
     implementation(libs.play.app.update.ktx)
+    implementation(libs.play.services.nearby)
+    // Tailor It Pro の購入(Google Play Billing)
+    implementation(libs.play.billing.ktx)
+    // 場所に着いたら知らせる(Geofencing)
+    implementation(libs.play.services.location)
+    // photoField.analyze を端末内で読む(#1119)。写真は外に出さない。部品は Play 開発者サービスが落とす(APK はほぼ増えない)
+    implementation(libs.play.services.mlkit.text.recognition.japanese)
+    implementation(libs.play.services.mlkit.barcode.scanning)
+    implementation(libs.play.services.mlkit.image.labeling)
+    implementation(libs.play.services.mlkit.face.detection)
+    // ホーム画面のウィジェット(#912)
+    implementation(libs.glance.appwidget)
+    implementation(libs.glance.material3)
 
     testImplementation(libs.junit)
     testImplementation(libs.kotlinx.coroutines.test)
     testImplementation(libs.okhttp.mockwebserver)
+
+    // 画面のテスト(#1314)。本物の MainActivity を起動するので ui-test-manifest(空の Activity)は入れない
+    androidTestImplementation(platform(libs.compose.bom))
+    androidTestImplementation(libs.compose.ui.test.junit4)
+    androidTestImplementation(libs.androidx.test.runner)
+    androidTestImplementation(libs.androidx.test.ext.junit)
 }
 
 // ランタイムのテストは docs/dsl/examples(全 OS 共通の例)をそのまま読む。

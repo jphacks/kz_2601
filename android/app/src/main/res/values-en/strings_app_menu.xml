@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 英語 -->
+<resources>
+    <string name="app_menu_cancel">Cancel</string>
+    <string name="app_menu_copy_name">%1$s copy</string>
+    <string name="app_menu_delete">Delete</string>
+    <string name="app_menu_delete_busy">You can\'t delete apps while one is being made.</string>
+    <string name="app_menu_delete_failed">Couldn\'t delete “%1$s”</string>
+    <string name="app_menu_delete_message">This can\'t be undone. Share links and listings in Discover are taken down too.</string>
+    <string name="app_menu_delete_message_current">This can\'t be undone. You\'re using this app, so you\'ll switch to another app (or the start screen if there are none). Share links and listings in Discover are taken down too.</string>
+    <string name="app_menu_delete_title">Delete “%1$s”?</string>
+    <string name="app_menu_deleted">Deleted “%1$s”</string>
+    <string name="app_menu_duplicate">Duplicate</string>
+    <string name="app_menu_duplicate_failed">Couldn\'t duplicate “%1$s”</string>
+    <string name="app_menu_duplicated">Created “%1$s”</string>
+    <string name="app_menu_move_left">Move left</string>
+    <string name="app_menu_move_right">Move right</string>
+    <string name="app_menu_rename">Rename</string>
+    <string name="app_menu_rename_confirm">Rename</string>
+    <string name="app_menu_rename_failed">Couldn\'t rename the app</string>
+    <string name="app_menu_rename_field">App name</string>
+    <string name="app_menu_rename_invalid">Enter a name of 1 to %1$d characters</string>
+    <string name="app_menu_rename_message">This name appears in your apps and at the top of the app (up to %1$d characters).</string>
+    <string name="app_menu_rename_title">Rename</string>
+    <string name="app_menu_reorder_failed">Couldn\'t save the order</string>
+</resources>

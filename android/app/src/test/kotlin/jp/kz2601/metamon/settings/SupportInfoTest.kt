@@ -5,9 +5,10 @@ import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-/** #898 「詳細(サポート用)」: 問い合わせに要る値だけを出し、uid・トークン・メールアドレスなどの秘密は入れない。 */
+/** #898 / #1240 「詳細(サポート用)」: 問い合わせに要る値(ユーザー ID を含む)だけを出し、トークン・メールアドレスなどの秘密は入れない。 */
 class SupportInfoTest {
     private val info = SupportInfo(
+        uid = "uid-123",
         voiceModel = "AndroidSpeechTranscriber",
         aiEndpoint = SupportInfo.host("https://ai-stg-1.asia-northeast1.run.app"),
         appConfigEndpoint = SupportInfo.host("https://appconfig-stg-1.asia-northeast1.run.app/v1"),
@@ -19,7 +20,7 @@ class SupportInfoTest {
     @Test
     fun rowsHoldEveryValueInOrder() {
         assertEquals(
-            listOf("AndroidSpeechTranscriber", "ai-stg-1.asia-northeast1.run.app", "appconfig-stg-1.asia-northeast1.run.app", "0.1.0-stg (1)", "v5"),
+            listOf("uid-123", "AndroidSpeechTranscriber", "ai-stg-1.asia-northeast1.run.app", "appconfig-stg-1.asia-northeast1.run.app", "0.1.0-stg (1)", "v5"),
             info.rows.map { it.value },
         )
     }
@@ -28,7 +29,8 @@ class SupportInfoTest {
     fun clipboardHasOneLinePerRow() {
         val lines = info.clipboardText { it.name }.split("\n")
         assertEquals(info.rows.size, lines.size)
-        assertEquals("VERSION: 0.1.0-stg (1)", lines[3])
+        assertEquals("USER_ID: uid-123", lines[0])
+        assertEquals("VERSION: 0.1.0-stg (1)", lines[4])
     }
 
     @Test
@@ -42,6 +44,7 @@ class SupportInfoTest {
     @Test
     fun noSecretsInRowsOrClipboard() {
         val leaky = SupportInfo(
+            uid = null,
             voiceModel = "m",
             aiEndpoint = SupportInfo.host("https://uid-abc:Bearer.eyJtoken@ai.example.com/path?uid=abc123&token=eyJ"),
             appConfigEndpoint = SupportInfo.host("https://appconfig.example.com/me?email=alice%40example.org"),
@@ -53,8 +56,15 @@ class SupportInfoTest {
         for (secret in listOf("abc123", "eyJ", "token", "Bearer", "@", "alice", "uid")) {
             assertFalse("$secret が出ている: $text", text.contains(secret))
         }
-        // 項目は 5 つだけ(ユーザー ID・メールアドレス・トークンの欄は無い)
-        assertEquals(SupportInfo.Field.entries.toSet(), leaky.rows.map { it.field }.toSet())
-        assertTrue(SupportInfo.Field.entries.none { f -> listOf("UID", "USER", "EMAIL", "TOKEN").any { f.name.contains(it) } })
+        // メールアドレス・トークンの欄は無い
+        assertTrue(SupportInfo.Field.entries.none { f -> listOf("EMAIL", "TOKEN").any { f.name.contains(it) } })
+    }
+
+    @Test
+    fun userIdRowOnlyWhenSignedIn() {
+        // iOS と同じく先頭に出す(#1240)。サインインしていない・空なら行ごと出さない
+        assertEquals(SupportInfo.Field.USER_ID, info.rows.first().field)
+        assertFalse(info.copy(uid = null).rows.any { it.field == SupportInfo.Field.USER_ID })
+        assertFalse(info.copy(uid = "").rows.any { it.field == SupportInfo.Field.USER_ID })
     }
 }

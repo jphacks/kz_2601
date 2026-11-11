@@ -5,7 +5,10 @@
     <string name="switcher_current">The app you\'re using</string>
     <string name="switcher_empty">No apps yet</string>
     <string name="switcher_new_app">+ New app</string>
-    <string name="switcher_open">Apps</string>
+    <string name="switcher_subtitle">Tap to switch. Long-press the mic to come back here anytime</string>
     <string name="switcher_title">Your apps</string>
     <string name="switcher_untitled">Untitled</string>
+    <string name="voice_intent_already_current">You\'re already using “%1$s”</string>
+    <string name="voice_intent_switch_ambiguous">Several apps match “%1$s”. Pick one from the list</string>
+    <string name="voice_intent_switch_not_found">Couldn\'t find an app called “%1$s”</string>
 </resources>

@@ -1,0 +1,11 @@
+{
+  "dsl": "examples/ai_counselor.json",
+  "records": {
+    "turn": [
+      { "id": "t2", "data": { "text": "それはつらかったですね。いちばん気になっているのはどんなことですか?", "role": "assistant" }, "createdAt": "2026-11-12T09:00:10+09:00" },
+      { "id": "t1", "data": { "text": "最近よく眠れません", "role": "user" }, "createdAt": "2026-11-12T09:00:00+09:00" },
+      { "id": "t3", "data": { "text": "  ", "role": "user" }, "createdAt": "2026-11-12T09:00:20+09:00" },
+      { "id": "t4", "data": { "text": "仕事の締め切りです", "role": "user" }, "createdAt": "2026-11-12T09:00:30+09:00" }
+    ]
+  }
+}
