@@ -104,6 +104,10 @@ struct ListLeaf: View {
                         .accessibilityActions {
                             #if os(macOS)
                             Button(L("コピー")) { copy(row, entity: entity) }
+                            // 行の写真も右クリックと同じく VoiceOver からコピーできる(#1370)
+                            if let photo = rowImage(row, entity: entity) {
+                                Button(L("画像をコピー")) { PlatformPasteboard.setImage(photo.image) }
+                            }
                             #endif
                             if deletable(row, entity: entityId) { Button(L("削除")) { delete(row, entity: entityId) } }
                         }
