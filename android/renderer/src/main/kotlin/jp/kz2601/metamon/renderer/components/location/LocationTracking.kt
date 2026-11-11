@@ -35,13 +35,14 @@ object LocationTracking {
     private var appContext: Context? = null
     private var entity: (() -> Entity?)? = null
     private var save: (suspend (Map<String, JSONValue>) -> Boolean)? = null
+    private var currentAppId: (() -> String?)? = null
 
     /** ホストの「記録中」バーと停止(iOS の `LocationTrackingControl`)。 */
     val status: TrackingStatus get() = _state.value.status
 
     /**
      * 記録を始める。位置の許可は呼ぶ前に聞いておく。[entity] は記録先の今の定義(アプリが変わったら null / 別物)、
-     * [save] はレコードを 1 件足す。
+     * [save] はレコードを 1 件足す。[currentAppId] は今開いているアプリ(開始した時の [TrackingTarget.appId] と違えば保存せず止める)。
      */
     fun start(
         context: Context,
@@ -49,12 +50,14 @@ object LocationTracking {
         autoStopSeconds: Int,
         entity: () -> Entity?,
         save: suspend (Map<String, JSONValue>) -> Boolean,
+        currentAppId: () -> String? = { target.appId },
     ) {
         if (_state.value.isActive) return
         val app = context.applicationContext
         appContext = app
         this.entity = entity
         this.save = save
+        this.currentAppId = currentAppId
         _state.value = _state.value.start(target, autoStopSeconds)
         try {
             app.startForegroundService(Intent(app, LocationTrackingService::class.java).setAction(LocationTrackingService.ACTION_START))
@@ -68,6 +71,11 @@ object LocationTracking {
     fun stop(reason: TrackingStopReason? = null) {
         if (!_state.value.isActive) return
         finish(reason)
+    }
+
+    /** サインアウト・アカウント削除([appId] = null)や、記録中のアプリの削除で止める。別のアプリの記録は止めない。 */
+    fun stopFor(appId: String?) {
+        if (_state.value.shouldStopFor(appId)) finish(null)
     }
 
     /** 位置の許可が無かった(サービスは起こさない)。部品が「設定を開く」を出す。 */
@@ -99,7 +107,7 @@ object LocationTracking {
                 val s = _state.value
                 val target = s.target ?: return@withLock
                 if (!s.shouldKeep(p, accuracy)) return@withLock
-                val data = TrackingRules.pointData(target, entity?.invoke(), p)
+                val data = TrackingRules.pointData(target, entity?.invoke(), p, currentAppId?.invoke())
                 val ok = data != null && save?.invoke(data) == true
                 if (!_state.value.isRecording(target)) return@withLock
                 if (ok) _state.update { it.kept(p) } else stop(TrackingStopReason.SAVE_FAILED)
@@ -115,6 +123,7 @@ object LocationTracking {
     private fun release() {
         save = null
         entity = null
+        currentAppId = null
         appContext?.let { it.stopService(Intent(it, LocationTrackingService::class.java)) }
     }
 }

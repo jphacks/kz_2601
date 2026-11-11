@@ -148,4 +148,28 @@ class LocationTrackerTest {
         assertEquals(61L, TrackingRules.remainingMinutes(s, 0)) // iOS と同じく +1
         assertEquals(47L, TrackingRules.remainingMinutes(s, (13 * 60 + 30) * 1000L))
     }
+
+    /** 開始した時のアプリの appId を持ち、今のアプリが違えば点を作らない(保存失敗として止まる)。 */
+    @Test
+    fun pointsGoOnlyToTheAppThatStartedTracking() {
+        val c = dsl.screens.first().components[0]
+        val scoped = TrackingTarget.of(c, "散歩", "app-1")!!
+        assertEquals("app-1", scoped.appId)
+        assertFalse("別のアプリの同じ部品は記録中に見せない", TrackingState().start(scoped, 600).isRecording(scoped.copy(appId = "app-2")))
+        assertNotNull(TrackingRules.pointData(scoped, point, p(35.0, 139.0, 0), currentAppId = "app-1"))
+        assertNull("切り替えた後", TrackingRules.pointData(scoped, point, p(35.0, 139.0, 0), currentAppId = "app-2"))
+        assertNull("消した後(新しい appId)", TrackingRules.pointData(scoped, point, p(35.0, 139.0, 0), currentAppId = null))
+    }
+
+    /** サインアウト・アカウント削除(null)は必ず止め、アプリの削除はそのアプリの記録だけ止める。 */
+    @Test
+    fun stopForMatchesSignOutAndTheDeletedApp() {
+        val scoped = TrackingTarget.of(dsl.screens.first().components[0], "散歩", "app-1")!!
+        val recording = TrackingState().start(scoped, 600).began(0)
+        assertTrue(recording.shouldStopFor(null))
+        assertTrue(recording.shouldStopFor("app-1"))
+        assertFalse(recording.shouldStopFor("app-2"))
+        assertFalse("記録していなければ何もしない", TrackingState().shouldStopFor(null))
+        assertTrue("許可を待っている間も止める", TrackingState().start(scoped, 600).shouldStopFor("app-1"))
+    }
 }

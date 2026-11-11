@@ -149,4 +149,45 @@ class ChatUnchangedTest {
         assertTrue(s.chat.isEmpty())
         assertTrue(s.history.isEmpty())
     }
+
+    /** 話しかける前の画面(voice-only)の相談で何も変わらず会話を閉じる時は、サーバーの会話も区切る。 */
+    @Test
+    fun unchangedThatClosesTheChatResetsTheConversation() = runTest {
+        val voiceOnly = AppDocument(
+            appId = "a1",
+            version = 0,
+            dsl = AppDSL.decode(
+                """{"schemaVersion":1,"app":{"name":"Tailor It","voiceEntry":"fullscreen"},"initialScreen":"voice",
+                   "screens":[{"id":"voice","components":[{"type":"voiceInput"}]}]}""",
+            ),
+        )
+        val ai = FakeAI(MorphResult(document = voiceOnly, summary = "作れませんでした", envelopeJson = "{}", unchanged = true)).apply {
+            turns += ready("家計簿")
+            turns += ChatTurn(kind = ChatTurn.Kind.QUESTION, text = "何を記録しますか", turn = 1)
+        }
+        val dispatcher = StandardTestDispatcher(testScheduler)
+        val vm = VoiceViewModel(
+            transcriber = MockSpeechTranscriber(),
+            ai = ai,
+            appId = { "a1" },
+            initial = voiceOnly,
+            clarifyEnabled = { true },
+            chatHistory = ChatHistoryStore(tmp.root),
+            io = dispatcher,
+            unchangedFallback = "FALLBACK",
+            scope = CoroutineScope(dispatcher + Job()),
+        )
+        vm.submit("家計簿")
+        advanceUntilIdle()
+        vm.buildFromChat()
+        advanceUntilIdle()
+
+        assertTrue("会話は閉じる", vm.state.value.chat.isEmpty())
+        assertEquals("作れませんでした", vm.state.value.summary)
+        assertEquals("サーバーの会話も区切る", 1, ai.resets)
+        // 次の発話は新しい相談として始まる(前の答えを持ち越さない)
+        vm.submit("散歩メモ")
+        advanceUntilIdle()
+        assertEquals(listOf(true to "散歩メモ", false to "何を記録しますか"), vm.state.value.chat.map { it.fromUser to it.text })
+    }
 }

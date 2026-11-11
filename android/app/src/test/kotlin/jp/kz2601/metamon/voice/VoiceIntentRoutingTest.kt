@@ -1,5 +1,6 @@
 package jp.kz2601.metamon.voice
 
+import jp.kz2601.metamon.consent.ConsentPrompt
 import jp.kz2601.metamon.dsl.AppDSL
 import jp.kz2601.metamon.dsl.AppDocument
 import jp.kz2601.metamon.dsl.decode
@@ -10,6 +11,8 @@ import jp.kz2601.metamon.services.ChatTurn
 import jp.kz2601.metamon.services.GenerateMode
 import jp.kz2601.metamon.services.GenerateProgress
 import jp.kz2601.metamon.services.MorphResult
+import jp.kz2601.metamon.services.consent.AiConsentStore
+import jp.kz2601.metamon.services.consent.InMemoryKeyValueStore
 import jp.kz2601.metamon.services.mock.MockSpeechTranscriber
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
@@ -136,5 +139,36 @@ class VoiceIntentRoutingTest {
         vm.submit("家計簿に切り替えて", InputSource.VOICE)
         advanceUntilIdle()
         assertEquals(listOf("家計簿に切り替えて" to "app-1"), ai.sent)
+    }
+
+    /** 同意の後の送り直しで「別のアプリ」をもう一度処理しない(appId を 2 回作り直さない)。 */
+    @Test
+    fun newAppWaitingForConsentRotatesTheAppIdOnce() = runTest {
+        val ai = FakeAI()
+        var fresh = 1
+        val requests = FakeRequests {
+            fresh++
+            currentAppId = "app-$fresh"
+            AppDocument(currentAppId, 0, appDsl("Tailor It", voiceOnly = true))
+        }
+        val prompt = ConsentPrompt(AiConsentStore(InMemoryKeyValueStore()))
+        val vm = VoiceViewModel(
+            transcriber = MockSpeechTranscriber(),
+            ai = ai,
+            appId = { currentAppId },
+            initial = AppDocument("app-1", 0, appDsl("Tailor It", voiceOnly = true)),
+            clarifyEnabled = { false },
+            requireConsent = prompt::require,
+            appRequests = requests,
+            scope = CoroutineScope(StandardTestDispatcher(testScheduler) + Job()),
+        )
+        vm.submit("別のアプリ。散歩メモが欲しい", InputSource.VOICE)
+        advanceUntilIdle()
+        assertTrue(prompt.visible.value)
+        assertTrue(ai.sent.isEmpty())
+        prompt.agree()
+        advanceUntilIdle()
+        assertEquals(listOf("new"), requests.calls)
+        assertEquals(listOf("別のアプリ。散歩メモが欲しい" to "app-2"), ai.sent)
     }
 }

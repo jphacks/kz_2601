@@ -12,6 +12,7 @@ import jp.kz2601.metamon.nearby.NearbySettings
 import jp.kz2601.metamon.nearby.NearbyShareController
 import jp.kz2601.metamon.nearby.PassbyController
 import jp.kz2601.metamon.discover.PublishEnv
+import jp.kz2601.metamon.renderer.components.location.LocationTracking
 import jp.kz2601.metamon.renderer.components.sensors.MockSensorSource
 import jp.kz2601.metamon.renderer.components.sensors.SensorSource
 import jp.kz2601.metamon.runtime.AiTextAccess
@@ -50,6 +51,7 @@ import jp.kz2601.metamon.services.AppEnvironment
 import jp.kz2601.metamon.account.AccountGuard
 import jp.kz2601.metamon.account.AccountLinkPrompt
 import jp.kz2601.metamon.account.ActiveOwner
+import jp.kz2601.metamon.account.LocalAppForget
 import jp.kz2601.metamon.account.LocalDataWipe
 import jp.kz2601.metamon.account.MediaTempFiles
 import jp.kz2601.metamon.account.OwnerGatedTokens
@@ -247,16 +249,14 @@ class AppContainer(
     /** 1 つのアプリの通知の予約・出ている通知を消す(アプリ削除・#896)。既定は何もしない(テスト) */
     private val forgetAppNotifications: (String) -> Unit = {},
 ) {
-    /**
-     * 削除したアプリの端末のデータ(iOS の `deleteApp` の後片付け・#896): 記録の DB と送信待ち・保存した DSL・
-     * サムネ・会話の履歴(#1176)・通知。サーバーの削除が済んでから呼ぶ。
-     */
-    suspend fun forgetAppLocally(appId: String) {
-        recordSync.purge(appId)
-        documentCache.remove(appId)
-        thumbnails.remove(appId)
-        chatHistory.remove(appId)
-        forgetAppNotifications(appId)
+    /** 削除したアプリの端末のデータを消す([LocalAppForget])。サーバーの削除が済んでから呼ぶ。 */
+    suspend fun forgetAppLocally(appId: String) = forgetApp(appId)
+
+    private val forgetApp: LocalAppForget by lazy {
+        LocalAppForget(
+            recordSync, documentCache, thumbnails, chatHistory, forgetAppNotifications,
+            stopLocationTracking = LocationTracking::stopFor,
+        )
     }
 
     /** リリース申請の状態(変身一覧のバッジと申請のシート・#1254)。null なら入口を出さない */
@@ -330,6 +330,7 @@ class AppContainer(
             feedCache = feedCache,
             thumbnails = thumbnails,
             closeFeedback = feedbackComposer::close,
+            stopLocationTracking = { LocationTracking.stopFor(null) },
             // チュートリアルと「こう話すと直せます」の印(iOS は LocalWipe.clearDefaults で消える)。次の人には出し直す
             forgetTutorial = {
                 tutorial.forget()
@@ -369,6 +370,7 @@ class AppContainer(
             stopSync = recordSync::stop,
             wipe = { wipeLocalData() },
             onSignedOut = {
+                LocationTracking.stopFor(null) // 前の人の記録を次の人に持ち越さない(#869)
                 ShareLinkIntents.inbox.clear()
                 feedbackComposer.close() // 消す前に開き直されても、サインアウトで閉じる(#1315)
                 releaseHeavyMemory() // 文字起こしのモデルを次の人まで持ち越さない

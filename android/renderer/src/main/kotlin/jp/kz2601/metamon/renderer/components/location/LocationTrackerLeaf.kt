@@ -56,7 +56,8 @@ import kotlinx.coroutines.delay
 @Composable
 fun LocationTrackerLeaf(c: Component, ctx: RenderContext, modifier: Modifier = Modifier) {
     val appName = LocalDashcamAppName.current
-    val target = TrackingTarget.of(c, appName)
+    val runtime = ctx.runtime
+    val target = TrackingTarget.of(c, appName, runtime.currentAppId)
     if (target == null) {
         UnavailableComponent(c, modifier)
         return
@@ -64,7 +65,6 @@ fun LocationTrackerLeaf(c: Component, ctx: RenderContext, modifier: Modifier = M
     val context = LocalContext.current
     val state by LocationTracking.state.collectAsState()
     val autoStop = Track.autoStopSeconds(c.seconds)
-    val runtime = ctx.runtime
 
     fun begin() {
         // 正確な位置が無いと点が粗すぎて捨てるだけなので、記録は正確な位置の許可がある時だけ
@@ -72,9 +72,13 @@ fun LocationTrackerLeaf(c: Component, ctx: RenderContext, modifier: Modifier = M
             LocationTracking.refused(target, autoStop)
             return
         }
-        LocationTracking.start(context, target, autoStop, { runtime.entityModel(target.entity) }) { data ->
-            runtime.addRecord(target.entity, data)
-        }
+        LocationTracking.start(
+            context, target, autoStop,
+            entity = { runtime.entityModel(target.entity) },
+            // 別のアプリに移った・消した後の点は保存せず止める(今のアプリに足さない)
+            save = { data -> runtime.currentAppId == target.appId && runtime.addRecord(target.entity, data) },
+            currentAppId = { runtime.currentAppId },
+        )
     }
 
     // 通知の許可(13+)は聞くだけ。断られても記録はする(通知は OS のタスクマネージャーに出る)
