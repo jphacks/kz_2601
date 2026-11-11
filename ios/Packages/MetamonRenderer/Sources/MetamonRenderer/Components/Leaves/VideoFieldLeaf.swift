@@ -258,7 +258,7 @@ struct VideoPreview: View {
     var body: some View {
         Group {
             if let url = playableURL {
-                VideoPlayer(player: player)
+                playerView
                     .onAppear { if player == nil { player = AVPlayer(url: url) } }
                     .onChange(of: url) { _, new in player = AVPlayer(url: new) }
                     .onDisappear { player?.pause() }
@@ -272,7 +272,7 @@ struct VideoPreview: View {
                 PhotoView(value: value, height: height, accessibilityLabel: L("この端末にはありません"))
                     .overlay(alignment: .bottom) {
                         if video != nil {
-                            Label(L("この端末にはありません"), systemImage: "iphone.slash")
+                            Label(L("この端末にはありません"), systemImage: PlatformSystem.notOnDeviceSymbol)
                                 .font(.caption.weight(.semibold))
                                 .padding(.horizontal, 10).padding(.vertical, 6)
                                 .background(.ultraThinMaterial, in: Capsule())
@@ -284,5 +284,15 @@ struct VideoPreview: View {
         .frame(height: height)
         .frame(maxWidth: .infinity)
         .clipShape(RoundedRectangle(cornerRadius: RenderTheme.Radius.inner, style: .continuous))
+    }
+
+    /// Mac は全画面のボタン・しまった時に止める `AVPlayerView`(#1340)。iOS は SwiftUI の `VideoPlayer`
+    @ViewBuilder
+    private var playerView: some View {
+        #if os(macOS)
+        MacVideoPlayerView(player: player)
+        #else
+        VideoPlayer(player: player)
+        #endif
     }
 }
