@@ -28,9 +28,10 @@ final class SharingUI {
 
     /// シェアリンクなら保留して true。それ以外の URL は false(触らない)。
     @discardableResult
-    func receive(_ url: URL) -> Bool {
+    func receive(_ url: URL, hold: LaunchConsentHold = .shared) -> Bool {
         guard ShareURL.token(from: url) != nil else { return false }
         pendingLink = url
+        hold.begin(.shareLink) // 開き終わるまで Intent を待たせる(リンク → Intent の順)
         return true
     }
 
@@ -39,6 +40,12 @@ final class SharingUI {
     func receive(activity: NSUserActivity) -> Bool {
         guard activity.activityType == NSUserActivityTypeBrowsingWeb, let url = activity.webpageURL else { return false }
         return receive(url)
+    }
+
+    /// 開いたリンクの確認(参加 / 追加)が閉じきったか、出さなかった時。次の段(Intent)へ進む。
+    func linkSettled(hold: LaunchConsentHold = .shared) {
+        guard pendingLink == nil, pendingJoin == nil, pendingImport == nil else { return }
+        hold.end(.shareLink)
     }
 
     /// 準備済みなら保留中のリンクを渡して空にする。まだなら nil(保留は残す)。
@@ -178,14 +185,17 @@ struct SharingHooks: ViewModifier {
     func body(content: Content) -> some View {
         content
             // リンクの受信は `ShareLinkReceiver`(サインイン画面の時も届く)。ここでは準備ができたら開く(#278)
-            .task(id: "\(ui.isReady)|\(splash.isShowing)|\(consentHold.isHolding)|\(ui.pendingLink?.absoluteString ?? "")") {
-                // スプラッシュ → 起動時の同意の画面が閉じてから開く(シートを同時に出すと片方が捨てられる)
-                guard !splash.isShowing, !consentHold.isHolding else { return }
-                if let url = ui.takeLink() { await rt.openShareURL(url) }
+            .task(id: "\(ui.isReady)|\(splash.isShowing)|\(consentHold.isHolding(before: .shareLink))|\(ui.pendingLink?.absoluteString ?? "")") {
+                // スプラッシュ → 起動時の同意 → チュートリアルが閉じてから開く(シートを同時に出すと片方が捨てられる)
+                guard !splash.isShowing, !consentHold.isHolding(before: .shareLink) else { return }
+                guard let url = ui.takeLink() else { return }
+                consentHold.begin(.shareLink) // サインインし直した後など、受信時の段が放されていても Intent を待たせる
+                await rt.openShareURL(url)
+                ui.linkSettled() // 確認を出さなかった(トースト等)時はここで次へ。出した時は閉じた時(onDismiss)
             }
             .sheet(isPresented: $ui.showDiscover) { DiscoverSheet() }
-            .sheet(item: $ui.pendingJoin) { JoinShareSheet(join: $0) }
-            .sheet(item: $ui.pendingImport) { AddShareSheet(pending: $0) }
+            .sheet(item: $ui.pendingJoin, onDismiss: { ui.linkSettled() }) { JoinShareSheet(join: $0) }
+            .sheet(item: $ui.pendingImport, onDismiss: { ui.linkSettled() }) { AddShareSheet(pending: $0) }
             #if DEBUG
             .task { await debugHooks() }
             .modifier(ReleaseRequestHooks())
