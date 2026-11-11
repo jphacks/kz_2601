@@ -58,6 +58,9 @@ public enum SyncEvent: Sendable, Equatable {
     case appStopped(appId: String, entity: String, recordId: String? = nil)
     /// 他の人に見える文字に表示できない言葉がある(422 `text_not_allowed`・#321)。`field` は直す Field.id(authorName もありうる)
     case textNotAllowed(appId: String, entity: String, field: String?, recordId: String? = nil)
+    /// 仲間探しのプロフィールの投稿に 18 歳以上の申告が要る(400 `age_unconfirmed`・#507)。操作は破棄し、ローカル行も消した。
+    /// `data` は送ろうとした値(申告のあとに投稿し直す)
+    case ageUnconfirmed(appId: String, entity: String, data: [String: JSONValue], recordId: String? = nil)
 }
 
 /// 指数バックオフ: base × multiplier^(attempt-1)。attempt は 1 始まり。
@@ -200,6 +203,13 @@ public actor SyncQueue {
                     finish(op)
                     print("[Metamon] sync \(op.kind.rawValue) \(op.entity)/\(op.recordId) not a member")
                     emit(.notMember(appId: op.appId, entity: op.entity, recordId: op.recordId))
+                    continue
+                }
+                if op.kind == .create, (error as? APIError)?.isAgeUnconfirmed == true { // #507: 4xx の rejected より先に見分ける
+                    await store.revertPending(appId: op.appId, entity: op.entity, recordId: rowId(op))
+                    finish(op)
+                    print("[Metamon] sync create \(op.entity)/\(op.recordId) needs the 18+ declaration")
+                    emit(.ageUnconfirmed(appId: op.appId, entity: op.entity, data: op.data, recordId: op.recordId))
                     continue
                 }
                 if let event = Self.refusal(error, appId: op.appId, entity: op.entity, recordId: op.recordId) { // 403 forbidden / 4xx rejected より先に見分ける

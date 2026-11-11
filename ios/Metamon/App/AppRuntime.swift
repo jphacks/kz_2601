@@ -1238,6 +1238,13 @@ final class AppRuntime: DSLRuntime {
                 toast = textNotAllowedToast(entity: entity, field: field) // #321
                 records[entity] = await recordSync.cached(appId: appId, entity: entity)
                 WidgetSnapshotWriter.write(dsl: dsl, records: records)
+            case .ageUnconfirmed(let appId, let entity, let data, _):
+                guard appId == document.appId else { return }
+                records[entity] = await recordSync.cached(appId: appId, entity: entity)
+                WidgetSnapshotWriter.write(dsl: dsl, records: records)
+                #if !APP_STORE_REVIEW
+                profilePostNeedsAge(entity: entity, data: data) // #507: 18 歳以上の確認 → 同意したら投稿し直す
+                #endif
             }
         }
     }
@@ -1258,7 +1265,8 @@ final class AppRuntime: DSLRuntime {
         case .forbidden(let appId, let entity, let id), .rejected(let appId, let entity, _, _, let id),
              .notMember(let appId, let entity, let id), .denied(let appId, let entity, _, let id),
              .proRequired(let appId, let entity, _, let id), .planLimit(let appId, let entity, _, let id),
-             .appStopped(let appId, let entity, let id), .textNotAllowed(let appId, let entity, _, let id):
+             .appStopped(let appId, let entity, let id), .textNotAllowed(let appId, let entity, _, let id),
+             .ageUnconfirmed(let appId, let entity, _, let id):
             return (appId, entity, id)
         case .sent, .conflict, .paused, .drained:
             return nil
