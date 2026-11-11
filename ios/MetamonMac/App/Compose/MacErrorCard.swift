@@ -4,7 +4,9 @@ import MetamonServices
 /// 会話のシートの失敗を出す状態カード(#968)。分け方と文言は iOS の `ErrorPresentation` / `ErrorCopy` をそのまま使う
 /// (上限・Pro が要る・一時停止・オフライン・混雑・失敗)。見た目は Mac に合わせ、ボタンは「もう一度」と「閉じる」。
 /// 持てるアプリの数の上限(#630)は「置き換える」で置き換えシート(`MacAppLimitSheet`)を出し、1 つ空いたら同じ依頼でやり直す。
-/// 「Pro にする」は Mac の課金画面(`MacPaywallView`)を出す。サインイン・今すぐ送るは Mac にまだ無い(#930)ので出さず、本文の案内だけにする。
+/// 「Pro にする」は Mac の課金画面(`MacPaywallView`)を出す。
+/// サインイン・Apple でサインイン(#1280)は Firebase につながっている版だけ「Apple でサインイン」を出し、できたら同じ依頼でやり直す。
+/// 今すぐ送るは Mac に圏外の保留が無いので出さない(本文の案内だけ)。
 struct MacErrorCard: View {
     let presentation: ErrorPresentation
     var retry: () -> Void
@@ -25,6 +27,12 @@ struct MacErrorCard: View {
         case .retry?: true
         case .sendNow?, .signIn?, .signInApple?, .upgradePro?, .replaceApp?, nil: false // 置き換えは別のボタン(下の appLimit)
         }
+    }
+
+    /// 「Apple でサインイン」を出すか(#1280)。サインインできるのは Firebase につながっている版だけ
+    static func showsAppleSignIn(_ presentation: ErrorPresentation, isLive: Bool) -> Bool {
+        guard isLive else { return false }
+        return presentation.primary == .signIn || presentation.primary == .signInApple
     }
 
     var body: some View {
@@ -49,6 +57,10 @@ struct MacErrorCard: View {
                         Button(AppLimitCopy.replaceButton) { replacing = appLimit }
                             .buttonStyle(.borderedProminent)
                             .accessibilityIdentifier("appLimit.replace")
+                    }
+                    if Self.showsAppleSignIn(presentation, isLive: MacAccount.shared.isLive) {
+                        // セッション切れ(.signIn)は引き継がずにサインインし直す。匿名の上限(.signInApple)は匿名から引き継ぐ
+                        MacAppleSignInButton(relogin: presentation.primary == .signIn, onSignedIn: retry)
                     }
                     #if !APP_STORE_REVIEW
                     if presentation.primary == .upgradePro {
