@@ -1339,6 +1339,23 @@
         }
       }
     },
+    "Android の端末とはつながりません(iPhone どうしで送り合えます)" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Can't connect to Android devices (works between iPhones)"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Android の端末とはつながりません(iPhone どうしで送り合えます)"
+          }
+        }
+      }
+    },
     "Apple Intelligence に対応していない端末です" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -6896,6 +6913,40 @@
         }
       }
     },
+    "横に広げる" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Make wider"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "横に広げる"
+          }
+        }
+      }
+    },
+    "横に狭める" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Make narrower"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "横に狭める"
+          }
+        }
+      }
+    },
     "横向き" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -7856,6 +7907,40 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "編集内容を破棄しますか?"
+          }
+        }
+      }
+    },
+    "縦に広げる" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Make taller"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "縦に広げる"
+          }
+        }
+      }
+    },
+    "縦に狭める" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Make shorter"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "縦に狭める"
           }
         }
       }
@@ -9633,74 +9718,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "項目"
-          }
-        }
-      }
-    },
-    "横に広げる" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Make wider"
-          }
-        },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "横に広げる"
-          }
-        }
-      }
-    },
-    "横に狭める" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Make narrower"
-          }
-        },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "横に狭める"
-          }
-        }
-      }
-    },
-    "縦に広げる" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Make taller"
-          }
-        },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "縦に広げる"
-          }
-        }
-      }
-    },
-    "縦に狭める" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Make shorter"
-          }
-        },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "縦に狭める"
           }
         }
       }
