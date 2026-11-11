@@ -34,7 +34,6 @@ class DeviceCapabilitiesTest {
         // 今 Android で描けない部品(登録を足したらここから消す)
         for (t in listOf(
             ComponentType.PLACE_SEARCH,
-            ComponentType.HEALTH_STAT,
         )) {
             assertFalse(t.wire, t.wire in caps.allowedComponents)
         }
@@ -50,6 +49,7 @@ class DeviceCapabilitiesTest {
             ComponentType.LOCATION_TRACKER, // #869
             // 送受信(#1382)とすれ違い(#1383)がそろった
             ComponentType.NEARBY_SHARE,
+            ComponentType.HEALTH_STAT, // #870
         )) {
             assertTrue(t.wire, t.wire in caps.allowedComponents)
         }
@@ -85,7 +85,8 @@ class DeviceCapabilitiesTest {
             ),
             caps.supportedFeatures,
         )
-        assertEquals(listOf("fieldHealth"), caps.disabledFeatures)
+        // Field.health は Health Connect で書けるようになった(#870)。審査用の版だけ外す(ReviewBuild)
+        assertEquals(emptyList<String>(), caps.disabledFeatures)
     }
 
     /** 機能のキーは iOS の通常の版と同じ集合を見ている(送るかどうかは Android の実装で決める)。 */
