@@ -2789,6 +2789,23 @@
         }
       }
     },
+    "カルーセル" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Carousel"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "カルーセル"
+          }
+        }
+      }
+    },
     "カードがありません" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -3261,6 +3278,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "ペン"
+          }
+        }
+      }
+    },
+    "ページ" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Page"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ページ"
           }
         }
       }
@@ -4999,6 +5033,23 @@
         }
       }
     },
+    "前へ" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Previous"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "前へ"
+          }
+        }
+      }
+    },
     "動画" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -6219,6 +6270,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "次の月"
+          }
+        }
+      }
+    },
+    "次へ" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Next"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "次へ"
           }
         }
       }
@@ -8382,6 +8450,40 @@
         }
       }
     },
+    "閉じています" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Collapsed"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "閉じています"
+          }
+        }
+      }
+    },
+    "閉じます" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Collapses"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "閉じます"
+          }
+        }
+      }
+    },
     "閉じる" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -8395,6 +8497,40 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "閉じる"
+          }
+        }
+      }
+    },
+    "開いています" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Expanded"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "開いています"
+          }
+        }
+      }
+    },
+    "開きます" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Expands"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "開きます"
           }
         }
       }

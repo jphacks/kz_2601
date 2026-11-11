@@ -2,11 +2,11 @@ import SwiftUI
 import AppKit
 
 /// メニューバー(#934)。ウインドウの状態は `focusedSceneValue` で受け取り、今の画面に合わせて有効 / 無効を変える。
-/// - ファイル: 新しいアプリ・声 / 文字で頼む(動きは後の Issue・今は押せない)・新しいウインドウ
+/// - ファイル: 新しいアプリ・文字で頼む(会話のシート・#967)・声で頼む(同じシートですぐ録音・#966)・新しいウインドウ
 /// - 編集: 元に戻す(記録を消した直後は削除の取り消し・それ以外は入力欄の取り消し)・やり直す
 /// - 表示: サイドバー(`SidebarCommands`)・ツールバー(`ToolbarCommands`)
 /// - 移動: 戻る・アプリの一覧 / 中央へ・前 / 次のアプリ
-/// - ヘルプ: 頼み方のコツ(後の Issue)・お問い合わせ
+/// - ヘルプ: 頼み方のコツ(#967)・お問い合わせ
 struct MacCommands: Commands {
     static let mainWindowId = "main"
     static let contactURL = URL(string: "https://tailor-it.app/contact")!
@@ -21,18 +21,19 @@ struct MacCommands: Commands {
         ToolbarCommands()
 
         CommandGroup(replacing: .newItem) {
-            Button("新しいアプリ") {}
+            Button("新しいアプリ") { shell?.newApp() }
                 .keyboardShortcut("n", modifiers: .command)
-                .disabled(true)
+                .disabled(!(shell?.canCompose ?? false))
             Button("新しいウインドウ") { openWindow(id: Self.mainWindowId) }
                 .keyboardShortcut("n", modifiers: [.command, .option])
             Divider()
-            Button("声で頼む") {}
+            // シートが開いている間は押せない(⇧⌘M はシートのマイクが受けて、録音の開始 / 終了になる)
+            Button("声で頼む") { shell?.speak() }
                 .keyboardShortcut("m", modifiers: [.command, .shift])
-                .disabled(true)
-            Button("文字で頼む") {}
+                .disabled(!(shell?.canCompose ?? false))
+            Button("文字で頼む") { shell?.ask() }
                 .keyboardShortcut("k", modifiers: .command)
-                .disabled(true)
+                .disabled(!(shell?.canCompose ?? false))
         }
 
         CommandGroup(replacing: .undoRedo) {
@@ -69,8 +70,8 @@ struct MacCommands: Commands {
         }
 
         CommandGroup(replacing: .help) {
-            Button("頼み方のコツ") {}
-                .disabled(true)
+            Button("頼み方のコツ") { shell?.showTips() }
+                .disabled(!(shell?.canCompose ?? false))
             Button("お問い合わせ") { openURL(Self.contactURL) }
         }
     }
@@ -85,6 +86,14 @@ struct ShellActions {
     var selectNext: () -> Void
     var focusSidebar: () -> Void
     var focusCanvas: () -> Void
+    /// 会話のシートを開けるか(開いている間は新しく開かない)
+    var canCompose: Bool
+    var newApp: () -> Void
+    /// 文字で頼む(中央のアプリを直す・無ければ作る)
+    var ask: () -> Void
+    /// 声で頼む(⌘K と同じ相手の会話を開いてすぐ録音・#966)
+    var speak: () -> Void
+    var showTips: () -> Void
 }
 
 private struct ShellActionsKey: FocusedValueKey {

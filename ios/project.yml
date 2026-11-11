@@ -119,6 +119,7 @@ targets:
       # ウィジェットと共有する受け渡しモデル(WidgetSnapshot)。両ターゲットにコンパイルする
       - path: MetamonWidget/Shared
       # Mac と共有するランタイムの部品(UIKit に依存しない: 遷移・確認・保存/削除の前段・文言)。#939
+      # Brand.xcassets(アクセント色・ツルの絵)もここ(#935)
       - path: Shared
       # DSL v1 の正典サンプル(docs/dsl/examples/*.json)をそのままバンドル。iOS 側にコピーを持たない(ドリフト防止)。
       - path: ../docs/dsl/examples
@@ -284,14 +285,31 @@ targets:
   # Mac のネイティブ版(#929・docs/decisions/363-desktop-strategy.md)。3 つのパッケージを iOS と共有し、殻は ios/MetamonMac/。
   # Bundle ID は iOS と同じ(ユニバーサル購入)。署名は project の base の自動署名・DEVELOPMENT_TEAM(METAMON_TEAM_ID)をそのまま使う。
   # Apple シリコンと Intel の両方(ARCHS_STANDARD = arm64 + x86_64。Debug は ONLY_ACTIVE_ARCH で手元の CPU だけ)。
-  # 同梱の DSL 例を中央で動かす(記録はメモリ上・#939)。画面の骨格は #933、Firebase の登録は #930、権限の説明は #931。
+  # 同梱の DSL 例を中央で動かす(記録はメモリ上・#939)。画面の骨格は #933、Firebase の登録は #930、権限の説明は #931(マイク・音声認識は #966)。
   MetamonMac:
     type: application
     platform: macOS
     sources:
       - path: MetamonMac
       # iOS の AppRuntime と共有する部品(遷移・確認・保存/削除の前段・文言)。#939
+      # Brand.xcassets(アクセント色・ツルの絵)も iOS と共有する(#935)
       - path: Shared
+      # 本体のデザイントークンとツルは iOS のファイルをそのまま使う(#935)
+      - path: Metamon/App/Theme.swift
+      - path: Metamon/App/CraneMascot.swift
+      # 設定の「ライセンス」は iOS と同じ一覧を同梱する(#973)
+      - path: Metamon/Resources/ThirdPartyLicenses.json
+        buildPhase: resources
+      # 作る・直す会話(#967): 組み上げの演出・生成中の段階の文言・頼み方のコツは iOS のファイルをそのまま使う
+      - path: Metamon/Features/Voice/BuildChoreography.swift
+      - path: Metamon/Features/Voice/BuildStageView.swift
+      - path: Metamon/Features/Voice/GeneratingStage.swift
+      - path: Metamon/Features/Tips/PromptTips.swift
+      # 規約・ポリシーは iOS と同じ同梱版をアプリ内で読む(#971)
+      - path: ../docs/legal
+        buildPhase: resources
+        type: group
+        includes: ["privacy-policy.md", "terms.md"]
       # iOS と同じ DSL 例をそのままバンドル(コピーを持たない)
       - path: ../docs/dsl/examples
         buildPhase: resources
@@ -312,7 +330,8 @@ targets:
         ENABLE_PREVIEWS: YES
         # アイコンはまだ無い(Mac 用のサイズを作る時に戻す)
         ASSETCATALOG_COMPILER_APPICON_NAME: ""
-        ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME: ""
+        # ブランドの藍をアクセントに(システム設定のアクセントが「マルチカラー」の時だけ効く・#935)
+        ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME: AccentColor
         # select-firebase-plist.sh が「あれば使う」plist を読むため(iOS と同じ理由・#292)
         ENABLE_USER_SCRIPT_SANDBOXING: NO
       configs:

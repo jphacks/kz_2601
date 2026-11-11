@@ -9,12 +9,13 @@ struct AppSidebar: View {
 
     var body: some View {
         List(apps, selection: $selection) { app in
-            VStack(alignment: .leading, spacing: 2) {
+            VStack(alignment: .leading, spacing: MacTheme.Spacing.rowLine) {
                 Text(app.name)
+                    .font(MacTheme.Fonts.sidebarTitle)
                     .lineLimit(1)
                 if let description = app.description {
                     Text(description)
-                        .font(.caption)
+                        .font(MacTheme.Fonts.sidebarDetail)
                         .foregroundStyle(.secondary)
                         .lineLimit(1)
                 }
@@ -29,7 +30,8 @@ struct AppSidebar: View {
         }
         .overlay {
             if apps.isEmpty {
-                ContentUnavailableView("アプリがありません", systemImage: "square.grid.2x2")
+                MacEmptyState(pose: .tea, title: "アプリがありません",
+                              mascotSize: MacTheme.Mascot.small, showsBackdrop: false)
             }
         }
         .navigationTitle("アプリ")

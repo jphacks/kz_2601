@@ -260,7 +260,7 @@ public final class WhisperKitRecognizer: SpeechTranscriber, AudioFileTranscriber
             diag.transcriptLength = text.count
             if text.isEmpty { diag.failure = "emptyTranscript" }
             lastDiagnostics = diag
-            log("transcribe result segments=\(results.flatMap(\.segments).count) text=\"\(text)\"")
+            log("transcribe result segments=\(results.flatMap(\.segments).count) chars=\(text.count)") // 話した内容はログに出さない
             return text
         } catch {
             diag.failure = "transcribe: \(error.localizedDescription)"
