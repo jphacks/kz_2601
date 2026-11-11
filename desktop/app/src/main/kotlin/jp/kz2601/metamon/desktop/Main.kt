@@ -14,7 +14,11 @@ import androidx.compose.ui.window.Window
 import androidx.compose.ui.window.WindowPosition
 import androidx.compose.ui.window.application
 import androidx.compose.ui.window.rememberWindowState
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.FlowPreview
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.debounce
 import java.awt.Dimension
 import java.awt.GraphicsEnvironment
@@ -33,7 +37,7 @@ import java.util.prefs.Preferences
 /**
  * 起動。引数 1 つ目(または -Dtailorit.example)で同梱の例を選ぶ。既定は shopping。
  * 引数 2 つ目に記録の JSON(`{"<entity>": [{"id", "data"}]}`・case.json の形も可)を渡すとモックに入れて開く(端末には残さない)。3 つ目は最初の画面の id。
- * 引数が無ければ最後に開いたアプリ。記録は端末に残す(SessionPersistence)。
+ * 引数が無ければ最後に開いたアプリ。記録は端末に残す(SessionPersistence)。端末の記録は裏で読み、読み終えるまでスケルトンを出す。
  * ウィンドウはアプリごとに 1 枚、記録の詳細も別の 1 枚で開ける(#1763・Windows.kt)。同じアプリのウィンドウは記録を共有する。
  * ウィンドウの大きさ・位置は種類(アプリ / 詳細)ごとに覚えて次の起動で戻す。トレイ / メニューバーに常駐する(Tray.kt)。サインインはまだ無い(モック)。
  */
@@ -44,18 +48,30 @@ fun main(args: Array<String>) = application {
         args.firstOrNull() ?: System.getProperty("tailorit.example")
             ?: desktopStore.lastAppId?.takeIf { it in BundledApps.ids() } ?: "shopping"
     }
+    // 端末の記録は裏で読む。読み終えるまでウィンドウはスケルトン(SharedRecords.loading)
+    val loadScope = remember { CoroutineScope(SupervisorJob() + Dispatchers.IO) }
     val hub = remember {
         // 記録の JSON を渡した時(開発・スクリーンショット)は最初のアプリだけそれを使い、端末に残さない
         val fixture = args.getOrNull(1)?.let { MockStore.fromJson(File(it).readText()) }
-        AppHub(openRecords = { id, dsl ->
-            if (fixture != null && id == first) {
-                SharedRecords(fixture)
-            } else {
-                SessionPersistence.open(desktopStore, id, dsl.entityModels()).let { (p, initial) -> SharedRecords(initial, p) }
-            }
-        })
+        AppHub(
+            openRecords = { id, dsl ->
+                if (fixture != null && id == first) {
+                    SharedRecords(fixture)
+                } else {
+                    val p = SessionPersistence.create(desktopStore, id)
+                    val models = dsl.entityModels()
+                    SharedRecords.opening(p, loadScope) { p.load(models) }
+                }
+            },
+            wipeStore = { desktopStore.wipe() },
+        )
     }
-    DisposableEffect(hub) { onDispose { hub.close() } }
+    DisposableEffect(hub) {
+        onDispose {
+            hub.close()
+            loadScope.cancel()
+        }
+    }
     val registry = remember { WindowRegistry().also { it.open(WindowKey.app(first)) } }
     val firstWindowId = remember { registry.windows.first().id }
     // トレイに常駐(#1761): × はトレイに隠す(設定で off・トレイが無ければ終わる)。終わるのはトレイの「終了」
@@ -124,16 +140,21 @@ private fun ApplicationScope.DesktopWindow(w: WindowEntry, registry: WindowRegis
         // 明暗は OS に従う・文言は OS の言語(日本語か英語)・#1759
         CompositionLocalProvider(LocalTray provides tray) {
             TailorItTheme {
-                DesktopApp(
-                    app.dsl,
-                    startScreen = w.key.screen ?: startScreen,
-                    onOpenApp = { registry.open(WindowKey.app(it)) },
-                    records = app.records,
-                    startRecordId = w.key.recordId,
-                    onOpenRecord = { screen, id -> registry.open(WindowKey.record(app.id, screen, id)) },
-                    onCloseWindow = close,
-                    isActive = { registry.active?.id == w.id },
-                )
+                if (app.records.loading) {
+                    LoadingSkeleton()
+                } else {
+    DesktopApp(
+                        app.dsl,
+                        startScreen = w.key.screen ?: startScreen,
+                        onOpenApp = { registry.open(WindowKey.app(it)) },
+                        records = app.records,
+                        startRecordId = w.key.recordId,
+                        onOpenRecord = { screen, id -> registry.open(WindowKey.record(app.id, screen, id)) },
+                        onCloseWindow = close,
+                        isActive = { registry.active?.id == w.id },
+                        onWipeLocalData = hub::wipeLocalData,
+                    )
+                }
             }
         }
     }

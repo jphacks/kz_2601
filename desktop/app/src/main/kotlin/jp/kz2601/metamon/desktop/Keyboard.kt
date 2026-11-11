@@ -6,6 +6,11 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
+import kotlinx.coroutines.launch
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Modifier
@@ -62,6 +67,10 @@ object KeyboardText {
     val HELP_TAB get() = Strings["desktop_keys_help_tab"]
     val NEW_WINDOW get() = Strings["desktop_tray_new_window"]
     val OPEN_RECORD_WINDOW get() = Strings["desktop_window_open_record"]
+    val WIPE get() = Strings["desktop_wipe"]
+    val WIPE_CONFIRM get() = Strings["desktop_wipe_confirm"]
+    val WIPE_CONFIRM_BUTTON get() = Strings["desktop_wipe_confirm_button"]
+    val WIPE_DONE get() = Strings["desktop_wipe_done"]
 }
 
 /** キーの決まりを分ける OS。Windows・Linux は Ctrl、macOS は ⌘。 */
@@ -242,6 +251,12 @@ class DesktopKeyboard(
     /** 記録の詳細を別のウィンドウで開く(#1763)。(画面, recordId)。 */
     var openRecord: ((String, String) -> Unit)? = null
 
+    /** 「この端末のデータを消す」(#1887)。全アプリの分を消す口(AppHub.wipeLocalData)。null ならパレットに出さない。 */
+    var wipeLocalData: (suspend () -> Unit)? = null
+
+    /** 消す前の確認を出している。 */
+    var wipeConfirmOpen by mutableStateOf(false)
+
     /** このウィンドウの検索欄(Ctrl+F は他のウィンドウに入らない)。 */
     val searchTargets = SearchTargets()
 
@@ -254,7 +269,7 @@ class DesktopKeyboard(
     private fun ctx() = session.top.let { ActionContext(it, session.form(it)) }
 
     fun handle(e: KeyEvent, bubble: Boolean): Boolean {
-        if (paletteOpen || helpOpen) return false // パレット・一覧が自分で受ける
+        if (paletteOpen || helpOpen || wipeConfirmOpen) return false // パレット・一覧・確認が自分で受ける
         val p = KeyPress.of(e) ?: return false
         val s = Keymap.match(p, os) ?: return false
         if (s == Shortcut.PRINT || s.bubble != bubble) return false // 印刷は Print.kt の Ctrl+P
@@ -314,7 +329,20 @@ class DesktopKeyboard(
         val record = openRecord?.takeIf { top.recordId != null && top != session.detailRoot }?.let { open ->
             listOf(PaletteCommand("window:record", KeyboardText.OPEN_RECORD_WINDOW, PaletteCommand.Kind.ACTION) { open(top.screen, top.recordId!!) })
         }.orEmpty()
-        return shortcuts + buttons + record + screens + apps
+        // サインアウトの画面(#1749)ができるまでの口。押すと確認を出す(すぐには消さない)
+        val wipe = wipeLocalData?.let {
+            listOf(PaletteCommand("data:wipe", KeyboardText.WIPE, PaletteCommand.Kind.ACTION, keywords = listOf("wipe", "sign out")) { wipeConfirmOpen = true })
+        }.orEmpty()
+        return shortcuts + buttons + record + screens + apps + wipe
+    }
+
+    /** 確認で「消す」を押した: 全アプリの端末のデータを消し、このウィンドウを最初の画面に戻す。 */
+    suspend fun confirmWipe() {
+        wipeConfirmOpen = false
+        val wipe = wipeLocalData ?: return
+        wipe()
+        session.followWipe()
+        session.message = KeyboardText.WIPE_DONE
     }
 
     /** 一番外に付ける: Ctrl の組みは入力欄より先に、Esc・Delete・F1 は入力欄の後に受ける。 */
@@ -357,6 +385,20 @@ class DesktopKeyboard(
                 runCatching { root.requestFocus() }
             }
         }
+        if (wipeConfirmOpen) {
+            val scope = rememberCoroutineScope()
+            val dismiss = {
+                wipeConfirmOpen = false
+                runCatching { root.requestFocus() }
+            }
+            AlertDialog(
+                onDismissRequest = { dismiss() },
+                title = { Text(KeyboardText.WIPE) },
+                text = { Text(KeyboardText.WIPE_CONFIRM) },
+                confirmButton = { TextButton(onClick = { scope.launch { confirmWipe() } }) { Text(KeyboardText.WIPE_CONFIRM_BUTTON) } },
+                dismissButton = { TextButton(onClick = { dismiss() }) { Text(Strings["inputs_cancel"]) } },
+            )
+        }
     }
 }
 
@@ -368,9 +410,11 @@ fun rememberDesktopKeyboard(
     print: () -> Unit,
     openApp: ((String) -> Unit)?,
     openRecord: ((String, String) -> Unit)? = null,
+    wipeLocalData: (suspend () -> Unit)? = null,
 ): DesktopKeyboard = remember(dsl, session) { DesktopKeyboard(dsl, session) }.also {
     it.dispatch = dispatch
     it.print = print
     it.openApp = openApp
     it.openRecord = openRecord
+    it.wipeLocalData = wipeLocalData
 }
