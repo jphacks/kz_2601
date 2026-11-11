@@ -1,7 +1,6 @@
 package jp.kz2601.metamon.desktop.io
 
 import androidx.compose.foundation.Image
-import androidx.compose.foundation.draganddrop.dragAndDropSource
 import androidx.compose.foundation.draganddrop.dragAndDropTarget
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -22,9 +21,6 @@ import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draganddrop.DragAndDropEvent
 import androidx.compose.ui.draganddrop.DragAndDropTarget
-import androidx.compose.ui.draganddrop.DragAndDropTransferAction
-import androidx.compose.ui.draganddrop.DragAndDropTransferData
-import androidx.compose.ui.draganddrop.DragAndDropTransferable
 import androidx.compose.ui.draganddrop.awtTransferable
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.toComposeImageBitmap
@@ -144,6 +140,13 @@ class DesktopIo(dsl: AppDSL, private val read: () -> MockStore, private val upda
         val entity = entity(entityId) ?: return
         val table = RecordIo.exportTable(entity.name, entity, read(), entities, null, ids = ids?.takeIf { it.isNotEmpty() })
         copyText(Tsv.string(table), table.rows.size)
+    }
+
+    /** 一覧の選んだ行を外へ引き出す形(TSV の文字 + CSV のファイル・#1764)。中身は [copyRows] と同じ。 */
+    fun rowsTransferable(entityId: String, ids: Set<String>): Transferable? {
+        val entity = entity(entityId) ?: return null
+        if (ids.isEmpty()) return null
+        return DragOut.rows(RecordIo.exportTable(entity.name, entity, read(), entities, null, ids = ids))
     }
 
     /** 作った TSV をクリップボードへ(table の選んだ行など)。 */
@@ -364,16 +367,4 @@ fun IoOverlay(io: DesktopIo) {
 }
 
 /** 写真・ファイルを外(エクスプローラー・他のアプリ)へ引き出す。 */
-@OptIn(ExperimentalComposeUiApi::class)
-private fun Modifier.fileDragSource(file: File): Modifier = dragAndDropSource { _ ->
-    DragAndDropTransferData(
-        transferable = DragAndDropTransferable(FileTransferable(listOf(file))),
-        supportedActions = listOf(DragAndDropTransferAction.Copy),
-    )
-}
-
-private class FileTransferable(private val files: List<File>) : Transferable {
-    override fun getTransferDataFlavors(): Array<DataFlavor> = arrayOf(DataFlavor.javaFileListFlavor)
-    override fun isDataFlavorSupported(flavor: DataFlavor): Boolean = flavor == DataFlavor.javaFileListFlavor
-    override fun getTransferData(flavor: DataFlavor): Any = if (isDataFlavorSupported(flavor)) files else throw UnsupportedFlavorException(flavor)
-}
+private fun Modifier.fileDragSource(file: File): Modifier = dragOut { FileTransferable(listOf(file)) }

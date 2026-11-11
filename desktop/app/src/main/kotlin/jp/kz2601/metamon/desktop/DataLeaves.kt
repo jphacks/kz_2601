@@ -73,6 +73,11 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.foundation.Image
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.layout.ContentScale
+import jp.kz2601.metamon.desktop.io.DragOut
+import jp.kz2601.metamon.desktop.io.dragOut
 import jp.kz2601.metamon.dsl.Action
 import jp.kz2601.metamon.dsl.Component
 import jp.kz2601.metamon.dsl.ComponentType
@@ -94,6 +99,7 @@ import jp.kz2601.metamon.dsl.records.Sort
 import jp.kz2601.metamon.dsl.records.TableGrouping
 import jp.kz2601.metamon.renderer.form.FormPrefill
 import java.awt.Cursor
+import java.awt.datatransfer.Transferable
 import java.time.Instant
 
 // データの部品(#1744): list・table・timeline・gridTable・searchBar・feed・matchList。stat・chart・calendar は DisplayLeaves.kt。
@@ -124,6 +130,8 @@ class DataEnv(
     val copyRows: (entity: String, ids: Set<String>) -> Unit = { _, _ -> },
     /** 作った TSV をコピー(table の選んだ行)。(TSV, 行の数)。 */
     val copyText: (tsv: String, rows: Int) -> Unit = { _, _ -> },
+    /** list の行を外へ引き出す形(TSV の文字 + CSV のファイル・#1764)。(entity, recordId の集まり)。 */
+    val dragRows: (entity: String, ids: Set<String>) -> Transferable? = { _, _ -> null },
 )
 
 @Composable
@@ -349,6 +357,8 @@ private fun ListLeaf(c: Component, env: DataEnv) {
                         .then(if (isSelected) Modifier.background(highlight) else Modifier)
                         .then(if (rowDeletable) Modifier.onKeyEvent { e -> (e.type == KeyEventType.KeyUp && e.key == Key.Delete).also { if (it) delete() } } else Modifier)
                         .rowClick(click, openWindow)
+                        // 引くと選んだ行(選んでいない行ならその行)を TSV・CSV で外へ(#1764)
+                        .dragOut { c.entity?.let { e -> env.dragRows(e, RowSelect.dragged(selection.value, r.id)) } }
                         .semantics { selected = isSelected }
                         .padding(vertical = 6.dp),
                     verticalAlignment = Alignment.CenterVertically,
@@ -359,6 +369,7 @@ private fun ListLeaf(c: Component, env: DataEnv) {
                         // 毎日リセットのチェックは日付の履歴を持つので、デスクトップ版はまだ見せるだけ
                         Checkbox(checked = on, onCheckedChange = if (daily || !env.canEdit(c.entity!!, r.id)) null else { v -> env.update(c.entity!!, r.id, mapOf(f.id to v.toString())) })
                     }
+                    c.item?.image?.let { f -> ListThumbnail(r[f]?.stringValue, t.title) }
                     Column(Modifier.weight(1f)) {
                         Text(t.title, maxLines = 2, overflow = TextOverflow.Ellipsis)
                         t.subtitle?.let { Text(it, style = MaterialTheme.typography.bodySmall, color = Color.Gray, maxLines = 1, overflow = TextOverflow.Ellipsis) }
@@ -372,6 +383,19 @@ private fun ListLeaf(c: Component, env: DataEnv) {
             )
             if (menu.isNotEmpty()) ContextMenuArea(items = { menu }) { row() } else row()
             if (i < rows.size - 1) HorizontalDivider()
+        }
+    }
+}
+
+private val THUMBNAIL = 44.dp
+
+/** 一覧の行の写真(item.image)。手元・data URL・https の画像。外へ PNG のファイルで引き出せる(#1764)。 */
+@Composable
+private fun ListThumbnail(src: String?, name: String) {
+    val image = rememberImage(src, allowFile = true)
+    Box(Modifier.size(THUMBNAIL).clip(RoundedCornerShape(8.dp)).background(Color(0x11000000))) {
+        image?.let { img ->
+            Image(img.bitmap, name, Modifier.fillMaxSize().dragOut { DragOut.image(img.bytes, name.ifEmpty { Strings["desktop_drag_image_name"] }) }, contentScale = ContentScale.Crop)
         }
     }
 }
@@ -449,6 +473,7 @@ private fun TableLeaf(c: Component, env: DataEnv) {
     val order = rows.map { it.id }
     val selection = rememberRowSelection(c.id, order)
     val headers = columns.map { TableCells.header(it, entity) }
+    val title = c.title ?: entity?.name ?: Strings["desktop_drag_table_name"]
     val keys = Modifier.rowSelectionKeys(selection, order) { env.copyText(TableCopy.tsv(headers, rows, selection.value), it.size) }
     val highlight = MaterialTheme.colorScheme.primary.copy(alpha = 0.14f)
     val density = LocalDensity.current
@@ -493,6 +518,7 @@ private fun TableLeaf(c: Component, env: DataEnv) {
                 Row(
                     Modifier.then(if (isSelected) Modifier.background(highlight) else Modifier)
                         .rowClick(click, null)
+                        .dragOut { DragOut.rows(TableCopy.table(title, headers, rows, RowSelect.dragged(selection.value, row.id))) }
                         .semantics { selected = isSelected }
                         .padding(vertical = 5.dp),
                 ) {

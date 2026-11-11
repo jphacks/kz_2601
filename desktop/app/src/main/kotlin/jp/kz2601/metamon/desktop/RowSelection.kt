@@ -2,6 +2,7 @@ package jp.kz2601.metamon.desktop
 
 import androidx.compose.ui.input.key.Key
 import jp.kz2601.metamon.desktop.io.Tsv
+import jp.kz2601.metamon.dsl.logic.ExportTable
 
 // list・table の行を選ぶ(#1766): クリック・Shift+クリックで範囲・Ctrl(macOS は ⌘)+クリックで足し引き・Ctrl+A で全部。
 
@@ -52,6 +53,9 @@ object RowSelect {
     /** 押すと詳細へ移る行: 選びは外し、Shift+クリックの起点だけ覚える。 */
     fun tapped(s: RowSelection, id: String, order: List<String>): RowSelection = sync(s, order).copy(selected = emptySet(), anchor = id)
 
+    /** 行を引いて外へ出す時の行(#1764)。選んだ行を引けば選んだ行全部、選んでいない行ならその行だけ。 */
+    fun dragged(s: RowSelection, id: String): Set<String> = if (id in s.selected) s.selected else setOf(id)
+
     fun selectAll(s: RowSelection, order: List<String>): RowSelection = sync(s, order).copy(selected = order.toSet())
 
     /** 一覧に効くキー。Ctrl+A・Ctrl+C(macOS は ⌘)。他は null。 */
@@ -70,8 +74,9 @@ object RowSelect {
 
 /** table の選んだ行の TSV(見出し付き・見えている列と文字そのまま・今の並び)。 */
 object TableCopy {
-    fun tsv(headers: List<String>, rows: List<TableCells.Row>, selected: RowSelection): String {
-        val chosen = rows.filter { it.id in selected.selected }
-        return Tsv.string(headers, chosen.map { r -> headers.indices.map { r.texts.getOrElse(it) { "" } } })
-    }
+    /** [ids] の行の表。コピーと外への引き出し(#1764)で同じ中身。 */
+    fun table(title: String, headers: List<String>, rows: List<TableCells.Row>, ids: Set<String>): ExportTable =
+        ExportTable(title, headers, rows.filter { it.id in ids }.map { r -> headers.indices.map { r.texts.getOrElse(it) { "" } } })
+
+    fun tsv(headers: List<String>, rows: List<TableCells.Row>, selected: RowSelection): String = Tsv.string(table("", headers, rows, selected.selected))
 }
