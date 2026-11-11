@@ -32,6 +32,13 @@ final class SharingUI {
         return true
     }
 
+    /// Universal Links(#331)。Web 閲覧の activity の URL がシェアリンクなら保留して true。
+    @discardableResult
+    func receive(activity: NSUserActivity) -> Bool {
+        guard activity.activityType == NSUserActivityTypeBrowsingWeb, let url = activity.webpageURL else { return false }
+        return receive(url)
+    }
+
     /// 準備済みなら保留中のリンクを渡して空にする。まだなら nil(保留は残す)。
     func takeLink() -> URL? {
         guard isReady, let url = pendingLink else { return nil }
@@ -44,7 +51,7 @@ extension AppRuntime {
     /// appconfig が live で、シェア / 探すが使えるか。
     var canShare: Bool { services.sharing != nil }
 
-    /// `tailorit://import/<token>` を受けたら import → そのアプリに変身。それ以外の URL は false。
+    /// `tailorit://import/<token>` / `https://tailor-it.app/s/<token>` を受けたら import → そのアプリに変身。それ以外の URL は false。
     @discardableResult
     func openShareURL(_ url: URL) async -> Bool {
         guard let token = ShareURL.token(from: url) else { return false }
@@ -139,9 +146,12 @@ extension AppRuntime {
 }
 
 /// WindowGroup の根に付ける(#278): サインイン画面の時に届いたシェアリンクも `SharingUI` に保留する。
+/// URL スキームは onOpenURL、Universal Links(`https://tailor-it.app/s/<token>`・#331)は Web 閲覧の NSUserActivity で届く。
 struct ShareLinkReceiver: ViewModifier {
     func body(content: Content) -> some View {
-        content.onOpenURL { url in SharingUI.shared.receive(url) }
+        content
+            .onOpenURL { url in SharingUI.shared.receive(url) }
+            .onContinueUserActivity(NSUserActivityTypeBrowsingWeb) { SharingUI.shared.receive(activity: $0) }
     }
 }
 

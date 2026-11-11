@@ -141,7 +141,7 @@
   - NG ワードのフィルタ(#321 の「最低限」)。
   - 年齢区分の質問票の「ユーザー生成コンテンツ」を「はい」に直す([listing.md](../store/listing.md) の 4 章)。
   - ラベルに「その他のユーザーコンテンツ(他の人に見える)」「名前(表示名)」。
-  - `CFBundleURLTypes`(`tailorit://`)を戻す。共有ページ(Web)も同じ通報の入口を持つこと。
+  - `CFBundleURLTypes`(`tailorit://`)を戻す。`Metamon-Review.entitlements` に Associated Domains(`applinks:tailor-it.app`・#331)を足す。共有ページ(Web)も同じ通報の入口を持つこと。
   - 審査で試せるよう、共有を受ける側の 2 つ目のアカウントか、匿名の 2 台目で試せる手順。
 - メモの案: `SHARING: A user can share a tracker with people they invite by link. Shared entries and chat messages can be reported (long-press > Report) and their authors can be blocked (Settings > Blocked Users). Reports reach our team and are handled within 24 hours; we can hide shared content.<Only after the word filter (#321) is confirmed: " Posts are filtered for objectionable words.">`
 
