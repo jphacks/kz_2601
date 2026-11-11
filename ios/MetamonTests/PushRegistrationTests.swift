@@ -144,6 +144,29 @@ final class PushRegistrationTests: XCTestCase {
         XCTAssertEqual(account.deletesBeforeAccount, 1, "DELETE /v1/me の後は送れない")
     }
 
+    /// 匿名 → Apple の引き継ぎが別のアカウントへの切り替えになる時も、切り替えの前に端末の登録を消す(Android #1301 と同じ)
+    func testSwitchingToAnotherAccountDeletesTheDeviceFirst() async throws {
+        let (rt, _, _) = try runtime()
+        install(uid: "u1")
+        await PushHost.shared.receive(token: token)
+        let auth = MockAuthService(signedIn: true)
+        auth.appleIDInUse = true
+        let session = AuthSession(service: auth)
+        _ = await session.linkApple(idToken: "t", nonce: "n", fullName: nil)
+        XCTAssertTrue(session.linkConflict)
+
+        var uidAtUnregister: String?
+        let switched = await session.switchToExistingAppleAccount(beforeSwitch: {
+            uidAtUnregister = session.user?.uid
+            await rt.unregisterPushDevice()
+        })
+        XCTAssertTrue(switched)
+        XCTAssertEqual(uidAtUnregister, MockAuthService.fixedUID, "匿名の uid のうちに消す")
+        XCTAssertEqual(session.user?.uid, MockAuthService.existingAppleUID)
+        let calls = await client.calls
+        XCTAssertEqual(calls, ["put", "delete"])
+    }
+
     // MARK: - 同意
 
     func testConsentIsRememberedOnlyWhenSaved() async throws {
