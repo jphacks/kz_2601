@@ -22,9 +22,19 @@ final class ReviewBuildTests: XCTestCase {
     /// #482・#265: 記録の自動削除・条件の通知はどの版も持つ。#507: 仲間探しは審査用の版では送らない(backend が match・item.interest・matchList を使わない)。
     func testSupportedFeatures() {
         #if APP_STORE_REVIEW
-        XCTAssertEqual(ClientCapabilities.supportedFeatures, ["recordRetention", "notification.when", "singleEntity", "notification.near", "aiButton.long", "aiButton.inputPhoto", "aiButton.saveTo", "aiButton.inputFeeds", "aiButton.outputs", "action.lookupBook", "text.highlight", "feed.v2", "expr.addMinutes", "aiChat.inputEntity", "component.bracket", "progressBar.settingTarget", "openUrlButton.app"])
+        XCTAssertEqual(ClientCapabilities.supportedFeatures, ["recordRetention", "notification.when", "singleEntity", "notification.near", "aiButton.saveTo", "aiButton.inputFeeds", "aiButton.outputs", "action.lookupBook", "text.highlight", "feed.v2", "expr.addMinutes", "aiChat.inputEntity", "component.bracket", "progressBar.settingTarget", "openUrlButton.app"])
         #else
         XCTAssertEqual(ClientCapabilities.supportedFeatures, ["recordRetention", "matching", "notification.when", "singleEntity", "dataRoles", "addressedMessages", "notification.near", "aiButton.long", "aiButton.inputPhoto", "aiButton.saveTo", "aiButton.inputFeeds", "aiButton.outputs", "action.lookupBook", "text.highlight", "feed.v2", "expr.addMinutes", "aiChat.inputEntity", "component.bracket", "progressBar.settingTarget", "photoField.illustrate", "component.callButton", "field.encrypted", "openUrlButton.app"])
+        #endif
+    }
+
+    /// #1640: long・inputPhoto はオンライン AI だけで動く。審査用の版は送らない(backend が外し、端末内 AI で動く形にする)。
+    func testOnlineOnlyAIButtonFeaturesFollowBuild() {
+        let online = ["aiButton.long", "aiButton.inputPhoto"]
+        #if APP_STORE_REVIEW
+        for f in online { XCTAssertFalse(ClientCapabilities.supportedFeatures.contains(f), f) }
+        #else
+        for f in online { XCTAssertTrue(ClientCapabilities.supportedFeatures.contains(f), f) }
         #endif
     }
 

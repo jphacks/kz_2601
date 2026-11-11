@@ -1,4 +1,5 @@
 import Foundation
+import SwiftUI
 import MetamonDSL
 #if canImport(FoundationModels)
 import FoundationModels
@@ -30,6 +31,30 @@ enum AIGenerateRoute: Equatable {
 
     static var longUnavailable: String { L("長い文章はオンラインの AI だけで書けます(この版では使えません)") }
     static var photoUnavailable: String { L("写真を読むのはオンラインの AI だけです(この版では使えません)") }
+
+    /// 使えない時に押したら出す知らせ(#1640: 押しても何も起きないように見せない)。使える時は nil。
+    var unavailableNotice: AIUnavailableNotice? {
+        guard case .unavailable(let reason) = self else { return nil }
+        return AIUnavailableNotice(title: AIAvailability.title, message: reason)
+    }
+}
+
+/// aiButton が使えない理由のアラート(#1640)。ボタンは押せるまま薄く見せ、押したら理由を出す(VoiceOver はアラートを読み上げる)。
+struct AIUnavailableNotice: Equatable, Identifiable {
+    let title: String
+    let message: String
+    var id: String { title + "\n" + message }
+}
+
+extension View {
+    func aiUnavailableAlert(_ notice: Binding<AIUnavailableNotice?>) -> some View {
+        alert(notice.wrappedValue?.title ?? "", isPresented: Binding(get: { notice.wrappedValue != nil }, set: { if !$0 { notice.wrappedValue = nil } }),
+              presenting: notice.wrappedValue) { _ in
+            Button(L("OK"), role: .cancel) {}
+        } message: { n in
+            Text(n.message)
+        }
+    }
 }
 
 // MARK: - 依頼の組み立て(純粋関数・テスト対象)
