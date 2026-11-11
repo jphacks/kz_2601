@@ -35,6 +35,8 @@ final class MacAppRuntime: RuntimeNavigating {
     var confirm: RuntimeConfirm?
     /// 中央の列の上に出す一言
     var toast: String?
+    /// もう読み上げた toast(`AppCanvas` は読み直さない)
+    @ObservationIgnored var announcedToast: String?
     /// 一覧の記録を消した直後の「削除しました・元に戻す」(iOS の M11 と同じく数秒は送らない)
     var recordUndo: DeletionTicket?
     static let undoSeconds: Double = 5
@@ -80,6 +82,8 @@ final class MacAppRuntime: RuntimeNavigating {
     @ObservationIgnored var onOpenVoice: (@MainActor () -> Void)?
     /// モーダルの中の openVoice。モーダルを閉じ終えてから会話を開く(シートを重ねない)
     @ObservationIgnored var pendingOpenVoice = false
+    /// Field.health を Mac では書かないことの一言(#958・アプリごとに 1 回)
+    @ObservationIgnored var healthNote = MacHealthNote()
 
     /// `recordLease` を渡したらそのエンジンを使い(止めるのは `MacRecordEngines`)、`recordSync` を渡したらこのランタイムだけのエンジン
     init(appId: String, dsl: AppDSL, recordSync: RecordSyncEngine? = nil, recordLease: MacRecordEngineLease? = nil,
@@ -336,11 +340,18 @@ final class MacAppRuntime: RuntimeNavigating {
             if case .invalid(let message) = target { toast = message }
             return
         }
+        let skipsHealth = MacHealthNote.applies(entity: dsl.entity(entity), data: form.payload, isNew: recordId == nil)
         switch await book.save(entity: entity, form: form, recordId: recordId, canEdit: { self.canEdit(entity: $0, record: $1) }) {
         case .readOnly: notifyReadOnly(entity: entity)
         case .saved:
             // 保存の後は画面が閉じる・進むので、VoiceOver には先に結果を伝える(#937)
             MacVoiceOver.announce(.saved)
+            // HealthKit が無いので書かない(#958)。一言はアプリごとに 1 回
+            if skipsHealth, let note = healthNote.noteOnce(appId: appId) {
+                MacVoiceOver.announce(.healthSkipped) // 「保存しました」に続けて読む。toast では読み直さない
+                announcedToast = note
+                toast = note
+            }
             leaveAfterSave(action, ctx)
         case .unchanged: leaveAfterSave(action, ctx) // 何も変えずに保存したら書かずに画面だけ進める(M10)
         case .inFlight: break // 保存ボタンの連打
