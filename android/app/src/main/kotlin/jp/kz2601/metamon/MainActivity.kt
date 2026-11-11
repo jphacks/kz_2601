@@ -115,8 +115,11 @@ class MainActivity : ComponentActivity() {
         }
     }
 
+    // singleTask: 開いている間に届いた共有リンク・通知のタップはここに来る。onCreate の初回と同じ受け口に通し、
+    // 今の画面の上で参加の確認・アプリの切り替えを出す(切り替えは変身一覧と同じ AppRuntime.switchApp)
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
+        setIntent(intent)
         offerPushOpen(intent)
     }
 
@@ -152,7 +155,7 @@ class MainActivity : ComponentActivity() {
 fun MetamonRoot(container: AppContainer) {
     val user by container.accountGuard.active.collectAsStateWithLifecycle()
     // お知らせのバナーと「アップデートしてください」はサインイン前にも出す(#906)
-    UpdateGateHost(container.updateGate) {
+    UpdateGateHost(container.updateGate, container.inAppUpdater) {
         when (RootScreen.of(user)) {
             RootScreen.SignIn -> SignInScreen(container.session)
             RootScreen.App -> CompositionLocalProvider(LocalFeedHost provides container.feedHost) { MetamonApp(container) }

@@ -1,5 +1,7 @@
 package jp.kz2601.metamon.update
 
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
@@ -36,9 +38,11 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -52,21 +56,42 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.compose.LifecycleResumeEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import jp.kz2601.metamon.R
 import jp.kz2601.metamon.language.AppLocales
 import jp.kz2601.metamon.services.update.ServiceNotice
+import kotlinx.coroutines.launch
 
 /**
  * 起動時の確認と、お知らせのバナー・更新の画面(iOS の `UpdateGateModifier`)。サインイン前の画面も含めて全体を包む。
  * 前面に戻った時の読み直しは AppForeground(ForegroundSteps の "update")が持つ。
+ * 「アップデート」は Play の In-App Updates をその場で始める(min 未満 = IMMEDIATE・latest 未満 = FLEXIBLE)。
+ * Play から入れていない端末(stg・debug)は今までどおり Google Play のページを開く。
  */
 @Composable
-fun UpdateGateHost(gate: UpdateGate, content: @Composable () -> Unit) {
+fun UpdateGateHost(gate: UpdateGate, updater: InAppUpdater, content: @Composable () -> Unit) {
     val context = LocalContext.current
     val state by gate.state.collectAsStateWithLifecycle()
     LaunchedEffect(gate) { gate.check() }
     val notice = gate.visibleNotice(state)
+    val progress by updater.progress.collectAsStateWithLifecycle()
+    val scope = rememberCoroutineScope()
+    // 断った・失敗した時は何もしない(IMMEDIATE は更新の画面が残るので、もう一度押せる)
+    val launcher = rememberLauncherForActivityResult(ActivityResultContracts.StartIntentSenderForResult()) {}
+    val startUpdate = {
+        scope.launch { if (!updater.update(state.requirement, launcher)) PlayStore.open(context, state.storeUrl) }
+        Unit
+    }
+    DisposableEffect(updater) {
+        val stop = updater.listen()
+        onDispose { stop() }
+    }
+    // 途中の IMMEDIATE を続ける・裏で落とし終わった FLEXIBLE の再起動のバナーを出す
+    LifecycleResumeEffect(updater) {
+        val job = if (updater.available) scope.launch { updater.resume(launcher) } else null
+        onPauseOrDispose { job?.cancel() }
+    }
 
     Box(Modifier.fillMaxSize()) {
         Column(Modifier.fillMaxSize()) {
@@ -78,11 +103,15 @@ fun UpdateGateHost(gate: UpdateGate, content: @Composable () -> Unit) {
                     onDismiss = gate::dismissNotice,
                 )
             }
+            val readyToInstall = progress == FlexibleProgress.DOWNLOADED && !state.isBlocking
+            AnimatedVisibility(readyToInstall, enter = expandVertically() + fadeIn(), exit = shrinkVertically() + fadeOut()) {
+                UpdateReadyBanner(topInset = notice == null, onRestart = updater::restart)
+            }
             // バナーが状態バーの分を取るので、下の画面には状態バーの余白を足させない
-            val inner = if (notice != null) Modifier.consumeWindowInsets(WindowInsets.statusBars) else Modifier
+            val inner = if (notice != null || readyToInstall) Modifier.consumeWindowInsets(WindowInsets.statusBars) else Modifier
             Box(inner.fillMaxWidth().weight(1f)) { content() }
         }
-        if (state.isBlocking) UpdateRequiredScreen(onOpenStore = { PlayStore.open(context, state.storeUrl) })
+        if (state.isBlocking) UpdateRequiredScreen(inApp = updater.available, onUpdate = startUpdate)
     }
 
     if (state.showsRecommended) {
@@ -93,7 +122,7 @@ fun UpdateGateHost(gate: UpdateGate, content: @Composable () -> Unit) {
             confirmButton = {
                 TextButton(onClick = {
                     gate.dismissRecommended()
-                    PlayStore.open(context, state.storeUrl)
+                    startUpdate()
                 }) { Text(stringResource(R.string.update_update)) }
             },
             dismissButton = { TextButton(onClick = gate::dismissRecommended) { Text(stringResource(R.string.update_later)) } },
@@ -143,9 +172,29 @@ fun ServiceNoticeBanner(notice: ServiceNotice, onOpenLink: (String) -> Unit, onD
     }
 }
 
+/** FLEXIBLE を落とし終わった時のバナー。押すと更新を入れて再起動する。 */
+@Composable
+private fun UpdateReadyBanner(topInset: Boolean, onRestart: () -> Unit) {
+    Surface(color = MaterialTheme.colorScheme.surfaceContainerHigh, modifier = Modifier.fillMaxWidth().testTag("update.ready")) {
+        Column(if (topInset) Modifier.statusBarsPadding() else Modifier) {
+            Row(Modifier.padding(start = 16.dp, end = 8.dp, top = 4.dp, bottom = 4.dp), verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    stringResource(R.string.inapp_update_ready),
+                    style = MaterialTheme.typography.bodyMedium,
+                    modifier = Modifier.weight(1f).semantics { liveRegion = LiveRegionMode.Polite },
+                )
+                TextButton(onClick = onRestart, modifier = Modifier.testTag("update.restart")) {
+                    Text(stringResource(R.string.inapp_update_restart), fontWeight = FontWeight.SemiBold)
+                }
+            }
+            HorizontalDivider()
+        }
+    }
+}
+
 /** min 未満の版で出す、閉じられない画面。下の画面には触らせない。 */
 @Composable
-private fun UpdateRequiredScreen(onOpenStore: () -> Unit) {
+private fun UpdateRequiredScreen(inApp: Boolean, onUpdate: () -> Unit) {
     Surface(
         color = MaterialTheme.colorScheme.background,
         modifier = Modifier.fillMaxSize().testTag("update.required")
@@ -165,8 +214,8 @@ private fun UpdateRequiredScreen(onOpenStore: () -> Unit) {
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
             Spacer(Modifier.weight(1f))
-            Button(onClick = onOpenStore, modifier = Modifier.fillMaxWidth().height(52.dp).testTag("update.openStore")) {
-                Text(stringResource(R.string.update_open_store))
+            Button(onClick = onUpdate, modifier = Modifier.fillMaxWidth().height(52.dp).testTag("update.openStore")) {
+                Text(stringResource(if (inApp) R.string.update_update else R.string.update_open_store))
             }
         }
     }
