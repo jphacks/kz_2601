@@ -77,6 +77,24 @@ final class IntentHost {
         }
     }
 
+    // MARK: - 記録の追加(AddRecordIntent)。Mac は同じ名前の口を MacIntentHost.swift に持つ(#1034)
+
+    /// 背面起動(bootstrap 前)でも `runtime` があれば書ける
+    var canWriteRecords: Bool { runtime != nil }
+
+    /// ref 項目の候補(参照先の記録)をローカル DB から読む
+    func cachedRecords(appId: String, entity: String) async -> [Record] {
+        await runtime?.recordSync.cached(appId: appId, entity: entity) ?? []
+    }
+
+    /// 1 件足す。戻り値はサーバーへ送り終えたか
+    func addRecord(appId: String, entity: String, data: [String: JSONValue],
+                   encryptedFields: [String: Set<String>]) async throws -> Bool {
+        guard let runtime else { throw TailorIntentError.notReady }
+        runtime.recordSync.encryptedFields[appId] = encryptedFields
+        return await runtime.addRecordFromIntent(appId: appId, entity: entity, data: data)
+    }
+
     // MARK: - カタログ(Entity の候補)
 
     /// 作ったアプリ(変身一覧と同じ並び・未生成は除く)。サーバーに届かなければ `AppListCache`。
@@ -94,6 +112,9 @@ final class IntentHost {
         }
         return AppSummary.visible(all, current: nil)
     }
+
+    /// 記録先の候補になるアプリ。iOS は作ったアプリ全部(Mac は端末に残る作ったアプリだけ)
+    func recordableApps() async -> [AppSummary] { await apps() }
 
     /// アプリの DSL。表示中ならそれ、無ければキャッシュ(`DocumentCache`)、それも無ければ `GET /dsl`。
     func document(appId: String) async -> AppDocument? {

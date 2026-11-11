@@ -162,6 +162,8 @@ struct MacRootView: View {
         .frame(minWidth: Self.minWindowSize.width, minHeight: Self.minWindowSize.height)
         .focusedSceneValue(\.shellActions, shellActions)
         .macNotificationRouting(selection: notificationSelection, appIds: apps.map(\.id)) // 押された通知のアプリを開く(#965)。入力中なら確認を通す・シートの間は閉じるまで待つ(#943)
+        .macIntentRouting(selection: notificationSelection, appIds: apps.map(\.id), talk: speak) // ショートカット・Siri の「開く / 話しかける」(#1034)
+        .onChange(of: apps.map(\.name)) { IntentHost.shared.appsMayHaveChanged() } // Siri のフレーズのアプリ名を引き直す(#1034)
         .background { WindowCloseGuard(discardGuard: discardGuard) } // ⌘W・閉じるボタン(#943)
         .modifier(MacUpdateGateModifier(gate: updateGate)) // 古い版は閉じられない更新のシート(#981)
         #if !APP_STORE_REVIEW
