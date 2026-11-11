@@ -90,6 +90,7 @@ struct MetamonApp: App {
         #endif
         _runtime = State(initialValue: runtime)
         _session = State(initialValue: session)
+        if splashMode != .hidden { SplashPresence.shared.begin() } // 起動時のシート・リンク・吹き出しはスプラッシュの後に
     }
 
     var body: some Scene {
