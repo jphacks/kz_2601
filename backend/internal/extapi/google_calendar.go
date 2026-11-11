@@ -76,8 +76,10 @@ func init() {
 	})
 }
 
-// googleCalendar is the provider's ops and OAuth client.
+// googleCalendar is the provider's ops and OAuth client. googleTasks uses
+// the same OAuth client and do with its own wire.
 type googleCalendar struct {
+	id   string // the provider, in errors
 	sec  Secrets
 	wire gcalWire
 	hc   *http.Client
@@ -85,18 +87,24 @@ type googleCalendar struct {
 }
 
 func newGoogleCalendar(sec Secrets, w gcalWire) (*googleCalendar, error) {
+	return newGoogleClient(GoogleCalendar, sec, w, googleCalendarHosts)
+}
+
+// newGoogleClient is the OAuth client and API caller of one Google provider
+// (Calendar, Tasks): the same token endpoints, its own API and hosts.
+func newGoogleClient(id string, sec Secrets, w gcalWire, hosts []string) (*googleCalendar, error) {
 	if sec.ClientID == "" || sec.ClientSecret == "" {
-		return nil, errors.New("EXT_GOOGLE_CALENDAR_CLIENT_ID / _CLIENT_SECRET not set")
+		return nil, fmt.Errorf("EXT_%s_CLIENT_ID / _CLIENT_SECRET not set", envName(id))
 	}
 	hc := w.Client
 	if hc == nil {
-		hc = NewHTTPClient(googleCalendarHosts, DefaultTimeout)
+		hc = NewHTTPClient(hosts, DefaultTimeout)
 	}
 	now := w.Now
 	if now == nil {
 		now = time.Now
 	}
-	return &googleCalendar{sec: sec, wire: w, hc: hc, now: now}, nil
+	return &googleCalendar{id: id, sec: sec, wire: w, hc: hc, now: now}, nil
 }
 
 // --- OAuth ---
@@ -183,7 +191,7 @@ func (g *googleCalendar) token(ctx context.Context, form url.Values, prev Token)
 		Scope        string `json:"scope"`
 	}
 	if err := json.Unmarshal(body, &r); err != nil || r.AccessToken == "" {
-		return Token{}, errors.New("googleCalendar: bad token answer")
+		return Token{}, fmt.Errorf("%s: bad token answer", g.id)
 	}
 	t := Token{AccessToken: r.AccessToken, RefreshToken: r.RefreshToken, Scopes: strings.Fields(r.Scope)}
 	if r.ExpiresIn > 0 {
@@ -446,7 +454,8 @@ func gcalEventID(requestID string) string {
 	return strings.ToLower(base32.HexEncoding.WithPadding(base32.NoPadding).EncodeToString(sum[:]))
 }
 
-// do calls the Calendar API with the person's token and decodes the answer.
+// do calls the provider's API (wire.APIBase) with the person's token and
+// decodes the answer.
 // 401 is a token Google no longer takes (ErrInvalidGrant: the connection
 // turns to error); a missing scope is ErrNotConnected (connect again with
 // it); 429 / 5xx / rate limits are retryable provider errors.
@@ -474,7 +483,7 @@ func (g *googleCalendar) do(ctx context.Context, t *Token, method, path string, 
 	}
 	if resp.StatusCode >= 200 && resp.StatusCode < 300 {
 		if err := json.Unmarshal(b, out); err != nil {
-			return fmt.Errorf("googleCalendar: bad answer: %w", err)
+			return fmt.Errorf("%s: bad answer: %w", g.id, err)
 		}
 		return nil
 	}
@@ -509,5 +518,5 @@ func (g *googleCalendar) do(ctx context.Context, t *Token, method, path string, 
 		return &ProviderError{Status: resp.StatusCode, Retryable: true, Err: errors.New("rate limited")}
 	}
 	return &ProviderError{Status: resp.StatusCode, Retryable: resp.StatusCode == 429 || resp.StatusCode >= 500,
-		Err: fmt.Errorf("googleCalendar %s", strings.Join(slices.DeleteFunc(reasons, func(r string) bool { return r == "" }), ","))}
+		Err: fmt.Errorf("%s %s", g.id, strings.Join(slices.DeleteFunc(reasons, func(r string) bool { return r == "" }), ","))}
 }
