@@ -94,6 +94,20 @@ class ProStoreTest {
     }
 
     @Test
+    fun purchaseTheServerRejectedIsNotAcknowledgedEvenWhenAlreadyPro() = runBlocking {
+        // iOS で買った Pro がある人でも、サーバーが確かめられなかった Play の購入は承認しない
+        val server = FakeServer(pro = true, verifies = false)
+        val billing = FakeBilling(owned = listOf(paid("other")))
+        val s = store(server, billing)
+        s.refresh()
+        assertTrue(s.isPro)
+        assertEquals(listOf("other"), server.submitted)
+        assertTrue(billing.acknowledged.isEmpty())
+        s.onPurchases(PlayBilling.RESULT_OK, listOf(paid("tok")))
+        assertTrue(billing.acknowledged.isEmpty())
+    }
+
+    @Test
     fun pendingAndCancelled() = runBlocking {
         val s = store(FakeServer(), FakeBilling())
         s.onPurchases(PlayBilling.RESULT_OK, listOf(PlayPurchase(listOf(ProProducts.MONTHLY), "p", PlayPurchase.State.PENDING, false)))

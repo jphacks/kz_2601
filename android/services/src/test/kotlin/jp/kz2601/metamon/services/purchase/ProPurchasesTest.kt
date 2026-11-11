@@ -80,10 +80,10 @@ class ProPurchasesTest {
 
     @Test
     fun acknowledgesOnlyAfterTheServerSaysPro() {
-        assertFalse(PlayPurchaseRules.shouldAcknowledge(purchase("p"), serverPro = false))
-        assertTrue(PlayPurchaseRules.shouldAcknowledge(purchase("p"), serverPro = true))
-        assertFalse(PlayPurchaseRules.shouldAcknowledge(purchase("p", ack = true), serverPro = true))
-        assertFalse(PlayPurchaseRules.shouldAcknowledge(purchase("p", PlayPurchase.State.PENDING), serverPro = true))
-        assertFalse(PlayPurchaseRules.shouldAcknowledge(purchase("p", product = "something.else"), serverPro = true))
+        assertFalse(PlayPurchaseRules.shouldAcknowledge(purchase("p"), verified = false))
+        assertTrue(PlayPurchaseRules.shouldAcknowledge(purchase("p"), verified = true))
+        assertFalse(PlayPurchaseRules.shouldAcknowledge(purchase("p", ack = true), verified = true))
+        assertFalse(PlayPurchaseRules.shouldAcknowledge(purchase("p", PlayPurchase.State.PENDING), verified = true))
+        assertFalse(PlayPurchaseRules.shouldAcknowledge(purchase("p", product = "something.else"), verified = true))
     }
 }
