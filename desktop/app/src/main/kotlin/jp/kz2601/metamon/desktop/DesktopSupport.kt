@@ -6,7 +6,12 @@ import jp.kz2601.metamon.dsl.Component
 import jp.kz2601.metamon.dsl.ComponentType
 import jp.kz2601.metamon.dsl.Entity
 import jp.kz2601.metamon.dsl.decode
+import jp.kz2601.metamon.dsl.records.Record
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.jsonArray
+import kotlinx.serialization.json.jsonObject
 
 /** デスクトップ版で描ける部品(骨格の段階)。ここに無い既知の type は「この端末では使えない」(unavailable)として穴を残す。 */
 object DesktopLeaves {
@@ -30,7 +35,7 @@ object DesktopLeaves {
         ComponentType.TOGGLE,
         ComponentType.PICKER,
         ComponentType.STEPPER,
-    )
+    ) + DISPLAY_LEAVES
 
     /** 適合テストの `state`(rendered / unavailable / unknown)。hidden・needsForm はまだ見ない。 */
     fun state(c: Component): String = when {
@@ -71,6 +76,26 @@ data class MockStore(val rows: Map<String, List<Row>> = emptyMap(), val nextId: 
     }
 
     fun delete(entity: String, id: String): MockStore = copy(rows = rows + (entity to list(entity).filterNot { it.id == id }))
+
+    /** 集計・式が読む形(数の field は数に)。 */
+    fun records(entity: String, model: jp.kz2601.metamon.dsl.records.Entity?): List<Record> = list(entity).mapIndexed { i, r ->
+        Record(r.id, r.data.mapValues { (k, v) -> typedValue(v, model?.field(k)?.type) }, createdAt = "%06d".format(i), author = "me")
+    }
+
+    companion object {
+        /** `{"<entity>": [{"id", "data"}]}`(適合テストの case.json の records と同じ形)を読む。開発・スクリーンショット用。 */
+        fun fromJson(text: String): MockStore {
+            val root = Json.parseToJsonElement(text).jsonObject
+            val obj = (root["records"] as? JsonObject) ?: root
+            val rows = obj.mapValues { (_, list) ->
+                list.jsonArray.map { e ->
+                    val r = Record.from(e)
+                    Row(r.id, r.data.mapValues { it.value.displayString })
+                }
+            }
+            return MockStore(rows)
+        }
+    }
 }
 
 /** 新規のフォームの初期値(defaultValue の文字列)。"now" などの解決は後の Issue。 */
