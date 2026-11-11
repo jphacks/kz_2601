@@ -31,6 +31,10 @@ struct MacRootView: View {
     @FocusState private var focus: Pane?
     /// 会話で作った・直したアプリの DSL と版の履歴(#967・#968)・作ったアプリの一覧(#969)
     @Environment(MacAppLibrary.self) private var library
+    /// 初回の案内(#971)。「直し方の例」を閉じたら β の案内を出す(#1215)。プレビューなど案内の無い所では nil
+    @Environment(MacOnboarding.self) private var onboarding: MacOnboarding?
+    /// β の案内の依頼の例(#1214)など、ほかのシート・ウインドウから入力欄に入れる文
+    private let draftRequest = MacDraftRequest.shared
     /// 完成の後のお知らせ(#968)
     @State private var notices = MacPostBuildNotices()
     @State private var compose: MacComposeSession?
@@ -164,6 +168,24 @@ struct MacRootView: View {
         .sheet(item: $appLimit) { request in
             MacAppLimitSheet(limit: request.limit, context: appReplaceContext, onFreed: request.retry)
         }
+        .onChange(of: draftRequest.serial) {
+            // 頼まれた文を入力欄に入れて会話を開く(送らない)。頼んだシートが閉じるのを待つ(重なると表示されない・iOS と同じ 0.6 秒)
+            guard let draft = draftRequest.take() else { return }
+            Task { @MainActor in
+                try? await Task.sleep(for: .milliseconds(600))
+                ask(draft: draft)
+            }
+        }
+        #if !APP_STORE_REVIEW
+        .onChange(of: notices.showsEditHint) { wasShowing, showing in
+            // 最初のアプリの後の「直し方の例」が閉じたら β の案内を出す(iOS の `BetaWelcomeHost` と同じ順・#1215)
+            guard wasShowing, !showing else { return }
+            Task { @MainActor in
+                try? await Task.sleep(for: .milliseconds(700))
+                onboarding?.presentBetaWelcomeIfNeeded()
+            }
+        }
+        #endif
         .sheet(isPresented: $showsTips, onDismiss: switchAfterSheet) {
             PromptTipsSheet { tip in
                 showsTips = false
@@ -313,7 +335,8 @@ struct MacRootView: View {
         // 本物の AI の結果はサーバーにも保存されている(記録・版をサーバーにつなぐ印)
         library.apply(document, envelope: envelope, created: target == .create, onServer: MacServices.shared.isLive)
         showChangeHighlight(previous: previous, next: document)
-        // 最初のアプリの印(iOS と同じ `hasShownEditHint`)。β の案内(`MacOnboarding`)は次の起動でこれを見て 1 回出す。
+        // 最初のアプリの印(iOS と同じ `hasShownEditHint`)。β の案内(`MacOnboarding`)は「直し方の例」を閉じた後
+        // (出さなかった時は次の起動)にこれを見て 1 回出す。
         // 最初の 1 回だけ「こう頼むと直せます」を予約する(要約が閉じてから出る・#1278)
         if target == .create {
             let tutorial = FirstRunTutorialStore.shared
