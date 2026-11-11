@@ -66,6 +66,7 @@ private class ScreenScope(
     val perform: (Action, String?) -> Unit,
     val io: DesktopIo,
     val data: LeafData,
+    val dataEnv: DataEnv,
 )
 
 /**
@@ -150,7 +151,13 @@ private fun ScreenView(dsl: AppDSL, session: DesktopSession, route: Route, io: D
     val form = session.form(route)
     val data = remember(session.store) { session.leafData() }
     val perform = { a: Action, recordId: String? -> dispatch(a, ActionContext(route, form, recordId)) }
-    val scope = ScreenScope(route, form, session, perform, io, data)
+    val dataEnv = DataEnv(
+        data, session.queries(route), perform,
+        { e, id, patch -> session.store.find(e, id)?.let { session.replaceStore(session.store.save(e, id, it.data + patch)) } },
+        { e, id -> dispatch(Action(type = jp.kz2601.metamon.dsl.ActionType.DELETE_RECORD, entity = e), ActionContext(route, form, id)) },
+        { ListIoBar(it, io) },
+    )
+    val scope = ScreenScope(route, form, session, perform, io, data, dataEnv)
     Column(Modifier.fillMaxSize()) {
         Row(Modifier.fillMaxWidth().padding(8.dp), verticalAlignment = Alignment.CenterVertically) {
             if (NavigationResolver.canClose(session.nav, route)) {
@@ -280,7 +287,7 @@ private fun Node(c: Component, s: ScreenScope) {
         ComponentType.LINK -> TextButton(onClick = { c.url?.let { s.perform(jp.kz2601.metamon.dsl.Action(type = jp.kz2601.metamon.dsl.ActionType.OPEN_URL, url = it), null) } }) {
             Text(c.text ?: c.label ?: c.url.orEmpty())
         }
-        ComponentType.LIST -> ListLeaf(c, s)
+        in DATA_LEAVES -> DataLeaf(c, s.dataEnv)
         ComponentType.FILE_IMPORT -> FileImportLeaf(c, s.io)
         in InputLeaves.types -> InputNode(c, s)
         else -> Text(
@@ -312,30 +319,4 @@ private fun InputNode(c: Component, s: ScreenScope) {
         "needsForm" -> return Text("この入力はフォームの画面で使えます", color = Color.Gray, style = MaterialTheme.typography.bodySmall)
     }
     InputLeaf(c, s.form!!) { s.session.message = it }
-}
-
-@Composable
-private fun ListLeaf(c: Component, s: ScreenScope) {
-    val entity = s.data.entity(c.entity)
-    val rows = s.session.rows(c, c.searchField?.let { s.session.queries(s.route)[it] })
-    c.entity?.let { ListIoBar(it, s.io) }
-    if (rows.isEmpty()) {
-        Text(c.emptyText ?: "まだありません", color = Color.Gray)
-        return
-    }
-    val titleField = c.item?.title ?: entity?.displayTitleField
-    rows.forEach { row ->
-        val tap = c.onItemTap
-        Column(
-            Modifier.fillMaxWidth()
-                .then(if (tap != null) Modifier.clickable { s.perform(tap, row.id) } else Modifier)
-                .padding(vertical = 6.dp),
-        ) {
-            Text(titleField?.let { FieldCoding.display(row[it], entity?.field(it)) }?.takeIf { it.isNotEmpty() } ?: row.id)
-            c.item?.subtitle?.let { f ->
-                FieldCoding.display(row[f], entity?.field(f)).takeIf { it.isNotEmpty() }?.let { Text(it, style = MaterialTheme.typography.bodySmall, color = Color.Gray) }
-            }
-        }
-        HorizontalDivider()
-    }
 }
