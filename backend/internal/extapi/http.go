@@ -1,9 +1,11 @@
 package extapi
 
 import (
+	"context"
 	"errors"
 	"log/slog"
 	"net/http"
+	"time"
 
 	"github.com/jphacks/kz_2601/backend/internal/httpx"
 )
@@ -87,6 +89,10 @@ func (s *Service) fail(w http.ResponseWriter, err error) {
 	httpx.WriteJSON(w, StatusOf(b.Reason), b)
 }
 
+// RevokeAllTimeout bounds one revokeAll, which does not stop when the
+// caller hangs up.
+const RevokeAllTimeout = time.Minute
+
 // Routes mounts the external API routes on mux.
 func (s *Service) Routes(mux *http.ServeMux) {
 	mux.HandleFunc("POST /internal/ext/call", func(w http.ResponseWriter, r *http.Request) {
@@ -133,7 +139,11 @@ func (s *Service) Routes(mux *http.ServeMux) {
 		if !httpx.DecodeBody(w, r, &b) {
 			return
 		}
-		n, err := s.RevokeAll(r.Context(), b.UID)
+		// the caller may stop waiting (account deletion is best effort on
+		// its side); the revocation still runs to the end, bounded on its own
+		ctx, cancel := context.WithTimeout(context.WithoutCancel(r.Context()), RevokeAllTimeout)
+		defer cancel()
+		n, err := s.RevokeAll(ctx, b.UID)
 		if err != nil {
 			s.fail(w, err)
 			return

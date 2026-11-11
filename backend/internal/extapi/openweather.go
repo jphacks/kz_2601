@@ -44,14 +44,35 @@ var owKeyRe = regexp.MustCompile(`^[A-Za-z0-9]{16,64}$`)
 func init() {
 	register(Provider{ID: OpenWeather, Billing: BillingFree,
 		Ops: []OpSpec{
-			{Name: "current", Args: []string{"lat", "lng"}},
-			{Name: "forecast", Args: []string{"lat", "lng", "limit"}},
-			{Name: "airQuality", Args: []string{"lat", "lng"}},
+			{Name: "current", Args: []string{"lat", "lng"}, Check: checkOWLatLng},
+			{Name: "forecast", Args: []string{"lat", "lng", "limit"}, Check: checkOWForecast},
+			{Name: "airQuality", Args: []string{"lat", "lng"}, Check: checkOWLatLng},
 		},
 		Hosts: []string{openWeatherHost},
 		New: func(sec Secrets) (map[string]Operation, error) {
 			return newOpenWeather(sec.APIKey, openWeatherHost, NewHTTPClient([]string{openWeatherHost}, DefaultTimeout))
 		}})
+}
+
+// checkOWLatLng rejects a call without a valid lat / lng at CheckArgs, before
+// it counts against any limit.
+func checkOWLatLng(args map[string]string) error {
+	_, _, ok, err := argLatLng(args, 2)
+	if err != nil {
+		return err
+	}
+	if !ok {
+		return errors.New("lat and lng are required")
+	}
+	return nil
+}
+
+func checkOWForecast(args map[string]string) error {
+	if err := checkOWLatLng(args); err != nil {
+		return err
+	}
+	_, err := argInt(args, "limit", 8, 1, 40)
+	return err
 }
 
 // newOpenWeather builds the ops against base (the API, or a test server).

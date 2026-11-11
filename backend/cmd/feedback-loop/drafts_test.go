@@ -7,6 +7,7 @@ import (
 	"regexp"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/jphacks/kz_2601/backend/internal/loop"
 	"github.com/jphacks/kz_2601/backend/internal/loop/github"
@@ -23,6 +24,8 @@ func (f *fakePublisher) CommentIssue(_ context.Context, repo string, n int, body
 	f.comments = append(f.comments, body)
 	return &github.Issue{Number: n, URL: "https://github.com/" + repo + "/issues/77#issuecomment-1"}, nil
 }
+
+func (f *fakePublisher) IssueOpen(context.Context, string, int) (bool, error) { return true, nil }
 
 var reDraftID = regexp.MustCompile(`drf_[0-9a-f]+`)
 
@@ -79,7 +82,7 @@ func TestDraftsFlow(t *testing.T) {
 	// a later report of the same cluster is added to #77, not filed again
 	later := loop.Item{ID: loop.ItemID(loop.SourceInApp, "later"), Source: loop.SourceInApp, SourceID: "later", UID: "u-later",
 		Text: "写真を足すと落ちる", AIAllowed: true, Status: loop.ItemTriaged, Category: "bug", Area: "render", Priority: "P2",
-		Summary: "写真を足すとアプリが終了する。", ClusterKey: "photo-add-crash", ExpiresAt: d.ExpiresAt}
+		Summary: "写真を足すとアプリが終了する。", ClusterKey: "photo-add-crash", IngestedAt: d.PublishedAt.Add(time.Minute), ExpiresAt: d.ExpiresAt}
 	if _, err := ta.ls.PutItem(context.Background(), later); err != nil {
 		t.Fatal(err)
 	}

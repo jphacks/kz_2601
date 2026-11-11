@@ -3,9 +3,11 @@ package draft
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"slices"
 	"strings"
 	"sync"
 	"testing"
@@ -20,11 +22,12 @@ type fakeGitHub struct {
 	mu       sync.Mutex
 	created  []map[string]any
 	comments map[int][]string
+	closed   map[int]bool // issue number -> closed on GitHub
 }
 
 func newFakeGitHub(t *testing.T) (*fakeGitHub, *github.Client) {
 	t.Helper()
-	g := &fakeGitHub{comments: map[int][]string{}}
+	g := &fakeGitHub{comments: map[int][]string{}, closed: map[int]bool{}}
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		g.mu.Lock()
 		defer g.mu.Unlock()
@@ -40,6 +43,12 @@ func newFakeGitHub(t *testing.T) (*fakeGitHub, *github.Client) {
 			g.comments[n] = append(g.comments[n], in["body"].(string))
 			w.WriteHeader(http.StatusCreated)
 			_, _ = fmt.Fprintf(w, `{"id":%d,"html_url":"https://github.com/owner/repo/issues/%d#issuecomment-1"}`, 7000+len(g.comments[n]), n)
+		case r.Method == http.MethodGet && sscan(r.URL.Path, "/repos/owner/repo/issues/%d", &n):
+			state := "open"
+			if g.closed[n] {
+				state = "closed"
+			}
+			_, _ = fmt.Fprintf(w, `{"number":%d,"state":%q}`, n, state)
 		default:
 			t.Errorf("unexpected %s %s", r.Method, r.URL.Path)
 			w.WriteHeader(http.StatusNotFound)
@@ -203,5 +212,117 @@ func TestAppendRefusesStaleTarget(t *testing.T) {
 	}
 	if len(g.comments) != 0 || len(g.created) != 1 {
 		t.Fatalf("posted: %v %d", g.comments, len(g.created))
+	}
+}
+
+// An issue closed on GitHub without a fix (not planned, duplicate) has no
+// FixedAt; the comment must not go to it.
+func TestAppendToClosedIssueRedrafts(t *testing.T) {
+	ctx := context.Background()
+	s := loop.NewMemory()
+	g, c := newFakeGitHub(t)
+	r := &Reviewer{Store: s, Now: func() time.Time { return now }, Repo: "owner/repo", Publisher: c}
+	triaged(t, s, 1, "photo", "bug", "写真で落ちる", "写真を追加するとアプリが終了する。", loop.SourceInApp)
+	first, _ := approve(t, r, s, "photo")
+
+	later := now.Add(time.Hour)
+	items := triaged(t, s, 2, "photo2", "bug", "写真で落ちた", "写真の追加で終了する。", loop.SourceStoreReview)
+	for _, it := range items {
+		it.ClusterKey, it.IngestedAt = "photo", later
+		_ = s.UpdateItem(ctx, it)
+	}
+	if _, err := (&Builder{Store: s, Now: func() time.Time { return later }}).Run(ctx); err != nil {
+		t.Fatal(err)
+	}
+	ds, _ := s.ListDrafts(ctx, loop.DraftQuery{Status: loop.DraftPending})
+	if len(ds) != 1 || ds[0].AppendIssue != first.IssueNumber {
+		t.Fatalf("append draft: %+v", ds)
+	}
+
+	g.closed[first.IssueNumber] = true // closed as not planned
+	_, iss, err := r.Approve(ctx, ds[0].ID, "ko-tarou")
+	if !errors.Is(err, ErrIssueClosed) || iss != nil {
+		t.Fatalf("approve: %v %+v", err, iss)
+	}
+	if len(g.comments) != 0 || len(g.created) != 1 {
+		t.Fatalf("posted to a closed issue: %v %d", g.comments, len(g.created))
+	}
+	got, _ := s.GetDraft(ctx, ds[0].ID)
+	if got.Status != loop.DraftPending || got.AppendIssue != 0 || got.BodyHash != "" || !strings.Contains(got.Body, "## 再現の手順") || len(got.ItemIDs) != 2 {
+		t.Fatalf("not drafted again as a new issue: %+v", got)
+	}
+	if f, _ := s.GetDraft(ctx, first.ID); f.ClosedAt.IsZero() {
+		t.Fatal("closed issue not marked")
+	}
+	if filed, _ := FiledIssues(ctx, s); filed["photo"].Number != 0 {
+		t.Fatalf("closed issue still filed: %+v", filed)
+	}
+
+	// approved again, it becomes a new issue
+	_, iss, err = r.Approve(ctx, got.ID, "ko-tarou")
+	if err != nil || iss == nil || iss.Number != 42 || len(g.created) != 2 || len(g.comments) != 0 {
+		t.Fatalf("new issue: %+v %v", iss, err)
+	}
+}
+
+// Reports that arrived before the issue was published are not posted as
+// new ones; they are attached to the filed issue instead.
+func TestAppendOnlyAfterPublish(t *testing.T) {
+	ctx := context.Background()
+	s := loop.NewMemory()
+	g, c := newFakeGitHub(t)
+	dry := &Reviewer{Store: s, Now: func() time.Time { return now }}
+	pub := &Reviewer{Store: s, Now: func() time.Time { return now.Add(2 * time.Hour) }, Repo: "owner/repo", Publisher: c}
+
+	// approved in a dry run; before it is posted, more reports arrive and
+	// get a pending (new-issue) draft of their own
+	triaged(t, s, 1, "photo", "bug", "写真で落ちる", "写真を追加するとアプリが終了する。", loop.SourceInApp)
+	first, _ := approve(t, dry, s, "photo")
+	early := triaged(t, s, 1, "photo-e", "bug", "写真の画面で落ちる", "写真の画面を開くと終了する。", loop.SourceTestFlight)
+	early[0].ClusterKey, early[0].IngestedAt = "photo", now.Add(time.Hour)
+	_ = s.UpdateItem(ctx, early[0])
+	if _, err := (&Builder{Store: s, Now: func() time.Time { return now.Add(time.Hour) }}).Run(ctx); err != nil {
+		t.Fatal(err)
+	}
+	if _, _, err := pub.Publish(ctx, first.ID); err != nil {
+		t.Fatal(err)
+	}
+
+	// a report after publication: the comment holds it, not the early one
+	late := triaged(t, s, 1, "photo-l", "bug", "写真で強制終了", "写真を足すと強制終了する。", loop.SourceStoreReview)
+	late[0].ClusterKey, late[0].IngestedAt = "photo", now.Add(3*time.Hour)
+	_ = s.UpdateItem(ctx, late[0])
+	res, err := (&Builder{Store: s, Now: func() time.Time { return now.Add(3 * time.Hour) }}).Run(ctx)
+	if err != nil || res.Attached != 1 || res.Extended != 1 {
+		t.Fatalf("run: %+v %v", res, err)
+	}
+	ds, _ := s.ListDrafts(ctx, loop.DraftQuery{Status: loop.DraftPending})
+	if len(ds) != 1 || ds[0].AppendIssue != 41 || len(ds[0].ItemIDs) != 1 || ds[0].ItemIDs[0] != late[0].ID {
+		t.Fatalf("append draft: %+v", ds)
+	}
+	if strings.Contains(ds[0].Body, "写真の画面を開くと終了する。") || !strings.Contains(ds[0].Body, "- 件数: 1(ストアのレビュー 1)") {
+		t.Fatalf("append body:\n%s", ds[0].Body)
+	}
+	filed, _ := s.GetDraft(ctx, first.ID)
+	if !slices.Contains(filed.ItemIDs, early[0].ID) {
+		t.Fatalf("early report not attached to the filed issue: %+v", filed.ItemIDs)
+	}
+	if it, _ := s.GetItem(ctx, early[0].ID); it.DraftID != first.ID || it.Status != loop.ItemDrafted {
+		t.Fatalf("early item %+v", it)
+	}
+	if _, iss, err := pub.Approve(ctx, ds[0].ID, "ko-tarou"); err != nil || iss.Number != 41 || len(g.comments[41]) != 1 {
+		t.Fatalf("append: %+v %v", iss, err)
+	}
+
+	// nothing new since publication: no draft, the report is attached
+	old := triaged(t, s, 1, "photo-o", "bug", "前から落ちてた", "写真の追加で前から終了していた。", loop.SourceInApp)
+	old[0].ClusterKey, old[0].IngestedAt = "photo", now.Add(time.Minute)
+	_ = s.UpdateItem(ctx, old[0])
+	res, err = (&Builder{Store: s, Now: func() time.Time { return now.Add(4 * time.Hour) }}).Run(ctx)
+	if err != nil || res.Created != 0 || res.Attached != 1 {
+		t.Fatalf("old only: %+v %v", res, err)
+	}
+	if ds, _ := s.ListDrafts(ctx, loop.DraftQuery{Status: loop.DraftPending}); len(ds) != 0 {
+		t.Fatalf("draft for old reports: %+v", ds)
 	}
 }

@@ -32,19 +32,31 @@ func retryReason(err error, resp *Response) string {
 		return RetryTruncated
 	}
 	var ve *dsl.ValidationError
-	if errors.As(err, &ve) {
+	if errors.As(err, &ve) && !patchOnly(ve.Codes()) {
 		return RetryValidation
 	}
 	return RetryInvalidOutput
 }
 
+// patchOnly reports whether every code is a patch_* code: the patch itself
+// was bad or did not apply, so the DSL was never validated.
+func patchOnly(codes []string) bool {
+	for _, c := range codes {
+		if !strings.HasPrefix(c, "patch_") {
+			return false
+		}
+	}
+	return len(codes) > 0
+}
+
 // noteRejected records why an attempt was rejected with err: its retry
-// reason and, for a validation failure, the code of each problem (#1772).
+// reason and, for a dsl.ValidationError (patch_* included), the code of each
+// problem (#1772).
 func (m *Meta) noteRejected(err error, resp *Response) {
 	r := retryReason(err, resp)
 	m.RetryReasons = append(m.RetryReasons, r)
 	var ve *dsl.ValidationError
-	if r == RetryValidation && errors.As(err, &ve) {
+	if r != RetryTruncated && errors.As(err, &ve) {
 		m.ValidationCodes = append(m.ValidationCodes, ve.Codes()...)
 	}
 }
