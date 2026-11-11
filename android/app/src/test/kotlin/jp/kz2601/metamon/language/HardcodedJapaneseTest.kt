@@ -48,6 +48,12 @@ class HardcodedJapaneseTest {
             "あなたは前向きなアシスタントです。与えられた内容を踏まえて、短い一言や提案を 1 つだけ返してください。\$common",
             "下の材料",
         ),
+        // AI へ送る材料の「外部データ」の節(人に出さない。言語は端末でなく request.locale で分ける。iOS の AIFeedInput と同じ文)
+        "renderer/src/main/kotlin/jp/kz2601/metamon/renderer/components/ai/AiFeedInput.kt" to setOf(
+            "気圧が大きく下がる", "最高 \${f(it)}°", "最低 \${f(it)}°", "降水確率 \$it%",
+            "外部データ: なし(添えられるデータがありません。外部のデータを推測・作成しないでください)",
+            "外部データ(アプリが表示している公開データ):", "- (取得できませんでした)", "- (今は表示するものがありません)",
+        ),
         // 適合テストの描画の木の値(iOS の日本語と突き合わせる。画面は strings で出す)
         "renderer/src/main/kotlin/jp/kz2601/metamon/renderer/conformance/PlayNodes.kt" to setOf("精算"),
         "renderer/src/main/kotlin/jp/kz2601/metamon/renderer/components/Containers.kt" to setOf("詳細"),
