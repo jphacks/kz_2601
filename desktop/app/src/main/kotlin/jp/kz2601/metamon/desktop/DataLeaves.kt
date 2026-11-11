@@ -13,6 +13,11 @@ import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.PointerEventType
 import androidx.compose.ui.input.pointer.isCtrlPressed
 import androidx.compose.ui.input.pointer.isMetaPressed
+import androidx.compose.ui.input.pointer.isShiftPressed
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.semantics.selected
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.foundation.gestures.Orientation
 import androidx.compose.foundation.gestures.draggable
@@ -47,6 +52,7 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
@@ -107,20 +113,24 @@ class DataEnv(
     /** 1 件の記録の field を書き換える(list のチェック)。フォームと同じ記録の規則を通す(DesktopSession.updateRecord)。 */
     val update: (entity: String, id: String, patch: Map<String, String>) -> Unit,
     val delete: (entity: String, id: String) -> Unit,
-    /** list の上に出す道具(表をコピー・貼り付け)。 */
-    val listBar: @Composable (entity: String) -> Unit = {},
+    /** list の上に出す道具(表をコピー・貼り付け)。選んだ行があればコピーはその行だけ(#1766)。 */
+    val listBar: @Composable (entity: String, selected: Set<String>) -> Unit = { _, _ -> },
     /** その行を書き換えられるか・消せるか(出せない操作は出さない)。 */
     val canEdit: (entity: String, id: String) -> Boolean = { _, _ -> true },
     val canDelete: (entity: String, id: String) -> Boolean = { _, _ -> true },
     /** 行の詳細を別のウィンドウで開く(#1763)。(行を押した時のアクション, recordId)。null なら出さない。 */
     val openWindow: ((Action, String) -> Unit)? = null,
+    /** list の選んだ行を表計算の形でコピー(Ctrl+C)。(entity, recordId の集まり)。 */
+    val copyRows: (entity: String, ids: Set<String>) -> Unit = { _, _ -> },
+    /** 作った TSV をコピー(table の選んだ行)。(TSV, 行の数)。 */
+    val copyText: (tsv: String, rows: Int) -> Unit = { _, _ -> },
 )
 
 @Composable
 fun DataLeaf(c: Component, env: DataEnv) {
     when (c.type) {
         ComponentType.LIST -> ListLeaf(c, env)
-        ComponentType.TABLE -> TableLeaf(c, env.data)
+        ComponentType.TABLE -> TableLeaf(c, env)
         ComponentType.TIMELINE -> TimelineLeaf(c, env.data)
         ComponentType.GRID_TABLE -> GridTableLeaf(c, env)
         ComponentType.SEARCH_BAR -> SearchBarLeaf(c, env.search)
@@ -303,7 +313,9 @@ private fun ListLeaf(c: Component, env: DataEnv) {
     val data = env.data
     val entity = data.entity(c.entity)
     val rows = ListRows.rows(c, data, c.searchField?.let { env.search[it] })
-    c.entity?.let { env.listBar(it) }
+    val order = rows.map { it.id }
+    val selection = rememberRowSelection(c.id, order)
+    c.entity?.let { env.listBar(it, selection.value.selected) }
     if (rows.isEmpty()) {
         Text(c.emptyText ?: DataText.EMPTY, color = Color.Gray)
         return
@@ -312,18 +324,32 @@ private fun ListLeaf(c: Component, env: DataEnv) {
     val daily = ListToggle.isDaily(c.item)
     val now = DSLClock.now()
     val deletable = c.swipeToDelete == true && c.entity != null
-    LazyColumn(Modifier.fillMaxWidth().heightIn(max = LIST_MAX_HEIGHT)) {
+    val keys = Modifier.rowSelectionKeys(selection, order) { ids -> c.entity?.let { env.copyRows(it, ids) } }
+    val highlight = MaterialTheme.colorScheme.primary.copy(alpha = 0.14f)
+    LazyColumn(Modifier.fillMaxWidth().heightIn(max = LIST_MAX_HEIGHT).then(keys)) {
         itemsIndexed(rows, key = { _, r -> r.id }) { i, r ->
             val t = ListRows.texts(c.item, r, entity, data)
             val tap = c.onItemTap
             val delete = { env.delete(c.entity!!, r.id) }
             val rowDeletable = deletable && env.canDelete(c.entity!!, r.id)
             val openWindow = tap?.let { a -> env.openWindow?.let { o -> { o(a, r.id) } } }
+            val isSelected = r.id in selection.value.selected
+            val click = { how: RowClick ->
+                // 修飾キー無しで押すと今までどおり onItemTap(詳細へ)。無ければ選ぶ
+                selection.value = if (tap != null && !how.shift && !how.toggle) {
+                    env.tap(tap, r.id)
+                    RowSelect.tapped(selection.value, r.id, order)
+                } else {
+                    RowSelect.click(selection.value, r.id, order, how)
+                }
+            }
             val row = @Composable {
                 Row(
                     Modifier.fillMaxWidth()
+                        .then(if (isSelected) Modifier.background(highlight) else Modifier)
                         .then(if (rowDeletable) Modifier.onKeyEvent { e -> (e.type == KeyEventType.KeyUp && e.key == Key.Delete).also { if (it) delete() } } else Modifier)
-                        .then(if (tap != null) Modifier.rowClick({ env.tap(tap, r.id) }, openWindow) else Modifier)
+                        .rowClick(click, openWindow)
+                        .semantics { selected = isSelected }
                         .padding(vertical = 6.dp),
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
@@ -351,24 +377,61 @@ private fun ListLeaf(c: Component, env: DataEnv) {
 }
 
 /**
- * 一覧の行を押す。別のウィンドウを開ける時は、ダブルクリックと Ctrl(macOS は ⌘)+クリックで詳細を別のウィンドウに(#1763)。
- * 押した時の Ctrl は先に見ておく(クリックの知らせには修飾キーが乗らない)。
+ * 一覧・table の行を押す(#1766)。Shift+クリックで範囲、Ctrl(macOS は ⌘)+クリックで足し引き。
+ * 別のウィンドウを開ける時は、ダブルクリックで詳細を別のウィンドウに(#1763)。
+ * 押した時の修飾キーは先に見ておく(クリックの知らせには修飾キーが乗らない)。
  */
 @OptIn(ExperimentalFoundationApi::class)
-private fun Modifier.rowClick(tap: () -> Unit, openWindow: (() -> Unit)?): Modifier =
-    if (openWindow == null) {
-        clickable(onClick = tap)
-    } else {
-        composed {
-            var ctrl by remember { mutableStateOf(false) }
-            pointerInput(Unit) {
-                awaitPointerEventScope {
-                    while (true) {
-                        val e = awaitPointerEvent(PointerEventPass.Initial)
-                        if (e.type == PointerEventType.Press) ctrl = e.keyboardModifiers.isCtrlPressed || e.keyboardModifiers.isMetaPressed
-                    }
+private fun Modifier.rowClick(onClick: (RowClick) -> Unit, openWindow: (() -> Unit)?): Modifier = composed {
+    val how = remember { arrayOf(RowClick()) }
+    // 押した行にフォーカスを置く(Ctrl+A・Ctrl+C は枠の rowSelectionKeys、Delete は行が受ける)
+    val focus = remember { FocusRequester() }
+    pointerInput(Unit) {
+        awaitPointerEventScope {
+            while (true) {
+                val e = awaitPointerEvent(PointerEventPass.Initial)
+                if (e.type == PointerEventType.Press) {
+                    val m = e.keyboardModifiers
+                    how[0] = RowSelect.click(m.isShiftPressed, m.isCtrlPressed, m.isMetaPressed, HostOs.current)
                 }
-            }.combinedClickable(onDoubleClick = openWindow, onClick = { if (ctrl) openWindow() else tap() })
+            }
+        }
+    }.then(
+        Modifier.focusRequester(focus).then(
+            if (openWindow == null) {
+                Modifier.clickable { focusRow(focus); onClick(how[0]) }
+            } else {
+                Modifier.combinedClickable(onDoubleClick = openWindow, onClick = { focusRow(focus); onClick(how[0]) })
+            },
+        ),
+    )
+}
+
+private fun focusRow(focus: FocusRequester) {
+    runCatching { focus.requestFocus() }
+}
+
+/** 行の選び。行の集まりが変わったら(足した・消した・絞った)外す(並べ替えだけなら残す)。 */
+@Composable
+private fun rememberRowSelection(id: String?, order: List<String>): MutableState<RowSelection> {
+    val ids = order.toSet()
+    return remember(id, ids) { mutableStateOf(RowSelection(ids = ids)) }
+}
+
+/** 一覧・table の枠: 中の行にフォーカスがある時、Ctrl+A で全部選ぶ・Ctrl+C で選んだ行をコピー。何も選んでいなければ Ctrl+C は他へ流す。 */
+private fun Modifier.rowSelectionKeys(selection: MutableState<RowSelection>, order: List<String>, copy: (Set<String>) -> Unit): Modifier =
+    onKeyEvent { e ->
+        val p = KeyPress.of(e) ?: return@onKeyEvent false
+        when (RowSelect.command(p, HostOs.current)) {
+            RowSelect.Command.SELECT_ALL -> {
+                selection.value = RowSelect.selectAll(selection.value, order)
+                true
+            }
+            RowSelect.Command.COPY -> if (selection.value.isEmpty) false else {
+                copy(selection.value.selected)
+                true
+            }
+            null -> false
         }
     }
 
@@ -376,14 +439,20 @@ private val MIN_COLUMN_W = 48.dp
 
 /** `table`: 見出しの境目を引いて列の幅を変え、見出しを押して並べ替える(どちらも表示だけ)。 */
 @Composable
-private fun TableLeaf(c: Component, data: LeafData) {
+private fun TableLeaf(c: Component, env: DataEnv) {
+    val data = env.data
     val entity = data.entity(c.entity)
     val columns = c.columns
     var sortColumn by remember(c.id) { mutableStateOf<Int?>(null) }
     var ascending by remember(c.id) { mutableStateOf(true) }
     val rows = TableCells.viewSorted(TableCells.rows(c, data), sortColumn, ascending)
+    val order = rows.map { it.id }
+    val selection = rememberRowSelection(c.id, order)
+    val headers = columns.map { TableCells.header(it, entity) }
+    val keys = Modifier.rowSelectionKeys(selection, order) { env.copyText(TableCopy.tsv(headers, rows, selection.value), it.size) }
+    val highlight = MaterialTheme.colorScheme.primary.copy(alpha = 0.14f)
     val density = LocalDensity.current
-    BoxWithConstraints(Modifier.fillMaxWidth()) {
+    BoxWithConstraints(Modifier.fillMaxWidth().then(keys)) {
         val initial = with(density) { ((maxWidth - 8.dp * columns.size).coerceAtLeast(MIN_COLUMN_W) / columns.size.coerceAtLeast(1)).toPx() }
         val widths = remember(c.id, columns.size) { mutableStateListOf<Float>().apply { repeat(columns.size) { add(initial) } } }
         Column(Modifier.horizontalScroll(rememberScrollState())) {
@@ -391,7 +460,7 @@ private fun TableLeaf(c: Component, data: LeafData) {
                 columns.forEachIndexed { i, col ->
                     val mark = if (sortColumn == i) (if (ascending) " ▲" else " ▼") else ""
                     Text(
-                        TableCells.header(col, entity) + mark,
+                        headers[i] + mark,
                         Modifier.width(with(density) { widths[i].toDp() }).clickable {
                             if (sortColumn == i) ascending = !ascending else {
                                 sortColumn = i
@@ -417,7 +486,16 @@ private fun TableLeaf(c: Component, data: LeafData) {
             }
             HorizontalDivider(Modifier.padding(vertical = 6.dp))
             rows.forEach { row ->
-                Row(Modifier.padding(vertical = 5.dp)) {
+                val isSelected = row.id in selection.value.selected
+                val click = { how: RowClick ->
+                    selection.value = RowSelect.click(selection.value, row.id, order, how)
+                }
+                Row(
+                    Modifier.then(if (isSelected) Modifier.background(highlight) else Modifier)
+                        .rowClick(click, null)
+                        .semantics { selected = isSelected }
+                        .padding(vertical = 5.dp),
+                ) {
                     columns.forEachIndexed { i, col ->
                         Text(
                             row.texts.getOrElse(i) { "" },

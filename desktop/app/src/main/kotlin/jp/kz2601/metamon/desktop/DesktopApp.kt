@@ -234,10 +234,12 @@ private fun ScreenView(
         data, session.queries(route), perform,
         { e, id, patch -> session.updateRecord(e, id, patch) },
         { e, id -> dispatch(ScreenShortcuts.withConfirm(Action(type = jp.kz2601.metamon.dsl.ActionType.DELETE_RECORD, entity = e)), ActionContext(route, form, id)) },
-        { ListIoBar(it, io) },
+        { e, selected -> ListIoBar(e, io, selected) },
         canEdit = session::canEditRecord,
         canDelete = session::canDeleteRecord,
-        // 行のダブルクリック・Ctrl+クリック・右クリックで詳細を別のウィンドウに(#1763)
+        // 行のダブルクリック・右クリックで詳細を別のウィンドウに(#1763)。Ctrl+クリックは行を選ぶ(#1766)
+        copyRows = { e, ids -> io.copyRows(e, ids) },
+        copyText = io::copyText,
         openWindow = openRecord?.let { open -> { a: Action, id: String -> RecordWindows.target(a)?.let { open(it, id) } } },
     )
     val scope = ScreenScope(route, form, session, perform, io, data, dataEnv)

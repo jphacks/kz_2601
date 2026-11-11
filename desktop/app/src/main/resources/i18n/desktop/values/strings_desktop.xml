@@ -38,6 +38,8 @@
     <string name="desktop_io_cancel">やめる</string>
     <string name="desktop_io_choose_file">ファイルを選ぶ</string>
     <string name="desktop_io_copied_rows">%1$d 件をコピーしました</string>
+    <string name="desktop_io_copy_failed">コピーできませんでした</string>
+    <string name="desktop_io_copy_selected">選んだ %1$d 行をコピー</string>
     <string name="desktop_io_copy_table">表をコピー</string>
     <string name="desktop_io_drop_not_here">この画面には落とせません</string>
     <string name="desktop_io_file_too_large">ファイルが大きすぎます</string>

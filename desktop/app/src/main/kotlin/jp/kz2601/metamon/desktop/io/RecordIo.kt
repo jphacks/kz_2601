@@ -66,7 +66,7 @@ object RecordIo {
         }
     }
 
-    /** `export` の表(古い順・hidden は RecordExport が落とす)。 */
+    /** `export` の表(古い順・hidden は RecordExport が落とす)。[ids] を渡すとその記録だけ。 */
     fun exportTable(
         title: String,
         entity: Entity,
@@ -76,8 +76,11 @@ object RecordIo {
         notes: List<String> = emptyList(),
         locale: Locale = Locale.JAPAN,
         now: Instant = Instant.now(),
+        ids: Set<String>? = null,
     ): ExportTable {
-        val records = RecordExport.chronological(store.list(entity.id).map { record(it, entity) }, entity)
+        // ids があればその行だけ(一覧で選んだ行のコピー #1766)。並びと書式は全部の時と同じ
+        val rows = store.list(entity.id).let { all -> if (ids == null) all else all.filter { it.id in ids } }
+        val records = RecordExport.chronological(rows.map { record(it, entity) }, entity)
         return RecordExport.table(title, entity, records, fields?.takeIf { it.isNotEmpty() }, currentUid = null, notes = notes, display = display(store, entities, locale, now))
     }
 
