@@ -30,6 +30,17 @@ final class AiGenerateTests: XCTestCase {
         XCTAssertEqual(AIGenerateRoute.choose(availability: .available, hostOnline: false, mock: true), .onDevice)
     }
 
+    /// #1640: 使えないボタンは押すと理由を出す(何もせずに戻らない)。使える時は知らせを出さず実行する。
+    func testUnavailableRouteGivesTapNotice() {
+        let off = AIAvailability.unavailable(.deviceNotEligible)
+        let route = AIGenerateRoute.choose(availability: off, hostOnline: false, mock: false)
+        XCTAssertEqual(route.unavailableNotice, AIUnavailableNotice(title: AIAvailability.title, message: off.message!))
+        let long = AIGenerateRoute.choose(availability: .available, hostOnline: false, mock: false, long: true)
+        XCTAssertEqual(long.unavailableNotice?.message, AIGenerateRoute.longUnavailable, "審査用の版の long も理由を出す")
+        XCTAssertNil(AIGenerateRoute.onDevice.unavailableNotice)
+        XCTAssertNil(AIGenerateRoute.online.unavailableNotice)
+    }
+
     // MARK: 依頼
 
     func testListAndFieldsRequestsFromExample() throws {
