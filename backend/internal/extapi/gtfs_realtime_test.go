@@ -242,7 +242,7 @@ func TestGTFSUpstreamErrors(t *testing.T) {
 		}
 	}
 	fake.status.Store(200)
-	for _, body := range []pb{pb("<html>"), pb{0x0a, 0xff}} {
+	for _, body := range []pb{pb("<html>"), {0x0a, 0xff}} {
 		fake.body.Store(body)
 		if _, err := ops["busPositions"].Do(t.Context(), Input{Args: args}); Reason(err) != ReasonUpstream {
 			t.Fatalf("%q: %s %v", body, Reason(err), err)
