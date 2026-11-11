@@ -5,6 +5,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.selection.toggleable
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
@@ -12,6 +13,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
@@ -24,15 +26,19 @@ import androidx.compose.ui.unit.dp
 import jp.kz2601.metamon.R
 import jp.kz2601.metamon.dsl.AppDSL
 import jp.kz2601.metamon.services.push.NotifyConsentToggle
+import jp.kz2601.metamon.services.sharing.AppMembersStore
 import kotlinx.coroutines.launch
 
 /**
  * 設定の「他の人の行動で届く通知」(#339・iOS の `PushConsentSection`)。設定の画面(同意の PR)に置く受け口。
- * 共有・公開の記録が無いアプリ・モックの構成([host] が null)では何も出さない。
+ * 共有・公開の記録が無いアプリ・作成者(同意なしで届く)・モックの構成([host] が null)では何も出さない。
+ * 作成者かは開いた時に参加者を読み直して確かめる(分かるまでは出さない・分からなければ出す・iOS と同じ)。下の区切り線まで出す。
  */
 @Composable
-fun PushConsentSection(host: PushHost?, appId: String, dsl: AppDSL, modifier: Modifier = Modifier) {
+fun PushConsentSection(host: PushHost?, members: AppMembersStore?, appId: String, dsl: AppDSL, modifier: Modifier = Modifier) {
     if (host == null || !PushHost.canSetConsent(dsl)) return
+    val available by produceState(false, appId, dsl) { value = PushHost.canSetConsent(dsl, appId, members) }
+    if (!available) return
     var state by remember(appId) { mutableStateOf(NotifyConsentToggle.State(isOn = host.consentAllowed(appId))) }
     var busy by remember(appId) { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
@@ -66,5 +72,6 @@ fun PushConsentSection(host: PushHost?, appId: String, dsl: AppDSL, modifier: Mo
             color = if (state.failed) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant,
             modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
         )
+        HorizontalDivider(Modifier.padding(vertical = 8.dp))
     }
 }

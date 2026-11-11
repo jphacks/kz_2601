@@ -5,6 +5,7 @@ import jp.kz2601.metamon.dsl.Scope
 import jp.kz2601.metamon.services.push.NotifyConsentStore
 import jp.kz2601.metamon.services.push.NotifyConsentToggle
 import jp.kz2601.metamon.services.push.PushDeviceRegistrar
+import jp.kz2601.metamon.services.sharing.AppMembersStore
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -58,11 +59,21 @@ class PushHost(
     fun currentUid(): String? = uid()
 
     companion object {
-        /**
-         * 切り替えを出すか: 共有・公開の記録があるアプリだけ(自分だけのアプリに他の人の行動は無い)。
-         * 作成者には同意なしで届くので iOS は作成者に出さない。役割を読む口(members)が入ったら同じにする。
-         */
+        /** 共有・公開の記録があるアプリか(自分だけのアプリに他の人の行動は無い)。 */
         fun canSetConsent(dsl: AppDSL): Boolean = dsl.entities.any { it.scope == Scope.SHARED || it.scope == Scope.PUBLIC }
+
+        /**
+         * 切り替えを出すか(iOS の `canSetNotifyConsent`): 共有・公開の記録があり、作成者でない(作成者には同意なしで届く)。
+         * 役割が分からない時(参加者の口が無い・読めない)は出す。
+         */
+        fun canSetConsent(dsl: AppDSL, member: AppMembersStore.Entry?): Boolean = canSetConsent(dsl) && member?.isOwner != true
+
+        /** 参加者を読み直してから [canSetConsent] を決める(設定を開いた時)。 */
+        suspend fun canSetConsent(dsl: AppDSL, appId: String, members: AppMembersStore?): Boolean {
+            if (!canSetConsent(dsl)) return false
+            members?.reload(appId)
+            return canSetConsent(dsl, members?.get(appId))
+        }
     }
 }
 

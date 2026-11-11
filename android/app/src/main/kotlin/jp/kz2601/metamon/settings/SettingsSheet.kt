@@ -40,7 +40,7 @@ import jp.kz2601.metamon.language.AppLocales
 import jp.kz2601.metamon.language.LanguageSection
 import jp.kz2601.metamon.push.PushConsentSection
 import jp.kz2601.metamon.renderer.components.social.BlockedUsersSection
-import jp.kz2601.metamon.push.PushHost
+import jp.kz2601.metamon.services.MyUsage
 import jp.kz2601.metamon.services.RemainingToday
 import jp.kz2601.metamon.share.MembersSettingsRow
 import jp.kz2601.metamon.share.ShareSettingsRow
@@ -61,6 +61,7 @@ import java.time.format.FormatStyle
  * お問い合わせ・ライセンス・詳細(サポート用)(#898 の [SupportSection])・アカウント(ログアウト・削除・#841 の [AccountSection])。
  * @param busy 生成中(アカウント削除をさせない)
  * @param remainingToday 音声の画面が最後に読んだ「今日の残り」。[onRefreshUsage] で開いた時に読み直す
+ * @param myUsage 同じく最後に読んだ `GET /v1/me/usage`。「使っている量」はこれを使い、自分では読まない(開くたびに 2 回呼ばない)
  * @param onStopRetention 「自動で消すのをやめる」の指示文を送る(送ったらシートを閉じる)
  * @param onShowTutorial 「使い方を見る」(#900)。シートを閉じて初回のチュートリアルをもう一度出す
  * @param canUndo 「元に戻す」を押せる(#1075)
@@ -79,6 +80,7 @@ fun SettingsSheet(
     onMembers: (() -> Unit)? = null,
     remainingToday: RemainingToday? = null,
     isPro: Boolean = false,
+    myUsage: MyUsage? = null,
     onRefreshUsage: () -> Unit = {},
     onStopRetention: (String) -> Unit = {},
     onShowTutorial: () -> Unit = {},
@@ -109,7 +111,7 @@ fun SettingsSheet(
             // 今日の残り(#630)。AI を使うまでは「AI を使うと表示されます」
             RemainingTodaySection(remainingToday, isPro)
             HorizontalDivider(Modifier.padding(vertical = 8.dp))
-            UsageSection(container, isPro) // 使っている量(#317・iOS と同じく「今日の残り」の次)
+            UsageSection(container, myUsage, isPro) // 使っている量(#317・iOS と同じく「今日の残り」の次)
             HorizontalDivider(Modifier.padding(vertical = 8.dp))
             var language by remember { mutableStateOf(AppLocales.setting(context)) }
             LanguageSection(language, onSelect = { selected ->
@@ -139,11 +141,8 @@ fun SettingsSheet(
                 onReset = onReset,
             )
             HorizontalDivider(Modifier.padding(vertical = 8.dp))
-            // 他の人の行動で届く通知(#887)。共有・公開の記録があるアプリだけ
-            if (container.push != null && PushHost.canSetConsent(runtimeState.document.dsl)) {
-                PushConsentSection(container.push, runtimeState.document.appId, runtimeState.document.dsl)
-                HorizontalDivider(Modifier.padding(vertical = 8.dp))
-            }
+            // 他の人の行動で届く通知(#887)。共有・公開の記録があり、作成者でない時だけ(下の区切り線も節が出す)
+            PushConsentSection(container.push, container.membersStore, runtimeState.document.appId, runtimeState.document.dsl)
             // 記録の自動削除(#482)。今のアプリに保存期間のある記録がある時だけ
             RetentionSettingsSection(container.runtime, onStop = { text ->
                 onStopRetention(text)

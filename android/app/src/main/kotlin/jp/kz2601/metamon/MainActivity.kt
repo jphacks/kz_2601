@@ -371,6 +371,7 @@ fun MetamonApp(container: AppContainer) {
             },
             remainingToday = state.remainingToday,
             isPro = state.isPro,
+            myUsage = state.myUsage,
             onRefreshUsage = { vm.refreshUsage() },
             onStopRetention = vm::generateNow,
             onShowTutorial = {

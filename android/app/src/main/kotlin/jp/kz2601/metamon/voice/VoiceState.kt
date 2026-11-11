@@ -4,6 +4,7 @@ import jp.kz2601.metamon.dsl.AppDocument
 import jp.kz2601.metamon.dsl.isVoiceOnly
 import jp.kz2601.metamon.services.ChatMode
 import jp.kz2601.metamon.services.ChatTurn
+import jp.kz2601.metamon.services.MyUsage
 import jp.kz2601.metamon.services.RemainingToday
 import jp.kz2601.metamon.services.StreamedComponent
 import jp.kz2601.metamon.services.TranscriberFailure
@@ -94,6 +95,8 @@ data class VoiceUiState(
     /** ai の「今日の残り」(#630)。分からなければ null */
     val remainingToday: RemainingToday? = null,
     val isPro: Boolean = false,
+    /** 最後に読んだ `GET /v1/me/usage`(設定の「使っている量」もこれを読む・#317)。分からなければ null */
+    val myUsage: MyUsage? = null,
     /** 入力欄に入れる文(設定の「頼み方のコツ」で選んだ例・#1161)。入れたら [VoiceViewModel.consumeDraft] で消す */
     val draft: String? = null,
 ) {

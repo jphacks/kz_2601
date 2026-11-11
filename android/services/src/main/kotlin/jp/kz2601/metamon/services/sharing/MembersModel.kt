@@ -21,6 +21,8 @@ class AppMembersStore(private val client: MembersClient?, private val scope: Cor
         val members: List<SharedMember>,
         /** null = 分からない(読めなかった) */
         val isAdmin: Boolean?,
+        /** 自分が作成者か(応答の role)。null = 分からない */
+        val isOwner: Boolean? = null,
     )
 
     private val _entries = MutableStateFlow<Map<String, Entry>>(emptyMap())
@@ -42,11 +44,11 @@ class AppMembersStore(private val client: MembersClient?, private val scope: Cor
         } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {
-            if (SharedAccessDenial.from(e) == SharedAccessDenial.NOT_MEMBER) _entries.update { it + (appId to Entry(emptyList(), false)) }
+            if (SharedAccessDenial.from(e) == SharedAccessDenial.NOT_MEMBER) _entries.update { it + (appId to Entry(emptyList(), isAdmin = false, isOwner = false)) }
         }
     }
 
-    fun put(appId: String, list: SharedMemberList) = _entries.update { it + (appId to Entry(list.items, list.isAdmin)) }
+    fun put(appId: String, list: SharedMemberList) = _entries.update { it + (appId to Entry(list.items, list.isAdmin, list.isOwner)) }
 
     fun forget(appId: String) = _entries.update { it - appId }
 

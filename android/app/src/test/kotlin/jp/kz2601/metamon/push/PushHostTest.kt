@@ -8,6 +8,14 @@ import jp.kz2601.metamon.services.push.NotifyConsentToggle
 import jp.kz2601.metamon.services.push.PushDeviceClient
 import jp.kz2601.metamon.services.push.PushDeviceRegistrar
 import jp.kz2601.metamon.services.push.PushDeviceRegistration
+import jp.kz2601.metamon.services.sharing.AppMembersStore
+import jp.kz2601.metamon.services.sharing.MembersClient
+import jp.kz2601.metamon.services.sharing.ROLE_MEMBER
+import jp.kz2601.metamon.services.sharing.ROLE_OWNER
+import jp.kz2601.metamon.services.sharing.SharedMember
+import jp.kz2601.metamon.services.sharing.SharedMemberList
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -110,15 +118,61 @@ class PushHostTest {
 
     @Test
     fun consentIsOfferedOnlyForSharedOrPublicRecords() {
-        fun dsl(scope: String?) = DslJson.decodeFromString(
-            AppDSL.serializer(),
-            """{"schemaVersion":1,"app":{"name":"x"},"initialScreen":"home","screens":[{"id":"home","title":"h","components":[]}],
-               "entities":[{"id":"e","name":"e"${scope?.let { ",\"scope\":\"$it\"" } ?: ""},"fields":[]}]}""",
-        )
         assertFalse(PushHost.canSetConsent(dsl(null)))
         assertFalse(PushHost.canSetConsent(dsl("private")))
         assertTrue(PushHost.canSetConsent(dsl("shared")))
         assertTrue(PushHost.canSetConsent(dsl("public")))
+    }
+
+    private fun dsl(scope: String?) = DslJson.decodeFromString(
+        AppDSL.serializer(),
+        """{"schemaVersion":1,"app":{"name":"x"},"initialScreen":"home","screens":[{"id":"home","title":"h","components":[]}],
+           "entities":[{"id":"e","name":"e"${scope?.let { ",\"scope\":\"$it\"" } ?: ""},"fields":[]}]}""",
+    )
+
+    /** 参加者の口。[list] が null なら読めない(通信の失敗) */
+    private class FakeMembers(var list: SharedMemberList?) : MembersClient {
+        var calls = 0
+        override suspend fun members(appId: String): SharedMemberList {
+            calls++
+            return list ?: throw IllegalStateException("offline")
+        }
+        override suspend fun setAdmin(appId: String, uid: String, admin: Boolean) = Unit
+        override suspend fun removeMember(appId: String, uid: String) = Unit
+        override suspend fun leave(appId: String) = Unit
+    }
+
+    private suspend fun offered(list: SharedMemberList?, scope: String? = "shared"): Boolean {
+        val client = FakeMembers(list)
+        val store = AppMembersStore(client, CoroutineScope(Dispatchers.Unconfined))
+        return PushHost.canSetConsent(dsl(scope), "app-1", store)
+    }
+
+    @Test
+    fun consentIsHiddenForOwnerOnly() = runTest {
+        val owner = SharedMember(uid = "o", role = ROLE_OWNER, you = true)
+        // 作成者には同意なしで届くので出さない
+        assertFalse(offered(SharedMemberList(listOf(owner), role = ROLE_OWNER)))
+        // 管理者・参加者には出す
+        val admin = SharedMember(uid = "a", role = ROLE_MEMBER, admin = true, you = true)
+        assertTrue(offered(SharedMemberList(listOf(SharedMember(uid = "o", role = ROLE_OWNER), admin), role = ROLE_MEMBER, admin = true)))
+        val member = SharedMember(uid = "m", role = ROLE_MEMBER, you = true)
+        assertTrue(offered(SharedMemberList(listOf(SharedMember(uid = "o", role = ROLE_OWNER), member), role = ROLE_MEMBER)))
+        // 役割が読めない時は出す(iOS と同じ)
+        assertTrue(offered(null))
+        // 自分だけのアプリは作成者でなくても出さない(参加者は読まない)
+        assertFalse(offered(SharedMemberList(role = ROLE_MEMBER), scope = "private"))
+    }
+
+    @Test
+    fun consentWithoutMembersClientIsOffered() = runTest {
+        assertTrue(PushHost.canSetConsent(dsl("public"), "app-1", null))
+        assertTrue(PushHost.canSetConsent(dsl("public"), "app-1", AppMembersStore(null, CoroutineScope(Dispatchers.Unconfined))))
+        // 読んだ役割がそのまま入る
+        val store = AppMembersStore(FakeMembers(SharedMemberList(role = ROLE_OWNER)), CoroutineScope(Dispatchers.Unconfined))
+        store.reload("app-1")
+        assertEquals(true, store["app-1"]?.isOwner)
+        assertFalse(PushHost.canSetConsent(dsl("shared"), store["app-1"]))
     }
 
     @Test
