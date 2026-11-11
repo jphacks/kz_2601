@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- aiChat (#874). Sorted by name. -->
+<resources>
+    <string name="ai_chat_ai">AI</string>
+    <string name="ai_chat_creator_needs_pro">You can\'t talk to the AI right now. Please let the app\'s creator know.</string>
+    <string name="ai_chat_empty">Say something to get started</string>
+    <string name="ai_chat_error_too_long">The conversation is too long to send to the AI. Please shorten it and try again.</string>
+    <string name="ai_chat_input_note">Your own records in \"%1$s\" are also shared with the AI for reference</string>
+    <string name="ai_chat_me">You</string>
+    <string name="ai_chat_mic">Speak to type</string>
+    <string name="ai_chat_mic_busy">Speak to type is unavailable right now</string>
+    <string name="ai_chat_mic_failed">Couldn\'t catch that. Please try again.</string>
+    <string name="ai_chat_mic_prepare">Get the voice model</string>
+    <string name="ai_chat_mic_stop">Listening… tap to finish</string>
+    <string name="ai_chat_mic_transcribing">Transcribing…</string>
+    <string name="ai_chat_needs_pro">Talking to the AI requires Tailor It Pro</string>
+    <string name="ai_chat_offline">You can\'t talk to the AI in this version</string>
+    <string name="ai_chat_placeholder">Message</string>
+    <string name="ai_chat_reply_save_failed">Couldn\'t save the AI\'s reply</string>
+    <string name="ai_chat_save_failed">Couldn\'t save the conversation</string>
+    <string name="ai_chat_send">Send</string>
+    <string name="ai_chat_speak">Read aloud</string>
+    <string name="ai_chat_speak_stop">Stop</string>
+    <string name="ai_chat_suggest_add">Add</string>
+    <string name="ai_chat_suggest_failed">Couldn\'t save the record</string>
+    <string name="ai_chat_suggest_fix">Edit</string>
+    <string name="ai_chat_suggest_full">No more records can be added</string>
+    <string name="ai_chat_suggest_saved">Saved</string>
+    <string name="ai_chat_suggest_title">Save this as a record?</string>
+    <string name="ai_chat_thinking">The AI is thinking…</string>
+</resources>

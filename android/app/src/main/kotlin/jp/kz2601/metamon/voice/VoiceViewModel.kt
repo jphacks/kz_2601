@@ -48,6 +48,10 @@ class VoiceViewModel(
     private val log: (String) -> Unit = {},
     /** サーバーの版の履歴(undo / redo)。null = 端末の履歴だけ(モック) */
     private val versions: AppVersions? = null,
+    /**
+     * AI に送る直前の同意の確認(#888)。未同意なら同意の画面を出して false。同意して閉じたら resume で続けて送る。
+     */
+    private val requireConsent: (resume: () -> Unit) -> Boolean = { true },
     scope: CoroutineScope? = null,
 ) : ViewModel() {
     private val scope: CoroutineScope = scope ?: viewModelScope
@@ -156,6 +160,7 @@ class VoiceViewModel(
         val t = text.trim()
         val s = _state.value
         if (t.isEmpty() || s.isGenerating || s.chatPending) return
+        if (!requireConsent { submit(t, source) }) return
         if (clarifyEnabled && (s.isInitial || s.isChatting)) say(t, source) else generate(t)
     }
 
@@ -232,6 +237,7 @@ class VoiceViewModel(
 
     private fun generate(text: String) {
         if (generateJob?.isActive == true) return
+        if (!requireConsent { generate(text) }) return
         cancelAutoBuild()
         val before = _state.value.document
         retryAction = { generate(text) }
@@ -404,6 +410,7 @@ class VoiceViewModel(
     fun buildNow() {
         val s = _state.value
         if (!s.isChatting || s.chatPending || s.isGenerating) return
+        if (!requireConsent { buildNow() }) return
         if (s.chatTurn?.kind == ChatTurn.Kind.READY) {
             buildFromChat()
             return

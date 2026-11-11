@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="media_cancel">Cancel</string>
+    <string name="media_camera_denied_body">Camera access isn\'t allowed. You can choose from your photos instead.</string>
+    <string name="media_camera_denied_title">Camera unavailable</string>
+    <string name="media_delete">Delete</string>
+    <string name="media_delete_named">Delete %1$s</string>
+    <string name="media_drawing_a11y_has">%1$s (has a drawing)</string>
+    <string name="media_drawing_canvas">Drawing canvas</string>
+    <string name="media_drawing_clear">Clear all</string>
+    <string name="media_drawing_clear_body">Erases all strokes and the earlier drawing</string>
+    <string name="media_drawing_clear_title">Clear everything?</string>
+    <string name="media_drawing_discard">Close without saving</string>
+    <string name="media_drawing_discard_title">Close without saving your drawing?</string>
+    <string name="media_drawing_done">Done</string>
+    <string name="media_drawing_eraser">Eraser</string>
+    <string name="media_drawing_hint">Opens the drawing screen. Draw with your finger.</string>
+    <string name="media_drawing_more">Draw more</string>
+    <string name="media_drawing_pen">Pen</string>
+    <string name="media_drawing_redo">Redo</string>
+    <string name="media_drawing_tap">Tap to draw</string>
+    <string name="media_drawing_title">Drawing</string>
+    <string name="media_drawing_undo">Undo</string>
+    <string name="media_photo">Photo</string>
+    <string name="media_photo_attached">%1$s (attached)</string>
+    <string name="media_photo_hint_camera">Opens the camera</string>
+    <string name="media_photo_hint_choose">Choose the camera or the photo library</string>
+    <string name="media_photo_hint_library">Opens the photo library</string>
+    <string name="media_photo_pick">Choose from Library</string>
+    <string name="media_photo_read_again">Read again</string>
+    <string name="media_photo_read_done">Read by on-device AI. Check the values and save.</string>
+    <string name="media_photo_read_missed">Couldn\'t read: %1$s</string>
+    <string name="media_photo_reading">Reading with AI…</string>
+    <string name="media_photo_retake">Retake</string>
+    <string name="media_photo_take">Take Photo</string>
+    <string name="media_photo_take_or_pick">Take or choose a photo</string>
+    <string name="media_photo_unreadable">This photo can\'t be read</string>
+</resources>

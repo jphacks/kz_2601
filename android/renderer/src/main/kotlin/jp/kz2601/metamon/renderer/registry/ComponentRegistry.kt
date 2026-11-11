@@ -30,9 +30,15 @@ import jp.kz2601.metamon.renderer.components.TextLeaf
 import jp.kz2601.metamon.renderer.components.VStackContainer
 import jp.kz2601.metamon.renderer.components.VoiceInputLeaf
 import jp.kz2601.metamon.renderer.components.actions.registerActionLeaves
+import jp.kz2601.metamon.renderer.components.ai.registerAiChatLeaves
+import jp.kz2601.metamon.renderer.components.ai.registerAiLeaves
+import jp.kz2601.metamon.renderer.components.audio.registerAudioLeaves
+import jp.kz2601.metamon.renderer.components.importing.registerImportLeaves
 import jp.kz2601.metamon.renderer.components.inputs.registerInputLeaves
 import jp.kz2601.metamon.renderer.components.lists.registerListLeaves
 import jp.kz2601.metamon.renderer.components.play.registerPlayLeaves
+import jp.kz2601.metamon.renderer.components.media.registerMediaLeaves
+import jp.kz2601.metamon.renderer.components.scan.registerScanLeaves
 import jp.kz2601.metamon.renderer.form.FormDraft
 import jp.kz2601.metamon.renderer.navigation.Route
 
@@ -92,11 +98,16 @@ class ComponentRegistry private constructor(private val builders: Map<String, Co
             register(ComponentType.DISCLOSURE) { c, ctx, m -> DisclosureContainer(c, ctx, m) }
             register(ComponentType.CAROUSEL) { c, ctx, m -> CarouselContainer(c, ctx, m) }
             register(ComponentType.GRID) { c, ctx, m -> GridContainer(c, ctx, m) }
+            registerAudioLeaves() // leaf: 音(3・#864)・components/audio/AudioLeaves.kt
             // input(12)・登録は components/inputs/InputLeaves.kt
             registerInputLeaves()
             // leaf: 一覧・集計・グラフ(10・#859)・登録は components/lists/ListLeaves.kt
             registerListLeaves()
             registerPlayLeaves() // leaf: 計算・遊び(5・#860)・components/play/PlayLeaves.kt
+            // 写真・手書き(#862)・登録は components/media/MediaLeaves.kt
+            registerMediaLeaves()
+            registerScanLeaves() // leaf: カメラで読む(#866)・components/scan/ScanLeaves.kt
+            registerImportLeaves() // leaf: ファイルの取り込み(#865)・components/importing/ImportLeaves.kt
             // leaf: 表示(11・#857)
             register(ComponentType.TEXT) { c, _, m -> TextLeaf(c, m) }
             register(ComponentType.LABEL) { c, _, m -> LabelLeaf(c, m) }
@@ -109,6 +120,9 @@ class ComponentRegistry private constructor(private val builders: Map<String, Co
             register(ComponentType.SPACER) { c, _, m -> SpacerLeaf(c, m) }
             register(ComponentType.LINK) { c, _, m -> LinkLeaf(c, m) }
             register(ComponentType.EMPTY_STATE) { c, _, m -> EmptyStateLeaf(c, m) }
+            // leaf: AI・登録は components/ai/AiLeaves.kt
+            registerAiLeaves()
+            registerAiChatLeaves() // AI と話す(#874)・components/ai/AiChatLeaves.kt
             // leaf: その他
             registerActionLeaves() // 外へ出る 4 種(#861)・components/actions/ActionLeaves.kt
             register(ComponentType.BUTTON) { c, ctx, m -> ButtonLeaf(c, ctx, m) }

@@ -2,6 +2,9 @@ package jp.kz2601.metamon.services
 
 import jp.kz2601.metamon.dsl.AppDocument
 import jp.kz2601.metamon.dsl.LenientEnumSerializer
+import jp.kz2601.metamon.dsl.ai.AiTextError
+import jp.kz2601.metamon.dsl.ai.AiTextRequest
+import jp.kz2601.metamon.dsl.ai.AiTextResult
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.JsonObject
 
@@ -40,6 +43,12 @@ interface AIClient {
 
     /** `DELETE /v1/chat/{appId}`。失敗は握りつぶす(サーバー側は 30 分で消える)。 */
     suspend fun resetChat(appId: String)
+
+    /**
+     * `POST /v1/text`(#417): aiButton のオンライン版。端末内 AI が使えない時だけ呼ぶ。
+     * 失敗は [AiTextError](402 pro_required → NeedsPro / CreatorNeedsPro など)。持たない実装は Unsupported。
+     */
+    suspend fun text(request: AiTextRequest): AiTextResult = throw AiTextError.Unsupported
 }
 
 /** generate の `mode`。iOS は auto だけを使う(「元に戻して」などはサーバーがキーワードで判定)。 */

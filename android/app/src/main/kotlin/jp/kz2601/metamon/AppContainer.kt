@@ -4,22 +4,39 @@ import android.content.Context
 import android.util.Log
 import jp.kz2601.metamon.dsl.AppDSL
 import jp.kz2601.metamon.dsl.AppDocument
+import jp.kz2601.metamon.consent.record
+import jp.kz2601.metamon.runtime.AiTextAccess
 import jp.kz2601.metamon.runtime.AndroidRuntimeHost
+import jp.kz2601.metamon.runtime.AppAiHost
 import jp.kz2601.metamon.runtime.AppDirectory
 import jp.kz2601.metamon.runtime.AppRuntime
 import jp.kz2601.metamon.runtime.RuntimeHost
+import jp.kz2601.metamon.runtime.TranscriberDictationHost
 import jp.kz2601.metamon.dsl.decode
 import jp.kz2601.metamon.dsl.fallback
 import jp.kz2601.metamon.dsl.screen
 import jp.kz2601.metamon.language.AppLocales
+import jp.kz2601.metamon.notifications.LocalNotifications
+import jp.kz2601.metamon.push.FcmTokens
+import jp.kz2601.metamon.push.PushHost
 import jp.kz2601.metamon.services.AIClient
 import jp.kz2601.metamon.services.AppConfigClient
 import jp.kz2601.metamon.services.AppEnvironment
 import jp.kz2601.metamon.auth.AuthSession
+import jp.kz2601.metamon.consent.ConsentPrompt
 import jp.kz2601.metamon.services.AuthService
 import jp.kz2601.metamon.services.CrashReporter
 import jp.kz2601.metamon.services.NoopCrashReporter
 import jp.kz2601.metamon.services.SpeechTranscriber
+import jp.kz2601.metamon.services.consent.AiButtonMetricsRecorder
+import jp.kz2601.metamon.services.consent.AiButtonMetricsSender
+import jp.kz2601.metamon.services.consent.AiConsentStore
+import jp.kz2601.metamon.services.consent.ConsentGatedAiClient
+import jp.kz2601.metamon.services.consent.CrashReportingPreference
+import jp.kz2601.metamon.services.consent.HttpAiButtonMetricsSender
+import jp.kz2601.metamon.services.consent.InMemoryKeyValueStore
+import jp.kz2601.metamon.services.consent.KeyValueStore
+import jp.kz2601.metamon.services.consent.SharedPreferencesKeyValueStore
 import jp.kz2601.metamon.services.http.AuthTokenProvider
 import jp.kz2601.metamon.services.http.ClientInfo
 import jp.kz2601.metamon.services.http.DeviceContext
@@ -30,6 +47,7 @@ import jp.kz2601.metamon.services.live.FirebaseBootstrap
 import jp.kz2601.metamon.services.live.FirebaseCrashReporter
 import jp.kz2601.metamon.services.live.HttpAIClient
 import jp.kz2601.metamon.services.live.HttpAppConfigClient
+import jp.kz2601.metamon.services.live.HttpPushDeviceClient
 import jp.kz2601.metamon.services.local.AndroidConnectivity
 import jp.kz2601.metamon.services.local.AppListCache
 import jp.kz2601.metamon.services.local.CurrentAppStore
@@ -42,6 +60,10 @@ import jp.kz2601.metamon.services.mock.MockAuthService
 import jp.kz2601.metamon.services.mock.MockSeed
 import jp.kz2601.metamon.services.mock.MockTranscriber
 import jp.kz2601.metamon.services.mock.OfflineSimulatingAppConfigClient
+import jp.kz2601.metamon.services.push.NotifyConsentStore
+import jp.kz2601.metamon.services.push.NotifyConsentToggle
+import jp.kz2601.metamon.services.push.PushDeviceRegistrar
+import jp.kz2601.metamon.services.push.SharedPreferencesPushPrefs
 import jp.kz2601.metamon.services.speech.AndroidSpeechTranscriber
 import jp.kz2601.metamon.services.sync.HotReload
 import jp.kz2601.metamon.services.sync.RealtimeDocumentSync
@@ -60,8 +82,16 @@ import java.time.Instant
 class AppContainer(
     val environment: AppEnvironment,
     val auth: AuthService,
-    /** クラッシュ報告(Firebase が無ければ何もしない) */
+    /** クラッシュ報告(Firebase が無ければ何もしない)。オン / オフは [crashReporting] を通す */
     val crashReporter: CrashReporter,
+    /** AI へのデータ送信の同意(#888)。[ai] はこれで包んである */
+    val consent: AiConsentStore,
+    /** 設定の「クラッシュ報告を送る」(#888) */
+    val crashReporting: CrashReportingPreference,
+    /** aiButton の端末内 AI の集計(#888)。設定の「AI ボタンの利用状況を送る」 */
+    val aiButtonMetrics: AiButtonMetricsRecorder,
+    /** 集計の送り先(`POST /v1/metrics/ai-button`)。モックは null(送らない) */
+    val aiButtonMetricsSender: AiButtonMetricsSender?,
     val initialDsl: AppDSL,
     val appConfig: AppConfigClient,
     val ai: AIClient,
@@ -79,12 +109,22 @@ class AppContainer(
     /** 他端末・共有の相手の変更(SSE + ポーリングの予備・#883)。モックは null */
     val hotReload: HotReload?,
     private val host: RuntimeHost,
+    /** 他の人の行動で届く通知(#887)。モック・Firebase の無い構成では null(何もしない) */
+    val push: PushHost? = null,
 ) {
     /** 画面の下に出す接続先の名前(モックなら "mock")。 */
     val environmentLabel: String get() = if (knobs.mock) "mock" else environment.name
 
     /** サインイン状態(未サインインならサインイン画面) */
-    val session = AuthSession(auth)
+    val session = AuthSession(auth, beforeSignOut = { push?.unregister() })
+
+    /** 同意の画面を出す時点(起動時・AI に送る直前・設定から・#888) */
+    val consentPrompt = ConsentPrompt(consent)
+
+    /** 前の日までの aiButton の集計を送る(起動・前面に戻った時。送るのは 1 日 1 回) */
+    suspend fun flushAiButtonMetrics() {
+        aiButtonMetricsSender?.let { aiButtonMetrics.flush(it) }
+    }
 
     companion object {
         /**
@@ -116,13 +156,20 @@ class AppContainer(
             )
             val delayMillis = knobs.mockAiDelaySeconds?.let { (it * 1000).toLong() } ?: 1_200
             val records = offlineIfRequested(appConfig, knobs)
+            // モックは端末に残さない・同意済みで始める(設定から取り消して同意の画面を試せる)
+            val prefs: KeyValueStore = InMemoryKeyValueStore()
+            val consent = AiConsentStore(prefs).apply { grant() }
             return AppContainer(
                 environment = environment,
                 auth = MockAuthService(signedIn = true),
                 crashReporter = NoopCrashReporter,
+                consent = consent,
+                crashReporting = CrashReportingPreference(prefs),
+                aiButtonMetrics = AiButtonMetricsRecorder(prefs),
+                aiButtonMetricsSender = null,
                 initialDsl = initialDsl,
                 appConfig = records,
-                ai = MockAIClient(samples, delayMillis = delayMillis),
+                ai = ConsentGatedAiClient(MockAIClient(samples, delayMillis = delayMillis)) { consent.isGranted },
                 transcriber = MockTranscriber(),
                 // 本物のアプリ・記録と混ざらないよう、モックは別の置き場
                 appId = DeviceAppId.store(context, "metamon-app-mock", migrateLegacy = false),
@@ -155,14 +202,23 @@ class AppContainer(
             val appConfigHttp = http(environment.appConfigBaseUrl)
             val appConfig = offlineIfRequested(HttpAppConfigClient(appConfigHttp, cache = documentCache), knobs)
             val sync = RealtimeDocumentSync(appConfig.asDocumentFetcher(), SseChangeEventSource(appConfigHttp), log = log)
+            // 同意・クラッシュ報告・AI ボタンの集計の置き場(iOS の UserDefaults の鍵と同じ名前・#888)
+            val prefs = SharedPreferencesKeyValueStore.of(context, PRIVACY_PREFS)
+            val consent = AiConsentStore(prefs)
+            val push = if (firebase) push(context, appConfigHttp, auth, log) else null
 
             return AppContainer(
                 environment = environment,
                 auth = auth,
                 crashReporter = (if (firebase) FirebaseCrashReporter.createIfConfigured() else null) ?: NoopCrashReporter,
+                consent = consent,
+                crashReporting = CrashReportingPreference(prefs),
+                aiButtonMetrics = AiButtonMetricsRecorder(prefs),
+                aiButtonMetricsSender = HttpAiButtonMetricsSender(appConfigHttp),
                 initialDsl = initialDsl,
                 appConfig = appConfig,
-                ai = HttpAIClient(http(environment.aiBaseUrl), log = log),
+                // 同意が無ければ一切送らない(最後の砦。画面側でも送る前に止めて同意の画面を出す)
+                ai = ConsentGatedAiClient(HttpAIClient(http(environment.aiBaseUrl), log = log)) { consent.isGranted },
                 // 声は端末内だけで文字にする(#354 §3)。端末内が無い端末は文字入力に落とす
                 transcriber = AndroidSpeechTranscriber(context, language = language, log = { Log.i(TAG, it) }),
                 appId = DeviceAppId.store(context, "metamon-app"),
@@ -172,8 +228,34 @@ class AppContainer(
                 documentCache = documentCache,
                 hotReload = HotReload(sync, CoroutineScope(SupervisorJob() + Dispatchers.Default)),
                 host = AndroidRuntimeHost(context.applicationContext),
+                push = push,
             )
         }
+
+        private fun push(context: Context, http: MetamonHttp, auth: AuthService, log: (String) -> Unit): PushHost {
+            val notifications = LocalNotifications.get(context)
+            // FCM が裏で出す通知もこのチャンネルに入るので先に作る
+            notifications.ensureChannels()
+            val client = HttpPushDeviceClient(http)
+            val prefs = SharedPreferencesPushPrefs(FcmTokens.prefs(context))
+            val consentStore = NotifyConsentStore(prefs)
+            return PushHost(
+                registrar = PushDeviceRegistrar(client, prefs, appVersion = BuildConfig.VERSION_NAME, os = FcmTokens.osName(), log = log),
+                consentStore = consentStore,
+                consent = NotifyConsentToggle(client, consentStore, log = log),
+                uid = { auth.currentUser.value?.uid },
+                canPost = notifications::canPost,
+                fetchToken = FcmTokens::current,
+                registerDevices = PUSH_DEVICE_REGISTRATION,
+                log = log,
+            )
+        }
+
+        /**
+         * FCM のトークンを backend に送るか。今の `PUT /v1/me/devices` は APNs の 16 進のトークンだけを受ける(platform も無い)ので、
+         * backend が android を受けるまで(#918)は送らない。同意(notify-consent)と登録の削除はこれと関係なく動く。
+         */
+        const val PUSH_DEVICE_REGISTRATION = false
 
         private fun recordSync(context: Context, client: AppConfigClient, dir: String) = RecordSyncEngine.create(
             client = client,
@@ -217,6 +299,9 @@ class AppContainer(
         }
 
         const val TAG = "Metamon"
+
+        /** 同意・クラッシュ報告・AI ボタンの集計(#888) */
+        private const val PRIVACY_PREFS = "metamon-privacy"
     }
 
     /** アプリ全体のランタイム(#889)。起動時に 1 つだけ作る。 */
@@ -237,6 +322,23 @@ class AppContainer(
                 cache = appList,
                 fresh = { id -> AppDocument(appId = id, dsl = initialDsl) },
             ),
+            aiHost = aiHost,
+        ).also { it.dictation = TranscriberDictationHost(transcriber, CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)) }
+    }
+
+    /**
+     * aiButton のホスト(#873)。端末内 AI(Gemini Nano)はまだ入れていないので、いつもオンライン版に回る。
+     * 同意は [consent] を読み、未同意なら同意の画面を出す(#888)。モックは課金の制限なし。
+     */
+    private val aiHost: AppAiHost by lazy {
+        AppAiHost(
+            ai = ai,
+            appId = { runtime.document.appId },
+            access = { AiTextAccess(consentGranted = consent.isGranted, isPro = false, enforced = !knobs.mock) },
+            sharedApp = { runtime.entityModels.any { it.isShared } },
+            isMock = knobs.mock,
+            metrics = aiButtonMetrics::record,
+            onNeedsConsent = { consentPrompt.require() },
         )
     }
 }

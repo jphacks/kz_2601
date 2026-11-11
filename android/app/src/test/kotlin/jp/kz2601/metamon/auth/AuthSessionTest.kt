@@ -32,6 +32,22 @@ class AuthSessionTest {
     }
 
     @Test
+    fun signOutUnregistersPushFirstEvenIfItFails() = runTest {
+        val auth = MockAuthService(signedIn = true)
+        val calls = mutableListOf<String?>()
+        val session = AuthSession(auth, beforeSignOut = {
+            calls += auth.currentUser.value?.uid
+            error("network down")
+        })
+
+        session.signOut()
+
+        // 登録を消す時はまだサインイン中(uid がある)。消せなくてもサインアウトする
+        assertEquals(listOf(MockAuthService.FIXED_UID), calls)
+        assertEquals(RootScreen.SignIn, RootScreen.of(session.user.value))
+    }
+
+    @Test
     fun googleIdTokenIsPassedToAuthService() = runTest {
         val auth = FakeAuth()
         val session = AuthSession(auth)

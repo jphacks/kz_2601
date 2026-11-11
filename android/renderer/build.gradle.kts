@@ -29,9 +29,12 @@ dependencies {
     api(libs.compose.ui)
     api(libs.compose.material3)
     implementation(libs.androidx.activity.compose)
+    // photoField のカメラの保存先(FileProvider)
+    implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.browser)
     implementation(libs.compose.material.icons.core)
     implementation(libs.compose.ui.tooling.preview)
+    implementation(libs.play.services.code.scanner)
     implementation(libs.zxing.core)
     debugImplementation(libs.compose.ui.tooling)
 

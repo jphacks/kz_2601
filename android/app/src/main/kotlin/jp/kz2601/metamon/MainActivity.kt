@@ -1,6 +1,7 @@
 package jp.kz2601.metamon
 
 import android.content.Context
+import android.content.Intent
 import android.os.Bundle
 import android.util.Log
 import androidx.activity.ComponentActivity
@@ -30,22 +31,31 @@ import androidx.compose.material3.TextButton
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.viewmodel.compose.viewModel
 import jp.kz2601.metamon.dsl.AppDSL
 import jp.kz2601.metamon.dsl.AppDocument
+import jp.kz2601.metamon.consent.AiConsentDialog
 import jp.kz2601.metamon.feedback.FeedbackHost
 import jp.kz2601.metamon.feedback.UndoHeaderButtons
 import jp.kz2601.metamon.language.AppLocales
+import jp.kz2601.metamon.notifications.LocalNotifications
+import jp.kz2601.metamon.push.PushOpen
+import jp.kz2601.metamon.services.push.PushMessage
+import jp.kz2601.metamon.permissions.MicrophoneAccessProvider
 import jp.kz2601.metamon.permissions.PermissionOffBarHost
 import jp.kz2601.metamon.auth.RootScreen
 import jp.kz2601.metamon.auth.SignInScreen
+import jp.kz2601.metamon.permissions.ProvideRendererPermissions
 import jp.kz2601.metamon.renderer.DSLView
 import jp.kz2601.metamon.renderer.theme.MetamonRenderTheme
 import jp.kz2601.metamon.renderer.theme.ReadableWidth
 import jp.kz2601.metamon.runtime.AppRuntime
+import jp.kz2601.metamon.runtime.TranscriberDictationHost
 import jp.kz2601.metamon.services.GenerateProgress
 import jp.kz2601.metamon.voice.AppConfigVersions
 import jp.kz2601.metamon.voice.GeneratingView
@@ -55,6 +65,7 @@ import jp.kz2601.metamon.voice.VoiceRoute
 import jp.kz2601.metamon.voice.VoiceUiState
 import jp.kz2601.metamon.voice.VoiceViewModel
 import jp.kz2601.metamon.services.AppSummary
+import jp.kz2601.metamon.settings.SettingsSheet
 import jp.kz2601.metamon.switcher.AppSwitcherDialog
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -70,11 +81,29 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
         val container = (application as MetamonApplication).container(DebugLaunch.knobs(intent))
+        if (savedInstanceState == null) offerPushOpen(intent)
         setContent {
             MetamonRenderTheme {
-                MetamonRoot(container)
+                MicrophoneAccessProvider { MetamonRoot(container) }
             }
         }
+    }
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        offerPushOpen(intent)
+    }
+
+    // 前面へ戻った時に端末の登録を確かめる(通知の許可の画面から戻った時もここ・#887)
+    override fun onResume() {
+        super.onResume()
+        val push = (application as MetamonApplication).builtContainer?.push ?: return
+        lifecycleScope.launch { push.refresh() }
+    }
+
+    /** 通知のタップ(自分で出した通知も、FCM が裏で出した通知も extra の `appId`)。 */
+    private fun offerPushOpen(intent: Intent?) {
+        PushOpen.offer(PushMessage.appId(intent?.getStringExtra(LocalNotifications.EXTRA_APP_ID)))
     }
 }
 
@@ -110,6 +139,8 @@ fun MetamonApp(container: AppContainer) {
             log = { if (BuildConfig.DEBUG) Log.i(AppContainer.TAG, it) },
             // モックはサーバーの版の履歴が無いので端末の履歴だけで戻す
             versions = if (container.knobs.mock) null else AppConfigVersions(container.appConfig),
+            // 未同意なら送らずに同意の画面を出す。同意して閉じたら、止めた 1 件を続けて送る(#888)
+            requireConsent = container.consentPrompt::require,
         )
     }
     val state by vm.state.collectAsStateWithLifecycle()
@@ -117,6 +148,11 @@ fun MetamonApp(container: AppContainer) {
     val runtimeState by runtime.state.collectAsStateWithLifecycle()
 
     LaunchedEffect(runtime) { runtime.bootstrap() }
+    // 初回起動・説明の版が上がった時に 1 回だけ同意の画面を出す(iOS の ConsentHost・#888)
+    LaunchedEffect(Unit) {
+        delay(CONSENT_PROMPT_DELAY_MILLIS)
+        container.consentPrompt.showOnLaunchIfNeeded()
+    }
     // 部品のマイク(onVoiceInput)は音声のシートを開く
     LaunchedEffect(runtimeState.showVoiceSheet) {
         if (runtimeState.showVoiceSheet) {
@@ -126,8 +162,19 @@ fun MetamonApp(container: AppContainer) {
     }
     // 生成の結果をランタイムに渡す(別の appId なら新しいアプリとして開いて保存し、記録を読む)
     LaunchedEffect(state.document) { runtime.adoptGenerated(state.document) }
+    // マイク FAB の音声入力が出ている間は transcribeField の録音を捨てる(#864)
+    LaunchedEffect(state.voiceOpen) { (runtime.dictation as? TranscriberDictationHost)?.setVoiceInputActive(state.voiceOpen) }
     // ランタイムが開いたアプリ(起動時の開き直し・切り替え・ホットリロード)を音声の画面にも映す
     LaunchedEffect(runtimeState.document) { vm.adopt(runtimeState.document) }
+
+    // サインイン(uid の変化)で端末の登録を確かめる(#887)
+    LaunchedEffect(user?.uid) { container.push?.refresh() }
+    // 通知のタップで該当アプリを開く
+    val pushOpen by PushOpen.pending.collectAsStateWithLifecycle()
+    LaunchedEffect(pushOpen) {
+        val appId = PushOpen.consume() ?: return@LaunchedEffect
+        container.push?.open(appId) { openFromNotification(runtime, it) }
+    }
 
     // ヘッドレス E2E 用のつまみ(debug だけ値が入る)。回転などで作り直しても 1 回だけ
     var knobsRan by rememberSaveable { mutableStateOf(false) }
@@ -150,6 +197,7 @@ fun MetamonApp(container: AppContainer) {
     }
 
     var switcherOpen by remember { mutableStateOf(false) }
+    var settingsOpen by rememberSaveable { mutableStateOf(false) }
     val apps by runtime.apps.collectAsStateWithLifecycle()
     val scope = rememberCoroutineScope()
 
@@ -161,6 +209,9 @@ fun MetamonApp(container: AppContainer) {
                     switcherOpen = true
                     scope.launch { runtime.appsList() }
                 }) { Text(stringResource(R.string.switcher_open)) }
+                TextButton(onClick = { settingsOpen = true }, modifier = Modifier.testTag("settings.open")) {
+                    Text(stringResource(R.string.settings_title))
+                }
                 if (!container.environment.isProduction || container.knobs.mock) {
                     Text(
                         "${container.environmentLabel} / auth=${container.auth.kind} / uid=${user?.uid ?: "-"}",
@@ -193,6 +244,18 @@ fun MetamonApp(container: AppContainer) {
         }
     }
 
+    if (settingsOpen) SettingsSheet(container, onDismiss = { settingsOpen = false })
+    // 設定のシートより後に置く(設定から出した時に上に重ねる)
+    val consentVisible by container.consentPrompt.visible.collectAsStateWithLifecycle()
+    if (consentVisible) {
+        val consentState by container.consent.state.collectAsStateWithLifecycle()
+        AiConsentDialog(
+            needsReconsent = consentState.needsReconsent,
+            onAgree = container.consentPrompt::agree,
+            onLater = container.consentPrompt::later,
+        )
+    }
+
     if (switcherOpen) {
         AppSwitcherDialog(
             apps = AppSummary.visible(apps, current = runtimeState.document.appId),
@@ -222,8 +285,18 @@ private fun GeneratedApp(state: VoiceUiState, dsl: AppDSL, runtime: AppRuntime, 
     Column(Modifier.fillMaxSize()) {
         // 部品が使う権限が断られていたら上に「オフ」のバー(#890・iOS の NotificationsOffBar)。要約は FeedbackHost が出す(#895)
         PermissionOffBarHost(dsl, appId, busy = state.isGenerating, summaryShowing = state.summary != null)
-        DSLView(dsl, runtime)
+        // カメラなど部品が使う権限は使う直前にアプリの窓口で聞く(#862)
+        ProvideRendererPermissions { DSLView(dsl, runtime) }
     }
+}
+
+/**
+ * 通知を押した時に appId のアプリを開く(#887)。今開いているアプリなら何もしない。
+ * 別のアプリは [AppRuntime.switchApp](#1069)で開く。読めなければ今のアプリのまま(切り替え側がトーストを出す)。
+ */
+private suspend fun openFromNotification(runtime: AppRuntime, appId: String) {
+    if (runtime.document.appId == appId) return
+    if (!runtime.switchApp(appId)) Log.i(AppContainer.TAG, "push: could not open the app from the notification")
 }
 
 /** 生成の途中経過を 1 行にする。今の画面の途中経過は [GeneratingView] が出す(文言の置き場として残す)。 */
@@ -235,3 +308,6 @@ internal fun progressText(p: GenerateProgress): String = when (p) {
 }
 
 private const val AUTO_NAV_START_MILLIS = 3_000L
+
+/** 起動の画面が落ち着いてから同意の画面を出す(iOS の ConsentHost と同じ 0.5 秒) */
+private const val CONSENT_PROMPT_DELAY_MILLIS = 500L

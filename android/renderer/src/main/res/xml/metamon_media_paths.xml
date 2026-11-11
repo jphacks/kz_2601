@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- カメラで撮った写真の一時置き場(値にしたら消す)。cache の下だけを渡す -->
+<paths>
+    <cache-path name="metamon_photos" path="metamon_photos/" />
+</paths>

@@ -36,7 +36,7 @@ object InputNodes {
 
     /** 入力部品の props(DSL に書いた値 + 束縛中の値)。入力でなければ空。 */
     fun props(c: Component, form: FormDraft?, runtime: DSLRuntime): Map<String, JsonElement> {
-        if (c.type !in InputRules.inputTypes || form == null) return emptyMap()
+        if (c.type !in InputRules.formBound || form == null) return emptyMap()
         val fid = c.field ?: return emptyMap()
         val p = LinkedHashMap(declared(c))
         val value = (form.values[fid] ?: JSONValue.Null).toJsonElement()

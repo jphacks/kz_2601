@@ -21,6 +21,8 @@ class MetamonApplication : Application() {
         ProcessLifecycleOwner.get().lifecycle.addObserver(object : DefaultLifecycleObserver {
             override fun onStart(owner: LifecycleOwner) {
                 built?.runtime?.setForeground(true)
+                // 前の日までの aiButton の集計(#888)。送るのは前の日の分だけなので 1 日 1 回
+                built?.let { scope.launch { it.flushAiButtonMetrics() } }
             }
 
             override fun onStop(owner: LifecycleOwner) {
@@ -28,6 +30,8 @@ class MetamonApplication : Application() {
             }
         })
     }
+    /** 組み立て済みの時だけ(FCM の受け口など、画面より先に起きる所から使う)。 */
+    val builtContainer: AppContainer? get() = built
 
     /**
      * 最初の画面の起動時に 1 回だけ組み立てる(DEBUG のつまみは起動の intent で来るため・#844)。
@@ -38,7 +42,9 @@ class MetamonApplication : Application() {
         built ?: AppContainer.make(this, knobs).also {
             built = it
             it.recordSync.start()
-            // クラッシュ報告に付けるのは uid だけ(サインアウトで外す)
-            scope.launch { it.auth.currentUser.collect { user -> it.crashReporter.setUserId(user?.uid) } }
+            // クラッシュ報告のオン / オフ(設定・#888)を送り先に反映する。付けるのは uid だけ(サインアウト・オフで外す)
+            it.crashReporting.activate(it.crashReporter)
+            scope.launch { it.auth.currentUser.collect { user -> it.crashReporting.updateUser(user?.uid) } }
+            scope.launch { it.flushAiButtonMetrics() }
         }
 }

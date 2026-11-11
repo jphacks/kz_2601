@@ -103,6 +103,7 @@ dependencies {
     implementation(libs.androidx.credentials)
     implementation(libs.androidx.credentials.play.services.auth)
     implementation(libs.googleid)
+    implementation(libs.firebase.messaging)
 
     testImplementation(libs.junit)
     testImplementation(libs.kotlinx.coroutines.test)

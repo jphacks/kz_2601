@@ -24,8 +24,11 @@ fun interface GoogleIdTokenSource {
     suspend fun idToken(): String
 }
 
-/** サインイン状態と操作(iOS の `AuthSession`)。画面は [user] で [RootScreen] を決める。 */
-class AuthSession(val service: AuthService) {
+/**
+ * サインイン状態と操作(iOS の `AuthSession`)。画面は [user] で [RootScreen] を決める。
+ * [beforeSignOut] はサインアウトの前に呼ぶ(通知の端末の登録を消す・#887)。失敗してもサインアウトは続ける。
+ */
+class AuthSession(val service: AuthService, private val beforeSignOut: suspend () -> Unit = {}) {
     val user: StateFlow<AuthUser?> = service.currentUser
 
     private val busy = MutableStateFlow(false)
@@ -41,6 +44,13 @@ class AuthSession(val service: AuthService) {
     suspend fun signInWithApple(activity: Activity) = perform { service.signInWithApple(activity) }
 
     suspend fun signOut() {
+        try {
+            beforeSignOut()
+        } catch (e: CancellationException) {
+            throw e
+        } catch (_: Exception) {
+            // 登録が消せなくてもサインアウトはする(次のサインインで登録し直す)
+        }
         runCatching { service.signOut() }.onFailure { error.value = it.message }
     }
 

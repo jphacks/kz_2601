@@ -13,10 +13,13 @@ import jp.kz2601.metamon.dsl.records.Record
 import jp.kz2601.metamon.dsl.records.RecordPermission
 import jp.kz2601.metamon.renderer.ActionContext
 import jp.kz2601.metamon.renderer.DSLRuntime
+import jp.kz2601.metamon.renderer.components.audio.DictationHost
 import jp.kz2601.metamon.dsl.logic.ExternalUrlPolicy
 import jp.kz2601.metamon.renderer.NavigationHost
 import jp.kz2601.metamon.renderer.components.play.RecordWriter
 import jp.kz2601.metamon.renderer.components.play.TimerHost
+import jp.kz2601.metamon.renderer.components.ai.AiChatPairSaving
+import jp.kz2601.metamon.renderer.components.ai.AiHost
 import jp.kz2601.metamon.renderer.form.FormDraft
 import jp.kz2601.metamon.renderer.form.FormPrefill
 import jp.kz2601.metamon.renderer.navigation.NavigationResolver
@@ -32,6 +35,7 @@ import jp.kz2601.metamon.services.sync.HotReload
 import jp.kz2601.metamon.services.sync.RecordsChange
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.FlowPreview
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -39,6 +43,9 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.debounce
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
@@ -101,7 +108,9 @@ class AppRuntime(
     private val recordsRefreshDelayMillis: Long = 250,
     /** 今のアプリの appId の保存・アプリの一覧・新しいアプリ(#881)。null なら appId は固定(モック・テスト) */
     private val directory: AppDirectory? = null,
-) : DSLRuntime, NavigationHost, RecordWriter, TimerHost {
+    /** aiButton のオンライン版・端末内 AI(#873)。null なら AI ボタンは理由つきで無効 */
+    private val aiHost: AiHost? = null,
+) : DSLRuntime, NavigationHost, RecordWriter, TimerHost, AiChatPairSaving {
     private val _state = MutableStateFlow(RuntimeState(document))
     val state: StateFlow<RuntimeState> = _state.asStateFlow()
 
@@ -121,6 +130,7 @@ class AppRuntime(
     private val savingForms = mutableSetOf<FormDraft>()
     private val savingLock = Mutex()
     private var eventsJob: Job? = null
+    private var notificationsJob: Job? = null
 
     // ホットリロード(#883)
     private var hotReloadJobs: List<Job> = emptyList()
@@ -157,6 +167,7 @@ class AppRuntime(
     private suspend fun bootstrapOnce() {
         recordSync.start()
         if (eventsJob == null) eventsJob = scope.launch { recordSync.events.collect { handle(it) } }
+        if (notificationsJob == null) notificationsJob = scope.launch { watchNotifications() }
         if (isIssued(document.appId)) {
             // 再起動しても作ったアプリが残る(iOS の G4)。サーバーの最新は続けて取り直す
             loadCached(document.appId)?.takeIf { it.appId == document.appId && it.version > document.version }?.let(::apply)
@@ -190,6 +201,26 @@ class AppRuntime(
                 _state.update { it.copy(offline = true) }
             }
         }
+    }
+
+    /**
+     * 通知(#886): DSL の読み込み・記録の保存・削除・同期が続いても 400ms まとめて 1 回、予約し直しと条件の評価を host に頼む。
+     * 通知の無い DSL では何もしない。
+     */
+    @OptIn(FlowPreview::class)
+    private suspend fun watchNotifications() {
+        combine(_state.map { it.document }.distinctUntilChanged(), _records) { doc, recs -> doc to recs }
+            .debounce(400)
+            .collect { (doc, recs) ->
+                if (doc.dsl.app.notifications.isEmpty()) return@collect
+                try {
+                    host.notificationsChanged(doc.appId, doc.dsl, recs)
+                } catch (e: CancellationException) {
+                    throw e
+                } catch (_: Exception) {
+                    // 予約に失敗しても画面は止めない(次の変化で予約し直す)
+                }
+            }
     }
 
     private suspend fun loadCached(appId: String): AppDocument? = try {
@@ -417,6 +448,9 @@ class AppRuntime(
         _state.update { it.copy(showVoiceSheet = true) }
     }
 
+    /** transcribeField の話して入力(#864)。AppContainer が本体の認識器で差す。 */
+    override var dictation: DictationHost? = null
+
     override fun onAction(action: Action, context: ActionContext) {
         scope.launch { run(action, context) }
     }
@@ -517,6 +551,29 @@ class AppRuntime(
         val (list, id) = write(entity, null, data)
         setRecords(document.appId, entity, list)
         return id
+    }
+
+    // AI ボタン(#873)
+
+    override val ai: AiHost? get() = aiHost
+
+    override suspend fun loadRecords(entities: Set<String>) = load(entities)
+
+    override suspend fun addRecord(entity: String, data: Map<String, JSONValue>): Boolean = createRecord(entity, data) != null
+
+    // AI と話す(#874)
+
+    /**
+     * roleField の無い aiChat の 1 往復を対で保存する(iOS の AppRuntime+AIChat)。役は並び順で読むので、
+     * 返事を保存できなければ自分の発言も消す(交互を崩さない)。後でサーバーが片方を断った時の取り消しは子 Issue。
+     */
+    override suspend fun saveAiChatPair(entity: String, user: Map<String, JSONValue>, assistant: Map<String, JSONValue>): Boolean {
+        val appId = document.appId
+        val userId = createRecord(entity, user) ?: return false
+        delay(5) // 作成時刻で並べるので、自分 → AI の順を同じ時刻にしない
+        if (appId == document.appId && createRecord(entity, assistant) != null) return true
+        setRecords(appId, entity, recordSync.delete(appId, entity, userId))
+        return false
     }
 
     /** 一覧から消して「元に戻す」を出す。前の取り消し待ちは時間が来たら送られる。 */

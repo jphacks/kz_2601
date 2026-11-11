@@ -2,8 +2,11 @@ package jp.kz2601.metamon.renderer
 
 import jp.kz2601.metamon.dsl.Action
 import jp.kz2601.metamon.dsl.records.Entity
+import jp.kz2601.metamon.renderer.components.audio.DictationHost
 import jp.kz2601.metamon.dsl.records.JSONValue
 import jp.kz2601.metamon.dsl.records.Record
+import jp.kz2601.metamon.renderer.components.ai.AiHost
+import jp.kz2601.metamon.renderer.components.media.PhotoReader
 import jp.kz2601.metamon.renderer.form.FormDraft
 import jp.kz2601.metamon.renderer.navigation.NavigationState
 import jp.kz2601.metamon.renderer.navigation.Route
@@ -32,6 +35,9 @@ interface NavigationHost {
 interface DSLRuntime {
     /** voiceInput が押された。音声認識は #359 で入れる。 */
     fun onVoiceInput(componentId: String?)
+
+    /** transcribeField が声を文字にする口(本体の音声入力と同じ認識器・#864)。null なら「この画面では使えません」。 */
+    val dictation: DictationHost? get() = null
 
     /** アクション。[navigationHost] があれば navigate / back もここへ来る。既定は何もしない。 */
     fun onAction(action: Action, context: ActionContext) = Unit
@@ -62,6 +68,19 @@ interface DSLRuntime {
 
     /** 共有データの参加者(member / members の選択肢・iOS の `membersHost.appMembers`)。読めなければ空。 */
     val formMembers: List<FormMember> get() = emptyList()
+
+    // AI ボタン(#873)
+
+    /** aiButton のオンライン版・端末内 AI・集計。null なら端末内 AI も無い(プレビュー・テスト)。 */
+    val ai: AiHost? get() = null
+
+    /** entity の記録を読んでおく([recordsFlow] に入る)。既定は何もしない。 */
+    suspend fun loadRecords(entities: Set<String>) = Unit
+
+    /** フォームを通さず 1 件足す(aiButton saveTo)。足せたら true。 */
+    suspend fun addRecord(entity: String, data: Map<String, JSONValue>): Boolean = false
+    /** photoField.analyze の端末内の読み取り(#862)。null なら analyze は無視して写真の入力として動く。 */
+    val photoReader: PhotoReader? get() = null
 }
 
 /** member / members の選択肢 1 人。保存値は [uid]。 */
