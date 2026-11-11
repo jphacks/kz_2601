@@ -27,6 +27,8 @@ extension MacAppRuntime {
 /// EventKit で既定のカレンダーに書く。許可は書き込みだけ(`requestWriteOnlyAccessToEvents`・macOS 14)。
 final class EventKitCalendarWriter: CalendarWriting, @unchecked Sendable {
     private let store = EKEventStore()
+    /// 最後に書いた予定の id(「カレンダーで開く」でその予定を出す・#1277)。書き込みだけの許可でも、自分で書いた予定の id は分かる
+    private(set) var lastSavedId: String?
 
     enum WriteError: Error { case noCalendar }
 
@@ -53,6 +55,7 @@ final class EventKitCalendarWriter: CalendarWriting, @unchecked Sendable {
         event.notes = draft.notes
         if let offset = draft.alertOffset { event.addAlarm(EKAlarm(relativeOffset: offset)) }
         try store.save(event, span: .thisEvent, commit: true)
+        lastSavedId = event.calendarItemIdentifier
     }
 }
 
@@ -137,7 +140,7 @@ struct MacCalendarSheet: View {
                     .keyboardShortcut(.defaultAction)
                     .disabled(phase == .saving)
             case .done(.added):
-                Button("カレンダーで開く") { Self.openCalendarApp(); close() }
+                Button("カレンダーで開く") { Self.openCalendarApp(eventId: (writer as? EventKitCalendarWriter)?.lastSavedId); close() }
                 Button("閉じる", action: close).keyboardShortcut(.defaultAction)
             case .done(.denied):
                 Button("システム設定を開く") { Self.openPrivacySettings() }
@@ -154,6 +157,24 @@ struct MacCalendarSheet: View {
         let result = await CalendarActionSteps.save(draft, using: writer)
         phase = .done(result)
         MacVoiceOver.announce(message)
+    }
+
+    /// 足した予定をカレンダー アプリで開く(その日の表示で予定が選ばれる・#1277)。
+    /// カレンダー アプリが受ける `ical://ekevent/<id>?method=show&options=more`(通知センターの予定から開くのと同じ形)。
+    /// 開けなければ今まで通りカレンダー アプリを開くだけ
+    static func openCalendarApp(eventId: String?) {
+        if let eventId, let url = eventURL(eventId), NSWorkspace.shared.open(url) { return }
+        openCalendarApp()
+    }
+
+    static func eventURL(_ eventId: String) -> URL? {
+        guard !eventId.isEmpty else { return nil }
+        var components = URLComponents()
+        components.scheme = "ical"
+        components.host = "ekevent"
+        components.path = "/" + eventId
+        components.queryItems = [URLQueryItem(name: "method", value: "show"), URLQueryItem(name: "options", value: "more")]
+        return components.url
     }
 
     static func openCalendarApp() {

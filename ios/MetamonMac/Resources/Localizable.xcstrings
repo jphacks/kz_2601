@@ -801,6 +801,22 @@
         }
       }
     },
+    "⌘K で文字で、⇧⌘M で声で頼めます。" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Type with ⌘K, or speak with ⇧⌘M."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "⌘K で文字で、⇧⌘M で声で頼めます。"
+          }
+        }
+      }
+    },
     "、" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -1322,6 +1338,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "お問い合わせ"
+          }
+        }
+      }
+    },
+    "こう頼むと直せます" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Try asking this to change it"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "こう頼むと直せます"
           }
         }
       }
@@ -2081,6 +2113,22 @@
         }
       }
     },
+    "とじる" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Close"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "とじる"
+          }
+        }
+      }
+    },
     "どこからも行けない画面" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -2127,6 +2175,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "どこをどう直しますか?"
+          }
+        }
+      }
+    },
+    "どの記録でこの画面を開くかを選びます" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Choose which record to open this screen with"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "どの記録でこの画面を開くかを選びます"
           }
         }
       }
@@ -2727,6 +2791,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "アプリを作る・直す機能と対話が使えなくなります。もう一度同意すると使えます。"
+          }
+        }
+      }
+    },
+    "アプリを探す" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Search Apps"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "アプリを探す"
           }
         }
       }
@@ -7459,6 +7539,22 @@
         }
       }
     },
+    "記録 %lld" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Record %lld"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "記録 %lld"
+          }
+        }
+      }
+    },
     "記録(入力したデータ)の中身は送りません。オンにしたものだけを送ります。" : {
       "localizations" : {
         "en" : {
@@ -7471,6 +7567,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "記録(入力したデータ)の中身は送りません。オンにしたものだけを送ります。"
+          }
+        }
+      }
+    },
+    "記録がまだ無いので、空のまま開きます" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No records yet, so it opens empty."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "記録がまだ無いので、空のまま開きます"
           }
         }
       }
@@ -7503,6 +7615,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "記録に写真を付けられるようにして"
+          }
+        }
+      }
+    },
+    "記録を選んで開く" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Open with a Record"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "記録を選んで開く"
           }
         }
       }
@@ -8635,6 +8763,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "頼み方のコツ"
+          }
+        }
+      }
+    },
+    "頼んでみる" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Try asking"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "頼んでみる"
           }
         }
       }
