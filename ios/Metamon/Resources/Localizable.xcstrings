@@ -2682,6 +2682,23 @@
         }
       }
     },
+    "「%@」を公開しますか?" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Publish “%@”?"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "「%@」を公開しますか?"
+          }
+        }
+      }
+    },
     "「%@」を削除しました" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -2954,6 +2971,23 @@
         }
       }
     },
+    "「探す」から誰でも見つけて、自分のアプリとして入れられます" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Anyone can find it in Discover and add it as their own app"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "「探す」から誰でも見つけて、自分のアプリとして入れられます"
+          }
+        }
+      }
+    },
     "「探す」から誰でも見つけてインストールできるようになります" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -3115,6 +3149,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "あなたが付けた記録も、参加している人に見えます"
+          }
+        }
+      }
+    },
+    "あなただけの記録は含まれません" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Your private entries are not included"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "あなただけの記録は含まれません"
           }
         }
       }
@@ -3982,6 +4033,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "このアプリを作った人が Tailor It Pro ではないため、共有のデータに書き込めません(見ることはできます)"
+          }
+        }
+      }
+    },
+    "このシェアの画面から、いつでも公開をやめられます" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "You can unpublish it from this share screen at any time"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "このシェアの画面から、いつでも公開をやめられます"
           }
         }
       }
@@ -10499,6 +10567,23 @@
         }
       }
     },
+    "公開すると" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "When you publish"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "公開すると"
+          }
+        }
+      }
+    },
     "公開できませんでした" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -11821,6 +11906,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "名前を変える"
+          }
+        }
+      }
+    },
+    "名前・説明・タグに、住所や電話番号などの個人の情報を書かないでください" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Don’t put personal info such as your address or phone number in the name, description or tags"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "名前・説明・タグに、住所や電話番号などの個人の情報を書かないでください"
           }
         }
       }
