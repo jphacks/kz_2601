@@ -220,7 +220,8 @@ private struct RuntimeOverlays: ViewModifier {
                         ToastCapsule(text: message) { withMacAnimation { runtime.toast = nil } }
                             .task(id: message) {
                                 // 出したのと同時に VoiceOver で読み、VoiceOver の時は長く出しておく(#937・iOS の H8 と同じ)
-                                MacVoiceOver.announce(.message(message))
+                                if runtime.announcedToast != message { MacVoiceOver.announce(.message(message)) }
+                                runtime.announcedToast = nil
                                 try? await Task.sleep(for: .seconds(MacVoiceOver.holdSeconds(3)))
                                 guard !Task.isCancelled, runtime.toast == message else { return }
                                 withMacAnimation { runtime.toast = nil }

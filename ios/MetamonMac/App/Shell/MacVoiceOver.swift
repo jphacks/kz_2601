@@ -55,6 +55,8 @@ enum MacAnnouncement: Equatable {
     case built(summary: String?, appName: String, created: Bool)
     /// 失敗の状態カード(`ErrorPresentation.announcement`)
     case failure(String)
+    /// Field.health のある記録を保存したが、Mac ではヘルスケアに書かない(#958)
+    case healthSkipped
     /// 一言(toast)
     case message(String)
 
@@ -62,6 +64,7 @@ enum MacAnnouncement: Equatable {
         switch self {
         case .saved: L10n.tr("保存しました")
         case .recordDeleted: L10n.tr("削除しました")
+        case .healthSkipped: MacHealthNote.message
         case .appCreated(let name): L10n.tr("「\(name)」を作りました")
         case .appDeleted(let name): L10n.tr("「\(name)」を削除しました")
         case .appRestored(let name): L10n.tr("「\(name)」を元の例に戻しました")
