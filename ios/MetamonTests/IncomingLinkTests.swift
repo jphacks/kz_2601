@@ -9,6 +9,12 @@ final class IncomingLinkTests: XCTestCase {
         XCTAssertEqual(IncomingLink(url: URL(string: "TailorIt://Import/tok_1")!), .share(token: "tok_1"))
     }
 
+    /// #331: Universal Links の共有ページも URL スキームと同じく読む(iOS の ShareURL.token と同じ)
+    func testUniversalLinkBecomesShareLink() {
+        XCTAssertEqual(IncomingLink(url: URL(string: "https://tailor-it.app/s/tok_1")!), .share(token: "tok_1"))
+        XCTAssertEqual(IncomingLink(url: URL(string: "https://TAILOR-IT.app/s/tok_1")!), .share(token: "tok_1"))
+    }
+
     func testUnknownURLsAreIgnored() {
         for url in [
             "tailorit://import/",
@@ -22,7 +28,7 @@ final class IncomingLinkTests: XCTestCase {
         }
     }
 
-    /// activity は Web 閲覧のものだけ読む。ほかの種類は URL があっても見ない。https は ShareURL が受けないので Web 閲覧でも nil
+    /// activity は Web 閲覧のものだけ読む。ほかの種類は URL があっても見ない。中の https は ShareURL と同じ規則(#331: 共有ページだけ読む)
     func testActivityMustBeWebBrowsing() {
         let other = NSUserActivity(activityType: "jp.kz2601.metamon.other")
         other.webpageURL = URL(string: "https://tailor-it.app/s/tok_1")!
@@ -32,9 +38,9 @@ final class IncomingLinkTests: XCTestCase {
         unknown.webpageURL = URL(string: "https://tailor-it.app/terms")!
         XCTAssertNil(IncomingLink(activity: unknown))
 
-        let shareLike = NSUserActivity(activityType: NSUserActivityTypeBrowsingWeb)
-        shareLike.webpageURL = URL(string: "https://tailor-it.app/s/tok_1")!
-        XCTAssertNil(IncomingLink(activity: shareLike))
+        let share = NSUserActivity(activityType: NSUserActivityTypeBrowsingWeb)
+        share.webpageURL = URL(string: "https://tailor-it.app/s/tok_1")!
+        XCTAssertEqual(IncomingLink(activity: share), .share(token: "tok_1"))
 
         XCTAssertNil(IncomingLink(activity: NSUserActivity(activityType: NSUserActivityTypeBrowsingWeb)))
     }

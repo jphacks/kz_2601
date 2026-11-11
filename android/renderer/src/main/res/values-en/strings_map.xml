@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="renderer_map_attribution_open">Open map copyright details</string>
+    <plurals name="renderer_map_pins">
+        <item quantity="one">Map of %1$d place</item>
+        <item quantity="other">Map of %1$d places</item>
+    </plurals>
+    <string name="renderer_map_pin_untitled">Untitled place</string>
+    <string name="renderer_map_route">Map of the route (latest track: %1$d points)</string>
+    <string name="renderer_location_picker_choose">Choose a place</string>
+    <string name="renderer_location_picker_change">Change place</string>
+    <string name="renderer_location_picker_search">Search for a place or address</string>
+    <string name="renderer_location_picker_clear">Clear search</string>
+    <string name="renderer_location_picker_not_found">No results</string>
+    <string name="renderer_location_picker_map">Map. Move it to choose the spot under the center pin</string>
+    <string name="renderer_location_picker_hint">Move the map and use the pin\'s position</string>
+    <string name="renderer_location_picker_current">Current location</string>
+    <string name="renderer_location_picker_use_pin">Use this place</string>
+</resources>

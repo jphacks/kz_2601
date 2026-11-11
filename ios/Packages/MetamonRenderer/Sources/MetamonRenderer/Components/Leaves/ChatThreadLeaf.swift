@@ -239,7 +239,7 @@ private struct ChatBubble: View {
     }
 
     private var hasPhoto: Bool {
-        PhotoCodec.image(from: photo) != nil || (photo.stringValue?.hasPrefix("http") ?? false)
+        PhotoCodec.image(from: photo) != nil || ImageHostPolicy.loadableURL(photo.stringValue) != nil
     }
 
     private var bubble: some View {

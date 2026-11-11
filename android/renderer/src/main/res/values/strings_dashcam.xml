@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- ドラレコの部品(dashcam・#872)の文言。iOS の DashcamLeaf の写し。英語は values-en。 -->
+<resources>
+    <string name="renderer_dashcam_auto_start_in">あと%1$d秒で自動で録画</string>
+    <string name="renderer_dashcam_clips">保存した映像(%1$d)</string>
+    <string name="renderer_dashcam_clips_empty">保存した映像はまだありません</string>
+    <string name="renderer_dashcam_clips_empty_detail">衝撃があった時や「今の映像を保存」を押した時の前後が残ります</string>
+    <string name="renderer_dashcam_clips_title">保存した映像</string>
+    <string name="renderer_dashcam_close">閉じる</string>
+    <string name="renderer_dashcam_condition_charging">充電中</string>
+    <string name="renderer_dashcam_condition_landscape">横向き</string>
+    <string name="renderer_dashcam_condition_separator">・</string>
+    <string name="renderer_dashcam_condition_still">ほぼ静止</string>
+    <string name="renderer_dashcam_delete">削除</string>
+    <string name="renderer_dashcam_delete_clip">%1$s の映像を削除</string>
+    <string name="renderer_dashcam_denied">カメラの許可がないため録画できません</string>
+    <string name="renderer_dashcam_footnote">画面を出している間だけ録画します(アプリを閉じる・画面を消すと止まります)。直近%1$d分を残し、衝撃の前後は保存します。</string>
+    <string name="renderer_dashcam_footnote_auto">%1$sが5秒続くと自動で録画を始めます。</string>
+    <string name="renderer_dashcam_full_device">端末の空きが少ないため録画を止めました</string>
+    <string name="renderer_dashcam_full_saved">保存した映像で容量の上限に達したため録画を止めました。いらない映像を消してください</string>
+    <string name="renderer_dashcam_gallery_failed">ギャラリーに保存できませんでした</string>
+    <string name="renderer_dashcam_gallery_saved">ギャラリーに保存しました</string>
+    <string name="renderer_dashcam_impact_saved">%1$s 前後の映像を保存しました</string>
+    <string name="renderer_dashcam_open_settings">設定を開く</string>
+    <string name="renderer_dashcam_preview">背面カメラの映像</string>
+    <string name="renderer_dashcam_recording">録画中</string>
+    <string name="renderer_dashcam_save_now">今の映像を保存</string>
+    <string name="renderer_dashcam_save_to_gallery">ギャラリーに保存</string>
+    <string name="renderer_dashcam_share">共有</string>
+    <string name="renderer_dashcam_start">録画を開始</string>
+    <string name="renderer_dashcam_stop">停止</string>
+    <string name="renderer_dashcam_stopped_in_background">画面を閉じたので録画を止めました。画面を出している間だけ録画できます</string>
+    <string name="renderer_dashcam_title">ドラレコ</string>
+    <string name="renderer_dashcam_unavailable">カメラが使えないため録画できません</string>
+</resources>

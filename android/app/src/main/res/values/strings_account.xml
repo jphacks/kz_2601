@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- ログアウト・アカウント削除(#841)。文言は iOS の SettingsSheet / SignOutCopy から写す -->
+<resources>
+    <string name="account_cancel">キャンセル</string>
+    <string name="account_delete">アカウントを削除</string>
+    <string name="account_delete_confirm">削除する</string>
+    <string name="account_delete_failed">アカウントを削除できませんでした</string>
+    <string name="account_delete_message">アカウントとすべてのアプリが使えなくなります。元に戻せません。\n\n作ったアプリが使えなくなり、共有リンクと「探す」への掲載も取り下げます。この端末のデータも消えます。ほかの人と共有しているアプリへの投稿は残ります。</string>
+    <string name="account_delete_requires_recent_login">もう一度サインインしてから削除してください</string>
+    <string name="account_delete_title">アカウントを削除しますか？</string>
+    <string name="account_deleting">削除しています…</string>
+    <string name="account_failed_try_again">少し待ってから、もう一度お試しください</string>
+    <string name="account_menu">アカウント</string>
+    <string name="account_ok">OK</string>
+    <string name="account_send_then_sign_out">送ってからログアウト</string>
+    <string name="account_sign_out">ログアウト</string>
+    <string name="account_sign_out_anonymous">この端末のデータが消え、匿名のアカウントには戻れません。作ったアプリと記録も開けなくなります。</string>
+    <string name="account_sign_out_failed">ログアウトできませんでした</string>
+    <string name="account_sign_out_signed_in">この端末のデータは消えます。もう一度サインインすると、作ったアプリと送り済みの記録は戻ります。</string>
+    <string name="account_sign_out_title">ログアウトしますか？</string>
+    <string name="account_sign_out_without_sending">送らずにログアウト</string>
+    <string name="account_signing_out">ログアウトしています…</string>
+    <plurals name="account_unsent_after_flush">
+        <item quantity="other">%1$d 件の記録を送れませんでした。送らずにログアウトすると、この記録は消えます。</item>
+    </plurals>
+    <plurals name="account_unsent_offline">
+        <item quantity="other">まだ送っていない記録が %1$d 件あります。今はオフラインのため送れません。送らずにログアウトすると、この記録は消えます。</item>
+    </plurals>
+    <string name="account_unsent_title">送れなかった記録があります</string>
+    <plurals name="account_unsent_will_send">
+        <item quantity="other">まだ送っていない記録が %1$d 件あります。送ってからログアウトします。</item>
+    </plurals>
+</resources>

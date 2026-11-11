@@ -486,11 +486,12 @@ func (c *CreatorPaidCap) take(ctx context.Context, log *slog.Logger, appID, uid 
 	if c == nil {
 		return refund, nil
 	}
-	c.once.Do(func() { c.fallback = ratelimit.NewMemory() })
 	now := time.Now
 	if c.Now != nil {
 		now = c.Now
 	}
+	// the in-memory counters expire by the same clock as the day's id
+	c.once.Do(func() { c.fallback = ratelimit.NewMemoryClock(now) })
 	t := now().In(ratelimit.JST)
 	y, m, d := t.Date()
 	reset := time.Date(y, m, d+1, 0, 0, 0, 0, ratelimit.JST)
