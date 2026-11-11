@@ -39,11 +39,15 @@ struct ChartLeaf: View {
                             .foregroundStyle(RenderTheme.Colors.brandA)
                             .lineStyle(StrokeStyle(lineWidth: 2.5, lineCap: .round))
                             .interpolationMethod(.catmullRom)
-                            .accessibilityHidden(true) // 読み上げは点ごと(PointMark)
+                            #if os(macOS)
+                            .accessibilityHidden(true) // Mac の読み上げは点ごと(PointMark)。iOS は今までどおり
+                            #endif
                         AreaMark(x: .value("x", b.label), y: .value("y", b.value))
                             .foregroundStyle(RenderTheme.brandWash)
                             .interpolationMethod(.catmullRom)
+                            #if os(macOS)
                             .accessibilityHidden(true)
+                            #endif
                         PointMark(x: .value("x", b.label), y: .value("y", b.value))
                             .foregroundStyle(RenderTheme.Colors.brandA)
                             .symbolSize(selected?.id == b.id ? 90 : 40)
