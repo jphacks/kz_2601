@@ -55,6 +55,7 @@ import java.awt.print.PrinterJob
 import java.time.LocalDateTime
 import java.time.format.DateTimeFormatter
 import java.util.Locale
+import kotlin.concurrent.thread
 import javax.print.attribute.HashPrintRequestAttributeSet
 import javax.print.attribute.standard.JobName
 import javax.print.attribute.standard.MediaSizeName
@@ -69,15 +70,11 @@ class PrintDocument(val title: String, val sections: List<ExportTable>) {
     class Page(val section: Int, val pdf: PdfIo.Page)
 
     val pages: List<Page> by lazy {
-        sections.flatMapIndexed { i, t -> PdfIo.pages(t, EMPTY_TEXT).map { Page(i, it) } }
+        sections.flatMapIndexed { i, t -> PdfIo.pages(t, Strings["desktop_print_empty"]).map { Page(i, it) } }
     }
 
     /** 印刷と同じ頁の PDF(export と同じ形)。 */
     fun pdf(): ByteArray = PdfIo.pdf(pages.map { it.pdf.image })
-
-    companion object {
-        const val EMPTY_TEXT = "記録がありません"
-    }
 }
 
 /** 今の画面 → 印刷する表。画面に触らない(JVM で確かめる)。 */
@@ -101,7 +98,7 @@ object ScreenPrint {
             when (c.type) {
                 ComponentType.LIST, ComponentType.TABLE -> data.entity(c.entity)?.let { e ->
                     val t = RecordIo.exportTable(c.title ?: section ?: e.name, e, store, entities, null, locale = locale)
-                    tables += t.copy(notes = listOf("${t.rows.size} 件"))
+                    tables += t.copy(notes = listOf(Strings.format("host_export_count", t.rows.size)))
                 }
                 ComponentType.GRID_TABLE -> tables += gridTable(c, section, data)
                 ComponentType.CHART -> tables += chart(c, section, data, locale)
@@ -122,11 +119,11 @@ object ScreenPrint {
 
         val sections = buildList {
             if (summary.isNotEmpty() || tables.isEmpty()) {
-                add(ExportTable(title, listOf("項目", "値"), summary, numericColumns = listOf(false, true)))
+                add(ExportTable(title, listOf(Strings["desktop_print_item"], Strings["desktop_print_value"]), summary, numericColumns = listOf(false, true)))
             }
             addAll(tables)
         }
-        val stamp = "印刷日 " + printedAt.format(DateTimeFormatter.ofPattern("yyyy/MM/dd HH:mm"))
+        val stamp = Strings.format("desktop_print_date", printedAt.format(DateTimeFormatter.ofPattern("yyyy/MM/dd HH:mm")))
         return PrintDocument(title, sections.mapIndexed { i, t -> if (i == 0) t.copy(notes = listOf(stamp) + t.notes) else t })
     }
 
@@ -138,7 +135,7 @@ object ScreenPrint {
         fun text(field: String?, v: JSONValue): String = field?.let { FieldCoding.display(v, entity?.field(it), data.locale) }.orEmpty()
         val rows = layout.rows.mapIndexed { ri, row ->
             listOf(row.label) + layout.columns.indices.map { ci ->
-                layout.records(GridTableLayout.Cell(ci, ri)).joinToString("、") { r ->
+                layout.records(GridTableLayout.Cell(ci, ri)).joinToString(Strings["desktop_list_separator"]) { r ->
                     val head = text(titleField, titleField?.let { r[it] } ?: JSONValue.Null).ifEmpty { r.id }
                     val sub = text(c.subtitleField, c.subtitleField?.let { r[it] } ?: JSONValue.Null)
                     if (sub.isEmpty()) head else "$head($sub)"
@@ -151,13 +148,13 @@ object ScreenPrint {
     /** chart は「まとまり / 値」の表(画面の棒・扇と同じ集計)。 */
     internal fun chart(c: Component, section: String?, data: LeafData, locale: Locale): ExportTable {
         val entity = data.entity(c.entity)
-        val group = c.groupBy?.let { entity?.field(it)?.name } ?: "項目"
+        val group = c.groupBy?.let { entity?.field(it)?.name } ?: Strings["desktop_print_item"]
         val fieldDef = c.field?.let { entity?.field(it) }
         val count = c.aggregate?.wire == "count"
         val format = c.format?.wire ?: if (count) "plain" else if (fieldDef?.type == FieldType.CURRENCY) "currency" else null
         val unit = if (count) StatValue.COUNT_UNIT else fieldDef?.unit
         val rows = ChartBuckets.buckets(c, data).map { listOf(it.label, Aggregator.format(it.value, format, unit, locale)) }
-        return ExportTable(c.title ?: c.label ?: section ?: entity?.name.orEmpty(), listOf(group, if (count) "件数" else fieldDef?.name ?: "値"), rows, numericColumns = listOf(false, true))
+        return ExportTable(c.title ?: c.label ?: section ?: entity?.name.orEmpty(), listOf(group, if (count) Strings["desktop_print_count"] else fieldDef?.name ?: Strings["desktop_print_value"]), rows, numericColumns = listOf(false, true))
     }
 }
 
@@ -196,24 +193,65 @@ object DesktopPrint {
     /** Ctrl+P(macOS は ⌘P)。 */
     fun isPrintKey(e: KeyEvent): Boolean = e.type == KeyEventType.KeyDown && e.key == Key.P && (e.isCtrlPressed || e.isMetaPressed)
 
-    /** OS の印刷ダイアログ(プリンター・部数・範囲)を出して印刷する。結果の一言を返す。 */
-    fun print(doc: PrintDocument): String {
-        if (PrinterJob.lookupPrintServices().isEmpty()) return Strings["desktop_print_no_printer"]
-        val job = PrinterJob.getPrinterJob()
-        job.jobName = doc.title
-        job.setPageable(PrintPages(doc))
+    /** 印刷ダイアログで選んだ印刷。[job] が null ならやめた・送れない(理由は [message])。 */
+    class Prepared(val job: PrinterJob?, val attrs: HashPrintRequestAttributeSet, val message: String?)
+
+    /** OS の印刷ダイアログ(プリンター・部数・範囲)を出す。ダイアログなので画面のスレッド(EDT)で呼ぶ。 */
+    fun prepare(doc: PrintDocument): Prepared {
         val attrs = HashPrintRequestAttributeSet().apply {
             add(MediaSizeName.ISO_A4)
             add(OrientationRequested.PORTRAIT)
             add(JobName(doc.title, null))
         }
-        if (!job.printDialog(attrs)) return Strings["desktop_print_cancelled"]
+        if (PrinterJob.lookupPrintServices().isEmpty()) return Prepared(null, attrs, Strings["desktop_print_no_printer"])
+        val job = PrinterJob.getPrinterJob()
+        job.jobName = doc.title
+        job.setPageable(PrintPages(doc))
+        if (!job.printDialog(attrs)) return Prepared(null, attrs, Strings["desktop_print_cancelled"])
+        return Prepared(job, attrs, null)
+    }
+
+    /** プリンターへ送る(頁を描くので時間がかかる)。画面のスレッドの外で呼ぶ。結果の一言を返す。 */
+    fun send(p: Prepared, pages: Int, print: (PrinterJob, HashPrintRequestAttributeSet) -> Unit = { j, a -> j.print(a) }): String {
+        val job = p.job ?: return p.message ?: Strings["desktop_print_failed"]
         return try {
-            job.print(attrs)
-            Strings.format("desktop_print_sent", doc.pages.size)
+            print(job, p.attrs)
+            Strings.format("desktop_print_sent", pages)
         } catch (_: PrinterException) {
             Strings["desktop_print_failed"]
+        } catch (_: RuntimeException) {
+            Strings["desktop_print_failed"]
         }
+    }
+}
+
+/** 印刷の操作(押した時に 1 つだけ動かす)。2 回押しても 2 つの印刷を始めない。 */
+class PrintRunner(private val background: (() -> Unit) -> Unit = { thread(isDaemon = true, name = "print") { it() } }) {
+    var busy by mutableStateOf(false)
+        private set
+
+    /** [dialog] を今のスレッド(EDT)で出し、送るのは [background] で。終わったら [onDone] を画面のスレッドで呼ぶ。 */
+    fun start(dialog: () -> DesktopPrint.Prepared, send: (DesktopPrint.Prepared) -> String, onDone: (String) -> Unit, onMain: (() -> Unit) -> Unit = ::onEdt): Boolean {
+        if (busy) return false
+        busy = true
+        val prepared = runCatching(dialog).getOrNull()
+        if (prepared?.job == null) {
+            busy = false
+            onDone(prepared?.message ?: Strings["desktop_print_failed"])
+            return true
+        }
+        background {
+            val msg = runCatching { send(prepared) }.getOrElse { Strings["desktop_print_failed"] }
+            onMain {
+                busy = false
+                onDone(msg)
+            }
+        }
+        return true
+    }
+
+    private companion object {
+        fun onEdt(block: () -> Unit) = if (java.awt.EventQueue.isDispatchThread()) block() else java.awt.EventQueue.invokeLater(block)
     }
 }
 
@@ -221,7 +259,7 @@ object DesktopPrint {
 @Composable
 fun PrintPreview(doc: PrintDocument, onDismiss: () -> Unit, onResult: (String) -> Unit) {
     var index by remember(doc) { mutableIntStateOf(0) }
-    var busy by remember { mutableStateOf(false) }
+    val runner = remember(doc) { PrintRunner() }
     val pages = doc.pages
     val bitmap = remember(doc, index) { pages[index].pdf.image.toComposeImageBitmap() }
     AlertDialog(
@@ -238,12 +276,16 @@ fun PrintPreview(doc: PrintDocument, onDismiss: () -> Unit, onResult: (String) -
             }
         },
         confirmButton = {
-            TextButton(enabled = !busy, onClick = {
-                busy = true
-                val msg = runCatching { DesktopPrint.print(doc) }.getOrElse { Strings["desktop_print_failed"] }
-                busy = false
-                onResult(msg)
-                onDismiss()
+            // ダイアログは画面のスレッド、プリンターへ送るのは別のスレッド。送っている間は押せない
+            TextButton(enabled = !runner.busy, onClick = {
+                runner.start(
+                    dialog = { DesktopPrint.prepare(doc) },
+                    send = { DesktopPrint.send(it, pages.size) },
+                    onDone = { msg ->
+                        onResult(msg)
+                        onDismiss()
+                    },
+                )
             }) { Text(Strings["desktop_print_dialog"]) }
         },
         dismissButton = { TextButton(onClick = onDismiss) { Text(Strings["desktop_close"]) } },

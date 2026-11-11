@@ -250,6 +250,7 @@ interface Notifier {
         return if (today.isAfter(now)) today else today.plusDays(1)
     }
 
+    /** 予約・取り消しは画面のスレッドからもタイマーのスレッドからも来るので、[timers] はこの object で同期する。 */
     object Tray : Notifier {
         private val timers = HashMap<String, Timer>()
         private var icon: TrayIcon? = null
@@ -266,26 +267,49 @@ interface Notifier {
 
         override fun schedule(n: Notification): String {
             if (GraphicsEnvironment.isHeadless() || !SystemTray.isSupported()) return Strings["desktop_tray_unavailable"]
-            cancel(n.id)
             val at = nextFire(n)
-            val timer = Timer("notify-${n.id}", true)
-            val task = object : TimerTask() {
-                override fun run() = show(n.title, n.body)
-            }
-            if (at == null) timer.schedule(task, 0) else timer.schedule(task, Duration.between(ZonedDateTime.now(at.zone), at).toMillis().coerceAtLeast(0))
-            timers[n.id] = timer
+            arm(n.id, at?.let { Duration.between(ZonedDateTime.now(it.zone), it).toMillis().coerceAtLeast(0) } ?: 0) { show(n.title, n.body) }
             val whenText = at?.let { DateTimeFormatter.ofPattern("M/d HH:mm").format(it) } ?: Strings["desktop_notification_now"]
             return Strings.format("desktop_notification_scheduled", whenText)
         }
 
         override fun cancel(id: String): String? {
-            timers.remove(id)?.cancel()
+            synchronized(this) { timers.remove(id) }?.cancel()
             return null
         }
 
-        @Synchronized
+        /** [id] の前の予約を消して [delayMillis] 後に [fire] を 1 回。鳴ったら表から外す。 */
+        internal fun arm(id: String, delayMillis: Long, fire: () -> Unit) {
+            val timer = Timer("notify-$id", true)
+            val previous = synchronized(this) { timers.put(id, timer) }
+            previous?.cancel()
+            timer.schedule(
+                object : TimerTask() {
+                    override fun run() {
+                        try {
+                            fire()
+                        } finally {
+                            synchronized(this@Tray) { if (timers[id] === timer) timers.remove(id) }
+                            timer.cancel()
+                        }
+                    }
+                },
+                delayMillis,
+            )
+        }
+
+        /** 予約中の id(テスト用)。 */
+        internal fun pending(): Set<String> = synchronized(this) { timers.keys.toSet() }
+
+        /** アイコンを作る・出すのは [timers] と別の鍵(AWT を待つ間に予約・取り消しを止めない)。 */
+        private val iconLock = Any()
+
         private fun show(title: String, body: String) {
             sink?.let { return it(title, body) }
+            synchronized(iconLock) { showOnIcon(title, body) }
+        }
+
+        private fun showOnIcon(title: String, body: String) {
             runCatching {
                 val tray = SystemTray.getSystemTray()
                 val i = icon ?: TrayIcon(BufferedImage(16, 16, BufferedImage.TYPE_INT_ARGB), "Tailor It").also {

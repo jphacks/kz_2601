@@ -17,6 +17,8 @@ import androidx.compose.ui.window.rememberWindowState
 import kotlinx.coroutines.FlowPreview
 import kotlinx.coroutines.flow.debounce
 import java.awt.Dimension
+import java.awt.GraphicsEnvironment
+import java.awt.Rectangle
 import jp.kz2601.metamon.desktop.i18n.Strings
 import jp.kz2601.metamon.desktop.theme.TailorItTheme
 import java.io.File
@@ -34,7 +36,7 @@ fun main(args: Array<String>) = application {
     var name by remember { mutableStateOf(first) }
     val dsl = remember(name) { Examples.load(name) }
     val store = remember(name) { args.getOrNull(1)?.takeIf { name == first }?.let { MockStore.fromJson(File(it).readText()) } ?: MockStore() }
-    val saved = remember { WindowBounds.load() }
+    val saved = remember { WindowBounds.load()?.let { WindowBounds.fit(it, WindowBounds.screens()) } }
     val state = rememberWindowState(
         size = saved?.size ?: DpSize(480.dp, 820.dp),
         position = saved?.position ?: WindowPosition.PlatformDefault,
@@ -68,8 +70,8 @@ fun main(args: Array<String>) = application {
 }
 
 /** ウィンドウの大きさ・位置(java.util.prefs: Windows はレジストリ、Linux は ~/.java)。 */
-private object WindowBounds {
-    private val prefs = Preferences.userRoot().node("jp/kz2601/tailorit/desktop")
+internal object WindowBounds {
+    private val prefs by lazy { Preferences.userRoot().node("jp/kz2601/tailorit/desktop") }
 
     data class Bounds(val size: DpSize, val position: WindowPosition)
 
@@ -82,6 +84,34 @@ private object WindowBounds {
         val pos = if (x.isNaN() || y.isNaN()) WindowPosition.PlatformDefault else WindowPosition(x.dp, y.dp)
         return Bounds(DpSize(w.dp, h.dp), pos)
     }
+
+    /** 今つながっている画面(外した画面に開かないため)。分からなければ空。 */
+    fun screens(): List<Rectangle> = runCatching {
+        if (GraphicsEnvironment.isHeadless()) emptyList() else GraphicsEnvironment.getLocalGraphicsEnvironment().screenDevices.map { it.defaultConfiguration.bounds }
+    }.getOrDefault(emptyList())
+
+    /**
+     * 覚えた位置・大きさを今の画面に収める。大きさは一番大きい画面まで。
+     * 見出し(左上)がどの画面にも乗らない位置(外した画面・解像度を下げた)は OS の既定の位置に戻す。
+     */
+    fun fit(b: Bounds, screens: List<Rectangle>): Bounds {
+        if (screens.isEmpty()) return b
+        val maxW = screens.maxOf { it.width }.toFloat()
+        val maxH = screens.maxOf { it.height }.toFloat()
+        val size = DpSize(b.size.width.value.coerceAtMost(maxW).dp, b.size.height.value.coerceAtMost(maxH).dp)
+        val pos = b.position as? WindowPosition.Absolute ?: return Bounds(size, b.position)
+        val title = Rectangle(pos.x.value.toInt(), pos.y.value.toInt(), size.width.value.toInt().coerceIn(1, TITLE_W), TITLE_H)
+        val onScreen = screens.firstOrNull { it.intersection(title).let { r -> !r.isEmpty && r.width >= TITLE_MIN_VISIBLE && r.height >= TITLE_H / 2 } }
+            ?: return Bounds(size, WindowPosition.PlatformDefault)
+        // 乗っている画面の中に収まるよう右下・左上を寄せる
+        val x = pos.x.value.coerceIn(onScreen.x.toFloat(), (onScreen.x + onScreen.width - size.width.value).coerceAtLeast(onScreen.x.toFloat()))
+        val y = pos.y.value.coerceIn(onScreen.y.toFloat(), (onScreen.y + onScreen.height - size.height.value).coerceAtLeast(onScreen.y.toFloat()))
+        return Bounds(size, WindowPosition(x.dp, y.dp))
+    }
+
+    private const val TITLE_W = 200
+    private const val TITLE_H = 32
+    private const val TITLE_MIN_VISIBLE = 48
 
     fun save(size: DpSize, pos: WindowPosition) {
         if (!size.width.value.isFinite() || !size.height.value.isFinite()) return
