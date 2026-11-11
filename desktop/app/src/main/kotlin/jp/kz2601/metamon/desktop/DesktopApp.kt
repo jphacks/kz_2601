@@ -82,13 +82,17 @@ fun DesktopApp(dsl: AppDSL, initialStore: MockStore = MockStore(), startScreen: 
     // 落とした物・Ctrl+V は一番上に見えている画面へ
     val topComponents = { dsl.screen(session.top.screen)?.components.orEmpty() }
     val topDraft = { session.form(session.top)?.let(::FormDraftStrings) ?: mutableMapOf() }
+    // 印刷(#1767): Ctrl+P・見出しの「印刷」で一番上の画面をプレビュー
+    var printing by remember { mutableStateOf<PrintDocument?>(null) }
+    val openPrint = { printing = ScreenPrint.document(dsl, session.top.screen, session.store, session.form(session.top)) }
 
-    Surface(Modifier.fillMaxSize().ioDropTarget(io, topComponents, topDraft).onPreviewKeyEvent(io.previewKey(topComponents, topDraft))) {
+    Surface(Modifier.fillMaxSize().ioDropTarget(io, topComponents, topDraft).onPreviewKeyEvent(io.previewKey(topComponents, topDraft))
+        .onPreviewKeyEvent { if (DesktopPrint.isPrintKey(it)) true.also { openPrint() } else false }) {
         IoOverlay(io)
         Box(Modifier.fillMaxSize()) {
             Column(Modifier.fillMaxSize()) {
                 val base = NavigationResolver.dismissModals(nav).top(dsl)
-                Box(Modifier.weight(1f)) { ScreenView(dsl, session, base, io, dispatch) }
+                Box(Modifier.weight(1f)) { ScreenView(dsl, session, base, io, dispatch, openPrint) }
                 if (dsl.app.hasTabs) {
                     HorizontalDivider()
                     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly) {
@@ -109,12 +113,14 @@ fun DesktopApp(dsl: AppDSL, initialStore: MockStore = MockStore(), startScreen: 
                 ) {
                     val m = if (full) Modifier.fillMaxSize() else Modifier.widthIn(max = 640.dp).fillMaxWidth(0.92f).fillMaxSize(0.9f)
                     Surface(m, shape = MaterialTheme.shapes.large, tonalElevation = 6.dp) {
-                        ScreenView(dsl, session, top, io, dispatch)
+                        ScreenView(dsl, session, top, io, dispatch, openPrint)
                     }
                 }
             }
         }
     }
+
+    printing?.let { doc -> PrintPreview(doc, onDismiss = { printing = null }, onResult = { io.notice = it }) }
 
     pending?.let { (a, ctx) ->
         AlertDialog(
@@ -139,7 +145,7 @@ private fun confirmLabel(a: Action): String = when (a.type) {
 
 /** route の画面 1 枚(見出し・戻る・toolbar・一言・グリッド)。 */
 @Composable
-private fun ScreenView(dsl: AppDSL, session: DesktopSession, route: Route, io: DesktopIo, dispatch: (Action, ActionContext) -> Unit) {
+private fun ScreenView(dsl: AppDSL, session: DesktopSession, route: Route, io: DesktopIo, dispatch: (Action, ActionContext) -> Unit, print: () -> Unit) {
     val screen = dsl.screen(route.screen) ?: dsl.screens.firstOrNull() ?: return
     val form = session.form(route)
     val data = remember(session.store) { session.leafData() }
@@ -154,6 +160,7 @@ private fun ScreenView(dsl: AppDSL, session: DesktopSession, route: Route, io: D
             screen.toolbar.forEach { b ->
                 if (isButtonVisible(b.action, form)) TextButton(onClick = { perform(b.action, null) }) { Text(b.label) }
             }
+            if (route == session.top) TextButton(onClick = print) { Text("印刷") }
         }
         HorizontalDivider()
         if (route == session.top) {
