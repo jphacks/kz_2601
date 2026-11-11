@@ -1,11 +1,10 @@
-// TODO mac-026: UIKit を直接使うテスト。Mac で回すには描画の仕方を置き換え層に寄せる
-#if os(iOS)
 import XCTest
 import SwiftUI
 import AVFoundation
 import MetamonDSL
 @testable import MetamonRenderer
 
+#if os(iOS) // AVAudioSession は iOS だけ(Mac の AudioSessionLease は何もしない作り)
 /// テスト用の AVAudioSession(設定と有効化の呼び出しだけ記録する)。
 private final class FakeSession: AudioSessionControlling {
     var category: AVAudioSession.Category = .playAndRecord
@@ -27,11 +26,13 @@ private final class FakeSession: AudioSessionControlling {
         if !active { deactivations.append(options) }
     }
 }
+#endif
 
 /// #420: 録音の部品。セッションの貸し借り(音声入力を壊さない)と描画。
 final class AudioRecorderRenderTests: XCTestCase {
     // MARK: - audio session
 
+    #if os(iOS) // AVAudioSession の偽物を使う(Mac には AVAudioSession が無い)
     /// 音声入力(WhisperKit)が設定した playAndRecord に、録音・再生の後で戻す。
     func testLeaseRestoresVoiceInputSession() throws {
         let s = FakeSession()
@@ -75,6 +76,16 @@ final class AudioRecorderRenderTests: XCTestCase {
         XCTAssertThrowsError(try AudioSessionLease.forRecording(s))
         XCTAssertEqual(s.categoryOptions, [.defaultToSpeaker, .allowBluetoothHFP])
     }
+    #else
+    /// Mac: 入出力はシステムの設定のままなので、借りる / 戻すは何もせず失敗もしない。
+    func testLeaseIsNoOpOnMac() throws {
+        let rec = try AudioSessionLease.forRecording()
+        rec.end()
+        rec.end()
+        let play = try AudioSessionLease.forPlayback()
+        play.end()
+    }
+    #endif
 
     // MARK: - render
 
@@ -90,10 +101,10 @@ final class AudioRecorderRenderTests: XCTestCase {
         return try JSONDecoder().decode(Component.self, from: Data((json + "}").utf8))
     }
 
-    @MainActor private func render<V: View>(_ view: V) -> UIImage? {
+    @MainActor private func render<V: View>(_ view: V) -> PlatformImage? {
         let r = ImageRenderer(content: view.frame(width: 360))
         r.scale = 1
-        return r.uiImage
+        return r.platformImage
     }
 
     @MainActor func testRegistryBuildsTheRecorder() {
@@ -142,4 +153,3 @@ final class AudioRecorderRenderTests: XCTestCase {
         XCTAssertNotNil(render(AudioPlayButton(value: .string(missing.encoded))))
     }
 }
-#endif

@@ -1,5 +1,3 @@
-// TODO mac-026: UIKit を直接使うテスト。Mac で回すには描画の仕方を置き換え層に寄せる
-#if os(iOS)
 import XCTest
 import SwiftUI
 import MetamonDSL
@@ -121,12 +119,11 @@ final class MusicPlayerTests: XCTestCase {
         let build = try XCTUnwrap(ComponentRegistry.standard.builder(for: "musicPlayer"))
         let view = build(c, RenderContext(route: Route(screen: "home")))
             .frame(width: 390, height: 600)
-        let host = UIHostingController(rootView: view)
+        let host = TestHostingController(rootView: view)
         host.view.frame = CGRect(x: 0, y: 0, width: 390, height: 600)
-        host.view.layoutIfNeeded()
+        host.layoutNow()
         let size = host.sizeThatFits(in: CGSize(width: 390, height: 600))
         XCTAssertGreaterThan(size.height, 0)
-        XCTAssertNotNil(ImageRenderer(content: view).uiImage)
+        XCTAssertNotNil(ImageRenderer(content: view).platformImage)
     }
 }
-#endif
