@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 押すと外へ出る部品(button・shareButton・openUrlButton・qrCode・webView・#861)の文言。英語は values-en。 -->
+<resources>
+    <string name="renderer_action_loading">読み込み中…</string>
+    <string name="renderer_share_any">共有</string>
+    <string name="renderer_share_line">LINE で送る</string>
+    <string name="renderer_share_slack">Slack に送る</string>
+    <string name="renderer_share_discord">Discord に送る</string>
+    <string name="renderer_share_x">X に投稿</string>
+    <string name="renderer_share_mail">メールで送る</string>
+    <string name="renderer_open_paypay">PayPay を開く</string>
+    <string name="renderer_open_line">LINE を開く</string>
+    <string name="renderer_open_slack">Slack を開く</string>
+    <string name="renderer_open_discord">Discord を開く</string>
+    <string name="renderer_open_x">X を開く</string>
+    <string name="renderer_open_instagram">Instagram を開く</string>
+    <string name="renderer_open_maps">地図で開く</string>
+    <string name="renderer_open_mail">メールを書く</string>
+    <string name="renderer_open_phone">電話をかける</string>
+    <string name="renderer_open_url_invalid">openUrlButton: url は https か line/slack/discord/tel/mailto/maps のみ</string>
+    <string name="renderer_qr_title">QR コード</string>
+    <string name="renderer_qr_empty">QR にする内容がまだありません</string>
+    <string name="renderer_qr_too_long">長すぎて QR コードにできません</string>
+    <string name="renderer_web_invalid">webView: https の URL だけ表示できます</string>
+    <string name="renderer_web_back">前のページ</string>
+    <string name="renderer_web_forward">次のページ</string>
+    <string name="renderer_web_reload">再読み込み</string>
+    <string name="renderer_web_stop">読み込みを止める</string>
+</resources>

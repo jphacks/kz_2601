@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="metamon_canvas">#0F1A22</color>
+    <color name="metamon_brand">#4E8DB8</color>
+
+    <style name="Theme.Metamon" parent="android:Theme.Material.NoActionBar">
+        <item name="android:windowBackground">@color/metamon_canvas</item>
+        <item name="android:colorAccent">@color/metamon_brand</item>
+    </style>
+</resources>

@@ -1,0 +1,59 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- アプリの共有シート(リンクの発行・送る・QR・取り消し)と、リンクから開く・参加する(#901)。文言は iOS の ShareAppSheet・JoinShareSheet から -->
+<resources>
+    <string name="share_action">シェア</string>
+    <string name="share_close">閉じる</string>
+    <string name="share_copied">コピーしました</string>
+    <string name="share_copy">リンクをコピー</string>
+    <string name="share_creating">リンクを作成中</string>
+    <string name="share_failure_blank">まだ中身の無いアプリはシェアできません。声で作ってからシェアしてください</string>
+    <string name="share_failure_generic">リンクを作れませんでした</string>
+    <string name="share_failure_not_member">この共有に参加していません。招待リンクから参加してください</string>
+    <string name="share_failure_offline">リンクを作れませんでした。通信できる所でもう一度お試しください</string>
+    <string name="share_failure_unavailable">シェアはサーバー接続時のみ使えます</string>
+    <string name="share_join_cancel">参加しない</string>
+    <string name="share_join_confirm">参加する</string>
+    <string name="share_join_name_footer">空欄のままなら、名前なしで一覧に出ます</string>
+    <string name="share_join_name_label">表示名(任意)</string>
+    <string name="share_join_name_placeholder">例: 父、たろう</string>
+    <string name="share_join_name_rejected">「表示名」に表示できない言葉が含まれています</string>
+    <string name="share_join_point">・%1$s</string>
+    <string name="share_join_point_leave">共有シートから、いつでも抜けられます</string>
+    <string name="share_join_point_list">参加している人の一覧に、下の名前で出ます</string>
+    <string name="share_join_point_notify">他の人の行動で届く通知を受け取ります。設定でオフにできます</string>
+    <string name="share_join_point_see">参加している人が付けた記録が見られます</string>
+    <string name="share_join_point_visible">あなたが付けた記録も、参加している人に見えます</string>
+    <string name="share_join_points_header">参加すると</string>
+    <string name="share_join_title">「%1$s」に参加しますか?</string>
+    <string name="share_open_added">シェアされた「%1$s」を追加しました</string>
+    <string name="share_open_extra_members">。参加している人の記録も見られます</string>
+    <string name="share_open_extra_public">。みんなの投稿も見られます</string>
+    <string name="share_open_failed">シェアされたアプリを開けませんでした</string>
+    <string name="share_open_inviter_left">このリンクを送った人はもう参加していないため、参加できません。参加している人に新しいリンクをもらってください</string>
+    <string name="share_open_joined">「%1$s」に参加しました</string>
+    <string name="share_open_members_full">参加している人が上限(100 人)に達しているため、参加できません</string>
+    <!-- 取り込んだ時の一言(先頭の文 + 補足) -->
+    <string name="share_open_message">%1$s%2$s</string>
+    <string name="share_open_offline">シェアされたアプリを開けませんでした。通信できる所でもう一度お試しください</string>
+    <string name="share_open_revoked">このシェアリンクは取り消されたか、存在しません</string>
+    <string name="share_open_unavailable">シェアリンクはサーバー接続時のみ開けます</string>
+    <string name="share_qr_caption">カメラで読み取ると Tailor It で開きます</string>
+    <string name="share_qr_label">シェア用 QR コード</string>
+    <string name="share_retry">もう一度</string>
+    <string name="share_revoke">リンクを取り消す</string>
+    <string name="share_revoke_cancel">やめる</string>
+    <string name="share_revoke_confirm">取り消す</string>
+    <string name="share_revoke_failed">取り消せませんでした</string>
+    <string name="share_revoke_message">このリンクと QR コードはもう開けなくなります。参加済みの人はそのまま使えます。新しいリンクを作り直します。</string>
+    <string name="share_revoke_title">リンクを取り消しますか?</string>
+    <string name="share_revoked">リンクを取り消しました。もう開けません</string>
+    <string name="share_scope_copy">受け取った人は自分のアプリとして使えます(記録は共有されません)</string>
+    <string name="share_scope_members">受け取った人はリンクから参加して、記録を一緒に使えます</string>
+    <string name="share_scope_public">受け取った人もみんなの投稿が見られます</string>
+    <string name="share_send">リンクを送る</string>
+    <string name="share_send_message">Tailor It で「%1$s」を使ってみて\n%2$s</string>
+    <string name="share_settings_footer">リンクや QR コードで、いま使っているアプリをほかの人に渡せます</string>
+    <string name="share_settings_row">このアプリをシェア</string>
+    <string name="share_title">「%1$s」をシェア</string>
+    <string name="share_untitled">このアプリ</string>
+</resources>
