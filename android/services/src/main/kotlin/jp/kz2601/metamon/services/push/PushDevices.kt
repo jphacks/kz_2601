@@ -5,8 +5,7 @@ import kotlinx.serialization.Serializable
 
 /**
  * `PUT /v1/me/devices/{installationId}` の本文(iOS の `PushDeviceRegistration`)。
- * Android は FCM のトークンなので `platform: "android"` を付ける。
- * 今の backend は APNs の 16 進のトークンと platform 無しだけを受ける(#918 で android を足す)。
+ * Android は FCM のトークンなので `platform: "android"` を付ける(backend は #918 で受ける)。
  */
 @Serializable
 data class PushDeviceRegistration(

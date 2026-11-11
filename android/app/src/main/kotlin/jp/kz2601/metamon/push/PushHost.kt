@@ -13,7 +13,7 @@ import kotlinx.coroutines.flow.asStateFlow
 /**
  * 他の人の行動で届く通知の窓口(#887・iOS の `PushHost`)。Android の部品は差し込みで受けるので JVM でテストできる。
  * - 許可済み(通知を出せる)の時だけ FCM のトークンを求める。確認のダイアログはここでは出さない(#886 の窓口が聞く)
- * - [registerDevices] が false の間はトークンを取らず送らない(backend が android を受けるまで・#918)
+ * - [registerDevices] が false ならトークンを取らず送らない(既定は [jp.kz2601.metamon.AppContainer.PUSH_DEVICE_REGISTRATION])
  * - モックの構成では作らない(AppContainer の push が null)
  */
 class PushHost(

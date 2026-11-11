@@ -548,10 +548,10 @@ class AppContainer(
         }
 
         /**
-         * FCM のトークンを backend に送るか。今の `PUT /v1/me/devices` は APNs の 16 進のトークンだけを受ける(platform も無い)ので、
-         * backend が android を受けるまで(#918)は送らない。同意(notify-consent)と登録の削除はこれと関係なく動く。
+         * FCM のトークンを backend に送るか。`PUT /v1/me/devices` は #918 で `platform: "android"` と FCM のトークンを受け、
+         * runner が FCM で送るようになったので送る(#1193)。同意(notify-consent)と登録の削除はこれと関係なく動く。
          */
-        const val PUSH_DEVICE_REGISTRATION = false
+        const val PUSH_DEVICE_REGISTRATION = true
 
         /**
          * 権限の記録と生成アプリの通知の予約(#886)を忘れる(表示の言語は端末の設定なので残す)。
