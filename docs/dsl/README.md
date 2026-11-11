@@ -702,8 +702,10 @@ appconfig `GET /v1/client-config`(認証不要・`docs/backend/openapi-appconfig
 | `IOS_APP_STORE_URL` | 更新ボタンの行き先(`https://apps.apple.com/app/id…`) | iOS の Info.plist `MetamonAppStoreURL`、それも無ければ App Store で「Tailor It」を検索 |
 | `MIN_ANDROID_BUILD` / `LATEST_ANDROID_BUILD` | Android の versionCode で、意味は上の 2 つと同じ | 強制しない・出さない |
 | `ANDROID_STORE_URL` | Android の更新ボタンの行き先(`https://play.google.com/store/apps/details?id=…`) | Android の既定(Google Play のアプリのページ) |
+| `MIN_MACOS_BUILD` / `LATEST_MACOS_BUILD` | Mac アプリの `CFBundleVersion` で、意味は上の 2 つと同じ(#981) | 強制しない・出さない |
+| `MAC_APP_STORE_URL` | Mac の更新ボタンの行き先(`https://apps.apple.com/app/id…` / `macappstore://…`) | Mac の既定(Info.plist `MetamonAppStoreURL`、無ければ Mac App Store で検索) |
 
-iOS / Android は起動時と前面に戻った時に読む。**通信失敗・不正な応答では何もしない**(fail open: backend が落ちていてもアプリは使える)。
+iOS / Android / macOS は起動時と前面に戻った時に読む。**通信失敗・不正な応答では何もしない**(fail open: backend が落ちていてもアプリは使える)。
 
 ### 5.5 API の破壊的な変更
 

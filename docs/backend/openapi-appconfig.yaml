@@ -2048,16 +2048,18 @@ paths:
   /client-config:
     get:
       security: []
-      summary: iOS / Android の最低対応版と最新版(#302)・アプリ内のお知らせ(#333)・認証不要
+      summary: iOS / Android / macOS の最低対応版と最新版(#302・#981)・アプリ内のお知らせ(#333)・認証不要
       description: |
-        サインイン前にも iOS / Android が起動時・前面に戻った時に読む。値は appconfig の環境変数(起動時に 1 回読む)。**未設定・不正な値のフィールドは省略 = 強制しない**。
+        サインイン前にも iOS / Android / macOS が起動時・前面に戻った時に読む。値は appconfig の環境変数(起動時に 1 回読む)。**未設定・不正な値のフィールドは省略 = 強制しない**。
         - `MIN_IOS_BUILD`: これ未満の CFBundleVersion は閉じられない「アップデートしてください」画面
         - `LATEST_IOS_BUILD`: これ未満は閉じられるお知らせ(MIN より小さければ MIN に揃える)
         - `IOS_APP_STORE_URL`: App Store のページ(https / itms-apps のみ)。省略時は iOS 側の既定
         - `MIN_ANDROID_BUILD` / `LATEST_ANDROID_BUILD`: Android の versionCode で、意味は iOS の 2 つと同じ(LATEST が MIN より小さければ MIN に揃える)。iOS の値とは別に判定する
         - `ANDROID_STORE_URL`: Google Play のページ(https / market のみ)。省略時は Android 側の既定
+        - `MIN_MACOS_BUILD` / `LATEST_MACOS_BUILD`: Mac アプリの CFBundleVersion で、意味は iOS の 2 つと同じ(LATEST が MIN より小さければ MIN に揃える)。iOS の値とは別に判定する(#981)
+        - `MAC_APP_STORE_URL`: Mac App Store のページ(https / macappstore のみ)。省略時は Mac 側の既定
         - `NOTICE_JSON`: アプリ内のお知らせ(`notice`・#333)。1 行のバナーで、利用者が閉じられる。iOS は閉じた `id` を覚えるので、文面を変えて出し直す時は `id` も変える。JSON が壊れている・必須が無い・未知のフィールドがある時は `notice` を省略する(他のフィールドは出す)。手順は `docs/ops/incident-runbook.md`
-        iOS / Android は通信失敗・不正な応答では何もしない(fail open)。`notice` だけが不正な時も版の判定は続ける。`Cache-Control: public, max-age=300`(変更が届くまで最大 5 分)。
+        iOS / Android / macOS は通信失敗・不正な応答では何もしない(fail open)。`notice` だけが不正な時も版の判定は続ける。`Cache-Control: public, max-age=300`(変更が届くまで最大 5 分)。
       responses:
         '200':
           description: OK
@@ -2072,6 +2074,9 @@ paths:
                   minAndroidBuild: { type: integer, minimum: 1 }
                   latestAndroidBuild: { type: integer, minimum: 1 }
                   androidStoreUrl: { type: string, format: uri }
+                  minMacOSBuild: { type: integer, minimum: 1 }
+                  latestMacOSBuild: { type: integer, minimum: 1 }
+                  macAppStoreUrl: { type: string, format: uri }
                   notice: { $ref: '#/components/schemas/Notice' }
               example:
                 minIOSBuild: 12
@@ -2080,6 +2085,9 @@ paths:
                 minAndroidBuild: 7
                 latestAndroidBuild: 9
                 androidStoreUrl: 'https://play.google.com/store/apps/details?id=jp.kz2601.metamon'
+                minMacOSBuild: 40
+                latestMacOSBuild: 42
+                macAppStoreUrl: 'https://apps.apple.com/app/id0000000000'
                 notice:
                   id: 2026-11-02-ai
                   severity: warning
