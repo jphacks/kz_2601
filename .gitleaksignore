@@ -2,3 +2,6 @@
 5a42052d431c9ba4a9da724170befbe7941537bc:backend/README.md:curl-auth-header:42
 5a42052d431c9ba4a9da724170befbe7941537bc:backend/README.md:curl-auth-header:47
 19585e6c607daf879faceefaa5f06dfb827de30e:backend/internal/auth/verifier.go:curl-auth-header:43
+# LiveKit のテスト用の偽の鍵(e92d242d で追加・3e3aeafc で偽と分かる値に置き換え済み)。実の鍵ではない。
+e92d242d4414af9573ebef21175e474489e46a74:backend/internal/appconfig/calls_test.go:generic-api-key:41
+e92d242d4414af9573ebef21175e474489e46a74:backend/internal/calls/calls_test.go:generic-api-key:23

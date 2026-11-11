@@ -38,7 +38,7 @@ func callEnv(t *testing.T, cs *coins.Service, perMinute int64, perHour int) *env
 	t.Setenv("FIREBASE_AUTH_EMULATOR_HOST", "localhost:9099")
 	cfg, err := calls.ConfigFromEnv(func(k string) string {
 		return map[string]string{"CALLS_ENABLED": "1", "LIVEKIT_URL": "wss://example.livekit.cloud", "LIVEKIT_API_KEY": "APIkey",
-			"LIVEKIT_API_SECRET": "secret-that-is-long-enough-for-hs256", "COIN_PER_CALL_MINUTE": fmt.Sprint(perMinute), "CALL_BLOCK_MINUTES": "10"}[k]
+			"LIVEKIT_API_SECRET": "fake-livekit-secret-for-tests-only-not-real", "COIN_PER_CALL_MINUTE": fmt.Sprint(perMinute), "CALL_BLOCK_MINUTES": "10"}[k]
 	})
 	if err != nil {
 		t.Fatal(err)
