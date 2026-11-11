@@ -58,6 +58,7 @@
     <string name="settings_support_header">詳細(サポート用)</string>
     <string name="settings_support_in_memory">インメモリ</string>
     <string name="settings_support_mock">モック</string>
+    <string name="settings_support_user_id">ユーザー ID</string>
     <string name="settings_support_version">バージョン</string>
     <string name="settings_support_voice_model">音声モデル</string>
     <string name="settings_sync">同期</string>

@@ -155,7 +155,8 @@ fun SettingsSheet(
             PrivacySection(container)
             HorizontalDivider(Modifier.padding(vertical = 8.dp))
             // お問い合わせ・ライセンス・詳細(サポート用)(#898・iOS の supportSection)
-            SupportSection(remember(runtimeState.document.version) { supportInfo(context, container, runtimeState.document.version) })
+            val uid = container.auth.currentUser.collectAsStateWithLifecycle().value?.uid
+            SupportSection(remember(runtimeState.document.version, uid) { supportInfo(context, container, uid, runtimeState.document.version) })
             // ログアウト・削除の後は本体の画面ごと消える(後片付けは画面より長く生きる scope で回る)
             container.accountGuard.active.collectAsStateWithLifecycle().value?.let { user ->
                 HorizontalDivider(Modifier.padding(vertical = 8.dp))
@@ -247,11 +248,12 @@ private fun ToggleRow(label: String, checked: Boolean, tag: String, onChange: (B
     }
 }
 
-/** 「詳細(サポート用)」の値(iOS の `SettingsSheet.supportInfo`)。ユーザー ID は入れない([SupportInfo])。 */
-private fun supportInfo(context: Context, container: AppContainer, revision: Int): SupportInfo {
+/** 「詳細(サポート用)」の値(iOS の `SettingsSheet.supportInfo`)。 */
+private fun supportInfo(context: Context, container: AppContainer, uid: String?, revision: Int): SupportInfo {
     val mock = container.knobs.mock
     val pkg = runCatching { context.packageManager.getPackageInfo(context.packageName, 0) }.getOrNull()
     return SupportInfo(
+        uid = uid,
         voiceModel = container.transcriber::class.simpleName ?: "-",
         aiEndpoint = if (mock) context.getString(R.string.settings_support_mock) else SupportInfo.host(container.environment.aiBaseUrl),
         appConfigEndpoint = if (mock) context.getString(R.string.settings_support_in_memory) else SupportInfo.host(container.environment.appConfigBaseUrl),

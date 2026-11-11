@@ -5,10 +5,11 @@ import java.net.URI
 /**
  * 設定の「詳細(サポート用)」に出す値(iOS の `SupportInfo`・#279)。音声モデル・接続先・ビルド番号を 1 画面目に出さず、ここにまとめる。
  *
- * iOS はユーザー ID も出すが、Android は出さない(#898: uid・トークン・メールアドレスは表示にもコピーにも入れない)。
- * 接続先はホスト名だけ(パス・クエリ・ユーザー情報は落とす)。
+ * iOS と同じくユーザー ID を出す(問い合わせで人を特定するため・#1240)。サインインしていなければ出さない。
+ * トークン・メールアドレスは出さない。接続先はホスト名だけ(パス・クエリ・ユーザー情報は落とす)。
  */
 data class SupportInfo(
+    val uid: String?,
     val voiceModel: String,
     val aiEndpoint: String,
     val appConfigEndpoint: String,
@@ -16,12 +17,13 @@ data class SupportInfo(
     val build: String,
     val appRevision: Int,
 ) {
-    enum class Field { VOICE_MODEL, AI, APPCONFIG, VERSION, APP_REVISION }
+    enum class Field { USER_ID, VOICE_MODEL, AI, APPCONFIG, VERSION, APP_REVISION }
 
     data class Row(val field: Field, val value: String)
 
     val rows: List<Row>
-        get() = listOf(
+        get() = listOfNotNull(
+            uid?.takeIf { it.isNotBlank() }?.let { Row(Field.USER_ID, it) },
             Row(Field.VOICE_MODEL, voiceModel),
             Row(Field.AI, aiEndpoint),
             Row(Field.APPCONFIG, appConfigEndpoint),
