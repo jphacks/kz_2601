@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- アプリ内のお知らせ(#333)・最低対応版(#302)。文言は iOS(ServiceNoticeBanner・UpdateGate)に合わせ、App Store は Google Play にする(#906) -->
+<resources>
+    <string name="notice_a11y_info">お知らせ: %1$s</string>
+    <string name="notice_a11y_warning">重要なお知らせ: %1$s</string>
+    <string name="notice_dismiss">お知らせを閉じる</string>
+    <string name="notice_learn_more">詳しく見る</string>
+    <string name="update_later">あとで</string>
+    <string name="update_open_store">Google Play を開く</string>
+    <string name="update_recommended_body">Google Play で最新の版にアップデートできます。</string>
+    <string name="update_recommended_title">新しい版があります</string>
+    <string name="update_required_body">この版の Tailor It は使えなくなりました。Google Play から最新の版にアップデートしてください。</string>
+    <string name="update_required_title">アップデートしてください</string>
+    <string name="update_update">アップデート</string>
+</resources>

@@ -41,6 +41,8 @@ jobs:
               - 'backend/**'
               - 'docs/dsl/conformance/expr/**'
               - 'docs/dsl/examples/**'
+              # cmd/dslgen の生成物(TestGeneratedKotlinIsUpToDate が古さを検査する・#1006)
+              - 'android/dsl/src/main/kotlin/**/generated/**'
               - '.github/workflows/backend-ci.yml'
 
   backend-ci:

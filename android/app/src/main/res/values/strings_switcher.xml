@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- アプリの切り替え(最小の一覧・#881)。見た目は子 Issue -->
+<resources>
+    <string name="switcher_close">閉じる</string>
+    <string name="switcher_current">いま使っているアプリ</string>
+    <string name="switcher_empty">まだアプリがありません</string>
+    <string name="switcher_new_app">+ 新しいアプリ</string>
+    <string name="switcher_open">アプリ一覧</string>
+    <string name="switcher_title">変身一覧</string>
+    <string name="switcher_untitled">名前なし</string>
+</resources>
