@@ -78,6 +78,11 @@ final class MacShareAppModel: Identifiable {
         }
     }
 
+    /// サインアウト・アカウント削除でシートを閉じる時。読み込み中の参加者を書き戻さない
+    func close() {
+        members?.invalidate()
+    }
+
     /// 抜けた後: 自分が出したリンクはもう使えないので捨てる
     func forgetLink() {
         state = .failed(SharedAccessDenial.notMember.message)

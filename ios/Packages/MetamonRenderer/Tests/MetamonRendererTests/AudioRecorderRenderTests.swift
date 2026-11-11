@@ -78,7 +78,7 @@ final class AudioRecorderRenderTests: XCTestCase {
     }
     #else
     /// Mac: 入出力はシステムの設定のままなので、借りる / 戻すは何もせず失敗もしない。
-    func testLeaseIsNoOpOnMac() throws {
+    @MainActor func testLeaseIsNoOpOnMac() throws {
         let rec = try AudioSessionLease.forRecording()
         rec.end()
         rec.end()

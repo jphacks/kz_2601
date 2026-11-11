@@ -8,14 +8,14 @@ import MetamonServices
 @MainActor
 final class MacHealthNoteTests: XCTestCase {
     private var posted: [String] = []
-    private var savedPost: ((String) -> Void)!
+    private var savedPost: ((String, MacVoiceOver.Priority) -> Void)!
     private var suiteName = ""
     private var defaults: UserDefaults!
 
     override func setUp() async throws {
         savedPost = MacVoiceOver.post
         posted = []
-        MacVoiceOver.post = { [weak self] in self?.posted.append($0) }
+        MacVoiceOver.post = { [weak self] text, _ in self?.posted.append(text) }
         suiteName = "mac-health-note-\(UUID().uuidString)"
         defaults = UserDefaults(suiteName: suiteName)
     }
