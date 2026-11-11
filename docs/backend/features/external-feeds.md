@@ -26,6 +26,7 @@
 - 気圧: 6 時間ごとの行に最低 / 最高(hPa)・1 時間ごとの値の小さな折れ線・急な低下の印(24 時間以内に 6 hPa 以上下がる)を出す。値を記録・グラフ・通知の条件に使うことはできない。
 - arXiv(`arxiv`): 許可した分野(`dsl.ArxivCategories` の 9 つ)の新着を投稿日の新しい順に。行は題名・著者(3 人まで、それ以上は「ほか」)・投稿日。タップで論文のページ(arxiv.org/abs/…)を Safari で開く。要約(abstract)は出さない。キーワード検索・分野の組み合わせはできない。
 - 国会会議録(`diet`): アプリに決めて書いた語(`query`・40 字まで)で発言を探し、新しい会議から。行は発言者(会派)・院と会議名と号・会議の日付。タップで会議録の発言のページを開く。発言の本文は出さない。利用者がその場で語を打って検索する形は無い(DSL に書いた語だけ)。
+- 台風(`typhoon`・#1661): 気象庁が今情報を出している台風(熱帯低気圧・台風から変わった温帯低気圧を含む・5 つまで)を 1 つ 1 行で。行は「台風第N号(名前)」・種別(台風でない時)・大きさと強さ・位置(存在地域と緯度経度)・中心気圧・最大風速(最大瞬間風速)・進路と速さ・予報の最後の時刻、日時は実況の時刻。引数は無い(地域で絞らない)。台風が無い時は行が無い(部品の `emptyText`)。進路図(画像)・予報円・暴風域は出さない(まず数字だけ)。**お知らせ用で、警報や避難の判断の代わりにはならない**(下の「台風の扱い」)。
 - NHK のニュースは**入れていない**(下の「外したもの」: RSS の規約が個人の利用だけで、プログラムでの再提供を許していない)。
 
 ## DSL の形
@@ -38,11 +39,12 @@
 {"type": "feed", "provider": "pressure", "region": "016000", "title": "札幌の気圧", "limit": 8}
 {"type": "feed", "provider": "arxiv", "feedId": "cs.CL", "title": "自然言語処理の新着論文", "limit": 10}
 {"type": "feed", "provider": "diet", "query": "こども家庭庁", "title": "国会で「こども家庭庁」", "limit": 10}
+{"type": "feed", "provider": "typhoon", "title": "今の台風", "emptyText": "今は台風はありません"}
 ```
 
 | キー | 中身 |
 |---|---|
-| `provider` | 必須。`weather` / `warnings` / `pressure` / `holidays` / `rss` / `arxiv` / `diet`(スキーマの閉じた enum) |
+| `provider` | 必須。`weather` / `warnings` / `pressure` / `holidays` / `rss` / `arxiv` / `diet` / `typhoon`(スキーマの閉じた enum。holidays と typhoon は引数なし) |
 | `region` | weather / warnings / pressure だけ・必須。気象庁の府県予報区のコード(`dsl.WeatherRegions` の 56 個。3 つで同じ一覧) |
 | `feedId` | rss・arxiv だけ・必須。rss は許可したフィードの id(`dsl.RSSFeeds`)、arxiv は分野(`dsl.ArxivCategories`: cs.AI / cs.CL / cs.CR / cs.CV / cs.HC / cs.LG / cs.RO / cs.SE / stat.ML) |
 | `query` | diet だけ・必須。国会会議録で探す語。空白(全角も)をまとめて 1〜40 字・改行やタブ・制御文字・見えない文字(Cf)は不可。空白区切りは AND。API には `q` で渡す |
@@ -59,6 +61,7 @@
 | weather | 気象庁 `https://www.jma.go.jp/bosai/forecast/data/forecast/{府県予報区}.json` | [気象庁ホームページについて](https://www.jma.go.jp/jma/kishou/info/coment.html): 権利表記の無いものは [公共データ利用規約(第1.0版)](https://www.digital.go.jp/resources/open_data/public_data_license_v1.0)(商用利用可・出典の記載が要る・CC BY 4.0 と互換) | 気象庁ホームページ |
 | warnings | 気象庁 `https://www.jma.go.jp/bosai/warning/data/r8/{府県予報区}.json`(2026 年の新しい警報の形。前の `bosai/warning/data/warning/` は 2026-05 から更新が止まっている) | weather と同じ(公共データ利用規約(第1.0版)) | 気象庁ホームページ |
 | pressure | MET Norway(ノルウェー気象研究所)`https://api.met.no/weatherapi/locationforecast/2.0/compact?lat=..&lon=..`(海面気圧 `air_pressure_at_sea_level`。緯度経度は府県予報区ごとにサーバーが持つ代表地点・小数 2 桁) | [Terms of Service](https://api.met.no/doc/TermsOfService)・[License](https://api.met.no/doc/License): NLOD 2.0 と CC BY 4.0。鍵・登録は無し。名乗る User-Agent が要る(無いと 403)。`Expires` より前に同じ問い合わせを繰り返さない・1 秒 20 回まで・座標は小数 4 桁まで・アプリは直接でなく自前のサーバーを通してキャッシュするよう勧めている。商用を禁じる文は無い(読んだ範囲) | MET Norway(ノルウェー気象研究所)・CC BY 4.0・加工したこと |
+| typhoon | 気象庁 `https://www.jma.go.jp/bosai/typhoon/data/targetTc.json`(今の台風の一覧)と、その中の番号(`TC` と 4 桁だけを使う)ごとの `https://www.jma.go.jp/bosai/typhoon/data/{TC番号}/specifications.json`(実況と予報)。[台風情報のページ](https://www.jma.go.jp/bosai/typhoon/)が使うデータ | weather と同じ(2026-11-12 に [気象庁ホームページについて](https://www.jma.go.jp/jma/kishou/info/coment.html) を読み直した): 権利表記の無いものは公共データ利用規約(第1.0版)。**出典の記載が要る**(例「出典：気象庁ホームページ(当該ページの URL)」)。**編集・加工したら、出典とは別に加工したことを書く**(例「気象庁「…」(URL)を加工して作成」)。加工した情報を国が作ったように見せてはいけない。気象情報は常に最新のものを使うよう求めている。気象業務法 23 条([警報の制限](https://www.jma.go.jp/jma/kishou/info/ml-23.html))で気象庁以外は警報をしてはならない | 気象庁ホームページ・「公共データ利用規約(第1.0版)・1 行にまとめて加工」。出典の URL は台風情報のページ |
 | holidays | 内閣府 `https://www8.cao.go.jp/chosei/shukujitsu/syukujitsu.csv`(Shift_JIS・[案内のページ](https://www8.cao.go.jp/chosei/shukujitsu/gaiyou.html)) | [内閣府ホームページ利用規約](https://www.cao.go.jp/notice/rule.html): 権利表記の無いものは公共データ利用規約(第1.0版) | 内閣府ホームページ |
 | rss `digital-news` | デジタル庁 新着・更新 `https://www.digital.go.jp/rss/news.xml`([RSS の案内](https://www.digital.go.jp/rss)) | [デジタル庁 著作権について](https://www.digital.go.jp/copyright-policy): 公共データ利用規約(第1.0版) | デジタル庁ホームページ |
 | rss `fdma-news` | 消防庁 新着情報 `https://www.fdma.go.jp/index.xml`([RSS の案内](https://www.fdma.go.jp/about/rss.html)) | [消防庁 このサイトについて](https://www.fdma.go.jp/about/others/post3.html): 公共データ利用規約(第1.0版) | 消防庁ホームページ |
@@ -78,6 +81,12 @@ arxiv・diet の表示: どちらも**一覧(メタデータ)とリンクだけ*
 
 加工の扱い: 公共データ利用規約は、編集・加工したら加工したことを書くよう求める。警報は気象庁のコードを名前に置き換え、種類と状態ごとに地域をまとめて出す(加工)。気圧は 1 時間ごとの値を 6 時間の行にまとめ、低下の印を足す(加工)ので、出典の license に「CC BY 4.0・6 時間ごとにまとめて加工」と書いた。天気は気象庁の天気のコードを「晴れ / くもり / 雨 / 雪」と絵に置き換えて出すので、出典の行は「出典: 気象庁ホームページ(公共データ利用規約(第1.0版))」とし、加工の表記の要否と書き方は**人が確かめる**(下の「まだ決めていないこと」)。
 
+台風の扱い(typhoon):
+- **お知らせ用の表示で、警報の仕組みではない**。気象庁の発表を出典つきで写して 1 行にまとめるだけで、独自の警報・危険度の判定・通知はしない(気象業務法 23 条)。キャッシュ 10 分と端末の側のキャッシュで発表から遅れることがあり、台風が近い時の判断は気象庁の台風情報・警報と自治体の避難情報を見る。部品にこの注意の文を出すか、`emptyText` の「台風はありません」が「安全です」と読まれないかは人が確かめる。
+- 加工: 気象庁の実況(と予報の最後の時刻)を言葉にして 1 行にまとめる(加工)ので、出典の license を「公共データ利用規約(第1.0版)・1 行にまとめて加工」にした。加工の表記の書き方(「気象庁「台風情報」を加工して作成」の形にするか)は天気と同じく人が確かめる。
+- 1 回の取得は一覧 1 本 + 台風ごとに 1 本(5 つまで)で、全部取れた時だけキャッシュに入れる(1 つでも失敗したら全体を失敗にして、24 時間以内の前の結果を `stale` で返す)。一覧の番号は `TC` と 4 桁だけを URL に使い、それ以外は捨てる。
+- 公式の API として案内されたデータではない(天気・警報と同じ)。台風の時期の実際の形(暴風域・予報の部分)は `testdata` に無いので、次の台風で stg で確かめる(`testdata` は 2026-11-12 に取った、温帯低気圧に変わった直後の台風第 32 号の 1 件だけ。台風の時の形は手で書いた例で試験している)。
+
 許可リストを増やす時: `backend/internal/feeds/client.go` の `DefaultEndpoints` と `backend/pkg/dsl/feed.go` の `RSSFeeds` に 1 行ずつ足す(テストが両方の一致を見る)。arXiv の分野は `backend/pkg/dsl/feed_arxiv_diet.go` の `ArxivCategories`(スキーマの `feedId` の説明と AI の規則 `feed_arxiv_diet_rules.go` にも書く。テストが規則との一致を見る)。**規約(再配布・商用・出典)を確かめて、この表に URL を書いてから**。表に無い URL・https でない URL・「外したもの」の URL がコードの許可リストにあると、`TestAllowlistMatchesDoc`(`internal/feeds/allowlist_doc_test.go`)が落ちる。追加は人の判断(#339)。
 
 ISBN から本の情報を引く `lookupBook` も同じ作り(専用のクライアント・固定の URL・上限・キャッシュ・止める)で、出どころは openBD だけ: [book-lookup.md](book-lookup.md)。
@@ -91,10 +100,10 @@ ISBN から本の情報を引く `lookupBook` も同じ作り(専用のクライ
 | 内部のアドレスに届かない | 専用のクライアントは、接続の直前に**実際の接続先のアドレス**を確かめ、公開のユニキャスト以外(ループバック・プライベート・リンクローカル(メタデータのサーバーを含む)・CGNAT・マルチキャスト・文書用・IPv4 を写した IPv6 など)には接続しない。名前を引き直して内部を指すようになっても同じ。環境のプロキシ設定は使わない。リダイレクトは許可リストのホストの同じ scheme の中だけ(3 回まで) |
 | 送る項目を最小にする | 送るのは府県予報区のコード・フィードの URL・arXiv の分野・国会会議録で探す語(diet の `query`)だけ。diet の語は**アプリを作った時に DSL に書いた決まった語**で、利用者がその場で打った文字や記録の値ではない(DSL から値を差し込む形は無い)。ただし API は認証した利用者なら任意の語(40 字まで)を送れるので、語は国会図書館に届く。アプリのログには語を残さない(取りに行くたびのログ `feeds.fetch` は語の文字数だけ・アクセスのログはパスだけ)。ただし Cloud Run の要求ログは URL を問い合わせごと残すので、語はそこに残る。利用者の uid・位置・記録の値は送らない。**緯度経度は受け取らない**(天気・警報・気圧は府県の単位)ので、ログにも座標は残らない。気圧の出どころには府県ごとに決まった代表地点(県庁などの所在地・`internal/feeds/pressure_points.go`)の座標を送るだけで、利用者の位置ではない |
 | 秘密は DSL に置かない | 鍵の要らない出どころだけなので、秘密は無い |
-| 量の上限 | 1 回 8 秒まで・応答の大きさの上限(天気 256 KiB・警報 512 KiB・気圧 256 KiB・祝日 128 KiB・RSS 512 KiB・arxiv 1 MiB・diet 3 MiB(発言の本文ごと返るため。20 件の実測は 84 KB))・保存する行は 60 まで・キャッシュは 2000 件まで(diet の語で増えないよう、古いものから捨てる)。arxiv と diet は出どころの求めに合わせ、インスタンスあたり**同時に 1 本**で、前の取得から間をあけて取りに行く(diet は 3 秒。arxiv は 3 秒 × appconfig の最大インスタンス数(`deploy-cloudrun.yml` の `--max-instances=3`)= 9 秒にして、全インスタンスが同時に取っても合計で 3 秒に 1 回を超えないようにした。最大インスタンス数を変える時は `backend/internal/feeds/feeds.go` の `appconfigMaxInstances` も変える)。順番待ちは来た順で 10 秒まで。超えたら 503。取得は待っていた要求の期限と切り離して 8 秒まで続け、結果はキャッシュに入る(要求の側の打ち切りは失敗として覚えない)。キャッシュ(天気 30 分・警報 10 分・気圧 30 分・祝日 12 時間・RSS 15 分・arxiv 3 時間・diet 3 時間。気圧の問い合わせは府県の 56 地点にまとまる)で同じ問い合わせはまとめ、同時の問い合わせも 1 回の取得にまとめる。出どころへの取得はインスタンスあたり 1 分 30 回まで(diet は別枠で 1 分 10 回。検索語はキャッシュに当たりにくいので、ほかの部品の枠を使わない)。利用者ごとに 1 時間 120 回まで。検索語のある問い合わせ(diet)で出どころまで取りに行くのは、利用者ごと・インスタンスごとに 1 時間 20 回まで(キャッシュにある語はこの数に入らない。超えたら 429)。失敗は 1 分覚えて、すぐに取り直さない |
+| 量の上限 | 1 回 8 秒まで・応答の大きさの上限(天気 256 KiB・警報 512 KiB・気圧 256 KiB・祝日 128 KiB・RSS 512 KiB・arxiv 1 MiB・diet 3 MiB(発言の本文ごと返るため。20 件の実測は 84 KB)・typhoon はファイルごとに 128 KiB)・保存する行は 60 まで・キャッシュは 2000 件まで(diet の語で増えないよう、古いものから捨てる)。arxiv と diet は出どころの求めに合わせ、インスタンスあたり**同時に 1 本**で、前の取得から間をあけて取りに行く(diet は 3 秒。arxiv は 3 秒 × appconfig の最大インスタンス数(`deploy-cloudrun.yml` の `--max-instances=3`)= 9 秒にして、全インスタンスが同時に取っても合計で 3 秒に 1 回を超えないようにした。最大インスタンス数を変える時は `backend/internal/feeds/feeds.go` の `appconfigMaxInstances` も変える)。順番待ちは来た順で 10 秒まで。超えたら 503。取得は待っていた要求の期限と切り離して 8 秒まで続け、結果はキャッシュに入る(要求の側の打ち切りは失敗として覚えない)。キャッシュ(天気 30 分・警報 10 分・台風 10 分(1 回の取得は一覧 + 台風ごとの 1 本で 6 本まで。1 分の取得の数え方では 1 回)・気圧 30 分・祝日 12 時間・RSS 15 分・arxiv 3 時間・diet 3 時間。気圧の問い合わせは府県の 56 地点にまとまる)で同じ問い合わせはまとめ、同時の問い合わせも 1 回の取得にまとめる。出どころへの取得はインスタンスあたり 1 分 30 回まで(diet は別枠で 1 分 10 回。検索語はキャッシュに当たりにくいので、ほかの部品の枠を使わない)。利用者ごとに 1 時間 120 回まで。検索語のある問い合わせ(diet)で出どころまで取りに行くのは、利用者ごと・インスタンスごとに 1 時間 20 回まで(キャッシュにある語はこの数に入らない。超えたら 429)。失敗は 1 分覚えて、すぐに取り直さない |
 | ログ | 外へ取りに行くたびに 1 行(`event=feeds.fetch`・成功は INFO・失敗は WARN): provider・status(`ok` / HTTP の番号 / `timeout`・`network`・`too_large`・`bad_response` などの種類)・bytes・duration_ms と、許可リストの region・feed_id・語の文字数(q_runes)。キャッシュから返した時は外へ出ないので書かない。語・URL・応答の本文・uid は書かない(通信の失敗の中身は URL を含むので、種類だけを書く) |
 | 同意と開示 | 利用者の情報を外部へ送らないので、第三者への提供には当たらない(と考える)。ただしプライバシーポリシー・App Privacy の書き方は人が確かめる(下) |
-| 止められる | `FEEDS_DISABLED` で provider ごとに止められる(`all` で全部。今回足した出どころだけ止めるなら `FEEDS_DISABLED=arxiv,diet`)。止めた provider は 503 で、部品は「読み込めませんでした」 |
+| 止められる | `FEEDS_DISABLED` で provider ごとに止められる(`all` で全部。台風だけなら `FEEDS_DISABLED=typhoon`。今回足した出どころだけ止めるなら `FEEDS_DISABLED=arxiv,diet`)。止めた provider は 503 で、部品は「読み込めませんでした」 |
 | 試験 | 許可リストの外・内部のアドレスに届かないこと・応答の上限・キャッシュを Go のテストで確かめる(下)。テストは偽の出どころ(httptest)だけを使い、実際の外部には出ない |
 
 表示の側: 取った文字は制御文字・見えない文字を除いて長さで切る。RSS の記事のリンクは https だけ(それ以外は捨てる)。リンクは Safari で開く(アプリの中で Web は表示しない)。
@@ -142,6 +151,7 @@ diet の検索語で出どころまで取りに行く回数は、利用者ごと
 - AI: `backend/internal/ai/feed_rules_test.go`・ai-eval `feed_cases.json` / `feed_chat_cases.json`(`-check` だけ確かめた。実際に Claude で回すのは別)。
 - AI: warnings・pressure の規則は `feed_warnings_pressure_rules.go`(`TestFeedWarningsPressureRules`)・ai-eval `feed_cases.json` に 2 件・`jphacks_coverage_cases.json` の hs_2503・NG_2301。
 - arxiv・diet: `backend/internal/feeds/arxiv_diet_test.go`(2026-11-08 に 1 回だけ実際に取った応答を 4 件に切って `testdata/arxiv_api_cs_AI.xml`・`testdata/kokkai_speech_kodomo.json` に置いた。解析・送る問い合わせ・通信の前に断る値・3 秒あける・1 つずつ止める・キャッシュの上限)・`backend/pkg/dsl/feed_arxiv_diet_test.go`・`backend/internal/appconfig/feeds_arxiv_diet_test.go`(`q` の検証)・AI の規則 `feed_arxiv_diet_rules.go`(`TestFeedArxivDietRules`)・ai-eval `feed_arxiv_diet_cases.json`(4 件・NHK は作らない)・iOS `FeedTests` / `FeedLeafTests`。
+- typhoon: `backend/internal/feeds/typhoon_test.go`(2026-11-12 に 1 回だけ実際に取った一覧と 1 件を `testdata/jma_typhoon_targetTc.json`・`testdata/jma_typhoon_TC2638_specifications.json` に置いた。台風の時の形は手で書いた例。解析・台風が無い時の空の一覧・1 件の失敗で全体が失敗・引数を断る・`FEEDS_DISABLED`・`TC` と 4 桁以外の番号を URL にしない・キャッシュ)・`backend/pkg/dsl/feed_test.go`。
 - iOS: `FeedTests`(DSL から問い合わせ)・`FeedLeafTests`(表示の組み立て)・`FeedClientTests`(appconfig だけに聞く・キャッシュ)。
 
 ## 記録に残す(サーバーの自動の動き saveFeed)
@@ -184,4 +194,5 @@ diet の検索語で出どころまで取りに行く回数は、利用者ごと
   - arXiv: 商用の扱いが規約に無い。「arXiv の承認や提携はない」の書き方。間隔はインスタンスごとなので、3 秒 × 最大インスタンス数(今は 9 秒)にして合計が 3 秒に 1 回を超えないようにした(キャッシュ 3 時間・9 分野なので実際はもっと少ない)。
   - 国会会議録: 発言の著作権は各発言者にある。発言者・会議名・日付の一覧とリンクだけを出す今の形で足りるか。出典の書き方(国立国会図書館ウェブサイトのコンテンツ利用規約は公共データ利用規約(第1.0版)を指すが、会議録の発言は「第三者が著作権を有するコンテンツ」に当たる)。商用・キャッシュは API の仕様のページに書かれていない。
   - NHK: 入れていない。os_2401・sp_2512 のようなニュースのアプリを作るなら、NHK の許諾を取るか、再提供を許す別の出どころを探す。
+- **typhoon(#1661)は正典のスキーマを変えるので、develop に入れる前にオーナーの OK が要る(#339)**。AI の規則(`feed_rules.go` ほか)・iOS / Android / Mac の部品はまだ `typhoon` を知らない(AI の決まりは親の Issue の決定を待つ)。クライアントに足すまでは、`typhoon` の feed は知らない provider として描かれる。応答の形は既存の行(日時・見出し・副題・アイコン)だけなので、クライアントは provider の一覧に足すだけで出せる見込み(アイコンは SF Symbols の `tropicalstorm` / `cloud`)。
 - 府県予報区のコードの一覧は、気象庁の公開の情報と開発者の資料から作った。十勝・奄美は別のファイルが無い(釧路・根室、鹿児島のファイルに入る)ので一覧に入れていない。

@@ -9,7 +9,7 @@ import (
 // DSL names a provider from a closed set plus that provider's typed params;
 // it can never carry a URL. Nothing about the user or the app's records is
 // sent out: weather / warnings / pressure take a forecast region code,
-// holidays nothing, rss the id of an allowlisted feed. docs/backend/features/external-feeds.md
+// holidays and typhoon nothing, rss the id of an allowlisted feed. docs/backend/features/external-feeds.md
 
 // Feed providers (Component.Provider).
 const (
@@ -20,11 +20,12 @@ const (
 	FeedPressure = "pressure" // MET Norway の気圧の予報(Component.Region の代表地点)
 	FeedArxiv    = "arxiv"    // arXiv の分野ごとの新着論文(Component.FeedID = ArxivCategories)
 	FeedDiet     = "diet"     // 国会会議録検索システムの発言の検索(Component.Query)
+	FeedTyphoon  = "typhoon"  // 気象庁の今の台風の情報(引数なし)
 )
 
 // FeedProviders is the closed set of feed.provider values.
 var FeedProviders = map[string]bool{FeedWeather: true, FeedHolidays: true, FeedRSS: true, FeedWarnings: true, FeedPressure: true,
-	FeedArxiv: true, FeedDiet: true}
+	FeedArxiv: true, FeedDiet: true, FeedTyphoon: true}
 
 // FeedUsesRegion reports whether a provider reads Component.Region (a key of
 // WeatherRegions). The same 56 forecast office codes serve all three.
@@ -65,7 +66,7 @@ var RSSFeeds = map[string]string{
 
 func checkFeed(where string, c *Component, add func(string, ...any)) {
 	if !FeedProviders[c.Provider] {
-		add("%s: feed provider must be weather, warnings, pressure, holidays, rss, arxiv or diet (got %q); other sources and URLs are not available", where, c.Provider)
+		add("%s: feed provider must be weather, warnings, pressure, holidays, rss, arxiv, diet or typhoon (got %q); other sources and URLs are not available", where, c.Provider)
 		return
 	}
 	if FeedUsesRegion(c.Provider) {

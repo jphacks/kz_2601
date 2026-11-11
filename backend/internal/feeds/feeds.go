@@ -26,10 +26,10 @@ import (
 
 // Item is one row of a feed. Fields a provider does not use are omitted.
 type Item struct {
-	Date     string    `json:"date,omitempty"` // YYYY-MM-DD (weather, holidays, diet) or RFC 3339 (rss, arxiv, warnings, pressure)
+	Date     string    `json:"date,omitempty"` // YYYY-MM-DD (weather, holidays, diet) or RFC 3339 (rss, arxiv, warnings, pressure, typhoon)
 	Title    string    `json:"title"`
 	Subtitle string    `json:"subtitle,omitempty"`
-	Icon     string    `json:"icon,omitempty"`   // SF Symbols name (weather, warnings)
+	Icon     string    `json:"icon,omitempty"`   // SF Symbols name (weather, warnings, typhoon)
 	URL      string    `json:"url,omitempty"`    // https only (rss, arxiv, diet)
 	Max      *float64  `json:"max,omitempty"`    // °C (weather) / hPa (pressure)
 	Min      *float64  `json:"min,omitempty"`    // °C (weather) / hPa (pressure)
@@ -111,6 +111,8 @@ var providerLimits = map[string]limits{
 	dsl.FeedPressure: {ttl: 30 * time.Minute, maxBody: 256 << 10},
 	dsl.FeedArxiv:    {ttl: 3 * time.Hour, maxBody: 1 << 20, gap: arxivGap},
 	dsl.FeedDiet:     {ttl: 3 * time.Hour, maxBody: 3 << 20, gap: 3 * time.Second},
+	// typhoon: per file (the list and each of up to maxTyphoons spec files).
+	dsl.FeedTyphoon: {ttl: 10 * time.Minute, maxBody: 128 << 10},
 }
 
 const (
@@ -334,7 +336,7 @@ func (s *Service) check(q Query) error {
 		if q.Q == "" || q.Region != "" || q.FeedID != "" {
 			return ErrUnknown
 		}
-	case dsl.FeedHolidays:
+	case dsl.FeedHolidays, dsl.FeedTyphoon:
 		if q.Region != "" || q.FeedID != "" {
 			return ErrUnknown
 		}
@@ -682,6 +684,8 @@ func (s *Service) fetch(ctx context.Context, q Query) (string, []Item, int, erro
 		rawURL, title, parse = s.ep.arxivURL(q.FeedID), "arXiv "+q.FeedID+"("+dsl.ArxivCategories[q.FeedID]+")の新着", parseArxiv
 	case dsl.FeedDiet:
 		rawURL, title, parse = s.ep.dietURL(q.Q), "国会会議録「"+q.Q+"」", parseDiet
+	case dsl.FeedTyphoon:
+		return s.fetchTyphoon(ctx) // a list, then one file per cyclone
 	default:
 		return "", nil, 0, ErrUnknown
 	}

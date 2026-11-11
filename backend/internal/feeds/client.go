@@ -38,6 +38,7 @@ type Endpoints struct {
 	RSS         map[string]RSSFeed
 	Arxiv       string // + "?search_query=cat:{category}&..." (dsl.ArxivCategories)
 	Diet        string // + "?any={q}&..." (国会会議録 speech search)
+	TyphoonBase string // + "targetTc.json" / "{TC0000}/specifications.json"
 }
 
 // DefaultEndpoints are the production sources (terms checked 2026-11-06,
@@ -53,8 +54,9 @@ func DefaultEndpoints() Endpoints {
 			"fdma-news":     {Name: "消防庁 新着情報", URL: "https://www.fdma.go.jp/index.xml", Publisher: "消防庁", SiteURL: "https://www.fdma.go.jp/"},
 			"fdma-disaster": {Name: "消防庁 災害情報", URL: "https://www.fdma.go.jp/disaster/info/index.xml", Publisher: "消防庁", SiteURL: "https://www.fdma.go.jp/"},
 		},
-		Arxiv: "https://export.arxiv.org/api/query",
-		Diet:  "https://kokkai.ndl.go.jp/api/speech",
+		Arxiv:       "https://export.arxiv.org/api/query",
+		Diet:        "https://kokkai.ndl.go.jp/api/speech",
+		TyphoonBase: "https://www.jma.go.jp/bosai/typhoon/data/",
 	}
 }
 
@@ -66,6 +68,9 @@ func (ep Endpoints) source(q Query) Source {
 		return Source{Name: "気象庁ホームページ", URL: "https://www.jma.go.jp/", License: pdl}
 	case dsl.FeedWarnings:
 		return Source{Name: "気象庁ホームページ", URL: "https://www.jma.go.jp/bosai/warning/", License: pdl}
+	case dsl.FeedTyphoon:
+		// 加工: the parts are put into one line per cyclone (the doc's 出どころと規約).
+		return Source{Name: "気象庁ホームページ", URL: "https://www.jma.go.jp/bosai/typhoon/", License: pdl + "・1 行にまとめて加工"}
 	case dsl.FeedPressure:
 		return Source{Name: "MET Norway(ノルウェー気象研究所)", URL: "https://api.met.no/", License: "CC BY 4.0・6 時間ごとにまとめて加工"}
 	case dsl.FeedHolidays:
@@ -85,6 +90,15 @@ func (ep Endpoints) weatherURL(region string) string { return ep.WeatherBase + r
 
 // warningURL builds the warning URL (region checked like weatherURL).
 func (ep Endpoints) warningURL(region string) string { return ep.WarningBase + region + ".json" }
+
+// typhoonListURL is the list of cyclones JMA reports on now.
+func (ep Endpoints) typhoonListURL() string { return ep.TyphoonBase + "targetTc.json" }
+
+// typhoonSpecURL builds a cyclone's file. id was checked against tcIDRe
+// (TC + 4 digits), so it cannot add a path or a query.
+func (ep Endpoints) typhoonSpecURL(id string) string {
+	return ep.TyphoonBase + id + "/specifications.json"
+}
 
 // pressureURL builds the forecast URL for the region's fixed point. MET
 // Norway asks for at most 4 decimals; the points have 2.
@@ -129,6 +143,7 @@ func (ep Endpoints) hosts() map[string]bool {
 	}
 	add(ep.Arxiv)
 	add(ep.Diet)
+	add(ep.TyphoonBase)
 	return out
 }
 

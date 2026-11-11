@@ -118,6 +118,7 @@ func (f *fake) endpoints() *Endpoints {
 		WarningBase: f.srv.URL + "/warning/",
 		Pressure:    f.srv.URL + "/met/compact",
 		Holidays:    f.srv.URL + "/syukujitsu.csv",
+		TyphoonBase: f.srv.URL + "/typhoon/",
 		RSS: map[string]RSSFeed{
 			"digital-news":  {Name: "RSS2", URL: f.srv.URL + "/rss2.xml", Publisher: "A", SiteURL: "https://a.example/"},
 			"fdma-news":     {Name: "RDF", URL: f.srv.URL + "/rdf.xml", Publisher: "B", SiteURL: "https://b.example/"},

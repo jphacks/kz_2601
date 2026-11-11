@@ -55,7 +55,7 @@ func TestAllowlistMatchesDoc(t *testing.T) {
 	allowed, excluded := docSourceURLs(t, feedsDoc)
 	code := map[string]string{
 		"weather": ep.WeatherBase, "warnings": ep.WarningBase, "pressure": ep.Pressure,
-		"holidays": ep.Holidays, "arxiv": ep.Arxiv, "diet": ep.Diet,
+		"holidays": ep.Holidays, "arxiv": ep.Arxiv, "diet": ep.Diet, "typhoon": ep.TyphoonBase,
 	}
 	for id, f := range ep.RSS {
 		code["rss "+id] = f.URL
