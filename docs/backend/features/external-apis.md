@@ -74,6 +74,7 @@ op の `Check` は引数の値を確かめる(appconfig と runner の両方で�
 | `asana` の `projectTasks`(プロジェクトのタスクを見る・#1683) | 無料・OAuth(`runs` だけ・scope `tasks:read`) | `projectTasks(projectId, limit?)`。プロジェクトの未完了のタスク。`projectId` は数字の id(Asana の URL の `/0/<id>/`)。持っていない id(Asana の 400 / 404)は 400 `bad_request`。行は `myTasks` と同じ。規約・回数は同上 | 同上 | なし | 同上 |
 | `asana` の `complete`(タスクを完了にする・#1683) | 無料・OAuth(`runs` だけ・scope `tasks:write`。初めて使う時につなぎ直す。Asana の scope は足し算にならないので、つなぎ直しでも読む scope を一緒に求める)・書く(確認必須) | `complete(taskId)`。`taskId` は数字の id。答えは `resultId`(= `taskId`)と 1 件(補足 = 「完了」)。完了済みをもう一度完了にしても変わらない。持っていないタスクは 400 `bad_request`。規約は同上。回数: 書き込みは同時 15 | 同上 | なし | 同上 |
 | `frankfurter`(為替・欧州中央銀行・#1499) | 無料・鍵なし(`runs` だけ) | `latest(from?, to?, amount?)`・`historical(date, from?, to?, amount?)`。`from` / `to` は大文字 3 文字の通貨(`to` はカンマ区切りで 10 個まで・重ならない)・`amount` は正の数・`date` は 1999-01-04 から今日まで。行は通貨ごと(見出し = 通貨・値 = レート・補足 = 「日付・量 基準」) | `https://api.frankfurter.app` だけ・本文 64 KiB まで | latest 1 時間・historical 1 日 | `EXT_FRANKFURTER_ENABLED=1` |
+| `odpt` の `trainStatus`(電車の運行情報・公共交通オープンデータセンター・#1691) | 無料・運営の鍵(`runs` だけ。ODPT の開発者登録の consumer key) | `trainStatus(operator?, railway?)`。`operator` は ODPT の事業者 id・`railway` は路線 id で、どちらも下の「ODPT の事業者と規約」の許可リストだけ(ほかは 400 `bad_request`)。両方あれば路線がその事業者のものであること。無ければ許可リストの全事業者。行は路線ごと(見出し = 路線名(路線の無い事業者全体の情報は事業者名)・補足 = 「状態: 案内の文」(状態が無ければ文だけ・200 文字で切る)・値 = 「M/D HH:MM 更新」(`dc:date`・日本時間))。並びは許可リストの順。`dct:valid` を過ぎた行・時刻の無い行・許可リストに無い事業者の行は出さない。出典(下の表)を出す。AI に選ばせる決まり(`prompt.go`・`catalog.go`)はまだ | `https://api.odpt.org` だけ(`/api/v4/odpt:TrainInformation`)・鍵は `acl:consumerKey` のクエリ(API の決まり。エラーに URL は出さない) | 1 分 | `EXT_ODPT_ENABLED=1`・`EXT_ODPT_API_KEY` |
 | `openWeather` の `airQuality`(空気の汚れ・OpenWeatherMap Air Pollution・#1656) | 無料・運営の鍵(`runs` だけ。OpenWeather の契約の範囲) | `airQuality(lat, lng)`。`lat` / `lng` は小数(10 進だけ)で小数 2 桁(約 1 km)に丸めて送る。答えは 1 件(見出し = 「空気 <AQI の段階>(目安)」・値 = `AQI n/5`・補足 = PM2.5・PM10・O₃・NO₂ の µg/m³)。AQI は OpenWeather の 1〜5(良い・まあまあ・ふつう・悪い・とても悪い)。1〜5 でない答えは 502 `upstream_unavailable`。健康の判断ではなく目安。出典「Weather data © OpenWeather (ODbL)」を出す。AI に選ばせる決まり(`prompt.go`・`catalog.go`)はまだ | `https://api.openweathermap.org` だけ(`/data/2.5/air_pollution`。天気と同じホスト・同じ鍵) | なし | `EXT_OPEN_WEATHER_ENABLED=1`・`EXT_OPEN_WEATHER_API_KEY` |
 | `todoist` の `listTasks`(タスクを見る・#1496・`project` / `label` は #1681) | 無料・OAuth(`runs` だけ・scope `data:read`) | `listTasks(filter?, projectId?, project?, label?, limit?)`。`filter`・`projectId`・`project`(プロジェクトの名前)はどれか 1 つ。`label` はどれとも組める(`project` か `filter` と組むと Todoist のフィルタ `#名前 & @ラベル`、ほかは `label` の引数)。名前は 120 文字まで・1 行・`& \| ! ( ) , \ * # @` は使えない。カンマを含む `filter` に `label` は付けられない。`limit` 1〜50(既定 20)。行はタスク(見出し = 内容・補足 = 期限の言葉・値 = 期限・リンク) | `https://api.todoist.com` だけ | なし | `EXT_TODOIST_ENABLED=1`・`EXT_TODOIST_CLIENT_ID` / `_CLIENT_SECRET` |
 | `todoist` の `projects`(プロジェクトの一覧・#1681) | 無料・OAuth(`runs` だけ・scope `data:read`) | `projects(limit?)`。`limit` 1〜50(既定 20)。行はプロジェクト(見出し = 名前。`listTasks` の `project` に渡せる・リンク) | 同上 | なし | 同上 |
@@ -96,7 +97,7 @@ op の `Check` は引数の値を確かめる(appconfig と runner の両方で�
 
 Google ToDo の 401 は接続を `error` にする(つなぎ直す)。403 は scope が足りない時もほかの拒否も 409 `ext_not_connected`(つなぎ直す)、ただし回数の上限の 403 と 429 / 5xx は 502 `upstream_unavailable`。
 
-Asana の `myTasks`・`projectTasks`・`complete`、Todoist の `complete`・`projects`・`project` / `label`、Notion の `updateProperties`・`pageText`、Google ToDo の全部の op、GitHub と Linear の op、YouTube の `channelStats`・`latestVideos` は runner の op だけ。生成アプリから呼ぶ部品と AI に選ばせる決まり(`prompt.go`・`catalog.go`・`docs/dsl`)は #1643 の判断の後に足す。
+Asana の `myTasks`・`projectTasks`・`complete`、Todoist の `complete`・`projects`・`project` / `label`、Notion の `updateProperties`・`pageText`、Google ToDo の全部の op、GitHub と Linear の op、YouTube の `channelStats`・`latestVideos`、ODPT の `trainStatus` は runner の op だけ。生成アプリから呼ぶ部品と AI に選ばせる決まり(`prompt.go`・`catalog.go`・`docs/dsl`)は #1643 の判断の後に足す。
 
 provider が 404 / 422(持っていない通貨・日)を返した時は 400 `bad_request`(`runs` は戻す)。429 / 5xx は 502 `upstream_unavailable`。
 
@@ -145,6 +146,45 @@ op の案: `boards()`(自分のボード・`GET /1/members/me/boards`。`/1/memb
 | 規約へのリンク(ポリシー III.A.1) | YouTube の利用規約(https://www.youtube.com/t/terms)へのリンクを出す | 部品と iOS の作業(#1643)。`docs/legal` にも書く(人の作業) |
 | プライバシーポリシー(規約 7・ポリシー III.A.2) | YouTube API サービスを使うと書き、Google のプライバシーポリシー(https://policies.google.com/privacy)へリンクする | 人の作業(`docs/legal`) |
 | 割り当て(規約 15・ポリシー III.D.3) | 割り当てを超えない・避けない。増やすには API Compliance Audit。認められた使い道にだけ使う | 1 回 1〜2 単位。回数の上限 `EXT_GLOBAL_DAILY_YOUTUBE` を 1 日の割り当てに合わせる(上限は回数で数えるので、`latestVideos` を 2 単位として見積もる・人の作業) |
+
+### ODPT の事業者と規約(#1691)
+
+[公共交通オープンデータセンター利用規約](https://developer.odpt.org/terms/center_use_rules.html)・[公共交通オープンデータ基本ライセンス](https://developer.odpt.org/terms/data_basic_license.html)・[開発者ガイドライン](https://developer.odpt.org/terms/data_basic_use_guideline.html)・[チャレンジ限定ライセンス](https://developer.odpt.org/challenge_license)と、[データカタログ](https://ckan.odpt.org/dataset?tags=%E9%81%8B%E8%A1%8C%E6%83%85%E5%A0%B1-train_status_information)の各事業者の「運行情報」のライセンス(2026-11-12 に読んだ)から決めた。
+
+入れた事業者(許可リスト・`odpt.go` の `odptOperators`):
+
+| 事業者 id | 路線 id(`odpt.Railway:` の後) | ライセンス | データセット |
+|---|---|---|---|
+| `odpt.Operator:TokyoMetro` | `TokyoMetro.Ginza`・`.Marunouchi`・`.MarunouchiBranch`・`.Hibiya`・`.Tozai`・`.Chiyoda`・`.Yurakucho`・`.Hanzomon`・`.Namboku`・`.Fukutoshin` | 基本ライセンス | [東京メトロ 運行情報](https://ckan.odpt.org/dataset/r_train_status-tokyometro) |
+| `odpt.Operator:Toei` | `Toei.Asakusa`・`.Mita`・`.Shinjuku`・`.Oedo`・`.Arakawa`・`.NipporiToneri` | CC BY 4.0 | [東京都交通局 運行情報](https://ckan.odpt.org/dataset/r_train_status-toei) |
+| `odpt.Operator:TWR` | `TWR.Rinkai` | 基本ライセンス | [東京臨海高速鉄道 運行情報](https://ckan.odpt.org/dataset/r_train_status-twr) |
+| `odpt.Operator:MIR` | `MIR.TsukubaExpress` | 基本ライセンス | [首都圏新都市鉄道 運行情報](https://ckan.odpt.org/dataset/r_train_status-mir) |
+| `odpt.Operator:TamaMonorail` | `TamaMonorail.TamaMonorail` | 基本ライセンス | [多摩都市モノレール 運行情報](https://ckan.odpt.org/dataset/r_train_status-tamamonorail) |
+| `odpt.Operator:YokohamaMunicipal` | `YokohamaMunicipal.Blue`・`.Green` | 基本ライセンス | [横浜市交通局 運行情報](https://ckan.odpt.org/dataset/r_train_status-yokohamamunicipal) |
+
+入れない事業者(運行情報が「公共交通オープンデータチャレンジ限定ライセンス」。チャレンジの期間中・作品の応募が前提で、常に動くアプリには使えない):
+
+| 事業者 | データセット |
+|---|---|
+| JR 東日本(JR東日本アイステイションズ提供・特定利用条件つき) | [JR東日本アイステイションズ 運行情報](https://ckan.odpt.org/dataset/jr-train-status-information-by-jr-east-i-stations) |
+| 東急電鉄 | [東急電鉄 運行情報](https://ckan.odpt.org/dataset/tokyu__r_train_status) |
+| 東武鉄道 | [東武鉄道 運行情報](https://ckan.odpt.org/dataset/tobu__r_train_status) |
+| 京王電鉄 | [京王電鉄 運行情報](https://ckan.odpt.org/dataset/keio__r_train_status) |
+| 西武鉄道 | [西武鉄道 運行情報](https://ckan.odpt.org/dataset/seibu__r_train_status) |
+| 京急電鉄 | [京急電鉄 運行情報](https://ckan.odpt.org/dataset/keikyu__r_train_status) |
+
+ライセンスが基本ライセンスか CC BY に変わったら、カタログで確かめてから許可リストに足す(コードと上の表を一緒に直す)。
+
+| 決まり | 中身 | この作りでの扱い |
+|---|---|---|
+| 利用者への通知(ガイドライン「利用者への通知」) | センターのデータであること・正確・完全とは限らないこと・事業者に直接問い合わせないこと・アプリの問い合わせ先を出す | 出典 `ODPTAttribution`(「公共交通オープンデータセンターのデータです。正確・完全とは限りません。遅れの情報は事業者の公式の案内を確かめてください(事業者への問い合わせはしないでください)」)を行のそばに出す。アプリの問い合わせ先の出し方は部品(#1643)と iOS で決める |
+| CC BY のクレジット(都営・FAQ) | 「提供者名、名称、CC BY 4.0(リンク)」 | 都営の行を出す時は `ODPTToeiCredit`(「東京都交通局・公共交通オープンデータ協議会、運行情報、CC BY 4.0」)も出す |
+| 時刻の表示(ガイドライン 2.1.1) | 動的データは `dc:date` を画面に出す | 行の値 = 「M/D HH:MM 更新」。時刻の無い行は出さない |
+| 新しい情報だけ(ガイドライン 2.1.2) | `odpt:frequency` の間隔で更新・`dct:valid` を過ぎたデータは使わない | `dct:valid` を過ぎた行は出さない。キャッシュは 1 分だけ |
+| 元の意味を変えない(基本ライセンス 4 条 2 項) | 分解・修正で意味を損なわない・成果物の外で表示しない | 案内の文はそのまま(長い時だけ末尾を切って `…`)。生のデータは端末に返さない(決まった行の形だけ) |
+| 再配布しない(基本ライセンス 8 条 4 項) | データ(復元できる派生データを含む)を第三者が再利用できる形で公開しない | 生成アプリの画面に出すだけ。**生成アプリが運行情報を一覧として外に出す(書き出し・公開の API)のは規約の外**(部品の決まりは #1643) |
+| 鍵(利用規約 5 条 1 項 5 号) | アクセストークンを第三者に開示しない | 鍵は Secret Manager の `EXT_ODPT_API_KEY` だけ・エラーとログに URL を出さない |
+| 営利 | 基本ライセンス 4 条 7 項で営利・非営利を問わず使える | Pro の機能として出してよい |
 
 ## 呼び出しの流れと数え方
 
@@ -274,6 +314,7 @@ DSL に `externalCall` / `externalList` があるかの確かめは、DSL の子
 - 各社の鍵・OAuth のクライアント(Secret Manager・`EXT_<PROVIDER>_*`)と、原価・押さえの量(非公開の資料から env)。
 - Google ToDo(#1677): カレンダーの OAuth クライアントに戻り先 `/oauth/callback/googleTasks` を足し、Google Cloud のプロジェクトで Tasks API を有効にし、同意の画面に scope `tasks.readonly`・`tasks`(センシティブ)を足して Google の確認を受け直す。
 - GitHub App の登録(#1674): 権限は Issues・Pull requests・Metadata を読むだけ・「Expire user authorization tokens」を入れたまま・コールバックは runner の `/oauth/callback/github`・Webhook は切る。利用者は App を自分の repo / org に入れる(org は管理者の承認が要ることがある)。
+- ODPT(#1691): [公共交通オープンデータセンターの開発者サイト](https://developer.odpt.org/)で開発者登録(運営のアカウント・審査に数日かかることがある)をし、発行された consumer key を Secret Manager の `EXT_ODPT_API_KEY` に入れる。上の「ODPT の事業者と規約」を読み直し、アプリの問い合わせ先(開発者のメールアドレスなど)を決める。路線 id は登録後に `odpt:Railway` で一度確かめる。
 - Linear の OAuth の App の登録(#1684): コールバックは runner の `/oauth/callback/linear`・公開にするか(ほかのワークスペースから使えるように)を決める。
 - 回数の上限の値(`EXT_LIMIT_*`・`EXT_GLOBAL_DAILY*`)を各社の割り当てに合わせて runner の env に入れる(非公開の資料から。入れなければコードの既定)。
 - プライバシーポリシー・利用規約(`docs/legal`)に外の API への送信とトークンの保管・消し方を書く。
