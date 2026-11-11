@@ -43,6 +43,11 @@ struct AppCanvas: View {
         .macHandoff(handoffTarget, appName: app.name)
         .onChange(of: MacHandoffInbox.shared.pending) { revealHandoff() }
         #endif
+        .onReceive(NotificationCenter.default.publisher(for: IntentHost.recordAdded)) { note in
+            // ショートカットで足した記録(#1034)を、開いている画面にすぐ出す
+            guard let runtime, note.object as? String == runtime.appId, let entity = note.userInfo?["entity"] as? String else { return }
+            Task { await runtime.reloadLocal(entity) }
+        }
         .onReceive(NotificationCenter.default.publisher(for: MacAppRuntime.retentionConfirmed)) { note in
             guard let runtime, note.object as? String == runtime.appId else { return }
             Task { await runtime.purgeExpiredRecords() }

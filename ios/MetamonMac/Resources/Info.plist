@@ -7,6 +7,18 @@
 	<!-- 表示名・Bundle ID・版は iOS と同じ build setting から(project.yml) -->
 	<key>CFBundleDisplayName</key>
 	<string>$(METAMON_DISPLAY_NAME)</string>
+	<!-- Siri の呼び名(#1034・iOS の Info.plist と同じ) -->
+	<key>INAlternativeAppNames</key>
+	<array>
+		<dict>
+			<key>INAlternativeAppName</key>
+			<string>テイラーイット</string>
+		</dict>
+		<dict>
+			<key>INAlternativeAppName</key>
+			<string>テーラーイット</string>
+		</dict>
+	</array>
 	<key>CFBundleExecutable</key>
 	<string>$(EXECUTABLE_NAME)</string>
 	<key>CFBundleIdentifier</key>

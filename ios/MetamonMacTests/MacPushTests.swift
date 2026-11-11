@@ -50,6 +50,7 @@ final class MacPushTests: XCTestCase {
         MacPushHost.shared.install(client: nil, defaults: .standard, environment: .production, uid: { nil },
                                    authorization: { .notDetermined }, requestToken: {}, openApp: { _ in })
         _ = MacNotificationRouter.shared.take()
+        MacNotificationRouter.shared.now = Date.init
         defaults.removePersistentDomain(forName: suite)
     }
 
@@ -155,6 +156,64 @@ final class MacPushTests: XCTestCase {
         XCTAssertNil(MacNotificationRouter.Route.app("gone").appId(among: ids), "一覧に無ければ前に出すだけ")
         XCTAssertEqual(MacNotificationRouter.Route.notification("dsl.app1x.n1").appId(among: ids), "app1x", "ローカル通知は今までどおり")
         XCTAssertNil(MacNotificationRouter.Route.notification("other").appId(among: ids))
+    }
+
+    /// 起動直後のタップ: サーバーの一覧が載る前は行き先を残し、載ったら開く
+    func testPushRouteWaitsUntilTheAppIsListed() {
+        let router = MacNotificationRouter.shared
+        router.open(appId: "app2")
+        XCTAssertNil(router.resolve(among: ["app1"]), "まだ一覧に無い")
+        XCTAssertEqual(router.pending, .app("app2"), "消さずに待つ")
+        XCTAssertEqual(router.resolve(among: ["app1", "app2"]), "app2", "載ったら開く")
+        XCTAssertNil(router.pending)
+    }
+
+    func testPushRouteGivesUpAfterTheListIsRefreshed() {
+        let router = MacNotificationRouter.shared
+        router.open(appId: "gone")
+        XCTAssertNil(router.resolve(among: ["app1"], listRefreshed: true))
+        XCTAssertNil(router.pending, "取り直しても無ければ諦める")
+        XCTAssertNil(router.resolve(among: ["app1", "gone"]), "後から載っても開かない")
+    }
+
+    func testPushRouteGivesUpAfterALongTime() {
+        let router = MacNotificationRouter.shared
+        var clock = Date(timeIntervalSince1970: 1000)
+        router.now = { clock }
+        router.open(appId: "late")
+        clock += MacNotificationRouter.appRouteLifetime + 1
+        XCTAssertNil(router.resolve(among: ["app1", "late"]), "待つ長さを過ぎたら一覧に載っても開かない")
+        XCTAssertNil(router.pending)
+    }
+
+    func testLocalNotificationRouteIsResolvedOnce() {
+        let router = MacNotificationRouter.shared
+        router.open(notificationId: "other")
+        XCTAssertNil(router.resolve(among: ["app1"]))
+        XCTAssertNil(router.pending, "ローカル通知は今までどおり 1 回で消す")
+    }
+
+    // MARK: - アカウント削除の失敗
+
+    private struct FailingAccountClient: AccountClient {
+        func deleteAccount() async throws { throw URLError(.notConnectedToInternet) }
+    }
+
+    /// 削除が失敗したら(サインインしたまま)端末の登録を戻す
+    func testFailedAccountDeletionRegistersPushAgain() async {
+        await MacPushHost.shared.receive(token: token)
+        let account = MacAccount(session: AuthSession(service: MockAuthService(signedIn: true)), account: FailingAccountClient(), isLive: false)
+        account.appleReauth = { nil }
+        do {
+            _ = try await account.deleteAccount()
+            XCTFail("サーバーで消せなければ throw")
+        } catch {}
+        let deletes = await client.deletes
+        XCTAssertEqual(deletes, 1, "削除の前に登録を消す")
+        XCTAssertEqual(requests, 1, "失敗したらトークンを求め直す")
+        await MacPushHost.shared.receive(token: token)
+        let puts = await client.puts.count
+        XCTAssertEqual(puts, 2, "同じ利用者で登録し直す")
     }
 
     func testPayloadAppId() {
