@@ -23,6 +23,7 @@ import (
 //   - our deadline (or the client's timeout) → context.DeadlineExceeded:
 //     upstream_timeout, the run and the coins go back
 //   - 429 / 5xx / a transport error → ProviderError{Retryable}: given back
+//     (a Google quota 403 — quotaExceeded, rateLimitExceeded, ... — is 429)
 //   - another status → ProviderError (not billable: none of these
 //     providers charges a refused request)
 //   - a host outside Provider.Hosts → ErrEgress (internal)
@@ -40,6 +41,10 @@ func sendJSON(ctx context.Context, hc *http.Client, req *http.Request, out any) 
 		return &ProviderError{Status: resp.StatusCode, Retryable: true, Err: errors.New("reading the answer failed")}
 	}
 	if resp.StatusCode < 200 || resp.StatusCode > 299 {
+		if resp.StatusCode == http.StatusForbidden && googleHas(googleErrorReasons(body), googleRateReasons...) {
+			// Google's quota answer (YouTube quotaExceeded, ...) is its 429
+			return statusError(http.StatusTooManyRequests)
+		}
 		return statusError(resp.StatusCode)
 	}
 	if err := json.Unmarshal(body, out); err != nil {
