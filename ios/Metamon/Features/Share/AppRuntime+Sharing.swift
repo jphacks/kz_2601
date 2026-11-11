@@ -17,6 +17,8 @@ final class SharingUI {
     var issued: [String: ShareInfo] = [:]
     /// 記録を共有するアプリのリンクを開いた時の参加の確認(#254・`JoinShareSheet`)
     var pendingJoin: PendingJoin?
+    /// 記録を共有しないアプリのリンクを開いた時の、取り込む前の確認(`AddShareSheet`)
+    var pendingImport: PendingImport?
 
     /// 受け取ったシェアリンク(#278)。サインイン前・bootstrap 前に届いた分も捨てずに持ち、準備ができてから 1 回だけ開く。
     /// 未インストールの人が入れてから開き直すと、サインイン画面の上で届くため(RootView の onOpenURL では取りこぼす)。
@@ -64,7 +66,7 @@ extension AppRuntime {
             toast = L10n.tr("シェアリンクはサーバー接続時のみ開けます")
             return
         }
-        // #254: 記録を共有するアプリは、参加すると何が見えるかを先に見せて表示名を聞く(プレビューが取れなければ従来どおり)
+        // #254: 記録を共有するアプリは、参加すると何が見えるかを先に見せて表示名を聞く
         let membership = sharing as? any MembershipClient
         let preview = try? await membership?.previewShare(token: token)
         if let preview, preview.sharedData, !preview.mine {
@@ -72,11 +74,22 @@ extension AppRuntime {
             SharingUI.shared.pendingJoin = PendingJoin(token: token, preview: preview)
             return
         }
+        // それ以外も取り込む前に「追加しますか?」を出す。プレビューが取れない時は名前なしで聞く
+        SharingUI.shared.pendingImport = PendingImport(token: token, preview: preview)
+    }
+
+    /// 確認画面の「追加する」。成功したらシートを閉じて変身し nil、失敗したら画面に出す文言を返す(シートは開いたまま)。
+    func confirmImport(_ pending: PendingImport) async -> String? {
+        guard let sharing = services.sharing else {
+            return L10n.tr("シェアリンクはサーバー接続時のみ開けます")
+        }
         do {
-            let app = try await sharing.importShare(token: token)
+            let app = try await sharing.importShare(token: pending.token)
+            SharingUI.shared.pendingImport = nil
             await adopt(app, banner: L10n.tr("シェアされた「\(app.name)」を追加しました"))
+            return nil
         } catch {
-            toast = Self.importFailureMessage(error)
+            return Self.importFailureMessage(error)
         }
     }
 
@@ -156,6 +169,7 @@ struct SharingHooks: ViewModifier {
             }
             .sheet(isPresented: $ui.showDiscover) { DiscoverSheet() }
             .sheet(item: $ui.pendingJoin) { JoinShareSheet(join: $0) }
+            .sheet(item: $ui.pendingImport) { AddShareSheet(pending: $0) }
             #if DEBUG
             .task { await debugHooks() }
             .modifier(ReleaseRequestHooks())
@@ -166,7 +180,7 @@ struct SharingHooks: ViewModifier {
     /// ヘッドレス E2E 用(起動 2.5 秒後):
     /// - `METAMON_AUTO_DISCOVER=1` 探すを開く(`METAMON_AUTO_INSTALL=<public app id>` で続けてインストール)
     /// - `METAMON_AUTO_SHARE=1` 変身一覧 → 今のアプリのシェアシート
-    /// - `METAMON_AUTO_IMPORT=<token>` シェアリンクを開いたのと同じ import → 変身
+    /// - `METAMON_AUTO_IMPORT=<token>` シェアリンクを開いたのと同じ経路(追加 / 参加の確認を出す)
     private func debugHooks() async {
         let env = ProcessInfo.processInfo.environment
         let importToken = env["METAMON_AUTO_IMPORT"] ?? ""
