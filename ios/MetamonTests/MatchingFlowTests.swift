@@ -9,6 +9,9 @@ import MetamonRenderer
 private final class FakeMatching: MatchingClient, @unchecked Sendable {
     private let lock = NSLock()
     var error: Error?
+    /// 一覧だけ失敗させる
+    var listError: Error?
+    var serverAgeConfirmed = false
     var result: MatchInterest?
     private(set) var calls: [String] = []
 
@@ -22,6 +25,7 @@ private final class FakeMatching: MatchingClient, @unchecked Sendable {
     }
     func list(appId: String, box: MatchBox) async throws -> [MatchInterest] {
         try log("list \(box.rawValue)")
+        if let listError { throw listError }
         return box == .incoming ? [MatchInterest(uid: "u-taro", profileRecordId: "r-taro")] : []
     }
     func accept(appId: String, uid: String, ageConfirmed: Bool) async throws -> MatchInterest {
@@ -30,7 +34,17 @@ private final class FakeMatching: MatchingClient, @unchecked Sendable {
     }
     func decline(appId: String, uid: String) async throws { try log("decline \(uid)") }
     func unmatch(appId: String, uid: String) async throws { try log("unmatch \(uid)") }
+    func ageConfirmation() async throws -> Bool {
+        try log("get age")
+        return serverAgeConfirmed
+    }
+    func confirmAge() async throws {
+        try log("put age")
+        serverAgeConfirmed = true
+    }
 }
+
+private let ageUnconfirmed = APIError.server(status: 400, code: "bad_request", message: "confirm", details: ["reason": .string("age_unconfirmed")])
 
 /// #507 phase 2: 「つながりたい」の出し分け・18 歳以上の確認(初回だけ)・失敗の理由。
 @MainActor
@@ -87,7 +101,7 @@ final class MatchingFlowTests: XCTestCase {
         XCTAssertNil(MatchingUI.shared.askingAge)
         XCTAssertTrue(MatchingUI.shared.ageGate.isConfirmed)
         let mine = try XCTUnwrap(rt.records(for: "profile").first)
-        XCTAssertEqual(fake.calls, ["send r-hanako from=\(mine.id) age=true"])
+        XCTAssertEqual(fake.calls, ["put age", "send r-hanako from=\(mine.id) age=true"], "申告を送ってから送る")
         XCTAssertEqual(rt.interestState(entity: "profile", record: hanako), .sent)
 
         await rt.acceptInterest(MatchInterest(uid: "u-taro", profileRecordId: "r-taro"))
@@ -117,6 +131,88 @@ final class MatchingFlowTests: XCTestCase {
         XCTAssertFalse(MatchingUI.shared.ageGate.isConfirmed)
         XCTAssertNotNil(MatchingUI.shared.askingAge)
         XCTAssertEqual(rt.interestState(entity: "profile", record: hanako), InterestState.none, "失敗したら戻す")
+    }
+
+    /// 仲間探しのアプリを開いた: 端末で確認済みなら申告を 1 回だけ送る(確認は出さない)。
+    func testOpeningSendsTheDeviceDeclarationOnce() async throws {
+        let fake = FakeMatching()
+        MatchingUI.shared.ageGate.confirm()
+        let rt = try await runtime(fake)
+        await rt.prepareMatching()
+        await rt.prepareMatching()
+        XCTAssertEqual(fake.calls, ["put age"])
+        XCTAssertNil(MatchingUI.shared.askingAge)
+        XCTAssertTrue(MatchingUI.shared.ageGate.isSent(uid: me))
+    }
+
+    /// 端末にもサーバーにも申告が無い: 開いた時に確認を出す → 同意で PUT。
+    func testOpeningWithoutDeclarationAsks() async throws {
+        let fake = FakeMatching()
+        let rt = try await runtime(fake)
+        await rt.prepareMatching()
+        XCTAssertEqual(fake.calls, ["get age"])
+        let pending = try XCTUnwrap(MatchingUI.shared.askingAge)
+        await rt.confirmAdult(pending)
+        XCTAssertEqual(fake.calls, ["get age", "put age"])
+        XCTAssertTrue(MatchingUI.shared.ageGate.isConfirmed)
+        XCTAssertTrue(MatchingUI.shared.ageGate.isSent(uid: me))
+    }
+
+    /// 別の端末で申告済み: 聞かずに端末にも覚える。
+    func testOpeningAdoptsTheServerDeclaration() async throws {
+        let fake = FakeMatching()
+        fake.serverAgeConfirmed = true
+        let rt = try await runtime(fake)
+        await rt.prepareMatching()
+        XCTAssertNil(MatchingUI.shared.askingAge)
+        XCTAssertTrue(MatchingUI.shared.ageGate.isConfirmed)
+    }
+
+    /// 「18 歳未満」と答えたら、開くたびには聞かない(ボタンを押したら聞く)。
+    func testDeclinedIsNotAskedAgainOnOpen() async throws {
+        let fake = FakeMatching()
+        let rt = try await runtime(fake)
+        await rt.prepareMatching()
+        rt.declineAdult()
+        await rt.prepareMatching()
+        XCTAssertNil(MatchingUI.shared.askingAge)
+        await rt.sendInterest(entity: "profile", record: hanako)
+        XCTAssertNotNil(MatchingUI.shared.askingAge, "押した時は聞く")
+    }
+
+    /// 一覧が 400 age_unconfirmed: 送った記録を消して確認を出す → 同意で PUT してから読み直す。
+    func testListAgeUnconfirmedAsksThenReloads() async throws {
+        let fake = FakeMatching()
+        MatchingUI.shared.ageGate.confirm()
+        MatchingUI.shared.ageGate.markSent(uid: me) // サーバーの記録だけ消えた
+        let rt = try await runtime(fake)
+        fake.listError = ageUnconfirmed
+        await rt.refreshMatches([.incoming])
+        XCTAssertFalse(MatchingUI.shared.ageGate.isSent(uid: me))
+        let pending = try XCTUnwrap(MatchingUI.shared.askingAge)
+        fake.listError = nil
+        await rt.confirmAdult(pending)
+        XCTAssertEqual(fake.calls, ["list incoming", "put age", "list incoming"])
+        XCTAssertEqual(rt.matchItems(.incoming)?.map(\.uid), ["u-taro"])
+    }
+
+    /// プロフィールの投稿が 400 age_unconfirmed: 確認 → 同意で PUT してから投稿し直す。
+    func testProfilePostRetriedAfterDeclaration() async throws {
+        let fake = FakeMatching()
+        let rt = try await runtime(fake, withProfile: false)
+        rt.profilePostNeedsAge(entity: "profile", data: ["hobby": "囲碁"])
+        let pending = try XCTUnwrap(MatchingUI.shared.askingAge)
+        await rt.confirmAdult(pending)
+        XCTAssertEqual(fake.calls, ["put age"])
+        XCTAssertEqual(rt.records(for: "profile").first?.data["hobby"], .string("囲碁"))
+    }
+
+    /// サインアウト・アカウント削除の後片付けで、送った記録も消す。
+    func testWipeForgetsTheSentDeclaration() async throws {
+        MatchingUI.shared.ageGate.markSent(uid: me)
+        MatchingUI.shared.wipe()
+        XCTAssertFalse(MatchingUI.shared.ageGate.isSent(uid: me))
+        XCTAssertFalse(LocalWipe.preservedKeys.contains(MatchingAgeGate.sentKey))
     }
 
     func testFailureTextsAndRollback() async throws {

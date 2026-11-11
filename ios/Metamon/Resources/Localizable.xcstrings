@@ -13023,19 +13023,19 @@
         }
       }
     },
-    "年齢や生年月日は保存しません。この確認は、この端末に 1 回だけ記録します。" : {
+    "年齢や生年月日は保存しません。18 歳以上と答えたことだけを、あなたのアカウントに記録します。" : {
       "extractionState" : "manual",
       "localizations" : {
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Your age and birthday are not stored. This confirmation is saved once on this device."
+            "value" : "Your age and birthday are not stored. Only your answer that you are 18 or older is saved to your account."
           }
         },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "年齢や生年月日は保存しません。この確認は、この端末に 1 回だけ記録します。"
+            "value" : "年齢や生年月日は保存しません。18 歳以上と答えたことだけを、あなたのアカウントに記録します。"
           }
         }
       }
