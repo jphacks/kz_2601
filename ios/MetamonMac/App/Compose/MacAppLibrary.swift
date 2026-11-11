@@ -7,6 +7,8 @@ import MetamonServices
 /// - 作ったアプリは端末に残す(`LocalAppLibrary`: iOS のキャッシュと同じ置き方)。サーバー(#930)が入るまでは端末だけ
 /// - 同梱の例を会話で直した分も端末に残す(#1283)。右クリックの「元の例に戻す」で消す。版の履歴はアプリを終えると消える
 /// - 版の nil は「同梱の例のまま(会話で直す前)」。同梱の例を直して戻すと、元の例を表示し直す
+/// - 本物の AI で作った・直したアプリはサーバー(appconfig)にも保存される。その印(`isOnServer`)を端末に残し、
+///   記録をサーバーに読み書きするかを決める(#1284 の続き)。端末で複製したアプリはサーバーに無いので端末だけ
 /// ウインドウをまたいで 1 つだけ持つ(`MetamonMacApp` が作って渡す)。
 @MainActor
 @Observable
@@ -24,11 +26,17 @@ final class MacAppLibrary {
     /// 一覧に残す名前・版。端末の DSL と揃える(封筒の無い版を当てても進めない)
     private var savedRows: [String: LocalAppLibrary.Row] = [:]
     private var histories: [String: LocalVersionHistory<Version?>] = [:]
+    /// サーバーにあるアプリの id(本物の AI の結果を当てた)
+    private(set) var serverIds: Set<String>
     @ObservationIgnored private let store: LocalAppLibrary?
+    @ObservationIgnored private let defaults: UserDefaults?
+    static let serverIdsKey = "metamon.mac.serverAppIds"
 
-    /// `store` が nil なら端末に残さない(プレビュー・テスト用)
-    init(store: LocalAppLibrary? = .standard) {
+    /// `store` が nil なら端末に残さない(プレビュー・テスト用)。`defaults` はサーバーにあるアプリの印の置き場(nil なら残さない)
+    init(store: LocalAppLibrary? = .standard, defaults: UserDefaults? = nil) {
         self.store = store
+        self.defaults = defaults
+        serverIds = Set(defaults?.stringArray(forKey: Self.serverIdsKey) ?? [])
         for entry in store?.load() ?? [] {
             generated[entry.summary.id] = entry.document
             envelopes[entry.summary.id] = entry.envelope
@@ -51,9 +59,13 @@ final class MacAppLibrary {
         envelopes[appId] = nil
         histories[appId] = nil
         store?.removeExample(appId: appId)
+        markOnServer(appId, false)
     }
 
     func isCreated(_ appId: String) -> Bool { createdIds.contains(appId) }
+
+    /// サーバー(appconfig)に保存されているアプリか。記録・版・フィードバックの添付をサーバーにつなぐかの判定
+    func isOnServer(_ appId: String) -> Bool { serverIds.contains(appId) }
 
     /// 最後に開いていたアプリ(起動時に開き直す)
     var lastAppId: String? {
@@ -61,9 +73,11 @@ final class MacAppLibrary {
         set { store?.currentAppId = newValue }
     }
 
-    /// 会話の結果を当てる。作った直後の版には戻り先が無い(iOS も作った直後は「元に戻す」を出さない)。作ったアプリは一覧の先頭に足す
-    func apply(_ document: AppDocument, envelope: Data? = nil, created: Bool) {
+    /// 会話の結果を当てる。作った直後の版には戻り先が無い(iOS も作った直後は「元に戻す」を出さない)。作ったアプリは一覧の先頭に足す。
+    /// `onServer`: 本物の AI の結果(サーバーにも保存された)
+    func apply(_ document: AppDocument, envelope: Data? = nil, created: Bool, onServer: Bool = false) {
         let id = document.appId
+        if onServer { markOnServer(id, true) }
         if !(created && generated[id] == nil) {
             histories[id, default: .init()].record(previous: current(id))
         }
@@ -115,6 +129,7 @@ final class MacAppLibrary {
         savedRows[appId] = nil
         histories[appId] = nil
         store?.remove(appId: appId)
+        markOnServer(appId, false)
         saveList()
     }
 
@@ -162,6 +177,12 @@ final class MacAppLibrary {
     }
 
     // MARK: - 内部
+
+    private func markOnServer(_ appId: String, _ on: Bool) {
+        guard serverIds.contains(appId) != on else { return }
+        if on { serverIds.insert(appId) } else { serverIds.remove(appId) }
+        defaults?.set(serverIds.sorted(), forKey: Self.serverIdsKey)
+    }
 
     private func current(_ appId: String) -> Version? {
         generated[appId].map { Version(document: $0, envelope: envelopes[appId]) }

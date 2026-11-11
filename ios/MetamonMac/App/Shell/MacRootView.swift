@@ -89,7 +89,9 @@ struct MacRootView: View {
         } detail: {
             Group {
                 if let app = selectedApp {
-                    AppCanvas(app: app, dsl: library.generated[app.id]?.dsl, keepsRecords: library.isCreated(app.id), showsScreenMap: $showsScreenMap,
+                    AppCanvas(app: app, dsl: library.generated[app.id]?.dsl, keepsRecords: library.isCreated(app.id),
+                              server: library.isCreated(app.id) && library.isOnServer(app.id) ? MacServices.shared.appConfig : nil,
+                              showsScreenMap: $showsScreenMap,
                               onTalk: { talk(about: $0) }, discardGuard: discardGuard)
                         .environment(\.changeHighlight, highlight?.canvas == Self.canvasKey(app) ? highlight?.value ?? .none : .none)
                         .id(Self.canvasKey(app))
@@ -183,8 +185,15 @@ struct MacRootView: View {
         let name = library.generated[id]?.dsl.app.name ?? ""
         if selectedAppId == id { selectedAppId = LocalAppLibrary.neighbor(deleting: id, in: apps.map(\.id)) }
         if notices.summary?.appId == id { notices.summary = nil }
+        let onServer = library.isOnServer(id)
         library.delete(id)
         MacRecordVault.purge(appId: id) // 記録も消す(#1284)
+        // サーバーにあるアプリはサーバーからも消す(iOS の deleteApp と同じ)。届かなくても端末からは消す
+        if onServer, let appConfig = MacServices.shared.appConfig {
+            Task {
+                do { try await appConfig.deleteApp(appId: id) } catch { print("[Metamon] Mac: deleteApp failed: \(error)") }
+            }
+        }
         thumbs.remove(appId: id)
         Task { await MacRuntimeNotifications.removeApp(id) } // そのアプリの通知とタイマーの予約(#1324)
         MacVoiceOver.announce(L10n.tr("「\(name)」を削除しました"))
@@ -265,7 +274,8 @@ struct MacRootView: View {
     private func apply(_ document: AppDocument, envelope: Data?, target: MacComposeSession.Target) {
         let previous = target == .create ? nil
             : library.generated[document.appId]?.dsl ?? (try? apps.first(where: { $0.id == document.appId })?.loadDSL())
-        library.apply(document, envelope: envelope, created: target == .create)
+        // 本物の AI の結果はサーバーにも保存されている(記録・版をサーバーにつなぐ印)
+        library.apply(document, envelope: envelope, created: target == .create, onServer: MacServices.shared.isLive)
         showChangeHighlight(previous: previous, next: document)
         // 最初のアプリの印(iOS と同じ `hasShownEditHint`)。β の案内(`MacOnboarding`)は次の起動でこれを見て 1 回出す。
         // 最初の 1 回だけ「こう頼むと直せます」を予約する(要約が閉じてから出る・#1278)
