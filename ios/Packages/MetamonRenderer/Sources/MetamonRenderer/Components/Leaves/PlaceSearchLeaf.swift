@@ -90,12 +90,13 @@ struct PlaceSearchLeaf: View {
     }
 
     private var pinMap: some View {
-        Map(initialPosition: .automatic, interactionModes: [.pan, .zoom]) {
+        Map(initialPosition: .automatic, interactionModes: PlatformMap.inlineModes([.pan, .zoom])) {
             if let here { Marker(L("現在地"), systemImage: "location.fill", coordinate: here).tint(.blue) }
             ForEach(results, id: \.place.id) { r in
                 Marker(r.place.name ?? "", coordinate: r.place.coordinate)
             }
         }
+        .macMapControls() // Mac: +/- で拡大縮小(#1346)
         .id(results.map(\.place.id).joined())
         .frame(height: 160)
         .clipShape(RoundedRectangle(cornerRadius: RenderTheme.Radius.card, style: .continuous))
