@@ -60,6 +60,18 @@ type OpSpec struct {
 	// a read op of a provider without OAuth, as long as the provider's terms
 	// allow. 0 = never cached.
 	CacheTTL time.Duration
+	// CacheTTLFor, when set, picks the TTL of one call (e.g. a shorter one
+	// for a day whose answer may still change); it is used only when
+	// CacheTTL > 0, and a result <= 0 leaves that call uncached.
+	CacheTTLFor func(args map[string]string, now time.Time) time.Duration
+}
+
+// cacheTTL is how long the answer of these arguments is kept.
+func (o OpSpec) cacheTTL(args map[string]string, now time.Time) time.Duration {
+	if o.CacheTTL <= 0 || o.CacheTTLFor == nil {
+		return o.CacheTTL
+	}
+	return o.CacheTTLFor(args, now)
 }
 
 // Provider is one external API. Everything here is static; the secrets come
@@ -175,7 +187,7 @@ func (p Provider) check() error {
 		if !opRe.MatchString(o.Name) || seen[o.Name] {
 			return fmt.Errorf("%s: bad or duplicate op %q", p.ID, o.Name)
 		}
-		if o.CacheTTL < 0 || (o.CacheTTL > 0 && (p.NeedsOAuth || o.Write)) {
+		if o.CacheTTL < 0 || (o.CacheTTL > 0 && (p.NeedsOAuth || o.Write)) || (o.CacheTTLFor != nil && o.CacheTTL <= 0) {
 			return fmt.Errorf("%s.%s: only a read op without OAuth may be cached", p.ID, o.Name)
 		}
 		seen[o.Name] = true

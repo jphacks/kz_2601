@@ -140,6 +140,7 @@ func TestCacheTTLOnlyForKeyReads(t *testing.T) {
 		{ID: "cacheWrite", Billing: BillingFree, New: newOps, Ops: []OpSpec{{Name: "put", Write: true, CacheTTL: time.Minute}}},
 		{ID: "cacheOauth", Billing: BillingFree, New: newOps, NeedsOAuth: true, NewOAuth: oauth, Ops: []OpSpec{{Name: "get", CacheTTL: time.Minute}}},
 		{ID: "cacheNeg", Billing: BillingFree, New: newOps, Ops: []OpSpec{{Name: "get", CacheTTL: -time.Minute}}},
+		{ID: "cacheForOnly", Billing: BillingFree, New: newOps, Ops: []OpSpec{{Name: "get", CacheTTLFor: func(map[string]string, time.Time) time.Duration { return time.Minute }}}},
 	} {
 		if p.check() == nil {
 			t.Errorf("%s: accepted", p.ID)
@@ -151,6 +152,23 @@ func TestCacheTTLOnlyForKeyReads(t *testing.T) {
 	}
 	if cacheKey("p", "o", map[string]string{"b": "2", "a": "1"}) != cacheKey("p", "o", map[string]string{"a": "1", "b": "2"}) {
 		t.Fatal("cache key depends on map order")
+	}
+}
+
+// Values holding the old separators ("\x00", "=") once met on one key; the
+// length prefixes keep them apart.
+func TestCacheKeyUnambiguous(t *testing.T) {
+	for _, c := range [][2]map[string]string{
+		{{"a": "1\x00b=2"}, {"a": "1", "b": "2"}},
+		{{"a": "x=y"}, {"a=x": "y"}},
+		{{"a": ""}, {}},
+	} {
+		if cacheKey("p", "o", c[0]) == cacheKey("p", "o", c[1]) {
+			t.Errorf("%v and %v share a key", c[0], c[1])
+		}
+	}
+	if cacheKey("p\x00o", "x", nil) == cacheKey("p", "o\x00x", nil) {
+		t.Error("provider/op share a key")
 	}
 }
 

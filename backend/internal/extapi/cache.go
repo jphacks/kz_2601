@@ -2,6 +2,7 @@ package extapi
 
 import (
 	"slices"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -28,7 +29,9 @@ type callCache struct {
 
 func newCallCache() *callCache { return &callCache{m: map[string]cacheEntry{}} }
 
-// cacheKey is provider, op and the arguments in name order.
+// cacheKey is provider, op and the arguments in name order. Every part is
+// length-prefixed, so no value (even one holding "=" or NUL) can make two
+// different argument sets meet on one key.
 func cacheKey(provider, op string, args map[string]string) string {
 	names := make([]string, 0, len(args))
 	for k := range args {
@@ -36,9 +39,16 @@ func cacheKey(provider, op string, args map[string]string) string {
 	}
 	slices.Sort(names)
 	var b strings.Builder
-	b.WriteString(provider + "\x00" + op)
+	part := func(v string) {
+		b.WriteString(strconv.Itoa(len(v)))
+		b.WriteByte(':')
+		b.WriteString(v)
+	}
+	part(provider)
+	part(op)
 	for _, k := range names {
-		b.WriteString("\x00" + k + "=" + args[k])
+		part(k)
+		part(args[k])
 	}
 	return b.String()
 }
