@@ -105,16 +105,23 @@ class PermissionRulesTest {
     }
 
     @Test
-    fun 近距離の権限は持たない() {
-        // 近距離共有(#878)を入れるまで、Bluetooth・Wi-Fi の近くの端末を求める単位は無い
-        val nearby = setOf(
-            "android.permission.BLUETOOTH_SCAN",
-            "android.permission.BLUETOOTH_ADVERTISE",
-            "android.permission.BLUETOOTH_CONNECT",
-            "android.permission.NEARBY_WIFI_DEVICES",
-        )
-        for (sdk in listOf(31, 33, 35)) {
-            assertTrue(AppPermission.entries.flatMap { it.manifestPermissions(sdk) }.none { it in nearby })
-        }
+    fun 近距離は版で求める権限が変わる() {
+        val bt = listOf(AppPermission.BLUETOOTH_SCAN, AppPermission.BLUETOOTH_ADVERTISE, AppPermission.BLUETOOTH_CONNECT)
+        // 12 / 12L: Nearby Connections は正確な位置で見つける
+        assertEquals(bt + AppPermission.ACCESS_FINE_LOCATION, AppPermission.NEARBY.manifestPermissions(31))
+        assertEquals(bt + AppPermission.ACCESS_FINE_LOCATION, AppPermission.NEARBY.manifestPermissions(32))
+        // 13+: 近くの Wi-Fi の端末で足りる(位置は聞かない)
+        assertEquals(bt + AppPermission.NEARBY_WIFI_DEVICES, AppPermission.NEARBY.manifestPermissions(33))
+        assertFalse(AppPermission.ACCESS_FINE_LOCATION in AppPermission.NEARBY.manifestPermissions(35))
+    }
+
+    @Test
+    fun 近距離は全部要る() {
+        val partial = mapOf(AppPermission.BLUETOOTH_SCAN to true, AppPermission.BLUETOOTH_CONNECT to true, AppPermission.BLUETOOTH_ADVERTISE to true)
+        assertFalse(AppPermission.NEARBY.isGranted(partial, 31))
+        assertTrue(AppPermission.NEARBY.isGranted(partial + (AppPermission.ACCESS_FINE_LOCATION to true), 31))
+        assertFalse("おおよその位置だけでは足りない", AppPermission.NEARBY.isGranted(partial + (AppPermission.ACCESS_COARSE_LOCATION to true), 32))
+        assertFalse(AppPermission.NEARBY.isGranted(partial + (AppPermission.ACCESS_FINE_LOCATION to true), 33))
+        assertTrue(AppPermission.NEARBY.isGranted(partial + (AppPermission.NEARBY_WIFI_DEVICES to true), 33))
     }
 }

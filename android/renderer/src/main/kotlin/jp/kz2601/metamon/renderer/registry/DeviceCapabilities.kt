@@ -58,9 +58,15 @@ data class DeviceCapabilities(
             Feature("openUrlButton.app", implemented = false, needs = ComponentType.OPEN_URL_BUTTON),
         )
 
-        /** [registry] で描ける部品(UNKNOWN を除く・schema の並び)。 */
+        /**
+         * 描けるが、iOS と同じ体験がそろうまで申告しない部品。
+         * nearbyShare: 送受信(#1382)はあるが、すれ違い(mode:passby・#1383)がそろってから申告する。
+         */
+        internal val PENDING: Set<ComponentType> = setOf(ComponentType.NEARBY_SHARE)
+
+        /** [registry] で描ける部品(UNKNOWN と [PENDING] を除く・schema の並び)。 */
         fun allowedComponents(registry: ComponentRegistry = ComponentRegistry.standard): List<String> =
-            ComponentType.entries.filter { it != ComponentType.UNKNOWN && registry.builder(it) != null }.map { it.wire }
+            ComponentType.entries.filter { it != ComponentType.UNKNOWN && it !in PENDING && registry.builder(it) != null }.map { it.wire }
 
         fun supportedFeatures(registry: ComponentRegistry = ComponentRegistry.standard): List<String> =
             features.filter { f -> f.implemented && (f.needs == null || registry.builder(f.needs) != null) }.map { it.key }

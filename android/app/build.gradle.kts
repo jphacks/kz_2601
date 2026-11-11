@@ -118,6 +118,7 @@ dependencies {
     implementation(libs.googleid)
     implementation(libs.firebase.messaging)
     implementation(libs.play.app.update.ktx)
+    implementation(libs.play.services.nearby)
     // Tailor It Pro の購入(Google Play Billing)
     implementation(libs.play.billing.ktx)
     // 場所に着いたら知らせる(Geofencing)

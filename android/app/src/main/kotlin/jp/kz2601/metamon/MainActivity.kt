@@ -58,6 +58,7 @@ import jp.kz2601.metamon.permissions.MicrophoneAccessProvider
 import jp.kz2601.metamon.permissions.PermissionOffBarHost
 import jp.kz2601.metamon.auth.RootScreen
 import jp.kz2601.metamon.auth.SignInScreen
+import jp.kz2601.metamon.nearby.NearbyHostUi
 import jp.kz2601.metamon.permissions.ProvideRendererPermissions
 import jp.kz2601.metamon.renderer.DSLView
 import jp.kz2601.metamon.renderer.components.feed.LocalFeedHost
@@ -355,6 +356,8 @@ fun MetamonApp(container: AppContainer) {
             }
             // 要約と元に戻す・状態カード・トースト・削除の取り消し・確認ダイアログ(#895)
             FeedbackHost(vm, state, runtime, runtimeState)
+            // 近くの人に送る(#1382): 送信シート・受信の確認・待ち受け。話しかける前の画面では動かさない
+            if (!state.isInitial) container.nearby?.let { NearbyHostUi(it, runtime) }
         }
     }
 

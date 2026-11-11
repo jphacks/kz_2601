@@ -26,18 +26,29 @@ import kotlin.math.sign
  * - 送る: `fields` に明示した保存 field だけ。hidden(#262)・photo・video・ref・refs・computed は送らない
  * - 量: 1 回 `limit` 件(既定 1・最大 20 件)かつ JSON で 16 KB 以内
  * - 受け取り: 同じ相手(senderId)・同じ記録 id は 2 度追加しない。内容が変わっていれば更新する
+ * - 受け取る量: 1 通 [MAX_RECEIVE_BYTES] まで・名前と id の長さは [NearbyLimits]
+ * - 名前: 同意の画面で匿名を選ぶと、表示名の代わりに [NearbyLimits.ANONYMOUS_NAME] を送る
  */
 object NearbyPassby {
     const val VERSION = 1
     const val MAX_RECORDS = 20
     const val MAX_BYTES = 16 * 1024
+
+    /** 受け取る 1 通の上限(相手の上限 16 KB + 余裕)。超えたら読まずに捨てる。 */
+    const val MAX_RECEIVE_BYTES = 32 * 1024
+
+    /** 接続の申し出に載る Hello の上限。 */
+    const val MAX_HELLO_BYTES = 1024
     const val DEFAULT_LIMIT = 1
 
     /** 同じ相手と続けて交換しない間隔(離れて戻ってきたら「また会った」)。 */
     val COOLDOWN: Duration = Duration.ofMinutes(10)
 
-    /** 同意文を変えたら上げる(もう一度同意を取る)。 */
-    const val CONSENT_VERSION = 1
+    /**
+     * 同意文を変えたら上げる(もう一度同意を取る)。
+     * 2: 相手に渡るもの(表示名・項目)を並べ、匿名を選べるようにした
+     */
+    const val CONSENT_VERSION = 2
 
     val BLOCKED_TYPES: Set<FieldType> = setOf(FieldType.PHOTO, FieldType.VIDEO, FieldType.REF, FieldType.REFS)
 
@@ -97,6 +108,12 @@ object NearbyPassby {
             mapOf("v" to JsonPrimitive(v), "app" to JsonPrimitive(app), "senderId" to JsonPrimitive(senderId), "name" to JsonPrimitive(name)),
         )
 
+        /** 受け取った Hello を上限に揃える。app・senderId が空・長すぎるものは null。名前は切り詰め、空なら「近くの人」。 */
+        fun validated(): Hello? {
+            if (!NearbyLimits.isValidId(app) || !NearbyLimits.isValidId(senderId)) return null
+            return copy(name = NearbyLimits.publicName(name, anonymous = false))
+        }
+
         companion object {
             fun from(e: JsonElement?): Hello {
                 val o = NearbyJson.obj(e, "Hello")
@@ -115,6 +132,12 @@ object NearbyPassby {
                 "records" to JsonArray(records.map { it.toJson() }),
             ),
         )
+
+        /** 受け取った Payload を上限に揃える。senderId・entityId が空・長すぎる、件数が上限を超えるものは null。 */
+        fun validated(): Payload? {
+            if (!NearbyLimits.isValidId(senderId) || !NearbyLimits.isValidId(entityId) || records.size > MAX_RECORDS) return null
+            return copy(name = NearbyLimits.publicName(name, anonymous = false))
+        }
 
         companion object {
             fun from(e: JsonElement?): Payload {
@@ -167,7 +190,7 @@ object NearbyPassby {
         val fields = allowedFields(config, entity).reversed().associateBy { it.id }
         return payload.records.take(MAX_RECORDS).mapNotNull { item ->
             val data = item.data.filter { (k, v) -> fields[k]?.let { NearbyShare.accepts(v, it.type) } ?: false }
-            if (data.isEmpty() || item.id.isEmpty()) null else Item(item.id, data)
+            if (data.isEmpty() || !NearbyLimits.isValidId(item.id)) null else Item(item.id, data)
         }
     }
 
@@ -300,10 +323,14 @@ object NearbyPassby {
         return if ((consentedVersion ?: 0) >= CONSENT_VERSION) ToggleOutcome.START else ToggleOutcome.ASK_CONSENT
     }
 
-    /** 同意文。送る項目の名前を必ず並べる。 */
-    fun consentText(fieldNames: List<String>): String {
+    /**
+     * 同意文(日本語)。相手に渡るもの(表示名と項目の名前)を必ず並べる。`name` は相手に見える名前(匿名なら「近くの人」)。
+     * 画面ではアプリ側のリソースで同じ形の文を組む(英語も出すため)。
+     */
+    fun consentText(fieldNames: List<String>, name: String): String {
         val list = if (fieldNames.isEmpty()) "(送る項目がありません)" else fieldNames.joinToString("") { "「$it」" }
-        return "オンの間、近くで同じアプリを開いている人と自動でつながり、あなたの${list}を交換します。" +
+        return "オンの間、近くで同じアプリを開いている人と自動でつながり、次のものを渡します。" +
+            "\n・表示名: $name\n・項目: $list\n" +
             "相手の記録はこの端末に追加されます。写真・動画や、それ以外の項目は送りません。" +
             "この画面を閉じるか、アプリを裏に回すと止まります。"
     }
@@ -334,7 +361,16 @@ object NearbyPassby {
     fun encode(hello: Hello): ByteArray = NearbyJson.bytes(hello.toJson())
     fun encode(ledger: Ledger): ByteArray = NearbyJson.bytes(ledger.toJson())
 
-    fun decodePayload(data: ByteArray): Payload = Payload.from(NearbyJson.parse(data))
-    fun decodeHello(data: ByteArray): Hello = Hello.from(NearbyJson.parse(data))
+    /** 届いた Payload を読む。全体のバイト数を先に確かめ、上限を超える・読めない・上限に合わないものは null。 */
+    fun decodePayload(data: ByteArray): Payload? {
+        if (data.size > MAX_RECEIVE_BYTES) return null
+        return runCatching { Payload.from(NearbyJson.parse(data)) }.getOrNull()?.validated()
+    }
+
+    /** 接続の申し出に載った Hello を読む。大きすぎる・id が長すぎるものは null(申し出を断る)。 */
+    fun decodeHello(data: ByteArray): Hello? {
+        if (data.size > MAX_HELLO_BYTES) return null
+        return runCatching { Hello.from(NearbyJson.parse(data)) }.getOrNull()?.validated()
+    }
     fun decodeLedger(data: ByteArray): Ledger = Ledger.from(NearbyJson.parse(data))
 }

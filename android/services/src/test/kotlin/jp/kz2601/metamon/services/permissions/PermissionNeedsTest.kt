@@ -30,7 +30,7 @@ class PermissionNeedsTest {
             """[{"type":"vstack","children":[{"type":"photoField","field":"p"},{"type":"card","children":[{"type":"nearbyShare"}]}]},
                {"type":"audioRecorder","field":"a"},{"type":"locationButton","field":"l"}]""",
         )
-        assertEquals(setOf(CAMERA, MICROPHONE, LOCATION), PermissionNeeds.of(d))
+        assertEquals(setOf(CAMERA, AppPermission.NEARBY, MICROPHONE, LOCATION), PermissionNeeds.of(d))
     }
 
     @Test

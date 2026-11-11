@@ -6,6 +6,10 @@ import jp.kz2601.metamon.dsl.AppDSL
 import jp.kz2601.metamon.dsl.AppDocument
 import jp.kz2601.metamon.consent.record
 import jp.kz2601.metamon.discover.DiscoverServices
+import jp.kz2601.metamon.nearby.NearbyEnv
+import jp.kz2601.metamon.nearby.NearbyService
+import jp.kz2601.metamon.nearby.NearbySettings
+import jp.kz2601.metamon.nearby.NearbyShareController
 import jp.kz2601.metamon.discover.PublishEnv
 import jp.kz2601.metamon.runtime.AiTextAccess
 import jp.kz2601.metamon.runtime.AndroidRuntimeHost
@@ -209,6 +213,8 @@ class AppContainer(
     val discover: DiscoverServices? = null,
     /** 共有アプリの参加者(#903)。モックは null(参加者の欄を出さない) */
     val members: MembersClient? = null,
+    /** 近くの人に送る(#1382)の通り道と端末の設定。null なら送るボタンを押しても何もしない(テスト) */
+    private val nearbyEnv: NearbyEnv? = null,
     /** Pro の権利(`GET /v1/me/entitlements`)。モックは null(Pro はモックの購入だけ) */
     private val entitlements: EntitlementClient? = null,
     /** Play の購入(Google Play Billing)。モックは null */
@@ -368,6 +374,7 @@ class AppContainer(
                 removeLocalMedia = removeLocalMedia(context),
                 clearImageCache = { RemoteImages.wipe(context) },
                 talkBackRunning = { TalkBack.isRunning(context) },
+                nearbyEnv = NearbyEnv.of(context, mock = true),
             )
         }
 
@@ -451,6 +458,7 @@ class AppContainer(
                 // 審査用の版(#1275)は「探す」(公開・インストール)を出さない
                 discover = if (ReviewBuild.enabled) null else DiscoverServices(HttpDiscoverClient(appConfigHttp), moderation),
                 members = HttpMembersClient(appConfigHttp),
+                nearbyEnv = NearbyEnv.of(context, mock = false),
                 entitlements = HttpEntitlementClient(appConfigHttp),
                 playBilling = { PlayBilling(context, it) },
             )
@@ -588,6 +596,15 @@ class AppContainer(
         ).also {
             it.dictation = TranscriberDictationHost(transcriber, CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate))
             it.audioFileTranscription = audioFiles
+        }
+    }
+
+    /** 近くの人に送る(#1382)。作った時にランタイムの送るボタンとつなぐ。 */
+    val nearby: NearbyShareController? by lazy {
+        nearbyEnv?.let { env ->
+            val service = NearbyService(env.transport(), CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate), env.deviceName())
+            service.text = env.text
+            NearbyShareController(runtime, service, NearbySettings(env.settings)) { authorProfile.name ?: env.deviceName() }
         }
     }
 
