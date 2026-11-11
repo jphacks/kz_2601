@@ -1343,6 +1343,22 @@
         }
       }
     },
+    "このアプリの次の通知を見る" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "See this app's upcoming notifications"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "このアプリの次の通知を見る"
+          }
+        }
+      }
+    },
     "このアプリの自動の動きは運営が止めています。この変更は保存できませんでした" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -2350,6 +2366,38 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "アプリを選んでください"
+          }
+        }
+      }
+    },
+    "アプリを閉じていても、この時刻に届きます。" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "These arrive at this time even when the app is closed."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "アプリを閉じていても、この時刻に届きます。"
+          }
+        }
+      }
+    },
+    "アプリを開いて、ツールバーのベルから確かめられます" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Open an app and check them from the bell in the toolbar"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "アプリを開いて、ツールバーのベルから確かめられます"
           }
         }
       }
@@ -3570,6 +3618,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "予定"
+          }
+        }
+      }
+    },
+    "予約中の通知はありません" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No scheduled notifications"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "予約中の通知はありません"
           }
         }
       }

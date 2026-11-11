@@ -4,7 +4,7 @@ import AppKit
 /// メニューバー(#934)。ウインドウの状態は `focusedSceneValue` で受け取り、今の画面に合わせて有効 / 無効を変える。
 /// - ファイル: 新しいアプリ・文字で頼む(会話のシート・#967)・声で頼む(同じシートですぐ録音・#966)・新しいウインドウ
 /// - 編集: 元に戻す(記録を消した直後は削除の取り消し・それ以外は入力欄の取り消し)・やり直す
-/// - アプリ: 生成したアプリの版の「変更を元に戻す」(⌥⌘Z)・「変更をやり直す」(⇧⌥⌘Z)(#968)。
+/// - アプリ: 生成したアプリの版の「変更を元に戻す」(⌥⌘Z)・「変更をやり直す」(⇧⌥⌘Z)(#968)・次の通知(#1325)。
 ///   ⌘Z / ⇧⌘Z は入力欄と記録の削除に使っているので、版の取り消しは別のキーにする
 /// - 表示: サイドバー(`SidebarCommands`)・ツールバー(`ToolbarCommands`)・画面マップ(⇧⌘E・#970)
 /// - 移動: 戻る・アプリの一覧 / 中央へ・前 / 次のアプリ
@@ -67,6 +67,10 @@ struct MacCommands: Commands {
             Button("変更をやり直す") { shell?.redoVersion() }
                 .keyboardShortcut("z", modifiers: [.command, .option, .shift])
                 .disabled(!(shell?.canRedoVersion ?? false))
+            Divider()
+            // ツールバーのベルと同じポップオーバー(#1325)。中央のアプリのシートの間は出さない
+            Button("次の通知") { runtime?.notifications.showsUpcoming = true }
+                .disabled(runtime == nil || runtime?.sheet != nil || runtime?.fullScreen != nil)
         }
 
         CommandMenu("移動") {
