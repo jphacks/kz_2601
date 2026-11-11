@@ -3,12 +3,16 @@ import MetamonServices
 
 /// サイドバーのアプリの一覧。iOS の AppSwitcherSheet に当たる(Mac では常に出す)。
 /// ↑↓ で選ぶと中央が切り替わり、Return / ダブルクリックで中央へ移る(#934)。
-/// 「作ったアプリ」と「同梱の例」に分ける(#969)。作ったアプリは右クリックで名前の変更・上へ / 下へ・削除(確認あり)、
+/// 「作ったアプリ」「共有されたアプリ」(シェアから追加・参加)と「同梱の例」に分ける(#969)。並べ替えは区分の中で。作ったアプリは右クリックで名前の変更・上へ / 下へ・削除(確認あり)、
 /// ドラッグで並べ替え、Delete キーで削除。同梱の例は右クリックの「複製」(作ったアプリに足す・#1285)と、会話で直した例なら「元の例に戻す」(確認あり・#1283)。
-/// 検索(#1282)で絞った一覧を受け取る。行の頭にアプリの画面の写し(#1281・無ければ頭の文字)。新着の数・共有されたアプリの区分はサーバー(#930)の後。
+/// 検索(#1282)で絞った一覧を受け取る。行の頭にアプリの画面の写し(#1281・無ければ頭の文字)、右に新着の数(#969)。
 struct AppSidebar: View {
     let created: [SampleApp]
+    /// 共有されたアプリ(#969)。作ったアプリと同じ操作(名前・複製・並べ替え・削除)
+    var shared: [SampleApp] = []
     let examples: [SampleApp]
+    /// 新着の数(#969)。0 なら出さない
+    var newItems: (String) -> Int = { _ in 0 }
     /// 行の写し(#1281)
     var thumbnail: (String) -> NSImage? = { _ in nil }
     /// 検索欄の文字(#1282)。絞り込みは呼ぶ側で済ませてある。並べ替えは絞っていない時だけ
@@ -32,7 +36,12 @@ struct AppSidebar: View {
     @State private var deleteTarget: SampleApp?
     @State private var resetTarget: SampleApp?
 
-    private var createdIds: [String] { created.map(\.id) }
+    /// 作ったアプリ・共有されたアプリ(右クリックの管理・Delete キーの対象)
+    private var manageable: [SampleApp] { created + shared }
+
+    private func section(of id: String) -> [SampleApp] {
+        shared.contains { $0.id == id } ? shared : created
+    }
 
     private var isSearching: Bool { !searchText.trimmingCharacters(in: .whitespaces).isEmpty }
 
@@ -41,7 +50,7 @@ struct AppSidebar: View {
             if !created.isEmpty {
                 Section {
                     ForEach(created) { row($0) }
-                        .onMove(perform: isSearching ? nil : { library.move(fromOffsets: $0, toOffset: $1) })
+                        .onMove(perform: isSearching ? nil : { move(created, fromOffsets: $0, toOffset: $1) })
                 } header: {
                     Text("作ったアプリ")
                 } footer: {
@@ -52,6 +61,12 @@ struct AppSidebar: View {
                     ForEach(0..<3, id: \.self) { _ in skeletonRow }
                 }
             }
+            if !shared.isEmpty {
+                Section("共有されたアプリ") {
+                    ForEach(shared) { row($0) }
+                        .onMove(perform: isSearching ? nil : { move(shared, fromOffsets: $0, toOffset: $1) })
+                }
+            }
             if !examples.isEmpty {
                 Section("同梱の例") {
                     ForEach(examples) { row($0) }
@@ -59,7 +74,7 @@ struct AppSidebar: View {
             }
         }
         .contextMenu(forSelectionType: SampleApp.ID.self) { ids in
-            if ids.count == 1, let id = ids.first, let app = created.first(where: { $0.id == id }) {
+            if ids.count == 1, let id = ids.first, let app = manageable.first(where: { $0.id == id }) {
                 manageItems(app)
             } else if ids.count == 1, let id = ids.first, let app = examples.first(where: { $0.id == id }) {
                 Button("複製") { onDuplicate(id) }
@@ -73,13 +88,13 @@ struct AppSidebar: View {
             onOpen()
         }
         .onDeleteCommand {
-            guard let id = selection, let app = created.first(where: { $0.id == id }) else { return }
+            guard let id = selection, let app = manageable.first(where: { $0.id == id }) else { return }
             deleteTarget = app
         }
         .overlay {
-            if created.isEmpty && examples.isEmpty && isSearching {
+            if manageable.isEmpty && examples.isEmpty && isSearching {
                 ContentUnavailableView.search(text: searchText)
-            } else if created.isEmpty && examples.isEmpty {
+            } else if manageable.isEmpty && examples.isEmpty {
                 MacEmptyState(pose: .tea, title: "アプリがありません",
                               mascotSize: MacTheme.Mascot.small, showsBackdrop: false)
             }
@@ -143,11 +158,13 @@ struct AppSidebar: View {
     }
 
     private func row(_ app: SampleApp) -> some View {
-        HStack(spacing: 8) {
+        let count = newItems(app.id)
+        return HStack(spacing: 8) {
             SidebarThumbnail(name: app.name, image: thumbnail(app.id))
             VStack(alignment: .leading, spacing: MacTheme.Spacing.rowLine) {
                 Text(app.name)
                     .font(MacTheme.Fonts.sidebarTitle)
+                    .fontWeight(count > 0 ? .semibold : nil) // 未読の印(#969)
                     .lineLimit(1)
                 if let description = app.description {
                     Text(description)
@@ -156,9 +173,21 @@ struct AppSidebar: View {
                         .lineLimit(1)
                 }
             }
+            if count > 0 {
+                Spacer(minLength: 4)
+                NewItemsBadge(count: count)
+            }
         }
         .padding(.vertical, 2)
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel(Text(verbatim: MacSidebarBadges.accessibilityLabel(name: app.name, count: count)))
         .tag(app.id)
+    }
+
+    /// 区分の中のドラッグ(#969)。全体の並びは区分の位置を保って入れ直す
+    private func move(_ section: [SampleApp], fromOffsets source: IndexSet, toOffset destination: Int) {
+        library.setOrder(MacSidebarSections.moved(library.createdIds, section: section.map(\.id),
+                                                  fromOffsets: source, toOffset: destination))
     }
 
     /// 作ったアプリの右クリック(iOS のカードの「…」と同じ並び: 名前 → 移動 → 削除)
@@ -168,14 +197,31 @@ struct AppSidebar: View {
             renameTarget = app
         }
         Button("複製") { onDuplicate(app.id) }
-        if !isSearching, created.count > 1, let index = createdIds.firstIndex(of: app.id) {
+        let ids = section(of: app.id).map(\.id)
+        if !isSearching, ids.count > 1, let index = ids.firstIndex(of: app.id) {
             Divider()
-            Button("上へ移動") { library.move(app.id, to: index - 1) }
+            Button("上へ移動") { library.setOrder(MacSidebarSections.moved(library.createdIds, section: ids, id: app.id, to: index - 1)) }
                 .disabled(index == 0)
-            Button("下へ移動") { library.move(app.id, to: index + 1) }
-                .disabled(index == created.count - 1)
+            Button("下へ移動") { library.setOrder(MacSidebarSections.moved(library.createdIds, section: ids, id: app.id, to: index + 1)) }
+                .disabled(index == ids.count - 1)
         }
         Divider()
         Button("削除…", role: .destructive) { deleteTarget = app }
+    }
+}
+
+/// 行の右の新着の数(#969)。読み上げは行の名前に含める
+private struct NewItemsBadge: View {
+    let count: Int
+
+    var body: some View {
+        Text(verbatim: MacSidebarBadges.badgeText(count))
+            .font(.caption2.weight(.semibold).monospacedDigit())
+            .foregroundStyle(.white)
+            .padding(.horizontal, 6)
+            .padding(.vertical, 1)
+            .background(Capsule().fill(Color.accentColor))
+            .help(L10n.tr("新着 \(count) 件"))
+            .accessibilityHidden(true)
     }
 }

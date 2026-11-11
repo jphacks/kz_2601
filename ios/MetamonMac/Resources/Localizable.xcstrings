@@ -67,6 +67,23 @@
         }
       }
     },
+    "%@, 新着 %lld 件" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$@, %2$lld new"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$@, 新着 %2$lld 件"
+          }
+        }
+      }
+    },
     "%@。「合計をもっと大きく表示して」のように、変えたい所を書いてください。" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -8398,6 +8415,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "共有…"
+          }
+        }
+      }
+    },
+    "共有されたアプリ" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Shared with you"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "共有されたアプリ"
           }
         }
       }
