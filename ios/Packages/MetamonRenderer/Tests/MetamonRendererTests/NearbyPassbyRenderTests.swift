@@ -29,6 +29,21 @@ final class NearbyPassbyRenderTests: XCTestCase {
        {"type":"nearbyShare","id":"pb","label":"すれ違い通信","entity":"profile","mode":"passby","fields":["name","hobby"],"distance":true}]}]}
     """
 
+    /// 送る方はどの OS でもボタン。passby は iOS だけ専用の表示で、Mac は「この Mac では使えません」の枠(#964)
+    @MainActor func testKindPerPlatform() throws {
+        let dsl = try JSONDecoder().decode(AppDSL.self, from: Data(json.utf8))
+        let c = try XCTUnwrap(dsl.screens.first?.components.first)
+        #if os(macOS)
+        XCTAssertEqual(NearbyShareLeaf.kind(of: c), .unavailable(feature: "すれ違い通信"))
+        #else
+        XCTAssertEqual(NearbyShareLeaf.kind(of: c), .passby(try XCTUnwrap(NearbyPassby.Config(c))))
+        #endif
+        var send = c
+        send.mode = nil
+        XCTAssertEqual(NearbyShareLeaf.kind(of: send), .send)
+    }
+
+    #if os(iOS) // Mac ではすれ違い通信を描かない(#964)
     @MainActor func testPassbyRendersAndAttachesWhileVisible() throws {
         let dsl = try JSONDecoder().decode(AppDSL.self, from: Data(json.utf8))
         let c = try XCTUnwrap(dsl.screens.first?.components.first)
@@ -72,6 +87,7 @@ final class NearbyPassbyRenderTests: XCTestCase {
         XCTAssertNil(host.attached, "画面を離れたら止める")
         XCTAssertFalse(host.isAdvertising)
     }
+    #endif
 
     @MainActor func testStaticControllerNeedsOptInAndAttach() throws {
         let config = NearbyPassby.Config(componentId: "pb", entityId: "profile", label: "", fields: ["name"])

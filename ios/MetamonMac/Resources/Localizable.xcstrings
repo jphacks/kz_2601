@@ -322,6 +322,203 @@
         }
       }
     },
+    "%@さんから「%@」が %lld 件届きました" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%#@count@"
+          },
+          "substitutions" : {
+            "count" : {
+              "argNum" : 3,
+              "formatSpecifier" : "lld",
+              "variations" : {
+                "plural" : {
+                  "one" : {
+                    "stringUnit" : {
+                      "state" : "translated",
+                      "value" : "%1$@ sent %arg “%2$@” record"
+                    }
+                  },
+                  "other" : {
+                    "stringUnit" : {
+                      "state" : "translated",
+                      "value" : "%1$@ sent %arg “%2$@” records"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@さんから「%@」が %lld 件届きました"
+          }
+        }
+      }
+    },
+    "%@さんから「%@」を %lld 件追加しました" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%#@count@"
+          },
+          "substitutions" : {
+            "count" : {
+              "argNum" : 3,
+              "formatSpecifier" : "lld",
+              "variations" : {
+                "plural" : {
+                  "one" : {
+                    "stringUnit" : {
+                      "state" : "translated",
+                      "value" : "Added %arg “%2$@” record from %1$@"
+                    }
+                  },
+                  "other" : {
+                    "stringUnit" : {
+                      "state" : "translated",
+                      "value" : "Added %arg “%2$@” records from %1$@"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@さんから「%@」を %lld 件追加しました"
+          }
+        }
+      }
+    },
+    "%@さんから届いた記録に、追加できる項目がありませんでした" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The records from %@ had no fields that could be added"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@さんから届いた記録に、追加できる項目がありませんでした"
+          }
+        }
+      }
+    },
+    "%@さんから応答がありませんでした" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No response from %@"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@さんから応答がありませんでした"
+          }
+        }
+      }
+    },
+    "%@さんが受け取りませんでした" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ didn't accept"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@さんが受け取りませんでした"
+          }
+        }
+      }
+    },
+    "%@さんが受け取れませんでした" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ couldn't receive it"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@さんが受け取れませんでした"
+          }
+        }
+      }
+    },
+    "%@さんに %lld 件届きました" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Delivered %2$lld to %1$@"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@さんに %lld 件届きました"
+          }
+        }
+      }
+    },
+    "%@さんに送っています…" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sending to %@…"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@さんに送っています…"
+          }
+        }
+      }
+    },
+    "%@さんの承認を待っています…" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Waiting for %@ to accept…"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@さんの承認を待っています…"
+          }
+        }
+      }
+    },
     "%@のコピー" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -1442,6 +1639,23 @@
         }
       }
     },
+    "iPhone・iPad・Mac の Tailor It と送り合えます。Android の端末とはつながりません" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "You can send to and receive from Tailor It on iPhone, iPad, and Mac. Android devices can't connect."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "iPhone・iPad・Mac の Tailor It と送り合えます。Android の端末とはつながりません"
+          }
+        }
+      }
+    },
     "openUrl: url は https か line/slack/discord/tel/mailto/maps のみ" : {
       "localizations" : {
         "en" : {
@@ -1623,6 +1837,45 @@
         }
       }
     },
+    "「%@」%lld 件" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%#@count@"
+          },
+          "substitutions" : {
+            "count" : {
+              "argNum" : 2,
+              "formatSpecifier" : "lld",
+              "variations" : {
+                "plural" : {
+                  "one" : {
+                    "stringUnit" : {
+                      "state" : "translated",
+                      "value" : "%arg “%1$@” record"
+                    }
+                  },
+                  "other" : {
+                    "stringUnit" : {
+                      "state" : "translated",
+                      "value" : "%arg “%1$@” records"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "「%@」%lld 件"
+          }
+        }
+      }
+    },
     "「%@」から抜けますか?" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -1753,6 +2006,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "「%@」に表示できない言葉が含まれています"
+          }
+        }
+      }
+    },
+    "「%@」のリクエスト" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Request for “%@”"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "「%@」のリクエスト"
           }
         }
       }
@@ -5569,6 +5839,23 @@
         }
       }
     },
+    "オンにすると、名前の代わりに「近くの人」と表示されます。" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "When on, others see \"Someone nearby\" instead of your name."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "オンにすると、名前の代わりに「近くの人」と表示されます。"
+          }
+        }
+      }
+    },
     "オンラインの AI で書く" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -6588,6 +6875,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "データを保存できませんでした"
+          }
+        }
+      }
+    },
+    "データを読み取れませんでした" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Couldn't read the data"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "データを読み取れませんでした"
           }
         }
       }
@@ -7898,6 +8202,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "今の記録帳の画面の形(画面・項目・名前など)"
+          }
+        }
+      }
+    },
+    "今は受け取れません" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Can't receive right now"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "今は受け取れません"
           }
         }
       }
@@ -9723,6 +10044,57 @@
         }
       }
     },
+    "受け取らない" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Decline"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "受け取らない"
+          }
+        }
+      }
+    },
+    "受け取る" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Accept"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "受け取る"
+          }
+        }
+      }
+    },
+    "受け取ると「%@」に追加します。" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Accepting adds them to “%@”."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "受け取ると「%@」に追加します。"
+          }
+        }
+      }
+    },
     "古い記録を自動で消しますか?" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -9914,6 +10286,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "名前のないアプリ"
+          }
+        }
+      }
+    },
+    "名前を出さない" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Hide my name"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "名前を出さない"
           }
         }
       }
@@ -10988,6 +11377,23 @@
         }
       }
     },
+    "接続が切れました" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Disconnected"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "接続が切れました"
+          }
+        }
+      }
+    },
     "接続が戻ったら自動で送ります" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -11611,6 +12017,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "暴力的・危険な内容"
+          }
+        }
+      }
+    },
+    "曲名を入れてください" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Enter a song title"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "曲名を入れてください"
           }
         }
       }
@@ -12687,6 +13110,57 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "相手が見つかりませんでした。一覧を更新してください"
+          }
+        }
+      }
+    },
+    "相手に見える名前" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Name others see"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "相手に見える名前"
+          }
+        }
+      }
+    },
+    "相手のアプリは今、曲のリクエストを受け付けていません" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Their app isn't taking song requests right now"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "相手のアプリは今、曲のリクエストを受け付けていません"
+          }
+        }
+      }
+    },
+    "相手も Tailor It で同じアプリを開いていると表示されます。相手が「受け取る」を押すと届きます。" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "People appear here when they have the same app open in Tailor It. It's delivered when they tap “Accept”."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "相手も Tailor It で同じアプリを開いていると表示されます。相手が「受け取る」を押すと届きます。"
           }
         }
       }
@@ -14187,6 +14661,74 @@
         }
       }
     },
+    "近くの Tailor It を探しています…" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Looking for Tailor It nearby…"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "近くの Tailor It を探しています…"
+          }
+        }
+      }
+    },
+    "近くの人に送る" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Send to someone nearby"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "近くの人に送る"
+          }
+        }
+      }
+    },
+    "近くの端末" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nearby devices"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "近くの端末"
+          }
+        }
+      }
+    },
+    "近くの端末を探せませんでした(ローカルネットワークの許可を確認してください)" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Couldn't look for nearby devices (check Local Network access)"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "近くの端末を探せませんでした(ローカルネットワークの許可を確認してください)"
+          }
+        }
+      }
+    },
     "追加" : {
       "localizations" : {
         "en" : {
@@ -14250,6 +14792,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "追加すると、このアプリに切り替わります"
+          }
+        }
+      }
+    },
+    "追加できる項目がありませんでした" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nothing could be added"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "追加できる項目がありませんでした"
           }
         }
       }
@@ -14430,6 +14989,23 @@
         }
       }
     },
+    "送るもの" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sending"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "送るもの"
+          }
+        }
+      }
+    },
     "送るスクショ" : {
       "localizations" : {
         "en" : {
@@ -14446,6 +15022,23 @@
         }
       }
     },
+    "送るデータを作れませんでした" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Couldn't prepare the data to send"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "送るデータを作れませんでした"
+          }
+        }
+      }
+    },
     "送る前に" : {
       "localizations" : {
         "en" : {
@@ -14458,6 +15051,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "送る前に"
+          }
+        }
+      }
+    },
+    "送る記録がありません" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No records to send"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "送る記録がありません"
           }
         }
       }
@@ -14539,6 +15149,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "送信しました"
+          }
+        }
+      }
+    },
+    "送信に失敗しました" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Couldn't send"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "送信に失敗しました"
           }
         }
       }

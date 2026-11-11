@@ -75,5 +75,14 @@
 	<!-- 写真・動画の撮影(#1043)と QR の読み取り(#1045)。Mac に無い機能(ドラレコ・ビデオ通話)は書かない。英語は InfoPlist.xcstrings -->
 	<key>NSCameraUsageDescription</key>
 	<string>生成したアプリで写真や動画を撮影・記録したり、QR コードを読み取ったりするために、カメラを使用します。</string>
+	<!-- 近くの人に送る(#964): MultipeerConnectivity で近くの Tailor It と記録を送り合う。サービス名は NearbyService.serviceType と一致させる。
+	     すれ違い通信(_tailorit-pb)は Mac では使えないので書かない。英語は InfoPlist.xcstrings -->
+	<key>NSLocalNetworkUsageDescription</key>
+	<string>近くにいる Tailor It の端末(iPhone・iPad・Mac)を見つけて、記録や曲のリクエストをその場で送ったり受け取ったりするために、ローカルネットワークを使用します。</string>
+	<key>NSBonjourServices</key>
+	<array>
+		<string>_tailorit-mc._tcp</string>
+		<string>_tailorit-mc._udp</string>
+	</array>
 </dict>
 </plist>

@@ -7,6 +7,10 @@
 	<true/>
 	<key>com.apple.security.network.client</key>
 	<true/>
+	<!-- 近くの人に送る(#964): MultipeerConnectivity は相手からの接続を受けるので、サンドボックスでは受ける側(server)も要る。
+	     審査用の版は nearbyShare を外しているので MetamonMac-Review.entitlements には入れない -->
+	<key>com.apple.security.network.server</key>
+	<true/>
 	<!-- 声で頼む(#966): マイク。サンドボックスとハードンドランタイムの両方がこのキーを見る -->
 	<key>com.apple.security.device.audio-input</key>
 	<true/>

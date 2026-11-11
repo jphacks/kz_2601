@@ -52,6 +52,23 @@
         }
       }
     },
+    "NSLocalNetworkUsageDescription" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Used to find nearby devices running Tailor It (iPhone, iPad, and Mac) and send or receive records and song requests on the spot."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "近くにいる Tailor It の端末(iPhone・iPad・Mac)を見つけて、記録や曲のリクエストをその場で送ったり受け取ったりするために、ローカルネットワークを使用します。"
+          }
+        }
+      }
+    },
     "NSLocationUsageDescription" : {
       "extractionState" : "manual",
       "localizations" : {
