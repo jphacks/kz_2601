@@ -56,6 +56,7 @@ private struct MacGeneralSettings: View {
 
     var body: some View {
         @Bindable var language = LanguagePreference.shared
+        @Bindable var reader = MacSpeechReader.shared
         Form {
             // 表示言語(#44)。iOS と同じ `LanguagePreference`(キー metamon.appLanguage)。
             Section {
@@ -86,9 +87,15 @@ private struct MacGeneralSettings: View {
                                   review: "新しい記録帳を声だけで相談している時は、内容がそろうと少し待ってから自動で用意し始めます。用意した記録帳の変更は、意図しない変更を防ぐため必ず「これでいく」を押してから反映します。"))
                 }
             }
-            // 読み上げは Mac の読み上げ(後の Issue)ができてから切り替えられるようにする
-            Section("読み上げ") {
-                MacUnavailableSettingRow(title: "挨拶と質問を読み上げる")
+            // 読み上げ(#1210・#1216)。iOS と同じ保存先(metamon.speech.enabled)。Mac が読むのは完成の要約だけ
+            Section {
+                Toggle("アプリができた時の説明を読み上げる", isOn: $reader.enabled)
+                    .help("アプリができた時の説明を Mac の声で読み上げます。VoiceOver を使っている時は重ねて読みません")
+                    .accessibilityIdentifier("settings.speech")
+            } header: {
+                Text("読み上げ")
+            } footer: {
+                Text("ON にすると、アプリができた時の説明を声で読み上げます。新しく頼むとすぐ止まります。")
             }
         }
         .formStyle(.grouped)

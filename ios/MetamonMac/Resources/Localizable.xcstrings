@@ -618,6 +618,22 @@
         }
       }
     },
+    "ON にすると、アプリができた時の説明を声で読み上げます。新しく頼むとすぐ止まります。" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "When on, the summary is read aloud when an app is ready. It stops as soon as you make a new request."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ON にすると、アプリができた時の説明を声で読み上げます。新しく頼むとすぐ止まります。"
+          }
+        }
+      }
+    },
     "ON にすると、新しく作る時も作ったアプリを変える時も、まずチャットで AI に相談できます。質問には答え、案を出すので「これでいく」で反映します。OFF にすると、話した内容をすぐ反映します。" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -3318,6 +3334,38 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "アプリがありません"
+          }
+        }
+      }
+    },
+    "アプリができた時の説明を Mac の声で読み上げます。VoiceOver を使っている時は重ねて読みません" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Reads the summary aloud with the Mac voice when an app is ready. Doesn't overlap VoiceOver while it's running"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "アプリができた時の説明を Mac の声で読み上げます。VoiceOver を使っている時は重ねて読みません"
+          }
+        }
+      }
+    },
+    "アプリができた時の説明を読み上げる" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Read the summary aloud when an app is ready"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "アプリができた時の説明を読み上げる"
           }
         }
       }

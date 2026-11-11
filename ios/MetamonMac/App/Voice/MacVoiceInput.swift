@@ -177,6 +177,7 @@ final class MacVoiceInput {
 
     private func start() async {
         guard state == .idle else { return }
+        MacSpeechReader.shared.stop() // 読み上げの声をマイクが拾わない(#1210)
         state = .recording
         let current = attempt
         do {
