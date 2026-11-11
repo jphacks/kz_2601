@@ -305,6 +305,9 @@ targets:
       - path: Metamon/Features/Voice/BuildStageView.swift
       - path: Metamon/Features/Voice/GeneratingStage.swift
       - path: Metamon/Features/Tips/PromptTips.swift
+      # エラーの状態カード(#968): 失敗の分け方と文言は iOS のファイルをそのまま使う(見た目の ErrorCard は iOS だけ)
+      - path: Metamon/Features/Voice/ErrorCopy.swift
+      - path: Metamon/Features/Voice/ErrorPresentation.swift
       # 規約・ポリシーは iOS と同じ同梱版をアプリ内で読む(#971)
       - path: ../docs/legal
         buildPhase: resources

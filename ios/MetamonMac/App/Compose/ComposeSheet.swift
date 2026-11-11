@@ -9,6 +9,8 @@ import MetamonServices
 struct ComposeSheet: View {
     @Bindable var session: MacComposeSession
     var onClose: () -> Void
+    /// 完成の画面の「元に戻す」(#968)。戻せる版がある時だけ渡す。押すと戻してシートを閉じる
+    var undo: (() -> Void)? = nil
     @Environment(MacVoiceInput.self) private var voice
 
     static let size = CGSize(width: 560, height: 620)
@@ -25,7 +27,7 @@ struct ComposeSheet: View {
             case .revealing(let job, let plan):
                 ComposeGenerating(session: session, job: job, plan: plan)
             case .finished(let summary, let unchanged):
-                ComposeFinished(summary: summary, unchanged: unchanged, onClose: close)
+                ComposeFinished(summary: summary, unchanged: unchanged, onClose: close, undo: unchanged ? nil : undo)
             }
         }
         .frame(minWidth: Self.size.width, idealWidth: Self.size.width, minHeight: Self.size.height, idealHeight: Self.size.height)
@@ -52,6 +54,10 @@ struct ComposeSheet: View {
                 if case .edit(_, let name, _) = session.target {
                     Text(name).font(.subheadline).foregroundStyle(.secondary).lineLimit(1)
                 }
+                if let screen = session.screen, session.mode == .edit {
+                    ScreenContextChip(screen: screen) { session.screen = nil }
+                        .padding(.top, 4)
+                }
             }
             Spacer()
             Button(action: close) { Image(systemName: "xmark.circle.fill").font(.title3) }
@@ -69,6 +75,32 @@ struct ComposeSheet: View {
         voice.cancel()
         session.close()
         onClose()
+    }
+}
+
+/// 画面マップから開いた時の「画面「B」について話す」(#970・iOS の ScreenContextChip)。× で文脈を外す
+private struct ScreenContextChip: View {
+    let screen: ScreenContext
+    let remove: () -> Void
+
+    var body: some View {
+        HStack(spacing: 6) {
+            Image(systemName: "point.3.connected.trianglepath.dotted")
+                .foregroundStyle(Theme.brandGradient)
+                .accessibilityHidden(true)
+            Text(ScreenMapCopy.chipText(screen))
+                .font(.callout.weight(.semibold))
+                .lineLimit(1)
+            Button(action: remove) { Image(systemName: "xmark.circle.fill").foregroundStyle(.secondary) }
+                .buttonStyle(.plain)
+                .help("画面の指定を外す")
+                .accessibilityLabel("画面の指定を外す")
+        }
+        .padding(.horizontal, 10)
+        .padding(.vertical, 4)
+        .background(Theme.Colors.surface, in: Capsule())
+        .overlay(Capsule().strokeBorder(Theme.brandGradient, lineWidth: 1.5))
+        .accessibilityIdentifier("compose.screenContext")
     }
 }
 
@@ -94,9 +126,9 @@ private struct ComposeChat: View {
                                 .accessibilityLabel("考えています")
                         }
                         if !session.sending { offerView }
-                        if let error = session.error {
-                            Label(error, systemImage: "exclamationmark.triangle")
-                                .font(.callout).foregroundStyle(Theme.Colors.warning)
+                        if let failure = session.failure {
+                            MacErrorCard(presentation: failure, retry: session.retryFailure, dismiss: session.dismissFailure)
+                                .id(failure.id)
                         }
                         Color.clear.frame(height: 1).id("bottom")
                     }
@@ -106,6 +138,9 @@ private struct ComposeChat: View {
                     withAnimation { proxy.scrollTo("bottom", anchor: .bottom) }
                 }
                 .onChange(of: session.sending) {
+                    withAnimation { proxy.scrollTo("bottom", anchor: .bottom) }
+                }
+                .onChange(of: session.failure?.id) {
                     withAnimation { proxy.scrollTo("bottom", anchor: .bottom) }
                 }
             }
@@ -422,6 +457,7 @@ private struct ComposeFinished: View {
     let summary: String
     let unchanged: Bool
     let onClose: () -> Void
+    var undo: (() -> Void)?
 
     var body: some View {
         VStack(spacing: MacTheme.Spacing.group) {
@@ -432,13 +468,20 @@ private struct ComposeFinished: View {
                 .multilineTextAlignment(.center)
                 .textSelection(.enabled)
                 .foregroundStyle(.secondary)
-            Button {
-                onClose()
-            } label: {
-                Text(unchanged ? "閉じる" : "アプリを見る").frame(minWidth: 120)
+            HStack(spacing: MacTheme.Spacing.group) {
+                if let undo {
+                    // 生成の版の取り消し(#968)。⌘Z は入力欄と記録の削除の取り消しなので、メニューは「アプリ > 変更を元に戻す」(⌥⌘Z)
+                    Button(action: undo) { Label("元に戻す", systemImage: "arrow.uturn.backward") }
+                        .help("この変更の前に戻します(⌥⌘Z)")
+                }
+                Button {
+                    onClose()
+                } label: {
+                    Text(unchanged ? "閉じる" : "アプリを見る").frame(minWidth: 120)
+                }
+                .buttonStyle(.borderedProminent)
+                .keyboardShortcut(.defaultAction)
             }
-            .buttonStyle(.borderedProminent)
-            .keyboardShortcut(.defaultAction)
         }
         .padding(MacTheme.Spacing.window)
         .frame(maxWidth: .infinity, maxHeight: .infinity)

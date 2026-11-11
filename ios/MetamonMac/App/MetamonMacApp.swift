@@ -1,4 +1,5 @@
 import SwiftUI
+import AppKit
 import MetamonDSL
 import MetamonRenderer
 import MetamonServices
@@ -10,6 +11,8 @@ struct MetamonMacApp: App {
     private let apps = SampleAppCatalog.load()
     /// 声で頼む(#966)。マイクは 1 つなのでウインドウをまたいで 1 つだけ持つ
     @State private var voice = MacVoiceInput()
+    /// 作ったアプリの一覧(#969)。端末に残すのでウインドウをまたいで 1 つだけ持つ
+    @State private var library = MacAppLibrary()
 
     init() {
         // UI テスト・手元の確認用(DEBUG のみ・iOS と同じ環境変数): METAMON_AI_CONSENT / METAMON_TUTORIAL / METAMON_BETA_WELCOME(#971)
@@ -18,12 +21,25 @@ struct MetamonMacApp: App {
         #if !APP_STORE_REVIEW
         BetaWelcomeStore.shared.applyLaunchOverride()
         #endif
+        // 記録の一時フォルダ(MacAppRuntime.mockRecordSync)を起動時(前回の残り)と終了時に片付ける
+        MacAppRuntime.removePreviewDirectories()
+        NotificationCenter.default.addObserver(forName: NSApplication.willTerminateNotification, object: nil, queue: .main) { _ in
+            MainActor.assumeIsolated { MacAppRuntime.removePreviewDirectories() }
+        }
     }
 
     var body: some Scene {
         WindowGroup(id: MacCommands.mainWindowId) {
-            // 設定の「言語」で即時切替(#973)・初回の案内(#971)・声で頼む(#966)
-            MacLanguageRoot { MacRootView(apps: apps).macOnboarding().environment(voice) }
+            // 設定の「言語」で即時切替(#973)・初回の案内(#971)・声で頼む(#966)・tailorit:// と共有のリンク(#975)
+            MacLanguageRoot {
+                MacRootView(apps: apps)
+                    .macOnboarding()
+                    .environment(voice)
+                    .environment(library)
+                    #if !APP_STORE_REVIEW
+                    .modifier(MacLinkReceiver())
+                    #endif
+            }
         }
         .defaultSize(width: 1100, height: 720)
         .windowResizability(.contentMinSize)

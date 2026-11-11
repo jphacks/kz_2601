@@ -53,7 +53,7 @@ struct FeedLeaf: View {
             }
         } else {
             EmptyPlaceholder(icon: Self.icon(c.provider), emptyText: c.emptyText ?? L("今は表示するものがありません"),
-                             state: failed ? .unavailable : (result == nil ? .loading : .empty)) {
+                             state: Self.emptyState(loaded: result != nil, failed: failed)) {
                 if let q = FeedQuery(c) { Task { await load(q, force: true) } }
             }
         }
@@ -122,6 +122,11 @@ struct FeedLeaf: View {
     }
 
     // MARK: - 表示の組み立て(テストから使う)
+
+    /// 行が無い時の状態。取れなかった(ホストが無い Mac・モックも)→「読み込めませんでした」と再試行、取る前→読み込み中、取れて 0 件→空。
+    static func emptyState(loaded: Bool, failed: Bool) -> EmptyState {
+        failed ? .unavailable : (loaded ? .empty : .loading)
+    }
 
     static func icon(_ provider: String?) -> String {
         switch provider {

@@ -4,7 +4,9 @@ import AppKit
 /// メニューバー(#934)。ウインドウの状態は `focusedSceneValue` で受け取り、今の画面に合わせて有効 / 無効を変える。
 /// - ファイル: 新しいアプリ・文字で頼む(会話のシート・#967)・声で頼む(同じシートですぐ録音・#966)・新しいウインドウ
 /// - 編集: 元に戻す(記録を消した直後は削除の取り消し・それ以外は入力欄の取り消し)・やり直す
-/// - 表示: サイドバー(`SidebarCommands`)・ツールバー(`ToolbarCommands`)
+/// - アプリ: 生成したアプリの版の「変更を元に戻す」(⌥⌘Z)・「変更をやり直す」(⇧⌥⌘Z)(#968)。
+///   ⌘Z / ⇧⌘Z は入力欄と記録の削除に使っているので、版の取り消しは別のキーにする
+/// - 表示: サイドバー(`SidebarCommands`)・ツールバー(`ToolbarCommands`)・画面マップ(⇧⌘E・#970)
 /// - 移動: 戻る・アプリの一覧 / 中央へ・前 / 次のアプリ
 /// - ヘルプ: 頼み方のコツ(#967)・お問い合わせ
 struct MacCommands: Commands {
@@ -49,6 +51,24 @@ struct MacCommands: Commands {
                 .keyboardShortcut("z", modifiers: [.command, .shift])
         }
 
+        CommandGroup(after: .toolbar) {
+            Divider()
+            // 中央のアプリのシート(sheet / fullScreen)が開いている間は出さない(シートを重ねない)
+            Button("画面マップ") { shell?.showScreenMap() }
+                .keyboardShortcut("e", modifiers: [.command, .shift])
+                .disabled(!(shell?.canShowScreenMap ?? false) || runtime?.sheet != nil || runtime?.fullScreen != nil
+                           || runtime?.calendarDraft != nil)
+        }
+
+        CommandMenu("アプリ") {
+            Button("変更を元に戻す") { shell?.undoVersion() }
+                .keyboardShortcut("z", modifiers: [.command, .option])
+                .disabled(!(shell?.canUndoVersion ?? false))
+            Button("変更をやり直す") { shell?.redoVersion() }
+                .keyboardShortcut("z", modifiers: [.command, .option, .shift])
+                .disabled(!(shell?.canRedoVersion ?? false))
+        }
+
         CommandMenu("移動") {
             Button("戻る") { runtime?.goBack() }
                 .keyboardShortcut("[", modifiers: .command)
@@ -88,12 +108,20 @@ struct ShellActions {
     var focusCanvas: () -> Void
     /// 会話のシートを開けるか(開いている間は新しく開かない)
     var canCompose: Bool
+    /// 中央のアプリの版を戻せる / やり直せるか(#968・会話のシートが開いている間は押せない)
+    var canUndoVersion: Bool = false
+    var canRedoVersion: Bool = false
+    var undoVersion: () -> Void = {}
+    var redoVersion: () -> Void = {}
     var newApp: () -> Void
     /// 文字で頼む(中央のアプリを直す・無ければ作る)
     var ask: () -> Void
     /// 声で頼む(⌘K と同じ相手の会話を開いてすぐ録音・#966)
     var speak: () -> Void
     var showTips: () -> Void
+    /// 画面マップ(#970)を開けるか(中央にアプリがあり、会話のシートが閉じている)
+    var canShowScreenMap: Bool = false
+    var showScreenMap: () -> Void = {}
 }
 
 private struct ShellActionsKey: FocusedValueKey {

@@ -3197,6 +3197,23 @@
         }
       }
     },
+    "ブラウザで開く" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Open in Browser"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ブラウザで開く"
+          }
+        }
+      }
+    },
     "プロフィールが見つかりません" : {
       "extractionState" : "manual",
       "localizations" : {

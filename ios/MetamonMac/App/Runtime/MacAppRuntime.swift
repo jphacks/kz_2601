@@ -33,29 +33,62 @@ final class MacAppRuntime: RuntimeNavigating {
     /// 一覧の記録を消した直後の「削除しました・元に戻す」(iOS の M11 と同じく数秒は送らない)
     var recordUndo: DeletionTicket?
     static let undoSeconds: Double = 5
+    /// addToCalendar で出す確認シートの中身(`MacAppRuntime+Calendar.swift`・#978)
+    var calendarDraft: CalendarEventDraft?
 
     @ObservationIgnored let recordSync: RecordSyncEngine
+    /// lookupBook の問い合わせ先。appconfig への接続(#930)が来るまでは nil
+    @ObservationIgnored var books: (any BookLookupClient)?
+    @ObservationIgnored var calendarWriter: any CalendarWriting = EventKitCalendarWriter()
     @ObservationIgnored private var savingForms: Set<ObjectIdentifier> = []
+    /// `mockRecordSync` の一時フォルダ。ランタイムを捨てる時(アプリの切り替え)に消す
+    @ObservationIgnored private let previewDirectory: URL?
 
     init(appId: String, dsl: AppDSL, recordSync: RecordSyncEngine? = nil) {
         self.appId = appId
         self.dsl = dsl
         selectedTab = dsl.initialTab // iOS と同じ: initialScreen がタブならそのタブから
-        self.recordSync = recordSync ?? Self.mockRecordSync()
+        if let recordSync {
+            self.recordSync = recordSync
+            previewDirectory = nil
+        } else {
+            let dir = Self.newPreviewDirectory()
+            self.recordSync = Self.mockRecordSync(directory: dir)
+            previewDirectory = dir
+        }
         self.recordSync.onEvent = { [weak self] event in self?.handle(event) }
         self.recordSync.start()
     }
 
-    /// アプリを切り替えるとランタイムごと作り直す(`AppCanvas` の `.id`)。購読のタスクがエンジンを握り続けないよう止める。
+    /// アプリを切り替えるとランタイムごと作り直す(`AppCanvas` の `.id`)。購読のタスクがエンジンを握り続けないよう止め、
+    /// 一時フォルダも消す(切り替えのたびに増えないように)
     deinit {
         let engine = recordSync
-        Task { @MainActor in engine.stop() }
+        let dir = previewDirectory
+        Task { @MainActor in
+            engine.stop()
+            if let dir { try? FileManager.default.removeItem(at: dir) }
+        }
     }
 
-    /// メモリ上の appconfig + 一時フォルダのローカル DB(アプリを閉じれば消える)。iOS の METAMON_MOCK 相当。
-    static func mockRecordSync() -> RecordSyncEngine {
-        let dir = FileManager.default.temporaryDirectory
-            .appendingPathComponent("metamon-mac-preview-\(UUID().uuidString)", isDirectory: true)
+    private static let previewPrefix = "metamon-mac-preview-"
+
+    private static func newPreviewDirectory() -> URL {
+        FileManager.default.temporaryDirectory
+            .appendingPathComponent("\(previewPrefix)\(UUID().uuidString)", isDirectory: true)
+    }
+
+    /// 一時フォルダをまとめて消す。使っている途中のものも消すので、起動時(前回の残り)と終了時だけ呼ぶ
+    static func removePreviewDirectories() {
+        let fm = FileManager.default
+        let items = (try? fm.contentsOfDirectory(at: fm.temporaryDirectory, includingPropertiesForKeys: nil)) ?? []
+        for item in items where item.lastPathComponent.hasPrefix(previewPrefix) {
+            try? fm.removeItem(at: item)
+        }
+    }
+
+    /// メモリ上の appconfig + 一時フォルダのローカル DB(アプリを切り替える・閉じると消す)。iOS の METAMON_MOCK 相当。
+    static func mockRecordSync(directory dir: URL) -> RecordSyncEngine {
         let store = RecordStore(directory: dir)
         let client = InMemoryAppConfigClient()
         return RecordSyncEngine(store: store, queue: SyncQueue(directory: nil, store: store, client: client),
@@ -203,6 +236,12 @@ final class MacAppRuntime: RuntimeNavigating {
             }
             NSWorkspace.shared.open(url)
 
+        case .addToCalendar:
+            addToCalendar(action, ctx)
+
+        case .lookupBook:
+            await lookupBook(action, ctx)
+
         default:
             // AI・通知・共有・書き出しなどは Mac ではまだ動かない(後の Issue)
             toast = L10n.tr("このボタンは Mac ではまだ使えません")
@@ -270,6 +309,17 @@ final class MacAppRuntime: RuntimeNavigating {
             sheet = nil
             paths["sheet"] = nil
         }
+    }
+
+    // MARK: - 画面マップ(#970)
+
+    /// 今いちばん上に見えている画面の id(画面マップを開いた時に選んでおく)
+    var currentScreen: String { NavigationResolver.top(navigationState, dsl: dsl).screen }
+
+    /// 画面マップから画面を開く。モーダルを閉じ、根(タブ)から矢印をたどって開く(戻るで来た道を戻れる)
+    func reveal(screen: String) {
+        guard let next = NavigationResolver.reveal(screen, graph: ScreenGraph(dsl: dsl), dsl: dsl, from: navigationState) else { return }
+        setNavigation(next)
     }
 
     // MARK: - 削除の取り消し(M11)

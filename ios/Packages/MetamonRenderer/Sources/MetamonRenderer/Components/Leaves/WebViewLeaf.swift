@@ -13,7 +13,7 @@ struct WebViewLeaf: View {
     var body: some View {
         if let url = ExternalURLPolicy.webViewURL(c.url) {
             VStack(spacing: 0) {
-                toolbar
+                toolbar(url)
                 Divider()
                 ZStack(alignment: .top) {
                     WebViewRepresentable(url: url, state: state)
@@ -32,7 +32,7 @@ struct WebViewLeaf: View {
         }
     }
 
-    private var toolbar: some View {
+    private func toolbar(_ url: URL) -> some View {
         HStack(spacing: 12) {
             Button { state.goBack?() } label: { Image(systemName: "chevron.backward") }
                 .disabled(!state.canGoBack)
@@ -48,12 +48,47 @@ struct WebViewLeaf: View {
                 Image(systemName: state.isLoading ? "xmark" : "arrow.clockwise")
             }
             .accessibilityLabel(state.isLoading ? L("読み込みを止める") : L("再読み込み"))
+            #if os(macOS)
+            // Mac(#961): 今のページを既定のブラウザで開く(NSWorkspace)。
+            Button { PlatformSystem.open(state.currentURL ?? url) } label: { Image(systemName: "safari") }
+                .help(L("ブラウザで開く"))
+                .accessibilityLabel(L("ブラウザで開く"))
+            #endif
         }
         .buttonStyle(.plain)
         .foregroundStyle(.tint)
         .padding(.horizontal, 12)
         .padding(.vertical, 8)
         .background(.bar)
+    }
+}
+
+/// webView の中のリンクの扱い(iOS と Mac で同じ判定・テストから使う)。
+enum WebLinkPolicy: Equatable {
+    case allow
+    /// アプリの外(ブラウザ・電話・LINE など)に渡す。iOS は UIApplication、Mac は NSWorkspace。
+    case openExternally(URL)
+    case ignore
+
+    /// 表示できるのは https だけ。ページ内リンクで他スキーム(tel: / line:// など)に飛ぶ時は allowlist 内なら OS に渡し、それ以外は無視する。
+    /// Mac は新しいウインドウで開くリンク(target=_blank)を既定のブラウザに渡す(#961)。iOS は今まで通り。
+    /// ブラウザに渡すのはリンクを押した時だけ(`linkActivated`)。スクリプトが開く新しいウインドウは渡さない。
+    static func decide(_ url: URL?, opensNewWindow: Bool, linkActivated: Bool = true,
+                       externalNewWindows: Bool = isMac) -> WebLinkPolicy {
+        guard let url, let scheme = url.scheme?.lowercased() else { return .ignore }
+        if scheme == "https" || scheme == "http" || scheme == "about" {
+            if externalNewWindows, opensNewWindow, scheme == "https" { return linkActivated ? .openExternally(url) : .ignore }
+            return .allow
+        }
+        return ExternalURLPolicy.isAllowed(url) ? .openExternally(url) : .ignore
+    }
+
+    static var isMac: Bool {
+        #if os(macOS)
+        true
+        #else
+        false
+        #endif
     }
 }
 
@@ -65,6 +100,8 @@ final class WebState {
     var canGoBack = false
     var canGoForward = false
     var pageTitle = ""
+    /// 今表示しているページ(Mac の「ブラウザで開く」が使う)。
+    var currentURL: URL?
     var goBack: (() -> Void)?
     var goForward: (() -> Void)?
     var reload: (() -> Void)?
@@ -150,16 +187,24 @@ extension WebViewRepresentable: NSViewRepresentable {
                 web.observe(\.title, options: [.initial, .new]) { [state] w, _ in
                     Task { @MainActor in state.pageTitle = w.title ?? "" }
                 },
+                web.observe(\.url, options: [.initial, .new]) { [state] w, _ in
+                    Task { @MainActor in state.currentURL = w.url }
+                },
             ]
         }
 
-        /// 表示できるのは https だけ。ページ内リンクで他スキーム(tel: / line:// など)に飛ぶ時は allowlist 内なら OS に渡し、それ以外は無視する。
         func webView(_ webView: WKWebView, decidePolicyFor action: WKNavigationAction,
                      decisionHandler: @escaping @MainActor (WKNavigationActionPolicy) -> Void) {
-            guard let url = action.request.url, let scheme = url.scheme?.lowercased() else { return decisionHandler(.cancel) }
-            if scheme == "https" || scheme == "http" || scheme == "about" { return decisionHandler(.allow) }
-            if ExternalURLPolicy.isAllowed(url) { PlatformSystem.open(url) }
-            decisionHandler(.cancel)
+            switch WebLinkPolicy.decide(action.request.url, opensNewWindow: action.targetFrame == nil,
+                                        linkActivated: action.navigationType == .linkActivated) {
+            case .allow:
+                decisionHandler(.allow)
+            case .openExternally(let url):
+                PlatformSystem.open(url)
+                decisionHandler(.cancel)
+            case .ignore:
+                decisionHandler(.cancel)
+            }
         }
     }
 }

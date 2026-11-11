@@ -11,11 +11,15 @@ struct AppCanvas: View {
     let app: SampleApp
     /// 会話で作った・直したアプリの DSL(#967)。nil なら同梱の例を読む
     var dsl: AppDSL?
+    /// 画面マップのシート(#970)。ツールバー・表示メニューが立てる
+    var showsScreenMap: Binding<Bool> = .constant(false)
+    /// 画面マップの「この画面について話す」。マップを閉じ終えてから呼ぶ(シートを 2 枚同時に出さない)
+    var onTalk: (ScreenContext) -> Void = { _ in }
 
     var body: some View {
         Group {
             if let runtime {
-                AppCanvasContent(runtime: runtime)
+                AppCanvasContent(runtime: runtime, showsScreenMap: showsScreenMap, onTalk: onTalk)
             } else if loadFailed {
                 ContentUnavailableView("アプリを開けませんでした", systemImage: "exclamationmark.triangle")
             } else {
@@ -37,9 +41,28 @@ struct AppCanvas: View {
 
 private struct AppCanvasContent: View {
     @Bindable var runtime: MacAppRuntime
+    @Binding var showsScreenMap: Bool
+    let onTalk: (ScreenContext) -> Void
+    /// マップで「この画面について話す」を押した画面。マップが閉じ終わったら会話を開く
+    @State private var pendingTalk: ScreenContext?
 
     var body: some View {
         DSLNavigationRoot()
+            .background {
+                // 画面マップ(#970)。アプリのシートとは別の view に付ける(同じ view に sheet を重ねない)
+                Color.clear.sheet(isPresented: $showsScreenMap, onDismiss: talkAfterMap) {
+                    MacScreenMapView(dsl: runtime.dsl, current: runtime.currentScreen,
+                                     onOpen: { screen in
+                                         runtime.reveal(screen: screen)
+                                         showsScreenMap = false
+                                     },
+                                     onTalk: { screen in
+                                         pendingTalk = screen
+                                         showsScreenMap = false
+                                     },
+                                     onClose: { showsScreenMap = false })
+                }
+            }
             // Mac の fullScreenCover は無いので sheet で出す(大きめの最小サイズ)
             .sheet(item: $runtime.sheet) { route in
                 modal(route).frame(minWidth: 420, minHeight: 480)
@@ -51,6 +74,12 @@ private struct AppCanvasContent: View {
             .environment(\.dslRuntime, runtime)
             .environment(\.componentRegistry, ComponentRegistry.standard)
             .focusedSceneValue(\.macAppRuntime, runtime) // メニューの「戻る」・削除の取り消し(#934)
+    }
+
+    private func talkAfterMap() {
+        guard let screen = pendingTalk else { return }
+        pendingTalk = nil
+        onTalk(screen)
     }
 
     /// モーダルの中にも確認と一言を出す(根の上に重ねるとシートに隠れる・iOS の RootView と同じ理由)
@@ -83,6 +112,10 @@ private struct RuntimeOverlays: ViewModifier {
                 }
                 Button("キャンセル", role: .cancel) {}
             }
+            // addToCalendar(#978): 中身を見せてから書く
+            .sheet(item: calendarShown) { draft in
+                MacCalendarSheet(draft: draft, writer: runtime.calendarWriter) { runtime.calendarDraft = nil }
+            }
             .overlay(alignment: .top) {
                 VStack(spacing: 8) {
                     if active, let message = runtime.toast {
@@ -114,6 +147,10 @@ private struct RuntimeOverlays: ViewModifier {
 
     private var confirmShown: Binding<Bool> {
         Binding(get: { active && runtime.confirm != nil }, set: { if !$0 { runtime.confirm = nil } })
+    }
+
+    private var calendarShown: Binding<CalendarEventDraft?> {
+        Binding(get: { active ? runtime.calendarDraft : nil }, set: { runtime.calendarDraft = $0 })
     }
 }
 
