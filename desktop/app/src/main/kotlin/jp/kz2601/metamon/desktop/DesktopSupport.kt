@@ -1,0 +1,83 @@
+package jp.kz2601.metamon.desktop
+
+import jp.kz2601.metamon.dsl.AppDSL
+import jp.kz2601.metamon.dsl.Component
+import jp.kz2601.metamon.dsl.ComponentType
+import jp.kz2601.metamon.dsl.Entity
+import jp.kz2601.metamon.dsl.decode
+import kotlinx.serialization.json.JsonPrimitive
+
+/** デスクトップ版で描ける部品(骨格の段階)。ここに無い既知の type は「この端末では使えない」(unavailable)として穴を残す。 */
+object DesktopLeaves {
+    val containers: Set<ComponentType> = ComponentType.entries.filter { it.isContainer }.toSet()
+
+    val leaves: Set<ComponentType> = setOf(
+        ComponentType.TEXT,
+        ComponentType.LABEL,
+        ComponentType.MARKDOWN,
+        ComponentType.BADGE,
+        ComponentType.EMPTY_STATE,
+        ComponentType.SPACER,
+        ComponentType.DIVIDER,
+        ComponentType.BUTTON,
+        ComponentType.LINK,
+        ComponentType.LIST,
+        ComponentType.TEXT_FIELD,
+        ComponentType.NUMBER_FIELD,
+        ComponentType.TEXT_EDITOR,
+        ComponentType.SECURE_FIELD,
+        ComponentType.TOGGLE,
+        ComponentType.PICKER,
+        ComponentType.STEPPER,
+    )
+
+    /** 適合テストの `state`(rendered / unavailable / unknown)。hidden・needsForm はまだ見ない。 */
+    fun state(c: Component): String = when {
+        c.type == ComponentType.UNKNOWN -> "unknown"
+        c.type in containers || c.type in leaves -> "rendered"
+        else -> "unavailable"
+    }
+
+    /** DSL に書いてある type の文字列そのまま(知らない type も)。 */
+    fun typeName(c: Component): String = c.rawType.ifEmpty { c.type.wire }
+}
+
+/** アプリに同梱した例の DSL(docs/dsl/examples)。 */
+object Examples {
+    fun load(name: String): AppDSL {
+        val path = "examples/${name.removeSuffix(".json")}.json"
+        val text = Examples::class.java.classLoader.getResourceAsStream(path)?.use { it.readBytes().decodeToString() }
+            ?: error("同梱の DSL が無い: $path")
+        return AppDSL.decode(text)
+    }
+}
+
+/** モックのレコード(サインインも通信もしない骨格用)。 */
+data class Row(val id: String, val data: Map<String, String>)
+
+data class MockStore(val rows: Map<String, List<Row>> = emptyMap(), val nextId: Int = 1) {
+    fun list(entity: String): List<Row> = rows[entity].orEmpty()
+
+    fun find(entity: String, id: String): Row? = list(entity).firstOrNull { it.id == id }
+
+    fun save(entity: String, id: String?, data: Map<String, String>): MockStore {
+        val current = list(entity)
+        return if (id != null && current.any { it.id == id }) {
+            copy(rows = rows + (entity to current.map { if (it.id == id) Row(id, data) else it }))
+        } else {
+            copy(rows = rows + (entity to current + Row("new-$nextId", data)), nextId = nextId + 1)
+        }
+    }
+
+    fun delete(entity: String, id: String): MockStore = copy(rows = rows + (entity to list(entity).filterNot { it.id == id }))
+}
+
+/** 新規のフォームの初期値(defaultValue の文字列)。"now" などの解決は後の Issue。 */
+fun Entity.defaultDraft(): Map<String, String> = fields.mapNotNull { f ->
+    val v = (f.defaultValue as? JsonPrimitive)?.content ?: return@mapNotNull null
+    if (v == "now") null else f.id to v
+}.toMap()
+
+/** 必須なのに空の項目の名前。 */
+fun Entity.missingRequired(draft: Map<String, String>): List<String> =
+    fields.filter { it.required == true && draft[it.id].isNullOrBlank() }.map { it.name }
