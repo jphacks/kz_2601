@@ -16,5 +16,6 @@ struct BadgeLeaf: View {
             .padding(.vertical, 5)
             .foregroundStyle(tint)
             .background(tint.opacity(SemanticPalette.badgeFill), in: Capsule())
+            .macTextSelection()
     }
 }

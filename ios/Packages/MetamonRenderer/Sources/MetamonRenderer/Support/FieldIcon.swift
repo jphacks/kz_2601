@@ -1,12 +1,18 @@
 import SwiftUI
 import MetamonDSL
+#if canImport(UIKit)
+import UIKit
+#else
+import AppKit
+#endif
 
 /// 入力・stat の左に置く SF Symbol を field 型(と id / ラベルの語)から推定する。component に `icon` があればそれを優先。
 /// 対応表は `docs/ios/design-system.md` §2.6。
 enum FieldIcon {
     static func infer(component c: Component, field: Field?) -> String {
-        if let icon = c.icon, !icon.isEmpty { return icon }
-        return infer(field: field, hint: [c.field ?? "", c.label ?? "", field?.name ?? ""].joined(separator: " "))
+        let inferred = infer(field: field, hint: [c.field ?? "", c.label ?? "", field?.name ?? ""].joined(separator: " "))
+        // DSL の icon は iOS 向けに書かれる。Mac に無い名前はこちらで推定した記号に落とす(#941)
+        return resolve(c.icon, fallback: inferred)
     }
 
     static func infer(field: Field?, hint: String = "") -> String {
@@ -52,3 +58,46 @@ enum FieldIcon {
         }
     }
 }
+
+// MARK: - その OS に無い記号の代わり(#941)
+
+extension FieldIcon {
+    /// `name` がこの OS の SF Symbols にあればそのまま、無ければ `fallback`(DSL は iOS 向けに書かれるので
+    /// Mac に無い記号が来る)。空・nil も `fallback`。
+    static func resolve(_ name: String?, fallback: String) -> String {
+        guard let name, !name.isEmpty else { return fallback }
+        return exists(name) ? name : fallback
+    }
+
+    /// この OS に実在する SF Symbol か。名前ごとに覚える(描画のたびに画像を作らない)。
+    static func exists(_ name: String) -> Bool {
+        if let known = symbolCache.value(name) { return known }
+        #if canImport(UIKit)
+        let found = UIImage(systemName: name) != nil
+        #else
+        let found = NSImage(systemSymbolName: name, accessibilityDescription: nil) != nil
+        #endif
+        symbolCache.set(name, found)
+        return found
+    }
+}
+
+/// 記号の有無の覚え書き。どのスレッドから引かれてもよいように鍵をかける。
+private final class SymbolCache: @unchecked Sendable {
+    private var known: [String: Bool] = [:]
+    private let lock = NSLock()
+
+    func value(_ name: String) -> Bool? {
+        lock.lock()
+        defer { lock.unlock() }
+        return known[name]
+    }
+
+    func set(_ name: String, _ found: Bool) {
+        lock.lock()
+        defer { lock.unlock() }
+        known[name] = found
+    }
+}
+
+private let symbolCache = SymbolCache()

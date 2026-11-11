@@ -2777,6 +2777,23 @@
         }
       }
     },
+    "アバター" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Avatar"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "アバター"
+          }
+        }
+      }
+    },
     "アプリを更新すると表示できます" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -3521,6 +3538,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "ファイルを開けませんでした"
+          }
+        }
+      }
+    },
+    "ブラウザで開きます" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Opens in your browser"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ブラウザで開きます"
           }
         }
       }
@@ -8242,6 +8276,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "設定アプリで Tailor It のマイクへのアクセスを許可してください。"
+          }
+        }
+      }
+    },
+    "評価" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Rating"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "評価"
           }
         }
       }

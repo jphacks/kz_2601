@@ -85,6 +85,16 @@ extension View {
         #endif
     }
 
+    /// Mac: 文字を選択してコピーできるようにする(#941・Mac では当たり前の操作)。iOS は指の操作と喧嘩するので今までどおり何もしない。
+    @ViewBuilder
+    func macTextSelection() -> some View {
+        #if os(macOS)
+        textSelection(.enabled)
+        #else
+        self
+        #endif
+    }
+
     /// Mac: 見出しとして VoiceOver に伝える(ローターの「見出し」で飛べる・#937)。iOS は今までどおり何もしない。
     @ViewBuilder
     func macAccessibilityHeading() -> some View {

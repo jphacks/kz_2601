@@ -45,6 +45,7 @@ struct TimelineLeaf: View {
                 }
             }
         .renderCard()
+        .macTextSelection()
         }
     }
 

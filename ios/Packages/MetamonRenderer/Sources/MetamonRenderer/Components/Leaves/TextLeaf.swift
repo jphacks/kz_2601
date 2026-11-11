@@ -4,6 +4,7 @@ import MetamonDSL
 /// `text`: style(title|headline|body|caption)と align(leading|center|trailing)。
 /// screen.entity の画面では `{{fieldId}}` を開いているレコードの値にする(`TextHighlight.substitutes` の field だけ・他は文字のまま)。
 /// `highlight` の語に印(marker: 背景 + 太字 / bold)。印は見た目だけで、VoiceOver はふつうの文として読む。
+/// Mac では文字を選択してコピーできる(#941)。
 struct TextLeaf: View {
     @Environment(\.dslRuntime) private var rt
     let c: Component
@@ -14,6 +15,7 @@ struct TextLeaf: View {
             .font(font)
             .multilineTextAlignment(alignment)
             .frame(maxWidth: .infinity, alignment: frameAlignment)
+            .macTextSelection()
     }
 
     private var content: AttributedString {
