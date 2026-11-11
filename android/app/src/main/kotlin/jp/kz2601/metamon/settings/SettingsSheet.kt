@@ -40,6 +40,10 @@ import jp.kz2601.metamon.language.AppLocales
 import jp.kz2601.metamon.language.LanguageSection
 import jp.kz2601.metamon.push.PushConsentSection
 import jp.kz2601.metamon.renderer.components.social.BlockedUsersSection
+import jp.kz2601.metamon.renderer.navigation.NavigationResolver
+import jp.kz2601.metamon.renderer.navigation.ScreenGraph
+import jp.kz2601.metamon.renderer.navigation.reveal
+import jp.kz2601.metamon.screenmap.ScreenMapSheet
 import jp.kz2601.metamon.services.MyUsage
 import jp.kz2601.metamon.services.RemainingToday
 import jp.kz2601.metamon.share.MembersSettingsRow
@@ -127,6 +131,16 @@ fun SettingsSheet(
             // 挨拶・AI の質問・完成の要約の読み上げ(#892・既定 OFF)
             SpeechSection(remember { SpeechSettings(context) })
             HorizontalDivider(Modifier.padding(vertical = 8.dp))
+            var screenMapOpen by rememberSaveable { mutableStateOf(false) }
+            if (screenMapOpen) {
+                // 画面マップ(#897)。選んだ画面を根から最短の道で開き、設定ごと閉じる
+                ScreenMapSheet(runtimeState.dsl, onDismiss = { screenMapOpen = false }, onOpen = { id ->
+                    val dsl = runtimeState.dsl
+                    NavigationResolver.reveal(id, ScreenGraph(dsl), dsl, container.runtime.navigation.value)?.let(container.runtime::setNavigation)
+                    screenMapOpen = false
+                    onDismiss()
+                })
+            }
             // アプリ(#898・iOS の appSection): 元に戻す・画面マップ・自動の動き・使い方を見る(#900)・頼み方のコツ・リセット
             AppActionsSection(
                 AppActionsState(
@@ -138,6 +152,7 @@ fun SettingsSheet(
                     hasServerRules = runtimeState.dsl.serverRules.isNotEmpty(),
                 ),
                 onUndo = onUndo,
+                onOpenScreenMap = { screenMapOpen = true },
                 onShowTutorial = onShowTutorial,
                 onPickTip = onPickTip,
                 onReset = onReset,
