@@ -102,6 +102,7 @@
     <string name="desktop_print_sent">Sent %1$d pages to the printer</string>
     <string name="desktop_print_title">Print: %1$s</string>
     <string name="desktop_print_value">Value</string>
+    <string name="desktop_record_deleted_elsewhere">This record was deleted in another window</string>
     <string name="desktop_sync_pending">%1$d waiting to send</string>
     <string name="desktop_timer_done">Time\'s up</string>
     <string name="desktop_timer_name">Timer</string>

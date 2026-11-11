@@ -33,6 +33,7 @@ import jp.kz2601.metamon.dsl.records.entityModels
 import jp.kz2601.metamon.dsl.screen
 import java.io.File
 import java.util.prefs.Preferences
+import javax.swing.SwingUtilities
 
 /**
  * 起動。引数 1 つ目(または -Dtailorit.example)で同梱の例を選ぶ。既定は shopping。
@@ -60,7 +61,8 @@ fun main(args: Array<String>) = application {
                 } else {
                     val p = SessionPersistence.create(desktopStore, id)
                     val models = dsl.entityModels()
-                    SharedRecords.opening(p, loadScope) { p.load(models) }
+                    // 記録は Swing の画面のスレッドでだけ書き換える(断られた分を混ぜる時も)
+                    SharedRecords.opening(p, loadScope, post = { SwingUtilities.invokeLater(it) }) { p.load(models) }
                 }
             },
             wipeStore = { desktopStore.wipe() },
@@ -68,6 +70,7 @@ fun main(args: Array<String>) = application {
     }
     DisposableEffect(hub) {
         onDispose {
+            // 終わる時: 全部のアプリの積んだ書き込みを書き終えるのを待ってから(3 秒まで)閉じる
             hub.close()
             loadScope.cancel()
         }
@@ -75,11 +78,13 @@ fun main(args: Array<String>) = application {
     val registry = remember { WindowRegistry().also { it.open(WindowKey.app(first)) } }
     val firstWindowId = remember { registry.windows.first().id }
     // トレイに常駐(#1761): × はトレイに隠す(設定で off・トレイが無ければ終わる)。終わるのはトレイの「終了」
-    val tray = remember { TrayController.create(hub.app(first).dsl) }
+    val tray = remember { TrayController.create(hub.dsl(first)) }
     tray.onOpenApp = { registry.open(WindowKey.app(it)) }
+    // すぐ記録は前にあるアプリの、アプリのウィンドウへ(詳細には入れない・無ければ開く)
+    tray.findQuickRecordWindow = { registry.quickRecordWindow()?.id }
     // トレイの名前・すぐ記録は前にあるウィンドウのアプリ
     val activeApp = registry.active?.key?.appId
-    LaunchedEffect(activeApp) { activeApp?.let { tray.switchApp(hub.app(it).dsl) } }
+    LaunchedEffect(activeApp) { activeApp?.let { tray.switchApp(hub.dsl(it)) } }
     DesktopTray(tray)
     registry.windows.toList().forEach { w ->
         key(w.id) {
@@ -92,7 +97,9 @@ fun main(args: Array<String>) = application {
 @OptIn(FlowPreview::class)
 @Composable
 private fun ApplicationScope.DesktopWindow(w: WindowEntry, registry: WindowRegistry, hub: AppHub, tray: TrayController, startScreen: String?) {
-    val app = remember(w) { hub.app(w.key.appId) }
+    // アプリの記録はウィンドウの数で数える。最後の 1 枚を閉じたら書き終えて閉じる
+    val app = remember(w) { hub.acquire(w.key.appId) }
+    DisposableEffect(w) { onDispose { hub.release(w.key.appId) } }
     val kind = w.key.kind
     val saved = remember(w) {
         WindowBounds.load(kind)?.let { WindowBounds.fit(WindowBounds.cascade(it, registry.indexInKind(w)), WindowBounds.screens()) }
@@ -127,7 +134,11 @@ private fun ApplicationScope.DesktopWindow(w: WindowEntry, registry: WindowRegis
         }
         DisposableEffect(window) {
             val l = object : WindowAdapter() {
-                override fun windowGainedFocus(e: WindowEvent?) = registry.activate(w.id)
+                override fun windowGainedFocus(e: WindowEvent?) {
+                    registry.activate(w.id)
+                    // 前に出た: 続けて失敗して止まった送り待ちを起こす
+                    app.records.persistence?.resume()
+                }
             }
             window.addWindowFocusListener(l)
             onDispose { window.removeWindowFocusListener(l) }
@@ -150,8 +161,10 @@ private fun ApplicationScope.DesktopWindow(w: WindowEntry, registry: WindowRegis
                         records = app.records,
                         startRecordId = w.key.recordId,
                         onOpenRecord = { screen, id -> registry.open(WindowKey.record(app.id, screen, id)) },
-                        onCloseWindow = close,
+                        // 画面の中の「閉じる」・Esc は終わらせない(最後の 1 枚ならアプリのウィンドウを開いてから閉じる)。トレイ・終了はタイトルバーの × だけ
+                        onCloseWindow = { registry.closeInApp(w.id) },
                         isActive = { registry.active?.id == w.id },
+                        windowId = w.id,
                         onWipeLocalData = hub::wipeLocalData,
                     )
                 }

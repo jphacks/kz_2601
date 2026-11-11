@@ -178,6 +178,14 @@ class TrayController(
     var focusRequests by mutableIntStateOf(0)
         private set
 
+    /** 「すぐ記録」を受け取るウィンドウを決める(Main: 前にあるアプリの、アプリのウィンドウ。無ければ開く)。null を返せば前にある物。 */
+    var findQuickRecordWindow: () -> Int? = { null }
+
+    /** まだ受け取られていない「すぐ記録」の行き先(null は前にあるウィンドウ)。 */
+    var quickRecordWindow: Int? by mutableStateOf(null)
+        private set
+    private var quickRecordPending = false
+
     fun open() {
         windowVisible = true
         focusRequests++
@@ -185,8 +193,23 @@ class TrayController(
 
     fun quickRecord() {
         if (quickRecordAction == null) return
+        quickRecordWindow = findQuickRecordWindow()
+        quickRecordPending = true
         open()
         quickRecordRequests++
+    }
+
+    /**
+     * ウィンドウが「すぐ記録」を受け取る。行き先なら 1 回だけ true。
+     * 行き先を開いたばかりで、記録を読み終えて画面ができた後に受け取っても動く。
+     */
+    fun takeQuickRecord(windowId: Int?, isActive: () -> Boolean): Boolean {
+        if (!quickRecordPending) return false
+        val target = quickRecordWindow
+        if (if (target != null) windowId != target else !isActive()) return false
+        quickRecordPending = false
+        quickRecordWindow = null
+        return true
     }
 
     fun updateCloseToTray(on: Boolean) {
@@ -261,15 +284,15 @@ private fun MenuScope.TrayItems(c: TrayController, items: List<TrayItem>, quit: 
     }
 }
 
-/** DesktopApp の中で呼ぶ: トレイの「すぐ記録」をこのセッションの遷移にする。ウィンドウが複数ある時は前にある 1 枚だけ([isActive])。 */
+/**
+ * DesktopApp の中で呼ぶ: トレイの「すぐ記録」をこのセッションの遷移にする。
+ * 行き先はトレイが決めたウィンドウ([windowId]・詳細には入れない)。決めていなければ前にある 1 枚([isActive])。
+ */
 @Composable
-fun TrayHook(session: DesktopSession, isActive: () -> Boolean = { true }) {
+fun TrayHook(session: DesktopSession, windowId: Int? = null, isActive: () -> Boolean = { true }) {
     val c = LocalTray.current ?: return
-    var handled by remember { mutableIntStateOf(c.quickRecordRequests) }
     LaunchedEffect(c.quickRecordRequests) {
-        if (c.quickRecordRequests == handled) return@LaunchedEffect
-        handled = c.quickRecordRequests
-        if (!isActive()) return@LaunchedEffect
+        if (!c.takeQuickRecord(windowId, isActive)) return@LaunchedEffect
         val a = c.quickRecordAction ?: return@LaunchedEffect
         if (a.screen?.let { session.dsl.screen(it) } == null) return@LaunchedEffect
         // もう開いていれば重ねない

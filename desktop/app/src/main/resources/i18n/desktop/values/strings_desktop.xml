@@ -103,6 +103,7 @@
     <string name="desktop_print_sent">%1$d 頁を印刷に送りました</string>
     <string name="desktop_print_title">印刷: %1$s</string>
     <string name="desktop_print_value">値</string>
+    <string name="desktop_record_deleted_elsewhere">この記録は別のウィンドウで消されました</string>
     <string name="desktop_sync_pending">送信待ち %1$d 件</string>
     <string name="desktop_timer_done">時間になりました</string>
     <string name="desktop_timer_name">タイマー</string>
