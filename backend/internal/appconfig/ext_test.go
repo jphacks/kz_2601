@@ -2,11 +2,13 @@ package appconfig
 
 import (
 	"context"
+	"fmt"
 	"io"
 	"log/slog"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
+	"slices"
 	"strings"
 	"sync"
 	"testing"
@@ -228,6 +230,47 @@ func TestExtUserLimit(t *testing.T) {
 	}
 }
 
+// providerIDs returns GET /v1/me/connections providers as "id:enabled".
+func providerIDs(t *testing.T, r resp) []string {
+	t.Helper()
+	list, ok := r.body["providers"].([]any)
+	if r.code != http.StatusOK || !ok {
+		t.Fatalf("providers: %d %s", r.code, r.raw)
+	}
+	out := []string{}
+	for _, v := range list {
+		p := v.(map[string]any)
+		if p["nameJa"] == "" || p["nameEn"] == "" {
+			t.Fatalf("no name: %v", p)
+		}
+		out = append(out, fmt.Sprintf("%s:%v", p["id"], p["enabled"]))
+	}
+	return out
+}
+
+// The list also says which services can be connected (#1566): OAuth
+// providers only, enabled = the runner has it on, a fake only when on, and
+// supportedFeatures narrows it (the review build sends no OAuth key).
+func TestExtConnectableProviders(t *testing.T) {
+	e := newExtEnv(t, 100)
+	got := providerIDs(t, e.do("solo", http.MethodGet, "/v1/me/connections", nil, nil))
+	want := []string{"fakeOauth:true", "googleCalendar:false", "notion:false", "outlookCalendar:false", "todoist:false"}
+	if !slices.Equal(got, want) {
+		t.Fatalf("providers: %v", got)
+	}
+	got = providerIDs(t, e.do("solo", http.MethodGet, "/v1/me/connections?supportedFeatures=externalCall.todoist,externalCall.fakeOauth&supportedFeatures=feed.v2", nil, nil))
+	if !slices.Equal(got, []string{"fakeOauth:true", "todoist:false"}) {
+		t.Fatalf("narrowed: %v", got)
+	}
+	review := "/v1/me/connections?supportedFeatures=" + url.QueryEscape(strings.Join(extapi.ReviewBuildFeatures(), ","))
+	if got := providerIDs(t, e.do("solo", http.MethodGet, review, nil, nil)); len(got) != 0 {
+		t.Fatalf("review build: %v", got)
+	}
+	if got := providerIDs(t, e.do("solo", http.MethodGet, "/v1/me/connections?supportedFeatures=", nil, nil)); len(got) != 0 {
+		t.Fatalf("empty features: %v", got)
+	}
+}
+
 // stubRunner answers every route with one reason.
 type stubRunner struct {
 	err error
@@ -239,8 +282,10 @@ func (s stubRunner) Call(context.Context, extapi.CallBody) (extapi.CallAnswer, e
 func (s stubRunner) Start(context.Context, string, string, []string) (string, error) {
 	return "", s.err
 }
-func (s stubRunner) Revoke(context.Context, string, string) error                  { return s.err }
-func (s stubRunner) List(context.Context, string) ([]extapi.ConnectionView, error) { return nil, s.err }
+func (s stubRunner) Revoke(context.Context, string, string) error { return s.err }
+func (s stubRunner) List(context.Context, string) (extapi.ConnectionList, error) {
+	return extapi.ConnectionList{}, s.err
+}
 
 // Every runner reason has its code and the contract's status.
 func TestExtReasonCodes(t *testing.T) {
@@ -281,7 +326,12 @@ func TestExtOff(t *testing.T) {
 	wantExtErr(t, e.do("solo", http.MethodPost, "/v1/apps/EXT-OFF/ext/fakeFree/listItems", `{"args":{}}`, nil), http.StatusServiceUnavailable, httpx.CodeExtUnavailable, "off")
 	wantExtErr(t, e.do("solo", http.MethodPost, "/v1/me/connections/fakeOauth/start", nil, nil), http.StatusServiceUnavailable, httpx.CodeExtUnavailable, "start off")
 	wantExtErr(t, e.do("solo", http.MethodDelete, "/v1/me/connections/fakeOauth", nil, nil), http.StatusServiceUnavailable, httpx.CodeExtUnavailable, "revoke off")
-	if r := e.do("solo", http.MethodGet, "/v1/me/connections", nil, nil); r.code != http.StatusOK || len(r.body["connections"].([]any)) != 0 {
+	r := e.do("solo", http.MethodGet, "/v1/me/connections", nil, nil)
+	if r.code != http.StatusOK || len(r.body["connections"].([]any)) != 0 {
 		t.Fatalf("list off: %d %s", r.code, r.raw)
+	}
+	// the services are still listed, all off, the fake not at all
+	if got := providerIDs(t, r); !slices.Equal(got, []string{"googleCalendar:false", "notion:false", "outlookCalendar:false", "todoist:false"}) {
+		t.Fatalf("providers off: %v", got)
 	}
 }

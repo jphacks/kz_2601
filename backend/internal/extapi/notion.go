@@ -62,7 +62,7 @@ var notionWireDefault = notionWire{
 var notionHosts = []string{"https://api.notion.com"}
 
 func init() {
-	register(Provider{ID: Notion, Billing: BillingFree, NeedsOAuth: true,
+	register(Provider{ID: Notion, Billing: BillingFree, NeedsOAuth: true, NameJa: "Notion", NameEn: "Notion",
 		Ops: []OpSpec{
 			{Name: "queryDatabase", Args: []string{"databaseId", "limit", "subtitleProperty", "valueProperty"}},
 			{Name: "addRow", Write: true, Args: []string{"databaseId", "title", "properties"}},

@@ -15,7 +15,9 @@ import (
 	"errors"
 	"net/http"
 	"os"
+	"slices"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/jphacks/kz_2601/backend/internal/auth"
@@ -35,7 +37,7 @@ type ExtRunner interface {
 	Call(ctx context.Context, b extapi.CallBody) (extapi.CallAnswer, error)
 	Start(ctx context.Context, uid, provider string, scopes []string) (string, error)
 	Revoke(ctx context.Context, uid, provider string) error
-	List(ctx context.Context, uid string) ([]extapi.ConnectionView, error)
+	List(ctx context.Context, uid string) (extapi.ConnectionList, error)
 }
 
 func init() {
@@ -222,18 +224,63 @@ func extErr(err error, provider string) *apiError {
 	return apiErr(http.StatusInternalServerError, httpx.CodeInternal, "internal server error")
 }
 
-// listConnections: GET /v1/me/connections (provider, status, scopes, dates; no tokens)
+// listConnections: GET /v1/me/connections[?supportedFeatures=a,b]
+//
+//	{"connections": [{provider, status, scopes, dates}] (no tokens),
+//	 "providers": [{id, nameJa, nameEn, enabled}]}
+//
+// providers are the services a person can connect (OAuth providers):
+// enabled = the runner has it on now. A fake is listed only when the runner
+// has it on (never in production). With supportedFeatures (the build's
+// list, as for generate), only providers whose externalCall.<id> is in it
+// are listed: the review build sends none of them (決定 6).
 func (h *Handler) listConnections(w http.ResponseWriter, r *http.Request) {
-	if h.ext == nil {
-		httpx.WriteJSON(w, http.StatusOK, map[string]any{"connections": []extapi.ConnectionView{}})
-		return
+	ans := extapi.ConnectionList{Connections: []extapi.ConnectionView{}}
+	if h.ext != nil {
+		var err error
+		if ans, err = h.ext.List(r.Context(), uidOf(r)); err != nil {
+			fail(w, extErr(err, ""))
+			return
+		}
+		if ans.Connections == nil {
+			ans.Connections = []extapi.ConnectionView{}
+		}
 	}
-	list, err := h.ext.List(r.Context(), uidOf(r))
-	if err != nil {
-		fail(w, extErr(err, ""))
-		return
+	httpx.WriteJSON(w, http.StatusOK, map[string]any{
+		"connections": ans.Connections,
+		"providers":   connectable(ans.Enabled, r.URL.Query()["supportedFeatures"]),
+	})
+}
+
+// connectableProvider is one entry of GET /v1/me/connections providers.
+type connectableProvider struct {
+	ID      string `json:"id"`
+	NameJa  string `json:"nameJa"`
+	NameEn  string `json:"nameEn"`
+	Enabled bool   `json:"enabled"`
+}
+
+// connectable lists the OAuth providers (sorted by id). features is the
+// supportedFeatures query (repeated or comma-separated); nil = no filter.
+func connectable(enabled, features []string) []connectableProvider {
+	var allow map[string]bool
+	if features != nil {
+		allow = map[string]bool{}
+		for _, f := range features {
+			for _, k := range strings.Split(f, ",") {
+				allow[strings.TrimSpace(k)] = true
+			}
+		}
 	}
-	httpx.WriteJSON(w, http.StatusOK, map[string]any{"connections": list})
+	out := []connectableProvider{}
+	for _, p := range extapi.Providers() {
+		on := slices.Contains(enabled, p.ID)
+		if !p.NeedsOAuth || (p.Fake && !on) || (allow != nil && !allow[p.FeatureKey()]) {
+			continue
+		}
+		out = append(out, connectableProvider{ID: p.ID, NameJa: p.NameJa, NameEn: p.NameEn, Enabled: on})
+	}
+	return out
 }
 
 // startConnection: POST /v1/me/connections/{provider}/start {"scopes": [...]} → {"authUrl"}

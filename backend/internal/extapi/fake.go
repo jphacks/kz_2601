@@ -44,7 +44,7 @@ func init() {
 				return out
 			})}, nil
 		}})
-	register(Provider{ID: FakeOAuth, Billing: BillingFree, Fake: true, NeedsOAuth: true,
+	register(Provider{ID: FakeOAuth, Billing: BillingFree, Fake: true, NeedsOAuth: true, NameJa: "テスト用サービス", NameEn: "Test service",
 		Ops: []OpSpec{
 			{Name: "listEvents", Scopes: []string{"fake.read"}, Args: []string{"fail"}},
 			{Name: "createEvent", Write: true, Scopes: []string{"fake.write"}, Args: []string{"title", "fail"}},

@@ -59,7 +59,7 @@ var googleCalendarWire = gcalWire{
 var googleCalendarHosts = []string{"https://oauth2.googleapis.com", "https://www.googleapis.com"}
 
 func init() {
-	register(Provider{ID: GoogleCalendar, Billing: BillingFree, NeedsOAuth: true,
+	register(Provider{ID: GoogleCalendar, Billing: BillingFree, NeedsOAuth: true, NameJa: "Google カレンダー", NameEn: "Google Calendar",
 		Ops: []OpSpec{
 			{Name: "listEvents", Scopes: []string{gcalScopeRead}, Args: []string{"timeMin", "timeMax", "maxResults", "q"}},
 			{Name: "createEvent", Write: true, Scopes: []string{gcalScopeWrite}, Args: []string{"title", "start", "end", "description", "location"}},

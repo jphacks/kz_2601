@@ -73,7 +73,10 @@ type Provider struct {
 	// the token of the person it acts for. Not in the review build
 	// (決定 6, ReviewBuildFeatures).
 	NeedsOAuth bool
-	Ops        []OpSpec
+	// NameJa / NameEn are the service's name on the device's 「つないだサービス」
+	// screen (GET /v1/me/connections providers). Required for NeedsOAuth.
+	NameJa, NameEn string
+	Ops            []OpSpec
 	// Hosts are the only scheme://host the provider's client may reach
 	// (NewHTTPClient).
 	Hosts []string
@@ -181,6 +184,9 @@ func (p Provider) check() error {
 		if !strings.HasPrefix(h, "https://") || strings.Count(h, "/") != 2 {
 			return fmt.Errorf("%s: host must be https://<host>, got %q", p.ID, h)
 		}
+	}
+	if p.NeedsOAuth && (p.NameJa == "" || p.NameEn == "") {
+		return fmt.Errorf("%s: an OAuth provider needs NameJa and NameEn", p.ID)
 	}
 	return nil
 }
