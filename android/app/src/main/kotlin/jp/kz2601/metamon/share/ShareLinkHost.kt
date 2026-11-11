@@ -39,6 +39,7 @@ import jp.kz2601.metamon.renderer.a11y.rememberAnnouncer
 import jp.kz2601.metamon.runtime.AppRuntime
 import jp.kz2601.metamon.runtime.UiText
 import jp.kz2601.metamon.services.InstallResult
+import jp.kz2601.metamon.services.sharing.PendingAdd
 import jp.kz2601.metamon.services.sharing.PendingJoin
 import jp.kz2601.metamon.services.sharing.ShareLinkInbox
 import jp.kz2601.metamon.services.sharing.ShareLinkOpener
@@ -68,7 +69,7 @@ object ShareLinkIntents {
 
 /**
  * 受け取ったシェアリンクを開く(iOS の `SharingHooks` / `AppRuntime.importShared`)。サインイン後の本体に 1 回置く。
- * 記録を共有するアプリは参加の確認([JoinShareSheet])、それ以外は取り込んでそのアプリに切り替える。
+ * 記録を共有するアプリは参加の確認([JoinShareSheet])、それ以外は追加の確認([AddShareSheet])の後に取り込んで切り替える。
  */
 @Composable
 fun ShareLinkHost(container: AppContainer, canShare: Boolean) {
@@ -79,6 +80,7 @@ fun ShareLinkHost(container: AppContainer, canShare: Boolean) {
     val pending by ShareLinkIntents.inbox.pending.collectAsStateWithLifecycle()
     var bootstrapped by remember(runtime) { mutableStateOf(false) }
     var join by remember { mutableStateOf<PendingJoin?>(null) }
+    var add by remember { mutableStateOf<PendingAdd?>(null) }
     // 開く・切り替えはシートを閉じた後も続くので、ここの scope で走らせる
     val scope = rememberCoroutineScope()
     val opener = remember(container, canShare) {
@@ -103,6 +105,7 @@ fun ShareLinkHost(container: AppContainer, canShare: Boolean) {
         scope.launch {
             when (val result = opener.open(token)) {
                 is ShareOpenResult.AskToJoin -> join = result.join
+                is ShareOpenResult.AskToAdd -> add = result.add
                 is ShareOpenResult.Added -> adopt(container, runtime, result)
                 is ShareOpenResult.Failed -> runtime.showToast(UiText.Res(result.reason.textRes))
             }
@@ -121,10 +124,28 @@ fun ShareLinkHost(container: AppContainer, canShare: Boolean) {
                         null
                     }
                     is ShareOpenResult.Failed -> result.reason
-                    is ShareOpenResult.AskToJoin -> null
+                    is ShareOpenResult.AskToJoin, is ShareOpenResult.AskToAdd -> null
                 }
             },
             onDismiss = { join = null },
+        )
+    }
+
+    add?.let { current ->
+        AddShareSheet(
+            add = current,
+            onAdd = {
+                when (val result = opener.add(current)) {
+                    is ShareOpenResult.Added -> {
+                        add = null
+                        scope.launch { adopt(container, runtime, result) }
+                        null
+                    }
+                    is ShareOpenResult.Failed -> result.reason
+                    is ShareOpenResult.AskToJoin, is ShareOpenResult.AskToAdd -> null
+                }
+            },
+            onDismiss = { add = null },
         )
     }
 }
@@ -146,7 +167,7 @@ private suspend fun adopt(container: AppContainer, runtime: AppRuntime, result: 
     runtime.appsList()
 }
 
-private val ShareOpenFailure.textRes: Int
+internal val ShareOpenFailure.textRes: Int
     get() = when (this) {
         ShareOpenFailure.UNAVAILABLE -> R.string.share_open_unavailable
         ShareOpenFailure.REVOKED -> R.string.share_open_revoked

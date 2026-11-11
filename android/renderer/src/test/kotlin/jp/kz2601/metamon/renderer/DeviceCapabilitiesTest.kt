@@ -23,19 +23,21 @@ class DeviceCapabilitiesTest {
     @Test
     fun unregisteredPartsAreNotDeclared() {
         val missing = ComponentType.entries.filter { it != ComponentType.UNKNOWN && ComponentRegistry.standard.builder(it) == null }
-        assertTrue("登録の無い部品がある前提(地図など)", missing.isNotEmpty())
+        assertTrue("登録の無い部品がある前提(場所の検索など)", missing.isNotEmpty())
         missing.forEach { assertFalse(it.wire, it.wire in caps.allowedComponents) }
         // 今 Android で描けない部品(登録を足したらここから消す)
         for (t in listOf(
-            ComponentType.MAP_VIEW,
+            ComponentType.PLACE_SEARCH,
             ComponentType.LOCATION_TRACKER,
             ComponentType.HEALTH_STAT,
             ComponentType.NEARBY_SHARE,
         )) {
             assertFalse(t.wire, t.wire in caps.allowedComponents)
         }
-        // この統合で登録した部品(#871・#872・#877・#879・#1354)は申告する
+        // この統合で登録した部品(#871・#872・#877・#879・#1354・地図 #867)は申告する
         for (t in listOf(
+            ComponentType.LOCATION_PICKER,
+            ComponentType.MAP_VIEW,
             ComponentType.SENSOR_VALUE,
             ComponentType.DASHCAM,
             ComponentType.MATCH_LIST,

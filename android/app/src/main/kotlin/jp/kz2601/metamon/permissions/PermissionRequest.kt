@@ -95,7 +95,6 @@ object PermissionCopy {
         AppPermission.CAMERA -> R.string.permission_name_camera
         AppPermission.LOCATION -> R.string.permission_name_location
         AppPermission.NOTIFICATIONS -> R.string.permission_name_notifications
-        AppPermission.NEARBY -> R.string.permission_name_nearby
         AppPermission.HEALTH -> R.string.permission_name_health
     }
 
@@ -105,7 +104,6 @@ object PermissionCopy {
         AppPermission.CAMERA -> R.string.permission_reason_camera
         AppPermission.LOCATION -> R.string.permission_reason_location
         AppPermission.NOTIFICATIONS -> R.string.permission_reason_notifications
-        AppPermission.NEARBY -> R.string.permission_reason_nearby
         AppPermission.HEALTH -> R.string.permission_reason_health
     }
 
@@ -115,7 +113,6 @@ object PermissionCopy {
         AppPermission.CAMERA -> R.string.permission_off_camera
         AppPermission.LOCATION -> R.string.permission_off_location
         AppPermission.NOTIFICATIONS -> R.string.permission_off_notifications
-        AppPermission.NEARBY -> R.string.permission_off_nearby
         AppPermission.HEALTH -> R.string.permission_off_health
     }
 }

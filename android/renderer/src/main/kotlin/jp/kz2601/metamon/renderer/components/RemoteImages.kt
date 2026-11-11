@@ -23,7 +23,7 @@ import java.time.Duration
 
 /**
  * https の画像の読み込み(iOS の `AsyncImage` + URLCache)。image / avatar / photoField の写真で使う。
- * 開いてよいのは https だけ・1 枚 [MAX_BYTES] まで。キャッシュはメモリ [MEMORY_PERCENT]・ディスク [DISK_MAX_BYTES]。
+ * 開いてよいのは公開のホストの https だけ([ImageHosts])・1 枚 [MAX_BYTES] まで。キャッシュはメモリ [MEMORY_PERCENT]・ディスク [DISK_MAX_BYTES]。
  */
 object RemoteImages {
     const val DISK_DIR = "metamon-images"
@@ -32,12 +32,13 @@ object RemoteImages {
     const val MAX_BYTES = 10L * 1024 * 1024
     const val MAX_URL_LENGTH = 2048
 
-    /** 読み込んでよい URL(https・host あり・ID / パスワード無し)。それ以外は null。 */
+    /** 読み込んでよい URL(https・公開のホスト・ID / パスワード無し)。それ以外は null。 */
     fun loadableUrl(value: String?): String? {
         val s = value?.trim()?.takeIf { it.isNotEmpty() && it.length <= MAX_URL_LENGTH } ?: return null
         val uri = runCatching { URI(s) }.getOrNull() ?: return null
         if (!uri.scheme.equals("https", ignoreCase = true)) return null
         if (uri.host.isNullOrEmpty() || uri.rawUserInfo != null) return null
+        if (!ImageHosts.isPublicName(uri.host)) return null
         return s
     }
 
@@ -71,9 +72,23 @@ object RemoteImages {
     /**
      * 画像用の接続。https の判定はリダイレクトの 1 回ごと(network)、大きさは gzip を解いた後(application)でも数える
      * (network だけだと圧縮した小さな応答が解くと上限を超えても通る)。
+     * [publicHostsOnly] の時は、リダイレクトを自分でたどって毎回ホストを確かめ、解決した宛先も公開の範囲に限る。
      */
-    fun imageClient(client: OkHttpClient, maxBytes: Long = MAX_BYTES, requireHttps: Boolean = true): OkHttpClient = client.newBuilder()
+    fun imageClient(
+        client: OkHttpClient,
+        maxBytes: Long = MAX_BYTES,
+        requireHttps: Boolean = true,
+        publicHostsOnly: Boolean = requireHttps,
+    ): OkHttpClient = client.newBuilder()
         .readTimeout(Duration.ofSeconds(20))
+        .apply {
+            if (publicHostsOnly) {
+                followRedirects(false)
+                followSslRedirects(false)
+                dns(PublicOnlyDns(client.dns))
+                addInterceptor(ImageRedirects({ (!requireHttps || it.isHttps) && ImageHosts.isPublicName(it.host) }))
+            }
+        }
         .addInterceptor(ImageGuard(maxBytes, requireHttps))
         .addNetworkInterceptor(ImageGuard(maxBytes, requireHttps))
         .build()
