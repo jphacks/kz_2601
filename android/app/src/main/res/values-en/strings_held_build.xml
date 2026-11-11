@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="held_body">Your conversation is still here. With Tailor It Pro you can continue right away. You can also create for free again tomorrow.</string>
+    <string name="held_close">Close</string>
+    <string name="held_continue">Continue building</string>
+    <string name="held_headline">You\'ve used today\'s free creations (%1$d)</string>
+    <string name="held_paid_cancel">Discard</string>
+    <string name="held_paid_headline">“%1$s” requires Tailor It Pro</string>
+    <string name="held_paid_without">Build without this feature</string>
+    <string name="paywall_close_paid_feature">If you close this, it won\'t be made this way.</string>
+    <string name="paywall_feature_shared_data">Shared data</string>
+    <string name="paywall_headline_limit_reached">You\'ve used today\'s free new apps (%1$d)</string>
+    <string name="paywall_headline_paid_feature">“%1$s” requires Tailor It Pro</string>
+    <string name="paywall_reason_shared_data">Data that everyone writes is stored in the cloud and synced to every device, which costs server resources.</string>
+</resources>

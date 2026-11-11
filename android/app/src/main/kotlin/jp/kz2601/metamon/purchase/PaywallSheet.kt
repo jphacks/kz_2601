@@ -81,14 +81,24 @@ fun PaywallSheet(pro: ProStore, reason: PaywallReason, onDismiss: () -> Unit) {
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
             Text("Tailor It Pro", style = MaterialTheme.typography.headlineMedium.copy(fontWeight = FontWeight.Bold))
+            // 見出しの差し込み: 無料作成の回数 / 有料の機能の名前(他の理由の文言は %1 を持たないので無視される)
+            val featureNames = state.paywallFeatures.map { it.title }.filter { it.isNotEmpty() }.joinToString("・")
+                .ifEmpty { stringResource(R.string.paywall_feature_shared_data) }
+            val headlineArg: Any = if (reason == PaywallReason.LIMIT_REACHED) pro.dailyFreeLimit else featureNames
             Text(
-                stringResource(PaywallCopy.headline(reason)),
+                stringResource(PaywallCopy.headline(reason), headlineArg),
                 style = MaterialTheme.typography.titleMedium,
                 textAlign = TextAlign.Center,
                 modifier = Modifier.testTag("paywall.headline"),
             )
-            PaywallCopy.reason(reason)?.let {
-                Text(stringResource(it), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            // 有料の機能はサーバーが返した理由があればそれを出す(iOS の featureReasons)
+            val reasons = state.paywallFeatures.map { it.reason }.filter { it.isNotEmpty() }
+            if (reason == PaywallReason.PAID_FEATURE && reasons.isNotEmpty()) {
+                reasons.forEach { Text(it, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant) }
+            } else {
+                PaywallCopy.reason(reason)?.let {
+                    Text(stringResource(it), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
             }
             if (state.isPro) {
                 ProBadge(justPurchased = reason != PaywallReason.SETTINGS)
@@ -202,18 +212,22 @@ object PaywallCopy {
         PaywallReason.SETTINGS -> R.string.paywall_headline_settings
         PaywallReason.AI_TEXT -> R.string.paywall_headline_ai_text
         PaywallReason.AI_CHAT -> R.string.paywall_headline_ai_chat
+        PaywallReason.LIMIT_REACHED -> R.string.paywall_headline_limit_reached
+        PaywallReason.PAID_FEATURE -> R.string.paywall_headline_paid_feature
     }
 
     fun reason(reason: PaywallReason): Int? = when (reason) {
-        PaywallReason.SETTINGS -> null
+        PaywallReason.SETTINGS, PaywallReason.LIMIT_REACHED -> null
         PaywallReason.AI_TEXT -> R.string.paywall_reason_ai_text
         PaywallReason.AI_CHAT -> R.string.paywall_reason_ai_chat
+        PaywallReason.PAID_FEATURE -> R.string.paywall_reason_shared_data
     }
 
     fun closeNote(reason: PaywallReason): Int? = when (reason) {
-        PaywallReason.SETTINGS -> null
+        PaywallReason.SETTINGS, PaywallReason.LIMIT_REACHED -> null
         PaywallReason.AI_TEXT -> R.string.paywall_close_ai_text
         PaywallReason.AI_CHAT -> R.string.paywall_close_ai_chat
+        PaywallReason.PAID_FEATURE -> R.string.paywall_close_paid_feature
     }
 
     fun message(m: ProMessage): Int = when (m) {

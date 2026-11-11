@@ -74,6 +74,8 @@ import jp.kz2601.metamon.services.consent.ConsentGatedAiClient
 import jp.kz2601.metamon.services.consent.CrashReportingPreference
 import jp.kz2601.metamon.services.consent.HttpAiButtonMetricsSender
 import jp.kz2601.metamon.services.consent.InMemoryKeyValueStore
+import jp.kz2601.metamon.services.purchase.CreationQuota
+import jp.kz2601.metamon.services.purchase.CreationUsageStore
 import jp.kz2601.metamon.services.consent.KeyValueStore
 import jp.kz2601.metamon.services.consent.SharedPreferencesKeyValueStore
 import jp.kz2601.metamon.services.social.AuthorProfile
@@ -220,6 +222,8 @@ class AppContainer(
     private val entitlements: EntitlementClient? = null,
     /** Play の購入(Google Play Billing)。モックは null */
     private val playBilling: ((PlayBilling.Listener) -> PlayBilling)? = null,
+    /** 今日の新規作成の回数(#1261・端末ごと)。モックはメモリだけ */
+    private val creationUsage: CreationUsageStore = CreationUsageStore(InMemoryKeyValueStore()),
 ) {
     /** 共有シートの「みんなに公開」に渡すもの(#902)。「探す」が無い構成は null */
     val publishEnv: PublishEnv? by lazy { discover?.let { PublishEnv(it.client, authorProfile) } }
@@ -247,6 +251,10 @@ class AppContainer(
             scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate),
             mock = knobs.mock,
             log = { Log.i(TAG, it) },
+            usage = creationUsage,
+            quota = CreationQuota(knobs.iapFreeLimit ?: CreationQuota.DAILY_FREE_CREATIONS),
+            // debug は既定で数えない(iOS の DEBUG と同じ・デモで上限に当たらない)。つまみで効かせる
+            enforceLimit = !BuildConfig.DEBUG || knobs.iapEnforce,
         )
         store
     }
@@ -462,6 +470,7 @@ class AppContainer(
                 nearbyEnv = NearbyEnv.of(context, mock = false),
                 entitlements = HttpEntitlementClient(appConfigHttp),
                 playBilling = { PlayBilling(context, it) },
+                creationUsage = CreationUsageStore(SharedPreferencesKeyValueStore.of(context, CREATION_PREFS)),
             )
         }
 
@@ -561,6 +570,9 @@ class AppContainer(
         private const val PRIVACY_PREFS = "metamon-privacy"
         private const val AUTHOR_PREFS = "metamon-author"
         private const val RETENTION_PREFS = "metamon-retention"
+
+        /** 今日の新規作成の回数(#1261) */
+        private const val CREATION_PREFS = "metamon-pro"
     }
 
     /** 今のアプリの参加者と自分が管理者か(#903)。部品の member の選択肢・管理者の削除が読む */

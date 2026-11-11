@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 新規作成の無料枠と、止めた作成を続きから作る(#1261)。文言は iOS の HeldBuildCard / PaidFeatureCard / PaywallSheet から写す -->
+<resources>
+    <string name="held_body">会話はこのまま残っています。Tailor It Pro にすると、続きからすぐ作れます。明日になると、また無料で作れます。</string>
+    <string name="held_close">閉じる</string>
+    <string name="held_continue">続きから作る</string>
+    <string name="held_headline">今日の無料作成(%1$d回)を使い切りました</string>
+    <string name="held_paid_cancel">やめる</string>
+    <string name="held_paid_headline">「%1$s」には Tailor It Pro が必要です</string>
+    <string name="held_paid_without">この機能なしで作る</string>
+    <string name="paywall_close_paid_feature">閉じると、この内容では作りません。</string>
+    <string name="paywall_feature_shared_data">みんなで共有するデータ</string>
+    <string name="paywall_headline_limit_reached">今日の無料作成(%1$d 回)を使い切りました</string>
+    <string name="paywall_headline_paid_feature">「%1$s」には Tailor It Pro が必要です</string>
+    <string name="paywall_reason_shared_data">みんなで書き込むデータはクラウドに保存して全員の端末に同期するため、サーバーの費用がかかります。</string>
+</resources>

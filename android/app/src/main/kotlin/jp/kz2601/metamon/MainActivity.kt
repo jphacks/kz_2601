@@ -204,6 +204,8 @@ fun MetamonApp(container: AppContainer) {
             speech = AndroidSpeechEngine.reader(context),
             // 「今日の残り」(`GET /v1/me/usage`・iOS と同じ口)。モックは出さない
             usage = if (container.knobs.mock) null else container.appConfig as? PlanUsageSource,
+            // 新規作成の無料枠と 402 の課金画面(#1261)。審査用の版は課金を持たない(iOS の APP_STORE_REVIEW と同じ)
+            creationGate = if (ReviewBuild.enabled) null else container.pro,
         )
     }
     val state by vm.state.collectAsStateWithLifecycle()

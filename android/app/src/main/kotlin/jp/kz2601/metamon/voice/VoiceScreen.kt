@@ -491,7 +491,11 @@ private fun ClarifyChat(state: VoiceUiState, vm: VoiceViewModel, modifier: Modif
         if (state.chatPending) {
             item { Bubble(ChatBubble(fromUser = false, text = stringResource(R.string.voice_status_thinking_chat))) }
         }
-        item { TurnActions(state, vm) }
+        item {
+            // 無料枠切れ・402 で止めた作成(#1261)は、案や質問の代わりにカードを出す(iOS の ClarifyChatView と同じ)
+            val held = state.heldBuild
+            if (held != null) HeldBuildCard(held, busy = state.isGenerating, vm) else TurnActions(state, vm)
+        }
     }
 }
 

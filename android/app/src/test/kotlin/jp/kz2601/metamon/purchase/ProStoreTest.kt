@@ -5,8 +5,13 @@ import jp.kz2601.metamon.services.purchase.EntitlementClient
 import jp.kz2601.metamon.services.purchase.PlayPurchase
 import jp.kz2601.metamon.services.purchase.ProProducts
 import jp.kz2601.metamon.services.purchase.ServerEntitlements
+import jp.kz2601.metamon.services.consent.InMemoryKeyValueStore
+import jp.kz2601.metamon.services.http.PaidFeature
+import jp.kz2601.metamon.services.purchase.CreationQuota
+import jp.kz2601.metamon.services.purchase.CreationUsageStore
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.async
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -139,5 +144,58 @@ class ProStoreTest {
         assertNull(s.state.value.paywall)
         val mock = store(null, null, mock = true)
         assertTrue(mock.isAvailable)
+    }
+
+    // MARK: - 新規作成の無料枠(#1261)
+
+    private fun metered(usage: CreationUsageStore, enforce: Boolean = true) = ProStore(
+        FakeServer(), FakeBilling(), uid = { "uid1" }, scope = CoroutineScope(Dispatchers.Unconfined),
+        usage = usage, quota = CreationQuota(dailyFreeLimit = 2), enforceLimit = enforce,
+    )
+
+    @Test
+    fun admitsUntilTheFreeLimitThenWaitsForThePaywall() = runBlocking {
+        val usage = CreationUsageStore(InMemoryKeyValueStore())
+        val s = metered(usage)
+        assertTrue(s.admitNewApp())
+        s.recordNewApp()
+        s.recordNewApp()
+        assertEquals(CreationQuota.Decision.Blocked, s.decision)
+        val admitted = async(Dispatchers.Unconfined) { s.admitNewApp() }
+        assertEquals(PaywallReason.LIMIT_REACHED, s.state.value.paywall)
+        s.dismissPaywall()
+        assertFalse("閉じたら作らない", admitted.await())
+
+        val bought = async(Dispatchers.Unconfined) { s.admitNewApp() }
+        s.onPurchases(PlayBilling.RESULT_OK, listOf(paid("tok")))
+        s.dismissPaywall()
+        assertTrue("買ったら作る", bought.await())
+        assertEquals(CreationQuota.Decision.Unlimited, s.decision)
+        s.reset()
+        assertEquals("後片付けで回数も消す", 0, usage.used())
+    }
+
+    @Test
+    fun limitIsOffUnlessEnforced() = runBlocking {
+        val usage = CreationUsageStore(InMemoryKeyValueStore())
+        val s = metered(usage, enforce = false)
+        repeat(5) { s.recordNewApp() }
+        assertTrue(s.admitNewApp())
+        assertNull(s.state.value.paywall)
+    }
+
+    @Test
+    fun requestProCarriesTheFeaturesAndReturnsFalseWithoutBilling() = runBlocking {
+        val s = metered(CreationUsageStore(InMemoryKeyValueStore()))
+        val features = listOf(PaidFeature("sharedData", "共有"))
+        val result = async(Dispatchers.Unconfined) { s.requestPro(features) }
+        assertEquals(PaywallReason.PAID_FEATURE, s.state.value.paywall)
+        assertEquals(features, s.state.value.paywallFeatures)
+        s.dismissPaywall()
+        assertFalse(result.await())
+        assertTrue(s.state.value.paywallFeatures.isEmpty())
+
+        val none = store(FakeServer(), billing = null)
+        assertFalse("課金画面を出せない構成は買えない", none.requestPro(features))
     }
 }

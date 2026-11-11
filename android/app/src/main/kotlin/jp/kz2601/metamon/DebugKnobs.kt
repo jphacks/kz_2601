@@ -26,6 +26,10 @@ data class DebugKnobs(
     val autoNavIntervalSeconds: Double = 2.0,
     /** `METAMON_E2E_OFFLINE_SECONDS=<n>`: 起動から n 秒間、記録の API を圏外にする */
     val offlineSeconds: Double? = null,
+    /** `METAMON_IAP_ENFORCE=1`: debug でも新規作成の無料枠を効かせる(#1261・上限の画面の確認用) */
+    val iapEnforce: Boolean = false,
+    /** `METAMON_IAP_FREE_LIMIT=<n>`: 1 日の無料作成の回数を上書き(確認用) */
+    val iapFreeLimit: Int? = null,
 ) {
     data class AutoNavStep(val screen: String, val presentation: String? = null) {
         override fun toString(): String = presentation?.let { "$screen:$it" } ?: screen
