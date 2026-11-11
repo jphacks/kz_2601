@@ -3285,6 +3285,22 @@
         }
       }
     },
+    "このアプリに集計(stat)の部品がありません" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "This app has no stat components"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "このアプリに集計(stat)の部品がありません"
+          }
+        }
+      }
+    },
     "このアプリの写真" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -6719,6 +6735,22 @@
         }
       }
     },
+    "システム設定の「ログイン項目」で許可してください。" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Allow it in System Settings > Login Items."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "システム設定の「ログイン項目」で許可してください。"
+          }
+        }
+      }
+    },
     "システム設定を開く" : {
       "localizations" : {
         "en" : {
@@ -7471,6 +7503,54 @@
         }
       }
     },
+    "メニューバー" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Menu Bar"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "メニューバー"
+          }
+        }
+      }
+    },
+    "メニューバーに表示する" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Show in Menu Bar"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "メニューバーに表示する"
+          }
+        }
+      }
+    },
+    "メニューバーのアイコンから、選んだアプリの集計を見て、アプリを開いたり頼んだりできます。" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "From the menu bar icon, see the stats of the app you pick, open it, or ask for changes."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "メニューバーのアイコンから、選んだアプリの集計を見て、アプリを開いたり頼んだりできます。"
+          }
+        }
+      }
+    },
     "メモ" : {
       "localizations" : {
         "en" : {
@@ -7778,6 +7858,38 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "ログアウトできませんでした"
+          }
+        }
+      }
+    },
+    "ログイン時に開く" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Open at Login"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ログイン時に開く"
+          }
+        }
+      }
+    },
+    "ログイン項目に登録できませんでした。" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Couldn't add to Login Items."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ログイン項目に登録できませんでした。"
           }
         }
       }
@@ -8636,6 +8748,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "作ったアプリ"
+          }
+        }
+      }
+    },
+    "作ったアプリがありません" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No apps yet"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "作ったアプリがありません"
           }
         }
       }
@@ -10648,6 +10776,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "声で頼む時に使うマイクを選びます。選んだマイクが見つからない時はシステムの設定のマイクを使います"
+          }
+        }
+      }
+    },
+    "声・文字で頼む" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ask by Voice or Text"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "声・文字で頼む"
           }
         }
       }
@@ -14657,6 +14801,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "読み込み中"
+          }
+        }
+      }
+    },
+    "読み込み中…" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Loading…"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "読み込み中…"
           }
         }
       }

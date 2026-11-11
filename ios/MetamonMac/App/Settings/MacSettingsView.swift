@@ -109,6 +109,8 @@ private struct MacGeneralSettings: View {
             }
             // 声で頼むのマイク(#1221)
             MacInputDeviceSection()
+            // メニューバーの常駐・ログイン時に開く(#1848)
+            MacMenuBarSettingsSection()
             // 読み上げ(#1210・#1216)。iOS と同じ保存先(metamon.speech.enabled)。Mac が読むのは完成の要約だけ
             Section {
                 Toggle("アプリができた時の説明を読み上げる", isOn: $reader.enabled)
