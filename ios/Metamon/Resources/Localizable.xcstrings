@@ -3119,23 +3119,6 @@
         }
       }
     },
-    "あなたの名前" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Your name"
-          }
-        },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "あなたの名前"
-          }
-        }
-      }
-    },
     "ありがとうございます。いただいた内容は改善に使います。" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -4679,6 +4662,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "しばらく開かれていないため休んでいます(開くと再開します)"
+          }
+        }
+      }
+    },
+    "すれ違い通信と同じ設定です。オンにすると、名前の代わりに「近くの人」と表示されます。" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Same setting as pass-by sharing. When on, others see \"Someone nearby\" instead of your name."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "すれ違い通信と同じ設定です。オンにすると、名前の代わりに「近くの人」と表示されます。"
           }
         }
       }
@@ -11740,6 +11740,23 @@
         }
       }
     },
+    "名前を出さない" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Hide my name"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "名前を出さない"
+          }
+        }
+      }
+    },
     "名前を変えられませんでした" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -14514,6 +14531,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "相手が見つかりませんでした。一覧を更新してください"
+          }
+        }
+      }
+    },
+    "相手に見える名前" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Name others see"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "相手に見える名前"
           }
         }
       }

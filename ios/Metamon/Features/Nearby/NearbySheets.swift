@@ -41,7 +41,7 @@ struct NearbySheets: ViewModifier {
 
     private func incomingTitle(_ item: NearbyService.Incoming?) -> String {
         guard let h = item?.header else { return "" }
-        return L10n.tr("\(h.sender)さんから「\(h.entityName)」が \(h.count) 件届きました")
+        return L10n.tr("\(NearbyLimits.displayName(h.sender))さんから「\(h.entityName)」が \(h.count) 件届きました")
     }
 }
 
@@ -106,6 +106,8 @@ private struct NearbyLifecycle: ViewModifier {
 struct NearbySendSheet: View {
     let service: NearbyService
     let payload: NearbyShare.Payload
+    /// 「名前を出さない」はすれ違い通信と同じ設定(切り替えると近距離共有の名前も `PassbyController` が揃える)
+    private let passby = NearbyPassbyHost.controller
     @Environment(\.dismiss) private var dismiss
 
     var body: some View {
@@ -114,7 +116,13 @@ struct NearbySendSheet: View {
                 Section {
                     LabeledContent("送るもの", value: payload.header.song.map { L10n.tr("「\($0.title)」のリクエスト") }
                         ?? L10n.tr("「\(payload.header.entityName)」\(payload.header.count) 件"))
-                    LabeledContent("あなたの名前", value: service.myName)
+                    Toggle("名前を出さない", isOn: Binding(get: { passby.isAnonymous }, set: { passby.setAnonymous($0) }))
+                        .disabled(service.sendState.isBusy)
+                        .accessibilityIdentifier("nearby.send.anonymous")
+                    LabeledContent("相手に見える名前", value: NearbyLimits.displayName(service.myName))
+                        .accessibilityIdentifier("nearby.send.publicName")
+                } footer: {
+                    Text("すれ違い通信と同じ設定です。オンにすると、名前の代わりに「近くの人」と表示されます。")
                 }
                 Section {
                     if service.peers.isEmpty {

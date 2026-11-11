@@ -80,8 +80,10 @@ kz_2601/
 - App Check は他人宛ての自動の動きを出す前に `enforce` にする(人の作業)。
 
 ## Git運用
-- ブランチ: `main` / `develop` / `feature/*` / `hotfix/*` / `release/*`。エピックブランチ無し。
-- `feature/*` → `develop`: PR必須、0 approve でマージ可(マージは人間のみ・botは不可)。
+- ブランチ: `main` / `develop` / `feature/*` / `hotfix/*` / `release/*` / `epic/*`。
+- エピックブランチ(2026-11-11): 種類ごとの `epic/ios`・`epic/mac`・`epic/android`・`epic/backend`・`epic/docs`・`epic/cross`(種類をまたぐもの)。個別の PR は `epic/<種類>` に出し、エージェントがまとめる。人が確認・マージするのは `epic/<種類>` → `develop` の PR だけ。
+- `feature/*` → `develop`: PR必須、0 approve でマージ可(マージは人間のみ・botは不可)。`epic/*` へのマージはエージェントがしてよい。
+- 新機能の進め方(2026-11-11): **まず iOS で作り、`develop` にマージしてから、必要なら Android・Mac に広げる**。Mac 専用・Android 専用の機能は、その OS で最初から作る。
 - `develop` → `main`: 実機テスト完了時のみ。
 - CI: PRがOpen(非Draft)になった時点で発火。backend CIは5分以内、iOS CIは制限なし。
 - PR/Issueテンプレートは `.github/` に用意。
@@ -110,3 +112,5 @@ kz_2601/
 | 10/24 夜 | 正式名(#62・#69) | **Tailor It**(表示名・UI 文言・README・台本・ピッチ)。由来は「あなたに合わせて仕立てる(tailor)」。仮名「メタモン」は商標リスク(Q6)もあり廃止。内部識別子(ターゲット `Metamon`・Bundle ID `jp.kz2601.metamon(.widget)`・App Group `group.jp.kz2601.metamon`・`Metamon{DSL,Renderer,Services}`・`METAMON_*`・Firebase 登録・Firestore パス)は変更しない。「変身」「変身一覧」の比喩は残す |
 | 10/24 昼 | PRテンプレ | 「重点レビューファイル」節を追加。レビュアーが読む順と見どころを最大5ファイルで明示 |
 | 10/24 夜 | マイク FAB の位置(#52) | **ピクチャーインピクチャー風に動かせる**。初期位置は左下(DSL の「追加」が右下 `D11:F12` に来るため)のまま、ドラッグで左右どちらの辺にも吸着・端に寄せると画面外に隠れて取っ手だけ残る。吸着した側の最下段 2 列に部品がある画面ではその上へ自動退避。位置・隠れ状態は端末に保存(アプリ共通)。詳細は `docs/ios/architecture.md` |
+| 11/11 | 新機能を作る順番 | **まず iOS で作って `develop` にマージし、必要なら Android・Mac に広げる**。iOS の形が決まってから移すので、仕様のずれと作り直しが減る。Mac 専用・Android 専用の機能はこの限りでない |
+| 11/11 | PR のまとめ方 | 種類ごとのエピックブランチ `epic/<種類>` に個別の PR をまとめ、人が見るのは `epic/<種類>` → `develop` の PR だけにする。`epic/*` へのマージはエージェント、`develop`・`main` へのマージは人 |
