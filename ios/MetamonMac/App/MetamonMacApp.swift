@@ -22,6 +22,7 @@ struct MetamonMacApp: App {
         MacFirebase.bootstrap()
         Task { await MacAccount.shared.start() } // 未ログインなら匿名でログインし、状態の変化を追う
         MacNotificationDelegate.install() // 前面でも通知を出す・押されたらそのアプリを開く(#965)
+        MacRecordResend.shared.install() // 記録の送信待ちを前面・スリープ明け・回線の復帰・一定間隔で送り直す(#976)
         // UI テスト・手元の確認用(DEBUG のみ・iOS と同じ環境変数): METAMON_AI_CONSENT / METAMON_TUTORIAL / METAMON_BETA_WELCOME(#971)
         AIConsentDebug.applyLaunchOverride()
         FirstRunTutorialStore.shared.applyLaunchOverride()
