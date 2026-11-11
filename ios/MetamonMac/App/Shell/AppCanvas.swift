@@ -71,6 +71,10 @@ private struct AppCanvasContent: View {
     let onTalk: (ScreenContext) -> Void
     /// マップの「この画面について話す」・モーダルの中の部品の「この部品について話す」を押した文脈。マップ・モーダルが閉じ終わったら会話を開く
     @State private var pendingTalk: ScreenContext?
+    /// 表示メニューの拡大 / 縮小(#1206)。生成したアプリの文字だけを Dynamic Type の段で変える
+    @AppStorage(MacTextZoom.storageKey) private var zoomStep = MacTextZoom.defaultStep
+
+    private var textSize: DynamicTypeSize { MacTextZoom.size(at: zoomStep) }
 
     /// 画面マップで選べる記録(#1322)。表示用の記録(隠した値は落とす)で、見出しは参照の見出しと同じ
     private func recordChoices(_ entity: String) -> [ScreenMapRecordChoice] {
@@ -82,6 +86,7 @@ private struct AppCanvasContent: View {
 
     var body: some View {
         DSLNavigationRoot()
+            .dynamicTypeSize(textSize)
             .background { SaveFormShortcut(runtime: runtime) } // ⌘Return で保存(#1138)。⌘S はメニュー(MacCommands)
             .background {
                 // 画面マップ(#970)。アプリのシートとは別の view に付ける(同じ view に sheet を重ねない)
@@ -105,10 +110,10 @@ private struct AppCanvasContent: View {
             }
             // Mac の fullScreenCover は無いので sheet で出す(大きめの最小サイズ)
             .sheet(item: $runtime.sheet, onDismiss: talkAfterModal) { route in
-                modal(route).frame(minWidth: 420, minHeight: 480)
+                modal(route).dynamicTypeSize(textSize).frame(minWidth: 420, minHeight: 480)
             }
             .sheet(item: $runtime.fullScreen, onDismiss: talkAfterModal) { route in
-                modal(route).frame(minWidth: 640, minHeight: 560)
+                modal(route).dynamicTypeSize(textSize).frame(minWidth: 640, minHeight: 560)
             }
             .modifier(RuntimeOverlays(runtime: runtime))
             .macNotificationsOffBar(runtime.notifications) // 通知がオフの時のバー(#965)
@@ -258,13 +263,12 @@ private struct ToastCapsule: View {
             Text(text).font(.callout)
             Button(action: dismiss) { Image(systemName: "xmark") }
                 .buttonStyle(.plain)
-                .foregroundStyle(.secondary)
+                .macSecondaryText() // コントラストを上げる時は本文の色(#1206)
                 .help("閉じる")
                 .accessibilityLabel("閉じる")
         }
         .padding(.horizontal, 14).padding(.vertical, 8)
-        .background(.regularMaterial, in: Capsule())
-        .overlay(Capsule().strokeBorder(.separator))
+        .macRaisedSurface(in: Capsule()) // 透明度を下げる・コントラストを上げる(#1206)
         .transition(.move(edge: .top).combined(with: .opacity))
         .accessibilityElement(children: .combine)
     }
@@ -280,8 +284,7 @@ private struct UndoDeleteCapsule: View {
             Button("元に戻す") { Task { await runtime.undoRecordDelete() } }
         }
         .padding(.horizontal, 14).padding(.vertical, 8)
-        .background(.regularMaterial, in: Capsule())
-        .overlay(Capsule().strokeBorder(.separator))
+        .macRaisedSurface(in: Capsule()) // 透明度を下げる・コントラストを上げる(#1206)
         .transition(.move(edge: .top).combined(with: .opacity))
     }
 }

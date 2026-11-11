@@ -295,14 +295,13 @@ private struct MacNotificationsOffBar: ViewModifier {
                 .accessibilityIdentifier("notificationsOff.openSettings")
             Button { notifications.barDismissed = true } label: { Image(systemName: "xmark") }
                 .buttonStyle(.plain)
-                .foregroundStyle(.secondary)
+                .macSecondaryText() // コントラストを上げる時は本文の色(#1206)
                 .help("閉じる")
                 .accessibilityLabel("閉じる")
                 .accessibilityIdentifier("notificationsOff.dismiss")
         }
         .padding(.horizontal, 14).padding(.vertical, 8)
-        .background(.bar)
-        .overlay(alignment: .bottom) { Divider() }
+        .macBarSurface() // 透明度を下げる・コントラストを上げる(#1206)
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier("notificationsOff")
     }

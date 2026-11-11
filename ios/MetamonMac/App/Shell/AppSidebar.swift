@@ -138,7 +138,7 @@ struct AppSidebar: View {
     private var offlineNote: some View {
         Label("オフラインです。保存済みの一覧を表示しています", systemImage: "wifi.slash")
             .font(MacTheme.Fonts.sidebarDetail)
-            .foregroundStyle(.secondary)
+            .macSecondaryText() // コントラストを上げる時は本文の色(#1206)
             .help("サーバーに届きませんでした。つながると一覧を取り直します。")
     }
 
@@ -152,7 +152,7 @@ struct AppSidebar: View {
                 if let description = app.description {
                     Text(description)
                         .font(MacTheme.Fonts.sidebarDetail)
-                        .foregroundStyle(.secondary)
+                        .macSecondaryText() // コントラストを上げる時は本文の色(#1206)
                         .lineLimit(1)
                 }
             }
