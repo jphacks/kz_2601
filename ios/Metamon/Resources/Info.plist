@@ -151,6 +151,22 @@
 		<string>_tailorit-pb._udp</string>
 	</array>
 	<!-- すれ違い通信の distance(#425): Nearby Interaction(UWB)で近くの人との距離・方向を測る -->
+	<!-- 記録のコピー・貼り付け(#1871): クリップボードに載せる独自の型。RecordClipboard.typeIdentifier と一致させる -->
+	<key>UTExportedTypeDeclarations</key>
+	<array>
+		<dict>
+			<key>UTTypeIdentifier</key>
+			<string>app.tailorit.record</string>
+			<key>UTTypeDescription</key>
+			<string>Tailor It Record</string>
+			<key>UTTypeConformsTo</key>
+			<array>
+				<string>public.json</string>
+			</array>
+			<key>UTTypeTagSpecification</key>
+			<dict/>
+		</dict>
+	</array>
 	<key>NSNearbyInteractionUsageDescription</key>
 	<string>生成したアプリで、すれ違い通信でつながった近くの人との距離と方向を表示するために使います。</string>
 </dict>
