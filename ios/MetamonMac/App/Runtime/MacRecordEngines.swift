@@ -62,16 +62,18 @@ final class MacRecordEngines {
         entries[lease.appId] = nil
     }
 
-    /// アプリを消す時: エンジンを止めて手放し(借りているウインドウが残っていても)、送信待ちとメモリ上の表を空にしてから
-    /// フォルダを消す。止める前に消すと、動いているエンジンが表を書き戻してフォルダを作り直してしまう
+    /// アプリを消す時: 借りているウインドウが残っていてもエンジンを手放し(通知も外す)、`MacRecordVault.purge` で
+    /// 止めて送信待ちとメモリ上の表を空にし、送っている途中の 1 件を待ってからフォルダを消す。
+    /// 止める前に消すと、動いているエンジンが表を書き戻してフォルダを作り直してしまう
     func purge(appId: String) async {
-        if let entry = entries.removeValue(forKey: appId) {
+        let entry = entries.removeValue(forKey: appId)
+        if let entry {
             entry.engine.stop()
             entry.engine.onEvent = nil
             entry.leases.values.forEach { $0.detach() }
-            await entry.engine.purge(appId: appId)
         }
-        MacRecordVault.purge(appId: appId, root: root)
+        await MacRecordVault.purge(appId: appId, root: root)
+        withExtendedLifetime(entry) {} // 消し終わるまでエンジンを生かしておく(弱く持たれているので)
     }
 }
 
