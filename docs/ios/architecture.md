@@ -523,7 +523,7 @@ DEBUG フック: `METAMON_AUTO_SWITCHER=1`(起動 2.5 秒後に変身一覧を�
 | 入口 | 動き | 実装 |
 |---|---|---|
 | 変身一覧の各カード右上の共有ボタン | `ShareAppSheet`: `POST /apps/{id}/share` → QR(`tailorit://import/<token>`)・`ShareLink`(Web フォールバック URL + アプリ URL)・コピー・取り消し。下段で「探す」へ公開/非公開(説明・タグ) | `Features/Share/ShareAppSheet.swift`。発行済みトークンは `SharingUI.issued` に保持(開くたびに増やさない) |
-| `tailorit://import/<token>`(QR / リンク) | `POST /shares/{token}/import` → 返った appId に `switchApp`(変身アニメ)→ 要約カード「シェアされた「◯◯」を追加しました」 | `Info.plist` の `CFBundleURLTypes`、`SharingHooks`(RootView に 1 行)の `onOpenURL` → `AppRuntime.openShareURL` |
+| `tailorit://import/<token>`(QR / リンク)・`https://tailor-it.app/s/<token>`(Universal Links・#331) | `POST /shares/{token}/import` → 返った appId に `switchApp`(変身アニメ)→ 要約カード「シェアされた「◯◯」を追加しました」 | `Info.plist` の `CFBundleURLTypes`、entitlement `applinks:tailor-it.app`(通常の版だけ)。`ShareLinkReceiver` の `onOpenURL` / `onContinueUserActivity` → `SharingHooks` → `AppRuntime.openShareURL`。サイト側の準備は `docs/infra/universal-links/README.md` |
 | 初期画面下部「みんなが作ったアプリを探す」 | `DiscoverSheet`: 検索(250ms 間引き)・人気/新着・カード(名前・作者・利用数・説明・部品アイコン・タグ)→「入れる」で `POST /public-apps/{id}/install` → 変身 | `Features/Share/DiscoverSheet.swift`。導線は `VoiceInputView` に 1 行(`DiscoverEntry`) |
 
 - サービスは `MetamonServices` の `SharingClient`(`HTTPSharingClient`)。`Services.sharing` は appconfig が live の時だけ非 nil で、モック起動では導線ごと出さない。

@@ -99,13 +99,27 @@ public protocol SharingClient: Sendable {
     func install(publicAppId: String) async throws -> InstalledApp
 }
 
-/// `tailorit://import/<token>` からトークンを取り出す(それ以外は nil)。
+/// シェアリンクからトークンを取り出す(それ以外は nil)。受けるのは 2 つ:
+/// - `tailorit://import/<token>`(URL スキーム・QR / 共有ページの「アプリで開く」)
+/// - `https://tailor-it.app/s/<token>`(Universal Links・#331。entitlement `applinks:tailor-it.app`。docs/infra/universal-links/README.md)
 public enum ShareURL {
     public static let scheme = "tailorit"
+    /// Universal Links のドメイン(Metamon.entitlements の applinks と AASA を置くサイト)
+    public static let webHost = "tailor-it.app"
 
     public static func token(from url: URL) -> String? {
-        guard url.scheme?.lowercased() == scheme, url.host?.lowercased() == "import" else { return nil }
-        let token = url.pathComponents.filter { $0 != "/" }.first ?? ""
+        let parts = url.pathComponents.filter { $0 != "/" }
+        let token: String
+        switch url.scheme?.lowercased() {
+        case scheme:
+            guard url.host?.lowercased() == "import" else { return nil }
+            token = parts.first ?? ""
+        case "https":
+            guard url.host?.lowercased() == webHost, url.port == nil, parts.count == 2, parts[0] == "s" else { return nil }
+            token = parts[1]
+        default:
+            return nil
+        }
         return isValidToken(token) ? token : nil
     }
 
