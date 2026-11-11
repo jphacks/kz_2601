@@ -139,12 +139,18 @@ class DesktopIo(dsl: AppDSL, private val read: () -> MockStore, private val upda
 
     // --- クリップボード(#1766) ---
 
-    /** 一覧の記録を表計算に貼れる形(TSV・見出し付き)でコピー。 */
-    fun copyRows(entityId: String) {
+    /** 一覧の記録を表計算に貼れる形(TSV・見出し付き)でコピー。[ids] があれば選んだ行だけ(#1766)。 */
+    fun copyRows(entityId: String, ids: Set<String>? = null) {
         val entity = entity(entityId) ?: return
-        val table = RecordIo.exportTable(entity.name, entity, read(), entities, null)
-        Toolkit.getDefaultToolkit().systemClipboard.setContents(StringSelection(Tsv.string(table)), null)
-        notice = Strings.format("desktop_io_copied_rows", table.rows.size)
+        val table = RecordIo.exportTable(entity.name, entity, read(), entities, null, ids = ids?.takeIf { it.isNotEmpty() })
+        copyText(Tsv.string(table), table.rows.size)
+    }
+
+    /** 作った TSV をクリップボードへ(table の選んだ行など)。 */
+    fun copyText(tsv: String, rows: Int) {
+        runCatching { Toolkit.getDefaultToolkit().systemClipboard.setContents(StringSelection(tsv), null) }
+            .onFailure { return run { notice = Strings["desktop_io_copy_failed"] } }
+        notice = Strings.format("desktop_io_copied_rows", rows)
     }
 
     /** クリップボードの表(TSV / CSV)を一覧に取り込む確認。 */
@@ -333,9 +339,12 @@ fun fileOf(uri: String): File? = runCatching { File(java.net.URI(uri)) }.getOrNu
 
 /** 一覧の上のコピー・貼り付け(表計算と行き来する)。 */
 @Composable
-fun ListIoBar(entityId: String, io: DesktopIo) {
+fun ListIoBar(entityId: String, io: DesktopIo, selected: Set<String> = emptySet()) {
     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-        TextButton(onClick = { io.copyRows(entityId) }) { Text(Strings["desktop_io_copy_table"]) }
+        // 行を選んでいればその行だけ、無ければ全部(今までどおり)
+        TextButton(onClick = { io.copyRows(entityId, selected) }) {
+            Text(if (selected.isEmpty()) Strings["desktop_io_copy_table"] else Strings.format("desktop_io_copy_selected", selected.size))
+        }
         TextButton(onClick = { io.pasteRows(entityId) }) { Text(Strings["desktop_io_paste_table"]) }
     }
 }
