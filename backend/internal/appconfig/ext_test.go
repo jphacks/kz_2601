@@ -282,7 +282,8 @@ func (s stubRunner) Call(context.Context, extapi.CallBody) (extapi.CallAnswer, e
 func (s stubRunner) Start(context.Context, string, string, []string) (string, error) {
 	return "", s.err
 }
-func (s stubRunner) Revoke(context.Context, string, string) error { return s.err }
+func (s stubRunner) Revoke(context.Context, string, string) error   { return s.err }
+func (s stubRunner) RevokeAll(context.Context, string) (int, error) { return 0, s.err }
 func (s stubRunner) List(context.Context, string) (extapi.ConnectionList, error) {
 	return extapi.ConnectionList{}, s.err
 }
