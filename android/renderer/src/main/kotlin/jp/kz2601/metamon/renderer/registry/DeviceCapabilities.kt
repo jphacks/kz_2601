@@ -36,8 +36,8 @@ data class DeviceCapabilities(
             // 管理者かは AppMembersStore で分かる(#903)が、visibleTo のボタンの出し分けが無い(#1089)
             Feature("dataRoles", implemented = false),
             Feature("addressedMessages", implemented = true), // members の選択(ChoiceLeaves)
-            // 場所の通知: 計画と登録までで、見張り(Geofencing)が無い
-            Feature("notification.near", implemented = false),
+            // 場所の通知: Geofencing で見張る(LocalNotifications・正確な位置と裏での位置の許可が要る)
+            Feature("notification.near", implemented = true),
             Feature("aiButton.long", implemented = true, needs = ComponentType.AI_BUTTON),
             Feature("aiButton.inputPhoto", implemented = true, needs = ComponentType.AI_BUTTON),
             Feature("aiButton.saveTo", implemented = true, needs = ComponentType.AI_BUTTON),

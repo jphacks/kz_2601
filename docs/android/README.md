@@ -6,6 +6,7 @@ Android アプリ(#354・#356〜#360)の文書の入口。
 |---|---|
 | [`android/README.md`](../../android/README.md) | モジュール・ビルドとテストのコマンド・stg / prod・Firebase の設定 |
 | [`ci.md`](ci.md) | CI の案(ワークフローの YAML。まだ置いていない) |
+| [`play-background-location.md`](play-background-location.md) | Play Console の裏での位置情報の申告の文(場所に着いたら知らせる) |
 | [`../decisions/354-android-tech.md`](../decisions/354-android-tech.md) | 技術の選び方(UI・音声・API レベル・モジュール・DSL の型) |
 | [`../decisions/351-dsl-cross-platform.md`](../decisions/351-dsl-cross-platform.md) | DSL を iOS 以外でも描く方針 |
 

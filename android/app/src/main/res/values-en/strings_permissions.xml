@@ -1,21 +1,26 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="permission_allow">Allow</string>
+    <string name="permission_background_body">To notify you when you arrive near a saved place, Tailor It needs your location even while the app is closed.\n\nOn the next screen, choose “%1$s” and turn on “Use precise location”.\n\nArrival is checked on this device, and your location is not sent anywhere.</string>
+    <string name="permission_background_title">To notify you when you arrive</string>
     <string name="permission_cancel">Cancel</string>
     <string name="permission_continue">Continue</string>
     <string name="permission_dismiss">Close</string>
+    <string name="permission_name_background_location">location while the app is closed</string>
     <string name="permission_name_camera">the camera</string>
     <string name="permission_name_health">Health Connect</string>
     <string name="permission_name_location">location</string>
     <string name="permission_name_microphone">the microphone</string>
     <string name="permission_name_notifications">notifications</string>
     <string name="permission_not_now">Not now</string>
+    <string name="permission_off_background_location">Location isn\'t set to “Allow all the time”, so arrival notifications won\'t arrive</string>
     <string name="permission_off_camera">The camera is off, so this app can\'t take photos or videos</string>
     <string name="permission_off_health">Health Connect access is off, so this app can\'t use steps or weight</string>
     <string name="permission_off_location">Location access is off, so this app can\'t use your current location</string>
     <string name="permission_off_microphone">The microphone is off, so this app can\'t record</string>
     <string name="permission_off_notifications">Notifications are off, so this app\'s notifications won\'t arrive</string>
     <string name="permission_open_settings">Open Settings</string>
+    <string name="permission_reason_background_location">Tailor It uses your location while the app is closed so it can notify you when you arrive near a saved place. Set location to “Allow all the time” and turn on “Use precise location”. Arrival is checked on this device, and your location is not sent anywhere.</string>
     <string name="permission_reason_camera">Tailor It uses the camera so the apps you make can take and record photos and videos, scan QR codes, and record video while the dashcam screen is shown.</string>
     <string name="permission_reason_health">Tailor It uses Health Connect data so the apps you make can show steps and weight, and save the weight you record.</string>
     <string name="permission_reason_location">Tailor It uses your location so the apps you make can record it, show it on a map, guide you to a destination, and notify you when you arrive near a saved place (arrival is checked on this device).</string>
