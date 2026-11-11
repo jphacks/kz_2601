@@ -64,9 +64,19 @@ data class DeviceCapabilities(
          */
         internal val PENDING: Set<ComponentType> = setOf(ComponentType.NEARBY_SHARE)
 
-        /** [registry] で描ける部品(UNKNOWN と [PENDING] を除く・schema の並び)。 */
+        /**
+         * 代わりの表示だけを登録した部品(#351 の C 区分・1 行 1 部品)。共有で届いた時は代わりを出すが、AI には作らせない。
+         * musicPlayer: 再生はせず、曲名で音楽アプリの検索を開く(#879)。
+         */
+        internal val FALLBACK_ONLY: Set<ComponentType> = setOf(
+            ComponentType.MUSIC_PLAYER,
+        )
+
+        /** [registry] で描ける部品(UNKNOWN・[PENDING]・[FALLBACK_ONLY] を除く・schema の並び)。 */
         fun allowedComponents(registry: ComponentRegistry = ComponentRegistry.standard): List<String> =
-            ComponentType.entries.filter { it != ComponentType.UNKNOWN && it !in PENDING && registry.builder(it) != null }.map { it.wire }
+            ComponentType.entries
+                .filter { it != ComponentType.UNKNOWN && it !in PENDING && it !in FALLBACK_ONLY && registry.builder(it) != null }
+                .map { it.wire }
 
         fun supportedFeatures(registry: ComponentRegistry = ComponentRegistry.standard): List<String> =
             features.filter { f -> f.implemented && (f.needs == null || registry.builder(f.needs) != null) }.map { it.key }
