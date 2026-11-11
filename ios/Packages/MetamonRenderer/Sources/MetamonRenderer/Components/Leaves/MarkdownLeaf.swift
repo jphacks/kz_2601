@@ -7,6 +7,7 @@ struct MarkdownLeaf: View {
 
     var body: some View {
         Text(attributed)
+            .macTextSelection() // Mac: 選んでコピーできる(#941)。リンクは標準の openURL で既定のブラウザ
             .frame(maxWidth: .infinity, alignment: .leading)
     }
 

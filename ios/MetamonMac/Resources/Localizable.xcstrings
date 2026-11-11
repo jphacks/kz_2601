@@ -67,6 +67,23 @@
         }
       }
     },
+    "%@, 新着 %lld 件" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$@, %2$lld new"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$@, 新着 %2$lld 件"
+          }
+        }
+      }
+    },
     "%@。「合計をもっと大きく表示して」のように、変えたい所を書いてください。" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -8719,6 +8736,23 @@
         }
       }
     },
+    "共有されたアプリ" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Shared with you"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "共有されたアプリ"
+          }
+        }
+      }
+    },
     "共有されたアプリは、今は iPhone の Tailor It で開けます。このリンクを iPhone で開いてください。" : {
       "localizations" : {
         "en" : {
@@ -8782,6 +8816,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "再試行"
+          }
+        }
+      }
+    },
+    "再読み込み" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Reload"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "再読み込み"
           }
         }
       }

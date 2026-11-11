@@ -298,6 +298,14 @@ final class MacAppLibrary {
         syncServerOrder()
     }
 
+    /// 並びをまるごと替える(サイドバーの区分の中での並べ替え・#969)。同じアプリの組でなければ何もしない
+    func setOrder(_ next: [String]) {
+        guard next != createdIds, next.count == createdIds.count, Set(next) == Set(createdIds) else { return }
+        createdIds = next
+        saveList()
+        syncServerOrder()
+    }
+
     /// ドラッグで並べ替え(`List` の `onMove`)
     func move(fromOffsets source: IndexSet, toOffset destination: Int) {
         var next = createdIds
