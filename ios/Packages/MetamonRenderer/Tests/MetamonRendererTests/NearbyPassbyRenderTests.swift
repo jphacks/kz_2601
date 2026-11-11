@@ -1,5 +1,3 @@
-// TODO mac-026: UIKit を直接使うテスト。Mac で回すには描画の仕方を置き換え層に寄せる
-#if os(iOS)
 #if !APP_STORE_REVIEW
 import XCTest
 import SwiftUI
@@ -50,11 +48,9 @@ final class NearbyPassbyRenderTests: XCTestCase {
             .environment(\.dslRuntime, PassbyRuntime(dsl: dsl))
             .environment(\.scenePhase, .active)
             .frame(width: 360, height: 480)
-        let window = UIWindow(frame: CGRect(x: 0, y: 0, width: 360, height: 480))
-        let vc = UIHostingController(rootView: view)
-        window.rootViewController = vc
-        window.makeKeyAndVisible()
-        vc.view.layoutIfNeeded()
+        let window = TestWindow(size: CGSize(width: 360, height: 480))
+        let vc = TestHostingController(rootView: view)
+        window.show(vc)
 
         let attached = expectation(description: "attach")
         Task { @MainActor in
@@ -66,8 +62,7 @@ final class NearbyPassbyRenderTests: XCTestCase {
         XCTAssertTrue(host.isAdvertising)
         XCTAssertGreaterThan(vc.sizeThatFits(in: CGSize(width: 360, height: 480)).height, 0)
 
-        window.rootViewController = nil
-        window.isHidden = true
+        window.remove()
         let detached = expectation(description: "detach")
         Task { @MainActor in
             for _ in 0..<50 where host.attached != nil { try? await Task.sleep(for: .milliseconds(20)) }
@@ -91,5 +86,4 @@ final class NearbyPassbyRenderTests: XCTestCase {
         XCTAssertFalse(host.isAdvertising)
     }
 }
-#endif
 #endif
