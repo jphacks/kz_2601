@@ -20,7 +20,7 @@ import (
 
 const (
 	testKey    = "APItestkey"
-	testSecret = "test-secret-that-is-long-enough-for-hs256"
+	testSecret = "fake-livekit-secret-for-tests-only-not-real"
 )
 
 func env(m map[string]string) func(string) string { return func(k string) string { return m[k] } }
