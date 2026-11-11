@@ -6,14 +6,14 @@ import SwiftUI
 @MainActor
 final class MacVoiceOverTests: XCTestCase {
     private var posted: [String] = []
-    private var savedPost: ((String) -> Void)!
+    private var savedPost: ((String, MacVoiceOver.Priority) -> Void)!
     private var savedRunning: (() -> Bool)!
 
     override func setUp() async throws {
         savedPost = MacVoiceOver.post
         savedRunning = MacVoiceOver.isVoiceOverRunning
         posted = []
-        MacVoiceOver.post = { [weak self] in self?.posted.append($0) }
+        MacVoiceOver.post = { [weak self] text, _ in self?.posted.append(text) }
     }
 
     override func tearDown() async throws {
@@ -34,6 +34,17 @@ final class MacVoiceOverTests: XCTestCase {
         MacVoiceOver.announce(.recordDeleted)
         MacVoiceOver.announce(.message("書き出しました"))
         XCTAssertEqual(posted, [MacAnnouncement.recordDeleted.text, "書き出しました"])
+    }
+
+    /// 続けて出した文が互いに切れないよう、失敗だけ割り込む
+    func testOnlyFailuresInterrupt() {
+        var priorities: [MacVoiceOver.Priority] = []
+        MacVoiceOver.post = { _, priority in priorities.append(priority) }
+        MacVoiceOver.announce(.saved)
+        MacVoiceOver.announce(.healthSkipped)
+        MacVoiceOver.announce("お知らせ")
+        MacVoiceOver.announce(.failure("通信できませんでした"))
+        XCTAssertEqual(priorities, [.medium, .medium, .medium, .high])
     }
 
     func testFixedMessagesMatchIOSWording() {

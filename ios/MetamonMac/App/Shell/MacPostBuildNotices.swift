@@ -52,6 +52,8 @@ final class MacPostBuildNotices {
         var appId: String
         var text: String
         var action: Action?
+        /// 出す前に読み上げ済み(会話のシートの完成で読んだ)。バーでは読み直さない
+        var announced = false
     }
 
     var summary: Summary?

@@ -136,7 +136,7 @@ extension View {
 /// 表示メニューの「拡大」⌘+ /「縮小」⌘- /「実際のサイズ」⌘0(#1206)。中央の生成したアプリの文字を Dynamic Type の段で上げ下げする。
 /// 段は UserDefaults に残す(ウインドウ・起動をまたいで同じ)。端の段では押せない。
 enum MacTextZoom {
-    static let storageKey = "mac.textZoom.step"
+    static let storageKey = LocalWipe.macTextZoomKey
 
     /// 選べる段。iOS の「さらに大きな文字」の手前(accessibility3)までにする(Mac のウインドウ幅で崩れない所まで)
     static let steps: [DynamicTypeSize] = [

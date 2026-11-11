@@ -67,6 +67,7 @@ final class MacAccountWipeTests: XCTestCase {
         defaults.set(["a"], forKey: MacAppLibrary.serverIdsKey)
         defaults.set("ja", forKey: "metamon.appLanguage")
         defaults.set(false, forKey: "metamon.crashReporting.enabled")
+        defaults.set(MacTextZoom.defaultStep + 2, forKey: MacTextZoom.storageKey)
         #if !APP_STORE_REVIEW
         wipe.social.blocked["u-x"] = "x" // ブロック・参加者(#963)
         wipe.social.memberEntries["a"] = ([AppMember(uid: "u-x", displayName: "x")], true)
@@ -90,6 +91,7 @@ final class MacAccountWipeTests: XCTestCase {
         XCTAssertNil(defaults.object(forKey: MacAppLibrary.serverIdsKey), "サーバーにあるアプリの印")
         XCTAssertEqual(defaults.string(forKey: "metamon.appLanguage"), "ja", "表示の言語は残す(iOS と同じ)")
         XCTAssertEqual(defaults.object(forKey: "metamon.crashReporting.enabled") as? Bool, false, "送信のオプトアウトは残す")
+        XCTAssertEqual(defaults.integer(forKey: MacTextZoom.storageKey), MacTextZoom.defaultStep + 2, "文字の大きさ(端末の設定)は残す")
         XCTAssertEqual(sharedStateReset, 1)
         XCTAssertEqual(notificationsRemoved, 1)
         XCTAssertEqual(library.wipeCount, 1, "開いているウインドウに知らせる")
