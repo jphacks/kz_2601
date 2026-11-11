@@ -140,7 +140,12 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
         val container = (application as MetamonApplication).container(DebugLaunch.knobs(intent))
-        if (savedInstanceState == null) offerPushOpen(intent) else restoreNavigation(container, savedInstanceState)
+        if (savedInstanceState == null) {
+            container.runtime.formDrafts.clear() // 戻さずに開いた: 前の書きかけを残さない(#1185)
+            offerPushOpen(intent)
+        } else {
+            restoreNavigation(container, savedInstanceState)
+        }
         setContent {
             MetamonRenderTheme {
                 MicrophoneAccessProvider { MetamonRoot(container) }
@@ -158,14 +163,16 @@ class MainActivity : ComponentActivity() {
 
     // 前面・背面の処理(送信待ち・取り直し・通知の登録など)は MetamonApplication の AppForeground が持つ(#891)
 
-    // プロセスが落とされても、戻った時に同じアプリの同じ画面を開く(#891)。記録・フォームの下書き・音声の画面は初めの状態に戻す
+    // プロセスが落とされても、戻った時に同じアプリの同じ画面を開く(#891)。フォームの書きかけも戻す(#1185)。記録・音声の画面は初めの状態に戻す
     private fun restoreNavigation(container: AppContainer, savedInstanceState: Bundle?) {
         container.runtime.offerNavigationRestore(NavigationSnapshot.decode(savedInstanceState?.getString(NAVIGATION_KEY)))
     }
 
     override fun onSaveInstanceState(outState: Bundle) {
         super.onSaveInstanceState(outState)
-        val snapshot = (application as MetamonApplication).builtContainer?.runtime?.navigationSnapshot() ?: return
+        val runtime = (application as MetamonApplication).builtContainer?.runtime ?: return
+        runtime.persistFormDrafts() // フォームの書きかけ(#1185)。戻せるのは画面の位置を戻せた時だけ
+        val snapshot = runtime.navigationSnapshot() ?: return
         outState.putString(NAVIGATION_KEY, snapshot.encode())
     }
 

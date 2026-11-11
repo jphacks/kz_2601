@@ -34,6 +34,7 @@ import jp.kz2601.metamon.voice.ChatHistoryStore
  * - ブロック中の人・仲間探しの一覧(#877・[resetRuntime] の中の `SocialRuntime.forget`。iOS は次の人の uid で読み直すまで残るが、
  *   Android は前の人のブロックで次の人の投稿を隠さないよう先に捨てる)
  * - 位置の記録(#869・[stopLocationTracking])
+ * - 端末に置いたフォームの書きかけ(#1185・[forgetFormDrafts]。iOS は置かない)
  * - 開いているフィードバックの画面(前の人の画面のスクショ・書きかけ・#1315。[closeFeedback]。消す途中で失敗しても閉じる)
  * - 音声の画面の状態は [AccountGuard.generation] で作り直し、前の ViewModel は [PerAccountViewModels] で捨てる(#1167・iOS `chatHistory = []`)
  */
@@ -54,6 +55,8 @@ class LocalDataWipe(
     private val closeFeedback: () -> Unit = {},
     /** 位置の記録(#869)を止め、保存の途中の 1 点が書き終わるまで待つ(前の人の記録を続けない・消した後に点を残さない) */
     private val stopLocationTracking: suspend () -> Unit = {},
+    /** プロセスが落とされた後に戻すフォームの書きかけ(#1185) */
+    private val forgetFormDrafts: () -> Unit = {},
 ) {
     suspend operator fun invoke() {
         closeFeedback()
@@ -78,6 +81,7 @@ class LocalDataWipe(
         clearImageCache()
         feedCache?.removeAll()
         thumbnails?.removeAll()
+        forgetFormDrafts()
         resetRuntime() // 一覧・DSL を消した後に新しい appId へ
     }
 }
