@@ -123,9 +123,15 @@ private struct MacAccountSettings: View {
 private struct MacNotificationSettings: View {
     var body: some View {
         Form {
-            // 予約した通知の一覧と、他の人の行動で届く通知(Push・Firebase)は Mac にまだ無い
+            // 予約した通知の一覧はアプリごとなので、中央のアプリのツールバーのベル・「アプリ」メニューに置く(#1325)。
+            // 他の人の行動で届く通知(Push・Firebase)は Mac にまだ無い
             Section {
-                MacUnavailableSettingRow(title: "次の通知")
+                LabeledContent("次の通知") {
+                    Text("アプリを開いて、ツールバーのベルから確かめられます")
+                        .foregroundStyle(.secondary)
+                        .multilineTextAlignment(.trailing)
+                }
+                .accessibilityElement(children: .combine)
                 #if !APP_STORE_REVIEW
                 MacUnavailableSettingRow(title: "他の人の行動で届く通知")
                 #endif
