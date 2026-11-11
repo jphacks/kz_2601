@@ -42,6 +42,7 @@ extension AppRuntime {
         await AppNotificationCleanup.removeApp(app.id, notifications: services.notifications) // 通知(#228)とタイマー
         DocumentCache.shared.remove(appId: app.id)
         AppThumbnailStore.shared.remove(appId: app.id)
+        AppGlanceStore.shared.forget(app.id)            // 一覧のひと目の数字(link-10)
         chatHistoryStore.remove(appId: app.id)          // チャット履歴(#210)
         toast = L10n.tr("「\(app.name)」を削除しました")
         print("[Metamon] deleted app: \(app.id) fallback=\(String(describing: fallback))")

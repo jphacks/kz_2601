@@ -3935,6 +3935,23 @@
         }
       }
     },
+    "おまかせ(最初の数字)" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Automatic (First Number)"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "おまかせ(最初の数字)"
+          }
+        }
+      }
+    },
     "おまけ +%lld" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -10197,6 +10214,40 @@
         }
       }
     },
+    "一覧に出す数字を保存できませんでした" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Couldn't save the number for the app list"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "一覧に出す数字を保存できませんでした"
+          }
+        }
+      }
+    },
+    "一覧に出す数字を選ぶ" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Number on the App List"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "一覧に出す数字を選ぶ"
+          }
+        }
+      }
+    },
     "一覧の行" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -12466,6 +12517,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "再試行"
+          }
+        }
+      }
+    },
+    "出さない" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Don't Show"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "出さない"
           }
         }
       }
