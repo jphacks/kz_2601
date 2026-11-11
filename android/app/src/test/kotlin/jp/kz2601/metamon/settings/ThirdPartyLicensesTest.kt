@@ -26,6 +26,15 @@ class ThirdPartyLicensesTest {
         assertTrue("CameraX(Apache-2.0)", entries.any { it.name == "androidx.camera" && it.license == "Apache-2.0" })
         assertTrue("libyuv", entries.any { it.name == "androidx.camera" && it.license == "BSD-3-Clause" && "LibYuv" in it.text })
         assertTrue("checker-qual", entries.any { it.name == "org.checkerframework" && it.license == "MIT" && "Checker Framework" in it.text })
+        // POM に無いが AAR に入っているもの(#1368): libyuv の PATENTS、PdfBox-Android の Adobe のデータと LiberationSans
+        val libyuv = entries.first { it.name == "androidx.camera" && it.license == "BSD-3-Clause" }
+        assertTrue("libyuv PATENTS", libyuv.notices.any { "Additional IP Rights Grant (Patents)" in it.text })
+        val pdfbox = entries.first { it.name == "com.tom-roush" }
+        val titles = pdfbox.notices.map { it.title }
+        for (t in listOf("Adobe CMaps for PDF Fonts", "Adobe Font Metrics (AFM) for PDF Core 14 Fonts", "Adobe Glyph List", "Liberation Sans (SIL Open Font License 1.1)")) {
+            assertTrue("PdfBox-Android: $t", t in titles)
+        }
+        assertTrue("OFL の本文", pdfbox.notices.any { "SIL OPEN FONT LICENSE Version 1.1" in it.text })
     }
 
     @Test
