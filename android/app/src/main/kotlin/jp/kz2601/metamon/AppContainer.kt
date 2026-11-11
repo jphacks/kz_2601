@@ -519,6 +519,8 @@ class AppContainer(
             connectivity = AndroidConnectivity(context),
             directory = File(context.filesDir, dir),
             scope = CoroutineScope(SupervisorJob() + Dispatchers.Default),
+            // 記録を消したら、その記録の動画ファイルも消す(#1201)
+            videos = VideoCodec.store(context),
         )
 
         /** `METAMON_E2E_OFFLINE_SECONDS=<n>`: 起動から n 秒は記録の API を圏外にする(iOS `RecordSyncFactory`)。 */
