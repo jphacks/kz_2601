@@ -31,4 +31,57 @@ final class ListRowSelectionTests: XCTestCase {
         XCTAssertNil(ListRowSelection.pruned("gone", ids: ids))
         XCTAssertNil(ListRowSelection.pruned(nil, ids: ids))
     }
+
+    // MARK: - 複数選択(#1398)
+
+    private let order = ["a", "b", "c", "d"]
+
+    func testCommandClickTogglesRows() {
+        var s = ListRowMultiSelection()
+        s.click("a", .plain, order: order)
+        s.click("c", .toggle, order: order)
+        XCTAssertEqual(s.ids, ["a", "c"])
+        XCTAssertTrue(s.isMultiple)
+        s.click("a", .toggle, order: order)
+        XCTAssertEqual(s.ids, ["c"], "もう一度 ⌘ クリックで外す")
+        XCTAssertFalse(s.isMultiple)
+    }
+
+    func testShiftClickSelectsRangeFromAnchor() {
+        var s = ListRowMultiSelection()
+        s.click("b", .plain, order: order)
+        s.click("d", .extend, order: order)
+        XCTAssertEqual(s.ordered(order), ["b", "c", "d"])
+        s.click("a", .extend, order: order)
+        XCTAssertEqual(s.ordered(order), ["a", "b"], "起点(b)は変えずに範囲を選び直す")
+        XCTAssertEqual(s.cursor, "a")
+    }
+
+    func testPlainClickResetsToOneRow() {
+        var s = ListRowMultiSelection()
+        s.click("a", .plain, order: order)
+        s.click("c", .extend, order: order)
+        s.click("d", .plain, order: order)
+        XCTAssertEqual(s.ids, ["d"])
+        XCTAssertEqual(s.anchor, "d")
+    }
+
+    func testShiftArrowExtends() {
+        var s = ListRowMultiSelection()
+        s.select("b")
+        s.extend(.down, order: order)
+        s.extend(.down, order: order)
+        XCTAssertEqual(s.ordered(order), ["b", "c", "d"])
+        s.extend(.up, order: order)
+        XCTAssertEqual(s.ordered(order), ["b", "c"])
+    }
+
+    func testPruneDropsDeletedRows() {
+        var s = ListRowMultiSelection()
+        s.click("a", .plain, order: order)
+        s.click("c", .extend, order: order)
+        s.prune(order: ["a", "d"])
+        XCTAssertEqual(s.ids, ["a"])
+        XCTAssertNil(s.cursor, "消えた行は起点にしない")
+    }
 }
