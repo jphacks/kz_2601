@@ -34,12 +34,22 @@ interface PushPrefs {
     fun getString(key: String): String?
     fun putString(key: String, value: String)
     fun remove(key: String)
+    fun keys(): Set<String>
+}
+
+/**
+ * 後片付け(#841・iOS `LocalWipe.clearDefaults`): 同意の控え(uid + appId ごと)と登録の控えを消す。
+ * installationId は端末で 1 つ・個人のデータではないので残す(iOS の `preservedKeys` と同じ)。
+ */
+fun PushPrefs.forgetAccount() {
+    keys().filter { it != PushDeviceRegistrar.INSTALLATION_ID_KEY }.forEach(::remove)
 }
 
 class SharedPreferencesPushPrefs(private val prefs: SharedPreferences) : PushPrefs {
     override fun getString(key: String): String? = prefs.getString(key, null)
     override fun putString(key: String, value: String) = prefs.edit().putString(key, value).apply()
     override fun remove(key: String) = prefs.edit().remove(key).apply()
+    override fun keys(): Set<String> = prefs.all.keys.toSet()
 }
 
 class InMemoryPushPrefs : PushPrefs {
@@ -47,6 +57,7 @@ class InMemoryPushPrefs : PushPrefs {
     override fun getString(key: String): String? = synchronized(values) { values[key] }
     override fun putString(key: String, value: String) = synchronized(values) { values[key] = value }
     override fun remove(key: String) { synchronized(values) { values.remove(key) } }
+    override fun keys(): Set<String> = synchronized(values) { values.keys.toSet() }
 }
 
 /**

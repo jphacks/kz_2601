@@ -3,21 +3,27 @@ package jp.kz2601.metamon.services.live
 import android.app.Activity
 import android.content.Context
 import android.util.Log
+import com.google.android.gms.tasks.Task
 import com.google.firebase.FirebaseApp
 import com.google.firebase.appcheck.AppCheckProviderFactory
 import com.google.firebase.appcheck.FirebaseAppCheck
+import com.google.firebase.auth.AuthCredential
 import com.google.firebase.auth.AuthResult
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.auth.FirebaseAuthException
 import com.google.firebase.auth.FirebaseAuthRecentLoginRequiredException
+import com.google.firebase.auth.FirebaseAuthUserCollisionException
 import com.google.firebase.auth.FirebaseUser
 import com.google.firebase.auth.GoogleAuthProvider
 import com.google.firebase.auth.OAuthProvider
+import jp.kz2601.metamon.services.AccountLinker
 import jp.kz2601.metamon.services.AuthError
 import jp.kz2601.metamon.services.AuthService
 import jp.kz2601.metamon.services.AuthUser
+import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.withContext
 
 /** Firebase の初期化。google-services.json が無いビルドでも落とさず false を返す(iOS の `FirebaseBootstrap`)。 */
 object FirebaseBootstrap {
@@ -118,6 +124,49 @@ class FirebaseAuthService private constructor(private val auth: FirebaseAuth) : 
         } catch (e: FirebaseAuthException) {
             if (e.errorCode == WEB_CONTEXT_CANCELED) throw AuthError.Canceled(e) else throw e
         }
+    }
+
+    /** 引き継ぎ(#1101)の分岐。credential-already-in-use の時の資格情報は Firebase の updated credential(Apple の nonce は 1 回限り)。 */
+    private val linker = AccountLinker<AuthCredential>(
+        // 前の link が画面を閉じた後に済んでいた時も、匿名でなくなったことを流す(AlreadyLinked の赤字と表示を揃える)
+        currentUser = { auth.currentUser?.toAuthUser()?.also { if (!it.isAnonymous && it.uid == user.value?.uid) user.value = it } },
+        classify = { e ->
+            AccountLinker.classifyFirebase(
+                (e as? FirebaseAuthException)?.errorCode,
+                (e as? FirebaseAuthUserCollisionException)?.updatedCredential,
+            )
+        },
+        signInWith = { auth.signInWithCredential(it).await().toAuthUser() },
+    )
+
+    override suspend fun linkWithGoogle(googleIdToken: String): AuthUser {
+        val credential = GoogleAuthProvider.getCredential(googleIdToken, null)
+        return linker.link(
+            link = { linked(requireNotNull(auth.currentUser).linkWithCredential(credential)) },
+            signIn = { signInWithGoogle(googleIdToken) },
+            fallback = credential, // Google の ID トークンは切り替えにもう一度使える
+        )
+    }
+
+    override suspend fun linkWithApple(activity: Activity): AuthUser = linker.link(
+        link = {
+            val provider = OAuthProvider.newBuilder(APPLE_PROVIDER_ID).setScopes(listOf("email", "name")).build()
+            val task = auth.pendingAuthResult ?: requireNotNull(auth.currentUser).startActivityForLinkWithProvider(activity, provider)
+            linked(task)
+        },
+        signIn = { signInWithApple(activity) },
+    )
+
+    override suspend fun switchToPendingAccount(): AuthUser = linker.switchToPending()
+
+    /**
+     * link の後は uid が同じでサインイン状態の通知が来ないので、匿名でなくなったことを自分で流す。
+     * 画面の scope が途中で切れても(設定を閉じる・回転)Firebase 側の link は進むので、待ちと通知は取り消さない。
+     */
+    private suspend fun linked(task: Task<AuthResult>): AuthUser = withContext(NonCancellable) {
+        val linkedUser = requireNotNull(task.await().user)
+        runCatching { linkedUser.reload().await() } // isAnonymous / providerData を最新に
+        (auth.currentUser ?: linkedUser).toAuthUser().also { user.value = it }
     }
 
     private fun AuthResult.toAuthUser(): AuthUser = requireNotNull(user).toAuthUser()

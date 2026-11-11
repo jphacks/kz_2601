@@ -50,6 +50,7 @@ import jp.kz2601.metamon.services.local.RecordSyncEngine
 import jp.kz2601.metamon.services.local.SyncEvent
 import jp.kz2601.metamon.services.social.AuthorProfile
 import jp.kz2601.metamon.services.sync.HotReload
+import jp.kz2601.metamon.services.sync.HotReloadStatus
 import jp.kz2601.metamon.services.sync.RecordsChange
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
@@ -92,9 +93,14 @@ data class RuntimeState(
     val recordUndo: DeletionTicket? = null,
     /** 起動時にサーバーへ届かなかった(手元・保存済みの DSL を表示中)。つながって取り直せたら false */
     val offline: Boolean = false,
+    /** 上部のバナー(iOS の summaryBanner)。ホットリロードの「最新の内容に更新しました」(#1108) */
+    val banner: RuntimeBanner? = null,
 ) {
     val dsl: AppDSL get() = document.dsl
 }
+
+/** 上部のバナーの 1 回分。同じ文でも [id] が変われば出し直す・読み直す。 */
+data class RuntimeBanner(val id: Long, val text: UiText)
 
 /**
  * アプリ全体の単一ランタイム(iOS の `AppRuntime`)。DSL・記録の表示用キャッシュ・遷移・アクションの実行を持ち、
@@ -152,6 +158,11 @@ class AppRuntime(
     val document: AppDocument get() = _state.value.document
     val dsl: AppDSL get() = document.dsl
     val toast: UiText? get() = _state.value.toast
+    val banner: RuntimeBanner? get() = _state.value.banner
+
+    /** ホットリロードが SSE か・ポーリングか・止まっているか(下部の開発用の表示・#1108)。 */
+    val hotReloadStatus: StateFlow<HotReloadStatus> = hotReloader?.status ?: MutableStateFlow(HotReloadStatus.OFF).asStateFlow()
+    private var bannerSeq = 0L
 
     private var entityCache: Pair<AppDSL, Map<String, Entity>>? = null
     private val savingForms = mutableSetOf<FormDraft>()
@@ -532,7 +543,7 @@ class AppRuntime(
             records = previous.records.filterKeys { it in keep },
             failed = previous.failed.intersect(keep),
             offline = previous.offline,
-            toast = RuntimeCopy.HOT_RELOADED,
+            banner = RuntimeBanner(++bannerSeq, RuntimeCopy.HOT_RELOADED),
         )
         publishRecords()
         val tab = _navigation.value.selectedTab
@@ -623,6 +634,9 @@ class AppRuntime(
     // 画面の操作
 
     fun dismissToast() = _state.update { it.copy(toast = null) }
+
+    /** [banner] がまだ同じ回なら閉じる(閉じる前に次の回が出ていたら残す)。 */
+    fun dismissBanner(id: Long) = _state.update { if (it.banner?.id == id) it.copy(banner = null) else it }
 
     fun dismissVoiceSheet() = _state.update { it.copy(showVoiceSheet = false) }
 

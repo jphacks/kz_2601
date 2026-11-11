@@ -97,6 +97,9 @@ class UpdateGate(private val checker: UpdateChecker?, private val dismissals: No
             return UpdateGate(UpdateChecker(HttpClientConfigClient(http), build), NoticeDismissals(SharedPreferencesKeyValueStore.of(context, PREFS)))
         }
 
+        /** 閉じたお知らせの記録を消す(#841 の後片付け・iOS は UserDefaults ごと消す)。 */
+        fun forgetDismissals(context: Context) = NoticeDismissals(SharedPreferencesKeyValueStore.of(context, PREFS)).clear()
+
         private const val PREFS = "metamon-notices"
     }
 }

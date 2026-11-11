@@ -4,6 +4,8 @@ import jp.kz2601.metamon.R
 import jp.kz2601.metamon.dsl.AppDSL
 import jp.kz2601.metamon.dsl.AppDocument
 import jp.kz2601.metamon.dsl.decode
+import jp.kz2601.metamon.runtime.RuntimeBanner
+import jp.kz2601.metamon.runtime.RuntimeCopy
 import jp.kz2601.metamon.runtime.RuntimeState
 import jp.kz2601.metamon.runtime.UiText
 import jp.kz2601.metamon.services.ChatTurn
@@ -114,6 +116,17 @@ class TalkBackAnnouncementsTest {
         assertEquals(listOf<UiText>(toast), TalkBackAnnouncements.runtime(base, shown))
         assertEquals(emptyList<UiText>(), TalkBackAnnouncements.runtime(shown, shown.copy()))
         assertEquals(emptyList<UiText>(), TalkBackAnnouncements.runtime(shown, base))
+    }
+
+    @Test
+    fun hotReloadBannerIsAnnouncedPerAppearance() {
+        val base = RuntimeState(AppDocument("app1", 1, built))
+        val first = base.copy(banner = RuntimeBanner(1, RuntimeCopy.HOT_RELOADED))
+        assertEquals(listOf<UiText>(RuntimeCopy.HOT_RELOADED), TalkBackAnnouncements.runtime(base, first))
+        assertTrue("同じ回の置き直しでは読まない", TalkBackAnnouncements.runtime(first, first.copy()).isEmpty())
+        val second = first.copy(banner = RuntimeBanner(2, RuntimeCopy.HOT_RELOADED))
+        assertEquals("続けて更新された時も読む", listOf<UiText>(RuntimeCopy.HOT_RELOADED), TalkBackAnnouncements.runtime(first, second))
+        assertTrue("閉じた時は読まない", TalkBackAnnouncements.runtime(second, base).isEmpty())
     }
 
     @Test

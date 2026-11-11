@@ -22,6 +22,14 @@ class MockAuthService(signedIn: Boolean = true) : AuthService {
 
     override suspend fun signInWithApple(activity: Activity): AuthUser = fixedUser.also { user.value = it }
 
+    /** 引き継ぎ(#1101): uid はそのまま匿名でなくなる。 */
+    override suspend fun linkWithGoogle(googleIdToken: String): AuthUser = linked(AuthUser.GOOGLE)
+
+    override suspend fun linkWithApple(activity: Activity): AuthUser = linked(AuthUser.APPLE)
+
+    private fun linked(provider: String): AuthUser =
+        AuthUser(uid = FIXED_UID, isAnonymous = false, provider = provider).also { user.value = it }
+
     override suspend fun idToken(forceRefresh: Boolean): String? = null
 
     override suspend fun signOut() {

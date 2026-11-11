@@ -10,7 +10,12 @@ import jp.kz2601.metamon.services.local.DocumentCache
 import jp.kz2601.metamon.services.local.RecordStore
 import jp.kz2601.metamon.services.local.RecordSyncEngine
 import jp.kz2601.metamon.services.local.SyncQueue
+import jp.kz2601.metamon.services.push.InMemoryPushPrefs
+import jp.kz2601.metamon.services.push.NotifyConsentStore
+import jp.kz2601.metamon.services.push.PushDeviceRegistrar
+import jp.kz2601.metamon.services.push.forgetAccount
 import jp.kz2601.metamon.services.social.AuthorProfile
+import jp.kz2601.metamon.services.update.NoticeDismissals
 import jp.kz2601.metamon.voice.ChatHistoryEntry
 import jp.kz2601.metamon.voice.ChatHistoryStore
 import kotlinx.coroutines.test.runTest
@@ -64,6 +69,31 @@ class LocalDataWipeTest {
         assertFalse(images.exists())
         assertEquals(1, resets)
         assertEquals(1, consentForgotten)
+    }
+
+    /** 通知の同意(uid + appId ごと)と閉じたお知らせも消す。installationId は端末で 1 つなので残す(iOS `LocalWipe.preservedKeys`)。 */
+    @Test
+    fun wipesNotifyConsentAndNoticeDismissals() = runTest {
+        val store = RecordStore(null, EmptyCoroutineContext)
+        val client = RuntimeFixture.offlineClient
+        val queue = SyncQueue(null, store, client, BackoffPolicy.immediate, sleep = {}, io = EmptyCoroutineContext)
+        val engine = RecordSyncEngine(store, queue, client, RuntimeFixture.Offline(), backgroundScope)
+        val push = InMemoryPushPrefs().apply { putString(PushDeviceRegistrar.INSTALLATION_ID_KEY, "install-1") }
+        val consent = NotifyConsentStore(push).apply { set(true, "uid-a", "app-1") }
+        val notices = NoticeDismissals(InMemoryKeyValueStore()).apply { dismiss("notice-1") }
+
+        LocalDataWipe(
+            engine, DocumentCache(null, EmptyCoroutineContext), AppListCache(null),
+            resetRuntime = {},
+            forgetDeviceState = {
+                push.forgetAccount()
+                notices.clear()
+            },
+        )()
+
+        assertFalse(consent.allowed("uid-a", "app-1"))
+        assertFalse(notices.isDismissed("notice-1"))
+        assertEquals("install-1", push.getString(PushDeviceRegistrar.INSTALLATION_ID_KEY))
     }
 
     @Test
