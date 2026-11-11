@@ -116,8 +116,8 @@ import jp.kz2601.metamon.share.ShareLinkIntents
 import jp.kz2601.metamon.share.ShareSheet
 import jp.kz2601.metamon.share.ShareTarget
 import jp.kz2601.metamon.switcher.AppListEditor
-import jp.kz2601.metamon.switcher.AppSwitcherDialog
 import jp.kz2601.metamon.switcher.AppSwitcherEdits
+import jp.kz2601.metamon.switcher.AppSwitcherSheet
 import jp.kz2601.metamon.switcher.AppThumbnailStore
 import jp.kz2601.metamon.switcher.captureWindow
 import jp.kz2601.metamon.switcher.findActivity
@@ -434,8 +434,7 @@ fun MetamonApp(container: AppContainer) {
     Scaffold(
         bottomBar = {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                // アプリの切り替えの入口(最小・iOS は FAB の長押し。見た目は子 Issue)
-                TextButton(onClick = openSwitcher) { Text(stringResource(R.string.switcher_open)) }
+                // アプリの切り替えの入口はマイク FAB の長押しと音声「アプリ一覧」(iOS と同じ・#1095)
                 TextButton(onClick = { settingsOpen = true }, modifier = Modifier.testTag("settings.open")) {
                     Text(stringResource(R.string.settings_title))
                 }
@@ -595,7 +594,7 @@ fun MetamonApp(container: AppContainer) {
     }
 
     if (switcherOpen) {
-        AppSwitcherDialog(
+        AppSwitcherSheet(
             apps = AppSummary.visible(apps, current = runtimeState.document.appId),
             currentAppId = runtimeState.document.appId,
             onSelect = { id ->
