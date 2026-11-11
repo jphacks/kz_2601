@@ -15,6 +15,7 @@
     <string name="nearby_hide_name">名前を出さない</string>
     <string name="nearby_hide_name_footer">すれ違い通信と同じ設定です。オンにすると、名前の代わりに「近くの人」と表示されます。</string>
     <string name="nearby_incoming_body">受け取ると「%1$s」に追加します。</string>
+    <string name="nearby_ios_not_supported">iOS の端末とはつながりません(Android どうしで送り合えます)</string>
     <string name="nearby_no_response">%1$sさんから応答がありませんでした</string>
     <string name="nearby_not_received">%1$sさんが受け取れませんでした</string>
     <string name="nearby_nothing_importable">追加できる項目がありませんでした</string>

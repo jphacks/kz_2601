@@ -14,6 +14,7 @@
     <string name="nearby_hide_name">Hide my name</string>
     <string name="nearby_hide_name_footer">Same setting as pass-by sharing. When on, others see “Someone nearby” instead of your name.</string>
     <string name="nearby_incoming_body">Accepting adds them to “%1$s”.</string>
+    <string name="nearby_ios_not_supported">Can\'t connect to iOS devices (works between Android devices)</string>
     <string name="nearby_no_response">No response from %1$s</string>
     <string name="nearby_not_received">%1$s couldn\'t receive it</string>
     <string name="nearby_nothing_importable">Nothing could be added</string>

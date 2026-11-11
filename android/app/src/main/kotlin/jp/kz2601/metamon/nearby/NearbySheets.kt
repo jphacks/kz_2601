@@ -175,6 +175,13 @@ private fun NearbySendSheet(controller: NearbyShareController, payload: NearbySh
                 )
             }
             Text(stringResource(R.string.nearby_devices_footer), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            // 同じ OS どうしだけつながる(#1384・iOS は MultipeerConnectivity・Android は Nearby Connections)
+            Text(
+                stringResource(R.string.nearby_ios_not_supported),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.testTag("nearby.send.iosNote"),
+            )
             SendStatus(sendState)
             Spacer(Modifier.height(8.dp))
         }
