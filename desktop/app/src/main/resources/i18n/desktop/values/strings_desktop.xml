@@ -11,6 +11,7 @@
     <string name="desktop_calendar_written">予定を書き出しました: %1$s</string>
     <string name="desktop_chart_empty">まだデータがありません</string>
     <string name="desktop_close">閉じる</string>
+    <string name="desktop_delete_not_allowed">このデータは削除できません</string>
     <string name="desktop_export_clipboard">(表はクリップボードにも入れました)</string>
     <string name="desktop_export_done">%1$d 件を書き出しました: %2$s</string>
     <string name="desktop_feed_offline">フィードはデスクトップ版ではまだ取得しません</string>

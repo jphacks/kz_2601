@@ -10,6 +10,7 @@
     <string name="desktop_calendar_written">Saved the event: %1$s</string>
     <string name="desktop_chart_empty">No data yet</string>
     <string name="desktop_close">Close</string>
+    <string name="desktop_delete_not_allowed">You can\'t delete this data</string>
     <string name="desktop_export_clipboard">" (the table is also on the clipboard)"</string>
     <string name="desktop_export_done">Exported %1$d records: %2$s</string>
     <string name="desktop_feed_offline">The desktop app doesn\'t load feeds yet</string>

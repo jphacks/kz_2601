@@ -96,11 +96,14 @@ class DataEnv(
     /** 画面の検索欄の文字(searchBar.field → 文字)。DesktopSession.queries(route)。 */
     val search: MutableMap<String, String>,
     val tap: (Action, String?) -> Unit,
-    /** 1 件の記録の field を書き換える(list のチェック)。 */
+    /** 1 件の記録の field を書き換える(list のチェック)。フォームと同じ記録の規則を通す(DesktopSession.updateRecord)。 */
     val update: (entity: String, id: String, patch: Map<String, String>) -> Unit,
     val delete: (entity: String, id: String) -> Unit,
     /** list の上に出す道具(表をコピー・貼り付け)。 */
     val listBar: @Composable (entity: String) -> Unit = {},
+    /** その行を書き換えられるか・消せるか(出せない操作は出さない)。 */
+    val canEdit: (entity: String, id: String) -> Boolean = { _, _ -> true },
+    val canDelete: (entity: String, id: String) -> Boolean = { _, _ -> true },
 )
 
 @Composable
@@ -304,10 +307,11 @@ private fun ListLeaf(c: Component, env: DataEnv) {
             val t = ListRows.texts(c.item, r, entity, data)
             val tap = c.onItemTap
             val delete = { env.delete(c.entity!!, r.id) }
+            val rowDeletable = deletable && env.canDelete(c.entity!!, r.id)
             val row = @Composable {
                 Row(
                     Modifier.fillMaxWidth()
-                        .then(if (deletable) Modifier.onKeyEvent { e -> (e.type == KeyEventType.KeyUp && e.key == Key.Delete).also { if (it) delete() } } else Modifier)
+                        .then(if (rowDeletable) Modifier.onKeyEvent { e -> (e.type == KeyEventType.KeyUp && e.key == Key.Delete).also { if (it) delete() } } else Modifier)
                         .then(if (tap != null) Modifier.clickable { env.tap(tap, r.id) } else Modifier)
                         .padding(vertical = 6.dp),
                     verticalAlignment = Alignment.CenterVertically,
@@ -316,7 +320,7 @@ private fun ListLeaf(c: Component, env: DataEnv) {
                     toggle?.let { f ->
                         val on = ListToggle.isOn(r, f.id, daily, now)
                         // 毎日リセットのチェックは日付の履歴を持つので、デスクトップ版はまだ見せるだけ
-                        Checkbox(checked = on, onCheckedChange = if (daily) null else { v -> env.update(c.entity!!, r.id, mapOf(f.id to v.toString())) })
+                        Checkbox(checked = on, onCheckedChange = if (daily || !env.canEdit(c.entity!!, r.id)) null else { v -> env.update(c.entity!!, r.id, mapOf(f.id to v.toString())) })
                     }
                     Column(Modifier.weight(1f)) {
                         Text(t.title, maxLines = 2, overflow = TextOverflow.Ellipsis)
@@ -325,7 +329,7 @@ private fun ListLeaf(c: Component, env: DataEnv) {
                     t.trailing?.let { Text(it, style = MaterialTheme.typography.bodyMedium, color = Color.Gray, maxLines = 1) }
                 }
             }
-            if (deletable) ContextMenuArea(items = { listOf(ContextMenuItem("削除", delete)) }) { row() } else row()
+            if (rowDeletable) ContextMenuArea(items = { listOf(ContextMenuItem(Strings["desktop_keys_delete"], delete)) }) { row() } else row()
             if (i < rows.size - 1) HorizontalDivider()
         }
     }

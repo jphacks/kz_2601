@@ -65,18 +65,27 @@ class DesktopSession(
     var nav: NavigationState by mutableStateOf(NavigationState.initial(dsl))
         private set
 
+    /** 遷移はここを通す(閉じた画面の下書きを捨てる)。 */
+    private fun go(next: NavigationState) {
+        nav = next
+        drafts.keys.retainAll(liveRouteIds())
+    }
+
     /** 画面に出す一言(保存できない理由・OS の機能の結果)。 */
     var message: String? by mutableStateOf(null)
 
     /** 起きたこと(適合テストの effects と同じ形)。 */
     val effects = mutableListOf<JsonElement>()
 
-    private val drafts = HashMap<String, FormDraft>()
+    /** 下書きと、作った時の記録(変わったら作り直す)。 */
+    private class DraftEntry(val draft: FormDraft, val source: Row?)
+
+    private val drafts = HashMap<String, DraftEntry>()
     private val queries = HashMap<String, MutableMap<String, String>>()
 
     init {
         if (startScreen != null && dsl.screen(startScreen) != null && startScreen != top.screen) {
-            nav = NavigationResolver.navigate(nav, startScreen, Presentation.PUSH, null, top, dsl)
+            go(NavigationResolver.navigate(nav, startScreen, Presentation.PUSH, null, top, dsl))
         }
     }
 
@@ -93,12 +102,17 @@ class DesktopSession(
 
     fun leafData(): LeafData = LeafData(models, ::records, uid)
 
-    /** route の下書き(entity の無い画面は null)。開いた時に 1 回作り、保存するまで入力を残す。 */
+    /**
+     * route の下書き(entity の無い画面は null)。開いた時に 1 回作り、保存するか閉じるまで入力を残す。
+     * 元の記録が変わったら作り直す(打ちかけの入力がある時は残す)。新規は開いた時に FormPrefill を受け取る。
+     */
     fun form(route: Route): FormDraft? {
-        drafts[route.id]?.let { return it }
         val entity = entityModel(dsl.screen(route.screen)?.entity) ?: return null
-        val rows = records(entity.id)
-        val record = if (entity.single) SingleRecord.pick(rows) else route.recordId?.let { id -> rows.firstOrNull { it.id == id } }
+        val source = sourceRow(entity, route)
+        drafts[route.id]?.let { e ->
+            if (e.source == source || source == null || e.draft.hasUnsavedChanges) return e.draft
+        }
+        val record = source?.let { row -> records(entity.id).firstOrNull { it.id == row.id } }
         val draft = FormDraft(entity, record)
         if (record != null) {
             draft.isReadOnly = !RecordPermission.canEdit(record, entity, uid)
@@ -106,8 +120,55 @@ class DesktopSession(
         } else {
             draft.prefill(FormPrefill.consume(entity))
         }
-        drafts[route.id] = draft
+        drafts[route.id] = DraftEntry(draft, source)
         return draft
+    }
+
+    /** 下書きの元の記録(single は 1 件・他は route の recordId)。 */
+    private fun sourceRow(entity: Entity, route: Route): Row? {
+        val id = if (entity.single) SingleRecord.pick(records(entity.id))?.id else route.recordId
+        return id?.let { store.find(entity.id, it) }
+    }
+
+    /** 今どこかのスタック・sheet・fullScreen・タブの根にある route の id(下書きを残す物)。 */
+    internal fun liveRouteIds(): Set<String> = buildSet {
+        nav.paths.values.forEach { routes -> routes.forEach { add(it.id) } }
+        nav.sheet?.let { add(it.id) }
+        nav.fullScreen?.let { add(it.id) }
+        dsl.app.tabs.forEach { add(Route(it.screen, stack = Route.tabStack(it.screen)).id) }
+        add(Route(dsl.initialScreen).id)
+        add(top.id)
+    }
+
+    /** 下書きを持っている route の id(テスト用)。 */
+    internal val draftRouteIds: Set<String> get() = drafts.keys.toSet()
+
+    /**
+     * 一覧のチェックなど、1 件の記録の field を書き換える。フォームと同じ記録の規則(作った人だけ・membersCanEdit)を通す。
+     * 書けたら true。書けない時は理由を [message] に出す。
+     */
+    fun updateRecord(entity: String, id: String, patch: Map<String, String>): Boolean {
+        val row = store.find(entity, id) ?: return false
+        if (!canEditRecord(entity, id)) {
+            message = Strings["runtime_read_only"]
+            return false
+        }
+        store = store.save(entity, id, row.data + patch)
+        return true
+    }
+
+    /** 1 件書き換えられるか(フォームの読み取りだけと同じ規則)。 */
+    fun canEditRecord(entity: String, id: String): Boolean {
+        val record = records(entity).firstOrNull { it.id == id } ?: return false
+        return RecordPermission.canEdit(record, entityModel(entity), uid)
+    }
+
+    /** 1 件消せるか(フォームの削除ボタンと同じ規則・single は消さない)。 */
+    fun canDeleteRecord(entity: String, id: String): Boolean {
+        val model = entityModel(entity)
+        if (model?.single == true) return false
+        val record = records(entity).firstOrNull { it.id == id } ?: return false
+        return RecordPermission.canDelete(record, model, uid)
     }
 
     /** 検索欄の文字(route ごと)。 */
@@ -137,16 +198,19 @@ class DesktopSession(
     }
 
     fun back(route: Route = top) {
-        nav = NavigationResolver.close(nav, route)
+        go(NavigationResolver.close(nav, route))
     }
 
     /** タブを選ぶ。 */
     fun selectTab(screen: String) {
-        nav = nav.copy(selectedTab = screen)
+        go(nav.copy(selectedTab = screen))
     }
 
+    /** 移った先が新規フォームなら、その場で FormPrefill を受け取る。受け取る新規が無ければ捨てる(別の画面に漏らさない)。 */
     private fun navigate(to: String, action: Action, recordId: String?, from: Route) {
-        nav = NavigationResolver.navigate(nav, to, Presentation.of(action.presentation?.wire), recordId, from, dsl)
+        go(NavigationResolver.navigate(nav, to, Presentation.of(action.presentation?.wire), recordId, from, dsl))
+        form(top)
+        models.firstOrNull()?.let(FormPrefill::consume)
     }
 
     private fun perform(action: Action, ctx: ActionContext) {
@@ -166,17 +230,22 @@ class DesktopSession(
                 }
                 FormPrefill.set(mapOf(ref to JSONValue.Str(parentId)))
                 navigate(to, action, null, ctx.route)
-                form(top) // 新規フォームは開いた時に初期値を受け取る
             }
             ActionType.BACK -> back(ctx.route)
             ActionType.SAVE_RECORD -> save(action, ctx)
             ActionType.DELETE_RECORD -> {
                 val entity = action.entity ?: ctx.form?.entity?.id ?: return
                 val id = ctx.recordId ?: ctx.form?.recordId ?: return
+                // 一覧の行の削除もフォームの削除ボタンと同じ記録の規則を通す
+                if (store.find(entity, id) != null && !canDeleteRecord(entity, id)) {
+                    effects += obj("rejected" to JsonPrimitive("notAllowed"))
+                    message = Strings["desktop_delete_not_allowed"]
+                    return
+                }
                 store = store.delete(entity, id)
                 effects += obj("deleted" to obj("entity" to JsonPrimitive(entity), "recordId" to JsonPrimitive(id)))
                 if (ctx.recordId == null) {
-                    drafts.entries.removeAll { it.value === ctx.form }
+                    drafts.entries.removeAll { it.value.draft === ctx.form }
                     back(ctx.route)
                 }
             }
@@ -219,7 +288,7 @@ class DesktopSession(
             ),
         )
         form.markSaved(queuedOffline = false)
-        drafts.entries.removeAll { it.value === form } // 保存した画面の下書きは捨てる(開き直すと新規)
+        drafts.entries.removeAll { it.value.draft === form } // 保存した画面の下書きは捨てる(開き直すと新規)
         val to = action.screen
         if (to != null) navigate(to, action, null, ctx.route) else back(ctx.route)
     }

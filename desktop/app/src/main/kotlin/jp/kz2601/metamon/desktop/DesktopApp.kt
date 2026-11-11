@@ -181,9 +181,11 @@ private fun ScreenView(dsl: AppDSL, session: DesktopSession, route: Route, io: D
     val perform = { a: Action, recordId: String? -> dispatch(a, ActionContext(route, form, recordId)) }
     val dataEnv = DataEnv(
         data, session.queries(route), perform,
-        { e, id, patch -> session.store.find(e, id)?.let { session.replaceStore(session.store.save(e, id, it.data + patch)) } },
+        { e, id, patch -> session.updateRecord(e, id, patch) },
         { e, id -> dispatch(ScreenShortcuts.withConfirm(Action(type = jp.kz2601.metamon.dsl.ActionType.DELETE_RECORD, entity = e)), ActionContext(route, form, id)) },
         { ListIoBar(it, io) },
+        canEdit = session::canEditRecord,
+        canDelete = session::canDeleteRecord,
     )
     val scope = ScreenScope(route, form, session, perform, io, data, dataEnv)
     Column(Modifier.fillMaxSize()) {
