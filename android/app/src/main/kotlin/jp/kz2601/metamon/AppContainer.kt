@@ -35,6 +35,7 @@ import jp.kz2601.metamon.dsl.screen
 import jp.kz2601.metamon.language.AppLocales
 import jp.kz2601.metamon.notifications.ExactAlarmPrompt
 import jp.kz2601.metamon.notifications.LocalNotifications
+import jp.kz2601.metamon.notifications.ActivityNotifications
 import jp.kz2601.metamon.notifications.TimerAlarms
 import jp.kz2601.metamon.services.sharing.AppMembersStore
 import jp.kz2601.metamon.services.purchase.EntitlementClient
@@ -452,6 +453,7 @@ class AppContainer(
                 forgetAppNotifications = {
                     LocalNotifications.get(context).removeApp(it)
                     TimerAlarms.get(context).removeApp(it) // タイマーの走行状態と終了通知(#1128)
+                    ActivityNotifications.get(context).removeApp(it) // 進行中の表示(#1030)
                 },
                 releaseClient = if (ReviewBuild.enabled) null else MockReleaseRequestClient(),
             )
@@ -550,6 +552,7 @@ class AppContainer(
                 forgetAppNotifications = {
                     LocalNotifications.get(context).removeApp(it)
                     TimerAlarms.get(context).removeApp(it) // タイマーの走行状態と終了通知(#1128)
+                    ActivityNotifications.get(context).removeApp(it) // 進行中の表示(#1030)
                 },
                 creationUsage = CreationUsageStore(SharedPreferencesKeyValueStore.of(context, CREATION_PREFS)),
                 remainingToday = remainingToday,
@@ -589,6 +592,7 @@ class AppContainer(
             PermissionCenter.get(context).forget()
             LocalNotifications.get(context).removeAll()
             TimerAlarms.get(context).removeAll() // タイマーの走行状態と終了通知(#1128・iOS は UserDefaults ごと消す)
+            ActivityNotifications.get(context).removeAll() // 進行中の表示(#1030・iOS の LiveActivities.endAll)
             ExactAlarmPrompt.of(context).forget() // 正確なアラームの案内を出した印(#1123)
             // 音声の画面の設定(#892)。iOS は UserDefaults ごと消す(表示の言語などの残すキーには入っていない)
             SpeechSettings(context).clear()

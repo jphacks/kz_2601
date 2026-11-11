@@ -71,6 +71,10 @@ class PermissionNeedsTest {
 
         val toolbar = dsl("[]", toolbar = """[{"label":"b","action":{"type":"scheduleNotification","notification":{"id":"n","title":"t","body":"b"}}}]""")
         assertEquals(setOf(NOTIFICATIONS), PermissionNeeds.of(toolbar))
+
+        // 進行中の表示(#1030)は常駐の通知
+        val activity = dsl("""[{"type":"button","label":"b","action":{"type":"startActivity","activity":{"title":"t"}}}]""")
+        assertEquals(setOf(NOTIFICATIONS), PermissionNeeds.of(activity))
     }
 
     @Test

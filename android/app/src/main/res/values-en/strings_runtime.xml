@@ -21,6 +21,7 @@
     <string name="runtime_missing_required">Please fill in %1$s</string>
     <string name="runtime_no_form">There\'s no form to save</string>
     <string name="runtime_not_member">You haven\'t joined this share. Join from an invite link.</string>
+    <string name="runtime_activity_notifications_off">Notifications are off, so the ongoing status can\'t be shown (Settings &gt; Notifications)</string>
     <string name="runtime_notification_failed">Couldn\'t schedule the notification</string>
     <string name="runtime_notification_scheduled">Reminder scheduled (%1$s)</string>
     <string name="runtime_offline_restored">You\'re offline. Showing the last saved app</string>

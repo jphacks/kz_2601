@@ -21,6 +21,7 @@ import jp.kz2601.metamon.dsl.records.RecordPermission
 import jp.kz2601.metamon.nearby.NearbyShareController
 import jp.kz2601.metamon.renderer.ActionContext
 import jp.kz2601.metamon.renderer.DSLRuntime
+import jp.kz2601.metamon.renderer.components.lists.LeafData
 import jp.kz2601.metamon.renderer.FormMember
 import jp.kz2601.metamon.renderer.components.audio.DictationHost
 import jp.kz2601.metamon.renderer.components.importing.AudioFileTranscriptionHost
@@ -998,7 +999,10 @@ class AppRuntime(
 
             ActionType.START_ACTIVITY -> {
                 val spec = action.activity ?: return
-                attempt(action.type) { host.startActivity(spec, document.appId) }
+                attempt(action.type) {
+                    val stat = spec.stat?.let { ActivityStat.read(it, dsl, LeafData(this, _records.value)) }
+                    if (!host.startActivity(spec, document.appId, dsl.app.name, stat)) showToast(RuntimeCopy.ACTIVITY_NOTIFICATIONS_OFF)
+                }
             }
 
             ActionType.END_ACTIVITY -> attempt(action.type) { host.endActivity(document.appId) }

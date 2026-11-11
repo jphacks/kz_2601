@@ -45,6 +45,8 @@ object PermissionNeeds {
     }
 
     private fun addAction(a: Action?, out: MutableSet<AppPermission>) {
+        // 進行中の表示(#1030)は Android では常駐の通知
+        if (a?.type == ActionType.START_ACTIVITY) out += AppPermission.NOTIFICATIONS
         if (a?.type != ActionType.SCHEDULE_NOTIFICATION) return
         out += AppPermission.NOTIFICATIONS
         if (a.notification?.near != null) out += NEAR

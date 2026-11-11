@@ -9,11 +9,15 @@ import android.provider.CalendarContract
 import androidx.core.content.FileProvider
 import jp.kz2601.metamon.R
 import jp.kz2601.metamon.dsl.Action
+import jp.kz2601.metamon.dsl.Activity
 import jp.kz2601.metamon.dsl.ActionFormat
 import jp.kz2601.metamon.dsl.AppDSL
 import jp.kz2601.metamon.dsl.Notification
 import jp.kz2601.metamon.dsl.logic.RecordExport
 import jp.kz2601.metamon.dsl.records.Record
+import jp.kz2601.metamon.notifications.ActivityNotificationPlanner
+import jp.kz2601.metamon.notifications.ActivityNotifications
+import jp.kz2601.metamon.notifications.ActivityStatReading
 import jp.kz2601.metamon.notifications.LocalNotifications
 import jp.kz2601.metamon.notifications.TimerAlarms
 import jp.kz2601.metamon.notifications.TimerVisibility
@@ -53,6 +57,15 @@ class AndroidRuntimeHost(
     }
 
     private val timers by lazy { TimerAlarms.get(context) }
+
+    private val activities by lazy { ActivityNotifications.get(context) }
+
+    override suspend fun startActivity(spec: Activity, appId: String, appName: String, stat: ActivityStatReading?): Boolean =
+        withContext(Dispatchers.IO) {
+            activities.show(ActivityNotificationPlanner.content(spec, appId, appName, stat, System.currentTimeMillis()))
+        }
+
+    override suspend fun endActivity(appId: String) = withContext(Dispatchers.IO) { activities.end(appId) }
 
     override suspend fun timerChanged(key: String, appName: String, timerName: String, endsAtEpochMillis: Long?) =
         withContext(Dispatchers.IO) { timers.changed(key, appName, timerName, endsAtEpochMillis) }
