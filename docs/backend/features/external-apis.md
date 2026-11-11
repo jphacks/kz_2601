@@ -95,6 +95,7 @@ op の `Check` は引数の値を確かめる(appconfig と runner の両方で�
 | `linear` の `createIssue`(Issue を足す・#1684) | 無料・OAuth(`runs` だけ・scope `issues:create`。つなぎ直す時も `read` を一緒に頼む)・書く(確認必須) | `createIssue(title, description?, team?)`。`title` は 1 行・255 文字まで・`description` は Markdown・10,000 文字まで。`team` はチームのキー(`ENG`・英字で始まる 7 文字まで)かチームの id。書かなければ本人のチームが 1 つの時だけそこ(2 つ以上は 400 `bad_request`)。無いチーム・Linear が受けない入力(`INVALID_INPUT`)も 400。状態はチームの最初の状態(Backlog か Triage)。答えは `resultId`(`ENG-123`)と 1 件 | 同上 | なし | 同上 |
 | `youtube` の `channelStats`(チャンネルの公開の数字・YouTube Data API v3・#1699) | 無料・運営の鍵(`runs` だけ。YouTube の 1 日の割り当てで 1 回 1 単位) | `channelStats(channel)`。`channel` はチャンネル id(`UC` + 22 文字)か `@ハンドル`(3〜30 文字・文字と数字と `.` `_` `-`)。答えは 1 件(見出し = チャンネル名・値 = 「登録者 n 人」・補足 = 「動画 n 本・再生 n 回」・リンク = チャンネル)。数は API の値をそのまま 3 桁区切りで出す(丸めない・作り直さない)。登録者を隠しているチャンネルは「登録者 非公開」。無いチャンネルは 400 `bad_request`。出典「YouTube」を出す(下の「YouTube の規約」)。AI に選ばせる決まり(`prompt.go`・`catalog.go`)はまだ | `https://www.googleapis.com` だけ(`/youtube/v3/channels`)・鍵は `X-Goog-Api-Key` ヘッダー | 1 時間 | `EXT_YOUTUBE_ENABLED=1`・`EXT_YOUTUBE_API_KEY` |
 | `youtube` の `latestVideos`(チャンネルの新しい動画・#1699) | 同上(1 回 2 単位: チャンネル + アップロードの再生リスト。`search` の 100 単位は使わない) | `latestVideos(channel, limit?)`。`channel` は同上・`limit` 1〜20(既定 5)。行は公開の動画だけ・新しい順(見出し = 題・補足 = 公開の日時(日本時間)・リンク = 動画)。動画が 1 本も無いチャンネルは 0 行 | 同上(`/youtube/v3/channels`・`/youtube/v3/playlistItems`) | 30 分 | 同上 |
+| `podcasts` の `searchPodcasts`(ポッドキャストの番組を探す・Apple の iTunes Search API・#1703) | 無料・鍵なし(`runs` だけ) | `searchPodcasts(term, limit?)`。`term` は 1〜100 文字・1 行(URL は 400)・`limit` 1〜20(既定 10)。日本のストア(`country=JP`・`lang=ja_jp`)の番組(`media=podcast`・`entity=podcast`)。行は番組ごと(見出し = 番組名・補足 = 作者・値 = 「RSS あり」/「RSS なし」・リンク = Apple Podcasts の番組のページ(クエリは落とす))。**RSS の URL そのものは返さない**(新しい回を読むのは #1702 の決定待ちで、URL は引数にも渡せないため)。アートワークの URL(`*.mzstatic.com`)と番組の id は `Output.Cells`(サーバーの中だけ)にあり、端末の行の形(`ExtRow`)に画像の欄が無いので今は端末に出ない。ストアのページが無い・`https` でない結果は出さない。出典 `PodcastsAttribution`(「provided courtesy of iTunes」)を出す(下の「iTunes Search API の規約」)。AI に選ばせる決まり(`prompt.go`・`catalog.go`)はまだ | `https://itunes.apple.com` だけ(`/search`) | 6 時間 | `EXT_PODCASTS_ENABLED=1` |
 | `slack` の `setStatus`(自分の状態を変える・#1679) | 無料・OAuth(`runs` だけ・ユーザーのトークン・scope `users.profile:write`)・書く(確認必須) | `setStatus(text?, emoji?, minutes?)`。`text` は 1 行 100 文字まで・`emoji` は `:tomato:` の形(肌の色 `:skin-tone-2:`〜`6` を 1 つ付けてよい)・`minutes` は 1〜10080(1 週間。無ければ消すまで)。`text` も `emoji` も無ければ状態を消す(その時 `minutes` は付けない)。同じ状態をもう一度入れても変わらない。答えは 1 件(見出し = 文・補足 = 絵文字・値 = 消える時刻)。Slack の上限は 1 人の状態を 1 分に 10 回まで | `https://slack.com` だけ(`/api/...`) | なし | `EXT_SLACK_ENABLED=1`・`EXT_SLACK_CLIENT_ID` / `_CLIENT_SECRET` |
 | `slack` の `postMessage`(チャンネルに本人として投稿・#1679) | 無料・OAuth(`runs` だけ・ユーザーのトークン・scope `chat:write`)・書く(確認必須) | `postMessage(channel, text)`。`channel` は会話の id(`C…` / `G…` / `D…`・名前は取らない)・`text` は 4000 文字まで(改行可・制御文字不可)。`<!channel>` `<!here>` `<!subteam^…>` などの一斉メンション(`<!`)は Slack に送らず 400 `bad_request`。`parse: none`・`link_names: false` で送る。本人が入っていない・無いチャンネル(`not_in_channel` / `channel_not_found`)は 400 `bad_request`。Slack に冪等のキーが無いので、二重にしないのは書く op をやり直さない決まりだけ。答えは `resultId`(メッセージの `ts`)と 1 件(見出し = 1 行目 120 文字まで・補足 = チャンネル)。本文は保存しない。Slack の上限は 1 チャンネルに 1 秒 1 通 | 同上 | なし | 同上 |
 | `slack` の `unread`(DM の未読の数・#1679) | 無料・OAuth(`runs` だけ・ユーザーのトークン・scope `im:read`) | `unread(channel)`。`channel` は DM の id(`D…`)だけ。`conversations.info` の `unread_count_display` を返す(Web API が未読の数を返すのは DM だけ。チャンネルの未読を数えるには本文を `conversations.history` で読むことになり、Marketplace に無い配布アプリは 1 分 1 回・15 件までなので入れない)。数が無い答えは 400 `bad_request`。答えは 1 件(見出し = 「未読」・補足 = id・値 = 数)。本文は読まない | 同上 | なし | 同上 |
@@ -108,7 +109,7 @@ Asana の 403 も、メッセージが scope の不足を言う時だけ 409 `ex
 
 Slack は利用者ごとの OAuth v2 でユーザーのトークン(`user_scope` だけ・ボットのトークンは取らない)。PKCE は使わない(Slack の PKCE はアプリを公開クライアントに戻せない形で変えるため。runner はクライアントの秘密を Basic 認証で送る)。新しい scope は同じトークンに足されるので、書く op のためにつなぎ直しても読む op は残る。トークンの回転(12 時間・使い捨ての refresh token)を入れた時も入れない時も動く。Slack はほとんどの失敗を 200 の `ok:false` で返すので、コードで分ける: `invalid_auth`・`not_authed`・`token_revoked`・`token_expired`・`account_inactive`(と HTTP 401)は接続を `error` にする(つなぎ直す)。`missing_scope`・`not_allowed_token_type`・`no_permission`・`access_denied` など(と HTTP 403)は 409 `ext_not_connected`。`ratelimited`(HTTP 429)・`fatal_error`・`internal_error`・`service_unavailable`・`request_timeout`(と 5xx)は 502 `upstream_unavailable`。ほかのコードは 400 `bad_request`。Slack の API 規約: 商用の配布は Marketplace(か別の契約)が要る・データは機能に要る間だけ持つ・モデルの学習に使わない・プライバシーポリシーに読むものを書く。だから op は本人の状態・本人の投稿・DM の未読の数だけで、メッセージの本文を読む op・ためる op は入れない。
 
-Asana の `myTasks`・`projectTasks`・`complete`、Todoist の `complete`・`projects`・`project` / `label`、Notion の `updateProperties`・`pageText`、Google ToDo の全部の op、GitHub と Linear の op、YouTube の `channelStats`・`latestVideos`、Slack の全部の op、ODPT の `trainStatus` は runner の op だけ。生成アプリから呼ぶ部品と AI に選ばせる決まり(`prompt.go`・`catalog.go`・`docs/dsl`)は #1643 の判断の後に足す。
+Asana の `myTasks`・`projectTasks`・`complete`、Todoist の `complete`・`projects`・`project` / `label`、Notion の `updateProperties`・`pageText`、Google ToDo の全部の op、GitHub と Linear の op、YouTube の `channelStats`・`latestVideos`、ポッドキャストの `searchPodcasts`、Slack の全部の op、ODPT の `trainStatus` は runner の op だけ。生成アプリから呼ぶ部品と AI に選ばせる決まり(`prompt.go`・`catalog.go`・`docs/dsl`)は #1643 の判断の後に足す。
 
 provider が 404 / 422(持っていない通貨・日)を返した時は 400 `bad_request`(`runs` は戻す)。429 / 5xx は 502 `upstream_unavailable`。
 
@@ -157,6 +158,21 @@ op の案: `boards()`(自分のボード・`GET /1/members/me/boards`。`/1/memb
 | 規約へのリンク(ポリシー III.A.1) | YouTube の利用規約(https://www.youtube.com/t/terms)へのリンクを出す | 部品と iOS の作業(#1643)。`docs/legal` にも書く(人の作業) |
 | プライバシーポリシー(規約 7・ポリシー III.A.2) | YouTube API サービスを使うと書き、Google のプライバシーポリシー(https://policies.google.com/privacy)へリンクする | 人の作業(`docs/legal`) |
 | 割り当て(規約 15・ポリシー III.D.3) | 割り当てを超えない・避けない。増やすには API Compliance Audit。認められた使い道にだけ使う | 1 回 1〜2 単位。回数の上限 `EXT_GLOBAL_DAILY_YOUTUBE` を 1 日の割り当てに合わせる(上限は回数で数えるので、`latestVideos` を 2 単位として見積もる・人の作業) |
+
+### iTunes Search API の規約(#1703)
+
+[Search API の説明](https://performance-partners.apple.com/search-api)(2026-11-12 に読んだ)から、`podcasts` を出す時に守ること。
+
+| 決まり | 中身 | この作りでの扱い |
+|---|---|---|
+| 回数 | 「おおよそ 1 分 20 回(変わることがある)」。多く使うなら Enterprise Partner Feed。大きなサイトは検索の答えを持つ(キャッシュする) | キャッシュは 6 時間(同じ `term`・`limit`)。runner の台は出口の IP を共有するので、`EXT_GLOBAL_DAILY_PODCASTS` で 1 日の全体を絞る(人の作業) |
+| 使い道 | 中身はストアの中身を広めるためだけ・広める中身のページにだけ置く・別の商品やサービスの宣伝に使わない・それだけで楽しむ使い方にしない | 行は必ずその番組の Apple Podcasts のページへリンクする(ページの無い結果は出さない)。「通勤のお供」の一覧のように番組を開きに行く使い方にする |
+| バッジ | 「Download on iTunes」などの Apple が認めたバッジを近くに置き、ストアのページへリンクする | 出し方(バッジの画像・Listen on Apple Podcasts)は部品(#1643)と iOS で決める |
+| 出典 | 試聴(preview)は「provided courtesy of iTunes」と出す | 試聴は使わないが、行のそばに `PodcastsAttribution`(同じ文)を出す |
+| 音声 | 試聴は流すだけで、ダウンロード・保存・キャッシュしない | 音声のファイルはサーバーで読まない・置かない。再生は Podcasts アプリを開く |
+| 求めに応じて消す | Apple から求められたら中身をすぐ消す・苦情は Apple に回す | キャッシュは 6 時間で消える。止める時は `EXT_PODCASTS_ENABLED` を切る |
+
+**新しい回(番組の RSS の `enclosure`)はまだ作らない。** 利用者やアプリが渡す RSS の URL を runner から読むかは #1702 の決定待ち。決まったら、Search API の lookup(`/lookup?id=<番組の id>`)で RSS の URL をサーバーの中で引く形か、許可リストの形で足す(番組の id は今 `Output.Cells` に入れてある)。
 
 ### ODPT の事業者と規約(#1691)
 
@@ -349,3 +365,4 @@ DSL に `externalCall` / `externalList` があるかの確かめは、DSL の子
 - プライバシーポリシー・利用規約(`docs/legal`)に外の API への送信とトークンの保管・消し方を書く。
 - YouTube(#1699): Google Cloud で YouTube Data API v3 を有効にし、鍵(使える API を YouTube Data API v3 だけに絞る)を Secret Manager の `EXT_YOUTUBE_API_KEY` に入れる。1 日の割り当て(Cloud Console の Quotas)を確かめて `EXT_GLOBAL_DAILY_YOUTUBE` を合わせる。上の「YouTube の規約」を読み直し、プライバシーポリシーに YouTube API サービスの利用と Google のプライバシーポリシーへのリンク、アプリに YouTube の利用規約へのリンクを足す。
 - ODPT(#1691): [公共交通オープンデータセンターの開発者サイト](https://developer.odpt.org/)で開発者登録(運営のアカウント・審査に数日かかることがある)をし、発行された consumer key を Secret Manager の `EXT_ODPT_API_KEY` に入れる。上の「ODPT の事業者と規約」を読み直し、アプリの問い合わせ先(開発者のメールアドレスなど)を決める。路線 id は登録後に `odpt:Railway` で一度確かめる。
+- ポッドキャスト(#1703): 上の「iTunes Search API の規約」を読み直し、「ストアの中身を広めるためだけ」の使い道に当たるか(番組を探して Apple Podcasts を開く使い方)を決める。`EXT_GLOBAL_DAILY_PODCASTS` を 1 分 20 回の目安に合わせて入れる。バッジ(Listen on Apple Podcasts)の出し方を iOS と決める。アートワークを端末に出すなら `ExtRow` に画像の欄を足すか(API の契約の変更)を決める。
