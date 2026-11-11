@@ -19,34 +19,25 @@ import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import jp.kz2601.metamon.dsl.Component
+import jp.kz2601.metamon.dsl.logic.ExternalUrlPolicy
 import jp.kz2601.metamon.renderer.theme.RenderTheme
 import jp.kz2601.metamon.renderer.theme.SymbolIcon
 import jp.kz2601.metamon.renderer.theme.colors
 import java.net.URI
 
-/**
- * `openUrlButton` / `link` / `openUrl` が開いてよい URL(iOS の `ExternalURLPolicy`・backend の `dsl.OpenURLSchemes` と同じ allowlist)。
- */
-object ExternalUrlPolicy {
-    val allowedSchemes = setOf("https", "line", "slack", "discord", "tel", "mailto", "maps", "comgooglemaps")
-
-    /** 許可されたスキームなら URI、そうでなければ null。 */
-    fun openable(s: String?): URI? {
-        val uri = parse(s) ?: return null
-        return uri.takeIf { it.scheme?.lowercase() in allowedSchemes }
-    }
-
-    /** URL として読めるか(iOS の `URL(string:)`)。空・空白入りは読めない。 */
-    fun parse(s: String?): URI? {
-        if (s.isNullOrEmpty()) return null
-        return runCatching { URI(s) }.getOrNull()
-    }
+/** URL として読めるか(iOS の `URL(string:)`)。空・空白入りは読めない。 */
+private fun parseUrl(s: String?): URI? {
+    if (s.isNullOrEmpty()) return null
+    return runCatching { URI(s) }.getOrNull()
 }
 
-/** link が出す文字(text が無ければ URL)と、押せるか(適合テストの `opens`)。 */
-fun Component.linkText(): String = text ?: ExternalUrlPolicy.parse(url)?.toString().orEmpty()
+/** 許可されたスキーム([ExternalUrlPolicy])で、URL として読めるものだけ。 */
+private fun openableUri(s: String?): URI? = ExternalUrlPolicy.openable(s)?.let(::parseUrl)
 
-val Component.linkOpens: Boolean get() = ExternalUrlPolicy.parse(url) != null
+/** link が出す文字(text が無ければ URL)と、押せるか(適合テストの `opens`)。 */
+fun Component.linkText(): String = text ?: parseUrl(url)?.toString().orEmpty()
+
+val Component.linkOpens: Boolean get() = parseUrl(url) != null
 
 /** https は Custom Tabs、それ以外(tel・mailto・line …)は対応アプリで開く。開けるアプリが無ければ何もしない。 */
 fun openExternalUrl(context: Context, uri: URI) {
@@ -63,7 +54,7 @@ fun openExternalUrl(context: Context, uri: URI) {
 /** `link`: URL を開く文字のリンク。許されない URL は押せない控えめな文字。 */
 @Composable
 fun LinkLeaf(c: Component, modifier: Modifier = Modifier) {
-    val target = ExternalUrlPolicy.openable(c.url)
+    val target = openableUri(c.url)
     val style = MaterialTheme.typography.bodyLarge.copy(fontWeight = FontWeight.Medium)
     if (target == null) {
         Text(c.text.orEmpty(), modifier.fillMaxWidth(), style = style, color = MaterialTheme.colorScheme.onSurfaceVariant)

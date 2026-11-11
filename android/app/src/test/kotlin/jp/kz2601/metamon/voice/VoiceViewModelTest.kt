@@ -430,4 +430,43 @@ class VoiceViewModelTest {
         )
         assertEquals("家計簿。支出だけ", vm.fallbackTranscript(chat))
     }
+
+    // ランタイムとのつなぎ(#881)
+
+    @Test
+    fun adoptShowsTheAppTheRuntimeOpenedWithoutGenerating() = runTest {
+        val ai = FakeAI()
+        val vm = vm(ai = ai)
+        vm.generateNow("家計簿")
+        advanceUntilIdle()
+        val other = generated.copy(appId = "app-2", version = 5)
+
+        vm.adopt(other)
+
+        assertEquals(other, vm.state.value.document)
+        assertNull("前のアプリの要約は出さない", vm.state.value.summary)
+        assertEquals(1, ai.morphCalls.size)
+    }
+
+    @Test
+    fun resultIsDroppedWhenTheAppChangedWhileGenerating() = runTest {
+        var current = "app-1"
+        val ai = FakeAI().apply { gate = CompletableDeferred() }
+        val vm = VoiceViewModel(
+            transcriber = MockSpeechTranscriber(),
+            ai = ai,
+            appId = { current },
+            initial = initial,
+            clarifyEnabled = false,
+            scope = CoroutineScope(StandardTestDispatcher(testScheduler) + Job()),
+        )
+        vm.generateNow("家計簿")
+        runCurrent()
+        current = "app-2" // 生成を待つ間に一覧から別のアプリへ
+        ai.gate!!.complete(Unit)
+        advanceUntilIdle()
+
+        assertEquals(initial, vm.state.value.document)
+        assertEquals(VoicePhase.IDLE, vm.state.value.phase)
+    }
 }

@@ -14,7 +14,7 @@ class AuthTokenProvider(private val auth: AuthService) : TokenProvider {
 
 /**
  * App Check のトークン(#318)。取れなければ null(ヘッダ無しで送る)。throw しない = App Check の不調で通信を止めない。
- * Android の実装(Play Integrity)は別 Issue。今は null を返す実装しか無い。
+ * 実装は [jp.kz2601.metamon.services.live.FirebaseAppCheckTokenProvider](release は Play Integrity・debug は debug provider)。
  */
 fun interface AppCheckTokenProvider {
     /** `forceRefresh = true` はサーバーに 401 `app_check_failed` で弾かれた後の取り直し */

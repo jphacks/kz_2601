@@ -3,6 +3,26 @@
 
     <uses-permission android:name="android.permission.INTERNET" />
 
+    <!-- 実行時の権限(#890)。聞くのは部品を使う直前(permissions/PermissionCenter)。マイクは :services で宣言済み -->
+    <!-- 写真・動画・QR・ドラレコ。カメラの無い端末でも入れられるように required="false" -->
+    <uses-permission android:name="android.permission.CAMERA" />
+    <uses-feature android:name="android.hardware.camera" android:required="false" />
+    <!-- 現在地・道案内・近くに着いたら通知。おおよそだけの許可でも使う。裏での取得(ACCESS_BACKGROUND_LOCATION)は持たない -->
+    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
+    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
+    <!-- 通知(13+ だけ実行時の権限。12 / 12L は設定のオン・オフのみ) -->
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <!-- 近くの端末と送り合う(nearbyShare)。minSdk 31 なので古い BLUETOOTH / BLUETOOTH_ADMIN は要らない。位置の推定には使わない -->
+    <uses-permission
+        android:name="android.permission.BLUETOOTH_SCAN"
+        android:usesPermissionFlags="neverForLocation" />
+    <uses-permission android:name="android.permission.BLUETOOTH_ADVERTISE" />
+    <uses-permission android:name="android.permission.BLUETOOTH_CONNECT" />
+    <uses-permission
+        android:name="android.permission.NEARBY_WIFI_DEVICES"
+        android:usesPermissionFlags="neverForLocation" />
+    <!-- Health Connect(healthStat)の権限は、その部品と権限の理由の画面を入れる時に足す(#890 の子 Issue) -->
+
     <application
         android:name=".MetamonApplication"
         android:allowBackup="false"

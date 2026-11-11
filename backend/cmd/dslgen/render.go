@@ -237,6 +237,9 @@ func (g *generator) renderComponent() string {
 			"/** JSON の type の元の文字列。知らない type([ComponentType.UNKNOWN])でも残る(描画の木・「更新すると表示」に使う)。 */",
 			"@Transient",
 			`val rawType: String = "",`,
+			"/** JSON の filter の元の値。配列(AND)でも残る(読み口は手書きの `Component.filters`)。 */",
+			"@Transient",
+			"val rawFilter: JsonElement? = null,",
 		}))
 	b.WriteString(componentSerializer)
 	b.WriteString(g.renderLenientObjects(true))
@@ -459,7 +462,8 @@ func (g *generator) renderKeys() string {
 }
 
 // componentSerializer reads with the plugin serializer, then keeps the raw
-// type string (iOS Component.rawType).
+// type string (iOS Component.rawType) and the raw filter (one object or an
+// array; iOS Component.filters).
 const componentSerializer = `
 @OptIn(ExperimentalSerializationApi::class)
 internal object ComponentSerializer : KSerializer<Component> {
@@ -470,8 +474,9 @@ internal object ComponentSerializer : KSerializer<Component> {
         val input = decoder as? JsonDecoder ?: return generated.deserialize(decoder)
         val element = input.decodeJsonElement()
         val component = input.json.decodeFromJsonElement(generated, element)
-        val raw = ((element as? JsonObject)?.get("type") as? JsonPrimitive)?.takeIf { it.isString }?.content
-        return if (raw == null) component else component.copy(rawType = raw)
+        val obj = element as? JsonObject
+        val raw = (obj?.get("type") as? JsonPrimitive)?.takeIf { it.isString }?.content
+        return component.copy(rawType = raw ?: component.rawType, rawFilter = obj?.get("filter"))
     }
 
     override fun serialize(encoder: Encoder, value: Component) = generated.serialize(encoder, value)
