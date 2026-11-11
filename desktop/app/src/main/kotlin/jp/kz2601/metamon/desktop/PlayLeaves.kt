@@ -555,11 +555,13 @@ data class TimerRun(val base: Int = 0, val startedAtMillis: Long? = null) {
 }
 
 /**
- * タイマーの走行状態(アプリが動いている間だけ)。画面を移っても止まらない。ウィンドウを閉じるとアプリが終わるので止まる。
+ * タイマーの走行状態(アプリが動いている間だけ)。画面を移っても止まらない。ウィンドウを閉じてもトレイに残っていれば止まらない(#1761)。
  * countdown の終わりは、その部品が画面に出ていなければトレイの通知で知らせる(Android の「前面で見えている間は出さない」と同じ)。
+ * 走っている物はトレイのメニュー・ツールチップに出す([active])。
  */
 object DesktopTimers {
     private val runs = ConcurrentHashMap<String, TimerRun>()
+    private val meta = ConcurrentHashMap<String, Pair<String, Int?>>()
     private val visible = ConcurrentHashMap.newKeySet<String>()
     private val alarms = HashMap<String, TimerTask>()
     private val clock by lazy { Timer("timerDisplay", true) }
@@ -569,15 +571,32 @@ object DesktopTimers {
     @Synchronized
     fun set(key: String, run: TimerRun, name: String, countdownTotal: Int?) {
         runs[key] = run
+        meta[key] = name to countdownTotal
         alarms.remove(key)?.cancel()
         val end = countdownTotal?.let { run.endsAtMillis(it) } ?: return
         val wait = end - System.currentTimeMillis()
         if (wait <= 0) return
         alarms[key] = clock.schedule(wait) {
             if (key !in visible && !GraphicsEnvironment.isHeadless()) {
-                Notifier.Tray.schedule(Notification(id = "timer-$key", title = name, body = "時間になりました"))
+                Notifier.Tray.schedule(Notification(id = "timer-$key", title = name, body = Strings["desktop_timer_done"]))
             }
         }
+    }
+
+    /** 走っている・途中で止めてあるタイマー(リセット済み・終わった countdown は出さない)。 */
+    fun active(nowMillis: Long = System.currentTimeMillis()): List<TimerStatus> = runs.entries.sortedBy { it.key }.mapNotNull { (key, run) ->
+        val (name, total) = meta[key] ?: return@mapNotNull null
+        val elapsed = run.elapsed(nowMillis, total)
+        if (!run.isRunning && run.base == 0) return@mapNotNull null
+        if (total != null && elapsed >= total) return@mapNotNull null
+        TimerStatus(key, name, if (total != null) total - elapsed else elapsed, total != null, run.isRunning)
+    }
+
+    /** テスト用: 全部消す。 */
+    internal fun clear() {
+        runs.clear()
+        meta.clear()
+        synchronized(this) { alarms.values.forEach { it.cancel() }; alarms.clear() }
     }
 
     fun visible(key: String, on: Boolean) {

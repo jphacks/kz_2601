@@ -27,6 +27,7 @@ TAILORIT_API=stg TAILORIT_DEV_TOKEN=<Firebase の ID トークン> ./gradlew :de
 - 入力: 日付・時刻は文字で入れて「今日」「‹ ›」で動かす。写真・動画はファイルを選ぶ・落とす・Ctrl+V、録音はファイルを選ぶ(撮影・録音・位置はこのパソコンでは使えない旨の枠)。手書きはマウス・ペンで描いて PNG に。QR は画像ファイルかクリップボードの画像から読む(zxing)。
 - 遷移: push はウィンドウの中で積み、sheet はウィンドウ内のダイアログ、fullScreen はウィンドウ全体に重ねる。タブは下に並べる。confirmMessage は確認ダイアログ。規則は Android と同じ `NavigationResolver`・`FormDraft`(`android/renderer` のソースをビルド時に取り込む。`android/` は変えない)。
 - アクション: 保存・削除・resetForm はメモリの中のモック。openUrl はブラウザ、addToCalendar は .ics を書き出して既定のカレンダーで開く、export は CSV か PDF(format)をダウンロードに書き出し、表を TSV でクリップボードにも入れる、scheduleNotification はトレイの通知(起動中だけ)、lookupBook はモックの本(`TAILORIT_API_BASE` を付けると `POST /v1/lookup/book`)。openVoice・startActivity・endActivity・follow は「使えない」旨を出す。
+- トレイ / メニューバーに常駐する(`Tray.kt`): 開く・すぐ記録(最初の記録できるフォーム画面を DSL と同じ開き方で開く)・音声(まだ使えない旨)・走っている timerDisplay の残り / 経過(メニューとツールチップ)・終了。ウィンドウの × はトレイに隠す(メニューの「ウィンドウを閉じてもトレイに残す」で切り替え・次の起動にも残る)。トレイが無い環境では × で終わる。通知(scheduleNotification・タイマーの終わり)もこのアイコンから出す。Linux は GNOME だと拡張(AppIndicator)が要る。
 - サインイン・通信はまだ無い。
 - 言語: OS の言語が日本語なら日本語、それ以外は英語。`TAILORIT_LANG=en`(または `-Dtailorit.lang=en`)で替えられる。文言は Android の `strings*.xml` をビルド時にそのまま同梱し、同じキーで引く(引けなければ英語 → 日本語)。
 - 明暗: OS のダークモードに従う(Windows はレジストリ、Linux は freedesktop の color-scheme か GNOME の設定、起動中の切り替えも 5 秒ごとに追う)。`TAILORIT_THEME=light / dark` で固定できる。

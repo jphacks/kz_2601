@@ -51,7 +51,7 @@ import kotlin.concurrent.thread
  * - openUrl: 既定のブラウザ(許可した scheme だけ)
  * - addToCalendar: .ics を書き出して既定のカレンダーで開く
  * - lookupBook: 本の情報(モックでは見本の本・`TAILORIT_API_BASE` があれば `POST /v1/lookup/book`)
- * - scheduleNotification / cancelNotification: トレイの通知(起動中だけ・時刻は次の 1 回)
+ * - scheduleNotification / cancelNotification: トレイの通知(起動中だけ・時刻は次の 1 回)。常駐トレイ(#1761)があればそのアイコンから
  * - export: CSV を書き出し、同じ中身をクリップボードにも入れる
  * - openVoice・startActivity・endActivity・follow・unfollow: 今は使えない旨
  */
@@ -254,6 +254,16 @@ interface Notifier {
         private val timers = HashMap<String, Timer>()
         private var icon: TrayIcon? = null
 
+        /** 常駐トレイ(Tray.kt の DesktopTray)が出ている間はそのアイコンから出す。無ければ通知用のアイコンを足す。 */
+        @Volatile
+        var sink: ((title: String, body: String) -> Unit)? = null
+
+        /** すぐ出す(予約しない)。トレイが無ければ何もしない。 */
+        fun notify(title: String, body: String) {
+            if (GraphicsEnvironment.isHeadless()) return
+            show(title, body)
+        }
+
         override fun schedule(n: Notification): String {
             if (GraphicsEnvironment.isHeadless() || !SystemTray.isSupported()) return Strings["desktop_tray_unavailable"]
             cancel(n.id)
@@ -275,6 +285,7 @@ interface Notifier {
 
         @Synchronized
         private fun show(title: String, body: String) {
+            sink?.let { return it(title, body) }
             runCatching {
                 val tray = SystemTray.getSystemTray()
                 val i = icon ?: TrayIcon(BufferedImage(16, 16, BufferedImage.TYPE_INT_ARGB), "Tailor It").also {

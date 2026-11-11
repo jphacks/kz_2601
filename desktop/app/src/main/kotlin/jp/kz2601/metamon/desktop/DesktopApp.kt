@@ -88,6 +88,7 @@ private class ScreenScope(
 @Composable
 fun DesktopApp(dsl: AppDSL, initialStore: MockStore = MockStore(), startScreen: String? = null, onOpenApp: ((String) -> Unit)? = null) {
     val session = remember { DesktopSession(dsl, initialStore, startScreen = startScreen, host = DesktopActionHost()) }
+    TrayHook(session)
     var pending by remember { mutableStateOf<Pair<Action, ActionContext>?>(null) }
     val nav = session.nav
     val dispatch = { a: Action, ctx: ActionContext -> if (a.confirmMessage != null) pending = a to ctx else session.dispatch(a, ctx) }
