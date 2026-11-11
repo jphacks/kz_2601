@@ -1,0 +1,95 @@
+package jp.kz2601.metamon.renderer.components.lists
+
+import android.content.res.Resources
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
+import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.platform.LocalContext
+import jp.kz2601.metamon.renderer.R
+
+/**
+ * 一覧・集計・グラフの値に入る文言(#843)。画面は端末の言語([rememberValueLabels])、
+ * 適合テストの描画の木は iOS の日本語の元文([JAPANESE])を渡す。書式は String.format(リソースは位置指定 `%1$s`)。
+ */
+data class ValueLabels(
+    val empty: String,
+    val count: String,
+    val sum: String,
+    val avg: String,
+    val min: String,
+    val max: String,
+    val countUnit: String,
+    val noData: String,
+    val chartOne: String,
+    val chartMany: String,
+    val everyone: String,
+    val member: String,
+    /** 文と文のあいだ(グラフの見出しと要約)。日本語「。」・英語「. 」 */
+    val sentenceSeparator: String,
+    /** 3 つ以上の名前のあいだ。日本語「、」・英語「, 」 */
+    val listSeparator: String,
+    /** 2 つの名前のあいだ。日本語「、」・英語「 and 」 */
+    val listPair: String,
+    /** 3 つ以上の時の最後の名前の前。日本語「、」・英語「, and 」 */
+    val listLast: String,
+) {
+    /** 名前を並べる(iOS の ListFormatter と同じ形:「A、B、C」/「A, B, and C」「A and B」)。 */
+    fun joinList(items: List<String>): String = when (items.size) {
+        0 -> ""
+        1 -> items[0]
+        2 -> items[0] + listPair + items[1]
+        else -> items.dropLast(1).joinToString(listSeparator) + listLast + items.last()
+    }
+
+    /** 文をつなぐ(空は飛ばす)。 */
+    fun joinSentences(parts: List<String?>): String = parts.filterNot { it.isNullOrEmpty() }.joinToString(sentenceSeparator)
+
+    companion object {
+        /** iOS の日本語の元文(適合テストの期待値と同じ)。文言の正は strings_lists.xml。 */
+        val JAPANESE = ValueLabels(
+            empty = "まだありません",
+            count = "件数",
+            sum = "%sの合計",
+            avg = "%sの平均",
+            min = "%sの最小",
+            max = "%sの最大",
+            countUnit = "件",
+            noData = "データがありません",
+            chartOne = "%d 項目。%s の %s",
+            chartMany = "%d 項目。最大は %s の %s、最小は %s の %s",
+            everyone = "全員",
+            member = "参加者",
+            sentenceSeparator = "。",
+            listSeparator = "、",
+            listPair = "、",
+            listLast = "、",
+        )
+
+        fun from(res: Resources) = ValueLabels(
+            empty = res.getString(R.string.lists_empty),
+            count = res.getString(R.string.lists_count),
+            sum = res.getString(R.string.lists_sum),
+            avg = res.getString(R.string.lists_avg),
+            min = res.getString(R.string.lists_min),
+            max = res.getString(R.string.lists_max),
+            countUnit = res.getString(R.string.lists_count_unit),
+            noData = res.getString(R.string.lists_no_data),
+            chartOne = res.getString(R.string.lists_chart_summary_one),
+            chartMany = res.getString(R.string.lists_chart_summary_many),
+            everyone = res.getString(R.string.lists_everyone),
+            member = res.getString(R.string.lists_member),
+            sentenceSeparator = res.getString(R.string.lists_sentence_separator),
+            listSeparator = res.getString(R.string.lists_list_separator),
+            listPair = res.getString(R.string.lists_list_pair),
+            listLast = res.getString(R.string.lists_list_last),
+        )
+    }
+}
+
+/** 端末(アプリ)の言語の [ValueLabels]。言語が変わると作り直す。 */
+@Composable
+fun rememberValueLabels(): ValueLabels {
+    val context = LocalContext.current
+    val config = LocalConfiguration.current
+    return remember(context, config) { ValueLabels.from(context.resources) }
+}

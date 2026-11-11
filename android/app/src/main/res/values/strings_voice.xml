@@ -104,6 +104,10 @@
     <string name="voice_plan_limit_body">このアプリで使える量が上限に達しました。使わないものを消すと、続けて使えます</string>
     <string name="voice_plan_limit_title">上限に達しました</string>
     <string name="voice_pro_required_body">この内容には Pro の機能が必要です。言い方を変えて、もう一度お話しください</string>
+    <string name="voice_progress_app">「%1$s」を作っています</string>
+    <string name="voice_progress_app_tabs">「%1$s」を作っています(%2$s)</string>
+    <string name="voice_progress_component">部品 %1$d: %2$s</string>
+    <string name="voice_progress_restart">やり直しています</string>
     <string name="voice_question_progress">質問 %1$d / %2$d</string>
     <string name="voice_quoted">「%1$s」</string>
     <string name="voice_rate_body">今日の上限に達しました。%1$sからまた使えます</string>
@@ -114,6 +118,9 @@
     <string name="voice_remaining_a11y_low">%1$s。少なくなっています</string>
     <string name="voice_remaining_a11y_pro">Pro。%1$s</string>
     <string name="voice_remaining_hint">新しく作ると %1$d、直すと %2$d、相談すると %3$d 減ります。%4$sに戻ります</string>
+    <string name="voice_remaining_settings_reset">戻る時刻</string>
+    <string name="voice_remaining_settings_title">今日の残り</string>
+    <string name="voice_remaining_settings_unknown">AI を使うと表示されます</string>
     <string name="voice_remaining_today">今日の残り %1$d</string>
     <string name="voice_rephrase">言い直す</string>
     <string name="voice_reply_placeholder">答えを文字で入力</string>

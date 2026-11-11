@@ -42,7 +42,7 @@ class FormRequiredSaveTest {
 
         assertEquals(setOf("body"), draft.flaggedFields)
         assertEquals(1, draft.flagCount)
-        assertEquals("本文 を入力してください", rt.toast)
+        assertEquals(RuntimeCopy.missingRequired(listOf("本文")), rt.toast)
         assertTrue(rt.recordSync.cached(appId, "memo").isEmpty())
     }
 

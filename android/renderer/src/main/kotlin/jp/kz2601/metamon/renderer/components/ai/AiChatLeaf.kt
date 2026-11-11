@@ -38,6 +38,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
@@ -46,6 +47,8 @@ import androidx.compose.ui.unit.dp
 import jp.kz2601.metamon.dsl.Component
 import jp.kz2601.metamon.dsl.ai.AiChat
 import jp.kz2601.metamon.renderer.R
+import jp.kz2601.metamon.renderer.a11y.TalkBack
+import jp.kz2601.metamon.renderer.a11y.rememberAnnouncer
 import jp.kz2601.metamon.renderer.components.play.rememberRecords
 import jp.kz2601.metamon.renderer.registry.RenderContext
 import jp.kz2601.metamon.renderer.theme.RenderTheme
@@ -84,12 +87,20 @@ fun AiChatLeaf(c: Component, ctx: RenderContext, modifier: Modifier = Modifier) 
     var suggestion by remember { mutableStateOf<AiChatSuggestion?>(null) }
     var phase by remember { mutableStateOf(DictationPhase.IDLE) }
     var visible by remember { mutableStateOf(true) }
+    val context = LocalContext.current
+    val announce = rememberAnnouncer()
+    val announceQueue = remember { AiChatAnnounceQueue() }
 
     LaunchedEffect(spec.entity) { rt.loadRecords(setOf(spec.entity)) }
+    // 録音中に届いた返事は録音が終わってから TalkBack に読ませる
+    LaunchedEffect(phase) {
+        announceQueue.phaseChanged(phase, visible, TalkBack.isRunning(context))?.let(announce)
+    }
     DisposableEffect(owner) {
         visible = true
         onDispose {
             visible = false
+            announceQueue.clear()
             speaking?.takeIf { it.startsWith("$owner/") }?.let { voice?.stop(it) }
             if (phase == DictationPhase.LISTENING) voice?.cancelDictation()
         }
@@ -108,8 +119,15 @@ fun AiChatLeaf(c: Component, ctx: RenderContext, modifier: Modifier = Modifier) 
                     is AiChatSend.Outcome.Sent -> {
                         suggestion = out.suggestion
                         val id = out.turnId
-                        if (id != null && AiChatAutoRead.mode(c.speak, visible, phase != DictationPhase.IDLE) == AiChatAutoRead.SPEAK) {
-                            voice?.speak(out.reply, "$owner/$id")
+                        if (id != null) {
+                            // 保存できた返事だけ。TalkBack の時は端末の声と重ねず TalkBack に読ませる
+                            val mode = AiChatAutoRead.mode(c.speak, visible, phase != DictationPhase.IDLE, TalkBack.isRunning(context))
+                            when (mode) {
+                                AiChatAutoRead.SPEAK -> voice?.speak(out.reply, "$owner/$id")
+                                AiChatAutoRead.ANNOUNCE -> announce(out.reply)
+                                AiChatAutoRead.QUEUE -> announceQueue.received(out.reply, mode)
+                                AiChatAutoRead.NONE -> Unit
+                            }
                         }
                     }
                     is AiChatSend.Outcome.Failed -> {

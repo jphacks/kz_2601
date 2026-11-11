@@ -40,7 +40,11 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import jp.kz2601.metamon.dsl.AppDSL
 import jp.kz2601.metamon.dsl.AppDocument
 import jp.kz2601.metamon.consent.AiConsentDialog
+import jp.kz2601.metamon.onboarding.TutorialScreen
+import jp.kz2601.metamon.services.consent.AiConsentStatus
+import jp.kz2601.metamon.feedback.FeedbackComposerHost
 import jp.kz2601.metamon.feedback.FeedbackHost
+import jp.kz2601.metamon.feedback.TalkBackAnnouncer
 import jp.kz2601.metamon.feedback.UndoHeaderButtons
 import jp.kz2601.metamon.language.AppLocales
 import jp.kz2601.metamon.notifications.LocalNotifications
@@ -55,9 +59,11 @@ import jp.kz2601.metamon.renderer.DSLView
 import jp.kz2601.metamon.renderer.components.feed.LocalFeedHost
 import jp.kz2601.metamon.renderer.theme.MetamonRenderTheme
 import jp.kz2601.metamon.renderer.theme.ReadableWidth
+import jp.kz2601.metamon.retention.RetentionPromptHost
 import jp.kz2601.metamon.runtime.AppRuntime
 import jp.kz2601.metamon.runtime.NavigationSnapshot
 import jp.kz2601.metamon.runtime.TranscriberDictationHost
+import jp.kz2601.metamon.runtime.UiText
 import jp.kz2601.metamon.services.GenerateProgress
 import jp.kz2601.metamon.services.PlanUsageSource
 import jp.kz2601.metamon.voice.AndroidSpeechEngine
@@ -70,7 +76,13 @@ import jp.kz2601.metamon.voice.VoiceUiState
 import jp.kz2601.metamon.voice.VoiceViewModel
 import jp.kz2601.metamon.voice.stage.BuildStageHost
 import jp.kz2601.metamon.services.AppSummary
+import jp.kz2601.metamon.services.sharing.IssuedShares
+import jp.kz2601.metamon.services.sharing.ShareSheetModel
 import jp.kz2601.metamon.settings.SettingsSheet
+import jp.kz2601.metamon.share.ShareLinkHost
+import jp.kz2601.metamon.share.ShareLinkIntents
+import jp.kz2601.metamon.share.ShareSheet
+import jp.kz2601.metamon.share.ShareTarget
 import jp.kz2601.metamon.switcher.AppSwitcherDialog
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -116,9 +128,10 @@ class MainActivity : ComponentActivity() {
         const val NAVIGATION_KEY = "metamon.navigation"
     }
 
-    /** 通知のタップ(自分で出した通知も、FCM が裏で出した通知も extra の `appId`)。 */
+    /** 通知のタップ(自分で出した通知も、FCM が裏で出した通知も extra の `appId`)と、シェアリンク(#901)。 */
     private fun offerPushOpen(intent: Intent?) {
         PushOpen.offer(PushMessage.appId(intent?.getStringExtra(LocalNotifications.EXTRA_APP_ID)))
+        ShareLinkIntents.offer(intent)
     }
 }
 
@@ -179,10 +192,22 @@ fun MetamonApp(container: AppContainer) {
     val runtimeState by runtime.state.collectAsStateWithLifecycle()
 
     LaunchedEffect(runtime) { runtime.bootstrap() }
+    // AI の質問・返事・完成の要約・状態カード・トーストを出たのと同時に TalkBack に読ませる(H8)
+    TalkBackAnnouncer(vm.state, runtime.state)
     // 初回起動・説明の版が上がった時に 1 回だけ同意の画面を出す(iOS の ConsentHost・#888)
     LaunchedEffect(Unit) {
         delay(CONSENT_PROMPT_DELAY_MILLIS)
         container.consentPrompt.showOnLaunchIfNeeded()
+    }
+    // 同意の画面が閉じたら(要らない時は起動して少し待って)初回のチュートリアルを出す(iOS の TutorialHost・#900)
+    val consentVisible by container.consentPrompt.visible.collectAsStateWithLifecycle()
+    LaunchedEffect(consentVisible) {
+        if (consentVisible) return@LaunchedEffect
+        delay(TUTORIAL_PROMPT_DELAY_MILLIS)
+        container.tutorialPrompt.presentIfNeeded(
+            consentPrompted = container.consent.state.value.status != AiConsentStatus.NOT_PROMPTED,
+            consentShowing = container.consentPrompt.visible.value,
+        )
     }
     // 部品のマイク(onVoiceInput)は音声のシートを開く
     LaunchedEffect(runtimeState.showVoiceSheet) {
@@ -231,6 +256,10 @@ fun MetamonApp(container: AppContainer) {
     var settingsOpen by rememberSaveable { mutableStateOf(false) }
     val apps by runtime.apps.collectAsStateWithLifecycle()
     val scope = rememberCoroutineScope()
+    // 共有シート(#901)。発行したリンクは人が変わる(wipes)まで覚える。モックは mockSharing の時だけ
+    var shareTarget by remember { mutableStateOf<ShareTarget?>(null) }
+    val issuedShares = remember(wipes) { IssuedShares() }
+    val canShare = !container.knobs.mock || container.knobs.mockSharing
 
     val openSwitcher = {
         switcherOpen = true
@@ -258,7 +287,7 @@ fun MetamonApp(container: AppContainer) {
     ) { padding ->
         Box(Modifier.fillMaxSize().padding(padding)) {
             // 生成中の組み立て台・変わった部品の印・完成の後のお知らせ(#894)
-            BuildStageHost(state, onCancel = vm::cancelGenerate, onOpenVoice = vm::openVoice) {
+            BuildStageHost(state, onCancel = vm::cancelGenerate, onOpenVoice = vm::openVoice, editHints = container.tutorial.editHints) {
                 if (state.isInitial) {
                     VoiceRoute(vm, onMicLongPress = openSwitcher)
                 } else {
@@ -275,9 +304,45 @@ fun MetamonApp(container: AppContainer) {
         }
     }
 
-    if (settingsOpen) SettingsSheet(container, busy = state.isGenerating, onDismiss = { settingsOpen = false })
+    if (settingsOpen) {
+        SettingsSheet(
+            container,
+            busy = state.isGenerating,
+            onDismiss = { settingsOpen = false },
+            // 一度も作っていないアプリ(version 1)はシェアできない(backend が 400)
+            onShare = if (canShare && runtimeState.document.version > 1) {
+                {
+                    settingsOpen = false
+                    shareTarget = ShareTarget(runtimeState.document.appId, runtimeState.dsl.app.name)
+                }
+            } else {
+                null
+            },
+            remainingToday = state.remainingToday,
+            isPro = state.isPro,
+            onRefreshUsage = { vm.refreshUsage() },
+            onStopRetention = vm::generateNow,
+            onShowTutorial = {
+                settingsOpen = false
+                container.tutorialPrompt.replay()
+            },
+            canUndo = state.canUndo && !state.undoing && !state.isGenerating,
+            onUndo = {
+                settingsOpen = false
+                vm.undo(state.document.version)
+            },
+            onPickTip = { text ->
+                settingsOpen = false
+                vm.putDraft(text)
+            },
+            onReset = {
+                settingsOpen = false
+                runtime.startNewApp()
+                vm.noteHomeEntry(Greeting.HomeEntry.HOME)
+            },
+        )
+    }
     // 設定のシートより後に置く(設定から出した時に上に重ねる)
-    val consentVisible by container.consentPrompt.visible.collectAsStateWithLifecycle()
     if (consentVisible) {
         val consentState by container.consent.state.collectAsStateWithLifecycle()
         AiConsentDialog(
@@ -286,6 +351,16 @@ fun MetamonApp(container: AppContainer) {
             onLater = container.consentPrompt::later,
         )
     }
+    // 初回のチュートリアル(#900)。同意の画面とは重ねない(閉じてから出す)
+    val tutorialVisible by container.tutorialPrompt.visible.collectAsStateWithLifecycle()
+    if (tutorialVisible && !consentVisible) {
+        TutorialScreen(onFinish = container.tutorialPrompt::finish)
+    }
+
+    // 記録の保存期間の確認(#482)。生成中・音声のシートの間は待つ
+    RetentionPromptHost(runtime, busy = state.isGenerating || state.voiceOpen, onStop = vm::generateNow)
+    // フィードバックの画面(#319)と端末を振って開く仕組み。設定から開いた時に上に重ねる
+    FeedbackComposerHost(container)
 
     if (switcherOpen) {
         AppSwitcherDialog(
@@ -301,8 +376,27 @@ fun MetamonApp(container: AppContainer) {
                 vm.noteHomeEntry(Greeting.HomeEntry.NEW_APP) // 挨拶を「新しいアプリですね」に
             },
             onDismiss = { switcherOpen = false },
+            onShare = if (canShare) { app ->
+                switcherOpen = false
+                shareTarget = ShareTarget(app.id, app.name)
+            } else {
+                null
+            },
         )
     }
+
+    // アプリの共有シート(#901)。入口は変身一覧の各行と設定
+    shareTarget?.let { target ->
+        val model = remember(target, issuedShares) {
+            ShareSheetModel(target.appId, container.appConfig.takeIf { canShare }, issuedShares) {
+                val now = runtime.state.value
+                if (now.document.appId == target.appId) now.dsl else container.appConfig.fetchDocument(target.appId).document.dsl
+            }
+        }
+        ShareSheet(target, model, onDismiss = { shareTarget = null })
+    }
+    // シェアリンクから開く・参加する(#901)
+    ShareLinkHost(container, canShare)
 
     if (!state.isInitial && state.voiceOpen) {
         ModalBottomSheet(onDismissRequest = vm::closeVoice, sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)) {
@@ -332,14 +426,19 @@ private suspend fun openFromNotification(runtime: AppRuntime, appId: String) {
 }
 
 /** 生成の途中経過を 1 行にする。今の画面の途中経過は [BuildStageHost] が出す(文言の置き場として残す)。 */
-internal fun progressText(p: GenerateProgress): String = when (p) {
-    is GenerateProgress.App -> "「${p.name}」を作っています" + if (p.tabs.isEmpty()) "" else "(${p.tabs.joinToString("・")})"
-    is GenerateProgress.Summary -> p.text
-    is GenerateProgress.Component -> "部品 ${p.component.index + 1}: ${p.component.label ?: p.component.type}"
-    is GenerateProgress.Restart -> "やり直しています"
+internal fun progressText(p: GenerateProgress): UiText = when (p) {
+    is GenerateProgress.App ->
+        if (p.tabs.isEmpty()) UiText.Res(R.string.voice_progress_app, p.name)
+        else UiText.Res(R.string.voice_progress_app_tabs, p.name, p.tabs.joinToString("・"))
+    is GenerateProgress.Summary -> UiText.Raw(p.text)
+    is GenerateProgress.Component -> UiText.Res(R.string.voice_progress_component, p.component.index + 1, p.component.label ?: p.component.type)
+    is GenerateProgress.Restart -> UiText.Res(R.string.voice_progress_restart)
 }
 
 private const val AUTO_NAV_START_MILLIS = 3_000L
 
 /** 起動の画面が落ち着いてから同意の画面を出す(iOS の ConsentHost と同じ 0.5 秒) */
 private const val CONSENT_PROMPT_DELAY_MILLIS = 500L
+
+/** 同意の画面が閉じきってから(要らない時は起動の画面が落ち着いてから)チュートリアルを出す(iOS の TutorialHost の 0.7〜0.8 秒) */
+private const val TUTORIAL_PROMPT_DELAY_MILLIS = 800L

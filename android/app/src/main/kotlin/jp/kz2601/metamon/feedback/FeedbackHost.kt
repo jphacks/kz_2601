@@ -43,18 +43,20 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.CustomAccessibilityAction
-import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.customActions
-import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import jp.kz2601.metamon.R
+import jp.kz2601.metamon.renderer.a11y.TalkBack
+import jp.kz2601.metamon.renderer.a11y.rememberTalkBackRunning
 import jp.kz2601.metamon.runtime.AppRuntime
 import jp.kz2601.metamon.runtime.Confirm
 import jp.kz2601.metamon.runtime.RuntimeState
+import jp.kz2601.metamon.runtime.UiText
+import jp.kz2601.metamon.runtime.resolve
 import jp.kz2601.metamon.ui.CraneMascot
 import jp.kz2601.metamon.ui.CranePose
 import jp.kz2601.metamon.voice.ErrorCard
@@ -70,7 +72,7 @@ import kotlin.math.roundToInt
 /**
  * 生成したアプリの上に重ねる知らせ(#895・iOS の RootView の summaryCard / errorCardOverlay / ToastHost / alert)。
  * - 上: 変身の要約と「元に戻す」/「やり直す」、失敗の状態カード
- * - 下: トースト(3 秒・下に払って閉じる)と「削除しました・元に戻す」(5 秒)
+ * - 下: トースト(3 秒・下に払って閉じる)と「削除しました・元に戻す」(5 秒。TalkBack の時は長め・H8)
  * - 確認ダイアログ(confirmMessage 付きのアクション)
  */
 @Composable
@@ -80,7 +82,7 @@ fun BoxScope.FeedbackHost(vm: VoiceViewModel, state: VoiceUiState, runtime: AppR
     // undo / redo の結果は 1 つのトーストの枠に流す
     LaunchedEffect(state.notice) {
         val notice = state.notice ?: return@LaunchedEffect
-        runtime.showToast(context.getString(notice.text))
+        runtime.showToast(UiText.Res(notice.text))
         vm.dismissNotice()
     }
 
@@ -135,10 +137,12 @@ private fun SummaryBanner(state: VoiceUiState, onUndo: (Int?) -> Unit, onRedo: (
         null -> null
     }
     val a11y = LocalAccessibilityManager.current
+    val talkBack = rememberTalkBackRunning()
     if (text != null) {
         LaunchedEffect(text, state.summaryAction) {
             val base = if (state.summaryAction == null) maxOf(3_000L, minOf(5_000L, text.length * 1_000L / 12)) else 6_000L
-            delay(a11y?.calculateRecommendedTimeoutMillis(base, containsIcons = false, containsText = true, containsControls = state.summaryAction != null) ?: base)
+            val recommended = a11y?.calculateRecommendedTimeoutMillis(base, containsIcons = false, containsText = true, containsControls = state.summaryAction != null) ?: base
+            delay(maxOf(recommended, TalkBack.holdMillis(base, talkBack)))
             onDismiss()
         }
     }
@@ -167,10 +171,8 @@ private fun SummaryBanner(state: VoiceUiState, onUndo: (Int?) -> Unit, onRedo: (
                     },
                 )
                 .clickable(onClick = onDismiss)
-                .semantics {
-                    liveRegion = LiveRegionMode.Polite
-                    customActions = listOf(CustomAccessibilityAction(close) { onDismiss(); true })
-                },
+                // 読み上げは TalkBackAnnouncer が出したのと同時に行う(liveRegion と二重に読まない)
+                .semantics { customActions = listOf(CustomAccessibilityAction(close) { onDismiss(); true }) },
         ) {
             Row(Modifier.padding(horizontal = 12.dp, vertical = 10.dp), verticalAlignment = Alignment.CenterVertically) {
                 CraneMascot(CranePose.JOY, size = 44.dp, sway = 6f)
@@ -227,20 +229,22 @@ private fun CapsuleButton(label: String, enabled: Boolean, onClick: () -> Unit) 
     }
 }
 
-/** 下部のトースト(iOS の ToastHost)。3 秒で消え、下に払っても閉じる。読み上げ中は長めに出す。 */
+/** 下部のトースト(iOS の ToastHost)。3 秒で消え、下に払っても閉じる。TalkBack の時は長めに出す(H8)。 */
 @Composable
-private fun RuntimeToast(runtime: AppRuntime, message: String?) {
+private fun RuntimeToast(runtime: AppRuntime, message: UiText?) {
     val a11y = LocalAccessibilityManager.current
+    val talkBack = rememberTalkBackRunning()
     if (message != null) {
         LaunchedEffect(message) {
-            delay(a11y?.calculateRecommendedTimeoutMillis(TOAST_MILLIS, containsIcons = false, containsText = true, containsControls = false) ?: TOAST_MILLIS)
+            val recommended = a11y?.calculateRecommendedTimeoutMillis(TOAST_MILLIS, containsIcons = false, containsText = true, containsControls = false) ?: TOAST_MILLIS
+            delay(maxOf(recommended, TalkBack.holdMillis(TOAST_MILLIS, talkBack)))
             if (runtime.toast == message) runtime.dismissToast()
         }
     }
     AnimatedVisibility(visible = message != null, enter = slideInVertically { it } + fadeIn(), exit = slideOutVertically { it } + fadeOut()) {
         val close = stringResource(R.string.feedback_close)
         ToastCapsule(onDismiss = runtime::dismissToast, dismissLabel = close) {
-            Text(message.orEmpty(), style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.Medium, textAlign = TextAlign.Center)
+            Text(message?.resolve().orEmpty(), style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.Medium, textAlign = TextAlign.Center)
         }
     }
 }
@@ -250,9 +254,11 @@ private fun RuntimeToast(runtime: AppRuntime, message: String?) {
 private fun RecordUndoToast(runtime: AppRuntime, runtimeState: RuntimeState) {
     val ticket = runtimeState.recordUndo
     val scope = rememberCoroutineScope()
+    val talkBack = rememberTalkBackRunning()
     if (ticket != null) {
         LaunchedEffect(ticket.id) {
-            delay(RECORD_UNDO_MILLIS)
+            // AppRuntime が削除を送るまでの時間と同じ(TalkBack の時は 10 秒)
+            delay(TalkBack.recordUndoMillis(talkBack))
             if (runtime.state.value.recordUndo == ticket) runtime.dismissRecordUndo()
         }
     }
@@ -300,7 +306,6 @@ private fun ToastCapsule(
                 },
             )
             .semantics {
-                liveRegion = LiveRegionMode.Polite
                 customActions = listOfNotNull(
                     extraAction?.let { (label, run) -> CustomAccessibilityAction(label) { run(); true } },
                     CustomAccessibilityAction(dismissLabel) { onDismiss(); true },
@@ -321,7 +326,7 @@ private fun ConfirmDialog(confirm: Confirm, runtime: AppRuntime) {
         confirmButton = {
             TextButton(onClick = { scope.launch { runtime.confirmAccepted() } }) {
                 Text(
-                    confirm.primaryLabel,
+                    stringResource(confirm.primaryLabel),
                     color = if (confirm.isDestructive) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary,
                     fontWeight = FontWeight.SemiBold,
                 )
@@ -334,9 +339,6 @@ private fun ConfirmDialog(confirm: Confirm, runtime: AppRuntime) {
 }
 
 private const val TOAST_MILLIS = 3_000L
-
-/** AppRuntime の undoGraceMillis(既定 5 秒)と同じ */
-private const val RECORD_UNDO_MILLIS = 5_000L
 
 private val SWIPE_DISMISS_DISTANCE = 40.dp
 

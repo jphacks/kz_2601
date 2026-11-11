@@ -12,12 +12,14 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import jp.kz2601.metamon.dsl.Action
 import jp.kz2601.metamon.dsl.ActionType
 import jp.kz2601.metamon.dsl.Component
 import jp.kz2601.metamon.dsl.Size
+import jp.kz2601.metamon.renderer.R
 import jp.kz2601.metamon.renderer.components.actions.ActionButton
 import jp.kz2601.metamon.renderer.components.actions.ActionButtonKind
 import jp.kz2601.metamon.renderer.form.FormDraft
@@ -71,7 +73,7 @@ fun VoiceInputLeaf(c: Component, ctx: RenderContext, modifier: Modifier = Modifi
         verticalArrangement = Arrangement.spacedBy(RenderTheme.Spacing.lg),
     ) {
         Text(
-            c.prompt ?: "話しかけてください",
+            c.prompt ?: stringResource(R.string.inputs_voice_prompt),
             style = MaterialTheme.typography.headlineSmall,
             textAlign = TextAlign.Center,
         )
@@ -81,7 +83,7 @@ fun VoiceInputLeaf(c: Component, ctx: RenderContext, modifier: Modifier = Modifi
             shape = CircleShape,
             modifier = Modifier.size(buttonSize),
         ) {
-            Text("話す", style = MaterialTheme.typography.titleMedium)
+            Text(stringResource(R.string.inputs_voice_talk), style = MaterialTheme.typography.titleMedium)
         }
     }
 }

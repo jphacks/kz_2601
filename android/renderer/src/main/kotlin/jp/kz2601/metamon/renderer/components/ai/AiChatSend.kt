@@ -289,12 +289,46 @@ enum class DictationReadiness { READY, PREPARING, NEEDS_MODEL, FAILED }
 enum class AiChatAutoRead {
     NONE,
     SPEAK,
+    /** TalkBack に読ませる(端末の声と重ねない) */
+    ANNOUNCE,
+    /** 録音中に届いた: 録音が終わってから TalkBack に読ませる */
+    QUEUE,
     ;
 
     companion object {
-        /** 画面を離れた後・話して入力の録音中は読まない。 */
-        fun mode(speak: Boolean?, visible: Boolean, recording: Boolean): AiChatAutoRead =
-            if (speak == true && visible && !recording) SPEAK else NONE
+        /**
+         * 画面を離れた後は読まない。話して入力の録音中は読まない(声をマイクが拾う)。
+         * TalkBack の時は TalkBack に読ませ、録音中なら終わるまで待つ(iOS の `autoReadMode`)。
+         */
+        fun mode(speak: Boolean?, visible: Boolean, recording: Boolean, talkBack: Boolean = false): AiChatAutoRead = when {
+            speak != true || !visible -> NONE
+            recording -> if (talkBack) QUEUE else NONE
+            talkBack -> ANNOUNCE
+            else -> SPEAK
+        }
+    }
+}
+
+/** 録音中に届いた返事の TalkBack の読み上げを録音が終わるまで待たせる(最新の 1 件だけ・iOS の `AiChatAnnounceQueue`)。 */
+class AiChatAnnounceQueue {
+    var pending: String? = null
+        private set
+
+    /** 返事が届いた。[AiChatAutoRead.QUEUE] なら持っておく(古い分は捨てる) */
+    fun received(text: String, mode: AiChatAutoRead) {
+        if (mode == AiChatAutoRead.QUEUE) pending = text
+    }
+
+    /** 録音の段階が変わった。録音が終わった(IDLE)ら待たせていた文を返す */
+    fun phaseChanged(phase: DictationPhase, visible: Boolean, talkBack: Boolean): String? {
+        if (phase != DictationPhase.IDLE) return null
+        val text = pending ?: return null
+        pending = null
+        return if (visible && talkBack) text else null
+    }
+
+    fun clear() {
+        pending = null
     }
 }
 

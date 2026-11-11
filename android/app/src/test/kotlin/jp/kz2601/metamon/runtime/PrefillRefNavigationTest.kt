@@ -84,7 +84,7 @@ class PrefillRefNavigationTest {
         rt.run(writeComment(), ctx)
 
         assertNull("親が未保存なら子のフォームを開かない", rt.navigation.value.sheet)
-        assertEquals("先に「${posts.name}」を保存してください", rt.toast)
+        assertEquals(RuntimeCopy.saveParentFirst(posts.name), rt.toast)
         assertEquals(emptyMap<String, JSONValue>(), FormPrefill.consume(rt.entityModel("post_comments")!!))
     }
 

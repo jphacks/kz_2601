@@ -16,9 +16,11 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
 import jp.kz2601.metamon.dsl.Component
 import jp.kz2601.metamon.dsl.records.FieldCoding
 import jp.kz2601.metamon.dsl.records.FieldType
+import jp.kz2601.metamon.renderer.R
 import jp.kz2601.metamon.renderer.form.DateInput
 import jp.kz2601.metamon.renderer.form.FormDraft
 import jp.kz2601.metamon.renderer.form.TimeText
@@ -53,7 +55,7 @@ fun DatePickerLeaf(c: Component, ctx: RenderContext, modifier: Modifier = Modifi
                     step = if (includeTime) 2 else 0
                 }) { Text("OK") }
             },
-            dismissButton = { TextButton(onClick = { step = 0 }) { Text("キャンセル") } },
+            dismissButton = { TextButton(onClick = { step = 0 }) { Text(stringResource(R.string.inputs_cancel)) } },
         ) { DatePicker(state) }
     }
     if (step == 2) TimeDialog(form, field) { step = 0 }
@@ -86,7 +88,7 @@ private fun TimeDialog(form: FormDraft, field: String, onDone: () -> Unit) {
                 onDone()
             }) { Text("OK") }
         },
-        dismissButton = { TextButton(onClick = onDone) { Text("キャンセル") } },
+        dismissButton = { TextButton(onClick = onDone) { Text(stringResource(R.string.inputs_cancel)) } },
         text = { TimePicker(state) },
     )
 }

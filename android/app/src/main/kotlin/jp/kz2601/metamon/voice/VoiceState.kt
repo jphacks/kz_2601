@@ -94,6 +94,8 @@ data class VoiceUiState(
     /** ai の「今日の残り」(#630)。分からなければ null */
     val remainingToday: RemainingToday? = null,
     val isPro: Boolean = false,
+    /** 入力欄に入れる文(設定の「頼み方のコツ」で選んだ例・#1161)。入れたら [VoiceViewModel.consumeDraft] で消す */
+    val draft: String? = null,
 ) {
     /** 初期状態(音声画面だけ)= 新規作成 */
     val isInitial: Boolean get() = document.dsl.isVoiceOnly

@@ -47,6 +47,8 @@ import jp.kz2601.metamon.dsl.records.JSONValue
 import jp.kz2601.metamon.dsl.records.Record
 import jp.kz2601.metamon.renderer.DSLRuntime
 import jp.kz2601.metamon.renderer.R
+import jp.kz2601.metamon.renderer.components.lists.ValueLabels
+import jp.kz2601.metamon.renderer.components.lists.rememberValueLabels
 import jp.kz2601.metamon.renderer.registry.RenderContext
 import jp.kz2601.metamon.renderer.theme.RenderTheme
 import jp.kz2601.metamon.renderer.theme.SymbolIcon
@@ -64,6 +66,7 @@ fun BracketLeaf(c: Component, ctx: RenderContext, modifier: Modifier = Modifier)
     val all by rememberRecords(ctx.runtime)
     val pending = remember(c.id) { mutableStateMapOf<String, Int>() }
     val draw = BracketRules.draw(c, ctx.runtime, all, pending.toMap())
+    val valueLabels = rememberValueLabels()
     val scope = rememberCoroutineScope()
     val haptics = LocalHapticFeedback.current
     val context = LocalContext.current
@@ -123,7 +126,7 @@ fun BracketLeaf(c: Component, ctx: RenderContext, modifier: Modifier = Modifier)
                 Row(horizontalArrangement = Arrangement.spacedBy(RenderTheme.Spacing.xs), verticalAlignment = Alignment.CenterVertically) {
                     SymbolIcon("trophy", 16.dp, RenderTheme.colors.brandA)
                     Text(
-                        stringResource(R.string.play_bracket_champion, BracketRules.name(c, ctx.runtime, all, champ)),
+                        stringResource(R.string.play_bracket_champion, BracketRules.name(c, ctx.runtime, all, champ, valueLabels)),
                         style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.SemiBold),
                         color = RenderTheme.colors.brandA,
                     )
@@ -262,7 +265,8 @@ private fun SlotRow(
 @Composable
 private fun slotText(c: Component, runtime: DSLRuntime, all: Map<String, List<Record>>, m: BracketDraw.Match, side: BracketDraw.Side): String {
     val r = if (side == BracketDraw.Side.A) m.a else m.b
-    return r?.let { BracketRules.name(c, runtime, all, it) }
+    val labels = rememberValueLabels()
+    return r?.let { BracketRules.name(c, runtime, all, it, labels) }
         ?: stringResource(if (m.round == 1) R.string.play_bracket_bye else R.string.play_bracket_tbd)
 }
 
@@ -288,10 +292,10 @@ object BracketRules {
     }
 
     /** 出場者の名前(titleField。無ければ id・空なら「—」)。 */
-    fun name(c: Component, runtime: DSLRuntime, all: Map<String, List<Record>>, r: Record): String {
+    fun name(c: Component, runtime: DSLRuntime, all: Map<String, List<Record>>, r: Record, labels: ValueLabels = ValueLabels.JAPANESE): String {
         val f = c.titleField?.takeIf { it.isNotEmpty() } ?: return r.id
         val entity = runtime.entityModel(c.entity.orEmpty())
-        return PlayRecords.display(runtime, all, r[f], entity?.field(f)).ifEmpty { FieldCoding.UNAVAILABLE }
+        return PlayRecords.display(runtime, all, r[f], entity?.field(f), labels).ifEmpty { FieldCoding.UNAVAILABLE }
     }
 
     /** 勝ち数を保存できる field(integer・computed でない)。条件を満たさなければ null(表示だけ)。 */

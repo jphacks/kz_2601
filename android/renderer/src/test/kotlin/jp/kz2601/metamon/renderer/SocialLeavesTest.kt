@@ -6,6 +6,7 @@ import jp.kz2601.metamon.dsl.records.Field
 import jp.kz2601.metamon.dsl.records.FieldType
 import jp.kz2601.metamon.dsl.records.JSONValue
 import jp.kz2601.metamon.renderer.components.lists.LeafData
+import jp.kz2601.metamon.renderer.components.lists.ValueLabels
 import jp.kz2601.metamon.renderer.components.social.AuthorNameHost
 import jp.kz2601.metamon.renderer.components.social.ChatThreadSend
 import jp.kz2601.metamon.renderer.registry.ComponentRegistry
@@ -98,8 +99,19 @@ class SocialLeavesTest {
         val data = LeafData(rt, emptyMap())
         val member = Field("who", type = FieldType.MEMBER)
         assertEquals("たろう", data.display(JSONValue.Str("u1"), member))
-        assertEquals(LeafData.MEMBER_FALLBACK, data.display(JSONValue.Str("u2"), member)) // 表示名が空
+        assertEquals(ValueLabels.JAPANESE.member, data.display(JSONValue.Str("u2"), member)) // 表示名が空
         assertEquals("参加者", data.display(JSONValue.Str("gone"), member)) // 名簿に無い(iOS と同じ・#1076)
         assertEquals("", data.display(JSONValue.Null, member))
+    }
+
+    @Test
+    fun membersJoinByLanguage() {
+        val rt = FakeRuntime(ask = false)
+        val members = Field("who", type = FieldType.MEMBERS)
+        val value = JSONValue.Arr(listOf("u1", "gone", "u2").map { JSONValue.Str(it) })
+        assertEquals("たろう、参加者、参加者", LeafData(rt, emptyMap()).display(value, members))
+        val en = ValueLabels.JAPANESE.copy(member = "Member", listSeparator = ", ", listPair = " and ", listLast = ", and ")
+        assertEquals("たろう, Member, and Member", LeafData(rt, emptyMap(), labels = en).display(value, members))
+        assertEquals("たろう and Member", LeafData(rt, emptyMap(), labels = en).display(JSONValue.Arr(listOf(JSONValue.Str("u1"), JSONValue.Str("u2"))), members))
     }
 }

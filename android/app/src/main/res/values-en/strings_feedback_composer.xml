@@ -1,0 +1,45 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- The feedback composer (#319, #906). Copied from the iOS English strings. -->
+<resources>
+    <string name="feedback_composer_agree">I agree to the above and want to send</string>
+    <string name="feedback_composer_app_fields">Fields: %1$s</string>
+    <string name="feedback_composer_app_note">Includes the app name, screen text, and field names. Records are not included.</string>
+    <string name="feedback_composer_app_screens">Screens: %1$s</string>
+    <string name="feedback_composer_app_title">Screens and fields of “%1$s”</string>
+    <string name="feedback_composer_attach_app">Design of the current app (DSL)</string>
+    <string name="feedback_composer_attach_device">App version, OS, and device model</string>
+    <string name="feedback_composer_attach_footer">The contents of your records (the data you entered) are never sent. Only what you turn on is sent.</string>
+    <string name="feedback_composer_attach_header">Attachments (all optional)</string>
+    <string name="feedback_composer_attach_screenshot">Screenshot of the current screen</string>
+    <string name="feedback_composer_cancel">Cancel</string>
+    <string name="feedback_composer_close">Close</string>
+    <string name="feedback_composer_consent">What you send (the text and the attachments you turned on) is read by the operator to fix bugs and improve Tailor It. It is stored on Google Cloud (Firestore) and erased after %1$d days, or when you delete your account. It is not shared with third parties.</string>
+    <string name="feedback_composer_consent_header">Before sending</string>
+    <string name="feedback_composer_device_app_version">App version</string>
+    <string name="feedback_composer_device_language">Language</string>
+    <string name="feedback_composer_device_model">Device model</string>
+    <string name="feedback_composer_device_os">OS</string>
+    <string name="feedback_composer_error_default">Please send again. If this keeps happening, remove some attachments.</string>
+    <string name="feedback_composer_error_offline">No connection. Please send again when you\'re online.</string>
+    <string name="feedback_composer_error_rate_limited">You can\'t send more today. Please try again tomorrow.</string>
+    <string name="feedback_composer_error_screenshot">Couldn\'t shrink the screenshot. Turn off the screenshot and send again.</string>
+    <string name="feedback_composer_error_server_busy">The server is busy. Please wait a moment and send again.</string>
+    <string name="feedback_composer_error_session">Please sign in again, then send.</string>
+    <string name="feedback_composer_error_title">Couldn\'t send</string>
+    <string name="feedback_composer_kind_bug">Bug</string>
+    <string name="feedback_composer_kind_idea">Request</string>
+    <string name="feedback_composer_kind_other">Other</string>
+    <string name="feedback_composer_list_separator">", "</string>
+    <string name="feedback_composer_max_length">Up to %1$d characters</string>
+    <string name="feedback_composer_message_placeholder">Problems, things that didn\'t turn out as expected, features you\'d like…</string>
+    <string name="feedback_composer_ok">OK</string>
+    <string name="feedback_composer_screenshot_description">Screenshot to send</string>
+    <string name="feedback_composer_screenshot_note">This image is sent as is. Check that it doesn\'t show personal information (names, amounts, contacts, etc.).</string>
+    <string name="feedback_composer_send">Send</string>
+    <string name="feedback_composer_sent_body">Thank you. We\'ll use your feedback to improve the app.</string>
+    <string name="feedback_composer_sent_title">Sent</string>
+    <string name="feedback_composer_settings_entry">Send feedback</string>
+    <string name="feedback_composer_settings_footer">You can also open this by shaking the device. You choose what to send before sending.</string>
+    <string name="feedback_composer_show_dsl">Show the full DSL to be sent</string>
+    <string name="feedback_composer_title">Feedback</string>
+</resources>

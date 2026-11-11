@@ -27,11 +27,13 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.style.TextOverflow
 import jp.kz2601.metamon.dsl.Component
 import jp.kz2601.metamon.dsl.records.Field
 import jp.kz2601.metamon.dsl.records.FieldType
+import jp.kz2601.metamon.renderer.R
 import jp.kz2601.metamon.renderer.form.FormChoices
 import jp.kz2601.metamon.renderer.form.FormDraft
 import jp.kz2601.metamon.renderer.form.PickerRules
@@ -100,7 +102,7 @@ fun MenuSelect(label: String, selection: String, options: List<Pair<String, Stri
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Text(
-                if (title == null || selection.isEmpty()) "選択してください" else title,
+                if (title == null || selection.isEmpty()) stringResource(R.string.inputs_select) else title,
                 color = if (title == null || selection.isEmpty()) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.onSurface,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
@@ -129,9 +131,9 @@ internal fun FieldOverrideRow(c: Component, field: Field, form: FormDraft, ctx: 
             val options = FormChoices.refOptions(field, ctx.runtime)
             LabeledInput(label) {
                 if (options.isEmpty()) {
-                    InputNotice("先に${FormChoices.refEntityName(field, ctx.runtime)}を追加してください")
+                    InputNotice(stringResource(R.string.inputs_add_ref_first, FormChoices.refEntityName(field, ctx.runtime, stringResource(R.string.inputs_ref_entity))))
                 } else {
-                    MenuSelect(label, form.text(field.id), listOf("" to "選択してください") + options.map { it.id to it.title }) {
+                    MenuSelect(label, form.text(field.id), listOf("" to stringResource(R.string.inputs_select)) + options.map { it.id to it.title }) {
                         form.setText(field.id, it)
                     }
                 }
@@ -141,13 +143,13 @@ internal fun FieldOverrideRow(c: Component, field: Field, form: FormDraft, ctx: 
             val options = FormChoices.refOptions(field, ctx.runtime)
             LabeledInput(label) {
                 if (options.isEmpty()) {
-                    InputNotice("先に${FormChoices.refEntityName(field, ctx.runtime)}を追加してください")
+                    InputNotice(stringResource(R.string.inputs_add_ref_first, FormChoices.refEntityName(field, ctx.runtime, stringResource(R.string.inputs_ref_entity))))
                 } else {
                     val selected = form.selectedIds(field.id).toSet()
                     Column {
                         Chips(options.map { it.id to it.title }, selected) { form.toggleId(field.id, it, options.map { o -> o.id }) }
                         Text(
-                            if (selected.isEmpty()) "未選択 = 全員で割ります" else "${selected.size}人で割ります",
+                            if (selected.isEmpty()) stringResource(R.string.inputs_split_all) else stringResource(R.string.inputs_split_count, selected.size),
                             style = MaterialTheme.typography.labelSmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
@@ -159,9 +161,9 @@ internal fun FieldOverrideRow(c: Component, field: Field, form: FormDraft, ctx: 
             val members = ctx.runtime.formMembers
             LabeledInput(label) {
                 if (members.isEmpty()) {
-                    InputNotice("参加している人を読み込めていません")
+                    InputNotice(stringResource(R.string.inputs_members_not_loaded))
                 } else {
-                    MenuSelect(label, form.text(field.id), FormChoices.memberOptions(form.text(field.id), members)) { form.setText(field.id, it) }
+                    MenuSelect(label, form.text(field.id), FormChoices.memberOptions(form.text(field.id), members, stringResource(R.string.inputs_select))) { form.setText(field.id, it) }
                 }
             }
         }
@@ -171,7 +173,7 @@ internal fun FieldOverrideRow(c: Component, field: Field, form: FormDraft, ctx: 
             val members = ctx.runtime.formMembers.filter { it.uid != me }
             LabeledInput(label) {
                 if (members.isEmpty()) {
-                    InputNotice("参加している人を読み込めていません")
+                    InputNotice(stringResource(R.string.inputs_members_not_loaded))
                 } else {
                     val selected = form.selectedIds(field.id).toSet()
                     Chips(members.map { it.uid to it.displayName.ifEmpty { it.uid } }, selected) {

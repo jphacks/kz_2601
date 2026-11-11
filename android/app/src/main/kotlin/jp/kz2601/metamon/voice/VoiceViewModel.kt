@@ -253,6 +253,12 @@ class VoiceViewModel(
     /** 生成後のアプリの上で音声のシートを開く(マイク FAB・voiceInput の部品) */
     fun openVoice() = _state.update { it.copy(voiceOpen = true) }
 
+    /** 入力欄に文を入れて音声の画面を開く(送らない。設定の「頼み方のコツ」・iOS の `composerDraft`) */
+    fun putDraft(text: String) = _state.update { it.copy(draft = text, voiceOpen = !it.isInitial || it.voiceOpen) }
+
+    /** 入力欄が [VoiceUiState.draft] を受け取った */
+    fun consumeDraft() = _state.update { it.copy(draft = null) }
+
     fun closeVoice() {
         onScreenHidden()
         _state.update { it.copy(voiceOpen = false) }

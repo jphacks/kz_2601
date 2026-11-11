@@ -1,0 +1,45 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- フィードバックを書いて送る画面(#319・#906)。文言は iOS(FeedbackComposerView・SettingsSheet の feedbackSection・Localizable.xcstrings)に合わせる -->
+<resources>
+    <string name="feedback_composer_agree">上の内容に同意して送る</string>
+    <string name="feedback_composer_app_fields">項目: %1$s</string>
+    <string name="feedback_composer_app_note">アプリの名前・画面の文言・項目の名前が含まれます。記録は含まれません。</string>
+    <string name="feedback_composer_app_screens">画面: %1$s</string>
+    <string name="feedback_composer_app_title">「%1$s」の画面と項目の設計</string>
+    <string name="feedback_composer_attach_app">今のアプリの設計(DSL)</string>
+    <string name="feedback_composer_attach_device">アプリの版・OS・機種</string>
+    <string name="feedback_composer_attach_footer">記録(入力したデータ)の中身は送りません。オンにしたものだけを送ります。</string>
+    <string name="feedback_composer_attach_header">添付(どれも任意)</string>
+    <string name="feedback_composer_attach_screenshot">今の画面のスクショ</string>
+    <string name="feedback_composer_cancel">キャンセル</string>
+    <string name="feedback_composer_close">閉じる</string>
+    <string name="feedback_composer_consent">送った内容(本文と、オンにした添付)は、Tailor It の不具合を直し、改善するために運営者が読みます。Google Cloud(Firestore)に保存し、%1$d 日後に消去します。アカウントを削除したときも消去します。第三者には渡しません。</string>
+    <string name="feedback_composer_consent_header">送る前に</string>
+    <string name="feedback_composer_device_app_version">アプリの版</string>
+    <string name="feedback_composer_device_language">言語</string>
+    <string name="feedback_composer_device_model">機種</string>
+    <string name="feedback_composer_device_os">OS</string>
+    <string name="feedback_composer_error_default">もう一度送ってください。続く場合は添付を減らしてください。</string>
+    <string name="feedback_composer_error_offline">接続がありません。つながる場所でもう一度送ってください。</string>
+    <string name="feedback_composer_error_rate_limited">今日はこれ以上送れません。明日また送ってください。</string>
+    <string name="feedback_composer_error_screenshot">スクショを小さくできませんでした。スクショをオフにして送ってください。</string>
+    <string name="feedback_composer_error_server_busy">サーバーが混み合っています。少し待ってからもう一度送ってください。</string>
+    <string name="feedback_composer_error_session">サインインし直してから送ってください。</string>
+    <string name="feedback_composer_error_title">送れませんでした</string>
+    <string name="feedback_composer_kind_bug">不具合</string>
+    <string name="feedback_composer_kind_idea">要望</string>
+    <string name="feedback_composer_kind_other">その他</string>
+    <string name="feedback_composer_list_separator">、</string>
+    <string name="feedback_composer_max_length">%1$d 文字までです</string>
+    <string name="feedback_composer_message_placeholder">困ったこと・思ったのと違ったこと・欲しい機能など</string>
+    <string name="feedback_composer_ok">OK</string>
+    <string name="feedback_composer_screenshot_description">送るスクショ</string>
+    <string name="feedback_composer_screenshot_note">この画像をそのまま送ります。個人の情報(名前・金額・連絡先など)が写っていないか確かめてください。</string>
+    <string name="feedback_composer_send">送信</string>
+    <string name="feedback_composer_sent_body">ありがとうございます。いただいた内容は改善に使います。</string>
+    <string name="feedback_composer_sent_title">送信しました</string>
+    <string name="feedback_composer_settings_entry">フィードバックを送る</string>
+    <string name="feedback_composer_settings_footer">端末を振っても開けます。何を送るかは送る前に選べます。</string>
+    <string name="feedback_composer_show_dsl">送る DSL をすべて見る</string>
+    <string name="feedback_composer_title">フィードバック</string>
+</resources>

@@ -29,6 +29,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.heading
@@ -48,6 +49,7 @@ import jp.kz2601.metamon.dsl.records.FieldCoding
 import jp.kz2601.metamon.dsl.records.GridTableLayout
 import jp.kz2601.metamon.dsl.records.Record
 import jp.kz2601.metamon.renderer.ActionContext
+import jp.kz2601.metamon.renderer.R
 import jp.kz2601.metamon.renderer.form.FormPrefill
 import jp.kz2601.metamon.renderer.registry.RenderContext
 import jp.kz2601.metamon.renderer.theme.RenderTheme
@@ -107,13 +109,14 @@ fun GridTableLeaf(c: Component, ctx: RenderContext, modifier: Modifier = Modifie
 
 @Composable
 private fun ColumnHeader(label: String, isToday: Boolean, modifier: Modifier) {
+    val today = stringResource(R.string.lists_today, label)
     val colors = RenderTheme.colors
     Text(
         label,
         modifier
             .background(if (isToday) Brush.linearGradient(listOf(colors.brandFillStart, colors.brandFillEnd)) else Brush.linearGradient(listOf(Color.Transparent, Color.Transparent)), CircleShape)
             .padding(vertical = 4.dp)
-            .clearAndSetSemantics { contentDescription = if (isToday) label + "、今日" else label },
+            .clearAndSetSemantics { contentDescription = if (isToday) today else label },
         style = RenderTheme.Fonts.tableHeader.copy(fontWeight = if (isToday) FontWeight.Bold else FontWeight.SemiBold),
         color = if (isToday) Color.White else MaterialTheme.colorScheme.onSurfaceVariant,
         textAlign = TextAlign.Center,
@@ -142,7 +145,11 @@ private fun GridCell(
         FormPrefill.set(layout.prefill(cell))
         ctx.dispatch(action, ActionContext(ctx.route, ctx.form))
     }
-    val titles = rows.map { gridTitle(c, it, entity, data) }
+    val untitled = stringResource(R.string.lists_untitled)
+    val titles = rows.map { gridTitle(c, it, entity, data, untitled) }
+    val emptyLabel = stringResource(R.string.lists_cell_empty)
+    val addLabel = stringResource(R.string.lists_add)
+    val editLabel = stringResource(R.string.lists_edit)
     val shape = RoundedCornerShape(RenderTheme.Radius.inner)
     Box(
         modifier
@@ -155,9 +162,9 @@ private fun GridCell(
             }
             .clearAndSetSemantics {
                 contentDescription = place
-                stateDescription = if (rows.isEmpty()) "空き" else titles.joinToString("、")
+                stateDescription = if (rows.isEmpty()) emptyLabel else titles.joinToString("、")
                 testTag = "gridTable.cell.${cell.column}.${cell.row}"
-                if (tap != null) onClick(if (rows.isEmpty()) "追加" else "編集") { if (rows.size > 1) menu = true else if (rows.size == 1) edit(rows[0]) else add(); true }
+                if (tap != null) onClick(if (rows.isEmpty()) addLabel else editLabel) { if (rows.size > 1) menu = true else if (rows.size == 1) edit(rows[0]) else add(); true }
             },
     ) {
         val colors = RenderTheme.colors
@@ -194,14 +201,14 @@ private fun GridCell(
             rows.forEachIndexed { i, r ->
                 DropdownMenuItem(text = { Text(titles[i]) }, onClick = { menu = false; edit(r) })
             }
-            DropdownMenuItem(text = { Text("追加") }, onClick = { menu = false; add() })
+            DropdownMenuItem(text = { Text(addLabel) }, onClick = { menu = false; add() })
         }
     }
 }
 
-private fun gridTitle(c: Component, r: Record, entity: Entity?, data: LeafData): String {
+private fun gridTitle(c: Component, r: Record, entity: Entity?, data: LeafData, untitled: String): String {
     val f = c.titleField ?: entity?.displayTitleField
-    return data.text(r, f, entity).ifEmpty { "(無題)" }
+    return data.text(r, f, entity).ifEmpty { untitled }
 }
 
 private fun gridSubtitle(c: Component, r: Record, entity: Entity?, data: LeafData): String? {

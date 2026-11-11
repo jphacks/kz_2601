@@ -100,6 +100,7 @@ class AccountGuardTest {
     ) {
         var syncStarts = 0
         var forgotPermissions = 0
+        var signedOut = 0
     }
 
     private fun TestScope.fixture(user: AuthUser?, saved: String? = null, online: Boolean = false): Fixture {
@@ -129,6 +130,7 @@ class AccountGuardTest {
             },
             stopSync = engine::stop,
             wipe = { wipe() },
+            onSignedOut = { f.signedOut++ },
         )
         f = Fixture(auth, guard, engine, net, spy, runtime, appId, apps, documents, ownerStore, tokens)
         return f
@@ -155,6 +157,22 @@ class AccountGuardTest {
         assertEquals(0, f.syncStarts)
         assertNull(f.guard.active.value)
         assertNull(f.tokens.idToken(false))
+    }
+
+    @Test
+    fun signedOutHookRunsOnlyWhenSomeoneSignsOut() = runTest {
+        val f = fixture(user = null)
+        f.guard.start(backgroundScope)
+        runCurrent()
+        assertEquals("起動時のサインインしていない状態では呼ばない(サインイン画面で受けたリンクを残す)", 0, f.signedOut)
+
+        f.auth.user.value = a
+        runCurrent()
+        assertEquals(0, f.signedOut)
+
+        f.auth.user.value = null // 外からのサインアウト
+        runCurrent()
+        assertEquals(1, f.signedOut)
     }
 
     @Test

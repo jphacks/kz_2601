@@ -31,10 +31,7 @@ import java.time.Instant
 import java.util.Locale
 
 // 一覧・集計・グラフの Leaf が出す値(iOS の各 Leaf の static な resolve)。View と適合テストの描画の木が同じ関数を使う。
-// 値の文言(「まだありません」「件」「X の合計」)は iOS の日本語の元文。英語化は描画器の文言の子 Issue でまとめて行う。
-
-/** 空の一覧の既定の文言。 */
-const val LIST_EMPTY_TEXT = "まだありません"
+// 値の文言(「件」「X の合計」など)は [ValueLabels] で外から渡す(画面は端末の言語・適合テストは iOS の日本語)。
 
 /** `list`: 表示する行(filter → sort → 検索)。iOS の `ListLeaf.rows`。 */
 object ListRows {
@@ -127,15 +124,15 @@ object TableCells {
         return data.display(JSONValue.Num(shown), field)
     }
 
-    fun header(col: TableColumn, entity: Entity?): String {
+    fun header(col: TableColumn, entity: Entity?, labels: ValueLabels): String {
         col.title?.let { return it }
         val name = entity?.field(col.field)?.name ?: col.field
         return when (col.aggregate?.wire) {
-            "count" -> "件数"
-            "sum" -> "${name}の合計"
-            "avg" -> "${name}の平均"
-            "min" -> "${name}の最小"
-            "max" -> "${name}の最大"
+            "count" -> labels.count
+            "sum" -> labels.sum.format(name)
+            "avg" -> labels.avg.format(name)
+            "min" -> labels.min.format(name)
+            "max" -> labels.max.format(name)
             else -> name
         }
     }
@@ -179,7 +176,7 @@ object StatValue {
         val value = Aggregator.aggregate(op, c.field, rows)
         // format 省略時: count → 件数、currency 型の field → ¥ と桁区切り
         val format = c.format?.wire ?: if (op == "count") "plain" else if (fieldDef?.type == FieldType.CURRENCY) "currency" else null
-        return Resolved(Aggregator.format(value, format, if (op == "count") "件" else fieldDef?.unit, locale), false)
+        return Resolved(Aggregator.format(value, format, if (op == "count") data.labels.countUnit else fieldDef?.unit, locale), false)
     }
 
     /** value モード(#101): 行コンテキスト無しで Expr を評価。評価できなければ「—」。 */
@@ -250,7 +247,7 @@ object GaugeValue {
         val entityId = c.entity ?: return 0.0 to null
         val entity = data.entity(entityId)
         val op = c.aggregate?.wire ?: "sum"
-        val unit = if (op == "count") "件" else c.field?.let { entity?.field(it)?.unit }
+        val unit = if (op == "count") data.labels.countUnit else c.field?.let { entity?.field(it)?.unit }
         return Aggregator.aggregate(op, c.field, data.filtered(c)) to unit
     }
 }
@@ -292,12 +289,12 @@ object ChartReadout {
     }
 
     /** 「4 項目。最大は 3月 の 12、最小は 1月 の 2」。1 項目なら「1 項目。3月 の 12」。 */
-    fun summary(buckets: List<Aggregator.Bucket>, locale: Locale = Locale.getDefault()): String {
-        val maxB = buckets.maxByOrNull { it.value } ?: return "データがありません"
-        val minB = buckets.minByOrNull { it.value } ?: return "データがありません"
+    fun summary(buckets: List<Aggregator.Bucket>, labels: ValueLabels, locale: Locale = Locale.getDefault()): String {
+        val maxB = buckets.maxByOrNull { it.value } ?: return labels.noData
+        val minB = buckets.minByOrNull { it.value } ?: return labels.noData
         val count = buckets.size
-        if (count == 1) return "$count 項目。${maxB.label} の ${format(maxB.value, locale)}"
-        return "$count 項目。最大は ${maxB.label} の ${format(maxB.value, locale)}、最小は ${minB.label} の ${format(minB.value, locale)}"
+        if (count == 1) return labels.chartOne.format(locale, count, maxB.label, format(maxB.value, locale))
+        return labels.chartMany.format(locale, count, maxB.label, format(maxB.value, locale), minB.label, format(minB.value, locale))
     }
 }
 

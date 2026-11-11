@@ -15,6 +15,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.testTag
 import androidx.compose.ui.unit.dp
@@ -22,6 +23,7 @@ import jp.kz2601.metamon.dsl.Component
 import jp.kz2601.metamon.dsl.ComponentType
 import jp.kz2601.metamon.dsl.records.Field
 import jp.kz2601.metamon.dsl.records.FieldType
+import jp.kz2601.metamon.renderer.R
 import jp.kz2601.metamon.renderer.form.FormDraft
 import jp.kz2601.metamon.renderer.registry.RenderContext
 import jp.kz2601.metamon.renderer.theme.RenderTheme
@@ -88,7 +90,7 @@ fun FormInput(c: Component, ctx: RenderContext, modifier: Modifier, content: @Co
         if (override != null) FieldOverrideRow(c, override, form, ctx) else content(form, c.field!!)
         if (form.isFlagged(c.field!!)) {
             Text(
-                "入力してください",
+                stringResource(R.string.inputs_required),
                 style = MaterialTheme.typography.labelSmall,
                 color = MaterialTheme.colorScheme.error,
                 modifier = Modifier.padding(start = 4.dp, top = 4.dp),
@@ -102,7 +104,7 @@ fun FormInput(c: Component, ctx: RenderContext, modifier: Modifier, content: @Co
 fun NeedsForm(c: Component, modifier: Modifier = Modifier) {
     Row(modifier.fillMaxWidth().inputChrome(), verticalAlignment = Alignment.CenterVertically) {
         Text(
-            "${c.type.wire} は screen.entity が必要です",
+            stringResource(R.string.inputs_needs_form, c.type.wire),
             style = MaterialTheme.typography.labelSmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )

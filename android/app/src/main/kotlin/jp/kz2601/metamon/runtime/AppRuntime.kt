@@ -1,5 +1,6 @@
 package jp.kz2601.metamon.runtime
 
+import androidx.annotation.StringRes
 import jp.kz2601.metamon.dsl.Action
 import jp.kz2601.metamon.dsl.ActionType
 import jp.kz2601.metamon.dsl.AppDSL
@@ -67,7 +68,7 @@ import jp.kz2601.metamon.services.Record as StoredRecord
 /** 確認ダイアログ(confirmMessage 付きのアクション)。主ボタンで [perform]。 */
 class Confirm(
     val message: String,
-    val primaryLabel: String,
+    @StringRes val primaryLabel: Int,
     val isDestructive: Boolean,
     internal val perform: suspend () -> Unit,
 )
@@ -78,7 +79,7 @@ data class RuntimeState(
     val records: Map<String, List<Record>> = emptyMap(),
     val loading: Set<String> = emptySet(),
     val failed: Set<String> = emptySet(),
-    val toast: String? = null,
+    val toast: UiText? = null,
     val confirm: Confirm? = null,
     val showVoiceSheet: Boolean = false,
     /** 「削除しました・元に戻す」(M11) */
@@ -109,8 +110,8 @@ class AppRuntime(
     private val authorName: () -> String? = { null },
     /** サーバーの最新 DSL。投げたら手元の DSL のまま(オフライン) */
     private val restore: (suspend (appId: String) -> AppDocument)? = null,
-    /** 削除を取り消せる時間(M11) */
-    private val undoGraceMillis: Long = 5_000,
+    /** 削除を取り消せる時間(M11)。削除のたびに読む(TalkBack の時は長く・H8) */
+    private val undoGraceMillis: () -> Long = { 5_000 },
     /** 他端末・共有の相手の変更(#883)。null ならホットリロードしない(モック・テスト) */
     private val hotReloader: HotReload? = null,
     /** 最後に取得した DSL(`DocumentCache`)。[restore] が届かない時の起動に使う(#883) */
@@ -125,6 +126,8 @@ class AppRuntime(
     private val authorProfile: AuthorProfile? = null,
     /** 仲間探し・通報・ブロック(#877)。null なら出さない(モック・テスト) */
     socialServices: SocialServices? = null,
+    /** 記録の保存期間(#482)。null なら自動で消さない(モック・テスト) */
+    val retention: RecordRetentionRunner? = null,
 ) : DSLRuntime, NavigationHost, RecordWriter, TimerHost, AiChatPairSaving, AuthorNameHost,
     ModerationHost, MatchingHost, SocialPromptHost, BlockedUsersHost {
     private val _state = MutableStateFlow(RuntimeState(document))
@@ -140,7 +143,7 @@ class AppRuntime(
 
     val document: AppDocument get() = _state.value.document
     val dsl: AppDSL get() = document.dsl
-    val toast: String? get() = _state.value.toast
+    val toast: UiText? get() = _state.value.toast
 
     private var entityCache: Pair<AppDSL, Map<String, Entity>>? = null
     private val savingForms = mutableSetOf<FormDraft>()
@@ -192,6 +195,7 @@ class AppRuntime(
         }
         startHotReload()
         scope.launch { social.loadBlockedUsers() }
+        sweepRetention(noteDsl = true) // #482 起動時の DSL(オフラインでは apply を通らない)
         pendingNavigationRestore?.let {
             pendingNavigationRestore = null
             applyNavigationRestore(it)
@@ -261,6 +265,7 @@ class AppRuntime(
         publishRecords()
         _navigation.value = NavigationState.initial(doc.dsl)
         noteAppliedVersion(doc, switched)
+        sweepRetention(noteDsl = true) // #482 保存期間の確認と期限切れの削除
     }
 
     // アプリの持ち物(iOS の DeviceAppID・変身一覧・#881)
@@ -398,6 +403,7 @@ class AppRuntime(
         if (!active) _state.update { it.copy(recordUndo = null) } // 背面では削除を送り切るので戻せない
         hotReloader?.setForeground(active)
         // 起動の前(bootstrap がまだ)は bootstrap が読むので取り直さない
+        if (active) sweepRetention() // #482 背面の間に期限を過ぎた記録
         if (active && bootstrapJob?.isCompleted == true) catchUpJob = scope.launch { catchUpAfterBackground() }
     }
 
@@ -522,6 +528,7 @@ class AppRuntime(
         val initial = NavigationState.initial(doc.dsl)
         _navigation.value = if (doc.dsl.app.tabs.any { it.screen == tab }) initial.copy(selectedTab = tab) else initial
         noteAppliedVersion(doc, switched = false)
+        sweepRetention(noteDsl = true) // #482
         scope.launch { load(keep) }
     }
 
@@ -608,7 +615,7 @@ class AppRuntime(
 
     fun dismissVoiceSheet() = _state.update { it.copy(showVoiceSheet = false) }
 
-    fun showToast(message: String) = _state.update { it.copy(toast = message) }
+    fun showToast(message: UiText) = _state.update { it.copy(toast = message) }
 
     suspend fun confirmAccepted() {
         val confirm = _state.value.confirm ?: return
@@ -667,6 +674,7 @@ class AppRuntime(
         } finally {
             _state.update { it.copy(loading = it.loading - entity) }
         }
+        sweepRetention(entity) // #482 サーバーから届いた期限切れ(別の端末で作った自分の記録など)
     }
 
     /** 一覧のワンタップ更新(list.item.toggle)・トーナメントの勝者・単語カードの結果。表示中に無い記録は保存しない。 */
@@ -723,7 +731,7 @@ class AppRuntime(
         override fun entity(id: String): Entity? = entityModel(id)
         override fun records(entity: String): List<Record> = this@AppRuntime.records(entity)
         override suspend fun reload(entities: Set<String>) = load(entities, force = true)
-        override fun toast(message: String) = showToast(message)
+        override fun toast(message: UiText) = showToast(message)
         override fun blockedChanged() = publishRecords()
     })
 
@@ -775,7 +783,7 @@ class AppRuntime(
     /** 一覧から消して「元に戻す」を出す。前の取り消し待ちは時間が来たら送られる。 */
     suspend fun deleteUndoably(entity: String, recordId: String) {
         val appId = document.appId
-        val (list, ticket) = recordSync.deleteUndoably(appId, entity, recordId, undoGraceMillis)
+        val (list, ticket) = recordSync.deleteUndoably(appId, entity, recordId, undoGraceMillis())
         setRecords(appId, entity, list)
         _state.update { it.copy(recordUndo = ticket) }
     }
@@ -907,6 +915,7 @@ class AppRuntime(
             setRecords(appId, entity, list)
             form.markSaved(queuedOffline = !recordSync.isOnline)
             lastSavedForm = SavedForm(appId, entity, written, form)
+            sweepRetention(entity) // #482 保存の後
         } finally {
             savingLock.withLock { savingForms.remove(form) }
         }
@@ -920,7 +929,7 @@ class AppRuntime(
     }
 
     /** prefillRef の親が未保存。 */
-    fun unsavedParentToast(ctx: ActionContext): String = RuntimeCopy.saveParentFirst(ctx.form?.entity?.name.orEmpty())
+    fun unsavedParentToast(ctx: ActionContext): UiText = RuntimeCopy.saveParentFirst(ctx.form?.entity?.name.orEmpty())
 
     private suspend fun attempt(type: ActionType, body: suspend () -> Unit) {
         try {
@@ -937,19 +946,19 @@ class AppRuntime(
     // 書き込みの拒否
 
     /** 同期で保存が弾かれた時。項目が分かれば DSL の名前で出す(英語の field id・サーバーの文は出さない)。 */
-    fun rejectedToast(entity: String, field: String?, message: String): String {
+    fun rejectedToast(entity: String, field: String?, message: String): UiText {
         field ?: return RuntimeCopy.REJECTED_GENERIC
         return RuntimeCopy.rejected(entityModel(entity)?.fields?.firstOrNull { it.id == field }?.name ?: field)
     }
 
-    fun textNotAllowedToast(entity: String?, field: String?): String {
+    fun textNotAllowedToast(entity: String?, field: String?): UiText {
         field ?: return RuntimeCopy.TEXT_NOT_ALLOWED
-        if (field == "authorName") return RuntimeCopy.textNotAllowed("表示名")
+        if (field == "authorName") return RuntimeCopy.textNotAllowed(RuntimeCopy.AUTHOR_NAME)
         val name = entity?.let { entityModel(it) }?.fields?.firstOrNull { it.id == field }?.name ?: return RuntimeCopy.TEXT_NOT_ALLOWED
         return RuntimeCopy.textNotAllowed(name)
     }
 
-    fun denialMessage(denial: RecordWriteDenial, entity: String): String {
+    fun denialMessage(denial: RecordWriteDenial, entity: String): UiText {
         val ent = entityModel(entity)
         fun name(id: String) = ent?.fields?.firstOrNull { it.id == id }?.name
         return when (denial) {
@@ -963,7 +972,7 @@ class AppRuntime(
     }
 
     /** 人に出す 1 文。OS・サーバーの文は出さない。 */
-    fun message(error: Throwable, entity: String?): String {
+    fun message(error: Throwable, entity: String?): UiText {
         RecordWriteDenial.from(error)?.let { d -> entity?.let { return denialMessage(d, it) } }
         return RuntimeCopy.FAILED
     }
@@ -1047,6 +1056,22 @@ class AppRuntime(
         if (appId != document.appId) return // 読む間に別のアプリへ切り替わった
         _state.update { it.copy(records = it.records + (entity to list.map { r -> r.toDsl() })) }
         publishRecords()
+    }
+
+    /**
+     * 記録の保存期間(#482・[RecordRetentionRunner])。[noteDsl] なら確認が要るかも見直す。
+     * 期限切れを消したら表示中の一覧だけ差し替える(未表示の entity は画面が開いた時に読む)。
+     */
+    fun sweepRetention(entity: String? = null, noteDsl: Boolean = false) {
+        val r = retention ?: return
+        val doc = document
+        val models = entityModels
+        if (noteDsl) r.note(doc.appId, doc.version, models)
+        val targets = if (entity == null) models else models.filter { it.id == entity }
+        if (targets.none { it.retentionDays != null }) return
+        scope.launch {
+            for (e in r.purgeAll(doc.appId, targets)) if (_state.value.records[e] != null) reloadCached(doc.appId, e)
+        }
     }
 
     private suspend fun ifCurrent(appId: String, body: suspend () -> Unit) {
