@@ -11,6 +11,8 @@ import MetamonServices
 ///   届かない時は端末の履歴(`LocalVersionHistory`)で戻す(#1279)
 /// - 本物の AI で作った・直したアプリはサーバー(appconfig)にも保存される。その印(`isOnServer`)を端末に残し、
 ///   記録をサーバーに読み書きするかを決める(#1284 の続き)。端末で複製したアプリはサーバーに無いので端末だけ
+/// - サインインしたらサーバーの自分のアプリ(iOS の変身一覧と同じ `GET /v1/apps`・同じ並び)も一覧に混ぜる(#1057)。
+///   起動直後は前回の一覧(`AppListCache`)をすぐ出し、取り直したら差し替える。中身(DSL)は開いた時に取る
 /// ウインドウをまたいで 1 つだけ持つ(`MetamonMacApp` が作って渡す)。
 @MainActor
 @Observable
@@ -42,14 +44,26 @@ final class MacAppLibrary {
     @ObservationIgnored private let serverEnvelope: (String) -> Data?
     /// 設定の「使用量」(作ったアプリの数)。作った・消した時に古くする(iOS は `AppSwitcherSheet` が同じことをする)
     @ObservationIgnored private let usage: PlanUsageStore
+    /// サーバーの自分のアプリ(#1057)。iOS の変身一覧と同じ並び(`AppSummary.visible`)
+    private(set) var serverApps: [AppSummary] = []
+    /// サーバーの一覧の読み込み(#1057)
+    private(set) var serverListState: ServerListState = .idle
+    /// 中身(DSL)を取っている途中・取れなかったサーバーのアプリ
+    private(set) var downloading: Set<String> = []
+    private(set) var downloadFailed: Set<String> = []
+    /// 前回のサーバーの一覧(起動直後にすぐ出す)。nil なら使わない(テスト)
+    @ObservationIgnored private let serverCache: AppListCache?
+    /// 取り直しの途中(前面に戻る・ウインドウごとに頼まれても 1 回にまとめる)
+    @ObservationIgnored private var refreshTask: Task<Void, Never>?
     static let serverIdsKey = "metamon.mac.serverAppIds"
 
     /// `store` が nil なら端末に残さない(プレビュー・テスト用)。`defaults` はサーバーにあるアプリの印の置き場(nil なら残さない)。
     /// `server` はサーバーの版で戻す時の相手(nil なら端末の履歴だけ)
     init(store: LocalAppLibrary? = .standard, defaults: UserDefaults? = nil, server: (any AppConfigClient)? = nil,
          serverEnvelope: @escaping (String) -> Data? = { DocumentCache.shared.loadData(appId: $0) },
-         usage: PlanUsageStore = .shared) {
+         usage: PlanUsageStore = .shared, serverCache: AppListCache? = nil) {
         self.store = store
+        self.serverCache = serverCache
         self.usage = usage
         self.defaults = defaults
         self.server = server
@@ -65,6 +79,7 @@ final class MacAppLibrary {
             generated[id] = edited.document
             envelopes[id] = edited.envelope
         }
+        if server != nil, let cached = serverCache?.load(), !cached.isEmpty { adoptServerList(cached) }
     }
 
     /// 会話で直した同梱の例(右クリックで「元の例に戻す」を出す)
@@ -192,7 +207,13 @@ final class MacAppLibrary {
     @discardableResult
     func rename(_ appId: String, to raw: String) -> Bool {
         guard let name = AppListEdit.normalizedName(raw) else { return false }
+        if isServerOnly(appId), let index = serverApps.firstIndex(where: { $0.id == appId }) { // 中身を取る前のサーバーのアプリ
+            serverApps[index].name = name
+            renameOnServer(appId, name)
+            return true
+        }
         guard isCreated(appId), var document = generated[appId], document.dsl.app.name != name else { return true }
+        if usesServerVersions(appId) { renameOnServer(appId, name) }
         histories[appId, default: .init()].record(previous: current(appId))
         serverRedo[appId] = nil
         document.dsl.app.name = name
@@ -208,6 +229,8 @@ final class MacAppLibrary {
         envelopes[appId] = nil
         savedRows[appId] = nil
         histories[appId] = nil
+        serverApps.removeAll { $0.id == appId } // 取り直すまでに一覧へ戻さない(サーバーで消すのは呼ぶ側)
+        downloadFailed.remove(appId)
         store?.remove(appId: appId)
         markOnServer(appId, false)
         saveList()
@@ -228,6 +251,12 @@ final class MacAppLibrary {
         serverIds = []
         serverRedo = [:]
         restoring = []
+        serverApps = []
+        serverListState = .idle
+        downloading = []
+        downloadFailed = []
+        refreshTask?.cancel()
+        refreshTask = nil
     }
 
     /// 複製する(#1285)。名前の付け方は iOS の `duplicateApp` と同じ(「○○のコピー」)。画面の定義だけを写し、記録は写さない。
@@ -262,6 +291,7 @@ final class MacAppLibrary {
         guard next != createdIds else { return }
         createdIds = next
         saveList()
+        syncServerOrder()
     }
 
     /// ドラッグで並べ替え(`List` の `onMove`)
@@ -271,11 +301,105 @@ final class MacAppLibrary {
         guard next != createdIds else { return }
         createdIds = next
         saveList()
+        syncServerOrder()
+    }
+
+    // MARK: - サーバーの一覧(#1057・iOS の `appsList`)
+
+    enum ServerListState: Equatable {
+        case idle
+        /// 前回の一覧が無く、初めて読んでいる(サイドバーにスケルトンを出す)
+        case loading
+        case loaded
+        /// 届かなかった(前回の一覧のまま)
+        case offline
+    }
+
+    /// サーバーの一覧の行(中身を取る前のアプリの名前・版)
+    func serverSummary(_ appId: String) -> AppSummary? { serverApps.first { $0.id == appId } }
+
+    /// サーバーにあり、まだ中身(DSL)を取っていないアプリ
+    func isServerOnly(_ appId: String) -> Bool { generated[appId] == nil && serverSummary(appId) != nil }
+
+    /// `GET /v1/apps` を取り直して一覧に混ぜる。モック(サーバー無し)は何もしない。途中なら同じ取り直しを待つ
+    func refreshServerApps() async {
+        guard let server else { return }
+        if let refreshTask { return await refreshTask.value }
+        let generation = wipeCount
+        if serverApps.isEmpty { serverListState = .loading }
+        let task = Task { @MainActor [weak self] in
+            do {
+                let list = try await server.listApps()
+                guard let self, generation == self.wipeCount else { return } // 途中でサインアウトした
+                self.adoptServerList(list)
+                self.serverListState = .loaded
+            } catch {
+                print("[Metamon] Mac: listApps failed, keeping the saved list: \(error)")
+                guard let self, generation == self.wipeCount else { return }
+                self.serverListState = .offline
+            }
+        }
+        refreshTask = task
+        await task.value
+        if generation == wipeCount { refreshTask = nil }
+    }
+
+    /// 中身を取る前のサーバーのアプリを開く(`GET /dsl`)。取れたら端末に残し、ほかの作ったアプリと同じに扱う
+    func download(_ appId: String) async {
+        guard let server, isServerOnly(appId), !downloading.contains(appId) else { return }
+        let generation = wipeCount
+        downloading.insert(appId)
+        downloadFailed.remove(appId)
+        defer { if generation == wipeCount { downloading.remove(appId) } }
+        do {
+            var document = try await server.fetchDocument(appId: appId)
+            guard generation == wipeCount, isCreated(appId) else { return } // 途中で消した・サインアウトした
+            document.appId = appId
+            markOnServer(appId, true)
+            applyFromServer(document)
+        } catch {
+            print("[Metamon] Mac: fetchDocument failed: \(error)")
+            if generation == wipeCount { downloadFailed.insert(appId) }
+        }
     }
 
     // MARK: - 内部
 
     private func usesServerVersions(_ appId: String) -> Bool { server != nil && isOnServer(appId) }
+
+    /// サーバーの一覧を当てる: 並びはサーバー(iOS と同じ)、この Mac にだけあるアプリはその上に今の並びで残す
+    private func adoptServerList(_ list: [AppSummary]) {
+        let visible = AppSummary.visible(list, current: nil)
+        serverApps = visible
+        let ids = visible.map(\.id)
+        if !Set(ids).isSubset(of: serverIds) {
+            serverIds.formUnion(ids)
+            defaults?.set(serverIds.sorted(), forKey: Self.serverIdsKey)
+        }
+        let merged = MacServerAppList.merged(local: createdIds, server: ids)
+        guard merged != createdIds else { return }
+        createdIds = merged
+        saveList()
+    }
+
+    /// 並べ替えをサーバーにも送る(iOS の `reorderApps`・#277)。サーバーの一覧も先に並べ替える(取り直しで戻らない)
+    private func syncServerOrder() {
+        guard let server, !serverApps.isEmpty else { return }
+        let ids = createdIds.filter { id in serverApps.contains { $0.id == id } }
+        serverApps = AppSummary.visible(AppListEdit.applyingOrder(ids, to: serverApps), current: nil)
+        Task {
+            do { try await server.reorderApps(ids: ids) } catch { print("[Metamon] Mac: reorderApps failed: \(error)") }
+        }
+    }
+
+    /// 名前をサーバーにも送り、一覧を取り直す(iOS の `renameApp`)
+    private func renameOnServer(_ appId: String, _ name: String) {
+        guard let server else { return }
+        Task { [weak self] in
+            do { _ = try await server.renameApp(appId: appId, name: name) } catch { print("[Metamon] Mac: renameApp failed: \(error)") }
+            await self?.refreshServerApps()
+        }
+    }
 
     /// サーバーの版を当てる(端末の DSL・一覧も揃える)。封筒が無ければ同じ版の DSL から作れないので中央だけ差し替える
     private func applyFromServer(_ document: AppDocument) {

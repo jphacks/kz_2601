@@ -34,6 +34,7 @@ final class MacAccountWipeTests: XCTestCase {
         wipe.thumbnails = MacAppThumbnailStore(directory: root.appendingPathComponent("thumbs", isDirectory: true))
         wipe.documents = DocumentCache(directory: root.appendingPathComponent("dsl", isDirectory: true))
         wipe.appList = AppListCache(directory: root.appendingPathComponent("list", isDirectory: true))
+        wipe.localList = AppListCache(directory: root.appendingPathComponent("local-list", isDirectory: true))
         #if !APP_STORE_REVIEW
         wipe.feeds = FeedCache()
         #endif

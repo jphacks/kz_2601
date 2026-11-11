@@ -14,7 +14,8 @@ struct MetamonMacApp: App {
     /// 声で頼む(#966)。マイクは 1 つなのでウインドウをまたいで 1 つだけ持つ
     @State private var voice = MacVoiceInput()
     /// 作ったアプリの一覧(#969)。端末に残すのでウインドウをまたいで 1 つだけ持つ
-    @State private var library = MacAppLibrary(defaults: .standard, server: MacServices.shared.appConfig)
+    /// サインインしたらサーバーの自分のアプリも混ぜる(#1057)。前回のサーバーの一覧(`AppListCache`)を起動直後に出す
+    @State private var library = MacAppLibrary(defaults: .standard, server: MacServices.shared.appConfig, serverCache: .shared)
 
     init() {
         // Firebase は接続(MacServices)を組み立てる前に初期化(plist が無ければ何もせず、ログインと AI はモック・#930)
