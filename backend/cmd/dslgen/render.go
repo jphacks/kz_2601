@@ -48,9 +48,17 @@ func (g *generator) renderModels() string {
 	var b strings.Builder
 	b.WriteString(header)
 	b.WriteString(imports(
+		"kotlinx.serialization.ExperimentalSerializationApi",
+		"kotlinx.serialization.KSerializer",
+		"kotlinx.serialization.KeepGeneratedSerializer",
 		"kotlinx.serialization.Serializable",
+		"kotlinx.serialization.Transient",
+		"kotlinx.serialization.encoding.Decoder",
+		"kotlinx.serialization.encoding.Encoder",
+		"kotlinx.serialization.json.JsonDecoder",
 		"kotlinx.serialization.json.JsonElement",
 		"kotlinx.serialization.json.JsonObject",
+		"kotlinx.serialization.json.JsonPrimitive",
 	))
 	// Render every class first so lenient serializers in use are known.
 	var body strings.Builder
@@ -59,9 +67,20 @@ func (g *generator) renderModels() string {
 			continue
 		}
 		body.WriteString("\n")
+		if c.name == actionName {
+			body.WriteString(g.renderClass(c,
+				"@OptIn(ExperimentalSerializationApi::class)\n@KeepGeneratedSerializer\n@Serializable(with = ActionSerializer::class)",
+				[]string{
+					"/** JSON の type の元の文字列。知らない type([ActionType.UNKNOWN])でも残る(「未対応のアクション: <type>」に使う)。 */",
+					"@Transient",
+					`val rawType: String = "",`,
+				}))
+			continue
+		}
 		body.WriteString(g.renderClass(c, "@Serializable", nil))
 	}
 	b.WriteString(body.String())
+	b.WriteString(actionSerializer)
 	b.WriteString(g.renderLenientObjects(false))
 	return b.String()
 }
@@ -460,6 +479,29 @@ func (g *generator) renderKeys() string {
 	b.WriteString("}\n")
 	return b.String()
 }
+
+// actionName is the class whose raw `type` string is kept (iOS Action.rawType).
+const actionName = "Action"
+
+// actionSerializer reads with the plugin serializer, then keeps the raw type
+// string so an unknown action can still be named (iOS Action.rawType).
+const actionSerializer = `
+@OptIn(ExperimentalSerializationApi::class)
+internal object ActionSerializer : KSerializer<Action> {
+    private val generated: KSerializer<Action> = Action.generatedSerializer()
+    override val descriptor = generated.descriptor
+
+    override fun deserialize(decoder: Decoder): Action {
+        val input = decoder as? JsonDecoder ?: return generated.deserialize(decoder)
+        val element = input.decodeJsonElement()
+        val action = input.json.decodeFromJsonElement(generated, element)
+        val raw = ((element as? JsonObject)?.get("type") as? JsonPrimitive)?.takeIf { it.isString }?.content
+        return action.copy(rawType = raw ?: action.rawType)
+    }
+
+    override fun serialize(encoder: Encoder, value: Action) = generated.serialize(encoder, value)
+}
+`
 
 // componentSerializer reads with the plugin serializer, then keeps the raw
 // type string (iOS Component.rawType) and the raw filter (one object or an

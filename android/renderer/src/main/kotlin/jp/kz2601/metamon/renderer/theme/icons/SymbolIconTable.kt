@@ -50,6 +50,7 @@ internal val symbolMaterialNames: Map<String, String> = mapOf(
     "arrow.up.right" to "north_east",
     "arrow.up.right.square" to "open_in_new",
     "arrow.uturn.left" to "undo",
+    "at" to "alternate_email",
     "bell" to "notifications",
     "book" to "menu_book",
     "book.closed" to "book",
@@ -59,6 +60,7 @@ internal val symbolMaterialNames: Map<String, String> = mapOf(
     "calendar" to "calendar_month",
     "calendar.badge.checkmark" to "event_available",
     "calendar.badge.clock" to "event",
+    "calendar.badge.plus" to "edit_calendar",
     "camera" to "photo_camera",
     "car" to "directions_car",
     "cart" to "shopping_cart",
@@ -95,6 +97,7 @@ internal val symbolMaterialNames: Map<String, String> = mapOf(
     "figure.walk" to "directions_walk",
     "flame" to "local_fire_department",
     "fork.knife" to "restaurant",
+    "gamecontroller" to "sports_esports",
     "gauge.with.dots.needle.33percent" to "speed",
     "gear" to "settings",
     "gearshape" to "settings",
@@ -158,6 +161,7 @@ internal val symbolMaterialNames: Map<String, String> = mapOf(
     "sun.max" to "wb_sunny",
     "tablecells" to "table_chart",
     "target" to "track_changes",
+    "text.book.closed" to "book",
     "text.bubble" to "chat",
     "textformat" to "text_fields",
     "timer" to "timer",
@@ -179,6 +183,7 @@ internal fun materialVector(name: String): ImageVector? = when (name) {
     "account_circle" -> Icons.Filled.AccountCircle
     "add" -> Icons.Filled.Add
     "add_circle" -> Icons.Filled.AddCircle
+    "alternate_email" -> Icons.Filled.AlternateEmail
     "arrow_back" -> Icons.AutoMirrored.Filled.ArrowBack
     "arrow_forward" -> Icons.AutoMirrored.Filled.ArrowForward
     "attach_money" -> Icons.Filled.AttachMoney
@@ -209,6 +214,7 @@ internal fun materialVector(name: String): ImageVector? = when (name) {
     "directions_walk" -> Icons.AutoMirrored.Filled.DirectionsWalk
     "document_scanner" -> Icons.Filled.DocumentScanner
     "edit" -> Icons.Filled.Edit
+    "edit_calendar" -> Icons.Filled.EditCalendar
     "edit_note" -> Icons.Filled.EditNote
     "emoji_events" -> Icons.Filled.EmojiEvents
     "error" -> Icons.Filled.Error
@@ -279,6 +285,7 @@ internal fun materialVector(name: String): ImageVector? = when (name) {
     "smartphone" -> Icons.Filled.Smartphone
     "south_east" -> Icons.Filled.SouthEast
     "speed" -> Icons.Filled.Speed
+    "sports_esports" -> Icons.Filled.SportsEsports
     "sports_gymnastics" -> Icons.Filled.SportsGymnastics
     "star" -> Icons.Filled.Star
     "straighten" -> Icons.Filled.Straighten
@@ -309,6 +316,7 @@ internal val materialVectorNames: Set<String> = setOf(
     "account_circle",
     "add",
     "add_circle",
+    "alternate_email",
     "arrow_back",
     "arrow_forward",
     "attach_money",
@@ -339,6 +347,7 @@ internal val materialVectorNames: Set<String> = setOf(
     "directions_walk",
     "document_scanner",
     "edit",
+    "edit_calendar",
     "edit_note",
     "emoji_events",
     "error",
@@ -409,6 +418,7 @@ internal val materialVectorNames: Set<String> = setOf(
     "smartphone",
     "south_east",
     "speed",
+    "sports_esports",
     "sports_gymnastics",
     "star",
     "straighten",
