@@ -21,7 +21,7 @@ import androidx.compose.ui.unit.dp
 import jp.kz2601.metamon.R
 import jp.kz2601.metamon.voice.PromptTipsSheet
 
-/** 設定の「アプリ」の節に出す行(iOS の `SettingsSheet.appSection`)。画面マップと自動の動きは Android にまだ無い(#897 / #905)。 */
+/** 設定の「アプリ」の節に出す行(iOS の `SettingsSheet.appSection`)。自動の動きは Android にまだ無い(#905)。 */
 data class AppActionsState(
     val appName: String,
     /** 起動時にサーバーへ届かず、保存済みの DSL を表示中 */
@@ -38,8 +38,9 @@ data class AppActionsState(
 
 /**
  * 設定の「アプリ」(iOS の `SettingsSheet.appSection`): 元に戻す(#1075)・画面マップ・自動の動き・使い方を見る(#900 / #1236)・
- * 頼み方のコツ(#1161)・リセット(初期状態に戻す)。Android に無い画面マップ・自動の動きは「この端末では使えません」と出すだけ。
+ * 頼み方のコツ(#1161)・リセット(初期状態に戻す)。Android に無い自動の動きは「この端末では使えません」と出すだけ。
  * @param onUndo シートを閉じて直前の版に戻す
+ * @param onOpenScreenMap 画面マップ(#897)を開く
  * @param onShowTutorial シートを閉じてチュートリアルをもう一度出す
  * @param onPickTip 選んだコツの文を入力欄に入れる(送らない・シートを閉じる)
  * @param onReset 初期状態に戻す(確認の後。シートを閉じる)
@@ -48,6 +49,7 @@ data class AppActionsState(
 fun AppActionsSection(
     state: AppActionsState,
     onUndo: () -> Unit,
+    onOpenScreenMap: () -> Unit,
     onShowTutorial: () -> Unit,
     onPickTip: (String) -> Unit,
     onReset: () -> Unit,
@@ -59,7 +61,11 @@ fun AppActionsSection(
     TextButton(onClick = onUndo, enabled = state.canUndo, modifier = Modifier.padding(horizontal = 4.dp).testTag("settings.undo")) {
         Text(stringResource(R.string.settings_undo))
     }
-    if (state.hasScreens) UnavailableRow(stringResource(R.string.settings_screen_map), "settings.screenMap")
+    if (state.hasScreens) {
+        TextButton(onClick = onOpenScreenMap, modifier = Modifier.padding(horizontal = 4.dp).testTag("settings.screenMap")) {
+            Text(stringResource(R.string.settings_screen_map))
+        }
+    }
     if (state.hasServerRules) UnavailableRow(stringResource(R.string.settings_automations), "settings.automations")
     TextButton(onClick = onShowTutorial, modifier = Modifier.padding(horizontal = 4.dp).testTag("settings.tutorial")) {
         Text(stringResource(R.string.onboarding_replay))
