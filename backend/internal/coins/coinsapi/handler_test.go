@@ -25,6 +25,8 @@ type env struct {
 	svc    *coins.Service
 	mux    *http.ServeMux
 	now    time.Time
+	// subjects overrides a uid's sign-in subject (default: its own Apple ID)
+	subjects map[string]string
 }
 
 func newEnv(t *testing.T, mode coins.Mode) *env {
@@ -56,7 +58,14 @@ func (e *env) do(t *testing.T, method, path, uid string, body any) (int, map[str
 	}
 	r := httptest.NewRequest(method, path, rd)
 	if uid != "" {
-		r = r.WithContext(auth.ContextWithIdentity(r.Context(), auth.Identity{UID: uid, Anonymous: strings.HasPrefix(uid, "anon")}))
+		id := auth.Identity{UID: uid, Anonymous: strings.HasPrefix(uid, "anon")}
+		if !id.Anonymous {
+			id.Subjects = []string{"apple.com:" + uid} // each test uid is its own Apple ID
+			if sub, ok := e.subjects[uid]; ok {
+				id.Subjects = []string{sub}
+			}
+		}
+		r = r.WithContext(auth.ContextWithIdentity(r.Context(), id))
 	}
 	w := httptest.NewRecorder()
 	e.mux.ServeHTTP(w, r)
@@ -65,8 +74,11 @@ func (e *env) do(t *testing.T, method, path, uid string, body any) (int, map[str
 	return w.Code, out
 }
 
-func (e *env) jws(t *testing.T, txid string) string {
-	return e.signer.Sign(t, appstoretest.Consumable(bundle, pack, txid, e.now))
+// jws is a pack bought by uid (appAccountToken set as iOS does).
+func (e *env) jws(t *testing.T, txid, uid string) string {
+	x := appstoretest.Consumable(bundle, pack, txid, e.now)
+	x.AppAccountToken = appstore.AccountToken(uid)
+	return e.signer.Sign(t, x)
 }
 
 func TestWalletAndInitialGrant(t *testing.T) {
@@ -81,9 +93,43 @@ func TestWalletAndInitialGrant(t *testing.T) {
 	}
 }
 
+// A new account of the same Apple ID gets no second initial grant.
+func TestInitialGrantOncePerAppleID(t *testing.T) {
+	e := newEnv(t, coins.ModeEnforce)
+	e.subjects = map[string]string{"u1": "apple.com:same", "u2": "apple.com:same"}
+	if _, body := e.do(t, "GET", "/v1/me/coins", "u1", nil); body["initial"] != 3.0 {
+		t.Fatalf("first %v", body)
+	}
+	if _, body := e.do(t, "GET", "/v1/me/coins", "u2", nil); body["initial"] != 0.0 || body["total"] != 0.0 {
+		t.Fatalf("second account %v", body)
+	}
+}
+
+// A pack is credited only to the account it was bought for.
+func TestCreditAppleBoundToBuyer(t *testing.T) {
+	e := newEnv(t, coins.ModeEnforce)
+	reason := func(body map[string]any) any {
+		d, _ := body["error"].(map[string]any)["details"].(map[string]any)
+		return d["reason"]
+	}
+	code, body := e.do(t, "POST", "/v1/me/coins/apple", "u2", map[string]string{"signedTransaction": e.jws(t, "tx1", "u1")})
+	if code != 422 || errCode(body) != "invalid_transaction" || reason(body) != "account" {
+		t.Fatalf("bought for u1, sent by u2: %d %v", code, body)
+	}
+	none := appstoretest.Consumable(bundle, pack, "tx2", e.now) // no appAccountToken
+	code, body = e.do(t, "POST", "/v1/me/coins/apple", "u1", map[string]string{"signedTransaction": e.signer.Sign(t, none)})
+	if code != 422 || reason(body) != "account" {
+		t.Fatalf("no token: %d %v", code, body)
+	}
+	// the buyer can still send it (it was not taken by the rejected call)
+	if code, body = e.do(t, "POST", "/v1/me/coins/apple", "u1", map[string]string{"signedTransaction": e.jws(t, "tx1", "u1")}); code != 200 || body["credited"] != true {
+		t.Fatalf("buyer: %d %v", code, body)
+	}
+}
+
 func TestCreditApple(t *testing.T) {
 	e := newEnv(t, coins.ModeEnforce)
-	req := map[string]string{"signedTransaction": e.jws(t, "tx1")}
+	req := map[string]string{"signedTransaction": e.jws(t, "tx1", "u1")}
 	code, body := e.do(t, "POST", "/v1/me/coins/apple", "u1", req)
 	if code != 200 || body["credited"] != true || body["coins"] != 40.0 {
 		t.Fatalf("credit %d %v", code, body)
@@ -96,17 +142,17 @@ func TestCreditApple(t *testing.T) {
 	if code != 200 || body["credited"] != false || body["wallet"].(map[string]any)["purchased"] != 40.0 {
 		t.Fatalf("retry %d %v", code, body)
 	}
-	// replayed by another account
-	if code, body = e.do(t, "POST", "/v1/me/coins/apple", "u2", req); code != 409 || errCode(body) != "transaction_owned_by_other" {
+	// sent by another account: not its purchase
+	if code, body = e.do(t, "POST", "/v1/me/coins/apple", "u2", req); code != 422 || errCode(body) != "invalid_transaction" {
 		t.Fatalf("other %d %v", code, body)
 	}
 	// anonymous accounts cannot buy
-	if code, body = e.do(t, "POST", "/v1/me/coins/apple", "anon1", map[string]string{"signedTransaction": e.jws(t, "tx2")}); code != 403 || errCode(body) != "forbidden" {
+	if code, body = e.do(t, "POST", "/v1/me/coins/apple", "anon1", map[string]string{"signedTransaction": e.jws(t, "tx2", "anon1")}); code != 403 || errCode(body) != "forbidden" {
 		t.Fatalf("anonymous %d %v", code, body)
 	}
 	// Xcode-signed (local StoreKit testing) is rejected
 	x := appstoretest.Consumable(bundle, pack, "tx3", e.now)
-	x.Environment = "Xcode"
+	x.Environment, x.AppAccountToken = "Xcode", appstore.AccountToken("u1")
 	code, body = e.do(t, "POST", "/v1/me/coins/apple", "u1", map[string]string{"signedTransaction": e.signer.Sign(t, x)})
 	if code != 422 || errCode(body) != "invalid_transaction" {
 		t.Fatalf("xcode %d %v", code, body)
@@ -168,7 +214,7 @@ func TestModeOffAPI(t *testing.T) {
 	if code != 200 || body["mode"] != "off" || body["total"] != 0.0 {
 		t.Fatalf("wallet %d %v", code, body)
 	}
-	if code, body = e.do(t, "POST", "/v1/me/coins/apple", "u1", map[string]string{"signedTransaction": e.jws(t, "tx1")}); code != 404 {
+	if code, body = e.do(t, "POST", "/v1/me/coins/apple", "u1", map[string]string{"signedTransaction": e.jws(t, "tx1", "u1")}); code != 404 {
 		t.Fatalf("credit %d %v", code, body)
 	}
 	if code, body = e.do(t, "GET", "/v1/me/coins/ledger", "u1", nil); code != 200 || len(body["entries"].([]any)) != 0 {

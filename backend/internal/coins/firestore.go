@@ -11,12 +11,13 @@ import (
 
 // Collection names (package doc).
 const (
-	usersCollection        = "users"
-	coinsCollection        = "coins"
-	walletDoc              = "wallet"
-	ledgerCollection       = "coinLedger"
-	holdsCollection        = "coinReservations"
-	transactionsCollection = "coin_transactions"
+	usersCollection         = "users"
+	coinsCollection         = "coins"
+	walletDoc               = "wallet"
+	ledgerCollection        = "coinLedger"
+	holdsCollection         = "coinReservations"
+	transactionsCollection  = "coin_transactions"
+	initialGrantsCollection = "coin_initial_grants"
 )
 
 // Firestore is the production Store (same database as appconfig).
@@ -60,7 +61,28 @@ func (f *Firestore) Update(ctx context.Context, k Keys, fn func(*Tx) error) erro
 		if err != nil {
 			return err
 		}
-		tx := &Tx{}
+		tx := &Tx{Claims: func(keys []string) (map[string]InitialClaim, error) {
+			crefs := make([]*firestore.DocumentRef, len(keys))
+			for i, key := range keys {
+				crefs[i] = f.c.Collection(initialGrantsCollection).Doc(key)
+			}
+			cs, err := ftx.GetAll(crefs)
+			if err != nil {
+				return nil, err
+			}
+			out := map[string]InitialClaim{}
+			for i, s := range cs {
+				if !s.Exists() {
+					continue
+				}
+				var c InitialClaim
+				if err := s.DataTo(&c); err != nil {
+					return nil, err
+				}
+				out[keys[i]] = c
+			}
+			return out, nil
+		}}
 		if snaps[0].Exists() {
 			if err := snaps[0].DataTo(&tx.Wallet); err != nil {
 				return err
@@ -102,6 +124,11 @@ func (f *Firestore) Update(ctx context.Context, k Keys, fn func(*Tx) error) erro
 		}
 		for _, e := range tx.Entries {
 			if err := ftx.Set(f.ledger(k.UID).Doc(e.ID), e); err != nil {
+				return err
+			}
+		}
+		for key, c := range tx.NewClaims {
+			if err := ftx.Set(f.c.Collection(initialGrantsCollection).Doc(key), c); err != nil {
 				return err
 			}
 		}

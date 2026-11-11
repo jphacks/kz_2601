@@ -41,7 +41,18 @@ const (
 	ReasonNotSubscription = "not_subscription"
 	ReasonNotConsumable   = "not_consumable"
 	ReasonRevoked         = "revoked"
+	// ReasonAccount: appAccountToken is not the caller's (AccountToken).
+	ReasonAccount = "account"
 )
+
+// AccountToken is the StoreKit appAccountToken iOS sets for uid: a UUIDv8
+// from SHA-256 (Firebase uids are not UUIDs). ios: ProAccountToken.swift.
+func AccountToken(uid string) string {
+	b := sha256.Sum256([]byte("tailorit:appAccountToken:" + uid))
+	b[6] = b[6]&0x0f | 0x80 // version 8
+	b[8] = b[8]&0x3f | 0x80 // RFC 9562 variant
+	return fmt.Sprintf("%x-%x-%x-%x-%x", b[0:4], b[4:6], b[6:8], b[8:10], b[10:16])
+}
 
 // TypeConsumable is JWSTransaction.type of a consumable in-app purchase (coin packs, #630).
 const TypeConsumable = "Consumable"

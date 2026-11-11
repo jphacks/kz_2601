@@ -25,6 +25,11 @@ type Tx struct {
 	Purchase      *Purchase
 	PurchaseDirty bool
 	Entries       []Entry
+	// Claims reads the initial-grant claims of keys in this transaction
+	// (absent keys are missing from the map). nil = the Store has none.
+	Claims func(keys []string) (map[string]InitialClaim, error)
+	// NewClaims are written with the rest.
+	NewClaims map[string]InitialClaim
 }
 
 // HoldRef points at a hold (Sweep).
@@ -48,6 +53,7 @@ type Store interface {
 	// newest). next is "" at the end.
 	Ledger(ctx context.Context, uid string, limit int, cursor string) (entries []Entry, next string, err error)
 	// PurgeUser deletes uid's wallet, ledger and holds (account deletion).
-	// coin_transactions are kept for refund matching (decision #7 of the design).
+	// coin_transactions are kept for refund matching (decision #7 of the
+	// design), and coin_initial_grants so the initial grant stays once per person.
 	PurgeUser(ctx context.Context, uid string) (int, error)
 }

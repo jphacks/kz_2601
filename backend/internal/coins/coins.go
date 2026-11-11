@@ -11,9 +11,10 @@
 //	users/{uid}/coinLedger/{entryId}  Entry: one row per balance change (same transaction)
 //	coinReservations/{holdId}         Hold: keyed by uid + X-Request-Id (idempotent)
 //	coin_transactions/{transactionId} Purchase: one App Store consumable credited once
+//	coin_initial_grants/{key}         InitialClaim: a sign-in subject that had the initial grant
 //
 // Sources and the spend order: Grant (Tailor It Pro's monthly coins, gone at
-// GrantPeriodEnd) → Initial (the one-time grant of a signed-in account) →
+// GrantPeriodEnd) → Initial (the one-time grant of a signed-in person) →
 // Purchased (bought, never expires; App Store guideline 3.1.1).
 //
 // Everything is behind COIN_BILLING_MODE (off | log | enforce, default off):
@@ -183,11 +184,37 @@ type Purchase struct {
 	At            time.Time `firestore:"at"`
 }
 
+// InitialClaim is coin_initial_grants/{key}: a sign-in subject (InitialKey)
+// that already had the initial grant. It outlives the account (PurgeUser
+// keeps it), so the grant is once per person, not per account.
+type InitialClaim struct {
+	// Owner is OwnerHash of the account that had the grant.
+	Owner string    `firestore:"owner"`
+	At    time.Time `firestore:"at"`
+}
+
+// InitialKey is the claim document id of a sign-in subject
+// (auth.Identity.Subjects); the subject itself is not stored.
+func InitialKey(subject string) string {
+	sum := sha256.Sum256([]byte("tailorit:coinInitialGrant:" + subject))
+	return hex.EncodeToString(sum[:])
+}
+
+// OwnerHash is the uid as kept in an InitialClaim.
+func OwnerHash(uid string) string {
+	sum := sha256.Sum256([]byte("tailorit:coinInitialGrant:uid:" + uid))
+	return hex.EncodeToString(sum[:16])
+}
+
 // GrantPolicy is what the grants of a wallet should be at a moment.
 type GrantPolicy struct {
-	// Initial is COIN_INITIAL_GRANT, credited once to a non-anonymous account.
-	Initial   int64
-	Anonymous bool
+	// Initial is COIN_INITIAL_GRANT, credited once per person: to a
+	// non-anonymous account whose InitialKeys no other account claimed.
+	Initial int64
+	// InitialKeys are the payer's InitialKey values; none = the initial
+	// grant waits (the payer is not the verified caller).
+	InitialKeys []string
+	Anonymous   bool
 	// Monthly is COIN_PRO_MONTHLY; ProPeriodEnd is the active Pro
 	// subscription's expiresAt (zero = not Pro).
 	Monthly      int64

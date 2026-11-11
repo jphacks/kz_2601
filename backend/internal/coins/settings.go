@@ -78,7 +78,11 @@ func (s *Service) SetOverflow(ctx context.Context, uid string, anonymous bool, o
 	now := storedTime(s.now())
 	var out Wallet
 	err = s.Store.Update(ctx, Keys{UID: uid}, func(tx *Tx) error {
-		tx.Entries = stamp(refresh(&tx.Wallet, g, now), now)
+		es, err := applyGrants(tx, uid, g, now)
+		if err != nil {
+			return err
+		}
+		tx.Entries = stamp(es, now)
 		tx.Wallet.Overflow.Enabled = o.Enabled
 		tx.Wallet.Overflow.MonthlyCap = o.MonthlyCap
 		tx.Wallet.UpdatedAt = now

@@ -15,18 +15,28 @@ type Memory struct {
 	ledgers   map[string]map[string]Entry // uid -> id -> entry
 	holds     map[string]Hold
 	purchases map[string]Purchase
+	claims    map[string]InitialClaim
 }
 
 // NewMemory returns an empty store.
 func NewMemory() *Memory {
-	return &Memory{wallets: map[string]Wallet{}, ledgers: map[string]map[string]Entry{}, holds: map[string]Hold{}, purchases: map[string]Purchase{}}
+	return &Memory{wallets: map[string]Wallet{}, ledgers: map[string]map[string]Entry{}, holds: map[string]Hold{},
+		purchases: map[string]Purchase{}, claims: map[string]InitialClaim{}}
 }
 
 // Update implements Store.
 func (m *Memory) Update(_ context.Context, k Keys, fn func(*Tx) error) error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
-	tx := &Tx{Wallet: m.wallets[k.UID]}
+	tx := &Tx{Wallet: m.wallets[k.UID], Claims: func(keys []string) (map[string]InitialClaim, error) {
+		out := map[string]InitialClaim{}
+		for _, key := range keys {
+			if c, ok := m.claims[key]; ok {
+				out[key] = c
+			}
+		}
+		return out, nil
+	}}
 	tx.Wallet.Holds = maps.Clone(tx.Wallet.Holds)
 	tx.Wallet.Overflow.Blocks = maps.Clone(tx.Wallet.Overflow.Blocks)
 	if k.HoldID != "" {
@@ -58,6 +68,7 @@ func (m *Memory) Update(_ context.Context, k Keys, fn func(*Tx) error) error {
 	for _, e := range tx.Entries {
 		m.ledgers[k.UID][e.ID] = e
 	}
+	maps.Copy(m.claims, tx.NewClaims)
 	return nil
 }
 

@@ -17,7 +17,6 @@ package entitlement
 
 import (
 	"context"
-	"crypto/sha256"
 	"errors"
 	"fmt"
 	"slices"
@@ -159,14 +158,9 @@ func owns(owner, uid, transferFrom string) bool {
 	return owner == "" || owner == uid || (transferFrom != "" && owner == transferFrom)
 }
 
-// AccountToken is the StoreKit appAccountToken iOS sets for uid: a UUIDv8
-// from SHA-256 (Firebase uids are not UUIDs). ios: ProAccountToken.swift.
-func AccountToken(uid string) string {
-	b := sha256.Sum256([]byte("tailorit:appAccountToken:" + uid))
-	b[6] = b[6]&0x0f | 0x80 // version 8
-	b[8] = b[8]&0x3f | 0x80 // RFC 9562 variant
-	return fmt.Sprintf("%x-%x-%x-%x-%x", b[0:4], b[4:6], b[6:8], b[8:10], b[10:16])
-}
+// AccountToken is appstore.AccountToken: the StoreKit appAccountToken iOS
+// sets for uid.
+func AccountToken(uid string) string { return appstore.AccountToken(uid) }
 
 // Default App Store policy (overridable by env, ConfigFromEnv).
 var (

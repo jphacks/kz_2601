@@ -5,9 +5,11 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"strings"
 	"time"
 
 	"github.com/jphacks/kz_2601/backend/internal/appstore"
+	"github.com/jphacks/kz_2601/backend/internal/auth"
 	"github.com/jphacks/kz_2601/backend/internal/httpx"
 	"github.com/jphacks/kz_2601/backend/internal/ratelimit"
 )
@@ -85,6 +87,10 @@ type Service struct {
 	// Env is their APP_ENV. nil = allowance not shown.
 	Counters ratelimit.Peeker
 	Env      string
+	// Subjects returns uid's sign-in subjects (auth.Identity.Subjects), which
+	// make the initial grant once per person. nil = the verified caller's
+	// (auth.Subjects) when uid is the caller, none otherwise.
+	Subjects func(ctx context.Context, uid string) []string
 }
 
 var _ Biller = (*Service)(nil)
@@ -113,6 +119,11 @@ func (s *Service) Mode() Mode {
 
 func (s *Service) policy(ctx context.Context, uid string, anonymous bool) (GrantPolicy, error) {
 	g := GrantPolicy{Initial: s.Config.InitialGrant, Anonymous: anonymous, Monthly: s.Config.ProMonthly}
+	if g.Initial > 0 && !anonymous {
+		for _, sub := range s.subjects(ctx, uid) {
+			g.InitialKeys = append(g.InitialKeys, InitialKey(sub))
+		}
+	}
 	if g.Monthly > 0 && s.ProPeriodEnd != nil {
 		end, err := s.ProPeriodEnd(ctx, uid)
 		if err != nil {
@@ -121,6 +132,16 @@ func (s *Service) policy(ctx context.Context, uid string, anonymous bool) (Grant
 		g.ProPeriodEnd = end
 	}
 	return g, nil
+}
+
+func (s *Service) subjects(ctx context.Context, uid string) []string {
+	if s.Subjects != nil {
+		return s.Subjects(ctx, uid)
+	}
+	if uid == "" || auth.UID(ctx) != uid {
+		return nil
+	}
+	return auth.Subjects(ctx)
 }
 
 // View is GET /v1/me/coins.
@@ -386,7 +407,8 @@ type Credit struct {
 }
 
 // CreditApple verifies a consumable JWS and credits its pack once per
-// transactionId. Errors: ErrOff, ErrAnonymous, *appstore.Error,
+// transactionId, to uid only when the transaction's appAccountToken is uid's
+// (appstore.AccountToken). Errors: ErrOff, ErrAnonymous, *appstore.Error,
 // ErrOwnedByOther.
 func (s *Service) CreditApple(ctx context.Context, uid string, anonymous bool, signedJWS string) (Credit, error) {
 	if s.Mode() == ModeOff {
@@ -401,6 +423,10 @@ func (s *Service) CreditApple(ctx context.Context, uid string, anonymous bool, s
 	tx, err := s.Verifier.VerifyConsumable(signedJWS)
 	if err != nil {
 		return Credit{}, err
+	}
+	// a pack is credited only to the account it was bought for (iOS sets appAccountToken)
+	if tx.AppAccountToken == "" || !strings.EqualFold(tx.AppAccountToken, appstore.AccountToken(uid)) {
+		return Credit{}, &appstore.Error{Reason: appstore.ReasonAccount, Err: errors.New("appAccountToken is not the caller's")}
 	}
 	coins, ok := s.Config.PackCoins(tx.ProductID)
 	if !ok { // the verifier allows only pack ids; a mismatch is a configuration error
