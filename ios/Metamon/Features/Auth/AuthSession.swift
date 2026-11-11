@@ -93,11 +93,14 @@ final class AuthSession {
     }
 
     /// `linkConflict` の後、その Apple ID の既存アカウントへ切り替える。匿名で作ったアプリはこの端末から見えなくなる。
+    /// - Parameter beforeSwitch: 切り替えの前に呼ぶ(匿名の uid に付いた通知の端末の登録を消す・サインアウトと同じ #269)。
+    ///   切り替えると uid が変わるので、新しい uid では前面に戻った時に登録し直す。
     @discardableResult
-    func switchToExistingAppleAccount() async -> Bool {
+    func switchToExistingAppleAccount(beforeSwitch: @MainActor () async -> Void = {}) async -> Bool {
         isBusy = true
         defer { isBusy = false }
         linkError = nil
+        await beforeSwitch()
         do {
             user = try await service.switchToPendingAppleAccount()
             return true
