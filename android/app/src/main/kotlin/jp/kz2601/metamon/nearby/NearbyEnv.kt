@@ -17,6 +17,8 @@ class NearbyEnv(
     val settings: KeyValueStore,
     val deviceName: () -> String,
     val text: (UiText) -> String,
+    /** [settings] の置き場を全部消す(後片付け・#841) */
+    val clearSettings: () -> Unit = {},
 ) {
     companion object {
         private const val PREFS = "metamon-nearby"
@@ -34,6 +36,7 @@ class NearbyEnv(
                     }
                 },
                 settings = SharedPreferencesKeyValueStore(app.getSharedPreferences(PREFS, Context.MODE_PRIVATE)),
+                clearSettings = { app.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit().clear().commit() },
                 deviceName = { deviceName(app) },
                 text = { it.resolve(app.resources) },
             )
