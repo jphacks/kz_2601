@@ -12,7 +12,7 @@ import (
 // both as limits with the allowed alternative. The call decline is only for
 // a build without callButton (#447, call_button_rules_test.go).
 func TestPaymentCallRulesReachPrompts(t *testing.T) {
-	for _, want := range []string{"## お金のやり取り・通話(#413・#424)", paywallNoteJA, paywallNoteEN, "paypay:// などの独自スキームは使わない"} {
+	for _, want := range []string{"## お金のやり取り・通話(#413・#424)", paywallNoteJA, paywallNoteEN, paypaySchemeRule} {
 		if !strings.Contains(systemPrompt, want) {
 			t.Errorf("systemPrompt lacks %q", want)
 		}
@@ -31,7 +31,7 @@ func TestPaymentCallRulesReachPrompts(t *testing.T) {
 	}
 }
 
-// #413: paypay:// stays off the openUrlButton allowlist (https links only).
+// #413: paypay:// stays off the openUrlButton url allowlist (PayPay is opened by app, #989).
 func TestPaymentNoPayPayScheme(t *testing.T) {
 	for _, s := range dsl.OpenURLSchemes {
 		if s == "paypay" {
