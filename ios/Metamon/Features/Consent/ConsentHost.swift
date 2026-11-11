@@ -9,7 +9,7 @@ struct ConsentHost: ViewModifier {
         @Bindable var rt = rt
         content
             .sheet(isPresented: $rt.showAIConsent, onDismiss: {
-                rt.launchConsentDismissed() // 待たせていたシェアリンク・Intent を出す(同意 → 残りの順)
+                rt.launchConsentDismissed() // 次の段へ(同意 → チュートリアル → シェアリンク → Intent)
                 Task { await rt.resumeUtteranceAfterConsent() }
             }) { AIConsentView() }
             .alert(
@@ -27,7 +27,7 @@ struct ConsentHost: ViewModifier {
                 // 説明の版が上がった時(古い版に同意した人)も、その版で 1 回だけ出し直す(ポリシー 6 章)
                 await rt.presentLaunchConsentIfNeeded()
             }
-            .onDisappear { rt.launchConsentDismissed() } // サインアウト等で消えた時も待たせたままにしない
+            .onDisappear { rt.launchPresentationsAbandoned() } // サインアウト等で消えた時も待たせたままにしない
     }
 
     /// ダウンロード確認の本文。モバイル回線・空き容量不足の時は先頭に注意を足す(#275)。

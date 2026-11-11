@@ -32,35 +32,76 @@ final class SplashPresence {
     #endif
 }
 
-/// 起動時の同意の画面(`ConsentHost`)が閉じるまで、シェアリンク・Intent(開く/話しかける)を待たせる。
-/// スプラッシュが閉じた瞬間にシートが同時に出ると SwiftUI が片方を捨て、同意が出ないまま止まるため(同意 → 残りの順)。
-/// 同意を出さなかった・「あとで」で閉じた・画面が消えた時も必ず `end()` する(待たせたままにしない)。
+/// 起動時に出す画面の順番待ち: 同意(`ConsentHost`)→ チュートリアル(`TutorialHost`)→ シェアリンク(`SharingHooks`)→ Intent(開く/話しかける)。
+/// シートを同時に出すと SwiftUI が片方を捨て、状態が残ったまま止まるため、前の画面が閉じきってから(出さないと決まってから)次へ進む。
+/// 各段は出さなかった・閉じた・画面が消えた時に必ず `end(_:)` する(待たせたままにしない)。全部消えた時は `endAll()`。
 @MainActor
 @Observable
 final class LaunchConsentHold {
     static let shared = LaunchConsentHold()
 
-    private(set) var isHolding = false
-    @ObservationIgnored private var waiters: [CheckedContinuation<Void, Never>] = []
-
-    func begin() { isHolding = true }
-
-    func end() {
-        guard isHolding else { return }
-        isHolding = false
-        let pending = waiters
-        waiters = []
-        pending.forEach { $0.resume() }
+    /// 出す順。後ろの段は前の段がすべて終わるまで待つ。Intent は全段の後。
+    enum Step: Int, Comparable, CaseIterable {
+        case consent, tutorial, shareLink
+        static func < (a: Step, b: Step) -> Bool { a.rawValue < b.rawValue }
     }
 
-    /// 待たせていなければすぐ戻る。待たせていれば同意の画面が閉じるまで待つ。
-    func waitUntilReleased() async {
-        guard isHolding else { return }
-        await withCheckedContinuation { waiters.append($0) }
+    private(set) var pending: Set<Step> = []
+    @ObservationIgnored private var waiters: [(before: Step?, continuation: CheckedContinuation<Void, Never>)] = []
+
+    /// どれかの段が残っている(Intent を待たせる)。
+    var isHolding: Bool { !pending.isEmpty }
+
+    /// `step` より前の段が残っているか(`step` の番がまだ来ていない)。
+    func isHolding(before step: Step) -> Bool { pending.contains { $0 < step } }
+
+    func begin(_ step: Step = .consent) { pending.insert(step) }
+
+    func end(_ step: Step = .consent) {
+        guard pending.remove(step) != nil else { return }
+        resumeReleased()
+    }
+
+    /// 画面が消えた(サインアウト等)時: 残りを全部放す。
+    func endAll() {
+        guard !pending.isEmpty else { return }
+        pending = []
+        resumeReleased()
+    }
+
+    /// 全段が終わるまで待つ(Intent)。待たせていなければすぐ戻る。
+    func waitUntilReleased() async { await wait(before: nil) }
+
+    /// `step` より前の段が終わるまで待つ。
+    func waitUntilReleased(before step: Step) async { await wait(before: step) }
+
+    private func wait(before step: Step?) async {
+        guard isBlocked(before: step) else { return }
+        await withCheckedContinuation { waiters.append((step, $0)) }
+    }
+
+    private func isBlocked(before step: Step?) -> Bool {
+        guard let step else { return isHolding }
+        return isHolding(before: step)
+    }
+
+    private func resumeReleased() {
+        var still: [(before: Step?, continuation: CheckedContinuation<Void, Never>)] = []
+        var ready: [CheckedContinuation<Void, Never>] = []
+        for w in waiters {
+            if isBlocked(before: w.before) { still.append(w) } else { ready.append(w.continuation) }
+        }
+        waiters = still
+        ready.forEach { $0.resume() }
     }
 
     #if DEBUG
-    func resetForTesting() { isHolding = false; waiters = [] }
+    func resetForTesting() {
+        pending = []
+        let pending = waiters
+        waiters = []
+        pending.forEach { $0.continuation.resume() }
+    }
     #endif
 }
 
