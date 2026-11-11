@@ -56,6 +56,9 @@ object RowSelect {
     /** 行を引いて外へ出す時の行(#1764)。選んだ行を引けば選んだ行全部、選んでいない行ならその行だけ。 */
     fun dragged(s: RowSelection, id: String): Set<String> = if (id in s.selected) s.selected else setOf(id)
 
+    /** [dragged] を画面の並び [order] で。 */
+    fun dragged(s: RowSelection, id: String, order: List<String>): List<String> = RowSelection(selected = dragged(s, id)).inOrder(order)
+
     fun selectAll(s: RowSelection, order: List<String>): RowSelection = sync(s, order).copy(selected = order.toSet())
 
     /** 一覧に効くキー。Ctrl+A・Ctrl+C(macOS は ⌘)。他は null。 */

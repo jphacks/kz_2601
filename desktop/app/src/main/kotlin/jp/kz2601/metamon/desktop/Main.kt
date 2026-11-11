@@ -20,12 +20,14 @@ import kotlinx.coroutines.FlowPreview
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.debounce
+import kotlinx.coroutines.launch
 import java.awt.Dimension
 import java.awt.GraphicsEnvironment
 import java.awt.Rectangle
 import java.awt.event.WindowAdapter
 import java.awt.event.WindowEvent
 import jp.kz2601.metamon.desktop.i18n.Strings
+import jp.kz2601.metamon.desktop.io.DragOut
 import jp.kz2601.metamon.desktop.store.DesktopStore
 import jp.kz2601.metamon.desktop.store.SessionPersistence
 import jp.kz2601.metamon.desktop.theme.TailorItTheme
@@ -51,6 +53,8 @@ fun main(args: Array<String>) = application {
     }
     // 端末の記録は裏で読む。読み終えるまでウィンドウはスケルトン(SharedRecords.loading)
     val loadScope = remember { CoroutineScope(SupervisorJob() + Dispatchers.IO) }
+    // 前に落ちた時などに残った引き出しの一時フォルダ(1 日より古い物)を裏で消す
+    remember { loadScope.launch { runCatching { DragOut.sweep() } } }
     val hub = remember {
         // 記録の JSON を渡した時(開発・スクリーンショット)は最初のアプリだけそれを使い、端末に残さない
         val fixture = args.getOrNull(1)?.let { MockStore.fromJson(File(it).readText()) }

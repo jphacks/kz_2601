@@ -120,18 +120,18 @@ class DataEnv(
     val update: (entity: String, id: String, patch: Map<String, String>) -> Unit,
     val delete: (entity: String, id: String) -> Unit,
     /** list の上に出す道具(表をコピー・貼り付け)。選んだ行があればコピーはその行だけ(#1766)。 */
-    val listBar: @Composable (entity: String, selected: Set<String>) -> Unit = { _, _ -> },
+    val listBar: @Composable (entity: String, selected: List<String>) -> Unit = { _, _ -> },
     /** その行を書き換えられるか・消せるか(出せない操作は出さない)。 */
     val canEdit: (entity: String, id: String) -> Boolean = { _, _ -> true },
     val canDelete: (entity: String, id: String) -> Boolean = { _, _ -> true },
     /** 行の詳細を別のウィンドウで開く(#1763)。(行を押した時のアクション, recordId)。null なら出さない。 */
     val openWindow: ((Action, String) -> Unit)? = null,
-    /** list の選んだ行を表計算の形でコピー(Ctrl+C)。(entity, recordId の集まり)。 */
-    val copyRows: (entity: String, ids: Set<String>) -> Unit = { _, _ -> },
+    /** list の選んだ行を表計算の形でコピー(Ctrl+C)。(entity, 画面の並びの recordId)。 */
+    val copyRows: (entity: String, ids: List<String>) -> Unit = { _, _ -> },
     /** 作った TSV をコピー(table の選んだ行)。(TSV, 行の数)。 */
     val copyText: (tsv: String, rows: Int) -> Unit = { _, _ -> },
-    /** list の行を外へ引き出す形(TSV の文字 + CSV のファイル・#1764)。(entity, recordId の集まり)。 */
-    val dragRows: (entity: String, ids: Set<String>) -> Transferable? = { _, _ -> null },
+    /** list の行を外へ引き出す形(TSV の文字 + CSV のファイル・#1764)。(entity, 画面の並びの recordId)。 */
+    val dragRows: (entity: String, ids: List<String>) -> Transferable? = { _, _ -> null },
 )
 
 @Composable
@@ -323,7 +323,7 @@ private fun ListLeaf(c: Component, env: DataEnv) {
     val rows = ListRows.rows(c, data, c.searchField?.let { env.search[it] })
     val order = rows.map { it.id }
     val selection = rememberRowSelection(c.id, order)
-    c.entity?.let { env.listBar(it, selection.value.selected) }
+    c.entity?.let { env.listBar(it, selection.value.inOrder(order)) }
     if (rows.isEmpty()) {
         Text(c.emptyText ?: DataText.EMPTY, color = Color.Gray)
         return
@@ -358,7 +358,7 @@ private fun ListLeaf(c: Component, env: DataEnv) {
                         .then(if (rowDeletable) Modifier.onKeyEvent { e -> (e.type == KeyEventType.KeyUp && e.key == Key.Delete).also { if (it) delete() } } else Modifier)
                         .rowClick(click, openWindow)
                         // 引くと選んだ行(選んでいない行ならその行)を TSV・CSV で外へ(#1764)
-                        .dragOut { c.entity?.let { e -> env.dragRows(e, RowSelect.dragged(selection.value, r.id)) } }
+                        .dragOut { c.entity?.let { e -> env.dragRows(e, RowSelect.dragged(selection.value, r.id, order)) } }
                         .semantics { selected = isSelected }
                         .padding(vertical = 6.dp),
                     verticalAlignment = Alignment.CenterVertically,
@@ -392,10 +392,10 @@ private val THUMBNAIL = 44.dp
 /** 一覧の行の写真(item.image)。手元・data URL・https の画像。外へ PNG のファイルで引き出せる(#1764)。 */
 @Composable
 private fun ListThumbnail(src: String?, name: String) {
-    val image = rememberImage(src, allowFile = true)
+    val image = rememberImage(src, allowFile = true, maxPx = ImageLoader.THUMBNAIL_PX)
     Box(Modifier.size(THUMBNAIL).clip(RoundedCornerShape(8.dp)).background(Color(0x11000000))) {
         image?.let { img ->
-            Image(img.bitmap, name, Modifier.fillMaxSize().dragOut { DragOut.image(img.bytes, name.ifEmpty { Strings["desktop_drag_image_name"] }) }, contentScale = ContentScale.Crop)
+            Image(img.bitmap, name, Modifier.fillMaxSize().dragOut { img.png?.let { DragOut.imageOfPng(it, name.ifEmpty { Strings["desktop_drag_image_name"] }) } }, contentScale = ContentScale.Crop)
         }
     }
 }
@@ -443,7 +443,7 @@ private fun rememberRowSelection(id: String?, order: List<String>): MutableState
 }
 
 /** 一覧・table の枠: 中の行にフォーカスがある時、Ctrl+A で全部選ぶ・Ctrl+C で選んだ行をコピー。何も選んでいなければ Ctrl+C は他へ流す。 */
-private fun Modifier.rowSelectionKeys(selection: MutableState<RowSelection>, order: List<String>, copy: (Set<String>) -> Unit): Modifier =
+private fun Modifier.rowSelectionKeys(selection: MutableState<RowSelection>, order: List<String>, copy: (List<String>) -> Unit): Modifier =
     onKeyEvent { e ->
         val p = KeyPress.of(e) ?: return@onKeyEvent false
         when (RowSelect.command(p, HostOs.current)) {
@@ -452,7 +452,7 @@ private fun Modifier.rowSelectionKeys(selection: MutableState<RowSelection>, ord
                 true
             }
             RowSelect.Command.COPY -> if (selection.value.isEmpty) false else {
-                copy(selection.value.selected)
+                copy(selection.value.inOrder(order))
                 true
             }
             null -> false

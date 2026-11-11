@@ -45,9 +45,9 @@ class DragOutTest {
     @Test
     fun listRowsDragAsTheSameTsvAsCopyAndACsvFile() {
         val ids = store.list("member").map { it.id }
-        val picked = setOf(ids[0], ids[2])
+        val picked = listOf(ids[0], ids[2])
         val t = io.rowsTransferable("member", picked)!!
-        assertEquals(listOf(DataFlavor.stringFlavor, DataFlavor.javaFileListFlavor), t.transferDataFlavors.toList())
+        assertEquals(listOf(DataFlavor.stringFlavor, DataFlavor.javaFileListFlavor, InternalDrag.FLAVOR), t.transferDataFlavors.toList())
 
         val member = io.entity("member")!!
         val table = RecordIo.exportTable(member.name, member, store, io.entities, null, ids = picked)
@@ -68,8 +68,8 @@ class DragOutTest {
 
     @Test
     fun nothingToDragWithoutRowsOrEntity() {
-        assertNull(io.rowsTransferable("member", emptySet()))
-        assertNull(io.rowsTransferable("nope", setOf("x")))
+        assertNull(io.rowsTransferable("member", emptyList()))
+        assertNull(io.rowsTransferable("nope", listOf("x")))
     }
 
     @Test
