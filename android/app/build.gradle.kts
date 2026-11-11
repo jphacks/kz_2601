@@ -112,6 +112,8 @@ dependencies {
     implementation(libs.googleid)
     implementation(libs.firebase.messaging)
     implementation(libs.play.app.update.ktx)
+    // Tailor It Pro の購入(Google Play Billing)
+    implementation(libs.play.billing.ktx)
 
     testImplementation(libs.junit)
     testImplementation(libs.kotlinx.coroutines.test)

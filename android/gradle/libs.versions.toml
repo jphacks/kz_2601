@@ -32,6 +32,8 @@ playServicesCodeScanner = "16.1.0"
 playServicesMlkitTextRecognitionJapanese = "16.0.2"
 # fileImport の PDF: 文字の層の取り出しとページの描画(Apache-2.0・#1181)。暗号化の BouncyCastle は外す
 pdfboxAndroid = "2.0.27.0"
+# Tailor It Pro の定期購入(Google Play Billing・#77 の Android 版)。Play の規約(OSS ではない)
+playBilling = "9.1.0"
 # Play の In-App Updates(更新の画面からその場で更新を始める)。Play Core の規約(OSS ではない)
 playAppUpdate = "2.1.0"
 # mapView / locationPicker の地図(BSD-2-Clause・#867)。描画は OpenGL ES 版(Vulkan 版より多くの端末・エミュレータで動く)。タイルは OpenFreeMap(キー不要)・components/map/MapStyle.kt
@@ -76,6 +78,7 @@ camerax-lifecycle = { module = "androidx.camera:camera-lifecycle", version.ref =
 camerax-video = { module = "androidx.camera:camera-video", version.ref = "camerax" }
 camerax-view = { module = "androidx.camera:camera-view", version.ref = "camerax" }
 junit = { module = "junit:junit", version.ref = "junit" }
+play-billing-ktx = { module = "com.android.billingclient:billing-ktx", version.ref = "playBilling" }
 play-app-update-ktx = { module = "com.google.android.play:app-update-ktx", version.ref = "playAppUpdate" }
 play-services-code-scanner = { module = "com.google.android.gms:play-services-code-scanner", version.ref = "playServicesCodeScanner" }
 play-services-mlkit-text-recognition-japanese = { module = "com.google.android.gms:play-services-mlkit-text-recognition-japanese", version.ref = "playServicesMlkitTextRecognitionJapanese" }
