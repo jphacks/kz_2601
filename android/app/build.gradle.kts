@@ -72,6 +72,7 @@ dependencies {
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.activity.compose)
     implementation(libs.androidx.lifecycle.runtime.compose)
+    implementation(libs.androidx.lifecycle.viewmodel.compose)
     implementation(platform(libs.compose.bom))
     implementation(libs.compose.ui)
     implementation(libs.compose.material3)
@@ -81,4 +82,13 @@ dependencies {
     implementation(libs.firebase.auth)
 
     testImplementation(libs.junit)
+    testImplementation(libs.kotlinx.coroutines.test)
+}
+
+// ランタイムのテストは docs/dsl/examples(全 OS 共通の例)をそのまま読む。
+val dslExamplesDir = rootDir.resolve("../docs/dsl/examples")
+
+tasks.withType<Test>().configureEach {
+    inputs.dir(dslExamplesDir).withPropertyName("dslExamples").withPathSensitivity(PathSensitivity.RELATIVE)
+    systemProperty("metamon.examplesDir", dslExamplesDir.absolutePath)
 }

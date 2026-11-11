@@ -23,6 +23,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
@@ -34,6 +35,7 @@ import jp.kz2601.metamon.dsl.Component
 import jp.kz2601.metamon.dsl.ComponentType
 import jp.kz2601.metamon.dsl.ItemWidth
 import jp.kz2601.metamon.dsl.Spacing
+import jp.kz2601.metamon.renderer.R
 import jp.kz2601.metamon.renderer.layout.localGridPlacement
 import jp.kz2601.metamon.renderer.registry.RenderContext
 import jp.kz2601.metamon.renderer.screen.LocalGrid
@@ -117,22 +119,23 @@ fun CardContainer(c: Component, ctx: RenderContext, modifier: Modifier = Modifie
     }
 }
 
-/** disclosure の見出し(既定「詳細」)。描画の木と同じ値。 */
+/** disclosure の見出し(既定「詳細」)。描画の木(全 OS 共通の期待値)の値なので日本語のまま。画面では訳した既定を出す。 */
 val Component.disclosureTitle: String get() = title ?: "詳細"
 
 /** `disclosure`: 折りたたみ。title がトグル行、expanded が初期状態(既定 false)。 */
 @Composable
 fun DisclosureContainer(c: Component, ctx: RenderContext, modifier: Modifier = Modifier) {
     var expanded by rememberSaveable(c.id) { mutableStateOf(c.expanded ?: false) }
+    val stateText = stringResource(if (expanded) R.string.renderer_disclosure_expanded else R.string.renderer_disclosure_collapsed)
     Column(modifier.renderCard()) {
         Row(
             Modifier
                 .fillMaxWidth()
                 .clickable(role = Role.Button) { expanded = !expanded }
-                .semantics { stateDescription = if (expanded) "開いています" else "閉じています" },
+                .semantics { stateDescription = stateText },
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            Text(c.disclosureTitle, style = MaterialTheme.typography.titleMedium, modifier = Modifier.weight(1f))
+            Text(c.title ?: stringResource(R.string.renderer_disclosure_default_title), style = MaterialTheme.typography.titleMedium, modifier = Modifier.weight(1f))
             Text(if (expanded) "▲" else "▼", color = MaterialTheme.colorScheme.primary)
         }
         if (expanded) {

@@ -129,7 +129,8 @@ class HttpAIClientTest {
         assertEquals(JsonPrimitive(2), sent["baseVersion"])
         assertEquals(JsonPrimitive("家計簿"), sent["transcript"])
         assertEquals(JsonPrimitive("auto"), sent["mode"])
-        assertNull(sent["locale"])
+        // 渡さない時は UI の言語(testDevice は ja)
+        assertEquals(JsonPrimitive("ja"), sent["locale"])
         assertNull(sent["allowedComponents"])
         assertEquals("""["recordRetention"]""", sent["supportedFeatures"].toString())
     }

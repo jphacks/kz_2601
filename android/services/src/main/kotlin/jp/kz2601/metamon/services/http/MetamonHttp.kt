@@ -94,6 +94,9 @@ class MetamonHttp(
 ) {
     val baseUrl: HttpUrl = baseUrl.toHttpUrl()
 
+    /** いまの UI の言語("ja" | "en")。`Accept-Language` と生成・相談の `locale` に使う(#843)。 */
+    fun language(): String = device.language()
+
     fun url(req: HttpRequest): HttpUrl = baseUrl.newBuilder().apply {
         req.path.forEach { addPathSegment(it) }
         req.query.forEach { (k, v) -> addQueryParameter(k, v) }
@@ -138,10 +141,11 @@ class MetamonHttp(
     /**
      * 本文を少しずつ読むリクエスト(SSE・#636)。ステータスを問わず返し、再送はしない(呼び出し側が [exchange] に戻す)。
      * 返した [Response] は呼び出し側が閉じる。
+     * [forceRefresh] は 401 の後の張り直し(ID トークンと App Check を取り直す・ホットリロードの SSE・#883)。
      */
-    suspend fun openStream(req: HttpRequest): Response {
-        val bearer = tokens.idToken(false)
-        val check = appCheck?.token(false)
+    suspend fun openStream(req: HttpRequest, forceRefresh: Boolean = false): Response {
+        val bearer = tokens.idToken(forceRefresh)
+        val check = appCheck?.token(forceRefresh)
         return clientFor(req).newCall(build(req, bearer, check)).await()
     }
 

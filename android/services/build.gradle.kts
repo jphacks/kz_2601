@@ -33,8 +33,12 @@ dependencies {
 
 // エラーコードの一覧が backend(backend/internal/httpx/codes.go)と揃っているかをテストで確かめる。
 val backendCodesFile = rootDir.resolve("../backend/internal/httpx/codes.go")
+val dslExamplesDir = rootDir.resolve("../docs/dsl/examples")
 
 tasks.withType<Test>().configureEach {
     inputs.file(backendCodesFile).withPropertyName("backendCodes").withPathSensitivity(PathSensitivity.RELATIVE)
     systemProperty("metamon.backendCodesFile", backendCodesFile.absolutePath)
+    // モック(#844)のテストはサンプル DSL を docs/dsl/examples から読む
+    inputs.dir(dslExamplesDir).withPropertyName("dslExamples").withPathSensitivity(PathSensitivity.RELATIVE)
+    systemProperty("metamon.dslExamplesDir", dslExamplesDir.absolutePath)
 }

@@ -17,6 +17,7 @@ import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
@@ -24,6 +25,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
@@ -37,6 +39,7 @@ import jp.kz2601.metamon.dsl.fallback
 import jp.kz2601.metamon.dsl.hasTabs
 import jp.kz2601.metamon.dsl.screen
 import jp.kz2601.metamon.renderer.components.UnavailableComponent
+import jp.kz2601.metamon.renderer.form.rememberScreenForm
 import jp.kz2601.metamon.renderer.layout.isVoiceScreen
 import jp.kz2601.metamon.renderer.navigation.NavigationResolver
 import jp.kz2601.metamon.renderer.navigation.NavigationState
@@ -54,15 +57,24 @@ import jp.kz2601.metamon.renderer.theme.RenderTheme
  */
 @Composable
 fun DSLView(dsl: AppDSL, runtime: DSLRuntime, modifier: Modifier = Modifier) {
-    var nav by remember(dsl) { mutableStateOf(NavigationState.initial(dsl)) }
+    // 遷移の状態はランタイムが持つ(AppRuntime)。無ければ描画器が自前で持つ(プレビュー)
+    val host = runtime.navigationHost
+    var local by remember(dsl) { mutableStateOf(NavigationState.initial(dsl)) }
+    val hosted = host?.navigation?.collectAsState()
+    val nav = hosted?.value ?: local
+    fun setNav(value: NavigationState) {
+        if (host != null) host.setNavigation(value) else local = value
+    }
 
-    fun perform(action: Action, from: Route) {
+    fun perform(action: Action, at: ActionContext) {
+        if (host != null) return runtime.onAction(action, at)
+        val from = at.route
         when (action.type) {
             ActionType.NAVIGATE -> action.screen?.let {
-                nav = NavigationResolver.navigate(nav, it, Presentation.of(action.presentation?.wire), null, from, dsl)
+                setNav(NavigationResolver.navigate(nav, it, Presentation.of(action.presentation?.wire), at.recordId, from, dsl))
             }
-            ActionType.BACK -> nav = NavigationResolver.close(nav, from)
-            else -> runtime.onAction(action, from)
+            ActionType.BACK -> setNav(NavigationResolver.close(nav, from))
+            else -> runtime.onAction(action, at)
         }
     }
 
@@ -70,10 +82,10 @@ fun DSLView(dsl: AppDSL, runtime: DSLRuntime, modifier: Modifier = Modifier) {
     fun stack(stack: String, root: Route) {
         val top = nav.path(stack).lastOrNull() ?: root
         val canClose = NavigationResolver.canClose(nav, top)
-        BackHandler(enabled = canClose) { nav = NavigationResolver.close(nav, top) }
+        BackHandler(enabled = canClose) { setNav(NavigationResolver.close(nav, top)) }
         key(top.id) {
-            RouteView(dsl, top, RenderContext(top, runtime) { perform(it, top) }, canClose) {
-                nav = NavigationResolver.close(nav, top)
+            RouteView(dsl, top, RenderContext(top, runtime) { a, at -> perform(a, at) }, canClose) {
+                setNav(NavigationResolver.close(nav, top))
             }
         }
     }
@@ -94,7 +106,7 @@ fun DSLView(dsl: AppDSL, runtime: DSLRuntime, modifier: Modifier = Modifier) {
                         selected = nav.selectedTab == t.screen,
                         onClick = {
                             // 選び直したタブは根まで戻す
-                            nav = nav.withPath(Route.tabStack(t.screen), emptyList()).copy(selectedTab = t.screen)
+                            setNav(nav.withPath(Route.tabStack(t.screen), emptyList()).copy(selectedTab = t.screen))
                         },
                         icon = {},
                         label = { Text(t.title, maxLines = 1, overflow = TextOverflow.Ellipsis) },
@@ -106,11 +118,11 @@ fun DSLView(dsl: AppDSL, runtime: DSLRuntime, modifier: Modifier = Modifier) {
 
     nav.sheet?.let { sheet ->
         // 下に引いて閉じた時はシートのスタックごと閉じる
-        SheetHost(onDismiss = { nav = nav.withPath(Route.SHEET, null).copy(sheet = null) }) { stack(Route.SHEET, sheet) }
+        SheetHost(onDismiss = { setNav(nav.withPath(Route.SHEET, null).copy(sheet = null)) }) { stack(Route.SHEET, sheet) }
     }
     nav.fullScreen?.let { full ->
         Dialog(
-            onDismissRequest = { nav = NavigationResolver.close(nav, nav.path(Route.FULL).lastOrNull() ?: full) },
+            onDismissRequest = { setNav(NavigationResolver.close(nav, nav.path(Route.FULL).lastOrNull() ?: full)) },
             properties = DialogProperties(usePlatformDefaultWidth = false),
         ) {
             Box(Modifier.fillMaxSize().background(RenderTheme.colors.canvas)) { stack(Route.FULL, full) }
@@ -137,15 +149,17 @@ private fun RouteView(dsl: AppDSL, route: Route, ctx: RenderContext, canClose: B
     ScreenView(screen, ctx, canClose, onBack)
 }
 
-/** 画面 1 枚(iOS の `ScreenView`)。フォーム・保存バーは子 Issue で入れる。 */
+/** 画面 1 枚(iOS の `ScreenView`)。`screen.entity` があれば下書きを作り、入力部品と保存に渡す。保存バーは子 Issue で入れる。 */
 @Composable
 fun ScreenView(
     screen: Screen,
-    ctx: RenderContext,
+    screenCtx: RenderContext,
     canClose: Boolean = false,
     onBack: () -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
+    val form = rememberScreenForm(screen, screenCtx.route, screenCtx.runtime)
+    val ctx = remember(screenCtx, form) { screenCtx.withForm(form) }
     Column(modifier.fillMaxSize()) {
         val showsHeader = !screen.isVoiceScreen && (screen.title.isNotEmpty() || canClose || screen.toolbar.isNotEmpty())
         if (showsHeader) {
@@ -153,7 +167,7 @@ fun ScreenView(
                 Modifier.fillMaxWidth().padding(horizontal = RenderTheme.Spacing.xs, vertical = RenderTheme.Spacing.xs),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                if (canClose) TextButton(onClick = onBack) { Text("戻る") }
+                if (canClose) TextButton(onClick = onBack) { Text(stringResource(R.string.renderer_back)) }
                 Text(
                     screen.title,
                     style = MaterialTheme.typography.titleLarge,

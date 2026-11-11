@@ -5,9 +5,16 @@ import jp.kz2601.metamon.dsl.AppDSL
 import jp.kz2601.metamon.dsl.Component
 import jp.kz2601.metamon.dsl.ComponentType
 import jp.kz2601.metamon.dsl.screen
+import jp.kz2601.metamon.renderer.DSLRuntime
+import jp.kz2601.metamon.renderer.NoopDSLRuntime
 import jp.kz2601.metamon.renderer.components.disclosureTitle
+import jp.kz2601.metamon.renderer.components.inputs.InputRules
+import jp.kz2601.metamon.renderer.form.FormDraft
 import jp.kz2601.metamon.renderer.components.gridColumns
 import jp.kz2601.metamon.renderer.components.isButtonVisible
+import jp.kz2601.metamon.renderer.components.linkOpens
+import jp.kz2601.metamon.renderer.components.linkText
+import jp.kz2601.metamon.renderer.components.photoFieldValue
 import jp.kz2601.metamon.renderer.layout.GridArea
 import jp.kz2601.metamon.renderer.layout.formBands
 import jp.kz2601.metamon.renderer.layout.gridPlacement
@@ -26,15 +33,20 @@ import kotlinx.serialization.json.JsonPrimitive
  * 形は docs/dsl/conformance/README.md、iOS の Conformance/RenderTree.swift と同じ。配置は View と同じ関数
  * (`gridPlacement` / `localGridPlacement` / `formBands`)から取る。
  *
- * まだ入れていないもの(子 Issue): フォームのドラフト(`form`・`hidden`・`needsForm`)・toolbar / saveBar・
- * レコードから解決する値(stat / list / chart …)。レジストリに無い Leaf は `unavailable` になる。
+ * まだ入れていないもの(子 Issue): toolbar / saveBar・
+ * レコードから解決する値(stat / list / chart …)・text の `{{field}}` の差し込み。レジストリに無い Leaf は `unavailable` になる。
  *
  * @param available 描ける type(レジストリの登録 ∩ 端末の能力)。外れた既知の type は `unavailable`、知らない type は `unknown`。
  */
-class RenderTree(private val dsl: AppDSL, private val available: Set<String>) {
+class RenderTree(
+    private val dsl: AppDSL,
+    private val available: Set<String>,
+    /** 記録・entity・サインイン中の uid(フォームと入力部品が読む) */
+    private val runtime: DSLRuntime = NoopDSLRuntime,
+) {
 
-    /** route の画面 1 枚。 */
-    fun screen(route: Route): JsonObject {
+    /** route の画面 1 枚。[form] は `ScreenForm.makeDraft` で作ったもの(フォーム画面でなければ null)。 */
+    fun screen(route: Route, form: FormDraft? = null): JsonObject {
         val screen = dsl.screen(route.screen)
             ?: return obj("route" to route(route), "missing" to JsonPrimitive(true))
         val placement = screen.gridPlacement
@@ -44,28 +56,29 @@ class RenderTree(private val dsl: AppDSL, private val available: Set<String>) {
             formBands(placement.placed).forEachIndexed { i, band -> band.items.forEach { bandOf[it.component] = i } }
         }
         val nodes = placement.placedInReadingOrder.map { (c, a) ->
-            node(c, a, bandOf[c]?.let { mapOf("band" to JsonPrimitive(it)) }.orEmpty())
-        } + placement.stacked.map { node(it, null, mapOf("stacked" to JsonPrimitive(true))) }
+            node(c, a, bandOf[c]?.let { mapOf("band" to JsonPrimitive(it)) }.orEmpty(), form)
+        } + placement.stacked.map { node(it, null, mapOf("stacked" to JsonPrimitive(true)), form) }
 
-        return obj(
+        val out = obj(
             "id" to JsonPrimitive(screen.id),
             "title" to JsonPrimitive(screen.title),
             "route" to route(route),
             "layout" to JsonPrimitive(if (screen.isVoiceScreen) "voice" else if (isForm) "form" else "grid"),
             "nodes" to JsonArray(nodes),
         )
+        return if (form == null) out else JsonObject(out + ("form" to InputNodes.form(form)))
     }
 
-    fun node(c: Component, cell: GridArea?, extra: Map<String, JsonElement> = emptyMap()): JsonObject {
+    fun node(c: Component, cell: GridArea?, extra: Map<String, JsonElement> = emptyMap(), form: FormDraft? = null): JsonObject {
         val out = LinkedHashMap(extra)
         out["id"] = c.id?.let(::JsonPrimitive) ?: JsonNull
         out["type"] = JsonPrimitive(c.type.wire)
         cell?.let { out["cell"] = cell(it) }
-        val state = state(c)
+        val state = state(c, form)
         out["state"] = JsonPrimitive(state)
         if (state != "rendered") return JsonObject(out)
 
-        val props = declared(c) + resolved(c)
+        val props = declared(c) + resolved(c) + InputNodes.props(c, form, runtime)
         if (props.isNotEmpty()) out["props"] = JsonObject(props)
         val actions = actions(c)
         if (actions.isNotEmpty()) out["actions"] = JsonArray(actions)
@@ -73,18 +86,20 @@ class RenderTree(private val dsl: AppDSL, private val available: Set<String>) {
             val local = c.localGridPlacement
             if (local != null) {
                 out["localGrid"] = JsonPrimitive(true)
-                out["children"] = JsonArray(local.map { node(it.component, it.area) })
+                out["children"] = JsonArray(local.map { node(it.component, it.area, form = form) })
             } else {
-                out["children"] = JsonArray(c.children.map { node(it, null) })
+                out["children"] = JsonArray(c.children.map { node(it, null, form = form) })
             }
         }
         return JsonObject(out)
     }
 
     /** rendered / hidden / unavailable / unknown(`DSLComponent` と各 Leaf の分岐と同じ順)。 */
-    fun state(c: Component): String {
+    fun state(c: Component, form: FormDraft? = null): String {
+        InputNodes.state(c, form, runtime)?.let { return it }
         if (c.type.wire !in available) return if (c.type == ComponentType.UNKNOWN) "unknown" else "unavailable"
-        if (c.type == ComponentType.BUTTON && !isButtonVisible(c.action)) return "hidden"
+        if (c.type == ComponentType.BUTTON && !isButtonVisible(c.action, form)) return "hidden"
+        if (c.type in InputRules.inputTypes && (form == null || c.field == null)) return "needsForm"
         return "rendered"
     }
 
@@ -93,6 +108,9 @@ class RenderTree(private val dsl: AppDSL, private val available: Set<String>) {
         c.title?.let { put("title", JsonPrimitive(it)) }
         c.text?.let { put("text", JsonPrimitive(it)) }
         c.label?.let { put("label", JsonPrimitive(it)) }
+        c.message?.let { put("message", JsonPrimitive(it)) }
+        c.url?.let { put("url", JsonPrimitive(it)) }
+        c.field?.let { put("field", JsonPrimitive(it)) }
         c.expanded?.let { put("expanded", JsonPrimitive(it)) }
     }
 
@@ -103,6 +121,9 @@ class RenderTree(private val dsl: AppDSL, private val available: Set<String>) {
             "expanded" to JsonPrimitive(c.expanded ?: false),
         )
         ComponentType.GRID -> mapOf("columns" to JsonPrimitive(c.gridColumns))
+        ComponentType.LINK -> mapOf("text" to JsonPrimitive(c.linkText()), "opens" to JsonPrimitive(c.linkOpens))
+        // フォームのドラフトが入るまで field の値は無い(photoFieldValue)
+        ComponentType.IMAGE -> mapOf("hasImage" to JsonPrimitive(photoFieldValue(c, null) != null))
         else -> emptyMap()
     }
 
