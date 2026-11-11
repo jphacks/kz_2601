@@ -281,7 +281,7 @@ func providerIDs(t *testing.T, r resp) []string {
 func TestExtConnectableProviders(t *testing.T) {
 	e := newExtEnv(t, 100)
 	got := providerIDs(t, e.do("solo", http.MethodGet, "/v1/me/connections", nil, nil))
-	want := []string{"fakeOauth:true", "googleCalendar:false", "googleTasks:false", "notion:false", "outlookCalendar:false", "slack:false", "todoist:false"}
+	want := []string{"asana:false", "fakeOauth:true", "github:false", "googleCalendar:false", "googleTasks:false", "linear:false", "notion:false", "outlookCalendar:false", "slack:false", "todoist:false"}
 	if !slices.Equal(got, want) {
 		t.Fatalf("providers: %v", got)
 	}
@@ -361,7 +361,7 @@ func TestExtOff(t *testing.T) {
 		t.Fatalf("list off: %d %s", r.code, r.raw)
 	}
 	// the services are still listed, all off, the fake not at all
-	if got := providerIDs(t, r); !slices.Equal(got, []string{"googleCalendar:false", "googleTasks:false", "notion:false", "outlookCalendar:false", "slack:false", "todoist:false"}) {
+	if got := providerIDs(t, r); !slices.Equal(got, []string{"asana:false", "github:false", "googleCalendar:false", "googleTasks:false", "linear:false", "notion:false", "outlookCalendar:false", "slack:false", "todoist:false"}) {
 		t.Fatalf("providers off: %v", got)
 	}
 }
