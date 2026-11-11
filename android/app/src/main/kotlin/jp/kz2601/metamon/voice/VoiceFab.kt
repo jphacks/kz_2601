@@ -1,6 +1,11 @@
 package jp.kz2601.metamon.voice
 
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.EnterTransition
+import androidx.compose.animation.ExitTransition
 import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.combinedClickable
@@ -9,6 +14,7 @@ import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -50,6 +56,10 @@ import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import jp.kz2601.metamon.R
+import jp.kz2601.metamon.onboarding.CoachMark
+import jp.kz2601.metamon.onboarding.CoachMarkBubble
+import jp.kz2601.metamon.onboarding.CoachMarkEvent
+import jp.kz2601.metamon.renderer.theme.LocalReduceMotion
 import jp.kz2601.metamon.renderer.screen.LocalFabCoordinator
 import kotlinx.coroutines.delay
 import kotlin.math.roundToInt
@@ -66,15 +76,31 @@ private val HANDLE_HIT_WIDTH = 28.dp
 private val HANDLE_HEIGHT = 56.dp
 private val REVEAL_DISTANCE = 20.dp
 
+/** 吹き出しの矢印の先と FAB の間 */
+private val BUBBLE_GAP = 4.dp
+
 /**
  * マイク FAB(iOS の `VoiceFab`・#52)。ピクチャーインピクチャー風に動かせる。
  * - タップ =「このアプリを変える」(音声のシート)、長押し = 変身一覧
  * - ドラッグで動かし、離すと近い左右の辺に吸着。端の近くで離すと画面の外へ隠れ、取っ手だけ残る(タップ / 内側へ引くと戻る)
  * - 位置は [FabPositionStore] でアプリ共通に残す。生成中は薄くして触れなくする
+ * - [coachMark] があれば FAB の上に吹き出し(#900)。長押し・ドラッグ(TalkBack の操作の一覧も)をしたら [onGesture] で知らせる
  */
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
-fun VoiceFab(busy: Boolean, onTap: () -> Unit, onLongPress: () -> Unit, modifier: Modifier = Modifier) {
+fun VoiceFab(
+    busy: Boolean,
+    onTap: () -> Unit,
+    onLongPress: () -> Unit,
+    modifier: Modifier = Modifier,
+    coachMark: CoachMark? = null,
+    onCoachMarkEvent: (CoachMark, CoachMarkEvent) -> Unit = { _, _ -> },
+    onGesture: (CoachMark) -> Unit = {},
+) {
+    val longPress = {
+        onGesture(CoachMark.FAB_LONG_PRESS)
+        onLongPress()
+    }
     val context = LocalContext.current
     val store = remember { FabPositionStore(context) }
     var side by remember { mutableStateOf(store.side) }
@@ -171,6 +197,7 @@ fun VoiceFab(busy: Boolean, onTap: () -> Unit, onLongPress: () -> Unit, modifier
                                     val snap = FabDock.snap(cx, predicted, width, size)
                                     val newBottom = FabDock.storedBottom(restY + drag.y, height, size, autoInset, maxBottom)
                                     apply(snap.side, snap.hidden, newBottom / density.density)
+                                    onGesture(CoachMark.FAB_DRAG)
                                 }
                                 dragging = false
                                 longPressFired = false
@@ -197,25 +224,56 @@ fun VoiceFab(busy: Boolean, onTap: () -> Unit, onLongPress: () -> Unit, modifier
                         },
                         onLongClick = {
                             longPressFired = true
-                            onLongPress()
+                            longPress()
                         },
                     )
                     .semantics {
                         contentDescription = label
                         stateDescription = hint
                         customActions = listOf(
-                            CustomAccessibilityAction(switcher) { onLongPress(); true },
+                            CustomAccessibilityAction(switcher) { longPress(); true },
                             CustomAccessibilityAction(moveOther) {
                                 apply(if (side == FabSide.LEFT) FabSide.RIGHT else FabSide.LEFT, false)
+                                onGesture(CoachMark.FAB_DRAG)
                                 true
                             },
-                            CustomAccessibilityAction(hide) { apply(side, true); true },
+                            CustomAccessibilityAction(hide) {
+                                apply(side, true)
+                                onGesture(CoachMark.FAB_DRAG)
+                                true
+                            },
                         )
                     }
                     .testTag("voice.fab"),
                 contentAlignment = Alignment.Center,
             ) {
                 MicGlyph(MaterialTheme.colorScheme.onPrimary, stop = false, modifier = Modifier.size(FAB_SIZE * 0.42f))
+            }
+            // 吹き出し(#900)。動かしている間・生成中は出さない。FAB の真上に置き、矢印は FAB の中心を指す
+            val mark = coachMark?.takeUnless { busy || dragging }
+            val reduceMotion = LocalReduceMotion.current
+            AnimatedVisibility(
+                visible = mark != null,
+                enter = if (reduceMotion) EnterTransition.None else fadeIn(),
+                exit = if (reduceMotion) ExitTransition.None else fadeOut(),
+                modifier = Modifier
+                    .align(if (side == FabSide.LEFT) Alignment.TopStart else Alignment.TopEnd)
+                    .padding(horizontal = HORIZONTAL_INSET)
+                    .height(with(density) { (restY - size / 2).coerceAtLeast(0f).toDp() - BUBBLE_GAP }.coerceAtLeast(0.dp)),
+            ) {
+                // 消える間も中身を描くため、最後に出したものを覚えておく
+                var shown by remember { mutableStateOf(mark) }
+                if (mark != null) shown = mark
+                shown?.let { m ->
+                    Box(contentAlignment = if (side == FabSide.LEFT) Alignment.BottomStart else Alignment.BottomEnd) {
+                        CoachMarkBubble(
+                            mark = m,
+                            onEvent = { onCoachMarkEvent(m, it) },
+                            arrowAtEnd = side == FabSide.RIGHT,
+                            arrowStart = FAB_SIZE / 2,
+                        )
+                    }
+                }
             }
         } else {
             val hitWidth = with(density) { HANDLE_HIT_WIDTH.toPx() }
@@ -244,10 +302,10 @@ fun VoiceFab(busy: Boolean, onTap: () -> Unit, onLongPress: () -> Unit, modifier
                             pull = (pull + inward).coerceIn(0f, reveal * 1.5f)
                         }
                     }
-                    .combinedClickable(enabled = !busy, onClick = { apply(side, false) }, onLongClick = onLongPress)
+                    .combinedClickable(enabled = !busy, onClick = { apply(side, false) }, onLongClick = longPress)
                     .semantics {
                         contentDescription = handleLabel
-                        customActions = listOf(CustomAccessibilityAction(switcher) { onLongPress(); true })
+                        customActions = listOf(CustomAccessibilityAction(switcher) { longPress(); true })
                     }
                     .testTag("voice.fabHandle"),
                 contentAlignment = if (side == FabSide.LEFT) Alignment.CenterStart else Alignment.CenterEnd,

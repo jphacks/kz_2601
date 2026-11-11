@@ -12,6 +12,7 @@ import jp.kz2601.metamon.dsl.records.Field
 import jp.kz2601.metamon.dsl.records.FieldCoding
 import jp.kz2601.metamon.dsl.records.FieldType
 import jp.kz2601.metamon.dsl.records.Filter
+import jp.kz2601.metamon.dsl.records.HiddenFields
 import jp.kz2601.metamon.dsl.records.JSONValue
 import jp.kz2601.metamon.dsl.records.Record
 import jp.kz2601.metamon.dsl.records.RecordQuery
@@ -54,6 +55,9 @@ class LeafData(
 
     /** computed を合成した記録(filter なし・calendar)。 */
     fun viewRecords(entity: String): List<Record> = evaluator.viewRecords(entity)
+
+    /** computed を合成し hidden を落とした記録(filter なし・計算・遊び系)。 */
+    fun visibleRecords(entity: String): List<Record> = HiddenFields.redact(viewRecords(entity), entity(entity))
 
     /** 表示用の文字列。ref / refs は参照先の見出し、member は表示名にする。 */
     fun display(value: JSONValue, field: Field?): String {

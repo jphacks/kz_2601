@@ -62,6 +62,7 @@ import jp.kz2601.metamon.account.MediaTempFiles
 import jp.kz2601.metamon.account.OwnerGatedTokens
 import jp.kz2601.metamon.auth.AuthSession
 import jp.kz2601.metamon.consent.ConsentPrompt
+import jp.kz2601.metamon.onboarding.CoachMarkStore
 import jp.kz2601.metamon.onboarding.FirstRunTutorialStore
 import jp.kz2601.metamon.onboarding.TutorialPrompt
 import jp.kz2601.metamon.permissions.PermissionCenter
@@ -232,6 +233,8 @@ class AppContainer(
     private val retentionConsent: RetentionConsentStore = KeyValueRetentionConsent(InMemoryKeyValueStore()),
     /** 初回のチュートリアルと「こう話すと直せます」を見た印(#900)。モックは見た扱いで始める */
     val tutorial: FirstRunTutorialStore = FirstRunTutorialStore(InMemoryKeyValueStore()).apply { markAllSeen() },
+    /** 気づきにくい操作の吹き出しを閉じた印(#900)。モックは出さない(FAB の上を塞がない) */
+    val coachMarks: CoachMarkStore = CoachMarkStore(InMemoryKeyValueStore()).apply { suppress() },
     /** 「作ったアプリを残しておきませんか」を出した印(#1316・端末ごと)。モックはメモリだけ */
     private val accountLinkStore: KeyValueStore = InMemoryKeyValueStore(),
     /** TalkBack が動いているか(削除の取り消しの時間を延ばす・H8) */
@@ -305,6 +308,8 @@ class AppContainer(
 
     init {
         DebugMocks.applyAiConsent(knobs, consent, tutorial) // `METAMON_AI_CONSENT`(debug だけ)
+        // 既存の自動テスト(同意済みで起動)では吹き出しで FAB を塞がない(iOS の `CoachMarkStore.applyLaunchOverride`)
+        if (knobs.aiConsent == DebugKnobs.AiConsentOverride.GRANTED) coachMarks.suppress()
     }
 
     /** 同意の画面を出す時点(起動時・AI に送る直前・設定から・#888) */
@@ -365,6 +370,7 @@ class AppContainer(
             forgetTutorial = {
                 tutorial.forget()
                 tutorialPrompt.reset()
+                coachMarks.forget() // 操作のヒントの吹き出し(#900)も次の人には未読から
                 accountLinkPrompt.forget() // 引き継ぎの案内(#1316)も iOS と同じく次の人に出し直す
             },
             // 同意は人ごと(iOS は UserDefaults ごと消す)。前の人の止めた発話も次の人の同意で送らない
@@ -570,6 +576,7 @@ class AppContainer(
                 ),
                 clearImageCache = { RemoteImages.wipe(context) },
                 tutorial = FirstRunTutorialStore(SharedPreferencesKeyValueStore.of(context, FirstRunTutorialStore.PREFS)),
+                coachMarks = CoachMarkStore(SharedPreferencesKeyValueStore.of(context, CoachMarkStore.PREFS)),
                 accountLinkStore = SharedPreferencesKeyValueStore.of(context, AccountLinkPrompt.PREFS),
                 talkBackRunning = { TalkBack.isRunning(context) },
                 feedback = HttpFeedbackClient(appConfigHttp),
