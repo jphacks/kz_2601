@@ -100,6 +100,7 @@ struct AppSidebar: View {
             }
         }
         .navigationTitle("アプリ")
+        .accessibilityIdentifier("shell.sidebar") // UI テスト(#1140)
         .alert("名前を変える", isPresented: Binding(get: { renameTarget != nil }, set: { if !$0 { renameTarget = nil } })) {
             TextField("アプリの名前", text: $renameText)
             Button("変更") {

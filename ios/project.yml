@@ -392,6 +392,10 @@ targets:
       # Mac の単体テスト(#1212)。`xcodebuild -scheme MetamonMac test`(mac-ci の mac-build-test でも回す)
       testTargets:
         - MetamonMacTests
+        # キーボード操作の UI テスト(#1140)。既定では回さない(CI の時間を増やさない)。手元で回す: -only-testing:MetamonMacUITests
+        - name: MetamonMacUITests
+          skipped: true
+          parallelizable: false
       gatherCoverageData: false
       # 課金: iOS と同じローカルの StoreKit の構成で Run 時にテスト購入できる(本番では使われない)
       storeKitConfiguration: StoreKit/TailorItPro.storekit
@@ -411,6 +415,21 @@ targets:
         # アプリの PRODUCT_NAME は Tailor It(ターゲット名と違う・#1054)ので、ホストの場所を書く
         TEST_HOST: $(BUILT_PRODUCTS_DIR)/Tailor It.app/Contents/MacOS/Tailor It
         BUNDLE_LOADER: $(TEST_HOST)
+
+  # Mac のキーボード操作の UI テスト(XCUITest・#1140)。モック(METAMON_MOCK=1)で起動し、⌘1 / ⌘2・Return・Esc・⌘[・⌘Z をキーだけで通す。
+  # scheme では skipped(CI の `xcodebuild test -scheme MetamonMac` では回らない)。手元で回す方法は MetamonMacUITests/KeyboardShellUITests.swift の頭
+  MetamonMacUITests:
+    type: bundle.ui-testing
+    platform: macOS
+    sources:
+      - path: MetamonMacUITests
+    dependencies:
+      - target: MetamonMac
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: jp.kz2601.metamon.macuitests
+        GENERATE_INFOPLIST_FILE: YES
+        TEST_TARGET_NAME: MetamonMac
 
 schemes:
   # Mac の検証版・審査用(#929)。iOS の Metamon-Staging / Metamon-Review と同じ形
