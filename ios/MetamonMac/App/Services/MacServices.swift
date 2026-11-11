@@ -57,6 +57,11 @@ final class MacServices: @unchecked Sendable {
         appConfig = url.map { HTTPAppConfigClient(baseURL: $0, token: token) }
     }
 
+    #if !APP_STORE_REVIEW
+    /// 外部の公開データ(feed・#348・#1288)。appconfig の URL がある時だけ(審査用ビルドは外す・iOS と同じ)
+    var feeds: (any FeedClient)? { appConfigURL.map { HTTPFeedClient(baseURL: $0, token: token) } }
+    #endif
+
     /// 作ったアプリをサーバーに置くか(本物の AI と appconfig の両方がある)。false なら記録は端末だけ
     var keepsAppsOnServer: Bool { appConfig != nil }
 

@@ -51,6 +51,10 @@ final class MacAppRuntime: RuntimeNavigating {
     /// AI の部品のオンライン版の送り先(#962)
     @ObservationIgnored let ai: any AIClient
     @ObservationIgnored let isAIConsentGranted: @MainActor () -> Bool
+    #if !APP_STORE_REVIEW
+    /// feed の問い合わせ先(`MacAppRuntime+Feeds.swift`・#1288)。サーバーにつながっていない時は nil
+    @ObservationIgnored var feedClient: (any FeedClient)?
+    #endif
     /// lookupBook の問い合わせ先。appconfig への接続(#930)が来るまでは nil
     @ObservationIgnored var books: (any BookLookupClient)?
     @ObservationIgnored var calendarWriter: any CalendarWriting = EventKitCalendarWriter()
