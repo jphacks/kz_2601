@@ -22,6 +22,8 @@ import jp.kz2601.metamon.runtime.AppAiHost
 import jp.kz2601.metamon.runtime.AppDirectory
 import jp.kz2601.metamon.runtime.AppFeedHost
 import jp.kz2601.metamon.runtime.AppRuntime
+import jp.kz2601.metamon.runtime.MlKitPhotoReader
+import jp.kz2601.metamon.renderer.components.media.PhotoReader
 import jp.kz2601.metamon.runtime.KeyValueRetentionConsent
 import jp.kz2601.metamon.runtime.RecordRetentionRunner
 import jp.kz2601.metamon.runtime.RetentionConsentStore
@@ -183,6 +185,8 @@ class AppContainer(
     val transcriber: SpeechTranscriber,
     /** fileImport の録音ファイルの文字起こし(whisper.cpp・端末内・#1180)。モックも端末内なので同じものを使う */
     private val audioFiles: AudioFileTranscriptionHost? = null,
+    /** photoField.analyze の端末内の読み取り(#1119・ML Kit)。テストは null(analyze を無視) */
+    private val photoReader: PhotoReader? = null,
     /** 今のアプリの appId(端末に保存・次の起動で開き直す)。切り替え・新しいアプリはランタイムが書き換える */
     val appId: CurrentAppStore,
     /** 最後に取得したアプリの一覧(オフラインの一覧) */
@@ -439,6 +443,7 @@ class AppContainer(
                 ai = ConsentGatedAiClient(MockAIClient(samples, delayMillis = delayMillis)) { consent.isGranted },
                 transcriber = MockTranscriber(),
                 audioFiles = WhisperAudioFileHost.create(context, CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)) { AppLocales.languageCode(context) },
+                photoReader = MlKitPhotoReader(context.applicationContext),
                 // 本物のアプリ・記録と混ざらないよう、モックは別の置き場
                 appId = DeviceAppId.store(context, "metamon-app-mock", migrateLegacy = false),
                 appList = AppListCache(File(context.filesDir, "metamon-app-mock")),
@@ -522,6 +527,7 @@ class AppContainer(
                 // 声は端末内だけで文字にする(#354 §3)。端末内が無い端末は文字入力に落とす
                 transcriber = AndroidSpeechTranscriber(context, language = language, log = { Log.i(TAG, it) }),
                 audioFiles = WhisperAudioFileHost.create(context, CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate), language),
+                photoReader = MlKitPhotoReader(context.applicationContext),
                 appId = DeviceAppId.store(context, "metamon-app"),
                 appList = AppListCache(File(context.filesDir, "metamon-app")),
                 feedHost = AppFeedHost(HttpFeedClient(appConfigHttp), feedCache),
@@ -717,6 +723,7 @@ class AppContainer(
         ).also {
             it.dictation = TranscriberDictationHost(transcriber, CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate))
             it.audioFileTranscription = audioFiles
+            it.photoReader = photoReader
         }
     }
 

@@ -20,6 +20,7 @@ import jp.kz2601.metamon.dsl.records.Record
 import jp.kz2601.metamon.dsl.records.RecordPermission
 import jp.kz2601.metamon.nearby.NearbyShareController
 import jp.kz2601.metamon.renderer.ActionContext
+import jp.kz2601.metamon.renderer.components.media.PhotoReader
 import jp.kz2601.metamon.renderer.DSLRuntime
 import jp.kz2601.metamon.renderer.components.lists.LeafData
 import jp.kz2601.metamon.renderer.FormMember
@@ -679,6 +680,9 @@ class AppRuntime(
 
     /** fileImport の録音ファイルの文字起こし(whisper.cpp・#1180)。AppContainer が差す。 */
     override var audioFileTranscription: AudioFileTranscriptionHost? = null
+
+    /** photoField.analyze の端末内の読み取り(#1119・ML Kit)。AppContainer が渡す。 */
+    override var photoReader: PhotoReader? = null
 
     override fun onAction(action: Action, context: ActionContext) {
         scope.launch { run(action, context) }
