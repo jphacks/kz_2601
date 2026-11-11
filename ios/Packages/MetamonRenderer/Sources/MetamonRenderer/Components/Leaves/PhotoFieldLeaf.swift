@@ -30,6 +30,8 @@ struct PhotoFieldLeaf: View {
     @State private var showFileImporter = false
     @State private var dropTargeted = false
     @State private var importRejected: ImportRejection?
+    /// 連係カメラ(#1852)
+    @State private var continuity = ContinuityCameraAnchor()
     #endif
     @Environment(\.openURL) private var openURL
 
@@ -175,6 +177,17 @@ struct PhotoFieldLeaf: View {
             guard case .success(let urls) = result, let url = urls.first else { return }
             importFile(url, form: form, field: field)
         }
+        // 連係カメラ(#1852): 近くの iPhone で撮る・書類をスキャン
+        Button { continuity.showMenu() } label: {
+            Label(L("iPhone から写真を撮る / 書類をスキャン"), systemImage: "iphone").frame(maxWidth: .infinity)
+        }
+        .buttonStyle(RenderButtonStyle(kind: .secondary))
+        .background(ContinuityCameraRequestor(anchor: continuity) { encoded in
+            importRejected = nil
+            setPhoto(encoded, form: form, field: field)
+        })
+        .help(L("近くの iPhone で撮った写真やスキャンした書類を入れます"))
+        .accessibilityHint(L("近くの iPhone で撮った写真やスキャンした書類を入れます"))
         switch importRejected {
         case .notImage:
             Text(L("画像のファイルだけ入れられます")).font(.caption).foregroundStyle(.secondary)
