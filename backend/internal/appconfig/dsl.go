@@ -74,9 +74,12 @@ func normalizeSource(src *store.Source, mode string) *store.Source {
 	if src == nil {
 		src = &store.Source{Kind: "manual"}
 	}
-	if src.Kind == "" {
+	// Only POST .../restore records a restore (#1774: clients walk undo by
+	// restoredFrom, so a PUT/PATCH must not claim one).
+	if src.Kind == "" || src.Kind == "restore" {
 		src.Kind = "manual"
 	}
+	src.RestoredFrom = 0
 	if src.Mode == "" {
 		src.Mode = mode
 	}
