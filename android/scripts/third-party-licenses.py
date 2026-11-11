@@ -7,6 +7,7 @@
   - Gradle のキャッシュ(~/.gradle/caches/modules-2)にある各依存の POM の <licenses>(無ければ親 POM)
   - Google の AAR が同梱する third_party_licenses.json / .txt(Play services・Firebase の中で使っている部品の表示)
   - android/scripts/license-texts/ の本文(POM には本文が無いので、種類ごとの正本をここに置く)
+  - Maven を通らずに同梱するもの(VENDORED: NDK でビルドする whisper.cpp・初回に落とす音声モデル)
 
 1 件 = groupId とライセンスの組(androidx.compose.ui の 10 個の artifact は 1 件)。版が揃っていれば版も出す。
 
@@ -78,6 +79,28 @@ TEXT_FILES = {
     # MapLibre Native Android(中に取り込んだ C++ の部品の表示も)と gestures。本文は各リポジトリの LICENSE.md
     ("BSD-2-Clause", "org.maplibre.gl"): "maplibre-BSD-2-Clause.txt",
 }
+
+# Maven の依存に出ない同梱物(#1180)。版は whisper/src/main/cpp/CMakeLists.txt・WhisperModels.kt と揃える
+VENDORED = [
+    {
+        "id": "whisper-cpp",
+        "name": "whisper.cpp",
+        "version": "1.9.5",
+        "url": "https://github.com/ggml-org/whisper.cpp",
+        "license": "MIT",
+        "text_file": "whisper-cpp-MIT.txt",
+        "artifacts": ["libmetamon_whisper.so(whisper.cpp + ggml)"],
+    },
+    {
+        "id": "openai-whisper-model",
+        "name": "OpenAI Whisper(音声モデル ggml-base-q5_1)",
+        "version": None,
+        "url": "https://github.com/openai/whisper",
+        "license": "MIT",
+        "text_file": "openai-whisper-MIT.txt",
+        "artifacts": ["ggml-base-q5_1.bin(初回に端末へダウンロード)"],
+    },
+]
 
 DEP_RE = re.compile(r"--- ([^\s:]+):([^\s:]+)(?::(\S+))?(?: -> (\S+))?")
 
@@ -254,11 +277,27 @@ def build(report):
     if errors:
         raise SystemExit("\n".join(errors))
 
+    vendored = []
+    for v in VENDORED:
+        text = read_text(os.path.join(TEXTS_DIR, v["text_file"]))
+        vendored.append({
+            "kind": "dependency",
+            "id": v["id"],
+            "name": v["name"],
+            "version": v["version"],
+            "url": v["url"],
+            "license": v["license"],
+            "copyright": [l for l in text.split("\n") if l.startswith("Copyright")],
+            "artifacts": v["artifacts"],
+            "text": text,
+            "notices": [],
+        })
+
     app_text = read_text(APP_LICENSE)
     app = dict(APP_ENTRY, kind="app", version=None, license="MIT",
                copyright=[l for l in app_text.split("\n") if l.startswith("Copyright")],
                artifacts=[], text=app_text, notices=[])
-    return {"source": f"android :app {CONFIGURATION}", "entries": [app] + entries}
+    return {"source": f"android :app {CONFIGURATION}", "entries": [app] + vendored + entries}
 
 
 def dump(data):

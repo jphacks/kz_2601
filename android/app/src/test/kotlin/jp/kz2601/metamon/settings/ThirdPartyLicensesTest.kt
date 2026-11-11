@@ -26,6 +26,9 @@ class ThirdPartyLicensesTest {
         assertTrue("CameraX(Apache-2.0)", entries.any { it.name == "androidx.camera" && it.license == "Apache-2.0" })
         assertTrue("libyuv", entries.any { it.name == "androidx.camera" && it.license == "BSD-3-Clause" && "LibYuv" in it.text })
         assertTrue("checker-qual", entries.any { it.name == "org.checkerframework" && it.license == "MIT" && "Checker Framework" in it.text })
+        // Maven を通らない同梱物(#1180): NDK でビルドする whisper.cpp と、初回に落とす音声モデル
+        assertTrue("whisper.cpp", entries.any { it.name == "whisper.cpp" && it.license == "MIT" && "The ggml authors" in it.text })
+        assertTrue("Whisper のモデル", entries.any { it.id == "openai-whisper-model" && it.license == "MIT" && "OpenAI" in it.text })
     }
 
     @Test
