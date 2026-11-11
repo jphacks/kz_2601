@@ -46,29 +46,15 @@ struct MetamonMacApp: App {
     }
 
     var body: some Scene {
-        WindowGroup(id: MacCommands.mainWindowId) {
-            // 設定の「言語」で即時切替(#973)・初回の案内(#971)・声で頼む(#966)・tailorit:// と共有のリンク(#975)
-            MacLanguageRoot {
-                MacRootView(apps: apps)
-                    .macOnboarding()
-                    .environment(voice)
-                    .environment(library)
-                    #if !APP_STORE_REVIEW
-                    .modifier(MacLinkReceiver())
-                    #endif
-                    .modifier(MacCrashReportUser())
-                    .task { MacAccount.shared.wipe.library = library } // サインアウト・削除で一覧も空にする(#972)
-                    .task {
-                        // マイクの抜き差し(#1221): 録音中に使っている装置が外れたら止めて知らせる
-                        MacInputDevices.shared.onChange = { [voice] in voice.inputDevicesChanged(available: $0) }
-                        voice.attachAudioFocus() // 録音と再生は同時に 1 つだけ(#952)
-                        MacInputDevices.shared.startObserving()
-                    }
-            }
-        }
-        .defaultSize(width: 1100, height: 720)
-        .windowResizability(.contentMinSize)
-        .commands { MacCommands() }
+        WindowGroup(id: MacCommands.mainWindowId) { root(window: nil) }
+            .defaultSize(width: 1100, height: 720)
+            .windowResizability(.contentMinSize)
+            .commands { MacCommands() }
+
+        // 生成アプリごとのウインドウ(#1853)。サイドバーの右クリック・⌥クリックで開く。同じアプリなら開いているものが前に出る
+        WindowGroup("アプリ", id: MacAppWindows.windowId, for: AppID.self) { $app in root(window: app) }
+            .defaultSize(width: 900, height: 680)
+            .windowResizability(.contentMinSize)
 
         Settings {
             MacLanguageRoot { MacSettingsView() } // ⌘,(#973)
@@ -82,5 +68,27 @@ struct MetamonMacApp: App {
         .windowResizability(.contentSize)
         .defaultPosition(.center)
         #endif
+    }
+
+    /// どのウインドウも同じ殻(`MacRootView`)。アプリのウインドウ(#1853)は開くアプリを渡す
+    private func root(window: AppID?) -> some View {
+        // 設定の「言語」で即時切替(#973)・初回の案内(#971)・声で頼む(#966)・tailorit:// と共有のリンク(#975)
+        MacLanguageRoot {
+            MacRootView(apps: apps, window: window)
+                .macOnboarding()
+                .environment(voice)
+                .environment(library)
+                #if !APP_STORE_REVIEW
+                .modifier(MacLinkReceiver())
+                #endif
+                .modifier(MacCrashReportUser())
+                .task { MacAccount.shared.wipe.library = library } // サインアウト・削除で一覧も空にする(#972)
+                .task {
+                    // マイクの抜き差し(#1221): 録音中に使っている装置が外れたら止めて知らせる
+                    MacInputDevices.shared.onChange = { [voice] in voice.inputDevicesChanged(available: $0) }
+                    voice.attachAudioFocus() // 録音と再生は同時に 1 つだけ(#952)
+                    MacInputDevices.shared.startObserving()
+                }
+        }
     }
 }
