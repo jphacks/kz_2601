@@ -3,6 +3,7 @@ package jp.kz2601.metamon.renderer
 import jp.kz2601.metamon.dsl.Action
 import jp.kz2601.metamon.dsl.records.Entity
 import jp.kz2601.metamon.renderer.components.audio.DictationHost
+import jp.kz2601.metamon.renderer.components.importing.AudioFileTranscriptionHost
 import jp.kz2601.metamon.dsl.records.JSONValue
 import jp.kz2601.metamon.dsl.records.Record
 import jp.kz2601.metamon.renderer.components.ai.AiHost
@@ -38,6 +39,9 @@ interface DSLRuntime {
 
     /** transcribeField が声を文字にする口(本体の音声入力と同じ認識器・#864)。null なら「この画面では使えません」。 */
     val dictation: DictationHost? get() = null
+
+    /** fileImport の録音ファイルを端末内で文字にする口(whisper.cpp・#1180)。null なら「この画面では録音ファイルを文字にできません」。 */
+    val audioFileTranscription: AudioFileTranscriptionHost? get() = null
 
     /** アクション。[navigationHost] があれば navigate / back もここへ来る。既定は何もしない。 */
     fun onAction(action: Action, context: ActionContext) = Unit
