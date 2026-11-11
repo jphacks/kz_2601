@@ -25,11 +25,21 @@ final class ExternalServicesClientTests: XCTestCase {
         {"connections":[
           {"provider":"googleCalendar","status":"active","scopes":["calendar.readonly"],"connectedAt":"2026-11-10T01:00:00Z","lastUsedAt":"2026-11-11T02:00:00.123Z"},
           {"provider":"todoist","status":"error"}
+        ],
+        "providers":[
+          {"id":"googleCalendar","nameJa":"Google カレンダー","nameEn":"Google Calendar","enabled":true},
+          {"id":"todoist","nameJa":"Todoist","nameEn":"Todoist","enabled":false}
         ]}
         """#)])
-        let list = try await client.connections()
+        let answer = try await client.connections(supportedFeatures: nil)
+        let list = answer.connections
         XCTAssertEqual(lastRequest?.httpMethod, "GET")
         XCTAssertEqual(lastRequest?.url?.path, "/v1/me/connections")
+        XCTAssertNil(lastRequest?.url?.query, "nil なら絞らない(query を付けない)")
+        XCTAssertEqual(answer.providers, [
+            ExtProvider(id: "googleCalendar", nameJa: "Google カレンダー", nameEn: "Google Calendar", enabled: true),
+            ExtProvider(id: "todoist", nameJa: "Todoist", nameEn: "Todoist", enabled: false),
+        ])
         XCTAssertEqual(list.map(\.provider), ["googleCalendar", "todoist"])
         XCTAssertEqual(list[0].status, .active)
         XCTAssertEqual(list[0].scopes, ["calendar.readonly"])
@@ -37,6 +47,36 @@ final class ExternalServicesClientTests: XCTestCase {
         XCTAssertNotNil(list[0].lastUsedAt, "小数秒つきも読む")
         XCTAssertEqual(list[1].status, .error)
         XCTAssertNil(list[1].connectedAt)
+    }
+
+    /// 古いサーバーは providers を返さない。nil(空の配列と区別する)で読める。
+    func testListWithoutProvidersFromOldServer() async throws {
+        StubURLProtocol.reset([.init(status: 200, body: #"{"connections":[{"provider":"todoist","status":"active"}]}"#)])
+        let answer = try await client.connections(supportedFeatures: nil)
+        XCTAssertEqual(answer.connections.map(\.provider), ["todoist"])
+        XCTAssertNil(answer.providers)
+
+        StubURLProtocol.reset([.init(status: 200, body: #"{"connections":[],"providers":[]}"#)])
+        let empty = try await client.connections(supportedFeatures: nil)
+        XCTAssertEqual(empty.providers, [])
+    }
+
+    func testListSendsSupportedFeatures() async throws {
+        StubURLProtocol.reset([.init(status: 200, body: #"{"connections":[],"providers":[]}"#)])
+        _ = try await client.connections(supportedFeatures: ["externalCall.googleCalendar", "externalCall.todoist"])
+        let url = try XCTUnwrap(lastRequest?.url)
+        XCTAssertEqual(url.path, "/v1/me/connections")
+        let items = URLComponents(url: url, resolvingAgainstBaseURL: false)?.queryItems
+        XCTAssertEqual(items, [URLQueryItem(name: "supportedFeatures", value: "externalCall.googleCalendar,externalCall.todoist")])
+    }
+
+    /// 審査用の版は空の値を送る(サーバーは何も出さない)。query を落とすと絞られないので必ず付ける。
+    func testListSendsEmptySupportedFeatures() async throws {
+        StubURLProtocol.reset([.init(status: 200, body: #"{"connections":[],"providers":[]}"#)])
+        _ = try await client.connections(supportedFeatures: [])
+        let url = try XCTUnwrap(lastRequest?.url)
+        XCTAssertEqual(URLComponents(url: url, resolvingAgainstBaseURL: false)?.queryItems,
+                       [URLQueryItem(name: "supportedFeatures", value: "")])
     }
 
     func testUnknownStatusDecodes() throws {
@@ -135,10 +175,22 @@ final class ExternalServicesClientTests: XCTestCase {
         let mock = MockExternalServicesClient()
         let url = try await mock.startConnection(provider: "todoist", scopes: nil)
         XCTAssertTrue(MockExternalServicesClient.isMockAuthURL(url))
-        var list = try await mock.connections()
-        XCTAssertEqual(list.map(\.provider), ["todoist"])
+        var list = try await mock.connections(supportedFeatures: nil)
+        XCTAssertEqual(list.connections.map(\.provider), ["todoist"])
         try await mock.disconnect(provider: "todoist")
-        list = try await mock.connections()
-        XCTAssertTrue(list.isEmpty)
+        list = try await mock.connections(supportedFeatures: nil)
+        XCTAssertTrue(list.connections.isEmpty)
+    }
+
+    func testMockFiltersProvidersLikeServer() async throws {
+        let mock = MockExternalServicesClient()
+        let all = try await mock.connections(supportedFeatures: nil).providers?.map(\.id)
+        XCTAssertEqual(all, MockExternalServicesClient.defaultProviders.map(\.id))
+        let some = try await mock.connections(supportedFeatures: ["externalCall.todoist"]).providers?.map(\.id)
+        XCTAssertEqual(some, ["todoist"])
+        let none = try await mock.connections(supportedFeatures: []).providers
+        XCTAssertEqual(none, [])
+        let old = try await MockExternalServicesClient(providers: nil).connections(supportedFeatures: []).providers
+        XCTAssertNil(old)
     }
 }

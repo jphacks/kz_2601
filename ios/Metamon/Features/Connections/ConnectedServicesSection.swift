@@ -65,7 +65,8 @@ struct ConnectedServicesSection: View {
         HStack(spacing: Theme.Spacing.sm) {
             VStack(alignment: .leading, spacing: 2) {
                 Text(row.name)
-                Text(ConnectedServicesCopy.status(row.status))
+                    .foregroundStyle(row.isUnavailable ? AnyShapeStyle(.secondary) : AnyShapeStyle(.primary))
+                Text(ConnectedServicesCopy.status(row))
                     .font(.footnote)
                     .foregroundStyle(row.status == .needsReconnect ? AnyShapeStyle(Theme.Colors.warning) : AnyShapeStyle(.secondary))
             }
@@ -76,7 +77,7 @@ struct ConnectedServicesSection: View {
                 actions(row)
             }
         }
-        .disabled(model.busy != nil && model.busy != row.provider)
+        .disabled(row.isUnavailable || (model.busy != nil && model.busy != row.provider))
         .accessibilityIdentifier("settings.connections.\(row.provider)")
     }
 
@@ -89,13 +90,15 @@ struct ConnectedServicesSection: View {
                 .accessibilityIdentifier("settings.connections.\(row.provider).disconnect")
         case .needsReconnect:
             HStack(spacing: Theme.Spacing.md) {
-                Button("つなぎ直す") { connect(row.provider) }
-                    .accessibilityIdentifier("settings.connections.\(row.provider).reconnect")
+                if row.enabled {
+                    Button("つなぎ直す") { connect(row.provider) }
+                        .accessibilityIdentifier("settings.connections.\(row.provider).reconnect")
+                }
                 Button("切る", role: .destructive) { confirmDisconnect = row }
                     .accessibilityIdentifier("settings.connections.\(row.provider).disconnect")
             }
             .buttonStyle(.borderless)
-        case .notConnected:
+        case .notConnected: // 今つなげない時は行ごと押せない(row の .disabled)
             Button("つなぐ") { connect(row.provider) }
                 .buttonStyle(.borderless)
                 .accessibilityIdentifier("settings.connections.\(row.provider).connect")
@@ -123,6 +126,11 @@ struct ConnectedServicesSection: View {
 }
 
 enum ConnectedServicesCopy {
+    /// 今つなげない(つないでいない)行は「いまは使えません」。
+    static func status(_ row: ConnectedServiceRow) -> String {
+        row.isUnavailable ? L10n.tr("いまは使えません") : status(row.status)
+    }
+
     static func status(_ s: ConnectedServiceStatus) -> String {
         switch s {
         case .connected: L10n.tr("つないでいます")

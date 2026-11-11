@@ -1725,23 +1725,6 @@
         }
       }
     },
-    "Google カレンダー" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Google Calendar"
-          }
-        },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Google カレンダー"
-          }
-        }
-      }
-    },
     "ISBN を確かめてください(10 桁か 13 桁)" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -3574,6 +3557,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "いまはモバイル回線です。通信量が多いので、Wi-Fi につないでからがおすすめです。"
+          }
+        }
+      }
+    },
+    "いまは使えません" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Not available right now"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "いまは使えません"
           }
         }
       }
@@ -18368,23 +18368,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "試してほしい依頼"
-          }
-        }
-      }
-    },
-    "試験用のサービス" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Test service"
-          }
-        },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "試験用のサービス"
           }
         }
       }
