@@ -41,12 +41,19 @@
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
-            <!-- シェアリンク tailorit://import/<token>(#901)。https の /s/<token>(App Links)は署名の指紋が決まってから -->
+            <!-- シェアリンク tailorit://import/<token>(#901) -->
             <intent-filter>
                 <action android:name="android.intent.action.VIEW" />
                 <category android:name="android.intent.category.DEFAULT" />
                 <category android:name="android.intent.category.BROWSABLE" />
                 <data android:scheme="tailorit" android:host="import" />
+            </intent-filter>
+            <!-- App Links https://tailor-it.app/s/<token>(#1272)。サイトに assetlinks.json が置かれるまではブラウザで開く(docs/infra/app-links) -->
+            <intent-filter android:autoVerify="true">
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="https" android:host="tailor-it.app" android:pathPrefix="/s/" />
             </intent-filter>
         </activity>
         <!-- 表示言語(#843)。端末の設定 > アプリ の「アプリの設定」からも開ける -->

@@ -20,6 +20,15 @@ class ShareLinkIntentsTest {
     }
 
     @Test
+    fun appLinkGoesToTheSameInbox() {
+        // App Links(https://tailor-it.app/s/<token>)も同じ確認の流れへ(#1272)
+        assertTrue(ShareLinkIntents.offer(Intent.ACTION_VIEW, "https://tailor-it.app/s/tok", 0))
+        assertEquals("tok", ShareLinkIntents.inbox.pending.value)
+        assertFalse(ShareLinkIntents.offer(Intent.ACTION_VIEW, "https://tailor-it.app/terms", 0))
+        assertEquals("tok", ShareLinkIntents.inbox.pending.value)
+    }
+
+    @Test
     fun relaunchFromRecentsDoesNotReopenTheOldLink() {
         // 最近使ったアプリから開き直すと、前に開いたリンクの intent がそのまま届く
         assertFalse(ShareLinkIntents.offer(Intent.ACTION_VIEW, "tailorit://import/old", Intent.FLAG_ACTIVITY_LAUNCHED_FROM_HISTORY))
