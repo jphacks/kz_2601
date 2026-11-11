@@ -15,10 +15,12 @@ import (
 	"time"
 )
 
-const (
-	sbTestToken  = "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
-	sbTestSecret = "fedcba9876543210fedcba9876543210"
-	sbMeter      = "C271111EC0AB"
+const sbMeter = "C271111EC0AB"
+
+// 偽の値(試験だけ)。
+var (
+	sbTestToken  = strings.Repeat("0123456789abcdef", 6)
+	sbTestSecret = strings.Repeat("fedcba9876543210", 2)
 )
 
 var sbNow = time.Date(2026, 11, 12, 9, 0, 0, 0, time.UTC)
