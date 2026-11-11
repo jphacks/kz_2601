@@ -43,6 +43,11 @@ struct AppCanvas: View {
             guard let runtime, note.object as? String == runtime.appId, let entity = note.userInfo?["entity"] as? String else { return }
             Task { await runtime.reloadLocal(entity) }
         }
+        .onChange(of: runtime?.records) { _, records in
+            // デスクトップのウィジェット(#984)へ stat を渡す。記録が端末に残る作ったアプリだけ(同梱の例の記録は閉じると消える)
+            guard keepsRecords, let runtime, let records else { return }
+            WidgetSnapshotWriter.write(dsl: runtime.dsl, records: records, appId: runtime.appId)
+        }
         .onReceive(NotificationCenter.default.publisher(for: MacAppRuntime.retentionConfirmed)) { note in
             guard let runtime, note.object as? String == runtime.appId else { return }
             Task { await runtime.purgeExpiredRecords() }

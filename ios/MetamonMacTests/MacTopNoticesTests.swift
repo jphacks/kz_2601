@@ -168,6 +168,7 @@ final class MacTopNoticesTests: XCTestCase {
         wipe.domain = suiteName
         wipe.resetSharedState = {}
         wipe.removeNotifications = {}
+        wipe.clearWidget = {}
         await wipe.run()
         notices.resetAfterWipe()
 

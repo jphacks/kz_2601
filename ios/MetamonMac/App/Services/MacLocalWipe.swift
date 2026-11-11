@@ -1,5 +1,6 @@
 import Foundation
 import UserNotifications
+import WidgetKit
 import MetamonRenderer
 import MetamonServices
 
@@ -35,6 +36,8 @@ struct MacLocalWipe {
     var resetSharedState: @MainActor () -> Void = MacLocalWipe.resetSharedState
     /// 予約した通知と届いた通知
     var removeNotifications: @MainActor () async -> Void = MacLocalWipe.removeAllNotifications
+    /// デスクトップのウィジェット(#984)の数字。App Group を空にして描き直す(iOS の `wipeLocalData` と同じ)
+    var clearWidget: @MainActor () -> Void = MacLocalWipe.clearWidgetSnapshot
 
     func run() async {
         MacComposeSession.wipeCount += 1 // 開いていた会話が後から履歴を書き戻さないように
@@ -50,6 +53,7 @@ struct MacLocalWipe {
         #endif
         LocalWipe.clearDefaults(defaults, domain: domain) // iOS と同じ残すキー(言語・送信のオプトアウト)
         resetSharedState()
+        clearWidget()
         await removeNotifications()
         library?.resetAfterWipe()
     }
@@ -62,6 +66,11 @@ struct MacLocalWipe {
         ExportFiles.removeAll()
         MacCameraFiles.removeAll()
         MacAppRuntime.removePreviewDirectories()
+    }
+
+    static func clearWidgetSnapshot() {
+        WidgetSnapshot.defaults?.removePersistentDomain(forName: WidgetSnapshot.appGroupID)
+        WidgetCenter.shared.reloadAllTimelines()
     }
 
     static func removeAllNotifications() async {

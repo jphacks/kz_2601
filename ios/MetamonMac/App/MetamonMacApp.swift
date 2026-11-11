@@ -61,6 +61,8 @@ struct MetamonMacApp: App {
                     #if !APP_STORE_REVIEW
                     .modifier(MacLinkReceiver())
                     .modifier(MacPushRegistrationObserver()) // プッシュの端末の登録(#982)
+                    #else
+                    .modifier(MacWidgetLinkReceiver()) // 審査用の版は共有のリンクを外すので、ウィジェットの URL(#984)だけ受ける
                     #endif
                     .modifier(MacCrashReportUser())
                     .task { MacAccount.shared.wipe.library = library } // サインアウト・削除で一覧も空にする(#972)
