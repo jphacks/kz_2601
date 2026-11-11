@@ -42,6 +42,7 @@ const (
 	SourceInApp       Source = "in_app"           // feedback/{id} (#319)
 	SourceStoreReview Source = "app_store_review" // App Store Connect customer reviews
 	SourceCrash       Source = "crash"            // a crash spike, recorded as one item (#296)
+	SourceTestFlight  Source = "testflight"       // TestFlight beta feedback (screenshot and crash submissions)
 )
 
 // Item statuses.

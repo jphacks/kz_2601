@@ -97,6 +97,31 @@ func TestIngestAppStoreOffByDefault(t *testing.T) {
 	}
 }
 
+func TestIngestTestFlight(t *testing.T) {
+	ta := newTestApp(t, env{ingest.EnvAppStoreOn: "on"})
+	ta.appStore = fakeFetcher{src: loop.SourceStoreReview}
+	ta.testFlight = fakeFetcher{src: loop.SourceTestFlight, raws: []ingest.Raw{{Source: loop.SourceTestFlight, SourceID: "s:1", Text: "保存できない", CreatedAt: time.Now()}}}
+	if out := ta.must(t, "ingest"); strings.Contains(out, "testflight") { // off by default, even with the App Store on
+		t.Fatalf("testflight ran while off: %s", out)
+	}
+	if err := ta.run(context.Background(), []string{"ingest", "-source", "testflight"}); err == nil {
+		t.Fatal("explicit source while off should fail")
+	}
+	ta.env[ingest.EnvTestFlightOn] = "on"
+	out := ta.must(t, "ingest", "-source", "testflight")
+	if !strings.Contains(out, "ingest testflight: fetched 1, new 1 (held from AI 1)") || strings.Contains(out, "in_app") { // not in LOOP_AI_SOURCES by default
+		t.Fatalf("out:\n%s", out)
+	}
+	if out := ta.must(t, "ingest"); !strings.Contains(out, "ingest testflight:") || !strings.Contains(out, "ingest app_store_review:") {
+		t.Fatalf("all sources: %s", out)
+	}
+	// on without a key fails loudly instead of skipping
+	ta.testFlight = nil
+	if err := ta.run(context.Background(), []string{"ingest", "-source", "testflight"}); err == nil || !strings.Contains(err.Error(), ingest.EnvTestFlightOn) {
+		t.Fatalf("missing key: %v", err)
+	}
+}
+
 func TestPurgeCommand(t *testing.T) {
 	ctx := context.Background()
 	ta := newTestApp(t, env{"LOOP_PAUSED": "1"}) // purge runs even while the loop is stopped
