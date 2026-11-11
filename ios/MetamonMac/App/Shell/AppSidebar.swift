@@ -5,6 +5,7 @@ import MetamonServices
 /// ↑↓ で選ぶと中央が切り替わり、Return / ダブルクリックで中央へ移る(#934)。
 /// 「作ったアプリ」「共有されたアプリ」(シェアから追加・参加)と「同梱の例」に分ける(#969)。並べ替えは区分の中で。作ったアプリは右クリックで名前の変更・上へ / 下へ・削除(確認あり)、
 /// ドラッグで並べ替え、Delete キーで削除。同梱の例は右クリックの「複製」(作ったアプリに足す・#1285)と、会話で直した例なら「元の例に戻す」(確認あり・#1283)。
+/// どの行も右クリックの「新しいウインドウで開く」・⌥クリックで別のウインドウに開ける(#1853)。
 /// 検索(#1282)で絞った一覧を受け取る。行の頭にアプリの画面の写し(#1281・無ければ頭の文字)、右に新着の数(#969)。
 struct AppSidebar: View {
     let created: [SampleApp]
@@ -25,6 +26,8 @@ struct AppSidebar: View {
     var onDuplicate: (String) -> Void = { _ in }
     /// 「元の例に戻す」の確認の後に呼ぶ(#1283)
     var onResetExample: (String) -> Void = { _ in }
+    /// 「新しいウインドウで開く」(#1853)
+    var onOpenInNewWindow: (String) -> Void = { _ in }
     /// サーバーの一覧を初めて読んでいる(前回の一覧が無い・#1057)。作ったアプリの所にスケルトンを出す
     var loadingServerApps = false
     /// サーバーに届かず、前回の一覧を出している(#1057)
@@ -75,8 +78,10 @@ struct AppSidebar: View {
         }
         .contextMenu(forSelectionType: SampleApp.ID.self) { ids in
             if ids.count == 1, let id = ids.first, let app = manageable.first(where: { $0.id == id }) {
+                openInNewWindowItem(id)
                 manageItems(app)
             } else if ids.count == 1, let id = ids.first, let app = examples.first(where: { $0.id == id }) {
+                openInNewWindowItem(id)
                 Button("複製") { onDuplicate(id) }
                 if library.isEditedExample(id) {
                     Button("元の例に戻す…") { resetTarget = app }
@@ -189,6 +194,12 @@ struct AppSidebar: View {
     private func move(_ section: [SampleApp], fromOffsets source: IndexSet, toOffset destination: Int) {
         library.setOrder(MacSidebarSections.moved(library.createdIds, section: section.map(\.id),
                                                   fromOffsets: source, toOffset: destination))
+    }
+
+    /// 別のウインドウで開く(#1853)。行の ⌥クリックと同じ
+    @ViewBuilder private func openInNewWindowItem(_ id: String) -> some View {
+        Button("新しいウインドウで開く") { onOpenInNewWindow(id) }
+        Divider()
     }
 
     /// 作ったアプリの右クリック(iOS のカードの「…」と同じ並び: 名前 → 移動 → 削除)
