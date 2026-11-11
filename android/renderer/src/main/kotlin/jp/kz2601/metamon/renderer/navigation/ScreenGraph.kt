@@ -5,6 +5,8 @@ import jp.kz2601.metamon.dsl.ActionType
 import jp.kz2601.metamon.dsl.AppDSL
 import jp.kz2601.metamon.dsl.ComponentType
 import jp.kz2601.metamon.dsl.hasTabs
+import jp.kz2601.metamon.renderer.NavigationHost
+import jp.kz2601.metamon.renderer.form.DiscardGuard
 import jp.kz2601.metamon.renderer.screen.ScreenToolbar
 
 /**
@@ -193,4 +195,22 @@ fun NavigationResolver.reveal(screen: String, graph: ScreenGraph, dsl: AppDSL, f
         s = navigate(s, link.to, link.edges.first().presentation, null, s.top(dsl), dsl)
     }
     return s
+}
+
+/** [reveal] で消える画面のスタック: 開いているシート・全画面と、今見ているタブ(タブが無ければ main)。 */
+fun NavigationResolver.revealLeaves(from: NavigationState, dsl: AppDSL): List<String> =
+    listOf(Route.SHEET, Route.FULL, if (dsl.app.hasTabs) Route.tabStack(from.selectedTab) else Route.MAIN)
+
+/**
+ * 画面マップから画面を開く。保存していない入力のあるフォームが消えるなら、DSLView の破棄の確認を挟む
+ * (確認を出している間は開かず、「破棄」で開く)。無い画面は false。
+ */
+fun NavigationHost.requestReveal(screen: String, graph: ScreenGraph, dsl: AppDSL): Boolean {
+    val from = navigation.value
+    NavigationResolver.reveal(screen, graph, dsl, from) ?: return false
+    // 確認の後は、その時の状態から開き直す
+    val open = { NavigationResolver.reveal(screen, graph, dsl, navigation.value)?.let(::setNavigation); Unit }
+    val guard = discardGuard ?: return true.also { open() }
+    guard.request(NavigationResolver.revealLeaves(from, dsl), open)
+    return true
 }

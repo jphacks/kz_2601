@@ -105,6 +105,13 @@ fun DSLView(dsl: AppDSL, runtime: DSLRuntime, modifier: Modifier = Modifier) {
     }
     // M10: 保存していない入力のある画面を離れる前の確認(戻る・シートを閉じる・タブの切り替え)
     val discard = remember(dsl) { DiscardGuard() }
+    // 画面マップなど外からの遷移も同じ確認を通す
+    if (host != null) {
+        DisposableEffect(host, discard) {
+            host.discardGuard = discard
+            onDispose { if (host.discardGuard === discard) host.discardGuard = null }
+        }
+    }
 
     fun perform(action: Action, at: ActionContext) {
         if (host != null) return runtime.onAction(action, at)

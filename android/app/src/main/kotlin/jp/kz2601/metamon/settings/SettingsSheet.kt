@@ -40,9 +40,8 @@ import jp.kz2601.metamon.language.AppLocales
 import jp.kz2601.metamon.language.LanguageSection
 import jp.kz2601.metamon.push.PushConsentSection
 import jp.kz2601.metamon.renderer.components.social.BlockedUsersSection
-import jp.kz2601.metamon.renderer.navigation.NavigationResolver
 import jp.kz2601.metamon.renderer.navigation.ScreenGraph
-import jp.kz2601.metamon.renderer.navigation.reveal
+import jp.kz2601.metamon.renderer.navigation.requestReveal
 import jp.kz2601.metamon.screenmap.ScreenMapSheet
 import jp.kz2601.metamon.services.MyUsage
 import jp.kz2601.metamon.services.RemainingToday
@@ -136,7 +135,8 @@ fun SettingsSheet(
                 // 画面マップ(#897)。選んだ画面を根から最短の道で開き、設定ごと閉じる
                 ScreenMapSheet(runtimeState.dsl, onDismiss = { screenMapOpen = false }, onOpen = { id ->
                     val dsl = runtimeState.dsl
-                    NavigationResolver.reveal(id, ScreenGraph(dsl), dsl, container.runtime.navigation.value)?.let(container.runtime::setNavigation)
+                    // 保存していない入力のあるフォームが消えるなら破棄の確認を挟む
+                    container.runtime.requestReveal(id, ScreenGraph(dsl), dsl)
                     screenMapOpen = false
                     onDismiss()
                 })

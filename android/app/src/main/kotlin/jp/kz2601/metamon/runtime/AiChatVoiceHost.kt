@@ -21,12 +21,36 @@ interface AiChatSpeechEngine {
     /** 読み終わり・止まった・失敗を [utteranceId] で知らせる口。 */
     fun setOnFinished(listener: (utteranceId: String) -> Unit)
 
+    /** 一度に読める長さ(TextToSpeech.getMaxSpeechInputLength)。超えた分は読まない。 */
+    val maxInputLength: Int get() = Int.MAX_VALUE
+
+    /** 読めなかった時(speak が ERROR)も [setOnFinished] の口で知らせる。 */
     fun speak(text: String, languageTag: String, utteranceId: String)
 
     fun stop()
 
     /** 声の仕組みを手放す(画面を離れた)。 */
     fun shutdown()
+}
+
+/** 端末の TextToSpeech に渡す前の決まり(JVM で確かめる)。 */
+object AiChatTts {
+    /** 読める長さで切る。サロゲートペアの途中では切らない。 */
+    fun clip(text: String, max: Int): String {
+        if (max <= 0 || text.length <= max) return text
+        val end = if (Character.isHighSurrogate(text[max - 1])) max - 1 else max
+        return text.substring(0, end)
+    }
+
+    /**
+     * [requested] の言語を試し、データが無い・対応していない(結果が負)なら [fallback] を試す。
+     * 使えた方を返す。どちらも使えなければ null(端末の既定の声のまま読む)。
+     */
+    fun <L> applyLanguage(requested: L, fallback: L, set: (L) -> Int): L? = when {
+        set(requested) >= 0 -> requested
+        fallback != requested && set(fallback) >= 0 -> fallback
+        else -> null
+    }
 }
 
 /** 音の取り合い(実機は AudioArbiter・テストは [AudioClaims])。 */
@@ -100,7 +124,7 @@ class AiChatVoiceHost(
     override fun prepareDictation() = dictation.prepareDictation()
 
     override fun speak(text: String, owner: String) {
-        val t = text.trim()
+        val t = AiChatTts.clip(text.trim(), engine.maxInputLength)
         if (released || recording || t.isEmpty()) return
         if (!gate.claim(TTS_OWNER, AudioClaims.Use.SPEECH) { stopSpeaking() }) return
         speaking.value = owner

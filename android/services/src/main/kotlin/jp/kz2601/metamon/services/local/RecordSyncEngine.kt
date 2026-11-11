@@ -16,6 +16,8 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import java.io.File
@@ -87,6 +89,9 @@ class RecordSyncEngine(
     @Volatile
     private var wipeGeneration = 0
 
+    /** wipe と書き込みを交互にしない(wipe の消す途中に積まれて、前の人の行が次の人の列に残るのを防ぐ) */
+    private val wipeLock = Mutex()
+
     // 動かす
 
     /** 到達性と列の知らせを購読し、未送信があれば流し始める。2 回呼んでも 1 回だけ。 */
@@ -115,12 +120,16 @@ class RecordSyncEngine(
 
     /** アカウント削除(#119): 購読を止め、送信待ちとローカル DB を空にする。次の [start] で再開できる。 */
     suspend fun wipe() {
-        stop()
-        wipeGeneration += 1
-        dropPendingDeletions { true }
-        settleCommitting()
-        queue.discardAll()
-        store.removeEverything()
+        wipeLock.withLock {
+            stop()
+            wipeGeneration += 1
+            dropPendingDeletions { true }
+            settleCommitting()
+            queue.discardAll()
+            store.removeEverything()
+            // 消し終わりにも増やす: wipe の途中に呼ばれて待っていた書き込みも、前の人の行として捨てる
+            wipeGeneration += 1
+        }
         refreshStatus()
     }
 
@@ -200,45 +209,48 @@ class RecordSyncEngine(
         authorUid: String? = null, authorName: String? = null, shared: Boolean = false,
     ): Pair<List<Record>, String> {
         val generation = wipeGeneration
-        val stamp = timestamp()
-        val existing = recordId?.let { store.row(appId, entity, it) }
-        val written = if (recordId != null && existing != null) {
-            // PATCH と同じくキー単位でマージ(DSL から消えた項目も残す)
-            store.upsert(
-                existing.copy(
-                    data = JsonObject(existing.data + data),
-                    updatedAt = stamp,
-                    pendingOp = if (existing.pendingOp == PendingOp.CREATE) PendingOp.CREATE else PendingOp.UPDATE,
-                ),
-            )
-            queue.enqueue(SyncOperation(appId = appId, entity = entity, recordId = recordId, kind = PendingOp.UPDATE, data = data))
-            recordId
-        } else {
-            val clientId = UUID.randomUUID().toString().lowercase()
-            val row = LocalRecord(
-                appId = appId, entity = entity, recordId = LocalRecord.temporaryId(clientId), data = data,
-                createdAt = stamp, updatedAt = stamp, pendingOp = PendingOp.CREATE, clientId = clientId,
-                author = if (shared) authorUid else null,
-                authorName = if (shared) authorName ?: ANONYMOUS_NAME else null,
-            )
-            store.upsert(row)
-            queue.enqueue(
-                SyncOperation(
-                    id = clientId, appId = appId, entity = entity, recordId = row.recordId, kind = PendingOp.CREATE,
-                    data = data, authorName = if (shared) authorName else null,
-                ),
-            )
-            row.recordId
+        // wipe の途中に呼ばれたら、wipe が終わるまで待ってから捨てる(下の世代の比較)
+        return wipeLock.withLock {
+            val stamp = timestamp()
+            val existing = recordId?.let { store.row(appId, entity, it) }
+            val written = if (recordId != null && existing != null) {
+                // PATCH と同じくキー単位でマージ(DSL から消えた項目も残す)
+                store.upsert(
+                    existing.copy(
+                        data = JsonObject(existing.data + data),
+                        updatedAt = stamp,
+                        pendingOp = if (existing.pendingOp == PendingOp.CREATE) PendingOp.CREATE else PendingOp.UPDATE,
+                    ),
+                )
+                queue.enqueue(SyncOperation(appId = appId, entity = entity, recordId = recordId, kind = PendingOp.UPDATE, data = data))
+                recordId
+            } else {
+                val clientId = UUID.randomUUID().toString().lowercase()
+                val row = LocalRecord(
+                    appId = appId, entity = entity, recordId = LocalRecord.temporaryId(clientId), data = data,
+                    createdAt = stamp, updatedAt = stamp, pendingOp = PendingOp.CREATE, clientId = clientId,
+                    author = if (shared) authorUid else null,
+                    authorName = if (shared) authorName ?: ANONYMOUS_NAME else null,
+                )
+                store.upsert(row)
+                queue.enqueue(
+                    SyncOperation(
+                        id = clientId, appId = appId, entity = entity, recordId = row.recordId, kind = PendingOp.CREATE,
+                        data = data, authorName = if (shared) authorName else null,
+                    ),
+                )
+                row.recordId
+            }
+            if (wipeGeneration != generation) {
+                // 書く途中で wipe された: 前の人の行を次の人の DB・列に残さない
+                queue.discard(appId, entity, written)
+                store.remove(appId, entity, written)
+                refreshStatus()
+            } else {
+                kick()
+            }
+            shown(appId, entity) to written
         }
-        if (wipeGeneration != generation) {
-            // 書く途中で wipe された: 前の人の行を次の人の DB・列に残さない
-            queue.discard(appId, entity, written)
-            store.remove(appId, entity, written)
-            refreshStatus()
-            return shown(appId, entity) to written
-        }
-        kick()
-        return shown(appId, entity) to written
     }
 
     /** 削除。ローカルではすぐ一覧から消え(行は削除待ちで残る)、送れたら行も消える。 */

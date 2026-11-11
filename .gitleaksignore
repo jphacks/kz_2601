@@ -5,3 +5,5 @@
 # LiveKit のテスト用の偽の鍵(e92d242d で追加・3e3aeafc で偽と分かる値に置き換え済み)。実の鍵ではない。
 e92d242d4414af9573ebef21175e474489e46a74:backend/internal/appconfig/calls_test.go:generic-api-key:41
 e92d242d4414af9573ebef21175e474489e46a74:backend/internal/calls/calls_test.go:generic-api-key:23
+# SharedPreferences のキー名(exactAlarm.prompted.v1)の誤検知。秘密情報ではない。
+860439072a981a5daabedf24da7f85a1036fbfef:android/app/src/main/kotlin/jp/kz2601/metamon/notifications/ExactAlarmAsk.kt:generic-api-key:45

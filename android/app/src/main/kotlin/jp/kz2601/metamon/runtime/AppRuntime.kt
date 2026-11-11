@@ -41,6 +41,7 @@ import jp.kz2601.metamon.renderer.components.social.ModerationHost
 import jp.kz2601.metamon.renderer.components.social.ReportReasonOption
 import jp.kz2601.metamon.renderer.components.social.SocialPrompt
 import jp.kz2601.metamon.renderer.components.social.SocialPromptHost
+import jp.kz2601.metamon.renderer.form.DiscardGuard
 import jp.kz2601.metamon.renderer.form.FormDraft
 import jp.kz2601.metamon.renderer.form.FormPrefill
 import jp.kz2601.metamon.renderer.navigation.NavigationResolver
@@ -383,6 +384,7 @@ class AppRuntime(
      * 次のサインインで [bootstrap] がもう一度走る。サーバーには何も送らない(記録の DB・送信待ちは `LocalDataWipe` が消す)。
      */
     fun resetForAccountChange() {
+        accountGeneration += 1
         bootstrapJob?.cancel()
         bootstrapJob = null
         accountSwitchJob?.cancel()
@@ -406,6 +408,10 @@ class AppRuntime(
     }
 
     private var accountSwitchJob: Job? = null
+
+    /** [resetForAccountChange] ごとに増やす。前の人の操作で始めた非同期の予約(タイマーのアラーム)を後から入れない */
+    @Volatile
+    private var accountGeneration = 0
 
     /**
      * 別のアカウントを受け入れた後(#1317・iOS の `adoptSwitchedAccount`)。[resetForAccountChange] の後に呼ぶ。
@@ -666,6 +672,8 @@ class AppRuntime(
         _navigation.value = next
     }
 
+    override var discardGuard: DiscardGuard? = null
+
     // 画面の操作
 
     fun dismissToast() = _state.update { it.copy(toast = null) }
@@ -775,7 +783,13 @@ class AppRuntime(
     /** timerDisplay の終了通知(端末の予約は [RuntimeHost.timerChanged])。 */
     override fun timerChanged(key: String, name: String, endsAtEpochMillis: Long?) {
         val appId = document.appId
-        scope.launch { host.timerChanged("$appId/$key", dsl.app.name, name, endsAtEpochMillis) }
+        val appName = dsl.app.name
+        val generation = accountGeneration
+        scope.launch {
+            // 予約する前にサインアウト・アカウントの切り替えがあった: 前の人のアラームを戻さない
+            if (accountGeneration != generation) return@launch
+            host.timerChanged("$appId/$key", appName, name, endsAtEpochMillis)
+        }
     }
 
     override fun loadTimer(key: String): TimerRun? = host.loadTimer("${document.appId}/$key")
