@@ -46,12 +46,20 @@ class AiChatVoiceHostTest {
         var stops = 0
         var shutdowns = 0
         lateinit var finish: (String) -> Unit
+        var max = Int.MAX_VALUE
+        /** 次の読み上げを受け付けない(TextToSpeech.speak が ERROR)。実機のエンジンと同じく、その場で終わりを知らせる */
+        var rejectNext = false
+        override val maxInputLength: Int get() = max
         override fun setOnFinished(listener: (utteranceId: String) -> Unit) {
             finish = listener
         }
 
         override fun speak(text: String, languageTag: String, utteranceId: String) {
             spoken += Triple(text, languageTag, utteranceId)
+            if (rejectNext) {
+                rejectNext = false
+                finish(utteranceId)
+            }
         }
 
         override fun stop() {
@@ -211,5 +219,47 @@ class AiChatVoiceHostTest {
         host.release()
         assertEquals(1, dictation.cancelled)
         assertNull(gate.claims.current)
+    }
+
+    @Test
+    fun longTextIsClippedToTheEngineLimit() {
+        engine.max = 5
+        host.speak("  あいうえおかきくけこ ", "o/1")
+        assertEquals("あいうえお", engine.spoken.last().first)
+    }
+
+    @Test
+    fun rejectedSpeechFreesTheSpeakerAtOnce() {
+        engine.rejectNext = true
+        host.speak("a", "o/1")
+        assertNull("受け付けられなかった読み上げは読み上げ中のまま残らない", host.speakingOwner.value)
+        assertNull(gate.claims.current)
+        host.speak("b", "o/2") // 次はふつうに読める
+        assertEquals("o/2", host.speakingOwner.value)
+    }
+
+    @Test
+    fun clipDoesNotSplitASurrogatePair() {
+        assertEquals("ab", AiChatTts.clip("ab\uD83D\uDE00c", 3))
+        assertEquals("ab\uD83D\uDE00", AiChatTts.clip("ab\uD83D\uDE00c", 4))
+        assertEquals("abc", AiChatTts.clip("abc", 3))
+        assertEquals("abc", AiChatTts.clip("abc", 0)) // 上限が分からない時は切らない
+    }
+
+    @Test
+    fun missingLanguageFallsBackToTheDefault() {
+        val tried = mutableListOf<String>()
+        // -1 = LANG_MISSING_DATA・-2 = LANG_NOT_SUPPORTED・0 以上 = 使える
+        fun results(vararg pairs: Pair<String, Int>): (String) -> Int = { l -> tried += l; pairs.toMap().getValue(l) }
+        assertEquals("ja", AiChatTts.applyLanguage("ja", "en", results("ja" to 0, "en" to 0)))
+        assertEquals(listOf("ja"), tried)
+        tried.clear()
+        assertEquals("en", AiChatTts.applyLanguage("ja", "en", results("ja" to -1, "en" to 1)))
+        assertEquals(listOf("ja", "en"), tried)
+        assertEquals("en", AiChatTts.applyLanguage("ja", "en", results("ja" to -2, "en" to 0)))
+        assertNull(AiChatTts.applyLanguage("ja", "en", results("ja" to -2, "en" to -1)))
+        tried.clear()
+        assertNull("既定と同じ言語は試し直さない", AiChatTts.applyLanguage("ja", "ja", results("ja" to -1)))
+        assertEquals(listOf("ja"), tried)
     }
 }

@@ -32,6 +32,12 @@ class DiscardGuard {
         if (pending == null) pending = action
     }
 
+    /** 複数のスタックをまとめて離れる操作(画面マップ: シート・全画面・今のタブ)。どれかに入力があれば確認する。 */
+    fun request(stacks: Collection<String>, action: () -> Unit) {
+        val stack = stacks.firstOrNull(::needsConfirm) ?: return action()
+        request(stack, action)
+    }
+
     /** 「破棄」: 預けた操作を実行する。 */
     fun discard() {
         val action = pending ?: return

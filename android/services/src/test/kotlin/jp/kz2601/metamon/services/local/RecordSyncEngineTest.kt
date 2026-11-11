@@ -223,4 +223,31 @@ class RecordSyncEngineTest {
         assertTrue(e.cached("app", "track").isEmpty())
         dir.deleteRecursively()
     }
+
+    /** wipe の消す途中に始まった書き込みも、次の人の DB・送信待ちに残さない(列を空にした後に積まれる競合・#1128)。 */
+    @Test
+    fun writeThatStartsDuringAWipeLeavesNoRow() = runTest {
+        val dir = Files.createTempDirectory("records").toFile()
+        val io = StandardTestDispatcher(testScheduler) // wipe をファイルの読み書きで止め、その間に書く
+        val store = RecordStore(dir, io)
+        val queue = SyncQueue(null, store, client, BackoffPolicy.immediate, sleep = {}, io = EmptyCoroutineContext)
+        val e = RecordSyncEngine(store, queue, client, net, backgroundScope)
+        val wipe = launch { e.wipe() } // 世代を上げ、ローカル DB を消す所で止まる
+        val write = launch { e.write("app", "track", null, data("point")) } // その間に始まる
+        wipe.join()
+        write.join()
+        assertEquals(0, e.queue.count())
+        assertTrue(e.cached("app", "track").isEmpty())
+        dir.deleteRecursively()
+    }
+
+    /** wipe が終わってからの書き込みは残して送る。 */
+    @Test
+    fun writeAfterAWipeIsKept() = runTest {
+        val e = engine()
+        e.wipe()
+        e.write("app", "todo", null, data("b"))
+        assertEquals(1, e.queue.count())
+        assertEquals(1, e.cached("app", "todo").size)
+    }
 }

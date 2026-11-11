@@ -8,6 +8,7 @@ import jp.kz2601.metamon.dsl.records.JSONValue
 import jp.kz2601.metamon.dsl.records.Record
 import jp.kz2601.metamon.renderer.components.ai.AiHost
 import jp.kz2601.metamon.renderer.components.media.PhotoReader
+import jp.kz2601.metamon.renderer.form.DiscardGuard
 import jp.kz2601.metamon.renderer.form.FormDraft
 import jp.kz2601.metamon.renderer.navigation.NavigationState
 import jp.kz2601.metamon.renderer.navigation.Route
@@ -30,6 +31,9 @@ interface NavigationHost {
     val navigation: StateFlow<NavigationState>
 
     fun setNavigation(next: NavigationState)
+
+    /** 描いている DSLView の破棄の確認(DSLView が入れ、離れたら外す)。外からの遷移(画面マップ)はこれを通す。 */
+    var discardGuard: DiscardGuard?
 }
 
 /** 描画器が使う能力。:app の AppRuntime が実装する(iOS の `DSLRuntime`)。:renderer は :services を知らない。 */

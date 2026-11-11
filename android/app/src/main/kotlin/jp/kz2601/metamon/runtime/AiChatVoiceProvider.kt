@@ -72,6 +72,8 @@ private class AndroidAiChatSpeechEngine(private val app: Context) : AiChatSpeech
     private var onFinished: (String) -> Unit = {}
     private var shut = false
 
+    override val maxInputLength: Int get() = TextToSpeech.getMaxSpeechInputLength()
+
     override fun setOnFinished(listener: (utteranceId: String) -> Unit) {
         onFinished = listener
     }
@@ -79,13 +81,20 @@ private class AndroidAiChatSpeechEngine(private val app: Context) : AiChatSpeech
     override fun speak(text: String, languageTag: String, utteranceId: String) {
         if (shut) return
         val run: () -> Unit = {
-            tts?.let { engine ->
-                val locale = Locale.forLanguageTag(languageTag)
-                engine.language = locale
-                engine.voices?.filter { it.locale.language == locale.language && !it.isNetworkConnectionRequired }
-                    ?.maxByOrNull { it.quality }
-                    ?.let { engine.voice = it }
-                engine.speak(text, TextToSpeech.QUEUE_FLUSH, null, utteranceId)
+            val engine = tts
+            if (engine == null) {
+                onFinished(utteranceId)
+            } else {
+                // データが無い・対応していない言語は端末の既定の言語で読む
+                val locale = AiChatTts.applyLanguage(Locale.forLanguageTag(languageTag), Locale.getDefault()) { engine.setLanguage(it) }
+                if (locale != null) {
+                    engine.voices?.filter { it.locale.language == locale.language && !it.isNetworkConnectionRequired }
+                        ?.maxByOrNull { it.quality }
+                        ?.let { engine.voice = it }
+                }
+                val clipped = AiChatTts.clip(text, TextToSpeech.getMaxSpeechInputLength())
+                // 受け付けられなかった読み上げは終わりの知らせが来ないので、すぐ終わったことにする
+                if (engine.speak(clipped, TextToSpeech.QUEUE_FLUSH, null, utteranceId) == TextToSpeech.ERROR) onFinished(utteranceId)
             }
             Unit
         }

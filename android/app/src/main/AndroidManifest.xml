@@ -44,6 +44,13 @@
     <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM" />
     <!-- Health Connect(healthStat)の権限は、その部品と権限の理由の画面を入れる時に足す(#890 の子 Issue) -->
 
+    <!-- 読み上げ(TextToSpeech)のエンジンを見つける(Android 11 からのパッケージの見え方の制限) -->
+    <queries>
+        <intent>
+            <action android:name="android.intent.action.TTS_SERVICE" />
+        </intent>
+    </queries>
+
     <application
         android:name=".MetamonApplication"
         android:allowBackup="false"
