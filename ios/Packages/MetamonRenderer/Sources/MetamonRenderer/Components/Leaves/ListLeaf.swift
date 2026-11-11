@@ -77,6 +77,12 @@ struct ListLeaf: View {
                                 Divider()
                             }
                             #endif
+                            #if os(iOS)
+                            // 記録を項目つきで別の生成アプリへ(#1871)
+                            if let entity, RecordPasteboard.payload(record: row, entity: entity, rt: rt) != nil {
+                                Button(L("記録をコピー"), systemImage: "doc.on.doc") { RecordPasteboard.copy(record: row, entity: entity, rt: rt) }
+                            }
+                            #endif
                             if deletable(row, entity: entityId) {
                                 Button(L("削除"), systemImage: "trash", role: .destructive) { delete(row, entity: entityId) }
                             }
@@ -85,6 +91,11 @@ struct ListLeaf: View {
                         .accessibilityActions {
                             #if os(macOS)
                             Button(L("コピー")) { copy(row, entity: entity) }
+                            #endif
+                            #if os(iOS)
+                            if let entity, RecordPasteboard.payload(record: row, entity: entity, rt: rt) != nil {
+                                Button(L("記録をコピー")) { RecordPasteboard.copy(record: row, entity: entity, rt: rt) }
+                            }
                             #endif
                             if deletable(row, entity: entityId) { Button(L("削除")) { delete(row, entity: entityId) } }
                             ModerationAccessibilityActions(rt: rt, entity: entityId, record: row)

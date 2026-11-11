@@ -914,6 +914,23 @@
         }
       }
     },
+    "%lld 項目を入れました: %@" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Filled %1$lld fields: %2$@"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld 項目を入れました: %@"
+          }
+        }
+      }
+    },
     "%lld 項目を入力欄に入れました。確認して保存してください" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -2144,6 +2161,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "このデータは誰でも見られます(公開)"
+          }
+        }
+      }
+    },
+    "このフォームに合う項目はありませんでした" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No fields matched this form"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "このフォームに合う項目はありませんでした"
           }
         }
       }
@@ -6080,6 +6114,23 @@
         }
       }
     },
+    "合わなかった項目: %@" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Didn't match: %@"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "合わなかった項目: %@"
+          }
+        }
+      }
+    },
     "同じ曲がもう入っています" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -8484,6 +8535,74 @@
         }
       }
     },
+    "記録のコピーと貼り付け" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Copy or Paste Record"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "記録のコピーと貼り付け"
+          }
+        }
+      }
+    },
+    "記録をコピー" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Copy Record"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "記録をコピー"
+          }
+        }
+      }
+    },
+    "記録をコピーしました" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Record copied"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "記録をコピーしました"
+          }
+        }
+      }
+    },
+    "記録をコピーできませんでした" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Couldn't copy the record"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "記録をコピーできませんでした"
+          }
+        }
+      }
+    },
     "記録を保存できませんでした" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -8514,6 +8633,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "記録を停止"
+          }
+        }
+      }
+    },
+    "記録を貼り付け" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Paste Record"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "記録を貼り付け"
           }
         }
       }
@@ -8871,6 +9007,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "負け"
+          }
+        }
+      }
+    },
+    "貼り付けられる記録がありません" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "There's no record to paste"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "貼り付けられる記録がありません"
           }
         }
       }
