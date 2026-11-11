@@ -36,6 +36,8 @@ struct MacRootView: View {
     @Environment(MacOnboarding.self) private var onboarding: MacOnboarding?
     /// β の案内の依頼の例(#1214)など、ほかのシート・ウインドウから入力欄に入れる文
     private let draftRequest = MacDraftRequest.shared
+    /// サービスメニューで文字が届いた時にウインドウが無ければ開く(#1849)
+    @Environment(\.openWindow) private var openWindow
     /// 完成の後のお知らせ(#968)
     @State private var notices = MacPostBuildNotices()
     /// 最低対応版と強制アップデート(#981)。サービスのお知らせと同じ応答で判定する
@@ -200,6 +202,9 @@ struct MacRootView: View {
         }
         .onAppear {
             reopenLastApp()
+            // サービスメニュー(#1849): ウインドウが無い時に届いた文字は、開いたこのウインドウが受け取る
+            MacTextServiceProvider.shared.openMainWindow = { [openWindow] in openWindow(id: MacCommands.mainWindowId) }
+            takeDraftRequest()
             badges.setOpen(selectedAppId, window: windowToken)
             // self ごと捕まえると見張り(State)との循環で残るので、シートの Binding だけ渡す
             let map = $showsScreenMap, tips = $showsTips
@@ -233,11 +238,7 @@ struct MacRootView: View {
         }
         .onChange(of: draftRequest.serial) {
             // 頼まれた文を入力欄に入れて会話を開く(送らない)。頼んだシートが閉じるのを待つ(重なると表示されない・iOS と同じ 0.6 秒)
-            guard let draft = draftRequest.take(in: discardGuard.window) else { return } // 頼んだ時に前に出したウインドウだけ
-            Task { @MainActor in
-                try? await Task.sleep(for: .milliseconds(600))
-                ask(draft: draft)
-            }
+            takeDraftRequest()
         }
         #if !APP_STORE_REVIEW
         .onChange(of: notices.showsEditHint) { wasShowing, showing in
@@ -423,6 +424,20 @@ struct MacRootView: View {
 
     /// ⇧⌘M: 声で頼む。⌘K と同じ相手(中央のアプリ・無ければ新しいアプリ)の会話を開き、すぐ録音する
     private func speak() { ask(draft: "", voice: true) }
+
+    /// 頼まれた文(β の案内・サービスメニュー)を受け取る。頼んだ時に前に出したウインドウだけ
+    private func takeDraftRequest() {
+        guard let draft = draftRequest.take(in: discardGuard.window) else { return }
+        Task { @MainActor in
+            try? await Task.sleep(for: .milliseconds(600))
+            if let compose {
+                // 会話が開いていれば、その入力欄に足す(書きかけは消さない・#1849)
+                compose.draft = MacTextServiceProvider.appending(draft, to: compose.draft)
+            } else {
+                ask(draft: draft)
+            }
+        }
+    }
 
     private func ask(draft: String, voice: Bool = false) {
         if let app = selectedApp {

@@ -58,6 +58,11 @@ final class MacDiscardGuard {
 final class MacAppDelegate: NSObject, NSApplicationDelegate {
     private var quitConfirmed = false
 
+    /// サービスメニューの「Tailor It に送る」(#1849)
+    func applicationDidFinishLaunching(_ notification: Notification) {
+        MacTextServiceProvider.shared.register()
+    }
+
     func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
         if quitConfirmed { return .terminateNow }
         let asked = MacDiscardGuard.confirmQuit { [weak self] in
