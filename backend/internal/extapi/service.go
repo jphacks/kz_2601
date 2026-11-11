@@ -61,6 +61,8 @@ type Service struct {
 	oauth map[string]OAuthClient
 	sem   chan struct{}
 	cache *callCache
+	// refreshing serialises token refreshes per uid + provider.
+	refreshing keyedLock
 
 	Runs  RunsCounter
 	Coins CoinBiller
@@ -368,8 +370,23 @@ func (s *Service) token(ctx context.Context, uid, provider string) (Token, error
 	if !t.expired(s.now()) {
 		return t, nil
 	}
+	// One refresh at a time per connection on this instance: providers that
+	// rotate the refresh token refuse the old one once it was used.
+	unlock, err := s.refreshing.lock(ctx, uid+"\x00"+provider)
+	if err != nil {
+		return Token{}, err
+	}
+	defer unlock()
+	if t, err = s.Conns.Token(ctx, uid, provider); err != nil || !t.expired(s.now()) {
+		return t, err // renewed by the call this one waited for
+	}
 	nt, err := s.oauth[provider].Refresh(ctx, t)
 	if errors.Is(err, ErrInvalidGrant) {
+		// another instance may have renewed (and rotated) it meanwhile
+		if cur, cerr := s.Conns.Token(ctx, uid, provider); cerr == nil && !cur.expired(s.now()) &&
+			(cur.RefreshToken != t.RefreshToken || cur.AccessToken != t.AccessToken) {
+			return cur, nil
+		}
 		_ = s.Conns.MarkError(ctx, uid, provider)
 		return Token{}, ErrNotConnected
 	}
