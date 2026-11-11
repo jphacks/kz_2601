@@ -2179,6 +2179,22 @@
         }
       }
     },
+    "どの記録でこの画面を開くかを選びます" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Choose which record to open this screen with"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "どの記録でこの画面を開くかを選びます"
+          }
+        }
+      }
+    },
     "どんなアプリにするか考えています…" : {
       "localizations" : {
         "en" : {
@@ -7523,6 +7539,22 @@
         }
       }
     },
+    "記録 %lld" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Record %lld"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "記録 %lld"
+          }
+        }
+      }
+    },
     "記録(入力したデータ)の中身は送りません。オンにしたものだけを送ります。" : {
       "localizations" : {
         "en" : {
@@ -7535,6 +7567,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "記録(入力したデータ)の中身は送りません。オンにしたものだけを送ります。"
+          }
+        }
+      }
+    },
+    "記録がまだ無いので、空のまま開きます" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No records yet, so it opens empty."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "記録がまだ無いので、空のまま開きます"
           }
         }
       }
@@ -7567,6 +7615,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "記録に写真を付けられるようにして"
+          }
+        }
+      }
+    },
+    "記録を選んで開く" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Open with a Record"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "記録を選んで開く"
           }
         }
       }
