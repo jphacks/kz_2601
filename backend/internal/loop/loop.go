@@ -150,6 +150,12 @@ type Draft struct {
 	IssueRepo    string    `firestore:"issueRepo,omitempty"`
 	IssueNumber  int       `firestore:"issueNumber,omitempty"`
 	BodyHash     string    `firestore:"bodyHash,omitempty"` // sha256 of the posted title+body (#366 decision 11)
+	// AppendRepo and AppendIssue: the cluster already has a published,
+	// not-fixed issue there, so this draft is a comment that adds the new
+	// counts and examples to it instead of a new issue (#369). Set by the
+	// builder; the approved body is posted as that comment.
+	AppendRepo  string `firestore:"appendRepo,omitempty"`
+	AppendIssue int    `firestore:"appendIssue,omitempty"`
 
 	FixedPR    int       `firestore:"fixedPr,omitempty"`
 	FixedAt    time.Time `firestore:"fixedAt,omitempty"`

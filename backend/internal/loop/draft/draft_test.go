@@ -148,6 +148,14 @@ func (f *fakePublisher) CreateIssue(_ context.Context, repo, title, body string,
 	return &github.Issue{Number: 900 + len(f.calls), URL: "u"}, nil
 }
 
+func (f *fakePublisher) CommentIssue(_ context.Context, repo string, n int, body string) (*github.Issue, error) {
+	if f.err != nil {
+		return nil, f.err
+	}
+	f.calls = append(f.calls, fmt.Sprintf("comment|%s#%d", repo, n))
+	return &github.Issue{Number: n, URL: "u"}, nil
+}
+
 func pendingDraft(t *testing.T, s loop.Store) loop.Draft {
 	t.Helper()
 	triaged(t, s, 2, "photo", "bug", "写真を追加しようとするとアプリが毎回落ちてしまって困っています", "写真を追加するとアプリが終了する。", loop.SourceInApp)

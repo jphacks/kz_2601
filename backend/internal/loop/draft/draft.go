@@ -4,6 +4,10 @@
 // configured. Drafts are built from the checked summaries with a fixed
 // template (no second LLM call), and pass the exit check (Check, #366 検査器 2)
 // when stored and again right before they are posted.
+//
+// A cluster that already has a published issue that is not fixed yet gets an
+// append draft instead: a comment with the new counts and summaries for that
+// issue (Draft.AppendIssue), approved and checked the same way.
 package draft
 
 import (
@@ -85,6 +89,10 @@ func (b *Builder) Run(ctx context.Context) (Result, error) {
 	for _, d := range pending {
 		open[d.ClusterKey] = d
 	}
+	filed, err := FiledIssues(ctx, b.Store)
+	if err != nil {
+		return res, err
+	}
 	maxNew := b.MaxNew
 	if maxNew <= 0 {
 		maxNew = 20
@@ -107,6 +115,8 @@ func (b *Builder) Run(ctx context.Context) (Result, error) {
 		} else {
 			d = loop.Draft{ID: newID(), ClusterKey: key, Status: loop.DraftPending, CreatedAt: now, ExpiresAt: now.Add(loop.Retention)}
 		}
+		t := filed[key]
+		d.AppendRepo, d.AppendIssue = t.Repo, t.Number
 		fill(&d, all, now)
 		if reasons := Check(d.Title, d.Body, texts(all)); len(reasons) > 0 {
 			// do not store a draft that would fail at approval; the items
@@ -156,6 +166,37 @@ func (b *Builder) updateItem(ctx context.Context, it loop.Item) error {
 
 func (b *Builder) load(ctx context.Context, ids []string) ([]loop.Item, error) {
 	return LoadItems(ctx, b.Store, ids)
+}
+
+// Filed is an issue the loop already posted for a cluster.
+type Filed struct {
+	Repo   string
+	Number int
+}
+
+// FiledIssues maps each cluster key to the newest published issue of that
+// cluster that is not fixed yet. A fixed cluster that comes back gets a new
+// issue (it is a regression, not more of the same).
+func FiledIssues(ctx context.Context, s loop.Store) (map[string]Filed, error) {
+	ds, err := s.ListDrafts(ctx, loop.DraftQuery{Status: loop.DraftPublished, Limit: 500})
+	if err != nil {
+		return nil, err
+	}
+	out := map[string]Filed{}
+	fixed := map[Filed]bool{}
+	for _, d := range ds {
+		if d.IssueNumber > 0 && !d.FixedAt.IsZero() {
+			fixed[Filed{d.IssueRepo, d.IssueNumber}] = true
+		}
+	}
+	for _, d := range ds { // newest first
+		f := Filed{d.IssueRepo, d.IssueNumber}
+		if _, seen := out[d.ClusterKey]; seen || d.ClusterKey == "" || f.Number <= 0 || fixed[f] {
+			continue
+		}
+		out[d.ClusterKey] = f
+	}
+	return out, nil
 }
 
 // LoadItems reads ids, skipping ones that expired or were erased.
@@ -219,9 +260,6 @@ func fill(d *loop.Draft, items []loop.Item, now time.Time) {
 	}
 	d.Priority = triage.Priority(rep.Category, impactOf(rep.Priority), rep.Area, count)
 	d.Title = fmt.Sprintf("[フィードバック] %s: %s", draftable[rep.Category], cut(firstSentence(rep.Summary), 60))
-
-	var b strings.Builder
-	b.WriteString("## 症状\n\n" + rep.Summary + "\n")
 	examples := []string{}
 	for _, it := range items[1:] {
 		if len(examples) == MaxExamples {
@@ -231,6 +269,32 @@ func fill(d *loop.Draft, items []loop.Item, now time.Time) {
 			examples = append(examples, it.Summary)
 		}
 	}
+	counts := func(b *strings.Builder) {
+		fmt.Fprintf(b, "- 件数: %d(%s)\n", count, sourceLine(bySource))
+		if len(versions) > 0 {
+			b.WriteString("- アプリの版: " + strings.Join(versions, "、") + "\n")
+		}
+		if len(oses) > 0 {
+			b.WriteString("- OS: " + strings.Join(oses, "、") + "\n")
+		}
+		b.WriteString("- 領域: " + rep.Area + "\n- 優先度の案: " + d.Priority + "\n")
+	}
+
+	var b strings.Builder
+	if d.AppendIssue > 0 {
+		// a comment on the filed issue: only what is new
+		b.WriteString("## 同じ束の新しい報告\n\n")
+		counts(&b)
+		b.WriteString("\n## 新しい報告(要約)\n\n")
+		for _, e := range append([]string{rep.Summary}, examples...) {
+			b.WriteString("- " + strings.ReplaceAll(e, "\n", " ") + "\n")
+		}
+		b.WriteString("\n---\nこの Issue を出した後に届いたフィードバックの要約を、人が確かめて追記した。原文と個人情報は載せていない(#367)。\n")
+		d.Body = b.String()
+		d.UpdatedAt = now
+		return
+	}
+	b.WriteString("## 症状\n\n" + rep.Summary + "\n")
 	if len(examples) > 0 {
 		b.WriteString("\n## ほかの報告(要約)\n\n")
 		for _, e := range examples {
@@ -238,14 +302,7 @@ func fill(d *loop.Draft, items []loop.Item, now time.Time) {
 		}
 	}
 	b.WriteString("\n## 件数と入口\n\n")
-	fmt.Fprintf(&b, "- 件数: %d(%s)\n", count, sourceLine(bySource))
-	if len(versions) > 0 {
-		b.WriteString("- アプリの版: " + strings.Join(versions, "、") + "\n")
-	}
-	if len(oses) > 0 {
-		b.WriteString("- OS: " + strings.Join(oses, "、") + "\n")
-	}
-	b.WriteString("- 領域: " + rep.Area + "\n- 優先度の案: " + d.Priority + "\n")
+	counts(&b)
 	b.WriteString("\n## 再現の手順\n\n(承認する人が書く: `feedback-loop drafts edit`)\n")
 	b.WriteString("\n## 完了の条件\n\n- 上の症状が、再現の手順で起きない\n- 同じ束のフィードバックが、直した版から 30 日間来ない\n")
 	b.WriteString("\n---\nフィードバックの要約から作った下書きを、人が確かめて出した Issue。原文と個人情報は載せていない(#367)。\n")
