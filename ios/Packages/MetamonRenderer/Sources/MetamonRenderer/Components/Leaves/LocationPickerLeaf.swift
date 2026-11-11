@@ -56,6 +56,9 @@ struct LocationPickerLeaf: View {
                 pickedName = place.name
             }
             .aiButtonTarget(c) // #629 シートの中にも AI ボタン
+            #if os(macOS)
+            .frame(minWidth: 520, minHeight: 600) // Mac の sheet は大きさを付けないと小さく開く(#1345)
+            #endif
         }
     }
 
@@ -81,6 +84,10 @@ struct LocationPickerSheet: View {
     @State private var region: MKCoordinateRegion?
     @State private var locating = false
     @State private var error: String?
+    #if os(macOS)
+    /// 検索結果の一覧の選択(↑↓ と Return で選ぶ #1345)
+    @State private var selectedResult: String?
+    #endif
 
     init(title: String, initial: CLLocationCoordinate2D?, onPick: @escaping (PickedPlace) -> Void) {
         self.title = title
@@ -104,6 +111,9 @@ struct LocationPickerSheet: View {
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button(L("キャンセル")) { dismiss() }
+                        #if os(macOS)
+                        .keyboardShortcut(.cancelAction) // Mac の sheet は Esc で閉じないので Esc で「キャンセル」
+                        #endif
                 }
             }
             .aiButtonLayer()
@@ -149,29 +159,40 @@ struct LocationPickerSheet: View {
             }
             .frame(maxWidth: .infinity)
         } else {
-            List(Array(results.enumerated()), id: \.element.id) { i, place in
-                Button { pick(place) } label: {
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text(place.name ?? place.locationValue).foregroundStyle(.primary)
-                        if let address = place.address, !address.isEmpty {
-                            Text(address).font(.caption).foregroundStyle(.secondary).lineLimit(1)
-                        }
-                    }
-                }
-                .accessibilityIdentifier("locationPicker.result.\(i)")
+            #if os(macOS)
+            // Mac: ↑↓ で選び Return(またはダブルクリック)で決める
+            List(Array(results.enumerated()), id: \.element.id, selection: $selectedResult) { i, place in
+                resultRow(place, index: i)
             }
             .listStyle(.plain)
+            .contextMenu(forSelectionType: String.self, menu: { _ in EmptyView() }) { ids in
+                if let id = ids.first, let place = results.first(where: { $0.id == id }) { pick(place) }
+            }
+            #else
+            List(Array(results.enumerated()), id: \.element.id) { i, place in
+                resultRow(place, index: i)
+            }
+            .listStyle(.plain)
+            #endif
         }
+    }
+
+    private func resultRow(_ place: PickedPlace, index i: Int) -> some View {
+        Button { pick(place) } label: {
+            VStack(alignment: .leading, spacing: 2) {
+                Text(place.name ?? place.locationValue).foregroundStyle(.primary)
+                if let address = place.address, !address.isEmpty {
+                    Text(address).font(.caption).foregroundStyle(.secondary).lineLimit(1)
+                }
+            }
+        }
+        .accessibilityIdentifier("locationPicker.result.\(i)")
     }
 
     private var mapArea: some View {
         VStack(spacing: 0) {
             ZStack {
-                Map(position: $position)
-                    .onMapCameraChange(frequency: .continuous) { ctx in
-                        center = ctx.region.center
-                        region = ctx.region
-                    }
+                pickerMap
                 // 中央のピン(先端が地図の中心に来るよう上にずらす)
                 Image(systemName: "mappin")
                     .font(.system(size: 36, weight: .bold))
@@ -182,7 +203,7 @@ struct LocationPickerSheet: View {
                     .accessibilityHidden(true)
             }
             VStack(spacing: 8) {
-                Text(L("地図を動かして、ピンの位置で決められます"))
+                Text(Self.mapHint)
                     .font(.caption).foregroundStyle(.secondary)
                 if let error { Text(error).font(.caption).foregroundStyle(.red) }
                 HStack(spacing: 12) {
@@ -205,6 +226,44 @@ struct LocationPickerSheet: View {
             }
             .padding(16)
         }
+    }
+
+    @ViewBuilder
+    private var pickerMap: some View {
+        #if os(macOS)
+        // Mac: クリックした所へ地図の中心を動かす(決めるのは「この場所に決める」)。iOS のタップは地図を動かすのに使う
+        MapReader { proxy in
+            Map(position: $position)
+                .onMapCameraChange(frequency: .continuous) { ctx in
+                    center = ctx.region.center
+                    region = ctx.region
+                }
+                .mapControls {
+                    MapZoomStepper()
+                    MapCompass()
+                    MapScaleView()
+                }
+                .onTapGesture(coordinateSpace: .local) { point in
+                    guard let tapped = proxy.convert(point, from: .local) else { return }
+                    center = tapped
+                    withAnimation { position = .region(PlacePicking.recentered(region, on: tapped)) }
+                }
+        }
+        #else
+        Map(position: $position)
+            .onMapCameraChange(frequency: .continuous) { ctx in
+                center = ctx.region.center
+                region = ctx.region
+            }
+        #endif
+    }
+
+    private static var mapHint: String {
+        #if os(macOS)
+        L("地図をクリックするか動かして、ピンの位置で決められます")
+        #else
+        L("地図を動かして、ピンの位置で決められます")
+        #endif
     }
 
     private func pick(_ place: PickedPlace) {
