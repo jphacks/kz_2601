@@ -57,6 +57,9 @@ import jp.kz2601.metamon.feedback.FeedbackComposerHost
 import jp.kz2601.metamon.feedback.FeedbackHost
 import jp.kz2601.metamon.feedback.HotReloadStatusBadge
 import jp.kz2601.metamon.feedback.TalkBackAnnouncer
+import jp.kz2601.metamon.feedback.ToastLayer
+import jp.kz2601.metamon.feedback.ToastPlacement
+import jp.kz2601.metamon.feedback.VOICE_SHEET_TOAST_BOTTOM_INSET
 import jp.kz2601.metamon.feedback.UndoHeaderButtons
 import jp.kz2601.metamon.language.AppLocales
 import jp.kz2601.metamon.notifications.LocalNotifications
@@ -656,10 +659,16 @@ fun MetamonApp(container: AppContainer) {
     // みんなが作ったアプリを探す・入れる(#902)
     DiscoverHost(container, discoverOpen, onDismiss = { discoverOpen = false })
 
-    if (!state.isInitial && state.voiceOpen) {
+    if (ToastPlacement.voiceSheetShown(state.isInitial, state.voiceOpen)) {
         ModalBottomSheet(onDismissRequest = vm::closeVoice, sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)) {
-            UndoHeaderButtons(state, vm)
-            VoiceRoute(vm, Modifier.fillMaxWidth())
+            Box(Modifier.fillMaxWidth()) {
+                Column(Modifier.fillMaxWidth()) {
+                    UndoHeaderButtons(state, vm)
+                    VoiceRoute(vm, Modifier.fillMaxWidth())
+                }
+                // シートは別のウィンドウなので、開いている間のトーストはシートの中に出す(#1106)
+                ToastLayer(runtime, runtimeState, bottomInset = VOICE_SHEET_TOAST_BOTTOM_INSET)
+            }
         }
     }
 }

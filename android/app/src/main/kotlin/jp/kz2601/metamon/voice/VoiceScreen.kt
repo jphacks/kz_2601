@@ -92,6 +92,7 @@ import jp.kz2601.metamon.services.ChatOption
 import jp.kz2601.metamon.services.ChatTurn
 import jp.kz2601.metamon.services.RemainingToday
 import jp.kz2601.metamon.services.permissions.AppPermission
+import jp.kz2601.metamon.ui.CraneMascot
 import kotlinx.coroutines.delay
 import java.time.Instant
 import java.time.ZoneId
@@ -190,6 +191,9 @@ fun VoiceScreen(
                 verticalArrangement = Arrangement.spacedBy(16.dp),
             ) {
                 Spacer(Modifier.height(16.dp))
+                // ツル(#1132・iOS と同じ 76dp・happy)。縦が狭い時は出さない
+                val compactHeight = VoiceCrane.isCompactHeight(LocalConfiguration.current.screenHeightDp)
+                VoiceCrane.pose(state, compactHeight)?.let { CraneMascot(it, size = 76.dp) }
                 Heading(title, subtitle)
                 Spacer(Modifier.height(8.dp))
                 MicButton(state, size = if (state.isInitial) 120.dp else 88.dp, onClick = onMic, onLongClick = onMicLongPress)
