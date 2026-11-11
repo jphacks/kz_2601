@@ -76,6 +76,9 @@ interface DSLRuntime {
     /** 共有データの参加者(member / members の選択肢・iOS の `membersHost.appMembers`)。読めなければ空。 */
     val formMembers: List<FormMember> get() = emptyList()
 
+    /** 自分が今のアプリの管理者か(#272・visibleTo のボタン)。分からない間は null(ボタンは出し、サーバーが判定する)。 */
+    val viewerIsAdmin: Boolean? get() = null
+
     // AI ボタン(#873)
 
     /** aiButton のオンライン版・端末内 AI・集計。null なら端末内 AI も無い(プレビュー・テスト)。 */
