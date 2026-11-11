@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 仲間探し・ブロックのトースト(SocialRuntime・#1062)。文言は iOS(Localizable.xcstrings)に合わせる -->
+<resources>
+    <string name="matching_connected">つながりました。連絡先が見られます</string>
+    <string name="matching_daily_limit">今日はこれ以上送れません。明日またお試しください</string>
+    <string name="matching_not_found">相手が見つかりませんでした。一覧を更新してください</string>
+    <string name="matching_offline">オフラインのあいだは送れません</string>
+    <string name="matching_profile_first">先に自分のプロフィールを書いてください</string>
+    <string name="matching_profile_not_sent">プロフィールの送信が終わってから送れます</string>
+    <string name="matching_try_again">うまくいきませんでした。もう一度お試しください</string>
+    <string name="matching_unavailable">このアプリでは今は仲間探しを使えません</string>
+    <string name="matching_unblock_failed">解除できませんでした</string>
+    <string name="matching_unblock_to_send">ブロックを解除してから送れます</string>
+    <string name="matching_under_18">18 歳未満の方は「つながりたい」を使えません</string>
+    <string name="matching_unmatched">つながりを解除しました</string>
+</resources>

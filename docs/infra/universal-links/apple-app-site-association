@@ -1,0 +1,13 @@
+{
+  "applinks": {
+    "details": [
+      {
+        "appIDs": ["CHP337D75C.jp.kz2601.metamon"],
+        "components": [
+          { "/": "/s/*/*", "exclude": true, "comment": "token is a single path segment" },
+          { "/": "/s/?*", "comment": "share link https://tailor-it.app/s/{token} (#331)" }
+        ]
+      }
+    ]
+  }
+}

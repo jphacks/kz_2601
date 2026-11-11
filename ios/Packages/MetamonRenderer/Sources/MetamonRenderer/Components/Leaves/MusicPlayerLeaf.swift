@@ -214,7 +214,7 @@ struct MusicArtwork: View {
 
     var body: some View {
         let shape = RoundedRectangle(cornerRadius: size * 0.18, style: .continuous)
-        AsyncImage(url: url.flatMap(URL.init(string:))) { phase in
+        AsyncImage(url: ImageHostPolicy.loadableURL(url)) { phase in
             if let image = phase.image {
                 image.resizable().scaledToFill()
             } else {
