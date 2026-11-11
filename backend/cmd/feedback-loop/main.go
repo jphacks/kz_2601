@@ -9,6 +9,7 @@
 //
 //	feedback-loop ingest [-source in_app|app_store_review|testflight|gen_failure]
 //	feedback-loop ingest-crash -issue ID -type T -count N -version V
+//	feedback-loop inbox [-source S] [-status S] [-limit N]
 //	feedback-loop triage [-max 200] [-batch 20]
 //	feedback-loop triage-score -labels FILE
 //	feedback-loop draft [-max-new 20]
@@ -90,6 +91,7 @@ func main() {
 const usageText = `usage: feedback-loop <command> [flags]
   ingest [-source in_app|app_store_review|testflight|gen_failure]   copy new feedback into the inbox (masked)
   ingest-crash -issue ID -type T -count N -version V   record one crash spike
+  inbox [-source S] [-status S] [-limit N]   every source in one list (metadata only, never the text)
   triage [-max 200] [-batch 20]              classify, cluster and prioritise new items (LLM, no tools)
   triage-score -labels FILE                  agreement with a human's labels (lines: itemId,category)
   draft [-max-new 20]                        build issue drafts from triaged clusters (private queue)
@@ -145,6 +147,8 @@ func (a *app) run(ctx context.Context, args []string) error {
 		return a.ingest(ctx, rest)
 	case "ingest-crash":
 		return a.ingestCrash(ctx, rest)
+	case "inbox":
+		return a.inbox(ctx, rest)
 	case "triage":
 		return a.triage(ctx, rest)
 	case "triage-score":
