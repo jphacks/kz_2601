@@ -2,8 +2,8 @@ package jp.kz2601.metamon.runtime
 
 import jp.kz2601.metamon.R
 import jp.kz2601.metamon.dsl.Action
-import jp.kz2601.metamon.dsl.logic.BookLookupFields
 import jp.kz2601.metamon.dsl.logic.BookLookupPlan
+import jp.kz2601.metamon.dsl.logic.fields
 import jp.kz2601.metamon.dsl.records.JSONValue
 import jp.kz2601.metamon.renderer.form.FormDraft
 import jp.kz2601.metamon.services.books.BookLookupClient
@@ -27,7 +27,7 @@ object BookLookupSteps {
     suspend fun run(action: Action, form: FormDraft?, client: BookLookupClient?): UiText? {
         val b = action.bookLookup
         if (b == null || form == null || form.isReadOnly) return FORM_ONLY
-        val spec = BookLookupFields(b.isbnField, b.titleField, b.authorsField, b.publisherField, b.publishedDateField)
+        val spec = b.fields
         val raw = (form.values[spec.isbnField] ?: JSONValue.Null).displayString
         if (raw.isBlank()) return ISBN_EMPTY
         val isbn = BookLookupPlan.normalizeISBN(raw) ?: return ISBN_INVALID

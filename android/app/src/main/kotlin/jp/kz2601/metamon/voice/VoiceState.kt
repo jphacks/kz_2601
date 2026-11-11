@@ -10,6 +10,7 @@ import jp.kz2601.metamon.services.StreamedComponent
 import jp.kz2601.metamon.services.TranscriberFailure
 import jp.kz2601.metamon.services.http.FailureKind
 import jp.kz2601.metamon.services.http.PaidFeature
+import jp.kz2601.metamon.services.privacy.PublicDataPrompt
 import jp.kz2601.metamon.services.purchase.PaidFeatureCheck
 
 /**
@@ -103,6 +104,8 @@ data class VoiceUiState(
     val draft: String? = null,
     /** 無料枠切れ・402 で作らずに止めた新規作成(#1261)。会話の下にカードを出す */
     val heldBuild: HeldBuild? = null,
+    /** 生成で個人の情報が「誰でも見られる」記録に入った時の確認(#253・#899)。サーバーが `meta.publicPersonalData` を返した時だけ */
+    val publicDataPrompt: PublicDataPrompt? = null,
 ) {
     /** 初期状態(音声画面だけ)= 新規作成 */
     val isInitial: Boolean get() = document.dsl.isVoiceOnly

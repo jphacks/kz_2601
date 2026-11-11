@@ -2,11 +2,11 @@ package jp.kz2601.metamon.renderer.components.importing
 
 import jp.kz2601.metamon.dsl.Accept
 import jp.kz2601.metamon.dsl.Component
-import jp.kz2601.metamon.dsl.logic.CsvColumnMapping
 import jp.kz2601.metamon.dsl.logic.CsvReader
 import jp.kz2601.metamon.dsl.logic.ImportPlan
 import jp.kz2601.metamon.dsl.logic.ImportRowFailure
 import jp.kz2601.metamon.dsl.logic.RecordImport
+import jp.kz2601.metamon.dsl.logic.csvMappings
 import jp.kz2601.metamon.dsl.records.Entity
 import jp.kz2601.metamon.dsl.records.Field
 import jp.kz2601.metamon.dsl.records.JSONValue
@@ -152,7 +152,7 @@ object FileImportFlow {
         refId: (Field, String) -> String?,
     ): ImportStep {
         val text = CsvReader.decode(bytes) ?: return ImportStep.Problem(ImportProblem.Encoding)
-        val map = c.map.map { CsvColumnMapping(it.column, it.field) }
+        val map = c.map.csvMappings
         val plan = RecordImport.plan(CsvReader.parse(text), entity, map, existing, refId = refId)
         if (plan.matched.isEmpty()) {
             return ImportStep.Problem(ImportProblem.NoMatchingColumns(entity.name, entity.storedFields.map { it.name }))

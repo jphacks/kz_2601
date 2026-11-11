@@ -2,8 +2,7 @@ package jp.kz2601.metamon.voice.stage
 
 /**
  * 完成の直後に出るお知らせ(#894・iOS の `PostBuildNotice`・H7)。同時に出さず、優先順位の高いものから 1 つずつ(前のが閉じたら次)出す。
- * 順番と待つ条件は iOS の `AppRuntime.pendingNotices` と同じ。Android にまだ画面が無いもの(公開の記録の確認・引き継ぎの案内)は、
- * 画面ができたら [PostBuildWaiting] に印を渡すだけで順番に入る(#1198)。
+ * 順番と待つ条件は iOS の `AppRuntime.pendingNotices` と同じ。課金画面・公開の記録の確認・引き継ぎの案内は [PostBuildWaiting] の印で順番に入る(#1198)。
  */
 enum class PostBuildNotice {
     /** 共有の記録が入った版の課金画面 */
