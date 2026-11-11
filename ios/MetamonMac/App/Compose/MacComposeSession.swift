@@ -91,6 +91,10 @@ final class MacComposeSession: Identifiable {
     /// 結果を中央に当てる(MacRootView がアプリの一覧を差し替える)
     /// 2 つ目は端末に残す形(封筒・#969)
     @ObservationIgnored var onResult: (AppDocument, Data?) -> Void = { _, _ in }
+    /// 競合(409)の時にサーバーの最新を取り直して中央に当てる(#1279)。取り直した版を返す。nil ならサーバーに無いアプリ
+    @ObservationIgnored var onConflict: (@MainActor () async -> Int?)?
+    /// 直すアプリの今の版(競合で取り直したら進める)
+    @ObservationIgnored private var editVersion: Int
 
     var mode: ChatMode {
         if case .edit = target { return .edit }
@@ -121,8 +125,12 @@ final class MacComposeSession: Identifiable {
         self.clarifyEnabled = clarifyEnabled
         self.clarifyAutoBuild = clarifyAutoBuild
         switch target {
-        case .create: appId = "mac-\(UUID().uuidString.prefix(8).lowercased())"
-        case .edit(let id, _, _): appId = id
+        case .create:
+            appId = "mac-\(UUID().uuidString.prefix(8).lowercased())"
+            editVersion = 0
+        case .edit(let id, _, let version):
+            appId = id
+            editVersion = version
         }
     }
 
@@ -287,7 +295,7 @@ final class MacComposeSession: Identifiable {
         let job = Job(transcript: transcript, started: .now, script: .init(transcript: transcript))
         withAnimation { phase = .generating(job) }
         MacVoiceOver.announce(L10n.tr("作っています"))
-        let version: Int = if case .edit(_, _, let v) = target { v } else { 0 }
+        let version = editVersion
         let instruction = Self.instruction(transcript, about: mode == .edit ? screen : nil)
         task = Task { [ai, appId] in
             do {
@@ -301,6 +309,12 @@ final class MacComposeSession: Identifiable {
                 guard !Task.isCancelled else { return }
                 withAnimation { phase = .chatting }
                 if error as? AIConsentError == .notGranted { _ = requireConsent(.build(transcript)); return }
+                if FailureKind.classify(error) == .conflict, let onConflict, let latest = await onConflict() {
+                    // 別の端末で直されていた: 最新に合わせ、カードの「もう一度」は取り直した版で送り直す(iOS のバナーと同じ文言)
+                    editVersion = latest
+                    show(ErrorPresentation(kind: .failed(message: ErrorCopy.conflictBanner), transcript: transcript, origin: .generate))
+                    return
+                }
                 show(Self.presentation(for: error, transcript: transcript, origin: .generate))
             }
         }
@@ -361,7 +375,8 @@ final class MacComposeSession: Identifiable {
     // MARK: - 失敗(#968)
 
     /// 失敗 → 状態カード。iOS の `ErrorPresentation.from` と同じ分け方。キャンセルは出さない。
-    /// 競合(409)は iOS ではバナー + 最新の取り直しだが、Mac はまだサーバーの版を持たない(#930)ので「もう一度」のカードにする。
+    /// 競合(409)は、サーバーにあるアプリなら `onConflict` で最新を取り直してから「もう一度」のカード(#1279)。
+    /// サーバーに無いアプリ(端末だけ)は今まで通り「もう一度」のカード。
     static func presentation(for error: Error, transcript: String, origin: ErrorPresentation.Origin) -> ErrorPresentation? {
         let kind = FailureKind.classify(error)
         if kind == .cancelled { return nil }
