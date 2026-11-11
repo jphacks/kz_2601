@@ -5,6 +5,7 @@ import MetamonServices
 /// 端末だけに置く「作ったアプリ」の一覧(#969・Mac)。サーバー(#930)が入るまでの置き場で、iOS は使わない。
 /// 置き方は iOS のキャッシュと同じ: 一覧(名前・並び)は `AppListCache`(apps.json)、DSL は `DocumentCache`(appId ごとの封筒)。
 /// 一覧の並びは配列の順(先頭が上)。名前の検査と並べ替えは iOS と同じ `AppListEdit`。
+/// 会話で直した同梱の例(#1283)も DSL を同じ `DocumentCache` に置き、直した例の id を `editedExamplesKey` に持つ。
 struct LocalAppLibrary {
     struct Entry {
         var summary: AppSummary
@@ -19,6 +20,7 @@ struct LocalAppLibrary {
     }
 
     static let currentAppKey = "metamon.local.currentAppId"
+    static let editedExamplesKey = "metamon.local.editedExampleIds"
 
     let list: AppListCache
     let documents: DocumentCache
@@ -47,6 +49,36 @@ struct LocalAppLibrary {
     func remove(appId: String) {
         documents.remove(appId: appId)
         if currentAppId == appId { currentAppId = nil }
+    }
+
+    // MARK: - 会話で直した同梱の例(#1283)
+
+    /// 直した同梱の例(id → DSL)。DSL が読めない例は外す(元の例を出す)
+    func loadEditedExamples() -> [String: (document: AppDocument, envelope: Data)] {
+        var result: [String: (document: AppDocument, envelope: Data)] = [:]
+        for id in editedExampleIds {
+            guard let envelope = documents.loadData(appId: id), var document = try? AppDocument.decode(envelope) else { continue }
+            document.appId = id
+            result[id] = (document, envelope)
+        }
+        return result
+    }
+
+    /// 直した同梱の例を置く
+    func storeExample(appId: String, envelope: Data) {
+        documents.store(appId: appId, envelope: envelope)
+        if !editedExampleIds.contains(appId) { editedExampleIds.append(appId) }
+    }
+
+    /// 直した同梱の例を消す(元の例に戻す)。開いていたアプリの記憶はそのまま(元の例を開き直す)
+    func removeExample(appId: String) {
+        documents.remove(appId: appId)
+        editedExampleIds.removeAll { $0 == appId }
+    }
+
+    private var editedExampleIds: [String] {
+        get { defaults.stringArray(forKey: Self.editedExamplesKey) ?? [] }
+        nonmutating set { defaults.set(newValue, forKey: Self.editedExamplesKey) }
     }
 
     /// 最後に開いていたアプリ(起動時に開き直す)
