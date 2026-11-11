@@ -10,9 +10,10 @@
 4. [コマンド](#コマンド)
 5. [環境変数](#環境変数)
 6. [アプリで見る](#アプリで見る)
-7. [運用の手順](#運用の手順)
-8. [ループを始める前に人がすること](#ループを始める前に人がすること)
-9. [まだ無いもの](#まだ無いもの)
+7. [振り分けの精度を測る](#振り分けの精度を測る)
+8. [運用の手順](#運用の手順)
+9. [ループを始める前に人がすること](#ループを始める前に人がすること)
+10. [まだ無いもの](#まだ無いもの)
 
 ## 流れ
 
@@ -78,6 +79,7 @@ flowchart LR
 | `ingest-crash -issue ID -type T -count N -version V` | intake | Crashlytics の急増を 1 件として記録(人が Crashlytics の画面を見て打つ) |
 | `triage [-max 200] [-batch 20]` | triage | 新しい項目を分類(`bug` / `feature` / `question` / `praise` / `spam`)・束ね・優先度(P1〜P3)付け。同じ文は 1 回だけ送る |
 | `triage-score -labels FILE` | — | 人が付けた正解(1 行 `itemId,category`)との一致率(#376 の完了の条件: 8 割) |
+| `triage-eval -set FILE [-model rules\|ai]` | (`ai` の時だけ triage) | 正解付きの組を、メモリの中だけで振り分け → 下書きまで通し、分類・優先度・束ねの一致率を出す([振り分けの精度を測る](#振り分けの精度を測る))。Firestore には書かない |
 | `draft [-max-new 20]` | draft | 束ごとに下書きを作る / 開いている下書きに足す。束にもう出した Issue(まだ直っていないもの)があれば、その Issue への追記の下書きにする([既存の Issue への追記](#既存の-issue-への追記)) |
 | `drafts list [-status pending]` / `show <id>` | — | 待ち行列を見る。`show` は出口の検査の結果と、承認の前に見る点を出す |
 | `drafts edit -by NAME [-title T] [-body-file F] <id>` | — | 再現の手順などを人が書く(出口の検査を通す) |
@@ -141,7 +143,42 @@ flowchart LR
 - 追記の下書きも `fixed` の対象(Issue が閉じたら送り主にお知らせ)。リリースノートの下書きは Issue ごとに 1 行。
 - GitHub の上で人が手で閉じた(直していない)Issue は、ループには分からないので追記の先に残る。その時は追記の下書きを却下する。
 
-## 運用の手順
+## 振り分けの精度を測る
+
+#376 の完了の条件(人の判断と 8 割以上一致)を測る口は 2 つ。
+
+| 口 | 正解 | 使う時 |
+|---|---|---|
+| `triage-score -labels FILE` | 本番の `loop_inbox` の項目に人が付けた分類(`itemId,category`) | 1 週間分を振り分けた後、人が同じ項目に分類を付けて比べる |
+| `triage-eval -set FILE` | 手で書いた架空のフィードバックの組(JSON の行: `id` `text` `category` `priority` `bundle`) | モデル・プロンプトを変える前後。本物のフィードバックを使わずに比べられる |
+
+`triage-eval` は本物の `Triager` と `draft.Builder` をメモリの店に対して回す。数えるもの:
+
+- 分類: `category` が正解と同じ項目の割合
+- 優先度: 下書き(= Issue に出る)の優先度が正解と同じ割合。束にならない `praise` / `spam` は項目の優先度
+- 束ね: 正解で同じ `bundle` の 2 件が同じ束になった割合(together)と、違う `bundle` の 2 件が別の束になった割合(apart)
+
+`held` や外れた出力で分類が付かなかった項目は外れとして数える。`-model rules`(既定)はキーワードの基準線(`internal/loop/triage/eval/rules.go`・費用なし)。`-model ai` は振り分けのモデルを呼ぶので、`triage` と同じく段のスイッチと月の上限を見て、トークンを数える(監査は `eval_call`)。
+
+正解の組は `backend/internal/loop/triage/eval/testdata/labeled.jsonl`(28 件・すべて手で書いた架空の文)。テスト(`TestEvalRulesOnLabelledSet`)は基準線でこの組を回し、分類・優先度・束ねのどれかが 8 割を下回ったら落ちる。基準線の今の値は分類 26/28・優先度 25/28・束ね together 14/14・apart 364/364。
+
+コマンドの入口は他と同じなので、接続先の環境変数は要る(読み書きはしない。ローカルは `make -C backend run-feedback-loop LOOP_ARGS="triage-eval -set ..."` でエミュレータに向く)。
+
+```sh
+go run ./cmd/feedback-loop triage-eval -set internal/loop/triage/eval/testdata/labeled.jsonl
+LOOP_TRIAGE=on LOOP_ANTHROPIC_API_KEY=... \
+  go run ./cmd/feedback-loop triage-eval -set internal/loop/triage/eval/testdata/labeled.jsonl -model ai
+```
+
+### 似たフィードバックの束ね
+
+| 段 | どう束ねる |
+|---|---|
+| 振り分けの前 | 全角半角・大文字小文字・空白・記号を落として同じになる文を 1 つにまとめ、モデルには 1 回だけ送る(`groupItems`)。同じ判定を全件にコピーする |
+| 振り分け | モデルが問題ごとの `cluster`(英小文字の短い名前)を付ける。待っている下書きの `cluster` を「既知の束」として渡し、同じ問題なら使い回させる |
+| 下書き | `cluster` が同じ項目を 1 つの下書きにまとめ、件数を足す。束にもう出した Issue があれば、その Issue への追記になる([既存の Issue への追記](#既存の-issue-への追記)) |
+
+埋め込み(ベクトルの近さ)での束ねはまだ無い([まだ無いもの](#まだ無いもの))。
 
 週 1 回、人が回す(定期の実行は後で):
 
@@ -192,3 +229,6 @@ go run ./cmd/feedback-loop audit -summary
 | Crashlytics を自動で読む | Crashlytics は安く読める API が無い。BigQuery のエクスポート(#296)ができたら `ingest.CrashSource` を実装する。それまでは `ingest-crash` で人が記録 |
 | 生成の失敗の急増を自動で読む | 今はログを人が `gcloud logging read` で書き出して `LOOP_GENFAIL_LOGS` に渡す。Logging API か BigQuery から読む時は `ingest.GenLogSource` を実装する |
 | Google の機密データの検出(#367 の選択肢 2-B) | GCP の設定が要るので後で |
+| 埋め込みでの束ね(#376) | 束ねはモデルの `cluster` の名前に任せている。同じ問題に別の名前が付くと別の束になる(呼び出しをまたぐと特に)。既知の束として渡すのは待っている下書きの名前だけ |
+| 束の優先度で影響が落ちる | 下書きの優先度は、代表の項目の優先度(P1〜P3)から影響を戻して計算する(`draft.impactOf`)。項目が P3 になった `feature` の影響 `medium` は `low` に戻るので、件数が増えても P3 のまま(正解の組の g01・g02) |
+| 本物の 1 週間分での一致率 | `triage-score` で人が測る(#376 の完了の条件) |
