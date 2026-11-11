@@ -37,6 +37,7 @@ type ExtRunner interface {
 	Call(ctx context.Context, b extapi.CallBody) (extapi.CallAnswer, error)
 	Start(ctx context.Context, uid, provider string, scopes []string) (string, error)
 	Revoke(ctx context.Context, uid, provider string) error
+	RevokeAll(ctx context.Context, uid string) (int, error)
 	List(ctx context.Context, uid string) (extapi.ConnectionList, error)
 }
 

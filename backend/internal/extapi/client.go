@@ -103,6 +103,18 @@ func (c *Client) Revoke(ctx context.Context, uid, provider string) error {
 	return c.post(ctx, "/internal/ext/connections/revoke", ConnBody{UID: uid, Provider: provider}, &out)
 }
 
+// RevokeAll is POST /internal/ext/connections/revokeAll (DELETE /v1/me):
+// every connection of uid is cut; the answer is how many were.
+func (c *Client) RevokeAll(ctx context.Context, uid string) (int, error) {
+	var out struct {
+		Revoked int `json:"revoked"`
+	}
+	if err := c.post(ctx, "/internal/ext/connections/revokeAll", ConnBody{UID: uid}, &out); err != nil {
+		return 0, err
+	}
+	return out.Revoked, nil
+}
+
 // ConnectionList is the runner's answer to /internal/ext/connections/list:
 // uid's connections (no tokens) and the provider ids the runner has on
 // (EnabledProviders; an older runner sends none).
