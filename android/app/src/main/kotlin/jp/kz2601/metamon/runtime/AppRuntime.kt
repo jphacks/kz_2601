@@ -808,6 +808,8 @@ class AppRuntime(
 
     override suspend fun addRecord(entity: String, data: Map<String, JSONValue>): Boolean = createRecord(entity, data) != null
 
+    override val currentAppId: String get() = document.appId
+
     // 投稿に出す名前(#875・iOS の AppRuntime+Chat)
 
     /** 共有の entity への初めての投稿で、まだ名前を聞いていなければ聞く。 */

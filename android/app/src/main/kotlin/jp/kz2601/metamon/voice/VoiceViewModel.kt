@@ -207,13 +207,16 @@ class VoiceViewModel(
     // MARK: - 依頼
 
     /** 文字入力・例文のチップ・声の書き起こし。新規作成で対話 ON なら相談へ、それ以外はすぐ生成する。 */
-    fun submit(text: String, source: InputSource = InputSource.TEXT) {
+    fun submit(text: String, source: InputSource = InputSource.TEXT) = send(text, source, intentHandled = false)
+
+    /** @param intentHandled 同意の後の送り直し。意図はもう処理した(「別のアプリ」で appId を作り直さない) */
+    private fun send(text: String, source: InputSource, intentHandled: Boolean) {
         val t = text.trim()
         val s = _state.value
         if (t.isEmpty() || s.isGenerating || s.chatPending) return
         // 相談の途中の答えは意図を見ない(「前の状態」などを答えに使えるように)
-        if (!s.isChatting && handleIntent(t)) return
-        if (!requireConsent { submit(t, source) }) return
+        if (!intentHandled && !s.isChatting && handleIntent(t)) return
+        if (!requireConsent { send(t, source, intentHandled = true) }) return
         if (clarifyEnabled()) say(t, source) else generate(t)
     }
 
@@ -392,7 +395,16 @@ class VoiceViewModel(
                     return@launch
                 }
                 val hadChat = _state.value.isChatting
-                if (result.unchanged) return@launch presentUnchanged(result.summary, reopenChat = hadChat && !before.dsl.isVoiceOnly)
+                if (result.unchanged) {
+                    val reopenChat = hadChat && !before.dsl.isVoiceOnly
+                    if (hadChat && !reopenChat) {
+                        // 会話を閉じるので、反映した時と同じく相談を区切る(前の相談の答えを次へ持ち越さない)
+                        chatEpoch++
+                        lastInput = null
+                        scope.launch { ai.resetChat(target) }
+                    }
+                    return@launch presentUnchanged(result.summary, reopenChat)
+                }
                 val history = appliedHistory(_state.value, result.document.version, result.summary)
                 chatEpoch++
                 if (!before.dsl.isVoiceOnly && !result.unchanged) remember(before)

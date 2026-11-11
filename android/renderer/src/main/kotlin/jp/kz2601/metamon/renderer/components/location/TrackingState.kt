@@ -10,13 +10,20 @@ import java.time.Instant
 import java.util.Locale
 
 /** 記録先(iOS の `LocationTracking.Target`)。同じアプリの同じ entity + location field の部品なら「この部品の記録」。 */
-data class TrackingTarget(val appName: String, val entity: String, val locationField: String, val dateField: String?) {
+data class TrackingTarget(
+    val appName: String,
+    val entity: String,
+    val locationField: String,
+    val dateField: String?,
+    /** 開始した時のアプリの appId。点はこのアプリにだけ足す(null = 分からない・プレビュー) */
+    val appId: String? = null,
+) {
     companion object {
         /** entity と locationField が無い部品は記録できない(代わりの枠)。 */
-        fun of(c: Component, appName: String): TrackingTarget? {
+        fun of(c: Component, appName: String, appId: String? = null): TrackingTarget? {
             val entity = c.entity ?: return null
             val field = c.locationField ?: return null
-            return TrackingTarget(appName, entity, field, c.dateField)
+            return TrackingTarget(appName, entity, field, c.dateField, appId)
         }
     }
 }
@@ -45,6 +52,9 @@ data class TrackingState(
     val isActive: Boolean get() = phase == TrackingPhase.RECORDING || phase == TrackingPhase.REQUESTING
 
     fun isRecording(t: TrackingTarget): Boolean = isActive && target == t
+
+    /** [appId] のアプリを消す・サインアウトで止めるか(null = どのアプリでも止める)。 */
+    fun shouldStopFor(appId: String?): Boolean = isActive && (appId == null || target?.appId == appId)
 
     /** 開始を押した。記録中なら何もしない。 */
     fun start(t: TrackingTarget, autoStopSeconds: Int): TrackingState =
@@ -108,8 +118,12 @@ object TrackingRules {
             .filter { !it.isComputed && it.defaultValue != null && it.id !in skipping }
             .associateTo(LinkedHashMap()) { it.id to FieldCoding.defaultValue(it, at) }
 
-    /** 1 点 = 1 レコードの data(location field = "lat,lng"、dateField = 時刻、他は既定値)。記録先が無くなっていれば null。 */
-    fun pointData(target: TrackingTarget, entity: Entity?, p: Track.Point): Map<String, JSONValue>? {
+    /**
+     * 1 点 = 1 レコードの data(location field = "lat,lng"、dateField = 時刻、他は既定値)。
+     * 記録先が無くなった・今のアプリが開始した時のアプリでない([currentAppId])なら null(保存しない)。
+     */
+    fun pointData(target: TrackingTarget, entity: Entity?, p: Track.Point, currentAppId: String? = target.appId): Map<String, JSONValue>? {
+        if (target.appId != currentAppId) return null
         if (entity?.field(target.locationField)?.type != FieldType.LOCATION) return null
         val data = LinkedHashMap(baseData(entity, listOfNotNull(target.locationField, target.dateField), p.date))
         data[target.locationField] = JSONValue.Str(Track.encode(p.lat, p.lng))
