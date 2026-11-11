@@ -136,6 +136,14 @@ final class MacAppLibrary {
         return name
     }
 
+    /// 1 つ足す前の持てるアプリの数の確かめ(#630)。iOS ではサーバーが 402 `app_limit_reached` で断るが、
+    /// Mac はサーバーにつながっていない(#930)ので、作ったアプリの数とプランの数(`planApps`)をここで比べる。
+    /// 足すと超えるなら置き換えシートに渡す上限を返す(nil = 足せる)。`planApps` が 0 なら数えない(サーバーと同じ)
+    func limitForAdding(planApps: Int) -> AppLimit? {
+        guard planApps > 0, createdIds.count >= planApps else { return nil }
+        return AppLimit(held: createdIds.count, limit: planApps, upgrade: planApps < MacPlanApps.pro)
+    }
+
     /// 作ったアプリの `index` 番目に動かす(右クリックの「上へ / 下へ」)
     func move(_ appId: String, to index: Int) {
         let next = AppListEdit.moved(createdIds, id: appId, to: index)
