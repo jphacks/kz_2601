@@ -21,7 +21,9 @@ final class MacPlatformDeclarationTests: XCTestCase {
         XCTAssertFalse(allowed.contains(ComponentType.unknown.rawValue))
         let disabled = ClientCapabilities.disabledFeatures ?? []
         XCTAssertTrue(disabled.contains("fieldHealth"))
-        XCTAssertTrue(disabled.contains("cameraCapture"))
+        // 撮影は Mac のカメラで撮れる(#1043)。審査用の版だけ外す
+        XCTAssertFalse(disabled.contains("cameraCapture"))
+        XCTAssertEqual(ClientCapabilities.disabledFeatures(macOS: true, review: true)?.contains("cameraCapture"), true)
     }
 
     /// iOS の値は変えない(同じ関数を iOS の引数で呼ぶ)

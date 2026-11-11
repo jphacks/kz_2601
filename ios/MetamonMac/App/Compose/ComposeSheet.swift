@@ -268,6 +268,9 @@ private struct ComposeChat: View {
         }
         .padding(.horizontal, MacTheme.Spacing.window)
         .padding(.vertical, MacTheme.Spacing.group)
+        // 押している間だけ録音(#1220): 入力欄が空の時のスペース長押し・⇧⌘M 長押し
+        .macHoldToTalkKeys(draftIsEmpty: session.draft.isEmpty, enabled: !session.sending,
+                           deliver: deliver, insertSpace: { session.draft += " " })
     }
 }
 

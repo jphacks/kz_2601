@@ -112,6 +112,9 @@ struct VideoFieldLeaf: View {
         .confirmationDialog(c.label ?? L("動画"), isPresented: $showChooser, titleVisibility: .hidden) {
             Button(L("撮影")) { openCamera() }
             Button(L("ライブラリから選ぶ")) { showLibrary = true }
+            #if os(macOS)
+            Button(L("ファイルから選ぶ")) { showFileImporter = true }
+            #endif
             Button(L("キャンセル"), role: .cancel) {}
         }
         .platformFullScreenCover(isPresented: $showCamera) {
@@ -138,12 +141,12 @@ struct VideoFieldLeaf: View {
         #if !APP_STORE_REVIEW
         .alert(L("カメラを使えません"), isPresented: $showDenied) {
             Button(L("設定を開く")) {
-                if let url = PlatformSystem.appSettingsURL { openURL(url) }
+                if let url = PlatformSystem.cameraSettingsURL { openURL(url) }
             }
             Button(L("ライブラリから選ぶ")) { showLibrary = true }
             Button(L("キャンセル"), role: .cancel) {}
         } message: {
-            Text(L("設定アプリで Tailor It のカメラへのアクセスを許可してください。"))
+            Text(PlatformSystem.cameraDeniedMessage)
         }
         #endif
     }

@@ -50,6 +50,23 @@
         }
       }
     },
+    "%@(見つかりません)" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ (not found)"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@(見つかりません)"
+          }
+        }
+      }
+    },
     "%@。「合計をもっと大きく表示して」のように、変えたい所を書いてください。" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -1483,6 +1500,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "「%@」を入力してください"
+          }
+        }
+      }
+    },
+    "「%@」を共有" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Share “%@”"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "「%@」を共有"
           }
         }
       }
@@ -4168,6 +4201,22 @@
         }
       }
     },
+    "アプリを選ぶと共有できます" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Select an app to share it"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "アプリを選ぶと共有できます"
+          }
+        }
+      }
+    },
     "アプリを選んでください" : {
       "localizations" : {
         "en" : {
@@ -4759,6 +4808,22 @@
         }
       }
     },
+    "サーバーに保存した自分のアプリだけ共有できます" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Only your own apps saved to the server can be shared"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "サーバーに保存した自分のアプリだけ共有できます"
+          }
+        }
+      }
+    },
     "サーバーに届きませんでした。つながってからもう一度お試しください。" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -4895,6 +4960,38 @@
         }
       }
     },
+    "シェアはサーバー接続時のみ使えます" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sharing is only available when connected to the server"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "シェアはサーバー接続時のみ使えます"
+          }
+        }
+      }
+    },
+    "シェアリンク" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Share link"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "シェアリンク"
+          }
+        }
+      }
+    },
     "シェアリンクはサーバー接続時のみ開けます" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -4908,6 +5005,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "シェアリンクはサーバー接続時のみ開けます"
+          }
+        }
+      }
+    },
+    "システムの設定に従う" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Use System Setting"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "システムの設定に従う"
           }
         }
       }
@@ -5436,6 +5550,23 @@
         }
       }
     },
+    "マイク" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Microphone"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "マイク"
+          }
+        }
+      }
+    },
     "マイクに近づいて、もう一度話してください" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -5514,6 +5645,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "マイクを使えません。システム設定 > プライバシーとセキュリティ > マイク で Tailor It を許可してください"
+          }
+        }
+      }
+    },
+    "メッセージ・メールなどでリンクを送る" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Send the link via Messages, Mail, and more"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "メッセージ・メールなどでリンクを送る"
           }
         }
       }
@@ -5648,6 +5795,38 @@
         }
       }
     },
+    "リンクをもう一度作る" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Create the link again"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "リンクをもう一度作る"
+          }
+        }
+      }
+    },
+    "リンクをクリップボードにコピーする" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Copy the link to the clipboard"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "リンクをクリップボードにコピーする"
+          }
+        }
+      }
+    },
     "リンクをコピー" : {
       "localizations" : {
         "en" : {
@@ -5660,6 +5839,54 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "リンクをコピー"
+          }
+        }
+      }
+    },
+    "リンクを作っています…" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Creating link…"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "リンクを作っています…"
+          }
+        }
+      }
+    },
+    "リンクを作れませんでした。もう一度お試しください" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Couldn't create the link. Please try again."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "リンクを作れませんでした。もう一度お試しください"
+          }
+        }
+      }
+    },
+    "リンクを取り消す" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Revoke Link"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "リンクを取り消す"
           }
         }
       }
@@ -6089,6 +6316,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "今のアプリの設計(画面・項目・アプリ名など)"
+          }
+        }
+      }
+    },
+    "今のリンクを開けなくして、新しいリンクを作る" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Disable the current link and create a new one"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "今のリンクを開けなくして、新しいリンクを作る"
           }
         }
       }
@@ -6850,6 +7093,23 @@
         }
       }
     },
+    "入力の装置" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Input device"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "入力の装置"
+          }
+        }
+      }
+    },
     "入力を消す" : {
       "localizations" : {
         "en" : {
@@ -7399,6 +7659,38 @@
         }
       }
     },
+    "取り消せませんでした" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Couldn't revoke the link"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "取り消せませんでした"
+          }
+        }
+      }
+    },
+    "受け取った人は、リンクから自分のアプリとして使えます" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "People who receive the link can use it as their own app"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "受け取った人は、リンクから自分のアプリとして使えます"
+          }
+        }
+      }
+    },
     "右下に「+ 追加」ボタンを置いて、押したら入力の画面が開くようにして" : {
       "localizations" : {
         "en" : {
@@ -7804,6 +8096,40 @@
         }
       }
     },
+    "声で頼む(⇧⌘M)。押している間だけ話すこともできます" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ask by voice (⇧⌘M). You can also hold it down while you speak"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "声で頼む(⇧⌘M)。押している間だけ話すこともできます"
+          }
+        }
+      }
+    },
+    "声で頼む時に使うマイクを選びます。選んだマイクが見つからない時はシステムの設定のマイクを使います" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Choose the microphone used when you ask by voice. If it can't be found, the system microphone is used"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "声で頼む時に使うマイクを選びます。選んだマイクが見つからない時はシステムの設定のマイクを使います"
+          }
+        }
+      }
+    },
     "変えられませんでした" : {
       "localizations" : {
         "en" : {
@@ -7915,6 +8241,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "変身一覧"
+          }
+        }
+      }
+    },
+    "外付けのマイクや AirPods を選べます。録音中にマイクが外れた時は録音を止めてお知らせします。" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "You can choose an external microphone or AirPods. If the microphone is disconnected while recording, recording stops and you'll be told."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "外付けのマイクや AirPods を選べます。録音中にマイクが外れた時は録音を止めてお知らせします。"
           }
         }
       }
@@ -10706,6 +11049,23 @@
         }
       }
     },
+    "話し終えた(⇧⌘M)。長く押した時は離すと送ります" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Done speaking (⇧⌘M). If you're holding it, release to send"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "話し終えた(⇧⌘M)。長く押した時は離すと送ります"
+          }
+        }
+      }
+    },
     "話すと、この記録帳を直せます" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -11422,6 +11782,23 @@
         }
       }
     },
+    "選んだマイクが見つからないため、今はシステムの設定のマイクを使っています。つなぎ直すと、また選んだマイクを使います。" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The chosen microphone can't be found, so the system microphone is being used. Reconnect it to use it again."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "選んだマイクが見つからないため、今はシステムの設定のマイクを使っています。つなぎ直すと、また選んだマイクを使います。"
+          }
+        }
+      }
+    },
     "選択中" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -11501,6 +11878,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "録音できませんでした。マイクがつながっているか確かめ、ほかのアプリの録音を終えてから、もう一度お試しください"
+          }
+        }
+      }
+    },
+    "録音中にマイクが外れました。つなぎ直すか、設定でマイクを選んでから、もう一度話してください" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The microphone was disconnected while recording. Reconnect it or choose a microphone in Settings, then speak again"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "録音中にマイクが外れました。つなぎ直すか、設定でマイクを選んでから、もう一度話してください"
           }
         }
       }
