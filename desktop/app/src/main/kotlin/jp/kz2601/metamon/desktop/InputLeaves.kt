@@ -227,7 +227,7 @@ private const val UNAVAILABLE_SHORT = "このパソコンでは使えません"
 @Composable
 fun UnavailableFrame(text: String) {
     Box(
-        Modifier.fillMaxWidth().border(1.dp, Color(0x33000000), RoundedCornerShape(8.dp)).padding(12.dp),
+        Modifier.fillMaxWidth().border(1.dp, MaterialTheme.colorScheme.outlineVariant, RoundedCornerShape(8.dp)).padding(12.dp),
         contentAlignment = Alignment.CenterStart,
     ) { Text(text, color = Color.Gray, style = MaterialTheme.typography.bodySmall) }
 }
@@ -330,7 +330,7 @@ private fun ColorInput(caption: String, hex: String?, set: (JSONValue) -> Unit) 
             val selected = hex.equals(h, ignoreCase = true)
             Box(
                 Modifier.size(28.dp).background(parseHex(h) ?: Color.Gray, CircleShape)
-                    .border(if (selected) 3.dp else 1.dp, if (selected) MaterialTheme.colorScheme.primary else Color(0x33000000), CircleShape)
+                    .border(if (selected) 3.dp else 1.dp, if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outlineVariant, CircleShape)
                     .clickable { set(JSONValue.Str(h)) },
             )
         }

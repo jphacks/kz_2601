@@ -1,5 +1,6 @@
 package jp.kz2601.metamon.desktop
 
+import jp.kz2601.metamon.desktop.i18n.Strings
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
@@ -167,7 +168,7 @@ class DesktopSession(
                 val parentId = ctx.currentRecordId
                 if (parentId == null) {
                     effects += obj("rejected" to JsonPrimitive("unsavedParent"))
-                    message = "先に保存してください"
+                    message = Strings["runtime_save_parent_first"]
                     return
                 }
                 FormPrefill.set(mapOf(ref to JSONValue.Str(parentId)))
@@ -200,17 +201,17 @@ class DesktopSession(
         val entity = action.entity ?: form?.entity?.id
         if (form == null || entity == null) {
             effects += obj("rejected" to JsonPrimitive("noForm"))
-            message = "保存するフォームがありません"
+            message = Strings["runtime_no_form"]
             return
         }
         if (form.isReadOnly) {
-            message = "このデータは作った人だけが変更できます"
+            message = Strings["runtime_read_only"]
             return
         }
         val missing = form.flagMissingRequired()
         if (missing.isNotEmpty()) {
             effects += obj("rejected" to obj("missing" to JsonArray(missing.map(::JsonPrimitive))))
-            message = missing.joinToString("、") + " を入力してください"
+            message = Strings.format("runtime_missing_required", missing.joinToString(Strings["desktop_list_separator"]))
             return
         }
         val payload = form.payload

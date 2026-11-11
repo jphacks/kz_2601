@@ -57,6 +57,18 @@ import jp.kz2601.metamon.desktop.io.ioDropTarget
 import jp.kz2601.metamon.desktop.io.previewKey
 import jp.kz2601.metamon.desktop.io.rememberDesktopIo
 import androidx.compose.ui.input.key.onPreviewKeyEvent
+import androidx.compose.foundation.selection.selectable
+import androidx.compose.foundation.selection.selectableGroup
+import androidx.compose.ui.semantics.LiveRegionMode
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.heading
+import androidx.compose.ui.semantics.isTraversalGroup
+import androidx.compose.ui.semantics.liveRegion
+import androidx.compose.ui.semantics.paneTitle
+import androidx.compose.ui.semantics.role
+import androidx.compose.ui.semantics.semantics
+import jp.kz2601.metamon.desktop.i18n.Strings
 
 /** 画面 1 枚の描画に要るもの。 */
 private class ScreenScope(
@@ -91,10 +103,15 @@ fun DesktopApp(dsl: AppDSL, initialStore: MockStore = MockStore(), startScreen: 
                 Box(Modifier.weight(1f)) { ScreenView(dsl, session, base, io, dispatch) }
                 if (dsl.app.hasTabs) {
                     HorizontalDivider()
-                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly) {
+                    // 読み上げでは「タブ・選択中」と読む
+                    Row(Modifier.fillMaxWidth().selectableGroup(), horizontalArrangement = Arrangement.SpaceEvenly) {
                         dsl.app.tabs.forEach { t ->
-                            TextButton(onClick = { session.selectTab(t.screen) }) {
-                                Text(t.title, fontWeight = if (nav.selectedTab == t.screen) androidx.compose.ui.text.font.FontWeight.Bold else null)
+                            val selected = nav.selectedTab == t.screen
+                            Box(
+                                Modifier.selectable(selected, role = Role.Tab, onClick = { session.selectTab(t.screen) }).padding(horizontal = 12.dp, vertical = 10.dp),
+                                contentAlignment = Alignment.Center,
+                            ) {
+                                Text(t.title, color = MaterialTheme.colorScheme.primary, fontWeight = if (selected) androidx.compose.ui.text.font.FontWeight.Bold else null)
                             }
                         }
                     }
@@ -103,12 +120,17 @@ fun DesktopApp(dsl: AppDSL, initialStore: MockStore = MockStore(), startScreen: 
             if (nav.sheet != null || nav.fullScreen != null) {
                 val top = nav.top(dsl)
                 val full = nav.fullScreen != null
-                Box(
-                    Modifier.fillMaxSize().background(Color(0x66000000)).clickable(enabled = !full) { session.back(top) },
-                    contentAlignment = Alignment.Center,
-                ) {
+                Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                    // 背景の暗幕は中身と兄弟にする(clickable で包むと中身ごと 1 つにまとまって読み上げで中が読めない)
+                    val closeLabel = Strings["desktop_close"]
+                    Box(
+                        Modifier.matchParentSize().background(Color(0x66000000))
+                            .clickable(enabled = !full, role = Role.Button) { session.back(top) }
+                            .semantics { contentDescription = closeLabel },
+                    )
                     val m = if (full) Modifier.fillMaxSize() else Modifier.widthIn(max = 640.dp).fillMaxWidth(0.92f).fillMaxSize(0.9f)
-                    Surface(m, shape = MaterialTheme.shapes.large, tonalElevation = 6.dp) {
+                    val pane = dsl.screen(top.screen)?.title?.ifEmpty { null } ?: dsl.app.name
+                    Surface(m.semantics { paneTitle = pane; isTraversalGroup = true }, shape = MaterialTheme.shapes.large, tonalElevation = 6.dp) {
                         ScreenView(dsl, session, top, io, dispatch)
                     }
                 }
@@ -121,20 +143,22 @@ fun DesktopApp(dsl: AppDSL, initialStore: MockStore = MockStore(), startScreen: 
             onDismissRequest = { pending = null },
             text = { Text(a.confirmMessage.orEmpty()) },
             confirmButton = { TextButton(onClick = { pending = null; session.dispatch(a, ctx) }) { Text(confirmLabel(a)) } },
-            dismissButton = { TextButton(onClick = { pending = null }) { Text("キャンセル") } },
+            dismissButton = { TextButton(onClick = { pending = null }) { Text(Strings["inputs_cancel"]) } },
         )
     }
 }
 
 /** 確認ダイアログの主ボタン(iOS と同じ語)。 */
-private fun confirmLabel(a: Action): String = when (a.type) {
-    jp.kz2601.metamon.dsl.ActionType.DELETE_RECORD -> "削除"
-    jp.kz2601.metamon.dsl.ActionType.SAVE_RECORD -> "保存"
-    jp.kz2601.metamon.dsl.ActionType.EXPORT -> "書き出す"
-    jp.kz2601.metamon.dsl.ActionType.OPEN_URL -> "開く"
-    jp.kz2601.metamon.dsl.ActionType.RESET_FORM -> "入力を消す"
-    else -> "続ける"
-}
+internal fun confirmLabel(a: Action): String = Strings[
+    when (a.type) {
+        jp.kz2601.metamon.dsl.ActionType.DELETE_RECORD -> "runtime_confirm_delete"
+        jp.kz2601.metamon.dsl.ActionType.SAVE_RECORD -> "runtime_confirm_save"
+        jp.kz2601.metamon.dsl.ActionType.EXPORT -> "runtime_confirm_export"
+        jp.kz2601.metamon.dsl.ActionType.OPEN_URL -> "runtime_confirm_open"
+        jp.kz2601.metamon.dsl.ActionType.RESET_FORM -> "runtime_confirm_reset"
+        else -> "runtime_confirm_continue"
+    },
+]
 
 
 /** route の画面 1 枚(見出し・戻る・toolbar・一言・グリッド)。 */
@@ -148,19 +172,19 @@ private fun ScreenView(dsl: AppDSL, session: DesktopSession, route: Route, io: D
     Column(Modifier.fillMaxSize()) {
         Row(Modifier.fillMaxWidth().padding(8.dp), verticalAlignment = Alignment.CenterVertically) {
             if (NavigationResolver.canClose(session.nav, route)) {
-                TextButton(onClick = { session.back(route) }) { Text(if (route.stack == Route.SHEET || route.stack == Route.FULL) "閉じる" else "戻る") }
+                TextButton(onClick = { session.back(route) }) { Text(Strings[if (route.stack == Route.SHEET || route.stack == Route.FULL) "desktop_close" else "renderer_back"]) }
             }
-            Text(screen.title.ifEmpty { dsl.app.name }, style = MaterialTheme.typography.titleLarge, modifier = Modifier.weight(1f))
+            Text(screen.title.ifEmpty { dsl.app.name }, style = MaterialTheme.typography.titleLarge, modifier = Modifier.weight(1f).semantics { heading() })
             screen.toolbar.forEach { b ->
                 if (isButtonVisible(b.action, form)) TextButton(onClick = { perform(b.action, null) }) { Text(b.label) }
             }
         }
         HorizontalDivider()
         if (route == session.top) {
-            session.message?.let { Text(it, color = MaterialTheme.colorScheme.error, modifier = Modifier.padding(12.dp)) }
-            io.notice?.let { Text(it, modifier = Modifier.padding(12.dp)) }
+            session.message?.let { Text(it, color = MaterialTheme.colorScheme.error, modifier = Modifier.padding(12.dp).semantics { liveRegion = LiveRegionMode.Polite }) }
+            io.notice?.let { Text(it, modifier = Modifier.padding(12.dp).semantics { liveRegion = LiveRegionMode.Polite }) }
         }
-        if (form?.isReadOnly == true) Text("このデータは作った人だけが変更できます", color = Color.Gray, modifier = Modifier.padding(horizontal = 12.dp))
+        if (form?.isReadOnly == true) Text(Strings["renderer_form_read_only"], color = Color.Gray, modifier = Modifier.padding(horizontal = 12.dp))
         GridScreen(screen, scope)
     }
 }
@@ -240,8 +264,14 @@ private fun LocalGridOrChildren(c: Component, s: ScreenScope, modifier: Modifier
     }
 }
 
+/** 部品 1 つ。絵で描く部品は読み上げ用に 1 つにまとめる(A11y.kt)。 */
 @Composable
 private fun Node(c: Component, s: ScreenScope) {
+    Box(Modifier.leafSemantics(c, s.data)) { NodeContent(c, s) }
+}
+
+@Composable
+private fun NodeContent(c: Component, s: ScreenScope) {
     when (c.type) {
         ComponentType.HSTACK -> Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
             c.children.forEach { Box1(Modifier.weight(1f)) { Node(it, s) } }
@@ -277,7 +307,7 @@ private fun Node(c: Component, s: ScreenScope) {
         ComponentType.FILE_IMPORT -> FileImportLeaf(c, s.io)
         in InputLeaves.types -> InputNode(c, s)
         else -> Text(
-            if (c.type == ComponentType.UNKNOWN) "知らない部品: ${DesktopLeaves.typeName(c)}" else "デスクトップ版ではまだ使えない部品: ${DesktopLeaves.typeName(c)}",
+            Strings.format(if (c.type == ComponentType.UNKNOWN) "desktop_unknown_component" else "desktop_unsupported_component", DesktopLeaves.typeName(c)),
             color = Color.Gray,
             style = MaterialTheme.typography.bodySmall,
         )
@@ -302,7 +332,7 @@ private fun Box1(modifier: Modifier, content: @Composable () -> Unit) {
 private fun InputNode(c: Component, s: ScreenScope) {
     when (s.session.tapState(c, s.form)) {
         "hidden" -> return
-        "needsForm" -> return Text("この入力はフォームの画面で使えます", color = Color.Gray, style = MaterialTheme.typography.bodySmall)
+        "needsForm" -> return Text(Strings["desktop_input_needs_form"], color = Color.Gray, style = MaterialTheme.typography.bodySmall)
     }
     InputLeaf(c, s.form!!) { s.session.message = it }
 }
@@ -313,7 +343,7 @@ private fun ListLeaf(c: Component, s: ScreenScope) {
     val rows = s.session.rows(c, c.searchField?.let { s.session.queries(s.route)[it] })
     c.entity?.let { ListIoBar(it, s.io) }
     if (rows.isEmpty()) {
-        Text(c.emptyText ?: "まだありません", color = Color.Gray)
+        Text(c.emptyText ?: Strings["desktop_list_empty"], color = Color.Gray)
         return
     }
     val titleField = c.item?.title ?: entity?.displayTitleField
@@ -321,7 +351,7 @@ private fun ListLeaf(c: Component, s: ScreenScope) {
         val tap = c.onItemTap
         Column(
             Modifier.fillMaxWidth()
-                .then(if (tap != null) Modifier.clickable { s.perform(tap, row.id) } else Modifier)
+                .then(if (tap != null) Modifier.clickable(role = Role.Button) { s.perform(tap, row.id) } else Modifier)
                 .padding(vertical = 6.dp),
         ) {
             Text(titleField?.let { FieldCoding.display(row[it], entity?.field(it)) }?.takeIf { it.isNotEmpty() } ?: row.id)

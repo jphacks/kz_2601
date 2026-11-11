@@ -1,5 +1,6 @@
 package jp.kz2601.metamon.desktop
 
+import jp.kz2601.metamon.desktop.i18n.Strings
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
@@ -249,7 +250,7 @@ fun ImageLeaf(c: Component, src: String?) {
         if (bitmap != null) {
             Image(bitmap, c.label, Modifier.fillMaxSize(), contentScale = ContentScale.Crop)
         } else {
-            Text("画像なし", color = Color.Gray, style = MaterialTheme.typography.bodySmall)
+            Text(Strings["desktop_image_none"], color = Color.Gray, style = MaterialTheme.typography.bodySmall)
         }
     }
 }
@@ -367,7 +368,7 @@ fun ChartLeaf(c: Component, data: LeafData) {
         c.title?.let { Text(it, style = MaterialTheme.typography.titleSmall) }
         if (buckets.isEmpty()) {
             Box(Modifier.fillMaxWidth().height(120.dp), contentAlignment = Alignment.Center) {
-                Text("まだデータがありません", color = Color.Gray)
+                Text(Strings["desktop_chart_empty"], color = Color.Gray)
             }
             return@Column
         }
@@ -401,7 +402,7 @@ private fun BarChart(buckets: List<Aggregator.Bucket>) {
 @Composable
 private fun LineChart(buckets: List<Aggregator.Bucket>) {
     val color = SERIES[0]
-    val grid = Color(0x22000000)
+    val grid = MaterialTheme.colorScheme.outlineVariant
     val lo = min(0.0, buckets.minOf { it.value })
     val hi = buckets.maxOf { it.value }.let { if (it > lo) it else lo + 1 }
     Column {
@@ -468,9 +469,9 @@ fun CalendarLeaf(c: Component, data: LeafData, onDateTap: ((LocalDate) -> Unit)?
     val start = first.with(TemporalAdjusters.previousOrSame(DayOfWeek.SUNDAY))
     val weeks = ((first.dayOfWeek.value % 7) + month.lengthOfMonth() + 6) / 7
     Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-        Text(c.title ?: "${month.year}年${month.monthValue}月", style = MaterialTheme.typography.titleSmall)
+        Text(c.title ?: month.format(java.time.format.DateTimeFormatter.ofPattern(Strings["desktop_calendar_month_pattern"], Strings.locale)), style = MaterialTheme.typography.titleSmall)
         Row(Modifier.fillMaxWidth()) {
-            listOf("日", "月", "火", "水", "木", "金", "土").forEach {
+            (0..6).map { DayOfWeek.SUNDAY.plus(it.toLong()).getDisplayName(java.time.format.TextStyle.SHORT, Strings.locale) }.forEach {
                 Text(it, Modifier.weight(1f), style = MaterialTheme.typography.labelSmall, color = Color.Gray)
             }
         }

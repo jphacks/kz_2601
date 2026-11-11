@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="desktop_a11y_chart">Chart: %1$s</string>
+    <string name="desktop_a11y_image">Image</string>
+    <string name="desktop_a11y_rating">%1$s %2$d of %3$d</string>
+    <string name="desktop_book_searching">Looking up the book…</string>
+    <string name="desktop_calendar_month_pattern">MMMM y</string>
+    <string name="desktop_calendar_opened">Opened the event (%1$s)</string>
+    <string name="desktop_calendar_write_failed">Couldn\'t save the event</string>
+    <string name="desktop_calendar_written">Saved the event: %1$s</string>
+    <string name="desktop_chart_empty">No data yet</string>
+    <string name="desktop_close">Close</string>
+    <string name="desktop_export_clipboard">" (the table is also on the clipboard)"</string>
+    <string name="desktop_export_done">Exported %1$d records: %2$s</string>
+    <string name="desktop_image_none">No image</string>
+    <string name="desktop_input_needs_form">This input works on a form screen</string>
+    <string name="desktop_list_empty">Nothing yet</string>
+    <string name="desktop_list_separator">", "</string>
+    <string name="desktop_notification_now">now</string>
+    <string name="desktop_notification_scheduled">Notification scheduled (%1$s, only while the app is open)</string>
+    <string name="desktop_tray_unavailable">This computer can\'t show notifications (no system tray)</string>
+    <string name="desktop_unavailable_activity">Live activities aren\'t available on this computer</string>
+    <string name="desktop_unavailable_follow">Following isn\'t available on desktop yet (sign-in is required)</string>
+    <string name="desktop_unavailable_voice">Voice changes aren\'t available on desktop yet</string>
+    <string name="desktop_unknown_component">Unknown component: %1$s</string>
+    <string name="desktop_unsupported_component">Not available on desktop yet: %1$s</string>
+    <string name="desktop_url_failed">Couldn\'t open the URL</string>
+    <string name="desktop_url_unsupported">This computer can\'t open URLs: %1$s</string>
+    <string name="desktop_window_title">Tailor It — %1$s</string>
+</resources>
