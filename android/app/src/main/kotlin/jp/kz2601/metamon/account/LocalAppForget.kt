@@ -6,7 +6,7 @@ import jp.kz2601.metamon.switcher.AppThumbnailStore
 import jp.kz2601.metamon.voice.ChatHistoryStore
 
 /**
- * 削除したアプリの端末のデータ(iOS の `deleteApp` の後片付け・#896): 記録の DB と送信待ち・保存した DSL・
+ * 削除したアプリの端末のデータ(iOS の `deleteApp` の後片付け・#896): 記録の DB と送信待ちと記録の動画・録音のファイル(#1098)・保存した DSL・
  * サムネ・会話の履歴(#1176)・通知。そのアプリで位置を記録中なら先に止める(#869)。サーバーの削除が済んでから呼ぶ。
  */
 class LocalAppForget(
