@@ -126,3 +126,27 @@ func (c *Client) CommentIssue(ctx context.Context, repo string, n int, body stri
 	}
 	return &Issue{Number: n, URL: out.URL}, nil
 }
+
+// IssueOpen reports whether issue n in repo is open right now (closed for
+// any reason, including not planned or duplicate, is false).
+func (c *Client) IssueOpen(ctx context.Context, repo string, n int) (bool, error) {
+	if !ValidRepo(repo) {
+		return false, fmt.Errorf("github: bad repo %q", repo)
+	}
+	if n <= 0 {
+		return false, fmt.Errorf("github: bad issue number %d", n)
+	}
+	var out struct {
+		State string `json:"state"`
+	}
+	if err := c.do(ctx, http.MethodGet, fmt.Sprintf("/repos/%s/issues/%d", repo, n), nil, &out); err != nil {
+		return false, err
+	}
+	switch out.State {
+	case "open":
+		return true, nil
+	case "closed":
+		return false, nil
+	}
+	return false, fmt.Errorf("github: unknown state %q for %s#%d", out.State, repo, n)
+}

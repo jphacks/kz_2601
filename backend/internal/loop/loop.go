@@ -157,6 +157,12 @@ type Draft struct {
 	AppendRepo  string `firestore:"appendRepo,omitempty"`
 	AppendIssue int    `firestore:"appendIssue,omitempty"`
 
+	// PublishedAt: when the issue or comment was posted. ClosedAt: the
+	// issue was found closed (any reason) when an append draft was about to
+	// be posted to it, so the loop stops adding to it.
+	PublishedAt time.Time `firestore:"publishedAt,omitempty"`
+	ClosedAt    time.Time `firestore:"closedAt,omitempty"`
+
 	FixedPR    int       `firestore:"fixedPr,omitempty"`
 	FixedAt    time.Time `firestore:"fixedAt,omitempty"`
 	NotifiedAt time.Time `firestore:"notifiedAt,omitempty"`
