@@ -3,12 +3,11 @@ package jp.kz2601.metamon.dsl.nearby
 import jp.kz2601.metamon.dsl.AppDSL
 import jp.kz2601.metamon.dsl.Component
 import jp.kz2601.metamon.dsl.ComponentType
+import jp.kz2601.metamon.dsl.logic.graphemePrefix
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import java.net.URI
-import java.text.BreakIterator
-import java.util.Locale
 
 /**
  * `musicPlayer`(#412)の 1 曲。近くの端末から届くので、使う前に必ず [MusicRequestRules.sanitize] を通す。
@@ -66,15 +65,7 @@ object MusicRequestRules {
     fun clip(s: String, max: Int): String {
         val t = s.trim()
         if (t.length <= max) return t
-        val bi = BreakIterator.getCharacterInstance(Locale.ROOT)
-        bi.setText(t)
-        var end = 0
-        repeat(max) {
-            val next = bi.next()
-            if (next == BreakIterator.DONE) return t
-            end = next
-        }
-        return t.substring(0, end)
+        return t.graphemePrefix(max)
     }
 }
 
