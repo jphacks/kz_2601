@@ -21,6 +21,8 @@ dependencies {
     implementation(project(":dsl"))
     implementation(compose.desktop.currentOs)
     implementation(compose.material3)
+    // PDF の本文を読む・表を PDF に書く(#1753)。pdfbox + fontbox + pdfbox-io + commons-logging で約 3.8 MB
+    implementation("org.apache.pdfbox:pdfbox:3.0.3")
 
     testImplementation(libs.junit)
 }
