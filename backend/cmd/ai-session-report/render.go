@@ -154,6 +154,7 @@ func renderMarkdown(w io.Writer, r *report, now time.Time) error {
 	p("\n`requiresPro`(確認カード)はログにも Firestore にも残らないので数えていない。\n")
 	if r.HasLogs {
 		renderChatOutcome(&b, r.Chat)
+		renderRetryBreakdown(&b, r.Retry)
 	}
 
 	p("\n## うまくいっていない疑いの上位 %d 件\n\n", c.Top)
@@ -285,14 +286,15 @@ func stepDetail(st step) string {
 
 // jsonReport is the machine-readable form (same content as the Markdown).
 type jsonReport struct {
-	GeneratedAt time.Time     `json:"generatedAt"`
-	Since       time.Time     `json:"since"`
-	Until       time.Time     `json:"until"`
-	HasLogs     bool          `json:"hasLogs"`
-	Totals      totals        `json:"totals"`
-	Chat        chatOutcome   `json:"chat"`
-	Users       []*userReport `json:"users"`
-	Sessions    []jsonSession `json:"sessions"`
+	GeneratedAt time.Time      `json:"generatedAt"`
+	Since       time.Time      `json:"since"`
+	Until       time.Time      `json:"until"`
+	HasLogs     bool           `json:"hasLogs"`
+	Totals      totals         `json:"totals"`
+	Chat        chatOutcome    `json:"chat"`
+	Retry       retryBreakdown `json:"retry"`
+	Users       []*userReport  `json:"users"`
+	Sessions    []jsonSession  `json:"sessions"`
 }
 
 type jsonSession struct {
@@ -331,7 +333,7 @@ type jsonFeedback struct {
 }
 
 func renderJSON(w io.Writer, r *report, now time.Time) error {
-	out := jsonReport{GeneratedAt: now, Since: r.Config.Since, Until: r.Config.Until, HasLogs: r.HasLogs, Totals: r.totals(), Chat: r.Chat, Users: r.Users}
+	out := jsonReport{GeneratedAt: now, Since: r.Config.Since, Until: r.Config.Until, HasLogs: r.HasLogs, Totals: r.totals(), Chat: r.Chat, Retry: r.Retry, Users: r.Users}
 	for _, s := range r.Sessions {
 		js := jsonSession{session: s, Flow: []jsonStep{}, Errors: []jsonError{}, Feedback: []jsonFeedback{}}
 		for _, st := range s.Steps {
