@@ -36,6 +36,7 @@ TAILORIT_API=stg TAILORIT_DEV_TOKEN=<Firebase の ID トークン> ./gradlew :de
 - ドラッグ & ドロップ: 画面に写真・動画・CSV・テキスト・PDF を落とすと、photoField / videoField / fileImport / list に振り分ける。写真は外へ引き出せる。
 - クリップボード: 一覧の「表をコピー」で表計算に貼れる TSV、「表を貼り付け」で表計算の行を取り込む。画像は Ctrl+V で photoField へ。
 - 印刷: Ctrl+P(または見出しの「印刷」)で一番上の画面をプレビューし、OS の印刷ダイアログから A4 縦で印刷する。頁は export の PDF と同じ(`io/PdfIo.pages`)。一覧・table・gridTable・chart は表ごとに頁を改めて全行を複数頁に割り、stat などの値とフォームの入力は「項目 / 値」の表にする(`Print.kt`)。
+- キーボード: Ctrl+K(または Ctrl+Shift+P)でコマンドパレット(画面・アクション・同梱のアプリを名前で選ぶ)、Ctrl+N 新規・Ctrl+S 保存・Ctrl+F 検索・Delete 削除(確認あり)・Esc 閉じる / 戻る・F1(または Ctrl+/)で一覧。macOS は Ctrl の代わりに ⌘、削除は ⌘⌫。Tab はグリッドの行 → 列の順(`Keyboard.kt`・`CommandPalette.kt`)。
 - まだ描けない部品は「デスクトップ版ではまだ使えない部品」の枠で残す。
 
 ## 構成

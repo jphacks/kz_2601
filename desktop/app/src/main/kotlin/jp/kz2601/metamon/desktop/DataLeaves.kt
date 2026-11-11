@@ -526,7 +526,7 @@ private fun SearchBarLeaf(c: Component, search: MutableMap<String, String>) {
         placeholder = { Text(c.placeholder ?: "検索") },
         singleLine = true,
         trailingIcon = if (text.isEmpty()) null else { { TextButton(onClick = { search[key] = "" }) { Text("消す") } } },
-        modifier = Modifier.fillMaxWidth(),
+        modifier = Modifier.fillMaxWidth().searchShortcutTarget(),
     )
 }
 

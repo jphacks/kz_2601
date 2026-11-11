@@ -2,7 +2,11 @@ package jp.kz2601.metamon.desktop
 
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.unit.dp
@@ -25,16 +29,19 @@ import java.util.prefs.Preferences
  */
 @OptIn(FlowPreview::class)
 fun main(args: Array<String>) = application {
-    val name = args.firstOrNull() ?: System.getProperty("tailorit.example") ?: "shopping"
-    val dsl = remember { Examples.load(name) }
-    val store = remember { args.getOrNull(1)?.let { MockStore.fromJson(File(it).readText()) } ?: MockStore() }
+    val first = args.firstOrNull() ?: System.getProperty("tailorit.example") ?: "shopping"
+    // コマンドパレット(#1765)で同梱の別の例に切り替える。記録・最初の画面は起動時の例にだけ使う
+    var name by remember { mutableStateOf(first) }
+    val dsl = remember(name) { Examples.load(name) }
+    val store = remember(name) { args.getOrNull(1)?.takeIf { name == first }?.let { MockStore.fromJson(File(it).readText()) } ?: MockStore() }
     val saved = remember { WindowBounds.load() }
     val state = rememberWindowState(
         size = saved?.size ?: DpSize(480.dp, 820.dp),
         position = saved?.position ?: WindowPosition.PlatformDefault,
     )
     // トレイに常駐(#1761): × はトレイに隠す(設定で off・トレイが無ければ終わる)。終わるのはトレイの「終了」
-    val tray = remember { TrayController.create(dsl) }
+    // パレットでアプリを替えたらトレイ(すぐ記録・名前)も替える
+    val tray = remember(dsl) { TrayController.create(dsl) }
     DesktopTray(tray)
     Window(
         onCloseRequest = { if (tray.onCloseRequest()) exitApplication() },
@@ -54,7 +61,9 @@ fun main(args: Array<String>) = application {
             snapshotFlow { state.size to state.position }.debounce(500).collect { (size, pos) -> WindowBounds.save(size, pos) }
         }
         // 明暗は OS に従う・文言は OS の言語(日本語か英語)・#1759
-        CompositionLocalProvider(LocalTray provides tray) { TailorItTheme { DesktopApp(dsl, store, args.getOrNull(2)) } }
+        CompositionLocalProvider(LocalTray provides tray) {
+            TailorItTheme { key(name) { DesktopApp(dsl, store, args.getOrNull(2)?.takeIf { name == first }, onOpenApp = { name = it }) } }
+        }
     }
 }
 
