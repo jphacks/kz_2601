@@ -54,6 +54,10 @@ struct MacRootView: View {
     /// 会話で直した直後に光らせる部品(#626・#1337)。iOS と同じく出現が済んだ頃(2 秒)に消す
     @State private var highlight: (canvas: String, value: ChangeHighlight)?
     @Environment(MacVoiceInput.self) private var voice
+    #if !APP_STORE_REVIEW
+    /// 共有のリンクから取り込んだアプリ(#1287)を一覧に足して開く
+    @State private var shareFlow = MacShareFlow.shared
+    #endif
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     init(apps: [SampleApp]) { bundledApps = apps }
@@ -124,6 +128,9 @@ struct MacRootView: View {
         .focusedSceneValue(\.shellActions, shellActions)
         .macNotificationRouting(selection: notificationSelection, appIds: apps.map(\.id)) // 押された通知のアプリを開く(#965)。入力中なら確認を通す・シートの間は閉じるまで待つ(#943)
         .background { WindowCloseGuard(discardGuard: discardGuard) } // ⌘W・閉じるボタン(#943)
+        #if !APP_STORE_REVIEW
+        .onChange(of: shareFlow.adopted?.id) { adoptShared() }
+        #endif
         .sheet(item: $compose, onDismiss: noteFinishedCompose) { session in
             ComposeSheet(session: session, onClose: { compose = nil }, undo: finishedUndo(session))
                 .interactiveDismissDisabled(session.isBusy)
@@ -198,6 +205,18 @@ struct MacRootView: View {
         Task { await MacRuntimeNotifications.removeApp(id) } // そのアプリの通知とタイマーの予約(#1324)
         MacVoiceOver.announce(L10n.tr("「\(name)」を削除しました"))
     }
+
+    #if !APP_STORE_REVIEW
+    /// 共有のリンクから取り込んだ・参加したアプリ(#1287)。サーバーにあるアプリとして一覧に足し、入力の確認を通して開く
+    private func adoptShared() {
+        guard let adopted = shareFlow.adopted else { return }
+        shareFlow.adopted = nil
+        let id = adopted.document.appId
+        library.apply(adopted.document, envelope: adopted.envelope, created: true, onServer: true)
+        switchApp(to: id)
+        notices.summary = .init(appId: id, text: adopted.banner, action: nil)
+    }
+    #endif
 
     /// 複製する(#1285)。iOS と同じく切り替えずに知らせる。
     /// 持てるアプリの数に達していれば、作る時と同じ置き換えシートを出し、1 つ空いたら複製し直す(#630・iOS の `duplicateApp`)

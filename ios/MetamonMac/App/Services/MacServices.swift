@@ -62,6 +62,9 @@ final class MacServices: @unchecked Sendable {
     var books: (any BookLookupClient)? { appConfigURL.map { HTTPBookLookupClient(baseURL: $0, token: token) } }
 
     #if !APP_STORE_REVIEW
+    /// 共有のリンクの取り込み・参加(#1287)。appconfig の URL がある時だけ(審査用ビルドは外す・iOS の `Sharing+Wiring` と同じ)
+    var sharing: (any SharingClient)? { appConfigURL.map { HTTPSharingClient(baseURL: $0, token: token) } }
+
     /// 外部の公開データ(feed・#348・#1288)。appconfig の URL がある時だけ(審査用ビルドは外す・iOS と同じ)
     var feeds: (any FeedClient)? { appConfigURL.map { HTTPFeedClient(baseURL: $0, token: token) } }
     #endif

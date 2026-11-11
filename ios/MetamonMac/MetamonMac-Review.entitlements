@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<!-- 審査用の版(Review)。MetamonMac.entitlements から Associated Domains(共有のリンク・#1286)だけを外したもの。
+	     ほかのキーを足す・消す時は MetamonMac.entitlements と揃える -->
+	<!-- Mac App Store に必須のサンドボックスと、通信(backend・音声モデルの取得)・マイク。カメラなどは各 Issue で足す -->
+	<key>com.apple.security.app-sandbox</key>
+	<true/>
+	<key>com.apple.security.network.client</key>
+	<true/>
+	<!-- 声で頼む(#966): マイク。サンドボックスとハードンドランタイムの両方がこのキーを見る -->
+	<key>com.apple.security.device.audio-input</key>
+	<true/>
+	<!-- カレンダーに追加(#978): 予定を足す(書き込みだけの許可を求める)。サンドボックスではこのキーが無いと EventKit に届かない -->
+	<key>com.apple.security.personal-information.calendars</key>
+	<true/>
+	<!-- 現在地(#956): locationButton・地図・道案内など。サンドボックスではこのキーが無いと CoreLocation の許可を求められない -->
+	<key>com.apple.security.personal-information.location</key>
+	<true/>
+	<!-- 利用者が選んだファイル: 取り込む(#956・fileImport)と、画像を保存…(#1333・保存パネルで選んだ場所へ書く) -->
+	<key>com.apple.security.files.user-selected.read-write</key>
+	<true/>
+	<!-- サインイン(#930): Sign in with Apple(iOS と同じ App ID の capability) -->
+	<key>com.apple.developer.applesignin</key>
+	<array>
+		<string>Default</string>
+	</array>
+	<!-- Firebase Auth は Mac ではログインの状態を Keychain(データ保護の Keychain)に置くので、Keychain Sharing が要る(firebase-ios-sdk の決まり・#930)。
+	     グループは自分の App ID だけ(ほかのアプリとは共有しない) -->
+	<key>keychain-access-groups</key>
+	<array>
+		<string>$(AppIdentifierPrefix)$(PRODUCT_BUNDLE_IDENTIFIER)</string>
+	</array>
+</dict>
+</plist>

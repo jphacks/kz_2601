@@ -26,6 +26,13 @@
 	</array>
 	<!-- Firebase Auth は Mac ではログインの状態を Keychain(データ保護の Keychain)に置くので、Keychain Sharing が要る(firebase-ios-sdk の決まり・#930)。
 	     グループは自分の App ID だけ(ほかのアプリとは共有しない) -->
+	<!-- 共有のリンク(#1286): https://tailor-it.app/s/<token> を Universal Links で開く(iOS と同じ applinks)。
+	     AASA の appIDs(Team ID + Bundle ID)は iOS と同じ jp.kz2601.metamon なので、Mac にも同じ行が効く(実機で確かめる)。
+	     審査用の版は共有を外しているので MetamonMac-Review.entitlements に入れない -->
+	<key>com.apple.developer.associated-domains</key>
+	<array>
+		<string>applinks:$(METAMON_APPLINKS_DOMAIN)</string>
+	</array>
 	<key>keychain-access-groups</key>
 	<array>
 		<string>$(AppIdentifierPrefix)$(PRODUCT_BUNDLE_IDENTIFIER)</string>
