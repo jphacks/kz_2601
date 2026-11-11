@@ -20,6 +20,8 @@ struct MacPaywallRequest: Identifiable, Equatable {
     var reason: MacPaywallReason
     /// 閉じた(買わなかった)時にどうなるかの一言
     var closeNote: String?
+    /// 出すウインドウ(`MacPro.windowKey`)。頼んだ時の前面のウインドウ。nil なら課金画面を出せるウインドウがまだ無い
+    var window: Int?
 }
 
 /// Mac の Tailor It Pro(iOS の `ProGate` の Mac 版)。商品は iOS と同じ `ProProducts`、Bundle ID も同じなので、
@@ -33,6 +35,10 @@ final class MacPro {
     let store: ProEntitlementStore
     /// 中央のアプリの部品(オンラインの AI)から出す課金画面。メインのウインドウが出す(`MacPaywallPresenter`)
     private(set) var paywall: MacPaywallRequest?
+    /// 課金画面を出せるメインのウインドウ(`MacPaywallPresenter` が入れる)。付いた順
+    @ObservationIgnored private(set) var presenterWindows: [Int] = []
+    /// 前面から順のウインドウの印(テストで差し替える)
+    @ObservationIgnored var frontWindows: @MainActor () -> [Int] = { MacPro.frontWindowNumbers() }
 
     init(store: ProEntitlementStore? = nil) {
         self.store = store ?? ProEntitlementStore(mode: Self.storeMode)
@@ -46,10 +52,49 @@ final class MacPro {
     /// 課金画面を出す。Pro なら出さない(設定から開く時は呼ばずに直接出す)
     func requestPro(_ reason: MacPaywallReason, closeNote: String? = nil) {
         guard !isPro else { return }
-        paywall = MacPaywallRequest(reason: reason, closeNote: closeNote)
+        paywall = MacPaywallRequest(reason: reason, closeNote: closeNote,
+                                    window: Self.target(front: frontWindows(), presenters: presenterWindows))
     }
 
     func dismissPaywall() { paywall = nil }
+
+    /// 課金画面を出すウインドウ: 前面(キー)のウインドウ。それが設定などで出せなければ、出せる中で一番前・無ければ最初に付いたもの
+    static func target(front: [Int], presenters: [Int]) -> Int? {
+        front.first(where: presenters.contains) ?? presenters.first
+    }
+
+    /// キー → メイン → 前から順のウインドウ。シートのウインドウは親のウインドウに読み替える
+    static func frontWindowNumbers() -> [Int] {
+        func root(_ window: NSWindow) -> NSWindow {
+            var window = window
+            while let parent = window.sheetParent { window = parent }
+            return window
+        }
+        let windows = [NSApp.keyWindow, NSApp.mainWindow].compactMap { $0 } + NSApp.orderedWindows
+        return windows.map { windowKey(root($0)) }
+    }
+
+    /// ウインドウの印。番号(`windowNumber`)は画面に出るまで決まらないので、ウインドウそのものの識別子を使う
+    static func windowKey(_ window: NSWindow) -> Int { ObjectIdentifier(window).hashValue }
+
+    /// メインのウインドウが課金画面を出せるようになった。宛先の無い要求があればここで出す
+    func registerPresenter(window: Int) {
+        guard !presenterWindows.contains(window) else { return }
+        presenterWindows.append(window)
+        if paywall != nil, paywall?.window == nil { paywall?.window = window }
+    }
+
+    /// ウインドウが閉じた。そこに出していた課金画面は閉じたものとする(ほかのウインドウには移さない)
+    func unregisterPresenter(window: Int) {
+        presenterWindows.removeAll { $0 == window }
+        if paywall?.window == window { paywall = nil }
+    }
+
+    /// このウインドウに出す要求か
+    func paywall(for window: Int?) -> MacPaywallRequest? {
+        guard let window, let paywall, paywall.window == window else { return nil }
+        return paywall
+    }
 
     /// サブスクリプションの管理(解約・プランの確認)は Apple のアカウントの画面で行う。
     /// iOS の `manageSubscriptionsSheet` は macOS に無いので、App Store のページを開く
