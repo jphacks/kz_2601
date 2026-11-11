@@ -6,7 +6,11 @@ import jp.kz2601.metamon.dsl.decode
 import jp.kz2601.metamon.dsl.expr.DSLClock
 import jp.kz2601.metamon.dsl.records.FieldCoding
 import jp.kz2601.metamon.dsl.records.Record
+import jp.kz2601.metamon.dsl.records.JSONValue
+import jp.kz2601.metamon.dsl.records.SingleRecord
 import jp.kz2601.metamon.dsl.records.entityModels
+import jp.kz2601.metamon.renderer.form.FormDraft
+import kotlinx.serialization.json.JsonNull
 import jp.kz2601.metamon.dsl.screen
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
@@ -31,7 +35,8 @@ import java.time.ZoneId
  * - 全 case の DSL が共有の :dsl で読めて、画面の id・見出し・`layout`(grid / form / voice)が同じ。
  * - 部品の並び(area は (行, 列, DSL の順)、その後に area 無し)・`cell`・`stacked`・`band`・ローカルグリッドの `cell`。
  * - デスクトップ版が描ける部品(DesktopLeaves)は、expected が rendered の時に rendered。値を比べる props は [comparedProps]。
- * 操作(steps)はまだ見ない(#1740)。
+ * - 入力の部品 20 種の `value`・`label`(新規の下書き。computed / ref の描き替えは除く)。
+ * - 操作(case.json の operations)を [DesktopSession](画面と同じ遷移・保存・削除)で順に実行し、各 step の top・effects・error。
  */
 class DesktopConformanceTest {
     private val docsDir = File(requireNotNull(System.getProperty("metamon.dslDocsDir")) { "metamon.dslDocsDir が未設定(Gradle から実行する)" })
@@ -67,6 +72,7 @@ class DesktopConformanceTest {
         assertTrue("case が無い: $casesDir", cases.isNotEmpty())
         val failures = mutableListOf<String>()
         var screens = 0
+        var steps = 0
         val compared = sortedMapOf<String, Int>()
         val zone = FieldCoding.zone
         try {
@@ -83,7 +89,9 @@ class DesktopConformanceTest {
                 DSLClock.fixed = OffsetDateTime.parse(device?.str("now") ?: "2026-11-12T12:00:00+09:00").toInstant()
                 FieldCoding.zone = ZoneId.of(device?.str("timeZone") ?: "Asia/Tokyo")
                 val records = (case["records"] as? JsonObject).orEmpty().mapValues { (_, v) -> (v as JsonArray).map(Record::from) }
-                val data = LeafData(dsl.entityModels(), { records[it].orEmpty() }, device?.str("userId") ?: "me")
+                val uid = device?.str("userId") ?: "me"
+                val data = LeafData(dsl.entityModels(), { records[it].orEmpty() }, uid)
+                val models = dsl.entityModels()
                 for (s in expected["screens"] as JsonArray) {
                     s as JsonObject
                     screens++
@@ -101,15 +109,19 @@ class DesktopConformanceTest {
                     val got = placement.placedInReadingOrder.map { (c, a) ->
                         Got(c, a, stacked = false, band = bands.indexOfFirst { b -> b.items.any { it.component === c } }.takeIf { it >= 0 })
                     } + placement.stacked.map { Got(it, null, stacked = true, band = null) }
-                    compare(at, got, s["nodes"] as JsonArray, data, failures, compared)
+                    val form = models.firstOrNull { it.id == screen.entity }?.let { e ->
+                        FormDraft(e, if (e.single) SingleRecord.pick(records[e.id].orEmpty()) else null)
+                    }
+                    compare(at, got, s["nodes"] as JsonArray, data, failures, compared, form)
                 }
+                steps += runSteps(dir.name, dsl, case, expected, uid, failures)
             }
         } finally {
             DSLClock.fixed = null
             FieldCoding.zone = zone
         }
         if (failures.isNotEmpty()) fail("${failures.size} 件が違う:\n" + failures.joinToString("\n"))
-        println("desktop conformance: ${cases.size} cases / $screens screens OK / props compared: $compared")
+        println("desktop conformance: ${cases.size} cases / $screens screens / $steps steps OK / props compared: $compared")
     }
 
     @Test
@@ -180,6 +192,19 @@ class DesktopConformanceTest {
         assertEquals(999, LeafData.of(dsl, store.delete(entityId, "r1")).let { ListRows.rows(list, it, null).size })
     }
 
+    @Test
+    fun listDeleteAndToggleThroughSession() {
+        val dsl = Examples.load("shopping")
+        val session = DesktopSession(dsl, MockStore(mapOf("groceries" to listOf(Row("a", mapOf("name" to "牛乳", "done" to "false")), Row("b", mapOf("name" to "卵", "done" to "false"))))))
+        val list = dsl.screen("home")!!.components.flatMap { it.children }.first { it.type == jp.kz2601.metamon.dsl.ComponentType.LIST }
+        val top = session.top
+        session.dispatch(jp.kz2601.metamon.dsl.Action(type = jp.kz2601.metamon.dsl.ActionType.DELETE_RECORD, entity = "groceries"), ActionContext(top, null, "a"))
+        assertEquals(top, session.top)
+        assertEquals(listOf("b"), session.rows(list, null).map { it.id })
+        session.queries(top)["q"] = "卵"
+        assertEquals("卵", session.queries(top)["q"])
+    }
+
     private fun decodeDsl(e: JsonElement): AppDSL =
         if (e is JsonPrimitive && e.isString) AppDSL.decode(docsDir.resolve(e.content).readText()) else AppDSL.decode(e.toString())
 
@@ -191,6 +216,7 @@ class DesktopConformanceTest {
         data: LeafData,
         failures: MutableList<String>,
         compared: MutableMap<String, Int>,
+        form: FormDraft? = null,
     ) {
         val want = nodes.map { it as JsonObject }
         val wantKeys = want.map { key(it.str("id"), it.str("type")) }
@@ -216,8 +242,9 @@ class DesktopConformanceTest {
             val props = n["props"] as? JsonObject
             if (mine == "rendered" && state == "rendered" && props != null) {
                 val type = DesktopLeaves.typeName(c)
-                val mineProps = resolvedProps(c, data)
-                for (k in comparedProps[type].orEmpty()) {
+                val mineProps = resolvedProps(c, data) + inputProps(c, form)
+                val inputKeys = if (c.type in InputLeaves.types && form != null && !props.containsKey("input")) listOf("value", "label") else emptyList()
+                for (k in comparedProps[type].orEmpty() + inputKeys) {
                     val w = props[k] ?: continue
                     val m = mineProps[k]
                     if (m == null || !sameJson(m, w)) failures += "$here: $k $m != $w"
@@ -232,8 +259,45 @@ class DesktopConformanceTest {
             } else {
                 c.children.map { Got(it, null, false, null) }
             }
-            compare(here, kids, children, data, failures, compared)
+            compare(here, kids, children, data, failures, compared, form)
         }
+    }
+
+    /** 入力の部品の値とラベル(画面と同じ FormDraft・InputLeaves から)。 */
+    private fun inputProps(c: Component, form: FormDraft?): Map<String, JsonElement> {
+        if (form == null || c.type !in InputLeaves.types) return emptyMap()
+        val fid = c.field ?: return emptyMap()
+        return mapOf(
+            "value" to (form.values[fid] ?: JSONValue.Null).toJsonElement(),
+            "label" to (InputLeaves.label(c, form)?.let(::JsonPrimitive) ?: JsonNull),
+        )
+    }
+
+    /** case の operations を画面と同じ [DesktopSession] で順に実行し、step ごとの top・effects・error を比べる。 */
+    private fun runSteps(name: String, dsl: AppDSL, case: JsonObject, expected: JsonObject, uid: String, failures: MutableList<String>): Int {
+        val ops = case["operations"] as? JsonArray ?: return 0
+        val want = expected["steps"] as? JsonArray ?: return 0
+        if (want.size != ops.size) failures += "$name: steps の数 ${ops.size} != ${want.size}"
+        val store = (case["records"] as? JsonObject)?.let { MockStore.fromJson(it.toString()) } ?: MockStore()
+        val session = DesktopSession(dsl, store, uid)
+        var n = 0
+        for ((i, op) in ops.withIndex()) {
+            val e = want.getOrNull(i) as? JsonObject ?: break
+            val at = "$name/steps[$i] $op"
+            session.effects.clear()
+            val ok = session.apply(op as JsonObject)
+            n++
+            val top = session.top
+            val route = JsonObject(
+                mapOf("screen" to JsonPrimitive(top.screen), "stack" to JsonPrimitive(top.stack), "recordId" to (top.recordId?.let(::JsonPrimitive) ?: JsonNull)),
+            )
+            e["top"]?.let { if (!sameJson(route, it)) failures += "$at: top $route != $it" }
+            if ((e["error"] != null) == ok) failures += "$at: error ${!ok} != ${e["error"]}"
+            val effects = JsonArray(session.effects.toList())
+            val wantEffects = e["effects"] as? JsonArray ?: JsonArray(emptyList())
+            if (!sameJson(effects, wantEffects)) failures += "$at: effects $effects != $wantEffects"
+        }
+        return n
     }
 
     /** デスクトップ版が描く値(画面と同じ関数から)。 */
@@ -270,7 +334,7 @@ class DesktopConformanceTest {
         dataProps(c, data).forEach { (k, v) -> put(k, v) }
     }
 
-    /** データの部品(#1744)。行は画面と同じ ListRows・TableCells・TimelineRows から。検索欄は空(steps は #1740)。 */
+    /** データの部品(#1744)。行は画面と同じ ListRows・TableCells・TimelineRows から。検索欄は開いた時の空(検索の操作は runSteps が DesktopSession で回す)。 */
     private fun dataProps(c: Component, data: LeafData): Map<String, JsonElement> = buildMap {
         fun putText(k: String, v: String?) {
             v?.let { put(k, JsonPrimitive(it)) }

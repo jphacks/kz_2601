@@ -77,6 +77,7 @@ import jp.kz2601.metamon.dsl.records.Record
 import jp.kz2601.metamon.dsl.records.RecordQuery
 import jp.kz2601.metamon.dsl.records.Sort
 import jp.kz2601.metamon.dsl.records.TableGrouping
+import jp.kz2601.metamon.renderer.form.FormPrefill
 import java.awt.Cursor
 import java.time.Instant
 
@@ -91,7 +92,7 @@ val DATA_LEAVES: Set<ComponentType> = setOf(
 /** データの部品が画面から受け取るもの。 */
 class DataEnv(
     val data: LeafData,
-    /** 画面の検索欄の文字(searchBar.field → 文字)。 */
+    /** 画面の検索欄の文字(searchBar.field → 文字)。DesktopSession.queries(route)。 */
     val search: MutableMap<String, String>,
     val tap: (Action, String?) -> Unit,
     /** 1 件の記録の field を書き換える(list のチェック)。 */
@@ -473,8 +474,7 @@ private fun GridCell(c: Component, env: DataEnv, layout: GridTableLayout, entity
             when {
                 rows.size > 1 -> menu = true
                 rows.size == 1 -> env.tap(tap!!, rows[0].id)
-                // 列・行の値を新規フォームへ渡すのは後の Issue(今は空のフォーム)
-                else -> env.tap(tap!!, null)
+                else -> addAt(env, tap!!, layout, cell)
             }
         },
     ) {
@@ -502,9 +502,15 @@ private fun GridCell(c: Component, env: DataEnv, layout: GridTableLayout, entity
         }
         DropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
             rows.forEachIndexed { i, r -> DropdownMenuItem(text = { Text(titles[i]) }, onClick = { menu = false; tap?.let { env.tap(it, r.id) } }) }
-            DropdownMenuItem(text = { Text("追加") }, onClick = { menu = false; tap?.let { env.tap(it, null) } })
+            DropdownMenuItem(text = { Text("追加") }, onClick = { menu = false; tap?.let { addAt(env, it, layout, cell) } })
         }
     }
+}
+
+/** 空のマス・「追加」: 列・行の値を新規フォームの初期値にして開く(Android の FormPrefill)。 */
+private fun addAt(env: DataEnv, tap: Action, layout: GridTableLayout, cell: GridTableLayout.Cell) {
+    FormPrefill.set(layout.prefill(cell))
+    env.tap(tap, null)
 }
 
 /** `searchBar`: 同じ画面の list(searchField が同じ)を絞る。 */

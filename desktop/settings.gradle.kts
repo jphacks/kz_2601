@@ -29,5 +29,9 @@ rootProject.name = "tailorit-desktop"
 include(":dsl")
 project(":dsl").projectDir = file("../android/dsl")
 
+// android/services の純 Kotlin の部分(API クライアント・保存・送信待ち)。取り込むファイルは desktop/services で名指しする
+include(":services")
+project(":services").projectDir = file("services")
+
 include(":desktop")
 project(":desktop").projectDir = file("app")
