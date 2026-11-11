@@ -101,6 +101,16 @@ extension View {
         accessibilityLabel(label).macIconButtonHelp(label, hoverHighlight: hoverHighlight)
     }
 
+    /// クリックできる行・カードのヘルプのタグ(ホバーの説明・#1373)。nil(押しても何も起きない)なら付けない。iOS は何もしない。
+    @ViewBuilder
+    func macHelp(_ label: String?) -> some View {
+        #if os(macOS)
+        if let label { help(label) } else { self }
+        #else
+        self
+        #endif
+    }
+
     /// `iconButtonLabel` の Mac の部分だけ(名前は `Label` や行の操作が既に持つボタン用)。iOS は何もしない。
     func macIconButtonHelp(_ label: String, hoverHighlight: Bool = true) -> some View {
         modifier(MacIconButtonHelp(label: label, hoverHighlight: hoverHighlight))

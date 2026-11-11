@@ -4,10 +4,14 @@ import MetamonServices
 /// サイドバーのアプリの一覧。iOS の AppSwitcherSheet に当たる(Mac では常に出す)。
 /// ↑↓ で選ぶと中央が切り替わり、Return / ダブルクリックで中央へ移る(#934)。
 /// 「作ったアプリ」と「同梱の例」に分ける(#969)。作ったアプリは右クリックで名前の変更・上へ / 下へ・削除(確認あり)、
-/// ドラッグで並べ替え、Delete キーで削除。同梱の例は整理できない。サムネイル・検索・新着の数は後の Issue。
+/// ドラッグで並べ替え、Delete キーで削除。同梱の例は整理できない。検索(#1282)で絞った一覧を受け取る。行の頭にアプリの画面の写し(#1281・無ければ頭の文字)。新着の数は後の Issue。
 struct AppSidebar: View {
     let created: [SampleApp]
     let examples: [SampleApp]
+    /// 行の写し(#1281)
+    var thumbnail: (String) -> NSImage? = { _ in nil }
+    /// 検索欄の文字(#1282)。絞り込みは呼ぶ側で済ませてある。並べ替えは絞っていない時だけ
+    var searchText = ""
     @Binding var selection: SampleApp.ID?
     var onOpen: () -> Void = {}
     /// 確認の後に呼ぶ(選択の付け替えはウインドウ側)
@@ -20,12 +24,14 @@ struct AppSidebar: View {
 
     private var createdIds: [String] { created.map(\.id) }
 
+    private var isSearching: Bool { !searchText.trimmingCharacters(in: .whitespaces).isEmpty }
+
     var body: some View {
         List(selection: $selection) {
             if !created.isEmpty {
                 Section("作ったアプリ") {
                     ForEach(created) { row($0) }
-                        .onMove { library.move(fromOffsets: $0, toOffset: $1) }
+                        .onMove(perform: isSearching ? nil : { library.move(fromOffsets: $0, toOffset: $1) })
                 }
             }
             if !examples.isEmpty {
@@ -48,7 +54,9 @@ struct AppSidebar: View {
             deleteTarget = app
         }
         .overlay {
-            if created.isEmpty && examples.isEmpty {
+            if created.isEmpty && examples.isEmpty && isSearching {
+                ContentUnavailableView.search(text: searchText)
+            } else if created.isEmpty && examples.isEmpty {
                 MacEmptyState(pose: .tea, title: "アプリがありません",
                               mascotSize: MacTheme.Mascot.small, showsBackdrop: false)
             }
@@ -78,15 +86,18 @@ struct AppSidebar: View {
     }
 
     private func row(_ app: SampleApp) -> some View {
-        VStack(alignment: .leading, spacing: MacTheme.Spacing.rowLine) {
-            Text(app.name)
-                .font(MacTheme.Fonts.sidebarTitle)
-                .lineLimit(1)
-            if let description = app.description {
-                Text(description)
-                    .font(MacTheme.Fonts.sidebarDetail)
-                    .foregroundStyle(.secondary)
+        HStack(spacing: 8) {
+            SidebarThumbnail(name: app.name, image: thumbnail(app.id))
+            VStack(alignment: .leading, spacing: MacTheme.Spacing.rowLine) {
+                Text(app.name)
+                    .font(MacTheme.Fonts.sidebarTitle)
                     .lineLimit(1)
+                if let description = app.description {
+                    Text(description)
+                        .font(MacTheme.Fonts.sidebarDetail)
+                        .foregroundStyle(.secondary)
+                        .lineLimit(1)
+                }
             }
         }
         .padding(.vertical, 2)
@@ -99,7 +110,7 @@ struct AppSidebar: View {
             renameText = app.name
             renameTarget = app
         }
-        if created.count > 1, let index = createdIds.firstIndex(of: app.id) {
+        if !isSearching, created.count > 1, let index = createdIds.firstIndex(of: app.id) {
             Divider()
             Button("上へ移動") { library.move(app.id, to: index - 1) }
                 .disabled(index == 0)

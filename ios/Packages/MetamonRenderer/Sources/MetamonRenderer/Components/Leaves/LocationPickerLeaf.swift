@@ -88,6 +88,8 @@ struct LocationPickerSheet: View {
     /// 検索結果の一覧の選択(↑↓ と Return で選ぶ #1345)
     @State private var selectedResult: String?
     #endif
+    /// 「現在地」の精度が低い時の一言(#1344)
+    @State private var accuracyNote: String?
 
     init(title: String, initial: CLLocationCoordinate2D?, onPick: @escaping (PickedPlace) -> Void) {
         self.title = title
@@ -206,6 +208,10 @@ struct LocationPickerSheet: View {
                 Text(Self.mapHint)
                     .font(.caption).foregroundStyle(.secondary)
                 if let error { Text(error).font(.caption).foregroundStyle(.red) }
+                if let accuracyNote {
+                    Text(accuracyNote).font(.caption).foregroundStyle(.secondary)
+                        .accessibilityIdentifier("locationPicker.accuracy")
+                }
                 HStack(spacing: 12) {
                     Button { Task { await locate() } } label: {
                         HStack {
@@ -276,10 +282,15 @@ struct LocationPickerSheet: View {
         locating = true
         defer { locating = false }
         let here: CLLocationCoordinate2D
+        var accuracy = LocationAccuracy.precise
         if PlacePicking.isMock {
             here = PlacePicking.mockHere.coordinate
         } else {
-            do { here = try await OneShotLocation().request().coordinate } catch is OneShotLocation.LocationError {
+            do {
+                let loc = try await OneShotLocation().request()
+                here = loc.coordinate
+                accuracy = LocationAccuracy.classify(loc.horizontalAccuracy)
+            } catch is OneShotLocation.LocationError {
                 self.error = LocationPermissionCopy.notAllowed
                 return
             } catch {
@@ -288,6 +299,7 @@ struct LocationPickerSheet: View {
             }
         }
         error = nil
+        accuracyNote = accuracy.pickerNote
         center = here
         withAnimation { position = .region(MKCoordinateRegion(center: here, latitudinalMeters: 800, longitudinalMeters: 800)) }
     }

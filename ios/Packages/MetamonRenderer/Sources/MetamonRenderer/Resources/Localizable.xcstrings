@@ -773,6 +773,23 @@
         }
       }
     },
+    "%lld 枚目を見る" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Show page %lld"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld 枚目を見る"
+          }
+        }
+      }
+    },
     "%lld 秒" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -1961,6 +1978,57 @@
         }
       }
     },
+    "おおよその位置(±%@)" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Approximate location (±%@)"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "おおよその位置(±%@)"
+          }
+        }
+      }
+    },
+    "おおよその位置(±%@)から探しました。距離は目安です" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Searched from an approximate location (±%@). Distances are rough"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "おおよその位置(±%@)から探しました。距離は目安です"
+          }
+        }
+      }
+    },
+    "おおよその位置(±%@)です。地図を動かしてピンで直せます" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Approximate location (±%@). Move the map to adjust the pin"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "おおよその位置(±%@)です。地図を動かしてピンで直せます"
+          }
+        }
+      }
+    },
     "お互いに連絡先が見えなくなります。相手に通知は送られません。" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -3100,6 +3168,40 @@
         }
       }
     },
+    "クリックでブラウザで開きます" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Click to open in your browser"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "クリックでブラウザで開きます"
+          }
+        }
+      }
+    },
+    "クリックで開きます" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Click to open"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "クリックで開きます"
+          }
+        }
+      }
+    },
     "グラフ" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -3708,6 +3810,40 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "マウスやトラックパッドで描きます"
+          }
+        }
+      }
+    },
+    "ミュージック アプリで開く" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Open in Music"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ミュージック アプリで開く"
+          }
+        }
+      }
+    },
+    "ミュージック アプリを開く" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Open Music"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ミュージック アプリを開く"
           }
         }
       }
@@ -8883,6 +9019,93 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "選び直す"
+          }
+        }
+      }
+    },
+    "選んだ %lld 件をコピー" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Copy %lld Selected Record"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Copy %lld Selected Records"
+                }
+              }
+            }
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "選んだ %lld 件をコピー"
+          }
+        }
+      }
+    },
+    "選んだ %lld 件を削除" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Delete %lld Selected Record"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Delete %lld Selected Records"
+                }
+              }
+            }
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "選んだ %lld 件を削除"
+          }
+        }
+      }
+    },
+    "選んだ %lld 件を削除しますか?" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Delete %lld selected record?"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Delete %lld selected records?"
+                }
+              }
+            }
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "選んだ %lld 件を削除しますか?"
           }
         }
       }
