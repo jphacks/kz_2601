@@ -28,9 +28,10 @@ const (
 
 // Feature ids referenced by code.
 const (
-	SharedData  = "sharedData"
-	ServerRules = "serverRules"
-	OnlineAI    = "onlineAI"
+	SharedData      = "sharedData"
+	ServerRules     = "serverRules"
+	OnlineAI        = "onlineAI"
+	EncryptedFields = "encryptedFields"
 )
 
 // ProChecker reports whether uid has Tailor It Pro (entitlement.ProChecker).
@@ -67,6 +68,7 @@ type Def struct {
 	DSLEntityScopes    []string  `json:"dslEntityScopes"`
 	DSLServerRules     bool      `json:"dslServerRules"`
 	DSLComponents      []string  `json:"dslComponents"`
+	DSLEncryptedFields bool      `json:"dslEncryptedFields"`
 	WithoutInstruction Localized `json:"withoutInstruction"`
 }
 
@@ -145,6 +147,9 @@ func (d Def) Uses(a *dsl.App) bool {
 		return false
 	}
 	if d.DSLServerRules && len(a.ServerRules) > 0 {
+		return true
+	}
+	if d.DSLEncryptedFields && a.HasEncryptedFields() {
 		return true
 	}
 	for i := range a.Entities {

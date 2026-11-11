@@ -8,7 +8,7 @@ import MetamonDSL
 /// 1 件 1 行の「名前: 値」(aiButton の `AIRequestBuilder.describe`)で 8 KB まで。発言が無い・語が重ならなければ新しい順(#748 と同じ)。
 /// 入りきらない記録は飛ばし、選んだ limit 件のうち後ろの入る記録で埋める(大きい記録が関係の深い小さい記録を塞がない)。
 /// 値の中の改行は「 ⏎ 」にする(1 件が何件にも見えないように)。
-/// hidden の field は誰の記録でも送らない。写真・位置・参照など読めない型と computed も送らない。
+/// hidden と暗号化して保存する(#233)field は誰の記録でも送らない。写真・位置・参照など読めない型と computed も送らない。
 enum AIChatMaterial {
     /// backend `dsl.MaxAIChatInputRecords` / `dsl.MaxAIChatMaterialBytes`。
     static let maxRecords = 20
@@ -20,7 +20,7 @@ enum AIChatMaterial {
 
     /// AI に読ませる field(DSL の順)。
     static func fields(of entity: Entity) -> [Field] {
-        entity.storedFields.filter { !$0.hidden && fieldTypes.contains($0.type) }
+        entity.storedFields.filter { !$0.hidden && !$0.encrypted && fieldTypes.contains($0.type) }
     }
 
     /// 添える記録(自分の分・limit 件)。並びは `query` に近い記録が先(同点は新しい順)、残りは新しい順。

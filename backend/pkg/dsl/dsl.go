@@ -201,6 +201,9 @@ type Field struct {
 	Hidden       bool      `json:"hidden,omitempty"`    // not shown to answerers (quiz answer key); computed may compare it (#262)
 	// EditableBy "admins": only the app's admins set it (#272, data_rules.go).
 	EditableBy string `json:"editableBy,omitempty"`
+	// Encrypted: iOS stores the value sealed with the user's key
+	// ("enc:v1:..."), so servers only ever see ciphertext (encrypted.go).
+	Encrypted bool `json:"encrypted,omitempty"`
 }
 
 // Screen is one navigable page.
@@ -361,6 +364,8 @@ const (
 	CompFlashcards ComponentType = "flashcards"
 	// external feed (#348): read-only list from an allowlisted public source via appconfig
 	CompFeed ComponentType = "feed"
+	// voice / video call of a shared app's participants (#447, call_button.go)
+	CompCallButton ComponentType = "callButton"
 )
 
 // ContainerTypes lists component types that may have Children.
@@ -443,7 +448,7 @@ type Component struct {
 	Address       string  `json:"address,omitempty"`       // routeGuide: fixed destination (address / place name)
 	Seconds       int     `json:"seconds,omitempty"`       // timerDisplay countdown start / locationTracker auto stop
 	LiveActivity  bool    `json:"liveActivity,omitempty"`  // timerDisplay: mirror to the lock screen / Dynamic Island (#423)
-	ShareTo       string  `json:"shareTo,omitempty"`       // shareButton: any|line|slack|discord (`target` is progressBar's number)
+	ShareTo       string  `json:"shareTo,omitempty"`       // shareButton: any|line|slack|discord|x|mail (`target` is progressBar's number)
 	// input batch (slider / stepper / rating / textEditor). Pointers so that
 	// an explicit 0 round-trips through omitempty. Min/Max are shared with gauge.
 	Min      *float64 `json:"min,omitempty"`      // slider / stepper / gauge
@@ -527,6 +532,10 @@ type Component struct {
 	// photoField: also offer an illustration made on the device (Apple Image
 	// Playground) from the record's title, saved like a picked photo.
 	Illustrate bool `json:"illustrate,omitempty"`
+	// openUrlButton (open_app.go): open an app / service by name instead of
+	// a fixed url; To is the place in it (link, username, address, number).
+	App string `json:"app,omitempty"`
+	To  string `json:"to,omitempty"`
 	// fileImport (file_import.go). Entity / Field / Label are shared.
 	Accept []string       `json:"accept,omitempty"` // csv|text|pdf
 	Map    []ImportColumn `json:"map,omitempty"`    // csv: column header -> field id
@@ -558,6 +567,10 @@ type Component struct {
 	Near         string `json:"near,omitempty"`         // "" | current
 	AddressField string `json:"addressField,omitempty"` // placeSearch / locationButton: the address string field
 	Pins         bool   `json:"pins,omitempty"`         // also pin the results on a small map
+
+	// callButton (#447, call_button.go). Label is shared.
+	Video bool   `json:"video,omitempty"` // also offer the camera (audio only otherwise)
+	Room  string `json:"room,omitempty"`  // a separate room of the app ("" = the app's room)
 }
 
 // PhotoAnalyze is one photoField.analyze entry: what to read (Kind) and the

@@ -2,15 +2,20 @@ package auth
 
 import (
 	"context"
+	"slices"
 	"strings"
 )
 
-type anonKey struct{}
+type (
+	anonKey     struct{}
+	subjectsKey struct{}
+)
 
 // ContextWithIdentity is ContextWithUID that also keeps whether the caller
-// signed in anonymously (Anonymous).
+// signed in anonymously (Anonymous) and its Subjects.
 func ContextWithIdentity(ctx context.Context, id Identity) context.Context {
-	return context.WithValue(ContextWithUID(ctx, id.UID), anonKey{}, id.Anonymous)
+	ctx = context.WithValue(ContextWithUID(ctx, id.UID), anonKey{}, id.Anonymous)
+	return context.WithValue(ctx, subjectsKey{}, slices.Clone(id.Subjects))
 }
 
 // Anonymous reports whether the verified caller is a Firebase anonymous
@@ -18,6 +23,12 @@ func ContextWithIdentity(ctx context.Context, id Identity) context.Context {
 func Anonymous(ctx context.Context) bool {
 	a, _ := ctx.Value(anonKey{}).(bool)
 	return a
+}
+
+// Subjects are the verified caller's Identity.Subjects (nil when unknown).
+func Subjects(ctx context.Context) []string {
+	s, _ := ctx.Value(subjectsKey{}).([]string)
+	return s
 }
 
 // verifyIdentity verifies token, reporting the sign-in provider when the
@@ -30,8 +41,9 @@ func verifyIdentity(ctx context.Context, verifier TokenVerifier, token string) (
 	return Identity{UID: uid}, err
 }
 
-// debugIdentity is the X-Debug-Uid caller (dev + emulator only): uids
-// starting with "anon" are anonymous, as with DevVerifier.
+// debugIdentity is the X-Debug-Uid / DevVerifier caller (dev only): uids
+// starting with "anon" are anonymous; the others are their own subject.
 func debugIdentity(uid string) Identity {
-	return Identity{UID: uid, Anonymous: strings.HasPrefix(uid, "anon")}
+	anon := strings.HasPrefix(uid, "anon")
+	return Identity{UID: uid, Anonymous: anon, Subjects: devSubjects(uid, anon)}
 }

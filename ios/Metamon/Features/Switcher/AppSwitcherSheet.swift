@@ -40,6 +40,7 @@ struct AppSwitcherSheet: View {
         .background(Theme.Colors.canvas.ignoresSafeArea())
         .modifier(AppRenameAlert()) // #277
         .presentationDetents([.height(500)])
+        .appLimitSheets() // #630 複製で持てるアプリの数に達したら、この上で置き換える
         .presentationDragIndicator(.visible)
         .sensoryFeedback(.selection, trigger: selected)
         .task { await rt.appsList() }

@@ -94,6 +94,7 @@ object PermissionCopy {
         AppPermission.MICROPHONE -> R.string.permission_name_microphone
         AppPermission.CAMERA -> R.string.permission_name_camera
         AppPermission.LOCATION -> R.string.permission_name_location
+        AppPermission.BACKGROUND_LOCATION -> R.string.permission_name_background_location
         AppPermission.NOTIFICATIONS -> R.string.permission_name_notifications
         AppPermission.HEALTH -> R.string.permission_name_health
     }
@@ -103,6 +104,7 @@ object PermissionCopy {
         AppPermission.MICROPHONE -> R.string.permission_reason_microphone
         AppPermission.CAMERA -> R.string.permission_reason_camera
         AppPermission.LOCATION -> R.string.permission_reason_location
+        AppPermission.BACKGROUND_LOCATION -> R.string.permission_reason_background_location
         AppPermission.NOTIFICATIONS -> R.string.permission_reason_notifications
         AppPermission.HEALTH -> R.string.permission_reason_health
     }
@@ -112,6 +114,7 @@ object PermissionCopy {
         AppPermission.MICROPHONE -> R.string.permission_off_microphone
         AppPermission.CAMERA -> R.string.permission_off_camera
         AppPermission.LOCATION -> R.string.permission_off_location
+        AppPermission.BACKGROUND_LOCATION -> R.string.permission_off_background_location
         AppPermission.NOTIFICATIONS -> R.string.permission_off_notifications
         AppPermission.HEALTH -> R.string.permission_off_health
     }

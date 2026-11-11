@@ -5,6 +5,7 @@
 ```
 users/{uid}/devices/{installationId}   # {token, environment: sandbox|production, appVersion?, os?, createdAt, updatedAt}
 users/{uid}/notifyConsent/{appId}      # {allowed, updatedAt}
+users/{uid}/notifyConsent/_feedback_fixed  # 送ったフィードバックが直った時の push(#374・features/feedback-loop.md)
 device_tokens/{sha256(token)}          # {uid, installationId}: トークンを今持っている端末
 ```
 

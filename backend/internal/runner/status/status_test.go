@@ -38,6 +38,12 @@ func TestResult(t *testing.T) {
 		{"skipped_inactive", "", false, ResultInactive},
 		{"gave_up", "", false, ResultFailed},
 		{"skipped_disabled", "", false, ResultDisabled},
+		{"skipped_allowance", "", false, ResultAllowanceExhausted},
+		{"skipped_overflow_cap", "", false, ResultOverflowCapReached},
+		{"skipped_coins", "", false, ResultCoinsInsufficient},
+		{"ok", "allowance_exhausted", false, ResultAllowanceExhausted},
+		{"ok", "overflow_cap_reached", true, ResultOverflowCapReached},
+		{"ok", "coins_insufficient", false, ResultCoinsInsufficient},
 		{"something_new", "", false, ResultOther},
 	}
 	for _, c := range cases {

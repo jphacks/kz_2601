@@ -67,6 +67,7 @@ struct ErrorCard: View {
         case .signIn: ErrorCopy.signIn
         case .signInApple: ErrorCopy.signInApple
         case .upgradePro: ErrorCopy.upgradePro
+        case .replaceApp: AppLimitCopy.replaceButton
         }
     }
 

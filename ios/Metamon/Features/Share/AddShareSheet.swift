@@ -47,6 +47,7 @@ struct AddShareSheet: View {
         .presentationDetents([.medium])
         .presentationDragIndicator(.visible)
         .interactiveDismissDisabled(busy)
+        .appLimitSheets() // #630 追加で持てるアプリの数に達したら、この上で置き換える
     }
 
     private var title: Text {

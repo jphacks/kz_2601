@@ -28,7 +28,6 @@ import jp.kz2601.metamon.services.sharing.AppMembersStore
 import jp.kz2601.metamon.services.purchase.EntitlementClient
 import jp.kz2601.metamon.services.purchase.HttpEntitlementClient
 import jp.kz2601.metamon.services.sharing.HttpMembersClient
-import jp.kz2601.metamon.services.sharing.LeaveCleanup
 import jp.kz2601.metamon.services.sharing.MembersClient
 import jp.kz2601.metamon.push.FcmTokens
 import jp.kz2601.metamon.push.PushHost
@@ -128,7 +127,6 @@ import jp.kz2601.metamon.update.PlayAppUpdates
 import jp.kz2601.metamon.update.UpdateGate
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.withContext
 import kotlinx.coroutines.SupervisorJob
 import java.io.File
 import java.time.Instant
@@ -211,8 +209,6 @@ class AppContainer(
     private val entitlements: EntitlementClient? = null,
     /** Play の購入(Google Play Billing)。モックは null */
     private val playBilling: ((PlayBilling.Listener) -> PlayBilling)? = null,
-    /** そのアプリの通知を消す(共有から抜けた後・#903) */
-    private val removeAppNotifications: (String) -> Unit = {},
 ) {
     /** 共有シートの「みんなに公開」に渡すもの(#902)。「探す」が無い構成は null */
     val publishEnv: PublishEnv? by lazy { discover?.let { PublishEnv(it.client, authorProfile) } }
@@ -450,7 +446,6 @@ class AppContainer(
                 members = HttpMembersClient(appConfigHttp),
                 entitlements = HttpEntitlementClient(appConfigHttp),
                 playBilling = { PlayBilling(context, it) },
-                removeAppNotifications = { LocalNotifications.get(context).removeApp(it) },
             )
         }
 
@@ -554,24 +549,6 @@ class AppContainer(
 
     /** 今のアプリの参加者と自分が管理者か(#903)。部品の member の選択肢・管理者の削除が読む */
     val membersStore = AppMembersStore(members, CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate))
-
-    /** 共有から抜けた後: 別のアプリへ切り替え、一覧から外し、自分のコピーと端末の記録・会話の履歴・通知を消す(#903) */
-    val leaveCleanup: LeaveCleanup by lazy {
-        LeaveCleanup(
-            currentAppId = { runtime.document.appId },
-            apps = { runtime.appsList() },
-            switchApp = { runtime.switchApp(it) },
-            startNewApp = { runtime.startNewApp() },
-            hideApp = { runtime.forgetApp(it) },
-            deleteCopy = { appConfig.deleteApp(it) },
-            purgeLocal = { id ->
-                recordSync.purge(id)
-                documentCache.remove(id)
-                withContext(Dispatchers.IO) { chatHistory.remove(id) }
-                removeAppNotifications(id)
-            },
-        )
-    }
 
     /** アプリ全体のランタイム(#889)。起動時に 1 つだけ作る。 */
     val runtime: AppRuntime by lazy {

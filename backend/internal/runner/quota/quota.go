@@ -25,6 +25,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/jphacks/kz_2601/backend/internal/coins"
 	"github.com/jphacks/kz_2601/backend/internal/paid"
 	"github.com/jphacks/kz_2601/backend/internal/ratelimit"
 )
@@ -90,6 +91,9 @@ type Config struct {
 	// #316 (log also writes pro_gate.would_block). Shared data needs Pro in
 	// every mode (#338).
 	ProMode paid.Mode
+	// Allowance is Pro's monthly server allowance (#630 part 3,
+	// allowance.go); the zero value (mode off) counts nothing.
+	Allowance AllowanceConfig
 }
 
 // Run is one execution of one rule (an outbox entry or a scheduled tick).
@@ -111,6 +115,9 @@ type Block struct {
 	CounterID string // empty for a per-run cap or a plan check
 	Limit     int
 	Used      int
+	// Stop is the outcome when the monthly allowance stopped the work
+	// (OutcomeSkippedAllowance / OverflowCap / Coins); "" for the daily limits.
+	Stop string
 }
 
 // Decision is the answer of Begin.
@@ -134,6 +141,7 @@ type Decision struct {
 
 	run      Run
 	expireAt time.Time
+	month    *month // the monthly allowance part (nil = not counted)
 }
 
 // Charge is what was counted. Exported so the runner can keep it with the
@@ -162,8 +170,14 @@ type Quota struct {
 	fallback ratelimit.Store
 	pro      ProChecker
 	warned   warned
+	// warnedMonth is warned for the monthly notices (keyed by month).
+	warnedMonth warned
+	blocks      blockCache
 	// Logger receives runner.usage and fallback warnings; nil = slog.Default().
 	Logger *slog.Logger
+	// Buyer buys monthly allowance blocks with coins (coins.Service); nil =
+	// past the allowance the work stops (enforce).
+	Buyer OverflowBuyer
 }
 
 // New builds a Quota. store nil = memory only.
@@ -245,34 +259,46 @@ func (q *Quota) Begin(ctx context.Context, r Run) (Decision, error) {
 		add(ScopeActorExec, "rx_actor_"+docSafe(r.AppID)+"_"+docSafe(r.ActorUID), l.ActorPerApp)
 	}
 	add(ScopeGlobal, "rx_global", l.Global)
-	if len(counters) == 0 {
+	if len(counters) > 0 {
+		u, mem, err := q.consume(ctx, counters, 1, dec.expireAt)
+		if err != nil {
+			return dec, err
+		}
+		for i, c := range counters {
+			if c.Scope == ScopeAppExec {
+				dec.AppExec = &Block{Scope: c.Scope, CounterID: c.ID, Limit: c.Limit, Used: u.Counts[i]}
+			}
+		}
+		if u.Blocked >= 0 {
+			c := counters[u.Blocked]
+			dec.Allowed = false
+			dec.Outcome = OutcomeSkippedQuota
+			if c.Scope == ScopeGlobal {
+				dec.Outcome = OutcomeSkippedGlobal
+			}
+			dec.Block = &Block{Scope: c.Scope, CounterID: c.ID, Limit: c.Limit, Used: u.Counts[u.Blocked]}
+			return dec, nil
+		}
+		dec.Charge.Parts = append(dec.Charge.Parts, ChargePart{Counters: counters, Weight: 1, ExpireAt: dec.expireAt, Memory: mem})
+		for i, c := range counters {
+			if c.Scope != ScopeGlobal && u.Counts[i]*5 >= c.Limit*4 {
+				dec.NearLimit = true
+			}
+		}
+	}
+	// the creator's month, after the daily (runaway) limits
+	dec.month = q.newMonth(now, plan, r)
+	part, stop, err := q.allow(ctx, dec, coins.KindRuns, 1)
+	if err != nil || stop != nil {
+		q.refundQuiet(ctx, dec.Charge)
+		dec.Charge, dec.AppExec, dec.NearLimit = Charge{}, nil, false
+		if err != nil {
+			return dec, err
+		}
+		dec.Allowed, dec.Outcome, dec.Block = false, stop.Stop, stop
 		return dec, nil
 	}
-	u, mem, err := q.consume(ctx, counters, 1, dec.expireAt)
-	if err != nil {
-		return dec, err
-	}
-	for i, c := range counters {
-		if c.Scope == ScopeAppExec {
-			dec.AppExec = &Block{Scope: c.Scope, CounterID: c.ID, Limit: c.Limit, Used: u.Counts[i]}
-		}
-	}
-	if u.Blocked >= 0 {
-		c := counters[u.Blocked]
-		dec.Allowed = false
-		dec.Outcome = OutcomeSkippedQuota
-		if c.Scope == ScopeGlobal {
-			dec.Outcome = OutcomeSkippedGlobal
-		}
-		dec.Block = &Block{Scope: c.Scope, CounterID: c.ID, Limit: c.Limit, Used: u.Counts[u.Blocked]}
-		return dec, nil
-	}
-	dec.Charge.Parts = append(dec.Charge.Parts, ChargePart{Counters: counters, Weight: 1, ExpireAt: dec.expireAt, Memory: mem})
-	for i, c := range counters {
-		if c.Scope != ScopeGlobal && u.Counts[i]*5 >= c.Limit*4 {
-			dec.NearLimit = true
-		}
-	}
+	dec.Charge = appendPart(dec.Charge, part)
 	return dec, nil
 }
 
@@ -296,24 +322,29 @@ func (q *Quota) Writes(ctx context.Context, dec Decision, n int) (Grant, error) 
 	if c := pick(dec.Plan, l.RunWritesFree, l.RunWritesPro); c > 0 && n > c {
 		g.Allowed, g.Block = c, &Block{Scope: ScopeRunWrites, Limit: c, Used: n}
 	}
-	limit := pick(dec.Plan, l.AppWritesFree, l.AppWritesPro)
-	if dec.run.Attempt > 1 || limit <= 0 {
-		g.Dropped = n - g.Allowed
-		return g, nil
+	if limit := pick(dec.Plan, l.AppWritesFree, l.AppWritesPro); dec.run.Attempt <= 1 && limit > 0 {
+		ctr := ratelimit.Counter{ID: q.id(dec.Day, "rw_app_"+docSafe(dec.run.AppID)), Scope: ScopeAppWrites, Limit: limit}
+		got, part, blk, err := q.fill(ctx, ctr, g.Allowed, dec.expireAt)
+		if err != nil {
+			return Grant{Dropped: n}, err
+		}
+		if blk != nil {
+			g.Block = blk
+		}
+		g.Allowed = got
+		g.Charge = appendPart(g.Charge, part)
 	}
-	ctr := ratelimit.Counter{ID: q.id(dec.Day, "rw_app_"+docSafe(dec.run.AppID)), Scope: ScopeAppWrites, Limit: limit}
-	got, part, blk, err := q.fill(ctx, ctr, g.Allowed, dec.expireAt)
-	if err != nil {
-		return Grant{Dropped: n}, err
+	g.Dropped = n - g.Allowed
+	// the creator's month: all of the run's writes or none
+	part, stop, err := q.allow(ctx, dec, coins.KindWrites, g.Allowed)
+	if err != nil || stop != nil {
+		q.refundQuiet(ctx, g.Charge)
+		if err != nil {
+			return Grant{Dropped: n}, err
+		}
+		return Grant{Dropped: n, Block: stop}, nil
 	}
-	if blk != nil {
-		g.Block = blk
-	}
-	g.Allowed = got
-	g.Dropped = n - got
-	if part != nil {
-		g.Charge.Parts = append(g.Charge.Parts, *part)
-	}
+	g.Charge = appendPart(g.Charge, part)
 	return g, nil
 }
 
@@ -330,19 +361,27 @@ func (q *Quota) Reads(ctx context.Context, dec Decision, n int) (Charge, *Block,
 	if !dec.Allowed {
 		return Charge{}, &Block{Scope: ScopeAppReads}, nil
 	}
-	limit := pick(dec.Plan, q.cfg.Limits.AppReadsFree, q.cfg.Limits.AppReadsPro)
-	if n <= 0 || dec.run.Attempt > 1 || limit <= 0 {
+	if n <= 0 || dec.run.Attempt > 1 {
 		return Charge{}, nil, nil
 	}
-	c := ratelimit.Counter{ID: q.id(dec.Day, "rr_app_"+docSafe(dec.run.AppID)), Scope: ScopeAppReads, Limit: limit}
-	u, mem, err := q.consume(ctx, []ratelimit.Counter{c}, n, dec.expireAt)
-	if err != nil {
-		return Charge{}, nil, err
+	var ch Charge
+	if limit := pick(dec.Plan, q.cfg.Limits.AppReadsFree, q.cfg.Limits.AppReadsPro); limit > 0 {
+		c := ratelimit.Counter{ID: q.id(dec.Day, "rr_app_"+docSafe(dec.run.AppID)), Scope: ScopeAppReads, Limit: limit}
+		u, mem, err := q.consume(ctx, []ratelimit.Counter{c}, n, dec.expireAt)
+		if err != nil {
+			return Charge{}, nil, err
+		}
+		if u.Blocked >= 0 {
+			return Charge{}, &Block{Scope: c.Scope, CounterID: c.ID, Limit: c.Limit, Used: u.Counts[0]}, nil
+		}
+		ch.Parts = []ChargePart{{Counters: []ratelimit.Counter{c}, Weight: n, ExpireAt: dec.expireAt, Memory: mem}}
 	}
-	if u.Blocked >= 0 {
-		return Charge{}, &Block{Scope: c.Scope, CounterID: c.ID, Limit: c.Limit, Used: u.Counts[0]}, nil
+	part, stop, err := q.allow(ctx, dec, coins.KindReads, n)
+	if err != nil || stop != nil {
+		q.refundQuiet(ctx, ch)
+		return Charge{}, stop, err
 	}
-	return Charge{Parts: []ChargePart{{Counters: []ratelimit.Counter{c}, Weight: n, ExpireAt: dec.expireAt, Memory: mem}}}, nil, nil
+	return appendPart(ch, part), nil, nil
 }
 
 // Drop is one recipient left out and why.
@@ -444,6 +483,22 @@ func (q *Quota) Recipients(ctx context.Context, dec Decision, uids []string) (Re
 		ok = ok[:n]
 		g.Charge = appendPart(g.Charge, part)
 	}
+	// the creator's month: all of the run's recipients or none
+	part, stop, err := q.allow(ctx, dec, coins.KindRecipients, len(ok))
+	if err != nil || stop != nil {
+		for _, t := range ok {
+			g.Charge = appendPart(g.Charge, &t.part)
+		}
+		q.refundQuiet(ctx, g.Charge)
+		if err != nil {
+			return RecipientGrant{}, err
+		}
+		for _, t := range ok {
+			g.Dropped = append(g.Dropped, Drop{UID: t.uid, Block: *stop})
+		}
+		return RecipientGrant{Dropped: g.Dropped}, nil
+	}
+	g.Charge = appendPart(g.Charge, part)
 	for _, t := range ok {
 		g.Allowed = append(g.Allowed, t.uid)
 		g.Charge = appendPart(g.Charge, &t.part)

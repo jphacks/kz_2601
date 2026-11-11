@@ -12,7 +12,7 @@ object PermissionNeeds {
     fun of(dsl: AppDSL): Set<AppPermission> {
         val out = mutableSetOf<AppPermission>()
         if (dsl.app.notifications.isNotEmpty()) out += AppPermission.NOTIFICATIONS
-        if (dsl.app.notifications.any { it.near != null }) out += AppPermission.LOCATION
+        if (dsl.app.notifications.any { it.near != null }) out += NEAR
         for (screen in dsl.screens) {
             screen.toolbar.forEach { addAction(it.action, out) }
             screen.components.forEach { addComponent(it, out) }
@@ -43,8 +43,11 @@ object PermissionNeeds {
     private fun addAction(a: Action?, out: MutableSet<AppPermission>) {
         if (a?.type != ActionType.SCHEDULE_NOTIFICATION) return
         out += AppPermission.NOTIFICATIONS
-        if (a.notification?.near != null) out += AppPermission.LOCATION
+        if (a.notification?.near != null) out += NEAR
     }
+
+    /** 場所に着いたら知らせる(near)が要る権限: 前面の位置と裏での位置(Geofencing)。 */
+    val NEAR = setOf(AppPermission.LOCATION, AppPermission.BACKGROUND_LOCATION)
 }
 
 /** 「オフ」のバーの出し分け(iOS の NotificationsOffBarModel)。View から切り離してテストする。 */
@@ -55,6 +58,7 @@ object PermissionOffBarModel {
         AppPermission.MICROPHONE,
         AppPermission.CAMERA,
         AppPermission.LOCATION,
+        AppPermission.BACKGROUND_LOCATION,
         AppPermission.HEALTH,
     )
 
@@ -70,6 +74,10 @@ object PermissionOffBarModel {
         summaryShowing: Boolean,
     ): AppPermission? {
         if (busy || summaryShowing) return null
-        return ORDER.firstOrNull { it in needed && it !in dismissed && PermissionRules.isOff(statuses[it] ?: PermissionStatus.UNAVAILABLE) }
+        return ORDER.firstOrNull { p ->
+            // 裏での位置は前面の位置が許可された後でないと聞けない(先に位置のバーを出す)
+            if (p == AppPermission.BACKGROUND_LOCATION && statuses[AppPermission.LOCATION] != PermissionStatus.GRANTED) return@firstOrNull false
+            p in needed && p !in dismissed && PermissionRules.isOff(statuses[p] ?: PermissionStatus.UNAVAILABLE)
+        }
     }
 }

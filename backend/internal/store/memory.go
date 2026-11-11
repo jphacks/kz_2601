@@ -68,6 +68,7 @@ type Memory struct {
 	// matching (#507, memory_matching.go)
 	matchPairs map[string]map[string]*MatchPair // apps_public/{appId}/match_pairs/{pairId}
 	matchQuota map[string]int                   // uid/day -> interests sent
+	ageOK      map[string]time.Time             // users/{uid}.ageConfirmedAt
 
 	// runner outbox (#341, memory_outbox.go)
 	outbox map[string]map[string]*OutboxEvent // env -> eventId
@@ -265,6 +266,11 @@ func (m *Memory) CommitVersion(_ context.Context, uid, appID string, c Commit) (
 	}
 	if c.BaseVersion != a.app.CurrentVersion {
 		return nil, &ConflictError{Current: a.app.CurrentVersion}
+	}
+	if c.HeldLimit > 0 && a.app.CurrentVersion <= HeldVersion {
+		if held := m.heldLocked(uid, appID); held >= c.HeldLimit {
+			return nil, &HeldLimitError{Held: held, Limit: c.HeldLimit}
+		}
 	}
 	now := m.now().UTC()
 	n := a.app.CurrentVersion + 1

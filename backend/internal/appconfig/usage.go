@@ -112,10 +112,25 @@ type MyUsage struct {
 	Tier    ratelimit.Tier `json:"tier"`
 	ResetAt time.Time      `json:"resetAt"`
 	// AI is null when this appconfig cannot read the ai counters.
-	AI   *AIUsage    `json:"ai"`
+	AI *AIUsage `json:"ai"`
+	// Apps are the apps held (own + joined shared ones) against the plan's
+	// base plus the bought slots (#630 app slots).
 	Apps *UsageMeter `json:"apps"`
+	// AppSlots is how Apps.limit is made up (null when apps are not counted).
+	AppSlots *AppSlotsUsage `json:"appSlots"`
 	// PerApp are the caller's plan's per-app limits (null = not counted).
 	PerApp map[string]*int `json:"perApp"`
+}
+
+// AppSlotsUsage is MyUsage.appSlots: limit = base + purchased.
+type AppSlotsUsage struct {
+	Base      int `json:"base"`
+	Purchased int `json:"purchased"`
+	Limit     int `json:"limit"`
+	// CanBuySlot: one more slot can be bought now for SlotCoins coins
+	// (COIN_BILLING_MODE=enforce and COIN_PRICE_APP_SLOT > 0).
+	CanBuySlot bool  `json:"canBuySlot"`
+	SlotCoins  int64 `json:"slotCoins"`
 }
 
 // AppUsage is GET /v1/apps/{appId}/usage.
@@ -165,7 +180,13 @@ func (h *Handler) getMyUsage(w http.ResponseWriter, r *http.Request) {
 		if err != nil {
 			slog.WarnContext(ctx, "appconfig: usage: apps count failed", slog.Any("error", err))
 		} else {
-			out.Apps = meter(n.a, limits.Apps, counted)
+			limit := limits.Apps
+			if counted && limit > 0 {
+				l := h.heldLimitOf(ctx, uid)
+				limit = l.limit()
+				out.AppSlots = &AppSlotsUsage{Base: l.base, Purchased: l.purchased, Limit: limit, CanBuySlot: l.price > 0, SlotCoins: l.price}
+			}
+			out.Apps = meter(n.a, limit, counted)
 		}
 	}
 	w.Header().Set("Cache-Control", "private, no-store")

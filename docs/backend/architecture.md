@@ -17,10 +17,12 @@
 - [shared の参加者(#254)](features/members.md)
 - [プッシュ通知の端末と受け取りの同意(#269)](features/notifications.md)
 - [フィードバック(#319)](features/feedback.md)
+- [自己改善ループ(#364)](features/feedback-loop.md)
 - [自動の動きの見える化(#347)](features/automations.md)
 - [外部の公開データの読み取り(#348)](features/external-feeds.md)
 - [ISBN から本の情報を入れる(lookupBook)](features/book-lookup.md)
 - [決まった形の文章(#417)](features/text.md)
+- [通話(#447・LiveKit Cloud)](features/calls.md)
 - [仲間探しのアプリ(#507)](features/matching.md)
 
 ## 1. サービス構成とリクエストフロー
@@ -419,13 +421,14 @@ backend/
   Dockerfile                 # 1 イメージに全サービス。既定は /app/appconfig、ai は --command=/app/ai
   Makefile                   # build / test / schema-check / dev。運用コマンドは mk/<feature>.mk
   go.mod                     # module github.com/jphacks/kz_2601/backend
-  mk/                        # feedback.mk / moderate.mk / purge.mk
+  mk/                        # feedback.mk / feedback-loop.mk / moderate.mk / purge.mk
   cmd/
     ai/                      # ai サービス: 文字(iOS が端末内で文字起こし済み)-> Claude -> DSL(全体 or JSON Patch)-> appconfig
     ai-audit/                # ai-eval の結果を機能面で採点(押しても動かないボタン・辿れない画面など)。API を呼ばない
     ai-eval/                 # internal/ai/eval/cases.json を実 Claude で流し、ケースごとの指標と DSL を JSON に出す
     appconfig/               # appconfig サービス: 配線のみ(env -> store -> handlers -> http.Server)
     feedback/                # アプリ内フィードバックを運営が読む(#319)。読み取りだけ
+    feedback-loop/           # 自己改善ループ(#364): 取り込み・振り分け・Issue の下書きと人の承認・直ったお知らせ・停止スイッチ
     moderate/                # 通報の確認と運営による非公開化(#321)。手順は docs/infra/moderation.md
     product-metrics/         # 指標のログ(#297)から週ごとの Markdown 表を出す。ログのエクスポートだけを読む
     purge/                   # 退会から一定期間たったアカウントと古いフィードバックを消す Cloud Run Job(#458・#319)
@@ -440,6 +443,7 @@ backend/
     entitlement/             # Pro の権利のサーバー側の記録(#314)
     fsenv/                   # 接続する Firestore の DB を決め、stg が本番の DB を使うと止める(#290)
     httpx/                   # JSON 書き出し・エラー封筒・RequestID・recover・アクセスログ middleware
+    loop/                    # 自己改善ループ(#364)。pii(伏せ字)・ingest・triage(LLM・道具なし)・draft(出口の検査)・github・fixed
     metrics/                 # プロダクトの指標のイベントを構造化ログに出す(#297)
     paid/                    # 有料機能のリスト(paid_features.json)と DSL での判定。ai / appconfig が 402 で止める(#316)
     ratelimit/               # 1 人(と全体)が 1 日に起こせる Claude の処理量の上限(#280)

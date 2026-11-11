@@ -83,10 +83,10 @@ extension RecordSyncEngine {
     /// 表示用の一覧: ローカル DB の内容から、取り消し待ちの削除を除く。
     func shown(appId: String, entity: String) async -> [Record] {
         let hidden = undoable.values.map(\.ticket).filter { $0.appId == appId && $0.entity == entity }
-        guard !hidden.isEmpty else { return await store.records(appId: appId, entity: entity) }
-        return await store.rows(appId: appId, entity: entity)
+        guard !hidden.isEmpty else { return opened(await store.records(appId: appId, entity: entity)) }
+        return opened(await store.rows(appId: appId, entity: entity)
             .filter { row in row.pendingOp != .delete && !hidden.contains { Self.matches($0, row) } }
-            .map(\.record)
+            .map(\.record))
     }
 
     /// 待ちの間に未送信の作成が送られると、仮 id(`local-<clientId>`)がサーバー id に替わる。どちらでも同じ行とみなす。

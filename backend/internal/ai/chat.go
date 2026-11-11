@@ -410,8 +410,11 @@ func (s *Service) Chat(ctx context.Context, req ChatRequest) (out *ChatResult, e
 		bctx := context.WithoutCancel(ctx)
 		prompt := chatUserMessage(cv.messages, loc, turn, false, nil)
 		callStart := time.Now()
+		untrack := tallyOf(ctx).track() // an early question returns before this call ends (coins wait)
 		go func() {
-			done <- s.chatAttempt(bctx, cfg, prompt, bgAR, func(q earlyQuestion) { questions <- q })
+			a := s.chatAttempt(bctx, cfg, prompt, bgAR, func(q earlyQuestion) { questions <- q })
+			untrack()
+			done <- a
 		}()
 		select {
 		case q := <-questions:

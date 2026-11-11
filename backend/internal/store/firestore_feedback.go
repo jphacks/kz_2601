@@ -85,7 +85,7 @@ func (f *Firestore) ListFeedback(ctx context.Context, q FeedbackQuery) ([]Feedba
 		fq = fq.Where("createdAt", ">=", q.Since)
 	}
 	// without the bodies: a screenshot can be ~0.5 MB per document
-	fq = fq.Select("uid", "kind", "message", "consentVersion", "status", "appId", "dslVersion", "device", "day", "createdAt")
+	fq = fq.Select("uid", "kind", "message", "consentVersion", "status", "attachments", "appId", "dslVersion", "device", "day", "createdAt")
 	it := fq.Documents(ctx)
 	defer it.Stop()
 	out := []Feedback{}
@@ -102,7 +102,9 @@ func (f *Firestore) ListFeedback(ctx context.Context, q FeedbackQuery) ([]Feedba
 			return nil, err
 		}
 		if q.Status == "" || d.Status == q.Status {
-			out = append(out, *d.toFeedback(snap.Ref.ID, false))
+			fb := d.toFeedback(snap.Ref.ID, false)
+			fb.Listed = append([]string{}, d.Attachments...)
+			out = append(out, *fb)
 		}
 	}
 	return out, nil

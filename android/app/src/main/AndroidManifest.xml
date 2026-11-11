@@ -7,9 +7,13 @@
     <!-- 写真・動画・QR・ドラレコ。カメラの無い端末でも入れられるように required="false" -->
     <uses-permission android:name="android.permission.CAMERA" />
     <uses-feature android:name="android.hardware.camera" android:required="false" />
-    <!-- 現在地・道案内・近くに着いたら通知。おおよそだけの許可でも使う。裏での取得(ACCESS_BACKGROUND_LOCATION)は持たない -->
+    <!-- 現在地・道案内・近くに着いたら通知。現在地と道案内はおおよそだけの許可でも使う -->
     <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
     <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
+    <!-- 場所に着いたら知らせる(near)だけが使う。Geofencing はアプリを閉じている間に着いたかを OS が端末の中で見るので、
+         正確な位置と裏での位置の両方が要る。前面の位置が許可された後に、説明の画面を出してから聞く。
+         Play Console の申告の文: docs/android/play-background-location.md -->
+    <uses-permission android:name="android.permission.ACCESS_BACKGROUND_LOCATION" />
     <!-- 通知(13+ だけ実行時の権限。12 / 12L は設定のオン・オフのみ) -->
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <!-- 近くの端末と送り合う(nearbyShare)は Android にまだ無いので、次の権限は持たない。近距離共有(#878)で戻す:

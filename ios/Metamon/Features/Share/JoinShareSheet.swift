@@ -61,6 +61,7 @@ struct JoinShareSheet: View {
         .presentationDetents([.large])
         .presentationDragIndicator(.visible)
         .interactiveDismissDisabled(busy)
+        .appLimitSheets() // #630 参加で持てるアプリの数に達したら、この上で置き換える
     }
 
     private var whatYouSee: some View {
