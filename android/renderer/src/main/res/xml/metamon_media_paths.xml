@@ -5,6 +5,8 @@
     <cache-path name="metamon_videos" path="metamon_videos/" />
     <!-- export(#911)の CSV / PDF。共有シートに渡す。次の書き出しで消す -->
     <cache-path name="metamon_export" path="metamon_export/" />
+    <!-- shareButton の写真・qrCode の画像(#1086)。共有シートに渡す。次の共有とデータの削除で消す -->
+    <cache-path name="metamon_share" path="metamon_share/" />
     <!-- dashcam(#872)の保存した映像の共有。filesDir/metamon-dashcam の下だけ -->
     <files-path name="metamon_dashcam" path="metamon-dashcam/" />
 </paths>

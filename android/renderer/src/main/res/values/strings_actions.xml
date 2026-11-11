@@ -21,6 +21,10 @@
     <string name="renderer_qr_title">QR コード</string>
     <string name="renderer_qr_empty">QR にする内容がまだありません</string>
     <string name="renderer_qr_too_long">長すぎて QR コードにできません</string>
+    <string name="renderer_qr_save">写真に保存</string>
+    <string name="renderer_qr_saved">写真に保存しました</string>
+    <string name="renderer_qr_save_failed">保存できませんでした</string>
+    <string name="renderer_qr_share">共有</string>
     <string name="renderer_web_invalid">webView: https の URL だけ表示できます</string>
     <string name="renderer_web_back">前のページ</string>
     <string name="renderer_web_forward">次のページ</string>
