@@ -117,6 +117,8 @@ import jp.kz2601.metamon.services.sync.HotReload
 import jp.kz2601.metamon.services.sync.RealtimeDocumentSync
 import jp.kz2601.metamon.services.sync.SseChangeEventSource
 import jp.kz2601.metamon.services.sync.asDocumentFetcher
+import jp.kz2601.metamon.update.InAppUpdater
+import jp.kz2601.metamon.update.PlayAppUpdates
 import jp.kz2601.metamon.update.UpdateGate
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -193,6 +195,8 @@ class AppContainer(
     val feedback: FeedbackClient = MockFeedbackClient(),
     /** 最低対応版とアプリ内のお知らせ(#906)。モックは何もしない(iOS と同じ) */
     val updateGate: UpdateGate = UpdateGate.disabled(InMemoryKeyValueStore()),
+    /** 更新の画面から Play の更新を始める。モック・Play 以外から入れた端末は null の口(ストアのページに落とす) */
+    val inAppUpdater: InAppUpdater = InAppUpdater(null),
     /** 「探す」と公開(#902)。モックは null(「サーバー接続時のみ使えます」・iOS と同じ) */
     val discover: DiscoverServices? = null,
     /** 共有アプリの参加者(#903)。モックは null(参加者の欄を出さない) */
@@ -415,6 +419,7 @@ class AppContainer(
                 talkBackRunning = { TalkBack.isRunning(context) },
                 feedback = HttpFeedbackClient(appConfigHttp),
                 updateGate = UpdateGate.live(context, environment.appConfigBaseUrl, client, device),
+                inAppUpdater = InAppUpdater(PlayAppUpdates.ifInstalledFromPlay(context)),
                 discover = DiscoverServices(HttpDiscoverClient(appConfigHttp), moderation),
                 members = HttpMembersClient(appConfigHttp),
                 removeAppNotifications = { LocalNotifications.get(context).removeApp(it) },

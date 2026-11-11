@@ -6,7 +6,7 @@ import android.content.Intent
 import android.net.Uri
 
 /**
- * Google Play のアプリのページを開く(iOS の `AppStoreLink`)。Play In-App Updates は使わない(#906)。
+ * Google Play のアプリのページを開く(iOS の `AppStoreLink`)。Play の In-App Updates([InAppUpdater])が使えない時の受け皿。
  * サーバーの URL(`androidStoreUrl`)があればそれ、無ければ `market://details?id=` → 開けなければ https のページ。
  */
 object PlayStore {

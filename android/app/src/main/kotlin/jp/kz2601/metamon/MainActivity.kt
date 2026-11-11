@@ -155,7 +155,7 @@ class MainActivity : ComponentActivity() {
 fun MetamonRoot(container: AppContainer) {
     val user by container.accountGuard.active.collectAsStateWithLifecycle()
     // お知らせのバナーと「アップデートしてください」はサインイン前にも出す(#906)
-    UpdateGateHost(container.updateGate) {
+    UpdateGateHost(container.updateGate, container.inAppUpdater) {
         when (RootScreen.of(user)) {
             RootScreen.SignIn -> SignInScreen(container.session)
             RootScreen.App -> CompositionLocalProvider(LocalFeedHost provides container.feedHost) { MetamonApp(container) }
