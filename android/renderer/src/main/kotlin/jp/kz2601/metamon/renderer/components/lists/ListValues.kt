@@ -313,6 +313,9 @@ object ChartReadout {
     /** 「3月: 12」 */
     fun line(label: String, value: Double, locale: Locale = Locale.getDefault()): String = "$label: ${format(value, locale)}"
 
+    /** 棒・点・扇 1 つの読み上げ「3月, 12」(iOS の accessibilityLabel + accessibilityValue・#1118)。 */
+    fun point(label: String, value: Double, locale: Locale = Locale.getDefault()): String = "$label, ${format(value, locale)}"
+
     /** 扇の累積値 → その扇の位置。 */
     fun index(cumulative: Double, values: List<Double>): Int? {
         var sum = 0.0

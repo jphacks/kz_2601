@@ -1,5 +1,7 @@
 package jp.kz2601.metamon.renderer.components.lists
 
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -34,6 +36,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.CustomAccessibilityAction
 import androidx.compose.ui.semantics.clearAndSetSemantics
@@ -65,10 +68,13 @@ import jp.kz2601.metamon.renderer.components.social.MatchingHost
 import jp.kz2601.metamon.renderer.components.social.ModerationHost
 import jp.kz2601.metamon.renderer.components.social.interestTitle
 import jp.kz2601.metamon.renderer.registry.RenderContext
+import jp.kz2601.metamon.renderer.screen.ScreenToolbar
+import jp.kz2601.metamon.renderer.theme.LocalReduceMotion
 import jp.kz2601.metamon.renderer.theme.RenderTheme
 import jp.kz2601.metamon.renderer.theme.SymbolIcon
 import jp.kz2601.metamon.renderer.theme.colors
 import jp.kz2601.metamon.renderer.theme.renderCard
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
 /**
@@ -88,8 +94,18 @@ fun ListLeaf(c: Component, ctx: RenderContext, modifier: Modifier = Modifier) {
     val entityId = c.entity ?: ""
     val entity = data.entity(entityId)
     val rows = ListRows.rows(c, data, query)
+    val highlighted = rememberNewRowHighlight(rows.map { it.id })
     if (rows.isEmpty()) {
-        RecordsPlaceholderView(data, c.entity, "tray", c.emptyText ?: data.labels.empty, modifier)
+        val dsl = LocalAppDsl.current
+        val add = remember(entityId, ctx.screen, dsl) {
+            val screen = ctx.screen
+            if (screen == null || dsl == null) null else ScreenToolbar.emptyListAdd(entityId, screen, dsl)
+        }
+        RecordsPlaceholderView(
+            data, c.entity, "tray", c.emptyText ?: data.labels.empty, modifier,
+            onAdd = add?.let { a -> { ctx.perform(a) } },
+            showsAddHint = true,
+        )
         return
     }
     val toggleField = ListToggle.field(c.item, entity)
@@ -125,7 +141,13 @@ fun ListLeaf(c: Component, ctx: RenderContext, modifier: Modifier = Modifier) {
             val sendInterest = { scope.launch { matching?.sendInterest(entityId, row) }; Unit }
             val interestLabel = interest?.let { interestTitle(it) }
             val interestBusy = matching?.interestBusy(row) ?: false
+            val highlight by animateColorAsState(
+                if (highlighted == row.id) RenderTheme.colors.brandSoft else Color.Transparent,
+                tween(durationMillis = if (highlighted == row.id) 200 else 400),
+                label = "newRow",
+            )
             ListRow(
+                modifier = Modifier.background(highlight),
                 item = c.item,
                 record = row,
                 entity = entity,
@@ -153,6 +175,27 @@ fun ListLeaf(c: Component, ctx: RenderContext, modifier: Modifier = Modifier) {
     }
 }
 
+/**
+ * 保存で増えた行(前回描いた id に無い行)の id を [NewRowHighlight.MILLIS] の間だけ返す(iOS の `markNewRows`・#1118)。
+ * 初回の描画・空からの初回ロード・動きを減らす設定では光らせない。
+ */
+@Composable
+private fun rememberNewRowHighlight(ids: List<String>): String? {
+    val reduceMotion = LocalReduceMotion.current
+    val seen = remember { arrayOfNulls<Set<String>>(1) }
+    var highlighted by remember { mutableStateOf<String?>(null) }
+    LaunchedEffect(ids) {
+        NewRowHighlight.fresh(seen[0], ids, reduceMotion)?.let { highlighted = it }
+        seen[0] = ids.toSet()
+    }
+    LaunchedEffect(highlighted) {
+        val id = highlighted ?: return@LaunchedEffect
+        delay(NewRowHighlight.MILLIS)
+        if (highlighted == id) highlighted = null
+    }
+    return highlighted
+}
+
 /** 先頭のアイコン / 画像の幅ぶん区切り線を内側に寄せる。 */
 private fun separatorInset(item: ListItem?): androidx.compose.ui.unit.Dp {
     val check = if (item?.toggle != null) 28.dp + RenderTheme.Spacing.row else 0.dp
@@ -171,6 +214,7 @@ private fun separatorInset(item: ListItem?): androidx.compose.ui.unit.Dp {
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
 internal fun ListRow(
+    modifier: Modifier = Modifier,
     item: ListItem?,
     record: Record,
     entity: Entity?,
@@ -214,7 +258,7 @@ internal fun ListRow(
         if (onBlock != null) add(CustomAccessibilityAction(blockLabel) { onBlock(); true })
         addAll(accessoryActions)
     }
-    Box {
+    Box(modifier) {
         Row(
             Modifier
                 .fillMaxWidth()

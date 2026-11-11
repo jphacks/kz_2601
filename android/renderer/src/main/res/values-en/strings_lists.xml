@@ -18,6 +18,7 @@
     <string name="lists_delete">Delete</string>
     <string name="lists_edit">Edit</string>
     <string name="lists_empty">Nothing yet</string>
+    <string name="lists_empty_add">Add your first entry</string>
     <string name="lists_everyone">Everyone</string>
     <string name="lists_gauge">Gauge</string>
     <string name="lists_gauge_range">%1$s (range %2$s–%3$s)</string>

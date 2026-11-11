@@ -47,6 +47,7 @@ import jp.kz2601.metamon.renderer.components.UnavailableComponent
 import jp.kz2601.metamon.renderer.components.dashcam.LocalDashcamAppName
 import jp.kz2601.metamon.renderer.components.social.SocialDialogs
 import jp.kz2601.metamon.renderer.components.social.SocialPromptHost
+import jp.kz2601.metamon.renderer.components.lists.LocalAppDsl
 import jp.kz2601.metamon.renderer.components.lists.LocalScreenLocals
 import jp.kz2601.metamon.renderer.components.lists.ScreenLocals
 import jp.kz2601.metamon.renderer.form.rememberScreenForm
@@ -279,7 +280,7 @@ fun ScreenView(
         }
         // searchBar の検索文字列は画面ごと(遷移で戻ると空に戻る)
         val locals = remember(screenCtx.route) { ScreenLocals() }
-        CompositionLocalProvider(LocalScreenLocals provides locals) {
+        CompositionLocalProvider(LocalScreenLocals provides locals, LocalAppDsl provides dsl) {
             GridScreenLayout(screen, ctx, Modifier.weight(1f))
         }
         when (val bar = ScreenToolbar.saveBar(screen, form)) {

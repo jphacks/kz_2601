@@ -14,7 +14,9 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -74,10 +76,12 @@ internal fun RecordsPlaceholderView(
     runtime: DSLRuntime,
     entity: String?,
     modifier: Modifier = Modifier,
+    onAdd: (() -> Unit)? = null,
+    showsAddHint: Boolean = false,
 ) {
     when (kind) {
         RecordsPlaceholder.SKELETON -> RecordsSkeleton(modifier)
-        RecordsPlaceholder.EMPTY -> EmptyPlaceholder(icon, emptyText, modifier)
+        RecordsPlaceholder.EMPTY -> if (showsAddHint) EmptyAddPlaceholder(icon, emptyText, onAdd, modifier) else EmptyPlaceholder(icon, emptyText, modifier)
         RecordsPlaceholder.UNAVAILABLE -> {
             val scope = rememberCoroutineScope()
             val text = stringResource(R.string.load_state_unavailable)
@@ -211,4 +215,35 @@ internal fun RecordsPlaceholderView(
     icon: String,
     emptyText: String,
     modifier: Modifier = Modifier,
-) = RecordsPlaceholderView(data.placeholder(entity), icon, emptyText, data.runtime, entity, modifier)
+    onAdd: (() -> Unit)? = null,
+    showsAddHint: Boolean = false,
+) = RecordsPlaceholderView(data.placeholder(entity), icon, emptyText, data.runtime, entity, modifier, onAdd, showsAddHint)
+
+/**
+ * 空の一覧の案内 +「最初の 1 件を追加しましょう」(iOS の `EmptyPlaceholder.cta`・#1118)。
+ * [onAdd] があれば同じ画面の追加と同じフォームを開くボタン、無ければブランド色の文字だけ([EmptyCta])。
+ */
+@Composable
+private fun EmptyAddPlaceholder(icon: String, emptyText: String, onAdd: (() -> Unit)?, modifier: Modifier) {
+    val label = stringResource(R.string.lists_empty_add)
+    Column(modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
+        EmptyPlaceholder(icon, emptyText)
+        when (EmptyCta.of(RecordsPlaceholder.EMPTY, onAdd != null)) {
+            EmptyCta.BUTTON -> OutlinedButton(
+                onClick = { onAdd?.invoke() },
+                modifier = Modifier.padding(bottom = RenderTheme.Spacing.md).testTag("empty.add"),
+                colors = ButtonDefaults.outlinedButtonColors(contentColor = RenderTheme.colors.brandText),
+            ) {
+                SymbolIcon("plus", 16.dp, RenderTheme.colors.brandText)
+                Text(label, Modifier.padding(start = 6.dp), style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.SemiBold))
+            }
+            EmptyCta.TEXT -> Text(
+                label,
+                Modifier.padding(bottom = RenderTheme.Spacing.md),
+                style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.SemiBold),
+                color = RenderTheme.colors.brandText,
+            )
+            EmptyCta.NONE -> Unit
+        }
+    }
+}

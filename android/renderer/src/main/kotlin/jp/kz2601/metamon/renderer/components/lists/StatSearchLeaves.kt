@@ -54,6 +54,7 @@ fun StatLeaf(c: Component, ctx: RenderContext, modifier: Modifier = Modifier) {
     val v = StatValue.resolve(c, data)
     val colors = RenderTheme.colors
     val label = c.label.orEmpty()
+    val iconName = StatIcon.name(c, c.field?.let { data.entity(c.entity)?.field(it) })
     val unavailable = stringResource(R.string.lists_unavailable)
     val loading = stringResource(R.string.load_state_loading)
     Column(
@@ -70,7 +71,7 @@ fun StatLeaf(c: Component, ctx: RenderContext, modifier: Modifier = Modifier) {
         verticalArrangement = Arrangement.spacedBy(RenderTheme.Spacing.xs),
     ) {
         Row(Modifier.defaultMinSize(minHeight = 18.dp), horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
-            c.icon?.let {
+            iconName?.let {
                 Box(Modifier.size(18.dp).background(colors.brandSoft, RoundedCornerShape(6.dp)), contentAlignment = Alignment.Center) {
                     SymbolIcon(it, 12.dp, colors.brandA)
                 }
