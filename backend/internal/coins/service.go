@@ -37,7 +37,7 @@ type ReserveRequest struct {
 	RequestID string
 	// Kind picks COIN_RESERVE_<OP>_<KIND> when that is set (TextKinds).
 	Kind string
-	// Max overrides the op's COIN_RESERVE_<OP> when > 0 (OpCall needs it).
+	// Max overrides the op's COIN_RESERVE_<OP> when > 0 (OpCall and OpExt need it).
 	Max int64
 	// TTL overrides COIN_HOLD_TTL when > 0 (a call block lives as long as
 	// the block plus a grace).
@@ -265,7 +265,7 @@ func (s *Service) Reserve(ctx context.Context, r ReserveRequest) (*Hold, error) 
 		return nil, nil
 	}
 	amount, ok := s.Config.Reserve[r.Op]
-	if !ok && (r.Op != OpCall || r.Max <= 0) {
+	if !ok && ((r.Op != OpCall && r.Op != OpExt) || r.Max <= 0) {
 		return nil, fmt.Errorf("%w: %q", ErrUnknownOp, r.Op)
 	}
 	if v, ok := s.Config.Reserve[r.Op+"_"+r.Kind]; ok && r.Kind != "" {
