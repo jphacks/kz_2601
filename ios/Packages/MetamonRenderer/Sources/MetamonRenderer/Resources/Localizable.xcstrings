@@ -807,6 +807,23 @@
         }
       }
     },
+    "%lld 段階中 %lld" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%2$lld of %1$lld"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$lld 段階中 %2$lld"
+          }
+        }
+      }
+    },
     "%lld 秒" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -9228,6 +9245,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "設定アプリで Tailor It のマイクへのアクセスを許可してください。"
+          }
+        }
+      }
+    },
+    "評価" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Rating"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "評価"
           }
         }
       }

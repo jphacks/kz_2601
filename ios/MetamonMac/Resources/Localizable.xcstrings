@@ -7845,6 +7845,22 @@
         }
       }
     },
+    "再読み込み" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Reload"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "再読み込み"
+          }
+        }
+      }
+    },
     "別の端末で更新されていたため、最新の状態に合わせました。もう一度お話しください" : {
       "extractionState" : "manual",
       "localizations" : {
