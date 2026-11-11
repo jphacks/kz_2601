@@ -44,6 +44,15 @@ public enum MusicAvailability: Equatable, Sendable {
         case .unavailable: L("この端末では Apple Music を使えません")
         }
     }
+
+    /// 許可を変える画面(#1377)。Mac で断られた時だけ「プライバシーとセキュリティ > メディアと Apple Music」。iOS は出さない。
+    public var settingsURL: URL? {
+        #if os(macOS)
+        self == .denied ? URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Media") : nil
+        #else
+        nil
+        #endif
+    }
 }
 
 public struct MusicPlaybackSnapshot: Equatable, Sendable {

@@ -51,7 +51,7 @@ struct VideoFieldLeaf: View {
                 VideoPreview(value: value, height: 200)
                 HStack(spacing: RenderTheme.Spacing.sm) {
                     Button { start() } label: {
-                        Label(L("撮り直す"), systemImage: "video").frame(maxWidth: .infinity)
+                        Label(picksOnly ? L("選び直す") : L("撮り直す"), systemImage: picksOnly ? "film" : "video").frame(maxWidth: .infinity)
                     }
                     .buttonStyle(RenderButtonStyle(kind: .secondary))
                     .accessibilityHint(sourceHint)
@@ -63,11 +63,11 @@ struct VideoFieldLeaf: View {
                 }
             } else {
                 Button { start() } label: {
-                    Label(c.label ?? L("動画を撮る / 選ぶ"), systemImage: mode == .library ? "film" : "video")
+                    Label(c.label ?? emptyTitle, systemImage: picksOnly || mode == .library ? "film" : "video")
                         .frame(maxWidth: .infinity)
                 }
                 .buttonStyle(RenderButtonStyle(kind: .secondary))
-                .accessibilityLabel(c.label ?? L("動画を撮る / 選ぶ"))
+                .accessibilityLabel(c.label ?? emptyTitle)
                 .accessibilityHint(sourceHint)
                 .accessibilityIdentifier("videoField.\(field)")
             }
@@ -176,6 +176,17 @@ struct VideoFieldLeaf: View {
     }
 
     private var plan: PhotoCapturePlan { PhotoSourcePolicy.plan(for: mode, cameraAvailable: Self.cameraAvailable) }
+
+    /// Mac で撮れない時(#1379)は「選ぶ」の文言・アイコンにする。iOS は今のまま。
+    private var picksOnly: Bool {
+        #if os(macOS)
+        plan == .library
+        #else
+        false
+        #endif
+    }
+
+    private var emptyTitle: String { picksOnly ? L("動画を選ぶ") : L("動画を撮る / 選ぶ") }
 
     private var sourceHint: String {
         #if os(macOS)

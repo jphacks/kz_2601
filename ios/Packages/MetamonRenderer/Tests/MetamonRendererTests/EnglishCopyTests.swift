@@ -29,8 +29,14 @@ final class EnglishCopyTests: XCTestCase {
         XCTAssertEqual(OnDeviceAIError.failed("x", reason: .invalidResponse).errorDescription, "AI processing failed (x)")
     }
 
+    func testVideoPickOnlyCopyIsEnglish() {
+        XCTAssertEqual(L("動画を選ぶ"), "Choose a video")
+        XCTAssertEqual(L("選び直す"), "Choose again")
+    }
+
     func testMusicCopyIsEnglish() {
         XCTAssertEqual(MusicAvailability.noSubscription.message, "Playing songs needs an Apple Music subscription")
+        XCTAssertEqual(L("システム設定を開く"), "Open System Settings")
     }
 
     /// 数と名詞が合う(1 records にならない)。String Catalog の plural で 1 と 2 以上を分ける。

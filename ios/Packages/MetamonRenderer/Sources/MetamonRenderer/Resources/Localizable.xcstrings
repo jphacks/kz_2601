@@ -3151,6 +3151,23 @@
         }
       }
     },
+    "システム設定を開く" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Open System Settings"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "システム設定を開く"
+          }
+        }
+      }
+    },
     "シミュレータ用: 読み取り結果を手入力" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -5617,6 +5634,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "動画を撮るかライブラリから選びます"
+          }
+        }
+      }
+    },
+    "動画を選ぶ" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Choose a video"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "動画を選ぶ"
           }
         }
       }
@@ -8696,6 +8730,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "道具"
+          }
+        }
+      }
+    },
+    "選び直す" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Choose again"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "選び直す"
           }
         }
       }
