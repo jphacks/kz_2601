@@ -19,6 +19,10 @@ import (
 //
 //	current(lat, lng)            Item: description / feels, humidity, wind / temperature
 //	forecast(lat, lng, limit)    Rows (3-hourly, limit 1-40, default 8 = 24 h)
+//	airQuality(lat, lng)         Item: AQI 1-5 label (目安) / PM2.5, PM10, O₃, NO₂ / "AQI n/5"
+//
+// airQuality (#1656) is the Air Pollution API (/data/2.5/air_pollution, same
+// host and key). The level is a guide only, never a health judgement.
 //
 // lat / lng are rounded to 2 places (about 1 km) before they leave the
 // runner. The key (EXT_OPEN_WEATHER_API_KEY, Secret Manager) goes in the
@@ -42,6 +46,7 @@ func init() {
 		Ops: []OpSpec{
 			{Name: "current", Args: []string{"lat", "lng"}},
 			{Name: "forecast", Args: []string{"lat", "lng", "limit"}},
+			{Name: "airQuality", Args: []string{"lat", "lng"}},
 		},
 		Hosts: []string{openWeatherHost},
 		New: func(sec Secrets) (map[string]Operation, error) {
@@ -56,8 +61,9 @@ func newOpenWeather(key, base string, hc *http.Client) (map[string]Operation, er
 	}
 	w := &openWeather{key: key, base: base, hc: hc}
 	return map[string]Operation{
-		"current":  OperationFunc(w.current),
-		"forecast": OperationFunc(w.forecast),
+		"current":    OperationFunc(w.current),
+		"forecast":   OperationFunc(w.forecast),
+		"airQuality": OperationFunc(w.airQuality),
 	}, nil
 }
 
@@ -167,6 +173,52 @@ func (w *openWeather) forecast(ctx context.Context, in Input) (Output, error) {
 		return Output{}, &ProviderError{Status: http.StatusOK, Err: errors.New("openweather: no forecast rows")}
 	}
 	return Output{Rows: rows}, nil
+}
+
+type owAirPollution struct {
+	List []struct {
+		Main struct {
+			AQI int `json:"aqi"`
+		} `json:"main"`
+		Components struct {
+			PM25 *float64 `json:"pm2_5"`
+			PM10 *float64 `json:"pm10"`
+			O3   *float64 `json:"o3"`
+			NO2  *float64 `json:"no2"`
+		} `json:"components"`
+	} `json:"list"`
+}
+
+// owAQILabels are OpenWeather's AQI 1-5 (Good … Very Poor).
+var owAQILabels = [...]string{1: "良い", 2: "まあまあ", 3: "ふつう", 4: "悪い", 5: "とても悪い"}
+
+func (w *openWeather) airQuality(ctx context.Context, in Input) (Output, error) {
+	var a owAirPollution
+	if err := w.get(ctx, "/data/2.5/air_pollution", in.Args, nil, &a); err != nil {
+		return Output{}, err
+	}
+	if len(a.List) == 0 || a.List[0].Main.AQI < 1 || a.List[0].Main.AQI > 5 {
+		return Output{}, &ProviderError{Status: http.StatusOK, Err: errors.New("openweather: no air quality index")}
+	}
+	it := a.List[0]
+	var sub []string
+	for _, c := range []struct {
+		name string
+		v    *float64
+	}{{"PM2.5", it.Components.PM25}, {"PM10", it.Components.PM10}, {"O₃", it.Components.O3}, {"NO₂", it.Components.NO2}} {
+		if c.v != nil {
+			sub = append(sub, c.name+" "+strconv.FormatFloat(math.Round(*c.v*10)/10+0, 'f', -1, 64))
+		}
+	}
+	subtitle := strings.Join(sub, "・")
+	if subtitle != "" {
+		subtitle += " µg/m³"
+	}
+	return Output{Item: &Row{
+		Title:    "空気 " + owAQILabels[it.Main.AQI] + "(目安)",
+		Subtitle: subtitle,
+		Value:    "AQI " + strconv.Itoa(it.Main.AQI) + "/5",
+	}}, nil
 }
 
 func celsius(v float64) string {

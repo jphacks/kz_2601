@@ -31,6 +31,12 @@ func owServer(t *testing.T, status *atomic.Int64, seen *atomic.Value) *httptest.
 				{"dt":1762830000,"main":{"temp":9.5},"weather":[],"pop":0},
 				{"dt":0,"main":{"temp":1}},
 				{"dt":1762840800,"main":{}}]}`))
+		case "/data/2.5/air_pollution":
+			if r.URL.Query().Get("lat") == "1" {
+				_, _ = w.Write([]byte(`{"list":[{"main":{"aqi":0},"components":{}}]}`))
+				return
+			}
+			_, _ = w.Write([]byte(`{"coord":{"lon":136.66,"lat":36.56},"list":[{"dt":1762819200,"main":{"aqi":2},"components":{"co":201.94,"no":0.02,"no2":0.77,"o3":68.66,"so2":0.64,"pm2_5":12.34,"pm10":20.05,"nh3":0.12}}]}`))
 		default:
 			http.NotFound(w, r)
 		}
@@ -96,6 +102,49 @@ func TestOpenWeatherForecast(t *testing.T) {
 	out, err = ops["forecast"].Do(t.Context(), Input{Args: map[string]string{"lat": "35", "lng": "139"}})
 	if err != nil || seen.Load().(url.Values).Get("cnt") != "8" || len(out.Rows) != 2 {
 		t.Fatalf("default limit: %+v %v", out, err)
+	}
+}
+
+func TestOpenWeatherAirQuality(t *testing.T) {
+	var status atomic.Int64
+	status.Store(200)
+	var seen atomic.Value
+	ops := owOps(t, owServer(t, &status, &seen))
+	out, err := ops["airQuality"].Do(t.Context(), Input{Args: map[string]string{"lat": "36.56133", "lng": "136.65621"}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	// rounded to 2 places like current / forecast
+	if q := seen.Load().(url.Values); q.Get("lat") != "36.56" || q.Get("lon") != "136.66" || q.Get("appid") != owTestKey {
+		t.Fatalf("query %v", q)
+	}
+	want := Row{Title: "空気 まあまあ(目安)", Subtitle: "PM2.5 12.3・PM10 20.1・O₃ 68.7・NO₂ 0.8 µg/m³", Value: "AQI 2/5"}
+	if out.Item == nil || *out.Item != want || len(out.Rows) != 0 || out.Usage.Priced {
+		t.Fatalf("output %+v %+v", out, out.Item)
+	}
+	// an AQI outside 1-5 is the provider's fault, not an empty card
+	if _, err := ops["airQuality"].Do(t.Context(), Input{Args: map[string]string{"lat": "1", "lng": "1"}}); Reason(err) != ReasonUpstream {
+		t.Fatalf("bad aqi: %s (%v)", Reason(err), err)
+	}
+	// upstream errors never carry the key
+	status.Store(401)
+	if _, err := ops["airQuality"].Do(t.Context(), Input{Args: map[string]string{"lat": "35", "lng": "139"}}); err == nil || strings.Contains(err.Error(), owTestKey) {
+		t.Fatalf("401: %v", err)
+	}
+}
+
+func TestOpenWeatherAirQualityRefusesBadArgs(t *testing.T) {
+	var status atomic.Int64
+	status.Store(200)
+	var seen atomic.Value
+	ops := owOps(t, owServer(t, &status, &seen))
+	for _, a := range []map[string]string{{}, {"lat": "35"}, {"lat": "35", "lng": "181"}, {"lat": "0x1", "lng": "1"}} {
+		if _, err := ops["airQuality"].Do(t.Context(), Input{Args: a}); Reason(err) != ReasonBadRequest {
+			t.Fatalf("%v: %s (%v)", a, Reason(err), err)
+		}
+	}
+	if seen.Load() != nil {
+		t.Fatal("a bad argument reached the API")
 	}
 }
 
