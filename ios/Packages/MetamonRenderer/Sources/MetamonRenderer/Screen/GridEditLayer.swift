@@ -81,6 +81,9 @@ struct GridEditLayer: View {
         var moving: Bool
     }
     @State private var drag: Drag?
+    /// 指が枠・つまみに触れている間 true。ドラッグが途中で打ち切られた時(着信・通知センター等)は
+    /// `onEnded` が呼ばれないので、これが戻ったのを見て片付ける(スクロールが止まったままにならない)
+    @GestureState private var touching = false
 
     private var conflicts: Set<String> {
         guard let drag else { return [] }
@@ -129,6 +132,15 @@ struct GridEditLayer: View {
             Text(L("「完了」を押すと保存されます。保存した後も「元に戻す」で戻せます。"))
         }
         .sensoryFeedback(.warning, trigger: blocked.isEmpty) { wasEmpty, isEmpty in wasEmpty && !isEmpty }
+        .onChange(of: touching) { _, now in
+            guard !now else { return }
+            // 普通に離した時は onEnded が先に置いている。次の周回で、残っていれば(打ち切られた)元へ戻す
+            Task { @MainActor in
+                guard !touching else { return }
+                if drag != nil { withAnimation(.spring(duration: 0.3, bounce: 0.15)) { drag = nil } }
+                session.isDragging = false
+            }
+        }
     }
 
     private func rect(_ a: GridArea) -> CGRect {
@@ -159,6 +171,24 @@ struct GridEditLayer: View {
             }
             .contentShape(Rectangle())
             .highPriorityGesture(dragGesture(item, mode: .move))
+            // VoiceOver が止まるのは枠そのもの(`.contain` の入れ物には止まらず、操作の一覧が選べなかった)。
+            // 角のつまみは指でしか動かせないので、大きさを変える操作もここに置く
+            .accessibilityElement(children: .ignore)
+            .accessibilityLabel(Text(L("部品 \(item.area.notation)")))
+            .accessibilityActions {
+                Button(L("左へ動かす")) { nudge(item, dc: -1, dr: 0) }
+                Button(L("右へ動かす")) { nudge(item, dc: 1, dr: 0) }
+                Button(L("上へ動かす")) { nudge(item, dc: 0, dr: -1) }
+                Button(L("下へ動かす")) { nudge(item, dc: 0, dr: 1) }
+                Button(L("横に広げる")) { resize(item, dc: 1, dr: 0) }
+                Button(L("横に狭める")) { resize(item, dc: -1, dr: 0) }
+                Button(L("縦に広げる")) { resize(item, dc: 0, dr: 1) }
+                Button(L("縦に狭める")) { resize(item, dc: 0, dr: -1) }
+                if session.draft.canRemove {
+                    Button(L("消す")) { session.pendingRemoval = item.componentId }
+                }
+            }
+            .accessibilityIdentifier("gridEdit.\(item.componentId)")
             .overlay(alignment: .topTrailing) {
                 if session.draft.canRemove {
                     Button { session.pendingRemoval = item.componentId } label: {
@@ -190,19 +220,11 @@ struct GridEditLayer: View {
             .frame(width: r.width, height: r.height)
             .offset(x: r.minX + follow.width, y: r.minY + follow.height)
             .zIndex(active ? 1 : 0)
-            .accessibilityElement(children: .contain)
-            .accessibilityLabel(Text(L("部品 \(item.area.notation)")))
-            .accessibilityActions {
-                Button(L("左へ動かす")) { nudge(item, dc: -1, dr: 0) }
-                Button(L("右へ動かす")) { nudge(item, dc: 1, dr: 0) }
-                Button(L("上へ動かす")) { nudge(item, dc: 0, dr: -1) }
-                Button(L("下へ動かす")) { nudge(item, dc: 0, dr: 1) }
-            }
-            .accessibilityIdentifier("gridEdit.\(item.componentId)")
     }
 
     private func dragGesture(_ item: GridEditDraft.Item, mode: Mode) -> some Gesture {
         DragGesture(minimumDistance: 2)
+            .updating($touching) { _, state, _ in state = true }
             .onChanged { v in
                 let t = v.translation
                 let candidate = mode == .move
@@ -226,6 +248,15 @@ struct GridEditLayer: View {
         let moved = GridEditMath.moved(item.area, dx: Double(dc) * Double(cellW), dy: Double(dr) * Double(cellH),
                                        cellW: Double(cellW), cellH: Double(cellH))
         if !session.place(item.componentId, at: moved) {
+            AccessibilityNotification.Announcement(L("ここには置けません")).post()
+        }
+    }
+
+    /// VoiceOver の操作から: 右下の角を 1 マスずつ動かす(指の角のつまみと同じ)
+    private func resize(_ item: GridEditDraft.Item, dc: Int, dr: Int) {
+        let resized = GridEditMath.resized(item.area, dx: Double(dc) * Double(cellW), dy: Double(dr) * Double(cellH),
+                                           cellW: Double(cellW), cellH: Double(cellH))
+        if !session.place(item.componentId, at: resized) {
             AccessibilityNotification.Announcement(L("ここには置けません")).post()
         }
     }

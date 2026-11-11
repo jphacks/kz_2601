@@ -124,6 +124,11 @@ final class SharedMembersTests: XCTestCase {
         XCTAssertEqual(SharedMemberList.memberLimit, 100)
         XCTAssertFalse(SharedMemberList(items: Array(members.dropLast()), role: .owner).isFull)
         XCTAssertTrue(SharedMemberList(items: members, role: .owner).isFull)
+        // 一覧には作成者も 1 行あるが、backend の上限は作成者を除いた参加者の数
+        let owner = SharedMember(uid: "o", role: .owner)
+        XCTAssertFalse(SharedMemberList(items: [owner] + members.dropLast(), role: .owner).isFull,
+                       "作成者 + 99 人なら、まだ 1 人参加できる")
+        XCTAssertTrue(SharedMemberList(items: [owner] + members, role: .member).isFull)
     }
 
     func testMemberLabel() {

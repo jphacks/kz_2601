@@ -525,6 +525,7 @@ final class AppRuntime: RuntimeNavigating {
             self.showVoiceSheet = false
             self.selectedTab = doc.dsl.initialTab
             self.morphJob = nil
+            self.gridEdit = nil // 手で動かしていた下書きは前の DSL のもの(別のアプリ・元に戻す後に残さない・#1442)
             self.redoPoint = nil // 戻した後に別の版が当たったら「やり直す」は無効(undo / redo は apply の後で付け直す)
         }
         if animated {

@@ -73,4 +73,19 @@ final class GridEditFlowTests: XCTestCase {
         XCTAssertNil(rt.gridEdit)
         XCTAssertNotNil(rt.toast)
     }
+
+    /// 編集中に別の版が当たったら(通知から別のアプリを開いた・要約の「元に戻す」等)、前の DSL の下書きを残さない
+    func testApplyingAnotherDocumentEndsEditMode() throws {
+        let rt = try makeRuntime()
+        rt.startGridEdit()
+        var draft = try XCTUnwrap(rt.gridEdit).draft
+        XCTAssertTrue(draft.place("add", at: GridArea("A11:C12")!))
+        rt.gridEdit = GridEditSession(draft: draft)
+
+        var other = try DSLExamples.document("kakeibo", version: 1)
+        other.appId = "another-app"
+        rt.apply(other, animated: false)
+        XCTAssertNil(rt.gridEdit, "別のアプリに前のアプリの下書きを持ち越さない")
+        XCTAssertEqual(area(rt, "add"), "D11:F12")
+    }
 }
