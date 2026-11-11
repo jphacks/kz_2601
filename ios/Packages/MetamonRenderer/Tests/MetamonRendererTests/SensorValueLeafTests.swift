@@ -80,7 +80,7 @@ final class SensorValueLeafTests: XCTestCase {
         for (name, view) in cases {
             let r = ImageRenderer(content: view.frame(width: 360, height: 240))
             r.scale = 1
-            let img = try XCTUnwrap(r.uiImage, name)
+            let img = try XCTUnwrap(r.platformImage, name)
             XCTAssertEqual(img.size.width, 360, name)
         }
     }

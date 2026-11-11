@@ -29,7 +29,7 @@ struct DrawingFieldPanel: View {
 
     private var title: String { c.label.flatMap { $0.isEmpty ? nil : $0 } ?? L("手書き") }
     private var value: JSONValue { form.values[field] ?? .null }
-    private var picture: UIImage? { PhotoCodec.image(from: value) }
+    private var picture: PlatformImage? { PhotoCodec.image(from: value) }
     private var hasDrawing: Bool { picture != nil || ImageHostPolicy.loadableURL(value.stringValue) != nil }
 
     var body: some View {
@@ -61,7 +61,7 @@ struct DrawingFieldPanel: View {
                 }
             }
         }
-        .fullScreenCover(item: $session) { s in
+        .platformFullScreenCover(item: $session) { s in
             DrawingSheet(session: s, title: title) { size in s.commit(to: form, field: field, canvasSize: size) }
         }
     }
@@ -70,7 +70,7 @@ struct DrawingFieldPanel: View {
     private var preview: some View {
         let shape = RoundedRectangle(cornerRadius: RenderTheme.Radius.inner, style: .continuous)
         if let picture {
-            Image(uiImage: picture)
+            Image(platformImage: picture)
                 .resizable()
                 .scaledToFit()
                 .frame(maxWidth: .infinity, minHeight: 100, maxHeight: 220)
@@ -113,9 +113,14 @@ struct DrawingSheet: View {
                     ZStack {
                         Color.white
                         if let bg = session.background {
-                            Image(uiImage: bg).resizable().scaledToFit().accessibilityHidden(true)
+                            Image(platformImage: bg).resizable().scaledToFit().accessibilityHidden(true)
                         }
+                        #if os(iOS)
                         DrawingCanvas(session: session, handle: canvas)
+                        #else
+                        // TODO mac-032: Mac の手書き(PKCanvasView が無いのでマウス / トラックパッドの線を PKDrawing に入れる)
+                        MacUnavailableView(feature: L("手書き"))
+                        #endif
                     }
                     .onAppear { canvasSize = geo.size }
                     .onChange(of: geo.size) { _, s in canvasSize = s }
@@ -125,7 +130,7 @@ struct DrawingSheet: View {
                 tools
             }
             .navigationTitle(title)
-            .navigationBarTitleDisplayMode(.inline)
+            .inlineNavigationTitle()
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button(L("キャンセル")) {
@@ -144,7 +149,7 @@ struct DrawingSheet: View {
                 Button(L("全部消す"), role: .destructive) {
                     session.clear()
                     canvas.didClear()
-                    UIAccessibility.post(notification: .announcement, argument: L("全部消しました"))
+                    PlatformSystem.announce(L("全部消しました"))
                 }
                 Button(L("キャンセル"), role: .cancel) {}
             }
@@ -186,7 +191,11 @@ struct DrawingSheet: View {
 @MainActor
 @Observable
 final class CanvasHandle {
+    #if os(iOS)
     @ObservationIgnored fileprivate weak var view: IsolatedCanvasView?
+    #else
+    @ObservationIgnored fileprivate weak var view: NSView?
+    #endif
     private(set) var canUndo = false
     private(set) var canRedo = false
 
@@ -205,6 +214,7 @@ final class CanvasHandle {
     }
 }
 
+#if os(iOS)
 /// フォームの入力欄の「取り消し」と混ざらないよう、キャンバスだけの UndoManager を持つ。
 fileprivate final class IsolatedCanvasView: PKCanvasView {
     private let ownUndo = UndoManager()
@@ -277,3 +287,4 @@ private struct DrawingCanvas: UIViewRepresentable {
         }
     }
 }
+#endif

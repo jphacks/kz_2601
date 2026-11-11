@@ -67,7 +67,7 @@ final class TextHighlightTests: XCTestCase {
         XCTAssertEqual(TextContent.resolve(c.text ?? "", form: nil, evaluator: ev), "エラー: {{message}}", "フォームの外は文字のまま")
         form.values["keywords"] = "typeerror, undefined"
         for v in [AnyView(TextLeaf(c: c, ctx: RenderContext(route: Route(screen: "form"), form: form))), AnyView(TextLeaf(c: c))] {
-            XCTAssertNotNil(ImageRenderer(content: v.frame(width: 320, height: 120)).uiImage, "フォームの外(プレビュー)でも描ける")
+            XCTAssertNotNil(ImageRenderer(content: v.frame(width: 320, height: 120)).platformImage, "フォームの外(プレビュー)でも描ける")
         }
     }
 

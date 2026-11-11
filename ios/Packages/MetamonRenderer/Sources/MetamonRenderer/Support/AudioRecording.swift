@@ -133,11 +133,13 @@ final class AudioRecorderController: NSObject, AVAudioRecorderDelegate {
 
     /// 電話・Siri などで中断されたら、そこまでを残して止める。
     private func observeInterruptions() {
+        #if os(iOS)
         interruption = NotificationCenter.default.addObserver(forName: AVAudioSession.interruptionNotification, object: nil, queue: .main) { [weak self] note in
             guard let raw = note.userInfo?[AVAudioSessionInterruptionTypeKey] as? UInt,
                   AVAudioSession.InterruptionType(rawValue: raw) == .began else { return }
             MainActor.assumeIsolated { self?.stop() }
         }
+        #endif
     }
 }
 

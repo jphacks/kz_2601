@@ -17,7 +17,9 @@ public final class LeafSpeech: NSObject, AVSpeechSynthesizerDelegate {
 
     override private init() {
         super.init()
+        #if os(iOS)
         synthesizer.usesApplicationAudioSession = false
+        #endif
         synthesizer.delegate = self
     }
 

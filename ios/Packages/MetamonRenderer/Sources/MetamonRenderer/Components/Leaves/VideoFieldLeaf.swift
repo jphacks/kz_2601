@@ -75,7 +75,7 @@ struct VideoFieldLeaf: View {
             Button(L("ライブラリから選ぶ")) { showLibrary = true }
             Button(L("キャンセル"), role: .cancel) {}
         }
-        .fullScreenCover(isPresented: $showCamera) {
+        .platformFullScreenCover(isPresented: $showCamera) {
             VideoCameraPicker(maxDuration: TimeInterval(maxDuration)) { url in
                 ingest(url, form: form, field: field)
             }
@@ -99,7 +99,7 @@ struct VideoFieldLeaf: View {
         #if !APP_STORE_REVIEW
         .alert(L("カメラを使えません"), isPresented: $showDenied) {
             Button(L("設定を開く")) {
-                if let url = URL(string: UIApplication.openSettingsURLString) { openURL(url) }
+                if let url = PlatformSystem.appSettingsURL { openURL(url) }
             }
             Button(L("ライブラリから選ぶ")) { showLibrary = true }
             Button(L("キャンセル"), role: .cancel) {}

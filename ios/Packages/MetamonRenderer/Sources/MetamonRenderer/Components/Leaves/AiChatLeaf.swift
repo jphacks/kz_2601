@@ -54,8 +54,8 @@ struct AiChatLeaf: View {
                 announceQueue.clear()
             }
             .onChange(of: micPhase) { _, phase in
-                if let text = announceQueue.phaseChanged(to: phase, visible: visible, voiceOver: UIAccessibility.isVoiceOverRunning) {
-                    UIAccessibility.post(notification: .announcement, argument: text)
+                if let text = announceQueue.phaseChanged(to: phase, visible: visible, voiceOver: PlatformSystem.isVoiceOverRunning) {
+                    PlatformSystem.announce(text)
                 }
             }
             .onChange(of: rt.dictation?.isVoiceInputActive ?? false) { _, active in
@@ -212,7 +212,7 @@ struct AiChatLeaf: View {
             .buttonStyle(.plain)
             .foregroundStyle(mic == .stop ? AnyShapeStyle(.red) : (mic.enabled ? AnyShapeStyle(RenderTheme.brandFill) : AnyShapeStyle(.tertiary)))
             .disabled(!mic.enabled)
-            .accessibilityLabel(Self.micLabel(mic, voiceOver: UIAccessibility.isVoiceOverRunning))
+            .accessibilityLabel(Self.micLabel(mic, voiceOver: PlatformSystem.isVoiceOverRunning))
             .accessibilityHint(mic == .start ? L("話した言葉が入力欄に入ります。確かめてから送れます") : "")
             .accessibilityIdentifier("aiChat.mic")
         }
@@ -358,13 +358,13 @@ struct AiChatLeaf: View {
     }
 
     private func autoRead(_ turn: AIChat.Turn) {
-        let mode = Self.autoReadMode(speak: c.speak, visible: visible, voiceOver: UIAccessibility.isVoiceOverRunning,
+        let mode = Self.autoReadMode(speak: c.speak, visible: visible, voiceOver: PlatformSystem.isVoiceOverRunning,
                                      recording: micPhase != .idle)
         switch mode {
         case .none: break
         case .queue: announceQueue.received(turn.text, mode: mode)
         case .speak: speech.speak(turn.text, owner: speechOwner(turn.id))
-        case .announce: UIAccessibility.post(notification: .announcement, argument: turn.text)
+        case .announce: PlatformSystem.announce(turn.text)
         }
     }
 

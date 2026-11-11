@@ -1,3 +1,4 @@
+#if os(iOS)
 import AVFoundation
 
 /// AVAudioSession のうち、録音・再生の部品が触る所だけ(テストで差し替える)。
@@ -56,3 +57,14 @@ struct AudioSessionLease {
         try? session.setCategory(saved.category, mode: saved.mode, options: saved.options)
     }
 }
+
+#else
+import AVFoundation
+
+/// Mac: AVAudioSession が無い(入出力はシステムの設定のまま)ので、借りる / 戻すは何もしない。
+struct AudioSessionLease {
+    static func forRecording() throws -> AudioSessionLease { AudioSessionLease() }
+    static func forPlayback() throws -> AudioSessionLease { AudioSessionLease() }
+    func end() {}
+}
+#endif

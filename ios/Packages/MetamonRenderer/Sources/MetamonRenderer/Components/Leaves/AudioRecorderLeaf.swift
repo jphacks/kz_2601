@@ -73,7 +73,7 @@ struct AudioRecorderPanel: View {
         .onChange(of: recorder.failure) { _, f in if f == .denied { showDenied = true } }
         .alert(L("マイクを使えません"), isPresented: $showDenied) {
             Button(L("設定を開く")) {
-                if let url = URL(string: UIApplication.openSettingsURLString) { openURL(url) }
+                if let url = PlatformSystem.appSettingsURL { openURL(url) }
             }
             Button(L("キャンセル"), role: .cancel) {}
         } message: {

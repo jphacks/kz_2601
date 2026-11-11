@@ -46,12 +46,12 @@ enum RemoteImageLoader {
         }
     }
 
-    static func image(from url: URL) async -> UIImage? {
+    static func image(from url: URL) async -> PlatformImage? {
         guard ImageHostPolicy.isLoadable(url),
               let (data, response) = try? await URLSession.shared.data(from: url, delegate: RedirectGuard()),
               let http = response as? HTTPURLResponse, (200..<300).contains(http.statusCode),
               http.url.map(ImageHostPolicy.isLoadable) ?? false else { return nil }
-        return UIImage(data: data)
+        return PlatformImage(data: data)
     }
 }
 
@@ -59,12 +59,12 @@ enum RemoteImageLoader {
 struct RemoteImage<Placeholder: View>: View {
     let url: URL
     @ViewBuilder var placeholder: () -> Placeholder
-    @State private var loaded: (url: URL, image: UIImage)?
+    @State private var loaded: (url: URL, image: PlatformImage)?
 
     var body: some View {
         Group {
             if let loaded, loaded.url == url {
-                Image(uiImage: loaded.image).resizable().scaledToFill()
+                Image(platformImage: loaded.image).resizable().scaledToFill()
             } else {
                 placeholder()
             }

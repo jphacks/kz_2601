@@ -15,6 +15,10 @@ ios/*.xcodeproj
 ios/*.xcworkspace
 xcuserdata/
 DerivedData/
+# ios/scripts/mac-package-test.sh の既定の置き場(#928)
+ios/DerivedData-mac/
+ios/SourcePackages/
+ios/TestResults-mac/
 build/
 *.ipa
 *.dSYM.zip

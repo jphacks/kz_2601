@@ -31,7 +31,7 @@ struct ShareButtonLeaf: View {
 
     private var text: String { target.format(rawText) }
 
-    private var photo: UIImage? {
+    private var photo: PlatformImage? {
         guard let field = c.field, let form = ctx.form, form.entity.field(field)?.type == .photo else { return nil }
         return PhotoCodec.image(from: form.values[field] ?? .null)
     }
@@ -42,7 +42,7 @@ struct ShareButtonLeaf: View {
                 // LINE は写真を URL で渡せないので文面のみ。
                 Button { openURL(url) } label: { buttonLabel }
             } else if let img = photo {
-                ShareLink(item: Image(uiImage: img), message: Text(text), preview: SharePreview(text, image: Image(uiImage: img))) {
+                ShareLink(item: Image(platformImage: img), message: Text(text), preview: SharePreview(text, image: Image(platformImage: img))) {
                     buttonLabel
                 }
             } else {

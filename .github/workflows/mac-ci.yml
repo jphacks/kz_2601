@@ -1,0 +1,256 @@
+# Mac アプリ(MetamonMac・#929)と共有パッケージの macOS ビルド・テスト(#928)。
+# PR が Open(非Draft) / develop・main への push で発火。iOS は ios-ci.yml(このファイルとは独立)。
+#
+# !!! コスト注意 !!!(ios-ci.yml と同じ方針)
+#   macOS runner は Linux の 10倍の分単価。変更の判定は ubuntu の軽いジョブで行い、関係ない変更では macOS ジョブを起動しない。
+#   「変更のあったパッケージのテストだけ」回す(下表)。timeout-minutes をガードにする。
+#   SwiftPM(SourcePackages) と DerivedData をキャッシュする。
+#
+# 変更の判定(dorny/paths-filter)→ 回すもの(mac-build-test ジョブ):
+#   | 変わった場所                                       | Mac アプリのビルド | テスト(macOS)                            |
+#   |----------------------------------------------------|--------------------|------------------------------------------|
+#   | ios/Packages/MetamonDSL/**・DSL のテストデータ(*1) | する               | DSL / Renderer / Services(DSL は全員の依存) |
+#   | ios/Packages/MetamonRenderer/**・docs/dsl の適合テストと例 | する       | Renderer                                 |
+#   | ios/Packages/MetamonServices/**                    | する               | Services                                 |
+#   | ios/MetamonMac/**・ios/Shared/**・ios/project.yml・docs/dsl/examples/** | する | なし                          |
+#   | .github/workflows/mac-ci.yml・ios/scripts/mac-package-test.sh | する    | 全部                                     |
+#   | 上記以外                                           | しない             | なし(mac-ci は成功で終わる)            |
+#   | develop / main への push(上記のどれかが変更)      | する               | 全部                                     |
+#   (*1) docs/dsl/conformance/expr/**・docs/dsl/dsl.schema.json・docs/dsl/examples/**・テストが読む backend の JSON
+#
+# 設計メモ:
+# - テストは各パッケージのフォルダで `xcodebuild test -destination platform=macOS`。
+#   `swift test` は文字列カタログ(.xcstrings)を訳さないので、英語の文言のテストが落ちる(#993 の報告)。
+# - 署名しない(CODE_SIGNING_ALLOWED=NO)。秘密(証明書・Firebase の plist)は使わない。
+# - workflow レベルの `paths:` は使わない(ios-ci.yml と同じ理由: required check が永遠に待ちになる)。
+# - 集約ジョブ `mac-ci`(ubuntu)を required check にできる形。macOS ジョブがスキップでも成功で終わる。
+# - ios/MetamonMac が無いブランチ(#929 より前)では macOS ジョブをスキップ。
+name: mac-ci
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+  push:
+    branches: [develop, main]
+
+concurrency:
+  group: mac-ci-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+permissions:
+  contents: read
+  pull-requests: read
+
+env:
+  XCODEGEN_VERSION: "2.43.0"
+
+jobs:
+  mac-changes:
+    name: mac-changes
+    if: github.event_name == 'push' || github.event.pull_request.draft == false
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    outputs:
+      run: ${{ steps.plan.outputs.run }}
+      test_dsl: ${{ steps.plan.outputs.test_dsl }}
+      test_renderer: ${{ steps.plan.outputs.test_renderer }}
+      test_services: ${{ steps.plan.outputs.test_services }}
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: dorny/paths-filter@v4
+        id: filter
+        with:
+          filters: |
+            dsl:
+              - 'ios/Packages/MetamonDSL/**'
+              - 'docs/dsl/conformance/expr/**'
+              - 'docs/dsl/dsl.schema.json'
+              - 'docs/dsl/examples/**'
+              # MetamonDSLTests が読む backend の JSON
+              - 'backend/internal/ai/examples/**'
+              - 'backend/pkg/dsl/testdata/**'
+            renderer:
+              - 'ios/Packages/MetamonRenderer/**'
+              - 'docs/dsl/conformance/**'
+              - 'docs/dsl/examples/**'
+            services:
+              - 'ios/Packages/MetamonServices/**'
+            app:
+              - 'ios/MetamonMac/**'
+              # iOS と共有するランタイムの部品(#939)。Mac のターゲットにもコンパイルする
+              - 'ios/Shared/**'
+              - 'ios/project.yml'
+              - 'ios/scripts/select-firebase-plist.sh'
+              - 'docs/dsl/examples/**'
+            ci:
+              - '.github/workflows/mac-ci.yml'
+              - 'ios/scripts/mac-package-test.sh'
+
+      - name: 回すテストを決める
+        id: plan
+        env:
+          EVENT: ${{ github.event_name }}
+          DSL: ${{ steps.filter.outputs.dsl }}
+          RENDERER: ${{ steps.filter.outputs.renderer }}
+          SERVICES: ${{ steps.filter.outputs.services }}
+          APP: ${{ steps.filter.outputs.app }}
+          CI_CHANGED: ${{ steps.filter.outputs.ci }}
+        run: |
+          set -euo pipefail
+          emit() {
+            {
+              echo "run=$1"
+              echo "test_dsl=$2"
+              echo "test_renderer=$3"
+              echo "test_services=$4"
+            } >> "$GITHUB_OUTPUT"
+            echo "::notice::mac-ci plan: run=$1 dsl=$2 renderer=$3 services=$4"
+          }
+
+          if [ ! -d ios/MetamonMac ]; then
+            echo "::notice::ios/MetamonMac が無いため mac-ci をスキップします"
+            emit false false false false
+            exit 0
+          fi
+
+          any=false
+          for v in "$DSL" "$RENDERER" "$SERVICES" "$APP" "$CI_CHANGED"; do
+            if [ "$v" = "true" ]; then any=true; fi
+          done
+          if [ "$any" != "true" ]; then
+            emit false false false false
+            exit 0
+          fi
+
+          # develop / main への push・ワークフローの変更・DSL(全員の依存)の変更: 全部
+          if [ "$EVENT" = "push" ] || [ "$CI_CHANGED" = "true" ] || [ "$DSL" = "true" ]; then
+            emit true true true true
+            exit 0
+          fi
+
+          emit true false "$RENDERER" "$SERVICES"
+
+  mac-build-test:
+    name: mac-build-test
+    needs: mac-changes
+    if: needs.mac-changes.outputs.run == 'true'
+    # Xcode 26 系(firebase-ios-sdk 13.x が swift-tools 6.2 を要求・ios-ci.yml と同じ)
+    runs-on: macos-26
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Xcode 26 を選択
+        run: |
+          # shellcheck disable=SC2010,SC2012
+          latest="$(ls -d /Applications/Xcode_26*.app 2>/dev/null | grep -v -i beta | sort -V | tail -1)"
+          # shellcheck disable=SC2012
+          if [ -z "$latest" ]; then latest="$(ls -d /Applications/Xcode_26*.app 2>/dev/null | sort -V | tail -1)"; fi
+          if [ -n "$latest" ]; then sudo xcode-select -s "$latest"; fi
+          xcodebuild -version
+
+      # キーは ios-ci.yml と同じ(同じバイナリを使い回す)
+      - name: xcodegen キャッシュ
+        id: xcodegen-cache
+        uses: actions/cache@v6
+        with:
+          path: ${{ runner.temp }}/xcodegen
+          key: xcodegen-${{ env.XCODEGEN_VERSION }}
+
+      - name: xcodegen インストール
+        if: steps.xcodegen-cache.outputs.cache-hit != 'true'
+        run: |
+          set -euo pipefail
+          curl -fsSL --retry 5 --retry-delay 5 --retry-all-errors -o "$RUNNER_TEMP/xcodegen.zip" \
+            "https://github.com/yonaskolb/XcodeGen/releases/download/${XCODEGEN_VERSION}/xcodegen.zip"
+          unzip -q "$RUNNER_TEMP/xcodegen.zip" -d "$RUNNER_TEMP"
+
+      - name: xcodegen generate
+        working-directory: ios
+        run: |
+          "$RUNNER_TEMP/xcodegen/bin/xcodegen" generate --quiet
+
+      # 依存のソース(OS に依らない)。キーは ios-ci.yml と同じにして iOS 側のキャッシュも使う
+      - name: SwiftPM キャッシュ
+        uses: actions/cache@v6
+        with:
+          path: ios/SourcePackages
+          key: spm-${{ runner.os }}-${{ hashFiles('ios/project.yml', 'ios/**/Package.resolved') }}
+          restore-keys: |
+            spm-${{ runner.os }}-
+
+      # Mac 用は iOS(シミュレータ)と中身が違うのでキーを分ける
+      - name: DerivedData キャッシュ
+        uses: actions/cache@v6
+        with:
+          path: ios/DerivedData-mac
+          key: dd-mac-${{ runner.os }}-${{ hashFiles('ios/project.yml') }}-${{ github.sha }}
+          restore-keys: |
+            dd-mac-${{ runner.os }}-${{ hashFiles('ios/project.yml') }}-
+            dd-mac-${{ runner.os }}-
+
+      - name: MetamonMac をビルド
+        working-directory: ios
+        run: |
+          set -euo pipefail
+          xcodebuild build \
+            -project Metamon.xcodeproj \
+            -scheme MetamonMac \
+            -configuration Debug \
+            -destination 'platform=macOS' \
+            -derivedDataPath DerivedData-mac \
+            -clonedSourcePackagesDirPath SourcePackages \
+            -skipPackagePluginValidation \
+            -skipMacroValidation \
+            -parallelizeTargets \
+            -quiet \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGN_IDENTITY=""
+
+      # 各パッケージのフォルダで xcodebuild test(パッケージの自動 scheme にテストターゲットが入る)。手元でも同じスクリプト
+      - name: テスト MetamonDSL(macOS)
+        if: needs.mac-changes.outputs.test_dsl == 'true'
+        run: ios/scripts/mac-package-test.sh MetamonDSL
+
+      - name: テスト MetamonRenderer(macOS)
+        if: needs.mac-changes.outputs.test_renderer == 'true'
+        run: ios/scripts/mac-package-test.sh MetamonRenderer
+
+      - name: テスト MetamonServices(macOS)
+        if: needs.mac-changes.outputs.test_services == 'true'
+        run: ios/scripts/mac-package-test.sh MetamonServices
+
+      - name: テスト結果をアップロード(失敗時)
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: mac-test-results
+          path: ios/TestResults-mac
+          if-no-files-found: ignore
+          retention-days: 3
+
+  # required check にできる集約ジョブ。macOS ジョブがスキップでも成功、失敗/キャンセルなら失敗。
+  mac-ci:
+    name: mac-ci
+    needs: [mac-changes, mac-build-test]
+    if: always() && (github.event_name == 'push' || github.event.pull_request.draft == false)
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    steps:
+      - name: 結果を集約
+        env:
+          CHANGES: ${{ needs.mac-changes.result }}
+          BUILD_TEST: ${{ needs.mac-build-test.result }}
+          RUN: ${{ needs.mac-changes.outputs.run }}
+        run: |
+          echo "run=${RUN} mac-changes=${CHANGES} mac-build-test=${BUILD_TEST}"
+          if [ "$CHANGES" != "success" ]; then
+            echo "::error::mac-changes が ${CHANGES}"
+            exit 1
+          fi
+          case "$BUILD_TEST" in
+            success|skipped) ;;
+            *) echo "::error::mac-build-test が ${BUILD_TEST}"; exit 1 ;;
+          esac

@@ -1,3 +1,5 @@
+// TODO mac-026: UIKit を直接使うテスト。Mac で回すには描画の仕方を置き換え層に寄せる
+#if os(iOS)
 import XCTest
 import AVFoundation
 import UIKit
@@ -70,3 +72,4 @@ final class VideoCodecTests: XCTestCase {
         return url
     }
 }
+#endif

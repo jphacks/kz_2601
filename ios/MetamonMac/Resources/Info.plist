@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>CFBundleDevelopmentRegion</key>
+	<string>ja</string>
+	<!-- 表示名・Bundle ID・版は iOS と同じ build setting から(project.yml) -->
+	<key>CFBundleDisplayName</key>
+	<string>$(METAMON_DISPLAY_NAME)</string>
+	<key>CFBundleExecutable</key>
+	<string>$(EXECUTABLE_NAME)</string>
+	<key>CFBundleIdentifier</key>
+	<string>$(PRODUCT_BUNDLE_IDENTIFIER)</string>
+	<key>CFBundleInfoDictionaryVersion</key>
+	<string>6.0</string>
+	<!-- Mac はメニューバー(「〜について」「〜を終了」)に CFBundleName を出すので、内部名 Metamon でなく表示名にする -->
+	<key>CFBundleName</key>
+	<string>$(METAMON_DISPLAY_NAME)</string>
+	<key>CFBundlePackageType</key>
+	<string>$(PRODUCT_BUNDLE_PACKAGE_TYPE)</string>
+	<key>CFBundleShortVersionString</key>
+	<string>$(MARKETING_VERSION)</string>
+	<key>CFBundleVersion</key>
+	<string>$(CURRENT_PROJECT_VERSION)</string>
+	<key>LSMinimumSystemVersion</key>
+	<string>$(MACOSX_DEPLOYMENT_TARGET)</string>
+	<key>LSApplicationCategoryType</key>
+	<string>public.app-category.productivity</string>
+	<key>ITSAppUsesNonExemptEncryption</key>
+	<false/>
+
+	<!-- バックエンド URL(iOS の Info.plist と同じキー・同じ build setting) -->
+	<key>MetamonAIBaseURL</key>
+	<string>$(METAMON_AI_BASE_URL)</string>
+	<key>MetamonAppConfigBaseURL</key>
+	<string>$(METAMON_APPCONFIG_BASE_URL)</string>
+	<key>MetamonAppStoreURL</key>
+	<string>$(METAMON_APP_STORE_URL)</string>
+
+	<!-- 権限の説明(マイク・カメラなど)は #931 で足す -->
+</dict>
+</plist>

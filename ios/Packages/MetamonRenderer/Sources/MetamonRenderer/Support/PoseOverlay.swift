@@ -3,7 +3,7 @@ import MetamonDSL
 
 /// 写真に骨格(関節の点と線)を重ねて描く(#418)。写真は縦横比を保って枠に収める(切り取ると点がずれるため)。
 struct PosePhotoView: View {
-    let image: UIImage
+    let image: PlatformImage
     let pose: BodyPose
     var height: CGFloat
 
@@ -11,7 +11,7 @@ struct PosePhotoView: View {
         GeometryReader { geo in
             let rect = Self.fittedRect(imageSize: image.size, in: geo.size)
             ZStack(alignment: .topLeading) {
-                Image(uiImage: image).resizable().frame(width: rect.width, height: rect.height).offset(x: rect.minX, y: rect.minY)
+                Image(platformImage: image).resizable().frame(width: rect.width, height: rect.height).offset(x: rect.minX, y: rect.minY)
                 Canvas { ctx, _ in
                     var bones = Path()
                     for (a, b) in PoseKeypoint.bones {
