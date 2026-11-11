@@ -385,7 +385,13 @@ func (s *Service) Call(ctx context.Context, r CallRequest) (res CallResult, err 
 	if cacheKeyOf != "" {
 		now := s.now()
 		if ttl := spec.cacheTTL(r.Args, now); ttl > 0 {
-			s.cache.put(cacheKeyOf, out, now.Add(ttl), now)
+			expires := now.Add(ttl)
+			if !out.ValidUntil.IsZero() && out.ValidUntil.Before(expires) {
+				expires = out.ValidUntil // a row would outlive its valid time
+			}
+			if expires.After(now) {
+				s.cache.put(cacheKeyOf, out, expires, now)
+			}
 		}
 	}
 	res.Output = out

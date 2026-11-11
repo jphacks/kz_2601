@@ -52,6 +52,9 @@ type Output struct {
 	ResultID string `json:"resultId,omitempty"`
 	// Usage is the call's measured cost (paid providers).
 	Usage Usage `json:"-"`
+	// ValidUntil, when set, is when the first row stops being valid (ODPT
+	// dct:valid): the answer cache keeps the answer no longer than this.
+	ValidUntil time.Time `json:"-"`
 }
 
 // Usage is the measured cost of a paid call. Priced false: the op did not
