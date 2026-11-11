@@ -117,6 +117,44 @@ class FeedCacheTest {
     }
 
     @Test
+    fun rowsArrivingAfterRemoveAllAreNotWritten() = runBlocking {
+        val c = cache()
+        // 取りに行っている間にサインアウトの後片付けが走った
+        val wiping = object : FeedClient {
+            override suspend fun feed(query: FeedQuery): FeedResult {
+                c.removeAll()
+                return result("a")
+            }
+        }
+        assertEquals("a", c.load(query, force = false, client = wiping).items[0].title)
+        assertNull(c.cached(query))
+        assertFalse(tmp.root.exists() && tmp.root.list().orEmpty().isNotEmpty())
+        assertNull(cache().cached(query))
+
+        // 消した後に始めた取得は普通に書く
+        c.load(query, force = false, client = FakeClient(result("b")))
+        assertEquals("b", c.cached(query)?.items?.get(0)?.title)
+    }
+
+    @Test
+    fun failureAfterRemoveAllDoesNotReturnOldRows() = runBlocking {
+        val c = cache()
+        c.load(query, force = false, client = FakeClient(result("a")))
+        clock += FeedCache.TTL_MILLIS
+        val wipingOffline = object : FeedClient {
+            override suspend fun feed(query: FeedQuery): FeedResult {
+                c.removeAll()
+                throw IOException("offline")
+            }
+        }
+        try {
+            c.load(query, force = false, client = wipingOffline)
+            fail("消した前の行は出さない")
+        } catch (_: IOException) {
+        }
+    }
+
+    @Test
     fun memoryOnlyWithoutDirectory() = runBlocking {
         val c = cache(null)
         c.load(query, force = false, client = FakeClient(result("a")))

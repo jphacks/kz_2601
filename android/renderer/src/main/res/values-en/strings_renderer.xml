@@ -4,6 +4,7 @@
     <string name="renderer_disclosure_collapsed">Collapsed</string>
     <string name="renderer_disclosure_default_title">Details</string>
     <string name="renderer_disclosure_expanded">Expanded</string>
+    <string name="renderer_form_read_only">Only the person who created this can change it</string>
     <string name="renderer_unavailable_here">Not available on this device</string>
     <string name="renderer_unavailable_needs_update">Update the app to show this</string>
 </resources>

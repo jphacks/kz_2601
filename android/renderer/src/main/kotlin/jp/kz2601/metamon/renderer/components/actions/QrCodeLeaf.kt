@@ -18,6 +18,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -40,6 +41,13 @@ import com.google.zxing.WriterException
 import com.google.zxing.qrcode.decoder.ErrorCorrectionLevel
 import com.google.zxing.qrcode.encoder.Encoder
 import jp.kz2601.metamon.dsl.Component
+import jp.kz2601.metamon.dsl.expr.Expr
+import jp.kz2601.metamon.dsl.expr.ExprEvaluator
+import jp.kz2601.metamon.dsl.records.FieldType
+import jp.kz2601.metamon.dsl.records.JSONValue
+import jp.kz2601.metamon.dsl.records.Record
+import jp.kz2601.metamon.dsl.records.RecordQuery
+import jp.kz2601.metamon.renderer.DSLRuntime
 import jp.kz2601.metamon.renderer.R
 import jp.kz2601.metamon.renderer.form.FormDraft
 import jp.kz2601.metamon.renderer.registry.RenderContext
@@ -76,13 +84,46 @@ class QrMatrix private constructor(val size: Int, private val dark: BooleanArray
     }
 }
 
-/** QR の中身(iOS の `QRCodeContent.resolve`): text(`{{id}}` は下書きの保存値のまま)> field の値。 */
+/**
+ * QR・読み上げの中身(iOS の `QRCodeContent.resolve`): text(`{{id}}`)> field > value(式)のどれか 1 つ。
+ * 保存値はそのまま(日時・数値を整形しない)、computed は式で評価(datetime は RFC3339)。行 = 表示中の下書き。
+ * [evaluator] は式を読む時だけ呼ぶ。
+ */
 object QrContent {
-    fun resolve(text: String?, field: String?, form: FormDraft?): String {
-        if (!text.isNullOrEmpty()) return FormTemplate.fill(text, form, raw = true)
-        if (!field.isNullOrEmpty()) return form?.values?.get(field)?.displayString.orEmpty()
+    fun resolve(c: Component, form: FormDraft?, evaluator: () -> ExprEvaluator): String =
+        resolve(c.text, c.field, RecordQuery.expr(c.value), form, evaluator)
+
+    fun resolve(text: String?, field: String?, value: Expr?, form: FormDraft?, evaluator: () -> ExprEvaluator): String {
+        val row = form?.let { ExprEvaluator.Row(it.entity, Record(it.recordId ?: "draft", it.values.toMap()), memoizable = false) }
+        if (!text.isNullOrEmpty()) {
+            if (form == null || !text.contains("{{")) return text
+            var s: String = text
+            for (f in form.entity.fields) {
+                val token = "{{${f.id}}}"
+                if (s.contains(token)) s = s.replace(token, fieldText(f.id, form, row, evaluator))
+            }
+            return s
+        }
+        if (!field.isNullOrEmpty()) return form?.let { fieldText(field, it, row, evaluator) }.orEmpty()
+        if (value != null) return evaluator().evaluate(value, row)?.text.orEmpty()
         return ""
     }
+
+    private fun fieldText(id: String, form: FormDraft, row: ExprEvaluator.Row?, evaluator: () -> ExprEvaluator): String {
+        val f = form.entity.field(id)
+        if (f != null && f.isComputed && row != null) {
+            val v = evaluator().fieldValue(id, row)
+            return if (f.type == FieldType.DATETIME) v?.json(f)?.displayString.orEmpty() else v?.text.orEmpty()
+        }
+        return (form.values[id] ?: JSONValue.Null).displayString
+    }
+}
+
+/** 部品が式を読む評価器(iOS の `rt.evaluator()`)。記録が変わると描き直す。 */
+@Composable
+internal fun rememberEvaluatorFactory(runtime: DSLRuntime): () -> ExprEvaluator {
+    val records = runtime.recordsFlow?.collectAsState()?.value.orEmpty()
+    return { ExprEvaluator(runtime.entityModels, { records[it].orEmpty() }) }
 }
 
 /** 1 モジュール 1px の白地・黒の画像(描く時は補間なしで拡大する)。アプリの共有シート(#901)も使う。 */
@@ -92,12 +133,12 @@ fun QrMatrix.bitmap(): ImageBitmap {
 }
 
 /**
- * `qrCode`: text / field から QR を作って見せる。ダークモードでも白地に黒(読み取りやすさ優先)。
+ * `qrCode`: text / field / value から QR を作って見せる。ダークモードでも白地に黒(読み取りやすさ優先)。
  * 空・長すぎる時は案内を出す。読み上げは label(無ければ「QR コード」)+ 中身。
  */
 @Composable
 fun QrCodeLeaf(c: Component, ctx: RenderContext, modifier: Modifier = Modifier) {
-    val content = QrContent.resolve(c.text, c.field, ctx.form)
+    val content = QrContent.resolve(c, ctx.form, rememberEvaluatorFactory(ctx.runtime))
     val caption = c.label?.takeIf { it.isNotEmpty() }
     val matrix = remember(content) { if (content.isBlank()) null else QrMatrix.encode(content) }
     val image = remember(matrix) { matrix?.bitmap() }

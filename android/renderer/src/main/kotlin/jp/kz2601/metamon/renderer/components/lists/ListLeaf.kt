@@ -62,6 +62,7 @@ import jp.kz2601.metamon.renderer.components.PhotoValue
 import jp.kz2601.metamon.renderer.components.PhotoView
 import jp.kz2601.metamon.renderer.components.social.InterestButton
 import jp.kz2601.metamon.renderer.components.social.MatchingHost
+import jp.kz2601.metamon.renderer.components.social.ModerationHost
 import jp.kz2601.metamon.renderer.components.social.interestTitle
 import jp.kz2601.metamon.renderer.registry.RenderContext
 import jp.kz2601.metamon.renderer.theme.RenderTheme
@@ -74,10 +75,11 @@ import kotlinx.coroutines.launch
  * `list`: entity の記録の一覧(filter / sort / 検索は端末側)。iOS の `ListLeaf`。
  * - 行タップ = `onItemTap` を recordId 付きで実行(#1060 の dispatch)
  * - 長押し = 「削除」のメニュー(`swipeToDelete` で消せる記録だけ)。読み上げでは行の操作「削除」。消した後の「元に戻す」はホスト(AppRuntime)が出す
+ * - 他人の共有の記録は長押し・読み上げの行の操作に「通報する」「投稿者をブロック」も([ModerationHost]・#1196)。理由の選択・確認はホストが出す
  * - `item.toggle`(#108): 行頭の丸で boolean を反転して即保存(楽観的 UI。失敗したら戻す)
  * - 行は 1 枚のカードに積み、行間は hairline。グリッドのセルが縦スクロールを持つので LazyColumn にはしない
  * - `item.interest`(#877): 仲間探しのプロフィールの行の右端に「つながりたい」([MatchingHost] を持つ runtime だけ)
- * 印(いいね)・通報は、共有まわりの能力(android-068・069)が入るまで出さない(Issue #859 の備考)。
+ * 印(いいね)は、共有まわりの能力(android-068)が入るまで出さない(Issue #859 の備考)。
  */
 @Composable
 fun ListLeaf(c: Component, ctx: RenderContext, modifier: Modifier = Modifier) {
@@ -95,6 +97,7 @@ fun ListLeaf(c: Component, ctx: RenderContext, modifier: Modifier = Modifier) {
     val scope = rememberCoroutineScope()
     val today = DSLClock.now()
     val matching = (ctx.runtime as? MatchingHost)?.takeIf { c.item?.interest == true }
+    val moderation = ctx.runtime as? ModerationHost
     matching?.matchingVersion?.collectAsState()?.value // 送った・つながったで描き直す
     if (matching != null) LaunchedEffect(entityId) { matching.refreshMatches(MatchBox.entries.toSet()) }
     Column(modifier.renderCard(padding = 0.dp)) {
@@ -117,6 +120,7 @@ fun ListLeaf(c: Component, ctx: RenderContext, modifier: Modifier = Modifier) {
                 }
             }
             val deletable = c.swipeToDelete == true && ctx.runtime.canDelete(entityId, row)
+            val menuItems = ListRowMenu.items(deletable, moderation, entityId, row)
             val interest = matching?.interestState(entityId, row)
             val sendInterest = { scope.launch { matching?.sendInterest(entityId, row) }; Unit }
             val interestLabel = interest?.let { interestTitle(it) }
@@ -131,11 +135,13 @@ fun ListLeaf(c: Component, ctx: RenderContext, modifier: Modifier = Modifier) {
                 toggleEnabled = editable,
                 onToggle = onToggle,
                 onTap = c.onItemTap?.let { a -> { ctx.dispatch(a, ActionContext(ctx.route, ctx.form, recordId = row.id)) } },
-                onDelete = if (deletable) {
+                onDelete = if (ListRowMenu.Item.DELETE in menuItems) {
                     { ctx.dispatch(Action(type = ActionType.DELETE_RECORD, entity = entityId), ActionContext(ctx.route, ctx.form, recordId = row.id)) }
                 } else {
                     null
                 },
+                onReport = if (ListRowMenu.Item.REPORT in menuItems) ({ moderation?.reportRecord(entityId, row) }) else null,
+                onBlock = if (ListRowMenu.Item.BLOCK in menuItems) ({ moderation?.blockAuthor(entityId, row) }) else null,
                 accessory = interest?.let { st -> { InterestButton(st, interestBusy, sendInterest) } },
                 accessoryActions = if (interest?.tappable == true && interestLabel != null && !interestBusy) {
                     listOf(CustomAccessibilityAction(interestLabel) { sendInterest(); true })
@@ -181,6 +187,9 @@ internal fun ListRow(
     accessoryActions: List<CustomAccessibilityAction> = emptyList(),
     /** 長押し。あれば削除のメニューの代わりに呼ぶ(呼んだ側がメニューを出す) */
     onLongPress: (() -> Unit)? = null,
+    /** 他人の共有の記録の通報・ブロック(#1196)。長押しのメニューと読み上げの行の操作に出す */
+    onReport: (() -> Unit)? = null,
+    onBlock: (() -> Unit)? = null,
 ) {
     val texts = ListRows.texts(item, record, entity, data)
     val imageField = item?.image
@@ -195,9 +204,14 @@ internal fun ListRow(
     val deleteLabel = stringResource(R.string.lists_delete)
     val toggleState = toggleOn?.let { stringResource(if (it) R.string.lists_checked else R.string.lists_not_checked) }
     val openLabel = stringResource(R.string.lists_open)
+    val reportLabel = stringResource(R.string.social_report)
+    val blockLabel = stringResource(R.string.social_block)
+    val hasMenu = onDelete != null || onReport != null || onBlock != null
     val actions = buildList {
         if (onToggle != null) add(CustomAccessibilityAction(toggleLabel) { onToggle(); true })
         if (onDelete != null) add(CustomAccessibilityAction(deleteLabel) { onDelete(); true })
+        if (onReport != null) add(CustomAccessibilityAction(reportLabel) { onReport(); true })
+        if (onBlock != null) add(CustomAccessibilityAction(blockLabel) { onBlock(); true })
         addAll(accessoryActions)
     }
     Box {
@@ -205,9 +219,9 @@ internal fun ListRow(
             Modifier
                 .fillMaxWidth()
                 .combinedClickable(
-                    enabled = onTap != null || onDelete != null || onLongPress != null,
+                    enabled = onTap != null || hasMenu || onLongPress != null,
                     onClick = { onTap?.invoke() },
-                    onLongClick = onLongPress ?: onDelete?.let { { menu = true } },
+                    onLongClick = onLongPress ?: if (hasMenu) ({ menu = true }) else null,
                 )
                 .clearAndSetSemantics {
                     contentDescription = label
@@ -258,14 +272,36 @@ internal fun ListRow(
             if (showsChevron) SymbolIcon("chevron.right", 16.dp, RenderTheme.colors.tertiaryLabel)
         }
         DropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
-            DropdownMenuItem(
-                text = { Text(deleteLabel, color = RenderTheme.colors.negative) },
-                leadingIcon = { SymbolIcon("trash", 20.dp, RenderTheme.colors.negative) },
-                onClick = {
-                    menu = false
-                    onDelete?.invoke()
-                },
-            )
+            if (onDelete != null) {
+                DropdownMenuItem(
+                    text = { Text(deleteLabel, color = RenderTheme.colors.negative) },
+                    leadingIcon = { SymbolIcon("trash", 20.dp, RenderTheme.colors.negative) },
+                    onClick = {
+                        menu = false
+                        onDelete()
+                    },
+                )
+            }
+            if (onReport != null) {
+                DropdownMenuItem(
+                    text = { Text(reportLabel) },
+                    leadingIcon = { SymbolIcon("exclamationmark.circle", 20.dp, MaterialTheme.colorScheme.onSurface) },
+                    onClick = {
+                        menu = false
+                        onReport()
+                    },
+                )
+            }
+            if (onBlock != null) {
+                DropdownMenuItem(
+                    text = { Text(blockLabel, color = RenderTheme.colors.negative) },
+                    leadingIcon = { SymbolIcon("hand.raised", 20.dp, RenderTheme.colors.negative) },
+                    onClick = {
+                        menu = false
+                        onBlock()
+                    },
+                )
+            }
         }
     }
 }

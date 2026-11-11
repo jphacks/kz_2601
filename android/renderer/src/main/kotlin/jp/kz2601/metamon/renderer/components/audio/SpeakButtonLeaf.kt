@@ -21,12 +21,13 @@ import jp.kz2601.metamon.renderer.R
 import jp.kz2601.metamon.renderer.components.actions.ActionButton
 import jp.kz2601.metamon.renderer.components.actions.ActionButtonKind
 import jp.kz2601.metamon.renderer.components.actions.QrContent
+import jp.kz2601.metamon.renderer.components.actions.rememberEvaluatorFactory
 import jp.kz2601.metamon.renderer.registry.RenderContext
 import java.util.Locale
 import java.util.UUID
 
 /**
- * `speakButton`(iOS の `SpeakButtonLeaf`): text / field の文を端末の声で読み上げる(もう一度押すと止まる)。声は UI の言語。
+ * `speakButton`(iOS の `SpeakButtonLeaf`): text / field / value(式)の文を端末の声で読み上げる(もう一度押すと止まる)。声は UI の言語。
  * 中身の作り方は qrCode と同じ([QrContent.resolve])。画面を離れたら止める。
  */
 @Composable
@@ -34,7 +35,7 @@ fun SpeakButtonLeaf(c: Component, ctx: RenderContext, modifier: Modifier = Modif
     val context = LocalContext.current
     val language = LocalConfiguration.current.locales[0]?.language.orEmpty()
     val owner = remember { "speak-" + UUID.randomUUID() }
-    val text = QrContent.resolve(c.text, c.field, ctx.form)
+    val text = QrContent.resolve(c, ctx.form, rememberEvaluatorFactory(ctx.runtime))
     val speaking = LeafSpeech.speakingOwner == owner
     val empty = text.isBlank()
     val title = c.label?.takeIf { it.isNotEmpty() } ?: stringResource(R.string.renderer_audio_speak)

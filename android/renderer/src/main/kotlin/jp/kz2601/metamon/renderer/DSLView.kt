@@ -27,6 +27,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
@@ -36,10 +37,14 @@ import jp.kz2601.metamon.dsl.Action
 import jp.kz2601.metamon.dsl.ActionType
 import jp.kz2601.metamon.dsl.AppDSL
 import jp.kz2601.metamon.dsl.Screen
+import jp.kz2601.metamon.renderer.components.actions.ActionButton
+import jp.kz2601.metamon.renderer.components.actions.ActionButtonKind
+import jp.kz2601.metamon.renderer.screen.ScreenToolbar
 import jp.kz2601.metamon.dsl.fallback
 import jp.kz2601.metamon.dsl.hasTabs
 import jp.kz2601.metamon.dsl.screen
 import jp.kz2601.metamon.renderer.components.UnavailableComponent
+import jp.kz2601.metamon.renderer.components.dashcam.LocalDashcamAppName
 import jp.kz2601.metamon.renderer.components.social.SocialDialogs
 import jp.kz2601.metamon.renderer.components.social.SocialPromptHost
 import jp.kz2601.metamon.renderer.components.lists.LocalScreenLocals
@@ -153,10 +158,13 @@ private fun RouteView(dsl: AppDSL, route: Route, ctx: RenderContext, canClose: B
         UnavailableComponent(jp.kz2601.metamon.dsl.Component(), Modifier.padding(16.dp))
         return
     }
-    ScreenView(screen, ctx, canClose, onBack)
+    // dashcam の映像はアプリごとの置き場に分ける(#872)
+    CompositionLocalProvider(LocalDashcamAppName provides dsl.app.name) {
+        ScreenView(screen, ctx, canClose, onBack, dsl = dsl)
+    }
 }
 
-/** 画面 1 枚(iOS の `ScreenView`)。`screen.entity` があれば下書きを作り、入力部品と保存に渡す。保存バーは子 Issue で入れる。 */
+/** 画面 1 枚(iOS の `ScreenView`)。`screen.entity` があれば下書きを作り、入力部品と保存バーに渡す。 */
 @Composable
 fun ScreenView(
     screen: Screen,
@@ -164,11 +172,13 @@ fun ScreenView(
     canClose: Boolean = false,
     onBack: () -> Unit = {},
     modifier: Modifier = Modifier,
+    dsl: AppDSL? = null,
 ) {
     val form = rememberScreenForm(screen, screenCtx.route, screenCtx.runtime)
     val ctx = remember(screenCtx, form) { screenCtx.withForm(form) }
+    val toolbar = ScreenToolbar.header(screen, dsl, form)
     Column(modifier.fillMaxSize()) {
-        val showsHeader = !screen.isVoiceScreen && (screen.title.isNotEmpty() || canClose || screen.toolbar.isNotEmpty())
+        val showsHeader = !screen.isVoiceScreen && (screen.title.isNotEmpty() || canClose || toolbar.isNotEmpty())
         if (showsHeader) {
             Row(
                 Modifier.fillMaxWidth().padding(horizontal = RenderTheme.Spacing.xs, vertical = RenderTheme.Spacing.xs),
@@ -182,13 +192,30 @@ fun ScreenView(
                     overflow = TextOverflow.Ellipsis,
                     modifier = Modifier.weight(1f).padding(horizontal = RenderTheme.Spacing.sm),
                 )
-                screen.toolbar.forEach { tb -> TextButton(onClick = { ctx.perform(tb.action) }) { Text(tb.label) } }
+                toolbar.forEach { tb -> TextButton(onClick = { ctx.perform(tb.action) }) { Text(tb.label) } }
             }
         }
         // searchBar の検索文字列は画面ごと(遷移で戻ると空に戻る)
         val locals = remember(screenCtx.route) { ScreenLocals() }
         CompositionLocalProvider(LocalScreenLocals provides locals) {
             GridScreenLayout(screen, ctx, Modifier.weight(1f))
+        }
+        when (val bar = ScreenToolbar.saveBar(screen, form)) {
+            ScreenToolbar.SaveBar.ReadOnly -> Text(
+                stringResource(R.string.renderer_form_read_only),
+                style = MaterialTheme.typography.bodyMedium,
+                color = RenderTheme.colors.secondaryLabel,
+                textAlign = TextAlign.Center,
+                modifier = Modifier.fillMaxWidth().padding(horizontal = RenderTheme.Spacing.md, vertical = RenderTheme.Spacing.md),
+            )
+            is ScreenToolbar.SaveBar.Save -> ActionButton(
+                label = bar.button.label,
+                kind = ActionButtonKind.PRIMARY,
+                onClick = { ctx.perform(bar.button.action) },
+                icon = bar.button.icon ?: "checkmark",
+                modifier = Modifier.padding(horizontal = RenderTheme.Spacing.md, vertical = RenderTheme.Spacing.sm),
+            )
+            null -> Unit
         }
     }
 }
