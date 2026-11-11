@@ -64,6 +64,7 @@ struct ListLeaf: View {
                         .background(rowBackground(row))
                         .contentShape(Rectangle())
                         .onTapGesture { tapRow(row, order: ids) }
+                        .macHelp(c.onItemTap != nil ? L("クリックで開きます") : nil)
                         #if os(macOS)
                         .accessibilityAddTraits(selection.ids.contains(row.id) ? .isSelected : [])
                         #endif
