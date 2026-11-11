@@ -14,15 +14,17 @@ final class MacFeedbackCenter {
     /// Firebase につながれば appconfig へ送る(#930)。つながらない時はモック(送った内容を覚えるだけ・iOS の `FeedbackServiceKey` の既定と同じ)
     let client: any FeedbackClient = MacServices.shared.feedback
     private(set) var context: MacFeedbackContext?
+    /// 中央に出しているアプリ(サーバーにある時だけ・#1330)。`MacRootView` が選択と版の変化で入れ替える
+    var currentApp: MacFeedbackContext.CurrentApp?
 
     func open(_ openWindow: OpenWindowAction) {
-        if context == nil { context = .capture(screenshot: MacFeedbackScreenshot.captureAppWindow()) }
+        if context == nil { context = .capture(screenshot: MacFeedbackScreenshot.captureAppWindow(), app: currentApp) }
         openWindow(id: Self.windowId)
     }
 
     /// 前の起動から戻ったウインドウなど、撮らずに開いた時
     func ensureContext() {
-        if context == nil { context = .capture(screenshot: nil) }
+        if context == nil { context = .capture(screenshot: nil, app: currentApp) }
     }
 
     func close() { context = nil }
@@ -63,6 +65,7 @@ struct MacFeedbackComposerView: View {
     @State private var message = ""
     @State private var attachScreenshot = false
     @State private var attachDevice = false
+    @State private var attachApp = false
     @State private var agreed = false
     @State private var sending = false
     @State private var error: String?
@@ -187,6 +190,11 @@ struct MacFeedbackComposerView: View {
                         .font(.footnote).foregroundStyle(.secondary)
                 }
             }
+            if let app = context.app {
+                Toggle("今のアプリの設計(DSL)", isOn: $attachApp)
+                    .accessibilityIdentifier("feedback.attachApp")
+                if attachApp { appPreview(app) }
+            }
             Toggle("アプリの版・OS・機種", isOn: $attachDevice)
                 .accessibilityIdentifier("feedback.attachDevice")
             if attachDevice {
@@ -200,6 +208,32 @@ struct MacFeedbackComposerView: View {
             Text("添付(どれも任意)")
         } footer: {
             Text("記録(入力したデータ)の中身は送りません。オンにしたものだけを送ります。")
+        }
+    }
+
+    /// 送る設計の中身(iOS と同じ: 名前・画面・項目・送る DSL の全文)
+    @ViewBuilder
+    private func appPreview(_ app: MacFeedbackContext.AppSummary) -> some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Text(L10n.tr("「\(app.name)」の画面と項目の設計")).font(.subheadline.weight(.medium))
+            Text(L10n.tr("画面: \(app.screens.joined(separator: "、"))")).font(.footnote)
+            if !app.entities.isEmpty {
+                Text(L10n.tr("項目: \(app.entities.joined(separator: "、"))")).font(.footnote)
+            }
+            Text("アプリの名前・画面の文言・項目の名前が含まれます。記録は含まれません。")
+                .font(.footnote).foregroundStyle(.secondary)
+        }
+        if let json = app.json {
+            DisclosureGroup("送る DSL をすべて見る") {
+                ScrollView([.vertical, .horizontal]) {
+                    Text(verbatim: json)
+                        .font(.caption2.monospaced())
+                        .textSelection(.enabled)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                }
+                .frame(maxHeight: 240)
+            }
+            .font(.footnote)
         }
     }
 
@@ -226,6 +260,7 @@ struct MacFeedbackComposerView: View {
             submission.screenshotJPEG = jpeg
         }
         if attachDevice { submission.device = context.device }
+        if attachApp { submission.app = context.app?.ref } // 送るのは appId と版だけ。記録は送らない
         sending = true
         Task {
             defer { sending = false }

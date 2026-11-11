@@ -1020,6 +1020,23 @@
         }
       }
     },
+    "「%@」の画面と項目の設計" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Screens and fields of “%@”"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "「%@」の画面と項目の設計"
+          }
+        }
+      }
+    },
     "「%@」の画面のつながり" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -2938,6 +2955,23 @@
         }
       }
     },
+    "アプリの名前・画面の文言・項目の名前が含まれます。記録は含まれません。" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Includes the app name, screen text, and field names. Records are not included."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "アプリの名前・画面の文言・項目の名前が含まれます。記録は含まれません。"
+          }
+        }
+      }
+    },
     "アプリの版" : {
       "localizations" : {
         "en" : {
@@ -4515,6 +4549,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "今のアプリの版"
+          }
+        }
+      }
+    },
+    "今のアプリの設計(DSL)" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Design of the current app (DSL)"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "今のアプリの設計(DSL)"
           }
         }
       }
@@ -7438,6 +7489,23 @@
         }
       }
     },
+    "画面: %@" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Screens: %@"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "画面: %@"
+          }
+        }
+      }
+    },
     "画面「%@」(id: %@)で: " : {
       "extractionState" : "manual",
       "localizations" : {
@@ -8789,6 +8857,23 @@
         }
       }
     },
+    "送る DSL をすべて見る" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Show the full DSL to be sent"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "送る DSL をすべて見る"
+          }
+        }
+      }
+    },
     "送るスクショ" : {
       "localizations" : {
         "en" : {
@@ -9339,6 +9424,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "音声認識の許可がありません。システム設定 > プライバシーとセキュリティ > 音声認識 で許可するか、音声モデルの準備ができるまで文字で頼んでください"
+          }
+        }
+      }
+    },
+    "項目: %@" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Fields: %@"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "項目: %@"
           }
         }
       }

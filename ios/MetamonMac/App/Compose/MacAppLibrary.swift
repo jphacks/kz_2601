@@ -78,6 +78,9 @@ final class MacAppLibrary {
 
     func isCreated(_ appId: String) -> Bool { createdIds.contains(appId) }
 
+    /// 端末に残した形(封筒)。フィードバックに添える DSL の全文を見せる(#1330)
+    func envelope(for appId: String) -> Data? { envelopes[appId] }
+
     /// サーバー(appconfig)に保存されているアプリか。記録・版・フィードバックの添付をサーバーにつなぐかの判定
     func isOnServer(_ appId: String) -> Bool { serverIds.contains(appId) }
 
