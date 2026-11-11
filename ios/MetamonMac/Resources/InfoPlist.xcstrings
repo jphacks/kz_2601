@@ -1,0 +1,108 @@
+{
+  "sourceLanguage" : "ja",
+  "strings" : {
+    "NSAppleMusicUsageDescription" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Used to search for and play Apple Music songs in the music player of the apps you build."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "生成したアプリの音楽プレーヤーで、Apple Music の曲を検索して再生するために使用します。"
+          }
+        }
+      }
+    },
+    "NSCalendarsWriteOnlyAccessUsageDescription" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Used to add a record's date and time to your calendar as an event after you check the details. Your existing events are never read."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "記録の日時を、内容を確かめたうえでカレンダーに予定として追加するために使用します。カレンダーの予定は読み取りません。"
+          }
+        }
+      }
+    },
+    "NSLocationUsageDescription" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Used in the apps you build to record your location and show it on a map, show directions to a destination, and notify you when you arrive near a saved place (arrival is checked on this Mac). Your route is recorded only after you press \"Start recording\", until you stop it (up to 4 hours)."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "生成したアプリで現在地を記録・地図に表示したり、目的地までの道順を表示したり、保存した場所の近くに着いた時に通知したりするために使います(近くに着いたかはこの Mac の中で判定します)。道のりは「記録を開始」を押した時だけ、停止するまで(最長4時間)記録します。"
+          }
+        }
+      }
+    },
+    "NSLocationWhenInUseUsageDescription" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Used in the apps you build to record your location and show it on a map, show directions to a destination, and notify you when you arrive near a saved place (arrival is checked on this Mac). Your route is recorded only after you press \"Start recording\", until you stop it (up to 4 hours)."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "生成したアプリで現在地を記録・地図に表示したり、目的地までの道順を表示したり、保存した場所の近くに着いた時に通知したりするために使います(近くに着いたかはこの Mac の中で判定します)。道のりは「記録を開始」を押した時だけ、停止するまで(最長4時間)記録します。"
+          }
+        }
+      }
+    },
+    "NSMicrophoneUsageDescription" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Used to build apps from what you say, and in the apps you build, to turn your speech into text on this Mac and to record voice memos, meetings, and more."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "話しかけた内容からアプリを生成するため、また生成したアプリで話した内容をこの Mac の中で文字にしたり、ボイスメモや会議などを録音したりするために、マイクを使用します。"
+          }
+        }
+      }
+    },
+    "NSSpeechRecognitionUsageDescription" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Used to turn your speech into text on this Mac while the voice model is getting ready. Your voice never leaves this Mac."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "音声モデルの準備ができるまでの間、話した内容をこの Mac の中で文字にするために、音声認識を使用します。声は Mac の外に送りません。"
+          }
+        }
+      }
+    }
+  },
+  "version" : "1.0"
+}

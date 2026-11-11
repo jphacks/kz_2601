@@ -359,7 +359,28 @@ targets:
           - $(TARGET_BUILD_DIR)/$(UNLOCALIZED_RESOURCES_FOLDER_PATH)/GoogleService-Info.plist
         basedOnDependencyAnalysis: false
     scheme:
+      # Mac の単体テスト(#1212)。`xcodebuild -scheme MetamonMac test`(mac-ci の mac-build-test でも回す)
+      testTargets:
+        - MetamonMacTests
       gatherCoverageData: false
+      # 課金: iOS と同じローカルの StoreKit の構成で Run 時にテスト購入できる(本番では使われない)
+      storeKitConfiguration: StoreKit/TailorItPro.storekit
+
+  # Mac アプリをホストにした単体テスト(#1212)。MacAppRuntime(画面の移動・一言・同期の知らせ)と Mac だけが使う共有の部品
+  MetamonMacTests:
+    type: bundle.unit-test
+    platform: macOS
+    sources:
+      - path: MetamonMacTests
+    dependencies:
+      - target: MetamonMac
+    settings:
+      base:
+        GENERATE_INFOPLIST_FILE: YES
+        PRODUCT_BUNDLE_IDENTIFIER: jp.kz2601.metamon.mactests
+        # アプリの PRODUCT_NAME は Metamon(ターゲット名と違う)ので、ホストの場所を書く
+        TEST_HOST: $(BUILT_PRODUCTS_DIR)/Metamon.app/Contents/MacOS/Metamon
+        BUNDLE_LOADER: $(TEST_HOST)
 
 schemes:
   # Mac の検証版・審査用(#929)。iOS の Metamon-Staging / Metamon-Review と同じ形

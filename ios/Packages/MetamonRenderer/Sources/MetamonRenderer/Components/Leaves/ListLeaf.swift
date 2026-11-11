@@ -1,5 +1,8 @@
 import SwiftUI
 import MetamonDSL
+#if os(macOS)
+import AppKit
+#endif
 
 /// `list`: entity のレコード一覧(filter/sort はクライアント側)。行タップで `onItemTap`、長押しで削除(swipeToDelete)。
 /// 行は `List` ではなく `LazyVStack` なので `.swipeActions` が効かない。縦スクロールとぶつかる自前のスワイプは作らず、
@@ -21,8 +24,12 @@ struct ListLeaf: View {
     /// 押した直後の印の表示(recordId → 楽観的な状態・#255)。確定したら外す
     @State private var markOverrides: [String: MarkState] = [:]
     #if os(macOS)
-    /// ⌘C の対象の行(#1332)。クリックか Tab でフォーカスした行
-    @FocusState private var focusedRowId: String?
+    /// 選んでいる行(#1387)。クリックか ↑↓ で選び、⌘C・⌫ の対象にする(#1332)。⌘・⇧ クリックで複数(#1398)
+    @State private var selection = ListRowMultiSelection()
+    /// 複数の行を消す前の確認(消せる行の id)
+    @State private var bulkDelete: [String]?
+    /// 一覧にキーボードのフォーカスがあるか。Tab は行ごとでなく一覧に 1 回だけ止まる(#1387)
+    @FocusState private var listFocused: Bool
     /// 行の写真の「画像を保存…」(#1333)
     @State private var imageToSave: ImageExport.Pending?
     #endif
@@ -54,12 +61,12 @@ struct ListLeaf: View {
                             mark: mark, markState: mark.map { markOverrides[row.id] ?? row.markState($0.id) },
                             onMark: mark.map { m in { toggleMark(row, mark: m.id, entity: entityId) } },
                             accessory: interestAccessory(row, entity: entityId))
-                        .background(highlightedId == row.id ? RenderTheme.Colors.brandSoft : Color.clear)
+                        .background(rowBackground(row))
                         .contentShape(Rectangle())
-                        .onTapGesture { focusRow(row); open(row) }
+                        .onTapGesture { tapRow(row, order: ids) }
+                        .macHelp(c.onItemTap != nil ? L("クリックで開きます") : nil)
                         #if os(macOS)
-                        .focusable()
-                        .focused($focusedRowId, equals: row.id)
+                        .accessibilityAddTraits(selection.ids.contains(row.id) ? .isSelected : [])
                         #endif
                         // VoiceOver: onTapGesture は読まれないので、行をボタンとして宣言しダブルタップで同じ遷移を実行
                         .accessibilityAddTraits(c.onItemTap != nil ? .isButton : [])
@@ -68,6 +75,19 @@ struct ListLeaf: View {
                         .contextMenu {
                             ComponentTalkMenuItem(component: c, ctx: ctx) // 行のメニューが先に出るので、ここにも置く(#1323)
                             #if os(macOS)
+                            if selection.isMultiple && selection.ids.contains(row.id) {
+                                // 選んだ行をまとめて(#1398)
+                                Button(L("選んだ \(selection.ids.count) 件をコピー"), systemImage: "doc.on.doc") {
+                                    copySelected(rows: rows, entity: entity)
+                                }
+                                if !bulkDeletable(rows: rows, entityId: entityId).isEmpty {
+                                    Button(L("選んだ \(bulkDeletable(rows: rows, entityId: entityId).count) 件を削除"),
+                                           systemImage: "trash", role: .destructive) {
+                                        bulkDelete = bulkDeletable(rows: rows, entityId: entityId)
+                                    }
+                                }
+                                Divider()
+                            }
                             Button(L("コピー"), systemImage: "doc.on.doc") { copy(row, entity: entity) }
                             if let photo = rowImage(row, entity: entity) {
                                 ImageMenuItems(image: photo.image, title: photo.title, copyLabel: L("画像をコピー")) {
@@ -85,15 +105,34 @@ struct ListLeaf: View {
                         .accessibilityActions {
                             #if os(macOS)
                             Button(L("コピー")) { copy(row, entity: entity) }
+                            // 行の写真も右クリックと同じく VoiceOver からコピーできる(#1370)
+                            if let photo = rowImage(row, entity: entity) {
+                                Button(L("画像をコピー")) { PlatformPasteboard.setImage(photo.image) }
+                            }
                             #endif
                             if deletable(row, entity: entityId) { Button(L("削除")) { delete(row, entity: entityId) } }
                         }
-                        .recordDrag { ListRowCopyText.text(item: c.item, record: row, entity: entity, rt: rt) }
+                        .recordDrag { rowDragItem(row, rows: rows, entity: entity) }
                 }
             }
             // 行が少なくてもカードはセルの高さまで伸ばす(#84: 空白の下半分を作らない)。行は上詰め
             .frame(maxHeight: .infinity, alignment: .top)
             #if os(macOS)
+            // 一覧ごとに 1 つのフォーカス(#1387)。青いリングは出さず、選んでいる行を自前の色で見せる。↑↓ で行を移り、Return で開く
+            .focusable()
+            .focusEffectDisabled()
+            .focused($listFocused)
+            .onMoveCommand { moveSelection($0, ids: ids) }
+            .onKeyPress(.return) { openSelected(rows) }
+            .onChange(of: listFocused) { _, focused in
+                if focused && selection.ids.isEmpty { selection.select(ListRowSelection.onFocus(current: selection.cursor, ids: ids)) }
+            }
+            .onChange(of: ids) { _, now in selection.prune(order: now) }
+            .confirmationDialog(L("選んだ \(bulkDelete?.count ?? 0) 件を削除しますか?"),
+                                isPresented: Binding(get: { bulkDelete != nil }, set: { if !$0 { bulkDelete = nil } }),
+                                titleVisibility: .visible) {
+                Button(L("削除"), role: .destructive) { deleteSelected(entityId: entityId) }
+            }
             // ⌘C(#1332): フォーカスのある行を右クリックの「コピー」と同じテキストで
             .onCopyCommand { copyCommand(rows: rows, entity: entity) }
             // ⌫: フォーカスのある行を、確認を挟んでから消す(消せない行では何もしない)
@@ -192,20 +231,81 @@ struct ListLeaf: View {
 
     #if os(macOS)
     private func copyCommand(rows: [Record], entity: Entity?) -> [NSItemProvider] {
-        guard let row = ListRowCopyCommand.target(focusedRowId: focusedRowId,
+        if selection.isMultiple {
+            guard listFocused, !ListRowCopyCommand.textInputActive else { return [] }
+            let csv = ListRowCopyText.csv(records: selectedRecords(rows), entity: entity, rt: rt)
+            return csv.isEmpty ? [] : [NSItemProvider(object: csv as NSString)]
+        }
+        guard let row = ListRowCopyCommand.target(focusedRowId: keyboardRowId,
                                                   textInputActive: ListRowCopyCommand.textInputActive, rows: rows) else { return [] }
         let text = ListRowCopyText.text(item: c.item, record: row, entity: entity, rt: rt)
         return text.isEmpty ? [] : [NSItemProvider(object: text as NSString)]
     }
 
     private func deleteCommand(rows: [Record], entity: Entity?, entityId: String) {
-        guard let row = ListRowDeleteCommand.target(focusedRowId: focusedRowId, textInputActive: ListRowCopyCommand.textInputActive,
+        if selection.isMultiple {
+            guard listFocused, !ListRowCopyCommand.textInputActive else { return }
+            let ids = bulkDeletable(rows: rows, entityId: entityId)
+            if !ids.isEmpty { bulkDelete = ids }
+            return
+        }
+        guard let row = ListRowDeleteCommand.target(focusedRowId: keyboardRowId, textInputActive: ListRowCopyCommand.textInputActive,
                                                     rows: rows, deletable: { deletable($0, entity: entityId) }) else { return }
         let titleField = c.item?.title ?? entity?.displayTitleField ?? ""
         var action = Action(type: .deleteRecord, entity: entityId)
         action.confirmMessage = ListRowDeleteCommand.confirmMessage(title: rt.display(row[titleField], field: entity?.field(titleField)),
                                                                     fallback: entity?.name ?? "")
         Task { await rt.run(action, ctx.actionContext(recordId: row.id)) }
+    }
+
+    /// ⌘C・⌫ の対象: 一覧にフォーカスがある時の選んでいる行
+    private var keyboardRowId: String? { listFocused ? selection.cursor : nil }
+
+    /// 選んでいる行(一覧に見えている順)
+    private func selectedRecords(_ rows: [Record]) -> [Record] { rows.filter { selection.ids.contains($0.id) } }
+
+    /// 選んでいる行のうち消せるもの(他人の共有の記録などは除く)
+    private func bulkDeletable(rows: [Record], entityId: String) -> [String] {
+        selectedRecords(rows).filter { deletable($0, entity: entityId) }.map(\.id)
+    }
+
+    /// 選んだ行をまとめてコピー: 書き出しと同じ列の CSV
+    private func copySelected(rows: [Record], entity: Entity?) {
+        let csv = ListRowCopyText.csv(records: selectedRecords(rows), entity: entity, rt: rt)
+        guard !csv.isEmpty else { return }
+        PlatformPasteboard.setString(csv)
+    }
+
+    /// 確認の後に 1 件ずつ消す。「元に戻す」で戻るのは最後の 1 件(ホストの取り消しは 1 件ずつ)
+    private func deleteSelected(entityId: String) {
+        guard let ids = bulkDelete else { return }
+        bulkDelete = nil
+        selection.select(nil)
+        Task {
+            for id in ids { await rt.run(Action(type: .deleteRecord, entity: entityId), ctx.actionContext(recordId: id)) }
+        }
+    }
+
+    private func moveSelection(_ direction: MoveCommandDirection, ids: [String]) {
+        let move: ListRowSelection.Move
+        switch direction {
+        case .up: move = .up
+        case .down: move = .down
+        default: return
+        }
+        if NSEvent.modifierFlags.contains(.shift) {
+            selection.extend(move, order: ids) // ⇧↑↓ で範囲を広げる(#1398)
+        } else {
+            selection.select(ListRowSelection.moved(from: selection.cursor, move, ids: ids))
+        }
+    }
+
+    /// Return: 選んでいる行を開く(行のクリックと同じ)。入力欄が文字を受けている時は任せる
+    private func openSelected(_ rows: [Record]) -> KeyPress.Result {
+        guard c.onItemTap != nil, !selection.isMultiple, !ListRowCopyCommand.textInputActive,
+              let row = rows.first(where: { $0.id == selection.cursor }) else { return .ignored }
+        open(row)
+        return .handled
     }
 
     /// 行の写真(item.image)。手元にある画像だけ(https・動画のサムネイルは除く)。名前は写真の項目名
@@ -215,11 +315,37 @@ struct ListLeaf: View {
     }
     #endif
 
-    /// クリックした行を ⌘C の対象にする(Mac)。
-    private func focusRow(_ row: Record) {
+    /// 行のクリック。Mac は行を選んで一覧にフォーカスを移す(⌘C・⌫・↑↓ がこの行から効く)。
+    /// ⌘ クリックは選択に足し引き、⇧ クリックは範囲を選ぶだけで、行は開かない(#1398)
+    private func tapRow(_ row: Record, order: [String]) {
         #if os(macOS)
-        focusedRowId = row.id
+        listFocused = true
+        let flags = NSEvent.modifierFlags
+        if flags.contains(.command) { return selection.click(row.id, .toggle, order: order) }
+        if flags.contains(.shift) { return selection.click(row.id, .extend, order: order) }
+        selection.select(row.id)
         #endif
+        open(row)
+    }
+
+    /// 行を外へドラッグする時に渡すもの。選んだ複数の行の 1 つならまとめて CSV、それ以外はその行のテキスト(#1334)
+    private func rowDragItem(_ row: Record, rows: [Record], entity: Entity?) -> NSItemProvider {
+        #if os(macOS)
+        if selection.isMultiple && selection.ids.contains(row.id) {
+            let csv = ListRowCopyText.csv(records: selectedRecords(rows), entity: entity, rt: rt)
+            return ListRowCopyText.csvDragItem(csv, title: entity?.name ?? "")
+        }
+        #endif
+        return ListRowCopyText.dragItem(ListRowCopyText.text(item: c.item, record: row, entity: entity, rt: rt))
+    }
+
+    /// 行の背景: 保存で増えた行の一瞬のハイライト、Mac は選んでいる行(フォーカスが無い時は薄いグレー)
+    private func rowBackground(_ row: Record) -> Color {
+        if highlightedId == row.id { return RenderTheme.Colors.brandSoft }
+        #if os(macOS)
+        if selection.ids.contains(row.id) { return listFocused ? RenderTheme.Colors.brandSoftStroke : Color.primary.opacity(0.06) }
+        #endif
+        return .clear
     }
 
     private func open(_ row: Record) {
@@ -273,12 +399,12 @@ struct ListLeaf: View {
 }
 
 private extension View {
-    /// 行を外(メモ・Finder・メール)へドラッグするとコピーと同じテキストを渡す(Mac のみ・#1334)。
+    /// 行を外(メモ・Finder・メール)へドラッグすると、コピーと同じテキスト(複数を選んでいれば CSV)を渡す(Mac のみ・#1334・#1398)。
     /// Mac のドラッグは少し動かしてから始まるので、行のクリックや中のボタンとはぶつからない。iOS は何もしない。
     @ViewBuilder
-    func recordDrag(_ text: @escaping () -> String) -> some View {
+    func recordDrag(_ item: @escaping () -> NSItemProvider) -> some View {
         #if os(macOS)
-        onDrag { ListRowCopyText.dragItem(text()) }
+        onDrag(item)
         #else
         self
         #endif

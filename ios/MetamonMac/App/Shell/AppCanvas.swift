@@ -13,6 +13,8 @@ struct AppCanvas: View {
     let app: SampleApp
     /// 会話で作った・直したアプリの DSL(#967)。nil なら同梱の例を読む
     var dsl: AppDSL?
+    /// 作ったアプリ(#969)。記録を端末に残す(#1284)。同梱の例は今まで通り一時フォルダ
+    var keepsRecords = false
     /// 画面マップのシート(#970)。ツールバー・表示メニューが立てる
     var showsScreenMap: Binding<Bool> = .constant(false)
     /// 画面マップの「この画面について話す」・部品の「この部品について話す」(#1323)。マップ・モーダルを閉じ終えてから呼ぶ(シートを 2 枚同時に出さない)
@@ -38,7 +40,8 @@ struct AppCanvas: View {
                 return
             }
             do {
-                let created = MacAppRuntime(appId: app.id, dsl: try dsl ?? app.loadDSL(), dictation: voice?.dictation)
+                let sync = keepsRecords ? MacRecordVault.recordSync(appId: app.id) : nil
+                let created = MacAppRuntime(appId: app.id, dsl: try dsl ?? app.loadDSL(), recordSync: sync, dictation: voice?.dictation)
                 runtime = created
                 discardGuard?.runtime = created
             } catch {
@@ -55,6 +58,14 @@ private struct AppCanvasContent: View {
     /// マップの「この画面について話す」・モーダルの中の部品の「この部品について話す」を押した文脈。マップ・モーダルが閉じ終わったら会話を開く
     @State private var pendingTalk: ScreenContext?
 
+    /// 画面マップで選べる記録(#1322)。表示用の記録(隠した値は落とす)で、見出しは参照の見出しと同じ
+    private func recordChoices(_ entity: String) -> [ScreenMapRecordChoice] {
+        runtime.viewRecords(for: entity).enumerated().map { index, record in
+            let title = runtime.refTitle(record.id, entity: entity).flatMap { $0.isEmpty || $0 == record.id ? nil : $0 }
+            return ScreenMapRecordChoice(id: record.id, title: title ?? L10n.tr("記録 \(index + 1)"))
+        }
+    }
+
     var body: some View {
         DSLNavigationRoot()
             .background {
@@ -69,7 +80,12 @@ private struct AppCanvasContent: View {
                                          pendingTalk = screen
                                          showsScreenMap = false
                                      },
-                                     onClose: { showsScreenMap = false })
+                                     onClose: { showsScreenMap = false },
+                                     records: recordChoices,
+                                     onOpenRecord: { screen, recordId in
+                                         runtime.reveal(screen: screen, recordId: recordId)
+                                         showsScreenMap = false
+                                     })
                 }
             }
             // Mac の fullScreenCover は無いので sheet で出す(大きめの最小サイズ)

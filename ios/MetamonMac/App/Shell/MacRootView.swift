@@ -1,6 +1,8 @@
 import SwiftUI
+import AppKit
 import MetamonDSL
 import MetamonRenderer
+import MetamonServices
 
 /// Mac の画面の骨格(#933): 左にアプリの一覧・中央に選んだアプリ・上にツールバー。
 /// iOS で sheet だった本体の画面の出し方:
@@ -9,13 +11,15 @@ import MetamonRenderer
 ///   文字で頼む(⌘K)・新しいアプリ(⌘N)は会話のシート(#967・ComposeSheet)。作ったアプリは一覧の先頭に足し、直したアプリは差し替える
 ///   声で頼む(⇧⌘M・#966)は同じシートを開いてすぐ録音する。文字にした文をそのまま送る
 /// - 設定 → Mac の設定ウインドウ(⌘,)
-/// - 完成の後のお知らせ(要約・「元に戻す」)→ 中央の列の上に 1 つずつ(#968・順番は iOS と同じ `PostBuildNotice`)
+/// - 完成の後のお知らせ(要約・「元に戻す」・最初のアプリの後の直し方の例 #1278)→ 中央の列の上に 1 つずつ(#968・順番は iOS と同じ `PostBuildNotice`)
 /// - 生成したアプリの版の「元に戻す / やり直す」(#968)→「アプリ」メニュー(⌥⌘Z / ⇧⌥⌘Z)・完成の画面・要約のお知らせ。
 ///   ⌘Z / ⇧⌘Z は入力欄と記録の削除の取り消し(編集メニュー)のまま
 /// キーボード(#934): ⌘1 / ⌘2 でサイドバーと中央を行き来・一覧は ↑↓ で選び Return で中央へ・⌥⌘↑↓ で前 / 次のアプリ。
 /// 画面マップ(#970): ツールバー・表示メニュー(⇧⌘E)からシートで出す。開く → 中央でその画面へ、話す → その画面を文脈にした会話(⌘K と同じシート)。
 /// 一覧(#969): 「作ったアプリ」(端末に残す・名前の変更 / 削除 / 並べ替え)と「同梱の例」に分ける。起動時は前に開いていたアプリを開き直す。
 /// 会話で直した同梱の例も端末に残し、右クリックで元の例に戻せる(#1283)。
+/// 行の写し(#1281): 中央に出したアプリを、出てから少し後(お知らせが閉じてから)に撮ってサイドバーの行に出す。
+/// 検索(#1282): サイドバーの上の検索欄(⌘F で入る)。名前と説明で両方の区分を絞り込む。
 struct MacRootView: View {
     enum Pane: Hashable { case sidebar, canvas }
 
@@ -33,6 +37,12 @@ struct MacRootView: View {
     /// 閉じた会話のシート(閉じた後に完成の要約を出すため・#968)
     @State private var closingCompose: MacComposeSession?
     @State private var showsTips = false
+    /// サイドバーの行の写し(#1281)
+    @State private var thumbs = MacAppThumbnailStore.shared
+    @State private var thumbAnchor = MacThumbnailAnchor()
+    /// サイドバーの検索(#1282)
+    @State private var searchText = ""
+    @FocusState private var searchFocused: Bool
     /// 画面マップ(#970・シートは中央の AppCanvas が出す)
     @State private var showsScreenMap = false
     /// 保存していない入力を、アプリの切り替え・ウインドウを閉じる前に確認する(#943)
@@ -67,17 +77,26 @@ struct MacRootView: View {
 
     var body: some View {
         NavigationSplitView(columnVisibility: $columnVisibility) {
-            AppSidebar(created: createdApps, examples: exampleApps, selection: guardedSelection,
+            AppSidebar(created: createdApps.filter { $0.matches(searchText) },
+                       examples: exampleApps.filter { $0.matches(searchText) },
+                       thumbnail: thumbnail(for:), searchText: searchText, selection: guardedSelection,
                        onOpen: { focus = .canvas }, onDelete: deleteApp, onResetExample: resetExample)
                 .focused($focus, equals: .sidebar)
                 .navigationSplitViewColumnWidth(min: 180, ideal: 220, max: 320)
         } detail: {
             Group {
                 if let app = selectedApp {
-                    AppCanvas(app: app, dsl: library.generated[app.id]?.dsl, showsScreenMap: $showsScreenMap,
+                    AppCanvas(app: app, dsl: library.generated[app.id]?.dsl, keepsRecords: library.isCreated(app.id), showsScreenMap: $showsScreenMap,
                               onTalk: { talk(about: $0) }, discardGuard: discardGuard)
                         .environment(\.changeHighlight, highlight?.canvas == Self.canvasKey(app) ? highlight?.value ?? .none : .none)
                         .id(Self.canvasKey(app))
+                        .background { MacThumbnailAnchorView(anchor: thumbAnchor) }
+                        .task(id: Self.canvasKey(app)) {
+                            // 描き終わった頃に撮る(iOS は版が変わった 1.2 秒後)
+                            try? await Task.sleep(for: .seconds(1.2))
+                            guard !Task.isCancelled else { return }
+                            captureThumbnail()
+                        }
                 } else {
                     MacEmptyState(pose: .point, title: "アプリを選んでください",
                                   message: "左の一覧から選ぶと、ここに表示します。")
@@ -90,6 +109,8 @@ struct MacRootView: View {
             .focusEffectDisabled()
             .focused($focus, equals: .canvas)
         }
+        .searchable(text: $searchText, placement: .sidebar, prompt: Text("アプリを探す"))
+        .modifier(SidebarSearchFocus(focused: $searchFocused))
         .toolbar {
             ShellToolbar(hasApp: selectedApp != nil, canCompose: canCompose, newApp: newApp, ask: ask, speak: speak,
                          canShowScreenMap: canShowScreenMap, showScreenMap: showScreenMap)
@@ -102,13 +123,25 @@ struct MacRootView: View {
             ComposeSheet(session: session, onClose: { compose = nil }, undo: finishedUndo(session))
                 .interactiveDismissDisabled(session.isBusy)
                 .environment(voice)
+                .environment(\.macAppReplace, appReplaceContext) // 持てるアプリの数の上限の置き換え(#630)
         }
+        #if !APP_STORE_REVIEW
+        .modifier(MacPaywallPresenter()) // 中央のアプリの部品が Pro を求めた時の課金画面(iOS と同じ商品)
+        #endif
         .task { voice.prepareIfAllowed() } // モデルが端末にあれば読み込む(無ければ起動では聞かない)
         .onAppear {
             reopenLastApp()
             // self ごと捕まえると見張り(State)との循環で残るので、シートの Binding だけ渡す
             let map = $showsScreenMap, tips = $showsTips
             discardGuard.beforeAsking = { map.wrappedValue = false; tips.wrappedValue = false }
+        }
+        .onChange(of: notices.summary == nil) { _, closed in
+            guard closed else { return }
+            // お知らせが写り込んだ時は、閉じて消え終わってから撮り直す
+            Task { @MainActor in
+                try? await Task.sleep(for: .seconds(0.4))
+                captureThumbnail()
+            }
         }
         .onChange(of: selectedAppId) { _, id in
             if let id { library.lastAppId = id }
@@ -131,12 +164,22 @@ struct MacRootView: View {
         selectedAppId = LocalAppLibrary.reopen(library.lastAppId, among: ids)
     }
 
+    /// 置き換えシートに並べるアプリ(この Mac で作ったアプリ)と消し方(#630)。版が 1 の空のアプリとして数えないよう 2 以上にする
+    private var appReplaceContext: MacAppReplaceContext {
+        let summaries = library.createdIds.compactMap { id in
+            library.generated[id].map { AppSummary(id: id, name: $0.dsl.app.name, currentVersion: max($0.version, 2)) }
+        }
+        return MacAppReplaceContext(apps: summaries, current: selectedAppId, delete: deleteApp)
+    }
+
     /// 作ったアプリを消す(確認はサイドバーで済んでいる)。開いていたら一覧で隣のアプリへ移る
     private func deleteApp(_ id: String) {
         let name = library.generated[id]?.dsl.app.name ?? ""
         if selectedAppId == id { selectedAppId = LocalAppLibrary.neighbor(deleting: id, in: apps.map(\.id)) }
         if notices.summary?.appId == id { notices.summary = nil }
         library.delete(id)
+        MacRecordVault.purge(appId: id) // 記録も消す(#1284)
+        thumbs.remove(appId: id)
         Task { await MacRuntimeNotifications.removeApp(id) } // そのアプリの通知とタイマーの予約(#1324)
         MacVoiceOver.announce(L10n.tr("「\(name)」を削除しました"))
     }
@@ -147,8 +190,23 @@ struct MacRootView: View {
         discardGuard.run {
             if notices.summary?.appId == id { notices.summary = nil }
             library.resetExample(id)
+            thumbs.remove(appId: id) // 写しも撮り直す
             MacVoiceOver.announce(L10n.tr("「\(name)」を元の例に戻しました"))
         }
+    }
+
+    // MARK: - 行の写し(#1281)
+
+    private func thumbnail(for appId: String) -> NSImage? {
+        _ = thumbs.revision // 撮り直しで描き直す
+        return thumbs.image(for: appId)
+    }
+
+    /// 中央のアプリを撮る。お知らせ・会話のシートが出ている間は撮らない(閉じた後に撮り直す)
+    private func captureThumbnail() {
+        guard let app = selectedApp, notices.summary == nil, compose == nil else { return }
+        let voiceOnly = library.generated[app.id]?.dsl.isVoiceOnly ?? false
+        thumbs.capture(appId: app.id, isVoiceOnly: voiceOnly, anchor: thumbAnchor)
     }
 
     // MARK: - 作る・直す(#967)
@@ -192,8 +250,13 @@ struct MacRootView: View {
             : library.generated[document.appId]?.dsl ?? (try? apps.first(where: { $0.id == document.appId })?.loadDSL())
         library.apply(document, envelope: envelope, created: target == .create)
         showChangeHighlight(previous: previous, next: document)
-        // 最初のアプリの印(iOS と同じ `hasShownEditHint`)。β の案内(`MacOnboarding`)は次の起動でこれを見て 1 回出す
-        if target == .create { FirstRunTutorialStore.shared.markEditHintShown() }
+        // 最初のアプリの印(iOS と同じ `hasShownEditHint`)。β の案内(`MacOnboarding`)は次の起動でこれを見て 1 回出す。
+        // 最初の 1 回だけ「こう頼むと直せます」を予約する(要約が閉じてから出る・#1278)
+        if target == .create {
+            let tutorial = FirstRunTutorialStore.shared
+            if tutorial.shouldShowEditHint(createdFromInitial: true), !document.dsl.isVoiceOnly { notices.showsEditHint = true }
+            tutorial.markEditHintShown()
+        }
         selectedAppId = document.appId
     }
 
@@ -293,11 +356,19 @@ struct MacRootView: View {
                         guard !Task.isCancelled, notices.summary == summary else { return }
                         withAnimation { notices.dismissActive() }
                     }
+            } else if compose == nil, notices.active == .editHint {
+                MacEditHintBar(ask: {
+                                   withAnimation { notices.dismissActive() }
+                                   ask()
+                               },
+                               dismiss: { withAnimation { notices.dismissActive() } })
+                    .task { MacVoiceOver.announce(L10n.tr("こう頼むと直せます")) }
             }
         }
         .padding(.top, 12)
         .padding(.horizontal, 16)
         .animation(reduceMotion ? nil : .easeInOut(duration: 0.2), value: notices.summary)
+        .animation(reduceMotion ? nil : .easeInOut(duration: 0.2), value: notices.showsEditHint)
     }
 
     /// サイドバーの選択。中央のアプリに保存していない入力があれば、確認して「破棄」の時だけ切り替える(#943)
@@ -342,6 +413,7 @@ struct MacRootView: View {
                 focus = .sidebar
             },
             focusCanvas: { focus = .canvas },
+            focusSearch: focusSearch,
             canCompose: canCompose,
             canUndoVersion: canCompose && selectedAppId.map(library.canUndo) == true,
             canRedoVersion: canCompose && selectedAppId.map(library.canRedo) == true,
@@ -354,6 +426,29 @@ struct MacRootView: View {
             canShowScreenMap: canShowScreenMap,
             showScreenMap: showScreenMap
         )
+    }
+
+    /// ⌘F: サイドバーを出して検索欄に入る(#1282)
+    private func focusSearch() {
+        if columnVisibility == .detailOnly { columnVisibility = .all }
+        if #available(macOS 15.0, *) {
+            searchFocused = true
+        } else {
+            // macOS 14 は検索欄のフォーカスを SwiftUI から動かせないので、ウインドウの検索欄を直接選ぶ
+            DispatchQueue.main.async {
+                guard let window = NSApp.keyWindow, let field = Self.searchField(in: window.contentView) else { return }
+                window.makeFirstResponder(field)
+            }
+        }
+    }
+
+    private static func searchField(in view: NSView?) -> NSSearchField? {
+        guard let view else { return nil }
+        if let field = view as? NSSearchField { return field }
+        for child in view.subviews {
+            if let field = searchField(in: child) { return field }
+        }
+        return nil
     }
 
     /// 前 / 次のアプリ。何も選んでいなければ先頭を選ぶ。
@@ -395,6 +490,19 @@ struct ShellToolbar: ToolbarContent {
                 .disabled(true)
             SettingsLink { Label("設定", systemImage: "gearshape") }
                 .help("設定を開く")
+        }
+    }
+}
+
+/// 検索欄のフォーカス(macOS 15 から)。⌘F で入るのに使う(#1282)
+private struct SidebarSearchFocus: ViewModifier {
+    var focused: FocusState<Bool>.Binding
+
+    func body(content: Content) -> some View {
+        if #available(macOS 15.0, *) {
+            content.searchFocused(focused)
+        } else {
+            content
         }
     }
 }
