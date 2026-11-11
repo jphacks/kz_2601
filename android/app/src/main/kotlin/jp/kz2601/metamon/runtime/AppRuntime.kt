@@ -18,12 +18,14 @@ import jp.kz2601.metamon.dsl.records.MatchBox
 import jp.kz2601.metamon.dsl.records.MatchInterest
 import jp.kz2601.metamon.dsl.records.Record
 import jp.kz2601.metamon.dsl.records.RecordPermission
+import jp.kz2601.metamon.nearby.NearbyShareController
 import jp.kz2601.metamon.renderer.ActionContext
 import jp.kz2601.metamon.renderer.DSLRuntime
 import jp.kz2601.metamon.renderer.FormMember
 import jp.kz2601.metamon.renderer.components.audio.DictationHost
 import jp.kz2601.metamon.dsl.logic.ExternalUrlPolicy
 import jp.kz2601.metamon.renderer.NavigationHost
+import jp.kz2601.metamon.renderer.components.nearby.NearbyHost
 import jp.kz2601.metamon.renderer.components.play.RecordWriter
 import jp.kz2601.metamon.renderer.components.play.TimerHost
 import jp.kz2601.metamon.renderer.components.ai.AiChatPairSaving
@@ -143,7 +145,7 @@ class AppRuntime(
     /** 共有アプリの参加者と自分が管理者か(#903)。null なら読まない(モック・テスト) */
     val members: AppMembersStore? = null,
 ) : DSLRuntime, NavigationHost, RecordWriter, TimerHost, AiChatPairSaving, AuthorNameHost,
-    ModerationHost, MatchingHost, SocialPromptHost, BlockedUsersHost, FollowsHost {
+    ModerationHost, MatchingHost, SocialPromptHost, BlockedUsersHost, FollowsHost, NearbyHost {
     private val _state = MutableStateFlow(RuntimeState(document))
     val state: StateFlow<RuntimeState> = _state.asStateFlow()
 
@@ -768,6 +770,15 @@ class AppRuntime(
         val (list, id) = write(entity, null, data)
         setRecords(document.appId, entity, list)
         return id
+    }
+
+    // 近くの人に送る(#1382)
+
+    /** 近距離共有の窓口(AppContainer が作る時に入れる)。null なら送るボタンを押しても何もしない(モック・テスト)。 */
+    var nearby: NearbyShareController? = null
+
+    override fun shareNearby(entity: String, records: List<Map<String, JSONValue>>) {
+        nearby?.share(entity, records)
     }
 
     // AI ボタン(#873)

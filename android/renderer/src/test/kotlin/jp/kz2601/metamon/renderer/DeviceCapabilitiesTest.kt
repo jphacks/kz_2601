@@ -15,7 +15,8 @@ class DeviceCapabilitiesTest {
 
     @Test
     fun allowedComponentsAreExactlyTheRegisteredTypes() {
-        assertEquals(ComponentRegistry.standard.registeredTypes, caps.allowedComponents.toSet())
+        val pending = DeviceCapabilities.PENDING.map { it.wire }.toSet()
+        assertEquals(ComponentRegistry.standard.registeredTypes - pending, caps.allowedComponents.toSet())
         assertEquals(caps.allowedComponents.size, caps.allowedComponents.toSet().size)
         assertFalse(ComponentType.UNKNOWN.wire in caps.allowedComponents)
     }
@@ -30,6 +31,7 @@ class DeviceCapabilitiesTest {
             ComponentType.PLACE_SEARCH,
             ComponentType.LOCATION_TRACKER,
             ComponentType.HEALTH_STAT,
+            // 描けるが、すれ違い(#1383)がそろうまで申告しない
             ComponentType.NEARBY_SHARE,
         )) {
             assertFalse(t.wire, t.wire in caps.allowedComponents)

@@ -6,6 +6,10 @@ import jp.kz2601.metamon.dsl.AppDSL
 import jp.kz2601.metamon.dsl.AppDocument
 import jp.kz2601.metamon.consent.record
 import jp.kz2601.metamon.discover.DiscoverServices
+import jp.kz2601.metamon.nearby.NearbyEnv
+import jp.kz2601.metamon.nearby.NearbyService
+import jp.kz2601.metamon.nearby.NearbySettings
+import jp.kz2601.metamon.nearby.NearbyShareController
 import jp.kz2601.metamon.discover.PublishEnv
 import jp.kz2601.metamon.runtime.AiTextAccess
 import jp.kz2601.metamon.runtime.AndroidRuntimeHost
@@ -203,6 +207,8 @@ class AppContainer(
     val members: MembersClient? = null,
     /** そのアプリの通知を消す(共有から抜けた後・#903) */
     private val removeAppNotifications: (String) -> Unit = {},
+    /** 近くの人に送る(#1382)の通り道と端末の設定。null なら送るボタンを押しても何もしない(テスト) */
+    private val nearbyEnv: NearbyEnv? = null,
 ) {
     /** 共有シートの「みんなに公開」に渡すもの(#902)。「探す」が無い構成は null */
     val publishEnv: PublishEnv? by lazy { discover?.let { PublishEnv(it.client, authorProfile) } }
@@ -341,6 +347,7 @@ class AppContainer(
                 removeLocalMedia = removeLocalMedia(context),
                 clearImageCache = { RemoteImages.wipe(context) },
                 talkBackRunning = { TalkBack.isRunning(context) },
+                nearbyEnv = NearbyEnv.of(context, mock = true),
             )
         }
 
@@ -423,6 +430,7 @@ class AppContainer(
                 discover = DiscoverServices(HttpDiscoverClient(appConfigHttp), moderation),
                 members = HttpMembersClient(appConfigHttp),
                 removeAppNotifications = { LocalNotifications.get(context).removeApp(it) },
+                nearbyEnv = NearbyEnv.of(context, mock = false),
             )
         }
 
@@ -574,6 +582,15 @@ class AppContainer(
             undoGraceMillis = { TalkBack.recordUndoMillis(talkBackRunning()) },
             members = membersStore,
         ).also { it.dictation = TranscriberDictationHost(transcriber, CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)) }
+    }
+
+    /** 近くの人に送る(#1382)。作った時にランタイムの送るボタンとつなぐ。 */
+    val nearby: NearbyShareController? by lazy {
+        nearbyEnv?.let { env ->
+            val service = NearbyService(env.transport(), CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate), env.deviceName())
+            service.text = env.text
+            NearbyShareController(runtime, service, NearbySettings(env.settings)) { authorProfile.name ?: env.deviceName() }
+        }
     }
 
     /**
