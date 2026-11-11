@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="language_close">Close</string>
+    <string name="language_footer">New apps and questions will also use this language. Text in apps you already made stays the same.</string>
+    <string name="language_system">Automatic</string>
+    <string name="language_title">Language</string>
+</resources>

@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 共有アプリの「参加している人」(一覧・管理者・外す・抜ける・#903)。文言は iOS の SharedMembersSection から -->
+<resources>
+    <string name="members_admin">管理者</string>
+    <string name="members_admin_failed">管理者を変更できませんでした。元に戻しました</string>
+    <string name="members_cancel">キャンセル</string>
+    <plurals name="members_count">
+        <item quantity="other">%1$d 人</item>
+    </plurals>
+    <string name="members_creator">作成者</string>
+    <string name="members_footer">この共有の記録を見られるのは、ここにいる人だけです</string>
+    <string name="members_full">参加している人が上限(100 人)に達しています。これ以上は参加できません</string>
+    <string name="members_keep_link">そのままにする</string>
+    <string name="members_leave">この共有から抜ける</string>
+    <string name="members_leave_confirm">抜ける</string>
+    <string name="members_leave_failed">抜けられませんでした。元に戻しました</string>
+    <string name="members_leave_message">抜けると、参加している人の記録は見られなくなります。もう一度参加するには招待リンクが要ります。</string>
+    <string name="members_leave_title">この共有から抜けますか?</string>
+    <string name="members_left">この共有から抜けました。もう一度参加するには、参加している人に招待リンクをもらってください</string>
+    <string name="members_left_toast">「%1$s」から抜けました</string>
+    <string name="members_load_failed">参加している人を読み込めませんでした</string>
+    <string name="members_loading">読み込み中</string>
+    <string name="members_make_admin">管理者にする</string>
+    <string name="members_make_admin_label">「%1$s」を管理者にする</string>
+    <string name="members_no_name">名前なし</string>
+    <string name="members_offline">通信できなかったので、元に戻しました。通信できる所でもう一度お試しください</string>
+    <string name="members_remove">外す</string>
+    <string name="members_remove_admin">管理者から外す</string>
+    <string name="members_remove_admin_label">「%1$s」を管理者から外す</string>
+    <string name="members_remove_failed">外せませんでした。元に戻しました</string>
+    <string name="members_remove_label">「%1$s」を外す</string>
+    <string name="members_remove_message">外した人は、この共有の記録を見られなくなります。その人の端末のアプリと、これまでの記録は残ります。</string>
+    <string name="members_remove_title">「%1$s」を外しますか?</string>
+    <string name="members_removed_notice">「%1$s」を外しました。あなたのシェアリンクはまだ使えるので、そのリンクからまた参加できます。リンクも止めますか?</string>
+    <string name="members_settings_footer">この共有に参加している人の一覧。管理者を決めたり、共有から抜けたりできます</string>
+    <string name="members_title">参加している人</string>
+    <string name="members_you">あなた</string>
+</resources>

@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 音楽の部品(musicPlayer の代わり・#879)の文言。英語は values-en。 -->
+<resources>
+    <string name="music_title_default">音楽</string>
+    <string name="music_unavailable">この端末では Apple Music を再生できません。曲名から音楽アプリの検索を開けます。</string>
+    <string name="music_song_title">曲名</string>
+    <string name="music_artist">アーティスト(任意)</string>
+    <string name="music_search">音楽アプリで探す</string>
+    <string name="music_search_note">Spotify の検索を開きます(アプリが無ければブラウザ)。再生の操作はできません。</string>
+    <string name="music_recent">探した曲</string>
+    <string name="music_open">開く</string>
+</resources>

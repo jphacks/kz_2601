@@ -37,12 +37,12 @@ struct PhotoView: View {
 
     var body: some View {
         let decoded = PhotoCodec.image(from: value)
-        let hasPhoto = decoded != nil || (value.stringValue?.hasPrefix("http") ?? false)
+        let hasPhoto = decoded != nil || ImageHostPolicy.loadableURL(value.stringValue) != nil
         Group {
             if let img = decoded {
                 Image(platformImage: img).resizable().scaledToFill()
-            } else if let s = value.stringValue, s.hasPrefix("http"), let url = URL(string: s) {
-                AsyncImage(url: url) { $0.resizable().scaledToFill() } placeholder: { Rectangle().fill(.quaternary) }
+            } else if let url = ImageHostPolicy.loadableURL(value.stringValue) {
+                RemoteImage(url: url) { Rectangle().fill(.quaternary) }
             } else {
                 Rectangle().fill(.quaternary).overlay(Image(systemName: "photo").foregroundStyle(.secondary))
             }
