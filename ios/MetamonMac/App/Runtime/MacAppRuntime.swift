@@ -261,8 +261,18 @@ final class MacAppRuntime: RuntimeNavigating {
         case .scheduleNotification, .cancelNotification:
             await notifications.perform(action)
 
+        case .export:
+            await export(action, ctx) // CSV / PDF を保存パネルで保存(`MacAppRuntime+Export.swift`・#1143)
+
+        case .startActivity:
+            // ライブアクティビティ(#423)は iPhone のロック画面のもの。Mac には無いので一言だけ
+            toast = L10n.tr("ライブアクティビティは iPhone だけで表示されます")
+
+        case .endActivity:
+            break // 出していないので止めるものも無い
+
         default:
-            // 共有・書き出しなどは Mac ではまだ動かない(後の Issue)
+            // フォローなどは Mac ではまだ動かない(後の Issue)
             toast = L10n.tr("このボタンは Mac ではまだ使えません")
         }
     }
