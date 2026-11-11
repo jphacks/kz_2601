@@ -49,6 +49,15 @@ extension Color {
 
 @MainActor
 enum PlatformSystem {
+    /// 「この端末にはありません」の印(#1340)。iOS は iPhone、Mac はコンピュータの形
+    static var notOnDeviceSymbol: String {
+        #if canImport(UIKit)
+        "iphone.slash"
+        #else
+        "desktopcomputer.trianglebadge.exclamationmark"
+        #endif
+    }
+
     /// OS の設定(このアプリの権限の画面)を開く URL。Mac はシステム設定の「プライバシーとセキュリティ」。
     static var appSettingsURL: URL? {
         #if canImport(UIKit)

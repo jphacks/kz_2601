@@ -130,7 +130,7 @@ struct AudioRecorderPanel: View {
                 AudioPlayButton(value: .string(v.encoded))
                 Spacer()
                 if !LocalAudioStore.shared.exists(v.id) {
-                    Label(L("この端末にはありません"), systemImage: "iphone.slash")
+                    Label(L("この端末にはありません"), systemImage: PlatformSystem.notOnDeviceSymbol)
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }
