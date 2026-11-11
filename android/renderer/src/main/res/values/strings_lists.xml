@@ -24,6 +24,10 @@
     <string name="lists_list_last">、</string>
     <string name="lists_list_pair">、</string>
     <string name="lists_list_separator">、</string>
+    <string name="lists_mark_add">%1$sを付ける</string>
+    <string name="lists_mark_count">%1$s %2$d 件</string>
+    <string name="lists_mark_count_mine">%1$s %2$d 件・付けています</string>
+    <string name="lists_mark_remove">%1$sを外す</string>
     <string name="lists_max">%1$sの最大</string>
     <string name="lists_member">参加者</string>
     <string name="lists_min">%1$sの最小</string>
@@ -35,11 +39,13 @@
     <string name="lists_open">開く</string>
     <string name="lists_previous_month">前の月</string>
     <string name="lists_progress">進捗</string>
+    <string name="lists_public_notice">このデータは誰でも見られます(公開)</string>
     <plurals name="lists_records_count">
         <item quantity="other">記録%1$d件</item>
     </plurals>
     <string name="lists_search">検索</string>
     <string name="lists_sentence_separator">。</string>
+    <string name="lists_shared_notice">このデータは参加者だけが見られます(共有)</string>
     <string name="lists_sum">%1$sの合計</string>
     <string name="lists_today">%1$s、今日</string>
     <string name="lists_unavailable">取得できませんでした</string>

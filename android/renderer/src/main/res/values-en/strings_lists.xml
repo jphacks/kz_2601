@@ -25,6 +25,10 @@
     <string name="lists_list_last">", and "</string>
     <string name="lists_list_pair">" and "</string>
     <string name="lists_list_separator">", "</string>
+    <string name="lists_mark_add">Add %1$s</string>
+    <string name="lists_mark_count">%1$s %2$d</string>
+    <string name="lists_mark_count_mine">%1$s %2$d, added by you</string>
+    <string name="lists_mark_remove">Remove %1$s</string>
     <string name="lists_max">Max %1$s</string>
     <string name="lists_member">Member</string>
     <string name="lists_min">Min %1$s</string>
@@ -36,12 +40,14 @@
     <string name="lists_open">Open</string>
     <string name="lists_previous_month">Previous month</string>
     <string name="lists_progress">Progress</string>
+    <string name="lists_public_notice">Anyone can see this data (public)</string>
     <plurals name="lists_records_count">
         <item quantity="one">%1$d record</item>
         <item quantity="other">%1$d records</item>
     </plurals>
     <string name="lists_search">Search</string>
     <string name="lists_sentence_separator">". "</string>
+    <string name="lists_shared_notice">Only participants can see this data (shared)</string>
     <string name="lists_sum">Total %1$s</string>
     <string name="lists_today">%1$s, today</string>
     <string name="lists_unavailable">Unavailable</string>

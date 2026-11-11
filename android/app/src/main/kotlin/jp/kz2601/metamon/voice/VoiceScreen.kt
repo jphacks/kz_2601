@@ -1,5 +1,7 @@
 package jp.kz2601.metamon.voice
 
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
@@ -58,6 +60,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
@@ -67,7 +70,9 @@ import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
@@ -183,6 +188,7 @@ fun VoiceScreen(
         if (state.restartConfirm) RestartConfirmDialog(vm)
         if (state.showsChat) {
             ClarifyChat(state, vm, Modifier.weight(1f))
+            PendingVoiceCard(state, vm)
             ErrorCardSlot(state, vm, onOpenSettings)
         } else {
             Column(
@@ -211,7 +217,8 @@ fun VoiceScreen(
                         textAlign = TextAlign.Center,
                     )
                 }
-                TranscriptCard(state)
+                if (state.pendingVoice == null) TranscriptCard(state)
+                PendingVoiceCard(state, vm)
                 ErrorCardSlot(state, vm, onOpenSettings)
             }
             if (state.phase.canStart && state.error == null) Examples(state, onPick = send, onTips = { showTips = true })
@@ -299,9 +306,15 @@ fun MicButton(
             else -> R.string.voice_mic_a11y_idle
         },
     )
+    // 録音中の声の大きさ(#1014): ボタンの外側に輪を広げる。読み上げは「録音中」の説明のまま(値の変化で読み上げを連打しない)
+    val level by animateFloatAsState(if (listening) state.inputLevel else 0f, tween(80), label = "micLevel")
+    val ringColor = colors.error.copy(alpha = 0.25f)
     Box(
         modifier
             .size(size)
+            .drawBehind {
+                if (level > 0f) drawCircle(ringColor, radius = this.size.minDimension / 2 * (1f + MIC_RING_MAX * level))
+            }
             .clip(CircleShape)
             .background(background)
             .combinedClickable(
@@ -344,6 +357,37 @@ internal fun MicGlyph(color: Color, stop: Boolean, modifier: Modifier = Modifier
         )
         drawLine(color, Offset(w / 2, h * 0.78f), Offset(w / 2, h * 0.95f), strokeWidth = stroke)
         drawLine(color, Offset(w * 0.32f, h * 0.96f), Offset(w * 0.68f, h * 0.96f), strokeWidth = stroke)
+    }
+}
+
+/** 輪がボタンの半径の何割まで広がるか */
+private const val MIC_RING_MAX = 0.35f
+
+/**
+ * 認識器が無音で自分から止まった時の確認(#1014)。途中で切れた依頼をそのまま送らない。
+ * 「送る」「続けて話す」(聞き取った分につなぐ)「言い直す」「送らない」。
+ */
+@Composable
+private fun PendingVoiceCard(state: VoiceUiState, vm: VoiceViewModel) {
+    val text = state.pendingVoice ?: return
+    OutlinedCard(Modifier.fillMaxWidth()) {
+        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            Text(
+                stringResource(R.string.voice_pending_title),
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.semantics { liveRegion = LiveRegionMode.Polite },
+            )
+            Text("「$text」", style = MaterialTheme.typography.bodyLarge)
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+                Button(onClick = vm::confirmPendingVoice) { Text(stringResource(R.string.voice_send)) }
+                OutlinedButton(onClick = vm::continuePendingVoice) { Text(stringResource(R.string.voice_pending_continue)) }
+            }
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                TextButton(onClick = vm::retakePendingVoice) { Text(stringResource(R.string.voice_pending_retake)) }
+                TextButton(onClick = vm::dismissPendingVoice) { Text(stringResource(R.string.voice_pending_cancel)) }
+            }
+        }
     }
 }
 

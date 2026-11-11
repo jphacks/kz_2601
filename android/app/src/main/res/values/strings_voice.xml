@@ -99,6 +99,10 @@
     <string name="voice_option_selected">選択中</string>
     <string name="voice_option_unselected">未選択</string>
     <string name="voice_other_body">少し待ってから、もう一度お試しください</string>
+    <string name="voice_pending_cancel">送らない</string>
+    <string name="voice_pending_continue">続けて話す</string>
+    <string name="voice_pending_retake">言い直す</string>
+    <string name="voice_pending_title">声が途切れたので止めました。この内容で送りますか?</string>
     <string name="voice_placeholder_text">または文字で入力</string>
     <string name="voice_placeholder_text_first">文字で入力(今すぐ作れます)</string>
     <string name="voice_plan_limit_body">このアプリで使える量が上限に達しました。使わないものを消すと、続けて使えます</string>

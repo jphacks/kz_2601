@@ -39,6 +39,9 @@ interface SpeechTranscriber {
      */
     val listening: StateFlow<Boolean> get() = NeverListening
 
+    /** 録音中の声の大きさ 0..1(#1014・`VoiceLevel`)。止まっている間は 0。既定は常に 0(輪を動かさない) */
+    val level: StateFlow<Float> get() = NoLevel
+
     val isReady: Boolean get() = status.value == TranscriberStatus.Ready
 
     /** 声で入力できる見込みがあるか(false なら最初から文字入力を勧める) */
@@ -66,6 +69,7 @@ interface SpeechTranscriber {
 private val AlwaysReady: StateFlow<TranscriberStatus> = MutableStateFlow(TranscriberStatus.Ready)
 private val NoPartial: StateFlow<String> = MutableStateFlow("")
 private val NeverListening: StateFlow<Boolean> = MutableStateFlow(false)
+private val NoLevel: StateFlow<Float> = MutableStateFlow(0f)
 
 /** 録音 / 認識が失敗した理由。画面の文言は :app の `VoiceErrorCopy`(iOS の `ErrorCopy.transcriber*`)で決める。 */
 sealed class TranscriberFailure(message: String) : Exception(message) {

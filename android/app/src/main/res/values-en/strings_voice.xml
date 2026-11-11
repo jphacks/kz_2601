@@ -99,6 +99,10 @@
     <string name="voice_option_selected">Selected</string>
     <string name="voice_option_unselected">Not selected</string>
     <string name="voice_other_body">Please wait a moment and try again</string>
+    <string name="voice_pending_cancel">Don\'t send</string>
+    <string name="voice_pending_continue">Keep talking</string>
+    <string name="voice_pending_retake">Say it again</string>
+    <string name="voice_pending_title">Recording stopped after a pause. Send this?</string>
     <string name="voice_placeholder_text">Or type here</string>
     <string name="voice_placeholder_text_first">Type here (works right away)</string>
     <string name="voice_plan_limit_body">What this app can store has reached its limit. Delete what you don\'t use to keep going</string>

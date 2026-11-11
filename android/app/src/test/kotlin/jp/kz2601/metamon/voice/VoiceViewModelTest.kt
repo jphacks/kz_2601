@@ -235,7 +235,7 @@ class VoiceViewModelTest {
     }
 
     @Test
-    fun recognizerEndingBySelfTranscribesWithoutTap() = runTest {
+    fun recognizerEndingBySelfAsksBeforeSending() = runTest {
         val speech = MockSpeechTranscriber(results = listOf(Result.success("早起きチェック")))
         val ai = FakeAI()
         val vm = vm(speech, ai)
@@ -243,8 +243,87 @@ class VoiceViewModelTest {
         runCurrent()
         speech.endBySelf()
         advanceUntilIdle()
+        // #1014 途中で切れた依頼をそのまま送らない
+        assertEquals(emptyList<String>(), ai.morphCalls)
+        assertEquals("早起きチェック", vm.state.value.pendingVoice)
+        assertEquals(VoicePhase.IDLE, vm.state.value.phase)
+
+        vm.confirmPendingVoice()
+        advanceUntilIdle()
         assertEquals(listOf("早起きチェック"), ai.morphCalls)
+        assertNull(vm.state.value.pendingVoice)
         assertEquals(VoicePhase.DONE, vm.state.value.phase)
+    }
+
+    @Test
+    fun continueAfterSelfStopJoinsTheNextPart() = runTest {
+        val speech = MockSpeechTranscriber(results = listOf(Result.success("毎朝の体重と"), Result.success("睡眠時間を記録")))
+        val ai = FakeAI()
+        val vm = vm(speech, ai)
+        vm.onMicTap()
+        runCurrent()
+        speech.endBySelf()
+        advanceUntilIdle()
+        vm.continuePendingVoice()
+        runCurrent()
+        assertEquals(VoicePhase.LISTENING, vm.state.value.phase)
+        assertNull(vm.state.value.pendingVoice)
+        vm.onMicTap() // タップで止めた分は確かめずに送る(iOS と同じ)
+        advanceUntilIdle()
+        assertEquals(listOf("毎朝の体重と睡眠時間を記録"), ai.morphCalls)
+    }
+
+    @Test
+    fun continueThatHearsNothingKeepsTheFirstPart() = runTest {
+        val speech = MockSpeechTranscriber(results = listOf(Result.success("家計簿"), Result.success("")))
+        val ai = FakeAI()
+        val vm = vm(speech, ai)
+        vm.onMicTap()
+        runCurrent()
+        speech.endBySelf()
+        advanceUntilIdle()
+        vm.continuePendingVoice()
+        runCurrent()
+        speech.endBySelf()
+        advanceUntilIdle()
+        assertNull(vm.state.value.error)
+        assertEquals("家計簿", vm.state.value.pendingVoice)
+        assertEquals(emptyList<String>(), ai.morphCalls)
+    }
+
+    @Test
+    fun retakeDropsTheHeardTextAndDismissSendsNothing() = runTest {
+        val speech = MockSpeechTranscriber(results = listOf(Result.success("まちがい"), Result.success("読書記録")))
+        val ai = FakeAI()
+        val vm = vm(speech, ai)
+        vm.onMicTap()
+        runCurrent()
+        speech.endBySelf()
+        advanceUntilIdle()
+        vm.retakePendingVoice()
+        runCurrent()
+        assertEquals(VoicePhase.LISTENING, vm.state.value.phase)
+        speech.endBySelf()
+        advanceUntilIdle()
+        assertEquals("読書記録", vm.state.value.pendingVoice)
+        vm.dismissPendingVoice()
+        assertNull(vm.state.value.pendingVoice)
+        advanceUntilIdle()
+        assertEquals(emptyList<String>(), ai.morphCalls)
+    }
+
+    @Test
+    fun inputLevelFollowsTheTranscriberWhileListening() = runTest {
+        val speech = MockSpeechTranscriber()
+        val vm = vm(speech, FakeAI())
+        vm.onMicTap()
+        runCurrent()
+        speech.emitLevel(0.6f)
+        runCurrent()
+        assertEquals(0.6f, vm.state.value.inputLevel, 0.001f)
+        vm.onMicTap()
+        runCurrent()
+        assertEquals(0f, vm.state.value.inputLevel, 0.001f)
     }
 
     /** iOS と同じ最小の口だけの実装(feat/android-mock の MockTranscriber と同じ形)でも動く。 */

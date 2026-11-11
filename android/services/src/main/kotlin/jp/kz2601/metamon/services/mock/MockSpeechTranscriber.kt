@@ -24,6 +24,9 @@ class MockSpeechTranscriber(
     private val _listening = MutableStateFlow(false)
     override val listening: StateFlow<Boolean> = _listening
 
+    private val _level = MutableStateFlow(0f)
+    override val level: StateFlow<Float> = _level
+
     private val queue = ArrayDeque(results)
     var startFailure: TranscriberFailure? = null
     var startCount = 0
@@ -40,9 +43,15 @@ class MockSpeechTranscriber(
         _partial.value = text
     }
 
+    /** 声の大きさを流す(テスト用・0..1) */
+    fun emitLevel(value: Float) {
+        _level.value = value
+    }
+
     /** 認識器が無音で自分から止まったことにする(テスト用) */
     fun endBySelf() {
         _listening.value = false
+        _level.value = 0f
     }
 
     override suspend fun startRecording() {
