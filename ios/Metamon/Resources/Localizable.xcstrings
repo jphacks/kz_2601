@@ -11620,6 +11620,23 @@
         }
       }
     },
+    "保存しました" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Saved"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "保存しました"
+          }
+        }
+      }
+    },
     "保存するフォームがありません" : {
       "extractionState" : "manual",
       "localizations" : {
