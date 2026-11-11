@@ -1,5 +1,6 @@
 import AuthenticationServices
 import Foundation
+import MetamonRenderer
 import MetamonServices
 
 /// 設定の「つないだサービス」(#1493)を出す版か。審査用の版は OAuth の provider を外す(決定 6)ので出さない。
@@ -10,6 +11,29 @@ enum ConnectedServicesPolicy {
         #else
         true
         #endif
+    }
+}
+
+/// 「つないだサービス」の一覧を取る時に送る `supportedFeatures`(#1493)。この画面で扱える provider の `externalCall.<id>`。
+/// generate に送る `ClientCapabilities.supportedFeatures` とは別(外を呼ぶ DSL の部品はまだ無い)。
+enum ConnectedServicesFeatures {
+    /// この画面で扱える provider(OAuth の要るもの)
+    static let providers = ["googleCalendar", "todoist", "outlookCalendar", "notion"]
+
+    static var current: [String] {
+        #if APP_STORE_REVIEW
+        list(reviewBuild: true, debug: false)
+        #elseif DEBUG
+        list(reviewBuild: false, debug: true)
+        #else
+        list(reviewBuild: false, debug: false)
+        #endif
+    }
+
+    /// 審査用の版は空(= 何も出さない・決定 6)。DEBUG だけ偽の provider も。
+    static func list(reviewBuild: Bool, debug: Bool) -> [String] {
+        if reviewBuild { return [] }
+        return (providers + (debug ? ["fakeOauth"] : [])).map { "externalCall.\($0)" }
     }
 }
 
@@ -24,9 +48,14 @@ enum ConnectedServiceStatus: Equatable {
 
 struct ConnectedServiceRow: Equatable, Identifiable {
     var provider: String
+    var name: String
     var status: ConnectedServiceStatus
+    /// このサーバーで今つなげるか(false なら「つなぐ」「つなぎ直す」を出さない。切るのはできる)
+    var enabled: Bool = true
     var id: String { provider }
-    var name: String { ConnectedServicesCatalog.name(provider) }
+
+    /// つないでいないうえに今つなげない(行ごと押せなくする)
+    var isUnavailable: Bool { !enabled && status == .notConnected }
 }
 
 /// 「つないだサービス」の表示の状態。
@@ -38,49 +67,40 @@ enum ConnectedServicesState: Equatable {
     case loaded([ConnectedServiceRow])
 
     /// 一覧の結果から。ext_unavailable は隠す・ほかの失敗は再試行できる状態。
-    static func from(_ result: Result<[ExtConnection], Error>,
-                     candidates: [String] = ConnectedServicesCatalog.oauthProviders) -> ConnectedServicesState {
+    static func from(_ result: Result<ExtConnectionList, Error>, english: Bool = LanguagePreference.shared.code == "en") -> ConnectedServicesState {
         switch result {
         case .success(let list):
-            return .loaded(rows(list, candidates: candidates))
+            return .loaded(rows(list, english: english))
         case .failure(let error):
             if (error as? APIError)?.isExtUnavailable == true { return .hidden }
             return .failed(L10n.tr("一覧を読み込めませんでした。"))
         }
     }
 
-    /// つないだもの(知っている順 → 知らないもの)の後に、まだつないでいない候補。
-    static func rows(_ list: [ExtConnection], candidates: [String]) -> [ConnectedServiceRow] {
-        var seen = Set<String>()
-        let connected = list
-            .filter { seen.insert($0.provider).inserted }
-            .sorted { order($0.provider, candidates) < order($1.provider, candidates) }
-            .map { ConnectedServiceRow(provider: $0.provider, status: $0.status == .active ? .connected : .needsReconnect) }
-        let rest = candidates.filter { !seen.contains($0) }.map { ConnectedServiceRow(provider: $0, status: .notConnected) }
-        return connected + rest
-    }
-
-    private static func order(_ p: String, _ candidates: [String]) -> Int { candidates.firstIndex(of: p) ?? candidates.count }
-}
-
-/// 端末が知っている OAuth の provider(backend `internal/extapi` の `NeedsOAuth`)。一覧の API はつないだものしか返さないので、
-/// まだつないでいないものはここから出す。知らない provider がつながっていれば ID のまま出す。
-enum ConnectedServicesCatalog {
-    static var oauthProviders: [String] {
-        #if DEBUG
-        ["googleCalendar", "todoist", "fakeOauth"]
-        #else
-        ["googleCalendar", "todoist"]
-        #endif
-    }
-
-    static func name(_ provider: String) -> String {
-        switch provider {
-        case "googleCalendar": L10n.tr("Google カレンダー")
-        case "todoist": "Todoist"
-        case "fakeOauth": L10n.tr("試験用のサービス")
-        default: provider
+    /// つないだもの(サーバーの providers の順 → 知らないもの)の後に、まだつないでいない provider。
+    /// `providers` が無い古いサーバーでは、つないだものだけ出す。
+    static func rows(_ list: ExtConnectionList, english: Bool) -> [ConnectedServiceRow] {
+        let providers = list.providers ?? []
+        let byId = Dictionary(providers.map { ($0.id, $0) }, uniquingKeysWith: { a, _ in a })
+        let order = providers.map(\.id)
+        func name(_ id: String) -> String {
+            guard let p = byId[id] else { return id }
+            let n = english ? p.nameEn : p.nameJa
+            return n.isEmpty ? id : n
         }
+        // 古いサーバーは enabled を知らせないので、つないだものはつなぎ直せる扱い
+        func enabled(_ id: String) -> Bool { byId[id]?.enabled ?? (list.providers == nil) }
+        func rank(_ id: String) -> Int { order.firstIndex(of: id) ?? order.count }
+
+        var seen = Set<String>()
+        let connected = list.connections
+            .filter { seen.insert($0.provider).inserted }
+            .sorted { rank($0.provider) < rank($1.provider) }
+            .map { ConnectedServiceRow(provider: $0.provider, name: name($0.provider),
+                                       status: $0.status == .active ? .connected : .needsReconnect, enabled: enabled($0.provider)) }
+        let rest = providers.filter { seen.insert($0.id).inserted }
+            .map { ConnectedServiceRow(provider: $0.id, name: name($0.id), status: .notConnected, enabled: $0.enabled) }
+        return connected + rest
     }
 }
 
@@ -119,7 +139,7 @@ final class ConnectedServicesModel {
 
     func load(_ client: any ExternalServicesClient) async {
         do {
-            state = .from(.success(try await client.connections()))
+            state = .from(.success(try await client.connections(supportedFeatures: ConnectedServicesFeatures.current)))
         } catch is CancellationError {
         } catch {
             state = .from(.failure(error))

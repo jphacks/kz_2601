@@ -63,6 +63,32 @@ public struct ExtConnection: Codable, Equatable, Sendable {
     }
 }
 
+/// つなげるサービス 1 件(`ExtProvider`)。`enabled` が false ならこのサーバーでは今つなげない。
+public struct ExtProvider: Codable, Equatable, Sendable {
+    public var id: String
+    public var nameJa: String
+    public var nameEn: String
+    public var enabled: Bool
+
+    public init(id: String, nameJa: String, nameEn: String, enabled: Bool = true) {
+        self.id = id
+        self.nameJa = nameJa
+        self.nameEn = nameEn
+        self.enabled = enabled
+    }
+}
+
+/// `GET /v1/me/connections` の答え。`providers` が nil = 古いサーバー(フィールドが無い)。
+public struct ExtConnectionList: Decodable, Equatable, Sendable {
+    public var connections: [ExtConnection]
+    public var providers: [ExtProvider]?
+
+    public init(connections: [ExtConnection], providers: [ExtProvider]?) {
+        self.connections = connections
+        self.providers = providers
+    }
+}
+
 /// op の決まった形の答えの 1 行(`ExtRow`)。
 public struct ExtRow: Codable, Equatable, Sendable {
     public var title: String
@@ -105,8 +131,9 @@ public struct ExtCallResponse: Equatable, Sendable {
 }
 
 public protocol ExternalServicesClient: Sendable {
-    /// `GET /v1/me/connections`(切ったものは出ない)
-    func connections() async throws -> [ExtConnection]
+    /// `GET /v1/me/connections`(切ったものは出ない)。`supportedFeatures` を渡すと `?supportedFeatures=` で
+    /// `externalCall.<id>` の入った provider だけに絞る(空の配列 = 何も出さない・nil = 絞らない)
+    func connections(supportedFeatures: [String]?) async throws -> ExtConnectionList
     /// `POST /v1/me/connections/{provider}/start` → 同意の画面の URL
     func startConnection(provider: String, scopes: [String]?) async throws -> URL
     /// `DELETE /v1/me/connections/{provider}`(つないでいなくても成功)
@@ -185,14 +212,19 @@ public struct HTTPExternalServicesClient: ExternalServicesClient {
         self.token = token
     }
 
-    struct ListBody: Decodable { var connections: [ExtConnection] }
     struct StartBody: Encodable { var scopes: [String]? }
     struct StartResponse: Decodable { var authUrl: String }
     struct CallBody: Encodable { var args: [String: String] }
 
-    public func connections() async throws -> [ExtConnection] {
-        let data = try await HTTP.send("GET", baseURL: baseURL, path: "v1/me/connections", body: nil, token: token)
-        return try JSONDecoder().decode(ListBody.self, from: data).connections
+    public func connections(supportedFeatures: [String]?) async throws -> ExtConnectionList {
+        var path = "v1/me/connections"
+        if let supportedFeatures {
+            var q = URLComponents()
+            q.queryItems = [URLQueryItem(name: "supportedFeatures", value: supportedFeatures.joined(separator: ","))]
+            path += "?" + (q.percentEncodedQuery ?? "")
+        }
+        let data = try await HTTP.send("GET", baseURL: baseURL, path: path, body: nil, token: token)
+        return try JSONDecoder().decode(ExtConnectionList.self, from: data)
     }
 
     public func startConnection(provider: String, scopes: [String]?) async throws -> URL {
@@ -225,14 +257,25 @@ public struct HTTPExternalServicesClient: ExternalServicesClient {
 /// モック(`METAMON_MOCK`・サーバー無しの起動・テスト)。つなぐと同意の画面を飛ばして成功の戻り先を返す扱い。
 public actor MockExternalServicesClient: ExternalServicesClient {
     public private(set) var stored: [ExtConnection]
+    /// nil = 古いサーバーのまね(`providers` を返さない)
+    public private(set) var providers: [ExtProvider]?
+    /// 直前の `connections(supportedFeatures:)` に渡された値(テスト用)
+    public private(set) var lastSupportedFeatures: [String]??
     /// 次の呼び出しで投げるエラー(テスト用)
     public var nextError: Error?
     public private(set) var disconnected: [String] = []
     public private(set) var started: [String] = []
 
-    public init(connections: [ExtConnection] = []) {
+    public init(connections: [ExtConnection] = [], providers: [ExtProvider]? = MockExternalServicesClient.defaultProviders) {
         self.stored = connections
+        self.providers = providers
     }
+
+    public static let defaultProviders = [
+        ExtProvider(id: "fakeOauth", nameJa: "試験用のサービス", nameEn: "Test service"),
+        ExtProvider(id: "googleCalendar", nameJa: "Google カレンダー", nameEn: "Google Calendar"),
+        ExtProvider(id: "todoist", nameJa: "Todoist", nameEn: "Todoist"),
+    ]
 
     public func setNextError(_ error: Error?) { nextError = error }
 
@@ -243,9 +286,16 @@ public actor MockExternalServicesClient: ExternalServicesClient {
         }
     }
 
-    public func connections() async throws -> [ExtConnection] {
+    public func connections(supportedFeatures: [String]?) async throws -> ExtConnectionList {
         try throwIfNeeded()
-        return stored
+        lastSupportedFeatures = .some(supportedFeatures)
+        // サーバーと同じく `externalCall.<id>` で絞る
+        let shown = providers.map { list in
+            guard let supportedFeatures else { return list }
+            let keys = Set(supportedFeatures)
+            return list.filter { keys.contains("externalCall.\($0.id)") }
+        }
+        return ExtConnectionList(connections: stored, providers: shown)
     }
 
     public func startConnection(provider: String, scopes: [String]?) async throws -> URL {
