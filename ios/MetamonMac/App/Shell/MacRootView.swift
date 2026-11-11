@@ -72,6 +72,8 @@ struct MacRootView: View {
     @State private var shareApp: MacShareAppModel?
     #endif
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    /// サイドバーの新着の数(#969)
+    @State private var badges = MacSidebarBadges.shared
 
     init(apps: [SampleApp]) { bundledApps = apps }
 
@@ -99,8 +101,10 @@ struct MacRootView: View {
 
     var body: some View {
         NavigationSplitView(columnVisibility: $columnVisibility) {
-            AppSidebar(created: createdApps.filter { $0.matches(searchText) },
+            AppSidebar(created: sidebarSections.own.filter { $0.matches(searchText) },
+                       shared: sidebarSections.shared.filter { $0.matches(searchText) },
                        examples: exampleApps.filter { $0.matches(searchText) },
+                       newItems: { badges.count($0) },
                        thumbnail: thumbnail(for:), searchText: searchText, selection: guardedSelection,
                        onOpen: { focus = .canvas }, onDelete: deleteApp, onDuplicate: duplicateApp,
                        onResetExample: resetExample,
@@ -138,6 +142,7 @@ struct MacRootView: View {
             .overlay(alignment: .top) { noticeBar }
             .safeAreaInset(edge: .top, spacing: 0) { serviceNoticeBar }
             .task(id: appNoticeKey) { await checkAppNotices() }
+            .task(id: badgeKey) { await refreshBadges() }
             .task(id: noticeCheck) { await checkServiceNotice() }
             // 中央の列をフォーカスの行き先にする(Tab で中の入力欄・ボタンへ進む)
             .focusable()
@@ -205,7 +210,7 @@ struct MacRootView: View {
             reopenLastApp()
         }
         .onChange(of: selectedAppId) { _, id in
-            if let id { library.lastAppId = id }
+            if let id { library.lastAppId = id; badges.markRead(id) } // 開いたら新着の印を消す(#969)
             showsScreenMap = false
         }
         .sheet(item: $appLimit) { request in
@@ -255,6 +260,30 @@ struct MacRootView: View {
 
     // MARK: - 一覧(#969)
 
+    /// 作ったアプリを「作ったアプリ」と「共有されたアプリ」に分ける(並びは一覧のまま)
+    private var sidebarSections: (own: [SampleApp], shared: [SampleApp]) {
+        let origins = MacAppOrigins()
+        let split = MacSidebarSections.split(library.createdIds, isShared: origins.isShared)
+        let byId = Dictionary(createdApps.map { ($0.id, $0) }, uniquingKeysWith: { a, _ in a })
+        return (split.own.compactMap { byId[$0] }, split.shared.compactMap { byId[$0] })
+    }
+
+    /// 新着の数を数え直すきっかけ: アカウント・一覧(中身を取ったアプリ)・前面に戻った
+    private var badgeKey: String {
+        let ids = library.createdIds.filter { library.isOnServer($0) && library.generated[$0] != nil }
+        return "\(MacAccount.shared.session.user?.uid ?? "")|\(ids.joined(separator: ","))|\(noticeCheck)"
+    }
+
+    /// サイドバーの新着の数(#969)。サーバーにあり中身を取ったアプリだけ(entity が分かるもの)
+    private func refreshBadges() async {
+        let targets = library.createdIds.compactMap { id -> MacSidebarBadges.Target? in
+            guard library.isOnServer(id), let document = library.generated[id] else { return nil }
+            return .init(appId: id, entities: document.dsl.entities.map(\.id))
+        }
+        await badges.refresh(targets, openAppId: selectedAppId, uid: MacAccount.shared.session.user?.uid,
+                             source: MacServices.shared.appConfig as? SharedRecordStampSource)
+    }
+
     /// サーバーの一覧を取り直す(#1057)。サインインしていなければ取らない(サインアウトの後は wipe が空にしている)
     private func refreshServerApps() async {
         guard MacAccount.shared.session.user != nil else { return }
@@ -285,6 +314,8 @@ struct MacRootView: View {
         if notices.summary?.appId == id { notices.summary = nil }
         let onServer = library.isOnServer(id)
         library.delete(id)
+        MacAppOrigins().remove(id)
+        badges.markRead(id)
         // 記録も消す(#1284)。開いているウインドウのエンジンを止めて手放してから消す(動いたままだと書き戻される)
         Task { await MacRecordEngines.shared.purge(appId: id) }
         // サーバーにあるアプリはサーバーからも消す(iOS の deleteApp と同じ)。届かなくても端末からは消す
@@ -315,6 +346,7 @@ struct MacRootView: View {
         guard let adopted = shareFlow.adopted else { return }
         shareFlow.adopted = nil
         let id = adopted.document.appId
+        MacAppOrigins().markShared(id) // サイドバーの「共有されたアプリ」(#969)
         library.apply(adopted.document, envelope: adopted.envelope, created: true, onServer: true)
         switchApp(to: id)
         notices.summary = .init(appId: id, text: adopted.banner, action: nil)
