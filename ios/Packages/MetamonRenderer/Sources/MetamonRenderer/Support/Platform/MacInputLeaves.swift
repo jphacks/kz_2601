@@ -108,4 +108,24 @@ enum IMEReturnGuard {
 
 #if os(macOS)
 extension NSTextView: MarkedTextProviding {}
+
+extension NSTextView {
+    /// 変換中の文字を確定させて全文を返す(#1047)。文書に残すだけでなく入力メソッドの変換も終えさせ、
+    /// 送った・保存した後に同じ文字が書き戻されて二重に残らないようにする。
+    @discardableResult
+    public func commitMarkedTextNow() -> String {
+        if hasMarkedText() {
+            unmarkText()
+            inputContext?.discardMarkedText()
+        }
+        return string
+    }
+}
+
+extension KeyboardState {
+    /// 今の入力欄で Return を「送る・次へ」に使ってよいか。変換中の Return は確定だけ(#1047)。
+    public static func allowsReturnSubmit() -> Bool {
+        IMEReturnGuard.allowsReturn(focusedTextView())
+    }
+}
 #endif
