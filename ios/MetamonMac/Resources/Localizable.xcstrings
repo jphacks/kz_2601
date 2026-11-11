@@ -1334,6 +1334,22 @@
         }
       }
     },
+    "「%@」を共有" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Share “%@”"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "「%@」を共有"
+          }
+        }
+      }
+    },
     "「%@」を削除しました" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -3658,6 +3674,22 @@
         }
       }
     },
+    "アプリを選ぶと共有できます" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Select an app to share it"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "アプリを選ぶと共有できます"
+          }
+        }
+      }
+    },
     "アプリを選んでください" : {
       "localizations" : {
         "en" : {
@@ -4181,6 +4213,22 @@
         }
       }
     },
+    "サーバーに保存した自分のアプリだけ共有できます" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Only your own apps saved to the server can be shared"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "サーバーに保存した自分のアプリだけ共有できます"
+          }
+        }
+      }
+    },
     "サーバーに届きませんでした。つながってからもう一度お試しください。" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -4313,6 +4361,38 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "シェアされたアプリを開けませんでした"
+          }
+        }
+      }
+    },
+    "シェアはサーバー接続時のみ使えます" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sharing is only available when connected to the server"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "シェアはサーバー接続時のみ使えます"
+          }
+        }
+      }
+    },
+    "シェアリンク" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Share link"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "シェアリンク"
           }
         }
       }
@@ -4872,6 +4952,22 @@
         }
       }
     },
+    "メッセージ・メールなどでリンクを送る" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Send the link via Messages, Mail, and more"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "メッセージ・メールなどでリンクを送る"
+          }
+        }
+      }
+    },
     "メモ" : {
       "localizations" : {
         "en" : {
@@ -4985,6 +5081,38 @@
         }
       }
     },
+    "リンクをもう一度作る" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Create the link again"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "リンクをもう一度作る"
+          }
+        }
+      }
+    },
+    "リンクをクリップボードにコピーする" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Copy the link to the clipboard"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "リンクをクリップボードにコピーする"
+          }
+        }
+      }
+    },
     "リンクをコピー" : {
       "localizations" : {
         "en" : {
@@ -4997,6 +5125,54 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "リンクをコピー"
+          }
+        }
+      }
+    },
+    "リンクを作っています…" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Creating link…"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "リンクを作っています…"
+          }
+        }
+      }
+    },
+    "リンクを作れませんでした。もう一度お試しください" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Couldn't create the link. Please try again."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "リンクを作れませんでした。もう一度お試しください"
+          }
+        }
+      }
+    },
+    "リンクを取り消す" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Revoke Link"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "リンクを取り消す"
           }
         }
       }
@@ -5426,6 +5602,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "今のアプリの設計(画面・項目・アプリ名など)"
+          }
+        }
+      }
+    },
+    "今のリンクを開けなくして、新しいリンクを作る" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Disable the current link and create a new one"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "今のリンクを開けなくして、新しいリンクを作る"
           }
         }
       }
@@ -6630,6 +6822,38 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "取り消す"
+          }
+        }
+      }
+    },
+    "取り消せませんでした" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Couldn't revoke the link"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "取り消せませんでした"
+          }
+        }
+      }
+    },
+    "受け取った人は、リンクから自分のアプリとして使えます" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "People who receive the link can use it as their own app"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "受け取った人は、リンクから自分のアプリとして使えます"
           }
         }
       }
