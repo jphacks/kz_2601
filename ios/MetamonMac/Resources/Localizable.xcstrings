@@ -50,6 +50,23 @@
         }
       }
     },
+    "%@(見つかりません)" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ (not found)"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@(見つかりません)"
+          }
+        }
+      }
+    },
     "%@が上限に達しました。作った人に知らせてください" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -4334,6 +4351,23 @@
         }
       }
     },
+    "システムの設定に従う" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Use System Setting"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "システムの設定に従う"
+          }
+        }
+      }
+    },
     "システム設定を開く" : {
       "localizations" : {
         "en" : {
@@ -4786,6 +4820,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "ボタンを押したら、今いる場所を記録できるようにして"
+          }
+        }
+      }
+    },
+    "マイク" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Microphone"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "マイク"
           }
         }
       }
@@ -6136,6 +6187,23 @@
         }
       }
     },
+    "入力の装置" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Input device"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "入力の装置"
+          }
+        }
+      }
+    },
     "入力を消す" : {
       "localizations" : {
         "en" : {
@@ -7039,6 +7107,40 @@
         }
       }
     },
+    "声で頼む(⇧⌘M)。押している間だけ話すこともできます" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ask by voice (⇧⌘M). You can also hold it down while you speak"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "声で頼む(⇧⌘M)。押している間だけ話すこともできます"
+          }
+        }
+      }
+    },
+    "声で頼む時に使うマイクを選びます。選んだマイクが見つからない時はシステムの設定のマイクを使います" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Choose the microphone used when you ask by voice. If it can't be found, the system microphone is used"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "声で頼む時に使うマイクを選びます。選んだマイクが見つからない時はシステムの設定のマイクを使います"
+          }
+        }
+      }
+    },
     "変えられませんでした" : {
       "localizations" : {
         "en" : {
@@ -7133,6 +7235,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "変更を反映しています…"
+          }
+        }
+      }
+    },
+    "外付けのマイクや AirPods を選べます。録音中にマイクが外れた時は録音を止めてお知らせします。" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "You can choose an external microphone or AirPods. If the microphone is disconnected while recording, recording stops and you'll be told."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "外付けのマイクや AirPods を選べます。録音中にマイクが外れた時は録音を止めてお知らせします。"
           }
         }
       }
@@ -9618,6 +9737,23 @@
         }
       }
     },
+    "話し終えた(⇧⌘M)。長く押した時は離すと送ります" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Done speaking (⇧⌘M). If you're holding it, release to send"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "話し終えた(⇧⌘M)。長く押した時は離すと送ります"
+          }
+        }
+      }
+    },
     "話すと、アプリができる" : {
       "localizations" : {
         "en" : {
@@ -10283,6 +10419,23 @@
         }
       }
     },
+    "選んだマイクが見つからないため、今はシステムの設定のマイクを使っています。つなぎ直すと、また選んだマイクを使います。" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The chosen microphone can't be found, so the system microphone is being used. Reconnect it to use it again."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "選んだマイクが見つからないため、今はシステムの設定のマイクを使っています。つなぎ直すと、また選んだマイクを使います。"
+          }
+        }
+      }
+    },
     "選択中" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -10362,6 +10515,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "録音できませんでした。マイクがつながっているか確かめ、ほかのアプリの録音を終えてから、もう一度お試しください"
+          }
+        }
+      }
+    },
+    "録音中にマイクが外れました。つなぎ直すか、設定でマイクを選んでから、もう一度話してください" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The microphone was disconnected while recording. Reconnect it or choose a microphone in Settings, then speak again"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "録音中にマイクが外れました。つなぎ直すか、設定でマイクを選んでから、もう一度話してください"
           }
         }
       }
