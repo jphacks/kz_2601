@@ -18,7 +18,7 @@
 
 | もの | 状態 |
 |---|---|
-| provider の閉じた一覧・op の定義・無料 / 有料・OAuth の要否 | 済(`internal/extapi/registry.go`)。本物の provider はまだ 0 個(子 Issue で 1 provider = 1 ファイル) |
+| provider の閉じた一覧・op の定義・無料 / 有料・OAuth の要否 | 済(`internal/extapi/registry.go`)。本物の provider は Frankfurter(為替・#1499・`frankfurter.go`)。ほかは子 Issue で 1 provider = 1 ファイル |
 | 数え方(無料 = `runs` 1・有料 = `runs` 1 + コインの押さえ → 確定 → 差額の戻し・失敗で両方戻す) | 済(`Service.Call`・`quota.ExtRun`・履歴 `spend_ext`) |
 | Pro だけ(決定 1) | 済(作成者の Pro。`PRO_GATE_MODE` に関係なく) |
 | OAuth の始める・戻り先・トークンの保管・取り消し・90 日で消す | 済(`oauth.go`・`connections.go`)。本物の provider の `OAuthClient` は子 Issue |
@@ -29,7 +29,8 @@
 | appconfig `POST /v1/apps/{appId}/ext/{provider}/{op}`・`/v1/me/connections/*`・エラーコード | 済(`internal/appconfig/ext.go`・runner の呼び出しは `extapi.Client`・`openapi-appconfig.yaml` の tag `ext`)。下の「appconfig の口」 |
 | DSL `externalCall` / `externalList`・自動の動きからの呼び出し | **まだ**(DSL の子 Issue。`CallRequest.Run` に run の `quota.Decision` を渡すだけで数え方は同じ) |
 | 退会(`DELETE /v1/me`)の時の provider 側の取り消し | **まだ**(appconfig から `/internal/ext/connections/revokeAll` を呼ぶ) |
-| 回数の上限 `EXT_LIMIT_*`・`EXT_GLOBAL_DAILY_<PROVIDER>`・キャッシュ・provider ごとの 1 分止め | **まだ**(本物の provider と一緒に) |
+| キャッシュ | 済(`cache.go`・op の `CacheTTL`。鍵だけ・OAuth なしの読む op だけ。台の中のメモリ) |
+| 回数の上限 `EXT_LIMIT_*`・`EXT_GLOBAL_DAILY_<PROVIDER>`・provider ごとの 1 分止め | **まだ**(割り当てのある provider と一緒に) |
 | iOS の「つないだサービス」・402 / 409 のシート・履歴の `spend_ext` の文言 | **まだ**(iOS の子 Issue。今は履歴に `spend_ext` がそのまま出る) |
 
 ## 置き場所
@@ -62,6 +63,16 @@ provider は `Provider` で定義し、そのファイルの `init()` で `regis
 
 機能のキーは `externalCall.<provider>`(`FeatureKey`)。provider は既定で off(`EXT_<PROVIDER>_ENABLED`)、`EXT_DISABLED=1` で全部止まる。
 
+op の `Check` は引数の値を確かめる(appconfig と runner の両方で、数える前に。だめなら 400)。`CacheTTL` は同じ引数の答えを持つ時間(下の「キャッシュ」)。
+
+### 入っている provider
+
+| provider | 種類 | op | 出口 | キャッシュ | 入れ方 |
+|---|---|---|---|---|---|
+| `frankfurter`(為替・欧州中央銀行・#1499) | 無料・鍵なし(`runs` だけ) | `latest(from?, to?, amount?)`・`historical(date, from?, to?, amount?)`。`from` / `to` は大文字 3 文字の通貨(`to` はカンマ区切りで 10 個まで・重ならない)・`amount` は正の数・`date` は 1999-01-04 から今日まで。行は通貨ごと(見出し = 通貨・値 = レート・補足 = 「日付・量 基準」) | `https://api.frankfurter.app` だけ・本文 64 KiB まで | latest 1 時間・historical 1 日 | `EXT_FRANKFURTER_ENABLED=1` |
+
+provider が 404 / 422(持っていない通貨・日)を返した時は 400 `bad_request`(`runs` は戻す)。429 / 5xx は 502 `upstream_unavailable`。
+
 ## 呼び出しの流れと数え方
 
 `Service.Call` の順:
@@ -77,7 +88,8 @@ provider は `Provider` で定義し、そのファイルの `init()` で `regis
 | 7. 確定 | 原価(op が測った値、無ければ `EXT_COST_USD_<PROVIDER>_<OP>`)× `COIN_PER_USD` を押さえの量まで引き、残りを戻す。どちらも無い時は押さえた量を引く(`coins.unpriced_model`)。履歴は `spend_ext`(`usd` つき) | 費用のかかった 4xx(`ProviderError.Billable`)だけは戻さず確定する |
 
 - `COIN_BILLING_MODE=off` は枠もコインも数えない(Pro の確認だけ)。`log` は数えるが止めず、コインは `coins.would_spend` を出すだけ。
-- ログは 1 回 1 行 `ext.call`(provider・op・結果・ms・`runs` か `coins` か・引いたコイン・app id・uid のハッシュ)。引数・答え・トークンは出さない。
+- ログは 1 回 1 行 `ext.call`(provider・op・結果・ms・`runs` か `coins` か `cache` か・引いたコイン・app id・uid のハッシュ)。引数・答え・トークンは出さない。
+- **キャッシュ**: `CacheTTL` のある op(鍵だけ・OAuth なしの読む op。登録の時に確かめる)は、同じ引数の答えを台の中のメモリに持つ(1 台 2048 件まで)。キャッシュから返した時は `runs` もコインも数えない。ただし Pro の確認(`quota.ExtPro`)はする。OAuth の op・書く op は持たない。
 
 ## OAuth のトークン
 

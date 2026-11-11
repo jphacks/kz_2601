@@ -25,6 +25,7 @@ import (
 	"slices"
 	"strings"
 	"sync"
+	"time"
 )
 
 // Billing says how a provider is paid for.
@@ -55,6 +56,10 @@ type OpSpec struct {
 	// before anything is counted; an error is 400 bad_request. nil = only
 	// the common checks of CheckArgs.
 	Check func(args map[string]string) error
+	// CacheTTL keeps the answer of the same arguments this long (cache.go):
+	// a read op of a provider without OAuth, as long as the provider's terms
+	// allow. 0 = never cached.
+	CacheTTL time.Duration
 }
 
 // Provider is one external API. Everything here is static; the secrets come
@@ -166,6 +171,9 @@ func (p Provider) check() error {
 	for _, o := range p.Ops {
 		if !opRe.MatchString(o.Name) || seen[o.Name] {
 			return fmt.Errorf("%s: bad or duplicate op %q", p.ID, o.Name)
+		}
+		if o.CacheTTL < 0 || (o.CacheTTL > 0 && (p.NeedsOAuth || o.Write)) {
+			return fmt.Errorf("%s.%s: only a read op without OAuth may be cached", p.ID, o.Name)
 		}
 		seen[o.Name] = true
 	}

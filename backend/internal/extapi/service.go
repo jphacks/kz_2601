@@ -39,6 +39,9 @@ const LogEvent = "ext.call"
 // RunsCounter counts a call as one `runs` (*quota.Quota).
 type RunsCounter interface {
 	ExtRun(ctx context.Context, r quota.Run, in *quota.Decision) (quota.Charge, *quota.Block, error)
+	// ExtPro is ExtRun's Pro check alone (a cached answer counts nothing
+	// but is still Pro only).
+	ExtPro(ctx context.Context, r quota.Run, in *quota.Decision) bool
 	Refund(ctx context.Context, charges ...quota.Charge) error
 }
 
@@ -54,6 +57,7 @@ type Service struct {
 	ops   map[string]map[string]Operation
 	oauth map[string]OAuthClient
 	sem   chan struct{}
+	cache *callCache
 
 	Runs  RunsCounter
 	Coins CoinBiller
@@ -79,7 +83,7 @@ func New(cfg Config, runs RunsCounter, biller CoinBiller, conns *Connections, st
 		cfg.Timeout = DefaultTimeout
 	}
 	s := &Service{cfg: cfg, ops: map[string]map[string]Operation{}, oauth: map[string]OAuthClient{},
-		sem: make(chan struct{}, cfg.MaxConcurrent), Runs: runs, Coins: biller, Conns: conns, States: states, Log: logger}
+		sem: make(chan struct{}, cfg.MaxConcurrent), cache: newCallCache(), Runs: runs, Coins: biller, Conns: conns, States: states, Log: logger}
 	if cfg.Disabled {
 		logger.Info("extapi: EXT_DISABLED: every provider is off")
 		return s
@@ -192,6 +196,23 @@ func (s *Service) Call(ctx context.Context, r CallRequest) (res CallResult, err 
 			slog.Int64("coins", charged), slog.String("app_id", r.AppID), slog.String("uid_hash", httpx.UIDHash(uid)))
 	}()
 
+	run := quota.Run{AppID: r.AppID, CreatorUID: r.CreatorUID, CreatorAnonymous: r.CreatorAnonymous, ActorUID: r.UserUID, Attempt: 1}
+
+	// 0. the same arguments answered a moment ago: nothing is counted
+	// (still Pro only)
+	var cacheKeyOf string
+	if spec.CacheTTL > 0 {
+		cacheKeyOf = cacheKey(p.ID, spec.Name, r.Args)
+		if out, ok := s.cache.get(cacheKeyOf, s.now()); ok {
+			if s.Runs != nil && !s.Runs.ExtPro(ctx, run, r.Run) {
+				return res, ErrProRequired
+			}
+			billing = "cache"
+			res.Output = out
+			return res, nil
+		}
+	}
+
 	select {
 	case s.sem <- struct{}{}:
 		defer func() { <-s.sem }()
@@ -200,7 +221,6 @@ func (s *Service) Call(ctx context.Context, r CallRequest) (res CallResult, err 
 	}
 
 	// 1. one `runs` of the creator's month (Pro only)
-	run := quota.Run{AppID: r.AppID, CreatorUID: r.CreatorUID, CreatorAnonymous: r.CreatorAnonymous, ActorUID: r.UserUID, Attempt: 1}
 	var runs quota.Charge
 	if s.Runs != nil {
 		ch, blk, err := s.Runs.ExtRun(ctx, run, r.Run)
@@ -293,6 +313,10 @@ func (s *Service) Call(ctx context.Context, r CallRequest) (res CallResult, err 
 	}
 	if perr != nil {
 		return res, err
+	}
+	if cacheKeyOf != "" {
+		now := s.now()
+		s.cache.put(cacheKeyOf, out, now.Add(spec.CacheTTL), now)
 	}
 	res.Output = out
 	return res, nil

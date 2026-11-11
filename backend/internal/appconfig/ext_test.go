@@ -37,6 +37,12 @@ func (f *fakeRuns) ExtRun(_ context.Context, r quota.Run, _ *quota.Decision) (qu
 	return quota.Charge{}, nil, nil
 }
 
+func (f *fakeRuns) ExtPro(_ context.Context, r quota.Run, _ *quota.Decision) bool {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	return f.pro[r.CreatorUID] && !r.CreatorAnonymous
+}
+
 func (f *fakeRuns) Refund(context.Context, ...quota.Charge) error { return nil }
 
 func (f *fakeRuns) last() quota.Run {
