@@ -330,6 +330,11 @@ class AppContainer(
         )
     }
 
+    /** 読み込んだ重いもの(文字起こしのモデル)をメモリから外す。メモリ不足([MetamonApplication.onTrimMemory])とサインアウトで呼ぶ。 */
+    fun releaseHeavyMemory() {
+        (audioFiles as? WhisperAudioFileHost)?.releaseModel()
+    }
+
     /**
      * サインアウト(外からも)・uid が変わった時に必ず後片付けし、記録の同期はサインイン後だけ動かす(#841)。
      * [MetamonApplication] が start する。画面は [AccountGuard.active] で本体を出す。
@@ -345,6 +350,7 @@ class AppContainer(
             onSignedOut = {
                 ShareLinkIntents.inbox.clear()
                 feedbackComposer.close() // 消す前に開き直されても、サインアウトで閉じる(#1315)
+                releaseHeavyMemory() // 文字起こしのモデルを次の人まで持ち越さない
             },
             onOwnerReplaced = runtime::resumeAfterAccountSwitch,
         )
