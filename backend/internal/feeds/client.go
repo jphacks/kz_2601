@@ -38,6 +38,19 @@ type Endpoints struct {
 	RSS         map[string]RSSFeed
 	Arxiv       string // + "?search_query=cat:{category}&..." (dsl.ArxivCategories)
 	Diet        string // + "?any={q}&..." (国会会議録 speech search)
+	Bikeshare   map[string]BikeshareSystem
+}
+
+// BikeshareSystem is one allowlisted GBFS system (#1694). Adding one is a
+// reviewed change here and in dsl.BikeshareSystems
+// (TestBikeshareAllowlistMatchesDSL keeps them equal).
+type BikeshareSystem struct {
+	Name       string // shown in the title
+	Info       string // https, fixed: station_information.json
+	Status     string // https, fixed: station_status.json
+	Credit     string // the credit line the license asks for
+	DatasetURL string // the catalogue page with the license
+	License    string
 }
 
 // DefaultEndpoints are the production sources (terms checked 2026-11-06,
@@ -55,7 +68,21 @@ func DefaultEndpoints() Endpoints {
 		},
 		Arxiv: "https://export.arxiv.org/api/query",
 		Diet:  "https://kokkai.ndl.go.jp/api/speech",
+		Bikeshare: map[string]BikeshareSystem{
+			"docomo-cycle":       odptGBFS("docomo-cycle", "ドコモ・バイクシェア(東京以外)", "株式会社ドコモ・バイクシェア", "c_bikeshare_gbfs-d-nationwide-bikeshare", "CC BY 4.0"),
+			"docomo-cycle-tokyo": odptGBFS("docomo-cycle-tokyo", "ドコモ・バイクシェア(東京)", "株式会社ドコモ・バイクシェア", "c_bikeshare_gbfs-d-bikeshare", "CC BY 4.0"),
+			// OpenStreet offers CC BY 4.0, ODC BY 1.0 or ODbL 1.0; we take CC BY 4.0.
+			"hellocycling": odptGBFS("hellocycling", "HELLO CYCLING", "OpenStreet株式会社", "c_bikeshare_gbfs-openstreet", "CC BY 4.0(3 つのライセンスから選択)"),
+		},
 	}
+}
+
+// odptGBFS is a system on ODPT's public (no key) GBFS API.
+func odptGBFS(id, name, operator, dataset, license string) BikeshareSystem {
+	base := "https://api-public.odpt.org/api/v4/gbfs/" + id + "/"
+	return BikeshareSystem{Name: name, Info: base + "station_information.json", Status: base + "station_status.json",
+		Credit: operator + " / 公共交通オープンデータ協議会", DatasetURL: "https://ckan.odpt.org/dataset/" + dataset,
+		License: license + "・近い順に並べ替えて表示"}
 }
 
 const pdl = "公共データ利用規約(第1.0版)"
@@ -74,6 +101,9 @@ func (ep Endpoints) source(q Query) Source {
 		return Source{Name: "arXiv.org", URL: "https://arxiv.org/list/" + q.FeedID + "/recent", License: "論文の情報は CC0 1.0・arXiv の承認や提携はありません"}
 	case dsl.FeedDiet:
 		return Source{Name: "国立国会図書館 国会会議録検索システム", URL: "https://kokkai.ndl.go.jp/", License: "検索用 API・発言の著作権は各発言者"}
+	case dsl.FeedBikeshare:
+		b := ep.Bikeshare[q.FeedID]
+		return Source{Name: b.Credit, URL: b.DatasetURL, License: b.License}
 	}
 	f := ep.RSS[q.FeedID]
 	return Source{Name: f.Publisher + "ホームページ", URL: f.SiteURL, License: pdl}
@@ -129,6 +159,10 @@ func (ep Endpoints) hosts() map[string]bool {
 	}
 	add(ep.Arxiv)
 	add(ep.Diet)
+	for _, b := range ep.Bikeshare {
+		add(b.Info)
+		add(b.Status)
+	}
 	return out
 }
 

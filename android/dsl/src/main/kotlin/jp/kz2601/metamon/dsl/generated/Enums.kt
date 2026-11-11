@@ -783,6 +783,7 @@ enum class Provider(val wire: String) {
     PRESSURE("pressure"),
     ARXIV("arxiv"),
     DIET("diet"),
+    BIKESHARE("bikeshare"),
 
     /** 知らない値(新しい版)。 */
     UNKNOWN(""),
