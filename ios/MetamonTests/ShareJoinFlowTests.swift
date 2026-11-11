@@ -264,6 +264,17 @@ final class ShareJoinFlowTests: XCTestCase {
         XCTAssertEqual(SharingUI.shared.pendingJoin?.token, token)
     }
 
+    /// #331: Universal Links `https://tailor-it.app/s/<token>` も URL スキームと同じ参加の確認に進む
+    func testOpenUniversalLinkRoutesToSameJoinFlow() async throws {
+        let fake = FakeShareClient()
+        fake.preview = .success(familyPreview)
+        let rt = try await makeRuntime(fake, pro: true)
+        let handled = await rt.openShareURL(URL(string: "https://tailor-it.app/s/\(token)")!)
+        XCTAssertTrue(handled)
+        XCTAssertEqual(fake.previewCalls, [token])
+        XCTAssertEqual(SharingUI.shared.pendingJoin?.token, token)
+    }
+
     // MARK: - joinShared
 
     /// 参加 → 表示名を付けて import・シートを閉じて変身・表示名を次回の初期値に覚える
