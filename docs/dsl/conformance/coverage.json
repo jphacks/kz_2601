@@ -1,3 +1,3 @@
 {
-  "notYetCovered": ["aiChat", "callButton", "fileImport", "placeSearch"]
+  "notYetCovered": ["callButton", "fileImport", "placeSearch"]
 }
