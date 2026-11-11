@@ -66,7 +66,7 @@ class SessionExpiryTest {
     fun expirySignsOutOnceWipesAndShowsTheReason() = runTest {
         val f = fixture()
 
-        f.session.expire()
+        f.session.expire("uid-a")
         runCurrent()
 
         assertEquals(1, f.auth.signOuts)
@@ -83,12 +83,12 @@ class SessionExpiryTest {
         val f = fixture(beforeSignOut = { gate.await() })
 
         // 同時に走っていた複数のリクエストが続けて 401 になった
-        repeat(3) { launch { f.session.expire() } }
+        repeat(3) { launch { f.session.expire("uid-a") } }
         runCurrent()
         gate.complete(Unit)
         runCurrent()
         // サインイン画面に戻った後に遅れて届いた 401
-        f.session.expire()
+        f.session.expire("uid-a")
         runCurrent()
 
         assertEquals(1, f.auth.signOuts)
@@ -100,14 +100,14 @@ class SessionExpiryTest {
     @Test
     fun signingInAgainClearsTheReasonAndANewExpiryWorksAgain() = runTest {
         val f = fixture()
-        f.session.expire()
+        f.session.expire("uid-a")
         runCurrent()
 
         f.session.signInAnonymously()
         runCurrent()
         assertNull("入り直したら理由は消える", f.session.errorMessage.value)
 
-        f.session.expire()
+        f.session.expire("uid-a")
         runCurrent()
         assertEquals(2, f.auth.signOuts)
         assertEquals(AuthSession.SESSION_EXPIRED, f.session.errorMessage.value)
@@ -117,13 +117,37 @@ class SessionExpiryTest {
     fun signalFromHttpReachesTheSession() = runTest {
         val f = fixture()
         val signal = SessionExpirySignal()
-        signal.listener = { backgroundScope.launch { f.session.expire() } }
+        signal.listener = { uid -> backgroundScope.launch { f.session.expire(uid) } }
 
-        signal.fire()
-        signal.fire()
+        signal.fire("uid-a")
+        signal.fire("uid-a")
         runCurrent()
 
         assertEquals(1, f.auth.signOuts)
         assertEquals(RootScreen.SignIn, RootScreen.of(f.session.user.value))
+    }
+
+    @Test
+    fun lateExpiryFromThePreviousUserDoesNotSignOutTheNextOne() = runTest {
+        val f = fixture()
+        // uid-a がサインアウトして uid-b が入った後に、uid-a のトークンで送ったリクエストの 401 が届いた
+        f.session.signOut()
+        f.auth.user.value = AuthUser("uid-b", isAnonymous = false)
+        runCurrent()
+
+        f.session.expire("uid-a")
+        f.session.expire(null)
+        runCurrent()
+
+        assertEquals(1, f.auth.signOuts)
+        assertEquals("uid-b", f.session.user.value?.uid)
+        assertEquals(RootScreen.App, RootScreen.of(f.session.user.value))
+        assertNull(f.session.errorMessage.value)
+
+        // uid-b 自身の 401 は今まで通り 1 回だけサインアウトする
+        repeat(2) { launch { f.session.expire("uid-b") } }
+        runCurrent()
+        assertEquals(2, f.auth.signOuts)
+        assertEquals(AuthSession.SESSION_EXPIRED, f.session.errorMessage.value)
     }
 }

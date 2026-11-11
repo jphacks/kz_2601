@@ -9,6 +9,7 @@ import java.util.concurrent.TimeUnit
 /** 呼ばれるたびに順にトークンを返す(forceRefresh で次へ進む)。 */
 class FakeTokens(private vararg val values: String?) : TokenProvider {
     var index = 0
+    var uid: String? = null
     val calls = mutableListOf<Boolean>()
 
     override suspend fun idToken(forceRefresh: Boolean): String? {
@@ -16,6 +17,8 @@ class FakeTokens(private vararg val values: String?) : TokenProvider {
         if (forceRefresh && index < values.lastIndex) index++
         return values.getOrNull(index)
     }
+
+    override fun subject(): String? = uid
 }
 
 class FakeAppCheck(private vararg val values: String?) : AppCheckTokenProvider {
@@ -45,7 +48,7 @@ fun MockWebServer.metamonHttp(
     sleeps: MutableList<Long> = mutableListOf(),
     retry: RetryPolicy = RetryPolicy(),
     remainingSink: ((RemainingToday) -> Unit)? = null,
-    onSessionExpired: (() -> Unit)? = null,
+    onSessionExpired: ((String?) -> Unit)? = null,
 ): MetamonHttp = MetamonHttp(
     baseUrl = baseUrl(),
     tokens = tokens,

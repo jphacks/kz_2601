@@ -30,6 +30,8 @@ class OwnerGatedTokens(private val auth: AuthService, private val owner: ActiveO
         if (auth.currentUser.value?.uid != uid) return null
         return auth.idToken(forceRefresh)
     }
+
+    override fun subject(): String? = owner.uid?.takeIf { it == auth.currentUser.value?.uid }
 }
 
 /**

@@ -286,7 +286,7 @@ class AppContainer(
 
     /** セッション切れ(#1102)でサインアウトしてサインイン画面に理由を出す。[MetamonApplication] が 1 回だけ呼ぶ。 */
     fun startSessionExpiry(scope: CoroutineScope) {
-        sessionExpiry?.listener = { scope.launch { session.expire() } }
+        sessionExpiry?.listener = { uid -> scope.launch { session.expire(uid) } }
     }
 
     /** 同意の画面を出す時点(起動時・AI に送る直前・設定から・#888) */

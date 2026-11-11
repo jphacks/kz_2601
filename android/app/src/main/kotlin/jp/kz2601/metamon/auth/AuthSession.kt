@@ -155,9 +155,11 @@ class AuthSession(val service: AuthService, private val beforeSignOut: suspend (
      * セッション切れ(#1102・iOS の `expire`。トークンを取り直しても 401)。サインアウトしてサインイン画面に理由を出す。
      * 端末のデータは持ち主の見張り(`AccountGuard`)がサインアウトを見て消す。同時に何本 401 が来ても 1 回だけ、
      * サインインしていない時(既に戻した後)は何もしない。
+     * [uid] は 401 を受けたリクエストを送った人。今の人と違えば(サインアウトして別の人が入った後に遅れて届いた)何もしない。
      */
-    suspend fun expire() {
-        if (user.value == null || !expiring.compareAndSet(false, true)) return
+    suspend fun expire(uid: String?) {
+        val current = user.value ?: return
+        if (uid == null || uid != current.uid || !expiring.compareAndSet(false, true)) return
         try {
             signOut()
             error.value = SESSION_EXPIRED
