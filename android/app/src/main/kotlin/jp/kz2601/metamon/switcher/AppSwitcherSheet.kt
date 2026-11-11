@@ -19,13 +19,17 @@ import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -46,13 +50,15 @@ import jp.kz2601.metamon.services.AppSummary
 import jp.kz2601.metamon.services.release.ReleaseRequest
 
 /**
- * アプリの切り替え(iOS の AppSwitcherSheet の最小版・#881)。名前の一覧をタップで切り替え、「+ 新しいアプリ」で初期画面へ。
+ * アプリの切り替え(iOS の `AppSwitcherSheet`・#881 / #1095)。下から出るシート。入口はマイク FAB の長押しと音声「アプリ一覧」。
+ * 名前の一覧をタップで切り替え、「+ 新しいアプリ」で初期画面へ。
  * 各行の「…」メニュー(iOS の `AppCardActions`)から共有シート(#901)・リリース申請(#1254)。申請済みなら状態のバッジを出す。
  * 変身の後に撮った画面があれば行の左にサムネを出す(#1199・iOS の `AppThumbnailStore`)。無ければ名前だけ。
  * 「…」の名前の変更・複製・左右へ移動・削除(#896・iOS の `AppManageMenuItems`)。削除は確認してから。
  */
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun AppSwitcherDialog(
+fun AppSwitcherSheet(
     apps: List<AppSummary>,
     currentAppId: String,
     onSelect: (String) -> Unit,
@@ -69,14 +75,25 @@ fun AppSwitcherDialog(
     val shown = if (edits == null || edits.hidden.isEmpty()) apps else apps.filter { it.id !in edits.hidden }
     // 撮り直したら描き直す
     val thumbRevision = thumbnails?.revision?.collectAsState()?.value
-    AlertDialog(
+    ModalBottomSheet(
         onDismissRequest = onDismiss,
-        title = { Text(stringResource(R.string.switcher_title)) },
-        text = {
+        sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
+        modifier = Modifier.testTag("switcher.sheet"),
+    ) {
+        Column(Modifier.padding(horizontal = 16.dp).padding(bottom = 16.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(stringResource(R.string.switcher_title), style = MaterialTheme.typography.titleLarge, modifier = Modifier.weight(1f))
+                TextButton(onClick = onDismiss, modifier = Modifier.testTag("switcher.close")) { Text(stringResource(R.string.switcher_close)) }
+            }
+            Text(
+                stringResource(R.string.switcher_subtitle),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
             if (shown.isEmpty()) {
-                Text(stringResource(R.string.switcher_empty))
+                Text(stringResource(R.string.switcher_empty), Modifier.padding(vertical = 24.dp))
             } else {
-                LazyColumn(Modifier.heightIn(max = 360.dp)) {
+                LazyColumn(Modifier.padding(top = 8.dp).heightIn(max = 420.dp)) {
                     itemsIndexed(shown, key = { _, app -> app.id }) { index, app ->
                         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                             val thumb = remember(app.id, thumbRevision) { thumbnails?.image(app.id) }
@@ -114,10 +131,11 @@ fun AppSwitcherDialog(
                     }
                 }
             }
-        },
-        confirmButton = { TextButton(onClick = onNewApp) { Text(stringResource(R.string.switcher_new_app)) } },
-        dismissButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.switcher_close)) } },
-    )
+            OutlinedButton(onClick = onNewApp, modifier = Modifier.fillMaxWidth().padding(top = 12.dp).testTag("switcher.newApp")) {
+                Text(stringResource(R.string.switcher_new_app))
+            }
+        }
+    }
     if (edits != null) {
         renaming?.let { app ->
             RenameDialog(app, onDismiss = { renaming = null }) { name ->
