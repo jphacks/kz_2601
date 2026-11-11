@@ -4411,6 +4411,22 @@
         }
       }
     },
+    "ライブアクティビティは iPhone だけで表示されます" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Live Activities are shown only on iPhone"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ライブアクティビティは iPhone だけで表示されます"
+          }
+        }
+      }
+    },
     "リンクをコピー" : {
       "localizations" : {
         "en" : {
@@ -7269,6 +7285,22 @@
         }
       }
     },
+    "書き出しました" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Exported"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "書き出しました"
+          }
+        }
+      }
+    },
     "書き出す" : {
       "localizations" : {
         "en" : {
@@ -7281,6 +7313,40 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "書き出す"
+          }
+        }
+      }
+    },
+    "書き出す記録が見つかりません" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No records to export"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "書き出す記録が見つかりません"
+          }
+        }
+      }
+    },
+    "書き出せませんでした" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Could not export"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "書き出せませんでした"
           }
         }
       }
