@@ -10,6 +10,7 @@ import jp.kz2601.metamon.renderer.components.ai.AiHost
 import jp.kz2601.metamon.renderer.components.media.PhotoReader
 import jp.kz2601.metamon.renderer.form.DiscardGuard
 import jp.kz2601.metamon.renderer.form.FormDraft
+import jp.kz2601.metamon.renderer.form.FormDraftRestore
 import jp.kz2601.metamon.renderer.navigation.NavigationState
 import jp.kz2601.metamon.renderer.navigation.Route
 import kotlinx.coroutines.flow.StateFlow
@@ -104,6 +105,9 @@ interface DSLRuntime {
     suspend fun addRecord(entity: String, data: Map<String, JSONValue>): Boolean = false
     /** photoField.analyze の端末内の読み取り(#862)。null なら analyze は無視して写真の入力として動く。 */
     val photoReader: PhotoReader? get() = null
+
+    /** プロセスが落とされた後にフォームの書きかけを戻す口(#1185)。null なら戻さない(プレビュー・テスト)。 */
+    val formDrafts: FormDraftRestore? get() = null
 }
 
 /** member / members の選択肢 1 人。保存値は [uid]。 */

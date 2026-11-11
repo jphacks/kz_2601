@@ -83,6 +83,7 @@ import androidx.compose.runtime.compositionLocalOf
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.ui.platform.LocalContext
 import jp.kz2601.metamon.renderer.form.DiscardGuard
+import jp.kz2601.metamon.renderer.form.FormDraftRestore
 import jp.kz2601.metamon.renderer.form.FormDraft
 import jp.kz2601.metamon.renderer.form.RequiredFieldFocus
 import kotlinx.coroutines.delay
@@ -105,7 +106,7 @@ fun DSLView(dsl: AppDSL, runtime: DSLRuntime, modifier: Modifier = Modifier) {
         if (host != null) host.setNavigation(value) else local = value
     }
     // M10: 保存していない入力のある画面を離れる前の確認(戻る・シートを閉じる・タブの切り替え)
-    val discard = remember(dsl) { DiscardGuard() }
+    val discard = remember(dsl, runtime) { DiscardGuard(onDiscard = { runtime.formDrafts?.forget(it) }) }
     // 画面マップなど外からの遷移も同じ確認を通す
     if (host != null) {
         DisposableEffect(host, discard) {
@@ -256,6 +257,14 @@ fun ScreenView(
         DisposableEffect(guard, stack, form) {
             guard.track(stack, form)
             onDispose { guard.untrack(stack, form) }
+        }
+    }
+    val drafts = screenCtx.runtime.formDrafts
+    if (drafts != null && form != null) {
+        val routeId = screenCtx.route.id
+        DisposableEffect(drafts, routeId, form, screen) {
+            drafts.attach(routeId, form, FormDraftRestore.excludedFields(screen, form.entity))
+            onDispose { drafts.detach(routeId, form) }
         }
     }
     if (form != null) RequiredFieldAttention(screen, form, ctx)
