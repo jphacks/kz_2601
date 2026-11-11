@@ -1927,7 +1927,7 @@ paths:
         - **Pro だけ**(決定 1): 作成者が Pro でなければ 402 `pro_required`。呼び出した人が作成者でない時は `details.reason: creator_needs_pro`(課金画面ではなく案内を出す)。`PRO_GATE_MODE` に関係なく runner が確かめる
         - **引数**: op が決めた名前だけ(ほかは 400)・値は文字列で 4096 バイトまで・URL に見える値は 400・op ごとの値の検査(通貨の記号など)も 400。runner でも同じ検査をする
         - **冪等**: `X-Request-Id` を有料の provider のコインの押さえの鍵にする(送らなければサーバーが作る)
-        - **数え方**: 1 回 = `runs` 1(Pro の月の枠・超えた後のコイン払い)。有料の provider は押さえる → 実費 × `COIN_PER_USD` → 差額を戻す。失敗(時間切れ・5xx)は両方戻す
+        - **数え方**: 1 回 = `runs` 1(Pro の月の枠・超えた後のコイン払い)。有料の provider は押さえる → 実費 × `COIN_PER_USD` → 差額を戻す。失敗(時間切れ・5xx)は両方戻す。鍵だけの読む op(為替など)は同じ引数の答えを決まった時間キャッシュし、キャッシュから返した時は数えない(Pro の確認はする)
         - 1 ユーザー 1 時間 `EXT_USER_PER_HOUR` 回(既定 120)。超えると 429 `rate_limited`
         - `EXT_RUNNER_URL` が無い時・provider が止まっている(`EXT_<PROVIDER>_ENABLED` が無い・`EXT_DISABLED`・鍵が無い)時は 503 `ext_unavailable`
       requestBody:

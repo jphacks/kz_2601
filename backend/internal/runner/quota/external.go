@@ -11,6 +11,16 @@ import (
 // 決定 1).
 const ScopeExtNeedsPro = "ext_needs_pro"
 
+// ExtPro reports whether the creator may use external APIs (Pro, 決定 1)
+// without counting anything: a call answered from the cache. in is as for
+// ExtRun.
+func (q *Quota) ExtPro(ctx context.Context, r Run, in *Decision) bool {
+	if in != nil {
+		return in.Allowed && in.Plan == PlanPro
+	}
+	return r.CreatorUID != "" && !r.CreatorAnonymous && q.pro != nil && q.pro.IsPro(ctx, r.CreatorUID)
+}
+
 // ExtRun counts one external API call as one `runs` of the creator's month
 // (docs/decisions/external-apis.md「数え方」): the same counter and overflow
 // as a run, no new kind. in is the Decision of the server rule run the call
@@ -29,7 +39,7 @@ func (q *Quota) ExtRun(ctx context.Context, r Run, in *Decision) (Charge, *Block
 			return Charge{}, &Block{Scope: ScopeExtNeedsPro}, nil
 		}
 	} else {
-		if r.CreatorUID == "" || r.CreatorAnonymous || q.pro == nil || !q.pro.IsPro(ctx, r.CreatorUID) {
+		if !q.ExtPro(ctx, r, nil) {
 			return Charge{}, &Block{Scope: ScopeExtNeedsPro}, nil
 		}
 		r.Attempt = 1

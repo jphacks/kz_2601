@@ -6,6 +6,7 @@ import (
 	"slices"
 	"strings"
 	"testing"
+	"time"
 )
 
 func TestRegistry(t *testing.T) {
@@ -120,6 +121,28 @@ func TestAllowedURL(t *testing.T) {
 	}
 	if _, err := ReadBody(strings.NewReader(strings.Repeat("x", MaxBody+1))); err == nil {
 		t.Fatal("body over 1 MB read")
+	}
+}
+
+// Only a read op without OAuth may be cached.
+func TestCacheTTLOnlyForKeyReads(t *testing.T) {
+	newOps := func(Secrets) (map[string]Operation, error) { return nil, nil }
+	oauth := func(Secrets) (OAuthClient, error) { return fakeOAuthClient{}, nil }
+	for _, p := range []Provider{
+		{ID: "cacheWrite", Billing: BillingFree, New: newOps, Ops: []OpSpec{{Name: "put", Write: true, CacheTTL: time.Minute}}},
+		{ID: "cacheOauth", Billing: BillingFree, New: newOps, NeedsOAuth: true, NewOAuth: oauth, Ops: []OpSpec{{Name: "get", CacheTTL: time.Minute}}},
+		{ID: "cacheNeg", Billing: BillingFree, New: newOps, Ops: []OpSpec{{Name: "get", CacheTTL: -time.Minute}}},
+	} {
+		if p.check() == nil {
+			t.Errorf("%s: accepted", p.ID)
+		}
+	}
+	ok := Provider{ID: "cacheRead", Billing: BillingFree, New: newOps, Ops: []OpSpec{{Name: "get", CacheTTL: time.Minute}}}
+	if err := ok.check(); err != nil {
+		t.Fatal(err)
+	}
+	if cacheKey("p", "o", map[string]string{"b": "2", "a": "1"}) != cacheKey("p", "o", map[string]string{"a": "1", "b": "2"}) {
+		t.Fatal("cache key depends on map order")
 	}
 }
 
