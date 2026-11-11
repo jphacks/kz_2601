@@ -44,6 +44,8 @@ final class MacAppLibrary {
     @ObservationIgnored private let serverEnvelope: (String) -> Data?
     /// 設定の「使用量」(作ったアプリの数)。作った・消した時に古くする(iOS は `AppSwitcherSheet` が同じことをする)
     @ObservationIgnored private let usage: PlanUsageStore
+    /// 会話の履歴(#1211)。アプリを消したら、そのアプリの分も消す(iOS の `AppRuntime+Delete` と同じ)
+    @ObservationIgnored private let chatHistory: ChatHistoryStore
     /// サーバーの自分のアプリ(#1057)。iOS の変身一覧と同じ並び(`AppSummary.visible`)
     private(set) var serverApps: [AppSummary] = []
     /// サーバーの一覧の読み込み(#1057)
@@ -61,8 +63,9 @@ final class MacAppLibrary {
     /// `server` はサーバーの版で戻す時の相手(nil なら端末の履歴だけ)
     init(store: LocalAppLibrary? = .standard, defaults: UserDefaults? = nil, server: (any AppConfigClient)? = nil,
          serverEnvelope: @escaping (String) -> Data? = { DocumentCache.shared.loadData(appId: $0) },
-         usage: PlanUsageStore = .shared, serverCache: AppListCache? = nil) {
+         usage: PlanUsageStore = .shared, serverCache: AppListCache? = nil, chatHistory: ChatHistoryStore = .forRuntime()) {
         self.store = store
+        self.chatHistory = chatHistory
         self.serverCache = serverCache
         self.usage = usage
         self.defaults = defaults
@@ -232,6 +235,7 @@ final class MacAppLibrary {
         serverApps.removeAll { $0.id == appId } // 取り直すまでに一覧へ戻さない(サーバーで消すのは呼ぶ側)
         downloadFailed.remove(appId)
         store?.remove(appId: appId)
+        chatHistory.remove(appId: appId)
         markOnServer(appId, false)
         saveList()
         usage.invalidateMe()

@@ -19,10 +19,14 @@ final class MacComposeSession: Identifiable {
         case edit(appId: String, name: String, version: Int)
     }
 
-    struct Bubble: Identifiable, Equatable {
+    struct Bubble: Identifiable, Equatable, QuestionProgressBubble {
         let id = UUID()
         var role: ChatMessage.Role
         var text: String
+        /// assistant の時だけ。応答の kind(「質問 n / 3」を数える・#1211)
+        var kind: ChatTurn.Kind? = nil
+
+        var isAssistantQuestion: Bool { role == .assistant && kind == .question }
     }
 
     /// 生成の 1 回分。経過秒・組み立て台の台本・SSE の仮置き(モックは届かない)
@@ -47,6 +51,11 @@ final class MacComposeSession: Identifiable {
     let id = UUID()
     let target: Target
     private(set) var bubbles: [Bubble] = []
+    /// このアプリの閉じた会話と反映の区切り(#1211・iOS の `chatHistory`)。今の会話(`bubbles`)は含まない。
+    /// 端末には `history + 今の会話` を保存する(吹き出しが増えるたび)ので、シートを開き直すと続きから話せる
+    private(set) var history: [ChatHistoryEntry] = []
+    /// 「最初から」の確認(これまでの会話があるとき・iOS の M9)
+    var showsRestartConfirm = false
     /// 最後の応答(チップ・案・要約カードはこれから決める)
     private(set) var latest: ChatTurn?
     private(set) var phase: Phase = .chatting
@@ -85,6 +94,7 @@ final class MacComposeSession: Identifiable {
 
     @ObservationIgnored private let ai: any AIClient
     @ObservationIgnored private let appId: String
+    @ObservationIgnored private let historyStore: ChatHistoryStore
     @ObservationIgnored private let reduceMotion: () -> Bool
     @ObservationIgnored private let isConsentGranted: @MainActor () -> Bool
     @ObservationIgnored private var task: Task<Void, Never>?
@@ -116,7 +126,8 @@ final class MacComposeSession: Identifiable {
     init(target: Target, draft: String = "", ai: any AIClient = MacComposeSession.gatedAI(),
          reduceMotion: @escaping () -> Bool = { NSWorkspace.shared.accessibilityDisplayShouldReduceMotion },
          isConsentGranted: @escaping @MainActor () -> Bool = { AIConsentStore.shared.isGranted },
-         clarifyEnabled: Bool = ClarifySettings.enabled, clarifyAutoBuild: Bool = ClarifySettings.autoBuild) {
+         clarifyEnabled: Bool = ClarifySettings.enabled, clarifyAutoBuild: Bool = ClarifySettings.autoBuild,
+         historyStore: ChatHistoryStore = .forRuntime()) {
         self.target = target
         self.draft = draft
         self.ai = ai
@@ -124,6 +135,7 @@ final class MacComposeSession: Identifiable {
         self.isConsentGranted = isConsentGranted
         self.clarifyEnabled = clarifyEnabled
         self.clarifyAutoBuild = clarifyAutoBuild
+        self.historyStore = historyStore
         switch target {
         case .create:
             appId = "mac-\(UUID().uuidString.prefix(8).lowercased())"
@@ -132,6 +144,7 @@ final class MacComposeSession: Identifiable {
             appId = id
             editVersion = version
         }
+        history = historyStore.load(appId: appId)
     }
 
     /// Mac の AI。同意が無ければどの入口からも送らないよう `ConsentGatedAIClient` で包む(最後の砦・iOS の MetamonApp と同じ)
@@ -187,29 +200,30 @@ final class MacComposeSession: Identifiable {
         if !clarifyEnabled, bubbles.isEmpty { return build(text) }
         guard requireConsent(.message(text)) else { return }
         cancelAutoBuild()
-        let first = bubbles.isEmpty
         bubbles.append(Bubble(role: .user, text: text))
+        persistHistory()
         selectedChips = []
         selectedOptions = []
         failure = nil
         sending = true
-        let history = bubbles.map { ChatMessage(role: $0.role, text: $0.text) }
+        let context = contextMessages
         let mode = mode
         task = Task { [ai, appId] in
             defer { sending = false }
             do {
-                let turn = first
-                    ? try await ClarifyFlow.startConversation(ai: ai, appId: appId, first: history[0], locale: Self.locale, mode: mode).turn
-                    : try await ai.chat(appId: appId, messages: history, locale: Self.locale, mode: mode)
+                let turn = context.count == 1
+                    ? try await ClarifyFlow.startConversation(ai: ai, appId: appId, first: context[0], locale: Self.locale, mode: mode).turn
+                    : try await ai.chat(appId: appId, messages: context, locale: Self.locale, mode: mode)
                 guard !Task.isCancelled else { return }
                 latest = turn
-                bubbles.append(Bubble(role: .assistant, text: turn.text))
+                bubbles.append(Bubble(role: .assistant, text: turn.text, kind: turn.kind))
+                persistHistory()
                 MacVoiceOver.announce(turn.text)
                 scheduleAutoBuildIfNeeded(turn)
             } catch {
                 guard !Task.isCancelled else { return }
                 // 届かなかった発言は履歴から外して入力欄に戻す(送り直しで同じ文が 2 回入らないように)
-                if bubbles.last?.role == .user { bubbles.removeLast() }
+                if bubbles.last?.role == .user { bubbles.removeLast(); persistHistory() }
                 // 送る途中で同意を取り消した時(包みが止めた): 同意の説明を出して、同意したら送り直す
                 if error as? AIConsentError == .notGranted { _ = requireConsent(.message(text)); return }
                 if draft.isEmpty { draft = text }
@@ -358,6 +372,7 @@ final class MacComposeSession: Identifiable {
     }
 
     private func complete(_ document: AppDocument, envelope: Data?, summary: String, unchanged: Bool) {
+        noteApplied(version: document.version, summary: summary, unchanged: unchanged)
         if !unchanged {
             onResult(document, envelope)
             resultAppId = document.appId
@@ -370,6 +385,73 @@ final class MacComposeSession: Identifiable {
     func cancelBuild() {
         task?.cancel()
         withAnimation { phase = .chatting }
+    }
+
+    // MARK: - 会話の履歴(#1211・iOS の `AppRuntime+ChatHistory`)
+
+    /// 閉じた会話があるか
+    var hasHistory: Bool { !history.isEmpty }
+
+    /// AI に送る messages(過去の変更の要約 + 最後の反映以降 + 今の会話・iOS と同じ `ChatContext`)
+    var contextMessages: [ChatMessage] {
+        ChatContext.messages(history: history, live: bubbles.map { ChatMessage(role: $0.role, text: $0.text) })
+    }
+
+    /// 今の質問が何問目か(「質問 n / 3」)。考えている間は出さない
+    var questionNumber: Int? {
+        sending ? nil : QuestionProgress.number(bubbles: bubbles, mode: mode, latest: latest?.kind)
+    }
+
+    /// 反映した所で今の会話を閉じ、区切りを入れる。対話を使っていない(履歴が空)なら入れない。変えられなかった時は会話だけ閉じる
+    private func noteApplied(version: Int, summary: String, unchanged: Bool) {
+        history = ChatHistoryStore.trimmed(history + liveEntries)
+        bubbles = []
+        latest = nil
+        if !unchanged, hasHistory {
+            history = ChatHistoryStore.trimmed(history + [ChatHistoryEntry(kind: .applied, text: summary, version: version)])
+        }
+        persistHistory()
+    }
+
+    /// 「最初から」。これまでの会話があれば確認を出す(iOS の M9)。無ければ今の会話だけ消す
+    func requestRestart() {
+        guard phase == .chatting, !sending else { return }
+        if hasHistory { showsRestartConfirm = true } else { restartLive() }
+    }
+
+    /// 今の会話だけ消す(これまでの会話と区切りは残す)
+    func restartLive() {
+        showsRestartConfirm = false
+        resetLive()
+        persistHistory()
+    }
+
+    /// これまでの会話も消す(戻せない)
+    func restartAll() {
+        showsRestartConfirm = false
+        resetLive()
+        history = []
+        historyStore.remove(appId: appId)
+    }
+
+    private func resetLive() {
+        cancelAutoBuild()
+        task?.cancel()
+        sending = false
+        bubbles = []
+        latest = nil
+        selectedChips = []
+        selectedOptions = []
+        failure = nil
+        // サーバーの会話は消しに行かない: 次の 1 発目は `ClarifyFlow.startConversation` が古い会話を検出してやり直す(iOS と同じ)
+    }
+
+    private func persistHistory() {
+        historyStore.save(history + liveEntries, appId: appId)
+    }
+
+    private var liveEntries: [ChatHistoryEntry] {
+        bubbles.map { ChatHistoryEntry(kind: $0.role == .user ? .user : .assistant, text: $0.text) }
     }
 
     // MARK: - 失敗(#968)
