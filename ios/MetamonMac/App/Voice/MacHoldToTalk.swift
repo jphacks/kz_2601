@@ -99,7 +99,7 @@ enum HoldToTalkKey {
     }
 }
 
-/// 会話のシートのキーを見る。シートの窓が手前の時だけ、スペース(入力欄が空)と ⇧⌘M を押している間だけ録音にする。
+/// 会話のシートのキーを見る。シートの窓が手前の時だけ、スペース(入力欄にいて空の時)と ⇧⌘M を押している間だけ録音にする。
 struct MacHoldToTalkKeys: ViewModifier {
     @Environment(MacVoiceInput.self) private var voice
     let draftIsEmpty: Bool
@@ -127,8 +127,10 @@ struct MacHoldToTalkKeys: ViewModifier {
         private var enabled = true
         private var deliver: (String) -> Void = { _ in }
         private var insertSpace: () -> Void = {}
-        private var gesture = HoldToTalkGesture()
+        private(set) var gesture = HoldToTalkGesture()
         private var token: Any?
+        /// 窓・アプリが手前でなくなった時(離したキーの keyUp が届かないので、押したままにしない)
+        private var resignTokens: [NSObjectProtocol] = []
         private var timer: Timer?
 
         func configure(voice: MacVoiceInput, draftIsEmpty: Bool, enabled: Bool,
@@ -155,13 +157,39 @@ struct MacHoldToTalkKeys: ViewModifier {
                 let consume = MainActor.assumeIsolated { self?.consumes(event) ?? false }
                 return consume ? nil : event
             }
+            let center = NotificationCenter.default
+            resignTokens = [
+                center.addObserver(forName: NSWindow.didResignKeyNotification, object: nil, queue: .main) { [weak self] note in
+                    MainActor.assumeIsolated {
+                        guard let self, let window = self.window, note.object as? NSWindow === window else { return }
+                        self.interrupt()
+                    }
+                },
+                center.addObserver(forName: NSApplication.didResignActiveNotification, object: nil, queue: .main) { [weak self] _ in
+                    MainActor.assumeIsolated { self?.interrupt() }
+                },
+            ]
         }
 
         func remove() {
             if let token { NSEvent.removeMonitor(token) }
             token = nil
+            resignTokens.forEach(NotificationCenter.default.removeObserver)
+            resignTokens = []
+            interrupt()
+        }
+
+        /// 押したまま別の操作で終わった。録音を始めていれば止める(`HoldToTalkGesture.interrupt`)
+        func interrupt() {
             timer?.invalidate()
+            heldKeyCode = nil
             handle(gesture.interrupt())
+        }
+
+        /// キーを押した(`consumes` の keyDown)
+        func press(_ mode: HoldToTalkGesture.Mode, keyCode: UInt16, isRecording: Bool) {
+            heldKeyCode = keyCode
+            handle(gesture.press(mode, at: Date(), isRecording: isRecording))
         }
 
         private func consumes(_ event: NSEvent) -> Bool {
@@ -173,14 +201,15 @@ struct MacHoldToTalkKeys: ViewModifier {
                     return isHeldKey(event)
                 }
                 let field = window.firstResponder as? NSTextView
+                // スペースは入力欄にいる時だけ(マイクのボタン等にいる時はそのボタンの操作に任せる)
+                if event.keyCode == HoldToTalkKey.spaceKeyCode, field == nil { return false }
                 let isRecording = voice?.isRecording ?? false
                 guard enabled || isRecording,
                       let mode = HoldToTalkKey.mode(keyCode: event.keyCode, characters: event.charactersIgnoringModifiers,
                                                      modifiers: event.modifierFlags, draftIsEmpty: draftIsEmpty,
                                                      fieldHasText: !(field?.string.isEmpty ?? true),
                                                      isComposing: field?.hasMarkedText() ?? false) else { return false }
-                heldKeyCode = event.keyCode
-                handle(gesture.press(mode, at: Date(), isRecording: isRecording))
+                press(mode, keyCode: event.keyCode, isRecording: isRecording)
                 if mode == .delayed {
                     timer?.invalidate()
                     timer = Timer.scheduledTimer(withTimeInterval: HoldToTalkGesture.threshold, repeats: false) { [weak self] _ in
@@ -204,7 +233,7 @@ struct MacHoldToTalkKeys: ViewModifier {
             }
         }
 
-        private var heldKeyCode: UInt16?
+        private(set) var heldKeyCode: UInt16?
 
         private func isHeldKey(_ event: NSEvent) -> Bool { event.keyCode == heldKeyCode }
 

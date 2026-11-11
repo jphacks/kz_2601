@@ -23,6 +23,13 @@ struct MacMicButton: View {
                     run(gesture.press(.immediate, at: Date(), isRecording: voice.isRecording))
                 }
                 .onEnded { _ in run(gesture.release(at: Date())) })
+            // フルキーボードアクセス: Tab で止まり、スペース・Return で押して開始・もう一度で終了(押している間の録音はポインタだけ)
+            .focusable(!isDisabled, interactions: .activate)
+            .onKeyPress(keys: [.space, .return]) { _ in
+                guard !isDisabled else { return .ignored }
+                voice.toggle(deliver: deliver)
+                return .handled
+            }
             .help(voice.isRecording ? Text("話し終えた(⇧⌘M)。長く押した時は離すと送ります")
                                     : Text("声で頼む(⇧⌘M)。押している間だけ話すこともできます"))
             .accessibilityElement()

@@ -98,6 +98,11 @@ final class MacComposeSession: Identifiable {
     @ObservationIgnored private let reduceMotion: () -> Bool
     @ObservationIgnored private let isConsentGranted: @MainActor () -> Bool
     @ObservationIgnored private var task: Task<Void, Never>?
+    /// 閉じた後・サインアウトの後始末の後は履歴を書かない(走っていた返事が消した履歴を書き戻さないように)
+    @ObservationIgnored private var closed = false
+    @ObservationIgnored private let wipeGeneration = MacComposeSession.wipeCount
+    /// `MacLocalWipe` が消すたびに進める
+    static var wipeCount = 0
     /// 結果を中央に当てる(MacRootView がアプリの一覧を差し替える)
     /// 2 つ目は端末に残す形(封筒・#969)
     @ObservationIgnored var onResult: (AppDocument, Data?) -> Void = { _, _ in }
@@ -447,6 +452,7 @@ final class MacComposeSession: Identifiable {
     }
 
     private func persistHistory() {
+        guard !closed, wipeGeneration == Self.wipeCount else { return }
         historyStore.save(history + liveEntries, appId: appId)
     }
 
@@ -491,6 +497,7 @@ final class MacComposeSession: Identifiable {
 
     /// シートを閉じる時。走っている呼び出しを止める
     func close() {
+        closed = true
         cancelAutoBuild()
         task?.cancel()
     }

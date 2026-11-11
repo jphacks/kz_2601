@@ -85,6 +85,33 @@ final class MacComposeHistoryTests: XCTestCase {
         XCTAssertTrue(store.load(appId: appId).isEmpty)
     }
 
+    func testClosedSessionDoesNotWriteHistoryBack() async throws {
+        let store = ChatHistoryStore()
+        let ai = ScriptedAI(turns: [ChatTurn(kind: .question, text: "どの色?", turn: 1)])
+        let session = editSession(store, ai: ai)
+        session.send("色")
+        try await waitUntil { session.bubbles.count == 2 }
+        session.close()
+        store.removeAll() // サインアウトの後始末
+        session.restartLive() // 閉じた後に履歴を書こうとする
+        XCTAssertTrue(store.load(appId: appId).isEmpty, "閉じた会話は消した履歴を書き戻さない")
+    }
+
+    func testWipeStopsOpenSessionFromWritingHistoryBack() async throws {
+        let store = ChatHistoryStore()
+        let ai = ScriptedAI(turns: [ChatTurn(kind: .question, text: "どの色?", turn: 1)])
+        let session = editSession(store, ai: ai)
+        session.send("色")
+        try await waitUntil { session.bubbles.count == 2 }
+        MacComposeSession.wipeCount += 1 // `MacLocalWipe.run` が進める
+        store.removeAll()
+        session.restartLive()
+        XCTAssertTrue(store.load(appId: appId).isEmpty, "後始末の後は閉じていない会話も書き戻さない")
+        let next = editSession(store, ai: ai)
+        next.restartLive()
+        XCTAssertTrue(next.history.isEmpty)
+    }
+
     func testDeletingAppClearsItsHistory() throws {
         let store = ChatHistoryStore()
         store.save([ChatHistoryEntry(kind: .user, text: "家計簿")], appId: appId)

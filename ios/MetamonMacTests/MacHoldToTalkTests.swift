@@ -64,6 +64,28 @@ final class MacHoldToTalkTests: XCTestCase {
         XCTAssertFalse(g.isPressed)
     }
 
+    func testResigningKeyWindowOrAppReleasesHeldKey() {
+        let monitor = MacHoldToTalkKeys.Monitor()
+        let window = NSWindow()
+        monitor.window = window
+        monitor.install()
+        defer { monitor.remove() }
+
+        monitor.press(.immediate, keyCode: 46, isRecording: false)
+        XCTAssertTrue(monitor.gesture.isPressed)
+        NotificationCenter.default.post(name: NSWindow.didResignKeyNotification, object: NSWindow()) // ほかの窓
+        XCTAssertTrue(monitor.gesture.isPressed, "ほかの窓は関係ない")
+        NotificationCenter.default.post(name: NSWindow.didResignKeyNotification, object: window)
+        XCTAssertFalse(monitor.gesture.isPressed, "keyUp が届かなくても押したままにしない")
+        XCTAssertNil(monitor.heldKeyCode)
+
+        monitor.press(.delayed, keyCode: HoldToTalkKey.spaceKeyCode, isRecording: false)
+        XCTAssertTrue(monitor.gesture.isPressed)
+        NotificationCenter.default.post(name: NSApplication.didResignActiveNotification, object: NSApp)
+        XCTAssertFalse(monitor.gesture.isPressed)
+        XCTAssertNil(monitor.heldKeyCode)
+    }
+
     // MARK: - どのキーを使うか
 
     func testKeyClassification() {
