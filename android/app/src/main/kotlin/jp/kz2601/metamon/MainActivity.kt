@@ -64,6 +64,7 @@ import jp.kz2601.metamon.renderer.components.feed.LocalFeedHost
 import jp.kz2601.metamon.renderer.theme.MetamonRenderTheme
 import jp.kz2601.metamon.renderer.theme.ReadableWidth
 import jp.kz2601.metamon.retention.RetentionPromptHost
+import jp.kz2601.metamon.retention.retentionPending
 import jp.kz2601.metamon.runtime.AppRuntime
 import jp.kz2601.metamon.runtime.NavigationSnapshot
 import jp.kz2601.metamon.runtime.TranscriberDictationHost
@@ -79,6 +80,7 @@ import jp.kz2601.metamon.voice.VoiceFab
 import jp.kz2601.metamon.voice.VoiceUiState
 import jp.kz2601.metamon.voice.VoiceViewModel
 import jp.kz2601.metamon.voice.stage.BuildStageHost
+import jp.kz2601.metamon.voice.stage.BuildStageState
 import jp.kz2601.metamon.services.AppSummary
 import jp.kz2601.metamon.services.sharing.IssuedShares
 import jp.kz2601.metamon.services.sharing.MembersModel
@@ -205,6 +207,8 @@ fun MetamonApp(container: AppContainer) {
     }
     val state by vm.state.collectAsStateWithLifecycle()
     val runtime = container.runtime
+    // 保存期間の確認が待っているか(完成の後のお知らせの順番・#1271)
+    val retentionWaiting = retentionPending(runtime)
     val runtimeState by runtime.state.collectAsStateWithLifecycle()
     val hotReloadStatus by runtime.hotReloadStatus.collectAsStateWithLifecycle()
 
@@ -331,7 +335,13 @@ fun MetamonApp(container: AppContainer) {
     ) { padding ->
         Box(Modifier.fillMaxSize().padding(padding)) {
             // 生成中の組み立て台・変わった部品の印・完成の後のお知らせ(#894)
-            BuildStageHost(state, onCancel = vm::cancelGenerate, onOpenVoice = vm::openVoice, editHints = container.tutorial.editHints) {
+            BuildStageHost(
+                state,
+                onCancel = vm::cancelGenerate,
+                onOpenVoice = vm::openVoice,
+                editHints = container.tutorial.editHints,
+                retentionPending = retentionWaiting,
+            ) {
                 if (state.isInitial) {
                     VoiceRoute(vm, onMicLongPress = openSwitcher)
                 } else {
@@ -410,8 +420,13 @@ fun MetamonApp(container: AppContainer) {
         TutorialScreen(onFinish = container.tutorialPrompt::finish)
     }
 
-    // 記録の保存期間の確認(#482)。生成中・音声のシートの間は待つ
-    RetentionPromptHost(runtime, busy = state.isGenerating || state.voiceOpen, onStop = vm::generateNow)
+    // 記録の保存期間の確認(#482)。完成の後のお知らせの順番(要約の後・#1271)で、生成中・音声のシートの間は待つ
+    RetentionPromptHost(
+        runtime,
+        busy = state.isGenerating || state.voiceOpen,
+        turn = BuildStageState.isRetentionTurn(state, retentionWaiting),
+        onStop = vm::generateNow,
+    )
     // フィードバックの画面(#319)と端末を振って開く仕組み。設定から開いた時に上に重ねる
     FeedbackComposerHost(container)
     // Tailor It Pro の課金画面(AI ボタン・設定から)。サインインのたびにサーバーの Pro を読み直す
