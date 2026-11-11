@@ -275,6 +275,7 @@ private fun Node(c: Component, s: ScreenScope) {
         }
         ComponentType.LIST -> ListLeaf(c, s)
         ComponentType.FILE_IMPORT -> FileImportLeaf(c, s.io)
+        in PlayLeaves.types -> PlayLeaf(c, s.session, s.route, s.form, s.data, s.perform)
         in InputLeaves.types -> InputNode(c, s)
         else -> Text(
             if (c.type == ComponentType.UNKNOWN) "知らない部品: ${DesktopLeaves.typeName(c)}" else "デスクトップ版ではまだ使えない部品: ${DesktopLeaves.typeName(c)}",

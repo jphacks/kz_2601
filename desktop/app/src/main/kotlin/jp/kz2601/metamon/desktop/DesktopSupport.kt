@@ -35,6 +35,7 @@ object DesktopLeaves {
         ComponentType.TOGGLE,
         ComponentType.PICKER,
         ComponentType.STEPPER,
+        *PlayLeaves.types.toTypedArray(),
     ) + DISPLAY_LEAVES + InputLeaves.types
 
     /** 適合テストの `state`(rendered / unavailable / unknown)。hidden・needsForm はまだ見ない。 */
