@@ -14,10 +14,14 @@ import jp.kz2601.metamon.services.MorphResult
 import jp.kz2601.metamon.services.MyUsage
 import jp.kz2601.metamon.services.PlanUsageSource
 import jp.kz2601.metamon.services.RemainingToday
+import jp.kz2601.metamon.services.RemainingTodayStore
+import jp.kz2601.metamon.services.http.FailureKind
+import jp.kz2601.metamon.services.http.RateLimitInfo
 import jp.kz2601.metamon.services.mock.MockSpeechTranscriber
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.advanceUntilIdle
@@ -187,6 +191,7 @@ class VoicePolishTest {
         clock: () -> Instant = { now },
         ai: AIClient = FakeAI(ChatTurn(kind = ChatTurn.Kind.QUESTION, text = "何を記録しますか?", turn = 1)),
         voiceOnly: Boolean = true,
+        remainingFeed: StateFlow<RemainingToday?>? = null,
     ): VoiceViewModel {
         val dispatcher = StandardTestDispatcher(testScheduler)
         return VoiceViewModel(
@@ -199,6 +204,7 @@ class VoicePolishTest {
             speech = SpeechReader(enabled = { speechOn }, engine = engine),
             usage = usage,
             clock = clock,
+            remainingFeed = remainingFeed,
             scope = CoroutineScope(dispatcher + Job()),
         )
     }
@@ -293,6 +299,46 @@ class VoicePolishTest {
         advanceUntilIdle()
         assertEquals(2, usage.calls)
         assertEquals(40, vm.state.value.remainingToday?.remaining)
+    }
+
+    @Test
+    fun remainingTodayFromResponseHeadersWithoutUsage() = runTest {
+        // #1203: usage を読み直さなくても、ai の応答のヘッダーで数が減る。古い値では上書きしない
+        val store = RemainingTodayStore()
+        val vm = vm(speechOn = false, engine = FakeEngine(), remainingFeed = store.value)
+        advanceUntilIdle()
+        val reset = Instant.parse("2026-11-11T15:00:00Z")
+        store.record(RemainingToday(30, 60, reset, observedAt = now))
+        advanceUntilIdle()
+        assertEquals(30, vm.state.value.remainingToday?.remaining)
+        store.record(RemainingToday(27, 60, reset, observedAt = now.plusSeconds(10)))
+        advanceUntilIdle()
+        assertEquals(27, vm.state.value.remainingToday?.remaining)
+        assertNull(vm.state.value.error)
+    }
+
+    @Test
+    fun exhaustedShowsLimitCardOncePerDay() = runTest {
+        val store = RemainingTodayStore()
+        val vm = vm(speechOn = false, engine = FakeEngine(), remainingFeed = store.value)
+        advanceUntilIdle()
+        val reset = Instant.parse("2026-11-11T15:00:00Z")
+        store.record(RemainingToday(0, 60, reset, observedAt = now))
+        advanceUntilIdle()
+        val kind = (vm.state.value.error as? VoiceError.Request)?.kind as? FailureKind.RateLimited
+        assertEquals(RateLimitInfo.Scope.USER, kind?.info?.scope)
+        assertEquals(reset, kind?.info?.resetAt)
+        assertEquals(0, kind?.info?.remaining)
+        // 閉じたら同じ日にはもう出さない
+        vm.dismissError()
+        store.record(RemainingToday(0, 60, reset, observedAt = now.plusSeconds(10)))
+        advanceUntilIdle()
+        assertNull(vm.state.value.error)
+        // 次の日の 0 はまた出す
+        val next = reset.plusSeconds(86_400)
+        store.record(RemainingToday(0, 60, next, observedAt = now.plusSeconds(20)))
+        advanceUntilIdle()
+        assertTrue(vm.state.value.error is VoiceError.Request)
     }
 
     // MARK: - マイク FAB の吸着

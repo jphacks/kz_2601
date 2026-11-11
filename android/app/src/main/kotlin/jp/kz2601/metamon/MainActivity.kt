@@ -207,6 +207,8 @@ fun MetamonApp(container: AppContainer) {
             speech = AndroidSpeechEngine.reader(context),
             // 「今日の残り」(`GET /v1/me/usage`・iOS と同じ口)。モックは出さない
             usage = if (container.knobs.mock) null else container.appConfig as? PlanUsageSource,
+            // ai の応答のヘッダーから「今日の残り」を入れる(#1203)。モックはヘッダーが無いので何も来ない
+            remainingFeed = container.remainingToday.value,
             // 上限のカードの「Pro にする」(#1103)。Play もモックの購入も無い構成ではボタンを出さない
             requestPaywall = container.pro.takeIf { it.isAvailable }?.let { pro -> pro::requestPaywall },
         )
