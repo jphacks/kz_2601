@@ -180,6 +180,39 @@ final class MatchingFlowTests: XCTestCase {
         XCTAssertNotNil(MatchingUI.shared.askingAge, "押した時は聞く")
     }
 
+    /// 確認をスワイプで閉じたら「18 歳未満」と同じ: 開いた時・一覧の読み込みでは聞かず、ボタンを押したら聞く。
+    func testSwipeDismissIsNotAskedAgainOnOpenOrList() async throws {
+        let fake = FakeMatching()
+        let rt = try await runtime(fake)
+        await rt.prepareMatching()
+        XCTAssertNotNil(MatchingUI.shared.askingAge)
+        let toastBefore = rt.toast
+        rt.dismissAdult()
+        XCTAssertNil(MatchingUI.shared.askingAge)
+        XCTAssertEqual(rt.toast, toastBefore, "答えていないので「使えません」は出さない")
+        await rt.prepareMatching()
+        XCTAssertNil(MatchingUI.shared.askingAge, "開き直しでは聞かない")
+        fake.listError = ageUnconfirmed
+        await rt.refreshMatches([.incoming])
+        XCTAssertNil(MatchingUI.shared.askingAge, "一覧の読み込みでは聞かない")
+        await rt.sendInterest(entity: "profile", record: hanako)
+        guard case .send? = MatchingUI.shared.askingAge else { return XCTFail("「つながりたい」を押した時は聞く") }
+        XCTAssertFalse(fake.calls.contains { $0.hasPrefix("send") }, "確認するまで送らない")
+    }
+
+    /// スワイプで閉じた後でも、ボタンからの確認で「18 歳以上」と答えれば送れる。
+    func testSwipeDismissThenConfirmOnButtonSends() async throws {
+        let fake = FakeMatching()
+        let rt = try await runtime(fake)
+        await rt.prepareMatching()
+        rt.dismissAdult()
+        await rt.sendInterest(entity: "profile", record: hanako)
+        let pending = try XCTUnwrap(MatchingUI.shared.askingAge)
+        await rt.confirmAdult(pending)
+        XCTAssertFalse(MatchingUI.shared.declinedAge)
+        XCTAssertTrue(fake.calls.contains { $0.hasPrefix("send") })
+    }
+
     /// 一覧が 400 age_unconfirmed: 送った記録を消して確認を出す → 同意で PUT してから読み直す。
     func testListAgeUnconfirmedAsksThenReloads() async throws {
         let fake = FakeMatching()
