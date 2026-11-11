@@ -2505,6 +2505,23 @@
         }
       }
     },
+    "すべての行をコピー(CSV)" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Copy All Rows (CSV)"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "すべての行をコピー(CSV)"
+          }
+        }
+      }
+    },
     "すれ違い通信をはじめますか？" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -3304,6 +3321,23 @@
         }
       }
     },
+    "クリップボードに画像がありません" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "There is no image on the clipboard"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "クリップボードに画像がありません"
+          }
+        }
+      }
+    },
     "グラフ" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -3368,6 +3402,40 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "コピーした画像から QR コードを読み取ります"
+          }
+        }
+      }
+    },
+    "コピーした画像を入れます" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Add the copied image"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "コピーした画像を入れます"
+          }
+        }
+      }
+    },
+    "コピーした画像を入れます(⌘V)" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Add the copied image (⌘V)"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "コピーした画像を入れます(⌘V)"
           }
         }
       }
@@ -7576,6 +7644,40 @@
         }
       }
     },
+    "画像のファイルだけ入れられます" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Only image files can be added"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "画像のファイルだけ入れられます"
+          }
+        }
+      }
+    },
+    "画像のファイルを選びます。画像をここにドロップしても入れられます" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Choose an image file. You can also drop an image here."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "画像のファイルを選びます。画像をここにドロップしても入れられます"
+          }
+        }
+      }
+    },
     "画像をコピー" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -8939,6 +9041,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "負け"
+          }
+        }
+      }
+    },
+    "貼り付け" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Paste"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "貼り付け"
           }
         }
       }

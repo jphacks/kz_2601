@@ -89,6 +89,12 @@ struct ListLeaf: View {
                                 Divider()
                             }
                             Button(L("コピー"), systemImage: "doc.on.doc") { copy(row, entity: entity) }
+                            if rows.count > 1 {
+                                // 一覧全体(#1035): 書き出しと同じ列の CSV。⌘A → ⌘C と同じ中身
+                                Button(L("すべての行をコピー(CSV)"), systemImage: "tablecells") {
+                                    copyCSV(rows, entity: entity)
+                                }
+                            }
                             if let photo = rowImage(row, entity: entity) {
                                 ImageMenuItems(image: photo.image, title: photo.title, copyLabel: L("画像をコピー")) {
                                     imageToSave = .init(document: ImageFileDocument(image: photo.image),
@@ -136,6 +142,11 @@ struct ListLeaf: View {
             }
             // ⌘C(#1332): フォーカスのある行を右クリックの「コピー」と同じテキストで
             .onCopyCommand { copyCommand(rows: rows, entity: entity) }
+            // ⌘A(#1035): 行を全部選ぶ。続けて ⌘C で一覧全体を CSV に(入力欄が文字を受けている時は入力欄の全選択に任せる)
+            .onCommand(#selector(NSResponder.selectAll(_:))) {
+                guard listFocused, !ListRowCopyCommand.textInputActive else { return }
+                selection.selectAll(order: ids)
+            }
             // ⌫: フォーカスのある行を、確認を挟んでから消す(消せない行では何もしない)
             .onDeleteCommand { deleteCommand(rows: rows, entity: entity, entityId: entityId) }
             #endif
@@ -272,7 +283,11 @@ struct ListLeaf: View {
 
     /// 選んだ行をまとめてコピー: 書き出しと同じ列の CSV
     private func copySelected(rows: [Record], entity: Entity?) {
-        let csv = ListRowCopyText.csv(records: selectedRecords(rows), entity: entity, rt: rt)
+        copyCSV(selectedRecords(rows), entity: entity)
+    }
+
+    private func copyCSV(_ records: [Record], entity: Entity?) {
+        let csv = ListRowCopyText.csv(records: records, entity: entity, rt: rt)
         guard !csv.isEmpty else { return }
         PlatformPasteboard.setString(csv)
     }

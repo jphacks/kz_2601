@@ -61,6 +61,8 @@ struct MacRootView: View {
     #if !APP_STORE_REVIEW
     /// 共有のリンクから取り込んだアプリ(#1287)を一覧に足して開く
     @State private var shareFlow = MacShareFlow.shared
+    /// ツールバーの「共有」(#1035)のシート
+    @State private var shareApp: MacShareAppModel?
     #endif
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
@@ -136,7 +138,8 @@ struct MacRootView: View {
         .modifier(SidebarSearchFocus(focused: $searchFocused))
         .toolbar {
             ShellToolbar(hasApp: selectedApp != nil, canCompose: canCompose, newApp: newApp, ask: ask, speak: speak,
-                         canShowScreenMap: canShowScreenMap, showScreenMap: showScreenMap)
+                         canShowScreenMap: canShowScreenMap, showScreenMap: showScreenMap,
+                         canShare: canShare, share: openShare)
         }
         .frame(minWidth: Self.minWindowSize.width, minHeight: Self.minWindowSize.height)
         .focusedSceneValue(\.shellActions, shellActions)
@@ -146,6 +149,11 @@ struct MacRootView: View {
         .onChange(of: shareFlow.adopted?.id) { adoptShared() }
         // フィードバックに添える今のアプリ(#1330)。サーバーにあるアプリの時だけ(選択・版・保存先が変わったら入れ替える)
         .onChange(of: feedbackAppKey, initial: true) { MacFeedbackCenter.shared.currentApp = feedbackApp }
+        #endif
+        #if !APP_STORE_REVIEW
+        .sheet(item: $shareApp) { model in
+            MacShareAppSheet(model: model, onClose: { shareApp = nil })
+        }
         #endif
         .sheet(item: $compose, onDismiss: noteFinishedCompose) { session in
             ComposeSheet(session: session, onClose: { compose = nil }, undo: finishedUndo(session))
@@ -402,6 +410,25 @@ struct MacRootView: View {
     /// 中央にアプリがあり、会話のシートが閉じている時だけ開ける
     private var canShowScreenMap: Bool { selectedApp != nil && compose == nil }
 
+    /// ツールバーの「共有」(#1035)を押せるか。サーバーに保存した自分のアプリだけ
+    private var canShare: Bool {
+        #if APP_STORE_REVIEW
+        false
+        #else
+        guard let app = selectedApp, compose == nil else { return false }
+        return MacShareAppModel.canShare(isCreated: library.isCreated(app.id), isOnServer: library.isOnServer(app.id),
+                                         signedIn: MacAccount.shared.session.user != nil,
+                                         sharingAvailable: MacServices.shared.sharing != nil)
+        #endif
+    }
+
+    private func openShare() {
+        #if !APP_STORE_REVIEW
+        guard canShare, let app = selectedApp else { return }
+        shareApp = MacShareAppModel(appId: app.id, appName: app.name, sharing: MacServices.shared.sharing)
+        #endif
+    }
+
     /// 会話のシートを開ける・版を戻せるか。画面マップのシートが出ている間は開かない(シートを重ねない)
     private var canCompose: Bool { compose == nil && !showsScreenMap }
 
@@ -604,7 +631,8 @@ struct MacRootView: View {
 }
 
 /// ツールバー。ショートカットはメニュー(MacCommands)が持つ。
-/// 新しいアプリ・文字で頼む・声で頼むは会話のシート(#967・#966)。画面マップはシート(#970)。共有は後の Issue なので今は押せない。
+/// 新しいアプリ・文字で頼む・声で頼むは会話のシート(#967・#966)。画面マップはシート(#970)。
+/// 共有はシェアリンクのシート(#1035)。サーバーに保存した自分のアプリの時だけ押せる。
 struct ShellToolbar: ToolbarContent {
     let hasApp: Bool
     var canCompose = true
@@ -613,6 +641,8 @@ struct ShellToolbar: ToolbarContent {
     var speak: () -> Void = {}
     var canShowScreenMap = false
     var showScreenMap: () -> Void = {}
+    var canShare = false
+    var share: () -> Void = {}
 
     var body: some ToolbarContent {
         ToolbarItemGroup(placement: .primaryAction) {
@@ -628,12 +658,22 @@ struct ShellToolbar: ToolbarContent {
             Button(action: showScreenMap) { Label("画面マップ", systemImage: "map") }
                 .help("画面のつながりを見る")
                 .disabled(!canShowScreenMap)
-            Button {} label: { Label("共有", systemImage: "square.and.arrow.up") }
-                .help("このアプリを共有する")
-                .disabled(true)
+            Button(action: share) { Label("共有", systemImage: "square.and.arrow.up") }
+                .help(shareHelp)
+                .disabled(!canShare)
             SettingsLink { Label("設定", systemImage: "gearshape") }
                 .help("設定を開く")
         }
+    }
+}
+
+extension ShellToolbar {
+    var shareHelp: String {
+        #if APP_STORE_REVIEW
+        String(localized: "このアプリを共有する")
+        #else
+        MacShareAppModel.help(canShare: canShare, hasApp: hasApp)
+        #endif
     }
 }
 

@@ -70,6 +70,14 @@ struct ListRowMultiSelection: Equatable {
         cursor = next
     }
 
+    /// ⌘A(#1035): 一覧の行を全部選ぶ。⌘C で一覧全体を CSV にする時の入口。起点は先頭・カーソルは末尾
+    mutating func selectAll(order: [String]) {
+        guard !order.isEmpty else { return select(nil) }
+        ids = Set(order)
+        anchor = order.first
+        cursor = order.last
+    }
+
     /// 消えた行を外す
     mutating func prune(order: [String]) {
         let alive = Set(order)
