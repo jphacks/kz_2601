@@ -204,6 +204,8 @@ fun MetamonApp(container: AppContainer) {
             speech = AndroidSpeechEngine.reader(context),
             // 「今日の残り」(`GET /v1/me/usage`・iOS と同じ口)。モックは出さない
             usage = if (container.knobs.mock) null else container.appConfig as? PlanUsageSource,
+            // 上限のカードの「Pro にする」(#1103)。Play もモックの購入も無い構成ではボタンを出さない
+            requestPaywall = container.pro.takeIf { it.isAvailable }?.let { pro -> pro::requestPaywall },
         )
     }
     val state by vm.state.collectAsStateWithLifecycle()

@@ -1,6 +1,7 @@
 package jp.kz2601.metamon.purchase
 
 import android.app.Activity
+import jp.kz2601.metamon.services.http.PaidFeature
 import jp.kz2601.metamon.services.purchase.EntitlementClient
 import jp.kz2601.metamon.services.purchase.PlayPurchase
 import jp.kz2601.metamon.services.purchase.PlayPurchaseRules
@@ -25,7 +26,22 @@ interface ProBilling {
 }
 
 /** 課金画面を開いた理由(iOS の `PaywallReason`)。見出しと「閉じるとどうなるか」が変わる */
-enum class PaywallReason { SETTINGS, AI_TEXT, AI_CHAT }
+sealed interface PaywallReason {
+    /** 設定の「Pro にする」・プランの上限のカード(#317) */
+    data object SETTINGS : PaywallReason
+
+    /** オンラインの AI で書く(#873) */
+    data object AI_TEXT : PaywallReason
+
+    /** AI と話す部品(#873) */
+    data object AI_CHAT : PaywallReason
+
+    /** 今日の上限のカードの「Pro にする」(iOS の `limitReached`) */
+    data object LIMIT_REACHED : PaywallReason
+
+    /** 共有・オンラインなどの有料機能(iOS の `paidFeature`)。[features] が空なら「みんなで共有するデータ」 */
+    data class PaidFeatures(val features: List<PaidFeature> = emptyList()) : PaywallReason
+}
 
 /** 課金画面の下に出す知らせ */
 enum class ProMessage { PENDING, PURCHASE_FAILED, NOT_VERIFIED, UNAVAILABLE, RESTORED, RESTORE_NONE, RESTORE_FAILED }
