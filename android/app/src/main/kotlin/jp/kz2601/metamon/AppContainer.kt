@@ -110,6 +110,7 @@ import jp.kz2601.metamon.services.http.AuthTokenProvider
 import jp.kz2601.metamon.services.http.ClientInfo
 import jp.kz2601.metamon.services.http.DeviceContext
 import jp.kz2601.metamon.services.http.MetamonHttp
+import jp.kz2601.metamon.services.http.SessionExpirySignal
 import jp.kz2601.metamon.services.live.FirebaseAppCheckTokenProvider
 import jp.kz2601.metamon.services.live.FirebaseAuthService
 import jp.kz2601.metamon.services.live.FirebaseBootstrap
@@ -154,6 +155,7 @@ import jp.kz2601.metamon.update.UpdateGate
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.launch
 import java.io.File
 import java.time.Instant
 
@@ -251,6 +253,8 @@ class AppContainer(
     val thumbnails: AppThumbnailStore = AppThumbnailStore(null),
     /** 1 つのアプリの通知の予約・出ている通知を消す(アプリ削除・#896)。既定は何もしない(テスト) */
     private val forgetAppNotifications: (String) -> Unit = {},
+    /** 「トークンを取り直しても 401」の知らせ(#1102)。モックは null(通信しない) */
+    private val sessionExpiry: SessionExpirySignal? = null,
 ) {
     /** 削除したアプリの端末のデータを消す([LocalAppForget])。サーバーの削除が済んでから呼ぶ。 */
     suspend fun forgetAppLocally(appId: String) = forgetApp(appId)
@@ -279,6 +283,11 @@ class AppContainer(
 
     /** サインイン状態(未サインインならサインイン画面) */
     val session = AuthSession(auth, beforeSignOut = { push?.unregister() })
+
+    /** セッション切れ(#1102)でサインアウトしてサインイン画面に理由を出す。[MetamonApplication] が 1 回だけ呼ぶ。 */
+    fun startSessionExpiry(scope: CoroutineScope) {
+        sessionExpiry?.listener = { scope.launch { session.expire() } }
+    }
 
     /** 同意の画面を出す時点(起動時・AI に送る直前・設定から・#888) */
     val consentPrompt = ConsentPrompt(consent)
@@ -476,8 +485,12 @@ class AppContainer(
             val client = MetamonHttp.defaultClient()
             // 画像も同じ接続を使う(トークンは付けない)
             RemoteImages.install(context, client)
-            fun http(baseUrl: String, remainingSink: ((RemainingToday) -> Unit)? = null) =
-                MetamonHttp(baseUrl, tokens, clientInfo, appCheck = appCheck, client = client, device = device, remainingSink = remainingSink)
+            // トークンを取り直しても 401 ならサインイン画面へ(#1102)。受け手は組み立て後に入れる
+            val sessionExpiry = SessionExpirySignal()
+            fun http(baseUrl: String, remainingSink: ((RemainingToday) -> Unit)? = null) = MetamonHttp(
+                baseUrl, tokens, clientInfo, appCheck = appCheck, client = client, device = device, remainingSink = remainingSink,
+                onSessionExpired = sessionExpiry::fire,
+            )
             // ai の応答の `X-RateLimit-*` から「今日の残り」を入れる(iOS の HTTP.noteRemaining・#1203)
             val remainingToday = RemainingTodayStore()
             val log: (String) -> Unit = { Log.w(TAG, it) }
@@ -556,6 +569,7 @@ class AppContainer(
                 },
                 creationUsage = CreationUsageStore(SharedPreferencesKeyValueStore.of(context, CREATION_PREFS)),
                 remainingToday = remainingToday,
+                sessionExpiry = sessionExpiry,
             )
         }
 

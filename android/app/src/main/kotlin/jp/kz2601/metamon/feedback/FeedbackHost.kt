@@ -48,6 +48,10 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
+import androidx.compose.material3.OutlinedCard
+import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.semantics.LiveRegionMode
+import androidx.compose.ui.semantics.liveRegion
 import jp.kz2601.metamon.R
 import jp.kz2601.metamon.renderer.a11y.TalkBack
 import jp.kz2601.metamon.renderer.a11y.rememberTalkBackRunning
@@ -83,8 +87,10 @@ fun BoxScope.FeedbackHost(vm: VoiceViewModel, state: VoiceUiState, runtime: AppR
         vm.dismissNotice()
     }
 
-    if (!state.isInitial) {
-        Column(Modifier.align(Alignment.TopCenter).fillMaxWidth().padding(horizontal = 12.dp)) {
+    Column(Modifier.align(Alignment.TopCenter).fillMaxWidth().padding(horizontal = 12.dp)) {
+        // 起動時にサーバーへ届かず保存した DSL も無い(#1107)。話しかける前の画面にも出す。つながったら自動で下がる
+        if (runtimeState.unreachable) UnreachableCard()
+        if (!state.isInitial) {
             // 変身の要約とホットリロードの「最新の内容に更新しました」(#1108)は 1 枠で、後から来た方に置き換える(#1320)
             TopBannerSlot(vm, state, runtime, runtimeState)
             // シートを閉じた後の失敗(生成は送るとシートを閉じる)。シートの中ではシートが出す
@@ -116,6 +122,17 @@ fun BoxScope.FeedbackHost(vm: VoiceViewModel, state: VoiceUiState, runtime: AppR
     }
 
     runtimeState.confirm?.let { ConfirmDialog(it, runtime) }
+}
+
+/** 「サーバーに接続できません」の消えない状態カード(iOS の `errorCard = .notice(unreachable…)`・#1107)。 */
+@Composable
+private fun UnreachableCard() {
+    OutlinedCard(Modifier.fillMaxWidth().padding(vertical = 8.dp).testTag("runtime.unreachable").semantics { liveRegion = LiveRegionMode.Polite }) {
+        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Text(stringResource(R.string.runtime_unreachable_title), style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
+            Text(stringResource(R.string.runtime_unreachable_body), style = MaterialTheme.typography.bodyMedium)
+        }
+    }
 }
 
 private val UndoNotice.text: Int

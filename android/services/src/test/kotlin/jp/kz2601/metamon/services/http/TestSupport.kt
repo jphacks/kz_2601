@@ -45,6 +45,7 @@ fun MockWebServer.metamonHttp(
     sleeps: MutableList<Long> = mutableListOf(),
     retry: RetryPolicy = RetryPolicy(),
     remainingSink: ((RemainingToday) -> Unit)? = null,
+    onSessionExpired: (() -> Unit)? = null,
 ): MetamonHttp = MetamonHttp(
     baseUrl = baseUrl(),
     tokens = tokens,
@@ -56,6 +57,7 @@ fun MockWebServer.metamonHttp(
     device = testDevice,
     sleep = { sleeps += it },
     remainingSink = remainingSink,
+    onSessionExpired = onSessionExpired,
 )
 
 fun json(status: Int, body: String, vararg headers: Pair<String, String>): MockResponse =

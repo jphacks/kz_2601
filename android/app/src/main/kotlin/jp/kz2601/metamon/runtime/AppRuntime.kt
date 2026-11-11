@@ -99,6 +99,11 @@ data class RuntimeState(
     val recordUndo: DeletionTicket? = null,
     /** 起動時にサーバーへ届かなかった(手元・保存済みの DSL を表示中)。つながって取り直せたら false */
     val offline: Boolean = false,
+    /**
+     * [offline] のうち保存した DSL も無かった(iOS の unreachable の状態カード・#1107)。画面に消えないカードを出す。
+     * つながって取り直せたら false
+     */
+    val unreachable: Boolean = false,
     /** 上部のバナー(iOS の summaryBanner)。ホットリロードの「最新の内容に更新しました」(#1108) */
     val banner: RuntimeBanner? = null,
 ) {
@@ -175,6 +180,7 @@ class AppRuntime(
     private val savingLock = Mutex()
     private var eventsJob: Job? = null
     private var notificationsJob: Job? = null
+    private var connectivityJob: Job? = null
 
     // ホットリロード(#883)
     private var hotReloadJobs: List<Job> = emptyList()
@@ -212,6 +218,7 @@ class AppRuntime(
     private suspend fun bootstrapOnce() {
         if (eventsJob == null) eventsJob = scope.launch { recordSync.events.collect { handle(it) } }
         if (notificationsJob == null) notificationsJob = scope.launch { watchNotifications() }
+        if (connectivityJob == null) connectivityJob = scope.launch { watchConnectivity() }
         if (isIssued(document.appId)) {
             // 再起動しても作ったアプリが残る(iOS の G4)。サーバーの最新は続けて取り直す
             loadCached(document.appId)?.takeIf { it.appId == document.appId && it.version > document.version }?.let(::apply)
@@ -236,7 +243,7 @@ class AppRuntime(
         val fetch = restore ?: return
         try {
             val remote = fetch(document.appId)
-            _state.update { it.copy(offline = false) }
+            _state.update { it.copy(offline = false, unreachable = false) }
             if (remote.version > document.version || (remote.version == document.version && document.version == 0)) apply(remote)
         } catch (e: CancellationException) {
             throw e
@@ -245,11 +252,23 @@ class AppRuntime(
             if (cached != null && cached.appId == document.appId && cached.version >= document.version) {
                 // 起動時に先に出した版と同じなら描き直さない(見ている画面・遷移を残す)
                 if (cached != document) apply(cached)
-                _state.update { it.copy(offline = true, toast = RuntimeCopy.OFFLINE_RESTORED) }
+                _state.update { it.copy(offline = true, unreachable = false, toast = RuntimeCopy.OFFLINE_RESTORED) }
             } else {
-                // 手元の DSL のまま(状態カードは画面の Issue で出す。ここでは offline だけ立てる)
-                _state.update { it.copy(offline = true) }
+                // 手元の DSL のまま。消えない状態カードで次の一手を出し、つながったら読み直す([watchConnectivity])
+                _state.update { it.copy(offline = true, unreachable = true) }
             }
+        }
+    }
+
+    /**
+     * 到達性を見張る(iOS の `observeConnectivity`・#1107)。オフラインからつながった時、起動時にサーバーへ届かなかったなら
+     * サーバーの最新を取り直す(取れたら状態カードを下げる)。
+     */
+    private suspend fun watchConnectivity() {
+        var previous: Boolean? = null
+        recordSync.connectivity.online.collect { online ->
+            if (online && previous == false && _state.value.offline) restoreFromServer()
+            previous = online
         }
     }
 
@@ -286,7 +305,7 @@ class AppRuntime(
         val switched = doc.appId != document.appId
         if (switched) dropPendingHotReload()
         if (isIssued(doc.appId)) directory?.store?.set(doc.appId)
-        _state.value = RuntimeState(doc, offline = _state.value.offline)
+        _state.value = RuntimeState(doc, offline = _state.value.offline, unreachable = _state.value.unreachable)
         publishRecords()
         _navigation.value = NavigationState.initial(doc.dsl)
         noteAppliedVersion(doc, switched)
@@ -504,7 +523,7 @@ class AppRuntime(
             return // 届かなければ今の DSL のまま(購読が戻れば追いつく)
         }
         if (document.appId != appId) return
-        _state.update { it.copy(offline = false) }
+        _state.update { it.copy(offline = false, unreachable = false) }
         hotReload(remote.copy(appId = appId)) // 進んでいれば当てる。操作中なら閉じるまで待つ
     }
 
@@ -571,6 +590,7 @@ class AppRuntime(
             records = previous.records.filterKeys { it in keep },
             failed = previous.failed.intersect(keep),
             offline = previous.offline,
+            unreachable = previous.unreachable,
             banner = RuntimeBanner(++bannerSeq, RuntimeCopy.HOT_RELOADED),
         )
         publishRecords()
