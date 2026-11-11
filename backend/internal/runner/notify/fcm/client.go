@@ -109,7 +109,7 @@ func Message(p notify.Push) *messaging.Message {
 		data = nil
 	}
 	return &messaging.Message{
-		Token:        p.Token,
+		Token:        p.Token, //nolint:staticcheck // 端末の登録トークンを送る先にする(Fid は別の宛先)
 		Notification: &messaging.Notification{Title: p.Title, Body: p.Body},
 		Data:         data,
 		Android: &messaging.AndroidConfig{
