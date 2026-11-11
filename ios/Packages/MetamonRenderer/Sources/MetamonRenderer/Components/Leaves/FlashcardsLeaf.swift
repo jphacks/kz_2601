@@ -14,6 +14,10 @@ struct FlashcardsLeaf: View {
     @State private var deck = FlashcardDeck()
     @State private var drag: CGFloat = 0
     @State private var answers = 0
+    #if os(macOS)
+    /// Mac: カードをクリックすると Space・←→ を受ける(#944)
+    @FocusState private var cardFocused: Bool
+    #endif
 
     private var entityId: String { c.entity ?? "" }
     private var entity: Entity? { rt.dsl.entity(entityId) }
@@ -56,7 +60,10 @@ struct FlashcardsLeaf: View {
     private func face(_ card: Record) -> some View {
         let text = deck.flipped ? value(card, c.back) : value(card, c.front)
         return Button {
-            withAnimation(reduceMotion ? nil : .easeInOut(duration: 0.3)) { deck.flip() }
+            flip()
+            #if os(macOS)
+            cardFocused = true
+            #endif
         } label: {
             VStack(spacing: RenderTheme.Spacing.xs) {
                 Text(deck.flipped ? fieldName(c.back) : fieldName(c.front))
@@ -81,6 +88,17 @@ struct FlashcardsLeaf: View {
         .offset(x: drag)
         .rotationEffect(.degrees(reduceMotion ? 0 : Double(drag / 25)))
         .simultaneousGesture(swipe(card))
+        #if os(macOS)
+        .macFlashcardKeys(focused: $cardFocused) { command in
+            switch command {
+            case .flip: flip()
+            case .notYet: answer(card, learned: false)
+            case .learned: answer(card, learned: true)
+            }
+            // 次のカードは別の view(.id)なので、続けてキーを受けるよう入れ直す
+            Task { @MainActor in cardFocused = true }
+        }
+        #endif
         .id(card.id)
         .transition(reduceMotion ? .opacity : .asymmetric(insertion: .scale(scale: 0.9).combined(with: .opacity), removal: .opacity))
         .accessibilityElement(children: .ignore)
@@ -89,6 +107,10 @@ struct FlashcardsLeaf: View {
         .accessibilityHint(L("ダブルタップでめくる"))
         .accessibilityAddTraits(.isButton)
         .accessibilityIdentifier("flashcards.card")
+    }
+
+    private func flip() {
+        withAnimation(reduceMotion ? nil : .easeInOut(duration: 0.3)) { deck.flip() }
     }
 
     /// ドラッグ中だけ「覚えた」「まだ」を出す。

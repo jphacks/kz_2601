@@ -500,7 +500,8 @@ struct MacRootView: View {
     private func openShare() {
         #if !APP_STORE_REVIEW
         guard canShare, let app = selectedApp else { return }
-        shareApp = MacShareAppModel(appId: app.id, appName: app.name, sharing: MacServices.shared.sharing)
+        shareApp = MacShareAppModel(appId: app.id, appName: app.name, sharing: MacServices.shared.sharing,
+                                    membership: MacSocial.shared.members, social: .shared)
         #endif
     }
 

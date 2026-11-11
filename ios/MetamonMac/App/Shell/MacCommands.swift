@@ -7,7 +7,7 @@ import AppKit
 /// - 編集: 元に戻す(記録を消した直後は削除の取り消し・それ以外は入力欄の取り消し)・やり直す・アプリを探す(⌘F・#1282)
 /// - アプリ: 生成したアプリの版の「変更を元に戻す」(⌥⌘Z)・「変更をやり直す」(⇧⌥⌘Z)(#968)・次の通知(#1325)。
 ///   ⌘Z / ⇧⌘Z は入力欄と記録の削除に使っているので、版の取り消しは別のキーにする
-/// - 表示: サイドバー(`SidebarCommands`)・ツールバー(`ToolbarCommands`)・画面マップ(⇧⌘E・#970)・
+/// - 表示: サイドバー(`SidebarCommands`)・ツールバー(`ToolbarCommands`)・再読み込み ⌘R(#944)・画面マップ(⇧⌘E・#970)・
 ///   拡大 ⌘+ / 縮小 ⌘- / 実際のサイズ ⌘0(中央のアプリの文字・#1206)
 /// - 移動: 戻る・アプリの一覧 / 中央へ・前 / 次のアプリ
 /// - ヘルプ: 頼み方のコツ(#967)・お問い合わせ・フィードバックを送る(#983)
@@ -69,6 +69,11 @@ struct MacCommands: Commands {
         }
 
         CommandGroup(after: .toolbar) {
+            Divider()
+            // iOS の「下に引いて更新」の代わり: 今の画面の記録を読み直す(#944)
+            Button("再読み込み") { Task { await runtime?.reloadFromMenu() } }
+                .keyboardShortcut("r", modifiers: .command)
+                .disabled(!canUseCanvas || !(runtime?.canReloadFromMenu ?? false))
             Divider()
             // 中央のアプリのシート(sheet / fullScreen)が開いている間は出さない(シートを重ねない)
             Button("画面マップ") { shell?.showScreenMap() }
