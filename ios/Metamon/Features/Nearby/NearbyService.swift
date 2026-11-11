@@ -165,7 +165,7 @@ final class NearbyService: NSObject {
 
     private func received(_ data: Data, from peer: MCPeerID) async {
         // 送信側: Ack を受け取ったら完了
-        if let out = outgoing, out.peer == peer, let ack = try? NearbyShare.decode(NearbyShare.Ack.self, from: data) {
+        if let out = outgoing, out.peer == peer, let ack = NearbyShare.decodeAck(data) {
             finishOutgoing(ack.ok
                 ? .done(L10n.tr("\(peer.displayName)さんに \(ack.added) 件届きました"))
                 : .failed(ack.message ?? L10n.tr("\(peer.displayName)さんが受け取れませんでした")))
@@ -174,7 +174,8 @@ final class NearbyService: NSObject {
         // 受信側: 承認した相手からの Payload だけ取り込む
         guard let decision = accepted.removeValue(forKey: peer) else { return }
         let ack: NearbyShare.Ack
-        if let payload = try? NearbyShare.decode(NearbyShare.Payload.self, from: data), let onReceive {
+        // 大きさ・名前・id の長さを読む前に確かめる(上限を超えたら取り込まない)
+        if let payload = NearbyShare.decodePayload(data), let onReceive {
             ack = await onReceive(payload, decision)
         } else {
             ack = .init(ok: false, added: 0, message: L10n.tr("データを読み取れませんでした"))
@@ -190,9 +191,9 @@ final class NearbyService: NSObject {
 extension NearbyService: MCNearbyServiceAdvertiserDelegate {
     nonisolated func advertiser(_ advertiser: MCNearbyServiceAdvertiser, didReceiveInvitationFromPeer peerID: MCPeerID,
                                 withContext context: Data?, invitationHandler: @escaping (Bool, MCSession?) -> Void) {
-        let header = context.flatMap { try? NearbyShare.decode(NearbyShare.Header.self, from: $0) }
+        let header = context.flatMap(NearbyShare.decodeHeader)
         Task { @MainActor in
-            // Header が無い・読めない招待(Tailor It 以外 / 壊れたデータ)と、確認中の二重招待は黙って断る
+            // Header が無い・読めない・上限を超える招待(Tailor It 以外 / 壊れたデータ)と、確認中の二重招待は黙って断る
             guard let header, self.incoming == nil else { invitationHandler(false, nil); return }
             let decision = self.decide?(header) ?? .reject(reason: L10n.tr("今は受け取れません"))
             // 曲のリクエスト(#412)は確認を出さずに受ける(承認は musicPlayer の一覧・autoAccept)。受けられないアプリなら黙って断る
