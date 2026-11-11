@@ -66,7 +66,7 @@ fun ChartLeaf(c: Component, ctx: RenderContext, modifier: Modifier = Modifier) {
         c.title?.let { Text(it, style = RenderTheme.Fonts.cardTitle) }
         if (buckets.isEmpty()) {
             // 記録すると出ることを伝える(L4)
-            EmptyPlaceholder("chart.bar", stringResource(R.string.lists_chart_empty))
+            RecordsPlaceholderView(data, c.entity, "chart.bar", stringResource(R.string.lists_chart_empty))
             return@Column
         }
         // 押していない時も高さを取っておく(押すたびにグラフが上下しない)

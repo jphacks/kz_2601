@@ -63,6 +63,12 @@ interface DSLRuntime {
     /** 表示中の記録(entity id → 記録)。変わると描き直す。null なら記録なし(新規のフォームだけ)。 */
     val recordsFlow: StateFlow<Map<String, List<Record>>>? get() = null
 
+    /** entity ごとの読み込み状態(#1116)。null か地図に無い entity は [EntityLoadState.LOADED](プレビュー・テスト)。 */
+    val loadStatesFlow: StateFlow<Map<String, EntityLoadState>>? get() = null
+
+    /** 「読み込めませんでした」の再試行。サーバーへ取り直す。既定は [loadRecords]。 */
+    suspend fun retryRecords(entities: Set<String>) = loadRecords(entities)
+
     fun canEdit(entity: String, record: Record): Boolean = true
 
     fun canDelete(entity: String, record: Record): Boolean = true

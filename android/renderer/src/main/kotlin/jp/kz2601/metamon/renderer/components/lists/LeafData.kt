@@ -17,6 +17,7 @@ import jp.kz2601.metamon.dsl.records.Record
 import jp.kz2601.metamon.dsl.records.RecordQuery
 import jp.kz2601.metamon.dsl.records.filters
 import jp.kz2601.metamon.renderer.DSLRuntime
+import jp.kz2601.metamon.renderer.EntityLoadState
 import jp.kz2601.metamon.renderer.components.social.followedFor
 import jp.kz2601.metamon.renderer.components.social.follows
 import java.time.Instant
@@ -31,10 +32,18 @@ class LeafData(
     val now: Instant = DSLClock.now(),
     /** 値の文言。既定は適合テストの値(iOS の日本語)。画面は [rememberLeafData] が端末の言語で渡す。 */
     val labels: ValueLabels = ValueLabels.JAPANESE,
+    /** entity ごとの読み込み状態(#1116)。無い entity は読めた扱い。 */
+    private val loadStates: Map<String, EntityLoadState> = emptyMap(),
 ) {
     val evaluator: ExprEvaluator = ExprEvaluator(runtime.entityModels, { records[it].orEmpty() }, now)
 
     fun entity(id: String?): Entity? = id?.let(runtime::entityModel)
+
+    /** entity の読み込み状態。entity が無い部品・ホストが状態を持たない時は読めた扱い。 */
+    fun loadState(entity: String?): EntityLoadState = entity?.let { loadStates[it] } ?: EntityLoadState.LOADED
+
+    /** 0 件の時に出す形(骨組み・取得失敗・空の案内)。 */
+    fun placeholder(entity: String?): RecordsPlaceholder = RecordsPlaceholder.of(loadState(entity))
 
     /** entity の記録(computed 合成前・filter 前)。 */
     fun records(entity: String): List<Record> = records[entity].orEmpty()
@@ -96,6 +105,7 @@ fun rememberLeafData(runtime: DSLRuntime): LeafData {
     val flow = runtime.recordsFlow
     val records = flow?.collectAsState()?.value.orEmpty()
     val labels = rememberValueLabels()
+    val loadStates = runtime.loadStatesFlow?.collectAsState()?.value.orEmpty()
     val follows = runtime.follows?.followsVersion?.collectAsState()?.value // {"myFollows": true} の一覧が変わったら描き直す
-    return remember(runtime, records, labels, follows) { LeafData(runtime, records, labels = labels) }
+    return remember(runtime, records, labels, follows, loadStates) { LeafData(runtime, records, labels = labels, loadStates = loadStates) }
 }
