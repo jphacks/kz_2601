@@ -38,10 +38,12 @@ import jp.kz2601.metamon.dsl.Component
 import jp.kz2601.metamon.dsl.ComponentType
 import jp.kz2601.metamon.dsl.Screen
 import jp.kz2601.metamon.renderer.components.DSLComponent
+import jp.kz2601.metamon.renderer.components.lists.rememberLeafData
 import jp.kz2601.metamon.renderer.layout.FabClearance
 import jp.kz2601.metamon.renderer.layout.GridArea
 import jp.kz2601.metamon.renderer.layout.GridMetrics
 import jp.kz2601.metamon.renderer.layout.Placed
+import jp.kz2601.metamon.renderer.layout.RowHeightStop
 import jp.kz2601.metamon.renderer.layout.bandIndices
 import jp.kz2601.metamon.renderer.layout.formBands
 import jp.kz2601.metamon.renderer.layout.gridPlacement
@@ -91,7 +93,7 @@ fun GridScreenLayout(screen: Screen, ctx: RenderContext, modifier: Modifier = Mo
                 verticalArrangement = Arrangement.spacedBy(gap),
             ) {
                 if (screen.isFormLayout) {
-                    FormFlowLayout(placement.placed, cellW, cellH, ctx)
+                    FormFlowLayout(placement.placed, cellW, cellH, ctx, appearScreen = screen.id)
                 } else if (placement.placed.isNotEmpty()) {
                     val obstruction = if (reportsObstruction) {
                         val areas = placement.placed.map { it.area }
@@ -107,19 +109,23 @@ fun GridScreenLayout(screen: Screen, ctx: RenderContext, modifier: Modifier = Mo
                         Modifier
                     }
                     Box(Modifier.fillMaxWidth().height(cellH * placement.lastRow).then(obstruction)) {
-                        placement.placed.forEach { (c, a) ->
+                        placement.placed.forEachIndexed { index, (c, a) ->
                             GridCell(
                                 c, ctx,
                                 Modifier
                                     .offset(x = cellW * a.col1 + gap / 2, y = cellH * (a.row1 - 1) + gap / 2)
                                     .size(width = cellW * a.colSpan - gap, height = cellH * a.rowSpan - gap)
+                                    .staggeredAppear(screen.id, index)
                                     .changeMark(screen.id, c, screen.components.indexOf(c)),
                             )
                         }
                     }
                 }
                 // 変わった部品の印(#894)
-                placement.stacked.forEach { DSLComponent(it, ctx, Modifier.changeMark(screen.id, it, screen.components.indexOf(it))) }
+                placement.stacked.forEachIndexed { index, c ->
+                    val m = Modifier.staggeredAppear(screen.id, placement.placed.size + index).changeMark(screen.id, c, screen.components.indexOf(c))
+                    DSLComponent(c, ctx, m)
+                }
             }
         }
     }
@@ -134,13 +140,14 @@ private val FILLS_SURFACE = setOf(
 
 /** フォーム画面の配置。行が重なる部品を 1 段にまとめ、段ごとに上から積む。横位置・幅は area のまま。 */
 @Composable
-fun FormFlowLayout(placed: List<Placed>, cellW: Dp, cellH: Dp, ctx: RenderContext) {
+fun FormFlowLayout(placed: List<Placed>, cellW: Dp, cellH: Dp, ctx: RenderContext, appearScreen: String? = null) {
     val gap = RenderTheme.Spacing.gridGap
     val bands = formBands(placed)
     Column(verticalArrangement = Arrangement.spacedBy(gap)) {
         bands.forEachIndexed { index, band ->
             val detached = band.isDetached(bands.getOrNull(index - 1))
-            Box(Modifier.fillMaxWidth().padding(top = if (detached) RenderTheme.Spacing.md else 0.dp)) {
+            val appear = if (appearScreen != null) Modifier.staggeredAppear(appearScreen, index) else Modifier
+            Box(Modifier.fillMaxWidth().padding(top = if (detached) RenderTheme.Spacing.md else 0.dp).then(appear)) {
                 band.items.forEach { (c, a) ->
                     val m = Modifier
                         .offset(x = cellW * a.col1 + gap / 2)
@@ -166,7 +173,10 @@ private val SCROLLS_INSIDE = setOf(
 /** Container 内グリッドを器いっぱいに置くか(GridCell が area 付き Container を描く時だけ true)。 */
 internal val LocalGridFills = compositionLocalOf { false }
 
-/** セル = 長方形の器。中身がはみ出す型は器の内側でスクロールする。 */
+/**
+ * セル = 長方形の器。中身がはみ出す型は器の内側でスクロールし、上下に続きがある時だけ端をフェードする。
+ * 中身は器の高さまで伸ばす(空状態をセル全体に)。行のある list(または list だけの section)は行の高さで止める(#131)。
+ */
 @Composable
 fun GridCell(component: Component, ctx: RenderContext, modifier: Modifier = Modifier) {
     val hasLocalGrid = component.localGridPlacement != null
@@ -174,8 +184,18 @@ fun GridCell(component: Component, ctx: RenderContext, modifier: Modifier = Modi
     if (scrollsInside) {
         // 背の高い list などは FAB が上に浮くので、中身の末尾に FAB ぶんの余白を足す(#157)
         val tail = fabTailMargin(LocalFabCoordinator.current)
-        Box(modifier.then(tail.viewport).verticalScroll(rememberScrollState())) {
-            DSLComponent(component, ctx, Modifier.padding(bottom = tail.margin))
+        val hugs = if (RowHeightStop.lists(component).isEmpty()) {
+            false
+        } else {
+            val data = rememberLeafData(ctx.runtime)
+            RowHeightStop.hugsContent(component) { data.filtered(it).isNotEmpty() }
+        }
+        val scroll = rememberScrollState()
+        BoxWithConstraints(modifier.then(tail.viewport)) {
+            val fill = if (hugs || !constraints.hasBoundedHeight) Modifier else Modifier.heightIn(min = maxHeight)
+            Box(Modifier.fillMaxSize().scrollEdgeFade(scroll, tail.margin).verticalScroll(scroll)) {
+                DSLComponent(component, ctx, fill.padding(bottom = tail.margin))
+            }
         }
     } else {
         Box(modifier) {
