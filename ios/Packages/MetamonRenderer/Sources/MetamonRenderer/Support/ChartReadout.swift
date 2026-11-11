@@ -1,4 +1,5 @@
 import Foundation
+import CoreGraphics
 import Accessibility
 import MetamonDSL
 
@@ -22,6 +23,28 @@ enum ChartReadout {
             if value <= sum { return i }
         }
         return values.isEmpty ? nil : values.count - 1
+    }
+
+    /// Mac のホバー(#945): ポインタの x に一番近い棒・点の位置。`positions` は各見出しの x(描けない見出しは nil)
+    static func nearestIndex(toX x: CGFloat, positions: [CGFloat?]) -> Int? {
+        var best: (index: Int, distance: CGFloat)?
+        for (i, p) in positions.enumerated() {
+            guard let p else { continue }
+            let d = abs(p - x)
+            if best == nil || d < best!.distance { best = (i, d) }
+        }
+        return best?.index
+    }
+
+    /// Mac のホバー(#945): 扇グラフの中の点 → 12 時から時計回りの累積値(`index(atCumulative:)` に渡す)。
+    /// 円の外・中心(角度が決まらない)・合計 0 は nil
+    static func cumulative(at point: CGPoint, center: CGPoint, radius: CGFloat, total: Double) -> Double? {
+        let dx = point.x - center.x, dy = point.y - center.y
+        let distance = (dx * dx + dy * dy).squareRoot()
+        guard total > 0, distance > 0, distance <= radius else { return nil }
+        var angle = atan2(Double(dx), Double(-dy)) // 上が 0・時計回り(y は下向き)
+        if angle < 0 { angle += 2 * .pi }
+        return angle / (2 * .pi) * total
     }
 
     static func summary(_ buckets: [Aggregator.Bucket], locale: Locale = .current) -> String {
