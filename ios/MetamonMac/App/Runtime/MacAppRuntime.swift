@@ -306,8 +306,9 @@ final class MacAppRuntime: RuntimeNavigating {
     var currentScreen: String { NavigationResolver.top(navigationState, dsl: dsl).screen }
 
     /// 画面マップから画面を開く。モーダルを閉じ、根(タブ)から矢印をたどって開く(戻るで来た道を戻れる)
-    func reveal(screen: String) {
-        guard let next = NavigationResolver.reveal(screen, graph: ScreenGraph(dsl: dsl), dsl: dsl, from: navigationState) else { return }
+    func reveal(screen: String, recordId: String? = nil) {
+        guard let next = NavigationResolver.reveal(screen, recordId: recordId, graph: ScreenGraph(dsl: dsl), dsl: dsl,
+                                                   from: navigationState) else { return }
         setNavigation(next)
     }
 
