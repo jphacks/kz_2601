@@ -23,6 +23,13 @@ func TestClientConfigFromEnv(t *testing.T) {
 		{"latest below min is raised", map[string]string{EnvMinIOSBuild: "20", EnvLatestIOSBuild: "10"}, ClientConfigValues{MinIOSBuild: 20, LatestIOSBuild: 20}},
 		{"store url", map[string]string{EnvIOSAppStoreURL: "https://apps.apple.com/app/id123"}, ClientConfigValues{IOSAppStoreURL: "https://apps.apple.com/app/id123"}},
 		{"bad store url", map[string]string{EnvIOSAppStoreURL: "javascript:alert(1)"}, ClientConfigValues{}},
+		{"android both set", map[string]string{EnvMinAndroidBuild: "7", EnvLatestAndroidBuild: " 9 "}, ClientConfigValues{MinAndroidBuild: 7, LatestAndroidBuild: 9}},
+		{"android invalid ignored", map[string]string{EnvMinAndroidBuild: "1.0", EnvLatestAndroidBuild: "0"}, ClientConfigValues{}},
+		{"android latest below min is raised", map[string]string{EnvMinAndroidBuild: "20", EnvLatestAndroidBuild: "10"}, ClientConfigValues{MinAndroidBuild: 20, LatestAndroidBuild: 20}},
+		{"android and ios are independent", map[string]string{EnvMinIOSBuild: "30", EnvLatestAndroidBuild: "5"}, ClientConfigValues{MinIOSBuild: 30, LatestAndroidBuild: 5}},
+		{"android store url", map[string]string{EnvAndroidStoreURL: "https://play.google.com/store/apps/details?id=jp.kz2601.metamon"}, ClientConfigValues{AndroidStoreURL: "https://play.google.com/store/apps/details?id=jp.kz2601.metamon"}},
+		{"android market url", map[string]string{EnvAndroidStoreURL: "market://details?id=jp.kz2601.metamon"}, ClientConfigValues{AndroidStoreURL: "market://details?id=jp.kz2601.metamon"}},
+		{"android bad store url", map[string]string{EnvAndroidStoreURL: "itms-apps://apps.apple.com/app/id1"}, ClientConfigValues{}},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -52,6 +59,10 @@ func TestClientConfigHandler(t *testing.T) {
 	body := get(ClientConfigValues{MinIOSBuild: 3, LatestIOSBuild: 5, IOSAppStoreURL: "https://apps.apple.com/app/id1"})
 	if body["minIOSBuild"] != float64(3) || body["latestIOSBuild"] != float64(5) || body["iosAppStoreUrl"] != "https://apps.apple.com/app/id1" {
 		t.Fatalf("body: %v", body)
+	}
+	body = get(ClientConfigValues{MinAndroidBuild: 4, LatestAndroidBuild: 6, AndroidStoreURL: "https://play.google.com/store/apps/details?id=x"})
+	if len(body) != 3 || body["minAndroidBuild"] != float64(4) || body["latestAndroidBuild"] != float64(6) || body["androidStoreUrl"] != "https://play.google.com/store/apps/details?id=x" {
+		t.Fatalf("android body: %v", body)
 	}
 }
 

@@ -10,8 +10,8 @@ import kotlinx.serialization.json.intOrNull
 /**
  * appconfig `GET /v1/client-config`(#302・#333・認証不要。iOS の `ClientConfig`)。省略されたフィールド = 強制しない。
  *
- * 今の backend が返すのは iOS 向けの版(`minIOSBuild` など)だけ。Android は iOS の値を使わず、
- * `minAndroidBuild` / `latestAndroidBuild` / `androidStoreUrl` が来た時だけ判定する(無ければ止めない・#906)。
+ * Android は iOS の値(`minIOSBuild` など)を使わず、`minAndroidBuild` / `latestAndroidBuild` / `androidStoreUrl`
+ * (backend の `MIN_ANDROID_BUILD` などの環境変数)だけで判定する(無ければ止めない・#906)。
  */
 data class ClientConfig(
     val minAndroidBuild: Int? = null,

@@ -109,7 +109,7 @@ Apple の「Universal Purchase」のページ(2026-11-11 に確認)より:
 | `photoField` | A | ○ ライブラリ・ファイルから。撮影は内蔵 / 連係カメラ | 撮影のボタンは出ない(`CameraPicker.isAvailable == false`)。mac-027 |
 | `videoField` | A | ○ 同上 | 同上。mac-029 |
 | `qrScanner` | A | △ カメラ / 画像から読む | 手入力だけの仮の形。mac-033 |
-| `drawingField` | A | ○ マウス・トラックパッドで描く(PencilKit の `PKCanvasView` は Mac に無い) | キャンバスは仮の枠。保存の形式(JPEG)は同じ。mac-032 |
+| `drawingField` | A | ○ マウス・トラックパッドで描く(PencilKit の `PKCanvasView` は Mac に無い) | マウス・トラックパッドで描ける(#1369)。保存の形式(JPEG)は同じ。mac-032 |
 | `webView` | A | ○ `WKWebView` | **Mac でも動く形にした**(`NSViewRepresentable`) |
 | `export`(CSV / PDF) | A | ○ | **PDF も Mac で書ける形にした**(CoreGraphics の PDF)。共有・保存の UI は mac-031 |
 | `locationButton` | A | △ Wi-Fi の位置 | 許可の判定を Mac に合わせた(「使用中のみ」が無い) |
