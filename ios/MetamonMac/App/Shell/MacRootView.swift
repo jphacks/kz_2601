@@ -307,6 +307,10 @@ struct MacRootView: View {
         guard MacAccount.shared.session.user != nil else { return }
         await library.refreshServerApps()
         reopenLastApp() // 前に開いていたサーバーのアプリが一覧に載ったら開き直す
+        // 待っていた通知のアプリを開く。取り直しても無ければ諦める
+        if let id = MacNotificationRouter.shared.resolve(among: apps.map(\.id), listRefreshed: true) {
+            notificationSelection.wrappedValue = id
+        }
     }
 
     /// 起動時: ウインドウが覚えている選択(SceneStorage)が無い・もう無いアプリなら、前に開いていたアプリを開き直す
