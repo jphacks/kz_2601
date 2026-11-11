@@ -1303,7 +1303,7 @@ final class AppRuntime: RuntimeNavigating {
             }
             // 既存の記録を何も変えずに保存: 書き込まず(「保存しました」も出さず)に画面だけ進める(M10)
             guard form.needsWrite else {
-                leaveAfterSave(action, ctx)
+                leaveAfterSave(action, ctx, form: form, recordId: recordId, wrote: false)
                 return
             }
             // 保存ボタンの連打: 1 回目のローカル保存を待つ間に 2 回目が来ると、新規なら同じ内容が 2 件できる
@@ -1322,7 +1322,7 @@ final class AppRuntime: RuntimeNavigating {
             writeHealthFields(entity: entity, data: payload, isNew: isNew) // Field.health(#167)
             #endif
             Task { await purgeExpired(entity) } // #482 保存の後(画面遷移を待たせない)
-            leaveAfterSave(action, ctx)
+            leaveAfterSave(action, ctx, form: form, recordId: recordId, wrote: true)
 
         case .deleteRecord:
             guard let target = RecordActionSteps.deleteTarget(action, ctx, dsl: dsl) else { return } // single の 1 件は消さない(#267)
@@ -1384,12 +1384,17 @@ final class AppRuntime: RuntimeNavigating {
         }
     }
 
-    /// 保存の後: `screen` があればそこへ、無ければ閉じる。
-    private func leaveAfterSave(_ action: Action, _ ctx: ActionContext) {
-        if let screen = action.screen {
+    /// 保存の後: `screen` があればそこへ、無ければ閉じる。タブ / main の根なら留まり、書き込めた時だけ「保存しました」(#1719)。
+    private func leaveAfterSave(_ action: Action, _ ctx: ActionContext, form: FormDraft, recordId: String?, wrote: Bool) {
+        switch NavigationResolver.afterSave(navigationState, from: ctx.route, screen: action.screen, isNewRecord: recordId == nil) {
+        case .navigate(let screen):
             navigate(to: screen, presentation: action.presentation, recordId: nil, from: ctx.route)
-        } else {
+        case .close:
             close(ctx.route)
+        case .stay(let resetForm):
+            guard wrote else { return } // 何も変えずに保存: 何も出さない(M10)
+            if resetForm { form.reset() } // 新規: 続けて入れられるよう空に戻す。既存の記録は値を残す
+            toast = L10n.tr("保存しました") // VoiceOver も読む(H8)
         }
     }
 
