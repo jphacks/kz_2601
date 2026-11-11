@@ -1,7 +1,5 @@
 package jp.kz2601.metamon.settings
 
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.MaterialTheme
@@ -12,16 +10,14 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import jp.kz2601.metamon.R
 import jp.kz2601.metamon.voice.PromptTipsSheet
 
-/** 設定の「アプリ」の節に出す行(iOS の `SettingsSheet.appSection`)。自動の動きは Android にまだ無い(#905)。 */
+/** 設定の「アプリ」の節に出す行(iOS の `SettingsSheet.appSection`)。 */
 data class AppActionsState(
     val appName: String,
     /** 起動時にサーバーへ届かず、保存済みの DSL を表示中 */
@@ -32,15 +28,16 @@ data class AppActionsState(
     val busy: Boolean,
     /** 作ったアプリを表示中(初期の音声画面だけでない)。画面マップの行を出す(iOS の `ScreenMapSettingsRow`) */
     val hasScreens: Boolean,
-    /** サーバーの自動の動き(serverRules)があるアプリ。自動の動きの行を出す(iOS の `AutomationsSettingsRow`) */
+    /** サーバーの自動の動き(serverRules)があるアプリ。自動の動きの行を出す(iOS の `AutomationsSettingsRow`・#905) */
     val hasServerRules: Boolean,
 )
 
 /**
  * 設定の「アプリ」(iOS の `SettingsSheet.appSection`): 元に戻す(#1075)・画面マップ・自動の動き・使い方を見る(#900 / #1236)・
- * 頼み方のコツ(#1161)・リセット(初期状態に戻す)。Android に無い自動の動きは「この端末では使えません」と出すだけ。
+ * 頼み方のコツ(#1161)・リセット(初期状態に戻す)。
  * @param onUndo シートを閉じて直前の版に戻す
  * @param onOpenScreenMap 画面マップ(#897)を開く
+ * @param onOpenAutomations 自動の動き(#905)を開く。null は使えない構成(審査用の版など)で、行を出さない
  * @param onShowTutorial シートを閉じてチュートリアルをもう一度出す
  * @param onPickTip 選んだコツの文を入力欄に入れる(送らない・シートを閉じる)
  * @param onReset 初期状態に戻す(確認の後。シートを閉じる)
@@ -50,6 +47,7 @@ fun AppActionsSection(
     state: AppActionsState,
     onUndo: () -> Unit,
     onOpenScreenMap: () -> Unit,
+    onOpenAutomations: (() -> Unit)?,
     onShowTutorial: () -> Unit,
     onPickTip: (String) -> Unit,
     onReset: () -> Unit,
@@ -66,7 +64,11 @@ fun AppActionsSection(
             Text(stringResource(R.string.settings_screen_map))
         }
     }
-    if (state.hasServerRules) UnavailableRow(stringResource(R.string.settings_automations), "settings.automations")
+    if (state.hasServerRules && onOpenAutomations != null) {
+        TextButton(onClick = onOpenAutomations, modifier = Modifier.padding(horizontal = 4.dp).testTag("settings.automations")) {
+            Text(stringResource(R.string.settings_automations))
+        }
+    }
     TextButton(onClick = onShowTutorial, modifier = Modifier.padding(horizontal = 4.dp).testTag("settings.tutorial")) {
         Text(stringResource(R.string.onboarding_replay))
     }
@@ -109,19 +111,3 @@ private fun appFooter(state: AppActionsState): String =
     stringResource(R.string.settings_app_footer_current, state.appName) +
         (if (state.offline) stringResource(R.string.settings_app_footer_offline) else "") +
         "\n" + stringResource(R.string.settings_app_footer_hint)
-
-/** Android にまだ無い機能の行(iOS にはある)。押せない・「この端末では使えません」を添える */
-@Composable
-private fun UnavailableRow(label: String, tag: String) {
-    Row(
-        Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 10.dp).semantics(mergeDescendants = true) {}.testTag(tag),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Text(label, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.weight(1f))
-        Text(
-            stringResource(R.string.settings_unavailable),
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
-    }
-}

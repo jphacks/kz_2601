@@ -71,7 +71,6 @@
     <string name="settings_sync_synced">Up to date</string>
     <string name="settings_tips">How to ask</string>
     <string name="settings_title">Settings</string>
-    <string name="settings_unavailable">Not available on this device</string>
     <string name="settings_undo">Undo</string>
     <string name="settings_usage_a11y_amount">%2$d of %1$d</string>
     <string name="settings_usage_a11y_no_limit">%1$d, no limit</string>
