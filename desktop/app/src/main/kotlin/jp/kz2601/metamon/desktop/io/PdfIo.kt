@@ -50,14 +50,21 @@ object PdfIo {
         }
     }
 
-    private const val SCALE = 2f
+    /** 頁の画像の倍率(A4 の pt × SCALE = 画素)。 */
+    const val SCALE = 2f
     private const val MARGIN = 36f
 
     /**
      * 表を A4 縦の PDF にする。日本語のフォントを PDF に埋め込む代わりに、OS のフォント(Java の論理フォント)で描いた画像を頁に貼る
      * (Windows・Linux で入っている CJK のフォントが違っても化けない)。文字は選べない。
      */
-    fun data(table: ExportTable, emptyText: String = "記録がありません"): ByteArray {
+    fun data(table: ExportTable, emptyText: String = "記録がありません"): ByteArray = pdf(pages(table, emptyText).map { it.image })
+
+    /** 書き出しの 1 頁: A4 を [SCALE] 倍で描いた画像と、その頁に載る行(`table.rows` の添字)。印刷(Print.kt)も同じ頁を使う。 */
+    class Page(val image: BufferedImage, val rows: IntRange)
+
+    /** 表を A4 の頁に割って描く。PDF の書き出しと印刷が同じ頁を使う。 */
+    fun pages(table: ExportTable, emptyText: String = "記録がありません"): List<Page> {
         val page = PDRectangle.A4
         val w = (page.width * SCALE).toInt()
         val h = (page.height * SCALE).toInt()
@@ -71,9 +78,11 @@ object PdfIo {
         val colW = (w - 2 * m) / cols
 
         val pages = mutableListOf<BufferedImage>()
+        val starts = mutableListOf<Int>()
         var img: BufferedImage? = null
         var g: Graphics2D? = null
         var y = 0
+        var next = 0
 
         fun newPage(first: Boolean) {
             g?.dispose()
@@ -85,6 +94,7 @@ object PdfIo {
             gg.fillRect(0, 0, w, h)
             gg.color = Color.BLACK
             pages += i
+            starts += next
             img = i
             g = gg
             y = m
@@ -121,12 +131,18 @@ object PdfIo {
             if (y + lineH > h - m) newPage(first = false)
             y += lineH
             drawRow(g!!, r, table.numericColumns, m, y, colW)
+            next++
         }
         g?.dispose()
         check(img != null)
+        return pages.mapIndexed { i, p -> Page(p, starts[i] until (starts.getOrNull(i + 1) ?: next)) }
+    }
 
+    /** 描いた頁の画像を A4 の PDF にする(1 枚 = 1 頁・頁いっぱいに貼る)。 */
+    fun pdf(images: List<BufferedImage>): ByteArray {
+        val page = PDRectangle.A4
         PDDocument().use { doc ->
-            for (p in pages) {
+            for (p in images) {
                 val pdPage = PDPage(page)
                 doc.addPage(pdPage)
                 val image = LosslessFactory.createFromImage(doc, p)
