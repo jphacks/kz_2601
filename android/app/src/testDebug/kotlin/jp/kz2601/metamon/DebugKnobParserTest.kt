@@ -25,6 +25,7 @@ class DebugKnobParserTest {
                 "METAMON_AUTO_NAV" to "home, list:sheet ,,detail:",
                 "METAMON_AUTO_NAV_INTERVAL" to "1",
                 "METAMON_E2E_OFFLINE_SECONDS" to "10",
+                "METAMON_ACCOUNT_LINK_PROMPTED" to "1",
             ),
         )
         assertTrue(k.mock)
@@ -36,6 +37,9 @@ class DebugKnobParserTest {
         assertEquals(listOf("home", "list:sheet", "detail"), k.autoNav.map { it.toString() })
         assertEquals(1.0, k.autoNavIntervalSeconds, 0.0)
         assertEquals(10.0, k.offlineSeconds!!, 0.0)
+        assertEquals(true, k.accountLinkPrompted)
+        assertEquals(false, DebugKnobParser.parse(mapOf("METAMON_ACCOUNT_LINK_PROMPTED" to "0")).accountLinkPrompted)
+        assertNull(DebugKnobParser.parse(mapOf("METAMON_ACCOUNT_LINK_PROMPTED" to "yes")).accountLinkPrompted)
     }
 
     @Test

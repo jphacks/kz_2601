@@ -45,6 +45,7 @@ import jp.kz2601.metamon.services.AIClient
 import jp.kz2601.metamon.services.AppConfigClient
 import jp.kz2601.metamon.services.AppEnvironment
 import jp.kz2601.metamon.account.AccountGuard
+import jp.kz2601.metamon.account.AccountLinkPrompt
 import jp.kz2601.metamon.account.ActiveOwner
 import jp.kz2601.metamon.account.LocalDataWipe
 import jp.kz2601.metamon.account.MediaTempFiles
@@ -204,6 +205,8 @@ class AppContainer(
     private val retentionConsent: RetentionConsentStore = KeyValueRetentionConsent(InMemoryKeyValueStore()),
     /** 初回のチュートリアルと「こう話すと直せます」を見た印(#900)。モックは見た扱いで始める */
     val tutorial: FirstRunTutorialStore = FirstRunTutorialStore(InMemoryKeyValueStore()).apply { markAllSeen() },
+    /** 「作ったアプリを残しておきませんか」を出した印(#1316・端末ごと)。モックはメモリだけ */
+    private val accountLinkStore: KeyValueStore = InMemoryKeyValueStore(),
     /** TalkBack が動いているか(削除の取り消しの時間を延ばす・H8) */
     private val talkBackRunning: () -> Boolean = { false },
     /** アプリ内のフィードバックの送り先(`POST /v1/feedback`・#319)。モックは送った内容を覚えるだけ */
@@ -258,6 +261,15 @@ class AppContainer(
     /** 初回のチュートリアルを出す時点(同意の後・設定の「使い方を見る」・#900) */
     val tutorialPrompt = TutorialPrompt(tutorial)
 
+    /** 匿名で最初のアプリを作った次の起動の引き継ぎの案内(#1316)。つまみ `METAMON_ACCOUNT_LINK_PROMPTED` で出した扱いにできる */
+    val accountLinkPrompt = AccountLinkPrompt(accountLinkStore).apply {
+        when (knobs.accountLinkPrompted) {
+            true -> markOffered()
+            false -> forget()
+            null -> Unit
+        }
+    }
+
     /** 前の日までの aiButton の集計を送る(起動・前面に戻った時。送るのは 1 日 1 回) */
     suspend fun flushAiButtonMetrics() {
         aiButtonMetricsSender?.let { aiButtonMetrics.flush(it) }
@@ -280,6 +292,7 @@ class AppContainer(
             forgetTutorial = {
                 tutorial.forget()
                 tutorialPrompt.reset()
+                accountLinkPrompt.forget() // 引き継ぎの案内(#1316)も iOS と同じく次の人に出し直す
             },
             // 同意は人ごと(iOS は UserDefaults ごと消す)。前の人の止めた発話も次の人の同意で送らない
             forgetConsent = {
@@ -460,6 +473,7 @@ class AppContainer(
                 ),
                 clearImageCache = { RemoteImages.wipe(context) },
                 tutorial = FirstRunTutorialStore(SharedPreferencesKeyValueStore.of(context, FirstRunTutorialStore.PREFS)),
+                accountLinkStore = SharedPreferencesKeyValueStore.of(context, AccountLinkPrompt.PREFS),
                 talkBackRunning = { TalkBack.isRunning(context) },
                 feedback = HttpFeedbackClient(appConfigHttp),
                 updateGate = UpdateGate.live(context, environment.appConfigBaseUrl, client, device),
