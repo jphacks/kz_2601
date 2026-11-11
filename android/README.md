@@ -104,6 +104,7 @@ adb shell am start -n jp.kz2601.metamon.stg/jp.kz2601.metamon.MainActivity \
 | `METAMON_AUTO_TRANSCRIPT=<文>` | 起動直後に 1 回だけ発話を投げる |
 | `METAMON_AUTO_NAV=a,b,c` / `METAMON_AUTO_NAV_INTERVAL=<秒>` | 起動 3 秒後から画面を順に出す。今の行は logcat(`Metamon`)と `cache/autonav-step` に出る |
 | `METAMON_E2E_OFFLINE_SECONDS=<n>` | 起動から n 秒は記録の API を圏外にする(DSL の取得は通す) |
+| `METAMON_ACCOUNT_LINK_PROMPTED=1` / `0` | 引き継ぎの案内(#1316)を出した扱いにする / 出していない扱いに戻す(iOS の `-metamon.accountLinkPrompted`) |
 
 モックの実装は `services/src/main/kotlin/.../services/mock/`(iOS の `MetamonServices/Mock`)。
 

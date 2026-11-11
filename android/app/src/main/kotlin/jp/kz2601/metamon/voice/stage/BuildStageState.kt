@@ -132,5 +132,14 @@ class BuildStageState(private val editHints: EditHintStore? = null) {
         fun isRetentionTurn(state: VoiceUiState, retentionPending: Boolean): Boolean =
             PostBuildNotice.current(PostBuildNotice.pending(summary = summaryPending(state), retention = retentionPending)) ==
                 PostBuildNotice.RETENTION
+
+        /**
+         * 引き継ぎの案内の番か(iOS の `isNoticeTurn(.accountLink)`・#1316)。いちばん後ろなので、要約と保存期間の確認が閉じてから。
+         * 直し方の例(画面の下のカード)は [BuildStageHost] の中だけで持つので見ない(最初のアプリの次の起動に出すので重ならない)。
+         */
+        fun isAccountLinkTurn(state: VoiceUiState, retentionPending: Boolean): Boolean =
+            PostBuildNotice.current(
+                PostBuildNotice.pending(summary = summaryPending(state), retention = retentionPending, accountLink = true),
+            ) == PostBuildNotice.ACCOUNT_LINK
     }
 }

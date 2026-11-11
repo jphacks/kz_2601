@@ -2,7 +2,7 @@ package jp.kz2601.metamon.voice.stage
 
 /**
  * 完成の直後に出るお知らせ(#894・iOS の `PostBuildNotice`・H7)。同時に出さず、優先順位の高いものから 1 つずつ(前のが閉じたら次)出す。
- * Android にまだ無いもの(課金画面・公開の記録の確認・引き継ぎの案内)も順番だけは iOS と揃えておく。
+ * Android にまだ無いもの(課金画面・公開の記録の確認)も順番だけは iOS と揃えておく。
  */
 enum class PostBuildNotice {
     /** 共有の記録が入った版の課金画面 */
@@ -29,10 +29,16 @@ enum class PostBuildNotice {
         fun current(pending: Set<PostBuildNotice>): PostBuildNotice? = pending.minOrNull()
 
         /** Android で待っているお知らせ(iOS の `AppRuntime.pendingNotices` の Android にある分)。 */
-        fun pending(summary: Boolean, retention: Boolean = false, editHint: Boolean = false): Set<PostBuildNotice> = buildSet {
+        fun pending(
+            summary: Boolean,
+            retention: Boolean = false,
+            editHint: Boolean = false,
+            accountLink: Boolean = false,
+        ): Set<PostBuildNotice> = buildSet {
             if (summary) add(SUMMARY)
             if (retention) add(RETENTION)
             if (editHint) add(EDIT_HINT)
+            if (accountLink) add(ACCOUNT_LINK)
         }
     }
 }

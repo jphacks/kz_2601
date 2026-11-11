@@ -12,6 +12,9 @@
     <string name="account_link_footer">Sign in with Google or Apple to keep your apps and data. If you stay anonymous and delete the app or change phones, you can\'t get back to your apps.</string>
     <string name="account_link_google">Continue with Google</string>
     <string name="account_link_no_pending">Please sign in again</string>
+    <string name="account_link_prompt_body">You\'re using Tailor It anonymously. Sign in with Google or Apple to get back to your apps and data after changing phones or reinstalling.</string>
+    <string name="account_link_prompt_later">Not now</string>
+    <string name="account_link_prompt_title">Keep the apps you made?</string>
     <string name="account_link_status_anonymous">You\'re using it anonymously</string>
     <string name="account_link_switch">Switch to that account</string>
 </resources>
