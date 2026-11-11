@@ -196,7 +196,8 @@ struct MacRootView: View {
         if notices.summary?.appId == id { notices.summary = nil }
         let onServer = library.isOnServer(id)
         library.delete(id)
-        MacRecordVault.purge(appId: id) // 記録も消す(#1284)
+        // 記録も消す(#1284)。開いているウインドウのエンジンを止めて手放してから消す(動いたままだと書き戻される)
+        Task { await MacRecordEngines.shared.purge(appId: id) }
         // サーバーにあるアプリはサーバーからも消す(iOS の deleteApp と同じ)。届かなくても端末からは消す
         if onServer, let appConfig = MacServices.shared.appConfig {
             Task {

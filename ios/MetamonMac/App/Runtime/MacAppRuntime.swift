@@ -48,6 +48,8 @@ final class MacAppRuntime: RuntimeNavigating {
     @ObservationIgnored let openForms = OpenFormRegistry()
 
     @ObservationIgnored let recordSync: RecordSyncEngine
+    /// 作ったアプリの記録のエンジンを借りている(`MacRecordEngines`)。同じアプリを開いた別のウインドウと同じエンジンを使う
+    @ObservationIgnored private let recordLease: MacRecordEngineLease?
     /// AI の部品のオンライン版の送り先(#962)
     @ObservationIgnored let ai: any AIClient
     @ObservationIgnored let isAIConsentGranted: @MainActor () -> Bool
@@ -69,7 +71,9 @@ final class MacAppRuntime: RuntimeNavigating {
     /// 話して入力(aiChat のマイク・transcribeField・#1328)。声で頼む(`MacVoiceInput`)と同じ認識を使う。nil なら使えない
     @ObservationIgnored let dictationSource: TranscriberDictation?
 
-    init(appId: String, dsl: AppDSL, recordSync: RecordSyncEngine? = nil, ai: any AIClient = MacComposeSession.gatedAI(),
+    /// `recordLease` を渡したらそのエンジンを使い(止めるのは `MacRecordEngines`)、`recordSync` を渡したらこのランタイムだけのエンジン
+    init(appId: String, dsl: AppDSL, recordSync: RecordSyncEngine? = nil, recordLease: MacRecordEngineLease? = nil,
+         ai: any AIClient = MacComposeSession.gatedAI(),
          isAIConsentGranted: @escaping @MainActor () -> Bool = { AIConsentStore.shared.isGranted },
          dictation: TranscriberDictation? = nil) {
         self.appId = appId
@@ -78,7 +82,11 @@ final class MacAppRuntime: RuntimeNavigating {
         self.ai = ai
         self.isAIConsentGranted = isAIConsentGranted
         selectedTab = dsl.initialTab // iOS と同じ: initialScreen がタブならそのタブから
-        if let recordSync {
+        self.recordLease = recordLease
+        if let recordLease {
+            self.recordSync = recordLease.engine
+            previewDirectory = nil
+        } else if let recordSync {
             self.recordSync = recordSync
             previewDirectory = nil
         } else {
@@ -87,7 +95,11 @@ final class MacAppRuntime: RuntimeNavigating {
             previewDirectory = dir
         }
         book = RecordBook(appId: appId, dsl: dsl, recordSync: self.recordSync)
-        self.recordSync.onEvent = { [weak self] event in self?.handle(event) }
+        if let recordLease {
+            recordLease.onEvent = { [weak self] event in self?.handle(event) } // 同じエンジンの通知は借りている全員に届く
+        } else {
+            self.recordSync.onEvent = { [weak self] event in self?.handle(event) }
+        }
         self.recordSync.start()
         notifications.start(self)
     }
@@ -96,9 +108,11 @@ final class MacAppRuntime: RuntimeNavigating {
     /// 一時フォルダも消す(切り替えのたびに増えないように)
     deinit {
         let engine = recordSync
+        let lease = recordLease
         let dir = previewDirectory
         Task { @MainActor in
-            engine.stop()
+            // 借りたエンジンは返すだけ(最後のウインドウが返したら `MacRecordEngines` が止める)
+            if let lease { lease.release() } else { engine.stop() }
             if let dir { try? FileManager.default.removeItem(at: dir) }
         }
     }
