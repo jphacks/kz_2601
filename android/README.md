@@ -68,6 +68,18 @@ product flavor `env` で分ける。値は `BuildConfig` に入る(iOS の `ios/
 
 stg の画面の下には接続先と認証の状態(`stg / auth=mock / uid=…`)が出る。
 
+### 審査用の版
+
+`-Pmetamon.playReview=true` を付けて組むと、iOS の審査用の版(`APP_STORE_REVIEW`・`docs/ios/review-build.md`)と同じく共有を外す(`BuildConfig.PLAY_REVIEW`・`ReviewBuild`)。既定はオフ。
+
+```sh
+./gradlew :app:bundleProdRelease -Pmetamon.playReview=true
+```
+
+- 出さないもの: 共有シート(変身一覧・設定の「このアプリをシェア」)・参加している人・「探す」(公開・インストール)・頼み方のコツの共有の例
+- シェアリンク(`tailorit://`)が届いても開かない
+- 生成の `disabledFeatures` に `sharedData` を足す(backend が記録を private に直す)
+
 ## モックとつまみ
 
 サーバー無しで画面を動かす構成(#844)。iOS の `METAMON_MOCK=1` などと同じ名前のつまみを、起動の intent extra で渡す。**つまみを読むのは debug のビルドだけ**(`app/src/debug`)。release は `app/src/release` の版が何も読まない。

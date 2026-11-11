@@ -143,7 +143,7 @@ class MainActivity : ComponentActivity() {
     /** 通知のタップ(自分で出した通知も、FCM が裏で出した通知も extra の `appId`)と、シェアリンク(#901)。 */
     private fun offerPushOpen(intent: Intent?) {
         PushOpen.offer(PushMessage.appId(intent?.getStringExtra(LocalNotifications.EXTRA_APP_ID)))
-        ShareLinkIntents.offer(intent)
+        if (!ReviewBuild.enabled) ShareLinkIntents.offer(intent) // 審査用の版はシェアリンクを開かない(#1275)
     }
 }
 
@@ -275,7 +275,8 @@ fun MetamonApp(container: AppContainer) {
     // 共有シート(#901)。発行したリンクは人が変わる(wipes)まで覚える。モックは mockSharing の時だけ
     var shareTarget by remember { mutableStateOf<ShareTarget?>(null) }
     val issuedShares = remember(wipes) { IssuedShares() }
-    val canShare = !container.knobs.mock || container.knobs.mockSharing
+    // 審査用の版(#1275)は共有の入口を出さない
+    val canShare = ReviewBuild.canShare(ReviewBuild.enabled, container.knobs.mock, container.knobs.mockSharing)
     // 「探す」(#902)。サーバーにつながる構成だけ入口を出す(iOS の canShare)
     var discoverOpen by rememberSaveable { mutableStateOf(false) }
     // 参加している人(#903)。入口は共有シートの下と設定

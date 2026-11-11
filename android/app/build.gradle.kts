@@ -33,6 +33,8 @@ android {
         targetSdk = 36
         versionCode = 1
         versionName = "0.1.0"
+        // Play の審査用の版(#1275・iOS の APP_STORE_REVIEW)。-Pmetamon.playReview=true の時だけ共有・探すの入口を外す
+        buildConfigField("boolean", "PLAY_REVIEW", (stringProperty("metamon.playReview") == "true").toString())
     }
 
     // 接続先は iOS の ios/project.yml(METAMON_AI_BASE_URL / METAMON_APPCONFIG_BASE_URL)と同じ。
