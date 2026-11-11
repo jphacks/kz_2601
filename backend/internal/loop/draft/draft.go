@@ -348,7 +348,7 @@ func fill(d *loop.Draft, items []loop.Item, now time.Time) {
 			d.Sources = append(d.Sources, string(s))
 		}
 	}
-	d.Priority = triage.Priority(rep.Category, impactOf(rep.Priority), rep.Area, count)
+	d.Priority = BundlePriority(rep.Category, rep.Area, items, count)
 	d.Title = fmt.Sprintf("[フィードバック] %s: %s", draftable[rep.Category], cut(firstSentence(rep.Summary), 60))
 	examples := []string{}
 	for _, it := range items[1:] {
@@ -405,10 +405,44 @@ func rank(it loop.Item) int {
 	return p*1000 + max(it.Count, 1)
 }
 
-// impactOf maps an item's computed priority back to an impact for the
-// cluster's priority (the model's impact itself is not stored).
-func impactOf(p string) string {
-	switch p {
+// ManyReports is how many reports raise a bundle's priority one more level.
+const ManyReports = 10
+
+// BundlePriority is a bundle's P1–P3, from the triage verdicts of all its
+// items and its number of reports (count):
+//
+//  1. triage.Priority with the bundle's category and area, the highest
+//     impact any item got, and count
+//  2. count >= ManyReports raises it one level, capped at P1
+//  3. spam and praise are always P3 and never raised
+func BundlePriority(category, area string, items []loop.Item, count int) string {
+	if _, ok := draftable[category]; !ok {
+		return "P3"
+	}
+	impact := "low"
+	for _, it := range items {
+		if impactRank(impactOf(it)) > impactRank(impact) {
+			impact = impactOf(it)
+		}
+	}
+	p := triage.Priority(category, impact, area, count)
+	if count >= ManyReports {
+		p = map[string]string{"P3": "P2", "P2": "P1", "P1": "P1"}[p]
+	}
+	return p
+}
+
+func impactRank(s string) int {
+	return map[string]int{"low": 1, "medium": 2, "high": 3}[s]
+}
+
+// impactOf is the model's impact for it. Items triaged before the impact was
+// stored fall back to one worked back from their priority.
+func impactOf(it loop.Item) string {
+	if impactRank(it.Impact) > 0 {
+		return it.Impact
+	}
+	switch it.Priority {
 	case "P1":
 		return "high"
 	case "P2":
