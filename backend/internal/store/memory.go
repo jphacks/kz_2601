@@ -256,6 +256,18 @@ func (m *Memory) ReorderApps(_ context.Context, uid string, ids []string) error 
 	return nil
 }
 
+// SetAppGlance implements Store.
+func (m *Memory) SetAppGlance(_ context.Context, uid, appID, glance string) (*App, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	a := m.get(uid, appID)
+	if a == nil {
+		return nil, ErrNotFound
+	}
+	a.app.GlanceStat = glance
+	return a.snapshot(), nil
+}
+
 // CommitVersion implements Store.
 func (m *Memory) CommitVersion(_ context.Context, uid, appID string, c Commit) (*Version, error) {
 	m.mu.Lock()
