@@ -1,3 +1,4 @@
+import Observation
 import XCTest
 import MetamonDSL
 import MetamonServices
@@ -60,7 +61,20 @@ final class MacRecordEnginesTests: XCTestCase {
             .appendingPathComponent("local", isDirectory: true))
         let onDisk = await disk.records(appId: "shared-app", entity: "expense")
         XCTAssertEqual(memos(onDisk), ["A", "B"])
+        // B の行が A の画面に届くのは、送れた通知(`.sent`)で A が読み直してから(非同期)
+        await waitForChanges(of: { self.memos(a.records(for: "expense")) == ["A", "B"] })
         XCTAssertEqual(memos(a.records(for: "expense")), ["A", "B"])
+    }
+
+    /// `condition` が真になるまで、読んだ値(Observation)が変わるたびに確かめ直す。
+    /// 時間切れならそのまま戻る(呼んだ側の XCTAssert が落とす)
+    private func waitForChanges(of condition: @escaping @MainActor () -> Bool, timeout: TimeInterval = 5) async {
+        while !condition() {
+            let changed = XCTestExpectation(description: "読んだ値が変わる")
+            // 確かめた直後に同じメインアクターで登録するので、その間の変化は取りこぼさない
+            withObservationTracking { _ = condition() } onChange: { changed.fulfill() }
+            guard await XCTWaiter().fulfillment(of: [changed], timeout: timeout) == .completed else { return }
+        }
     }
 
     func testEventsReachEveryWindow() throws {

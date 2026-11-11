@@ -3168,6 +3168,23 @@
         }
       }
     },
+    "クリックした所へピンを動かします" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Click to move the pin there"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "クリックした所へピンを動かします"
+          }
+        }
+      }
+    },
     "クリックでブラウザで開きます" : {
       "extractionState" : "manual",
       "localizations" : {
