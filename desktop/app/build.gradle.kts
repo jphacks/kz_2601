@@ -21,6 +21,7 @@ dependencies {
     implementation(project(":dsl"))
     implementation(compose.desktop.currentOs)
     implementation(compose.material3)
+    implementation(libs.zxing.core)
 
     testImplementation(libs.junit)
 }
@@ -41,6 +42,16 @@ tasks.test {
     inputs.dir(dslDocsDir.resolve("examples")).withPropertyName("dslExamples").withPathSensitivity(PathSensitivity.RELATIVE)
     systemProperty("metamon.dslDocsDir", dslDocsDir.absolutePath)
 }
+
+// Android の :renderer のうち Compose の状態しか使わない純 Kotlin(フォームの下書き・遷移の規則)は、android/ を変えずにそのまま取り込む。
+val sharedRendererDir = rootDir.resolve("../android/renderer/src/main/kotlin/jp/kz2601/metamon/renderer")
+val syncSharedRenderer by tasks.registering(Sync::class) {
+    from(sharedRendererDir) {
+        include("form/FormDraft.kt", "navigation/NavigationResolver.kt")
+    }
+    into(layout.buildDirectory.dir("generated/sharedRenderer"))
+}
+kotlin.sourceSets.named("main") { kotlin.srcDir(syncSharedRenderer) }
 
 compose.desktop {
     application {

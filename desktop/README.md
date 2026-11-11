@@ -16,9 +16,12 @@ cd desktop
 ## 今できること
 
 - `docs/dsl/examples` の DSL を 1 本読み、画面を 6 列のグリッド(`area`)に並べる。area の無い部品は下に全幅で積み、フォーム画面は段(band)で積む。広いウィンドウでは幅 720dp で止めて中央に寄せる。最小 360×560、大きさと位置は次の起動で戻す。
-- 描ける部品: 並び・見出し・text・label・badge・markdown(書式付き)・button・link・list・入力(textField など・toggle・picker・stepper・rating)・image・avatar・stat・chart(棒・線・扇)・progressBar・gauge・calendar(今月の表)。
+- 描ける部品: 並び・見出し・text・label・badge・markdown(書式付き)・button・link・list・入力 20 種(textField〜qrScanner)・image・avatar・stat・chart(棒・線・扇)・progressBar・gauge・calendar(今月の表)。
 - 記録を入れて開く: `./gradlew :desktop:run --args="kakeibo /path/records.json stats"`(2 つ目は `{"<entity>": [{"id", "data"}]}`、3 つ目は最初の画面)。
-- 保存・削除・戻るはメモリの中のモック。サインイン・通信はまだ無い。
+- 入力: 日付・時刻は文字で入れて「今日」「‹ ›」で動かす。写真・動画・録音はファイルを選ぶ(撮影・録音・位置はこのパソコンでは使えない旨の枠)。手書きはマウス・ペンで描いて PNG に。QR は画像ファイルかクリップボードの画像から読む(zxing)。
+- 遷移: push はウィンドウの中で積み、sheet はウィンドウ内のダイアログ、fullScreen はウィンドウ全体に重ねる。タブは下に並べる。confirmMessage は確認ダイアログ。規則は Android と同じ `NavigationResolver`・`FormDraft`(`android/renderer` のソースをビルド時に取り込む。`android/` は変えない)。
+- アクション: 保存・削除・resetForm はメモリの中のモック。openUrl はブラウザ、addToCalendar は .ics を書き出して既定のカレンダーで開く、export は CSV をダウンロードに書き出してクリップボードにも入れる、scheduleNotification はトレイの通知(起動中だけ)、lookupBook はモックの本(`TAILORIT_API_BASE` を付けると `POST /v1/lookup/book`)。openVoice・startActivity・endActivity・follow は「使えない」旨を出す。
+- サインイン・通信はまだ無い。
 - まだ描けない部品は「デスクトップ版ではまだ使えない部品」の枠で残す。
 
 ## 構成
@@ -27,4 +30,6 @@ cd desktop
 |---|---|
 | `settings.gradle.kts` | `:dsl`(`../android/dsl`)と `:desktop`(`app/`)。版は `../android/gradle/libs.versions.toml` を共有 |
 | `app/src/main/kotlin/.../desktop/` | ウィンドウ・画面の描画・モックのレコード |
-| `app/src/test/kotlin/.../desktop/DesktopConformanceTest.kt` | 全 OS 共通の適合テストのうち、今比べられる部分 |
+| `app/src/main/kotlin/.../desktop/Session.kt` | 画面の状態と操作(遷移・下書き・保存・削除)。画面と適合テストが同じ物を使う |
+| `app/src/main/kotlin/.../desktop/InputLeaves.kt`・`Actions.kt` | 入力の部品 20 種・OS に頼むアクション |
+| `app/src/test/kotlin/.../desktop/DesktopConformanceTest.kt` | 全 OS 共通の適合テストのうち、今比べられる部分(画面・入力の値とラベル・操作の steps) |

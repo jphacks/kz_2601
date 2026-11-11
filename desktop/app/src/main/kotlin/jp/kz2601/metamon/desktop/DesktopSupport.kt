@@ -34,7 +34,7 @@ object DesktopLeaves {
         ComponentType.TOGGLE,
         ComponentType.PICKER,
         ComponentType.STEPPER,
-    ) + DISPLAY_LEAVES
+    ) + DISPLAY_LEAVES + InputLeaves.types
 
     /** 適合テストの `state`(rendered / unavailable / unknown)。hidden・needsForm はまだ見ない。 */
     fun state(c: Component): String = when {
@@ -58,7 +58,8 @@ object Examples {
 }
 
 /** モックのレコード(サインインも通信もしない骨格用)。 */
-data class Row(val id: String, val data: Map<String, String>)
+/** createdAt / author は読み込んだ記録のもの(無ければ並び順・自分)。createdAt の "" は「分からない」(並べ替えで元の順を保つ)。 */
+data class Row(val id: String, val data: Map<String, String>, val createdAt: String? = null, val author: String? = null)
 
 data class MockStore(val rows: Map<String, List<Row>> = emptyMap(), val nextId: Int = 1) {
     fun list(entity: String): List<Row> = rows[entity].orEmpty()
@@ -68,7 +69,7 @@ data class MockStore(val rows: Map<String, List<Row>> = emptyMap(), val nextId: 
     fun save(entity: String, id: String?, data: Map<String, String>): MockStore {
         val current = list(entity)
         return if (id != null && current.any { it.id == id }) {
-            copy(rows = rows + (entity to current.map { if (it.id == id) Row(id, data) else it }))
+            copy(rows = rows + (entity to current.map { if (it.id == id) it.copy(data = data) else it }))
         } else {
             copy(rows = rows + (entity to current + Row("new-$nextId", data)), nextId = nextId + 1)
         }
@@ -78,10 +79,16 @@ data class MockStore(val rows: Map<String, List<Row>> = emptyMap(), val nextId: 
 
     /** 集計・式が読む形(数の field は数に)。 */
     fun records(entity: String, model: jp.kz2601.metamon.dsl.records.Entity?): List<Record> = list(entity).mapIndexed { i, r ->
-        Record(r.id, r.data.mapValues { (k, v) -> typedValue(v, model?.field(k)?.type) }, createdAt = "%06d".format(i), author = "me")
+        Record(r.id, r.data.mapValues { (k, v) -> typedValue(v, model?.field(k)?.type) }, createdAt = r.createdAt ?: "%06d".format(i), author = r.author ?: "me")
     }
 
     companion object {
+        /** 記録の値 → モックの文字列(配列・オブジェクトは JSON のまま)。 */
+        fun cell(v: jp.kz2601.metamon.dsl.records.JSONValue): String = when (v) {
+            is jp.kz2601.metamon.dsl.records.JSONValue.Arr, is jp.kz2601.metamon.dsl.records.JSONValue.Obj -> v.toJsonElement().toString()
+            else -> v.displayString
+        }
+
         /** `{"<entity>": [{"id", "data"}]}`(適合テストの case.json の records と同じ形)を読む。開発・スクリーンショット用。 */
         fun fromJson(text: String): MockStore {
             val root = Json.parseToJsonElement(text).jsonObject
@@ -89,7 +96,7 @@ data class MockStore(val rows: Map<String, List<Row>> = emptyMap(), val nextId: 
             val rows = obj.mapValues { (_, list) ->
                 list.jsonArray.map { e ->
                     val r = Record.from(e)
-                    Row(r.id, r.data.mapValues { it.value.displayString })
+                    Row(r.id, r.data.mapValues { cell(it.value) }, r.createdAt ?: "", r.author)
                 }
             }
             return MockStore(rows)

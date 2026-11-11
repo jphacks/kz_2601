@@ -1,5 +1,6 @@
 package jp.kz2601.metamon.desktop
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -8,6 +9,7 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -17,121 +19,134 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
-import androidx.compose.material3.FilterChip
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
-import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
-import androidx.compose.runtime.snapshots.SnapshotStateMap
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.text.input.PasswordVisualTransformation
-import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import jp.kz2601.metamon.dsl.Screen
 import jp.kz2601.metamon.dsl.Action
-import jp.kz2601.metamon.dsl.ActionType
 import jp.kz2601.metamon.dsl.AppDSL
 import jp.kz2601.metamon.dsl.Component
 import jp.kz2601.metamon.dsl.ComponentType
-import jp.kz2601.metamon.dsl.Entity
+import jp.kz2601.metamon.dsl.hasTabs
+import jp.kz2601.metamon.dsl.records.FieldCoding
 import jp.kz2601.metamon.dsl.screen
-import java.awt.Desktop
-import java.net.URI
-
-private data class NavEntry(val screenId: String, val recordId: String?, val key: Int)
+import jp.kz2601.metamon.renderer.form.FormDraft
+import jp.kz2601.metamon.renderer.navigation.NavigationResolver
+import jp.kz2601.metamon.renderer.navigation.Route
+import jp.kz2601.metamon.renderer.navigation.top
 
 /** 画面 1 枚の描画に要るもの。 */
 private class ScreenScope(
-    val entity: Entity?,
-    val draft: SnapshotStateMap<String, String>,
-    val store: MockStore,
+    val route: Route,
+    val form: FormDraft?,
+    val session: DesktopSession,
     val perform: (Action, String?) -> Unit,
-    val entityOf: (String?) -> Entity?,
     val data: LeafData,
 )
 
-/** DSL を 1 本読み、スタックで画面を積んで描く。画面は 6 列のグリッド(フォームは段)に並べる。 */
+/**
+ * DSL を 1 本読み、[DesktopSession] の遷移で画面を描く。画面は 6 列のグリッド(フォームは段)に並べる。
+ * push はウィンドウの中で積み、sheet はウィンドウ内のダイアログ、fullScreen はウィンドウ全体に重ねる。タブは下に並べる。
+ */
 @Composable
 fun DesktopApp(dsl: AppDSL, initialStore: MockStore = MockStore(), startScreen: String? = null) {
-    var store by remember { mutableStateOf(initialStore) }
-    var stack by remember { mutableStateOf(listOf(NavEntry(startScreen ?: dsl.initialScreen, null, 0))) }
-    var nextKey by remember { mutableStateOf(1) }
-    var message by remember { mutableStateOf<String?>(null) }
+    val session = remember { DesktopSession(dsl, initialStore, startScreen = startScreen, host = DesktopActionHost()) }
+    var pending by remember { mutableStateOf<Pair<Action, ActionContext>?>(null) }
+    val nav = session.nav
+    val dispatch = { a: Action, ctx: ActionContext -> if (a.confirmMessage != null) pending = a to ctx else session.dispatch(a, ctx) }
 
-    val top = stack.last()
-    val screen = dsl.screen(top.screenId) ?: dsl.screens.firstOrNull() ?: return
-    val entityOf = { id: String? -> dsl.entities.firstOrNull { it.id == id } }
-    val entity = entityOf(screen.entity)
-    val draft = remember(top.key) {
-        mutableStateMapOf<String, String>().apply {
-            val saved = if (entity != null && top.recordId != null) store.find(entity.id, top.recordId) else null
-            putAll(saved?.data ?: entity?.defaultDraft().orEmpty())
-        }
-    }
-
-    fun pop() {
-        if (stack.size > 1) stack = stack.dropLast(1)
-    }
-
-    fun perform(action: Action, recordId: String?) {
-        message = null
-        when (action.type) {
-            ActionType.NAVIGATE -> action.screen?.let {
-                stack = stack + NavEntry(it, recordId, nextKey)
-                nextKey++
-            }
-            ActionType.BACK -> pop()
-            ActionType.SAVE_RECORD -> {
-                val target = entityOf(action.entity ?: screen.entity)
-                if (target == null) {
-                    message = "保存先のフォームがありません"
-                    return
-                }
-                val missing = target.missingRequired(draft)
-                if (missing.isNotEmpty()) {
-                    message = "入力してください: ${missing.joinToString("、")}"
-                    return
-                }
-                store = store.save(target.id, top.recordId, draft.toMap())
-                pop()
-            }
-            ActionType.DELETE_RECORD -> {
-                val target = entityOf(action.entity ?: screen.entity)
-                if (target != null && top.recordId != null) store = store.delete(target.id, top.recordId)
-                pop()
-            }
-            ActionType.OPEN_URL -> action.url?.let(::openBrowser)
-            else -> message = "デスクトップ版ではまだ使えない操作: ${action.rawType.ifEmpty { action.type.name }}"
-        }
-    }
-
-    val leafData = remember(store) { LeafData.of(dsl, store) }
-    val scope = ScreenScope(entity, draft, store, ::perform, entityOf, leafData)
     Surface(Modifier.fillMaxSize()) {
-        Column(Modifier.fillMaxSize()) {
-            Row(Modifier.fillMaxWidth().padding(8.dp), verticalAlignment = Alignment.CenterVertically) {
-                if (stack.size > 1) TextButton(onClick = ::pop) { Text("戻る") }
-                Text(screen.title.ifEmpty { dsl.app.name }, style = MaterialTheme.typography.titleLarge, modifier = Modifier.weight(1f))
-                screen.toolbar.forEach { b -> TextButton(onClick = { perform(b.action, top.recordId) }) { Text(b.label) } }
+        Box(Modifier.fillMaxSize()) {
+            Column(Modifier.fillMaxSize()) {
+                val base = NavigationResolver.dismissModals(nav).top(dsl)
+                Box(Modifier.weight(1f)) { ScreenView(dsl, session, base, dispatch) }
+                if (dsl.app.hasTabs) {
+                    HorizontalDivider()
+                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly) {
+                        dsl.app.tabs.forEach { t ->
+                            TextButton(onClick = { session.selectTab(t.screen) }) {
+                                Text(t.title, fontWeight = if (nav.selectedTab == t.screen) androidx.compose.ui.text.font.FontWeight.Bold else null)
+                            }
+                        }
+                    }
+                }
             }
-            HorizontalDivider()
-            message?.let { Text(it, color = MaterialTheme.colorScheme.error, modifier = Modifier.padding(12.dp)) }
-            GridScreen(screen, scope)
+            if (nav.sheet != null || nav.fullScreen != null) {
+                val top = nav.top(dsl)
+                val full = nav.fullScreen != null
+                Box(
+                    Modifier.fillMaxSize().background(Color(0x66000000)).clickable(enabled = !full) { session.back(top) },
+                    contentAlignment = Alignment.Center,
+                ) {
+                    val m = if (full) Modifier.fillMaxSize() else Modifier.widthIn(max = 640.dp).fillMaxWidth(0.92f).fillMaxSize(0.9f)
+                    Surface(m, shape = MaterialTheme.shapes.large, tonalElevation = 6.dp) {
+                        ScreenView(dsl, session, top, dispatch)
+                    }
+                }
+            }
         }
+    }
+
+    pending?.let { (a, ctx) ->
+        AlertDialog(
+            onDismissRequest = { pending = null },
+            text = { Text(a.confirmMessage.orEmpty()) },
+            confirmButton = { TextButton(onClick = { pending = null; session.dispatch(a, ctx) }) { Text(confirmLabel(a)) } },
+            dismissButton = { TextButton(onClick = { pending = null }) { Text("キャンセル") } },
+        )
+    }
+}
+
+/** 確認ダイアログの主ボタン(iOS と同じ語)。 */
+private fun confirmLabel(a: Action): String = when (a.type) {
+    jp.kz2601.metamon.dsl.ActionType.DELETE_RECORD -> "削除"
+    jp.kz2601.metamon.dsl.ActionType.SAVE_RECORD -> "保存"
+    jp.kz2601.metamon.dsl.ActionType.EXPORT -> "書き出す"
+    jp.kz2601.metamon.dsl.ActionType.OPEN_URL -> "開く"
+    jp.kz2601.metamon.dsl.ActionType.RESET_FORM -> "入力を消す"
+    else -> "続ける"
+}
+
+
+/** route の画面 1 枚(見出し・戻る・toolbar・一言・グリッド)。 */
+@Composable
+private fun ScreenView(dsl: AppDSL, session: DesktopSession, route: Route, dispatch: (Action, ActionContext) -> Unit) {
+    val screen = dsl.screen(route.screen) ?: dsl.screens.firstOrNull() ?: return
+    val form = session.form(route)
+    val data = remember(session.store) { session.leafData() }
+    val perform = { a: Action, recordId: String? -> dispatch(a, ActionContext(route, form, recordId)) }
+    val scope = ScreenScope(route, form, session, perform, data)
+    Column(Modifier.fillMaxSize()) {
+        Row(Modifier.fillMaxWidth().padding(8.dp), verticalAlignment = Alignment.CenterVertically) {
+            if (NavigationResolver.canClose(session.nav, route)) {
+                TextButton(onClick = { session.back(route) }) { Text(if (route.stack == Route.SHEET || route.stack == Route.FULL) "閉じる" else "戻る") }
+            }
+            Text(screen.title.ifEmpty { dsl.app.name }, style = MaterialTheme.typography.titleLarge, modifier = Modifier.weight(1f))
+            screen.toolbar.forEach { b ->
+                if (isButtonVisible(b.action, form)) TextButton(onClick = { perform(b.action, null) }) { Text(b.label) }
+            }
+        }
+        HorizontalDivider()
+        if (route == session.top) {
+            session.message?.let { Text(it, color = MaterialTheme.colorScheme.error, modifier = Modifier.padding(12.dp)) }
+        }
+        if (form?.isReadOnly == true) Text("このデータは作った人だけが変更できます", color = Color.Gray, modifier = Modifier.padding(horizontal = 12.dp))
+        GridScreen(screen, scope)
     }
 }
 
@@ -222,61 +237,29 @@ private fun Node(c: Component, s: ScreenScope) {
         ComponentType.MARKDOWN -> MarkdownLeaf(c.text.orEmpty())
         ComponentType.LABEL -> Text(c.label ?: c.text.orEmpty(), style = MaterialTheme.typography.labelLarge)
         ComponentType.BADGE -> BadgeLeaf(c)
-        ComponentType.IMAGE -> ImageLeaf(c, c.field?.let { s.draft[it] })
-        ComponentType.AVATAR -> AvatarLeaf(c, c.field?.let { s.draft[it] })
+        ComponentType.IMAGE -> ImageLeaf(c, c.field?.let { s.form?.values?.get(it)?.stringValue })
+        ComponentType.AVATAR -> AvatarLeaf(c, c.field?.let { s.form?.values?.get(it)?.stringValue })
         ComponentType.STAT -> StatLeaf(c, s.data)
         ComponentType.CHART -> ChartLeaf(c, s.data)
         ComponentType.PROGRESS_BAR -> ProgressLeaf(c, s.data)
         ComponentType.GAUGE -> GaugeLeaf(c, s.data)
         ComponentType.CALENDAR -> CalendarLeaf(c, s.data, c.onDateTap?.let { a -> { _ -> s.perform(a, null) } })
-        ComponentType.RATING -> {
-            val field = c.field
-            val value = field?.let { s.draft[it]?.toDoubleOrNull()?.toInt() } ?: (c.value as? jp.kz2601.metamon.dsl.ExprNumber)?.value?.toInt() ?: 0
-            RatingLeaf(c, value, if (field != null) fieldLabel(c, s) else c.label, field?.let { f -> { n: Int -> s.draft[f] = n.toString() } })
+        ComponentType.RATING -> if (c.field != null && s.form != null) {
+            InputNode(c, s)
+        } else {
+            RatingLeaf(c, (c.value as? jp.kz2601.metamon.dsl.ExprNumber)?.value?.toInt() ?: 0, c.label, null)
         }
         ComponentType.EMPTY_STATE -> Text(c.title ?: c.message ?: c.text.orEmpty(), color = Color.Gray)
         ComponentType.SPACER -> Spacer(Modifier.height(8.dp))
         ComponentType.DIVIDER -> HorizontalDivider()
-        ComponentType.BUTTON -> Button(onClick = { c.action?.let { s.perform(it, null) } }) { Text(c.label ?: c.title ?: c.text.orEmpty()) }
-        ComponentType.LINK -> TextButton(onClick = { c.url?.let(::openBrowser) }) { Text(c.text ?: c.label ?: c.url.orEmpty()) }
+        ComponentType.BUTTON -> if (s.session.tapState(c, s.form) == "rendered") {
+            Button(onClick = { c.action?.let { s.perform(it, null) } }) { Text(c.label ?: c.title ?: c.text.orEmpty()) }
+        }
+        ComponentType.LINK -> TextButton(onClick = { c.url?.let { s.perform(jp.kz2601.metamon.dsl.Action(type = jp.kz2601.metamon.dsl.ActionType.OPEN_URL, url = it), null) } }) {
+            Text(c.text ?: c.label ?: c.url.orEmpty())
+        }
         ComponentType.LIST -> ListLeaf(c, s)
-        ComponentType.TEXT_FIELD, ComponentType.NUMBER_FIELD, ComponentType.TEXT_EDITOR, ComponentType.SECURE_FIELD -> {
-            val field = c.field ?: return
-            OutlinedTextField(
-                value = s.draft[field].orEmpty(),
-                onValueChange = { s.draft[field] = it },
-                label = { Text(fieldLabel(c, s)) },
-                placeholder = c.placeholder?.let { p -> { Text(p) } },
-                singleLine = c.type != ComponentType.TEXT_EDITOR,
-                visualTransformation = if (c.type == ComponentType.SECURE_FIELD) PasswordVisualTransformation() else VisualTransformation.None,
-                modifier = Modifier.fillMaxWidth(),
-            )
-        }
-        ComponentType.TOGGLE -> {
-            val field = c.field ?: return
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Text(fieldLabel(c, s), Modifier.weight(1f))
-                Switch(checked = s.draft[field] == "true", onCheckedChange = { s.draft[field] = it.toString() })
-            }
-        }
-        ComponentType.PICKER -> {
-            val field = c.field ?: return
-            val options = s.entity?.fields?.firstOrNull { it.id == field }?.options.orEmpty()
-            Text(fieldLabel(c, s), style = MaterialTheme.typography.labelLarge)
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                options.forEach { o -> FilterChip(selected = s.draft[field] == o, onClick = { s.draft[field] = o }, label = { Text(o) }) }
-            }
-        }
-        ComponentType.STEPPER -> {
-            val field = c.field ?: return
-            val n = s.draft[field]?.toDoubleOrNull()?.toInt() ?: 0
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Text(fieldLabel(c, s), Modifier.weight(1f))
-                TextButton(onClick = { s.draft[field] = (n - 1).toString() }) { Text("−") }
-                Text(n.toString())
-                TextButton(onClick = { s.draft[field] = (n + 1).toString() }) { Text("+") }
-            }
-        }
+        in InputLeaves.types -> InputNode(c, s)
         else -> Text(
             if (c.type == ComponentType.UNKNOWN) "知らない部品: ${DesktopLeaves.typeName(c)}" else "デスクトップ版ではまだ使えない部品: ${DesktopLeaves.typeName(c)}",
             color = Color.Gray,
@@ -298,15 +281,25 @@ private fun Box1(modifier: Modifier, content: @Composable () -> Unit) {
     Column(modifier) { content() }
 }
 
+/** 入力の部品: 隠す・フォームの外を先に決めてから描く。 */
+@Composable
+private fun InputNode(c: Component, s: ScreenScope) {
+    when (s.session.tapState(c, s.form)) {
+        "hidden" -> return
+        "needsForm" -> return Text("この入力はフォームの画面で使えます", color = Color.Gray, style = MaterialTheme.typography.bodySmall)
+    }
+    InputLeaf(c, s.form!!) { s.session.message = it }
+}
+
 @Composable
 private fun ListLeaf(c: Component, s: ScreenScope) {
-    val entity = s.entityOf(c.entity)
-    val rows = c.entity?.let { s.store.list(it) }.orEmpty()
+    val entity = s.data.entity(c.entity)
+    val rows = s.session.rows(c, c.searchField?.let { s.session.queries(s.route)[it] })
     if (rows.isEmpty()) {
         Text(c.emptyText ?: "まだありません", color = Color.Gray)
         return
     }
-    val titleField = c.item?.title ?: entity?.titleField
+    val titleField = c.item?.title ?: entity?.displayTitleField
     rows.forEach { row ->
         val tap = c.onItemTap
         Column(
@@ -314,16 +307,11 @@ private fun ListLeaf(c: Component, s: ScreenScope) {
                 .then(if (tap != null) Modifier.clickable { s.perform(tap, row.id) } else Modifier)
                 .padding(vertical = 6.dp),
         ) {
-            Text(titleField?.let { row.data[it] } ?: row.id)
-            c.item?.subtitle?.let { f -> row.data[f]?.let { Text(it, style = MaterialTheme.typography.bodySmall, color = Color.Gray) } }
+            Text(titleField?.let { FieldCoding.display(row[it], entity?.field(it)) }?.takeIf { it.isNotEmpty() } ?: row.id)
+            c.item?.subtitle?.let { f ->
+                FieldCoding.display(row[f], entity?.field(f)).takeIf { it.isNotEmpty() }?.let { Text(it, style = MaterialTheme.typography.bodySmall, color = Color.Gray) }
+            }
         }
         HorizontalDivider()
     }
-}
-
-private fun fieldLabel(c: Component, s: ScreenScope): String =
-    c.label ?: s.entity?.fields?.firstOrNull { it.id == c.field }?.name ?: c.field.orEmpty()
-
-private fun openBrowser(url: String) {
-    runCatching { if (Desktop.isDesktopSupported()) Desktop.getDesktop().browse(URI(url)) }
 }
