@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Current-location component (locationButton, #867). -->
+<resources>
+    <string name="renderer_location_button">Record current location</string>
+    <string name="renderer_location_saved">Recorded location %1$s</string>
+    <string name="renderer_location_denied">Location access is not allowed. You can allow it in the device settings.</string>
+    <string name="renderer_location_off">Location is turned off on this device. Turn it on in Settings, then try again.</string>
+    <string name="renderer_location_failed">Couldn\'t get your location. Wait a moment and try again.</string>
+</resources>
