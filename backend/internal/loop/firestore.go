@@ -244,6 +244,8 @@ func (f *Firestore) MarkNoticeRead(ctx context.Context, uid, id string, at time.
 		if !n.ReadAt.IsZero() {
 			return nil
 		}
+		// Firestore keeps microseconds: return what a later read will see
+		at = at.UTC().Truncate(time.Microsecond)
 		out.ReadAt = at
 		return tx.Update(ref, []firestore.Update{{Path: "readAt", Value: at}})
 	})
