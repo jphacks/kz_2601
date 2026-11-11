@@ -41,20 +41,36 @@ final class MacSharedMembersModel {
     /// 欄を出すか(確かめ中・共有の記録が無いアプリでは出さない)
     var isVisible: Bool { phase != .probing && phase != .hidden }
 
+    /// `invalidate()` で進む世代。待っている間に変わったら結果を書き戻さない
+    @ObservationIgnored private var generation = 0
+
+    /// サインアウト・アカウント削除で手放す。読み込み中・変更中の結果を一覧にも `MacSocial` にも書き戻さない
+    func invalidate() {
+        generation += 1
+        list = nil
+        justRemoved = nil
+        phase = .hidden
+    }
+
     func load() async {
+        let gen = generation
         do {
             if phase == .probing {
-                guard try await client.hasMembersOnlyData(appId: appId) else {
+                let has = try await client.hasMembersOnlyData(appId: appId)
+                guard gen == generation else { return }
+                guard has else {
                     phase = .hidden
                     return
                 }
                 phase = .loading
             }
             let loaded = try await client.members(appId: appId)
+            guard gen == generation else { return }
             list = loaded
             phase = .loaded
             sync()
         } catch {
+            guard gen == generation else { return }
             if SharedAccessDenial(error) == .notMember {
                 phase = .notMember
                 social?.memberEntries[appId] = ([], false)
@@ -85,14 +101,16 @@ final class MacSharedMembersModel {
         current.items.remove(at: index)
         list = current
         justRemoved = member
+        let gen = generation
         do {
             try await client.removeMember(appId: appId, uid: member.uid)
-            sync()
+            if gen == generation { sync() }
             return nil
         } catch let e as APIError where e.status == 404 {
-            sync()
+            if gen == generation { sync() }
             return nil // もう参加していない = 目的は達成
         } catch {
+            guard gen == generation else { return nil }
             if var back = list, !back.items.contains(member) {
                 back.items.insert(member, at: min(index, back.items.count))
                 list = back
@@ -107,11 +125,13 @@ final class MacSharedMembersModel {
         guard var current = list, let index = current.items.firstIndex(of: member) else { return nil }
         current.items[index].isAdmin = admin
         list = current
+        let gen = generation
         do {
             try await client.setAdmin(appId: appId, uid: member.uid, admin: admin)
-            sync()
+            if gen == generation { sync() }
             return nil
         } catch {
+            guard gen == generation else { return nil }
             if var back = list, let i = back.items.firstIndex(where: { $0.uid == member.uid }) {
                 back.items[i].isAdmin = member.isAdmin
                 list = back
@@ -124,11 +144,13 @@ final class MacSharedMembersModel {
     func leave() async -> String? {
         let before = phase
         phase = .left
+        let gen = generation
         do {
             try await client.leave(appId: appId)
-            social?.memberEntries[appId] = ([], false)
+            if gen == generation { social?.memberEntries[appId] = ([], false) }
             return nil
         } catch {
+            guard gen == generation else { return nil }
             phase = before
             return L10n.tr("抜けられませんでした。元に戻しました")
         }
