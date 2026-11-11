@@ -44,8 +44,7 @@ data class DeviceCapabilities(
             Feature("aiButton.inputFeeds", implemented = false, needs = ComponentType.AI_BUTTON),
             Feature("aiButton.outputs", implemented = false, needs = ComponentType.AI_BUTTON),
             Feature("action.lookupBook", implemented = true), // BookLookupPlan
-            // text の {{fieldId}} と field からの highlight がまだ(TextLeaf)
-            Feature("text.highlight", implemented = false, needs = ComponentType.TEXT),
+            Feature("text.highlight", implemented = true, needs = ComponentType.TEXT), // TextLeaf・{{fieldId}}・field の語
             Feature("feed.v2", implemented = true, needs = ComponentType.FEED), // warnings / pressure
             Feature("expr.addMinutes", implemented = true), // ExprEvaluator
             Feature("aiChat.inputEntity", implemented = true, needs = ComponentType.AI_CHAT),
