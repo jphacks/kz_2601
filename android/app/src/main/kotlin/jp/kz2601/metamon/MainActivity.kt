@@ -20,6 +20,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -82,6 +83,8 @@ import jp.kz2601.metamon.runtime.UiText
 import jp.kz2601.metamon.services.GenerateProgress
 import jp.kz2601.metamon.services.PlanUsageSource
 import jp.kz2601.metamon.voice.AndroidSpeechEngine
+import jp.kz2601.metamon.voice.AppNameMatch
+import jp.kz2601.metamon.voice.VoiceAppRequests
 import jp.kz2601.metamon.voice.AppConfigVersions
 import jp.kz2601.metamon.voice.ClarifySettings
 import jp.kz2601.metamon.voice.Greeting
@@ -354,6 +357,45 @@ fun MetamonApp(container: AppContainer) {
         scope.launch { runtime.appsList() }
         scope.launch { container.releaseRequests?.refresh() } // カードのバッジ(#1254)
         Unit
+    }
+
+    // 発話の「アプリ一覧」「〜に切り替えて」「別のアプリ」(#884・iOS の VoiceIntent)。画面が出ている間だけつなぐ
+    DisposableEffect(vm, runtime) {
+        vm.appRequests = object : VoiceAppRequests {
+            override fun openAppList() = openSwitcher()
+
+            override fun switchApp(name: String) {
+                scope.launch {
+                    val current = runtime.state.value.document.appId
+                    val candidates = AppSummary.visible(runtime.appsList(), current = current)
+                    when (val m = AppNameMatch.match(name, candidates.map { it.name })) {
+                        is AppNameMatch.One -> {
+                            val target = candidates[m.index]
+                            if (target.id == current) {
+                                runtime.showToast(UiText.Res(R.string.voice_intent_already_current, target.name))
+                            } else {
+                                runtime.switchApp(target.id)
+                            }
+                        }
+                        is AppNameMatch.Ambiguous -> {
+                            runtime.showToast(UiText.Res(R.string.voice_intent_switch_ambiguous, name))
+                            openSwitcher()
+                        }
+                        AppNameMatch.None -> {
+                            runtime.showToast(UiText.Res(R.string.voice_intent_switch_not_found, name))
+                            openSwitcher()
+                        }
+                    }
+                }
+            }
+
+            override fun startNewApp(): AppDocument {
+                runtime.startNewApp()
+                vm.noteHomeEntry(Greeting.HomeEntry.NEW_APP)
+                return runtime.state.value.document
+            }
+        }
+        onDispose { vm.appRequests = null }
     }
 
     Scaffold(

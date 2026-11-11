@@ -82,6 +82,8 @@ class VoiceViewModel(
     private val remainingFeed: StateFlow<RemainingToday?>? = null,
     /** 状態カードの「Pro にする」で課金画面を開く(#1103)。null = 課金を持たない構成(カードにボタンを出さない) */
     private val requestPaywall: ((PaywallReason) -> Unit)? = null,
+    /** 発話の「アプリ一覧」「〜に切り替えて」「別のアプリ」を画面へ渡す口(#884)。null = 拾わず AI へ。画面が出ている間だけ入れる */
+    var appRequests: VoiceAppRequests? = null,
     scope: CoroutineScope? = null,
 ) : ViewModel() {
     private val scope: CoroutineScope = scope ?: viewModelScope
@@ -205,8 +207,46 @@ class VoiceViewModel(
         val t = text.trim()
         val s = _state.value
         if (t.isEmpty() || s.isGenerating || s.chatPending) return
+        // 相談の途中の答えは意図を見ない(「前の状態」などを答えに使えるように)
+        if (!s.isChatting && handleIntent(t)) return
         if (!requireConsent { submit(t, source) }) return
         if (clarifyEnabled()) say(t, source) else generate(t)
+    }
+
+    /**
+     * AI に送る前に端末で拾う発話(#884・iOS の `AppRuntime.morph` の分岐)。処理し終えたら true。
+     * 「別のアプリ」は新しいアプリに移してから、同じ文を従来どおり送る(false)。
+     */
+    private fun handleIntent(text: String): Boolean {
+        val intent = VoiceIntent.detect(text)
+        val requests = appRequests
+        if (intent != VoiceIntent.Undo && requests == null) return false
+        return when (intent) {
+            VoiceIntent.Undo -> {
+                log("voice intent: undo")
+                closeVoice()
+                undo()
+                true
+            }
+            VoiceIntent.ListApps -> {
+                log("voice intent: list apps")
+                closeVoice()
+                requests?.openAppList()
+                true
+            }
+            is VoiceIntent.SwitchApp -> {
+                log("voice intent: switch app")
+                closeVoice()
+                requests?.switchApp(intent.name)
+                true
+            }
+            VoiceIntent.NewApp -> {
+                log("voice intent: new app")
+                requests?.startNewApp()?.let { adopt(it) }
+                false
+            }
+            VoiceIntent.Morph -> false
+        }
     }
 
     /** 相談を飛ばしてすぐ生成する(DEBUG のつまみ `METAMON_AUTO_TRANSCRIPT` 用) */
