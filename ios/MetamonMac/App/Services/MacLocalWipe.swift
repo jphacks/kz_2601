@@ -22,6 +22,8 @@ struct MacLocalWipe {
     #if !APP_STORE_REVIEW
     /// 外部の公開データ(#1288)
     var feeds: FeedCache = .shared
+    /// ブロック・参加者・仲間探しの一覧と申告の記録(#963)
+    var social: MacSocial = .shared
     #endif
     /// 会話の履歴(#1211)。UserDefaults の掃除でも消えるが、保存先を差し替えた時も残さないよう明示して消す
     var chatHistory: ChatHistoryStore = .forRuntime()
@@ -44,6 +46,7 @@ struct MacLocalWipe {
         chatHistory.removeAll()
         #if !APP_STORE_REVIEW
         feeds.reset()
+        social.wipe()
         #endif
         LocalWipe.clearDefaults(defaults, domain: domain) // iOS と同じ残すキー(言語・送信のオプトアウト)
         resetSharedState()
