@@ -10,6 +10,7 @@ import jp.kz2601.metamon.nearby.NearbyEnv
 import jp.kz2601.metamon.nearby.NearbyService
 import jp.kz2601.metamon.nearby.NearbySettings
 import jp.kz2601.metamon.nearby.NearbyShareController
+import jp.kz2601.metamon.nearby.PassbyController
 import jp.kz2601.metamon.discover.PublishEnv
 import jp.kz2601.metamon.runtime.AiTextAccess
 import jp.kz2601.metamon.runtime.AndroidRuntimeHost
@@ -599,12 +600,23 @@ class AppContainer(
         }
     }
 
+    /** 近くの人に送る・すれ違い通信の端末の設定(「名前を出さない」は両方で同じ)。 */
+    private val nearbySettings: NearbySettings? by lazy { nearbyEnv?.let { NearbySettings(it.settings) } }
+
     /** 近くの人に送る(#1382)。作った時にランタイムの送るボタンとつなぐ。 */
     val nearby: NearbyShareController? by lazy {
         nearbyEnv?.let { env ->
             val service = NearbyService(env.transport(), CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate), env.deviceName())
             service.text = env.text
-            NearbyShareController(runtime, service, NearbySettings(env.settings)) { authorProfile.name ?: env.deviceName() }
+            NearbyShareController(runtime, service, nearbySettings!!) { authorProfile.name ?: env.deviceName() }
+        }
+    }
+
+    /** すれ違い通信(#1383)。作った時にランタイムの passby の部品とつなぐ。部品が前面に出ている間だけ探す。 */
+    val passby: PassbyController? by lazy {
+        nearbyEnv?.let { env ->
+            val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
+            PassbyController(runtime, env.passbyTransport(scope), nearbySettings!!, scope, displayName = { authorProfile.name ?: env.deviceName() })
         }
     }
 

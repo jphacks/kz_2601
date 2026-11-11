@@ -3,13 +3,17 @@ package jp.kz2601.metamon.nearby
 import android.content.Context
 import android.os.Build
 import android.provider.Settings
+import jp.kz2601.metamon.R
 import jp.kz2601.metamon.runtime.UiText
 import jp.kz2601.metamon.services.consent.KeyValueStore
 import jp.kz2601.metamon.services.consent.SharedPreferencesKeyValueStore
+import kotlinx.coroutines.CoroutineScope
 
 /** 近距離共有の端末側の材料(通り道・設定・端末の名前・文言の解き方)。AppContainer が作る。 */
 class NearbyEnv(
     val transport: () -> NearbyTransport,
+    /** すれ違い通信(#1383)の通り道。モックは少し待って「テスト花子」とすれ違う */
+    val passbyTransport: (CoroutineScope) -> PassbyTransport,
     val settings: KeyValueStore,
     val deviceName: () -> String,
     val text: (UiText) -> String,
@@ -22,6 +26,13 @@ class NearbyEnv(
             val app = context.applicationContext
             return NearbyEnv(
                 transport = { if (mock) MockNearbyTransport.withEchoPeer() else NearbyConnectionsTransport(app) },
+                passbyTransport = { scope ->
+                    if (mock) {
+                        MockPassbyTransport(scope)
+                    } else {
+                        NearbyConnectionsPassbyTransport(app) { UiText.Res(R.string.nearby_discovery_failed).resolve(app.resources) }
+                    }
+                },
                 settings = SharedPreferencesKeyValueStore(app.getSharedPreferences(PREFS, Context.MODE_PRIVATE)),
                 deviceName = { deviceName(app) },
                 text = { it.resolve(app.resources) },

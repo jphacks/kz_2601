@@ -22,6 +22,11 @@ class DeviceCapabilitiesTest {
     }
 
     @Test
+    fun nothingIsPending() {
+        assertTrue(DeviceCapabilities.PENDING.isEmpty())
+    }
+
+    @Test
     fun unregisteredPartsAreNotDeclared() {
         val missing = ComponentType.entries.filter { it != ComponentType.UNKNOWN && ComponentRegistry.standard.builder(it) == null }
         assertTrue("登録の無い部品がある前提(場所の検索など)", missing.isNotEmpty())
@@ -31,8 +36,6 @@ class DeviceCapabilitiesTest {
             ComponentType.PLACE_SEARCH,
             ComponentType.LOCATION_TRACKER,
             ComponentType.HEALTH_STAT,
-            // 描けるが、すれ違い(#1383)がそろうまで申告しない
-            ComponentType.NEARBY_SHARE,
         )) {
             assertFalse(t.wire, t.wire in caps.allowedComponents)
         }
@@ -46,6 +49,8 @@ class DeviceCapabilitiesTest {
             ComponentType.MUSIC_PLAYER,
             ComponentType.ROUTE_GUIDE,
             ComponentType.LOCATION_BUTTON,
+            // 送受信(#1382)とすれ違い(#1383)がそろった
+            ComponentType.NEARBY_SHARE,
         )) {
             assertTrue(t.wire, t.wire in caps.allowedComponents)
         }

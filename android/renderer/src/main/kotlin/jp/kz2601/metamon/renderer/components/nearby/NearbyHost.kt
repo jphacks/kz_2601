@@ -9,6 +9,9 @@ import jp.kz2601.metamon.renderer.components.media.PermissionPrompt
 interface NearbyHost {
     /** `nearbyShare`: 近くの端末を探すシートを開き、選んだ相手に [records](entity の保存フィールドのみ)を送る。 */
     fun shareNearby(entity: String, records: List<Map<String, JSONValue>>)
+
+    /** `nearbyShare` mode:passby(すれ違い通信・#1383)の通信側。null なら何も通信しない表示だけ。 */
+    val passby: NearbyPassbyController? get() = null
 }
 
 val DSLRuntime.nearby: NearbyHost? get() = this as? NearbyHost

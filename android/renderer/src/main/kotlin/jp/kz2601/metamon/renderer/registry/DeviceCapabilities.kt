@@ -59,10 +59,10 @@ data class DeviceCapabilities(
         )
 
         /**
-         * 描けるが、iOS と同じ体験がそろうまで申告しない部品。
-         * nearbyShare: 送受信(#1382)はあるが、すれ違い(mode:passby・#1383)がそろってから申告する。
+         * 描けるが、iOS と同じ体験がそろうまで申告しない部品(今は無い)。
+         * nearbyShare は送受信(#1382)とすれ違い(mode:passby・#1383)がそろったので申告する。
          */
-        internal val PENDING: Set<ComponentType> = setOf(ComponentType.NEARBY_SHARE)
+        internal val PENDING: Set<ComponentType> = emptySet()
 
         /** [registry] で描ける部品(UNKNOWN と [PENDING] を除く・schema の並び)。 */
         fun allowedComponents(registry: ComponentRegistry = ComponentRegistry.standard): List<String> =
