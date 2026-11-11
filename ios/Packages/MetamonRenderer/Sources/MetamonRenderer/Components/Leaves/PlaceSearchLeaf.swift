@@ -16,6 +16,8 @@ struct PlaceSearchLeaf: View {
     @State private var searching = false
     @State private var searched = false
     @State private var notice: String?
+    /// 現在地の精度が低い時の一言(#1344)
+    @State private var accuracyNote: String?
     @State private var addedId: String?
 
     private var fixedQuery: String? {
@@ -59,6 +61,10 @@ struct PlaceSearchLeaf: View {
                 Text(notice).font(.caption).foregroundStyle(.secondary)
                     .accessibilityIdentifier("placeSearch.notice")
             }
+            if let accuracyNote, !results.isEmpty {
+                Text(accuracyNote).font(.caption).foregroundStyle(.secondary)
+                    .accessibilityIdentifier("placeSearch.accuracy")
+            }
             if c.pins == true, !results.isEmpty { pinMap }
             if searched, results.isEmpty, !searching, notice == nil {
                 Text(L("見つかりませんでした")).font(.subheadline).foregroundStyle(.secondary)
@@ -84,12 +90,13 @@ struct PlaceSearchLeaf: View {
     }
 
     private var pinMap: some View {
-        Map(initialPosition: .automatic, interactionModes: [.pan, .zoom]) {
+        Map(initialPosition: .automatic, interactionModes: PlatformMap.inlineModes([.pan, .zoom])) {
             if let here { Marker(L("現在地"), systemImage: "location.fill", coordinate: here).tint(.blue) }
             ForEach(results, id: \.place.id) { r in
                 Marker(r.place.name ?? "", coordinate: r.place.coordinate)
             }
         }
+        .macMapControls() // Mac: +/- で拡大縮小(#1346)
         .id(results.map(\.place.id).joined())
         .frame(height: 160)
         .clipShape(RoundedRectangle(cornerRadius: RenderTheme.Radius.card, style: .continuous))
@@ -127,11 +134,17 @@ struct PlaceSearchLeaf: View {
         searching = true
         defer { searching = false; searched = true }
         notice = nil
+        accuracyNote = nil
         addedId = nil
         if PlacePicking.isMock {
             here = PlacePicking.mockHere.coordinate
         } else {
-            do { here = try await OneShotLocation().request().coordinate } catch {
+            do {
+                let loc = try await OneShotLocation().request()
+                here = loc.coordinate
+                // 精度が低いと近い順の距離が当てにならない(#1344)
+                accuracyNote = LocationAccuracy.classify(loc.horizontalAccuracy).searchNote
+            } catch {
                 here = nil
                 // 断られても責めない。語があれば位置なしで探す
                 let denied = error is OneShotLocation.LocationError

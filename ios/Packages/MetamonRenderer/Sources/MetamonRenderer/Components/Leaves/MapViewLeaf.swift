@@ -6,6 +6,7 @@ import MetamonDSL
 /// `zoom`: near(約1km) / city(約10km・既定) / wide(約100km)。ピンが無ければ東京駅を中心に出す。
 /// `kind: "route"`(#168): ピンの代わりに点を `dateField`(省略時は作成順)の時刻順に線で結ぶ(`locationTracker` の軌跡)。
 /// 10 分以上空いた所は別の記録として線を切る。始点・終点だけ印を出し、カメラは最新の記録に合わせる。
+/// Mac(#1346): 地図の中のスクロールで画面を送れるよう移動を外し、+/- とピンチで拡大する。ピンはホバーで名前。
 struct MapViewLeaf: View {
     @Environment(\.dslRuntime) private var rt
     let c: Component
@@ -47,7 +48,7 @@ struct MapViewLeaf: View {
     private var routeMap: some View {
         let segs = segments
         let latest = segs.last ?? []
-        return Map(position: $position) {
+        return Map(position: $position, interactionModes: PlatformMap.inlineModes(.all)) {
             ForEach(Array(segs.enumerated()), id: \.offset) { i, seg in
                 MapPolyline(coordinates: seg.map(Self.coord))
                     .stroke(i == segs.count - 1 ? AnyShapeStyle(.tint) : AnyShapeStyle(.tint.opacity(0.4)),
@@ -61,6 +62,7 @@ struct MapViewLeaf: View {
             }
         }
         .mapStyle(.standard(pointsOfInterest: .excludingAll))
+        .macMapControls() // Mac: +/- で拡大縮小(#1346)
         .frame(maxWidth: .infinity, minHeight: 160, maxHeight: .infinity)
         .clipShape(RoundedRectangle(cornerRadius: RenderTheme.Radius.card, style: .continuous))
         .onAppear { position = Self.fit(latest.map(Self.coord), minSpan: routeMinSpan) }
@@ -91,7 +93,7 @@ struct MapViewLeaf: View {
 
     private var pinMap: some View {
         let pins = pins
-        return Map(position: $position) {
+        return Map(position: $position, interactionModes: PlatformMap.inlineModes(.all)) {
             ForEach(pins) { pin in
                 Annotation(pin.title, coordinate: pin.coordinate) {
                     Button {
@@ -104,10 +106,13 @@ struct MapViewLeaf: View {
                     }
                     .buttonStyle(.plain)
                     .accessibilityLabel(pin.title)
+                    .macIconButtonHelp(pin.title, hoverHighlight: false) // Mac: ホバーで名前(#1346)
+                    .macPointingHandCursor()
                 }
             }
         }
         .mapStyle(.standard(pointsOfInterest: .excludingAll))
+        .macMapControls() // Mac: +/- で拡大縮小(#1346)
         .frame(maxWidth: .infinity, minHeight: 160, maxHeight: .infinity)
         .clipShape(RoundedRectangle(cornerRadius: RenderTheme.Radius.card, style: .continuous))
         .onAppear { position = Self.camera(for: pins.map(\.coordinate), span: spanMeters) }

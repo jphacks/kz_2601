@@ -58,6 +58,14 @@ private struct AppCanvasContent: View {
     /// マップの「この画面について話す」・モーダルの中の部品の「この部品について話す」を押した文脈。マップ・モーダルが閉じ終わったら会話を開く
     @State private var pendingTalk: ScreenContext?
 
+    /// 画面マップで選べる記録(#1322)。表示用の記録(隠した値は落とす)で、見出しは参照の見出しと同じ
+    private func recordChoices(_ entity: String) -> [ScreenMapRecordChoice] {
+        runtime.viewRecords(for: entity).enumerated().map { index, record in
+            let title = runtime.refTitle(record.id, entity: entity).flatMap { $0.isEmpty || $0 == record.id ? nil : $0 }
+            return ScreenMapRecordChoice(id: record.id, title: title ?? L10n.tr("記録 \(index + 1)"))
+        }
+    }
+
     var body: some View {
         DSLNavigationRoot()
             .background {
@@ -72,7 +80,12 @@ private struct AppCanvasContent: View {
                                          pendingTalk = screen
                                          showsScreenMap = false
                                      },
-                                     onClose: { showsScreenMap = false })
+                                     onClose: { showsScreenMap = false },
+                                     records: recordChoices,
+                                     onOpenRecord: { screen, recordId in
+                                         runtime.reveal(screen: screen, recordId: recordId)
+                                         showsScreenMap = false
+                                     })
                 }
             }
             // Mac の fullScreenCover は無いので sheet で出す(大きめの最小サイズ)

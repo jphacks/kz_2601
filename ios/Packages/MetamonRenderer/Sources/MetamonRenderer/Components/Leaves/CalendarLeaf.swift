@@ -153,6 +153,7 @@ struct CalendarLeaf: View {
                             guard let action = c.onDateTap else { return }
                             Task { await rt.run(action, ctx.actionContext(recordId: row.id)) }
                         }
+                        .macHelp(c.onDateTap != nil ? L("クリックで開きます") : nil)
                 }
             }
         }

@@ -102,6 +102,7 @@ struct FeedLeaf: View {
         .padding(.vertical, RenderTheme.Spacing.sm)
         .contentShape(Rectangle())
         .onTapGesture { if let link { openURL(link) } }
+        .macHelp(link != nil ? L("クリックでブラウザで開きます") : nil)
         .accessibilityElement(children: .combine)
         .accessibilityAddTraits(link != nil ? .isLink : [])
     }
