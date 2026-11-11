@@ -1,12 +1,49 @@
 import SwiftUI
 import Observation
+import MetamonServices
+import MetamonRenderer
+
+/// 中央の列の上に 1 つずつ出すお知らせ(#1058)。iOS と同じ順: 完成の後のお知らせ(`RootView` の要約など)→
+/// 新着(`NewItemsHost`・要約が消えてから)→ 上限に近い(`UsageNoticeHost`・新着が消えてから)。
+enum MacTopNotice: Equatable {
+    case postBuild(PostBuildNotice)
+    case newItems
+    case usage
+}
 
 /// 完成の後のお知らせ(H7・#968)を Mac で 1 つずつ出す。順番は iOS と同じ `PostBuildNotice`(Shared)。
 /// 今の Mac にあるのは要約(「元に戻す / やり直す」付き)と、最初のアプリの後の直し方の例(#1278)。
 /// 公開の確認・保存期間・引き継ぎはそれぞれの機能が Mac に来たら `pending` に足す(順番はここで決まる)。
+/// 新着(#268)・上限に近い(#317)はその後、サービスのお知らせ(#333)は別の段で常に一番上に出す(iOS と同じ・#1058)。
+/// 「見た・閉じた」の記録は iOS と同じキー(UserDefaults)で、サインアウトの `MacLocalWipe` で消える。
 @MainActor
 @Observable
 final class MacPostBuildNotices {
+    /// 新着(#268)。「新着 N 件」
+    struct NewItems: Identifiable, Equatable {
+        let id = UUID()
+        var appId: String
+        var count: Int
+    }
+
+    var newItems: NewItems?
+    /// 上限に近い・達した(#317)。1 つのアカウント・リソースにつき 1 日 1 回(`UsageNoticeLog`)
+    var usage: UsageNotice?
+    /// appconfig `GET /v1/client-config` のお知らせ(#333)。閉じたかは `serviceDismissals` で見る
+    private(set) var service: ServiceNotice?
+    /// @Observable に閉じたことを伝える(UserDefaults は追跡されない)
+    private var dismissedServiceID: String?
+
+    @ObservationIgnored let serviceDismissals: NoticeDismissals
+    @ObservationIgnored let usageLog: UsageNoticeLog
+    @ObservationIgnored let lastOpened: LastOpenedStore
+
+    init(defaults: UserDefaults = .standard) {
+        serviceDismissals = NoticeDismissals(defaults: defaults)
+        usageLog = UsageNoticeLog(defaults: defaults)
+        lastOpened = LastOpenedStore(defaults: defaults)
+    }
+
     /// 要約のお知らせ。action はアプリの版の「元に戻す / やり直す」
     struct Summary: Identifiable, Equatable {
         enum Action: Equatable { case undo, redo }
@@ -34,16 +71,90 @@ final class MacPostBuildNotices {
 
     var active: PostBuildNotice? { PostBuildNotice.current(pending) }
 
-    /// 中央の列の上にお知らせが出ているか(出ている間はサイドバーの写しを撮らない・#1281)
-    var isShowing: Bool { active != nil }
+    /// 中央の列の上に出す 1 つ。完成の後のお知らせ → 新着 → 上限(iOS と同じ順・#1058)
+    var top: MacTopNotice? {
+        if let active { return .postBuild(active) }
+        if newItems != nil { return .newItems }
+        if usage != nil { return .usage }
+        return nil
+    }
+
+    /// 中央の列の上にお知らせが出ているか(出ている間はサイドバーの写しを撮らない・#1281)。
+    /// サービスのお知らせは閉じるまで出続け、列を押し下げる段(写しに入らない)なので数えない
+    var isShowing: Bool { top != nil }
 
     /// いま出ているお知らせを閉じる(閉じるボタン・Esc・時間)。閉じたら次の番のものが出る
     func dismissActive() {
-        switch active {
-        case .summary: summary = nil
-        case .editHint: showsEditHint = false
+        switch top {
+        case .postBuild(.summary): summary = nil
+        case .postBuild(.editHint): showsEditHint = false
+        case .newItems: newItems = nil
+        case .usage: usage = nil
         default: break
         }
+    }
+
+    // MARK: - 新着(#268)
+
+    /// アプリを開いた時(選んだ・前面に戻った)に数える。前回の時刻は数えるたびに進むので二重には出ない
+    func checkNewItems(appId: String, entities: [String], uid: String?, source: (any SharedRecordStampSource)?, now: Date = .now) async {
+        newItems = nil
+        guard let source, let uid else { return }
+        let count = await NewItemsCheck(source: source, store: lastOpened).run(appId: appId, entities: entities, uid: uid, now: now)
+        guard !Task.isCancelled, let count, count > 0 else { return }
+        newItems = NewItems(appId: appId, count: count)
+    }
+
+    // MARK: - 上限(#317)
+
+    /// 候補のうち今日まだ出していない最初の 1 つを出す(出ている間は替えない)
+    func offerUsage(_ candidates: [UsageNotice], uid: String?, now: Date = .now) {
+        guard usage == nil, let next = candidates.first(where: { usageLog.shouldShow($0, uid: uid, now: now) }) else { return }
+        usage = next
+    }
+
+    /// 見えた時点で数える(閉じても同じ日はもう出さない・iOS と同じ)
+    func markUsageShown(uid: String?, now: Date = .now) {
+        guard let usage else { return }
+        usageLog.markShown(usage, uid: uid, now: now)
+    }
+
+    /// アプリの中の候補: そのアプリの記録・写真(作成者だけ)→ 作れるアプリの数
+    static func usageCandidates(app: AppUsage?, me: MyUsage?) -> [UsageNotice] {
+        UsageNoticeRules.appNotices(app) + [UsageNoticeRules.appsNotice(me)].compactMap { $0 }
+    }
+
+    // MARK: - サービスのお知らせ(#333)
+
+    /// 出すサービスのお知らせ(閉じた id は二度と出さない)
+    var visibleService: ServiceNotice? {
+        guard let service, service.id != dismissedServiceID, !serviceDismissals.isDismissed(service.id) else { return nil }
+        return service
+    }
+
+    func updateService(_ notice: ServiceNotice?) { service = notice }
+
+    func checkService(checker: UpdateChecker) async {
+        let result = await checker.check()
+        guard !Task.isCancelled else { return }
+        service = result.notice
+    }
+
+    func dismissService() {
+        guard let service else { return }
+        serviceDismissals.dismiss(service.id)
+        dismissedServiceID = service.id
+    }
+
+    // MARK: - サインアウト(#972)
+
+    /// `MacLocalWipe` の後: 出ているものを下げ、閉じた記録の写しも忘れる(UserDefaults は wipe が消している)
+    func resetAfterWipe() {
+        summary = nil
+        showsEditHint = false
+        newItems = nil
+        usage = nil
+        dismissedServiceID = nil
     }
 }
 
@@ -125,5 +236,121 @@ struct MacEditHintBar: View {
         .transition(.move(edge: .top).combined(with: .opacity))
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier("editHint.card")
+    }
+}
+
+/// 新着(#268・iOS の `NewItemsHost`)。数秒か閉じるボタン・Esc で消える
+struct MacNewItemsBar: View {
+    let notice: MacPostBuildNotices.NewItems
+    var dismiss: () -> Void
+
+    var body: some View {
+        HStack(spacing: 12) {
+            Image(systemName: "bell.badge.fill")
+                .foregroundStyle(Theme.brandGradient)
+                .accessibilityHidden(true)
+            VStack(alignment: .leading, spacing: 2) {
+                Text("新着 \(notice.count) 件").font(.callout.weight(.semibold))
+                Text("ほかの人が追加・更新しました")
+                    .font(.caption)
+                    .macSecondaryText()
+            }
+            MacNoticeCloseButton(dismiss: dismiss, cancelAction: true)
+        }
+        .padding(.horizontal, 14).padding(.vertical, 8)
+        .macRaisedSurface(in: Capsule())
+        .frame(maxWidth: 560)
+        .transition(.move(edge: .top).combined(with: .opacity))
+        .accessibilityElement(children: .contain)
+        .accessibilityIdentifier("newItems.banner")
+    }
+}
+
+/// 上限に近い・達した(#317・iOS の `UsageNoticeBanner`)。「Pro にする」は押した時だけ課金画面を開く
+struct MacUsageNoticeBar: View {
+    let notice: UsageNotice
+    /// nil = 「Pro にする」を出さない(Pro・審査用の版・上がらない上限)
+    var upgrade: (() -> Void)?
+    var dismiss: () -> Void
+
+    var body: some View {
+        HStack(spacing: 12) {
+            Image(systemName: "gauge.with.dots.needle.67percent")
+                .macSecondaryText()
+                .accessibilityHidden(true)
+            Text(UsageCopy.notice(notice))
+                .font(.callout)
+                .lineLimit(2)
+                .accessibilityIdentifier("usage.notice.text")
+            if let upgrade {
+                Button("Pro にする", action: upgrade)
+                    .controlSize(.small)
+                    .help("Pro にすると上限が増えます")
+                    .accessibilityIdentifier("usage.notice.upgrade")
+            }
+            MacNoticeCloseButton(dismiss: dismiss, cancelAction: true)
+        }
+        .padding(.horizontal, 14).padding(.vertical, 8)
+        .macRaisedSurface(in: Capsule())
+        .frame(maxWidth: 560)
+        .transition(.move(edge: .top).combined(with: .opacity))
+        .accessibilityElement(children: .contain)
+        .accessibilityIdentifier("usage.notice.\(notice.resource.rawValue)")
+    }
+}
+
+/// サービスのお知らせ(#333・iOS の `ServiceNoticeBanner`)。閉じるまで出す。閉じた id は二度と出さない
+struct MacServiceNoticeBar: View {
+    let notice: ServiceNotice
+    var dismiss: () -> Void
+    @Environment(\.openURL) private var openURL
+
+    private var isWarning: Bool { notice.severity == .warning }
+    private var text: String { notice.text(languageCode: LanguagePreference.shared.code) }
+
+    var body: some View {
+        HStack(alignment: .firstTextBaseline, spacing: 12) {
+            Image(systemName: isWarning ? "exclamationmark.triangle.fill" : "info.circle.fill")
+                .foregroundStyle(isWarning ? AnyShapeStyle(Theme.Colors.warning) : AnyShapeStyle(Theme.brandGradient))
+                .accessibilityHidden(true)
+            Text(verbatim: text)
+                .font(.callout)
+                .fixedSize(horizontal: false, vertical: true)
+                .textSelection(.enabled)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .accessibilityLabel(isWarning ? Text("重要なお知らせ: \(text)") : Text("お知らせ: \(text)"))
+            if let url = notice.linkURL {
+                Button("詳しく見る") { openURL(url) }
+                    .buttonStyle(.link)
+                    .help(Text(verbatim: url.absoluteString))
+                    .accessibilityIdentifier("notice.link")
+            }
+            // Esc は下の段(要約など)に譲る
+            MacNoticeCloseButton(dismiss: dismiss, cancelAction: false, label: "お知らせを閉じる")
+                .accessibilityIdentifier("notice.dismiss")
+        }
+        .padding(.horizontal, 14).padding(.vertical, 8)
+        .macRaisedSurface(in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+        .frame(maxWidth: 560)
+        .transition(.move(edge: .top).combined(with: .opacity))
+        .accessibilityElement(children: .contain)
+        .accessibilityIdentifier("notice.banner")
+    }
+}
+
+/// お知らせの閉じるボタン
+private struct MacNoticeCloseButton: View {
+    var dismiss: () -> Void
+    /// Esc で閉じる(同時に 1 つだけ)
+    var cancelAction: Bool
+    var label: LocalizedStringKey = "閉じる"
+
+    var body: some View {
+        Button(action: dismiss) { Image(systemName: "xmark") }
+            .buttonStyle(.plain)
+            .macSecondaryText()
+            .keyboardShortcut(cancelAction ? KeyboardShortcut.cancelAction : nil)
+            .help(Text(label))
+            .accessibilityLabel(Text(label))
     }
 }

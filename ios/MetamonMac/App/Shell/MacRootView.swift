@@ -12,6 +12,7 @@ import MetamonServices
 ///   声で頼む(⇧⌘M・#966)は同じシートを開いてすぐ録音する。文字にした文をそのまま送る
 /// - 設定 → Mac の設定ウインドウ(⌘,)
 /// - 完成の後のお知らせ(要約・「元に戻す」・最初のアプリの後の直し方の例 #1278)→ 中央の列の上に 1 つずつ(#968・順番は iOS と同じ `PostBuildNotice`)
+///   その後に新着(#268)・上限に近い(#317)。サービスのお知らせ(#333)は列の上の段に閉じるまで出す(#1058)
 /// - 生成したアプリの版の「元に戻す / やり直す」(#968)→「アプリ」メニュー(⌥⌘Z / ⇧⌥⌘Z)・完成の画面・要約のお知らせ。
 ///   ⌘Z / ⇧⌘Z は入力欄と記録の削除の取り消し(編集メニュー)のまま
 /// キーボード(#934): ⌘1 / ⌘2 でサイドバーと中央を行き来・一覧は ↑↓ で選び Return で中央へ・⌥⌘↑↓ で前 / 次のアプリ。
@@ -37,6 +38,8 @@ struct MacRootView: View {
     private let draftRequest = MacDraftRequest.shared
     /// 完成の後のお知らせ(#968)
     @State private var notices = MacPostBuildNotices()
+    /// 前面に戻った回数。新着・上限のお知らせを数え直す(#1058)
+    @State private var noticeCheck = 0
     @State private var compose: MacComposeSession?
     /// 閉じた会話のシート(閉じた後に完成の要約を出すため・#968)
     @State private var closingCompose: MacComposeSession?
@@ -129,6 +132,9 @@ struct MacRootView: View {
             }
             .frame(minWidth: 480, minHeight: 400)
             .overlay(alignment: .top) { noticeBar }
+            .safeAreaInset(edge: .top, spacing: 0) { serviceNoticeBar }
+            .task(id: appNoticeKey) { await checkAppNotices() }
+            .task(id: noticeCheck) { await checkServiceNotice() }
             // 中央の列をフォーカスの行き先にする(Tab で中の入力欄・ボタンへ進む)
             .focusable()
             .focusEffectDisabled()
@@ -169,6 +175,7 @@ struct MacRootView: View {
         .task(id: MacAccount.shared.session.user?.uid) { await refreshServerApps() }
         .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
             Task { await refreshServerApps() }
+            noticeCheck += 1
         }
         .onDisappear { MacSpeechReader.shared.stop() } // ウインドウを閉じたら読み上げを止める(#1210)
         .onAppear {
@@ -187,7 +194,7 @@ struct MacRootView: View {
         }
         .onChange(of: library.wipeCount) { // サインアウト・アカウント削除(#972): 作ったアプリを開いていたら初めの状態に戻す
             compose = nil
-            notices.summary = nil
+            notices.resetAfterWipe()
             reopenLastApp()
         }
         .onChange(of: selectedAppId) { _, id in
@@ -522,12 +529,91 @@ struct MacRootView: View {
                                },
                                dismiss: { withAnimation { notices.dismissActive() } })
                     .task { MacVoiceOver.announce(L10n.tr("こう頼むと直せます")) }
+            } else if compose == nil, notices.top == .newItems, let newItems = notices.newItems {
+                MacNewItemsBar(notice: newItems, dismiss: { withAnimation { notices.dismissActive() } })
+                    .task(id: newItems.id) {
+                        // VoiceOver へは 1 回だけ(読み上げの声 #1210 は要約だけ・重ねない)
+                        MacVoiceOver.announce(L10n.tr("新着 \(newItems.count) 件"))
+                        try? await Task.sleep(for: .seconds(MacVoiceOver.holdSeconds(6)))
+                        guard !Task.isCancelled, notices.newItems == newItems else { return }
+                        withAnimation { notices.dismissActive() }
+                    }
+            } else if compose == nil, notices.top == .usage, let usage = notices.usage {
+                MacUsageNoticeBar(notice: usage, upgrade: usageUpgrade(usage),
+                                  dismiss: { withAnimation { notices.dismissActive() } })
+                    .task(id: usage.id) {
+                        notices.markUsageShown(uid: MacAccount.shared.session.user?.uid) // 見えた時点で数える
+                        MacVoiceOver.announce(UsageCopy.notice(usage))
+                        try? await Task.sleep(for: .seconds(MacVoiceOver.holdSeconds(8)))
+                        guard !Task.isCancelled, notices.usage == usage else { return }
+                        withAnimation { notices.dismissActive() }
+                    }
             }
         }
         .padding(.top, 12)
         .padding(.horizontal, 16)
         .animation(reduceMotion ? nil : .easeInOut(duration: 0.2), value: notices.summary)
         .animation(reduceMotion ? nil : .easeInOut(duration: 0.2), value: notices.showsEditHint)
+        .animation(reduceMotion ? nil : .easeInOut(duration: 0.2), value: notices.newItems)
+        .animation(reduceMotion ? nil : .easeInOut(duration: 0.2), value: notices.usage)
+    }
+
+    /// サービスのお知らせ(#333)。列を押し下げる段に、閉じるまで出す(iOS の `UpdateGateModifier` と同じ)
+    @ViewBuilder private var serviceNoticeBar: some View {
+        if let notice = notices.visibleService {
+            MacServiceNoticeBar(notice: notice, dismiss: { withAnimation { notices.dismissService() } })
+                .padding(.top, 12)
+                .padding(.horizontal, 16)
+                .task(id: notice.id) {
+                    let text = notice.text(languageCode: LanguagePreference.shared.code)
+                    MacVoiceOver.announce(notice.severity == .warning ? L10n.tr("重要なお知らせ: \(text)") : L10n.tr("お知らせ: \(text)"))
+                }
+                .animation(reduceMotion ? nil : .easeInOut(duration: 0.2), value: notices.visibleService)
+        }
+    }
+
+    /// 新着・上限のお知らせを数え直すきっかけ: 中央のアプリ(版)・アカウント・前面に戻った
+    private var appNoticeKey: String {
+        "\(selectedApp.map(Self.canvasKey) ?? "")|\(MacAccount.shared.session.user?.uid ?? "")|\(noticeCheck)"
+    }
+
+    /// 中央のアプリを開いた時の新着(#268)と上限(#317)。iOS と同じく上限は開いた直後のバナーと重ねないよう少し待つ
+    private func checkAppNotices() async {
+        notices.usage = nil
+        guard let app = selectedApp, library.isCreated(app.id), library.isOnServer(app.id) else {
+            notices.newItems = nil
+            return
+        }
+        let uid = MacAccount.shared.session.user?.uid
+        let entities = library.generated[app.id]?.dsl.entities.map(\.id) ?? []
+        await notices.checkNewItems(appId: app.id, entities: entities, uid: uid,
+                                    source: MacServices.shared.appConfig as? SharedRecordStampSource)
+        try? await Task.sleep(for: .seconds(1.5))
+        guard !Task.isCancelled, let source = MacServices.shared.appConfig as? PlanUsageSource else { return }
+        let store = PlanUsageStore.shared
+        let usage = await store.refreshApp(appId: app.id, source: source)
+        let me = await store.refreshMe(source: source)
+        guard !Task.isCancelled, selectedApp?.id == app.id else { return }
+        notices.offerUsage(MacPostBuildNotices.usageCandidates(app: usage, me: me), uid: uid)
+    }
+
+    /// サービスのお知らせ(#333)を読む。appconfig につながっていない時は何もしない(fail open)
+    private func checkServiceNotice() async {
+        guard let url = MacServices.shared.appConfigURL else { return }
+        await notices.checkService(checker: UpdateChecker(client: HTTPClientConfigClient(baseURL: url)))
+    }
+
+    /// 上限のお知らせの「Pro にする」。Pro・審査用の版・上がらない上限では出さない
+    private func usageUpgrade(_ notice: UsageNotice) -> (() -> Void)? {
+        #if APP_STORE_REVIEW
+        return nil
+        #else
+        guard UsageCopy.showsProButton(notice, isPro: RemainingTodayPlan.isPro) else { return nil }
+        return {
+            withAnimation { notices.dismissActive() }
+            MacPro.shared.requestPro(.planLimit)
+        }
+        #endif
     }
 
     /// サイドバーの選択。中央のアプリに保存していない入力があれば、確認して「破棄」の時だけ切り替える(#943)
