@@ -190,9 +190,17 @@ private struct ComposeChat: View {
 
     /// 文字にした文を(書きかけがあればその後ろに足して)送る。送っている途中なら入力欄に足すだけ(送るのは本人が Return)
     private func deliver(_ text: String) {
-        let typed = session.draft.trimmingCharacters(in: .whitespacesAndNewlines)
+        // 変換中の文字があれば先に確定させ、その後ろに足す(#1047)
+        let typed = MacComposeInput.committedDraft(session.draft, inputFocused: inputFocused)
+            .trimmingCharacters(in: .whitespacesAndNewlines)
         session.draft = typed.isEmpty ? text : typed + " " + text
         if session.phase == .chatting, !session.sending { session.sendDraft(source: typed.isEmpty ? .voice : .text) }
+    }
+
+    /// 入力欄の文を送る。変換中の文字は確定させてから送る(#1047)
+    private func submitDraft() {
+        session.draft = MacComposeInput.committedDraft(session.draft, inputFocused: inputFocused)
+        session.sendDraft()
     }
 
     /// 時間帯・初回 / 再訪で変わるあいさつ(#1211・iOS と同じ `Greeting`)
@@ -240,7 +248,11 @@ private struct ComposeChat: View {
                 .textFieldStyle(.plain)
                 .lineLimit(1...4)
                 .focused($inputFocused)
-                .onSubmit { session.sendDraft() }
+                .onSubmit {
+                    // 変換中の Return は確定だけ(#1047)
+                    guard MacComposeInput.allowsReturnSubmit() else { return }
+                    submitDraft()
+                }
                 .disabled(session.sending || voice.isBusy)
             MacMicButton(disabled: session.sending, deliver: deliver)
             Button {
@@ -260,7 +272,7 @@ private struct ComposeChat: View {
                 .frame(width: 420, height: 440)
             }
             Button {
-                session.sendDraft()
+                submitDraft()
             } label: {
                 Image(systemName: "arrow.up.circle.fill").font(.title2)
             }
