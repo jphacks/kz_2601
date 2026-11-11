@@ -634,8 +634,16 @@ type handleTokens struct {
 }
 
 // Tokens implements notify.TokenReader.
-func (t handleTokens) Tokens(ctx context.Context, uid string) ([]string, error) {
-	return t.h.DeviceTokens(ctx, uid, t.env)
+func (t handleTokens) Tokens(ctx context.Context, uid string) ([]notify.Device, error) {
+	ds, err := t.h.PushDevices(ctx, uid, t.env)
+	if err != nil {
+		return nil, err
+	}
+	out := make([]notify.Device, 0, len(ds))
+	for _, d := range ds {
+		out = append(out, notify.Device{Token: d.Token, Platform: d.Platform})
+	}
+	return out, nil
 }
 
 // dropUnregistered deletes the tokens APNs rejected as unregistered (410). A
