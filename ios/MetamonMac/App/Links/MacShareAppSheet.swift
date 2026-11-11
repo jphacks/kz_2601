@@ -61,7 +61,9 @@ final class MacShareAppModel: Identifiable {
         }
         state = .loading
         do {
-            state = .ready(try await sharing.share(appId: appId))
+            let info = try await sharing.share(appId: appId)
+            state = .ready(info)
+            MacHandoffLinks.set(Self.link(info), appId: appId) // Handoff の webpageURL(#1851)
         } catch {
             state = .failed(L10n.tr("リンクを作れませんでした。もう一度お試しください"))
         }
@@ -72,6 +74,7 @@ final class MacShareAppModel: Identifiable {
         guard case .ready(let info) = state, let sharing else { return }
         do {
             try await sharing.revokeShare(token: info.token)
+            MacHandoffLinks.set(nil, appId: appId) // 取り消したリンクは Handoff にも出さない
             await issue()
         } catch {
             state = .failed(L10n.tr("取り消せませんでした"))
@@ -86,6 +89,7 @@ final class MacShareAppModel: Identifiable {
     /// 抜けた後: 自分が出したリンクはもう使えないので捨てる
     func forgetLink() {
         state = .failed(SharedAccessDenial.notMember.message)
+        MacHandoffLinks.set(nil, appId: appId)
     }
 
     /// QR に入れる文字列(iOS と同じくアプリのリンク。カメラで読むと Tailor It で開く)

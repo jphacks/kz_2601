@@ -7,6 +7,7 @@ import MetamonRenderer
 /// 外から届いた URL を受ける(#975)。ウインドウの根に 1 行で付ける。
 /// - URL スキーム(`tailorit://import/<token>`)は onOpenURL で届く
 /// - Universal Links(`https://tailor-it.app/s/<token>`・#1286)は Web 閲覧の NSUserActivity で届く
+/// - 連係の Handoff(`HandoffActivity.type`・#1851)は `MacHandoffInbox` へ(アプリを開いてから画面と記録を開く)
 ///   (entitlement `applinks:$(METAMON_APPLINKS_DOMAIN)`。AASA の appIDs に Mac の App ID が要る・docs/infra/universal-links/README.md)
 /// - 起動していない時: macOS がアプリを起動し、最初のウインドウに届く
 /// - 開いている時: 新しいウインドウを作らず、今あるウインドウ(手前のもの)で受ける(handlesExternalEvents)
@@ -27,6 +28,8 @@ struct MacLinkReceiver: ViewModifier {
             .onContinueUserActivity(NSUserActivityTypeBrowsingWeb) { activity in
                 if let url = activity.webpageURL { flow.receive(url) }
             }
+            // iPhone・ほかの Mac からの Handoff(#1851): 押された通知と同じ道でアプリを開き、画面は AppCanvas が開く
+            .onContinueUserActivity(HandoffActivity.type) { MacHandoffInbox.shared.receive($0) }
             .handlesExternalEvents(preferring: ["*"], allowing: ["*"])
             // 届いた時・ログインできた時に、保留のリンクを開く
             .task(id: "\(session.user?.uid ?? "")|\(flow.link.url?.absoluteString ?? "")") {

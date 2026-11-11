@@ -18,6 +18,8 @@ final class IntentHost {
         #if !APP_STORE_REVIEW
         /// 通知のタップ(#269)。すでに開いているアプリなら何も言わない
         case openFromNotification(appId: String)
+        /// 連係の Handoff(#1851)。そのアプリに切り替えてから画面と記録を開く
+        case handoff(HandoffTarget)
         #endif
     }
 
@@ -62,6 +64,7 @@ final class IntentHost {
         #if !APP_STORE_REVIEW
         case .openFromNotification(let appId):
             if appId != runtime.document.appId { await runtime.switchApp(to: appId) }
+        case .handoff(let target): await runtime.openHandoff(target)
         #endif
         }
     }
