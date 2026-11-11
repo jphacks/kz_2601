@@ -106,7 +106,7 @@ private struct MacAccountSettings: View {
             }
             #if !APP_STORE_REVIEW // 審査用ビルドは App 内課金を持たない(#450 G1)
             Section {
-                MacUnavailableSettingRow(title: "Tailor It Pro")
+                MacProSettingsRow()
             }
             #endif
             Section {
@@ -117,6 +117,27 @@ private struct MacAccountSettings: View {
         .formStyle(.grouped)
     }
 }
+
+#if !APP_STORE_REVIEW
+/// Tailor It Pro の状態と課金画面の入口(iOS の「Pro にする」と同じ商品・同じ購入)
+private struct MacProSettingsRow: View {
+    var body: some View {
+        LabeledContent("Tailor It Pro") {
+            if MacPro.shared.isPro {
+                HStack {
+                    Label("ご利用中", systemImage: "checkmark.seal.fill")
+                        .foregroundStyle(Theme.Colors.brandText)
+                    Button("サブスクリプションを管理") { MacPro.openManageSubscriptions() }
+                        .help("App Store のアカウントのページを開きます")
+                }
+            } else {
+                MacUpgradeProButton(reason: .settings)
+            }
+        }
+        .task { MacPro.shared.start() }
+    }
+}
+#endif
 
 // MARK: - 通知
 
