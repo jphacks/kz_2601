@@ -71,8 +71,18 @@ op の `Check` は引数の値を確かめる(appconfig と runner の両方で�
 | provider | 種類 | op | 出口 | キャッシュ | 入れ方 |
 |---|---|---|---|---|---|
 | `frankfurter`(為替・欧州中央銀行・#1499) | 無料・鍵なし(`runs` だけ) | `latest(from?, to?, amount?)`・`historical(date, from?, to?, amount?)`。`from` / `to` は大文字 3 文字の通貨(`to` はカンマ区切りで 10 個まで・重ならない)・`amount` は正の数・`date` は 1999-01-04 から今日まで。行は通貨ごと(見出し = 通貨・値 = レート・補足 = 「日付・量 基準」) | `https://api.frankfurter.app` だけ・本文 64 KiB まで | latest 1 時間・historical 1 日 | `EXT_FRANKFURTER_ENABLED=1` |
+| `openWeather` の `airQuality`(空気の汚れ・OpenWeatherMap Air Pollution・#1656) | 無料・運営の鍵(`runs` だけ。OpenWeather の契約の範囲) | `airQuality(lat, lng)`。`lat` / `lng` は小数(10 進だけ)で小数 2 桁(約 1 km)に丸めて送る。答えは 1 件(見出し = 「空気 <AQI の段階>(目安)」・値 = `AQI n/5`・補足 = PM2.5・PM10・O₃・NO₂ の µg/m³)。AQI は OpenWeather の 1〜5(良い・まあまあ・ふつう・悪い・とても悪い)。1〜5 でない答えは 502 `upstream_unavailable`。健康の判断ではなく目安。出典「Weather data © OpenWeather (ODbL)」を出す。AI に選ばせる決まり(`prompt.go`・`catalog.go`)はまだ | `https://api.openweathermap.org` だけ(`/data/2.5/air_pollution`。天気と同じホスト・同じ鍵) | なし | `EXT_OPEN_WEATHER_ENABLED=1`・`EXT_OPEN_WEATHER_API_KEY` |
 
 provider が 404 / 422(持っていない通貨・日)を返した時は 400 `bad_request`(`runs` は戻す)。429 / 5xx は 502 `upstream_unavailable`。
+
+### 入れないもの(黄砂・そらまめ君)
+
+#1656 で調べ、外の API としては入れない。
+
+| もの | 入れない理由 |
+|---|---|
+| 黄砂(気象庁の黄砂情報) | 予測図が画像で出るだけで、数値で読める公式の API・使い方の決まり(仕様と規約)が無い。画像を読み取るのは壊れやすく、出典の決まりの外になる。数値の公式の出どころができたら入れ直す |
+| 環境省「そらまめ君」(大気汚染物質広域監視システム) | 公式の API の仕様が無く、画面とデータのダウンロードだけ。機械から呼ぶ使い方の規約も無いので、runner から定期に読む形にできない。PM2.5 は上の `airQuality` で見る |
 
 ## 呼び出しの流れと数え方
 

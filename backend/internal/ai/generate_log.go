@@ -4,6 +4,8 @@ import (
 	"context"
 	"errors"
 	"log/slog"
+	"sort"
+	"strconv"
 	"strings"
 	"time"
 
@@ -34,6 +36,36 @@ func retryReason(err error, resp *Response) string {
 		return RetryValidation
 	}
 	return RetryInvalidOutput
+}
+
+// noteRejected records why an attempt was rejected with err: its retry
+// reason and, for a validation failure, the code of each problem (#1772).
+func (m *Meta) noteRejected(err error, resp *Response) {
+	r := retryReason(err, resp)
+	m.RetryReasons = append(m.RetryReasons, r)
+	var ve *dsl.ValidationError
+	if r == RetryValidation && errors.As(err, &ve) {
+		m.ValidationCodes = append(m.ValidationCodes, ve.Codes()...)
+	}
+}
+
+// codeCounts renders codes as "code:count,..." sorted by code
+// (validation_codes of ai.generate).
+func codeCounts(codes []string) string {
+	n := map[string]int{}
+	for _, c := range codes {
+		n[c]++
+	}
+	keys := make([]string, 0, len(n))
+	for k := range n {
+		keys = append(keys, k)
+	}
+	sort.Strings(keys)
+	parts := make([]string, len(keys))
+	for i, k := range keys {
+		parts[i] = k + ":" + strconv.Itoa(n[k])
+	}
+	return strings.Join(parts, ",")
 }
 
 // contentRetryReasons labels a valid output retried for its content.
@@ -131,6 +163,9 @@ func (s *Service) logGenerate(ctx context.Context, tr genTrace, stream bool, res
 		)
 		if len(m.RetryReasons) > 0 { // labels only, in order (e.g. "validation,validation")
 			attrs = append(attrs, slog.String("retry_reasons", strings.Join(m.RetryReasons, ",")))
+		}
+		if len(m.ValidationCodes) > 0 { // dsl problem codes and counts only (#1772)
+			attrs = append(attrs, slog.String("validation_codes", codeCounts(m.ValidationCodes)))
 		}
 	}
 	var ge *Error
