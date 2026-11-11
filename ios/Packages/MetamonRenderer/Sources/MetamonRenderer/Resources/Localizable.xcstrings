@@ -3814,6 +3814,40 @@
         }
       }
     },
+    "ミュージック アプリで開く" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Open in Music"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ミュージック アプリで開く"
+          }
+        }
+      }
+    },
+    "ミュージック アプリを開く" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Open Music"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ミュージック アプリを開く"
+          }
+        }
+      }
+    },
     "メッセージ" : {
       "extractionState" : "manual",
       "localizations" : {
