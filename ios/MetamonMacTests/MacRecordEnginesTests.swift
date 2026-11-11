@@ -58,7 +58,8 @@ final class MacRecordEnginesTests: XCTestCase {
         // ファイルに両方残っている(新しい RecordStore で読み直す)
         let disk = RecordStore(directory: MacRecordVault.directory(appId: "shared-app", root: root)
             .appendingPathComponent("local", isDirectory: true))
-        XCTAssertEqual(memos(await disk.records(appId: "shared-app", entity: "expense")), ["A", "B"])
+        let onDisk = await disk.records(appId: "shared-app", entity: "expense")
+        XCTAssertEqual(memos(onDisk), ["A", "B"])
         XCTAssertEqual(memos(a.records(for: "expense")), ["A", "B"])
     }
 
