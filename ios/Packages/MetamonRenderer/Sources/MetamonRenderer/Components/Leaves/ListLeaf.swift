@@ -21,8 +21,10 @@ struct ListLeaf: View {
     /// 押した直後の印の表示(recordId → 楽観的な状態・#255)。確定したら外す
     @State private var markOverrides: [String: MarkState] = [:]
     #if os(macOS)
-    /// ⌘C の対象の行(#1332)。クリックか Tab でフォーカスした行
-    @FocusState private var focusedRowId: String?
+    /// 選んでいる行(#1387)。クリックか ↑↓ で選び、⌘C・⌫ の対象にする(#1332)
+    @State private var selectedRowId: String?
+    /// 一覧にキーボードのフォーカスがあるか。Tab は行ごとでなく一覧に 1 回だけ止まる(#1387)
+    @FocusState private var listFocused: Bool
     /// 行の写真の「画像を保存…」(#1333)
     @State private var imageToSave: ImageExport.Pending?
     #endif
@@ -54,12 +56,11 @@ struct ListLeaf: View {
                             mark: mark, markState: mark.map { markOverrides[row.id] ?? row.markState($0.id) },
                             onMark: mark.map { m in { toggleMark(row, mark: m.id, entity: entityId) } },
                             accessory: interestAccessory(row, entity: entityId))
-                        .background(highlightedId == row.id ? RenderTheme.Colors.brandSoft : Color.clear)
+                        .background(rowBackground(row))
                         .contentShape(Rectangle())
                         .onTapGesture { focusRow(row); open(row) }
                         #if os(macOS)
-                        .focusable()
-                        .focused($focusedRowId, equals: row.id)
+                        .accessibilityAddTraits(selectedRowId == row.id ? .isSelected : [])
                         #endif
                         // VoiceOver: onTapGesture は読まれないので、行をボタンとして宣言しダブルタップで同じ遷移を実行
                         .accessibilityAddTraits(c.onItemTap != nil ? .isButton : [])
@@ -94,6 +95,16 @@ struct ListLeaf: View {
             // 行が少なくてもカードはセルの高さまで伸ばす(#84: 空白の下半分を作らない)。行は上詰め
             .frame(maxHeight: .infinity, alignment: .top)
             #if os(macOS)
+            // 一覧ごとに 1 つのフォーカス(#1387)。青いリングは出さず、選んでいる行を自前の色で見せる。↑↓ で行を移り、Return で開く
+            .focusable()
+            .focusEffectDisabled()
+            .focused($listFocused)
+            .onMoveCommand { moveSelection($0, ids: ids) }
+            .onKeyPress(.return) { openSelected(rows) }
+            .onChange(of: listFocused) { _, focused in
+                if focused { selectedRowId = ListRowSelection.onFocus(current: selectedRowId, ids: ids) }
+            }
+            .onChange(of: ids) { _, now in selectedRowId = ListRowSelection.pruned(selectedRowId, ids: now) }
             // ⌘C(#1332): フォーカスのある行を右クリックの「コピー」と同じテキストで
             .onCopyCommand { copyCommand(rows: rows, entity: entity) }
             // ⌫: フォーカスのある行を、確認を挟んでから消す(消せない行では何もしない)
@@ -192,20 +203,41 @@ struct ListLeaf: View {
 
     #if os(macOS)
     private func copyCommand(rows: [Record], entity: Entity?) -> [NSItemProvider] {
-        guard let row = ListRowCopyCommand.target(focusedRowId: focusedRowId,
+        guard let row = ListRowCopyCommand.target(focusedRowId: keyboardRowId,
                                                   textInputActive: ListRowCopyCommand.textInputActive, rows: rows) else { return [] }
         let text = ListRowCopyText.text(item: c.item, record: row, entity: entity, rt: rt)
         return text.isEmpty ? [] : [NSItemProvider(object: text as NSString)]
     }
 
     private func deleteCommand(rows: [Record], entity: Entity?, entityId: String) {
-        guard let row = ListRowDeleteCommand.target(focusedRowId: focusedRowId, textInputActive: ListRowCopyCommand.textInputActive,
+        guard let row = ListRowDeleteCommand.target(focusedRowId: keyboardRowId, textInputActive: ListRowCopyCommand.textInputActive,
                                                     rows: rows, deletable: { deletable($0, entity: entityId) }) else { return }
         let titleField = c.item?.title ?? entity?.displayTitleField ?? ""
         var action = Action(type: .deleteRecord, entity: entityId)
         action.confirmMessage = ListRowDeleteCommand.confirmMessage(title: rt.display(row[titleField], field: entity?.field(titleField)),
                                                                     fallback: entity?.name ?? "")
         Task { await rt.run(action, ctx.actionContext(recordId: row.id)) }
+    }
+
+    /// ⌘C・⌫ の対象: 一覧にフォーカスがある時の選んでいる行
+    private var keyboardRowId: String? { listFocused ? selectedRowId : nil }
+
+    private func moveSelection(_ direction: MoveCommandDirection, ids: [String]) {
+        let move: ListRowSelection.Move
+        switch direction {
+        case .up: move = .up
+        case .down: move = .down
+        default: return
+        }
+        selectedRowId = ListRowSelection.moved(from: selectedRowId, move, ids: ids)
+    }
+
+    /// Return: 選んでいる行を開く(行のクリックと同じ)。入力欄が文字を受けている時は任せる
+    private func openSelected(_ rows: [Record]) -> KeyPress.Result {
+        guard c.onItemTap != nil, !ListRowCopyCommand.textInputActive,
+              let row = rows.first(where: { $0.id == selectedRowId }) else { return .ignored }
+        open(row)
+        return .handled
     }
 
     /// 行の写真(item.image)。手元にある画像だけ(https・動画のサムネイルは除く)。名前は写真の項目名
@@ -215,11 +247,21 @@ struct ListLeaf: View {
     }
     #endif
 
-    /// クリックした行を ⌘C の対象にする(Mac)。
+    /// クリックした行を選び、一覧にフォーカスを移す(Mac)。⌘C・⌫・↑↓ がこの行から効く
     private func focusRow(_ row: Record) {
         #if os(macOS)
-        focusedRowId = row.id
+        selectedRowId = row.id
+        listFocused = true
         #endif
+    }
+
+    /// 行の背景: 保存で増えた行の一瞬のハイライト、Mac は選んでいる行(フォーカスが無い時は薄いグレー)
+    private func rowBackground(_ row: Record) -> Color {
+        if highlightedId == row.id { return RenderTheme.Colors.brandSoft }
+        #if os(macOS)
+        if selectedRowId == row.id { return listFocused ? RenderTheme.Colors.brandSoftStroke : Color.primary.opacity(0.06) }
+        #endif
+        return .clear
     }
 
     private func open(_ row: Record) {
