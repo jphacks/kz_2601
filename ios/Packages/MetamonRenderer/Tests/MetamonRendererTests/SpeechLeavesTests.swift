@@ -67,7 +67,7 @@ final class SpeechLeavesTests: XCTestCase {
             AnyView(SpeakButtonLeaf(c: try component(#"{"type":"speakButton","text":"こんにちは","label":"聞く"}"#), ctx: RenderContext(route: Route(screen: "home")))),
         ]
         for v in views {
-            XCTAssertNotNil(ImageRenderer(content: v.frame(width: 320, height: 240)).uiImage)
+            XCTAssertNotNil(ImageRenderer(content: v.frame(width: 320, height: 240)).platformImage)
         }
     }
 

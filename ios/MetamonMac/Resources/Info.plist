@@ -1,0 +1,77 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>CFBundleDevelopmentRegion</key>
+	<string>ja</string>
+	<!-- 表示名・Bundle ID・版は iOS と同じ build setting から(project.yml) -->
+	<key>CFBundleDisplayName</key>
+	<string>$(METAMON_DISPLAY_NAME)</string>
+	<key>CFBundleExecutable</key>
+	<string>$(EXECUTABLE_NAME)</string>
+	<key>CFBundleIdentifier</key>
+	<string>$(PRODUCT_BUNDLE_IDENTIFIER)</string>
+	<key>CFBundleInfoDictionaryVersion</key>
+	<string>6.0</string>
+	<!-- Mac はメニューバー(「〜について」「〜を終了」)に CFBundleName を出すので、内部名 Metamon でなく表示名にする -->
+	<key>CFBundleName</key>
+	<string>$(METAMON_DISPLAY_NAME)</string>
+	<key>CFBundlePackageType</key>
+	<string>$(PRODUCT_BUNDLE_PACKAGE_TYPE)</string>
+	<key>CFBundleShortVersionString</key>
+	<string>$(MARKETING_VERSION)</string>
+	<key>CFBundleVersion</key>
+	<string>$(CURRENT_PROJECT_VERSION)</string>
+	<key>LSMinimumSystemVersion</key>
+	<string>$(MACOSX_DEPLOYMENT_TARGET)</string>
+	<key>LSApplicationCategoryType</key>
+	<string>public.app-category.productivity</string>
+	<key>ITSAppUsesNonExemptEncryption</key>
+	<false/>
+
+	<!-- 共有のリンク tailorit://import/<token>(#975)。iOS の Info.plist と同じ名前・スキーム -->
+	<key>CFBundleURLTypes</key>
+	<array>
+		<dict>
+			<key>CFBundleURLName</key>
+			<string>jp.kz2601.metamon.share</string>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<string>tailorit</string>
+			</array>
+		</dict>
+	</array>
+
+	<!-- バックエンド URL(iOS の Info.plist と同じキー・同じ build setting) -->
+	<key>MetamonAIBaseURL</key>
+	<string>$(METAMON_AI_BASE_URL)</string>
+	<key>MetamonAppConfigBaseURL</key>
+	<string>$(METAMON_APPCONFIG_BASE_URL)</string>
+	<key>MetamonAppStoreURL</key>
+	<string>$(METAMON_APP_STORE_URL)</string>
+
+	<!-- WhisperKit のモデル名(#966)。空なら `small`(約500MB・日本語精度優先)。環境変数 METAMON_WHISPER_MODEL でも上書き可(iOS と同じ) -->
+	<key>MetamonWhisperModel</key>
+	<string></string>
+
+	<!-- 声で頼む(#966)。文言は iOS と同じ。声は端末の外に送らない -->
+	<key>NSMicrophoneUsageDescription</key>
+	<string>話しかけた内容からアプリを生成するため、また生成したアプリで話した内容を端末の中で文字にしたり、動画やドラレコの音声、ボイスメモ・会議などを録音したりするために、マイクを使用します。</string>
+	<!-- 音声モデルの準備中だけ、Apple の端末内の音声認識(requiresOnDeviceRecognition)で仮に聞き取る(iOS の U5 と同じ) -->
+	<key>NSSpeechRecognitionUsageDescription</key>
+	<string>音声モデルの準備ができるまでの間、話した内容をこの端末の中で文字にするために、音声認識を使用します。声は端末の外に送りません。</string>
+	<!-- カレンダーに追加(#978)。iOS は OS の画面(EventKitUI・別プロセス)なので説明文が要らないが、Mac は自前のシートから
+	     EventKit で書くので、書き込みだけの許可(requestWriteOnlyAccessToEvents)の説明を出す。中身は読まない -->
+	<key>NSCalendarsWriteOnlyAccessUsageDescription</key>
+	<string>記録の日時を、内容を確かめたうえでカレンダーに予定として追加するために使用します。カレンダーの予定は読み取りません。</string>
+	<!-- musicPlayer(#960): Apple Music の検索と再生(MusicKit の ApplicationMusicPlayer)。文言は iOS と同じ -->
+	<key>NSAppleMusicUsageDescription</key>
+	<string>生成したアプリの音楽プレーヤーで、Apple Music の曲を検索して再生するために使用します。</string>
+	<!-- 現在地(#956)。文言は iOS と同じ。macOS は NSLocationUsageDescription も見るので同じ文にする -->
+	<key>NSLocationWhenInUseUsageDescription</key>
+	<string>生成したアプリで現在地を記録・地図に表示したり、目的地まで道案内したり、保存した場所の近くに着いた時に通知したりするために使います(近くに着いたかは端末の中で判定します)。「記録を開始」を押した時だけ、停止するまで(最長4時間)散歩などの道のりを記録し、その間はアプリを閉じても記録を続けます。</string>
+	<key>NSLocationUsageDescription</key>
+	<string>生成したアプリで現在地を記録・地図に表示したり、目的地まで道案内したり、保存した場所の近くに着いた時に通知したりするために使います(近くに着いたかは端末の中で判定します)。「記録を開始」を押した時だけ、停止するまで(最長4時間)散歩などの道のりを記録し、その間はアプリを閉じても記録を続けます。</string>
+	<!-- ほかの権限の説明(カメラなど)は #931 で足す -->
+</dict>
+</plist>

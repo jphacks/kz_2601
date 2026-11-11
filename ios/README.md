@@ -92,8 +92,13 @@ python3 scripts/third-party-licenses.py --check                                 
 
 ```sh
 xcodebuild -scheme Metamon -destination 'platform=iOS Simulator,name=iPhone 17' test CODE_SIGNING_ALLOWED=NO  # 3 パッケージ一括
-(cd Packages/MetamonDSL && swift test)   # DSL のみ、macOS で数秒
+(cd Packages/MetamonDSL && swift test)   # DSL のみ、macOS で数秒(英語の文言のテストだけ落ちる。下の xcodebuild 版なら通る)
+scripts/mac-package-test.sh MetamonDSL   # パッケージ 1 つを macOS の xcodebuild test で(mac-ci と同じ。Renderer / Services も可)
 ```
+
+`swift test` は文字列カタログ(.xcstrings)を訳さないので `EnglishCopyTests` が落ちる。macOS のテストを `xcodebuild` で回す時、
+repo か DerivedData が `~/Desktop`・`~/Documents`・`~/Downloads` の下にあると、テストの実行役が読めずに落ちる(macOS の保護)。
+その時は repo と `MAC_DERIVED_DATA` を保護の外に置く。
 
 ## コンポーネントを足す(3 行)
 1. `Packages/MetamonRenderer/Sources/MetamonRenderer/Components/Leaves/FooLeaf.swift` に `struct FooLeaf: View`

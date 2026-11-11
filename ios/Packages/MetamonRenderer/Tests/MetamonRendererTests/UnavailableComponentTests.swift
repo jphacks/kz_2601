@@ -28,10 +28,10 @@ final class UnavailableComponentTests: XCTestCase {
         return r
     }
 
-    @MainActor private func render<V: View>(_ view: V) -> UIImage? {
+    @MainActor private func render<V: View>(_ view: V) -> PlatformImage? {
         let r = ImageRenderer(content: view.frame(width: 160))
         r.scale = 1
-        return r.uiImage
+        return r.platformImage
     }
 
     func testReasonSplitsNewerTypeFromExcludedType() throws {

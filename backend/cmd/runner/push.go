@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log/slog"
 	"strings"
 	"sync"
 	"time"
@@ -13,6 +14,7 @@ import (
 
 	"github.com/jphacks/kz_2601/backend/internal/runner/notify"
 	"github.com/jphacks/kz_2601/backend/internal/runner/notify/apns"
+	"github.com/jphacks/kz_2601/backend/internal/runner/notify/fcm"
 	"github.com/jphacks/kz_2601/backend/internal/store"
 )
 
@@ -65,6 +67,44 @@ func pushFromEnv(getenv func(string) string) (pushConfig, error) {
 	}
 	cfg.Sender = c
 	return cfg, nil
+}
+
+// fcmFromEnv reads the FCM settings (#918). Without FCM_SERVICE_ACCOUNT_JSON
+// the runner starts and Android pushes are skipped (notify.PlatformSender
+// logs it). The key comes from Secret Manager (--set-secrets); it is never
+// logged.
+//
+//	FCM_SERVICE_ACCOUNT_JSON  the service account key (JSON) allowed to send
+//	                          FCM messages (roles/firebasecloudmessaging.admin)
+//	FCM_PROJECT_ID            the Firebase project ("" = the key's project_id)
+func fcmFromEnv(ctx context.Context, getenv func(string) string) (notify.Sender, string, error) {
+	raw := strings.TrimSpace(getenv("FCM_SERVICE_ACCOUNT_JSON"))
+	if raw == "" {
+		return nil, "", nil
+	}
+	project := strings.TrimSpace(getenv("FCM_PROJECT_ID"))
+	if project == "" {
+		p, err := fcm.ProjectOf([]byte(raw))
+		if err != nil {
+			// fcm's errors carry no key material
+			return nil, "", fmt.Errorf("FCM_SERVICE_ACCOUNT_JSON: %w", err)
+		}
+		project = p
+	}
+	c, err := fcm.New(ctx, fcm.Config{CredentialsJSON: []byte(raw), ProjectID: project})
+	if err != nil {
+		return nil, "", fmt.Errorf("FCM_SERVICE_ACCOUNT_JSON: %w", err)
+	}
+	return c, project, nil
+}
+
+// pushSender routes each device to APNs or FCM (#918). Neither configured =
+// nil (the runner's LogSender logs the shape of every push).
+func pushSender(apnsSender, fcmSender notify.Sender, logger *slog.Logger) notify.Sender {
+	if apnsSender == nil && fcmSender == nil {
+		return nil
+	}
+	return &notify.PlatformSender{IOS: apnsSender, Android: fcmSender, Logger: logger}
 }
 
 // userGetter is the part of the Firebase Auth client firebaseAge uses.

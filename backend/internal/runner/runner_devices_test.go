@@ -84,3 +84,53 @@ func TestRunnerStoredDevicesAndConsent(t *testing.T) {
 		}
 	})
 }
+
+func fcmToken(n int) string { return fmt.Sprintf("dX%016x:APA91b-%048x", tokenSalt, n) }
+
+func (h *harness) registerAndroid(uid, inst string, tok int, env string) {
+	h.t.Helper()
+	body := fmt.Sprintf(`{"platform":"android","token":%q,"environment":%q}`, fcmToken(tok), env)
+	if code, out := h.do(uid, http.MethodPut, "/v1/me/devices/"+inst+h.sfx, body, nil); code != http.StatusOK {
+		h.t.Fatalf("register android %s: %d %v", uid, code, out)
+	}
+}
+
+// #918: Android devices registered through appconfig get the push with their
+// platform (whatever environment they sent); an FCM token rejected as
+// unregistered is deleted.
+func TestRunnerAndroidDevices(t *testing.T) {
+	stores(t, options{pro: fakePro{}, age: oldAccounts{}, storeDevices: true}, func(t *testing.T, h *harness) {
+		owner, mom, dad := "uid-a-owner"+h.sfx, "uid-a-mom"+h.sfx, "uid-a-dad"+h.sfx
+		h.pro[owner] = true
+		id := "RUN-ANDROID" + h.sfx
+		app := h.circle(id, owner, circleRules(t), mom, dad)
+		h.registerAndroid(owner, "inst-owner", 1, "")
+		h.registerAndroid(mom, "inst-mom", 2, "sandbox")
+		h.consent(mom, id)
+		h.sender.Results = map[string]notify.Result{fcmToken(1): {Status: 404, Reason: "UNREGISTERED", Unregistered: true}}
+
+		h.post(dad, app+"/entities/messages/records", `{"data":{"body":"こんにちは"}}`)
+		h.tick()
+
+		var toks []string
+		for _, p := range h.sender.Pushes() {
+			if p.Platform != notify.PlatformAndroid {
+				t.Errorf("platform %q", p.Platform)
+			}
+			toks = append(toks, p.Token)
+		}
+		slices.Sort(toks)
+		if !slices.Equal(toks, []string{fcmToken(1), fcmToken(2)}) {
+			t.Fatalf("pushes: %v", toks)
+		}
+		if out := h.logs.String(); strings.Contains(out, fcmToken(1)) || strings.Contains(out, fcmToken(2)) {
+			t.Fatal("a device token was logged")
+		}
+		if ds, err := h.st.ListDevices(t.Context(), owner); err != nil || len(ds) != 0 {
+			t.Fatalf("unregistered token kept: %+v %v", ds, err)
+		}
+		if ds, _ := h.st.ListDevices(t.Context(), mom); len(ds) != 1 {
+			t.Fatalf("mom's device: %+v", ds)
+		}
+	})
+}

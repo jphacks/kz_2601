@@ -56,7 +56,7 @@ object DslKeys {
         ComponentType.CALENDAR to setOf("type", "id", "area", "entity", "dateField", "onDateTap", "title"),
         ComponentType.GRID_TABLE to setOf("type", "id", "area", "entity", "title", "columnField", "rowField", "titleField", "subtitleField", "columnValues", "rowValues", "rowRange", "onItemTap"),
         ComponentType.SHARE_BUTTON to setOf("type", "id", "area", "text", "field", "label", "icon", "shareTo"),
-        ComponentType.OPEN_URL_BUTTON to setOf("type", "id", "area", "label", "url", "icon", "style"),
+        ComponentType.OPEN_URL_BUTTON to setOf("type", "id", "area", "label", "url", "app", "to", "icon", "style"),
         ComponentType.MAP_VIEW to setOf("type", "id", "area", "entity", "locationField", "titleField", "zoom", "onItemTap", "kind", "dateField"),
         ComponentType.LOCATION_BUTTON to setOf("type", "id", "area", "field", "label", "addressField"),
         ComponentType.LOCATION_PICKER to setOf("type", "id", "area", "field", "label", "nameField"),
@@ -82,6 +82,7 @@ object DslKeys {
         ComponentType.MATCH_LIST to setOf("type", "id", "area", "entity", "show", "title", "emptyText", "item", "onItemTap"),
         ComponentType.FLASHCARDS to setOf("type", "id", "area", "entity", "front", "back", "filter", "toggle"),
         ComponentType.FEED to setOf("type", "id", "area", "provider", "region", "feedId", "query", "title", "limit", "emptyText"),
+        ComponentType.CALL_BUTTON to setOf("type", "id", "area", "label", "video", "room"),
     )
 
     val action: Map<ActionType, Set<String>> = mapOf(

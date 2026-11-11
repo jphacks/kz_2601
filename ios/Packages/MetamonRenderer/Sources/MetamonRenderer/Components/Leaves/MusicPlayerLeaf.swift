@@ -8,6 +8,7 @@ struct MusicPlayerLeaf: View {
     let c: Component
     @Environment(\.dslRuntime) private var runtime
     @Environment(\.scenePhase) private var scenePhase
+    @Environment(\.openURL) private var openURL
     @State private var session = MusicSession.shared
     @State private var searching = false
     /// 検索シートで選んだリクエスト。シートを閉じてから送る(シートの上に送信シートは重ねられない)
@@ -91,12 +92,30 @@ struct MusicPlayerLeaf: View {
             EmptyView()
         default:
             if let message = session.availability.message {
-                Label(message, systemImage: "exclamationmark.triangle")
-                    .font(.footnote)
-                    .foregroundStyle(.secondary)
-                    .fixedSize(horizontal: false, vertical: true)
+                VStack(alignment: .leading, spacing: 4) {
+                    Label(message, systemImage: "exclamationmark.triangle")
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                    if let url = settingsURL {
+                        Button(L("システム設定を開く")) { openURL(url) }
+                            .font(.footnote.weight(.semibold))
+                            .accessibilityIdentifier("music.openSettings")
+                    }
+                }
             }
         }
+    }
+
+    /// 開けるシステム設定の画面(Mac で断られた時だけ・#1377)。開くアプリが無ければ文言だけにする。
+    private var settingsURL: URL? {
+        #if os(macOS)
+        guard let url = session.availability.settingsURL,
+              NSWorkspace.shared.urlForApplication(toOpen: url) != nil else { return nil }
+        return url
+        #else
+        nil
+        #endif
     }
 
     private var nowPlaying: some View {
@@ -143,7 +162,7 @@ struct MusicPlayerLeaf: View {
         }
         .buttonStyle(.plain)
         .foregroundStyle(RenderTheme.Colors.brandA)
-        .accessibilityLabel(label)
+        .iconButtonLabel(label)
     }
 
     private var lists: some View {
@@ -195,7 +214,7 @@ struct MusicArtwork: View {
 
     var body: some View {
         let shape = RoundedRectangle(cornerRadius: size * 0.18, style: .continuous)
-        AsyncImage(url: url.flatMap(URL.init(string:))) { phase in
+        AsyncImage(url: ImageHostPolicy.loadableURL(url)) { phase in
             if let image = phase.image {
                 image.resizable().scaledToFill()
             } else {
@@ -306,7 +325,7 @@ struct MusicSearchSheet: View {
                                     Image(systemName: "plus.circle.fill").font(.title3)
                                 }
                                 .buttonStyle(.borderless)
-                                .accessibilityLabel(L("再生待ちに追加"))
+                                .iconButtonLabel(L("再生待ちに追加"))
                             }
                             if requests {
                                 Button {
@@ -315,7 +334,7 @@ struct MusicSearchSheet: View {
                                     Image(systemName: "paperplane.fill").font(.title3)
                                 }
                                 .buttonStyle(.borderless)
-                                .accessibilityLabel(L("近くの人にリクエスト"))
+                                .iconButtonLabel(L("近くの人にリクエスト"))
                             }
                         }
                     }
@@ -345,7 +364,7 @@ struct MusicSearchSheet: View {
             .searchable(text: $term, prompt: L("曲名・アーティスト"))
             .onSubmit(of: .search) { Task { await runSearch() } }
             .navigationTitle(L("曲を探す"))
-            .navigationBarTitleDisplayMode(.inline)
+            .inlineNavigationTitle()
             .toolbar {
                 SheetCloseToolbarItem { dismiss() }
             }

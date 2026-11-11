@@ -29,9 +29,8 @@ final class GridTableUITests: XCTestCase {
     func testEmptyCellOpensPrefilledFormAndSaves() {
         app = XCUIApplication()
         app.launchEnvironment = ["METAMON_MOCK": "1", "METAMON_FAB_POSITION": "auto", "METAMON_AI_CONSENT": "granted", "METAMON_INITIAL_EXAMPLE": "timetable"]
-        // 前のテストで作ったアプリの「引き継ぎのためにサインイン」(#276・次の起動で出る)がマスを塞ぐので出さない
         app.launchArguments = ["-AppleLanguages", "(ja)", "-AppleLocale", "ja_JP", "-metamon.appLanguage", "ja",
-                               "-metamon.accountLinkPrompted", "YES"]
+                               "-metamon.accountLinkPrompted", "YES"] // 前のテストで作ったアプリの引き継ぎの案内(シート)がマスのタップを奪わないように
         app.launch()
 
         // seed: 月1 線形代数 / 水2 英語 + 英語演習(+1)/ 金3 プログラミング

@@ -5,6 +5,8 @@ import MetamonDSL
 public struct ScreenView: View {
     @Environment(\.dslRuntime) private var rt
     @Environment(\.formToolbarAccessory) private var formToolbarAccessory
+    /// Mac: Esc・⌘W・アプリの切り替えの前に入力の有無を見るための控え(iOS は nil)
+    @Environment(\.openForms) private var openForms
     let route: Route
     @State private var form: FormDraft?
     @State private var locals = ScreenLocals()
@@ -22,13 +24,13 @@ public struct ScreenView: View {
                 .modifier(FormSaveBar(screen: screen, ctx: ctx)) // saveRecord は画面下の固定バーへ(#89)
                 .modifier(PublicFormNotice(screen: screen)) // #253 公開の entity のフォームに「誰でも見られます」
                 .navigationTitle(screen.title)
-                .navigationBarTitleDisplayMode(.inline)
+                .inlineNavigationTitle()
                 .toolbar {
                     // フォーム画面はホストの FAB を隠す代わりに、ナビバー右上(DSL のボタンより左)に小さな入口を置く(#83)
                     if screen.entity != nil, let accessory = formToolbarAccessory {
-                        ToolbarItem(placement: .topBarTrailing) { accessory }
+                        ToolbarItem(placement: .platformTrailing) { accessory }
                     }
-                    ToolbarItemGroup(placement: .topBarTrailing) {
+                    ToolbarItemGroup(placement: .platformTrailing) {
                         // 同じフォームを開く button がある画面では右上の＋を出さない(#416)
                         ForEach(DuplicateAddControl.toolbar(of: screen, in: rt.dsl).filter { tb in !FormSaveBar.pinned(in: screen).contains { $0.id == tb.id } && ButtonLeaf.isVisible(action: tb.action, form: form) }) { tb in
                             Button {
@@ -36,13 +38,17 @@ public struct ScreenView: View {
                             } label: {
                                 if let icon = tb.icon { Label(tb.label, systemImage: icon) } else { Text(tb.label) }
                             }
+                            .macIconButtonHelp(tb.label, hoverHighlight: false) // Mac のツールバーはアイコンだけになる(#1335)
                         }
                     }
-                    // 数値キーパッドには return が無いので、全入力共通でキーボード上に「完了」を出す(#143)
+                    // 数値キーパッドには return が無いので、全入力共通でキーボード上に「完了」を出す(#143)。
+                    // Mac はソフトキーボードが無い(.keyboard は Touch Bar に出てしまう)ので出さない(#1337)
+                    #if os(iOS)
                     ToolbarItemGroup(placement: .keyboard) {
                         Spacer()
                         Button(L("完了")) { KeyboardState.dismiss() }.fontWeight(.semibold)
                     }
+                    #endif
                     if route.stack == "sheet" || route.stack == "full", (rt.paths[route.stack] ?? []).isEmpty {
                         SheetCloseToolbarItem {
                             if hasUnsavedInput { confirmDiscard = true } else { rt.close(route) }
@@ -50,11 +56,11 @@ public struct ScreenView: View {
                     }
                     // M10: 積まれたフォームに入力があれば、標準の戻るの代わりに確認付きの戻るを出す
                     if guardsBack {
-                        ToolbarItem(placement: .topBarLeading) {
+                        ToolbarItem(placement: .platformLeading) {
                             Button { confirmDiscard = true } label: {
                                 Image(systemName: "chevron.backward").fontWeight(.semibold)
                             }
-                            .accessibilityLabel(L("戻る"))
+                            .iconButtonLabel(L("戻る"), hoverHighlight: false)
                             .accessibilityIdentifier("form.back")
                         }
                     }
@@ -63,12 +69,7 @@ public struct ScreenView: View {
                 .navigationBarBackButtonHidden(guardsBack)
                 // M10: シートのフォームに入力があれば、下に払って閉じない(「閉じる」で破棄を確認する)
                 .interactiveDismissDisabled(hasUnsavedInput)
-                .confirmationDialog(L("編集内容を破棄しますか?"), isPresented: $confirmDiscard, titleVisibility: .visible) {
-                    Button(L("破棄"), role: .destructive) { rt.close(route) }
-                    Button(L("編集を続ける"), role: .cancel) {}
-                } message: {
-                    Text(L("保存していない入力は失われます。"))
-                }
+                .discardFormConfirmation(isPresented: $confirmDiscard) { rt.close(route) }
                 .task(id: route) {
                     // 新規フォームは読み込みを待たずに用意する(FormPrefill は数秒で失効するため、通信待ちで落とさない)
                     if route.recordId == nil { setUpForm(screen) } // single(#267)は読み込み後に既存の 1 件へ差し替わる
@@ -108,13 +109,19 @@ public struct ScreenView: View {
     /// `screen.entity` があればドラフトを用意。recordId 付きなら既存レコードをロード(編集モード)。
     private func setUpForm(_ screen: Screen) {
         guard let entityId = screen.entity, let entity = rt.dsl.entity(entityId) else {
-            form = nil
+            replaceForm(with: nil)
             return
         }
         let record = Self.formRecord(entity: entity, recordId: route.recordId, records: rt.records(for: entityId))
         if form == nil || form?.entity.id != entityId || form?.recordId != record?.id {
-            form = Self.makeDraft(entity: entity, record: record, rt: rt)
+            replaceForm(with: Self.makeDraft(entity: entity, record: record, rt: rt))
         }
+    }
+
+    private func replaceForm(with next: FormDraft?) {
+        if let form, form !== next { openForms?.untrack(form) }
+        form = next
+        if let next { openForms?.track(next, at: route) }
     }
 
     /// フォームが編集するレコード。single の entity(#267)は recordId によらず、その 1 件(無ければ nil = 初期値の新規)。

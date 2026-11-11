@@ -71,7 +71,7 @@ func main() {
 		appconfig.WithTextFilter(textMode), usage(st, logger), appconfig.WithCalls(cl))
 	entitlement.Register(api, ents) // Pro (#314)
 	coinsapi.Register(api, cs)      // coins (#630)
-	handler := newHandler(authed, logger, api, appconfig.SharePage(st), appStoreNotifications(ents, logger), coinsapi.Public(cs.Config), calls.Public(cl))
+	handler := newHandler(authed, logger, api, appconfig.SharePage(st), appconfig.MountAccountDeletePage, appStoreNotifications(ents, logger), coinsapi.Public(cs.Config), calls.Public(cl))
 	server := &http.Server{
 		Handler:           handler,
 		ReadHeaderTimeout: 10 * time.Second,
@@ -136,7 +136,7 @@ func newVerifier(ctx context.Context, mode, project string, logger *slog.Logger)
 }
 
 // newAppCheck returns the App Check middleware (#318) for the authenticated
-// API only: /health, /s/{token} and /v1/client-config (needed to tell old
+// API only: /health, /s/{token}, /account/delete and /v1/client-config (needed to tell old
 // builds to update) stay open. APP_CHECK_MODE=off (default) | log | enforce,
 // APP_CHECK_APP_IDS optional. docs/infra/app-check.md
 func newAppCheck(ctx context.Context, project string, logger *slog.Logger) func(http.Handler) http.Handler {

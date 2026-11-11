@@ -100,7 +100,7 @@ struct LocationPickerSheet: View {
                 if query.trimmingCharacters(in: .whitespaces).isEmpty { mapArea } else { resultList }
             }
             .navigationTitle(title)
-            .navigationBarTitleDisplayMode(.inline)
+            .inlineNavigationTitle()
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button(L("キャンセル")) { dismiss() }
@@ -130,7 +130,7 @@ struct LocationPickerSheet: View {
                 .accessibilityIdentifier("locationPicker.search")
             if !query.isEmpty {
                 Button { query = "" } label: { Image(systemName: "xmark.circle.fill").foregroundStyle(.secondary) }
-                    .accessibilityLabel(L("検索を消す"))
+                    .iconButtonLabel(L("検索を消す"))
             }
         }
         .padding(10)
@@ -220,7 +220,10 @@ struct LocationPickerSheet: View {
         if PlacePicking.isMock {
             here = PlacePicking.mockHere.coordinate
         } else {
-            do { here = try await OneShotLocation().request().coordinate } catch {
+            do { here = try await OneShotLocation().request().coordinate } catch is OneShotLocation.LocationError {
+                self.error = LocationPermissionCopy.notAllowed
+                return
+            } catch {
                 self.error = L("位置情報を取得できませんでした(\(error.localizedDescription))")
                 return
             }

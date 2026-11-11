@@ -11,6 +11,14 @@ public enum NearbyShare {
     public static let maxSendRecords = 50
     /// 受信側が取り込む最大件数(壊れた/悪意ある相手から大量に入れられないように)。
     public static let maxReceiveRecords = 200
+    /// 送るデータ(JSON)の上限。超える分は古い方から落とす。
+    public static let maxSendBytes = 512 * 1024
+    /// 受け取るデータの上限(送る側の上限 + 余裕)。超えたら読まずに捨てる。
+    public static let maxReceiveBytes = 1024 * 1024
+    /// 招待に載る Header の上限。
+    public static let maxHeaderBytes = 16 * 1024
+    /// 受け取りの結果(Ack)の上限。
+    public static let maxAckBytes = 4 * 1024
 
     public struct FieldSignature: Codable, Hashable, Sendable {
         public var id: String
@@ -60,6 +68,57 @@ public enum NearbyShare {
         public var header: Header
         public var records: [[String: JSONValue]]
     }
+}
+
+extension NearbyShare.Header {
+    /// 受け取った Header を上限に揃える。id・項目一覧が長すぎるものは nil。名前は切り詰め、空なら `NearbyLimits.anonymousName`。
+    public func validated() -> Self? {
+        guard NearbyLimits.isValidId(appId), NearbyLimits.isValidId(entityId), fields.count <= NearbyLimits.maxFields,
+              fields.allSatisfy({ NearbyLimits.isValidId($0.id) && NearbyLimits.isValidId($0.type) }) else { return nil }
+        var h = self
+        h.sender = NearbyLimits.publicName(sender, anonymous: false)
+        h.appName = NearbyLimits.clip(appName, NearbyLimits.maxLabelLength)
+        h.entityName = NearbyLimits.clip(entityName, NearbyLimits.maxLabelLength)
+        h.count = Swift.min(Swift.max(count, 0), NearbyShare.maxReceiveRecords)
+        return h
+    }
+}
+
+/// 近距離共有・すれ違い通信で受け取る値の上限と、相手に見せる名前(Android の `NearbyLimits` と同じ値)。
+public enum NearbyLimits {
+    /// 表示名の上限(文字数・MCPeerID の displayName は UTF-8 で 63 バイトまで)。
+    public static let maxNameLength = 63
+    /// senderId・記録の id・appId・entityId・項目 id の上限(文字数)。
+    public static let maxIdLength = 128
+    /// アプリ名・entity 名の上限(文字数)。
+    public static let maxLabelLength = 100
+    /// 受け取りの結果メッセージの上限(文字数)。
+    public static let maxMessageLength = 200
+    /// Header の項目一覧の上限(件数)。
+    public static let maxFields = 200
+    /// 名前を出さない時に表示名の代わりに送る決まった文言(言語に依らず同じ値を送り、表示する側で訳す)。
+    public static let anonymousName = "近くの人"
+
+    public static func clip(_ s: String, _ max: Int) -> String {
+        String(s.trimmingCharacters(in: .whitespacesAndNewlines).prefix(max))
+    }
+
+    public static func isValidId(_ s: String) -> Bool { !s.isEmpty && s.count <= maxIdLength }
+
+    /// 相手に送る名前。匿名・空なら `anonymousName`。
+    public static func publicName(_ name: String, anonymous: Bool) -> String {
+        let n = clip(name, maxNameLength)
+        return anonymous || n.isEmpty ? anonymousName : n
+    }
+
+    /// 受け取った名前を画面に出す形に(匿名の印は今の言語の「近くの人」に)。
+    public static func displayName(_ received: String) -> String {
+        let n = clip(received, maxNameLength)
+        return n.isEmpty || n == anonymousName ? L("近くの人") : n
+    }
+}
+
+extension NearbyShare {
 
     /// 受信側 → 送信側の結果。
     public struct Ack: Codable, Equatable, Sendable {
@@ -90,8 +149,13 @@ public enum NearbyShare {
             let kept = data.filter { stored.contains($0.key) && !$0.value.isNull }
             return kept.isEmpty ? nil : kept
         }
-        return Payload(header: Header(sender: sender, appId: appId, appName: appName, entity: entity, count: rows.count),
-                       records: Array(rows))
+        var p = Payload(header: Header(sender: sender, appId: appId, appName: appName, entity: entity, count: rows.count),
+                        records: Array(rows))
+        while !p.records.isEmpty, ((try? encode(p).count) ?? .max) > maxSendBytes {
+            p.records.removeLast()
+            p.header.count = p.records.count
+        }
+        return p
     }
 
     /// 一覧画面で送る範囲: 新しい順(createdAt 降順・無ければ元の順)に最大 `maxSendRecords` 件。
@@ -104,6 +168,28 @@ public enum NearbyShare {
     }
 
     // MARK: - 受信
+
+    /// 招待の context を読む。大きすぎる・上限を超える Header は nil(招待を断る)。
+    public static func decodeHeader(_ data: Data) -> Header? {
+        guard data.count <= maxHeaderBytes else { return nil }
+        return (try? decode(Header.self, from: data))?.validated()
+    }
+
+    /// 届いた Payload を読む。全体のバイト数を先に確かめ、上限を超えたら読まずに捨てる。
+    public static func decodePayload(_ data: Data) -> Payload? {
+        guard data.count <= maxReceiveBytes, var p = try? decode(Payload.self, from: data),
+              let header = p.header.validated(), p.records.count <= maxReceiveRecords else { return nil }
+        p.header = header
+        return p
+    }
+
+    /// 送信側が受け取る Ack を読む。
+    public static func decodeAck(_ data: Data) -> Ack? {
+        guard data.count <= maxAckBytes, var ack = try? decode(Ack.self, from: data) else { return nil }
+        ack.added = Swift.min(Swift.max(ack.added, 0), maxReceiveRecords)
+        ack.message = ack.message.map { NearbyLimits.clip($0, NearbyLimits.maxMessageLength) }
+        return ack
+    }
 
     /// 受け取れるか。同じ appId なら entity id が在れば OK。別アプリなら entity id と保存フィールド(id+型)の集合が一致する時だけ。
     public static func decide(_ header: Header, dsl: AppDSL, appId: String) -> Decision {

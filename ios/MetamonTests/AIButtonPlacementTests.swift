@@ -126,6 +126,17 @@ final class AIButtonPlacementTests: XCTestCase {
         XCTAssertNotEqual(ScreenMapCopy.chipText(part), ScreenMapCopy.chipText(screen))
     }
 
+    /// Mac の部品の「この部品について話す」(#1323)も、iOS の部品のシートと同じ文脈・同じ文言の先頭になる
+    func testComponentTalkTargetBuildsSameContext() throws {
+        let dsl = try runtime().dsl
+        let part = AIButtonComponent(id: "where", label: "場所")
+        let screen = ScreenContext(ComponentTalk.Target(route: Route(screen: "detail", stack: "sheet"), component: part), dsl: dsl)
+        XCTAssertEqual(screen, ScreenContext(id: "detail", title: "詳細", component: part))
+        let (title, id, label, cid) = ("詳細", "detail", "場所", "where")
+        XCTAssertEqual(ScreenMapCopy.contextPrefix(screen), L10n.tr("画面「\(title)」(id: \(id))の部品「\(label)」(id: \(cid))で: "))
+        XCTAssertFalse(ScreenMapCopy.talkAboutComponent.isEmpty)
+    }
+
     func testComponentLabelFallsBack() throws {
         let json = #"[{"id":"a","type":"locationPicker","label":"行き先"},{"id":"b","type":"musicPlayer","title":"BGM"},{"id":"c","type":"dashcam"}]"#
         let comps = try JSONDecoder().decode([Component].self, from: Data(json.utf8))

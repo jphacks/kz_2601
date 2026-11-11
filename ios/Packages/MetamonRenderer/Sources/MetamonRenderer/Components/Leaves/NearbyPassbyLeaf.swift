@@ -4,7 +4,8 @@ import SwiftUI
 import MetamonDSL
 
 /// `nearbyShare` mode:passby(すれ違い通信・#425)。オンの間、この画面を開いていて前面にいる時だけ近くの同じアプリの人と
-/// `fields` の項目を自動で交換し、会った人と日時を並べる。初回オンの前に同意を取る。通信はホスト(`NearbyPassbyHost.controller`)。
+/// `fields` の項目を自動で交換し、会った人と日時を並べる。初回オンの前に同意を取る(相手に渡る表示名と項目を見せ、匿名も選べる)。
+/// 通信はホスト(`NearbyPassbyHost.controller`)。
 struct NearbyPassbyLeaf: View {
     @Environment(\.dslRuntime) private var runtime
     @Environment(\.scenePhase) private var scenePhase
@@ -45,14 +46,11 @@ struct NearbyPassbyLeaf: View {
             if scenePhase == .background { host.detach(config) } else { host.attach(config) }
         }
         .onDisappear { host.detach(config) }
-        .alert(L("すれ違い通信をはじめますか？"), isPresented: $askConsent) {
-            Button(L("同意してはじめる")) {
-                host.agree()
+        .sheet(isPresented: $askConsent) {
+            PassbyConsentSheet(displayName: host.displayName, anonymous: host.isAnonymous, fieldNames: fieldNames) { anonymous in
+                host.agree(anonymous: anonymous)
                 host.setOptIn(true, config: config)
             }
-            Button(L("やめる"), role: .cancel) {}
-        } message: {
-            Text(NearbyPassby.consentText(fieldNames: fieldNames))
         }
     }
 
@@ -83,6 +81,18 @@ struct NearbyPassbyLeaf: View {
                 .foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
         }
+        if (host.consentedVersion ?? 0) >= NearbyPassby.consentVersion {
+            Toggle(isOn: Binding(get: { host.isAnonymous }, set: { host.setAnonymous($0) })) {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(L("名前を出さない")).font(.subheadline)
+                    Text(L("相手に見える名前: \(NearbyLimits.displayName(host.publicName))"))
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .lineLimit(1)
+                }
+            }
+            .accessibilityIdentifier("passby.anonymous.\(config.componentId)")
+        }
         Label(L("画面を閉じる・アプリを裏に回すと止まります(iOS の制約)"), systemImage: "info.circle")
             .font(.caption)
             .foregroundStyle(.secondary)
@@ -111,7 +121,7 @@ struct NearbyPassbyLeaf: View {
                         .opacity(peer.azimuth == nil ? 0.3 : 1)
                         .foregroundStyle(RenderTheme.Colors.brandA)
                         .accessibilityHidden(true)
-                    Text(peer.name).font(.subheadline.weight(.semibold)).lineLimit(1)
+                    Text(NearbyLimits.displayName(peer.name)).font(.subheadline.weight(.semibold)).lineLimit(1)
                     Spacer()
                     Text(peer.distance.map(NearbyPassby.distanceText) ?? L("測定中"))
                         .font(.subheadline.monospacedDigit())
@@ -137,7 +147,7 @@ struct NearbyPassbyLeaf: View {
                         HStack {
                             Image(systemName: "person.crop.circle").foregroundStyle(.secondary).accessibilityHidden(true)
                             VStack(alignment: .leading, spacing: 2) {
-                                Text(e.name).font(.subheadline.weight(.semibold)).lineLimit(1)
+                                Text(NearbyLimits.displayName(e.name)).font(.subheadline.weight(.semibold)).lineLimit(1)
                                 Text(e.lastMet.formatted(.dateTime.month().day().hour().minute()))
                                     .font(.caption).foregroundStyle(.secondary)
                             }
@@ -150,6 +160,71 @@ struct NearbyPassbyLeaf: View {
             }
             .accessibilityIdentifier("passby.encounters")
         }
+    }
+}
+/// すれ違い通信の同意。相手に渡るもの(表示名・項目)を並べ、名前を出さない(匿名)を選べる。
+struct PassbyConsentSheet: View {
+    @Environment(\.dismiss) private var dismiss
+    let displayName: String
+    @State var anonymous: Bool
+    let fieldNames: [String]
+    let onAgree: (Bool) -> Void
+
+    init(displayName: String, anonymous: Bool, fieldNames: [String], onAgree: @escaping (Bool) -> Void) {
+        self.displayName = displayName
+        _anonymous = State(initialValue: anonymous)
+        self.fieldNames = fieldNames
+        self.onAgree = onAgree
+    }
+
+    /// 相手に渡る名前(画面の言語で)
+    private var shownName: String { NearbyLimits.displayName(NearbyLimits.publicName(displayName, anonymous: anonymous)) }
+
+    var body: some View {
+        NavigationStack {
+            Form {
+                Section {
+                    LabeledContent(L("表示名"), value: shownName)
+                        .accessibilityElement(children: .combine)
+                        .accessibilityIdentifier("passby.consent.name")
+                    if fieldNames.isEmpty {
+                        Text(L("送る項目がありません")).foregroundStyle(.secondary)
+                    } else {
+                        ForEach(fieldNames, id: \.self) { name in
+                            Label(name, systemImage: "checkmark.circle")
+                        }
+                    }
+                } header: {
+                    Text(L("相手に渡るもの"))
+                }
+                Section {
+                    Toggle(L("名前を出さない"), isOn: $anonymous)
+                        .accessibilityIdentifier("passby.consent.anonymous")
+                } footer: {
+                    Text(L("オンにすると、表示名の代わりに「近くの人」と渡します。"))
+                }
+                Section {
+                    Text(NearbyPassby.consentText(fieldNames: fieldNames, name: shownName))
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
+                }
+            }
+            .navigationTitle(L("すれ違い通信をはじめますか？"))
+            .inlineNavigationTitle() // Mac でも組める(#1295)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button(L("やめる")) { dismiss() }
+                }
+                ToolbarItem(placement: .confirmationAction) {
+                    Button(L("同意してはじめる")) {
+                        onAgree(anonymous)
+                        dismiss()
+                    }
+                    .accessibilityIdentifier("passby.consent.agree")
+                }
+            }
+        }
+        .presentationDetents([.medium, .large])
     }
 }
 #endif

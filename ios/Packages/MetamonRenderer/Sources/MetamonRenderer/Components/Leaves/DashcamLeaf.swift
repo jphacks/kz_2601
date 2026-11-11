@@ -5,6 +5,17 @@ import AVFoundation
 import AVKit
 import MetamonDSL
 
+#if os(macOS)
+/// Mac: ドラレコは使えない(持ち歩かない・加速度センサーが無い。mac-001 の決定・mac-037)。
+struct DashcamLeaf: View {
+    let c: Component
+    let ctx: RenderContext
+
+    var body: some View {
+        MacUnavailableView(feature: c.title ?? L("ドラレコ")).renderCard()
+    }
+}
+#else
 /// `dashcam`(#410): 背面カメラのプレビュー + 録画の開始/停止 + 保存した映像の一覧。
 /// 1 分ごとの区間で録画し、直近 `keepMinutes` 分だけ残す(ループ)。衝撃・「今の映像を保存」で前後を保存済みにする。
 /// `autoStart` の条件が続いたら自動で開始。録画中は画面のスリープを止める。
@@ -264,7 +275,7 @@ private struct DashcamClipsSheet: View {
                 }
             }
             .navigationTitle(L("保存した映像"))
-            .navigationBarTitleDisplayMode(.inline)
+            .inlineNavigationTitle()
             .toolbar { SheetCloseToolbarItem { dismiss() } }
             .aiButtonLayer()
         }
@@ -301,7 +312,7 @@ private struct DashcamClipView: View {
         .padding()
         .navigationTitle(clip.start.formatted(date: .omitted, time: .standard))
         .toolbar {
-            ToolbarItem(placement: .topBarTrailing) {
+            ToolbarItem(placement: .platformTrailing) {
                 Button(L("削除"), systemImage: "trash", role: .destructive) {
                     recorder.delete(clip)
                     dismiss()
@@ -312,4 +323,5 @@ private struct DashcamClipView: View {
         .onDisappear { player?.pause() }
     }
 }
+#endif // os(macOS)
 #endif

@@ -28,12 +28,17 @@ var (
 	installationIDRe = regexp.MustCompile(`^[A-Za-z0-9_-]{8,64}$`)
 	// APNs tokens are 32 bytes today; Apple says the length may grow.
 	deviceTokenRe = regexp.MustCompile(`^(?:[0-9a-f]{2}){32,100}$`)
+	// FCM registration tokens are opaque (about 150-200 characters today,
+	// case-sensitive); only the characters FCM uses are accepted.
+	fcmTokenRe = regexp.MustCompile(`^[A-Za-z0-9_:.-]{32,1000}$`)
 )
 
 const maxDeviceText = 32 // runes of appVersion / os
 
 type deviceIn struct {
-	Token       string `json:"token"`
+	Token string `json:"token"`
+	// Platform: ios (default, APNs) / android (FCM, #918).
+	Platform    string `json:"platform"`
 	Environment string `json:"environment"`
 	AppVersion  string `json:"appVersion"`
 	OS          string `json:"os"`
@@ -52,11 +57,27 @@ func badDevice(field, msg string) error {
 }
 
 func deviceFrom(id string, in deviceIn) (store.Device, error) {
-	d := store.Device{InstallationID: id, Token: strings.ToLower(strings.TrimSpace(in.Token)),
+	d := store.Device{InstallationID: id, Platform: in.Platform, Token: strings.TrimSpace(in.Token),
 		Environment: in.Environment, AppVersion: strings.TrimSpace(in.AppVersion), OS: strings.TrimSpace(in.OS)}
+	switch d.Platform {
+	case "", store.PlatformIOS:
+		d.Platform = store.PlatformIOS
+		d.Token = strings.ToLower(d.Token)
+		if !deviceTokenRe.MatchString(d.Token) {
+			return d, badDevice("token", "token must be an APNs device token (hex)")
+		}
+	case store.PlatformAndroid:
+		// FCM tokens are case-sensitive: kept as sent.
+		if !fcmTokenRe.MatchString(d.Token) {
+			return d, badDevice("token", "token must be an FCM registration token")
+		}
+		if d.Environment == "" {
+			d.Environment = store.DeviceProduction // not used to filter Android tokens
+		}
+	default:
+		return d, badDevice("platform", "platform must be ios or android")
+	}
 	switch {
-	case !deviceTokenRe.MatchString(d.Token):
-		return d, badDevice("token", "token must be an APNs device token (hex)")
 	case d.Environment != store.DeviceSandbox && d.Environment != store.DeviceProduction:
 		return d, badDevice("environment", "environment must be sandbox or production")
 	case tooLong(d.AppVersion, maxDeviceText):
@@ -90,7 +111,7 @@ func (h *Handler) putDevice(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	// never log the token
-	slog.Info("appconfig: device registered", slog.String("environment", out.Environment))
+	slog.Info("appconfig: device registered", slog.String("platform", out.Platform), slog.String("environment", out.Environment))
 	httpx.WriteJSON(w, http.StatusOK, out)
 }
 

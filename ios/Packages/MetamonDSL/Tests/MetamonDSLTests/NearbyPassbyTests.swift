@@ -138,9 +138,50 @@ final class NearbyPassbyTests: XCTestCase {
         XCTAssertEqual(NearbyPassby.toggle(on: true, consentedVersion: 0), .askConsent)
         XCTAssertEqual(NearbyPassby.toggle(on: true, consentedVersion: NearbyPassby.consentVersion), .start)
         XCTAssertEqual(NearbyPassby.toggle(on: false, consentedVersion: nil), .stop)
-        let text = NearbyPassby.consentText(fieldNames: ["名前", "趣味"])
+        XCTAssertEqual(NearbyPassby.toggle(on: true, consentedVersion: 1), .askConsent, "同意文が変わったら同意を取り直す")
+        let text = NearbyPassby.consentText(fieldNames: ["名前", "趣味"], name: "太郎")
         XCTAssertTrue(text.contains("「名前」「趣味」"))
+        XCTAssertTrue(text.contains("表示名: 太郎"), "相手に渡る名前を見せる")
         XCTAssertTrue(text.contains("裏に回すと止まります"))
+        XCTAssertTrue(NearbyPassby.consentText(fieldNames: [], name: "近くの人").contains("送る項目がありません"))
+    }
+
+    func testAnonymousSendsFixedName() {
+        XCTAssertEqual(NearbyLimits.publicName("山田太郎", anonymous: true), NearbyLimits.anonymousName)
+        XCTAssertEqual(NearbyLimits.publicName("  山田太郎 ", anonymous: false), "山田太郎")
+        XCTAssertEqual(NearbyLimits.publicName("   ", anonymous: false), NearbyLimits.anonymousName, "空の名前も匿名と同じ")
+        XCTAssertEqual(NearbyLimits.publicName(String(repeating: "あ", count: 100), anonymous: false).count, NearbyLimits.maxNameLength)
+        XCTAssertEqual(NearbyLimits.displayName(NearbyLimits.anonymousName), "近くの人")
+        setAppLanguage("en")
+        XCTAssertEqual(NearbyLimits.displayName(NearbyLimits.anonymousName), "Someone nearby", "匿名の印は見る側の言語で出す")
+        XCTAssertEqual(NearbyLimits.displayName("Taro"), "Taro")
+    }
+
+    func testReceiveLimits() throws {
+        let hello = NearbyPassby.Hello(app: NearbyPassby.appTag("a"), senderId: "s1", name: String(repeating: "名", count: 200))
+        XCTAssertEqual(NearbyPassby.decodeHello(try NearbyPassby.encode(hello))?.name.count, NearbyLimits.maxNameLength, "名前は切り詰める")
+        let longId = NearbyPassby.Hello(app: "x", senderId: String(repeating: "s", count: NearbyLimits.maxIdLength + 1), name: "n")
+        XCTAssertNil(NearbyPassby.decodeHello(try NearbyPassby.encode(longId)), "senderId が長すぎる招待は断る")
+        XCTAssertNil(NearbyPassby.decodeHello(Data(repeating: 0x20, count: NearbyPassby.maxHelloBytes + 1)), "大きすぎる招待は読まない")
+        let empty = NearbyPassby.Hello(app: "x", senderId: "", name: "n")
+        XCTAssertNil(NearbyPassby.decodeHello(try NearbyPassby.encode(empty)))
+
+        let p = NearbyPassby.Payload(v: 1, senderId: "s2", name: "  ", entityId: "profile", records: [.init(id: "r", data: ["name": "a"])])
+        XCTAssertEqual(p.validated()?.name, NearbyLimits.anonymousName)
+        var many = p
+        many.records = (0...NearbyPassby.maxRecords).map { .init(id: "r\($0)", data: ["name": "a"]) }
+        XCTAssertNil(many.validated(), "送る側の上限を超える件数は捨てる")
+        var badSender = p
+        badSender.senderId = String(repeating: "s", count: NearbyLimits.maxIdLength + 1)
+        XCTAssertNil(badSender.validated())
+        XCTAssertGreaterThan(NearbyPassby.maxReceiveBytes, NearbyPassby.maxBytes, "受け取る上限は送る上限より大きい")
+
+        let (_, entity, config) = try fixture()
+        let longIds = NearbyPassby.Payload(v: 1, senderId: "s2", name: "n", entityId: "profile", records: [
+            .init(id: String(repeating: "r", count: NearbyLimits.maxIdLength + 1), data: ["name": "長い id"]),
+            .init(id: "ok", data: ["name": "普通"]),
+        ])
+        XCTAssertEqual(NearbyPassby.sanitize(longIds, into: entity, config: config).map(\.id), ["ok"], "記録の id が長すぎるものは捨てる")
     }
 
     func testAppTagAndFormatting() {

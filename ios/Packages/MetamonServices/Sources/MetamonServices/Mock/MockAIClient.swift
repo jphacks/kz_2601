@@ -39,7 +39,14 @@ public struct MockAIClient: AIClient {
         // モックは mode を知らないので推定(同梱例を version 0 で起動した直後の改変も拾う)
         let looksLikeEdit = currentVersion > 0 || (!transcript.contains("アプリ") && !transcript.contains("。"))
         let summary = looksLikeEdit && name != "initial" ? "「\(transcript)」を反映しました(モック)" : "「\(doc.dsl.app.name)」を用意しました(モック)"
-        return MorphResult(document: doc, summary: summary, mode: "full")
+        return MorphResult(document: doc, summary: summary, mode: "full",
+                           envelope: Self.envelope(example: name, appId: appId, version: doc.version))
+    }
+
+    /// 同梱の例の JSON を封筒に包む(本物の `/v1/generate` の結果と同じく、端末に残せる形)
+    static func envelope(example name: String, appId: String, version: Int, bundle: Bundle = .main) -> Data? {
+        guard let url = bundle.url(forResource: name, withExtension: "json"), let data = try? Data(contentsOf: url) else { return nil }
+        return DocumentEnvelope.make(appId: appId, version: version, dsl: data)
     }
 
     /// 対話のモック(状態は持たず、iOS が毎回送る全履歴だけで決める)。

@@ -1,5 +1,9 @@
 import Foundation
+#if canImport(UIKit)
 import UIKit
+#else
+import AppKit
+#endif
 import MapKit
 import CoreLocation
 import AVFoundation
@@ -69,7 +73,9 @@ final class RouteGuideSession {
         synthesizer.stopSpeaking(at: .immediate)
         keepScreenOn(false)
         if isActive { phase = .idle }
+        #if os(iOS)
         try? AVAudioSession.sharedInstance().setActive(false, options: .notifyOthersOnDeactivation)
+        #endif
     }
 
     /// 車 / 徒歩の切り替え。案内中なら今の位置から引き直す。
@@ -132,7 +138,7 @@ final class RouteGuideSession {
 
     /// MKPlacemark は iOS 26 で非推奨。iOS 26 以降は init(location:address:) を使う。
     private static func mapItem(_ c: RouteGuidance.Coord) -> MKMapItem {
-        if #available(iOS 26.0, *) {
+        if #available(iOS 26.0, macOS 26.0, *) {
             return MKMapItem(location: CLLocation(latitude: c.lat, longitude: c.lng), address: nil)
         }
         return MKMapItem(placemark: MKPlacemark(coordinate: CLLocationCoordinate2D(latitude: c.lat, longitude: c.lng)))
@@ -207,11 +213,13 @@ final class RouteGuideSession {
         let text = Self.text(cue)
         lastCue = text
         guard voiceOn else { return }
+        #if os(iOS)
         let session = AVAudioSession.sharedInstance()
         if session.category != .playback || session.mode != .voicePrompt {
             try? session.setCategory(.playback, mode: .voicePrompt, options: [.duckOthers, .interruptSpokenAudioAndMixWithOthers])
         }
         try? session.setActive(true)
+        #endif
         if synthesizer.isSpeaking { synthesizer.stopSpeaking(at: .word) }
         let u = AVSpeechUtterance(string: text)
         u.voice = AVSpeechSynthesisVoice(language: LanguagePreference.shared.code == "en" ? "en-US" : "ja-JP")

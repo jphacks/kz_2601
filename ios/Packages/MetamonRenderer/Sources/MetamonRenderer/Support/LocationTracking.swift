@@ -42,10 +42,20 @@ final class LocationTracking: NSObject {
     private var lastKept: Track.Point?
     private var updatesTask: Task<Void, Never>?
     private var stopTask: Task<Void, Never>?
+    #if os(iOS)
     private var backgroundSession: CLBackgroundActivitySession?
+    #endif
     private var save: (@MainActor ([String: JSONValue]) async -> Bool)?
     private let manager = CLLocationManager()
     private var authContinuation: CheckedContinuation<CLAuthorizationStatus, Never>?
+
+    static func isAuthorized(_ status: CLAuthorizationStatus) -> Bool {
+        #if os(iOS)
+        status == .authorizedWhenInUse || status == .authorizedAlways
+        #else
+        status == .authorizedAlways
+        #endif
+    }
 
     static var isMock: Bool { ProcessInfo.processInfo.environment["METAMON_MOCK"] == "1" }
 
@@ -71,7 +81,7 @@ final class LocationTracking: NSObject {
                 return
             }
             let status = await authorize()
-            guard status == .authorizedWhenInUse || status == .authorizedAlways else {
+            guard Self.isAuthorized(status) else {
                 finish(.denied, message: nil)
                 return
             }
@@ -92,7 +102,9 @@ final class LocationTracking: NSObject {
         endsAt = now.addingTimeInterval(TimeInterval(seconds))
         phase = .recording
         // 前面にいる今のうちに作る(背面からは作れない)。生きている間だけ背面でも位置が届き、青いインジケータが出る
+        #if os(iOS)
         if !Self.isMock { backgroundSession = CLBackgroundActivitySession() }
+        #endif
         stopTask = Task { [weak self] in
             try? await Task.sleep(for: .seconds(seconds))
             guard !Task.isCancelled else { return }
@@ -105,8 +117,10 @@ final class LocationTracking: NSObject {
         updatesTask = nil
         stopTask?.cancel()
         stopTask = nil
+        #if os(iOS)
         backgroundSession?.invalidate()
         backgroundSession = nil
+        #endif
         save = nil
         if phase != .idle || message != nil { lastStopMessage = message }
         self.phase = phase
@@ -117,7 +131,7 @@ final class LocationTracking: NSObject {
         do {
             for try await update in CLLocationUpdate.liveUpdates(.fitness) {
                 if Task.isCancelled { return }
-                if #available(iOS 18, *), update.authorizationDenied || update.authorizationDeniedGlobally {
+                if #available(iOS 18, macOS 15, *), update.authorizationDenied || update.authorizationDeniedGlobally {
                     finish(.denied, message: nil)
                     return
                 }

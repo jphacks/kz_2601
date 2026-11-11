@@ -107,6 +107,29 @@ internal object AlignSerializer : LenientEnumSerializer<Align>(
     Align.UNKNOWN,
 )
 
+@Serializable(with = AppSerializer::class)
+enum class App(val wire: String) {
+    PAYPAY("paypay"),
+    LINE("line"),
+    SLACK("slack"),
+    DISCORD("discord"),
+    X("x"),
+    INSTAGRAM("instagram"),
+    MAPS("maps"),
+    MAIL("mail"),
+    PHONE("phone"),
+
+    /** 知らない値(新しい版)。 */
+    UNKNOWN(""),
+}
+
+internal object AppSerializer : LenientEnumSerializer<App>(
+    "jp.kz2601.metamon.dsl.App",
+    App.entries,
+    App::wire,
+    App.UNKNOWN,
+)
+
 @Serializable(with = AutoStartSerializer::class)
 enum class AutoStart(val wire: String) {
     LANDSCAPE("landscape"),
@@ -920,6 +943,8 @@ enum class ShareTo(val wire: String) {
     LINE("line"),
     SLACK("slack"),
     DISCORD("discord"),
+    X("x"),
+    MAIL("mail"),
 
     /** 知らない値(新しい版)。 */
     UNKNOWN(""),

@@ -79,7 +79,16 @@ final class RegionLocationAccess: NSObject, CLLocationManagerDelegate {
 
     var isAuthorized: Bool {
         let s = manager.authorizationStatus
-        return s == .authorizedWhenInUse || s == .authorizedAlways
+        return Self.isGranted(s)
+    }
+
+    /// iOS: 使用中のみ / 常に。Mac は「使用中のみ」が無い。
+    nonisolated static func isGranted(_ s: CLAuthorizationStatus) -> Bool {
+        #if os(iOS)
+        s == .authorizedWhenInUse || s == .authorizedAlways
+        #else
+        s == .authorizedAlways
+        #endif
     }
 
     var isUndetermined: Bool { manager.authorizationStatus == .notDetermined }
@@ -102,7 +111,7 @@ final class RegionLocationAccess: NSObject, CLLocationManagerDelegate {
         let status = manager.authorizationStatus
         Task { @MainActor in
             guard status != .notDetermined, !waiters.isEmpty else { return }
-            let ok = status == .authorizedWhenInUse || status == .authorizedAlways
+            let ok = Self.isGranted(status)
             let w = waiters
             waiters = []
             w.forEach { $0.resume(returning: ok) }

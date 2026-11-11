@@ -21,7 +21,7 @@ enum AIAvailability: Equatable, Sendable {
         case appleIntelligenceNotEnabled
         /// モデルのダウンロード・準備中
         case modelNotReady
-        /// iOS 26 未満(FoundationModels が無い)
+        /// iOS 26 / macOS 26 未満(FoundationModels が無い)
         case osTooOld
         /// SDK が返した未知の理由
         case other
@@ -36,9 +36,17 @@ enum AIAvailability: Equatable, Sendable {
         guard case .unavailable(let reason) = self else { return nil }
         switch reason {
         case .deviceNotEligible: return L("Apple Intelligence に対応していない端末です")
+        #if os(macOS)
+        case .appleIntelligenceNotEnabled: return L("システム設定 > Apple Intelligence と Siri でオンにしてください")
+        #else
         case .appleIntelligenceNotEnabled: return L("設定 > Apple Intelligence と Siri でオンにしてください")
+        #endif
         case .modelNotReady: return L("AI モデルを準備中です。しばらくしてから再度お試しください")
+        #if os(macOS)
+        case .osTooOld: return L("macOS 26 以降が必要です")
+        #else
         case .osTooOld: return L("iOS 26 以降が必要です")
+        #endif
         case .other: return L("Apple Intelligence を利用できません")
         }
     }

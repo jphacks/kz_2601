@@ -1,4 +1,8 @@
+#if canImport(UIKit)
 import UIKit
+#else
+import AppKit
+#endif
 import PencilKit
 import Observation
 import MetamonDSL
@@ -11,34 +15,37 @@ public enum DrawingCodec {
     public static let maxSide: CGFloat = 800
 
     /// 描いた線 + 下絵(保存済みの絵に描き足す時)→ field の値。何も無ければ `.null`(field を空にする)。
-    public static func fieldValue(drawing: PKDrawing, background: UIImage?, canvasSize: CGSize) -> JSONValue {
+    public static func fieldValue(drawing: PKDrawing, background: PlatformImage?, canvasSize: CGSize) -> JSONValue {
         dataURL(drawing: drawing, background: background, canvasSize: canvasSize).map(JSONValue.string) ?? .null
     }
 
-    public static func dataURL(drawing: PKDrawing, background: UIImage?, canvasSize: CGSize) -> String? {
+    public static func dataURL(drawing: PKDrawing, background: PlatformImage?, canvasSize: CGSize) -> String? {
         guard let image = render(drawing: drawing, background: background, canvasSize: canvasSize) else { return nil }
         return PhotoCodec.dataURL(from: image, maxSide: maxSide, quality: quality)
     }
 
     /// キャンバスの見えている範囲をそのまま 1 枚に。下絵はキャンバスに収まるように(aspect fit)置く。
-    static func render(drawing: PKDrawing, background: UIImage?, canvasSize: CGSize) -> UIImage? {
+    static func render(drawing: PKDrawing, background: PlatformImage?, canvasSize: CGSize) -> PlatformImage? {
         guard !drawing.strokes.isEmpty || background != nil, canvasSize.width >= 1, canvasSize.height >= 1 else { return nil }
         let rect = CGRect(origin: .zero, size: canvasSize)
         // 長い辺が maxSide を少し超える倍率で描き、PhotoCodec が 800px に縮める(線がにじまない)
         let scale = min(3, max(1, (maxSide / max(canvasSize.width, canvasSize.height)).rounded(.up)))
         // インクの色はダークモードで反転するので、常にライトで描く(保存する絵は白地に黒)
-        var ink: UIImage?
+        var ink: PlatformImage?
+        #if canImport(UIKit)
         UITraitCollection(userInterfaceStyle: .light).performAsCurrent {
             ink = drawing.image(from: rect, scale: scale)
         }
-        let format = UIGraphicsImageRendererFormat.default()
-        format.scale = scale
-        format.opaque = true
-        return UIGraphicsImageRenderer(size: canvasSize, format: format).image { ctx in
-            UIColor.white.setFill()
+        #else
+        (NSAppearance(named: .aqua) ?? NSAppearance.currentDrawing()).performAsCurrentDrawingAppearance {
+            ink = drawing.image(from: rect, scale: scale)
+        }
+        #endif
+        return PlatformGraphics.image(size: canvasSize, scale: scale, opaque: true) { ctx in
+            PlatformColor.white.setFill()
             ctx.fill(rect)
-            if let background { background.draw(in: aspectFit(background.size, in: rect)) }
-            ink?.draw(in: rect)
+            if let background { background.drawUpright(in: aspectFit(background.size, in: rect)) }
+            ink?.drawUpright(in: rect)
         }
     }
 
@@ -60,9 +67,9 @@ final class DrawingSession: Identifiable {
 
     var drawing = PKDrawing()
     /// 保存済みの絵(描き足す時の下絵)。「全部消す」で消える。
-    var background: UIImage?
+    var background: PlatformImage?
     var tool: Tool = .pen
-    /// 「全部消す」のたびに増える(キャンバスに空の絵を戻す合図)
+    /// キャンバスの外で絵が変わるたびに増える(全部消す・Mac の線の追加 / 消しゴム / 取り消し)。キャンバスに絵を戻す合図
     private(set) var revision = 0
 
     init(value: JSONValue) {
@@ -70,6 +77,47 @@ final class DrawingSession: Identifiable {
     }
 
     var isEmpty: Bool { drawing.strokes.isEmpty && background == nil }
+
+    /// VoiceOver で読むキャンバスの値(iOS・Mac 共通)。
+    var accessibilityValue: String {
+        let n = drawing.strokes.count
+        return n == 0 ? L("何も描いていません") : L("線 \(n) 本")
+    }
+
+    /// Mac のキャンバスで描き終えた線を足す(iOS は PKCanvasView の絵をそのまま入れる)。
+    func add(_ stroke: PKStroke, undo: UndoManager? = nil) {
+        var next = drawing
+        next.strokes.append(stroke)
+        replace(with: next, undo: undo)
+    }
+
+    /// Mac の消しゴム: `from` → `to` を通って触れた線を消す(1 本ごと)。取り消しはドラッグの終わりに
+    /// `finishErasing(from:undo:)` でまとめて 1 回にする。消えた線があれば true。
+    @discardableResult
+    func erase(from: CGPoint, to: CGPoint) -> Bool {
+        let next = DrawingEraser.erase(drawing, from: from, to: to)
+        guard next.strokes.count != drawing.strokes.count else { return false }
+        drawing = next
+        revision += 1
+        return true
+    }
+
+    /// 消しゴムのドラッグ 1 回(押した時の絵 `start` から今まで)を取り消し 1 回として登録する。消えていなければ何もしない。
+    func finishErasing(from start: PKDrawing, undo: UndoManager?) {
+        guard start.strokes.count != drawing.strokes.count else { return }
+        replace(with: drawing, undo: undo, previous: start)
+    }
+
+    /// 絵を置き換え、`undo` に元(`previous`、無ければ今の絵)へ戻す操作を登録する
+    /// (Mac のキャンバスだけの UndoManager。戻した時はやり直しとして登録される)。
+    func replace(with next: PKDrawing, undo: UndoManager?, previous: PKDrawing? = nil) {
+        let before = previous ?? drawing
+        drawing = next
+        revision += 1
+        undo?.registerUndo(withTarget: self) { session in
+            MainActor.assumeIsolated { session.replace(with: before, undo: undo) }
+        }
+    }
 
     /// 「全部消す」: 描いた線も下絵も消す。
     func clear() {

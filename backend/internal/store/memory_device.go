@@ -19,6 +19,9 @@ func (m *Memory) PutDevice(_ context.Context, uid string, d Device) (*Device, er
 		m.devices = map[string]map[string]*Device{}
 		m.deviceTokens = map[string]deviceRef{}
 	}
+	if d.Platform == "" {
+		d.Platform = PlatformIOS
+	}
 	now := m.now().UTC()
 	key := tokenKey(d.Token)
 	if ref, ok := m.deviceTokens[key]; ok && ref != (deviceRef{uid, d.InstallationID}) {

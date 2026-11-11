@@ -23,6 +23,55 @@ struct DisclosureContainer: View {
             Text(c.title ?? L("詳細")).font(RenderTheme.Fonts.cardTitle)
         }
         .tint(RenderTheme.Colors.brandA)
+        #if os(macOS)
+        .disclosureGroupStyle(MacDisclosureStyle())
+        #endif
         .renderCard()
     }
+}
+
+#if os(macOS)
+/// Mac の標準の折りたたみは小さな三角だけが押せて、見出しの文字は押せない(#940)。
+/// 行全体を 1 つのボタンにして、クリック・Tab で止めて Space / Return・VoiceOver の操作で開閉する(#937)。
+struct MacDisclosureStyle: DisclosureGroupStyle {
+    func makeBody(configuration: Configuration) -> some View {
+        MacDisclosureBody(configuration: configuration)
+    }
+}
+
+private struct MacDisclosureBody: View {
+    let configuration: DisclosureGroupStyleConfiguration
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            Button {
+                withAnimation(reduceMotion ? nil : RenderTheme.Motion.select) { configuration.isExpanded.toggle() }
+            } label: {
+                HStack(spacing: RenderTheme.Spacing.sm) {
+                    configuration.label
+                    Spacer(minLength: 0)
+                    Image(systemName: "chevron.right")
+                        .font(.callout.weight(.semibold))
+                        .foregroundStyle(RenderTheme.Colors.brandA)
+                        .rotationEffect(.degrees(configuration.isExpanded ? 90 : 0))
+                        .accessibilityHidden(true)
+                }
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .accessibilityValue(DisclosureAccessibility.value(expanded: configuration.isExpanded))
+            .accessibilityHint(DisclosureAccessibility.hint(expanded: configuration.isExpanded))
+            if configuration.isExpanded {
+                configuration.content
+            }
+        }
+    }
+}
+#endif
+
+/// 折りたたみの VoiceOver の値とヒント(Mac の自前の行で使う)。
+enum DisclosureAccessibility {
+    static func value(expanded: Bool) -> String { expanded ? L("開いています") : L("閉じています") }
+    static func hint(expanded: Bool) -> String { expanded ? L("閉じます") : L("開きます") }
 }

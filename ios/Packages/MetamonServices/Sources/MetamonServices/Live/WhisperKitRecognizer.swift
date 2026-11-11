@@ -152,6 +152,7 @@ public final class WhisperKitRecognizer: SpeechTranscriber, AudioFileTranscriber
 
         // 2. AVAudioSession を自前で明示的に有効化(WhisperKit 側は try? で失敗を握りつぶすため)。
         //    カメラ(UIImagePickerController / AVCaptureSession)の後でも必ず record 系カテゴリに戻す。
+        #if os(iOS)
         let session = AVAudioSession.sharedInstance()
         let before = "\(session.category.rawValue)/\(session.mode.rawValue)"
         do {
@@ -172,6 +173,15 @@ public final class WhisperKitRecognizer: SpeechTranscriber, AudioFileTranscriber
             diag.failure = "noInputAvailable"
             throw TranscriberFailure.noInputAvailable
         }
+        #else
+        // Mac: AVAudioSession は無い。既定の入力装置(内蔵 / 外付けのマイク)をそのまま使い、診断に残す
+        MacAudioInput.fill(&diag)
+        log("mac input available=\(diag.inputAvailable) rate=\(diag.inputSampleRate) input=[\(diag.inputRoute)]")
+        guard diag.inputAvailable else {
+            diag.failure = "noInputAvailable"
+            throw TranscriberFailure.noInputAvailable
+        }
+        #endif
 
         // 3. 録音開始(ハードウェアレート → 16kHz mono Float32 に変換して蓄積)
         do {
@@ -250,7 +260,7 @@ public final class WhisperKitRecognizer: SpeechTranscriber, AudioFileTranscriber
             diag.transcriptLength = text.count
             if text.isEmpty { diag.failure = "emptyTranscript" }
             lastDiagnostics = diag
-            log("transcribe result segments=\(results.flatMap(\.segments).count) text=\"\(text)\"")
+            log("transcribe result segments=\(results.flatMap(\.segments).count) chars=\(text.count)") // 話した内容はログに出さない
             return text
         } catch {
             diag.failure = "transcribe: \(error.localizedDescription)"

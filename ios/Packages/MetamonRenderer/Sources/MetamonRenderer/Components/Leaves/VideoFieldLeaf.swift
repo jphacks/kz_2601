@@ -17,6 +17,12 @@ struct VideoFieldLeaf: View {
     @State private var showDenied = false
     @State private var saving = false
     @State private var failed = false
+    #if os(macOS)
+    @State private var showMacChooser = false
+    @State private var showFileImporter = false
+    @State private var dropTargeted = false
+    @State private var dropRejected = false
+    #endif
     @Environment(\.openURL) private var openURL
 
     var body: some View {
@@ -45,7 +51,7 @@ struct VideoFieldLeaf: View {
                 VideoPreview(value: value, height: 200)
                 HStack(spacing: RenderTheme.Spacing.sm) {
                     Button { start() } label: {
-                        Label(L("撮り直す"), systemImage: "video").frame(maxWidth: .infinity)
+                        Label(picksOnly ? L("選び直す") : L("撮り直す"), systemImage: picksOnly ? "film" : "video").frame(maxWidth: .infinity)
                     }
                     .buttonStyle(RenderButtonStyle(kind: .secondary))
                     .accessibilityHint(sourceHint)
@@ -57,27 +63,60 @@ struct VideoFieldLeaf: View {
                 }
             } else {
                 Button { start() } label: {
-                    Label(c.label ?? L("動画を撮る / 選ぶ"), systemImage: mode == .library ? "film" : "video")
+                    Label(c.label ?? emptyTitle, systemImage: picksOnly || mode == .library ? "film" : "video")
                         .frame(maxWidth: .infinity)
                 }
                 .buttonStyle(RenderButtonStyle(kind: .secondary))
-                .accessibilityLabel(c.label ?? L("動画を撮る / 選ぶ"))
+                .accessibilityLabel(c.label ?? emptyTitle)
                 .accessibilityHint(sourceHint)
                 .accessibilityIdentifier("videoField.\(field)")
             }
             if failed {
                 Text(L("動画を保存できませんでした。もう一度お試しください。")).font(.caption).foregroundStyle(.red)
             }
+            #if os(macOS)
+            if dropRejected {
+                Text(L("動画のファイルだけ入れられます")).font(.caption).foregroundStyle(.secondary)
+            }
+            #endif
         }
+        #if os(macOS)
+        .padding(dropTargeted ? 4 : 0)
+        .overlay {
+            if dropTargeted {
+                RoundedRectangle(cornerRadius: RenderTheme.Radius.inner, style: .continuous)
+                    .strokeBorder(Color.accentColor, lineWidth: 2)
+            }
+        }
+        .dropDestination(for: URL.self) { urls, _ in
+            guard let url = urls.first, VideoFileImport.accepts(url) else {
+                dropRejected = true
+                return false
+            }
+            dropRejected = false
+            ingest(url, origin: .userFile, form: form, field: field)
+            return true
+        } isTargeted: { dropTargeted = $0 }
+        .confirmationDialog(c.label ?? L("動画"), isPresented: $showMacChooser, titleVisibility: .hidden) {
+            Button(L("写真ライブラリから選ぶ")) { showLibrary = true }
+            Button(L("ファイルから選ぶ")) { showFileImporter = true }
+            Button(L("キャンセル"), role: .cancel) {}
+        }
+        .fileImporter(isPresented: $showFileImporter, allowedContentTypes: VideoFileImport.contentTypes, allowsMultipleSelection: false) { result in
+            guard case .success(let urls) = result, let url = urls.first else { return }
+            dropRejected = false
+            ingest(url, origin: .userFile, form: form, field: field)
+        }
+        #endif
         #if !APP_STORE_REVIEW
         .confirmationDialog(c.label ?? L("動画"), isPresented: $showChooser, titleVisibility: .hidden) {
             Button(L("撮影")) { openCamera() }
             Button(L("ライブラリから選ぶ")) { showLibrary = true }
             Button(L("キャンセル"), role: .cancel) {}
         }
-        .fullScreenCover(isPresented: $showCamera) {
+        .platformFullScreenCover(isPresented: $showCamera) {
             VideoCameraPicker(maxDuration: TimeInterval(maxDuration)) { url in
-                ingest(url, form: form, field: field)
+                ingest(url, origin: .temporary, form: form, field: field)
             }
             .ignoresSafeArea()
         }
@@ -88,7 +127,7 @@ struct VideoFieldLeaf: View {
             saving = true
             Task {
                 if let movie = try? await item.loadTransferable(type: PickedMovie.self) {
-                    ingest(movie.url, form: form, field: field)
+                    ingest(movie.url, origin: .temporary, form: form, field: field)
                 } else {
                     saving = false
                     failed = true
@@ -99,7 +138,7 @@ struct VideoFieldLeaf: View {
         #if !APP_STORE_REVIEW
         .alert(L("カメラを使えません"), isPresented: $showDenied) {
             Button(L("設定を開く")) {
-                if let url = URL(string: UIApplication.openSettingsURLString) { openURL(url) }
+                if let url = PlatformSystem.appSettingsURL { openURL(url) }
             }
             Button(L("ライブラリから選ぶ")) { showLibrary = true }
             Button(L("キャンセル"), role: .cancel) {}
@@ -109,19 +148,19 @@ struct VideoFieldLeaf: View {
         #endif
     }
 
-    private func ingest(_ url: URL, form: FormDraft, field: String) {
+    /// 一時ファイル(撮影・写真ライブラリ)は取り込んだら消す。ユーザーのファイル(Mac のファイル選択・ドロップ)は読むだけ。
+    private func ingest(_ url: URL, origin: VideoFileImport.Origin, form: FormDraft, field: String) {
         saving = true
         failed = false
         Task { @MainActor in
             defer { saving = false }
             do {
-                let v = try await VideoCodec.ingest(url, maxDuration: maxDuration)
+                let v = try await VideoFileImport.ingest(url, origin: origin, maxDuration: maxDuration)
                 form.values[field] = .string(v.encoded)
             } catch {
                 print("[Metamon] video ingest failed: \(error)")
                 failed = true
             }
-            try? FileManager.default.removeItem(at: url)
         }
     }
 
@@ -138,8 +177,22 @@ struct VideoFieldLeaf: View {
 
     private var plan: PhotoCapturePlan { PhotoSourcePolicy.plan(for: mode, cameraAvailable: Self.cameraAvailable) }
 
+    /// Mac で撮れない時(#1379)は「選ぶ」の文言・アイコンにする。iOS は今のまま。
+    private var picksOnly: Bool {
+        #if os(macOS)
+        plan == .library
+        #else
+        false
+        #endif
+    }
+
+    private var emptyTitle: String { picksOnly ? L("動画を選ぶ") : L("動画を撮る / 選ぶ") }
+
     private var sourceHint: String {
-        switch plan {
+        #if os(macOS)
+        if plan == .library { return L("写真ライブラリかファイルから動画を選びます") }
+        #endif
+        return switch plan {
         case .camera: L("カメラで動画を撮ります")
         case .library: L("ライブラリから動画を選びます")
         case .choose: L("動画を撮るかライブラリから選びます")
@@ -149,7 +202,12 @@ struct VideoFieldLeaf: View {
     private func start() {
         switch plan {
         case .camera: openCamera()
-        case .library: showLibrary = true
+        case .library:
+            #if os(macOS)
+            showMacChooser = true
+            #else
+            showLibrary = true
+            #endif
         case .choose: showChooser = true
         }
     }

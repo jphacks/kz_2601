@@ -39,14 +39,25 @@ public protocol NearbyPassbyController: AnyObject, Observable {
     var distanceSupport: PassbyDistanceSupport { get }
     /// 直近の失敗・案内(ローカルネットワークの許可が無い等)
     var notice: String? { get }
+    /// 自分の表示名(名前を出す時に相手に渡る)
+    var displayName: String { get }
+    /// 名前を出さない(相手には「近くの人」と渡る)
+    var isAnonymous: Bool { get }
 
     func isOptedIn(_ config: NearbyPassby.Config) -> Bool
     func setOptIn(_ on: Bool, config: NearbyPassby.Config)
-    func agree()
+    /// 同意する。`anonymous` = 表示名の代わりに「近くの人」を送る
+    func agree(anonymous: Bool)
+    func setAnonymous(_ on: Bool)
     /// 画面に出て前面にいる間: オンなら探し始める
     func attach(_ config: NearbyPassby.Config)
     /// 画面を離れた・裏に回った: 止める
     func detach(_ config: NearbyPassby.Config)
+}
+
+extension NearbyPassbyController {
+    /// 相手に見える名前。
+    public var publicName: String { NearbyLimits.publicName(displayName, anonymous: isAnonymous) }
 }
 
 public enum NearbyPassbyHost {
@@ -63,6 +74,8 @@ public final class StaticNearbyPassbyController: NearbyPassbyController {
     public var peers: [PassbyPeer] = []
     public var distanceSupport: PassbyDistanceSupport = .unsupported(L("この端末は距離・方向の測定に対応していません"))
     public var notice: String?
+    public var displayName = "Tailor It"
+    public var isAnonymous = false
     public private(set) var optedIn: Set<String> = []
     public private(set) var attached: String?
 
@@ -73,7 +86,11 @@ public final class StaticNearbyPassbyController: NearbyPassbyController {
         if on { optedIn.insert(config.componentId) } else { optedIn.remove(config.componentId) }
         isAdvertising = on && attached == config.componentId
     }
-    public func agree() { consentedVersion = NearbyPassby.consentVersion }
+    public func agree(anonymous: Bool) {
+        consentedVersion = NearbyPassby.consentVersion
+        isAnonymous = anonymous
+    }
+    public func setAnonymous(_ on: Bool) { isAnonymous = on }
     public func attach(_ config: NearbyPassby.Config) {
         attached = config.componentId
         isAdvertising = isOptedIn(config)

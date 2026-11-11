@@ -42,6 +42,7 @@ struct SettingsSheet: View {
                 RemainingTodaySettingsSection() // #630 今日の残り(審査用の版も出す)
                 UsageSettingsSection() // #317 使っている量(作ったアプリの数・今のアプリの記録と写真)
                 languageSection
+                Section { AppIconSettingsRow() } // #232 ホーム画面のアイコン(全員・審査用の版も出す)
                 voiceModelSection
                 clarifySection
                 speechSection
@@ -406,12 +407,14 @@ struct SettingsSheet: View {
                 Label("保存した場所 \(rt.notificationPlaces) か所の近くに着いたら知らせます", systemImage: "location")
                     .foregroundStyle(.secondary)
             }
-            if rt.upcomingNotifications.isEmpty && rt.notificationPlaces == 0 && !rt.placesLocationOff {
+            let list = UpcomingNotificationList(rt.upcomingNotifications, places: rt.notificationPlaces,
+                                                locationOff: rt.placesLocationOff)
+            if list.isEmpty {
                 Text("予約中の通知はありません").foregroundStyle(.secondary)
             }
-            ForEach(Array(rt.upcomingNotifications.prefix(5).enumerated()), id: \.offset) { _, n in
+            ForEach(list.rows) { n in
                 LabeledContent {
-                    Text(NotificationCopy.when(n.date)).monospacedDigit()
+                    Text(n.when).monospacedDigit()
                 } label: {
                     VStack(alignment: .leading, spacing: 2) {
                         Text(n.title)

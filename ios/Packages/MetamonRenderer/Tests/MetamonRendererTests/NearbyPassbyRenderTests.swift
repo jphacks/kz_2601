@@ -1,3 +1,5 @@
+// TODO mac-026: UIKit を直接使うテスト。Mac で回すには描画の仕方を置き換え層に寄せる
+#if os(iOS)
 #if !APP_STORE_REVIEW
 import XCTest
 import SwiftUI
@@ -34,7 +36,7 @@ final class NearbyPassbyRenderTests: XCTestCase {
         let c = try XCTUnwrap(dsl.screens.first?.components.first)
         let config = try XCTUnwrap(NearbyPassby.Config(c))
         let host = StaticNearbyPassbyController()
-        host.agree()
+        host.agree(anonymous: false)
         host.setOptIn(true, config: config)
         host.distanceSupport = .supported
         host.peers = [PassbyPeer(id: "s2", name: "花子", distance: 1.2, azimuth: 0.3)]
@@ -89,4 +91,5 @@ final class NearbyPassbyRenderTests: XCTestCase {
         XCTAssertFalse(host.isAdvertising)
     }
 }
+#endif
 #endif

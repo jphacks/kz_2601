@@ -7,31 +7,14 @@ import MetamonRenderer
 /// `addToCalendar`: 今のレコードを端末のカレンダーに入れる。
 /// OS の「新規イベント」画面(EventKitUI)を中身を埋めて開き、ユーザーが「追加」を押す。
 /// iOS 17 以降この画面は別プロセスで動くので、カレンダーの許可・Info.plist の説明文・entitlement は要らない。
+/// 予定の作り方は Mac と共有する(`Shared/Runtime/CalendarActionSteps.swift`・#978)。
 extension AppRuntime {
     func addToCalendar(_ action: Action, _ ctx: ActionContext) {
-        guard let spec = action.calendarEvent, let entityId = action.entity ?? ctx.form?.entity.id,
-              let entity = dsl.entity(entityId) else {
-            toast = L10n.tr("カレンダーに入れる記録が見つかりません")
-            return
-        }
-        // フォーム画面なら入力中の値(未保存でも)、list の行タップならその行
-        let data: [String: JSONValue]?
-        if let form = ctx.form, form.entity.id == entityId {
-            data = form.payload
-        } else if let id = ctx.recordId {
-            data = records[entityId]?.first { $0.id == id }?.data
-        } else {
-            data = nil
-        }
-        guard let data else {
-            toast = L10n.tr("カレンダーに入れる記録が見つかりません")
-            return
-        }
-        switch CalendarEventPlan.build(spec, entity: entity, data: data) {
-        case .success(let draft):
+        switch CalendarActionSteps.draft(action, ctx, dsl: dsl, records: { self.records[$0] ?? [] }) {
+        case .ready(let draft):
             calendarDraft = draft
-        case .failure(.noStart(let name)):
-            toast = L10n.tr("「\(name)」を入力してください")
+        case .invalid(let message):
+            toast = message
         }
     }
 }

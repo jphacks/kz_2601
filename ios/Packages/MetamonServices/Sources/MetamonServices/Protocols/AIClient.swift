@@ -11,10 +11,14 @@ public struct MorphResult: Sendable {
     public var unchanged: Bool
     /// #253: 新しく誰でも見られる記録に入った個人の情報の欄(`meta.publicPersonalData`)。旧サーバーは送らない(空)
     public var publicPersonalData: [PublicPersonalField]
+    /// 結果の DSL の封筒(`{appId, version, dsl}` の生 JSON・`DocumentCache` に置く形)。
+    /// `AppDocument` は書き出せないので、端末に残す側(Mac の作ったアプリ・#969)はこれを置く。iOS は使わない
+    public var envelope: Data?
 
     public init(document: AppDocument, summary: String? = nil, mode: String? = nil, unchanged: Bool = false,
-                publicPersonalData: [PublicPersonalField] = []) {
+                publicPersonalData: [PublicPersonalField] = [], envelope: Data? = nil) {
         self.document = document
+        self.envelope = envelope
         self.summary = summary
         self.mode = mode
         self.unchanged = unchanged

@@ -1,3 +1,5 @@
+// TODO mac-026: UIKit を直接使うテスト。Mac で回すには描画の仕方を置き換え層に寄せる
+#if os(iOS)
 import XCTest
 import UIKit
 @testable import MetamonRenderer
@@ -60,3 +62,4 @@ final class PhotoFieldTests: XCTestCase {
         XCTAssertEqual(decoded.size.width * decoded.scale, 300, accuracy: 1, "800px 未満は拡大しない")
     }
 }
+#endif

@@ -52,6 +52,10 @@ data class DeviceCapabilities(
             Feature("component.bracket", implemented = true, needs = ComponentType.BRACKET),
             Feature("progressBar.settingTarget", implemented = true, needs = ComponentType.PROGRESS_BAR),
             Feature("photoField.illustrate", implemented = PhotoIllustrate.AVAILABLE, needs = ComponentType.PHOTO_FIELD),
+            // 以下 3 つは iOS だけ(Android の部品・暗号化・アプリへの受け渡しがまだ)
+            Feature("component.callButton", implemented = false, needs = ComponentType.CALL_BUTTON),
+            Feature("field.encrypted", implemented = false),
+            Feature("openUrlButton.app", implemented = false, needs = ComponentType.OPEN_URL_BUTTON),
         )
 
         /** [registry] で描ける部品(UNKNOWN を除く・schema の並び)。 */

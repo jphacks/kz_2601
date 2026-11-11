@@ -199,8 +199,9 @@ extension HTTPAIClient {
 
     /// 応答本文 → 結果。キャッシュにも入れる(通常の呼び方と同じ)。
     func finish(_ data: Data, appId: String) throws -> MorphResult {
-        let result = try Self.parse(data, appId: appId)
-        if let cache, let envelope = Self.envelope(from: data, appId: result.document.appId, version: result.document.version) {
+        var result = try Self.parse(data, appId: appId)
+        result.envelope = Self.envelope(from: data, appId: result.document.appId, version: result.document.version)
+        if let cache, let envelope = result.envelope {
             cache.store(appId: result.document.appId, envelope: envelope)
         }
         return result

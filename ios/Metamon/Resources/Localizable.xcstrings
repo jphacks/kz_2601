@@ -92,7 +92,29 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "%1$@ · %2$lld users"
+            "value" : "%#@count@"
+          },
+          "substitutions" : {
+            "count" : {
+              "argNum" : 2,
+              "formatSpecifier" : "lld",
+              "variations" : {
+                "plural" : {
+                  "one" : {
+                    "stringUnit" : {
+                      "state" : "translated",
+                      "value" : "%1$@ · %arg user"
+                    }
+                  },
+                  "other" : {
+                    "stringUnit" : {
+                      "state" : "translated",
+                      "value" : "%1$@ · %arg users"
+                    }
+                  }
+                }
+              }
+            }
           }
         },
         "ja" : {
@@ -330,7 +352,29 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "%1$@ sent %3$lld “%2$@” records"
+            "value" : "%#@count@"
+          },
+          "substitutions" : {
+            "count" : {
+              "argNum" : 3,
+              "formatSpecifier" : "lld",
+              "variations" : {
+                "plural" : {
+                  "one" : {
+                    "stringUnit" : {
+                      "state" : "translated",
+                      "value" : "%1$@ sent %arg “%2$@” record"
+                    }
+                  },
+                  "other" : {
+                    "stringUnit" : {
+                      "state" : "translated",
+                      "value" : "%1$@ sent %arg “%2$@” records"
+                    }
+                  }
+                }
+              }
+            }
           }
         },
         "ja" : {
@@ -347,7 +391,29 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Added %3$lld “%2$@” records from %1$@"
+            "value" : "%#@count@"
+          },
+          "substitutions" : {
+            "count" : {
+              "argNum" : 3,
+              "formatSpecifier" : "lld",
+              "variations" : {
+                "plural" : {
+                  "one" : {
+                    "stringUnit" : {
+                      "state" : "translated",
+                      "value" : "Added %arg “%2$@” record from %1$@"
+                    }
+                  },
+                  "other" : {
+                    "stringUnit" : {
+                      "state" : "translated",
+                      "value" : "Added %arg “%2$@” records from %1$@"
+                    }
+                  }
+                }
+              }
+            }
           }
         },
         "ja" : {
@@ -804,9 +870,21 @@
       "extractionState" : "manual",
       "localizations" : {
         "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "%lld people"
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld person"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld people"
+                }
+              }
+            }
           }
         },
         "ja" : {
@@ -821,9 +899,21 @@
       "extractionState" : "manual",
       "localizations" : {
         "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "%lld records couldn’t be sent. If you sign out without sending, they’ll be lost."
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld record couldn’t be sent. If you sign out without sending, it’ll be lost."
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld records couldn’t be sent. If you sign out without sending, they’ll be lost."
+                }
+              }
+            }
           }
         },
         "ja" : {
@@ -872,9 +962,21 @@
       "extractionState" : "manual",
       "localizations" : {
         "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Failed %lld times in a row."
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Failed %lld time in a row."
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Failed %lld times in a row."
+                }
+              }
+            }
           }
         },
         "ja" : {
@@ -889,9 +991,21 @@
       "extractionState" : "manual",
       "localizations" : {
         "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Up to %lld characters"
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Up to %lld character"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Up to %lld characters"
+                }
+              }
+            }
           }
         },
         "ja" : {
@@ -923,9 +1037,21 @@
       "extractionState" : "manual",
       "localizations" : {
         "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Please wait about %lld seconds and try again"
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Please wait about %lld second and try again"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Please wait about %lld seconds and try again"
+                }
+              }
+            }
           }
         },
         "ja" : {
@@ -2234,7 +2360,29 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "%2$lld “%1$@” records"
+            "value" : "%#@count@"
+          },
+          "substitutions" : {
+            "count" : {
+              "argNum" : 2,
+              "formatSpecifier" : "lld",
+              "variations" : {
+                "plural" : {
+                  "one" : {
+                    "stringUnit" : {
+                      "state" : "translated",
+                      "value" : "%arg “%1$@” record"
+                    }
+                  },
+                  "other" : {
+                    "stringUnit" : {
+                      "state" : "translated",
+                      "value" : "%arg “%1$@” records"
+                    }
+                  }
+                }
+              }
+            }
           }
         },
         "ja" : {
@@ -2925,6 +3073,23 @@
         }
       }
     },
+    "「%@」を追加しますか?" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Add “%@”?"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "「%@」を追加しますか?"
+          }
+        }
+      }
+    },
     "「AI で書く」ボタン(文を作る・要約・分類・書き直し・抜き出し・提案)は、押した時だけ送ります。短い答えは、端末の中の AI が使える時は送らず、使えない時だけ最近の記録と入力中の文字(最大 4KB)を送ります。長い答えのボタンは、いつも最大 16KB を送ります。共有のアプリで材料にするのは、自分が入れた記録だけです。" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -3065,9 +3230,21 @@
       "extractionState" : "manual",
       "localizations" : {
         "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Published on Discover · %lld installs"
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Published on Discover · %lld install"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Published on Discover · %lld installs"
+                }
+              }
+            }
           }
         },
         "ja" : {
@@ -3261,6 +3438,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "いつでも解約できます(App Store の設定から)"
+          }
+        }
+      }
+    },
+    "いつもの" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Default"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "いつもの"
           }
         }
       }
@@ -4540,6 +4734,23 @@
         }
       }
     },
+    "この端末ではアイコンを変えられません。" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "This device can't change the app icon."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "この端末ではアイコンを変えられません。"
+          }
+        }
+      }
+    },
     "この端末では音声モデルの準備ができるまで声で入力できません。文字で入力してください" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -4706,6 +4917,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "この通話には入れません"
+          }
+        }
+      }
+    },
+    "この部品について話す" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Talk about this component"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "この部品について話す"
           }
         }
       }
@@ -5581,9 +5809,21 @@
       "extractionState" : "manual",
       "localizations" : {
         "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "You have %lld unsent records. You’re offline, so they can’t be sent now. If you sign out without sending, they’ll be lost."
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "You have %lld unsent record. You’re offline, so it can’t be sent now. If you sign out without sending, it’ll be lost."
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "You have %lld unsent records. You’re offline, so they can’t be sent now. If you sign out without sending, they’ll be lost."
+                }
+              }
+            }
           }
         },
         "ja" : {
@@ -5598,9 +5838,21 @@
       "extractionState" : "manual",
       "localizations" : {
         "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "You have %lld unsent records. They’ll be sent before you sign out."
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "You have %lld unsent record. It’ll be sent before you sign out."
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "You have %lld unsent records. They’ll be sent before you sign out."
+                }
+              }
+            }
           }
         },
         "ja" : {
@@ -5930,6 +6182,74 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "やり直せませんでした"
+          }
+        }
+      }
+    },
+    "アイコン" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "App Icon"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "アイコン"
+          }
+        }
+      }
+    },
+    "アイコン: %@" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "App icon: %@"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "アイコン: %@"
+          }
+        }
+      }
+    },
+    "アイコンを変えられませんでした" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Couldn't Change the Icon"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "アイコンを変えられませんでした"
+          }
+        }
+      }
+    },
+    "アイコンを変えられませんでした。少し待ってからもう一度お試しください。" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Couldn't change the app icon. Wait a moment and try again."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "アイコンを変えられませんでした。少し待ってからもう一度お試しください。"
           }
         }
       }
@@ -7515,6 +7835,23 @@
         }
       }
     },
+    "シェアされたアプリを追加しますか?" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Add the shared app?"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "シェアされたアプリを追加しますか?"
+          }
+        }
+      }
+    },
     "シェアされたアプリを開けませんでした" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -7919,6 +8256,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "ダウンロード中 %lld%%"
+          }
+        }
+      }
+    },
+    "ダーク" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Dark"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ダーク"
           }
         }
       }
@@ -8790,6 +9144,23 @@
         }
       }
     },
+    "モノクロ" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mono"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "モノクロ"
+          }
+        }
+      }
+    },
     "ユーザー ID" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -8837,6 +9208,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "ライセンスを読み込めませんでした"
+          }
+        }
+      }
+    },
+    "ライト" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Light"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ライト"
           }
         }
       }
@@ -10664,9 +11052,21 @@
       "extractionState" : "manual",
       "localizations" : {
         "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "You'll be notified when you arrive near %lld saved place(s)"
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "You'll be notified when you arrive near %lld saved place"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "You'll be notified when you arrive near %lld saved places"
+                }
+              }
+            }
           }
         },
         "ja" : {
@@ -12598,6 +12998,23 @@
         }
       }
     },
+    "変えると iOS の確認が出ます。" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "iOS shows a confirmation when you change it."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "変えると iOS の確認が出ます。"
+          }
+        }
+      }
+    },
     "変更" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -12704,9 +13121,21 @@
       "extractionState" : "manual",
       "localizations" : {
         "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Shown in your app list and at the top of the app (up to %lld characters)."
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Shown in your app list and at the top of the app (up to %lld character)."
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Shown in your app list and at the top of the app (up to %lld characters)."
+                }
+              }
+            }
           }
         },
         "ja" : {
@@ -15033,9 +15462,21 @@
       "extractionState" : "manual",
       "localizations" : {
         "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "The free plan lets you create %lld new apps a day. Editing your apps doesn't count."
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "The free plan lets you create %lld new app a day. Editing your apps doesn't count."
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "The free plan lets you create %lld new apps a day. Editing your apps doesn't count."
+                }
+              }
+            }
           }
         },
         "ja" : {
@@ -16869,9 +17310,21 @@
       "extractionState" : "manual",
       "localizations" : {
         "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Shown in your tracker list and at the top of the screen (up to %lld characters)."
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Shown in your tracker list and at the top of the screen (up to %lld character)."
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Shown in your tracker list and at the top of the screen (up to %lld characters)."
+                }
+              }
+            }
           }
         },
         "ja" : {
@@ -17936,6 +18389,57 @@
         }
       }
     },
+    "追加しない" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Not now"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "追加しない"
+          }
+        }
+      }
+    },
+    "追加する" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Add"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "追加する"
+          }
+        }
+      }
+    },
+    "追加すると、このアプリに切り替わります" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Adding it switches to this app."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "追加すると、このアプリに切り替わります"
+          }
+        }
+      }
+    },
     "追加できる項目がありませんでした" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -18025,9 +18529,21 @@
       "extractionState" : "manual",
       "localizations" : {
         "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "What you send (the text and the attachments you turned on) is read by the operator to fix bugs and improve Tailor It. It is stored on Google Cloud (Firestore) and erased after %lld days, or when you delete your account. It is not shared with third parties."
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "What you send (the text and the attachments you turned on) is read by the operator to fix bugs and improve Tailor It. It is stored on Google Cloud (Firestore) and erased after %lld day, or when you delete your account. It is not shared with third parties."
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "What you send (the text and the attachments you turned on) is read by the operator to fix bugs and improve Tailor It. It is stored on Google Cloud (Firestore) and erased after %lld days, or when you delete your account. It is not shared with third parties."
+                }
+              }
+            }
           }
         },
         "ja" : {
