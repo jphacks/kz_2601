@@ -1,0 +1,326 @@
+package jp.kz2601.metamon.desktop
+
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
+import jp.kz2601.metamon.dsl.Action
+import jp.kz2601.metamon.dsl.ActionType
+import jp.kz2601.metamon.dsl.AppDSL
+import jp.kz2601.metamon.dsl.Component
+import jp.kz2601.metamon.dsl.ComponentType
+import jp.kz2601.metamon.dsl.Screen
+import jp.kz2601.metamon.dsl.records.Aggregator
+import jp.kz2601.metamon.dsl.records.Entity
+import jp.kz2601.metamon.dsl.records.FieldCoding
+import jp.kz2601.metamon.dsl.records.JSONValue
+import jp.kz2601.metamon.dsl.records.Record
+import jp.kz2601.metamon.dsl.records.RecordPermission
+import jp.kz2601.metamon.dsl.records.RecordQuery
+import jp.kz2601.metamon.dsl.records.SingleRecord
+import jp.kz2601.metamon.dsl.records.entityModels
+import jp.kz2601.metamon.dsl.screen
+import jp.kz2601.metamon.renderer.form.FormDraft
+import jp.kz2601.metamon.renderer.form.FormPrefill
+import jp.kz2601.metamon.renderer.navigation.NavigationResolver
+import jp.kz2601.metamon.renderer.navigation.NavigationState
+import jp.kz2601.metamon.renderer.navigation.Presentation
+import jp.kz2601.metamon.renderer.navigation.Route
+import jp.kz2601.metamon.renderer.navigation.top
+import kotlinx.serialization.json.JsonArray
+import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.JsonNull
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.contentOrNull
+import kotlinx.serialization.json.doubleOrNull
+
+/** アクションを押した場所(画面・下書き・押した行の recordId)。 */
+data class ActionContext(val route: Route, val form: FormDraft?, val recordId: String? = null) {
+    /** 親から子を作る時の親(押した行 → 編集中の記録)。 */
+    val currentRecordId: String? get() = recordId ?: form?.recordId
+}
+
+/** OS の機能に頼むアクション(URL・カレンダー・本・通知・書き出し・音声・ライブアクティビティ)の受け口。返り値は画面に出す一言。 */
+fun interface ActionHost {
+    fun request(action: Action, ctx: ActionContext, session: DesktopSession): String?
+}
+
+/**
+ * デスクトップ版の画面の状態と操作(iOS の AppRuntime・Android の ConformanceTest の CaseSession と同じ規則)。
+ * 遷移は Android と同じ [NavigationResolver]、下書きは [FormDraft](どちらも android/renderer のソースをそのまま取り込む)。
+ * 画面(DesktopApp)と適合テストが同じこのクラスで操作するので、steps の比べ方がそのまま画面の動きになる。
+ */
+class DesktopSession(
+    val dsl: AppDSL,
+    initialStore: MockStore = MockStore(),
+    val uid: String? = "me",
+    startScreen: String? = null,
+    var host: ActionHost? = null,
+) {
+    val models: List<Entity> = dsl.entityModels()
+    var store: MockStore by mutableStateOf(initialStore)
+        private set
+    var nav: NavigationState by mutableStateOf(NavigationState.initial(dsl))
+        private set
+
+    /** 画面に出す一言(保存できない理由・OS の機能の結果)。 */
+    var message: String? by mutableStateOf(null)
+
+    /** 起きたこと(適合テストの effects と同じ形)。 */
+    val effects = mutableListOf<JsonElement>()
+
+    private val drafts = HashMap<String, FormDraft>()
+    private val queries = HashMap<String, MutableMap<String, String>>()
+
+    init {
+        if (startScreen != null && dsl.screen(startScreen) != null && startScreen != top.screen) {
+            nav = NavigationResolver.navigate(nav, startScreen, Presentation.PUSH, null, top, dsl)
+        }
+    }
+
+    val top: Route get() = nav.top(dsl)
+
+    /** 取り込み・貼り付け(io/DesktopIo)が記録を差し替える。 */
+    fun replaceStore(next: MockStore) {
+        store = next
+    }
+
+    fun entityModel(id: String?): Entity? = id?.let { i -> models.firstOrNull { it.id == i } }
+
+    fun records(entity: String): List<Record> = store.records(entity, entityModel(entity))
+
+    fun leafData(): LeafData = LeafData(models, ::records, uid)
+
+    /** route の下書き(entity の無い画面は null)。開いた時に 1 回作り、保存するまで入力を残す。 */
+    fun form(route: Route): FormDraft? {
+        drafts[route.id]?.let { return it }
+        val entity = entityModel(dsl.screen(route.screen)?.entity) ?: return null
+        val rows = records(entity.id)
+        val record = if (entity.single) SingleRecord.pick(rows) else route.recordId?.let { id -> rows.firstOrNull { it.id == id } }
+        val draft = FormDraft(entity, record)
+        if (record != null) {
+            draft.isReadOnly = !RecordPermission.canEdit(record, entity, uid)
+            draft.canDelete = !entity.single && RecordPermission.canDelete(record, entity, uid)
+        } else {
+            draft.prefill(FormPrefill.consume(entity))
+        }
+        drafts[route.id] = draft
+        return draft
+    }
+
+    /** 検索欄の文字(route ごと)。 */
+    fun queries(route: Route): MutableMap<String, String> = queries.getOrPut(route.id) { HashMap() }
+
+    /** `list` の行(filter → sort → 検索)。iOS の `ListLeaf.rows`。 */
+    fun rows(c: Component, query: String?): List<Record> {
+        val data = leafData()
+        val entity = data.entity(c.entity)
+        val sorted = Aggregator.sorted(data.filtered(c), RecordQuery.sort(c.sort), entity)
+        if (c.searchField == null) return sorted
+        val q = query?.trim()?.takeIf { it.isNotEmpty() } ?: return sorted
+        val fields = listOfNotNull(c.item?.title ?: entity?.titleField, c.item?.subtitle)
+        return sorted.filter { r -> fields.any { f -> FieldCoding.display(r[f], entity?.field(f)).contains(q, ignoreCase = true) } }
+    }
+
+    /** 押せるか: rendered / hidden / needsForm / unknown(iOS の「全部品が登録済み」の規則)。 */
+    fun tapState(c: Component, form: FormDraft?): String {
+        if (c.type == ComponentType.UNKNOWN) return "unknown"
+        if (c.type in InputLeaves.types) {
+            if (form != null && form.hides(c, uid)) return "hidden"
+            if (form == null || c.field == null) return "needsForm"
+        }
+        if (c.type == ComponentType.BUTTON && !isButtonVisible(c.action, form)) return "hidden"
+        return "rendered"
+    }
+
+    // MARK: - 操作
+
+    /** 部品・toolbar・行を押した。確認(confirmMessage)は呼ぶ側が「はい」を受けてから呼ぶ。 */
+    fun dispatch(action: Action, ctx: ActionContext) {
+        message = null
+        action.confirmMessage?.let { effects += obj("confirm" to JsonPrimitive(it)) }
+        perform(action, ctx)
+    }
+
+    fun back(route: Route = top) {
+        nav = NavigationResolver.close(nav, route)
+    }
+
+    /** タブを選ぶ。 */
+    fun selectTab(screen: String) {
+        nav = nav.copy(selectedTab = screen)
+    }
+
+    private fun navigate(to: String, action: Action, recordId: String?, from: Route) {
+        nav = NavigationResolver.navigate(nav, to, Presentation.of(action.presentation?.wire), recordId, from, dsl)
+    }
+
+    private fun perform(action: Action, ctx: ActionContext) {
+        when (action.type) {
+            ActionType.NAVIGATE -> {
+                val to = action.screen ?: return
+                val ref = action.prefillRef
+                if (ref == null) {
+                    navigate(to, action, ctx.recordId, ctx.route)
+                    return
+                }
+                val parentId = ctx.currentRecordId
+                if (parentId == null) {
+                    effects += obj("rejected" to JsonPrimitive("unsavedParent"))
+                    message = "先に保存してください"
+                    return
+                }
+                FormPrefill.set(mapOf(ref to JSONValue.Str(parentId)))
+                navigate(to, action, null, ctx.route)
+                form(top) // 新規フォームは開いた時に初期値を受け取る
+            }
+            ActionType.BACK -> back(ctx.route)
+            ActionType.SAVE_RECORD -> save(action, ctx)
+            ActionType.DELETE_RECORD -> {
+                val entity = action.entity ?: ctx.form?.entity?.id ?: return
+                val id = ctx.recordId ?: ctx.form?.recordId ?: return
+                store = store.delete(entity, id)
+                effects += obj("deleted" to obj("entity" to JsonPrimitive(entity), "recordId" to JsonPrimitive(id)))
+                if (ctx.recordId == null) {
+                    drafts.entries.removeAll { it.value === ctx.form }
+                    back(ctx.route)
+                }
+            }
+            else -> {
+                // OS の機能を呼ぶもの(URL・通知・書き出し・ライブアクティビティ・音声)は「何を頼んだか」を残し、ホストに渡す
+                effects += obj("request" to actionJson(action))
+                if (action.type == ActionType.RESET_FORM) ctx.form?.reset()
+                message = host?.request(action, ctx, this) ?: message
+            }
+        }
+    }
+
+    private fun save(action: Action, ctx: ActionContext) {
+        val form = ctx.form
+        val entity = action.entity ?: form?.entity?.id
+        if (form == null || entity == null) {
+            effects += obj("rejected" to JsonPrimitive("noForm"))
+            message = "保存するフォームがありません"
+            return
+        }
+        if (form.isReadOnly) {
+            message = "このデータは作った人だけが変更できます"
+            return
+        }
+        val missing = form.flagMissingRequired()
+        if (missing.isNotEmpty()) {
+            effects += obj("rejected" to obj("missing" to JsonArray(missing.map(::JsonPrimitive))))
+            message = missing.joinToString("、") + " を入力してください"
+            return
+        }
+        val payload = form.payload
+        val existing = form.recordId?.takeIf { id -> store.find(entity, id) != null }
+        val id = existing ?: "new-${store.nextId}"
+        store = store.save(entity, existing, payload.mapValues { MockStore.cell(it.value) })
+        effects += obj(
+            "saved" to obj(
+                "entity" to JsonPrimitive(entity),
+                "recordId" to JsonPrimitive(id),
+                "data" to JsonObject(payload.mapValues { it.value.toJsonElement() }),
+            ),
+        )
+        form.markSaved(queuedOffline = false)
+        drafts.entries.removeAll { it.value === form } // 保存した画面の下書きは捨てる(開き直すと新規)
+        val to = action.screen
+        if (to != null) navigate(to, action, null, ctx.route) else back(ctx.route)
+    }
+
+    /** 適合テストの操作 1 つ(case.json の operations)。対象が無い・見えていないなら false。 */
+    fun apply(op: JsonObject): Boolean {
+        val route = top
+        val form = form(route)
+        val screen = dsl.screen(route.screen)
+        val ctx = ActionContext(route, form)
+        when {
+            op.containsKey("tap") -> {
+                val id = (op["tap"] as? JsonPrimitive)?.contentOrNull
+                val c = screen?.allComponents()?.firstOrNull { it.id == id } ?: return false
+                val a = c.action ?: return false
+                if (tapState(c, form) != "rendered") return false
+                dispatch(a, ctx)
+            }
+            op.containsKey("tapToolbar") -> {
+                val label = (op["tapToolbar"] as? JsonPrimitive)?.contentOrNull
+                val tb = screen?.toolbar?.firstOrNull { it.label == label } ?: return false
+                dispatch(tb.action, ctx)
+            }
+            op.containsKey("tapRow") -> {
+                val row = op["tapRow"] as? JsonObject ?: return false
+                val id = (row["component"] as? JsonPrimitive)?.contentOrNull
+                val c = screen?.allComponents()?.firstOrNull { if (id == null) it.onItemTap != null else it.id == id } ?: return false
+                val a = c.onItemTap ?: return false
+                if (tapState(c, form) != "rendered") return false
+                val rows = rows(c, c.searchField?.let { queries(route)[it] })
+                val i = (row["index"] as? JsonPrimitive)?.doubleOrNull?.toInt() ?: 0
+                val r = rows.getOrNull(i) ?: return false
+                dispatch(a, ActionContext(route, form, r.id))
+            }
+            op.containsKey("input") -> {
+                val input = op["input"] as? JsonObject ?: return false
+                val f = (input["field"] as? JsonPrimitive)?.contentOrNull
+                if (form == null || f == null) return false
+                form.values[f] = JSONValue.from(input["value"] ?: JsonNull)
+            }
+            op.containsKey("search") -> {
+                val search = op["search"] as? JsonObject ?: return false
+                val key = (search["field"] as? JsonPrimitive)?.contentOrNull ?: return false
+                queries(route)[key] = (search["text"] as? JsonPrimitive)?.contentOrNull.orEmpty()
+            }
+            op.containsKey("back") -> back(route)
+            else -> return false
+        }
+        return true
+    }
+
+    companion object {
+        /** effects の `request` に入れるアクション(Android の RenderTree.action と同じキー)。 */
+        fun actionJson(a: Action): JsonObject = JsonObject(
+            buildMap {
+                put("type", JsonPrimitive(a.type.wire.ifEmpty { a.rawType }))
+                a.screen?.let { put("screen", JsonPrimitive(it)) }
+                a.presentation?.let { put("presentation", JsonPrimitive(it.wire)) }
+                a.prefillRef?.let { put("prefillRef", JsonPrimitive(it)) }
+                a.entity?.let { put("entity", JsonPrimitive(it)) }
+                a.url?.let { put("url", JsonPrimitive(it)) }
+                a.confirmMessage?.let { put("confirmMessage", JsonPrimitive(it)) }
+                a.format?.let { put("format", JsonPrimitive(it.wire)) }
+                a.notificationId?.let { put("notificationId", JsonPrimitive(it)) }
+            },
+        )
+
+        private fun obj(vararg pairs: Pair<String, JsonElement>) = JsonObject(mapOf(*pairs))
+    }
+}
+
+/**
+ * 下書きを文字の map として見せる(io/DesktopIo の写真・動画・ドロップが field に file URI を書く口)。
+ * 書くと文字の値・消すと空になる。
+ */
+class FormDraftStrings(private val form: FormDraft) : AbstractMutableMap<String, String>() {
+    override fun get(key: String): String? = form.values[key]?.stringValue
+
+    override fun put(key: String, value: String): String? = get(key).also { form.values[key] = JSONValue.Str(value) }
+
+    override fun remove(key: String): String? = get(key).also { form.values[key] = JSONValue.Null }
+
+    override val entries: MutableSet<MutableMap.MutableEntry<String, String>>
+        get() = form.values.mapNotNull { (k, v) -> v.stringValue?.let { java.util.AbstractMap.SimpleEntry(k, it) } }.toMutableSet()
+}
+
+/** 画面の部品を子まで全部(押す対象を id で探す)。 */
+fun Screen.allComponents(): List<Component> {
+    fun walk(c: Component): List<Component> = listOf(c) + c.children.flatMap(::walk)
+    return components.flatMap(::walk)
+}
+
+/** ボタンを出すか(新規フォームの削除・読み取りだけの保存は隠す)。Android の components/Leaves.kt と同じ。 */
+fun isButtonVisible(action: Action?, form: FormDraft?): Boolean = when (action?.type) {
+    ActionType.DELETE_RECORD -> (form?.isEditing ?: false) && (form?.canDelete ?: true)
+    ActionType.SAVE_RECORD -> !(form?.isReadOnly ?: false)
+    else -> true
+}

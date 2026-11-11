@@ -23,6 +23,7 @@ dependencies {
     implementation(project(":services"))
     implementation(compose.desktop.currentOs)
     implementation(compose.material3)
+    implementation(libs.zxing.core)
     // PDF の本文を読む・表を PDF に書く(#1753)。pdfbox + fontbox + pdfbox-io + commons-logging で約 3.8 MB
     implementation("org.apache.pdfbox:pdfbox:3.0.3")
 
@@ -47,6 +48,16 @@ tasks.test {
     inputs.dir(dslDocsDir.resolve("examples")).withPropertyName("dslExamples").withPathSensitivity(PathSensitivity.RELATIVE)
     systemProperty("metamon.dslDocsDir", dslDocsDir.absolutePath)
 }
+
+// Android の :renderer のうち Compose の状態しか使わない純 Kotlin(フォームの下書き・遷移の規則)は、android/ を変えずにそのまま取り込む。
+val sharedRendererDir = rootDir.resolve("../android/renderer/src/main/kotlin/jp/kz2601/metamon/renderer")
+val syncSharedRenderer by tasks.registering(Sync::class) {
+    from(sharedRendererDir) {
+        include("form/FormDraft.kt", "navigation/NavigationResolver.kt")
+    }
+    into(layout.buildDirectory.dir("generated/sharedRenderer"))
+}
+kotlin.sourceSets.named("main") { kotlin.srcDir(syncSharedRenderer) }
 
 // 手元の確かめ: TAILORIT_API=stg TAILORIT_DEV_TOKEN=<ID トークン> ./gradlew :desktop:listApps(stg のアプリの一覧を出す)
 tasks.register<JavaExec>("listApps") {
