@@ -102,6 +102,9 @@ struct MacRootView: View {
                 .interactiveDismissDisabled(session.isBusy)
                 .environment(voice)
         }
+        #if !APP_STORE_REVIEW
+        .modifier(MacPaywallPresenter()) // 中央のアプリの部品が Pro を求めた時の課金画面(iOS と同じ商品)
+        #endif
         .task { voice.prepareIfAllowed() } // モデルが端末にあれば読み込む(無ければ起動では聞かない)
         .onAppear {
             reopenLastApp()
