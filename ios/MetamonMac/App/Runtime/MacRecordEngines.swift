@@ -75,6 +75,19 @@ final class MacRecordEngines {
         await MacRecordVault.purge(appId: appId, root: root)
         withExtendedLifetime(entry) {} // 消し終わるまでエンジンを生かしておく(弱く持たれているので)
     }
+
+    /// サインアウト・アカウント削除(#972): 全部のエンジンを手放してから、記録のフォルダごと消す
+    func purgeAll() async {
+        let all = entries
+        entries = [:]
+        for entry in all.values {
+            entry.engine.stop()
+            entry.engine.onEvent = nil
+            entry.leases.values.forEach { $0.detach() }
+        }
+        await MacRecordVault.purgeAll(root: root)
+        withExtendedLifetime(all) {}
+    }
 }
 
 /// `MacRecordEngines` から借りたエンジン。ウインドウ(ランタイム)ごとに 1 つ。`release` は何度呼んでも 1 回だけ

@@ -208,6 +208,22 @@ final class MacAppLibrary {
         saveList()
     }
 
+    /// 端末のデータを消した回数(開いているウインドウが選択を初期に戻す合図・#972)
+    private(set) var wipeCount = 0
+
+    /// サインアウト・アカウント削除(#972)。メモリ上の一覧・版の履歴を空にする(端末のファイルと UserDefaults は `MacLocalWipe` が消す)
+    func resetAfterWipe() {
+        wipeCount += 1
+        generated = [:]
+        createdIds = []
+        envelopes = [:]
+        savedRows = [:]
+        histories = [:]
+        serverIds = []
+        serverRedo = [:]
+        restoring = []
+    }
+
     /// 複製する(#1285)。名前の付け方は iOS の `duplicateApp` と同じ(「○○のコピー」)。画面の定義だけを写し、記録は写さない。
     /// 作ったアプリは元のすぐ下、同梱の例は作ったアプリの先頭に置く。切り替えはしない(iOS と同じ)。複製したアプリの名前を返す
     @discardableResult
