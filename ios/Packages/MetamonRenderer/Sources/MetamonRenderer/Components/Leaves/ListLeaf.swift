@@ -127,7 +127,8 @@ struct ListLeaf: View {
             .onChange(of: listFocused) { _, focused in
                 if focused && selection.ids.isEmpty { selection.select(ListRowSelection.onFocus(current: selection.cursor, ids: ids)) }
             }
-            .onChange(of: ids) { _, now in selection.prune(order: now) }
+            // 一覧が空になって出し直した時も(行の束は作り直しで、変わった時の知らせが来ない)、もう無い行を選択から外す
+            .onChange(of: ids, initial: true) { _, now in selection.prune(order: now) }
             .confirmationDialog(L("選んだ \(bulkDelete?.count ?? 0) 件を削除しますか?"),
                                 isPresented: Binding(get: { bulkDelete != nil }, set: { if !$0 { bulkDelete = nil } }),
                                 titleVisibility: .visible) {
