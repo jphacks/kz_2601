@@ -8,6 +8,8 @@ import MetamonRenderer
 enum MacVoiceCopy {
     static var listening: String { L10n.tr("聞いています。話し終えたら、もう一度押してください") }
     static var inputDeviceLost: String { L10n.tr("録音中にマイクが外れました。つなぎ直すか、設定でマイクを選んでから、もう一度話してください") }
+    /// 録音の部品(audioRecorder)が録音している間に声で頼んだ(#952)
+    static var otherRecording: String { L10n.tr("ほかの録音を終えてから、もう一度お試しください") }
     static var transcribing: String { L10n.tr("文字にしています") }
     static var provisional: String { L10n.tr("準備中のため簡易の聞き取りです") }
     static var downloadButton: String { L10n.tr("音声モデルをダウンロード") }

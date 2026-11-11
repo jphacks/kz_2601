@@ -42,17 +42,30 @@ final class MacVoiceInput {
     /// 録音に使っている入力の装置の UID(抜けたかを見る・#1221)
     @ObservationIgnored private var recordingDeviceUID: String?
     @ObservationIgnored private let currentInputUID: () -> String?
+    /// 録音と再生は同時に 1 つだけ(#952)。部品の録音中は声で頼まない・録音を始める時は再生を止める
+    @ObservationIgnored let audioFocus: AudioFocus
 
     init(transcriber: (any SpeechTranscriber)? = nil,
          defaults: UserDefaults = .standard,
          slowHardware: Bool = !MacHardware.isAppleSilicon,
          isExpensiveNetwork: @escaping () -> Bool = { ExpensiveNetworkProbe.shared.isExpensive },
-         currentInputUID: @escaping () -> String? = { MacInputDevices.inUseUID() }) {
+         currentInputUID: @escaping () -> String? = { MacInputDevices.inUseUID() },
+         audioFocus: AudioFocus = .shared) {
         self.transcriber = transcriber ?? Self.makeTranscriber()
         self.defaults = defaults
         self.slowHardware = slowHardware
         self.isExpensiveNetwork = isExpensiveNetwork
         self.currentInputUID = currentInputUID
+        self.audioFocus = audioFocus
+    }
+
+    /// 起動時に 1 回: 声の入力(声で頼む・話して入力)がマイクを使っている間は、部品の録音・再生を断る(#952)
+    func attachAudioFocus() {
+        audioFocus.isMicBusyElsewhere = { [weak self] in
+            guard let self else { return false }
+            return self.isBusy || self.dictation.isRecording
+        }
+        audioFocus.stopHostPlayback = { MacSpeechReader.shared.stop() }
     }
 
     /// 本命は WhisperKit(モデル名は iOS と同じ `MetamonWhisperModel` / `METAMON_WHISPER_MODEL`・既定 small)、準備中は Apple の端末内の認識。
@@ -84,7 +97,10 @@ final class MacVoiceInput {
     @ObservationIgnored private(set) lazy var dictation = TranscriberDictation(
         transcriber: transcriber,
         voiceInputActive: { [weak self] in self?.isBusy ?? false },
-        stopSpeech: { LeafSpeech.shared.stopForRecording() },
+        stopSpeech: { [weak self] in
+            self?.audioFocus.micWillStart() // 音声の再生も止める(#952)
+            LeafSpeech.shared.stopForRecording()
+        },
         resumeSpeech: { LeafSpeech.shared.recordingFinished() },
         failure: { MacVoiceCopy.dictationFailure($0) },
         requestModel: { [weak self] in self?.requestDownloadFromApp() })
@@ -138,6 +154,10 @@ final class MacVoiceInput {
         dictation.cancel() // 部品が録音していたら捨てる(マイクは 1 つ)
         failure = nil
         settingsPane = nil
+        guard !audioFocus.isRecording else { // audioRecorder が録音中(#952)
+            failure = MacVoiceCopy.otherRecording
+            return
+        }
         if case .failed = transcriber.status { Task { try? await transcriber.prepare() } } // 失敗後は作り直す
         let plan = VoiceStartPlan.decide(
             needsDownload: transcriber.needsDownload && transcriber.status == .notDownloaded,
@@ -210,6 +230,7 @@ final class MacVoiceInput {
     private func startRecording() {
         guard state == .idle else { return }
         MacSpeechReader.shared.stop() // 読み上げの声をマイクが拾わない(#1210)
+        audioFocus.micWillStart() // 音声の再生・speakButton も止める(#952)
         state = .recording
         startPending = true
         stopWhenStarted = nil

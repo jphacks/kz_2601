@@ -76,6 +76,33 @@ enum PlatformSystem {
         #endif
     }
 
+    /// マイクが拒否された時の「設定を開く」(#952)。Mac はシステム設定 > プライバシーとセキュリティ > マイク へ直接。
+    static var microphoneSettingsURL: URL? {
+        #if canImport(UIKit)
+        appSettingsURL
+        #else
+        URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Microphone")
+        #endif
+    }
+
+    /// マイクが拒否された時の説明(Mac は「システム設定 > プライバシーとセキュリティ > マイク」)
+    static var microphoneDeniedMessage: String {
+        #if canImport(UIKit)
+        L("設定アプリで Tailor It のマイクへのアクセスを許可してください。")
+        #else
+        L("システム設定 > プライバシーとセキュリティ > マイク で Tailor It を許可してください。")
+        #endif
+    }
+
+    /// 権限の「設定を開く」ボタンの文言(Mac は「システム設定を開く」)
+    static var openSettingsTitle: String {
+        #if canImport(UIKit)
+        L("設定を開く")
+        #else
+        L("システム設定を開く")
+        #endif
+    }
+
     /// カメラが拒否された時の説明(Mac は「システム設定」)
     static var cameraDeniedMessage: String {
         #if canImport(UIKit)

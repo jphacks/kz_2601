@@ -61,6 +61,7 @@ struct MetamonMacApp: App {
                     .task {
                         // マイクの抜き差し(#1221): 録音中に使っている装置が外れたら止めて知らせる
                         MacInputDevices.shared.onChange = { [voice] in voice.inputDevicesChanged(available: $0) }
+                        voice.attachAudioFocus() // 録音と再生は同時に 1 つだけ(#952)
                         MacInputDevices.shared.startObserving()
                     }
             }

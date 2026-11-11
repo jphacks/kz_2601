@@ -70,6 +70,8 @@ final class MacAppRuntime: RuntimeNavigating {
     #endif
     /// 話して入力(aiChat のマイク・transcribeField・#1328)。声で頼む(`MacVoiceInput`)と同じ認識を使う。nil なら使えない
     @ObservationIgnored let dictationSource: TranscriberDictation?
+    /// 録音と再生は同時に 1 つだけ(#952)。audioRecorder の録音中は話して入力・録音ファイルの文字起こしを始めない
+    @ObservationIgnored var audioFocus: AudioFocus = .shared
     /// openVoice(#946): 中央のアプリを直す会話を声で開く(⇧⌘M と同じ)。`AppCanvas` が `MacRootView` の会話につなぐ
     @ObservationIgnored var onOpenVoice: (@MainActor () -> Void)?
     /// モーダルの中の openVoice。モーダルを閉じ終えてから会話を開く(シートを重ねない)
