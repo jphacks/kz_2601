@@ -94,7 +94,11 @@ func (s *Service) BuyOverflow(ctx context.Context, r OverflowRequest) (OverflowR
 		if w.Overflow.Month > r.Month {
 			return ErrStaleMonth
 		}
-		es := stamp(refresh(w, g, now), now)
+		es, err := applyGrants(tx, r.UID, g, now)
+		if err != nil {
+			return err
+		}
+		es = stamp(es, now)
 		o := w.Overflow.inMonth(r.Month)
 		have := o.Blocks[r.Kind]
 		out = OverflowResult{Blocks: have, Spent: o.Spent, Cap: o.MonthlyCap}

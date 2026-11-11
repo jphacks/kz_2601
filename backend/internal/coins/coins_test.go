@@ -10,6 +10,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/jphacks/kz_2601/backend/internal/auth"
 	"github.com/jphacks/kz_2601/backend/internal/fsenv"
 )
 
@@ -58,8 +59,11 @@ func testConfig(mode Mode) Config {
 }
 
 func newService(st Store, mode Mode, c *clock) *Service {
-	return &Service{Config: testConfig(mode), Store: st, Now: c.now}
+	return &Service{Config: testConfig(mode), Store: st, Now: c.now, Subjects: ownSubject}
 }
+
+// ownSubject makes every account its own person.
+func ownSubject(_ context.Context, uid string) []string { return []string{"test:" + uid} }
 
 // fund credits n purchased coins to uid directly.
 func fund(t *testing.T, st Store, u string, n int64, now time.Time) {
@@ -431,6 +435,62 @@ func TestInitialGrantOnceForSignedIn(t *testing.T) {
 		}
 		consistent(t, st, u, c.now())
 	})
+}
+
+// The initial grant is once per person (sign-in subject), not per account:
+// a second account of the same Apple ID, also after the first is deleted,
+// gets none; another person still gets theirs.
+func TestInitialGrantOncePerPerson(t *testing.T) {
+	stores(t, func(t *testing.T, st Store) {
+		ctx, c := context.Background(), &clock{t: t0}
+		s := newService(st, ModeEnforce, c)
+		s.Config.InitialGrant = 7
+		person, other := "apple.com:"+uid(t, "sub"), "apple.com:"+uid(t, "sub2")
+		first, second, third, stranger := uid(t, "a"), uid(t, "b"), uid(t, "c"), uid(t, "d")
+		subs := map[string][]string{first: {person}, second: {person}, third: {other, person}, stranger: {other}}
+		s.Subjects = func(_ context.Context, u string) []string { return subs[u] }
+
+		if v, err := s.Wallet(ctx, first, false); err != nil || v.Initial != 7 {
+			t.Fatalf("first %+v %v", v, err)
+		}
+		if v, _ := s.Wallet(ctx, first, false); v.Initial != 7 {
+			t.Fatalf("first again %+v", v)
+		}
+		if _, err := st.PurgeUser(ctx, first); err != nil {
+			t.Fatal(err)
+		}
+		if v, _ := s.Wallet(ctx, second, false); v.Initial != 0 || v.Total != 0 {
+			t.Fatalf("same person, new account %+v", v)
+		}
+		// one claimed subject is enough to refuse, and the new one is not claimed
+		if v, _ := s.Wallet(ctx, third, false); v.Initial != 0 {
+			t.Fatalf("linked subjects %+v", v)
+		}
+		if v, _ := s.Wallet(ctx, stranger, false); v.Initial != 7 {
+			t.Fatalf("another person %+v", v)
+		}
+		consistent(t, st, second, c.now())
+	})
+}
+
+// Without the payer's subjects (the payer is not the verified caller) the
+// initial grant waits instead of being given or refused.
+func TestInitialGrantWaitsForSubjects(t *testing.T) {
+	ctx, c := context.Background(), &clock{t: t0}
+	st := NewMemory()
+	s := newService(st, ModeEnforce, c)
+	s.Config.InitialGrant = 7
+	s.Subjects = nil // from the request: none in a bare context
+	u := uid(t, "u")
+	if v, _ := s.Wallet(ctx, u, false); v.Initial != 0 {
+		t.Fatalf("no caller %+v", v)
+	}
+	if v, _ := s.Wallet(auth.ContextWithIdentity(ctx, auth.Identity{UID: "someone-else", Subjects: []string{"apple.com:x"}}), u, false); v.Initial != 0 {
+		t.Fatalf("other caller %+v", v)
+	}
+	if v, _ := s.Wallet(auth.ContextWithIdentity(ctx, auth.Identity{UID: u, Subjects: []string{"apple.com:y"}}), u, false); v.Initial != 7 {
+		t.Fatalf("caller %+v", v)
+	}
 }
 
 func TestCreditPurchaseOncePerTransaction(t *testing.T) {

@@ -46,6 +46,8 @@ public final class CoinStore {
         case unverified
         case productNotFound
         case disabled
+        /// 購入に結び付ける uid が無い(サインインしていない)
+        case notSignedIn
     }
 
     /// 公開の設定。nil = まだ読んでいない
@@ -161,10 +163,9 @@ public final class CoinStore {
         }
         if products.isEmpty { await loadProducts() }
         guard let product = products.first(where: { $0.id == productID }) else { throw StoreError.productNotFound }
-        var options: Set<Product.PurchaseOption> = []
-        if let uid = accountUID?(), !uid.isEmpty {
-            options.insert(.appAccountToken(ProAccountToken.uuid(for: uid))) // どの uid の購入か(#314 と同じ)
-        }
+        // どの uid の購入か(#314 と同じ)。サーバーはこの uid の取引だけを足すので、uid が無ければ買わせない
+        guard let uid = accountUID?(), !uid.isEmpty else { throw StoreError.notSignedIn }
+        let options: Set<Product.PurchaseOption> = [.appAccountToken(ProAccountToken.uuid(for: uid))]
         switch try await product.purchase(options: options) {
         case .success(let verification):
             guard case .verified(let transaction) = verification else { throw StoreError.unverified }

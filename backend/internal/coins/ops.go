@@ -23,12 +23,62 @@ func stamp(es []Entry, now time.Time) []Entry {
 	return es
 }
 
+// applyGrants is refresh with the initial grant given once per person: the
+// first account to claim one of g.InitialKeys gets it, in the same
+// transaction; a key another account claimed means none for this one.
+// Without keys the initial grant waits (nothing is marked).
+func applyGrants(tx *Tx, uid string, g GrantPolicy, now time.Time) ([]Entry, error) {
+	if !tx.Wallet.InitialGranted && !g.Anonymous && g.Initial > 0 {
+		ok, err := claimInitial(tx, uid, g.InitialKeys, now)
+		if err != nil {
+			return nil, err
+		}
+		if !ok {
+			g.Initial = 0
+		}
+	}
+	return refresh(&tx.Wallet, g, now), nil
+}
+
+// claimInitial reports whether uid may have the initial grant, recording
+// its claims in tx when so.
+func claimInitial(tx *Tx, uid string, keys []string, now time.Time) (bool, error) {
+	if len(keys) == 0 || tx.Claims == nil {
+		return false, nil
+	}
+	have, err := tx.Claims(keys)
+	if err != nil {
+		return false, err
+	}
+	owner := OwnerHash(uid)
+	for _, k := range keys {
+		if c, ok := have[k]; ok && c.Owner != owner {
+			tx.Wallet.InitialGranted, tx.WalletDirty = true, true // already given to this person
+			return false, nil
+		}
+	}
+	for _, k := range keys {
+		if _, ok := have[k]; ok {
+			continue
+		}
+		if tx.NewClaims == nil {
+			tx.NewClaims = map[string]InitialClaim{}
+		}
+		tx.NewClaims[k] = InitialClaim{Owner: owner, At: now}
+	}
+	return true, nil
+}
+
 // GetWallet applies the grants due at now and returns the wallet.
 func GetWallet(ctx context.Context, st Store, uid string, g GrantPolicy, now time.Time) (Wallet, error) {
 	now = storedTime(now)
 	var out Wallet
 	err := st.Update(ctx, Keys{UID: uid}, func(tx *Tx) error {
-		if es := refresh(&tx.Wallet, g, now); len(es) > 0 {
+		es, err := applyGrants(tx, uid, g, now)
+		if err != nil {
+			return err
+		}
+		if len(es) > 0 {
 			tx.Entries = stamp(es, now)
 			tx.Wallet.UpdatedAt = now
 			tx.WalletDirty = true
@@ -54,7 +104,10 @@ func ReserveHold(ctx context.Context, st Store, uid string, h Hold, g GrantPolic
 			out.Existing = true
 			return nil
 		}
-		es := refresh(&tx.Wallet, g, now)
+		es, err := applyGrants(tx, uid, g, now)
+		if err != nil {
+			return err
+		}
 		parts, ok := take(&tx.Wallet, h.Amount)
 		if !ok {
 			return &InsufficientError{Required: h.Amount, Balance: tx.Wallet.Available(), Payer: "self"}
@@ -164,7 +217,10 @@ func CreditPurchase(ctx context.Context, st Store, uid string, p Purchase, g Gra
 			}
 			return nil
 		}
-		es := refresh(&tx.Wallet, g, now)
+		es, err := applyGrants(tx, uid, g, now)
+		if err != nil {
+			return err
+		}
 		tx.Wallet.Purchased += p.Coins
 		es = append(stamp(es, now), Entry{ID: "purchase_" + p.TransactionID, Kind: KindPurchase, Amount: p.Coins,
 			Delta: Split{Purchased: p.Coins}, TransactionID: p.TransactionID, ProductID: p.ProductID, At: now})

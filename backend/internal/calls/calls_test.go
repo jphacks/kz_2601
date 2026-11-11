@@ -66,7 +66,8 @@ func newFixture(t *testing.T, perMinute int64, mode coins.Mode, grant int64) *fi
 	t.Helper()
 	f := &fixture{now: time.Date(2026, 11, 10, 12, 0, 0, 0, time.UTC)}
 	f.coins = &coins.Service{Config: coins.Config{Mode: mode, InitialGrant: grant, HoldTTL: time.Minute, Reserve: map[string]int64{}},
-		Store: coins.NewMemory(), Now: func() time.Time { return f.now }}
+		Store: coins.NewMemory(), Now: func() time.Time { return f.now },
+		Subjects: func(_ context.Context, uid string) []string { return []string{"test:" + uid} }}
 	cfg, err := ConfigFromEnv(env(onEnv(map[string]string{"COIN_PER_CALL_MINUTE": fmt.Sprint(perMinute), "CALL_BLOCK_MINUTES": "10"})))
 	if err != nil {
 		t.Fatal(err)

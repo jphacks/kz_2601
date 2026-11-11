@@ -62,7 +62,11 @@ func (s *Service) BuySlot(ctx context.Context, uid string, anonymous bool, reque
 	var out SlotPurchase
 	var w Wallet
 	err = s.Store.Update(ctx, Keys{UID: uid, HoldID: id}, func(tx *Tx) error {
-		es := stamp(refresh(&tx.Wallet, g, now), now)
+		es, err := applyGrants(tx, uid, g, now)
+		if err != nil {
+			return err
+		}
+		es = stamp(es, now)
 		if tx.Hold != nil { // a retry of a purchase that went through
 			if len(es) > 0 {
 				tx.Entries, tx.Wallet.UpdatedAt, tx.WalletDirty = es, now, true

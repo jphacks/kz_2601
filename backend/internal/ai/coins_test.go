@@ -96,6 +96,8 @@ func coinWallets(mode coins.Mode, balance int64) (*coins.Service, *lockedBuf) {
 			InitialGrant: balance, Reserve: testCoinReserve},
 		Store: coins.NewMemory(),
 		Log:   slog.New(slog.NewJSONHandler(logs, nil)),
+		// each account is its own person (the initial grant is once per person)
+		Subjects: func(_ context.Context, uid string) []string { return []string{"test:" + uid} },
 	}, logs
 }
 
