@@ -32,6 +32,38 @@ final class SplashPresence {
     #endif
 }
 
+/// 起動時の同意の画面(`ConsentHost`)が閉じるまで、シェアリンク・Intent(開く/話しかける)を待たせる。
+/// スプラッシュが閉じた瞬間にシートが同時に出ると SwiftUI が片方を捨て、同意が出ないまま止まるため(同意 → 残りの順)。
+/// 同意を出さなかった・「あとで」で閉じた・画面が消えた時も必ず `end()` する(待たせたままにしない)。
+@MainActor
+@Observable
+final class LaunchConsentHold {
+    static let shared = LaunchConsentHold()
+
+    private(set) var isHolding = false
+    @ObservationIgnored private var waiters: [CheckedContinuation<Void, Never>] = []
+
+    func begin() { isHolding = true }
+
+    func end() {
+        guard isHolding else { return }
+        isHolding = false
+        let pending = waiters
+        waiters = []
+        pending.forEach { $0.resume() }
+    }
+
+    /// 待たせていなければすぐ戻る。待たせていれば同意の画面が閉じるまで待つ。
+    func waitUntilReleased() async {
+        guard isHolding else { return }
+        await withCheckedContinuation { waiters.append($0) }
+    }
+
+    #if DEBUG
+    func resetForTesting() { isHolding = false; waiters = [] }
+    #endif
+}
+
 /// アニメを始める合図: 最初のコマが描かれ、メインスレッドが空いた(画面の更新が続けて間に合った)ら始める。
 /// `cap` 秒待っても空かなければ、動かさずに完成形を出してフェードする。
 struct SplashStartGate {
@@ -55,6 +87,19 @@ struct SplashStartGate {
         last = time
         return smooth >= Self.smoothFrames ? .start : .wait
     }
+
+    /// 起動からフェードの終わりまでの上限(秒)
+    static let totalBudget: TimeInterval = 3.0
+    /// フェードアウトの長さ(`SplashOverlay`)
+    static let fadeOut: TimeInterval = 0.3
+
+    /// 開始を `waited` 秒待った時の、アニメの速さの倍率(1 = そのまま・小さいほど速い)。
+    /// 待った分だけ縮めて、待つ + アニメ + フェードを `totalBudget` に収める。
+    static func pace(waited: TimeInterval, animation: TimeInterval) -> Double {
+        let room = totalBudget - fadeOut - max(0, waited)
+        guard animation > 0, room < animation else { return 1 }
+        return max(0.1, room / animation)
+    }
 }
 
 /// `SplashStartGate` を画面の更新(CADisplayLink)で回す。
@@ -66,8 +111,15 @@ final class SplashStartWaiter: NSObject {
 
     private init(origin: TimeInterval) { gate = SplashStartGate(origin: origin) }
 
-    static func wait() async -> SplashStartGate.Decision {
-        let waiter = SplashStartWaiter(origin: CACurrentMediaTime())
+    /// 合図と、それまで待った秒数。
+    static func wait() async -> (decision: SplashStartGate.Decision, waited: TimeInterval) {
+        let origin = CACurrentMediaTime()
+        let decision = await waitForDecision(origin: origin)
+        return (decision, CACurrentMediaTime() - origin)
+    }
+
+    private static func waitForDecision(origin: TimeInterval) async -> SplashStartGate.Decision {
+        let waiter = SplashStartWaiter(origin: origin)
         return await withCheckedContinuation { c in
             waiter.continuation = c
             let link = CADisplayLink(target: waiter, selector: #selector(tick(_:)))

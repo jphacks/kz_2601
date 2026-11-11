@@ -91,6 +91,7 @@ struct MetamonApp: App {
         _runtime = State(initialValue: runtime)
         _session = State(initialValue: session)
         if splashMode != .hidden { SplashPresence.shared.begin() } // 起動時のシート・リンク・吹き出しはスプラッシュの後に
+        runtime.beginLaunchConsentHoldIfNeeded() // 起動時の同意 → シェアリンク・Intent の順(シートを同時に出さない)
     }
 
     var body: some Scene {
