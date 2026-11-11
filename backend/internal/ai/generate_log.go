@@ -4,12 +4,49 @@ import (
 	"context"
 	"errors"
 	"log/slog"
+	"strings"
 	"time"
 
 	"github.com/jphacks/kz_2601/backend/internal/auth"
 	"github.com/jphacks/kz_2601/backend/internal/httpx"
 	"github.com/jphacks/kz_2601/backend/internal/metrics"
+	"github.com/jphacks/kz_2601/backend/pkg/dsl"
 )
+
+// Retry reasons (Meta.RetryReasons, retry_reasons of ai.generate): why an
+// attempt was rejected and the model asked again (or the edit fell back).
+const (
+	RetryValidation    = "validation"     // dsl validation problems (schema / semantic rules)
+	RetryInvalidOutput = "invalid_output" // not JSON / not a PatchDocument / patch does not apply
+	RetryTruncated     = "truncated"      // stopped at max_tokens
+	RetryRestriction   = "restriction"    // a part this build cannot render (#245)
+	RetryLint          = "lint"           // content warnings or omissions (LintRetry)
+	RetryShare         = "share"          // share request not answered (#254 #259)
+)
+
+// retryReason labels an attempt rejected with err.
+func retryReason(err error, resp *Response) string {
+	if resp != nil && resp.StopReason == "max_tokens" {
+		return RetryTruncated
+	}
+	var ve *dsl.ValidationError
+	if errors.As(err, &ve) {
+		return RetryValidation
+	}
+	return RetryInvalidOutput
+}
+
+// contentRetryReasons labels a valid output retried for its content.
+func contentRetryReasons(lint, share bool) []string {
+	var r []string
+	if lint {
+		r = append(r, RetryLint)
+	}
+	if share {
+		r = append(r, RetryShare)
+	}
+	return r
+}
 
 // GenerateEvent is the message (and `event` attr) of the per-request log of
 // POST /v1/generate (#297 #322). Cloud Logging filter: jsonPayload.event="ai.generate".
@@ -92,6 +129,9 @@ func (s *Service) logGenerate(ctx context.Context, tr genTrace, stream bool, res
 			slog.Bool("lint_retried", m.LintRetried),
 			slog.Int64("claude_ms", res.LatencyMs.Claude),
 		)
+		if len(m.RetryReasons) > 0 { // labels only, in order (e.g. "validation,validation")
+			attrs = append(attrs, slog.String("retry_reasons", strings.Join(m.RetryReasons, ",")))
+		}
 	}
 	var ge *Error
 	if errors.As(err, &ge) {
