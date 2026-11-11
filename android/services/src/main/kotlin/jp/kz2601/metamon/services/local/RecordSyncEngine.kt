@@ -1,5 +1,7 @@
 package jp.kz2601.metamon.services.local
 
+import jp.kz2601.metamon.dsl.records.LocalVideoStore
+import jp.kz2601.metamon.dsl.records.VideoValue
 import jp.kz2601.metamon.services.AppConfigClient
 import jp.kz2601.metamon.services.MarkState
 import jp.kz2601.metamon.services.Record
@@ -15,6 +17,7 @@ import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
 import java.io.File
 import java.time.Instant
 import java.time.temporal.ChronoUnit
@@ -53,6 +56,8 @@ class RecordSyncEngine(
     val connectivity: ConnectivityMonitor,
     private val scope: CoroutineScope,
     private val now: () -> Instant = Instant::now,
+    /** 端末内の動画の置き場(#863)。記録を消した時にその記録の動画ファイルも消す。null = 消さない(テスト・置き場の無い構成) */
+    private val videos: LocalVideoStore? = null,
 ) {
     sealed interface Status {
         data object Synced : Status
@@ -230,6 +235,8 @@ class RecordSyncEngine(
 
     /** 削除。ローカルではすぐ一覧から消え(行は削除待ちで残る)、送れたら行も消える。 */
     suspend fun delete(appId: String, entity: String, recordId: String): List<Record> {
+        // 端末内の動画ファイル(#1201・iOS の `store.videos.remove(VideoValue.localIDs(in:))`)。取り消し期間の後にだけ通る
+        videos?.let { v -> store.current(appId, entity, recordId)?.let { v.remove(localVideoIds(it.data)) } }
         val result = queue.enqueue(SyncOperation(appId = appId, entity = entity, recordId = recordId, kind = PendingOp.DELETE))
         if (result == SyncQueue.EnqueueResult.CANCELLED_CREATE) {
             store.remove(appId, entity, recordId) // まだサーバーに無い行はその場で消す
@@ -345,6 +352,10 @@ class RecordSyncEngine(
             .map { it.record }
     }
 
+    /** 記録の値の中にある端末内動画の id([VideoValue.localIds] の JsonObject 版) */
+    private fun localVideoIds(data: JsonObject): Set<String> =
+        data.values.mapNotNull { v -> (v as? JsonPrimitive)?.takeIf { it.isString }?.content?.let(VideoValue::parse)?.id }.toSet()
+
     /** ローカル行の時刻。ミリ秒まで持つ(同じ秒に続けて作った行も作った順に並ぶ)。 */
     private fun timestamp(): String = now().truncatedTo(ChronoUnit.MILLIS).toString()
 
@@ -358,9 +369,10 @@ class RecordSyncEngine(
             connectivity: ConnectivityMonitor,
             directory: File,
             scope: CoroutineScope,
+            videos: LocalVideoStore? = null,
         ): RecordSyncEngine {
             val store = RecordStore(directory)
-            return RecordSyncEngine(store, SyncQueue(directory, store, client), client, connectivity, scope)
+            return RecordSyncEngine(store, SyncQueue(directory, store, client), client, connectivity, scope, videos = videos)
         }
     }
 }
