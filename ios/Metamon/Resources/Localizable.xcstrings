@@ -11179,6 +11179,23 @@
         }
       }
     },
+    "参加している人が上限(100 人)に達しています。これ以上は参加できません" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "This share is full (100 people). No one else can join."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "参加している人が上限(100 人)に達しています。これ以上は参加できません"
+          }
+        }
+      }
+    },
     "参加している人が上限(100 人)に達しているため、参加できません" : {
       "extractionState" : "manual",
       "localizations" : {
