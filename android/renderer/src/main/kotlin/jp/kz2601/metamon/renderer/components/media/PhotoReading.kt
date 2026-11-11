@@ -49,23 +49,29 @@ object PhotoReading {
     /** いま値にできる kind。jointAngle は骨格の読み取り(ML Kit の姿勢は端末に同梱する大きい部品)が無いので読めなかった扱い。 */
     val supportedKinds = PhotoAnalyzeKind.entries.toSet() - setOf(PhotoAnalyzeKind.JOINT_ANGLE, PhotoAnalyzeKind.UNKNOWN)
 
-    /** describe のラベルの前置き(iOS の `L("写っているもの: ")`)。 */
-    const val DESCRIBE_PREFIX = "写っているもの: "
-
-    /** 手がかり → 各 into の値。読めなかった・型に入らない項目は missed(今の値のまま)。 */
-    fun apply(clues: PhotoClues, specs: List<PhotoAnalyze>, entity: Entity, zone: ZoneId = ZoneId.systemDefault()): PhotoReadOutcome {
+    /**
+     * 手がかり → 各 into の値。読めなかった・型に入らない項目は missed(今の値のまま)。
+     * [describePrefix] は describe のラベルの前置き(iOS の `L("写っているもの: ")`・`R.string.media_photo_describe_prefix`)。
+     */
+    fun apply(
+        clues: PhotoClues,
+        specs: List<PhotoAnalyze>,
+        entity: Entity,
+        zone: ZoneId = ZoneId.systemDefault(),
+        describePrefix: String,
+    ): PhotoReadOutcome {
         val values = linkedMapOf<String, JSONValue>()
         val missed = mutableListOf<String>()
         for (spec in specs) {
             val field = entity.field(spec.into)
-            val v = field?.let { jsonValue(reading(spec, it.options, clues), it.type, zone) }
+            val v = field?.let { jsonValue(reading(spec, it.options, clues, describePrefix), it.type, zone) }
             if (v == null) missed += spec.into else values[spec.into] = v
         }
         return PhotoReadOutcome(values, missed)
     }
 
     /** 端末内 AI を使わない読み方(iOS で Apple Intelligence が無い時と同じ)。 */
-    internal fun reading(spec: PhotoAnalyze, fieldOptions: List<String>?, clues: PhotoClues): Any? {
+    internal fun reading(spec: PhotoAnalyze, fieldOptions: List<String>?, clues: PhotoClues, describePrefix: String): Any? {
         val text = clues.lines.joinToString("\n")
         val labels = clues.labels
         return when (spec.kind) {
@@ -77,7 +83,7 @@ object PhotoReading {
                 if (options.size < 2 || (labels.isEmpty() && text.isEmpty())) null else PhotoClassifier.classify(options, labels, text)
             }
             PhotoAnalyzeKind.DESCRIBE -> when {
-                labels.isNotEmpty() -> DESCRIBE_PREFIX + labels.take(5).map(PhotoClassifier::japanese).joinToString("、")
+                labels.isNotEmpty() -> describePrefix + labels.take(5).map(PhotoClassifier::japanese).joinToString("、")
                 text.isNotEmpty() -> text.take(200)
                 else -> null
             }
