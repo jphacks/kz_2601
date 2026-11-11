@@ -1,11 +1,16 @@
 package jp.kz2601.metamon.voice
 
 import jp.kz2601.metamon.R
+import jp.kz2601.metamon.purchase.PaywallCopy
+import jp.kz2601.metamon.purchase.PaywallReason
 import jp.kz2601.metamon.services.TranscriberFailure
 import jp.kz2601.metamon.services.http.FailureKind
+import jp.kz2601.metamon.services.http.PaidFeature
+import jp.kz2601.metamon.services.http.PlanLimit
 import jp.kz2601.metamon.services.http.RateLimitInfo
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.time.Instant
@@ -44,6 +49,39 @@ class VoiceErrorCopyTest {
         assertEquals(R.string.voice_rate_body, rate.body)
         assertEquals(reset, rate.resetAt)
         assertFalse(rate.retry)
+    }
+
+    /** 上限のカードの「Pro にする」(#1103・iOS の `ErrorPresentation.primary` の upgradePro) */
+    @Test
+    fun upgradeProOnlyWhereProHelps() {
+        fun r(k: FailureKind) = VoiceErrorCopy.request(k, VoiceError.Origin.GENERATE)
+        fun rate(scope: RateLimitInfo.Scope, tier: String?) = r(FailureKind.RateLimited(RateLimitInfo(scope, tier = tier))).upgrade
+        // 今日の上限: サインインした無料の人だけ。匿名・IP・全体の停止・Pro は出さない
+        assertEquals(PaywallReason.LIMIT_REACHED, rate(RateLimitInfo.Scope.USER, "signed_in"))
+        assertNull(rate(RateLimitInfo.Scope.USER, "anonymous"))
+        assertNull(rate(RateLimitInfo.Scope.USER, "pro"))
+        assertNull(rate(RateLimitInfo.Scope.IP, "signed_in"))
+        assertNull(rate(RateLimitInfo.Scope.GLOBAL, "signed_in"))
+        // プランの上限: 上がる時・作成者本人だけ。設定と同じ見出しで開く(#317)
+        val own = r(FailureKind.PlanLimitReached(PlanLimit(PlanLimit.Resource.RECORDS_PER_APP, upgrade = true)))
+        assertEquals(PaywallReason.SETTINGS, own.upgrade)
+        assertEquals(R.string.voice_plan_limit_body_pro, own.body)
+        val byCreator = r(FailureKind.PlanLimitReached(PlanLimit(PlanLimit.Resource.RECORDS_PER_APP, upgrade = true, byCreator = true)))
+        assertNull(byCreator.upgrade)
+        assertEquals(R.string.voice_plan_limit_body, byCreator.body)
+        assertNull(r(FailureKind.PlanLimitReached(PlanLimit(PlanLimit.Resource.APPS, upgrade = false))).upgrade)
+        assertNull(r(FailureKind.Offline).upgrade)
+    }
+
+    @Test
+    fun paywallCopyForNewReasons() {
+        assertEquals(R.string.paywall_headline_limit_reached, PaywallCopy.headline(PaywallReason.LIMIT_REACHED))
+        assertEquals(R.string.paywall_headline_paid_feature, PaywallCopy.headline(PaywallReason.PaidFeatures()))
+        assertNull(PaywallCopy.closeNote(PaywallReason.LIMIT_REACHED))
+        val features = listOf(PaidFeature("sharedData", "共有のデータ", "費用がかかる"), PaidFeature("online", "", ""))
+        assertEquals("共有のデータ", PaywallCopy.featureNames(features))
+        assertNull(PaywallCopy.featureNames(listOf(PaidFeature("x", ""))))
+        assertEquals(listOf("費用がかかる"), PaywallCopy.featureReasons(features))
     }
 
     @Test

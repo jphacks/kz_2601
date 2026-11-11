@@ -62,6 +62,8 @@ import jp.kz2601.metamon.nearby.NearbyHostUi
 import jp.kz2601.metamon.permissions.ProvideRendererPermissions
 import jp.kz2601.metamon.renderer.DSLView
 import jp.kz2601.metamon.renderer.components.feed.LocalFeedHost
+import jp.kz2601.metamon.renderer.screen.FabCoordinator
+import jp.kz2601.metamon.renderer.screen.LocalFabCoordinator
 import jp.kz2601.metamon.renderer.theme.MetamonRenderTheme
 import jp.kz2601.metamon.renderer.theme.ReadableWidth
 import jp.kz2601.metamon.retention.RetentionPromptHost
@@ -82,6 +84,7 @@ import jp.kz2601.metamon.voice.VoiceUiState
 import jp.kz2601.metamon.voice.VoiceViewModel
 import jp.kz2601.metamon.voice.stage.BuildStageHost
 import jp.kz2601.metamon.voice.stage.BuildStageState
+import jp.kz2601.metamon.voice.stage.PostBuildWaiting
 import jp.kz2601.metamon.services.AppSummary
 import jp.kz2601.metamon.services.sharing.IssuedShares
 import jp.kz2601.metamon.services.sharing.MembersModel
@@ -206,6 +209,8 @@ fun MetamonApp(container: AppContainer) {
             usage = if (container.knobs.mock) null else container.appConfig as? PlanUsageSource,
             // ai の応答のヘッダーから「今日の残り」を入れる(#1203)。モックはヘッダーが無いので何も来ない
             remainingFeed = container.remainingToday.value,
+            // 上限のカードの「Pro にする」(#1103)。Play もモックの購入も無い構成ではボタンを出さない
+            requestPaywall = container.pro.takeIf { it.isAvailable }?.let { pro -> pro::requestPaywall },
         )
     }
     val state by vm.state.collectAsStateWithLifecycle()
@@ -214,6 +219,10 @@ fun MetamonApp(container: AppContainer) {
     remember(container) { container.passby }
     // 保存期間の確認が待っているか(完成の後のお知らせの順番・#1271)
     val retentionWaiting = retentionPending(runtime)
+    // 課金画面を出している間は、後ろのお知らせ(位置語の印・保存期間・直し方の例)を待たせる(#1198)。
+    // 公開の記録の確認・引き継ぎの案内は Android に画面がまだ無い
+    val proState by container.pro.state.collectAsStateWithLifecycle()
+    val noticeWaiting = PostBuildWaiting(paywall = proState.paywall != null)
     val runtimeState by runtime.state.collectAsStateWithLifecycle()
     val hotReloadStatus by runtime.hotReloadStatus.collectAsStateWithLifecycle()
 
@@ -346,16 +355,21 @@ fun MetamonApp(container: AppContainer) {
                 onOpenVoice = vm::openVoice,
                 editHints = container.tutorial.editHints,
                 retentionPending = retentionWaiting,
+                waiting = noticeWaiting,
             ) {
                 if (state.isInitial) {
                     VoiceRoute(vm, onMicLongPress = openSwitcher)
                 } else {
-                    // 横向き・タブレット・折りたたみでは幅を絞って中央に寄せる(iOS の readableWidth・#842)。
-                    ReadableWidth {
-                        GeneratedApp(state, runtimeState.dsl, runtime, appId = runtimeState.document.appId)
+                    // 描画器と FAB のやり取り: 最下段の部品を FAB が避け、list の末尾は FAB ぶん余白を足す(#1204)
+                    val fabCoordinator = remember { FabCoordinator() }
+                    CompositionLocalProvider(LocalFabCoordinator provides fabCoordinator) {
+                        // 横向き・タブレット・折りたたみでは幅を絞って中央に寄せる(iOS の readableWidth・#842)。
+                        ReadableWidth {
+                            GeneratedApp(state, runtimeState.dsl, runtime, appId = runtimeState.document.appId)
+                        }
+                        // マイク FAB(#892): タップ = このアプリを変える・長押し = 変身一覧・ドラッグで動かす / 端に隠す
+                        VoiceFab(busy = state.isGenerating, onTap = vm::openVoice, onLongPress = openSwitcher)
                     }
-                    // マイク FAB(#892): タップ = このアプリを変える・長押し = 変身一覧・ドラッグで動かす / 端に隠す
-                    VoiceFab(busy = state.isGenerating, onTap = vm::openVoice, onLongPress = openSwitcher)
                 }
             }
             // 要約と元に戻す・状態カード・トースト・削除の取り消し・確認ダイアログ(#895)
@@ -431,7 +445,7 @@ fun MetamonApp(container: AppContainer) {
     RetentionPromptHost(
         runtime,
         busy = state.isGenerating || state.voiceOpen,
-        turn = BuildStageState.isRetentionTurn(state, retentionWaiting),
+        turn = BuildStageState.isRetentionTurn(state, retentionWaiting, noticeWaiting),
         onStop = vm::generateNow,
     )
     // フィードバックの画面(#319)と端末を振って開く仕組み。設定から開いた時に上に重ねる

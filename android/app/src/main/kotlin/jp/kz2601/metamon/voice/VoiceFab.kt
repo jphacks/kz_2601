@@ -18,7 +18,9 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -30,7 +32,12 @@ import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Rect
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.input.pointer.util.VelocityTracker
+import androidx.compose.ui.layout.boundsInRoot
+import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
@@ -43,6 +50,7 @@ import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import jp.kz2601.metamon.R
+import jp.kz2601.metamon.renderer.screen.LocalFabCoordinator
 import kotlinx.coroutines.delay
 import kotlin.math.roundToInt
 
@@ -50,6 +58,9 @@ private val FAB_SIZE = 64.dp
 private val HORIZONTAL_INSET = 20.dp
 private val AUTO_BOTTOM_INSET = 20.dp
 private val TOP_RESERVE = 24.dp
+
+/** 最下段の部品の上端と FAB の間(iOS の `fabClearanceGap`) */
+private val CLEARANCE_GAP = 8.dp
 private val HANDLE_WIDTH = 14.dp
 private val HANDLE_HIT_WIDTH = 28.dp
 private val HANDLE_HEIGHT = 56.dp
@@ -74,6 +85,12 @@ fun VoiceFab(busy: Boolean, onTap: () -> Unit, onLongPress: () -> Unit, modifier
     var longPressFired by remember { mutableStateOf(false) }
     var pull by remember { mutableFloatStateOf(0f) }
     var showsHint by remember { mutableStateOf(false) }
+    // 弾いた方向で辺を選ぶための速さ(#1204・iOS の predictedEndTranslation)
+    val velocity = remember { VelocityTracker() }
+    // 描画器とのやり取り: 最下段の部品の上端を受け取り、止まっている FAB の矩形を渡す(#83 / #157)
+    val coordinator = LocalFabCoordinator.current
+    var areaInRoot by remember { mutableStateOf(Rect.Zero) }
+    DisposableEffect(coordinator) { onDispose { coordinator?.fabFrame = null } }
 
     fun apply(newSide: FabSide, newHidden: Boolean, bottomDp: Float = storedBottomDp) {
         val wasHidden = hidden
@@ -104,18 +121,33 @@ fun VoiceFab(busy: Boolean, onTap: () -> Unit, onLongPress: () -> Unit, modifier
     val handleLabel = stringResource(R.string.voice_fab_handle)
     val scale by animateFloatAsState(if (dragging) 1.08f else 1f, label = "fabScale")
 
-    BoxWithConstraints(modifier.fillMaxSize().alpha(if (busy) 0.35f else 1f)) {
+    BoxWithConstraints(
+        modifier.fillMaxSize().alpha(if (busy) 0.35f else 1f).onGloballyPositioned { areaInRoot = it.boundsInRoot() },
+    ) {
         val density = LocalDensity.current
         val width = constraints.maxWidth.toFloat()
         val height = constraints.maxHeight.toFloat()
         val size = with(density) { FAB_SIZE.toPx() }
         val inset = with(density) { HORIZONTAL_INSET.toPx() }
-        val autoInset = with(density) { AUTO_BOTTOM_INSET.toPx() }
+        // 吸着した側の最下段に部品がある画面では、その上端まで上げる(#83)
+        val autoInset = FabDock.autoInset(
+            base = with(density) { AUTO_BOTTOM_INSET.toPx() },
+            obstructionTop = coordinator?.obstructionTop(leadingSide = side == FabSide.LEFT),
+            areaBottom = areaInRoot.bottom,
+            gap = with(density) { CLEARANCE_GAP.toPx() },
+        )
         val maxBottom = height - size - with(density) { TOP_RESERVE.toPx() }
         val storedPx = if (storedBottomDp < 0) FabDock.AUTO_BOTTOM else with(density) { storedBottomDp.dp.toPx() }
         val bottom = FabDock.displayedBottom(storedPx, autoInset, maxBottom)
         val restX = if (side == FabSide.LEFT) inset + size / 2 else width - inset - size / 2
         val restY = height - bottom - size / 2
+        // 止まっている FAB の矩形(ルート座標)。隠れている・動かしている間は渡さない(#157)
+        val frame = if (hidden || dragging || areaInRoot.isEmpty) {
+            null
+        } else {
+            Rect(Offset(areaInRoot.left + restX - size / 2, areaInRoot.top + restY - size / 2), Size(size, size))
+        }
+        SideEffect { coordinator?.fabFrame = frame }
 
         if (!hidden) {
             Box(
@@ -128,11 +160,15 @@ fun VoiceFab(busy: Boolean, onTap: () -> Unit, onLongPress: () -> Unit, modifier
                     .pointerInput(busy, width, height, restX, restY) {
                         if (busy) return@pointerInput
                         detectDragGestures(
-                            onDragStart = { if (!longPressFired) dragging = true },
+                            onDragStart = {
+                                if (!longPressFired) dragging = true
+                                velocity.resetTracking()
+                            },
                             onDragEnd = {
                                 if (dragging) {
                                     val cx = restX + drag.x
-                                    val snap = FabDock.snap(cx, cx, width, size)
+                                    val predicted = FabDock.predictedCenterX(cx, velocity.calculateVelocity().x)
+                                    val snap = FabDock.snap(cx, predicted, width, size)
                                     val newBottom = FabDock.storedBottom(restY + drag.y, height, size, autoInset, maxBottom)
                                     apply(snap.side, snap.hidden, newBottom / density.density)
                                 }
@@ -149,6 +185,8 @@ fun VoiceFab(busy: Boolean, onTap: () -> Unit, onLongPress: () -> Unit, modifier
                             if (!dragging) return@detectDragGestures
                             change.consume()
                             drag += amount
+                            // FAB は指と一緒に動くので、指の位置ではなく動かした量で速さを測る
+                            velocity.addPosition(change.uptimeMillis, drag)
                         }
                     }
                     .combinedClickable(
