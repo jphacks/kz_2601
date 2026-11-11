@@ -61,6 +61,10 @@ data class VoiceUiState(
     val phase: VoicePhase = VoicePhase.IDLE,
     /** 録音中の途中の聞き取り */
     val partial: String = "",
+    /** 録音中の声の大きさ 0..1(#1014・マイクの周りの輪) */
+    val inputLevel: Float = 0f,
+    /** 認識器が無音で自分から止まった時の聞き取り。送る前に確かめる(#1014・null = 確認なし) */
+    val pendingVoice: String? = null,
     /** 送った(送る)依頼文。生成中の表示に使う */
     val transcript: String = "",
     val progress: BuildProgress? = null,

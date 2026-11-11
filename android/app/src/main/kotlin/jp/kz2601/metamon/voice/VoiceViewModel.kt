@@ -147,11 +147,45 @@ class VoiceViewModel(
         transcriber.cancelRecording()
         stopListenJobs()
         speech.recordingFinished()
-        _state.update { it.copy(phase = VoicePhase.IDLE, partial = "") }
+        carried = null
+        _state.update { it.copy(phase = VoicePhase.IDLE, partial = "", inputLevel = 0f) }
+    }
+
+    // MARK: - 自分で止まった時の確認(#1014)
+
+    /** 「続けて話す」の前に聞き取った分。次の聞き取りとつなぐ */
+    private var carried: String? = null
+
+    /** 確認の「送る」 */
+    fun confirmPendingVoice() {
+        val text = _state.value.pendingVoice ?: return
+        _state.update { it.copy(pendingVoice = null) }
+        submit(text, InputSource.VOICE)
+    }
+
+    /** 確認の「続けて話す」: 聞き取った分を残して聞き直し、次の分とつなぐ */
+    fun continuePendingVoice() {
+        val text = _state.value.pendingVoice ?: return
+        carried = text
+        startListening()
+    }
+
+    /** 確認の「言い直す」: 聞き取った分を捨てて聞き直す */
+    fun retakePendingVoice() {
+        if (_state.value.pendingVoice == null) return
+        carried = null
+        startListening()
+    }
+
+    /** 確認を閉じる(送らない) */
+    fun dismissPendingVoice() {
+        carried = null
+        _state.update { it.copy(pendingVoice = null) }
     }
 
     private fun startListening() {
         clearVoiceError()
+        _state.update { it.copy(pendingVoice = null) }
         // 読み上げ中なら即止め、録音が終わるまで読まない(TTS の音をマイクが拾わない)
         speech.stopForRecording()
         scope.launch {
@@ -161,24 +195,33 @@ class VoiceViewModel(
                 throw e
             } catch (e: TranscriberFailure) {
                 speech.recordingFinished()
-                showError(VoiceError.Voice(e), retry = null)
+                if (!restoreCarried()) showError(VoiceError.Voice(e), retry = null)
                 return@launch
             }
-            _state.update { it.copy(phase = VoicePhase.LISTENING, partial = "") }
+            _state.update { it.copy(phase = VoicePhase.LISTENING, partial = "", inputLevel = 0f) }
             listenJobs = listOf(
                 scope.launch { transcriber.partial.collect { p -> _state.update { it.copy(partial = p) } } },
-                // 認識器が無音で自分から止まったら、タップを待たずに文字にする
+                scope.launch { transcriber.level.collect { l -> _state.update { it.copy(inputLevel = l) } } },
+                // 認識器が無音で自分から止まったら、文字にして送る前に確かめる(#1014)
                 scope.launch {
                     transcriber.listening.dropWhile { !it }.first { !it } // true になってから false に戻った時だけ
-                    if (_state.value.phase == VoicePhase.LISTENING) stopListening()
+                    if (_state.value.phase == VoicePhase.LISTENING) stopListening(autoStopped = true)
                 },
             )
         }
     }
 
-    private fun stopListening() {
+    /** 「続けて話す」の後に聞き取れなかった: 前の分を確認に戻す。戻したら true */
+    private fun restoreCarried(): Boolean {
+        val back = VoiceConfirm.afterFailure(carried) as? VoiceConfirm.Outcome.Confirm ?: return false
+        carried = null
+        _state.update { it.copy(phase = VoicePhase.IDLE, partial = "", inputLevel = 0f, pendingVoice = back.text) }
+        return true
+    }
+
+    private fun stopListening(autoStopped: Boolean = false) {
         if (_state.value.phase != VoicePhase.LISTENING) return
-        _state.update { it.copy(phase = VoicePhase.TRANSCRIBING) }
+        _state.update { it.copy(phase = VoicePhase.TRANSCRIBING, inputLevel = 0f) }
         stopListenJobs()
         scope.launch {
             val text = try {
@@ -186,17 +229,25 @@ class VoiceViewModel(
             } catch (e: CancellationException) {
                 throw e
             } catch (e: TranscriberFailure) {
-                showError(VoiceError.Voice(e), retry = null)
+                if (!restoreCarried()) showError(VoiceError.Voice(e), retry = null)
                 return@launch
             } finally {
                 speech.recordingFinished()
             }
             if (text.isEmpty()) {
-                showError(VoiceError.Voice(TranscriberFailure.NotHeard), retry = null)
+                if (!restoreCarried()) showError(VoiceError.Voice(TranscriberFailure.NotHeard), retry = null)
                 return@launch
             }
-            _state.update { it.copy(partial = "") }
-            submit(text, InputSource.VOICE)
+            val outcome = VoiceConfirm.afterTranscribe(autoStopped, carried, text)
+            carried = null
+            when (outcome) {
+                is VoiceConfirm.Outcome.Send -> {
+                    _state.update { it.copy(partial = "") }
+                    submit(outcome.text, InputSource.VOICE)
+                }
+                is VoiceConfirm.Outcome.Confirm ->
+                    _state.update { it.copy(phase = VoicePhase.IDLE, partial = "", pendingVoice = outcome.text) }
+            }
         }
     }
 
@@ -215,6 +266,7 @@ class VoiceViewModel(
         val t = text.trim()
         val s = _state.value
         if (t.isEmpty() || s.isGenerating || s.chatPending) return
+        if (s.pendingVoice != null) _state.update { it.copy(pendingVoice = null) } // 文字で送ったら確認は閉じる
         // 相談の途中の答えは意図を見ない(「前の状態」などを答えに使えるように)
         if (!intentHandled && !s.isChatting && handleIntent(t)) return
         if (!requireConsent { send(t, source, intentHandled = true) }) return

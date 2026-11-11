@@ -39,6 +39,7 @@ import jp.kz2601.metamon.renderer.components.ai.AiHost
 import jp.kz2601.metamon.renderer.components.social.AuthorNameHost
 import jp.kz2601.metamon.renderer.components.social.BlockedUsersHost
 import jp.kz2601.metamon.renderer.components.social.FollowsHost
+import jp.kz2601.metamon.renderer.components.social.MarksHost
 import jp.kz2601.metamon.renderer.components.social.MatchingHost
 import jp.kz2601.metamon.renderer.components.social.ModerationHost
 import jp.kz2601.metamon.renderer.components.social.ReportReasonOption
@@ -157,7 +158,7 @@ class AppRuntime(
     /** 共有アプリの参加者と自分が管理者か(#903)。null なら読まない(モック・テスト) */
     val members: AppMembersStore? = null,
 ) : DSLRuntime, NavigationHost, RecordWriter, TimerHost, AiChatPairSaving, AuthorNameHost,
-    ModerationHost, MatchingHost, SocialPromptHost, BlockedUsersHost, FollowsHost, NearbyHost {
+    ModerationHost, MatchingHost, SocialPromptHost, BlockedUsersHost, FollowsHost, NearbyHost, MarksHost {
     private val _state = MutableStateFlow(RuntimeState(document))
     val state: StateFlow<RuntimeState> = _state.asStateFlow()
 
@@ -901,6 +902,20 @@ class AppRuntime(
 
     private fun loadStatesOf(s: RuntimeState): Map<String, EntityLoadState> =
         EntityLoadState.all(s.records, s.loading, s.failed, s.document.dsl.entities.map { it.id }.toSet())
+
+    /** 印(#255)。ローカルを先に変えてサーバーで確定。失敗はローカルを戻して null(一覧は元の値に戻る)。 */
+    override suspend fun toggleMark(entity: String, recordId: String, mark: String): MarkState? {
+        val appId = document.appId
+        val settled = try {
+            recordSync.toggleMark(appId, entity, recordId, mark)
+        } catch (e: CancellationException) {
+            throw e
+        } catch (_: Exception) {
+            null
+        }
+        if (document.appId == appId) setRecords(appId, entity, recordSync.cached(appId, entity))
+        return settled?.let { MarkState(it.count, it.mine) }
+    }
 
     override fun canReport(entity: String, record: Record): Boolean = social.canReport(entity, record)
     override fun reportRecord(entity: String, record: Record) = social.reportRecord(entity, record)
