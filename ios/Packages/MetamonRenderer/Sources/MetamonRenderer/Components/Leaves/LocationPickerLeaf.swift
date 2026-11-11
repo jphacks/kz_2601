@@ -254,6 +254,7 @@ struct LocationPickerSheet: View {
                     center = tapped
                     withAnimation { position = .region(PlacePicking.recentered(region, on: tapped)) }
                 }
+                .macHelp(L("クリックした所へピンを動かします"))
         }
         #else
         Map(position: $position)
