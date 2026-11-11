@@ -208,6 +208,8 @@ fun MetamonApp(container: AppContainer) {
     }
     val state by vm.state.collectAsStateWithLifecycle()
     val runtime = container.runtime
+    // すれ違い通信(#1383)の部品とつなぐ(探すのは部品が前面に出ている間だけ)
+    remember(container) { container.passby }
     // 保存期間の確認が待っているか(完成の後のお知らせの順番・#1271)
     val retentionWaiting = retentionPending(runtime)
     val runtimeState by runtime.state.collectAsStateWithLifecycle()

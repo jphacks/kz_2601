@@ -56,6 +56,8 @@ class HardcodedJapaneseTest {
             "まだありません", "件数", "%sの合計", "%sの平均", "%sの最小", "%sの最大", "件", "データがありません",
             "%d 項目。%s の %s", "%d 項目。最大は %s の %s、最小は %s の %s", "全員", "参加者",
         ),
+        // METAMON_MOCK のすれ違いの相手が送ってくる記録(相手のデータ。iOS の MockPassbyTransport と同じ値)
+        "app/src/main/kotlin/jp/kz2601/metamon/nearby/MockPassbyTransport.kt" to setOf("テスト花子", "よろしくお願いします"),
         // まだ移していない(サインインの失敗。OS の文をそのまま出す所と一緒に直す)
         "app/src/main/kotlin/jp/kz2601/metamon/auth/AuthSession.kt" to setOf("サインインできませんでした。もう一度お試しください"),
     )

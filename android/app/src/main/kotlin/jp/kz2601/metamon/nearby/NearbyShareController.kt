@@ -36,21 +36,21 @@ class NearbyShareController(
     val request: StateFlow<SendRequest?> = _request.asStateFlow()
     private var seq = 0L
 
-    private val _anonymous = MutableStateFlow(settings.anonymous)
-    val anonymous: StateFlow<Boolean> = _anonymous.asStateFlow()
+    val anonymous: StateFlow<Boolean> = settings.anonymousFlow
 
     /** この起動で近くのデバイスの権限を一度聞いたか(待ち受けのために自分から聞くのは 1 回だけ)。 */
     var askedForPermission = false
 
     init {
         service.rename(publicName)
+        settings.onAnonymousChanged { service.rename(publicName) }
         service.decide = { header -> decide(header) }
         service.onReceive = { payload, _ -> import(payload) }
         runtime.nearby = this
     }
 
     /** 相手に見える名前(端末の名前と Header の送り主)。 */
-    val publicName: String get() = NearbyLimits.peerName(displayName(), _anonymous.value)
+    val publicName: String get() = NearbyLimits.peerName(displayName(), settings.anonymous)
 
     fun share(entity: String, records: List<Map<String, JSONValue>>) {
         val e = runtime.entityModel(entity) ?: return
@@ -68,10 +68,7 @@ class NearbyShareController(
 
     /** 「名前を出さない」の切り替え(すれ違い通信と同じ設定)。名前を変えて待ち受け・探すのをやり直す。 */
     fun setAnonymous(on: Boolean) {
-        if (on == _anonymous.value) return
-        _anonymous.value = on
         settings.anonymous = on
-        service.rename(publicName)
     }
 
     /** 前面にいて、今のアプリが送る `nearbyShare` を使い、権限がある間だけ待ち受ける。 */
@@ -108,12 +105,28 @@ class NearbyShareController(
     }
 }
 
-/** 近距離共有・すれ違い通信の端末の設定。 */
-class NearbySettings(private val store: KeyValueStore) {
+/** 近距離共有・すれ違い通信の端末の設定。両方が同じ 1 つを持ち、「名前を出さない」はどちらで変えても両方に効く。 */
+class NearbySettings(val store: KeyValueStore) {
+    private val _anonymous = MutableStateFlow(store.getBoolean(ANONYMOUS_KEY) == true)
+
     /** 名前を出さない(表示名の代わりに「近くの人」を送る)。iOS と同じキー。 */
+    val anonymousFlow: StateFlow<Boolean> = _anonymous.asStateFlow()
+
     var anonymous: Boolean
-        get() = store.getBoolean(ANONYMOUS_KEY) == true
-        set(value) = store.putBoolean(ANONYMOUS_KEY, value)
+        get() = _anonymous.value
+        set(value) {
+            if (value == _anonymous.value) return
+            store.putBoolean(ANONYMOUS_KEY, value)
+            _anonymous.value = value
+            listeners.toList().forEach { it(value) }
+        }
+
+    private val listeners = mutableListOf<(Boolean) -> Unit>()
+
+    /** 「名前を出さない」が変わった時(メインスレッド・変えたその場で呼ぶ)。 */
+    fun onAnonymousChanged(listener: (Boolean) -> Unit) {
+        listeners += listener
+    }
 
     companion object {
         const val ANONYMOUS_KEY = "passby.anonymous"

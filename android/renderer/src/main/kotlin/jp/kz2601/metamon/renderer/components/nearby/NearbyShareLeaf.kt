@@ -15,6 +15,7 @@ import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.semantics.testTag
 import jp.kz2601.metamon.dsl.Component
 import jp.kz2601.metamon.dsl.ComponentMode
+import jp.kz2601.metamon.dsl.nearby.NearbyPassby
 import jp.kz2601.metamon.dsl.nearby.NearbyShare
 import jp.kz2601.metamon.dsl.records.JSONValue
 import jp.kz2601.metamon.dsl.records.Record
@@ -28,12 +29,13 @@ import jp.kz2601.metamon.renderer.registry.RenderContext
 /**
  * `nearbyShare`(#36・iOS の `NearbyShareLeaf`): 近くの Tailor It 端末へ記録を送るボタン。通信と相手選びはホスト([NearbyHost])。
  * 送る範囲: フォーム画面(screen.entity == entity)なら入力中の 1 件、それ以外はその entity の新しい順 最大 50 件。
- * 押した時に近くのデバイスの権限を聞く(断られたら開かない)。mode:passby(すれ違い通信)はまだ Android に無い(#1383)。
+ * 押した時に近くのデバイスの権限を聞く(断られたら開かない)。mode:passby(すれ違い通信・#1383)は [NearbyPassbyLeaf]。
  */
 @Composable
 fun NearbyShareLeaf(c: Component, ctx: RenderContext, modifier: Modifier = Modifier) {
     if (c.mode == ComponentMode.PASSBY) {
-        UnavailableComponent(c, modifier)
+        val config = remember(c) { NearbyPassby.Config.of(c) }
+        if (config == null) UnavailableComponent(c, modifier) else NearbyPassbyLeaf(c, config, ctx, modifier)
         return
     }
     val rt = ctx.runtime

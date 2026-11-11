@@ -27,6 +27,7 @@ import jp.kz2601.metamon.renderer.components.importing.AudioFileTranscriptionHos
 import jp.kz2601.metamon.dsl.logic.ExternalUrlPolicy
 import jp.kz2601.metamon.renderer.NavigationHost
 import jp.kz2601.metamon.renderer.components.nearby.NearbyHost
+import jp.kz2601.metamon.renderer.components.nearby.NearbyPassbyController
 import jp.kz2601.metamon.renderer.components.play.RecordWriter
 import jp.kz2601.metamon.renderer.components.play.TimerHost
 import jp.kz2601.metamon.renderer.components.ai.AiChatPairSaving
@@ -784,6 +785,12 @@ class AppRuntime(
     override fun shareNearby(entity: String, records: List<Map<String, JSONValue>>) {
         nearby?.share(entity, records)
     }
+
+    /** すれ違い通信(#1383)。AppContainer が [jp.kz2601.metamon.nearby.PassbyController] を作る時に入れる。null なら表示だけ */
+    override var passby: NearbyPassbyController? = null
+
+    /** ローカル DB から読み直す(サーバーには取りに行かない)。すれ違い通信の更新で、仮 id が変わった記録を内容で探す前に呼ぶ。 */
+    suspend fun reloadLocal(entity: String) = reloadCached(document.appId, entity)
 
     // AI ボタン(#873)
 
