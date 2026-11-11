@@ -161,15 +161,10 @@ func (h *Handler) serveRecords(w http.ResponseWriter, r *http.Request, in record
 		fail(w, apiErr(http.StatusRequestEntityTooLarge, httpx.CodePayloadTooLarge, "too many records to sort in memory"))
 		return
 	}
-	var blocked map[string]bool // #321: posts of users the caller blocked
-	// #507: profile / matched-only rules of matching apps (matching.go)
-	var matchOK func(author string) bool
+	// #321 blocks either way, #507 matching rules (matching_age.go)
+	var readable func(author string) bool
 	if ent.IsShared() {
-		if blocked, err = h.blockedBy(r); err != nil {
-			fail(w, err)
-			return
-		}
-		if matchOK, err = h.matchFilter(r, cur.ID, eid, recordAuthors(all)); err != nil {
+		if readable, err = h.sharedFilter(r, cur.ID, eid, recordAuthors(all)); err != nil {
 			fail(w, err)
 			return
 		}
@@ -180,7 +175,7 @@ func (h *Handler) serveRecords(w http.ResponseWriter, r *http.Request, in record
 		if !canRead(ent, &all[i], uid) { // #271: only the author and recipients
 			continue
 		}
-		if blocked[all[i].Author] || (matchOK != nil && !matchOK(all[i].Author)) {
+		if readable != nil && !readable(all[i].Author) {
 			continue
 		}
 		if pred == nil || pred(&all[i]) {
@@ -323,6 +318,12 @@ func (h *Handler) createRecord(w http.ResponseWriter, r *http.Request) {
 		fail(w, err)
 		return
 	}
+	if ent.IsShared() {
+		if err := h.checkProfileWrite(r, cur.ID, eid); err != nil { // #507: 18+ declaration
+			fail(w, err)
+			return
+		}
+	}
 	data, err := normalizeData(ent, body.Data, true)
 	if err != nil {
 		fail(w, err)
@@ -422,8 +423,8 @@ func (h *Handler) getRecord(w http.ResponseWriter, r *http.Request) {
 	}
 	if err == nil && ent.IsShared() {
 		var ok func(string) bool
-		if ok, err = h.matchFilter(r, cur.ID, eid, []string{rec.Author}); err == nil && ok != nil && !ok(rec.Author) {
-			err = store.ErrNotFound // #507: not matched with the author
+		if ok, err = h.sharedFilter(r, cur.ID, eid, []string{rec.Author}); err == nil && !ok(rec.Author) {
+			err = store.ErrNotFound // #321 blocked either way / #507 not matched with the author
 		}
 	}
 	if err != nil {

@@ -159,6 +159,26 @@ func (f *Firestore) BlockedEither(ctx context.Context, uid string, others []stri
 	return out, nil
 }
 
+// ConfirmAge implements Matching (merged into users/{uid}).
+func (f *Firestore) ConfirmAge(ctx context.Context, uid string) error {
+	_, err := f.userRef(uid).Set(ctx, map[string]any{"ageConfirmedAt": Now()}, firestore.MergeAll)
+	return err
+}
+
+// AgeConfirmed implements Matching.
+func (f *Firestore) AgeConfirmed(ctx context.Context, uid string) (bool, error) {
+	snap, err := f.userRef(uid).Get(ctx)
+	if isNotFound(err) {
+		return false, nil
+	}
+	if err != nil {
+		return false, err
+	}
+	v, _ := snap.DataAt("ageConfirmedAt")
+	at, ok := v.(time.Time)
+	return ok && !at.IsZero(), nil
+}
+
 // purgeMatching erases uid's pairs in appID and uid's records in the
 // profile / matched entities of the published DSL (account purge).
 func (f *Firestore) purgeMatching(ctx context.Context, appID, uid string, res *AccountPurgeResult) error {

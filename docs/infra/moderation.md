@@ -17,7 +17,7 @@ App Store Review Guidelines 1.2 / 1.2.1(a)(利用者が作った内容を共有�
 | --- | --- | --- |
 | 通報 | `POST /v1/reports` → `reports/{id}` | 対象 = 「探す」の掲載・シェアリンク・共有アプリ・共有アプリの投稿。理由は 7 種(spam / sexual / violence / harassment / illegal / privacy / other)。同じ人が同じ対象を通報しても 1 件。1 人 1 日(JST)30 件まで。保存するのは通報者 uid・対象の種類と ID・対象の持ち主 / 投稿者 uid・理由・日時・状態(`open` / `done` / `dismissed`)だけ |
 | 運営への知らせ | Cloud Logging の `moderation: report`(WARNING) | uid と内容は出さない(reportId・種類・対象 ID・理由)。下のアラートで運営に届く |
-| ブロック | `GET/POST /v1/me/blocks`・`DELETE /v1/me/blocks/{uid}` → `users/{uid}/blocks/{blockedUid}` | ブロックした人の投稿(GET records)と掲載(GET /public-apps)を、その人にだけ返さない。iOS はブロックした瞬間に端末でも隠す。相手には知らせない |
+| ブロック | `GET/POST /v1/me/blocks`・`DELETE /v1/me/blocks/{uid}` → `users/{uid}/blocks/{blockedUid}` | ブロックした人の掲載(GET /public-apps)をその人に返さない。共有アプリの投稿(GET records・id 指定・通報・マーク)は、どちら向きのブロックでもお互いに返さない。iOS はブロックした瞬間に端末でも隠す。相手には知らせない |
 | 掲載の非公開化 | `public_apps/{id}` の `hidden`・`hiddenReason`・`hiddenAt` | 掲載者以外の検索に出ず、install は 403 `unpublished`。掲載者には「運営により非公開」と理由が出る。掲載者が公開し直しても非公開のまま |
 | 共有アプリの非公開化 | `apps_public/{appId}` の同じ項目 | その appId の共有データ(public / shared の entity の記録・いいね)が全員 403 `unpublished`(理由つき)。シェアリンクのプレビュー・参加、「探す」からの参加、他人が appId を開いた時の DSL の配布も止まる。各自の端末のアプリ(自分の木のコピー)と自分だけの記録は残る |
 | 投稿の削除 | `apps_public/{appId}/entities/{e}/records/{id}` | `delete-record` で消す |

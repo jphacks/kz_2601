@@ -145,8 +145,19 @@ func TestBlockHidesPostsAndListings(t *testing.T) {
 	if r = e.do("u2", http.MethodPost, "/v1/me/blocks", `{"uid":"u1","name":"いち"}`, nil); r.code != http.StatusCreated || r.body["uid"] != "u1" {
 		t.Fatalf("block: %d %s", r.code, r.raw)
 	}
-	if count("u2") != 1 || count("u1") != 2 {
+	// either way: the blocked person stops seeing the blocker's posts too
+	if count("u2") != 1 || count("u1") != 1 {
 		t.Fatalf("after block: u2 %d u1 %d", count("u2"), count("u1"))
+	}
+	if r = e.do("u2", http.MethodGet, recs+"/"+recID, nil, nil); r.code != http.StatusNotFound {
+		t.Fatalf("blocked author's post by id: %d %s", r.code, r.raw)
+	}
+	r = e.do("u1", http.MethodGet, recs, nil, nil)
+	if items := r.body["items"].([]any); len(items) != 1 || items[0].(map[string]any)["author"] != "u1" {
+		t.Fatalf("u1 sees %s", r.raw)
+	}
+	if r = e.do("u2", http.MethodPost, "/v1/reports", `{"kind":"record","appId":"SHARED-APP-1","entityId":"expense","recordId":"`+recID+`","reason":"spam"}`, nil); r.code != http.StatusNotFound {
+		t.Fatalf("report a hidden post: %d %s", r.code, r.raw)
 	}
 	r = e.do("u2", http.MethodGet, "/v1/me/blocks", nil, nil)
 	if items := r.body["items"].([]any); len(items) != 1 || items[0].(map[string]any)["name"] != "いち" {

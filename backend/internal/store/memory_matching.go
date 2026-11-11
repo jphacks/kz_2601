@@ -4,6 +4,7 @@ import (
 	"context"
 	"sort"
 	"strings"
+	"time"
 )
 
 // ChangeMatchPair implements Matching.
@@ -85,6 +86,25 @@ func (m *Memory) BlockedEither(_ context.Context, uid string, others []string) (
 		}
 	}
 	return out, nil
+}
+
+// ConfirmAge implements Matching.
+func (m *Memory) ConfirmAge(_ context.Context, uid string) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	if m.ageOK == nil {
+		m.ageOK = map[string]time.Time{}
+	}
+	m.ageOK[uid] = m.now().UTC()
+	return nil
+}
+
+// AgeConfirmed implements Matching.
+func (m *Memory) AgeConfirmed(_ context.Context, uid string) (bool, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	_, ok := m.ageOK[uid]
+	return ok, nil
 }
 
 // purgeMatching erases uid's pairs in appID and uid's records in its
