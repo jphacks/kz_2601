@@ -11,7 +11,7 @@ coil = "3.5.0"
 coreKtx = "1.18.0"
 # icon / label の Material アイコン(BOM から外れたので版を書く)。extended の絵は scripts/gen-symbol-icons.py で必要な分だけ取り込む(#842)
 materialIconsCore = "1.7.8"
-# videoPlayer の再生(ExoPlayer + PlayerView・#863)。1.11 は compileSdk 36 で通る
+# videoPlayer の再生(ExoPlayer + PlayerView・#863)と videoField の書き直し(Transformer・#1202)。1.11 は compileSdk 36 で通る
 media3 = "1.11.1"
 # dashcam のループ録画(Preview + VideoCapture・#872)。1.6 は compileSdk 36 で通る。権限はマニフェストに足さない
 camerax = "1.6.2"
@@ -83,6 +83,8 @@ googleid = { module = "com.google.android.libraries.identity.googleid:googleid",
 firebase-messaging = { module = "com.google.firebase:firebase-messaging" }
 media3-exoplayer = { module = "androidx.media3:media3-exoplayer", version.ref = "media3" }
 media3-ui = { module = "androidx.media3:media3-ui", version.ref = "media3" }
+media3-transformer = { module = "androidx.media3:media3-transformer", version.ref = "media3" }
+media3-effect = { module = "androidx.media3:media3-effect", version.ref = "media3" }
 camerax-camera2 = { module = "androidx.camera:camera-camera2", version.ref = "camerax" }
 camerax-lifecycle = { module = "androidx.camera:camera-lifecycle", version.ref = "camerax" }
 camerax-video = { module = "androidx.camera:camera-video", version.ref = "camerax" }
