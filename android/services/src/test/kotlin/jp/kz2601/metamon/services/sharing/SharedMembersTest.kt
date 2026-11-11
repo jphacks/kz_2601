@@ -149,6 +149,10 @@ class SharedMembersTest {
     fun fullAtHundredPeople() {
         assertFalse(SharedMemberList(items = List(99) { SharedMember("u$it") }).isFull)
         assertTrue(SharedMemberList(items = List(MEMBER_LIMIT) { SharedMember("u$it") }).isFull)
+        // 一覧には作成者も 1 行あるが、backend の上限は作成者を除いた参加者の数
+        val owner = SharedMember("o", role = ROLE_OWNER)
+        assertFalse("作成者 + 99 人なら、まだ 1 人参加できる", SharedMemberList(items = listOf(owner) + List(99) { SharedMember("u$it") }, role = ROLE_OWNER).isFull)
+        assertTrue(SharedMemberList(items = listOf(owner) + List(MEMBER_LIMIT) { SharedMember("u$it") }).isFull)
     }
 
     // MARK: 読み込み

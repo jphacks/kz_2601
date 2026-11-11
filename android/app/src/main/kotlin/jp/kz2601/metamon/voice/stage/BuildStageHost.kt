@@ -71,6 +71,8 @@ fun BoxScope.BuildStageHost(
     onOpenVoice: () -> Unit,
     editHints: EditHintStore? = null,
     retentionPending: Boolean = false,
+    /** 課金画面・公開の記録・引き継ぎが待っているか(#1198) */
+    waiting: PostBuildWaiting = PostBuildWaiting.NONE,
     content: @Composable BoxScope.() -> Unit,
 ) {
     val stage = remember(editHints) { BuildStageState(editHints) }
@@ -104,7 +106,7 @@ fun BoxScope.BuildStageHost(
         CompositionLocalProvider(LocalChangeHighlight provides stage.highlight) { content() }
     }
 
-    val notice = stage.currentNotice(state, retentionPending)
+    val notice = stage.currentNotice(state, retentionPending, waiting)
     // 要約の位置語(「右下のボタンから」)を領域のハイライトに
     val anchor = stage.anchor
     if (anchor != null && notice == PostBuildNotice.SUMMARY && state.summary != null && !stage.showsFullScreen && !state.isInitial) {

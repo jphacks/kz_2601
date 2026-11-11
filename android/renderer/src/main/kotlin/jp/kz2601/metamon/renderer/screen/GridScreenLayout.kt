@@ -16,11 +16,21 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.compositionLocalOf
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.layout.Layout
 import androidx.compose.ui.layout.Placeable
+import androidx.compose.ui.layout.boundsInRoot
+import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.layout.positionInRoot
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
@@ -28,6 +38,7 @@ import jp.kz2601.metamon.dsl.Component
 import jp.kz2601.metamon.dsl.ComponentType
 import jp.kz2601.metamon.dsl.Screen
 import jp.kz2601.metamon.renderer.components.DSLComponent
+import jp.kz2601.metamon.renderer.layout.FabClearance
 import jp.kz2601.metamon.renderer.layout.GridArea
 import jp.kz2601.metamon.renderer.layout.GridMetrics
 import jp.kz2601.metamon.renderer.layout.Placed
@@ -66,16 +77,36 @@ fun GridScreenLayout(screen: Screen, ctx: RenderContext, modifier: Modifier = Mo
         val placement = screen.gridPlacement
         val scrolls = !screen.isVoiceScreen || metrics.scrollsVertically
         val scroll = if (scrolls) Modifier.verticalScroll(rememberScrollState()) else Modifier
+        val fab = LocalFabCoordinator.current
+        val density = LocalDensity.current
+        // area 無しで積んだ部品(全幅の list 等)は画面のスクロールの末尾に FAB ぶんの余白(#157)。area だけの画面は高さぴったりなので足さない
+        val tail = if (scrolls && placement.stacked.isNotEmpty()) fabTailMargin(fab) else FabTail.NONE
+        // 最下段に寄せた部品の上端をホストに渡し、FAB をその上へ逃がす(#83)。画面ごとスクロールする時は渡さない
+        val reportsObstruction = fab != null && !screen.isFormLayout && !metrics.scrollsVertically
+        if (fab != null) DisposableEffect(fab, screen.id) { onDispose { fab.forget(screen.id) } }
 
-        Box(Modifier.fillMaxSize().then(scroll), contentAlignment = Alignment.TopCenter) {
+        Box(Modifier.fillMaxSize().then(tail.viewport).then(scroll), contentAlignment = Alignment.TopCenter) {
             Column(
-                Modifier.width(metrics.frameWidth.dp).padding(inset),
+                Modifier.width(metrics.frameWidth.dp).padding(inset).padding(bottom = tail.margin),
                 verticalArrangement = Arrangement.spacedBy(gap),
             ) {
                 if (screen.isFormLayout) {
                     FormFlowLayout(placement.placed, cellW, cellH, ctx)
                 } else if (placement.placed.isNotEmpty()) {
-                    Box(Modifier.fillMaxWidth().height(cellH * placement.lastRow)) {
+                    val obstruction = if (reportsObstruction) {
+                        val areas = placement.placed.map { it.area }
+                        val rows = FabClearance.obstructedRows(areas, leading = true) to FabClearance.obstructedRows(areas, leading = false)
+                        val cellPx = with(density) { cellH.toPx() }
+                        val gapPx = with(density) { gap.toPx() }
+                        Modifier.onGloballyPositioned { coords ->
+                            val top = coords.positionInRoot().y
+                            fun edge(n: Int) = if (n > 0) top + cellPx * (GridArea.VISIBLE_ROWS - n) + gapPx / 2 else null
+                            fab?.report(screen.id, edge(rows.first), edge(rows.second))
+                        }
+                    } else {
+                        Modifier
+                    }
+                    Box(Modifier.fillMaxWidth().height(cellH * placement.lastRow).then(obstruction)) {
                         placement.placed.forEach { (c, a) ->
                             GridCell(
                                 c, ctx,
@@ -141,7 +172,11 @@ fun GridCell(component: Component, ctx: RenderContext, modifier: Modifier = Modi
     val hasLocalGrid = component.localGridPlacement != null
     val scrollsInside = !hasLocalGrid && component.type in SCROLLS_INSIDE
     if (scrollsInside) {
-        Box(modifier.verticalScroll(rememberScrollState())) { DSLComponent(component, ctx) }
+        // 背の高い list などは FAB が上に浮くので、中身の末尾に FAB ぶんの余白を足す(#157)
+        val tail = fabTailMargin(LocalFabCoordinator.current)
+        Box(modifier.then(tail.viewport).verticalScroll(rememberScrollState())) {
+            DSLComponent(component, ctx, Modifier.padding(bottom = tail.margin))
+        }
     } else {
         Box(modifier) {
             CompositionLocalProvider(LocalGridFills provides hasLocalGrid) {
@@ -149,6 +184,25 @@ fun GridCell(component: Component, ctx: RenderContext, modifier: Modifier = Modi
             }
         }
     }
+}
+
+/** スクロール領域の末尾の余白。[viewport] を領域に付けると、その位置と FAB の矩形から [margin] が決まる */
+private class FabTail(val viewport: Modifier, val margin: Dp) {
+    companion object {
+        val NONE = FabTail(Modifier, 0.dp)
+    }
+}
+
+/** FAB と重なる分だけの末尾の余白(iOS の `FabClearance.contentMargin`)。FAB が無ければ何もしない */
+@Composable
+private fun fabTailMargin(fab: FabCoordinator?): FabTail {
+    if (fab == null) return FabTail.NONE
+    var viewport by remember { mutableStateOf(Rect.Zero) }
+    val density = LocalDensity.current
+    val margin = with(density) {
+        FabClearance.contentMargin(viewport, fab.fabFrame, gap = FabClearance.CONTENT_GAP_DP.dp.toPx(), minVisible = FabClearance.MIN_VISIBLE_DP.dp.toPx()).toDp()
+    }
+    return FabTail(Modifier.onGloballyPositioned { viewport = it.boundsInRoot() }, margin)
 }
 
 /**
