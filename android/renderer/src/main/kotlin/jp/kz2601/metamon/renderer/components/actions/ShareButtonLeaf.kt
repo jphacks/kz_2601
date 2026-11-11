@@ -11,7 +11,7 @@ import jp.kz2601.metamon.renderer.R
 import jp.kz2601.metamon.renderer.form.FormDraft
 import jp.kz2601.metamon.renderer.registry.RenderContext
 
-/** 送り先。生成した型 `ShareTo` は x / mail をまだ知らない(#989)ので UNKNOWN になり、共有シートに落ちる。 */
+/** 送り先(any・line・slack・discord・x・mail)。知らない値は共有シートに落ちる。 */
 internal val Component.shareTarget: ShareTarget get() = ShareTarget.of(shareTo?.wire)
 
 /** 押した時にすること(iOS の `ShareButtonLeaf.body` の分岐)。 */
