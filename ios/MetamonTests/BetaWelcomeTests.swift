@@ -12,9 +12,14 @@ final class BetaWelcomeTests: XCTestCase {
     override func setUp() {
         suite = "betaWelcome313-\(UUID().uuidString)"
         defaults = UserDefaults(suiteName: suite)
+        // 起動の順番待ちは共有の状態。テストホストの起動(同意の段)や他のテストの残りで止まらないよう空にする。
+        SplashPresence.shared.resetForTesting()
+        LaunchConsentHold.shared.resetForTesting()
     }
 
     override func tearDown() {
+        SplashPresence.shared.resetForTesting()
+        LaunchConsentHold.shared.resetForTesting()
         defaults.removePersistentDomain(forName: suite)
         defaults = nil
     }
