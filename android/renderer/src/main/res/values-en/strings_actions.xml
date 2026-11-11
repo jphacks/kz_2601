@@ -20,6 +20,10 @@
     <string name="renderer_qr_title">QR code</string>
     <string name="renderer_qr_empty">Nothing to turn into a QR code yet</string>
     <string name="renderer_qr_too_long">Too long for a QR code</string>
+    <string name="renderer_qr_save">Save to Photos</string>
+    <string name="renderer_qr_saved">Saved to Photos</string>
+    <string name="renderer_qr_save_failed">Couldn\'t save</string>
+    <string name="renderer_qr_share">Share</string>
     <string name="renderer_web_invalid">webView: only https URLs can be shown</string>
     <string name="renderer_web_back">Previous page</string>
     <string name="renderer_web_forward">Next page</string>
