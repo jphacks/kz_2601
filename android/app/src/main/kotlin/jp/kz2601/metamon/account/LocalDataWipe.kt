@@ -33,7 +33,7 @@ import jp.kz2601.metamon.voice.ChatHistoryStore
  *   Android は前の人のブロックで次の人の投稿を隠さないよう先に捨てる)
  * - 位置の記録(#869・[stopLocationTracking])
  * - 開いているフィードバックの画面(前の人の画面のスクショ・書きかけ・#1315。[closeFeedback]。消す途中で失敗しても閉じる)
- * - 音声の画面の状態は [AccountGuard.generation] で作り直す(iOS `chatHistory = []`)
+ * - 音声の画面の状態は [AccountGuard.generation] で作り直し、前の ViewModel は [PerAccountViewModels] で捨てる(#1167・iOS `chatHistory = []`)
  */
 class LocalDataWipe(
     private val recordSync: RecordSyncEngine,

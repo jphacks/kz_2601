@@ -44,6 +44,7 @@ import jp.kz2601.metamon.dsl.AppDSL
 import jp.kz2601.metamon.dsl.AppDocument
 import jp.kz2601.metamon.dsl.isVoiceOnly
 import jp.kz2601.metamon.account.AccountLinkPromptHost
+import jp.kz2601.metamon.account.PerAccountViewModels
 import jp.kz2601.metamon.consent.AiConsentDialog
 import jp.kz2601.metamon.purchase.PaywallHost
 import jp.kz2601.metamon.discover.DiscoverHost
@@ -208,7 +209,10 @@ fun MetamonApp(container: AppContainer) {
     val buildNow = stringResource(R.string.voice_build_now_utterance)
     val historyHeader = stringResource(R.string.voice_history_header)
     val unchangedReason = stringResource(R.string.voice_unchanged_reason)
-    val vm = viewModel(key = "voice-$wipes") {
+    // 前の人の ViewModel はキーで隠すだけでなく置き場ごと捨てる(#1167)
+    val perAccount: PerAccountViewModels = viewModel()
+    val voiceOwner = remember(perAccount, wipes) { perAccount.ownerFor(wipes) }
+    val vm = viewModel(viewModelStoreOwner = voiceOwner, key = "voice") {
         val clarify = ClarifySettings(context)
         VoiceViewModel(
             transcriber = container.transcriber,
