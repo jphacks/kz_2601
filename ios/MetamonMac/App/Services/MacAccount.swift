@@ -73,7 +73,9 @@ final class MacAccount {
         if await session.completeAppleLink(result, nonce: nonce) { return true }
         guard session.linkConflict else { return false }
         session.linkConflict = false
-        guard await session.switchToExistingAppleAccount() else { return false }
+        // 前のアカウントの端末の登録を消してから切り替える。失敗したら今の uid で戻す(iOS の `AccountLink` と同じ・#982)
+        guard await session.switchToExistingAppleAccount(beforeSwitch: { await Self.unregisterPush() },
+                                                         afterFailedSwitch: { await Self.registerPush() }) else { return false }
         await adoptUser(session.user?.uid) // 匿名の時のデータを消す(iOS の `adoptSwitchedAccount`)
         return true
     }
@@ -103,7 +105,10 @@ final class MacAccount {
                 for engine in MacRecordVault.liveEngines { left += await engine.flush() }
                 return left
             },
-            wipeLocal: { await wipe.run() }
+            wipeLocal: {
+                await Self.unregisterPush() // 送れなくても続ける(iOS の `signOutAndWipe` と同じ・#982)
+                await wipe.run()
+            }
         )
         guard outcome == .signedOut else { return outcome }
         session.signOut() // セッションの表示を即反映(サインアウト済みでも安全)
@@ -124,6 +129,7 @@ final class MacAccount {
             // 失効の仕組みと人の作業(鍵の登録)は docs/legal/apple-token-revocation.md(#246)
             _ = await AppleTokenRevocation.run(auth: service, authorizationCode: apple.code, idToken: apple.idToken, nonce: apple.nonce)
         }
+        await Self.unregisterPush() // `DELETE /v1/me` の後は送れない。送れなくても続ける(iOS と同じ・#982)
         let wipe = wipe, reauth = appleReauth
         try await AccountDeletionFlow.run(
             account: account,
@@ -138,6 +144,19 @@ final class MacAccount {
         session.signOut()
         await startFresh()
         return true
+    }
+
+    /// プッシュの端末の登録(#982)。審査用ビルドはプッシュごと外す
+    private static func unregisterPush() async {
+        #if !APP_STORE_REVIEW
+        await MacPushHost.shared.unregister()
+        #endif
+    }
+
+    private static func registerPush() async {
+        #if !APP_STORE_REVIEW
+        await MacPushHost.shared.refresh()
+        #endif
     }
 
     /// サインアウトの後: Firebase につながっていれば新しい匿名で入る(起動時と同じ・開いてすぐ使える)

@@ -213,6 +213,15 @@ final class MacNotificationDelegate: NSObject, UNUserNotificationCenterDelegate 
         _ center: UNUserNotificationCenter, didReceive response: UNNotificationResponse
     ) async {
         let id = response.notification.request.identifier
+        #if !APP_STORE_REVIEW
+        // プッシュ(#982): 本文の appId のアプリを開く。ローカル通知には appId が無いので下の識別子で開く
+        if response.actionIdentifier == UNNotificationDefaultActionIdentifier,
+           let appId = PushPayload.appId(from: response.notification.request.content.userInfo) {
+            await MainActor.run { NSApp.activate() }
+            await MacPushHost.shared.open(appId: appId)
+            return
+        }
+        #endif
         await MainActor.run {
             NSApp.activate()
             MacNotificationRouter.shared.open(notificationId: id)
@@ -225,11 +234,29 @@ final class MacNotificationDelegate: NSObject, UNUserNotificationCenterDelegate 
 @Observable
 final class MacNotificationRouter {
     static let shared = MacNotificationRouter()
-    private(set) var pending: String?
+    private(set) var pending: Route?
 
-    func open(notificationId: String) { pending = notificationId }
+    /// 押された通知の行き先
+    enum Route: Equatable {
+        /// ローカル通知の識別子(`dsl.` / `when.` / `timer.` + appId・#965)
+        case notification(String)
+        /// プッシュの本文の appId(#982)
+        case app(String)
 
-    func take() -> String? {
+        /// 一覧で選ぶアプリ。一覧に無ければ nil(前に出すだけ)
+        func appId(among ids: [String]) -> String? {
+            switch self {
+            case .notification(let id): NotificationAppRoute.appId(for: id, among: ids)
+            case .app(let id): ids.contains(id) ? id : nil
+            }
+        }
+    }
+
+    func open(notificationId: String) { pending = .notification(notificationId) }
+
+    func open(appId: String) { pending = .app(appId) }
+
+    func take() -> Route? {
         defer { pending = nil }
         return pending
     }
@@ -259,8 +286,8 @@ private struct MacNotificationRouting: ViewModifier {
     }
 
     private func route() {
-        guard let id = router.take() else { return }
-        if let appId = NotificationAppRoute.appId(for: id, among: appIds) { selection = appId }
+        guard let route = router.take() else { return }
+        if let appId = route.appId(among: appIds) { selection = appId }
     }
 }
 

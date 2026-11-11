@@ -13,7 +13,7 @@ MANIFEST="${TARGET_BUILD_DIR}/${UNLOCALIZED_RESOURCES_FOLDER_PATH}/PrivacyInfo.x
 # (製品の操作は、サーバーの利用の集計が全部の版にあるので元のファイルで宣言済み。aiButton の集計もそこに入る)
 # カスタマーサポート(アプリ内のフィードバック・v1/feedback)
 # デバイス ID(プッシュの端末の登録・v1/me/devices)
-# 足す種類はターゲットの METAMON_PRIVACY_EXTRA_TYPES で変えられる(Mac はプッシュが無いので DeviceID を外す・#931)
+# 足す種類はターゲットの METAMON_PRIVACY_EXTRA_TYPES で変えられる(Mac も #982 からプッシュを登録するので既定のまま)
 for type in ${METAMON_PRIVACY_EXTRA_TYPES:-PurchaseHistory CustomerSupport DeviceID}; do
   key="NSPrivacyCollectedDataType${type}"
   # 差分ビルドでリソースがコピーし直されない時に二重に足さない

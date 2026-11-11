@@ -291,6 +291,7 @@ targets:
   # Apple シリコンと Intel の両方(ARCHS_STANDARD = arm64 + x86_64。Debug は ONLY_ACTIVE_ARCH で手元の CPU だけ)。
   # 同梱の DSL 例を中央で動かす(記録はメモリ上・#939)。画面の骨格は #933、権限の説明は #931(マイク・音声認識は #966)。
   # Firebase(#930): ログイン(匿名・Sign in with Apple)・AI・フィードバック・App Check(DeviceCheck)・Crashlytics。plist が無ければモック(MacServices)。
+  # プッシュ(#982): 通常の版だけ APNs の端末を登録する(MacPushHost・entitlement は com.apple.developer.aps-environment = METAMON_APS_ENV)。
   MetamonMac:
     type: application
     platform: macOS
@@ -358,13 +359,12 @@ targets:
         ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME: AccentColor
         # select-firebase-plist.sh が「あれば使う」plist を読むため(iOS と同じ理由・#292)
         ENABLE_USER_SCRIPT_SANDBOXING: NO
-        # 通常の版だけマニフェストに足す種類(#931)。Mac はプッシュを登録しないのでデバイス ID は足さない
-        METAMON_PRIVACY_EXTRA_TYPES: PurchaseHistory CustomerSupport
+        # 通常の版だけマニフェストに足す種類(#931)。Mac もプッシュの端末を登録する(#982)ので iOS と同じ既定(デバイス ID 込み)を使う
       configs:
         Review:
           SWIFT_ACTIVE_COMPILATION_CONDITIONS: "$(inherited) APP_STORE_REVIEW"
           METAMON_APP_STORE_REVIEW: "YES"
-          # 共有のリンクを外した版なので Associated Domains(#1286)を入れない(iOS の Metamon-Review.entitlements と同じ)
+          # 共有のリンクとプッシュを外した版なので Associated Domains(#1286)と aps-environment(#982)を入れない(iOS の Metamon-Review.entitlements と同じ)
           CODE_SIGN_ENTITLEMENTS: MetamonMac/MetamonMac-Review.entitlements
     postBuildScripts:
       # iOS と同じスクリプト・同じ plist(Bundle ID が iOS と同じなので、Firebase の Apple アプリ 1 つを Mac でも使う・#930)。
