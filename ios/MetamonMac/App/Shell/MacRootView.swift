@@ -36,6 +36,8 @@ struct MacRootView: View {
     @Environment(MacOnboarding.self) private var onboarding: MacOnboarding?
     /// β の案内の依頼の例(#1214)など、ほかのシート・ウインドウから入力欄に入れる文
     private let draftRequest = MacDraftRequest.shared
+    /// サービスメニューで文字が届いた時にウインドウが無ければ開く(#1849)
+    @Environment(\.openWindow) private var openWindow
     /// 完成の後のお知らせ(#968)
     @State private var notices = MacPostBuildNotices()
     /// 最低対応版と強制アップデート(#981)。サービスのお知らせと同じ応答で判定する
@@ -76,8 +78,16 @@ struct MacRootView: View {
     @State private var badges = MacSidebarBadges.shared
     /// このウインドウの印(新着の数で「どのウインドウで開いているか」を分ける)
     @State private var windowToken = UUID()
+    /// 生成アプリごとのウインドウ(#1853)で開いたアプリ。メインのウインドウでは nil
+    private let windowApp: AppID?
+    @Environment(\.openWindow) private var openWindow
 
-    init(apps: [SampleApp]) { bundledApps = apps }
+    init(apps: [SampleApp], window: AppID? = nil) {
+        bundledApps = apps
+        windowApp = window
+        // アプリのウインドウはサイドバーを畳んで開く(⌃⌘S・ツールバーで出せる)
+        _columnVisibility = State(initialValue: window == nil ? .all : .detailOnly)
+    }
 
     /// 作ったアプリ(一覧の並び)。サーバーのアプリで中身をまだ取っていない行は、一覧の名前で出す(#1057)
     private var createdApps: [SampleApp] {
@@ -109,7 +119,7 @@ struct MacRootView: View {
                        newItems: { badges.count($0) },
                        thumbnail: thumbnail(for:), searchText: searchText, selection: guardedSelection,
                        onOpen: { focus = .canvas }, onDelete: deleteApp, onDuplicate: duplicateApp,
-                       onResetExample: resetExample,
+                       onResetExample: resetExample, onOpenInNewWindow: openAppWindow,
                        loadingServerApps: library.serverListState == .loading,
                        offline: library.serverListState == .offline)
                 .focused($focus, equals: .sidebar)
@@ -167,6 +177,7 @@ struct MacRootView: View {
         .macIntentRouting(selection: notificationSelection, appIds: apps.map(\.id), talk: speak) // ショートカット・Siri の「開く / 話しかける」(#1034)
         .onChange(of: apps.map(\.name)) { IntentHost.shared.appsMayHaveChanged() } // Siri のフレーズのアプリ名を引き直す(#1034)
         .background { WindowCloseGuard(discardGuard: discardGuard) } // ⌘W・閉じるボタン(#943)
+        .background { if let windowApp { WindowFrameAutosave(name: MacAppWindows.frameAutosaveName(windowApp)) } } // #1853
         .modifier(MacUpdateGateModifier(gate: updateGate)) // 古い版は閉じられない更新のシート(#981)
         #if !APP_STORE_REVIEW
         .onChange(of: shareFlow.adopted?.id) { adoptShared() }
@@ -200,6 +211,9 @@ struct MacRootView: View {
         }
         .onAppear {
             reopenLastApp()
+            // サービスメニュー(#1849): ウインドウが無い時に届いた文字は、開いたこのウインドウが受け取る
+            MacTextServiceProvider.shared.openMainWindow = { [openWindow] in openWindow(id: MacCommands.mainWindowId) }
+            takeDraftRequest()
             badges.setOpen(selectedAppId, window: windowToken)
             // self ごと捕まえると見張り(State)との循環で残るので、シートの Binding だけ渡す
             let map = $showsScreenMap, tips = $showsTips
@@ -224,7 +238,7 @@ struct MacRootView: View {
             reopenLastApp()
         }
         .onChange(of: selectedAppId) { _, id in
-            if let id { library.lastAppId = id }
+            if let id, windowApp == nil { library.lastAppId = id } // 次の起動で開き直すのはメインのウインドウの選択だけ
             badges.setOpen(id, window: windowToken) // 開いたら新着の印を消す(#969)。どのウインドウで開いていても数えない
             showsScreenMap = false
         }
@@ -233,11 +247,7 @@ struct MacRootView: View {
         }
         .onChange(of: draftRequest.serial) {
             // 頼まれた文を入力欄に入れて会話を開く(送らない)。頼んだシートが閉じるのを待つ(重なると表示されない・iOS と同じ 0.6 秒)
-            guard let draft = draftRequest.take(in: discardGuard.window) else { return } // 頼んだ時に前に出したウインドウだけ
-            Task { @MainActor in
-                try? await Task.sleep(for: .milliseconds(600))
-                ask(draft: draft)
-            }
+            takeDraftRequest()
         }
         #if !APP_STORE_REVIEW
         .onChange(of: notices.showsEditHint) { wasShowing, showing in
@@ -319,6 +329,10 @@ struct MacRootView: View {
     private func reopenLastApp() {
         let ids = apps.map(\.id)
         if let id = selectedAppId, ids.contains(id) { return }
+        if windowApp != nil { // アプリのウインドウ(#1853)はそのアプリを開く。まだ一覧に無ければ載るまで待つ
+            selectedAppId = MacAppWindows.initialSelection(window: windowApp, restored: selectedAppId, appIds: ids)
+            return
+        }
         selectedAppId = LocalAppLibrary.reopen(library.lastAppId, among: ids)
     }
 
@@ -423,6 +437,20 @@ struct MacRootView: View {
 
     /// ⇧⌘M: 声で頼む。⌘K と同じ相手(中央のアプリ・無ければ新しいアプリ)の会話を開き、すぐ録音する
     private func speak() { ask(draft: "", voice: true) }
+
+    /// 頼まれた文(β の案内・サービスメニュー)を受け取る。頼んだ時に前に出したウインドウだけ
+    private func takeDraftRequest() {
+        guard let draft = draftRequest.take(in: discardGuard.window) else { return }
+        Task { @MainActor in
+            try? await Task.sleep(for: .milliseconds(600))
+            if let compose {
+                // 会話が開いていれば、その入力欄に足す(書きかけは消さない・#1849)
+                compose.draft = MacTextServiceProvider.appending(draft, to: compose.draft)
+            } else {
+                ask(draft: draft)
+            }
+        }
+    }
 
     private func ask(draft: String, voice: Bool = false) {
         if let app = selectedApp {
@@ -748,7 +776,16 @@ struct MacRootView: View {
 
     /// サイドバーの選択。中央のアプリに保存していない入力があれば、確認して「破棄」の時だけ切り替える(#943)
     private var guardedSelection: Binding<String?> {
-        Binding(get: { selectedAppId }, set: { id in switchApp(to: id) })
+        Binding(get: { selectedAppId }, set: { id in
+            // ⌥クリックは選ばずに別のウインドウで開く(#1853)
+            if let id, id != selectedAppId, MacAppWindows.opensNewWindow(NSApp.currentEvent) { return openAppWindow(id) }
+            switchApp(to: id)
+        })
+    }
+
+    /// 生成アプリを別のウインドウで開く(#1853)。もう開いていればそのウインドウが前に出る
+    private func openAppWindow(_ id: String) {
+        openWindow(id: MacAppWindows.windowId, value: AppID(rawValue: id))
     }
 
     private func switchApp(to id: String?) {
