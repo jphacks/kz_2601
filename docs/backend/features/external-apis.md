@@ -70,6 +70,9 @@ op の `Check` は引数の値を確かめる(appconfig と runner の両方で�
 
 | provider | 種類 | op | 出口 | キャッシュ | 入れ方 |
 |---|---|---|---|---|---|
+| `asana` の `myTasks`(自分のタスクを見る・#1683) | 無料・OAuth(`runs` だけ・scope `tasks:read` `workspaces:read`) | `myTasks(workspaceId?, limit?)`。自分に割り当てられた未完了のタスク(`assignee=me`・`completed_since=now`)。`workspaceId` は数字の id。無い時は利用者のワークスペースが 1 つならそれを使い、0 か 2 つ以上なら 400 `bad_request`(`workspaces:read` はこのためだけ)。`limit` 1〜50(既定 20)。行はタスク(見出し = 名前・値 = 期限(`due_at`、無ければ `due_on`)・リンク = `https://app.asana.com/` の permalink だけ)。規約: Asana API Terms(出典の表示・利用者の同意・データを売らない・Asana の機能そのものに課金しない)。回数: トークンごとに 1 分 150 回(無料の組織)/ 1,500 回(有料)・同時 GET 50。429 は `Retry-After` | `https://app.asana.com` だけ(認可・トークン・API が同じホスト) | なし | `EXT_ASANA_ENABLED=1`・`EXT_ASANA_CLIENT_ID` / `_CLIENT_SECRET` |
+| `asana` の `projectTasks`(プロジェクトのタスクを見る・#1683) | 無料・OAuth(`runs` だけ・scope `tasks:read`) | `projectTasks(projectId, limit?)`。プロジェクトの未完了のタスク。`projectId` は数字の id(Asana の URL の `/0/<id>/`)。持っていない id(Asana の 400 / 404)は 400 `bad_request`。行は `myTasks` と同じ。規約・回数は同上 | 同上 | なし | 同上 |
+| `asana` の `complete`(タスクを完了にする・#1683) | 無料・OAuth(`runs` だけ・scope `tasks:write`。初めて使う時につなぎ直す。Asana の scope は足し算にならないので、つなぎ直しでも読む scope を一緒に求める)・書く(確認必須) | `complete(taskId)`。`taskId` は数字の id。答えは `resultId`(= `taskId`)と 1 件(補足 = 「完了」)。完了済みをもう一度完了にしても変わらない。持っていないタスクは 400 `bad_request`。規約は同上。回数: 書き込みは同時 15 | 同上 | なし | 同上 |
 | `frankfurter`(為替・欧州中央銀行・#1499) | 無料・鍵なし(`runs` だけ) | `latest(from?, to?, amount?)`・`historical(date, from?, to?, amount?)`。`from` / `to` は大文字 3 文字の通貨(`to` はカンマ区切りで 10 個まで・重ならない)・`amount` は正の数・`date` は 1999-01-04 から今日まで。行は通貨ごと(見出し = 通貨・値 = レート・補足 = 「日付・量 基準」) | `https://api.frankfurter.app` だけ・本文 64 KiB まで | latest 1 時間・historical 1 日 | `EXT_FRANKFURTER_ENABLED=1` |
 | `openWeather` の `airQuality`(空気の汚れ・OpenWeatherMap Air Pollution・#1656) | 無料・運営の鍵(`runs` だけ。OpenWeather の契約の範囲) | `airQuality(lat, lng)`。`lat` / `lng` は小数(10 進だけ)で小数 2 桁(約 1 km)に丸めて送る。答えは 1 件(見出し = 「空気 <AQI の段階>(目安)」・値 = `AQI n/5`・補足 = PM2.5・PM10・O₃・NO₂ の µg/m³)。AQI は OpenWeather の 1〜5(良い・まあまあ・ふつう・悪い・とても悪い)。1〜5 でない答えは 502 `upstream_unavailable`。健康の判断ではなく目安。出典「Weather data © OpenWeather (ODbL)」を出す。AI に選ばせる決まり(`prompt.go`・`catalog.go`)はまだ | `https://api.openweathermap.org` だけ(`/data/2.5/air_pollution`。天気と同じホスト・同じ鍵) | なし | `EXT_OPEN_WEATHER_ENABLED=1`・`EXT_OPEN_WEATHER_API_KEY` |
 | `todoist` の `listTasks`(タスクを見る・#1496・`project` / `label` は #1681) | 無料・OAuth(`runs` だけ・scope `data:read`) | `listTasks(filter?, projectId?, project?, label?, limit?)`。`filter`・`projectId`・`project`(プロジェクトの名前)はどれか 1 つ。`label` はどれとも組める(`project` か `filter` と組むと Todoist のフィルタ `#名前 & @ラベル`、ほかは `label` の引数)。名前は 120 文字まで・1 行・`& \| ! ( ) , \ * # @` は使えない。カンマを含む `filter` に `label` は付けられない。`limit` 1〜50(既定 20)。行はタスク(見出し = 内容・補足 = 期限の言葉・値 = 期限・リンク) | `https://api.todoist.com` だけ | なし | `EXT_TODOIST_ENABLED=1`・`EXT_TODOIST_CLIENT_ID` / `_CLIENT_SECRET` |
@@ -83,14 +86,49 @@ op の `Check` は引数の値を確かめる(appconfig と runner の両方で�
 | `googleTasks` の `tasks`(リストのタスクを見る・#1677) | 無料・OAuth(`runs` だけ・scope `tasks.readonly`) | `tasks(listId?, due?, status?, limit?)`。`listId` は英数字と `_` `-` の 128 文字まで(無ければ既定のリスト `@default`)。`due` は `today`(今日・日本時間)・`overdue`(今日より前)・`week`(今日から 7 日)・`YYYY-MM-DD`(その日)。`status` は `open`(既定・まだのもの)・`completed`(済んだもの)・`all`。`limit` 1〜50(既定 20)。行はタスク(見出し = タイトル・補足 = メモの 1 行目(120 文字まで。済んだものは頭に「完了」)・値 = 期限の日・リンク) | 同上 | なし | 同上 |
 | `googleTasks` の `addTask`(タスクを足す・#1677) | 無料・OAuth(`runs` だけ・scope `tasks`。Google にこれより狭い書く scope が無い)・書く(確認必須) | `addTask(title, notes?, due?, listId?)`。`title` 1024 文字まで・`notes` 8192 文字まで(制御文字は不可)・`due` は `YYYY-MM-DD`(Google は日付だけ持つ)。答えは `resultId`(タスクの id)と 1 件。Google に冪等のキーが無いので、二重にしないのは書く op をやり直さない決まりだけ | 同上 | なし | 同上 |
 | `googleTasks` の `complete`(タスクを済みにする・#1677) | 無料・OAuth(`runs` だけ・scope `tasks`)・書く(確認必須) | `complete(taskId, listId?)`。id は英数字と `_` `-` の 128 文字まで。答えは `resultId`(= `taskId`)と 1 件。済みをもう一度済みにしても変わらない。持っていないリスト・タスク(Google の 400 / 404)は 400 `bad_request` | 同上 | なし | 同上 |
+| `github` の `contributions`(草・#1674) | 無料・OAuth(GitHub App の利用者のトークン。scope は無く、App の権限で決まる・下の注) | `contributions(from?, to?)`。日付は `YYYY-MM-DD`(日本時間)・既定は今日までの 7 日・`to` は今日まで・`from` から `to` は 366 日まで・2008 年から。GraphQL の `contributionsCollection`。行は 1 日 1 行で古い順(見出し = 日付・値 = 数)、1 件(`item`)は期間の合計(見出し = 「from〜to」・値 = 合計)。private の分は本人のプロフィールの設定どおりに数える | `https://github.com`(トークン)・`https://api.github.com` だけ | なし | `EXT_GITHUB_ENABLED=1`・`EXT_GITHUB_CLIENT_ID` / `_CLIENT_SECRET` |
+| `github` の `pullRequests`(レビュー待ち・自分の PR・#1674) | 同上・読むだけ | `pullRequests(role?, state?, limit?)`。`role` は `reviewRequested`(既定・レビューを頼まれた)か `author`(自分の)。`state` は `open`(既定)・`closed`・`merged`・`all`。`limit` 1〜50(既定 20)。検索(`GET /search/issues`・`is:pr`・アーカイブは除く・更新の新しい順)。行は PR(見出し = 題名・補足 = `owner/repo#番号`・値 = 更新日時・リンク)、1 件(`item`)の値は件数(GitHub の上限 1,000) | 同上 | なし | 同上 |
+| `github` の `issues`(担当の Issue・#1674) | 同上・読むだけ | `issues(state?, limit?)`。`state` は `open`(既定)・`closed`・`all`。`limit` 1〜50(既定 20)。検索(`is:issue assignee:@me`)。行と件数は `pullRequests` と同じ形 | 同上 | なし | 同上 |
+| `linear` の `myIssues`(自分の Issue・#1684) | 無料・OAuth(`runs` だけ・scope `read`) | `myIssues(state?, limit?)`。`state` は `open`(既定・完了と取り消し以外)・`all`・状態の種類(`triage`・`backlog`・`unstarted`・`started`・`completed`・`canceled`)。`limit` 1〜50(既定 20)。担当の Issue を更新の新しい順。行は Issue(見出し = 題名・補足 = 「`ENG-12` · 状態の名前」・値 = 期限・リンク) | `https://api.linear.app` だけ | なし | `EXT_LINEAR_ENABLED=1`・`EXT_LINEAR_CLIENT_ID` / `_CLIENT_SECRET` |
+| `linear` の `createIssue`(Issue を足す・#1684) | 無料・OAuth(`runs` だけ・scope `issues:create`。つなぎ直す時も `read` を一緒に頼む)・書く(確認必須) | `createIssue(title, description?, team?)`。`title` は 1 行・255 文字まで・`description` は Markdown・10,000 文字まで。`team` はチームのキー(`ENG`・英字で始まる 7 文字まで)かチームの id。書かなければ本人のチームが 1 つの時だけそこ(2 つ以上は 400 `bad_request`)。無いチーム・Linear が受けない入力(`INVALID_INPUT`)も 400。状態はチームの最初の状態(Backlog か Triage)。答えは `resultId`(`ENG-123`)と 1 件 | 同上 | なし | 同上 |
+| `youtube` の `channelStats`(チャンネルの公開の数字・YouTube Data API v3・#1699) | 無料・運営の鍵(`runs` だけ。YouTube の 1 日の割り当てで 1 回 1 単位) | `channelStats(channel)`。`channel` はチャンネル id(`UC` + 22 文字)か `@ハンドル`(3〜30 文字・文字と数字と `.` `_` `-`)。答えは 1 件(見出し = チャンネル名・値 = 「登録者 n 人」・補足 = 「動画 n 本・再生 n 回」・リンク = チャンネル)。数は API の値をそのまま 3 桁区切りで出す(丸めない・作り直さない)。登録者を隠しているチャンネルは「登録者 非公開」。無いチャンネルは 400 `bad_request`。出典「YouTube」を出す(下の「YouTube の規約」)。AI に選ばせる決まり(`prompt.go`・`catalog.go`)はまだ | `https://www.googleapis.com` だけ(`/youtube/v3/channels`)・鍵は `X-Goog-Api-Key` ヘッダー | 1 時間 | `EXT_YOUTUBE_ENABLED=1`・`EXT_YOUTUBE_API_KEY` |
+| `youtube` の `latestVideos`(チャンネルの新しい動画・#1699) | 同上(1 回 2 単位: チャンネル + アップロードの再生リスト。`search` の 100 単位は使わない) | `latestVideos(channel, limit?)`。`channel` は同上・`limit` 1〜20(既定 5)。行は公開の動画だけ・新しい順(見出し = 題・補足 = 公開の日時(日本時間)・リンク = 動画)。動画が 1 本も無いチャンネルは 0 行 | 同上(`/youtube/v3/channels`・`/youtube/v3/playlistItems`) | 30 分 | 同上 |
+| `slack` の `setStatus`(自分の状態を変える・#1679) | 無料・OAuth(`runs` だけ・ユーザーのトークン・scope `users.profile:write`)・書く(確認必須) | `setStatus(text?, emoji?, minutes?)`。`text` は 1 行 100 文字まで・`emoji` は `:tomato:` の形(肌の色 `:skin-tone-2:`〜`6` を 1 つ付けてよい)・`minutes` は 1〜10080(1 週間。無ければ消すまで)。`text` も `emoji` も無ければ状態を消す(その時 `minutes` は付けない)。同じ状態をもう一度入れても変わらない。答えは 1 件(見出し = 文・補足 = 絵文字・値 = 消える時刻)。Slack の上限は 1 人の状態を 1 分に 10 回まで | `https://slack.com` だけ(`/api/...`) | なし | `EXT_SLACK_ENABLED=1`・`EXT_SLACK_CLIENT_ID` / `_CLIENT_SECRET` |
+| `slack` の `postMessage`(チャンネルに本人として投稿・#1679) | 無料・OAuth(`runs` だけ・ユーザーのトークン・scope `chat:write`)・書く(確認必須) | `postMessage(channel, text)`。`channel` は会話の id(`C…` / `G…` / `D…`・名前は取らない)・`text` は 4000 文字まで(改行可・制御文字不可)。`<!channel>` `<!here>` `<!subteam^…>` などの一斉メンション(`<!`)は Slack に送らず 400 `bad_request`。`parse: none`・`link_names: false` で送る。本人が入っていない・無いチャンネル(`not_in_channel` / `channel_not_found`)は 400 `bad_request`。Slack に冪等のキーが無いので、二重にしないのは書く op をやり直さない決まりだけ。答えは `resultId`(メッセージの `ts`)と 1 件(見出し = 1 行目 120 文字まで・補足 = チャンネル)。本文は保存しない。Slack の上限は 1 チャンネルに 1 秒 1 通 | 同上 | なし | 同上 |
+| `slack` の `unread`(DM の未読の数・#1679) | 無料・OAuth(`runs` だけ・ユーザーのトークン・scope `im:read`) | `unread(channel)`。`channel` は DM の id(`D…`)だけ。`conversations.info` の `unread_count_display` を返す(Web API が未読の数を返すのは DM だけ。チャンネルの未読を数えるには本文を `conversations.history` で読むことになり、Marketplace に無い配布アプリは 1 分 1 回・15 件までなので入れない)。数が無い答えは 400 `bad_request`。答えは 1 件(見出し = 「未読」・補足 = id・値 = 数)。本文は読まない | 同上 | なし | 同上 |
 | `googleSheets` の `readRange`(スプレッドシートの範囲を見る・#1685) | 無料・OAuth(`runs` だけ・scope `drive.file`。利用者が Google Picker で選んだファイルとアプリが作ったファイルだけ・センシティブでない) | `readRange(spreadsheetId, range, limit?)`。`spreadsheetId` は英数字と `_` `-` の 20〜128 文字(Picker で選んだファイルの id)。`range` はシート名か A1 の範囲(`Sheet1!A1:D50`・`'売上'!A:D`・シート名を省くと最初のシート)で 200 文字まで。`limit` 1〜100(既定 50)。行の範囲が無い・`limit` より広い範囲は `limit` 行に縮めて頼む。行はシートの 1 行(見出し = 1 列目・値 = 2 列目・補足 = 3〜10 列目を「・」でつなぐ。11 列目からは捨てる・空の行は飛ばす)。選んでいないファイル(Google の 404)は 400 `bad_request`(「Picker で選んで」の理由付き)・無いシートや範囲(400)も 400 `bad_request` | `https://sheets.googleapis.com` と `https://oauth2.googleapis.com` だけ | なし(シートの中身を持たない) | `EXT_GOOGLE_SHEETS_ENABLED=1`。OAuth のクライアントは Google カレンダーのもの(`EXT_GOOGLE_CALENDAR_CLIENT_ID` / `_CLIENT_SECRET`)。`EXT_GOOGLE_SHEETS_CLIENT_ID` / `_CLIENT_SECRET` を入れた時だけそちら(`Provider.ClientFrom`) |
 | `googleSheets` の `appendRow`(スプレッドシートに 1 行足す・#1685) | 無料・OAuth(`runs` だけ・scope `drive.file`)・書く(確認必須) | `appendRow(spreadsheetId, range, values)`。`range` は `readRange` と同じ(表のある範囲。その下に足す)。`values` は文字列の JSON 配列(1〜26 個・1 つ 1000 文字まで・改行とタブ以外の制御文字は不可)。値はそのまま入れる(`RAW`。`=` で始まっても式にしない)。答えは `resultId`(書いた範囲・例 `Sheet1!A5:C5`)と 1 件(リンク = そのシート)。Google に冪等のキーが無いので、二重にしないのは書く op をやり直さない決まりだけ | 同上 | なし | 同上 |
 
 Google ToDo の 401 は接続を `error` にする(つなぎ直す)。403 は scope が足りない時もほかの拒否も 409 `ext_not_connected`(つなぎ直す)、ただし回数の上限の 403 と 429 / 5xx は 502 `upstream_unavailable`。
 
-Todoist の `complete`・`projects`・`project` / `label` と Notion の `updateProperties`・`pageText`、Google ToDo の全部の op は runner の op だけ。生成アプリから呼ぶ部品と AI に選ばせる決まり(`prompt.go`・`catalog.go`・`docs/dsl`)は #1643 の判断の後に足す。
+Slack は利用者ごとの OAuth v2 でユーザーのトークン(`user_scope` だけ・ボットのトークンは取らない)。PKCE は使わない(Slack の PKCE はアプリを公開クライアントに戻せない形で変えるため。runner はクライアントの秘密を Basic 認証で送る)。新しい scope は同じトークンに足されるので、書く op のためにつなぎ直しても読む op は残る。トークンの回転(12 時間・使い捨ての refresh token)を入れた時も入れない時も動く。Slack はほとんどの失敗を 200 の `ok:false` で返すので、コードで分ける: `invalid_auth`・`not_authed`・`token_revoked`・`token_expired`・`account_inactive`(と HTTP 401)は接続を `error` にする(つなぎ直す)。`missing_scope`・`not_allowed_token_type`・`no_permission`・`access_denied` など(と HTTP 403)は 409 `ext_not_connected`。`ratelimited`(HTTP 429)・`fatal_error`・`internal_error`・`service_unavailable`・`request_timeout`(と 5xx)は 502 `upstream_unavailable`。ほかのコードは 400 `bad_request`。Slack の API 規約: 商用の配布は Marketplace(か別の契約)が要る・データは機能に要る間だけ持つ・モデルの学習に使わない・プライバシーポリシーに読むものを書く。だから op は本人の状態・本人の投稿・DM の未読の数だけで、メッセージの本文を読む op・ためる op は入れない。
+
+Asana の `myTasks`・`projectTasks`・`complete`、Todoist の `complete`・`projects`・`project` / `label`、Notion の `updateProperties`・`pageText`、Google ToDo の全部の op、GitHub と Linear の op、YouTube の `channelStats`・`latestVideos`、Slack の全部の op は runner の op だけ。生成アプリから呼ぶ部品と AI に選ばせる決まり(`prompt.go`・`catalog.go`・`docs/dsl`)は #1643 の判断の後に足す。
 
 provider が 404 / 422(持っていない通貨・日)を返した時は 400 `bad_request`(`runs` は戻す)。429 / 5xx は 502 `upstream_unavailable`。
+
+### Trello を入れていない理由(#1682・設計のメモ)
+
+Trello の認可は今の接続の形(`OAuthClient`: 同意の URL を作る → 戻り先の `state` と `code` を受けて交換 → 更新 → 取り消し)に合わないので、runner の provider は作っていない。
+
+| Trello の方式 | 合わないところ |
+|---|---|
+| `/1/authorize`(API キー + 利用者のトークン) | トークンは戻り先の URL の `#` の後ろ(`callback_method=fragment`)か `postMessage` で返る。`#` の後ろはサーバーに届かないので、runner の `/oauth/callback/{provider}` では受け取れない。`state` も無い |
+| OAuth 1.0a(`OAuthGetRequestToken` → `OAuthAuthorizeToken` → `OAuthGetAccessToken`) | 同意の URL を作る前に runner からリクエストトークンを取る(`AuthURL` は通信しない作り)。戻り先は `oauth_token` と `oauth_verifier` で `state` / `code` ではない。リクエストトークンの秘密を state と一緒に持つ所が要る。署名(HMAC-SHA1)も要る |
+
+入れる時の案(どちらもオーナーの判断が要る):
+
+1. **OAuth 1.0a を足す(推奨)**: `OAuthClient` に「始める時に通信してよい」版(`Begin(ctx, state, redirectURI) (authURL, secret string, err error)`)を足し、`OAuthState` にリクエストトークンの秘密を暗号化して持つ。戻り先は `oauth_token` と `oauth_verifier` も受ける。手に入るトークンは期限なし(`expiration=never`)か 30 日で、更新は無い(切れたらつなぎ直す)。API は `Authorization: OAuth oauth_consumer_key="<API キー>", oauth_token="<トークン>"` で呼ぶ(URL にトークンを載せない)。取り消しは `DELETE /1/tokens/{token}`。
+2. **`#` を読む小さな戻り先のページ**: runner が返す静的な HTML が `#token=` を読み、`state` と一緒に runner へ POST する。トークンがブラウザーの履歴・JS を通るので 1 より弱い。
+
+op の案: `boards()`(自分のボード・`GET /1/members/me/boards`。`/1/members` は 900 秒に 100 回と厳しい)・`cards(boardId? / listId?)`(`GET /1/lists/{id}/cards`・`GET /1/boards/{id}/cards`)・`addCard(listId, name, desc?, due?)`(書く・確認必須・`POST /1/cards`)。scope は `read`(足す時だけ `write`。`account` は要らない)。出口は `https://api.trello.com`(認可は `https://trello.com` でブラウザーだけ)。回数: API キーごとに 10 秒 300 回・トークンごとに 10 秒 100 回(429 の本文 `API_TOKEN_LIMIT_EXCEEDED` / `API_KEY_LIMIT_EXCEEDED`)。規約: Atlassian Developer Terms(利用者の同意・データを売らない・Trello の機能そのものに課金しない・セキュリティの事故は 48 時間以内に知らせる)。
+
+### GitHub と Linear の注(#1674・#1684)
+
+- **GitHub は GitHub App**(OAuth App ではない)。OAuth App の `repo` scope は private の repo に書く権限まで付くので使わない。GitHub App は scope が無く、App に付けた権限(Issues: 読む・Pull requests: 読む・Metadata: 読む)と、本人が App を入れた repo にだけ届く(private の repo は入れたものだけ読める)。PKCE は S256。利用者のトークンは 8 時間・リフレッシュトークンは 6 か月で、使うたびに入れ替わる。トークンの口は失敗も 200 と `{"error"}` で返す(`bad_verification_code` / `bad_refresh_token` は つなぎ直し)。切る時は `DELETE /applications/{client_id}/grant`(本人の許可ごと消える)。
+- **GitHub の上限と決まり**: 利用者 1 人 1 時間 5,000 回(本人のほかのトークンと共有)・検索は 1 分 30 回・同時に 100 本まで。GitHub は 1 人ぶんを並べて呼ばないよう求めるので、同じトークンの呼び出しは台の中で 1 本ずつにする。上限の 403(`x-ratelimit-remaining: 0` か `retry-after` つき)と 429 と GraphQL の `RATE_LIMITED` は 429 として扱い、provider を 1 分止める(上限を超えて呼び続けると連携を止められることがある)。上限でない 403 は App の権限が足りない(つなぎ直し)。`User-Agent` を必ず付け、`X-GitHub-Api-Version: 2026-03-10`。検索は GitHub App のトークンでは `is:pr` / `is:issue` が要る(無いと 422)。
+- **Linear**: scope は `read`(既定)と `issues:create`(Issue を足すだけ。直す・消すはできない)。`write`・`admin` は頼まない。PKCE は S256・`actor=user`。アクセストークンは 24 時間・リフレッシュトークンは 30 日で入れ替わる。切る時は `POST /oauth/revoke` にリフレッシュトークン(無ければアクセストークン)。400(もう取り消し済み)・401 は済んだものとする。
+- **Linear の上限**: OAuth の App は利用者 1 人 1 時間 5,000 回・複雑さ 2,000,000 点(1 回 10,000 点を超える問い合わせは断られる)。上限は 429 と `RATELIMITED`。問い合わせは見せる項目だけ・50 件までにする。Linear はエラーを 200 / 400 と `extensions.code` で返すので、`AUTHENTICATION_ERROR` は接続のエラー、`FORBIDDEN` はつなぎ直し、`INVALID_INPUT` は 400 にする(エラーの code の一覧は公開の文書に無いので、知らない code は 502 `upstream_unavailable`)。
 
 ### 入れないもの(黄砂・そらまめ君)
 
@@ -100,6 +138,20 @@ provider が 404 / 422(持っていない通貨・日)を返した時は 400 `ba
 |---|---|
 | 黄砂(気象庁の黄砂情報) | 予測図が画像で出るだけで、数値で読める公式の API・使い方の決まり(仕様と規約)が無い。画像を読み取るのは壊れやすく、出典の決まりの外になる。数値の公式の出どころができたら入れ直す |
 | 環境省「そらまめ君」(大気汚染物質広域監視システム) | 公式の API の仕様が無く、画面とデータのダウンロードだけ。機械から呼ぶ使い方の規約も無いので、runner から定期に読む形にできない。PM2.5 は上の `airQuality` で見る |
+
+
+### YouTube の規約(#1699)
+
+[YouTube API サービス利用規約](https://developers.google.com/youtube/terms/api-services-terms-of-service)と[開発者ポリシー](https://developers.google.com/youtube/terms/developer-policies)(2026-11-12 に読んだ)から、`youtube` を出す時に守ること。
+
+| 決まり | 中身 | この作りでの扱い |
+|---|---|---|
+| 出どころを見せる(規約 10.3・ポリシー III.F.2) | YouTube の中身を出す画面は、YouTube が出どころだと分かるように YouTube のブランド(Branding Guidelines)を出す。他の出どころとまとめた 1 つの出典にしない | 出典「YouTube」(`YouTubeAttribution`)を数字・行のそばに出す。ロゴの出し方は部品(#1643)と iOS で決める |
+| 数字をそのまま出す(ポリシー III.E.4.h・III.E.4.f) | API の数字を、自分で計算した別の数字に置き換えない。出すのは手に入る一番新しい値。過去の値は「いつの値か」を添えるなら出せる | 数は API の値をそのまま(3 桁区切りだけ)。隠された登録者は出さない |
+| 持つ期間(ポリシー III.E.4.b・c・d・e) | 許可されていないデータ(運営の鍵で読む公開の数字)は 30 日まで。統計(登録者の数など)も 30 日を超えて持たない。持つ間も今の値に合わせる努力をする | キャッシュは 1 時間 / 30 分だけ。**生成アプリが毎日の登録者を記録して 30 日より長く持つのは規約の外**。推移を出す部品は 30 日で古い記録を消す形にする(#1643 で決める) |
+| 規約へのリンク(ポリシー III.A.1) | YouTube の利用規約(https://www.youtube.com/t/terms)へのリンクを出す | 部品と iOS の作業(#1643)。`docs/legal` にも書く(人の作業) |
+| プライバシーポリシー(規約 7・ポリシー III.A.2) | YouTube API サービスを使うと書き、Google のプライバシーポリシー(https://policies.google.com/privacy)へリンクする | 人の作業(`docs/legal`) |
+| 割り当て(規約 15・ポリシー III.D.3) | 割り当てを超えない・避けない。増やすには API Compliance Audit。認められた使い道にだけ使う | 1 回 1〜2 単位。回数の上限 `EXT_GLOBAL_DAILY_YOUTUBE` を 1 日の割り当てに合わせる(上限は回数で数えるので、`latestVideos` を 2 単位として見積もる・人の作業) |
 
 ## 呼び出しの流れと数え方
 
@@ -228,6 +280,9 @@ DSL に `externalCall` / `externalList` があるかの確かめは、DSL の子
 - runner の最小 1 台(決定 4)・`#288` までは runner が prod だけなので、stg で偽の provider を通す時の runner の置き場所。
 - 各社の鍵・OAuth のクライアント(Secret Manager・`EXT_<PROVIDER>_*`)と、原価・押さえの量(非公開の資料から env)。
 - Google ToDo(#1677): カレンダーの OAuth クライアントに戻り先 `/oauth/callback/googleTasks` を足し、Google Cloud のプロジェクトで Tasks API を有効にし、同意の画面に scope `tasks.readonly`・`tasks`(センシティブ)を足して Google の確認を受け直す。
+- GitHub App の登録(#1674): 権限は Issues・Pull requests・Metadata を読むだけ・「Expire user authorization tokens」を入れたまま・コールバックは runner の `/oauth/callback/github`・Webhook は切る。利用者は App を自分の repo / org に入れる(org は管理者の承認が要ることがある)。
+- Linear の OAuth の App の登録(#1684): コールバックは runner の `/oauth/callback/linear`・公開にするか(ほかのワークスペースから使えるように)を決める。
 - Google スプレッドシート(#1685): カレンダーの OAuth クライアントに戻り先 `/oauth/callback/googleSheets` を足し、Google Cloud のプロジェクトで Sheets API と Picker API を有効にし、同意の画面に scope `drive.file`(センシティブでない)を足す。iOS の Google Picker でファイルを選ばせる部分は別の Issue。
 - 回数の上限の値(`EXT_LIMIT_*`・`EXT_GLOBAL_DAILY*`)を各社の割り当てに合わせて runner の env に入れる(非公開の資料から。入れなければコードの既定)。
 - プライバシーポリシー・利用規約(`docs/legal`)に外の API への送信とトークンの保管・消し方を書く。
+- YouTube(#1699): Google Cloud で YouTube Data API v3 を有効にし、鍵(使える API を YouTube Data API v3 だけに絞る)を Secret Manager の `EXT_YOUTUBE_API_KEY` に入れる。1 日の割り当て(Cloud Console の Quotas)を確かめて `EXT_GLOBAL_DAILY_YOUTUBE` を合わせる。上の「YouTube の規約」を読み直し、プライバシーポリシーに YouTube API サービスの利用と Google のプライバシーポリシーへのリンク、アプリに YouTube の利用規約へのリンクを足す。
