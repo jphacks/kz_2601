@@ -1,5 +1,7 @@
 package jp.kz2601.metamon.services.local
 
+import jp.kz2601.metamon.dsl.records.AudioValue
+import jp.kz2601.metamon.dsl.records.JSONValue
 import jp.kz2601.metamon.dsl.records.LocalVideoStore
 import jp.kz2601.metamon.dsl.records.VideoValue
 import jp.kz2601.metamon.services.AppConfigClient
@@ -58,6 +60,8 @@ class RecordSyncEngine(
     private val now: () -> Instant = Instant::now,
     /** 端末内の動画の置き場(#863)。記録を消した時にその記録の動画ファイルも消す。null = 消さない(テスト・置き場の無い構成) */
     private val videos: LocalVideoStore? = null,
+    /** 端末内の録音のファイルを消す(#1098・`LocalAudioStore.remove`。:renderer にあるので関数で受ける)。null = 消さない */
+    private val removeAudios: ((Set<String>) -> Unit)? = null,
 ) {
     sealed interface Status {
         data object Synced : Status
@@ -243,8 +247,8 @@ class RecordSyncEngine(
 
     /** 削除。ローカルではすぐ一覧から消え(行は削除待ちで残る)、送れたら行も消える。 */
     suspend fun delete(appId: String, entity: String, recordId: String): List<Record> {
-        // 端末内の動画ファイル(#1201・iOS の `store.videos.remove(VideoValue.localIDs(in:))`)。取り消し期間の後にだけ通る
-        videos?.let { v -> store.current(appId, entity, recordId)?.let { v.remove(localVideoIds(it.data)) } }
+        // 端末内の動画・録音のファイル(#1201・#1098・iOS の `store.videos/audios.remove(…localIDs(in:))`)。取り消し期間の後にだけ通る
+        store.current(appId, entity, recordId)?.let { row -> removeLocalMedia(listOf(row)) { it.appId == appId && it.entity == entity && it.isKnownAs(row.recordId) } }
         val result = queue.enqueue(SyncOperation(appId = appId, entity = entity, recordId = recordId, kind = PendingOp.DELETE))
         if (result == SyncQueue.EnqueueResult.CANCELLED_CREATE) {
             store.remove(appId, entity, recordId) // まだサーバーに無い行はその場で消す
@@ -259,6 +263,8 @@ class RecordSyncEngine(
     suspend fun purge(appId: String) {
         dropPendingDeletions { it.appId == appId }
         queue.discard(appId)
+        // そのアプリの記録の動画・録音のファイル(iOS `RecordStore.removeAll(appId:)`)
+        removeLocalMedia(store.allRows().filter { it.appId == appId }) { it.appId == appId }
         store.removeAll(appId)
         refreshStatus()
     }
@@ -360,9 +366,30 @@ class RecordSyncEngine(
             .map { it.record }
     }
 
+    /**
+     * [rows] の値にある端末内の動画・録音のファイルを消す。[leaving] に当たらない行(ほかの記録)がまだ使う id は残す。
+     * 削除待ちの行は数えない(その行のファイルは消した時に片付け済み)。
+     */
+    private suspend fun removeLocalMedia(rows: List<LocalRecord>, leaving: (LocalRecord) -> Boolean) {
+        if (videos == null && removeAudios == null) return
+        val videoIds = rows.flatMap { localVideoIds(it.data) }.toSet()
+        val audioIds = rows.flatMap { localAudioIds(it.data) }.toSet()
+        if (videoIds.isEmpty() && audioIds.isEmpty()) return
+        val others = store.allRows().filter { it.pendingOp != PendingOp.DELETE && !leaving(it) }
+        videos?.remove(videoIds - others.flatMap { localVideoIds(it.data) }.toSet())
+        removeAudios?.let { remove ->
+            (audioIds - others.flatMap { localAudioIds(it.data) }.toSet()).takeIf { it.isNotEmpty() }?.let(remove)
+        }
+    }
+
+    private fun strings(data: JsonObject): List<String> =
+        data.values.mapNotNull { v -> (v as? JsonPrimitive)?.takeIf { it.isString }?.content }
+
     /** 記録の値の中にある端末内動画の id([VideoValue.localIds] の JsonObject 版) */
-    private fun localVideoIds(data: JsonObject): Set<String> =
-        data.values.mapNotNull { v -> (v as? JsonPrimitive)?.takeIf { it.isString }?.content?.let(VideoValue::parse)?.id }.toSet()
+    private fun localVideoIds(data: JsonObject): Set<String> = strings(data).mapNotNull { VideoValue.parse(it)?.id }.toSet()
+
+    /** 記録の値の中にある端末内録音の id(iOS `AudioValue.localIDs(in:)`) */
+    private fun localAudioIds(data: JsonObject): Set<String> = strings(data).mapNotNull { AudioValue.parse(JSONValue.Str(it))?.id }.toSet()
 
     /** ローカル行の時刻。ミリ秒まで持つ(同じ秒に続けて作った行も作った順に並ぶ)。 */
     private fun timestamp(): String = now().truncatedTo(ChronoUnit.MILLIS).toString()
@@ -378,9 +405,13 @@ class RecordSyncEngine(
             directory: File,
             scope: CoroutineScope,
             videos: LocalVideoStore? = null,
+            removeAudios: ((Set<String>) -> Unit)? = null,
         ): RecordSyncEngine {
             val store = RecordStore(directory)
-            return RecordSyncEngine(store, SyncQueue(directory, store, client), client, connectivity, scope, videos = videos)
+            return RecordSyncEngine(
+                store, SyncQueue(directory, store, client), client, connectivity, scope,
+                videos = videos, removeAudios = removeAudios,
+            )
         }
     }
 }
