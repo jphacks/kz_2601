@@ -1958,7 +1958,7 @@ paths:
         '402': { description: '`pro_required`(作成者が Pro でない・`details.reason: creator_needs_pro`)・`allowance_exhausted` / `overflow_cap_reached` / `coins_insufficient`(CoinsPaymentRequired と同じ)', content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
         '403': { $ref: '#/components/responses/NotMember' }
         '404': { description: provider / op が一覧に無い・アプリが自分のツリーに無い, content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
-        '409': { description: '`ext_not_connected`: OAuth の要る op で、本人がつないでいない・切った・provider が拒んだ(`details.provider`)。`POST /me/connections/{provider}/start` でつなぐ', content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+        '409': { description: '`ext_not_connected`: OAuth の要る op で、本人がつないでいない・切った・provider が拒んだ(`details.provider`)。`POST /me/connections/{provider}/start` でつなぐ。`duplicate_request`: 有料の provider で、この `X-Request-Id` はもうコインの押さえに使った(同じ呼び出しはもう一度しない)',content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
         '410': { description: '公開を止めた共有のアプリ(`unpublished`)・退会済み(`account_deleted`)', content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
         '429': { description: 1 時間の上限。`Retry-After` と details(scope=user・limit・retryAfterSec), content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
         '500': { description: runner の中の失敗(`internal`), content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
@@ -2271,6 +2271,7 @@ components:
                 - bad_request
                 - coins_insufficient
                 - duplicate_record
+                - duplicate_request
                 - ext_busy
                 - ext_not_connected
                 - ext_unavailable

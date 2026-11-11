@@ -1,6 +1,7 @@
 package extapi
 
 import (
+	"bytes"
 	"context"
 	"crypto/aes"
 	"crypto/cipher"
@@ -55,6 +56,10 @@ type ConnRef struct {
 type ConnectionStore interface {
 	Get(ctx context.Context, uid, provider string) (Connection, bool, error)
 	Put(ctx context.Context, uid string, c Connection) error
+	// Update reads uid's connection of provider and writes what fn returns
+	// when its second result is true, in one transaction. fn may run more
+	// than once and gets ok false when there is none.
+	Update(ctx context.Context, uid, provider string, fn func(c Connection, ok bool) (Connection, bool)) error
 	Delete(ctx context.Context, uid, provider string) error
 	List(ctx context.Context, uid string) ([]Connection, error)
 	// Due returns up to limit connections whose DeleteAt is before now.
@@ -133,8 +138,8 @@ func (c *Connections) open(ctx context.Context, uid, provider string, sealed []b
 	return Token{AccessToken: s.A, RefreshToken: s.R, Expiry: s.E, Scopes: s.S}, nil
 }
 
-// Save stores t as uid's active connection of provider (a new connection,
-// or a token renewed by Refresh).
+// Save stores t as uid's active connection of provider (a new connection
+// from the OAuth callback).
 func (c *Connections) Save(ctx context.Context, uid, provider string, t Token) error {
 	if c.Sealer == nil {
 		return errors.New("extapi: no sealer")
@@ -144,56 +149,106 @@ func (c *Connections) Save(ctx context.Context, uid, provider string, t Token) e
 		return fmt.Errorf("seal: %w", err)
 	}
 	now := c.now()
-	conn := Connection{Provider: provider, Status: StatusActive, Sealed: sealed, Scopes: t.Scopes, ConnectedAt: now, LastUsedAt: now, DeleteAt: now.Add(c.ttl())}
-	if old, ok, err := c.Store.Get(ctx, uid, provider); err == nil && ok && old.Status == StatusActive && !old.ConnectedAt.IsZero() {
-		conn.ConnectedAt = old.ConnectedAt
+	return c.Store.Update(ctx, uid, provider, func(old Connection, ok bool) (Connection, bool) {
+		conn := Connection{Provider: provider, Status: StatusActive, Sealed: sealed, Scopes: t.Scopes, ConnectedAt: now, LastUsedAt: now, DeleteAt: now.Add(c.ttl())}
+		if ok && old.Status == StatusActive && !old.ConnectedAt.IsZero() {
+			conn.ConnectedAt = old.ConnectedAt
+		}
+		return conn, true
+	})
+}
+
+// SaveRefreshed stores t, renewed from the token sealed as from, and
+// returns its sealed form. Nothing is written and the error is
+// ErrNotConnected when the connection no longer holds from (cut, refused or
+// connected again meanwhile): a cut connection is never brought back.
+func (c *Connections) SaveRefreshed(ctx context.Context, uid, provider string, from []byte, t Token) ([]byte, error) {
+	if c.Sealer == nil {
+		return nil, errors.New("extapi: no sealer")
 	}
-	return c.Store.Put(ctx, uid, conn)
+	sealed, err := c.seal(ctx, uid, provider, t)
+	if err != nil {
+		return nil, fmt.Errorf("seal: %w", err)
+	}
+	now := c.now()
+	saved := false
+	err = c.Store.Update(ctx, uid, provider, func(cur Connection, ok bool) (Connection, bool) {
+		saved = ok && cur.Status == StatusActive && bytes.Equal(cur.Sealed, from)
+		if !saved {
+			return cur, false
+		}
+		cur.Sealed, cur.Scopes, cur.LastUsedAt, cur.DeleteAt = sealed, t.Scopes, now, now.Add(c.ttl())
+		return cur, true
+	})
+	if err != nil {
+		return nil, err
+	}
+	if !saved {
+		return nil, ErrNotConnected
+	}
+	return sealed, nil
 }
 
 // Token returns uid's token of provider and notes its use (DeleteAt moves
 // to 90 days from now). ErrNotConnected when there is none, it was cut or
 // refused, or it was unused past its DeleteAt (then it is deleted now).
 func (c *Connections) Token(ctx context.Context, uid, provider string) (Token, error) {
+	t, _, err := c.read(ctx, uid, provider)
+	return t, err
+}
+
+// read is Token with the sealed form it was read from.
+func (c *Connections) read(ctx context.Context, uid, provider string) (Token, []byte, error) {
 	if c.Sealer == nil {
-		return Token{}, ErrNotConnected
+		return Token{}, nil, ErrNotConnected
 	}
 	conn, ok, err := c.Store.Get(ctx, uid, provider)
 	if err != nil {
-		return Token{}, err
+		return Token{}, nil, err
 	}
 	if !ok || conn.Status != StatusActive || len(conn.Sealed) == 0 {
-		return Token{}, ErrNotConnected
+		return Token{}, nil, ErrNotConnected
 	}
 	now := c.now()
 	if !conn.DeleteAt.IsZero() && !now.Before(conn.DeleteAt) {
 		if err := c.Store.Delete(ctx, uid, provider); err != nil {
 			c.log().WarnContext(ctx, "extapi: deleting an unused connection failed", slog.String("provider", provider), slog.Any("error", err))
 		}
-		return Token{}, ErrNotConnected
+		return Token{}, nil, ErrNotConnected
 	}
 	t, err := c.open(ctx, uid, provider, conn.Sealed)
 	if err != nil {
-		return Token{}, fmt.Errorf("open: %w", err)
+		return Token{}, nil, fmt.Errorf("open: %w", err)
 	}
 	if now.Sub(conn.LastUsedAt) >= time.Hour { // one write an hour at most
-		conn.LastUsedAt, conn.DeleteAt = now, now.Add(c.ttl())
-		if err := c.Store.Put(ctx, uid, conn); err != nil {
+		// only the dates of the connection as it is now (a token renewed or
+		// a connection cut meanwhile stays as it is)
+		err := c.Store.Update(ctx, uid, provider, func(cur Connection, ok bool) (Connection, bool) {
+			if !ok || cur.Status != StatusActive {
+				return cur, false
+			}
+			cur.LastUsedAt, cur.DeleteAt = now, now.Add(c.ttl())
+			return cur, true
+		})
+		if err != nil {
 			c.log().WarnContext(ctx, "extapi: noting a connection's use failed", slog.String("provider", provider), slog.Any("error", err))
 		}
 	}
-	return t, nil
+	return t, conn.Sealed, nil
 }
 
-// MarkError turns uid's connection to error (the provider refused its
-// refresh token): it is not used until the person connects again.
-func (c *Connections) MarkError(ctx context.Context, uid, provider string) error {
-	conn, ok, err := c.Store.Get(ctx, uid, provider)
-	if err != nil || !ok {
-		return err
-	}
-	conn.Status = StatusError
-	return c.Store.Put(ctx, uid, conn)
+// MarkError turns uid's connection to error (the provider refused the
+// token sealed as sealed): it is not used until the person connects again.
+// A connection that no longer holds that token (renewed, cut or connected
+// again meanwhile) is left as it is.
+func (c *Connections) MarkError(ctx context.Context, uid, provider string, sealed []byte) error {
+	return c.Store.Update(ctx, uid, provider, func(cur Connection, ok bool) (Connection, bool) {
+		if !ok || cur.Status != StatusActive || len(sealed) == 0 || !bytes.Equal(cur.Sealed, sealed) {
+			return cur, false
+		}
+		cur.Status = StatusError
+		return cur, true
+	})
 }
 
 // Revoke cuts uid's connection: the provider's revoke endpoint is called

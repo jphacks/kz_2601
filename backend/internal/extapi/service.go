@@ -1,6 +1,7 @@
 package extapi
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"fmt"
@@ -23,6 +24,9 @@ var (
 	ErrBusy = errors.New("extapi: busy")
 	// ErrProRequired is 402 pro_required: external APIs are Pro only (決定 1).
 	ErrProRequired = errors.New("extapi: pro required")
+	// ErrDuplicateRequest is 409 duplicate_request: the request id already
+	// held coins for a paid call (a retry does not run the call again).
+	ErrDuplicateRequest = errors.New("extapi: request id already used")
 )
 
 // AllowanceError is a call the creator's monthly allowance stopped
@@ -58,6 +62,8 @@ type Service struct {
 	oauth map[string]OAuthClient
 	sem   chan struct{}
 	cache *callCache
+	// refreshing serialises token refreshes per uid + provider.
+	refreshing keyedLock
 
 	Runs  RunsCounter
 	Coins CoinBiller
@@ -258,8 +264,10 @@ func (s *Service) Call(ctx context.Context, r CallRequest) (res CallResult, err 
 	// 2. the person's token (the creator's for a server rule)
 	in := Input{Args: r.Args, RequestID: r.RequestID}
 	who, anon := r.actor()
+	var sealed []byte // the stored form of the token used
 	if p.NeedsOAuth {
-		t, err := s.token(ctx, who, p.ID)
+		var t Token
+		t, sealed, err = s.token(ctx, who, p.ID)
 		if err != nil {
 			refundRuns()
 			return res, err
@@ -280,6 +288,11 @@ func (s *Service) Call(ctx context.Context, r CallRequest) (res CallResult, err 
 			}
 			return res, err
 		}
+		if hold != nil && hold.Existing {
+			// the first hold is not this call's: it is neither run nor settled again
+			refundRuns()
+			return res, ErrDuplicateRequest
+		}
 	}
 	release := func() {
 		if err := s.Coins.Release(context.WithoutCancel(ctx), hold); err != nil {
@@ -299,7 +312,7 @@ func (s *Service) Call(ctx context.Context, r CallRequest) (res CallResult, err 
 		}
 		refundRuns()
 		if errors.Is(err, ErrInvalidGrant) && s.Conns != nil {
-			_ = s.Conns.MarkError(context.WithoutCancel(ctx), who, p.ID)
+			_ = s.Conns.MarkError(context.WithoutCancel(ctx), who, p.ID, sealed)
 			return res, ErrNotConnected
 		}
 		return res, err
@@ -316,7 +329,8 @@ func (s *Service) Call(ctx context.Context, r CallRequest) (res CallResult, err 
 		}
 	}
 	if hold != nil {
-		ch, cerr := s.Coins.Commit(ctx, hold, coins.Usage{USD: usage.USD, Priced: usage.Priced})
+		// the provider was called: the cost is settled even when the caller is gone
+		ch, cerr := s.Coins.Commit(context.WithoutCancel(ctx), hold, coins.Usage{USD: usage.USD, Priced: usage.Priced})
 		if cerr != nil {
 			s.Log.WarnContext(ctx, "extapi: committing the hold failed", slog.String("provider", r.Provider), slog.Any("error", cerr))
 		}
@@ -358,33 +372,52 @@ func (s *Service) check(r CallRequest) (Provider, OpSpec, error) {
 	return p, spec, nil
 }
 
-// token reads uid's token of provider, refreshing it when it expired.
-func (s *Service) token(ctx context.Context, uid, provider string) (Token, error) {
+// token reads uid's token of provider, refreshing it when it expired. It
+// also returns the stored (sealed) form of the token, which MarkError takes.
+func (s *Service) token(ctx context.Context, uid, provider string) (Token, []byte, error) {
 	if uid == "" {
-		return Token{}, ErrNotConnected
+		return Token{}, nil, ErrNotConnected
 	}
-	t, err := s.Conns.Token(ctx, uid, provider)
+	t, sealed, err := s.Conns.read(ctx, uid, provider)
 	if err != nil {
-		return t, err
+		return t, nil, err
 	}
 	if !t.expired(s.now()) {
-		return t, nil
+		return t, sealed, nil
+	}
+	// One refresh at a time per connection on this instance: providers that
+	// rotate the refresh token refuse the old one once it was used.
+	unlock, err := s.refreshing.lock(ctx, uid+"\x00"+provider)
+	if err != nil {
+		return Token{}, nil, err
+	}
+	defer unlock()
+	if t, sealed, err = s.Conns.read(ctx, uid, provider); err != nil || !t.expired(s.now()) {
+		return t, sealed, err // renewed by the call this one waited for
 	}
 	nt, err := s.oauth[provider].Refresh(ctx, t)
 	if errors.Is(err, ErrInvalidGrant) {
-		_ = s.Conns.MarkError(ctx, uid, provider)
-		return Token{}, ErrNotConnected
+		// another instance may have renewed (and rotated) it meanwhile
+		if cur, cs, cerr := s.Conns.read(ctx, uid, provider); cerr == nil && !cur.expired(s.now()) && !bytes.Equal(cs, sealed) {
+			return cur, cs, nil
+		}
+		_ = s.Conns.MarkError(ctx, uid, provider, sealed)
+		return Token{}, nil, ErrNotConnected
 	}
 	if err != nil {
-		return Token{}, fmt.Errorf("refresh: %w", err)
+		return Token{}, nil, fmt.Errorf("refresh: %w", err)
 	}
 	if nt.RefreshToken == "" {
 		nt.RefreshToken = t.RefreshToken // providers that do not rotate it
 	}
-	if err := s.Conns.Save(ctx, uid, provider, nt); err != nil {
+	ns, err := s.Conns.SaveRefreshed(ctx, uid, provider, sealed, nt)
+	if errors.Is(err, ErrNotConnected) {
+		return Token{}, nil, err // cut (or connected again) while it was renewed
+	}
+	if err != nil {
 		s.Log.WarnContext(ctx, "extapi: saving the refreshed token failed", slog.String("provider", provider), slog.Any("error", err))
 	}
-	return nt, nil
+	return nt, ns, nil
 }
 
 // Reasons are the internal answer's reason (the runner → appconfig body);
@@ -395,6 +428,7 @@ const (
 	ReasonNotConnected       = "ext_not_connected"
 	ReasonUnavailable        = "ext_unavailable"
 	ReasonBusy               = "ext_busy"
+	ReasonDuplicateRequest   = "duplicate_request"
 	ReasonProRequired        = "pro_required"
 	ReasonAllowanceExhausted = "allowance_exhausted"
 	ReasonOverflowCap        = "overflow_cap_reached"
@@ -420,6 +454,8 @@ func Reason(err error) string {
 		return ReasonUnavailable
 	case errors.Is(err, ErrBusy):
 		return ReasonBusy
+	case errors.Is(err, ErrDuplicateRequest):
+		return ReasonDuplicateRequest
 	case errors.Is(err, ErrProRequired):
 		return ReasonProRequired
 	case errors.As(err, &ae):
