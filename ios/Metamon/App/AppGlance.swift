@@ -5,7 +5,7 @@ import MetamonServices
 
 /// アプリの一覧のカードに出す「ひと目の数字」(link-10・例「今月 ¥38,200」)。
 /// 数え方はウィジェット(`WidgetSnapshotWriter`)と同じなので、アプリの中の stat と数字が一致する。
-@MainActor
+/// 数える処理(`compute(_:)`)は main actor の外で走る(1 entity 最大 1000 行・一覧を開いた時に引っかからない)。
 enum AppGlance {
     /// `AppSummary.glanceStat` の「出さない」。
     static let hidden = "-"
@@ -18,6 +18,19 @@ enum AppGlance {
         var value: String
         var at: Date
     }
+
+    /// 数えるのに要るものの写し。言語の設定(件数の単位)は main actor で引いて入れる。
+    struct Input: Sendable {
+        var dsl: AppDSL
+        var records: [String: [Record]]
+        var setting: String?
+        var canDecrypt: Bool
+        var countUnit: String
+        var now: Date
+    }
+
+    /// 数える処理(テストで差し替えて、main の外で走ることを確かめる)。
+    typealias Compute = @Sendable (Input) -> Value?
 
     /// 選べる数字(画面順の stat・ウィジェットの `statComponents` と同じ)。初期状態のアプリは無し。
     static func choices(in dsl: AppDSL) -> [Component] {
@@ -45,13 +58,27 @@ enum AppGlance {
     }
 
     /// 1 アプリの数字。stat が無い・出さない・記録が未取得なら nil。鍵の無い暗号化 field は「🔒」。
+    @MainActor
     static func compute(dsl: AppDSL, records: [String: [Record]], setting: String?, canDecrypt: Bool = true, now: Date = .now) -> Value? {
-        guard let c = chosen(in: dsl, setting: setting) else { return nil }
+        compute(Input(dsl: dsl, records: records, setting: setting, canDecrypt: canDecrypt,
+                      countUnit: WidgetSnapshotWriter.countUnit, now: now))
+    }
+
+    /// `compute` の main actor の外で呼ぶ版。
+    static func compute(_ input: Input) -> Value? {
+        guard let c = chosen(in: input.dsl, setting: input.setting) else { return nil }
         let label = c.label ?? ""
-        if !canDecrypt, isEncrypted(c, in: dsl) { return Value(statId: c.id, label: label, value: "🔒", at: now) }
-        let evaluator = ExprEvaluator(dsl: dsl, records: { records[$0] ?? [] })
-        guard let text = WidgetSnapshotWriter.statText(c, dsl: dsl, records: records, evaluator: evaluator) else { return nil }
-        return Value(statId: c.id, label: label, value: text, at: now)
+        if !input.canDecrypt, isEncrypted(c, in: input.dsl) { return Value(statId: c.id, label: label, value: "🔒", at: input.now) }
+        let records = input.records
+        let evaluator = ExprEvaluator(dsl: input.dsl, records: { records[$0] ?? [] })
+        guard let text = WidgetSnapshotWriter.statText(c, dsl: input.dsl, records: records, evaluator: evaluator,
+                                                        countUnit: input.countUnit) else { return nil }
+        return Value(statId: c.id, label: label, value: text, at: input.now)
+    }
+
+    /// 重い処理を main actor の外で走らせる。
+    static func offMain<T: Sendable>(_ work: @escaping @Sendable () -> T) async -> T {
+        await Task.detached(priority: .userInitiated) { work() }.value
     }
 
     /// カードの 2 行目(「今月 ¥38,200」)。
@@ -67,11 +94,16 @@ enum AppGlance {
 
 /// 端末の中だけで数字を作る読み口。記録の API は呼ばない(一覧を開くたびの取得の回数と費用を増やさない)。
 /// 後でサーバーが数字を返す形(`GET /me/glance`)に替える時はここを差し替える。
+/// `document` と `open` はファイルの読み出し・復号をするので main actor の外で呼ぶ。
 struct AppGlanceSource {
     /// 端末に残っている DSL(`DocumentCache`)。無ければ nil。
-    var document: (String) -> AppDSL?
-    /// ローカル DB(`RecordSyncEngine.cached`)の記録。
-    var cached: (_ appId: String, _ entity: String) async -> [Record]
+    var document: @Sendable (String) -> AppDSL?
+    /// ローカル DB(`RecordSyncEngine.cachedSealed`)の記録。暗号文のままでよい(`open` で開く)。
+    var cached: @MainActor (_ appId: String, _ entity: String) async -> [Record]
+    /// 暗号文を開く(AES-GCM)。既定は何もしない。
+    var open: @Sendable ([Record]) -> [Record] = { $0 }
+    /// 数える処理。
+    var compute: AppGlance.Compute = { AppGlance.compute($0) }
 }
 
 /// 一覧の数字の置き場(appId → 値・時刻)。端末に保存し、次に一覧を開いた時はすぐ出す。サインアウトで消す。
@@ -89,6 +121,10 @@ final class AppGlanceStore {
     /// 読み込み中(値がまだ無いカードはスケルトン)。
     private(set) var loading: Set<String> = []
     @ObservationIgnored private var checkedAt: [String: Date] = [:]
+    /// 読み込み中(DSL の読み出しを含む・同じアプリを重ねて読まない)。
+    @ObservationIgnored private var inFlight: Set<String> = []
+    /// `clear()` で増やす。読み込み中に消された時、前の利用者の値を書き戻さない
+    @ObservationIgnored private var generation = 0
     @ObservationIgnored private let defaults: UserDefaults
 
     init(defaults: UserDefaults = .standard) {
@@ -106,11 +142,16 @@ final class AppGlanceStore {
     }
 
     /// 見えているカード 1 枚分を端末の中の DSL・記録で作り直す。DSL が端末に無いアプリは前の値のまま。
+    /// DSL の読み出し・復号・集計は main actor の外。main では入力の写しと結果の反映だけをする。
     func load(appId: String, setting: String?, source: AppGlanceSource, now: Date = .now) async {
         if let at = checkedAt[appId], now.timeIntervalSince(at) < Self.recheckAfter { return }
-        guard !loading.contains(appId) else { return }
+        guard !inFlight.contains(appId) else { return }
         checkedAt[appId] = now
-        guard let dsl = source.document(appId) else { return }
+        inFlight.insert(appId)
+        defer { inFlight.remove(appId) }
+        let started = generation
+        let read = source.document
+        guard let dsl = await AppGlance.offMain({ read(appId) }), started == generation else { return }
         loading.insert(appId)
         defer { loading.remove(appId) }
         choices[appId] = AppGlance.choices(in: dsl).map { ($0.id, $0.label ?? "") }
@@ -118,18 +159,24 @@ final class AppGlanceStore {
             put(appId, nil)
             return
         }
-        var records: [String: [Record]] = [:]
+        var sealed: [String: [Record]] = [:]
         for e in AppGlance.entities(for: c, in: dsl) {
-            records[e] = await source.cached(appId, e)
+            sealed[e] = await source.cached(appId, e)
         }
         // この端末でまだ開いていないアプリは記録が空。「0 件」と言い切らず、前の値のまま(無ければ出さない)
-        guard records.values.contains(where: { !$0.isEmpty }) || c.aggregate == nil && c.valueExpr != nil else { return }
+        guard sealed.values.contains(where: { !$0.isEmpty }) || c.aggregate == nil && c.valueExpr != nil else { return }
         // ローカル DB の記録は暗号化 field を開けないので、その stat は「🔒」
-        put(appId, AppGlance.compute(dsl: dsl, records: records, setting: setting, canDecrypt: false, now: now))
+        let open = source.open, compute = source.compute, countUnit = WidgetSnapshotWriter.countUnit, rows = sealed
+        let value = await AppGlance.offMain {
+            compute(.init(dsl: dsl, records: rows.mapValues(open), setting: setting, canDecrypt: false, countUnit: countUnit, now: now))
+        }
+        guard started == generation else { return } // 数えている間にサインアウトした
+        put(appId, value)
     }
 
-    /// 使用中のアプリは画面に読み込んだ記録(復号済み)で作る。
-    func update(appId: String, dsl: AppDSL, records: [String: [Record]], setting: String?, now: Date = .now) {
+    /// 使用中のアプリは画面に読み込んだ記録(復号済み)で作る。集計は main actor の外。
+    func update(appId: String, dsl: AppDSL, records: [String: [Record]], setting: String?, now: Date = .now,
+                compute: @escaping AppGlance.Compute = { AppGlance.compute($0) }) async {
         choices[appId] = AppGlance.choices(in: dsl).map { ($0.id, $0.label ?? "") }
         guard let c = AppGlance.chosen(in: dsl, setting: setting) else {
             put(appId, nil)
@@ -137,7 +184,12 @@ final class AppGlanceStore {
         }
         // 記録がまだ届いていない間は前の値を残す
         guard AppGlance.entities(for: c, in: dsl).allSatisfy({ records[$0] != nil }) else { return }
-        put(appId, AppGlance.compute(dsl: dsl, records: records, setting: setting, now: now))
+        let started = generation
+        let input = AppGlance.Input(dsl: dsl, records: records, setting: setting, canDecrypt: true,
+                                    countUnit: WidgetSnapshotWriter.countUnit, now: now)
+        let value = await AppGlance.offMain { compute(input) }
+        guard started == generation else { return }
+        put(appId, value)
     }
 
     /// 選び直した時: 次の `load` で必ず読み直す。
@@ -153,6 +205,7 @@ final class AppGlanceStore {
 
     /// サインアウト・アカウント削除(前の人の数字を残さない)。
     func clear() {
+        generation += 1
         values = [:]
         choices = [:]
         loading = []
