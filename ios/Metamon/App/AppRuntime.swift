@@ -106,8 +106,11 @@ final class AppRuntime: RuntimeNavigating {
             if let toast { print("[Metamon] toast: \(toast)") } // ヘッドレス E2E でエラー文言を拾うため
             #endif
             if let toast, toast != oldValue { VoiceOverAnnouncer.announce(toast) } // H8
+            if fixOffer != nil, fixOffer?.message != toast { fixOffer = nil } // 別のトーストに替わったら外す
         }
     }
+    /// いまのトーストに付ける「直してと頼む」(`AppRuntime+FixRequest.swift`)。
+    var fixOffer: FixOffer?
 
     /// 一覧の記録を消した直後の「削除しました・元に戻す」(M11・`AppRuntime+RecordUndo.swift`)。
     var recordUndo: RecordUndo?
@@ -1289,7 +1292,10 @@ final class AppRuntime: RuntimeNavigating {
             // フォーム・必須(空の欄に印 M10)・single の上書き先(#267)は Mac と共有
             let target = RecordActionSteps.saveTarget(action, ctx, dsl: dsl) { self.records[$0] ?? [] }
             guard case .ready(let entity, let form, let recordId) = target else {
-                if case .invalid(let message) = target { toast = message }
+                if case .invalid(let message) = target {
+                    // フォームの無い画面の保存ボタンはアプリの作りの問題 → 「直してと頼む」を添える。入力漏れは利用者が直す
+                    if ctx.form == nil { reportFixable(message, ctx: ctx, part: L10n.tr("保存")) } else { toast = message }
+                }
                 return
             }
             if let id = recordId, let current = record(entity, id), !canEdit(entity: entity, record: current) {
@@ -1340,7 +1346,7 @@ final class AppRuntime: RuntimeNavigating {
         case .openUrl:
             // openUrlButton / link / webView と同じ判定
             guard let url = ExternalURLPolicy.openable(action.url) else {
-                toast = L10n.tr("openUrl: url は https か line/slack/discord/tel/mailto/maps のみ")
+                reportFixable(L10n.tr("openUrl: url は https か line/slack/discord/tel/mailto/maps のみ"), ctx: ctx, part: L10n.tr("リンク"))
                 return
             }
             _ = await openExternalURL(url)
@@ -1380,7 +1386,7 @@ final class AppRuntime: RuntimeNavigating {
             await lookupBook(action, ctx) // Features/Books
 
         case .unknown:
-            toast = L10n.tr("未対応のアクション: \(action.rawType)")
+            reportFixable(L10n.tr("未対応のアクション: \(action.rawType)"), ctx: ctx)
         }
     }
 

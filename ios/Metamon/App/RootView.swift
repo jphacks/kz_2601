@@ -305,7 +305,11 @@ private struct ToastHost: ViewModifier {
         content.overlay(alignment: .bottom) {
             if active, let message = rt.toast {
                 let dismiss = { withAnimation { rt.toast = nil } }
-                Text(message)
+                let fixable = rt.fixOffer?.message == message
+                HStack(spacing: Theme.Spacing.sm) {
+                    Text(message)
+                    if fixable { FixRequestToastButton() }
+                }
                     .font(.footnote.weight(.medium))
                     .padding(.horizontal, Theme.Spacing.md).padding(.vertical, Theme.Spacing.sm + 2)
                     .background(.regularMaterial, in: Capsule())
@@ -318,7 +322,8 @@ private struct ToastHost: ViewModifier {
                     .padding(.bottom, Theme.Layout.fabBottomInset(hasTabs: true) + Theme.Layout.fabSize + Theme.Spacing.md)
                     .transition(.move(edge: .bottom).combined(with: .opacity))
                     .task(id: message) {
-                        try? await Task.sleep(for: .seconds(VoiceOverAnnouncer.holdSeconds(3))) // H8: VoiceOver の時は長く
+                        // H8: VoiceOver の時は長く。「直してと頼む」付きは押す間を取る
+                        try? await Task.sleep(for: .seconds(VoiceOverAnnouncer.holdSeconds(fixable ? 6 : 3)))
                         guard !Task.isCancelled else { return }
                         withAnimation { rt.toast = nil }
                     }
@@ -332,6 +337,23 @@ private struct ToastHost: ViewModifier {
                              + (rt.toast == nil ? 0 : 56))
             }
         }
+    }
+}
+
+/// 失敗のトーストの「直してと頼む」。音声シートの入力欄に依頼文を入れて開く(送らない)。
+private struct FixRequestToastButton: View {
+    @Environment(AppRuntime.self) private var rt
+
+    var body: some View {
+        Button { withAnimation { rt.requestFix() } } label: {
+            Label("直してと頼む", systemImage: "wand.and.stars")
+                .labelStyle(.titleAndIcon)
+        }
+        .buttonStyle(.borderless)
+        .foregroundStyle(Theme.Colors.brandText)
+        .fixedSize()
+        .accessibilityHint(Text("直す依頼を入力欄に入れて、話しかける画面を開きます"))
+        .accessibilityIdentifier("toast.fixRequest")
     }
 }
 
