@@ -154,6 +154,23 @@ func TestCacheTTLOnlyForKeyReads(t *testing.T) {
 	}
 }
 
+// Values holding the old separators ("\x00", "=") once met on one key; the
+// length prefixes keep them apart.
+func TestCacheKeyUnambiguous(t *testing.T) {
+	for _, c := range [][2]map[string]string{
+		{{"a": "1\x00b=2"}, {"a": "1", "b": "2"}},
+		{{"a": "x=y"}, {"a=x": "y"}},
+		{{"a": ""}, {}},
+	} {
+		if cacheKey("p", "o", c[0]) == cacheKey("p", "o", c[1]) {
+			t.Errorf("%v and %v share a key", c[0], c[1])
+		}
+	}
+	if cacheKey("p\x00o", "x", nil) == cacheKey("p", "o\x00x", nil) {
+		t.Error("provider/op share a key")
+	}
+}
+
 // CheckArgs: the op's names only, no URL, then the op's own Check; every
 // refusal is ErrUnknown (400 bad_request).
 func TestCheckArgs(t *testing.T) {
