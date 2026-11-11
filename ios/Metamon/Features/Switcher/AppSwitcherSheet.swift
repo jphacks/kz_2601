@@ -9,6 +9,7 @@ struct AppSwitcherSheet: View {
     @Environment(AppRuntime.self) private var rt
     @Environment(\.dismiss) private var dismiss
     @State private var thumbs = AppThumbnailStore.shared
+    @State private var glance = AppGlanceStore.shared
     @State private var selected: String?
     @State private var showSettings = false
     #if !APP_STORE_REVIEW
@@ -116,13 +117,16 @@ struct AppSwitcherSheet: View {
             .padding(.horizontal, Theme.Spacing.lg)
         } else {
             ScrollView(.horizontal, showsIndicators: false) {
-                HStack(spacing: Theme.Spacing.md) {
+                LazyHStack(spacing: Theme.Spacing.md) { // 見えているカードだけ数字を読む(link-10)
                     ForEach(apps) { app in
                         AppCard(app: app,
                                 isCurrent: app.id == rt.document.appId,
-                                thumbnail: thumbnail(for: app.id)) {
+                                thumbnail: thumbnail(for: app.id),
+                                glance: glance.values[app.id],
+                                glanceLoading: glance.loading.contains(app.id)) {
                             select(app)
                         }
+                        .task(id: app.glanceStat ?? "") { await rt.loadGlance(for: app) }
                         .overlay(alignment: .topTrailing) { AppCardActions(app: app) }
                         .overlay(alignment: .bottomTrailing) { if app.id == rt.document.appId { ScreenMapCardButton() } } // #116
                         .modifier(AppCardReorder(app: app)) // #277 長押しでドラッグして並べ替え
@@ -193,6 +197,9 @@ struct AppCard: View {
     let app: AppSummary
     let isCurrent: Bool
     let thumbnail: UIImage?
+    /// ひと目の数字(link-10)。無ければ最終更新を出す。
+    var glance: AppGlance.Value? = nil
+    var glanceLoading = false
     let action: () -> Void
 
     static let width: CGFloat = 150
@@ -217,18 +224,37 @@ struct AppCard: View {
                     Text(app.name)
                         .font(.subheadline.weight(.semibold))
                         .lineLimit(1)
-                    Text(updatedText)
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                        .lineLimit(1)
+                    secondLine
                 }
                 .padding(.horizontal, Theme.Spacing.xs)
             }
             .frame(width: Self.width)
         }
         .buttonStyle(CardPressStyle())
-        .accessibilityLabel(app.name + (isCurrent ? L10n.tr("(使用中)") : ""))
+        .accessibilityLabel(AppGlance.accessibilityLabel(appName: app.name + (isCurrent ? L10n.tr("(使用中)") : ""), value: glance))
         .accessibilityHint(isCurrent ? "" : L10n.tr("タップで切り替え"))
+    }
+
+    /// 2 行目: 数字(古ければ薄く)/ 読み込み中はスケルトン / 無ければ最終更新。
+    @ViewBuilder
+    private var secondLine: some View {
+        if let glance {
+            Text(AppGlance.line(glance))
+                .font(.caption.weight(.semibold).monospacedDigit())
+                .foregroundStyle(Date.now.timeIntervalSince(glance.at) > AppGlance.staleAfter ? AnyShapeStyle(.tertiary) : AnyShapeStyle(.secondary))
+                .lineLimit(1)
+                .minimumScaleFactor(0.8)
+        } else if glanceLoading {
+            RoundedRectangle(cornerRadius: 4)
+                .fill(Theme.Colors.surfaceElevated)
+                .frame(width: 80, height: 12)
+                .accessibilityHidden(true)
+        } else {
+            Text(updatedText)
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                .lineLimit(1)
+        }
     }
 
     @ViewBuilder

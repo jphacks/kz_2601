@@ -32,6 +32,7 @@ public struct HTTPAppConfigClient: AppConfigClient {
     }
     private struct NameBody: Encodable { var name: String }
     private struct OrderBody: Encodable { var ids: [String] }
+    private struct GlanceBody: Encodable { var glanceStat: String }
     private struct PatchBody: Encodable {
         struct Source: Encodable { var kind = "manual"; var mode = "patch"; var summary: String }
         var patch: [JSONPatchOp]
@@ -87,6 +88,13 @@ public struct HTTPAppConfigClient: AppConfigClient {
     public func reorderApps(ids: [String]) async throws {
         _ = try await request("PUT", "v1/apps/order", body: OrderBody(ids: ids))
         AppListCache.shared.store(AppListEdit.applyingOrder(ids, to: AppListCache.shared.load()))
+    }
+
+    /// `PATCH /v1/apps/{appId}`(glanceStat・link-10)。オフライン用の一覧キャッシュも書き換える。
+    public func setAppGlance(appId: String, glanceStat: String) async throws -> AppSummary {
+        let app = try JSONDecoder().decode(AppSummary.self, from: try await request("PATCH", "v1/apps/\(appId)", body: GlanceBody(glanceStat: glanceStat)))
+        AppListCache.shared.store(AppListCache.shared.load().map { $0.id == appId ? app : $0 })
+        return app
     }
 
     // MARK: - DSL
