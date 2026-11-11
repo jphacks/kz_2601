@@ -11,7 +11,7 @@ import (
 	"github.com/jphacks/kz_2601/backend/internal/httpx"
 )
 
-// Client config (#302): the oldest iOS / Android build the backend still
+// Client config (#302, macOS #981): the oldest iOS / Android / macOS build the backend still
 // serves and the newest one in the store. Read from env at startup; an unset or
 // invalid value means "no enforcement" (the field is omitted and the client
 // does nothing).
@@ -23,6 +23,10 @@ const (
 	EnvMinAndroidBuild    = "MIN_ANDROID_BUILD"    // versionCode; same meaning as MIN_IOS_BUILD
 	EnvLatestAndroidBuild = "LATEST_ANDROID_BUILD" // versionCode; same meaning as LATEST_IOS_BUILD
 	EnvAndroidStoreURL    = "ANDROID_STORE_URL"    // https://play.google.com/store/apps/details?id=<pkg> (optional)
+
+	EnvMinMacOSBuild    = "MIN_MACOS_BUILD"    // CFBundleVersion of the Mac app; same meaning as MIN_IOS_BUILD
+	EnvLatestMacOSBuild = "LATEST_MACOS_BUILD" // same meaning as LATEST_IOS_BUILD
+	EnvMacAppStoreURL   = "MAC_APP_STORE_URL"  // https://apps.apple.com/app/id<id> or macappstore:// (optional)
 )
 
 // ClientConfigValues is the body of GET /v1/client-config.
@@ -34,6 +38,10 @@ type ClientConfigValues struct {
 	MinAndroidBuild    int    `json:"minAndroidBuild,omitempty"`
 	LatestAndroidBuild int    `json:"latestAndroidBuild,omitempty"`
 	AndroidStoreURL    string `json:"androidStoreUrl,omitempty"`
+
+	MinMacOSBuild    int    `json:"minMacOSBuild,omitempty"`
+	LatestMacOSBuild int    `json:"latestMacOSBuild,omitempty"`
+	MacAppStoreURL   string `json:"macAppStoreUrl,omitempty"`
 
 	Notice *Notice `json:"notice,omitempty"` // #333 (notice.go)
 }
@@ -71,6 +79,9 @@ func ClientConfigFromEnv(getenv func(string) string) ClientConfigValues {
 		MinAndroidBuild:    build(EnvMinAndroidBuild),
 		LatestAndroidBuild: build(EnvLatestAndroidBuild),
 		AndroidStoreURL:    storeURL(EnvAndroidStoreURL, "https", "market"),
+		MinMacOSBuild:      build(EnvMinMacOSBuild),
+		LatestMacOSBuild:   build(EnvLatestMacOSBuild),
+		MacAppStoreURL:     storeURL(EnvMacAppStoreURL, "https", "macappstore"),
 		Notice:             NoticeFromEnv(getenv),
 	}
 	// A latest below min would only confuse: min wins.
@@ -79,6 +90,9 @@ func ClientConfigFromEnv(getenv func(string) string) ClientConfigValues {
 	}
 	if v.LatestAndroidBuild != 0 && v.LatestAndroidBuild < v.MinAndroidBuild {
 		v.LatestAndroidBuild = v.MinAndroidBuild
+	}
+	if v.LatestMacOSBuild != 0 && v.LatestMacOSBuild < v.MinMacOSBuild {
+		v.LatestMacOSBuild = v.MinMacOSBuild
 	}
 	return v
 }
