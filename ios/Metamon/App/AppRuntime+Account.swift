@@ -15,6 +15,7 @@ extension AppRuntime {
         await recordSync.wipe()                         // オフライン DB(metamon-records)と未送信キュー・取り消し待ちの削除
         DocumentCache.shared.removeAll()                // DSL キャッシュとアプリ一覧(metamon-dsl)
         AppThumbnailStore.shared.removeAll()            // 変身一覧のサムネ(metamon-thumbs)
+        AppGlanceStore.shared.clear()                   // 一覧のひと目の数字(link-10・前の人の数字を残さない)
         ExportFiles.removeAll()                         // 書き出した CSV / PDF(#421・記録の写し)
         RemoteImageLoader.removeAllCached()             // https の画像のキャッシュ(#1265・前の人が見た画像を残さない)
         URLCache.shared.removeAllCachedResponses()      // 共有の URL キャッシュも
