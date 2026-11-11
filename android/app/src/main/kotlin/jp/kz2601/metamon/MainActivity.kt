@@ -48,6 +48,7 @@ import jp.kz2601.metamon.purchase.PaywallHost
 import jp.kz2601.metamon.discover.DiscoverHost
 import jp.kz2601.metamon.discover.LocalPublishEnv
 import jp.kz2601.metamon.onboarding.TutorialScreen
+import jp.kz2601.metamon.renderer.components.sensors.LocalSensorSource
 import jp.kz2601.metamon.services.consent.AiConsentStatus
 import jp.kz2601.metamon.feedback.FeedbackComposerHost
 import jp.kz2601.metamon.feedback.FeedbackHost
@@ -177,7 +178,10 @@ fun MetamonRoot(container: AppContainer) {
     UpdateGateHost(container.updateGate, container.inAppUpdater) {
         when (RootScreen.of(user)) {
             RootScreen.SignIn -> SignInScreen(container.session)
-            RootScreen.App -> CompositionLocalProvider(LocalFeedHost provides container.feedHost) { MetamonApp(container) }
+            RootScreen.App -> CompositionLocalProvider(
+                LocalFeedHost provides container.feedHost,
+                LocalSensorSource provides container.sensorSource,
+            ) { MetamonApp(container) }
         }
     }
 }

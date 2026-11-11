@@ -12,6 +12,8 @@ import jp.kz2601.metamon.nearby.NearbySettings
 import jp.kz2601.metamon.nearby.NearbyShareController
 import jp.kz2601.metamon.nearby.PassbyController
 import jp.kz2601.metamon.discover.PublishEnv
+import jp.kz2601.metamon.renderer.components.sensors.MockSensorSource
+import jp.kz2601.metamon.renderer.components.sensors.SensorSource
 import jp.kz2601.metamon.runtime.AiTextAccess
 import jp.kz2601.metamon.runtime.AndroidRuntimeHost
 import jp.kz2601.metamon.runtime.AppAiHost
@@ -249,6 +251,9 @@ class AppContainer(
 
     /** フィードバックの画面の出し入れ(設定の入口・端末を振った時) */
     val feedbackComposer = FeedbackComposerLauncher()
+
+    /** sensorValue が読むセンサー(#1195)。`METAMON_MOCK=1` なら決まった波形(エミュレータでも値が出る)、それ以外は端末のセンサー(null)。 */
+    val sensorSource: SensorSource? get() = sensorSourceFor(knobs.mock)
 
     /** 画面の下に出す接続先の名前(モックなら "mock")。 */
     val environmentLabel: String get() = if (knobs.mock) "mock" else environment.name
@@ -587,6 +592,9 @@ class AppContainer(
             Log.i(TAG, "起動から ${seconds} 秒は圏外の扱いにします")
             return OfflineSimulatingAppConfigClient(inner, offlineUntil = Instant.now().plusMillis((seconds * 1000).toLong()))
         }
+
+        /** モックの構成は iOS の `MockSensorData` と同じ波形(傾きが 0〜40° を往復)に差し替える。null なら部品が端末のセンサーを使う。 */
+        internal fun sensorSourceFor(mock: Boolean): SensorSource? = if (mock) MockSensorSource else null
 
         /** Firebase が使えれば Firebase の認証、使えなければ(json 無し・モックの構成)固定 uid のモック。 */
         internal fun chooseAuth(firebaseConfigured: Boolean, firebase: () -> AuthService?): AuthService =
