@@ -4,27 +4,38 @@ import (
 	"log/slog"
 	"net/http"
 	"net/url"
+	"slices"
 	"strconv"
 	"strings"
 
 	"github.com/jphacks/kz_2601/backend/internal/httpx"
 )
 
-// Client config (#302): the oldest iOS build the backend still serves and the
-// newest one in the store. Read from env at startup; an unset or invalid
-// value means "no enforcement" (the field is omitted and iOS does nothing).
+// Client config (#302): the oldest iOS / Android build the backend still
+// serves and the newest one in the store. Read from env at startup; an unset or
+// invalid value means "no enforcement" (the field is omitted and the client
+// does nothing).
 const (
 	EnvMinIOSBuild    = "MIN_IOS_BUILD"     // below this: blocking "please update" screen
 	EnvLatestIOSBuild = "LATEST_IOS_BUILD"  // below this: dismissible notice
 	EnvIOSAppStoreURL = "IOS_APP_STORE_URL" // https://apps.apple.com/app/id<id> (optional)
+
+	EnvMinAndroidBuild    = "MIN_ANDROID_BUILD"    // versionCode; same meaning as MIN_IOS_BUILD
+	EnvLatestAndroidBuild = "LATEST_ANDROID_BUILD" // versionCode; same meaning as LATEST_IOS_BUILD
+	EnvAndroidStoreURL    = "ANDROID_STORE_URL"    // https://play.google.com/store/apps/details?id=<pkg> (optional)
 )
 
 // ClientConfigValues is the body of GET /v1/client-config.
 type ClientConfigValues struct {
-	MinIOSBuild    int     `json:"minIOSBuild,omitempty"`
-	LatestIOSBuild int     `json:"latestIOSBuild,omitempty"`
-	IOSAppStoreURL string  `json:"iosAppStoreUrl,omitempty"`
-	Notice         *Notice `json:"notice,omitempty"` // #333 (notice.go)
+	MinIOSBuild    int    `json:"minIOSBuild,omitempty"`
+	LatestIOSBuild int    `json:"latestIOSBuild,omitempty"`
+	IOSAppStoreURL string `json:"iosAppStoreUrl,omitempty"`
+
+	MinAndroidBuild    int    `json:"minAndroidBuild,omitempty"`
+	LatestAndroidBuild int    `json:"latestAndroidBuild,omitempty"`
+	AndroidStoreURL    string `json:"androidStoreUrl,omitempty"`
+
+	Notice *Notice `json:"notice,omitempty"` // #333 (notice.go)
 }
 
 // ClientConfigFromEnv reads the env vars through getenv (os.Getenv).
@@ -41,22 +52,38 @@ func ClientConfigFromEnv(getenv func(string) string) ClientConfigValues {
 		}
 		return n
 	}
-	v := ClientConfigValues{MinIOSBuild: build(EnvMinIOSBuild), LatestIOSBuild: build(EnvLatestIOSBuild), Notice: NoticeFromEnv(getenv)}
-	if raw := strings.TrimSpace(getenv(EnvIOSAppStoreURL)); raw != "" {
-		if u, err := url.Parse(raw); err == nil && (u.Scheme == "https" || u.Scheme == "itms-apps") && u.Host != "" {
-			v.IOSAppStoreURL = raw
-		} else {
-			slog.Warn("appconfig: ignoring invalid App Store URL", slog.String("env", EnvIOSAppStoreURL), slog.String("value", raw))
+	// storeURL accepts only the given schemes, with a host.
+	storeURL := func(key string, schemes ...string) string {
+		raw := strings.TrimSpace(getenv(key))
+		if raw == "" {
+			return ""
 		}
+		if u, err := url.Parse(raw); err == nil && u.Host != "" && slices.Contains(schemes, u.Scheme) {
+			return raw
+		}
+		slog.Warn("appconfig: ignoring invalid store URL", slog.String("env", key), slog.String("value", raw))
+		return ""
+	}
+	v := ClientConfigValues{
+		MinIOSBuild:        build(EnvMinIOSBuild),
+		LatestIOSBuild:     build(EnvLatestIOSBuild),
+		IOSAppStoreURL:     storeURL(EnvIOSAppStoreURL, "https", "itms-apps"),
+		MinAndroidBuild:    build(EnvMinAndroidBuild),
+		LatestAndroidBuild: build(EnvLatestAndroidBuild),
+		AndroidStoreURL:    storeURL(EnvAndroidStoreURL, "https", "market"),
+		Notice:             NoticeFromEnv(getenv),
 	}
 	// A latest below min would only confuse: min wins.
 	if v.LatestIOSBuild != 0 && v.LatestIOSBuild < v.MinIOSBuild {
 		v.LatestIOSBuild = v.MinIOSBuild
 	}
+	if v.LatestAndroidBuild != 0 && v.LatestAndroidBuild < v.MinAndroidBuild {
+		v.LatestAndroidBuild = v.MinAndroidBuild
+	}
 	return v
 }
 
-// ClientConfig serves GET /v1/client-config. It is public (iOS checks it
+// ClientConfig serves GET /v1/client-config. It is public (clients check it
 // before sign-in) and holds no user data.
 func ClientConfig(v ClientConfigValues) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {

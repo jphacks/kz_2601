@@ -53,6 +53,7 @@ struct MacFeedbackWindow: View {
 /// - 添付はどれも既定でオフ。オンにした添付は、送る中身をその場で見せる
 /// - 送る前に同意文を見せ、同意のチェックを入れるまで送れない(`FeedbackConsent.version` を一緒に送る)
 /// - 記録(入力したデータ)の中身は送らない
+/// - 書きかけ(送っていない文)のまま閉じる(キャンセル・Esc・⌘W・閉じるボタン)と、捨てるかを聞く(#1309)
 struct MacFeedbackComposerView: View {
     let context: MacFeedbackContext
     let client: any FeedbackClient
@@ -66,8 +67,18 @@ struct MacFeedbackComposerView: View {
     @State private var sending = false
     @State private var error: String?
     @State private var receipt: FeedbackReceipt?
+    /// 書きかけを捨てるかの確認。「捨てる」で呼ぶ閉じ方
+    @State private var discardThen: (() -> Void)?
 
     private var trimmed: String { message.trimmingCharacters(in: .whitespacesAndNewlines) }
+    /// 送っていない文がある(送った後・空白だけは書きかけにしない)
+    private var hasDraft: Bool { MacFeedbackDraft.isUnsent(message: message, sent: receipt != nil) }
+
+    /// 閉じる前に、書きかけなら確認を出す
+    private func requestClose(_ close: @escaping () -> Void) {
+        if hasDraft { discardThen = close } else { close() }
+    }
+
     private var canSend: Bool {
         !trimmed.isEmpty && trimmed.count <= FeedbackConsent.maxMessageLength && agreed && !sending && receipt == nil
     }
@@ -83,7 +94,7 @@ struct MacFeedbackComposerView: View {
             Divider()
             HStack {
                 Spacer()
-                Button("キャンセル", action: onClose)
+                Button("キャンセル") { requestClose(onClose) }
                     .keyboardShortcut(.cancelAction)
                     .disabled(sending)
                 if sending {
@@ -98,6 +109,26 @@ struct MacFeedbackComposerView: View {
         }
         .frame(width: 520)
         .frame(minHeight: 560)
+        // ⌘W・閉じるボタンも、書きかけなら同じ確認を出す
+        .background {
+            WindowCloseGuard { closeAgain in
+                guard hasDraft, !sending else { return true }
+                requestClose(closeAgain)
+                return false
+            }
+        }
+        .confirmationDialog("書いた内容を捨てますか?",
+                            isPresented: Binding(get: { discardThen != nil }, set: { if !$0 { discardThen = nil } }),
+                            titleVisibility: .visible) {
+            Button("捨てる", role: .destructive) {
+                let close = discardThen
+                discardThen = nil
+                close?()
+            }
+            Button("書き続ける", role: .cancel) { discardThen = nil }
+        } message: {
+            Text("送っていないフィードバックは残りません。")
+        }
         .alert("送れませんでした", isPresented: Binding(get: { error != nil }, set: { if !$0 { error = nil } })) {
             Button("OK", role: .cancel) {}
         } message: {
@@ -204,6 +235,12 @@ struct MacFeedbackComposerView: View {
                 self.error = FeedbackCopy.message(for: error)
             }
         }
+    }
+}
+/// 書きかけの判定(#1309)。送った後と、空白・改行だけは捨てても失うものが無いので聞かない
+enum MacFeedbackDraft {
+    static func isUnsent(message: String, sent: Bool) -> Bool {
+        !sent && !message.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
     }
 }
 #endif

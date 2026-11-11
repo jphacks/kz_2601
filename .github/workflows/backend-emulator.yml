@@ -1,29 +1,22 @@
 # backend の Firestore エミュレータ試験(#546)。backend-ci は 5 分上限なので別 workflow にしている。
 #
 # 設計メモ:
-# - required check ではない(必須化はリポジトリ設定=人間の判断)。required でないので workflow の
-#   `paths:` フィルタを使ってよい(backend-ci の "Expected" 待ち問題は起きない)。
-#   必須化するときは backend-ci と同じく paths-filter ジョブ + `if:` に書き換えること。
+# - workflow レベルの `paths:` は使わない(backend-ci.yml と同じ理由: required check が永遠に待ちになる)。
+#   `backend-emulator-changes` で変更有無を判定し、試験ジョブ `backend-emulator-test` を `if:` で飛ばす。
+# - required check 名 = 集約ジョブ `backend-emulator`(試験を飛ばした時は成功、回した時はその結果)。
+#   登録は人(scripts/github/setup-branch-protection.sh)。
 # - エミュレータは gcloud SDK の `cloud-firestore-emulator` コンポーネント(バージョン固定)。
 #   docker イメージより取得が軽く、firebase-tools と違って firebase.json が要らない。
 # - プロジェクトは `demo-kz2601` 固定(テスト側もハードコード)。`demo-` プロジェクトは実 GCP に
 #   繋がらない。認証情報も secrets も渡さない。
-# - firestore.rules / indexes はリポジトリに無いので paths に入れていない。追加したら足すこと。
+# - firestore.rules / indexes はリポジトリに無いのでフィルタに入れていない。追加したら足すこと。
 name: backend-emulator
 
 on:
   pull_request:
     types: [opened, synchronize, reopened, ready_for_review]
-    paths:
-      - 'backend/**'
-      - '.github/workflows/backend-emulator.yml'
-      - 'scripts/firestore-emulator.sh'
   push:
     branches: [develop, main]
-    paths:
-      - 'backend/**'
-      - '.github/workflows/backend-emulator.yml'
-      - 'scripts/firestore-emulator.sh'
 
 concurrency:
   group: backend-emulator-${{ github.event.pull_request.number || github.ref }}
@@ -31,11 +24,33 @@ concurrency:
 
 permissions:
   contents: read
+  pull-requests: read
 
 jobs:
-  backend-emulator:
-    name: backend-emulator
+  backend-emulator-changes:
+    name: backend-emulator-changes
     if: github.event_name == 'push' || github.event.pull_request.draft == false
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    outputs:
+      run: ${{ steps.filter.outputs.emulator }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      # push では github.event.before との差分、PR では base との差分。
+      - uses: dorny/paths-filter@v4
+        id: filter
+        with:
+          filters: |
+            emulator:
+              - 'backend/**'
+              - '.github/workflows/backend-emulator.yml'
+              - 'scripts/firestore-emulator.sh'
+
+  backend-emulator-test:
+    name: backend-emulator-test
+    needs: backend-emulator-changes
+    if: needs.backend-emulator-changes.outputs.run == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 15
     env:
@@ -76,3 +91,31 @@ jobs:
       - name: エミュレータログ(失敗時)
         if: failure()
         run: cat "$RUNNER_TEMP/emulator.log" || true
+
+  # required check。試験を飛ばした時は成功、回した時はその結果。判定の失敗/キャンセルは失敗。
+  backend-emulator:
+    name: backend-emulator
+    needs: [backend-emulator-changes, backend-emulator-test]
+    if: always() && (github.event_name == 'push' || github.event.pull_request.draft == false)
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    steps:
+      - name: 結果を集約
+        env:
+          CHANGES: ${{ needs.backend-emulator-changes.result }}
+          TEST: ${{ needs.backend-emulator-test.result }}
+          RUN: ${{ needs.backend-emulator-changes.outputs.run }}
+        run: |
+          echo "run=${RUN} backend-emulator-changes=${CHANGES} backend-emulator-test=${TEST}"
+          if [ "$CHANGES" != "success" ]; then
+            echo "::error::backend-emulator-changes が ${CHANGES}"
+            exit 1
+          fi
+          if [ "$RUN" = "true" ] && [ "$TEST" != "success" ]; then
+            echo "::error::backend-emulator-test が ${TEST}"
+            exit 1
+          fi
+          if [ "$RUN" != "true" ] && [ "$TEST" != "skipped" ]; then
+            echo "::error::backend-emulator-test が ${TEST}(変更なしなのに)"
+            exit 1
+          fi
