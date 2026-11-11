@@ -731,6 +731,40 @@
         }
       }
     },
+    "「%@」を元の例に戻しました" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Restored “%@” to the original example"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "「%@」を元の例に戻しました"
+          }
+        }
+      }
+    },
+    "「%@」を元の例に戻しますか?" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Restore “%@” to the original example?"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "「%@」を元の例に戻しますか?"
+          }
+        }
+      }
+    },
     "「%@」を入力してください" : {
       "localizations" : {
         "en" : {
@@ -3919,6 +3953,22 @@
         }
       }
     },
+    "会話で直した分は消えます。" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Changes you made by asking will be removed."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "会話で直した分は消えます。"
+          }
+        }
+      }
+    },
     "作ったアプリ" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -4194,6 +4244,38 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "元に戻せません。"
+          }
+        }
+      }
+    },
+    "元の例に戻す" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Restore Original"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "元の例に戻す"
+          }
+        }
+      }
+    },
+    "元の例に戻す…" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Restore Original Example…"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "元の例に戻す…"
           }
         }
       }

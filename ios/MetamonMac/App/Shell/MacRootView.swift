@@ -15,6 +15,7 @@ import MetamonRenderer
 /// キーボード(#934): ⌘1 / ⌘2 でサイドバーと中央を行き来・一覧は ↑↓ で選び Return で中央へ・⌥⌘↑↓ で前 / 次のアプリ。
 /// 画面マップ(#970): ツールバー・表示メニュー(⇧⌘E)からシートで出す。開く → 中央でその画面へ、話す → その画面を文脈にした会話(⌘K と同じシート)。
 /// 一覧(#969): 「作ったアプリ」(端末に残す・名前の変更 / 削除 / 並べ替え)と「同梱の例」に分ける。起動時は前に開いていたアプリを開き直す。
+/// 会話で直した同梱の例も端末に残し、右クリックで元の例に戻せる(#1283)。
 struct MacRootView: View {
     enum Pane: Hashable { case sidebar, canvas }
 
@@ -67,7 +68,7 @@ struct MacRootView: View {
     var body: some View {
         NavigationSplitView(columnVisibility: $columnVisibility) {
             AppSidebar(created: createdApps, examples: exampleApps, selection: guardedSelection,
-                       onOpen: { focus = .canvas }, onDelete: deleteApp)
+                       onOpen: { focus = .canvas }, onDelete: deleteApp, onResetExample: resetExample)
                 .focused($focus, equals: .sidebar)
                 .navigationSplitViewColumnWidth(min: 180, ideal: 220, max: 320)
         } detail: {
@@ -138,6 +139,16 @@ struct MacRootView: View {
         library.delete(id)
         Task { await MacRuntimeNotifications.removeApp(id) } // そのアプリの通知とタイマーの予約(#1324)
         MacVoiceOver.announce(L10n.tr("「\(name)」を削除しました"))
+    }
+
+    /// 会話で直した同梱の例を元に戻す(#1283)。開いていれば中央を作り直すので、入力があれば先に確認する(#943)
+    private func resetExample(_ id: String) {
+        let name = bundledApps.first { $0.id == id }?.name ?? ""
+        discardGuard.run {
+            if notices.summary?.appId == id { notices.summary = nil }
+            library.resetExample(id)
+            MacVoiceOver.announce(L10n.tr("「\(name)」を元の例に戻しました"))
+        }
     }
 
     // MARK: - 作る・直す(#967)

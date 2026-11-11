@@ -5,7 +5,7 @@ import MetamonServices
 
 /// 会話で作った・直したアプリの DSL と、その版の「元に戻す / やり直す」(#967・#968)、作ったアプリの一覧の整理(#969)。
 /// - 作ったアプリは端末に残す(`LocalAppLibrary`: iOS のキャッシュと同じ置き方)。サーバー(#930)が入るまでは端末だけ
-/// - 同梱の例を会話で直した分と版の履歴は、今まで通りウインドウを閉じる(アプリを終える)と消える
+/// - 同梱の例を会話で直した分も端末に残す(#1283)。右クリックの「元の例に戻す」で消す。版の履歴はアプリを終えると消える
 /// - 版の nil は「同梱の例のまま(会話で直す前)」。同梱の例を直して戻すと、元の例を表示し直す
 /// ウインドウをまたいで 1 つだけ持つ(`MetamonMacApp` が作って渡す)。
 @MainActor
@@ -35,6 +35,22 @@ final class MacAppLibrary {
             savedRows[entry.summary.id] = .init(name: entry.document.dsl.app.name, version: entry.document.version)
             createdIds.append(entry.summary.id)
         }
+        for (id, edited) in store?.loadEditedExamples() ?? [:] where generated[id] == nil {
+            generated[id] = edited.document
+            envelopes[id] = edited.envelope
+        }
+    }
+
+    /// 会話で直した同梱の例(右クリックで「元の例に戻す」を出す)
+    func isEditedExample(_ appId: String) -> Bool { !isCreated(appId) && generated[appId] != nil }
+
+    /// 同梱の例を元に戻す(#1283)。端末に残した DSL と版の履歴を消す(確認はサイドバーで済んでいる)
+    func resetExample(_ appId: String) {
+        guard isEditedExample(appId) else { return }
+        generated[appId] = nil
+        envelopes[appId] = nil
+        histories[appId] = nil
+        store?.removeExample(appId: appId)
     }
 
     func isCreated(_ appId: String) -> Bool { createdIds.contains(appId) }
@@ -129,7 +145,13 @@ final class MacAppLibrary {
     private func set(_ appId: String, _ version: Version?) {
         generated[appId] = version?.document
         envelopes[appId] = version?.envelope
-        guard isCreated(appId), let envelope = version?.envelope else { return }
+        guard isCreated(appId) else {
+            // 同梱の例(#1283): 直した版は端末に残し、元の例まで戻したら消す
+            if version == nil { store?.removeExample(appId: appId) }
+            else if let envelope = version?.envelope { store?.storeExample(appId: appId, envelope: envelope) }
+            return
+        }
+        guard let envelope = version?.envelope else { return }
         store?.store(appId: appId, envelope: envelope)
         savedRows[appId] = LocalAppLibrary.row(after: version?.document, envelope: envelope, previous: savedRows[appId])
         saveList() // 名前・版が変わる

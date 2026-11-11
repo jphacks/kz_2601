@@ -4,7 +4,8 @@ import MetamonServices
 /// サイドバーのアプリの一覧。iOS の AppSwitcherSheet に当たる(Mac では常に出す)。
 /// ↑↓ で選ぶと中央が切り替わり、Return / ダブルクリックで中央へ移る(#934)。
 /// 「作ったアプリ」と「同梱の例」に分ける(#969)。作ったアプリは右クリックで名前の変更・上へ / 下へ・削除(確認あり)、
-/// ドラッグで並べ替え、Delete キーで削除。同梱の例は整理できない。サムネイル・検索・新着の数は後の Issue。
+/// ドラッグで並べ替え、Delete キーで削除。同梱の例は整理できないが、会話で直した例は右クリックで「元の例に戻す」(確認あり・#1283)。
+/// サムネイル・検索・新着の数は後の Issue。
 struct AppSidebar: View {
     let created: [SampleApp]
     let examples: [SampleApp]
@@ -12,11 +13,14 @@ struct AppSidebar: View {
     var onOpen: () -> Void = {}
     /// 確認の後に呼ぶ(選択の付け替えはウインドウ側)
     var onDelete: (String) -> Void = { _ in }
+    /// 「元の例に戻す」の確認の後に呼ぶ(#1283)
+    var onResetExample: (String) -> Void = { _ in }
 
     @Environment(MacAppLibrary.self) private var library
     @State private var renameTarget: SampleApp?
     @State private var renameText = ""
     @State private var deleteTarget: SampleApp?
+    @State private var resetTarget: SampleApp?
 
     private var createdIds: [String] { created.map(\.id) }
 
@@ -37,6 +41,9 @@ struct AppSidebar: View {
         .contextMenu(forSelectionType: SampleApp.ID.self) { ids in
             if ids.count == 1, let id = ids.first, let app = created.first(where: { $0.id == id }) {
                 manageItems(app)
+            } else if ids.count == 1, let id = ids.first, library.isEditedExample(id),
+                      let app = examples.first(where: { $0.id == id }) {
+                Button("元の例に戻す…") { resetTarget = app }
             }
         } primaryAction: { ids in
             guard let id = ids.first else { return }
@@ -74,6 +81,16 @@ struct AppSidebar: View {
             Button("キャンセル", role: .cancel) {}
         } message: {
             Text("元に戻せません。")
+        }
+        .alert(L10n.tr("「\(resetTarget?.name ?? "")」を元の例に戻しますか?"),
+               isPresented: Binding(get: { resetTarget != nil }, set: { if !$0 { resetTarget = nil } })) {
+            Button("元の例に戻す", role: .destructive) {
+                guard let app = resetTarget else { return }
+                onResetExample(app.id)
+            }
+            Button("キャンセル", role: .cancel) {}
+        } message: {
+            Text("会話で直した分は消えます。")
         }
     }
 
