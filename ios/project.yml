@@ -327,6 +327,13 @@ targets:
       - path: Metamon/Features/Share/SharedAccessCopy.swift
       # 設定の「つないだサービス」(#1714): 一覧の並べ方・戻り先の読み方・つなぐ / 切るの状態は iOS のファイルをそのまま使う
       - path: Metamon/Features/Connections/ConnectedServices.swift
+      # ショートカット・Siri・Spotlight(App Intents・#1034): Intent の型・Query・フレーズは iOS のファイルをそのまま使う。
+      # 本体との橋渡し(IntentHost)だけ Mac 用(MetamonMac/App/Intents/MacIntentHost.swift)。iOS の IntentHost.swift は AppRuntime を使うので入れない
+      - path: Metamon/Features/Intents/TailorItIntents.swift
+      - path: Metamon/Features/Intents/IntentEntities.swift
+      - path: Metamon/Features/Intents/IntentE2E.swift
+      - path: Metamon/Resources/AppShortcuts.xcstrings
+        buildPhase: resources
       # 規約・ポリシーは iOS と同じ同梱版をアプリ内で読む(#971)
       - path: ../docs/legal
         buildPhase: resources
