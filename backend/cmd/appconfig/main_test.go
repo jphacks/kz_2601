@@ -73,7 +73,7 @@ func TestAppCheckEnforceGuardsAPIOnly(t *testing.T) {
 	ac := appcheck.Middleware(appcheck.Config{Mode: appcheck.ModeEnforce, Verifier: okVerifier{}, Logger: logger})
 	authed := func(h http.Handler) http.Handler { return ac(auth.Middleware(nil, auth.ModeDev)(h)) }
 	share := http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) { w.WriteHeader(http.StatusOK) })
-	h := newHandler(authed, logger, appconfig.New(store.NewMemory()), share)
+	h := newHandler(authed, logger, appconfig.New(store.NewMemory()), share, appconfig.MountAccountDeletePage)
 
 	tests := []struct {
 		path, token string
@@ -81,6 +81,7 @@ func TestAppCheckEnforceGuardsAPIOnly(t *testing.T) {
 	}{
 		{"/health", "", http.StatusOK},
 		{"/s/abc", "", http.StatusOK},
+		{"/account/delete", "", http.StatusOK},
 		{"/v1/client-config", "", http.StatusOK},
 		{"/v1/nope", "", http.StatusNotFound},
 		{"/v1/apps", "", http.StatusUnauthorized},

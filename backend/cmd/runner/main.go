@@ -21,6 +21,8 @@
 //	APNS_AUTH_KEY / APNS_KEY_ID / APNS_TEAM_ID / APNS_TOPIC
 //	                                           APNs (#269; push.go). No key = notifications are logged only
 //	RUNNER_APNS_ENVIRONMENT                    production (default) / sandbox
+//	FCM_SERVICE_ACCOUNT_JSON / FCM_PROJECT_ID  FCM for Android devices (#918; push.go). No key = Android
+//	                                           pushes are skipped (logged)
 //	RUNNER_ACCOUNT_AGE=firestore               actors' account age from users/{uid}.firstSeenAt (#339 24h ban;
 //	                                           appconfig writes it). firebase = Firebase Auth (needs
 //	                                           roles/firebaseauth.viewer; not deployed).
@@ -123,10 +125,19 @@ func main() {
 		logger.Error("runner: account age", slog.Any("error", err))
 		os.Exit(2)
 	}
+	fcmSender, fcmProject, err := fcmFromEnv(ctx, os.Getenv)
+	if err != nil {
+		logger.Error("runner: bad FCM configuration", slog.Any("error", err))
+		os.Exit(2)
+	}
+	if fcmSender == nil {
+		logger.Info("runner: FCM_SERVICE_ACCOUNT_JSON not set: pushes to Android devices are skipped")
+	}
+	sender := pushSender(push.Sender, fcmSender, logger)
 	env := outboxEnv(os.Getenv("APP_ENV"))
 	// Notifications are resolved against the stored devices and consents
-	// (#269). Without an APNs key (push.Sender nil) LogSender logs their shape only.
-	r, err := runner.New(runner.Config{Env: env, Store: st, Quota: q, Sender: push.Sender, PushEnvironment: push.Environment,
+	// (#269). Without an APNs or FCM key (sender nil) LogSender logs their shape only.
+	r, err := runner.New(runner.Config{Env: env, Store: st, Quota: q, Sender: sender, PushEnvironment: push.Environment,
 		Age: age, Paused: pausedFromEnv(os.Getenv), Feeds: feeds.New(feeds.OptionsFromEnv(os.Getenv)),
 		NotifyPaused: flagFromEnv(os.Getenv, "RUNNER_NOTIFY_PAUSED"), AutoPause: autoPause, MaxLate: maxLate, Logger: logger})
 	if err != nil {
@@ -137,9 +148,10 @@ func main() {
 		slog.Duration("tick_interval", interval), slog.Bool("paused", pausedFromEnv(os.Getenv)()),
 		slog.Bool("notify_paused", flagFromEnv(os.Getenv, "RUNNER_NOTIFY_PAUSED")()),
 		slog.Bool("apns", push.Sender != nil), slog.String("apns_environment", push.Environment), slog.String("apns_topic", push.Topic),
+		slog.Bool("fcm", fcmSender != nil), slog.String("fcm_project", fcmProject),
 		slog.Bool("account_age", age != nil))
-	if push.Sender != nil && age == nil {
-		logger.Warn("runner: APNs is on but RUNNER_ACCOUNT_AGE is not set: notifications to others are refused as new_account")
+	if sender != nil && age == nil {
+		logger.Warn("runner: push is on but RUNNER_ACCOUNT_AGE is not set: notifications to others are refused as new_account")
 	}
 	t := &serial{t: r}
 	if err := serve(ctx, envOr("PORT", "8080"), newMux(t, logger), t, interval, logger); err != nil {

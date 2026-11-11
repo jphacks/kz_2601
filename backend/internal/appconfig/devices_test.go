@@ -86,6 +86,11 @@ func TestDevicesAPIValidation(t *testing.T) {
 		{"bad environment", "/v1/me/devices/inst-0001", `{"token":"` + strings.Repeat("ab", 32) + `","environment":"dev"}`, "environment"},
 		{"long os", "/v1/me/devices/inst-0001", `{"token":"` + strings.Repeat("ab", 32) + `","environment":"production","os":"` + strings.Repeat("x", 33) + `"}`, "os"},
 		{"unknown field", "/v1/me/devices/inst-0001", `{"token":"` + strings.Repeat("ab", 32) + `","environment":"production","uid":"x"}`, ""},
+		{"bad platform", "/v1/me/devices/inst-0001", `{"platform":"web","token":"` + strings.Repeat("ab", 32) + `","environment":"production"}`, "platform"},
+		{"android short token", "/v1/me/devices/inst-0001", `{"platform":"android","token":"abc:def"}`, "token"},
+		{"android bad char", "/v1/me/devices/inst-0001", `{"platform":"android","token":"` + strings.Repeat("a", 40) + ` /x"}`, "token"},
+		{"android bad environment", "/v1/me/devices/inst-0001", `{"platform":"android","token":"` + strings.Repeat("a", 40) + `","environment":"dev"}`, "environment"},
+		{"ios without environment", "/v1/me/devices/inst-0001", `{"platform":"ios","token":"` + strings.Repeat("ab", 32) + `"}`, "environment"},
 	} {
 		t.Run(c.name, func(t *testing.T) {
 			r := e.do("val", http.MethodPut, c.path, c.body, nil)
@@ -100,6 +105,30 @@ func TestDevicesAPIValidation(t *testing.T) {
 			}
 		})
 	}
+}
+
+// #918: an Android device carries an FCM token, kept as sent (case-sensitive),
+// with no environment needed.
+func TestDevicesAPIAndroid(t *testing.T) {
+	storeEnvs(t, func(t *testing.T, e *env, st store.Store, sfx string) {
+		ctx := context.Background()
+		a := "dev-api-android" + sfx
+		tok := fmt.Sprintf("dX%016x:APA91b-Ab_Cd.%s", devTokenSalt, strings.Repeat("Zz", 60))
+		r := e.do(a, http.MethodPut, "/v1/me/devices/inst-android"+sfx,
+			fmt.Sprintf(`{"platform":"android","token":%q,"appVersion":"1.0.0","os":"Android 15"}`, tok), nil)
+		if r.code != http.StatusOK || r.body["platform"] != "android" || r.body["environment"] != "production" || r.body["token"] != nil {
+			t.Fatalf("put: %d %s", r.code, r.raw)
+		}
+		ds, err := st.ListDevices(ctx, a)
+		if err != nil || len(ds) != 1 || ds[0].Token != tok || ds[0].Platform != store.PlatformAndroid {
+			t.Fatalf("stored: %+v %v", ds, err)
+		}
+		// iOS stays the default platform
+		r = e.do(a, http.MethodPut, "/v1/me/devices/inst-ios-01"+sfx, deviceBody(7), nil)
+		if r.code != http.StatusOK || r.body["platform"] != "ios" {
+			t.Fatalf("ios: %d %s", r.code, r.raw)
+		}
+	})
 }
 
 // #269: the 11th device removes the least recently updated.

@@ -50,6 +50,7 @@ func (s LogSender) Send(ctx context.Context, p Push) (Result, error) {
 		l = slog.Default()
 	}
 	l.InfoContext(ctx, "notify: push (log only)",
+		slog.String("platform", p.Platform),
 		slog.String("app_id", p.AppID),
 		slog.String("collapse_id", p.CollapseID),
 		slog.Int("title_runes", utf8.RuneCountInString(p.Title)),
@@ -57,10 +58,22 @@ func (s LogSender) Send(ctx context.Context, p Push) (Result, error) {
 	return Result{Status: 200}, nil
 }
 
-// MemoryTokens is a TokenReader over a map (tests).
+// MemoryTokens is a TokenReader over a map of iOS tokens (tests).
 type MemoryTokens map[string][]string
 
+// Tokens returns m[uid] as iOS devices.
+func (m MemoryTokens) Tokens(_ context.Context, uid string) ([]Device, error) {
+	var out []Device
+	for _, t := range m[uid] {
+		out = append(out, Device{Token: t, Platform: PlatformIOS})
+	}
+	return out, nil
+}
+
+// MemoryDevices is a TokenReader over a map of devices (tests).
+type MemoryDevices map[string][]Device
+
 // Tokens returns m[uid].
-func (m MemoryTokens) Tokens(_ context.Context, uid string) ([]string, error) {
-	return append([]string(nil), m[uid]...), nil
+func (m MemoryDevices) Tokens(_ context.Context, uid string) ([]Device, error) {
+	return append([]Device(nil), m[uid]...), nil
 }

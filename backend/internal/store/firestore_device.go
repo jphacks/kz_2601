@@ -18,6 +18,7 @@ const (
 
 type deviceDoc struct {
 	Token       string    `firestore:"token"`
+	Platform    string    `firestore:"platform,omitempty"` // "" = ios (stored before #918)
 	Environment string    `firestore:"environment"`
 	AppVersion  string    `firestore:"appVersion,omitempty"`
 	OS          string    `firestore:"os,omitempty"`
@@ -26,7 +27,11 @@ type deviceDoc struct {
 }
 
 func (d deviceDoc) device(id string) Device {
-	return Device{InstallationID: id, Token: d.Token, Environment: d.Environment, AppVersion: d.AppVersion,
+	p := d.Platform
+	if p == "" {
+		p = PlatformIOS
+	}
+	return Device{InstallationID: id, Token: d.Token, Platform: p, Environment: d.Environment, AppVersion: d.AppVersion,
 		OS: d.OS, CreatedAt: d.CreatedAt, UpdatedAt: d.UpdatedAt}
 }
 
@@ -135,7 +140,7 @@ func (f *Firestore) PutDevice(ctx context.Context, uid string, d Device) (*Devic
 				return err
 			}
 		}
-		doc := deviceDoc{Token: d.Token, Environment: d.Environment, AppVersion: d.AppVersion, OS: d.OS,
+		doc := deviceDoc{Token: d.Token, Platform: d.Platform, Environment: d.Environment, AppVersion: d.AppVersion, OS: d.OS,
 			CreatedAt: created, UpdatedAt: now}
 		if err := tx.Set(ref, doc); err != nil {
 			return err
