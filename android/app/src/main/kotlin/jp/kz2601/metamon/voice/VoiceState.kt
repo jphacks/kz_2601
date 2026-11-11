@@ -4,6 +4,7 @@ import jp.kz2601.metamon.dsl.AppDocument
 import jp.kz2601.metamon.dsl.isVoiceOnly
 import jp.kz2601.metamon.services.ChatMode
 import jp.kz2601.metamon.services.ChatTurn
+import jp.kz2601.metamon.services.RemainingToday
 import jp.kz2601.metamon.services.StreamedComponent
 import jp.kz2601.metamon.services.TranscriberFailure
 import jp.kz2601.metamon.services.http.FailureKind
@@ -88,6 +89,11 @@ data class VoiceUiState(
     val history: List<ChatHistoryEntry> = emptyList(),
     /** 「最初から」で、これまでの会話も消すかを確かめている */
     val restartConfirm: Boolean = false,
+    /** 初期画面に来た経路(挨拶の出し分け・#892) */
+    val homeEntry: Greeting.HomeEntry = Greeting.HomeEntry.LAUNCH,
+    /** ai の「今日の残り」(#630)。分からなければ null */
+    val remainingToday: RemainingToday? = null,
+    val isPro: Boolean = false,
 ) {
     /** 初期状態(音声画面だけ)= 新規作成 */
     val isInitial: Boolean get() = document.dsl.isVoiceOnly

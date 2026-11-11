@@ -4,6 +4,7 @@ import jp.kz2601.metamon.dsl.Action
 import jp.kz2601.metamon.dsl.AppDSL
 import jp.kz2601.metamon.dsl.Component
 import jp.kz2601.metamon.dsl.ComponentType
+import jp.kz2601.metamon.dsl.Show
 import jp.kz2601.metamon.dsl.screen
 import jp.kz2601.metamon.dsl.records.FieldCoding
 import jp.kz2601.metamon.renderer.components.lists.ChartBuckets
@@ -90,7 +91,7 @@ class RenderTree(
         out["state"] = JsonPrimitive(state)
         if (state != "rendered") return JsonObject(out)
 
-        val props = declared(c) + resolved(c) + InputNodes.props(c, form, runtime) + PlayNodes.props(c, runtime)
+        val props = declared(c) + resolved(c) + InputNodes.props(c, form, runtime) + PlayNodes.props(c, runtime) + SensorNodes.props(c)
         if (props.isNotEmpty()) out["props"] = JsonObject(props)
         val actions = actions(c)
         if (actions.isNotEmpty()) out["actions"] = JsonArray(actions)
@@ -138,6 +139,8 @@ class RenderTree(
         (c.target as? JsonPrimitive)?.takeIf { !it.isString && it.doubleOrNull != null }?.let { put("target", it) }
         c.limit?.let { put("limit", JsonPrimitive(it)) }
         c.expanded?.let { put("expanded", JsonPrimitive(it)) }
+        // matchList の届いた / 送った / つながった(#877)
+        c.show?.takeIf { it != Show.UNKNOWN }?.let { put("show", JsonPrimitive(it.wire)) }
     }
 
     /** 解決した値。View と同じ関数を使う。 */

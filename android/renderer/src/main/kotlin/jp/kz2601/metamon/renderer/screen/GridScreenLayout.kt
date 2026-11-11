@@ -81,12 +81,14 @@ fun GridScreenLayout(screen: Screen, ctx: RenderContext, modifier: Modifier = Mo
                                 c, ctx,
                                 Modifier
                                     .offset(x = cellW * a.col1 + gap / 2, y = cellH * (a.row1 - 1) + gap / 2)
-                                    .size(width = cellW * a.colSpan - gap, height = cellH * a.rowSpan - gap),
+                                    .size(width = cellW * a.colSpan - gap, height = cellH * a.rowSpan - gap)
+                                    .changeMark(screen.id, c, screen.components.indexOf(c)),
                             )
                         }
                     }
                 }
-                placement.stacked.forEach { DSLComponent(it, ctx) }
+                // 変わった部品の印(#894)
+                placement.stacked.forEach { DSLComponent(it, ctx, Modifier.changeMark(screen.id, it, screen.components.indexOf(it))) }
             }
         }
     }

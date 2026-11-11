@@ -6,6 +6,8 @@ composeBom = "2026.06.01"
 activityCompose = "1.12.4"
 # link を Custom Tabs で開く
 browser = "1.9.0"
+# https の画像(image / avatar / photoField)。OkHttp は下の okhttp を共有する。3.6 は Compose 1.12(compileSdk 37)を求めるので 3.5 に留める
+coil = "3.5.0"
 coreKtx = "1.18.0"
 # icon / label の Material アイコン(BOM から外れたので版を書く)。extended の絵は scripts/gen-symbol-icons.py で必要な分だけ取り込む(#842)
 materialIconsCore = "1.7.8"
@@ -34,6 +36,8 @@ androidx-activity-compose = { module = "androidx.activity:activity-compose", ver
 androidx-lifecycle-process = { module = "androidx.lifecycle:lifecycle-process", version.ref = "lifecycle" }
 androidx-lifecycle-runtime-compose = { module = "androidx.lifecycle:lifecycle-runtime-compose", version.ref = "lifecycle" }
 androidx-lifecycle-viewmodel-compose = { module = "androidx.lifecycle:lifecycle-viewmodel-compose", version.ref = "lifecycle" }
+coil-compose = { module = "io.coil-kt.coil3:coil-compose", version.ref = "coil" }
+coil-network-okhttp = { module = "io.coil-kt.coil3:coil-network-okhttp", version.ref = "coil" }
 compose-bom = { module = "androidx.compose:compose-bom", version.ref = "composeBom" }
 compose-ui = { module = "androidx.compose.ui:ui" }
 compose-ui-tooling-preview = { module = "androidx.compose.ui:ui-tooling-preview" }

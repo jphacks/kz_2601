@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- センサーの部品(sensorValue・#871)の文言。iOS の SensorValueLeaf の写し。英語は values-en。 -->
+<resources>
+    <string name="renderer_sensor_alert">しきい値を超えました</string>
+    <string name="renderer_sensor_level">水平です</string>
+    <string name="renderer_sensor_log_finished">%1$d 件を記録して止めました(上限)</string>
+    <string name="renderer_sensor_logging">記録中 %1$d/%2$d 件・%3$d 秒ごと(画面を開いている間だけ)</string>
+    <string name="renderer_sensor_save">今の値を記録</string>
+    <string name="renderer_sensor_save_failed">保存できませんでした</string>
+    <string name="renderer_sensor_saved">%1$d 件を記録しました</string>
+    <string name="renderer_sensor_start">記録を開始</string>
+    <string name="renderer_sensor_stop">記録を停止</string>
+    <string name="renderer_sensor_tilted">傾いています</string>
+    <string name="renderer_sensor_unavailable">このセンサーはこの端末では使えません</string>
+</resources>

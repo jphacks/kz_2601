@@ -61,7 +61,7 @@ enum class GenerateMode(val wire: String) {
 
 /**
  * 端末が描ける範囲の申告(#245・#482)。null は送らない(= 全部使える)。
- * Android の描画器が揃うまでの値の決め方は android-082 / android-010。
+ * アプリでは描画器の登録表から作る(:renderer の `DeviceCapabilities`・#845)。
  */
 data class ClientCapabilities(
     val allowedComponents: List<String>? = null,

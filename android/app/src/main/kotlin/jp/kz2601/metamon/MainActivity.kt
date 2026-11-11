@@ -36,7 +36,6 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.viewmodel.compose.viewModel
 import jp.kz2601.metamon.dsl.AppDSL
 import jp.kz2601.metamon.dsl.AppDocument
@@ -57,16 +56,19 @@ import jp.kz2601.metamon.renderer.components.feed.LocalFeedHost
 import jp.kz2601.metamon.renderer.theme.MetamonRenderTheme
 import jp.kz2601.metamon.renderer.theme.ReadableWidth
 import jp.kz2601.metamon.runtime.AppRuntime
+import jp.kz2601.metamon.runtime.NavigationSnapshot
 import jp.kz2601.metamon.runtime.TranscriberDictationHost
 import jp.kz2601.metamon.services.GenerateProgress
+import jp.kz2601.metamon.services.PlanUsageSource
+import jp.kz2601.metamon.voice.AndroidSpeechEngine
 import jp.kz2601.metamon.voice.AppConfigVersions
 import jp.kz2601.metamon.voice.ClarifySettings
-import jp.kz2601.metamon.voice.GeneratingView
-import jp.kz2601.metamon.voice.MicButton
-import jp.kz2601.metamon.voice.VoicePhase
+import jp.kz2601.metamon.voice.Greeting
 import jp.kz2601.metamon.voice.VoiceRoute
+import jp.kz2601.metamon.voice.VoiceFab
 import jp.kz2601.metamon.voice.VoiceUiState
 import jp.kz2601.metamon.voice.VoiceViewModel
+import jp.kz2601.metamon.voice.stage.BuildStageHost
 import jp.kz2601.metamon.services.AppSummary
 import jp.kz2601.metamon.settings.SettingsSheet
 import jp.kz2601.metamon.switcher.AppSwitcherDialog
@@ -84,7 +86,7 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
         val container = (application as MetamonApplication).container(DebugLaunch.knobs(intent))
-        if (savedInstanceState == null) offerPushOpen(intent)
+        if (savedInstanceState == null) offerPushOpen(intent) else restoreNavigation(container, savedInstanceState)
         setContent {
             MetamonRenderTheme {
                 MicrophoneAccessProvider { MetamonRoot(container) }
@@ -97,11 +99,21 @@ class MainActivity : ComponentActivity() {
         offerPushOpen(intent)
     }
 
-    // 前面へ戻った時に端末の登録を確かめる(通知の許可の画面から戻った時もここ・#887)
-    override fun onResume() {
-        super.onResume()
-        val push = (application as MetamonApplication).builtContainer?.push ?: return
-        lifecycleScope.launch { push.refresh() }
+    // 前面・背面の処理(送信待ち・取り直し・通知の登録など)は MetamonApplication の AppForeground が持つ(#891)
+
+    // プロセスが落とされても、戻った時に同じアプリの同じ画面を開く(#891)。記録・フォームの下書き・音声の画面は初めの状態に戻す
+    private fun restoreNavigation(container: AppContainer, savedInstanceState: Bundle?) {
+        container.runtime.offerNavigationRestore(NavigationSnapshot.decode(savedInstanceState?.getString(NAVIGATION_KEY)))
+    }
+
+    override fun onSaveInstanceState(outState: Bundle) {
+        super.onSaveInstanceState(outState)
+        val snapshot = (application as MetamonApplication).builtContainer?.runtime?.navigationSnapshot() ?: return
+        outState.putString(NAVIGATION_KEY, snapshot.encode())
+    }
+
+    private companion object {
+        const val NAVIGATION_KEY = "metamon.navigation"
     }
 
     /** 通知のタップ(自分で出した通知も、FCM が裏で出した通知も extra の `appId`)。 */
@@ -156,6 +168,10 @@ fun MetamonApp(container: AppContainer) {
             versions = if (container.knobs.mock) null else AppConfigVersions(container.appConfig),
             // 未同意なら送らずに同意の画面を出す。同意して閉じたら、止めた 1 件を続けて送る(#888)
             requireConsent = container.consentPrompt::require,
+            // 挨拶・AI の質問・完成の要約の読み上げ(#892・設定で ON の時だけ)
+            speech = AndroidSpeechEngine.reader(context),
+            // 「今日の残り」(`GET /v1/me/usage`・iOS と同じ口)。モックは出さない
+            usage = if (container.knobs.mock) null else container.appConfig as? PlanUsageSource,
         )
     }
     val state by vm.state.collectAsStateWithLifecycle()
@@ -216,14 +232,17 @@ fun MetamonApp(container: AppContainer) {
     val apps by runtime.apps.collectAsStateWithLifecycle()
     val scope = rememberCoroutineScope()
 
+    val openSwitcher = {
+        switcherOpen = true
+        scope.launch { runtime.appsList() }
+        Unit
+    }
+
     Scaffold(
         bottomBar = {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 // アプリの切り替えの入口(最小・iOS は FAB の長押し。見た目は子 Issue)
-                TextButton(onClick = {
-                    switcherOpen = true
-                    scope.launch { runtime.appsList() }
-                }) { Text(stringResource(R.string.switcher_open)) }
+                TextButton(onClick = openSwitcher) { Text(stringResource(R.string.switcher_open)) }
                 TextButton(onClick = { settingsOpen = true }, modifier = Modifier.testTag("settings.open")) {
                     Text(stringResource(R.string.settings_title))
                 }
@@ -238,22 +257,19 @@ fun MetamonApp(container: AppContainer) {
         },
     ) { padding ->
         Box(Modifier.fillMaxSize().padding(padding)) {
-            if (state.isInitial) {
-                VoiceRoute(vm)
-            } else {
-                // 横向き・タブレット・折りたたみでは幅を絞って中央に寄せる(iOS の readableWidth・#842)。
-                ReadableWidth {
-                    GeneratedApp(state, runtimeState.dsl, runtime, appId = runtimeState.document.appId)
+            // 生成中の組み立て台・変わった部品の印・完成の後のお知らせ(#894)
+            BuildStageHost(state, onCancel = vm::cancelGenerate, onOpenVoice = vm::openVoice) {
+                if (state.isInitial) {
+                    VoiceRoute(vm, onMicLongPress = openSwitcher)
+                } else {
+                    // 横向き・タブレット・折りたたみでは幅を絞って中央に寄せる(iOS の readableWidth・#842)。
+                    ReadableWidth {
+                        GeneratedApp(state, runtimeState.dsl, runtime, appId = runtimeState.document.appId)
+                    }
+                    // マイク FAB(#892): タップ = このアプリを変える・長押し = 変身一覧・ドラッグで動かす / 端に隠す
+                    VoiceFab(busy = state.isGenerating, onTap = vm::openVoice, onLongPress = openSwitcher)
                 }
-                MicButton(
-                    state.copy(phase = VoicePhase.IDLE),
-                    size = 64.dp,
-                    onClick = vm::openVoice,
-                    description = stringResource(R.string.voice_change_this_app),
-                    modifier = Modifier.align(Alignment.BottomEnd).padding(20.dp),
-                )
             }
-            if (state.isGenerating) GeneratingView(state, onCancel = vm::cancelGenerate)
             // 要約と元に戻す・状態カード・トースト・削除の取り消し・確認ダイアログ(#895)
             FeedbackHost(vm, state, runtime, runtimeState)
         }
@@ -282,6 +298,7 @@ fun MetamonApp(container: AppContainer) {
             onNewApp = {
                 switcherOpen = false
                 runtime.startNewApp()
+                vm.noteHomeEntry(Greeting.HomeEntry.NEW_APP) // 挨拶を「新しいアプリですね」に
             },
             onDismiss = { switcherOpen = false },
         )
@@ -314,7 +331,7 @@ private suspend fun openFromNotification(runtime: AppRuntime, appId: String) {
     if (!runtime.switchApp(appId)) Log.i(AppContainer.TAG, "push: could not open the app from the notification")
 }
 
-/** 生成の途中経過を 1 行にする。今の画面の途中経過は [GeneratingView] が出す(文言の置き場として残す)。 */
+/** 生成の途中経過を 1 行にする。今の画面の途中経過は [BuildStageHost] が出す(文言の置き場として残す)。 */
 internal fun progressText(p: GenerateProgress): String = when (p) {
     is GenerateProgress.App -> "「${p.name}」を作っています" + if (p.tabs.isEmpty()) "" else "(${p.tabs.joinToString("・")})"
     is GenerateProgress.Summary -> p.text

@@ -8,7 +8,10 @@ import jp.kz2601.metamon.dsl.isVoiceOnly
 import jp.kz2601.metamon.dsl.records.Entity
 import jp.kz2601.metamon.dsl.records.entityModels
 import jp.kz2601.metamon.dsl.records.JSONValue
+import jp.kz2601.metamon.dsl.records.InterestState
 import jp.kz2601.metamon.dsl.records.MarkState
+import jp.kz2601.metamon.dsl.records.MatchBox
+import jp.kz2601.metamon.dsl.records.MatchInterest
 import jp.kz2601.metamon.dsl.records.Record
 import jp.kz2601.metamon.dsl.records.RecordPermission
 import jp.kz2601.metamon.renderer.ActionContext
@@ -21,6 +24,12 @@ import jp.kz2601.metamon.renderer.components.play.TimerHost
 import jp.kz2601.metamon.renderer.components.ai.AiChatPairSaving
 import jp.kz2601.metamon.renderer.components.ai.AiHost
 import jp.kz2601.metamon.renderer.components.social.AuthorNameHost
+import jp.kz2601.metamon.renderer.components.social.BlockedUsersHost
+import jp.kz2601.metamon.renderer.components.social.MatchingHost
+import jp.kz2601.metamon.renderer.components.social.ModerationHost
+import jp.kz2601.metamon.renderer.components.social.ReportReasonOption
+import jp.kz2601.metamon.renderer.components.social.SocialPrompt
+import jp.kz2601.metamon.renderer.components.social.SocialPromptHost
 import jp.kz2601.metamon.renderer.form.FormDraft
 import jp.kz2601.metamon.renderer.form.FormPrefill
 import jp.kz2601.metamon.renderer.navigation.NavigationResolver
@@ -114,7 +123,10 @@ class AppRuntime(
     private val aiHost: AiHost? = null,
     /** 共有アプリへの投稿に出す名前(#875)。null なら名前を聞かず、[authorName] だけを使う(モック・テスト) */
     private val authorProfile: AuthorProfile? = null,
-) : DSLRuntime, NavigationHost, RecordWriter, TimerHost, AiChatPairSaving, AuthorNameHost {
+    /** 仲間探し・通報・ブロック(#877)。null なら出さない(モック・テスト) */
+    socialServices: SocialServices? = null,
+) : DSLRuntime, NavigationHost, RecordWriter, TimerHost, AiChatPairSaving, AuthorNameHost,
+    ModerationHost, MatchingHost, SocialPromptHost, BlockedUsersHost {
     private val _state = MutableStateFlow(RuntimeState(document))
     val state: StateFlow<RuntimeState> = _state.asStateFlow()
 
@@ -179,6 +191,11 @@ class AppRuntime(
             if (directory?.store?.issuedThisLaunch == true) resumeLatestAppIfEmpty()
         }
         startHotReload()
+        scope.launch { social.loadBlockedUsers() }
+        pendingNavigationRestore?.let {
+            pendingNavigationRestore = null
+            applyNavigationRestore(it)
+        }
         load(dsl.entities.map { it.id }.toSet())
     }
 
@@ -241,7 +258,7 @@ class AppRuntime(
         if (switched) dropPendingHotReload()
         if (isIssued(doc.appId)) directory?.store?.set(doc.appId)
         _state.value = RuntimeState(doc, offline = _state.value.offline)
-        _records.value = _state.value.records
+        publishRecords()
         _navigation.value = NavigationState.initial(doc.dsl)
         noteAppliedVersion(doc, switched)
     }
@@ -332,12 +349,16 @@ class AppRuntime(
     fun resetForAccountChange() {
         bootstrapJob?.cancel()
         bootstrapJob = null
+        catchUpJob?.cancel()
+        catchUpJob = null
+        pendingNavigationRestore = null
         dropPendingHotReload()
         hotReloader?.stop()
         syncingAppId = null
         lastSavedForm = null
         entityCache = null
         _apps.value = emptyList()
+        social.forget() // 前の人のブロックで次の人の投稿を隠さない(#877)
         val next = directory?.let { it.fresh(it.store.rotate()) } ?: document
         _state.value = RuntimeState(next)
         _records.value = emptyMap()
@@ -363,13 +384,111 @@ class AppRuntime(
 
     // ホットリロード(iOS の startSync / hotReload / setForeground)
 
-    /** 前面・背面(ProcessLifecycleOwner の onStart / onStop)。背面では購読を止め、戻ったら張り直して読み直す。 */
+    /**
+     * 前面・背面(iOS の `setForeground`・#891)。呼ぶのは `AppForeground` だけ(ProcessLifecycleOwner の onStart / onStop)。
+     * - 前面: 送信待ちを流す → 購読を張り直す → [catchUpAfterBackground](送信待ちが空いてから DSL → 表示中の記録 → 通知の予約)
+     * - 背面: 取り直しを止める → 取り消し待ちの削除を確定する(戻せなくなるので「元に戻す」も消す)→ 購読を止める
+     */
     fun setForeground(active: Boolean) {
         if (foreground == active) return
         foreground = active
+        catchUpJob?.cancel()
+        catchUpJob = null
         recordSync.setForeground(active)
         if (!active) _state.update { it.copy(recordUndo = null) } // 背面では削除を送り切るので戻せない
         hotReloader?.setForeground(active)
+        // 起動の前(bootstrap がまだ)は bootstrap が読むので取り直さない
+        if (active && bootstrapJob?.isCompleted == true) catchUpJob = scope.launch { catchUpAfterBackground() }
+    }
+
+    private var catchUpJob: Job? = null
+
+    /**
+     * 前面に戻った直後に 1 回(iOS の `catchUpAfterBackground`)。背面の間は購読が止まっているので取りこぼしを埋める。
+     * 送信待ち → DSL → 表示中の記録 → 通知の予約し直し の順。どれかが失敗しても残りは続ける。
+     */
+    internal suspend fun catchUpAfterBackground() {
+        val appId = document.appId
+        drainQueueForCatchUp()
+        if (isIssued(appId) && document.appId == appId) catchUpDocument(appId)
+        val entities = _state.value.records.keys.toList()
+        for (entity in entities) {
+            if (document.appId != appId) return
+            // 購読の張り直しが頼んだ取り直しはここでまとめて済ませる(同じ記録を 2 回読まない)
+            recordsRefreshJobs.remove(entity)?.cancel()
+            refresh(entity)
+        }
+        rescheduleNotifications()
+    }
+
+    /** 送信待ちを流し、流し終わるまで待つ(前面復帰の kick と重なるので最大 [CATCH_UP_DRAIN_WAIT_MILLIS])。 */
+    private suspend fun drainQueueForCatchUp() {
+        if (!recordSync.isOnline) return
+        try {
+            recordSync.queue.resume()
+        } catch (e: CancellationException) {
+            throw e
+        } catch (_: Exception) {
+            return
+        }
+        var waited = 0L
+        while (recordSync.queue.isDraining && waited < CATCH_UP_DRAIN_WAIT_MILLIS) {
+            delay(CATCH_UP_POLL_MILLIS)
+            waited += CATCH_UP_POLL_MILLIS
+        }
+    }
+
+    private suspend fun catchUpDocument(appId: String) {
+        val fetch = restore ?: return
+        val remote = try {
+            fetch(appId)
+        } catch (e: CancellationException) {
+            throw e
+        } catch (_: Exception) {
+            return // 届かなければ今の DSL のまま(購読が戻れば追いつく)
+        }
+        if (document.appId != appId) return
+        _state.update { it.copy(offline = false) }
+        hotReload(remote.copy(appId = appId)) // 進んでいれば当てる。操作中なら閉じるまで待つ
+    }
+
+    private suspend fun rescheduleNotifications() {
+        val doc = document
+        if (doc.dsl.app.notifications.isEmpty()) return
+        try {
+            host.notificationsChanged(doc.appId, doc.dsl, _records.value)
+        } catch (e: CancellationException) {
+            throw e
+        } catch (_: Exception) {
+            // 次の変化で予約し直す
+        }
+    }
+
+    // プロセスが落とされた後の復元(#891)
+
+    private var pendingNavigationRestore: NavigationSnapshot? = null
+
+    /** 今の画面の位置(Activity の保存状態に入れる)。話しかける前の画面では null。 */
+    fun navigationSnapshot(): NavigationSnapshot? {
+        val doc = document
+        if (doc.dsl.isVoiceOnly) return null
+        return NavigationSnapshot(doc.appId, _navigation.value)
+    }
+
+    /**
+     * 保存しておいた画面の位置を戻す。起動([bootstrap])が終わってから当てる(開き直したアプリと同じ appId で、
+     * 今の DSL にその画面がある時だけ。違えばアプリを開いた直後の画面のまま)。
+     * 画面の作り直し(回転など)ではランタイムが生きているので、もう動いた遷移を上書きしない。
+     */
+    fun offerNavigationRestore(snapshot: NavigationSnapshot?) {
+        if (snapshot == null) return
+        if (bootstrapJob?.isCompleted == true) applyNavigationRestore(snapshot) else pendingNavigationRestore = snapshot
+    }
+
+    private fun applyNavigationRestore(snapshot: NavigationSnapshot) {
+        val doc = document
+        if (_navigation.value != NavigationState.initial(doc.dsl)) return
+        snapshot.restoreIn(doc.appId, doc.dsl)?.let { _navigation.value = it }
     }
 
     /** 他端末・ai 直叩きで進んだ DSL を当てる。操作中(シート・push 先・音声シート)なら閉じるまで待ち、最新の 1 件だけ当てる。 */
@@ -398,7 +517,7 @@ class AppRuntime(
             offline = previous.offline,
             toast = RuntimeCopy.HOT_RELOADED,
         )
-        _records.value = _state.value.records
+        publishRecords()
         val tab = _navigation.value.selectedTab
         val initial = NavigationState.initial(doc.dsl)
         _navigation.value = if (doc.dsl.app.tabs.any { it.screen == tab }) initial.copy(selectedTab = tab) else initial
@@ -536,14 +655,14 @@ class AppRuntime(
             val fresh = recordSync.pull(appId, entity)
             if (document.appId != appId) return
             _state.update { it.copy(records = it.records + (entity to fresh.map { r -> r.toDsl() }), failed = it.failed - entity) }
-            _records.value = _state.value.records
+            publishRecords()
         } catch (e: CancellationException) {
             throw e
         } catch (_: Exception) {
             if (document.appId != appId) return
             if (_state.value.records[entity].isNullOrEmpty()) {
                 _state.update { it.copy(records = it.records + (entity to emptyList()), failed = it.failed + entity) }
-                _records.value = _state.value.records
+                publishRecords()
             }
         } finally {
             _state.update { it.copy(loading = it.loading - entity) }
@@ -594,6 +713,49 @@ class AppRuntime(
     override fun answerAuthorName(name: String?) {
         authorProfile?.answer(name)
     }
+
+    // 通報・ブロック・仲間探し(#877・iOS の AppRuntime+Moderation / AppRuntime+Matching)
+
+    private val social = SocialRuntime(socialServices, scope, object : SocialRuntime.Env {
+        override val appId: String get() = document.appId
+        override fun currentUid(): String? = currentUserId()
+        override val entities: List<Entity> get() = entityModels
+        override fun entity(id: String): Entity? = entityModel(id)
+        override fun records(entity: String): List<Record> = this@AppRuntime.records(entity)
+        override suspend fun reload(entities: Set<String>) = load(entities, force = true)
+        override fun toast(message: String) = showToast(message)
+        override fun blockedChanged() = publishRecords()
+    })
+
+    /** 描画に渡す記録(ブロックした人の共有の投稿を除く)。 */
+    private fun publishRecords() {
+        _records.value = social.hidingBlocked(_state.value.records)
+    }
+
+    override fun canReport(entity: String, record: Record): Boolean = social.canReport(entity, record)
+    override fun reportRecord(entity: String, record: Record) = social.reportRecord(entity, record)
+    override fun blockAuthor(entity: String, record: Record) = social.blockAuthor(entity, record)
+    override val socialPrompt: StateFlow<SocialPrompt?> get() = social.prompt
+    override fun submitReport(reason: ReportReasonOption) = social.submitReport(reason)
+    override fun confirmBlock() = social.confirmBlock()
+    override fun confirmAdult() = social.confirmAdult()
+    override fun declineAdult() = social.declineAdult()
+    override fun dismissSocialPrompt() = social.dismiss()
+    override val blockedUsers: StateFlow<Map<String, String>>? get() = if (social.moderationAvailable) social.blocked else null
+    override suspend fun unblock(uid: String) = social.unblock(uid)
+    override val matchingVersion: StateFlow<Int> get() = social.version
+    override fun interestState(entity: String, record: Record): InterestState? = social.interestState(entity, record)
+    override fun interestBusy(record: Record): Boolean = social.interestBusy(record)
+    override suspend fun sendInterest(entity: String, record: Record) = social.sendInterest(entity, record)
+    override fun matchItems(box: MatchBox): List<MatchInterest>? = social.matchItems(box)
+    override fun matchLoadFailed(box: MatchBox): Boolean = social.matchLoadFailed(box)
+    override suspend fun refreshMatches(boxes: Set<MatchBox>) {
+        social.loadBlockedUsers()
+        social.refreshMatches(boxes)
+    }
+    override suspend fun acceptInterest(item: MatchInterest) = social.acceptInterest(item)
+    override suspend fun declineInterest(item: MatchInterest, box: MatchBox) = social.declineInterest(item, box)
+    override suspend fun unmatch(item: MatchInterest) = social.unmatch(item)
 
     // AI と話す(#874)
 
@@ -884,7 +1046,7 @@ class AppRuntime(
     private fun setRecords(appId: String, entity: String, list: List<StoredRecord>) {
         if (appId != document.appId) return // 読む間に別のアプリへ切り替わった
         _state.update { it.copy(records = it.records + (entity to list.map { r -> r.toDsl() })) }
-        _records.value = _state.value.records
+        publishRecords()
     }
 
     private suspend fun ifCurrent(appId: String, body: suspend () -> Unit) {
@@ -924,3 +1086,7 @@ internal fun StoredRecord.toDsl(): Record = Record(
 )
 
 internal fun Map<String, JSONValue>.toJson(): JsonObject = JsonObject(mapValues { it.value.toJsonElement() })
+
+/** 前面復帰で送信待ちが流れ終わるのを待つ上限(iOS と同じ 10 秒) */
+private const val CATCH_UP_DRAIN_WAIT_MILLIS = 10_000L
+private const val CATCH_UP_POLL_MILLIS = 100L

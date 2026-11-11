@@ -7,12 +7,15 @@ import jp.kz2601.metamon.services.AppWithDsl
 import jp.kz2601.metamon.services.FetchedDocument
 import jp.kz2601.metamon.services.InstallResult
 import jp.kz2601.metamon.services.MarkState
+import jp.kz2601.metamon.services.MyUsage
+import jp.kz2601.metamon.services.PlanUsageSource
 import jp.kz2601.metamon.services.Record
 import jp.kz2601.metamon.services.RecordPage
 import jp.kz2601.metamon.services.RecordQuery
 import jp.kz2601.metamon.services.Share
 import jp.kz2601.metamon.services.SharePreview
 import jp.kz2601.metamon.services.VersionSummary
+import jp.kz2601.metamon.services.http.ApiError
 import jp.kz2601.metamon.services.http.ApiJson
 import jp.kz2601.metamon.services.http.HttpRequest
 import jp.kz2601.metamon.services.http.MetamonHttp
@@ -37,7 +40,7 @@ class HttpAppConfigClient(
     private val http: MetamonHttp,
     /** 取得・復元した DSL の封筒を入れる(オフライン起動の復元用・iOS と同じ)。null なら入れない */
     private val cache: DocumentCache? = null,
-) : AppConfigClient {
+) : AppConfigClient, PlanUsageSource {
 
     @Serializable
     private data class AppsPage(val items: List<AppSummary> = emptyList(), val nextPageToken: String? = null)
@@ -153,6 +156,15 @@ class HttpAppConfigClient(
 
     override suspend fun revokeShare(token: String) {
         send("DELETE", listOf("v1", "shares", token))
+    }
+
+    // MARK: 使用量(#630・iOS の `HTTPAppConfigClient+Usage`)
+
+    /** `GET /v1/me/usage`。古いサーバー(まだ無い)は 404 → null */
+    override suspend fun myUsage(): MyUsage? = try {
+        MyUsage.decode(get(listOf("v1", "me", "usage")))
+    } catch (e: ApiError) {
+        if (e.status == 404) null else throw e
     }
 
     // MARK: 下回り

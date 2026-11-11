@@ -23,6 +23,8 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
@@ -52,7 +54,11 @@ import jp.kz2601.metamon.dsl.expr.DSLClock
 import jp.kz2601.metamon.dsl.records.Entity
 import jp.kz2601.metamon.dsl.records.FieldType
 import jp.kz2601.metamon.dsl.records.Record
+import jp.kz2601.metamon.dsl.records.MatchBox
 import jp.kz2601.metamon.renderer.ActionContext
+import jp.kz2601.metamon.renderer.components.social.InterestButton
+import jp.kz2601.metamon.renderer.components.social.MatchingHost
+import jp.kz2601.metamon.renderer.components.social.interestTitle
 import jp.kz2601.metamon.renderer.registry.RenderContext
 import jp.kz2601.metamon.renderer.theme.RenderTheme
 import jp.kz2601.metamon.renderer.theme.SymbolIcon
@@ -66,7 +72,8 @@ import kotlinx.coroutines.launch
  * - 長押し = 「削除」のメニュー(`swipeToDelete` で消せる記録だけ)。読み上げでは行の操作「削除」。消した後の「元に戻す」はホスト(AppRuntime)が出す
  * - `item.toggle`(#108): 行頭の丸で boolean を反転して即保存(楽観的 UI。失敗したら戻す)
  * - 行は 1 枚のカードに積み、行間は hairline。グリッドのセルが縦スクロールを持つので LazyColumn にはしない
- * 印(いいね)・通報・つながりたいは、共有まわりの能力(android-068・069・042)が入るまで出さない(Issue #859 の備考)。
+ * - `item.interest`(#877): 仲間探しのプロフィールの行の右端に「つながりたい」([MatchingHost] を持つ runtime だけ)
+ * 印(いいね)・通報は、共有まわりの能力(android-068・069)が入るまで出さない(Issue #859 の備考)。
  */
 @Composable
 fun ListLeaf(c: Component, ctx: RenderContext, modifier: Modifier = Modifier) {
@@ -83,6 +90,9 @@ fun ListLeaf(c: Component, ctx: RenderContext, modifier: Modifier = Modifier) {
     val overrides = remember { mutableStateMapOf<String, Boolean>() }
     val scope = rememberCoroutineScope()
     val today = DSLClock.now()
+    val matching = (ctx.runtime as? MatchingHost)?.takeIf { c.item?.interest == true }
+    matching?.matchingVersion?.collectAsState()?.value // 送った・つながったで描き直す
+    if (matching != null) LaunchedEffect(entityId) { matching.refreshMatches(MatchBox.entries.toSet()) }
     Column(modifier.renderCard(padding = 0.dp)) {
         rows.forEachIndexed { index, row ->
             if (index > 0) HorizontalDivider(Modifier.padding(start = separatorInset(c.item)), color = RenderTheme.colors.hairline)
@@ -103,6 +113,10 @@ fun ListLeaf(c: Component, ctx: RenderContext, modifier: Modifier = Modifier) {
                 }
             }
             val deletable = c.swipeToDelete == true && ctx.runtime.canDelete(entityId, row)
+            val interest = matching?.interestState(entityId, row)
+            val sendInterest = { scope.launch { matching?.sendInterest(entityId, row) }; Unit }
+            val interestLabel = interest?.let { interestTitle(it) }
+            val interestBusy = matching?.interestBusy(row) ?: false
             ListRow(
                 item = c.item,
                 record = row,
@@ -117,6 +131,12 @@ fun ListLeaf(c: Component, ctx: RenderContext, modifier: Modifier = Modifier) {
                     { ctx.dispatch(Action(type = ActionType.DELETE_RECORD, entity = entityId), ActionContext(ctx.route, ctx.form, recordId = row.id)) }
                 } else {
                     null
+                },
+                accessory = interest?.let { st -> { InterestButton(st, interestBusy, sendInterest) } },
+                accessoryActions = if (interest?.tappable == true && interestLabel != null && !interestBusy) {
+                    listOf(CustomAccessibilityAction(interestLabel) { sendInterest(); true })
+                } else {
+                    emptyList()
                 },
             )
         }
@@ -150,6 +170,12 @@ internal fun ListRow(
     onToggle: (() -> Unit)? = null,
     onTap: (() -> Unit)? = null,
     onDelete: (() -> Unit)? = null,
+    /** 行の右端(chevron の前)。仲間探しのボタンなど(#877) */
+    accessory: (@Composable () -> Unit)? = null,
+    /** 右端の操作を読み上げの行の操作にも出す */
+    accessoryActions: List<CustomAccessibilityAction> = emptyList(),
+    /** 長押し。あれば削除のメニューの代わりに呼ぶ(呼んだ側がメニューを出す) */
+    onLongPress: (() -> Unit)? = null,
 ) {
     val texts = ListRows.texts(item, record, entity, data)
     val checked = toggleOn == true
@@ -162,15 +188,16 @@ internal fun ListRow(
     val actions = buildList {
         if (onToggle != null) add(CustomAccessibilityAction(if (checked) "チェックを外す" else "チェックする") { onToggle(); true })
         if (onDelete != null) add(CustomAccessibilityAction("削除") { onDelete(); true })
+        addAll(accessoryActions)
     }
     Box {
         Row(
             Modifier
                 .fillMaxWidth()
                 .combinedClickable(
-                    enabled = onTap != null || onDelete != null,
+                    enabled = onTap != null || onDelete != null || onLongPress != null,
                     onClick = { onTap?.invoke() },
-                    onLongClick = onDelete?.let { { menu = true } },
+                    onLongClick = onLongPress ?: onDelete?.let { { menu = true } },
                 )
                 .clearAndSetSemantics {
                     contentDescription = label
@@ -215,6 +242,7 @@ internal fun ListRow(
                     maxLines = 1,
                 )
             }
+            accessory?.invoke()
             if (showsChevron) SymbolIcon("chevron.right", 16.dp, RenderTheme.colors.tertiaryLabel)
         }
         DropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {

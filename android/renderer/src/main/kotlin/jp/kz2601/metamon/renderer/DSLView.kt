@@ -40,6 +40,8 @@ import jp.kz2601.metamon.dsl.fallback
 import jp.kz2601.metamon.dsl.hasTabs
 import jp.kz2601.metamon.dsl.screen
 import jp.kz2601.metamon.renderer.components.UnavailableComponent
+import jp.kz2601.metamon.renderer.components.social.SocialDialogs
+import jp.kz2601.metamon.renderer.components.social.SocialPromptHost
 import jp.kz2601.metamon.renderer.components.lists.LocalScreenLocals
 import jp.kz2601.metamon.renderer.components.lists.ScreenLocals
 import jp.kz2601.metamon.renderer.form.rememberScreenForm
@@ -131,6 +133,8 @@ fun DSLView(dsl: AppDSL, runtime: DSLRuntime, modifier: Modifier = Modifier) {
             Box(Modifier.fillMaxSize().background(RenderTheme.colors.canvas)) { stack(Route.FULL, full) }
         }
     }
+    // 通報・ブロック・18 歳以上の確認(#877)。窓なのでシート・全画面の上にも出る
+    (runtime as? SocialPromptHost)?.let { SocialDialogs(it) }
 }
 
 @OptIn(ExperimentalMaterial3Api::class)

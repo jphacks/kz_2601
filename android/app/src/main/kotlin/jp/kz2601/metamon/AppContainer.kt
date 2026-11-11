@@ -12,6 +12,7 @@ import jp.kz2601.metamon.runtime.AppDirectory
 import jp.kz2601.metamon.runtime.AppFeedHost
 import jp.kz2601.metamon.runtime.AppRuntime
 import jp.kz2601.metamon.runtime.RuntimeHost
+import jp.kz2601.metamon.runtime.SocialServices
 import jp.kz2601.metamon.runtime.TranscriberDictationHost
 import jp.kz2601.metamon.dsl.decode
 import jp.kz2601.metamon.dsl.fallback
@@ -50,6 +51,10 @@ import jp.kz2601.metamon.services.consent.KeyValueStore
 import jp.kz2601.metamon.services.consent.SharedPreferencesKeyValueStore
 import jp.kz2601.metamon.services.social.AuthorProfile
 import jp.kz2601.metamon.voice.ChatHistoryStore
+import jp.kz2601.metamon.voice.FabPositionStore
+import jp.kz2601.metamon.voice.LaunchVisits
+import jp.kz2601.metamon.voice.SpeechSettings
+import jp.kz2601.metamon.renderer.components.RemoteImages
 import jp.kz2601.metamon.renderer.components.audio.LocalAudioStore
 import jp.kz2601.metamon.renderer.components.media.VideoCodec
 import jp.kz2601.metamon.services.http.AuthTokenProvider
@@ -63,6 +68,8 @@ import jp.kz2601.metamon.services.live.FirebaseCrashReporter
 import jp.kz2601.metamon.services.live.HttpAIClient
 import jp.kz2601.metamon.services.live.HttpAppConfigClient
 import jp.kz2601.metamon.services.live.HttpFeedClient
+import jp.kz2601.metamon.services.live.HttpMatchingClient
+import jp.kz2601.metamon.services.live.HttpModerationClient
 import jp.kz2601.metamon.services.live.HttpPushDeviceClient
 import jp.kz2601.metamon.services.local.AndroidConnectivity
 import jp.kz2601.metamon.services.local.AppListCache
@@ -82,6 +89,7 @@ import jp.kz2601.metamon.services.push.NotifyConsentStore
 import jp.kz2601.metamon.services.push.NotifyConsentToggle
 import jp.kz2601.metamon.services.push.PushDeviceRegistrar
 import jp.kz2601.metamon.services.push.SharedPreferencesPushPrefs
+import jp.kz2601.metamon.services.social.MatchingAgeGate
 import jp.kz2601.metamon.services.speech.AndroidSpeechTranscriber
 import jp.kz2601.metamon.services.sync.HotReload
 import jp.kz2601.metamon.services.sync.RealtimeDocumentSync
@@ -147,6 +155,10 @@ class AppContainer(
     val chatHistory: ChatHistoryStore,
     /** 端末内の動画(#863)・録音(#1084)のファイルを全部消す(#841 の後片付け) */
     private val removeLocalMedia: () -> Unit,
+    /** 仲間探し・通報・ブロック(#877)。モックは null(出さない) */
+    private val social: SocialServices? = null,
+    /** https の画像のキャッシュを消す(#841 の後片付け) */
+    private val clearImageCache: () -> Unit = {},
 ) {
     /** 画面の下に出す接続先の名前(モックなら "mock")。 */
     val environmentLabel: String get() = if (knobs.mock) "mock" else environment.name
@@ -172,12 +184,14 @@ class AppContainer(
             chatHistory = chatHistory,
             authorProfile = authorProfile,
             removeLocalMedia = removeLocalMedia,
+            clearImageCache = clearImageCache,
             feedCache = feedCache,
             // 同意は人ごと(iOS は UserDefaults ごと消す)。前の人の止めた発話も次の人の同意で送らない
             forgetConsent = {
                 consent.forget()
                 consentPrompt.reset()
                 aiButtonMetrics.clearCounts()
+                social?.ageGate?.reset() // 18 歳以上の確認(#877)も人ごと(iOS は UserDefaults ごと消す)
             },
         )
     }
@@ -230,6 +244,8 @@ class AppContainer(
             // モックは端末に残さない・同意済みで始める(設定から取り消して同意の画面を試せる)
             val prefs: KeyValueStore = InMemoryKeyValueStore()
             val consent = AiConsentStore(prefs).apply { grant() }
+            // DSL に書かれた https の画像は外のサーバーなのでモックでも読む
+            RemoteImages.install(context, MetamonHttp.defaultClient())
             return AppContainer(
                 environment = environment,
                 auth = MockAuthService(signedIn = true),
@@ -258,6 +274,7 @@ class AppContainer(
                 authorProfile = AuthorProfile(InMemoryKeyValueStore()),
                 chatHistory = ChatHistoryStore(null),
                 removeLocalMedia = removeLocalMedia(context),
+                clearImageCache = { RemoteImages.wipe(context) },
             )
         }
 
@@ -276,6 +293,8 @@ class AppContainer(
             // App Check: release は Play Integrity・debug は debug provider。Firebase が無ければヘッダ無し
             val appCheck = if (firebase) FirebaseAppCheckTokenProvider.createIfConfigured() else null
             val client = MetamonHttp.defaultClient()
+            // 画像も同じ接続を使う(トークンは付けない)
+            RemoteImages.install(context, client)
             fun http(baseUrl: String) = MetamonHttp(baseUrl, tokens, clientInfo, appCheck = appCheck, client = client, device = device)
             val log: (String) -> Unit = { Log.w(TAG, it) }
 
@@ -300,7 +319,7 @@ class AppContainer(
                 initialDsl = initialDsl,
                 appConfig = appConfig,
                 // 同意が無ければ一切送らない(最後の砦。画面側でも送る前に止めて同意の画面を出す)
-                ai = ConsentGatedAiClient(HttpAIClient(http(environment.aiBaseUrl), log = log)) { consent.isGranted },
+                ai = ConsentGatedAiClient(HttpAIClient(http(environment.aiBaseUrl), capabilities = deviceCapabilities(), log = log)) { consent.isGranted },
                 // 声は端末内だけで文字にする(#354 §3)。端末内が無い端末は文字入力に落とす
                 transcriber = AndroidSpeechTranscriber(context, language = language, log = { Log.i(TAG, it) }),
                 appId = DeviceAppId.store(context, "metamon-app"),
@@ -320,6 +339,8 @@ class AppContainer(
                 authorProfile = AuthorProfile(SharedPreferencesKeyValueStore.of(context, AUTHOR_PREFS)),
                 chatHistory = ChatHistoryStore(File(context.filesDir, "chat_history")),
                 removeLocalMedia = removeLocalMedia(context),
+                social = SocialServices(HttpMatchingClient(appConfigHttp), HttpModerationClient(appConfigHttp), MatchingAgeGate(prefs)),
+                clearImageCache = { RemoteImages.wipe(context) },
             )
         }
 
@@ -355,6 +376,10 @@ class AppContainer(
         private fun forgetDeviceState(context: Context): () -> Unit = {
             PermissionCenter.get(context).forget()
             LocalNotifications.get(context).removeAll()
+            // 音声の画面の設定(#892)。iOS は UserDefaults ごと消す(表示の言語などの残すキーには入っていない)
+            SpeechSettings(context).clear()
+            LaunchVisits.forget(context)
+            FabPositionStore(context).clear()
         }
 
         /** 端末内の動画・録音のファイル(どちらもバックアップされない領域)と、撮影・録音の途中で残った一時ファイル。 */
@@ -432,6 +457,7 @@ class AppContainer(
             ),
             aiHost = aiHost,
             authorProfile = authorProfile,
+            socialServices = social,
         ).also { it.dictation = TranscriberDictationHost(transcriber, CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)) }
     }
 

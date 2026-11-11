@@ -16,13 +16,17 @@ import jp.kz2601.metamon.voice.ChatHistoryStore
  * - 保存した DSL([DocumentCache.removeAll] = iOS `DocumentCache.shared.removeAll()`)
  * - アプリの一覧([AppListCache.clear] = iOS `DocumentCache` の一覧・`apps = []`)
  * - 権限の記録(聞いた結果。[forgetDeviceState] = iOS `LocalWipe.clearDefaults`)
+ * - 音声の画面の読み上げの ON / OFF・起動回数・マイク FAB の位置(#892・[forgetDeviceState] の中 = iOS `LocalWipe.clearDefaults`)
  * - 会話の履歴(#893・[ChatHistoryStore.removeAll] = iOS `ChatHistoryStore.removeAll()`)
  * - 投稿に表示する名前(#875・[AuthorProfile.clear])
  * - feed の覚えた行(#876・[FeedCache.removeAll] = iOS `FeedCache.removeAll()`)
  * - 端末内の動画(#863)・録音(#1084)のファイル([removeLocalMedia] = iOS `LocalVideoStore` / `LocalAudioStore` の removeAll)
- * - AI への同意・同意の前に止めた 1 件・aiButton の貯めた数([forgetConsent] = iOS `LocalWipe.clearDefaults` + `aiConsent.reload()`)
+ * - AI への同意・同意の前に止めた 1 件・aiButton の貯めた数・18 歳以上の確認(#877)([forgetConsent] = iOS `LocalWipe.clearDefaults` + `aiConsent.reload()`)
  * - 生成アプリの通知の予約・出ている通知([forgetDeviceState] の中 = iOS `notifications.removeAll()`)
+ * - https の画像のキャッシュ(メモリ・ディスク。[clearImageCache] = iOS は URLCache)
  * - 画面の状態・appId(新しい appId に。[resetRuntime] = iOS `recordUndo = nil`・`resetToInitial()`・`DeviceAppID.set`)
+ * - ブロック中の人・仲間探しの一覧(#877・[resetRuntime] の中の `SocialRuntime.forget`。iOS は次の人の uid で読み直すまで残るが、
+ *   Android は前の人のブロックで次の人の投稿を隠さないよう先に捨てる)
  * - 音声の画面の状態は [AccountGuard.generation] で作り直す(iOS `chatHistory = []`)
  */
 class LocalDataWipe(
@@ -34,6 +38,7 @@ class LocalDataWipe(
     private val chatHistory: ChatHistoryStore? = null,
     private val authorProfile: AuthorProfile? = null,
     private val removeLocalMedia: () -> Unit = {},
+    private val clearImageCache: () -> Unit = {},
     private val feedCache: FeedCache? = null,
     private val forgetConsent: () -> Unit = {},
 ) {
@@ -46,6 +51,7 @@ class LocalDataWipe(
         authorProfile?.clear()
         chatHistory?.removeAll()
         removeLocalMedia()
+        clearImageCache()
         feedCache?.removeAll()
         resetRuntime() // 一覧・DSL を消した後に新しい appId へ
     }

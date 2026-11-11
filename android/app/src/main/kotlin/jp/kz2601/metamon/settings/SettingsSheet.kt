@@ -36,9 +36,12 @@ import jp.kz2601.metamon.consent.LegalLinks
 import jp.kz2601.metamon.language.AppLocales
 import jp.kz2601.metamon.language.LanguageSection
 import jp.kz2601.metamon.push.PushConsentSection
+import jp.kz2601.metamon.renderer.components.social.BlockedUsersSection
 import jp.kz2601.metamon.push.PushHost
 import jp.kz2601.metamon.voice.ClarifySection
 import jp.kz2601.metamon.voice.ClarifySettings
+import jp.kz2601.metamon.voice.SpeechSection
+import jp.kz2601.metamon.voice.SpeechSettings
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import java.time.format.FormatStyle
@@ -64,6 +67,8 @@ fun SettingsSheet(container: AppContainer, busy: Boolean, onDismiss: () -> Unit)
             }
             val context = LocalContext.current
             ClarifySection(remember { ClarifySettings(context) })
+            // 挨拶・AI の質問・完成の要約の読み上げ(#892・既定 OFF)
+            SpeechSection(remember { SpeechSettings(context) })
             HorizontalDivider(Modifier.padding(vertical = 8.dp))
             AuthorNameSection(container.authorProfile)
             HorizontalDivider(Modifier.padding(vertical = 8.dp))
@@ -75,6 +80,8 @@ fun SettingsSheet(container: AppContainer, busy: Boolean, onDismiss: () -> Unit)
                 PushConsentSection(container.push, document.appId, document.dsl)
                 HorizontalDivider(Modifier.padding(vertical = 8.dp))
             }
+            // ブロック中のユーザー(#877)。通報・ブロックが使える時だけ
+            BlockedUsersSection(container.runtime)
             var language by remember { mutableStateOf(AppLocales.setting(context)) }
             LanguageSection(language, onSelect = { selected ->
                 if (selected == language) return@LanguageSection

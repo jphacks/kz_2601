@@ -4,6 +4,11 @@
     <string name="feedback_cancel">キャンセル</string>
     <string name="feedback_close">閉じる</string>
     <string name="feedback_deleted">削除しました</string>
+    <string name="feedback_edit_hint_body">画面のマイクをタップして、話しかけてください。</string>
+    <string name="feedback_edit_hint_close">とじる</string>
+    <string name="feedback_edit_hint_examples">「ボタンを大きくして」 「メモ欄を足して」 「元に戻して」</string>
+    <string name="feedback_edit_hint_talk">話してみる</string>
+    <string name="feedback_edit_hint_title">こう話すと直せます</string>
     <string name="feedback_no_earlier">これ以上前の状態はありません</string>
     <string name="feedback_redo">やり直す</string>
     <string name="feedback_redo_failed">やり直せませんでした</string>
