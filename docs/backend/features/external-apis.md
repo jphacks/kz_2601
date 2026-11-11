@@ -82,8 +82,14 @@ op の `Check` は引数の値を確かめる(appconfig と runner の両方で�
 | `notion` の `queryDatabase` / `addRow`(データベースを見る・足す・#1497) | 無料・OAuth(`runs` だけ)・`addRow` は書く(確認必須) | `queryDatabase(databaseId, limit?, subtitleProperty?, valueProperty?)`・`addRow(databaseId, title, properties?)` | `https://api.notion.com` だけ | なし | `EXT_NOTION_ENABLED=1`・`EXT_NOTION_CLIENT_ID` / `_CLIENT_SECRET` |
 | `notion` の `updateProperties`(ページのプロパティを直す・#1680) | 無料・OAuth(`runs` だけ)・書く(確認必須) | `updateProperties(pageId, properties)`。`pageId` は 32 桁の 16 進(ハイフン有り無しどちらも)。`properties` は「プロパティ名 → 値」の JSON(1〜20 個・8 KiB まで)。直せる型は `title`・`rich_text`・`number`・`select`・`checkbox`・`date` だけで、ほか(`status`・`relation`・`people` など)・ページに無い名前・型に合わない値は Notion に送らず 400 `bad_request`。値の読み方はページの型で決める(ページを 1 回読んでから直す)。同じ値でやり直しても変わらない。答えは `resultId`(ページ id)と 1 件(見出し = タイトル・リンク) | 同上 | なし | 同上 |
 | `notion` の `pageText`(ページの本文を読む・#1680) | 無料・OAuth(`runs` だけ) | `pageText(pageId)`。ページの一番上の段のブロックを文字だけにする(見出し・段落・引用・コールアウト・トグル・コード・箇条書き `•`・番号付き `1.`・ToDo `☑` / `☐`・子ページの名前・区切り `---`。画像や表など文字の無いもの・入れ子の中身は読まない)。答えは 1 件(見出し = ページのタイトル・値 = 本文・リンク)。本文は 64 KiB(`MaxBody` の 1/16)か 5 回の読み出し(500 ブロック)で切り、切った時は末尾に `…` | 同上 | なし | 同上 |
+| `googleTasks` の `lists`(ToDo のリストの一覧・#1677) | 無料・OAuth(`runs` だけ・scope `tasks.readonly`) | `lists(limit?)`。`limit` 1〜50(既定 20)。行はリスト(見出し = 名前・値 = リストの id。`tasks` / `addTask` / `complete` の `listId` に渡せる) | `https://tasks.googleapis.com` と `https://oauth2.googleapis.com` だけ | なし | `EXT_GOOGLE_TASKS_ENABLED=1`。OAuth のクライアントは Google カレンダーのもの(`EXT_GOOGLE_CALENDAR_CLIENT_ID` / `_CLIENT_SECRET`)。`EXT_GOOGLE_TASKS_CLIENT_ID` / `_CLIENT_SECRET` を入れた時だけそちら(`Provider.ClientFrom`) |
+| `googleTasks` の `tasks`(リストのタスクを見る・#1677) | 無料・OAuth(`runs` だけ・scope `tasks.readonly`) | `tasks(listId?, due?, status?, limit?)`。`listId` は英数字と `_` `-` の 128 文字まで(無ければ既定のリスト `@default`)。`due` は `today`(今日・日本時間)・`overdue`(今日より前)・`week`(今日から 7 日)・`YYYY-MM-DD`(その日)。`status` は `open`(既定・まだのもの)・`completed`(済んだもの)・`all`。`limit` 1〜50(既定 20)。行はタスク(見出し = タイトル・補足 = メモの 1 行目(120 文字まで。済んだものは頭に「完了」)・値 = 期限の日・リンク) | 同上 | なし | 同上 |
+| `googleTasks` の `addTask`(タスクを足す・#1677) | 無料・OAuth(`runs` だけ・scope `tasks`。Google にこれより狭い書く scope が無い)・書く(確認必須) | `addTask(title, notes?, due?, listId?)`。`title` 1024 文字まで・`notes` 8192 文字まで(制御文字は不可)・`due` は `YYYY-MM-DD`(Google は日付だけ持つ)。答えは `resultId`(タスクの id)と 1 件。Google に冪等のキーが無いので、二重にしないのは書く op をやり直さない決まりだけ | 同上 | なし | 同上 |
+| `googleTasks` の `complete`(タスクを済みにする・#1677) | 無料・OAuth(`runs` だけ・scope `tasks`)・書く(確認必須) | `complete(taskId, listId?)`。id は英数字と `_` `-` の 128 文字まで。答えは `resultId`(= `taskId`)と 1 件。済みをもう一度済みにしても変わらない。持っていないリスト・タスク(Google の 400 / 404)は 400 `bad_request` | 同上 | なし | 同上 |
 
-Asana の `myTasks`・`projectTasks`・`complete`、Todoist の `complete`・`projects`・`project` / `label` と Notion の `updateProperties`・`pageText` は runner の op だけ。生成アプリから呼ぶ部品と AI に選ばせる決まり(`prompt.go`・`catalog.go`・`docs/dsl`)は #1643 の判断の後に足す。
+Google ToDo の 401 は接続を `error` にする(つなぎ直す)。403 は scope が足りない時もほかの拒否も 409 `ext_not_connected`(つなぎ直す)、ただし回数の上限の 403 と 429 / 5xx は 502 `upstream_unavailable`。
+
+Asana の `myTasks`・`projectTasks`・`complete`、Todoist の `complete`・`projects`・`project` / `label` と Notion の `updateProperties`・`pageText`、Google ToDo の全部の op は runner の op だけ。生成アプリから呼ぶ部品と AI に選ばせる決まり(`prompt.go`・`catalog.go`・`docs/dsl`)は #1643 の判断の後に足す。
 
 provider が 404 / 422(持っていない通貨・日)を返した時は 400 `bad_request`(`runs` は戻す)。429 / 5xx は 502 `upstream_unavailable`。
 
@@ -238,5 +244,6 @@ DSL に `externalCall` / `externalList` があるかの確かめは、DSL の子
 - Cloud Scheduler で `POST /internal/ext/expire` を 1 日 1 回。
 - runner の最小 1 台(決定 4)・`#288` までは runner が prod だけなので、stg で偽の provider を通す時の runner の置き場所。
 - 各社の鍵・OAuth のクライアント(Secret Manager・`EXT_<PROVIDER>_*`)と、原価・押さえの量(非公開の資料から env)。
+- Google ToDo(#1677): カレンダーの OAuth クライアントに戻り先 `/oauth/callback/googleTasks` を足し、Google Cloud のプロジェクトで Tasks API を有効にし、同意の画面に scope `tasks.readonly`・`tasks`(センシティブ)を足して Google の確認を受け直す。
 - 回数の上限の値(`EXT_LIMIT_*`・`EXT_GLOBAL_DAILY*`)を各社の割り当てに合わせて runner の env に入れる(非公開の資料から。入れなければコードの既定)。
 - プライバシーポリシー・利用規約(`docs/legal`)に外の API への送信とトークンの保管・消し方を書く。

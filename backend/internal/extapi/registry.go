@@ -100,6 +100,10 @@ type Provider struct {
 	New func(Secrets) (map[string]Operation, error)
 	// NewOAuth builds the OAuth client of a NeedsOAuth provider.
 	NewOAuth func(Secrets) (OAuthClient, error)
+	// ClientFrom is another provider whose OAuth client (EXT_<IT>_CLIENT_ID /
+	// _CLIENT_SECRET) this one uses when its own are not set (googleTasks →
+	// googleCalendar: one Google client and consent screen).
+	ClientFrom string
 }
 
 // Op returns the provider's op name.
