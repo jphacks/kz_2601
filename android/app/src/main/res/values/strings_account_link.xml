@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 匿名から Google・Apple への引き継ぎ(#1101)。文言は iOS の AccountLink / SettingsSheet / AuthError から写す -->
+<resources>
+    <string name="account_link_already_linked">すでにサインインしています</string>
+    <string name="account_link_apple">Apple で続ける</string>
+    <string name="account_link_conflict_apple_title">この Apple ID は別のアカウントで使われています</string>
+    <string name="account_link_conflict_apple_message">切り替えると、その Apple ID で作ったアプリが開きます。いま匿名で作ったアプリは引き継がれず、この端末から見えなくなります。</string>
+    <string name="account_link_conflict_google_title">この Google アカウントは別のアカウントで使われています</string>
+    <string name="account_link_conflict_google_message">切り替えると、その Google アカウントで作ったアプリが開きます。いま匿名で作ったアプリは引き継がれず、この端末から見えなくなります。</string>
+    <string name="account_link_done_apple">Apple に引き継ぎました。機種変更のあとも同じ Apple ID で戻れます</string>
+    <string name="account_link_done_google">Google に引き継ぎました。機種変更のあとも同じ Google アカウントで戻れます</string>
+    <string name="account_link_failed">引き継げませんでした。もう一度お試しください</string>
+    <string name="account_link_footer">Google か Apple でサインインすると、作ったアプリとデータをこのまま引き継げます。匿名のままアプリを消したり機種変更したりすると、作ったアプリに戻れません。</string>
+    <string name="account_link_google">Google で続ける</string>
+    <string name="account_link_no_pending">もう一度サインインしてください</string>
+    <string name="account_link_status_anonymous">匿名で使っています</string>
+    <string name="account_link_switch">そのアカウントに切り替える</string>
+</resources>

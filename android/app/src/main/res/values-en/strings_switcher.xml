@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 英語 -->
+<resources>
+    <string name="switcher_close">Close</string>
+    <string name="switcher_current">The app you\'re using</string>
+    <string name="switcher_empty">No apps yet</string>
+    <string name="switcher_new_app">+ New app</string>
+    <string name="switcher_open">Apps</string>
+    <string name="switcher_title">Your apps</string>
+    <string name="switcher_untitled">Untitled</string>
+</resources>

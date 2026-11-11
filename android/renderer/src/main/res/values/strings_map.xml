@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- 地図(mapView / locationPicker・#867) -->
+    <string name="renderer_map_attribution_open">地図の著作権の説明を開く</string>
+    <plurals name="renderer_map_pins">
+        <item quantity="other">%1$d 件の場所の地図</item>
+    </plurals>
+    <string name="renderer_map_pin_untitled">名前の無い場所</string>
+    <string name="renderer_map_route">移動の軌跡の地図(最新の記録 %1$d 点)</string>
+    <string name="renderer_location_picker_choose">場所を選ぶ</string>
+    <string name="renderer_location_picker_change">場所を変える</string>
+    <string name="renderer_location_picker_search">地名・住所で検索</string>
+    <string name="renderer_location_picker_clear">検索を消す</string>
+    <string name="renderer_location_picker_not_found">見つかりませんでした</string>
+    <string name="renderer_location_picker_map">地図。動かすと中央のピンの位置を選べます</string>
+    <string name="renderer_location_picker_hint">地図を動かして、ピンの位置で決められます</string>
+    <string name="renderer_location_picker_current">現在地</string>
+    <string name="renderer_location_picker_use_pin">この場所に決める</string>
+</resources>

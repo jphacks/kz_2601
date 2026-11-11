@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Local notifications from generated apps (#886) -->
+<resources>
+    <string name="notification_alarm_stop">Stop</string>
+    <string name="notification_channel_alarms">Alarms</string>
+    <string name="notification_channel_alarms_description">Alerts that keep ringing until you stop them</string>
+    <string name="notification_channel_conditions">Condition alerts</string>
+    <string name="notification_channel_conditions_description">Alerts when your records meet a condition</string>
+    <string name="notification_channel_reminders">Reminders</string>
+    <string name="notification_channel_reminders_description">Reminders at the times set in your generated apps</string>
+</resources>

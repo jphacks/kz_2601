@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 現在地を記録する部品(locationButton・#867)の文言。英語は values-en。 -->
+<resources>
+    <string name="renderer_location_button">現在地を記録</string>
+    <string name="renderer_location_saved">記録した位置 %1$s</string>
+    <string name="renderer_location_denied">位置情報の利用が許可されていません。端末の設定から許可できます</string>
+    <string name="renderer_location_off">端末の位置情報がオフです。設定でオンにしてからもう一度押してください</string>
+    <string name="renderer_location_failed">位置情報を取得できませんでした。少し待ってからもう一度押してください</string>
+</resources>
