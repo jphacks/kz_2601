@@ -448,7 +448,8 @@ class AppContainer(
                 feedback = HttpFeedbackClient(appConfigHttp),
                 updateGate = UpdateGate.live(context, environment.appConfigBaseUrl, client, device),
                 inAppUpdater = InAppUpdater(PlayAppUpdates.ifInstalledFromPlay(context)),
-                discover = DiscoverServices(HttpDiscoverClient(appConfigHttp), moderation),
+                // 審査用の版(#1275)は「探す」(公開・インストール)を出さない
+                discover = if (ReviewBuild.enabled) null else DiscoverServices(HttpDiscoverClient(appConfigHttp), moderation),
                 members = HttpMembersClient(appConfigHttp),
                 entitlements = HttpEntitlementClient(appConfigHttp),
                 playBilling = { PlayBilling(context, it) },
