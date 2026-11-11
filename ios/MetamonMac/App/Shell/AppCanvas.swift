@@ -48,6 +48,7 @@ struct AppCanvas: View {
                 // 暗号化して保存する項目(#233): サーバーに送る時だけ iOS と同じく端末の鍵で包む(端末だけの記録は包まない)
                 if server != nil { sync?.encryptedFields[app.id] = appDSL.encryptedFields }
                 let created = MacAppRuntime(appId: app.id, dsl: appDSL, recordSync: sync, dictation: voice?.dictation)
+                created.books = MacServices.shared.books // 本の情報(#1276)。モックの時は nil
                 #if !APP_STORE_REVIEW
                 created.feedClient = MacServices.shared.feeds // 天気・祝日などの feed(#1288)。モックの時は nil
                 #endif

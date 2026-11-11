@@ -18,7 +18,7 @@ extension MacAppRuntime {
     }
 
     /// 本の情報は iOS と同じ手順(`BookLookupSteps`)。Mac はまだ appconfig につながらない(#930)ので、
-    /// `books` が nil の間は「読み込めません。手で入力してください」になる(iOS の METAMON_MOCK と同じ)。
+    /// `books` が nil(モック・plist 無し)の時は「読み込めません。手で入力してください」になる(iOS の METAMON_MOCK と同じ)。
     func lookupBook(_ action: Action, _ ctx: ActionContext) async {
         if let message = await BookLookupSteps.run(action, form: ctx.form, client: books) { toast = message }
     }

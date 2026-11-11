@@ -55,7 +55,7 @@ final class MacAppRuntime: RuntimeNavigating {
     /// feed の問い合わせ先(`MacAppRuntime+Feeds.swift`・#1288)。サーバーにつながっていない時は nil
     @ObservationIgnored var feedClient: (any FeedClient)?
     #endif
-    /// lookupBook の問い合わせ先。appconfig への接続(#930)が来るまでは nil
+    /// lookupBook の問い合わせ先(#1276)。サーバーにつながっている時は `MacServices.books`、モックの時は nil
     @ObservationIgnored var books: (any BookLookupClient)?
     @ObservationIgnored var calendarWriter: any CalendarWriting = EventKitCalendarWriter()
     /// `mockRecordSync` の一時フォルダ。ランタイムを捨てる時(アプリの切り替え)に消す
