@@ -93,12 +93,14 @@ paths:
         '404': { $ref: '#/components/responses/NotFound' }
     patch:
       tags: [apps]
-      summary: メタ更新 (名前・status)
+      summary: メタ更新 (名前・status・一覧に出す数字)
       description: |
         `name`(変身一覧の「名前を変える」・#277)は前後の空白を除いて 1〜40 文字。名前は `dsl.app.name` にも書き込み、
         **新しい version として積む**(`source.kind=manual`・`mode=patch`・`patch=[{op:add,path:/app/name}]`)。
         DSL の書き込みは毎回 `dsl.app.name` をアプリの名前に写すので、メタだけ変えると次の音声編集で元に戻るため。
         同じ名前なら version は進めない。`status` だけの時は version を進めない。
+        `glanceStat`(アプリの一覧のカードに出す数字・link-10)は DSL の部品の id・`"-"`(出さない)・`""`(既定 = 初期画面の先頭の stat)。
+        形だけ確かめる(DSL に無い id は端末が既定に戻す)。version も `updatedAt` も変えない。
       requestBody:
         content:
           application/json:
@@ -107,6 +109,7 @@ paths:
               properties:
                 name: { type: string, minLength: 1, maxLength: 40 }
                 status: { type: string, enum: [active, archived] }
+                glanceStat: { type: string, pattern: '^$|^-$|^[a-z][a-z0-9_-]{0,39}$' }
       responses:
         '200': { description: OK, content: { application/json: { schema: { $ref: '#/components/schemas/AppSummary' } } } }
         '400': { $ref: '#/components/responses/BadRequest' }
@@ -2604,6 +2607,7 @@ components:
         createdAt: { type: string, format: date-time }
         updatedAt: { type: string, format: date-time }
         sortIndex: { type: integer, minimum: 1, description: '変身一覧で自分が並べた位置(1 が先頭・#277)。並べ替えたことが無いアプリには無い' }
+        glanceStat: { type: string, description: 'アプリの一覧のカードに出す数字の部品の id(link-10)。"-" は出さない。無ければ初期画面の先頭の stat' }
     AppWithDSL:
       allOf:
         - { $ref: '#/components/schemas/AppSummary' }
