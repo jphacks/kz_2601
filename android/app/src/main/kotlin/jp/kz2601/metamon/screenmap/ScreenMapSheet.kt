@@ -43,8 +43,11 @@ import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.onClick
+import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
@@ -199,6 +202,7 @@ private fun ScreenCard(node: ScreenGraph.Node, rootLabel: String, isSelected: Bo
         else -> stringResource(R.string.screen_map_badge_screen)
     }
     val hint = stringResource(R.string.screen_map_card_hint)
+    val unreachable = stringResource(R.string.screen_map_unreachable)
     Surface(
         onClick = onClick,
         shape = RoundedCornerShape(12.dp),
@@ -210,7 +214,11 @@ private fun ScreenCard(node: ScreenGraph.Node, rootLabel: String, isSelected: Bo
         shadowElevation = if (isSelected) 6.dp else 1.dp,
         modifier = modifier
             .alpha(if (node.reachable) 1f else 0.5f)
-            .semantics { onClick(label = hint) { onClick(); true } }
+            .semantics {
+                onClick(label = hint) { onClick(); true }
+                selected = isSelected
+                if (!node.reachable) stateDescription = unreachable // 薄い表示だけでは読み上げで分からない
+            }
             .testTag("screenMap.node.${node.id}"),
     ) {
         Column(Modifier.padding(horizontal = 10.dp, vertical = 8.dp), verticalArrangement = Arrangement.Center) {
@@ -265,8 +273,14 @@ private fun LinkList(label: String, links: List<ScreenGraph.Link>, graph: Screen
         for (link in links) {
             val other = graph.node(if (outgoing) link.to else link.from)?.title.orEmpty()
             val how = link.edges.map { describe(it) }.joinToString(separator)
-            Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                Text(if (outgoing) "→" else "←", color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold)
+            // 1 行を 1 つに読む。向きは見出し(行き先 / 来る元)で伝わるので矢印は読ませない
+            Row(Modifier.semantics(mergeDescendants = true) {}, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                Text(
+                    if (outgoing) "→" else "←",
+                    color = MaterialTheme.colorScheme.primary,
+                    fontWeight = FontWeight.Bold,
+                    modifier = Modifier.clearAndSetSemantics {},
+                )
                 Text(other, style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.SemiBold)
                 Text(how, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 2)
             }

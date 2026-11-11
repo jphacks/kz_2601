@@ -15,11 +15,11 @@ class LocalAppForget(
     private val thumbnails: AppThumbnailStore,
     private val chatHistory: ChatHistoryStore,
     private val forgetNotifications: (String) -> Unit = {},
-    /** そのアプリの位置の記録を止める(別のアプリの記録は止めない) */
-    private val stopLocationTracking: (appId: String) -> Unit = {},
+    /** そのアプリの位置の記録を止め、保存の途中の 1 点を待つ(別のアプリの記録は止めない) */
+    private val stopLocationTracking: suspend (appId: String) -> Unit = {},
 ) {
     suspend operator fun invoke(appId: String) {
-        stopLocationTracking(appId) // 消したアプリへ点を足し続けない
+        stopLocationTracking(appId) // 消したアプリへ点を足し続けない(書きかけの点を待ってから消す)
         recordSync.purge(appId)
         documentCache.remove(appId)
         thumbnails.remove(appId)

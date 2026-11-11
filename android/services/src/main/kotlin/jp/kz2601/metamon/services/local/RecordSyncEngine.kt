@@ -199,6 +199,7 @@ class RecordSyncEngine(
         appId: String, entity: String, recordId: String?, data: JsonObject,
         authorUid: String? = null, authorName: String? = null, shared: Boolean = false,
     ): Pair<List<Record>, String> {
+        val generation = wipeGeneration
         val stamp = timestamp()
         val existing = recordId?.let { store.row(appId, entity, it) }
         val written = if (recordId != null && existing != null) {
@@ -228,6 +229,13 @@ class RecordSyncEngine(
                 ),
             )
             row.recordId
+        }
+        if (wipeGeneration != generation) {
+            // 書く途中で wipe された: 前の人の行を次の人の DB・列に残さない
+            queue.discard(appId, entity, written)
+            store.remove(appId, entity, written)
+            refreshStatus()
+            return shown(appId, entity) to written
         }
         kick()
         return shown(appId, entity) to written

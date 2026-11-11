@@ -183,6 +183,8 @@ fun NavigationResolver.reveal(screen: String, graph: ScreenGraph, dsl: AppDSL, f
     val steps = graph.path(screen)
     if (steps == null) {
         val root = mainRoot(s, dsl)
+        // タブ未選択("")なら mainRoot は最初のタブ。選んだことにしないと積んだ画面が出ない
+        if (dsl.app.hasTabs) s = s.copy(selectedTab = root.screen)
         return s.withPath(root.stack, listOf(Route(screen, stack = root.stack)))
     }
     val start = steps.firstOrNull()?.from ?: screen

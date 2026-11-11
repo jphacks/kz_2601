@@ -2,6 +2,7 @@ package jp.kz2601.metamon.renderer
 
 import jp.kz2601.metamon.dsl.AppDSL
 import jp.kz2601.metamon.dsl.decode
+import jp.kz2601.metamon.dsl.hasTabs
 import jp.kz2601.metamon.renderer.navigation.NavigationResolver
 import jp.kz2601.metamon.renderer.navigation.NavigationState
 import jp.kz2601.metamon.renderer.navigation.Presentation
@@ -142,5 +143,22 @@ class ScreenGraphTest {
         val island = NavigationResolver.reveal("island", g, d, chain)!!
         assertEquals("行けない画面は根の上に 1 枚", listOf(Route("island")), island.path(Route.MAIN))
         assertEquals(Presentation.PUSH, g.links.first().edges.first().presentation)
+    }
+
+    /** タブがあり、まだタブを選んでいない("")時に行けない画面を開くと、最初のタブを選んでその上に積む。 */
+    @Test
+    fun revealUnreachableWithTabsSelectsTheInitialTab() {
+        val d = AppDSL.decode(
+            """
+            {"schemaVersion":1,"app":{"name":"t","tabs":[{"screen":"home","title":"ホーム"},{"screen":"more","title":"その他"}]},
+             "initialScreen":"home","screens":[{"id":"home"},{"id":"more"},{"id":"island"}]}
+            """.trimIndent(),
+        )
+        val g = ScreenGraph(d)
+        assertTrue(d.app.hasTabs)
+        val s = NavigationResolver.reveal("island", g, d, NavigationState())!!
+        assertEquals("home", s.selectedTab)
+        assertEquals(listOf(Route("island", stack = "tab:home")), s.path("tab:home"))
+        assertEquals("island", s.top(d).screen)
     }
 }

@@ -55,10 +55,7 @@ object LocationTracking {
         if (_state.value.isActive) return
         val app = context.applicationContext
         appContext = app
-        this.entity = entity
-        this.save = save
-        this.currentAppId = currentAppId
-        _state.value = _state.value.start(target, autoStopSeconds)
+        begin(target, autoStopSeconds, entity, save, currentAppId)
         try {
             app.startForegroundService(Intent(app, LocationTrackingService::class.java).setAction(LocationTrackingService.ACTION_START))
         } catch (_: RuntimeException) {
@@ -76,6 +73,12 @@ object LocationTracking {
     /** サインアウト・アカウント削除([appId] = null)や、記録中のアプリの削除で止める。別のアプリの記録は止めない。 */
     fun stopFor(appId: String?) {
         if (_state.value.shouldStopFor(appId)) finish(null)
+    }
+
+    /** [stopFor] して、保存の途中の 1 点が書き終わるまで待つ。記録を消す(wipe・purge)前に呼ぶ(消した後に点を残さない)。 */
+    suspend fun stopAndAwait(appId: String?) {
+        stopFor(appId)
+        saving.withLock {}
     }
 
     /** 位置の許可が無かった(サービスは起こさない)。部品が「設定を開く」を出す。 */
@@ -102,17 +105,33 @@ object LocationTracking {
     internal fun onLocation(loc: Location) {
         val accuracy = if (loc.hasAccuracy()) loc.accuracy.toDouble() else -1.0
         val p = Track.Point(loc.latitude, loc.longitude, Instant.ofEpochMilli(loc.time))
-        scope.launch {
-            saving.withLock {
-                val s = _state.value
-                val target = s.target ?: return@withLock
-                if (!s.shouldKeep(p, accuracy)) return@withLock
-                val data = TrackingRules.pointData(target, entity?.invoke(), p, currentAppId?.invoke())
-                val ok = data != null && save?.invoke(data) == true
-                if (!_state.value.isRecording(target)) return@withLock
-                if (ok) _state.update { it.kept(p) } else stop(TrackingStopReason.SAVE_FAILED)
-            }
+        scope.launch { savePoint(p, accuracy) }
+    }
+
+    internal suspend fun savePoint(p: Track.Point, accuracy: Double) {
+        saving.withLock {
+            val s = _state.value
+            val target = s.target ?: return@withLock
+            if (!s.shouldKeep(p, accuracy)) return@withLock
+            val data = TrackingRules.pointData(target, entity?.invoke(), p, currentAppId?.invoke())
+            val ok = data != null && save?.invoke(data) == true
+            if (!_state.value.isRecording(target)) return@withLock
+            if (ok) _state.update { it.kept(p) } else stop(TrackingStopReason.SAVE_FAILED)
         }
+    }
+
+    /** 記録先と保存を覚えて記録中にする(サービスは起こさない。[start] とテストから)。 */
+    internal fun begin(
+        target: TrackingTarget,
+        autoStopSeconds: Int,
+        entity: () -> Entity?,
+        save: suspend (Map<String, JSONValue>) -> Boolean,
+        currentAppId: () -> String?,
+    ) {
+        this.entity = entity
+        this.save = save
+        this.currentAppId = currentAppId
+        _state.value = _state.value.start(target, autoStopSeconds)
     }
 
     private fun finish(reason: TrackingStopReason?) {

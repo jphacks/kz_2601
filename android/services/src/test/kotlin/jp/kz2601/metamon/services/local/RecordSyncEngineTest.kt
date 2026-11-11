@@ -2,6 +2,8 @@ package jp.kz2601.metamon.services.local
 
 import jp.kz2601.metamon.dsl.records.LocalVideoStore
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.runCurrent
@@ -203,5 +205,22 @@ class RecordSyncEngineTest {
         assertTrue(e.cached("app", "todo").isEmpty())
         assertTrue(e.pendingDeletions.isEmpty())
         assertNotNull(e.status.value)
+    }
+
+    /** 書く途中で wipe された行は、次の人の DB・送信待ちに残さない(位置の記録の点が wipe を跨いだ時・#869)。 */
+    @Test
+    fun writeThatStraddlesAWipeLeavesNoRow() = runTest {
+        val dir = Files.createTempDirectory("records").toFile()
+        val io = StandardTestDispatcher(testScheduler) // ファイルの読み書きで中断させ、その間に wipe を入れる
+        val store = RecordStore(dir, io)
+        val queue = SyncQueue(null, store, client, BackoffPolicy.immediate, sleep = {}, io = EmptyCoroutineContext)
+        val e = RecordSyncEngine(store, queue, client, net, backgroundScope)
+        val write = launch { e.write("app", "track", null, data("point")) } // ファイルを読む所で止まる
+        val wipe = launch { e.wipe() }
+        write.join()
+        wipe.join()
+        assertEquals(0, e.queue.count())
+        assertTrue(e.cached("app", "track").isEmpty())
+        dir.deleteRecursively()
     }
 }

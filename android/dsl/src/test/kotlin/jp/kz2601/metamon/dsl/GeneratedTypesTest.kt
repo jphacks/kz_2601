@@ -88,6 +88,14 @@ class GeneratedTypesTest {
         assertEquals("navigate", action?.rawType)
     }
 
+    /** コードで作った Action も type の文字列を持つ(iOS の `Action.init` と同じ)。 */
+    @Test
+    fun codeBuiltActionRawTypeIsItsType() {
+        assertEquals("navigate", Action(type = ActionType.NAVIGATE).rawType)
+        assertEquals("saveRecord", Action(type = ActionType.SAVE_RECORD).rawType)
+        assertEquals("", Action().rawType)
+    }
+
     @Test
     fun wrongTypedOptionalValuesBecomeNullInsteadOfDroppingTheParent() {
         val dsl = decode(
