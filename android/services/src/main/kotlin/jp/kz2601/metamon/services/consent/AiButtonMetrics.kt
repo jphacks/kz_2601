@@ -12,7 +12,6 @@ import kotlinx.serialization.Serializable
 import kotlinx.serialization.builtins.MapSerializer
 import kotlinx.serialization.builtins.serializer
 import java.time.Instant
-import java.time.LocalDate
 import java.time.ZoneId
 import java.util.UUID
 
@@ -192,7 +191,7 @@ class AiButtonMetricsRecorder(
 
     /** [KEEP_DAYS] より古い日を捨てる(圏外が続いても増え続けない)。 */
     private fun prune() = synchronized(lock) {
-        val cutoff = LocalDate.ofInstant(clock(), zone()).minusDays(KEEP_DAYS.toLong()).toString()
+        val cutoff = clock().atZone(zone()).toLocalDate().minusDays(KEEP_DAYS.toLong()).toString()
         val kept = buckets.filterKeys { it >= cutoff }
         if (kept.size != buckets.size) {
             buckets = kept
@@ -200,7 +199,7 @@ class AiButtonMetricsRecorder(
         }
     }
 
-    private fun today(): String = LocalDate.ofInstant(clock(), zone()).toString()
+    private fun today(): String = clock().atZone(zone()).toLocalDate().toString()
 
     private fun load(): Map<String, Bucket> = store.getString(BUCKETS_KEY)
         ?.let { runCatching { ApiJson.decodeFromString(bucketsSerializer, it) }.getOrNull() }

@@ -22,6 +22,10 @@ class ThirdPartyLicensesTest {
             assertTrue("${it.id} のライセンスが無い", it.license.isNotBlank())
         }
         assertTrue("Kotlin の標準ライブラリ", entries.any { it.name == "org.jetbrains.kotlin" && it.license == "Apache-2.0" })
+        // POM に 2 つ書かれた camera-core は両方(取り込んだ libyuv の BSD-3-Clause)・MIT の checker-qual も入る
+        assertTrue("CameraX(Apache-2.0)", entries.any { it.name == "androidx.camera" && it.license == "Apache-2.0" })
+        assertTrue("libyuv", entries.any { it.name == "androidx.camera" && it.license == "BSD-3-Clause" && "LibYuv" in it.text })
+        assertTrue("checker-qual", entries.any { it.name == "org.checkerframework" && it.license == "MIT" && "Checker Framework" in it.text })
     }
 
     @Test

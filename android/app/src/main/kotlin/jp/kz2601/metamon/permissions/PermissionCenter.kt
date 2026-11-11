@@ -1,5 +1,6 @@
 package jp.kz2601.metamon.permissions
 
+import android.annotation.SuppressLint
 import android.app.Activity
 import android.content.Context
 import android.content.Intent
@@ -31,7 +32,10 @@ class PermissionCenter private constructor(private val app: Context) {
         runCatching {
             requestedPermissions(
                 SDK,
-                modern = { pm.getPackageInfo(app.packageName, PackageManager.PackageInfoFlags.of(PackageManager.GET_PERMISSIONS.toLong())).requestedPermissions },
+                // 13+ の時だけ呼ばれる([requestedPermissions] が版を見る。テストのため版を引数で渡すので lint が追えない)
+                modern = @SuppressLint("NewApi") {
+                    pm.getPackageInfo(app.packageName, PackageManager.PackageInfoFlags.of(PackageManager.GET_PERMISSIONS.toLong())).requestedPermissions
+                },
                 legacy = {
                     @Suppress("DEPRECATION")
                     pm.getPackageInfo(app.packageName, PackageManager.GET_PERMISSIONS).requestedPermissions

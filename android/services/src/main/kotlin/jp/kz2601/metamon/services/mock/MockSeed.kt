@@ -7,13 +7,12 @@ import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import java.time.Instant
-import java.time.LocalDate
 import java.time.ZoneId
 
 /** モックの初期データ(iOS の `MockSeed`)。entity id は docs/dsl/examples に合わせる。 */
 object MockSeed {
     fun demoRecords(now: Instant = Instant.now(), zone: ZoneId = ZoneId.systemDefault()): Map<String, List<Record>> {
-        val today = LocalDate.ofInstant(now, zone)
+        val today = now.atZone(zone).toLocalDate()
         val d = today.toString()
         val iso = now.toString()
         fun r(id: String, vararg data: Pair<String, Any>) = Record(id = id, data = obj(*data), createdAt = iso)

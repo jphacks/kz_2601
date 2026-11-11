@@ -12,6 +12,8 @@ import jp.kz2601.metamon.dsl.records.Field
 import jp.kz2601.metamon.dsl.records.JSONValue
 import jp.kz2601.metamon.renderer.DSLRuntime
 import jp.kz2601.metamon.renderer.form.FormChoices
+import java.io.ByteArrayOutputStream
+import java.io.InputStream
 
 /** 読むファイルの種類。Android でまだ読めないのは録音だけ([FileImportFlow.unavailableKinds])。 */
 enum class ImportKind { CSV, TEXT, PDF, AUDIO }
@@ -87,6 +89,20 @@ object FileImportFlow {
 
     /** 読むバイト数の上限(超えたら読まずに断る)。 */
     fun byteLimit(kind: ImportKind): Int = if (kind == ImportKind.PDF) RecordImport.MAX_PDF_BYTES else RecordImport.MAX_TEXT_BYTES
+
+    /** 先頭から最大 [max] バイトを読む(`InputStream.readNBytes(Int)` は API 33 からなので minSdk 31 では自前)。 */
+    fun readUpTo(input: InputStream, max: Int): ByteArray {
+        val out = ByteArrayOutputStream(minOf(max, 8192))
+        val buf = ByteArray(8192)
+        var left = max
+        while (left > 0) {
+            val n = input.read(buf, 0, minOf(buf.size, left))
+            if (n < 0) break
+            out.write(buf, 0, n)
+            left -= n
+        }
+        return out.toByteArray()
+    }
 
     /** 使える部品か: entity があり、public でも single でもなく、この端末で読める種類が 1 つはある。 */
     fun usable(c: Component, entity: Entity?): Boolean =

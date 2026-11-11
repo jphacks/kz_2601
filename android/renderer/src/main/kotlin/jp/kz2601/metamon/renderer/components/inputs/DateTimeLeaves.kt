@@ -16,6 +16,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalLocale
 import androidx.compose.ui.res.stringResource
 import jp.kz2601.metamon.dsl.Component
 import jp.kz2601.metamon.dsl.records.FieldCoding
@@ -31,7 +32,6 @@ import jp.kz2601.metamon.renderer.form.setTime
 import jp.kz2601.metamon.renderer.form.time
 import jp.kz2601.metamon.renderer.registry.RenderContext
 import java.time.ZonedDateTime
-import java.util.Locale
 
 // 日時の入力。date は "YYYY-MM-DD"、datetime は RFC 3339、timePicker の string は "HH:mm"(iOS と同じ形)。
 
@@ -43,7 +43,7 @@ fun DatePickerLeaf(c: Component, ctx: RenderContext, modifier: Modifier = Modifi
     var step by remember { mutableStateOf(0) } // 0: 閉じる・1: 日付・2: 時刻
     val at = form.date(field)
     InputRow(InputRules.label(c, form).orEmpty()) {
-        TextButton(onClick = { step = 1 }) { Text(DateInput.text(at, includeTime, Locale.getDefault())) }
+        TextButton(onClick = { step = 1 }) { Text(DateInput.text(at, includeTime, LocalLocale.current.platformLocale)) }
     }
     if (step == 1) {
         val state = rememberDatePickerState(initialSelectedDateMillis = DateInput.pickerMillis(at))
