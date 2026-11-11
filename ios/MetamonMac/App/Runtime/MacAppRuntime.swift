@@ -266,7 +266,7 @@ final class MacAppRuntime: RuntimeNavigating {
             await notifications.perform(action)
 
         case .export:
-            await export(action, ctx) // CSV / PDF を保存パネルで保存(`MacAppRuntime+Export.swift`・#1143)
+            await export(action, ctx) // CSV / PDF を保存・共有・プリントで出す(`MacAppRuntime+Export.swift`・#1143・#946・#953)
 
         case .startActivity:
             // ライブアクティビティ(#423)は iPhone のロック画面のもの。Mac には無いので一言だけ
