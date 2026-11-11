@@ -13,6 +13,8 @@ struct MetamonApp: App {
     /// 最低対応版・強制アップデート(#302)。サインイン前にも効く
     @State private var updateGate = UpdateGate()
     @Environment(\.scenePhase) private var scenePhase
+    /// 起動のスプラッシュ(コールド起動の 1 回だけ・UI テストのモック起動では出さない)
+    private let splashMode = SplashGate.decide()
     #if !APP_STORE_REVIEW
     @UIApplicationDelegateAdaptor(PushAppDelegate.self) private var pushDelegate // 端末トークンを受ける(#269)
     #endif
@@ -123,6 +125,7 @@ struct MetamonApp: App {
                 }
             }
             .animation(.easeInOut(duration: 0.3), value: session.user == nil)
+            .modifier(SplashOverlay(mode: splashMode)) // 下の起動処理は待たずに進む
             .modifier(UpdateGateModifier(gate: updateGate))
             #if !APP_STORE_REVIEW
             .modifier(ShareLinkReceiver()) // シェアリンクはサインイン前でも受けて保留(#278)
