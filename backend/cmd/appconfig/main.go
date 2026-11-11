@@ -16,6 +16,8 @@ import (
 	"github.com/jphacks/kz_2601/backend/internal/appconfig"
 	"github.com/jphacks/kz_2601/backend/internal/appstore"
 	"github.com/jphacks/kz_2601/backend/internal/auth"
+	"github.com/jphacks/kz_2601/backend/internal/calls"
+	"github.com/jphacks/kz_2601/backend/internal/coins/coinsapi"
 	"github.com/jphacks/kz_2601/backend/internal/entitlement"
 	"github.com/jphacks/kz_2601/backend/internal/fsenv"
 	"github.com/jphacks/kz_2601/backend/internal/httpx"
@@ -62,9 +64,14 @@ func main() {
 	}
 	logger.Info("text filter", slog.String("mode", string(textMode)))
 	limits := planLimits(logger) // #317
-	api := appconfig.New(st, appconfig.WithPro(pro), appconfig.WithProMode(proMode), appconfig.WithPlanLimits(limits), appconfig.WithTextFilter(textMode), usage(st, logger))
+	cs := newCoins(st, ents, logger)
+	cl := newCalls(st, cs, logger) // calls (#447)
+	api := appconfig.New(st, appconfig.WithPro(pro), appconfig.WithProMode(proMode), appconfig.WithPlanLimits(limits),
+		appconfig.WithAppSlots(cs), // coin-bought app slots raise the held-app limit (#630)
+		appconfig.WithTextFilter(textMode), usage(st, logger), appconfig.WithCalls(cl))
 	entitlement.Register(api, ents) // Pro (#314)
-	handler := newHandler(authed, logger, api, appconfig.SharePage(st), appStoreNotifications(ents, logger))
+	coinsapi.Register(api, cs)      // coins (#630)
+	handler := newHandler(authed, logger, api, appconfig.SharePage(st), appStoreNotifications(ents, logger), coinsapi.Public(cs.Config), calls.Public(cl))
 	server := &http.Server{
 		Handler:           handler,
 		ReadHeaderTimeout: 10 * time.Second,

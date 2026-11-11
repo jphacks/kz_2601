@@ -16,14 +16,15 @@ final class ReviewBuildTests: XCTestCase {
         XCTAssertFalse(allowed.contains(ComponentType.matchList.rawValue), "仲間探し(#507)は共有と一緒に外す")
         XCTAssertFalse(allowed.contains(ComponentType.feed.rawValue), "外部の公開データ(#348)は外す(外部の Web の内容を出す)")
         XCTAssertFalse(allowed.contains(ComponentType.aiChat.rawValue), "aiChat はオンライン AI だけで動く(審査用の版に無い)")
+        XCTAssertFalse(allowed.contains(ComponentType.callButton.rawValue), "通話(#447)は共有と一緒に外す")
     }
 
     /// #482・#265: 記録の自動削除・条件の通知はどの版も持つ。#507: 仲間探しは審査用の版では送らない(backend が match・item.interest・matchList を使わない)。
     func testSupportedFeatures() {
         #if APP_STORE_REVIEW
-        XCTAssertEqual(ClientCapabilities.supportedFeatures, ["recordRetention", "notification.when", "singleEntity", "notification.near", "aiButton.long", "aiButton.inputPhoto", "aiButton.saveTo", "aiButton.inputFeeds", "aiButton.outputs", "action.lookupBook", "text.highlight", "feed.v2", "expr.addMinutes", "aiChat.inputEntity", "component.bracket", "progressBar.settingTarget"])
+        XCTAssertEqual(ClientCapabilities.supportedFeatures, ["recordRetention", "notification.when", "singleEntity", "notification.near", "aiButton.long", "aiButton.inputPhoto", "aiButton.saveTo", "aiButton.inputFeeds", "aiButton.outputs", "action.lookupBook", "text.highlight", "feed.v2", "expr.addMinutes", "aiChat.inputEntity", "component.bracket", "progressBar.settingTarget", "openUrlButton.app"])
         #else
-        XCTAssertEqual(ClientCapabilities.supportedFeatures, ["recordRetention", "matching", "notification.when", "singleEntity", "dataRoles", "addressedMessages", "notification.near", "aiButton.long", "aiButton.inputPhoto", "aiButton.saveTo", "aiButton.inputFeeds", "aiButton.outputs", "action.lookupBook", "text.highlight", "feed.v2", "expr.addMinutes", "aiChat.inputEntity", "component.bracket", "progressBar.settingTarget", "photoField.illustrate"])
+        XCTAssertEqual(ClientCapabilities.supportedFeatures, ["recordRetention", "matching", "notification.when", "singleEntity", "dataRoles", "addressedMessages", "notification.near", "aiButton.long", "aiButton.inputPhoto", "aiButton.saveTo", "aiButton.inputFeeds", "aiButton.outputs", "action.lookupBook", "text.highlight", "feed.v2", "expr.addMinutes", "aiChat.inputEntity", "component.bracket", "progressBar.settingTarget", "photoField.illustrate", "component.callButton", "field.encrypted", "openUrlButton.app"])
         #endif
     }
 

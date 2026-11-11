@@ -109,6 +109,7 @@ struct RootView: View {
                 .modifier(NearbySheets(onModal: true))
                 .modifier(ModerationDialogs(onModal: true))
                 .modifier(MatchingSheets(onModal: true))
+                .modifier(CallSheets(onModal: true))
                 #endif
                 .modifier(ToastHost(onModal: true))
         }
@@ -120,6 +121,7 @@ struct RootView: View {
                 .modifier(NearbySheets(onModal: true))
                 .modifier(ModerationDialogs(onModal: true))
                 .modifier(MatchingSheets(onModal: true))
+                .modifier(CallSheets(onModal: true))
                 #endif
                 .modifier(ToastHost(onModal: true))
         }
@@ -129,6 +131,7 @@ struct RootView: View {
         .modifier(NearbySheets(onModal: false)) // 近くの端末と送り合う(#36)
         .modifier(ModerationDialogs()) // 通報・ブロック(#321)
         .modifier(MatchingSheets()) // 仲間探しの 18 歳以上の確認(#507)
+        .modifier(CallSheets()) // 通話の画面(#447)
         #endif
         .environment(\.formToolbarAccessory, AnyView(VoiceToolbarButton()))
         .environment(\.aiButtonLayer, ComponentAIButtonLayer.wrapper) // #629 部品から開くシートにも AI ボタン

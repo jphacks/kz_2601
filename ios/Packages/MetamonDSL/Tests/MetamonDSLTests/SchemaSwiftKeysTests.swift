@@ -17,7 +17,7 @@ final class SchemaSwiftKeysTests: XCTestCase {
     func testComponentTypesMatchSchema() throws {
         let schemaTypes = Set(try SchemaFixture.load().componentProps.keys)
         let swiftTypes = Set(ComponentType.allCases.filter { $0 != .unknown }.map(\.rawValue))
-        XCTAssertEqual(schemaTypes.count, 76, "部品の数が 76 でない(7 Container + 69 Leaf・placeSearch・#351・matchList #507・flashcards #264・transcribeField / speakButton・drawingField・feed #348・fileImport・aiChat・bracket)")
+        XCTAssertEqual(schemaTypes.count, 77, "部品の数が 77 でない(7 Container + 70 Leaf・placeSearch・#351・matchList #507・flashcards #264・transcribeField / speakButton・drawingField・feed #348・fileImport・aiChat・bracket・callButton #447)")
         assertSameSet(schema: schemaTypes, swift: swiftTypes, what: "部品の type",
                       swiftPlace: "ComponentType の case")
     }

@@ -12,8 +12,14 @@ const CodeAccountDeleted = "account_deleted"
 // AI_PAUSED=1 on the ai service (#511)
 const CodeAIPaused = "ai_paused"
 
+// the server allowance is used up and paying overflow with coins is off (#630; coins.WriteError, enforce only)
+const CodeAllowanceExhausted = "allowance_exhausted"
+
 // App Check enforce (#318)
 const CodeAppCheckFailed = "app_check_failed"
+
+// the caller holds as many apps as their plan + bought slots allow (#630 app slots)
+const CodeAppLimitReached = "app_limit_reached"
 
 // the operator force-stopped the app's server features (#346)
 const CodeAppStopped = "app_stopped"
@@ -26,8 +32,14 @@ const CodeBadOutput = "bad_output"
 
 const CodeBadRequest = "bad_request"
 
+// the payer has fewer coins than the call's hold (#630; coins.WriteError, enforce only)
+const CodeCoinsInsufficient = "coins_insufficient"
+
 // another record of the entity has the same entity.unique values (#273)
 const CodeDuplicateRecord = "duplicate_record"
+
+// the X-Request-Id of an AI call was already used for a coin hold (#630, enforce only)
+const CodeDuplicateRequest = "duplicate_request"
 
 const CodeForbidden = "forbidden"
 
@@ -45,6 +57,9 @@ const CodeInvalidRecord = "invalid_record"
 const CodeInvalidTransaction = "invalid_transaction"
 
 const CodeNotFound = "not_found"
+
+// overflow paid with coins reached the payer's monthly cap (#630; coins.WriteError, enforce only)
+const CodeOverflowCapReached = "overflow_cap_reached"
 
 const CodePayloadTooLarge = "payload_too_large"
 

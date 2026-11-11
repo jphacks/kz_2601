@@ -37,6 +37,7 @@ struct SettingsSheet: View {
                 #endif
                 #if !APP_STORE_REVIEW // 審査用ビルドは App 内課金を持たない(#450 G1)
                 ProSettingsSection() // 課金(#77)
+                CoinSettingsSection() // #630 コイン(サーバーが有効にした時だけ)
                 #endif
                 RemainingTodaySettingsSection() // #630 今日の残り(審査用の版も出す)
                 UsageSettingsSection() // #317 使っている量(作ったアプリの数・今のアプリの記録と写真)
@@ -126,8 +127,9 @@ struct SettingsSheet: View {
         }
         .interactiveDismissDisabled(isDeleting || isSigningOut)
         #if !APP_STORE_REVIEW
+        .coinSheets() // #630 設定の上にお店・プランの比較を重ねる
         .sheet(item: $feedback) { ctx in
-            FeedbackComposerView(context: ctx, client: services.feedback) { feedback = nil }
+            FeedbackComposerView(context: ctx, client: services.feedback, notifyWhenFixed: services.loopNotices.map { FeedbackFixedOptIn.live(client: $0) }) { feedback = nil }
         }
         #endif
         #if DEBUG
@@ -374,6 +376,9 @@ struct SettingsSheet: View {
                 Label("フィードバックを送る", systemImage: "envelope")
             }
             .accessibilityIdentifier("settings.feedback")
+            if let notices = services.loopNotices {
+                NoticesSettingsRow(client: notices) // #374 「あなたの声で直りました」
+            }
         } footer: {
             Text("端末を振っても開けます。何を送るかは送る前に選べます。")
         }

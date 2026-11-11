@@ -161,6 +161,9 @@ type options struct {
 	sender notify.Sender
 	// feeds: what saveFeed reads (feed_test.go); nil = none.
 	feeds runner.FeedGetter
+	// allowance / buyer: the monthly allowance (#630, allowance_test.go); zero = off.
+	allowance quota.AllowanceConfig
+	buyer     quota.OverflowBuyer
 }
 
 func stores(t *testing.T, opts options, f func(t *testing.T, h *harness)) {
@@ -195,9 +198,10 @@ func newHarness(t *testing.T, st runnerStore, sfx string, opts options) *harness
 		opts.pro = fakePro{"*": true}
 	}
 	h.pro = opts.pro
-	q := quota.New(quota.Config{Limits: lim, Env: env}, nil, opts.pro)
+	q := quota.New(quota.Config{Limits: lim, Env: env, Allowance: opts.allowance}, nil, opts.pro)
 	logger := slog.New(slog.NewJSONHandler(h.logs, nil))
 	q.Logger = logger
+	q.Buyer = opts.buyer
 	cfg := runner.Config{
 		Env: env, Store: st, Quota: q, Sender: h.sender, Tokens: h.tokens, Age: opts.age,
 		Paused: func() bool { return h.paused }, NotifyPaused: func() bool { return h.notifyPaused }, Now: func() time.Time { return h.clock }, Logger: logger,

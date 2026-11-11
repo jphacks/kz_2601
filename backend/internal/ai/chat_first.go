@@ -240,6 +240,7 @@ func (s *Service) chatFirst(ctx context.Context, req ChatRequest, incoming []Cha
 	bctx := context.WithoutCancel(ctx)
 	callStart := time.Now()
 	canEarly := !force
+	untrack := tallyOf(ctx).track() // an early reply returns before this call ends (coins wait)
 	go func() {
 		var onEarly func(earlyFirst)
 		if canEarly {
@@ -251,7 +252,9 @@ func (s *Service) chatFirst(ctx context.Context, req ChatRequest, incoming []Cha
 				}
 			}
 		}
-		done <- s.chatFirstAttempt(bctx, cfg, system, schema, prompt(nil), bgAR, onEarly)
+		a := s.chatFirstAttempt(bctx, cfg, system, schema, prompt(nil), bgAR, onEarly)
+		untrack()
+		done <- a
 	}()
 	var att firstAttempt
 	select {

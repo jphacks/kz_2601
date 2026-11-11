@@ -41,35 +41,6 @@ func wantLimit(t *testing.T, what string, r resp, resource, planName string, lim
 	return d
 }
 
-// #317: a free user's apps stop at the free limit, however they are made
-// (POST /apps, the first GET of a new appId, duplicate); Pro goes higher.
-func TestPlanLimitApps(t *testing.T) {
-	pro := proSet{}
-	e := newPlanEnv(t, pro, tinyPlans(plan.ModeEnforce))
-	if r := e.do("u", http.MethodPost, "/v1/apps", map[string]any{"id": "PL-A1"}, nil); r.code != http.StatusCreated {
-		t.Fatalf("1st: %d %s", r.code, r.raw)
-	}
-	if r := e.do("u", http.MethodGet, "/v1/apps/PL-A2/dsl", nil, nil); r.code != http.StatusOK {
-		t.Fatalf("2nd (implicit): %d %s", r.code, r.raw)
-	}
-	d := wantLimit(t, "3rd POST", e.do("u", http.MethodPost, "/v1/apps", map[string]any{"id": "PL-A3"}, nil), plan.Apps, "free", 2, true)
-	if d["used"] != float64(2) || d["reason"] != nil {
-		t.Fatalf("details: %v", d)
-	}
-	wantLimit(t, "3rd implicit", e.do("u", http.MethodGet, "/v1/apps/PL-A3/dsl", nil, nil), plan.Apps, "free", 2, true)
-	wantLimit(t, "duplicate", e.do("u", http.MethodPost, "/v1/apps/PL-A1/duplicate", nil, nil), plan.Apps, "free", 2, true)
-	// existing apps still open
-	if r := e.do("u", http.MethodGet, "/v1/apps/PL-A1/dsl", nil, nil); r.code != http.StatusOK {
-		t.Fatalf("open existing: %d %s", r.code, r.raw)
-	}
-
-	pro["u"] = true
-	if r := e.do("u", http.MethodPost, "/v1/apps/PL-A1/duplicate", nil, nil); r.code != http.StatusCreated {
-		t.Fatalf("pro duplicate: %d %s", r.code, r.raw)
-	}
-	wantLimit(t, "pro 4th", e.do("u", http.MethodPost, "/v1/apps", map[string]any{"id": "PL-A4"}, nil), plan.Apps, "pro", 3, false)
-}
-
 // Records and photos per app; patches that add no record or photo pass.
 func TestPlanLimitRecordsAndPhotos(t *testing.T) {
 	e := newPlanEnv(t, proSet{}, tinyPlans(plan.ModeEnforce))

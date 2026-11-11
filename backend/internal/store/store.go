@@ -139,6 +139,12 @@ type Commit struct {
 	// rules_changed). An event with Version 0 gets the new version. nil
 	// stores nothing (the commit costs what it did before).
 	Events []OutboxEvent
+	// HeldLimit > 0: a commit on a blank app (version HeldVersion) makes it
+	// held (#630 app slots), so it fails with *HeldLimitError when uid
+	// already holds HeldLimit apps. Counted in the same transaction, which
+	// also writes users/{uid}.heldAppsAt so two such commits of one uid run
+	// one after the other (the second counts the first). 0 = not checked.
+	HeldLimit int
 }
 
 // commitEvents gives c's events the new version n and validates them.

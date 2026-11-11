@@ -266,6 +266,11 @@ func (m *Memory) CommitVersion(_ context.Context, uid, appID string, c Commit) (
 	if c.BaseVersion != a.app.CurrentVersion {
 		return nil, &ConflictError{Current: a.app.CurrentVersion}
 	}
+	if c.HeldLimit > 0 && a.app.CurrentVersion <= HeldVersion {
+		if held := m.heldLocked(uid, appID); held >= c.HeldLimit {
+			return nil, &HeldLimitError{Held: held, Limit: c.HeldLimit}
+		}
+	}
 	now := m.now().UTC()
 	n := a.app.CurrentVersion + 1
 	events, err := commitEvents(c, n, now)

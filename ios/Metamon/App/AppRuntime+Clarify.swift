@@ -260,6 +260,7 @@ extension AppRuntime {
                 errorCard = ErrorPresentation.from(failure, transcript: history.last?.text ?? "", origin: .chat)
             }
             if failure == .sessionExpired { onSessionExpired?() }
+            if case .appLimit = failure, let card = errorCard { handle(.replaceApp, of: card) } // #630 置き換えシートをすぐ出す
             return nil
         }
     }

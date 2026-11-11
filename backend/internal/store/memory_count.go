@@ -8,7 +8,18 @@ var _ Counter = (*Memory)(nil)
 func (m *Memory) CountApps(_ context.Context, uid string) (int, error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
-	return len(m.users[uid]), nil
+	return m.heldLocked(uid, ""), nil
+}
+
+// heldLocked counts uid's held apps other than except.
+func (m *Memory) heldLocked(uid, except string) int {
+	n := 0
+	for id, a := range m.users[uid] {
+		if id != except && a.app.CurrentVersion > HeldVersion {
+			n++
+		}
+	}
+	return n
 }
 
 // CountRecords implements Counter.
