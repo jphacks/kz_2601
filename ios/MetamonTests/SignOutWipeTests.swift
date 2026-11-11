@@ -79,6 +79,22 @@ final class SignOutWipeTests: XCTestCase {
 
         XCTAssertNil(FeedCache.shared.cached(q), "前の人の feed の行を残さない")
     }
+
+    /// 取りに行っている間に消されたら、戻ってきた前の人の結果を書き戻さない
+    func testFeedLoadInFlightDuringResetDoesNotWriteBack() async throws {
+        struct ResetsMidFlight: FeedClient {
+            let cache: FeedCache
+            func feed(_ query: FeedQuery) async throws -> FeedResult {
+                await MainActor.run { cache.reset() }
+                return FeedResult(provider: query.provider, title: "前の人", items: [], source: FeedSource(name: "n", url: "https://x", license: "l"))
+            }
+        }
+        let cache = FeedCache()
+        let q = FeedQuery(provider: "diet", q: "前の人の検索語")
+        let result = try await cache.load(q, force: false, client: ResetsMidFlight(cache: cache))
+        XCTAssertEqual(result.title, "前の人", "呼んだ画面には返す")
+        XCTAssertNil(cache.cached(q), "消した後に書き戻さない")
+    }
     #endif
 
     func testPreservedKeysAreTheThreeSettingsPlusDeviceMarks() {

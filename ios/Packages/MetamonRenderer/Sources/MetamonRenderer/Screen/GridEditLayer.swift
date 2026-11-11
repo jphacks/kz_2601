@@ -174,7 +174,8 @@ struct GridEditLayer: View {
             // VoiceOver が止まるのは枠そのもの(`.contain` の入れ物には止まらず、操作の一覧が選べなかった)。
             // 角のつまみは指でしか動かせないので、大きさを変える操作もここに置く
             .accessibilityElement(children: .ignore)
-            .accessibilityLabel(Text(L("部品 \(item.area.notation)")))
+            .accessibilityLabel(Text(GridEditCopy.label(item)))
+            .accessibilityValue(Text(active ? drag!.candidate.notation : item.area.notation))
             .accessibilityActions {
                 Button(L("左へ動かす")) { nudge(item, dc: -1, dr: 0) }
                 Button(L("右へ動かす")) { nudge(item, dc: 1, dr: 0) }
@@ -235,10 +236,12 @@ struct GridEditLayer: View {
             }
             .onEnded { _ in
                 if let d = drag, d.id == item.componentId {
+                    var placed = false
                     withAnimation(.spring(duration: 0.3, bounce: 0.15)) {
-                        _ = session.place(d.id, at: d.candidate) // 重なる時は置かずに元へ戻る
+                        placed = session.place(d.id, at: d.candidate) // 重なる時は置かずに元へ戻る
                         drag = nil
                     }
+                    if placed, d.candidate != item.area { announceArea(of: d.id) }
                 }
                 session.isDragging = false
             }
@@ -247,7 +250,9 @@ struct GridEditLayer: View {
     private func nudge(_ item: GridEditDraft.Item, dc: Int, dr: Int) {
         let moved = GridEditMath.moved(item.area, dx: Double(dc) * Double(cellW), dy: Double(dr) * Double(cellH),
                                        cellW: Double(cellW), cellH: Double(cellH))
-        if !session.place(item.componentId, at: moved) {
+        if session.place(item.componentId, at: moved) {
+            announceArea(of: item.componentId)
+        } else {
             AccessibilityNotification.Announcement(L("ここには置けません")).post()
         }
     }
@@ -256,8 +261,50 @@ struct GridEditLayer: View {
     private func resize(_ item: GridEditDraft.Item, dc: Int, dr: Int) {
         let resized = GridEditMath.resized(item.area, dx: Double(dc) * Double(cellW), dy: Double(dr) * Double(cellH),
                                            cellW: Double(cellW), cellH: Double(cellH))
-        if !session.place(item.componentId, at: resized) {
+        if session.place(item.componentId, at: resized) {
+            announceArea(of: item.componentId)
+        } else {
             AccessibilityNotification.Announcement(L("ここには置けません")).post()
+        }
+    }
+
+    /// 動かした・大きさを変えた後の場所を読み上げる
+    private func announceArea(of id: String) {
+        guard let moved = session.draft.placed.first(where: { $0.componentId == id }) else { return }
+        AccessibilityNotification.Announcement(GridEditCopy.moved(moved)).post()
+    }
+}
+
+/// 編集モードの読み上げの文言(#1442)。
+public enum GridEditCopy {
+    /// 枠の名前: 見出し(無ければ種類)。場所(A1:B2)は値として続けて読まれる
+    public static func label(_ item: GridEditDraft.Item) -> String { name(item) }
+
+    /// 動かした後: 「<見出し or 種類> を A1:B2 に置きました」
+    public static func moved(_ item: GridEditDraft.Item) -> String {
+        L("\(name(item)) を \(item.area.notation) に置きました")
+    }
+
+    static func name(_ item: GridEditDraft.Item) -> String {
+        if let title = item.title { return title.count > 40 ? String(title.prefix(40)) + "…" : title }
+        return typeName(item.type)
+    }
+
+    /// 見出しの無い部品の種類名
+    static func typeName(_ type: ComponentType) -> String {
+        switch type {
+        case .text, .markdown, .label: L("文字")
+        case .button, .shareButton, .openUrlButton, .locationButton, .speakButton, .aiButton, .callButton: L("ボタン")
+        case .list, .table, .timeline, .matchList: L("一覧")
+        case .chart: L("グラフ")
+        case .stat, .healthStat, .gauge, .progressBar: L("数値")
+        case .image, .avatar, .icon: L("画像")
+        case .calendar: L("カレンダー")
+        case .mapView: L("地図")
+        case .section, .card, .vstack, .hstack, .grid, .disclosure, .carousel: L("まとまり")
+        case .textField, .numberField, .datePicker, .picker, .toggle, .slider, .stepper, .textEditor,
+             .secureField, .timePicker, .colorPicker, .rating, .searchBar: L("入力欄")
+        default: L("部品")
         }
     }
 }

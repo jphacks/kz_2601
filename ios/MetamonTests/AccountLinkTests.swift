@@ -61,6 +61,29 @@ final class AccountLinkTests: XCTestCase {
         XCTAssertEqual(session.user?.uid, MockAuthService.fixedUID)
     }
 
+    /// 切り替えに失敗したら匿名の uid のまま残るので、先に消した通知の登録を戻す
+    func testFailedSwitchRunsAfterFailedSwitch() async {
+        let session = AuthSession(service: MockAuthService(signedIn: true))
+        var steps: [String] = []
+        let switched = await session.switchToExistingAppleAccount(beforeSwitch: { steps.append("unregister") },
+                                                                  afterFailedSwitch: { steps.append("register") })
+        XCTAssertFalse(switched)
+        XCTAssertEqual(steps, ["unregister", "register"])
+        XCTAssertEqual(session.user?.uid, MockAuthService.fixedUID)
+    }
+
+    func testSuccessfulSwitchDoesNotRegisterAgain() async {
+        let auth = MockAuthService(signedIn: true)
+        auth.appleIDInUse = true
+        let session = AuthSession(service: auth)
+        _ = await session.linkApple(idToken: "t", nonce: "n", fullName: nil)
+        var steps: [String] = []
+        let switched = await session.switchToExistingAppleAccount(beforeSwitch: { steps.append("unregister") },
+                                                                  afterFailedSwitch: { steps.append("register") })
+        XCTAssertTrue(switched)
+        XCTAssertEqual(steps, ["unregister"])
+    }
+
     func testAlreadyAppleUserCannotLinkAgain() async {
         let auth = MockAuthService(signedIn: false)
         _ = try? await auth.signInWithApple(idToken: "t", nonce: "n", fullName: nil)

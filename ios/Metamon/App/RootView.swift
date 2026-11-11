@@ -201,9 +201,10 @@ struct RootView: View {
                                                               : .default(Text(confirm.primaryLabel), action: run),
                          secondaryButton: .cancel(Text("キャンセル")))
         }
+        // 編集モード中は上のカードを出さない(「完了」「キャンセル」に被る)。バーは上のカードより後に重ねる
+        .overlay(alignment: .top) { if Self.showsTopCards(gridEditing: rt.gridEdit != nil) { summaryCard } }
+        .overlay(alignment: .top) { if Self.showsTopCards(gridEditing: rt.gridEdit != nil) { errorCardOverlay } }
         .overlay(alignment: .top) { if rt.gridEdit != nil { GridEditBar().transition(.move(edge: .top).combined(with: .opacity)) } }
-        .overlay(alignment: .top) { summaryCard }
-        .overlay(alignment: .top) { errorCardOverlay }
         .modifier(ToastHost(onModal: false))
         .modifier(NewItemsHost()) // #268: 開いた直後に他の人の新着の数
         .modifier(UsageNoticeHost()) // #317: 記録・写真が上限に近い(作成者・1 日 1 回)
@@ -211,6 +212,9 @@ struct RootView: View {
             rt.setForeground(phase == .active) // ホットリロードのポーリングは前面時のみ
         }
     }
+
+    /// 上部の要約・失敗のカードを出すか。編集モード(#1442)中は編集のバーを隠さないよう出さない
+    static func showsTopCards(gridEditing: Bool) -> Bool { !gridEditing }
 
     private var colorScheme: ColorScheme? { Self.colorScheme(themeMode: rt.dsl.app.theme?.mode) }
 

@@ -72,6 +72,7 @@ public struct GridScreenLayout: View {
                                 .staggeredAppear(index: index, highlightKey: ChangeHighlight.key(screen: screen.id, component: c.id))
                                 .offset(x: CGFloat(a.col1) * cellW + gap / 2, y: CGFloat(a.row1 - 1) * cellH + gap / 2)
                                 .allowsHitTesting(editing == nil) // 編集中は部品を押させない(枠のドラッグだけ)
+                                .accessibilityHidden(editing != nil) // VoiceOver も枠だけに止まる
                         }
                         if let editing { GridEditLayer(session: editing, cellW: cellW, cellH: cellH, gap: gap) }
                     }
@@ -82,6 +83,7 @@ public struct GridScreenLayout: View {
                         // area 無しで積んだ部品は v1 では動かせない。編集中は薄くして押させない
                         .opacity(editing == nil ? 1 : 0.4)
                         .allowsHitTesting(editing == nil)
+                        .accessibilityHidden(editing != nil)
                 }
             }
             .padding(inset)

@@ -88,4 +88,36 @@ final class GridEditFlowTests: XCTestCase {
         XCTAssertNil(rt.gridEdit, "別のアプリに前のアプリの下書きを持ち越さない")
         XCTAssertEqual(area(rt, "add"), "D11:F12")
     }
+
+    /// VoiceOver の枠の名前は見出し(無ければ種類)。場所は値として読む。動かした後の読み上げも同じ名前で
+    func testFrameLabelUsesTitleOrTypeName() throws {
+        let saved = LanguagePreference.shared.setting
+        defer { LanguagePreference.shared.setting = saved }
+        let rt = try makeRuntime()
+        rt.startGridEdit()
+        let draft = try XCTUnwrap(rt.gridEdit).draft
+        let add = try XCTUnwrap(draft.placed.first { $0.componentId == "add" })
+        let summary = try XCTUnwrap(draft.placed.first { $0.componentId == "summary" })
+        let recent = try XCTUnwrap(draft.placed.first { $0.componentId == "recent" })
+
+        LanguagePreference.shared.setting = .ja
+        XCTAssertEqual(GridEditCopy.label(add), "支出を追加")
+        XCTAssertEqual(GridEditCopy.label(recent), "最近の支出")
+        XCTAssertEqual(GridEditCopy.label(summary), "まとまり", "見出しの無い部品は種類名")
+        XCTAssertEqual(GridEditCopy.moved(add), "支出を追加 を D11:F12 に置きました")
+
+        LanguagePreference.shared.setting = .en
+        XCTAssertEqual(GridEditCopy.label(summary), "Group")
+        XCTAssertEqual(GridEditCopy.moved(add), "Moved 支出を追加 to D11:F12")
+    }
+
+    /// 編集モード中は上の要約・失敗のカードを出さない(編集のバーの「完了」「キャンセル」に被る)
+    func testTopCardsHiddenWhileEditing() throws {
+        let rt = try makeRuntime()
+        XCTAssertTrue(RootView.showsTopCards(gridEditing: rt.gridEdit != nil))
+        rt.startGridEdit()
+        XCTAssertFalse(RootView.showsTopCards(gridEditing: rt.gridEdit != nil))
+        rt.cancelGridEdit()
+        XCTAssertTrue(RootView.showsTopCards(gridEditing: rt.gridEdit != nil))
+    }
 }
