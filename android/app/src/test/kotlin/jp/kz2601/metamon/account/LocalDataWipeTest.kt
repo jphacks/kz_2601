@@ -16,6 +16,7 @@ import jp.kz2601.metamon.services.push.PushDeviceRegistrar
 import jp.kz2601.metamon.services.push.forgetAccount
 import jp.kz2601.metamon.services.social.AuthorProfile
 import jp.kz2601.metamon.services.update.NoticeDismissals
+import jp.kz2601.metamon.switcher.AppThumbnailStore
 import jp.kz2601.metamon.voice.ChatHistoryEntry
 import jp.kz2601.metamon.voice.ChatHistoryStore
 import kotlinx.coroutines.test.runTest
@@ -28,7 +29,7 @@ import org.junit.Test
 import org.junit.rules.TemporaryFolder
 import kotlin.coroutines.EmptyCoroutineContext
 
-/** 後片付けで、会話の履歴・投稿に出す名前・feed の覚えた行・端末内の動画 / 録音・https の画像のキャッシュも消す(#841 + #893 / #875 / #876 / #863 / #1084)。 */
+/** 後片付けで、会話の履歴・投稿に出す名前・feed の覚えた行・端末内の動画 / 録音・https の画像のキャッシュ・切り替え一覧のサムネも消す(#841 + #893 / #875 / #876 / #863 / #1084 / #1199)。 */
 class LocalDataWipeTest {
     @get:Rule
     val tmp = TemporaryFolder()
@@ -46,6 +47,7 @@ class LocalDataWipeTest {
         val feedDir = tmp.newFolder("metamon-feeds").apply { resolve("x.json").writeText("{}") }
         val feeds = FeedCache(feedDir, io = EmptyCoroutineContext)
         val images = tmp.newFolder(RemoteImages.DISK_DIR).apply { resolve("journal").writeText("x") }
+        val thumbDir = tmp.newFolder("metamon-thumbs").apply { resolve("app-of-a.jpg").writeText("x") }
         var resets = 0
         var consentForgotten = 0
 
@@ -58,6 +60,7 @@ class LocalDataWipeTest {
             removeLocalMedia = { video.parentFile?.deleteRecursively() },
             clearImageCache = { RemoteImages.wipe(images) },
             feedCache = feeds,
+            thumbnails = AppThumbnailStore(thumbDir),
             forgetConsent = { consentForgotten++ },
         )()
 
@@ -67,6 +70,7 @@ class LocalDataWipeTest {
         assertFalse(video.exists())
         assertFalse(feedDir.exists())
         assertFalse(images.exists())
+        assertFalse("切り替え一覧のサムネも消す(#1199)", thumbDir.exists())
         assertEquals(1, resets)
         assertEquals(1, consentForgotten)
     }

@@ -56,6 +56,7 @@ import jp.kz2601.metamon.onboarding.FirstRunTutorialStore
 import jp.kz2601.metamon.onboarding.TutorialPrompt
 import jp.kz2601.metamon.permissions.PermissionCenter
 import jp.kz2601.metamon.share.ShareLinkIntents
+import jp.kz2601.metamon.switcher.AppThumbnailStore
 import jp.kz2601.metamon.services.account.AccountClient
 import jp.kz2601.metamon.services.account.HttpAccountClient
 import jp.kz2601.metamon.services.account.MockAccountClient
@@ -237,6 +238,8 @@ class AppContainer(
     private val creationUsage: CreationUsageStore = CreationUsageStore(InMemoryKeyValueStore()),
     /** 最後に分かった「今日の残り」(ai の応答のヘッダーから入る・#1203)。モックは入らない */
     val remainingToday: RemainingTodayStore = RemainingTodayStore(),
+    /** 切り替え一覧のカードのサムネ(#1199)。サインアウト・削除で消す。既定は端末に残さない(テスト) */
+    val thumbnails: AppThumbnailStore = AppThumbnailStore(null),
 ) {
     /** リリース申請の状態(変身一覧のバッジと申請のシート・#1254)。null なら入口を出さない */
     val releaseRequests: ReleaseRequestsModel? = releaseClient?.let { ReleaseRequestsModel(it) { line -> Log.i(TAG, line) } }
@@ -304,6 +307,7 @@ class AppContainer(
             removeLocalMedia = removeLocalMedia,
             clearImageCache = clearImageCache,
             feedCache = feedCache,
+            thumbnails = thumbnails,
             closeFeedback = feedbackComposer::close,
             // チュートリアルと「こう話すと直せます」の印(iOS は LocalWipe.clearDefaults で消える)。次の人には出し直す
             forgetTutorial = {
@@ -413,6 +417,7 @@ class AppContainer(
                 clearImageCache = { RemoteImages.wipe(context) },
                 talkBackRunning = { TalkBack.isRunning(context) },
                 nearbyEnv = NearbyEnv.of(context, mock = true),
+                thumbnails = AppThumbnailStore(File(context.filesDir, "metamon-thumbs-mock")),
                 releaseClient = if (ReviewBuild.enabled) null else MockReleaseRequestClient(),
             )
         }
@@ -506,6 +511,7 @@ class AppContainer(
                 playBilling = { PlayBilling(context, it) },
                 // 審査用の版(#1275)はリリース申請を出さない(iOS の APP_STORE_REVIEW と同じ)
                 releaseClient = if (ReviewBuild.enabled) null else HttpReleaseRequestClient(appConfigHttp),
+                thumbnails = AppThumbnailStore(File(context.filesDir, "metamon-thumbs")),
                 creationUsage = CreationUsageStore(SharedPreferencesKeyValueStore.of(context, CREATION_PREFS)),
                 remainingToday = remainingToday,
             )
