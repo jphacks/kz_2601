@@ -118,6 +118,23 @@
         }
       }
     },
+    "%lld のうち %lld" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%2$lld of %1$lld"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld のうち %lld"
+          }
+        }
+      }
+    },
     "%lld 文字までです" : {
       "localizations" : {
         "en" : {
@@ -171,6 +188,40 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "%lld 秒ほど待ってから、もう一度お試しください"
+          }
+        }
+      }
+    },
+    "%lld(上限なし)" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld (no limit)"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld(上限なし)"
+          }
+        }
+      }
+    },
+    "%lld、上限なし" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld, no limit"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld、上限なし"
           }
         }
       }
@@ -402,6 +453,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "AI を一時的に止めています。しばらくしてからもう一度お試しください"
+          }
+        }
+      }
+    },
+    "AI を使うと表示されます" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Shown after you use AI"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "AI を使うと表示されます"
           }
         }
       }
@@ -656,6 +724,40 @@
         }
       }
     },
+    "Pro プランの上限です" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "These are the Pro plan limits"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Pro プランの上限です"
+          }
+        }
+      }
+    },
+    "Pro。" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Pro. "
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Pro。"
+          }
+        }
+      }
+    },
     "QRコードを読み取って記録できるようにして" : {
       "localizations" : {
         "en" : {
@@ -882,6 +984,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "。参加している人の記録も見られます"
+          }
+        }
+      }
+    },
+    "。少なくなっています" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : ". Running low"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "。少なくなっています"
           }
         }
       }
@@ -1842,6 +1961,23 @@
         }
       }
     },
+    "このアプリの写真" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Photos in this app"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "このアプリの写真"
+          }
+        }
+      }
+    },
     "このアプリの次の通知を見る" : {
       "localizations" : {
         "en" : {
@@ -1871,6 +2007,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "このアプリの自動の動きは運営が止めています。この変更は保存できませんでした"
+          }
+        }
+      }
+    },
+    "このアプリの記録" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Records in this app"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "このアプリの記録"
           }
         }
       }
@@ -4700,6 +4853,23 @@
         }
       }
     },
+    "今日の残り %lld" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld left today"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "今日の残り %lld"
+          }
+        }
+      }
+    },
     "今日はここまでです" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -4909,6 +5079,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "使っている量"
+          }
+        }
+      }
+    },
+    "使わないものを消すと、空きが増えます" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Delete what you don't use to free up space"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "使わないものを消すと、空きが増えます"
           }
         }
       }
@@ -6371,6 +6558,23 @@
         }
       }
     },
+    "戻る時刻" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Refills at"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "戻る時刻"
+          }
+        }
+      }
+    },
     "承認待ちです。承認されると自動で Pro になります。" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -6851,6 +7055,23 @@
         }
       }
     },
+    "新しく作ると %lld、直すと %lld、相談すると %lld 減ります。%@に戻ります" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Creating an app uses %lld, editing %lld, and chatting %lld. Refills %@"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "新しく作ると %lld、直すと %lld、相談すると %lld 減ります。%@に戻ります"
+          }
+        }
+      }
+    },
     "新しく作るアプリと質問もこの言語になります。作成済みのアプリの文言は変わりません。" : {
       "localizations" : {
         "en" : {
@@ -6863,6 +7084,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "新しく作るアプリと質問もこの言語になります。作成済みのアプリの文言は変わりません。"
+          }
+        }
+      }
+    },
+    "新しく用意すると %lld、直すと %lld、相談すると %lld 減ります。%@に戻ります" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Setting up a new one uses %lld, editing %lld, and chatting %lld. Refills %@"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "新しく用意すると %lld、直すと %lld、相談すると %lld 減ります。%@に戻ります"
           }
         }
       }
@@ -7406,6 +7644,23 @@
         }
       }
     },
+    "無料プランの上限です。使わないものを消すか、Pro にすると増やせます" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "These are the free plan limits. Delete what you don't use, or go Pro for more"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "無料プランの上限です。使わないものを消すか、Pro にすると増やせます"
+          }
+        }
+      }
+    },
     "無料プランを一時停止しています" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -7435,6 +7690,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "版"
+          }
+        }
+      }
+    },
+    "用意した記録帳" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Notebooks you set up"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "用意した記録帳"
           }
         }
       }

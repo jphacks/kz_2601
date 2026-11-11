@@ -113,9 +113,13 @@ private struct MacAccountSettings: View {
                 MacProSettingsRow()
             }
             #endif
-            Section {
-                MacUnavailableSettingRow(title: "今日の残り")
-                MacUnavailableSettingRow(title: "使っている量")
+            // 今日の残り(#630・#1219)。AI の応答のヘッダーと「使っている量」から入る(iOS と同じ表示・審査用の版も出す)
+            RemainingTodaySettingsSection()
+            // 使っている量(#317・#1219)。サーバーにつながっている版だけ
+            if MacAccount.shared.isLive {
+                MacUsageSettingsSection()
+            } else {
+                Section { MacUnavailableSettingRow(title: "使っている量") }
             }
         }
         .formStyle(.grouped)
