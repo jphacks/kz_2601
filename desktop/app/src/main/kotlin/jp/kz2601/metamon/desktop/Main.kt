@@ -1,16 +1,15 @@
 package jp.kz2601.metamon.desktop
 
+import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
-import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.window.ApplicationScope
 import androidx.compose.ui.window.Window
 import androidx.compose.ui.window.WindowPosition
 import androidx.compose.ui.window.application
@@ -20,11 +19,14 @@ import kotlinx.coroutines.flow.debounce
 import java.awt.Dimension
 import java.awt.GraphicsEnvironment
 import java.awt.Rectangle
+import java.awt.event.WindowAdapter
+import java.awt.event.WindowEvent
 import jp.kz2601.metamon.desktop.i18n.Strings
 import jp.kz2601.metamon.desktop.store.DesktopStore
 import jp.kz2601.metamon.desktop.store.SessionPersistence
 import jp.kz2601.metamon.desktop.theme.TailorItTheme
 import jp.kz2601.metamon.dsl.records.entityModels
+import jp.kz2601.metamon.dsl.screen
 import java.io.File
 import java.util.prefs.Preferences
 
@@ -32,70 +34,148 @@ import java.util.prefs.Preferences
  * 起動。引数 1 つ目(または -Dtailorit.example)で同梱の例を選ぶ。既定は shopping。
  * 引数 2 つ目に記録の JSON(`{"<entity>": [{"id", "data"}]}`・case.json の形も可)を渡すとモックに入れて開く(端末には残さない)。3 つ目は最初の画面の id。
  * 引数が無ければ最後に開いたアプリ。記録は端末に残す(SessionPersistence)。
- * ウィンドウの大きさ・位置は覚えて次の起動で戻す。トレイ / メニューバーに常駐する(Tray.kt)。サインインはまだ無い(モック)。
+ * ウィンドウはアプリごとに 1 枚、記録の詳細も別の 1 枚で開ける(#1763・Windows.kt)。同じアプリのウィンドウは記録を共有する。
+ * ウィンドウの大きさ・位置は種類(アプリ / 詳細)ごとに覚えて次の起動で戻す。トレイ / メニューバーに常駐する(Tray.kt)。サインインはまだ無い(モック)。
  */
-@OptIn(FlowPreview::class)
 fun main(args: Array<String>) = application {
     // 端末の保存(#1887): 記録・設定は再起動しても残る。最後に開いたアプリから開く
     val desktopStore = remember { DesktopStore.open() }
-    val first = args.firstOrNull() ?: System.getProperty("tailorit.example")
-        ?: desktopStore.lastAppId?.takeIf { it in BundledApps.ids() } ?: "shopping"
-    // コマンドパレット(#1765)で同梱の別の例に切り替える。記録・最初の画面は起動時の例にだけ使う
-    var name by remember { mutableStateOf(first) }
-    val dsl = remember(name) { Examples.load(name) }
-    // 記録の JSON を渡した時(開発・スクリーンショット)は端末に残さない
-    val fixture = remember(name) { args.getOrNull(1)?.takeIf { name == first }?.let { MockStore.fromJson(File(it).readText()) } }
-    val opened = remember(name) { if (fixture != null) null else SessionPersistence.open(desktopStore, name, dsl.entityModels()) }
-    DisposableEffect(opened) { onDispose { opened?.first?.close() } }
-    val store = fixture ?: opened?.second ?: MockStore()
-    val saved = remember { WindowBounds.load()?.let { WindowBounds.fit(it, WindowBounds.screens()) } }
-    val state = rememberWindowState(
-        size = saved?.size ?: DpSize(480.dp, 820.dp),
-        position = saved?.position ?: WindowPosition.PlatformDefault,
-    )
-    // トレイに常駐(#1761): × はトレイに隠す(設定で off・トレイが無ければ終わる)。終わるのはトレイの「終了」
-    // パレットでアプリを替えたらトレイ(すぐ記録・名前)も替える
-    val tray = remember(dsl) { TrayController.create(dsl) }
-    DesktopTray(tray)
-    Window(
-        onCloseRequest = { if (tray.onCloseRequest()) exitApplication() },
-        visible = tray.windowVisible,
-        title = Strings.format("desktop_window_title", dsl.app.name),
-        state = state,
-    ) {
-        LaunchedEffect(tray.focusRequests) {
-            if (tray.focusRequests > 0) {
-                state.isMinimized = false
-                window.toFront()
+    val first = remember {
+        args.firstOrNull() ?: System.getProperty("tailorit.example")
+            ?: desktopStore.lastAppId?.takeIf { it in BundledApps.ids() } ?: "shopping"
+    }
+    val hub = remember {
+        // 記録の JSON を渡した時(開発・スクリーンショット)は最初のアプリだけそれを使い、端末に残さない
+        val fixture = args.getOrNull(1)?.let { MockStore.fromJson(File(it).readText()) }
+        AppHub(openRecords = { id, dsl ->
+            if (fixture != null && id == first) {
+                SharedRecords(fixture)
+            } else {
+                SessionPersistence.open(desktopStore, id, dsl.entityModels()).let { (p, initial) -> SharedRecords(initial, p) }
             }
-        }
-        LaunchedEffect(Unit) {
-            // 6 列が潰れない最小(1 列 ≈ 50dp)
-            window.minimumSize = Dimension(360, 560)
-            snapshotFlow { state.size to state.position }.debounce(500).collect { (size, pos) -> WindowBounds.save(size, pos) }
-        }
-        // 明暗は OS に従う・文言は OS の言語(日本語か英語)・#1759
-        CompositionLocalProvider(LocalTray provides tray) {
-            TailorItTheme { key(name) { DesktopApp(dsl, store, args.getOrNull(2)?.takeIf { name == first }, onOpenApp = { name = it }, persistence = opened?.first) } }
+        })
+    }
+    DisposableEffect(hub) { onDispose { hub.close() } }
+    val registry = remember { WindowRegistry().also { it.open(WindowKey.app(first)) } }
+    val firstWindowId = remember { registry.windows.first().id }
+    // トレイに常駐(#1761): × はトレイに隠す(設定で off・トレイが無ければ終わる)。終わるのはトレイの「終了」
+    val tray = remember { TrayController.create(hub.app(first).dsl) }
+    tray.onOpenApp = { registry.open(WindowKey.app(it)) }
+    // トレイの名前・すぐ記録は前にあるウィンドウのアプリ
+    val activeApp = registry.active?.key?.appId
+    LaunchedEffect(activeApp) { activeApp?.let { tray.switchApp(hub.app(it).dsl) } }
+    DesktopTray(tray)
+    registry.windows.toList().forEach { w ->
+        key(w.id) {
+            DesktopWindow(w, registry, hub, tray, startScreen = args.getOrNull(2)?.takeIf { w.id == firstWindowId })
         }
     }
 }
 
-/** ウィンドウの大きさ・位置(java.util.prefs: Windows はレジストリ、Linux は ~/.java)。 */
+/** ウィンドウ 1 枚。画面の状態(遷移・下書き・キー)はウィンドウごと、記録はアプリごとに共有。 */
+@OptIn(FlowPreview::class)
+@Composable
+private fun ApplicationScope.DesktopWindow(w: WindowEntry, registry: WindowRegistry, hub: AppHub, tray: TrayController, startScreen: String?) {
+    val app = remember(w) { hub.app(w.key.appId) }
+    val kind = w.key.kind
+    val saved = remember(w) {
+        WindowBounds.load(kind)?.let { WindowBounds.fit(WindowBounds.cascade(it, registry.indexInKind(w)), WindowBounds.screens()) }
+    }
+    val state = rememberWindowState(
+        size = saved?.size ?: WindowBounds.defaultSize(kind),
+        position = saved?.position ?: WindowPosition.PlatformDefault,
+    )
+    val close = {
+        if (registry.requestClose(w.id) { tray.onCloseRequest() }) exitApplication()
+    }
+    val screenTitle = w.key.screen?.let { app.dsl.screen(it)?.title?.ifEmpty { null } }
+    Window(
+        onCloseRequest = close,
+        visible = tray.windowVisible,
+        title = if (screenTitle != null) Strings.format("desktop_window_title_record", app.dsl.app.name, screenTitle) else Strings.format("desktop_window_title", app.dsl.app.name),
+        state = state,
+    ) {
+        // トレイの「開く」は前にあるウィンドウ、同じ物をもう一度開いた時はそのウィンドウを前に出す
+        LaunchedEffect(tray.focusRequests) {
+            if (tray.focusRequests > 0 && registry.active?.id == w.id) {
+                state.isMinimized = false
+                window.toFront()
+            }
+        }
+        LaunchedEffect(w.focusRequests) {
+            if (w.focusRequests > 0) {
+                state.isMinimized = false
+                window.toFront()
+                window.requestFocus()
+            }
+        }
+        DisposableEffect(window) {
+            val l = object : WindowAdapter() {
+                override fun windowGainedFocus(e: WindowEvent?) = registry.activate(w.id)
+            }
+            window.addWindowFocusListener(l)
+            onDispose { window.removeWindowFocusListener(l) }
+        }
+        LaunchedEffect(Unit) {
+            // 6 列が潰れない最小(1 列 ≈ 50dp)
+            window.minimumSize = Dimension(360, 560)
+            snapshotFlow { state.size to state.position }.debounce(500).collect { (size, pos) -> WindowBounds.save(kind, size, pos) }
+        }
+        // 明暗は OS に従う・文言は OS の言語(日本語か英語)・#1759
+        CompositionLocalProvider(LocalTray provides tray) {
+            TailorItTheme {
+                DesktopApp(
+                    app.dsl,
+                    startScreen = w.key.screen ?: startScreen,
+                    onOpenApp = { registry.open(WindowKey.app(it)) },
+                    records = app.records,
+                    startRecordId = w.key.recordId,
+                    onOpenRecord = { screen, id -> registry.open(WindowKey.record(app.id, screen, id)) },
+                    onCloseWindow = close,
+                    isActive = { registry.active?.id == w.id },
+                )
+            }
+        }
+    }
+}
+
+/** ウィンドウの大きさ・位置(java.util.prefs: Windows はレジストリ、Linux は ~/.java)。種類(アプリ / 詳細)ごとに覚える。 */
 internal object WindowBounds {
     private val prefs by lazy { Preferences.userRoot().node("jp/kz2601/tailorit/desktop") }
 
     data class Bounds(val size: DpSize, val position: WindowPosition)
 
-    fun load(): Bounds? {
-        val w = prefs.getFloat("w", -1f)
-        val h = prefs.getFloat("h", -1f)
+    /** 種類ごとの鍵の頭。アプリのウィンドウは前からの鍵(w・h・x・y)のまま。 */
+    fun prefix(kind: WindowKind): String = when (kind) {
+        WindowKind.APP -> ""
+        WindowKind.RECORD -> "record."
+    }
+
+    /** 覚えた物が無い時の大きさ。詳細は 1 件のフォームなので少し小さく。 */
+    fun defaultSize(kind: WindowKind): DpSize = when (kind) {
+        WindowKind.APP -> DpSize(480.dp, 820.dp)
+        WindowKind.RECORD -> DpSize(440.dp, 640.dp)
+    }
+
+    fun load(kind: WindowKind = WindowKind.APP): Bounds? {
+        val k = prefix(kind)
+        val w = prefs.getFloat("${k}w", -1f)
+        val h = prefs.getFloat("${k}h", -1f)
         if (w < 360 || h < 560) return null
-        val x = prefs.getFloat("x", Float.NaN)
-        val y = prefs.getFloat("y", Float.NaN)
+        val x = prefs.getFloat("${k}x", Float.NaN)
+        val y = prefs.getFloat("${k}y", Float.NaN)
         val pos = if (x.isNaN() || y.isNaN()) WindowPosition.PlatformDefault else WindowPosition(x.dp, y.dp)
         return Bounds(DpSize(w.dp, h.dp), pos)
     }
+
+    /** 同じ種類の [index] 枚目は右下へずらす(同じ場所にぴったり重ねない)。画面に収めるのは [fit]。 */
+    fun cascade(b: Bounds, index: Int): Bounds {
+        val pos = b.position as? WindowPosition.Absolute ?: return b
+        if (index <= 0) return b
+        return Bounds(b.size, WindowPosition(pos.x + CASCADE * index, pos.y + CASCADE * index))
+    }
+
+    private val CASCADE = 32.dp
 
     /** 今つながっている画面(外した画面に開かないため)。分からなければ空。 */
     fun screens(): List<Rectangle> = runCatching {
@@ -125,13 +205,14 @@ internal object WindowBounds {
     private const val TITLE_H = 32
     private const val TITLE_MIN_VISIBLE = 48
 
-    fun save(size: DpSize, pos: WindowPosition) {
+    fun save(kind: WindowKind, size: DpSize, pos: WindowPosition) {
         if (!size.width.value.isFinite() || !size.height.value.isFinite()) return
-        prefs.putFloat("w", size.width.value)
-        prefs.putFloat("h", size.height.value)
+        val k = prefix(kind)
+        prefs.putFloat("${k}w", size.width.value)
+        prefs.putFloat("${k}h", size.height.value)
         if (pos is WindowPosition.Absolute) {
-            prefs.putFloat("x", pos.x.value)
-            prefs.putFloat("y", pos.y.value)
+            prefs.putFloat("${k}x", pos.x.value)
+            prefs.putFloat("${k}y", pos.y.value)
         }
     }
 }

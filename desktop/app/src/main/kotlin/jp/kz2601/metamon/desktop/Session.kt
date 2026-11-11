@@ -59,22 +59,32 @@ class DesktopSession(
     val uid: String? = "me",
     startScreen: String? = null,
     var host: ActionHost? = null,
-    /** 端末に残す・送る(#1887)。null はメモリだけ(適合テスト・開発用の記録の JSON)。 */
-    val persistence: SessionPersistence? = null,
+    /** 端末に残す・送る(#1887)。null はメモリだけ(適合テスト・開発用の記録の JSON)。[shared] を渡した時はそちらの物を使う。 */
+    persistence: SessionPersistence? = null,
+    /** 同じアプリの他のウィンドウと共有する記録(#1763)。null ならこのセッションだけの物を作る。 */
+    shared: SharedRecords? = null,
+    /** 記録の詳細のウィンドウ(#1763): [startScreen] をこの記録で開き、そこから戻るとウィンドウを閉じる。 */
+    startRecordId: String? = null,
 ) {
     val models: List<Entity> = dsl.entityModels()
-    private var current: MockStore by mutableStateOf(initialStore)
+
+    /** 記録(同じアプリのウィンドウで共有)。 */
+    val records: SharedRecords = shared ?: SharedRecords(initialStore, persistence)
+    val persistence: SessionPersistence? get() = records.persistence
 
     /** 画面が見る記録。書き換えると前後の差を [persistence] に渡す。 */
     var store: MockStore
-        get() = current
-        private set(value) {
-            val old = current
-            current = value
-            persistence?.changed(models, old, value)
-        }
+        get() = records.store
+        private set(value) = records.update(models, value)
     var nav: NavigationState by mutableStateOf(NavigationState.initial(dsl))
         private set
+
+    /** 詳細のウィンドウの根(ここから戻るとウィンドウを閉じる)。アプリのウィンドウは null。 */
+    var detailRoot: Route? = null
+        private set
+
+    /** 詳細のウィンドウの根から戻った(ウィンドウを閉じる)。 */
+    var onCloseWindow: (() -> Unit)? = null
 
     /** 遷移はここを通す(閉じた画面の下書きを捨てる)。 */
     private fun go(next: NavigationState) {
@@ -95,10 +105,9 @@ class DesktopSession(
     private val queries = HashMap<String, MutableMap<String, String>>()
 
     init {
-        // 送れずに断られて端末の行が戻った時は読み直す(端末にはもう書いてあるので persistence には渡さない)
-        persistence?.onReload = { current = it }
-        if (startScreen != null && dsl.screen(startScreen) != null && startScreen != top.screen) {
-            go(NavigationResolver.navigate(nav, startScreen, Presentation.PUSH, null, top, dsl))
+        if (startScreen != null && dsl.screen(startScreen) != null && (startScreen != top.screen || startRecordId != null)) {
+            go(NavigationResolver.navigate(nav, startScreen, Presentation.PUSH, startRecordId, top, dsl))
+            if (startRecordId != null && top.recordId == startRecordId) detailRoot = top
         }
     }
 
@@ -112,7 +121,7 @@ class DesktopSession(
     /** サインアウト・端末のデータを消す(#1887): 端末の記録・送り待ち・設定を消し、画面を空にして最初の画面へ。 */
     suspend fun wipeLocalData() {
         persistence?.wipe()
-        current = MockStore()
+        records.reset()
         drafts.clear()
         go(NavigationState.initial(dsl))
     }
@@ -219,8 +228,15 @@ class DesktopSession(
     }
 
     fun back(route: Route = top) {
+        if (route == detailRoot) {
+            onCloseWindow?.invoke()
+            return
+        }
         go(NavigationResolver.close(nav, route))
     }
+
+    /** 戻る・閉じるを出すか(詳細のウィンドウの根は「閉じる」)。 */
+    fun canClose(route: Route): Boolean = route == detailRoot || NavigationResolver.canClose(nav, route)
 
     /** タブを選ぶ。 */
     fun selectTab(screen: String) {
@@ -299,6 +315,8 @@ class DesktopSession(
         }
         val payload = form.payload
         val existing = form.recordId?.takeIf { id -> store.find(entity, id) != null }
+        // 同じ記録を別のウィンドウが先に保存していた: 後から保存した方が勝ち、上書きしたことを知らせる(#1763)
+        val overwrote = existing != null && drafts.values.firstOrNull { it.draft === form }?.source?.let { it != store.find(entity, existing) } == true
         // 端末に残す時は送れた後もたどれる仮 id(local-…)。メモリだけの時は適合テストと同じ new-N
         val id = existing ?: persistence?.newRecordId() ?: "new-${store.nextId}"
         store = store.save(entity, existing, payload.mapValues { MockStore.cell(it.value) }, newId = id)
@@ -313,6 +331,7 @@ class DesktopSession(
         drafts.entries.removeAll { it.value.draft === form } // 保存した画面の下書きは捨てる(開き直すと新規)
         val to = action.screen
         if (to != null) navigate(to, action, null, ctx.route) else back(ctx.route)
+        if (overwrote) message = Strings["desktop_window_conflict"]
     }
 
     /** 適合テストの操作 1 つ(case.json の operations)。対象が無い・見えていないなら false。 */
