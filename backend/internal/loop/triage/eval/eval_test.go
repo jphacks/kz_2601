@@ -47,6 +47,14 @@ func TestEvalRulesOnLabelledSet(t *testing.T) {
 	if rep.Together.Rate() < bar || rep.Apart.Rate() < bar {
 		t.Fatalf("bundling below %.0f%%: together %s, apart %s", 100*bar, rep.Together, rep.Apart)
 	}
+	// a bundle keeps its items' impact: two medium-impact feature reports
+	// (g01, g02) are P2, not P3 (the draft once worked the impact back from
+	// the representative's P3)
+	for _, m := range rep.Misses {
+		if m.Field == "priority" && (m.ID == "g01" || m.ID == "g02") {
+			t.Fatalf("priority miss %+v", m)
+		}
+	}
 }
 
 func TestLoadRejectsBadLines(t *testing.T) {
