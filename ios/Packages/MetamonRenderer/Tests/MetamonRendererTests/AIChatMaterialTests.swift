@@ -221,17 +221,19 @@ final class AIChatMaterialTests: XCTestCase {
     }
 
     /// 1000 件 × 8 KB でも選びが数秒かからない(AiChatLeaf はメインの外で呼ぶ・Debug のシミュレータで約 0.9 秒)。
+    /// 測るのはこのスレッドの CPU 時間(CI の混んだシミュレータでは待ち時間で壁時計が 4〜12 秒に振れる)。
     func testRankingThousandLargeRecordsIsFast() throws {
         let e = try entity()
         let para = "今日は会議で来期の予算と採用の計画を話した。帰りに本屋で技術書を買った。"
         let big = String(repeating: para, count: 8 * 1024 / para.utf8.count)
         let rows = (0..<1000).map { rec("r\($0)", big + " \($0)", day: 1 + $0 % 28) }
-        let t0 = Date()
+        let t0 = Date(), c0 = clock_gettime_nsec_np(CLOCK_THREAD_CPUTIME_ID)
         let m = AIChatMaterial.request(entity: e, records: rows, uid: "me", limit: nil, query: "予算の話はどうなった?")
         let dt = Date().timeIntervalSince(t0)
-        print("rank 1000x8KB: \(dt)s")
+        let cpu = Double(clock_gettime_nsec_np(CLOCK_THREAD_CPUTIME_ID) - c0) / 1e9
+        print("rank 1000x8KB: wall \(dt)s cpu \(cpu)s")
         XCTAssertNotNil(m)
-        XCTAssertLessThan(dt, 3.0)
+        XCTAssertLessThan(cpu, 3.0)
     }
 
     /// 絵文字・異体字セレクタ・拡張漢字・とても長い発言でも落ちず、決まった語になる。
