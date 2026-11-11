@@ -79,10 +79,22 @@ op の `Check` は引数の値を確かめる(appconfig と runner の両方で�
 | `notion` の `queryDatabase` / `addRow`(データベースを見る・足す・#1497) | 無料・OAuth(`runs` だけ)・`addRow` は書く(確認必須) | `queryDatabase(databaseId, limit?, subtitleProperty?, valueProperty?)`・`addRow(databaseId, title, properties?)` | `https://api.notion.com` だけ | なし | `EXT_NOTION_ENABLED=1`・`EXT_NOTION_CLIENT_ID` / `_CLIENT_SECRET` |
 | `notion` の `updateProperties`(ページのプロパティを直す・#1680) | 無料・OAuth(`runs` だけ)・書く(確認必須) | `updateProperties(pageId, properties)`。`pageId` は 32 桁の 16 進(ハイフン有り無しどちらも)。`properties` は「プロパティ名 → 値」の JSON(1〜20 個・8 KiB まで)。直せる型は `title`・`rich_text`・`number`・`select`・`checkbox`・`date` だけで、ほか(`status`・`relation`・`people` など)・ページに無い名前・型に合わない値は Notion に送らず 400 `bad_request`。値の読み方はページの型で決める(ページを 1 回読んでから直す)。同じ値でやり直しても変わらない。答えは `resultId`(ページ id)と 1 件(見出し = タイトル・リンク) | 同上 | なし | 同上 |
 | `notion` の `pageText`(ページの本文を読む・#1680) | 無料・OAuth(`runs` だけ) | `pageText(pageId)`。ページの一番上の段のブロックを文字だけにする(見出し・段落・引用・コールアウト・トグル・コード・箇条書き `•`・番号付き `1.`・ToDo `☑` / `☐`・子ページの名前・区切り `---`。画像や表など文字の無いもの・入れ子の中身は読まない)。答えは 1 件(見出し = ページのタイトル・値 = 本文・リンク)。本文は 64 KiB(`MaxBody` の 1/16)か 5 回の読み出し(500 ブロック)で切り、切った時は末尾に `…` | 同上 | なし | 同上 |
+| `github` の `contributions`(草・#1674) | 無料・OAuth(GitHub App の利用者のトークン。scope は無く、App の権限で決まる・下の注) | `contributions(from?, to?)`。日付は `YYYY-MM-DD`(日本時間)・既定は今日までの 7 日・`to` は今日まで・`from` から `to` は 366 日まで・2008 年から。GraphQL の `contributionsCollection`。行は 1 日 1 行で古い順(見出し = 日付・値 = 数)、1 件(`item`)は期間の合計(見出し = 「from〜to」・値 = 合計)。private の分は本人のプロフィールの設定どおりに数える | `https://github.com`(トークン)・`https://api.github.com` だけ | なし | `EXT_GITHUB_ENABLED=1`・`EXT_GITHUB_CLIENT_ID` / `_CLIENT_SECRET` |
+| `github` の `pullRequests`(レビュー待ち・自分の PR・#1674) | 同上・読むだけ | `pullRequests(role?, state?, limit?)`。`role` は `reviewRequested`(既定・レビューを頼まれた)か `author`(自分の)。`state` は `open`(既定)・`closed`・`merged`・`all`。`limit` 1〜50(既定 20)。検索(`GET /search/issues`・`is:pr`・アーカイブは除く・更新の新しい順)。行は PR(見出し = 題名・補足 = `owner/repo#番号`・値 = 更新日時・リンク)、1 件(`item`)の値は件数(GitHub の上限 1,000) | 同上 | なし | 同上 |
+| `github` の `issues`(担当の Issue・#1674) | 同上・読むだけ | `issues(state?, limit?)`。`state` は `open`(既定)・`closed`・`all`。`limit` 1〜50(既定 20)。検索(`is:issue assignee:@me`)。行と件数は `pullRequests` と同じ形 | 同上 | なし | 同上 |
+| `linear` の `myIssues`(自分の Issue・#1684) | 無料・OAuth(`runs` だけ・scope `read`) | `myIssues(state?, limit?)`。`state` は `open`(既定・完了と取り消し以外)・`all`・状態の種類(`triage`・`backlog`・`unstarted`・`started`・`completed`・`canceled`)。`limit` 1〜50(既定 20)。担当の Issue を更新の新しい順。行は Issue(見出し = 題名・補足 = 「`ENG-12` · 状態の名前」・値 = 期限・リンク) | `https://api.linear.app` だけ | なし | `EXT_LINEAR_ENABLED=1`・`EXT_LINEAR_CLIENT_ID` / `_CLIENT_SECRET` |
+| `linear` の `createIssue`(Issue を足す・#1684) | 無料・OAuth(`runs` だけ・scope `issues:create`。つなぎ直す時も `read` を一緒に頼む)・書く(確認必須) | `createIssue(title, description?, team?)`。`title` は 1 行・255 文字まで・`description` は Markdown・10,000 文字まで。`team` はチームのキー(`ENG`・英字で始まる 7 文字まで)かチームの id。書かなければ本人のチームが 1 つの時だけそこ(2 つ以上は 400 `bad_request`)。無いチーム・Linear が受けない入力(`INVALID_INPUT`)も 400。状態はチームの最初の状態(Backlog か Triage)。答えは `resultId`(`ENG-123`)と 1 件 | 同上 | なし | 同上 |
 
-Todoist の `complete`・`projects`・`project` / `label` と Notion の `updateProperties`・`pageText` は runner の op だけ。生成アプリから呼ぶ部品と AI に選ばせる決まり(`prompt.go`・`catalog.go`・`docs/dsl`)は #1643 の判断の後に足す。
+Todoist の `complete`・`projects`・`project` / `label`、Notion の `updateProperties`・`pageText`、GitHub と Linear の op は runner の op だけ。生成アプリから呼ぶ部品と AI に選ばせる決まり(`prompt.go`・`catalog.go`・`docs/dsl`)は #1643 の判断の後に足す。
 
 provider が 404 / 422(持っていない通貨・日)を返した時は 400 `bad_request`(`runs` は戻す)。429 / 5xx は 502 `upstream_unavailable`。
+
+### GitHub と Linear の注(#1674・#1684)
+
+- **GitHub は GitHub App**(OAuth App ではない)。OAuth App の `repo` scope は private の repo に書く権限まで付くので使わない。GitHub App は scope が無く、App に付けた権限(Issues: 読む・Pull requests: 読む・Metadata: 読む)と、本人が App を入れた repo にだけ届く(private の repo は入れたものだけ読める)。PKCE は S256。利用者のトークンは 8 時間・リフレッシュトークンは 6 か月で、使うたびに入れ替わる。トークンの口は失敗も 200 と `{"error"}` で返す(`bad_verification_code` / `bad_refresh_token` は つなぎ直し)。切る時は `DELETE /applications/{client_id}/grant`(本人の許可ごと消える)。
+- **GitHub の上限と決まり**: 利用者 1 人 1 時間 5,000 回(本人のほかのトークンと共有)・検索は 1 分 30 回・同時に 100 本まで。GitHub は 1 人ぶんを並べて呼ばないよう求めるので、同じトークンの呼び出しは台の中で 1 本ずつにする。上限の 403(`x-ratelimit-remaining: 0` か `retry-after` つき)と 429 と GraphQL の `RATE_LIMITED` は 429 として扱い、provider を 1 分止める(上限を超えて呼び続けると連携を止められることがある)。上限でない 403 は App の権限が足りない(つなぎ直し)。`User-Agent` を必ず付け、`X-GitHub-Api-Version: 2026-03-10`。検索は GitHub App のトークンでは `is:pr` / `is:issue` が要る(無いと 422)。
+- **Linear**: scope は `read`(既定)と `issues:create`(Issue を足すだけ。直す・消すはできない)。`write`・`admin` は頼まない。PKCE は S256・`actor=user`。アクセストークンは 24 時間・リフレッシュトークンは 30 日で入れ替わる。切る時は `POST /oauth/revoke` にリフレッシュトークン(無ければアクセストークン)。400(もう取り消し済み)・401 は済んだものとする。
+- **Linear の上限**: OAuth の App は利用者 1 人 1 時間 5,000 回・複雑さ 2,000,000 点(1 回 10,000 点を超える問い合わせは断られる)。上限は 429 と `RATELIMITED`。問い合わせは見せる項目だけ・50 件までにする。Linear はエラーを 200 / 400 と `extensions.code` で返すので、`AUTHENTICATION_ERROR` は接続のエラー、`FORBIDDEN` はつなぎ直し、`INVALID_INPUT` は 400 にする(エラーの code の一覧は公開の文書に無いので、知らない code は 502 `upstream_unavailable`)。
 
 ### 入れないもの(黄砂・そらまめ君)
 
@@ -219,5 +231,7 @@ DSL に `externalCall` / `externalList` があるかの確かめは、DSL の子
 - Cloud Scheduler で `POST /internal/ext/expire` を 1 日 1 回。
 - runner の最小 1 台(決定 4)・`#288` までは runner が prod だけなので、stg で偽の provider を通す時の runner の置き場所。
 - 各社の鍵・OAuth のクライアント(Secret Manager・`EXT_<PROVIDER>_*`)と、原価・押さえの量(非公開の資料から env)。
+- GitHub App の登録(#1674): 権限は Issues・Pull requests・Metadata を読むだけ・「Expire user authorization tokens」を入れたまま・コールバックは runner の `/oauth/callback/github`・Webhook は切る。利用者は App を自分の repo / org に入れる(org は管理者の承認が要ることがある)。
+- Linear の OAuth の App の登録(#1684): コールバックは runner の `/oauth/callback/linear`・公開にするか(ほかのワークスペースから使えるように)を決める。
 - 回数の上限の値(`EXT_LIMIT_*`・`EXT_GLOBAL_DAILY*`)を各社の割り当てに合わせて runner の env に入れる(非公開の資料から。入れなければコードの既定)。
 - プライバシーポリシー・利用規約(`docs/legal`)に外の API への送信とトークンの保管・消し方を書く。
