@@ -70,6 +70,9 @@ op の `Check` は引数の値を確かめる(appconfig と runner の両方で�
 
 | provider | 種類 | op | 出口 | キャッシュ | 入れ方 |
 |---|---|---|---|---|---|
+| `asana` の `myTasks`(自分のタスクを見る・#1683) | 無料・OAuth(`runs` だけ・scope `tasks:read` `workspaces:read`) | `myTasks(workspaceId?, limit?)`。自分に割り当てられた未完了のタスク(`assignee=me`・`completed_since=now`)。`workspaceId` は数字の id。無い時は利用者のワークスペースが 1 つならそれを使い、0 か 2 つ以上なら 400 `bad_request`(`workspaces:read` はこのためだけ)。`limit` 1〜50(既定 20)。行はタスク(見出し = 名前・値 = 期限(`due_at`、無ければ `due_on`)・リンク = `https://app.asana.com/` の permalink だけ)。規約: Asana API Terms(出典の表示・利用者の同意・データを売らない・Asana の機能そのものに課金しない)。回数: トークンごとに 1 分 150 回(無料の組織)/ 1,500 回(有料)・同時 GET 50。429 は `Retry-After` | `https://app.asana.com` だけ(認可・トークン・API が同じホスト) | なし | `EXT_ASANA_ENABLED=1`・`EXT_ASANA_CLIENT_ID` / `_CLIENT_SECRET` |
+| `asana` の `projectTasks`(プロジェクトのタスクを見る・#1683) | 無料・OAuth(`runs` だけ・scope `tasks:read`) | `projectTasks(projectId, limit?)`。プロジェクトの未完了のタスク。`projectId` は数字の id(Asana の URL の `/0/<id>/`)。持っていない id(Asana の 400 / 404)は 400 `bad_request`。行は `myTasks` と同じ。規約・回数は同上 | 同上 | なし | 同上 |
+| `asana` の `complete`(タスクを完了にする・#1683) | 無料・OAuth(`runs` だけ・scope `tasks:write`。初めて使う時につなぎ直す。Asana の scope は足し算にならないので、つなぎ直しでも読む scope を一緒に求める)・書く(確認必須) | `complete(taskId)`。`taskId` は数字の id。答えは `resultId`(= `taskId`)と 1 件(補足 = 「完了」)。完了済みをもう一度完了にしても変わらない。持っていないタスクは 400 `bad_request`。規約は同上。回数: 書き込みは同時 15 | 同上 | なし | 同上 |
 | `frankfurter`(為替・欧州中央銀行・#1499) | 無料・鍵なし(`runs` だけ) | `latest(from?, to?, amount?)`・`historical(date, from?, to?, amount?)`。`from` / `to` は大文字 3 文字の通貨(`to` はカンマ区切りで 10 個まで・重ならない)・`amount` は正の数・`date` は 1999-01-04 から今日まで。行は通貨ごと(見出し = 通貨・値 = レート・補足 = 「日付・量 基準」) | `https://api.frankfurter.app` だけ・本文 64 KiB まで | latest 1 時間・historical 1 日 | `EXT_FRANKFURTER_ENABLED=1` |
 | `openWeather` の `airQuality`(空気の汚れ・OpenWeatherMap Air Pollution・#1656) | 無料・運営の鍵(`runs` だけ。OpenWeather の契約の範囲) | `airQuality(lat, lng)`。`lat` / `lng` は小数(10 進だけ)で小数 2 桁(約 1 km)に丸めて送る。答えは 1 件(見出し = 「空気 <AQI の段階>(目安)」・値 = `AQI n/5`・補足 = PM2.5・PM10・O₃・NO₂ の µg/m³)。AQI は OpenWeather の 1〜5(良い・まあまあ・ふつう・悪い・とても悪い)。1〜5 でない答えは 502 `upstream_unavailable`。健康の判断ではなく目安。出典「Weather data © OpenWeather (ODbL)」を出す。AI に選ばせる決まり(`prompt.go`・`catalog.go`)はまだ | `https://api.openweathermap.org` だけ(`/data/2.5/air_pollution`。天気と同じホスト・同じ鍵) | なし | `EXT_OPEN_WEATHER_ENABLED=1`・`EXT_OPEN_WEATHER_API_KEY` |
 | `todoist` の `listTasks`(タスクを見る・#1496・`project` / `label` は #1681) | 無料・OAuth(`runs` だけ・scope `data:read`) | `listTasks(filter?, projectId?, project?, label?, limit?)`。`filter`・`projectId`・`project`(プロジェクトの名前)はどれか 1 つ。`label` はどれとも組める(`project` か `filter` と組むと Todoist のフィルタ `#名前 & @ラベル`、ほかは `label` の引数)。名前は 120 文字まで・1 行・`& \| ! ( ) , \ * # @` は使えない。カンマを含む `filter` に `label` は付けられない。`limit` 1〜50(既定 20)。行はタスク(見出し = 内容・補足 = 期限の言葉・値 = 期限・リンク) | `https://api.todoist.com` だけ | なし | `EXT_TODOIST_ENABLED=1`・`EXT_TODOIST_CLIENT_ID` / `_CLIENT_SECRET` |
@@ -91,9 +94,25 @@ op の `Check` は引数の値を確かめる(appconfig と runner の両方で�
 
 Google ToDo の 401 は接続を `error` にする(つなぎ直す)。403 は scope が足りない時もほかの拒否も 409 `ext_not_connected`(つなぎ直す)、ただし回数の上限の 403 と 429 / 5xx は 502 `upstream_unavailable`。
 
-Todoist の `complete`・`projects`・`project` / `label`、Notion の `updateProperties`・`pageText`、Google ToDo の全部の op、GitHub と Linear の op は runner の op だけ。生成アプリから呼ぶ部品と AI に選ばせる決まり(`prompt.go`・`catalog.go`・`docs/dsl`)は #1643 の判断の後に足す。
+Asana の `myTasks`・`projectTasks`・`complete`、Todoist の `complete`・`projects`・`project` / `label`、Notion の `updateProperties`・`pageText`、Google ToDo の全部の op、GitHub と Linear の op は runner の op だけ。生成アプリから呼ぶ部品と AI に選ばせる決まり(`prompt.go`・`catalog.go`・`docs/dsl`)は #1643 の判断の後に足す。
 
 provider が 404 / 422(持っていない通貨・日)を返した時は 400 `bad_request`(`runs` は戻す)。429 / 5xx は 502 `upstream_unavailable`。
+
+### Trello を入れていない理由(#1682・設計のメモ)
+
+Trello の認可は今の接続の形(`OAuthClient`: 同意の URL を作る → 戻り先の `state` と `code` を受けて交換 → 更新 → 取り消し)に合わないので、runner の provider は作っていない。
+
+| Trello の方式 | 合わないところ |
+|---|---|
+| `/1/authorize`(API キー + 利用者のトークン) | トークンは戻り先の URL の `#` の後ろ(`callback_method=fragment`)か `postMessage` で返る。`#` の後ろはサーバーに届かないので、runner の `/oauth/callback/{provider}` では受け取れない。`state` も無い |
+| OAuth 1.0a(`OAuthGetRequestToken` → `OAuthAuthorizeToken` → `OAuthGetAccessToken`) | 同意の URL を作る前に runner からリクエストトークンを取る(`AuthURL` は通信しない作り)。戻り先は `oauth_token` と `oauth_verifier` で `state` / `code` ではない。リクエストトークンの秘密を state と一緒に持つ所が要る。署名(HMAC-SHA1)も要る |
+
+入れる時の案(どちらもオーナーの判断が要る):
+
+1. **OAuth 1.0a を足す(推奨)**: `OAuthClient` に「始める時に通信してよい」版(`Begin(ctx, state, redirectURI) (authURL, secret string, err error)`)を足し、`OAuthState` にリクエストトークンの秘密を暗号化して持つ。戻り先は `oauth_token` と `oauth_verifier` も受ける。手に入るトークンは期限なし(`expiration=never`)か 30 日で、更新は無い(切れたらつなぎ直す)。API は `Authorization: OAuth oauth_consumer_key="<API キー>", oauth_token="<トークン>"` で呼ぶ(URL にトークンを載せない)。取り消しは `DELETE /1/tokens/{token}`。
+2. **`#` を読む小さな戻り先のページ**: runner が返す静的な HTML が `#token=` を読み、`state` と一緒に runner へ POST する。トークンがブラウザーの履歴・JS を通るので 1 より弱い。
+
+op の案: `boards()`(自分のボード・`GET /1/members/me/boards`。`/1/members` は 900 秒に 100 回と厳しい)・`cards(boardId? / listId?)`(`GET /1/lists/{id}/cards`・`GET /1/boards/{id}/cards`)・`addCard(listId, name, desc?, due?)`(書く・確認必須・`POST /1/cards`)。scope は `read`(足す時だけ `write`。`account` は要らない)。出口は `https://api.trello.com`(認可は `https://trello.com` でブラウザーだけ)。回数: API キーごとに 10 秒 300 回・トークンごとに 10 秒 100 回(429 の本文 `API_TOKEN_LIMIT_EXCEEDED` / `API_KEY_LIMIT_EXCEEDED`)。規約: Atlassian Developer Terms(利用者の同意・データを売らない・Trello の機能そのものに課金しない・セキュリティの事故は 48 時間以内に知らせる)。
 
 ### GitHub と Linear の注(#1674・#1684)
 
