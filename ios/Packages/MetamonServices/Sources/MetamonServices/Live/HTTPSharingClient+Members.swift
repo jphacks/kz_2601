@@ -13,13 +13,13 @@ extension HTTPSharingClient: MembershipClient {
     }
 
     public func previewShare(token: String) async throws -> ShareLinkPreview {
-        try JSONDecoder().decode(ShareLinkPreview.self, from: try await send("GET", "v1/shares/\(token)"))
+        try JSONDecoder().decode(ShareLinkPreview.self, from: try await send("GET", try Self.sharePath(token)))
     }
 
     public func importShare(token: String, displayName: String) async throws -> InstalledApp {
         let name = displayName.trimmingCharacters(in: .whitespacesAndNewlines)
         let body: ImportBody? = name.isEmpty ? nil : ImportBody(displayName: String(name.prefix(64)))
-        return try JSONDecoder().decode(InstalledApp.self, from: try await send("POST", "v1/shares/\(token)/import", body: body))
+        return try JSONDecoder().decode(InstalledApp.self, from: try await send("POST", try Self.sharePath(token) + "/import", body: body))
     }
 
     public func hasMembersOnlyData(appId: String) async throws -> Bool {
