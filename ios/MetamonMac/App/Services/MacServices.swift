@@ -69,6 +69,11 @@ final class MacServices: @unchecked Sendable {
     var feeds: (any FeedClient)? { appConfigURL.map { HTTPFeedClient(baseURL: $0, token: token) } }
     #endif
 
+    /// アカウント削除(#972・`DELETE /v1/me`)。iOS の `Account+Wiring` と同じく appconfig の URL がある時だけ本物
+    var account: any AccountClient {
+        appConfigURL.map { HTTPAccountClient(baseURL: $0, token: token) } ?? MockAccountClient()
+    }
+
     /// 作ったアプリをサーバーに置くか(本物の AI と appconfig の両方がある)。false なら記録は端末だけ
     var keepsAppsOnServer: Bool { appConfig != nil }
 

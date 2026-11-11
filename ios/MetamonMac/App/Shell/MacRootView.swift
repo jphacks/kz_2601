@@ -161,6 +161,11 @@ struct MacRootView: View {
                 captureThumbnail()
             }
         }
+        .onChange(of: library.wipeCount) { // サインアウト・アカウント削除(#972): 作ったアプリを開いていたら初めの状態に戻す
+            compose = nil
+            notices.summary = nil
+            reopenLastApp()
+        }
         .onChange(of: selectedAppId) { _, id in
             if let id { library.lastAppId = id }
             showsScreenMap = false

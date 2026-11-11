@@ -126,9 +126,15 @@ private struct MacAccountSettings: View {
     }
 }
 
-/// アカウントの状態と「Apple でサインイン」(#930)。匿名なら Apple に引き継ぐ(uid はそのまま)
+/// アカウントの状態と「Apple でサインイン」(#930)。匿名なら Apple に引き継ぐ(uid はそのまま)。
+/// ログアウトとアカウント削除(#972)は iOS の設定と同じ確認・同じ文言で、この Mac のデータを消してから行う
 private struct MacAccountRow: View {
     private let account = MacAccount.shared
+    @State private var signOutPrompt: SignOutFlow.Prompt?
+    @State private var signOutUnsent: Int?
+    @State private var signOutError: String?
+    @State private var confirmDelete = false
+    @State private var deleteError: String?
 
     var body: some View {
         LabeledContent("アカウント") {
@@ -145,6 +151,88 @@ private struct MacAccountRow: View {
             Text(message)
                 .font(.callout)
                 .foregroundStyle(.secondary)
+        }
+        if account.session.user != nil {
+            LabeledContent {
+                HStack {
+                    if let busy = account.busy {
+                        ProgressView(LocalizedStringKey(busy == .deleting ? "削除しています…" : "ログアウトしています…"))
+                            .controlSize(.small)
+                    }
+                    Button("ログアウト", role: .destructive) {
+                        Task { signOutPrompt = await account.signOutPrompt() }
+                    }
+                    .help("この Mac のデータを消してからログアウトします")
+                    .accessibilityIdentifier("settings.signOut")
+                    Button("アカウントを削除", role: .destructive) { confirmDelete = true }
+                        .help("アカウントを削除し、この Mac のデータも消します。元に戻せません")
+                        .accessibilityIdentifier("settings.deleteAccount")
+                }
+                .disabled(account.busy != nil)
+            } label: {
+                Text(L10n.key("作ったアプリが使えなくなり、共有リンクと「探す」への掲載も取り下げます。この端末のデータも消えます。ほかの人と共有しているアプリへの投稿は残ります。", review: "用意した記録帳が使えなくなります。この端末のデータも消えます。"))
+                    .font(.callout)
+                    .foregroundStyle(.secondary)
+            }
+            .alert("ログアウトしますか？", isPresented: Binding(get: { signOutPrompt != nil }, set: { if !$0 { signOutPrompt = nil } }),
+                   presenting: signOutPrompt) { prompt in
+                switch prompt {
+                case .plain:
+                    Button("ログアウト", role: .destructive) { signOut(.discardAndWipe) }
+                case .unsent(_, let canSend):
+                    if canSend {
+                        Button("送ってからログアウト") { signOut(.sendThenWipe) }
+                            .keyboardShortcut(.defaultAction)
+                    }
+                    Button("送らずにログアウト", role: .destructive) { signOut(.discardAndWipe) }
+                }
+                Button("キャンセル", role: .cancel) {}
+            } message: { prompt in
+                Text(SignOutCopy.message(isAnonymous: account.session.user?.isAnonymous == true, prompt: prompt))
+            }
+            .alert("送れなかった記録があります", isPresented: Binding(get: { signOutUnsent != nil }, set: { if !$0 { signOutUnsent = nil } }),
+                   presenting: signOutUnsent) { _ in
+                Button("送らずにログアウト", role: .destructive) { signOut(.discardAndWipe) }
+                Button("キャンセル", role: .cancel) {}
+            } message: { n in
+                Text(SignOutCopy.unsentAfterFlush(n))
+            }
+            .alert("ログアウトできませんでした", isPresented: Binding(get: { signOutError != nil }, set: { if !$0 { signOutError = nil } })) {
+                Button("OK", role: .cancel) {}
+            } message: {
+                Text(signOutError ?? "")
+            }
+            .alert("アカウントを削除しますか？", isPresented: $confirmDelete) {
+                Button("削除する", role: .destructive) { deleteAccount() }
+                Button("キャンセル", role: .cancel) {}
+            } message: {
+                Text(L10n.key("アカウントとすべてのアプリが使えなくなります。元に戻せません。", review: "アカウントとすべての記録帳が使えなくなります。元に戻せません。"))
+            }
+            .alert("アカウントを削除できませんでした", isPresented: Binding(get: { deleteError != nil }, set: { if !$0 { deleteError = nil } })) {
+                Button("OK", role: .cancel) {}
+            } message: {
+                Text(deleteError ?? "")
+            }
+        }
+    }
+
+    private func signOut(_ choice: SignOutFlow.Choice) {
+        Task {
+            do {
+                if case .unsent(let n) = try await account.signOutAndWipe(choice: choice) { signOutUnsent = n }
+            } catch {
+                signOutError = error.localizedDescription
+            }
+        }
+    }
+
+    private func deleteAccount() {
+        Task {
+            do {
+                _ = try await account.deleteAccount()
+            } catch {
+                deleteError = error.localizedDescription
+            }
         }
     }
 }

@@ -58,6 +58,13 @@ final class MacAppThumbnailStore {
         revision += 1
     }
 
+    /// サインアウト・アカウント削除(#972)。写しを全部消す
+    func removeAll() {
+        memory = [:]
+        try? FileManager.default.removeItem(at: directory)
+        revision += 1
+    }
+
     private static func jpeg(_ image: NSImage) -> Data? {
         guard let cg = image.cgImage(forProposedRect: nil, context: nil, hints: nil) else { return nil }
         return NSBitmapImageRep(cgImage: cg).representation(using: .jpeg, properties: [.compressionFactor: 0.75])

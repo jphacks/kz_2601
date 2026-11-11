@@ -64,4 +64,23 @@ enum MacRecordVault {
         }
         try? FileManager.default.removeItem(at: dir)
     }
+
+    /// 動いているエンジン(未送信の数・送り切り・サインアウトの前に使う・#972)
+    @MainActor
+    static var liveEngines: [RecordSyncEngine] { live.compactMap(\.engine) }
+
+    /// サインアウト・アカウント削除(#972)。全部のアプリのエンジンを止めて送信待ちを捨て、記録のフォルダごと消す
+    @MainActor
+    static func purgeAll(root: URL = root, timeout: Duration = .seconds(5)) async {
+        let targets = live.filter { $0.directory.deletingLastPathComponent().standardizedFileURL == root.standardizedFileURL }
+        live.removeAll { target in targets.contains { $0.directory == target.directory } || (target.engine == nil && target.queue == nil) }
+        let deadline = ContinuousClock.now + timeout
+        for target in targets {
+            if let engine = target.engine { await engine.wipe() } else { await target.queue?.discardAll() }
+            while let queue = target.queue, await queue.isDraining, ContinuousClock.now < deadline {
+                try? await Task.sleep(for: .milliseconds(20))
+            }
+        }
+        try? FileManager.default.removeItem(at: root)
+    }
 }

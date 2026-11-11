@@ -53,6 +53,7 @@ struct MetamonMacApp: App {
                     .modifier(MacLinkReceiver())
                     #endif
                     .modifier(MacCrashReportUser())
+                    .task { MacAccount.shared.wipe.library = library } // サインアウト・削除で一覧も空にする(#972)
             }
         }
         .defaultSize(width: 1100, height: 720)
