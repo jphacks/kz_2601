@@ -39,6 +39,9 @@ dependencies {
     // videoPlayer の再生
     implementation(libs.media3.exoplayer)
     implementation(libs.media3.ui)
+    // videoField の動画を中くらいの画質に書き直す(#1202)。縮小は effect の Presentation
+    implementation(libs.media3.transformer)
+    implementation(libs.media3.effect)
     // dashcam のループ録画(#872)
     implementation(libs.camerax.camera2)
     implementation(libs.camerax.lifecycle)

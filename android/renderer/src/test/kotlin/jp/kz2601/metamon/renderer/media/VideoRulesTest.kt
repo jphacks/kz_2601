@@ -12,6 +12,7 @@ import jp.kz2601.metamon.renderer.components.media.VideoDisplay
 import jp.kz2601.metamon.renderer.registry.ComponentRegistry
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.nio.file.Files
@@ -30,6 +31,34 @@ class VideoRulesTest {
         assertEquals(1, VideoCodec.limitSeconds(0))
         assertEquals(1, VideoCodec.limitSeconds(-5))
         assertEquals(30_000_000L, VideoCodec.limitMicros(30))
+    }
+
+    @Test
+    fun reencodesLargeVideoToMediumQuality() {
+        // 1080p・17 Mbps(カメラの既定) → 短辺 480・1 Mbps
+        assertEquals(VideoCodec.EncodePlan(480, 1_000_000), VideoCodec.encodePlan(1920, 1080, 17_000_000))
+        // 縦長でも短辺で決める
+        assertEquals(VideoCodec.EncodePlan(480, 1_000_000), VideoCodec.encodePlan(1080, 1920, 17_000_000))
+    }
+
+    @Test
+    fun doesNotUpscaleOrRaiseBitrate() {
+        // 小さいが重い → 縮めずビットレートだけ下げる
+        assertEquals(VideoCodec.EncodePlan(null, 1_000_000), VideoCodec.encodePlan(640, 480, 3_000_000))
+        // 大きいが軽い → 縮めるがビットレートは上げない
+        assertEquals(VideoCodec.EncodePlan(480, 800_000), VideoCodec.encodePlan(1280, 720, 800_000))
+        // もう小さく軽い → 書き直さない
+        assertNull(VideoCodec.encodePlan(640, 480, 900_000))
+        assertNull(VideoCodec.encodePlan(480, 360, 1_000_000))
+    }
+
+    @Test
+    fun unknownSourceStillGetsMediumBitrate() {
+        assertEquals(VideoCodec.EncodePlan(null, 1_000_000), VideoCodec.encodePlan(null, null, null))
+        assertEquals(VideoCodec.EncodePlan(null, 1_000_000), VideoCodec.encodePlan(0, 0, 0))
+        // 大きさは分かるがビットレートが分からない
+        assertEquals(VideoCodec.EncodePlan(480, 1_000_000), VideoCodec.encodePlan(1280, 720, null))
+        assertEquals(VideoCodec.EncodePlan(null, 1_000_000), VideoCodec.encodePlan(640, 480, null))
     }
 
     @Test
