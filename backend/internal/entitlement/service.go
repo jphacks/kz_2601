@@ -23,7 +23,10 @@ type Service struct {
 	Environments []string
 	Now          func() time.Time
 	Log          *slog.Logger
-	// Changed is called after POST /v1/me/entitlements/apple stored a
+	// GooglePlay verifies Play purchases (google.go). nil = not configured:
+	// POST /v1/me/entitlements/google answers 503.
+	GooglePlay *GooglePlay
+	// Changed is called after POST /v1/me/entitlements/apple (or /google) stored a
 	// transaction (ProChecker.Forget: a purchase counts at once, #316).
 	Changed func(uid string)
 }
@@ -89,15 +92,9 @@ func (s *Service) SubmitApple(ctx context.Context, uid, signedJWS string) (Statu
 	if err != nil {
 		return Status{}, fmt.Errorf("owner: %w", err)
 	}
-	transferFrom := ""
-	if owner != "" && owner != uid && s.Deleted != nil {
-		gone, err := s.Deleted(ctx, owner)
-		if err != nil {
-			return Status{}, fmt.Errorf("owner status: %w", err)
-		}
-		if gone {
-			transferFrom = owner
-		}
+	transferFrom, err := s.transferFrom(ctx, owner, uid)
+	if err != nil {
+		return Status{}, err
 	}
 	attrs := []any{slog.String("account", hash(uid)), slog.String("environment", tx.Environment),
 		slog.String("productId", tx.ProductID), slog.Bool("revoked", tx.Revoked()),
@@ -121,6 +118,22 @@ func (s *Service) SubmitApple(ctx context.Context, uid, signedJWS string) (Statu
 	st := s.status(p)
 	s.log().InfoContext(ctx, "entitlement: apple transaction applied", append(attrs, slog.Bool("isPro", st.IsPro))...)
 	return st, nil
+}
+
+// transferFrom returns owner when a binding held by owner may move to uid
+// (owner is a deleted account), else "".
+func (s *Service) transferFrom(ctx context.Context, owner, uid string) (string, error) {
+	if owner == "" || owner == uid || s.Deleted == nil {
+		return "", nil
+	}
+	gone, err := s.Deleted(ctx, owner)
+	if err != nil {
+		return "", fmt.Errorf("owner status: %w", err)
+	}
+	if gone {
+		return owner, nil
+	}
+	return "", nil
 }
 
 // hash keeps uids out of logs while letting lines be correlated.
