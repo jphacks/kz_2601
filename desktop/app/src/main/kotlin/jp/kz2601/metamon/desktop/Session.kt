@@ -1,6 +1,7 @@
 package jp.kz2601.metamon.desktop
 
 import jp.kz2601.metamon.desktop.i18n.Strings
+import jp.kz2601.metamon.desktop.store.SessionPersistence
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
@@ -58,10 +59,20 @@ class DesktopSession(
     val uid: String? = "me",
     startScreen: String? = null,
     var host: ActionHost? = null,
+    /** 端末に残す・送る(#1887)。null はメモリだけ(適合テスト・開発用の記録の JSON)。 */
+    val persistence: SessionPersistence? = null,
 ) {
     val models: List<Entity> = dsl.entityModels()
-    var store: MockStore by mutableStateOf(initialStore)
-        private set
+    private var current: MockStore by mutableStateOf(initialStore)
+
+    /** 画面が見る記録。書き換えると前後の差を [persistence] に渡す。 */
+    var store: MockStore
+        get() = current
+        private set(value) {
+            val old = current
+            current = value
+            persistence?.changed(models, old, value)
+        }
     var nav: NavigationState by mutableStateOf(NavigationState.initial(dsl))
         private set
 
@@ -84,6 +95,8 @@ class DesktopSession(
     private val queries = HashMap<String, MutableMap<String, String>>()
 
     init {
+        // 送れずに断られて端末の行が戻った時は読み直す(端末にはもう書いてあるので persistence には渡さない)
+        persistence?.onReload = { current = it }
         if (startScreen != null && dsl.screen(startScreen) != null && startScreen != top.screen) {
             go(NavigationResolver.navigate(nav, startScreen, Presentation.PUSH, null, top, dsl))
         }
@@ -94,6 +107,14 @@ class DesktopSession(
     /** 取り込み・貼り付け(io/DesktopIo)が記録を差し替える。 */
     fun replaceStore(next: MockStore) {
         store = next
+    }
+
+    /** サインアウト・端末のデータを消す(#1887): 端末の記録・送り待ち・設定を消し、画面を空にして最初の画面へ。 */
+    suspend fun wipeLocalData() {
+        persistence?.wipe()
+        current = MockStore()
+        drafts.clear()
+        go(NavigationState.initial(dsl))
     }
 
     fun entityModel(id: String?): Entity? = id?.let { i -> models.firstOrNull { it.id == i } }
@@ -278,8 +299,9 @@ class DesktopSession(
         }
         val payload = form.payload
         val existing = form.recordId?.takeIf { id -> store.find(entity, id) != null }
-        val id = existing ?: "new-${store.nextId}"
-        store = store.save(entity, existing, payload.mapValues { MockStore.cell(it.value) })
+        // 端末に残す時は送れた後もたどれる仮 id(local-…)。メモリだけの時は適合テストと同じ new-N
+        val id = existing ?: persistence?.newRecordId() ?: "new-${store.nextId}"
+        store = store.save(entity, existing, payload.mapValues { MockStore.cell(it.value) }, newId = id)
         effects += obj(
             "saved" to obj(
                 "entity" to JsonPrimitive(entity),

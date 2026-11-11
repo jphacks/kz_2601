@@ -66,12 +66,13 @@ data class MockStore(val rows: Map<String, List<Row>> = emptyMap(), val nextId: 
 
     fun find(entity: String, id: String): Row? = list(entity).firstOrNull { it.id == id }
 
-    fun save(entity: String, id: String?, data: Map<String, String>): MockStore {
+    /** [newId] は新規の時の id(無ければ new-N)。 */
+    fun save(entity: String, id: String?, data: Map<String, String>, newId: String? = null): MockStore {
         val current = list(entity)
         return if (id != null && current.any { it.id == id }) {
             copy(rows = rows + (entity to current.map { if (it.id == id) it.copy(data = data) else it }))
         } else {
-            copy(rows = rows + (entity to current + Row("new-$nextId", data)), nextId = nextId + 1)
+            copy(rows = rows + (entity to current + Row(newId ?: "new-$nextId", data)), nextId = nextId + 1)
         }
     }
 
