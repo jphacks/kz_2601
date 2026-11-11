@@ -25,6 +25,14 @@ const (
 	paypayNoLinkRuleOff = "(言われていなければボタンは置かず、記録だけ作って app.description に「支払いページのリンク(https)を教えてもらえれば、開くボタンを置けます。」と書く)"
 )
 
+// paypaySchemeRule: custom schemes stay out of url either way; with the
+// feature, apps such as PayPay are opened by app (#989). A build without it
+// gets #413's https-only sentence back (rewrite).
+const (
+	paypaySchemeRule    = "url に paypay:// などの独自スキームは書かない(PayPay などのアプリを開くのは openUrlButton の app)"
+	paypaySchemeRuleOff = "paypay:// などの独自スキームは使わない(https のリンクだけ)"
+)
+
 func isOpenApp(c map[string]any) bool {
 	return isType(c, dsl.CompOpenURLButton) && (c["app"] != nil || c["to"] != nil)
 }
@@ -38,7 +46,7 @@ func init() {
 	clientFeatures = append(clientFeatures, clientFeature{
 		key:     FeatureOpenApp,
 		rules:   []string{openAppRules},
-		rewrite: [][2]string{{paypayNoLinkRule, paypayNoLinkRuleOff}},
+		rewrite: [][2]string{{paypayNoLinkRule, paypayNoLinkRuleOff}, {paypaySchemeRule, paypaySchemeRuleOff}},
 		note:    "- openUrlButton の app / to と shareButton の shareTo x / mail は使わない(この版では動かない)。アプリを開くのは openUrlButton の url(https・tel:・mailto: など)、送るのは shareButton の shareTo line|slack|discord|any にする。\n",
 		schema: func(defs map[string]any) {
 			deleteProps(defs, "OpenUrlButton", "app", "to")

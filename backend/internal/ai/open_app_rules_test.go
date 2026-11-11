@@ -18,6 +18,9 @@ func TestOpenAppRuleReachesPrompt(t *testing.T) {
 	if strings.Contains(systemPrompt, paypayNoLinkRuleOff) {
 		t.Fatal("the full prompt must not keep #413's no-button sentence")
 	}
+	if !strings.Contains(systemPrompt, paypaySchemeRule) || strings.Contains(systemPrompt, paypaySchemeRuleOff) {
+		t.Fatal("the full prompt must send apps to openUrlButton app, not #413's https-only sentence")
+	}
 	sch := string(GenerationSchema())
 	for _, want := range []string{`"app"`, `"paypay"`, `"instagram"`} {
 		if !strings.Contains(sch, want) {
@@ -39,6 +42,9 @@ func TestOpenAppWithheldWithoutFeature(t *testing.T) {
 	p := restrictPrompt(withRestriction(context.Background(), r), systemPrompt)
 	if !strings.Contains(p, paypayNoLinkRuleOff) || strings.Contains(p, paypayNoLinkRule) {
 		t.Fatal("restricted prompt must restore #413's no-link rule")
+	}
+	if !strings.Contains(p, paypaySchemeRuleOff) || strings.Contains(p, paypaySchemeRule) {
+		t.Fatal("restricted prompt must restore #413's https-only sentence")
 	}
 	sch := string(restrictSchemaJSON(dsl.SchemaJSON(), r))
 	if strings.Contains(sch, `"instagram"`) || strings.Contains(sch, `"mail",`) {
