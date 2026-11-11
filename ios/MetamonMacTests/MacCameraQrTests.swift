@@ -51,9 +51,13 @@ final class MacCameraQrTests: XCTestCase {
         var stopRecordings = 0
         var photo = NSImage(size: NSSize(width: 4, height: 3))
         var recordContinuation: CheckedContinuation<URL, Error>?
+        /// true の時は `startContinuation` を返すまで開き終わらない(許可を待つ間を真似る)
+        var holdsStart = false
+        var startContinuation: CheckedContinuation<Void, Never>?
 
         func start(mode: MacCaptureMode, deviceID: String?) async throws {
             started.append(deviceID)
+            if holdsStart { await withCheckedContinuation { startContinuation = $0 } }
             if let startError { throw startError }
         }
         func stop() { stops += 1 }
@@ -145,6 +149,52 @@ final class MacCameraQrTests: XCTestCase {
         XCTAssertEqual(flow.takeVideo(), url)
         flow.cancel()
         XCTAssertTrue(FileManager.default.fileExists(atPath: url.path), "使う動画は取り込み側が消す")
+    }
+
+    func testCancelWhileRecordingDeletesFinishedFile() async throws {
+        let driver = FakeDriver()
+        let flow = MacCaptureFlow(mode: .video(maxDuration: 30), driver: driver)
+        await flow.start()
+        let recording = Task { await flow.shutter() }
+        while driver.recordContinuation == nil { await Task.yield() }
+        flow.cancel()
+        XCTAssertEqual(driver.stopRecordings, 1)
+        let url = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString).appendingPathExtension("mov")
+        try Data([0]).write(to: url)
+        defer { try? FileManager.default.removeItem(at: url) }
+        driver.recordContinuation?.resume(returning: url) // 止めた後に録り終わる
+        await recording.value
+        XCTAssertFalse(FileManager.default.fileExists(atPath: url.path), "閉じた後に録り終わった動画は消す")
+        XCTAssertNil(flow.video)
+        XCTAssertNotEqual(flow.phase, .reviewVideo)
+    }
+
+    func testCancelWhileStartingStopsCameraAgain() async {
+        let driver = FakeDriver()
+        driver.holdsStart = true
+        let flow = MacCaptureFlow(mode: .photo, driver: driver)
+        let starting = Task { await flow.start() }
+        while driver.startContinuation == nil { await Task.yield() }
+        flow.cancel()
+        let stopsAtCancel = driver.stops
+        driver.startContinuation?.resume()
+        await starting.value
+        XCTAssertEqual(driver.stops, stopsAtCancel + 1, "閉じた後に開き終わったカメラは止める")
+        XCTAssertNotEqual(flow.phase, .live)
+    }
+
+    func testMicrophonePrefersSelectedDeviceElseDefault() {
+        XCTAssertEqual(MacCameraSession.pickMicrophone(preferredUID: "usb-mic", devices: ["builtin", "usb-mic"]), "usb-mic")
+        XCTAssertNil(MacCameraSession.pickMicrophone(preferredUID: "gone", devices: ["builtin"]), "見つからなければ既定")
+        XCTAssertNil(MacCameraSession.pickMicrophone(preferredUID: nil, devices: ["builtin"]))
+    }
+
+    func testCameraFilesLiveInWipedDirectory() throws {
+        let url = MacCameraFiles.newMovieURL()
+        XCTAssertEqual(url.deletingLastPathComponent().standardizedFileURL, MacCameraFiles.directory.standardizedFileURL)
+        try Data([0]).write(to: url)
+        MacCameraFiles.removeAll()
+        XCTAssertFalse(FileManager.default.fileExists(atPath: url.path), "後始末で録画の一時ファイルも消す")
     }
 
     func testQrFlowTakesFirstCodeOnly() async {

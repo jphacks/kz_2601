@@ -186,6 +186,7 @@ struct MacRootView: View {
             }
         }
         .onChange(of: library.wipeCount) { // サインアウト・アカウント削除(#972): 作ったアプリを開いていたら初めの状態に戻す
+            compose?.close() // 走っている返事・生成が消した履歴を書き戻さないように止める
             compose = nil
             notices.summary = nil
             reopenLastApp()

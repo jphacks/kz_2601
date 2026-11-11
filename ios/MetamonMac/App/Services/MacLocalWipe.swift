@@ -35,6 +35,7 @@ struct MacLocalWipe {
     var removeNotifications: @MainActor () async -> Void = MacLocalWipe.removeAllNotifications
 
     func run() async {
+        MacComposeSession.wipeCount += 1 // 開いていた会話が後から履歴を書き戻さないように
         await records.purgeAll()
         documents.removeAll()
         appList.clear()
@@ -56,6 +57,7 @@ struct MacLocalWipe {
         AIConsentStore.shared.reload()
         FirstRunTutorialStore.shared.reload()
         ExportFiles.removeAll()
+        MacCameraFiles.removeAll()
         MacAppRuntime.removePreviewDirectories()
     }
 

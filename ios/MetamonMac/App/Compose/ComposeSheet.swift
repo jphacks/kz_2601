@@ -33,7 +33,10 @@ struct ComposeSheet: View {
         .frame(minWidth: Self.size.width, idealWidth: Self.size.width, minHeight: Self.size.height, idealHeight: Self.size.height)
         .background(.background)
         .modifier(MacModelDownloadConfirm())
-        .onDisappear { voice.cancel() } // 録音中に閉じたら録音を捨てる
+        .onDisappear { // 録音中に閉じたら録音を捨てる・走っている呼び出しを止める
+            voice.cancel()
+            session.close()
+        }
         // 同意していない時は送らずに説明を出す(#246)。閉じたら、同意していれば止めた 1 件を送る
         .sheet(isPresented: $session.needsConsent, onDismiss: { session.resumeAfterConsent() }) {
             MacAIConsentSheet()

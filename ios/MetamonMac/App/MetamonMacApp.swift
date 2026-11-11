@@ -32,6 +32,8 @@ struct MetamonMacApp: App {
         // 記録の一時フォルダ(MacAppRuntime.mockRecordSync)と共有に渡した書き出しの写し(#946)を起動時(前回の残り)と終了時に片付ける
         MacAppRuntime.removePreviewDirectories()
         ExportFiles.removeAll()
+        MacCameraFiles.removeAll() // 録画の一時ファイル(前回の残り)
+        MacCameraFiles.preferredMicrophoneUID = { MacAudioInput.selectedDevice()?.uid } // 録画も設定で選んだマイクで(#1221)
         NotificationCenter.default.addObserver(forName: NSApplication.willTerminateNotification, object: nil, queue: .main) { _ in
             MainActor.assumeIsolated {
                 MacAppRuntime.removePreviewDirectories()

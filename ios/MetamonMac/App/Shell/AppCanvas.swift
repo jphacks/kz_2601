@@ -88,6 +88,7 @@ private struct AppCanvasContent: View {
         DSLNavigationRoot()
             .dynamicTypeSize(textSize)
             .background { SaveFormShortcut(runtime: runtime) } // ⌘Return で保存(#1138)。⌘S はメニュー(MacCommands)
+            .background { ZoomInAlias(step: $zoomStep) } // ⌘= でも拡大(#1206・メニューは ⌘+)
             .background {
                 // 画面マップ(#970)。アプリのシートとは別の view に付ける(同じ view に sheet を重ねない)
                 Color.clear.sheet(isPresented: $showsScreenMap, onDismiss: talkAfterMap) {
@@ -304,6 +305,20 @@ private struct EscapeToDismiss: View {
 
 /// ⌘Return でフォームを保存する(#1138)。⌘S はメニューの「保存」が受け、⌘Return は会話のシートの「送る」と同じ指の形で押せるよう
 /// 中央の列(根とモーダル)にだけ置く。メニューの「保存」と同じく、フォームが無い・何も変えていない時は押せない
+/// 表示メニューの「拡大」(⌘+)の別のキー ⌘=(US 配列では ⇧ 無しで押せる)。メニューには出さない
+private struct ZoomInAlias: View {
+    @Binding var step: Int
+
+    var body: some View {
+        Button("拡大") { step = MacTextZoom.zoomedIn(step) }
+            .keyboardShortcut("=", modifiers: .command)
+            .disabled(!MacTextZoom.canZoomIn(step))
+            .opacity(0)
+            .frame(width: 0, height: 0)
+            .accessibilityHidden(true)
+    }
+}
+
 private struct SaveFormShortcut: View {
     let runtime: MacAppRuntime
 
