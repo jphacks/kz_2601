@@ -80,6 +80,12 @@ final class AppRuntime: RuntimeNavigating {
     /// 確認ダイアログの中身。Mac と共有(`Shared/Runtime/RuntimeConfirm.swift`)
     typealias Confirm = RuntimeConfirm
     var confirm: Confirm?
+    /// 手で動かす編集モード(#1442・`AppRuntime+GridEdit.swift`)。nil なら普段の画面
+    var gridEdit: GridEditSession?
+    /// 「完了」で保存している間(二重に押させない)
+    var gridEditSaving = false
+    /// 編集を始めた時の版(この版に対して PATCH する)
+    @ObservationIgnored var gridEditBaseVersion = 0
     /// 書き出したファイル(#421)。立つと共有シートを開く(`RootView` の HostSheets)。
     var exportFile: ExportFile?
     /// addToCalendar で開く「新規イベント」画面の中身(`AppRuntime+Calendar.swift`)。
@@ -438,6 +444,7 @@ final class AppRuntime: RuntimeNavigating {
     /// シート / 全画面 / push 先 / 音声シートが開いている = 入力や操作の途中。DSL を差し替えるとフォームの下書きが消えるので待つ。
     private var isInteracting: Bool {
         sheet != nil || fullScreen != nil || showVoiceSheet || paths.values.contains { !$0.isEmpty }
+            || gridEdit != nil // 手で動かしている間に画面が差し替わらない(#1442)
     }
 
     /// 他端末 / ai 直叩きで進んだ DSL を当てる。操作中なら閉じるまで保留し、最新の 1 件だけ当てる。
@@ -886,7 +893,7 @@ final class AppRuntime: RuntimeNavigating {
         await gatePaidRestore(before: current)
     }
 
-    private func remember(_ doc: AppDocument) {
+    func remember(_ doc: AppDocument) {
         localHistory.append(doc)
         if localHistory.count > 10 { localHistory.removeFirst() }
     }

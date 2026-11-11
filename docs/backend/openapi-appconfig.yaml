@@ -255,6 +255,11 @@ paths:
         2. サーバーは `dsl.ApplyPatch(現行DSL, patch)` = 適用 → JSON Schema → 意味検証。失敗は 422 に全問題を列挙 (現行 DSL は無変更)。
         3. 成功時は `versions/{n+1}` に **フルスナップショット `dsl` と `patch` の両方**を保存。
         Patch の `value` は `docs/dsl/dsl.schema.json#/$defs/PatchValue` (プリミティブ or DSL 部分文書) に限る。ops 上限 50。
+
+        **iOS の手で動かす編集モード(#1442)** もこの経路で保存する(新しい版になり、声の編集と同じく restore で戻せる)。
+        `application/json` で `source: {kind: manual, mode: patch, summary}` を付け、patch は
+        `test /screens/{i}/id` → 動かした部品ごとに `test` + `replace .../components/{j}/area` → 消した部品を後ろから `test` + `remove`。
+        重なり・範囲外は通常の検証(`Validate()`)が 422 で断る。
       parameters:
         - in: header
           name: If-Match

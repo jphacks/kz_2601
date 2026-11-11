@@ -58,13 +58,14 @@ struct RootView: View {
                 .onPreferenceChange(GridBottomTrailingObstructionKey.self) { trailingBottomObstructions = $0 }
                 .environment(\.fabFrame, fabFrame)
                 .environment(\.changeHighlight, rt.changeHighlight) // #626 編集で変わった部品だけ光らせる
+                .environment(\.gridEditSession, rt.gridEdit) // #1442 手で動かす編集モード
 
             // フォーム画面(push)では FAB を出さず、ナビバー右上のマイク(`formToolbarAccessory`)が入口になる(#83)
             // キーボード表示中も隠す(入力欄・キーボードのツールバーに被るため・#143)
             // シート・部品のシートが上にある間はそちらの層が出す(#629 `ModalVoiceFabLayer` / `ComponentAIButtonLayer`)
             ZStack {
                 // create の全画面「変身中」の上には出さない(重ねる方式の時は GeneratingView が覆っていた)
-                if mainEntry == .fab {
+                if mainEntry == .fab, rt.gridEdit == nil { // 編集モード中は FAB を出さない(部品のつまみに被る)
                     VoiceFab(
                         hasTabs: rt.dsl.app.hasTabs,
                         leadingObstructionTop: bottomObstructions[visibleMainRoute.id],
@@ -197,6 +198,7 @@ struct RootView: View {
                                                               : .default(Text(confirm.primaryLabel), action: run),
                          secondaryButton: .cancel(Text("キャンセル")))
         }
+        .overlay(alignment: .top) { if rt.gridEdit != nil { GridEditBar().transition(.move(edge: .top).combined(with: .opacity)) } }
         .overlay(alignment: .top) { summaryCard }
         .overlay(alignment: .top) { errorCardOverlay }
         .modifier(ToastHost(onModal: false))

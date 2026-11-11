@@ -4717,6 +4717,23 @@
         }
       }
     },
+    "この画面には動かせる部品がありません" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "There's nothing to move on this screen"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "この画面には動かせる部品がありません"
+          }
+        }
+      }
+    },
     "この端末では AI を端末内で動かせないため、サーバーの AI を使います。" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -5631,6 +5648,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "ほかの人の投稿を開いてからフォローしてください"
+          }
+        }
+      }
+    },
+    "ほかの変更が先に保存されました。もう一度やり直してください" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Another change was saved first. Please try again."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ほかの変更が先に保存されました。もう一度やり直してください"
           }
         }
       }
@@ -8409,6 +8443,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "データを読み取れませんでした"
+          }
+        }
+      }
+    },
+    "ドラッグで動かす・角で大きさ・✕で消す" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Drag to move, use the corner to resize, ✕ to remove"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ドラッグで動かす・角で大きさ・✕で消す"
           }
         }
       }
@@ -13282,6 +13333,23 @@
         }
       }
     },
+    "完了" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Done"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "完了"
+          }
+        }
+      }
+    },
     "家族・友達と" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -16507,6 +16575,23 @@
         }
       }
     },
+    "編集" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Edit"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "編集"
+          }
+        }
+      }
+    },
     "置き換える" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -19417,6 +19502,74 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "部品のタップ"
+          }
+        }
+      }
+    },
+    "部品の配置を変えました" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Rearranged the parts"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "部品の配置を変えました"
+          }
+        }
+      }
+    },
+    "部品を指で動かして配置を変えます" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Rearrange the parts with your finger"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "部品を指で動かして配置を変えます"
+          }
+        }
+      }
+    },
+    "配置を保存します" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Saves the layout"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "配置を保存します"
+          }
+        }
+      }
+    },
+    "配置を保存できませんでした" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Couldn't save the layout"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "配置を保存できませんでした"
           }
         }
       }
