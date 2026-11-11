@@ -68,7 +68,8 @@ func main() {
 	cl := newCalls(st, cs, logger) // calls (#447)
 	api := appconfig.New(st, appconfig.WithPro(pro), appconfig.WithProMode(proMode), appconfig.WithPlanLimits(limits),
 		appconfig.WithAppSlots(cs), // coin-bought app slots raise the held-app limit (#630)
-		appconfig.WithTextFilter(textMode), usage(st, logger), appconfig.WithCalls(cl))
+		appconfig.WithTextFilter(textMode), usage(st, logger), appconfig.WithCalls(cl),
+		appconfig.WithExt(newExt(ctx, logger))) // external APIs through the runner (#1493)
 	entitlement.Register(api, ents) // Pro (#314)
 	coinsapi.Register(api, cs)      // coins (#630)
 	handler := newHandler(authed, logger, api, appconfig.SharePage(st), appconfig.MountAccountDeletePage, appStoreNotifications(ents, logger), coinsapi.Public(cs.Config), calls.Public(cl))

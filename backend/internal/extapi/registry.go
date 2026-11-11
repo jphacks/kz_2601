@@ -20,6 +20,7 @@ package extapi
 
 import (
 	"fmt"
+	"net/url"
 	"regexp"
 	"slices"
 	"strings"
@@ -50,6 +51,10 @@ type OpSpec struct {
 	// Args are the argument names the op takes (the DSL's args are
 	// additionalProperties:false); any other name is refused.
 	Args []string
+	// Check validates the argument values (currency codes, dates ...)
+	// before anything is counted; an error is 400 bad_request. nil = only
+	// the common checks of CheckArgs.
+	Check func(args map[string]string) error
 }
 
 // Provider is one external API. Everything here is static; the secrets come
@@ -85,6 +90,34 @@ func (p Provider) Op(name string) (OpSpec, bool) {
 		}
 	}
 	return OpSpec{}, false
+}
+
+// MaxArgLen is the longest argument value.
+const MaxArgLen = 4096
+
+// CheckArgs finds op and checks args: only the names the op takes, at most
+// MaxArgLen, no URL (no URL reaches a provider from the DSL), then the op's
+// own Check. Errors wrap ErrUnknown (400 bad_request). appconfig runs it
+// before calling the runner; Service.Call runs it again.
+func (p Provider) CheckArgs(op string, args map[string]string) (OpSpec, error) {
+	spec, ok := p.Op(op)
+	if !ok {
+		return spec, ErrUnknown
+	}
+	for k, v := range args {
+		if !slices.Contains(spec.Args, k) || len(v) > MaxArgLen {
+			return spec, fmt.Errorf("%w: argument %q", ErrUnknown, k)
+		}
+		if u, err := url.Parse(v); err == nil && u.Scheme != "" && u.Host != "" {
+			return spec, fmt.Errorf("%w: argument %q is a URL", ErrUnknown, k)
+		}
+	}
+	if spec.Check != nil {
+		if err := spec.Check(args); err != nil {
+			return spec, fmt.Errorf("%w: %v", ErrUnknown, err)
+		}
+	}
+	return spec, nil
 }
 
 // EnvName is the provider's part of env names: googleCalendar → GOOGLE_CALENDAR.

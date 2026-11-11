@@ -1,6 +1,7 @@
 package extapi
 
 import (
+	"errors"
 	"net/url"
 	"slices"
 	"strings"
@@ -119,5 +120,34 @@ func TestAllowedURL(t *testing.T) {
 	}
 	if _, err := ReadBody(strings.NewReader(strings.Repeat("x", MaxBody+1))); err == nil {
 		t.Fatal("body over 1 MB read")
+	}
+}
+
+// CheckArgs: the op's names only, no URL, then the op's own Check; every
+// refusal is ErrUnknown (400 bad_request).
+func TestCheckArgs(t *testing.T) {
+	p := Provider{ID: "argsTest", Ops: []OpSpec{{Name: "get", Args: []string{"code"}, Check: func(a map[string]string) error {
+		if a["code"] == "bad" {
+			return errors.New("bad code")
+		}
+		return nil
+	}}}}
+	for _, c := range []struct {
+		op   string
+		args map[string]string
+		ok   bool
+	}{
+		{"get", map[string]string{"code": "ok"}, true},
+		{"get", nil, true},
+		{"nope", nil, false},
+		{"get", map[string]string{"other": "x"}, false},
+		{"get", map[string]string{"code": "bad"}, false},
+		{"get", map[string]string{"code": "https://example.com/x"}, false},
+		{"get", map[string]string{"code": strings.Repeat("a", MaxArgLen+1)}, false},
+	} {
+		_, err := p.CheckArgs(c.op, c.args)
+		if (err == nil) != c.ok || (err != nil && !errors.Is(err, ErrUnknown)) {
+			t.Errorf("%s %v: err %v", c.op, c.args, err)
+		}
 	}
 }
