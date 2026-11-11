@@ -19,8 +19,11 @@ sealed class AuthError(message: String, cause: Throwable? = null) : Exception(me
     /** 利用者が自分で閉じた。画面にエラーは出さない */
     class Canceled(cause: Throwable? = null) : AuthError("canceled", cause)
 
-    /** この端末・ビルドでは使えない方法(Google の Web クライアント ID が無い等) */
+    /** この端末・ビルドでは使えない方法(Google の Web クライアント ID が無い等)。[message] はアプリが strings から作った文言で、画面にそのまま出る */
     class Unavailable(message: String) : AuthError(message)
+
+    /** この [AuthService] の実装が持たない操作(既定の実装)。[message] は開発者向けで画面には出さない(固定の文言になる) */
+    class Unsupported(operation: String) : AuthError("$operation is not supported")
 
     /** 削除の前に入り直しが要る(Firebase の requires-recent-login)。 */
     class RequiresRecentLogin(cause: Throwable? = null) : AuthError("requires recent login", cause)
@@ -63,12 +66,12 @@ interface AuthService {
 
     /** 削除の前の入り直し(Google)。Credential Manager で取り直した ID トークンを渡す。 */
     suspend fun reauthenticateWithGoogle(googleIdToken: String) {
-        throw AuthError.Unavailable("reauthenticate is not supported")
+        throw AuthError.Unsupported("reauthenticate")
     }
 
     /** 削除の前の入り直し(Apple・Custom Tab)。 */
     suspend fun reauthenticateWithApple(activity: Activity) {
-        throw AuthError.Unavailable("reauthenticate is not supported")
+        throw AuthError.Unsupported("reauthenticate")
     }
 
     /**
@@ -77,12 +80,12 @@ interface AuthService {
      * 匿名でなければ [AuthError.AlreadyLinked]。未サインインならそのままサインインする。
      */
     suspend fun linkWithGoogle(googleIdToken: String): AuthUser {
-        throw AuthError.Unavailable("link is not supported")
+        throw AuthError.Unsupported("link")
     }
 
     /** [linkWithGoogle] の Apple 版(Firebase の `OAuthProvider("apple.com")`・Custom Tab)。 */
     suspend fun linkWithApple(activity: Activity): AuthUser {
-        throw AuthError.Unavailable("link is not supported")
+        throw AuthError.Unsupported("link")
     }
 
     /** [AuthError.CredentialAlreadyInUse] の後、その資格情報の既存アカウントに切り替える。匿名で作ったアプリは引き継がれない(uid が変わる)。 */

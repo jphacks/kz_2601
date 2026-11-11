@@ -643,6 +643,11 @@ class AppRuntime(
         scope.launch { run(action, context) }
     }
 
+    /** 画面が閉じて呼び手が止まっても、書き込みはランタイムの scope で最後までやる。 */
+    override suspend fun runAction(action: Action, context: ActionContext) {
+        scope.launch { run(action, context) }.join()
+    }
+
     override fun setNavigation(next: NavigationState) {
         _navigation.value = next
     }

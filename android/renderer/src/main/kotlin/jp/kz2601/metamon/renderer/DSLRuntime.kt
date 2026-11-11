@@ -42,6 +42,9 @@ interface DSLRuntime {
     /** アクション。[navigationHost] があれば navigate / back もここへ来る。既定は何もしない。 */
     fun onAction(action: Action, context: ActionContext) = Unit
 
+    /** [onAction] を終わるまで待つ版(保存バーが「保存しました」を出すか決める・iOS の `await rt.run`)。既定は待たない。 */
+    suspend fun runAction(action: Action, context: ActionContext) = onAction(action, context)
+
     /** 遷移をランタイムが持つならその口。null なら描画器が自前で持つ(プレビュー・テスト)。 */
     val navigationHost: NavigationHost? get() = null
 

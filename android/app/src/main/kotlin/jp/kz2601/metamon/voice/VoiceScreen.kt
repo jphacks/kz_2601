@@ -15,7 +15,6 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.widthIn
@@ -83,6 +82,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import jp.kz2601.metamon.R
 import jp.kz2601.metamon.permissions.PermissionCenter
 import jp.kz2601.metamon.permissions.rememberPermissionRequest
+import jp.kz2601.metamon.renderer.layout.imePaddingExcludingBelow
 import jp.kz2601.metamon.runtime.UiText
 import jp.kz2601.metamon.runtime.resolve
 import jp.kz2601.metamon.services.ChatMode
@@ -175,7 +175,7 @@ fun VoiceScreen(
             typed = text
         }
     }
-    Column(modifier.fillMaxSize().imePadding().padding(horizontal = 20.dp)) {
+    Column(modifier.fillMaxSize().imePaddingExcludingBelow().padding(horizontal = 20.dp)) {
         TopBar(state, onRestart = vm::restartChat)
         if (state.restartConfirm) RestartConfirmDialog(vm)
         if (state.showsChat) {

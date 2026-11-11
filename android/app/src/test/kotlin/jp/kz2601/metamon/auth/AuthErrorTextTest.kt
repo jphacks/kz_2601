@@ -7,6 +7,9 @@ import jp.kz2601.metamon.services.AuthService
 import jp.kz2601.metamon.services.mock.MockAuthService
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.w3c.dom.Element
 import java.io.File
@@ -68,5 +71,33 @@ class AuthErrorTextTest {
         assertEquals(AuthSession.SIGN_IN_FAILED, AuthSession.failureText(AuthError.Unavailable("")))
         // Unavailable はアプリが strings から作った文言(GoogleSignIn)なのでそのまま
         assertEquals(UiText.Raw("No account"), AuthSession.failureText(AuthError.Unavailable("No account")))
+    }
+
+    /** 再認証・引き継ぎを持たない実装(既定の実装をそのまま使う)。 */
+    private class DefaultsOnlyAuth : AuthService by MockAuthService(signedIn = false) {
+        override suspend fun reauthenticateWithGoogle(googleIdToken: String) = super.reauthenticateWithGoogle(googleIdToken)
+
+        override suspend fun linkWithGoogle(googleIdToken: String) = super.linkWithGoogle(googleIdToken)
+    }
+
+    @Test
+    fun defaultImplementationFailureShowsFixedText() = runTest {
+        val auth = DefaultsOnlyAuth()
+        val reauth = runCatching { auth.reauthenticateWithGoogle("t") }.exceptionOrNull() as Exception
+        val link = runCatching { auth.linkWithGoogle("t") }.exceptionOrNull() as Exception
+
+        for (e in listOf(reauth, link)) {
+            assertTrue(e is AuthError.Unsupported)
+            // 開発者向けの英語(「… is not supported」)は画面に出さない
+            assertEquals(AuthSession.SIGN_IN_FAILED, AuthSession.failureText(e))
+            assertEquals("サインインできませんでした。もう一度お試しください", text(AuthSession.failureText(e), english = false))
+            assertEquals(LinkProblem.Failed, LinkProblem.of(e))
+        }
+
+        // 設定の引き継ぎから届いても「失敗」の固定の文言(LinkProblem.Failed)になる
+        val session = AuthSession(auth)
+        assertFalse(session.linkWithGoogle { "t" })
+        assertEquals(LinkProblem.Failed, session.linkError.value)
+        assertNull(session.linkConflict.value)
     }
 }

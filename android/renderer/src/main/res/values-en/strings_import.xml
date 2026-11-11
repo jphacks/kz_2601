@@ -28,19 +28,19 @@
     <string name="renderer_import_csv_unused">Columns not used: %1$s</string>
     <string name="renderer_import_csv_failures">Unreadable rows: %1$d (skipped)</string>
     <plurals name="renderer_import_csv_over">
-        <item quantity="one">%3$d row over the limit (%1$d per import, %2$d in total) will be skipped</item>
-        <item quantity="other">%3$d rows over the limit (%1$d per import, %2$d in total) will be skipped</item>
+        <item quantity="one">%3$d row over the limit (%1$d per import, %2$d in total) is skipped</item>
+        <item quantity="other">%3$d rows over the limit (%1$d per import, %2$d in total) are skipped</item>
     </plurals>
     <string name="renderer_import_failure_invalid">Row %1$d: can\'t read %2$s \"%3$s\"</string>
     <string name="renderer_import_failure_required">Row %1$d: %2$s is empty</string>
     <string name="renderer_import_failure_too_long">Row %1$d: %2$s is too long</string>
     <plurals name="renderer_import_body">
-        <item quantity="one">Add 1 record with %2$d character from \"%1$s\" to \"%3$s\".</item>
-        <item quantity="other">Add 1 record with %2$d characters from \"%1$s\" to \"%3$s\".</item>
+        <item quantity="one">Add 1 record to \"%3$s\" with %2$d character from \"%1$s\".</item>
+        <item quantity="other">Add 1 record to \"%3$s\" with %2$d characters from \"%1$s\".</item>
     </plurals>
     <plurals name="renderer_import_body_truncated">
-        <item quantity="one">It\'s long, so only the first %1$d character will be added.</item>
-        <item quantity="other">It\'s long, so only the first %1$d characters will be added.</item>
+        <item quantity="one">It\'s long, so only the first %1$d character is kept.</item>
+        <item quantity="other">It\'s long, so only the first %1$d characters are kept.</item>
     </plurals>
     <string name="renderer_import_problem_unsupported">This type of file can\'t be imported</string>
     <string name="renderer_import_problem_open">Couldn\'t open the file</string>

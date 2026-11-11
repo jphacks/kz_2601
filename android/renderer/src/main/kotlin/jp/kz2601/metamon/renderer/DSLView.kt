@@ -50,6 +50,7 @@ import jp.kz2601.metamon.renderer.components.social.SocialPromptHost
 import jp.kz2601.metamon.renderer.components.lists.LocalScreenLocals
 import jp.kz2601.metamon.renderer.components.lists.ScreenLocals
 import jp.kz2601.metamon.renderer.form.rememberScreenForm
+import jp.kz2601.metamon.renderer.layout.imePaddingExcludingBelow
 import jp.kz2601.metamon.renderer.layout.isVoiceScreen
 import jp.kz2601.metamon.renderer.navigation.NavigationResolver
 import jp.kz2601.metamon.renderer.navigation.NavigationState
@@ -60,6 +61,19 @@ import jp.kz2601.metamon.renderer.screen.GridScreenLayout
 import jp.kz2601.metamon.renderer.theme.MetamonRenderTheme
 import jp.kz2601.metamon.renderer.theme.colors
 import jp.kz2601.metamon.renderer.theme.RenderTheme
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.platform.LocalHapticFeedback
+import jp.kz2601.metamon.dsl.ToolbarButton
+import jp.kz2601.metamon.renderer.a11y.rememberAnnouncer
+import jp.kz2601.metamon.renderer.form.FormSaveResult
+import jp.kz2601.metamon.renderer.screen.SaveBarFeedback
+import jp.kz2601.metamon.renderer.screen.SaveBarPhase
+import kotlinx.coroutines.launch
 
 /**
  * DSL のアプリ全体を描く(iOS の `DSLNavigationRoot`)。タブ(2 個以上)・main のスタック・シート・全画面を持ち、
@@ -208,16 +222,59 @@ fun ScreenView(
                 textAlign = TextAlign.Center,
                 modifier = Modifier.fillMaxWidth().padding(horizontal = RenderTheme.Spacing.md, vertical = RenderTheme.Spacing.md),
             )
-            is ScreenToolbar.SaveBar.Save -> ActionButton(
-                label = bar.button.label,
-                kind = ActionButtonKind.PRIMARY,
-                onClick = { ctx.perform(bar.button.action) },
-                icon = bar.button.icon ?: "checkmark",
-                modifier = Modifier.padding(horizontal = RenderTheme.Spacing.md, vertical = RenderTheme.Spacing.sm),
-            )
+            is ScreenToolbar.SaveBar.Save -> FormSaveBar(bar.button, ctx)
             null -> Unit
         }
     }
+}
+
+/**
+ * 画面下の保存ボタン(iOS の `FormSaveBar.bar`)。押下中はスピナーで 2 回目を受けず、書けたら 0.6 秒だけ
+ * 「保存しました」(オフラインなら「接続が戻ったら自動で送ります」)を出して戻す。TalkBack には知らせで 1 回だけ読ませる
+ * (ボタンの読み上げは iOS と同じく元の名前のまま)。キーボードが出ている時はその上に出る。
+ */
+@Composable
+private fun FormSaveBar(button: ToolbarButton, ctx: RenderContext) {
+    val form = ctx.form
+    val feedback = remember(form) { SaveBarFeedback() }
+    val scope = rememberCoroutineScope()
+    val focus = LocalFocusManager.current
+    val announce = rememberAnnouncer()
+    val haptics = LocalHapticFeedback.current
+    val saved = stringResource(R.string.renderer_save_bar_saved)
+    val queued = stringResource(R.string.renderer_save_bar_queued_offline)
+    val lastResult = form?.lastSaveResult
+    LaunchedEffect(feedback, lastResult) { feedback.onSaveResultChanged(lastResult) } // 送った後にサーバーが断った
+    val phase = feedback.phase
+    val done = (phase as? SaveBarPhase.Done)?.result
+    LaunchedEffect(phase) {
+        if (done == null) return@LaunchedEffect
+        haptics.performHapticFeedback(HapticFeedbackType.Confirm)
+        announce(if (done == FormSaveResult.QUEUED_OFFLINE) queued else saved)
+    }
+    ActionButton(
+        label = when (done) {
+            FormSaveResult.SAVED -> saved
+            FormSaveResult.QUEUED_OFFLINE -> queued
+            null -> button.label
+        },
+        kind = ActionButtonKind.PRIMARY,
+        onClick = {
+            if (feedback.phase != SaveBarPhase.Idle) return@ActionButton
+            focus.clearFocus() // 変換中の文字を確定させてから保存する(iOS #627)
+            scope.launch { feedback.press(form) { ctx.runtime.runAction(button.action, ActionContext(ctx.route, form)) } }
+        },
+        icon = when (done) {
+            FormSaveResult.SAVED -> "checkmark.circle"
+            FormSaveResult.QUEUED_OFFLINE -> "wifi.slash"
+            null -> button.icon ?: "checkmark"
+        },
+        running = phase == SaveBarPhase.Saving,
+        modifier = Modifier
+            .imePaddingExcludingBelow() // 下のタブバー・帯の分は引く(imePadding だと二重になる)
+            .padding(horizontal = RenderTheme.Spacing.md, vertical = RenderTheme.Spacing.sm)
+            .semantics { contentDescription = button.label },
+    )
 }
 
 @Preview(showBackground = true)
