@@ -100,9 +100,13 @@ private struct MacGeneralSettings: View {
 private struct MacAccountSettings: View {
     var body: some View {
         Form {
-            // Mac はサインイン(Firebase)がまだ無い(#930)
+            // サインイン(#930)。Firebase につながっていない版(plist 無し)は今まで通り「使えない」
             Section {
-                MacUnavailableSettingRow(title: "アカウント")
+                if MacAccount.shared.isLive {
+                    MacAccountRow()
+                } else {
+                    MacUnavailableSettingRow(title: "アカウント")
+                }
             }
             #if !APP_STORE_REVIEW // 審査用ビルドは App 内課金を持たない(#450 G1)
             Section {
@@ -115,6 +119,29 @@ private struct MacAccountSettings: View {
             }
         }
         .formStyle(.grouped)
+    }
+}
+
+/// アカウントの状態と「Apple でサインイン」(#930)。匿名なら Apple に引き継ぐ(uid はそのまま)
+private struct MacAccountRow: View {
+    private let account = MacAccount.shared
+
+    var body: some View {
+        LabeledContent("アカウント") {
+            if let user = account.session.user {
+                VStack(alignment: .trailing, spacing: 6) {
+                    Text(SupportInfo.accountStatus(isAnonymous: user.isAnonymous))
+                    if user.isAnonymous { MacAppleSignInButton() }
+                }
+            } else {
+                MacAppleSignInButton()
+            }
+        }
+        if let message = account.errorMessage {
+            Text(message)
+                .font(.callout)
+                .foregroundStyle(.secondary)
+        }
     }
 }
 

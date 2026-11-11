@@ -7,7 +7,7 @@ import MetamonServices
 
 /// アプリを作る・直す会話(#967)の状態。iOS の `AppRuntime+Clarify` / `AppRuntime+BuildStage` の Mac 版。
 /// 判断は iOS と同じ `ClarifyFlow`(何を出すか)・`MultiSelect`(複数選択)・`BuildChoreography`(組み上げ)を使う。
-/// AI は Mac に Firebase が無い間(#930)は `MockAIClient`(iOS の METAMON_MOCK と同じ・同梱の DSL 例を返す)。
+/// AI は `MacServices`(#930): Firebase につながれば ai サービス、つながらない時(plist 無し・CI・METAMON_MOCK=1)は `MockAIClient`(同梱の DSL 例を返す)。
 /// AI に送る前に同意(#246・5.1.2(i))を確かめる。無ければ送らずに同意の説明を出し、同意したら止めた 1 件を送る(iOS の `requireAIConsent`)。
 /// 流れ: 頼む(文字)→ 聞き返し・案(chat)→「これでいく」→ 生成中(組み立て台・経過秒)→ 組み上げ → 完成の要約。
 @MainActor
@@ -127,7 +127,7 @@ final class MacComposeSession: Identifiable {
     }
 
     /// Mac の AI。同意が無ければどの入口からも送らないよう `ConsentGatedAIClient` で包む(最後の砦・iOS の MetamonApp と同じ)
-    nonisolated static func gatedAI(base: any AIClient = MockAIClient()) -> any AIClient {
+    nonisolated static func gatedAI(base: any AIClient = MacServices.shared.ai) -> any AIClient {
         ConsentGatedAIClient(base: base) { AIConsentStore.isGranted(in: .standard) }
     }
 
