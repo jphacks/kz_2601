@@ -26,10 +26,12 @@ extension MacLeafKey {
 
 extension View {
     /// Mac: 文字を選んでコピーできるようにする(text・markdown)。
+    /// 「この部品について話す」(#1323)がある時は、選べる文字の右クリックが OS の文字のメニューになって話す項目が隠れるので、
+    /// 選ぶ代わりに自前のメニュー(話す・全文をコピー)を出す。`copy` は全文(コピーの項目で使う)。
     @ViewBuilder
-    func macTextSelection() -> some View {
+    func macTextSelection(copy: @escaping () -> String) -> some View {
         #if os(macOS)
-        textSelection(.enabled)
+        modifier(MacSelectableText(copy: copy))
         #else
         self
         #endif
@@ -89,3 +91,27 @@ extension View {
         #endif
     }
 }
+
+/// 選べる文字にするか: 部品について話せる時(話す先がある)は選ばせず、右クリックを自前のメニューにする
+enum MacTextSelectionPolicy {
+    static func selectable(canTalk: Bool) -> Bool { !canTalk }
+}
+
+#if os(macOS)
+private struct MacSelectableText: ViewModifier {
+    @Environment(\.componentTalk) private var talk
+    @Environment(\.componentTalkTarget) private var target
+    let copy: () -> String
+
+    func body(content: Content) -> some View {
+        if MacTextSelectionPolicy.selectable(canTalk: talk != nil && target != nil) {
+            content.textSelection(.enabled)
+        } else {
+            content.contextMenu {
+                ComponentTalkImageMenuItem() // 外側の部品のメニューより先に出るので、ここにも置く
+                Button(L("コピー"), systemImage: "doc.on.doc") { PlatformPasteboard.setString(copy()) }
+            }
+        }
+    }
+}
+#endif

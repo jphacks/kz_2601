@@ -13,7 +13,7 @@ struct TextLeaf: View {
         Text(content)
             .font(font)
             .multilineTextAlignment(alignment)
-            .macTextSelection() // Mac: 選んでコピーできる(#941)
+            .macTextSelection { String(content.characters) } // Mac: 選んでコピーできる(#941)
             .frame(maxWidth: .infinity, alignment: frameAlignment)
     }
 

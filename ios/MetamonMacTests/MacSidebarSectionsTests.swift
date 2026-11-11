@@ -94,6 +94,72 @@ final class MacSidebarSectionsTests: XCTestCase {
         XCTAssertEqual(badges.counts, [:])
     }
 
+    private final class CountingStamps: SharedRecordStampSource, @unchecked Sendable {
+        var calls: [String] = []
+        let stamps: [RecordStamp]
+        init(_ stamps: [RecordStamp]) { self.stamps = stamps }
+        func sharedStamps(appId: String, entity: String, notBy uid: String) async throws -> [RecordStamp] {
+            calls.append("\(appId)/\(entity)")
+            return stamps
+        }
+    }
+
+    /// 別のウインドウで開いているアプリも数えない。閉じたら数える
+    func testAppOpenInAnyWindowIsNotCounted() async {
+        let store = LastOpenedStore(defaults: defaults)
+        store.mark(appId: "a", at: base)
+        store.mark(appId: "b", at: base)
+        let source = FakeStamps(stamps: ["a/memo": [RecordStamp(id: "1", author: "other", createdAt: at(10))],
+                                         "b/memo": [RecordStamp(id: "2", author: "other", createdAt: at(10))]])
+        let badges = MacSidebarBadges()
+        let w1 = UUID(), w2 = UUID()
+        badges.setOpen("a", window: w1)
+        badges.setOpen("b", window: w2)
+        let targets: [MacSidebarBadges.Target] = [.init(appId: "a", entities: ["memo"]), .init(appId: "b", entities: ["memo"])]
+        await badges.refresh(targets, openAppId: nil, uid: "me", source: source, store: store)
+        XCTAssertEqual(badges.counts, [:])
+
+        badges.closeWindow(w2)
+        await badges.refresh(targets, openAppId: nil, uid: "me", source: source, store: store)
+        XCTAssertEqual(badges.counts, ["b": 1])
+    }
+
+    /// 前面に戻るたび・ウインドウごとに問い合わせない。一覧・アカウントが変わった時と、間隔が空いた時だけ
+    func testRefreshIfDueThrottlesAcrossWindows() async {
+        let store = LastOpenedStore(defaults: defaults)
+        store.mark(appId: "a", at: base)
+        store.mark(appId: "b", at: base)
+        let source = CountingStamps([RecordStamp(id: "1", author: "other", createdAt: at(10))])
+        var clock = base
+        let badges = MacSidebarBadges(now: { clock })
+        let targets: [MacSidebarBadges.Target] = [.init(appId: "a", entities: ["memo"])]
+        await badges.refreshIfDue(targets, uid: "me", source: source, store: store)
+        await badges.refreshIfDue(targets, uid: "me", source: source, store: store) // 別のウインドウ・前面に戻った
+        XCTAssertEqual(source.calls, ["a/memo"])
+        XCTAssertEqual(badges.count("a"), 1)
+
+        clock = base.addingTimeInterval(MacSidebarBadges.minInterval + 1)
+        await badges.refreshIfDue(targets, uid: "me", source: source, store: store)
+        XCTAssertEqual(source.calls.count, 2)
+
+        await badges.refreshIfDue(targets + [.init(appId: "b", entities: ["memo"])], uid: "me", source: source, store: store)
+        XCTAssertEqual(source.calls.count, 4, "一覧が変わったらすぐ数え直す")
+
+        await badges.refreshIfDue(targets, uid: nil, source: source, store: store)
+        XCTAssertEqual(badges.counts, [:], "サインアウトはすぐ消す")
+    }
+
+    /// 共有の entity だけ問い合わせる(private の記録は他の人が書かない)
+    func testTargetUsesOnlySharedEntities() throws {
+        let entities = try JSONDecoder().decode([Entity].self, from: Data(#"""
+        [{"id":"memo","name":"メモ","fields":[]},
+         {"id":"board","name":"掲示板","scope":"shared","fields":[]},
+         {"id":"news","name":"お知らせ","scope":"public","fields":[]}]
+        """#.utf8))
+        XCTAssertEqual(MacSidebarBadges.target(appId: "a", entities: entities)?.entities, ["board", "news"])
+        XCTAssertNil(MacSidebarBadges.target(appId: "a", entities: [entities[0]]), "共有の entity が無いアプリは数えない")
+    }
+
     func testBadgeTextAndVoiceOverLabel() {
         XCTAssertEqual(MacSidebarBadges.badgeText(3), "3")
         XCTAssertEqual(MacSidebarBadges.badgeText(99), "99")

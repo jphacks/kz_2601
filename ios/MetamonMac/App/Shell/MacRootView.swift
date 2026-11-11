@@ -74,6 +74,8 @@ struct MacRootView: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     /// サイドバーの新着の数(#969)
     @State private var badges = MacSidebarBadges.shared
+    /// このウインドウの印(新着の数で「どのウインドウで開いているか」を分ける)
+    @State private var windowToken = UUID()
 
     init(apps: [SampleApp]) { bundledApps = apps }
 
@@ -190,9 +192,13 @@ struct MacRootView: View {
             Task { await refreshServerApps() }
             noticeCheck += 1
         }
-        .onDisappear { MacSpeechReader.shared.stop() } // ウインドウを閉じたら読み上げを止める(#1210)
+        .onDisappear {
+            MacSpeechReader.shared.stop() // ウインドウを閉じたら読み上げを止める(#1210)
+            badges.closeWindow(windowToken)
+        }
         .onAppear {
             reopenLastApp()
+            badges.setOpen(selectedAppId, window: windowToken)
             // self ごと捕まえると見張り(State)との循環で残るので、シートの Binding だけ渡す
             let map = $showsScreenMap, tips = $showsTips
             discardGuard.beforeAsking = { map.wrappedValue = false; tips.wrappedValue = false }
@@ -208,11 +214,16 @@ struct MacRootView: View {
         .onChange(of: library.wipeCount) { // サインアウト・アカウント削除(#972): 作ったアプリを開いていたら初めの状態に戻す
             compose?.close() // 走っている返事・生成が消した履歴を書き戻さないように止める
             compose = nil
+            #if !APP_STORE_REVIEW
+            shareApp?.close() // 読み込み中の参加者を書き戻さない
+            shareApp = nil
+            #endif
             notices.resetAfterWipe()
             reopenLastApp()
         }
         .onChange(of: selectedAppId) { _, id in
-            if let id { library.lastAppId = id; badges.markRead(id) } // 開いたら新着の印を消す(#969)
+            if let id { library.lastAppId = id }
+            badges.setOpen(id, window: windowToken) // 開いたら新着の印を消す(#969)。どのウインドウで開いていても数えない
             showsScreenMap = false
         }
         .sheet(item: $appLimit) { request in
@@ -270,20 +281,25 @@ struct MacRootView: View {
         return (split.own.compactMap { byId[$0] }, split.shared.compactMap { byId[$0] })
     }
 
-    /// 新着の数を数え直すきっかけ: アカウント・一覧(中身を取ったアプリ)・前面に戻った
+    /// 新着の数を数え直すきっかけ: アカウント・一覧(共有の記録があるアプリ)・前面に戻った。
+    /// 実際に問い合わせるかは `MacSidebarBadges.refreshIfDue` が決める(全ウインドウで 1 本・数分に 1 回)
     private var badgeKey: String {
-        let ids = library.createdIds.filter { library.isOnServer($0) && library.generated[$0] != nil }
+        let ids = badgeTargets.map(\.appId)
         return "\(MacAccount.shared.session.user?.uid ?? "")|\(ids.joined(separator: ","))|\(noticeCheck)"
     }
 
-    /// サイドバーの新着の数(#969)。サーバーにあり中身を取ったアプリだけ(entity が分かるもの)
-    private func refreshBadges() async {
-        let targets = library.createdIds.compactMap { id -> MacSidebarBadges.Target? in
+    /// 数える相手: サーバーにあり中身を取ったアプリの、共有の entity だけ
+    private var badgeTargets: [MacSidebarBadges.Target] {
+        library.createdIds.compactMap { id in
             guard library.isOnServer(id), let document = library.generated[id] else { return nil }
-            return .init(appId: id, entities: document.dsl.entities.map(\.id))
+            return MacSidebarBadges.target(appId: id, entities: document.dsl.entities)
         }
-        await badges.refresh(targets, openAppId: selectedAppId, uid: MacAccount.shared.session.user?.uid,
-                             source: MacServices.shared.appConfig as? SharedRecordStampSource)
+    }
+
+    /// サイドバーの新着の数(#969)
+    private func refreshBadges() async {
+        await badges.refreshIfDue(badgeTargets, uid: MacAccount.shared.session.user?.uid,
+                                  source: MacServices.shared.appConfig as? SharedRecordStampSource)
     }
 
     /// サーバーの一覧を取り直す(#1057)。サインインしていなければ取らない(サインアウトの後は wipe が空にしている)
@@ -492,7 +508,7 @@ struct MacRootView: View {
         #if APP_STORE_REVIEW
         false
         #else
-        guard let app = selectedApp, compose == nil else { return false }
+        guard let app = selectedApp, compose == nil, !updateGate.isBlocking else { return false }
         return MacShareAppModel.canShare(isCreated: library.isCreated(app.id), isOnServer: library.isOnServer(app.id),
                                          signedIn: MacAccount.shared.session.user != nil,
                                          sharingAvailable: MacServices.shared.sharing != nil)
@@ -508,7 +524,7 @@ struct MacRootView: View {
     }
 
     /// 会話のシートを開ける・版を戻せるか。画面マップのシートが出ている間は開かない(シートを重ねない)
-    private var canCompose: Bool { compose == nil && !showsScreenMap }
+    private var canCompose: Bool { compose == nil && !showsScreenMap && !updateGate.isBlocking }
 
     private func showScreenMap() {
         guard canShowScreenMap else { return }
@@ -532,7 +548,8 @@ struct MacRootView: View {
         }
         guard let session = closingCompose, case .finished(let summary, false) = session.phase,
               let appId = session.resultAppId else { return }
-        notices.summary = .init(appId: appId, text: summary, action: library.canUndo(appId) ? .undo : nil)
+        // 完成の読み上げは会話のシート(`.built`)で済んでいる
+        notices.summary = .init(appId: appId, text: summary, action: library.canUndo(appId) ? .undo : nil, announced: true)
         if let data = session.resultPublicData { // 公開の確認(#253)は要約が閉じてから
             notices.notePublicData(data.fields, appId: appId, version: data.version)
         }
@@ -591,7 +608,7 @@ struct MacRootView: View {
                                     redo: { redoVersion(summary.appId) },
                                     dismiss: { withMacAnimation { notices.dismissActive() } })
                     .task(id: summary.id) {
-                        MacVoiceOver.announce(summary.text)
+                        if !summary.announced { MacVoiceOver.announce(summary.text) }
                         try? await Task.sleep(for: .seconds(MacPostBuildNotices.holdSeconds(summary)))
                         guard !Task.isCancelled, notices.summary == summary else { return }
                         withMacAnimation { notices.dismissActive() }
