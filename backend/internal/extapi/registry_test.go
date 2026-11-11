@@ -32,6 +32,9 @@ func TestRegistry(t *testing.T) {
 	ids := []string{}
 	for _, p := range Providers() {
 		ids = append(ids, p.ID)
+		if p.NeedsOAuth && (p.NameJa == "" || p.NameEn == "") {
+			t.Errorf("%s: an OAuth provider without its name", p.ID)
+		}
 	}
 	if !slices.IsSorted(ids) {
 		t.Fatalf("not sorted: %v", ids)
@@ -46,6 +49,11 @@ func TestRegisterRefusesBadDefinitions(t *testing.T) {
 		func(p *Provider) { p.Ops = nil },
 		func(p *Provider) { p.Ops = []OpSpec{{Name: "get"}, {Name: "get"}} },
 		func(p *Provider) { p.NeedsOAuth = true },
+		func(p *Provider) { // OAuth without a name for the 「つないだサービス」 list
+			p.NeedsOAuth = true
+			p.NewOAuth = func(Secrets) (OAuthClient, error) { return fakeOAuthClient{}, nil }
+			p.NameJa = "名前"
+		},
 		func(p *Provider) { p.Hosts = []string{"http://example.com"} },
 		func(p *Provider) { p.Hosts = []string{"https://example.com/path"} },
 		func(p *Provider) { p.ID = FakeFree }, // duplicate

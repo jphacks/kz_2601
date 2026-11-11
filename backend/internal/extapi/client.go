@@ -103,16 +103,22 @@ func (c *Client) Revoke(ctx context.Context, uid, provider string) error {
 	return c.post(ctx, "/internal/ext/connections/revoke", ConnBody{UID: uid, Provider: provider}, &out)
 }
 
+// ConnectionList is the runner's answer to /internal/ext/connections/list:
+// uid's connections (no tokens) and the provider ids the runner has on
+// (EnabledProviders; an older runner sends none).
+type ConnectionList struct {
+	Connections []ConnectionView `json:"connections"`
+	Enabled     []string         `json:"enabled"`
+}
+
 // List is POST /internal/ext/connections/list (no tokens).
-func (c *Client) List(ctx context.Context, uid string) ([]ConnectionView, error) {
-	var out struct {
-		Connections []ConnectionView `json:"connections"`
-	}
+func (c *Client) List(ctx context.Context, uid string) (ConnectionList, error) {
+	var out ConnectionList
 	if err := c.post(ctx, "/internal/ext/connections/list", ConnBody{UID: uid}, &out); err != nil {
-		return nil, err
+		return ConnectionList{}, err
 	}
 	if out.Connections == nil {
 		out.Connections = []ConnectionView{}
 	}
-	return out.Connections, nil
+	return out, nil
 }

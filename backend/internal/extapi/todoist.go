@@ -61,7 +61,7 @@ var todoistWireDefault = todoistWire{
 var todoistHosts = []string{"https://api.todoist.com"}
 
 func init() {
-	register(Provider{ID: Todoist, Billing: BillingFree, NeedsOAuth: true,
+	register(Provider{ID: Todoist, Billing: BillingFree, NeedsOAuth: true, NameJa: "Todoist", NameEn: "Todoist",
 		Ops: []OpSpec{
 			{Name: "listTasks", Scopes: []string{todoistScopeRead}, Args: []string{"filter", "projectId", "limit"}},
 			{Name: "addTask", Write: true, Scopes: []string{todoistScopeAdd}, Args: []string{"content", "description", "dueString", "dueDate", "priority", "projectId"}},

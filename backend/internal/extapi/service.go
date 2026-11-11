@@ -141,6 +141,17 @@ func (s *Service) Enabled(provider string) bool {
 	return ok && !s.cfg.Disabled
 }
 
+// EnabledProviders are the provider ids that can be called now, sorted.
+func (s *Service) EnabledProviders() []string {
+	out := []string{}
+	for _, p := range Providers() {
+		if s.Enabled(p.ID) {
+			out = append(out, p.ID)
+		}
+	}
+	return out
+}
+
 // CallRequest is one call.
 type CallRequest struct {
 	Provider string

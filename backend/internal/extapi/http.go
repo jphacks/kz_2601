@@ -130,16 +130,16 @@ func (s *Service) Routes(mux *http.ServeMux) {
 		if !httpx.DecodeBody(w, r, &b) {
 			return
 		}
-		if s.Conns == nil || b.UID == "" {
-			httpx.WriteJSON(w, http.StatusOK, map[string]any{"connections": []ConnectionView{}})
-			return
+		out := ConnectionList{Connections: []ConnectionView{}, Enabled: s.EnabledProviders()}
+		if s.Conns != nil && b.UID != "" {
+			list, err := s.Conns.List(r.Context(), b.UID)
+			if err != nil {
+				s.fail(w, err)
+				return
+			}
+			out.Connections = list
 		}
-		list, err := s.Conns.List(r.Context(), b.UID)
-		if err != nil {
-			s.fail(w, err)
-			return
-		}
-		httpx.WriteJSON(w, http.StatusOK, map[string]any{"connections": list})
+		httpx.WriteJSON(w, http.StatusOK, out)
 	})
 	mux.HandleFunc("POST /internal/ext/expire", func(w http.ResponseWriter, r *http.Request) {
 		if s.Conns == nil {

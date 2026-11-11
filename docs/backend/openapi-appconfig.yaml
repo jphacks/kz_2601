@@ -1973,6 +1973,15 @@ paths:
       description: |
         利用者ごとの OAuth のつなぎ(`users/{uid}/connections/*`)。provider・状態・scope・日付だけを返す(トークンは返さない)。切ったもの(印だけ残っている)は出さない。
         `EXT_RUNNER_URL` が無い時は空の一覧。
+        `providers` はつなげるサービスの一覧(#1566・OAuth の要る provider だけ・id の順)。`enabled` は runner が今動かしているか(`EXT_RUNNER_URL` が無い時はみな false)。偽の provider は runner が動かしている時だけ(本番では出ない)。
+        `supportedFeatures` を付けると `externalCall.<id>` が入っている provider だけ。審査用の版は OAuth の provider のキーを送らないので何も出ない(決定 6)。
+      parameters:
+        - in: query
+          name: supportedFeatures
+          required: false
+          schema: { type: string }
+          example: externalCall.googleCalendar,externalCall.todoist
+          description: 'generate と同じ値。カンマ区切り・くり返しも可。無ければ絞らない'
       responses:
         '200':
           description: OK
@@ -1980,9 +1989,10 @@ paths:
             application/json:
               schema:
                 type: object
-                required: [connections]
+                required: [connections, providers]
                 properties:
                   connections: { type: array, items: { $ref: '#/components/schemas/ExtConnection' } }
+                  providers: { type: array, items: { $ref: '#/components/schemas/ExtProvider' } }
         '401': { $ref: '#/components/responses/Unauthenticated' }
         '502': { description: runner に届かない(`upstream_unavailable`), content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
 
@@ -2294,6 +2304,15 @@ components:
         scopes: { type: array, items: { type: string } }
         connectedAt: { type: string, format: date-time }
         lastUsedAt: { type: string, format: date-time }
+    ExtProvider:
+      type: object
+      description: つなげるサービス(GET /me/connections の providers)
+      required: [id, nameJa, nameEn, enabled]
+      properties:
+        id: { type: string, example: googleCalendar, description: 'POST /me/connections/{provider}/start の provider' }
+        nameJa: { type: string, example: Google カレンダー }
+        nameEn: { type: string, example: Google Calendar }
+        enabled: { type: boolean, description: 'このサーバーで今つなげるか(false なら画面はボタンを押せなくする)' }
     ExtResult:
       type: object
       description: op の決まった形の答え(外の API の生の JSON は返さない)。読む op は rows、1 件は item、書く op は resultId

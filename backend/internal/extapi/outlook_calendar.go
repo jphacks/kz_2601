@@ -62,7 +62,7 @@ var outlookCalendarWire = outlookWire{
 var outlookCalendarHosts = []string{"https://login.microsoftonline.com", "https://graph.microsoft.com"}
 
 func init() {
-	register(Provider{ID: OutlookCalendar, Billing: BillingFree, NeedsOAuth: true,
+	register(Provider{ID: OutlookCalendar, Billing: BillingFree, NeedsOAuth: true, NameJa: "Outlook カレンダー", NameEn: "Outlook Calendar",
 		Ops: []OpSpec{
 			{Name: "listEvents", Scopes: []string{outlookScopeRead}, Args: []string{"timeMin", "timeMax", "maxResults", "q"}},
 			{Name: "createEvent", Write: true, Scopes: []string{outlookScopeWrite}, Args: []string{"title", "start", "end", "description", "location"}},

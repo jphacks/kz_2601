@@ -113,7 +113,7 @@ provider が 404 / 422(持っていない通貨・日)を返した時は 400 `ba
 |---|---|
 | `POST /internal/ext/call` | `{provider, op, args, appId, creatorUid, creatorAnonymous, userUid, userAnonymous, requestId}` → `{result: {rows / item / resultId}, coinsCharged, coinsBalance}`(後の 2 つは `X-Coins-Charged` / `X-Coins-Balance` にする) |
 | `POST /internal/ext/connections/start` | `{uid, provider, scopes?}` → `{authUrl}`(scope を書かなければ読む op の分だけ。書く op の scope は使う時に足す) |
-| `POST /internal/ext/connections/revoke` / `revokeAll` / `list` | 切る / 全部切る(退会)/ 一覧(トークン無し) |
+| `POST /internal/ext/connections/revoke` / `revokeAll` / `list` | 切る / 全部切る(退会)/ 一覧(トークン無し。`list` は動かしている provider の id `enabled` も返す) |
 | `POST /internal/ext/expire` | 90 日を過ぎた接続を最大 500 件消す(Scheduler から 1 日 1 回の想定) |
 | `GET /oauth/callback/{provider}` | provider の同意から戻る唯一の認証なしの口。state を 1 回だけ確かめ、code をトークンに替えて保管し、`tailorit://connected?provider=…&status=ok\|error` に 302。URL にトークン・code は入らない |
 
@@ -132,9 +132,17 @@ provider が 404 / 422(持っていない通貨・日)を返した時は 400 `ba
 | 口 | 中身 |
 |---|---|
 | `POST /v1/apps/{appId}/ext/{provider}/{op}` | `{"args": {...}}` → `{rows / item / resultId}`。有料の provider は `X-Coins-Charged` / `X-Coins-Balance` |
-| `GET /v1/me/connections` | つないだサービスの一覧(provider・状態・scope・日付。トークンは返さない) |
+| `GET /v1/me/connections` | `connections`: つないだサービスの一覧(provider・状態・scope・日付。トークンは返さない)。`providers`: つなげるサービスの一覧(下) |
 | `POST /v1/me/connections/{provider}/start` | `{"scopes"?}` → `{authUrl}`(OAuth の要る provider だけ。ほかは 404) |
 | `DELETE /v1/me/connections/{provider}` | 切る(204) |
+
+`GET /v1/me/connections` の `providers` は、端末の「つないだサービス」の画面がつなぐボタンを出すための一覧(#1566)。端末に provider を書き込まずに済む。
+
+- 中身は `{id, nameJa, nameEn, enabled}`。OAuth の要る provider だけ・id の順。名前は provider のファイルの `NameJa` / `NameEn`(OAuth の provider では必須)
+- `enabled` は runner が今その provider を動かしているか(runner の一覧の答えの `enabled`・`Service.EnabledProviders`)。`EXT_RUNNER_URL` が無い時はみな false
+- 偽の provider(`fakeOauth`)は runner が動かしている時だけ出す。本番では動かないので出ない
+- `?supportedFeatures=a,b`(generate と同じ値・くり返しも可)を付けると、`externalCall.<id>` が入っている provider だけにする。審査用の版は OAuth の provider のキーを送らない(`ReviewBuildFeatures`・決定 6)ので何も出ない。付けなければ絞らない
+- 別の口にせず一覧に入れたのは、画面が 1 回の呼び出しで「つないだもの」と「つなげるもの」を出せるから
 
 `POST /v1/apps/{appId}/ext/...` で appconfig が確かめること:
 
