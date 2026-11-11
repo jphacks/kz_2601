@@ -32,12 +32,12 @@ protocol PassbyTransport: AnyObject {
 ///
 /// - 同じアプリかは discoveryInfo の `a`(appId のハッシュ)で判定。招待は senderId の小さい側だけが出す(二重接続を防ぐ)
 /// - 相手ごとに暗号化必須の MCSession。交換が済んだら切る(distance の時は測り続けるためつないだまま)
-/// - 受け取るデータは 1 通 32 KB まで(相手の上限 16 KB + 余裕)
+/// - 受け取るデータは 1 通 `NearbyPassby.maxReceiveBytes` まで(読む前に大きさを確かめる)。名前・id の長さは `NearbyLimits`
+/// - MCPeerID の名前は相手に渡す名前(匿名なら「近くの人」)と同じにする
 @MainActor
 final class MCPassbyTransport: NSObject, PassbyTransport {
     /// Info.plist `NSBonjourServices` の `_tailorit-pb._tcp` / `_udp` と一致させる(15 文字以内)
     static let serviceType = "tailorit-pb"
-    static let maxMessageBytes = 32 * 1024
 
     var onPayload: ((NearbyPassby.Payload) -> Void)?
     var onPeers: (([PassbyPeer]) -> Void)?
@@ -80,7 +80,7 @@ final class MCPassbyTransport: NSObject, PassbyTransport {
         current = start
         var name = start.hello.name
         while name.utf8.count > 63 { name.removeLast() }
-        let peer = MCPeerID(displayName: name.isEmpty ? "Tailor It" : name)
+        let peer = MCPeerID(displayName: name.isEmpty ? NearbyLimits.anonymousName : name)
         me = peer
         let info = ["v": "\(NearbyPassby.version)", "a": start.hello.app, "s": start.hello.senderId]
         let a = MCNearbyServiceAdvertiser(peer: peer, discoveryInfo: info, serviceType: Self.serviceType)
@@ -114,14 +114,14 @@ final class MCPassbyTransport: NSObject, PassbyTransport {
         guard let me else { return nil }
         let session = MCSession(peer: me, securityIdentity: nil, encryptionPreference: .required)
         session.delegate = self
-        let link = Link(session: session, senderId: senderId, name: peer.displayName)
+        let link = Link(session: session, senderId: senderId, name: NearbyLimits.publicName(peer.displayName, anonymous: false))
         links[peer] = link
         return link
     }
 
     private func found(_ peer: MCPeerID, info: [String: String]?) {
         guard let cur = current, let browser, links[peer] == nil,
-              info?["a"] == cur.hello.app, let s = info?["s"], s != cur.hello.senderId,
+              info?["a"] == cur.hello.app, let s = info?["s"], NearbyLimits.isValidId(s), s != cur.hello.senderId,
               cur.hello.senderId < s, // 小さい側だけが招待する
               cur.config.distance || cur.shouldExchange(s),
               let context = try? NearbyPassby.encode(cur.hello),
@@ -131,7 +131,7 @@ final class MCPassbyTransport: NSObject, PassbyTransport {
 
     private func invited(by peer: MCPeerID, context: Data?, handler: @escaping (Bool, MCSession?) -> Void) {
         guard let cur = current, links[peer] == nil,
-              let hello = context.flatMap({ try? NearbyPassby.decode(NearbyPassby.Hello.self, from: $0) }),
+              let hello = context.flatMap(NearbyPassby.decodeHello),
               hello.app == cur.hello.app, hello.senderId != cur.hello.senderId,
               cur.config.distance || cur.shouldExchange(hello.senderId),
               let link = makeLink(for: peer, senderId: hello.senderId) else {
@@ -166,9 +166,9 @@ final class MCPassbyTransport: NSObject, PassbyTransport {
     }
 
     private func received(_ data: Data, from peer: MCPeerID) {
-        guard data.count <= Self.maxMessageBytes, let link = links[peer],
+        guard data.count <= NearbyPassby.maxReceiveBytes, let link = links[peer],
               let msg = try? NearbyPassby.decode(Message.self, from: data) else { return }
-        if var payload = msg.payload, !link.received {
+        if var payload = msg.payload?.validated(), !link.received {
             link.received = true
             payload.senderId = link.senderId // 招待時の id に揃える(なりすまし防止)
             link.name = payload.name

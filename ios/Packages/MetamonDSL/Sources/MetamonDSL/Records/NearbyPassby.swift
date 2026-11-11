@@ -5,15 +5,22 @@ import Foundation
 /// - 送る: `fields` に明示した保存 field だけ。hidden(#262)・photo・video・ref・refs・computed は送らない
 /// - 量: 1 回 `limit` 件(既定 1・最大 20 件)かつ JSON で 16 KB 以内
 /// - 受け取り: 同じ相手(senderId)・同じ記録 id は 2 度追加しない。内容が変わっていれば更新する
+/// - 受け取る量: 1 通 `maxReceiveBytes` まで・名前と id の長さは `NearbyLimits`
+/// - 名前: 同意の画面で匿名を選ぶと、表示名の代わりに `NearbyLimits.anonymousName` を送る
 public enum NearbyPassby {
     public static let version = 1
     public static let maxRecords = 20
     public static let maxBytes = 16 * 1024
+    /// 受け取る 1 通の上限(相手の上限 16 KB + 距離測定の token + 余裕)。超えたら読まずに捨てる。
+    public static let maxReceiveBytes = 32 * 1024
+    /// 招待に載る Hello の上限。
+    public static let maxHelloBytes = 1024
     public static let defaultLimit = 1
     /// 同じ相手と続けて交換しない間隔(離れて戻ってきたら「また会った」)。
     public static let cooldown: TimeInterval = 10 * 60
     /// 同意文を変えたら上げる(もう一度同意を取る)。
-    public static let consentVersion = 1
+    /// 2: 相手に渡るもの(表示名・項目)を並べ、匿名を選べるようにした
+    public static let consentVersion = 2
     public static let blockedTypes: Set<FieldType> = [.photo, .video, .ref, .refs]
 
     // MARK: - 設定
@@ -87,6 +94,12 @@ public enum NearbyPassby {
         }
     }
 
+    /// 招待の context を読む。大きすぎる・id が長すぎる Hello は nil(招待を断る)。
+    public static func decodeHello(_ data: Data) -> Hello? {
+        guard data.count <= maxHelloBytes else { return nil }
+        return (try? decode(Hello.self, from: data))?.validated()
+    }
+
     /// 同じアプリかを Bonjour の discoveryInfo / Hello で比べる印(FNV-1a 64bit・暗号用途ではない)。
     public static func appTag(_ appId: String) -> String {
         var h: UInt64 = 0xcbf2_9ce4_8422_2325
@@ -123,7 +136,7 @@ public enum NearbyPassby {
         let fields = Dictionary(allowedFields(config, in: entity).map { ($0.id, $0) }, uniquingKeysWith: { a, _ in a })
         return payload.records.prefix(maxRecords).compactMap { item in
             let data = item.data.filter { k, v in fields[k].map { NearbyShare.accepts(v, $0.type) } ?? false }
-            return data.isEmpty || item.id.isEmpty ? nil : Item(id: item.id, data: data)
+            return data.isEmpty || !NearbyLimits.isValidId(item.id) ? nil : Item(id: item.id, data: data)
         }
     }
 
@@ -233,12 +246,13 @@ public enum NearbyPassby {
         return (consentedVersion ?? 0) >= consentVersion ? .start : .askConsent
     }
 
-    /// 同意文。送る項目の名前を必ず並べる。
-    public static func consentText(fieldNames: [String]) -> String {
-        let list = fieldNames.isEmpty ? "(送る項目がありません)" : fieldNames.map { "「\($0)」" }.joined(separator: "")
-        return "オンの間、近くで同じアプリを開いている人と自動でつながり、あなたの\(list)を交換します。"
-            + "相手の記録はこの端末に追加されます。写真・動画や、それ以外の項目は送りません。"
-            + "この画面を閉じるか、アプリを裏に回すと止まります。"
+    /// 同意文。相手に渡るもの(表示名と項目の名前)を必ず並べる。`name` は相手に見える名前(匿名なら「近くの人」)。
+    public static func consentText(fieldNames: [String], name: String) -> String {
+        let list = fieldNames.isEmpty ? L("(送る項目がありません)") : fieldNames.map { "「\($0)」" }.joined(separator: "")
+        return L("オンの間、近くで同じアプリを開いている人と自動でつながり、次のものを渡します。")
+            + "\n" + L("・表示名: \(name)") + "\n" + L("・項目: \(list)") + "\n"
+            + L("相手の記録はこの端末に追加されます。写真・動画や、それ以外の項目は送りません。")
+            + L("この画面を閉じるか、アプリを裏に回すと止まります。")
     }
 
     // MARK: - 距離・方向の表示
@@ -272,5 +286,26 @@ public enum NearbyPassby {
         let d = JSONDecoder()
         d.dateDecodingStrategy = .iso8601
         return try d.decode(type, from: data)
+    }
+}
+
+extension NearbyPassby.Hello {
+    /// 受け取った Hello を上限に揃える。app・senderId が空・長すぎるものは nil。名前は切り詰め、空なら「近くの人」。
+    public func validated() -> Self? {
+        guard NearbyLimits.isValidId(app), NearbyLimits.isValidId(senderId) else { return nil }
+        var h = self
+        h.name = NearbyLimits.publicName(name, anonymous: false)
+        return h
+    }
+}
+
+extension NearbyPassby.Payload {
+    /// 受け取った Payload を上限に揃える。senderId・entityId が空・長すぎる、件数が上限を超えるものは nil。
+    public func validated() -> Self? {
+        guard NearbyLimits.isValidId(senderId), NearbyLimits.isValidId(entityId),
+              records.count <= NearbyPassby.maxRecords else { return nil }
+        var p = self
+        p.name = NearbyLimits.publicName(name, anonymous: false)
+        return p
     }
 }

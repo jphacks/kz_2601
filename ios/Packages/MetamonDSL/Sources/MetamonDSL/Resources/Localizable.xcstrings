@@ -1,6 +1,23 @@
 {
   "sourceLanguage" : "ja",
   "strings" : {
+    "(送る項目がありません)" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "(no fields to send)"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "(送る項目がありません)"
+          }
+        }
+      }
+    },
     "AI の答えを読み取れませんでした。もう一度お試しください" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -171,6 +188,23 @@
         }
       }
     },
+    "この画面を閉じるか、アプリを裏に回すと止まります。" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "It stops when you close this screen or move the app to the background."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "この画面を閉じるか、アプリを裏に回すと止まります。"
+          }
+        }
+      }
+    },
     "この端末では AI を使えません" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -218,6 +252,57 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "すれ違い通信"
+          }
+        }
+      }
+    },
+    "オンの間、近くで同じアプリを開いている人と自動でつながり、次のものを渡します。" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "While on, you automatically connect with nearby people who have the same app open and share the following."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "オンの間、近くで同じアプリを開いている人と自動でつながり、次のものを渡します。"
+          }
+        }
+      }
+    },
+    "・表示名: %@" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "• Display name: %@"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "・表示名: %@"
+          }
+        }
+      }
+    },
+    "・項目: %@" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "• Fields: %@"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "・項目: %@"
           }
         }
       }
@@ -405,6 +490,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "相手のアプリが新しすぎるため受け取れません"
+          }
+        }
+      }
+    },
+    "相手の記録はこの端末に追加されます。写真・動画や、それ以外の項目は送りません。" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Their records are added to this device. Photos, videos and other fields are not sent. "
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "相手の記録はこの端末に追加されます。写真・動画や、それ以外の項目は送りません。"
           }
         }
       }

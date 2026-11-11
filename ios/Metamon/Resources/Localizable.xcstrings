@@ -2687,6 +2687,23 @@
         }
       }
     },
+    "「%@」を追加しますか?" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Add “%@”?"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "「%@」を追加しますか?"
+          }
+        }
+      }
+    },
     "「AI で書く」ボタン(文を作る・要約・分類・書き直し・抜き出し・提案)は、押した時だけ送ります。短い答えは、端末の中の AI が使える時は送らず、使えない時だけ最近の記録と入力中の文字(最大 4KB)を送ります。長い答えのボタンは、いつも最大 16KB を送ります。共有のアプリで材料にするのは、自分が入れた記録だけです。" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -3006,6 +3023,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "いつでも解約できます(App Store の設定から)"
+          }
+        }
+      }
+    },
+    "いつもの" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Default"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "いつもの"
           }
         }
       }
@@ -4162,6 +4196,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "この端末では AI を端末内で動かせないため、サーバーの AI を使います。"
+          }
+        }
+      }
+    },
+    "この端末ではアイコンを変えられません。" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "This device can't change the app icon."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "この端末ではアイコンを変えられません。"
           }
         }
       }
@@ -5437,6 +5488,74 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "やり直せませんでした"
+          }
+        }
+      }
+    },
+    "アイコン" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "App Icon"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "アイコン"
+          }
+        }
+      }
+    },
+    "アイコン: %@" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "App icon: %@"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "アイコン: %@"
+          }
+        }
+      }
+    },
+    "アイコンを変えられませんでした" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Couldn't Change the Icon"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "アイコンを変えられませんでした"
+          }
+        }
+      }
+    },
+    "アイコンを変えられませんでした。少し待ってからもう一度お試しください。" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Couldn't change the app icon. Wait a moment and try again."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "アイコンを変えられませんでした。少し待ってからもう一度お試しください。"
           }
         }
       }
@@ -6750,6 +6869,23 @@
         }
       }
     },
+    "シェアされたアプリを追加しますか?" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Add the shared app?"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "シェアされたアプリを追加しますか?"
+          }
+        }
+      }
+    },
     "シェアされたアプリを開けませんでした" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -7154,6 +7290,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "ダウンロード中 %lld%%"
+          }
+        }
+      }
+    },
+    "ダーク" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Dark"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ダーク"
           }
         }
       }
@@ -7940,6 +8093,23 @@
         }
       }
     },
+    "モノクロ" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mono"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "モノクロ"
+          }
+        }
+      }
+    },
     "ユーザー ID" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -7987,6 +8157,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "ライセンスを読み込めませんでした"
+          }
+        }
+      }
+    },
+    "ライト" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Light"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ライト"
           }
         }
       }
@@ -11489,6 +11676,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "声を文字にする準備(初回だけ約%lldMB)が終わる前でも、文字ならすぐに作れます。"
+          }
+        }
+      }
+    },
+    "変えると iOS の確認が出ます。" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "iOS shows a confirmation when you change it."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "変えると iOS の確認が出ます。"
           }
         }
       }
@@ -16062,6 +16266,57 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "近くの端末を探せませんでした(設定 › プライバシー › ローカルネットワークで Tailor It を許可してください)"
+          }
+        }
+      }
+    },
+    "追加しない" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Not now"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "追加しない"
+          }
+        }
+      }
+    },
+    "追加する" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Add"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "追加する"
+          }
+        }
+      }
+    },
+    "追加すると、このアプリに切り替わります" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Adding it switches to this app."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "追加すると、このアプリに切り替わります"
           }
         }
       }

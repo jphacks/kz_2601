@@ -2602,6 +2602,23 @@
         }
       }
     },
+    "オンにすると、表示名の代わりに「近くの人」と渡します。" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "When on, “Someone nearby” is shared instead of your display name."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "オンにすると、表示名の代わりに「近くの人」と渡します。"
+          }
+        }
+      }
+    },
     "オンラインの AI が入力しました。確認して保存してください" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -5271,6 +5288,23 @@
         }
       }
     },
+    "名前を出さない" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Hide my name"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "名前を出さない"
+          }
+        }
+      }
+    },
     "地図を動かして、ピンの位置で決められます" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -6648,6 +6682,40 @@
         }
       }
     },
+    "相手に渡るもの" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "What you share"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "相手に渡るもの"
+          }
+        }
+      }
+    },
+    "相手に見える名前: %@" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Name others see: %@"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "相手に見える名前: %@"
+          }
+        }
+      }
+    },
     "相手の端末で曲を再生待ちに入れられませんでした" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -7069,6 +7137,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "表"
+          }
+        }
+      }
+    },
+    "表示名" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Display name"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "表示名"
           }
         }
       }

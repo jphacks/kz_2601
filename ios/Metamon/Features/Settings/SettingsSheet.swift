@@ -41,6 +41,7 @@ struct SettingsSheet: View {
                 RemainingTodaySettingsSection() // #630 今日の残り(審査用の版も出す)
                 UsageSettingsSection() // #317 使っている量(作ったアプリの数・今のアプリの記録と写真)
                 languageSection
+                Section { AppIconSettingsRow() } // #232 ホーム画面のアイコン(全員・審査用の版も出す)
                 voiceModelSection
                 clarifySection
                 speechSection
