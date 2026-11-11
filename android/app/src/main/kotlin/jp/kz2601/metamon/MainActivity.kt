@@ -62,6 +62,8 @@ import jp.kz2601.metamon.nearby.NearbyHostUi
 import jp.kz2601.metamon.permissions.ProvideRendererPermissions
 import jp.kz2601.metamon.renderer.DSLView
 import jp.kz2601.metamon.renderer.components.feed.LocalFeedHost
+import jp.kz2601.metamon.renderer.screen.FabCoordinator
+import jp.kz2601.metamon.renderer.screen.LocalFabCoordinator
 import jp.kz2601.metamon.renderer.theme.MetamonRenderTheme
 import jp.kz2601.metamon.renderer.theme.ReadableWidth
 import jp.kz2601.metamon.retention.RetentionPromptHost
@@ -348,12 +350,16 @@ fun MetamonApp(container: AppContainer) {
                 if (state.isInitial) {
                     VoiceRoute(vm, onMicLongPress = openSwitcher)
                 } else {
-                    // 横向き・タブレット・折りたたみでは幅を絞って中央に寄せる(iOS の readableWidth・#842)。
-                    ReadableWidth {
-                        GeneratedApp(state, runtimeState.dsl, runtime, appId = runtimeState.document.appId)
+                    // 描画器と FAB のやり取り: 最下段の部品を FAB が避け、list の末尾は FAB ぶん余白を足す(#1204)
+                    val fabCoordinator = remember { FabCoordinator() }
+                    CompositionLocalProvider(LocalFabCoordinator provides fabCoordinator) {
+                        // 横向き・タブレット・折りたたみでは幅を絞って中央に寄せる(iOS の readableWidth・#842)。
+                        ReadableWidth {
+                            GeneratedApp(state, runtimeState.dsl, runtime, appId = runtimeState.document.appId)
+                        }
+                        // マイク FAB(#892): タップ = このアプリを変える・長押し = 変身一覧・ドラッグで動かす / 端に隠す
+                        VoiceFab(busy = state.isGenerating, onTap = vm::openVoice, onLongPress = openSwitcher)
                     }
-                    // マイク FAB(#892): タップ = このアプリを変える・長押し = 変身一覧・ドラッグで動かす / 端に隠す
-                    VoiceFab(busy = state.isGenerating, onTap = vm::openVoice, onLongPress = openSwitcher)
                 }
             }
             // 要約と元に戻す・状態カード・トースト・削除の取り消し・確認ダイアログ(#895)
