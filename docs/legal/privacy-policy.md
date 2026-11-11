@@ -2,7 +2,7 @@
 
 
 施行日: 2026年10月30日
-改定日: 2026年11月9日
+改定日: 2026年11月11日
 運営者: 高岡己太朗
 連絡先: support@tailor-it.app
 
@@ -62,6 +62,7 @@ Tailor It(以下「本アプリ」)は、話した内容や入力した文から
 - ヘルスケアのデータは端末の中で表示するだけで、サーバー・AI には送りません。広告やマーケティングには使いません。App Store で配布する版にはヘルスケアの機能が無い場合があり、その場合はヘルスケアのデータを一切読み取りません。
 - 位置情報・写真は、ユーザーが記録に入れた場合に限り、記録の一部として 1.4 のとおり保存します。写真の項目で、端末の中の Image Playground で作ったイラストも、写真と同じに扱います(イラストは端末の中だけで作り、作るために何かを送ることはありません)。
 - 地図の表示・近くの場所の検索・住所の入力・道案内では、端末から Apple に直接、検索の言葉と位置を送ります(2 章)。本アプリのサーバーには送りません。
+- Android 版の地図の表示では、端末から OpenFreeMap に直接、地図の画像(タイル)を取りに行きます。この時 OpenFreeMap は、端末の IP アドレスと表示している地図の範囲を受け取ります(2 章)。
 - 保存した場所に着いた時の通知は、iPhone の仕組みで端末の中で判定します。この判定のために位置をサーバーに送ることはありません。
 
 ### 1.6 共有・公開(利用できる場合)
@@ -144,10 +145,13 @@ Tailor It(以下「本アプリ」)は、話した内容や入力した文から
 - Anthropic, PBC(AI による生成・相談。米国への移転を含みます)
 - Apple Inc.(Sign in with Apple・App Store の課金と取引の確認・プッシュ通知の配信)
 - Hugging Face, Inc.(音声認識のモデルの配信。1.2 のダウンロードの通信だけで、音声・話した内容は送りません。米国)
+- OpenFreeMap(Android 版の地図のタイルの配信。端末の IP アドレスと表示している地図の範囲だけを受け取ります)
 
 1.2 の端末の中の音声認識では、声を Apple に送りません。1.11 の出どころ(気象庁・内閣府・デジタル庁・消防庁・MET Norway(ノルウェー)・arXiv(米国)・国立国会図書館・openBD)には、1.11 に書いたもの(府県予報区のコード・代表地点の座標・ファイルの指定・論文の分野・探す語・ISBN)のほかは送りません。
 
 地図の表示・場所の検索・住所の取得・道案内(利用できる場合)では、iPhone に Apple が用意している地図の仕組み(MapKit)を使い、**端末から Apple に直接**、検索の言葉と位置(現在地・地図の範囲・選んだ場所の座標)を送ります。本アプリのサーバーは通らず、運営者はこの送信の内容を受け取りません。Apple での扱いは [Apple のプライバシーポリシー](https://www.apple.com/legal/privacy/) によります。
+
+Android 版の地図の表示(利用できる場合)では、[OpenFreeMap](https://openfreemap.org/) の地図の画像(タイル)を使い、**端末から OpenFreeMap に直接**取りに行きます。この時 OpenFreeMap は、端末の IP アドレスと表示している地図の範囲(どの場所のタイルか)を受け取ります。検索の言葉・現在地の座標・記録の中身・ユーザー ID は送りません。本アプリのサーバーは通らず、運営者はこの送信の内容を受け取りません。本アプリは [OpenFreeMap の利用規約](https://openfreemap.org/tos/) に同意して使っており、OpenFreeMap での扱いはこの利用規約によります。
 
 ## 3. 保存期間
 - 作ったアプリ・記録・アカウントの情報は、アカウントを削除するまで保存します(削除後の扱いは 4 章)。
@@ -186,7 +190,7 @@ Tailor It(以下「本アプリ」)は、話した内容や入力した文から
 
 > This summary is for convenience. The Japanese text above prevails.
 
-- **Operator:** Kotaro Takaoka (高岡己太朗) (individual). **Effective:** October 30, 2026. **Revised:** November 9, 2026.
+- **Operator:** Kotaro Takaoka (高岡己太朗) (individual). **Effective:** October 30, 2026. **Revised:** November 11, 2026.
 - **Sign-in:** Sign in with Apple or anonymous, via Google Firebase Authentication. Firebase stores your user ID and, if Apple provides them, your name and email (or Apple's private relay address). Our own server (Firestore) uses only the user ID.
 - **Voice:** Speech is transcribed **on the device** (WhisperKit). **Audio is never uploaded.** Only when the speech model is not on the device (e.g. first use), and after asking you, it is downloaded over HTTPS from **Hugging Face, Inc. (USA)**. Hugging Face receives only standard connection data (your IP address and the file request), never audio, what you say, your records or account details. See [Hugging Face's privacy policy](https://huggingface.co/privacy). While the model is being prepared, Apple's **on-device** speech recognition transcribes your speech temporarily (with the "Speech Recognition" permission); your voice still never leaves the device and is not recorded. The microphone of the "AI chat" part and importing audio files (where available) also transcribe on the device; the audio is never sent (transcribed text you put in a record is stored as a record).
 - **Third-party AI:** Only **after your explicit consent**, the transcribed/typed request, the current conversation and the current app design (screen/field names) are sent through our server (Google Cloud Run, Tokyo) to **Anthropic, PBC (USA, "Claude")** solely to build or edit your app. The contents of your records are not sent when building, editing or chatting about your app. AI parts inside your apps (where available) send data only when you tap or send, within the same consent:
@@ -199,7 +203,7 @@ Tailor It(以下「本アプリ」)は、話した内容や入力した文から
 - **Use by Anthropic:** data sent to Anthropic is used only to build your app, write a button's text (including summaries) or reply in a chat (including suggested records). Under Anthropic's commercial terms, API inputs and outputs are not used to train their models. Without consent you can still view and use your apps. You can withdraw consent in Settings at any time.
 - **Storage:** App designs, version history and records (including downscaled photos you add) are stored on the device and in Google Cloud Firestore (Tokyo). Conversations for building an app are kept on the server for up to 30 minutes. "AI chat" conversations are saved as your private records of that app. Server logs are kept for up to 30 days (request paths may include lookup values such as an ISBN or search term). We keep Firestore backups to recover from failures: point-in-time recovery data for the last 7 days and daily backups kept for 14 days. Both expire automatically.
 - **Device features** (microphone, speech recognition, camera/photos, location, motion, Health, local network, Apple Music, notifications) are used only where available in your build, only when your app uses them, and with your permission. Location is also used for nearby place search, address entry and notifications when you arrive near a saved place; arrival is detected on the device by iOS and your location is not sent to our server for this. Health data stays on the device and is never used for advertising. Illustrations you create on the device with Image Playground in a photo field are treated the same as photos (they are created on the device only; nothing is sent to create them).
-- **Maps** (where available): map display, place search, address lookup and route guidance use Apple's MapKit, which sends your search terms and locations (current location, visible map area, chosen place) **directly from the device to Apple**. They do not pass through our server and we do not receive them. [Apple's privacy policy](https://www.apple.com/legal/privacy/) applies.
+- **Maps** (where available): map display, place search, address lookup and route guidance use Apple's MapKit, which sends your search terms and locations (current location, visible map area, chosen place) **directly from the device to Apple**. They do not pass through our server and we do not receive them. [Apple's privacy policy](https://www.apple.com/legal/privacy/) applies. On Android, map tiles are fetched **directly from the device** from [OpenFreeMap](https://openfreemap.org/), which receives your device's IP address and the visible map area (which tiles are requested), never search terms, your location coordinates, records or user ID. They do not pass through our server. We use OpenFreeMap under [its terms of service](https://openfreemap.org/tos/), which govern its handling of this data.
 - **Sharing / public data** (where available): shared links, the "Discover" catalog and data marked "public" can be seen by others. You can withdraw sharing at any time.
 - **Payments** (if offered) are processed by Apple; we never receive payment details. Our server verifies Apple's signed transactions (and Apple's server notifications) and stores, with your user ID, the product ID, transaction IDs, expiry, revocation/refund time, auto-renew status, grace period, environment and which account a subscription belongs to. Purchases carry a value derived from your user ID that cannot be turned back into it.
 - **Notifications and automations** (where available): to deliver push notifications we store your device token, a per-installation ID, environment, app and OS version with your user ID (up to 10 devices), and deliver them through Apple Push Notification service. Notifications triggered by other people are sent only if you agreed per app (on when you join a shared app after confirming; off by default for public apps); you can turn this off any time. Automations set by an app's creator (Tailor It Pro) run on our server on record changes or at set times and may notify participants; notification text may include up to 30 characters of record values but never URLs, phone numbers or email addresses. Records are not sent to AI for this. When an automation saves the day's weather, pressure or warnings to records (where available), our server fetches them as in "Public data" below and sends the source only the region written in your app (a forecast-area code, or the representative point for pressure), never record values or your details.
