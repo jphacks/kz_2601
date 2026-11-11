@@ -83,6 +83,15 @@ class FeedbackComposerLauncher {
         _open.value = null
     }
 
+    /** つまみ `METAMON_AUTO_FEEDBACK` で自動で開くのは 1 回だけ(画面の作り直し・回転で開き直さない)。初回だけ true */
+    private var autoOpenClaimed = false
+
+    fun claimAutoOpen(): Boolean {
+        if (autoOpenClaimed) return false
+        autoOpenClaimed = true
+        return true
+    }
+
     companion object {
         /** アプリの版・OS・機種・言語。uid などの本人に結びつく値は入れない。 */
         fun currentDevice(context: Context): FeedbackSubmission.Device = FeedbackSubmission.Device(

@@ -26,6 +26,8 @@ data class DebugKnobs(
     val autoNavIntervalSeconds: Double = 2.0,
     /** `METAMON_E2E_OFFLINE_SECONDS=<n>`: 起動から n 秒間、記録の API を圏外にする */
     val offlineSeconds: Double? = null,
+    /** `METAMON_AUTO_FEEDBACK=<秒>`: その秒数後に、端末を振った時と同じくフィードバックの画面を開く(ヘッドレス E2E・#1314) */
+    val autoFeedbackSeconds: Double? = null,
 ) {
     data class AutoNavStep(val screen: String, val presentation: String? = null) {
         override fun toString(): String = presentation?.let { "$screen:$it" } ?: screen

@@ -33,6 +33,7 @@ object DebugKnobParser {
             autoNav = parseAutoNav(str("METAMON_AUTO_NAV")),
             autoNavIntervalSeconds = seconds("METAMON_AUTO_NAV_INTERVAL") ?: 2.0,
             offlineSeconds = seconds("METAMON_E2E_OFFLINE_SECONDS")?.takeIf { it > 0 },
+            autoFeedbackSeconds = seconds("METAMON_AUTO_FEEDBACK"),
         )
     }
 

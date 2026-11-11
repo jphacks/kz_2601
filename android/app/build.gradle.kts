@@ -37,6 +37,8 @@ android {
         versionName = "0.1.0"
         // Play の審査用の版(#1275・iOS の APP_STORE_REVIEW)。-Pmetamon.playReview=true の時だけ共有・探すの入口を外す
         buildConfigField("boolean", "PLAY_REVIEW", (stringProperty("metamon.playReview") == "true").toString())
+        // 画面のテスト(src/androidTest・#1314)。端末かエミュレータで connectedStgDebugAndroidTest
+        testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 
     // 接続先は iOS の ios/project.yml(METAMON_AI_BASE_URL / METAMON_APPCONFIG_BASE_URL)と同じ。
@@ -127,6 +129,12 @@ dependencies {
     testImplementation(libs.junit)
     testImplementation(libs.kotlinx.coroutines.test)
     testImplementation(libs.okhttp.mockwebserver)
+
+    // 画面のテスト(#1314)。本物の MainActivity を起動するので ui-test-manifest(空の Activity)は入れない
+    androidTestImplementation(platform(libs.compose.bom))
+    androidTestImplementation(libs.compose.ui.test.junit4)
+    androidTestImplementation(libs.androidx.test.runner)
+    androidTestImplementation(libs.androidx.test.ext.junit)
 }
 
 // ランタイムのテストは docs/dsl/examples(全 OS 共通の例)をそのまま読む。
