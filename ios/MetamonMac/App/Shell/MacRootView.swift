@@ -67,7 +67,7 @@ struct MacRootView: View {
     var body: some View {
         NavigationSplitView(columnVisibility: $columnVisibility) {
             AppSidebar(created: createdApps, examples: exampleApps, selection: guardedSelection,
-                       onOpen: { focus = .canvas }, onDelete: deleteApp)
+                       onOpen: { focus = .canvas }, onDelete: deleteApp, onDuplicate: duplicateApp)
                 .focused($focus, equals: .sidebar)
                 .navigationSplitViewColumnWidth(min: 180, ideal: 220, max: 320)
         } detail: {
@@ -138,6 +138,12 @@ struct MacRootView: View {
         library.delete(id)
         Task { await MacRuntimeNotifications.removeApp(id) } // そのアプリの通知とタイマーの予約(#1324)
         MacVoiceOver.announce(L10n.tr("「\(name)」を削除しました"))
+    }
+
+    /// 複製する(#1285)。iOS と同じく切り替えずに知らせる
+    private func duplicateApp(_ id: String) {
+        guard let name = library.duplicate(id, bundled: bundledApps.first { $0.id == id }) else { return }
+        MacVoiceOver.announce(L10n.tr("「\(name)」を作りました"))
     }
 
     // MARK: - 作る・直す(#967)

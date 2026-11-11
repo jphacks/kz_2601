@@ -3,7 +3,7 @@ import Observation
 import MetamonDSL
 import MetamonServices
 
-/// 会話で作った・直したアプリの DSL と、その版の「元に戻す / やり直す」(#967・#968)、作ったアプリの一覧の整理(#969)。
+/// 会話で作った・直したアプリの DSL と、その版の「元に戻す / やり直す」(#967・#968)、作ったアプリの一覧の整理(#969)・複製(#1285)。
 /// - 作ったアプリは端末に残す(`LocalAppLibrary`: iOS のキャッシュと同じ置き方)。サーバー(#930)が入るまでは端末だけ
 /// - 同梱の例を会話で直した分と版の履歴は、今まで通りウインドウを閉じる(アプリを終える)と消える
 /// - 版の nil は「同梱の例のまま(会話で直す前)」。同梱の例を直して戻すと、元の例を表示し直す
@@ -100,6 +100,24 @@ final class MacAppLibrary {
         histories[appId] = nil
         store?.remove(appId: appId)
         saveList()
+    }
+
+    /// 複製する(#1285)。名前の付け方は iOS の `duplicateApp` と同じ(「○○のコピー」)。画面の定義だけを写し、記録は写さない。
+    /// 作ったアプリは元のすぐ下、同梱の例は作ったアプリの先頭に置く。切り替えはしない(iOS と同じ)。複製したアプリの名前を返す
+    @discardableResult
+    func duplicate(_ appId: String, bundled: SampleApp? = nil) -> String? {
+        let source = envelopes[appId] ?? bundled?.url.flatMap { url in
+            (try? Data(contentsOf: url)).flatMap { DocumentEnvelope.make(appId: appId, version: 1, dsl: $0) }
+        }
+        guard let source, let original = generated[appId]?.dsl.app.name ?? bundled?.name else { return nil }
+        let name = AppListEdit.copyName(of: original) { L10n.tr("\($0)のコピー") }
+        let id = "mac-\(UUID().uuidString.prefix(8).lowercased())" // 会話で作るアプリと同じ形(MacComposeSession)
+        guard let envelope = DocumentEnvelope.duplicated(source, appId: id, name: name),
+              var document = try? AppDocument.decode(envelope) else { return nil }
+        document.appId = id
+        createdIds.insert(id, at: createdIds.firstIndex(of: appId).map { $0 + 1 } ?? 0)
+        set(id, Version(document: document, envelope: envelope))
+        return name
     }
 
     /// 作ったアプリの `index` 番目に動かす(右クリックの「上へ / 下へ」)
