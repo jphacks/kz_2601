@@ -174,6 +174,15 @@ class SyncQueue(
         before - ops.size
     }
 
+    /** 1 件の記録の未送信を捨てる(wipe を跨いだ書き込みを取り消す)。送っている 1 件は止められないので残す。 */
+    suspend fun discard(appId: String, entity: String, recordId: String): Int = lock.withLock {
+        load()
+        val before = ops.size
+        ops.removeAll { it.appId == appId && it.entity == entity && it.recordId == recordId && it.id != inFlight }
+        persist()
+        before - ops.size
+    }
+
     /** アカウント削除(#119): 未送信を全部捨てる。 */
     suspend fun discardAll() = lock.withLock {
         load()

@@ -255,7 +255,7 @@ class AppContainer(
     private val forgetApp: LocalAppForget by lazy {
         LocalAppForget(
             recordSync, documentCache, thumbnails, chatHistory, forgetAppNotifications,
-            stopLocationTracking = LocationTracking::stopFor,
+            stopLocationTracking = { LocationTracking.stopAndAwait(it) },
         )
     }
 
@@ -330,7 +330,7 @@ class AppContainer(
             feedCache = feedCache,
             thumbnails = thumbnails,
             closeFeedback = feedbackComposer::close,
-            stopLocationTracking = { LocationTracking.stopFor(null) },
+            stopLocationTracking = { LocationTracking.stopAndAwait(null) },
             // チュートリアルと「こう話すと直せます」の印(iOS は LocalWipe.clearDefaults で消える)。次の人には出し直す
             forgetTutorial = {
                 tutorial.forget()

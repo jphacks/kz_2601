@@ -50,8 +50,8 @@ class LocalDataWipe(
     private val forgetConsent: () -> Unit = {},
     private val forgetTutorial: () -> Unit = {},
     private val closeFeedback: () -> Unit = {},
-    /** 位置の記録(#869)を止める(前の人の記録を続けない) */
-    private val stopLocationTracking: () -> Unit = {},
+    /** 位置の記録(#869)を止め、保存の途中の 1 点が書き終わるまで待つ(前の人の記録を続けない・消した後に点を残さない) */
+    private val stopLocationTracking: suspend () -> Unit = {},
 ) {
     suspend operator fun invoke() {
         closeFeedback()
@@ -63,7 +63,7 @@ class LocalDataWipe(
     }
 
     private suspend fun wipeAll() {
-        stopLocationTracking() // 消す前に止める(消した後に点を足さない)
+        stopLocationTracking() // 消す前に止め、書きかけの点を待つ(消した後に点を足さない)
         recordSync.wipe() // 最初に止める(前の人の送信待ちを次の人に送らない)
         documentCache.removeAll()
         appList.clear()

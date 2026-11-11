@@ -71,9 +71,9 @@ func (g *generator) renderModels() string {
 			body.WriteString(g.renderClass(c,
 				"@OptIn(ExperimentalSerializationApi::class)\n@KeepGeneratedSerializer\n@Serializable(with = ActionSerializer::class)",
 				[]string{
-					"/** JSON の type の元の文字列。知らない type([ActionType.UNKNOWN])でも残る(「未対応のアクション: <type>」に使う)。 */",
+					"/** JSON の type の元の文字列。知らない type([ActionType.UNKNOWN])でも残る(「未対応のアクション: <type>」に使う)。コードで作った時は [type] の文字列(iOS と同じ)。 */",
 					"@Transient",
-					`val rawType: String = "",`,
+					`val rawType: String = type.wire,`,
 				}))
 			continue
 		}

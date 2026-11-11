@@ -224,9 +224,9 @@ data class Action(
     val calendarEvent: CalendarEvent? = null,
     @Serializable(with = ActionBookLookupLenientSerializer::class)
     val bookLookup: ActionBookLookup? = null,
-    /** JSON の type の元の文字列。知らない type([ActionType.UNKNOWN])でも残る(「未対応のアクション: <type>」に使う)。 */
+    /** JSON の type の元の文字列。知らない type([ActionType.UNKNOWN])でも残る(「未対応のアクション: <type>」に使う)。コードで作った時は [type] の文字列(iOS と同じ)。 */
     @Transient
-    val rawType: String = "",
+    val rawType: String = type.wire,
 ) {
     companion object
 }
