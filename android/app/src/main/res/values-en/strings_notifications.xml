@@ -6,6 +6,8 @@
     <string name="exact_alarm_prompt_open">Open settings</string>
     <string name="exact_alarm_prompt_title">Ring on time?</string>
     <string name="notification_alarm_stop">Stop</string>
+    <string name="notification_channel_activities">Ongoing status</string>
+    <string name="notification_channel_activities_description">What an app shows while something is in progress</string>
     <string name="notification_channel_alarms">Alarms</string>
     <string name="notification_channel_alarms_description">Alerts that keep ringing until you stop them</string>
     <string name="notification_channel_conditions">Condition alerts</string>

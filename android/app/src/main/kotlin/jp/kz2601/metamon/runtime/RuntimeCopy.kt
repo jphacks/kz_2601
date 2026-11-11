@@ -19,6 +19,7 @@ object RuntimeCopy {
     val ONE_PER_PERSON = UiText.Res(R.string.runtime_one_per_person)
     val DUPLICATE = UiText.Res(R.string.runtime_duplicate)
     val NOTIFICATION_FAILED = UiText.Res(R.string.runtime_notification_failed)
+    val ACTIVITY_NOTIFICATIONS_OFF = UiText.Res(R.string.runtime_activity_notifications_off)
     val FAILED = UiText.Res(R.string.runtime_failed)
     val UNAVAILABLE_ON_ANDROID = UiText.Res(R.string.runtime_unavailable_on_android)
     const val NAME_SEPARATOR = "・"
