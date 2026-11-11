@@ -14,6 +14,9 @@ import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.SegmentedButton
+import androidx.compose.material3.SegmentedButtonDefaults
+import androidx.compose.material3.SingleChoiceSegmentedButtonRow
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -27,6 +30,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.clearAndSetSemantics
+import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.testTag
@@ -51,6 +55,7 @@ private val recentSaver = listSaver<List<MusicSong>, String>(
 /**
  * `musicPlayer`(#879)の Android の代わり。iOS は Apple Music(MusicKit)で再生するが、Android には同じものが無い(C 区分・#351)。
  * 再生はせず「この端末では再生できません」+ 曲名・アーティストで外部の音楽アプリ(無ければ Web)の検索を開く。
+ * 開くのは YouTube Music か Spotify から選べる(#1164・API キーは使わない)。
  * 探した曲はこの画面の間だけ一覧に残す(押すともう一度開く)。`allowRequests`・`autoAccept`(近くの友だちからのリクエスト)は
  * Android に近距離共有が無いので使わない。
  */
@@ -60,10 +65,11 @@ fun MusicPlayerLeaf(c: Component, modifier: Modifier = Modifier) {
     var title by rememberSaveable { mutableStateOf("") }
     var artist by rememberSaveable { mutableStateOf("") }
     var recent by rememberSaveable(stateSaver = recentSaver) { mutableStateOf(emptyList<MusicSong>()) }
+    var service by rememberSaveable { mutableStateOf(MusicSearch.DEFAULT_SERVICE) }
     val query = MusicSearch.sanitize(MusicSong(title, artist))
 
     fun open(song: MusicSong) {
-        val url = MusicSearch.searchUrl(song) ?: return
+        val url = MusicSearch.searchUrl(song, service) ?: return
         if (openExternal(context, listOf(url), preferApp = true)) recent = MusicSearch.remember(recent, song)
     }
 
@@ -109,6 +115,7 @@ fun MusicPlayerLeaf(c: Component, modifier: Modifier = Modifier) {
             keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
             keyboardActions = KeyboardActions(onSearch = { query?.let(::open) }),
         )
+        ServicePicker(service, onPick = { service = it })
         ActionButton(
             label = stringResource(R.string.music_search),
             kind = ActionButtonKind.SECONDARY,
@@ -116,7 +123,7 @@ fun MusicPlayerLeaf(c: Component, modifier: Modifier = Modifier) {
             enabled = query != null,
             onClick = { query?.let(::open) },
         )
-        Text(stringResource(R.string.music_search_note), style = RenderTheme.Fonts.rowSubtitle, color = RenderTheme.colors.tertiaryLabel)
+        Text(stringResource(searchNote(service)), style = RenderTheme.Fonts.rowSubtitle, color = RenderTheme.colors.tertiaryLabel)
         if (recent.isNotEmpty()) {
             Text(stringResource(R.string.music_recent), style = RenderTheme.Fonts.sectionTitle, color = RenderTheme.colors.secondaryLabel)
             Column {
@@ -125,6 +132,28 @@ fun MusicPlayerLeaf(c: Component, modifier: Modifier = Modifier) {
                     RecentRow(song, onOpen = { open(song) })
                 }
             }
+        }
+    }
+}
+
+private val services = listOf(MusicService.YOUTUBE_MUSIC to R.string.music_service_youtube_music, MusicService.SPOTIFY to R.string.music_service_spotify)
+
+private fun searchNote(service: MusicService): Int = when (service) {
+    MusicService.YOUTUBE_MUSIC -> R.string.music_search_note_youtube_music
+    MusicService.SPOTIFY -> R.string.music_search_note_spotify
+}
+
+/** 検索を開くサービスを選ぶ(YouTube Music / Spotify)。 */
+@Composable
+private fun ServicePicker(selected: MusicService, onPick: (MusicService) -> Unit) {
+    val label = stringResource(R.string.music_service)
+    SingleChoiceSegmentedButtonRow(Modifier.fillMaxWidth().semantics { testTag = "music.service"; contentDescription = label }) {
+        services.forEachIndexed { i, (service, res) ->
+            SegmentedButton(
+                selected = selected == service,
+                onClick = { onPick(service) },
+                shape = SegmentedButtonDefaults.itemShape(i, services.size),
+            ) { Text(stringResource(res), maxLines = 1, overflow = TextOverflow.Ellipsis) }
         }
     }
 }
