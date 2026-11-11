@@ -44,6 +44,8 @@ dependencies {
     implementation(libs.camerax.lifecycle)
     implementation(libs.camerax.video)
     implementation(libs.camerax.view)
+    // mapView / locationPicker の地図(#867)。タイルの配信元は components/map/MapStyle.kt の 1 か所
+    implementation(libs.maplibre.android.sdk.opengl)
     implementation(libs.compose.material.icons.core)
     implementation(libs.compose.ui.tooling.preview)
     implementation(libs.play.services.code.scanner)

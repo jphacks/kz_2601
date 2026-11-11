@@ -32,6 +32,8 @@ playServicesCodeScanner = "16.1.0"
 playServicesMlkitTextRecognitionJapanese = "16.0.2"
 # fileImport の PDF: 文字の層の取り出しとページの描画(Apache-2.0・#1181)。暗号化の BouncyCastle は外す
 pdfboxAndroid = "2.0.27.0"
+# mapView / locationPicker の地図(BSD-2-Clause・#867)。描画は OpenGL ES 版(Vulkan 版より多くの端末・エミュレータで動く)。タイルは OpenFreeMap(キー不要)・components/map/MapStyle.kt
+maplibre = "13.7.1"
 # 5.5 は compileSdk 37 を求める。compileSdk を上げるまで 5.4 に留める
 okhttp = "5.4.0"
 
@@ -76,6 +78,7 @@ play-services-code-scanner = { module = "com.google.android.gms:play-services-co
 play-services-mlkit-text-recognition-japanese = { module = "com.google.android.gms:play-services-mlkit-text-recognition-japanese", version.ref = "playServicesMlkitTextRecognitionJapanese" }
 pdfbox-android = { module = "com.tom-roush:pdfbox-android", version.ref = "pdfboxAndroid" }
 zxing-core = { module = "com.google.zxing:core", version.ref = "zxing" }
+maplibre-android-sdk-opengl = { module = "org.maplibre.gl:android-sdk-opengl", version.ref = "maplibre" }
 okhttp = { module = "com.squareup.okhttp3:okhttp", version.ref = "okhttp" }
 okhttp-mockwebserver = { module = "com.squareup.okhttp3:mockwebserver", version.ref = "okhttp" }
 

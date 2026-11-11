@@ -55,6 +55,10 @@ SPDX_BY_NAME = {
     "mit license": "MIT",
     "mit": "MIT",
 }
+# 名前だけでは種類が決まらない(「BSD」)時は URL で決める。MapLibre の POM は名前が「BSD」で URL が BSD-2-Clause
+SPDX_BY_URL = {
+    "opensource.org/licenses/bsd-2-clause": "BSD-2-Clause",
+}
 TERMS = {
     "android software development kit license",
     "ml kit terms of service",
@@ -71,6 +75,8 @@ TEXT_FILES = {
     ("BSD-3-Clause", "androidx.camera"): "libyuv-BSD-3-Clause.txt",
     # checker-qual(guava から来る)。本文は jar の META-INF/LICENSE.txt
     ("MIT", "org.checkerframework"): "checker-qual-MIT.txt",
+    # MapLibre Native Android(中に取り込んだ C++ の部品の表示も)と gestures。本文は各リポジトリの LICENSE.md
+    ("BSD-2-Clause", "org.maplibre.gl"): "maplibre-BSD-2-Clause.txt",
 }
 
 DEP_RE = re.compile(r"--- ([^\s:]+):([^\s:]+)(?::(\S+))?(?: -> (\S+))?")
@@ -147,11 +153,15 @@ def normalize(name):
     return re.sub(r"^the ", "", re.sub(r"\s+", " ", name).strip().lower())
 
 
-def classify(name):
+def classify(name, url=""):
     key = normalize(name)
     spdx = {normalize(k): v for k, v in SPDX_BY_NAME.items()}
     if key in spdx:
         return spdx[key], True
+    if key == "bsd":
+        by_url = SPDX_BY_URL.get(re.sub(r"^https?://(www\.)?", "", url.strip().lower()).rstrip("/"))
+        if by_url:
+            return by_url, True
     if key in {normalize(t) for t in TERMS}:
         return name, False
     return None, False
@@ -192,7 +202,7 @@ def build(report):
         # 複数あれば全部出す(camera-core は Apache-2.0 と、取り込んだ libyuv の BSD-3-Clause)
         notices = archive_notices(group, artifact, version)
         for name, url in licenses:
-            license_id, oss = classify(name)
+            license_id, oss = classify(name, url)
             if license_id is None:
                 errors.append(f"{group}:{artifact}:{version} のライセンス「{name}」を判定できません(SPDX_BY_NAME / TERMS に足す)")
                 continue
