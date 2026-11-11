@@ -263,6 +263,13 @@ private struct MacScreenCard: View {
     let talk: () -> Void
 
     @State private var hovering = false
+    @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
+    @Environment(\.colorSchemeContrast) private var contrast
+
+    /// コントラストを上げる時は枠を濃く・太く(#1206)
+    private var surfaceStyle: MacSurfaceStyle {
+        MacSurfaceStyle.resolve(reduceTransparency: reduceTransparency, contrast: contrast)
+    }
 
     var body: some View {
         face
@@ -313,7 +320,7 @@ private struct MacScreenCard: View {
         .background(Theme.Colors.surface, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
         .overlay(
             RoundedRectangle(cornerRadius: 12, style: .continuous)
-                .strokeBorder(border, style: StrokeStyle(lineWidth: isSelected ? 2.5 : 1, dash: node.reachable ? [] : [5, 3]))
+                .strokeBorder(border, style: StrokeStyle(lineWidth: isSelected ? 2.5 : surfaceStyle.borderWidth, dash: node.reachable ? [] : [5, 3]))
         )
         .shadow(color: Theme.Shadow.softColor, radius: isSelected ? 10 : 4, y: 3)
         .opacity(node.reachable ? 1 : 0.5)
@@ -322,7 +329,7 @@ private struct MacScreenCard: View {
     /// 選んでいればブランドの色・マウスが乗っていれば濃い線・それ以外は細い線
     private var border: AnyShapeStyle {
         if isSelected { return AnyShapeStyle(Theme.brandGradient) }
-        return hovering ? AnyShapeStyle(.secondary) : AnyShapeStyle(Theme.Colors.hairline)
+        return hovering ? AnyShapeStyle(.secondary) : surfaceStyle.hairlineStyle
     }
 
     private var icon: String {

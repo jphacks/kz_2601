@@ -77,14 +77,13 @@ struct MacSummaryNoticeBar: View {
             }
             Button(action: dismiss) { Image(systemName: "xmark") }
                 .buttonStyle(.plain)
-                .foregroundStyle(.secondary)
+                .macSecondaryText() // コントラストを上げる時は本文の色(#1206)
                 .keyboardShortcut(.cancelAction) // Esc で閉じる
                 .help("閉じる")
                 .accessibilityLabel("閉じる")
         }
         .padding(.horizontal, 14).padding(.vertical, 8)
-        .background(.regularMaterial, in: Capsule())
-        .overlay(Capsule().strokeBorder(.separator))
+        .macRaisedSurface(in: Capsule()) // 透明度を下げる・コントラストを上げる(#1206)
         .frame(maxWidth: 560)
         .transition(.move(edge: .top).combined(with: .opacity))
         .accessibilityElement(children: .contain)
@@ -105,7 +104,7 @@ struct MacEditHintBar: View {
                 Text("こう頼むと直せます").font(.headline)
                 Text("⌘K で文字で、⇧⌘M で声で頼めます。")
                     .font(.callout)
-                    .foregroundStyle(.secondary)
+                    .macSecondaryText() // コントラストを上げる時は本文の色(#1206)
                 Text(FirstRunTutorial.editHintExamples.map { L10n.tr("「\($0)」") }.joined(separator: " "))
                     .font(.callout.weight(.medium))
                     .foregroundStyle(Theme.Colors.brandText)
@@ -121,8 +120,7 @@ struct MacEditHintBar: View {
             }
         }
         .padding(.horizontal, 16).padding(.vertical, 12)
-        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
-        .overlay(RoundedRectangle(cornerRadius: 14, style: .continuous).strokeBorder(.separator))
+        .macRaisedSurface(in: RoundedRectangle(cornerRadius: 14, style: .continuous)) // #1206
         .frame(maxWidth: 560)
         .transition(.move(edge: .top).combined(with: .opacity))
         .accessibilityElement(children: .contain)

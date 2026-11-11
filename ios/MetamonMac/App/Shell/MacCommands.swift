@@ -7,7 +7,8 @@ import AppKit
 /// - 編集: 元に戻す(記録を消した直後は削除の取り消し・それ以外は入力欄の取り消し)・やり直す・アプリを探す(⌘F・#1282)
 /// - アプリ: 生成したアプリの版の「変更を元に戻す」(⌥⌘Z)・「変更をやり直す」(⇧⌥⌘Z)(#968)・次の通知(#1325)。
 ///   ⌘Z / ⇧⌘Z は入力欄と記録の削除に使っているので、版の取り消しは別のキーにする
-/// - 表示: サイドバー(`SidebarCommands`)・ツールバー(`ToolbarCommands`)・画面マップ(⇧⌘E・#970)
+/// - 表示: サイドバー(`SidebarCommands`)・ツールバー(`ToolbarCommands`)・画面マップ(⇧⌘E・#970)・
+///   拡大 ⌘+ / 縮小 ⌘- / 実際のサイズ ⌘0(中央のアプリの文字・#1206)
 /// - 移動: 戻る・アプリの一覧 / 中央へ・前 / 次のアプリ
 /// - ヘルプ: 頼み方のコツ(#967)・お問い合わせ・フィードバックを送る(#983)
 struct MacCommands: Commands {
@@ -18,6 +19,8 @@ struct MacCommands: Commands {
     @FocusedValue(\.macAppRuntime) private var runtime
     @Environment(\.openWindow) private var openWindow
     @Environment(\.openURL) private var openURL
+    /// 中央のアプリの文字の段(#1206)。`AppCanvas` と同じ値を読む
+    @AppStorage(MacTextZoom.storageKey) private var zoomStep = MacTextZoom.defaultStep
 
     /// 会話のシート・画面マップが開いている間は中央のアプリに向けた操作(保存・書き出し)を押せない
     private var canUseCanvas: Bool { shell?.canCompose ?? true }
@@ -72,6 +75,17 @@ struct MacCommands: Commands {
                 .keyboardShortcut("e", modifiers: [.command, .shift])
                 .disabled(!(shell?.canShowScreenMap ?? false) || runtime?.sheet != nil || runtime?.fullScreen != nil
                            || runtime?.calendarDraft != nil)
+            Divider()
+            // 中央のアプリの文字の大きさ(#1206)。端の段と、画面マップ・会話のシートの間は押せない(マップは自分の拡大縮小に同じキーを使う)
+            Button("拡大") { zoomStep = MacTextZoom.zoomedIn(zoomStep) }
+                .keyboardShortcut("+", modifiers: .command)
+                .disabled(!canUseCanvas || !MacTextZoom.canZoomIn(zoomStep))
+            Button("縮小") { zoomStep = MacTextZoom.zoomedOut(zoomStep) }
+                .keyboardShortcut("-", modifiers: .command)
+                .disabled(!canUseCanvas || !MacTextZoom.canZoomOut(zoomStep))
+            Button("実際のサイズ") { zoomStep = MacTextZoom.defaultStep }
+                .keyboardShortcut("0", modifiers: .command)
+                .disabled(!canUseCanvas || MacTextZoom.isActualSize(zoomStep))
         }
 
         CommandMenu("アプリ") {
