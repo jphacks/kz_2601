@@ -19,12 +19,16 @@ kotlin {
 
 dependencies {
     implementation(project(":dsl"))
+    // API クライアント・記録の保存・送信待ち(android/services と同じソース・#1748 #1754)
+    implementation(project(":services"))
     implementation(compose.desktop.currentOs)
     implementation(compose.material3)
     // PDF の本文を読む・表を PDF に書く(#1753)。pdfbox + fontbox + pdfbox-io + commons-logging で約 3.8 MB
     implementation("org.apache.pdfbox:pdfbox:3.0.3")
 
     testImplementation(libs.junit)
+    testImplementation(libs.kotlinx.coroutines.test)
+    testImplementation(libs.okhttp.mockwebserver)
 }
 
 val dslDocsDir = rootDir.resolve("../docs/dsl")
@@ -42,6 +46,14 @@ tasks.test {
     inputs.dir(dslDocsDir.resolve("conformance")).withPropertyName("conformanceCases").withPathSensitivity(PathSensitivity.RELATIVE)
     inputs.dir(dslDocsDir.resolve("examples")).withPropertyName("dslExamples").withPathSensitivity(PathSensitivity.RELATIVE)
     systemProperty("metamon.dslDocsDir", dslDocsDir.absolutePath)
+}
+
+// 手元の確かめ: TAILORIT_API=stg TAILORIT_DEV_TOKEN=<ID トークン> ./gradlew :desktop:listApps(stg のアプリの一覧を出す)
+tasks.register<JavaExec>("listApps") {
+    group = "verification"
+    description = "stg の appconfig からアプリの一覧を出す(手元の確かめ用・#1748)"
+    classpath = sourceSets["main"].runtimeClasspath
+    mainClass.set("jp.kz2601.metamon.desktop.net.ListAppsKt")
 }
 
 compose.desktop {
