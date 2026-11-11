@@ -169,7 +169,7 @@ func SettleHold(ctx context.Context, st Store, uid, id string, s Settlement, now
 		}
 		es := settle(&tx.Wallet, &h, charge, now)
 		for i := range es {
-			if es[i].Kind == KindSpendAI {
+			if es[i].Kind == KindSpendAI || es[i].Kind == KindSpendExt {
 				es[i].USD = s.USD
 			}
 		}
