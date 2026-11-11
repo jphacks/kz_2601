@@ -4411,6 +4411,91 @@
         }
       }
     },
+    "このボタンの操作の一覧から「変身一覧」を選ぶと、作ったアプリの一覧に戻れます。" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Choose “Your apps” from this button's actions to go back to the apps you've made."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "このボタンの操作の一覧から「変身一覧」を選ぶと、作ったアプリの一覧に戻れます。"
+          }
+        }
+      }
+    },
+    "このボタンの操作の一覧から「記録帳の一覧」を選ぶと、記録帳の一覧に戻れます。" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Choose “Your trackers” from this button's actions to go back to your trackers."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "このボタンの操作の一覧から「記録帳の一覧」を選ぶと、記録帳の一覧に戻れます。"
+          }
+        }
+      }
+    },
+    "このボタンの操作の一覧の「反対側へ移動」「端に隠す」で、置き場所を変えられます。" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Use “Move to the other side” or “Tuck to the edge” in this button's actions to change where it sits."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "このボタンの操作の一覧の「反対側へ移動」「端に隠す」で、置き場所を変えられます。"
+          }
+        }
+      }
+    },
+    "このボタンを長押しすると、作ったアプリの一覧に戻れます。" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Press and hold this button to go back to the apps you've made."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "このボタンを長押しすると、作ったアプリの一覧に戻れます。"
+          }
+        }
+      }
+    },
+    "このボタンを長押しすると、記録帳の一覧に戻れます。" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Press and hold this button to go back to your trackers."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "このボタンを長押しすると、記録帳の一覧に戻れます。"
+          }
+        }
+      }
+    },
     "このリンクを送った人はもう参加していないため、参加できません。参加している人に新しいリンクをもらってください" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -6101,6 +6186,23 @@
         }
       }
     },
+    "もう出さない" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Don't show again"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "もう出さない"
+          }
+        }
+      }
+    },
     "もう少しかかっています…" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -6182,6 +6284,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "やり直せませんでした"
+          }
+        }
+      }
+    },
+    "わかった" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Got it"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "わかった"
           }
         }
       }
@@ -7270,6 +7389,40 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "カレンダー・連絡先・銀行など、ほかのアプリやサービスのデータは読み込めません。"
+          }
+        }
+      }
+    },
+    "カードの「…」のメニューの「左へ移動」「右へ移動」で順番を変えられます。" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Use “Move Left” or “Move Right” in the card's “…” menu to change the order."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "カードの「…」のメニューの「左へ移動」「右へ移動」で順番を変えられます。"
+          }
+        }
+      }
+    },
+    "カードを長押ししたまま動かし、別のカードの上で離すと順番を変えられます。" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Press and hold a card, drag it, and drop it on another card to change the order."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "カードを長押ししたまま動かし、別のカードの上で離すと順番を変えられます。"
           }
         }
       }
@@ -8902,6 +9055,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "ボタンの色をもっと目立つ色にして"
+          }
+        }
+      }
+    },
+    "ボタンは動かせます" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "You can move this button"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ボタンは動かせます"
           }
         }
       }
@@ -13775,6 +13945,23 @@
         }
       }
     },
+    "指で押さえたまま動かすと、左右の辺に移せます。端に寄せると隠れて、取っ手だけ残ります。" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Press and drag it to move it to either side. Push it to the edge to tuck it away, leaving just a handle."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "指で押さえたまま動かすと、左右の辺に移せます。端に寄せると隠れて、取っ手だけ残ります。"
+          }
+        }
+      }
+    },
     "挨拶と質問を読み上げる" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -13873,6 +14060,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "接続を確認してください。つながると自動で読み込み直します"
+          }
+        }
+      }
+    },
+    "操作のヒントをもう一度見る" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Show gesture tips again"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "操作のヒントをもう一度見る"
           }
         }
       }
@@ -19506,6 +19710,23 @@
         }
       }
     },
+    "長押しで並べ替え" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Press and hold to reorder"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "長押しで並べ替え"
+          }
+        }
+      }
+    },
     "長押しで変身一覧" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -19523,6 +19744,23 @@
         }
       }
     },
+    "長押しで変身一覧へ" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Press and hold for your apps"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "長押しで変身一覧へ"
+          }
+        }
+      }
+    },
     "長押しで記録帳の一覧" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -19536,6 +19774,40 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "長押しで記録帳の一覧"
+          }
+        }
+      }
+    },
+    "長押しで記録帳の一覧へ" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Press and hold for your trackers"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "長押しで記録帳の一覧へ"
+          }
+        }
+      }
+    },
+    "長押しやドラッグなど、見た目から分からない操作の案内をもう一度出します" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Shows the tips for hidden gestures such as press and hold or drag again"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "長押しやドラッグなど、見た目から分からない操作の案内をもう一度出します"
           }
         }
       }

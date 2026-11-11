@@ -333,6 +333,14 @@ struct SettingsSheet: View {
                 Label("使い方を見る", systemImage: "questionmark.circle")
             }
             .accessibilityIdentifier("settings.tutorial")
+            Button {
+                dismiss()
+                rt.replayCoachMarks() // #1441
+            } label: {
+                Label("操作のヒントをもう一度見る", systemImage: "hand.tap")
+            }
+            .accessibilityHint("長押しやドラッグなど、見た目から分からない操作の案内をもう一度出します")
+            .accessibilityIdentifier("settings.coachMarks")
             NavigationLink {
                 // #415: 選んだ例は音声画面(か対話)の入力欄に入る。送らない
                 PromptTipsView { text in

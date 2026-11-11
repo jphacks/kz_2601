@@ -113,7 +113,10 @@ struct ModalVoiceFabLayer: ViewModifier {
                         trailingObstructionTop: trailingBottomObstructions[visible.route.id],
                         isBusy: rt.morphJob != nil,
                         onTap: { rt.openVoiceForVisibleScreen() },
-                        onLongPress: { rt.openSwitcher() }
+                        onLongPress: { rt.openSwitcher() },
+                        coachMark: rt.fabCoachMark, // #1441
+                        onCoachMark: { rt.handleCoachMark($0, $1) },
+                        onGesturePerformed: { rt.noteGesturePerformed($0) }
                     )
                     .transition(.scale(scale: 0.6).combined(with: .opacity))
                 }
@@ -179,7 +182,11 @@ struct VoiceToolbarButton: View {
         .buttonStyle(.plain)
         .simultaneousGesture(
             LongPressGesture(minimumDuration: Theme.Layout.fabLongPressSeconds)
-                .onEnded { _ in if target == nil, !isBusy { rt.openSwitcher() } }
+                .onEnded { _ in
+                    guard target == nil, !isBusy else { return }
+                    rt.noteGesturePerformed(.fabLongPress) // #1441
+                    rt.openSwitcher()
+                }
         )
         // 生成中・組み上げ中(#626)は FAB と同じく押せない(フォームのシートは本体の暗転の外なので、ここから設定の「初期状態に戻す」等に行けていた)
         .opacity(isBusy ? 0.35 : 1)

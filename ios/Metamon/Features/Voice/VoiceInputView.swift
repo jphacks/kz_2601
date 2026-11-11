@@ -293,7 +293,11 @@ struct VoiceInputView: View {
             }
                 .simultaneousGesture(
                     LongPressGesture(minimumDuration: Theme.Layout.fabLongPressSeconds)
-                        .onEnded { _ in if phase == .idle { rt.openSwitcher() } }
+                        .onEnded { _ in
+                            guard phase == .idle else { return }
+                            rt.noteGesturePerformed(.fabLongPress) // #1441
+                            rt.openSwitcher()
+                        }
                 )
                 .accessibilityHint(L10n.key("長押しで変身一覧", review: "長押しで記録帳の一覧"))
             Text(statusText)

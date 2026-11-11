@@ -56,6 +56,8 @@ final class AppRuntime: RuntimeNavigating {
     @ObservationIgnored var tutorial: FirstRunTutorialStore?
     /// チュートリアルを出す(初回の同意のあと / 設定の「使い方を見る」)。
     var showTutorial = false
+    /// 気づきにくい操作の吹き出し(#1441)。MetamonApp が `.shared` を入れる。nil(ユニットテスト等)は出さない。
+    @ObservationIgnored var coachMarks: CoachMarkStore?
     #if !APP_STORE_REVIEW // 審査用ビルドは β の案内を持たない(#313)
     /// β の初回の案内(#313)。MetamonApp が `.shared` を入れる。nil(ユニットテスト等)は出さない。
     @ObservationIgnored var betaWelcome: BetaWelcomeStore?

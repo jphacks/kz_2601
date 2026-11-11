@@ -71,7 +71,10 @@ struct RootView: View {
                         trailingObstructionTop: trailingBottomObstructions[visibleMainRoute.id],
                         isBusy: rt.morphJob != nil,
                         onTap: { rt.openVoiceForVisibleScreen() },
-                        onLongPress: { rt.openSwitcher() }
+                        onLongPress: { rt.openSwitcher() },
+                        coachMark: rt.fabCoachMark, // #1441
+                        onCoachMark: { rt.handleCoachMark($0, $1) },
+                        onGesturePerformed: { rt.noteGesturePerformed($0) }
                     )
                     .transition(.scale(scale: 0.6).combined(with: .opacity))
                 }

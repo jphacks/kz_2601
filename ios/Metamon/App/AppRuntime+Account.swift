@@ -28,6 +28,7 @@ extension AppRuntime {
         #endif
         aiConsent?.reload()                             // 同意(#246)・チュートリアル(#274)の画面の状態を消した後に合わせる
         tutorial?.reload()
+        coachMarks?.reload()                            // 操作の吹き出し(#1441)
         let center = UNUserNotificationCenter.current()
         await services.notifications.removeAll()        // アプリごとの予約(#228)
         center.removeAllPendingNotificationRequests()
