@@ -65,9 +65,10 @@ final class UpdateGate {
         return false
     }
 
-    /// 「新しい版があります」のアラートを出すか。スプラッシュの上には出さない(閉じてから出す)。
+    /// 「新しい版があります」のアラートを出すか。スプラッシュの上・起動時の同意 / チュートリアル / シェアリンクの順番待ちの間は出さない
+    /// (アラートが出ていると同意のシートが捨てられ、順番待ちが進まなくなる)。
     var canShowNoticeAlert: Bool {
-        showsNotice && !isBlocking && !SplashPresence.shared.isShowing
+        showsNotice && !isBlocking && !SplashPresence.shared.isShowing && !LaunchConsentHold.shared.isHolding
     }
 
     func dismissNotice() {

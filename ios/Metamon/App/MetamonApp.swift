@@ -113,6 +113,7 @@ struct MetamonApp: App {
                         .task {
                             await runtime.bootstrap()
                             IntentHost.shared.markReady() // 保留中の「開く/話しかける」を実行(#80)
+                            LaunchConsentHold.shared.finishLaunchIfIdle() // 待たせる段が無ければ、以後のリンクは順番待ちにしない
                             #if !APP_STORE_REVIEW
                             SharingUI.shared.isReady = true // 保留中のシェアリンクを開く(#278)
                             #endif
@@ -139,6 +140,9 @@ struct MetamonApp: App {
             .environment(\.locale, LanguagePreference.shared.locale)
             .task { await session.observe() }
             // クラッシュ報告に付ける本人の区別は uid だけ(名前・内容は付けない・#296)
+            .onChange(of: session.user == nil) { _, signedOut in
+                if signedOut { runtime.launchPresentationsAbandoned() } // サインアウト: 起動時の順番待ちを全部放す
+            }
             .onChange(of: session.user?.uid, initial: true) { _, uid in CrashReportingPreference.shared.updateUser(uid: uid) }
             .onChange(of: scenePhase) { _, phase in
                 if phase == .background { BackgroundRefresh.schedule() } // #38: 裏の定期同期を予約

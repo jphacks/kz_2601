@@ -8,7 +8,10 @@ struct TutorialHost: ViewModifier {
     func body(content: Content) -> some View {
         @Bindable var rt = rt
         content
-            .fullScreenCover(isPresented: $rt.showTutorial, onDismiss: { rt.tutorialDismissed() }) { TutorialView() }
+            .fullScreenCover(isPresented: $rt.showTutorial, onDismiss: { rt.tutorialDismissed() }) {
+                TutorialView()
+                    .onAppear { LaunchConsentHold.shared.markShown(.tutorial) } // 出た: 閉じるまで時間では放さない
+            }
             .overlay(alignment: .bottom) {
                 // H7: 要約バナー・確認が閉じてから(`PostBuildNotice`)
                 if rt.showFirstEditHint, rt.isNoticeTurn(.editHint), !rt.dsl.isVoiceOnly, rt.morphJob == nil, !rt.showVoiceSheet {
@@ -31,6 +34,5 @@ struct TutorialHost: ViewModifier {
                 // 起動時: スプラッシュ → 同意の画面が閉じきってから(シートを同時に出さない)
                 await rt.runLaunchTutorialStep()
             }
-            .onDisappear { LaunchConsentHold.shared.end(.tutorial) } // 画面が消えた時も待たせたままにしない
     }
 }

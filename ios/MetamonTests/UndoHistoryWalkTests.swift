@@ -86,6 +86,16 @@ final class UndoHistoryWalkTests: XCTestCase {
         XCTAssertNil(UndoWalk.undoTarget(current: 5, versions: vs))
     }
 
+    /// 一覧は最新の 1 ページだけ。restore の元がページより前でも「戻せない」にしない。
+    func testTargetWhenOriginIsOlderThanListedPage() {
+        let vs = [
+            VersionSummary(version: 40, parentVersion: 39, source: .init(kind: "edit")),
+            VersionSummary(version: 41, parentVersion: 40, source: .init(kind: "restore", restoredFrom: 12)),
+        ]
+        XCTAssertEqual(UndoWalk.undoTarget(current: 41, versions: vs), 11, "v41 は一覧に無い v12 の中身 → その 1 つ前")
+        XCTAssertEqual(UndoWalk.undoTarget(current: 40, versions: vs), 39, "一覧に無い親でも親の番号へ戻す")
+    }
+
     // MARK: AppRuntime の往復
 
     /// 3 回直した後に 3 回戻すと最初の版の中身に戻る(往復しない)。

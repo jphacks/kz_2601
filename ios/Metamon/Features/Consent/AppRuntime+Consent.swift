@@ -47,7 +47,8 @@ extension AppRuntime {
         hold.end(.consent)
     }
 
-    /// 起動時の画面が消えた時(サインアウト等)。待たせていた段を全部放す(止まらない)。
+    /// サインアウトした時(`MetamonApp`)。待たせていた段を全部放す(止まらない)。
+    /// 画面の onDisappear では呼ばない: チュートリアルの全画面が上に重なっただけでも呼ばれ、順番待ちが早く崩れるため。
     func launchPresentationsAbandoned(hold: LaunchConsentHold = .shared) {
         hold.endAll()
     }

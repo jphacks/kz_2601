@@ -23,6 +23,8 @@ final class SharingUI {
     /// 受け取ったシェアリンク(#278)。サインイン前・bootstrap 前に届いた分も捨てずに持ち、準備ができてから 1 回だけ開く。
     /// 未インストールの人が入れてから開き直すと、サインイン画面の上で届くため(RootView の onOpenURL では取りこぼす)。
     private(set) var pendingLink: URL?
+    /// 受け取るたびに増やす番号。開く処理(`SharingHooks` の .task)の id に使う(`takeLink` では変わらないので、開いている途中で取り消されない)
+    private(set) var linkSerial = 0
     /// RootView の bootstrap が終わったか(`MetamonApp`)。サインアウトで false に戻す
     var isReady = false
 
@@ -31,7 +33,10 @@ final class SharingUI {
     func receive(_ url: URL, hold: LaunchConsentHold = .shared) -> Bool {
         guard ShareURL.token(from: url) != nil else { return false }
         pendingLink = url
-        hold.begin(.shareLink) // 開き終わるまで Intent を待たせる(リンク → Intent の順)
+        linkSerial += 1
+        // 起動の途中だけ、開き終わるまで Intent を待たせる(リンク → Intent の順)。
+        // 使っている途中に届いたリンクは待たせない(他のシートが出ていると確認が出せず、段が放されないまま残るため)
+        hold.beginDuringLaunch(.shareLink)
         return true
     }
 
@@ -185,17 +190,20 @@ struct SharingHooks: ViewModifier {
     func body(content: Content) -> some View {
         content
             // リンクの受信は `ShareLinkReceiver`(サインイン画面の時も届く)。ここでは準備ができたら開く(#278)
-            .task(id: "\(ui.isReady)|\(splash.isShowing)|\(consentHold.isHolding(before: .shareLink))|\(ui.pendingLink?.absoluteString ?? "")") {
+            .task(id: "\(ui.isReady)|\(splash.isShowing)|\(consentHold.isHolding(before: .shareLink))|\(ui.linkSerial)") {
                 // スプラッシュ → 起動時の同意 → チュートリアルが閉じてから開く(シートを同時に出すと片方が捨てられる)
                 guard !splash.isShowing, !consentHold.isHolding(before: .shareLink) else { return }
                 guard let url = ui.takeLink() else { return }
-                consentHold.begin(.shareLink) // サインインし直した後など、受信時の段が放されていても Intent を待たせる
-                await rt.openShareURL(url)
-                ui.linkSettled() // 確認を出さなかった(トースト等)時はここで次へ。出した時は閉じた時(onDismiss)
+                consentHold.beginDuringLaunch(.shareLink) // 起動の途中なら、受信時の段が放されていても Intent を待たせる
+                // 取り出したリンクは id が変わっても最後まで開く(.task の取り消しでプレビューの取得を止めない)
+                await Task { @MainActor in
+                    await rt.openShareURL(url)
+                    ui.linkSettled() // 確認を出さなかった(トースト等)時はここで次へ。出した時は閉じた時(onDismiss)
+                }.value
             }
             .sheet(isPresented: $ui.showDiscover) { DiscoverSheet() }
-            .sheet(item: $ui.pendingJoin, onDismiss: { ui.linkSettled() }) { JoinShareSheet(join: $0) }
-            .sheet(item: $ui.pendingImport, onDismiss: { ui.linkSettled() }) { AddShareSheet(pending: $0) }
+            .sheet(item: $ui.pendingJoin, onDismiss: { ui.linkSettled() }) { JoinShareSheet(join: $0).onAppear { consentHold.markShown(.shareLink) } }
+            .sheet(item: $ui.pendingImport, onDismiss: { ui.linkSettled() }) { AddShareSheet(pending: $0).onAppear { consentHold.markShown(.shareLink) } }
             #if DEBUG
             .task { await debugHooks() }
             .modifier(ReleaseRequestHooks())
