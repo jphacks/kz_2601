@@ -84,7 +84,7 @@ class ProStore(
     private val _state = MutableStateFlow(ProUiState())
     val state: StateFlow<ProUiState> = _state.asStateFlow()
 
-    val isPro: Boolean get() = _state.value.isPro
+    override val isPro: Boolean get() = _state.value.isPro
 
     /** 課金画面と Pro の欄を出すか(Play も、モックの購入も無い構成では出さない) */
     val isAvailable: Boolean get() = mock || billing != null
