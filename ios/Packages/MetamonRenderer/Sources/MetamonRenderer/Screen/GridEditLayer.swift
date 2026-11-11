@@ -159,6 +159,24 @@ struct GridEditLayer: View {
             }
             .contentShape(Rectangle())
             .highPriorityGesture(dragGesture(item, mode: .move))
+            // VoiceOver が止まるのは枠そのもの(`.contain` の入れ物には止まらず、操作の一覧が選べなかった)。
+            // 角のつまみは指でしか動かせないので、大きさを変える操作もここに置く
+            .accessibilityElement(children: .ignore)
+            .accessibilityLabel(Text(L("部品 \(item.area.notation)")))
+            .accessibilityActions {
+                Button(L("左へ動かす")) { nudge(item, dc: -1, dr: 0) }
+                Button(L("右へ動かす")) { nudge(item, dc: 1, dr: 0) }
+                Button(L("上へ動かす")) { nudge(item, dc: 0, dr: -1) }
+                Button(L("下へ動かす")) { nudge(item, dc: 0, dr: 1) }
+                Button(L("横に広げる")) { resize(item, dc: 1, dr: 0) }
+                Button(L("横に狭める")) { resize(item, dc: -1, dr: 0) }
+                Button(L("縦に広げる")) { resize(item, dc: 0, dr: 1) }
+                Button(L("縦に狭める")) { resize(item, dc: 0, dr: -1) }
+                if session.draft.canRemove {
+                    Button(L("消す")) { session.pendingRemoval = item.componentId }
+                }
+            }
+            .accessibilityIdentifier("gridEdit.\(item.componentId)")
             .overlay(alignment: .topTrailing) {
                 if session.draft.canRemove {
                     Button { session.pendingRemoval = item.componentId } label: {
@@ -190,15 +208,6 @@ struct GridEditLayer: View {
             .frame(width: r.width, height: r.height)
             .offset(x: r.minX + follow.width, y: r.minY + follow.height)
             .zIndex(active ? 1 : 0)
-            .accessibilityElement(children: .contain)
-            .accessibilityLabel(Text(L("部品 \(item.area.notation)")))
-            .accessibilityActions {
-                Button(L("左へ動かす")) { nudge(item, dc: -1, dr: 0) }
-                Button(L("右へ動かす")) { nudge(item, dc: 1, dr: 0) }
-                Button(L("上へ動かす")) { nudge(item, dc: 0, dr: -1) }
-                Button(L("下へ動かす")) { nudge(item, dc: 0, dr: 1) }
-            }
-            .accessibilityIdentifier("gridEdit.\(item.componentId)")
     }
 
     private func dragGesture(_ item: GridEditDraft.Item, mode: Mode) -> some Gesture {
@@ -226,6 +235,15 @@ struct GridEditLayer: View {
         let moved = GridEditMath.moved(item.area, dx: Double(dc) * Double(cellW), dy: Double(dr) * Double(cellH),
                                        cellW: Double(cellW), cellH: Double(cellH))
         if !session.place(item.componentId, at: moved) {
+            AccessibilityNotification.Announcement(L("ここには置けません")).post()
+        }
+    }
+
+    /// VoiceOver の操作から: 右下の角を 1 マスずつ動かす(指の角のつまみと同じ)
+    private func resize(_ item: GridEditDraft.Item, dc: Int, dr: Int) {
+        let resized = GridEditMath.resized(item.area, dx: Double(dc) * Double(cellW), dy: Double(dr) * Double(cellH),
+                                           cellW: Double(cellW), cellH: Double(cellH))
+        if !session.place(item.componentId, at: resized) {
             AccessibilityNotification.Announcement(L("ここには置けません")).post()
         }
     }
