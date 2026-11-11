@@ -32,3 +32,12 @@ func TestSubjects(t *testing.T) {
 		t.Fatalf("empty %v", s)
 	}
 }
+
+// A Firebase Auth user's provider ids give the same subjects as its token.
+func TestProviderSubjects(t *testing.T) {
+	got := ProviderSubjects(map[string][]string{"google.com": {"g1"}, "apple.com": {"001.abc", ""}, "password": {"a@example.com"}})
+	tok := subjectsOf(map[string]interface{}{"apple.com": []interface{}{"001.abc"}, "google.com": []interface{}{"g1"}})
+	if want := []string{"apple.com:001.abc", "google.com:g1"}; !slices.Equal(got, want) || !slices.Equal(tok, want) {
+		t.Fatalf("subjects %v / %v, want %v", got, tok, want)
+	}
+}
