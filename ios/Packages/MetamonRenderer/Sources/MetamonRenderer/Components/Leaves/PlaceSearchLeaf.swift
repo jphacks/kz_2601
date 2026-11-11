@@ -82,7 +82,12 @@ struct PlaceSearchLeaf: View {
             TextField(L("店名・種類で探す(例: ラーメン)"), text: $typed)
                 .submitLabel(.search)
                 .autocorrectionDisabled()
-                .onSubmit { Task { await search() } }
+                .onSubmit {
+                    #if os(macOS)
+                    guard IMEReturnGuard.allowsReturn(KeyboardState.focusedTextView()) else { return }
+                    #endif
+                    Task { await search() }
+                }
                 .accessibilityIdentifier("placeSearch.search")
         }
         .padding(10)

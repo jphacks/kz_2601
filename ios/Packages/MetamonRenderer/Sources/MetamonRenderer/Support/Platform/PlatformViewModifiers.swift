@@ -75,6 +75,19 @@ extension View {
         #endif
     }
 
+    /// Mac: 日付は欄 + クリックでカレンダー、時刻だけは欄 + ステッパー(#942)。iOS は今までどおり。
+    @ViewBuilder
+    func macDatePickerStyle(includesDate: Bool) -> some View {
+        #if os(macOS)
+        switch MacDatePickerStyle.choose(includesDate: includesDate) {
+        case .fieldWithCalendar: datePickerStyle(.compact)
+        case .fieldWithStepper: datePickerStyle(.stepperField)
+        }
+        #else
+        self
+        #endif
+    }
+
     /// iOS: ホイールの picker。Mac は既定(ポップアップ)。
     @ViewBuilder
     func wheelPickerStyle() -> some View {
