@@ -24,11 +24,26 @@ var subjectProviders = []string{"apple.com", "google.com"}
 
 // subjectsOf reads firebase.identities ({"apple.com": ["<sub>"], ...}).
 func subjectsOf(identities map[string]interface{}) []string {
+	ids := map[string][]string{}
+	for p, v := range identities {
+		list, _ := v.([]interface{})
+		for _, id := range list {
+			if sub, ok := id.(string); ok {
+				ids[p] = append(ids[p], sub)
+			}
+		}
+	}
+	return ProviderSubjects(ids)
+}
+
+// ProviderSubjects are the Identity.Subjects of an account with these
+// provider user ids ({"apple.com": ["<sub>"], ...}, e.g. a Firebase Auth
+// user's providerUserInfo). Providers other than Apple / Google are left out.
+func ProviderSubjects(ids map[string][]string) []string {
 	var out []string
 	for _, p := range subjectProviders {
-		ids, _ := identities[p].([]interface{})
-		for _, id := range ids {
-			if sub, ok := id.(string); ok && sub != "" {
+		for _, sub := range ids[p] {
+			if sub != "" {
 				out = append(out, p+":"+sub)
 			}
 		}
