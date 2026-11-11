@@ -8,6 +8,7 @@ import (
 	"bufio"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"slices"
@@ -99,10 +100,34 @@ type Report struct {
 	Drafts []loop.Draft
 }
 
+// MaxCases bounds one set: with the triage batch of 20 a run makes at most
+// 10 model calls.
+const MaxCases = 200
+
+// Errors of Run.
+var (
+	// ErrTooManyCases: the set has more than MaxCases cases (nothing is called).
+	ErrTooManyCases = errors.New("triage eval: too many cases")
+	// ErrStopped: Hooks.BeforeCall refused a call; the report is partial.
+	ErrStopped = errors.New("triage eval: stopped")
+)
+
+// Hooks are the per-call checks the real triage run has (the loop's stop
+// switch, the monthly cap, the usage record). The zero Hooks checks nothing
+// (an offline model).
+type Hooks struct {
+	BeforeCall func(ctx context.Context) error
+	AfterCall  func(ctx context.Context, u triage.Usage, callErr error) error
+}
+
 // Run triages cases with m and compares the result with the labels. A case
-// the model did not classify (held, rejected) counts as a miss.
-func Run(ctx context.Context, m triage.Model, cases []Case) (Report, error) {
+// the model did not classify (held, rejected) counts as a miss. h is
+// called around every model call, as in the triage run.
+func Run(ctx context.Context, m triage.Model, cases []Case, h Hooks) (Report, error) {
 	rep := Report{Cases: len(cases)}
+	if len(cases) > MaxCases {
+		return rep, fmt.Errorf("%w: %d (at most %d)", ErrTooManyCases, len(cases), MaxCases)
+	}
 	s := loop.NewMemory()
 	now := time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)
 	ids := make([]string, len(cases))
@@ -115,11 +140,15 @@ func Run(ctx context.Context, m triage.Model, cases []Case) (Report, error) {
 		}
 	}
 	clock := func() time.Time { return now.Add(time.Hour) }
-	tr := &triage.Triager{Store: s, Model: m, MaxItems: max(len(cases), 1), Now: clock}
+	tr := &triage.Triager{Store: s, Model: m, MaxItems: max(len(cases), 1), Now: clock,
+		BeforeCall: h.BeforeCall, AfterCall: h.AfterCall}
 	res, err := tr.Run(ctx)
 	rep.Usage = res.Usage
 	if err != nil {
 		return rep, err
+	}
+	if res.Stopped != "" {
+		return rep, fmt.Errorf("%w: %s", ErrStopped, res.Stopped)
 	}
 	// the priority a human sees is the draft's: computed over the bundle
 	if _, err := (&draft.Builder{Store: s, Now: clock, MaxNew: len(cases) + 1}).Run(ctx); err != nil {
