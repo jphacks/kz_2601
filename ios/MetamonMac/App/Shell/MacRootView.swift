@@ -16,6 +16,7 @@ import MetamonServices
 /// キーボード(#934): ⌘1 / ⌘2 でサイドバーと中央を行き来・一覧は ↑↓ で選び Return で中央へ・⌥⌘↑↓ で前 / 次のアプリ。
 /// 画面マップ(#970): ツールバー・表示メニュー(⇧⌘E)からシートで出す。開く → 中央でその画面へ、話す → その画面を文脈にした会話(⌘K と同じシート)。
 /// 一覧(#969): 「作ったアプリ」(端末に残す・名前の変更 / 削除 / 並べ替え)と「同梱の例」に分ける。起動時は前に開いていたアプリを開き直す。
+/// 行の写し(#1281): 中央に出したアプリを、出てから少し後(お知らせが閉じてから)に撮ってサイドバーの行に出す。
 struct MacRootView: View {
     enum Pane: Hashable { case sidebar, canvas }
 
@@ -33,6 +34,9 @@ struct MacRootView: View {
     /// 閉じた会話のシート(閉じた後に完成の要約を出すため・#968)
     @State private var closingCompose: MacComposeSession?
     @State private var showsTips = false
+    /// サイドバーの行の写し(#1281)
+    @State private var thumbs = MacAppThumbnailStore.shared
+    @State private var thumbAnchor = MacThumbnailAnchor()
     /// 画面マップ(#970・シートは中央の AppCanvas が出す)
     @State private var showsScreenMap = false
     /// 保存していない入力を、アプリの切り替え・ウインドウを閉じる前に確認する(#943)
@@ -67,7 +71,7 @@ struct MacRootView: View {
 
     var body: some View {
         NavigationSplitView(columnVisibility: $columnVisibility) {
-            AppSidebar(created: createdApps, examples: exampleApps, selection: guardedSelection,
+            AppSidebar(created: createdApps, examples: exampleApps, thumbnail: thumbnail(for:), selection: guardedSelection,
                        onOpen: { focus = .canvas }, onDelete: deleteApp)
                 .focused($focus, equals: .sidebar)
                 .navigationSplitViewColumnWidth(min: 180, ideal: 220, max: 320)
@@ -78,6 +82,13 @@ struct MacRootView: View {
                               onTalk: { talk(about: $0) }, discardGuard: discardGuard)
                         .environment(\.changeHighlight, highlight?.canvas == Self.canvasKey(app) ? highlight?.value ?? .none : .none)
                         .id(Self.canvasKey(app))
+                        .background { MacThumbnailAnchorView(anchor: thumbAnchor) }
+                        .task(id: Self.canvasKey(app)) {
+                            // 描き終わった頃に撮る(iOS は版が変わった 1.2 秒後)
+                            try? await Task.sleep(for: .seconds(1.2))
+                            guard !Task.isCancelled else { return }
+                            captureThumbnail()
+                        }
                 } else {
                     MacEmptyState(pose: .point, title: "アプリを選んでください",
                                   message: "左の一覧から選ぶと、ここに表示します。")
@@ -114,6 +125,14 @@ struct MacRootView: View {
             let map = $showsScreenMap, tips = $showsTips
             discardGuard.beforeAsking = { map.wrappedValue = false; tips.wrappedValue = false }
         }
+        .onChange(of: notices.summary == nil) { _, closed in
+            guard closed else { return }
+            // お知らせが写り込んだ時は、閉じて消え終わってから撮り直す
+            Task { @MainActor in
+                try? await Task.sleep(for: .seconds(0.4))
+                captureThumbnail()
+            }
+        }
         .onChange(of: selectedAppId) { _, id in
             if let id { library.lastAppId = id }
             showsScreenMap = false
@@ -149,8 +168,23 @@ struct MacRootView: View {
         if selectedAppId == id { selectedAppId = LocalAppLibrary.neighbor(deleting: id, in: apps.map(\.id)) }
         if notices.summary?.appId == id { notices.summary = nil }
         library.delete(id)
+        thumbs.remove(appId: id)
         Task { await MacRuntimeNotifications.removeApp(id) } // そのアプリの通知とタイマーの予約(#1324)
         MacVoiceOver.announce(L10n.tr("「\(name)」を削除しました"))
+    }
+
+    // MARK: - 行の写し(#1281)
+
+    private func thumbnail(for appId: String) -> NSImage? {
+        _ = thumbs.revision // 撮り直しで描き直す
+        return thumbs.image(for: appId)
+    }
+
+    /// 中央のアプリを撮る。お知らせ・会話のシートが出ている間は撮らない(閉じた後に撮り直す)
+    private func captureThumbnail() {
+        guard let app = selectedApp, notices.summary == nil, compose == nil else { return }
+        let voiceOnly = library.generated[app.id]?.dsl.isVoiceOnly ?? false
+        thumbs.capture(appId: app.id, isVoiceOnly: voiceOnly, anchor: thumbAnchor)
     }
 
     // MARK: - 作る・直す(#967)
