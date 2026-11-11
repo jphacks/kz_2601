@@ -1,6 +1,6 @@
 # 生成したアプリから外の API を使う(設計)
 
-> 状態: **判断待ち(下書き)**。2026-11-11 作成。方向(無料の API は枠・有料の API はコイン・サーバーから呼ぶ)は 2026-11-11 にオーナーが決めた(正典 [`docs/00_decisions.md`](../00_decisions.md) の「課金・Pro」)。この文書は作りの案で、「決めてほしいこと」はオーナーが決める。親 Issue ができたら `<番号>-external-apis.md` に名前を変える。
+> 状態: **決定(2026-11-11)**。「決めてほしいこと」の 9 つはオーナーが推奨どおりに決めた。2026-11-11 作成。方向(無料の API は枠・有料の API はコイン・サーバーから呼ぶ)は 2026-11-11 にオーナーが決めた(正典 [`docs/00_decisions.md`](../00_decisions.md) の「課金・Pro」)。この文書は作りの案で、「決めてほしいこと」はオーナーが決める。親 Issue ができたら `<番号>-external-apis.md` に名前を変える。
 > 前提: コイン課金 [#630](630-token-billing.md)(押さえ → 確定・サーバーの枠と超えた後のコイン払い)・費用の作り [#338](338-server-feature-cost-model.md)・悪用と脅威 [#339](339-abuse-threat-model.md) の「3. 外部への送信」・runner([infra/runner.md](../infra/runner.md))・外部の公開データ [features/external-feeds.md](../backend/features/external-feeds.md)・本の情報 [features/book-lookup.md](../backend/features/book-lookup.md)・通話 [features/calls.md](../backend/features/calls.md)。
 > **値段は書かない。** 1 コインの値段・API ごとの原価・枠の大きさ・粗利は非公開の資料で決める。この文書は「原価(USD)に `COIN_PER_USD` を掛ける」とだけ書く。
 
@@ -266,7 +266,10 @@ Issue の下書きは手元にある(公開する時に Issue にする)。
 
 ## 決めてほしいこと
 
-| # | 決めること | 推奨 |
+鍵は 2 種類ある。天気・為替・翻訳・場所の検索は**運営の API キー 1 つ**を全員で使う(利用者ごとのトークンは無い)。カレンダー・Outlook・Todoist・Notion は**その人のデータ**を読み書きするので、利用者ごとに OAuth で許可をもらい、その人のトークンを backend に保存して使う(7 はこちらの話)。
+
+
+| # | 決めること | 決定(2026-11-11・推奨どおり) |
 |---|---|---|
 | 1 | 外の API は Pro だけか | Pro だけ(有料の機能の②と同じ線。無料の人は使えない) |
 | 2 | 有料の API の履歴の種類 | 新しい `spend_ext`(AI の `spend_ai` と分けて、何に使ったかを履歴で分かるように) |
