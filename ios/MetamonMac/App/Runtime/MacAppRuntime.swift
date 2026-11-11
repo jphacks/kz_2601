@@ -257,7 +257,7 @@ final class MacAppRuntime: RuntimeNavigating {
         switch await book.save(entity: entity, form: form, recordId: recordId, canEdit: { self.canEdit(entity: $0, record: $1) }) {
         case .readOnly: notifyReadOnly(entity: entity)
         case .saved, .unchanged: leaveAfterSave(action, ctx) // 何も変えずに保存したら書かずに画面だけ進める(M10)
-        case .inFlight: break // 保存ボタンの連打
+        case .inFlight, .held: break // 保存ボタンの連打(.held は beforeNew を渡さないので来ない)
         }
     }
 
