@@ -27,6 +27,7 @@ tags:
   - { name: dsl }
   - { name: entities }
   - { name: entitlements, description: 'Tailor It Pro の権利(#314)。StoreKit 2 の署名付き取引をサーバーで検証して保存する。features/pro.md' }
+  - { name: ext, description: '外の API(#1493)。決まった provider と op だけを runner 経由で呼ぶ・利用者ごとの OAuth のつなぎ。features/external-apis.md' }
   - { name: feedback, description: 'アプリ内のフィードバック(#319)。features/feedback.md' }
   - { name: feeds, description: '外部の公開データの読み取り(#348)。許可リストの出どころだけ。features/external-feeds.md' }
   - { name: lookup, description: 'ISBN から本の情報を引く(DSL の lookupBook)。鍵の要らない決まった出どころだけ。features/book-lookup.md' }
@@ -1912,6 +1913,138 @@ paths:
         '429': { description: 1 時間の上限(GET と共通)。`Retry-After` と details(scope=user・limit・retryAfterSec), content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
         '503': { description: 止めている(details.reason = disabled)・出どころに今つながらない・取得の予算切れ(`Retry-After`), content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
 
+  /apps/{appId}/ext/{provider}/{op}:
+    parameters:
+      - { $ref: '#/components/parameters/AppId' }
+      - { in: path, name: provider, required: true, schema: { type: string, pattern: '^[a-z][a-zA-Z0-9]{1,31}$' }, example: fakeFree, description: '閉じた一覧の provider(DSL の provider)。一覧に無ければ 404' }
+      - { in: path, name: op, required: true, schema: { type: string, pattern: '^[a-z][a-zA-Z0-9]{1,47}$' }, example: listItems, description: 'その provider の決まった op。無ければ 404' }
+    post:
+      tags: [ext]
+      summary: 外の API を 1 回呼ぶ(#1493)
+      description: |
+        DSL の `externalCall` / `externalList` が使う。appconfig は人(ID トークン・App Check)とアプリと引数を確かめ、サービス間の認証(OIDC)で runner の `/internal/ext/call` に渡す。API キーと利用者のトークンは runner だけが持ち、端末には来ない。
+        - **誰の枠か**: 共有のアプリ(公開の DSL に public / shared の entity がある)は**作成者**の `runs`(作成者の Pro)。呼べるのは参加者(public の entity があるアプリは入れた人も)。それ以外は 403 `not_member`。自分のアプリ・自分の写しの private のアプリは呼び出した人の `runs`。有料の provider のコインは押した人
+        - **Pro だけ**(決定 1): 作成者が Pro でなければ 402 `pro_required`。呼び出した人が作成者でない時は `details.reason: creator_needs_pro`(課金画面ではなく案内を出す)。`PRO_GATE_MODE` に関係なく runner が確かめる
+        - **引数**: op が決めた名前だけ(ほかは 400)・値は文字列で 4096 バイトまで・URL に見える値は 400・op ごとの値の検査(通貨の記号など)も 400。runner でも同じ検査をする
+        - **冪等**: `X-Request-Id` を有料の provider のコインの押さえの鍵にする(送らなければサーバーが作る)
+        - **数え方**: 1 回 = `runs` 1(Pro の月の枠・超えた後のコイン払い)。有料の provider は押さえる → 実費 × `COIN_PER_USD` → 差額を戻す。失敗(時間切れ・5xx)は両方戻す。鍵だけの読む op(為替など)は同じ引数の答えを決まった時間キャッシュし、キャッシュから返した時は数えない(Pro の確認はする)
+        - 1 ユーザー 1 時間 `EXT_USER_PER_HOUR` 回(既定 120)。超えると 429 `rate_limited`
+        - `EXT_RUNNER_URL` が無い時・provider が止まっている(`EXT_<PROVIDER>_ENABLED` が無い・`EXT_DISABLED`・鍵が無い)時は 503 `ext_unavailable`
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              properties:
+                args:
+                  type: object
+                  description: op の引数(名前は op ごとに決まっている)
+                  additionalProperties: { type: string, maxLength: 4096 }
+            example: { args: { q: rain } }
+      responses:
+        '200':
+          description: 'OK。有料の provider は `X-Coins-Charged` / `X-Coins-Balance` も返す'
+          headers:
+            X-Coins-Charged: { schema: { type: integer }, description: 有料の provider で引いたコイン }
+            X-Coins-Balance: { schema: { type: integer }, description: 引いた後の残高 }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ExtResult' }
+              example: { rows: [{ title: fake 1, subtitle: rain, value: '1' }] }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '402': { description: '`pro_required`(作成者が Pro でない・`details.reason: creator_needs_pro`)・`allowance_exhausted` / `overflow_cap_reached` / `coins_insufficient`(CoinsPaymentRequired と同じ)', content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+        '403': { $ref: '#/components/responses/NotMember' }
+        '404': { description: provider / op が一覧に無い・アプリが自分のツリーに無い, content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+        '409': { description: '`ext_not_connected`: OAuth の要る op で、本人がつないでいない・切った・provider が拒んだ(`details.provider`)。`POST /me/connections/{provider}/start` でつなぐ。`duplicate_request`: 有料の provider で、この `X-Request-Id` はもうコインの押さえに使った(同じ呼び出しはもう一度しない)',content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+        '410': { description: '公開を止めた共有のアプリ(`unpublished`)・退会済み(`account_deleted`)', content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+        '429': { description: 1 時間の上限。`Retry-After` と details(scope=user・limit・retryAfterSec), content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+        '500': { description: runner の中の失敗(`internal`), content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+        '502': { description: '`upstream_unavailable`: 外の API が失敗した・runner に届かない', content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+        '503': { description: '`ext_unavailable`: 止まっている(`details.provider`)・`ext_busy`: 混んでいる', content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+        '504': { description: '`upstream_timeout`: 外の API が時間内(`EXT_TIMEOUT`・既定 8 秒)に答えない', content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+
+  /me/connections:
+    get:
+      tags: [ext]
+      summary: つないだサービスの一覧(#1493)
+      description: |
+        利用者ごとの OAuth のつなぎ(`users/{uid}/connections/*`)。provider・状態・scope・日付だけを返す(トークンは返さない)。切ったもの(印だけ残っている)は出さない。
+        `EXT_RUNNER_URL` が無い時は空の一覧。
+        `providers` はつなげるサービスの一覧(#1566・OAuth の要る provider だけ・id の順)。`enabled` は runner が今動かしているか(`EXT_RUNNER_URL` が無い時はみな false)。偽の provider は runner が動かしている時だけ(本番では出ない)。
+        `supportedFeatures` を付けると `externalCall.<id>` が入っている provider だけ。審査用の版は OAuth の provider のキーを送らないので何も出ない(決定 6)。
+      parameters:
+        - in: query
+          name: supportedFeatures
+          required: false
+          schema: { type: string }
+          example: externalCall.googleCalendar,externalCall.todoist
+          description: 'generate と同じ値。カンマ区切り・くり返しも可。無ければ絞らない'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [connections, providers]
+                properties:
+                  connections: { type: array, items: { $ref: '#/components/schemas/ExtConnection' } }
+                  providers: { type: array, items: { $ref: '#/components/schemas/ExtProvider' } }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '502': { description: runner に届かない(`upstream_unavailable`), content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+
+  /me/connections/{provider}/start:
+    parameters:
+      - { in: path, name: provider, required: true, schema: { type: string }, example: fakeOauth, description: 'OAuth の要る provider。それ以外・一覧に無い provider は 404' }
+    post:
+      tags: [ext]
+      summary: サービスにつなぐのを始める(#1493)
+      description: |
+        runner が state(1 回だけ・10 分)と PKCE の `code_verifier` を作り、provider の同意の URL を返す。iOS は `ASWebAuthenticationSession` で開く。同意の後は runner の `/oauth/callback/{provider}` が code をトークンに替えて保管し、`tailorit://connected?provider=…&status=ok|error` に戻す(URL にトークン・code は入らない)。
+        - `scopes` を書かなければ読む op の分だけ。書く op の scope は使う時に足す。provider の op に無い scope は 400
+        - 本文は省ける。`Cache-Control: no-store`
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              properties:
+                scopes: { type: array, maxItems: 32, items: { type: string } }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [authUrl]
+                properties:
+                  authUrl: { type: string, format: uri, description: provider の同意の画面 }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '502': { description: runner に届かない(`upstream_unavailable`), content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+        '503': { description: '`ext_unavailable`: provider が止まっている・`EXT_RUNNER_URL` が無い', content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+
+  /me/connections/{provider}:
+    parameters:
+      - { in: path, name: provider, required: true, schema: { type: string }, example: fakeOauth }
+    delete:
+      tags: [ext]
+      summary: サービスとのつなぎを切る(#1493)
+      description: |
+        provider の取り消しの口を呼び(無い provider は呼ばない)、**すぐ**トークンを消す(決定 7)。`revoked` の印だけ 90 日残る。つないでいない時も 204。
+      responses:
+        '204': { description: 切った }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '404': { description: OAuth の要らない provider・一覧に無い provider, content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+        '502': { description: runner に届かない(`upstream_unavailable`), content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+        '503': { description: '`ext_unavailable`: `EXT_RUNNER_URL` が無い', content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+
   /client-config:
     get:
       security: []
@@ -2138,6 +2271,10 @@ components:
                 - bad_request
                 - coins_insufficient
                 - duplicate_record
+                - duplicate_request
+                - ext_busy
+                - ext_not_connected
+                - ext_unavailable
                 - forbidden
                 - internal
                 - invalid_dsl
@@ -2153,11 +2290,45 @@ components:
                 - transaction_owned_by_other
                 - unauthenticated
                 - unpublished
+                - upstream_timeout
                 - upstream_unavailable
                 - version_conflict
             message: { type: string }
             details: { type: object, additionalProperties: true }
             requestId: { type: string }
+    ExtConnection:
+      type: object
+      required: [provider, status]
+      properties:
+        provider: { type: string, example: fakeOauth }
+        status: { type: string, enum: [active, error], description: 'error = provider がトークンを拒んだ(つなぎ直す)' }
+        scopes: { type: array, items: { type: string } }
+        connectedAt: { type: string, format: date-time }
+        lastUsedAt: { type: string, format: date-time }
+    ExtProvider:
+      type: object
+      description: つなげるサービス(GET /me/connections の providers)
+      required: [id, nameJa, nameEn, enabled]
+      properties:
+        id: { type: string, example: googleCalendar, description: 'POST /me/connections/{provider}/start の provider' }
+        nameJa: { type: string, example: Google カレンダー }
+        nameEn: { type: string, example: Google Calendar }
+        enabled: { type: boolean, description: 'このサーバーで今つなげるか(false なら画面はボタンを押せなくする)' }
+    ExtResult:
+      type: object
+      description: op の決まった形の答え(外の API の生の JSON は返さない)。読む op は rows、1 件は item、書く op は resultId
+      properties:
+        rows: { type: array, items: { $ref: '#/components/schemas/ExtRow' } }
+        item: { $ref: '#/components/schemas/ExtRow' }
+        resultId: { type: string, description: 書く op が作ったものの id(DSL の resultIdField) }
+    ExtRow:
+      type: object
+      required: [title]
+      properties:
+        title: { type: string }
+        subtitle: { type: string }
+        value: { type: string }
+        url: { type: string, format: uri }
     CallJoin:
       type: object
       required: [url, token, room, identity, sessionId, expiresAt, video, blockMinutes, reservedUntil, coinsReserved, coinsPerMinute]
@@ -2239,10 +2410,11 @@ components:
                   - refund_failed
                   - spend_ai
                   - spend_call
+                  - spend_ext
                   - spend_overflow
                   - spend_slot
               amount: { type: integer, description: 符号つきの増減 }
-              op: { type: string, description: 'spend_ai の処理(generate / edit / chat / text)' }
+              op: { type: string, description: 'spend_ai の処理(generate / edit / chat / text)。spend_ext は ext' }
               appId: { type: string }
               transactionId: { type: string, description: purchase の App Store の取引 }
               productId: { type: string }

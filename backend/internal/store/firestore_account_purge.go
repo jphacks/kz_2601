@@ -107,6 +107,12 @@ func (f *Firestore) PurgeAccount(ctx context.Context, uid string) (AccountPurgeR
 			res.NotifyConsents += n
 			return err
 		}},
+		{"ext connections", func() error {
+			// users/{uid}/connections/* (#1493): sealed OAuth tokens and revoked markers
+			n, err := f.deleteQuery(ctx, f.userRef(uid).Collection("connections").Query, nil)
+			res.ExtConnections += n
+			return err
+		}},
 		{"match quota", func() error {
 			_, err := f.c.Collection(matchQuotaCollection).Doc(uid).Delete(ctx)
 			return err
