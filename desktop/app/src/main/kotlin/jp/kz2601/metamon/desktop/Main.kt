@@ -1,6 +1,7 @@
 package jp.kz2601.metamon.desktop
 
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
@@ -20,22 +21,33 @@ import java.awt.Dimension
 import java.awt.GraphicsEnvironment
 import java.awt.Rectangle
 import jp.kz2601.metamon.desktop.i18n.Strings
+import jp.kz2601.metamon.desktop.store.DesktopStore
+import jp.kz2601.metamon.desktop.store.SessionPersistence
 import jp.kz2601.metamon.desktop.theme.TailorItTheme
+import jp.kz2601.metamon.dsl.records.entityModels
 import java.io.File
 import java.util.prefs.Preferences
 
 /**
  * 起動。引数 1 つ目(または -Dtailorit.example)で同梱の例を選ぶ。既定は shopping。
- * 引数 2 つ目に記録の JSON(`{"<entity>": [{"id", "data"}]}`・case.json の形も可)を渡すとモックに入れて開く。3 つ目は最初の画面の id。
+ * 引数 2 つ目に記録の JSON(`{"<entity>": [{"id", "data"}]}`・case.json の形も可)を渡すとモックに入れて開く(端末には残さない)。3 つ目は最初の画面の id。
+ * 引数が無ければ最後に開いたアプリ。記録は端末に残す(SessionPersistence)。
  * ウィンドウの大きさ・位置は覚えて次の起動で戻す。トレイ / メニューバーに常駐する(Tray.kt)。サインインはまだ無い(モック)。
  */
 @OptIn(FlowPreview::class)
 fun main(args: Array<String>) = application {
-    val first = args.firstOrNull() ?: System.getProperty("tailorit.example") ?: "shopping"
+    // 端末の保存(#1887): 記録・設定は再起動しても残る。最後に開いたアプリから開く
+    val desktopStore = remember { DesktopStore.open() }
+    val first = args.firstOrNull() ?: System.getProperty("tailorit.example")
+        ?: desktopStore.lastAppId?.takeIf { it in BundledApps.ids() } ?: "shopping"
     // コマンドパレット(#1765)で同梱の別の例に切り替える。記録・最初の画面は起動時の例にだけ使う
     var name by remember { mutableStateOf(first) }
     val dsl = remember(name) { Examples.load(name) }
-    val store = remember(name) { args.getOrNull(1)?.takeIf { name == first }?.let { MockStore.fromJson(File(it).readText()) } ?: MockStore() }
+    // 記録の JSON を渡した時(開発・スクリーンショット)は端末に残さない
+    val fixture = remember(name) { args.getOrNull(1)?.takeIf { name == first }?.let { MockStore.fromJson(File(it).readText()) } }
+    val opened = remember(name) { if (fixture != null) null else SessionPersistence.open(desktopStore, name, dsl.entityModels()) }
+    DisposableEffect(opened) { onDispose { opened?.first?.close() } }
+    val store = fixture ?: opened?.second ?: MockStore()
     val saved = remember { WindowBounds.load()?.let { WindowBounds.fit(it, WindowBounds.screens()) } }
     val state = rememberWindowState(
         size = saved?.size ?: DpSize(480.dp, 820.dp),
@@ -64,7 +76,7 @@ fun main(args: Array<String>) = application {
         }
         // 明暗は OS に従う・文言は OS の言語(日本語か英語)・#1759
         CompositionLocalProvider(LocalTray provides tray) {
-            TailorItTheme { key(name) { DesktopApp(dsl, store, args.getOrNull(2)?.takeIf { name == first }, onOpenApp = { name = it }) } }
+            TailorItTheme { key(name) { DesktopApp(dsl, store, args.getOrNull(2)?.takeIf { name == first }, onOpenApp = { name = it }, persistence = opened?.first) } }
         }
     }
 }

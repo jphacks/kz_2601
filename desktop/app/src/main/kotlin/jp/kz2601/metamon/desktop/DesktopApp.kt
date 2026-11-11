@@ -69,6 +69,7 @@ import androidx.compose.ui.semantics.paneTitle
 import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.semantics
 import jp.kz2601.metamon.desktop.i18n.Strings
+import jp.kz2601.metamon.desktop.store.SessionPersistence
 
 /** 画面 1 枚の描画に要るもの。 */
 private class ScreenScope(
@@ -86,8 +87,14 @@ private class ScreenScope(
  * push はウィンドウの中で積み、sheet はウィンドウ内のダイアログ、fullScreen はウィンドウ全体に重ねる。タブは下に並べる。
  */
 @Composable
-fun DesktopApp(dsl: AppDSL, initialStore: MockStore = MockStore(), startScreen: String? = null, onOpenApp: ((String) -> Unit)? = null) {
-    val session = remember { DesktopSession(dsl, initialStore, startScreen = startScreen, host = DesktopActionHost()) }
+fun DesktopApp(
+    dsl: AppDSL,
+    initialStore: MockStore = MockStore(),
+    startScreen: String? = null,
+    onOpenApp: ((String) -> Unit)? = null,
+    persistence: SessionPersistence? = null,
+) {
+    val session = remember { DesktopSession(dsl, initialStore, startScreen = startScreen, host = DesktopActionHost(), persistence = persistence) }
     TrayHook(session)
     var pending by remember { mutableStateOf<Pair<Action, ActionContext>?>(null) }
     val nav = session.nav
@@ -111,6 +118,16 @@ fun DesktopApp(dsl: AppDSL, initialStore: MockStore = MockStore(), startScreen: 
             Column(Modifier.fillMaxSize().then(keyboard.inert(nav.sheet != null || nav.fullScreen != null))) {
                 val base = NavigationResolver.dismissModals(nav).top(dsl)
                 Box(Modifier.weight(1f)) { ScreenView(dsl, session, base, io, dispatch, openPrint) }
+                // 送り待ちがある時だけ小さく出す(#1887)
+                session.persistence?.pending?.takeIf { it > 0 }?.let { n ->
+                    Text(
+                        Strings.format("desktop_sync_pending", n),
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 4.dp)
+                            .semantics { liveRegion = LiveRegionMode.Polite },
+                    )
+                }
                 if (dsl.app.hasTabs) {
                     HorizontalDivider()
                     // 読み上げでは「タブ・選択中」と読む
