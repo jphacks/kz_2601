@@ -53,6 +53,9 @@ sequenceDiagram
 | 引く | webhook の `participant_left`(または `room_finished`)で、入った時刻から出た時刻まで(始まった分は 1 分)× `COIN_PER_CALL_MINUTE` を、押さえたまとまりの順に、それぞれ押さえた量まで引く(履歴の種類 `spend_call`)。押さえより長い分は引かない(ログ `calls.uncovered_minutes`) |
 | 1 回だけ | 精算は `callSessions/{sessionId}` に `settled`・分・まとまりごとの量を 1 回だけ書く。同じ webhook がもう一度来ても同じ量を確定するだけ(`SettleHold` は確定済みならそのまま) |
 | webhook が来ない | 押さえは `CALL_BLOCK_MINUTES + CALL_HOLD_GRACE` で期限が切れ、全部戻る(利用者に損をさせない側。ログ `coins.hold_expired`)。押さえ直した時は、前のまとまりの期限も新しいまとまりと同じ時刻まで延ばす(精算は出る時なので、長い通話の途中で前のまとまりが戻らないように) |
+| 押さえの終わり | 入った時刻から「押さえたまとまりの数 × `CALL_BLOCK_MINUTES`」が、その通話の終わり(`paidUntil`)。押さえ直すと延びる。`paidUntil` になったら、サーバーが LiveKit の RoomService(`RemoveParticipant`)でその人を部屋から外し、`paidUntil` までで精算する。外すのに失敗したら 30 秒おきに数回やり直す(精算は外せてから) |
+| トークンの期限 | トークンで入れる期限は `CALL_TOKEN_TTL` と `paidUntil`(まだ入っていなければ、今から押さえた分)の短い方 |
+| 精算の後 | 精算した通話(`settled`)の `sessionId` で部屋に入り直すと、`participant_joined` の webhook で外す。押さえ直しも 404 `call_ended` |
 | 止める | `COIN_BILLING_MODE=off` なら押さえない・引かない。`log` は押さえず、引くはずの量をログ `coins.would_spend` に出すだけ。`COIN_PER_CALL_MINUTE=0`(既定)なら数えない |
 
 値段(`COIN_PER_CALL_MINUTE`)は非公開の資料で決め、この repo には書かない。
@@ -70,7 +73,7 @@ sequenceDiagram
 
 | 置き場 | 中身 |
 |---|---|
-| `callSessions/{sessionId}` | `{uid, appId, room, video, blocks: [{holdId, amount, dryRun}], createdAt, joinedAt, endedAt, settled, minutes, charges: {holdId: coins}, deleteAt}` |
+| `callSessions/{sessionId}` | `{uid, appId, room, video, blocks: [{holdId, amount, dryRun}], createdAt, joinedAt, endedAt, paidUntil, settled, minutes, charges: {holdId: coins}, deleteAt}` |
 | `coinReservations/{holdId}` | 押さえ(#630 と同じ・op `call`) |
 | `users/{uid}/coinLedger/*` | 引いた分は `spend_call` |
 
@@ -102,7 +105,9 @@ sequenceDiagram
 
 ## 9. 分かっている制約
 
-- 押さえ直しはアプリがする。アプリが落ちて押さえ直さないまま部屋に残ると、押さえより長い分は引かれない(ログで見張る)。サーバーから部屋を追い出す(LiveKit の RoomService)のは今は入れていない。
+- 押さえ直しはアプリがする。押さえ直さないまま `paidUntil` を過ぎると、サーバーが部屋から外す。
+- `paidUntil` の見張りは appconfig のインスタンスの中のタイマー。インスタンスが止まるとタイマーは消えるが、同じ部屋に次の webhook が来た時か、押さえ直しの時に追いつく(誰も来ない部屋では遅れる)。
+- `COIN_BILLING_MODE=log`・`COIN_PER_CALL_MINUTE=0` の時は外さない(押さえていないため)。
 - 人数の上限は部屋を作る時だけ効く(先に入った人の設定)。
 - 回数の上限はインスタンスごと(Cloud Run の台数ぶん緩くなる)。
 - ブロック(#321)した相手と同じ部屋に入るのは止めていない。

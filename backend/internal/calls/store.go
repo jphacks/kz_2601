@@ -36,6 +36,9 @@ type Session struct {
 	CreatedAt time.Time `firestore:"createdAt"`
 	JoinedAt  time.Time `firestore:"joinedAt,omitempty"`
 	EndedAt   time.Time `firestore:"endedAt,omitempty"`
+	// PaidUntil is when the holds run out (from the join; zero = not
+	// bounded or not joined yet). The server takes the participant out then.
+	PaidUntil time.Time `firestore:"paidUntil,omitempty"`
 	// Settled is set once with Minutes and Charges (hold id -> coins); a
 	// repeated webhook commits the same charges again (idempotent).
 	Settled bool             `firestore:"settled"`

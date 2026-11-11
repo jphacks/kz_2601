@@ -9,6 +9,7 @@ import (
 	"log/slog"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 	"unicode/utf8"
 
@@ -52,8 +53,15 @@ type Service struct {
 	Coins  Coins
 	Now    func() time.Time
 	Log    *slog.Logger
+	// Rooms takes people out of a room (nil = nobody is taken out).
+	Rooms Rooms
 	// NewID makes session ids (tests); nil = 16 random bytes.
 	NewID func() string
+	// AfterFunc runs f after d and returns its stop (tests); nil = time.AfterFunc.
+	AfterFunc func(d time.Duration, f func()) (stop func() bool)
+
+	timersMu sync.Mutex
+	timers   map[string]func() bool // session id -> stop of its PaidUntil timer
 }
 
 func (s *Service) now() time.Time {
@@ -143,6 +151,13 @@ func (s *Service) Join(ctx context.Context, r JoinRequest) (Join, error) {
 		if got.UID != r.UID || got.Room != room || got.Settled {
 			return Join{}, ErrSessionClosed
 		}
+		if !got.PaidUntil.IsZero() && !now.Before(got.PaidUntil) {
+			// the holds already ran out: the stay ends there
+			if err := s.Expire(ctx, got.ID); err != nil {
+				s.log().WarnContext(ctx, "calls: expire failed", slog.String("uid_hash", httpx.UIDHash(got.UID)), slog.Any("error", err))
+			}
+			return Join{}, ErrSessionClosed
+		}
 		sess = got
 		// the earlier blocks are settled only when the caller leaves: keep
 		// their holds as long as the new block's, or they expire mid-call
@@ -164,6 +179,7 @@ func (s *Service) Join(ctx context.Context, r JoinRequest) (Join, error) {
 			if block != nil {
 				cur.Blocks = append(cur.Blocks, *block)
 			}
+			cur.PaidUntil = s.paidUntil(*cur, cur.JoinedAt)
 			sess = *cur
 			return nil
 		})
@@ -178,13 +194,17 @@ func (s *Service) Join(ctx context.Context, r JoinRequest) (Join, error) {
 		return Join{}, err
 	}
 
-	token, err := s.token(sess, r.Name)
+	if !sess.PaidUntil.IsZero() {
+		s.arm(sess.ID, sess.PaidUntil)
+	}
+	ttl := s.tokenTTL(sess, now)
+	token, err := s.token(sess, r.Name, ttl)
 	if err != nil {
 		return Join{}, err
 	}
 	at := now.Truncate(time.Second) // whole seconds: iOS reads plain RFC 3339
 	out := Join{URL: s.Config.URL, Token: token, Room: room, Identity: sess.ID, SessionID: sess.ID,
-		ExpiresAt: at.Add(s.Config.TokenTTL), Video: sess.Video, BlockMinutes: s.Config.BlockMinutes,
+		ExpiresAt: at.Add(ttl).Truncate(time.Second), Video: sess.Video, BlockMinutes: s.Config.BlockMinutes,
 		ReservedUntil: at.Add(s.Config.BlockDuration()), PerMinute: s.Config.PerMinute}
 	if block != nil && !block.DryRun {
 		out.CoinsReserved = block.Amount
@@ -228,7 +248,7 @@ func (s *Service) reserve(ctx context.Context, r JoinRequest, sessionID string, 
 
 // token is the LiveKit access token of sess: join its room, publish the
 // microphone (and the camera when video), subscribe, no data channel.
-func (s *Service) token(sess Session, name string) (string, error) {
+func (s *Service) token(sess Session, name string, ttl time.Duration) (string, error) {
 	yes, no := true, false
 	sources := []livekit.TrackSource{livekit.TrackSource_MICROPHONE}
 	if sess.Video {
@@ -243,7 +263,7 @@ func (s *Service) token(sess Session, name string) (string, error) {
 		SetVideoGrant(grant).
 		SetIdentity(sess.ID).
 		SetName(cleanName(name)).
-		SetValidFor(s.Config.TokenTTL).
+		SetValidFor(ttl).
 		SetRoomConfig(&livekit.RoomConfiguration{
 			MaxParticipants: uint32(s.Config.MaxParticipants),
 			EmptyTimeout:    60,
@@ -289,17 +309,37 @@ const (
 func (s *Service) Handle(ctx context.Context, e Event) error {
 	switch e.Kind {
 	case KindJoined:
-		_, err := s.Store.Update(ctx, e.Identity, func(cur *Session) error {
-			if cur.JoinedAt.IsZero() && !e.JoinedAt.IsZero() {
-				cur.JoinedAt = e.JoinedAt
+		joined := e.JoinedAt
+		if joined.IsZero() {
+			joined = e.At
+		}
+		sess, err := s.Store.Update(ctx, e.Identity, func(cur *Session) error {
+			if cur.Settled {
+				return nil
 			}
+			if cur.JoinedAt.IsZero() && !joined.IsZero() {
+				cur.JoinedAt = joined
+			}
+			cur.PaidUntil = s.paidUntil(*cur, cur.JoinedAt)
 			return nil
 		})
 		if errors.Is(err, ErrNotFound) {
 			return nil // not ours (or already gone)
 		}
-		return err
+		if err != nil {
+			return err
+		}
+		defer s.sweepRoom(ctx, e.Room)
+		switch {
+		case sess.Settled:
+			// a token of a stay that already ended: not back into the room
+			return s.remove(ctx, sess, removedSettled)
+		case !sess.PaidUntil.IsZero():
+			return s.Expire(ctx, sess.ID) // sets the timer (or ends it now)
+		}
+		return nil
 	case KindLeft:
+		defer s.sweepRoom(ctx, e.Room)
 		return s.settle(ctx, e.Identity, e.JoinedAt, e.At)
 	case KindFinished:
 		open, err := s.Store.Open(ctx, e.Room)
@@ -352,6 +392,7 @@ func (s *Service) settle(ctx context.Context, id string, joined, left time.Time)
 	if err != nil {
 		return err
 	}
+	s.disarm(id)
 	var charged int64
 	for _, b := range sess.Blocks {
 		h := &coins.Hold{ID: b.HoldID, UID: sess.UID, Op: coins.OpCall, AppID: sess.AppID, Amount: b.Amount, DryRun: b.DryRun}

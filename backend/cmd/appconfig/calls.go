@@ -23,5 +23,9 @@ func newCalls(st store.Store, cs *coins.Service, logger *slog.Logger) *calls.Ser
 		cst = calls.NewFirestore(fs.Client())
 	}
 	logger.Info("calls", slog.Bool("enabled", cfg.Enabled), slog.Bool("charged", cfg.PerMinute > 0), slog.Int("blockMinutes", cfg.BlockMinutes))
-	return &calls.Service{Config: cfg, Store: cst, Coins: cs, Log: logger}
+	svc := &calls.Service{Config: cfg, Store: cst, Coins: cs, Log: logger}
+	if cfg.Enabled {
+		svc.Rooms = calls.NewLiveKitRooms(cfg) // ends a stay when its holds run out
+	}
+	return svc
 }
