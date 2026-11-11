@@ -302,6 +302,12 @@ class AppRuntime(
     /** 一覧に出すアプリ(archived・未生成を除き、今のアプリを先頭に)。 */
     val visibleApps: List<AppSummary> get() = AppSummary.visible(_apps.value, current = document.appId)
 
+    /** 一覧を差し替える(変身一覧の名前の変更・複製・並べ替え・削除・#896)。オフラインの一覧にも残す。 */
+    fun setApps(list: List<AppSummary>) {
+        _apps.value = list
+        directory?.cache?.store(list)
+    }
+
     /**
      * 生成(音声 #995)の結果を受け取る。ai は送った appId で返すので、別の appId なら新しいアプリとして開き、その appId を保存する。
      * 同じアプリの古い版(ホットリロードが先に新しい版を当てた)は捨てる。

@@ -109,7 +109,9 @@ import jp.kz2601.metamon.share.ShareLinkHost
 import jp.kz2601.metamon.share.ShareLinkIntents
 import jp.kz2601.metamon.share.ShareSheet
 import jp.kz2601.metamon.share.ShareTarget
+import jp.kz2601.metamon.switcher.AppListEditor
 import jp.kz2601.metamon.switcher.AppSwitcherDialog
+import jp.kz2601.metamon.switcher.AppSwitcherEdits
 import jp.kz2601.metamon.switcher.AppThumbnailStore
 import jp.kz2601.metamon.switcher.captureWindow
 import jp.kz2601.metamon.switcher.findActivity
@@ -358,6 +360,22 @@ fun MetamonApp(container: AppContainer) {
     // 組み上げ中か(サムネを撮ってよいか・#1199)を読むので見せ方の状態はここで持つ
     val buildStage = remember(container.tutorial.editHints) { BuildStageState(container.tutorial.editHints) }
 
+    // 変身一覧の「…」の名前の変更・複製・並べ替え・削除(#896)。どれも楽観的 UI で、失敗したら戻す
+    val appEditor = remember(container, runtime, vm) {
+        AppListEditor(
+            client = container.appConfig,
+            apps = { runtime.apps.value },
+            setApps = runtime::setApps,
+            currentAppId = { runtime.state.value.document.appId },
+            switchTo = runtime::switchApp,
+            goHome = runtime::startNewApp,
+            forgetLocal = container::forgetAppLocally,
+            toast = runtime::showToast,
+            isBusy = { vm.state.value.isGenerating },
+        )
+    }
+    val deletingApps by appEditor.hidden.collectAsStateWithLifecycle()
+
     val openSwitcher = {
         switcherOpen = true
         scope.launch { runtime.appsList() }
@@ -593,6 +611,15 @@ fun MetamonApp(container: AppContainer) {
             } },
             releases = releases,
             thumbnails = container.thumbnails,
+            edits = AppSwitcherEdits(
+                onRename = { app, name -> scope.launch { appEditor.rename(app, name) } },
+                onDuplicate = { app -> scope.launch { appEditor.duplicate(app) { context.getString(R.string.app_menu_copy_name, it) } } },
+                onMove = { app, index -> scope.launch { appEditor.move(app.id, index) } },
+                // 回転で画面が作り直されても途中で止めない(サーバーで消えたのに端末のデータが残らないよう)
+                onDelete = { app -> container.accountScope.launch { appEditor.delete(app) } },
+                hidden = deletingApps,
+                canDelete = !state.isGenerating,
+            ),
         )
     }
     // リリース申請(#1254)。入口は変身一覧の「…」
