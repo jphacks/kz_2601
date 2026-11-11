@@ -1,6 +1,7 @@
 import SwiftUI
 import MetamonDSL
 import MetamonRenderer
+import MetamonServices
 
 /// Mac の画面の骨格(#933): 左にアプリの一覧・中央に選んだアプリ・上にツールバー。
 /// iOS で sheet だった本体の画面の出し方:
@@ -101,6 +102,7 @@ struct MacRootView: View {
             ComposeSheet(session: session, onClose: { compose = nil }, undo: finishedUndo(session))
                 .interactiveDismissDisabled(session.isBusy)
                 .environment(voice)
+                .environment(\.macAppReplace, appReplaceContext) // 持てるアプリの数の上限の置き換え(#630)
         }
         .task { voice.prepareIfAllowed() } // モデルが端末にあれば読み込む(無ければ起動では聞かない)
         .onAppear {
@@ -128,6 +130,14 @@ struct MacRootView: View {
         let ids = apps.map(\.id)
         if let id = selectedAppId, ids.contains(id) { return }
         selectedAppId = LocalAppLibrary.reopen(library.lastAppId, among: ids)
+    }
+
+    /// 置き換えシートに並べるアプリ(この Mac で作ったアプリ)と消し方(#630)。版が 1 の空のアプリとして数えないよう 2 以上にする
+    private var appReplaceContext: MacAppReplaceContext {
+        let summaries = library.createdIds.compactMap { id in
+            library.generated[id].map { AppSummary(id: id, name: $0.dsl.app.name, currentVersion: max($0.version, 2)) }
+        }
+        return MacAppReplaceContext(apps: summaries, current: selectedAppId, delete: deleteApp)
     }
 
     /// 作ったアプリを消す(確認はサイドバーで済んでいる)。開いていたら一覧で隣のアプリへ移る
