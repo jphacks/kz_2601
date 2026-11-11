@@ -10,8 +10,9 @@ enum MacExportOutput: Equatable {
 }
 
 /// `export` アクション(#421 の Mac 版・#1143): 記録を CSV / PDF にして、保存パネル・共有メニュー・プリントで出す。
-/// 表は iOS と同じ `makeExportFile`(Renderer)で作る。保存とプリントの後は一時フォルダの写しを消す(記録の写しを残さない)。
-/// 共有は相手が読み終えるまで写しを残し、次の書き出し(`makeExportFile` が消す)か終了時に消す。
+/// 表は iOS と同じ `makeExportFile`(Renderer)で、書き出しごとのフォルダに作る(ほかのウインドウの共有・行のドラッグの写しを消さない)。
+/// 保存は終わったら自分のフォルダだけ消す(記録の写しを残さない)。プリントは一時ファイルを作らない。
+/// 共有は送り終えた・失敗した・閉じた時に自分のフォルダを消す(`MacExportShareSession`)。残ったものは起動時と終了時に片付ける。
 extension MacAppRuntime {
     func export(_ action: Action, _ ctx: ActionContext) async {
         guard let entityId = action.entity, let entity = dsl.entity(entityId) else {
@@ -32,12 +33,12 @@ extension MacAppRuntime {
     private func saveExport(_ action: Action, _ ctx: ActionContext) async {
         let file: ExportFile
         do {
-            file = try makeExportFile(action, screen: ctx.route.screen)
+            file = try makeExportFile(action, screen: ctx.route.screen, clearingPrevious: false)
         } catch {
             toast = L10n.tr("書き出せませんでした")
             return
         }
-        defer { ExportFiles.removeAll() }
+        defer { ExportFiles.remove(file.url) }
         guard let destination = await MacExportSaver.chooseDestination(file) else { return } // キャンセル
         do {
             try MacExportSaver.save(file, to: destination)
@@ -49,12 +50,12 @@ extension MacAppRuntime {
 
     /// 共有メニュー(NSSharingServicePicker)。CSV / PDF のファイルをそのまま渡す
     private func shareExport(_ action: Action, _ ctx: ActionContext) {
-        guard let file = try? makeExportFile(action, screen: ctx.route.screen) else {
+        guard let file = try? makeExportFile(action, screen: ctx.route.screen, clearingPrevious: false) else {
             toast = L10n.tr("書き出せませんでした")
             return
         }
         if !MacExportSaver.share(file.url) {
-            ExportFiles.removeAll()
+            ExportFiles.remove(file.url)
             toast = L10n.tr("書き出せませんでした")
         }
     }
@@ -118,11 +119,12 @@ enum MacExportSaver {
         return response == .OK ? panel.url : nil
     }
 
-    /// 共有メニューを前のウインドウの中央に出す。出せなければ false
+    /// 共有メニューを前のウインドウの中央に出す。出せなければ false。
+    /// 送り終えた・失敗した・閉じた時に写しを消す(`MacExportShareSession`)
     static var share: @MainActor (URL) -> Bool = { url in
         guard let view = (NSApp.keyWindow ?? NSApp.mainWindow)?.contentView else { return false }
         let anchor = NSRect(x: view.bounds.midX, y: view.bounds.midY, width: 1, height: 1)
-        NSSharingServicePicker(items: [url]).show(relativeTo: anchor, of: view, preferredEdge: .minY)
+        MacExportShareSession(url: url).show(relativeTo: anchor, of: view)
         return true
     }
 
@@ -148,5 +150,57 @@ enum MacExportSaver {
         let fm = FileManager.default
         if fm.fileExists(atPath: destination.path) { try fm.removeItem(at: destination) }
         try fm.copyItem(at: file.url, to: destination)
+    }
+}
+
+/// 共有メニュー 1 回ぶん。送り終えた・失敗した・選ばずに閉じた時に、渡した写し(書き出しのフォルダ)を消す。
+/// メニューの delegate は弱参照なので、終わるまで `active` で持つ
+@MainActor
+final class MacExportShareSession: NSObject, NSSharingServicePickerDelegate, NSSharingServiceDelegate {
+    private static var active: Set<MacExportShareSession> = []
+    static var activeCount: Int { active.count }
+
+    let url: URL
+    private var picker: NSSharingServicePicker?
+
+    init(url: URL) {
+        self.url = url
+        super.init()
+        Self.active.insert(self)
+    }
+
+    func show(relativeTo rect: NSRect, of view: NSView) {
+        let picker = NSSharingServicePicker(items: [url])
+        picker.delegate = self
+        self.picker = picker
+        picker.show(relativeTo: rect, of: view, preferredEdge: .minY)
+    }
+
+    /// 写しを消して手放す(2 回呼んでもよい)
+    func finish() {
+        guard Self.active.remove(self) != nil else { return }
+        ExportFiles.remove(url)
+        picker = nil
+    }
+
+    // MARK: NSSharingServicePickerDelegate
+
+    func sharingServicePicker(_ picker: NSSharingServicePicker,
+                              delegateFor sharingService: NSSharingService) -> NSSharingServiceDelegate? {
+        self
+    }
+
+    func sharingServicePicker(_ picker: NSSharingServicePicker, didChoose service: NSSharingService?) {
+        if service == nil { finish() } // 選ばずに閉じた
+    }
+
+    // MARK: NSSharingServiceDelegate
+
+    func sharingService(_ sharingService: NSSharingService, didShareItems items: [Any]) {
+        finish()
+    }
+
+    func sharingService(_ sharingService: NSSharingService, didFailToShareItems items: [Any], error: any Error) {
+        finish()
     }
 }

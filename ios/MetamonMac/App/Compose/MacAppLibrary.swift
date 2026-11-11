@@ -40,13 +40,17 @@ final class MacAppLibrary {
     @ObservationIgnored private let server: (any AppConfigClient)?
     /// サーバーから受けた版の封筒(端末に残す形)。既定は `HTTPAppConfigClient` が書く `DocumentCache`
     @ObservationIgnored private let serverEnvelope: (String) -> Data?
+    /// 設定の「使用量」(作ったアプリの数)。作った・消した時に古くする(iOS は `AppSwitcherSheet` が同じことをする)
+    @ObservationIgnored private let usage: PlanUsageStore
     static let serverIdsKey = "metamon.mac.serverAppIds"
 
     /// `store` が nil なら端末に残さない(プレビュー・テスト用)。`defaults` はサーバーにあるアプリの印の置き場(nil なら残さない)。
     /// `server` はサーバーの版で戻す時の相手(nil なら端末の履歴だけ)
     init(store: LocalAppLibrary? = .standard, defaults: UserDefaults? = nil, server: (any AppConfigClient)? = nil,
-         serverEnvelope: @escaping (String) -> Data? = { DocumentCache.shared.loadData(appId: $0) }) {
+         serverEnvelope: @escaping (String) -> Data? = { DocumentCache.shared.loadData(appId: $0) },
+         usage: PlanUsageStore = .shared) {
         self.store = store
+        self.usage = usage
         self.defaults = defaults
         self.server = server
         self.serverEnvelope = serverEnvelope
@@ -101,6 +105,7 @@ final class MacAppLibrary {
         }
         if created, !createdIds.contains(id) { createdIds.insert(id, at: 0) }
         set(id, Version(document: document, envelope: envelope))
+        if created { usage.invalidateMe() }
     }
 
     /// 「元に戻す」を押せるか。サーバーにあるアプリは前の版がある(版が 2 以上)時も(iOS の `canUndo` と同じ)
@@ -206,6 +211,7 @@ final class MacAppLibrary {
         store?.remove(appId: appId)
         markOnServer(appId, false)
         saveList()
+        usage.invalidateMe()
     }
 
     /// 端末のデータを消した回数(開いているウインドウが選択を初期に戻す合図・#972)

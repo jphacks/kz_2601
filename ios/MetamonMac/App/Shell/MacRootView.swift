@@ -175,7 +175,7 @@ struct MacRootView: View {
         }
         .onChange(of: draftRequest.serial) {
             // 頼まれた文を入力欄に入れて会話を開く(送らない)。頼んだシートが閉じるのを待つ(重なると表示されない・iOS と同じ 0.6 秒)
-            guard let draft = draftRequest.take() else { return }
+            guard let draft = draftRequest.take(in: discardGuard.window) else { return } // 頼んだ時に前に出したウインドウだけ
             Task { @MainActor in
                 try? await Task.sleep(for: .milliseconds(600))
                 ask(draft: draft)

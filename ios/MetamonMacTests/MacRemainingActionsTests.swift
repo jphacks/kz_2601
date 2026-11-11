@@ -51,7 +51,7 @@ final class MacRemainingActionsTests: XCTestCase {
         XCTAssertNil(MacExportSaver.output(for: NSApplication.ModalResponse(rawValue: 1003)), "キャンセル")
     }
 
-    func testShareHandsCSVFileToPickerAndKeepsItUntilNextExport() async throws {
+    func testShareHandsCSVFileToPickerAndKeepsItWhileSharing() async throws {
         let rt = try runtime()
         let shared = Box<URL>()
         MacExportSaver.chooseOutput = { .share }
