@@ -4,10 +4,12 @@ import MetamonServices
 /// サイドバーのアプリの一覧。iOS の AppSwitcherSheet に当たる(Mac では常に出す)。
 /// ↑↓ で選ぶと中央が切り替わり、Return / ダブルクリックで中央へ移る(#934)。
 /// 「作ったアプリ」と「同梱の例」に分ける(#969)。作ったアプリは右クリックで名前の変更・上へ / 下へ・削除(確認あり)、
-/// ドラッグで並べ替え、Delete キーで削除。同梱の例は整理できない。検索(#1282)で絞った一覧を受け取る。サムネイル・新着の数は後の Issue。
+/// ドラッグで並べ替え、Delete キーで削除。同梱の例は整理できない。検索(#1282)で絞った一覧を受け取る。行の頭にアプリの画面の写し(#1281・無ければ頭の文字)。新着の数は後の Issue。
 struct AppSidebar: View {
     let created: [SampleApp]
     let examples: [SampleApp]
+    /// 行の写し(#1281)
+    var thumbnail: (String) -> NSImage? = { _ in nil }
     /// 検索欄の文字(#1282)。絞り込みは呼ぶ側で済ませてある。並べ替えは絞っていない時だけ
     var searchText = ""
     @Binding var selection: SampleApp.ID?
@@ -84,15 +86,18 @@ struct AppSidebar: View {
     }
 
     private func row(_ app: SampleApp) -> some View {
-        VStack(alignment: .leading, spacing: MacTheme.Spacing.rowLine) {
-            Text(app.name)
-                .font(MacTheme.Fonts.sidebarTitle)
-                .lineLimit(1)
-            if let description = app.description {
-                Text(description)
-                    .font(MacTheme.Fonts.sidebarDetail)
-                    .foregroundStyle(.secondary)
+        HStack(spacing: 8) {
+            SidebarThumbnail(name: app.name, image: thumbnail(app.id))
+            VStack(alignment: .leading, spacing: MacTheme.Spacing.rowLine) {
+                Text(app.name)
+                    .font(MacTheme.Fonts.sidebarTitle)
                     .lineLimit(1)
+                if let description = app.description {
+                    Text(description)
+                        .font(MacTheme.Fonts.sidebarDetail)
+                        .foregroundStyle(.secondary)
+                        .lineLimit(1)
+                }
             }
         }
         .padding(.vertical, 2)
