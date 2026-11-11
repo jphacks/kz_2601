@@ -5,6 +5,8 @@ import jp.kz2601.metamon.dsl.ExprNumber
 import jp.kz2601.metamon.dsl.ListItem
 import jp.kz2601.metamon.dsl.Resets
 import jp.kz2601.metamon.dsl.TableColumn
+import jp.kz2601.metamon.dsl.targetExpr
+import jp.kz2601.metamon.dsl.targetNumber
 import jp.kz2601.metamon.dsl.expr.DailyCheck
 import jp.kz2601.metamon.dsl.expr.Expr
 import jp.kz2601.metamon.dsl.expr.ExprValue
@@ -20,10 +22,6 @@ import jp.kz2601.metamon.dsl.records.Sort
 import jp.kz2601.metamon.dsl.records.TableGrouping
 import jp.kz2601.metamon.dsl.records.Track
 import jp.kz2601.metamon.renderer.EntityLoadState
-import kotlinx.serialization.json.JsonElement
-import kotlinx.serialization.json.JsonNull
-import kotlinx.serialization.json.JsonPrimitive
-import kotlinx.serialization.json.doubleOrNull
 import java.math.BigDecimal
 import java.math.RoundingMode
 import java.text.DecimalFormat
@@ -247,24 +245,17 @@ object ProgressValue {
     fun literal(c: Component): Double? = (c.value as? ExprNumber)?.value
 
     /** `target` が式({"setting"} など)か。 */
-    fun targetExpr(c: Component): Expr? {
-        val t = c.target ?: return null
-        if (t is JsonPrimitive && !t.isString && t.doubleOrNull != null) return null
-        if (t == JsonNull) return null
-        return runCatching { Expr.from(t) }.getOrNull()
-    }
-
-    private fun targetLiteral(t: JsonElement?): Double? = (t as? JsonPrimitive)?.takeIf { !it.isString }?.doubleOrNull
+    fun targetExpr(c: Component): Expr? = c.targetExpr
 
     /** entity モードの分母: 数値の `target`、または式の今の値。0 以下・空は null。 */
     fun target(c: Component, data: LeafData): Double? {
-        val t = targetLiteral(c.target) ?: targetExpr(c)?.let { data.evaluator.evaluate(it)?.number } ?: return null
+        val t = c.targetNumber ?: targetExpr(c)?.let { data.evaluator.evaluate(it)?.number } ?: return null
         return t.takeIf { it.isFinite() && it > 0 }
     }
 
     /** 目標を式で読むのに、その値が空・0 以下。 */
     fun missingTarget(c: Component, data: LeafData): Boolean =
-        literal(c) == null && c.entity != null && targetLiteral(c.target) == null && targetExpr(c) != null && target(c, data) == null
+        literal(c) == null && c.entity != null && c.targetNumber == null && targetExpr(c) != null && target(c, data) == null
 
     /** 比率(1 を超えてもよい)。 */
     fun ratio(c: Component, data: LeafData): Double {

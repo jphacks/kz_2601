@@ -23,8 +23,11 @@ dependencies {
 
 // テストは docs/dsl/examples/*.json(正典の例)をそのまま読む。
 val dslExamplesDir = rootDir.resolve("../docs/dsl/examples")
+// ExprConformanceTest は ../conformance/expr(計算式の共有ケース)を読む。入力に入れないと変えても up-to-date で回らない(#1017)。
+val exprConformanceDir = rootDir.resolve("../docs/dsl/conformance/expr")
 
 tasks.test {
     inputs.dir(dslExamplesDir).withPropertyName("dslExamples").withPathSensitivity(PathSensitivity.RELATIVE)
+    inputs.dir(exprConformanceDir).withPropertyName("exprConformance").withPathSensitivity(PathSensitivity.RELATIVE)
     systemProperty("metamon.dslExamplesDir", dslExamplesDir.absolutePath)
 }
