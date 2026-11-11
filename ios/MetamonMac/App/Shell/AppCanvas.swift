@@ -38,6 +38,11 @@ struct AppCanvas: View {
             }
         }
         .navigationTitle(app.name)
+        #if !APP_STORE_REVIEW
+        // 連係の Handoff(#1851): 今の画面と記録を iPhone へ。届いた Handoff の画面は、ランタイムができてから・開いている時はすぐ開く
+        .macHandoff(handoffTarget, appName: app.name)
+        .onChange(of: MacHandoffInbox.shared.pending) { revealHandoff() }
+        #endif
         .onReceive(NotificationCenter.default.publisher(for: MacAppRuntime.retentionConfirmed)) { note in
             guard let runtime, note.object as? String == runtime.appId else { return }
             Task { await runtime.purgeExpiredRecords() }
@@ -62,6 +67,9 @@ struct AppCanvas: View {
                 #endif
                 runtime = created
                 discardGuard?.runtime = created
+                #if !APP_STORE_REVIEW
+                revealHandoff()
+                #endif
                 await created.purgeExpiredRecords() // 確認済みの保存期間を過ぎた記録を消す(#482・#979)
             } catch {
                 loadFailed = true
@@ -69,6 +77,26 @@ struct AppCanvas: View {
         }
     }
 }
+
+#if !APP_STORE_REVIEW
+extension AppCanvas {
+    /// Handoff に出す今の画面。iPhone でも開けるサーバーにある自分のアプリだけ(同梱の例・端末だけのアプリは出さない)
+    private var handoffTarget: HandoffTarget? {
+        guard let runtime, server != nil else { return nil }
+        return HandoffTarget(appId: app.id, navigation: runtime.navigationState, dsl: runtime.dsl)
+    }
+
+    /// このアプリ宛ての Handoff の画面を開く。保存していない入力があれば確かめてから(#943)
+    private func revealHandoff() {
+        guard let runtime, let target = MacHandoffInbox.shared.take(appId: app.id) else { return }
+        if let discardGuard {
+            discardGuard.run { runtime.reveal(target) }
+        } else {
+            runtime.reveal(target)
+        }
+    }
+}
+#endif
 
 private struct AppCanvasContent: View {
     @Bindable var runtime: MacAppRuntime

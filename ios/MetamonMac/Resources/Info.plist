@@ -42,6 +42,12 @@
 		</dict>
 	</array>
 
+	<!-- 連係の Handoff(#1851): 開いている生成アプリの画面を iPhone ⇄ Mac で引き継ぐ。Shared/Runtime/HandoffActivity.swift の type と同じ -->
+	<key>NSUserActivityTypes</key>
+	<array>
+		<string>jp.kz2601.metamon.view</string>
+	</array>
+
 	<!-- バックエンド URL(iOS の Info.plist と同じキー・同じ build setting) -->
 	<key>MetamonAIBaseURL</key>
 	<string>$(METAMON_AI_BASE_URL)</string>

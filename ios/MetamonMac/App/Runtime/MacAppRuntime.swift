@@ -402,12 +402,7 @@ final class MacAppRuntime: RuntimeNavigating {
     /// 今いちばん上に見えている画面の id(画面マップを開いた時に選んでおく)
     var currentScreen: String { NavigationResolver.top(navigationState, dsl: dsl).screen }
 
-    /// 画面マップから画面を開く。モーダルを閉じ、根(タブ)から矢印をたどって開く(戻るで来た道を戻れる)
-    func reveal(screen: String, recordId: String? = nil) {
-        guard let next = NavigationResolver.reveal(screen, recordId: recordId, graph: ScreenGraph(dsl: dsl), dsl: dsl,
-                                                   from: navigationState) else { return }
-        setNavigation(next)
-    }
+    // 画面マップから画面を開く `reveal(screen:recordId:)` は iOS と共有(`RuntimeNavigating`・Shared/Runtime/HandoffActivity.swift)
 
     // MARK: - 削除の取り消し(M11)
 
