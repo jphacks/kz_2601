@@ -5,7 +5,7 @@ import MetamonDSL
 
 /// 記録のコピー・貼り付け(#1871)のクリップボードの読み書き。中身の作り方と対応は `RecordClipboard`(MetamonDSL)。
 /// 独自の型(`app.tailorit.record`)と文字(「名前: 値」の行)の 2 つを 1 項目に載せ、10 分で消える。
-/// `UIPasteboard.general` はユニバーサルクリップボードで同じ Apple アカウントの Mac にも届く(Mac 側の貼り付けは後で作る)。
+/// Mac 側の貼り付けができるまでは、この端末の中だけに置く(`.localOnly`)。
 @MainActor
 public enum RecordPasteboard {
     /// 載せるもの。載せる項目が無い記録は nil(メニューを出さない)。文字は画面と同じ書き方。
@@ -20,7 +20,7 @@ public enum RecordPasteboard {
         guard let data = RecordClipboard.encode(payload) else { return false }
         var item: [String: Any] = [RecordClipboard.typeIdentifier: data]
         if !text.isEmpty { item[UTType.utf8PlainText.identifier] = text }
-        board.setItems([item], options: [.expirationDate: now.addingTimeInterval(RecordClipboard.expiry)])
+        board.setItems([item], options: [.expirationDate: now.addingTimeInterval(RecordClipboard.expiry), .localOnly: true])
         return true
     }
 
@@ -48,12 +48,17 @@ public enum RecordPasteboard {
     /// 「記録を貼り付け」: 合う項目をフォームに入れ(保存はしない)、入った・合わなかった項目を一言で出す。
     static func paste(into form: FormDraft, rt: any DSLRuntime) {
         guard let p = read() else {
-            rt.recordClipboard?.notifyRecordClipboard(L("貼り付けられる記録がありません"))
+            rt.recordClipboard?.notifyRecordClipboard(unreadableMessage(hasRecord: hasRecord()))
             return
         }
-        let result = RecordClipboard.paste(p, into: form.entity)
+        let result = RecordClipboard.paste(p, into: form.entity, appId: rt.appId, isAdmin: rt.viewerIsAdmin == true)
         for (k, v) in result.values { form.values[k] = v }
         rt.recordClipboard?.notifyRecordClipboard(message(for: result))
+    }
+
+    /// 読めなかった時の一言。記録は載っているのに読めない時は、貼り付けを許可されなかった(または壊れていた)。
+    static func unreadableMessage(hasRecord: Bool) -> String {
+        hasRecord ? L("貼り付けが許可されませんでした") : L("貼り付けられる記録がありません")
     }
 
     /// 結果の一言: 「2 項目を入れました: 題名、著者」+ 合わなかった項目の名前。
