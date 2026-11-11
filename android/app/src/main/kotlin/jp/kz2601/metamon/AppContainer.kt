@@ -242,7 +242,21 @@ class AppContainer(
     val remainingToday: RemainingTodayStore = RemainingTodayStore(),
     /** 切り替え一覧のカードのサムネ(#1199)。サインアウト・削除で消す。既定は端末に残さない(テスト) */
     val thumbnails: AppThumbnailStore = AppThumbnailStore(null),
+    /** 1 つのアプリの通知の予約・出ている通知を消す(アプリ削除・#896)。既定は何もしない(テスト) */
+    private val forgetAppNotifications: (String) -> Unit = {},
 ) {
+    /**
+     * 削除したアプリの端末のデータ(iOS の `deleteApp` の後片付け・#896): 記録の DB と送信待ち・保存した DSL・
+     * サムネ・会話の履歴(#1176)・通知。サーバーの削除が済んでから呼ぶ。
+     */
+    suspend fun forgetAppLocally(appId: String) {
+        recordSync.purge(appId)
+        documentCache.remove(appId)
+        thumbnails.remove(appId)
+        chatHistory.remove(appId)
+        forgetAppNotifications(appId)
+    }
+
     /** リリース申請の状態(変身一覧のバッジと申請のシート・#1254)。null なら入口を出さない */
     val releaseRequests: ReleaseRequestsModel? = releaseClient?.let { ReleaseRequestsModel(it) { line -> Log.i(TAG, line) } }
 
@@ -429,6 +443,7 @@ class AppContainer(
                 talkBackRunning = { TalkBack.isRunning(context) },
                 nearbyEnv = NearbyEnv.of(context, mock = true),
                 thumbnails = AppThumbnailStore(File(context.filesDir, "metamon-thumbs-mock")),
+                forgetAppNotifications = { LocalNotifications.get(context).removeApp(it) },
                 releaseClient = if (ReviewBuild.enabled) null else MockReleaseRequestClient(),
             )
         }
@@ -523,6 +538,7 @@ class AppContainer(
                 // 審査用の版(#1275)はリリース申請を出さない(iOS の APP_STORE_REVIEW と同じ)
                 releaseClient = if (ReviewBuild.enabled) null else HttpReleaseRequestClient(appConfigHttp),
                 thumbnails = AppThumbnailStore(File(context.filesDir, "metamon-thumbs")),
+                forgetAppNotifications = { LocalNotifications.get(context).removeApp(it) },
                 creationUsage = CreationUsageStore(SharedPreferencesKeyValueStore.of(context, CREATION_PREFS)),
                 remainingToday = remainingToday,
             )
