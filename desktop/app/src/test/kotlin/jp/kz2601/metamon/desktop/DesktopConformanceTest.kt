@@ -36,7 +36,7 @@ import java.time.ZoneId
  * docs/dsl/conformance/cases(全 OS 共通の期待値・iOS が書く)のうち、デスクトップ版が今比べられる部分を回す。
  * - 全 case の DSL が共有の :dsl で読めて、画面の id・見出し・`layout`(grid / form / voice)が同じ。
  * - 部品の並び(area は (行, 列, DSL の順)、その後に area 無し)・`cell`・`stacked`・`band`・ローカルグリッドの `cell`。
- * - デスクトップ版が描ける部品(DesktopLeaves)は、expected が rendered の時に rendered。値を比べる props は [comparedProps]。
+ * - 部品の state と props は expected と同じ。違ってよい所は [ConformanceAllowlist] に理由付きで書く(無い違い・使われない項目は落ちる)。値を比べる props は [comparedProps]。
  * - 入力の部品 20 種の `value`・`label`(新規の下書き。computed / ref の描き替えは除く)。
  * - 操作(case.json の operations)を [DesktopSession](画面と同じ遷移・保存・削除)で順に実行し、各 step の top・effects・error。
  */
@@ -70,7 +70,11 @@ class DesktopConformanceTest {
         "randomPicker" to listOf("title", "label"),
         "timerDisplay" to listOf("mode", "seconds", "label"),
         "qrCode" to listOf("text", "label"),
+        "icon" to listOf("label"),
     )
+
+    /** allowlist のうち実際に使った項目(使われない項目は古いので落とす)。 */
+    private val usedAllowlist = mutableSetOf<String>()
 
     /** 今の case の保存した記録(計算・遊びの部品が computed を足す前の値を読む)。 */
     private var raw: (String) -> List<Record> = { emptyList() }
@@ -136,6 +140,7 @@ class DesktopConformanceTest {
             FieldCoding.zone = zone
             Strings.lang = lang
         }
+        failures += staleAllowlist()
         if (failures.isNotEmpty()) fail("${failures.size} 件が違う:\n" + failures.joinToString("\n"))
         println("desktop conformance: ${cases.size} cases / $screens screens / $steps steps OK / props compared: $compared")
     }
@@ -256,18 +261,25 @@ class DesktopConformanceTest {
 
             val state = n.str("state")
             val mine = DesktopLeaves.state(c)
-            // デスクトップ版で描けない部品は unavailable(iOS は rendered)でよい。知らない type の判定は同じであること
-            if ((state == "unknown") != (mine == "unknown")) failures += "$here: state $mine != $state"
+            val type = DesktopLeaves.typeName(c)
+            if (state != mine) stateDifference(type, state, mine)?.let { failures += "$here: $it" }
             val props = n["props"] as? JsonObject
             if (mine == "rendered" && state == "rendered" && props != null) {
-                val type = DesktopLeaves.typeName(c)
                 val mineProps = resolvedProps(c, data) + inputProps(c, form)
                 val inputKeys = if (c.type in InputLeaves.types && form != null && !props.containsKey("input")) listOf("value", "label") else emptyList()
-                for (k in comparedProps[type].orEmpty() + inputKeys) {
+                val keys = comparedProps[type].orEmpty() + inputKeys
+                for (k in keys) {
                     val w = props[k] ?: continue
                     val m = mineProps[k]
                     if (m == null || !sameJson(m, w)) failures += "$here: $k $m != $w"
                     compared[type] = (compared[type] ?: 0) + 1
+                }
+                for (k in props.keys - keys.toSet()) {
+                    if (ConformanceAllowlist.propsNotCompared[type]?.containsKey(k) == true) {
+                        usedAllowlist += "props:$type.$k"
+                    } else {
+                        failures += "$here: props の $k を比べていない(ConformanceAllowlist.propsNotCompared に理由が無い)"
+                    }
                 }
             }
             val children = n["children"] as? JsonArray ?: continue
@@ -280,6 +292,25 @@ class DesktopConformanceTest {
             }
             compare(here, kids, children, data, failures, compared, form)
         }
+    }
+
+    /** state の違いが allowlist にあれば null、無ければ失敗の文。 */
+    private fun stateDifference(type: String, want: String?, mine: String): String? {
+        val key = when {
+            want == "rendered" && mine == "unavailable" && type in ConformanceAllowlist.unavailableTypes -> "unavailable:$type"
+            mine == "rendered" && want in ConformanceAllowlist.statesNotJudged -> "state:$want"
+            else -> return "state $mine != $want(ConformanceAllowlist に理由が無い)"
+        }
+        usedAllowlist += key
+        return null
+    }
+
+    /** どの case にも出てこなかった allowlist の項目(描けるようになった・比べるようになったら外す)。 */
+    private fun staleAllowlist(): List<String> {
+        val all = ConformanceAllowlist.unavailableTypes.keys.map { "unavailable:$it" } +
+            ConformanceAllowlist.statesNotJudged.keys.map { "state:$it" } +
+            ConformanceAllowlist.propsNotCompared.flatMap { (t, m) -> m.keys.map { "props:$t.$it" } }
+        return (all - usedAllowlist).map { "ConformanceAllowlist の $it は使われていない(外す)" }
     }
 
     /** 入力の部品の値とラベル(画面と同じ FormDraft・InputLeaves から)。 */

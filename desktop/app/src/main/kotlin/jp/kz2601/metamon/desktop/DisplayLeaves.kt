@@ -69,7 +69,7 @@ import java.util.Base64
 import kotlin.math.max
 import kotlin.math.min
 
-// 表示の部品(#1742): image・avatar・badge・markdown・stat・chart・progressBar・gauge・rating・calendar。
+// 表示の部品(#1742): image・avatar・badge・markdown・stat・chart・progressBar・gauge・rating・calendar(icon は IconLeaf.kt)。
 
 /** 系列の色(bar / pie)。iOS・Android の既定の配色に近い 6 色。 */
 private val SERIES = listOf(
@@ -504,5 +504,5 @@ fun CalendarLeaf(c: Component, data: LeafData, onDateTap: ((LocalDate) -> Unit)?
 /** 表示の部品(DesktopApp の Node が呼ぶ)。 */
 val DISPLAY_LEAVES: Set<ComponentType> = setOf(
     ComponentType.IMAGE, ComponentType.AVATAR, ComponentType.STAT, ComponentType.CHART, ComponentType.PROGRESS_BAR,
-    ComponentType.GAUGE, ComponentType.RATING, ComponentType.CALENDAR,
+    ComponentType.GAUGE, ComponentType.RATING, ComponentType.CALENDAR, ComponentType.ICON,
 )
