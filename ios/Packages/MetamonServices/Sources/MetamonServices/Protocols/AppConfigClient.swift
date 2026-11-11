@@ -8,6 +8,13 @@ public struct VersionSummary: Decodable, Sendable, Equatable {
         public var mode: String?
         public var summary: String?
         public var restoredFrom: Int?
+
+        public init(kind: String? = nil, mode: String? = nil, summary: String? = nil, restoredFrom: Int? = nil) {
+            self.kind = kind
+            self.mode = mode
+            self.summary = summary
+            self.restoredFrom = restoredFrom
+        }
     }
 
     public var appId: String?

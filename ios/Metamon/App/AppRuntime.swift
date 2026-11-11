@@ -183,8 +183,10 @@ final class AppRuntime: RuntimeNavigating {
         var document: AppDocument
         var viaServer: Bool
     }
-    /// 戻した直後だけ持つ。新しい DSL が当たったら(`apply`)消える
-    private(set) var redoPoint: RedoPoint?
+    /// 戻した直後だけ持つ。続けて戻すと積み、やり直すと 1 つずつ降ろす。新しい DSL が当たったら(`apply`)消える
+    private(set) var redoStack: [RedoPoint] = []
+    /// 次の「やり直す」の戻り先。
+    var redoPoint: RedoPoint? { redoStack.last }
 
     /// サーバー(appconfig)に届かず、ローカルキャッシュの DSL を表示している。
     private(set) var isOffline = false
@@ -529,7 +531,7 @@ final class AppRuntime: RuntimeNavigating {
             self.selectedTab = doc.dsl.initialTab
             self.morphJob = nil
             self.gridEdit = nil // 手で動かしていた下書きは前の DSL のもの(別のアプリ・元に戻す後に残さない・#1442)
-            self.redoPoint = nil // 戻した後に別の版が当たったら「やり直す」は無効(undo / redo は apply の後で付け直す)
+            self.redoStack = [] // 戻した後に別の版が当たったら「やり直す」は無効(undo / redo は apply の後で付け直す)
         }
         if animated {
             withAnimation(.spring(duration: 0.65, bounce: 0.12), swap)
@@ -830,32 +832,36 @@ final class AppRuntime: RuntimeNavigating {
         !dsl.isVoiceOnly && ((services.isLive && document.version > 1) || !localHistory.isEmpty)
     }
 
-    /// 「元に戻して」(G11)。appconfig の `GET /versions` で直前の version を取り `POST /versions/{n}/restore`。
+    /// 「元に戻して」(G11)。appconfig の `GET /versions` から戻す先を選び(`UndoWalk`)`POST /versions/{n}/restore`。
+    /// restore の版は中身の元に読み替えるので、続けて押すと v5 → v4 → v3 … と遡る(直前 2 つの往復にならない)。
     /// サーバーが履歴を返せない時(mock / 未デプロイ)はローカル履歴にフォールバックする。
     /// 戻している間は `morphJob` が立つので二重には走らない。戻した後は「やり直す」用に戻す前の版を覚える(#209)。
     /// `expectedVersion`: ボタンを押した時点の版。押した後に版が変わっていたら(連打で 2 回目が来た等)何もしない。
     func undo(expectedVersion: Int? = nil) async {
         guard morphJob == nil, expectedVersion == nil || expectedVersion == document.version else { return }
         let before = document
+        let stack = redoStack
         withAnimation(.easeInOut(duration: 0.35)) {
             morphJob = MorphJob(kind: .edit, transcript: L10n.tr("元に戻して"), startedAt: .now)
         }
         if services.isLive {
             do {
                 let versions = try await services.appConfig.listVersions(appId: document.appId)
-                guard let current = versions.first else { throw APIError.server(status: 404, code: "not_found", message: "no versions") }
-                guard let target = versions.first(where: { $0.version < current.version }) else {
+                guard !versions.isEmpty else { throw APIError.server(status: 404, code: "not_found", message: "no versions") }
+                let byVersion = Dictionary(versions.map { ($0.version, $0) }, uniquingKeysWith: { a, _ in a })
+                let shown = UndoWalk.origin(of: before.version, in: byVersion)
+                guard let target = UndoWalk.undoTarget(current: before.version, versions: versions) else {
                     withAnimation(.easeInOut(duration: 0.3)) { morphJob = nil }
                     toast = L10n.tr("これ以上前の状態はありません")
                     return
                 }
-                let doc = try await services.appConfig.restore(appId: document.appId, toVersion: target.version)
+                let doc = try await services.appConfig.restore(appId: document.appId, toVersion: target)
                 apply(doc)
                 startSync()
-                // restore は新しい版を作るので、「やり直す」は戻す前の版(current)をもう一度 restore すればよい
-                redoPoint = RedoPoint(version: current.version, document: before, viaServer: true)
+                // restore は新しい版を作るので、「やり直す」は戻す前の中身の版(shown)をもう一度 restore すればよい
+                redoStack = stack + [RedoPoint(version: shown, document: before, viaServer: true)]
                 summaryBanner = SummaryBanner(text: L10n.tr("元に戻しました"), highlight: nil, action: .redo)
-                print("[Metamon] undo ok: restored from version \(target.version) → new version \(doc.version)")
+                print("[Metamon] undo ok: restored from version \(target) → new version \(doc.version)")
                 await gatePaidRestore(before: before) // #414 共有の版に戻した時も課金画面を通す
                 return
             } catch {
@@ -868,14 +874,15 @@ final class AppRuntime: RuntimeNavigating {
             return
         }
         apply(previous)
-        redoPoint = RedoPoint(version: before.version, document: before, viaServer: false)
+        redoStack = stack + [RedoPoint(version: before.version, document: before, viaServer: false)]
         summaryBanner = SummaryBanner(text: L10n.tr("元に戻しました"), highlight: nil, action: .redo)
         await gatePaidRestore(before: before)
     }
 
-    /// 「やり直す」(#209): 戻す前の版に戻る。サーバー経由で戻したならその版を restore、端末の履歴で戻したなら当て直す。
+    /// 「やり直す」(#209): 戻す前の版に戻る(続けて戻した分は 1 つずつ前へ進む)。サーバー経由で戻したならその版を restore、端末の履歴で戻したなら当て直す。
     func redo(expectedVersion: Int? = nil) async {
-        guard morphJob == nil, expectedVersion == nil || expectedVersion == document.version, let point = redoPoint else { return }
+        guard morphJob == nil, expectedVersion == nil || expectedVersion == document.version, let point = redoStack.last else { return }
+        let rest = redoStack.dropLast()
         let current = document
         withAnimation(.easeInOut(duration: 0.35)) {
             morphJob = MorphJob(kind: .edit, transcript: L10n.tr("やり直す"), startedAt: .now)
@@ -895,6 +902,7 @@ final class AppRuntime: RuntimeNavigating {
             remember(current)
             apply(point.document)
         }
+        redoStack = Array(rest) // 続けて戻していたら、残りもやり直せる
         summaryBanner = SummaryBanner(text: L10n.tr("やり直しました"), highlight: nil, action: canUndo ? .undo : nil)
         await gatePaidRestore(before: current)
     }
