@@ -540,6 +540,23 @@
         }
       }
     },
+    "CSV / PDF をファイルに保存します" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Save the CSV / PDF as a file"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "CSV / PDF をファイルに保存します"
+          }
+        }
+      }
+    },
     "ISBN を確かめてください(10 桁か 13 桁)" : {
       "localizations" : {
         "en" : {
@@ -4103,6 +4120,23 @@
         }
       }
     },
+    "フォローは Mac では使えません" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Following isn't available on Mac"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "フォローは Mac では使えません"
+          }
+        }
+      }
+    },
     "フォーム" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -4148,6 +4182,40 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "プライバシーポリシー"
+          }
+        }
+      }
+    },
+    "プリント…" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Print…"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "プリント…"
+          }
+        }
+      }
+    },
+    "プリントできませんでした" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Couldn't print"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "プリントできませんでした"
           }
         }
       }
@@ -4363,6 +4431,23 @@
         }
       }
     },
+    "メール・メッセージ・AirDrop などに送ります" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Send it with Mail, Messages, AirDrop, and more"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "メール・メッセージ・AirDrop などに送ります"
+          }
+        }
+      }
+    },
     "ユーザー ID" : {
       "localizations" : {
         "en" : {
@@ -4520,6 +4605,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "一覧の項目をタップしたら、詳しい内容の画面が開くようにして"
+          }
+        }
+      }
+    },
+    "一覧をプリントします" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Print the list"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "一覧をプリントします"
           }
         }
       }
@@ -5215,6 +5317,23 @@
         }
       }
     },
+    "保存…" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Save…"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "保存…"
+          }
+        }
+      }
+    },
     "保存したあと" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -5519,6 +5638,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "共有(家族だけ / みんなに公開)"
+          }
+        }
+      }
+    },
+    "共有…" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Share…"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "共有…"
           }
         }
       }
@@ -7297,6 +7433,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "書き出しました"
+          }
+        }
+      }
+    },
+    "書き出し方を選んでください" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Choose how to export"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "書き出し方を選んでください"
           }
         }
       }

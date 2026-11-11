@@ -127,7 +127,7 @@ final class MacAppRuntimeTests: XCTestCase {
 
     func testUnsupportedActionShowsToast() async throws {
         let rt = try runtime()
-        await rt.run(try action(#"{"type":"follow"}"#), ActionContext(route: home))
+        await rt.run(try action(#"{"type":"somethingNew"}"#), ActionContext(route: home))
         XCTAssertEqual(rt.toast, L10n.tr("このボタンは Mac ではまだ使えません"))
     }
 

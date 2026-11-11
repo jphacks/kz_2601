@@ -1,10 +1,17 @@
 import AppKit
+import PDFKit
 import UniformTypeIdentifiers
 import MetamonDSL
 import MetamonRenderer
 
-/// `export` アクション(#421 の Mac 版・#1143): 記録を CSV / PDF にして、保存パネルで選んだ場所に保存する。
-/// 表は iOS と同じ `makeExportFile`(Renderer)で作る。一時フォルダの写しは保存の後に消す(記録の写しを残さない)。
+/// `export` を Mac でどう出すか。iOS の共有シート(保存・共有・プリントが 1 つに並ぶ)の代わりに最初に選ぶ(#946・#953)
+enum MacExportOutput: Equatable {
+    case save, share, print
+}
+
+/// `export` アクション(#421 の Mac 版・#1143): 記録を CSV / PDF にして、保存パネル・共有メニュー・プリントで出す。
+/// 表は iOS と同じ `makeExportFile`(Renderer)で作る。保存とプリントの後は一時フォルダの写しを消す(記録の写しを残さない)。
+/// 共有は相手が読み終えるまで写しを残し、次の書き出し(`makeExportFile` が消す)か終了時に消す。
 extension MacAppRuntime {
     func export(_ action: Action, _ ctx: ActionContext) async {
         guard let entityId = action.entity, let entity = dsl.entity(entityId) else {
@@ -14,6 +21,15 @@ extension MacAppRuntime {
         // 参照先の名前(ref の見出し)も表に出すので一緒に読む(iOS と同じ)
         let refs = entity.fields.compactMap(\.refEntity)
         await load(entities: Set([entityId] + refs))
+        guard let output = await MacExportSaver.chooseOutput() else { return } // キャンセル
+        switch output {
+        case .save: await saveExport(action, ctx)
+        case .share: shareExport(action, ctx)
+        case .print: printExport(action, ctx)
+        }
+    }
+
+    private func saveExport(_ action: Action, _ ctx: ActionContext) async {
         let file: ExportFile
         do {
             file = try makeExportFile(action, screen: ctx.route.screen)
@@ -30,11 +46,62 @@ extension MacAppRuntime {
             toast = L10n.tr("書き出せませんでした")
         }
     }
+
+    /// 共有メニュー(NSSharingServicePicker)。CSV / PDF のファイルをそのまま渡す
+    private func shareExport(_ action: Action, _ ctx: ActionContext) {
+        guard let file = try? makeExportFile(action, screen: ctx.route.screen) else {
+            toast = L10n.tr("書き出せませんでした")
+            return
+        }
+        if !MacExportSaver.share(file.url) {
+            ExportFiles.removeAll()
+            toast = L10n.tr("書き出せませんでした")
+        }
+    }
+
+    /// プリント。CSV を選んだボタンでも、紙には PDF と同じ表(グラフ付き)を出す
+    private func printExport(_ action: Action, _ ctx: ActionContext) {
+        guard let table = try? exportTable(action),
+              let document = PDFDocument(data: ExportPDF.data(table, charts: exportChartImages(screen: ctx.route.screen,
+                                                                                               entity: action.entity ?? ""))),
+              MacExportSaver.print(document) else {
+            toast = L10n.tr("プリントできませんでした")
+            return
+        }
+    }
 }
 
-/// 保存パネルと、選んだ場所への書き込み。テストでは `chooseDestination` を差し替える
+/// 出し方の選択・保存パネル・共有メニュー・プリントと、選んだ場所への書き込み。テストでは各 `static var` を差し替える
 @MainActor
 enum MacExportSaver {
+    /// 保存・共有・プリントのどれで出すかを聞く。nil ならキャンセル
+    static var chooseOutput: @MainActor () async -> MacExportOutput? = {
+        let alert = NSAlert()
+        alert.messageText = L10n.tr("書き出し方を選んでください")
+        alert.addButton(withTitle: L10n.tr("保存…")).toolTip = L10n.tr("CSV / PDF をファイルに保存します")
+        alert.addButton(withTitle: L10n.tr("共有…")).toolTip = L10n.tr("メール・メッセージ・AirDrop などに送ります")
+        alert.addButton(withTitle: L10n.tr("プリント…")).toolTip = L10n.tr("一覧をプリントします")
+        let cancel = alert.addButton(withTitle: L10n.tr("キャンセル"))
+        cancel.keyEquivalent = "\u{1b}" // Esc
+        let response: NSApplication.ModalResponse
+        if let window = NSApp.keyWindow ?? NSApp.mainWindow {
+            response = await alert.beginSheetModal(for: window)
+        } else {
+            response = alert.runModal()
+        }
+        return output(for: response)
+    }
+
+    /// アラートのボタンの順(保存・共有・プリント・キャンセル)から選んだ出し方
+    static func output(for response: NSApplication.ModalResponse) -> MacExportOutput? {
+        switch response {
+        case .alertFirstButtonReturn: .save
+        case .alertSecondButtonReturn: .share
+        case .alertThirdButtonReturn: .print
+        default: nil
+        }
+    }
+
     /// 保存先を聞く。nil ならキャンセル
     static var chooseDestination: @MainActor (ExportFile) async -> URL? = { file in
         let panel = NSSavePanel()
@@ -49,6 +116,27 @@ enum MacExportSaver {
             response = panel.runModal()
         }
         return response == .OK ? panel.url : nil
+    }
+
+    /// 共有メニューを前のウインドウの中央に出す。出せなければ false
+    static var share: @MainActor (URL) -> Bool = { url in
+        guard let view = (NSApp.keyWindow ?? NSApp.mainWindow)?.contentView else { return false }
+        let anchor = NSRect(x: view.bounds.midX, y: view.bounds.midY, width: 1, height: 1)
+        NSSharingServicePicker(items: [url]).show(relativeTo: anchor, of: view, preferredEdge: .minY)
+        return true
+    }
+
+    /// プリントのパネルを出す(ウインドウがあればシートで)。出せなければ false
+    static var print: @MainActor (PDFDocument) -> Bool = { document in
+        guard let info = NSPrintInfo.shared.copy() as? NSPrintInfo,
+              let operation = document.printOperation(for: info, scalingMode: .pageScaleToFit, autoRotate: true)
+        else { return false }
+        if let window = NSApp.keyWindow ?? NSApp.mainWindow {
+            operation.runModal(for: window, delegate: nil, didRun: nil, contextInfo: nil)
+        } else {
+            operation.run()
+        }
+        return true
     }
 
     static func contentTypes(_ url: URL) -> [UTType] {

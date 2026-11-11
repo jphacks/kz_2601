@@ -15,7 +15,7 @@ import MetamonServices
 /// メモリ上の appconfig(`InMemoryAppConfigClient`)に持つ。
 /// ローカル通知は `MacRuntimeNotifications`(#965)。AI の部品(aiButton・aiGenerate・aiChat)は `MacAppRuntime+AIText.swift`(#962)。
 /// 話して入力(aiChat のマイク・transcribeField)は `MacAppRuntime+Dictation.swift`(#1328)。
-/// 共有・課金など iOS 固有の機能は持たない(未対応のアクションは一言で知らせる)。
+/// 課金・フォローなど iOS 固有の機能は持たない(未対応のアクションは一言で知らせる)。export は保存・共有・プリント(`+Export`)。
 @MainActor
 @Observable
 final class MacAppRuntime: RuntimeNavigating {
@@ -70,6 +70,10 @@ final class MacAppRuntime: RuntimeNavigating {
     #endif
     /// 話して入力(aiChat のマイク・transcribeField・#1328)。声で頼む(`MacVoiceInput`)と同じ認識を使う。nil なら使えない
     @ObservationIgnored let dictationSource: TranscriberDictation?
+    /// openVoice(#946): 中央のアプリを直す会話を声で開く(⇧⌘M と同じ)。`AppCanvas` が `MacRootView` の会話につなぐ
+    @ObservationIgnored var onOpenVoice: (@MainActor () -> Void)?
+    /// モーダルの中の openVoice。モーダルを閉じ終えてから会話を開く(シートを重ねない)
+    @ObservationIgnored var pendingOpenVoice = false
 
     /// `recordLease` を渡したらそのエンジンを使い(止めるのは `MacRecordEngines`)、`recordSync` を渡したらこのランタイムだけのエンジン
     init(appId: String, dsl: AppDSL, recordSync: RecordSyncEngine? = nil, recordLease: MacRecordEngineLease? = nil,
@@ -271,10 +275,37 @@ final class MacAppRuntime: RuntimeNavigating {
         case .endActivity:
             break // 出していないので止めるものも無い
 
+        case .openVoice:
+            openVoice()
+
+        case .follow, .unfollow:
+            // フォロー(#270)は投稿のある iOS のアプリの機能。Mac には投稿の画面もサインインの相手も無い
+            toast = L10n.tr("フォローは Mac では使えません")
+
         default:
-            // フォローなどは Mac ではまだ動かない(後の Issue)
-            toast = L10n.tr("このボタンは Mac ではまだ使えません")
+            toast = L10n.tr("このボタンは Mac ではまだ使えません") // 知らない種類(.unknown)
         }
+    }
+
+    /// openVoice: 声で頼む会話を開く。モーダルの中からは、入力を確かめてモーダルを閉じ、閉じ終えてから開く
+    func openVoice() {
+        guard let onOpenVoice else {
+            toast = L10n.tr("このボタンは Mac ではまだ使えません")
+            return
+        }
+        guard sheet != nil || fullScreen != nil else { return onOpenVoice() }
+        confirmDiscard(leaving: { $0.stack == "sheet" || $0.stack == "full" }) { [weak self] in
+            guard let self else { return }
+            pendingOpenVoice = true
+            while sheet != nil || fullScreen != nil { dismissTopModal() }
+        }
+    }
+
+    /// モーダルが閉じ終わった(`AppCanvas`)。openVoice を待っていれば会話を開く
+    func openVoiceAfterModal() {
+        guard pendingOpenVoice, sheet == nil, fullScreen == nil else { return }
+        pendingOpenVoice = false
+        onOpenVoice?()
     }
 
     private func save(_ action: Action, _ ctx: ActionContext) async {

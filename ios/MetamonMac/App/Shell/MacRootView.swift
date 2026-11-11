@@ -100,7 +100,7 @@ struct MacRootView: View {
                     AppCanvas(app: app, dsl: library.generated[app.id]?.dsl, keepsRecords: library.isCreated(app.id),
                               server: library.isCreated(app.id) && library.isOnServer(app.id) ? MacServices.shared.appConfig : nil,
                               showsScreenMap: $showsScreenMap,
-                              onTalk: { talk(about: $0) }, discardGuard: discardGuard)
+                              onTalk: { talk(about: $0) }, onOpenVoice: { speak() }, discardGuard: discardGuard)
                         .environment(\.changeHighlight, highlight?.canvas == Self.canvasKey(app) ? highlight?.value ?? .none : .none)
                         .id(Self.canvasKey(app))
                         .background { MacThumbnailAnchorView(anchor: thumbAnchor) }

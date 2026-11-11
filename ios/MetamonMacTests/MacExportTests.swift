@@ -10,16 +10,20 @@ final class MacExportTests: XCTestCase {
     @MainActor private final class Box { var url: URL? }
     private let home = Route(screen: "home", stack: Route.tabStack("home"))
     private var original: (@MainActor (ExportFile) async -> URL?)!
+    private var originalOutput: (@MainActor () async -> MacExportOutput?)!
     private var outDir: URL!
 
     override func setUp() async throws {
         original = MacExportSaver.chooseDestination
+        originalOutput = MacExportSaver.chooseOutput
+        MacExportSaver.chooseOutput = { .save } // 出し方のアラートは出さずに「保存…」を選んだことにする
         outDir = FileManager.default.temporaryDirectory.appendingPathComponent("mac-export-test-\(UUID().uuidString)", isDirectory: true)
         try FileManager.default.createDirectory(at: outDir, withIntermediateDirectories: true)
     }
 
     override func tearDown() async throws {
         MacExportSaver.chooseDestination = original
+        MacExportSaver.chooseOutput = originalOutput
         try? FileManager.default.removeItem(at: outDir)
     }
 

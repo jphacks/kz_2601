@@ -28,10 +28,14 @@ struct MetamonMacApp: App {
         BetaWelcomeStore.shared.applyLaunchOverride()
         MacAIButtonMetrics.install() // 前の日までの AI ボタンの集計を、起動・前面に戻った時に送る(#446・#1327)
         #endif
-        // 記録の一時フォルダ(MacAppRuntime.mockRecordSync)を起動時(前回の残り)と終了時に片付ける
+        // 記録の一時フォルダ(MacAppRuntime.mockRecordSync)と共有に渡した書き出しの写し(#946)を起動時(前回の残り)と終了時に片付ける
         MacAppRuntime.removePreviewDirectories()
+        ExportFiles.removeAll()
         NotificationCenter.default.addObserver(forName: NSApplication.willTerminateNotification, object: nil, queue: .main) { _ in
-            MainActor.assumeIsolated { MacAppRuntime.removePreviewDirectories() }
+            MainActor.assumeIsolated {
+                MacAppRuntime.removePreviewDirectories()
+                ExportFiles.removeAll()
+            }
         }
         // musicPlayer(#960): 既定は MusicKit。METAMON_MOCK=1(iOS と同じ環境変数)の時だけ音を出さない偽物
         if ProcessInfo.processInfo.environment["METAMON_MOCK"] == "1" { MusicSession.shared.player = FakeMusicPlayback() }
