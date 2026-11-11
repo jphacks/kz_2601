@@ -25,8 +25,10 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.material3.TextButton
 import androidx.compose.ui.Alignment
@@ -104,8 +106,13 @@ import jp.kz2601.metamon.share.ShareLinkIntents
 import jp.kz2601.metamon.share.ShareSheet
 import jp.kz2601.metamon.share.ShareTarget
 import jp.kz2601.metamon.switcher.AppSwitcherDialog
+import jp.kz2601.metamon.switcher.AppThumbnailStore
+import jp.kz2601.metamon.switcher.captureWindow
+import jp.kz2601.metamon.switcher.findActivity
 import jp.kz2601.metamon.update.UpdateGateHost
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.withTimeoutOrNull
 import kotlinx.coroutines.launch
 import java.io.File
 
@@ -339,6 +346,9 @@ fun MetamonApp(container: AppContainer) {
         runtime.showToast(UiText.Res(R.string.members_left_toast, name))
     }
 
+    // 組み上げ中か(サムネを撮ってよいか・#1199)を読むので見せ方の状態はここで持つ
+    val buildStage = remember(container.tutorial.editHints) { BuildStageState(container.tutorial.editHints) }
+
     val openSwitcher = {
         switcherOpen = true
         scope.launch { runtime.appsList() }
@@ -380,6 +390,7 @@ fun MetamonApp(container: AppContainer) {
                 editHints = container.tutorial.editHints,
                 retentionPending = retentionWaiting,
                 waiting = noticeWaiting,
+                stage = buildStage,
             ) {
                 if (state.isInitial) {
                     VoiceRoute(vm, onMicLongPress = openSwitcher)
@@ -485,6 +496,29 @@ fun MetamonApp(container: AppContainer) {
     // Tailor It Pro の課金画面(AI ボタン・設定から)。サインインのたびにサーバーの Pro を読み直す
     PaywallHost(container.pro, user?.uid)
 
+    // 変身(作成・編集・切り替え)の後に今の画面を切り替え一覧のサムネに撮る(#1199・iOS の RootView の onChange(version))。
+    // シート・お知らせ・組み上げが出ている間は撮らない(落ち着くのを少し待ち、出たままなら今回は撮らない)
+    val thumbnailBlocked by rememberUpdatedState(
+        state.isGenerating || buildStage.showsFullScreen || buildStage.editHint || state.voiceOpen || switcherOpen || settingsOpen ||
+            consentVisible || tutorialVisible || discoverOpen || shareTarget != null || membersTarget != null || releaseTarget != null ||
+            proState.paywall != null || accountLinkVisible || BuildStageState.summaryPending(state) || retentionWaiting ||
+            runtimeState.toast != null || runtimeState.banner != null || runtimeState.confirm != null,
+    )
+    LaunchedEffect(runtimeState.document.appId, runtimeState.document.version) {
+        val doc = runtimeState.document
+        if (runtimeState.dsl.isVoiceOnly) return@LaunchedEffect
+        delay(AppThumbnailStore.SETTLE_MILLIS)
+        if (buildStage.showsFullScreen) {
+            // 組み上げの演出の間は生成中の表示なので、終わって本物の画面に替わってから
+            withTimeoutOrNull(THUMBNAIL_WAIT_MILLIS) { snapshotFlow { buildStage.showsFullScreen }.first { !it } } ?: return@LaunchedEffect
+            delay(AppThumbnailStore.AFTER_REVEAL_MILLIS)
+        }
+        withTimeoutOrNull(THUMBNAIL_WAIT_MILLIS) { snapshotFlow { thumbnailBlocked }.first { !it } } ?: return@LaunchedEffect
+        if (!AppThumbnailStore.shouldCapture(doc.appId, runtimeState.dsl.isVoiceOnly, thumbnailBlocked)) return@LaunchedEffect
+        val activity = context.findActivity() ?: return@LaunchedEffect
+        captureWindow(activity)?.let { container.thumbnails.put(doc.appId, it) }
+    }
+
     if (switcherOpen) {
         AppSwitcherDialog(
             apps = AppSummary.visible(apps, current = runtimeState.document.appId),
@@ -510,6 +544,7 @@ fun MetamonApp(container: AppContainer) {
                 releaseTarget = app
             } },
             releases = releases,
+            thumbnails = container.thumbnails,
         )
     }
     // リリース申請(#1254)。入口は変身一覧の「…」
@@ -584,3 +619,6 @@ private const val CONSENT_PROMPT_DELAY_MILLIS = 500L
 
 /** 同意の画面が閉じきってから(要らない時は起動の画面が落ち着いてから)チュートリアルを出す(iOS の TutorialHost の 0.7〜0.8 秒) */
 private const val TUTORIAL_PROMPT_DELAY_MILLIS = 800L
+
+/** 変身の後のサムネ(#1199): 組み上げ・シート・お知らせが閉じるのを待つ長さ。過ぎたら今回は撮らない */
+private const val THUMBNAIL_WAIT_MILLIS = 10_000L

@@ -73,9 +73,10 @@ fun BoxScope.BuildStageHost(
     retentionPending: Boolean = false,
     /** 課金画面・公開の記録・引き継ぎが待っているか(#1198) */
     waiting: PostBuildWaiting = PostBuildWaiting.NONE,
+    /** 見せ方の状態。外で持つと組み上げ中か(切り替え一覧のサムネを撮ってよいか・#1199)を読める */
+    stage: BuildStageState = remember(editHints) { BuildStageState(editHints) },
     content: @Composable BoxScope.() -> Unit,
 ) {
-    val stage = remember(editHints) { BuildStageState(editHints) }
     val reduceMotion = LocalReduceMotion.current
     LaunchedEffect(state) { stage.update(state, SystemClock.elapsedRealtime(), reduceMotion) }
 

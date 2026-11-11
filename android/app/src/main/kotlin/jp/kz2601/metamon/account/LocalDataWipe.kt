@@ -5,6 +5,7 @@ import jp.kz2601.metamon.services.local.AppListCache
 import jp.kz2601.metamon.services.local.DocumentCache
 import jp.kz2601.metamon.services.local.RecordSyncEngine
 import jp.kz2601.metamon.services.social.AuthorProfile
+import jp.kz2601.metamon.switcher.AppThumbnailStore
 import jp.kz2601.metamon.voice.ChatHistoryStore
 
 /**
@@ -26,6 +27,7 @@ import jp.kz2601.metamon.voice.ChatHistoryStore
  * - 他の人の行動で届く通知の同意の控え・登録の控え(installationId は残す)・閉じたお知らせ([forgetDeviceState] の中 = iOS `LocalWipe.clearDefaults`)
  * - 生成アプリの通知の予約・出ている通知([forgetDeviceState] の中 = iOS `notifications.removeAll()`)
  * - https の画像のキャッシュ(メモリ・ディスク。[clearImageCache] = iOS は URLCache)
+ * - 切り替え一覧のサムネ(#1199・[AppThumbnailStore.removeAll] = iOS `AppThumbnailStore.shared.removeAll()`)
  * - 画面の状態・appId(新しい appId に。[resetRuntime] = iOS `recordUndo = nil`・`resetToInitial()`・`DeviceAppID.set`)
  * - ブロック中の人・仲間探しの一覧(#877・[resetRuntime] の中の `SocialRuntime.forget`。iOS は次の人の uid で読み直すまで残るが、
  *   Android は前の人のブロックで次の人の投稿を隠さないよう先に捨てる)
@@ -43,6 +45,7 @@ class LocalDataWipe(
     private val removeLocalMedia: () -> Unit = {},
     private val clearImageCache: () -> Unit = {},
     private val feedCache: FeedCache? = null,
+    private val thumbnails: AppThumbnailStore? = null,
     private val forgetConsent: () -> Unit = {},
     private val forgetTutorial: () -> Unit = {},
     private val closeFeedback: () -> Unit = {},
@@ -68,6 +71,7 @@ class LocalDataWipe(
         removeLocalMedia()
         clearImageCache()
         feedCache?.removeAll()
+        thumbnails?.removeAll()
         resetRuntime() // 一覧・DSL を消した後に新しい appId へ
     }
 }
