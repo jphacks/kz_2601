@@ -885,6 +885,7 @@
     "play-services-cloud-messaging:17.4.0",
     "play-services-fido:21.0.0",
     "play-services-identity-credentials:16.0.0-alpha02",
+    "play-services-nearby:19.5.1",
     "play-services-stats:17.0.2",
     "play-services-tasks:18.4.0"
    ],

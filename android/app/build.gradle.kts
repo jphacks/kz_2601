@@ -112,6 +112,7 @@ dependencies {
     implementation(libs.googleid)
     implementation(libs.firebase.messaging)
     implementation(libs.play.app.update.ktx)
+    implementation(libs.play.services.nearby)
 
     testImplementation(libs.junit)
     testImplementation(libs.kotlinx.coroutines.test)

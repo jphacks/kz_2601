@@ -55,6 +55,7 @@ object PermissionOffBarModel {
         AppPermission.MICROPHONE,
         AppPermission.CAMERA,
         AppPermission.LOCATION,
+        AppPermission.NEARBY,
         AppPermission.HEALTH,
     )
 

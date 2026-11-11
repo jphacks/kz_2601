@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
-<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
 
     <uses-permission android:name="android.permission.INTERNET" />
 
@@ -12,9 +13,22 @@
     <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
     <!-- 通知(13+ だけ実行時の権限。12 / 12L は設定のオン・オフのみ) -->
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
-    <!-- 近くの端末と送り合う(nearbyShare)は Android にまだ無いので、次の権限は持たない。近距離共有(#878)で戻す:
-         BLUETOOTH_SCAN(neverForLocation)・BLUETOOTH_ADVERTISE・BLUETOOTH_CONNECT・NEARBY_WIFI_DEVICES(neverForLocation)。
-         minSdk 31 なので古い BLUETOOTH / BLUETOOTH_ADMIN は戻す時も要らない -->
+    <!-- 近くの端末と送り合う(nearbyShare・Nearby Connections・#1380)。minSdk 31 なので古い BLUETOOTH / BLUETOOTH_ADMIN は要らない。
+         13+ は NEARBY_WIFI_DEVICES、12 / 12L は Wi-Fi の状態と ACCESS_FINE_LOCATION(上で宣言済み)を使う -->
+    <uses-permission
+        android:name="android.permission.BLUETOOTH_SCAN"
+        android:usesPermissionFlags="neverForLocation" />
+    <uses-permission android:name="android.permission.BLUETOOTH_ADVERTISE" />
+    <uses-permission android:name="android.permission.BLUETOOTH_CONNECT" />
+    <uses-permission
+        android:name="android.permission.NEARBY_WIFI_DEVICES"
+        android:usesPermissionFlags="neverForLocation" />
+    <uses-permission
+        android:name="android.permission.ACCESS_WIFI_STATE"
+        android:maxSdkVersion="32" />
+    <uses-permission
+        android:name="android.permission.CHANGE_WIFI_STATE"
+        android:maxSdkVersion="32" />
     <!-- 生成アプリの通知(#886): 再起動の後に予約し直す -->
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
     <!-- アラーム(alarm: true)だけ正確な時刻で鳴らす。利用者が設定で許可した時だけ使い、無ければ正確でないアラーム。
@@ -32,6 +46,11 @@
         android:roundIcon="@mipmap/ic_launcher_round"
         android:supportsRtl="true"
         android:theme="@style/Theme.Metamon">
+        <!-- play-services-nearby が持ち込む接触確認(Exposure Notifications)の受け口。使わないので外す(#1380) -->
+        <service
+            android:name="com.google.android.gms.nearby.exposurenotification.WakeUpService"
+            tools:ignore="MissingClass"
+            tools:node="remove" />
         <!-- 共有リンク・通知から開いた時も、開いている画面で受ける(onNewIntent・iOS と同じく 1 つの画面) -->
         <activity
             android:name=".MainActivity"

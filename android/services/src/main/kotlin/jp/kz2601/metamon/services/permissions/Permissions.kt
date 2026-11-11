@@ -1,8 +1,7 @@
 package jp.kz2601.metamon.services.permissions
 
 /**
- * 実行時に聞く権限の単位(#890)。1 つの単位が OS の権限を複数まとめることがある(位置)。
- * 近くの端末と送り合う(nearbyShare)の単位は、近距離共有(#878)を入れる時に Bluetooth・Wi-Fi の権限と一緒に戻す。
+ * 実行時に聞く権限の単位(#890)。1 つの単位が OS の権限を複数まとめることがある(位置・近距離)。
  * OS の権限名は版で変わるので [manifestPermissions] で引く。
  */
 enum class AppPermission {
@@ -15,6 +14,12 @@ enum class AppPermission {
     /** 13+ は POST_NOTIFICATIONS。12 / 12L は実行時の権限が無く、設定のオン・オフだけ。 */
     NOTIFICATIONS,
 
+    /**
+     * 近くの端末と送り合う(nearbyShare・Nearby Connections・#1380)。Bluetooth 3 つと、
+     * 13+ は Wi-Fi の近くの端末・12 / 12L は正確な位置(Nearby Connections が 12L までは位置で見つける)。
+     */
+    NEARBY,
+
     /** Health Connect(歩数・体重)。 */
     HEALTH,
     ;
@@ -25,6 +30,8 @@ enum class AppPermission {
         CAMERA -> listOf(CAMERA_PERMISSION)
         LOCATION -> listOf(ACCESS_COARSE_LOCATION, ACCESS_FINE_LOCATION)
         NOTIFICATIONS -> if (sdkInt >= TIRAMISU) listOf(POST_NOTIFICATIONS) else emptyList()
+        NEARBY -> listOf(BLUETOOTH_SCAN, BLUETOOTH_ADVERTISE, BLUETOOTH_CONNECT) +
+            if (sdkInt >= TIRAMISU) listOf(NEARBY_WIFI_DEVICES) else listOf(ACCESS_FINE_LOCATION)
         HEALTH -> HEALTH_PERMISSIONS
     }
 
@@ -43,6 +50,10 @@ enum class AppPermission {
         const val ACCESS_COARSE_LOCATION = "android.permission.ACCESS_COARSE_LOCATION"
         const val ACCESS_FINE_LOCATION = "android.permission.ACCESS_FINE_LOCATION"
         const val POST_NOTIFICATIONS = "android.permission.POST_NOTIFICATIONS"
+        const val BLUETOOTH_SCAN = "android.permission.BLUETOOTH_SCAN"
+        const val BLUETOOTH_ADVERTISE = "android.permission.BLUETOOTH_ADVERTISE"
+        const val BLUETOOTH_CONNECT = "android.permission.BLUETOOTH_CONNECT"
+        const val NEARBY_WIFI_DEVICES = "android.permission.NEARBY_WIFI_DEVICES"
         val HEALTH_PERMISSIONS = listOf(
             "android.permission.health.READ_STEPS",
             "android.permission.health.READ_WEIGHT",
