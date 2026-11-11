@@ -28,7 +28,7 @@
 | 退会の 30 日後の消去(`cmd/purge`) | 済(`users/{uid}/connections/*` を消す・ログ `extConnections`) |
 | appconfig `POST /v1/apps/{appId}/ext/{provider}/{op}`・`/v1/me/connections/*`・エラーコード | 済(`internal/appconfig/ext.go`・runner の呼び出しは `extapi.Client`・`openapi-appconfig.yaml` の tag `ext`)。下の「appconfig の口」 |
 | DSL `externalCall` / `externalList`・自動の動きからの呼び出し | **まだ**(DSL の子 Issue。`CallRequest.Run` に run の `quota.Decision` を渡すだけで数え方は同じ) |
-| 退会(`DELETE /v1/me`)の時の provider 側の取り消し | **まだ**(appconfig から `/internal/ext/connections/revokeAll` を呼ぶ) |
+| 退会(`DELETE /v1/me`)の時の provider 側の取り消し | 済(`account.go` の `deleteMe` が `extapi.Client.RevokeAll` で `/internal/ext/connections/revokeAll` を呼ぶ・#1716)。失敗してもログだけで退会は 204 |
 | キャッシュ | 済(`cache.go`・op の `CacheTTL`。鍵だけ・OAuth なしの読む op だけ。台の中のメモリ) |
 | 回数の上限 `EXT_LIMIT_*`・`EXT_GLOBAL_DAILY_<PROVIDER>`・provider ごとの 1 分止め | **まだ**(割り当てのある provider と一緒に) |
 | iOS の「つないだサービス」・402 / 409 のシート・履歴の `spend_ext` の文言 | **まだ**(iOS の子 Issue。今は履歴に `spend_ext` がそのまま出る) |
@@ -103,7 +103,7 @@ provider が 404 / 422(持っていない通貨・日)を返した時は 400 `ba
 - **切る(取り消し)**: provider の取り消しの口を呼び(無い provider は呼ばない)、**すぐ**トークンを消して `revoked` の印だけ残す(決定 7)。印は 90 日で消える。
 - **90 日使わない**: 使うたび(1 時間に 1 回まで書く)に `deleteAt` を 90 日先にする。過ぎたものは次に読んだ時に消し、`POST /internal/ext/expire`(`ExpireUnused`)と Firestore の TTL(`deleteAt`)でも消える。
 - **Pro が切れた**: トークンは残し、使わない(呼び出しが枠の段で止まる)。使わなければ 90 日で消える。
-- **退会**: 30 日後の消去(`cmd/purge`)で `users/{uid}/connections/*` を消す。退会の時の provider 側の取り消しは appconfig から `revokeAll` を呼ぶ(子 Issue)。
+- **退会**: 30 日後の消去(`cmd/purge`)で `users/{uid}/connections/*` を消す。退会の時は appconfig が runner の `revokeAll` を呼び、provider 側の許可も取り消す(#1716)。runner が失敗・落ちていても退会は止めず(ログ `revoking external connections on delete failed`)、30 日後の消去でトークンは必ず消える。
 
 ## runner の口
 
