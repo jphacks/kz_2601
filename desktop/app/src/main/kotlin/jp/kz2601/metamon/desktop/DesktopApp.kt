@@ -101,6 +101,8 @@ fun DesktopApp(
     onOpenRecord: ((screen: String, recordId: String) -> Unit)? = null,
     onCloseWindow: (() -> Unit)? = null,
     isActive: () -> Boolean = { true },
+    /** このウィンドウの番号(トレイの「すぐ記録」の行き先と比べる)。null は 1 枚だけ。 */
+    windowId: Int? = null,
     /** パレットの「この端末のデータを消す」(#1887)。全アプリの分を消す。null なら出さない。 */
     onWipeLocalData: (suspend () -> Unit)? = null,
 ) {
@@ -108,10 +110,13 @@ fun DesktopApp(
         DesktopSession(dsl, initialStore, startScreen = startScreen, host = DesktopActionHost(), persistence = persistence, shared = records, startRecordId = startRecordId)
     }
     session.onCloseWindow = onCloseWindow
-    TrayHook(session, isActive)
+    TrayHook(session, windowId, isActive)
     // 他のウィンドウで端末のデータを消した: 下書きを捨てて最初の画面へ(詳細のウィンドウは閉じる)
     val wipes = session.records.wipes
     LaunchedEffect(wipes) { session.followWipe() }
+    // 他のウィンドウで開いている記録が消えた: 下書きを捨て、詳細のウィンドウは閉じる
+    val shown = session.store
+    LaunchedEffect(shown) { session.followRemoval() }
     var pending by remember { mutableStateOf<Pair<Action, ActionContext>?>(null) }
     val nav = session.nav
     val dispatch = { a: Action, ctx: ActionContext -> if (a.confirmMessage != null) pending = a to ctx else session.dispatch(a, ctx) }

@@ -13,6 +13,8 @@ import jp.kz2601.metamon.dsl.records.Entity
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.withTimeoutOrNull
 
 // 複数のウィンドウ(#1763): アプリごとに 1 枚・記録の詳細を別の 1 枚。画面の状態(遷移・下書き・キー)はウィンドウごと、記録はアプリごとに 1 つを共有する。
 
@@ -46,29 +48,60 @@ class WindowRegistry {
 
     val active: WindowEntry? get() = windows.firstOrNull { it.id == activeId } ?: windows.lastOrNull()
 
+    /** 前に出た順(後ろほど新しい)。 */
+    private val recency = mutableListOf<Int>()
+
+    private fun touch(id: Int) {
+        recency.remove(id)
+        recency += id
+        activeId = id
+    }
+
     fun find(key: WindowKey): WindowEntry? = windows.firstOrNull { it.key == key }
 
     /** 開く。同じアプリ・同じ記録のウィンドウがあれば作らずにそれを前に出す。 */
     fun open(key: WindowKey): WindowEntry {
         find(key)?.let { e ->
             e.focusRequests++
-            activeId = e.id
+            touch(e.id)
             return e
         }
         return WindowEntry(nextId++, key).also {
             windows += it
-            activeId = it.id
+            touch(it.id)
         }
     }
 
     fun activate(id: Int) {
-        if (windows.any { it.id == id }) activeId = id
+        if (windows.any { it.id == id }) touch(id)
     }
 
     /** 閉じる。残りがあれば最後に開いた物を次の行き先にする。 */
     fun close(id: Int) {
         windows.removeAll { it.id == id }
+        recency.remove(id)
         if (activeId == id) activeId = windows.lastOrNull()?.id
+    }
+
+    /** そのアプリのウィンドウ(詳細でない物)のうち最後に前に出た 1 枚。 */
+    fun latestAppWindow(appId: String): WindowEntry? =
+        recency.asReversed().firstNotNullOfOrNull { id -> windows.firstOrNull { it.id == id && it.key == WindowKey.app(appId) } }
+            ?: find(WindowKey.app(appId))
+
+    /** トレイの「すぐ記録」の行き先: 前にあるウィンドウのアプリの、アプリのウィンドウ(詳細には入れない)。無ければ開く。 */
+    fun quickRecordWindow(): WindowEntry? {
+        val appId = active?.key?.appId ?: return null
+        return latestAppWindow(appId)?.also { activate(it.id) } ?: open(WindowKey.app(appId))
+    }
+
+    /**
+     * 画面の中の「閉じる」・Esc(詳細のウィンドウの根から戻る)。アプリは終わらせない。
+     * 最後の 1 枚ならそのアプリのウィンドウを先に開いてから閉じる(トレイに隠す・終わるのはタイトルバーの × だけ)。
+     */
+    fun closeInApp(id: Int) {
+        val entry = windows.firstOrNull { it.id == id } ?: return
+        if (windows.size == 1) open(WindowKey.app(entry.key.appId))
+        if (windows.size > 1) close(id)
     }
 
     /**
@@ -92,7 +125,13 @@ class WindowRegistry {
  * 端末への書き込み([persistence])もアプリごとに 1 本(ウィンドウの数だけ二重に書かない)。
  * 端末から読む間は [loading](画面はスケルトン・[opening])。
  */
-class SharedRecords(initial: MockStore = MockStore(), val persistence: SessionPersistence? = null, loading: Boolean = false) {
+class SharedRecords(
+    initial: MockStore = MockStore(),
+    val persistence: SessionPersistence? = null,
+    loading: Boolean = false,
+    /** 画面のスレッドで動かす口(Main は Swing の EDT)。記録はここでだけ書き換える。 */
+    private val post: (() -> Unit) -> Unit = { it() },
+) {
     var store: MockStore by mutableStateOf(initial)
         private set
 
@@ -107,8 +146,8 @@ class SharedRecords(initial: MockStore = MockStore(), val persistence: SessionPe
     private val ready = CompletableDeferred<Unit>().also { if (!loading) it.complete(Unit) }
 
     init {
-        // 送れずに断られて端末の行が戻った時は読み直す(端末にはもう書いてあるので persistence には渡さない)
-        persistence?.onReload = { store = it }
+        // 送れずに断られて端末の行が戻った時は、戻った行だけを画面のスレッドで混ぜる(端末にはもう書いてあるので persistence には渡さない)
+        persistence?.onReload = { delta -> post { store = delta.applyTo(store) } }
     }
 
     /** 画面から書き換えた。前後の差を端末に渡す。読み終わる前は捨てる(読んだ記録で上書きされるため)。 */
@@ -145,6 +184,16 @@ class SharedRecords(initial: MockStore = MockStore(), val persistence: SessionPe
         persistence?.close()
     }
 
+    /** 積んだ書き込みが終わるのを待つ(終わる時・最後のウィンドウを閉じた時)。 */
+    suspend fun idle() {
+        persistence?.idle()
+    }
+
+    /** そのアプリのウィンドウが全部閉じた: 書き終えてから列を閉じ、裏の仕事を止める。 */
+    suspend fun shutdown() {
+        persistence?.shutdown()
+    }
+
     companion object {
         /**
          * 起動時(#1887): 画面を止めずに端末の記録を [scope] で読む。読み終えるまで [loading]。
@@ -153,14 +202,15 @@ class SharedRecords(initial: MockStore = MockStore(), val persistence: SessionPe
         fun opening(
             persistence: SessionPersistence,
             scope: CoroutineScope,
+            post: (() -> Unit) -> Unit = { it() },
             read: suspend () -> MockStore,
-        ): SharedRecords = SharedRecords(MockStore(), persistence, loading = true).also { r ->
+        ): SharedRecords = SharedRecords(MockStore(), persistence, loading = true, post).also { r ->
             scope.launch {
                 val initial = runCatching { read() }.getOrElse {
                     System.err.println("[TailorIt] 端末の記録を読めませんでした: ${it::class.simpleName}")
                     MockStore()
                 }
-                r.loaded(initial)
+                r.post { r.loaded(initial) }
                 persistence.resendPending()
             }
         }
@@ -183,9 +233,41 @@ class AppHub(
     class OpenedApp(val id: String, val dsl: AppDSL, val records: SharedRecords)
 
     private val apps = LinkedHashMap<String, OpenedApp>()
+    private val dsls = HashMap<String, AppDSL>()
+
+    /** アプリごとの開いているウィンドウの数。0 になったら記録の書き込みを閉じる。 */
+    private val refs = HashMap<String, Int>()
 
     @Synchronized
-    fun app(id: String): OpenedApp = apps.getOrPut(id) { load(id).let { OpenedApp(id, it, openRecords(id, it)) } }
+    fun app(id: String): OpenedApp = apps.getOrPut(id) { dsl(id).let { OpenedApp(id, it, openRecords(id, it)) } }
+
+    /** DSL だけ(トレイの名前・すぐ記録)。記録は開かない。 */
+    @Synchronized
+    fun dsl(id: String): AppDSL = apps[id]?.dsl ?: dsls.getOrPut(id) { load(id) }
+
+    /** ウィンドウを 1 枚開いた。 */
+    @Synchronized
+    fun acquire(id: String): OpenedApp {
+        refs[id] = (refs[id] ?: 0) + 1
+        return app(id)
+    }
+
+    /**
+     * ウィンドウを 1 枚閉じた。そのアプリの最後の 1 枚なら、書き終えるのを待って([timeoutMillis] まで)書き込みを閉じ、裏の仕事を止める。
+     * 次に開く時は端末から読み直す。
+     */
+    fun release(id: String, timeoutMillis: Long = FLUSH_TIMEOUT_MILLIS) {
+        val closing = synchronized(this) {
+            val n = (refs[id] ?: 0) - 1
+            if (n > 0) {
+                refs[id] = n
+                return
+            }
+            refs.remove(id)
+            apps.remove(id)
+        } ?: return
+        runBlocking { withTimeoutOrNull(timeoutMillis) { closing.records.shutdown() } }
+    }
 
     @Synchronized
     fun opened(): List<OpenedApp> = apps.values.toList()
@@ -199,10 +281,15 @@ class AppHub(
         wipeStore()
     }
 
-    /** 終わる時: 積んだ書き込みを書き終えてから閉じる。 */
-    @Synchronized
-    fun close() {
-        apps.values.forEach { it.records.close() }
-        apps.clear()
+    /** 終わる時: 全部のアプリの積んだ書き込みを書き終えるのを待ち([timeoutMillis] まで)、それから閉じる。 */
+    fun close(timeoutMillis: Long = FLUSH_TIMEOUT_MILLIS) {
+        val all = synchronized(this) { apps.values.toList().also { apps.clear(); refs.clear() } }
+        runBlocking { withTimeoutOrNull(timeoutMillis) { all.forEach { it.records.idle() } } }
+        all.forEach { it.records.close() }
+    }
+
+    companion object {
+        /** 終わる・閉じる時に書き終えるのを待つ長さ。 */
+        const val FLUSH_TIMEOUT_MILLIS = 3_000L
     }
 }

@@ -89,7 +89,9 @@ class DesktopSession(
     /** 遷移はここを通す(閉じた画面の下書きを捨てる)。 */
     private fun go(next: NavigationState) {
         nav = next
-        drafts.keys.retainAll(liveRouteIds())
+        val live = liveRouteIds()
+        drafts.keys.retainAll(live)
+        gone.retainAll(live)
     }
 
     /** 画面に出す一言(保存できない理由・OS の機能の結果)。 */
@@ -102,6 +104,9 @@ class DesktopSession(
     private class DraftEntry(val draft: FormDraft, val source: Row?)
 
     private val drafts = HashMap<String, DraftEntry>()
+
+    /** 元の記録が他のウィンドウで消えた route の id(下書きは捨て、保存させない)。 */
+    private val gone = HashSet<String>()
     private val queries = HashMap<String, MutableMap<String, String>>()
 
     init {
@@ -141,6 +146,27 @@ class DesktopSession(
         }
     }
 
+    /**
+     * 記録が変わった後(DesktopApp が記録の変わるたびに呼ぶ): 開いている記録が他のウィンドウで消えていたら、
+     * 詳細のウィンドウは閉じ、アプリのウィンドウは一番上の画面を閉じて知らせる。
+     */
+    fun followRemoval() {
+        detailRoot?.let { root ->
+            form(root)
+            if (root.id in gone) {
+                detailRoot = null
+                onCloseWindow?.invoke()
+                return
+            }
+        }
+        val t = top
+        form(t)
+        if (t.id in gone && NavigationResolver.canClose(nav, t)) {
+            go(NavigationResolver.close(nav, t))
+            message = Strings["desktop_record_deleted_elsewhere"]
+        }
+    }
+
     fun entityModel(id: String?): Entity? = id?.let { i -> models.firstOrNull { it.id == i } }
 
     fun records(entity: String): List<Record> = store.records(entity, entityModel(entity))
@@ -155,8 +181,16 @@ class DesktopSession(
         val entity = entityModel(dsl.screen(route.screen)?.entity) ?: return null
         val source = sourceRow(entity, route)
         drafts[route.id]?.let { e ->
-            if (e.source == source || source == null || e.draft.hasUnsavedChanges) return e.draft
+            if (e.source != null && source == null && !entity.single) {
+                // 元の記録が他のウィンドウで消えた: 下書きを捨て、保存できない形にする(保存すると別の新しい記録になるため)
+                drafts.remove(route.id)
+                gone += route.id
+            } else if (e.source == source || source == null || e.draft.hasUnsavedChanges) {
+                return e.draft
+            }
         }
+        if (route.id in gone && source == null) return FormDraft(entity, null).also { it.isReadOnly = true }
+        gone -= route.id
         val record = source?.let { row -> records(entity.id).firstOrNull { it.id == row.id } }
         val draft = FormDraft(entity, record)
         if (record != null) {
@@ -318,6 +352,13 @@ class DesktopSession(
             message = Strings["runtime_no_form"]
             return
         }
+        // 開いている間に他のウィンドウで消された: 保存すると別の新しい記録になって生き返るので断る
+        val formId = form.recordId
+        if ((formId != null && store.find(entity, formId) == null) || ctx.route.id in gone) {
+            effects += obj("rejected" to JsonPrimitive("deleted"))
+            message = Strings["desktop_record_deleted_elsewhere"]
+            return
+        }
         if (form.isReadOnly) {
             message = Strings["runtime_read_only"]
             return
@@ -329,7 +370,7 @@ class DesktopSession(
             return
         }
         val payload = form.payload
-        val existing = form.recordId?.takeIf { id -> store.find(entity, id) != null }
+        val existing = formId
         // 同じ記録を別のウィンドウが先に保存していた: 後から保存した方が勝ち、上書きしたことを知らせる(#1763)
         val overwrote = existing != null && drafts.values.firstOrNull { it.draft === form }?.source?.let { it != store.find(entity, existing) } == true
         // 端末に残す時は送れた後もたどれる仮 id(local-…)。メモリだけの時は適合テストと同じ new-N
