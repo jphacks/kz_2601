@@ -125,6 +125,11 @@ dependencies {
     implementation(libs.play.billing.ktx)
     // 場所に着いたら知らせる(Geofencing)
     implementation(libs.play.services.location)
+    // photoField.analyze を端末内で読む(#1119)。写真は外に出さない。部品は Play 開発者サービスが落とす(APK はほぼ増えない)
+    implementation(libs.play.services.mlkit.text.recognition.japanese)
+    implementation(libs.play.services.mlkit.barcode.scanning)
+    implementation(libs.play.services.mlkit.image.labeling)
+    implementation(libs.play.services.mlkit.face.detection)
 
     testImplementation(libs.junit)
     testImplementation(libs.kotlinx.coroutines.test)
