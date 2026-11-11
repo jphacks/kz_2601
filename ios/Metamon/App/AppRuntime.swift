@@ -8,7 +8,7 @@ import MetamonServices
 /// Renderer には `DSLRuntime` protocol 越しに見せる(`.environment(\.dslRuntime, runtime)`)。
 @MainActor
 @Observable
-final class AppRuntime: DSLRuntime {
+final class AppRuntime: RuntimeNavigating {
     private(set) var document: AppDocument {
         didSet { if oldValue.appId != document.appId { reloadChatHistory() } } // #210 アプリごとのチャット履歴
     }
@@ -74,26 +74,8 @@ final class AppRuntime: DSLRuntime {
     enum HomeEntry { case launch, newApp, home }
     var homeEntry: HomeEntry = .launch
 
-    struct Confirm: Identifiable {
-        let id = UUID()
-        var message: String
-        /// 主ボタンの文言(L1: 「実行」でなく何が起きるか)と、取り消せない操作か
-        var primaryLabel: String = L10n.tr("続ける")
-        var isDestructive = false
-        var perform: @MainActor () async -> Void
-
-        /// アクションの種類から主ボタンを決める(L1)
-        static func button(for type: ActionType) -> (label: String, destructive: Bool) {
-            switch type {
-            case .deleteRecord: (L10n.tr("削除"), true)
-            case .resetForm: (L10n.tr("入力を消す"), true)
-            case .saveRecord: (L10n.tr("保存"), false)
-            case .export: (L10n.tr("書き出す"), false)
-            case .navigate, .openUrl: (L10n.tr("開く"), false)
-            default: (L10n.tr("続ける"), false)
-            }
-        }
-    }
+    /// 確認ダイアログの中身。Mac と共有(`Shared/Runtime/RuntimeConfirm.swift`)
+    typealias Confirm = RuntimeConfirm
     var confirm: Confirm?
     /// 書き出したファイル(#421)。立つと共有シートを開く(`RootView` の HostSheets)。
     var exportFile: ExportFile?
@@ -439,7 +421,7 @@ final class AppRuntime: DSLRuntime {
     @ObservationIgnored var lastSavedForm: SavedForm?
     #if !APP_STORE_REVIEW
     /// roleField の無い aiChat の対(仮 id → 相方)。片方が断られたら相方も消す(AppRuntime+AIChat.swift)
-    @ObservationIgnored var aiChatPartners: [String: AIChatPartner] = [:]
+    @ObservationIgnored let aiChatPairs = AIChatPairLedger()
     #endif
     struct SavedForm {
         let appId: String
@@ -1037,12 +1019,12 @@ final class AppRuntime: DSLRuntime {
 
     /// 他人の共有レコードを変えようとした時の一言(#249)。端末で止めた時もサーバーの 403 でも同じ文言。
     func notifyReadOnly(entity: String) {
-        toast = L10n.tr("このデータは作った人だけが変更できます")
+        toast = RecordActionSteps.readOnlyMessage
     }
 
     /// 一覧のチェックなど、その場で描いた変更を保存できず戻した時の一言(read-only と同じ下部の toast)。
     func notifySaveFailed(entity: String) {
-        toast = L10n.tr("保存できませんでした。通信を確かめてもう一度お試しください")
+        toast = RecordActionSteps.saveFailedMessage
     }
 
     private func record(_ entity: String, _ id: String) -> Record? {
@@ -1218,54 +1200,15 @@ final class AppRuntime: DSLRuntime {
     /// 保存は送信待ちに積んだ時点で数えるので、断られた分はここで戻す(画面を閉じた後なら toast・カードだけが残る)。
     /// 同じ entity の前に積んだ別の記録が断られても、今のフォームの表示は変えない(recordId で見分ける)。
     func revokeSaveFeedback(for event: SyncEvent) {
-        guard let refused = Self.refusedWrite(event), let recordId = refused.recordId,
+        guard let refused = event.refusedWrite, let recordId = refused.recordId,
               let saved = lastSavedForm, saved.appId == refused.appId, saved.entity == refused.entity,
               saved.recordId == recordId else { return }
         saved.form?.markSaveRefused()
         lastSavedForm = nil
     }
 
-    static func refusedWrite(_ event: SyncEvent) -> (appId: String, entity: String, recordId: String?)? {
-        switch event {
-        case .forbidden(let appId, let entity, let id), .rejected(let appId, let entity, _, _, let id),
-             .notMember(let appId, let entity, let id), .denied(let appId, let entity, _, let id),
-             .proRequired(let appId, let entity, _, let id), .planLimit(let appId, let entity, _, let id),
-             .appStopped(let appId, let entity, let id), .textNotAllowed(let appId, let entity, _, let id):
-            return (appId, entity, id)
-        case .sent, .conflict, .paused, .drained:
-            return nil
-        }
-    }
-
     // MARK: - Navigation
-
-    func pathBinding(_ stack: String) -> Binding<[Route]> {
-        Binding(get: { self.paths[stack] ?? [] }, set: { self.paths[stack] = $0 })
-    }
-
-    /// 行き先は `NavigationResolver` が今いる場所で解決する(#113): 今のスタックにあれば pop・タブの根ならタブ切替・
-    /// モーダル内から下の画面へ飛ぶならモーダルを閉じる・それ以外は push。sheet / fullScreen 指定は従来どおり。
-    private func navigate(to screen: String, presentation: Presentation?, recordId: String?, from route: Route) {
-        setNavigation(NavigationResolver.navigate(navigationState, to: screen, presentation: presentation,
-                                                  recordId: recordId, from: route, dsl: dsl))
-    }
-
-    /// back: スタックに積まれていれば pop、モーダルの最下層なら dismiss。
-    func close(_ route: Route) {
-        setNavigation(NavigationResolver.close(navigationState, route))
-    }
-
-    private var navigationState: NavigationState {
-        NavigationState(paths: paths, selectedTab: selectedTab, sheet: sheet, fullScreen: fullScreen)
-    }
-
-    /// 変わったものだけ書き戻す(@Observable の無駄な再描画・NavigationStack の再設定を避ける)。
-    private func setNavigation(_ next: NavigationState) {
-        if next.sheet != sheet { sheet = next.sheet }
-        if next.fullScreen != fullScreen { fullScreen = next.fullScreen }
-        if next.selectedTab != selectedTab { selectedTab = next.selectedTab }
-        if next.paths != paths { paths = next.paths }
-    }
+    // navigate / close / pathBinding は Mac と共有(`Shared/Runtime/RuntimeNavigating.swift`)
 
     // MARK: - Actions
 
@@ -1298,17 +1241,12 @@ final class AppRuntime: DSLRuntime {
             close(ctx.route)
 
         case .saveRecord:
-            guard let form = ctx.form, let entity = action.entity ?? ctx.form?.entity.id else {
-                toast = L10n.tr("保存するフォームがありません")
+            // フォーム・必須(空の欄に印 M10)・single の上書き先(#267)は Mac と共有
+            let target = RecordActionSteps.saveTarget(action, ctx, dsl: dsl) { self.records[$0] ?? [] }
+            guard case .ready(let entity, let form, let recordId) = target else {
+                if case .invalid(let message) = target { toast = message }
                 return
             }
-            let missing = form.flagMissingRequired() // 空の欄に印を付ける(M10)
-            guard missing.isEmpty else {
-                toast = L10n.tr("\(missing.joined(separator: L10n.tr("・"))) を入力してください")
-                return
-            }
-            // single(#267): 既存の 1 件があれば常にそれを上書き(フォームを開いた後に読み込まれた分も)
-            let recordId = form.recordId ?? (dsl.entity(entity)?.single == true ? SingleRecord.pick(records[entity] ?? [])?.id : nil)
             if let id = recordId, let current = record(entity, id), !canEdit(entity: entity, record: current) {
                 notifyReadOnly(entity: entity) // 送信待ちに積まない(#249)
                 return
@@ -1342,9 +1280,8 @@ final class AppRuntime: DSLRuntime {
             leaveAfterSave(action, ctx)
 
         case .deleteRecord:
-            guard let entity = action.entity ?? ctx.form?.entity.id,
-                  let id = ctx.recordId ?? ctx.form?.recordId,
-                  dsl.entity(entity)?.single != true else { return } // single の 1 件は消さない(#267・backend も拒否)
+            guard let target = RecordActionSteps.deleteTarget(action, ctx, dsl: dsl) else { return } // single の 1 件は消さない(#267)
+            let (entity, id) = (target.entity, target.recordId)
             if let current = record(entity, id), !canDelete(entity: entity, record: current) {
                 notifyReadOnly(entity: entity)
                 return
@@ -1413,8 +1350,7 @@ final class AppRuntime: DSLRuntime {
 
     /// prefillRef の親が未保存(新規フォームの button / toolbar)。子は親の id が無いと作れないので先に保存してもらう。
     func unsavedParentToast(_ ctx: ActionContext) -> String {
-        let name = ctx.form?.entity.name ?? ""
-        return name.isEmpty ? L10n.tr("先に保存してください") : L10n.tr("先に「\(name)」を保存してください")
+        RecordActionSteps.unsavedParentMessage(ctx) // Mac と共有
     }
 
     private func attempt(entity: String? = nil, _ body: () async throws -> Void) async {

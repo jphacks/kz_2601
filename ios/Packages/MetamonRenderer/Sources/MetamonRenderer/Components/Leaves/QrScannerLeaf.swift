@@ -12,7 +12,20 @@ struct QrScannerLeaf: View {
     var body: some View {
         if let form = ctx.form, let field = c.field {
             VStack(alignment: .leading, spacing: 4) {
-                #if targetEnvironment(simulator)
+                #if os(macOS)
+                // TODO mac-033: Mac のカメラ(AVCaptureSession)と画像からの読み取り(Vision)
+                HStack {
+                    Label(c.label ?? L("QRを読み取る"), systemImage: "qrcode.viewfinder").foregroundStyle(.secondary)
+                    Spacer()
+                    Text(L("この Mac では使えません")).font(.caption2).foregroundStyle(.secondary)
+                }
+                .padding(12)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .background(RenderTheme.Colors.surface, in: RoundedRectangle(cornerRadius: RenderTheme.Radius.inner, style: .continuous))
+                TextField(L("読み取り結果を手入力"), text: form.string(field))
+                    .textFieldStyle(.roundedBorder)
+                    .font(.caption)
+                #elseif targetEnvironment(simulator)
                 HStack {
                     Label(c.label ?? L("QRを読み取る"), systemImage: "qrcode.viewfinder").foregroundStyle(.secondary)
                     Spacer()
@@ -39,7 +52,7 @@ struct QrScannerLeaf: View {
                         }
                         .ignoresSafeArea()
                         .navigationTitle(c.label ?? L("QRを読み取る"))
-                        .navigationBarTitleDisplayMode(.inline)
+                        .inlineNavigationTitle()
                         .toolbar { SheetCloseToolbarItem { showScanner = false } }
                         .aiButtonLayer()
                     }
@@ -56,7 +69,7 @@ struct QrScannerLeaf: View {
     }
 }
 
-#if !targetEnvironment(simulator)
+#if os(iOS) && !targetEnvironment(simulator)
 /// AVCaptureSession + メタデータ出力でコードを 1 回検出して返す。
 struct QrCameraView: UIViewControllerRepresentable {
     let onFound: (String) -> Void
@@ -133,7 +146,7 @@ final class QrCameraController: UIViewController, AVCaptureMetadataOutputObjects
     func metadataOutput(_ output: AVCaptureMetadataOutput, didOutput metadataObjects: [AVMetadataObject], from connection: AVCaptureConnection) {
         guard !found, let code = metadataObjects.compactMap({ ($0 as? AVMetadataMachineReadableCodeObject)?.stringValue }).first else { return }
         found = true
-        UINotificationFeedbackGenerator().notificationOccurred(.success)
+        PlatformSystem.successHaptic()
         onFound?(code)
     }
 }

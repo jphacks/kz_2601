@@ -10,7 +10,7 @@
 # 変更の判定(dorny/paths-filter)→ 回すもの:
 #   | 変わった場所                                  | ジョブ          | テスト                                                    |
 #   |-----------------------------------------------|-----------------|-----------------------------------------------------------|
-#   | ios/Packages/MetamonDSL/** だけ(*2)           | ios-dsl         | `swift test`(MetamonDSLTests)。アプリのビルド・シミュレータ無し |
+#   | ios/Packages/MetamonDSL/** だけ(*2)           | ios-dsl         | macOS の `xcodebuild test`(MetamonDSLTests)。アプリのビルド・シミュレータ無し |
 #   | MetamonDSL + 他の iOS 変更                    | ios-xcode       | DSL / Renderer / Services / MetamonTests(DSL は全員の依存) |
 #   | ios/Packages/MetamonRenderer/**               | ios-xcode       | MetamonRendererTests + MetamonTests                       |
 #   | docs/dsl/conformance/**・docs/dsl/examples/** | ios-xcode       | MetamonRendererTests(適合テスト #352)+ MetamonTests      |
@@ -20,9 +20,10 @@
 #   | .github/workflows/ios-ci.yml                  | ios-xcode       | ユニットテスト全部(UI 以外)                              |
 #   | 上記以外(ios/README.md, ios/scripts/** 等)    | なし            | なし(ios-ci は成功で終わる)                              |
 #   | develop / main への push(上記のどれかが変更) | ios-xcode       | 全部(UI テスト MetamonUITests を含む)                    |
-#   (*1) ios/Metamon/**, ios/MetamonWidget/**, ios/MetamonTests/**, ios/project.yml, ios/StoreKit/**,
+#   (*1) ios/Metamon/**, ios/Shared/**(Mac と共有・#939), ios/MetamonWidget/**, ios/MetamonTests/**, ios/project.yml, ios/StoreKit/**,
 #        docs/dsl/examples/**(アプリにバンドルされる)
 #   (*2) docs/dsl/conformance/expr/**(Expr の共有テストデータ・#545)も DSL の変更として扱う
+#        ios/scripts/mac-package-test.sh(ios-dsl がテストを回すスクリプト・#928)も DSL の変更として扱う
 #   PR では常に -skip-testing:MetamonUITests(`ui-tests` ラベル時だけ UI テストも足す)。
 #
 # UI テスト(MetamonUITests)を PR で回したい時: PR に `ui-tests` ラベルを付けて、ios-ci の
@@ -80,6 +81,8 @@ jobs:
           filters: |
             dsl:
               - 'ios/Packages/MetamonDSL/**'
+              # ios-dsl ジョブがこのスクリプトでテストを回す(#928)
+              - 'ios/scripts/mac-package-test.sh'
               - 'docs/dsl/conformance/expr/**'
               - 'docs/dsl/dsl.schema.json'    # スキーマだけの変更でも SchemaSwiftKeysTests を回す(#537)
             renderer:
@@ -91,6 +94,8 @@ jobs:
               - 'ios/Packages/MetamonServices/**'
             app:
               - 'ios/Metamon/**'
+              # Mac と共有するランタイムの部品(#939)。iOS のアプリにもコンパイルする
+              - 'ios/Shared/**'
               - 'ios/MetamonWidget/**'
               - 'ios/MetamonTests/**'
               - 'ios/project.yml'
@@ -160,7 +165,7 @@ jobs:
 
           ui="${UI_LABEL:-false}"
 
-          # PR で DSL だけ(ラベル無し): macOS の swift test だけ
+          # PR で DSL だけ(ラベル無し): macOS の DSL テストだけ
           if [ "$DSL" = "true" ] && [ "$others" != "true" ] && [ "$ui" != "true" ]; then
             emit dsl "" true
             exit 0
@@ -194,7 +199,7 @@ jobs:
           fi
           emit xcode "${args# }" true
 
-  # DSL だけの変更: Foundation のみなので macOS の swift test で足りる(シミュレータ・アプリのビルド不要)
+  # DSL だけの変更: Foundation のみなので macOS のテストで足りる(シミュレータ・アプリのビルド不要)
   ios-dsl:
     name: ios-dsl
     needs: ios-changes
@@ -213,17 +218,26 @@ jobs:
           if [ -n "$latest" ]; then sudo xcode-select -s "$latest"; fi
           xcodebuild -version
 
-      - name: SwiftPM ビルドキャッシュ
+      - name: DerivedData キャッシュ
         uses: actions/cache@v6
         with:
-          path: ios/Packages/MetamonDSL/.build
-          key: dsl-build-${{ runner.os }}-${{ hashFiles('ios/Packages/MetamonDSL/**/*.swift') }}
+          path: ios/DerivedData-mac
+          key: dsl-dd-${{ runner.os }}-${{ hashFiles('ios/Packages/MetamonDSL/**/*.swift') }}
           restore-keys: |
-            dsl-build-${{ runner.os }}-
+            dsl-dd-${{ runner.os }}-
 
-      - name: swift test (MetamonDSL)
-        working-directory: ios/Packages/MetamonDSL
-        run: swift test --parallel
+      # `swift test` は文字列カタログを訳さず英語の文言のテストが落ちるので xcodebuild test(macOS)で回す(#928)
+      - name: xcodebuild test (MetamonDSL・macOS)
+        run: ios/scripts/mac-package-test.sh MetamonDSL
+
+      - name: テスト結果をアップロード(失敗時)
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: ios-dsl-test-results
+          path: ios/TestResults-mac
+          if-no-files-found: ignore
+          retention-days: 3
 
   ios-xcode:
     name: ios-xcode

@@ -33,7 +33,7 @@ enum PhotoIllustrate {
     /// この端末で Image Playground が使えるか(iOS 18.1 以上・Apple Intelligence)。審査用の版は常に false。
     @MainActor static var isAvailable: Bool {
         #if canImport(ImagePlayground) && !APP_STORE_REVIEW
-        if #available(iOS 18.1, *) { return ImagePlaygroundViewController.isAvailable }
+        if #available(iOS 18.1, macOS 15.1, *) { return ImagePlaygroundViewController.isAvailable }
         #endif
         return false
     }
@@ -47,7 +47,7 @@ struct IllustrateSheet: ViewModifier {
 
     func body(content: Content) -> some View {
         #if canImport(ImagePlayground) && !APP_STORE_REVIEW
-        if #available(iOS 18.1, *) {
+        if #available(iOS 18.1, macOS 15.1, *) {
             content.imagePlaygroundSheet(isPresented: $isPresented, concept: concept, onCompletion: onImage)
         } else {
             content

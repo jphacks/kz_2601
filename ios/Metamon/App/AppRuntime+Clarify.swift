@@ -2,37 +2,6 @@ import SwiftUI
 import MetamonServices
 import MetamonRenderer
 
-/// 生成・改変の前にチャットで相談するかの設定(#75 / #186)。既定 ON。OFF は従来どおり一発で反映(create も edit も)。`METAMON_CLARIFY=0/1` があれば UserDefaults より優先(E2E・デモ端末用)。
-enum ClarifySettings {
-    private static let key = "metamon.clarify.enabled"
-
-    static var enabled: Bool {
-        get {
-            switch ProcessInfo.processInfo.environment["METAMON_CLARIFY"] {
-            case "0": return false
-            case "1": return true
-            default: return UserDefaults.standard.object(forKey: key) as? Bool ?? true
-            }
-        }
-        set { UserDefaults.standard.set(newValue, forKey: key) }
-    }
-
-    private static let autoBuildKey = "metamon.clarify.autoBuild"
-
-    /// 音声だけで進めている時、ready で自動生成するか(#160)。既定 ON(デモ本線は声だけで最後まで進むのが主役)。
-    /// `METAMON_CLARIFY_AUTOBUILD=0/1` があれば優先。
-    static var autoBuild: Bool {
-        get {
-            switch ProcessInfo.processInfo.environment["METAMON_CLARIFY_AUTOBUILD"] {
-            case "0": return false
-            case "1": return true
-            default: return UserDefaults.standard.object(forKey: autoBuildKey) as? Bool ?? true
-            }
-        }
-        set { UserDefaults.standard.set(newValue, forKey: autoBuildKey) }
-    }
-}
-
 /// 生成・改変の前の対話(#75 / backend #74 `POST /v1/chat`・チャット基本化 #184 / #186)。
 /// 初期(音声)画面の新規作成も、作ったアプリの上で開く音声シートの改変も、まずチャットでやり取りする。
 /// - 応答 kind: answer = 答えるだけ / question = 聞き返し(チップ) / proposal = 案のカード / ready = 要約 +「これでいく」

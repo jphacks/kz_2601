@@ -26,7 +26,7 @@ struct NumberFieldLeaf: View {
                             .accessibilityHidden(true)
                     }
                     TextField(c.placeholder ?? "0", text: form.number(field))
-                        .keyboardType(ftype == .number ? .decimalPad : .numberPad)
+                        .numericKeyboard(decimal: ftype == .number)
                         .textFieldStyle(.plain)
                         .font(RenderTheme.Fonts.number)
                         .focused($focused)

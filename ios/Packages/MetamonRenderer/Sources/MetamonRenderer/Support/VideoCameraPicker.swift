@@ -1,11 +1,16 @@
 import SwiftUI
+#if canImport(UIKit)
 import UIKit
+#else
+import AppKit
+#endif
 import AVFoundation
 import UniformTypeIdentifiers
 import CoreTransferable
 
 // 審査用ビルド(APP_STORE_REVIEW・#245)では撮影をバイナリから外す(ライブラリから選ぶ PickedMovie は残す)。
 #if !APP_STORE_REVIEW
+#if os(iOS)
 /// 動画撮影の `UIImagePickerController`(#206)。標準のカメラ UI に内カメ / 外カメの切り替えボタンがある。
 /// 録画の上限は `maxDuration` 秒、画質は中程度(`.typeMedium`)。権限は呼び出し側で `requestAccess()` を先に確認する。
 struct VideoCameraPicker: UIViewControllerRepresentable {
@@ -58,6 +63,18 @@ struct VideoCameraPicker: UIViewControllerRepresentable {
         }
     }
 }
+#else
+/// Mac: 動画の撮影はまだ無い(TODO mac-029)。`isAvailable` が false なので撮影のボタンは出ない。
+struct VideoCameraPicker: View {
+    var maxDuration: TimeInterval
+    var onVideo: (URL) -> Void
+
+    static var isAvailable: Bool { false }
+    static func requestAccess() async -> Bool { await CameraPicker.requestAccess() }
+
+    var body: some View { MacUnavailableView(feature: L("カメラ")) }
+}
+#endif
 #endif
 
 /// PhotosPicker で選んだ動画を一時ファイルとして受け取る。

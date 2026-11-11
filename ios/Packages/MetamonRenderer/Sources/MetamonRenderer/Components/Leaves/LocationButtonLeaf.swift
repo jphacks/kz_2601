@@ -47,6 +47,8 @@ struct LocationButtonLeaf: View {
             if let af = c.addressField, !af.isEmpty, af != field, let address = await PlaceSearch.address(of: coord) {
                 form.values[af] = .string(address)
             }
+        } catch is OneShotLocation.LocationError {
+            self.error = LocationPermissionCopy.notAllowed
         } catch {
             self.error = L("位置情報を取得できませんでした(\(error.localizedDescription))")
         }
@@ -61,7 +63,7 @@ final class OneShotLocation: NSObject, CLLocationManagerDelegate {
 
     enum LocationError: LocalizedError {
         case denied
-        var errorDescription: String? { L("位置情報の利用が許可されていません") }
+        var errorDescription: String? { LocationPermissionCopy.notAllowed }
     }
 
     func request() async throws -> CLLocation {

@@ -155,6 +155,7 @@ public final class AppleOnDeviceTranscriber: ProvisionalTranscriber {
         }
         diag.micPermission = "granted"
 
+        #if os(iOS)
         let session = AVAudioSession.sharedInstance()
         do {
             try session.setCategory(.playAndRecord, mode: .default, options: [.defaultToSpeaker, .allowBluetoothHFP])
@@ -172,6 +173,13 @@ public final class AppleOnDeviceTranscriber: ProvisionalTranscriber {
             diag.failure = "noInputAvailable"
             throw TranscriberFailure.noInputAvailable
         }
+        #else
+        MacAudioInput.fill(&diag)
+        guard diag.inputAvailable else {
+            diag.failure = "noInputAvailable"
+            throw TranscriberFailure.noInputAvailable
+        }
+        #endif
 
         let request = SFSpeechAudioBufferRecognitionRequest()
         request.requiresOnDeviceRecognition = true // 声を端末の外に出さない(U5 の条件)
@@ -238,7 +246,7 @@ public final class AppleOnDeviceTranscriber: ProvisionalTranscriber {
         diag.transcriptLength = text.count
         if text.isEmpty { diag.failure = "emptyTranscript" }
         lastDiagnostics = diag
-        log("transcribe result text=\"\(text)\"")
+        log("transcribe result chars=\(text.count)") // 話した内容はログに出さない
         return text
     }
 

@@ -107,6 +107,7 @@ struct ListRow: View {
         }
         .buttonStyle(.plain)
         .padding(-8)
+        .macIconButtonHelp(st.mine ? L("\(mark.label)を外す") : L("\(mark.label)を付ける"))
         .accessibilityHidden(true) // 行 1 要素の accessibilityAction で操作する
     }
 
@@ -137,6 +138,7 @@ struct ListRow: View {
         }
         .buttonStyle(.plain)
         .padding(-8)
+        .macIconButtonHelp(on ? L("チェックを外す") : L("チェックする"))
         .accessibilityHidden(true) // 行 1 要素の accessibilityAction で操作する
     }
 

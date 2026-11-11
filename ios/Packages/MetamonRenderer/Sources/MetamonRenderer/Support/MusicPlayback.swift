@@ -34,11 +34,24 @@ public enum MusicAvailability: Equatable, Sendable {
     public var message: String? {
         switch self {
         case .notDetermined, .ready: nil
+        #if os(macOS)
+        case .denied: L("Apple Music へのアクセスが許可されていません。システム設定 > プライバシーとセキュリティ > メディアと Apple Music で Tailor It を許可してください")
+        #else
         case .denied: L("Apple Music へのアクセスが許可されていません。設定アプリの Tailor It で「メディアと Apple Music」をオンにしてください")
+        #endif
         case .restricted: L("この端末では Apple Music の利用が制限されています")
         case .noSubscription: L("曲を再生するには Apple Music の契約が必要です")
         case .unavailable: L("この端末では Apple Music を使えません")
         }
+    }
+
+    /// 許可を変える画面(#1377)。Mac で断られた時だけ「プライバシーとセキュリティ > メディアと Apple Music」。iOS は出さない。
+    public var settingsURL: URL? {
+        #if os(macOS)
+        self == .denied ? URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Media") : nil
+        #else
+        nil
+        #endif
     }
 }
 

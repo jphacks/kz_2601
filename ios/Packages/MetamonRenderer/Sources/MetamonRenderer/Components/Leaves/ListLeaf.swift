@@ -20,6 +20,12 @@ struct ListLeaf: View {
     @State private var toggleTaps = 0
     /// 押した直後の印の表示(recordId → 楽観的な状態・#255)。確定したら外す
     @State private var markOverrides: [String: MarkState] = [:]
+    #if os(macOS)
+    /// ⌘C の対象の行(#1332)。クリックか Tab でフォーカスした行
+    @FocusState private var focusedRowId: String?
+    /// 行の写真の「画像を保存…」(#1333)
+    @State private var imageToSave: ImageExport.Pending?
+    #endif
 
     var body: some View {
         let entityId = c.entity ?? ""
@@ -50,25 +56,53 @@ struct ListLeaf: View {
                             accessory: interestAccessory(row, entity: entityId))
                         .background(highlightedId == row.id ? RenderTheme.Colors.brandSoft : Color.clear)
                         .contentShape(Rectangle())
-                        .onTapGesture { open(row) }
+                        .onTapGesture { focusRow(row); open(row) }
+                        #if os(macOS)
+                        .focusable()
+                        .focused($focusedRowId, equals: row.id)
+                        #endif
                         // VoiceOver: onTapGesture は読まれないので、行をボタンとして宣言しダブルタップで同じ遷移を実行
                         .accessibilityAddTraits(c.onItemTap != nil ? .isButton : [])
                         .accessibilityHint(c.onItemTap != nil ? L("ダブルタップで開きます") : "")
                         .accessibilityAction { open(row) }
                         .contextMenu {
+                            ComponentTalkMenuItem(component: c, ctx: ctx) // 行のメニューが先に出るので、ここにも置く(#1323)
+                            #if os(macOS)
+                            Button(L("コピー"), systemImage: "doc.on.doc") { copy(row, entity: entity) }
+                            if let photo = rowImage(row, entity: entity) {
+                                ImageMenuItems(image: photo.image, title: photo.title, copyLabel: L("画像をコピー")) {
+                                    imageToSave = .init(document: ImageFileDocument(image: photo.image),
+                                                        fileName: ImageExport.fileName(title: photo.title, fallback: L("写真"), date: Date()))
+                                }
+                                Divider()
+                            }
+                            #endif
                             if deletable(row, entity: entityId) {
                                 Button(L("削除"), systemImage: "trash", role: .destructive) { delete(row, entity: entityId) }
                             }
                             ModerationMenuItems(entity: entityId, record: row)
                         }
                         .accessibilityActions {
+                            #if os(macOS)
+                            Button(L("コピー")) { copy(row, entity: entity) }
+                            #endif
                             if deletable(row, entity: entityId) { Button(L("削除")) { delete(row, entity: entityId) } }
                         }
+                        .recordDrag { ListRowCopyText.text(item: c.item, record: row, entity: entity, rt: rt) }
                 }
             }
             // 行が少なくてもカードはセルの高さまで伸ばす(#84: 空白の下半分を作らない)。行は上詰め
             .frame(maxHeight: .infinity, alignment: .top)
+            #if os(macOS)
+            // ⌘C(#1332): フォーカスのある行を右クリックの「コピー」と同じテキストで
+            .onCopyCommand { copyCommand(rows: rows, entity: entity) }
+            // ⌫: フォーカスのある行を、確認を挟んでから消す(消せない行では何もしない)
+            .onDeleteCommand { deleteCommand(rows: rows, entity: entity, entityId: entityId) }
+            #endif
             .renderCard(padding: 0)
+            #if os(macOS)
+            .imageSaveExporter($imageToSave)
+            #endif
             .onChange(of: ids, initial: true) { _, now in markNewRows(now) }
             .sensoryFeedback(.selection, trigger: toggleTaps)
             .task(id: c.item?.interest == true ? entityId : "") { await loadInterestStates() }
@@ -149,6 +183,45 @@ struct ListLeaf: View {
         Task { await rt.run(Action(type: .deleteRecord, entity: entity), ctx.actionContext(recordId: row.id)) }
     }
 
+    /// 右クリックの「コピー」(Mac・#1332): 行に見えている項目をテキストにしてクリップボードへ。
+    private func copy(_ row: Record, entity: Entity?) {
+        let text = ListRowCopyText.text(item: c.item, record: row, entity: entity, rt: rt)
+        guard !text.isEmpty else { return }
+        PlatformPasteboard.setString(text)
+    }
+
+    #if os(macOS)
+    private func copyCommand(rows: [Record], entity: Entity?) -> [NSItemProvider] {
+        guard let row = ListRowCopyCommand.target(focusedRowId: focusedRowId,
+                                                  textInputActive: ListRowCopyCommand.textInputActive, rows: rows) else { return [] }
+        let text = ListRowCopyText.text(item: c.item, record: row, entity: entity, rt: rt)
+        return text.isEmpty ? [] : [NSItemProvider(object: text as NSString)]
+    }
+
+    private func deleteCommand(rows: [Record], entity: Entity?, entityId: String) {
+        guard let row = ListRowDeleteCommand.target(focusedRowId: focusedRowId, textInputActive: ListRowCopyCommand.textInputActive,
+                                                    rows: rows, deletable: { deletable($0, entity: entityId) }) else { return }
+        let titleField = c.item?.title ?? entity?.displayTitleField ?? ""
+        var action = Action(type: .deleteRecord, entity: entityId)
+        action.confirmMessage = ListRowDeleteCommand.confirmMessage(title: rt.display(row[titleField], field: entity?.field(titleField)),
+                                                                    fallback: entity?.name ?? "")
+        Task { await rt.run(action, ctx.actionContext(recordId: row.id)) }
+    }
+
+    /// 行の写真(item.image)。手元にある画像だけ(https・動画のサムネイルは除く)。名前は写真の項目名
+    private func rowImage(_ row: Record, entity: Entity?) -> (image: PlatformImage, title: String)? {
+        guard let field = c.item?.image, VideoValue(row[field]) == nil, let image = PhotoCodec.image(from: row[field]) else { return nil }
+        return (image, entity?.field(field)?.name ?? L("写真"))
+    }
+    #endif
+
+    /// クリックした行を ⌘C の対象にする(Mac)。
+    private func focusRow(_ row: Record) {
+        #if os(macOS)
+        focusedRowId = row.id
+        #endif
+    }
+
     private func open(_ row: Record) {
         guard let action = c.onItemTap else { return }
         Task { await rt.run(action, ctx.actionContext(recordId: row.id)) }
@@ -196,5 +269,18 @@ struct ListLeaf: View {
         return rows.filter { r in
             fields.contains { rt.display(r[$0], field: entity?.field($0)).localizedCaseInsensitiveContains(q) }
         }
+    }
+}
+
+private extension View {
+    /// 行を外(メモ・Finder・メール)へドラッグするとコピーと同じテキストを渡す(Mac のみ・#1334)。
+    /// Mac のドラッグは少し動かしてから始まるので、行のクリックや中のボタンとはぶつからない。iOS は何もしない。
+    @ViewBuilder
+    func recordDrag(_ text: @escaping () -> String) -> some View {
+        #if os(macOS)
+        onDrag { ListRowCopyText.dragItem(text()) }
+        #else
+        self
+        #endif
     }
 }

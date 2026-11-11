@@ -42,6 +42,9 @@ struct TranscribeFieldPanel: View {
 
     @State private var phase: DictationPhase = .idle
     @State private var message: String?
+    /// 許可が無い時に「設定を開く」で開く先(`DictationFailure.settingsURL`)
+    @State private var settingsURL: URL?
+    @Environment(\.openURL) private var openURL
     @FocusState private var focused: Bool
 
     private var host: (any DictationHost)? { rt.dictation }
@@ -63,6 +66,11 @@ struct TranscribeFieldPanel: View {
                         .font(.caption)
                         .foregroundStyle(.secondary)
                         .accessibilityIdentifier("transcribeField.message")
+                }
+                if let settingsURL {
+                    Button(L("設定を開く")) { openURL(settingsURL) }
+                        .font(.caption.weight(.semibold))
+                        .accessibilityIdentifier("transcribeField.openSettings")
                 }
             }
         }
@@ -119,11 +127,12 @@ struct TranscribeFieldPanel: View {
         phase = .starting
         focused = false
         message = nil
+        settingsURL = nil
         do {
             try await host.startDictation()
             phase = .listening
         } catch {
-            message = error.localizedDescription
+            show(error)
             phase = .idle
         }
     }
@@ -136,9 +145,14 @@ struct TranscribeFieldPanel: View {
             let current = (form.values[field] ?? .null).displayString
             form.values[field] = .string(DictationText.appending(text, to: current))
         } catch {
-            message = error.localizedDescription
+            show(error)
         }
         phase = .idle
+    }
+
+    private func show(_ error: Error) {
+        message = error.localizedDescription
+        settingsURL = (error as? DictationFailure)?.settingsURL
     }
 
     private func cancel() {

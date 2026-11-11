@@ -1,6 +1,10 @@
 import SwiftUI
 import PhotosUI
+#if canImport(UIKit)
 import UIKit
+#else
+import AppKit
+#endif
 import MetamonDSL
 
 /// `photoField`(P0 カメラ): source(camera|library|both)に応じて実機カメラ / 写真選択 / 二択ダイアログ。
@@ -41,14 +45,15 @@ struct PhotoFieldLeaf: View {
     private func content(form: FormDraft, field: String) -> some View {
         let value = form.values[field] ?? .null
         let decoded = PhotoCodec.image(from: value)
-        let hasPhoto = decoded != nil || (value.stringValue?.hasPrefix("http") ?? false)
+        let hasPhoto = decoded != nil || ImageHostPolicy.loadableURL(value.stringValue) != nil
 
         VStack(alignment: .leading, spacing: 8) {
             if hasPhoto {
                 if wantsPose, let pose, let decoded {
                     PosePhotoView(image: decoded, pose: pose, height: 200)
+                        .imageContextMenu(decoded, title: c.label ?? L("写真"))
                 } else {
-                    PhotoView(value: value, height: 160, accessibilityLabel: L("\(c.label ?? L("写真"))(添付済み)"))
+                    PhotoView(value: value, height: 160, accessibilityLabel: L("\(c.label ?? L("写真"))(添付済み)"), menuTitle: c.label ?? L("写真"))
                 }
                 HStack(spacing: RenderTheme.Spacing.sm) {
                     Button { start() } label: {
@@ -97,7 +102,7 @@ struct PhotoFieldLeaf: View {
             Button(L("写真から選ぶ")) { showLibrary = true }
             Button(L("キャンセル"), role: .cancel) {}
         }
-        .fullScreenCover(isPresented: $showCamera) {
+        .platformFullScreenCover(isPresented: $showCamera) {
             CameraPicker { image in
                 if let encoded = PhotoCodec.dataURL(from: image) { setPhoto(encoded, form: form, field: field) }
             }
@@ -117,7 +122,7 @@ struct PhotoFieldLeaf: View {
         #if !APP_STORE_REVIEW
         .alert(L("カメラを使えません"), isPresented: $showDenied) {
             Button(L("設定を開く")) {
-                if let url = URL(string: UIApplication.openSettingsURLString) { openURL(url) }
+                if let url = PlatformSystem.appSettingsURL { openURL(url) }
             }
             Button(L("写真から選ぶ")) { showLibrary = true }
             Button(L("キャンセル"), role: .cancel) {}

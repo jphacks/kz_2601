@@ -5,7 +5,11 @@ import AVFoundation
 import CoreMotion
 import Observation
 import Photos
+#if canImport(UIKit)
 import UIKit
+#else
+import AppKit
+#endif
 import MetamonDSL
 
 /// `dashcam`(#410)の端末内の置き場: Application Support/metamon-dashcam/<アプリ名のハッシュ>/{loop,saved}/。
@@ -163,6 +167,7 @@ final class DashcamCapture: NSObject, AVCaptureFileOutputRecordingDelegate, @unc
     }
 }
 
+#if os(iOS)
 /// ドラレコの状態。部品が表示されている間だけ動く(画面を離れる・裏に回ると止める)。
 @MainActor
 @Observable
@@ -453,4 +458,5 @@ final class DashcamRecorder {
         }
     }
 }
+#endif // os(iOS)
 #endif

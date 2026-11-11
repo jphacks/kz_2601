@@ -60,7 +60,10 @@ struct ChatThreadLeaf: View {
                                 sender: ChatThread.showsSender(row, after: i > 0 ? rows[i - 1] : nil, in: entity, uid: uid)
                                     ? (row.authorName ?? L("匿名")) : nil
                             )
-                            .contextMenu { ModerationMenuItems(entity: entity.id, record: row) }
+                            .contextMenu {
+                                ComponentTalkMenuItem(component: c, ctx: ctx) // 吹き出しのメニューが先に出るので、ここにも置く(#1323)
+                                ModerationMenuItems(entity: entity.id, record: row)
+                            }
                             .id(row.id)
                         }
                     }
@@ -99,7 +102,7 @@ struct ChatThreadLeaf: View {
                 }
                 .buttonStyle(.plain)
                 .foregroundStyle(RenderTheme.Colors.brandText)
-                .accessibilityLabel(L("写真を選ぶ"))
+                .iconButtonLabel(L("写真を選ぶ"))
                 .accessibilityIdentifier("chatThread.photo")
             }
             VStack(alignment: .leading, spacing: RenderTheme.Spacing.sm) {
@@ -121,8 +124,8 @@ struct ChatThreadLeaf: View {
             }
             .buttonStyle(.plain)
             .foregroundStyle(canSend ? AnyShapeStyle(RenderTheme.brandFill) : AnyShapeStyle(.tertiary))
+            .iconButtonLabel(L("送信"))
             .disabled(!canSend)
-            .accessibilityLabel(L("送信"))
             .accessibilityIdentifier("chatThread.send")
         }
         // マイク FAB が入力欄の左に重なる時だけ、その分を空ける(キーボード表示中は FAB が隠れるので 0)
@@ -151,7 +154,7 @@ struct ChatThreadLeaf: View {
             }
             .buttonStyle(.plain)
             .padding(4)
-            .accessibilityLabel(L("写真を外す"))
+            .iconButtonLabel(L("写真を外す"))
         }
     }
 
@@ -236,7 +239,7 @@ private struct ChatBubble: View {
     }
 
     private var hasPhoto: Bool {
-        PhotoCodec.image(from: photo) != nil || (photo.stringValue?.hasPrefix("http") ?? false)
+        PhotoCodec.image(from: photo) != nil || ImageHostPolicy.loadableURL(photo.stringValue) != nil
     }
 
     private var bubble: some View {

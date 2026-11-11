@@ -13,7 +13,7 @@ struct WebViewLeaf: View {
     var body: some View {
         if let url = ExternalURLPolicy.webViewURL(c.url) {
             VStack(spacing: 0) {
-                toolbar
+                toolbar(url)
                 Divider()
                 ZStack(alignment: .top) {
                     WebViewRepresentable(url: url, state: state)
@@ -24,22 +24,22 @@ struct WebViewLeaf: View {
                     }
                 }
             }
-            .background(Color(.systemBackground))
+            .background(Color.platformBackground)
             .clipShape(RoundedRectangle(cornerRadius: 12))
-            .overlay(RoundedRectangle(cornerRadius: 12).strokeBorder(Color(.separator), lineWidth: 0.5))
+            .overlay(RoundedRectangle(cornerRadius: 12).strokeBorder(Color.platformSeparator, lineWidth: 0.5))
         } else {
             UnsupportedComponent(label: L("webView: https の URL だけ表示できます"))
         }
     }
 
-    private var toolbar: some View {
+    private func toolbar(_ url: URL) -> some View {
         HStack(spacing: 12) {
             Button { state.goBack?() } label: { Image(systemName: "chevron.backward") }
+                .iconButtonLabel(L("前のページ"))
                 .disabled(!state.canGoBack)
-                .accessibilityLabel(L("前のページ"))
             Button { state.goForward?() } label: { Image(systemName: "chevron.forward") }
+                .iconButtonLabel(L("次のページ"))
                 .disabled(!state.canGoForward)
-                .accessibilityLabel(L("次のページ"))
             Text(c.title ?? state.pageTitle)
                 .font(.subheadline.weight(.medium))
                 .lineLimit(1)
@@ -47,13 +47,47 @@ struct WebViewLeaf: View {
             Button { state.reload?() } label: {
                 Image(systemName: state.isLoading ? "xmark" : "arrow.clockwise")
             }
-            .accessibilityLabel(state.isLoading ? L("読み込みを止める") : L("再読み込み"))
+            .iconButtonLabel(state.isLoading ? L("読み込みを止める") : L("再読み込み"))
+            #if os(macOS)
+            // Mac(#961): 今のページを既定のブラウザで開く(NSWorkspace)。
+            Button { PlatformSystem.open(state.currentURL ?? url) } label: { Image(systemName: "safari") }
+                .iconButtonLabel(L("ブラウザで開く"))
+            #endif
         }
         .buttonStyle(.plain)
         .foregroundStyle(.tint)
         .padding(.horizontal, 12)
         .padding(.vertical, 8)
         .background(.bar)
+    }
+}
+
+/// webView の中のリンクの扱い(iOS と Mac で同じ判定・テストから使う)。
+enum WebLinkPolicy: Equatable {
+    case allow
+    /// アプリの外(ブラウザ・電話・LINE など)に渡す。iOS は UIApplication、Mac は NSWorkspace。
+    case openExternally(URL)
+    case ignore
+
+    /// 表示できるのは https だけ。ページ内リンクで他スキーム(tel: / line:// など)に飛ぶ時は allowlist 内なら OS に渡し、それ以外は無視する。
+    /// Mac は新しいウインドウで開くリンク(target=_blank)を既定のブラウザに渡す(#961)。iOS は今まで通り。
+    /// ブラウザに渡すのはリンクを押した時だけ(`linkActivated`)。スクリプトが開く新しいウインドウは渡さない。
+    static func decide(_ url: URL?, opensNewWindow: Bool, linkActivated: Bool = true,
+                       externalNewWindows: Bool = isMac) -> WebLinkPolicy {
+        guard let url, let scheme = url.scheme?.lowercased() else { return .ignore }
+        if scheme == "https" || scheme == "http" || scheme == "about" {
+            if externalNewWindows, opensNewWindow, scheme == "https" { return linkActivated ? .openExternally(url) : .ignore }
+            return .allow
+        }
+        return ExternalURLPolicy.isAllowed(url) ? .openExternally(url) : .ignore
+    }
+
+    static var isMac: Bool {
+        #if os(macOS)
+        true
+        #else
+        false
+        #endif
     }
 }
 
@@ -65,25 +99,45 @@ final class WebState {
     var canGoBack = false
     var canGoForward = false
     var pageTitle = ""
+    /// 今表示しているページ(Mac の「ブラウザで開く」が使う)。
+    var currentURL: URL?
     var goBack: (() -> Void)?
     var goForward: (() -> Void)?
     var reload: (() -> Void)?
 }
 
-private struct WebViewRepresentable: UIViewRepresentable {
+#if os(iOS)
+extension WebViewRepresentable: UIViewRepresentable {
+    func makeUIView(context: Context) -> WKWebView { makeWeb(context.coordinator) }
+    func updateUIView(_ web: WKWebView, context: Context) { updateWeb(web, context.coordinator) }
+    static func dismantleUIView(_ web: WKWebView, coordinator: Coordinator) { dismantle(web, coordinator) }
+}
+#else
+extension WebViewRepresentable: NSViewRepresentable {
+    func makeNSView(context: Context) -> WKWebView { makeWeb(context.coordinator) }
+    func updateNSView(_ web: WKWebView, context: Context) { updateWeb(web, context.coordinator) }
+    static func dismantleNSView(_ web: WKWebView, coordinator: Coordinator) { dismantle(web, coordinator) }
+}
+#endif
+
+@MainActor private struct WebViewRepresentable {
     let url: URL
     let state: WebState
 
     func makeCoordinator() -> Coordinator { Coordinator(state: state) }
 
-    func makeUIView(context: Context) -> WKWebView {
+    func makeWeb(_ coordinator: Coordinator) -> WKWebView {
         let config = WKWebViewConfiguration()
+        #if os(iOS)
         config.allowsInlineMediaPlayback = true
+        #endif
         let web = WKWebView(frame: .zero, configuration: config)
-        web.navigationDelegate = context.coordinator
+        web.navigationDelegate = coordinator
         web.allowsBackForwardNavigationGestures = true
+        #if os(iOS)
         web.scrollView.contentInsetAdjustmentBehavior = .never
-        context.coordinator.observe(web)
+        #endif
+        coordinator.observe(web)
         state.goBack = { [weak web] in web?.goBack() }
         state.goForward = { [weak web] in web?.goForward() }
         state.reload = { [weak web] in
@@ -94,15 +148,15 @@ private struct WebViewRepresentable: UIViewRepresentable {
         return web
     }
 
-    func updateUIView(_ web: WKWebView, context: Context) {
+    func updateWeb(_ web: WKWebView, _ coordinator: Coordinator) {
         // DSL の url が差し替わった時だけ読み直す(同じ URL での再描画でリロードしない)。
-        if context.coordinator.loadedURL != url {
-            context.coordinator.loadedURL = url
+        if coordinator.loadedURL != url {
+            coordinator.loadedURL = url
             web.load(URLRequest(url: url))
         }
     }
 
-    static func dismantleUIView(_ web: WKWebView, coordinator: Coordinator) {
+    static func dismantle(_ web: WKWebView, _ coordinator: Coordinator) {
         coordinator.observations.removeAll()
         web.stopLoading()
     }
@@ -132,16 +186,24 @@ private struct WebViewRepresentable: UIViewRepresentable {
                 web.observe(\.title, options: [.initial, .new]) { [state] w, _ in
                     Task { @MainActor in state.pageTitle = w.title ?? "" }
                 },
+                web.observe(\.url, options: [.initial, .new]) { [state] w, _ in
+                    Task { @MainActor in state.currentURL = w.url }
+                },
             ]
         }
 
-        /// 表示できるのは https だけ。ページ内リンクで他スキーム(tel: / line:// など)に飛ぶ時は allowlist 内なら OS に渡し、それ以外は無視する。
         func webView(_ webView: WKWebView, decidePolicyFor action: WKNavigationAction,
                      decisionHandler: @escaping @MainActor (WKNavigationActionPolicy) -> Void) {
-            guard let url = action.request.url, let scheme = url.scheme?.lowercased() else { return decisionHandler(.cancel) }
-            if scheme == "https" || scheme == "http" || scheme == "about" { return decisionHandler(.allow) }
-            if ExternalURLPolicy.isAllowed(url) { UIApplication.shared.open(url) }
-            decisionHandler(.cancel)
+            switch WebLinkPolicy.decide(action.request.url, opensNewWindow: action.targetFrame == nil,
+                                        linkActivated: action.navigationType == .linkActivated) {
+            case .allow:
+                decisionHandler(.allow)
+            case .openExternally(let url):
+                PlatformSystem.open(url)
+                decisionHandler(.cancel)
+            case .ignore:
+                decisionHandler(.cancel)
+            }
         }
     }
 }

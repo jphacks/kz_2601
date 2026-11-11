@@ -12,14 +12,7 @@ extension AppRuntime: DictationHost {
     /// 本命のモデルが文字にしている間(録音ファイルの文字起こしなど)は、仮の聞き取りが使えても録音を始めない(モデルを使っている間)。
     /// 部品の自分の録音を文字にしている間も recognizing だが、その間の部品は「文字にしています」を出していて読まない。
     nonisolated static func dictationReadiness(isReady: Bool, status: TranscriberStatus) -> DictationReadiness {
-        if status == .recognizing { return .preparing }
-        if isReady { return .ready }
-        switch status {
-        case .ready: return .ready
-        case .downloading, .loading, .recognizing: return .preparing
-        case .failed: return .failed
-        case .notDownloaded: return .needsModel
-        }
+        TranscriberDictation.readiness(isReady: isReady, status: status) // Mac と同じ対応(#1328)
     }
 
     var isVoiceInputActive: Bool { showVoiceSheet }

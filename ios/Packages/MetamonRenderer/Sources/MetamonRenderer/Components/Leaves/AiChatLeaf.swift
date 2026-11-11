@@ -14,6 +14,7 @@ import MetamonDSL
 struct AiChatLeaf: View {
     @Environment(\.dslRuntime) private var rt
     @Environment(\.fabFrame) private var fabFrame
+    @Environment(\.openURL) private var openURL
     let c: Component
     let ctx: RenderContext
 
@@ -22,6 +23,8 @@ struct AiChatLeaf: View {
     /// 返事を待っている自分の発言(roleField が無く、まだ保存していない時だけ)
     @State private var pending: String?
     @State private var error: String?
+    /// 話して入力の許可が無い時に「設定を開く」で開く先(`DictationFailure.settingsURL`)
+    @State private var errorSettingsURL: URL?
     @State private var echo: SentTextEcho?
     @State private var barFrame: CGRect = .zero
     @State private var scrollFrame: CGRect = .zero
@@ -54,8 +57,8 @@ struct AiChatLeaf: View {
                 announceQueue.clear()
             }
             .onChange(of: micPhase) { _, phase in
-                if let text = announceQueue.phaseChanged(to: phase, visible: visible, voiceOver: UIAccessibility.isVoiceOverRunning) {
-                    UIAccessibility.post(notification: .announcement, argument: text)
+                if let text = announceQueue.phaseChanged(to: phase, visible: visible, voiceOver: PlatformSystem.isVoiceOverRunning) {
+                    PlatformSystem.announce(text)
                 }
             }
             .onChange(of: rt.dictation?.isVoiceInputActive ?? false) { _, active in
@@ -141,8 +144,15 @@ struct AiChatLeaf: View {
 
     @ViewBuilder private var footer: some View {
         if let error {
-            Text(error).font(.caption).foregroundStyle(.red).frame(maxWidth: .infinity, alignment: .leading)
-                .accessibilityIdentifier("aiChat.error")
+            VStack(alignment: .leading, spacing: 4) {
+                Text(error).font(.caption).foregroundStyle(.red).frame(maxWidth: .infinity, alignment: .leading)
+                    .accessibilityIdentifier("aiChat.error")
+                if let url = errorSettingsURL {
+                    Button(L("設定を開く")) { openURL(url) }
+                        .font(.caption.weight(.semibold))
+                        .accessibilityIdentifier("aiChat.openSettings")
+                }
+            }
         } else if !online {
             Text(L("この版では AI と話せません")).font(.caption).foregroundStyle(.secondary).frame(maxWidth: .infinity, alignment: .leading)
         } else if let input = c.inputEntity.flatMap({ rt.dsl.entity($0) }) {
@@ -172,8 +182,8 @@ struct AiChatLeaf: View {
             }
             .buttonStyle(.plain)
             .foregroundStyle(canSend ? AnyShapeStyle(RenderTheme.brandFill) : AnyShapeStyle(.tertiary))
+            .iconButtonLabel(L("送信"))
             .disabled(!canSend)
-            .accessibilityLabel(L("送信"))
             .accessibilityIdentifier("aiChat.send")
         }
         .padding(.leading, ChatInputInset.leading(bar: barFrame, fab: fabFrame))
@@ -211,8 +221,8 @@ struct AiChatLeaf: View {
             }
             .buttonStyle(.plain)
             .foregroundStyle(mic == .stop ? AnyShapeStyle(.red) : (mic.enabled ? AnyShapeStyle(RenderTheme.brandFill) : AnyShapeStyle(.tertiary)))
+            .iconButtonLabel(Self.micLabel(mic, voiceOver: PlatformSystem.isVoiceOverRunning))
             .disabled(!mic.enabled)
-            .accessibilityLabel(Self.micLabel(mic, voiceOver: UIAccessibility.isVoiceOverRunning))
             .accessibilityHint(mic == .start ? L("話した言葉が入力欄に入ります。確かめてから送れます") : "")
             .accessibilityIdentifier("aiChat.mic")
         }
@@ -246,6 +256,7 @@ struct AiChatLeaf: View {
         focused = false
         stopSpeech()
         error = nil
+        errorSettingsURL = nil
         do {
             try await host.startDictation() // 読み上げ(アプリ全体)を止め、録音の間は読まない
             guard visible, !host.isVoiceInputActive else { // 始める間に画面を離れた・マイク FAB が始まった
@@ -255,7 +266,7 @@ struct AiChatLeaf: View {
             }
             micPhase = .listening
         } catch {
-            self.error = error.localizedDescription
+            showDictationError(error)
             micPhase = .idle
         }
     }
@@ -268,9 +279,14 @@ struct AiChatLeaf: View {
             echo = nil
             draft = DictationText.appending(text, to: draft)
         } catch {
-            self.error = error.localizedDescription
+            showDictationError(error)
         }
         micPhase = .idle
+    }
+
+    private func showDictationError(_ error: Error) {
+        self.error = error.localizedDescription
+        errorSettingsURL = (error as? DictationFailure)?.settingsURL
     }
 
     private func cancelDictation() {
@@ -294,6 +310,7 @@ struct AiChatLeaf: View {
         let limit = c.limit
         sending = true
         error = nil
+        errorSettingsURL = nil
         suggestion = nil // 前の案は閉じる(言い直した内容で新しい案が来る)
         if focused { KeyboardState.clearFocusedText() }
         draft = ""
@@ -358,13 +375,13 @@ struct AiChatLeaf: View {
     }
 
     private func autoRead(_ turn: AIChat.Turn) {
-        let mode = Self.autoReadMode(speak: c.speak, visible: visible, voiceOver: UIAccessibility.isVoiceOverRunning,
+        let mode = Self.autoReadMode(speak: c.speak, visible: visible, voiceOver: PlatformSystem.isVoiceOverRunning,
                                      recording: micPhase != .idle)
         switch mode {
         case .none: break
         case .queue: announceQueue.received(turn.text, mode: mode)
         case .speak: speech.speak(turn.text, owner: speechOwner(turn.id))
-        case .announce: UIAccessibility.post(notification: .announcement, argument: turn.text)
+        case .announce: PlatformSystem.announce(turn.text)
         }
     }
 
@@ -473,8 +490,8 @@ private struct AiChatBubble: View {
                     }
                     .buttonStyle(.plain)
                     .foregroundStyle(.secondary)
+                    .iconButtonLabel(speaking ? L("止める") : L("読み上げる"))
                     .disabled(!canSpeak && !speaking)
-                    .accessibilityLabel(speaking ? L("止める") : L("読み上げる"))
                     .accessibilityIdentifier("aiChat.speak")
                 }
             }

@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<!-- Mac App Store に必須のサンドボックスと、通信(backend・音声モデルの取得)・マイク。Sign in with Apple・カメラなどは各 Issue で足す -->
+	<key>com.apple.security.app-sandbox</key>
+	<true/>
+	<key>com.apple.security.network.client</key>
+	<true/>
+	<!-- 声で頼む(#966): マイク。サンドボックスとハードンドランタイムの両方がこのキーを見る -->
+	<key>com.apple.security.device.audio-input</key>
+	<true/>
+	<!-- カレンダーに追加(#978): 予定を足す(書き込みだけの許可を求める)。サンドボックスではこのキーが無いと EventKit に届かない -->
+	<key>com.apple.security.personal-information.calendars</key>
+	<true/>
+	<!-- 現在地(#956): locationButton・地図・道案内など。サンドボックスではこのキーが無いと CoreLocation の許可を求められない -->
+	<key>com.apple.security.personal-information.location</key>
+	<true/>
+	<!-- 利用者が選んだファイル: 取り込む(#956・fileImport)と、画像を保存…(#1333・保存パネルで選んだ場所へ書く) -->
+	<key>com.apple.security.files.user-selected.read-write</key>
+	<true/>
+</dict>
+</plist>

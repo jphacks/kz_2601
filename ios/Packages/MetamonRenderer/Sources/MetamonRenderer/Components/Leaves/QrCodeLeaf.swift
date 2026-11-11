@@ -38,18 +38,22 @@ struct QrCodeLeaf: View {
     private var caption: String? { c.label.flatMap { $0.isEmpty ? nil : $0 } }
 
     @ViewBuilder
-    private func code(_ shown: UIImage, export: UIImage, content: String) -> some View {
-        Image(uiImage: shown)
+    private func code(_ shown: PlatformImage, export: PlatformImage, content: String) -> some View {
+        Image(platformImage: shown)
             .interpolation(.none)
             .resizable()
             .scaledToFit()
             .frame(maxWidth: 320, maxHeight: .infinity)
             .clipShape(RoundedRectangle(cornerRadius: RenderTheme.Radius.inner, style: .continuous))
             .overlay(RoundedRectangle(cornerRadius: RenderTheme.Radius.inner, style: .continuous).strokeBorder(RenderTheme.Colors.hairline))
-            .contentShape(.contextMenuPreview, RoundedRectangle(cornerRadius: RenderTheme.Radius.inner, style: .continuous))
+            .contextMenuPreviewShape(RoundedRectangle(cornerRadius: RenderTheme.Radius.inner, style: .continuous))
             .contextMenu {
+                ComponentTalkMenuItem(component: c, ctx: ctx) // 画像のメニューが先に出るので、ここにも置く(#1323)
+                #if os(macOS)
+                Button(L("コピー"), systemImage: "doc.on.doc") { PlatformPasteboard.setImage(export) }
+                #endif
                 Button { save(export) } label: { Label(L("写真に保存"), systemImage: "square.and.arrow.down") }
-                ShareLink(item: Image(uiImage: export), preview: SharePreview(caption ?? L("QR コード"), image: Image(uiImage: export))) {
+                ShareLink(item: Image(platformImage: export), preview: SharePreview(caption ?? L("QR コード"), image: Image(platformImage: export))) {
                     Label(L("共有"), systemImage: "square.and.arrow.up")
                 }
             }
@@ -72,7 +76,7 @@ struct QrCodeLeaf: View {
             }
             .disabled(saveState == .saving)
             .accessibilityIdentifier("qrCode.save")
-            ShareLink(item: Image(uiImage: export), preview: SharePreview(caption ?? L("QR コード"), image: Image(uiImage: export))) {
+            ShareLink(item: Image(platformImage: export), preview: SharePreview(caption ?? L("QR コード"), image: Image(platformImage: export))) {
                 Label(L("共有"), systemImage: "square.and.arrow.up")
             }
             .accessibilityIdentifier("qrCode.share")
@@ -109,7 +113,7 @@ struct QrCodeLeaf: View {
     }
 
     /// 写真に追加(`NSPhotoLibraryAddUsageDescription`・追加のみ)。拒否・失敗は文言で知らせる。
-    private func save(_ image: UIImage) {
+    private func save(_ image: PlatformImage) {
         saveState = .saving
         Task { @MainActor in
             let status = await PHPhotoLibrary.requestAuthorization(for: .addOnly)
