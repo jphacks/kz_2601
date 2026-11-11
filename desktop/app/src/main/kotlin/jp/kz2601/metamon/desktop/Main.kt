@@ -1,5 +1,6 @@
 package jp.kz2601.metamon.desktop
 
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.snapshotFlow
@@ -20,7 +21,7 @@ import java.util.prefs.Preferences
 /**
  * 起動。引数 1 つ目(または -Dtailorit.example)で同梱の例を選ぶ。既定は shopping。
  * 引数 2 つ目に記録の JSON(`{"<entity>": [{"id", "data"}]}`・case.json の形も可)を渡すとモックに入れて開く。3 つ目は最初の画面の id。
- * ウィンドウの大きさ・位置は覚えて次の起動で戻す。サインインはまだ無い(モック)。
+ * ウィンドウの大きさ・位置は覚えて次の起動で戻す。トレイ / メニューバーに常駐する(Tray.kt)。サインインはまだ無い(モック)。
  */
 @OptIn(FlowPreview::class)
 fun main(args: Array<String>) = application {
@@ -32,14 +33,28 @@ fun main(args: Array<String>) = application {
         size = saved?.size ?: DpSize(480.dp, 820.dp),
         position = saved?.position ?: WindowPosition.PlatformDefault,
     )
-    Window(onCloseRequest = ::exitApplication, title = Strings.format("desktop_window_title", dsl.app.name), state = state) {
+    // トレイに常駐(#1761): × はトレイに隠す(設定で off・トレイが無ければ終わる)。終わるのはトレイの「終了」
+    val tray = remember { TrayController.create(dsl) }
+    DesktopTray(tray)
+    Window(
+        onCloseRequest = { if (tray.onCloseRequest()) exitApplication() },
+        visible = tray.windowVisible,
+        title = Strings.format("desktop_window_title", dsl.app.name),
+        state = state,
+    ) {
+        LaunchedEffect(tray.focusRequests) {
+            if (tray.focusRequests > 0) {
+                state.isMinimized = false
+                window.toFront()
+            }
+        }
         LaunchedEffect(Unit) {
             // 6 列が潰れない最小(1 列 ≈ 50dp)
             window.minimumSize = Dimension(360, 560)
             snapshotFlow { state.size to state.position }.debounce(500).collect { (size, pos) -> WindowBounds.save(size, pos) }
         }
         // 明暗は OS に従う・文言は OS の言語(日本語か英語)・#1759
-        TailorItTheme { DesktopApp(dsl, store, args.getOrNull(2)) }
+        CompositionLocalProvider(LocalTray provides tray) { TailorItTheme { DesktopApp(dsl, store, args.getOrNull(2)) } }
     }
 }
 
