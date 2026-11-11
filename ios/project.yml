@@ -330,6 +330,13 @@ targets:
       # 近くの人に送る(#964): MultipeerConnectivity の通信は iOS のファイルをそのまま使う(iPhone・iPad と送り合える)。
       # すれ違い通信(passby)は NearbyInteraction・持ち歩く前提なので Mac には入れない(「この Mac では使えません」)
       - path: Metamon/Features/Nearby/NearbyService.swift
+      # ショートカット・Siri・Spotlight(App Intents・#1034): Intent の型・Query・フレーズは iOS のファイルをそのまま使う。
+      # 本体との橋渡し(IntentHost)だけ Mac 用(MetamonMac/App/Intents/MacIntentHost.swift)。iOS の IntentHost.swift は AppRuntime を使うので入れない
+      - path: Metamon/Features/Intents/TailorItIntents.swift
+      - path: Metamon/Features/Intents/IntentEntities.swift
+      - path: Metamon/Features/Intents/IntentE2E.swift
+      - path: Metamon/Resources/AppShortcuts.xcstrings
+        buildPhase: resources
       # 規約・ポリシーは iOS と同じ同梱版をアプリ内で読む(#971)
       - path: ../docs/legal
         buildPhase: resources
@@ -411,6 +418,9 @@ targets:
     platform: macOS
     sources:
       - path: MetamonMacTests
+        # スナップショットの参照の PNG(#1136)はテストがソースの場所から読む。バンドルには入れない
+        excludes:
+          - "__Snapshots__/**"
     dependencies:
       - target: MetamonMac
     settings:

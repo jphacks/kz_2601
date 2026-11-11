@@ -131,16 +131,21 @@ final class MacAccount {
         }
         await Self.unregisterPush() // `DELETE /v1/me` の後は送れない。送れなくても続ける(iOS と同じ・#982)
         let wipe = wipe, reauth = appleReauth
-        try await AccountDeletionFlow.run(
-            account: account,
-            auth: service,
-            reauthenticate: {
-                guard isApple, let apple = try await reauth() else { return false }
-                try await service.reauthenticateWithApple(idToken: apple.idToken, nonce: apple.nonce)
-                return true
-            },
-            wipeLocal: { await wipe.run() }
-        )
+        do {
+            try await AccountDeletionFlow.run(
+                account: account,
+                auth: service,
+                reauthenticate: {
+                    guard isApple, let apple = try await reauth() else { return false }
+                    try await service.reauthenticateWithApple(idToken: apple.idToken, nonce: apple.nonce)
+                    return true
+                },
+                wipeLocal: { await wipe.run() }
+            )
+        } catch {
+            await Self.registerPush() // 消せなかった(サインインしたまま): 端末の登録を戻す(切り替えの失敗と同じ)
+            throw error
+        }
         session.signOut()
         await startFresh()
         return true
