@@ -10,8 +10,9 @@
 4. [呼び出しの流れと数え方](#呼び出しの流れと数え方)
 5. [OAuth のトークン](#oauth-のトークン)
 6. [runner の口](#runner-の口)
-7. [偽の provider(stg と試験)](#偽の-providerstg-と試験)
-8. [人の作業](#人の作業)
+7. [appconfig の口(端末から)](#appconfig-の口端末から)
+8. [偽の provider(stg と試験)](#偽の-providerstg-と試験)
+9. [人の作業](#人の作業)
 
 ## できていること・まだのこと
 
@@ -25,7 +26,7 @@
 | runner の口 | 済(`/internal/ext/*`・`/oauth/callback/{provider}`)。Cloud Run の設定(戻り先を認証なしで受ける)は人の作業 |
 | 出口の許可リスト・本文の上限 | 済(`NewHTTPClient`・`ReadBody`)。provider のファイルが使う |
 | 退会の 30 日後の消去(`cmd/purge`) | 済(`users/{uid}/connections/*` を消す・ログ `extConnections`) |
-| appconfig `POST /v1/apps/{appId}/ext/{provider}/{op}`・`/v1/me/connections/*`・エラーコード | **まだ**(契約の子 Issue。runner の答えの `reason` をそのままコードにする) |
+| appconfig `POST /v1/apps/{appId}/ext/{provider}/{op}`・`/v1/me/connections/*`・エラーコード | 済(`internal/appconfig/ext.go`・runner の呼び出しは `extapi.Client`・`openapi-appconfig.yaml` の tag `ext`)。下の「appconfig の口」 |
 | DSL `externalCall` / `externalList`・自動の動きからの呼び出し | **まだ**(DSL の子 Issue。`CallRequest.Run` に run の `quota.Decision` を渡すだけで数え方は同じ) |
 | 退会(`DELETE /v1/me`)の時の provider 側の取り消し | **まだ**(appconfig から `/internal/ext/connections/revokeAll` を呼ぶ) |
 | 回数の上限 `EXT_LIMIT_*`・`EXT_GLOBAL_DAILY_<PROVIDER>`・キャッシュ・provider ごとの 1 分止め | **まだ**(本物の provider と一緒に) |
@@ -44,6 +45,7 @@
 | OAuth の state / PKCE | `oauth.go` |
 | 出口 | `egress.go` |
 | runner への組み込み | `backend/cmd/runner/ext.go` |
+| appconfig の口・runner の呼び出し | `backend/internal/appconfig/ext.go`・`internal/extapi/client.go`・`backend/cmd/appconfig/ext.go`(`EXT_RUNNER_URL`) |
 
 ## provider の一覧(閉じた一覧)
 
@@ -93,7 +95,7 @@ provider は `Provider` で定義し、そのファイルの `init()` で `regis
 
 ## runner の口
 
-`/internal/*` は appconfig の SA だけが呼ぶ(Cloud Run の IAM・OIDC)。答えが失敗の時は `{"reason": "<理由>"}` と下の状態コードで、appconfig が理由を同じ名前のエラーコードにして端末に返す(契約の子 Issue)。
+`/internal/*` は appconfig の SA だけが呼ぶ(Cloud Run の IAM・OIDC)。答えが失敗の時は `{"reason": "<理由>"}` と下の状態コードで、appconfig が理由を同じ名前のエラーコードにして端末に返す(下の「appconfig の口」)。
 
 | 口 | 中身 |
 |---|---|
@@ -111,6 +113,29 @@ provider は `Provider` で定義し、そのファイルの `init()` で `regis
 | `pro_required` / `allowance_exhausted` / `overflow_cap_reached` / `coins_insufficient` | 402 |
 | `upstream_timeout` / `upstream_unavailable` | 504 / 502 |
 
+## appconfig の口(端末から)
+
+端末は appconfig だけを呼ぶ。appconfig は人とアプリと引数を確かめ、`EXT_RUNNER_URL` の runner を ID トークン(audience = その URL)つきで呼ぶ。`EXT_RUNNER_URL` が無い時は 503 `ext_unavailable`(一覧は空)。契約は `openapi-appconfig.yaml` の tag `ext`。
+
+| 口 | 中身 |
+|---|---|
+| `POST /v1/apps/{appId}/ext/{provider}/{op}` | `{"args": {...}}` → `{rows / item / resultId}`。有料の provider は `X-Coins-Charged` / `X-Coins-Balance` |
+| `GET /v1/me/connections` | つないだサービスの一覧(provider・状態・scope・日付。トークンは返さない) |
+| `POST /v1/me/connections/{provider}/start` | `{"scopes"?}` → `{authUrl}`(OAuth の要る provider だけ。ほかは 404) |
+| `DELETE /v1/me/connections/{provider}` | 切る(204) |
+
+`POST /v1/apps/{appId}/ext/...` で appconfig が確かめること:
+
+| 段 | 中身 | 失敗した時 |
+|---|---|---|
+| 1. 一覧 | provider と op が閉じた一覧にあるか | 404 `not_found` |
+| 2. 引数 | op の名前だけ・4096 バイトまで・URL は受けない・op の `Check`(`Provider.CheckArgs`。runner でももう一度) | 400 `bad_request` |
+| 3. 誰の枠か | 共有のアプリ(公開の DSL に public / shared の entity)は**作成者**。呼べるのは参加者(public の entity があれば入れた人も)。自分のアプリ・自分の写しの private のアプリは呼び出した人 | 403 `not_member` / 404(自分のツリーに無い)/ 410 `unpublished` |
+| 4. 1 時間の上限 | 1 人 `EXT_USER_PER_HOUR` 回(既定 120) | 429 `rate_limited` |
+| 5. runner | `X-Request-Id` を `requestId` に(コインの押さえの鍵)。Pro は runner が確かめる(`PRO_GATE_MODE` に関係なく)。作成者でない人の 402 `pro_required` には `details.reason: creator_needs_pro` | 理由をそのままコードに。runner に届かない時は 502 `upstream_unavailable`・待ちきれない時は 504 `upstream_timeout` |
+
+DSL に `externalCall` / `externalList` があるかの確かめは、DSL の子 Issue で部品と一緒に足す(今は provider が既定で off・Pro だけなので、一覧と引数だけを見る)。
+
 ## 偽の provider(stg と試験)
 
 決定 5 のとおり、stg は偽の provider で通す(本物の鍵は prod の runner だけ)。`APP_ENV=production` では `EXT_*_ENABLED` を入れても動かない。
@@ -126,6 +151,7 @@ provider は `Provider` で定義し、そのファイルの `init()` で `regis
 ## 人の作業
 
 - Cloud KMS の鍵(対称・runner の SA にだけ `roles/cloudkms.cryptoKeyEncrypterDecrypter`)を作り、`EXT_TOKEN_KMS_KEY` を runner に入れる(`infra/runner.tf`)。
+- appconfig に `EXT_RUNNER_URL`(runner の URL)を入れ、runner の invoker に appconfig の SA(`run-backend`)を足す(`infra/runner.tf`)。
 - runner の `/oauth/callback/{provider}` を認証なしで受けられるようにする(今の runner は Cloud Run の IAM で全部の口が認証つき)。`/internal/*` は今のまま appconfig の SA だけにする(アプリの中で口ごとに確かめる形に変えるか、戻り先だけ別の入口にするかを決める)。
 - Firestore の TTL: `connections` の `deleteAt` と `oauthStates` の `expireAt`(`gcloud firestore fields ttls update`)。`ExpireUnused` のコレクショングループの検索は `connections.deleteAt` の単一フィールドのインデックス(コレクショングループの範囲)が要る。
 - Cloud Scheduler で `POST /internal/ext/expire` を 1 日 1 回。

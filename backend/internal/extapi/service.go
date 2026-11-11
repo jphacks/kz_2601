@@ -5,8 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
-	"net/url"
-	"slices"
 	"time"
 
 	"github.com/jphacks/kz_2601/backend/internal/coins"
@@ -306,17 +304,9 @@ func (s *Service) check(r CallRequest) (Provider, OpSpec, error) {
 	if !ok {
 		return p, OpSpec{}, ErrUnknown
 	}
-	spec, ok := p.Op(r.Op)
-	if !ok {
-		return p, spec, ErrUnknown
-	}
-	for k, v := range r.Args {
-		if !slices.Contains(spec.Args, k) || len(v) > 4096 {
-			return p, spec, ErrUnknown
-		}
-		if u, err := url.Parse(v); err == nil && u.Scheme != "" && u.Host != "" {
-			return p, spec, ErrUnknown // no URL reaches a provider from the DSL
-		}
+	spec, err := p.CheckArgs(r.Op, r.Args)
+	if err != nil {
+		return p, spec, err
 	}
 	if r.RequestID == "" {
 		return p, spec, fmt.Errorf("%w: a call needs a request id", ErrUnknown)

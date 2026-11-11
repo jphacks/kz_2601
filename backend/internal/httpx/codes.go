@@ -41,6 +41,15 @@ const CodeDuplicateRecord = "duplicate_record"
 // the X-Request-Id of an AI call was already used for a coin hold (#630, enforce only)
 const CodeDuplicateRequest = "duplicate_request"
 
+// the runner's external API calls of this instance are full (#1493)
+const CodeExtBusy = "ext_busy"
+
+// the person has not connected the OAuth provider, or the connection was cut or refused (#1493)
+const CodeExtNotConnected = "ext_not_connected"
+
+// the external API provider is off, has no key, or EXT_DISABLED (#1493)
+const CodeExtUnavailable = "ext_unavailable"
+
 const CodeForbidden = "forbidden"
 
 // the free plan's AI work is paused: the day's AI cost passed its threshold (#317)

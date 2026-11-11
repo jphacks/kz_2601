@@ -75,6 +75,9 @@ type Handler struct {
 	callUsers *feedLimiter
 
 	notices loop.NoticeReader // 「直りました」 (loop_notices.go, #374); nil = next to the store
+
+	ext      ExtRunner // the runner's external API door (ext.go, #1493); nil = 503 ext_unavailable
+	extUsers *feedLimiter
 }
 
 // routeGroups holds the feature routes. Each feature file registers its own
