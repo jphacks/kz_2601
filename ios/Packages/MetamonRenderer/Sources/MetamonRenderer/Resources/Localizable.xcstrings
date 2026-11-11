@@ -1492,6 +1492,23 @@
         }
       }
     },
+    "Mac のカメラに QR コードをかざして読み取ります" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Hold a QR code up to the Mac's camera to read it"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mac のカメラに QR コードをかざして読み取ります"
+          }
+        }
+      }
+    },
     "OK" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -1556,6 +1573,40 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "QR コード"
+          }
+        }
+      }
+    },
+    "QR コードが写った画像ファイルを選んで読み取ります。画像をここにドロップしても読めます" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Choose an image file with a QR code to read it. You can also drop an image here"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "QR コードが写った画像ファイルを選んで読み取ります。画像をここにドロップしても読めます"
+          }
+        }
+      }
+    },
+    "QR コードが見つかりませんでした" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No QR code found"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "QR コードが見つかりませんでした"
           }
         }
       }
@@ -2777,6 +2828,23 @@
         }
       }
     },
+    "もう一度試す" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Try Again"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "もう一度試す"
+          }
+        }
+      }
+    },
     "もう一度読み取る" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -3100,6 +3168,23 @@
         }
       }
     },
+    "カメラを開けませんでした" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Couldn't open the camera"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "カメラを開けませんでした"
+          }
+        }
+      }
+    },
     "カルーセル" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -3270,6 +3355,23 @@
         }
       }
     },
+    "コピーした画像から QR コードを読み取ります" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Reads a QR code from a copied image"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "コピーした画像から QR コードを読み取ります"
+          }
+        }
+      }
+    },
     "システム設定 > Apple Intelligence と Siri でオンにしてください" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -3283,6 +3385,40 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "システム設定 > Apple Intelligence と Siri でオンにしてください"
+          }
+        }
+      }
+    },
+    "システム設定で Tailor It のカメラへのアクセスを許可してください。" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Allow Tailor It to access the camera in System Settings."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "システム設定で Tailor It のカメラへのアクセスを許可してください。"
+          }
+        }
+      }
+    },
+    "システム設定のカメラの許可を開きます" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Opens the camera permission in System Settings"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "システム設定のカメラの許可を開きます"
           }
         }
       }
@@ -5485,6 +5621,23 @@
         }
       }
     },
+    "写真を撮ります(スペース)" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Takes a photo (Space)"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "写真を撮ります(スペース)"
+          }
+        }
+      }
+    },
     "写真を撮る / 選ぶ" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -6590,6 +6743,23 @@
         }
       }
     },
+    "撮ったものを入れて閉じます" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Uses what you captured and closes"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "撮ったものを入れて閉じます"
+          }
+        }
+      }
+    },
     "撮り直す" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -7385,6 +7555,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "現在地を記録"
+          }
+        }
+      }
+    },
+    "画像から読み取る" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Read from Image"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "画像から読み取る"
           }
         }
       }
@@ -8637,6 +8824,23 @@
         }
       }
     },
+    "読み取れない時は、ここに直接入力できます" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "If it can't be read, type it here"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "読み取れない時は、ここに直接入力できます"
+          }
+        }
+      }
+    },
     "読み取れなかった項目: %@" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -9259,6 +9463,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "録画を開始"
+          }
+        }
+      }
+    },
+    "録画を開始・停止します(スペース)" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Starts or stops recording (Space)"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "録画を開始・停止します(スペース)"
           }
         }
       }

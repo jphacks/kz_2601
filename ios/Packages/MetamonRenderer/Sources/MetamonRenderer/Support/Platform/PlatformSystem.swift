@@ -67,6 +67,24 @@ enum PlatformSystem {
         #endif
     }
 
+    /// カメラが拒否された時の「設定を開く」(#1043)。Mac はシステム設定のカメラの欄へ直接。
+    static var cameraSettingsURL: URL? {
+        #if canImport(UIKit)
+        appSettingsURL
+        #else
+        URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Camera")
+        #endif
+    }
+
+    /// カメラが拒否された時の説明(Mac は「システム設定」)
+    static var cameraDeniedMessage: String {
+        #if canImport(UIKit)
+        L("設定アプリで Tailor It のカメラへのアクセスを許可してください。")
+        #else
+        L("システム設定で Tailor It のカメラへのアクセスを許可してください。")
+        #endif
+    }
+
     /// 外のアプリ / ブラウザで開く。
     static func open(_ url: URL) {
         #if canImport(UIKit)

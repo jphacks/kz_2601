@@ -122,12 +122,12 @@ struct PhotoFieldLeaf: View {
         #if !APP_STORE_REVIEW
         .alert(L("カメラを使えません"), isPresented: $showDenied) {
             Button(L("設定を開く")) {
-                if let url = PlatformSystem.appSettingsURL { openURL(url) }
+                if let url = PlatformSystem.cameraSettingsURL { openURL(url) }
             }
             Button(L("写真から選ぶ")) { showLibrary = true }
             Button(L("キャンセル"), role: .cancel) {}
         } message: {
-            Text(L("設定アプリで Tailor It のカメラへのアクセスを許可してください。"))
+            Text(PlatformSystem.cameraDeniedMessage)
         }
         #endif
         // 既存の写真(編集で開いた時)にも骨格を重ねる。値は書き換えない

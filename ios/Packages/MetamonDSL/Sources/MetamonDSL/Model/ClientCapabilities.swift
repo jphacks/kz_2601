@@ -39,9 +39,9 @@ public enum ClientCapabilities {
     /// 表は docs/decisions/363-desktop-strategy.md「部品の対応(Mac の列)」の ×。AI には作らせず、古い DSL で来た時は
     /// Renderer が「この Mac では使えません」の枠(MacUnavailableView)で受ける。
     public static let macUnavailableComponents: Set<ComponentType> = [.healthStat, .sensorValue, .locationTracker, .dashcam]
-    /// Mac で無効にする機能。fieldHealth = Field.health(HealthKit が無い)、cameraCapture = photoField / videoField の撮影
-    /// (Mac 版の撮影は mac-027 / mac-029 でできるまで出さない。`CameraPicker.isAvailable == false`)。
-    public static let macDisabledFeatures = ["fieldHealth", "cameraCapture"]
+    /// Mac で無効にする機能。fieldHealth = Field.health(HealthKit が無い)。
+    /// photoField / videoField の撮影(cameraCapture)は Mac のカメラで撮れる(#1043)ので外さない。カメラの無い Mac は Renderer が選ぶだけにする。
+    public static let macDisabledFeatures = ["fieldHealth"]
 
     /// 通常のビルドの部品の allowlist(OS ごと)。Mac は描けない部品を外す。
     public static func allowedComponents(macOS: Bool, review: Bool) -> [String] {
