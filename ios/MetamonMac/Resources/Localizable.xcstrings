@@ -2714,6 +2714,23 @@
         }
       }
     },
+    "この Mac ではヘルスケアに書き込みません" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "This Mac doesn't write to Apple Health"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "この Mac ではヘルスケアに書き込みません"
+          }
+        }
+      }
+    },
     "この Mac では音声モデルの準備ができるまで声で頼めません。文字で頼んでください" : {
       "localizations" : {
         "en" : {
