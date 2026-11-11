@@ -86,6 +86,8 @@ struct MetamonMacApp: App {
                 #if !APP_STORE_REVIEW
                 .modifier(MacLinkReceiver())
                 .modifier(MacPushRegistrationObserver()) // プッシュの端末の登録(#982)
+                #else
+                .modifier(MacWidgetLinkReceiver()) // 審査用の版は共有のリンクを外すので、ウィジェットの URL(#984)だけ受ける
                 #endif
                 .modifier(MacCrashReportUser())
                 .modifier(MacStatusItemInstaller()) // メニューバーの常駐(#1848・設定で ON の時だけ。1 つだけ作る)

@@ -23,6 +23,8 @@ struct MacLinkReceiver: ViewModifier {
         content
             // OAuth の戻り先(`tailorit://connected?…`・#1714)は設定の「つないだサービス」へ。ほかは共有のリンク
             .onOpenURL { url in
+                // デスクトップのウィジェット(`tailorit://widget?app=…`・#984)はそのアプリを開く
+                if MacWidgetLinkReceiver.receive(url) { return }
                 if !MacConnectCallbackInbox.shared.receive(url) { flow.receive(url) }
             }
             .onContinueUserActivity(NSUserActivityTypeBrowsingWeb) { activity in

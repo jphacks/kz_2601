@@ -346,10 +346,17 @@ targets:
       - path: ../docs/dsl/examples
         buildPhase: resources
         type: group
+      # Mac のウィジェット(#984): 受け渡しモデルと集計は iOS のファイルをそのまま使う(TailorActivityAttributes は iOS だけ)。
+      # 押した時の URL(tailorit://widget?app=…)はウィジェットと共有
+      - path: MetamonWidget/Shared/WidgetSnapshot.swift
+      - path: Metamon/App/WidgetSnapshotWriter.swift
+      - path: MetamonMacWidget/Shared
     dependencies:
       - package: MetamonDSL
       - package: MetamonRenderer
       - package: MetamonServices
+      # デスクトップ・通知センターのウィジェット(埋め込み・#984)
+      - target: MetamonMacWidget
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: jp.kz2601.metamon$(METAMON_BUNDLE_ID_SUFFIX)
@@ -411,6 +418,34 @@ targets:
       gatherCoverageData: false
       # 課金: iOS と同じローカルの StoreKit の構成で Run 時にテスト購入できる(本番では使われない)
       storeKitConfiguration: StoreKit/TailorItPro.storekit
+
+  # Mac のウィジェット(WidgetKit・#984)。デスクトップと通知センターに小・中・大。iOS の MetamonWidget と同じく、本体が App Group に書いた
+  # WidgetSnapshot を描くだけ(Renderer/DSL 非依存)。見た目は iOS の Views を共有(AccessoryViews は Mac に無いので入れない)。
+  # Bundle ID は iOS のウィジェットと同じ(本体が iOS と同じ ID なので、その子を揃える)。App Group も iOS と同じ名前。
+  MetamonMacWidget:
+    type: app-extension
+    platform: macOS
+    sources:
+      - path: MetamonMacWidget
+      - path: MetamonWidget/Shared/WidgetSnapshot.swift
+      - path: MetamonWidget/Views/StatViews.swift
+      - path: MetamonWidget/Views/LargeStatsView.swift
+      - path: MetamonWidget/Localizable.xcstrings
+      - path: MetamonWidget/PrivacyInfo.xcprivacy
+        buildPhase: resources
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: jp.kz2601.metamon$(METAMON_BUNDLE_ID_SUFFIX).widget
+        PRODUCT_NAME: MetamonMacWidget
+        INFOPLIST_FILE: MetamonMacWidget/Info.plist
+        CODE_SIGN_ENTITLEMENTS: MetamonMacWidget/MetamonMacWidget.entitlements
+        ARCHS: $(ARCHS_STANDARD)
+        ENABLE_HARDENED_RUNTIME: YES
+        SKIP_INSTALL: YES
+        ENABLE_PREVIEWS: YES
+      configs:
+        Review:
+          SWIFT_ACTIVE_COMPILATION_CONDITIONS: "$(inherited) APP_STORE_REVIEW"
 
   # Mac アプリをホストにした単体テスト(#1212)。MacAppRuntime(画面の移動・一言・同期の知らせ)と Mac だけが使う共有の部品
   MetamonMacTests:

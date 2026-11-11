@@ -12,6 +12,7 @@ final class MacAccountWipeTests: XCTestCase {
     private var defaults: UserDefaults!
     private var sharedStateReset = 0
     private var notificationsRemoved = 0
+    private var widgetCleared = 0
 
     override func setUp() async throws {
         root = FileManager.default.temporaryDirectory.appendingPathComponent("metamon-wipe-test-\(UUID().uuidString)", isDirectory: true)
@@ -19,6 +20,7 @@ final class MacAccountWipeTests: XCTestCase {
         defaults = UserDefaults(suiteName: suiteName)
         sharedStateReset = 0
         notificationsRemoved = 0
+        widgetCleared = 0
     }
 
     override func tearDown() async throws {
@@ -45,6 +47,7 @@ final class MacAccountWipeTests: XCTestCase {
         wipe.library = library
         wipe.resetSharedState = { [weak self] in self?.sharedStateReset += 1 }
         wipe.removeNotifications = { [weak self] in self?.notificationsRemoved += 1 }
+        wipe.clearWidget = { [weak self] in self?.widgetCleared += 1 }
         return wipe
     }
 
@@ -94,6 +97,7 @@ final class MacAccountWipeTests: XCTestCase {
         XCTAssertEqual(defaults.integer(forKey: MacTextZoom.storageKey), MacTextZoom.defaultStep + 2, "文字の大きさ(端末の設定)は残す")
         XCTAssertEqual(sharedStateReset, 1)
         XCTAssertEqual(notificationsRemoved, 1)
+        XCTAssertEqual(widgetCleared, 1, "デスクトップのウィジェットの数字(#984)")
         XCTAssertEqual(library.wipeCount, 1, "開いているウインドウに知らせる")
         withExtendedLifetime(lease) {}
     }
