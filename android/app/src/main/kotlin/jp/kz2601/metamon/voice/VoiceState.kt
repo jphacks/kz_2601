@@ -2,6 +2,7 @@ package jp.kz2601.metamon.voice
 
 import jp.kz2601.metamon.dsl.AppDocument
 import jp.kz2601.metamon.dsl.isVoiceOnly
+import jp.kz2601.metamon.services.ChatMode
 import jp.kz2601.metamon.services.ChatTurn
 import jp.kz2601.metamon.services.StreamedComponent
 import jp.kz2601.metamon.services.TranscriberFailure
@@ -83,10 +84,20 @@ data class VoiceUiState(
     val voiceOpen: Boolean = false,
     /** 声で入力できる見込みがあるか(false なら文字入力を勧める) */
     val voiceAvailable: Boolean = true,
+    /** このアプリの閉じた会話と反映の区切り(#210)。今の会話([chat])は含まない */
+    val history: List<ChatHistoryEntry> = emptyList(),
+    /** 「最初から」で、これまでの会話も消すかを確かめている */
+    val restartConfirm: Boolean = false,
 ) {
     /** 初期状態(音声画面だけ)= 新規作成 */
     val isInitial: Boolean get() = document.dsl.isVoiceOnly
     val isChatting: Boolean get() = chat.isNotEmpty()
+
+    /** 今の相談の種類。初期画面 = 新しく作る、作ったアプリの上 = 変える */
+    val chatMode: ChatMode get() = if (isInitial) ChatMode.CREATE else ChatMode.EDIT
+
+    /** 吹き出しの画面を出すか。今の会話が無くても、閉じた会話があれば見せる */
+    val showsChat: Boolean get() = isChatting || history.isNotEmpty()
 
     /** 生成の依頼中(相談の往復は含まない) */
     val isGenerating: Boolean get() = (phase == VoicePhase.SENDING && !chatPending) || phase == VoicePhase.GENERATING

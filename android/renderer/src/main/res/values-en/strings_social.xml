@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="social_anonymous">Anonymous</string>
+    <string name="social_author_name_anonymous">Post anonymously</string>
+    <string name="social_author_name_message">Others will see this name in the list. Your Google account name and email address are never shown. You can change it later in Settings.</string>
+    <string name="social_author_name_placeholder">Nickname</string>
+    <string name="social_author_name_post">Post with this name</string>
+    <string name="social_author_name_title">Name shown on your posts</string>
+    <string name="social_block">Block poster</string>
+    <string name="social_chat_empty">No messages yet</string>
+    <string name="social_chat_me">You</string>
+    <string name="social_chat_other">Other person</string>
+    <string name="social_chat_photo">Photo</string>
+    <string name="social_chat_placeholder">Message</string>
+    <string name="social_chat_send">Send</string>
+    <string name="social_report">Report</string>
+</resources>

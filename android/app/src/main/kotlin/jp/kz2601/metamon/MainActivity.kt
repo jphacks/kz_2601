@@ -19,6 +19,7 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -52,12 +53,14 @@ import jp.kz2601.metamon.auth.RootScreen
 import jp.kz2601.metamon.auth.SignInScreen
 import jp.kz2601.metamon.permissions.ProvideRendererPermissions
 import jp.kz2601.metamon.renderer.DSLView
+import jp.kz2601.metamon.renderer.components.feed.LocalFeedHost
 import jp.kz2601.metamon.renderer.theme.MetamonRenderTheme
 import jp.kz2601.metamon.renderer.theme.ReadableWidth
 import jp.kz2601.metamon.runtime.AppRuntime
 import jp.kz2601.metamon.runtime.TranscriberDictationHost
 import jp.kz2601.metamon.services.GenerateProgress
 import jp.kz2601.metamon.voice.AppConfigVersions
+import jp.kz2601.metamon.voice.ClarifySettings
 import jp.kz2601.metamon.voice.GeneratingView
 import jp.kz2601.metamon.voice.MicButton
 import jp.kz2601.metamon.voice.VoicePhase
@@ -107,13 +110,16 @@ class MainActivity : ComponentActivity() {
     }
 }
 
-/** 未サインインならサインイン画面、サインイン済みなら本体(iOS の `AuthSession.user` で出し分けるのと同じ)。 */
+/**
+ * 未サインインならサインイン画面、サインイン済みなら本体(iOS の `AuthSession.user` で出し分けるのと同じ)。
+ * 見るのは持ち主の見張り(#841)が受け入れた人: 別の人に変わった時は、前の人のデータを消し終わるまで本体を出さない。
+ */
 @Composable
 fun MetamonRoot(container: AppContainer) {
-    val user by container.session.user.collectAsStateWithLifecycle()
+    val user by container.accountGuard.active.collectAsStateWithLifecycle()
     when (RootScreen.of(user)) {
         RootScreen.SignIn -> SignInScreen(container.session)
-        RootScreen.App -> MetamonApp(container)
+        RootScreen.App -> CompositionLocalProvider(LocalFeedHost provides container.feedHost) { MetamonApp(container) }
     }
 }
 
@@ -126,15 +132,24 @@ fun MetamonRoot(container: AppContainer) {
 @Composable
 fun MetamonApp(container: AppContainer) {
     val context = LocalContext.current
-    val user by container.auth.currentUser.collectAsStateWithLifecycle()
+    val user by container.accountGuard.active.collectAsStateWithLifecycle()
+    // 後片付け(#841)のたびに作り直す: 前の人の発話・要約・元に戻すの履歴を次の人に出さない
+    val wipes by container.accountGuard.generation.collectAsStateWithLifecycle()
     val buildNow = stringResource(R.string.voice_build_now_utterance)
-    val vm = viewModel {
+    val historyHeader = stringResource(R.string.voice_history_header)
+    val vm = viewModel(key = "voice-$wipes") {
+        val clarify = ClarifySettings(context)
         VoiceViewModel(
             transcriber = container.transcriber,
             ai = container.ai,
             appId = { container.appId.current },
             initial = AppDocument(appId = container.appId.current, dsl = container.initialDsl),
             buildNowUtterance = buildNow,
+            clarifyEnabled = { clarify.enabled },
+            autoBuild = { clarify.autoBuild },
+            // 会話の履歴はアプリごとに端末へ(#893)。サインアウト・削除で消すので container が持つ
+            chatHistory = container.chatHistory,
+            historyHeader = historyHeader,
             // 発話・AI の返事を含むので debug だけ(release の logcat に個人の情報を出さない)
             log = { if (BuildConfig.DEBUG) Log.i(AppContainer.TAG, it) },
             // モックはサーバーの版の履歴が無いので端末の履歴だけで戻す
@@ -244,7 +259,7 @@ fun MetamonApp(container: AppContainer) {
         }
     }
 
-    if (settingsOpen) SettingsSheet(container, onDismiss = { settingsOpen = false })
+    if (settingsOpen) SettingsSheet(container, busy = state.isGenerating, onDismiss = { settingsOpen = false })
     // 設定のシートより後に置く(設定から出した時に上に重ねる)
     val consentVisible by container.consentPrompt.visible.collectAsStateWithLifecycle()
     if (consentVisible) {

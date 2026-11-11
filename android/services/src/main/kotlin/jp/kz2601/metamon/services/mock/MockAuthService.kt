@@ -28,6 +28,10 @@ class MockAuthService(signedIn: Boolean = true) : AuthService {
         user.value = null
     }
 
+    override suspend fun deleteCurrentUser() {
+        user.value = null
+    }
+
     companion object {
         const val FIXED_UID = "mock-user"
         private val fixedUser = AuthUser(uid = FIXED_UID, isAnonymous = true)

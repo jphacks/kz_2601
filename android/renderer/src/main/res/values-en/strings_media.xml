@@ -35,4 +35,15 @@
     <string name="media_photo_take">Take Photo</string>
     <string name="media_photo_take_or_pick">Take or choose a photo</string>
     <string name="media_photo_unreadable">This photo can\'t be read</string>
+    <string name="media_video">Video</string>
+    <string name="media_video_camera_denied_body">Camera access isn\'t allowed. You can choose a video from your library instead.</string>
+    <string name="media_video_failed">Couldn\'t save the video. Please try again.</string>
+    <string name="media_video_hint_camera">Records a video with the camera</string>
+    <string name="media_video_hint_choose">Record a video or choose one from the library</string>
+    <string name="media_video_hint_library">Chooses a video from the library</string>
+    <string name="media_video_none">No video</string>
+    <string name="media_video_not_on_device">Not on this device</string>
+    <string name="media_video_pick">Choose from library</string>
+    <string name="media_video_saving">Saving video…</string>
+    <string name="media_video_take_or_pick">Record / choose a video</string>
 </resources>

@@ -1,5 +1,6 @@
 package jp.kz2601.metamon.voice
 
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -18,22 +19,29 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
+import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.Checkbox
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.FilterChip
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedCard
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.SuggestionChip
 import androidx.compose.material3.Surface
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -45,6 +53,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
@@ -53,9 +62,12 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextAlign
@@ -67,6 +79,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import jp.kz2601.metamon.R
 import jp.kz2601.metamon.permissions.PermissionCenter
 import jp.kz2601.metamon.permissions.rememberPermissionRequest
+import jp.kz2601.metamon.services.ChatMode
 import jp.kz2601.metamon.services.ChatOption
 import jp.kz2601.metamon.services.ChatTurn
 import jp.kz2601.metamon.services.permissions.AppPermission
@@ -113,7 +126,8 @@ fun VoiceScreen(
     }
     Column(modifier.fillMaxSize().imePadding().padding(horizontal = 20.dp)) {
         TopBar(state, onRestart = vm::restartChat)
-        if (state.isChatting) {
+        if (state.restartConfirm) RestartConfirmDialog(vm)
+        if (state.showsChat) {
             ClarifyChat(state, vm, Modifier.weight(1f))
             ErrorCardSlot(state, vm, onOpenSettings)
         } else {
@@ -150,14 +164,15 @@ fun VoiceScreen(
             onText = { typed = it },
             placeholder = stringResource(
                 when {
-                    state.isChatting -> R.string.voice_reply_placeholder
+                    state.showsChat && state.chatMode == ChatMode.EDIT -> R.string.voice_edit_reply_placeholder
+                    state.showsChat -> R.string.voice_reply_placeholder
                     state.voiceAvailable -> R.string.voice_placeholder_text
                     else -> R.string.voice_placeholder_text_first
                 },
             ),
             enabled = !state.isGenerating && !state.chatPending,
             onSend = send,
-            onMic = if (state.isChatting) onMic else null,
+            onMic = if (state.showsChat) onMic else null,
             state = state,
         )
     }
@@ -170,7 +185,7 @@ private fun TopBar(state: VoiceUiState, onRestart: () -> Unit) {
             Text(stringResource(R.string.app_name), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
         }
         Spacer(Modifier.weight(1f))
-        if (state.isChatting) {
+        if (state.showsChat) {
             TextButton(onClick = onRestart, enabled = !state.isGenerating) { Text(stringResource(R.string.voice_restart)) }
         }
     }
@@ -378,17 +393,35 @@ private fun Composer(
     }
 }
 
-// MARK: - 相談(iOS の `ClarifyChatView` の基本だけ)
+// MARK: - 相談(iOS の `ClarifyChatView`)
 
+/**
+ * 吹き出しの一覧。上に閉じた会話と反映の区切り(#210)、下に今の会話。右 = 自分・左 = AI・待っている最新の質問だけ大きく。
+ */
 @Composable
 private fun ClarifyChat(state: VoiceUiState, vm: VoiceViewModel, modifier: Modifier = Modifier) {
     val list = rememberLazyListState()
-    LaunchedEffect(state.chat.size, state.chatPending) {
-        val last = state.chat.size + (if (state.chatPending) 1 else 0) + 1
-        list.animateScrollToItem(last - 1)
+    val questionNumber = if (state.chatPending) null else QuestionProgress.number(state.chat, state.chatMode, state.chatTurn?.kind)
+    LaunchedEffect(state.history.size, state.chat.size, state.chatPending) {
+        val count = state.history.size + state.chat.size + (if (state.chatPending) 1 else 0) + 1
+        list.animateScrollToItem(count - 1)
     }
     LazyColumn(modifier.fillMaxWidth(), state = list, verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        items(state.chat) { Bubble(it) }
+        items(state.history, key = { it.id }) { HistoryRow(it) }
+        itemsIndexed(state.chat) { i, bubble ->
+            val latestQuestion = i == state.chat.lastIndex && questionNumber != null
+            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                Bubble(bubble, large = latestQuestion)
+                if (latestQuestion) {
+                    Text(
+                        stringResource(R.string.voice_question_progress, questionNumber!!, QuestionProgress.MAX_QUESTIONS),
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.padding(start = 8.dp),
+                    )
+                }
+            }
+        }
         if (state.chatPending) {
             item { Bubble(ChatBubble(fromUser = false, text = stringResource(R.string.voice_status_thinking_chat))) }
         }
@@ -397,7 +430,7 @@ private fun ClarifyChat(state: VoiceUiState, vm: VoiceViewModel, modifier: Modif
 }
 
 @Composable
-private fun Bubble(bubble: ChatBubble) {
+private fun Bubble(bubble: ChatBubble, large: Boolean = false) {
     val colors = MaterialTheme.colorScheme
     Box(Modifier.fillMaxWidth(), contentAlignment = if (bubble.fromUser) Alignment.CenterEnd else Alignment.CenterStart) {
         Surface(
@@ -405,31 +438,108 @@ private fun Bubble(bubble: ChatBubble) {
             color = if (bubble.fromUser) colors.primaryContainer else colors.surfaceVariant,
             modifier = Modifier.widthIn(max = 320.dp),
         ) {
-            Text(bubble.text, Modifier.padding(horizontal = 14.dp, vertical = 10.dp), style = MaterialTheme.typography.bodyMedium)
+            Text(
+                bubble.text,
+                Modifier.padding(horizontal = 14.dp, vertical = 10.dp),
+                style = if (large) MaterialTheme.typography.titleMedium else MaterialTheme.typography.bodyMedium,
+                fontWeight = if (large) FontWeight.SemiBold else null,
+            )
         }
     }
 }
 
-/** 最後の返事に応じた操作: 質問 = チップ + 「このまま作る」/ 案 = カード / ready = 「これでいく」。 */
+/** 閉じた会話の 1 件(少し薄く)か、反映の区切り「ここで反映しました(v3)・〜」 */
+@Composable
+private fun HistoryRow(entry: ChatHistoryEntry) {
+    when (entry.kind) {
+        ChatHistoryEntry.Kind.APPLIED -> {
+            val head = entry.version?.let { stringResource(R.string.voice_history_applied, it) }
+                ?: stringResource(R.string.voice_history_applied_plain)
+            val text = entry.text.trim()
+            Row(Modifier.fillMaxWidth().padding(vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
+                HorizontalDivider(Modifier.weight(1f))
+                Text(
+                    if (text.isEmpty()) head else "$head・$text",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    textAlign = TextAlign.Center,
+                    modifier = Modifier.padding(horizontal = 8.dp).widthIn(max = 260.dp),
+                )
+                HorizontalDivider(Modifier.weight(1f))
+            }
+        }
+        else -> Box(Modifier.alpha(0.7f)) {
+            Bubble(ChatBubble(fromUser = entry.kind == ChatHistoryEntry.Kind.USER, text = entry.text))
+        }
+    }
+}
+
+/**
+ * 最後の返事に応じた操作(iOS の `ClarifyFlow.offer`): 質問 = チップ / 案 = カード / ready = 「これでいく」。
+ * `multiSelect` の時はチップ・案をいくつでも選び、まとめて送る(#220)。下に副ボタン(「このまま作る」/「このまま反映」)。
+ */
 @Composable
 private fun TurnActions(state: VoiceUiState, vm: VoiceViewModel) {
     val turn = state.chatTurn ?: return
     if (state.chatPending || state.chat.lastOrNull()?.fromUser == true) return
     val busy = state.isGenerating
+    // 選んだもの。返事が変わったら(吹き出しの数で見る)空に戻す
+    var pickedChips by remember(state.chat.size) { mutableStateOf(listOf<String>()) }
+    var pickedOptions by remember(state.chat.size) { mutableStateOf(setOf<String>()) }
+    val multi = turn.isMultiSelect
     Column(Modifier.fillMaxWidth().padding(vertical = 4.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
         when (turn.kind) {
-            ChatTurn.Kind.QUESTION -> {
-                turn.suggestions.orEmpty().takeIf { it.isNotEmpty() }?.let { chips ->
+            ChatTurn.Kind.QUESTION, ChatTurn.Kind.ANSWER -> {
+                val chips = turn.suggestions.orEmpty().filter { it.isNotBlank() }.take(3)
+                val multiChips = multi && turn.kind == ChatTurn.Kind.QUESTION
+                if (chips.isNotEmpty()) {
+                    if (multiChips) MultiSelectHint()
                     Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        chips.forEach { c -> SuggestionChip(onClick = { vm.answer(c) }, enabled = !busy, label = { Text(c) }) }
+                        chips.forEach { c ->
+                            if (multiChips) {
+                                FilterChip(
+                                    selected = c in pickedChips,
+                                    onClick = { pickedChips = if (c in pickedChips) pickedChips - c else pickedChips + c },
+                                    enabled = !busy,
+                                    label = { Text(c) },
+                                )
+                            } else {
+                                SuggestionChip(onClick = { vm.answer(c) }, enabled = !busy, label = { Text(c) })
+                            }
+                        }
+                    }
+                    if (multiChips) {
+                        Button(onClick = { vm.answerMany(pickedChips) }, enabled = !busy && pickedChips.isNotEmpty()) {
+                            Text(stringResource(R.string.voice_answer_selected))
+                        }
                     }
                 }
-                OutlinedButton(onClick = vm::buildNow, enabled = !busy) { Text(stringResource(R.string.voice_build_now_button)) }
             }
-            ChatTurn.Kind.PROPOSAL -> turn.options.orEmpty().forEach { OptionCard(it, enabled = !busy) { vm.choose(it) } }
+            ChatTurn.Kind.PROPOSAL -> {
+                val options = turn.options.orEmpty().filter { it.instructionText.isNotBlank() }.take(3)
+                if (multi) MultiSelectHint()
+                options.forEach { option ->
+                    val selected = if (multi) option.optionId in pickedOptions else null
+                    OptionCard(option, enabled = !busy, selected = selected) {
+                        if (multi) {
+                            val id = option.optionId
+                            pickedOptions = if (id in pickedOptions) pickedOptions - id else pickedOptions + id
+                        } else {
+                            vm.choose(option)
+                        }
+                    }
+                }
+                if (multi) {
+                    val chosen = options.filter { it.optionId in pickedOptions }
+                    Button(onClick = { vm.chooseMany(chosen) }, enabled = !busy && chosen.isNotEmpty()) {
+                        Text(stringResource(R.string.voice_choose_selected, chosen.size))
+                    }
+                }
+            }
             ChatTurn.Kind.READY -> OutlinedCard(Modifier.fillMaxWidth()) {
                 Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Text(stringResource(R.string.voice_ready_title), style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
+                    val title = if (state.chatMode == ChatMode.EDIT) R.string.voice_edit_ready_title else R.string.voice_ready_title
+                    Text(stringResource(title), style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
                     turn.brief?.let { b ->
                         if (b.name.isNotEmpty()) Text(b.name, style = MaterialTheme.typography.bodyLarge)
                         if (b.purpose.isNotEmpty()) Text(b.purpose, style = MaterialTheme.typography.bodySmall)
@@ -440,20 +550,114 @@ private fun TurnActions(state: VoiceUiState, vm: VoiceViewModel) {
                     Button(onClick = vm::buildFromChat, enabled = !busy) { Text(stringResource(R.string.voice_build_button)) }
                 }
             }
-            ChatTurn.Kind.ANSWER -> Unit
+        }
+        when (ChatShortcut.of(turn, state.chatMode)) {
+            ChatShortcut.BUILD_NOW ->
+                OutlinedButton(onClick = vm::buildNow, enabled = !busy) { Text(stringResource(R.string.voice_build_now_button)) }
+            ChatShortcut.APPLY_NOW ->
+                OutlinedButton(onClick = vm::applyNow, enabled = !busy) { Text(stringResource(R.string.voice_apply_now_button)) }
+            ChatShortcut.NONE -> Unit
         }
     }
 }
 
 @Composable
-private fun OptionCard(option: ChatOption, enabled: Boolean, onChoose: () -> Unit) {
-    OutlinedCard(Modifier.fillMaxWidth()) {
-        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-            Text(option.title, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
-            if (option.detail.isNotEmpty()) Text(option.detail, style = MaterialTheme.typography.bodySmall)
-            Button(onClick = onChoose, enabled = enabled) { Text(stringResource(R.string.voice_build_button)) }
+private fun MultiSelectHint() {
+    Text(
+        stringResource(R.string.voice_multi_select_hint),
+        style = MaterialTheme.typography.labelMedium,
+        fontWeight = FontWeight.SemiBold,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+    )
+}
+
+/** 案 1 つ。[selected] が null でない時(複数選択)はカード全体で選び、「これでいく」は下にまとめて出す */
+@Composable
+private fun OptionCard(option: ChatOption, enabled: Boolean, selected: Boolean? = null, onChoose: () -> Unit) {
+    val stateText = selected?.let { stringResource(if (it) R.string.voice_option_selected else R.string.voice_option_unselected) }
+    val border = if (selected == true) BorderStroke(2.dp, MaterialTheme.colorScheme.primary) else CardDefaults.outlinedCardBorder(enabled)
+    OutlinedCard(
+        Modifier
+            .fillMaxWidth()
+            .then(if (selected != null) Modifier.clickable(enabled = enabled, onClick = onChoose) else Modifier)
+            .semantics { if (stateText != null) stateDescription = stateText },
+        border = border,
+    ) {
+        Row(Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            if (selected != null) Checkbox(checked = selected, onCheckedChange = null, enabled = enabled)
+            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                Text(option.title, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
+                if (option.detail.isNotEmpty()) Text(option.detail, style = MaterialTheme.typography.bodySmall)
+                if (selected == null) Button(onClick = onChoose, enabled = enabled) { Text(stringResource(R.string.voice_build_button)) }
+            }
         }
     }
+}
+
+/** 「最初から」で、これまでの会話があるときの確認(iOS の M9) */
+@Composable
+private fun RestartConfirmDialog(vm: VoiceViewModel) {
+    AlertDialog(
+        onDismissRequest = vm::dismissRestartConfirm,
+        title = { Text(stringResource(R.string.voice_restart_confirm_title)) },
+        text = { Text(stringResource(R.string.voice_restart_confirm_body)) },
+        confirmButton = {
+            TextButton(onClick = vm::clearChatHistory) {
+                Text(stringResource(R.string.voice_restart_clear_all), color = MaterialTheme.colorScheme.error)
+            }
+        },
+        dismissButton = {
+            Column(horizontalAlignment = Alignment.End) {
+                TextButton(onClick = vm::restartLiveChat) { Text(stringResource(R.string.voice_restart_live_only)) }
+                TextButton(onClick = vm::dismissRestartConfirm) { Text(stringResource(R.string.voice_cancel)) }
+            }
+        },
+    )
+}
+
+/** 相談の ON / OFF(iOS の設定の「チャットで相談してから作る」)。設定の画面([jp.kz2601.metamon.settings.SettingsSheet])に出す */
+@Composable
+fun ClarifySection(settings: ClarifySettings, modifier: Modifier = Modifier) {
+    var enabled by remember { mutableStateOf(settings.enabled) }
+    var autoBuild by remember { mutableStateOf(settings.autoBuild) }
+    Column(modifier.fillMaxWidth().testTag("settings.clarify")) {
+        SettingSwitch(stringResource(R.string.voice_clarify_setting_title), enabled) {
+            enabled = it
+            settings.enabled = it
+        }
+        SettingFooter(stringResource(R.string.voice_clarify_setting_footer))
+        if (enabled) {
+            SettingSwitch(stringResource(R.string.voice_clarify_autobuild_title), autoBuild) {
+                autoBuild = it
+                settings.autoBuild = it
+            }
+            SettingFooter(stringResource(R.string.voice_clarify_autobuild_footer))
+        }
+    }
+}
+
+@Composable
+private fun SettingSwitch(title: String, checked: Boolean, onChange: (Boolean) -> Unit) {
+    Row(
+        Modifier
+            .fillMaxWidth()
+            .toggleable(value = checked, role = Role.Switch, onValueChange = onChange)
+            .padding(horizontal = 16.dp, vertical = 12.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(title, Modifier.weight(1f))
+        Switch(checked = checked, onCheckedChange = null)
+    }
+}
+
+@Composable
+private fun SettingFooter(text: String) {
+    Text(
+        text,
+        style = MaterialTheme.typography.bodySmall,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+        modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp),
+    )
 }
 
 // MARK: - 生成中(iOS の `GeneratingView` の簡易版。組み立て台の演出は android-059)

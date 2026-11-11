@@ -7,6 +7,8 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -84,7 +86,7 @@ class LanguageSettingsActivity : ComponentActivity() {
             MetamonRenderTheme {
                 var selected by remember { mutableStateOf(AppLocales.setting(this)) }
                 Scaffold { padding ->
-                    Column(Modifier.fillMaxSize().padding(padding)) {
+                    Column(Modifier.fillMaxSize().padding(padding).verticalScroll(rememberScrollState())) {
                         TextButton(onClick = ::finish, modifier = Modifier.padding(4.dp)) {
                             Text(stringResource(R.string.language_close))
                         }

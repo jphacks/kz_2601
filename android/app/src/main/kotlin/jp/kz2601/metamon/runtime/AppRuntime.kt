@@ -20,6 +20,7 @@ import jp.kz2601.metamon.renderer.components.play.RecordWriter
 import jp.kz2601.metamon.renderer.components.play.TimerHost
 import jp.kz2601.metamon.renderer.components.ai.AiChatPairSaving
 import jp.kz2601.metamon.renderer.components.ai.AiHost
+import jp.kz2601.metamon.renderer.components.social.AuthorNameHost
 import jp.kz2601.metamon.renderer.form.FormDraft
 import jp.kz2601.metamon.renderer.form.FormPrefill
 import jp.kz2601.metamon.renderer.navigation.NavigationResolver
@@ -31,6 +32,7 @@ import jp.kz2601.metamon.services.http.RecordWriteDenial
 import jp.kz2601.metamon.services.local.DeletionTicket
 import jp.kz2601.metamon.services.local.RecordSyncEngine
 import jp.kz2601.metamon.services.local.SyncEvent
+import jp.kz2601.metamon.services.social.AuthorProfile
 import jp.kz2601.metamon.services.sync.HotReload
 import jp.kz2601.metamon.services.sync.RecordsChange
 import kotlinx.coroutines.CancellationException
@@ -110,7 +112,9 @@ class AppRuntime(
     private val directory: AppDirectory? = null,
     /** aiButton のオンライン版・端末内 AI(#873)。null なら AI ボタンは理由つきで無効 */
     private val aiHost: AiHost? = null,
-) : DSLRuntime, NavigationHost, RecordWriter, TimerHost, AiChatPairSaving {
+    /** 共有アプリへの投稿に出す名前(#875)。null なら名前を聞かず、[authorName] だけを使う(モック・テスト) */
+    private val authorProfile: AuthorProfile? = null,
+) : DSLRuntime, NavigationHost, RecordWriter, TimerHost, AiChatPairSaving, AuthorNameHost {
     private val _state = MutableStateFlow(RuntimeState(document))
     val state: StateFlow<RuntimeState> = _state.asStateFlow()
 
@@ -150,7 +154,8 @@ class AppRuntime(
     // 起動
 
     /**
-     * 同期を始め、前に開いていたアプリを開き直し(保存した DSL を先に出す → サーバーの最新)、画面の entity の記録を読む。
+     * 前に開いていたアプリを開き直し(保存した DSL を先に出す → サーバーの最新)、画面の entity の記録を読む。
+     * 記録の同期の start はここではしない(サインインして持ち主を受け入れた後に `AccountGuard` がする・#841)。
      * インストール直後で話しかける前の画面なら、サーバーの最近のアプリを開く(#276・再インストール後)。
      *
      * 1 回だけ走る。画面の作り直し(回転など)で呼び直しても、最初の 1 回の終わりを待つだけ
@@ -165,7 +170,6 @@ class AppRuntime(
     private var bootstrapJob: Job? = null
 
     private suspend fun bootstrapOnce() {
-        recordSync.start()
         if (eventsJob == null) eventsJob = scope.launch { recordSync.events.collect { handle(it) } }
         if (notificationsJob == null) notificationsJob = scope.launch { watchNotifications() }
         if (isIssued(document.appId)) {
@@ -318,6 +322,26 @@ class AppRuntime(
     fun startNewApp() {
         val dir = directory ?: return
         apply(dir.fresh(dir.store.rotate()))
+    }
+
+    /**
+     * ログアウト・アカウント削除・別の人のサインイン(#841・iOS の `wipeLocalData` の画面の分)。
+     * 前の人のアプリ・記録の表示・一覧・「元に戻す」・ホットリロードを捨て、新しい appId の話しかける前の画面に戻す。
+     * 次のサインインで [bootstrap] がもう一度走る。サーバーには何も送らない(記録の DB・送信待ちは `LocalDataWipe` が消す)。
+     */
+    fun resetForAccountChange() {
+        bootstrapJob?.cancel()
+        bootstrapJob = null
+        dropPendingHotReload()
+        hotReloader?.stop()
+        syncingAppId = null
+        lastSavedForm = null
+        entityCache = null
+        _apps.value = emptyList()
+        val next = directory?.let { it.fresh(it.store.rotate()) } ?: document
+        _state.value = RuntimeState(next)
+        _records.value = emptyMap()
+        _navigation.value = NavigationState.initial(next.dsl)
     }
 
     /** インストール直後のサインイン(#276): 話しかける前の画面なら、サーバーの一覧の先頭のアプリを開く。 */
@@ -560,6 +584,16 @@ class AppRuntime(
     override suspend fun loadRecords(entities: Set<String>) = load(entities)
 
     override suspend fun addRecord(entity: String, data: Map<String, JSONValue>): Boolean = createRecord(entity, data) != null
+
+    // 投稿に出す名前(#875・iOS の AppRuntime+Chat)
+
+    /** 共有の entity への初めての投稿で、まだ名前を聞いていなければ聞く。 */
+    override fun needsAuthorName(entity: String): Boolean =
+        authorProfile != null && entityModel(entity)?.isShared == true && !authorProfile.asked
+
+    override fun answerAuthorName(name: String?) {
+        authorProfile?.answer(name)
+    }
 
     // AI と話す(#874)
 
@@ -837,7 +871,7 @@ class AppRuntime(
         return recordSync.write(
             document.appId, entity, recordId, data.toJson(),
             authorUid = if (shared) currentUserId() else null,
-            authorName = if (shared) authorName() else null,
+            authorName = if (shared) authorName() ?: authorProfile?.name else null,
             shared = shared,
         )
     }

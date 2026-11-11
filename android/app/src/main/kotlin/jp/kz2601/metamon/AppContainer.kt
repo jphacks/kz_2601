@@ -9,6 +9,7 @@ import jp.kz2601.metamon.runtime.AiTextAccess
 import jp.kz2601.metamon.runtime.AndroidRuntimeHost
 import jp.kz2601.metamon.runtime.AppAiHost
 import jp.kz2601.metamon.runtime.AppDirectory
+import jp.kz2601.metamon.runtime.AppFeedHost
 import jp.kz2601.metamon.runtime.AppRuntime
 import jp.kz2601.metamon.runtime.RuntimeHost
 import jp.kz2601.metamon.runtime.TranscriberDictationHost
@@ -22,8 +23,18 @@ import jp.kz2601.metamon.push.PushHost
 import jp.kz2601.metamon.services.AIClient
 import jp.kz2601.metamon.services.AppConfigClient
 import jp.kz2601.metamon.services.AppEnvironment
+import jp.kz2601.metamon.account.AccountGuard
+import jp.kz2601.metamon.account.ActiveOwner
+import jp.kz2601.metamon.account.LocalDataWipe
+import jp.kz2601.metamon.account.MediaTempFiles
+import jp.kz2601.metamon.account.OwnerGatedTokens
 import jp.kz2601.metamon.auth.AuthSession
 import jp.kz2601.metamon.consent.ConsentPrompt
+import jp.kz2601.metamon.permissions.PermissionCenter
+import jp.kz2601.metamon.services.account.AccountClient
+import jp.kz2601.metamon.services.account.HttpAccountClient
+import jp.kz2601.metamon.services.account.MockAccountClient
+import jp.kz2601.metamon.services.local.AccountOwnerStore
 import jp.kz2601.metamon.services.AuthService
 import jp.kz2601.metamon.services.CrashReporter
 import jp.kz2601.metamon.services.NoopCrashReporter
@@ -37,6 +48,10 @@ import jp.kz2601.metamon.services.consent.HttpAiButtonMetricsSender
 import jp.kz2601.metamon.services.consent.InMemoryKeyValueStore
 import jp.kz2601.metamon.services.consent.KeyValueStore
 import jp.kz2601.metamon.services.consent.SharedPreferencesKeyValueStore
+import jp.kz2601.metamon.services.social.AuthorProfile
+import jp.kz2601.metamon.voice.ChatHistoryStore
+import jp.kz2601.metamon.renderer.components.audio.LocalAudioStore
+import jp.kz2601.metamon.renderer.components.media.VideoCodec
 import jp.kz2601.metamon.services.http.AuthTokenProvider
 import jp.kz2601.metamon.services.http.ClientInfo
 import jp.kz2601.metamon.services.http.DeviceContext
@@ -47,11 +62,14 @@ import jp.kz2601.metamon.services.live.FirebaseBootstrap
 import jp.kz2601.metamon.services.live.FirebaseCrashReporter
 import jp.kz2601.metamon.services.live.HttpAIClient
 import jp.kz2601.metamon.services.live.HttpAppConfigClient
+import jp.kz2601.metamon.services.live.HttpFeedClient
 import jp.kz2601.metamon.services.live.HttpPushDeviceClient
 import jp.kz2601.metamon.services.local.AndroidConnectivity
 import jp.kz2601.metamon.services.local.AppListCache
 import jp.kz2601.metamon.services.local.CurrentAppStore
 import jp.kz2601.metamon.services.local.DocumentCache
+import jp.kz2601.metamon.services.feeds.FeedCache
+import jp.kz2601.metamon.renderer.components.feed.FeedHost
 import jp.kz2601.metamon.services.local.RecordSyncEngine
 import jp.kz2601.metamon.services.mock.DslSamples
 import jp.kz2601.metamon.services.mock.InMemoryAppConfigClient
@@ -101,6 +119,10 @@ class AppContainer(
     val appId: CurrentAppStore,
     /** 最後に取得したアプリの一覧(オフラインの一覧) */
     val appList: AppListCache,
+    /** 外部の公開データ(feed・#876)。モックは null(部品は「読み込めませんでした」・iOS と同じ) */
+    val feedHost: FeedHost? = null,
+    /** [feedHost] の覚えた行(#876)。サインアウト・削除で消す。モックは null */
+    private val feedCache: FeedCache? = null,
     val knobs: DebugKnobs,
     /** 記録のローカル DB と送信待ちの列(#882)。[MetamonApplication] が start する */
     val recordSync: RecordSyncEngine,
@@ -111,6 +133,20 @@ class AppContainer(
     private val host: RuntimeHost,
     /** 他の人の行動で届く通知(#887)。モック・Firebase の無い構成では null(何もしない) */
     val push: PushHost? = null,
+    /** アカウント削除の `DELETE /v1/me`(#841) */
+    val account: AccountClient,
+    /** 端末のデータの持ち主(起動をまたいで覚える・#841) */
+    private val ownerStore: AccountOwnerStore,
+    /** トークンを付けてよい uid(#841)。[accountGuard] が書く */
+    private val activeOwner: ActiveOwner,
+    /** 権限の記録など、端末の設定のうち前の人の分(#841) */
+    private val forgetDeviceState: () -> Unit,
+    /** 共有アプリへの投稿に出す名前(#875)。設定で決め、サインアウト・削除で消す */
+    val authorProfile: AuthorProfile,
+    /** アプリごとの会話の履歴(#893)。モックはメモリだけ */
+    val chatHistory: ChatHistoryStore,
+    /** 端末内の動画(#863)・録音(#1084)のファイルを全部消す(#841 の後片付け) */
+    private val removeLocalMedia: () -> Unit,
 ) {
     /** 画面の下に出す接続先の名前(モックなら "mock")。 */
     val environmentLabel: String get() = if (knobs.mock) "mock" else environment.name
@@ -124,6 +160,41 @@ class AppContainer(
     /** 前の日までの aiButton の集計を送る(起動・前面に戻った時。送るのは 1 日 1 回) */
     suspend fun flushAiButtonMetrics() {
         aiButtonMetricsSender?.let { aiButtonMetrics.flush(it) }
+    }
+
+    /** ログアウト・アカウント削除を回す scope(画面が消えても途中で止めない・#841)。 */
+    val accountScope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
+
+    /** 端末のデータの後片付け(#841・iOS の `wipeLocalData`)。 */
+    val wipeLocalData: LocalDataWipe by lazy {
+        LocalDataWipe(
+            recordSync, documentCache, appList, resetRuntime = { runtime.resetForAccountChange() }, forgetDeviceState = forgetDeviceState,
+            chatHistory = chatHistory,
+            authorProfile = authorProfile,
+            removeLocalMedia = removeLocalMedia,
+            feedCache = feedCache,
+            // 同意は人ごと(iOS は UserDefaults ごと消す)。前の人の止めた発話も次の人の同意で送らない
+            forgetConsent = {
+                consent.forget()
+                consentPrompt.reset()
+                aiButtonMetrics.clearCounts()
+            },
+        )
+    }
+
+    /**
+     * サインアウト(外からも)・uid が変わった時に必ず後片付けし、記録の同期はサインイン後だけ動かす(#841)。
+     * [MetamonApplication] が start する。画面は [AccountGuard.active] で本体を出す。
+     */
+    val accountGuard: AccountGuard by lazy {
+        AccountGuard(
+            auth = auth,
+            saved = ownerStore,
+            owner = activeOwner,
+            startSync = recordSync::start,
+            stopSync = recordSync::stop,
+            wipe = { wipeLocalData() },
+        )
     }
 
     companion object {
@@ -179,6 +250,14 @@ class AppContainer(
                 documentCache = DocumentCache(null),
                 hotReload = null,
                 host = AndroidRuntimeHost(context.applicationContext),
+                account = MockAccountClient,
+                ownerStore = AccountOwnerStore(File(context.filesDir, "metamon-account-mock")),
+                activeOwner = ActiveOwner(),
+                forgetDeviceState = forgetDeviceState(context),
+                // モックは端末に残さない(前の起動の名前・履歴を持ち込まない)
+                authorProfile = AuthorProfile(InMemoryKeyValueStore()),
+                chatHistory = ChatHistoryStore(null),
+                removeLocalMedia = removeLocalMedia(context),
             )
         }
 
@@ -186,8 +265,10 @@ class AppContainer(
             val firebase = FirebaseBootstrap.configureIfAvailable(context, AppCheckProviders.factory())
             val auth = chooseAuth(firebase) { FirebaseAuthService.createIfConfigured() }
 
-            // backend への Bearer は Firebase の ID トークン(モックなら付けない)
-            val tokens = AuthTokenProvider(auth)
+            // backend への Bearer は Firebase の ID トークン(モックなら付けない)。
+            // 端末のデータの持ち主を受け入れるまでは付けない(前の人の送信待ちを次の人のトークンで送らない・#841)
+            val owner = ActiveOwner()
+            val tokens = OwnerGatedTokens(auth, owner)
             val clientInfo = ClientInfo(version = BuildConfig.VERSION_NAME, build = BuildConfig.VERSION_CODE.toString())
             // アプリ内で選んだ言語(無ければ端末の言語)。リクエストごとに読むので切り替えはすぐ効く(#843)
             val language = { AppLocales.languageCode(context) }
@@ -206,6 +287,7 @@ class AppContainer(
             val prefs = SharedPreferencesKeyValueStore.of(context, PRIVACY_PREFS)
             val consent = AiConsentStore(prefs)
             val push = if (firebase) push(context, appConfigHttp, auth, log) else null
+            val feedCache = FeedCache(File(context.filesDir, "metamon-feeds"))
 
             return AppContainer(
                 environment = environment,
@@ -223,12 +305,21 @@ class AppContainer(
                 transcriber = AndroidSpeechTranscriber(context, language = language, log = { Log.i(TAG, it) }),
                 appId = DeviceAppId.store(context, "metamon-app"),
                 appList = AppListCache(File(context.filesDir, "metamon-app")),
+                feedHost = AppFeedHost(HttpFeedClient(appConfigHttp), feedCache),
+                feedCache = feedCache,
                 knobs = knobs,
                 recordSync = recordSync(context, appConfig, "metamon-records"),
                 documentCache = documentCache,
                 hotReload = HotReload(sync, CoroutineScope(SupervisorJob() + Dispatchers.Default)),
                 host = AndroidRuntimeHost(context.applicationContext),
                 push = push,
+                account = HttpAccountClient(appConfigHttp),
+                ownerStore = AccountOwnerStore(File(context.filesDir, "metamon-account")),
+                activeOwner = owner,
+                forgetDeviceState = forgetDeviceState(context),
+                authorProfile = AuthorProfile(SharedPreferencesKeyValueStore.of(context, AUTHOR_PREFS)),
+                chatHistory = ChatHistoryStore(File(context.filesDir, "chat_history")),
+                removeLocalMedia = removeLocalMedia(context),
             )
         }
 
@@ -256,6 +347,22 @@ class AppContainer(
          * backend が android を受けるまで(#918)は送らない。同意(notify-consent)と登録の削除はこれと関係なく動く。
          */
         const val PUSH_DEVICE_REGISTRATION = false
+
+        /**
+         * 権限の記録と生成アプリの通知の予約(#886)を忘れる(表示の言語は端末の設定なので残す)。
+         * 通知の予約は前の人の記録から作った文面を持ち、残すとサインアウト後・次の人にも鳴る(iOS は removeAll する)。
+         */
+        private fun forgetDeviceState(context: Context): () -> Unit = {
+            PermissionCenter.get(context).forget()
+            LocalNotifications.get(context).removeAll()
+        }
+
+        /** 端末内の動画・録音のファイル(どちらもバックアップされない領域)と、撮影・録音の途中で残った一時ファイル。 */
+        private fun removeLocalMedia(context: Context): () -> Unit = {
+            VideoCodec.store(context).removeAll()
+            LocalAudioStore.of(context).removeAll()
+            MediaTempFiles.removeAll(context.cacheDir)
+        }
 
         private fun recordSync(context: Context, client: AppConfigClient, dir: String) = RecordSyncEngine.create(
             client = client,
@@ -302,6 +409,7 @@ class AppContainer(
 
         /** 同意・クラッシュ報告・AI ボタンの集計(#888) */
         private const val PRIVACY_PREFS = "metamon-privacy"
+        private const val AUTHOR_PREFS = "metamon-author"
     }
 
     /** アプリ全体のランタイム(#889)。起動時に 1 つだけ作る。 */
@@ -323,6 +431,7 @@ class AppContainer(
                 fresh = { id -> AppDocument(appId = id, dsl = initialDsl) },
             ),
             aiHost = aiHost,
+            authorProfile = authorProfile,
         ).also { it.dictation = TranscriberDictationHost(transcriber, CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)) }
     }
 

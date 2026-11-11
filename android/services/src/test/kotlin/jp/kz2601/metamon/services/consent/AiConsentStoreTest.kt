@@ -92,4 +92,18 @@ class AiConsentStoreTest {
         assertEquals("metamon.aiConsent.date", AiConsentStore.DATE_KEY)
         assertEquals(3, AiConsentStore.CURRENT_VERSION)
     }
+
+    @Test
+    fun forgetClearsConsentAndPromptMarkSoTheNextPersonIsAskedAgain() {
+        val s = store()
+        s.grant()
+        s.forget()
+        assertEquals(AiConsentStatus.NOT_PROMPTED, s.state.value.status)
+        assertFalse(s.isGranted)
+        assertTrue(s.shouldPromptOnLaunch)
+        assertNull(prefs.getInt(AiConsentStore.VERSION_KEY))
+        assertNull(prefs.getBoolean(AiConsentStore.PROMPTED_KEY))
+        assertNull(prefs.getInt(AiConsentStore.PROMPTED_VERSION_KEY))
+        assertFalse(store().isGranted) // 保存先からも消える
+    }
 }

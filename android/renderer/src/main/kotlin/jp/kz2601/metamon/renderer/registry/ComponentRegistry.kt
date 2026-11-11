@@ -33,12 +33,14 @@ import jp.kz2601.metamon.renderer.components.actions.registerActionLeaves
 import jp.kz2601.metamon.renderer.components.ai.registerAiChatLeaves
 import jp.kz2601.metamon.renderer.components.ai.registerAiLeaves
 import jp.kz2601.metamon.renderer.components.audio.registerAudioLeaves
+import jp.kz2601.metamon.renderer.components.feed.registerFeedLeaves
 import jp.kz2601.metamon.renderer.components.importing.registerImportLeaves
 import jp.kz2601.metamon.renderer.components.inputs.registerInputLeaves
 import jp.kz2601.metamon.renderer.components.lists.registerListLeaves
 import jp.kz2601.metamon.renderer.components.play.registerPlayLeaves
 import jp.kz2601.metamon.renderer.components.media.registerMediaLeaves
 import jp.kz2601.metamon.renderer.components.scan.registerScanLeaves
+import jp.kz2601.metamon.renderer.components.social.registerSocialLeaves
 import jp.kz2601.metamon.renderer.form.FormDraft
 import jp.kz2601.metamon.renderer.navigation.Route
 
@@ -107,7 +109,9 @@ class ComponentRegistry private constructor(private val builders: Map<String, Co
             // 写真・手書き(#862)・登録は components/media/MediaLeaves.kt
             registerMediaLeaves()
             registerScanLeaves() // leaf: カメラで読む(#866)・components/scan/ScanLeaves.kt
+            registerFeedLeaves() // leaf: 外部の公開データ(#876)・components/feed/FeedLeaves.kt
             registerImportLeaves() // leaf: ファイルの取り込み(#865)・components/importing/ImportLeaves.kt
+            registerSocialLeaves() // leaf: みんなで話す(#875)・components/social/SocialLeaves.kt
             // leaf: 表示(11・#857)
             register(ComponentType.TEXT) { c, _, m -> TextLeaf(c, m) }
             register(ComponentType.LABEL) { c, _, m -> LabelLeaf(c, m) }

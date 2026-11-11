@@ -9,6 +9,7 @@ import com.google.firebase.appcheck.FirebaseAppCheck
 import com.google.firebase.auth.AuthResult
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.auth.FirebaseAuthException
+import com.google.firebase.auth.FirebaseAuthRecentLoginRequiredException
 import com.google.firebase.auth.FirebaseUser
 import com.google.firebase.auth.GoogleAuthProvider
 import com.google.firebase.auth.OAuthProvider
@@ -95,6 +96,30 @@ class FirebaseAuthService private constructor(private val auth: FirebaseAuth) : 
 
     override suspend fun signOut() = auth.signOut()
 
+    override suspend fun deleteCurrentUser() {
+        val current = auth.currentUser ?: return
+        try {
+            current.delete().await()
+        } catch (e: FirebaseAuthRecentLoginRequiredException) {
+            throw AuthError.RequiresRecentLogin(e)
+        }
+    }
+
+    override suspend fun reauthenticateWithGoogle(googleIdToken: String) {
+        val current = auth.currentUser ?: return
+        current.reauthenticate(GoogleAuthProvider.getCredential(googleIdToken, null)).await()
+    }
+
+    override suspend fun reauthenticateWithApple(activity: Activity) {
+        val current = auth.currentUser ?: return
+        val provider = OAuthProvider.newBuilder(APPLE_PROVIDER_ID).build()
+        try {
+            current.startActivityForReauthenticateWithProvider(activity, provider).await()
+        } catch (e: FirebaseAuthException) {
+            if (e.errorCode == WEB_CONTEXT_CANCELED) throw AuthError.Canceled(e) else throw e
+        }
+    }
+
     private fun AuthResult.toAuthUser(): AuthUser = requireNotNull(user).toAuthUser()
 
     companion object {
@@ -107,4 +132,8 @@ class FirebaseAuthService private constructor(private val auth: FirebaseAuth) : 
     }
 }
 
-private fun FirebaseUser.toAuthUser() = AuthUser(uid = uid, isAnonymous = isAnonymous)
+private fun FirebaseUser.toAuthUser(): AuthUser {
+    val ids = providerData.map { it.providerId }
+    val provider = listOf(AuthUser.APPLE, AuthUser.GOOGLE).firstOrNull { it in ids }
+    return AuthUser(uid = uid, isAnonymous = isAnonymous, provider = provider)
+}

@@ -144,4 +144,16 @@ class ConsentWiringTest {
         assertEquals("model_not_ready", day.availability)
         assertEquals(mapOf("invalid_response" to 1), day.tasks.single().failures)
     }
+
+    @Test
+    fun resetDropsTheHeldUtteranceSoTheNextPersonsConsentDoesNotSendIt() {
+        var sent = 0
+        assertFalse(prompt.require { sent++ })
+        assertTrue(prompt.visible.value)
+
+        prompt.reset() // サインアウトの後片付け
+        assertFalse(prompt.visible.value)
+        prompt.agree() // 次の人が同意
+        assertEquals("前の人の止めた発話を送らない", 0, sent)
+    }
 }
