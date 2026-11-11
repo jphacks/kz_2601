@@ -26,6 +26,25 @@ final class ShareLinkInboxTests: XCTestCase {
         XCTAssertNil(ui.takeLink())
     }
 
+    /// #331: Universal Links は Web 閲覧の NSUserActivity で届く。シェアリンクの URL だけ保留する
+    func testReceivesUniversalLinkActivity() {
+        let ui = SharingUI()
+        let universal = URL(string: "https://tailor-it.app/s/tok_web")!
+        let activity = NSUserActivity(activityType: NSUserActivityTypeBrowsingWeb)
+        activity.webpageURL = universal
+        XCTAssertTrue(ui.receive(activity: activity))
+        ui.isReady = true
+        XCTAssertEqual(ui.takeLink(), universal)
+
+        let other = NSUserActivity(activityType: NSUserActivityTypeBrowsingWeb)
+        other.webpageURL = URL(string: "https://tailor-it.app/terms")!
+        XCTAssertFalse(ui.receive(activity: other))
+        let notWeb = NSUserActivity(activityType: "jp.kz2601.metamon.other")
+        notWeb.webpageURL = universal
+        XCTAssertFalse(ui.receive(activity: notWeb))
+        XCTAssertNil(ui.takeLink())
+    }
+
     func testLatestLinkWins() {
         let ui = SharingUI()
         ui.receive(link)
