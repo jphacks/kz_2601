@@ -25,13 +25,58 @@ public enum ClientCapabilities {
         ComponentType.allCases.filter { $0 != .unknown && !reviewExcludedComponents.contains($0) }.map(\.rawValue)
     }
 
-    /// このビルドの値。通常 = 全部品(#302)、審査用 = 外した部品を除く。
-    public static var allowedComponents: [String]? {
-        #if APP_STORE_REVIEW
-        reviewAllowedComponents
+    /// この端末の OS(ヘッダ `X-Client-Platform`・#925)。backend はログに残すだけで、部品の絞り込みは allowedComponents で行う。
+    /// 値は docs/decisions/363-desktop-strategy.md の「AI への申告」に合わせて "macos"。
+    public static var platform: String {
+        #if os(macOS)
+        "macos"
         #else
-        allComponents
+        "ios"
         #endif
+    }
+
+    /// Mac で描けない部品(#925・#947)。Mac にハード / データが無い(HealthKit・加速度 / 気圧・持ち歩く位置の追跡・ドラレコ)。
+    /// 表は docs/decisions/363-desktop-strategy.md「部品の対応(Mac の列)」の ×。AI には作らせず、古い DSL で来た時は
+    /// Renderer が「この Mac では使えません」の枠(MacUnavailableView)で受ける。
+    public static let macUnavailableComponents: Set<ComponentType> = [.healthStat, .sensorValue, .locationTracker, .dashcam]
+    /// Mac で無効にする機能。fieldHealth = Field.health(HealthKit が無い)、cameraCapture = photoField / videoField の撮影
+    /// (Mac 版の撮影は mac-027 / mac-029 でできるまで出さない。`CameraPicker.isAvailable == false`)。
+    public static let macDisabledFeatures = ["fieldHealth", "cameraCapture"]
+
+    /// 通常のビルドの部品の allowlist(OS ごと)。Mac は描けない部品を外す。
+    public static func allowedComponents(macOS: Bool, review: Bool) -> [String] {
+        var excluded: Set<ComponentType> = [.unknown]
+        if review { excluded.formUnion(reviewExcludedComponents) }
+        if macOS { excluded.formUnion(macUnavailableComponents) }
+        return ComponentType.allCases.filter { !excluded.contains($0) }.map(\.rawValue)
+    }
+
+    /// 無効にする機能(OS ごと)。どれも無ければ nil(送らない)。
+    public static func disabledFeatures(macOS: Bool, review: Bool) -> [String]? {
+        var out: [String] = []
+        for f in (review ? reviewDisabledFeatures : []) + (macOS ? macDisabledFeatures : []) where !out.contains(f) { out.append(f) }
+        return out.isEmpty ? nil : out
+    }
+
+    private static var isMacOS: Bool {
+        #if os(macOS)
+        true
+        #else
+        false
+        #endif
+    }
+
+    private static var isReview: Bool {
+        #if APP_STORE_REVIEW
+        true
+        #else
+        false
+        #endif
+    }
+
+    /// このビルドの値。通常 = 全部品(#302)、審査用 = 外した部品を除く。Mac は描けない部品も除く(#925)。
+    public static var allowedComponents: [String]? {
+        allowedComponents(macOS: isMacOS, review: isReview)
     }
 
     /// 部品以外で、この版が実装している DSL の動作(#482)。backend は allowedComponents を送るのにここに無い動作(= v1.0)を AI に使わせない。
@@ -63,10 +108,6 @@ public enum ClientCapabilities {
     }
 
     public static var disabledFeatures: [String]? {
-        #if APP_STORE_REVIEW
-        reviewDisabledFeatures
-        #else
-        nil
-        #endif
+        disabledFeatures(macOS: isMacOS, review: isReview)
     }
 }

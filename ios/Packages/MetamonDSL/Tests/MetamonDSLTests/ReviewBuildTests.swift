@@ -29,14 +29,41 @@ final class ReviewBuildTests: XCTestCase {
     }
 
     func testBuildFlagControlsWhatIsSent() {
+        #if os(macOS)
+        let macOS = true // Mac は描けない部品も外す(#925)
+        #else
+        let macOS = false
+        #endif
         #if APP_STORE_REVIEW
-        XCTAssertEqual(ClientCapabilities.allowedComponents, ClientCapabilities.reviewAllowedComponents)
-        XCTAssertEqual(ClientCapabilities.disabledFeatures, ClientCapabilities.reviewDisabledFeatures)
+        XCTAssertEqual(ClientCapabilities.allowedComponents, ClientCapabilities.allowedComponents(macOS: macOS, review: true))
+        XCTAssertEqual(ClientCapabilities.disabledFeatures, ClientCapabilities.disabledFeatures(macOS: macOS, review: true))
+        XCTAssertEqual(ClientCapabilities.allowedComponents(macOS: false, review: true), ClientCapabilities.reviewAllowedComponents)
+        XCTAssertEqual(ClientCapabilities.disabledFeatures(macOS: false, review: true), ClientCapabilities.reviewDisabledFeatures)
         XCTAssertTrue(Set(DSLExamples.names).isDisjoint(with: DSLExamples.reviewExcluded))
         #else
-        XCTAssertEqual(ClientCapabilities.allowedComponents, ClientCapabilities.allComponents) // 通常ビルドも全部品を送る(#302)
-        XCTAssertNil(ClientCapabilities.disabledFeatures)
+        XCTAssertEqual(ClientCapabilities.allowedComponents, ClientCapabilities.allowedComponents(macOS: macOS, review: false))
+        XCTAssertEqual(ClientCapabilities.disabledFeatures, ClientCapabilities.disabledFeatures(macOS: macOS, review: false))
+        XCTAssertEqual(ClientCapabilities.allowedComponents(macOS: false, review: false), ClientCapabilities.allComponents) // 通常ビルドも全部品を送る(#302)
+        XCTAssertNil(ClientCapabilities.disabledFeatures(macOS: false, review: false))
         XCTAssertTrue(DSLExamples.reviewExcluded.isSubset(of: Set(DSLExamples.names)))
+        #endif
+    }
+
+    /// Mac の申告(#925): 描けない部品と機能を外す。iOS の値は変えない
+    func testMacDeclaration() {
+        let mac = Set(ClientCapabilities.allowedComponents(macOS: true, review: false))
+        XCTAssertEqual(ClientCapabilities.macUnavailableComponents, [.healthStat, .sensorValue, .locationTracker, .dashcam])
+        XCTAssertTrue(mac.isDisjoint(with: ClientCapabilities.macUnavailableComponents.map(\.rawValue)))
+        XCTAssertEqual(mac.count, ClientCapabilities.allComponents.count - ClientCapabilities.macUnavailableComponents.count)
+        XCTAssertEqual(ClientCapabilities.disabledFeatures(macOS: true, review: false), ["fieldHealth", "cameraCapture"])
+        XCTAssertEqual(ClientCapabilities.disabledFeatures(macOS: true, review: true), ["fieldHealth", "cameraCapture", "sharedData"])
+        let macReview = Set(ClientCapabilities.allowedComponents(macOS: true, review: true))
+        XCTAssertTrue(macReview.isDisjoint(with: ClientCapabilities.reviewExcludedComponents.map(\.rawValue)))
+        XCTAssertTrue(macReview.isDisjoint(with: ClientCapabilities.macUnavailableComponents.map(\.rawValue)))
+        #if os(macOS)
+        XCTAssertEqual(ClientCapabilities.platform, "macos")
+        #else
+        XCTAssertEqual(ClientCapabilities.platform, "ios")
         #endif
     }
 
