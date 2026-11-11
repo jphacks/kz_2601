@@ -2731,6 +2731,22 @@
         }
       }
     },
+    "アプリを探す" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Search Apps"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "アプリを探す"
+          }
+        }
+      }
+    },
     "アプリを見る" : {
       "localizations" : {
         "en" : {

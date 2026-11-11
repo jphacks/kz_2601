@@ -1,4 +1,5 @@
 import SwiftUI
+import AppKit
 import MetamonDSL
 import MetamonRenderer
 import MetamonServices
@@ -16,6 +17,7 @@ import MetamonServices
 /// キーボード(#934): ⌘1 / ⌘2 でサイドバーと中央を行き来・一覧は ↑↓ で選び Return で中央へ・⌥⌘↑↓ で前 / 次のアプリ。
 /// 画面マップ(#970): ツールバー・表示メニュー(⇧⌘E)からシートで出す。開く → 中央でその画面へ、話す → その画面を文脈にした会話(⌘K と同じシート)。
 /// 一覧(#969): 「作ったアプリ」(端末に残す・名前の変更 / 削除 / 並べ替え)と「同梱の例」に分ける。起動時は前に開いていたアプリを開き直す。
+/// 検索(#1282): サイドバーの上の検索欄(⌘F で入る)。名前と説明で両方の区分を絞り込む。
 struct MacRootView: View {
     enum Pane: Hashable { case sidebar, canvas }
 
@@ -33,6 +35,9 @@ struct MacRootView: View {
     /// 閉じた会話のシート(閉じた後に完成の要約を出すため・#968)
     @State private var closingCompose: MacComposeSession?
     @State private var showsTips = false
+    /// サイドバーの検索(#1282)
+    @State private var searchText = ""
+    @FocusState private var searchFocused: Bool
     /// 画面マップ(#970・シートは中央の AppCanvas が出す)
     @State private var showsScreenMap = false
     /// 保存していない入力を、アプリの切り替え・ウインドウを閉じる前に確認する(#943)
@@ -67,7 +72,9 @@ struct MacRootView: View {
 
     var body: some View {
         NavigationSplitView(columnVisibility: $columnVisibility) {
-            AppSidebar(created: createdApps, examples: exampleApps, selection: guardedSelection,
+            AppSidebar(created: createdApps.filter { $0.matches(searchText) },
+                       examples: exampleApps.filter { $0.matches(searchText) },
+                       searchText: searchText, selection: guardedSelection,
                        onOpen: { focus = .canvas }, onDelete: deleteApp)
                 .focused($focus, equals: .sidebar)
                 .navigationSplitViewColumnWidth(min: 180, ideal: 220, max: 320)
@@ -90,6 +97,8 @@ struct MacRootView: View {
             .focusEffectDisabled()
             .focused($focus, equals: .canvas)
         }
+        .searchable(text: $searchText, placement: .sidebar, prompt: Text("アプリを探す"))
+        .modifier(SidebarSearchFocus(focused: $searchFocused))
         .toolbar {
             ShellToolbar(hasApp: selectedApp != nil, canCompose: canCompose, newApp: newApp, ask: ask, speak: speak,
                          canShowScreenMap: canShowScreenMap, showScreenMap: showScreenMap)
@@ -344,6 +353,7 @@ struct MacRootView: View {
                 focus = .sidebar
             },
             focusCanvas: { focus = .canvas },
+            focusSearch: focusSearch,
             canCompose: canCompose,
             canUndoVersion: canCompose && selectedAppId.map(library.canUndo) == true,
             canRedoVersion: canCompose && selectedAppId.map(library.canRedo) == true,
@@ -356,6 +366,29 @@ struct MacRootView: View {
             canShowScreenMap: canShowScreenMap,
             showScreenMap: showScreenMap
         )
+    }
+
+    /// ⌘F: サイドバーを出して検索欄に入る(#1282)
+    private func focusSearch() {
+        if columnVisibility == .detailOnly { columnVisibility = .all }
+        if #available(macOS 15.0, *) {
+            searchFocused = true
+        } else {
+            // macOS 14 は検索欄のフォーカスを SwiftUI から動かせないので、ウインドウの検索欄を直接選ぶ
+            DispatchQueue.main.async {
+                guard let window = NSApp.keyWindow, let field = Self.searchField(in: window.contentView) else { return }
+                window.makeFirstResponder(field)
+            }
+        }
+    }
+
+    private static func searchField(in view: NSView?) -> NSSearchField? {
+        guard let view else { return nil }
+        if let field = view as? NSSearchField { return field }
+        for child in view.subviews {
+            if let field = searchField(in: child) { return field }
+        }
+        return nil
     }
 
     /// 前 / 次のアプリ。何も選んでいなければ先頭を選ぶ。
@@ -397,6 +430,19 @@ struct ShellToolbar: ToolbarContent {
                 .disabled(true)
             SettingsLink { Label("設定", systemImage: "gearshape") }
                 .help("設定を開く")
+        }
+    }
+}
+
+/// 検索欄のフォーカス(macOS 15 から)。⌘F で入るのに使う(#1282)
+private struct SidebarSearchFocus: ViewModifier {
+    var focused: FocusState<Bool>.Binding
+
+    func body(content: Content) -> some View {
+        if #available(macOS 15.0, *) {
+            content.searchFocused(focused)
+        } else {
+            content
         }
     }
 }
