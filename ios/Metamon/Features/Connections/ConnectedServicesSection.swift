@@ -63,6 +63,10 @@ struct ConnectedServicesSection: View {
 
     private func row(_ row: ConnectedServiceRow) -> some View {
         HStack(spacing: Theme.Spacing.sm) {
+            Image(systemName: ConnectedServiceCatalog.symbol(row.provider))
+                .foregroundStyle(.secondary)
+                .frame(width: 24)
+                .accessibilityHidden(true)
             VStack(alignment: .leading, spacing: 2) {
                 Text(row.name)
                     .foregroundStyle(row.isUnavailable ? AnyShapeStyle(.secondary) : AnyShapeStyle(.primary))

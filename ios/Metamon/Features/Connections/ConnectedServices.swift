@@ -18,7 +18,7 @@ enum ConnectedServicesPolicy {
 /// generate に送る `ClientCapabilities.supportedFeatures` とは別(外を呼ぶ DSL の部品はまだ無い)。
 enum ConnectedServicesFeatures {
     /// この画面で扱える provider(OAuth の要るもの)
-    static let providers = ["googleCalendar", "todoist", "outlookCalendar", "notion"]
+    static let providers = ["googleCalendar", "todoist", "outlookCalendar", "notion", "googleTasks", "github", "linear", "asana"]
 
     static var current: [String] {
         #if APP_STORE_REVIEW
@@ -35,6 +35,42 @@ enum ConnectedServicesFeatures {
         if reviewBuild { return [] }
         return (providers + (debug ? ["fakeOauth"] : [])).map { "externalCall.\($0)" }
     }
+}
+
+/// provider の端末側の名前とアイコン。名前はサーバーの `nameJa`/`nameEn` を優先し、無い時だけ使う。
+enum ConnectedServiceCatalog {
+    private static let names: [String: (ja: String, en: String)] = [
+        "asana": ("Asana", "Asana"),
+        "github": ("GitHub", "GitHub"),
+        "googleCalendar": ("Google カレンダー", "Google Calendar"),
+        "googleTasks": ("Google ToDo リスト", "Google Tasks"),
+        "linear": ("Linear", "Linear"),
+        "notion": ("Notion", "Notion"),
+        "outlookCalendar": ("Outlook カレンダー", "Outlook Calendar"),
+        "todoist": ("Todoist", "Todoist"),
+    ]
+
+    private static let symbols: [String: String] = [
+        "asana": "circle.hexagongrid",
+        "github": "chevron.left.forwardslash.chevron.right",
+        "googleCalendar": "calendar",
+        "googleTasks": "checklist",
+        "linear": "list.bullet.rectangle",
+        "notion": "doc.text",
+        "outlookCalendar": "calendar",
+        "todoist": "checklist",
+    ]
+
+    /// 知らない provider のアイコン
+    static let fallbackSymbol = "link"
+
+    /// 知らない provider は id のまま
+    static func name(_ id: String, english: Bool) -> String {
+        guard let n = names[id] else { return id }
+        return english ? n.en : n.ja
+    }
+
+    static func symbol(_ id: String) -> String { symbols[id] ?? fallbackSymbol }
 }
 
 #if !APP_STORE_REVIEW
@@ -84,9 +120,8 @@ enum ConnectedServicesState: Equatable {
         let byId = Dictionary(providers.map { ($0.id, $0) }, uniquingKeysWith: { a, _ in a })
         let order = providers.map(\.id)
         func name(_ id: String) -> String {
-            guard let p = byId[id] else { return id }
-            let n = english ? p.nameEn : p.nameJa
-            return n.isEmpty ? id : n
+            let n = byId[id].map { english ? $0.nameEn : $0.nameJa } ?? ""
+            return n.isEmpty ? ConnectedServiceCatalog.name(id, english: english) : n
         }
         // 古いサーバーは enabled を知らせないので、つないだものはつなぎ直せる扱い
         func enabled(_ id: String) -> Bool { byId[id]?.enabled ?? (list.providers == nil) }
