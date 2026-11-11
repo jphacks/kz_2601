@@ -87,6 +87,8 @@ private struct MacGeneralSettings: View {
                                   review: "新しい記録帳を声だけで相談している時は、内容がそろうと少し待ってから自動で用意し始めます。用意した記録帳の変更は、意図しない変更を防ぐため必ず「これでいく」を押してから反映します。"))
                 }
             }
+            // 声で頼むのマイク(#1221)
+            MacInputDeviceSection()
             // 読み上げ(#1210・#1216)。iOS と同じ保存先(metamon.speech.enabled)。Mac が読むのは完成の要約だけ
             Section {
                 Toggle("アプリができた時の説明を読み上げる", isOn: $reader.enabled)

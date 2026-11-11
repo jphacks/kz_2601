@@ -6,7 +6,7 @@ import MetamonServices
 /// サインアウト・アカウント削除の後始末(#972)。iOS の `AppRuntime.wipeLocalData` の Mac 版で、この Mac に残る自分のデータを消す。
 /// サーバーには何も送らない。Firebase のログインの状態(Keychain)は `AuthService.signOut` が消す。
 /// 記録の暗号の鍵(iCloud キーチェーン・#233)は iOS と同じく消さない(同じ Apple ID のほかの端末が使う)。
-/// Mac は会話の履歴を端末に残さない(会話のシートを閉じると消える)ので、消す物は無い。
+/// 会話の履歴(#1211・アプリごとの `ChatHistoryStore`)も消す。
 @MainActor
 struct MacLocalWipe {
     /// 作ったアプリの記録(Application Support/metamon-mac-records)。開いているエンジンを止めてから消す
@@ -23,6 +23,8 @@ struct MacLocalWipe {
     /// 外部の公開データ(#1288)
     var feeds: FeedCache = .shared
     #endif
+    /// 会話の履歴(#1211)。UserDefaults の掃除でも消えるが、保存先を差し替えた時も残さないよう明示して消す
+    var chatHistory: ChatHistoryStore = .forRuntime()
     var defaults: UserDefaults = .standard
     var domain: String? = Bundle.main.bundleIdentifier
     /// ウインドウをまたいで 1 つの一覧(メモリ上の版の履歴も消す)
@@ -33,11 +35,13 @@ struct MacLocalWipe {
     var removeNotifications: @MainActor () async -> Void = MacLocalWipe.removeAllNotifications
 
     func run() async {
+        MacComposeSession.wipeCount += 1 // 開いていた会話が後から履歴を書き戻さないように
         await records.purgeAll()
         documents.removeAll()
         appList.clear()
         localList.store([])
         thumbnails.removeAll()
+        chatHistory.removeAll()
         #if !APP_STORE_REVIEW
         feeds.reset()
         #endif
@@ -53,6 +57,7 @@ struct MacLocalWipe {
         AIConsentStore.shared.reload()
         FirstRunTutorialStore.shared.reload()
         ExportFiles.removeAll()
+        MacCameraFiles.removeAll()
         MacAppRuntime.removePreviewDirectories()
     }
 

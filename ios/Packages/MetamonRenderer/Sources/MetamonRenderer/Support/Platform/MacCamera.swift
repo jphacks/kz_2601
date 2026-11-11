@@ -97,6 +97,8 @@ final class MacCaptureFlow {
     private(set) var video: URL?
     private(set) var code: String?
     private(set) var deviceID: String?
+    /// 閉じた(`cancel()`)後。開き終わったカード・録り終わった動画は捨てる
+    private(set) var cancelled = false
 
     init(mode: MacCaptureMode, driver: MacCaptureDriving) {
         self.mode = mode
@@ -112,6 +114,8 @@ final class MacCaptureFlow {
         }
         do {
             try await driver.start(mode: mode, deviceID: deviceID)
+            // 開いている間にシートを閉じた: 点けたカメラを止める
+            guard !cancelled else { return driver.stop() }
             phase = .live
         } catch let e as MacCaptureError where e != .failed {
             phase = .unavailable(e)
@@ -142,7 +146,13 @@ final class MacCaptureFlow {
         case (.video(let max), .live):
             phase = .recording
             do {
-                video = try await driver.record(maxDuration: max)
+                let url = try await driver.record(maxDuration: max)
+                // 録っている間に閉じた: 使わないので一時ファイルを消す
+                guard !cancelled else {
+                    try? FileManager.default.removeItem(at: url)
+                    return
+                }
+                video = url
                 phase = .reviewVideo
                 driver.stop()
             } catch {
@@ -172,6 +182,7 @@ final class MacCaptureFlow {
 
     /// 閉じる時。使わなかった動画は消す。
     func cancel() {
+        cancelled = true
         driver.stop()
         if phase == .recording { driver.stopRecording() }
         discardVideo()
@@ -187,6 +198,33 @@ final class MacCaptureFlow {
         if let video { try? FileManager.default.removeItem(at: video) }
         video = nil
     }
+}
+
+/// 録画の一時ファイルの置き場(サインアウトの後始末 `MacLocalWipe` で消す)と、録画に使うマイク。
+public enum MacCameraFiles {
+    public static var directory: URL {
+        FileManager.default.temporaryDirectory.appending(path: "metamon-camera", directoryHint: .isDirectory)
+    }
+
+    static func newMovieURL() -> URL {
+        try? FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        return directory.appendingPathComponent(UUID().uuidString).appendingPathExtension("mov")
+    }
+
+    public static func removeAll() {
+        try? FileManager.default.removeItem(at: directory)
+    }
+
+    /// 録画に使うマイク: 設定で選んだ入力の装置の UID(Core Audio の UID = AVCaptureDevice の uniqueID)。アプリが起動時に差し込む
+    nonisolated(unsafe) public static var preferredMicrophoneUID: @Sendable () -> String? = { nil }
+}
+
+/// 止めた回数(main と セッションの queue から読むのでロックで守る)
+private final class CameraGeneration: @unchecked Sendable {
+    private let lock = NSLock()
+    private var value = 0
+    var current: Int { lock.withLock { value } }
+    func advance() { lock.withLock { value += 1 } }
 }
 
 /// 本物のカメラ(AVCaptureSession)。内蔵・連係カメラ・外付けから選べる。
@@ -210,26 +248,47 @@ final class MacCameraSession: NSObject, MacCaptureDriving {
     /// この Mac にカメラがあるか(無ければ撮影のボタンを出さない)
     static var hasCamera: Bool { !discovery.devices.isEmpty }
 
+    /// 録画の音声。設定で選んだマイクがあればそれ、無ければシステムの既定
+    static func microphone() -> AVCaptureDevice? {
+        let devices = AVCaptureDevice.DiscoverySession(deviceTypes: [.microphone, .external], mediaType: .audio, position: .unspecified).devices
+        return pickMicrophone(preferredUID: MacCameraFiles.preferredMicrophoneUID(), devices: devices.map(\.uniqueID)).flatMap { id in
+            devices.first { $0.uniqueID == id }
+        } ?? AVCaptureDevice.default(for: .audio)
+    }
+
+    /// 選んだ UID が一覧にあればそれ(無ければ nil = 既定)
+    static func pickMicrophone(preferredUID: String?, devices: [String]) -> String? {
+        guard let preferredUID else { return nil }
+        return devices.first { $0 == preferredUID }
+    }
+
     var devices: [MacCaptureDevice] {
         Self.discovery.devices.map { MacCaptureDevice(id: $0.uniqueID, name: $0.localizedName) }
     }
 
+    /// 止めた回数。開く途中で止めたら(シートを閉じた)開き終わっても点けない。セッションの queue からも読む
+    private let generation = CameraGeneration()
+
     func start(mode: MacCaptureMode, deviceID: String?) async throws {
+        let ticket = generation.current
         let all = Self.discovery.devices
         guard let device = all.first(where: { $0.uniqueID == deviceID }) ?? AVCaptureDevice.default(for: .video) ?? all.first else {
             throw MacCaptureError.noCamera
         }
         guard await CameraPicker.requestAccess() else { throw MacCaptureError.denied }
+        // 許可を待つ間に閉じた
+        guard !Task.isCancelled, generation.current == ticket else { throw CancellationError() }
         let input = try AVCaptureDeviceInput(device: device)
         var audio: AVCaptureDeviceInput?
         if case .video = mode, AVCaptureDevice.authorizationStatus(for: .audio) == .authorized,
-           let mic = AVCaptureDevice.default(for: .audio) {
+           let mic = Self.microphone() {
             audio = try? AVCaptureDeviceInput(device: mic)
         }
         frameReader.onCode = { @Sendable [weak self] code in
             Task { @MainActor in self?.onCode?(code) }
         }
         let session = session, photoOutput = photoOutput, movieOutput = movieOutput, frameOutput = frameOutput, frameReader = frameReader
+        let generation = generation
         let ok: Bool = await withCheckedContinuation { cont in
             queue.async {
                 session.beginConfiguration()
@@ -254,7 +313,8 @@ final class MacCameraSession: NSObject, MacCaptureDriving {
                 ok = ok && session.canAddOutput(output)
                 if ok { session.addOutput(output) }
                 session.commitConfiguration()
-                if ok { session.startRunning() }
+                // 組み立てる間に止めた時は点けない(後から点いてカメラのランプが残らないように)
+                if ok, generation.current == ticket { session.startRunning() }
                 cont.resume(returning: ok)
             }
         }
@@ -262,6 +322,7 @@ final class MacCameraSession: NSObject, MacCaptureDriving {
     }
 
     func stop() {
+        generation.advance()
         let session = session
         queue.async { if session.isRunning { session.stopRunning() } }
     }
@@ -274,7 +335,7 @@ final class MacCameraSession: NSObject, MacCaptureDriving {
     }
 
     func record(maxDuration: TimeInterval) async throws -> URL {
-        let url = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString).appendingPathExtension("mov")
+        let url = MacCameraFiles.newMovieURL()
         return try await withCheckedThrowingContinuation { cont in
             recordContinuation = cont
             movieOutput.startRecording(to: url, recordingDelegate: self)

@@ -83,6 +83,22 @@ final class MacAccountWipeTests: XCTestCase {
         withExtendedLifetime(lease) {}
     }
 
+    /// 会話の履歴(#1211)も消す。保存先が UserDefaults でも、差し替えた保存先でも残さない
+    func testWipeClearsChatHistory() async throws {
+        let engines = MacRecordEngines(root: recordsRoot)
+        var wipe = makeWipe(engines: engines)
+        let memory = ChatHistoryStore()
+        memory.save([ChatHistoryEntry(kind: .user, text: "家計簿")], appId: "a")
+        wipe.chatHistory = memory
+        let persisted = ChatHistoryStore(defaults: defaults)
+        persisted.save([ChatHistoryEntry(kind: .user, text: "メモ")], appId: "b")
+
+        await wipe.run()
+
+        XCTAssertTrue(memory.load(appId: "a").isEmpty)
+        XCTAssertTrue(persisted.load(appId: "b").isEmpty, "UserDefaults の履歴も消える")
+    }
+
     func testSignOutWipesThenSignsOut() async throws {
         let auth = MockAuthService(signedIn: true)
         let account = MacAccount(session: AuthSession(service: auth), account: MockAccountClient(), isLive: false)

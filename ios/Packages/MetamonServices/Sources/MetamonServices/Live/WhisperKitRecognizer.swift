@@ -174,7 +174,7 @@ public final class WhisperKitRecognizer: SpeechTranscriber, AudioFileTranscriber
             throw TranscriberFailure.noInputAvailable
         }
         #else
-        // Mac: AVAudioSession は無い。既定の入力装置(内蔵 / 外付けのマイク)をそのまま使い、診断に残す
+        // Mac: AVAudioSession は無い。設定で選んだ入力の装置(無ければ既定)を使い、診断に残す(#1221)
         MacAudioInput.fill(&diag)
         log("mac input available=\(diag.inputAvailable) rate=\(diag.inputSampleRate) input=[\(diag.inputRoute)]")
         guard diag.inputAvailable else {
@@ -185,7 +185,12 @@ public final class WhisperKitRecognizer: SpeechTranscriber, AudioFileTranscriber
 
         // 3. 録音開始(ハードウェアレート → 16kHz mono Float32 に変換して蓄積)
         do {
-            try pipe.audioProcessor.startRecordingLive(inputDeviceID: nil, callback: nil)
+            #if os(macOS)
+            let deviceID = MacAudioInput.selectedDevice()?.id // 設定で選んだ装置(#1221)。無ければ既定
+            #else
+            let deviceID: DeviceID? = nil
+            #endif
+            try pipe.audioProcessor.startRecordingLive(inputDeviceID: deviceID, callback: nil)
         } catch {
             diag.failure = "startRecordingLive: \(error.localizedDescription)"
             log("start failed: startRecordingLive \(error)")

@@ -1,6 +1,7 @@
 import Foundation
 
-/// 音声画面の問いかけ文言(#42)。見出し・サブ文言はここにだけ置き、多言語化(#44)ではこのファイルを差し替える。
+/// 音声画面の問いかけ文言(#42)。iOS と Mac の会話のシート(#1211)で共有する(iOS の初期画面の判定は `Greeting+HomeEntry.swift`)。
+/// 見出し・サブ文言はここにだけ置き、多言語化(#44)ではこのファイルを差し替える。
 /// 時間帯の挨拶(おはよう/こんにちは/こんばんは)を前置きし、初回・再訪・新規作成・既存アプリの改変で出し分ける。
 enum Greeting {
     enum Context: Equatable {
@@ -103,14 +104,4 @@ enum Greeting {
         defaults.set(count + 1, forKey: visitsKey)
         return count > 0
     }()
-
-    /// 初期画面でどの挨拶を出すか(`AppRuntime.homeEntry` と起動回数から)。
-    static func context(homeEntry: AppRuntime.HomeEntry, isInitial: Bool) -> Context {
-        guard isInitial else { return .editing }
-        switch homeEntry {
-        case .launch: return launchIsReturning ? .returning : .firstVisit
-        case .newApp: return .newApp
-        case .home: return .home
-        }
-    }
 }

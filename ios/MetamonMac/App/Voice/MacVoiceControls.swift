@@ -3,30 +3,60 @@ import AppKit
 import MetamonServices
 
 /// 会話のシートの入力欄の横のマイク(#966)。押して録音・もう一度押して止める(⇧⌘M でも同じ)。
+/// 長く押した時は、離したら止めて送る(#1220)。VoiceOver・キーボードの操作は押して開始・もう一度で終了。
 struct MacMicButton: View {
     @Environment(MacVoiceInput.self) private var voice
     let disabled: Bool
     let deliver: (String) -> Void
+    @State private var gesture = HoldToTalkGesture()
+
+    private var isDisabled: Bool { voice.state == .transcribing || (disabled && voice.state == .idle) }
 
     var body: some View {
-        Button {
-            voice.toggle(deliver: deliver)
-        } label: {
-            switch voice.state {
-            case .idle:
-                Image(systemName: "mic").font(.title3)
-            case .recording:
-                Image(systemName: "stop.circle.fill").font(.title2).foregroundStyle(.red)
-                    .symbolEffect(.pulse, options: .repeating)
-            case .transcribing:
-                ProgressView().controlSize(.small)
+        label
+            .frame(width: 24, height: 24)
+            .contentShape(Rectangle())
+            .opacity(isDisabled ? 0.4 : 1)
+            .gesture(DragGesture(minimumDistance: 0)
+                .onChanged { _ in
+                    guard !gesture.isPressed, !isDisabled else { return }
+                    run(gesture.press(.immediate, at: Date(), isRecording: voice.isRecording))
+                }
+                .onEnded { _ in run(gesture.release(at: Date())) })
+            // フルキーボードアクセス: Tab で止まり、スペース・Return で押して開始・もう一度で終了(押している間の録音はポインタだけ)
+            .focusable(!isDisabled, interactions: .activate)
+            .onKeyPress(keys: [.space, .return]) { _ in
+                guard !isDisabled else { return .ignored }
+                voice.toggle(deliver: deliver)
+                return .handled
             }
+            .help(voice.isRecording ? Text("話し終えた(⇧⌘M)。長く押した時は離すと送ります")
+                                    : Text("声で頼む(⇧⌘M)。押している間だけ話すこともできます"))
+            .accessibilityElement()
+            .accessibilityAddTraits(.isButton)
+            .accessibilityLabel(voice.isRecording ? Text("話し終えた") : Text("声で頼む"))
+            .accessibilityAction { if !isDisabled { voice.toggle(deliver: deliver) } }
+            .accessibilityIdentifier("compose.mic")
+    }
+
+    @ViewBuilder private var label: some View {
+        switch voice.state {
+        case .idle:
+            Image(systemName: "mic").font(.title3)
+        case .recording:
+            Image(systemName: "stop.circle.fill").font(.title2).foregroundStyle(.red)
+                .symbolEffect(.pulse, options: .repeating)
+        case .transcribing:
+            ProgressView().controlSize(.small)
         }
-        .buttonStyle(.borderless)
-        .keyboardShortcut("m", modifiers: [.command, .shift])
-        .disabled(voice.state == .transcribing || (disabled && voice.state == .idle))
-        .help(voice.isRecording ? Text("話し終えた(⇧⌘M)") : Text("声で頼む(⇧⌘M)"))
-        .accessibilityLabel(voice.isRecording ? Text("話し終えた") : Text("声で頼む"))
+    }
+
+    private func run(_ action: HoldToTalkGesture.Action) {
+        switch action {
+        case .start: voice.holdStart(deliver: deliver)
+        case .stop: voice.holdStop(deliver: deliver)
+        case .none, .insertSpace: break
+        }
     }
 }
 
