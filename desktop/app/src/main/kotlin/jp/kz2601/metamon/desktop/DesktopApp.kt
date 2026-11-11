@@ -72,6 +72,7 @@ private class ScreenScope(
     val entityOf: (String?) -> Entity?,
     val io: DesktopIo,
     val data: LeafData,
+    val dataEnv: DataEnv,
 )
 
 /** DSL を 1 本読み、スタックで画面を積んで描く。画面は 6 列のグリッド(フォームは段)に並べる。 */
@@ -132,7 +133,9 @@ fun DesktopApp(dsl: AppDSL, initialStore: MockStore = MockStore(), startScreen: 
     }
 
     val leafData = remember(store) { LeafData.of(dsl, store) }
-    val scope = ScreenScope(entity, draft, store, ::perform, entityOf, io, leafData)
+    val search = remember(top.key) { mutableStateMapOf<String, String>() }
+    val dataEnv = DataEnv(leafData, search, ::perform, { e, id, patch -> store.find(e, id)?.let { store = store.save(e, id, it.data + patch) } }, { e, id -> store = store.delete(e, id) }, { ListIoBar(it, io) })
+    val scope = ScreenScope(entity, draft, store, ::perform, entityOf, io, leafData, dataEnv)
     Surface(Modifier.fillMaxSize().ioDropTarget(io, { screen.components }, { draft }).onPreviewKeyEvent(io.previewKey({ screen.components }, { draft }))) {
         IoOverlay(io)
         Column(Modifier.fillMaxSize()) {
@@ -253,7 +256,7 @@ private fun Node(c: Component, s: ScreenScope) {
         ComponentType.DIVIDER -> HorizontalDivider()
         ComponentType.BUTTON -> Button(onClick = { c.action?.let { s.perform(it, null) } }) { Text(c.label ?: c.title ?: c.text.orEmpty()) }
         ComponentType.LINK -> TextButton(onClick = { c.url?.let(::openBrowser) }) { Text(c.text ?: c.label ?: c.url.orEmpty()) }
-        ComponentType.LIST -> ListLeaf(c, s)
+        in DATA_LEAVES -> DataLeaf(c, s.dataEnv)
         ComponentType.FILE_IMPORT -> FileImportLeaf(c, s.io)
         ComponentType.PHOTO_FIELD, ComponentType.VIDEO_FIELD -> MediaFieldLeaf(c, fieldLabel(c, s), s.draft)
         ComponentType.TEXT_FIELD, ComponentType.NUMBER_FIELD, ComponentType.TEXT_EDITOR, ComponentType.SECURE_FIELD -> {
@@ -312,30 +315,6 @@ private fun Children(c: Component, s: ScreenScope, modifier: Modifier = Modifier
 @Composable
 private fun Box1(modifier: Modifier, content: @Composable () -> Unit) {
     Column(modifier) { content() }
-}
-
-@Composable
-private fun ListLeaf(c: Component, s: ScreenScope) {
-    val entity = s.entityOf(c.entity)
-    val rows = c.entity?.let { s.store.list(it) }.orEmpty()
-    c.entity?.let { ListIoBar(it, s.io) }
-    if (rows.isEmpty()) {
-        Text(c.emptyText ?: "まだありません", color = Color.Gray)
-        return
-    }
-    val titleField = c.item?.title ?: entity?.titleField
-    rows.forEach { row ->
-        val tap = c.onItemTap
-        Column(
-            Modifier.fillMaxWidth()
-                .then(if (tap != null) Modifier.clickable { s.perform(tap, row.id) } else Modifier)
-                .padding(vertical = 6.dp),
-        ) {
-            Text(titleField?.let { row.data[it] } ?: row.id)
-            c.item?.subtitle?.let { f -> row.data[f]?.let { Text(it, style = MaterialTheme.typography.bodySmall, color = Color.Gray) } }
-        }
-        HorizontalDivider()
-    }
 }
 
 private fun fieldLabel(c: Component, s: ScreenScope): String =
