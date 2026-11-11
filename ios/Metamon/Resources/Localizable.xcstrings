@@ -5574,6 +5574,23 @@
         }
       }
     },
+    "もう一度サインインしてから削除してください" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sign in again, then delete"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "もう一度サインインしてから削除してください"
+          }
+        }
+      }
+    },
     "もう一度サインインしてください" : {
       "extractionState" : "manual",
       "localizations" : {
