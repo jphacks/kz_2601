@@ -8,7 +8,7 @@ import MetamonRenderer
 /// すれ違い通信(#425)の本体側。`NearbyPassbyLeaf` のスイッチ・同意・会った人の一覧と、通信路(`PassbyTransport`)・記録の保存を結ぶ。
 ///
 /// 端末に保存するもの(UserDefaults・サーバーへは送らない):
-/// - 同意した版 / 部品ごとのオン・オフ / この端末の senderId(ランダム。アカウントとは無関係)
+/// - 同意した版 / 名前を出さないか / 部品ごとのオン・オフ / この端末の senderId(ランダム。アカウントとは無関係)
 /// - アプリごとの台帳(受け取った記録の内容・会った人)
 @MainActor
 @Observable
@@ -18,6 +18,8 @@ final class PassbyController: NearbyPassbyController {
     private(set) var encounters: [NearbyPassby.Encounter] = []
     private(set) var peers: [PassbyPeer] = []
     private(set) var notice: String?
+    private(set) var isAnonymous: Bool
+    var displayName: String { runtime?.nearbyDisplayName ?? "" }
     var distanceSupport: PassbyDistanceSupport { transport.distanceSupport }
 
     @ObservationIgnored weak var runtime: AppRuntime?
@@ -31,6 +33,7 @@ final class PassbyController: NearbyPassbyController {
 
     private enum Key {
         static let consent = "passby.consent"
+        static let anonymous = "passby.anonymous"
         static let senderId = "passby.senderId"
         static func optIn(_ appId: String, _ component: String) -> String { "passby.optin.\(appId).\(component)" }
         static func ledger(_ appId: String) -> String { "passby.ledger.\(appId)" }
@@ -40,6 +43,7 @@ final class PassbyController: NearbyPassbyController {
         self.transport = transport
         self.defaults = defaults
         consentedVersion = defaults.object(forKey: Key.consent) as? Int
+        isAnonymous = defaults.bool(forKey: Key.anonymous)
         transport.onPayload = { [weak self] p in Task { await self?.receive(p) } }
         transport.onPeers = { [weak self] in self?.peers = $0 }
         transport.onNotice = { [weak self] in self?.notice = $0 }
@@ -74,9 +78,18 @@ final class PassbyController: NearbyPassbyController {
         if current?.componentId == config.componentId { restart() }
     }
 
-    func agree() {
+    func agree(anonymous: Bool) {
         consentedVersion = NearbyPassby.consentVersion
         defaults.set(NearbyPassby.consentVersion, forKey: Key.consent)
+        setAnonymous(anonymous)
+    }
+
+    /// 名前を出さない(表示名の代わりに「近くの人」を送る・MCPeerID も同じ名前)。探している最中なら名前を変えて探し直す。
+    func setAnonymous(_ on: Bool) {
+        guard on != isAnonymous else { return }
+        isAnonymous = on
+        defaults.set(on, forKey: Key.anonymous)
+        if isAdvertising { restart() }
     }
 
     func attach(_ config: NearbyPassby.Config) {
@@ -104,7 +117,7 @@ final class PassbyController: NearbyPassbyController {
             return
         }
         let me = senderId
-        let name = runtime.nearbyDisplayName
+        let name = NearbyLimits.publicName(runtime.nearbyDisplayName, anonymous: isAnonymous)
         let hello = NearbyPassby.Hello(app: NearbyPassby.appTag(appId), senderId: me, name: name)
         transport.start(PassbyStart(
             hello: hello, config: config, entity: entity,
@@ -152,7 +165,7 @@ final class PassbyController: NearbyPassbyController {
         }
         ledger.met(payload.senderId, name: payload.name, at: .now, records: changed)
         saveLedger()
-        if changed > 0 { runtime.toast = L10n.tr("\(payload.name)さんとすれ違いました(\(entity.name) \(changed) 件)") }
+        if changed > 0 { runtime.toast = L10n.tr("\(NearbyLimits.displayName(payload.name))さんとすれ違いました(\(entity.name) \(changed) 件)") }
     }
 
     // MARK: - 台帳
