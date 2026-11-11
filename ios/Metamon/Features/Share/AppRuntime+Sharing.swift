@@ -173,12 +173,14 @@ struct SharingHooks: ViewModifier {
     @Environment(AppRuntime.self) private var rt
     @State private var ui = SharingUI.shared
     private var splash: SplashPresence { .shared }
+    private var consentHold: LaunchConsentHold { .shared }
 
     func body(content: Content) -> some View {
         content
             // リンクの受信は `ShareLinkReceiver`(サインイン画面の時も届く)。ここでは準備ができたら開く(#278)
-            .task(id: "\(ui.isReady)|\(splash.isShowing)|\(ui.pendingLink?.absoluteString ?? "")") {
-                guard !splash.isShowing else { return } // スプラッシュが閉じてから開く(シートを重ねない)
+            .task(id: "\(ui.isReady)|\(splash.isShowing)|\(consentHold.isHolding)|\(ui.pendingLink?.absoluteString ?? "")") {
+                // スプラッシュ → 起動時の同意の画面が閉じてから開く(シートを同時に出すと片方が捨てられる)
+                guard !splash.isShowing, !consentHold.isHolding else { return }
                 if let url = ui.takeLink() { await rt.openShareURL(url) }
             }
             .sheet(isPresented: $ui.showDiscover) { DiscoverSheet() }

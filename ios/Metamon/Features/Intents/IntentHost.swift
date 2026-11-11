@@ -55,6 +55,7 @@ final class IntentHost {
 
     private func perform(_ action: Pending) async {
         await SplashPresence.shared.waitUntilHidden() // 通知・Siri から開いた時もスプラッシュの後に
+        await LaunchConsentHold.shared.waitUntilReleased() // 起動時の同意の画面が閉じてから(シートを同時に出さない)
         guard let runtime else { return }
         switch action {
         case .open(let appId): await runtime.openFromIntent(appId: appId)

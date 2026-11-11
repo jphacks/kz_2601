@@ -65,6 +65,11 @@ final class UpdateGate {
         return false
     }
 
+    /// 「新しい版があります」のアラートを出すか。スプラッシュの上には出さない(閉じてから出す)。
+    var canShowNoticeAlert: Bool {
+        showsNotice && !isBlocking && !SplashPresence.shared.isShowing
+    }
+
     func dismissNotice() {
         if case .recommended(let latest) = requirement { dismissedLatest = latest }
     }
@@ -160,7 +165,7 @@ struct UpdateGateModifier: ViewModifier {
                 }
             }
             .animation(.easeInOut(duration: 0.25), value: gate.visibleNotice)
-            .alert("新しい版があります", isPresented: Binding(get: { gate.showsNotice && !gate.isBlocking }, set: { if !$0 { gate.dismissNotice() } })) {
+            .alert("新しい版があります", isPresented: Binding(get: { gate.canShowNoticeAlert }, set: { if !$0 { gate.dismissNotice() } })) {
                 Button("アップデート") {
                     gate.dismissNotice()
                     openURL(gate.storeURL)

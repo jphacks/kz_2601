@@ -25,6 +25,27 @@ extension AppRuntime {
         showAIConsent = false
     }
 
+    /// 起動時に同意の画面を出すなら、閉じるまでシェアリンク・Intent を待たせる(`MetamonApp` の起動時)。
+    func beginLaunchConsentHoldIfNeeded(hold: LaunchConsentHold = .shared) {
+        if aiConsent?.shouldPromptOnLaunch == true { hold.begin() }
+    }
+
+    /// 起動時の同意の画面(`ConsentHost`)。スプラッシュが閉じてから少し待って出す。
+    /// 出さない(済み)・出す前に画面が消えた時は、待たせていたリンク・Intent をすぐ放す。
+    func presentLaunchConsentIfNeeded(hold: LaunchConsentHold = .shared, splash: SplashPresence = .shared,
+                                      delay: Duration = .milliseconds(500)) async {
+        guard aiConsent?.shouldPromptOnLaunch == true else { hold.end(); return }
+        await splash.waitUntilHidden() // スプラッシュの上にシートを重ねない
+        try? await Task.sleep(for: delay)
+        guard !Task.isCancelled else { hold.end(); return }
+        showAIConsent = true
+    }
+
+    /// 同意の画面が閉じきった時(同意・「あとで」どちらでも)。待たせていたリンク・Intent を出す。
+    func launchConsentDismissed(hold: LaunchConsentHold = .shared) {
+        hold.end()
+    }
+
     /// 同意の画面が閉じた時(`ConsentHost`)。同意していれば、同意の前に話した 1 件を送り直す(M2: 話し直さなくてよい)。
     /// 「あとで」で閉じたら捨てる(後で設定から同意した時に、古い発話を勝手に送らない)。
     func resumeUtteranceAfterConsent() async {

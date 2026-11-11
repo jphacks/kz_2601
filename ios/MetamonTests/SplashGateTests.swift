@@ -86,6 +86,41 @@ final class SplashGateTests: XCTestCase {
         XCTAssertEqual(gate.frame(at: SplashStartGate.cap + 0.1), .fallback, "1.5 秒待っても空かなければ完成形でフェード")
     }
 
+    // MARK: - 開始を待った分だけアニメを縮める(全体 3 秒以内)
+
+    func testPaceKeepsFullSpeedWhenStartIsQuick() {
+        XCTAssertEqual(SplashStartGate.pace(waited: 0, animation: SplashView.Timing.finish), 1)
+        XCTAssertEqual(SplashStartGate.pace(waited: 0.1, animation: SplashView.Timing.finish), 1, "すぐ始まればそのまま")
+    }
+
+    func testLateStartShortensAnimationToFitBudget() {
+        let animation = SplashView.Timing.finish
+        for waited in stride(from: 0.0, through: SplashStartGate.cap, by: 0.05) {
+            let k = SplashStartGate.pace(waited: waited, animation: animation)
+            XCTAssertLessThanOrEqual(k, 1)
+            XCTAssertGreaterThan(k, 0)
+            XCTAssertLessThanOrEqual(waited + animation * k + SplashStartGate.fadeOut, SplashStartGate.totalBudget + 1e-9,
+                                     "\(waited) 秒待っても 3 秒に収める")
+        }
+        XCTAssertLessThan(SplashStartGate.pace(waited: 1.4, animation: animation), 1, "遅く始まったら縮める")
+    }
+
+    func testStartPathEndToEndStaysInBudget() {
+        // 詰まって 1.2 秒目にやっと始まった: 合図 → 縮めたアニメ → フェード
+        var gate = SplashStartGate(origin: 0)
+        var started: TimeInterval?
+        for time in [0.016, 0.9, 1.2, 1.216, 1.233, 1.25] where started == nil {
+            if gate.frame(at: time) == .start { started = time }
+        }
+        let t = try? XCTUnwrap(started)
+        XCTAssertEqual(t, 1.25)
+        let k = SplashStartGate.pace(waited: t ?? 0, animation: SplashView.Timing.finish)
+        XCTAssertLessThan(k, 1)
+        XCTAssertLessThanOrEqual((t ?? 0) + SplashView.Timing.finish * k + SplashStartGate.fadeOut, 3.0 + 1e-9)
+        // 待ちきれなかった時は完成形(縮めない)
+        XCTAssertLessThanOrEqual(SplashStartGate.cap + SplashView.Timing.stillFinish + SplashStartGate.fadeOut, SplashStartGate.totalBudget)
+    }
+
     // MARK: - スプラッシュの間は起動時のシート・リンク・吹き出しを待たせる
 
     @MainActor
