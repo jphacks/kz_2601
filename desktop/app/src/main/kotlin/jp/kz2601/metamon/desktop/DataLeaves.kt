@@ -1,5 +1,6 @@
 package jp.kz2601.metamon.desktop
 
+import jp.kz2601.metamon.desktop.i18n.Strings
 import androidx.compose.foundation.ContextMenuArea
 import androidx.compose.foundation.ContextMenuItem
 import androidx.compose.foundation.background
@@ -110,8 +111,8 @@ fun DataLeaf(c: Component, env: DataEnv) {
         ComponentType.TIMELINE -> TimelineLeaf(c, env.data)
         ComponentType.GRID_TABLE -> GridTableLeaf(c, env)
         ComponentType.SEARCH_BAR -> SearchBarLeaf(c, env.search)
-        ComponentType.FEED -> OfflineCard(c.title, "フィードはデスクトップ版ではまだ取得しません")
-        ComponentType.MATCH_LIST -> OfflineCard(c.title, "仲間探しのつながりはサインインした後に出ます")
+        ComponentType.FEED -> OfflineCard(c.title, Strings["desktop_feed_offline"])
+        ComponentType.MATCH_LIST -> OfflineCard(c.title, Strings["desktop_match_offline"])
         else -> Unit
     }
 }
@@ -120,7 +121,8 @@ fun DataLeaf(c: Component, env: DataEnv) {
 
 /** 表示用の文字(Android の LeafData.display)。member の名簿はまだ無いので「参加者」。 */
 object DataText {
-    const val EMPTY = "まだありません"
+    /** 一覧などの空の一言。日本語は conformance の期待値と同じ「まだありません」。 */
+    val EMPTY: String get() = Strings["desktop_list_empty"]
     const val EVERYONE = "全員"
     const val MEMBER = "参加者"
 

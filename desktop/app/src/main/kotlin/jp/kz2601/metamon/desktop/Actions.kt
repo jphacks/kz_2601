@@ -1,5 +1,6 @@
 package jp.kz2601.metamon.desktop
 
+import jp.kz2601.metamon.desktop.i18n.Strings
 import androidx.compose.runtime.snapshots.Snapshot
 import jp.kz2601.metamon.desktop.io.PdfIo
 import jp.kz2601.metamon.desktop.io.RecordIo
@@ -64,65 +65,65 @@ class DesktopActionHost(
         ActionType.RESET_FORM -> null
         ActionType.ADD_TO_CALENDAR -> addToCalendar(action, ctx, session)
         ActionType.LOOKUP_BOOK -> lookupBook(action, ctx, session)
-        ActionType.SCHEDULE_NOTIFICATION -> action.notification?.let { notifier.schedule(it) } ?: "通知を予約できませんでした"
+        ActionType.SCHEDULE_NOTIFICATION -> action.notification?.let { notifier.schedule(it) } ?: Strings["runtime_notification_failed"]
         ActionType.CANCEL_NOTIFICATION -> action.notificationId?.let { notifier.cancel(it) }
         ActionType.EXPORT -> export(action, ctx, session)
         ActionType.OPEN_VOICE -> UNAVAILABLE_VOICE
         ActionType.START_ACTIVITY, ActionType.END_ACTIVITY -> UNAVAILABLE_ACTIVITY
         ActionType.FOLLOW, ActionType.UNFOLLOW -> UNAVAILABLE_FOLLOW
-        else -> "未対応のアクション: ${action.rawType.ifEmpty { action.type.wire }}"
+        else -> Strings.format("runtime_unknown_action", action.rawType.ifEmpty { action.type.wire })
     }
 
     private fun openUrl(url: String?): String? {
-        if (url == null || !ExternalUrlPolicy.isAllowed(url)) return "openUrl: url は https か line/slack/discord/tel/mailto/maps のみ"
+        if (url == null || !ExternalUrlPolicy.isAllowed(url)) return Strings["runtime_open_url_rejected"]
         val ok = runCatching { Desktop.isDesktopSupported() && Desktop.getDesktop().isSupported(Desktop.Action.BROWSE) }.getOrDefault(false)
-        if (!ok) return "このパソコンでは URL を開けません: $url"
-        return runCatching { Desktop.getDesktop().browse(URI(url)); null }.getOrElse { "URL を開けませんでした" }
+        if (!ok) return Strings.format("desktop_url_unsupported", url)
+        return runCatching { Desktop.getDesktop().browse(URI(url)); null }.getOrElse { Strings["desktop_url_failed"] }
     }
 
     private fun addToCalendar(action: Action, ctx: ActionContext, session: DesktopSession): String? {
-        val spec = action.calendarEvent ?: return "カレンダーに入れる記録が見つかりません"
+        val spec = action.calendarEvent ?: return Strings["host_calendar_no_record"]
         val form = ctx.form
-        val entity = session.entityModel(action.entity ?: form?.entity?.id) ?: return "カレンダーに入れる記録が見つかりません"
+        val entity = session.entityModel(action.entity ?: form?.entity?.id) ?: return Strings["host_calendar_no_record"]
         val data = ctx.recordId?.let { id -> session.records(entity.id).firstOrNull { it.id == id }?.data } ?: form?.payload
-            ?: return "カレンダーに入れる記録が見つかりません"
+            ?: return Strings["host_calendar_no_record"]
         val request = CalendarEventRequest(spec.startField, spec.endField, spec.durationMinutes, spec.titleField, spec.locationField, spec.notesField, spec.alertMinutes)
         return when (val r = CalendarEventPlan.build(request, entity, data)) {
-            is CalendarEventPlan.Result.NoStart -> "「${r.fieldName}」を入力してください"
+            is CalendarEventPlan.Result.NoStart -> Strings.format("host_calendar_no_start", r.fieldName)
             is CalendarEventPlan.Result.Success -> {
                 val file = exportDir.resolve(RecordExport.fileName(r.draft.title, "ics"))
                 runCatching {
                     exportDir.mkdirs()
                     file.writeText(Ics.event(r.draft, uid = "${entity.id}-${ctx.currentRecordId ?: "new"}@tailorit"))
-                }.getOrElse { return "予定を書き出せませんでした" }
+                }.getOrElse { return Strings["desktop_calendar_write_failed"] }
                 val opened = runCatching { Desktop.getDesktop().open(file); true }.getOrDefault(false)
-                if (opened) "予定を開きました(${file.name})" else "予定を書き出しました: ${file.absolutePath}"
+                if (opened) Strings.format("desktop_calendar_opened", file.name) else Strings.format("desktop_calendar_written", file.absolutePath)
             }
         }
     }
 
     private fun lookupBook(action: Action, ctx: ActionContext, session: DesktopSession): String? {
-        val spec = action.bookLookup ?: return "本の情報を読み込めません。手で入力してください"
-        val form = ctx.form ?: return "本の情報はフォームの画面で読み込めます"
-        val raw = form.values[spec.isbnField]?.stringValue?.takeIf { it.isNotBlank() } ?: return "先に ISBN を入力してください"
-        val isbn = BookLookupPlan.normalizeISBN(raw) ?: return "ISBN を確かめてください(10 桁か 13 桁)"
+        val spec = action.bookLookup ?: return Strings["host_book_unavailable"]
+        val form = ctx.form ?: return Strings["host_book_form_only"]
+        val raw = form.values[spec.isbnField]?.stringValue?.takeIf { it.isNotBlank() } ?: return Strings["host_book_isbn_empty"]
+        val isbn = BookLookupPlan.normalizeISBN(raw) ?: return Strings["host_book_isbn_invalid"]
         val fields = BookLookupFields(spec.isbnField, spec.titleField, spec.authorsField, spec.publisherField, spec.publishedDateField)
         thread(isDaemon = true, name = "lookupBook") {
             val msg = try {
                 val book = books.lookup(isbn)
                 if (book == null) {
-                    "この ISBN の本は見つかりませんでした。手で入力してください"
+                    Strings["host_book_not_found"]
                 } else {
                     val values = BookLookupPlan.values(fields, book, form.entity)
                     Snapshot.withMutableSnapshot { form.values.putAll(values) }
-                    "「${book.title}」の情報を入れました(出典: ${book.source.name})"
+                    Strings.format("host_book_filled", book.title, book.source.name)
                 }
             } catch (e: Exception) {
-                "本の情報を読み込めません。手で入力してください"
+                Strings["host_book_unavailable"]
             }
             Snapshot.withMutableSnapshot { session.message = msg }
         }
-        return "本の情報を探しています…"
+        return Strings["desktop_book_searching"]
     }
 
     /**
@@ -130,27 +131,27 @@ class DesktopActionHost(
      * ファイルはダウンロードに書き、同じ表を表計算に貼れる TSV でクリップボードにも入れる(一覧の「表をコピー」と同じ形)。
      */
     private fun export(action: Action, ctx: ActionContext, session: DesktopSession): String? {
-        val entity = session.entityModel(action.entity ?: ctx.form?.entity?.id) ?: return "書き出す記録が見つかりません"
+        val entity = session.entityModel(action.entity ?: ctx.form?.entity?.id) ?: return Strings["host_export_no_entity"]
         val count = session.store.list(entity.id).size
-        if (count == 0) return "記録がありません"
+        if (count == 0) return Strings["host_export_empty"]
         val title = action.title?.trim()?.ifEmpty { null } ?: entity.name
         val date = java.time.LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyy/MM/dd HH:mm"))
-        val table = RecordIo.exportTable(title, entity, session.store, session.models, action.fields, listOf("書き出し日 $date", "$count 件"))
+        val table = RecordIo.exportTable(title, entity, session.store, session.models, action.fields, listOf(Strings.format("host_export_date", date), Strings.format("host_export_count", count)))
         val pdf = action.format == ActionFormat.PDF
         val file = exportDir.resolve(RecordExport.fileName(title, if (pdf) "pdf" else "csv"))
         runCatching {
             exportDir.mkdirs()
             file.writeBytes(if (pdf) PdfIo.data(table) else RecordIo.csv(table))
-        }.getOrElse { return "書き出せませんでした" }
+        }.getOrElse { return Strings["host_export_failed"] }
         val copied = !GraphicsEnvironment.isHeadless() &&
             runCatching { Toolkit.getDefaultToolkit().systemClipboard.setContents(StringSelection(Tsv.string(table)), null) }.isSuccess
-        return "$count 件を書き出しました: ${file.absolutePath}" + if (copied) "(表はクリップボードにも入れました)" else ""
+        return Strings.format("desktop_export_done", count, file.absolutePath) + if (copied) Strings["desktop_export_clipboard"] else ""
     }
 
     companion object {
-        const val UNAVAILABLE_VOICE = "音声で変える操作はデスクトップ版ではまだ使えません"
-        const val UNAVAILABLE_ACTIVITY = "進行中の表示(ライブアクティビティ)はこのパソコンでは使えません"
-        const val UNAVAILABLE_FOLLOW = "フォローはデスクトップ版ではまだ使えません(サインインが要ります)"
+        val UNAVAILABLE_VOICE get() = Strings["desktop_unavailable_voice"]
+        val UNAVAILABLE_ACTIVITY get() = Strings["desktop_unavailable_activity"]
+        val UNAVAILABLE_FOLLOW get() = Strings["desktop_unavailable_follow"]
 
         fun defaultExportDir(): File {
             val home = File(System.getProperty("user.home"))
@@ -254,7 +255,7 @@ interface Notifier {
         private var icon: TrayIcon? = null
 
         override fun schedule(n: Notification): String {
-            if (GraphicsEnvironment.isHeadless() || !SystemTray.isSupported()) return "このパソコンでは通知を出せません(トレイがありません)"
+            if (GraphicsEnvironment.isHeadless() || !SystemTray.isSupported()) return Strings["desktop_tray_unavailable"]
             cancel(n.id)
             val at = nextFire(n)
             val timer = Timer("notify-${n.id}", true)
@@ -263,8 +264,8 @@ interface Notifier {
             }
             if (at == null) timer.schedule(task, 0) else timer.schedule(task, Duration.between(ZonedDateTime.now(at.zone), at).toMillis().coerceAtLeast(0))
             timers[n.id] = timer
-            val whenText = at?.let { DateTimeFormatter.ofPattern("M/d HH:mm").format(it) } ?: "今"
-            return "通知を予約しました($whenText・アプリを開いている間だけ)"
+            val whenText = at?.let { DateTimeFormatter.ofPattern("M/d HH:mm").format(it) } ?: Strings["desktop_notification_now"]
+            return Strings.format("desktop_notification_scheduled", whenText)
         }
 
         override fun cancel(id: String): String? {

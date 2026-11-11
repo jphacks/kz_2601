@@ -1,5 +1,7 @@
 package jp.kz2601.metamon.desktop
 
+import jp.kz2601.metamon.desktop.i18n.Lang
+import jp.kz2601.metamon.desktop.i18n.Strings
 import jp.kz2601.metamon.dsl.AppDSL
 import jp.kz2601.metamon.dsl.Component
 import jp.kz2601.metamon.dsl.decode
@@ -62,7 +64,16 @@ class DesktopConformanceTest {
         "gridTable" to listOf("entity", "title"),
         "feed" to listOf("title", "limit"),
         "matchList" to listOf("entity", "show", "title"),
+        "settlement" to listOf("title", "transfers"),
+        "bracket" to listOf("title", "rounds", "champion"),
+        "flashcards" to listOf("cards", "progress"),
+        "randomPicker" to listOf("title", "label"),
+        "timerDisplay" to listOf("mode", "seconds", "label"),
+        "qrCode" to listOf("text", "label"),
     )
+
+    /** 今の case の保存した記録(計算・遊びの部品が computed を足す前の値を読む)。 */
+    private var raw: (String) -> List<Record> = { emptyList() }
 
     private data class Got(val c: Component, val area: GridArea?, val stacked: Boolean, val band: Int?)
 
@@ -75,6 +86,7 @@ class DesktopConformanceTest {
         var steps = 0
         val compared = sortedMapOf<String, Int>()
         val zone = FieldCoding.zone
+        val lang = Strings.lang
         try {
             for (dir in cases) {
                 val case = Json.parseToJsonElement(dir.resolve("case.json").readText()) as JsonObject
@@ -88,9 +100,12 @@ class DesktopConformanceTest {
                 val device = case["device"] as? JsonObject
                 DSLClock.fixed = OffsetDateTime.parse(device?.str("now") ?: "2026-11-12T12:00:00+09:00").toInstant()
                 FieldCoding.zone = ZoneId.of(device?.str("timeZone") ?: "Asia/Tokyo")
+                // en* の case は英語の UI で比べる(#1759)
+                Strings.lang = Lang.resolve(device?.str("locale") ?: "ja_JP")
                 val records = (case["records"] as? JsonObject).orEmpty().mapValues { (_, v) -> (v as JsonArray).map(Record::from) }
                 val uid = device?.str("userId") ?: "me"
                 val data = LeafData(dsl.entityModels(), { records[it].orEmpty() }, uid)
+                raw = { records[it].orEmpty() }
                 val models = dsl.entityModels()
                 for (s in expected["screens"] as JsonArray) {
                     s as JsonObject
@@ -119,6 +134,7 @@ class DesktopConformanceTest {
         } finally {
             DSLClock.fixed = null
             FieldCoding.zone = zone
+            Strings.lang = lang
         }
         if (failures.isNotEmpty()) fail("${failures.size} 件が違う:\n" + failures.joinToString("\n"))
         println("desktop conformance: ${cases.size} cases / $screens screens / $steps steps OK / props compared: $compared")
@@ -305,6 +321,7 @@ class DesktopConformanceTest {
         fun putText(k: String, v: String?) {
             v?.let { put(k, JsonPrimitive(it)) }
         }
+        putAll(PlayLeaves.props(c, data, raw))
         when (c.type.wire) {
             "text", "markdown" -> putText("text", c.text)
             "label", "badge" -> putText("text", c.text ?: c.label)

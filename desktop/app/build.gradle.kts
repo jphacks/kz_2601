@@ -47,6 +47,9 @@ tasks.test {
     inputs.dir(dslDocsDir.resolve("conformance")).withPropertyName("conformanceCases").withPathSensitivity(PathSensitivity.RELATIVE)
     inputs.dir(dslDocsDir.resolve("examples")).withPropertyName("dslExamples").withPathSensitivity(PathSensitivity.RELATIVE)
     systemProperty("metamon.dslDocsDir", dslDocsDir.absolutePath)
+    // 文言・テーマはテストを動かす機械の言語・OS の設定に左右されないよう固定する(テストの中で切り替える)
+    systemProperty("tailorit.lang", "ja")
+    systemProperty("tailorit.theme", "light")
 }
 
 // Android の :renderer のうち Compose の状態しか使わない純 Kotlin(フォームの下書き・遷移の規則)は、android/ を変えずにそのまま取り込む。
@@ -58,6 +61,26 @@ val syncSharedRenderer by tasks.registering(Sync::class) {
     into(layout.buildDirectory.dir("generated/sharedRenderer"))
 }
 kotlin.sourceSets.named("main") { kotlin.srcDir(syncSharedRenderer) }
+
+// 文言は Android の strings*.xml(values = 日本語・values-en = 英語)をビルド時にそのまま同梱し、同じキーで引く(#1759)。
+// renderer と app で同じファイル名があるので置き場を分け、jar の中では一覧を引けないので index.txt を書く。
+// デスクトップにしか無い文言は src/main/resources/i18n/desktop の同じ形の XML に置く(キーは desktop_ で始める)。
+val androidResDir = rootDir.resolve("../android")
+val syncAndroidStrings by tasks.registering(Sync::class) {
+    listOf("renderer", "app").forEach { module ->
+        from(androidResDir.resolve("$module/src/main/res")) {
+            include("values/strings*.xml", "values-en/strings*.xml")
+            into("i18n/$module")
+        }
+    }
+    into(layout.buildDirectory.dir("generated/androidStrings"))
+    doLast {
+        val root = destinationDir.resolve("i18n")
+        val files = root.walkTopDown().filter { it.isFile && it.extension == "xml" }.map { it.relativeTo(root).invariantSeparatorsPath }.sorted()
+        root.resolve("index.txt").writeText(files.joinToString("\n", postfix = "\n"))
+    }
+}
+sourceSets.named("main") { resources.srcDir(syncAndroidStrings) }
 
 // 手元の確かめ: TAILORIT_API=stg TAILORIT_DEV_TOKEN=<ID トークン> ./gradlew :desktop:listApps(stg のアプリの一覧を出す)
 tasks.register<JavaExec>("listApps") {
@@ -75,6 +98,8 @@ compose.desktop {
             targetFormats(TargetFormat.Msi, TargetFormat.Deb, TargetFormat.Rpm, TargetFormat.Dmg)
             packageName = "Tailor It"
             packageVersion = "0.1.0"
+            // 読み上げ(Windows の Java Access Bridge)を同梱の実行環境に入れる(#1759)
+            modules("jdk.accessibility")
         }
     }
 }

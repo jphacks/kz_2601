@@ -1,6 +1,5 @@
 package jp.kz2601.metamon.desktop
 
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
@@ -17,6 +16,8 @@ import androidx.compose.ui.window.rememberWindowState
 import kotlinx.coroutines.FlowPreview
 import kotlinx.coroutines.flow.debounce
 import java.awt.Dimension
+import jp.kz2601.metamon.desktop.i18n.Strings
+import jp.kz2601.metamon.desktop.theme.TailorItTheme
 import java.io.File
 import java.util.prefs.Preferences
 
@@ -37,13 +38,14 @@ fun main(args: Array<String>) = application {
         size = saved?.size ?: DpSize(480.dp, 820.dp),
         position = saved?.position ?: WindowPosition.PlatformDefault,
     )
-    Window(onCloseRequest = ::exitApplication, title = "Tailor It — ${dsl.app.name}", state = state) {
+    Window(onCloseRequest = ::exitApplication, title = Strings.format("desktop_window_title", dsl.app.name), state = state) {
         LaunchedEffect(Unit) {
             // 6 列が潰れない最小(1 列 ≈ 50dp)
             window.minimumSize = Dimension(360, 560)
             snapshotFlow { state.size to state.position }.debounce(500).collect { (size, pos) -> WindowBounds.save(size, pos) }
         }
-        MaterialTheme { key(name) { DesktopApp(dsl, store, args.getOrNull(2)?.takeIf { name == first }, onOpenApp = { name = it }) } }
+        // 明暗は OS に従う・文言は OS の言語(日本語か英語)・#1759
+        TailorItTheme { key(name) { DesktopApp(dsl, store, args.getOrNull(2)?.takeIf { name == first }, onOpenApp = { name = it }) } }
     }
 }
 
