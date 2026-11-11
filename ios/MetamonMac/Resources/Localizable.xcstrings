@@ -801,6 +801,22 @@
         }
       }
     },
+    "⌘K で文字で、⇧⌘M で声で頼めます。" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Type with ⌘K, or speak with ⇧⌘M."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "⌘K で文字で、⇧⌘M で声で頼めます。"
+          }
+        }
+      }
+    },
     "、" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -1322,6 +1338,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "お問い合わせ"
+          }
+        }
+      }
+    },
+    "こう頼むと直せます" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Try asking this to change it"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "こう頼むと直せます"
           }
         }
       }
@@ -2077,6 +2109,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "できた画面に向かって、こう頼むと思いどおりに直せます。例を押すと入力欄に入るので、言葉を足してから送ってください。"
+          }
+        }
+      }
+    },
+    "とじる" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Close"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "とじる"
           }
         }
       }
@@ -8635,6 +8683,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "頼み方のコツ"
+          }
+        }
+      }
+    },
+    "頼んでみる" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Try asking"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "頼んでみる"
           }
         }
       }
