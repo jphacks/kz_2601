@@ -287,17 +287,13 @@ fun MetamonApp(container: AppContainer) {
     }
     fun membersModel(target: ShareTarget) =
         MembersModel(target.appId, membersClient, isShared = { ShareScope.of(loadDsl(target.appId)()) == ShareScope.MEMBERS }, container.membersStore)
-    // 抜けた後: 別のアプリへ切り替え、一覧から外し、端末の記録・会話の履歴を消す。画面が消えても止めない
+    // 抜けた後: シートを閉じて知らせるだけ。アプリと自分のコピーは一覧に残す(iOS と同じ・#1298)
     val onLeftShare = { target: ShareTarget ->
         shareTarget = null
         membersTarget = null
         issuedShares[target.appId] = null
-        container.accountScope.launch {
-            container.leaveCleanup.run(target.appId)
-            val name: Any = target.name.ifEmpty { null } ?: UiText.Res(R.string.share_untitled)
-            runtime.showToast(UiText.Res(R.string.members_left_toast, name))
-        }
-        Unit
+        val name: Any = target.name.ifEmpty { null } ?: UiText.Res(R.string.share_untitled)
+        runtime.showToast(UiText.Res(R.string.members_left_toast, name))
     }
 
     val openSwitcher = {
