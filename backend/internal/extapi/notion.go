@@ -16,6 +16,7 @@ import (
 	"strings"
 	"sync"
 	"time"
+	"unicode/utf8"
 )
 
 // Notion (#1497, API version notionVersion): free (one `runs` a call),
@@ -24,6 +25,8 @@ import (
 //
 //	queryDatabase(databaseId, limit?, subtitleProperty?, valueProperty?)
 //	addRow(databaseId, title, properties?)
+//	updateProperties(pageId, properties)
+//	pageText(pageId)
 //
 // Notion has no OAuth scopes (the integration's capabilities are set when
 // it is registered: read content, insert content) and documents no PKCE,
@@ -66,6 +69,8 @@ func init() {
 		Ops: []OpSpec{
 			{Name: "queryDatabase", Args: []string{"databaseId", "limit", "subtitleProperty", "valueProperty"}},
 			{Name: "addRow", Write: true, Args: []string{"databaseId", "title", "properties"}},
+			{Name: "updateProperties", Write: true, Args: []string{"pageId", "properties"}, Check: checkNotionUpdate},
+			{Name: "pageText", Args: []string{"pageId"}, Check: checkNotionPageText},
 		},
 		Hosts: notionHosts,
 		New: func(sec Secrets) (map[string]Operation, error) {
@@ -73,7 +78,8 @@ func init() {
 			if err != nil {
 				return nil, err
 			}
-			return map[string]Operation{"queryDatabase": OperationFunc(c.queryDatabase), "addRow": OperationFunc(c.addRow)}, nil
+			return map[string]Operation{"queryDatabase": OperationFunc(c.queryDatabase), "addRow": OperationFunc(c.addRow),
+				"updateProperties": OperationFunc(c.updateProperties), "pageText": OperationFunc(c.pageText)}, nil
 		},
 		NewOAuth: func(sec Secrets) (OAuthClient, error) { return newNotion(sec, notionWireDefault) },
 	})
@@ -501,19 +507,9 @@ func (c *notion) addRow(ctx context.Context, in Input) (Output, error) {
 	if err != nil {
 		return Output{}, err
 	}
-	var props map[string]any
-	if v := in.Args["properties"]; v != "" {
-		if len(v) > notionMaxPropsLen {
-			return Output{}, fmt.Errorf("%w: properties is over %d bytes", ErrUnknown, notionMaxPropsLen)
-		}
-		d := json.NewDecoder(strings.NewReader(v))
-		d.UseNumber()
-		if err := d.Decode(&props); err != nil || d.More() {
-			return Output{}, fmt.Errorf("%w: properties must be a JSON object", ErrUnknown)
-		}
-		if len(props) > notionMaxProps {
-			return Output{}, fmt.Errorf("%w: properties has over %d entries", ErrUnknown, notionMaxProps)
-		}
+	props, err := notionProps(in.Args["properties"], false)
+	if err != nil {
+		return Output{}, err
 	}
 	if in.Token == nil || in.Token.AccessToken == "" {
 		return Output{}, ErrNotConnected
@@ -571,6 +567,33 @@ func (c *notion) addRow(ctx context.Context, in Input) (Output, error) {
 		}
 		return Output{ResultID: page.ID, Item: &row}, nil
 	})
+}
+
+// notionProps reads a properties argument: a JSON object of property name
+// → value, at most notionMaxProps entries.
+func notionProps(v string, required bool) (map[string]any, error) {
+	if v == "" {
+		if required {
+			return nil, fmt.Errorf("%w: properties is required", ErrUnknown)
+		}
+		return nil, nil
+	}
+	if len(v) > notionMaxPropsLen {
+		return nil, fmt.Errorf("%w: properties is over %d bytes", ErrUnknown, notionMaxPropsLen)
+	}
+	var props map[string]any
+	d := json.NewDecoder(strings.NewReader(v))
+	d.UseNumber()
+	if err := d.Decode(&props); err != nil || d.More() {
+		return nil, fmt.Errorf("%w: properties must be a JSON object", ErrUnknown)
+	}
+	if len(props) > notionMaxProps {
+		return nil, fmt.Errorf("%w: properties has over %d entries", ErrUnknown, notionMaxProps)
+	}
+	if required && len(props) == 0 {
+		return nil, fmt.Errorf("%w: properties is empty", ErrUnknown)
+	}
+	return props, nil
 }
 
 func notionText(s string) []map[string]any {
@@ -718,6 +741,225 @@ func notionNullable(s string) any {
 		return nil
 	}
 	return s
+}
+
+// notionUpdatable are the property types updateProperties sets; others
+// (status, relation, people, files, formula ...) are refused.
+var notionUpdatable = []string{"title", "rich_text", "number", "select", "checkbox", "date"}
+
+// notionUpdateArgs checks updateProperties' pageId and properties (1-20
+// named entries; the values are checked against the page's types later).
+func notionUpdateArgs(a map[string]string) (string, map[string]any, error) {
+	id, err := notionID("pageId", a["pageId"])
+	if err != nil {
+		return "", nil, err
+	}
+	props, err := notionProps(a["properties"], true)
+	if err != nil {
+		return "", nil, err
+	}
+	for name := range props {
+		if _, err := gcalText("property name", name, 200, true); err != nil {
+			return "", nil, err
+		}
+	}
+	return id, props, nil
+}
+
+func checkNotionUpdate(a map[string]string) error {
+	_, _, err := notionUpdateArgs(a)
+	return err
+}
+
+// updateProperties sets properties of one page (a database row): a JSON
+// object of property name → value, of the types in notionUpdatable (title
+// is a string; the rest as notionPropValue). The page's own types decide
+// how a value is read. Setting the same values again changes nothing, so a
+// retried request is harmless.
+func (c *notion) updateProperties(ctx context.Context, in Input) (Output, error) {
+	id, props, err := notionUpdateArgs(in.Args)
+	if err != nil {
+		return Output{}, err
+	}
+	if in.Token == nil || in.Token.AccessToken == "" {
+		return Output{}, ErrNotConnected
+	}
+	var page notionPage
+	if err := c.do(ctx, in.Token, http.MethodGet, "/pages/"+id, nil, &page); err != nil {
+		return Output{}, err
+	}
+	names := make([]string, 0, len(props))
+	for name := range props {
+		names = append(names, name)
+	}
+	slices.Sort(names)
+	values := make(map[string]any, len(props))
+	for _, name := range names {
+		p, ok := page.Properties[name]
+		if !ok {
+			return Output{}, fmt.Errorf("%w: the page has no property %q", ErrUnknown, name)
+		}
+		if !slices.Contains(notionUpdatable, p.Type) {
+			return Output{}, fmt.Errorf("%w: property %q (%s) cannot be set; only %s", ErrUnknown, name, p.Type, strings.Join(notionUpdatable, ", "))
+		}
+		if p.Type == "title" {
+			s, ok := props[name].(string)
+			if !ok {
+				return Output{}, fmt.Errorf("%w: property %q must be a string", ErrUnknown, name)
+			}
+			s, err := gcalText(name, s, notionMaxText, true)
+			if err != nil {
+				return Output{}, err
+			}
+			values[name] = map[string]any{"title": notionText(s)}
+			continue
+		}
+		v, err := notionPropValue(name, p.Type, props[name])
+		if err != nil {
+			return Output{}, err
+		}
+		values[name] = v
+	}
+	body, err := json.Marshal(map[string]any{"properties": values})
+	if err != nil {
+		return Output{}, err
+	}
+	var updated notionPage
+	if err := c.do(ctx, in.Token, http.MethodPatch, "/pages/"+id, body, &updated); err != nil {
+		return Output{}, err
+	}
+	row := updated.row("", "")
+	return Output{ResultID: updated.ID, Item: &row}, nil
+}
+
+const (
+	// notionMaxPageText caps pageText's text (bytes; MaxBody/16 keeps the
+	// answer far under the runner's answer cap even when JSON escapes it).
+	notionMaxPageText = MaxBody / 16
+	// notionMaxBlockReads caps the block pages read (100 blocks each).
+	notionMaxBlockReads = 5
+)
+
+func checkNotionPageText(a map[string]string) error {
+	_, err := notionID("pageId", a["pageId"])
+	return err
+}
+
+// notionBlockText is the text of one block's content (types with text).
+type notionBlockText struct {
+	RichText []notionRichText `json:"rich_text"`
+	Checked  bool             `json:"checked"`
+	Title    string           `json:"title"`
+}
+
+// line is one block as a line of plain text; ok false for blocks without
+// text (images, tables ...). n numbers a run of numbered list items.
+func notionBlockLine(typ string, b notionBlockText, n int) (string, bool) {
+	t := notionPlain(b.RichText)
+	switch typ {
+	case "paragraph", "heading_1", "heading_2", "heading_3", "quote", "callout", "toggle", "code":
+		return t, true
+	case "bulleted_list_item":
+		return "• " + t, true
+	case "numbered_list_item":
+		return strconv.Itoa(n) + ". " + t, true
+	case "to_do":
+		if b.Checked {
+			return "☑ " + t, true
+		}
+		return "☐ " + t, true
+	case "child_page":
+		return b.Title, true
+	case "divider":
+		return "---", true
+	}
+	return "", false
+}
+
+// pageText reads one page's top-level blocks as plain text (nested blocks
+// are not read): title = the page's title, value = the text, cut at
+// notionMaxPageText (ending in "…") after at most notionMaxBlockReads reads.
+func (c *notion) pageText(ctx context.Context, in Input) (Output, error) {
+	id, err := notionID("pageId", in.Args["pageId"])
+	if err != nil {
+		return Output{}, err
+	}
+	var page notionPage
+	if err := c.do(ctx, in.Token, http.MethodGet, "/pages/"+id, nil, &page); err != nil {
+		return Output{}, err
+	}
+	var b strings.Builder
+	cut, number, cursor := false, 0, ""
+	for read := 0; ; read++ {
+		if read == notionMaxBlockReads {
+			cut = true
+			break
+		}
+		v := url.Values{"page_size": {"100"}}
+		if cursor != "" {
+			v.Set("start_cursor", cursor)
+		}
+		var r struct {
+			Results    []map[string]json.RawMessage `json:"results"`
+			HasMore    bool                         `json:"has_more"`
+			NextCursor string                       `json:"next_cursor"`
+		}
+		if err := c.do(ctx, in.Token, http.MethodGet, "/blocks/"+id+"/children?"+v.Encode(), nil, &r); err != nil {
+			return Output{}, err
+		}
+		for _, blk := range r.Results {
+			var typ string
+			if json.Unmarshal(blk["type"], &typ) != nil {
+				continue
+			}
+			var bt notionBlockText
+			if raw, ok := blk[typ]; ok {
+				_ = json.Unmarshal(raw, &bt)
+			}
+			if typ == "numbered_list_item" {
+				number++
+			} else {
+				number = 0
+			}
+			line, ok := notionBlockLine(typ, bt, number)
+			if !ok {
+				continue
+			}
+			if b.Len() > 0 {
+				b.WriteByte('\n')
+			}
+			b.WriteString(line)
+			if b.Len() > notionMaxPageText {
+				cut = true
+				break
+			}
+		}
+		if cut || !r.HasMore {
+			break
+		}
+		if cursor, err = notionID("next_cursor", r.NextCursor); err != nil {
+			cut = true
+			break
+		}
+	}
+	text := strings.TrimRight(b.String(), "\n ")
+	if cut {
+		text = notionCut(text, notionMaxPageText-len("…")) + "…"
+	}
+	row := page.row("", "")
+	row.Value = text
+	return Output{Item: &row}, nil
+}
+
+// notionCut cuts s to at most max bytes on a rune boundary.
+func notionCut(s string, max int) string {
+	if len(s) <= max {
+		return s
+	}
+	for max > 0 && !utf8.RuneStart(s[max]) {
+		max--
+	}
+	return s[:max]
 }
 
 // do calls the API with the person's token and the Notion-Version. 401 is
