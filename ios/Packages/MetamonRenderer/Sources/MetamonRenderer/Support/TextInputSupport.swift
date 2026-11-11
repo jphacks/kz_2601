@@ -89,6 +89,12 @@ extension View {
     /// 1 行の入力欄: return =「次へ」(最後の欄なら閉じる)。
     func singleLineSubmit() -> some View {
         submitLabel(.next)
-            .onSubmit { KeyboardState.focusNext() }
+            .onSubmit {
+                #if os(macOS)
+                // 日本語の変換中の Return は確定だけ。次の欄へ進まない(#942)
+                guard IMEReturnGuard.allowsReturn(KeyboardState.focusedTextView()) else { return }
+                #endif
+                KeyboardState.focusNext()
+            }
     }
 }
