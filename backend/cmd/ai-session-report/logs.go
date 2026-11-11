@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"regexp"
 	"sort"
 	"strconv"
 	"strings"
@@ -39,6 +40,10 @@ type logEvent struct {
 	ReplyKind string // ai.chat reply_kind
 	Turn      int    // ai.chat turn (1-based within the conversation)
 	Built     bool   // ai.chat clarify_ended_in_build
+	// ai.generate retry_reasons (one label per rejected attempt, in order)
+	// and validation_codes (dsl problem code -> problems, #1772).
+	RetryReasons    []string
+	ValidationCodes map[string]int
 }
 
 // Event names the report reads (backend/internal/ai, internal/httpx, internal/metrics).
@@ -174,6 +179,8 @@ func decodeEntry(raw json.RawMessage) (logEvent, bool) {
 	switch ev.Event {
 	case evGenerate:
 		ev.Duration = time.Duration(p.num("duration_ms")) * time.Millisecond
+		ev.RetryReasons = parseLabels(p.str("retry_reasons"))
+		ev.ValidationCodes = parseCodeCounts(p.str("validation_codes"))
 	case evRequest:
 		ev.Duration = parseDuration(p["duration"])
 	case evChat:
@@ -199,6 +206,36 @@ func parseDuration(v any) time.Duration {
 		}
 	}
 	return 0
+}
+
+var labelRe = regexp.MustCompile(`^[a-z][a-z0-9_]{0,40}$`)
+
+// parseLabels reads "a,b,a". Anything that is not a plain label is dropped.
+func parseLabels(s string) []string {
+	var out []string
+	for _, l := range strings.Split(s, ",") {
+		if l = strings.TrimSpace(l); labelRe.MatchString(l) {
+			out = append(out, l)
+		}
+	}
+	return out
+}
+
+// parseCodeCounts reads "code:n,code:n" (validation_codes).
+func parseCodeCounts(s string) map[string]int {
+	var out map[string]int
+	for _, part := range strings.Split(s, ",") {
+		code, n, ok := strings.Cut(strings.TrimSpace(part), ":")
+		c, err := strconv.Atoi(n)
+		if !ok || err != nil || c <= 0 || !labelRe.MatchString(code) {
+			continue
+		}
+		if out == nil {
+			out = map[string]int{}
+		}
+		out[code] += c
+	}
+	return out
 }
 
 func firstNonEmpty(s ...string) string {
