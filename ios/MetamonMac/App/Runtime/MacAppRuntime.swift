@@ -48,6 +48,12 @@ final class MacAppRuntime: RuntimeNavigating {
     var discardRequest: DiscardRequest?
     /// 描いているフォームの控え(`MacAppRuntime+Discard.swift`)
     @ObservationIgnored let openForms = OpenFormRegistry()
+    /// Quick Look(#1850・`MacQuickLook.swift`)。見ているファイルと、矢印で移れるファイル
+    var quickLookURL: URL?
+    var quickLookItems: [URL] = []
+    /// 写真の書き出し先。名前が `previewPrefix` で始まるので起動・終了時の片付けで消える
+    @ObservationIgnored let quickLookDirectory = FileManager.default.temporaryDirectory
+        .appendingPathComponent("metamon-mac-preview-quicklook-\(UUID().uuidString)", isDirectory: true)
 
     @ObservationIgnored let recordSync: RecordSyncEngine
     /// 作ったアプリの記録のエンジンを借りている(`MacRecordEngines`)。同じアプリを開いた別のウインドウと同じエンジンを使う
@@ -112,6 +118,9 @@ final class MacAppRuntime: RuntimeNavigating {
         book.postAuthor = { [weak self] entity in self?.postAuthor(for: entity) } // 共有の投稿に作者を付ける(#963)
         if let recordLease {
             recordLease.onEvent = { [weak self] event in self?.handle(event) } // 同じエンジンの通知は借りている全員に届く
+            // 同じアプリを開いた別のウインドウ(#1853)へ、端末に書いた entity を知らせて読み直してもらう(送信を待たない)
+            book.onLocalWrite = { [weak recordLease] entity in recordLease?.announceLocalChange(entity: entity) }
+            recordLease.onLocalChange = { [weak self] entity in self?.reloadAfterOtherWindow(entity) }
         } else {
             self.recordSync.onEvent = { [weak self] event in self?.handle(event) }
         }
@@ -125,7 +134,9 @@ final class MacAppRuntime: RuntimeNavigating {
         let engine = recordSync
         let lease = recordLease
         let dir = previewDirectory
+        let quickLook = quickLookDirectory
         Task { @MainActor in
+            try? FileManager.default.removeItem(at: quickLook)
             // 借りたエンジンは返すだけ(最後のウインドウが返したら `MacRecordEngines` が止める)
             if let lease { lease.release() } else { engine.stop() }
             if let dir { try? FileManager.default.removeItem(at: dir) }
@@ -208,6 +219,12 @@ final class MacAppRuntime: RuntimeNavigating {
     func reloadLocal(_ entity: String) async { await book.reloadLocal(entity) }
 
     /// 同期キューからの通知。送れたらローカルを読み直し、競合はサーバーから引き直す(iOS と同じくサーバー優先)。
+    /// 別のウインドウが同じ entity を書いた(#1853)。読み込んだ entity だけ端末の内容で読み直す
+    private func reloadAfterOtherWindow(_ entity: String) {
+        guard records[entity] != nil else { return }
+        Task { await book.reloadLocal(entity) }
+    }
+
     private func handle(_ event: SyncEvent) {
         Task { @MainActor in
             #if !APP_STORE_REVIEW

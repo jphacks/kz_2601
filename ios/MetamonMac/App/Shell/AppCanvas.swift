@@ -1,4 +1,5 @@
 import SwiftUI
+import QuickLook
 import MetamonDSL
 import MetamonRenderer
 import MetamonServices
@@ -155,6 +156,9 @@ private struct AppCanvasContent: View {
                 modal(route).dynamicTypeSize(textSize).frame(minWidth: 640, minHeight: 560)
             }
             .modifier(RuntimeOverlays(runtime: runtime))
+            // 記録の写真・動画・録音を Quick Look で見る(#1850)。パネルは 1 つなので根にだけ付ける
+            .quickLookPreview($runtime.quickLookURL, in: runtime.quickLookItems)
+            .modifier(QuickLookSpaceKey(runtime: runtime))
             .macNotificationsOffBar(runtime.notifications) // 通知がオフの時のバー(#965)
             .toolbar { MacUpcomingNotificationsToolbar(notifications: runtime.notifications) } // 次の通知(#1325)
             .toolbar { MacSyncStatusToolbar(engine: runtime.recordSync) } // 未送信 N 件(#976)
@@ -200,10 +204,24 @@ private struct AppCanvasContent: View {
             .background { EscapeToDismiss { runtime.requestDismissTopModal() } } // 入力があれば先に確認(#943)
             .background { SaveFormShortcut(runtime: runtime) } // ⌘Return で保存(#1138)
             .modifier(RuntimeOverlays(runtime: runtime))
+            .modifier(QuickLookSpaceKey(runtime: runtime))
             .environment(\.dslRuntime, runtime)
             .environment(\.componentRegistry, ComponentRegistry.standard)
             .environment(\.openForms, runtime.openForms)
             .environment(\.componentTalk, componentTalk)
+    }
+}
+
+/// スペースで Quick Look を開く / 閉じる(#1850)。入力欄が受けたスペースはここに来ない。見る物が無ければ素通し
+private struct QuickLookSpaceKey: ViewModifier {
+    let runtime: MacAppRuntime
+
+    func body(content: Content) -> some View {
+        content.onKeyPress(.space) {
+            guard runtime.quickLookURL != nil || runtime.canQuickLook else { return .ignored }
+            runtime.toggleQuickLook()
+            return .handled
+        }
     }
 }
 
