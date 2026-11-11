@@ -101,6 +101,23 @@
         }
       }
     },
+    "%@のコピー" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ Copy"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@のコピー"
+          }
+        }
+      }
+    },
     "%lld 文字までです" : {
       "localizations" : {
         "en" : {
@@ -964,6 +981,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "「%@」の画面のつながり"
+          }
+        }
+      }
+    },
+    "「%@」を作りました" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Created “%@”"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "「%@」を作りました"
           }
         }
       }
@@ -7551,6 +7585,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "表示できない言葉が含まれています"
+          }
+        }
+      }
+    },
+    "複製" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Duplicate"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "複製"
           }
         }
       }

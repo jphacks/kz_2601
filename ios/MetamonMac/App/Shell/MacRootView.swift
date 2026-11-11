@@ -80,7 +80,8 @@ struct MacRootView: View {
             AppSidebar(created: createdApps.filter { $0.matches(searchText) },
                        examples: exampleApps.filter { $0.matches(searchText) },
                        thumbnail: thumbnail(for:), searchText: searchText, selection: guardedSelection,
-                       onOpen: { focus = .canvas }, onDelete: deleteApp, onResetExample: resetExample)
+                       onOpen: { focus = .canvas }, onDelete: deleteApp, onDuplicate: duplicateApp,
+                       onResetExample: resetExample)
                 .focused($focus, equals: .sidebar)
                 .navigationSplitViewColumnWidth(min: 180, ideal: 220, max: 320)
         } detail: {
@@ -182,6 +183,12 @@ struct MacRootView: View {
         thumbs.remove(appId: id)
         Task { await MacRuntimeNotifications.removeApp(id) } // そのアプリの通知とタイマーの予約(#1324)
         MacVoiceOver.announce(L10n.tr("「\(name)」を削除しました"))
+    }
+
+    /// 複製する(#1285)。iOS と同じく切り替えずに知らせる
+    private func duplicateApp(_ id: String) {
+        guard let name = library.duplicate(id, bundled: bundledApps.first { $0.id == id }) else { return }
+        MacVoiceOver.announce(L10n.tr("「\(name)」を作りました"))
     }
 
     /// 会話で直した同梱の例を元に戻す(#1283)。開いていれば中央を作り直すので、入力があれば先に確認する(#943)

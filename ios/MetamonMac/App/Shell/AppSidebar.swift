@@ -4,8 +4,8 @@ import MetamonServices
 /// サイドバーのアプリの一覧。iOS の AppSwitcherSheet に当たる(Mac では常に出す)。
 /// ↑↓ で選ぶと中央が切り替わり、Return / ダブルクリックで中央へ移る(#934)。
 /// 「作ったアプリ」と「同梱の例」に分ける(#969)。作ったアプリは右クリックで名前の変更・上へ / 下へ・削除(確認あり)、
-/// ドラッグで並べ替え、Delete キーで削除。同梱の例は整理できないが、会話で直した例は右クリックで「元の例に戻す」(確認あり・#1283)。
-/// 検索(#1282)で絞った一覧を受け取る。行の頭にアプリの画面の写し(#1281・無ければ頭の文字)。新着の数は後の Issue。
+/// ドラッグで並べ替え、Delete キーで削除。同梱の例は右クリックの「複製」(作ったアプリに足す・#1285)と、会話で直した例なら「元の例に戻す」(確認あり・#1283)。
+/// 検索(#1282)で絞った一覧を受け取る。行の頭にアプリの画面の写し(#1281・無ければ頭の文字)。新着の数・共有されたアプリの区分はサーバー(#930)の後。
 struct AppSidebar: View {
     let created: [SampleApp]
     let examples: [SampleApp]
@@ -17,6 +17,8 @@ struct AppSidebar: View {
     var onOpen: () -> Void = {}
     /// 確認の後に呼ぶ(選択の付け替えはウインドウ側)
     var onDelete: (String) -> Void = { _ in }
+    /// 「複製」(#1285)。作ったアプリも同梱の例も
+    var onDuplicate: (String) -> Void = { _ in }
     /// 「元の例に戻す」の確認の後に呼ぶ(#1283)
     var onResetExample: (String) -> Void = { _ in }
 
@@ -47,9 +49,11 @@ struct AppSidebar: View {
         .contextMenu(forSelectionType: SampleApp.ID.self) { ids in
             if ids.count == 1, let id = ids.first, let app = created.first(where: { $0.id == id }) {
                 manageItems(app)
-            } else if ids.count == 1, let id = ids.first, library.isEditedExample(id),
-                      let app = examples.first(where: { $0.id == id }) {
-                Button("元の例に戻す…") { resetTarget = app }
+            } else if ids.count == 1, let id = ids.first, let app = examples.first(where: { $0.id == id }) {
+                Button("複製") { onDuplicate(id) }
+                if library.isEditedExample(id) {
+                    Button("元の例に戻す…") { resetTarget = app }
+                }
             }
         } primaryAction: { ids in
             guard let id = ids.first else { return }
@@ -127,6 +131,7 @@ struct AppSidebar: View {
             renameText = app.name
             renameTarget = app
         }
+        Button("複製") { onDuplicate(app.id) }
         if !isSearching, created.count > 1, let index = createdIds.firstIndex(of: app.id) {
             Divider()
             Button("上へ移動") { library.move(app.id, to: index - 1) }
