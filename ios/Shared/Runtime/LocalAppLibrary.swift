@@ -3,7 +3,9 @@ import MetamonDSL
 import MetamonServices
 
 /// 端末だけに置く「作ったアプリ」の一覧(#969・Mac)。サーバー(#930)が入るまでの置き場で、iOS は使わない。
-/// 置き方は iOS のキャッシュと同じ: 一覧(名前・並び)は `AppListCache`(apps.json)、DSL は `DocumentCache`(appId ごとの封筒)。
+/// 置き方は iOS のキャッシュと同じ: 一覧(名前・並び)は `AppListCache`、DSL は `DocumentCache`(appId ごとの封筒)。
+/// 一覧は `metamon-dsl/mac-library/apps.json`(#1057)。`metamon-dsl/apps.json`(`AppListCache.shared`)は iOS と同じく
+/// サーバーの一覧(`GET /v1/apps`)のキャッシュに使うので分ける。前の版の一覧は初回に移す(`legacyList`)。
 /// 一覧の並びは配列の順(先頭が上)。名前の検査と並べ替えは iOS と同じ `AppListEdit`。
 /// 会話で直した同梱の例(#1283)も DSL を同じ `DocumentCache` に置き、直した例の id を `editedExamplesKey` に持つ。
 struct LocalAppLibrary {
@@ -25,20 +27,37 @@ struct LocalAppLibrary {
     let list: AppListCache
     let documents: DocumentCache
     let defaults: UserDefaults
+    /// 前の版が一覧を置いていた所(`AppListCache.shared`)。`list` がまだ無い時だけ 1 回読んで移す
+    var legacyList: AppListCache?
+
+    /// 端末の一覧の置き場(`DocumentCache` と同じフォルダの下・サインアウトの wipe で一緒に消える)
+    static let standardList: AppListCache = {
+        let base = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first
+            ?? FileManager.default.temporaryDirectory
+        return AppListCache(directory: base.appendingPathComponent("metamon-dsl/mac-library", isDirectory: true))
+    }()
 
     static var standard: LocalAppLibrary {
-        LocalAppLibrary(list: .shared, documents: .shared, defaults: .standard)
+        LocalAppLibrary(list: standardList, documents: .shared, defaults: .standard, legacyList: .shared)
     }
 
     /// 保存した一覧を読む。DSL が読めないアプリは外す(一覧だけ残っても開けないため)
     func load() -> [Entry] {
         var seen = Set<String>()
-        return list.load().compactMap { summary in
+        return loadSummaries().compactMap { summary in
             guard seen.insert(summary.id).inserted, let envelope = documents.loadData(appId: summary.id),
                   var document = try? AppDocument.decode(envelope) else { return nil }
             document.appId = summary.id
             return Entry(summary: summary, document: document, envelope: envelope)
         }
+    }
+
+    /// `list` が無ければ前の置き場から移す(無ければ空で作り、以後はサーバーの一覧を端末の一覧と取り違えない)
+    private func loadSummaries() -> [AppSummary] {
+        guard !list.exists else { return list.load() }
+        let migrated = legacyList?.load() ?? []
+        list.store(migrated)
+        return migrated
     }
 
     /// 一覧(名前・並び)を置く

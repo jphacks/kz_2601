@@ -15,7 +15,10 @@ struct MacLocalWipe {
     var thumbnails: MacAppThumbnailStore = .shared
     /// 作ったアプリの DSL・一覧(metamon-dsl・`LocalAppLibrary`)
     var documents: DocumentCache = .shared
+    /// サーバーの一覧のキャッシュ(`GET /v1/apps`・#1057)
     var appList: AppListCache = .shared
+    /// 作ったアプリの端末の一覧(`LocalAppLibrary`)。空で置き直す(無いと次の起動で前の置き場から移し直すため)
+    var localList: AppListCache = LocalAppLibrary.standardList
     #if !APP_STORE_REVIEW
     /// 外部の公開データ(#1288)
     var feeds: FeedCache = .shared
@@ -33,6 +36,7 @@ struct MacLocalWipe {
         await records.purgeAll()
         documents.removeAll()
         appList.clear()
+        localList.store([])
         thumbnails.removeAll()
         #if !APP_STORE_REVIEW
         feeds.reset()

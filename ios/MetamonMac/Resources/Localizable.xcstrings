@@ -1320,6 +1320,23 @@
         }
       }
     },
+    "「%@」を読み込んでいます" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Loading “%@”…"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "「%@」を読み込んでいます"
+          }
+        }
+      }
+    },
     "「%@」を追加しますか?" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -3382,6 +3399,23 @@
         }
       }
     },
+    "アプリの一覧を読み込んでいます" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Loading your apps"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "アプリの一覧を読み込んでいます"
+          }
+        }
+      }
+    },
     "アプリの名前" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -3621,6 +3655,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "オフラインです"
+          }
+        }
+      }
+    },
+    "オフラインです。保存済みの一覧を表示しています" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "You're offline. Showing your saved list."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "オフラインです。保存済みの一覧を表示しています"
           }
         }
       }
@@ -4000,6 +4051,40 @@
         }
       }
     },
+    "サーバーからアプリをもう一度読み込みます" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Load the app from the server again"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "サーバーからアプリをもう一度読み込みます"
+          }
+        }
+      }
+    },
+    "サーバーからアプリを読み込んでいます" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Loading the app from the server"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "サーバーからアプリを読み込んでいます"
+          }
+        }
+      }
+    },
     "サーバーが混み合っています。少し待ってからもう一度送ってください。" : {
       "localizations" : {
         "en" : {
@@ -4012,6 +4097,40 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "サーバーが混み合っています。少し待ってからもう一度送ってください。"
+          }
+        }
+      }
+    },
+    "サーバーに届きませんでした。つながってからもう一度お試しください。" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Couldn't reach the server. Try again once you're online."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "サーバーに届きませんでした。つながってからもう一度お試しください。"
+          }
+        }
+      }
+    },
+    "サーバーに届きませんでした。つながると一覧を取り直します。" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Couldn't reach the server. The list will refresh once you're back online."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "サーバーに届きませんでした。つながると一覧を取り直します。"
           }
         }
       }

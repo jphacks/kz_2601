@@ -66,9 +66,12 @@ struct MacRootView: View {
 
     init(apps: [SampleApp]) { bundledApps = apps }
 
-    /// 作ったアプリ(一覧の並び)
+    /// 作ったアプリ(一覧の並び)。サーバーのアプリで中身をまだ取っていない行は、一覧の名前で出す(#1057)
     private var createdApps: [SampleApp] {
-        library.createdIds.compactMap { id in library.generated[id].map { Self.entry(id: id, $0) } }
+        library.createdIds.compactMap { id in
+            if let document = library.generated[id] { return Self.entry(id: id, document) }
+            return library.serverSummary(id).map { SampleApp(id: id, name: $0.name, description: nil, url: nil, version: $0.currentVersion) }
+        }
     }
 
     /// 同梱の例(直したものは差し替え)
@@ -91,12 +94,19 @@ struct MacRootView: View {
                        examples: exampleApps.filter { $0.matches(searchText) },
                        thumbnail: thumbnail(for:), searchText: searchText, selection: guardedSelection,
                        onOpen: { focus = .canvas }, onDelete: deleteApp, onDuplicate: duplicateApp,
-                       onResetExample: resetExample)
+                       onResetExample: resetExample,
+                       loadingServerApps: library.serverListState == .loading,
+                       offline: library.serverListState == .offline)
                 .focused($focus, equals: .sidebar)
                 .navigationSplitViewColumnWidth(min: 180, ideal: 220, max: 320)
         } detail: {
             Group {
-                if let app = selectedApp {
+                if let app = selectedApp, library.isServerOnly(app.id) {
+                    MacServerAppLoading(app: app, failed: library.downloadFailed.contains(app.id)) {
+                        Task { await library.download(app.id) }
+                    }
+                    .task(id: app.id) { await library.download(app.id) }
+                } else if let app = selectedApp {
                     AppCanvas(app: app, dsl: library.generated[app.id]?.dsl, keepsRecords: library.isCreated(app.id),
                               server: library.isCreated(app.id) && library.isOnServer(app.id) ? MacServices.shared.appConfig : nil,
                               showsScreenMap: $showsScreenMap,
@@ -147,6 +157,11 @@ struct MacRootView: View {
         .modifier(MacPaywallPresenter()) // 中央のアプリの部品が Pro を求めた時の課金画面(iOS と同じ商品)
         #endif
         .task { voice.prepareIfAllowed() } // モデルが端末にあれば読み込む(無ければ起動では聞かない)
+        // サインインした・アカウントが変わった時と、前面に戻った時にサーバーの一覧を取り直す(#1057)
+        .task(id: MacAccount.shared.session.user?.uid) { await refreshServerApps() }
+        .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
+            Task { await refreshServerApps() }
+        }
         .onAppear {
             reopenLastApp()
             // self ごと捕まえると見張り(State)との循環で残るので、シートの Binding だけ渡す
@@ -201,6 +216,13 @@ struct MacRootView: View {
 
     // MARK: - 一覧(#969)
 
+    /// サーバーの一覧を取り直す(#1057)。サインインしていなければ取らない(サインアウトの後は wipe が空にしている)
+    private func refreshServerApps() async {
+        guard MacAccount.shared.session.user != nil else { return }
+        await library.refreshServerApps()
+        reopenLastApp() // 前に開いていたサーバーのアプリが一覧に載ったら開き直す
+    }
+
     /// 起動時: ウインドウが覚えている選択(SceneStorage)が無い・もう無いアプリなら、前に開いていたアプリを開き直す
     private func reopenLastApp() {
         let ids = apps.map(\.id)
@@ -212,6 +234,7 @@ struct MacRootView: View {
     private var appReplaceContext: MacAppReplaceContext {
         let summaries = library.createdIds.compactMap { id in
             library.generated[id].map { AppSummary(id: id, name: $0.dsl.app.name, currentVersion: max($0.version, 2)) }
+                ?? library.serverSummary(id).map { AppSummary(id: id, name: $0.name, currentVersion: max($0.currentVersion, 2)) }
         }
         return MacAppReplaceContext(apps: summaries, current: selectedAppId, delete: deleteApp)
     }
@@ -229,6 +252,7 @@ struct MacRootView: View {
         if onServer, let appConfig = MacServices.shared.appConfig {
             Task {
                 do { try await appConfig.deleteApp(appId: id) } catch { print("[Metamon] Mac: deleteApp failed: \(error)") }
+                await refreshServerApps()
             }
         }
         thumbs.remove(appId: id)
@@ -339,6 +363,7 @@ struct MacRootView: View {
             : library.generated[document.appId]?.dsl ?? (try? apps.first(where: { $0.id == document.appId })?.loadDSL())
         // 本物の AI の結果はサーバーにも保存されている(記録・版をサーバーにつなぐ印)
         library.apply(document, envelope: envelope, created: target == .create, onServer: MacServices.shared.isLive)
+        if target == .create, MacServices.shared.isLive { Task { await refreshServerApps() } } // サーバーの並びに入れる(#1057)
         showChangeHighlight(previous: previous, next: document)
         // 最初のアプリの印(iOS と同じ `hasShownEditHint`)。β の案内(`MacOnboarding`)は「直し方の例」を閉じた後
         // (出さなかった時は次の起動)にこれを見て 1 回出す。

@@ -21,6 +21,10 @@ struct AppSidebar: View {
     var onDuplicate: (String) -> Void = { _ in }
     /// 「元の例に戻す」の確認の後に呼ぶ(#1283)
     var onResetExample: (String) -> Void = { _ in }
+    /// サーバーの一覧を初めて読んでいる(前回の一覧が無い・#1057)。作ったアプリの所にスケルトンを出す
+    var loadingServerApps = false
+    /// サーバーに届かず、前回の一覧を出している(#1057)
+    var offline = false
 
     @Environment(MacAppLibrary.self) private var library
     @State private var renameTarget: SampleApp?
@@ -35,9 +39,17 @@ struct AppSidebar: View {
     var body: some View {
         List(selection: $selection) {
             if !created.isEmpty {
-                Section("作ったアプリ") {
+                Section {
                     ForEach(created) { row($0) }
                         .onMove(perform: isSearching ? nil : { library.move(fromOffsets: $0, toOffset: $1) })
+                } header: {
+                    Text("作ったアプリ")
+                } footer: {
+                    if offline { offlineNote }
+                }
+            } else if loadingServerApps && !isSearching {
+                Section("作ったアプリ") {
+                    ForEach(0..<3, id: \.self) { _ in skeletonRow }
                 }
             }
             if !examples.isEmpty {
@@ -104,6 +116,30 @@ struct AppSidebar: View {
         } message: {
             Text("会話で直した分は消えます。")
         }
+    }
+
+    /// 読み込み中の行(#1057)。選べない・中身の形だけ
+    private var skeletonRow: some View {
+        HStack(spacing: 8) {
+            SidebarThumbnail(name: " ", image: nil)
+            VStack(alignment: .leading, spacing: MacTheme.Spacing.rowLine) {
+                Text(verbatim: "アプリの名前を読み込み中")
+                    .font(MacTheme.Fonts.sidebarTitle)
+                    .lineLimit(1)
+            }
+        }
+        .padding(.vertical, 2)
+        .redacted(reason: .placeholder)
+        .selectionDisabled()
+        .accessibilityLabel(Text("アプリの一覧を読み込んでいます"))
+        .help("アプリの一覧を読み込んでいます")
+    }
+
+    private var offlineNote: some View {
+        Label("オフラインです。保存済みの一覧を表示しています", systemImage: "wifi.slash")
+            .font(MacTheme.Fonts.sidebarDetail)
+            .foregroundStyle(.secondary)
+            .help("サーバーに届きませんでした。つながると一覧を取り直します。")
     }
 
     private func row(_ app: SampleApp) -> some View {
