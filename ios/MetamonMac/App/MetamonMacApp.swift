@@ -63,6 +63,7 @@ struct MetamonMacApp: App {
                     .modifier(MacPushRegistrationObserver()) // プッシュの端末の登録(#982)
                     #endif
                     .modifier(MacCrashReportUser())
+                    .modifier(MacStatusItemInstaller()) // メニューバーの常駐(#1848・設定で ON の時だけ)
                     .task { MacAccount.shared.wipe.library = library } // サインアウト・削除で一覧も空にする(#972)
                     .task {
                         // マイクの抜き差し(#1221): 録音中に使っている装置が外れたら止めて知らせる
