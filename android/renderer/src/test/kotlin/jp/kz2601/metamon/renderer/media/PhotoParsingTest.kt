@@ -156,7 +156,7 @@ class PhotoParsingTest {
             labels = listOf("food", "sushi", "dish", "rice", "sashimi_platter", "plate", "table"),
             barcodes = listOf("9784000000000", "https://example.com"), peopleCount = 3, color = "赤",
         )
-        val out = PhotoReading.apply(clues, moreSpecs, more)
+        val out = PhotoReading.apply(clues, moreSpecs, more, describePrefix = "写っているもの: ")
         assertEquals("大まかな food を飛ばして具体的なラベル", JSONValue.Str("寿司"), out.values["name"])
         assertEquals(JSONValue.Str("寿司、ご飯、sashimi platter、plate、テーブル"), out.values["things"])
         assertEquals(JSONValue.Str("9784000000000"), out.values["code"])
@@ -167,14 +167,14 @@ class PhotoParsingTest {
 
     @Test
     fun moreKindsWithNothingFound() {
-        val out = PhotoReading.apply(PhotoClues(peopleCount = 0), moreSpecs, more)
+        val out = PhotoReading.apply(PhotoClues(peopleCount = 0), moreSpecs, more, describePrefix = "写っているもの: ")
         assertEquals(mapOf("people" to JSONValue.Num(0.0)), out.values)
         assertEquals(listOf("name", "things", "code", "color"), out.missed)
     }
 
     @Test
     fun labelFallsBackToGenericLabel() {
-        val out = PhotoReading.apply(PhotoClues(labels = listOf("food", "plant")), listOf(PhotoAnalyze(PhotoAnalyzeKind.LABEL, "name")), more)
+        val out = PhotoReading.apply(PhotoClues(labels = listOf("food", "plant")), listOf(PhotoAnalyze(PhotoAnalyzeKind.LABEL, "name")), more, describePrefix = "写っているもの: ")
         assertEquals(JSONValue.Str("食べ物"), out.values["name"])
     }
 
@@ -196,7 +196,7 @@ class PhotoParsingTest {
             PhotoAnalyze(PhotoAnalyzeKind.JOINT_ANGLE, "angle"),
         )
         val clues = PhotoClues(lines = listOf("TAILOR MART", "2026/10/28 18:42", "Milk ¥198", "Bread ¥258", "TOTAL ¥493"), labels = listOf("receipt", "food"))
-        val out = PhotoReading.apply(clues, specs, expense, ZoneId.of("Asia/Tokyo"))
+        val out = PhotoReading.apply(clues, specs, expense, ZoneId.of("Asia/Tokyo"), describePrefix = "写っているもの: ")
         assertEquals(JSONValue.Num(493.0), out.values["amount"])
         assertEquals(JSONValue.Str("2026-10-28"), out.values["date"])
         assertEquals(JSONValue.Str("2026-10-28T18:42:00+09:00"), out.values["at"])
@@ -210,7 +210,7 @@ class PhotoParsingTest {
     fun blankPhotoMissesEverything() {
         val expense = Entity(id = "e", name = "e", fields = listOf(field("amount", FieldType.CURRENCY), field("date", FieldType.DATE)))
         val specs = listOf(PhotoAnalyze(PhotoAnalyzeKind.AMOUNT, "amount"), PhotoAnalyze(PhotoAnalyzeKind.DATE, "date"))
-        val out = PhotoReading.apply(PhotoClues(), specs, expense)
+        val out = PhotoReading.apply(PhotoClues(), specs, expense, describePrefix = "写っているもの: ")
         assertEquals(emptyMap<String, JSONValue>(), out.values)
         assertEquals(listOf("amount", "date"), out.missed)
     }

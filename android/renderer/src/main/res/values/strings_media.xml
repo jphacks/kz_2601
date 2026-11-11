@@ -24,6 +24,7 @@
     <string name="media_drawing_undo">元に戻す</string>
     <string name="media_photo">写真</string>
     <string name="media_photo_attached">%1$s(添付済み)</string>
+    <string name="media_photo_describe_prefix">"写っているもの: "</string>
     <string name="media_photo_hint_camera">カメラを開きます</string>
     <string name="media_photo_hint_choose">カメラか写真ライブラリを選びます</string>
     <string name="media_photo_hint_library">写真ライブラリを開きます</string>

@@ -23,6 +23,7 @@
     <string name="media_drawing_undo">Undo</string>
     <string name="media_photo">Photo</string>
     <string name="media_photo_attached">%1$s (attached)</string>
+    <string name="media_photo_describe_prefix">"In the photo: "</string>
     <string name="media_photo_hint_camera">Opens the camera</string>
     <string name="media_photo_hint_choose">Choose the camera or the photo library</string>
     <string name="media_photo_hint_library">Opens the photo library</string>
