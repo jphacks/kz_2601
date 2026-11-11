@@ -83,12 +83,12 @@ import jp.kz2601.metamon.renderer.theme.ReadableWidth
 import jp.kz2601.metamon.retention.RetentionPromptHost
 import jp.kz2601.metamon.retention.retentionPending
 import jp.kz2601.metamon.runtime.AppRuntime
+import jp.kz2601.metamon.runtime.AutoNav
 import jp.kz2601.metamon.runtime.NavigationSnapshot
 import jp.kz2601.metamon.runtime.ProvideAiChatVoice
 import jp.kz2601.metamon.runtime.TranscriberDictationHost
 import jp.kz2601.metamon.runtime.UiText
 import jp.kz2601.metamon.services.GenerateProgress
-import jp.kz2601.metamon.services.PlanUsageSource
 import jp.kz2601.metamon.voice.AndroidSpeechEngine
 import jp.kz2601.metamon.voice.AppNameMatch
 import jp.kz2601.metamon.voice.VoiceAppRequests
@@ -238,7 +238,7 @@ fun MetamonApp(container: AppContainer) {
             // 挨拶・AI の質問・完成の要約の読み上げ(#892・設定で ON の時だけ)
             speech = AndroidSpeechEngine.reader(context),
             // 「今日の残り」(`GET /v1/me/usage`・iOS と同じ口)。モックは出さない
-            usage = if (container.knobs.mock) null else container.appConfig as? PlanUsageSource,
+            usage = container.usageSource,
             // 新規作成の無料枠と 402 の課金画面(#1261)。審査用の版は課金を持たない(iOS の APP_STORE_REVIEW と同じ)
             creationGate = if (ReviewBuild.enabled) null else container.pro,
             // ai の応答のヘッダーから「今日の残り」を入れる(#1203)。モックはヘッダーが無いので何も来ない
@@ -323,9 +323,8 @@ fun MetamonApp(container: AppContainer) {
         if (knobs.autoNav.isEmpty()) return@LaunchedEffect
         delay(AUTO_NAV_START_MILLIS)
         knobs.autoNav.forEachIndexed { i, step ->
-            // 遷移(#357)が入るまでは initialScreen の差し替えで画面を出す。出し方(sheet など)はまだ見ない
-            val found = vm.showScreen(step.screen)
-            val line = "auto nav ${i + 1}/${knobs.autoNav.size}: → $step ${if (found) "ok" else "not found"}"
+            // 本物の遷移(navigate のアクション)で、今見えている画面から進む。出し方(:sheet / :fullScreen)も効く
+            val line = AutoNav.step(runtime, step, i, knobs.autoNav.size)
             Log.i(AppContainer.TAG, line)
             // logcat はまとめて流れることがあるので、スクショ側が同期できるよう cache/autonav-step にも書く
             runCatching { File(context.cacheDir, "autonav-step").writeText(line) }

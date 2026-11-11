@@ -98,11 +98,19 @@ adb shell am start -n jp.kz2601.metamon.stg/jp.kz2601.metamon.MainActivity \
 | `METAMON_MOCK=1` | 全部モック(認証・appconfig・ai・文字起こし)。ai は発話の語でサンプル DSL を選び、生成の途中経過も擬似で流す |
 | `METAMON_MOCK_AI_DELAY=<秒>` | モックの ai の応答待ち(既定 1.2) |
 | `METAMON_MOCK_SHARING=1` | 変身一覧に 2 件入れ、共有を端末内で完結させる |
+| `METAMON_MOCK_NEW_ITEMS=<n>` | 新着(#268)に他の人の記録 n 件 + 自分の 1 件を出す。Android は新着の画面がまだ無いので、今は読むだけ(画面を作る PR でつなぐ) |
+| `METAMON_MOCK_USAGE=apps:9/10,records:4200/5000,photos:10/500[,pro][,participant]` | 「今日の残り」と設定の「使っている量」をサーバー無しで出す。`METAMON_MOCK` 無しでも効く |
+| `METAMON_MOCK_MEMBERS=owner` / `member` | モックの構成で、共有アプリの参加者(#903)を端末内で 3 人出す。値は自分の立場。未設定なら参加者の欄を出さない |
+| `METAMON_MOCK_MEMBERS_FAIL=1` | 参加者を外す・抜ける・管理者にするを失敗させる(楽観的 UI の巻き戻しを見る) |
+| `METAMON_AI_CONSENT=granted` / `reset` | AI への送信に同意済み(チュートリアルも見た扱い) / 初回(未同意・説明未表示)の状態で起動する |
 | `METAMON_INITIAL_EXAMPLE=<名前>` | 最初に描く DSL を `docs/dsl/examples/<名前>.json` にする |
 | `METAMON_INITIAL_DSL_PATH=<パス>` | 最初に描く DSL を端末のファイルから読む(見た目の監査用。アプリが読める `/sdcard/Android/data/<applicationId>/files/` に `adb push` して、そのパスを渡す) |
 | `METAMON_INITIAL_SCREEN=<screen>` | 最初の画面を変える |
+| `METAMON_SEED_DUMMY=<n>` | モックの構成で、最初に描く DSL の各 entity に欄の型からダミーの記録を n 件(1〜10・数字でなければ 4)作る。長い文字列・大きい金額を混ぜる(見た目の監査用) |
+| `METAMON_SEED_STEP_HOURS=<h>` | ダミーの記録の作成日時の間隔(既定 1 時間。記録の保存期間 #482 の確認は 24) |
+| `METAMON_SEED_AUTHORS=mixed` | ダミーの記録の投稿者を自分 / 別の人の交互にする(`Field.hidden` #262 の確認) |
 | `METAMON_AUTO_TRANSCRIPT=<文>` | 起動直後に 1 回だけ発話を投げる |
-| `METAMON_AUTO_NAV=a,b,c` / `METAMON_AUTO_NAV_INTERVAL=<秒>` | 起動 3 秒後から画面を順に出す。今の行は logcat(`Metamon`)と `cache/autonav-step` に出る |
+| `METAMON_AUTO_NAV=a,b,c:sheet` / `METAMON_AUTO_NAV_INTERVAL=<秒>` | 起動 3 秒後から、今見えている画面から navigate のアクションを順に実行する(本物の遷移。`:sheet` / `:fullScreen` で出し方を指定)。DSL に無い画面は飛ばす。今の行(タブ・スタック・シート)は logcat(`Metamon`)と `cache/autonav-step` に出る |
 | `METAMON_E2E_OFFLINE_SECONDS=<n>` | 起動から n 秒は記録の API を圏外にする(DSL の取得は通す) |
 | `METAMON_AUTO_FEEDBACK=<秒>` | その秒数後に、端末を振った時と同じくフィードバックの画面を開く(#1314・画面のテスト `FeedbackComposerUiTest` が使う) |
 | `METAMON_IAP_ENFORCE=1` / `METAMON_IAP_FREE_LIMIT=<n>` | debug でも新規作成の無料枠を効かせる / 1 日の回数を変える(#1261・既定は 3 回、debug は数えない) |

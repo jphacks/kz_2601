@@ -263,17 +263,6 @@ class VoiceViewModel(
     }
 
     /**
-     * 今のアプリの最初の画面を差し替える(DEBUG のつまみ `METAMON_AUTO_NAV` 用・遷移 #357 が入るまで)。
-     * その画面が無ければ何もせず false。
-     */
-    fun showScreen(screenId: String): Boolean {
-        val dsl = _state.value.document.dsl
-        if (dsl.screen(screenId) == null) return false
-        _state.update { it.copy(document = it.document.copy(dsl = it.document.dsl.copy(initialScreen = screenId))) }
-        return true
-    }
-
-    /**
      * ランタイムが開いたアプリ(起動時の開き直し・切り替え・新しいアプリ・ホットリロード)に合わせる。生成はしない。
      * 別のアプリになったら、前のアプリの要約・相談・元に戻す履歴は捨てる(前のアプリの版を移った先に当てない)。
      */
