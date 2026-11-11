@@ -54,6 +54,14 @@ class DesktopConformanceTest {
         "progressBar" to listOf("ratio", "percent"),
         "gauge" to listOf("value", "unit"),
         "chart" to listOf("buckets"),
+        "list" to listOf("entity", "rows", "emptyText"),
+        "table" to listOf("entity", "columns", "rows", "limit", "groupBy"),
+        "timeline" to listOf("entity", "rows", "limit"),
+        "searchBar" to listOf("field", "placeholder", "query"),
+        "calendar" to listOf("entity", "title"),
+        "gridTable" to listOf("entity", "title"),
+        "feed" to listOf("title", "limit"),
+        "matchList" to listOf("entity", "show", "title"),
         "settlement" to listOf("title", "transfers"),
         "bracket" to listOf("title", "rounds", "champion"),
         "flashcards" to listOf("cards", "progress"),
@@ -169,6 +177,42 @@ class DesktopConformanceTest {
         assertEquals(Markdown.Block.Item("•", "いち"), blocks[1])
         assertEquals(Markdown.Block.Item("1.", "に"), blocks[2])
         assertEquals("本文 太字 と リンク", Markdown.inline("本文 **太字** と [リンク](https://example.com)").text)
+    }
+
+    @Test
+    fun tableViewSortIsDisplayOnly() {
+        val rows = listOf(TableCells.Row("a", listOf("みかん", "¥1,200")), TableCells.Row("b", listOf("りんご", "¥300")), TableCells.Row("c", listOf("いちご", "¥45")))
+        assertEquals(listOf("c", "b", "a"), TableCells.viewSorted(rows, 1, true).map { it.id })
+        assertEquals(listOf("a", "b", "c"), TableCells.viewSorted(rows, 1, false).map { it.id })
+        assertEquals(listOf("a", "b", "c"), TableCells.viewSorted(rows, null, true).map { it.id })
+        assertEquals(1200.0, TableCells.number("¥1,200")!!, 0.0)
+    }
+
+    @Test
+    fun listRowsFor1000RecordsAndSearch() {
+        val dsl = Examples.load("shopping")
+        val list = dsl.screen("home")!!.components.flatMap { it.children }.first { it.type == jp.kz2601.metamon.dsl.ComponentType.LIST }
+        val entityId = list.entity!!
+        val store = MockStore(mapOf(entityId to (1..1000).map { Row("r$it", mapOf("name" to "品$it", "done" to "false", "added" to "2026-11-01")) }))
+        val data = LeafData.of(dsl, store)
+        val started = System.nanoTime()
+        val rows = ListRows.rows(list, data, null)
+        assertEquals(1000, rows.size)
+        assertTrue("1000 行の行の計算が遅い", (System.nanoTime() - started) / 1_000_000 < 2000)
+        assertEquals(999, LeafData.of(dsl, store.delete(entityId, "r1")).let { ListRows.rows(list, it, null).size })
+    }
+
+    @Test
+    fun listDeleteAndToggleThroughSession() {
+        val dsl = Examples.load("shopping")
+        val session = DesktopSession(dsl, MockStore(mapOf("groceries" to listOf(Row("a", mapOf("name" to "牛乳", "done" to "false")), Row("b", mapOf("name" to "卵", "done" to "false"))))))
+        val list = dsl.screen("home")!!.components.flatMap { it.children }.first { it.type == jp.kz2601.metamon.dsl.ComponentType.LIST }
+        val top = session.top
+        session.dispatch(jp.kz2601.metamon.dsl.Action(type = jp.kz2601.metamon.dsl.ActionType.DELETE_RECORD, entity = "groceries"), ActionContext(top, null, "a"))
+        assertEquals(top, session.top)
+        assertEquals(listOf("b"), session.rows(list, null).map { it.id })
+        session.queries(top)["q"] = "卵"
+        assertEquals("卵", session.queries(top)["q"])
     }
 
     private fun decodeDsl(e: JsonElement): AppDSL =
@@ -296,6 +340,56 @@ class DesktopConformanceTest {
                 "buckets",
                 JsonArray(ChartBuckets.buckets(c, data).map { JsonObject(mapOf("label" to JsonPrimitive(it.label), "value" to JsonPrimitive(it.value))) }),
             )
+            else -> Unit
+        }
+        dataProps(c, data).forEach { (k, v) -> put(k, v) }
+    }
+
+    /** データの部品(#1744)。行は画面と同じ ListRows・TableCells・TimelineRows から。検索欄は開いた時の空(検索の操作は runSteps が DesktopSession で回す)。 */
+    private fun dataProps(c: Component, data: LeafData): Map<String, JsonElement> = buildMap {
+        fun putText(k: String, v: String?) {
+            v?.let { put(k, JsonPrimitive(it)) }
+        }
+        if (c.type !in DATA_LEAVES && c.type.wire != "calendar") return@buildMap
+        putText("entity", c.entity)
+        putText("title", c.title)
+        c.limit?.let { put("limit", JsonPrimitive(it)) }
+        val entity = data.entity(c.entity)
+        when (c.type.wire) {
+            "list" -> {
+                val rows = ListRows.rows(c, data, null)
+                val toggle = ListToggle.field(c.item, entity)
+                put("rows", JsonArray(rows.map { r ->
+                    val t = ListRows.texts(c.item, r, entity, data)
+                    JsonObject(buildMap {
+                        put("recordId", JsonPrimitive(r.id))
+                        put("title", JsonPrimitive(t.title))
+                        t.subtitle?.let { put("subtitle", JsonPrimitive(it)) }
+                        t.trailing?.let { put("trailing", JsonPrimitive(it)) }
+                        toggle?.let { f -> put("checked", JsonPrimitive(ListToggle.isOn(r, f.id, ListToggle.isDaily(c.item), DSLClock.now()))) }
+                    })
+                }))
+                if (rows.isEmpty()) putText("emptyText", c.emptyText ?: DataText.EMPTY)
+            }
+            "table" -> {
+                putText("groupBy", c.groupBy)
+                put("columns", JsonArray(c.columns.map { JsonPrimitive(TableCells.header(it, entity)) }))
+                put("rows", JsonArray(TableCells.rows(c, data).map { r -> JsonArray(r.texts.map(::JsonPrimitive)) }))
+            }
+            "timeline" -> put("rows", JsonArray(TimelineRows.rows(c, data).map { r ->
+                JsonObject(buildMap {
+                    put("recordId", JsonPrimitive(r.id))
+                    put("date", JsonPrimitive(DataText.text(data, r, c.dateField, entity)))
+                    put("title", JsonPrimitive(DataText.text(data, r, c.titleField, entity)))
+                    c.subtitleField?.let { DataText.text(data, r, it, entity) }?.takeIf { it.isNotEmpty() }?.let { put("subtitle", JsonPrimitive(it)) }
+                })
+            }))
+            "searchBar" -> {
+                putText("field", c.field)
+                putText("placeholder", c.placeholder)
+                put("query", JsonPrimitive(""))
+            }
+            "matchList" -> putText("show", c.show?.wire)
         }
     }
 
