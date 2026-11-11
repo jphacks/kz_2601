@@ -82,9 +82,15 @@ func (f *Firestore) UpdateItem(ctx context.Context, it Item) error {
 	})
 }
 
-// ListItems implements Store. Sorted in memory (status equality + order on
-// another field would need a composite index); the status and source
-// filters keep the page small.
+// itemPage is how many inbox documents one page of ListItems reads.
+const itemPage = 1000
+
+// ListItems implements Store: the oldest items first. Ordering by
+// ingestedAt with the status / source equality filters would need a
+// composite index, so every matching document is read in pages ordered by
+// document id (equality filters + __name__ need no composite index) and
+// the oldest are kept in memory (oldestItems). Only Limit items are held
+// between pages, however large the inbox.
 func (f *Firestore) ListItems(ctx context.Context, q ItemQuery) ([]Item, error) {
 	query := f.c.Collection(colInbox).Query
 	if q.Status != "" {
@@ -94,29 +100,56 @@ func (f *Firestore) ListItems(ctx context.Context, q ItemQuery) ([]Item, error) 
 		// equality filters only: served by single-field indexes, no composite index
 		query = query.Where("source", "==", string(q.Source))
 	}
+	return oldestItems(ctx, limitOr(q.Limit, 100), itemPage, func(ctx context.Context, after string, n int) ([]Item, error) {
+		pq := query.OrderBy(firestore.DocumentID, firestore.Asc).Limit(n)
+		if after != "" {
+			pq = pq.StartAfter(after)
+		}
+		var page []Item
+		err := each(ctx, pq, func(s *firestore.DocumentSnapshot) error {
+			var it Item
+			if err := s.DataTo(&it); err != nil {
+				return err
+			}
+			it.ID = s.Ref.ID
+			page = append(page, it)
+			return nil
+		})
+		return page, err
+	})
+}
+
+// oldestItems reads every page (page(after, size): up to size items with
+// ids after `after`, in id order) and returns the limit oldest items,
+// oldest first.
+func oldestItems(ctx context.Context, limit, size int, page func(ctx context.Context, after string, n int) ([]Item, error)) ([]Item, error) {
 	out := []Item{}
-	err := each(ctx, query.Limit(2000), func(s *firestore.DocumentSnapshot) error {
-		var it Item
-		if err := s.DataTo(&it); err != nil {
-			return err
+	after := ""
+	for {
+		got, err := page(ctx, after, size)
+		if err != nil {
+			return nil, err
 		}
-		it.ID = s.Ref.ID
-		out = append(out, it)
-		return nil
-	})
-	if err != nil {
-		return nil, err
-	}
-	sort.Slice(out, func(i, j int) bool {
-		if !out[i].IngestedAt.Equal(out[j].IngestedAt) {
-			return out[i].IngestedAt.Before(out[j].IngestedAt)
+		out = append(out, got...)
+		sortItems(out)
+		if len(out) > limit {
+			out = out[:limit]
 		}
-		return out[i].ID < out[j].ID
-	})
-	if n := limitOr(q.Limit, 100); len(out) > n {
-		out = out[:n]
+		if len(got) < size {
+			return out, nil
+		}
+		after = got[len(got)-1].ID
 	}
-	return out, nil
+}
+
+// sortItems orders items oldest first (ties by id).
+func sortItems(items []Item) {
+	sort.Slice(items, func(i, j int) bool {
+		if !items[i].IngestedAt.Equal(items[j].IngestedAt) {
+			return items[i].IngestedAt.Before(items[j].IngestedAt)
+		}
+		return items[i].ID < items[j].ID
+	})
 }
 
 // PutDraft implements Store.

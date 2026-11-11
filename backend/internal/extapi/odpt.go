@@ -30,7 +30,8 @@ import (
 //     no direct questions to the operators); Toei rows also need
 //     ODPTToeiCredit (CC BY 4.0).
 //   - the time of each row (dc:date) is shown, and a row past its dct:valid
-//     is dropped; the shared cache keeps an answer 1 minute only.
+//     is dropped; the shared cache keeps an answer 1 minute at most, and
+//     never past the first dct:valid of its rows (Output.ValidUntil).
 //   - the key (EXT_ODPT_API_KEY, Secret Manager) goes in the query
 //     (acl:consumerKey) as the API wants; errors never carry the URL
 //     (keyed.go).
@@ -220,6 +221,7 @@ func (o *odpt) trainStatus(ctx context.Context, in Input) (Output, error) {
 	type ranked struct {
 		op, line int
 		row      Row
+		valid    time.Time // zero: no dct:valid
 	}
 	now := o.now()
 	var rs []ranked
@@ -232,7 +234,8 @@ func (o *odpt) trainStatus(ctx context.Context, in Input) (Output, error) {
 		if err != nil {
 			continue // the time must be shown with the row (ガイドライン 2.1.1)
 		}
-		if v, err := time.Parse(time.RFC3339, it.Valid); err == nil && v.Before(now) {
+		valid, verr := time.Parse(time.RFC3339, it.Valid)
+		if verr == nil && valid.Before(now) {
 			continue // past its valid time (ガイドライン 2.1.2)
 		}
 		title, li := odptOperators[oi].name, -1
@@ -249,7 +252,7 @@ func (o *odpt) trainStatus(ctx context.Context, in Input) (Output, error) {
 		} else if s != "" {
 			text = s
 		}
-		rs = append(rs, ranked{oi, li, Row{Title: title, Subtitle: text, Value: date.In(odptJST).Format("1/2 15:04") + " 更新"}})
+		rs = append(rs, ranked{oi, li, Row{Title: title, Subtitle: text, Value: date.In(odptJST).Format("1/2 15:04") + " 更新"}, valid})
 	}
 	slices.SortStableFunc(rs, func(a, b ranked) int {
 		if a.op != b.op {
@@ -257,14 +260,23 @@ func (o *odpt) trainStatus(ctx context.Context, in Input) (Output, error) {
 		}
 		return a.line - b.line
 	})
-	rows := make([]Row, 0, min(len(rs), odptMaxRows))
+	// the cache keeps the answer no longer than its first row is valid
+	// (Output.ValidUntil), so a cached row is never shown past dct:valid
+	var out Output
+	out.Rows = make([]Row, 0, min(len(rs), odptMaxRows))
 	for _, r := range rs {
-		if len(rows) == odptMaxRows {
+		if len(out.Rows) == odptMaxRows {
 			break
 		}
-		rows = append(rows, r.row)
+		out.Rows = append(out.Rows, r.row)
+		if !r.valid.IsZero() && (out.ValidUntil.IsZero() || r.valid.Before(out.ValidUntil)) {
+			out.ValidUntil = r.valid
+		}
 	}
-	return Output{Rows: rows}, nil
+	// TODO(#1643): Output has no place for a notice yet, so ODPTAttribution
+	// (and ODPTToeiCredit for Toei rows) is not sent with the rows; the
+	// part that shows them adds it when the DSL's external-API parts land.
+	return out, nil
 }
 
 func odptClip(s string) string {

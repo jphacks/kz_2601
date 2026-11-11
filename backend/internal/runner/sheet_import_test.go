@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"testing"
+	"time"
 
 	"github.com/jphacks/kz_2601/backend/internal/extapi"
 	"github.com/jphacks/kz_2601/backend/internal/runner"
@@ -64,8 +65,12 @@ type importEnv struct {
 
 func newImportEnv(t *testing.T, cells [][]string) *importEnv {
 	t.Helper()
+	return newImportEnvApp(t, importApp(), cells)
+}
+
+func newImportEnvApp(t *testing.T, app *dsl.App, cells [][]string) *importEnv {
+	t.Helper()
 	st := store.NewMemory()
-	app := importApp()
 	h, err := scope.New(st, "rt", store.OutboxEvent{AppID: "app1", Scope: string(dsl.ScopeShared)}, nil)
 	if err != nil {
 		t.Fatal(err)
@@ -115,7 +120,7 @@ func TestSheetImportTwiceNoDuplicates(t *testing.T) {
 		t.Fatalf("first run = %+v", res)
 	}
 	got := e.records(t)
-	if got["A-1"]["qty"] != float64(3) || got["A-1"]["ok"] != true || got["A-2"]["qty"] != float64(1200) || got["A-2"]["ok"] != false {
+	if got["A-1"]["qty"] != int64(3) || got["A-1"]["ok"] != true || got["A-2"]["qty"] != int64(1200) || got["A-2"]["ok"] != false {
 		t.Fatalf("records = %v", got)
 	}
 	if _, ok := got["A-1"]["メモ"]; ok {
@@ -133,25 +138,27 @@ func TestSheetImportTwiceNoDuplicates(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if res.Created != 1 || res.Updated != 2 {
-		t.Fatalf("second run = %+v", res)
+	// A-2 is the same: not written, not counted
+	if res.Created != 1 || res.Updated != 1 || res.Unchanged != 1 || e.q.asked[len(e.q.asked)-1] != 2 {
+		t.Fatalf("second run = %+v, asked %v", res, e.q.asked)
 	}
 	got = e.records(t)
 	if len(got) != 3 {
 		t.Fatalf("records = %d, want 3", len(got))
 	}
-	if got["A-1"]["qty"] != float64(0) {
+	if got["A-1"]["qty"] != int64(0) {
 		t.Fatalf("A-1 qty = %v, want 0", got["A-1"]["qty"])
 	}
 
-	// a retry of the same event adds nothing and does not apply the
-	// updates again (the record it created gets the same values once more)
+	// a retry of the same event adds nothing, writes nothing and asks for
+	// no writes: every row equals its record
+	asked := len(e.q.asked)
 	res, err = e.im.Import(t.Context(), e.app, importRun("ev2"), importSpec)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if res.Created != 0 || res.Unchanged != 2 || res.Updated+res.Unchanged != 3 || len(e.records(t)) != 3 {
-		t.Fatalf("retry = %+v", res)
+	if res.Created != 0 || res.Updated != 0 || res.Unchanged != 3 || len(e.records(t)) != 3 || len(e.q.asked) != asked {
+		t.Fatalf("retry = %+v, asked %v", res, e.q.asked)
 	}
 }
 
@@ -277,5 +284,112 @@ func TestSheetImportBadSpec(t *testing.T) {
 				t.Fatalf("err = %v, calls = %d", err, len(e.ext.calls))
 			}
 		})
+	}
+}
+
+// The record of a row is keyed on the entity, the id column (or ImportKey)
+// and the normalized id: renaming the rule, moving the action and changing
+// the id column's display format find the same records.
+func TestSheetImportKeyIgnoresRuleActionAndFormat(t *testing.T) {
+	e := newImportEnv(t, [][]string{{"品番", "数"}, {"1", "5"}, {"2", "6"}, {"1000", "7"}, {"ab", "8"}})
+	if res, err := e.im.Import(t.Context(), e.app, importRun("ev1"), importSpec); err != nil || res.Created != 4 {
+		t.Fatalf("first run = %+v, %v", res, err)
+	}
+	run := importRun("ev2")
+	run.RuleID, run.Action = "renamed", 3
+	e.ext.cells = [][]string{{"品番", "数"}, {"1.00", "5"}, {"００２", "6"}, {"1,000", "7"}, {" ａｂ ", "8"}}
+	res, err := e.im.Import(t.Context(), e.app, run, importSpec)
+	if err != nil {
+		t.Fatal(err)
+	}
+	// the code field takes the new text; no row makes a second record
+	if res.Created != 0 || res.Updated != 4 {
+		t.Fatalf("reformatted run = %+v", res)
+	}
+	if got := e.records(t); len(got) != 4 || got["1.00"]["qty"] != int64(5) || got["ａｂ"]["qty"] != int64(8) {
+		t.Fatalf("records = %v", got)
+	}
+
+	// two cells that normalize to one id are one row
+	e.ext.cells = [][]string{{"品番", "数"}, {"001", "9"}, {"1", "10"}}
+	if res, err := e.im.Import(t.Context(), e.app, importRun("ev3"), importSpec); err != nil || res.Duplicate != 1 || res.Created != 0 {
+		t.Fatalf("same id twice = %+v, %v", res, err)
+	}
+}
+
+// ImportKey replaces the id column in the key: the column can be renamed.
+func TestSheetImportImportKey(t *testing.T) {
+	e := newImportEnv(t, [][]string{{"品番", "数"}, {"K-1", "1"}})
+	spec := importSpec
+	spec.ImportKey = "stock-sheet"
+	if res, err := e.im.Import(t.Context(), e.app, importRun("ev1"), spec); err != nil || res.Created != 1 {
+		t.Fatalf("first run = %+v, %v", res, err)
+	}
+	e.ext.cells = [][]string{{"コード", "数"}, {"K-1", "2"}}
+	spec.IDColumn, spec.Fields = "コード", map[string]string{"コード": "code", "数": "qty"}
+	res, err := e.im.Import(t.Context(), e.app, importRun("ev2"), spec)
+	if err != nil || res.Created != 0 || res.Updated != 1 {
+		t.Fatalf("renamed column = %+v, %v", res, err)
+	}
+	if got := e.records(t); len(got) != 1 || got["K-1"]["qty"] != int64(2) {
+		t.Fatalf("records = %v", got)
+	}
+}
+
+// Rows equal to their records are not written and not counted; only the
+// changed rows are asked of quota.Writes.
+func TestSheetImportSkipsUnchangedRows(t *testing.T) {
+	cells := [][]string{{"品番", "品名", "数"}, {"U-1", "a", "1"}, {"U-2", "b", "2"}, {"U-3", "c", ""}}
+	e := newImportEnv(t, cells)
+	if _, err := e.im.Import(t.Context(), e.app, importRun("ev1"), importSpec); err != nil {
+		t.Fatal(err)
+	}
+	res, err := e.im.Import(t.Context(), e.app, importRun("ev2"), importSpec)
+	if err != nil || res.Unchanged != 3 || res.Updated != 0 || len(e.q.asked) != 1 || !res.Charge.Empty() {
+		t.Fatalf("same sheet = %+v, %v, asked %v", res, err, e.q.asked)
+	}
+	e.ext.cells = [][]string{{"品番", "品名", "数"}, {"U-1", "a", "1"}, {"U-2", "b", "3"}, {"U-3", "c", ""}}
+	res, err = e.im.Import(t.Context(), e.app, importRun("ev3"), importSpec)
+	if err != nil || res.Unchanged != 2 || res.Updated != 1 || e.q.asked[len(e.q.asked)-1] != 1 {
+		t.Fatalf("one change = %+v, %v, asked %v", res, err, e.q.asked)
+	}
+}
+
+// Cells go through the device write's checks (appconfig.NormalizeValue);
+// a date or time without a zone is read in the run's location.
+func TestSheetImportValuesLikeDeviceWrites(t *testing.T) {
+	app := &dsl.App{Entities: []dsl.Entity{{ID: "stock", Name: "在庫", Scope: dsl.ScopeShared, Fields: []dsl.Field{
+		{ID: "code", Name: "品番", Type: dsl.FieldString, Required: true},
+		{ID: "price", Name: "価格", Type: dsl.FieldCurrency},
+		{ID: "qty", Name: "数", Type: dsl.FieldInteger},
+		{ID: "kind", Name: "種類", Type: dsl.FieldEnum},
+		{ID: "at", Name: "日時", Type: dsl.FieldDatetime},
+	}}}}
+	e := newImportEnvApp(t, app, [][]string{
+		{"品番", "価格", "数", "種類", "日時"},
+		{"V-1", "¥1,200", "3.00", "なんでも", "2026-11-12"},
+		{"V-2", "100.5", "2.5", "", "2026-11-12 06:00"},
+		{"V-3", "", "1e19", "", "2026-11-12T06:00:00+09:00"},
+	})
+	run := importRun("ev1")
+	run.Location = time.FixedZone("EST", -5*60*60)
+	res, err := e.im.Import(t.Context(), e.app, run, importSpec)
+	if err != nil {
+		t.Fatal(err)
+	}
+	// 100.5 (currency), 2.5 (integer, not rounded), 1e19 (int64 bounds)
+	if res.BadValues != 3 || res.Created != 3 {
+		t.Fatalf("res = %+v", res)
+	}
+	got := e.records(t)
+	v1, v2, v3 := got["V-1"], got["V-2"], got["V-3"]
+	if v1["price"] != int64(1200) || v1["qty"] != int64(3) || v1["kind"] != "なんでも" || v1["at"] != "2026-11-12T00:00:00-05:00" {
+		t.Fatalf("V-1 = %v", v1)
+	}
+	if _, ok := v2["price"]; ok || v2["at"] != "2026-11-12T06:00:00-05:00" {
+		t.Fatalf("V-2 = %v", v2)
+	}
+	if _, ok := v3["qty"]; ok || v3["at"] != "2026-11-12T06:00:00+09:00" {
+		t.Fatalf("V-3 = %v", v3)
 	}
 }

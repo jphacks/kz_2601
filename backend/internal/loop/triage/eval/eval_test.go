@@ -3,7 +3,9 @@ package eval
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"os"
+	"strconv"
 	"strings"
 	"testing"
 
@@ -33,7 +35,7 @@ func TestEvalRulesOnLabelledSet(t *testing.T) {
 	if len(cases) < 20 || len(cases) > 30 {
 		t.Fatalf("labelled set has %d cases, want 20-30", len(cases))
 	}
-	rep, err := Run(context.Background(), Rules{}, cases)
+	rep, err := Run(context.Background(), Rules{}, cases, Hooks{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -69,11 +71,54 @@ func TestLoadRejectsBadLines(t *testing.T) {
 	}
 }
 
+// The hooks run around every model call: AfterCall sees each call's usage,
+// and a BeforeCall refusal mid-run stops the run (ErrStopped).
+func TestEvalRunsHooksPerCall(t *testing.T) {
+	cases := make([]Case, 45) // 3 calls of 20
+	for i := range cases {
+		cases[i] = Case{ID: strconv.Itoa(i), Text: "落ちる " + strconv.Itoa(i), Category: "bug", Priority: "P1"}
+	}
+	var before, after, tokens int
+	h := Hooks{
+		BeforeCall: func(context.Context) error {
+			before++
+			if before == 3 {
+				return errors.New("switch off")
+			}
+			return nil
+		},
+		AfterCall: func(_ context.Context, u triage.Usage, _ error) error {
+			after++
+			tokens += u.Total()
+			return nil
+		},
+	}
+	rep, err := Run(context.Background(), constModel{}, cases, h)
+	if !errors.Is(err, ErrStopped) || !strings.Contains(err.Error(), "switch off") {
+		t.Fatalf("err %v", err)
+	}
+	if before != 3 || after != 2 || tokens != rep.Usage.Total() || tokens == 0 {
+		t.Fatalf("before %d after %d tokens %d usage %d", before, after, tokens, rep.Usage.Total())
+	}
+}
+
+// A set over MaxCases is refused before any call.
+func TestEvalCapsTheSet(t *testing.T) {
+	cases := make([]Case, MaxCases+1)
+	for i := range cases {
+		cases[i] = Case{ID: strconv.Itoa(i), Text: "x" + strconv.Itoa(i), Category: "bug", Priority: "P1"}
+	}
+	counter := &countingModel{m: Rules{}}
+	if _, err := Run(context.Background(), counter, cases, Hooks{}); !errors.Is(err, ErrTooManyCases) || counter.texts != 0 {
+		t.Fatalf("err %v texts %d", err, counter.texts)
+	}
+}
+
 // A model that classifies everything wrong scores low: the scores are not
 // trivially 100%.
 func TestEvalScoresAWrongModelLow(t *testing.T) {
 	cases := loadSet(t)
-	rep, err := Run(context.Background(), constModel{}, cases)
+	rep, err := Run(context.Background(), constModel{}, cases, Hooks{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -106,7 +151,7 @@ func TestSimilarFeedbackIsBundledIntoOneDraft(t *testing.T) {
 		{ID: "4", Text: "ダークモードが欲しい", Category: "feature", Priority: "P3"},
 	}
 	counter := &countingModel{m: Rules{}}
-	rep, err := Run(context.Background(), counter, cases)
+	rep, err := Run(context.Background(), counter, cases, Hooks{})
 	if err != nil {
 		t.Fatal(err)
 	}
