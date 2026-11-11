@@ -6152,6 +6152,22 @@
         }
       }
     },
+    "クイックルック" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Quick Look"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "クイックルック"
+          }
+        }
+      }
+    },
     "クラッシュ報告を送る" : {
       "localizations" : {
         "en" : {
@@ -9465,6 +9481,22 @@
         }
       }
     },
+    "写真" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Photo"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "写真"
+          }
+        }
+      }
+    },
     "切り替えられませんでした" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -11770,6 +11802,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "新しいウインドウ"
+          }
+        }
+      }
+    },
+    "新しいウインドウで開く" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Open in New Window"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "新しいウインドウで開く"
           }
         }
       }
@@ -15002,6 +15050,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "送る前に"
+          }
+        }
+      }
+    },
+    "送る文字がありません。文字を選んでからもう一度お試しください。" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "There's no text to send. Select some text and try again."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "送る文字がありません。文字を選んでからもう一度お試しください。"
           }
         }
       }

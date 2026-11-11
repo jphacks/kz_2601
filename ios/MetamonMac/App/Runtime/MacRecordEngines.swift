@@ -46,6 +46,12 @@ final class MacRecordEngines {
         return lease
     }
 
+    /// 端末に書いた entity を、同じアプリを借りているほかのウインドウ(#1853)に知らせる。書いた本人には返さない
+    fileprivate func announceLocalChange(from lease: MacRecordEngineLease, entity: String) {
+        guard let entry = entries[lease.appId], entry.engine === lease.engine else { return }
+        for other in Array(entry.leases.values) where other !== lease { other.onLocalChange?(entity) }
+    }
+
     /// 借りているエンジン(テスト用)
     func engine(appId: String) -> RecordSyncEngine? { entries[appId]?.engine }
 
@@ -97,6 +103,8 @@ final class MacRecordEngineLease {
     let engine: RecordSyncEngine
     /// このウインドウへの同期の通知
     var onEvent: (@MainActor (SyncEvent) -> Void)?
+    /// ほかのウインドウが端末に書いた entity(#1853)。読み直す
+    var onLocalChange: (@MainActor (String) -> Void)?
     private weak var owner: MacRecordEngines?
 
     fileprivate init(appId: String, engine: RecordSyncEngine, owner: MacRecordEngines) {
@@ -109,12 +117,19 @@ final class MacRecordEngineLease {
         guard let owner else { return }
         self.owner = nil
         onEvent = nil
+        onLocalChange = nil
         owner.release(self)
     }
 
     /// アプリを消した(`MacRecordEngines.purge`)。もう返す先は無い
+    /// 端末に書いた(`RecordBook.onLocalWrite`)。ほかのウインドウに知らせる
+    func announceLocalChange(entity: String) {
+        owner?.announceLocalChange(from: self, entity: entity)
+    }
+
     fileprivate func detach() {
         owner = nil
         onEvent = nil
+        onLocalChange = nil
     }
 }
