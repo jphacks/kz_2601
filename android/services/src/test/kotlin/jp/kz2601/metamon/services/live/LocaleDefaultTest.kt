@@ -5,6 +5,7 @@ import jp.kz2601.metamon.services.http.ApiJson
 import jp.kz2601.metamon.services.http.DeviceContext
 import jp.kz2601.metamon.services.http.FakeTokens
 import jp.kz2601.metamon.services.http.MetamonHttp
+import jp.kz2601.metamon.services.http.baseUrl
 import jp.kz2601.metamon.services.http.json
 import jp.kz2601.metamon.services.http.take
 import jp.kz2601.metamon.services.http.testClientInfo
@@ -34,7 +35,7 @@ class LocaleDefaultTest {
 
     private fun client() = HttpAIClient(
         MetamonHttp(
-            baseUrl = server.url("/").toString(),
+            baseUrl = server.baseUrl(),
             tokens = FakeTokens("token-1"),
             clientInfo = testClientInfo,
             device = DeviceContext(timeZone = { "Asia/Tokyo" }, language = { language }),

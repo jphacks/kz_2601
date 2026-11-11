@@ -27,13 +27,22 @@ class DeviceCapabilitiesTest {
         missing.forEach { assertFalse(it.wire, it.wire in caps.allowedComponents) }
         // 今 Android で描けない部品(登録を足したらここから消す)
         for (t in listOf(
-            ComponentType.MAP_VIEW, ComponentType.LOCATION_TRACKER, ComponentType.HEALTH_STAT,
+            ComponentType.MAP_VIEW,
+            ComponentType.LOCATION_TRACKER,
+            ComponentType.HEALTH_STAT,
             ComponentType.NEARBY_SHARE,
         )) {
             assertFalse(t.wire, t.wire in caps.allowedComponents)
         }
-        // この統合で登録した部品(#871・#872・#877・#879)は申告する
-        for (t in listOf(ComponentType.SENSOR_VALUE, ComponentType.DASHCAM, ComponentType.MATCH_LIST, ComponentType.MUSIC_PLAYER, ComponentType.ROUTE_GUIDE)) {
+        // この統合で登録した部品(#871・#872・#877・#879・#1354)は申告する
+        for (t in listOf(
+            ComponentType.SENSOR_VALUE,
+            ComponentType.DASHCAM,
+            ComponentType.MATCH_LIST,
+            ComponentType.MUSIC_PLAYER,
+            ComponentType.ROUTE_GUIDE,
+            ComponentType.LOCATION_BUTTON,
+        )) {
             assertTrue(t.wire, t.wire in caps.allowedComponents)
         }
     }

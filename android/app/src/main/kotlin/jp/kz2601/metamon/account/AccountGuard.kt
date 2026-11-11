@@ -54,6 +54,8 @@ class AccountGuard(
      * 起動時のサインインしていない状態では呼ばない(サインイン画面の上で受けたものは次にサインインした人のもの)
      */
     private val onSignedOut: () -> Unit = {},
+    /** 前の人のデータを消して別の人を受け入れた後(アカウントの切り替え・#1317)。その人のアプリを開く */
+    private val onOwnerReplaced: () -> Unit = {},
 ) {
     private val _active = MutableStateFlow<AuthUser?>(null)
 
@@ -93,11 +95,13 @@ class AccountGuard(
         _active.value = null
         stopSync()
         val previous = saved.uid
-        if (previous != null && previous != uid) wipeLocked()
+        val replaced = previous != null && previous != uid
+        if (replaced) wipeLocked()
         saved.uid = uid
         owner.uid = uid
         startSync()
         _active.value = user
+        if (replaced) onOwnerReplaced()
     }
 
     /**

@@ -374,6 +374,8 @@ class AppRuntime(
     fun resetForAccountChange() {
         bootstrapJob?.cancel()
         bootstrapJob = null
+        accountSwitchJob?.cancel()
+        accountSwitchJob = null
         catchUpJob?.cancel()
         catchUpJob = null
         pendingNavigationRestore = null
@@ -390,6 +392,20 @@ class AppRuntime(
         _state.value = RuntimeState(next)
         _records.value = emptyMap()
         _navigation.value = NavigationState.initial(next.dsl)
+    }
+
+    private var accountSwitchJob: Job? = null
+
+    /**
+     * 別のアカウントを受け入れた後(#1317・iOS の `adoptSwitchedAccount`)。[resetForAccountChange] の後に呼ぶ。
+     * 話しかける前の画面のままなら一覧の先頭のアプリを開き、起動の流れ(ホットリロードなど)を新しい人で回し直す。
+     */
+    fun resumeAfterAccountSwitch() {
+        accountSwitchJob?.cancel()
+        accountSwitchJob = scope.launch {
+            resumeLatestAppIfEmpty() // 先に開く(新しい appId の空のアプリをサーバーに取りに行かない)
+            bootstrap()
+        }
     }
 
     /** インストール直後のサインイン(#276): 話しかける前の画面なら、サーバーの一覧の先頭のアプリを開く。 */

@@ -29,6 +29,7 @@ import jp.kz2601.metamon.voice.ChatHistoryStore
  * - 画面の状態・appId(新しい appId に。[resetRuntime] = iOS `recordUndo = nil`・`resetToInitial()`・`DeviceAppID.set`)
  * - ブロック中の人・仲間探しの一覧(#877・[resetRuntime] の中の `SocialRuntime.forget`。iOS は次の人の uid で読み直すまで残るが、
  *   Android は前の人のブロックで次の人の投稿を隠さないよう先に捨てる)
+ * - 開いているフィードバックの画面(前の人の画面のスクショ・書きかけ・#1315。[closeFeedback]。消す途中で失敗しても閉じる)
  * - 音声の画面の状態は [AccountGuard.generation] で作り直す(iOS `chatHistory = []`)
  */
 class LocalDataWipe(
@@ -44,8 +45,18 @@ class LocalDataWipe(
     private val feedCache: FeedCache? = null,
     private val forgetConsent: () -> Unit = {},
     private val forgetTutorial: () -> Unit = {},
+    private val closeFeedback: () -> Unit = {},
 ) {
     suspend operator fun invoke() {
+        closeFeedback()
+        try {
+            wipeAll()
+        } finally {
+            closeFeedback() // 消している間に開かれた分(前の人の画面を撮ったもの)も閉じる
+        }
+    }
+
+    private suspend fun wipeAll() {
         recordSync.wipe() // 最初に止める(前の人の送信待ちを次の人に送らない)
         documentCache.removeAll()
         appList.clear()
