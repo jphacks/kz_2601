@@ -433,7 +433,7 @@ final class AppRuntime: RuntimeNavigating {
     @ObservationIgnored private var pendingHotReloadTask: Task<Void, Never>?
     @ObservationIgnored private var recordsRefreshTasks: [String: Task<Void, Never>] = [:]
     /// 保存中のフォーム(saveRecord の連打で同じ記録を 2 件作らない)
-    @ObservationIgnored private var savingForms: Set<ObjectIdentifier> = []
+    @ObservationIgnored private let saveFlight = SaveFlight()
     /// 最後に書き込んだフォーム。送った後にサーバーが断ったら「保存しました」を取り消す(M10 × #317 / #346 / #321)
     @ObservationIgnored var lastSavedForm: SavedForm?
     #if !APP_STORE_REVIEW
@@ -1306,37 +1306,36 @@ final class AppRuntime: RuntimeNavigating {
                 }
                 return
             }
-            if let id = recordId, let current = record(entity, id), !canEdit(entity: entity, record: current) {
-                notifyReadOnly(entity: entity) // 送信待ちに積まない(#249)
-                return
-            }
-            if recordId == nil, postAuthor(for: entity) != nil, !AuthorProfile.asked {
-                // 共有アプリへの初めての投稿: 一覧に出る名前を先に決めてもらう(#250)
-                authorNamePrompt = AuthorNamePrompt { [weak self] in await self?.perform(action, ctx) }
-                return
-            }
+            // 書き込みの手順は Mac と共有(RecordBook.save・#1141)。iOS だけの処理はフックで足す
+            let appId = document.appId
+            let hooks = RecordBook.SaveHooks(
+                beforeNew: { [self] in
+                    guard postAuthor(for: entity) != nil, !AuthorProfile.asked else { return true }
+                    // 共有アプリへの初めての投稿: 一覧に出る名前を先に決めてもらう(#250)
+                    authorNamePrompt = AuthorNamePrompt { [weak self] in await self?.perform(action, ctx) }
+                    return false
+                },
+                afterSave: { [self] saved in
+                    // 送った後にサーバーが断ったら「保存しました」を取り消す
+                    lastSavedForm = SavedForm(appId: appId, entity: entity, recordId: saved.recordId, form: form)
+                    WidgetSnapshotWriter.write(dsl: dsl, records: records)
+                    #if !APP_STORE_REVIEW
+                    writeHealthFields(entity: entity, data: saved.payload, isNew: saved.isNew) // Field.health(#167)
+                    #endif
+                    Task { await purgeExpired(entity) } // #482 保存の後(画面遷移を待たせない)
+                })
+            let outcome = await RecordBook.save(
+                appId: appId, entity: entity, form: form, recordId: recordId,
+                recordSync: recordSync, flight: saveFlight, author: postAuthor(for: entity), hooks: hooks,
+                canEdit: { self.canEdit(entity: $0, record: $1) },
+                current: { self.record(entity, $0) }, store: { self.records[entity] = $0 })
+            switch outcome {
+            case .readOnly: notifyReadOnly(entity: entity) // 送信待ちに積まない(#249)
             // 既存の記録を何も変えずに保存: 書き込まず(「保存しました」も出さず)に画面だけ進める(M10)
-            guard form.needsWrite else {
-                leaveAfterSave(action, ctx, form: form, recordId: recordId, wrote: false)
-                return
+            case .unchanged: leaveAfterSave(action, ctx, form: form, recordId: recordId, wrote: false)
+            case .saved: leaveAfterSave(action, ctx, form: form, recordId: recordId, wrote: true)
+            case .inFlight, .held: break // 連打・名前を聞いている間
             }
-            // 保存ボタンの連打: 1 回目のローカル保存を待つ間に 2 回目が来ると、新規なら同じ内容が 2 件できる
-            guard savingForms.insert(ObjectIdentifier(form)).inserted else { return }
-            defer { savingForms.remove(ObjectIdentifier(form)) }
-            // 楽観的 UI: ローカル DB に即反映して画面を進める。appconfig への送信は recordSync のキューが行う
-            let payload = form.payload
-            let isNew = recordId == nil
-            let written = await recordSync.write(appId: document.appId, entity: entity, recordId: recordId, data: payload,
-                                                 author: postAuthor(for: entity))
-            records[entity] = written.records
-            form.markSaved(queuedOffline: !recordSync.isOnline) // 閉じても破棄の確認を出さない・オフラインなら保存バーが送信待ちと出す(M10)
-            lastSavedForm = SavedForm(appId: document.appId, entity: entity, recordId: written.recordId, form: form)
-            WidgetSnapshotWriter.write(dsl: dsl, records: records)
-            #if !APP_STORE_REVIEW
-            writeHealthFields(entity: entity, data: payload, isNew: isNew) // Field.health(#167)
-            #endif
-            Task { await purgeExpired(entity) } // #482 保存の後(画面遷移を待たせない)
-            leaveAfterSave(action, ctx, form: form, recordId: recordId, wrote: true)
 
         case .deleteRecord:
             guard let target = RecordActionSteps.deleteTarget(action, ctx, dsl: dsl) else { return } // single の 1 件は消さない(#267)
