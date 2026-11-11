@@ -135,6 +135,58 @@ final class AppGlanceTests: XCTestCase {
         XCTAssertEqual(after, before, "一覧の数字のために記録の API を呼ばない")
     }
 
+    // MARK: - main actor の外で数える
+
+    func testLoadReadsDecryptsAndComputesOffMainWithSameResult() async throws {
+        let d = try dsl()
+        let threads = ThreadLog()
+        let rows = glanceRows
+        let source = AppGlanceSource(
+            document: { _ in threads.note("document"); return d },
+            cached: { _, e in rows[e] ?? [] },
+            open: { threads.note("open"); return $0 },
+            compute: { threads.note("compute"); return AppGlance.compute($0) })
+        for setting in [nil, "times", "memo_latest"] as [String?] {
+            let store = AppGlanceStore(defaults: freshDefaults())
+            await store.load(appId: "a", setting: setting, source: source)
+            let expected = AppGlance.compute(dsl: d, records: rows, setting: setting, canDecrypt: false)
+            XCTAssertEqual(store.values["a"]?.statId, expected?.statId)
+            XCTAssertEqual(store.values["a"]?.label, expected?.label)
+            XCTAssertEqual(store.values["a"]?.value, expected?.value, "main の外で数えても同じ数字(\(setting ?? "既定"))")
+        }
+        XCTAssertEqual(threads.values.compactMap { $0.value ? $0.key : nil }, [], "DSL の読み出し・復号・集計は main で走らない")
+        XCTAssertEqual(Set(threads.values.keys), ["document", "open", "compute"])
+    }
+
+    func testEncryptedStatStaysLockedWhenComputedOffMain() async throws {
+        let d = try dsl()
+        let store = AppGlanceStore(defaults: freshDefaults())
+        await store.load(appId: "a", setting: "memo_latest",
+                         source: AppGlanceSource(document: { _ in d }, cached: { _, e in glanceRows[e] ?? [] }))
+        XCTAssertEqual(store.values["a"]?.value, "🔒", "ローカル DB から数える時は暗号化した項目を出さない")
+    }
+
+    func testUpdateComputesOffMainWithSameResult() async throws {
+        let d = try dsl()
+        let threads = ThreadLog()
+        let store = AppGlanceStore(defaults: freshDefaults())
+        await store.update(appId: "a", dsl: d, records: records, setting: "times",
+                           compute: { threads.note("compute"); return AppGlance.compute($0) })
+        XCTAssertEqual(store.values["a"]?.value, AppGlance.compute(dsl: d, records: records, setting: "times")?.value)
+        XCTAssertEqual(threads.values, ["compute": false], "使用中のアプリの数字も main の外で数える")
+    }
+
+    func testClearWhileLoadingDoesNotWriteBack() async throws {
+        let d = try dsl()
+        let defaults = freshDefaults()
+        let store = AppGlanceStore(defaults: defaults)
+        // 記録を読んでいる間にサインアウトした(この後 main の外で数えて戻ってくる)
+        await store.load(appId: "a", setting: nil, source: AppGlanceSource(
+            document: { _ in d }, cached: { _, e in store.clear(); return glanceRows[e] ?? [] }))
+        XCTAssertNil(store.values["a"], "サインアウト後に前の人の数字を書き戻さない")
+        XCTAssertNil(defaults.data(forKey: AppGlanceStore.defaultsKey))
+    }
+
     // MARK: - 保存・消す
 
     func testSetGlanceStatSavesToServerAndRollsBackOnFailure() async throws {
@@ -173,6 +225,17 @@ final class AppGlanceTests: XCTestCase {
     }
 
     private final class ReadLog: @unchecked Sendable { var reads: [String] = [] }
+
+    /// 呼ばれた処理ごとに「main thread で走ったか」(1 度でも main なら true)。
+    private final class ThreadLog: @unchecked Sendable {
+        private let lock = NSLock()
+        private var log: [String: Bool] = [:]
+        var values: [String: Bool] { lock.withLock { log } }
+        func note(_ name: String) {
+            let main = Thread.isMainThread
+            lock.withLock { log[name] = (log[name] ?? false) || main }
+        }
+    }
 
     /// 記録の取得を数えるだけのクライアント(書き換えは失敗)。
     private actor CountingClient: AppConfigClient {

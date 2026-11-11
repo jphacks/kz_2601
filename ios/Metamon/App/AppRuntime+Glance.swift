@@ -5,18 +5,21 @@ import MetamonServices
 /// アプリの一覧のひと目の数字(link-10)。どの数字を出すかはアプリごとにサーバー(`glanceStat`)に置き、iPhone と Mac で同じにする。
 extension AppRuntime {
     /// 端末の中だけの読み口(DSL キャッシュとローカル DB)。記録の API は呼ばない。
+    /// ファイルの読み出しと復号は main actor の外(`AppGlanceStore.load`)。
     var glanceSource: AppGlanceSource {
         let sync = recordSync
+        let cipher = sync.cipher, lockedText = FieldCipher.lockedText
         return AppGlanceSource(
             document: { DocumentCache.shared.load(appId: $0)?.dsl },
-            cached: { appId, entity in await sync.cached(appId: appId, entity: entity) }
+            cached: { appId, entity in await sync.cachedSealed(appId: appId, entity: entity) },
+            open: { RecordSyncEngine.opened($0, cipher: cipher, lockedText: lockedText) }
         )
     }
 
     /// カードが見えた時に呼ぶ。使用中のアプリは画面の記録、ほかは端末の中の記録で数える。
     func loadGlance(for app: AppSummary, store: AppGlanceStore = .shared) async {
         if app.id == document.appId {
-            store.update(appId: app.id, dsl: dsl, records: records, setting: app.glanceStat)
+            await store.update(appId: app.id, dsl: dsl, records: records, setting: app.glanceStat)
         } else {
             await store.load(appId: app.id, setting: app.glanceStat, source: glanceSource)
         }
