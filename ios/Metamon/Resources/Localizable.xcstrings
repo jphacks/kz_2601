@@ -52,6 +52,23 @@
         }
       }
     },
+    "%@ とのつなぎを切りますか？" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Disconnect %@?"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ とのつなぎを切りますか？"
+          }
+        }
+      }
+    },
     "%@ に自動で解除されます。" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -1704,6 +1721,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Apple に引き継ぎました。機種変更のあとも同じ Apple ID で戻れます"
+          }
+        }
+      }
+    },
+    "Google カレンダー" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Google Calendar"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Google カレンダー"
           }
         }
       }
@@ -5397,6 +5431,40 @@
         }
       }
     },
+    "つないだサービス" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Connected services"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "つないだサービス"
+          }
+        }
+      }
+    },
+    "つないでいます" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Connected"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "つないでいます"
+          }
+        }
+      }
+    },
     "つないでいます…" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -5410,6 +5478,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "つないでいます…"
+          }
+        }
+      }
+    },
+    "つないでいません" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Not connected"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "つないでいません"
           }
         }
       }
@@ -5461,6 +5546,74 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "つながる場所で、引っぱって読み込み直してください。"
+          }
+        }
+      }
+    },
+    "つなぎ直してください" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Needs reconnecting"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "つなぎ直してください"
+          }
+        }
+      }
+    },
+    "つなぎ直す" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Reconnect"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "つなぎ直す"
+          }
+        }
+      }
+    },
+    "つなぐ" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Connect"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "つなぐ"
+          }
+        }
+      }
+    },
+    "つなげませんでした。もう一度試してください。" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Couldn't connect. Please try again."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "つなげませんでした。もう一度試してください。"
           }
         }
       }
@@ -7508,6 +7661,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "カレンダーに追加しました"
+          }
+        }
+      }
+    },
+    "カレンダーやタスクなどの外のサービスとつなぐと、アプリから使えます。Pro で使えます。" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Connect outside services like calendars and tasks to use them from your apps. Requires Pro."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "カレンダーやタスクなどの外のサービスとつなぐと、アプリから使えます。Pro で使えます。"
           }
         }
       }
@@ -9943,6 +10113,23 @@
         }
       }
     },
+    "一覧を読み込めませんでした。" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Couldn't load the list."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "一覧を読み込めませんでした。"
+          }
+        }
+      }
+    },
     "上の内容に同意して送る" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -12199,6 +12386,57 @@
         }
       }
     },
+    "切る" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Disconnect"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "切る"
+          }
+        }
+      }
+    },
+    "切ると、このサービスを使うアプリの部品が動かなくなります。もう一度つなげば戻ります。" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Parts of your apps that use this service will stop working. Connect again anytime to restore them."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "切ると、このサービスを使うアプリの部品が動かなくなります。もう一度つなげば戻ります。"
+          }
+        }
+      }
+    },
+    "切れませんでした。もう一度試してください。" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Couldn't disconnect. Please try again."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "切れませんでした。もう一度試してください。"
+          }
+        }
+      }
+    },
     "初期状態に戻しました" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -13622,6 +13860,23 @@
         }
       }
     },
+    "外のサービスを呼ぶたびにサーバーの費用がかかるため、Pro の機能です。" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Each call to an outside service costs server resources, so this is a Pro feature."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "外のサービスを呼ぶたびにサーバーの費用がかかるため、Pro の機能です。"
+          }
+        }
+      }
+    },
     "外部の情報を取りにいけませんでした" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -13635,6 +13890,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "外部の情報を取りにいけませんでした"
+          }
+        }
+      }
+    },
+    "外部サービス" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "External services"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "外部サービス"
           }
         }
       }
@@ -18096,6 +18368,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "試してほしい依頼"
+          }
+        }
+      }
+    },
+    "試験用のサービス" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Test service"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "試験用のサービス"
           }
         }
       }
