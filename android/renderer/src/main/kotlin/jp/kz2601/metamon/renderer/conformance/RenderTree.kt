@@ -6,6 +6,7 @@ import jp.kz2601.metamon.dsl.Component
 import jp.kz2601.metamon.dsl.ComponentType
 import jp.kz2601.metamon.dsl.Show
 import jp.kz2601.metamon.dsl.screen
+import jp.kz2601.metamon.dsl.targetNumber
 import jp.kz2601.metamon.dsl.records.FieldCoding
 import jp.kz2601.metamon.renderer.components.lists.ChartBuckets
 import jp.kz2601.metamon.renderer.components.lists.GaugeValue
@@ -41,7 +42,6 @@ import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
-import kotlinx.serialization.json.doubleOrNull
 
 /**
  * 適合テスト(#352)の「描画の木」の Android 版。画面を描かずに DSL → 何が・どこに・押すと何が起きるか を JSON にする。
@@ -156,7 +156,7 @@ class RenderTree(
         c.max?.let { put("max", JsonPrimitive(it)) }
         c.step?.let { put("step", JsonPrimitive(it)) }
         // target は数のリテラルだけ(式の目標は resolved の target)
-        (c.target as? JsonPrimitive)?.takeIf { !it.isString && it.doubleOrNull != null }?.let { put("target", it) }
+        if (c.targetNumber != null) c.target?.let { put("target", it) }
         c.limit?.let { put("limit", JsonPrimitive(it)) }
         c.expanded?.let { put("expanded", JsonPrimitive(it)) }
         // matchList の届いた / 送った / つながった(#877)

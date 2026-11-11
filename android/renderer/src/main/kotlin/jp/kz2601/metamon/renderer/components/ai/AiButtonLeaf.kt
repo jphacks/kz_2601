@@ -35,6 +35,7 @@ import androidx.compose.ui.unit.dp
 import jp.kz2601.metamon.dsl.Component
 import jp.kz2601.metamon.dsl.Length
 import jp.kz2601.metamon.dsl.Task
+import jp.kz2601.metamon.dsl.aiSaveTo
 import jp.kz2601.metamon.dsl.ai.AiSaveTo
 import jp.kz2601.metamon.dsl.ai.AiTextResult
 import jp.kz2601.metamon.dsl.ai.AiTextShape
@@ -130,7 +131,7 @@ private fun AiGenerateLeaf(c: Component, ctx: RenderContext, modifier: Modifier)
     var outputs by remember { mutableStateOf<AiButtonRun.OutputsFill?>(null) } // outputs: 今回入れた / 入れなかった項目
     val aiValues = remember { mutableMapOf<String, JSONValue>() } // outputs: 前回 AI が入れた値(そのままなら次は入れ替えてよい)
     val route = AiButtonRun.route(c, ctx.runtime)
-    val saveTo = remember(c.saveTo) { AiSaveTo.from(c.saveTo) }
+    val saveTo = remember(c.saveTo) { c.aiSaveTo }
     val feeds = ctx.runtime.feeds ?: LocalFeedHost.current
     val view = LocalView.current
     ShownMetric(c, ctx)
