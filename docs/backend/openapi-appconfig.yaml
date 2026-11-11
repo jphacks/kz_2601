@@ -1560,7 +1560,7 @@ paths:
         '403': { $ref: '#/components/responses/NotMember' }
         '404': { description: '通話が off(`details.reason: calls_disabled`)・共有のアプリでない(`no_shared_data`)・その部屋の callButton が無い(`no_call_button`)・続けようとした通話が終わっている(`call_ended`)', content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
         '410': { description: 退会済み(`account_deleted`), content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
-        '429': { description: 1 時間の上限。`Retry-After` と details(scope=user・limit・retryAfterSec), content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+        '429': { description: '1 時間の上限(`EXT_USER_PER_HOUR`)。`Retry-After` と details(scope=user・limit・retryAfterSec)。runner の provider ごとの回数の上限(#1715)も 429 で、details の scope は user_hourly / user_daily / app_hourly / app_daily / global_daily / provider_paused(provider が 429 を返した後の 1 分)・provider・retryAfterSec', content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
 
   /calls/webhook:
     post:
@@ -2033,6 +2033,7 @@ paths:
         - **冪等**: `X-Request-Id` を有料の provider のコインの押さえの鍵にする(送らなければサーバーが作る)
         - **数え方**: 1 回 = `runs` 1(Pro の月の枠・超えた後のコイン払い)。有料の provider は押さえる → 実費 × `COIN_PER_USD` → 差額を戻す。失敗(時間切れ・5xx)は両方戻す。鍵だけの読む op(為替など)は同じ引数の答えを決まった時間キャッシュし、キャッシュから返した時は数えない(Pro の確認はする)
         - 1 ユーザー 1 時間 `EXT_USER_PER_HOUR` 回(既定 120)。超えると 429 `rate_limited`
+        - runner でも provider ごとに数える: 利用者・アプリの 1 時間 / 1 日(`EXT_LIMIT_*`)・環境全体の 1 日(`EXT_GLOBAL_DAILY*`)・provider が 429 を返した後の 1 分止め。超えると 429 `rate_limited`(`details.scope`・`Retry-After`)
         - `EXT_RUNNER_URL` が無い時・provider が止まっている(`EXT_<PROVIDER>_ENABLED` が無い・`EXT_DISABLED`・鍵が無い)時は 503 `ext_unavailable`
       requestBody:
         required: true

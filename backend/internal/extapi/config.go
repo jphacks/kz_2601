@@ -51,6 +51,15 @@ type Config struct {
 	// AppReturnURL is where the callback sends the device back
 	// (EXT_OAUTH_APP_RETURN, default tailorit://connected).
 	AppReturnURL string
+	// Limits per provider (EXT_LIMIT_* / EXT_GLOBAL_DAILY*, limits.go).
+	// A provider missing here is not limited (tests); ConfigFromEnv fills
+	// every provider with DefaultLimits.
+	Limits map[string]Limits
+	// UpstreamPause is how long a provider is not called after it answered
+	// 429 (ConfigFromEnv: UpstreamPause, 1 minute; 0 = no pause).
+	UpstreamPause time.Duration
+	// Env prefixes the limit counters (APP_ENV: stg and prod share Firestore).
+	Env string
 }
 
 // ConfigFromEnv reads:
@@ -65,6 +74,8 @@ type Config struct {
 //	EXT_MAX_CONCURRENT               calls per instance (default 8)
 //	EXT_OAUTH_CALLBACK_BASE          https origin of the runner's /oauth/callback (default none = OAuth off)
 //	EXT_OAUTH_APP_RETURN             where the callback returns the device (default tailorit://connected)
+//	EXT_LIMIT_<SCOPE> / EXT_LIMIT_<PROVIDER>_<SCOPE>   calls per user / app per hour / day (limits.go)
+//	EXT_GLOBAL_DAILY / EXT_GLOBAL_DAILY_<PROVIDER>     a provider's calls per day, everyone together
 //	APP_ENV                          production never runs fake providers
 func ConfigFromEnv(getenv func(string) string) (Config, error) {
 	c := Config{
@@ -79,7 +90,14 @@ func ConfigFromEnv(getenv func(string) string) (Config, error) {
 		UnusedTTL:     DefaultUnusedTTL,
 		CallbackBase:  strings.TrimRight(strings.TrimSpace(getenv("EXT_OAUTH_CALLBACK_BASE")), "/"),
 		AppReturnURL:  strings.TrimSpace(getenv("EXT_OAUTH_APP_RETURN")),
+		Env:           strings.TrimSpace(getenv("APP_ENV")),
+		UpstreamPause: UpstreamPause,
 	}
+	limits, err := limitsFromEnv(getenv)
+	if err != nil {
+		return c, err
+	}
+	c.Limits = limits
 	if c.AppReturnURL == "" {
 		c.AppReturnURL = "tailorit://connected"
 	}

@@ -30,7 +30,7 @@
 | DSL `externalCall` / `externalList`・自動の動きからの呼び出し | **まだ**(DSL の子 Issue。`CallRequest.Run` に run の `quota.Decision` を渡すだけで数え方は同じ) |
 | 退会(`DELETE /v1/me`)の時の provider 側の取り消し | 済(`account.go` の `deleteMe` が `extapi.Client.RevokeAll` で `/internal/ext/connections/revokeAll` を呼ぶ・#1716)。失敗してもログだけで退会は 204 |
 | キャッシュ | 済(`cache.go`・op の `CacheTTL`。鍵だけ・OAuth なしの読む op だけ。台の中のメモリ) |
-| 回数の上限 `EXT_LIMIT_*`・`EXT_GLOBAL_DAILY_<PROVIDER>`・provider ごとの 1 分止め | **まだ**(割り当てのある provider と一緒に) |
+| 回数の上限 `EXT_LIMIT_*`・`EXT_GLOBAL_DAILY_<PROVIDER>`・provider ごとの 1 分止め | 済(`limits.go`・#1715)。下の「回数の上限」 |
 | iOS の「つないだサービス」・402 / 409 のシート・履歴の `spend_ext` の文言 | **まだ**(iOS の子 Issue。今は履歴に `spend_ext` がそのまま出る) |
 
 ## 置き場所
@@ -40,6 +40,7 @@
 | provider の定義・登録 | `backend/internal/extapi/registry.go`(`register` は同じパッケージの `init()` からだけ = 閉じた一覧) |
 | op の形(`Operation`・`Input`・`Output`・`Token`・`OAuthClient`) | `operation.go` |
 | 呼び出しの流れ・数え方・理由(`Reason*`) | `service.go` |
+| 回数の上限・1 分止め | `limits.go`(数えるのは `ratelimit.Store`。runner では Firestore の `rateLimits`) |
 | 月の枠 `runs` を 1 足す | `backend/internal/runner/quota/external.go`(`ExtRun`) |
 | コインの op `ext`・履歴 `spend_ext` | `backend/internal/coins`(`OpExt`・`KindSpendExt`) |
 | トークンの保管・取り消し・90 日 | `connections.go`(`Connections`・`Sealer`・`LocalSealer`)・`kms.go`(`KMSSealer`)・`firestore.go` |
@@ -91,6 +92,7 @@ provider が 404 / 422(持っていない通貨・日)を返した時は 400 `ba
 |---|---|---|
 | 1. 確かめる | provider・op・引数・request id・止め弁・(有料で enforce)押さえの量があるか | 400 `bad_request` / 503 `ext_unavailable`。何も数えない |
 | 2. 同時の数 | 1 台で `EXT_MAX_CONCURRENT` まで(tick と別) | 503 `ext_busy` |
+| 2.5 回数の上限 | provider の 1 分止めの中か・利用者 / アプリ / 全体の回数(下の「回数の上限」) | 429 `rate_limited`(`scope`・`retryAfterSec`)。何も数えない |
 | 3. 枠 | 作成者の Pro を確かめ、作成者の月の `runs` を 1 足す(`quota.ExtRun`。超えたら今の「超えた後のコイン払い」でブロックを買う) | 402 `pro_required` / `allowance_exhausted` / `overflow_cap_reached` / `coins_insufficient` |
 | 4. トークン | OAuth の provider は**押した人**(自動の動きは**作成者**)のトークンを読む。期限切れは更新 | 409 `ext_not_connected`。`runs` を戻す |
 | 5. 押さえる | 有料の provider だけ。押した人(自動の動きは作成者)のコインを `COIN_RESERVE_EXT_<PROVIDER>` だけ押さえる(op `ext`) | 402 `coins_insufficient`。同じ request id の押さえがもうある時は呼ばずに 409 `duplicate_request`。どちらも `runs` を戻す |
@@ -98,8 +100,28 @@ provider が 404 / 422(持っていない通貨・日)を返した時は 400 `ba
 | 7. 確定 | 原価(op が測った値、無ければ `EXT_COST_USD_<PROVIDER>_<OP>`)× `COIN_PER_USD` を押さえの量まで引き、残りを戻す。どちらも無い時は押さえた量を引く(`coins.unpriced_model`)。履歴は `spend_ext`(`usd` つき) | 費用のかかった 4xx(`ProviderError.Billable`)だけは戻さず確定する |
 
 - `COIN_BILLING_MODE=off` は枠もコインも数えない(Pro の確認だけ)。`log` は数えるが止めず、コインは `coins.would_spend` を出すだけ。
-- ログは 1 回 1 行 `ext.call`(provider・op・結果・ms・`runs` か `coins` か `cache` か・引いたコイン・app id・uid のハッシュ)。引数・答え・トークンは出さない。
+- ログは 1 回 1 行 `ext.call`(provider・op・結果・ms・`runs` か `coins` か `cache` か・引いたコイン・app id・uid のハッシュ)。引数・答え・トークンは出さない。上限で止めた時は `limit`(scope)・`limit_max`・`limit_count`・`retry_after_sec`、provider の 429 で止めた時は `paused: provider_paused` も出す(コードと数だけ)。
 - **キャッシュ**: `CacheTTL` のある op(鍵だけ・OAuth なしの読む op。登録の時に確かめる)は、同じ引数の答えを台の中のメモリに持つ(1 台 2048 件まで)。キャッシュから返した時は `runs` もコインも数えない。ただし Pro の確認(`quota.ExtPro`)はする。OAuth の op・書く op は持たない。
+
+### 回数の上限(#1715)
+
+暴走の歯止め(`runs` とコインとは別)。provider を呼ぶ 1 回を、**provider ごと**に下の数え方で 1 数える(全部まとめて数えるか、1 つでも超えるなら何も数えない。`ratelimit.Store` の Consume)。値は env だけで決める(既定は安全側の小さめの値をコードに持つ。値はここに書かない)。0 はその数えを止める。
+
+| scope | 数えるもの | env(全部の provider / 1 つの provider) | 戻る時 |
+|---|---|---|---|
+| `user_hourly` | 押した人(自動の動きは作成者)の 1 時間 | `EXT_LIMIT_USER_HOURLY` / `EXT_LIMIT_<PROVIDER>_USER_HOURLY` | 次の正時 |
+| `user_daily` | 押した人の 1 日(JST) | `EXT_LIMIT_USER_DAILY` / `EXT_LIMIT_<PROVIDER>_USER_DAILY` | 次の 0:00 JST |
+| `app_hourly` | アプリの 1 時間 | `EXT_LIMIT_APP_HOURLY` / `EXT_LIMIT_<PROVIDER>_APP_HOURLY` | 次の正時 |
+| `app_daily` | アプリの 1 日 | `EXT_LIMIT_APP_DAILY` / `EXT_LIMIT_<PROVIDER>_APP_DAILY` | 次の 0:00 JST |
+| `global_daily` | その provider の環境全体の 1 日(provider の割り当ての手前で止める) | `EXT_GLOBAL_DAILY` / `EXT_GLOBAL_DAILY_<PROVIDER>` | 次の 0:00 JST |
+| `provider_paused` | provider が 429 を返した後の 1 分(台ごと・メモリ) | なし(1 分で固定) | 1 分たった時 |
+
+- 1 つの provider の env が全部の provider の env より勝つ。env が無ければコードの既定(`DefaultLimits`)。
+- 数えるのは provider を呼んだ時だけ。キャッシュから返した時は数えない。トークンが無い・コインが足りない・同じ request id・枠で止まった時(provider を呼ばなかった)は戻す。provider が失敗した時(5xx・時間切れ・429)は呼んだので戻さない。
+- 文書は `rateLimits/{APP_ENV}_{日 or 日T時}_ext_{provider}_{uid_… / app_… / global}`(TTL `expireAt`)。全体の数えは `ratelimit.GlobalShards` に分ける。Firestore が落ちた時は台のメモリで数える(開けっぱなしにしない)。
+- runner の答えは `{"reason": "rate_limited", "scope": "<scope>", "retryAfterSec": <秒>}`(429)。appconfig は 429 `rate_limited`・`Retry-After`・`details`(`scope`・`provider`・`retryAfterSec`)にする。
+- 偽の provider は `fail=429` で 1 分止めを試せる。
+- appconfig の `EXT_USER_PER_HOUR`(provider をまたいだ 1 人 1 時間)はそのまま残る。
 
 ## OAuth のトークン
 
@@ -132,6 +154,7 @@ provider が 404 / 422(持っていない通貨・日)を返した時は 400 `ba
 | `bad_request` | 400 |
 | `ext_not_connected` / `duplicate_request` | 409 |
 | `ext_unavailable` / `ext_busy` | 503 |
+| `rate_limited`(`scope`・`retryAfterSec` つき) | 429 |
 | `pro_required` / `allowance_exhausted` / `overflow_cap_reached` / `coins_insufficient` | 402 |
 | `upstream_timeout` / `upstream_unavailable` | 504 / 502 |
 
@@ -162,7 +185,7 @@ provider が 404 / 422(持っていない通貨・日)を返した時は 400 `ba
 | 2. 引数 | op の名前だけ・4096 バイトまで・URL は受けない・op の `Check`(`Provider.CheckArgs`。runner でももう一度) | 400 `bad_request` |
 | 3. 誰の枠か | 共有のアプリ(公開の DSL に public / shared の entity)は**作成者**。呼べるのは参加者(public の entity があれば入れた人も)。自分のアプリ・自分の写しの private のアプリは呼び出した人 | 403 `not_member` / 404(自分のツリーに無い)/ 410 `unpublished` |
 | 4. 1 時間の上限 | 1 人 `EXT_USER_PER_HOUR` 回(既定 120) | 429 `rate_limited` |
-| 5. runner | `X-Request-Id` を `requestId` に(コインの押さえの鍵)。Pro は runner が確かめる(`PRO_GATE_MODE` に関係なく)。作成者でない人の 402 `pro_required` には `details.reason: creator_needs_pro` | 理由をそのままコードに。runner に届かない時は 502 `upstream_unavailable`・待ちきれない時は 504 `upstream_timeout` |
+| 5. runner | `X-Request-Id` を `requestId` に(コインの押さえの鍵)。Pro は runner が確かめる(`PRO_GATE_MODE` に関係なく)。作成者でない人の 402 `pro_required` には `details.reason: creator_needs_pro`。runner の回数の上限は 429 `rate_limited`(`Retry-After`・`details.scope` / `provider` / `retryAfterSec`) | 理由をそのままコードに。runner に届かない時は 502 `upstream_unavailable`・待ちきれない時は 504 `upstream_timeout` |
 
 DSL に `externalCall` / `externalList` があるかの確かめは、DSL の子 Issue で部品と一緒に足す(今は provider が既定で off・Pro だけなので、一覧と引数だけを見る)。
 
@@ -187,4 +210,5 @@ DSL に `externalCall` / `externalList` があるかの確かめは、DSL の子
 - Cloud Scheduler で `POST /internal/ext/expire` を 1 日 1 回。
 - runner の最小 1 台(決定 4)・`#288` までは runner が prod だけなので、stg で偽の provider を通す時の runner の置き場所。
 - 各社の鍵・OAuth のクライアント(Secret Manager・`EXT_<PROVIDER>_*`)と、原価・押さえの量(非公開の資料から env)。
+- 回数の上限の値(`EXT_LIMIT_*`・`EXT_GLOBAL_DAILY*`)を各社の割り当てに合わせて runner の env に入れる(非公開の資料から。入れなければコードの既定)。
 - プライバシーポリシー・利用規約(`docs/legal`)に外の API への送信とトークンの保管・消し方を書く。
