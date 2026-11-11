@@ -83,7 +83,7 @@ provider が 404 / 422(持っていない通貨・日)を返した時は 400 `ba
 | 2. 同時の数 | 1 台で `EXT_MAX_CONCURRENT` まで(tick と別) | 503 `ext_busy` |
 | 3. 枠 | 作成者の Pro を確かめ、作成者の月の `runs` を 1 足す(`quota.ExtRun`。超えたら今の「超えた後のコイン払い」でブロックを買う) | 402 `pro_required` / `allowance_exhausted` / `overflow_cap_reached` / `coins_insufficient` |
 | 4. トークン | OAuth の provider は**押した人**(自動の動きは**作成者**)のトークンを読む。期限切れは更新 | 409 `ext_not_connected`。`runs` を戻す |
-| 5. 押さえる | 有料の provider だけ。押した人(自動の動きは作成者)のコインを `COIN_RESERVE_EXT_<PROVIDER>` だけ押さえる(op `ext`) | 402 `coins_insufficient`。`runs` を戻す |
+| 5. 押さえる | 有料の provider だけ。押した人(自動の動きは作成者)のコインを `COIN_RESERVE_EXT_<PROVIDER>` だけ押さえる(op `ext`) | 402 `coins_insufficient`。同じ request id の押さえがもうある時は呼ばずに 409 `duplicate_request`。どちらも `runs` を戻す |
 | 6. 呼ぶ | `EXT_TIMEOUT`(既定 8 秒) | 時間切れ・5xx は押さえを全部戻し、`runs` も戻す。provider がトークンを拒んだら接続を `error` にして 409 |
 | 7. 確定 | 原価(op が測った値、無ければ `EXT_COST_USD_<PROVIDER>_<OP>`)× `COIN_PER_USD` を押さえの量まで引き、残りを戻す。どちらも無い時は押さえた量を引く(`coins.unpriced_model`)。履歴は `spend_ext`(`usd` つき) | 費用のかかった 4xx(`ProviderError.Billable`)だけは戻さず確定する |
 
@@ -120,7 +120,7 @@ provider が 404 / 422(持っていない通貨・日)を返した時は 400 `ba
 | 理由 | HTTP |
 |---|---|
 | `bad_request` | 400 |
-| `ext_not_connected` | 409 |
+| `ext_not_connected` / `duplicate_request` | 409 |
 | `ext_unavailable` / `ext_busy` | 503 |
 | `pro_required` / `allowance_exhausted` / `overflow_cap_reached` / `coins_insufficient` | 402 |
 | `upstream_timeout` / `upstream_unavailable` | 504 / 502 |

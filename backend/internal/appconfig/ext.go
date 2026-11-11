@@ -206,6 +206,8 @@ func extErr(err error, provider string) *apiError {
 		return extOff().With("provider", provider)
 	case extapi.ReasonBusy:
 		return apiErr(http.StatusServiceUnavailable, httpx.CodeExtBusy, "混み合っています。しばらくしてからもう一度試してください。").With("provider", provider)
+	case extapi.ReasonDuplicateRequest:
+		return apiErr(http.StatusConflict, httpx.CodeDuplicateRequest, "this request id was already used")
 	case extapi.ReasonProRequired:
 		return apiErr(http.StatusPaymentRequired, httpx.CodeProRequired, "this needs Tailor It Pro: externalCall")
 	case extapi.ReasonAllowanceExhausted:

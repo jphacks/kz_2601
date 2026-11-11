@@ -24,7 +24,7 @@ func StatusOf(reason string) int {
 		return http.StatusOK
 	case ReasonBadRequest:
 		return http.StatusBadRequest
-	case ReasonNotConnected:
+	case ReasonNotConnected, ReasonDuplicateRequest:
 		return http.StatusConflict
 	case ReasonUnavailable, ReasonBusy:
 		return http.StatusServiceUnavailable

@@ -23,6 +23,9 @@ var (
 	ErrBusy = errors.New("extapi: busy")
 	// ErrProRequired is 402 pro_required: external APIs are Pro only (決定 1).
 	ErrProRequired = errors.New("extapi: pro required")
+	// ErrDuplicateRequest is 409 duplicate_request: the request id already
+	// held coins for a paid call (a retry does not run the call again).
+	ErrDuplicateRequest = errors.New("extapi: request id already used")
 )
 
 // AllowanceError is a call the creator's monthly allowance stopped
@@ -269,6 +272,11 @@ func (s *Service) Call(ctx context.Context, r CallRequest) (res CallResult, err 
 			}
 			return res, err
 		}
+		if hold != nil && hold.Existing {
+			// the first hold is not this call's: it is neither run nor settled again
+			refundRuns()
+			return res, ErrDuplicateRequest
+		}
 	}
 	release := func() {
 		if err := s.Coins.Release(context.WithoutCancel(ctx), hold); err != nil {
@@ -384,6 +392,7 @@ const (
 	ReasonNotConnected       = "ext_not_connected"
 	ReasonUnavailable        = "ext_unavailable"
 	ReasonBusy               = "ext_busy"
+	ReasonDuplicateRequest   = "duplicate_request"
 	ReasonProRequired        = "pro_required"
 	ReasonAllowanceExhausted = "allowance_exhausted"
 	ReasonOverflowCap        = "overflow_cap_reached"
@@ -409,6 +418,8 @@ func Reason(err error) string {
 		return ReasonUnavailable
 	case errors.Is(err, ErrBusy):
 		return ReasonBusy
+	case errors.Is(err, ErrDuplicateRequest):
+		return ReasonDuplicateRequest
 	case errors.Is(err, ErrProRequired):
 		return ReasonProRequired
 	case errors.As(err, &ae):

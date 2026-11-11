@@ -253,6 +253,7 @@ func TestExtReasonCodes(t *testing.T) {
 		{&extapi.RunnerError{Status: 409, Reason: extapi.ReasonNotConnected}, 409, httpx.CodeExtNotConnected},
 		{&extapi.RunnerError{Status: 503, Reason: extapi.ReasonUnavailable}, 503, httpx.CodeExtUnavailable},
 		{&extapi.RunnerError{Status: 503, Reason: extapi.ReasonBusy}, 503, httpx.CodeExtBusy},
+		{&extapi.RunnerError{Status: 409, Reason: extapi.ReasonDuplicateRequest}, 409, httpx.CodeDuplicateRequest},
 		{&extapi.RunnerError{Status: 402, Reason: extapi.ReasonProRequired}, 402, httpx.CodeProRequired},
 		{&extapi.RunnerError{Status: 402, Reason: extapi.ReasonAllowanceExhausted}, 402, httpx.CodeAllowanceExhausted},
 		{&extapi.RunnerError{Status: 402, Reason: extapi.ReasonOverflowCap}, 402, httpx.CodeOverflowCapReached},
