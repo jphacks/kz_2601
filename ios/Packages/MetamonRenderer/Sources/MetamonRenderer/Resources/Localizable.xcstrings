@@ -773,6 +773,23 @@
         }
       }
     },
+    "%lld 枚目を見る" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Show page %lld"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld 枚目を見る"
+          }
+        }
+      }
+    },
     "%lld 秒" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -3096,6 +3113,40 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "クリア"
+          }
+        }
+      }
+    },
+    "クリックでブラウザで開きます" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Click to open in your browser"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "クリックでブラウザで開きます"
+          }
+        }
+      }
+    },
+    "クリックで開きます" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Click to open"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "クリックで開きます"
           }
         }
       }

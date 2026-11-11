@@ -57,6 +57,7 @@ struct ListLeaf: View {
                         .background(highlightedId == row.id ? RenderTheme.Colors.brandSoft : Color.clear)
                         .contentShape(Rectangle())
                         .onTapGesture { focusRow(row); open(row) }
+                        .macHelp(c.onItemTap != nil ? L("クリックで開きます") : nil)
                         #if os(macOS)
                         .focusable()
                         .focused($focusedRowId, equals: row.id)
