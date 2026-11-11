@@ -313,6 +313,30 @@ class VoicePolishTest {
     }
 
     @Test
+    fun fabFlickPicksSideByPredictedPosition() {
+        // #1204: 左寄りで離しても、右へ弾けば右に吸着する(止めて離せば実位置のまま)
+        val w = 400f
+        val size = 64f
+        val cx = 150f
+        assertEquals(cx, FabDock.predictedCenterX(cx, 0f))
+        assertEquals(FabSide.LEFT, FabDock.snap(cx, FabDock.predictedCenterX(cx, 0f), w, size).side)
+        val flicked = FabDock.predictedCenterX(cx, 600f)
+        assertEquals(cx + 600f * FabDock.PROJECTION_SECONDS, flicked)
+        assertEquals(FabSide.RIGHT, FabDock.snap(cx, flicked, w, size).side)
+        assertEquals(FabSide.LEFT, FabDock.snap(300f, FabDock.predictedCenterX(300f, -800f), w, size).side)
+    }
+
+    @Test
+    fun fabAutoInsetClearsBottomRowComponents() {
+        // 最下段の部品が無ければ既定。あれば部品の上端より gap 上(既定より低くはしない)
+        assertEquals(20f, FabDock.autoInset(base = 20f, obstructionTop = null, areaBottom = 800f, gap = 8f))
+        assertEquals(108f, FabDock.autoInset(base = 20f, obstructionTop = 700f, areaBottom = 800f, gap = 8f))
+        assertEquals(20f, FabDock.autoInset(base = 20f, obstructionTop = 795f, areaBottom = 800f, gap = 8f))
+        // まだ領域を測れていない
+        assertEquals(20f, FabDock.autoInset(base = 20f, obstructionTop = 700f, areaBottom = 0f, gap = 8f))
+    }
+
+    @Test
     fun fabRevealAndBottom() {
         assertTrue(FabDock.shouldReveal(20f, FabSide.LEFT, 20f))
         assertFalse(FabDock.shouldReveal(-30f, FabSide.LEFT, 20f))
