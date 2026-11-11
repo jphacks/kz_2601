@@ -87,6 +87,7 @@ struct ListLeaf: View {
                             Button(L("コピー")) { copy(row, entity: entity) }
                             #endif
                             if deletable(row, entity: entityId) { Button(L("削除")) { delete(row, entity: entityId) } }
+                            ModerationAccessibilityActions(rt: rt, entity: entityId, record: row)
                         }
                         .recordDrag { ListRowCopyText.text(item: c.item, record: row, entity: entity, rt: rt) }
                 }

@@ -1,6 +1,8 @@
+import SwiftUI
 import XCTest
 import MetamonDSL
 import MetamonServices
+@testable import MetamonRenderer
 @testable import Metamon
 
 /// シェアと通報・ブロック(#321)。成否を切り替えられる。
@@ -70,6 +72,20 @@ final class ModerationTests: XCTestCase {
         XCTAssertFalse(rt.canReport(entity: "post", record: Record(id: "x", data: [:])), "作者の分からない行")
         XCTAssertFalse(try runtime(nil).canReport(entity: "post", record: other), "シェアが無ければ出さない")
         XCTAssertFalse(try runtime(FakeModeration(), scope: "private").canReport(entity: "post", record: other), "private の entity")
+    }
+
+    /// 長押しメニューと VoiceOver の行の操作に出す「通報する」「投稿者をブロック」(Android #1307 と同じ)
+    func testModerationActionsForVoiceOver() throws {
+        let rt = try runtime(FakeModeration())
+        let actions = ModerationMenuItems.actions(rt, entity: "post", record: other)
+        XCTAssertEqual(actions.map(\.systemImage), ["exclamationmark.bubble", "hand.raised"], "通報 → ブロックの順")
+        XCTAssertEqual(actions.last?.role, .destructive)
+        actions[0].perform()
+        XCTAssertEqual(ModerationUI.shared.reporting?.target, .record(appId: "board", entityId: "post", recordId: "r1"))
+        actions[1].perform()
+        XCTAssertEqual(ModerationUI.shared.blocking?.authorUID, "u-hanako")
+        XCTAssertTrue(ModerationMenuItems.actions(rt, entity: "post", record: mine).isEmpty, "自分の投稿には出さない")
+        XCTAssertTrue(ModerationMenuItems.actions(try runtime(nil), entity: "post", record: other).isEmpty, "シェアが無ければ出さない")
     }
 
     func testReportSendsTargetAndShowsNotice() async throws {

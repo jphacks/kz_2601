@@ -184,7 +184,7 @@ struct SettingsSheet: View {
             do {
                 if try await session.deleteAccount(account: services.account, runtime: rt) { dismiss() }
             } catch {
-                deleteError = error.localizedDescription
+                deleteError = ErrorCopy.accountFailureBody(error, context: "account delete")
             }
         }
     }
@@ -200,7 +200,7 @@ struct SettingsSheet: View {
                 case .unsent(let n): signOutUnsent = n
                 }
             } catch {
-                signOutError = error.localizedDescription
+                signOutError = ErrorCopy.accountFailureBody(error, context: "sign out")
             }
         }
     }

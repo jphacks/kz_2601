@@ -71,6 +71,7 @@ struct MatchListLeaf: View {
                     .onTapGesture { open(profile) }
                     .accessibilityAddTraits(c.onItemTap != nil ? .isButton : [])
                     .accessibilityAction { open(profile) }
+                    .accessibilityActions { ModerationAccessibilityActions(rt: rt, entity: entity.id, record: profile) }
             } else {
                 missingProfileRow(item, box: box)
             }

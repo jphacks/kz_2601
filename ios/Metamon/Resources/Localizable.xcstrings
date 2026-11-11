@@ -3170,23 +3170,6 @@
         }
       }
     },
-    "あなたの名前" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Your name"
-          }
-        },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "あなたの名前"
-          }
-        }
-      }
-    },
     "ありがとうございます。いただいた内容は改善に使います。" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -4751,6 +4734,23 @@
         }
       }
     },
+    "すれ違い通信と同じ設定です。オンにすると、名前の代わりに「近くの人」と表示されます。" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Same setting as pass-by sharing. When on, others see \"Someone nearby\" instead of your name."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "すれ違い通信と同じ設定です。オンにすると、名前の代わりに「近くの人」と表示されます。"
+          }
+        }
+      }
+    },
     "そのままにする" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -5638,6 +5638,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "もう一度、はっきり話してください"
+          }
+        }
+      }
+    },
+    "もう一度サインインしてから削除してください" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sign in again, then delete"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "もう一度サインインしてから削除してください"
           }
         }
       }
@@ -11264,6 +11281,23 @@
         }
       }
     },
+    "参加している人が上限(100 人)に達しています。これ以上は参加できません" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "This share is full (100 people). No one else can join."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "参加している人が上限(100 人)に達しています。これ以上は参加できません"
+          }
+        }
+      }
+    },
     "参加している人が上限(100 人)に達しているため、参加できません" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -11821,6 +11855,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "名前は1〜%lld文字で入力してください"
+          }
+        }
+      }
+    },
+    "名前を出さない" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Hide my name"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "名前を出さない"
           }
         }
       }
@@ -14616,6 +14667,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "相手が見つかりませんでした。一覧を更新してください"
+          }
+        }
+      }
+    },
+    "相手に見える名前" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Name others see"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "相手に見える名前"
           }
         }
       }
