@@ -204,9 +204,10 @@ private struct MacPrivacySettings: View {
     }
 }
 
-// MARK: - 詳細(お問い合わせ・ライセンス・サポート用の詳細・バージョン)
+// MARK: - 詳細(お問い合わせ・フィードバック・ライセンス・サポート用の詳細・バージョン)
 
 private struct MacDetailSettings: View {
+    @Environment(\.openWindow) private var openWindow
     @State private var showLicenses = false
     @State private var showTutorial = false // #971
     #if !APP_STORE_REVIEW
@@ -242,6 +243,14 @@ private struct MacDetailSettings: View {
                     Label("お問い合わせ", systemImage: "envelope")
                 }
                 .accessibilityIdentifier("settings.contact")
+                #if !APP_STORE_REVIEW // 審査用ビルドはフィードバックを外す(#319)
+                Button {
+                    MacFeedbackCenter.shared.open(openWindow) // #983
+                } label: {
+                    Label("フィードバックを送る", systemImage: "bubble.left.and.text.bubble.right")
+                }
+                .accessibilityIdentifier("settings.feedback")
+                #endif
                 Button {
                     showLicenses = true
                 } label: {

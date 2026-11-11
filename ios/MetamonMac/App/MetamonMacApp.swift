@@ -15,6 +15,7 @@ struct MetamonMacApp: App {
     @State private var library = MacAppLibrary()
 
     init() {
+        MacNotificationDelegate.install() // 前面でも通知を出す・押されたらそのアプリを開く(#965)
         // UI テスト・手元の確認用(DEBUG のみ・iOS と同じ環境変数): METAMON_AI_CONSENT / METAMON_TUTORIAL / METAMON_BETA_WELCOME(#971)
         AIConsentDebug.applyLaunchOverride()
         FirstRunTutorialStore.shared.applyLaunchOverride()
@@ -26,6 +27,8 @@ struct MetamonMacApp: App {
         NotificationCenter.default.addObserver(forName: NSApplication.willTerminateNotification, object: nil, queue: .main) { _ in
             MainActor.assumeIsolated { MacAppRuntime.removePreviewDirectories() }
         }
+        // musicPlayer(#960): 既定は MusicKit。METAMON_MOCK=1(iOS と同じ環境変数)の時だけ音を出さない偽物
+        if ProcessInfo.processInfo.environment["METAMON_MOCK"] == "1" { MusicSession.shared.player = FakeMusicPlayback() }
     }
 
     var body: some Scene {
@@ -48,5 +51,14 @@ struct MetamonMacApp: App {
         Settings {
             MacLanguageRoot { MacSettingsView() } // ⌘,(#973)
         }
+
+        #if !APP_STORE_REVIEW // 審査用ビルドはフィードバックを外す(#319)
+        // ヘルプのメニューと設定の「詳細」から開く(#983)
+        Window("フィードバック", id: MacFeedbackCenter.windowId) {
+            MacLanguageRoot { MacFeedbackWindow() }
+        }
+        .windowResizability(.contentSize)
+        .defaultPosition(.center)
+        #endif
     }
 }

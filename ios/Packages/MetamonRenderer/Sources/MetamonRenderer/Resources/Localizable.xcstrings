@@ -1276,6 +1276,23 @@
         }
       }
     },
+    "Apple Music へのアクセスが許可されていません。システム設定 > プライバシーとセキュリティ > メディアと Apple Music で Tailor It を許可してください" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Apple Music access isn't allowed. Allow Tailor It in System Settings > Privacy & Security > Media & Apple Music."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Apple Music へのアクセスが許可されていません。システム設定 > プライバシーとセキュリティ > メディアと Apple Music で Tailor It を許可してください"
+          }
+        }
+      }
+    },
     "Apple Music へのアクセスが許可されていません。設定アプリの Tailor It で「メディアと Apple Music」をオンにしてください" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -1476,6 +1493,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "iOS 26 以降が必要です"
+          }
+        }
+      }
+    },
+    "macOS 26 以降が必要です" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Requires macOS 26 or later"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "macOS 26 以降が必要です"
           }
         }
       }
@@ -2891,6 +2925,23 @@
         }
       }
     },
+    "システム設定 > Apple Intelligence と Siri でオンにしてください" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Turn it on in System Settings > Apple Intelligence & Siri"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "システム設定 > Apple Intelligence と Siri でオンにしてください"
+          }
+        }
+      }
+    },
     "シミュレータ用: 読み取り結果を手入力" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -3792,6 +3843,23 @@
         }
       }
     },
+    "位置情報がオフのため案内できません。「システム設定 > プライバシーとセキュリティ > 位置情報サービス」でこのアプリを許可してください" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Location is off, so guidance can’t start. Allow this app in System Settings > Privacy & Security > Location Services."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "位置情報がオフのため案内できません。「システム設定 > プライバシーとセキュリティ > 位置情報サービス」でこのアプリを許可してください"
+          }
+        }
+      }
+    },
     "位置情報がオフのため案内できません。設定で「このAppの使用中のみ許可」を選んでください" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -3809,6 +3877,23 @@
         }
       }
     },
+    "位置情報がオフのため記録できません。「システム設定 > プライバシーとセキュリティ > 位置情報サービス」でこのアプリを許可してください" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Location is off. Allow this app in System Settings > Privacy & Security > Location Services to record."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "位置情報がオフのため記録できません。「システム設定 > プライバシーとセキュリティ > 位置情報サービス」でこのアプリを許可してください"
+          }
+        }
+      }
+    },
     "位置情報がオフのため記録できません。設定で「このAppの使用中のみ許可」を選んでください" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -3822,6 +3907,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "位置情報がオフのため記録できません。設定で「このAppの使用中のみ許可」を選んでください"
+          }
+        }
+      }
+    },
+    "位置情報が許可されていないので近くを探せません。「システム設定 > プライバシーとセキュリティ > 位置情報サービス」でこのアプリを許可するか、探す語を入れてください" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Location access is off, so nearby places can’t be found. Allow this app in System Settings > Privacy & Security > Location Services, or type what to search for."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "位置情報が許可されていないので近くを探せません。「システム設定 > プライバシーとセキュリティ > 位置情報サービス」でこのアプリを許可するか、探す語を入れてください"
           }
         }
       }
@@ -3856,6 +3958,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "位置情報の利用が許可されていません"
+          }
+        }
+      }
+    },
+    "位置情報の利用が許可されていません。「システム設定 > プライバシーとセキュリティ > 位置情報サービス」で許可してください" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Location access is not allowed. Allow it in System Settings > Privacy & Security > Location Services."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "位置情報の利用が許可されていません。「システム設定 > プライバシーとセキュリティ > 位置情報サービス」で許可してください"
           }
         }
       }

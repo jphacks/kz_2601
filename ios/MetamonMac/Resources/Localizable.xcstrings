@@ -84,6 +84,22 @@
         }
       }
     },
+    "%lld 文字までです" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Up to %lld characters"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld 文字までです"
+          }
+        }
+      }
+    },
     "%lld 秒ほど待ってから、もう一度お試しください" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -408,6 +424,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "ON にすると、新しく用意する時も記録帳を直す時も、まずチャットで AI に相談できます。質問には答え、案を出すので「これでいく」で反映します。OFF にすると、話した内容をすぐ反映します。"
+          }
+        }
+      }
+    },
+    "OS" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "OS"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "OS"
           }
         }
       }
@@ -881,6 +913,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "あなた: %@"
+          }
+        }
+      }
+    },
+    "ありがとうございます。いただいた内容は改善に使います。" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Thank you. We'll use your feedback to improve the app."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ありがとうございます。いただいた内容は改善に使います。"
           }
         }
       }
@@ -1425,6 +1473,22 @@
         }
       }
     },
+    "この画像をそのまま送ります。個人の情報(名前・金額・連絡先など)が写っていないか確かめてください。" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "This image is sent as is. Check that it doesn't show personal information (names, amounts, contacts, etc.)."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "この画像をそのまま送ります。個人の情報(名前・金額・連絡先など)が写っていないか確かめてください。"
+          }
+        }
+      }
+    },
     "この画面について話す" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -1603,6 +1667,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "これでいく(%lld 件)"
+          }
+        }
+      }
+    },
+    "その他" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Other"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "その他"
           }
         }
       }
@@ -1935,6 +2015,22 @@
         }
       }
     },
+    "もう一度送ってください。続く場合は添付を減らしてください。" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Please send again. If this keeps happening, remove some attachments."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "もう一度送ってください。続く場合は添付を減らしてください。"
+          }
+        }
+      }
+    },
     "もう少しかかっています…" : {
       "localizations" : {
         "en" : {
@@ -2126,6 +2222,38 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "アプリの名前"
+          }
+        }
+      }
+    },
+    "アプリの版" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "App version"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "アプリの版"
+          }
+        }
+      }
+    },
+    "アプリの版・OS・機種" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "App version, OS, and device model"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "アプリの版・OS・機種"
           }
         }
       }
@@ -2534,6 +2662,22 @@
         }
       }
     },
+    "サインインし直してから送ってください。" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Please sign in again, then send."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "サインインし直してから送ってください。"
+          }
+        }
+      }
+    },
     "サインインの有効期限が切れました" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -2564,6 +2708,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "サインインの有効期限が切れました。もう一度サインインしてください"
+          }
+        }
+      }
+    },
+    "サーバーが混み合っています。少し待ってからもう一度送ってください。" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The server is busy. Please wait a moment and send again."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "サーバーが混み合っています。少し待ってからもう一度送ってください。"
           }
         }
       }
@@ -2647,6 +2807,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "スキップ"
+          }
+        }
+      }
+    },
+    "スクショを小さくできませんでした。スクショをオフにして送ってください。" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Couldn't shrink the screenshot. Turn off the screenshot and send again."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "スクショを小さくできませんでした。スクショをオフにして送ってください。"
           }
         }
       }
@@ -2777,6 +2953,54 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "バージョン"
+          }
+        }
+      }
+    },
+    "フィードバック" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Feedback"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "フィードバック"
+          }
+        }
+      }
+    },
+    "フィードバックを送る" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Send feedback"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "フィードバックを送る"
+          }
+        }
+      }
+    },
+    "フィードバックを送る…" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Send Feedback…"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "フィードバックを送る…"
           }
         }
       }
@@ -3202,6 +3426,22 @@
         }
       }
     },
+    "上の内容に同意して送る" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "I agree to the above and want to send"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "上の内容に同意して送る"
+          }
+        }
+      }
+    },
     "上へ移動" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -3302,6 +3542,22 @@
         }
       }
     },
+    "不具合" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bug"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "不具合"
+          }
+        }
+      }
+    },
     "予定" : {
       "localizations" : {
         "en" : {
@@ -3363,6 +3619,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "今のアプリの設計(画面・項目・アプリ名など)"
+          }
+        }
+      }
+    },
+    "今の画面のスクショ" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Screenshot of the current screen"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "今の画面のスクショ"
           }
         }
       }
@@ -3478,6 +3750,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "今日はここまでです"
+          }
+        }
+      }
+    },
+    "今日はこれ以上送れません。明日また送ってください。" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "You can't send more today. Please try again tomorrow."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "今日はこれ以上送れません。明日また送ってください。"
           }
         }
       }
@@ -4346,6 +4634,22 @@
         }
       }
     },
+    "困ったこと・思ったのと違ったこと・欲しい機能など" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Problems, things that didn't turn out as expected, features you'd like…"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "困ったこと・思ったのと違ったこと・欲しい機能など"
+          }
+        }
+      }
+    },
     "地図・場所" : {
       "localizations" : {
         "en" : {
@@ -4374,6 +4678,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "場所"
+          }
+        }
+      }
+    },
+    "場所の通知は Mac では使えません" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Location notifications aren't available on Mac"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "場所の通知は Mac では使えません"
           }
         }
       }
@@ -4797,6 +5117,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "挨拶と質問を読み上げる"
+          }
+        }
+      }
+    },
+    "接続がありません。つながる場所でもう一度送ってください。" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No connection. Please send again when you're online."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "接続がありません。つながる場所でもう一度送ってください。"
           }
         }
       }
@@ -5340,6 +5676,22 @@
         }
       }
     },
+    "機種" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Device model"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "機種"
+          }
+        }
+      }
+    },
     "次のアプリ" : {
       "localizations" : {
         "en" : {
@@ -5497,6 +5849,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "混み合っています。安全なテンプレートに切り替えています…"
+          }
+        }
+      }
+    },
+    "添付(どれも任意)" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Attachments (all optional)"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "添付(どれも任意)"
           }
         }
       }
@@ -5832,6 +6200,22 @@
         }
       }
     },
+    "種類" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Type"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "種類"
+          }
+        }
+      }
+    },
     "空き容量が足りません(あと約%lldMB 必要です)。不要なファイルを整理してから試してください。" : {
       "localizations" : {
         "en" : {
@@ -6059,6 +6443,22 @@
         }
       }
     },
+    "要望" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Request"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "要望"
+          }
+        }
+      }
+    },
     "言い方を変えて、もう一度お話しください" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -6105,6 +6505,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "言語"
+          }
+        }
+      }
+    },
+    "記録(入力したデータ)の中身は送りません。オンにしたものだけを送ります。" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The contents of your records (the data you entered) are never sent. Only what you turn on is sent."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "記録(入力したデータ)の中身は送りません。オンにしたものだけを送ります。"
           }
         }
       }
@@ -6576,6 +6992,22 @@
         }
       }
     },
+    "送った内容(本文と、オンにした添付)は、Tailor It の不具合を直し、改善するために運営者が読みます。Google Cloud(Firestore)に保存し、%lld 日後に消去します。アカウントを削除したときも消去します。第三者には渡しません。" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "What you send (the text and the attachments you turned on) is read by the operator to fix bugs and improve Tailor It. It is stored on Google Cloud (Firestore) and erased after %lld days, or when you delete your account. It is not shared with third parties."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "送った内容(本文と、オンにした添付)は、Tailor It の不具合を直し、改善するために運営者が読みます。Google Cloud(Firestore)に保存し、%lld 日後に消去します。アカウントを削除したときも消去します。第三者には渡しません。"
+          }
+        }
+      }
+    },
     "送り先: Tailor It のサーバー(Google Cloud)を経由して Anthropic, PBC(米国)へ。送った内容は、アプリを作る・ボタンの文を作る・会話の返事を作るためだけに使います。" : {
       "localizations" : {
         "en" : {
@@ -6624,6 +7056,86 @@
         }
       }
     },
+    "送るスクショ" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Screenshot to send"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "送るスクショ"
+          }
+        }
+      }
+    },
+    "送る前に" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Before sending"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "送る前に"
+          }
+        }
+      }
+    },
+    "送れませんでした" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Couldn't send"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "送れませんでした"
+          }
+        }
+      }
+    },
+    "送信" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Send"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "送信"
+          }
+        }
+      }
+    },
+    "送信しました" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sent"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "送信しました"
+          }
+        }
+      }
+    },
     "通信が切れました" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -6657,6 +7169,22 @@
         }
       }
     },
+    "通知がオフのため、このアプリの通知は届きません" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Notifications are off, so this app's notifications won't arrive"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "通知がオフのため、このアプリの通知は届きません"
+          }
+        }
+      }
+    },
     "通知の時間を朝7時に変えて" : {
       "localizations" : {
         "en" : {
@@ -6669,6 +7197,38 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "通知の時間を朝7時に変えて"
+          }
+        }
+      }
+    },
+    "通知を予約しました(%@)" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Reminder scheduled (%@)"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "通知を予約しました(%@)"
+          }
+        }
+      }
+    },
+    "通知を予約できませんでした" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Couldn't schedule the notification"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "通知を予約できませんでした"
           }
         }
       }

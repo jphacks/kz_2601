@@ -8,7 +8,7 @@ import AppKit
 ///   ⌘Z / ⇧⌘Z は入力欄と記録の削除に使っているので、版の取り消しは別のキーにする
 /// - 表示: サイドバー(`SidebarCommands`)・ツールバー(`ToolbarCommands`)・画面マップ(⇧⌘E・#970)
 /// - 移動: 戻る・アプリの一覧 / 中央へ・前 / 次のアプリ
-/// - ヘルプ: 頼み方のコツ(#967)・お問い合わせ
+/// - ヘルプ: 頼み方のコツ(#967)・お問い合わせ・フィードバックを送る(#983)
 struct MacCommands: Commands {
     static let mainWindowId = "main"
     static let contactURL = URL(string: "https://tailor-it.app/contact")!
@@ -93,6 +93,9 @@ struct MacCommands: Commands {
             Button("頼み方のコツ") { shell?.showTips() }
                 .disabled(!(shell?.canCompose ?? false))
             Button("お問い合わせ") { openURL(Self.contactURL) }
+            #if !APP_STORE_REVIEW // 審査用ビルドはフィードバックを外す(#319)
+            Button("フィードバックを送る…") { MacFeedbackCenter.shared.open(openWindow) } // #983
+            #endif
         }
     }
 }

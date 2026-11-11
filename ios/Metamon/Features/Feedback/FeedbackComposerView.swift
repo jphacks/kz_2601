@@ -161,7 +161,7 @@ struct FeedbackComposerView: View {
 
     private var consentSection: some View {
         Section {
-            Text(L10n.tr("送った内容(本文と、オンにした添付)は、Tailor It の不具合を直し、改善するために運営者が読みます。Google Cloud(Firestore)に保存し、\(FeedbackConsent.retentionDays) 日後に消去します。アカウントを削除したときも消去します。第三者には渡しません。"))
+            Text(FeedbackCopy.consent)
                 .font(.footnote)
             Toggle("上の内容に同意して送る", isOn: $agreed)
                 .accessibilityIdentifier("feedback.agree")
@@ -194,13 +194,7 @@ struct FeedbackComposerView: View {
     }
 
     static func message(for error: Error) -> String {
-        switch FailureKind.classify(error) {
-        case .rateLimited: L10n.tr("今日はこれ以上送れません。明日また送ってください。")
-        case .offline: L10n.tr("接続がありません。つながる場所でもう一度送ってください。")
-        case .timeout, .busy: L10n.tr("サーバーが混み合っています。少し待ってからもう一度送ってください。")
-        case .sessionExpired: L10n.tr("サインインし直してから送ってください。")
-        default: L10n.tr("もう一度送ってください。続く場合は添付を減らしてください。")
-        }
+        FeedbackCopy.message(for: error)
     }
 }
 

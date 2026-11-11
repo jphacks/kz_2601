@@ -18,11 +18,7 @@ public final class MusicSession {
     public var notice: String?
 
     public init(player: (any MusicPlayback)? = nil) {
-        #if os(iOS)
         self.player = player ?? AppleMusicPlayback()
-        #else
-        self.player = player ?? FakeMusicPlayback()
-        #endif
     }
 
     // MARK: - 再生

@@ -136,7 +136,7 @@ struct PlaceSearchLeaf: View {
                 // 断られても責めない。語があれば位置なしで探す
                 let denied = error is OneShotLocation.LocationError
                 notice = switch (denied, words == nil) {
-                case (true, true): L("位置情報が許可されていないので近くを探せません。設定で「このAppの使用中のみ許可」を選ぶか、探す語を入れてください")
+                case (true, true): LocationPermissionCopy.cannotSearchNearby
                 case (false, true): L("現在地がわからないので近くを探せません。少し待つか、探す語を入れてください")
                 default: L("現在地が使えないので、近くに限らず探しました")
                 }

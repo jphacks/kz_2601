@@ -220,7 +220,10 @@ struct LocationPickerSheet: View {
         if PlacePicking.isMock {
             here = PlacePicking.mockHere.coordinate
         } else {
-            do { here = try await OneShotLocation().request().coordinate } catch {
+            do { here = try await OneShotLocation().request().coordinate } catch is OneShotLocation.LocationError {
+                self.error = LocationPermissionCopy.notAllowed
+                return
+            } catch {
                 self.error = L("位置情報を取得できませんでした(\(error.localizedDescription))")
                 return
             }

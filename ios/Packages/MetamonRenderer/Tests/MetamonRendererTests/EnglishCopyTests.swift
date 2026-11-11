@@ -17,7 +17,14 @@ final class EnglishCopyTests: XCTestCase {
         XCTAssertEqual(AIPhotoInput.PhotoError.noPhoto.errorDescription, "Take or choose a photo first")
         XCTAssertEqual(AIPhotoInput.PhotoError.unreadable.errorDescription, "Couldn't load the photo. Retake it and try again")
         XCTAssertEqual(AIAvailability.title, "AI isn't available on this device")
+        #if os(macOS)
+        XCTAssertEqual(AIAvailability.unavailable(.osTooOld).message, "Requires macOS 26 or later")
+        XCTAssertEqual(AIAvailability.unavailable(.appleIntelligenceNotEnabled).message,
+                       "Turn it on in System Settings > Apple Intelligence & Siri")
+        #else
         XCTAssertEqual(AIAvailability.unavailable(.osTooOld).message, "Requires iOS 26 or later")
+        XCTAssertEqual(AIAvailability.unavailable(.appleIntelligenceNotEnabled).message, "Turn it on in Settings > Apple Intelligence & Siri")
+        #endif
         XCTAssertEqual(AIGenerateBuilder.BuildError.noRecords.errorDescription, "Add a record first")
         XCTAssertEqual(OnDeviceAIError.failed("x", reason: .invalidResponse).errorDescription, "AI processing failed (x)")
     }

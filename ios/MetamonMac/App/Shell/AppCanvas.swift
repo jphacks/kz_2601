@@ -71,6 +71,7 @@ private struct AppCanvasContent: View {
                 modal(route).frame(minWidth: 640, minHeight: 560)
             }
             .modifier(RuntimeOverlays(runtime: runtime))
+            .macNotificationsOffBar(runtime.notifications) // 通知がオフの時のバー(#965)
             .environment(\.dslRuntime, runtime)
             .environment(\.componentRegistry, ComponentRegistry.standard)
             .focusedSceneValue(\.macAppRuntime, runtime) // メニューの「戻る」・削除の取り消し(#934)
@@ -116,6 +117,8 @@ private struct RuntimeOverlays: ViewModifier {
             .sheet(item: calendarShown) { draft in
                 MacCalendarSheet(draft: draft, writer: runtime.calendarWriter) { runtime.calendarDraft = nil }
             }
+            // AI の部品(#962): 同意の無いまま送ろうとしたら説明を出す。同意したら押し直しで送る(iOS と同じ)
+            .sheet(isPresented: consentShown) { MacAIConsentSheet() }
             .overlay(alignment: .top) {
                 VStack(spacing: 8) {
                     if active, let message = runtime.toast {
@@ -147,6 +150,10 @@ private struct RuntimeOverlays: ViewModifier {
 
     private var confirmShown: Binding<Bool> {
         Binding(get: { active && runtime.confirm != nil }, set: { if !$0 { runtime.confirm = nil } })
+    }
+
+    private var consentShown: Binding<Bool> {
+        Binding(get: { active && runtime.needsAIConsent }, set: { if !$0 { runtime.needsAIConsent = false } })
     }
 
     private var calendarShown: Binding<CalendarEventDraft?> {
