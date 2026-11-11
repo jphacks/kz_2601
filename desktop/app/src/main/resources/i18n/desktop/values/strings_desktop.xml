@@ -80,6 +80,7 @@
     <string name="desktop_keys_save">保存</string>
     <string name="desktop_keys_search">検索</string>
     <string name="desktop_list_empty">まだありません</string>
+    <string name="desktop_list_open_window">別のウィンドウで開く</string>
     <string name="desktop_list_separator">、</string>
     <string name="desktop_match_offline">仲間探しのつながりはサインインした後に出ます</string>
     <string name="desktop_notification_now">今</string>
@@ -110,6 +111,7 @@
     <string name="desktop_timer_start">開始</string>
     <string name="desktop_tray_close_to_tray">ウィンドウを閉じてもトレイに残す</string>
     <string name="desktop_tray_hidden_hint">トレイに残っています。終わるにはトレイのメニューの「終了」を選びます</string>
+    <string name="desktop_tray_new_window">新しいウィンドウ</string>
     <string name="desktop_tray_open">「%1$s」を開く</string>
     <string name="desktop_tray_quick_record">すぐ記録</string>
     <string name="desktop_tray_quit">終了</string>
@@ -126,5 +128,8 @@
     <string name="desktop_untitled">(無題)</string>
     <string name="desktop_url_failed">URL を開けませんでした</string>
     <string name="desktop_url_unsupported">このパソコンでは URL を開けません: %1$s</string>
+    <string name="desktop_window_conflict">別のウィンドウで先に保存された内容を上書きしました</string>
+    <string name="desktop_window_open_record">この記録を別のウィンドウで開く</string>
     <string name="desktop_window_title">Tailor It — %1$s</string>
+    <string name="desktop_window_title_record">Tailor It — %1$s — %2$s</string>
 </resources>

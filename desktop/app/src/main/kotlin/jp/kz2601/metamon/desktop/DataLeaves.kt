@@ -5,7 +5,15 @@ import androidx.compose.foundation.ContextMenuArea
 import androidx.compose.foundation.ContextMenuItem
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
+import androidx.compose.ui.composed
+import androidx.compose.ui.input.pointer.PointerEventPass
+import androidx.compose.ui.input.pointer.PointerEventType
+import androidx.compose.ui.input.pointer.isCtrlPressed
+import androidx.compose.ui.input.pointer.isMetaPressed
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.foundation.gestures.Orientation
 import androidx.compose.foundation.gestures.draggable
 import androidx.compose.foundation.gestures.rememberDraggableState
@@ -104,6 +112,8 @@ class DataEnv(
     /** その行を書き換えられるか・消せるか(出せない操作は出さない)。 */
     val canEdit: (entity: String, id: String) -> Boolean = { _, _ -> true },
     val canDelete: (entity: String, id: String) -> Boolean = { _, _ -> true },
+    /** 行の詳細を別のウィンドウで開く(#1763)。(行を押した時のアクション, recordId)。null なら出さない。 */
+    val openWindow: ((Action, String) -> Unit)? = null,
 )
 
 @Composable
@@ -308,11 +318,12 @@ private fun ListLeaf(c: Component, env: DataEnv) {
             val tap = c.onItemTap
             val delete = { env.delete(c.entity!!, r.id) }
             val rowDeletable = deletable && env.canDelete(c.entity!!, r.id)
+            val openWindow = tap?.let { a -> env.openWindow?.let { o -> { o(a, r.id) } } }
             val row = @Composable {
                 Row(
                     Modifier.fillMaxWidth()
                         .then(if (rowDeletable) Modifier.onKeyEvent { e -> (e.type == KeyEventType.KeyUp && e.key == Key.Delete).also { if (it) delete() } } else Modifier)
-                        .then(if (tap != null) Modifier.clickable { env.tap(tap, r.id) } else Modifier)
+                        .then(if (tap != null) Modifier.rowClick({ env.tap(tap, r.id) }, openWindow) else Modifier)
                         .padding(vertical = 6.dp),
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
@@ -329,11 +340,37 @@ private fun ListLeaf(c: Component, env: DataEnv) {
                     t.trailing?.let { Text(it, style = MaterialTheme.typography.bodyMedium, color = Color.Gray, maxLines = 1) }
                 }
             }
-            if (rowDeletable) ContextMenuArea(items = { listOf(ContextMenuItem(Strings["desktop_keys_delete"], delete)) }) { row() } else row()
+            val menu = listOfNotNull(
+                openWindow?.let { ContextMenuItem(Strings["desktop_list_open_window"], it) },
+                ContextMenuItem(Strings["desktop_keys_delete"], delete).takeIf { rowDeletable },
+            )
+            if (menu.isNotEmpty()) ContextMenuArea(items = { menu }) { row() } else row()
             if (i < rows.size - 1) HorizontalDivider()
         }
     }
 }
+
+/**
+ * 一覧の行を押す。別のウィンドウを開ける時は、ダブルクリックと Ctrl(macOS は ⌘)+クリックで詳細を別のウィンドウに(#1763)。
+ * 押した時の Ctrl は先に見ておく(クリックの知らせには修飾キーが乗らない)。
+ */
+@OptIn(ExperimentalFoundationApi::class)
+private fun Modifier.rowClick(tap: () -> Unit, openWindow: (() -> Unit)?): Modifier =
+    if (openWindow == null) {
+        clickable(onClick = tap)
+    } else {
+        composed {
+            var ctrl by remember { mutableStateOf(false) }
+            pointerInput(Unit) {
+                awaitPointerEventScope {
+                    while (true) {
+                        val e = awaitPointerEvent(PointerEventPass.Initial)
+                        if (e.type == PointerEventType.Press) ctrl = e.keyboardModifiers.isCtrlPressed || e.keyboardModifiers.isMetaPressed
+                    }
+                }
+            }.combinedClickable(onDoubleClick = openWindow, onClick = { if (ctrl) openWindow() else tap() })
+        }
+    }
 
 private val MIN_COLUMN_W = 48.dp
 

@@ -79,6 +79,7 @@
     <string name="desktop_keys_save">Save</string>
     <string name="desktop_keys_search">Search</string>
     <string name="desktop_list_empty">Nothing yet</string>
+    <string name="desktop_list_open_window">Open in new window</string>
     <string name="desktop_list_separator">", "</string>
     <string name="desktop_match_offline">Matches appear after you sign in</string>
     <string name="desktop_notification_now">now</string>
@@ -109,6 +110,7 @@
     <string name="desktop_timer_start">Start</string>
     <string name="desktop_tray_close_to_tray">Keep in tray when window is closed</string>
     <string name="desktop_tray_hidden_hint">Still running in the tray. To quit, choose Quit from the tray menu</string>
+    <string name="desktop_tray_new_window">New window</string>
     <string name="desktop_tray_open">Open %1$s</string>
     <string name="desktop_tray_quick_record">Quick record</string>
     <string name="desktop_tray_quit">Quit</string>
@@ -125,5 +127,8 @@
     <string name="desktop_untitled">(Untitled)</string>
     <string name="desktop_url_failed">Couldn\'t open the URL</string>
     <string name="desktop_url_unsupported">This computer can\'t open URLs: %1$s</string>
+    <string name="desktop_window_conflict">Saved over changes made in another window</string>
+    <string name="desktop_window_open_record">Open this record in a new window</string>
     <string name="desktop_window_title">Tailor It — %1$s</string>
+    <string name="desktop_window_title_record">Tailor It — %1$s — %2$s</string>
 </resources>
