@@ -3,7 +3,7 @@ import MetamonServices
 
 /// 会話のシートの失敗を出す状態カード(#968)。分け方と文言は iOS の `ErrorPresentation` / `ErrorCopy` をそのまま使う
 /// (上限・Pro が要る・一時停止・オフライン・混雑・失敗)。見た目は Mac に合わせ、ボタンは「もう一度」と「閉じる」。
-/// サインイン・Pro にする・今すぐ送るは Mac にまだ無い(#930・課金は後の Issue)ので出さず、本文の案内だけにする。
+/// 「Pro にする」は Mac の課金画面(`MacPaywallView`)を出す。サインイン・今すぐ送るは Mac にまだ無い(#930)ので出さず、本文の案内だけにする。
 struct MacErrorCard: View {
     let presentation: ErrorPresentation
     var retry: () -> Void
@@ -35,6 +35,11 @@ struct MacErrorCard: View {
                         Button(ErrorCopy.retry, action: retry)
                             .buttonStyle(.borderedProminent)
                     }
+                    #if !APP_STORE_REVIEW
+                    if presentation.primary == .upgradePro {
+                        MacUpgradeProButton(reason: .planLimit, prominent: true)
+                    }
+                    #endif
                     Button(ErrorCopy.dismiss, action: dismiss)
                 }
                 .padding(.top, 2)

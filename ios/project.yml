@@ -363,6 +363,8 @@ targets:
       testTargets:
         - MetamonMacTests
       gatherCoverageData: false
+      # 課金: iOS と同じローカルの StoreKit の構成で Run 時にテスト購入できる(本番では使われない)
+      storeKitConfiguration: StoreKit/TailorItPro.storekit
 
   # Mac アプリをホストにした単体テスト(#1212)。MacAppRuntime(画面の移動・一言・同期の知らせ)と Mac だけが使う共有の部品
   MetamonMacTests:
