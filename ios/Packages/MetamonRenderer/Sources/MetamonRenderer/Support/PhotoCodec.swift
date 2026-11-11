@@ -34,15 +34,15 @@ struct PhotoView: View {
     var accessibilityLabel: String? = nil
 
     private var hasPhoto: Bool {
-        PhotoCodec.image(from: value) != nil || (value.stringValue?.hasPrefix("http") ?? false)
+        PhotoCodec.image(from: value) != nil || ImageHostPolicy.loadableURL(value.stringValue) != nil
     }
 
     var body: some View {
         Group {
             if let img = PhotoCodec.image(from: value) {
                 Image(platformImage: img).resizable().scaledToFill()
-            } else if let s = value.stringValue, s.hasPrefix("http"), let url = URL(string: s) {
-                AsyncImage(url: url) { $0.resizable().scaledToFill() } placeholder: { Rectangle().fill(.quaternary) }
+            } else if let url = ImageHostPolicy.loadableURL(value.stringValue) {
+                RemoteImage(url: url) { Rectangle().fill(.quaternary) }
             } else {
                 Rectangle().fill(.quaternary).overlay(Image(systemName: "photo").foregroundStyle(.secondary))
             }

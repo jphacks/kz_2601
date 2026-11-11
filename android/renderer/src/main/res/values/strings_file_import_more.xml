@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- fileImport の PDF の取り込み(#1181)の文言。英語は values-en。 -->
+<resources>
+    <string name="renderer_import_audio_note">録音ファイルはこの端末ではまだ取り込めません</string>
+    <string name="renderer_import_problem_pdf_unreadable">PDF から文字を取り出せませんでした</string>
+</resources>

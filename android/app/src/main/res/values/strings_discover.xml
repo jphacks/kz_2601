@@ -1,0 +1,75 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 「探す」(検索・インストール・通報)と、共有シートの「みんなに公開」(#902)。文言は iOS の DiscoverSheet・ShareAppSheet から -->
+<resources>
+    <string name="discover_anonymous">匿名</string>
+    <string name="discover_block">公開した人をブロック</string>
+    <plurals name="discover_byline">
+        <item quantity="other">%1$s ・ %2$d 人が利用</item>
+    </plurals>
+    <plurals name="discover_byline_mine">
+        <item quantity="other">%1$s ・ %2$d 人が利用 ・ あなたの公開</item>
+    </plurals>
+    <string name="discover_categories">カテゴリ</string>
+    <string name="discover_category_all">すべて</string>
+    <string name="discover_close">閉じる</string>
+    <string name="discover_copy">コピー</string>
+    <string name="discover_empty">まだ公開されたアプリがありません</string>
+    <string name="discover_entry">みんなが作ったアプリを探す</string>
+    <string name="discover_entry_short">探す</string>
+    <string name="discover_failure_load">読み込めませんでした</string>
+    <string name="discover_failure_offline">読み込めませんでした。通信できる所でもう一度お試しください</string>
+    <string name="discover_failure_unavailable">「探す」はサーバー接続時のみ使えます</string>
+    <string name="discover_get">入れる</string>
+    <string name="discover_hidden">運営により非公開</string>
+    <string name="discover_hidden_reason">運営により非公開: %1$s</string>
+    <string name="discover_install_failed">インストールできませんでした</string>
+    <string name="discover_install_label">%1$sをインストール</string>
+    <string name="discover_install_offline">インストールできませんでした。通信できる所でもう一度お試しください</string>
+    <string name="discover_install_unpublished">このアプリは公開をやめました</string>
+    <string name="discover_installed">「%1$s」をインストールしました</string>
+    <string name="discover_loading">読み込み中</string>
+    <string name="discover_more">%1$sの操作</string>
+    <string name="discover_no_match">「%1$s」に合うアプリは見つかりませんでした</string>
+    <string name="discover_report">通報する</string>
+    <string name="discover_retry">もう一度</string>
+    <string name="discover_search_placeholder">家計簿、筋トレ、散歩…</string>
+    <string name="discover_sort">並び順</string>
+    <string name="discover_sort_new">新着</string>
+    <string name="discover_sort_popular">人気</string>
+    <string name="discover_title">アプリを探す</string>
+    <string name="publish_action">公開する</string>
+    <string name="publish_cancel">キャンセル</string>
+    <string name="publish_confirm_name_footer">空欄のままなら「匿名」と出ます</string>
+    <string name="publish_confirm_name_label">公開する人の名前(任意)</string>
+    <string name="publish_confirm_name_placeholder">例: たろう</string>
+    <string name="publish_confirm_point_anyone">「探す」から誰でも見つけて、自分のアプリとして入れられます</string>
+    <string name="publish_confirm_point_privacy">名前・説明・タグに、住所や電話番号などの個人の情報を書かないでください</string>
+    <string name="publish_confirm_point_records">あなただけの記録は含まれません</string>
+    <string name="publish_confirm_point_stop">共有シートから、いつでも公開をやめられます</string>
+    <string name="publish_confirm_points_header">公開すると</string>
+    <string name="publish_confirm_title">「%1$s」を公開しますか?</string>
+    <string name="publish_description_label">ひとこと説明(任意)</string>
+    <string name="publish_failed">公開できませんでした</string>
+    <string name="publish_failed_blank">まだ中身の無いアプリは公開できません。声で作ってから公開してください</string>
+    <string name="publish_failed_not_owner">自分で作ったアプリだけ公開できます</string>
+    <string name="publish_failed_offline">公開できませんでした。通信できる所でもう一度お試しください</string>
+    <string name="publish_field_author">表示名</string>
+    <string name="publish_field_description">ひとこと説明</string>
+    <string name="publish_field_name">アプリの名前</string>
+    <string name="publish_field_tags">タグ</string>
+    <string name="publish_header">みんなに公開</string>
+    <string name="publish_intro">「探す」から誰でも見つけてインストールできるようになります</string>
+    <plurals name="publish_live">
+        <item quantity="other">「探す」に公開中・%1$d 人がインストール</item>
+    </plurals>
+    <string name="publish_published">「探す」に公開しました</string>
+    <string name="publish_tags_label">タグ(スペース区切り・任意)</string>
+    <string name="publish_tags_placeholder">例: 健康 習慣</string>
+    <string name="publish_text_not_allowed">「%1$s」に表示できない言葉が含まれています</string>
+    <string name="publish_text_not_allowed_generic">表示できない言葉が含まれています</string>
+    <string name="publish_unpublish">公開をやめる</string>
+    <string name="publish_unpublish_failed">非公開にできませんでした</string>
+    <string name="publish_unpublish_message">「探す」に出なくなります。すでに入れた人のアプリは消えません。</string>
+    <string name="publish_unpublish_title">公開をやめますか?</string>
+    <string name="publish_unpublished">公開をやめました</string>
+</resources>

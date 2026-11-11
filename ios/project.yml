@@ -67,6 +67,10 @@ settings:
     # プッシュ通知の環境(#683・Metamon.entitlements の aps-environment に展開)。Debug / Staging は development(APNs sandbox)、
     # Release は production。Review は通知を外しているので Metamon-Review.entitlements に入れない。docs/infra/runtime-config.md
     METAMON_APS_ENV: development
+    # Universal Links のドメイン(#331・Metamon.entitlements の applinks:<ここ> に展開)。シェアリンク https://tailor-it.app/s/<token> をアプリで開く。
+    # 全構成で同じ(AASA は Apple の CDN 経由で取るので開発署名でも効く)。Review は共有リンクを外しているので Metamon-Review.entitlements に入れない。
+    # アプリ側の判定は ShareURL.webHost と揃える。docs/infra/universal-links/README.md
+    METAMON_APPLINKS_DOMAIN: tailor-it.app
   configs:
     Debug:
       METAMON_BUNDLE_ID_SUFFIX: "${METAMON_STG_BUNDLE_ID_SUFFIX}"
@@ -134,9 +138,10 @@ targets:
     # Sign in with Apple + App Group(ウィジェットとの共有)。自動署名(-allowProvisioningUpdates)が App ID に capability を付与する(有料 Developer Program 必須)。
     # 中身: Sign in with Apple / App Group / HealthKit(healthStat / Field.health・#167。自動署名で App ID に HealthKit が付く)/
     # App Attest(App Check・#318。環境は METAMON_APP_ATTEST_ENV。自動署名で App ID に App Attest が付く)/
-    # Push(aps-environment・#683。環境は METAMON_APS_ENV。自動署名で App ID に Push Notifications が付く)。
+    # Push(aps-environment・#683。環境は METAMON_APS_ENV。自動署名で App ID に Push Notifications が付く)/
+    # Associated Domains(Universal Links・#331。applinks:$(METAMON_APPLINKS_DOMAIN)。自動署名で App ID に Associated Domains が付く)。
     # 構成ごとに別ファイルにするため xcodegen の `entitlements:` ではなく CODE_SIGN_ENTITLEMENTS で指定する(#245)。
-    # Review(審査用)は HealthKit と Push を外した Metamon/Metamon-Review.entitlements。
+    # Review(審査用)は HealthKit・Push・Associated Domains を外した Metamon/Metamon-Review.entitlements。
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: jp.kz2601.metamon$(METAMON_BUNDLE_ID_SUFFIX)

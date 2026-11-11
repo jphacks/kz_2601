@@ -30,7 +30,7 @@ struct DrawingFieldPanel: View {
     private var title: String { c.label.flatMap { $0.isEmpty ? nil : $0 } ?? L("手書き") }
     private var value: JSONValue { form.values[field] ?? .null }
     private var picture: PlatformImage? { PhotoCodec.image(from: value) }
-    private var hasDrawing: Bool { picture != nil || (value.stringValue?.hasPrefix("http") ?? false) }
+    private var hasDrawing: Bool { picture != nil || ImageHostPolicy.loadableURL(value.stringValue) != nil }
 
     var body: some View {
         VStack(alignment: .leading, spacing: RenderTheme.Spacing.sm) {

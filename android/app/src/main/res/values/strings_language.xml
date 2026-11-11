@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 表示言語の設定(#843)。文言の正は iOS の Localizable.xcstrings(日本語の元文) -->
+<resources>
+    <string name="language_close">閉じる</string>
+    <string name="language_footer">新しく作るアプリと質問もこの言語になります。作成済みのアプリの文言は変わりません。</string>
+    <string name="language_system">自動</string>
+    <string name="language_title">言語</string>
+</resources>

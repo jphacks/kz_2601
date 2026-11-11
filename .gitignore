@@ -4,6 +4,9 @@
 *.pem
 *.p8
 GoogleService-Info*.plist
+# Android の Firebase 設定(#356)
+android/app/google-services.json
+android/app/src/*/google-services.json
 serviceAccountKey*.json
 
 # macOS / Xcode
