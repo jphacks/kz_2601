@@ -29,6 +29,7 @@ struct MetamonMacApp: App {
         #if !APP_STORE_REVIEW
         BetaWelcomeStore.shared.applyLaunchOverride()
         MacAIButtonMetrics.install() // 前の日までの AI ボタンの集計を、起動・前面に戻った時に送る(#446・#1327)
+        MacPushHost.shared.install(services: MacServices.shared) // プッシュの端末の登録(#982)
         #endif
         // 記録の一時フォルダ(MacAppRuntime.mockRecordSync)と共有に渡した書き出しの写し(#946)を起動時(前回の残り)と終了時に片付ける
         MacAppRuntime.removePreviewDirectories()
@@ -55,6 +56,7 @@ struct MetamonMacApp: App {
                     .environment(library)
                     #if !APP_STORE_REVIEW
                     .modifier(MacLinkReceiver())
+                    .modifier(MacPushRegistrationObserver()) // プッシュの端末の登録(#982)
                     #endif
                     .modifier(MacCrashReportUser())
                     .task { MacAccount.shared.wipe.library = library } // サインアウト・削除で一覧も空にする(#972)
