@@ -60,6 +60,9 @@ import jp.kz2601.metamon.auth.RootScreen
 import jp.kz2601.metamon.auth.SignInScreen
 import jp.kz2601.metamon.nearby.NearbyHostUi
 import jp.kz2601.metamon.permissions.ProvideRendererPermissions
+import jp.kz2601.metamon.release.ReleaseRequestSheet
+import jp.kz2601.metamon.services.release.ReleaseRequest
+import kotlinx.coroutines.flow.MutableStateFlow
 import jp.kz2601.metamon.renderer.DSLView
 import jp.kz2601.metamon.renderer.components.feed.LocalFeedHost
 import jp.kz2601.metamon.renderer.theme.MetamonRenderTheme
@@ -277,6 +280,10 @@ fun MetamonApp(container: AppContainer) {
     }
 
     var switcherOpen by remember { mutableStateOf(false) }
+    // リリース申請(#1254): 申請のシートの対象と、変身一覧のバッジ
+    var releaseTarget by remember { mutableStateOf<AppSummary?>(null) }
+    val releaseFlow = remember(container) { container.releaseRequests?.byApp ?: MutableStateFlow(emptyMap<String, ReleaseRequest>()) }
+    val releases by releaseFlow.collectAsStateWithLifecycle()
     var settingsOpen by rememberSaveable { mutableStateOf(false) }
     val apps by runtime.apps.collectAsStateWithLifecycle()
     val scope = rememberCoroutineScope()
@@ -308,6 +315,7 @@ fun MetamonApp(container: AppContainer) {
     val openSwitcher = {
         switcherOpen = true
         scope.launch { runtime.appsList() }
+        scope.launch { container.releaseRequests?.refresh() } // カードのバッジ(#1254)
         Unit
     }
 
@@ -457,7 +465,16 @@ fun MetamonApp(container: AppContainer) {
             } else {
                 null
             },
+            onRelease = container.releaseRequests?.let { { app ->
+                switcherOpen = false
+                releaseTarget = app
+            } },
+            releases = releases,
         )
+    }
+    // リリース申請(#1254)。入口は変身一覧の「…」
+    releaseTarget?.let { app ->
+        container.releaseRequests?.let { model -> ReleaseRequestSheet(app, model, onDismiss = { releaseTarget = null }) }
     }
 
     // アプリの共有シート(#901)。入口は変身一覧の各行と設定

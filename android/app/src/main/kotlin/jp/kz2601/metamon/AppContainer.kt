@@ -73,7 +73,11 @@ import jp.kz2601.metamon.services.consent.AiConsentStore
 import jp.kz2601.metamon.services.consent.ConsentGatedAiClient
 import jp.kz2601.metamon.services.consent.CrashReportingPreference
 import jp.kz2601.metamon.services.consent.HttpAiButtonMetricsSender
+import jp.kz2601.metamon.release.ReleaseRequestsModel
 import jp.kz2601.metamon.services.consent.InMemoryKeyValueStore
+import jp.kz2601.metamon.services.live.HttpReleaseRequestClient
+import jp.kz2601.metamon.services.release.MockReleaseRequestClient
+import jp.kz2601.metamon.services.release.ReleaseRequestClient
 import jp.kz2601.metamon.services.consent.KeyValueStore
 import jp.kz2601.metamon.services.consent.SharedPreferencesKeyValueStore
 import jp.kz2601.metamon.services.social.AuthorProfile
@@ -220,7 +224,12 @@ class AppContainer(
     private val entitlements: EntitlementClient? = null,
     /** Play の購入(Google Play Billing)。モックは null */
     private val playBilling: ((PlayBilling.Listener) -> PlayBilling)? = null,
+    /** リリース申請の API(#1254)。モックは端末の中だけ。審査用の版は null(入口を出さない) */
+    private val releaseClient: ReleaseRequestClient? = null,
 ) {
+    /** リリース申請の状態(変身一覧のバッジと申請のシート・#1254)。null なら入口を出さない */
+    val releaseRequests: ReleaseRequestsModel? = releaseClient?.let { ReleaseRequestsModel(it) { line -> Log.i(TAG, line) } }
+
     /** 共有シートの「みんなに公開」に渡すもの(#902)。「探す」が無い構成は null */
     val publishEnv: PublishEnv? by lazy { discover?.let { PublishEnv(it.client, authorProfile) } }
 
@@ -285,6 +294,7 @@ class AppContainer(
                 aiButtonMetrics.clearCounts()
                 social?.ageGate?.reset() // 18 歳以上の確認(#877)も人ごと(iOS は UserDefaults ごと消す)
                 runtime.retention?.forget() // 記録の保存期間の確認(#482)も人ごと(iOS は UserDefaults ごと消す)
+                releaseRequests?.reset() // リリース申請のバッジ(#1254)も前の人の分を見せない
             },
         )
     }
@@ -376,6 +386,7 @@ class AppContainer(
                 clearImageCache = { RemoteImages.wipe(context) },
                 talkBackRunning = { TalkBack.isRunning(context) },
                 nearbyEnv = NearbyEnv.of(context, mock = true),
+                releaseClient = if (ReviewBuild.enabled) null else MockReleaseRequestClient(),
             )
         }
 
@@ -462,6 +473,8 @@ class AppContainer(
                 nearbyEnv = NearbyEnv.of(context, mock = false),
                 entitlements = HttpEntitlementClient(appConfigHttp),
                 playBilling = { PlayBilling(context, it) },
+                // 審査用の版(#1275)はリリース申請を出さない(iOS の APP_STORE_REVIEW と同じ)
+                releaseClient = if (ReviewBuild.enabled) null else HttpReleaseRequestClient(appConfigHttp),
             )
         }
 

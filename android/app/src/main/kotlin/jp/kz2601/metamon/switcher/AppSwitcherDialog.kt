@@ -8,22 +8,35 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import jp.kz2601.metamon.R
+import jp.kz2601.metamon.release.ReleaseStatusBadge
 import jp.kz2601.metamon.services.AppSummary
+import jp.kz2601.metamon.services.release.ReleaseRequest
 
 /**
  * アプリの切り替え(iOS の AppSwitcherSheet の最小版・#881)。名前の一覧をタップで切り替え、「+ 新しいアプリ」で初期画面へ。
- * 各行の「シェア」で共有シート(#901)。サムネ・並べ替え・名前の変更・削除は子 Issue。
+ * 各行の「…」メニュー(iOS の `AppCardActions`)から共有シート(#901)・リリース申請(#1254)。申請済みなら状態のバッジを出す。
+ * サムネ・並べ替え・名前の変更・削除は子 Issue。
  */
 @Composable
 fun AppSwitcherDialog(
@@ -33,6 +46,8 @@ fun AppSwitcherDialog(
     onNewApp: () -> Unit,
     onDismiss: () -> Unit,
     onShare: ((AppSummary) -> Unit)? = null,
+    onRelease: ((AppSummary) -> Unit)? = null,
+    releases: Map<String, ReleaseRequest> = emptyMap(),
 ) {
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -52,11 +67,10 @@ fun AppSwitcherDialog(
                                     Text(stringResource(R.string.switcher_current), style = MaterialTheme.typography.labelSmall)
                                 }
                             }
-                            // 共有シート(#901・iOS は各カードの「シェア」)。シェアが使えない構成では出さない
-                            if (onShare != null) {
-                                TextButton(onClick = { onShare(app) }, modifier = Modifier.testTag("switcher.share.${app.id}")) {
-                                    Text(stringResource(R.string.share_action))
-                                }
+                            Column(horizontalAlignment = Alignment.End) {
+                                // 「…」: シェア・公開(#901)/ リリース申請(#1254)。どちらも使えない構成では出さない
+                                if (onShare != null || onRelease != null) CardMenu(app, onShare, onRelease)
+                                releases[app.id]?.let { ReleaseStatusBadge(it.kind) }
                             }
                         }
                     }
@@ -66,4 +80,35 @@ fun AppSwitcherDialog(
         confirmButton = { TextButton(onClick = onNewApp) { Text(stringResource(R.string.switcher_new_app)) } },
         dismissButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.switcher_close)) } },
     )
+}
+
+@Composable
+private fun CardMenu(app: AppSummary, onShare: ((AppSummary) -> Unit)?, onRelease: ((AppSummary) -> Unit)?) {
+    var open by remember { mutableStateOf(false) }
+    val name = app.name.ifEmpty { stringResource(R.string.switcher_untitled) }
+    IconButton(onClick = { open = true }, modifier = Modifier.testTag("switcher.cardMenu.${app.id}")) {
+        Icon(Icons.Filled.MoreVert, contentDescription = stringResource(R.string.release_menu, name))
+    }
+    DropdownMenu(expanded = open, onDismissRequest = { open = false }) {
+        if (onShare != null) {
+            DropdownMenuItem(
+                text = { Text(stringResource(R.string.release_menu_share)) },
+                onClick = {
+                    open = false
+                    onShare(app)
+                },
+                modifier = Modifier.testTag("switcher.share.${app.id}"),
+            )
+        }
+        if (onRelease != null) {
+            DropdownMenuItem(
+                text = { Text(stringResource(R.string.release_menu_request)) },
+                onClick = {
+                    open = false
+                    onRelease(app)
+                },
+                modifier = Modifier.testTag("switcher.release.${app.id}"),
+            )
+        }
+    }
 }
