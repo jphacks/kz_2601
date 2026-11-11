@@ -1,6 +1,22 @@
 {
   "sourceLanguage" : "ja",
   "strings" : {
+    "ひと声で、あなた仕立て。" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Just say it. Tailored to you."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ひと声で、あなた仕立て。"
+          }
+        }
+      }
+    },
     " ・ あなたの公開" : {
       "extractionState" : "manual",
       "localizations" : {
