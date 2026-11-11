@@ -96,6 +96,7 @@ op の `Check` は引数の値を確かめる(appconfig と runner の両方で�
 | `linear` の `createIssue`(Issue を足す・#1684) | 無料・OAuth(`runs` だけ・scope `issues:create`。つなぎ直す時も `read` を一緒に頼む)・書く(確認必須) | `createIssue(title, description?, team?)`。`title` は 1 行・255 文字まで・`description` は Markdown・10,000 文字まで。`team` はチームのキー(`ENG`・英字で始まる 7 文字まで)かチームの id。書かなければ本人のチームが 1 つの時だけそこ(2 つ以上は 400 `bad_request`)。無いチーム・Linear が受けない入力(`INVALID_INPUT`)も 400。状態はチームの最初の状態(Backlog か Triage)。答えは `resultId`(`ENG-123`)と 1 件 | 同上 | なし | 同上 |
 | `youtube` の `channelStats`(チャンネルの公開の数字・YouTube Data API v3・#1699) | 無料・運営の鍵(`runs` だけ。YouTube の 1 日の割り当てで 1 回 1 単位) | `channelStats(channel)`。`channel` はチャンネル id(`UC` + 22 文字)か `@ハンドル`(3〜30 文字・文字と数字と `.` `_` `-`)。答えは 1 件(見出し = チャンネル名・値 = 「登録者 n 人」・補足 = 「動画 n 本・再生 n 回」・リンク = チャンネル)。数は API の値をそのまま 3 桁区切りで出す(丸めない・作り直さない)。登録者を隠しているチャンネルは「登録者 非公開」。無いチャンネルは 400 `bad_request`。出典「YouTube」を出す(下の「YouTube の規約」)。AI に選ばせる決まり(`prompt.go`・`catalog.go`)はまだ | `https://www.googleapis.com` だけ(`/youtube/v3/channels`)・鍵は `X-Goog-Api-Key` ヘッダー | 1 時間 | `EXT_YOUTUBE_ENABLED=1`・`EXT_YOUTUBE_API_KEY` |
 | `youtube` の `latestVideos`(チャンネルの新しい動画・#1699) | 同上(1 回 2 単位: チャンネル + アップロードの再生リスト。`search` の 100 単位は使わない) | `latestVideos(channel, limit?)`。`channel` は同上・`limit` 1〜20(既定 5)。行は公開の動画だけ・新しい順(見出し = 題・補足 = 公開の日時(日本時間)・リンク = 動画)。動画が 1 本も無いチャンネルは 0 行 | 同上(`/youtube/v3/channels`・`/youtube/v3/playlistItems`) | 30 分 | 同上 |
+| `podcasts` の `searchPodcasts`(ポッドキャストの番組を探す・Apple の iTunes Search API・#1703) | 無料・鍵なし(`runs` だけ) | `searchPodcasts(term, limit?)`。`term` は 1〜100 文字・1 行(URL は 400)・`limit` 1〜20(既定 10)。日本のストア(`country=JP`・`lang=ja_jp`)の番組(`media=podcast`・`entity=podcast`)。行は番組ごと(見出し = 番組名・補足 = 作者・値 = 「RSS あり」/「RSS なし」・リンク = Apple Podcasts の番組のページ(クエリは落とす))。**RSS の URL そのものは返さない**(新しい回を読むのは #1702 の決定待ちで、URL は引数にも渡せないため)。アートワークの URL(`*.mzstatic.com`)と番組の id は `Output.Cells`(サーバーの中だけ)にあり、端末の行の形(`ExtRow`)に画像の欄が無いので今は端末に出ない。ストアのページが無い・`https` でない結果は出さない。出典 `PodcastsAttribution`(「provided courtesy of iTunes」)を出す(下の「iTunes Search API の規約」)。AI に選ばせる決まり(`prompt.go`・`catalog.go`)はまだ | `https://itunes.apple.com` だけ(`/search`) | 6 時間 | `EXT_PODCASTS_ENABLED=1` |
 | `slack` の `setStatus`(自分の状態を変える・#1679) | 無料・OAuth(`runs` だけ・ユーザーのトークン・scope `users.profile:write`)・書く(確認必須) | `setStatus(text?, emoji?, minutes?)`。`text` は 1 行 100 文字まで・`emoji` は `:tomato:` の形(肌の色 `:skin-tone-2:`〜`6` を 1 つ付けてよい)・`minutes` は 1〜10080(1 週間。無ければ消すまで)。`text` も `emoji` も無ければ状態を消す(その時 `minutes` は付けない)。同じ状態をもう一度入れても変わらない。答えは 1 件(見出し = 文・補足 = 絵文字・値 = 消える時刻)。Slack の上限は 1 人の状態を 1 分に 10 回まで | `https://slack.com` だけ(`/api/...`) | なし | `EXT_SLACK_ENABLED=1`・`EXT_SLACK_CLIENT_ID` / `_CLIENT_SECRET` |
 | `slack` の `postMessage`(チャンネルに本人として投稿・#1679) | 無料・OAuth(`runs` だけ・ユーザーのトークン・scope `chat:write`)・書く(確認必須) | `postMessage(channel, text)`。`channel` は会話の id(`C…` / `G…` / `D…`・名前は取らない)・`text` は 4000 文字まで(改行可・制御文字不可)。`<!channel>` `<!here>` `<!subteam^…>` などの一斉メンション(`<!`)は Slack に送らず 400 `bad_request`。`parse: none`・`link_names: false` で送る。本人が入っていない・無いチャンネル(`not_in_channel` / `channel_not_found`)は 400 `bad_request`。Slack に冪等のキーが無いので、二重にしないのは書く op をやり直さない決まりだけ。答えは `resultId`(メッセージの `ts`)と 1 件(見出し = 1 行目 120 文字まで・補足 = チャンネル)。本文は保存しない。Slack の上限は 1 チャンネルに 1 秒 1 通 | 同上 | なし | 同上 |
 | `slack` の `unread`(DM の未読の数・#1679) | 無料・OAuth(`runs` だけ・ユーザーのトークン・scope `im:read`) | `unread(channel)`。`channel` は DM の id(`D…`)だけ。`conversations.info` の `unread_count_display` を返す(Web API が未読の数を返すのは DM だけ。チャンネルの未読を数えるには本文を `conversations.history` で読むことになり、Marketplace に無い配布アプリは 1 分 1 回・15 件までなので入れない)。数が無い答えは 400 `bad_request`。答えは 1 件(見出し = 「未読」・補足 = id・値 = 数)。本文は読まない | 同上 | なし | 同上 |
@@ -109,7 +110,7 @@ Asana の 403 も、メッセージが scope の不足を言う時だけ 409 `ex
 
 Slack は利用者ごとの OAuth v2 でユーザーのトークン(`user_scope` だけ・ボットのトークンは取らない)。PKCE は使わない(Slack の PKCE はアプリを公開クライアントに戻せない形で変えるため。runner はクライアントの秘密を Basic 認証で送る)。新しい scope は同じトークンに足されるので、書く op のためにつなぎ直しても読む op は残る。トークンの回転(12 時間・使い捨ての refresh token)を入れた時も入れない時も動く。Slack はほとんどの失敗を 200 の `ok:false` で返すので、コードで分ける: `invalid_auth`・`not_authed`・`token_revoked`・`token_expired`・`account_inactive`(と HTTP 401)は接続を `error` にする(つなぎ直す)。`missing_scope`・`not_allowed_token_type`・`no_permission`・`access_denied` など(と HTTP 403)は 409 `ext_not_connected`。`ratelimited`(HTTP 429)・`fatal_error`・`internal_error`・`service_unavailable`・`request_timeout`(と 5xx)は 502 `upstream_unavailable`。ほかのコードは 400 `bad_request`。Slack の API 規約: 商用の配布は Marketplace(か別の契約)が要る・データは機能に要る間だけ持つ・モデルの学習に使わない・プライバシーポリシーに読むものを書く。だから op は本人の状態・本人の投稿・DM の未読の数だけで、メッセージの本文を読む op・ためる op は入れない。
 
-Asana の `myTasks`・`projectTasks`・`complete`、Todoist の `complete`・`projects`・`project` / `label`、Notion の `updateProperties`・`pageText`、Google ToDo の全部の op、GitHub と Linear の op、YouTube の `channelStats`・`latestVideos`、Slack の全部の op、GTFS リアルタイムの `nextBuses`・`busPositions`、ODPT の `trainStatus` は runner の op だけ。生成アプリから呼ぶ部品と AI に選ばせる決まり(`prompt.go`・`catalog.go`・`docs/dsl`)は #1643 の判断の後に足す。
+Asana の `myTasks`・`projectTasks`・`complete`、Todoist の `complete`・`projects`・`project` / `label`、Notion の `updateProperties`・`pageText`、Google ToDo の全部の op、GitHub と Linear の op、YouTube の `channelStats`・`latestVideos`、ポッドキャストの `searchPodcasts`、Slack の全部の op、GTFS リアルタイムの `nextBuses`・`busPositions`、ODPT の `trainStatus` は runner の op だけ。生成アプリから呼ぶ部品と AI に選ばせる決まり(`prompt.go`・`catalog.go`・`docs/dsl`)は #1643 の判断の後に足す。
 
 provider が 404 / 422(持っていない通貨・日)を返した時は 400 `bad_request`(`runs` は戻す)。429 / 5xx は 502 `upstream_unavailable`。
 
@@ -181,6 +182,21 @@ GTFS リアルタイム(protobuf)の読み方は [GTFS Realtime の仕様](https
 
 まだのこと(後の Issue): 静的な GTFS-JP(停留所・系統の名前・時刻表)をサーバーで前処理して持ち、`nextBuses` の停留所を名前で選べるようにし、遅れだけの予測を時刻表に足して出す。
 
+### iTunes Search API の規約(#1703)
+
+[Search API の説明](https://performance-partners.apple.com/search-api)(2026-11-12 に読んだ)から、`podcasts` を出す時に守ること。
+
+| 決まり | 中身 | この作りでの扱い |
+|---|---|---|
+| 回数 | 「おおよそ 1 分 20 回(変わることがある)」。多く使うなら Enterprise Partner Feed。大きなサイトは検索の答えを持つ(キャッシュする) | キャッシュは 6 時間(同じ `term`・`limit`)。runner の台は出口の IP を共有するので、`EXT_GLOBAL_DAILY_PODCASTS` で 1 日の全体を絞る(人の作業) |
+| 使い道 | 中身はストアの中身を広めるためだけ・広める中身のページにだけ置く・別の商品やサービスの宣伝に使わない・それだけで楽しむ使い方にしない | 行は必ずその番組の Apple Podcasts のページへリンクする(ページの無い結果は出さない)。「通勤のお供」の一覧のように番組を開きに行く使い方にする |
+| バッジ | 「Download on iTunes」などの Apple が認めたバッジを近くに置き、ストアのページへリンクする | 出し方(バッジの画像・Listen on Apple Podcasts)は部品(#1643)と iOS で決める |
+| 出典 | 試聴(preview)は「provided courtesy of iTunes」と出す | 試聴は使わないが、行のそばに `PodcastsAttribution`(同じ文)を出す |
+| 音声 | 試聴は流すだけで、ダウンロード・保存・キャッシュしない | 音声のファイルはサーバーで読まない・置かない。再生は Podcasts アプリを開く |
+| 求めに応じて消す | Apple から求められたら中身をすぐ消す・苦情は Apple に回す | キャッシュは 6 時間で消える。止める時は `EXT_PODCASTS_ENABLED` を切る |
+
+**新しい回(番組の RSS の `enclosure`)はまだ作らない。** 利用者やアプリが渡す RSS の URL を runner から読むかは #1702 の決定待ち。決まったら、Search API の lookup(`/lookup?id=<番組の id>`)で RSS の URL をサーバーの中で引く形か、許可リストの形で足す(番組の id は今 `Output.Cells` に入れてある)。
+
 ### ODPT の事業者と規約(#1691)
 
 [公共交通オープンデータセンター利用規約](https://developer.odpt.org/terms/center_use_rules.html)・[公共交通オープンデータ基本ライセンス](https://developer.odpt.org/terms/data_basic_license.html)・[開発者ガイドライン](https://developer.odpt.org/terms/data_basic_use_guideline.html)・[チャレンジ限定ライセンス](https://developer.odpt.org/challenge_license)と、[データカタログ](https://ckan.odpt.org/dataset?tags=%E9%81%8B%E8%A1%8C%E6%83%85%E5%A0%B1-train_status_information)の各事業者の「運行情報」のライセンス(2026-11-12 に読んだ)から決めた。
@@ -214,7 +230,7 @@ GTFS リアルタイム(protobuf)の読み方は [GTFS Realtime の仕様](https
 | 利用者への通知(ガイドライン「利用者への通知」) | センターのデータであること・正確・完全とは限らないこと・事業者に直接問い合わせないこと・アプリの問い合わせ先を出す | 出典 `ODPTAttribution`(「公共交通オープンデータセンターのデータです。正確・完全とは限りません。遅れの情報は事業者の公式の案内を確かめてください(事業者への問い合わせはしないでください)」)を行のそばに出す。アプリの問い合わせ先の出し方は部品(#1643)と iOS で決める |
 | CC BY のクレジット(都営・FAQ) | 「提供者名、名称、CC BY 4.0(リンク)」 | 都営の行を出す時は `ODPTToeiCredit`(「東京都交通局・公共交通オープンデータ協議会、運行情報、CC BY 4.0」)も出す |
 | 時刻の表示(ガイドライン 2.1.1) | 動的データは `dc:date` を画面に出す | 行の値 = 「M/D HH:MM 更新」。時刻の無い行は出さない |
-| 新しい情報だけ(ガイドライン 2.1.2) | `odpt:frequency` の間隔で更新・`dct:valid` を過ぎたデータは使わない | `dct:valid` を過ぎた行は出さない。キャッシュは 1 分だけ |
+| 新しい情報だけ(ガイドライン 2.1.2) | `odpt:frequency` の間隔で更新・`dct:valid` を過ぎたデータは使わない | `dct:valid` を過ぎた行は出さない。キャッシュは 1 分だけで、行の一番早い `dct:valid` を過ぎたら捨てる(`Output.ValidUntil`) |
 | 元の意味を変えない(基本ライセンス 4 条 2 項) | 分解・修正で意味を損なわない・成果物の外で表示しない | 案内の文はそのまま(長い時だけ末尾を切って `…`)。生のデータは端末に返さない(決まった行の形だけ) |
 | 再配布しない(基本ライセンス 8 条 4 項) | データ(復元できる派生データを含む)を第三者が再利用できる形で公開しない | 生成アプリの画面に出すだけ。**生成アプリが運行情報を一覧として外に出す(書き出し・公開の API)のは規約の外**(部品の決まりは #1643) |
 | 鍵(利用規約 5 条 1 項 5 号) | アクセストークンを第三者に開示しない | 鍵は Secret Manager の `EXT_ODPT_API_KEY` だけ・エラーとログに URL を出さない |
@@ -332,14 +348,14 @@ DSL に `externalCall` / `externalList` があるかの確かめは、DSL の子
 
 | 項目 | 中身 |
 |---|---|
-| 入力(`SheetImport`) | `SpreadsheetID`・`Range`(`readRange` と同じ)・`Entity`・`IDColumn`(見出しの名前)・`Fields`(見出し → field id。無ければ field の id か名前と同じ見出しの列)・`MaxRows` |
+| 入力(`SheetImport`) | `SpreadsheetID`・`Range`(`readRange` と同じ)・`Entity`・`IDColumn`(見出しの名前)・`ImportKey`(任意。記録の id で `IDColumn` の代わりに使う名前)・`Fields`(見出し → field id。無ければ field の id か名前と同じ見出しの列)・`MaxRows` |
 | 見出し | 範囲の最初の行(空の行は飛ばした後)。`IDColumn` が見出しに無い・範囲が空は `ErrImportNoIDColumn`(何も書かない・数えない) |
-| 上書き | 記録の id は `store.IDFromClientID("import/<rule>/<action>/<id の値>")`。何回走っても同じ id の行は同じ記録になり、二つにならない。新しい id は作る(`CreateRecord`・作った記録は `origin` に rule・版・event)、ある id は変わった field を書く(`ApplyRecordOnce`。印は event + rule + action + 記録の id なので、同じ event のやり直しで二度書かない) |
+| 上書き | 記録の id は `store.IDFromClientID` に entity・`ImportKey`(無ければ `IDColumn`)・正規化した id の値を渡したもの(`importClientID`)。rule や action は入れない: rule の名前を変える・前に action を足すと全部の行が二重になるため。id の値は NFKC・前後の空白を外し、数に見えるものは 1 つの書き方にそろえる(`1` / `1.00` / `001` / `１` は同じ・`1,000` と `1000` は同じ)。表示の形式を変えても同じ記録になる。列の見出しの名前を変えるなら `ImportKey` を決めておく。何回走っても同じ id の行は同じ記録になり、二つにならない。新しい id は作る(`CreateRecord`・作った記録は `origin` に rule・版・event)、ある id は変わった field を書く(`ApplyRecordOnce`。印は event + rule + action + 記録の id なので、同じ event のやり直しで二度書かない) |
 | 空のセル | 新しい記録には入れない。ある記録では消す(必須の field は消さず前の値のまま) |
 | 飛ばす行 | id が空(`NoID`)・前の行と同じ id(`Duplicate`・最初の行が勝つ)・新しい行で必須の field が無い(`Required`)。型に合わないセル(`BadValues`)はその field だけ入れない |
-| 型 | string / text はそのまま。integer / number / currency は数(`,` `¥` を外す・integer は丸める)。boolean は true / false / 1 / 0 / yes / no / はい / いいえ / ○ / ×。date は `2026-11-12` か `2026/11/12`。datetime は RFC 3339 か `2026-11-12 06:00`(日本時間)。enum は選択肢にある値だけ。ほかの型・computed・encrypted の field は `ErrImportSpec`(呼ぶ前に止める) |
+| 型 | セルを型のある値にしてから、端末の書き込みと同じ確かめ(`appconfig.NormalizeValue`)を通す。integer / number / currency は数(`,` `¥` を外す)。integer / currency に小数があれば入れない(丸めない)・int64 の範囲を超えるものも入れない。boolean は true / false / 1 / 0 / yes / no / はい / いいえ / ○ / ×。date は `2026-11-12` か `2026/11/12`。datetime は RFC 3339・`2026-11-12 06:00`・日付だけ(その日の 0 時)。時差の無い日時は run の地域(`ImportRun.Location`・無ければ日本時間)で読む。enum は選択肢にある値だけ(選択肢の無い enum は何でも)。ほかの型・computed・encrypted の field は `ErrImportSpec`(呼ぶ前に止める) |
 | 1 回の行数 | `MaxRows`(既定 `DefaultImportRows` = 50・上限 `MaxImportRows` = 99)。`readRange` の `limit` は見出しを足した数(最大 100)なので、それより先の行は読みもしない。列は `readRange` と同じ 10 列まで・1 セル 1000 文字まで |
-| 数え方 | 呼び出しは `CallRequest.Run` に run の `quota.Decision` を渡す(自動の動きの外の API と同じ。`runs` 1・Pro だけ・回数の上限は作成者・トークンは作成者のもの)。request id は `import/<event>/<rule>/<action>`。書く行は `quota.Writes` で数え、1 回の上限・アプリの 1 日の上限で切った行は `Dropped`(書かない) |
+| 数え方 | 呼び出しは `CallRequest.Run` に run の `quota.Decision` を渡す(自動の動きの外の API と同じ。`runs` 1・Pro だけ・回数の上限は作成者・トークンは作成者のもの)。request id は `import/<event>/<rule>/<action>`。記録と同じ値の行は書かず数えない(`Unchanged`)。書く行だけを `quota.Writes` で数え、1 回の上限・アプリの 1 日の上限で切った行は `Dropped`(書かない) |
 | 列の受け渡し | `readRange` の答えの `Output.Cells`(列のまま・サーバーの中だけ。JSON には出さず端末に返らない)。端末に返す `rows` の形は変わらない |
 | プライバシー | シートの中身は記録として保存する(今の記録と同じ扱い)。`readRange` の答え自体はキャッシュしない |
 
@@ -373,3 +389,4 @@ DSL に `externalCall` / `externalList` があるかの確かめは、DSL の子
 - YouTube(#1699): Google Cloud で YouTube Data API v3 を有効にし、鍵(使える API を YouTube Data API v3 だけに絞る)を Secret Manager の `EXT_YOUTUBE_API_KEY` に入れる。1 日の割り当て(Cloud Console の Quotas)を確かめて `EXT_GLOBAL_DAILY_YOUTUBE` を合わせる。上の「YouTube の規約」を読み直し、プライバシーポリシーに YouTube API サービスの利用と Google のプライバシーポリシーへのリンク、アプリに YouTube の利用規約へのリンクを足す。
 - GTFS リアルタイム(#1692): 上の「GTFS リアルタイムのフィードと規約」の都営バスの URL とライセンスを一度確かめる(このコードは実際のフィードを読んでいない)。TripUpdate を出すフィード(金沢・北陸の事業者を含む)を探し、ライセンスが CC BY なら許可リストに足す。足すまで `nextBuses` は使えない。
 - ODPT(#1691): [公共交通オープンデータセンターの開発者サイト](https://developer.odpt.org/)で開発者登録(運営のアカウント・審査に数日かかることがある)をし、発行された consumer key を Secret Manager の `EXT_ODPT_API_KEY` に入れる。上の「ODPT の事業者と規約」を読み直し、アプリの問い合わせ先(開発者のメールアドレスなど)を決める。路線 id は登録後に `odpt:Railway` で一度確かめる。
+- ポッドキャスト(#1703): 上の「iTunes Search API の規約」を読み直し、「ストアの中身を広めるためだけ」の使い道に当たるか(番組を探して Apple Podcasts を開く使い方)を決める。`EXT_GLOBAL_DAILY_PODCASTS` を 1 分 20 回の目安に合わせて入れる。バッジ(Listen on Apple Podcasts)の出し方を iOS と決める。アートワークを端末に出すなら `ExtRow` に画像の欄を足すか(API の契約の変更)を決める。

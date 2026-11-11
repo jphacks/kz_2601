@@ -200,6 +200,44 @@ func TestODPTAllowList(t *testing.T) {
 	}
 }
 
+// Through the Service: the cached answer is kept no longer than its first
+// row's dct:valid, so a row is never served from the cache past it.
+func TestODPTCacheStopsAtValid(t *testing.T) {
+	var hits atomic.Int64
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		hits.Add(1)
+		_, _ = w.Write([]byte(odptBody))
+	}))
+	t.Cleanup(srv.Close)
+	e := newEnv(t, opts{cfg: func(c *Config) { c.Enabled[ODPT] = true }})
+	e.c.t = time.Date(2026, 11, 12, 8, 23, 30, 0, odptJST) // 銀座線 is valid until 08:24
+	ops, err := newODPT(odptTestKey, srv.URL, srv.Client(), e.c.now)
+	if err != nil {
+		t.Fatal(err)
+	}
+	e.svc.ops[ODPT] = ops
+	call := func() []Row {
+		t.Helper()
+		res, err := e.call(e.req(ODPT, "trainStatus", map[string]string{}))
+		if err != nil {
+			t.Fatal(err)
+		}
+		return res.Output.Rows
+	}
+	if rows := call(); len(rows) != 4 || rows[0].Title != "銀座線" {
+		t.Fatalf("rows %+v", rows)
+	}
+	e.c.t = e.c.t.Add(20 * time.Second) // 08:23:50: still cached
+	if call(); hits.Load() != 1 {
+		t.Fatalf("hits %d, want 1 (cached)", hits.Load())
+	}
+	e.c.t = e.c.t.Add(20 * time.Second) // 08:24:10: inside the minute, past 銀座線's valid
+	rows := call()
+	if hits.Load() != 2 || len(rows) != 3 || rows[0].Title == "銀座線" {
+		t.Fatalf("hits %d rows %+v", hits.Load(), rows)
+	}
+}
+
 func TestODPTDefinition(t *testing.T) {
 	p, ok := Lookup(ODPT)
 	if !ok || p.Billing != BillingFree || p.NeedsOAuth || p.Fake || p.EnvName() != "ODPT" {

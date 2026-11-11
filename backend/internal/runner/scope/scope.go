@@ -478,6 +478,25 @@ func (h *Handle) UpsertRecord(ctx context.Context, entity, id string, data map[s
 	return false, applied, err
 }
 
+// ImportedRecord reads entity/id for the scheduled import (#1712), so a
+// row equal to the stored record is not written again. Like UpsertRecord,
+// the caller names only ids it derives from its own key. found=false when
+// the record is not there.
+func (h *Handle) ImportedRecord(ctx context.Context, entity, id string) (data map[string]any, found bool, err error) {
+	rs, err := h.recordSet(ctx, entity)
+	if err != nil {
+		return nil, false, err
+	}
+	r, err := h.b.GetRecord(ctx, rs, id)
+	if errors.Is(err, store.ErrNotFound) {
+		return nil, false, nil
+	}
+	if err != nil {
+		return nil, false, err
+	}
+	return r.Data, true, nil
+}
+
 // Marked reports whether the action key already ran.
 func (h *Handle) Marked(ctx context.Context, key string) (bool, error) {
 	return h.b.RunnerMarked(ctx, h.env, key)

@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -11,6 +12,7 @@ import (
 
 	"github.com/jphacks/kz_2601/backend/internal/loop"
 	"github.com/jphacks/kz_2601/backend/internal/loop/triage"
+	"github.com/jphacks/kz_2601/backend/internal/loop/triage/eval"
 	"github.com/jphacks/kz_2601/backend/internal/store"
 )
 
@@ -101,6 +103,37 @@ func TestTriageEvalCommand(t *testing.T) {
 	}
 	if used, _ := ta.ctl.Usage(context.Background(), loop.Month(ta.now())); used == 0 {
 		t.Fatal("ai eval tokens not counted")
+	}
+}
+
+// -model ai checks the monthly cap before every call and records each
+// call's usage: the cap reached after the first call stops the second.
+func TestTriageEvalAIStopsMidRun(t *testing.T) {
+	ta := newTestApp(t, env{"LOOP_MONTHLY_TOKEN_CAP": "15"})
+	fm := &fakeModel{category: "bug", cluster: "all", summary: "落ちる。"} // 15 tokens a call
+	ta.model = fm
+	err := ta.run(context.Background(), []string{"triage-eval", "-set", labelledSet, "-model", "ai"})
+	if !errors.Is(err, eval.ErrStopped) || fm.calls != 1 {
+		t.Fatalf("err %v calls %d", err, fm.calls)
+	}
+	if used, _ := ta.ctl.Usage(context.Background(), loop.Month(ta.now())); used != 15 {
+		t.Fatalf("usage %d, want 15", used)
+	}
+	evs, err := ta.ctl.ListAudit(context.Background(), loop.AuditQuery{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	var calls, stopped int
+	for _, e := range evs {
+		switch e.Action {
+		case "eval_call":
+			calls++
+		case "stopped":
+			stopped++
+		}
+	}
+	if calls != 1 || stopped != 1 {
+		t.Fatalf("audit %+v", evs)
 	}
 }
 
