@@ -2239,10 +2239,11 @@ components:
                   - refund_failed
                   - spend_ai
                   - spend_call
+                  - spend_ext
                   - spend_overflow
                   - spend_slot
               amount: { type: integer, description: 符号つきの増減 }
-              op: { type: string, description: 'spend_ai の処理(generate / edit / chat / text)' }
+              op: { type: string, description: 'spend_ai の処理(generate / edit / chat / text)。spend_ext は ext' }
               appId: { type: string }
               transactionId: { type: string, description: purchase の App Store の取引 }
               productId: { type: string }
