@@ -258,8 +258,8 @@ struct ListLeaf: View {
         Task { await rt.run(action, ctx.actionContext(recordId: row.id)) }
     }
 
-    /// ⌘C・⌫ の対象: 一覧にフォーカスがある時の選んでいる行
-    private var keyboardRowId: String? { listFocused ? selection.cursor : nil }
+    /// ⌘C・⌫ の対象: 一覧にフォーカスがある時の選んでいる行(⌘ クリックで外した行は対象にしない)
+    private var keyboardRowId: String? { listFocused ? selection.single : nil }
 
     /// 選んでいる行(一覧に見えている順)
     private func selectedRecords(_ rows: [Record]) -> [Record] { rows.filter { selection.ids.contains($0.id) } }
@@ -303,7 +303,7 @@ struct ListLeaf: View {
     /// Return: 選んでいる行を開く(行のクリックと同じ)。入力欄が文字を受けている時は任せる
     private func openSelected(_ rows: [Record]) -> KeyPress.Result {
         guard c.onItemTap != nil, !selection.isMultiple, !ListRowCopyCommand.textInputActive,
-              let row = rows.first(where: { $0.id == selection.cursor }) else { return .ignored }
+              let row = rows.first(where: { $0.id == selection.single }) else { return .ignored }
         open(row)
         return .handled
     }
