@@ -43,7 +43,11 @@ type Row struct {
 // JSON never goes back to the device.
 type Output struct {
 	Rows []Row `json:"rows,omitempty"`
-	Item *Row  `json:"item,omitempty"`
+	// Cells are Rows' cells in column order (Cells[i] is Rows[i]) for
+	// server-side readers only (the scheduled import, #1712); an op that
+	// has no columns leaves it nil. Never sent to a device.
+	Cells [][]string `json:"-"`
+	Item  *Row       `json:"item,omitempty"`
 	// ResultID is the id of what a write op made (resultIdField).
 	ResultID string `json:"resultId,omitempty"`
 	// Usage is the call's measured cost (paid providers).

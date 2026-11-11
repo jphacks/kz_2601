@@ -11,8 +11,9 @@
 5. [OAuth のトークン](#oauth-のトークン)
 6. [runner の口](#runner-の口)
 7. [appconfig の口(端末から)](#appconfig-の口端末から)
-8. [偽の provider(stg と試験)](#偽の-providerstg-と試験)
-9. [人の作業](#人の作業)
+8. [スプレッドシートの取り込み(自動の動き・#1712)](#スプレッドシートの取り込み自動の動き1712)
+9. [偽の provider(stg と試験)](#偽の-providerstg-と試験)
+10. [人の作業](#人の作業)
 
 ## できていること・まだのこと
 
@@ -28,6 +29,7 @@
 | 退会の 30 日後の消去(`cmd/purge`) | 済(`users/{uid}/connections/*` を消す・ログ `extConnections`) |
 | appconfig `POST /v1/apps/{appId}/ext/{provider}/{op}`・`/v1/me/connections/*`・エラーコード | 済(`internal/appconfig/ext.go`・runner の呼び出しは `extapi.Client`・`openapi-appconfig.yaml` の tag `ext`)。下の「appconfig の口」 |
 | DSL `externalCall` / `externalList`・自動の動きからの呼び出し | **まだ**(DSL の子 Issue。`CallRequest.Run` に run の `quota.Decision` を渡すだけで数え方は同じ) |
+| スプレッドシートを決まった時間に取り込む(#1712) | 実行する部分は済(`internal/runner/sheet_import.go`)。DSL の書き方と runner への組み込みは **まだ**(#1643 待ち)。下の「スプレッドシートの取り込み」 |
 | 退会(`DELETE /v1/me`)の時の provider 側の取り消し | 済(`account.go` の `deleteMe` が `extapi.Client.RevokeAll` で `/internal/ext/connections/revokeAll` を呼ぶ・#1716)。失敗してもログだけで退会は 204 |
 | キャッシュ | 済(`cache.go`・op の `CacheTTL`。鍵だけ・OAuth なしの読む op だけ。台の中のメモリ) |
 | 回数の上限 `EXT_LIMIT_*`・`EXT_GLOBAL_DAILY_<PROVIDER>`・provider ごとの 1 分止め | 済(`limits.go`・#1715)。下の「回数の上限」 |
@@ -257,6 +259,23 @@ op の案: `boards()`(自分のボード・`GET /1/members/me/boards`。`/1/memb
 | 5. runner | `X-Request-Id` を `requestId` に(コインの押さえの鍵)。Pro は runner が確かめる(`PRO_GATE_MODE` に関係なく)。作成者でない人の 402 `pro_required` には `details.reason: creator_needs_pro`。runner の回数の上限は 429 `rate_limited`(`Retry-After`・`details.scope` / `provider` / `retryAfterSec`) | 理由をそのままコードに。runner に届かない時は 502 `upstream_unavailable`・待ちきれない時は 504 `upstream_timeout` |
 
 DSL に `externalCall` / `externalList` があるかの確かめは、DSL の子 Issue で部品と一緒に足す(今は provider が既定で off・Pro だけなので、一覧と引数だけを見る)。
+
+## スプレッドシートの取り込み(自動の動き・#1712)
+
+自動の動き(serverRules)の 1 回の中で `googleSheets` の `readRange` を呼び、表の行を entity に入れる(id の列で上書き)。実行する部分だけが入っている(`runner.SheetImporter`)。**DSL の書き方(serverRules の action)と runner の tick への組み込みはまだ**: 生成アプリから外の API を使う部品と AI の決まり(#1643)が決まってから、その形で足す。それまで DSL のスキーマ・`prompt.go`・`catalog.go` は変えない。
+
+| 項目 | 中身 |
+|---|---|
+| 入力(`SheetImport`) | `SpreadsheetID`・`Range`(`readRange` と同じ)・`Entity`・`IDColumn`(見出しの名前)・`Fields`(見出し → field id。無ければ field の id か名前と同じ見出しの列)・`MaxRows` |
+| 見出し | 範囲の最初の行(空の行は飛ばした後)。`IDColumn` が見出しに無い・範囲が空は `ErrImportNoIDColumn`(何も書かない・数えない) |
+| 上書き | 記録の id は `store.IDFromClientID("import/<rule>/<action>/<id の値>")`。何回走っても同じ id の行は同じ記録になり、二つにならない。新しい id は作る(`CreateRecord`・作った記録は `origin` に rule・版・event)、ある id は変わった field を書く(`ApplyRecordOnce`。印は event + rule + action + 記録の id なので、同じ event のやり直しで二度書かない) |
+| 空のセル | 新しい記録には入れない。ある記録では消す(必須の field は消さず前の値のまま) |
+| 飛ばす行 | id が空(`NoID`)・前の行と同じ id(`Duplicate`・最初の行が勝つ)・新しい行で必須の field が無い(`Required`)。型に合わないセル(`BadValues`)はその field だけ入れない |
+| 型 | string / text はそのまま。integer / number / currency は数(`,` `¥` を外す・integer は丸める)。boolean は true / false / 1 / 0 / yes / no / はい / いいえ / ○ / ×。date は `2026-11-12` か `2026/11/12`。datetime は RFC 3339 か `2026-11-12 06:00`(日本時間)。enum は選択肢にある値だけ。ほかの型・computed・encrypted の field は `ErrImportSpec`(呼ぶ前に止める) |
+| 1 回の行数 | `MaxRows`(既定 `DefaultImportRows` = 50・上限 `MaxImportRows` = 99)。`readRange` の `limit` は見出しを足した数(最大 100)なので、それより先の行は読みもしない。列は `readRange` と同じ 10 列まで・1 セル 1000 文字まで |
+| 数え方 | 呼び出しは `CallRequest.Run` に run の `quota.Decision` を渡す(自動の動きの外の API と同じ。`runs` 1・Pro だけ・回数の上限は作成者・トークンは作成者のもの)。request id は `import/<event>/<rule>/<action>`。書く行は `quota.Writes` で数え、1 回の上限・アプリの 1 日の上限で切った行は `Dropped`(書かない) |
+| 列の受け渡し | `readRange` の答えの `Output.Cells`(列のまま・サーバーの中だけ。JSON には出さず端末に返らない)。端末に返す `rows` の形は変わらない |
+| プライバシー | シートの中身は記録として保存する(今の記録と同じ扱い)。`readRange` の答え自体はキャッシュしない |
 
 ## 偽の provider(stg と試験)
 

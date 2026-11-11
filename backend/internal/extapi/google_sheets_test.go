@@ -183,6 +183,15 @@ func TestGoogleSheetsFlow(t *testing.T) {
 		r[1].Title != "りんご" || r[1].Value != "1,200" || r[1].Subtitle != "金沢" || r[2].Title != "みかん" {
 		t.Fatalf("rows %+v", r)
 	}
+	// Cells (the import, #1712): the columns as they are, 10 at most, empty
+	// rows left out like Rows; never in the answer's JSON
+	cells := res.Output.Cells
+	if len(cells) != 3 || fmt.Sprint(cells[0]) != "[商品 売上 店 メモ]" || len(cells[1]) != 10 || cells[1][2] != "金沢" || fmt.Sprint(cells[2]) != "[みかん 800]" {
+		t.Fatalf("cells %q", cells)
+	}
+	if b, _ := json.Marshal(res.Output); strings.Contains(string(b), "金沢\",\"\"") || strings.Contains(string(b), "ells") {
+		t.Fatalf("cells in JSON: %s", b)
+	}
 	if f.lastRange != "Sheet1!A1:D50" || f.lastQuery.Get("valueRenderOption") != "FORMATTED_VALUE" {
 		t.Fatalf("range %s %v", f.lastRange, f.lastQuery)
 	}
