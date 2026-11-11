@@ -1,10 +1,8 @@
 package jp.kz2601.metamon.nearby
 
-import android.content.Context
 import android.os.Handler
 import android.os.Looper
 import android.util.Log
-import com.google.android.gms.nearby.Nearby
 import com.google.android.gms.nearby.connection.AdvertisingOptions
 import com.google.android.gms.nearby.connection.ConnectionInfo
 import com.google.android.gms.nearby.connection.ConnectionLifecycleCallback
@@ -30,13 +28,14 @@ import jp.kz2601.metamon.renderer.components.nearby.PassbyPeer
  * - 受け取る 1 通は [NearbyPassby.MAX_RECEIVE_BYTES] まで(読む前に大きさを確かめる)。名前・id の長さは [NearbyLimits]
  * - 距離・方向は測らない(UWB の端末が限られる)。distance の部品でも交換したら切る
  * - Strategy は多対多(P2P_CLUSTER)。送るだけの近距離共有(1 対 1)とは serviceId を分ける
+ * - 近距離共有と同じ [client] を使うので、止める時は [shared] を通して自分の分だけ止める(相手の送受信を切らない)
  */
 class NearbyConnectionsPassbyTransport(
-    context: Context,
+    private val client: ConnectionsClient,
+    private val shared: SharedNearbyClient,
     /** 失敗の案内(画面の言語で) */
     private val discoveryFailed: () -> String,
 ) : PassbyTransport {
-    private val client: ConnectionsClient = Nearby.getConnectionsClient(context.applicationContext)
     private val main = Handler(Looper.getMainLooper())
 
     override var onPayload: ((NearbyPassby.Payload) -> Unit)? = null
@@ -77,10 +76,12 @@ class NearbyConnectionsPassbyTransport(
             }
             if (!ok || hello == null) {
                 links.remove(endpointId)
+                shared.closed(endpointId)
                 client.rejectConnection(endpointId)
                 return
             }
             if (link == null) links[endpointId] = Link(hello.senderId)
+            shared.opened(SERVICE_ID, endpointId)
             client.acceptConnection(endpointId, payloads)
         }
 
@@ -88,6 +89,7 @@ class NearbyConnectionsPassbyTransport(
             val link = links[endpointId] ?: return
             if (!resolution.status.isSuccess) {
                 links.remove(endpointId)
+                shared.closed(endpointId)
                 publishPeers()
                 return
             }
@@ -95,6 +97,7 @@ class NearbyConnectionsPassbyTransport(
         }
 
         override fun onDisconnected(endpointId: String) {
+            shared.closed(endpointId)
             if (links.remove(endpointId) != null) publishPeers()
         }
     }
@@ -106,9 +109,11 @@ class NearbyConnectionsPassbyTransport(
             val hello = PassbyTag.decode(info.endpointName) ?: return
             if (!PassbyTag.shouldInvite(cur.hello, hello, cur.shouldExchange)) return
             links[endpointId] = Link(hello.senderId)
+            shared.opened(SERVICE_ID, endpointId)
             client.requestConnection(tag, endpointId, lifecycle).addOnFailureListener {
                 Log.w(TAG, "connect failed: ${it.javaClass.simpleName}")
                 links.remove(endpointId)
+                shared.closed(endpointId)
             }
         }
 
@@ -120,18 +125,27 @@ class NearbyConnectionsPassbyTransport(
         current = start
         tag = PassbyTag.encode(start.hello)
         onNotice?.invoke(null)
+        shared.willAdvertise(SERVICE_ID)
         client.startAdvertising(tag, SERVICE_ID, lifecycle, AdvertisingOptions.Builder().setStrategy(STRATEGY).build())
-            .addOnFailureListener { failed("advertise", it) }
+            .addOnFailureListener {
+                shared.advertisingFailed(SERVICE_ID)
+                failed("advertise", it)
+            }
+        shared.willDiscover(SERVICE_ID)
         client.startDiscovery(SERVICE_ID, discovery, DiscoveryOptions.Builder().setStrategy(STRATEGY).build())
-            .addOnFailureListener { failed("discovery", it) }
+            .addOnFailureListener {
+                shared.discoveryFailed(SERVICE_ID)
+                failed("discovery", it)
+            }
     }
 
     override fun stop() {
         main.removeCallbacksAndMessages(null)
         if (current != null) {
-            client.stopAdvertising()
-            client.stopDiscovery()
-            client.stopAllEndpoints()
+            // stopAdvertising / stopDiscovery / stopAllEndpoints はアプリ全体に効く(近くの人に送るのを切る)ので使わない
+            shared.stopAdvertising(SERVICE_ID)
+            shared.stopDiscovery(SERVICE_ID)
+            shared.disconnectAll(SERVICE_ID)
         }
         current = null
         links.clear()
@@ -149,7 +163,7 @@ class NearbyConnectionsPassbyTransport(
         val bytes = NearbyPassby.encode(cur.payload())
         client.sendPayload(endpointId, Payload.fromBytes(bytes)).addOnFailureListener {
             Log.w(TAG, "send failed: ${it.javaClass.simpleName}")
-            client.disconnectFromEndpoint(endpointId)
+            shared.disconnect(endpointId)
             if (links.remove(endpointId) != null) publishPeers()
         }
         link.sent = true
@@ -175,7 +189,7 @@ class NearbyConnectionsPassbyTransport(
         if (!link.sent || !link.received) return
         main.postDelayed({
             if (links[endpointId] !== link) return@postDelayed
-            client.disconnectFromEndpoint(endpointId)
+            shared.disconnect(endpointId)
             links.remove(endpointId)
             publishPeers()
         }, LINGER_MILLIS)
