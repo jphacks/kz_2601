@@ -313,7 +313,8 @@ func (s *Service) Call(ctx context.Context, r CallRequest) (res CallResult, err 
 		}
 	}
 	if hold != nil {
-		ch, cerr := s.Coins.Commit(ctx, hold, coins.Usage{USD: usage.USD, Priced: usage.Priced})
+		// the provider was called: the cost is settled even when the caller is gone
+		ch, cerr := s.Coins.Commit(context.WithoutCancel(ctx), hold, coins.Usage{USD: usage.USD, Priced: usage.Priced})
 		if cerr != nil {
 			s.Log.WarnContext(ctx, "extapi: committing the hold failed", slog.String("provider", r.Provider), slog.Any("error", cerr))
 		}

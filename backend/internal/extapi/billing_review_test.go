@@ -44,6 +44,46 @@ func TestPaidSameRequestIDRunsOnce(t *testing.T) {
 	}
 }
 
+// ctxBiller fails a settlement on a cancelled context, as Firestore does
+// (the memory store does not look at the context).
+type ctxBiller struct{ *coins.Service }
+
+func (b ctxBiller) Commit(ctx context.Context, h *coins.Hold, u coins.Usage) (coins.Charge, error) {
+	if err := ctx.Err(); err != nil {
+		return coins.Charge{}, err
+	}
+	return b.Service.Commit(ctx, h, u)
+}
+
+func (b ctxBiller) Release(ctx context.Context, h *coins.Hold) error {
+	if err := ctx.Err(); err != nil {
+		return err
+	}
+	return b.Service.Release(ctx, h)
+}
+
+// The caller going away after the provider answered (appconfig's wait
+// ended) still settles the cost: the hold is committed, not left to expire.
+func TestPaidCommitAfterCallerGone(t *testing.T) {
+	e := newEnv(t, opts{})
+	e.fund(user, 100)
+	e.svc.Coins = ctxBiller{e.coins}
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	e.svc.ops[FakePaid] = map[string]Operation{"echo": OperationFunc(func(context.Context, Input) (Output, error) {
+		cancel() // the answer came, then the request was cancelled
+		return Output{Item: &Row{Title: "x"}, Usage: Usage{USD: 0.10, Priced: true}}, nil
+	})}
+	res, err := e.svc.Call(ctx, e.req(FakePaid, "echo", map[string]string{"text": "a"}))
+	if err != nil || res.Charge.Coins != 10 {
+		t.Fatalf("%+v %v", res, err)
+	}
+	w := e.wallet(user)
+	if w.Available() != 90 || w.Reserved != 0 || len(w.Holds) != 0 || len(spends(e.ledger(user), coins.KindSpendExt)) != 1 {
+		t.Fatalf("wallet %+v", w)
+	}
+}
+
 // A request id first used by a call that failed (its hold given back) does
 // not make a later call with it free.
 func TestPaidSameRequestIDAfterFailure(t *testing.T) {
