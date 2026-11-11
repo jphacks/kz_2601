@@ -117,20 +117,27 @@ struct MacVoiceStatus: View {
 }
 
 /// 音声モデルのダウンロードの確認(iOS の ConsentHost と同じ形・#246・#275)。会話のシートに付ける。
+/// `shown`: 生成したアプリの話して入力(#1328)から出す確認の旗。中央の列に付ける(会話のシートとは別の旗で、2 か所に同時に出さない)。
 struct MacModelDownloadConfirm: ViewModifier {
-    @Environment(MacVoiceInput.self) private var voice
+    /// 中央の列のシートの中では渡っていないことがあるので任意で読む(無ければ何も出さない)
+    @Environment(MacVoiceInput.self) private var voice: MacVoiceInput?
+    var shown: Binding<Bool>?
 
     func body(content: Content) -> some View {
-        @Bindable var voice = voice
-        content.alert(MacVoiceCopy.confirmTitle, isPresented: $voice.showsDownloadConfirm) {
-            Button("ダウンロード") { voice.approveDownload() }
-            Button("あとで", role: .cancel) { voice.declineDownload() }
-        } message: {
-            Text(MacVoiceCopy.confirmMessage(
-                advice: ModelDownloadAdvice.evaluate(megabytes: MacVoiceInput.modelMegabytes,
-                                                     isExpensiveNetwork: ExpensiveNetworkProbe.shared.isExpensive,
-                                                     availableBytes: ModelDownloadAdvice.availableBytesOnDevice()),
-                slowHardware: voice.isSlowHardware))
+        if let voice {
+            @Bindable var voice = voice
+            content.alert(MacVoiceCopy.confirmTitle, isPresented: shown ?? $voice.showsDownloadConfirm) {
+                Button("ダウンロード") { voice.approveDownload() }
+                Button("あとで", role: .cancel) { voice.declineDownload() }
+            } message: {
+                Text(MacVoiceCopy.confirmMessage(
+                    advice: ModelDownloadAdvice.evaluate(megabytes: MacVoiceInput.modelMegabytes,
+                                                         isExpensiveNetwork: ExpensiveNetworkProbe.shared.isExpensive,
+                                                         availableBytes: ModelDownloadAdvice.availableBytesOnDevice()),
+                    slowHardware: voice.isSlowHardware))
+            }
+        } else {
+            content
         }
     }
 }

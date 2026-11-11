@@ -92,7 +92,29 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "%1$@ · %2$lld users"
+            "value" : "%#@count@"
+          },
+          "substitutions" : {
+            "count" : {
+              "argNum" : 2,
+              "formatSpecifier" : "lld",
+              "variations" : {
+                "plural" : {
+                  "one" : {
+                    "stringUnit" : {
+                      "state" : "translated",
+                      "value" : "%1$@ · %arg user"
+                    }
+                  },
+                  "other" : {
+                    "stringUnit" : {
+                      "state" : "translated",
+                      "value" : "%1$@ · %arg users"
+                    }
+                  }
+                }
+              }
+            }
           }
         },
         "ja" : {
@@ -313,7 +335,29 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "%1$@ sent %3$lld “%2$@” records"
+            "value" : "%#@count@"
+          },
+          "substitutions" : {
+            "count" : {
+              "argNum" : 3,
+              "formatSpecifier" : "lld",
+              "variations" : {
+                "plural" : {
+                  "one" : {
+                    "stringUnit" : {
+                      "state" : "translated",
+                      "value" : "%1$@ sent %arg “%2$@” record"
+                    }
+                  },
+                  "other" : {
+                    "stringUnit" : {
+                      "state" : "translated",
+                      "value" : "%1$@ sent %arg “%2$@” records"
+                    }
+                  }
+                }
+              }
+            }
           }
         },
         "ja" : {
@@ -330,7 +374,29 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Added %3$lld “%2$@” records from %1$@"
+            "value" : "%#@count@"
+          },
+          "substitutions" : {
+            "count" : {
+              "argNum" : 3,
+              "formatSpecifier" : "lld",
+              "variations" : {
+                "plural" : {
+                  "one" : {
+                    "stringUnit" : {
+                      "state" : "translated",
+                      "value" : "Added %arg “%2$@” record from %1$@"
+                    }
+                  },
+                  "other" : {
+                    "stringUnit" : {
+                      "state" : "translated",
+                      "value" : "Added %arg “%2$@” records from %1$@"
+                    }
+                  }
+                }
+              }
+            }
           }
         },
         "ja" : {
@@ -736,9 +802,21 @@
       "extractionState" : "manual",
       "localizations" : {
         "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "%lld people"
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld person"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld people"
+                }
+              }
+            }
           }
         },
         "ja" : {
@@ -753,9 +831,21 @@
       "extractionState" : "manual",
       "localizations" : {
         "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "%lld records couldn’t be sent. If you sign out without sending, they’ll be lost."
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld record couldn’t be sent. If you sign out without sending, it’ll be lost."
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld records couldn’t be sent. If you sign out without sending, they’ll be lost."
+                }
+              }
+            }
           }
         },
         "ja" : {
@@ -787,9 +877,21 @@
       "extractionState" : "manual",
       "localizations" : {
         "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Failed %lld times in a row."
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Failed %lld time in a row."
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Failed %lld times in a row."
+                }
+              }
+            }
           }
         },
         "ja" : {
@@ -804,9 +906,21 @@
       "extractionState" : "manual",
       "localizations" : {
         "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Up to %lld characters"
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Up to %lld character"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Up to %lld characters"
+                }
+              }
+            }
           }
         },
         "ja" : {
@@ -838,9 +952,21 @@
       "extractionState" : "manual",
       "localizations" : {
         "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Please wait about %lld seconds and try again"
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Please wait about %lld second and try again"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Please wait about %lld seconds and try again"
+                }
+              }
+            }
           }
         },
         "ja" : {
@@ -2013,7 +2139,29 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "%2$lld “%1$@” records"
+            "value" : "%#@count@"
+          },
+          "substitutions" : {
+            "count" : {
+              "argNum" : 2,
+              "formatSpecifier" : "lld",
+              "variations" : {
+                "plural" : {
+                  "one" : {
+                    "stringUnit" : {
+                      "state" : "translated",
+                      "value" : "%arg “%1$@” record"
+                    }
+                  },
+                  "other" : {
+                    "stringUnit" : {
+                      "state" : "translated",
+                      "value" : "%arg “%1$@” records"
+                    }
+                  }
+                }
+              }
+            }
           }
         },
         "ja" : {
@@ -2827,9 +2975,21 @@
       "extractionState" : "manual",
       "localizations" : {
         "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Published on Discover · %lld installs"
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Published on Discover · %lld install"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Published on Discover · %lld installs"
+                }
+              }
+            }
           }
         },
         "ja" : {
@@ -4302,6 +4462,23 @@
         }
       }
     },
+    "この部品について話す" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Talk about this component"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "この部品について話す"
+          }
+        }
+      }
+    },
     "これでいく" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -5105,9 +5282,21 @@
       "extractionState" : "manual",
       "localizations" : {
         "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "You have %lld unsent records. You’re offline, so they can’t be sent now. If you sign out without sending, they’ll be lost."
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "You have %lld unsent record. You’re offline, so it can’t be sent now. If you sign out without sending, it’ll be lost."
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "You have %lld unsent records. You’re offline, so they can’t be sent now. If you sign out without sending, they’ll be lost."
+                }
+              }
+            }
           }
         },
         "ja" : {
@@ -5122,9 +5311,21 @@
       "extractionState" : "manual",
       "localizations" : {
         "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "You have %lld unsent records. They’ll be sent before you sign out."
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "You have %lld unsent record. It’ll be sent before you sign out."
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "You have %lld unsent records. They’ll be sent before you sign out."
+                }
+              }
+            }
           }
         },
         "ja" : {
@@ -9678,9 +9879,21 @@
       "extractionState" : "manual",
       "localizations" : {
         "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "You'll be notified when you arrive near %lld saved place(s)"
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "You'll be notified when you arrive near %lld saved place"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "You'll be notified when you arrive near %lld saved places"
+                }
+              }
+            }
           }
         },
         "ja" : {
@@ -11599,9 +11812,21 @@
       "extractionState" : "manual",
       "localizations" : {
         "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Shown in your app list and at the top of the app (up to %lld characters)."
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Shown in your app list and at the top of the app (up to %lld character)."
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Shown in your app list and at the top of the app (up to %lld characters)."
+                }
+              }
+            }
           }
         },
         "ja" : {
@@ -13503,9 +13728,21 @@
       "extractionState" : "manual",
       "localizations" : {
         "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "The free plan lets you create %lld new apps a day. Editing your apps doesn't count."
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "The free plan lets you create %lld new app a day. Editing your apps doesn't count."
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "The free plan lets you create %lld new apps a day. Editing your apps doesn't count."
+                }
+              }
+            }
           }
         },
         "ja" : {
@@ -15101,9 +15338,21 @@
       "extractionState" : "manual",
       "localizations" : {
         "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Shown in your tracker list and at the top of the screen (up to %lld characters)."
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Shown in your tracker list and at the top of the screen (up to %lld character)."
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Shown in your tracker list and at the top of the screen (up to %lld characters)."
+                }
+              }
+            }
           }
         },
         "ja" : {
@@ -16121,9 +16370,21 @@
       "extractionState" : "manual",
       "localizations" : {
         "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "What you send (the text and the attachments you turned on) is read by the operator to fix bugs and improve Tailor It. It is stored on Google Cloud (Firestore) and erased after %lld days, or when you delete your account. It is not shared with third parties."
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "What you send (the text and the attachments you turned on) is read by the operator to fix bugs and improve Tailor It. It is stored on Google Cloud (Firestore) and erased after %lld day, or when you delete your account. It is not shared with third parties."
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "What you send (the text and the attachments you turned on) is read by the operator to fix bugs and improve Tailor It. It is stored on Google Cloud (Firestore) and erased after %lld days, or when you delete your account. It is not shared with third parties."
+                }
+              }
+            }
           }
         },
         "ja" : {

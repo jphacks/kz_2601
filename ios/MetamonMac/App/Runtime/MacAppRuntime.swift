@@ -13,6 +13,7 @@ import MetamonServices
 /// サーバーへの接続(appconfig のクライアント・ログイン)は Mac に Firebase がまだ無い(#930)ので、
 /// iOS の `METAMON_MOCK=1` と同じくメモリ上の appconfig(`InMemoryAppConfigClient`)に記録を持つ。
 /// ローカル通知は `MacRuntimeNotifications`(#965)。AI の部品(aiButton・aiGenerate・aiChat)は `MacAppRuntime+AIText.swift`(#962)。
+/// 話して入力(aiChat のマイク・transcribeField)は `MacAppRuntime+Dictation.swift`(#1328)。
 /// 共有・課金など iOS 固有の機能は持たない(未対応のアクションは一言で知らせる)。
 @MainActor
 @Observable
@@ -23,9 +24,11 @@ final class MacAppRuntime: RuntimeNavigating {
     var selectedTab: String
     var sheet: Route?
     var fullScreen: Route?
-    private(set) var loading: Set<String> = []
-    private(set) var failed: Set<String> = []
-    private(set) var records: [String: [Record]] = [:]
+    /// 記録の読み書き(`Shared/Runtime/RecordBook.swift`・iOS の単体テストで確かめる #1338)
+    let book: RecordBook
+    var records: [String: [Record]] { book.records }
+    var loading: Set<String> { book.loading }
+    var failed: Set<String> { book.failed }
 
     /// 確認ダイアログ(アクションの confirm)。中央の列に `.confirmationDialog` で出す
     var confirm: RuntimeConfirm?
@@ -50,7 +53,6 @@ final class MacAppRuntime: RuntimeNavigating {
     /// lookupBook の問い合わせ先。appconfig への接続(#930)が来るまでは nil
     @ObservationIgnored var books: (any BookLookupClient)?
     @ObservationIgnored var calendarWriter: any CalendarWriting = EventKitCalendarWriter()
-    @ObservationIgnored private var savingForms: Set<ObjectIdentifier> = []
     /// `mockRecordSync` の一時フォルダ。ランタイムを捨てる時(アプリの切り替え)に消す
     @ObservationIgnored private let previewDirectory: URL?
     /// ローカル通知(#965・MacRuntimeNotifications)
@@ -59,10 +61,14 @@ final class MacAppRuntime: RuntimeNavigating {
     /// roleField の無い aiChat の対(仮 id → 相方)。片方が断られたら相方も消す(`MacAppRuntime+AIText.swift`・#1326)
     @ObservationIgnored let aiChatPairs = AIChatPairLedger()
     #endif
+    /// 話して入力(aiChat のマイク・transcribeField・#1328)。声で頼む(`MacVoiceInput`)と同じ認識を使う。nil なら使えない
+    @ObservationIgnored let dictationSource: TranscriberDictation?
 
     init(appId: String, dsl: AppDSL, recordSync: RecordSyncEngine? = nil, ai: any AIClient = MacComposeSession.gatedAI(),
-         isAIConsentGranted: @escaping @MainActor () -> Bool = { AIConsentStore.shared.isGranted }) {
+         isAIConsentGranted: @escaping @MainActor () -> Bool = { AIConsentStore.shared.isGranted },
+         dictation: TranscriberDictation? = nil) {
         self.appId = appId
+        self.dictationSource = dictation
         self.dsl = dsl
         self.ai = ai
         self.isAIConsentGranted = isAIConsentGranted
@@ -75,6 +81,7 @@ final class MacAppRuntime: RuntimeNavigating {
             self.recordSync = Self.mockRecordSync(directory: dir)
             previewDirectory = dir
         }
+        book = RecordBook(appId: appId, dsl: dsl, recordSync: self.recordSync)
         self.recordSync.onEvent = { [weak self] event in self?.handle(event) }
         self.recordSync.start()
         notifications.start(self)
@@ -117,42 +124,22 @@ final class MacAppRuntime: RuntimeNavigating {
 
     // MARK: - Records
 
-    func records(for entity: String) -> [Record] { records[entity] ?? [] }
+    func records(for entity: String) -> [Record] { book.records(for: entity) }
 
     func load(entities: Set<String>, force: Bool) async {
-        for e in entities where force || records[e] == nil {
-            await refresh(e)
-        }
+        await book.load(entities: entities, force: force)
     }
 
-    /// ローカル先出し → appconfig(メモリ)の全件で置換。取れずローカルにも無ければ「読み込めませんでした」。
-    func refresh(_ entity: String) async {
-        if records[entity] == nil {
-            let cached = await recordSync.cached(appId: appId, entity: entity)
-            if !cached.isEmpty { records[entity] = cached }
-        }
-        loading.insert(entity)
-        defer { loading.remove(entity) }
-        do {
-            records[entity] = try await recordSync.pull(appId: appId, entity: entity)
-            failed.remove(entity)
-        } catch {
-            if records[entity]?.isEmpty ?? true {
-                records[entity] = []
-                failed.insert(entity)
-            }
-            print("[MetamonMac] records pull failed: entity=\(entity) \(error)")
-        }
-    }
+    func refresh(_ entity: String) async { await book.refresh(entity) }
 
     func updateRecord(entity: String, recordId: String, data: [String: JSONValue]) async -> Bool {
-        guard let current = record(entity, recordId) else { return false }
-        guard canEdit(entity: entity, record: current) else {
+        switch await book.update(entity: entity, recordId: recordId, data: data, canEdit: { self.canEdit(entity: $0, record: $1) }) {
+        case .saved: return true
+        case .missing: return false
+        case .readOnly:
             notifyReadOnly(entity: entity)
             return false
         }
-        records[entity] = await recordSync.save(appId: appId, entity: entity, recordId: recordId, data: data)
-        return true
     }
 
     func createRecord(entity: String, data: [String: JSONValue]) async -> Bool {
@@ -161,22 +148,15 @@ final class MacAppRuntime: RuntimeNavigating {
 
     /// `createRecord` と同じ。作った行の id(仮 id `local-…`)を返す。保存できなければ nil(iOS と同じ)。
     func createRecordId(entity: String, data: [String: JSONValue]) async -> String? {
-        guard dsl.entity(entity) != nil else { return nil }
-        let written = await recordSync.write(appId: appId, entity: entity, recordId: nil, data: data)
-        records[entity] = written.records
-        return written.recordId
+        await book.createId(entity: entity, data: data)
     }
 
     func notifyReadOnly(entity: String) { toast = RecordActionSteps.readOnlyMessage }
     func notifySaveFailed(entity: String) { toast = RecordActionSteps.saveFailedMessage }
 
-    private func record(_ entity: String, _ id: String) -> Record? {
-        records[entity]?.first { $0.id == id }
-    }
+    private func record(_ entity: String, _ id: String) -> Record? { book.record(entity, id) }
 
-    func reloadLocal(_ entity: String) async {
-        records[entity] = await recordSync.cached(appId: appId, entity: entity)
-    }
+    func reloadLocal(_ entity: String) async { await book.reloadLocal(entity) }
 
     /// 同期キューからの通知。送れたらローカルを読み直し、競合はサーバーから引き直す(iOS と同じくサーバー優先)。
     private func handle(_ event: SyncEvent) {
@@ -274,22 +254,11 @@ final class MacAppRuntime: RuntimeNavigating {
             if case .invalid(let message) = target { toast = message }
             return
         }
-        if let id = recordId, let current = record(entity, id), !canEdit(entity: entity, record: current) {
-            notifyReadOnly(entity: entity)
-            return
+        switch await book.save(entity: entity, form: form, recordId: recordId, canEdit: { self.canEdit(entity: $0, record: $1) }) {
+        case .readOnly: notifyReadOnly(entity: entity)
+        case .saved, .unchanged: leaveAfterSave(action, ctx) // 何も変えずに保存したら書かずに画面だけ進める(M10)
+        case .inFlight: break // 保存ボタンの連打
         }
-        // 既存の記録を何も変えずに保存: 書き込まずに画面だけ進める(M10)
-        guard form.needsWrite else {
-            leaveAfterSave(action, ctx)
-            return
-        }
-        // 保存ボタンの連打で同じ内容が 2 件できないように
-        guard savingForms.insert(ObjectIdentifier(form)).inserted else { return }
-        defer { savingForms.remove(ObjectIdentifier(form)) }
-        let written = await recordSync.write(appId: appId, entity: entity, recordId: recordId, data: form.payload)
-        records[entity] = written.records
-        form.markSaved(queuedOffline: !recordSync.isOnline)
-        leaveAfterSave(action, ctx)
     }
 
     /// 保存の後: `screen` があればそこへ、無ければ閉じる。
@@ -345,9 +314,7 @@ final class MacAppRuntime: RuntimeNavigating {
     // MARK: - 削除の取り消し(M11)
 
     func deleteUndoably(entity: String, recordId: String) async {
-        let ticket = await recordSync.deleteUndoably(appId: appId, entity: entity, recordId: recordId,
-                                                     grace: .seconds(Self.undoSeconds)).ticket
-        await reloadLocal(entity)
+        let ticket = await book.deleteUndoably(entity: entity, recordId: recordId, grace: .seconds(Self.undoSeconds))
         withAnimation { recordUndo = ticket }
         AccessibilityNotification.Announcement(L10n.tr("削除しました")).post() // iOS と同じく VoiceOver に知らせる
     }
@@ -355,7 +322,6 @@ final class MacAppRuntime: RuntimeNavigating {
     func undoRecordDelete() async {
         guard let ticket = recordUndo else { return }
         withAnimation { recordUndo = nil }
-        guard await recordSync.undoDelete(ticket) != nil else { return }
-        await reloadLocal(ticket.entity)
+        await book.undoDelete(ticket)
     }
 }

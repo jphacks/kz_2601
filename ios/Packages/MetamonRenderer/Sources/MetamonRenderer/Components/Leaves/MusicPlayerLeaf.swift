@@ -8,6 +8,7 @@ struct MusicPlayerLeaf: View {
     let c: Component
     @Environment(\.dslRuntime) private var runtime
     @Environment(\.scenePhase) private var scenePhase
+    @Environment(\.openURL) private var openURL
     @State private var session = MusicSession.shared
     @State private var searching = false
     /// 検索シートで選んだリクエスト。シートを閉じてから送る(シートの上に送信シートは重ねられない)
@@ -91,12 +92,30 @@ struct MusicPlayerLeaf: View {
             EmptyView()
         default:
             if let message = session.availability.message {
-                Label(message, systemImage: "exclamationmark.triangle")
-                    .font(.footnote)
-                    .foregroundStyle(.secondary)
-                    .fixedSize(horizontal: false, vertical: true)
+                VStack(alignment: .leading, spacing: 4) {
+                    Label(message, systemImage: "exclamationmark.triangle")
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                    if let url = settingsURL {
+                        Button(L("システム設定を開く")) { openURL(url) }
+                            .font(.footnote.weight(.semibold))
+                            .accessibilityIdentifier("music.openSettings")
+                    }
+                }
             }
         }
+    }
+
+    /// 開けるシステム設定の画面(Mac で断られた時だけ・#1377)。開くアプリが無ければ文言だけにする。
+    private var settingsURL: URL? {
+        #if os(macOS)
+        guard let url = session.availability.settingsURL,
+              NSWorkspace.shared.urlForApplication(toOpen: url) != nil else { return nil }
+        return url
+        #else
+        nil
+        #endif
     }
 
     private var nowPlaying: some View {

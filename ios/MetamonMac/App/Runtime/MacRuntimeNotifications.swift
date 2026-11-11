@@ -23,6 +23,10 @@ final class MacRuntimeNotifications {
     private(set) var denied = false
     /// バーを閉じた(このアプリを開いている間は出さない)
     var barDismissed = false
+    /// このアプリの次の通知(近い順・#1325)。予約し直すたびに `NotificationSyncResult.upcoming` で置き換える
+    private(set) var upcoming: [UpcomingNotification] = []
+    /// ツールバーの「次の通知」のポップオーバー(「アプリ」メニューからも開く)
+    var showsUpcoming = false
 
     @ObservationIgnored private weak var runtime: MacAppRuntime?
     @ObservationIgnored private var syncTask: Task<Void, Never>?
@@ -139,6 +143,7 @@ final class MacRuntimeNotifications {
 
     private func handle(_ result: NotificationSyncResult, hasSpecs: Bool) {
         denied = result.denied && hasSpecs
+        upcoming = result.upcoming
         // 場所の通知が保存されているのに Mac では届かない: 1 回だけ知らせる
         if result.locationOff, hasSpecs, !toldPlacesUnavailable {
             toldPlacesUnavailable = true
