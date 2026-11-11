@@ -1,6 +1,7 @@
 // 審査用ビルド(APP_STORE_REVIEW・#450 G1)は App 内課金を持たない(iOS と同じ)。
 #if !APP_STORE_REVIEW
 import SwiftUI
+import AppKit
 import MetamonServices
 
 /// 「Tailor It Pro」の課金画面(Mac)。iOS の `PaywallSheet` と同じ並び: 見出し → 価格と購入 → できるようになること →
@@ -274,15 +275,49 @@ struct MacPaywallView: View {
     }
 }
 
-/// 中央のアプリの部品(オンラインの AI)が求めた課金画面を出す(`MacPro.requestPro`)。メインのウインドウに 1 つだけ付ける。
+/// 中央のアプリの部品(オンラインの AI)が求めた課金画面を出す(`MacPro.requestPro`)。メインのウインドウごとに付ける。
+/// 出すのは頼んだ時に前面だったウインドウ 1 つだけ(全部のウインドウに出して、1 つ閉じると全部閉じるのを防ぐ)。
 struct MacPaywallPresenter: ViewModifier {
+    @State private var window: Int?
+
     func body(content: Content) -> some View {
         let pro = MacPro.shared
         content
-            .sheet(item: Binding(get: { pro.paywall }, set: { if $0 == nil { pro.dismissPaywall() } })) { request in
+            .background { WindowNumberReader(number: $window) }
+            .onChange(of: window) { old, new in
+                if let old { pro.unregisterPresenter(window: old) }
+                if let new { pro.registerPresenter(window: new) }
+            }
+            .onDisappear { if let window { pro.unregisterPresenter(window: window) } }
+            .sheet(item: Binding(get: { pro.paywall(for: window) }, set: { if $0 == nil { pro.dismissPaywall() } })) { request in
                 MacPaywallView(reason: request.reason, closeNote: request.closeNote)
             }
             .task { pro.start() }
+    }
+}
+
+/// 置いた view のウインドウの印(`MacPro.windowKey`)
+private struct WindowNumberReader: NSViewRepresentable {
+    @Binding var number: Int?
+
+    func makeNSView(context: Context) -> ReaderView {
+        let view = ReaderView()
+        view.onWindow = { number = $0 }
+        return view
+    }
+
+    func updateNSView(_ view: ReaderView, context: Context) {
+        view.onWindow = { number = $0 }
+    }
+
+    final class ReaderView: NSView {
+        var onWindow: (Int?) -> Void = { _ in }
+
+        override func viewDidMoveToWindow() {
+            super.viewDidMoveToWindow()
+            let value = window.map(MacPro.windowKey)
+            DispatchQueue.main.async { [weak self] in self?.onWindow(value) }
+        }
     }
 }
 
