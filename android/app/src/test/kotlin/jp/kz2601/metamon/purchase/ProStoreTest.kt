@@ -108,6 +108,26 @@ class ProStoreTest {
     }
 
     @Test
+    fun answerArrivingAfterResetIsNotKeptForTheNextPerson() = runBlocking {
+        // サインアウトの後片付けの後に届いた前の人の答えで、次の人を Pro にしない
+        val gate = kotlinx.coroutines.CompletableDeferred<Unit>()
+        val server = object : EntitlementClient {
+            override suspend fun current(): ServerEntitlements {
+                gate.await()
+                return ServerEntitlements(isPro = true)
+            }
+
+            override suspend fun submitGooglePurchase(productId: String, purchaseToken: String) = ServerEntitlements(isPro = true)
+        }
+        val s = ProStore(server, FakeBilling(), uid = { "uid1" }, scope = CoroutineScope(Dispatchers.Unconfined))
+        val reading = async(Dispatchers.Unconfined) { s.refresh() }
+        s.reset()
+        gate.complete(Unit)
+        reading.await()
+        assertFalse(s.isPro)
+    }
+
+    @Test
     fun pendingAndCancelled() = runBlocking {
         val s = store(FakeServer(), FakeBilling())
         s.onPurchases(PlayBilling.RESULT_OK, listOf(PlayPurchase(listOf(ProProducts.MONTHLY), "p", PlayPurchase.State.PENDING, false)))
