@@ -347,8 +347,8 @@ targets:
         COMBINE_HIDPI_IMAGES: YES
         ENABLE_HARDENED_RUNTIME: YES
         ENABLE_PREVIEWS: YES
-        # アイコンはまだ無い(Mac 用のサイズを作る時に戻す)
-        ASSETCATALOG_COMPILER_APPICON_NAME: ""
+        # Mac 用のアイコン(16〜512pt・1x/2x。iOS の絵を macOS の角丸の枠に入れたもの・#1052)
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
         # ブランドの藍をアクセントに(システム設定のアクセントが「マルチカラー」の時だけ効く・#935)
         ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME: AccentColor
         # select-firebase-plist.sh が「あれば使う」plist を読むため(iOS と同じ理由・#292)
