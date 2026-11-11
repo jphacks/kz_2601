@@ -472,7 +472,7 @@ private fun GridCell(c: Component, env: DataEnv, layout: GridTableLayout, entity
     val rows = layout.records(cell)
     val tap = c.onItemTap
     var menu by remember { mutableStateOf(false) }
-    val titles = rows.map { r -> DataText.text(data, r, c.titleField ?: entity?.displayTitleField, entity).ifEmpty { "(無題)" } }
+    val titles = rows.map { r -> DataText.text(data, r, c.titleField ?: entity?.displayTitleField, entity).ifEmpty { Strings["desktop_untitled"] } }
     val accent = MaterialTheme.colorScheme.primary
     val shape = RoundedCornerShape(6.dp)
     Box(
@@ -508,7 +508,7 @@ private fun GridCell(c: Component, env: DataEnv, layout: GridTableLayout, entity
         }
         DropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
             rows.forEachIndexed { i, r -> DropdownMenuItem(text = { Text(titles[i]) }, onClick = { menu = false; tap?.let { env.tap(it, r.id) } }) }
-            DropdownMenuItem(text = { Text("追加") }, onClick = { menu = false; tap?.let { addAt(env, it, layout, cell) } })
+            DropdownMenuItem(text = { Text(Strings["desktop_data_add"]) }, onClick = { menu = false; tap?.let { addAt(env, it, layout, cell) } })
         }
     }
 }
@@ -527,9 +527,9 @@ private fun SearchBarLeaf(c: Component, search: MutableMap<String, String>) {
     OutlinedTextField(
         value = text,
         onValueChange = { search[key] = it },
-        placeholder = { Text(c.placeholder ?: "検索") },
+        placeholder = { Text(c.placeholder ?: Strings["desktop_keys_search"]) },
         singleLine = true,
-        trailingIcon = if (text.isEmpty()) null else { { TextButton(onClick = { search[key] = "" }) { Text("消す") } } },
+        trailingIcon = if (text.isEmpty()) null else { { TextButton(onClick = { search[key] = "" }) { Text(Strings["desktop_input_clear"]) } } },
         modifier = Modifier.fillMaxWidth().searchShortcutTarget(),
     )
 }

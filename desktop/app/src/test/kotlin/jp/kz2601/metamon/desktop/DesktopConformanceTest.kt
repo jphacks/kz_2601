@@ -150,9 +150,12 @@ class DesktopConformanceTest {
     @Test
     fun mockStoreSavesAndValidates() {
         val dsl = Examples.load("shopping")
-        val entity = dsl.entities.first { it.id == "groceries" }
-        assertEquals(listOf("品名"), entity.missingRequired(entity.defaultDraft()))
-        val store = MockStore().save("groceries", null, entity.defaultDraft() + ("name" to "牛乳"))
+        val entity = dsl.entityModels().first { it.id == "groceries" }
+        val draft = jp.kz2601.metamon.renderer.form.FormDraft(entity)
+        assertEquals(listOf("品名"), draft.flagMissingRequired())
+        draft.values["name"] = jp.kz2601.metamon.dsl.records.JSONValue.Str("牛乳")
+        assertTrue(draft.flagMissingRequired().isEmpty())
+        val store = MockStore().save("groceries", null, draft.payload.mapValues { MockStore.cell(it.value) })
         assertEquals("new-1", store.list("groceries").single().id)
         assertEquals("牛乳", store.list("groceries").single().data["name"])
         assertTrue(store.delete("groceries", "new-1").list("groceries").isEmpty())

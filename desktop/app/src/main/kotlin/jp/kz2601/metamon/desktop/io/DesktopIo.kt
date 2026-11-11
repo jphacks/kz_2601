@@ -37,14 +37,12 @@ import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.type
 import androidx.compose.ui.unit.dp
 import jp.kz2601.metamon.desktop.MockStore
+import jp.kz2601.metamon.desktop.i18n.Strings
 import jp.kz2601.metamon.dsl.Accept
-import jp.kz2601.metamon.dsl.Action
-import jp.kz2601.metamon.dsl.ActionFormat
 import jp.kz2601.metamon.dsl.AppDSL
 import jp.kz2601.metamon.dsl.Component
 import jp.kz2601.metamon.dsl.ComponentType
 import jp.kz2601.metamon.dsl.logic.ImportPlan
-import jp.kz2601.metamon.dsl.logic.RecordExport
 import jp.kz2601.metamon.dsl.logic.RecordImport
 import jp.kz2601.metamon.dsl.records.Entity
 import jp.kz2601.metamon.dsl.records.entityModels
@@ -58,16 +56,14 @@ import java.awt.datatransfer.Transferable
 import java.awt.datatransfer.UnsupportedFlavorException
 import java.awt.image.BufferedImage
 import java.io.File
-import java.time.LocalDateTime
-import java.time.format.DateTimeFormatter
 import javax.imageio.ImageIO
 
 /** 取り込みの確認待ち(CSV・TSV)。 */
 data class PendingImport(val entityId: String, val label: String, val plan: ImportPlan)
 
-/** 部品のうち、このパッケージが描くもの(fileImport・photoField・videoField)。 */
+/** 部品のうち、このパッケージだけが描くもの(fileImport)。photoField・videoField は入力の部品(InputLeaves)で、中身は [MediaFieldLeaf]。 */
 object IoLeaves {
-    val types: Set<ComponentType> = setOf(ComponentType.FILE_IMPORT, ComponentType.PHOTO_FIELD, ComponentType.VIDEO_FIELD)
+    val types: Set<ComponentType> = setOf(ComponentType.FILE_IMPORT)
 }
 
 /**
@@ -81,81 +77,63 @@ class DesktopIo(dsl: AppDSL, private val read: () -> MockStore, private val upda
 
     fun entity(id: String?): Entity? = entities.firstOrNull { it.id == id }
 
-    // --- 書き出し(#1753) ---
-
-    fun export(action: Action, screenEntity: String?) {
-        val entity = entity(action.entity ?: screenEntity) ?: return run { notice = "書き出す記録が見つかりません" }
-        val format = action.format?.takeIf { it != ActionFormat.UNKNOWN } ?: return run { notice = "書き出せませんでした" }
-        val store = read()
-        val title = action.title?.trim()?.ifEmpty { null } ?: entity.name
-        val date = LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyy/MM/dd HH:mm"))
-        val count = store.list(entity.id).size
-        val table = RecordIo.exportTable(title, entity, store, entities, action.fields, listOf("書き出し日 $date", "$count 件"))
-        val (bytes, ext) = when (format) {
-            ActionFormat.CSV -> RecordIo.csv(table) to "csv"
-            else -> PdfIo.data(table) to "pdf"
-        }
-        val file = saveDialog(RecordExport.fileName(title, ext)) ?: return
-        notice = runCatching { file.writeBytes(bytes) }.fold({ "書き出しました: ${file.name}" }, { "書き出せませんでした" })
-    }
-
     // --- 取り込み(#1753) ---
 
     fun pick(c: Component) {
-        val file = openDialog(c.label ?: "ファイルを選ぶ") ?: return
+        val file = openDialog(c.label ?: Strings["desktop_io_choose_file"]) ?: return
         importFile(file, c)
     }
 
     /** fileImport にファイルを 1 つ入れる。CSV は確認を出し、テキスト・PDF は本文を 1 件の記録にする。 */
     fun importFile(file: File, c: Component) {
-        val entity = entity(c.entity) ?: return run { notice = "取り込み先のフォームがありません" }
+        val entity = entity(c.entity) ?: return run { notice = Strings["desktop_io_no_import_target"] }
         val accept = c.accept.ifEmpty { listOf(Accept.CSV) }
         when (FileKind.of(file.name)) {
-            FileKind.CSV -> if (Accept.CSV in accept) importCsv(file.readBytes(), entity, c, c.label ?: file.name) else notice = "このファイルは取り込めません"
+            FileKind.CSV -> if (Accept.CSV in accept) importCsv(file.readBytes(), entity, c, c.label ?: file.name) else notice = Strings["desktop_io_unsupported_file"]
             FileKind.TEXT -> if (Accept.TEXT in accept) {
-                if (file.length() > RecordImport.MAX_TEXT_BYTES) return run { notice = "ファイルが大きすぎます" }
-                val text = RecordImport.plainText(file.readBytes()) ?: return run { notice = "文字コードが読めません" }
+                if (file.length() > RecordImport.MAX_TEXT_BYTES) return run { notice = Strings["desktop_io_file_too_large"] }
+                val text = RecordImport.plainText(file.readBytes()) ?: return run { notice = Strings["desktop_io_unreadable_encoding"] }
                 addBody(text, file.name, entity, c)
             } else {
-                notice = "このファイルは取り込めません"
+                notice = Strings["desktop_io_unsupported_file"]
             }
             FileKind.PDF -> if (Accept.PDF in accept) {
                 when (val r = PdfIo.text(file.readBytes())) {
                     is PdfIo.TextResult.Text -> addBody(r.text, file.name, entity, c)
-                    PdfIo.TextResult.Locked -> notice = "パスワードのかかった PDF は読めません"
-                    PdfIo.TextResult.NoText -> notice = "文字の入っていない PDF(スキャン)はデスクトップ版では読めません"
-                    PdfIo.TextResult.TooLarge -> notice = "ファイルが大きすぎます"
-                    PdfIo.TextResult.Broken -> notice = "PDF が読めません"
+                    PdfIo.TextResult.Locked -> notice = Strings["desktop_io_pdf_locked"]
+                    PdfIo.TextResult.NoText -> notice = Strings["desktop_io_pdf_no_text"]
+                    PdfIo.TextResult.TooLarge -> notice = Strings["desktop_io_file_too_large"]
+                    PdfIo.TextResult.Broken -> notice = Strings["desktop_io_pdf_broken"]
                 }
             } else {
-                notice = "このファイルは取り込めません"
+                notice = Strings["desktop_io_unsupported_file"]
             }
-            else -> notice = "このファイルは取り込めません"
+            else -> notice = Strings["desktop_io_unsupported_file"]
         }
     }
 
     private fun addBody(text: String, name: String, entity: Entity, c: Component) {
         val field = c.field ?: entity.storedFields.firstOrNull { it.type == jp.kz2601.metamon.dsl.records.FieldType.TEXT }?.id ?: return
-        val body = RecordImport.bodyRecord(text, name, entity, field) ?: return run { notice = "取り込み先の項目がありません" }
+        val body = RecordImport.bodyRecord(text, name, entity, field) ?: return run { notice = Strings["desktop_io_no_import_field"] }
         update(RecordIo.apply(read(), entity.id, listOf(body.data)))
-        notice = if (body.truncated) "取り込みました(長いので途中まで)" else "取り込みました"
+        notice = Strings[if (body.truncated) "desktop_io_imported_truncated" else "desktop_io_imported"]
     }
 
     fun importCsv(bytes: ByteArray, entity: Entity, c: Component?, label: String) {
-        val table = RecordIo.csvTable(bytes) ?: return run { notice = "文字コードが読めません" }
+        val table = RecordIo.csvTable(bytes) ?: return run { notice = Strings["desktop_io_unreadable_encoding"] }
         offer(table, entity, c, label)
     }
 
     private fun offer(table: List<List<String>>, entity: Entity, c: Component?, label: String) {
         val plan = RecordIo.plan(table, entity, c?.map.orEmpty(), read(), entities)
-        if (plan.matched.isEmpty()) return run { notice = "当てられる列がありません(1 行目の見出しを項目名にしてください)" }
+        if (plan.matched.isEmpty()) return run { notice = Strings["desktop_io_no_matching_columns"] }
         pending = PendingImport(entity.id, label, plan)
     }
 
     fun confirm() {
         val p = pending ?: return
         update(RecordIo.apply(read(), p.entityId, p.plan.rows))
-        notice = "${p.plan.rows.size} 件を追加しました"
+        notice = Strings.format("desktop_io_added_rows", p.plan.rows.size)
         pending = null
     }
 
@@ -166,41 +144,52 @@ class DesktopIo(dsl: AppDSL, private val read: () -> MockStore, private val upda
         val entity = entity(entityId) ?: return
         val table = RecordIo.exportTable(entity.name, entity, read(), entities, null)
         Toolkit.getDefaultToolkit().systemClipboard.setContents(StringSelection(Tsv.string(table)), null)
-        notice = "${table.rows.size} 件をコピーしました"
+        notice = Strings.format("desktop_io_copied_rows", table.rows.size)
     }
 
     /** クリップボードの表(TSV / CSV)を一覧に取り込む確認。 */
     fun pasteRows(entityId: String) {
         val entity = entity(entityId) ?: return
-        val text = clipboardText() ?: return run { notice = "クリップボードに表がありません" }
-        offer(RecordIo.pastedTable(text), entity, null, "貼り付けた表")
+        val text = clipboardText() ?: return run { notice = Strings["desktop_io_no_table_on_clipboard"] }
+        offer(RecordIo.pastedTable(text), entity, null, Strings["desktop_io_pasted_table"])
     }
 
     /**
      * Ctrl+V(macOS は ⌘V)。クリップボードが画像・ファイルの時だけ受け取る(文字は入力欄の貼り付けに任せる)。
      * 画像は画面の最初の photoField、ファイルは [dropFiles] と同じ振り分け。
      */
-    fun onKey(e: KeyEvent, screen: List<Component>, draft: MutableMap<String, String>): Boolean {
+    fun onKey(e: KeyEvent, screen: List<Component>, draft: MutableMap<String, String>?): Boolean {
         if (e.type != KeyEventType.KeyDown || e.key != Key.V || !(e.isCtrlPressed || e.isMetaPressed)) return false
         val t = runCatching { Toolkit.getDefaultToolkit().systemClipboard.getContents(null) }.getOrNull() ?: return false
+        return paste(t, screen, draft)
+    }
+
+    /** 貼り付け。ファイルは受け取る。文字もある時(表計算のセルは文字と画像の両方を載せる)は画像を取らず、入力欄に任せる。 */
+    fun paste(t: Transferable, screen: List<Component>, draft: MutableMap<String, String>?): Boolean {
+        files(t)?.let { return dropFiles(it, screen, draft) }
+        if (t.isDataFlavorSupported(DataFlavor.stringFlavor)) return false
         return drop(t, screen, draft)
     }
 
     // --- ドラッグ & ドロップ(#1764) ---
 
-    /** 落とした物(ファイル・画像)を画面の部品に振り分ける。受け取ったら true。 */
-    fun drop(t: Transferable, screen: List<Component>, draft: MutableMap<String, String>): Boolean {
+    /**
+     * 落とした物(ファイル・画像)を画面の部品に振り分ける。受け取ったら true。
+     * [draft] は一番上の画面の書けるフォーム(無い・読み取りだけなら null。写真・動画は入れない)。
+     */
+    fun drop(t: Transferable, screen: List<Component>, draft: MutableMap<String, String>?): Boolean {
         files(t)?.let { return dropFiles(it, screen, draft) }
         image(t)?.let { img ->
+            val d = draft ?: return false
             val field = screen.flatten().firstOrNull { it.type == ComponentType.PHOTO_FIELD }?.field ?: return false
-            draft[field] = savePhoto(img).toURI().toString()
-            notice = "写真を入れました"
+            d[field] = savePhoto(img).toURI().toString()
+            notice = Strings["desktop_io_photo_added"]
             return true
         }
         return false
     }
 
-    fun dropFiles(files: List<File>, screen: List<Component>, draft: MutableMap<String, String>): Boolean {
+    fun dropFiles(files: List<File>, screen: List<Component>, draft: MutableMap<String, String>?): Boolean {
         val all = screen.flatten()
         var used = false
         for (f in files) {
@@ -210,7 +199,7 @@ class DesktopIo(dsl: AppDSL, private val read: () -> MockStore, private val upda
                 FileKind.VIDEO -> ComponentType.VIDEO_FIELD
                 else -> null
             }
-            if (media != null) {
+            if (media != null && draft != null) {
                 val field = all.firstOrNull { it.type == media && it.field != null && draft[it.field!!].isNullOrEmpty() }?.field
                     ?: all.firstOrNull { it.type == media }?.field
                 if (field != null) {
@@ -239,7 +228,7 @@ class DesktopIo(dsl: AppDSL, private val read: () -> MockStore, private val upda
                 used = true
             }
         }
-        if (!used) notice = "この画面には落とせません"
+        if (!used) notice = Strings["desktop_io_drop_not_here"]
         return used
     }
 
@@ -279,14 +268,6 @@ class DesktopIo(dsl: AppDSL, private val read: () -> MockStore, private val upda
             return File.createTempFile("paste-", ".png", dir).also { ImageIO.write(img, "png", it) }
         }
 
-        fun saveDialog(name: String): File? {
-            val d = FileDialog(null as Frame?, "書き出す場所", FileDialog.SAVE)
-            d.file = name
-            d.isVisible = true
-            val f = d.file ?: return null
-            return File(d.directory, f)
-        }
-
         fun openDialog(title: String): File? {
             val d = FileDialog(null as Frame?, title, FileDialog.LOAD)
             d.isVisible = true
@@ -303,7 +284,7 @@ fun rememberDesktopIo(dsl: AppDSL, read: () -> MockStore, update: (MockStore) ->
 
 /** 画面全体でファイル・画像を受ける。 */
 @OptIn(ExperimentalComposeUiApi::class)
-fun Modifier.ioDropTarget(io: DesktopIo, screen: () -> List<Component>, draft: () -> MutableMap<String, String>): Modifier =
+fun Modifier.ioDropTarget(io: DesktopIo, screen: () -> List<Component>, draft: () -> MutableMap<String, String>?): Modifier =
     dragAndDropTarget(
         shouldStartDragAndDrop = { true },
         target = object : DragAndDropTarget {
@@ -312,24 +293,24 @@ fun Modifier.ioDropTarget(io: DesktopIo, screen: () -> List<Component>, draft: (
     )
 
 /** Ctrl+V の画像・ファイルの貼り付け(onPreviewKeyEvent に渡す)。 */
-fun DesktopIo.previewKey(screen: () -> List<Component>, draft: () -> MutableMap<String, String>): (KeyEvent) -> Boolean = { onKey(it, screen(), draft()) }
+fun DesktopIo.previewKey(screen: () -> List<Component>, draft: () -> MutableMap<String, String>?): (KeyEvent) -> Boolean = { onKey(it, screen(), draft()) }
 
 /** `fileImport`: ボタンでファイルを選ぶ(落としても入る)。 */
 @Composable
 fun FileImportLeaf(c: Component, io: DesktopIo) {
     Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-        OutlinedButton(onClick = { io.pick(c) }) { Text(c.label ?: "ファイルを取り込む") }
-        val kinds = c.accept.ifEmpty { listOf(Accept.CSV) }.joinToString("・") { it.wire.uppercase() }
-        Text("$kinds をここへ落としても取り込めます", style = MaterialTheme.typography.bodySmall, color = Color.Gray)
+        OutlinedButton(onClick = { io.pick(c) }) { Text(c.label ?: Strings["desktop_io_import_file"]) }
+        val kinds = c.accept.ifEmpty { listOf(Accept.CSV) }.joinToString(Strings["desktop_io_kind_separator"]) { it.wire.uppercase() }
+        Text(Strings.format("desktop_io_import_drop_hint", kinds), style = MaterialTheme.typography.bodySmall, color = Color.Gray)
     }
 }
 
-/** `photoField` / `videoField`: ファイルを選ぶ・落とす・Ctrl+V。写真は縮小して見せ、外へ引き出せる。 */
+/** `photoField` / `videoField`: ファイルを選ぶ・落とす・Ctrl+V。写真は縮小して見せ、外へ引き出せる。[readOnly] の時は見せるだけ。 */
 @Composable
-fun MediaFieldLeaf(c: Component, label: String, draft: MutableMap<String, String>) {
+fun MediaFieldLeaf(c: Component, label: String, draft: MutableMap<String, String>, readOnly: Boolean = false) {
     val field = c.field ?: return
     val uri = draft[field]
-    val file = uri?.let { runCatching { File(java.net.URI(it)) }.getOrNull() }
+    val file = uri?.let(::fileOf)
     Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
         Text(label, style = MaterialTheme.typography.labelLarge)
         if (file != null && c.type == ComponentType.PHOTO_FIELD) {
@@ -338,20 +319,24 @@ fun MediaFieldLeaf(c: Component, label: String, draft: MutableMap<String, String
         } else if (file != null) {
             Text(file.name, modifier = Modifier.fileDragSource(file))
         }
+        if (readOnly) return@Column
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            OutlinedButton(onClick = { DesktopIo.openDialog(label)?.let { draft[field] = it.toURI().toString() } }) { Text("ファイルを選ぶ") }
-            if (file != null) TextButton(onClick = { draft.remove(field) }) { Text("外す") }
+            OutlinedButton(onClick = { DesktopIo.openDialog(label)?.let { draft[field] = it.toURI().toString() } }) { Text(Strings["desktop_io_choose_file"]) }
+            if (file != null) TextButton(onClick = { draft.remove(field) }) { Text(Strings["desktop_io_remove"]) }
         }
-        Text(if (c.type == ComponentType.PHOTO_FIELD) "画像を落とすか Ctrl+V で貼れます" else "動画を落とせます", style = MaterialTheme.typography.bodySmall, color = Color.Gray)
+        Text(Strings[if (c.type == ComponentType.PHOTO_FIELD) "desktop_io_photo_hint" else "desktop_io_video_hint"], style = MaterialTheme.typography.bodySmall, color = Color.Gray)
     }
 }
+
+/** file URI(file:/C:/a%20b.png など)→ File。読めない値は null(描く途中で投げない)。 */
+fun fileOf(uri: String): File? = runCatching { File(java.net.URI(uri)) }.getOrNull()
 
 /** 一覧の上のコピー・貼り付け(表計算と行き来する)。 */
 @Composable
 fun ListIoBar(entityId: String, io: DesktopIo) {
     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-        TextButton(onClick = { io.copyRows(entityId) }) { Text("表をコピー") }
-        TextButton(onClick = { io.pasteRows(entityId) }) { Text("表を貼り付け") }
+        TextButton(onClick = { io.copyRows(entityId) }) { Text(Strings["desktop_io_copy_table"]) }
+        TextButton(onClick = { io.pasteRows(entityId) }) { Text(Strings["desktop_io_paste_table"]) }
     }
 }
 
@@ -361,10 +346,10 @@ fun IoOverlay(io: DesktopIo) {
     io.pending?.let { p ->
         AlertDialog(
             onDismissRequest = { io.pending = null },
-            title = { Text("${p.label} を取り込みますか？") },
+            title = { Text(Strings.format("desktop_io_import_confirm", p.label)) },
             text = { Column(verticalArrangement = Arrangement.spacedBy(4.dp)) { RecordIo.summary(p.plan).forEach { Text(it) } } },
-            confirmButton = { TextButton(onClick = io::confirm, enabled = p.plan.rows.isNotEmpty()) { Text("取り込む") } },
-            dismissButton = { TextButton(onClick = { io.pending = null }) { Text("やめる") } },
+            confirmButton = { TextButton(onClick = io::confirm, enabled = p.plan.rows.isNotEmpty()) { Text(Strings["desktop_io_import"]) } },
+            dismissButton = { TextButton(onClick = { io.pending = null }) { Text(Strings["desktop_io_cancel"]) } },
         )
     }
 }

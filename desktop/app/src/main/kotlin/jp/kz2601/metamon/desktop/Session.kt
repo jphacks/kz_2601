@@ -180,7 +180,7 @@ class DesktopSession(
     /** 押せるか: rendered / hidden / needsForm / unknown(iOS の「全部品が登録済み」の規則)。 */
     fun tapState(c: Component, form: FormDraft?): String {
         if (c.type == ComponentType.UNKNOWN) return "unknown"
-        if (c.type in InputLeaves.types) {
+        if (InputLeaves.isInput(c)) {
             if (form != null && form.hides(c, uid)) return "hidden"
             if (form == null || c.field == null) return "needsForm"
         }
