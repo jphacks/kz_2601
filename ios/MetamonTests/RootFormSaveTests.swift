@@ -8,12 +8,12 @@ import MetamonDSL
 final class RootFormSaveTests: XCTestCase {
     private let appId = "test-rootsave-\(UUID().uuidString.lowercased())"
 
-    private func runtime() throws -> AppRuntime {
+    private func runtime(single: Bool = false) throws -> AppRuntime {
         let json = """
         {"schemaVersion":1,"app":{"name":"メモ","voiceEntry":"floating",
           "tabs":[{"screen":"form","title":"入力","icon":"pencil"},{"screen":"list","title":"一覧","icon":"list.bullet"}]},
          "initialScreen":"form",
-         "entities":[{"id":"memo","name":"メモ","fields":[{"id":"body","name":"本文","type":"text","required":true}]}],
+         "entities":[{"id":"memo","name":"メモ",\(single ? "\"single\":true," : "")"fields":[{"id":"body","name":"本文","type":"text","required":true}]}],
          "screens":[{"id":"form","title":"メモ","entity":"memo","components":[{"type":"textField","field":"body"}]},
                     {"id":"list","title":"一覧","components":[{"type":"list","entity":"memo","titleField":"body"}]}]}
         """
@@ -63,6 +63,48 @@ final class RootFormSaveTests: XCTestCase {
         rt.toast = nil
         await save(rt, editing, at: tabRoot)
         XCTAssertNil(rt.toast, "何も変えずに保存したら何も出さない(M10)")
+    }
+
+    /// single(#267)は 1 件を上書きし続ける。最初の保存(まだ記録が無い)でも入力を空に戻さない。
+    func testSingleEntityKeepsValuesOnFirstSave() async throws {
+        let rt = try runtime(single: true)
+        let draft = FormDraft(entity: try XCTUnwrap(rt.dsl.entity("memo")))
+        draft.values["body"] = .string("目標 10km")
+
+        await save(rt, draft, at: tabRoot)
+
+        XCTAssertEqual(rt.toast, L10n.tr("保存しました"))
+        XCTAssertEqual(draft.payload["body"], .string("目標 10km"), "single は値を残す")
+    }
+
+    /// 空に戻した後にサーバーが断ったら、送った入力をフォームに戻す(打ち直さなくてよい)。
+    func testRefusedSaveRestoresResetForm() async throws {
+        let rt = try runtime()
+        let draft = FormDraft(entity: try XCTUnwrap(rt.dsl.entity("memo")))
+        draft.values["body"] = .string("散歩した")
+        await save(rt, draft, at: tabRoot)
+        XCTAssertNil(draft.payload["body"])
+        let saved = try XCTUnwrap(rt.lastSavedForm)
+
+        rt.revokeSaveFeedback(for: .rejected(appId: appId, entity: "memo", message: "bad", recordId: saved.recordId))
+
+        XCTAssertEqual(draft.payload["body"], .string("散歩した"), "送った入力を戻す")
+        XCTAssertTrue(draft.hasUnsavedChanges, "未保存に戻る(閉じる前に破棄の確認が出る)")
+        XCTAssertNil(draft.lastSaveResult)
+    }
+
+    /// 空に戻した後に次の入力を始めていたら、断られても上書きしない。
+    func testRefusedSaveKeepsNewInput() async throws {
+        let rt = try runtime()
+        let draft = FormDraft(entity: try XCTUnwrap(rt.dsl.entity("memo")))
+        draft.values["body"] = .string("散歩した")
+        await save(rt, draft, at: tabRoot)
+        let saved = try XCTUnwrap(rt.lastSavedForm)
+        draft.values["body"] = .string("次のメモ")
+
+        rt.revokeSaveFeedback(for: .rejected(appId: appId, entity: "memo", message: "bad", recordId: saved.recordId))
+
+        XCTAssertEqual(draft.payload["body"], .string("次のメモ"))
     }
 
     func testPushedFormStillCloses() async throws {

@@ -25,9 +25,14 @@ enum UndoWalk {
             parent = p
         } else if byVersion[from] != nil, from == 1 {
             parent = nil
-        } else {
+        } else if let listed = versions.map(\.version).filter({ $0 < from }).max() {
             // 親を返さない古い版: 一覧にある 1 つ前の版
-            parent = versions.map(\.version).filter { $0 < from }.max()
+            parent = listed
+        } else if byVersion[from] == nil, from > 1 {
+            // 中身の元が一覧(最新の 1 ページ)より前: 親が分からないので番号で 1 つ前(版は 1 ずつ増える)。「戻せない」で止めない
+            parent = from - 1
+        } else {
+            parent = nil
         }
         guard let parent else { return nil }
         let target = origin(of: parent, in: byVersion)

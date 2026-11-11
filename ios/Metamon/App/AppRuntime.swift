@@ -446,6 +446,8 @@ final class AppRuntime: RuntimeNavigating {
         /// 書いた行の id(新規は仮 id `local-…`)。断られた操作の `SyncEvent` の recordId と一致した時だけ取り消す
         let recordId: String
         weak var form: FormDraft?
+        /// 送った入力。根のフォームは保存の後に空に戻すので、断られたらこれを戻す(#1723)
+        var payload: [String: JSONValue]?
     }
 
     /// シート / 全画面 / push 先 / 音声シートが開いている = 入力や操作の途中。DSL を差し替えるとフォームの下書きが消えるので待つ。
@@ -1259,7 +1261,7 @@ final class AppRuntime: RuntimeNavigating {
         guard let refused = event.refusedWrite, let recordId = refused.recordId,
               let saved = lastSavedForm, saved.appId == refused.appId, saved.entity == refused.entity,
               saved.recordId == recordId else { return }
-        saved.form?.markSaveRefused()
+        saved.form?.markSaveRefused(restoring: saved.payload) // 空に戻したフォームにも入力を戻す(入れ直しは消さない)
         lastSavedForm = nil
     }
 
@@ -1317,7 +1319,7 @@ final class AppRuntime: RuntimeNavigating {
                 },
                 afterSave: { [self] saved in
                     // 送った後にサーバーが断ったら「保存しました」を取り消す
-                    lastSavedForm = SavedForm(appId: appId, entity: entity, recordId: saved.recordId, form: form)
+                    lastSavedForm = SavedForm(appId: appId, entity: entity, recordId: saved.recordId, form: form, payload: saved.payload)
                     WidgetSnapshotWriter.write(dsl: dsl, records: records)
                     #if !APP_STORE_REVIEW
                     writeHealthFields(entity: entity, data: saved.payload, isNew: saved.isNew) // Field.health(#167)
@@ -1332,8 +1334,8 @@ final class AppRuntime: RuntimeNavigating {
             switch outcome {
             case .readOnly: notifyReadOnly(entity: entity) // 送信待ちに積まない(#249)
             // 既存の記録を何も変えずに保存: 書き込まず(「保存しました」も出さず)に画面だけ進める(M10)
-            case .unchanged: leaveAfterSave(action, ctx, form: form, recordId: recordId, wrote: false)
-            case .saved: leaveAfterSave(action, ctx, form: form, recordId: recordId, wrote: true)
+            case .unchanged: leaveAfterSave(action, ctx, entity: entity, form: form, recordId: recordId, wrote: false)
+            case .saved: leaveAfterSave(action, ctx, entity: entity, form: form, recordId: recordId, wrote: true)
             case .inFlight, .held: break // 連打・名前を聞いている間
             }
 
@@ -1398,8 +1400,10 @@ final class AppRuntime: RuntimeNavigating {
     }
 
     /// 保存の後: `screen` があればそこへ、無ければ閉じる。タブ / main の根なら留まり、書き込めた時だけ「保存しました」(#1719)。
-    private func leaveAfterSave(_ action: Action, _ ctx: ActionContext, form: FormDraft, recordId: String?, wrote: Bool) {
-        switch NavigationResolver.afterSave(navigationState, from: ctx.route, screen: action.screen, isNewRecord: recordId == nil) {
+    /// single の entity(#267)は 1 件を上書きし続けるので、最初の保存(recordId なし)でも新規として空に戻さない。
+    private func leaveAfterSave(_ action: Action, _ ctx: ActionContext, entity: String, form: FormDraft, recordId: String?, wrote: Bool) {
+        let isNewRecord = recordId == nil && dsl.entity(entity)?.single != true
+        switch NavigationResolver.afterSave(navigationState, from: ctx.route, screen: action.screen, isNewRecord: isNewRecord) {
         case .navigate(let screen):
             navigate(to: screen, presentation: action.presentation, recordId: nil, from: ctx.route)
         case .close:

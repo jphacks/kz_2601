@@ -61,7 +61,8 @@ final class LaunchHoldOrderTests: XCTestCase {
         rt.showAppSwitcher = true
         var done = false
         let intent = Task { @MainActor in
-            await host.request(.talk)
+            let work = await host.request(.talk)
+            await work?.value
             done = true
         }
         await settle()
@@ -134,7 +135,8 @@ final class LaunchHoldOrderTests: XCTestCase {
         host.register(rt)
         host.markReady()
         return Task { @MainActor in
-            await host.request(.talk)
+            let work = await host.request(.talk)
+            await work?.value
             done()
         }
     }
@@ -301,6 +303,103 @@ final class LaunchHoldOrderTests: XCTestCase {
         let config: ClientConfig
         func fetch() async throws -> ClientConfig { config }
     }
+
+    func testUpdateAlertHeldBehindLaunchSteps() async {
+        let gate = UpdateGate(checker: UpdateChecker(client: StubClient(config: ClientConfig(latestIOSBuild: 20)), build: "10"),
+                              dismissals: NoticeDismissals(defaults: defaults))
+        await gate.check()
+        LaunchConsentHold.shared.begin(.consent)
+        XCTAssertFalse(gate.canShowNoticeAlert, "同意のシートを出す前にアラートを出さない(シートが捨てられて止まる)")
+        LaunchConsentHold.shared.end(.consent)
+        XCTAssertTrue(gate.canShowNoticeAlert)
+    }
+
+    // MARK: - 出せなかった段を放す・サインアウト・Siri
+
+    /// 番が来ても画面が出なかった段(他の表示に捨てられた等)は、時間がたてば放す(後ろがずっと止まらない)。
+    func testUnshownStepReleasedAfterDeadline() async throws {
+        let hold = LaunchConsentHold.shared
+        hold.deadlineOverride = .milliseconds(50)
+        hold.begin(.consent)
+        hold.begin(.tutorial)
+        hold.hostsAppeared()
+        await hold.waitUntilReleased()
+        XCTAssertFalse(hold.isHolding, "同意もチュートリアルも出なければ順に放す")
+    }
+
+    func testShownStepIsNotReleasedByDeadline() async throws {
+        let hold = LaunchConsentHold.shared
+        hold.deadlineOverride = .milliseconds(50)
+        hold.begin(.consent)
+        hold.hostsAppeared()
+        hold.markShown(.consent) // 同意の画面が出た(読んでいる間は待つ)
+        try await Task.sleep(for: .milliseconds(200))
+        XCTAssertTrue(hold.isHolding, "出ている段は閉じるまで放さない")
+        hold.end(.consent)
+        XCTAssertFalse(hold.isHolding)
+    }
+
+    func testNoDeadlineBeforeHostsAppear() async throws {
+        // サインイン画面の間は同意を出せないが、時間で放さない(サインイン後に順番どおり出す)
+        let hold = LaunchConsentHold.shared
+        hold.deadlineOverride = .milliseconds(50)
+        hold.begin(.consent)
+        try await Task.sleep(for: .milliseconds(200))
+        XCTAssertTrue(hold.isHolding)
+    }
+
+    /// Siri の Intent は同意・チュートリアルを待たずに戻る(待つと時間切れ)。実行は閉じた後。
+    func testIntentRequestReturnsWithoutWaitingForLaunchSteps() async throws {
+        let rt = try makeRuntime(tutorialSeen: false)
+        rt.beginLaunchConsentHoldIfNeeded()
+        let host = IntentHost()
+        host.register(rt)
+        host.markReady()
+        rt.showAppSwitcher = true
+        let work = await host.request(.talk)
+        XCTAssertNotNil(work, "準備済みなら実行を始めてすぐ戻る")
+        XCTAssertTrue(rt.showAppSwitcher, "同意の前には実行しない")
+        rt.launchPresentationsAbandoned()
+        await work?.value
+        XCTAssertFalse(rt.showAppSwitcher)
+    }
+
+    #if !APP_STORE_REVIEW
+    /// 使っている途中に届いたシェアリンクは順番待ちにしない(他のシートで確認が出せないと、ずっと放されない)。
+    func testShareLinkMidSessionDoesNotHold() throws {
+        let hold = LaunchConsentHold.shared
+        hold.finishLaunchIfIdle() // 起動の処理が済んだ(待たせる段なし)
+        XCTAssertTrue(SharingUI.shared.receive(URL(string: ShareURL.scheme + "://import/mid123")!))
+        XCTAssertFalse(hold.isHolding, "起動の後のリンクは Intent を待たせない")
+    }
+
+    func testShareLinkDuringLaunchStillHolds() throws {
+        let hold = LaunchConsentHold.shared
+        hold.begin(.consent)
+        hold.finishLaunchIfIdle() // まだ同意が残っているので起動の途中のまま
+        XCTAssertTrue(SharingUI.shared.receive(URL(string: ShareURL.scheme + "://import/early1")!))
+        XCTAssertTrue(hold.pending.contains(.shareLink))
+        hold.end(.consent)
+        SharingUI.shared.isReady = true
+        _ = SharingUI.shared.takeLink()
+        SharingUI.shared.linkSettled()
+        XCTAssertFalse(hold.isHolding)
+        XCTAssertTrue(SharingUI.shared.receive(URL(string: ShareURL.scheme + "://import/later2")!))
+        XCTAssertFalse(hold.isHolding, "一度全部終わった後は待たせない")
+    }
+
+    /// 開く処理の id は `takeLink` で変わらない(変わると .task が取り消され、プレビューの取得が必ず失敗する)。
+    func testTakeLinkKeepsTaskIdentity() throws {
+        let ui = SharingUI.shared
+        ui.receive(URL(string: ShareURL.scheme + "://import/keep1")!)
+        let serial = ui.linkSerial
+        ui.isReady = true
+        XCTAssertNotNil(ui.takeLink())
+        XCTAssertEqual(ui.linkSerial, serial)
+        ui.receive(URL(string: ShareURL.scheme + "://import/keep2")!)
+        XCTAssertEqual(ui.linkSerial, serial + 1, "新しいリンクでは開き直す")
+    }
+    #endif
 
     func testUpdateAlertHeldBehindSplash() async {
         let gate = UpdateGate(checker: UpdateChecker(client: StubClient(config: ClientConfig(latestIOSBuild: 20)), build: "10"),

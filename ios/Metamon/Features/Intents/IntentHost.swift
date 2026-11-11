@@ -44,13 +44,16 @@ final class IntentHost {
     }
 
     /// 開く/話しかける: 準備済みなら今すぐ、まだなら bootstrap 後に。
-    func request(_ action: Pending) async {
+    /// 実行(スプラッシュ・同意・チュートリアルの後)は待たずに戻る: Siri の Intent は同意の画面を閉じるまで待つと時間切れになる。
+    /// 戻り値は実行の Task(テストで終わりを待つ用)。保留した時は nil。
+    @discardableResult
+    func request(_ action: Pending) async -> Task<Void, Never>? {
         guard isReady else {
             pending = action
             print("[Metamon] intent: queued \(action) until bootstrap")
-            return
+            return nil
         }
-        await perform(action)
+        return Task { await perform(action) }
     }
 
     private func perform(_ action: Pending) async {
