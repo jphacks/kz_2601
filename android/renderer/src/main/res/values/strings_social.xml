@@ -27,6 +27,9 @@
     <string name="social_chat_me">自分</string>
     <string name="social_chat_other">相手</string>
     <string name="social_chat_photo">写真</string>
+    <string name="social_chat_photo_attached">添付する写真</string>
+    <string name="social_chat_photo_choose">写真を選ぶ</string>
+    <string name="social_chat_photo_remove">写真を外す</string>
     <string name="social_chat_placeholder">メッセージ</string>
     <string name="social_chat_send">送信</string>
     <string name="social_interest_accept">承認する</string>
