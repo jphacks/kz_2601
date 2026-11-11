@@ -82,6 +82,7 @@ private struct AppCanvasContent: View {
 
     var body: some View {
         DSLNavigationRoot()
+            .background { SaveFormShortcut(runtime: runtime) } // ⌘Return で保存(#1138)。⌘S はメニュー(MacCommands)
             .background {
                 // 画面マップ(#970)。アプリのシートとは別の view に付ける(同じ view に sheet を重ねない)
                 Color.clear.sheet(isPresented: $showsScreenMap, onDismiss: talkAfterMap) {
@@ -152,6 +153,7 @@ private struct AppCanvasContent: View {
     private func modal(_ route: Route) -> some View {
         ScreenStack(root: route)
             .background { EscapeToDismiss { runtime.requestDismissTopModal() } } // 入力があれば先に確認(#943)
+            .background { SaveFormShortcut(runtime: runtime) } // ⌘Return で保存(#1138)
             .modifier(RuntimeOverlays(runtime: runtime))
             .environment(\.dslRuntime, runtime)
             .environment(\.componentRegistry, ComponentRegistry.standard)
@@ -291,6 +293,21 @@ private struct EscapeToDismiss: View {
     var body: some View {
         Button("閉じる", action: dismiss)
             .keyboardShortcut(.cancelAction)
+            .opacity(0)
+            .frame(width: 0, height: 0)
+            .accessibilityHidden(true)
+    }
+}
+
+/// ⌘Return でフォームを保存する(#1138)。⌘S はメニューの「保存」が受け、⌘Return は会話のシートの「送る」と同じ指の形で押せるよう
+/// 中央の列(根とモーダル)にだけ置く。メニューの「保存」と同じく、フォームが無い・何も変えていない時は押せない
+private struct SaveFormShortcut: View {
+    let runtime: MacAppRuntime
+
+    var body: some View {
+        Button("保存") { Task { await runtime.saveFromMenu() } }
+            .keyboardShortcut(.return, modifiers: .command)
+            .disabled(!runtime.canSaveFromMenu)
             .opacity(0)
             .frame(width: 0, height: 0)
             .accessibilityHidden(true)

@@ -26,7 +26,7 @@ extension MacAppRuntime {
         switch output {
         case .save: await saveExport(action, ctx)
         case .share: shareExport(action, ctx)
-        case .print: printExport(action, ctx)
+        case .print: printExport(action, screen: ctx.route.screen)
         }
     }
 
@@ -60,10 +60,10 @@ extension MacAppRuntime {
         }
     }
 
-    /// プリント。CSV を選んだボタンでも、紙には PDF と同じ表(グラフ付き)を出す
-    private func printExport(_ action: Action, _ ctx: ActionContext) {
+    /// プリント。CSV を選んだボタンでも、紙には PDF と同じ表(グラフ付き)を出す。メニューの ⌘P(#1139)もここ
+    func printExport(_ action: Action, screen: String?) {
         guard let table = try? exportTable(action),
-              let document = PDFDocument(data: ExportPDF.data(table, charts: exportChartImages(screen: ctx.route.screen,
+              let document = PDFDocument(data: ExportPDF.data(table, charts: exportChartImages(screen: screen,
                                                                                                entity: action.entity ?? ""))),
               MacExportSaver.print(document) else {
             toast = L10n.tr("プリントできませんでした")

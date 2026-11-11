@@ -2,7 +2,8 @@ import SwiftUI
 import AppKit
 
 /// メニューバー(#934)。ウインドウの状態は `focusedSceneValue` で受け取り、今の画面に合わせて有効 / 無効を変える。
-/// - ファイル: 新しいアプリ・文字で頼む(会話のシート・#967)・声で頼む(同じシートですぐ録音・#966)・新しいウインドウ
+/// - ファイル: 新しいアプリ・文字で頼む(会話のシート・#967)・声で頼む(同じシートですぐ録音・#966)・新しいウインドウ・
+///   保存 ⌘S(#1138)・CSV / PDF で書き出す・プリント ⌘P(#1139・今の画面に一覧がある時だけ)
 /// - 編集: 元に戻す(記録を消した直後は削除の取り消し・それ以外は入力欄の取り消し)・やり直す・アプリを探す(⌘F・#1282)
 /// - アプリ: 生成したアプリの版の「変更を元に戻す」(⌥⌘Z)・「変更をやり直す」(⇧⌥⌘Z)(#968)・次の通知(#1325)。
 ///   ⌘Z / ⇧⌘Z は入力欄と記録の削除に使っているので、版の取り消しは別のキーにする
@@ -17,6 +18,9 @@ struct MacCommands: Commands {
     @FocusedValue(\.macAppRuntime) private var runtime
     @Environment(\.openWindow) private var openWindow
     @Environment(\.openURL) private var openURL
+
+    /// 会話のシート・画面マップが開いている間は中央のアプリに向けた操作(保存・書き出し)を押せない
+    private var canUseCanvas: Bool { shell?.canCompose ?? true }
 
     var body: some Commands {
         SidebarCommands()
@@ -37,6 +41,8 @@ struct MacCommands: Commands {
                 .keyboardShortcut("k", modifiers: .command)
                 .disabled(!(shell?.canCompose ?? false))
         }
+
+        saveAndExportCommands
 
         CommandGroup(replacing: .undoRedo) {
             if let runtime, runtime.recordUndo != nil {
@@ -108,6 +114,28 @@ struct MacCommands: Commands {
             #if !APP_STORE_REVIEW // 審査用ビルドはフィードバックを外す(#319)
             Button("フィードバックを送る…") { MacFeedbackCenter.shared.open(openWindow) } // #983
             #endif
+        }
+    }
+
+    /// ファイルの保存・書き出し・プリント(`body` の項目数の上限を超えないよう分ける)
+    @CommandsBuilder private var saveAndExportCommands: some Commands {
+        // 中央のフォームを保存バーと同じ流れで保存する(#1138)。⌘Return は中央の列の隠しボタン(`AppCanvas`)
+        CommandGroup(after: .saveItem) {
+            Button("保存") { Task { await runtime?.saveFromMenu() } }
+                .keyboardShortcut("s", modifiers: .command)
+                .disabled(!canUseCanvas || !(runtime?.canSaveFromMenu ?? false))
+        }
+
+        // 今の画面の一覧(list / table)を export と同じ流れで出す(#1139)
+        CommandGroup(replacing: .printItem) {
+            Button("CSV で書き出す…") { Task { await runtime?.exportFromMenu(format: "csv") } }
+                .disabled(!canUseCanvas || !(runtime?.canExportFromMenu ?? false))
+            Button("PDF で書き出す…") { Task { await runtime?.exportFromMenu(format: "pdf") } }
+                .disabled(!canUseCanvas || !(runtime?.canExportFromMenu ?? false))
+            Divider()
+            Button("プリント…") { Task { await runtime?.printFromMenu() } }
+                .keyboardShortcut("p", modifiers: .command)
+                .disabled(!canUseCanvas || !(runtime?.canExportFromMenu ?? false))
         }
     }
 }
