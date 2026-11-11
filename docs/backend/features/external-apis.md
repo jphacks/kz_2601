@@ -76,6 +76,7 @@ op の `Check` は引数の値を確かめる(appconfig と runner の両方で�
 | `asana` の `projectTasks`(プロジェクトのタスクを見る・#1683) | 無料・OAuth(`runs` だけ・scope `tasks:read`) | `projectTasks(projectId, limit?)`。プロジェクトの未完了のタスク。`projectId` は数字の id(Asana の URL の `/0/<id>/`)。持っていない id(Asana の 400 / 404)は 400 `bad_request`。行は `myTasks` と同じ。規約・回数は同上 | 同上 | なし | 同上 |
 | `asana` の `complete`(タスクを完了にする・#1683) | 無料・OAuth(`runs` だけ・scope `tasks:write`。初めて使う時につなぎ直す。Asana の scope は足し算にならないので、つなぎ直しでも読む scope を一緒に求める)・書く(確認必須) | `complete(taskId)`。`taskId` は数字の id。答えは `resultId`(= `taskId`)と 1 件(補足 = 「完了」)。完了済みをもう一度完了にしても変わらない。持っていないタスクは 400 `bad_request`。規約は同上。回数: 書き込みは同時 15 | 同上 | なし | 同上 |
 | `frankfurter`(為替・欧州中央銀行・#1499) | 無料・鍵なし(`runs` だけ) | `latest(from?, to?, amount?)`・`historical(date, from?, to?, amount?)`。`from` / `to` は大文字 3 文字の通貨(`to` はカンマ区切りで 10 個まで・重ならない)・`amount` は正の数・`date` は 1999-01-04 から今日まで。行は通貨ごと(見出し = 通貨・値 = レート・補足 = 「日付・量 基準」) | `https://api.frankfurter.app` だけ・本文 64 KiB まで | latest 1 時間・historical 1 日 | `EXT_FRANKFURTER_ENABLED=1` |
+| `gtfsRealtime` の `nextBuses` / `busPositions`(バスの次の便・今の位置・GTFS リアルタイム・#1692) | 無料・鍵なし(`runs` だけ) | `nextBuses(feed, stop, route?, limit?)`・`busPositions(feed, route?, limit?)`。`feed` は下の「GTFS リアルタイムのフィードと規約」の許可リストの id だけ(ほかは 400 `bad_request`)。`stop` / `route` はそのフィードの GTFS の `stop_id` / `route_id`(英数字と `_ . : -`・64 文字まで)。`limit` は `nextBuses` 1〜10(既定 3)・`busPositions` 1〜50(既定 20)。`nextBuses` は TripUpdate を読み、その停留所に来る便を時刻の順に出す(見出し = `route_id`・補足 = 「遅れ N 分」/「N 分早い」/「定刻」(遅れの無い便は空)・値 = 「HH:MM(あと N 分)」日本時間)。取り消し・通過(SKIPPED / NO_DATA)の便・1 分より前・3 時間より先の便は出さない。時刻が遅れだけで来る便(静的な時刻表が要る)はまだ出さない。`busPositions` は VehiclePosition を読み、バスごとに 1 行(見出し = 車両の表示名(無ければ id)・補足 = 「`route_id`・HH:MM 更新」・値 = 「緯度,経度」)。並びは `route_id`・見出しの順。フィードか車両の時刻が 10 分より古いものは出さない(古い予測は出さないより悪い)。停留所・系統の名前は静的な GTFS-JP を取り込むまで id のまま。TripUpdate を出すフィードはまだ許可リストに無い(人の作業)。出典(下の表)を出す。AI に選ばせる決まり(`prompt.go`・`catalog.go`)はまだ | 許可リストのフィードのホストだけ(今は `https://api-public.odpt.org`)・本文 1 MB まで・実体は 20000 件まで | 30 秒 | `EXT_GTFS_REALTIME_ENABLED=1` |
 | `openWeather` の `airQuality`(空気の汚れ・OpenWeatherMap Air Pollution・#1656) | 無料・運営の鍵(`runs` だけ。OpenWeather の契約の範囲) | `airQuality(lat, lng)`。`lat` / `lng` は小数(10 進だけ)で小数 2 桁(約 1 km)に丸めて送る。答えは 1 件(見出し = 「空気 <AQI の段階>(目安)」・値 = `AQI n/5`・補足 = PM2.5・PM10・O₃・NO₂ の µg/m³)。AQI は OpenWeather の 1〜5(良い・まあまあ・ふつう・悪い・とても悪い)。1〜5 でない答えは 502 `upstream_unavailable`。健康の判断ではなく目安。出典「Weather data © OpenWeather (ODbL)」を出す。AI に選ばせる決まり(`prompt.go`・`catalog.go`)はまだ | `https://api.openweathermap.org` だけ(`/data/2.5/air_pollution`。天気と同じホスト・同じ鍵) | なし | `EXT_OPEN_WEATHER_ENABLED=1`・`EXT_OPEN_WEATHER_API_KEY` |
 | `todoist` の `listTasks`(タスクを見る・#1496・`project` / `label` は #1681) | 無料・OAuth(`runs` だけ・scope `data:read`) | `listTasks(filter?, projectId?, project?, label?, limit?)`。`filter`・`projectId`・`project`(プロジェクトの名前)はどれか 1 つ。`label` はどれとも組める(`project` か `filter` と組むと Todoist のフィルタ `#名前 & @ラベル`、ほかは `label` の引数)。名前は 120 文字まで・1 行・`& \| ! ( ) , \ * # @` は使えない。カンマを含む `filter` に `label` は付けられない。`limit` 1〜50(既定 20)。行はタスク(見出し = 内容・補足 = 期限の言葉・値 = 期限・リンク) | `https://api.todoist.com` だけ | なし | `EXT_TODOIST_ENABLED=1`・`EXT_TODOIST_CLIENT_ID` / `_CLIENT_SECRET` |
 | `todoist` の `projects`(プロジェクトの一覧・#1681) | 無料・OAuth(`runs` だけ・scope `data:read`) | `projects(limit?)`。`limit` 1〜50(既定 20)。行はプロジェクト(見出し = 名前。`listTasks` の `project` に渡せる・リンク) | 同上 | なし | 同上 |
@@ -108,7 +109,7 @@ Asana の 403 も、メッセージが scope の不足を言う時だけ 409 `ex
 
 Slack は利用者ごとの OAuth v2 でユーザーのトークン(`user_scope` だけ・ボットのトークンは取らない)。PKCE は使わない(Slack の PKCE はアプリを公開クライアントに戻せない形で変えるため。runner はクライアントの秘密を Basic 認証で送る)。新しい scope は同じトークンに足されるので、書く op のためにつなぎ直しても読む op は残る。トークンの回転(12 時間・使い捨ての refresh token)を入れた時も入れない時も動く。Slack はほとんどの失敗を 200 の `ok:false` で返すので、コードで分ける: `invalid_auth`・`not_authed`・`token_revoked`・`token_expired`・`account_inactive`(と HTTP 401)は接続を `error` にする(つなぎ直す)。`missing_scope`・`not_allowed_token_type`・`no_permission`・`access_denied` など(と HTTP 403)は 409 `ext_not_connected`。`ratelimited`(HTTP 429)・`fatal_error`・`internal_error`・`service_unavailable`・`request_timeout`(と 5xx)は 502 `upstream_unavailable`。ほかのコードは 400 `bad_request`。Slack の API 規約: 商用の配布は Marketplace(か別の契約)が要る・データは機能に要る間だけ持つ・モデルの学習に使わない・プライバシーポリシーに読むものを書く。だから op は本人の状態・本人の投稿・DM の未読の数だけで、メッセージの本文を読む op・ためる op は入れない。
 
-Asana の `myTasks`・`projectTasks`・`complete`、Todoist の `complete`・`projects`・`project` / `label`、Notion の `updateProperties`・`pageText`、Google ToDo の全部の op、GitHub と Linear の op、YouTube の `channelStats`・`latestVideos`、Slack の全部の op、ODPT の `trainStatus` は runner の op だけ。生成アプリから呼ぶ部品と AI に選ばせる決まり(`prompt.go`・`catalog.go`・`docs/dsl`)は #1643 の判断の後に足す。
+Asana の `myTasks`・`projectTasks`・`complete`、Todoist の `complete`・`projects`・`project` / `label`、Notion の `updateProperties`・`pageText`、Google ToDo の全部の op、GitHub と Linear の op、YouTube の `channelStats`・`latestVideos`、Slack の全部の op、GTFS リアルタイムの `nextBuses`・`busPositions`、ODPT の `trainStatus` は runner の op だけ。生成アプリから呼ぶ部品と AI に選ばせる決まり(`prompt.go`・`catalog.go`・`docs/dsl`)は #1643 の判断の後に足す。
 
 provider が 404 / 422(持っていない通貨・日)を返した時は 400 `bad_request`(`runs` は戻す)。429 / 5xx は 502 `upstream_unavailable`。
 
@@ -157,6 +158,28 @@ op の案: `boards()`(自分のボード・`GET /1/members/me/boards`。`/1/memb
 | 規約へのリンク(ポリシー III.A.1) | YouTube の利用規約(https://www.youtube.com/t/terms)へのリンクを出す | 部品と iOS の作業(#1643)。`docs/legal` にも書く(人の作業) |
 | プライバシーポリシー(規約 7・ポリシー III.A.2) | YouTube API サービスを使うと書き、Google のプライバシーポリシー(https://policies.google.com/privacy)へリンクする | 人の作業(`docs/legal`) |
 | 割り当て(規約 15・ポリシー III.D.3) | 割り当てを超えない・避けない。増やすには API Compliance Audit。認められた使い道にだけ使う | 1 回 1〜2 単位。回数の上限 `EXT_GLOBAL_DAILY_YOUTUBE` を 1 日の割り当てに合わせる(上限は回数で数えるので、`latestVideos` を 2 単位として見積もる・人の作業) |
+
+### GTFS リアルタイムのフィードと規約(#1692)
+
+GTFS リアルタイム(protobuf)の読み方は [GTFS Realtime の仕様](https://gtfs.org/documentation/realtime/reference/)の番号どおりで、要るフィールドだけを `google.golang.org/protobuf` の `protowire`(もとから依存にある・BSD-3-Clause)で読む。生成したバインディング(MobilityData の `gtfs-realtime-bindings`)は足していない。
+
+入れたフィード(許可リスト・`gtfs_realtime.go` の `gtfsFeeds`):
+
+| id | 事業者 | 読むもの | URL | ライセンス(人が確かめる) |
+|---|---|---|---|---|
+| `toeiBus` | 都営バス(東京都交通局) | VehiclePosition だけ(`busPositions`) | `https://api-public.odpt.org/api/v4/gtfs/realtime/ToeiBus` | CC BY 4.0(公共交通オープンデータセンターの公開の口・鍵なし) |
+
+フィードを足す時は、事業者ごとにライセンスと URL をデータカタログ([公共交通オープンデータセンター](https://ckan.odpt.org/)・[GTFS データリポジトリ](https://gtfs-data.jp/)・事業者のサイト)で確かめてから、コードと上の表を一緒に直す。CC BY 以外(独自の規約・非営利だけ・チャレンジ限定)のフィードは入れない。
+
+| 決まり | 中身 | この作りでの扱い |
+|---|---|---|
+| CC BY のクレジット | 提供者名・データの名前・ライセンス(リンク)を出す | フィードごとの `credit`(都営バスは「東京都交通局・公共交通オープンデータ協議会、都営バス GTFS-RT、CC BY 4.0」)を行のそばに出す |
+| 利用者への通知(公共交通オープンデータセンターのフィード) | センターのデータであること・正確・完全とは限らないこと・事業者に直接問い合わせないこと | センターの口(`api-public.odpt.org`)のフィードは `ODPTAttribution` も出す。ほかのフィードは `GTFSAttribution` |
+| 時刻の表示・古いデータ(センターのガイドライン 2.1) | 動的データは時刻を出す・古いデータは使わない | 位置の行に「HH:MM 更新」・フィードか車両の時刻が 10 分より古いものは出さない・キャッシュは 30 秒 |
+| 元の意味を変えない | 予測の時刻・位置をそのまま出す | 時刻は分に・位置は float32 のまま(丸めない)。生のデータは端末に返さない(決まった行の形だけ) |
+| 再配布 | CC BY は再配布できるが、センターの基本ライセンスは再配布を禁じる | 生成アプリの画面に出すだけ |
+
+まだのこと(後の Issue): 静的な GTFS-JP(停留所・系統の名前・時刻表)をサーバーで前処理して持ち、`nextBuses` の停留所を名前で選べるようにし、遅れだけの予測を時刻表に足して出す。
 
 ### ODPT の事業者と規約(#1691)
 
@@ -348,4 +371,5 @@ DSL に `externalCall` / `externalList` があるかの確かめは、DSL の子
 - 回数の上限の値(`EXT_LIMIT_*`・`EXT_GLOBAL_DAILY*`)を各社の割り当てに合わせて runner の env に入れる(非公開の資料から。入れなければコードの既定)。
 - プライバシーポリシー・利用規約(`docs/legal`)に外の API への送信とトークンの保管・消し方を書く。
 - YouTube(#1699): Google Cloud で YouTube Data API v3 を有効にし、鍵(使える API を YouTube Data API v3 だけに絞る)を Secret Manager の `EXT_YOUTUBE_API_KEY` に入れる。1 日の割り当て(Cloud Console の Quotas)を確かめて `EXT_GLOBAL_DAILY_YOUTUBE` を合わせる。上の「YouTube の規約」を読み直し、プライバシーポリシーに YouTube API サービスの利用と Google のプライバシーポリシーへのリンク、アプリに YouTube の利用規約へのリンクを足す。
+- GTFS リアルタイム(#1692): 上の「GTFS リアルタイムのフィードと規約」の都営バスの URL とライセンスを一度確かめる(このコードは実際のフィードを読んでいない)。TripUpdate を出すフィード(金沢・北陸の事業者を含む)を探し、ライセンスが CC BY なら許可リストに足す。足すまで `nextBuses` は使えない。
 - ODPT(#1691): [公共交通オープンデータセンターの開発者サイト](https://developer.odpt.org/)で開発者登録(運営のアカウント・審査に数日かかることがある)をし、発行された consumer key を Secret Manager の `EXT_ODPT_API_KEY` に入れる。上の「ODPT の事業者と規約」を読み直し、アプリの問い合わせ先(開発者のメールアドレスなど)を決める。路線 id は登録後に `odpt:Railway` で一度確かめる。
