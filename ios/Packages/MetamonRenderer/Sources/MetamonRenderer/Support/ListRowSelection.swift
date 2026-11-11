@@ -84,6 +84,10 @@ struct ListRowMultiSelection: Equatable {
     /// 2 行以上を選んでいるか(まとめての操作にするか)
     var isMultiple: Bool { ids.count > 1 }
 
+    /// 1 行だけ選んでいる時のその行(⌘C・⌫・Return の対象)。
+    /// `cursor` は ⌘ クリックで外した行や消えた行を指すことがあるので、対象は選んでいる行から決める
+    var single: String? { ids.count == 1 ? ids.first : nil }
+
     static func range(from a: String, to b: String, order: [String]) -> [String] {
         guard let i = order.firstIndex(of: a), let j = order.firstIndex(of: b) else { return order.contains(b) ? [b] : [] }
         return Array(order[min(i, j)...max(i, j)])

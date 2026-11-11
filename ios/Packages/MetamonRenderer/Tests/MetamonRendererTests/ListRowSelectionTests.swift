@@ -83,5 +83,18 @@ final class ListRowSelectionTests: XCTestCase {
         s.prune(order: ["a", "d"])
         XCTAssertEqual(s.ids, ["a"])
         XCTAssertNil(s.cursor, "消えた行は起点にしない")
+        XCTAssertEqual(s.single, "a", "残った 1 行は ⌘C・⌫ の対象")
+    }
+
+    /// ⌘ クリックで外した行を ⌘C・⌫・Return の対象にしない(残った 1 行が対象)
+    func testCommandClickDeselectKeepsSelectedRowAsTarget() {
+        var s = ListRowMultiSelection()
+        s.click("a", .plain, order: order)
+        s.click("b", .toggle, order: order)
+        s.click("b", .toggle, order: order)
+        XCTAssertEqual(s.ids, ["a"])
+        XCTAssertEqual(s.single, "a")
+        s.click("a", .toggle, order: order)
+        XCTAssertNil(s.single, "何も選んでいなければ対象は無い")
     }
 }

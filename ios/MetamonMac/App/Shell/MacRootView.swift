@@ -138,9 +138,9 @@ struct MacRootView: View {
             let map = $showsScreenMap, tips = $showsTips
             discardGuard.beforeAsking = { map.wrappedValue = false; tips.wrappedValue = false }
         }
-        .onChange(of: notices.summary == nil) { _, closed in
-            guard closed else { return }
-            // お知らせが写り込んだ時は、閉じて消え終わってから撮り直す
+        .onChange(of: notices.isShowing) { _, showing in
+            guard !showing else { return }
+            // お知らせ(要約・直し方の例)が写り込まないよう、全部閉じて消え終わってから撮り直す
             Task { @MainActor in
                 try? await Task.sleep(for: .seconds(0.4))
                 captureThumbnail()
@@ -221,7 +221,7 @@ struct MacRootView: View {
 
     /// 中央のアプリを撮る。お知らせ・会話のシートが出ている間は撮らない(閉じた後に撮り直す)
     private func captureThumbnail() {
-        guard let app = selectedApp, notices.summary == nil, compose == nil else { return }
+        guard let app = selectedApp, !notices.isShowing, compose == nil else { return }
         let voiceOnly = library.generated[app.id]?.dsl.isVoiceOnly ?? false
         thumbs.capture(appId: app.id, isVoiceOnly: voiceOnly, anchor: thumbAnchor)
     }
@@ -417,12 +417,15 @@ struct MacRootView: View {
 
     private var selectedIndex: Int? { apps.firstIndex { $0.id == selectedAppId } }
 
+    /// サイドバーに見えているアプリの id(検索で絞った後・#1282)。前 / 次のアプリはこの中で移る
+    private var visibleAppIds: [String] { apps.filter { $0.matches(searchText) }.map(\.id) }
+
     private var shellActions: ShellActions {
-        let index = selectedIndex
+        let visible = visibleAppIds
         return ShellActions(
-            hasSelection: index != nil,
-            canSelectPrevious: canSwitchApp && (index ?? 0) > 0,
-            canSelectNext: canSwitchApp && (index.map { $0 + 1 < apps.count } ?? !apps.isEmpty),
+            hasSelection: selectedIndex != nil,
+            canSelectPrevious: canSwitchApp && Self.step(from: selectedAppId, offset: -1, in: visible) != nil,
+            canSelectNext: canSwitchApp && Self.step(from: selectedAppId, offset: 1, in: visible) != nil,
             selectPrevious: { select(offset: -1) },
             selectNext: { select(offset: 1) },
             focusSidebar: {
@@ -468,12 +471,20 @@ struct MacRootView: View {
         return nil
     }
 
-    /// 前 / 次のアプリ。何も選んでいなければ先頭を選ぶ。
+    /// 前 / 次のアプリ。サイドバーに見えている中で移る(検索で隠れたアプリには移らない)。
     private func select(offset: Int) {
-        guard canSwitchApp, !apps.isEmpty else { return }
-        let next = selectedIndex.map { $0 + offset } ?? 0
-        guard apps.indices.contains(next) else { return }
-        switchApp(to: apps[next].id)
+        guard canSwitchApp, let next = Self.step(from: selectedAppId, offset: offset, in: visibleAppIds) else { return }
+        switchApp(to: next)
+    }
+
+    /// `visible` の中で `selected` から `offset` 先の id。端より先は nil。
+    /// 選んでいない(または検索で隠れている)時は、次なら先頭・前なら nil。
+    static func step(from selected: String?, offset: Int, in visible: [String]) -> String? {
+        guard let index = selected.flatMap({ visible.firstIndex(of: $0) }) else {
+            return offset > 0 ? visible.first : nil
+        }
+        let next = index + offset
+        return visible.indices.contains(next) ? visible[next] : nil
     }
 }
 

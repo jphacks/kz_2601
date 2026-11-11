@@ -127,7 +127,8 @@ struct ListLeaf: View {
             .onChange(of: listFocused) { _, focused in
                 if focused && selection.ids.isEmpty { selection.select(ListRowSelection.onFocus(current: selection.cursor, ids: ids)) }
             }
-            .onChange(of: ids) { _, now in selection.prune(order: now) }
+            // 一覧が空になって出し直した時も(行の束は作り直しで、変わった時の知らせが来ない)、もう無い行を選択から外す
+            .onChange(of: ids, initial: true) { _, now in selection.prune(order: now) }
             .confirmationDialog(L("選んだ \(bulkDelete?.count ?? 0) 件を削除しますか?"),
                                 isPresented: Binding(get: { bulkDelete != nil }, set: { if !$0 { bulkDelete = nil } }),
                                 titleVisibility: .visible) {
@@ -258,8 +259,8 @@ struct ListLeaf: View {
         Task { await rt.run(action, ctx.actionContext(recordId: row.id)) }
     }
 
-    /// ⌘C・⌫ の対象: 一覧にフォーカスがある時の選んでいる行
-    private var keyboardRowId: String? { listFocused ? selection.cursor : nil }
+    /// ⌘C・⌫ の対象: 一覧にフォーカスがある時の選んでいる行(⌘ クリックで外した行は対象にしない)
+    private var keyboardRowId: String? { listFocused ? selection.single : nil }
 
     /// 選んでいる行(一覧に見えている順)
     private func selectedRecords(_ rows: [Record]) -> [Record] { rows.filter { selection.ids.contains($0.id) } }
@@ -303,7 +304,7 @@ struct ListLeaf: View {
     /// Return: 選んでいる行を開く(行のクリックと同じ)。入力欄が文字を受けている時は任せる
     private func openSelected(_ rows: [Record]) -> KeyPress.Result {
         guard c.onItemTap != nil, !selection.isMultiple, !ListRowCopyCommand.textInputActive,
-              let row = rows.first(where: { $0.id == selection.cursor }) else { return .ignored }
+              let row = rows.first(where: { $0.id == selection.single }) else { return .ignored }
         open(row)
         return .handled
     }

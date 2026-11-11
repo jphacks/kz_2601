@@ -19,6 +19,19 @@ final class MacPostBuildNoticesTests: XCTestCase {
         XCTAssertNil(notices.active)
     }
 
+    /// 写し(#1281)は、要約が閉じた後に出る直し方の例(#1278)が閉じるまで撮らない
+    func testIsShowingUntilEditHintCloses() {
+        let notices = MacPostBuildNotices()
+        XCTAssertFalse(notices.isShowing)
+        notices.summary = .init(appId: "a", text: "できました", action: nil)
+        notices.showsEditHint = true
+        notices.dismissActive()
+        XCTAssertNil(notices.summary)
+        XCTAssertTrue(notices.isShowing, "要約が閉じても直し方の例が出ている")
+        notices.dismissActive()
+        XCTAssertFalse(notices.isShowing)
+    }
+
     func testEditHintAloneIsActive() {
         let notices = MacPostBuildNotices()
         notices.showsEditHint = true
