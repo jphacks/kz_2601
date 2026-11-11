@@ -15,17 +15,17 @@ import java.util.concurrent.TimeUnit
 /**
  * PDF の本文を端末内で取り出す(#1181・iOS の PDFKit + Vision)。文字の層は PdfBox-Android、スキャンのページは描画して
  * ML Kit の文字認識(日本語・端末内。認識の部品は Play 開発者サービスが落とす)。メモリで読むだけで、保存・送信しない。
- * 重いので main 以外のスレッドで呼ぶ。読めない・暗号化されたものは null。
+ * 重いので main 以外のスレッドで呼ぶ。読めない・開くパスワードが要るものは null。
  */
 object PdfTextReader {
     private const val OCR_TIMEOUT_SECONDS = 30L
 
     fun text(context: Context, bytes: ByteArray): String? {
         PDFBoxResourceLoader.init(context.applicationContext)
-        val doc = runCatching { PDDocument.load(bytes) }.getOrNull() ?: return null
+        val doc = open(bytes) ?: return null
         val recognizer = lazy { TextRecognition.getClient(JapaneseTextRecognizerOptions.Builder().build()) }
         return try {
-            if (doc.isEncrypted) null else PdfText.assemble(Pages(doc) { recognize(recognizer.value, it) })
+            PdfText.assemble(Pages(doc) { recognize(recognizer.value, it) })
         } catch (_: Exception) {
             null
         } finally {
@@ -33,6 +33,12 @@ object PdfTextReader {
             runCatching { doc.close() }
         }
     }
+
+    /**
+     * 空のパスワードで開く(#1319)。印刷・コピーの制限だけの暗号化(開くパスワードが無い)は読む。開くパスワードが要るもの
+     * (iOS の isLocked)・壊れたものは null。標準の暗号(RC4 / AES)は端末の javax.crypto で解くので BouncyCastle は要らない。
+     */
+    internal fun open(bytes: ByteArray): PDDocument? = runCatching { PDDocument.load(bytes, "") }.getOrNull()
 
     /** 認識できない(部品が落とせない・時間切れ)時は空(そのページは飛ばす)。 */
     private fun recognize(recognizer: TextRecognizer, image: InputImage): List<String> =

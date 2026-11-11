@@ -50,7 +50,7 @@ sealed interface ImportProblem {
     /** 当たる列はあるが、足せる行が 1 つも無い(読めない行・上限) */
     data class NothingToAdd(val summary: ImportMessage.Csv) : ImportProblem
     data object EmptyText : ImportProblem
-    /** PDF から文字を 1 つも取り出せない(壊れている・暗号化・文字認識もできない) */
+    /** PDF から文字を 1 つも取り出せない(壊れている・開くパスワードが要る・文字認識もできない) */
     data object PdfUnreadable : ImportProblem
     data object Full : ImportProblem
     /** 録音: この画面・端末では文字にできない */

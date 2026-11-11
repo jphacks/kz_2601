@@ -53,7 +53,8 @@ dependencies {
     implementation(libs.compose.ui.tooling.preview)
     implementation(libs.play.services.code.scanner)
     implementation(libs.zxing.core)
-    // fileImport の PDF(#1181)。暗号化した PDF は読まない(iOS の isLocked と同じく断る)ので BouncyCastle は入れない
+    // fileImport の PDF(#1181)。BouncyCastle は証明書の暗号化だけに使う。開くパスワードの無い暗号化(印刷・コピーの制限)は
+    // javax.crypto で読み、開くパスワードが要るものは断る(iOS の isLocked と同じ・#1319)ので入れない
     implementation(libs.pdfbox.android) { exclude(group = "org.bouncycastle") }
     implementation(libs.play.services.mlkit.text.recognition.japanese)
     debugImplementation(libs.compose.ui.tooling)
