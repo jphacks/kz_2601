@@ -9011,6 +9011,23 @@
         }
       }
     },
+    "貼り付けが許可されませんでした" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Paste wasn't allowed"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "貼り付けが許可されませんでした"
+          }
+        }
+      }
+    },
     "貼り付けられる記録がありません" : {
       "extractionState" : "manual",
       "localizations" : {

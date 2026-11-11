@@ -66,7 +66,7 @@ final class RecordClipboardTests: XCTestCase {
     // MARK: - 対応
 
     func testSameEntityMatchesById() throws {
-        let r = RecordClipboard.paste(try payload(), into: books)
+        let r = RecordClipboard.paste(try payload(), into: books, appId: "reading")
         XCTAssertEqual(r.values["title"], .string("走れメロス"))
         XCTAssertEqual(r.values["pages"], .number(32))
         XCTAssertEqual(r.values["read"], .bool(true))
@@ -87,7 +87,7 @@ final class RecordClipboardTests: XCTestCase {
           {"id":"memo","name":"メモ","type":"text"}
         ]}
         """)
-        let r = RecordClipboard.paste(try payload(), into: club)
+        let r = RecordClipboard.paste(try payload(), into: club, appId: "club")
         XCTAssertEqual(r.values["bookTitle"], .string("走れメロス"), "string → text")
         XCTAssertEqual(r.values["writer"], .string("太宰治"), "名前は前後の空白を無視")
         XCTAssertEqual(r.values["p"], .number(32), "integer → number")
@@ -100,10 +100,6 @@ final class RecordClipboardTests: XCTestCase {
     }
 
     func testCoercionRules() {
-        func field(_ type: String, options: [String]? = nil) -> Field {
-            let opts = options.map { ",\"options\":[\($0.map { "\"\($0)\"" }.joined(separator: ","))]" } ?? ""
-            return try! JSONDecoder().decode(Field.self, from: Data("{\"id\":\"f\",\"name\":\"f\",\"type\":\"\(type)\"\(opts)}".utf8))
-        }
         XCTAssertEqual(RecordClipboard.coerce(.string("12"), from: "string", to: field("integer")), .number(12))
         XCTAssertNil(RecordClipboard.coerce(.string("1.5"), from: "string", to: field("integer")))
         XCTAssertEqual(RecordClipboard.coerce(.number(3), from: "currency", to: field("string")), .string("3"))
@@ -124,7 +120,7 @@ final class RecordClipboardTests: XCTestCase {
             .init(id: "a", name: "名前", type: "string", value: .string("一")),
             .init(id: "b", name: "名前", type: "string", value: .string("二")),
         ])
-        let r = RecordClipboard.paste(p, into: target)
+        let r = RecordClipboard.paste(p, into: target, appId: "t")
         XCTAssertEqual(r.values, ["name": .string("一")])
         XCTAssertEqual(r.unmatched, ["名前"])
     }
@@ -134,9 +130,99 @@ final class RecordClipboardTests: XCTestCase {
         {"id":"t","name":"t","fields":[{"id":"title","name":"題名","type":"string","encrypted":true},
          {"id":"author","name":"著者","type":"string","hidden":true}]}
         """)
-        let r = RecordClipboard.paste(try payload(), into: target)
+        let r = RecordClipboard.paste(try payload(), into: target, appId: "t")
         XCTAssertTrue(r.values.isEmpty)
         XCTAssertTrue(r.matched.isEmpty)
+    }
+
+    private func field(_ type: String, options: [String]? = nil) -> Field {
+        let opts = options.map { ",\"options\":[\($0.map { "\"\($0)\"" }.joined(separator: ","))]" } ?? ""
+        return try! JSONDecoder().decode(Field.self, from: Data("{\"id\":\"f\",\"name\":\"f\",\"type\":\"\(type)\"\(opts)}".utf8))
+    }
+
+    func testOtherAppWithSameEntityIdMatchesByNameNotId() throws {
+        // 別のアプリにたまたま同じ entity id・field id がある。id では合わせない
+        let other = try entity("""
+        {"id":"books","name":"本","fields":[
+          {"id":"title","name":"著者","type":"string"},
+          {"id":"author","name":"題名","type":"string"}
+        ]}
+        """)
+        let r = RecordClipboard.paste(try payload(), into: other, appId: "another")
+        XCTAssertEqual(r.values["title"], .string("太宰治"), "名前で合わせる")
+        XCTAssertEqual(r.values["author"], .string("走れメロス"))
+        let same = RecordClipboard.paste(try payload(), into: other, appId: "reading")
+        XCTAssertEqual(same.values["title"], .string("走れメロス"), "同じアプリなら id で合わせる")
+    }
+
+    func testAdminOnlyTargetsNeedAdmin() throws {
+        let target = try entity("""
+        {"id":"t","name":"t","fields":[{"id":"title","name":"題名","type":"string","editableBy":"admins"},
+         {"id":"author","name":"著者","type":"string"}]}
+        """)
+        let member = RecordClipboard.paste(try payload(), into: target, appId: "t")
+        XCTAssertNil(member.values["title"], "管理者でなければ管理者だけの項目には入れない")
+        XCTAssertEqual(member.values["author"], .string("太宰治"))
+        XCTAssertEqual(member.unmatched.first, "題名")
+        let admin = RecordClipboard.paste(try payload(), into: target, appId: "t", isAdmin: true)
+        XCTAssertEqual(admin.values["title"], .string("走れメロス"))
+    }
+
+    func testCurrencyIsIntegerAndBounded() {
+        XCTAssertEqual(RecordClipboard.coerce(.number(4.5), from: "number", to: field("currency")), .number(5), "currency は四捨五入")
+        XCTAssertEqual(RecordClipboard.coerce(.string("1200.4"), from: "string", to: field("currency")), .number(1200))
+        XCTAssertEqual(RecordClipboard.coerce(.number(-2.5), from: "number", to: field("currency")), .number(-3))
+        XCTAssertNil(RecordClipboard.coerce(.number(1e19), from: "number", to: field("currency")), "サーバーの上限を超える")
+        XCTAssertNil(RecordClipboard.coerce(.number(-1e19), from: "number", to: field("integer")))
+        XCTAssertEqual(RecordClipboard.coerce(.number(4e18), from: "number", to: field("integer")), .number(4e18))
+        XCTAssertEqual(RecordClipboard.coerce(.number(1e19), from: "number", to: field("number")), .number(1e19), "number に上限は無い")
+    }
+
+    func testTextOverCharacterLimitIsUnmatched() throws {
+        let long = String(repeating: "あ", count: 4001)
+        XCTAssertNil(RecordClipboard.coerce(.string(long), from: "text", to: field("string")))
+        XCTAssertEqual(RecordClipboard.coerce(.string(long), from: "text", to: field("text")), .string(long), "text は 20000 文字まで")
+        XCTAssertNil(RecordClipboard.coerce(.string(String(repeating: "a", count: 20001)), from: "text", to: field("text")))
+        let target = try entity("""
+        {"id":"t","name":"t","fields":[{"id":"title","name":"題名","type":"string"}]}
+        """)
+        let p = RecordClipboard.Payload(appId: "a", appName: "A", entityId: "s", entityName: "s",
+                                        fields: [.init(id: "x", name: "題名", type: "text", value: .string(long))])
+        let r = RecordClipboard.paste(p, into: target, appId: "t")
+        XCTAssertTrue(r.values.isEmpty)
+        XCTAssertEqual(r.unmatched, ["題名"])
+    }
+
+    func testDatesAreValidatedAndReencoded() {
+        XCTAssertEqual(RecordClipboard.coerce(.string("2026-11-01"), from: "date", to: field("date")), .string("2026-11-01"))
+        XCTAssertEqual(RecordClipboard.coerce(.string("2026-1-5"), from: "date", to: field("date")), .string("2026-01-05"))
+        XCTAssertNil(RecordClipboard.coerce(.string("2026-02-30"), from: "date", to: field("date")), "あり得ない日")
+        XCTAssertNil(RecordClipboard.coerce(.string("きのう"), from: "date", to: field("date")))
+        XCTAssertEqual(RecordClipboard.coerce(.string("2026-11-01T03:00:00Z"), from: "datetime", to: field("datetime")),
+                       .string("2026-11-01T03:00:00Z"))
+        XCTAssertNil(RecordClipboard.coerce(.string("2026-11-01T25:00:00Z"), from: "datetime", to: field("datetime")))
+        XCTAssertNil(RecordClipboard.coerce(.string("not a date"), from: "datetime", to: field("datetime")))
+    }
+
+    func testDatetimeWithFractionalSecondsIsAccepted() throws {
+        let day = FieldCoding.dateFormatter.string(from: try XCTUnwrap(FieldCoding.date(from: .string("2026-11-01T03:00:00Z"))))
+        XCTAssertEqual(RecordClipboard.coerce(.string("2026-11-01T03:00:00.123Z"), from: "datetime", to: field("date")), .string(day))
+        XCTAssertNotNil(RecordClipboard.coerce(.string("2026-11-01T03:00:00.123Z"), from: "datetime", to: field("datetime")))
+    }
+
+    func testLocationIsValidated() {
+        XCTAssertEqual(RecordClipboard.coerce(.string("35.68, 139.76"), from: "location", to: field("location")), .string("35.68,139.76"))
+        XCTAssertNil(RecordClipboard.coerce(.string("91,0"), from: "location", to: field("location")), "緯度は 90 まで")
+        XCTAssertNil(RecordClipboard.coerce(.string("0,181"), from: "location", to: field("location")), "経度は 180 まで")
+        XCTAssertNil(RecordClipboard.coerce(.string("東京"), from: "location", to: field("location")))
+        XCTAssertNil(RecordClipboard.coerce(.string("1,2,3"), from: "location", to: field("location")))
+    }
+
+    @MainActor
+    func testUnreadableMessageTellsDeniedFromEmpty() {
+        XCTAssertEqual(RecordPasteboard.unreadableMessage(hasRecord: true), L("貼り付けが許可されませんでした"))
+        XCTAssertEqual(RecordPasteboard.unreadableMessage(hasRecord: false), L("貼り付けられる記録がありません"))
+        XCTAssertNotEqual(RecordPasteboard.unreadableMessage(hasRecord: true), RecordPasteboard.unreadableMessage(hasRecord: false))
     }
 
     @MainActor

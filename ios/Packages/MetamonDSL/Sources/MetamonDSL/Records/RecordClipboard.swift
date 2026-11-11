@@ -4,7 +4,8 @@ import Foundation
 ///
 /// - コピー: 載せる項目は保存フィールドのうち、hidden・暗号化・端末のファイル(photo / video / audio)・
 ///   アプリが違うと意味を持たない参照(ref / refs / member / members)以外。null・型の合わない値も載せない
-/// - 貼り付け: 1. 同じ entity id で field の id と型が合う → 2. 名前が同じで型が変換できる。合わないものは捨てる
+/// - 貼り付け: 1. 同じアプリの同じ entity で field の id と型が合う → 2. 名前が同じで型が変換できる。合わないものは捨てる。
+///   管理者でなければ管理者だけの項目には入れない。値はサーバーと同じ規則(整数・文字数・日付・位置)で確かめる
 public enum RecordClipboard {
     public static let version = 1
     /// クリップボードに載せる独自の型(Info.plist の UTExportedTypeDeclarations と一致させる)。
@@ -120,11 +121,12 @@ public enum RecordClipboard {
 
     // MARK: - 貼り付け
 
-    /// 貼る先の entity に入れる値を決める。同じ entity なら id で、それ以外は名前(前後の空白・大文字小文字を無視)で合わせる。
-    /// 貼る先の 1 つの field には 1 回だけ入れる。
-    public static func paste(_ payload: Payload, into entity: Entity) -> PasteResult {
-        let targets = copyableFields(of: entity)
-        let sameEntity = payload.entityId == entity.id
+    /// 貼る先の entity に入れる値を決める。同じアプリ(`appId`)の同じ entity なら id で、それ以外は名前
+    /// (前後の空白・大文字小文字を無視)で合わせる。貼る先の 1 つの field には 1 回だけ入れる。
+    /// `isAdmin` が true でなければ管理者だけの項目(`isAdminOnly`)には入れない。
+    public static func paste(_ payload: Payload, into entity: Entity, appId: String, isAdmin: Bool = false) -> PasteResult {
+        let targets = copyableFields(of: entity).filter { isAdmin || !$0.isAdminOnly }
+        let sameEntity = payload.appId == appId && payload.entityId == entity.id
         var used: Set<String> = []
         var values: [String: JSONValue] = [:]
         var unmatched: [String] = []
@@ -151,15 +153,17 @@ public enum RecordClipboard {
     }
 
     /// コピー元の値を貼る先の field の型に変える。変えられなければ nil。
-    /// 文字(string ↔ text・enum → 文字)、数(integer → number / currency、整数の number → integer、数字だけの文字 → 数)、
-    /// 選択肢(選べる値だけ)、日時 → 日付、同じ型どうし。
+    /// 文字(string ↔ text・enum → 文字。文字数は `RecordImport.characterLimit` まで)、
+    /// 数(integer → number / currency、整数の number → integer、currency は四捨五入、数字だけの文字 → 数。
+    /// integer / currency は絶対値が Int64.max / 2 まで)、選択肢(選べる値だけ)、日付・日時(読めるものを書き直す・日時 → 日付)、
+    /// 位置(緯度 90・経度 180 まで)、同じ型どうし。
     public static func coerce(_ value: JSONValue, from sourceType: String, to target: Field) -> JSONValue? {
         guard let src = FieldType(rawValue: sourceType), !excludedTypes.contains(src), NearbyShare.accepts(value, src) else { return nil }
         let t = target.type
         switch (src, value) {
         case (_, .string(let s)) where src == .string || src == .text || src == .enum:
             switch t {
-            case .string, .text: return value
+            case .string, .text: return s.unicodeScalars.count > RecordImport.characterLimit(target) ? JSONValue?.none : value
             case .enum: return (target.options ?? []).contains(s) ? value : JSONValue?.none
             case .integer, .number, .currency:
                 guard let n = Double(s.trimmingCharacters(in: .whitespaces)), n.isFinite else { return nil }
@@ -173,18 +177,43 @@ public enum RecordClipboard {
             default: return nil
             }
         case (.boolean, .bool): return t == .boolean ? value : JSONValue?.none
-        case (.date, .string): return t == .date ? value : JSONValue?.none
-        case (.datetime, .string(let s)):
-            if t == .datetime { return value }
-            guard t == .date, let d = FieldCoding.datetimeFormatter.date(from: s) else { return nil }
-            return .string(FieldCoding.dateFormatter.string(from: d))
-        case (.location, .string): return t == .location ? value : JSONValue?.none
+        case (.date, .string):
+            guard t == .date, let d = FieldCoding.date(from: value) else { return nil }
+            return .string(FieldCoding.encode(d, for: target))
+        case (.datetime, .string):
+            guard t == .datetime || t == .date, let d = FieldCoding.date(from: value) else { return nil }
+            return .string(FieldCoding.encode(d, for: target))
+        case (.location, .string(let s)):
+            guard t == .location else { return nil }
+            return location(s).map { .string($0) }
         default: return nil
         }
     }
 
+    /// 整数で持つ型(integer・currency)の上限。サーバー(appconfig の RecordData)と同じ。
+    static let maxInteger = Double(Int64.max / 2)
+
+    /// integer は小数を断り、currency は CSV の読み込み(`RecordImport`)と同じく四捨五入する。どちらも上限を超えたら断る。
     private static func numeric(_ n: Double, to t: FieldType) -> JSONValue? {
-        if t == .integer, n.rounded() != n { return nil }
-        return .number(n)
+        guard n.isFinite else { return nil }
+        switch t {
+        case .integer:
+            guard n.rounded() == n, abs(n) <= maxInteger else { return nil }
+            return .number(n)
+        case .currency:
+            let r = n.rounded()
+            guard abs(r) <= maxInteger else { return nil }
+            return .number(r)
+        default:
+            return .number(n)
+        }
+    }
+
+    /// "lat,lng"(緯度 90・経度 180 まで)。空白を外して返す。読めなければ nil。`RecordImport` と同じ規則。
+    private static func location(_ s: String) -> String? {
+        let parts = s.split(separator: ",", omittingEmptySubsequences: false).map { Double($0.trimmingCharacters(in: .whitespaces)) }
+        guard parts.count == 2, let lat = parts[0], let lng = parts[1], lat.isFinite, lng.isFinite,
+              abs(lat) <= 90, abs(lng) <= 180 else { return nil }
+        return s.replacingOccurrences(of: " ", with: "")
     }
 }
