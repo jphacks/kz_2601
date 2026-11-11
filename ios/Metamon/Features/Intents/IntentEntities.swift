@@ -80,7 +80,7 @@ struct RecordTargetEntity: AppEntity {
     @MainActor
     static func all(limit: Int = 12) async -> [RecordTargetEntity] {
         var out: [RecordTargetEntity] = []
-        for app in await IntentHost.shared.apps().prefix(limit) {
+        for app in await IntentHost.shared.recordableApps().prefix(limit) {
             guard let doc = await IntentHost.shared.document(appId: app.id) else { continue }
             let entities = QuickRecord.recordableEntities(in: doc.dsl)
             out += entities.map { RecordTargetEntity(app: app, entity: $0, showsEntity: entities.count > 1) }

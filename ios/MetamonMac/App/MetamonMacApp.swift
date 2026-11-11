@@ -15,20 +15,25 @@ struct MetamonMacApp: App {
     @State private var voice = MacVoiceInput()
     /// 作ったアプリの一覧(#969)。端末に残すのでウインドウをまたいで 1 つだけ持つ
     /// サインインしたらサーバーの自分のアプリも混ぜる(#1057)。前回のサーバーの一覧(`AppListCache`)を起動直後に出す
-    @State private var library = MacAppLibrary(defaults: .standard, server: MacServices.shared.appConfig, serverCache: .shared)
+    @State private var library: MacAppLibrary
 
     init() {
+        let library = MacAppLibrary(defaults: .standard, server: MacServices.shared.appConfig, serverCache: .shared)
+        _library = State(initialValue: library)
         // Firebase は接続(MacServices)を組み立てる前に初期化(plist が無ければ何もせず、ログインと AI はモック・#930)
         MacFirebase.bootstrap()
         Task { await MacAccount.shared.start() } // 未ログインなら匿名でログインし、状態の変化を追う
         MacNotificationDelegate.install() // 前面でも通知を出す・押されたらそのアプリを開く(#965)
         MacRecordResend.shared.install() // 記録の送信待ちを前面・スリープ明け・回線の復帰・一定間隔で送り直す(#976)
+        // ショートカット・Siri・Spotlight(App Intents・#1034)。記録の追加はウインドウを開かずに来るので、一覧は起動の最初に渡す
+        IntentHost.shared.register(library: library, bundled: apps)
         // UI テスト・手元の確認用(DEBUG のみ・iOS と同じ環境変数): METAMON_AI_CONSENT / METAMON_TUTORIAL / METAMON_BETA_WELCOME(#971)
         AIConsentDebug.applyLaunchOverride()
         FirstRunTutorialStore.shared.applyLaunchOverride()
         #if !APP_STORE_REVIEW
         BetaWelcomeStore.shared.applyLaunchOverride()
         MacAIButtonMetrics.install() // 前の日までの AI ボタンの集計を、起動・前面に戻った時に送る(#446・#1327)
+        MacPushHost.shared.install(services: MacServices.shared) // プッシュの端末の登録(#982)
         #endif
         // 記録の一時フォルダ(MacAppRuntime.mockRecordSync)と共有に渡した書き出しの写し(#946)を起動時(前回の残り)と終了時に片付ける
         MacAppRuntime.removePreviewDirectories()
@@ -80,6 +85,7 @@ struct MetamonMacApp: App {
                 .environment(library)
                 #if !APP_STORE_REVIEW
                 .modifier(MacLinkReceiver())
+                .modifier(MacPushRegistrationObserver()) // プッシュの端末の登録(#982)
                 #endif
                 .modifier(MacCrashReportUser())
                 .task { MacAccount.shared.wipe.library = library } // サインアウト・削除で一覧も空にする(#972)

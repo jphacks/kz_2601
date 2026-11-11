@@ -172,6 +172,8 @@ struct MacRootView: View {
         .frame(minWidth: Self.minWindowSize.width, minHeight: Self.minWindowSize.height)
         .focusedSceneValue(\.shellActions, shellActions)
         .macNotificationRouting(selection: notificationSelection, appIds: apps.map(\.id)) // 押された通知のアプリを開く(#965)。入力中なら確認を通す・シートの間は閉じるまで待つ(#943)
+        .macIntentRouting(selection: notificationSelection, appIds: apps.map(\.id), talk: speak) // ショートカット・Siri の「開く / 話しかける」(#1034)
+        .onChange(of: apps.map(\.name)) { IntentHost.shared.appsMayHaveChanged() } // Siri のフレーズのアプリ名を引き直す(#1034)
         .background { WindowCloseGuard(discardGuard: discardGuard) } // ⌘W・閉じるボタン(#943)
         .background { if let windowApp { WindowFrameAutosave(name: MacAppWindows.frameAutosaveName(windowApp)) } } // #1853
         .modifier(MacUpdateGateModifier(gate: updateGate)) // 古い版は閉じられない更新のシート(#981)
@@ -316,6 +318,10 @@ struct MacRootView: View {
         guard MacAccount.shared.session.user != nil else { return }
         await library.refreshServerApps()
         reopenLastApp() // 前に開いていたサーバーのアプリが一覧に載ったら開き直す
+        // 待っていた通知のアプリを開く。取り直しても無ければ諦める
+        if let id = MacNotificationRouter.shared.resolve(among: apps.map(\.id), listRefreshed: true) {
+            notificationSelection.wrappedValue = id
+        }
     }
 
     /// 起動時: ウインドウが覚えている選択(SceneStorage)が無い・もう無いアプリなら、前に開いていたアプリを開き直す

@@ -213,6 +213,15 @@ final class MacNotificationDelegate: NSObject, UNUserNotificationCenterDelegate 
         _ center: UNUserNotificationCenter, didReceive response: UNNotificationResponse
     ) async {
         let id = response.notification.request.identifier
+        #if !APP_STORE_REVIEW
+        // プッシュ(#982): 本文の appId のアプリを開く。ローカル通知には appId が無いので下の識別子で開く
+        if response.actionIdentifier == UNNotificationDefaultActionIdentifier,
+           let appId = PushPayload.appId(from: response.notification.request.content.userInfo) {
+            await MainActor.run { NSApp.activate() }
+            await MacPushHost.shared.open(appId: appId)
+            return
+        }
+        #endif
         await MainActor.run {
             NSApp.activate()
             MacNotificationRouter.shared.open(notificationId: id)
@@ -225,13 +234,59 @@ final class MacNotificationDelegate: NSObject, UNUserNotificationCenterDelegate 
 @Observable
 final class MacNotificationRouter {
     static let shared = MacNotificationRouter()
-    private(set) var pending: String?
+    private(set) var pending: Route?
 
-    func open(notificationId: String) { pending = notificationId }
+    /// 押された通知の行き先
+    enum Route: Equatable {
+        /// ローカル通知の識別子(`dsl.` / `when.` / `timer.` + appId・#965)
+        case notification(String)
+        /// プッシュの本文の appId(#982)
+        case app(String)
 
-    func take() -> String? {
+        /// 一覧で選ぶアプリ。一覧に無ければ nil(前に出すだけ)
+        func appId(among ids: [String]) -> String? {
+            switch self {
+            case .notification(let id): NotificationAppRoute.appId(for: id, among: ids)
+            case .app(let id): ids.contains(id) ? id : nil
+            }
+        }
+    }
+
+    /// プッシュのアプリが一覧に載るのを待つ長さ。過ぎたら諦める(後から急に開かない)
+    static let appRouteLifetime: TimeInterval = 30
+    @ObservationIgnored var now: () -> Date = Date.init
+    @ObservationIgnored private var pendingSince = Date.distantPast
+
+    func open(notificationId: String) { set(.notification(notificationId)) }
+
+    func open(appId: String) { set(.app(appId)) }
+
+    private func set(_ route: Route) {
+        pendingSince = now()
+        pending = route
+    }
+
+    func take() -> Route? {
         defer { pending = nil }
         return pending
+    }
+
+    /// 一覧で選ぶアプリ。決まったら(または諦めたら)行き先を消す。
+    /// プッシュのアプリが一覧にまだ無い時(起動直後でサーバーの一覧が載る前)は残して待つ。
+    /// サーバーの一覧を取り直し終えた(`listRefreshed`)・待つ長さを過ぎた時は諦める
+    func resolve(among ids: [String], listRefreshed: Bool = false) -> String? {
+        guard let route = pending else { return nil }
+        if case .app = route, now().timeIntervalSince(pendingSince) >= Self.appRouteLifetime {
+            pending = nil // 古い行き先は一覧に載っても開かない
+            return nil
+        }
+        if let id = route.appId(among: ids) {
+            pending = nil
+            return id
+        }
+        if case .app = route, !listRefreshed { return nil }
+        pending = nil
+        return nil
     }
 }
 
@@ -256,11 +311,11 @@ private struct MacNotificationRouting: ViewModifier {
         content
             .onAppear(perform: route)
             .onChange(of: router.pending) { route() }
+            .onChange(of: appIds) { route() } // 起動直後: 一覧が載ってからプッシュのアプリを開く
     }
 
     private func route() {
-        guard let id = router.take() else { return }
-        if let appId = NotificationAppRoute.appId(for: id, among: appIds) { selection = appId }
+        if let appId = router.resolve(among: appIds) { selection = appId }
     }
 }
 
