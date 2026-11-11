@@ -1,4 +1,5 @@
 import AuthenticationServices
+import UIKit
 import XCTest
 import MetamonDSL
 import MetamonRenderer
@@ -69,7 +70,7 @@ final class ConnectedServicesTests: XCTestCase {
     func testOldServerShowsOnlyConnected() {
         let list = ExtConnectionList(connections: [ExtConnection(provider: "todoist", status: .error)], providers: nil)
         XCTAssertEqual(ConnectedServicesState.from(.success(list), english: false),
-                       .loaded([ConnectedServiceRow(provider: "todoist", name: "todoist", status: .needsReconnect, enabled: true)]))
+                       .loaded([ConnectedServiceRow(provider: "todoist", name: "Todoist", status: .needsReconnect, enabled: true)]))
         XCTAssertEqual(ConnectedServicesState.from(.success(ExtConnectionList(connections: [], providers: nil)), english: false), .loaded([]))
     }
 
@@ -117,13 +118,40 @@ final class ConnectedServicesTests: XCTestCase {
     func testSupportedFeaturesForThisScreen() {
         XCTAssertEqual(ConnectedServicesFeatures.list(reviewBuild: true, debug: true), [])
         XCTAssertEqual(ConnectedServicesFeatures.list(reviewBuild: false, debug: false),
-                       ["externalCall.googleCalendar", "externalCall.todoist", "externalCall.outlookCalendar", "externalCall.notion"])
+                       ["externalCall.googleCalendar", "externalCall.todoist", "externalCall.outlookCalendar", "externalCall.notion",
+                        "externalCall.googleTasks", "externalCall.github", "externalCall.linear", "externalCall.asana"])
         XCTAssertEqual(ConnectedServicesFeatures.list(reviewBuild: false, debug: true).last, "externalCall.fakeOauth")
         #if DEBUG
         XCTAssertTrue(ConnectedServicesFeatures.current.contains("externalCall.fakeOauth"))
         #endif
         // generate に送る一覧には足さない(外を呼ぶ DSL の部品はまだ無い)
         XCTAssertFalse(ClientCapabilities.supportedFeatures.contains { $0.hasPrefix("externalCall.") })
+    }
+
+    /// サーバーの名前が無い時は端末の名前(ja/en)。知らない provider は id のまま・アイコンは汎用。
+    func testCatalogNamesAndSymbols() {
+        for id in ConnectedServicesFeatures.providers {
+            XCTAssertNotEqual(ConnectedServiceCatalog.name(id, english: false), id, id)
+            XCTAssertNotEqual(ConnectedServiceCatalog.name(id, english: true), id, id)
+            XCTAssertNotEqual(ConnectedServiceCatalog.symbol(id), ConnectedServiceCatalog.fallbackSymbol, id)
+            XCTAssertNotNil(UIImage(systemName: ConnectedServiceCatalog.symbol(id)), id)
+        }
+        XCTAssertEqual(ConnectedServiceCatalog.name("googleTasks", english: false), "Google ToDo リスト")
+        XCTAssertEqual(ConnectedServiceCatalog.name("googleTasks", english: true), "Google Tasks")
+        XCTAssertEqual(ConnectedServiceCatalog.name("github", english: true), "GitHub")
+        XCTAssertEqual(ConnectedServiceCatalog.name("someNew", english: false), "someNew")
+        XCTAssertEqual(ConnectedServiceCatalog.symbol("someNew"), ConnectedServiceCatalog.fallbackSymbol)
+        XCTAssertNotNil(UIImage(systemName: ConnectedServiceCatalog.fallbackSymbol))
+    }
+
+    /// サーバーの名前が空の新しい provider は端末の名前で出す。サーバーの名前があればそちら。
+    func testNewProvidersRowNames() {
+        let list = ExtConnectionList(connections: [ExtConnection(provider: "linear", status: .active)],
+                                     providers: [ExtProvider(id: "linear", nameJa: "", nameEn: ""),
+                                                 ExtProvider(id: "asana", nameJa: "アサナ", nameEn: "Asana!"),
+                                                 ExtProvider(id: "someNew", nameJa: "", nameEn: "")])
+        XCTAssertEqual(ConnectedServicesState.rows(list, english: false).map(\.name), ["Linear", "アサナ", "someNew"])
+        XCTAssertEqual(ConnectedServicesState.rows(list, english: true).map(\.name), ["Linear", "Asana!", "someNew"])
     }
 
     func testLoadSendsSupportedFeatures() async {
