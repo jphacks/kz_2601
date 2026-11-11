@@ -111,6 +111,8 @@ fun SettingsSheet(
             // 今日の残り(#630)。AI を使うまでは「AI を使うと表示されます」
             RemainingTodaySection(remainingToday, isPro)
             HorizontalDivider(Modifier.padding(vertical = 8.dp))
+            // Tailor It Pro(iOS の ProSettingsSection)。課金画面は本体の PaywallHost が上に重ねる
+            jp.kz2601.metamon.purchase.ProSettingsSection(container.pro, serverPro = isPro)
             UsageSection(container, myUsage, isPro) // 使っている量(#317・iOS と同じく「今日の残り」の次)
             HorizontalDivider(Modifier.padding(vertical = 8.dp))
             var language by remember { mutableStateOf(AppLocales.setting(context)) }
