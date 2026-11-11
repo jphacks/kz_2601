@@ -96,7 +96,30 @@ func (m *Memory) ConfirmAge(_ context.Context, uid string) error {
 		m.ageOK = map[string]time.Time{}
 	}
 	m.ageOK[uid] = m.now().UTC()
+	for _, p := range m.public {
+		if p.app == nil {
+			continue
+		}
+		for _, r := range p.records[profileEntityID(p.app.DSL)] {
+			if r.Author == uid {
+				r.OwnerAgeConfirmed = true
+			}
+		}
+	}
 	return nil
+}
+
+// AgeConfirmedAmong implements Matching.
+func (m *Memory) AgeConfirmedAmong(_ context.Context, uids []string) (map[string]bool, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	out := map[string]bool{}
+	for _, u := range uids {
+		if _, ok := m.ageOK[u]; ok {
+			out[u] = true
+		}
+	}
+	return out, nil
 }
 
 // AgeConfirmed implements Matching.

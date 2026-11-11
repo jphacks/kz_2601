@@ -151,11 +151,11 @@ func (h *Handler) reportTarget(r *http.Request, kind, id, appID, entityID, recor
 		if !canRead(nil, rec, uidOf(r)) { // #271: an addressed record the caller cannot read
 			return "", "", recordNotFound()
 		}
-		ok, err := h.sharedFilter(r, appID, entityID, []string{rec.Author})
+		ok, err := h.sharedFilter(r, appID, entityID, []store.Record{*rec})
 		if err != nil {
 			return "", "", err
 		}
-		if !ok(rec.Author) { // blocked either way / matched-only (#507)
+		if !ok(rec) { // blocked either way / matched-only (#507)
 			return "", "", recordNotFound()
 		}
 		return appID + "/" + entityID + "/" + recordID, rec.Author, nil
