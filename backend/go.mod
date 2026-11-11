@@ -11,6 +11,7 @@ require (
 	firebase.google.com/go/v4 v4.22.0
 	github.com/evanphx/json-patch/v5 v5.9.11
 	github.com/livekit/protocol v1.52.1
+	github.com/twitchtv/twirp v8.1.3+incompatible
 	google.golang.org/api v0.311.0
 	google.golang.org/grpc v1.85.0
 )
@@ -88,7 +89,6 @@ require (
 	github.com/prometheus/procfs v0.21.1 // indirect
 	github.com/puzpuzpuz/xsync/v4 v4.5.0 // indirect
 	github.com/spiffe/go-spiffe/v2 v2.8.1 // indirect
-	github.com/twitchtv/twirp v8.1.3+incompatible // indirect
 	github.com/wlynxg/anet v0.0.5 // indirect
 	github.com/zeebo/xxh3 v1.1.0 // indirect
 	go.opentelemetry.io/auto/sdk v1.2.1 // indirect

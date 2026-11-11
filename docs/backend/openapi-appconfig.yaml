@@ -2157,7 +2157,7 @@ components:
         room: { type: string, example: 'app:app_01HXYZ' }
         identity: { type: string, description: 'LiveKit の participant identity(= sessionId)' }
         sessionId: { type: string, description: '続けて話す時にもう一度送る' }
-        expiresAt: { type: string, format: date-time, description: 'このトークンで入れる期限' }
+        expiresAt: { type: string, format: date-time, description: 'このトークンで入れる期限(`CALL_TOKEN_TTL` と押さえた分の終わりの短い方)' }
         video: { type: boolean, description: 'カメラを出してよい' }
         blockMinutes: { type: integer, description: '1 回で押さえる分(`CALL_BLOCK_MINUTES`)' }
         reservedUntil: { type: string, format: date-time, description: 'この時刻の前に sessionId でもう一度呼ぶ' }
