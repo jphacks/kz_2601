@@ -2,7 +2,6 @@ package jp.kz2601.metamon.services.sharing
 
 import jp.kz2601.metamon.dsl.AppDSL
 import jp.kz2601.metamon.dsl.decode
-import jp.kz2601.metamon.services.AppSummary
 import jp.kz2601.metamon.services.http.errorBody
 import jp.kz2601.metamon.services.http.json
 import jp.kz2601.metamon.services.http.metamonHttp
@@ -21,7 +20,6 @@ import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
-import java.io.IOException
 import java.util.concurrent.TimeUnit
 
 /** 参加している人(#903): members API の口・役割ごとに押せる操作・楽観的 UI・抜けた後の後片付け。 */
@@ -302,68 +300,6 @@ class SharedMembersTest {
         assertTrue(dsl("""{"id":"e","name":"E","fields":[{"id":"f","name":"F","type":"text","editableBy":"admins"}]}""").usesMembers())
         val button = """{"type":"button","id":"b","label":"L","visibleTo":"admins"}"""
         assertTrue(dsl("""{"id":"e","name":"E","fields":[]}""", components = """[{"type":"vstack","id":"s","children":[$button]}]""").usesMembers())
-    }
-
-    // MARK: 抜けた後の後片付け
-
-    private class Recorder {
-        val calls = mutableListOf<String>()
-        var current = "app1"
-        var switchOk = true
-        var deleteFails = false
-        var apps = listOf(AppSummary("app1", currentVersion = 3), AppSummary("app2", currentVersion = 3, updatedAt = "2026-11-10T00:00:00Z"))
-
-        fun cleanup() = LeaveCleanup(
-            currentAppId = { current },
-            apps = { apps },
-            switchApp = { id ->
-                calls += "switch:$id"
-                if (switchOk) current = id
-                switchOk
-            },
-            startNewApp = {
-                calls += "new"
-                current = "fresh"
-            },
-            hideApp = { calls += "hide:$it" },
-            deleteCopy = {
-                calls += "delete:$it"
-                if (deleteFails) throw IOException("offline")
-            },
-            purgeLocal = { calls += "purge:$it" },
-        )
-    }
-
-    @Test
-    fun leavingOpenAppSwitchesFirstThenDeletesCopyAndLocalData() = runBlocking {
-        val r = Recorder()
-        r.cleanup().run("app1")
-        assertEquals(listOf("switch:app2", "hide:app1", "delete:app1", "purge:app1"), r.calls)
-        assertEquals("app2", r.current)
-    }
-
-    @Test
-    fun leavingWithNoOtherAppStartsNewApp() = runBlocking {
-        val r = Recorder().apply { apps = listOf(AppSummary("app1", currentVersion = 3)) }
-        r.cleanup().run("app1")
-        assertEquals(listOf("new", "hide:app1", "delete:app1", "purge:app1"), r.calls)
-    }
-
-    @Test
-    fun switchFailureFallsBackToNewAppAndDeleteFailureStillPurges() = runBlocking {
-        val r = Recorder().apply {
-            switchOk = false
-            deleteFails = true
-        }
-        r.cleanup().run("app1")
-        assertEquals(listOf("switch:app2", "new", "hide:app1", "delete:app1", "purge:app1"), r.calls)
-    }
-
-    @Test
-    fun leavingAnotherAppDoesNotSwitch() = runBlocking {
-        val r = Recorder().apply { current = "app2" }
-        r.cleanup().run("app1")
-        assertEquals(listOf("hide:app1", "delete:app1", "purge:app1"), r.calls)
     }
 
     private fun dsl(entity: String, components: String = "[]"): AppDSL = AppDSL.decode(

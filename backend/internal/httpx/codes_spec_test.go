@@ -17,8 +17,8 @@ import (
 // count for both. A package that writes an error code must be listed here.
 var (
 	sharedCodePkgs    = []string{"internal/appcheck", "internal/auth", "internal/httpx", "internal/ratelimit"}
-	appconfigCodePkgs = []string{"cmd/appconfig", "internal/appconfig", "internal/entitlement"}
-	aiCodePkgs        = []string{"cmd/ai", "internal/ai", "internal/appconfigclient", "internal/budget"}
+	appconfigCodePkgs = []string{"cmd/appconfig", "internal/appconfig", "internal/calls", "internal/coins", "internal/coins/coinsapi", "internal/entitlement"}
+	aiCodePkgs        = []string{"cmd/ai", "internal/ai", "internal/appconfigclient", "internal/budget", "internal/coins"}
 )
 
 // aiRelayedCodes are appconfig codes the ai passes through unchanged from the
@@ -26,6 +26,7 @@ var (
 var aiRelayedCodes = []string{
 	CodeAccountDeleted,
 	CodeAppCheckFailed,
+	CodeAppLimitReached,
 	CodeBadRequest,
 	CodeForbidden,
 	CodeInternal,

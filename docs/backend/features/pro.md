@@ -24,6 +24,7 @@
 | `sharedData` | みんなで共有するデータ(entity.scope shared / public・apps_public の同期) | 保存(`save`)・共有のレコードの書き込み | `dslEntityScopes: [shared, public]` |
 | `serverRules` | サーバーの自動の動き(serverRules・通知・定期処理・数える / 記録する) | 保存(`save`)・runner の実行 | `dslServerRules: true`(serverRules が 1 本以上) |
 | `onlineAI` | アプリの中のオンラインの AI(aiButton のオンライン版 `POST /v1/text`) | 使う時(`use`)。DSL には入れてよい(端末内の AI は無料) | `dslComponents: [aiButton]`(表示用。保存では見ない) |
+| `encryptedFields` | 暗号化して保存する項目(Field.encrypted・#233。鍵は iCloud キーチェーン・private のアプリだけ) | 保存(`save`) | `dslEncryptedFields: true`(encrypted の field が 1 つ以上) |
 
 | 項目 | 決定 |
 |---|---|

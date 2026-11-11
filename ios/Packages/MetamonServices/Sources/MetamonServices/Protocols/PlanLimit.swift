@@ -67,4 +67,11 @@ extension APIError {
     /// 他の人に見える文字に表示できない言葉がある(#321・422 `text_not_allowed`)。`field` が直す項目
     public static let textNotAllowedCode = "text_not_allowed"
     public var isTextNotAllowed: Bool { status == 422 && code == Self.textNotAllowedCode }
+
+    /// 仲間探しの 18 歳以上の申告が無い(#507・400 `details.reason: age_unconfirmed`)。プロフィールの投稿・仲間探しの口
+    public static let ageUnconfirmedReason = "age_unconfirmed"
+    public var isAgeUnconfirmed: Bool {
+        guard status == 400, case .server(_, _, _, let d) = self, case .string(let r)? = d["reason"] else { return false }
+        return r == Self.ageUnconfirmedReason
+    }
 }

@@ -12,7 +12,9 @@ import (
 // featuresDoc uses every clientFeature once: aiButton long / inputPhoto /
 // saveTo / inputFeeds / outputs, lookupBook (button and toolbar), text {{field}} + highlight, a
 // warnings feed, addMinutes, aiChat inputEntity, bracket, a progressBar setting
-// target and photoField illustrate.
+// target, photoField illustrate, callButton and openUrlButton app + shareButton
+// shareTo x. An encrypted field needs a private app and callButton a shared
+// one, so the encrypted field lives in featuresPrivateDoc.
 const featuresDoc = `{"schemaVersion":1,"app":{"name":"本","description":"d","icon":"book","voiceEntry":"fullscreen"},"initialScreen":"home",
 "entities":[
  {"id":"player","name":"出場者","titleField":"name","fields":[{"id":"name","name":"名前","type":"string"},{"id":"wins","name":"勝ち上がり","type":"integer"}]},
@@ -20,13 +22,16 @@ const featuresDoc = `{"schemaVersion":1,"app":{"name":"本","description":"d","i
   {"id":"isbn","name":"ISBN","type":"string"},{"id":"title","name":"書名","type":"string"},
   {"id":"body","name":"本文","type":"text"},{"id":"keywords","name":"語","type":"string"},
   {"id":"photo","name":"写真","type":"photo"},{"id":"note","name":"メモ","type":"text"},
+  {"id":"impression","name":"感想","type":"text"},
   {"id":"meet","name":"集合","type":"string"},{"id":"leave","name":"出発","type":"string","computed":{"op":"addMinutes","args":[{"ref":"meet"},-30]}}]},
  {"id":"card","name":"カード","titleField":"q","fields":[{"id":"q","name":"問題","type":"string","required":true}]},
  {"id":"goal","name":"目標","single":true,"fields":[{"id":"pages","name":"ページ","type":"integer","defaultValue":300}]},
- {"id":"turn","name":"会話","fields":[{"id":"text","name":"本文","type":"text","required":true},{"id":"role","name":"話した人","type":"enum","options":["user","assistant"]}]}],
+ {"id":"turn","name":"会話","fields":[{"id":"text","name":"本文","type":"text","required":true},{"id":"role","name":"話した人","type":"enum","options":["user","assistant"]}]},
+ {"id":"msg","name":"連絡","scope":"shared","fields":[{"id":"body","name":"本文","type":"string"}]}],
 "screens":[
  {"id":"home","title":"ホーム","components":[
   {"type":"bracket","entity":"player","titleField":"name","winsField":"wins"},
+  {"type":"callButton","label":"話す"},
   {"type":"feed","provider":"warnings","region":"130000"},
   {"type":"feed","id":"wx","provider":"weather","region":"170000"},
   {"type":"aiButton","task":"generate","label":"問題を作る","prompt":"英単語の問題","shape":"list","count":5,"saveTo":{"entity":"card","field":"q"}},
@@ -43,14 +48,37 @@ const featuresDoc = `{"schemaVersion":1,"app":{"name":"本","description":"d","i
   {"type":"photoField","field":"photo","source":"library","illustrate":true},
   {"type":"aiButton","task":"extract","inputPhoto":"photo","output":"note","label":"写真を読む"},
   {"type":"text","text":"{{body}}","highlight":{"field":"keywords"}},
-  {"type":"text","text":"本の記録"}],
+  {"type":"text","text":"本の記録"},
+  {"type":"openUrlButton","app":"paypay","label":"PayPay で払う"},
+  {"type":"shareButton","text":"{{title}} を読んだ","shareTo":"x"}],
   "toolbar":[{"label":"保存","action":{"type":"saveRecord","entity":"book"}},{"label":"ISBN","action":{"type":"lookupBook","bookLookup":{"isbnField":"isbn","titleField":"title"}}}]},
  {"id":"talk","title":"相談","components":[
   {"type":"aiChat","area":"A1:F12","entity":"turn","textField":"text","roleField":"role","persona":"本の記録を読んで話す相手","inputEntity":"book","limit":5}]}]}`
 
+// featuresPrivateDoc is featuresDoc without the shared parts (callButton and
+// the shared entity) and with an encrypted field.
+var featuresPrivateDoc = strings.NewReplacer(
+	`  {"type":"callButton","label":"話す"},`+"\n", "",
+	`,`+"\n"+` {"id":"msg","name":"連絡","scope":"shared","fields":[{"id":"body","name":"本文","type":"string"}]}]`, "]",
+	`{"id":"impression","name":"感想","type":"text"}`, `{"id":"impression","name":"感想","type":"text","encrypted":true}`,
+).Replace(featuresDoc)
+
+// featuresDocFor is the doc that uses feature key.
+func featuresDocFor(key string) string {
+	if key == FeatureEncryptedFields {
+		return featuresPrivateDoc
+	}
+	return featuresDoc
+}
+
 func TestClientFeaturesDocIsValid(t *testing.T) {
-	if _, err := dsl.Parse([]byte(featuresDoc)); err != nil {
-		t.Fatal(err)
+	for _, doc := range []string{featuresDoc, featuresPrivateDoc} {
+		if _, err := dsl.Parse([]byte(doc)); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if strings.Contains(featuresDoc, `"encrypted"`) || !strings.Contains(featuresPrivateDoc, `"encrypted":true`) || strings.Contains(featuresPrivateDoc, `"shared"`) || strings.Contains(featuresPrivateDoc, `"callButton"`) {
+		t.Fatal("featuresPrivateDoc replacements did not apply")
 	}
 }
 
@@ -65,7 +93,7 @@ func TestClientFeaturesRestriction(t *testing.T) {
 	gone := map[string]struct {
 		rule   string // a line of the dropped rules
 		schema string // Def.prop (or a fragment) that must go
-		places int    // uses in featuresDoc
+		places int    // uses in featuresDocFor(key)
 		left   string // a doc fragment that must go
 	}{
 		FeatureAILong:                {"## アプリの中の AI の長い文章(aiButton length long)", "AiButton.length", 1, `"length"`},
@@ -81,6 +109,9 @@ func TestClientFeaturesRestriction(t *testing.T) {
 		FeatureBracket:               {"## トーナメント表(bracket)", `"#/$defs/Bracket"`, 1, `"bracket"`},
 		FeatureProgressSettingTarget: {`progressBar は target {"setting":"<fieldId>"} で目標を読める`, "A goal the user edits", 1, `{"setting"`},
 		FeatureIllustrate:            {"photoField に illustrate: true", "PhotoField.illustrate", 1, `"illustrate"`},
+		FeatureCallButton:            {"callButton{label, video?: true}", `"#/$defs/CallButton"`, 1, `"callButton"`},
+		FeatureOpenApp:               {"「開く」と「送る」で作る", "OpenUrlButton.app", 2, `"paypay"`},
+		FeatureEncryptedFields:       {"encrypted: true(端末で暗号化", "Field.encrypted", 1, `"encrypted"`},
 	}
 	if len(gone) != len(clientFeatures) {
 		t.Fatalf("test covers %d of %d features", len(gone), len(clientFeatures))
@@ -102,14 +133,15 @@ func TestClientFeaturesRestriction(t *testing.T) {
 			if schemaHas(t, restrictSchemaJSON(dsl.SchemaJSON(), r), g.schema) {
 				t.Fatalf("restricted schema still has %s", g.schema)
 			}
-			v := restrictionViolations([]byte(featuresDoc), nil, r)
+			doc := []byte(featuresDocFor(f.key))
+			v := restrictionViolations(doc, nil, r)
 			if len(v) != g.places {
 				t.Fatalf("violations = %v", v)
 			}
-			if v := restrictionViolations([]byte(featuresDoc), []byte(featuresDoc), r); len(v) != 0 {
+			if v := restrictionViolations(doc, doc, r); len(v) != 0 {
 				t.Fatalf("existing uses are not new: %v", v)
 			}
-			out, notes, changed := enforceRestriction([]byte(featuresDoc), r)
+			out, notes, changed := enforceRestriction(doc, r)
 			if !changed || len(notes) != 1 || strings.Contains(string(out), g.left) {
 				t.Fatalf("enforce: changed=%v notes=%v out=%s", changed, notes, out)
 			}

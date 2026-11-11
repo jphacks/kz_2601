@@ -89,6 +89,10 @@ extension AppRuntime {
             await adopt(app, banner: L10n.tr("シェアされた「\(app.name)」を追加しました"))
             return nil
         } catch {
+            if let limit = AppLimit(error) { // #630 持てるアプリの数: 追加の確認の上に置き換えシートを出し、空いたら追加し直す
+                presentAppLimit(limit) { [weak self] in _ = await self?.confirmImport(pending) }
+                return AppLimitCopy.toast(limit)
+            }
             return Self.importFailureMessage(error)
         }
     }
@@ -106,6 +110,10 @@ extension AppRuntime {
             if document.appId == app.appId { await setNotifyConsent(true, appId: app.appId) } // 参加の画面の確認つきで有効(#339)
             return nil
         } catch {
+            if let limit = AppLimit(error) { // #630 持てるアプリの数: 参加の確認の上に置き換えシートを出し、空いたら同じ名前で参加し直す
+                presentAppLimit(limit) { [weak self] in _ = await self?.joinShared(join, displayName: displayName) }
+                return AppLimitCopy.toast(limit)
+            }
             return Self.importFailureMessage(error)
         }
     }
@@ -128,6 +136,10 @@ extension AppRuntime {
             let app = try await sharing.install(publicAppId: listing.id)
             await adopt(app, banner: L10n.tr("「\(app.name)」をインストールしました"))
         } catch {
+            if let limit = AppLimit(error) { // #630 持てるアプリの数
+                presentAppLimit(limit) { [weak self] in await self?.installPublic(listing) }
+                return
+            }
             toast = ErrorCopy.failure(L10n.tr("インストールできませんでした"), error, context: "install public")
         }
     }

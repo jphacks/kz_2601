@@ -312,6 +312,9 @@ targets:
       # エラーの状態カード(#968): 失敗の分け方と文言は iOS のファイルをそのまま使う(見た目の ErrorCard は iOS だけ)
       - path: Metamon/Features/Voice/ErrorCopy.swift
       - path: Metamon/Features/Voice/ErrorPresentation.swift
+      # 持てるアプリの数(#630)の状態カードの文言と置き換えの中身は iOS と共有する
+      - path: Metamon/Features/AppLimit/AppLimitCopy.swift
+      - path: Metamon/Features/AppLimit/AppReplacePlan.swift
       # 規約・ポリシーは iOS と同じ同梱版をアプリ内で読む(#971)
       - path: ../docs/legal
         buildPhase: resources

@@ -26,11 +26,16 @@ import jp.kz2601.metamon.dsl.screen
 import jp.kz2601.metamon.language.AppLocales
 import jp.kz2601.metamon.notifications.LocalNotifications
 import jp.kz2601.metamon.services.sharing.AppMembersStore
+import jp.kz2601.metamon.services.purchase.EntitlementClient
+import jp.kz2601.metamon.services.purchase.HttpEntitlementClient
 import jp.kz2601.metamon.services.sharing.HttpMembersClient
-import jp.kz2601.metamon.services.sharing.LeaveCleanup
 import jp.kz2601.metamon.services.sharing.MembersClient
 import jp.kz2601.metamon.push.FcmTokens
 import jp.kz2601.metamon.push.PushHost
+import jp.kz2601.metamon.purchase.PaywallReason
+import jp.kz2601.metamon.purchase.PlayBilling
+import jp.kz2601.metamon.purchase.PlayProBilling
+import jp.kz2601.metamon.purchase.ProStore
 import jp.kz2601.metamon.services.AIClient
 import jp.kz2601.metamon.services.AppConfigClient
 import jp.kz2601.metamon.services.AppEnvironment
@@ -124,7 +129,6 @@ import jp.kz2601.metamon.update.PlayAppUpdates
 import jp.kz2601.metamon.update.UpdateGate
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.withContext
 import kotlinx.coroutines.SupervisorJob
 import java.io.File
 import java.time.Instant
@@ -205,8 +209,10 @@ class AppContainer(
     val discover: DiscoverServices? = null,
     /** 共有アプリの参加者(#903)。モックは null(参加者の欄を出さない) */
     val members: MembersClient? = null,
-    /** そのアプリの通知を消す(共有から抜けた後・#903) */
-    private val removeAppNotifications: (String) -> Unit = {},
+    /** Pro の権利(`GET /v1/me/entitlements`)。モックは null(Pro はモックの購入だけ) */
+    private val entitlements: EntitlementClient? = null,
+    /** Play の購入(Google Play Billing)。モックは null */
+    private val playBilling: ((PlayBilling.Listener) -> PlayBilling)? = null,
 ) {
     /** 共有シートの「みんなに公開」に渡すもの(#902)。「探す」が無い構成は null */
     val publishEnv: PublishEnv? by lazy { discover?.let { PublishEnv(it.client, authorProfile) } }
@@ -222,6 +228,21 @@ class AppContainer(
 
     /** 同意の画面を出す時点(起動時・AI に送る直前・設定から・#888) */
     val consentPrompt = ConsentPrompt(consent)
+
+    /** Tailor It Pro(iOS の ProGate・#77)。AI ボタンのオンライン版などの Pro の判定はサーバーの答え */
+    val pro: ProStore = run {
+        lateinit var store: ProStore
+        val billing = playBilling?.invoke { result, purchases -> store.onPurchases(result, purchases) }
+        store = ProStore(
+            entitlements = entitlements,
+            billing = billing?.let(::PlayProBilling),
+            uid = { auth.currentUser.value?.uid },
+            scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate),
+            mock = knobs.mock,
+            log = { Log.i(TAG, it) },
+        )
+        store
+    }
 
     /** 初回のチュートリアルを出す時点(同意の後・設定の「使い方を見る」・#900) */
     val tutorialPrompt = TutorialPrompt(tutorial)
@@ -253,6 +274,7 @@ class AppContainer(
             forgetConsent = {
                 consent.forget()
                 consentPrompt.reset()
+                pro.reset() // Pro の状態と送った購入の記録も人ごと(次の人はサーバーに聞き直す)
                 aiButtonMetrics.clearCounts()
                 social?.ageGate?.reset() // 18 歳以上の確認(#877)も人ごと(iOS は UserDefaults ごと消す)
                 runtime.retention?.forget() // 記録の保存期間の確認(#482)も人ごと(iOS は UserDefaults ごと消す)
@@ -428,7 +450,8 @@ class AppContainer(
                 inAppUpdater = InAppUpdater(PlayAppUpdates.ifInstalledFromPlay(context)),
                 discover = DiscoverServices(HttpDiscoverClient(appConfigHttp), moderation),
                 members = HttpMembersClient(appConfigHttp),
-                removeAppNotifications = { LocalNotifications.get(context).removeApp(it) },
+                entitlements = HttpEntitlementClient(appConfigHttp),
+                playBilling = { PlayBilling(context, it) },
             )
         }
 
@@ -533,24 +556,6 @@ class AppContainer(
     /** 今のアプリの参加者と自分が管理者か(#903)。部品の member の選択肢・管理者の削除が読む */
     val membersStore = AppMembersStore(members, CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate))
 
-    /** 共有から抜けた後: 別のアプリへ切り替え、一覧から外し、自分のコピーと端末の記録・会話の履歴・通知を消す(#903) */
-    val leaveCleanup: LeaveCleanup by lazy {
-        LeaveCleanup(
-            currentAppId = { runtime.document.appId },
-            apps = { runtime.appsList() },
-            switchApp = { runtime.switchApp(it) },
-            startNewApp = { runtime.startNewApp() },
-            hideApp = { runtime.forgetApp(it) },
-            deleteCopy = { appConfig.deleteApp(it) },
-            purgeLocal = { id ->
-                recordSync.purge(id)
-                documentCache.remove(id)
-                withContext(Dispatchers.IO) { chatHistory.remove(id) }
-                removeAppNotifications(id)
-            },
-        )
-    }
-
     /** アプリ全体のランタイム(#889)。起動時に 1 つだけ作る。 */
     val runtime: AppRuntime by lazy {
         AppRuntime(
@@ -587,17 +592,19 @@ class AppContainer(
 
     /**
      * aiButton のホスト(#873)。端末内 AI(Gemini Nano)はまだ入れていないので、いつもオンライン版に回る。
-     * 同意は [consent] を読み、未同意なら同意の画面を出す(#888)。モックは課金の制限なし。
+     * 同意は [consent] を読み、未同意なら同意の画面を出す(#888)。Pro は [pro](サーバーの答え)で、要る時は課金画面を出す。
+     * モックは課金の制限なし。
      */
     private val aiHost: AppAiHost by lazy {
         AppAiHost(
             ai = ai,
             appId = { runtime.document.appId },
-            access = { AiTextAccess(consentGranted = consent.isGranted, isPro = false, enforced = !knobs.mock) },
+            access = { AiTextAccess(consentGranted = consent.isGranted, isPro = pro.isPro, enforced = !knobs.mock) },
             sharedApp = { runtime.entityModels.any { it.isShared } },
             isMock = knobs.mock,
             metrics = aiButtonMetrics::record,
             onNeedsConsent = { consentPrompt.require() },
+            onNeedsPro = { chat -> pro.requestPaywall(if (chat) PaywallReason.AI_CHAT else PaywallReason.AI_TEXT) },
         )
     }
 }

@@ -6,9 +6,12 @@ import jp.kz2601.metamon.dsl.logic.ExternalUrlPolicy
 /** 1 曲(iOS の `MusicSong` の曲名・アーティストだけ)。 */
 data class MusicSong(val title: String, val artist: String = "")
 
+/** 検索を開く音楽サービス(#1164)。API キーは使わず、検索のページを開くだけ(アプリが入っていれば OS がアプリで開く)。 */
+enum class MusicService { YOUTUBE_MUSIC, SPOTIFY }
+
 /**
  * `musicPlayer` の代わりの表示の決まり(Compose に依らない・JVM で試す)。
- * 値の上限と検索の URL は iOS の `MusicRequestRules` / `MusicLinks` と同じ。
+ * 値の上限と Spotify の検索の URL は iOS の `MusicRequestRules` / `MusicLinks` と同じ。YouTube Music は Android だけ。
  */
 object MusicSearch {
     const val MAX_TITLE = 100
@@ -17,7 +20,12 @@ object MusicSearch {
     /** 一覧に残す件数(新しい順)。 */
     const val MAX_RECENT = 5
 
-    private const val SEARCH_BASE = "https://open.spotify.com/search/"
+    /** 何も選んでいない時のサービス(iOS の `MusicLinks.spotifySearchURL` と同じ) */
+    val DEFAULT_SERVICE = MusicService.SPOTIFY
+
+    private const val SPOTIFY_BASE = "https://open.spotify.com/search/"
+    private const val YOUTUBE_MUSIC_BASE = "https://music.youtube.com/search?q="
+    private const val QUERY_KEEP = "-._~"
     private const val PATH_KEEP = "-._~!$&'()*+,;=:@"
     private const val HEX = "0123456789ABCDEF"
 
@@ -36,10 +44,14 @@ object MusicSearch {
         listOf(song.title, song.artist).map { it.trim() }.filter { it.isNotEmpty() }.joinToString(" ")
 
     /** 検索のページ(音楽アプリが入っていれば OS がアプリで開く)。開いてよい URL([ExternalUrlPolicy])でなければ null。 */
-    fun searchUrl(song: MusicSong): String? {
+    fun searchUrl(song: MusicSong, service: MusicService = DEFAULT_SERVICE): String? {
         val term = searchTerm(song)
         if (term.isEmpty()) return null
-        return ExternalUrlPolicy.openable(SEARCH_BASE + encodePathSegment(term))
+        val url = when (service) {
+            MusicService.SPOTIFY -> SPOTIFY_BASE + encodePathSegment(term)
+            MusicService.YOUTUBE_MUSIC -> YOUTUBE_MUSIC_BASE + encodeQueryValue(term)
+        }
+        return ExternalUrlPolicy.openable(url)
     }
 
     /** 探した曲を一覧の先頭に入れる(同じ曲は前に出すだけ・[MAX_RECENT] 件まで)。 */
@@ -54,11 +66,16 @@ object MusicSearch {
      * パスの 1 区間として符号化(iOS の `urlPathAllowed` から `/?#` を除いた文字はそのまま、他は UTF-8 の %XX)。
      * 空白は `%20`(`+` にしない)。
      */
-    fun encodePathSegment(s: String): String = buildString {
+    fun encodePathSegment(s: String): String = percentEncode(s, PATH_KEEP)
+
+    /** クエリの値として符号化(英数字と `-._~` だけそのまま。`&` `=` `+` も %XX・空白は `%20`)。 */
+    fun encodeQueryValue(s: String): String = percentEncode(s, QUERY_KEEP)
+
+    private fun percentEncode(s: String, keep: String): String = buildString {
         for (b in s.toByteArray(Charsets.UTF_8)) {
             val code = b.toInt() and 0xFF
             val ch = code.toChar()
-            if (code < 0x80 && (ch.isLetterOrDigit() || ch in PATH_KEEP)) {
+            if (code < 0x80 && (ch.isLetterOrDigit() || ch in keep)) {
                 append(ch)
             } else {
                 append('%').append(HEX[code shr 4]).append(HEX[code and 0xF])

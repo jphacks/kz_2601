@@ -36,8 +36,8 @@ data class DeviceCapabilities(
             // 管理者かは AppMembersStore で分かる(#903)が、visibleTo のボタンの出し分けが無い(#1089)
             Feature("dataRoles", implemented = false),
             Feature("addressedMessages", implemented = true), // members の選択(ChoiceLeaves)
-            // 場所の通知: 計画と登録までで、見張り(Geofencing)が無い
-            Feature("notification.near", implemented = false),
+            // 場所の通知: Geofencing で見張る(LocalNotifications・正確な位置と裏での位置の許可が要る)
+            Feature("notification.near", implemented = true),
             Feature("aiButton.long", implemented = true, needs = ComponentType.AI_BUTTON),
             Feature("aiButton.inputPhoto", implemented = true, needs = ComponentType.AI_BUTTON),
             Feature("aiButton.saveTo", implemented = true, needs = ComponentType.AI_BUTTON),
@@ -52,6 +52,10 @@ data class DeviceCapabilities(
             Feature("component.bracket", implemented = true, needs = ComponentType.BRACKET),
             Feature("progressBar.settingTarget", implemented = true, needs = ComponentType.PROGRESS_BAR),
             Feature("photoField.illustrate", implemented = PhotoIllustrate.AVAILABLE, needs = ComponentType.PHOTO_FIELD),
+            // 以下 3 つは iOS だけ(Android の部品・暗号化・アプリへの受け渡しがまだ)
+            Feature("component.callButton", implemented = false, needs = ComponentType.CALL_BUTTON),
+            Feature("field.encrypted", implemented = false),
+            Feature("openUrlButton.app", implemented = false, needs = ComponentType.OPEN_URL_BUTTON),
         )
 
         /** [registry] で描ける部品(UNKNOWN を除く・schema の並び)。 */

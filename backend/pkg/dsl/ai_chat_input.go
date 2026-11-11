@@ -6,7 +6,7 @@ package dsl
 // (default and max MaxAIChatInputRecords) as one text block of at most
 // MaxAIChatMaterialBytes: only the user's own records (a shared / public
 // entity is filtered to the records the user wrote, like the conversation),
-// never hidden fields, only the AIChatInputFieldTypes. /v1/text task chat
+// never hidden or encrypted fields, only the AIChatInputFieldTypes. /v1/text task chat
 // puts the block into the user turn as data, not instructions (text_chat.go).
 
 // Bounds of aiChat inputEntity; /v1/text task chat applies the same.
@@ -46,9 +46,9 @@ func checkAIChatInput(where string, c *Component, entities map[string]*Entity, a
 	}
 	for i := range e.Fields {
 		f := &e.Fields[i]
-		if f.Computed == nil && !f.Hidden && AIChatInputFieldTypes[f.Type] {
+		if f.Computed == nil && !f.Hidden && !f.Encrypted && AIChatInputFieldTypes[f.Type] {
 			return
 		}
 	}
-	add("%s: aiChat inputEntity %q has no field the AI can read (string / text / number / date / enum ..., not hidden)", where, e.ID)
+	add("%s: aiChat inputEntity %q has no field the AI can read (string / text / number / date / enum ..., not hidden or encrypted)", where, e.ID)
 }

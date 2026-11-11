@@ -165,6 +165,13 @@ func (h *Handler) checkReadable(r *http.Request, rs store.RecordSet, ent *dsl.En
 	if !canRead(ent, rec, uidOf(r)) {
 		return recordNotFound()
 	}
+	ok, err := h.sharedFilter(r, rs.AppID, ent.ID, []store.Record{*rec})
+	if err != nil {
+		return err
+	}
+	if !ok(rec) { // #321 / #507
+		return recordNotFound()
+	}
 	return nil
 }
 

@@ -110,7 +110,7 @@
 
 	<!-- ネイティブ機能の権限説明(P0: マイク/カメラ/通知、P1: 位置/モーション) -->
 	<key>NSMicrophoneUsageDescription</key>
-	<string>話しかけた内容からアプリを生成するため、また生成したアプリで話した内容を端末の中で文字にしたり、動画やドラレコの音声、ボイスメモ・会議などを録音したりするために、マイクを使用します。</string>
+	<string>話しかけた内容からアプリを生成するため、また生成したアプリで話した内容を端末の中で文字にしたり、動画やドラレコの音声、ボイスメモ・会議などを録音したり、みんなで使うアプリで参加者と通話したりするために、マイクを使用します。</string>
 	<!-- 止めるまで鳴るアラーム(Notification.alarm・AlarmKit・iOS 26.1 以降)。審査用の版では外す(strip-review-plist.sh) -->
 	<key>NSAlarmKitUsageDescription</key>
 	<string>生成したアプリで、設定した時刻にアラームを鳴らすために使用します。</string>
@@ -120,7 +120,7 @@
 	<key>NSAppleMusicUsageDescription</key>
 	<string>生成したアプリの音楽プレーヤーで、Apple Music の曲を検索して再生するために使用します。</string>
 	<key>NSCameraUsageDescription</key>
-	<string>生成したアプリで写真や動画を撮影・記録するため、またドラレコとして画面を出している間に録画するために、カメラを使用します。</string>
+	<string>生成したアプリで写真や動画を撮影・記録するため、またドラレコとして画面を出している間に録画したり、みんなで使うアプリで参加者とビデオ通話したりするために、カメラを使用します。</string>
 	<key>NSPhotoLibraryUsageDescription</key>
 	<string>生成したアプリで写真や動画を選択・保存するために、写真ライブラリを使用します。</string>
 	<key>NSPhotoLibraryAddUsageDescription</key>

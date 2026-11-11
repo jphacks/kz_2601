@@ -341,6 +341,23 @@
         }
       }
     },
+    "暗号化の鍵がまだこの端末に届いていないため、暗号化する項目は保存しませんでした。iCloud キーチェーンの同期を待ってからもう一度保存してください" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The encryption key has not reached this device yet, so the encrypted fields were not saved. Wait for iCloud Keychain to sync, then save again"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "暗号化の鍵がまだこの端末に届いていないため、暗号化する項目は保存しませんでした。iCloud キーチェーンの同期を待ってからもう一度保存してください"
+          }
+        }
+      }
+    },
     "最新" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -541,6 +558,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "音量%.0fdB"
+          }
+        }
+      }
+    },
+    "🔒 この端末ではまだ読めません(iCloud キーチェーンの同期を待っています)" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "🔒 Not readable on this device yet (waiting for iCloud Keychain to sync)"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "🔒 この端末ではまだ読めません(iCloud キーチェーンの同期を待っています)"
           }
         }
       }

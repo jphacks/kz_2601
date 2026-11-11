@@ -120,12 +120,16 @@ public enum ShareURL {
         default:
             return nil
         }
-        return valid(token) ? token : nil
+        return isValidToken(token) ? token : nil
     }
 
-    private static func valid(_ token: String) -> Bool {
-        let allowed = CharacterSet.alphanumerics.union(CharacterSet(charactersIn: "_-.:"))
-        return !token.isEmpty && token.count <= 128 && token.unicodeScalars.allSatisfy(allowed.contains)
+    /// サーバーの ID と同じ形(ASCII の英数字と `_-.:`・1〜128 文字)。点だけの値はパスの区切りとして解かれるので除く。
+    public static func isValidToken(_ token: String) -> Bool {
+        let scalars = token.unicodeScalars
+        guard (1...128).contains(scalars.count), scalars.allSatisfy(allowed.contains) else { return false }
+        return scalars.contains { $0 != "." }
     }
+
+    private static let allowed = CharacterSet(charactersIn: "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789_-.:")
 }
 #endif

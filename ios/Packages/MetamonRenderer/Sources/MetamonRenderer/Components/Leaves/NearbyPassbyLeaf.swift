@@ -210,7 +210,7 @@ struct PassbyConsentSheet: View {
                 }
             }
             .navigationTitle(L("すれ違い通信をはじめますか？"))
-            .navigationBarTitleDisplayMode(.inline)
+            .inlineNavigationTitle() // Mac でも組める(#1295)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button(L("やめる")) { dismiss() }

@@ -153,6 +153,8 @@ data class Field(
     @Serializable(with = LenientBooleanSerializer::class)
     val hidden: Boolean? = null,
     val editableBy: EditableBy? = null,
+    @Serializable(with = LenientBooleanSerializer::class)
+    val encrypted: Boolean? = null,
 ) {
     companion object
 }

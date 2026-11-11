@@ -126,6 +126,37 @@
       "dslComponents": [
         "aiButton"
       ]
+    },
+    {
+      "id": "encryptedFields",
+      "enabled": true,
+      "gate": "save",
+      "title": {
+        "ja": "暗号化して保存する項目",
+        "en": "Encrypted fields"
+      },
+      "reason": {
+        "ja": "見られたくない項目を端末で暗号化し、iCloud キーチェーンの鍵で同じ Apple ID の端末だけが読めるようにします。",
+        "en": "Sensitive fields are encrypted on your device, and only your devices with the same Apple ID can read them through the iCloud Keychain key."
+      },
+      "keywords": [
+        "暗号化",
+        "暗号で",
+        "encrypt",
+        "encrypted"
+      ],
+      "excludeKeywords": [
+        "暗号化しない",
+        "暗号化は不要",
+        "暗号化はいらない",
+        "not encrypted",
+        "without encryption"
+      ],
+      "dslEncryptedFields": true,
+      "withoutInstruction": {
+        "ja": "(無料版で作る: 項目の暗号化(field の encrypted)は使わない。ふつうの項目として保存する)",
+        "en": "(Free version: do not use encrypted fields (field encrypted); store the values as normal fields.)"
+      }
     }
   ]
 }

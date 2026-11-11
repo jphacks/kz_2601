@@ -57,6 +57,7 @@ struct PaywallSheet: View {
         }
         .presentationDetents([.large])
         .presentationDragIndicator(.visible)
+        .coinSheets() // #630 この画面の上にお店・プランの比較を重ねる
         .task {
             if store.offer == nil { await store.loadProducts() }
         }
@@ -83,6 +84,15 @@ struct PaywallSheet: View {
                 .multilineTextAlignment(.center)
                 .fixedSize(horizontal: false, vertical: true)
                 .accessibilityIdentifier("paywall.headline")
+            if CoinGate.shared.isEnabled { // #630 コインの残高とプランの比較
+                HStack(spacing: Theme.Spacing.md) {
+                    CoinBalanceChip(accessibilityID: "paywall.coins")
+                    Button { CoinGate.shared.openPlans() } label: { Text("プランを比べる") }
+                        .font(.subheadline.weight(.medium))
+                        .tint(Theme.Colors.brandText)
+                        .accessibilityIdentifier("paywall.comparePlans")
+                }
+            }
         }
     }
 
@@ -300,6 +310,7 @@ struct PaywallHost: ViewModifier {
     func body(content: Content) -> some View {
         content
             .modifier(PaywallPresenter(placement: .root))
+            .modifier(CoinHost()) // #630 コイン(サーバーが有効にした時だけ出る)
             .task { ProGate.shared.start() }
     }
 }

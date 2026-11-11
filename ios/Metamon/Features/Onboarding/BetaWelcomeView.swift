@@ -103,7 +103,7 @@ struct BetaWelcomeView: View {
                 }
             }
             .sheet(item: $feedback) { ctx in
-                FeedbackComposerView(context: ctx, client: services.feedback) { feedback = nil }
+                FeedbackComposerView(context: ctx, client: services.feedback, notifyWhenFixed: services.loopNotices.map { FeedbackFixedOptIn.live(client: $0) }) { feedback = nil }
             }
         }
         .accessibilityIdentifier("betaWelcome.sheet")

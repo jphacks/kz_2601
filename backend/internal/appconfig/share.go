@@ -69,6 +69,20 @@ func newShareToken() (string, error) {
 	return base64.RawURLEncoding.EncodeToString(b[:]), nil
 }
 
+// shareToken reads the {token} path value. Besides idRe it rejects values
+// made only of dots, which URL resolution treats as path segments.
+func shareToken(r *http.Request) (string, error) {
+	tok := r.PathValue("token")
+	if !validShareToken(tok) {
+		return "", apiErr(http.StatusBadRequest, httpx.CodeBadRequest, "invalid token")
+	}
+	return tok, nil
+}
+
+func validShareToken(tok string) bool {
+	return idRe.MatchString(tok) && strings.Trim(tok, ".") != ""
+}
+
 // newAppID matches what iOS generates for appIds (lowercase UUID v4).
 func newAppID() string {
 	var b [16]byte
@@ -189,7 +203,7 @@ func (h *Handler) createShare(w http.ResponseWriter, r *http.Request) {
 
 // liveShare loads a share that has not been revoked (404 otherwise).
 func (h *Handler) liveShare(r *http.Request) (*store.Share, error) {
-	tok, err := pathID(r, "token")
+	tok, err := shareToken(r)
 	if err != nil {
 		return nil, err
 	}
@@ -224,7 +238,7 @@ func (h *Handler) getShare(w http.ResponseWriter, r *http.Request) {
 
 // revokeShare: DELETE /v1/shares/{token} (owner only, idempotent).
 func (h *Handler) revokeShare(w http.ResponseWriter, r *http.Request) {
-	tok, err := pathID(r, "token")
+	tok, err := shareToken(r)
 	if err != nil {
 		fail(w, err)
 		return

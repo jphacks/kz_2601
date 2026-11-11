@@ -29,6 +29,15 @@ class ThirdPartyLicensesTest {
         // Maven を通らない同梱物(#1180): NDK でビルドする whisper.cpp と、初回に落とす音声モデル
         assertTrue("whisper.cpp", entries.any { it.name == "whisper.cpp" && it.license == "MIT" && "The ggml authors" in it.text })
         assertTrue("Whisper のモデル", entries.any { it.id == "openai-whisper-model" && it.license == "MIT" && "OpenAI" in it.text })
+        // POM に無いが AAR に入っているもの(#1368): libyuv の PATENTS、PdfBox-Android の Adobe のデータと LiberationSans
+        val libyuv = entries.first { it.name == "androidx.camera" && it.license == "BSD-3-Clause" }
+        assertTrue("libyuv PATENTS", libyuv.notices.any { "Additional IP Rights Grant (Patents)" in it.text })
+        val pdfbox = entries.first { it.name == "com.tom-roush" }
+        val titles = pdfbox.notices.map { it.title }
+        for (t in listOf("Adobe CMaps for PDF Fonts", "Adobe Font Metrics (AFM) for PDF Core 14 Fonts", "Adobe Glyph List", "Liberation Sans (SIL Open Font License 1.1)")) {
+            assertTrue("PdfBox-Android: $t", t in titles)
+        }
+        assertTrue("OFL の本文", pdfbox.notices.any { "SIL OPEN FONT LICENSE Version 1.1" in it.text })
     }
 
     @Test

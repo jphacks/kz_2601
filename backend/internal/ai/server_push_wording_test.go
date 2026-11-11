@@ -34,7 +34,7 @@ func TestServerPushWording_Rewrite(t *testing.T) {
 		if strings.Contains(got, "サーバーからのプッシュ通知") || !strings.Contains(got, serverPushChatRule) {
 			t.Errorf("%s: chatLimits push item not swapped", name)
 		}
-		if !strings.Contains(got, "アプリの中での通話・ビデオ通話") || !strings.Contains(got, "順位番号") {
+		if !strings.Contains(got, "ログイン・アプリの中での課金") || !strings.Contains(got, "順位番号") {
 			t.Errorf("%s: other limits must stay", name)
 		}
 	}

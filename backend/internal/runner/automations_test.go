@@ -17,7 +17,8 @@ import (
 // creator (none falls through to "other").
 func TestEveryOutcomeHasACreatorWord(t *testing.T) {
 	for _, o := range []string{quota.OutcomeOK, quota.OutcomeSkippedQuota, quota.OutcomeSkippedGlobal, quota.OutcomeSkippedPaused,
-		quota.OutcomeSkippedPlan, runner.OutcomeSkippedStale, runner.OutcomeSkippedLate, runner.OutcomeSkippedInactive, queue.OutcomeGaveUp, runner.OutcomeSkippedDisabled} {
+		quota.OutcomeSkippedPlan, runner.OutcomeSkippedStale, runner.OutcomeSkippedLate, runner.OutcomeSkippedInactive, queue.OutcomeGaveUp, runner.OutcomeSkippedDisabled,
+		quota.OutcomeSkippedAllowance, quota.OutcomeSkippedOverflowCap, quota.OutcomeSkippedCoins} {
 		if got := status.Result(o, "", false); got == status.ResultOther || got == status.ResultNone {
 			t.Errorf("outcome %s -> %s", o, got)
 		}
@@ -35,6 +36,23 @@ func TestEveryOutcomeHasACreatorWord(t *testing.T) {
 	}
 	if got := status.Result(quota.OutcomeOK, runner.ReasonAppLimit, false); got != status.ResultLimit {
 		t.Errorf("ok + %s -> %s", runner.ReasonAppLimit, got)
+	}
+	// #630: the monthly allowance, as a stop and as a cut of an ok run
+	for o, w := range map[string]string{
+		quota.OutcomeSkippedAllowance: status.ResultAllowanceExhausted, quota.OutcomeSkippedOverflowCap: status.ResultOverflowCapReached,
+		quota.OutcomeSkippedCoins: status.ResultCoinsInsufficient,
+	} {
+		if got := status.Result(o, "", false); got != w {
+			t.Errorf("%s -> %s, want %s", o, got, w)
+		}
+	}
+	for r, w := range map[string]string{
+		runner.ReasonAllowance: status.ResultAllowanceExhausted, runner.ReasonOverflowCap: status.ResultOverflowCapReached,
+		runner.ReasonCoins: status.ResultCoinsInsufficient,
+	} {
+		if got := status.Result(quota.OutcomeOK, r, true); got != w {
+			t.Errorf("ok + %s -> %s, want %s", r, got, w)
+		}
 	}
 }
 

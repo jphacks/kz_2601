@@ -101,6 +101,21 @@ VENDORED = [
         "artifacts": ["ggml-base-q5_1.bin(初回に端末へダウンロード)"],
     },
 ]
+# POM に書かれていないが AAR の中に入っている部品の表示。(groupId, artifactId, POM のライセンス)→ [(見出し, license-texts のファイル)]
+# 本文は上流の文(PdfBox-Android の LICENSE.txt の EXTERNAL COMPONENTS・同梱の glyphlist の頭・liberation-fonts 2.1.5 の LICENSE・libyuv の PATENTS)
+BUNDLED_NOTICES = {
+    # fileImport の PDF(#1181)。assets に Adobe の CMap・AFM・glyphlist と LiberationSans-Regular.ttf(2.1.5)が入っている
+    ("com.tom-roush", "pdfbox-android", "Apache-2.0"): [
+        ("Adobe CMaps for PDF Fonts", "pdfbox-adobe-cmap-BSD-3-Clause.txt"),
+        ("Adobe Font Metrics (AFM) for PDF Core 14 Fonts", "pdfbox-adobe-afm.txt"),
+        ("Adobe Glyph List", "pdfbox-adobe-glyphlist-BSD-3-Clause.txt"),
+        ("Liberation Sans (SIL Open Font License 1.1)", "liberation-fonts-OFL-1.1.txt"),
+    ],
+    # camera-core が取り込んだ libyuv の特許の許諾(LICENSE は TEXT_FILES の libyuv-BSD-3-Clause.txt)
+    ("androidx.camera", "camera-core", "BSD-3-Clause"): [
+        ("libyuv (PATENTS)", "libyuv-PATENTS.txt"),
+    ],
+}
 
 DEP_RE = re.compile(r"--- ([^\s:]+):([^\s:]+)(?::(\S+))?(?: -> (\S+))?")
 
@@ -209,6 +224,11 @@ def archive_notices(group, artifact, version):
     return notices
 
 
+def bundled_notices(group, artifact, license_id):
+    entries = BUNDLED_NOTICES.get((group, artifact, license_id), [])
+    return [{"title": title, "text": read_text(os.path.join(TEXTS_DIR, name))} for title, name in entries]
+
+
 def build(report):
     mods = modules(report)
     if not mods:
@@ -234,7 +254,7 @@ def build(report):
             })
             entry["artifacts"][artifact] = version
             entry["url"] = entry["url"] or pom_url(group, artifact, version)
-            entry["notices"] += notices
+            entry["notices"] += notices + bundled_notices(group, artifact, license_id)
             notices = []  # 同じ AAR の表示は 1 回だけ
 
     multi = {}

@@ -3440,6 +3440,23 @@
         }
       }
     },
+    "ビデオ通話に参加" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Join video call"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ビデオ通話に参加"
+          }
+        }
+      }
+    },
     "ファイルから取り込む" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -8781,6 +8798,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "通報する"
+          }
+        }
+      }
+    },
+    "通話に参加" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Join call"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "通話に参加"
           }
         }
       }

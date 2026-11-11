@@ -40,6 +40,7 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import jp.kz2601.metamon.dsl.AppDSL
 import jp.kz2601.metamon.dsl.AppDocument
 import jp.kz2601.metamon.consent.AiConsentDialog
+import jp.kz2601.metamon.purchase.PaywallHost
 import jp.kz2601.metamon.discover.DiscoverHost
 import jp.kz2601.metamon.discover.LocalPublishEnv
 import jp.kz2601.metamon.onboarding.TutorialScreen
@@ -287,17 +288,13 @@ fun MetamonApp(container: AppContainer) {
     }
     fun membersModel(target: ShareTarget) =
         MembersModel(target.appId, membersClient, isShared = { ShareScope.of(loadDsl(target.appId)()) == ShareScope.MEMBERS }, container.membersStore)
-    // 抜けた後: 別のアプリへ切り替え、一覧から外し、端末の記録・会話の履歴を消す。画面が消えても止めない
+    // 抜けた後: シートを閉じて知らせるだけ。アプリと自分のコピーは一覧に残す(iOS と同じ・#1298)
     val onLeftShare = { target: ShareTarget ->
         shareTarget = null
         membersTarget = null
         issuedShares[target.appId] = null
-        container.accountScope.launch {
-            container.leaveCleanup.run(target.appId)
-            val name: Any = target.name.ifEmpty { null } ?: UiText.Res(R.string.share_untitled)
-            runtime.showToast(UiText.Res(R.string.members_left_toast, name))
-        }
-        Unit
+        val name: Any = target.name.ifEmpty { null } ?: UiText.Res(R.string.share_untitled)
+        runtime.showToast(UiText.Res(R.string.members_left_toast, name))
     }
 
     val openSwitcher = {
@@ -416,6 +413,8 @@ fun MetamonApp(container: AppContainer) {
     RetentionPromptHost(runtime, busy = state.isGenerating || state.voiceOpen, onStop = vm::generateNow)
     // フィードバックの画面(#319)と端末を振って開く仕組み。設定から開いた時に上に重ねる
     FeedbackComposerHost(container)
+    // Tailor It Pro の課金画面(AI ボタン・設定から)。サインインのたびにサーバーの Pro を読み直す
+    PaywallHost(container.pro, user?.uid)
 
     if (switcherOpen) {
         AppSwitcherDialog(

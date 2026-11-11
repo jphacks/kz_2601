@@ -321,10 +321,16 @@ func (r *Runner) runRule(ctx context.Context, h *scope.Handle, ev store.OutboxEv
 	fail := func(err error) (string, quota.Charge, error) { return "", *charged, err }
 	usage := quota.Usage{AppID: ev.AppID, CreatorUID: creator, ActorUID: ev.ActorUID, RuleID: rule.ID, Trigger: triggerName(ev.Kind)}
 	rl := runLog{ruleID: rule.ID}
+	// stopped: the outcome of the monthly allowance (#630) that cut this
+	// run's writes or notifications (quota.Block.Stop)
+	stopped := ""
 	finish := func(outcome string) string {
 		usage.Outcome, rl.outcome = outcome, outcome
 		if outcome == quota.OutcomeOK && appLimited(usage.Limit) {
 			rl.reason = ReasonAppLimit
+		}
+		if outcome == quota.OutcomeOK && stopped != "" {
+			rl.reason = allowanceReason(stopped)
 		}
 		usage.CPUMs, rl.took = time.Since(start).Milliseconds(), time.Since(start)
 		r.cfg.Quota.LogUsage(ctx, usage)
@@ -338,6 +344,7 @@ func (r *Runner) runRule(ctx context.Context, h *scope.Handle, ev store.OutboxEv
 	charged.Parts = append(charged.Parts, dec.Charge.Parts...)
 	rl.quota, rl.quotaDay = dec.AppExec, dec.Day
 	r.warnQuota(ctx, h, dec, ev.AppID, app.App.Name, creator, notifyPaused)
+	defer r.warnAllowance(ctx, h, dec, ev.AppID, app.App.Name, creator, notifyPaused)
 	if !dec.Allowed {
 		if dec.Block != nil {
 			usage.Limit = dec.Block.Scope
@@ -351,6 +358,9 @@ func (r *Runner) runRule(ctx context.Context, h *scope.Handle, ev store.OutboxEv
 		var rle *engine.ReadLimitError
 		if errors.As(err, &rle) {
 			usage.Limit = rle.Scope
+		}
+		if reader.stop != "" {
+			return finish(reader.stop), quota.Charge{}, nil
 		}
 		return finish(quota.OutcomeSkippedQuota), quota.Charge{}, nil
 	}
@@ -369,6 +379,9 @@ func (r *Runner) runRule(ctx context.Context, h *scope.Handle, ev store.OutboxEv
 	charged.Parts = append(charged.Parts, grant.Charge.Parts...)
 	if grant.Block != nil {
 		usage.Limit = grant.Block.Scope
+		if grant.Block.Stop != "" {
+			stopped = grant.Block.Stop
+		}
 	}
 	usage.WritesDropped = grant.Dropped
 	written := 0
@@ -396,7 +409,7 @@ func (r *Runner) runRule(ctx context.Context, h *scope.Handle, ev store.OutboxEv
 		consent = r.cfg.Consent
 	}
 	resolver, err := notify.NewResolver(notify.Config{Directory: h, Accounts: h, Consent: consent, Age: r.cfg.Age,
-		Limiter: recipientLimiter{q: r.cfg.Quota, dec: dec, charged: charged, usage: &usage}})
+		Limiter: recipientLimiter{q: r.cfg.Quota, dec: dec, charged: charged, usage: &usage, stopped: &stopped}})
 	if err != nil {
 		return fail(err)
 	}
@@ -493,6 +506,8 @@ type ruleReader struct {
 	charged  *quota.Charge
 	usage    *quota.Usage
 	feeds    FeedGetter // saveFeed (feed.go); nil = skipped
+	// stop: the monthly allowance (#630) stopped the reads (quota.Block.Stop)
+	stop string
 }
 
 // Record implements engine.RefReader.
@@ -524,6 +539,7 @@ func (rr *ruleReader) List(ctx context.Context, entity string) ([]expreval.Recor
 	}
 	rr.charged.Parts = append(rr.charged.Parts, ch.Parts...)
 	if blk != nil {
+		rr.stop = blk.Stop
 		return nil, &engine.ReadLimitError{Scope: blk.Scope, Limit: blk.Limit, Used: blk.Used}
 	}
 	return recs, nil
@@ -662,6 +678,8 @@ type recipientLimiter struct {
 	dec     quota.Decision
 	charged *quota.Charge // what the grants counted (refund on give-up)
 	usage   *quota.Usage  // Limit gets the app's notify limit when it dropped someone
+	// stopped gets the monthly allowance's outcome when it dropped everyone (#630)
+	stopped *string
 }
 
 func (l recipientLimiter) Limit(ctx context.Context, uids []string) ([]string, []notify.LimitDrop, error) {
@@ -677,6 +695,14 @@ func (l recipientLimiter) Limit(ctx context.Context, uids []string) ([]string, [
 		drops = append(drops, notify.LimitDrop{UID: d.UID, Scope: d.Block.Scope})
 		if l.usage != nil && d.Block.Scope == quota.ScopeAppNotify {
 			l.usage.Limit = d.Block.Scope
+		}
+		if d.Block.Stop != "" {
+			if l.usage != nil {
+				l.usage.Limit = d.Block.Scope
+			}
+			if l.stopped != nil {
+				*l.stopped = d.Block.Stop
+			}
 		}
 	}
 	return g.Allowed, drops, nil
