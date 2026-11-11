@@ -89,7 +89,7 @@ final class UpdateCheckTests: XCTestCase {
         StubURLProtocol.reset([.init(status: 200, body: "{}")])
         _ = try await HTTP.send("GET", baseURL: base, path: "v1/apps", body: nil, token: NoAuthTokenProvider())
         let req = try XCTUnwrap(StubURLProtocol.requests.first)
-        XCTAssertEqual(req.value(forHTTPHeaderField: "X-Client-Platform"), "ios")
+        XCTAssertEqual(req.value(forHTTPHeaderField: "X-Client-Platform"), ClientCapabilities.platform)
         XCTAssertEqual(req.value(forHTTPHeaderField: "X-Client-Build"), ClientInfo.current.build)
         XCTAssertEqual(req.value(forHTTPHeaderField: "X-Client-Version"), ClientInfo.current.version)
         XCTAssertEqual(req.value(forHTTPHeaderField: "X-Client-DSL-Version"), String(ClientCapabilities.supportedSchemaVersion))

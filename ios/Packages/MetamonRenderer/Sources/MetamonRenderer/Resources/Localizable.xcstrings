@@ -3338,6 +3338,23 @@
         }
       }
     },
+    "センサー" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sensors"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "センサー"
+          }
+        }
+      }
+    },
     "タイマー" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -3708,6 +3725,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "プロフィールが見つかりません"
+          }
+        }
+      }
+    },
+    "ヘルスケア" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Health"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ヘルスケア"
           }
         }
       }
@@ -4325,6 +4359,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "会話を保存できませんでした"
+          }
+        }
+      }
+    },
+    "位置の記録" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Location tracking"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "位置の記録"
           }
         }
       }
