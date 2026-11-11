@@ -12,7 +12,8 @@
 6. [runner の口](#runner-の口)
 7. [appconfig の口(端末から)](#appconfig-の口端末から)
 8. [偽の provider(stg と試験)](#偽の-providerstg-と試験)
-9. [人の作業](#人の作業)
+9. [作れないもの・代わりの道](#作れないもの代わりの道)
+10. [人の作業](#人の作業)
 
 ## できていること・まだのこと
 
@@ -168,6 +169,24 @@ DSL に `externalCall` / `externalList` があるかの確かめは、DSL の子
 
 どの op も `fail=5xx | 4xx | timeout | grant` で失敗の形を試せる。`fakeOauth` の同意の URL は runner 自身の戻り先なので、本物の provider 無しで「つなぐ」まで通る。
 
+## 作れないもの・代わりの道
+
+要望は来るが、生成アプリの外の API(provider)としては作れないもの。AI は「作れない」と短く伝え、下の「代わりにできること」を出す(AI の決まりへの反映は `externalCall` / `externalList` の子 Issue)。入れる・入れないの決定は [decisions/external-apis.md](../../decisions/external-apis.md) のままで、ここはその理由と代わりの道を 1 か所にまとめたもの。名前の順(英字 → かな)・1 行 1 項目。
+
+どの項目にも共通: **画面を読み取る(スクレイピング)・利用者のログイン情報を預かる形では作らない**。
+
+| もの | 作れない理由 | 代わりにできること |
+|---|---|---|
+| Amazon の注文履歴(#1709) | 買った人が自分の注文履歴を外のアプリに渡す公開の API が見当たらない(2026-11-12 の確認の範囲)。残る道はスクレイピングかログイン情報を預かる形で、どちらもしない | 手で入れる記録のアプリ(品名・金額・日付)。注文の確認メールの本文を貼る text の field を置き、`aiButton`(task `extract`)で品名・金額を下書きに入れる(保存は利用者) |
+| Jアラート(国民保護情報・#1662) | 政府が市町村の防災行政無線と携帯電話の緊急速報メールで伝える仕組みで、生成アプリから受け取る公開の口が無い([国民保護ポータル](https://www.kokuminhogo.go.jp/kokuminaction/jalert.html))。遅れて届く・届かない通知は危ないので、まねて作らない | 「Jアラートは携帯電話の緊急速報メールと防災行政無線で届く」と案内する text。端末の緊急速報の受信の設定を確かめるよう促す。弾道ミサイルの時の行動など公式の案内のページを `openUrlButton` で開く。「このアプリで知らせる」と受け取れる文言にしない |
+| Strava の記録(#1670) | API の規約がデータを AI・機械学習に使うことを禁じ、本人にだけ見せる決まりが共有のアプリと合わない([API Agreement](https://www.strava.com/legal/api))。決定どおり入れない | Strava は設定でアクティビティ(種類・距離・時間・カロリー・ルート)を Apple のヘルスケアに書く([Strava のヘルプ](https://support.strava.com/hc/en-us/articles/216917527-Health-App-and-Strava))。端末のヘルスデータを読む道(iOS = HealthKit・Android = Health Connect)で見せる。**今の `healthStat` は歩数と体重だけ**で、ワークアウトを読む部品はまだ無い(足すなら別の Issue)。HealthKit は審査用の版から外している。それまでは手で入れる運動の記録 |
+| 緊急地震速報(#1662) | 強い揺れまでの猶予は数秒から数十秒で、震源に近い所には原理的に間に合わない([気象庁: 特性や限界](https://www.jma.go.jp/jma/kishou/know/jishin/eew/shikumi/tokusei.html))。サーバーを通す生成アプリの通知では遅れがさらに足され、誤った安心を与える。予報を人に伝える時の決まりもある([気象庁: 伝達に係るお願い](https://www.jma.go.jp/jma/kishou/know/jishin/eew/katsuyou/attention.html)) | 「緊急地震速報は携帯電話各社の配信(緊急速報メール)・テレビ・ラジオ・防災行政無線で届く」と案内する([気象庁: 入手方法](https://www.jma.go.jp/jma/kishou/know/jishin/eew/katsuyou/receive.html))。起きた後の地震の情報(遅れて出るもの)の一覧は、今の feed の許可リストに無い(下の「人の作業」)。揺れへの備え(持ち出し品のチェックリストなど)の記録のアプリ |
+| 駐車場の空き(#1696) | 全国で使える空きの公開の API が見当たらない(事業者ごとの契約)。スクレイピングはしない | `openUrlButton`(`app: maps`)で地図のアプリを開き、そこで駐車場を探す。行き先が決まっていれば `routeGuide`。自治体のオープンデータで使えるものが見つかれば別の Issue |
+| ポイントカードの残高(#1709) | 各社の利用者のデータを読む公開の API が見当たらない(各社ごと)。残る道はログイン情報を預かる形で、しない | 手で入れる残高・有効期限の記録と、期限の前の通知。各社の公式のアプリ・サイトを `openUrlButton` で開く |
+
+- 規約・公開の状況が変わったら見直す(Strava は規約の改定、ほかは公開の API が出た時)。
+- 防災の 2 行は、審査で防災をうたう表現に注意する(掲載文・審査メモにも「速報を知らせる」とは書かない)。
+
 ## 人の作業
 
 - Cloud KMS の鍵(対称・runner の SA にだけ `roles/cloudkms.cryptoKeyEncrypterDecrypter`)を作り、`EXT_TOKEN_KMS_KEY` を runner に入れる(`infra/runner.tf`)。
@@ -178,3 +197,5 @@ DSL に `externalCall` / `externalList` があるかの確かめは、DSL の子
 - runner の最小 1 台(決定 4)・`#288` までは runner が prod だけなので、stg で偽の provider を通す時の runner の置き場所。
 - 各社の鍵・OAuth のクライアント(Secret Manager・`EXT_<PROVIDER>_*`)と、原価・押さえの量(非公開の資料から env)。
 - プライバシーポリシー・利用規約(`docs/legal`)に外の API への送信とトークンの保管・消し方を書く。
+- 「作れないもの・代わりの道」で一次情報を読めなかったもの: Amazon の利用規約と Selling Partner API の説明のページ(2026-11-12 に取得できず)・Strava から Health Connect への書き込みの公式のヘルプ。読んで表の理由と合っているかを確かめる。
+- 起きた後の地震の情報(気象庁)を feed の許可リストに足すかの判断(足すなら別の Issue。遅れて出る情報だと画面に書く)。
