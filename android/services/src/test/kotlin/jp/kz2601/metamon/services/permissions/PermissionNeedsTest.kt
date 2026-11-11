@@ -5,7 +5,6 @@ import jp.kz2601.metamon.dsl.decode
 import jp.kz2601.metamon.services.permissions.AppPermission.CAMERA
 import jp.kz2601.metamon.services.permissions.AppPermission.LOCATION
 import jp.kz2601.metamon.services.permissions.AppPermission.MICROPHONE
-import jp.kz2601.metamon.services.permissions.AppPermission.NEARBY
 import jp.kz2601.metamon.services.permissions.AppPermission.NOTIFICATIONS
 import jp.kz2601.metamon.services.permissions.PermissionStatus.DENIED
 import jp.kz2601.metamon.services.permissions.PermissionStatus.GRANTED
@@ -30,7 +29,7 @@ class PermissionNeedsTest {
             """[{"type":"vstack","children":[{"type":"photoField","field":"p"},{"type":"card","children":[{"type":"nearbyShare"}]}]},
                {"type":"audioRecorder","field":"a"},{"type":"locationButton","field":"l"}]""",
         )
-        assertEquals(setOf(CAMERA, NEARBY, MICROPHONE, LOCATION), PermissionNeeds.of(d))
+        assertEquals(setOf(CAMERA, MICROPHONE, LOCATION), PermissionNeeds.of(d))
     }
 
     @Test
@@ -74,8 +73,8 @@ class PermissionNeedsTest {
         // 使っていない権限が断られていても出さない
         assertNull(PermissionOffBarModel.pick(setOf(MICROPHONE, LOCATION), statuses, emptySet(), busy = false, summaryShowing = false))
         // 宣言していない(UNAVAILABLE)・状態が無いものは出さない
-        assertNull(PermissionOffBarModel.pick(setOf(NEARBY), mapOf(NEARBY to UNAVAILABLE), emptySet(), busy = false, summaryShowing = false))
-        assertNull(PermissionOffBarModel.pick(setOf(NEARBY), emptyMap(), emptySet(), busy = false, summaryShowing = false))
+        assertNull(PermissionOffBarModel.pick(setOf(AppPermission.HEALTH), mapOf(AppPermission.HEALTH to UNAVAILABLE), emptySet(), busy = false, summaryShowing = false))
+        assertNull(PermissionOffBarModel.pick(setOf(AppPermission.HEALTH), emptyMap(), emptySet(), busy = false, summaryShowing = false))
     }
 
     @Test

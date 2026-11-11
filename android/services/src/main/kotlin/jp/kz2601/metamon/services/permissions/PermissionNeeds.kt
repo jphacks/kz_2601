@@ -20,7 +20,7 @@ object PermissionNeeds {
         return out
     }
 
-    /** 部品 1 つが要る権限。音声の入口(voiceInput)は音声のシートが自前で案内するので含めない。qrScanner は Google Code Scanner が読むので要らない(#866)。dashcam のマイクは audio: true の時だけ(iOS の DashcamRecorder と同じ)。 */
+    /** 部品 1 つが要る権限。音声の入口(voiceInput)は音声のシートが自前で案内するので含めない。qrScanner は Google Code Scanner が読むので要らない(#866)。dashcam のマイクは audio: true の時だけ(iOS の DashcamRecorder と同じ)。nearbyShare は Android にまだ無いので求めない(近距離共有 #878 で戻す)。 */
     fun of(component: Component): Set<AppPermission> = when (component.type) {
         ComponentType.AUDIO_RECORDER, ComponentType.TRANSCRIBE_FIELD -> setOf(AppPermission.MICROPHONE)
         ComponentType.PHOTO_FIELD, ComponentType.VIDEO_FIELD ->
@@ -28,7 +28,6 @@ object PermissionNeeds {
         ComponentType.DASHCAM ->
             if (component.audio == true) setOf(AppPermission.CAMERA, AppPermission.MICROPHONE) else setOf(AppPermission.CAMERA)
         ComponentType.LOCATION_BUTTON, ComponentType.ROUTE_GUIDE, ComponentType.LOCATION_TRACKER -> setOf(AppPermission.LOCATION)
-        ComponentType.NEARBY_SHARE -> setOf(AppPermission.NEARBY)
         ComponentType.HEALTH_STAT -> setOf(AppPermission.HEALTH)
         else -> emptySet()
     }
@@ -56,7 +55,6 @@ object PermissionOffBarModel {
         AppPermission.MICROPHONE,
         AppPermission.CAMERA,
         AppPermission.LOCATION,
-        AppPermission.NEARBY,
         AppPermission.HEALTH,
     )
 
