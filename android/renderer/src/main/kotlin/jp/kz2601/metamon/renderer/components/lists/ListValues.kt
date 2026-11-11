@@ -19,6 +19,7 @@ import jp.kz2601.metamon.dsl.records.RecordQuery
 import jp.kz2601.metamon.dsl.records.Sort
 import jp.kz2601.metamon.dsl.records.TableGrouping
 import jp.kz2601.metamon.dsl.records.Track
+import jp.kz2601.metamon.renderer.EntityLoadState
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.JsonPrimitive
@@ -153,7 +154,11 @@ object TimelineRows {
 
 /** `stat`: 表示する値(書式後の文字, 取得失敗)。iOS の `StatLeaf.resolve`。 */
 object StatValue {
-    data class Resolved(val text: String, val unavailable: Boolean)
+    /** [loading]: 初回の読み込み中(0 を見せず「—」の骨組み)。[unavailable]: 取得失敗・評価できない(「—」)。 */
+    data class Resolved(val text: String, val unavailable: Boolean, val loading: Boolean = false)
+
+    private val LOADING = Resolved(FieldCoding.UNAVAILABLE, unavailable = false, loading = true)
+    private val UNAVAILABLE = Resolved(FieldCoding.UNAVAILABLE, unavailable = true)
 
     /** `value`(Expr)で値を出すモード(aggregate 指定が優先)。 */
     fun isValueMode(c: Component): Boolean = c.aggregate == null && c.value != null
@@ -164,6 +169,12 @@ object StatValue {
     private fun aggregateValue(c: Component, data: LeafData, locale: Locale): Resolved {
         val entity = data.entity(c.entity)
         val rows = data.filtered(c)
+        // 起動直後に「¥0 → ¥480」と跳ねない・取得失敗を「¥0」と見せない(#1116・iOS の aggregateValue)
+        when (AggregateLoad.of(c.entity, rows, data)) {
+            EntityLoadState.LOADING -> return LOADING
+            EntityLoadState.UNAVAILABLE -> return UNAVAILABLE
+            EntityLoadState.LOADED -> Unit
+        }
         val op = c.aggregate?.wire
         val fieldDef = c.field?.let { entity?.field(it) }
         if (Track.isTrackAggregate(op)) {
@@ -181,14 +192,38 @@ object StatValue {
 
     /** value モード(#101): 行コンテキスト無しで Expr を評価。評価できなければ「—」。 */
     private fun exprValue(c: Component, data: LeafData, locale: Locale): Resolved {
-        val expr = RecordQuery.expr(c.value) ?: return Resolved(FieldCoding.UNAVAILABLE, true)
-        val v = data.evaluator.evaluate(expr) ?: return Resolved(FieldCoding.UNAVAILABLE, true)
+        val expr = RecordQuery.expr(c.value) ?: return UNAVAILABLE
+        val entities = expr.referencedEntities
+        if (entities.any { data.loadState(it) == EntityLoadState.LOADING && data.records(it).isEmpty() }) return LOADING
+        if (entities.any { data.records(it).isEmpty() && data.loadState(it) == EntityLoadState.UNAVAILABLE }) return UNAVAILABLE
+        val v = data.evaluator.evaluate(expr) ?: return UNAVAILABLE
         return when (v) {
             // percent の value は比率(0〜1)。100 倍は Aggregator.format が持つ
             is ExprValue.Number -> Resolved(Aggregator.format(v.value, c.format?.wire, c.unit, locale), false)
             else -> Resolved(v.text, false)
         }
     }
+}
+
+/**
+ * stat / progressBar / gauge の集計の読み込み状態(#1116)。iOS の `StatLeaf.aggregateValue`・`ProgressBarLeaf.isUnavailable`。
+ * - 読み込み中で手元に記録が 1 件も無い → LOADING(0 を見せない)
+ * - 取得失敗で絞り込んだ記録が 0 件 → UNAVAILABLE(「—」。手元に記録があれば通常どおり集計)
+ */
+object AggregateLoad {
+    fun of(entity: String?, rows: List<Record>, data: LeafData): EntityLoadState {
+        if (entity.isNullOrEmpty()) return EntityLoadState.LOADED
+        val state = data.loadState(entity)
+        return when {
+            state == EntityLoadState.LOADING && data.records(entity).isEmpty() -> EntityLoadState.LOADING
+            state == EntityLoadState.UNAVAILABLE && rows.isEmpty() -> EntityLoadState.UNAVAILABLE
+            else -> EntityLoadState.LOADED
+        }
+    }
+
+    /** progressBar / gauge: `value` のリテラルなら記録を読まないので常に読めた扱い。 */
+    fun of(c: Component, data: LeafData): EntityLoadState =
+        if (ProgressValue.literal(c) != null) EntityLoadState.LOADED else of(c.entity, data.filtered(c), data)
 }
 
 /** `progressBar`: 比率と表示。iOS の `ProgressBarLeaf`。 */

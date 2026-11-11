@@ -9,10 +9,12 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -28,10 +30,12 @@ import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import jp.kz2601.metamon.renderer.DSLRuntime
 import jp.kz2601.metamon.renderer.EntityLoadState
 import jp.kz2601.metamon.renderer.R
+import jp.kz2601.metamon.renderer.theme.LocalReduceMotion
 import jp.kz2601.metamon.renderer.theme.RenderTheme
 import jp.kz2601.metamon.renderer.theme.SymbolIcon
 import jp.kz2601.metamon.renderer.theme.colors
@@ -100,12 +104,7 @@ internal fun RecordsPlaceholderView(
 @Composable
 internal fun RecordsSkeleton(modifier: Modifier = Modifier) {
     val loading = stringResource(R.string.load_state_loading)
-    val pulse by rememberInfiniteTransition(label = "skeleton").animateFloat(
-        initialValue = 0.45f,
-        targetValue = 1f,
-        animationSpec = infiniteRepeatable(tween(durationMillis = 900), RepeatMode.Reverse),
-        label = "skeletonAlpha",
-    )
+    val pulse = skeletonPulse()
     Column(
         modifier
             .fillMaxWidth()
@@ -121,6 +120,72 @@ internal fun RecordsSkeleton(modifier: Modifier = Modifier) {
             Column(Modifier.alpha(pulse), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                 SkeletonBar(width)
                 SkeletonBar(width * 0.55f, height = 10)
+            }
+        }
+    }
+}
+
+/** 骨組みの明滅の透明度(0.45〜1)。動きを減らす設定では明滅させない。 */
+@Composable
+internal fun skeletonPulse(): Float {
+    if (LocalReduceMotion.current) return SKELETON_STILL_ALPHA
+    val pulse by rememberInfiniteTransition(label = "skeleton").animateFloat(
+        initialValue = 0.45f,
+        targetValue = 1f,
+        animationSpec = infiniteRepeatable(tween(durationMillis = 900), RepeatMode.Reverse),
+        label = "skeletonAlpha",
+    )
+    return pulse
+}
+
+private const val SKELETON_STILL_ALPHA = 0.7f
+
+/**
+ * calendar / gridTable の 1 行の読み込み状態(iOS の caption の文言と再試行)。
+ * 骨組みは細い帯 1 本(読み上げ「読み込み中…」)、取得失敗は「読み込めませんでした」+ 再試行、空は [empty]。
+ */
+@Composable
+internal fun InlineRecordsState(
+    kind: RecordsPlaceholder,
+    runtime: DSLRuntime,
+    entity: String?,
+    modifier: Modifier = Modifier,
+    empty: @Composable () -> Unit = {},
+) {
+    when (kind) {
+        RecordsPlaceholder.EMPTY -> empty()
+        RecordsPlaceholder.SKELETON -> {
+            val loading = stringResource(R.string.load_state_loading)
+            Box(
+                modifier
+                    .fillMaxWidth()
+                    .padding(vertical = 4.dp)
+                    .testTag("records.skeleton")
+                    .clearAndSetSemantics {
+                        contentDescription = loading
+                        liveRegion = LiveRegionMode.Polite
+                    }
+                    .alpha(skeletonPulse()),
+            ) { SkeletonBar(0.5f, height = 12) }
+        }
+        RecordsPlaceholder.UNAVAILABLE -> {
+            val scope = rememberCoroutineScope()
+            Row(
+                modifier.fillMaxWidth().testTag("records.unavailable"),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(RenderTheme.Spacing.sm),
+            ) {
+                Text(
+                    stringResource(R.string.load_state_unavailable),
+                    Modifier.semantics { liveRegion = LiveRegionMode.Polite },
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                if (!entity.isNullOrEmpty()) {
+                    TextButton(onClick = { scope.launch { runtime.retryRecords(setOf(entity)) } }) {
+                        Text(stringResource(R.string.load_state_retry), style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.SemiBold))
+                    }
+                }
             }
         }
     }

@@ -170,7 +170,10 @@ fun CalendarLeaf(c: Component, ctx: RenderContext, modifier: Modifier = Modifier
         }
         val rows = days[selected].orEmpty()
         if (rows.isEmpty()) {
-            Text(stringResource(R.string.lists_no_events), style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            // 読み込み中・取得失敗は「予定はありません」と言わない(#1116・iOS の emptyState)
+            InlineRecordsState(data.placeholder(c.entity), data.runtime, c.entity) {
+                Text(stringResource(R.string.lists_no_events), style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
         } else {
             val item = ListItem(title = entity?.titleField ?: dateField)
             rows.forEach { row ->
