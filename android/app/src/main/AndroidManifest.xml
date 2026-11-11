@@ -112,6 +112,18 @@
                 <action android:name="android.app.action.SCHEDULE_EXACT_ALARM_PERMISSION_STATE_CHANGED" />
             </intent-filter>
         </receiver>
+        <!-- ホーム画面のウィジェット(#912)。中身は本体が書き、書いた時だけ描き直す -->
+        <receiver
+            android:name=".widget.MetamonWidgetReceiver"
+            android:exported="true"
+            android:label="@string/widget_name">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/metamon_widget_info" />
+        </receiver>
         <!-- 他の人の行動で届く通知(FCM・#887)。トークンは通知を出せる・サインイン済みの時にだけ取る(自動では作らない) -->
         <service
             android:name=".push.MetamonMessagingService"

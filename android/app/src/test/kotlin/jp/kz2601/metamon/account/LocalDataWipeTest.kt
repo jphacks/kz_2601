@@ -19,6 +19,8 @@ import jp.kz2601.metamon.services.update.NoticeDismissals
 import jp.kz2601.metamon.switcher.AppThumbnailStore
 import jp.kz2601.metamon.voice.ChatHistoryEntry
 import jp.kz2601.metamon.voice.ChatHistoryStore
+import jp.kz2601.metamon.widget.WidgetSnapshot
+import jp.kz2601.metamon.widget.WidgetSnapshotStore
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -73,6 +75,32 @@ class LocalDataWipeTest {
         assertFalse("切り替え一覧のサムネも消す(#1199)", thumbDir.exists())
         assertEquals(1, resets)
         assertEquals(1, consentForgotten)
+    }
+
+    /** ホーム画面のウィジェットの中身も消す(#912)。ランタイムを戻した後に消す(戻す前の値で書き直されない)。 */
+    @Test
+    fun clearsWidgetSnapshotAfterResettingRuntime() = runTest {
+        val store = RecordStore(null, EmptyCoroutineContext)
+        val client = RuntimeFixture.offlineClient
+        val queue = SyncQueue(null, store, client, BackoffPolicy.immediate, sleep = {}, io = EmptyCoroutineContext)
+        val engine = RecordSyncEngine(store, queue, client, RuntimeFixture.Offline(), backgroundScope)
+        val widget = WidgetSnapshotStore(InMemoryKeyValueStore()).apply {
+            save(WidgetSnapshot("app-of-a", "家計簿", listOf(WidgetSnapshot.Stat("k", "合計", "¥1")), 0))
+        }
+        val order = mutableListOf<String>()
+
+        LocalDataWipe(
+            engine, DocumentCache(null, EmptyCoroutineContext), AppListCache(null),
+            resetRuntime = { order += "reset" },
+            forgetDeviceState = {},
+            clearWidget = {
+                order += "widget"
+                widget.clear()
+            },
+        )()
+
+        assertNull(widget.load())
+        assertEquals(listOf("reset", "widget"), order)
     }
 
     /** 通知の同意(uid + appId ごと)と閉じたお知らせも消す。installationId は端末で 1 つなので残す(iOS `LocalWipe.preservedKeys`)。 */

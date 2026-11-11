@@ -140,6 +140,9 @@ dependencies {
     implementation(libs.play.services.mlkit.barcode.scanning)
     implementation(libs.play.services.mlkit.image.labeling)
     implementation(libs.play.services.mlkit.face.detection)
+    // ホーム画面のウィジェット(#912)
+    implementation(libs.glance.appwidget)
+    implementation(libs.glance.material3)
 
     testImplementation(libs.junit)
     testImplementation(libs.kotlinx.coroutines.test)
