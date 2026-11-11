@@ -366,9 +366,10 @@ func (s *googleSheets) appendRow(ctx context.Context, in Input) (Output, error) 
 }
 
 // do is Google Calendar's do (401 → ErrInvalidGrant, a missing scope →
-// ErrNotConnected, 429 / 5xx / rate limits → retryable) plus: any other 403
-// is ErrNotConnected (connect again), 404 is a sheet the person did not
-// pick (bad_request), 400 a range the sheet does not have (bad_request).
+// ErrNotConnected, 429 / 5xx / quota 403 → retryable) plus: an API not
+// enabled stays upstream_unavailable; any other 403 and 404 are a sheet the
+// person did not pick (bad_request), 400 a range the sheet does not have
+// (bad_request).
 func (s *googleSheets) do(ctx context.Context, tok *Token, method, path string, body []byte, out any) error {
 	ctype := ""
 	if body != nil {
@@ -379,7 +380,10 @@ func (s *googleSheets) do(ctx context.Context, tok *Token, method, path string, 
 	if errors.As(err, &pe) && !pe.Retryable {
 		switch pe.Status {
 		case http.StatusForbidden:
-			return ErrNotConnected
+			if errors.Is(err, errGoogleAPIDisabled) {
+				return err
+			}
+			return &ProviderError{Status: pe.Status, Err: fmt.Errorf("%w: googleSheets cannot open this spreadsheet; pick it in the Google Picker first", ErrUnknown)}
 		case http.StatusNotFound:
 			return &ProviderError{Status: pe.Status, Err: fmt.Errorf("%w: googleSheets cannot see this spreadsheet; pick it in the Google Picker first", ErrUnknown)}
 		case http.StatusBadRequest:

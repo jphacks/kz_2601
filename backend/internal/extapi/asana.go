@@ -402,9 +402,10 @@ func (c *asana) complete(ctx context.Context, in Input) (Output, error) {
 
 // do calls the API with the person's token. 401 is a token Asana no longer
 // takes (ErrInvalidGrant: the connection turns to error); 403 is a missing
-// scope or no access (ErrNotConnected: connect again); 400 / 404 are an id
-// the person does not have (bad_request); 429 / 5xx are retryable provider
-// errors.
+// scope (ErrNotConnected: connect again with it) or, any other 403, an item
+// the person has no access to (bad_request: connecting again would not
+// help); 400 / 404 are an id the person does not have (bad_request); 429 /
+// 5xx are retryable provider errors.
 func (c *asana) do(ctx context.Context, in Input, method, path string, body []byte, out any) error {
 	if in.Token == nil || in.Token.AccessToken == "" {
 		return ErrNotConnected
@@ -435,11 +436,30 @@ func (c *asana) do(ctx context.Context, in Input, method, path string, body []by
 		return nil
 	case resp.StatusCode == http.StatusUnauthorized:
 		return ErrInvalidGrant
-	case resp.StatusCode == http.StatusForbidden:
+	case resp.StatusCode == http.StatusForbidden && asanaScopeMissing(b):
 		return ErrNotConnected
+	case resp.StatusCode == http.StatusForbidden:
+		return &ProviderError{Status: resp.StatusCode, Err: fmt.Errorf("%w: asana: this person has no access to this item", ErrUnknown)}
 	case resp.StatusCode == http.StatusBadRequest || resp.StatusCode == http.StatusNotFound:
 		return &ProviderError{Status: resp.StatusCode, Err: fmt.Errorf("%w: asana has no such item", ErrUnknown)}
 	}
 	return &ProviderError{Status: resp.StatusCode, Retryable: resp.StatusCode == 429 || resp.StatusCode >= 500,
 		Err: errors.New("asana refused")}
+}
+
+// asanaScopeMissing: a 403 says the token lacks a scope (Asana names the
+// missing scopes in the message); the message is not kept.
+func asanaScopeMissing(body []byte) bool {
+	var e struct {
+		Errors []struct {
+			Message string `json:"message"`
+		} `json:"errors"`
+	}
+	_ = json.Unmarshal(body, &e)
+	for _, x := range e.Errors {
+		if strings.Contains(strings.ToLower(x.Message), "scope") {
+			return true
+		}
+	}
+	return false
 }
