@@ -77,6 +77,9 @@ final class MacServices: @unchecked Sendable {
 
     /// 自動の動きの一覧とオン / オフ(#347・#979)。appconfig の URL がある時だけ(審査用ビルドは外す・iOS の `Automations+Wiring` と同じ)
     var automations: (any AutomationsClient)? { appConfigURL.map { HTTPAutomationsClient(baseURL: $0, token: token) } }
+
+    /// 設定の「つないだサービス」(#1714)。iOS の `Connections+Wiring` と同じく appconfig の URL がある時だけ(審査用ビルドは外す)
+    var external: (any ExternalServicesClient)? { appConfigURL.map { HTTPExternalServicesClient(baseURL: $0, token: token) } }
     #endif
 
     /// アカウント削除(#972・`DELETE /v1/me`)。iOS の `Account+Wiring` と同じく appconfig の URL がある時だけ本物
