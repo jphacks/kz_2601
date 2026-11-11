@@ -98,6 +98,7 @@ op の `Check` は引数の値を確かめる(appconfig と runner の両方で�
 | `slack` の `unread`(DM の未読の数・#1679) | 無料・OAuth(`runs` だけ・ユーザーのトークン・scope `im:read`) | `unread(channel)`。`channel` は DM の id(`D…`)だけ。`conversations.info` の `unread_count_display` を返す(Web API が未読の数を返すのは DM だけ。チャンネルの未読を数えるには本文を `conversations.history` で読むことになり、Marketplace に無い配布アプリは 1 分 1 回・15 件までなので入れない)。数が無い答えは 400 `bad_request`。答えは 1 件(見出し = 「未読」・補足 = id・値 = 数)。本文は読まない | 同上 | なし | 同上 |
 | `googleSheets` の `readRange`(スプレッドシートの範囲を見る・#1685) | 無料・OAuth(`runs` だけ・scope `drive.file`。利用者が Google Picker で選んだファイルとアプリが作ったファイルだけ・センシティブでない) | `readRange(spreadsheetId, range, limit?)`。`spreadsheetId` は英数字と `_` `-` の 20〜128 文字(Picker で選んだファイルの id)。`range` はシート名か A1 の範囲(`Sheet1!A1:D50`・`'売上'!A:D`・シート名を省くと最初のシート)で 200 文字まで。`limit` 1〜100(既定 50)。行の範囲が無い・`limit` より広い範囲は `limit` 行に縮めて頼む。行はシートの 1 行(見出し = 1 列目・値 = 2 列目・補足 = 3〜10 列目を「・」でつなぐ。11 列目からは捨てる・空の行は飛ばす)。選んでいないファイル(Google の 404)は 400 `bad_request`(「Picker で選んで」の理由付き)・無いシートや範囲(400)も 400 `bad_request` | `https://sheets.googleapis.com` と `https://oauth2.googleapis.com` だけ | なし(シートの中身を持たない) | `EXT_GOOGLE_SHEETS_ENABLED=1`。OAuth のクライアントは Google カレンダーのもの(`EXT_GOOGLE_CALENDAR_CLIENT_ID` / `_CLIENT_SECRET`)。`EXT_GOOGLE_SHEETS_CLIENT_ID` / `_CLIENT_SECRET` を入れた時だけそちら(`Provider.ClientFrom`) |
 | `googleSheets` の `appendRow`(スプレッドシートに 1 行足す・#1685) | 無料・OAuth(`runs` だけ・scope `drive.file`)・書く(確認必須) | `appendRow(spreadsheetId, range, values)`。`range` は `readRange` と同じ(表のある範囲。その下に足す)。`values` は文字列の JSON 配列(1〜26 個・1 つ 1000 文字まで・改行とタブ以外の制御文字は不可)。値はそのまま入れる(`RAW`。`=` で始まっても式にしない)。答えは `resultId`(書いた範囲・例 `Sheet1!A5:C5`)と 1 件(リンク = そのシート)。Google に冪等のキーが無いので、二重にしないのは書く op をやり直さない決まりだけ | 同上 | なし | 同上 |
+| `odpt` の `trainStatus`(電車の運行情報・公共交通オープンデータセンター・#1691) | 無料・運営の鍵(`runs` だけ。ODPT の開発者登録の consumer key) | `trainStatus(operator?, railway?)`。`operator` は ODPT の事業者 id・`railway` は路線 id で、どちらも下の「ODPT の事業者と規約」の許可リストだけ(ほかは 400 `bad_request`)。両方あれば路線がその事業者のものであること。無ければ許可リストの全事業者。行は路線ごと(見出し = 路線名(路線の無い事業者全体の情報は事業者名)・補足 = 「状態: 案内の文」(状態が無ければ文だけ・200 文字で切る)・値 = 「M/D HH:MM 更新」(`dc:date`・日本時間))。並びは許可リストの順。`dct:valid` を過ぎた行・時刻の無い行・許可リストに無い事業者の行は出さない。出典(下の表)を出す。AI に選ばせる決まり(`prompt.go`・`catalog.go`)はまだ | `https://api.odpt.org` だけ(`/api/v4/odpt:TrainInformation`)・鍵は `acl:consumerKey` のクエリ(API の決まり。エラーに URL は出さない) | 1 分 | `EXT_ODPT_ENABLED=1`・`EXT_ODPT_API_KEY` |
 
 Google(カレンダー・ToDo・スプレッドシート)の 401 は接続を `error` にする(つなぎ直す)。403 は理由で分ける: scope が足りない(`insufficientPermissions`・`ACCESS_TOKEN_SCOPE_INSUFFICIENT`)だけ 409 `ext_not_connected`(つなぎ直す)。回数の上限(`rateLimitExceeded`・`userRateLimitExceeded`・`quotaExceeded`・`dailyLimitExceeded`)は 429 として扱い、502 `upstream_unavailable` にして provider を止める(次の呼び出しは 429 `rate_limited` と `retryAfterSec`)。キーで呼ぶ YouTube などの 403 も同じ。API が有効でない(`accessNotConfigured`・`SERVICE_DISABLED`)はこちらの設定なので 502 `upstream_unavailable`。ほかの 403(そのリスト・シートを使えない)は ToDo とスプレッドシートでは 400 `bad_request`(つなぎ直しても直らない)。429 / 5xx は 502 `upstream_unavailable`。
 
@@ -105,7 +106,7 @@ Asana の 403 も、メッセージが scope の不足を言う時だけ 409 `ex
 
 Slack は利用者ごとの OAuth v2 でユーザーのトークン(`user_scope` だけ・ボットのトークンは取らない)。PKCE は使わない(Slack の PKCE はアプリを公開クライアントに戻せない形で変えるため。runner はクライアントの秘密を Basic 認証で送る)。新しい scope は同じトークンに足されるので、書く op のためにつなぎ直しても読む op は残る。トークンの回転(12 時間・使い捨ての refresh token)を入れた時も入れない時も動く。Slack はほとんどの失敗を 200 の `ok:false` で返すので、コードで分ける: `invalid_auth`・`not_authed`・`token_revoked`・`token_expired`・`account_inactive`(と HTTP 401)は接続を `error` にする(つなぎ直す)。`missing_scope`・`not_allowed_token_type`・`no_permission`・`access_denied` など(と HTTP 403)は 409 `ext_not_connected`。`ratelimited`(HTTP 429)・`fatal_error`・`internal_error`・`service_unavailable`・`request_timeout`(と 5xx)は 502 `upstream_unavailable`。ほかのコードは 400 `bad_request`。Slack の API 規約: 商用の配布は Marketplace(か別の契約)が要る・データは機能に要る間だけ持つ・モデルの学習に使わない・プライバシーポリシーに読むものを書く。だから op は本人の状態・本人の投稿・DM の未読の数だけで、メッセージの本文を読む op・ためる op は入れない。
 
-Asana の `myTasks`・`projectTasks`・`complete`、Todoist の `complete`・`projects`・`project` / `label`、Notion の `updateProperties`・`pageText`、Google ToDo の全部の op、GitHub と Linear の op、YouTube の `channelStats`・`latestVideos`、Slack の全部の op は runner の op だけ。生成アプリから呼ぶ部品と AI に選ばせる決まり(`prompt.go`・`catalog.go`・`docs/dsl`)は #1643 の判断の後に足す。
+Asana の `myTasks`・`projectTasks`・`complete`、Todoist の `complete`・`projects`・`project` / `label`、Notion の `updateProperties`・`pageText`、Google ToDo の全部の op、GitHub と Linear の op、YouTube の `channelStats`・`latestVideos`、Slack の全部の op、ODPT の `trainStatus` は runner の op だけ。生成アプリから呼ぶ部品と AI に選ばせる決まり(`prompt.go`・`catalog.go`・`docs/dsl`)は #1643 の判断の後に足す。
 
 provider が 404 / 422(持っていない通貨・日)を返した時は 400 `bad_request`(`runs` は戻す)。429 / 5xx は 502 `upstream_unavailable`。
 
@@ -154,6 +155,45 @@ op の案: `boards()`(自分のボード・`GET /1/members/me/boards`。`/1/memb
 | 規約へのリンク(ポリシー III.A.1) | YouTube の利用規約(https://www.youtube.com/t/terms)へのリンクを出す | 部品と iOS の作業(#1643)。`docs/legal` にも書く(人の作業) |
 | プライバシーポリシー(規約 7・ポリシー III.A.2) | YouTube API サービスを使うと書き、Google のプライバシーポリシー(https://policies.google.com/privacy)へリンクする | 人の作業(`docs/legal`) |
 | 割り当て(規約 15・ポリシー III.D.3) | 割り当てを超えない・避けない。増やすには API Compliance Audit。認められた使い道にだけ使う | 1 回 1〜2 単位。回数の上限 `EXT_GLOBAL_DAILY_YOUTUBE` を 1 日の割り当てに合わせる(上限は回数で数えるので、`latestVideos` を 2 単位として見積もる・人の作業) |
+
+### ODPT の事業者と規約(#1691)
+
+[公共交通オープンデータセンター利用規約](https://developer.odpt.org/terms/center_use_rules.html)・[公共交通オープンデータ基本ライセンス](https://developer.odpt.org/terms/data_basic_license.html)・[開発者ガイドライン](https://developer.odpt.org/terms/data_basic_use_guideline.html)・[チャレンジ限定ライセンス](https://developer.odpt.org/challenge_license)と、[データカタログ](https://ckan.odpt.org/dataset?tags=%E9%81%8B%E8%A1%8C%E6%83%85%E5%A0%B1-train_status_information)の各事業者の「運行情報」のライセンス(2026-11-12 に読んだ)から決めた。
+
+入れた事業者(許可リスト・`odpt.go` の `odptOperators`):
+
+| 事業者 id | 路線 id(`odpt.Railway:` の後) | ライセンス | データセット |
+|---|---|---|---|
+| `odpt.Operator:TokyoMetro` | `TokyoMetro.Ginza`・`.Marunouchi`・`.MarunouchiBranch`・`.Hibiya`・`.Tozai`・`.Chiyoda`・`.Yurakucho`・`.Hanzomon`・`.Namboku`・`.Fukutoshin` | 基本ライセンス | [東京メトロ 運行情報](https://ckan.odpt.org/dataset/r_train_status-tokyometro) |
+| `odpt.Operator:Toei` | `Toei.Asakusa`・`.Mita`・`.Shinjuku`・`.Oedo`・`.Arakawa`・`.NipporiToneri` | CC BY 4.0 | [東京都交通局 運行情報](https://ckan.odpt.org/dataset/r_train_status-toei) |
+| `odpt.Operator:TWR` | `TWR.Rinkai` | 基本ライセンス | [東京臨海高速鉄道 運行情報](https://ckan.odpt.org/dataset/r_train_status-twr) |
+| `odpt.Operator:MIR` | `MIR.TsukubaExpress` | 基本ライセンス | [首都圏新都市鉄道 運行情報](https://ckan.odpt.org/dataset/r_train_status-mir) |
+| `odpt.Operator:TamaMonorail` | `TamaMonorail.TamaMonorail` | 基本ライセンス | [多摩都市モノレール 運行情報](https://ckan.odpt.org/dataset/r_train_status-tamamonorail) |
+| `odpt.Operator:YokohamaMunicipal` | `YokohamaMunicipal.Blue`・`.Green` | 基本ライセンス | [横浜市交通局 運行情報](https://ckan.odpt.org/dataset/r_train_status-yokohamamunicipal) |
+
+入れない事業者(運行情報が「公共交通オープンデータチャレンジ限定ライセンス」。チャレンジの期間中・作品の応募が前提で、常に動くアプリには使えない):
+
+| 事業者 | データセット |
+|---|---|
+| JR 東日本(JR東日本アイステイションズ提供・特定利用条件つき) | [JR東日本アイステイションズ 運行情報](https://ckan.odpt.org/dataset/jr-train-status-information-by-jr-east-i-stations) |
+| 東急電鉄 | [東急電鉄 運行情報](https://ckan.odpt.org/dataset/tokyu__r_train_status) |
+| 東武鉄道 | [東武鉄道 運行情報](https://ckan.odpt.org/dataset/tobu__r_train_status) |
+| 京王電鉄 | [京王電鉄 運行情報](https://ckan.odpt.org/dataset/keio__r_train_status) |
+| 西武鉄道 | [西武鉄道 運行情報](https://ckan.odpt.org/dataset/seibu__r_train_status) |
+| 京急電鉄 | [京急電鉄 運行情報](https://ckan.odpt.org/dataset/keikyu__r_train_status) |
+
+ライセンスが基本ライセンスか CC BY に変わったら、カタログで確かめてから許可リストに足す(コードと上の表を一緒に直す)。
+
+| 決まり | 中身 | この作りでの扱い |
+|---|---|---|
+| 利用者への通知(ガイドライン「利用者への通知」) | センターのデータであること・正確・完全とは限らないこと・事業者に直接問い合わせないこと・アプリの問い合わせ先を出す | 出典 `ODPTAttribution`(「公共交通オープンデータセンターのデータです。正確・完全とは限りません。遅れの情報は事業者の公式の案内を確かめてください(事業者への問い合わせはしないでください)」)を行のそばに出す。アプリの問い合わせ先の出し方は部品(#1643)と iOS で決める |
+| CC BY のクレジット(都営・FAQ) | 「提供者名、名称、CC BY 4.0(リンク)」 | 都営の行を出す時は `ODPTToeiCredit`(「東京都交通局・公共交通オープンデータ協議会、運行情報、CC BY 4.0」)も出す |
+| 時刻の表示(ガイドライン 2.1.1) | 動的データは `dc:date` を画面に出す | 行の値 = 「M/D HH:MM 更新」。時刻の無い行は出さない |
+| 新しい情報だけ(ガイドライン 2.1.2) | `odpt:frequency` の間隔で更新・`dct:valid` を過ぎたデータは使わない | `dct:valid` を過ぎた行は出さない。キャッシュは 1 分だけ |
+| 元の意味を変えない(基本ライセンス 4 条 2 項) | 分解・修正で意味を損なわない・成果物の外で表示しない | 案内の文はそのまま(長い時だけ末尾を切って `…`)。生のデータは端末に返さない(決まった行の形だけ) |
+| 再配布しない(基本ライセンス 8 条 4 項) | データ(復元できる派生データを含む)を第三者が再利用できる形で公開しない | 生成アプリの画面に出すだけ。**生成アプリが運行情報を一覧として外に出す(書き出し・公開の API)のは規約の外**(部品の決まりは #1643) |
+| 鍵(利用規約 5 条 1 項 5 号) | アクセストークンを第三者に開示しない | 鍵は Secret Manager の `EXT_ODPT_API_KEY` だけ・エラーとログに URL を出さない |
+| 営利 | 基本ライセンス 4 条 7 項で営利・非営利を問わず使える | Pro の機能として出してよい |
 
 ## 呼び出しの流れと数え方
 
@@ -289,3 +329,4 @@ DSL に `externalCall` / `externalList` があるかの確かめは、DSL の子
 - 回数の上限の値(`EXT_LIMIT_*`・`EXT_GLOBAL_DAILY*`)を各社の割り当てに合わせて runner の env に入れる(非公開の資料から。入れなければコードの既定)。
 - プライバシーポリシー・利用規約(`docs/legal`)に外の API への送信とトークンの保管・消し方を書く。
 - YouTube(#1699): Google Cloud で YouTube Data API v3 を有効にし、鍵(使える API を YouTube Data API v3 だけに絞る)を Secret Manager の `EXT_YOUTUBE_API_KEY` に入れる。1 日の割り当て(Cloud Console の Quotas)を確かめて `EXT_GLOBAL_DAILY_YOUTUBE` を合わせる。上の「YouTube の規約」を読み直し、プライバシーポリシーに YouTube API サービスの利用と Google のプライバシーポリシーへのリンク、アプリに YouTube の利用規約へのリンクを足す。
+- ODPT(#1691): [公共交通オープンデータセンターの開発者サイト](https://developer.odpt.org/)で開発者登録(運営のアカウント・審査に数日かかることがある)をし、発行された consumer key を Secret Manager の `EXT_ODPT_API_KEY` に入れる。上の「ODPT の事業者と規約」を読み直し、アプリの問い合わせ先(開発者のメールアドレスなど)を決める。路線 id は登録後に `odpt:Railway` で一度確かめる。
