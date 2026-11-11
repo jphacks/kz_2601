@@ -191,7 +191,7 @@ private fun ScreenView(dsl: AppDSL, session: DesktopSession, route: Route, io: D
             screen.toolbar.forEach { b ->
                 if (isButtonVisible(b.action, form)) TextButton(onClick = { perform(b.action, null) }) { Text(b.label) }
             }
-            if (route == session.top) TextButton(onClick = print) { Text("印刷") }
+            if (route == session.top) TextButton(onClick = print) { Text(Strings["desktop_print"]) }
         }
         HorizontalDivider()
         if (route == session.top) {

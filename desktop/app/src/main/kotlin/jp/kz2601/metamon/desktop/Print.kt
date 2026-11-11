@@ -1,5 +1,6 @@
 package jp.kz2601.metamon.desktop
 
+import jp.kz2601.metamon.desktop.i18n.Strings
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
@@ -197,7 +198,7 @@ object DesktopPrint {
 
     /** OS の印刷ダイアログ(プリンター・部数・範囲)を出して印刷する。結果の一言を返す。 */
     fun print(doc: PrintDocument): String {
-        if (PrinterJob.lookupPrintServices().isEmpty()) return "プリンターが見つかりません"
+        if (PrinterJob.lookupPrintServices().isEmpty()) return Strings["desktop_print_no_printer"]
         val job = PrinterJob.getPrinterJob()
         job.jobName = doc.title
         job.setPageable(PrintPages(doc))
@@ -206,12 +207,12 @@ object DesktopPrint {
             add(OrientationRequested.PORTRAIT)
             add(JobName(doc.title, null))
         }
-        if (!job.printDialog(attrs)) return "印刷をやめました"
+        if (!job.printDialog(attrs)) return Strings["desktop_print_cancelled"]
         return try {
             job.print(attrs)
-            "${doc.pages.size} 頁を印刷に送りました"
+            Strings.format("desktop_print_sent", doc.pages.size)
         } catch (_: PrinterException) {
-            "印刷できませんでした"
+            Strings["desktop_print_failed"]
         }
     }
 }
@@ -225,13 +226,13 @@ fun PrintPreview(doc: PrintDocument, onDismiss: () -> Unit, onResult: (String) -
     val bitmap = remember(doc, index) { pages[index].pdf.image.toComposeImageBitmap() }
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("印刷: ${doc.title}") },
+        title = { Text(Strings.format("desktop_print_title", doc.title)) },
         text = {
             Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                Image(bitmap, "${index + 1} 頁目", Modifier.heightIn(max = 520.dp).border(1.dp, Color.LightGray))
+                Image(bitmap, Strings.format("desktop_print_page", index + 1), Modifier.heightIn(max = 520.dp).border(1.dp, Color.LightGray))
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     TextButton(onClick = { index-- }, enabled = index > 0) { Text("‹") }
-                    Text("${index + 1} / ${pages.size} 頁(A4 縦)", style = MaterialTheme.typography.bodySmall)
+                    Text(Strings.format("desktop_print_page_of", index + 1, pages.size), style = MaterialTheme.typography.bodySmall)
                     TextButton(onClick = { index++ }, enabled = index < pages.lastIndex) { Text("›") }
                 }
             }
@@ -239,12 +240,12 @@ fun PrintPreview(doc: PrintDocument, onDismiss: () -> Unit, onResult: (String) -
         confirmButton = {
             TextButton(enabled = !busy, onClick = {
                 busy = true
-                val msg = runCatching { DesktopPrint.print(doc) }.getOrElse { "印刷できませんでした" }
+                val msg = runCatching { DesktopPrint.print(doc) }.getOrElse { Strings["desktop_print_failed"] }
                 busy = false
                 onResult(msg)
                 onDismiss()
-            }) { Text("印刷…") }
+            }) { Text(Strings["desktop_print_dialog"]) }
         },
-        dismissButton = { TextButton(onClick = onDismiss) { Text("閉じる") } },
+        dismissButton = { TextButton(onClick = onDismiss) { Text(Strings["desktop_close"]) } },
     )
 }
