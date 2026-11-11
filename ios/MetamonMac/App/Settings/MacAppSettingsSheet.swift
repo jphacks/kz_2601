@@ -33,10 +33,19 @@ struct MacAppSettingsSheet: View {
         #endif
     }
 
+    /// 他の人の行動で届く通知の同意(#339・#982)を出しうるか。作成者かどうかは節の中で確かめる
+    private var mayShowPushConsent: Bool {
+        #if APP_STORE_REVIEW
+        false
+        #else
+        isOnServer && dsl.entities.contains(where: \.isShared) && MacServices.shared.pushDevices != nil
+        #endif
+    }
+
     var body: some View {
         VStack(spacing: 0) {
             Form {
-                if retentionEntities.isEmpty && !showsAutomations {
+                if retentionEntities.isEmpty && !showsAutomations && !mayShowPushConsent {
                     Text("このアプリには、ここで変えられる設定がありません。")
                         .macSecondaryText()
                 }
@@ -45,6 +54,7 @@ struct MacAppSettingsSheet: View {
                 if showsAutomations, let automations = MacServices.shared.automations {
                     MacAutomationsSection(model: AutomationsModel(appId: appId, client: automations)) { onRequest($0, false) }
                 }
+                if mayShowPushConsent { MacPushConsentSection(appId: appId, dsl: dsl) }
                 #endif
             }
             .formStyle(.grouped)
