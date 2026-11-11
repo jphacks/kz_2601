@@ -15,7 +15,8 @@ class DeviceCapabilitiesTest {
 
     @Test
     fun allowedComponentsAreExactlyTheRegisteredTypes() {
-        assertEquals(ComponentRegistry.standard.registeredTypes, caps.allowedComponents.toSet())
+        val hidden = (DeviceCapabilities.PENDING + DeviceCapabilities.FALLBACK_ONLY).map { it.wire }.toSet()
+        assertEquals(ComponentRegistry.standard.registeredTypes - hidden, caps.allowedComponents.toSet())
         assertEquals(caps.allowedComponents.size, caps.allowedComponents.toSet().size)
         assertFalse(ComponentType.UNKNOWN.wire in caps.allowedComponents)
     }
@@ -30,6 +31,7 @@ class DeviceCapabilitiesTest {
             ComponentType.PLACE_SEARCH,
             ComponentType.LOCATION_TRACKER,
             ComponentType.HEALTH_STAT,
+            // 描けるが、すれ違い(#1383)がそろうまで申告しない
             ComponentType.NEARBY_SHARE,
         )) {
             assertFalse(t.wire, t.wire in caps.allowedComponents)
@@ -41,12 +43,20 @@ class DeviceCapabilitiesTest {
             ComponentType.SENSOR_VALUE,
             ComponentType.DASHCAM,
             ComponentType.MATCH_LIST,
-            ComponentType.MUSIC_PLAYER,
             ComponentType.ROUTE_GUIDE,
             ComponentType.LOCATION_BUTTON,
         )) {
             assertTrue(t.wire, t.wire in caps.allowedComponents)
         }
+    }
+
+    /** #1267: musicPlayer は代わりの表示だけ(描画器には登録する)なので申告しない。 */
+    @Test
+    fun fallbackOnlyPartsAreRegisteredButNotDeclared() {
+        assertTrue(ComponentType.MUSIC_PLAYER.wire in ComponentRegistry.standard.registeredTypes)
+        assertFalse(ComponentType.MUSIC_PLAYER.wire in caps.allowedComponents)
+        val music = ComponentRegistry.build { register(ComponentType.MUSIC_PLAYER) { _, _, _ -> } }
+        assertEquals(emptyList<String>(), DeviceCapabilities.allowedComponents(music))
     }
 
     @Test
@@ -66,6 +76,7 @@ class DeviceCapabilitiesTest {
             listOf(
                 "recordRetention", "matching", "notification.when", "singleEntity", "addressedMessages", "notification.near", "aiButton.long", "aiButton.inputPhoto", "aiButton.saveTo",
                 "action.lookupBook", "text.highlight", "feed.v2", "expr.addMinutes", "aiChat.inputEntity", "component.bracket", "progressBar.settingTarget",
+                "openUrlButton.app",
             ),
             caps.supportedFeatures,
         )

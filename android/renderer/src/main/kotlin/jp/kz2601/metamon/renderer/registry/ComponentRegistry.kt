@@ -44,6 +44,7 @@ import jp.kz2601.metamon.renderer.components.map.registerMapLeaves
 import jp.kz2601.metamon.renderer.components.route.registerRouteLeaves
 import jp.kz2601.metamon.renderer.components.media.registerMediaLeaves
 import jp.kz2601.metamon.renderer.components.music.registerMusicLeaves
+import jp.kz2601.metamon.renderer.components.nearby.registerNearbyLeaves
 import jp.kz2601.metamon.renderer.components.scan.registerScanLeaves
 import jp.kz2601.metamon.renderer.components.sensors.registerSensorLeaves
 import jp.kz2601.metamon.renderer.components.social.registerSocialLeaves
@@ -121,6 +122,7 @@ class ComponentRegistry private constructor(private val builders: Map<String, Co
             registerDashcamLeaves() // leaf: ドラレコ(#872)・components/dashcam/DashcamLeaves.kt
             registerSensorLeaves() // leaf: センサー(#871)・components/sensors/SensorLeaves.kt
             registerMusicLeaves() // leaf: 音楽の代わり(#879)・components/music/MusicLeaves.kt
+            registerNearbyLeaves() // leaf: 近くの端末と送り合う(#1382)・components/nearby/NearbyLeaves.kt
             registerFeedLeaves() // leaf: 外部の公開データ(#876)・components/feed/FeedLeaves.kt
             registerImportLeaves() // leaf: ファイルの取り込み(#865)・components/importing/ImportLeaves.kt
             registerSocialLeaves() // leaf: みんなで話す(#875)・components/social/SocialLeaves.kt
