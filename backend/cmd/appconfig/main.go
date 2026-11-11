@@ -47,6 +47,14 @@ func main() {
 
 	authed := newAuthed(newAppCheck(ctx, project, logger), auth.Middleware(verifier, mode), st)
 	ents := newEntitlements(st, logger)
+	gp, err := googlePlayFromEnv(ctx, os.Getenv) // Android Pro purchases; nil = 503 not_configured
+	if err != nil {
+		logger.Error("google play: not configured", slog.Any("error", err))
+	}
+	ents.GooglePlay = gp
+	if gp != nil {
+		logger.Info("google play", slog.String("packageName", gp.Policy.PackageName), slog.Any("productIds", gp.Policy.ProductIDs))
+	}
 	// Pro features (#316): paid saves and shared writes need Pro; a purchase
 	// counts at once on this instance (Changed drops the cached "not Pro")
 	pro := entitlement.NewProChecker(ents.Store, ents.Verifier.Environments)
@@ -68,10 +76,11 @@ func main() {
 	cl := newCalls(st, cs, logger) // calls (#447)
 	api := appconfig.New(st, appconfig.WithPro(pro), appconfig.WithProMode(proMode), appconfig.WithPlanLimits(limits),
 		appconfig.WithAppSlots(cs), // coin-bought app slots raise the held-app limit (#630)
-		appconfig.WithTextFilter(textMode), usage(st, logger), appconfig.WithCalls(cl))
+		appconfig.WithTextFilter(textMode), usage(st, logger), appconfig.WithCalls(cl),
+		appconfig.WithExt(newExt(ctx, logger))) // external APIs through the runner (#1493)
 	entitlement.Register(api, ents) // Pro (#314)
 	coinsapi.Register(api, cs)      // coins (#630)
-	handler := newHandler(authed, logger, api, appconfig.SharePage(st), appconfig.MountAccountDeletePage, appStoreNotifications(ents, logger), coinsapi.Public(cs.Config), calls.Public(cl))
+	handler := newHandler(authed, logger, api, appconfig.SharePage(st), appconfig.MountAccountDeletePage, appStoreNotifications(ents, logger), playNotifications(ents, os.Getenv, logger), coinsapi.Public(cs.Config), calls.Public(cl))
 	server := &http.Server{
 		Handler:           handler,
 		ReadHeaderTimeout: 10 * time.Second,

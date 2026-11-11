@@ -16,6 +16,8 @@ extension AppRuntime {
         DocumentCache.shared.removeAll()                // DSL キャッシュとアプリ一覧(metamon-dsl)
         AppThumbnailStore.shared.removeAll()            // 変身一覧のサムネ(metamon-thumbs)
         ExportFiles.removeAll()                         // 書き出した CSV / PDF(#421・記録の写し)
+        RemoteImageLoader.removeAllCached()             // https の画像のキャッシュ(#1265・前の人が見た画像を残さない)
+        URLCache.shared.removeAllCachedResponses()      // 共有の URL キャッシュも
         WidgetSnapshot.defaults?.removePersistentDomain(forName: WidgetSnapshot.appGroupID) // App Group(ウィジェット)
         WidgetCenter.shared.reloadAllTimelines()
         LiveActivities.enqueue { await LiveActivities.endAll() } // ロック画面・Dynamic Island(#423)
@@ -25,9 +27,11 @@ extension AppRuntime {
         #if !APP_STORE_REVIEW
         CoinGate.shared.clear()                         // コインの残高(#630・前のアカウントの数を出さない)
         MatchingUI.shared.wipe()                        // 仲間探しの 18 歳以上の申告を送った記録・一覧(#507)
+        FeedCache.shared.reset()                        // feed の覚えた行(#1318・diet の検索語から引いた結果を次の人に出さない)
         #endif
         aiConsent?.reload()                             // 同意(#246)・チュートリアル(#274)の画面の状態を消した後に合わせる
         tutorial?.reload()
+        coachMarks?.reload()                            // 操作の吹き出し(#1441)
         let center = UNUserNotificationCenter.current()
         await services.notifications.removeAll()        // アプリごとの予約(#228)
         center.removeAllPendingNotificationRequests()

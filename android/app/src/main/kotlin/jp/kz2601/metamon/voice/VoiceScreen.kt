@@ -1,5 +1,7 @@
 package jp.kz2601.metamon.voice
 
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
@@ -58,6 +60,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
@@ -67,7 +70,9 @@ import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
@@ -80,8 +85,10 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LifecycleEventEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import jp.kz2601.metamon.R
+import jp.kz2601.metamon.ReviewBuild
 import jp.kz2601.metamon.permissions.PermissionCenter
 import jp.kz2601.metamon.permissions.rememberPermissionRequest
+import jp.kz2601.metamon.purchase.PaywallReason
 import jp.kz2601.metamon.renderer.layout.imePaddingExcludingBelow
 import jp.kz2601.metamon.runtime.UiText
 import jp.kz2601.metamon.runtime.resolve
@@ -90,6 +97,7 @@ import jp.kz2601.metamon.services.ChatOption
 import jp.kz2601.metamon.services.ChatTurn
 import jp.kz2601.metamon.services.RemainingToday
 import jp.kz2601.metamon.services.permissions.AppPermission
+import jp.kz2601.metamon.ui.CraneMascot
 import kotlinx.coroutines.delay
 import java.time.Instant
 import java.time.ZoneId
@@ -180,6 +188,7 @@ fun VoiceScreen(
         if (state.restartConfirm) RestartConfirmDialog(vm)
         if (state.showsChat) {
             ClarifyChat(state, vm, Modifier.weight(1f))
+            PendingVoiceCard(state, vm)
             ErrorCardSlot(state, vm, onOpenSettings)
         } else {
             Column(
@@ -188,6 +197,9 @@ fun VoiceScreen(
                 verticalArrangement = Arrangement.spacedBy(16.dp),
             ) {
                 Spacer(Modifier.height(16.dp))
+                // ツル(#1132・iOS と同じ 76dp・happy)。縦が狭い時は出さない
+                val compactHeight = VoiceCrane.isCompactHeight(LocalConfiguration.current.screenHeightDp)
+                VoiceCrane.pose(state, compactHeight)?.let { CraneMascot(it, size = 76.dp) }
                 Heading(title, subtitle)
                 Spacer(Modifier.height(8.dp))
                 MicButton(state, size = if (state.isInitial) 120.dp else 88.dp, onClick = onMic, onLongClick = onMicLongPress)
@@ -205,7 +217,8 @@ fun VoiceScreen(
                         textAlign = TextAlign.Center,
                     )
                 }
-                TranscriptCard(state)
+                if (state.pendingVoice == null) TranscriptCard(state)
+                PendingVoiceCard(state, vm)
                 ErrorCardSlot(state, vm, onOpenSettings)
             }
             if (state.phase.canStart && state.error == null) Examples(state, onPick = send, onTips = { showTips = true })
@@ -293,9 +306,15 @@ fun MicButton(
             else -> R.string.voice_mic_a11y_idle
         },
     )
+    // 録音中の声の大きさ(#1014): ボタンの外側に輪を広げる。読み上げは「録音中」の説明のまま(値の変化で読み上げを連打しない)
+    val level by animateFloatAsState(if (listening) state.inputLevel else 0f, tween(80), label = "micLevel")
+    val ringColor = colors.error.copy(alpha = 0.25f)
     Box(
         modifier
             .size(size)
+            .drawBehind {
+                if (level > 0f) drawCircle(ringColor, radius = this.size.minDimension / 2 * (1f + MIC_RING_MAX * level))
+            }
             .clip(CircleShape)
             .background(background)
             .combinedClickable(
@@ -341,6 +360,37 @@ internal fun MicGlyph(color: Color, stop: Boolean, modifier: Modifier = Modifier
     }
 }
 
+/** 輪がボタンの半径の何割まで広がるか */
+private const val MIC_RING_MAX = 0.35f
+
+/**
+ * 認識器が無音で自分から止まった時の確認(#1014)。途中で切れた依頼をそのまま送らない。
+ * 「送る」「続けて話す」(聞き取った分につなぐ)「言い直す」「送らない」。
+ */
+@Composable
+private fun PendingVoiceCard(state: VoiceUiState, vm: VoiceViewModel) {
+    val text = state.pendingVoice ?: return
+    OutlinedCard(Modifier.fillMaxWidth()) {
+        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            Text(
+                stringResource(R.string.voice_pending_title),
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.semantics { liveRegion = LiveRegionMode.Polite },
+            )
+            Text("「$text」", style = MaterialTheme.typography.bodyLarge)
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+                Button(onClick = vm::confirmPendingVoice) { Text(stringResource(R.string.voice_send)) }
+                OutlinedButton(onClick = vm::continuePendingVoice) { Text(stringResource(R.string.voice_pending_continue)) }
+            }
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                TextButton(onClick = vm::retakePendingVoice) { Text(stringResource(R.string.voice_pending_retake)) }
+                TextButton(onClick = vm::dismissPendingVoice) { Text(stringResource(R.string.voice_pending_cancel)) }
+            }
+        }
+    }
+}
+
 /** 途中の聞き取り / 送った依頼文。 */
 @Composable
 private fun TranscriptCard(state: VoiceUiState) {
@@ -354,7 +404,7 @@ private fun TranscriptCard(state: VoiceUiState) {
 @Composable
 private fun ErrorCardSlot(state: VoiceUiState, vm: VoiceViewModel, onOpenSettings: () -> Unit) {
     val error = state.error ?: return
-    ErrorCard(VoiceErrorCopy.of(error), onRetry = vm::retry, onDismiss = vm::dismissError, onOpenSettings = onOpenSettings)
+    ErrorCard(VoiceErrorCopy.of(error), onRetry = vm::retry, onDismiss = vm::dismissError, onOpenSettings = onOpenSettings, onUpgrade = vm.upgradeHandler())
 }
 
 /** 状態カードの本文。上限に達した時は戻る時刻(分からなければ「明日」)を入れる。TalkBack の読み上げにも使う。 */
@@ -372,7 +422,15 @@ fun ErrorCardCopy.bodyText(english: Boolean): UiText {
 
 /** 状態カード(iOS の `ErrorCard`)。 */
 @Composable
-fun ErrorCard(copy: ErrorCardCopy, onRetry: () -> Unit, onDismiss: () -> Unit, onOpenSettings: () -> Unit, modifier: Modifier = Modifier) {
+fun ErrorCard(
+    copy: ErrorCardCopy,
+    onRetry: () -> Unit,
+    onDismiss: () -> Unit,
+    onOpenSettings: () -> Unit,
+    modifier: Modifier = Modifier,
+    /** 「Pro にする」(#1103)。null = 課金を持たない構成なので出さない */
+    onUpgrade: ((PaywallReason) -> Unit)? = null,
+) {
     val english = LocalConfiguration.current.locales[0].language == "en"
     val body = copy.bodyText(english).resolve()
     OutlinedCard(modifier.fillMaxWidth().padding(vertical = 8.dp)) {
@@ -380,8 +438,12 @@ fun ErrorCard(copy: ErrorCardCopy, onRetry: () -> Unit, onDismiss: () -> Unit, o
             Text(stringResource(copy.title), style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
             Text(body, style = MaterialTheme.typography.bodyMedium)
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                val upgrade = copy.upgrade
                 when {
                     copy.openSettings -> Button(onClick = onOpenSettings) { Text(stringResource(R.string.voice_open_settings)) }
+                    upgrade != null && onUpgrade != null -> Button(onClick = { onUpgrade(upgrade) }, modifier = Modifier.testTag("errorCard.upgradePro")) {
+                        Text(stringResource(R.string.voice_upgrade_pro))
+                    }
                     copy.retry -> Button(onClick = onRetry) { Text(stringResource(R.string.voice_retry)) }
                 }
                 TextButton(onClick = onDismiss) { Text(stringResource(R.string.voice_dismiss)) }
@@ -490,7 +552,11 @@ private fun ClarifyChat(state: VoiceUiState, vm: VoiceViewModel, modifier: Modif
         if (state.chatPending) {
             item { Bubble(ChatBubble(fromUser = false, text = stringResource(R.string.voice_status_thinking_chat))) }
         }
-        item { TurnActions(state, vm) }
+        item {
+            // 無料枠切れ・402 で止めた作成(#1261)は、案や質問の代わりにカードを出す(iOS の ClarifyChatView と同じ)
+            val held = state.heldBuild
+            if (held != null) HeldBuildCard(held, busy = state.isGenerating, vm) else TurnActions(state, vm)
+        }
     }
 }
 
@@ -811,7 +877,7 @@ fun PromptTipsSheet(onDismiss: () -> Unit, onPick: (String) -> Unit) {
                     modifier = Modifier.padding(vertical = 8.dp),
                 )
             }
-            PromptTips.categories().forEach { category ->
+            PromptTips.categories(PromptTips.available(ReviewBuild.enabled)).forEach { category ->
                 item(key = "cat-" + category.id) {
                     Text(
                         stringResource(category.title),

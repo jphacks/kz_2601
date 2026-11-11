@@ -120,10 +120,10 @@ object NavigationResolver {
     fun canClose(state: NavigationState, route: Route): Boolean =
         state.path(route.stack).isNotEmpty() || route.stack in modalStacks
 
-    private fun dismissModals(s: NavigationState): NavigationState =
+    internal fun dismissModals(s: NavigationState): NavigationState =
         s.withPath(Route.SHEET, null).withPath(Route.FULL, null).copy(sheet = null, fullScreen = null)
 
-    private fun mainRoot(state: NavigationState, dsl: AppDSL): Route {
+    internal fun mainRoot(state: NavigationState, dsl: AppDSL): Route {
         if (dsl.app.hasTabs) {
             val tab = state.selectedTab.ifEmpty { dsl.initialTab }
             return Route(tab, stack = Route.tabStack(tab))

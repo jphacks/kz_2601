@@ -116,7 +116,7 @@ final class UpdateCheckTests: XCTestCase {
         let body = HTTPAIClient.GenerateBody(appId: "a", baseVersion: nil, transcript: "t")
         let chat = HTTPAIClient.ChatBody(appId: "a", messages: [])
         #if APP_STORE_REVIEW
-        let expected = ["recordRetention", "notification.when", "singleEntity", "notification.near", "aiButton.long", "aiButton.inputPhoto", "aiButton.saveTo", "aiButton.inputFeeds", "aiButton.outputs", "action.lookupBook", "text.highlight", "feed.v2", "expr.addMinutes", "aiChat.inputEntity", "component.bracket", "progressBar.settingTarget", "openUrlButton.app"]
+        let expected = ["recordRetention", "notification.when", "singleEntity", "notification.near", "aiButton.saveTo", "aiButton.inputFeeds", "aiButton.outputs", "action.lookupBook", "text.highlight", "feed.v2", "expr.addMinutes", "aiChat.inputEntity", "component.bracket", "progressBar.settingTarget", "openUrlButton.app"]
         #else
         let expected = ["recordRetention", "matching", "notification.when", "singleEntity", "dataRoles", "addressedMessages", "notification.near", "aiButton.long", "aiButton.inputPhoto", "aiButton.saveTo", "aiButton.inputFeeds", "aiButton.outputs", "action.lookupBook", "text.highlight", "feed.v2", "expr.addMinutes", "aiChat.inputEntity", "component.bracket", "progressBar.settingTarget", "photoField.illustrate", "component.callButton", "field.encrypted", "openUrlButton.app"] // #507 仲間探し(審査用の版は送らない)
         #endif

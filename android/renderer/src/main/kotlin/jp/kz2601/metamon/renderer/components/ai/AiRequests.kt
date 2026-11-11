@@ -3,6 +3,7 @@ package jp.kz2601.metamon.renderer.components.ai
 import jp.kz2601.metamon.dsl.Component
 import jp.kz2601.metamon.dsl.Length
 import jp.kz2601.metamon.dsl.Task
+import jp.kz2601.metamon.dsl.ai.AiOutputs
 import jp.kz2601.metamon.dsl.ai.AiPlaceholder
 import jp.kz2601.metamon.dsl.ai.AiTextLimits
 import jp.kz2601.metamon.dsl.ai.AiTextRequest
@@ -248,6 +249,13 @@ object AiGenerateBuilder {
         input = input?.let { AiTextLimits.clip(it, AiTextLimits.maxInputBytes(long)) }?.takeIf { it.isNotBlank() }
 
         val shape = AiTextShape.of(c.shape?.wire) ?: AiTextShape.LINE
+        // outputs: 数・日付・enum の書き方は formats で別に渡す(指示はボタンの指示のまま・作成者が払う呼び出しの照合のため)
+        val outputs = AiOutputs.from(c.outputs)
+        val formats = if (shape == AiTextShape.FIELDS && outputs != null && form != null) {
+            AiOutputs.formats(c.items.take(AiTextLimits.MAX_ITEMS), outputs, form)
+        } else {
+            null
+        }
         return AiTextRequest(
             instruction = instruction,
             shape = shape,
@@ -256,6 +264,7 @@ object AiGenerateBuilder {
             input = input,
             locale = locale,
             length = if (long) "long" else null,
+            formats = formats,
         )
     }
 }

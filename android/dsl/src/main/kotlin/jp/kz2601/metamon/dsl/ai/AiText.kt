@@ -13,7 +13,7 @@ import kotlinx.serialization.json.contentOrNull
 
 /**
  * aiButton の依頼と答え(iOS の MetamonDSL/Model/AIText.swift・AISaveTo.swift)。
- * 依頼は `POST /v1/text` の body と同じ形で、端末内 AI にも使う。写真・会話(aiChat)・outputs の書き方はまだ持たない。
+ * 依頼は `POST /v1/text` の body と同じ形で、端末内 AI にも使う。写真・会話(aiChat)はまだ持たない。
  */
 @Serializable
 enum class AiTextShape {
@@ -100,6 +100,8 @@ data class AiTextRequest(
     val saveTo: AiTextSaveTo? = null,
     /** aiChat inputEntity の参考の記録(task chat だけ) */
     val material: AiTextMaterial? = null,
+    /** aiButton outputs の数・日付・enum の書き方(generate の fields だけ・[AiOutputs.formats]) */
+    val formats: List<AiTextFormat>? = null,
 ) {
     /** aiChat の返事の依頼か(端末内 AI を使わない)。答えは要約などと同じく 1 つの文(long は長い文)。 */
     val isChat: Boolean get() = task == "chat"
@@ -118,6 +120,15 @@ data class AiTextRequest(
 
 @Serializable
 data class AiTextField(val name: String, val value: String)
+
+/** `POST /v1/text` の `formats` の 1 つ(kind は number | date | datetime | enum)。 */
+@Serializable
+data class AiTextFormat(
+    val item: String,
+    val kind: String,
+    /** enum の選択肢(enum 以外は null・20 個・各 40 字まで) */
+    val options: List<String>? = null,
+)
 
 /** 形に合わせて整えた結果。[text] は記録の string / text にそのまま入れる形。 */
 @Serializable

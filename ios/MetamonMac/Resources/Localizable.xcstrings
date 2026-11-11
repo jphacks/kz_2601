@@ -556,6 +556,70 @@
         }
       }
     },
+    "18 歳以上です" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "I'm 18 or older"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "18 歳以上です"
+          }
+        }
+      }
+    },
+    "18 歳以上ですか?" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Are you 18 or older?"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "18 歳以上ですか?"
+          }
+        }
+      }
+    },
+    "18 歳未満です" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "I'm under 18"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "18 歳未満です"
+          }
+        }
+      }
+    },
+    "18 歳未満の方は「つながりたい」を使えません" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Connecting is only available to people 18 or older"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "18 歳未満の方は「つながりたい」を使えません"
+          }
+        }
+      }
+    },
     "1日ごとの変化を折れ線グラフで見せて" : {
       "localizations" : {
         "en" : {
@@ -864,6 +928,40 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "ISBN を確かめてください(10 桁か 13 桁)"
+          }
+        }
+      }
+    },
+    "Mac App Store で最新の版にアップデートできます。" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "You can update to the latest version on the Mac App Store."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mac App Store で最新の版にアップデートできます。"
+          }
+        }
+      }
+    },
+    "Mac App Store を開く" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Open Mac App Store"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mac App Store を開く"
           }
         }
       }
@@ -1184,6 +1282,23 @@
         }
       }
     },
+    "Tailor It を終了" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Quit Tailor It"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tailor It を終了"
+          }
+        }
+      }
+    },
     "iPhone と Mac のどちらで購入しても、同じ Apple ID なら両方で使えます" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -1412,6 +1527,38 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "「%@」ができました"
+          }
+        }
+      }
+    },
+    "「%@」さんの投稿と公開したアプリは表示されません。設定から解除できます。" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "You will no longer see posts or apps from “%@”. You can unblock them in Settings."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "「%@」さんの投稿と公開したアプリは表示されません。設定から解除できます。"
+          }
+        }
+      }
+    },
+    "「%@」さんをブロックしますか?" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Block “%@”?"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "「%@」さんをブロックしますか?"
           }
         }
       }
@@ -1941,6 +2088,38 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "いまは従量制の回線です。通信量が多いので、ほかの回線につないでからがおすすめです。"
+          }
+        }
+      }
+    },
+    "うまくいきませんでした。もう一度お試しください" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Something went wrong. Please try again"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "うまくいきませんでした。もう一度お試しください"
+          }
+        }
+      }
+    },
+    "うまく付けられませんでした。もう一度お試しください" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Couldn't save that. Please try again"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "うまく付けられませんでした。もう一度お試しください"
           }
         }
       }
@@ -2525,6 +2704,22 @@
         }
       }
     },
+    "このアプリでは今は仲間探しを使えません" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Finding people isn't available in this app right now"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "このアプリでは今は仲間探しを使えません"
+          }
+        }
+      }
+    },
     "このアプリで使える量" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -2876,6 +3071,22 @@
         }
       }
     },
+    "この人の投稿と公開したアプリが、あなたに表示されなくなります。相手には知らされません。設定からいつでも解除できます。" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "You will no longer see this person’s posts or the apps they publish. They will not be told. You can unblock them in Settings at any time."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "この人の投稿と公開したアプリが、あなたに表示されなくなります。相手には知らされません。設定からいつでも解除できます。"
+          }
+        }
+      }
+    },
     "この共有に参加していません。招待リンクから参加してください" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -2939,6 +3150,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "この欄を消すように直します"
+          }
+        }
+      }
+    },
+    "この版の Tailor It は使えなくなりました。Mac App Store から最新の版にアップデートしてください。" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "This version of Tailor It is no longer supported. Please update to the latest version from the Mac App Store."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "この版の Tailor It は使えなくなりました。Mac App Store から最新の版にアップデートしてください。"
           }
         }
       }
@@ -3445,6 +3673,38 @@
         }
       }
     },
+    "つながりました。連絡先が見られます" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Connected. You can now see their contact info"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "つながりました。連絡先が見られます"
+          }
+        }
+      }
+    },
+    "つながりを解除しました" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Connection removed"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "つながりを解除しました"
+          }
+        }
+      }
+    },
     "できあがりました" : {
       "localizations" : {
         "en" : {
@@ -3736,6 +3996,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "ほかの変更と重なったため切り替えませんでした。最新の状態を読み込み直しました。"
+          }
+        }
+      }
+    },
+    "ほかの録音を終えてから、もう一度お試しください" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Finish the other recording, then try again."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ほかの録音を終えてから、もう一度お試しください"
           }
         }
       }
@@ -4229,6 +4506,40 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "アカウントを削除できませんでした"
+          }
+        }
+      }
+    },
+    "アップデート" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Update"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "アップデート"
+          }
+        }
+      }
+    },
+    "アップデートしてください" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Please update"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "アップデートしてください"
           }
         }
       }
@@ -4782,6 +5093,38 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "オフラインです。最後に保存した記録帳を表示しています"
+          }
+        }
+      }
+    },
+    "オフラインのあいだは付けられません" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "You can't add this while offline"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "オフラインのあいだは付けられません"
+          }
+        }
+      }
+    },
+    "オフラインのあいだは送れません" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "You can't send while offline"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "オフラインのあいだは送れません"
           }
         }
       }
@@ -5596,6 +5939,22 @@
         }
       }
     },
+    "スパム・宣伝" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Spam or advertising"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "スパム・宣伝"
+          }
+        }
+      }
+    },
     "ソースコード" : {
       "localizations" : {
         "en" : {
@@ -5875,6 +6234,70 @@
         }
       }
     },
+    "ブロックしました" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Blocked"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ブロックしました"
+          }
+        }
+      }
+    },
+    "ブロックする" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Block"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ブロックする"
+          }
+        }
+      }
+    },
+    "ブロックできませんでした" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Could not block"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ブロックできませんでした"
+          }
+        }
+      }
+    },
+    "ブロックを解除してから送れます" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Unblock this person to send a request"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ブロックを解除してから送れます"
+          }
+        }
+      }
+    },
     "プライバシー" : {
       "localizations" : {
         "en" : {
@@ -5937,6 +6360,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "プリントできませんでした"
+          }
+        }
+      }
+    },
+    "プロフィールの送信が終わってから送れます" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "You can send once your profile has been uploaded"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "プロフィールの送信が終わってから送れます"
           }
         }
       }
@@ -7125,6 +7564,22 @@
         }
       }
     },
+    "今日はこれ以上送れません。明日またお試しください" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "You've reached today's limit. Please try again tomorrow"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "今日はこれ以上送れません。明日またお試しください"
+          }
+        }
+      }
+    },
     "今日はこれ以上送れません。明日また送ってください。" : {
       "localizations" : {
         "en" : {
@@ -7137,6 +7592,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "今日はこれ以上送れません。明日また送ってください。"
+          }
+        }
+      }
+    },
+    "今日はこれ以上通報できません。明日またお試しください" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "You cannot send more reports today. Please try again tomorrow."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "今日はこれ以上通報できません。明日またお試しください"
           }
         }
       }
@@ -7169,6 +7640,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "他の人の行動で届く通知"
+          }
+        }
+      }
+    },
+    "仲間探しでは、知らない人と「つながりたい」を送り合い、お互いに承認すると連絡先が見えるようになります。18 歳以上の方だけが使えます。" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "To find people, you send connection requests to people you don't know, and once both of you accept, you can see each other's contact info. Only people 18 or older can use this."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "仲間探しでは、知らない人と「つながりたい」を送り合い、お互いに承認すると連絡先が見えるようになります。18 歳以上の方だけが使えます。"
           }
         }
       }
@@ -7589,6 +8076,22 @@
         }
       }
     },
+    "個人情報の公開" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Shares personal information"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "個人情報の公開"
+          }
+        }
+      }
+    },
     "元に戻して" : {
       "localizations" : {
         "en" : {
@@ -7748,6 +8251,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "先に保存してください"
+          }
+        }
+      }
+    },
+    "先に自分のプロフィールを書いてください" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Create your own profile first"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "先に自分のプロフィールを書いてください"
           }
         }
       }
@@ -8302,6 +8821,22 @@
         }
       }
     },
+    "匿名" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Anonymous"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "匿名"
+          }
+        }
+      }
+    },
     "匿名で利用中" : {
       "localizations" : {
         "en" : {
@@ -8433,6 +8968,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "参加中"
+          }
+        }
+      }
+    },
+    "参加者を外せませんでした" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Couldn't remove the member"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "参加者を外せませんでした"
           }
         }
       }
@@ -9139,6 +9690,22 @@
         }
       }
     },
+    "嫌がらせ・差別" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Harassment or hate"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "嫌がらせ・差別"
+          }
+        }
+      }
+    },
     "実際のサイズ" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -9289,6 +9856,22 @@
         }
       }
     },
+    "年齢や生年月日は保存しません。18 歳以上と答えたことだけを、あなたのアカウントに記録します。" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Your age and birthday are not stored. Only your answer that you are 18 or older is saved to your account."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "年齢や生年月日は保存しません。18 歳以上と答えたことだけを、あなたのアカウントに記録します。"
+          }
+        }
+      }
+    },
     "当てはまるものを全部選んでください" : {
       "localizations" : {
         "en" : {
@@ -9351,6 +9934,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "必要な画面とデータを決めています…"
+          }
+        }
+      }
+    },
+    "性的な内容" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sexual content"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "性的な内容"
           }
         }
       }
@@ -9418,6 +10017,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "抜けて続ける"
+          }
+        }
+      }
+    },
+    "抜けられませんでした。もう一度お試しください" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Couldn't leave. Please try again"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "抜けられませんでした。もう一度お試しください"
           }
         }
       }
@@ -9869,6 +10484,23 @@
         }
       }
     },
+    "新しい版があります" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "A new version is available"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "新しい版があります"
+          }
+        }
+      }
+    },
     "新しい記録帳" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -10132,6 +10764,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "時間内に終わりませんでした"
+          }
+        }
+      }
+    },
+    "暴力的・危険な内容" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Violent or dangerous content"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "暴力的・危険な内容"
           }
         }
       }
@@ -11180,6 +11828,22 @@
         }
       }
     },
+    "相手が見つかりませんでした。一覧を更新してください" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Couldn't find this person. Please refresh the list"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "相手が見つかりませんでした。一覧を更新してください"
+          }
+        }
+      }
+    },
     "矢印キーで選び、Return で開けます" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -11356,6 +12020,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "答えや続きを書く"
+          }
+        }
+      }
+    },
+    "管理者を変えられませんでした" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Couldn't change the admin"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "管理者を変えられませんでした"
           }
         }
       }
@@ -11773,6 +12453,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "要望"
+          }
+        }
+      }
+    },
+    "解除できませんでした" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Could not unblock"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "解除できませんでした"
           }
         }
       }
@@ -12872,6 +13568,22 @@
         }
       }
     },
+    "送信が終わってから付けられます" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "You can add this once your post has been sent"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "送信が終わってから付けられます"
+          }
+        }
+      }
+    },
     "送信しました" : {
       "localizations" : {
         "en" : {
@@ -12901,6 +13613,70 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "通信が切れました"
+          }
+        }
+      }
+    },
+    "通信できる状態でもう一度お試しください" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Check your connection and try again"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "通信できる状態でもう一度お試しください"
+          }
+        }
+      }
+    },
+    "通報しました" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Reported"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "通報しました"
+          }
+        }
+      }
+    },
+    "通報できませんでした" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Could not send the report"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "通報できませんでした"
+          }
+        }
+      }
+    },
+    "通報の理由" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Why are you reporting this?"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "通報の理由"
           }
         }
       }
@@ -13070,6 +13846,38 @@
         }
       }
     },
+    "運営が内容を確認し、利用規約に反するものは非公開にします。この人を表示したくない時はブロックもできます。" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "We will review it and unpublish anything that breaks the Terms of Use. You can also block this person if you do not want to see them."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "運営が内容を確認し、利用規約に反するものは非公開にします。この人を表示したくない時はブロックもできます。"
+          }
+        }
+      }
+    },
+    "運営が内容を確認します。通報したことは相手に知らされません。" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "We will review it. The person will not be told that you reported them."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "運営が内容を確認します。通報したことは相手に知らされません。"
+          }
+        }
+      }
+    },
     "運営が止めています" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -13083,6 +13891,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "運営が止めています"
+          }
+        }
+      }
+    },
+    "違法な内容" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Illegal content"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "違法な内容"
           }
         }
       }
@@ -13233,6 +14057,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "録音できませんでした。マイクがつながっているか確かめ、ほかのアプリの録音を終えてから、もう一度お試しください"
+          }
+        }
+      }
+    },
+    "録音ファイルを文字にできませんでした。もう一度お試しください" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Couldn't transcribe the audio file. Please try again."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "録音ファイルを文字にできませんでした。もう一度お試しください"
           }
         }
       }
@@ -13478,6 +14319,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "音声モデルを読み込み中…(初回は1分ほど)"
+          }
+        }
+      }
+    },
+    "音声入力を使っている間は、録音ファイルを文字にできません" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "You can't transcribe an audio file while voice input is in use."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "音声入力を使っている間は、録音ファイルを文字にできません"
           }
         }
       }

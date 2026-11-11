@@ -117,6 +117,7 @@ struct ListLeaf: View {
                             }
                             #endif
                             if deletable(row, entity: entityId) { Button(L("削除")) { delete(row, entity: entityId) } }
+                            ModerationAccessibilityActions(rt: rt, entity: entityId, record: row)
                         }
                         .recordDrag { rowDragItem(row, rows: rows, entity: entity) }
                 }

@@ -85,11 +85,13 @@ final class PassbyController: NearbyPassbyController {
     }
 
     /// 名前を出さない(表示名の代わりに「近くの人」を送る・MCPeerID も同じ名前)。探している最中なら名前を変えて探し直す。
+    /// 近距離共有(#36)も同じ設定に従うので、そちらの名前も揃える。
     func setAnonymous(_ on: Bool) {
         guard on != isAnonymous else { return }
         isAnonymous = on
         defaults.set(on, forKey: Key.anonymous)
         if isAdvertising { restart() }
+        runtime?.refreshNearbyName()
     }
 
     func attach(_ config: NearbyPassby.Config) {

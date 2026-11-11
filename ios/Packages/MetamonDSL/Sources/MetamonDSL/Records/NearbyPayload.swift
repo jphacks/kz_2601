@@ -67,6 +67,13 @@ public enum NearbyShare {
     public struct Payload: Codable, Equatable, Sendable {
         public var header: Header
         public var records: [[String: JSONValue]]
+
+        /// 送り主の名前を差し替えたもの(送る直前に今の MCPeerID の名前へ揃える。シートを開いた後に「名前を出さない」を切り替えても合う)。
+        public func sent(as sender: String) -> Payload {
+            var p = self
+            p.header.sender = sender
+            return p
+        }
     }
 }
 
@@ -109,6 +116,13 @@ public enum NearbyLimits {
     public static func publicName(_ name: String, anonymous: Bool) -> String {
         let n = clip(name, maxNameLength)
         return anonymous || n.isEmpty ? anonymousName : n
+    }
+
+    /// 近距離共有の MCPeerID と Header の送り主に使う名前。`publicName` を UTF-8 で 63 バイト以内に切る(MCPeerID の上限)。
+    public static func peerName(_ name: String, anonymous: Bool) -> String {
+        var n = publicName(name, anonymous: anonymous)
+        while n.utf8.count > maxNameLength { n.removeLast() }
+        return n
     }
 
     /// 受け取った名前を画面に出す形に(匿名の印は今の言語の「近くの人」に)。

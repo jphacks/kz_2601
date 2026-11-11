@@ -5,7 +5,6 @@ import jp.kz2601.metamon.dsl.ComponentType
 import jp.kz2601.metamon.dsl.decode
 import jp.kz2601.metamon.dsl.nearby.NearbyShare.Decision
 import jp.kz2601.metamon.dsl.nearby.NearbyShare.FieldSignature
-import jp.kz2601.metamon.dsl.records.DslDecodeException
 import jp.kz2601.metamon.dsl.records.Entity
 import jp.kz2601.metamon.dsl.records.Fixtures
 import jp.kz2601.metamon.dsl.records.JSONValue
@@ -57,7 +56,7 @@ class NearbyShareTest {
               "fields":[{"id":"name","type":"string"}],"count":1,"future":true},
              "records":[{"name":"太郎"}],"extra":[1,2]}
         """.trimIndent()
-        val p = NearbyShare.decodePayload(json.toByteArray())
+        val p = NearbyShare.decodePayload(json.toByteArray()) ?: return fail("読めるはず")
         assertEquals("太郎", p.header.sender)
         assertEquals(JSONValue.Str("太郎"), p.records.first()["name"])
     }
@@ -70,13 +69,7 @@ class NearbyShareTest {
             """{"header":{"v":1,"sender":"a","appId":"a","appName":"x","entityId":"e","entityName":"e","fields":[],"count":0.5},"records":[]}""",
             "not json",
         )
-        for (json in bad) {
-            try {
-                NearbyShare.decodePayload(json.toByteArray())
-                fail("例外のはず: $json")
-            } catch (_: DslDecodeException) {
-            }
-        }
+        for (json in bad) assertNull(json, NearbyShare.decodePayload(json.toByteArray()))
     }
 
     @Test fun encodeMatchesIosSortedKeysAndEscaping() {
@@ -188,5 +181,73 @@ class NearbyShareTest {
         )
         assertTrue(on.usesMusicRequests)
         assertTrue(!load("attendance_nearby").usesMusicRequests)
+    }
+
+    @Test fun receiveByteAndLengthLimits() {
+        val (_, entity) = attendance()
+        val payload = NearbyShare.makePayload("花子", "app1", "出席カード", entity, listOf(rec("name" to "花子")))
+        assertEquals(payload, NearbyShare.decodePayload(NearbyShare.encode(payload)))
+        assertNull("大きすぎるデータは読まない", NearbyShare.decodePayload(ByteArray(NearbyShare.MAX_RECEIVE_BYTES + 1) { 0x20 }))
+        assertNull(NearbyShare.decodeHeader(ByteArray(NearbyShare.MAX_HEADER_BYTES + 1) { 0x20 }))
+
+        val tooMany = payload.copy(records = List(NearbyShare.MAX_RECEIVE_RECORDS + 1) { rec("name" to "a") })
+        assertNull("受け取る件数の上限を超えたら捨てる", NearbyShare.decodePayload(NearbyShare.encode(tooMany)))
+
+        val h = payload.header.copy(sender = "名".repeat(200), appName = "a".repeat(300), count = 10_000)
+        val v = NearbyShare.decodeHeader(NearbyShare.encode(h)) ?: return fail("読めるはず")
+        assertEquals("名前は切り詰める", NearbyLimits.MAX_NAME_LENGTH, v.sender.length)
+        assertEquals(NearbyLimits.MAX_LABEL_LENGTH, v.appName.length)
+        assertEquals(NearbyShare.MAX_RECEIVE_RECORDS, v.count)
+
+        val longEntity = payload.header.copy(entityId = "e".repeat(NearbyLimits.MAX_ID_LENGTH + 1))
+        assertNull("id が長すぎる申し出は断る", NearbyShare.decodeHeader(NearbyShare.encode(longEntity)))
+        val manyFields = payload.header.copy(fields = (0..NearbyLimits.MAX_FIELDS).map { FieldSignature("f$it", "string") })
+        assertNull("項目一覧が長すぎる申し出は断る", NearbyShare.decodeHeader(NearbyShare.encode(manyFields)))
+        val anonymous = payload.header.copy(sender = "")
+        assertEquals(NearbyLimits.ANONYMOUS_NAME, NearbyShare.decodeHeader(NearbyShare.encode(anonymous))?.sender)
+
+        val ack = NearbyShare.Ack(ok = true, added = 9_999, message = "m".repeat(1000))
+        val a = NearbyShare.decodeAck(NearbyShare.encode(ack)) ?: return fail("読めるはず")
+        assertEquals(NearbyShare.MAX_RECEIVE_RECORDS, a.added)
+        assertEquals(NearbyLimits.MAX_MESSAGE_LENGTH, a.message?.length)
+        assertNull(NearbyShare.decodeAck(ByteArray(NearbyShare.MAX_ACK_BYTES + 1) { 0x20 }))
+    }
+
+    @Test fun sendStaysUnderByteLimit() {
+        val (_, entity) = attendance()
+        val big = "あ".repeat(4000) // 約 12 KB / 件
+        val rows = List(NearbyShare.MAX_SEND_RECORDS) { rec("name" to big) }
+        val p = NearbyShare.makePayload("s", "a", "x", entity, rows)
+        assertTrue(NearbyShare.encode(p).size <= NearbyShare.MAX_SEND_BYTES)
+        assertTrue(p.records.size < NearbyShare.MAX_SEND_RECORDS)
+        assertEquals(p.records.size, p.header.count)
+        assertTrue("受け取る上限は送る上限より大きい", NearbyShare.MAX_SEND_BYTES < NearbyShare.MAX_RECEIVE_BYTES)
+    }
+
+    /** 「名前を出さない」(すれ違い通信と同じ設定): 端末の名前と Header の送り主が「近くの人」になり、オフなら本名。 */
+    @Test fun anonymousSenderAndPeerName() {
+        val (_, entity) = attendance()
+        val rows = listOf(rec("name" to "花子"))
+
+        val anonPeer = NearbyLimits.peerName("花子のPixel", anonymous = true)
+        assertEquals(NearbyLimits.ANONYMOUS_NAME, anonPeer)
+        val anon = NearbyShare.makePayload(anonPeer, "a", "x", entity, rows)
+        assertEquals(NearbyLimits.ANONYMOUS_NAME, anon.header.sender)
+        val anonHeader = NearbyShare.decodeHeader(NearbyShare.encode(anon.header))
+        assertEquals("受け取った側でも決まった文言のまま", NearbyLimits.ANONYMOUS_NAME, anonHeader?.sender)
+        assertEquals("近くの人", NearbyLimits.displayName(anonHeader?.sender ?: ""))
+
+        val realPeer = NearbyLimits.peerName(" 花子のPixel ", anonymous = false)
+        assertEquals("花子のPixel", realPeer)
+        val real = NearbyShare.makePayload(realPeer, "a", "x", entity, rows)
+        assertEquals("花子のPixel", real.header.sender)
+
+        assertEquals("送る直前に今の名前へ差し替える", NearbyLimits.ANONYMOUS_NAME, real.sentAs(anonPeer).header.sender)
+        assertEquals(real.records, real.sentAs(anonPeer).records)
+        assertEquals("空なら「近くの人」", NearbyLimits.ANONYMOUS_NAME, NearbyLimits.peerName("", anonymous = false))
+        val long = NearbyLimits.peerName("あ".repeat(60), anonymous = false)
+        assertTrue("端末の名前の上限(UTF-8 63 バイト)", long.toByteArray(Charsets.UTF_8).size <= 63)
+        assertTrue(long.startsWith("あ"))
+        assertEquals("書記素の途中で切らない", 21, long.length)
     }
 }

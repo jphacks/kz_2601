@@ -68,7 +68,7 @@ data class UsageSectionModel(val rows: List<Row>, val pro: Boolean) {
  */
 @Composable
 fun UsageSection(container: AppContainer, me: MyUsage?, isPro: Boolean) {
-    val source = if (container.knobs.mock) null else container.appConfig as? PlanUsageSource
+    val source = container.usageSource
     val state = container.runtime.state.collectAsStateWithLifecycle().value
     val appId = state.document.appId.takeUnless { state.dsl.isVoiceOnly }
     val app by produceState<AppUsage?>(null, source, appId) { value = loadAppUsage(source, appId) }

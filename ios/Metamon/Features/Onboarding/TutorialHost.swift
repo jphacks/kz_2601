@@ -28,8 +28,10 @@ struct TutorialHost: ViewModifier {
                 }
             }
             .task {
-                // 同意の説明が要らない(済み)時は、起動して少し待ってから出す(同意の画面は 0.5 秒後に出る)
+                // 同意の説明が要らない(済み)時は、起動して少し待ってから出す(同意の画面はスプラッシュの 0.5 秒後に出る)
+                await SplashPresence.shared.waitUntilHidden()
                 try? await Task.sleep(for: .milliseconds(800))
+                guard !Task.isCancelled else { return }
                 rt.presentTutorialIfNeeded()
             }
     }

@@ -150,4 +150,30 @@ final class NearbyShareTests: XCTestCase {
         XCTAssertEqual(p.header.count, p.records.count)
         XCTAssertLessThan(NearbyShare.maxSendBytes, NearbyShare.maxReceiveBytes, "受け取る上限は送る上限より大きい")
     }
+
+    /// 「名前を出さない」(すれ違い通信と同じ設定): MCPeerID と Header の送り主が「近くの人」になり、オフなら本名。
+    func testAnonymousSenderAndPeerName() throws {
+        let (_, entity) = try attendance()
+        let rows: [[String: JSONValue]] = [["name": .string("花子")]]
+
+        let anonPeer = NearbyLimits.peerName("花子のiPhone", anonymous: true)
+        XCTAssertEqual(anonPeer, NearbyLimits.anonymousName)
+        let anon = NearbyShare.makePayload(sender: anonPeer, appId: "a", appName: "x", entity: entity, records: rows)
+        XCTAssertEqual(anon.header.sender, NearbyLimits.anonymousName)
+        let anonHeader = try NearbyShare.decodeHeader(NearbyShare.encode(anon.header))
+        XCTAssertEqual(anonHeader?.sender, NearbyLimits.anonymousName, "受け取った側でも決まった文言のまま")
+        XCTAssertEqual(NearbyLimits.displayName(anonHeader?.sender ?? ""), "近くの人")
+
+        let realPeer = NearbyLimits.peerName(" 花子のiPhone ", anonymous: false)
+        XCTAssertEqual(realPeer, "花子のiPhone")
+        let real = NearbyShare.makePayload(sender: realPeer, appId: "a", appName: "x", entity: entity, records: rows)
+        XCTAssertEqual(real.header.sender, "花子のiPhone")
+
+        XCTAssertEqual(real.sent(as: anonPeer).header.sender, NearbyLimits.anonymousName, "送る直前に今の名前へ差し替える")
+        XCTAssertEqual(real.sent(as: anonPeer).records, real.records)
+        XCTAssertEqual(NearbyLimits.peerName("", anonymous: false), NearbyLimits.anonymousName, "空なら「近くの人」")
+        let long = NearbyLimits.peerName(String(repeating: "あ", count: 60), anonymous: false)
+        XCTAssertLessThanOrEqual(long.utf8.count, 63, "MCPeerID の上限(UTF-8 63 バイト)")
+        XCTAssertTrue(long.hasPrefix("あ"))
+    }
 }

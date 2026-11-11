@@ -1,0 +1,53 @@
+{
+  "screens" : [
+    {
+      "id" : "home",
+      "layout" : "grid",
+      "nodes" : [
+        {
+          "cell" : {
+            "col" : 0,
+            "colSpan" : 6,
+            "row" : 0,
+            "rowSpan" : 12
+          },
+          "id" : "talk",
+          "props" : {
+            "entity" : "turn",
+            "placeholder" : "いま気になっていること",
+            "roleField" : "role",
+            "textField" : "text",
+            "turns" : [
+              {
+                "recordId" : "t1",
+                "role" : "user",
+                "text" : "最近よく眠れません"
+              },
+              {
+                "recordId" : "t2",
+                "role" : "assistant",
+                "text" : "それはつらかったですね。いちばん気になっているのはどんなことですか?"
+              },
+              {
+                "recordId" : "t4",
+                "role" : "user",
+                "text" : "仕事の締め切りです"
+              }
+            ]
+          },
+          "state" : "rendered",
+          "type" : "aiChat"
+        }
+      ],
+      "route" : {
+        "recordId" : null,
+        "screen" : "home",
+        "stack" : "main"
+      },
+      "title" : "こころの相談室",
+      "toolbar" : [
+
+      ]
+    }
+  ]
+}

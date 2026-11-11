@@ -156,7 +156,7 @@ class MediaRulesTest {
             PhotoAnalyze(PhotoAnalyzeKind.AMOUNT, "total"),
             PhotoAnalyze(PhotoAnalyzeKind.TEXT, "nope"),
         )
-        val out = PhotoReading.apply(reader.clues(byteArrayOf(), specs), specs, entity)
+        val out = PhotoReading.apply(reader.clues(byteArrayOf(), specs), specs, entity, describePrefix = "写っているもの: ")
         assertEquals(1, reader.calls)
         assertEquals(JSONValue.Str("ありがとう\nまたどうぞ"), out.values["memo"])
         assertEquals("前後の空白は落とす", JSONValue.Str("4901234567894"), out.values["code"])

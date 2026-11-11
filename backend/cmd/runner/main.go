@@ -28,6 +28,8 @@
 //	                                           roles/firebaseauth.viewer; not deployed).
 //	                                           "" = unknown, so only the actor's own notifications go out
 //	FEEDS_DISABLED / FEEDS_UPSTREAM_PER_MINUTE public feeds saveFeed reads (internal/feeds; same as appconfig)
+//	EXT_* / COIN_RESERVE_EXT_*                 external APIs (internal/extapi; every provider off by default)
+//	EXT_TOKEN_KMS_KEY                          Cloud KMS key sealing per-user OAuth tokens (none = OAuth providers off)
 //	PORT                                       default 8080
 //
 // A stg process on the production database refuses to start even with
@@ -129,7 +131,8 @@ func main() {
 	q := quota.New(qcfg, ratelimit.NewFirestore(st.Client(), os.Getenv("RATE_LIMIT_COLLECTION")),
 		entitlement.NewProChecker(entitlement.NewFirestore(st.Client()), policy.Environments))
 	q.Logger = logger
-	q.Buyer = overflowBuyer(ccfg, st.Client(), policy.Environments, logger)
+	buyer := overflowBuyer(ccfg, st.Client(), policy.Environments, logger)
+	q.Buyer = buyer
 	age, err := ageFromEnv(ctx, os.Getenv, target.Project, st)
 	if err != nil {
 		logger.Error("runner: account age", slog.Any("error", err))
@@ -163,8 +166,15 @@ func main() {
 	if sender != nil && age == nil {
 		logger.Warn("runner: push is on but RUNNER_ACCOUNT_AGE is not set: notifications to others are refused as new_account")
 	}
+	ext, err := extFromEnv(ctx, os.Getenv, q, buyer, st.Client(), logger)
+	if err != nil {
+		logger.Error("runner: bad external API configuration", slog.Any("error", err))
+		os.Exit(2)
+	}
 	t := &serial{t: r}
-	if err := serve(ctx, envOr("PORT", "8080"), newMux(t, logger), t, interval, logger); err != nil {
+	mux := newMux(t, logger)
+	ext.Routes(mux)
+	if err := serve(ctx, envOr("PORT", "8080"), mux, t, interval, logger); err != nil {
 		logger.Error("runner: serve failed", slog.Any("error", err))
 		os.Exit(1)
 	}

@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <plurals name="passby_met">
+        <item quantity="one">Passed %1$s (%2$s: %3$d)</item>
+        <item quantity="other">Passed %1$s (%2$s: %3$d)</item>
+    </plurals>
+</resources>

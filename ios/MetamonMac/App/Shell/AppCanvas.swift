@@ -210,6 +210,10 @@ private struct RuntimeOverlays: ViewModifier {
             .sheet(isPresented: consentShown) { MacAIConsentSheet() }
             // 話して入力(aiChat・transcribeField・#1328)の「音声モデルを用意する」: 会話のシートと同じ確認
             .modifier(MacModelDownloadConfirm(shown: modelDownloadShown))
+            #if !APP_STORE_REVIEW
+            // 通報・ブロック・18 歳以上の確認(#963)
+            .modifier(MacSocialDialogs(runtime: runtime, active: active))
+            #endif
             .overlay(alignment: .top) {
                 VStack(spacing: 8) {
                     if active, let message = runtime.toast {

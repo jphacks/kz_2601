@@ -67,6 +67,7 @@ struct AppManageMenuItems: View {
     }
 
     private func move(to index: Int) {
+        rt.noteGesturePerformed(.switcherReorder) // #1441 メニューで並べ替えた(VoiceOver の代わりの操作)
         Task { await rt.moveApp(app.id, to: index) }
     }
 }
@@ -108,6 +109,7 @@ struct AppCardReorder: ViewModifier {
             .dropDestination(for: String.self) { ids, _ in
                 let order = rt.visibleApps.map(\.id)
                 guard let id = ids.first, id != app.id, order.contains(id), let to = order.firstIndex(of: app.id) else { return false }
+                rt.noteGesturePerformed(.switcherReorder) // #1441
                 Task { await rt.moveApp(id, to: to) }
                 return true
             }

@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Discard confirmation for unsaved input and the announcement for an empty required field (#1111, iOS discardFormConfirmation / RequiredFieldMark). -->
+<resources>
+    <string name="renderer_discard_title">Discard your changes?</string>
+    <string name="renderer_discard_message">Anything you haven\'t saved will be lost.</string>
+    <string name="renderer_discard_confirm">Discard</string>
+    <string name="renderer_discard_keep_editing">Keep Editing</string>
+    <string name="renderer_required_fill_in">Please fill in %1$s</string>
+</resources>

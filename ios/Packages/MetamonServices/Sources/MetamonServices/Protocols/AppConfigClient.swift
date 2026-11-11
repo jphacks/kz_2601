@@ -89,7 +89,7 @@ public struct AppSummary: Codable, Sendable, Equatable, Identifiable, Hashable {
 
 /// appconfig サービス: DSL 取得 + version 履歴 + entity レコード API(docs/backend/openapi-appconfig.yaml)。
 /// 生成アプリのユーザーデータはすべてここ(Firestore)に保存する。iOS ローカルはキャッシュのみ。
-/// DSL の書き込み(PUT/PATCH /dsl)は ai 経由なので iOS からは行わない。iOS が version を進めるのは restore だけ。
+/// DSL の書き込みは基本 ai 経由。iOS が version を進めるのは restore と、手で動かす編集モードの `patchDSL`(#1442)だけ。
 public protocol AppConfigClient: Sendable {
     /// `GET /v1/apps`(uid スコープ)。変身一覧(複数アプリ切替)が使う。実装が無ければ空。
     func listApps() async throws -> [AppSummary]
@@ -108,6 +108,9 @@ public protocol AppConfigClient: Sendable {
     func listVersions(appId: String) async throws -> [VersionSummary]
     /// `POST /versions/{version}/restore` → 新 version として積み直した最新 DSL を返す。
     func restore(appId: String, toVersion version: Int) async throws -> AppDocument
+    /// `PATCH /v1/apps/{appId}/dsl`(`If-Match: "<baseVersion>"`)。手で動かした配置(#1442)を新しい版として積み、最新 DSL を返す。
+    /// サーバーが同じ検証(`Validate()`)を通すので、重なり等は 422・版が進んでいたら 409。
+    func patchDSL(appId: String, baseVersion: Int, patch: [JSONPatchOp], summary: String) async throws -> AppDocument
 
     func list(appId: String, entity: String) async throws -> [Record]
     func create(appId: String, entity: String, data: [String: JSONValue]) async throws -> Record
@@ -132,6 +135,10 @@ public extension AppConfigClient {
     func renameApp(appId: String, name: String) async throws -> AppSummary { throw AppListEdit.unsupported }
     func duplicateApp(appId: String, name: String) async throws -> AppSummary { throw AppListEdit.unsupported }
     func reorderApps(ids: [String]) async throws { throw AppListEdit.unsupported }
+    /// DSL を書けない実装(古いモック等)。ホストは端末だけで当てる
+    func patchDSL(appId: String, baseVersion: Int, patch: [JSONPatchOp], summary: String) async throws -> AppDocument {
+        throw APIError.server(status: 501, code: "unsupported", message: "patchDSL is not supported by this client")
+    }
 
     /// 冪等キーを使わない実装(インメモリ等)向けの既定。
     func create(appId: String, entity: String, data: [String: JSONValue], clientId: String) async throws -> Record {

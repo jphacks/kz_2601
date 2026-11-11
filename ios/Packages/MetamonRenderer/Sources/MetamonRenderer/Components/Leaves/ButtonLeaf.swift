@@ -98,7 +98,10 @@ struct ButtonLeaf: View {
 struct RenderButtonStyle: ButtonStyle {
     enum Kind { case primary, secondary, destructive, plain }
     let kind: Kind
-    @Environment(\.isEnabled) private var isEnabled
+    /// 押せるが使えない見た目(#1640: aiButton は押すと理由を出す)。無効と同じ薄さにする
+    var dimmed = false
+    @Environment(\.isEnabled) private var envEnabled
+    private var isEnabled: Bool { envEnabled && !dimmed }
     @Environment(\.dynamicTypeSize) private var typeSize
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @ScaledMetric(relativeTo: .body) private var minHeight: CGFloat = 52

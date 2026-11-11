@@ -191,6 +191,12 @@ struct SharedMembersSection: View {
                     if member != list.items.last { Divider() }
                 }
             }
+            if list.isFull {
+                Text("参加している人が上限(100 人)に達しています。これ以上は参加できません")
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+                    .accessibilityIdentifier("members.full")
+            }
             if let removed = model.justRemoved {
                 removedNotice(model, removed)
             }

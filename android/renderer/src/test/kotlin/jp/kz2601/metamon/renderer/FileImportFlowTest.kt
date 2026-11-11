@@ -93,9 +93,10 @@ class FileImportFlowTest {
     fun pickerOffersOnlyKindsThisDeviceCanRead() {
         assertTrue("text/csv" in FileImportFlow.mimeTypes(listOf(Accept.CSV)))
         assertEquals(listOf("text/plain", "text/markdown", "application/pdf"), FileImportFlow.mimeTypes(listOf(Accept.TEXT, Accept.PDF, Accept.AUDIO)))
-        // 録音はまだ読めない(#1180)。PDF は読める(#1181)
+        // 録音は文字起こしの口がある時だけ選べる(#1180)。PDF は読める(#1181)
         assertTrue(FileImportFlow.mimeTypes(listOf(Accept.AUDIO)).isEmpty())
-        assertEquals(setOf(Accept.AUDIO), FileImportFlow.unavailableKinds)
+        assertEquals(listOf("audio/*"), FileImportFlow.mimeTypes(listOf(Accept.AUDIO), audio = true))
+        assertEquals(listOf("text/plain", "text/markdown"), FileImportFlow.mimeTypes(listOf(Accept.TEXT), audio = true))
         // CSV は text/plain を名乗っても拡張子で CSV。accept に無い種類は null。
         assertEquals(ImportKind.CSV, FileImportFlow.kind("a.CSV", "text/plain", listOf(Accept.CSV, Accept.TEXT)))
         assertEquals(ImportKind.CSV, FileImportFlow.kind("download", "text/csv; charset=utf-8", listOf(Accept.CSV)))
@@ -111,6 +112,7 @@ class FileImportFlowTest {
         assertTrue(FileImportFlow.usable(components[0], member))
         assertFalse(FileImportFlow.usable(components[2], entities.first { it.id == "board" }))
         assertFalse(FileImportFlow.usable(components[3], member))
+        assertTrue("録音だけの部品は文字起こしの口がある時だけ使える", FileImportFlow.usable(components[3], member, audio = true))
         assertFalse(FileImportFlow.usable(components[0], null))
     }
 

@@ -6,6 +6,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -19,7 +20,11 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -27,10 +32,13 @@ import androidx.compose.ui.graphics.FilterQuality
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.heading
+import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.semantics.testTag
@@ -53,6 +61,7 @@ import jp.kz2601.metamon.renderer.form.FormDraft
 import jp.kz2601.metamon.renderer.registry.RenderContext
 import jp.kz2601.metamon.renderer.theme.RenderTheme
 import jp.kz2601.metamon.renderer.theme.colors
+import kotlinx.coroutines.launch
 
 /**
  * QR のモジュール(iOS の `QRCodeImage`: CoreImage の誤り訂正 M・周りに 4 モジュールの余白)。ZXing の core で作る。
@@ -135,6 +144,7 @@ fun QrMatrix.bitmap(): ImageBitmap {
 /**
  * `qrCode`: text / field / value から QR を作って見せる。ダークモードでも白地に黒(読み取りやすさ優先)。
  * 空・長すぎる時は案内を出す。読み上げは label(無ければ「QR コード」)+ 中身。
+ * 下に「写真に保存」(MediaStore・追加だけ・権限なし)と「共有」(PNG・#1086・iOS と同じ)。
  */
 @Composable
 fun QrCodeLeaf(c: Component, ctx: RenderContext, modifier: Modifier = Modifier) {
@@ -142,6 +152,9 @@ fun QrCodeLeaf(c: Component, ctx: RenderContext, modifier: Modifier = Modifier) 
     val caption = c.label?.takeIf { it.isNotEmpty() }
     val matrix = remember(content) { if (content.isBlank()) null else QrMatrix.encode(content) }
     val image = remember(matrix) { matrix?.bitmap() }
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+    var saveState by remember(content) { mutableStateOf(QrSaveState.IDLE) }
     val shape = RoundedCornerShape(RenderTheme.Radius.inner)
     Column(
         modifier.fillMaxWidth(),
@@ -188,9 +201,47 @@ fun QrCodeLeaf(c: Component, ctx: RenderContext, modifier: Modifier = Modifier) 
                         maxLines = 2,
                     )
                 }
+                val m = matrix!!
+                Row(Modifier.widthIn(max = 320.dp).fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(RenderTheme.Spacing.sm)) {
+                    ActionButton(
+                        stringResource(saveState.labelRes),
+                        ActionButtonKind.SECONDARY,
+                        onClick = {
+                            saveState = QrSaveState.SAVING
+                            scope.launch {
+                                val ok = runCatching {
+                                    saveImageToGallery(context, ShareImages.qrGalleryEntry(System.currentTimeMillis()), m.exportPng())
+                                }.getOrDefault(false)
+                                saveState = if (ok) QrSaveState.SAVED else QrSaveState.FAILED
+                            }
+                        },
+                        modifier = Modifier.weight(1f).semantics {
+                            liveRegion = LiveRegionMode.Polite // 保存できた・できなかったを読み上げる
+                            testTag = "qrCode.save"
+                        },
+                        icon = if (saveState == QrSaveState.SAVED) "checkmark" else null,
+                        running = saveState == QrSaveState.SAVING,
+                    )
+                    val shareLabel = stringResource(R.string.renderer_qr_share)
+                    ActionButton(
+                        shareLabel,
+                        ActionButtonKind.SECONDARY,
+                        onClick = { shareImage(context, m.exportPng(), ShareImages.QR_FILE, ShareImages.PNG, null, description) },
+                        modifier = Modifier.weight(1f).semantics { testTag = "qrCode.share" },
+                        icon = "square.and.arrow.up",
+                    )
+                }
             }
         }
     }
+}
+
+/** 「写真に保存」の状態と、ボタンの文言(iOS の `QrCodeLeaf.saveLabel`)。中身が変わったら最初に戻す。 */
+internal enum class QrSaveState(val labelRes: Int) {
+    IDLE(R.string.renderer_qr_save),
+    SAVING(R.string.renderer_qr_save),
+    SAVED(R.string.renderer_qr_saved),
+    FAILED(R.string.renderer_qr_save_failed),
 }
 
 @Composable

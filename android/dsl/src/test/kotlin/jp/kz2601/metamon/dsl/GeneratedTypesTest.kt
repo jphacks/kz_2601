@@ -77,6 +77,23 @@ class GeneratedTypesTest {
         assertEquals(ThemeMode.UNKNOWN, dsl.app.theme?.mode)
         assertEquals(ActionType.UNKNOWN, button.action?.type)
         assertEquals("s", button.action?.screen)
+        assertEquals("teleport", button.action?.rawType)
+    }
+
+    @Test
+    fun actionKeepsRawTypeForKnownTypes() {
+        val dsl = decode("""{"type":"button","label":"b","action":{"type":"navigate","screen":"s"}}""")
+        val action = dsl.screens.single().components.single().action
+        assertEquals(ActionType.NAVIGATE, action?.type)
+        assertEquals("navigate", action?.rawType)
+    }
+
+    /** コードで作った Action も type の文字列を持つ(iOS の `Action.init` と同じ)。 */
+    @Test
+    fun codeBuiltActionRawTypeIsItsType() {
+        assertEquals("navigate", Action(type = ActionType.NAVIGATE).rawType)
+        assertEquals("saveRecord", Action(type = ActionType.SAVE_RECORD).rawType)
+        assertEquals("", Action().rawType)
     }
 
     @Test

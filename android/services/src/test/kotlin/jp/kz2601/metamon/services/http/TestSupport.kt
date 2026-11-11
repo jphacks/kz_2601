@@ -1,5 +1,6 @@
 package jp.kz2601.metamon.services.http
 
+import jp.kz2601.metamon.services.RemainingToday
 import okhttp3.mockwebserver.MockResponse
 import okhttp3.mockwebserver.MockWebServer
 import java.net.InetAddress
@@ -8,6 +9,7 @@ import java.util.concurrent.TimeUnit
 /** 呼ばれるたびに順にトークンを返す(forceRefresh で次へ進む)。 */
 class FakeTokens(private vararg val values: String?) : TokenProvider {
     var index = 0
+    var uid: String? = null
     val calls = mutableListOf<Boolean>()
 
     override suspend fun idToken(forceRefresh: Boolean): String? {
@@ -15,6 +17,8 @@ class FakeTokens(private vararg val values: String?) : TokenProvider {
         if (forceRefresh && index < values.lastIndex) index++
         return values.getOrNull(index)
     }
+
+    override fun subject(): String? = uid
 }
 
 class FakeAppCheck(private vararg val values: String?) : AppCheckTokenProvider {
@@ -43,6 +47,8 @@ fun MockWebServer.metamonHttp(
     appCheck: AppCheckTokenProvider? = null,
     sleeps: MutableList<Long> = mutableListOf(),
     retry: RetryPolicy = RetryPolicy(),
+    remainingSink: ((RemainingToday) -> Unit)? = null,
+    onSessionExpired: ((String?) -> Unit)? = null,
 ): MetamonHttp = MetamonHttp(
     baseUrl = baseUrl(),
     tokens = tokens,
@@ -53,6 +59,8 @@ fun MockWebServer.metamonHttp(
     retry = retry,
     device = testDevice,
     sleep = { sleeps += it },
+    remainingSink = remainingSink,
+    onSessionExpired = onSessionExpired,
 )
 
 fun json(status: Int, body: String, vararg headers: Pair<String, String>): MockResponse =

@@ -228,20 +228,24 @@ struct MusicArtwork: View {
 
     var body: some View {
         let shape = RoundedRectangle(cornerRadius: size * 0.18, style: .continuous)
-        AsyncImage(url: ImageHostPolicy.loadableURL(url)) { phase in
-            if let image = phase.image {
-                image.resizable().scaledToFill()
+        Group {
+            if let loadable = ImageHostPolicy.loadableURL(url) {
+                RemoteImage(url: loadable) { note }
             } else {
-                Image(systemName: "music.note")
-                    .font(.system(size: size * 0.4, weight: .semibold))
-                    .foregroundStyle(RenderTheme.Colors.brandA)
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
-                    .background(RenderTheme.Colors.brandSoft)
+                note
             }
         }
         .frame(width: size, height: size)
         .clipShape(shape)
         .accessibilityHidden(true)
+    }
+
+    private var note: some View {
+        Image(systemName: "music.note")
+            .font(.system(size: size * 0.4, weight: .semibold))
+            .foregroundStyle(RenderTheme.Colors.brandA)
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .background(RenderTheme.Colors.brandSoft)
     }
 }
 

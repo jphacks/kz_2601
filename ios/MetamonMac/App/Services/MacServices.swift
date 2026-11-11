@@ -65,6 +65,13 @@ final class MacServices: @unchecked Sendable {
     /// 共有のリンクの取り込み・参加(#1287)。appconfig の URL がある時だけ(審査用ビルドは外す・iOS の `Sharing+Wiring` と同じ)
     var sharing: (any SharingClient)? { appConfigURL.map { HTTPSharingClient(baseURL: $0, token: token) } }
 
+    /// 参加者・通報 / ブロック(#963)。iOS と同じく共有のクライアント(`HTTPSharingClient`)の別の口
+    var members: (any MembershipClient)? { sharing as? any MembershipClient }
+    var moderation: (any ModerationClient)? { sharing as? any ModerationClient }
+
+    /// 仲間探し(#507・#963)。iOS の `Matching+Wiring` と同じく appconfig の URL がある時だけ
+    var matching: (any MatchingClient)? { appConfigURL.map { HTTPMatchingClient(baseURL: $0, token: token) } }
+
     /// 外部の公開データ(feed・#348・#1288)。appconfig の URL がある時だけ(審査用ビルドは外す・iOS と同じ)
     var feeds: (any FeedClient)? { appConfigURL.map { HTTPFeedClient(baseURL: $0, token: token) } }
 

@@ -1,5 +1,7 @@
 package jp.kz2601.metamon.dsl.logic
 
+import jp.kz2601.metamon.dsl.AppDSL
+import jp.kz2601.metamon.dsl.decode
 import jp.kz2601.metamon.dsl.logic.QuickRecord.Parsed
 import jp.kz2601.metamon.dsl.records.Entity
 import jp.kz2601.metamon.dsl.records.Fixtures
@@ -82,15 +84,26 @@ class QuickRecordTest {
         assertEquals(emptyList<String>(), draft.missing)
     }
 
-    private fun formEntityIds(root: JsonObject): Set<String> =
-        (root["screens"] as JsonArray).mapNotNull { (it as JsonObject).str("entity") }.toSet()
+    private fun dsl(name: String) = AppDSL.decode(Fixtures.examplesDir.resolve("$name.json").readText())
 
     @Test
     fun recordableEntitiesPreferFormScreens() {
-        val k = Fixtures.load("kakeibo")
-        assertEquals("expense", QuickRecord.recordableEntities(k.entities, formEntityIds(k.root)).first().id)
-        val initial = Fixtures.load("initial")
-        assertTrue(QuickRecord.recordableEntities(initial.entities, formEntityIds(initial.root)).isEmpty())
+        assertEquals("expense", QuickRecord.recordableEntities(dsl("kakeibo")).first().id)
+        assertTrue(QuickRecord.recordableEntities(dsl("initial")).isEmpty())
+    }
+
+    /** DSL から取る入口と、例の JSON の `screens[].entity` を渡した時が全部の例で一致する。 */
+    @Test
+    fun recordableEntitiesFromDslMatchesRawScreens() {
+        val names = Fixtures.examplesDir.listFiles { f -> f.extension == "json" }!!.map { it.nameWithoutExtension }.sorted()
+        assertTrue(names.size > 10)
+        for (name in names) {
+            val raw = Fixtures.load(name)
+            val formIds = (raw.root["screens"] as JsonArray).mapNotNull { (it as JsonObject).str("entity") }.toSet()
+            val d = dsl(name)
+            assertEquals(name, formIds, d.formEntityIds)
+            assertEquals(name, QuickRecord.recordableEntities(raw.entities, formIds).map { it.id }, QuickRecord.recordableEntities(d).map { it.id })
+        }
     }
 
     @Test

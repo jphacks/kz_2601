@@ -18,24 +18,36 @@ import jp.kz2601.metamon.dsl.records.MatchBox
 import jp.kz2601.metamon.dsl.records.MatchInterest
 import jp.kz2601.metamon.dsl.records.Record
 import jp.kz2601.metamon.dsl.records.RecordPermission
+import jp.kz2601.metamon.nearby.NearbyShareController
 import jp.kz2601.metamon.renderer.ActionContext
+import jp.kz2601.metamon.renderer.components.media.PhotoReader
 import jp.kz2601.metamon.renderer.DSLRuntime
+import jp.kz2601.metamon.renderer.form.FormDraftRestore
+import jp.kz2601.metamon.renderer.form.FormDraftStorage
+import jp.kz2601.metamon.renderer.EntityLoadState
+import jp.kz2601.metamon.renderer.components.lists.LeafData
 import jp.kz2601.metamon.renderer.FormMember
 import jp.kz2601.metamon.renderer.components.audio.DictationHost
+import jp.kz2601.metamon.renderer.components.importing.AudioFileTranscriptionHost
 import jp.kz2601.metamon.dsl.logic.ExternalUrlPolicy
 import jp.kz2601.metamon.renderer.NavigationHost
+import jp.kz2601.metamon.renderer.components.nearby.NearbyHost
+import jp.kz2601.metamon.renderer.components.nearby.NearbyPassbyController
 import jp.kz2601.metamon.renderer.components.play.RecordWriter
 import jp.kz2601.metamon.renderer.components.play.TimerHost
+import jp.kz2601.metamon.renderer.components.play.TimerRun
 import jp.kz2601.metamon.renderer.components.ai.AiChatPairSaving
 import jp.kz2601.metamon.renderer.components.ai.AiHost
 import jp.kz2601.metamon.renderer.components.social.AuthorNameHost
 import jp.kz2601.metamon.renderer.components.social.BlockedUsersHost
 import jp.kz2601.metamon.renderer.components.social.FollowsHost
+import jp.kz2601.metamon.renderer.components.social.MarksHost
 import jp.kz2601.metamon.renderer.components.social.MatchingHost
 import jp.kz2601.metamon.renderer.components.social.ModerationHost
 import jp.kz2601.metamon.renderer.components.social.ReportReasonOption
 import jp.kz2601.metamon.renderer.components.social.SocialPrompt
 import jp.kz2601.metamon.renderer.components.social.SocialPromptHost
+import jp.kz2601.metamon.renderer.form.DiscardGuard
 import jp.kz2601.metamon.renderer.form.FormDraft
 import jp.kz2601.metamon.renderer.form.FormPrefill
 import jp.kz2601.metamon.renderer.navigation.NavigationResolver
@@ -93,6 +105,11 @@ data class RuntimeState(
     val recordUndo: DeletionTicket? = null,
     /** 起動時にサーバーへ届かなかった(手元・保存済みの DSL を表示中)。つながって取り直せたら false */
     val offline: Boolean = false,
+    /**
+     * [offline] のうち保存した DSL も無かった(iOS の unreachable の状態カード・#1107)。画面に消えないカードを出す。
+     * つながって取り直せたら false
+     */
+    val unreachable: Boolean = false,
     /** 上部のバナー(iOS の summaryBanner)。ホットリロードの「最新の内容に更新しました」(#1108) */
     val banner: RuntimeBanner? = null,
 ) {
@@ -142,8 +159,10 @@ class AppRuntime(
     val retention: RecordRetentionRunner? = null,
     /** 共有アプリの参加者と自分が管理者か(#903)。null なら読まない(モック・テスト) */
     val members: AppMembersStore? = null,
+    /** プロセスが落とされた後に戻すフォームの書きかけ(#1185)。既定は端末に残さない(テスト) */
+    override val formDrafts: FormDraftRestore = FormDraftRestore(FormDraftStorage.InMemory()),
 ) : DSLRuntime, NavigationHost, RecordWriter, TimerHost, AiChatPairSaving, AuthorNameHost,
-    ModerationHost, MatchingHost, SocialPromptHost, BlockedUsersHost, FollowsHost {
+    ModerationHost, MatchingHost, SocialPromptHost, BlockedUsersHost, FollowsHost, NearbyHost, MarksHost {
     private val _state = MutableStateFlow(RuntimeState(document))
     val state: StateFlow<RuntimeState> = _state.asStateFlow()
 
@@ -154,6 +173,10 @@ class AppRuntime(
     /** 描画器のフォームが読む記録([RuntimeState.records] と同じもの)。 */
     private val _records = MutableStateFlow<Map<String, List<Record>>>(emptyMap())
     override val recordsFlow: StateFlow<Map<String, List<Record>>> = _records.asStateFlow()
+
+    /** entity ごとの読み込み状態(#1116)。[RuntimeState] の records / loading / failed から作る。 */
+    private val _loadStates = MutableStateFlow(loadStatesOf(_state.value))
+    override val loadStatesFlow: StateFlow<Map<String, EntityLoadState>> = _loadStates.asStateFlow()
 
     val document: AppDocument get() = _state.value.document
     val dsl: AppDSL get() = document.dsl
@@ -169,6 +192,7 @@ class AppRuntime(
     private val savingLock = Mutex()
     private var eventsJob: Job? = null
     private var notificationsJob: Job? = null
+    private var connectivityJob: Job? = null
 
     // ホットリロード(#883)
     private var hotReloadJobs: List<Job> = emptyList()
@@ -206,6 +230,7 @@ class AppRuntime(
     private suspend fun bootstrapOnce() {
         if (eventsJob == null) eventsJob = scope.launch { recordSync.events.collect { handle(it) } }
         if (notificationsJob == null) notificationsJob = scope.launch { watchNotifications() }
+        if (connectivityJob == null) connectivityJob = scope.launch { watchConnectivity() }
         if (isIssued(document.appId)) {
             // 再起動しても作ったアプリが残る(iOS の G4)。サーバーの最新は続けて取り直す
             loadCached(document.appId)?.takeIf { it.appId == document.appId && it.version > document.version }?.let(::apply)
@@ -230,7 +255,7 @@ class AppRuntime(
         val fetch = restore ?: return
         try {
             val remote = fetch(document.appId)
-            _state.update { it.copy(offline = false) }
+            _state.update { it.copy(offline = false, unreachable = false) }
             if (remote.version > document.version || (remote.version == document.version && document.version == 0)) apply(remote)
         } catch (e: CancellationException) {
             throw e
@@ -239,11 +264,23 @@ class AppRuntime(
             if (cached != null && cached.appId == document.appId && cached.version >= document.version) {
                 // 起動時に先に出した版と同じなら描き直さない(見ている画面・遷移を残す)
                 if (cached != document) apply(cached)
-                _state.update { it.copy(offline = true, toast = RuntimeCopy.OFFLINE_RESTORED) }
+                _state.update { it.copy(offline = true, unreachable = false, toast = RuntimeCopy.OFFLINE_RESTORED) }
             } else {
-                // 手元の DSL のまま(状態カードは画面の Issue で出す。ここでは offline だけ立てる)
-                _state.update { it.copy(offline = true) }
+                // 手元の DSL のまま。消えない状態カードで次の一手を出し、つながったら読み直す([watchConnectivity])
+                _state.update { it.copy(offline = true, unreachable = true) }
             }
+        }
+    }
+
+    /**
+     * 到達性を見張る(iOS の `observeConnectivity`・#1107)。オフラインからつながった時、起動時にサーバーへ届かなかったなら
+     * サーバーの最新を取り直す(取れたら状態カードを下げる)。
+     */
+    private suspend fun watchConnectivity() {
+        var previous: Boolean? = null
+        recordSync.connectivity.online.collect { online ->
+            if (online && previous == false && _state.value.offline) restoreFromServer()
+            previous = online
         }
     }
 
@@ -258,7 +295,7 @@ class AppRuntime(
             .collect { (doc, recs) ->
                 if (doc.dsl.app.notifications.isEmpty()) return@collect
                 try {
-                    host.notificationsChanged(doc.appId, doc.dsl, recs)
+                    host.notificationsChanged(doc.appId, doc.dsl, notificationRecords(doc, recs))
                 } catch (e: CancellationException) {
                     throw e
                 } catch (_: Exception) {
@@ -266,6 +303,12 @@ class AppRuntime(
                 }
             }
     }
+
+    /** まだ読み込んでいない entity を端末内 DB で埋める・読めなかった entity は外す(#1124・[NotificationRecords])。 */
+    private suspend fun notificationRecords(doc: AppDocument, recs: Map<String, List<Record>>): Map<String, List<Record>> =
+        NotificationRecords.fill(doc.dsl.entities.map { it.id }, recs, _state.value.failed) { entity ->
+            social.hidingBlocked(mapOf(entity to recordSync.cached(doc.appId, entity).map { r -> r.toDsl() }))[entity].orEmpty()
+        }
 
     private suspend fun loadCached(appId: String): AppDocument? = try {
         cachedDocument?.invoke(appId)
@@ -280,7 +323,7 @@ class AppRuntime(
         val switched = doc.appId != document.appId
         if (switched) dropPendingHotReload()
         if (isIssued(doc.appId)) directory?.store?.set(doc.appId)
-        _state.value = RuntimeState(doc, offline = _state.value.offline)
+        _state.value = RuntimeState(doc, offline = _state.value.offline, unreachable = _state.value.unreachable)
         publishRecords()
         _navigation.value = NavigationState.initial(doc.dsl)
         noteAppliedVersion(doc, switched)
@@ -297,6 +340,12 @@ class AppRuntime(
 
     /** 一覧に出すアプリ(archived・未生成を除き、今のアプリを先頭に)。 */
     val visibleApps: List<AppSummary> get() = AppSummary.visible(_apps.value, current = document.appId)
+
+    /** 一覧を差し替える(変身一覧の名前の変更・複製・並べ替え・削除・#896)。オフラインの一覧にも残す。 */
+    fun setApps(list: List<AppSummary>) {
+        _apps.value = list
+        directory?.cache?.store(list)
+    }
 
     /**
      * 生成(音声 #995)の結果を受け取る。ai は送った appId で返すので、別の appId なら新しいアプリとして開き、その appId を保存する。
@@ -372,6 +421,7 @@ class AppRuntime(
      * 次のサインインで [bootstrap] がもう一度走る。サーバーには何も送らない(記録の DB・送信待ちは `LocalDataWipe` が消す)。
      */
     fun resetForAccountChange() {
+        accountGeneration += 1
         bootstrapJob?.cancel()
         bootstrapJob = null
         accountSwitchJob?.cancel()
@@ -391,10 +441,15 @@ class AppRuntime(
         val next = directory?.let { it.fresh(it.store.rotate()) } ?: document
         _state.value = RuntimeState(next)
         _records.value = emptyMap()
+        publishLoadStates()
         _navigation.value = NavigationState.initial(next.dsl)
     }
 
     private var accountSwitchJob: Job? = null
+
+    /** [resetForAccountChange] ごとに増やす。前の人の操作で始めた非同期の予約(タイマーのアラーム)を後から入れない */
+    @Volatile
+    private var accountGeneration = 0
 
     /**
      * 別のアカウントを受け入れた後(#1317・iOS の `adoptSwitchedAccount`)。[resetForAccountChange] の後に呼ぶ。
@@ -492,7 +547,7 @@ class AppRuntime(
             return // 届かなければ今の DSL のまま(購読が戻れば追いつく)
         }
         if (document.appId != appId) return
-        _state.update { it.copy(offline = false) }
+        _state.update { it.copy(offline = false, unreachable = false) }
         hotReload(remote.copy(appId = appId)) // 進んでいれば当てる。操作中なら閉じるまで待つ
     }
 
@@ -500,7 +555,7 @@ class AppRuntime(
         val doc = document
         if (doc.dsl.app.notifications.isEmpty()) return
         try {
-            host.notificationsChanged(doc.appId, doc.dsl, _records.value)
+            host.notificationsChanged(doc.appId, doc.dsl, notificationRecords(doc, _records.value))
         } catch (e: CancellationException) {
             throw e
         } catch (_: Exception) {
@@ -531,8 +586,17 @@ class AppRuntime(
 
     private fun applyNavigationRestore(snapshot: NavigationSnapshot) {
         val doc = document
-        if (_navigation.value != NavigationState.initial(doc.dsl)) return
-        snapshot.restoreIn(doc.appId, doc.dsl)?.let { _navigation.value = it }
+        val restored = snapshot.restoreIn(doc.appId, doc.dsl)
+        if (_navigation.value == NavigationState.initial(doc.dsl)) restored?.let { _navigation.value = it }
+        // 同じ画面に戻れた時だけフォームの書きかけを当てる(#1185)。戻れなければ捨てる
+        if (restored != null && _navigation.value == restored) formDrafts.arm(doc.appId) else formDrafts.clear()
+    }
+
+    /** 開いているフォームの書きかけを端末に置く(Activity の保存状態を書く時・#1185)。話しかける前の画面では置かない。 */
+    fun persistFormDrafts() {
+        val doc = document
+        if (doc.dsl.isVoiceOnly) return formDrafts.clear()
+        formDrafts.persist(doc.appId)
     }
 
     /** 他端末・ai 直叩きで進んだ DSL を当てる。操作中(シート・push 先・音声シート)なら閉じるまで待ち、最新の 1 件だけ当てる。 */
@@ -559,6 +623,7 @@ class AppRuntime(
             records = previous.records.filterKeys { it in keep },
             failed = previous.failed.intersect(keep),
             offline = previous.offline,
+            unreachable = previous.unreachable,
             banner = RuntimeBanner(++bannerSeq, RuntimeCopy.HOT_RELOADED),
         )
         publishRecords()
@@ -639,6 +704,12 @@ class AppRuntime(
     /** transcribeField の話して入力(#864)。AppContainer が本体の認識器で差す。 */
     override var dictation: DictationHost? = null
 
+    /** fileImport の録音ファイルの文字起こし(whisper.cpp・#1180)。AppContainer が差す。 */
+    override var audioFileTranscription: AudioFileTranscriptionHost? = null
+
+    /** photoField.analyze の端末内の読み取り(#1119・ML Kit)。AppContainer が渡す。 */
+    override var photoReader: PhotoReader? = null
+
     override fun onAction(action: Action, context: ActionContext) {
         scope.launch { run(action, context) }
     }
@@ -651,6 +722,8 @@ class AppRuntime(
     override fun setNavigation(next: NavigationState) {
         _navigation.value = next
     }
+
+    override var discardGuard: DiscardGuard? = null
 
     // 画面の操作
 
@@ -706,6 +779,8 @@ class AppRuntime(
     /** 今のアプリで自分が管理者か(#272)。null = 分からない(読む前・読めなかった) */
     val isAppAdmin: Boolean? get() = memberEntries[document.appId]?.isAdmin
 
+    override val viewerIsAdmin: Boolean? get() = isAppAdmin
+
     override val formMembers: List<FormMember>
         get() = memberEntries[document.appId]?.members.orEmpty().map { FormMember(it.uid, it.displayName) }
 
@@ -724,6 +799,7 @@ class AppRuntime(
             if (cached.isNotEmpty()) setRecords(appId, entity, cached)
         }
         _state.update { it.copy(loading = it.loading + entity) }
+        publishLoadStates()
         try {
             val fresh = recordSync.pull(appId, entity)
             if (document.appId != appId) return
@@ -739,6 +815,7 @@ class AppRuntime(
             }
         } finally {
             _state.update { it.copy(loading = it.loading - entity) }
+            publishLoadStates()
         }
         sweepRetention(entity) // #482 サーバーから届いた期限切れ(別の端末で作った自分の記録など)
     }
@@ -759,8 +836,20 @@ class AppRuntime(
     /** timerDisplay の終了通知(端末の予約は [RuntimeHost.timerChanged])。 */
     override fun timerChanged(key: String, name: String, endsAtEpochMillis: Long?) {
         val appId = document.appId
-        scope.launch { host.timerChanged("$appId/$key", dsl.app.name, name, endsAtEpochMillis) }
+        val appName = dsl.app.name
+        val generation = accountGeneration
+        scope.launch {
+            // 予約する前にサインアウト・アカウントの切り替えがあった: 前の人のアラームを戻さない
+            if (accountGeneration != generation) return@launch
+            host.timerChanged("$appId/$key", appName, name, endsAtEpochMillis)
+        }
     }
+
+    override fun loadTimer(key: String): TimerRun? = host.loadTimer("${document.appId}/$key")
+
+    override fun saveTimer(key: String, run: TimerRun) = host.saveTimer("${document.appId}/$key", run)
+
+    override fun timerVisible(key: String, visible: Boolean) = host.timerVisible("${document.appId}/$key", visible)
 
     /** フォームを通さず 1 件足す。作った行の id(仮 id)。entity が無ければ null。 */
     suspend fun createRecord(entity: String, data: Map<String, JSONValue>): String? {
@@ -770,13 +859,32 @@ class AppRuntime(
         return id
     }
 
+    // 近くの人に送る(#1382)
+
+    /** 近距離共有の窓口(AppContainer が作る時に入れる)。null なら送るボタンを押しても何もしない(モック・テスト)。 */
+    var nearby: NearbyShareController? = null
+
+    override fun shareNearby(entity: String, records: List<Map<String, JSONValue>>) {
+        nearby?.share(entity, records)
+    }
+
+    /** すれ違い通信(#1383)。AppContainer が [jp.kz2601.metamon.nearby.PassbyController] を作る時に入れる。null なら表示だけ */
+    override var passby: NearbyPassbyController? = null
+
+    /** ローカル DB から読み直す(サーバーには取りに行かない)。すれ違い通信の更新で、仮 id が変わった記録を内容で探す前に呼ぶ。 */
+    suspend fun reloadLocal(entity: String) = reloadCached(document.appId, entity)
+
     // AI ボタン(#873)
 
     override val ai: AiHost? get() = aiHost
 
     override suspend fun loadRecords(entities: Set<String>) = load(entities)
 
+    override suspend fun retryRecords(entities: Set<String>) = load(entities, force = true)
+
     override suspend fun addRecord(entity: String, data: Map<String, JSONValue>): Boolean = createRecord(entity, data) != null
+
+    override val currentAppId: String get() = document.appId
 
     // 投稿に出す名前(#875・iOS の AppRuntime+Chat)
 
@@ -804,6 +912,28 @@ class AppRuntime(
     /** 描画に渡す記録(ブロックした人の共有の投稿を除く)。 */
     private fun publishRecords() {
         _records.value = social.hidingBlocked(_state.value.records)
+        publishLoadStates()
+    }
+
+    private fun publishLoadStates() {
+        _loadStates.value = loadStatesOf(_state.value)
+    }
+
+    private fun loadStatesOf(s: RuntimeState): Map<String, EntityLoadState> =
+        EntityLoadState.all(s.records, s.loading, s.failed, s.document.dsl.entities.map { it.id }.toSet())
+
+    /** 印(#255)。ローカルを先に変えてサーバーで確定。失敗はローカルを戻して null(一覧は元の値に戻る)。 */
+    override suspend fun toggleMark(entity: String, recordId: String, mark: String): MarkState? {
+        val appId = document.appId
+        val settled = try {
+            recordSync.toggleMark(appId, entity, recordId, mark)
+        } catch (e: CancellationException) {
+            throw e
+        } catch (_: Exception) {
+            null
+        }
+        if (document.appId == appId) setRecords(appId, entity, recordSync.cached(appId, entity))
+        return settled?.let { MarkState(it.count, it.mine) }
     }
 
     override fun canReport(entity: String, record: Record): Boolean = social.canReport(entity, record)
@@ -959,7 +1089,10 @@ class AppRuntime(
 
             ActionType.START_ACTIVITY -> {
                 val spec = action.activity ?: return
-                attempt(action.type) { host.startActivity(spec, document.appId) }
+                attempt(action.type) {
+                    val stat = spec.stat?.let { ActivityStat.read(it, dsl, LeafData(this, _records.value)) }
+                    if (!host.startActivity(spec, document.appId, dsl.app.name, stat)) showToast(RuntimeCopy.ACTIVITY_NOTIFICATIONS_OFF)
+                }
             }
 
             ActionType.END_ACTIVITY -> attempt(action.type) { host.endActivity(document.appId) }
@@ -968,7 +1101,7 @@ class AppRuntime(
 
             ActionType.LOOKUP_BOOK -> attempt(action.type) { host.lookupBook(action, ctx, this) }
 
-            ActionType.UNKNOWN -> showToast(RuntimeCopy.unknownAction(action.type.wire))
+            ActionType.UNKNOWN -> showToast(RuntimeCopy.unknownAction(action.rawType))
         }
     }
 
@@ -993,6 +1126,7 @@ class AppRuntime(
             val (list, written) = write(entity, recordId, form.payload)
             setRecords(appId, entity, list)
             form.markSaved(queuedOffline = !recordSync.isOnline)
+            formDrafts.forget(form) // 保存したら端末の書きかけも消す(#1185)
             lastSavedForm = SavedForm(appId, entity, written, form)
             sweepRetention(entity) // #482 保存の後
         } finally {

@@ -58,20 +58,24 @@ struct RootView: View {
                 .onPreferenceChange(GridBottomTrailingObstructionKey.self) { trailingBottomObstructions = $0 }
                 .environment(\.fabFrame, fabFrame)
                 .environment(\.changeHighlight, rt.changeHighlight) // #626 編集で変わった部品だけ光らせる
+                .environment(\.gridEditSession, rt.gridEdit) // #1442 手で動かす編集モード
 
             // フォーム画面(push)では FAB を出さず、ナビバー右上のマイク(`formToolbarAccessory`)が入口になる(#83)
             // キーボード表示中も隠す(入力欄・キーボードのツールバーに被るため・#143)
             // シート・部品のシートが上にある間はそちらの層が出す(#629 `ModalVoiceFabLayer` / `ComponentAIButtonLayer`)
             ZStack {
                 // create の全画面「変身中」の上には出さない(重ねる方式の時は GeneratingView が覆っていた)
-                if mainEntry == .fab {
+                if mainEntry == .fab, rt.gridEdit == nil { // 編集モード中は FAB を出さない(部品のつまみに被る)
                     VoiceFab(
                         hasTabs: rt.dsl.app.hasTabs,
                         leadingObstructionTop: bottomObstructions[visibleMainRoute.id],
                         trailingObstructionTop: trailingBottomObstructions[visibleMainRoute.id],
                         isBusy: rt.morphJob != nil,
                         onTap: { rt.openVoiceForVisibleScreen() },
-                        onLongPress: { rt.openSwitcher() }
+                        onLongPress: { rt.openSwitcher() },
+                        coachMark: rt.fabCoachMark, // #1441
+                        onCoachMark: { rt.handleCoachMark($0, $1) },
+                        onGesturePerformed: { rt.noteGesturePerformed($0) }
                     )
                     .transition(.scale(scale: 0.6).combined(with: .opacity))
                 }
@@ -197,8 +201,10 @@ struct RootView: View {
                                                               : .default(Text(confirm.primaryLabel), action: run),
                          secondaryButton: .cancel(Text("キャンセル")))
         }
-        .overlay(alignment: .top) { summaryCard }
-        .overlay(alignment: .top) { errorCardOverlay }
+        // 編集モード中は上のカードを出さない(「完了」「キャンセル」に被る)。バーは上のカードより後に重ねる
+        .overlay(alignment: .top) { if Self.showsTopCards(gridEditing: rt.gridEdit != nil) { summaryCard } }
+        .overlay(alignment: .top) { if Self.showsTopCards(gridEditing: rt.gridEdit != nil) { errorCardOverlay } }
+        .overlay(alignment: .top) { if rt.gridEdit != nil { GridEditBar().transition(.move(edge: .top).combined(with: .opacity)) } }
         .modifier(ToastHost(onModal: false))
         .modifier(NewItemsHost()) // #268: 開いた直後に他の人の新着の数
         .modifier(UsageNoticeHost()) // #317: 記録・写真が上限に近い(作成者・1 日 1 回)
@@ -206,6 +212,9 @@ struct RootView: View {
             rt.setForeground(phase == .active) // ホットリロードのポーリングは前面時のみ
         }
     }
+
+    /// 上部の要約・失敗のカードを出すか。編集モード(#1442)中は編集のバーを隠さないよう出さない
+    static func showsTopCards(gridEditing: Bool) -> Bool { !gridEditing }
 
     private var colorScheme: ColorScheme? { Self.colorScheme(themeMode: rt.dsl.app.theme?.mode) }
 

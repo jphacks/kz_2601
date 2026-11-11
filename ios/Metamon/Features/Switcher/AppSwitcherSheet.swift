@@ -28,6 +28,7 @@ struct AppSwitcherSheet: View {
                     .padding(.top, Theme.Spacing.lg)
                 AppsUsageNotice() // #317 作れるアプリの数が上限に近い(1 日 1 回)
                     .padding(.horizontal, Theme.Spacing.lg)
+                reorderCoachMark // #1441
                 cards
                     .padding(.top, Theme.Spacing.lg)
                 actions
@@ -79,6 +80,17 @@ struct AppSwitcherSheet: View {
             .accessibilityLabel("設定")
             .accessibilityIdentifier("switcher.settings")
             SheetCloseButton(identifier: "switcher.close") { dismiss() }
+        }
+    }
+
+    /// カードが 2 枚以上ある時だけ、最初のカードを指して「長押しで並べ替え」を 1 回出す(#1441)。
+    @ViewBuilder
+    private var reorderCoachMark: some View {
+        if !showSkeleton, apps.count > 1, let mark = rt.coachMark(eligible: [.switcherReorder]) {
+            CoachMarkBubble(mark: mark, arrowAlignment: .leading, arrowInset: AppCard.width / 2) { rt.handleCoachMark(mark, $0) }
+                .padding(.horizontal, Theme.Spacing.lg)
+                .padding(.top, Theme.Spacing.md)
+                .transition(.opacity)
         }
     }
 

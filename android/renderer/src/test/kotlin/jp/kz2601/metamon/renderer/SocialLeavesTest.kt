@@ -12,6 +12,7 @@ import jp.kz2601.metamon.renderer.components.social.ChatThreadSend
 import jp.kz2601.metamon.renderer.registry.ComponentRegistry
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -50,6 +51,28 @@ class SocialLeavesTest {
     @Test
     fun blankDraftDoesNotSend() {
         assertEquals(ChatThreadSend.Plan.Empty, ChatThreadSend.plan(FakeRuntime(ask = true), shared, "   ", "text", null))
+    }
+
+    @Test
+    fun photoOnlyMessageSendsAndKeepsThePhotoToRestore() {
+        val pic = "data:image/jpeg;base64,AAAA"
+        val plan = ChatThreadSend.plan(FakeRuntime(ask = false), shared, "", "text", "photo", pic)
+        plan as ChatThreadSend.Plan.Send
+        assertEquals(mapOf("room" to JSONValue.Str("general"), "photo" to JSONValue.Str(pic)), plan.pending.data)
+        assertEquals("送れなかった時に戻す写真", pic, plan.pending.photo)
+        val both = ChatThreadSend.plan(FakeRuntime(ask = true), shared, "見て", "text", "photo", pic) as ChatThreadSend.Plan.AskName
+        assertEquals(JSONValue.Str("見て"), both.pending.data["text"])
+        assertEquals(pic, both.pending.photo)
+        // photoField が無い chatThread は写真を持たない
+        assertEquals(ChatThreadSend.Plan.Empty, ChatThreadSend.plan(FakeRuntime(ask = false), shared, "", "text", null, pic))
+    }
+
+    @Test
+    fun sendNeedsTextOrPhoto() {
+        assertFalse(ChatThreadSend.canSend(sending = false, text = "  ", photo = null))
+        assertTrue(ChatThreadSend.canSend(sending = false, text = "", photo = "data:image/jpeg;base64,AAAA"))
+        assertTrue(ChatThreadSend.canSend(sending = false, text = "hi", photo = null))
+        assertFalse("送っている間は押せない", ChatThreadSend.canSend(sending = true, text = "hi", photo = "x"))
     }
 
     @Test
