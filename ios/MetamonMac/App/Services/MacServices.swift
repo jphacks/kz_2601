@@ -57,6 +57,10 @@ final class MacServices: @unchecked Sendable {
         appConfig = url.map { HTTPAppConfigClient(baseURL: $0, token: token) }
     }
 
+    /// ISBN から本の情報(lookupBook・#1276)。iOS の `Books+Wiring` と同じく appconfig の `POST /v1/lookup/book` に聞く
+    /// (端末から外部の書誌 API には直接つながらない)。Bearer はログイン(#930)のトークン。審査用ビルドにも残す(iOS と同じ)
+    var books: (any BookLookupClient)? { appConfigURL.map { HTTPBookLookupClient(baseURL: $0, token: token) } }
+
     #if !APP_STORE_REVIEW
     /// 外部の公開データ(feed・#348・#1288)。appconfig の URL がある時だけ(審査用ビルドは外す・iOS と同じ)
     var feeds: (any FeedClient)? { appConfigURL.map { HTTPFeedClient(baseURL: $0, token: token) } }
