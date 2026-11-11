@@ -68,6 +68,8 @@ final class MacHoldToTalkTests: XCTestCase {
         let monitor = MacHoldToTalkKeys.Monitor()
         let window = NSWindow()
         monitor.window = window
+        var discarded = 0
+        monitor.discardRecording = { discarded += 1 }
         monitor.install()
         defer { monitor.remove() }
 
@@ -78,12 +80,22 @@ final class MacHoldToTalkTests: XCTestCase {
         NotificationCenter.default.post(name: NSWindow.didResignKeyNotification, object: window)
         XCTAssertFalse(monitor.gesture.isPressed, "keyUp が届かなくても押したままにしない")
         XCTAssertNil(monitor.heldKeyCode)
+        XCTAssertEqual(discarded, 1, "始めていた録音は送らずに捨てる")
 
         monitor.press(.delayed, keyCode: HoldToTalkKey.spaceKeyCode, isRecording: false)
         XCTAssertTrue(monitor.gesture.isPressed)
         NotificationCenter.default.post(name: NSApplication.didResignActiveNotification, object: NSApp)
         XCTAssertFalse(monitor.gesture.isPressed)
         XCTAssertNil(monitor.heldKeyCode)
+        XCTAssertEqual(discarded, 1, "まだ始めていない(短いスペース)なら捨てる物は無い")
+
+        monitor.press(.immediate, keyCode: 46, isRecording: false)
+        NotificationCenter.default.post(name: NSApplication.didResignActiveNotification, object: NSApp)
+        XCTAssertEqual(discarded, 2)
+
+        monitor.press(.immediate, keyCode: 46, isRecording: false)
+        monitor.interrupt(discard: false) // 窓を閉じた時(`remove`)は今まで通り止めて送る
+        XCTAssertEqual(discarded, 2)
     }
 
     // MARK: - どのキーを使うか

@@ -162,11 +162,11 @@ struct MacHoldToTalkKeys: ViewModifier {
                 center.addObserver(forName: NSWindow.didResignKeyNotification, object: nil, queue: .main) { [weak self] note in
                     MainActor.assumeIsolated {
                         guard let self, let window = self.window, note.object as? NSWindow === window else { return }
-                        self.interrupt()
+                        self.interrupt(discard: true)
                     }
                 },
                 center.addObserver(forName: NSApplication.didResignActiveNotification, object: nil, queue: .main) { [weak self] _ in
-                    MainActor.assumeIsolated { self?.interrupt() }
+                    MainActor.assumeIsolated { self?.interrupt(discard: true) }
                 },
             ]
         }
@@ -176,14 +176,23 @@ struct MacHoldToTalkKeys: ViewModifier {
             token = nil
             resignTokens.forEach(NotificationCenter.default.removeObserver)
             resignTokens = []
-            interrupt()
+            interrupt(discard: false)
         }
 
-        /// 押したまま別の操作で終わった。録音を始めていれば止める(`HoldToTalkGesture.interrupt`)
-        func interrupt() {
+        /// 録音を捨てる(テストは差し替える)
+        var discardRecording: (() -> Void)?
+
+        /// 押したまま別の操作で終わった。録音を始めていれば止める(`HoldToTalkGesture.interrupt`)。
+        /// `discard`: 窓・アプリが手前でなくなった時は送らずに捨てる(離したつもりの無い録音を送らない)。窓を閉じた時は今まで通り止めて送る
+        func interrupt(discard: Bool) {
             timer?.invalidate()
             heldKeyCode = nil
-            handle(gesture.interrupt())
+            let action = gesture.interrupt()
+            if discard, action == .stop {
+                if let discardRecording { discardRecording() } else { voice?.cancel() }
+            } else {
+                handle(action)
+            }
         }
 
         /// キーを押した(`consumes` の keyDown)
