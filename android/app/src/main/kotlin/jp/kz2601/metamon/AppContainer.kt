@@ -74,6 +74,7 @@ import jp.kz2601.metamon.services.local.AccountOwnerStore
 import jp.kz2601.metamon.services.AuthService
 import jp.kz2601.metamon.services.CrashReporter
 import jp.kz2601.metamon.services.NoopCrashReporter
+import jp.kz2601.metamon.services.PlanUsageSource
 import jp.kz2601.metamon.services.RemainingToday
 import jp.kz2601.metamon.services.RemainingTodayStore
 import jp.kz2601.metamon.services.SpeechTranscriber
@@ -282,6 +283,9 @@ class AppContainer(
     /** sensorValue が読むセンサー(#1195)。`METAMON_MOCK=1` なら決まった波形(エミュレータでも値が出る)、それ以外は端末のセンサー(null)。 */
     val sensorSource: SensorSource? get() = sensorSourceFor(knobs.mock)
 
+    /** 使用量の口(「今日の残り」・設定の「使っている量」)。モックの構成は null、つまみ `METAMON_MOCK_USAGE` ならモック */
+    val usageSource: PlanUsageSource? get() = DebugMocks.usage(knobs, appConfig as? PlanUsageSource)
+
     /** 画面の下に出す接続先の名前(モックなら "mock")。 */
     val environmentLabel: String get() = if (knobs.mock) "mock" else environment.name
 
@@ -291,6 +295,10 @@ class AppContainer(
     /** セッション切れ(#1102)でサインアウトしてサインイン画面に理由を出す。[MetamonApplication] が 1 回だけ呼ぶ。 */
     fun startSessionExpiry(scope: CoroutineScope) {
         sessionExpiry?.listener = { uid -> scope.launch { session.expire(uid) } }
+    }
+
+    init {
+        DebugMocks.applyAiConsent(knobs, consent, tutorial) // `METAMON_AI_CONSENT`(debug だけ)
     }
 
     /** 同意の画面を出す時点(起動時・AI に送る直前・設定から・#888) */
@@ -418,7 +426,7 @@ class AppContainer(
         private fun makeMock(context: Context, environment: AppEnvironment, samples: DslSamples, initialDsl: AppDSL, knobs: DebugKnobs): AppContainer {
             Log.i(TAG, "モックの構成で起動します($knobs)")
             val appConfig = InMemoryAppConfigClient(
-                seed = MockSeed.demoRecords(),
+                seed = DebugMocks.seed(initialDsl, knobs),
                 apps = if (knobs.mockSharing) MockSeed.sharingApps else emptyList(),
                 sharing = knobs.mockSharing,
                 initialDocument = { appId -> samples.document(DslSamples.INITIAL, appId, 1) },
@@ -470,6 +478,7 @@ class AppContainer(
                     ActivityNotifications.get(context).removeApp(it) // 進行中の表示(#1030)
                 },
                 releaseClient = if (ReviewBuild.enabled) null else MockReleaseRequestClient(),
+                members = DebugMocks.members(knobs),
             )
         }
 

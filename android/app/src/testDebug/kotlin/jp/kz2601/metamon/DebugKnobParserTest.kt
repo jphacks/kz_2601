@@ -55,4 +55,55 @@ class DebugKnobParserTest {
         assertNull(k.offlineSeconds)
         assertEquals(2.0, k.autoNavIntervalSeconds, 0.0)
     }
+
+    @Test
+    fun parsesFeatureMockKnobs() {
+        val k = DebugKnobParser.parse(
+            mapOf(
+                "METAMON_MOCK_NEW_ITEMS" to "2",
+                "METAMON_MOCK_USAGE" to "apps:9/10,pro",
+                "METAMON_MOCK_MEMBERS" to "member",
+                "METAMON_MOCK_MEMBERS_FAIL" to "1",
+                "METAMON_AI_CONSENT" to "granted",
+                "METAMON_SEED_DUMMY" to "6",
+                "METAMON_SEED_STEP_HOURS" to "24",
+                "METAMON_SEED_AUTHORS" to "mixed",
+            ),
+        )
+        assertEquals(2, k.mockNewItems)
+        assertEquals("apps:9/10,pro", k.mockUsage)
+        assertEquals("member", k.mockMembers)
+        assertTrue(k.mockMembersFail)
+        assertEquals(DebugKnobs.AiConsentOverride.GRANTED, k.aiConsent)
+        assertEquals(6, k.seedDummy)
+        assertEquals(24.0, k.seedStepHours, 0.0)
+        assertTrue(k.seedAuthorsMixed)
+        assertEquals(DebugKnobs.AiConsentOverride.RESET, DebugKnobParser.parse(mapOf("METAMON_AI_CONSENT" to "reset")).aiConsent)
+    }
+
+    @Test
+    fun featureMockKnobsFallBackLikeIos() {
+        val k = DebugKnobParser.parse(
+            mapOf(
+                "METAMON_MOCK_NEW_ITEMS" to "x",
+                "METAMON_MOCK_MEMBERS" to "admin",
+                "METAMON_MOCK_MEMBERS_FAIL" to "true",
+                "METAMON_AI_CONSENT" to "yes",
+                "METAMON_SEED_DUMMY" to "many",
+                "METAMON_SEED_STEP_HOURS" to "-5",
+                "METAMON_SEED_AUTHORS" to "other",
+            ),
+        )
+        assertNull(k.mockNewItems)
+        assertNull(k.mockMembers)
+        assertFalse(k.mockMembersFail)
+        assertNull(k.aiConsent)
+        assertEquals(4, k.seedDummy) // 数字でなければ 4 件
+        assertEquals(0.0, k.seedStepHours, 0.0) // 0〜1 年に丸める
+        assertFalse(k.seedAuthorsMixed)
+        assertEquals(10, DebugKnobParser.parse(mapOf("METAMON_SEED_DUMMY" to "99")).seedDummy)
+        assertEquals(1, DebugKnobParser.parse(mapOf("METAMON_SEED_DUMMY" to "0")).seedDummy)
+        assertNull(DebugKnobs.NONE.seedDummy)
+        assertEquals(1.0, DebugKnobs.NONE.seedStepHours, 0.0)
+    }
 }

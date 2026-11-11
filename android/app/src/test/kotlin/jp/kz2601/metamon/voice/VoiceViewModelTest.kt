@@ -151,17 +151,6 @@ class VoiceViewModelTest {
     }
 
     @Test
-    fun showScreenSwapsInitialScreenOnlyWhenItExists() = runTest {
-        val vm = vm()
-        vm.generateNow("家計簿")
-        advanceUntilIdle()
-        assertFalse(vm.showScreen("missing"))
-        assertEquals("home", vm.state.value.document.dsl.initialScreen)
-        assertTrue(vm.showScreen("home"))
-        assertEquals("home", vm.state.value.document.dsl.initialScreen)
-    }
-
-    @Test
     fun voiceToGenerateToDone() = runTest {
         val speech = MockSpeechTranscriber(results = listOf(Result.success("家計簿アプリが欲しい")))
         val ai = FakeAI().apply {

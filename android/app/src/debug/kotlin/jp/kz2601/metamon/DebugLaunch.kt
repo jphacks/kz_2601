@@ -26,6 +26,20 @@ object DebugKnobParser {
             mock = flag("METAMON_MOCK"),
             mockAiDelaySeconds = seconds("METAMON_MOCK_AI_DELAY"),
             mockSharing = flag("METAMON_MOCK_SHARING"),
+            mockNewItems = str("METAMON_MOCK_NEW_ITEMS")?.toIntOrNull()?.takeIf { it >= 0 },
+            mockUsage = str("METAMON_MOCK_USAGE"),
+            mockMembers = str("METAMON_MOCK_MEMBERS")?.takeIf { it == "owner" || it == "member" },
+            mockMembersFail = flag("METAMON_MOCK_MEMBERS_FAIL"),
+            aiConsent = when (str("METAMON_AI_CONSENT")) {
+                "granted" -> DebugKnobs.AiConsentOverride.GRANTED
+                "reset" -> DebugKnobs.AiConsentOverride.RESET
+                else -> null
+            },
+            // iOS と同じく数字でなければ 4 件、1〜10 に丸める
+            seedDummy = str("METAMON_SEED_DUMMY")?.let { (it.toIntOrNull() ?: 4).coerceIn(1, 10) },
+            seedStepHours = str("METAMON_SEED_STEP_HOURS")?.toDoubleOrNull()?.takeIf { it.isFinite() }
+                ?.coerceIn(0.0, 24.0 * 365) ?: 1.0,
+            seedAuthorsMixed = str("METAMON_SEED_AUTHORS") == "mixed",
             initialExample = str("METAMON_INITIAL_EXAMPLE"),
             initialDslPath = str("METAMON_INITIAL_DSL_PATH"),
             initialScreen = str("METAMON_INITIAL_SCREEN"),
