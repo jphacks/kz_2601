@@ -6,6 +6,7 @@ import androidx.compose.ui.Modifier
 import jp.kz2601.metamon.dsl.Action
 import jp.kz2601.metamon.dsl.Component
 import jp.kz2601.metamon.dsl.ComponentType
+import jp.kz2601.metamon.dsl.Screen
 import jp.kz2601.metamon.renderer.ActionContext
 import jp.kz2601.metamon.renderer.DSLRuntime
 import jp.kz2601.metamon.renderer.NoopDSLRuntime
@@ -57,13 +58,17 @@ class RenderContext(
     val runtime: DSLRuntime = NoopDSLRuntime,
     /** `screen.entity` を持つ画面の下書き(入力部品が書く)。無ければ入力部品は「フォームの外」の枠になる。 */
     val form: FormDraft? = null,
+    /** 描いている画面(aiButton の inputFeeds が同じ画面の feed を探す)。無ければ null。 */
+    val screen: Screen? = null,
     /** 押した場所つきのアクション。遷移は描画器が、それ以外は runtime が受ける。一覧の行タップは recordId 付きで呼ぶ。 */
     val dispatch: (Action, ActionContext) -> Unit = { _, _ -> },
 ) {
     /** button などが押された時(この画面・このフォームから)。 */
     val perform: (Action) -> Unit = { dispatch(it, ActionContext(route, form)) }
 
-    fun withForm(form: FormDraft?): RenderContext = RenderContext(route, runtime, form, dispatch)
+    fun withForm(form: FormDraft?): RenderContext = RenderContext(route, runtime, form, screen, dispatch)
+
+    fun withScreen(screen: Screen?): RenderContext = RenderContext(route, runtime, form, screen, dispatch)
 }
 
 typealias ComponentBuilder = @Composable (component: Component, ctx: RenderContext, modifier: Modifier) -> Unit

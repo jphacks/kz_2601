@@ -713,6 +713,8 @@ class AppRuntime(
     /** 今のアプリで自分が管理者か(#272)。null = 分からない(読む前・読めなかった) */
     val isAppAdmin: Boolean? get() = memberEntries[document.appId]?.isAdmin
 
+    override val viewerIsAdmin: Boolean? get() = isAppAdmin
+
     override val formMembers: List<FormMember>
         get() = memberEntries[document.appId]?.members.orEmpty().map { FormMember(it.uid, it.displayName) }
 

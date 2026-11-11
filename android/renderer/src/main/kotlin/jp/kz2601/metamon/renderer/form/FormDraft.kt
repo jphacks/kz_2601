@@ -47,6 +47,9 @@ class FormDraft(val entity: Entity, record: Record? = null) {
     }
 
     val isEditing: Boolean get() = recordId != null
+
+    /** 開いた時(最後に保存した時)の値。型に合わせて正規化済み・空は null。 */
+    fun baselineValue(field: String): JSONValue? = baseline[field]
     val hasUnsavedChanges: Boolean get() = !isReadOnly && normalized(values) != baseline
 
     /** 既存の記録を何も変えずに保存したら書かない(M10)。 */

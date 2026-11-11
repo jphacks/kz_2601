@@ -189,7 +189,7 @@ fun ScreenView(
     dsl: AppDSL? = null,
 ) {
     val form = rememberScreenForm(screen, screenCtx.route, screenCtx.runtime)
-    val ctx = remember(screenCtx, form) { screenCtx.withForm(form) }
+    val ctx = remember(screenCtx, form, screen) { screenCtx.withForm(form).withScreen(screen) }
     val toolbar = ScreenToolbar.header(screen, dsl, form)
     Column(modifier.fillMaxSize()) {
         val showsHeader = !screen.isVoiceScreen && (screen.title.isNotEmpty() || canClose || toolbar.isNotEmpty())

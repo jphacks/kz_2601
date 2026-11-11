@@ -33,16 +33,15 @@ data class DeviceCapabilities(
             Feature("matching", implemented = true, needs = ComponentType.MATCH_LIST),
             Feature("notification.when", implemented = true), // ConditionNotifications
             Feature("singleEntity", implemented = true), // ScreenForm・{"setting"}
-            // 管理者かは AppMembersStore で分かる(#903)が、visibleTo のボタンの出し分けが無い(#1089)
-            Feature("dataRoles", implemented = false),
+            Feature("dataRoles", implemented = true), // member の選択(ChoiceLeaves)・visibleTo のボタン(ButtonLeaf・#1244)
             Feature("addressedMessages", implemented = true), // members の選択(ChoiceLeaves)
             // 場所の通知: Geofencing で見張る(LocalNotifications・正確な位置と裏での位置の許可が要る)
             Feature("notification.near", implemented = true),
             Feature("aiButton.long", implemented = true, needs = ComponentType.AI_BUTTON),
             Feature("aiButton.inputPhoto", implemented = true, needs = ComponentType.AI_BUTTON),
             Feature("aiButton.saveTo", implemented = true, needs = ComponentType.AI_BUTTON),
-            Feature("aiButton.inputFeeds", implemented = false, needs = ComponentType.AI_BUTTON),
-            Feature("aiButton.outputs", implemented = false, needs = ComponentType.AI_BUTTON),
+            Feature("aiButton.inputFeeds", implemented = true, needs = ComponentType.AI_BUTTON), // AiFeedInput
+            Feature("aiButton.outputs", implemented = true, needs = ComponentType.AI_BUTTON), // AiOutputs・AiButtonRun.fillOutputs
             Feature("action.lookupBook", implemented = true), // BookLookupPlan
             Feature("text.highlight", implemented = true, needs = ComponentType.TEXT), // TextLeaf・{{fieldId}}・field の語
             Feature("feed.v2", implemented = true, needs = ComponentType.FEED), // warnings / pressure

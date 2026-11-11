@@ -25,6 +25,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
@@ -37,7 +38,10 @@ import jp.kz2601.metamon.dsl.Task
 import jp.kz2601.metamon.dsl.ai.AiSaveTo
 import jp.kz2601.metamon.dsl.ai.AiTextResult
 import jp.kz2601.metamon.dsl.ai.AiTextShape
+import jp.kz2601.metamon.dsl.records.JSONValue
 import jp.kz2601.metamon.renderer.R
+import jp.kz2601.metamon.renderer.components.feed.LocalFeedHost
+import jp.kz2601.metamon.renderer.components.feed.feeds
 import jp.kz2601.metamon.renderer.form.FormDraft
 import jp.kz2601.metamon.renderer.registry.RenderContext
 import jp.kz2601.metamon.renderer.theme.RenderTheme
@@ -123,8 +127,12 @@ private fun AiGenerateLeaf(c: Component, ctx: RenderContext, modifier: Modifier)
     var result by remember { mutableStateOf<AiTextResult?>(null) }
     var usedOnline by remember { mutableStateOf(false) }
     var runs by remember { mutableIntStateOf(0) }
+    var outputs by remember { mutableStateOf<AiButtonRun.OutputsFill?>(null) } // outputs: 今回入れた / 入れなかった項目
+    val aiValues = remember { mutableMapOf<String, JSONValue>() } // outputs: 前回 AI が入れた値(そのままなら次は入れ替えてよい)
     val route = AiButtonRun.route(c, ctx.runtime)
     val saveTo = remember(c.saveTo) { AiSaveTo.from(c.saveTo) }
+    val feeds = ctx.runtime.feeds ?: LocalFeedHost.current
+    val view = LocalView.current
     ShownMetric(c, ctx)
     Column(modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(RenderTheme.Spacing.sm)) {
         val label = c.label?.takeIf { it.isNotEmpty() }
@@ -140,10 +148,14 @@ private fun AiGenerateLeaf(c: Component, ctx: RenderContext, modifier: Modifier)
                 busy = true
                 error = null
                 try {
-                    val out = AiButtonRun.generate(c, ctx.form, ctx.runtime, locale, route)
+                    val out = AiButtonRun.generate(c, ctx.form, ctx.runtime, locale, route, ctx.screen, feeds)
                     usedOnline = route == AiRoute.Online
                     result = out
                     runs += 1
+                    val form = ctx.form
+                    outputs = form?.let { AiButtonRun.fillOutputs(c, out, it, aiValues) }
+                    val names = outputs?.applied?.applied.orEmpty().map { it.fieldName }
+                    if (names.isNotEmpty()) view.announceForAccessibility(view.context.getString(R.string.ai_outputs_announce, names.joinToString("、")))
                 } catch (e: CancellationException) {
                     throw e
                 } catch (e: Exception) {
@@ -163,9 +175,23 @@ private fun AiGenerateLeaf(c: Component, ctx: RenderContext, modifier: Modifier)
         when {
             error != null -> Caption(error!!.text(), isError = true)
             route is AiRoute.Unavailable -> Caption(stringResource(R.string.ai_unavailable, stringResource(AiCopy.reason(route.reason))))
+            out != null && !outputs?.filled.isNullOrEmpty() -> OutputsCaption(outputs!!)
             out != null && c.output != null && ctx.form != null -> Caption(stringResource(R.string.ai_generate_filled))
             out != null && usedOnline -> Caption(stringResource(R.string.ai_generate_online))
         }
+    }
+}
+
+/** outputs で入れた項目・入力済みで入れなかった項目・読めなかった項目(iOS の outputsCaption)。 */
+@Composable
+private fun OutputsCaption(fill: AiButtonRun.OutputsFill) {
+    val ok = fill.applied.applied.size
+    val kept = fill.applied.kept.map { it.fieldName }
+    val missed = fill.missed.map { it.fieldName }
+    Column(Modifier.testTag("aiGenerate.outputs"), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+        if (ok > 0) Caption(pluralStringResource(R.plurals.ai_outputs_filled, ok, ok))
+        if (kept.isNotEmpty()) Caption(stringResource(R.string.ai_outputs_kept, kept.joinToString("、")))
+        if (missed.isNotEmpty()) Caption(stringResource(R.string.ai_outputs_missed, missed.joinToString("、")))
     }
 }
 

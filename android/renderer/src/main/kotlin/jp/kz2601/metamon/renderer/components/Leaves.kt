@@ -20,6 +20,7 @@ import jp.kz2601.metamon.dsl.Action
 import jp.kz2601.metamon.dsl.ActionType
 import jp.kz2601.metamon.dsl.Component
 import jp.kz2601.metamon.dsl.Size
+import jp.kz2601.metamon.dsl.VisibleTo
 import jp.kz2601.metamon.dsl.records.isFollow
 import jp.kz2601.metamon.renderer.R
 import jp.kz2601.metamon.renderer.components.actions.ActionButton
@@ -44,6 +45,9 @@ fun isButtonVisible(action: Action?, isEditing: Boolean = false, readOnly: Boole
 fun isButtonVisible(action: Action?, form: FormDraft?): Boolean =
     isButtonVisible(action, form?.isEditing ?: false, form?.isReadOnly ?: false, form?.canDelete ?: true)
 
+/** visibleTo "admins"(#272): 管理者でないと分かっている時だけ隠す(分からない間は出し、サーバーが判定する)。 */
+fun isButtonVisible(visibleTo: VisibleTo?, isAdmin: Boolean?): Boolean = visibleTo != VisibleTo.ADMINS || isAdmin != false
+
 /** icon 省略時の既定(iOS の `ButtonLeaf.defaultIcon`)。押すと共有・カレンダー・本の検索になるものだけ。 */
 fun buttonDefaultIcon(action: Action?): String? = when (action?.type) {
     ActionType.EXPORT -> "square.and.arrow.up"
@@ -59,6 +63,7 @@ fun buttonDefaultIcon(action: Action?): String? = when (action?.type) {
 @Composable
 fun ButtonLeaf(c: Component, ctx: RenderContext, modifier: Modifier = Modifier) {
     if (!isButtonVisible(c.action, ctx.form)) return
+    if (!isButtonVisible(c.visibleTo, ctx.runtime.viewerIsAdmin)) return
     // follow / unfollow(#270)は今の投稿の作者の状態に合う方だけ
     if (c.action?.type?.isFollow == true) ctx.runtime.follows?.followsVersion?.collectAsState()?.value
     if (!ctx.runtime.showsFollowButton(c.action, ctx.form?.recordId)) return
