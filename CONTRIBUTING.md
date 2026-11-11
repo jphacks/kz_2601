@@ -13,6 +13,7 @@ Tailor It(jphacks/kz_2601)に変更を入れる人とエージェントのため
 5. [レビューの観点](#レビューの観点)
 6. [ローカルでのテストと lint](#ローカルでのテストと-lint)
 7. [秘密情報](#秘密情報)
+8. [新機能を作る順番](#新機能を作る順番)
 
 ## ブランチ
 
@@ -51,7 +52,7 @@ Tailor It(jphacks/kz_2601)に変更を入れる人とエージェントのため
 
 ## PR
 
-- base は **`develop`**(リリースの PR だけ `main`)。まず Draft で出し、動作確認が済んだら Ready for review(CI はそこで走る)。
+- base は **`epic/<種類>`**(`ios`・`mac`・`android`・`backend`・`docs`・種類をまたぐものは `cross`)。epic はエージェントがまとめて `develop` に PR を出す。`develop` 自体の CI を直す PR と、リリースの PR(`main`)だけは直接出す。まず Draft で出し、動作確認が済んだら Ready for review(CI はそこで走る)。
 - 本文は [`PULL_REQUEST_TEMPLATE.md`](.github/PULL_REQUEST_TEMPLATE.md) どおり。UI の変更はスクショ必須。
 - **Assignee**(作った人)と **Milestone**(Issue と同じもの)を付ける。レビュアーは CODEOWNERS で自動。
   - 例外: `/jphacks-task` でエージェントが出す PR にはマイルストーンを付けない(マイルストーンが「進めてよい範囲」の判定に使われるため。`.claude/skills/jphacks-task/SKILL.md`)。
@@ -108,3 +109,12 @@ public リポジトリ。次のものは**絶対にコミットしない**(`.git
 - API キー・トークンをコード・ログ・PR 本文・Issue に貼らない。
 
 `secrets-scan` が赤になったら: 本物なら**先にキーを無効化(ローテート)**してから履歴を消す。誤検知なら `.gitleaksignore` に fingerprint を足す。
+
+## 新機能を作る順番
+
+1. **まず iOS で作る。** 仕様・DSL・backend の形は iOS で決める。
+2. iOS の PR を `develop` にマージする。
+3. 必要なら、Android・Mac に広げる。iOS で決まった形に合わせて作る(仕様を変えたくなったら、先に iOS 側を直す)。
+
+- Mac 専用・Android 専用の機能(メニューバー・ウィジェットの OS 差など)は、その OS で最初から作ってよい。
+- 広げる時の PR には、元の iOS の PR 番号を書く。
