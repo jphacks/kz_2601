@@ -10,6 +10,7 @@ import MetamonRenderer
 ///   (entitlement `applinks:$(METAMON_APPLINKS_DOMAIN)`。AASA の appIDs に Mac の App ID が要る・docs/infra/universal-links/README.md)
 /// - 起動していない時: macOS がアプリを起動し、最初のウインドウに届く
 /// - 開いている時: 新しいウインドウを作らず、今あるウインドウ(手前のもの)で受ける(handlesExternalEvents)
+/// - つなぐの戻り先(`tailorit://connected?…`・#1714)は `MacConnectCallbackInbox` に渡し、設定のタブが一覧を取り直す
 /// - 知らない URL は何もしない(iOS と同じ)
 /// 共有のリンクは `MacShareFlow`(#1287)が iOS と同じ流れで開く。ログインの前に届いたら保留し、ログインできてから 1 回だけ開く。
 /// サーバーにつながっていない時(モック・plist 無し)は開けないことを伝え、リンクをコピーできるようにする
@@ -19,7 +20,10 @@ struct MacLinkReceiver: ViewModifier {
 
     func body(content: Content) -> some View {
         content
-            .onOpenURL { flow.receive($0) }
+            // OAuth の戻り先(`tailorit://connected?…`・#1714)は設定の「つないだサービス」へ。ほかは共有のリンク
+            .onOpenURL { url in
+                if !MacConnectCallbackInbox.shared.receive(url) { flow.receive(url) }
+            }
             .onContinueUserActivity(NSUserActivityTypeBrowsingWeb) { activity in
                 if let url = activity.webpageURL { flow.receive(url) }
             }
