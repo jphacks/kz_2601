@@ -7,6 +7,8 @@ import MetamonRenderer
 /// アプリを切り替えたら呼び出し側の `.id(app.id)` でランタイムごと作り直す。
 struct AppCanvas: View {
     @State private var runtime: MacAppRuntime?
+    /// 声で頼む(#966)。生成したアプリの話して入力(#1328)も同じ認識を使う
+    @Environment(MacVoiceInput.self) private var voice: MacVoiceInput?
     @State private var loadFailed = false
     let app: SampleApp
     /// 会話で作った・直したアプリの DSL(#967)。nil なら同梱の例を読む
@@ -36,7 +38,7 @@ struct AppCanvas: View {
                 return
             }
             do {
-                let created = MacAppRuntime(appId: app.id, dsl: try dsl ?? app.loadDSL())
+                let created = MacAppRuntime(appId: app.id, dsl: try dsl ?? app.loadDSL(), dictation: voice?.dictation)
                 runtime = created
                 discardGuard?.runtime = created
             } catch {
@@ -106,6 +108,8 @@ private struct AppCanvasContent: View {
 private struct RuntimeOverlays: ViewModifier {
     @Bindable var runtime: MacAppRuntime
     @Environment(\.isPresented) private var isPresented
+    /// 話して入力の「音声モデルを用意する」の確認(#1328)
+    @Environment(MacVoiceInput.self) private var voice: MacVoiceInput?
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     private var active: Bool {
@@ -134,6 +138,8 @@ private struct RuntimeOverlays: ViewModifier {
             }
             // AI の部品(#962): 同意の無いまま送ろうとしたら説明を出す。同意したら押し直しで送る(iOS と同じ)
             .sheet(isPresented: consentShown) { MacAIConsentSheet() }
+            // 話して入力(aiChat・transcribeField・#1328)の「音声モデルを用意する」: 会話のシートと同じ確認
+            .modifier(MacModelDownloadConfirm(shown: modelDownloadShown))
             .overlay(alignment: .top) {
                 VStack(spacing: 8) {
                     if active, let message = runtime.toast {
@@ -169,6 +175,11 @@ private struct RuntimeOverlays: ViewModifier {
 
     private var consentShown: Binding<Bool> {
         Binding(get: { active && runtime.needsAIConsent }, set: { if !$0 { runtime.needsAIConsent = false } })
+    }
+
+    private var modelDownloadShown: Binding<Bool> {
+        Binding(get: { active && voice?.showsAppDownloadConfirm == true },
+                set: { if !$0 { voice?.showsAppDownloadConfirm = false } })
     }
 
     private var discardShown: Binding<Bool> {

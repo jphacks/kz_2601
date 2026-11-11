@@ -23,6 +23,8 @@ final class MacVoiceInput {
     private(set) var settingsPane: MacVoiceCopy.PrivacyPane?
     /// ダウンロードの確認を出すか(シートの alert が読む)
     var showsDownloadConfirm = false
+    /// 生成したアプリの話して入力(aiChat・transcribeField)から出す確認か(中央の列の alert が読む・#1328)
+    var showsAppDownloadConfirm = false
 
     @ObservationIgnored let transcriber: any SpeechTranscriber
     @ObservationIgnored private let defaults: UserDefaults
@@ -70,6 +72,15 @@ final class MacVoiceInput {
     /// 遅い見込みの Mac(確認の文に一言足す)
     var isSlowHardware: Bool { slowHardware }
 
+    /// 生成したアプリの話して入力(#1328)。同じ認識を使い、録音は部品が始めた分だけを持つ(声で頼むと取り合わない)
+    @ObservationIgnored private(set) lazy var dictation = TranscriberDictation(
+        transcriber: transcriber,
+        voiceInputActive: { [weak self] in self?.isBusy ?? false },
+        stopSpeech: { LeafSpeech.shared.stopForRecording() },
+        resumeSpeech: { LeafSpeech.shared.recordingFinished() },
+        failure: { MacVoiceCopy.dictationFailure($0) },
+        requestModel: { [weak self] in self?.requestDownloadFromApp() })
+
     // MARK: - 起動
 
     /// 起動時: モデルが端末にあれば読み込む・承認済みなら取得を続ける。無くて未承認なら起動では聞かない(iOS の M14 と同じ)。
@@ -93,6 +104,7 @@ final class MacVoiceInput {
     }
 
     private func begin() {
+        dictation.cancel() // 部品が録音していたら捨てる(マイクは 1 つ)
         failure = nil
         settingsPane = nil
         if case .failed = transcriber.status { Task { try? await transcriber.prepare() } } // 失敗後は作り直す
@@ -123,6 +135,7 @@ final class MacVoiceInput {
     func approveDownload() {
         ModelDownloadConsent.approve(defaults)
         showsDownloadConfirm = false
+        showsAppDownloadConfirm = false
         Task { try? await transcriber.prepare() }
         continueAfterConfirm(downloading: true)
     }
@@ -130,6 +143,7 @@ final class MacVoiceInput {
     /// 確認で「あとで」
     func declineDownload() {
         showsDownloadConfirm = false
+        showsAppDownloadConfirm = false
         continueAfterConfirm(downloading: false)
     }
 
@@ -138,6 +152,16 @@ final class MacVoiceInput {
         askedThisLaunch = true
         recordsAfterConfirm = false
         showsDownloadConfirm = true
+    }
+
+    /// 生成したアプリの話して入力で「音声モデルを用意する」: 承認済みなら取得を始め、まだなら中央の列で確認する
+    func requestDownloadFromApp() {
+        if ModelDownloadConsent.isApproved(defaults) {
+            Task { try? await transcriber.prepare() }
+            return
+        }
+        recordsAfterConfirm = false
+        showsAppDownloadConfirm = true
     }
 
     /// 確認の後: 仮の聞き取りが使えればそのまま録音する。使えなければ、取得中は進み具合を、「あとで」なら文字で頼む案内を出す

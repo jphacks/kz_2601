@@ -13,6 +13,7 @@ import MetamonServices
 /// サーバーへの接続(appconfig のクライアント・ログイン)は Mac に Firebase がまだ無い(#930)ので、
 /// iOS の `METAMON_MOCK=1` と同じくメモリ上の appconfig(`InMemoryAppConfigClient`)に記録を持つ。
 /// ローカル通知は `MacRuntimeNotifications`(#965)。AI の部品(aiButton・aiGenerate・aiChat)は `MacAppRuntime+AIText.swift`(#962)。
+/// 話して入力(aiChat のマイク・transcribeField)は `MacAppRuntime+Dictation.swift`(#1328)。
 /// 共有・課金など iOS 固有の機能は持たない(未対応のアクションは一言で知らせる)。
 @MainActor
 @Observable
@@ -55,10 +56,14 @@ final class MacAppRuntime: RuntimeNavigating {
     @ObservationIgnored private let previewDirectory: URL?
     /// ローカル通知(#965・MacRuntimeNotifications)
     @ObservationIgnored let notifications = MacRuntimeNotifications()
+    /// 話して入力(aiChat のマイク・transcribeField・#1328)。声で頼む(`MacVoiceInput`)と同じ認識を使う。nil なら使えない
+    @ObservationIgnored let dictationSource: TranscriberDictation?
 
     init(appId: String, dsl: AppDSL, recordSync: RecordSyncEngine? = nil, ai: any AIClient = MacComposeSession.gatedAI(),
-         isAIConsentGranted: @escaping @MainActor () -> Bool = { AIConsentStore.shared.isGranted }) {
+         isAIConsentGranted: @escaping @MainActor () -> Bool = { AIConsentStore.shared.isGranted },
+         dictation: TranscriberDictation? = nil) {
         self.appId = appId
+        self.dictationSource = dictation
         self.dsl = dsl
         self.ai = ai
         self.isAIConsentGranted = isAIConsentGranted
