@@ -415,6 +415,9 @@ targets:
     platform: macOS
     sources:
       - path: MetamonMacTests
+        # スナップショットの参照の PNG(#1136)はテストがソースの場所から読む。バンドルには入れない
+        excludes:
+          - "__Snapshots__/**"
     dependencies:
       - target: MetamonMac
     settings:

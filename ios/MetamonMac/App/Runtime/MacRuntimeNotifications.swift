@@ -252,13 +252,41 @@ final class MacNotificationRouter {
         }
     }
 
-    func open(notificationId: String) { pending = .notification(notificationId) }
+    /// プッシュのアプリが一覧に載るのを待つ長さ。過ぎたら諦める(後から急に開かない)
+    static let appRouteLifetime: TimeInterval = 30
+    @ObservationIgnored var now: () -> Date = Date.init
+    @ObservationIgnored private var pendingSince = Date.distantPast
 
-    func open(appId: String) { pending = .app(appId) }
+    func open(notificationId: String) { set(.notification(notificationId)) }
+
+    func open(appId: String) { set(.app(appId)) }
+
+    private func set(_ route: Route) {
+        pendingSince = now()
+        pending = route
+    }
 
     func take() -> Route? {
         defer { pending = nil }
         return pending
+    }
+
+    /// 一覧で選ぶアプリ。決まったら(または諦めたら)行き先を消す。
+    /// プッシュのアプリが一覧にまだ無い時(起動直後でサーバーの一覧が載る前)は残して待つ。
+    /// サーバーの一覧を取り直し終えた(`listRefreshed`)・待つ長さを過ぎた時は諦める
+    func resolve(among ids: [String], listRefreshed: Bool = false) -> String? {
+        guard let route = pending else { return nil }
+        if case .app = route, now().timeIntervalSince(pendingSince) >= Self.appRouteLifetime {
+            pending = nil // 古い行き先は一覧に載っても開かない
+            return nil
+        }
+        if let id = route.appId(among: ids) {
+            pending = nil
+            return id
+        }
+        if case .app = route, !listRefreshed { return nil }
+        pending = nil
+        return nil
     }
 }
 
@@ -283,11 +311,11 @@ private struct MacNotificationRouting: ViewModifier {
         content
             .onAppear(perform: route)
             .onChange(of: router.pending) { route() }
+            .onChange(of: appIds) { route() } // 起動直後: 一覧が載ってからプッシュのアプリを開く
     }
 
     private func route() {
-        guard let route = router.take() else { return }
-        if let appId = route.appId(among: appIds) { selection = appId }
+        if let appId = router.resolve(among: appIds) { selection = appId }
     }
 }
 
