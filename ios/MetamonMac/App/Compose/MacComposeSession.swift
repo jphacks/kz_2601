@@ -61,6 +61,8 @@ final class MacComposeSession: Identifiable {
     private(set) var phase: Phase = .chatting
     /// 完成して中央に当てたアプリの id(完成の画面の「元に戻す」・閉じた後の要約のお知らせ・#968)
     private(set) var resultAppId: String?
+    /// 完成した版で新しく公開の記録に入った個人の情報(#253)と、その版。閉じた後の確認(`MacPostBuildNotices.publicData`)に使う
+    private(set) var resultPublicData: (fields: [PublicPersonalField], version: Int)?
     private(set) var sending = false
     /// 失敗の状態カード(#968・会話の下に出す)。分け方と文言は iOS と同じ `ErrorPresentation`
     private(set) var failure: ErrorPresentation?
@@ -356,6 +358,7 @@ final class MacComposeSession: Identifiable {
         var document = result.document
         document.appId = appId
         let summary = result.summary ?? L10n.tr("できあがりました")
+        resultPublicData = result.unchanged ? nil : (result.publicPersonalData, document.version)
         let done: () -> Void = { [weak self] in
             self?.complete(document, envelope: result.envelope, summary: summary, unchanged: result.unchanged)
         }

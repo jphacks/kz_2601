@@ -305,6 +305,23 @@
         }
       }
     },
+    "%@は、アプリを開いた人なら誰でも見られます。" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Anyone who opens the app can see %@."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@は、アプリを開いた人なら誰でも見られます。"
+          }
+        }
+      }
+    },
     "%lld のうち %lld" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -347,6 +364,35 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "%lld 件の記録を送れませんでした。送らずにログアウトすると、この記録は消えます。"
+          }
+        }
+      }
+    },
+    "%lld 回続けてうまくいっていません。" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Failed %lld time in a row."
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Failed %lld times in a row."
+                }
+              }
+            }
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld 回続けてうまくいっていません。"
           }
         }
       }
@@ -1635,6 +1681,23 @@
         }
       }
     },
+    "「%@」の設定" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ Settings"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "「%@」の設定"
+          }
+        }
+      }
+    },
     "「%@」を作りました" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -1748,6 +1811,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "「%@」を削除しますか?"
+          }
+        }
+      }
+    },
+    "「%@」を動かす" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Run “%@”"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "「%@」を動かす"
           }
         }
       }
@@ -2657,6 +2737,23 @@
         }
       }
     },
+    "このアプリには、ここで変えられる設定がありません。" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "This app has no settings to change here."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "このアプリには、ここで変えられる設定がありません。"
+          }
+        }
+      }
+    },
     "このアプリには画面がありません" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -2670,6 +2767,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "このアプリには画面がありません"
+          }
+        }
+      }
+    },
+    "このアプリには自動の動きがありません。" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "This app has no automations."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "このアプリには自動の動きがありません。"
           }
         }
       }
@@ -2771,6 +2885,40 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "このアプリの記録"
+          }
+        }
+      }
+    },
+    "このアプリの設定" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "App Settings"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "このアプリの設定"
+          }
+        }
+      }
+    },
+    "このアプリの設定を閉じる" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Close this app's settings"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "このアプリの設定を閉じる"
           }
         }
       }
@@ -2968,6 +3116,40 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "この変更の前に戻します(⌥⌘Z)"
+          }
+        }
+      }
+    },
+    "この欄を消す" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Remove these fields"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "この欄を消す"
+          }
+        }
+      }
+    },
+    "この欄を消すように直します" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Changes the app to remove these fields"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "この欄を消すように直します"
           }
         }
       }
@@ -3207,6 +3389,23 @@
         }
       }
     },
+    "この記録を自分だけが見られるように直します" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Changes the app so only you can see these entries"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "この記録を自分だけが見られるように直します"
+          }
+        }
+      }
+    },
     "この記録帳をどう直しますか?" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -3387,6 +3586,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "ご利用中"
+          }
+        }
+      }
+    },
+    "しばらく開かれていないため休んでいます(開くと再開します)" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Resting because the app hasn't been opened for a while (open it to resume)"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "しばらく開かれていないため休んでいます(開くと再開します)"
           }
         }
       }
@@ -3767,6 +3983,23 @@
         }
       }
     },
+    "ほかの変更と重なったため切り替えませんでした。最新の状態を読み込み直しました。" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Didn't switch because it overlapped with another change. Reloaded the latest state."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ほかの変更と重なったため切り替えませんでした。最新の状態を読み込み直しました。"
+          }
+        }
+      }
+    },
     "ほかの録音を終えてから、もう一度お試しください" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -3830,6 +4063,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "まだ他の記録帳はありません。\n「+ 新しい記録帳」から 2 つ目を用意できます"
+          }
+        }
+      }
+    },
+    "まだ動いていません" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Hasn't run yet"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "まだ動いていません"
           }
         }
       }
@@ -4358,6 +4608,40 @@
         }
       }
     },
+    "アプリが使えない状態だったため動きませんでした" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Didn't run because the app wasn't available"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "アプリが使えない状態だったため動きませんでした"
+          }
+        }
+      }
+    },
+    "アプリが変わったため動きませんでした" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Didn't run because the app changed"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "アプリが変わったため動きませんでした"
+          }
+        }
+      }
+    },
     "アプリが落ちた時に、落ちた場所(プログラムの位置)・端末の機種・OS・アプリの版とユーザー ID を Google の Firebase Crashlytics に送り、不具合を直すのに使います。話した内容・記録・作ったアプリの中身は送りません。" : {
       "localizations" : {
         "en" : {
@@ -4694,6 +4978,57 @@
         }
       }
     },
+    "オフ" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Off"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "オフ"
+          }
+        }
+      }
+    },
+    "オフにしていたため動かしませんでした" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Didn't run because it was turned off"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "オフにしていたため動かしませんでした"
+          }
+        }
+      }
+    },
+    "オフにすると、このルールは動きません。ルールは消えません。" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "When off, this rule doesn't run. The rule isn't deleted."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "オフにすると、このルールは動きません。ルールは消えません。"
+          }
+        }
+      }
+    },
     "オフラインです" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -4790,6 +5125,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "オフラインのあいだは送れません"
+          }
+        }
+      }
+    },
+    "オン" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "On"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "オン"
           }
         }
       }
@@ -5337,6 +5689,57 @@
         }
       }
     },
+    "サービス側の問題でした" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "A problem on our side"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "サービス側の問題でした"
+          }
+        }
+      }
+    },
+    "サービス全体で一時停止しています" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Paused for the whole service"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "サービス全体で一時停止しています"
+          }
+        }
+      }
+    },
+    "サービス全体の上限に達したため止めました" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Stopped: the service's daily limit was reached"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "サービス全体の上限に達したため止めました"
+          }
+        }
+      }
+    },
     "シェアされた「%@」を追加しました" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -5696,6 +6099,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "データについて"
+          }
+        }
+      }
+    },
+    "データを保存できませんでした" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Couldn't save the data"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "データを保存できませんでした"
           }
         }
       }
@@ -6432,6 +6852,23 @@
         }
       }
     },
+    "ルールが今のアプリのデータの形と合っていません" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The rule no longer matches the app's data"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ルールが今のアプリのデータの形と合っていません"
+          }
+        }
+      }
+    },
     "ログアウト" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -6861,6 +7298,23 @@
         }
       }
     },
+    "今のプランでは動きません" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Not available on your current plan"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "今のプランでは動きません"
+          }
+        }
+      }
+    },
     "今のリンクを開けなくして、新しいリンクを作る" : {
       "localizations" : {
         "en" : {
@@ -6959,6 +7413,23 @@
         }
       }
     },
+    "今は消しません。アプリの設定から確認できます" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nothing is deleted for now. You can confirm later in App Settings"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "今は消しません。アプリの設定から確認できます"
+          }
+        }
+      }
+    },
     "今は簡易の聞き取りで話せます。音声モデル(約%lldMB)を入れると、より正確に聞き取れます。" : {
       "localizations" : {
         "en" : {
@@ -6992,6 +7463,23 @@
         }
       }
     },
+    "今日の上限に達したため止めました" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Stopped: today's limit was reached"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "今日の上限に達したため止めました"
+          }
+        }
+      }
+    },
     "今日の上限に達しました。%@からまた使えます" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -7005,6 +7493,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "今日の上限に達しました。%@からまた使えます"
+          }
+        }
+      }
+    },
+    "今日の実行" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Runs today"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "今日の実行"
           }
         }
       }
@@ -7171,6 +7676,23 @@
         }
       }
     },
+    "何も変えずに閉じます" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Closes without changing anything"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "何も変えずに閉じます"
+          }
+        }
+      }
+    },
     "何を記録したいですか?" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -7184,6 +7706,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "何を記録したいですか?"
+          }
+        }
+      }
+    },
+    "何度か試しましたがうまくいきませんでした" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tried several times but couldn't run"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "何度か試しましたがうまくいきませんでした"
           }
         }
       }
@@ -7317,6 +7856,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "使い方を見る"
+          }
+        }
+      }
+    },
+    "使うはずのデータが見つからないか、読めませんでした" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The data it uses was missing or couldn't be read"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "使うはずのデータが見つからないか、読めませんでした"
           }
         }
       }
@@ -7499,6 +8055,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "保存できませんでした。通信を確かめてもう一度お試しください"
+          }
+        }
+      }
+    },
+    "個人の情報も公開されます" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Personal info will be public too"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "個人の情報も公開されます"
           }
         }
       }
@@ -7763,6 +8336,23 @@
         }
       }
     },
+    "公開のままにする" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Keep it public"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "公開のままにする"
+          }
+        }
+      }
+    },
     "共有" : {
       "localizations" : {
         "en" : {
@@ -7828,6 +8418,23 @@
         }
       }
     },
+    "共有の記録は自分が追加したものだけが消えます。" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : " For shared entries, only the ones you added are deleted."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "共有の記録は自分が追加したものだけが消えます。"
+          }
+        }
+      }
+    },
     "共有・オンラインの機能と、新しいアプリを、いくつでも" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -7841,6 +8448,57 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "共有・オンラインの機能と、新しいアプリを、いくつでも"
+          }
+        }
+      }
+    },
+    "再試行" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Retry"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "再試行"
+          }
+        }
+      }
+    },
+    "切り替えられませんでした" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Couldn't switch"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "切り替えられませんでした"
+          }
+        }
+      }
+    },
+    "切り替えられませんでした。時間をおいてもう一度お試しください。" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Couldn't switch. Please try again later."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "切り替えられませんでした。時間をおいてもう一度お試しください。"
           }
         }
       }
@@ -8112,6 +8770,57 @@
         }
       }
     },
+    "動きました" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ran"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "動きました"
+          }
+        }
+      }
+    },
+    "動きました(通知は止めています)" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ran (notifications are paused)"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "動きました(通知は止めています)"
+          }
+        }
+      }
+    },
+    "動きませんでした" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Didn't run"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "動きませんでした"
+          }
+        }
+      }
+    },
     "匿名" : {
       "localizations" : {
         "en" : {
@@ -8340,6 +9049,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "受け取った人は、リンクから自分のアプリとして使えます"
+          }
+        }
+      }
+    },
+    "古い記録を自動で消しますか?" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Delete old entries automatically?"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "古い記録を自動で消しますか?"
           }
         }
       }
@@ -8911,6 +9637,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "外付けのマイクや AirPods を選べます。録音中にマイクが外れた時は録音を止めてお知らせします。"
+          }
+        }
+      }
+    },
+    "外部の情報を取りにいけませんでした" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Couldn't get information from the outside source"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "外部の情報を取りにいけませんでした"
           }
         }
       }
@@ -10008,6 +10751,23 @@
         }
       }
     },
+    "時間内に終わりませんでした" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Didn't finish in time"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "時間内に終わりませんでした"
+          }
+        }
+      }
+    },
     "暴力的・危険な内容" : {
       "localizations" : {
         "en" : {
@@ -10209,6 +10969,23 @@
         }
       }
     },
+    "最後に動いた: %@" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Last run: %@"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "最後に動いた: %@"
+          }
+        }
+      }
+    },
     "最後に開いた: %@" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -10271,6 +11048,40 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "有料の機能は Mac ではまだ使えないため、無料版で作ります"
+          }
+        }
+      }
+    },
+    "期間を過ぎた記録は、開いた時などに自動で消えます。消えた記録は元に戻せません。" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Entries older than the period are deleted automatically, for example when you open it. Deleted entries cannot be restored."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "期間を過ぎた記録は、開いた時などに自動で消えます。消えた記録は元に戻せません。"
+          }
+        }
+      }
+    },
+    "期間を過ぎた記録をこの Mac で自動で消します" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Automatically deletes entries older than the period on this Mac"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "期間を過ぎた記録をこの Mac で自動で消します"
           }
         }
       }
@@ -10416,6 +11227,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "次へ"
+          }
+        }
+      }
+    },
+    "止まっている理由について確かめる" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ask why it is stopped"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "止まっている理由について確かめる"
           }
         }
       }
@@ -10933,6 +11761,23 @@
         }
       }
     },
+    "直しますか?" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Fix it?"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "直しますか?"
+          }
+        }
+      }
+    },
     "直し方" : {
       "localizations" : {
         "en" : {
@@ -10945,6 +11790,40 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "直し方"
+          }
+        }
+      }
+    },
+    "直す依頼を入力欄に入れて、設定を閉じます" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Puts a fix request in the input field and closes Settings"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "直す依頼を入力欄に入れて、設定を閉じます"
+          }
+        }
+      }
+    },
+    "直す依頼を入力欄に入れます" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Puts a fix request in the input field"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "直す依頼を入力欄に入れます"
           }
         }
       }
@@ -10978,6 +11857,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "矢印キーで選び、Return で開けます"
+          }
+        }
+      }
+    },
+    "確認して自動で消す" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Confirm and delete automatically"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "確認して自動で消す"
           }
         }
       }
@@ -11275,6 +12171,23 @@
         }
       }
     },
+    "自分だけにする" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Make it private"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "自分だけにする"
+          }
+        }
+      }
+    },
     "自分で作成" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -11308,6 +12221,74 @@
         }
       }
     },
+    "自動で消す" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Delete automatically"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "自動で消す"
+          }
+        }
+      }
+    },
+    "自動で消すのをやめる" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Stop auto-deleting"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "自動で消すのをやめる"
+          }
+        }
+      }
+    },
+    "自動の動き" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Automations"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "自動の動き"
+          }
+        }
+      }
+    },
+    "自動の動き「%@」が続けてうまくいっていません。うまく動くように直して" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The automation “%@” keeps failing. Please fix it so it works"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "自動の動き「%@」が続けてうまくいっていません。うまく動くように直して"
+          }
+        }
+      }
+    },
     "自動の動きが止まっています" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -11321,6 +12302,57 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "自動の動きが止まっています"
+          }
+        }
+      }
+    },
+    "自動の動きはアプリを作った人だけが見られます。" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Only the person who made this app can see its automations."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "自動の動きはアプリを作った人だけが見られます。"
+          }
+        }
+      }
+    },
+    "自動の動きを読み込み直す" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Reload automations"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "自動の動きを読み込み直す"
+          }
+        }
+      }
+    },
+    "自動の動きを読み込めませんでした" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Couldn't load the automations"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "自動の動きを読み込めませんでした"
           }
         }
       }
@@ -11584,6 +12616,57 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "記録に写真を付けられるようにして"
+          }
+        }
+      }
+    },
+    "記録の自動削除" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Auto-delete entries"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "記録の自動削除"
+          }
+        }
+      }
+    },
+    "記録の自動削除・自動の動きなど、このアプリの設定を開く" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Open this app's settings, such as automatic deletion and automations"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "記録の自動削除・自動の動きなど、このアプリの設定を開く"
+          }
+        }
+      }
+    },
+    "記録を自動で消さないようにアプリを直します" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Changes the app to stop deleting entries automatically"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "記録を自動で消さないようにアプリを直します"
           }
         }
       }
@@ -12039,6 +13122,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "読み上げ"
+          }
+        }
+      }
+    },
+    "読み込み直す" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Reload"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "読み込み直す"
           }
         }
       }
@@ -12629,6 +13729,23 @@
         }
       }
     },
+    "通知を一時的に止めています。自動の動きは動いています。" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Notifications are paused for now. Automations still run."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "通知を一時的に止めています。自動の動きは動いています。"
+          }
+        }
+      }
+    },
     "通知を予約しました(%@)" : {
       "localizations" : {
         "en" : {
@@ -12661,6 +13778,74 @@
         }
       }
     },
+    "通知を送れませんでした" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Couldn't send the notification"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "通知を送れませんでした"
+          }
+        }
+      }
+    },
+    "遅れたため動かしませんでした" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Skipped because it was running late"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "遅れたため動かしませんでした"
+          }
+        }
+      }
+    },
+    "運営がこのアプリの自動の動きを止めています。" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tailor It has stopped this app's automations."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "運営がこのアプリの自動の動きを止めています。"
+          }
+        }
+      }
+    },
+    "運営がこのルールを止めています。" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tailor It has stopped this automation."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "運営がこのルールを止めています。"
+          }
+        }
+      }
+    },
     "運営が内容を確認し、利用規約に反するものは非公開にします。この人を表示したくない時はブロックもできます。" : {
       "localizations" : {
         "en" : {
@@ -12689,6 +13874,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "運営が内容を確認します。通報したことは相手に知らされません。"
+          }
+        }
+      }
+    },
+    "運営が止めています" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Stopped by Tailor It"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "運営が止めています"
           }
         }
       }

@@ -38,6 +38,10 @@ struct AppCanvas: View {
             }
         }
         .navigationTitle(app.name)
+        .onReceive(NotificationCenter.default.publisher(for: MacAppRuntime.retentionConfirmed)) { note in
+            guard let runtime, note.object as? String == runtime.appId else { return }
+            Task { await runtime.purgeExpiredRecords() }
+        }
         .task {
             // 見え直した時(.task は出るたびに走る)に作り直すと、メモリ上の記録が消える
             guard runtime == nil, !loadFailed else {
@@ -58,6 +62,7 @@ struct AppCanvas: View {
                 #endif
                 runtime = created
                 discardGuard?.runtime = created
+                await created.purgeExpiredRecords() // 確認済みの保存期間を過ぎた記録を消す(#482・#979)
             } catch {
                 loadFailed = true
             }

@@ -2,6 +2,7 @@ import SwiftUI
 import Observation
 import MetamonServices
 import MetamonRenderer
+import MetamonDSL
 
 /// 中央の列の上に 1 つずつ出すお知らせ(#1058)。iOS と同じ順: 完成の後のお知らせ(`RootView` の要約など)→
 /// 新着(`NewItemsHost`・要約が消えてから)→ 上限に近い(`UsageNoticeHost`・新着が消えてから)。
@@ -12,8 +13,8 @@ enum MacTopNotice: Equatable {
 }
 
 /// 完成の後のお知らせ(H7・#968)を Mac で 1 つずつ出す。順番は iOS と同じ `PostBuildNotice`(Shared)。
-/// 今の Mac にあるのは要約(「元に戻す / やり直す」付き)と、最初のアプリの後の直し方の例(#1278)。
-/// 公開の確認・保存期間・引き継ぎはそれぞれの機能が Mac に来たら `pending` に足す(順番はここで決まる)。
+/// 今の Mac にあるのは要約(「元に戻す / やり直す」付き)→ 公開の確認(#253)→ 保存期間の確認(#482)→ 最初のアプリの後の直し方の例(#1278)。
+/// 引き継ぎは機能が Mac に来たら `pending` に足す(順番はここで決まる)。
 /// 新着(#268)・上限に近い(#317)はその後、サービスのお知らせ(#333)は別の段で常に一番上に出す(iOS と同じ・#1058)。
 /// 「見た・閉じた」の記録は iOS と同じキー(UserDefaults)で、サインアウトの `MacLocalWipe` で消える。
 @MainActor
@@ -62,9 +63,24 @@ final class MacPostBuildNotices {
         MacVoiceOver.holdSeconds(max(summary.action == nil ? 3.0 : 6.0, min(5.0, Double(summary.text.count) / 12)))
     }
 
+    /// 公開の記録に個人の情報が入った確認(#253・iOS の `PublicDataPromptHost`)。生成した appId と一緒に持つ
+    struct PublicData: Identifiable, Equatable {
+        var appId: String
+        var prompt: PublicDataPrompt
+        var id: UUID { prompt.id }
+    }
+
+    var publicData: PublicData?
+    /// 記録の保存期間の確認(#482・iOS の `RetentionPromptHost`)。確認は端末ごと・アプリごと(`RetentionConsent`)
+    var retention: RetentionPrompt?
+    /// 「あとで」にした確認(このセッションでは聞き直さない・iOS の `retentionDeferred` と同じ)
+    @ObservationIgnored private(set) var retentionDeferred: Set<String> = []
+
     var pending: Set<PostBuildNotice> {
         var pending: Set<PostBuildNotice> = []
         if summary != nil { pending.insert(.summary) }
+        if publicData != nil { pending.insert(.publicData) }
+        if retention != nil { pending.insert(.retention) }
         if showsEditHint { pending.insert(.editHint) }
         return pending
     }
@@ -87,11 +103,71 @@ final class MacPostBuildNotices {
     func dismissActive() {
         switch top {
         case .postBuild(.summary): summary = nil
+        case .postBuild(.publicData): publicData = nil // 閉じる = 公開のまま(何も送らない)
+        case .postBuild(.retention): deferRetention()
         case .postBuild(.editHint): showsEditHint = false
         case .newItems: newItems = nil
         case .usage: usage = nil
         default: break
         }
+    }
+
+    // MARK: - 公開の確認(#253)
+
+    enum PublicDataChoice { case keep, remove, makePrivate }
+
+    /// 生成の結果に公開の個人の情報があれば確認を予約する(無ければ下げる)
+    func notePublicData(_ fields: [PublicPersonalField], appId: String, version: Int) {
+        publicData = PublicDataPrompt(fields: fields, version: version).map { PublicData(appId: appId, prompt: $0) }
+    }
+
+    /// ボタンの答え。直す指示文を返す(送るのは呼ぶ側)。公開のまま・別のアプリ / 版に変わっていたら nil(何も送らない・iOS と同じ)
+    func resolvePublicData(_ choice: PublicDataChoice, currentAppId: String?, currentVersion: Int?,
+                           english: Bool = LanguagePreference.shared.code == "en") -> String? {
+        guard let notice = publicData else { return nil }
+        publicData = nil
+        guard choice != .keep, notice.appId == currentAppId, notice.prompt.version == currentVersion else { return nil }
+        return choice == .remove ? notice.prompt.removeInstruction(english: english) : notice.prompt.privateInstruction(english: english)
+    }
+
+    // MARK: - 保存期間(#482)
+
+    /// アプリを開いた・版が変わった時に、確認が要る entity があれば確認を出す(確認済み・あとでにした分は出さない)
+    func noteRetention(appId: String, version: Int, dsl: AppDSL, defaults: UserDefaults = .standard) {
+        let consented = RetentionConsent.days(appId: appId, defaults: defaults)
+        let pending = RecordRetention.pending(dsl, consented: consented)
+            .filter { !retentionDeferred.contains(RetentionPrompt.key(appId: appId, entity: $0)) }
+        retention = pending.isEmpty ? nil : RetentionPrompt(appId: appId, version: version, entities: pending)
+    }
+
+    /// 「自動で消す」: 確認した期間を覚える(消すのは `MacRetentionPurge`)。確認した appId を返す
+    @discardableResult
+    func confirmRetention(defaults: UserDefaults = .standard) -> String? {
+        guard let prompt = retention else { return nil }
+        retention = nil
+        for item in prompt.items { RetentionConsent.set(item.days, appId: prompt.appId, entity: item.entity, defaults: defaults) }
+        return prompt.appId
+    }
+
+    /// 「あとで」: このセッションでは聞き直さない(消さない)。アプリの設定から確認できる
+    func deferRetention() {
+        guard let prompt = retention else { return }
+        retention = nil
+        for item in prompt.items { retentionDeferred.insert(RetentionPrompt.key(appId: prompt.appId, entity: item.entity, days: item.days)) }
+    }
+
+    /// 「自動で消すのをやめる」の指示文(iOS の `removeRetention` と同じ)。送るのは呼ぶ側
+    func stopRetention(english: Bool = LanguagePreference.shared.code == "en") -> String? {
+        guard retention != nil else { return nil }
+        retention = nil
+        return Self.stopRetentionInstruction(entityName: nil, english: english)
+    }
+
+    static func stopRetentionInstruction(entityName: String?, english: Bool = LanguagePreference.shared.code == "en") -> String {
+        if let entityName {
+            return english ? "Stop deleting \(entityName) entries automatically" : "「\(entityName)」の記録を自動で消すのをやめて"
+        }
+        return english ? "Stop deleting entries automatically" : "記録を自動で消すのをやめて"
     }
 
     // MARK: - 新着(#268)
@@ -151,6 +227,9 @@ final class MacPostBuildNotices {
     /// `MacLocalWipe` の後: 出ているものを下げ、閉じた記録の写しも忘れる(UserDefaults は wipe が消している)
     func resetAfterWipe() {
         summary = nil
+        publicData = nil
+        retention = nil
+        retentionDeferred = []
         showsEditHint = false
         newItems = nil
         usage = nil
