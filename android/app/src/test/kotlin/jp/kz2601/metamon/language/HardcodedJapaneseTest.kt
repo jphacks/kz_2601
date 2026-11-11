@@ -36,7 +36,9 @@ class HardcodedJapaneseTest {
         "app/src/main/kotlin/jp/kz2601/metamon/voice/VoiceScreen.kt" to setOf("M月d日 H:mm"),
         "renderer/src/main/kotlin/jp/kz2601/metamon/renderer/components/lists/CalendarLeaf.kt" to setOf("yyyy年M月", "M月d日(E)"),
         // 画面は strings から渡す。既定値はテスト・プレビュー用
-        "app/src/main/kotlin/jp/kz2601/metamon/voice/VoiceViewModel.kt" to setOf("このまま作って", "(これまでに反映した変更)"),
+        "app/src/main/kotlin/jp/kz2601/metamon/voice/VoiceViewModel.kt" to setOf(
+            "このまま作って", "(これまでに反映した変更)", "変更できませんでした。何をどう変えるか、もう少し詳しく教えてください。",
+        ),
         // AI へ送る指示(人に出さない)
         "renderer/src/main/kotlin/jp/kz2601/metamon/renderer/components/ai/AiRequests.kt" to setOf(
             "\\n\\n候補: ",

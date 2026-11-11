@@ -196,6 +196,7 @@ fun MetamonApp(container: AppContainer) {
     val wipes by container.accountGuard.generation.collectAsStateWithLifecycle()
     val buildNow = stringResource(R.string.voice_build_now_utterance)
     val historyHeader = stringResource(R.string.voice_history_header)
+    val unchangedReason = stringResource(R.string.voice_unchanged_reason)
     val vm = viewModel(key = "voice-$wipes") {
         val clarify = ClarifySettings(context)
         VoiceViewModel(
@@ -209,6 +210,7 @@ fun MetamonApp(container: AppContainer) {
             // 会話の履歴はアプリごとに端末へ(#893)。サインアウト・削除で消すので container が持つ
             chatHistory = container.chatHistory,
             historyHeader = historyHeader,
+            unchangedFallback = unchangedReason,
             // 発話・AI の返事を含むので debug だけ(release の logcat に個人の情報を出さない)
             log = { if (BuildConfig.DEBUG) Log.i(AppContainer.TAG, it) },
             // モックはサーバーの版の履歴が無いので端末の履歴だけで戻す
