@@ -1,10 +1,9 @@
 package jp.kz2601.metamon.dsl.expr
 
+import jp.kz2601.metamon.dsl.logic.graphemeCount
 import java.math.BigDecimal
 import java.math.MathContext
 import java.math.RoundingMode
-import java.text.BreakIterator
-import java.util.Locale
 import kotlin.math.abs
 import kotlin.math.sign
 import kotlin.math.truncate
@@ -74,14 +73,7 @@ object SwiftNumbers {
     }
 
     /** 書記素クラスタの数(Swift の `String.count`)。 */
-    fun graphemeCount(s: String): Int {
-        if (s.isEmpty()) return 0
-        val it = BreakIterator.getCharacterInstance(Locale.ROOT)
-        it.setText(s)
-        var n = 0
-        while (it.next() != BreakIterator.DONE) n++
-        return n
-    }
+    fun graphemeCount(s: String): Int = s.graphemeCount()
 
     // MARK: - pow(最も近い Double に丸める)
 
