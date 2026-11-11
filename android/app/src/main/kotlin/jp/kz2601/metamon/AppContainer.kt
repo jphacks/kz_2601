@@ -321,6 +321,7 @@ class AppContainer(
                 social?.ageGate?.reset() // 18 歳以上の確認(#877)も人ごと(iOS は UserDefaults ごと消す)
                 runtime.retention?.forget() // 記録の保存期間の確認(#482)も人ごと(iOS は UserDefaults ごと消す)
                 releaseRequests?.reset() // リリース申請のバッジ(#1254)も前の人の分を見せない
+                nearbySettings?.forget() // すれ違いの同意・会った人・受け取った記録の台帳(#1383)も人ごと(iOS は UserDefaults ごと消す)
             },
         )
     }
@@ -651,7 +652,7 @@ class AppContainer(
     }
 
     /** 近くの人に送る・すれ違い通信の端末の設定(「名前を出さない」は両方で同じ)。 */
-    private val nearbySettings: NearbySettings? by lazy { nearbyEnv?.let { NearbySettings(it.settings) } }
+    private val nearbySettings: NearbySettings? by lazy { nearbyEnv?.let { NearbySettings(it.settings, it.clearSettings) } }
 
     /** 近くの人に送る(#1382)。作った時にランタイムの送るボタンとつなぐ。 */
     val nearby: NearbyShareController? by lazy {

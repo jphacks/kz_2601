@@ -91,7 +91,13 @@ class ProStore(
 
     /** 送れた購入(uid + token)。同じものを何度も送らない。失敗したものは入れない(次の起動・復元で送り直す) */
     private val submitted = mutableSetOf<String>()
+
+    /** 送れた購入のうち、サーバーが Pro と答えたもの(uid + token)。承認してよいのはこれだけ */
+    private val entitled = mutableSetOf<String>()
     private val syncing = Mutex()
+
+    /** [reset] のたびに進める。前の人の分の答え(後片付けの後に届いたもの)を今の状態に入れない */
+    @Volatile private var generation = 0
 
     /** [requestPro] で課金画面が閉じるのを待っている側 */
     private var waiter: CompletableDeferred<Boolean>? = null
@@ -217,7 +223,9 @@ class ProStore(
 
     /** 後片付け(サインアウト・削除・別の人のサインイン・#841) */
     fun reset() {
+        generation++
         submitted.clear()
+        entitled.clear()
         _state.value = ProUiState()
         finishWaiter()
         usage?.reset() // 今日の作成回数も人ごと(iOS は LocalWipe で消える)
@@ -225,11 +233,14 @@ class ProStore(
 
     private suspend fun readServer() {
         val client = entitlements ?: return
-        attempt { client.current() }?.let { s -> _state.update { it.copy(isPro = s.isPro) } }
+        val gen = generation
+        val s = attempt { client.current() } ?: return
+        if (gen == generation) _state.update { it.copy(isPro = s.isPro) }
     }
 
     private suspend fun sync(purchases: List<PlayPurchase>, fromPurchase: Boolean) = syncing.withLock {
         val id = uid()?.takeIf { it.isNotEmpty() } ?: return@withLock
+        val gen = generation
         if (PlayPurchaseRules.hasPending(purchases)) _state.update { it.copy(message = ProMessage.PENDING) }
         for (p in PlayPurchaseRules.toSubmit(purchases, submitted, id)) {
             val productId = p.productIds.first { it in ProProducts.ALL }
@@ -239,13 +250,16 @@ class ProStore(
                 if (fromPurchase) _state.update { it.copy(message = ProMessage.NOT_VERIFIED) }
                 continue
             }
-            submitted += PlayPurchaseRules.submittedKey(id, p.purchaseToken)
+            if (gen != generation) return@withLock // 途中で後片付けされた(前の人の答えを次の人に入れない)
+            val key = PlayPurchaseRules.submittedKey(id, p.purchaseToken)
+            submitted += key
+            if (server.isPro) entitled += key else entitled -= key
             _state.update { it.copy(isPro = server.isPro) }
         }
-        // 承認はサーバーが Pro と認めた後だけ(承認に失敗しても、次の起動・復元でまた承認する)
-        val server = _state.value.isPro
+        // 承認はサーバーがその購入を確かめて Pro と認めた後だけ。別の購入(iOS など)で Pro でも、確かめられない購入は承認しない
+        // (承認に失敗しても、次の起動・復元でまた承認する)
         for (p in purchases) {
-            if (PlayPurchaseRules.shouldAcknowledge(p, server)) {
+            if (PlayPurchaseRules.shouldAcknowledge(p, verified = PlayPurchaseRules.submittedKey(id, p.purchaseToken) in entitled)) {
                 billing?.let { b -> attempt { b.acknowledge(p.purchaseToken) } }
             }
         }

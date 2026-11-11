@@ -105,8 +105,11 @@ class NearbyShareController(
     }
 }
 
-/** 近距離共有・すれ違い通信の端末の設定。両方が同じ 1 つを持ち、「名前を出さない」はどちらで変えても両方に効く。 */
-class NearbySettings(val store: KeyValueStore) {
+/**
+ * 近距離共有・すれ違い通信の端末の設定。両方が同じ 1 つを持ち、「名前を出さない」はどちらで変えても両方に効く。
+ * @param clearAll 置き場を全部消す(アプリごとの台帳・オン・オフはキーを列挙できないので、置き場ごと消す)
+ */
+class NearbySettings(val store: KeyValueStore, private val clearAll: () -> Unit = {}) {
     private val _anonymous = MutableStateFlow(store.getBoolean(ANONYMOUS_KEY) == true)
 
     /** 名前を出さない(表示名の代わりに「近くの人」を送る)。iOS と同じキー。 */
@@ -126,6 +129,24 @@ class NearbySettings(val store: KeyValueStore) {
     /** 「名前を出さない」が変わった時(メインスレッド・変えたその場で呼ぶ)。 */
     fun onAnonymousChanged(listener: (Boolean) -> Unit) {
         listeners += listener
+    }
+
+    private val forgetListeners = mutableListOf<() -> Unit>()
+
+    /** [forget] の後(覚えている同意・台帳を捨てる)。 */
+    fun onForget(listener: () -> Unit) {
+        forgetListeners += listener
+    }
+
+    /**
+     * 後片付け(#841・iOS は `LocalWipe.clearDefaults` で passby の鍵も消す)。すれ違いの同意・台帳(会った人・受け取った記録)・
+     * オン・オフ・senderId・「名前を出さない」を消し、次の人には初めからにする。
+     */
+    fun forget() {
+        clearAll()
+        forgetListeners.toList().forEach { it() } // 先に止める(名前の切り替えで探し直さない)
+        anonymous = false
+        store.remove(ANONYMOUS_KEY) // 上の切り替えで書いた分も残さない
     }
 
     companion object {

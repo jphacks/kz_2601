@@ -203,4 +203,37 @@ class PassbyControllerTest {
         assertNull("hidden には入れない", saved.data["memo"])
         assertTrue(c.state.value.distanceSupport is PassbyDistanceSupport.Unsupported)
     }
+
+    @Test
+    fun forgetWipesConsentLedgerAndOptInForTheNextPerson() = runTest {
+        val store = InMemoryKeyValueStore()
+        val fake = FakeTransport()
+        val rt = runtime(dsl, appId = "passby-test")
+        val keys = listOf(
+            PassbyController.CONSENT_KEY, PassbyController.SENDER_ID_KEY, NearbySettings.ANONYMOUS_KEY,
+            PassbyController.optInKey("passby-test", config.componentId), PassbyController.ledgerKey("passby-test"),
+        )
+        val settings = NearbySettings(store) { keys.forEach(store::remove) }
+        val c = PassbyController(rt, fake, settings, backgroundScope, displayName = { "太郎の Pixel" }, now = { clock })
+        c.attach(config)
+        runCurrent()
+        c.agree(anonymous = true)
+        c.setOptIn(true, config)
+        c.receive(NearbyPassby.Payload(1, "s2", "花子", "profile", listOf(NearbyPassby.Item("r1", mapOf("name" to JSONValue.Str("花子"))))))
+        assertNotNull(fake.started)
+
+        settings.forget()
+        assertNull("止める", fake.started)
+        assertNull("同意を忘れる", c.state.value.consentedVersion)
+        assertTrue("会った人を忘れる", c.state.value.encounters.isEmpty())
+        assertFalse("オンにした部品を忘れる", c.isOptedIn(config))
+        assertFalse(settings.anonymous)
+        keys.forEach { assertNull("端末に残さない: $it", store.getString(it) ?: store.getInt(it) ?: store.getBoolean(it)) }
+
+        // 次の人が開き直しても、前の人の台帳は出ない
+        c.attach(config)
+        runCurrent()
+        assertNull("同意の前は探さない", fake.started)
+        assertTrue(c.state.value.encounters.isEmpty())
+    }
 }

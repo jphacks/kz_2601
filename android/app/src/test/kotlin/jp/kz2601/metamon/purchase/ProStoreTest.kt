@@ -94,6 +94,40 @@ class ProStoreTest {
     }
 
     @Test
+    fun purchaseTheServerRejectedIsNotAcknowledgedEvenWhenAlreadyPro() = runBlocking {
+        // iOS で買った Pro がある人でも、サーバーが確かめられなかった Play の購入は承認しない
+        val server = FakeServer(pro = true, verifies = false)
+        val billing = FakeBilling(owned = listOf(paid("other")))
+        val s = store(server, billing)
+        s.refresh()
+        assertTrue(s.isPro)
+        assertEquals(listOf("other"), server.submitted)
+        assertTrue(billing.acknowledged.isEmpty())
+        s.onPurchases(PlayBilling.RESULT_OK, listOf(paid("tok")))
+        assertTrue(billing.acknowledged.isEmpty())
+    }
+
+    @Test
+    fun answerArrivingAfterResetIsNotKeptForTheNextPerson() = runBlocking {
+        // サインアウトの後片付けの後に届いた前の人の答えで、次の人を Pro にしない
+        val gate = kotlinx.coroutines.CompletableDeferred<Unit>()
+        val server = object : EntitlementClient {
+            override suspend fun current(): ServerEntitlements {
+                gate.await()
+                return ServerEntitlements(isPro = true)
+            }
+
+            override suspend fun submitGooglePurchase(productId: String, purchaseToken: String) = ServerEntitlements(isPro = true)
+        }
+        val s = ProStore(server, FakeBilling(), uid = { "uid1" }, scope = CoroutineScope(Dispatchers.Unconfined))
+        val reading = async(Dispatchers.Unconfined) { s.refresh() }
+        s.reset()
+        gate.complete(Unit)
+        reading.await()
+        assertFalse(s.isPro)
+    }
+
+    @Test
     fun pendingAndCancelled() = runBlocking {
         val s = store(FakeServer(), FakeBilling())
         s.onPurchases(PlayBilling.RESULT_OK, listOf(PlayPurchase(listOf(ProProducts.MONTHLY), "p", PlayPurchase.State.PENDING, false)))

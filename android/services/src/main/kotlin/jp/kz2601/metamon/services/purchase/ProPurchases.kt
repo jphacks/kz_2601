@@ -95,9 +95,12 @@ object PlayPurchaseRules {
                 submittedKey(uid, p.purchaseToken) !in submitted
         }
 
-    /** 承認してよいか: サーバーが確かめて Pro にした後だけ(確かめられない購入は承認せず、Play が 3 日で返金する)。 */
-    fun shouldAcknowledge(p: PlayPurchase, serverPro: Boolean): Boolean =
-        serverPro && !p.acknowledged && p.state == PlayPurchase.State.PURCHASED && p.productIds.any { it in ProProducts.ALL }
+    /**
+     * 承認してよいか: サーバーがこの購入そのものを確かめて Pro にした後だけ([verified])。
+     * 別の購入(iOS など)で Pro でも、確かめられていない購入は承認しない(Play が 3 日で返金する)。
+     */
+    fun shouldAcknowledge(p: PlayPurchase, verified: Boolean): Boolean =
+        verified && !p.acknowledged && p.state == PlayPurchase.State.PURCHASED && p.productIds.any { it in ProProducts.ALL }
 
     /** 保留中の購入がある(「承認待ちです」を出す) */
     fun hasPending(purchases: List<PlayPurchase>): Boolean =

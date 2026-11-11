@@ -59,6 +59,13 @@ class PassbyController(
             _state.update { it.copy(isAnonymous = on) }
             if (_state.value.isAdvertising) restart()
         }
+        // 後片付け(#841): 前の人の同意・台帳・オンにした部品を捨てて止める
+        settings.onForget {
+            stop()
+            ledger = NearbyPassby.Ledger()
+            ledgerAppId = null
+            _state.update { it.copy(consentedVersion = null, encounters = emptyList(), optedIn = emptySet(), notice = null) }
+        }
         runtime.passby = this
     }
 
