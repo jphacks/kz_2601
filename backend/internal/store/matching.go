@@ -15,6 +15,9 @@ import (
 //
 //	apps_public/{appId}/match_pairs/{pairId} {uids,from,status,declinedBy,profiles,createdAt,updatedAt,matchedAt}
 //	match_quota/{uid}                         {day,n}  daily cap on sent interests
+//	users/{uid}.ageConfirmedAt                the person's own "18 or older" (no age)
+//	apps_public/{appId}/entities/{profile}/records/{id}.ownerAgeConfirmed
+//	                                          set once the author declared
 //
 // docs/backend/features/matching.md.
 
@@ -91,6 +94,28 @@ type Matching interface {
 	// BlockedEither returns the uids among others that uid blocked or that
 	// blocked uid (#321 blocks, both ways).
 	BlockedEither(ctx context.Context, uid string, others []string) (map[string]bool, error)
+	// ConfirmAge records that uid said they are 18 or older
+	// (users/{uid}.ageConfirmedAt), then sets OwnerAgeConfirmed on uid's
+	// records in the profile entities of uid's apps. The age itself is never
+	// stored.
+	ConfirmAge(ctx context.Context, uid string) error
+	// AgeConfirmed reports whether ConfirmAge was called for uid.
+	AgeConfirmed(ctx context.Context, uid string) (bool, error)
+	// AgeConfirmedAmong returns the uids among uids for whom ConfirmAge was
+	// called.
+	AgeConfirmedAmong(ctx context.Context, uids []string) (map[string]bool, error)
+}
+
+// profileEntityID is the match:"profile" entity of a published DSL ("" = none).
+func profileEntityID(raw json.RawMessage) string {
+	var a dsl.App
+	if len(raw) == 0 || json.Unmarshal(raw, &a) != nil {
+		return ""
+	}
+	if e := a.ProfileEntity(); e != nil {
+		return e.ID
+	}
+	return ""
 }
 
 // matchEntityIDs lists the profile and matched entities of a published DSL.

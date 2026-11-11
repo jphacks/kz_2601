@@ -11,8 +11,8 @@ import (
 	"github.com/jphacks/kz_2601/backend/pkg/dsl"
 )
 
-// Plan limits (#317, internal/plan, docs/backend/rate-limit.md): apps per
-// user, records and photos per app. They count against the payer's plan: the
+// Plan limits (#317, internal/plan, docs/backend/rate-limit.md): records and
+// photos per app here; the apps a user holds in app_slots.go (#630). They count against the payer's plan: the
 // caller for its own apps, the creator for an app someone else made.
 // Over the limit: 403 plan_limit_reached (details: resource, plan, limit,
 // used, upgrade; reason creator_plan_limit when the payer is the creator).
@@ -45,21 +45,6 @@ func (h *Handler) planOf(ctx context.Context, uid string) plan.Plan {
 		return plan.Pro
 	}
 	return plan.Free
-}
-
-// checkAppLimit runs before the caller creates a new app of its own.
-func (h *Handler) checkAppLimit(r *http.Request) error {
-	c, ok := h.planCounter()
-	if !ok {
-		return nil
-	}
-	uid := uidOf(r)
-	n, err := c.CountApps(r.Context(), uid)
-	if err != nil {
-		slog.WarnContext(r.Context(), "appconfig: plan limit count failed", slog.String("resource", plan.Apps), slog.Any("error", err))
-		return nil
-	}
-	return h.planStop(r, uid, uid, plan.Apps, n, 1)
 }
 
 // checkRecordLimits runs before a record write of ent in cur. data is the

@@ -103,6 +103,10 @@ struct VoiceInputView: View {
                     #endif
             }
         }
+        #if !APP_STORE_REVIEW
+        .coinSheets() // #630 音声シートの上にお店を重ねる(コインが足りない 402・「約 N コイン」から)
+        #endif
+        .appLimitSheets() // #630 持てるアプリの数に達した時の置き換えシート
         .sheet(isPresented: $showSettings) { SettingsSheet() }
         .sheet(isPresented: $showTips) {
             PromptTipsSheet { text in
@@ -180,6 +184,9 @@ struct VoiceInputView: View {
                 examples
             }
             RemainingTodayBadge() // #630 今日の残り
+            #if !APP_STORE_REVIEW
+            CoinEstimateLine(operation: rt.dsl.isVoiceOnly ? .generate : .edit) // #630 送る前の「約 N コイン」
+            #endif
             textEntry
             #if !APP_STORE_REVIEW
             if isInitial, !typing { DiscoverEntry() } // 「探す」(#50)
@@ -286,7 +293,11 @@ struct VoiceInputView: View {
             }
                 .simultaneousGesture(
                     LongPressGesture(minimumDuration: Theme.Layout.fabLongPressSeconds)
-                        .onEnded { _ in if phase == .idle { rt.openSwitcher() } }
+                        .onEnded { _ in
+                            guard phase == .idle else { return }
+                            rt.noteGesturePerformed(.fabLongPress) // #1441
+                            rt.openSwitcher()
+                        }
                 )
                 .accessibilityHint(L10n.key("長押しで変身一覧", review: "長押しで記録帳の一覧"))
             Text(statusText)

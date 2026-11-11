@@ -3,8 +3,9 @@ package appconfig
 // Reports, blocks and operator unpublishing (#321, App Review 1.2). Reports
 // are stored as reports/{id} and logged as "moderation: report" for the
 // operator's alert (docs/infra/moderation.md); the operator unpublishes with
-// cmd/moderate. Blocked users' listings and shared posts are left out of the
-// blocker's GET /public-apps and GET .../records.
+// cmd/moderate. Blocked users' listings are left out of the blocker's
+// GET /public-apps; shared posts of people blocked either way are left out
+// of GET .../records (sharedFilter).
 
 import (
 	"errors"
@@ -148,6 +149,13 @@ func (h *Handler) reportTarget(r *http.Request, kind, id, appID, entityID, recor
 			return "", "", mapStoreErr(err, "record")
 		}
 		if !canRead(nil, rec, uidOf(r)) { // #271: an addressed record the caller cannot read
+			return "", "", recordNotFound()
+		}
+		ok, err := h.sharedFilter(r, appID, entityID, []store.Record{*rec})
+		if err != nil {
+			return "", "", err
+		}
+		if !ok(rec) { // blocked either way / matched-only (#507)
 			return "", "", recordNotFound()
 		}
 		return appID + "/" + entityID + "/" + recordID, rec.Author, nil

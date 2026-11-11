@@ -150,6 +150,7 @@ enum ErrorCopy {
         case .aiPaused: aiPausedBody
         case .freePlanPaused(let resumeAt): freePlanPausedBody(resumeAt: resumeAt)
         case .planLimit(let limit): planLimitBody(limit)
+        case .appLimit(let limit): AppLimitCopy.toast(limit)
         case .appStopped: appStoppedBody
         default: otherBody
         }

@@ -13,7 +13,7 @@ struct MacErrorCard: View {
     static func showsRetry(_ presentation: ErrorPresentation) -> Bool {
         switch presentation.primary {
         case .retry?: true
-        case .sendNow?, .signIn?, .signInApple?, .upgradePro?, nil: false
+        case .sendNow?, .signIn?, .signInApple?, .upgradePro?, .replaceApp?, nil: false // 置き換えシートは Mac にまだ無い(#630)
         }
     }
 

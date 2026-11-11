@@ -124,7 +124,7 @@ func (f *Firestore) CreateRecordEmit(ctx context.Context, rs RecordSet, rec Reco
 			return err
 		}
 		now := Now()
-		d := recordDoc{Entity: rs.Entity, Data: rec.Data, ClientID: rec.ClientID, Author: rec.Author, AuthorName: rec.AuthorName, Readers: rec.Readers, CreatedAt: now, UpdatedAt: now}
+		d := recordDoc{Entity: rs.Entity, Data: rec.Data, ClientID: rec.ClientID, Author: rec.Author, AuthorName: rec.AuthorName, Readers: rec.Readers, OwnerAgeConfirmed: rec.OwnerAgeConfirmed, CreatedAt: now, UpdatedAt: now}
 		if err := tx.Create(ref, d); err != nil {
 			return err
 		}

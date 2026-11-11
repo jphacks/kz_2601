@@ -1,5 +1,5 @@
 {
-  "originHash" : "de77c57cd1370f17b53853d33ec04bcc618e4863f89ac4e990bf61654babfa6c",
+  "originHash" : "9ba08cca2a476f1fa02879b50f572f71d6c704cdd05b74ff1494fe85518c5ed0",
   "pins" : [
     {
       "identity" : "abseil-cpp-binary",
@@ -26,6 +26,15 @@
       "state" : {
         "revision" : "1bbc57cb7fe6410248a685b1c5a3c6d56adc2ed4",
         "version" : "1.1.1"
+      }
+    },
+    {
+      "identity" : "client-sdk-swift",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/livekit/client-sdk-swift",
+      "state" : {
+        "revision" : "93a7251057bdb6a80a7b1f6d11464d578ebdc09b",
+        "version" : "2.18.0"
       }
     },
     {
@@ -110,6 +119,15 @@
       }
     },
     {
+      "identity" : "livekit-uniffi-xcframework",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/livekit/livekit-uniffi-xcframework.git",
+      "state" : {
+        "revision" : "7a9bf91b1601d5c408ae0cac7dc2047b5a4f615e",
+        "version" : "0.1.9"
+      }
+    },
+    {
       "identity" : "nanopb",
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/firebase/nanopb.git",
@@ -134,6 +152,15 @@
       "state" : {
         "revision" : "6a52f3251125d74daf04fcbd5e6f08a75d074382",
         "version" : "1.8.2"
+      }
+    },
+    {
+      "identity" : "webrtc-xcframework",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/livekit/webrtc-xcframework.git",
+      "state" : {
+        "revision" : "a41df9e9bcc7ab1d62131fda75c123ea391e5188",
+        "version" : "150.7871.3"
       }
     }
   ],

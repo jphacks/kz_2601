@@ -137,15 +137,17 @@ type recordDoc struct {
 	Origin     *originDoc       `firestore:"origin,omitempty"`     // #341
 	UniqueKey  string           `firestore:"uniqueKey,omitempty"`  // #273
 	Readers    []string         `firestore:"readers,omitempty"`    // #271
-	CreatedAt  time.Time        `firestore:"createdAt"`
-	UpdatedAt  time.Time        `firestore:"updatedAt"`
+	// #507: set on a matching profile once its author declared 18+
+	OwnerAgeConfirmed bool      `firestore:"ownerAgeConfirmed,omitempty"`
+	CreatedAt         time.Time `firestore:"createdAt"`
+	UpdatedAt         time.Time `firestore:"updatedAt"`
 }
 
 func (d *recordDoc) toRecord(id string) *Record {
 	if d.Data == nil {
 		d.Data = map[string]any{}
 	}
-	rec := &Record{ID: id, Entity: d.Entity, Data: d.Data, ClientID: d.ClientID, Author: d.Author, AuthorName: d.AuthorName, Origin: d.Origin.toOrigin(), UniqueKey: d.UniqueKey, Readers: d.Readers, CreatedAt: d.CreatedAt, UpdatedAt: d.UpdatedAt}
+	rec := &Record{ID: id, Entity: d.Entity, Data: d.Data, ClientID: d.ClientID, Author: d.Author, AuthorName: d.AuthorName, Origin: d.Origin.toOrigin(), UniqueKey: d.UniqueKey, Readers: d.Readers, OwnerAgeConfirmed: d.OwnerAgeConfirmed, CreatedAt: d.CreatedAt, UpdatedAt: d.UpdatedAt}
 	for k, v := range d.MarkCounts {
 		if rec.MarkCounts == nil {
 			rec.MarkCounts = map[string]int{}
@@ -359,6 +361,12 @@ func (f *Firestore) CommitVersion(ctx context.Context, uid, appID string, c Comm
 		}
 		now := Now()
 		// reads first (a transaction cannot read after writing)
+		guard := c.HeldLimit > 0 && cur <= HeldVersion
+		if guard {
+			if err := f.checkHeld(ctx, tx, uid, c.HeldLimit); err != nil {
+				return err
+			}
+		}
 		var pubWrite func() error
 		if c.Publish != nil {
 			if pubWrite, err = f.publishOnCommit(tx, uid, appID, c, m, n, now); err != nil {
@@ -376,6 +384,11 @@ func (f *Firestore) CommitVersion(ctx context.Context, uid, appID string, c Comm
 		}
 		if err := tx.Update(ref, upd); err != nil {
 			return err
+		}
+		if guard { // the lock: concurrent guarded commits of uid conflict here and retry
+			if err := tx.Set(f.userRef(uid), map[string]any{"heldAppsAt": now}, firestore.MergeAll); err != nil {
+				return err
+			}
 		}
 		vd := versionDoc{Version: int64(n), ParentVersion: int64(cur), DSLJSON: string(c.DSL), CreatedAt: now}
 		if len(c.Patch) > 0 {
@@ -412,6 +425,24 @@ func (f *Firestore) CommitVersion(ctx context.Context, uid, appID string, c Comm
 		return nil, err
 	}
 	return out, nil
+}
+
+// checkHeld reads users/{uid} (the lock CommitVersion then writes) and
+// counts uid's held apps in tx; *HeldLimitError at limit. The app being
+// committed is still at version 1, so it is not in the count.
+func (f *Firestore) checkHeld(ctx context.Context, tx *firestore.Transaction, uid string, limit int) error {
+	if _, err := tx.Get(f.userRef(uid)); err != nil && !isNotFound(err) {
+		return err
+	}
+	q := f.heldApps(uid)
+	held, err := countAgg(ctx, q.NewAggregationQuery().Transaction(tx))
+	if err != nil {
+		return err
+	}
+	if held >= limit {
+		return &HeldLimitError{Held: held, Limit: limit}
+	}
+	return nil
 }
 
 // ListVersions implements Store.
@@ -641,7 +672,7 @@ func (f *Firestore) CreateRecord(ctx context.Context, rs RecordSet, rec Record) 
 		}
 		// Firestore keeps microseconds: return what a later read returns
 		now := Now()
-		d := recordDoc{Entity: rs.Entity, Data: rec.Data, ClientID: rec.ClientID, Author: rec.Author, AuthorName: rec.AuthorName, Readers: rec.Readers, Origin: toOriginDoc(rec.Origin), CreatedAt: now, UpdatedAt: now}
+		d := recordDoc{Entity: rs.Entity, Data: rec.Data, ClientID: rec.ClientID, Author: rec.Author, AuthorName: rec.AuthorName, Readers: rec.Readers, OwnerAgeConfirmed: rec.OwnerAgeConfirmed, Origin: toOriginDoc(rec.Origin), CreatedAt: now, UpdatedAt: now}
 		if err := tx.Create(ref, d); err != nil {
 			return err
 		}

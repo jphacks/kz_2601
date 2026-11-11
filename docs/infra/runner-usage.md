@@ -48,8 +48,8 @@ scripts/runner-usage.sh prod --dry-run          # フィルタだけ出す(Logs 
 | --- | --- |
 | `event` | `runner.usage` |
 | `app_id` / `rule_id` / `trigger` | どのアプリのどのルールが、何で動いたか(`record_created` / `record_updated` / `schedule`) |
-| `outcome` | `ok` / `error` / `skipped_quota` / `skipped_global` / `skipped_paused` / `skipped_plan` など |
-| `limit` | 止めた・削った上限の名前(あれば) |
+| `outcome` | `ok` / `error` / `skipped_quota` / `skipped_global` / `skipped_paused` / `skipped_plan` / 月の枠(#630)の `skipped_allowance`(枠を使い切り、超えた後のコイン払いが OFF)・`skipped_overflow_cap`(コインの月の上限)・`skipped_coins`(コインが足りない) など |
+| `limit` | 止めた・削った上限の名前(あれば)。月の枠は `allowance_runs` / `allowance_recipients` / `allowance_writes` / `allowance_reads` |
 | `reads` / `writes` / `notify_recipients` / `tasks_ops` / `cpu_ms` | 使った量 |
 | `writes_dropped` / `recipients_dropped` | 上限で落とした分(あれば) |
 | `creator_uid_hash` / `actor_uid_hash` | 作成者・動かした人の擬名(`ai.usage` の `uid_hash` と同じ鍵)。**生の uid は出さない** |

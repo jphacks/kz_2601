@@ -20,6 +20,7 @@ public struct HTTPMatchingClient: MatchingClient {
     }
     private struct AcceptBody: Encodable { var ageConfirmed: Bool }
     private struct ListResponse: Decodable { var items: [MatchInterest]? }
+    private struct AgeConfirmation: Codable { var ageConfirmed: Bool }
 
     public func sendInterest(appId: String, recordId: String, fromRecordId: String, ageConfirmed: Bool) async throws -> MatchInterest {
         try JSONDecoder().decode(MatchInterest.self, from: try await request(
@@ -46,6 +47,14 @@ public struct HTTPMatchingClient: MatchingClient {
 
     public func unmatch(appId: String, uid: String) async throws {
         _ = try await request("DELETE", "v1/apps/\(Self.escape(appId))/matches/\(Self.escape(uid))")
+    }
+
+    public func ageConfirmation() async throws -> Bool {
+        try JSONDecoder().decode(AgeConfirmation.self, from: try await request("GET", "v1/me/age-confirmation")).ageConfirmed
+    }
+
+    public func confirmAge() async throws {
+        _ = try await request("PUT", "v1/me/age-confirmation", body: AgeConfirmation(ageConfirmed: true))
     }
 
     static func escape(_ s: String) -> String {

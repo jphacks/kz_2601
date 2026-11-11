@@ -85,6 +85,7 @@ struct AddRecordIntent: AppIntent {
         }
         guard draft.missing.isEmpty else { throw TailorIntentError.missingFields(draft.missing) }
 
+        runtime.recordSync.encryptedFields[target.appId] = doc.dsl.encryptedFields // #233 今のアプリでなくても暗号化する
         let sent = await runtime.addRecordFromIntent(appId: target.appId, entity: entity.id, data: draft.data)
         let what = draft.summary.isEmpty ? content : draft.summary
         let message = Self.addedMessage(appName: target.appName, what: what, refs: draft.refs, sent: sent)

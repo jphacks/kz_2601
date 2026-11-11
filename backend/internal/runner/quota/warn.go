@@ -72,3 +72,25 @@ func (q *Quota) ClaimWarning(ctx context.Context, dec Decision, level int) (bool
 	q.warned.add(dec.Day, id)
 	return u.Blocked < 0, nil
 }
+
+// ClaimNotice is ClaimWarning for a monthly notice (#630 part 3): the first
+// caller in dec's JST month to warn dec's creator of n.Kind at n.Level gets
+// true, through the limit-1 counter mq_warn_{uid}_{kind}_{level} of the
+// month. Each kind and level is pushed once a month.
+func (q *Quota) ClaimNotice(ctx context.Context, dec Decision, n Notice) (bool, error) {
+	m := dec.month
+	if m == nil || n.Level != WarnNear && n.Level != WarnFull || n.Kind == "" {
+		return false, nil
+	}
+	id := q.id(m.key, "mq_warn_"+docSafe(dec.run.CreatorUID)+"_"+docSafe(n.Kind)+"_"+strconv.Itoa(n.Level))
+	if q.warnedMonth.has(m.key, id) {
+		return false, nil
+	}
+	c := ratelimit.Counter{ID: id, Scope: "warn", Limit: 1}
+	u, _, err := q.consume(ctx, []ratelimit.Counter{c}, 1, m.expireAt)
+	if err != nil {
+		return false, err
+	}
+	q.warnedMonth.add(m.key, id)
+	return u.Blocked < 0, nil
+}

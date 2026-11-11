@@ -125,7 +125,7 @@ func (h *Handler) putDSL(w http.ResponseWriter, r *http.Request) {
 		fail(w, err)
 		return
 	}
-	v, err := h.store.CommitVersion(r.Context(), uidOf(r), id, store.Commit{
+	v, err := h.commit(r, id, store.Commit{
 		BaseVersion: base, DSL: raw, Name: app.App.Name, Source: normalizeSource(body.Source, "full"), Publish: pub,
 		Events: h.rulesChanged(r, id, prev.DSL, app),
 	})
@@ -188,7 +188,7 @@ func (h *Handler) patchDSL(w http.ResponseWriter, r *http.Request) {
 		fail(w, err)
 		return
 	}
-	v, err := h.store.CommitVersion(r.Context(), uidOf(r), id, store.Commit{
+	v, err := h.commit(r, id, store.Commit{
 		BaseVersion: base, DSL: next, Name: app.App.Name, Patch: ops, Source: normalizeSource(src, "patch"), Publish: pub,
 		Events: h.rulesChanged(r, id, cur.DSL, app),
 	})
@@ -296,7 +296,7 @@ func (h *Handler) restoreVersion(w http.ResponseWriter, r *http.Request) {
 		fail(w, err)
 		return
 	}
-	v, err := h.store.CommitVersion(r.Context(), uidOf(r), id, store.Commit{
+	v, err := h.commit(r, id, store.Commit{
 		BaseVersion: cur.CurrentVersion, DSL: target.DSL, Name: app.App.Name,
 		Source: &store.Source{Kind: "restore", Mode: "full", RestoredFrom: n}, Publish: pub,
 		Events: h.rulesChanged(r, id, cur.DSL, app),

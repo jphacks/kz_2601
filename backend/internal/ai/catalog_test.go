@@ -106,6 +106,8 @@ func TestCatalogCoversEverySchemaType(t *testing.T) {
 		dsl.CompAudioRecorder,
 		// speech: transcription / read aloud
 		dsl.CompTranscribeField, dsl.CompSpeakButton,
+		// calls (#447)
+		dsl.CompCallButton,
 	} {
 		goTypes[string(ct)] = true
 	}
