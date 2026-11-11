@@ -11,7 +11,8 @@ import MetamonServices
 /// - 保存・削除の前段: `RecordActionSteps`、書き込みと同期: `RecordSyncEngine`(MetamonServices)
 ///
 /// サーバーへの接続(appconfig のクライアント・ログイン)は Mac に Firebase がまだ無い(#930)ので、
-/// iOS の `METAMON_MOCK=1` と同じくメモリ上の appconfig(`InMemoryAppConfigClient`)に記録を持つ。
+/// 作ったアプリは端末だけの appconfig(`MacRecordVault`・#1284)に記録を残し、同梱の例は iOS の `METAMON_MOCK=1` と同じく
+/// メモリ上の appconfig(`InMemoryAppConfigClient`)に持つ。
 /// ローカル通知は `MacRuntimeNotifications`(#965)。AI の部品(aiButton・aiGenerate・aiChat)は `MacAppRuntime+AIText.swift`(#962)。
 /// 話して入力(aiChat のマイク・transcribeField)は `MacAppRuntime+Dictation.swift`(#1328)。
 /// 共有・課金など iOS 固有の機能は持たない(未対応のアクションは一言で知らせる)。
@@ -306,8 +307,9 @@ final class MacAppRuntime: RuntimeNavigating {
     var currentScreen: String { NavigationResolver.top(navigationState, dsl: dsl).screen }
 
     /// 画面マップから画面を開く。モーダルを閉じ、根(タブ)から矢印をたどって開く(戻るで来た道を戻れる)
-    func reveal(screen: String) {
-        guard let next = NavigationResolver.reveal(screen, graph: ScreenGraph(dsl: dsl), dsl: dsl, from: navigationState) else { return }
+    func reveal(screen: String, recordId: String? = nil) {
+        guard let next = NavigationResolver.reveal(screen, recordId: recordId, graph: ScreenGraph(dsl: dsl), dsl: dsl,
+                                                   from: navigationState) else { return }
         setNavigation(next)
     }
 

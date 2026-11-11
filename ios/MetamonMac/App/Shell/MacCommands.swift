@@ -3,7 +3,7 @@ import AppKit
 
 /// メニューバー(#934)。ウインドウの状態は `focusedSceneValue` で受け取り、今の画面に合わせて有効 / 無効を変える。
 /// - ファイル: 新しいアプリ・文字で頼む(会話のシート・#967)・声で頼む(同じシートですぐ録音・#966)・新しいウインドウ
-/// - 編集: 元に戻す(記録を消した直後は削除の取り消し・それ以外は入力欄の取り消し)・やり直す
+/// - 編集: 元に戻す(記録を消した直後は削除の取り消し・それ以外は入力欄の取り消し)・やり直す・アプリを探す(⌘F・#1282)
 /// - アプリ: 生成したアプリの版の「変更を元に戻す」(⌥⌘Z)・「変更をやり直す」(⇧⌥⌘Z)(#968)・次の通知(#1325)。
 ///   ⌘Z / ⇧⌘Z は入力欄と記録の削除に使っているので、版の取り消しは別のキーにする
 /// - 表示: サイドバー(`SidebarCommands`)・ツールバー(`ToolbarCommands`)・画面マップ(⇧⌘E・#970)
@@ -49,6 +49,14 @@ struct MacCommands: Commands {
             }
             Button("やり直す") { NSApp.sendAction(Selector(("redo:")), to: nil, from: nil) }
                 .keyboardShortcut("z", modifiers: [.command, .shift])
+        }
+
+        // サイドバーの検索欄に入る(#1282)
+        CommandGroup(after: .pasteboard) {
+            Divider()
+            Button("アプリを探す") { shell?.focusSearch() }
+                .keyboardShortcut("f", modifiers: .command)
+                .disabled(shell == nil)
         }
 
         CommandGroup(after: .toolbar) {
@@ -113,6 +121,8 @@ struct ShellActions {
     var selectNext: () -> Void
     var focusSidebar: () -> Void
     var focusCanvas: () -> Void
+    /// ⌘F: サイドバーの検索欄に入る(#1282)
+    var focusSearch: () -> Void = {}
     /// 会話のシートを開けるか(開いている間は新しく開かない)
     var canCompose: Bool
     /// 中央のアプリの版を戻せる / やり直せるか(#968・会話のシートが開いている間は押せない)

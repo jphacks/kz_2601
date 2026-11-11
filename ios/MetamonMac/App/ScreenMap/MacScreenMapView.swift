@@ -5,6 +5,7 @@ import MetamonRenderer
 /// 画面マップの Mac 版(#970・iOS の `ScreenMapSheet`・#116)。中央のアプリの上にシートで出す。
 /// 図(段・カードの置き場所・矢印)は iOS と共有の `ScreenGraph` / `ScreenMapLayout`。
 /// - クリックで選ぶ → 右に出入りの一覧と「この画面を開く」「この画面について話す」。ダブルクリックでその画面を開く
+/// - 一覧の行から開く画面(詳細・フォーム)は「記録を選んで開く」でその記録の中身を出す(#1322)。記録が無ければ空で開くと知らせる
 /// - キーボード: 矢印キーでカードを選ぶ・Return で開く・⌘+ / ⌘- / ⌘0 で拡大 / 縮小 / 等倍・Esc で閉じる
 /// - トラックパッドのピンチでも拡大・縮小。大きい図は縦横にスクロール
 /// - VoiceOver: カードは上の段から順に読む。既定の操作で開く・「この画面について話す」は操作の一覧から
@@ -16,6 +17,10 @@ struct MacScreenMapView: View {
     let onOpen: (String) -> Void
     let onTalk: (ScreenContext) -> Void
     let onClose: () -> Void
+    /// 記録の種類(entity)ごとの、選べる記録(#1322)
+    var records: (String) -> [ScreenMapRecordChoice] = { _ in [] }
+    /// 画面をその記録で開く(#1322)
+    var onOpenRecord: (String, String) -> Void = { _, _ in }
 
     @State private var selected: String?
     @State private var zoom: CGFloat = 1
@@ -28,6 +33,16 @@ struct MacScreenMapView: View {
     static let zoomStep: CGFloat = 0.25
 
     private var graph: ScreenGraph { ScreenGraph(dsl: dsl) }
+
+    /// 一覧の行(onItemTap)で開く画面なら、その一覧の記録の種類。それ以外の画面は nil(記録を選ばずに開く)
+    static func recordEntity(opening screen: String, in dsl: AppDSL) -> String? {
+        for s in dsl.screens {
+            for c in s.allComponents where c.onItemTap?.screen == screen {
+                if let entity = c.entity, dsl.entity(entity) != nil { return entity }
+            }
+        }
+        return nil
+    }
 
     var body: some View {
         let graph = graph
@@ -42,7 +57,9 @@ struct MacScreenMapView: View {
                     map(graph)
                     Divider()
                     MacScreenMapDetail(graph: graph, selected: selected, hasTabs: dsl.app.hasTabs,
-                                       open: onOpen, talk: talk, select: { select($0, announce: true) })
+                                       recordChoices: selected.flatMap { Self.recordEntity(opening: $0, in: dsl) }.map(records),
+                                       open: onOpen, openRecord: onOpenRecord, talk: talk,
+                                       select: { select($0, announce: true) })
                         .frame(width: 280)
                 }
             }
@@ -326,7 +343,10 @@ private struct MacScreenMapDetail: View {
     let graph: ScreenGraph
     let selected: String?
     let hasTabs: Bool
+    /// 一覧の行から開く画面の、選べる記録(#1322)。nil なら記録を選ばない画面
+    var recordChoices: [ScreenMapRecordChoice]?
     let open: (String) -> Void
+    var openRecord: (String, String) -> Void = { _, _ in }
     let talk: (String) -> Void
     let select: (String) -> Void
 
@@ -349,6 +369,7 @@ private struct MacScreenMapDetail: View {
                         }
                         .controlSize(.large)
                         .help("Return でも開けます")
+                        recordMenu(node.id)
                         Button { talk(node.id) } label: {
                             Label(L10n.tr("この画面について話す"), systemImage: "bubble.left.and.text.bubble.right")
                                 .frame(maxWidth: .infinity)
@@ -383,6 +404,29 @@ private struct MacScreenMapDetail: View {
         }
     }
 
+    /// 記録を選んで開く(#1322)。記録が無ければ、空で開くことを一言で知らせる
+    @ViewBuilder private func recordMenu(_ screen: String) -> some View {
+        if let choices = recordChoices {
+            if choices.isEmpty {
+                Text("記録がまだ無いので、空のまま開きます")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+            } else {
+                Menu {
+                    ForEach(choices.prefix(ScreenMapRecordChoice.menuLimit)) { choice in
+                        Button(choice.title) { openRecord(screen, choice.id) }
+                    }
+                } label: {
+                    Label("記録を選んで開く", systemImage: "list.bullet.rectangle").frame(maxWidth: .infinity)
+                }
+                .controlSize(.large)
+                .help("どの記録でこの画面を開くかを選びます")
+                .accessibilityIdentifier("screenMap.openRecord")
+            }
+        }
+    }
+
     private func links(_ label: String, _ links: [ScreenGraph.Link], outgoing: Bool) -> some View {
         VStack(alignment: .leading, spacing: 6) {
             Text(label).font(.caption.weight(.semibold)).foregroundStyle(.secondary)
@@ -413,4 +457,13 @@ private struct MacScreenMapDetail: View {
             }
         }
     }
+}
+
+/// 画面マップで選べる記録 1 件(#1322)。title は一覧の見出しと同じ(見出しの無い記録は「記録 n」)
+struct ScreenMapRecordChoice: Identifiable, Equatable {
+    /// メニューに並べる数の上限(多すぎる時は一覧の先頭から)
+    static let menuLimit = 50
+
+    let id: String
+    let title: String
 }

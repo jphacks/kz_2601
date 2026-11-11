@@ -54,24 +54,24 @@
 	<key>MetamonWhisperModel</key>
 	<string></string>
 
-	<!-- 声で頼む(#966)。文言は iOS と同じ。声は端末の外に送らない -->
+	<!-- 声で頼む(#966)。Mac に無い機能(ドラレコ・閉じても続く記録)は書かない。英語は InfoPlist.xcstrings -->
 	<key>NSMicrophoneUsageDescription</key>
-	<string>話しかけた内容からアプリを生成するため、また生成したアプリで話した内容を端末の中で文字にしたり、動画やドラレコの音声、ボイスメモ・会議などを録音したりするために、マイクを使用します。</string>
+	<string>話しかけた内容からアプリを生成するため、また生成したアプリで話した内容をこの Mac の中で文字にしたり、ボイスメモや会議などを録音したりするために、マイクを使用します。</string>
 	<!-- 音声モデルの準備中だけ、Apple の端末内の音声認識(requiresOnDeviceRecognition)で仮に聞き取る(iOS の U5 と同じ) -->
 	<key>NSSpeechRecognitionUsageDescription</key>
-	<string>音声モデルの準備ができるまでの間、話した内容をこの端末の中で文字にするために、音声認識を使用します。声は端末の外に送りません。</string>
+	<string>音声モデルの準備ができるまでの間、話した内容をこの Mac の中で文字にするために、音声認識を使用します。声は Mac の外に送りません。</string>
 	<!-- カレンダーに追加(#978)。iOS は OS の画面(EventKitUI・別プロセス)なので説明文が要らないが、Mac は自前のシートから
 	     EventKit で書くので、書き込みだけの許可(requestWriteOnlyAccessToEvents)の説明を出す。中身は読まない -->
 	<key>NSCalendarsWriteOnlyAccessUsageDescription</key>
 	<string>記録の日時を、内容を確かめたうえでカレンダーに予定として追加するために使用します。カレンダーの予定は読み取りません。</string>
-	<!-- musicPlayer(#960): Apple Music の検索と再生(MusicKit の ApplicationMusicPlayer)。文言は iOS と同じ -->
+	<!-- musicPlayer(#960): Apple Music の検索と再生(MusicKit の ApplicationMusicPlayer) -->
 	<key>NSAppleMusicUsageDescription</key>
 	<string>生成したアプリの音楽プレーヤーで、Apple Music の曲を検索して再生するために使用します。</string>
-	<!-- 現在地(#956)。文言は iOS と同じ。macOS は NSLocationUsageDescription も見るので同じ文にする -->
+	<!-- 現在地(#956)。Mac は閉じた後に記録を続けないので、その文は書かない。macOS は NSLocationUsageDescription も見るので同じ文にする -->
 	<key>NSLocationWhenInUseUsageDescription</key>
-	<string>生成したアプリで現在地を記録・地図に表示したり、目的地まで道案内したり、保存した場所の近くに着いた時に通知したりするために使います(近くに着いたかは端末の中で判定します)。「記録を開始」を押した時だけ、停止するまで(最長4時間)散歩などの道のりを記録し、その間はアプリを閉じても記録を続けます。</string>
+	<string>生成したアプリで現在地を記録・地図に表示したり、目的地までの道順を表示したり、保存した場所の近くに着いた時に通知したりするために使います(近くに着いたかはこの Mac の中で判定します)。道のりは「記録を開始」を押した時だけ、停止するまで(最長4時間)記録します。</string>
 	<key>NSLocationUsageDescription</key>
-	<string>生成したアプリで現在地を記録・地図に表示したり、目的地まで道案内したり、保存した場所の近くに着いた時に通知したりするために使います(近くに着いたかは端末の中で判定します)。「記録を開始」を押した時だけ、停止するまで(最長4時間)散歩などの道のりを記録し、その間はアプリを閉じても記録を続けます。</string>
+	<string>生成したアプリで現在地を記録・地図に表示したり、目的地までの道順を表示したり、保存した場所の近くに着いた時に通知したりするために使います(近くに着いたかはこの Mac の中で判定します)。道のりは「記録を開始」を押した時だけ、停止するまで(最長4時間)記録します。</string>
 	<!-- ほかの権限の説明(カメラなど)は #931 で足す -->
 </dict>
 </plist>

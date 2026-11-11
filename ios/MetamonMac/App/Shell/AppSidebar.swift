@@ -4,31 +4,40 @@ import MetamonServices
 /// サイドバーのアプリの一覧。iOS の AppSwitcherSheet に当たる(Mac では常に出す)。
 /// ↑↓ で選ぶと中央が切り替わり、Return / ダブルクリックで中央へ移る(#934)。
 /// 「作ったアプリ」と「同梱の例」に分ける(#969)。作ったアプリは右クリックで名前の変更・上へ / 下へ・削除(確認あり)、
-/// ドラッグで並べ替え、Delete キーで削除。同梱の例は右クリックの「複製」だけ(作ったアプリに足す・#1285)。
-/// サムネイル・検索・新着の数・共有されたアプリの区分はサーバー(#930)の後。
+/// ドラッグで並べ替え、Delete キーで削除。同梱の例は右クリックの「複製」(作ったアプリに足す・#1285)と、会話で直した例なら「元の例に戻す」(確認あり・#1283)。
+/// 検索(#1282)で絞った一覧を受け取る。行の頭にアプリの画面の写し(#1281・無ければ頭の文字)。新着の数・共有されたアプリの区分はサーバー(#930)の後。
 struct AppSidebar: View {
     let created: [SampleApp]
     let examples: [SampleApp]
+    /// 行の写し(#1281)
+    var thumbnail: (String) -> NSImage? = { _ in nil }
+    /// 検索欄の文字(#1282)。絞り込みは呼ぶ側で済ませてある。並べ替えは絞っていない時だけ
+    var searchText = ""
     @Binding var selection: SampleApp.ID?
     var onOpen: () -> Void = {}
     /// 確認の後に呼ぶ(選択の付け替えはウインドウ側)
     var onDelete: (String) -> Void = { _ in }
     /// 「複製」(#1285)。作ったアプリも同梱の例も
     var onDuplicate: (String) -> Void = { _ in }
+    /// 「元の例に戻す」の確認の後に呼ぶ(#1283)
+    var onResetExample: (String) -> Void = { _ in }
 
     @Environment(MacAppLibrary.self) private var library
     @State private var renameTarget: SampleApp?
     @State private var renameText = ""
     @State private var deleteTarget: SampleApp?
+    @State private var resetTarget: SampleApp?
 
     private var createdIds: [String] { created.map(\.id) }
+
+    private var isSearching: Bool { !searchText.trimmingCharacters(in: .whitespaces).isEmpty }
 
     var body: some View {
         List(selection: $selection) {
             if !created.isEmpty {
                 Section("作ったアプリ") {
                     ForEach(created) { row($0) }
-                        .onMove { library.move(fromOffsets: $0, toOffset: $1) }
+                        .onMove(perform: isSearching ? nil : { library.move(fromOffsets: $0, toOffset: $1) })
                 }
             }
             if !examples.isEmpty {
@@ -40,8 +49,11 @@ struct AppSidebar: View {
         .contextMenu(forSelectionType: SampleApp.ID.self) { ids in
             if ids.count == 1, let id = ids.first, let app = created.first(where: { $0.id == id }) {
                 manageItems(app)
-            } else if ids.count == 1, let id = ids.first, examples.contains(where: { $0.id == id }) {
+            } else if ids.count == 1, let id = ids.first, let app = examples.first(where: { $0.id == id }) {
                 Button("複製") { onDuplicate(id) }
+                if library.isEditedExample(id) {
+                    Button("元の例に戻す…") { resetTarget = app }
+                }
             }
         } primaryAction: { ids in
             guard let id = ids.first else { return }
@@ -53,7 +65,9 @@ struct AppSidebar: View {
             deleteTarget = app
         }
         .overlay {
-            if created.isEmpty && examples.isEmpty {
+            if created.isEmpty && examples.isEmpty && isSearching {
+                ContentUnavailableView.search(text: searchText)
+            } else if created.isEmpty && examples.isEmpty {
                 MacEmptyState(pose: .tea, title: "アプリがありません",
                               mascotSize: MacTheme.Mascot.small, showsBackdrop: false)
             }
@@ -80,18 +94,31 @@ struct AppSidebar: View {
         } message: {
             Text("元に戻せません。")
         }
+        .alert(L10n.tr("「\(resetTarget?.name ?? "")」を元の例に戻しますか?"),
+               isPresented: Binding(get: { resetTarget != nil }, set: { if !$0 { resetTarget = nil } })) {
+            Button("元の例に戻す", role: .destructive) {
+                guard let app = resetTarget else { return }
+                onResetExample(app.id)
+            }
+            Button("キャンセル", role: .cancel) {}
+        } message: {
+            Text("会話で直した分は消えます。")
+        }
     }
 
     private func row(_ app: SampleApp) -> some View {
-        VStack(alignment: .leading, spacing: MacTheme.Spacing.rowLine) {
-            Text(app.name)
-                .font(MacTheme.Fonts.sidebarTitle)
-                .lineLimit(1)
-            if let description = app.description {
-                Text(description)
-                    .font(MacTheme.Fonts.sidebarDetail)
-                    .foregroundStyle(.secondary)
+        HStack(spacing: 8) {
+            SidebarThumbnail(name: app.name, image: thumbnail(app.id))
+            VStack(alignment: .leading, spacing: MacTheme.Spacing.rowLine) {
+                Text(app.name)
+                    .font(MacTheme.Fonts.sidebarTitle)
                     .lineLimit(1)
+                if let description = app.description {
+                    Text(description)
+                        .font(MacTheme.Fonts.sidebarDetail)
+                        .foregroundStyle(.secondary)
+                        .lineLimit(1)
+                }
             }
         }
         .padding(.vertical, 2)
@@ -105,7 +132,7 @@ struct AppSidebar: View {
             renameTarget = app
         }
         Button("複製") { onDuplicate(app.id) }
-        if created.count > 1, let index = createdIds.firstIndex(of: app.id) {
+        if !isSearching, created.count > 1, let index = createdIds.firstIndex(of: app.id) {
             Divider()
             Button("上へ移動") { library.move(app.id, to: index - 1) }
                 .disabled(index == 0)

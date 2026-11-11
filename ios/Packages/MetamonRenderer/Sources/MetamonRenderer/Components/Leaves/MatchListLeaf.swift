@@ -69,6 +69,7 @@ struct MatchListLeaf: View {
                         accessory: accessory(item, box: box))
                     .contentShape(Rectangle())
                     .onTapGesture { open(profile) }
+                    .macHelp(c.onItemTap != nil ? L("クリックで開きます") : nil)
                     .accessibilityAddTraits(c.onItemTap != nil ? .isButton : [])
                     .accessibilityAction { open(profile) }
             } else {

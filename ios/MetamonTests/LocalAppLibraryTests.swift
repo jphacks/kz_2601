@@ -70,6 +70,23 @@ final class LocalAppLibraryTests: XCTestCase {
         XCTAssertNil(library.currentAppId)
     }
 
+    /// 会話で直した同梱の例(#1283): 残して読み直せる・元に戻すと消える・作ったアプリの一覧には出ない
+    func testEditedExampleIsKeptAndRemoved() async throws {
+        let edited = try await MockAIClient(delay: .zero).morph(transcript: "家計簿のアプリ", appId: "expense", currentVersion: 1)
+        library.currentAppId = "expense"
+        library.storeExample(appId: "expense", envelope: try XCTUnwrap(edited.envelope))
+        library.storeExample(appId: "expense", envelope: try XCTUnwrap(edited.envelope))
+
+        let loaded = library.loadEditedExamples()
+        XCTAssertEqual(Array(loaded.keys), ["expense"])
+        XCTAssertEqual(loaded["expense"]?.document.dsl.app.name, edited.document.dsl.app.name)
+        XCTAssertTrue(library.load().isEmpty)
+
+        library.removeExample(appId: "expense")
+        XCTAssertTrue(library.loadEditedExamples().isEmpty)
+        XCTAssertEqual(library.currentAppId, "expense", "元に戻しても開いていた例はそのまま")
+    }
+
     func testNeighborAfterDelete() {
         XCTAssertEqual(LocalAppLibrary.neighbor(deleting: "a", in: ["a", "b", "c"]), "b")
         XCTAssertEqual(LocalAppLibrary.neighbor(deleting: "c", in: ["a", "b", "c"]), "b")
