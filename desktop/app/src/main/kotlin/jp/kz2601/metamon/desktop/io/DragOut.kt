@@ -56,8 +56,8 @@ object DragOut {
         return FileNames.guard(name)
     }
 
-    /** 引き出したファイルを書く場所。 */
-    fun tempRoot(): File = File(System.getProperty("java.io.tmpdir"), "tailorit-drag")
+    /** 引き出したファイルを書く場所(利用者ごとのフォルダ・[UserDirs.drag])。 */
+    fun tempRoot(): File = UserDirs.drag
 
     /** [f] が引き出し用の一時ファイルか(終わる時に消えるので、落とし直された時は残る場所へ写す)。 */
     fun isTemp(f: File): Boolean {
@@ -105,9 +105,10 @@ object ImageSource {
 
     /**
      * [allowFile] は記録・フォームの値の時だけ(photoField の値は file URI)。DSL に書かれた URL では手元のファイルを読まない。
+     * 手元のファイルはアプリの写真フォルダ([photoDir])の下の画像だけ。
      * どの読み方も [max] バイトまで(手元のファイルも読みながら数える・途中で大きくなる物も止まる)。
      */
-    fun bytes(src: String?, allowFile: Boolean, max: Int = MAX_BYTES): ByteArray? {
+    fun bytes(src: String?, allowFile: Boolean, max: Int = MAX_BYTES, photoDir: File = UserDirs.photos): ByteArray? {
         if (src.isNullOrBlank()) return null
         return runCatching {
             when {
@@ -117,7 +118,7 @@ object ImageSource {
                     readTimeout = READ_TIMEOUT_MS
                     if (contentLengthLong > max) null else getInputStream().use { capped(it, max) }
                 }
-                allowFile && src.startsWith("file:") -> fileOf(src)?.takeIf { it.isFile && FileKind.of(it.name) == FileKind.IMAGE }?.let { readFile(it, max) }
+                allowFile && src.startsWith("file:") -> UserDirs.photoFile(src, photoDir)?.takeIf { it.isFile && FileKind.of(it.name) == FileKind.IMAGE }?.let { readFile(it, max) }
                 else -> null
             }
         }.getOrNull()

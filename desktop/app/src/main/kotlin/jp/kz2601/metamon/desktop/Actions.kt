@@ -7,6 +7,7 @@ import jp.kz2601.metamon.desktop.io.FileNames
 import jp.kz2601.metamon.desktop.io.PdfIo
 import jp.kz2601.metamon.desktop.io.RecordIo
 import jp.kz2601.metamon.desktop.io.Tsv
+import jp.kz2601.metamon.desktop.io.UserDirs
 import jp.kz2601.metamon.desktop.store.writeAtomically
 import jp.kz2601.metamon.dsl.Action
 import jp.kz2601.metamon.dsl.ActionFormat
@@ -214,8 +215,8 @@ class DesktopActionHost(
     companion object {
         const val CALENDAR_PREFIX = "ics-"
 
-        /** カレンダーに渡す .ics の置き場(OS の一時フォルダ・人ごと)。 */
-        fun calendarTempRoot(): File = File(System.getProperty("java.io.tmpdir"), "tailorit-calendar")
+        /** カレンダーに渡す .ics の置き場(利用者ごとのフォルダ・[UserDirs.calendar])。 */
+        fun calendarTempRoot(): File = UserDirs.calendar
 
         /** 起動時: 前に渡した .ics のうち 1 日より古い物を消す。 */
         fun sweepCalendar(now: Long = System.currentTimeMillis(), root: File = calendarTempRoot()): Int =

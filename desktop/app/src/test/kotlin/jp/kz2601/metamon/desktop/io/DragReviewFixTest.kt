@@ -68,12 +68,17 @@ class DragReviewFixTest {
         assertTrue("元が消えても残る", kept.isFile)
         kept.delete()
 
-        // 外から落としたファイルはそのまま(写さない)
+        // 外から落とした写真も写真フォルダへ写す(写真フォルダの下にあればそのまま)
         val outside = File.createTempFile("photo-", ".png").apply { writeBytes(png); deleteOnExit() }
         assertFalse(DragOut.isTemp(outside))
         val d2 = mutableMapOf<String, String>()
         assertTrue(io.dropFiles(listOf(outside), listOf(photo), d2))
-        assertEquals(outside.toURI().toString(), d2["photo"])
+        val copied = fileOf(d2["photo"]!!)!!.apply { deleteOnExit() }
+        assertEquals(UserDirs.photos.canonicalFile, copied.canonicalFile.parentFile)
+        assertArrayEquals(png, copied.readBytes())
+        val d3 = mutableMapOf<String, String>()
+        assertTrue(io.dropFiles(listOf(copied), listOf(photo), d3))
+        assertEquals(copied.canonicalFile, fileOf(d3["photo"]!!)!!.canonicalFile)
     }
 
     // 2. アプリの中で引いた行を落とし直しても取り込みが始まらない
@@ -133,7 +138,7 @@ class DragReviewFixTest {
         assertEquals(ImageLoader.CACHE_SIZE, ImageLoader.size())
         assertNull("古い物から捨てる", ImageLoader.cached(url(0), allowFile = false, maxPx = ImageLoader.THUMBNAIL_PX))
 
-        val f = File.createTempFile("photo-", ".png").apply { writeBytes(encoded("png")); deleteOnExit() }
+        val f = File.createTempFile("photo-", ".png", UserDirs.photos).apply { writeBytes(encoded("png")); deleteOnExit() }
         assertNotNull(ImageLoader.load(f.toURI().toString(), allowFile = true))
         assertNull("手元のファイルは覚えない", ImageLoader.cached(f.toURI().toString(), allowFile = true, maxPx = null))
         ImageLoader.clear()

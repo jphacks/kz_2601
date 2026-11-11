@@ -222,8 +222,13 @@ class DesktopIo(dsl: AppDSL, private val read: () -> MockStore, private val upda
                 val field = all.firstOrNull { it.type == media && it.field != null && draft[it.field!!].isNullOrEmpty() }?.field
                     ?: all.firstOrNull { it.type == media }?.field
                 if (field != null) {
-                    // 引き出した一時ファイル(終わる時に消える)は残る場所へ写してから
-                    draft[field] = (if (DragOut.isTemp(f)) keep(f) else f).toURI().toString()
+                    // 写真はアプリの写真フォルダへ写してから(記録の写真は写真フォルダの下だけ読む)。引き出した一時ファイル(終わる時に消える)も残る場所へ
+                    val stored = when {
+                        kind == FileKind.IMAGE -> runCatching { UserDirs.adoptPhoto(f) }.getOrNull() ?: continue
+                        DragOut.isTemp(f) -> keep(f)
+                        else -> f
+                    }
+                    draft[field] = stored.toURI().toString()
                     used = true
                     continue
                 }
@@ -292,7 +297,7 @@ class DesktopIo(dsl: AppDSL, private val read: () -> MockStore, private val upda
             return File.createTempFile("drop-", ext, photoDir()).also { f.copyTo(it, overwrite = true) }
         }
 
-        private fun photoDir(): File = File(System.getProperty("java.io.tmpdir"), "tailorit-photos").apply { mkdirs() }
+        private fun photoDir(): File = UserDirs.photos
 
         fun openDialog(title: String): File? {
             val d = FileDialog(null as Frame?, title, FileDialog.LOAD)
@@ -340,14 +345,19 @@ fun MediaFieldLeaf(c: Component, label: String, draft: MutableMap<String, String
     Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
         Text(label, style = MaterialTheme.typography.labelLarge)
         if (file != null && c.type == ComponentType.PHOTO_FIELD) {
-            val bitmap = remember(uri) { runCatching { ImageSource.readFile(file)?.let { SkiaImage.makeFromEncoded(it).toComposeImageBitmap() } }.getOrNull() }
+            val bitmap = remember(uri) { runCatching { ImageSource.bytes(uri, allowFile = true)?.let { SkiaImage.makeFromEncoded(it).toComposeImageBitmap() } }.getOrNull() }
             bitmap?.let { Image(it, contentDescription = label, modifier = Modifier.heightIn(max = 160.dp).widthIn(max = 240.dp).photoPreviewClick(uri, label).fileDragSource(file)) }
         } else if (file != null) {
             Text(file.name, modifier = Modifier.fileDragSource(file))
         }
         if (readOnly) return@Column
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            OutlinedButton(onClick = { DesktopIo.openDialog(label)?.let { draft[field] = it.toURI().toString() } }) { Text(Strings["desktop_io_choose_file"]) }
+            OutlinedButton(onClick = {
+                DesktopIo.openDialog(label)?.let { f ->
+                    val stored = if (c.type == ComponentType.PHOTO_FIELD) runCatching { UserDirs.adoptPhoto(f) }.getOrNull() else f
+                    stored?.let { draft[field] = it.toURI().toString() }
+                }
+            }) { Text(Strings["desktop_io_choose_file"]) }
             if (file != null) TextButton(onClick = { draft.remove(field) }) { Text(Strings["desktop_io_remove"]) }
         }
         Text(Strings[if (c.type == ComponentType.PHOTO_FIELD) "desktop_io_photo_hint" else "desktop_io_video_hint"], style = MaterialTheme.typography.bodySmall, color = Color.Gray)
