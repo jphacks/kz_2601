@@ -159,10 +159,69 @@ func (f *Firestore) BlockedEither(ctx context.Context, uid string, others []stri
 	return out, nil
 }
 
-// ConfirmAge implements Matching (merged into users/{uid}).
+// ConfirmAge implements Matching (merged into users/{uid}). The declaration
+// is written first: a profile left unmarked by a failure is still shown,
+// through the author's declaration (AgeConfirmedAmong).
 func (f *Firestore) ConfirmAge(ctx context.Context, uid string) error {
-	_, err := f.userRef(uid).Set(ctx, map[string]any{"ageConfirmedAt": Now()}, firestore.MergeAll)
-	return err
+	if _, err := f.userRef(uid).Set(ctx, map[string]any{"ageConfirmedAt": Now()}, firestore.MergeAll); err != nil {
+		return err
+	}
+	return eachRef(f.userRef(uid).Collection("apps").DocumentRefs(ctx), func(app *firestore.DocumentRef) error {
+		return f.markProfilesAgeConfirmed(ctx, app.ID, uid)
+	})
+}
+
+// markProfilesAgeConfirmed sets ownerAgeConfirmed on uid's unmarked records
+// in the profile entity of appID's published DSL.
+func (f *Firestore) markProfilesAgeConfirmed(ctx context.Context, appID, uid string) error {
+	pub, err := f.GetPublicApp(ctx, appID)
+	if errors.Is(err, ErrNotFound) {
+		return nil
+	}
+	if err != nil {
+		return err
+	}
+	eid := profileEntityID(pub.DSL)
+	if eid == "" {
+		return nil
+	}
+	return each(ctx, f.recordsCol(PublicRecords(appID, eid)).Where("author", "==", uid), func(s *firestore.DocumentSnapshot) error {
+		if v, _ := s.DataAt("ownerAgeConfirmed"); v == true {
+			return nil
+		}
+		_, err := s.Ref.Update(ctx, []firestore.Update{{Path: "ownerAgeConfirmed", Value: true}})
+		if isNotFound(err) {
+			return nil // deleted meanwhile
+		}
+		return err
+	})
+}
+
+// AgeConfirmedAmong implements Matching: users/{uid} read in chunks.
+func (f *Firestore) AgeConfirmedAmong(ctx context.Context, uids []string) (map[string]bool, error) {
+	out := map[string]bool{}
+	refs := make([]*firestore.DocumentRef, 0, len(uids))
+	for _, u := range uids {
+		refs = append(refs, f.userRef(u))
+	}
+	for start := 0; start < len(refs); start += markedByChunk {
+		snaps, err := f.c.GetAll(ctx, refs[start:min(start+markedByChunk, len(refs))])
+		if err != nil {
+			return nil, err
+		}
+		for _, s := range snaps {
+			if s.Exists() && ageConfirmedIn(s) {
+				out[s.Ref.ID] = true
+			}
+		}
+	}
+	return out, nil
+}
+
+func ageConfirmedIn(s *firestore.DocumentSnapshot) bool {
+	v, _ := s.DataAt("ageConfirmedAt")
+	at, ok := v.(time.Time)
+	return ok && !at.IsZero()
 }
 
 // AgeConfirmed implements Matching.
@@ -174,9 +233,7 @@ func (f *Firestore) AgeConfirmed(ctx context.Context, uid string) (bool, error) 
 	if err != nil {
 		return false, err
 	}
-	v, _ := snap.DataAt("ageConfirmedAt")
-	at, ok := v.(time.Time)
-	return ok && !at.IsZero(), nil
+	return ageConfirmedIn(snap), nil
 }
 
 // purgeMatching erases uid's pairs in appID and uid's records in the

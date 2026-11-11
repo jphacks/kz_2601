@@ -162,9 +162,9 @@ func (h *Handler) serveRecords(w http.ResponseWriter, r *http.Request, in record
 		return
 	}
 	// #321 blocks either way, #507 matching rules (matching_age.go)
-	var readable func(author string) bool
+	var readable func(rec *store.Record) bool
 	if ent.IsShared() {
-		if readable, err = h.sharedFilter(r, cur.ID, eid, recordAuthors(all)); err != nil {
+		if readable, err = h.sharedFilter(r, cur.ID, eid, all); err != nil {
 			fail(w, err)
 			return
 		}
@@ -175,7 +175,7 @@ func (h *Handler) serveRecords(w http.ResponseWriter, r *http.Request, in record
 		if !canRead(ent, &all[i], uid) { // #271: only the author and recipients
 			continue
 		}
-		if readable != nil && !readable(all[i].Author) {
+		if readable != nil && !readable(&all[i]) {
 			continue
 		}
 		if pred == nil || pred(&all[i]) {
@@ -318,8 +318,9 @@ func (h *Handler) createRecord(w http.ResponseWriter, r *http.Request) {
 		fail(w, err)
 		return
 	}
+	profile := false
 	if ent.IsShared() {
-		if err := h.checkProfileWrite(r, cur.ID, eid); err != nil { // #507: 18+ declaration
+		if profile, err = h.checkProfileWrite(r, cur.ID, eid); err != nil { // #507: 18+ declaration
 			fail(w, err)
 			return
 		}
@@ -367,6 +368,7 @@ func (h *Handler) createRecord(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		rec.Readers = recordReaders(ent, rec.Author, data) // #271
+		rec.OwnerAgeConfirmed = profile                    // #507: checkProfileWrite needed the declaration
 		// the collection is shared, so two users' idempotency keys must not collide
 		clientKey = rec.Author + "/" + body.ClientID
 	}
@@ -422,8 +424,8 @@ func (h *Handler) getRecord(w http.ResponseWriter, r *http.Request) {
 		err = store.ErrNotFound // #271: an addressed record of others
 	}
 	if err == nil && ent.IsShared() {
-		var ok func(string) bool
-		if ok, err = h.sharedFilter(r, cur.ID, eid, []string{rec.Author}); err == nil && !ok(rec.Author) {
+		var ok func(*store.Record) bool
+		if ok, err = h.sharedFilter(r, cur.ID, eid, []store.Record{*rec}); err == nil && !ok(rec) {
 			err = store.ErrNotFound // #321 blocked either way / #507 not matched with the author
 		}
 	}

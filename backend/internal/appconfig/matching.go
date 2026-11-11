@@ -100,10 +100,11 @@ func (h *Handler) matchApp(r *http.Request) (string, *matchSpec, error) {
 	return appID, spec, nil
 }
 
-// matchFilter returns which authors' records of entity eid the caller may
+// matchFilter returns which of recs (records of entity eid) the caller may
 // read by the matching rules (nil = no rule; blocks: sharedFilter). Without
-// the 18+ declaration only the caller's own.
-func (h *Handler) matchFilter(r *http.Request, appID, eid string) (func(author string) bool, error) {
+// the 18+ declaration only the caller's own; profiles of people who have not
+// declared only to their author.
+func (h *Handler) matchFilter(r *http.Request, appID, eid string, recs []store.Record) (func(rec *store.Record) bool, error) {
 	spec, _, err := h.publishedMatch(r.Context(), appID)
 	if err != nil || spec == nil {
 		return nil, err
@@ -119,15 +120,19 @@ func (h *Handler) matchFilter(r *http.Request, appID, eid string) (func(author s
 	}
 	switch {
 	case !adult:
-		return func(a string) bool { return a == me }, nil
+		return func(rec *store.Record) bool { return rec.Author == me }, nil
 	case isProfile:
-		return nil, nil
+		declared, err := h.declaredOwners(r.Context(), recs, me)
+		if err != nil {
+			return nil, err
+		}
+		return func(rec *store.Record) bool { return rec.Author == me || ownerDeclared(rec, declared) }, nil
 	}
 	ok, err := h.matchedWith(r, appID)
 	if err != nil {
 		return nil, err
 	}
-	return func(a string) bool { return a == me || ok[a] }, nil
+	return func(rec *store.Record) bool { return rec.Author == me || ok[rec.Author] }, nil
 }
 
 // matchedWith returns the uids matched with the caller, minus blocks both ways.
@@ -280,6 +285,15 @@ func (h *Handler) sendInterest(w http.ResponseWriter, r *http.Request) {
 	rs := store.PublicRecords(appID, spec.profile.ID)
 	theirs, err := h.store.GetRecord(ctx, rs, body.RecordID)
 	if err != nil || theirs.Author == "" {
+		fail(w, mapStoreErr(store.ErrNotFound, "profile"))
+		return
+	}
+	declared, err := h.declaredOwners(ctx, []store.Record{*theirs}, me)
+	if err != nil {
+		fail(w, err)
+		return
+	}
+	if theirs.Author != me && !ownerDeclared(theirs, declared) { // hidden profile
 		fail(w, mapStoreErr(store.ErrNotFound, "profile"))
 		return
 	}
