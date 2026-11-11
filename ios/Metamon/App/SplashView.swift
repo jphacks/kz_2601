@@ -21,17 +21,20 @@ enum SplashGate {
     static func decide(
         arguments: [String] = ProcessInfo.processInfo.arguments,
         environment: [String: String] = ProcessInfo.processInfo.environment,
-        reduceMotion: Bool = UIAccessibility.isReduceMotionEnabled
+        reduceMotion: Bool = UIAccessibility.isReduceMotionEnabled,
+        voiceOver: Bool = UIAccessibility.isVoiceOverRunning
     ) -> Mode {
         guard !didShowThisProcess else { return .hidden }
-        let mode = mode(arguments: arguments, environment: environment, reduceMotion: reduceMotion)
+        let mode = mode(arguments: arguments, environment: environment, reduceMotion: reduceMotion, voiceOver: voiceOver)
         if mode != .hidden { didShowThisProcess = true }
         return mode
     }
 
     /// 記録を残さない判定(テスト用にも使う)。
-    static func mode(arguments: [String], environment: [String: String], reduceMotion: Bool) -> Mode {
+    static func mode(arguments: [String], environment: [String: String], reduceMotion: Bool, voiceOver: Bool = false) -> Mode {
         if arguments.contains(skipArgument) { return .hidden }
+        // VoiceOver: 最初のダブルタップが下の画面に届くよう出さない(読み上げも下の画面だけにする)
+        if voiceOver { return .hidden }
         switch environment["METAMON_SPLASH"] {
         case "0": return .hidden
         case "1": return reduceMotion ? .reduced : .animated // モックでも見たい時(スクショ撮り)
@@ -67,9 +70,12 @@ struct SplashView: View {
         static let tag = 1.50
         static let finish = 2.20
         static let reducedFinish = 0.90
+        /// 開始を待ちきれなかった時(メインスレッドが空かない): 完成形を止めて見せる長さ
+        static let stillFinish = 0.50
     }
 
     @Environment(\.accessibilityReduceMotion) private var envReduceMotion
+    @Environment(\.accessibilityVoiceOverEnabled) private var voiceOverOn
     @ScaledMetric(relativeTo: .largeTitle) private var wordSize: CGFloat = 40
     @ScaledMetric(relativeTo: .subheadline) private var tagSize: CGFloat = 15
 
@@ -115,7 +121,9 @@ struct SplashView: View {
         .ignoresSafeArea()
         .contentShape(Rectangle())
         .onTapGesture { finish() }
-        // VoiceOver: 名前を 1 回読むだけ。要素にはせず、下の画面へのフォーカスを妨げない
+        .allowsHitTesting(!voiceOverOn) // 途中で VoiceOver が付いたら触れるのを下の画面に通し、すぐ閉じる
+        .onChange(of: voiceOverOn) { _, on in if on { finish() } }
+        // 要素にはせず、下の画面へのフォーカスを妨げない(VoiceOver の時はそもそも出さない)
         .accessibilityHidden(true)
         .task { await run() }
     }
@@ -165,14 +173,18 @@ struct SplashView: View {
     }
 
     private func run() async {
-        if UIAccessibility.isVoiceOverRunning {
-            AccessibilityNotification.Announcement("Tailor It").post()
-        }
         if reduced {
             withAnimation(.easeOut(duration: 0.25)) {
                 ambience = true; stitch = 1; iconShown = true; wordShown = true; tagShown = true
             }
             await wait(Timing.reducedFinish)
+            finish()
+            return
+        }
+        // 最初のコマが描かれ、メインスレッドが空いてから縫い始める(起動処理で詰まったまま始めると縫う所が飛ぶ)
+        if await SplashStartWaiter.wait() == .fallback {
+            ambience = true; stitch = 1; iconShown = true; wordShown = true; tagShown = true
+            await wait(Timing.stillFinish)
             finish()
             return
         }
@@ -208,8 +220,10 @@ struct SplashOverlay: ViewModifier {
             if mode != .hidden {
                 SplashView(mode: mode) {
                     withAnimation(.easeInOut(duration: mode == .reduced ? 0.2 : 0.3)) { mode = .hidden }
+                    SplashPresence.shared.end() // 待たせていたシート・リンク・吹き出しを出す
                 }
                 .transition(.opacity)
+                .onDisappear { SplashPresence.shared.end() }
                 .zIndex(1)
             }
         }

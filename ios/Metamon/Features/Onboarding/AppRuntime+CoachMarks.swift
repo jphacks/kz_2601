@@ -5,7 +5,8 @@ import Foundation
 extension AppRuntime {
     /// 吹き出しを出してよい時か。先の案内・お知らせ・シート・生成中の間は出さない。
     var canShowCoachMarks: Bool {
-        guard hasSeenTutorial, hasMadeFirstApp, activeNotice == nil,
+        guard !SplashPresence.shared.isShowing, // スプラッシュの下で「出した」と記録・読み上げしない
+              hasSeenTutorial, hasMadeFirstApp, activeNotice == nil,
               !showTutorial, !showAIConsent, !showVoiceSheet,
               morphJob == nil, buildStage == nil else { return false }
         #if !APP_STORE_REVIEW

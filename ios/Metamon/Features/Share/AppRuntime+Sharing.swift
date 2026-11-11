@@ -172,11 +172,13 @@ struct ShareLinkReceiver: ViewModifier {
 struct SharingHooks: ViewModifier {
     @Environment(AppRuntime.self) private var rt
     @State private var ui = SharingUI.shared
+    private var splash: SplashPresence { .shared }
 
     func body(content: Content) -> some View {
         content
             // リンクの受信は `ShareLinkReceiver`(サインイン画面の時も届く)。ここでは準備ができたら開く(#278)
-            .task(id: "\(ui.isReady)|\(ui.pendingLink?.absoluteString ?? "")") {
+            .task(id: "\(ui.isReady)|\(splash.isShowing)|\(ui.pendingLink?.absoluteString ?? "")") {
+                guard !splash.isShowing else { return } // スプラッシュが閉じてから開く(シートを重ねない)
                 if let url = ui.takeLink() { await rt.openShareURL(url) }
             }
             .sheet(isPresented: $ui.showDiscover) { DiscoverSheet() }
