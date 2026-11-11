@@ -207,5 +207,6 @@
     <string name="voice_title_returning">Welcome back.\nWhat shall we make today?</string>
     <string name="voice_tomorrow">tomorrow</string>
     <string name="voice_unavailable_hint">Voice input isn\'t available on this device. Type below to start right away.</string>
+    <string name="voice_unchanged_reason">Couldn\'t make the change. Tell me a bit more about what to change and how.</string>
     <string name="voice_upgrade_pro">Go Pro</string>
 </resources>

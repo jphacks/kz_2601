@@ -71,6 +71,8 @@ class VoiceViewModel(
     private val chatHistory: ChatHistoryStore = ChatHistoryStore(null),
     /** 過去の変更の要約を AI に渡す時の見出し(UI の言語) */
     private val historyHeader: String = "(これまでに反映した変更)",
+    /** 生成しても何も変わらず、サーバーが理由を返さなかった時の文(画面は strings から渡す・#1177) */
+    private val unchangedFallback: String = "変更できませんでした。何をどう変えるか、もう少し詳しく教えてください。",
     /** 履歴の読み書き。順番が入れ替わらないよう 1 本ずつ */
     private val io: CoroutineContext = Dispatchers.IO.limitedParallelism(1),
     /** 挨拶・AI の質問・完成の要約の読み上げ(#43・設定で ON の時だけ読む) */
@@ -390,6 +392,7 @@ class VoiceViewModel(
                     return@launch
                 }
                 val hadChat = _state.value.isChatting
+                if (result.unchanged) return@launch presentUnchanged(result.summary, reopenChat = hadChat && !before.dsl.isVoiceOnly)
                 val history = appliedHistory(_state.value, result.document.version, result.summary)
                 chatEpoch++
                 if (!before.dsl.isVoiceOnly && !result.unchanged) remember(before)
@@ -432,6 +435,29 @@ class VoiceViewModel(
                 showError(VoiceError.Request(kind, VoiceError.Origin.GENERATE), retry = retryAction)
             }
         }
+    }
+
+    /**
+     * 生成しても何も変わらなかった(#211・#1177・iOS の `presentUnchanged`)。保存されていないので版・元に戻す・反映の区切りは触らない。
+     * 変更の相談から来たなら会話を残したまま理由の吹き出しを足してシートを開き直し(続けて話せる)、それ以外は要約のバナーに出す。
+     */
+    private fun presentUnchanged(summary: String?, reopenChat: Boolean) {
+        val reason = summary?.trim()?.ifEmpty { null } ?: unchangedFallback
+        log("generate unchanged: reopenChat=$reopenChat")
+        _state.update {
+            val base = it.copy(phase = VoicePhase.IDLE, progress = null, transcript = "")
+            if (reopenChat) {
+                base.copy(chat = it.chat + ChatBubble(fromUser = false, text = reason, kind = ChatTurn.Kind.ANSWER), chatTurn = null, voiceOpen = true)
+            } else {
+                base.copy(
+                    phase = VoicePhase.DONE, summary = reason, summaryAction = null, undone = null,
+                    chat = emptyList(), chatTurn = null, chatPending = false,
+                )
+            }
+        }
+        if (reopenChat) persistLive()
+        speech.speak(reason)
+        refreshUsage(force = true)
     }
 
     // MARK: - 止めた作成(#1261・iOS の AppRuntime+HeldBuild)

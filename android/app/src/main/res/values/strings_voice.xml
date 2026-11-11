@@ -207,5 +207,6 @@
     <string name="voice_title_returning">おかえりなさい。\n今日は何を作りますか?</string>
     <string name="voice_tomorrow">明日</string>
     <string name="voice_unavailable_hint">この端末では声の入力を使えません。下の欄に文字で入力すれば、今すぐ作れます。</string>
+    <string name="voice_unchanged_reason">変更できませんでした。何をどう変えるか、もう少し詳しく教えてください。</string>
     <string name="voice_upgrade_pro">Pro にする</string>
 </resources>
