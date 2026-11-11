@@ -58,6 +58,7 @@ var compiled = func() *jsonschema.Schema {
 // with the full list at once.
 type ValidationError struct {
 	Problems []string
+	codes    []string // per problem; "" or missing = ProblemCode (see Codes)
 }
 
 func (e *ValidationError) Error() string {
@@ -68,7 +69,7 @@ func (e *ValidationError) Error() string {
 // the typed App. This is the single entry point appconfig and ai must use.
 func Parse(raw []byte) (*App, error) {
 	if len(raw) > MaxDSLBytes {
-		return nil, &ValidationError{Problems: []string{fmt.Sprintf("document exceeds %d bytes", MaxDSLBytes)}}
+		return nil, problem(CodeTooLarge, fmt.Sprintf("document exceeds %d bytes", MaxDSLBytes))
 	}
 	if err := ValidateSchema(raw); err != nil {
 		return nil, err
@@ -77,7 +78,7 @@ func Parse(raw []byte) (*App, error) {
 	dec := json.NewDecoder(bytes.NewReader(raw))
 	dec.DisallowUnknownFields()
 	if err := dec.Decode(&app); err != nil {
-		return nil, &ValidationError{Problems: []string{"decode: " + err.Error()}}
+		return nil, problem(CodeDecode, "decode: "+err.Error())
 	}
 	if err := app.Validate(); err != nil {
 		return nil, err
@@ -89,25 +90,26 @@ func Parse(raw []byte) (*App, error) {
 func ValidateSchema(raw []byte) error {
 	doc, err := jsonschema.UnmarshalJSON(bytes.NewReader(raw))
 	if err != nil {
-		return &ValidationError{Problems: []string{"invalid JSON: " + err.Error()}}
+		return problem(CodeInvalidJSON, "invalid JSON: "+err.Error())
 	}
 	if err := compiled.Validate(doc); err != nil {
 		var ve *jsonschema.ValidationError
 		if errors.As(err, &ve) {
-			return &ValidationError{Problems: flatten(ve)}
+			return flatten(ve)
 		}
 		return &ValidationError{Problems: []string{err.Error()}}
 	}
 	return nil
 }
 
-func flatten(ve *jsonschema.ValidationError) []string {
-	var out []string
+func flatten(ve *jsonschema.ValidationError) *ValidationError {
+	var out, codes []string
 	var walk func(v *jsonschema.ValidationError)
 	walk = func(v *jsonschema.ValidationError) {
 		if len(v.Causes) == 0 {
 			loc := "/" + strings.Join(v.InstanceLocation, "/")
 			out = append(out, loc+": "+v.ErrorKind.LocalizedString(errPrinter))
+			codes = append(codes, schemaCode(v))
 			return
 		}
 		causes := v.Causes
@@ -121,8 +123,9 @@ func flatten(ve *jsonschema.ValidationError) []string {
 	walk(ve)
 	if len(out) > 20 {
 		out = append(out[:20], fmt.Sprintf("...and %d more", len(out)-20))
+		codes = append(codes[:20], CodeMore)
 	}
-	return out
+	return &ValidationError{Problems: out, codes: codes}
 }
 
 // matchingTypeCauses drops anyOf branches that failed on the node's own
