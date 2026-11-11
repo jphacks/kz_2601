@@ -3424,6 +3424,22 @@
         }
       }
     },
+    "クリックすると入力欄に入ります(まだ送りません)。" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Click one to put it in the input field (it won't be sent yet)."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "クリックすると入力欄に入ります(まだ送りません)。"
+          }
+        }
+      }
+    },
     "グラフ・合計" : {
       "localizations" : {
         "en" : {
@@ -3882,6 +3898,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "フィードバック"
+          }
+        }
+      }
+    },
+    "フィードバックのウインドウを開きます" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Opens the feedback window"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "フィードバックのウインドウを開きます"
           }
         }
       }
@@ -5895,6 +5927,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "困ったこと・思ったのと違ったこと・欲しい機能など"
+          }
+        }
+      }
+    },
+    "困ったこと・欲しい機能を、ここからそのまま送れます。" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Send us problems or features you want, right from here."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "困ったこと・欲しい機能を、ここからそのまま送れます。"
           }
         }
       }
