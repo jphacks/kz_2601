@@ -18,6 +18,23 @@
         }
       }
     },
+    "%@ とのつなぎを切りますか？" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Disconnect %@?"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ とのつなぎを切りますか？"
+          }
+        }
+      }
+    },
     "%@ を入力してください" : {
       "localizations" : {
         "en" : {
@@ -2233,6 +2250,23 @@
         }
       }
     },
+    "いまは使えません" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Not available right now"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "いまは使えません"
+          }
+        }
+      }
+    },
     "いまは従量制の回線です。通信量が多いので、ほかの回線につないでからがおすすめです。" : {
       "localizations" : {
         "en" : {
@@ -2710,6 +2744,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "この Mac では、モデルで文字にするのに時間がかかることがあります。"
+          }
+        }
+      }
+    },
+    "この Mac ではヘルスケアに書き込みません" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "This Mac doesn't write to Apple Health"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "この Mac ではヘルスケアに書き込みません"
           }
         }
       }
@@ -3926,6 +3977,57 @@
         }
       }
     },
+    "つないだサービス" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Connected services"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "つないだサービス"
+          }
+        }
+      }
+    },
+    "つないでいます" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Connected"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "つないでいます"
+          }
+        }
+      }
+    },
+    "つないでいません" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Not connected"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "つないでいません"
+          }
+        }
+      }
+    },
     "つながりました。連絡先が見られます" : {
       "localizations" : {
         "en" : {
@@ -3954,6 +4056,74 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "つながりを解除しました"
+          }
+        }
+      }
+    },
+    "つなぎ直してください" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Needs reconnecting"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "つなぎ直してください"
+          }
+        }
+      }
+    },
+    "つなぎ直す" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Reconnect"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "つなぎ直す"
+          }
+        }
+      }
+    },
+    "つなぐ" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Connect"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "つなぐ"
+          }
+        }
+      }
+    },
+    "つなげませんでした。もう一度試してください。" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Couldn't connect. Please try again."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "つなげませんでした。もう一度試してください。"
           }
         }
       }
@@ -5572,6 +5742,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "カレンダーへの追加が許可されていません。システム設定の「プライバシーとセキュリティ」→「カレンダー」で許可してください。"
+          }
+        }
+      }
+    },
+    "カレンダーやタスクなどの外のサービスとつなぐと、アプリから使えます。Pro で使えます。" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Connect outside services like calendars and tasks to use them from your apps. Requires Pro."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "カレンダーやタスクなどの外のサービスとつなぐと、アプリから使えます。Pro で使えます。"
           }
         }
       }
@@ -7336,6 +7523,23 @@
         }
       }
     },
+    "一覧を読み込めませんでした。" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Couldn't load the list."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "一覧を読み込めませんでした。"
+          }
+        }
+      }
+    },
     "上の内容に同意して送る" : {
       "localizations" : {
         "en" : {
@@ -8870,6 +9074,57 @@
         }
       }
     },
+    "切る" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Disconnect"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "切る"
+          }
+        }
+      }
+    },
+    "切ると、このサービスを使うアプリの部品が動かなくなります。もう一度つなげば戻ります。" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Parts of your apps that use this service will stop working. Connect again anytime to restore them."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "切ると、このサービスを使うアプリの部品が動かなくなります。もう一度つなげば戻ります。"
+          }
+        }
+      }
+    },
+    "切れませんでした。もう一度試してください。" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Couldn't disconnect. Please try again."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "切れませんでした。もう一度試してください。"
+          }
+        }
+      }
+    },
     "別の端末で更新されていたため、最新の状態に合わせました。もう一度お話しください" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -10099,6 +10354,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "外せませんでした。元に戻しました"
+          }
+        }
+      }
+    },
+    "外のサービスを呼ぶたびにサーバーの費用がかかるため、Pro の機能です。" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Each call to an outside service costs server resources, so this is a Pro feature."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "外のサービスを呼ぶたびにサーバーの費用がかかるため、Pro の機能です。"
           }
         }
       }
