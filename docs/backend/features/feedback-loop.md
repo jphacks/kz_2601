@@ -22,6 +22,8 @@ flowchart LR
   F[(feedback/{id}<br/>アプリ内 #319)] --> I
   R[App Store の<br/>レビュー] --> I
   C[クラッシュの急増<br/>手で記録] --> I
+  TF[TestFlight の<br/>フィードバック] --> I
+  GF[生成の失敗の急増<br/>ログから] --> I
   I[ingest<br/>伏せ字・同意の版] --> X[(loop_inbox)]
   X --> T[triage<br/>LLM・道具なし・JSON だけ]
   T --> X
@@ -76,6 +78,7 @@ flowchart LR
 | コマンド | 段 | すること |
 |---|---|---|
 | `ingest [-source in_app\|app_store_review\|testflight\|gen_failure]` | intake | 新しいフィードバックを伏せ字して `loop_inbox` へ。ストアのレビューは `LOOP_SOURCE_APPSTORE=on`、TestFlight は `LOOP_SOURCE_TESTFLIGHT=on`、生成の失敗の急増は `LOOP_SOURCE_GENFAIL=on` の時だけ |
+| `inbox [-source S] [-status S] [-limit N]` | (止めない・読むだけ) | すべての出どころ(アプリ内・ストアのレビュー・クラッシュ・TestFlight・生成の失敗)を 1 つの一覧で見る(#368)。ID・出どころ・状態・`held` の理由・アプリの版・OS・届いた日時だけ出し、**本文は出さない**。取り込んだ古い順。`-source` は `in_app` / `app_store_review` / `crash` / `testflight` / `gen_failure`、`-status` は `new` / `held` / `triaged` / `spam` / `drafted`、`-limit` は既定 100(最大 2000) |
 | `ingest-crash -issue ID -type T -count N -version V` | intake | Crashlytics の急増を 1 件として記録(人が Crashlytics の画面を見て打つ) |
 | `triage [-max 200] [-batch 20]` | triage | 新しい項目を分類(`bug` / `feature` / `question` / `praise` / `spam`)・束ね・優先度(P1〜P3)付け。同じ文は 1 回だけ送る |
 | `triage-score -labels FILE` | — | 人が付けた正解(1 行 `itemId,category`)との一致率(#376 の完了の条件: 8 割) |
@@ -113,7 +116,7 @@ flowchart LR
 | `LOOP_ASC_ISSUER_ID` / `LOOP_ASC_KEY_ID` / `LOOP_ASC_PRIVATE_KEY` / `LOOP_ASC_APP_ID` | — | App Store Connect API のキー(役割は Customer Support で足りる)。鍵は `.p8` の中身そのもの |
 | `LOOP_ISSUE_REPO` | 空 = dry run | Issue を作るリポジトリ(`owner/name`) |
 | `LOOP_GITHUB_TOKEN` | — | Issue の作成・コメント・読み取りだけの権限(GitHub App のインストールのトークン、または fine-grained の PAT の `issues: write`)。マージ・ラベル・コードの権限は持たせない |
-| `LOOP_ISSUE_LABELS` | 空 | 作る Issue に付けるラベル(カンマ区切り)。`agent:ready` は入れない(人が付ける) |
+| `LOOP_ISSUE_LABELS` | 空 | 作る Issue に付けるラベル(カンマ区切り)。`agent:` で始まるラベル(`agent:ready` など)が入っていたら `drafts show` / `edit` / `approve` / `reject` / `publish` は起動を拒む(人が付ける・ループは付けない) |
 | `LOOP_NOTIFY_PUSH` | 空 | `on` で「直りました」を push でも送る(本人の同意 `users/{uid}/notifyConsent/_feedback_fixed` と週 1 回の上限つき) |
 | `APNS_AUTH_KEY` / `APNS_KEY_ID` / `APNS_TEAM_ID` / `APNS_TOPIC` / `LOOP_APNS_ENVIRONMENT` | — | push の時だけ。runner と同じ APNs のキー |
 
@@ -187,6 +190,7 @@ cd backend
 export GOOGLE_CLOUD_PROJECT=jphacks-kz2601 LOOP_INTAKE=on LOOP_TRIAGE=on LOOP_DRAFT=on
 go run ./cmd/feedback-loop switch show
 go run ./cmd/feedback-loop ingest
+go run ./cmd/feedback-loop inbox                     # 届いた分を出どころを問わず 1 つの一覧で(本文は出ない)
 go run ./cmd/feedback-loop triage
 go run ./cmd/feedback-loop draft
 go run ./cmd/feedback-loop drafts list

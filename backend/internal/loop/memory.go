@@ -73,7 +73,7 @@ func (m *Memory) ListItems(_ context.Context, q ItemQuery) ([]Item, error) {
 	defer m.mu.Unlock()
 	out := []Item{}
 	for _, it := range m.items {
-		if q.Status == "" || it.Status == q.Status {
+		if (q.Status == "" || it.Status == q.Status) && (q.Source == "" || it.Source == q.Source) {
 			out = append(out, cloneItem(it))
 		}
 	}

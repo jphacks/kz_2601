@@ -83,12 +83,16 @@ func (f *Firestore) UpdateItem(ctx context.Context, it Item) error {
 }
 
 // ListItems implements Store. Sorted in memory (status equality + order on
-// another field would need a composite index); the status filter keeps the
-// page small.
+// another field would need a composite index); the status and source
+// filters keep the page small.
 func (f *Firestore) ListItems(ctx context.Context, q ItemQuery) ([]Item, error) {
 	query := f.c.Collection(colInbox).Query
 	if q.Status != "" {
 		query = query.Where("status", "==", q.Status)
+	}
+	if q.Source != "" {
+		// equality filters only: served by single-field indexes, no composite index
+		query = query.Where("source", "==", string(q.Source))
 	}
 	out := []Item{}
 	err := each(ctx, query.Limit(2000), func(s *firestore.DocumentSnapshot) error {
