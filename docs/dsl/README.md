@@ -296,6 +296,7 @@ API 封筒(appconfig): DSLEnvelope { appId, version, dsl: AppDSL, source?, creat
 | Container 内(#81) | 子は既定で積む。**card / section / vstack だけ**は子にも `area` を付けられ、Container の中身の矩形を**ローカルグリッド**(A1 = Container の左上・横 6 列 = 中身の幅 ÷ 6・行は Container 自身の `area` の行数まで)として配置する。ルール: 子の**全部に付けるか全部付けないか**(一部だけはエラー)/ 子同士の重なり禁止 / 行は Container の行数以内(Container が `area` 無しで積まれている時は 48 行まで)/ **入れ子は 1 段まで**(hstack / grid / carousel / disclosure の子と孫には付けない)。用途は「カードの中で 2 列に並べる」(stat 2 枚・ボタン 2 つ)だけ。iOS: 通常画面では中身の高さ ÷ 子が使う最終行 を 1 行とし `GridCell` を再利用して絶対配置。フォーム画面(`FormFlowLayout`)と `area` 無しで積まれた Container の中では横位置と幅だけ効かせ、高さは中身なり(#139 の方針) |
 | タブとの関係 | グリッドは**タブ内の各 Screen の中身**の配置。直交する概念で、タブの有無に関係なく同じ |
 | 上限(極端な値) | `area` の行は 48 まで・入れ子は 2 段(Screen > Container > Leaf)まで。どちらも backend が断る。iOS も二重に守り、48 行を超える行は 48 に丸め、8 段より深い `children` は読まず描かない(空の枠) |
+| 手で動かす編集(#1442) | iOS の修正チャット上部の「編集」で入り、「完了」で保存・「キャンセル」で捨てる。Screen 直下で `area` を持つ部品の枠と `area` を出し、ドラッグで移動・角のつまみで大きさ(どちらもセルに吸着)・✕(確認つき)で削除。重なる所は赤く出して置かせない(上の重なり禁止と同じ)。保存は `PATCH /dsl`(JSON Patch・`source.kind=manual`)で新しい版になり「元に戻す」で戻せる。フォーム画面・`area` 無しの部品・Container の中は対象外(v1) |
 | iOS 実装 | `GridScreenLayout`: `GeometryReader` で `cellW = (幅-24)/6`、`cellH = (高さ-24)/12` を算出し、`area` 子を `.frame(width: colSpan*cellW-8, height: rowSpan*cellH-8).offset(...)` で絶対配置。`voiceInput` 画面(初期状態)は非スクロール |
 
 例(家計簿 home): 合計カード `A1:F2`・最近の支出(list・セル内スクロール) `A3:F10`・追加ボタン `D11:F12`。散歩メモ home: 今日 `A1:C2` / ぜんぶ `D1:F2` の 2 枚並び + 一覧 `A3:F12`。

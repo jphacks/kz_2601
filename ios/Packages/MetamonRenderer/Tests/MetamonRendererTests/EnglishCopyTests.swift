@@ -29,6 +29,12 @@ final class EnglishCopyTests: XCTestCase {
         XCTAssertEqual(OnDeviceAIError.failed("x", reason: .invalidResponse).errorDescription, "AI processing failed (x)")
     }
 
+    /// すれ違いの部品: OS をまたいでつながらないことを出す(Android の passby_ios_not_supported と対)
+    func testPassbyAndroidNoteIsEnglish() {
+        XCTAssertEqual(L("Android の端末とはつながりません(iPhone どうしで送り合えます)"),
+                       "Can't connect to Android devices (works between iPhones)")
+    }
+
     func testVideoPickOnlyCopyIsEnglish() {
         XCTAssertEqual(L("動画を選ぶ"), "Choose a video")
         XCTAssertEqual(L("選び直す"), "Choose again")

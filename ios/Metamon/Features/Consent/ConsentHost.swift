@@ -23,7 +23,9 @@ struct ConsentHost: ViewModifier {
                 // 初回起動: まだ説明を出していなければ 1 回だけ出す(「あとで」の人には、生成しようとした時にまた出る)。
                 // 説明の版が上がった時(古い版に同意した人)も、その版で 1 回だけ出し直す(ポリシー 6 章)
                 guard rt.aiConsent?.shouldPromptOnLaunch == true else { return }
+                await SplashPresence.shared.waitUntilHidden() // スプラッシュの上にシートを重ねない
                 try? await Task.sleep(for: .milliseconds(500))
+                guard !Task.isCancelled else { return }
                 rt.showAIConsent = true
             }
     }

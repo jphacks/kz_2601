@@ -25,6 +25,8 @@ struct ShareAppSheet: View {
     @State private var members: SharedMembersModel?
     /// 表示できない言葉があった項目(#321 text_not_allowed の details.field)
     @State private var flaggedField: String?
+    /// 公開の前の注意(Android #1297 と同じ)
+    @State private var confirmPublish = false
 
     var body: some View {
         ScrollView {
@@ -44,6 +46,9 @@ struct ShareAppSheet: View {
         .presentationDetents([.large])
         .presentationDragIndicator(.visible)
         .task { await load() }
+        .sheet(isPresented: $confirmPublish) {
+            PublishConfirmSheet(appName: app.name) { Task { await publish() } }
+        }
         .task {
             guard let client = services.sharing as? any MembershipClient else { return }
             let model = SharedMembersModel(appId: app.id, client: client)
@@ -152,7 +157,7 @@ struct ShareAppSheet: View {
                     .submitLabel(.done)
                     .metamonInputField(flagged: flaggedField == "tags")
                     .onChange(of: tags) { if flaggedField == "tags" { flaggedField = nil } }
-                Button { Task { await publish() } } label: {
+                Button { confirmPublish = true } label: {
                     Text("公開する")
                         .font(.subheadline.weight(.semibold))
                         .frame(maxWidth: .infinity)

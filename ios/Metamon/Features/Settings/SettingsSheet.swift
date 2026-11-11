@@ -39,6 +39,9 @@ struct SettingsSheet: View {
                 ProSettingsSection() // 課金(#77)
                 CoinSettingsSection() // #630 コイン(サーバーが有効にした時だけ)
                 #endif
+                #if !APP_STORE_REVIEW // 審査用の版は OAuth の provider を外す(決定 6)
+                if ConnectedServicesPolicy.isAvailable { ConnectedServicesSection() } // #1493 つないだサービス
+                #endif
                 RemainingTodaySettingsSection() // #630 今日の残り(審査用の版も出す)
                 UsageSettingsSection() // #317 使っている量(作ったアプリの数・今のアプリの記録と写真)
                 languageSection
@@ -186,7 +189,7 @@ struct SettingsSheet: View {
             do {
                 if try await session.deleteAccount(account: services.account, runtime: rt) { dismiss() }
             } catch {
-                deleteError = error.localizedDescription
+                deleteError = ErrorCopy.accountFailureBody(error, context: "account delete")
             }
         }
     }
@@ -202,7 +205,7 @@ struct SettingsSheet: View {
                 case .unsent(let n): signOutUnsent = n
                 }
             } catch {
-                signOutError = error.localizedDescription
+                signOutError = ErrorCopy.accountFailureBody(error, context: "sign out")
             }
         }
     }
@@ -333,6 +336,14 @@ struct SettingsSheet: View {
                 Label("使い方を見る", systemImage: "questionmark.circle")
             }
             .accessibilityIdentifier("settings.tutorial")
+            Button {
+                dismiss()
+                rt.replayCoachMarks() // #1441
+            } label: {
+                Label("操作のヒントをもう一度見る", systemImage: "hand.tap")
+            }
+            .accessibilityHint("長押しやドラッグなど、見た目から分からない操作の案内をもう一度出します")
+            .accessibilityIdentifier("settings.coachMarks")
             NavigationLink {
                 // #415: 選んだ例は音声画面(か対話)の入力欄に入る。送らない
                 PromptTipsView { text in

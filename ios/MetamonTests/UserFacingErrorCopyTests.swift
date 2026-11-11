@@ -92,6 +92,19 @@ final class UserFacingErrorCopyTests: XCTestCase {
         XCTAssertEqual(other, "名前を変えられませんでした。少し待ってから、もう一度お試しください")
     }
 
+    /// 設定のアカウント削除・ログアウトの失敗: Firebase の英語の文を出さない
+    func testAccountFailureHidesFirebaseMessage() {
+        let firebase = NSError(domain: "FIRAuthErrorDomain", code: 17020,
+                               userInfo: [NSLocalizedDescriptionKey: "Network error (such as timeout, interrupted connection or unreachable host) has occurred."])
+        let body = ErrorCopy.accountFailureBody(firebase, context: "test")
+        XCTAssertEqual(body, "少し待ってから、もう一度お試しください")
+        assertUserFacing(body, ["Network", "timeout"])
+        XCTAssertEqual(ErrorCopy.accountFailureBody(URLError(.notConnectedToInternet), context: "test"), "接続を確認して、もう一度お試しください")
+        XCTAssertEqual(ErrorCopy.accountFailureBody(AuthError.requiresRecentLogin, context: "test"), "もう一度サインインしてから削除してください")
+        LanguagePreference.shared.setting = .en
+        XCTAssertEqual(ErrorCopy.accountFailureBody(AuthError.requiresRecentLogin, context: "test"), "Sign in again, then delete")
+    }
+
     func testActionErrorHidesServerAndOSMessage() throws {
         let rt = AppRuntime(document: try DSLExamples.document("warikan", version: 1), services: BuildConfig.make(environment: .mock))
         let os = NSError(domain: NSURLErrorDomain, code: -1011, userInfo: [NSLocalizedDescriptionKey: "bad server response"])

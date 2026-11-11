@@ -6,6 +6,7 @@ import MetamonRenderer
 /// - ドラッグで自由移動 → 離すと最寄りの左右の辺に吸着。端から `fabSize * 0.3` 以内で離す(or 端へ弾く)と画面外へ隠れ、取っ手だけ残る。
 ///   取っ手のタップ / 内側へ 20pt 引く で戻る。取っ手の長押しでも変身一覧。
 ///   初めて隠した時だけ、取っ手の横に「取っ手を押すと戻ります」を数秒出す(UX 点検 L6・`FabHideHint`)。
+/// - 長押し・ドラッグを知らない人には、FAB の上に吹き出しを 1 回ずつ出す(#1441・`CoachMarkBubble`)。
 /// - 位置(辺・下端距離・隠れ)は `@AppStorage` でアプリ共通に保存。初期値は左下 + 自動退避(従来どおり)。
 /// - 吸着した側の最下段 2 列に DSL の部品がある画面では、その上端まで退避する(#83・左 `GridBottomObstructionKey` / 右 `GridBottomTrailingObstructionKey`)。
 ///
@@ -21,6 +22,11 @@ struct VoiceFab: View {
     let isBusy: Bool
     let onTap: () -> Void
     let onLongPress: () -> Void
+    /// 気づきにくい操作の吹き出し(#1441)。出すものが無ければ nil
+    var coachMark: CoachMark? = nil
+    var onCoachMark: (CoachMark, CoachMarkEvent) -> Void = { _, _ in }
+    /// 実際に長押し・ドラッグした(吹き出しを次から出さない)
+    var onGesturePerformed: (CoachMark) -> Void = { _ in }
 
     @AppStorage("fab.side") private var sideRaw = Theme.Layout.fabDefaultSide.rawValue
     /// 領域の下端から FAB の下端まで。`FabDock.autoBottom`(-1)= 自動(タブバー・部品退避のみ)
@@ -61,6 +67,10 @@ struct VoiceFab: View {
                         x: hidden ? (side == .leading ? -size : area.width + size) : rest.x + drag.width,
                         y: rest.y + drag.height
                     )
+                if let coachMark, !hidden, !isDragging {
+                    coachBubble(coachMark, rest: rest, area: area)
+                        .transition(.opacity.combined(with: .scale(scale: 0.92, anchor: side == .leading ? .bottomLeading : .bottomTrailing)))
+                }
                 if hidden {
                     handle
                         .position(
@@ -79,6 +89,7 @@ struct VoiceFab: View {
             }
             .animation(.easeOut(duration: 0.25), value: bottom)
             .animation(.easeInOut(duration: 0.25), value: showsHideHint)
+            .animation(.easeInOut(duration: 0.25), value: coachMark)
             // 止まっている位置の矩形(global)。Renderer が背の高い list の末尾に FAB ぶんの余白を足すのに使う(#157)。
             // ドラッグ中の位置は流さない(指に合わせて list の余白が揺れるため)。隠れている時は nil = 余白不要
             .preference(key: VoiceFabFrameKey.self, value: hidden ? nil : CGRect(
@@ -129,6 +140,7 @@ struct VoiceFab: View {
                 .onEnded { _ in
                     guard !isDragging else { return }
                     longPressFired = true
+                    onGesturePerformed(.fabLongPress)
                     onLongPress()
                 }
         )
@@ -154,6 +166,7 @@ struct VoiceFab: View {
                         minBottom: Theme.Layout.fabBottomInset(hasTabs: hasTabs), maxBottom: maxBottom
                     )
                     let wasHidden = hidden
+                    onGesturePerformed(.fabDrag)
                     withAnimation(snapAnimation) {
                         isDragging = false
                         sideRaw = snap.side.rawValue
@@ -169,11 +182,16 @@ struct VoiceFab: View {
         .accessibilityLabel("話しかけて変える")
         .accessibilityHint(L10n.key("長押しで変身一覧", review: "長押しで記録帳の一覧"))
         .accessibilityIdentifier("voice.fab")
-        .accessibilityAction(named: L10n.key("変身一覧", review: "記録帳の一覧")) { onLongPress() }
+        .accessibilityAction(named: L10n.key("変身一覧", review: "記録帳の一覧")) {
+            onGesturePerformed(.fabLongPress)
+            onLongPress()
+        }
         .accessibilityAction(named: "反対側へ移動") {
+            onGesturePerformed(.fabDrag)
             withAnimation(snapAnimation) { sideRaw = (side == .leading ? FabSide.trailing : .leading).rawValue }
         }
         .accessibilityAction(named: "端に隠す") {
+            onGesturePerformed(.fabDrag)
             let wasHidden = hidden
             withAnimation(snapAnimation) { hidden = true }
             noteHidden(was: wasHidden)
@@ -204,7 +222,10 @@ struct VoiceFab: View {
                    alignment: side == .leading ? .leading : .trailing)
             .contentShape(Rectangle())
             .onTapGesture { reveal() }
-            .onLongPressGesture(minimumDuration: Theme.Layout.fabLongPressSeconds, maximumDistance: FabDock.dragThreshold) { onLongPress() }
+            .onLongPressGesture(minimumDuration: Theme.Layout.fabLongPressSeconds, maximumDistance: FabDock.dragThreshold) {
+                onGesturePerformed(.fabLongPress)
+                onLongPress()
+            }
             .simultaneousGesture(
                 DragGesture(minimumDistance: FabDock.dragThreshold, coordinateSpace: .global)
                     .onChanged { v in
@@ -224,7 +245,10 @@ struct VoiceFab: View {
             .accessibilityIdentifier("voice.fabHandle")
             .accessibilityAddTraits(.isButton)
             .accessibilityAction { reveal() }
-            .accessibilityAction(named: L10n.key("変身一覧", review: "記録帳の一覧")) { onLongPress() }
+            .accessibilityAction(named: L10n.key("変身一覧", review: "記録帳の一覧")) {
+                onGesturePerformed(.fabLongPress)
+                onLongPress()
+            }
     }
 
     private func reveal() {
@@ -233,6 +257,24 @@ struct VoiceFab: View {
             hidden = false
             handlePull = 0
         }
+    }
+
+    // MARK: 吹き出し(#1441)
+
+    /// FAB の真上に出し、矢印の先を FAB の中心に合わせる。
+    private func coachBubble(_ mark: CoachMark, rest: CGPoint, area: CGSize) -> some View {
+        let gap: CGFloat = 8
+        let bottom = max(0, rest.y - size / 2 - gap)
+        let edgeInset = Theme.Spacing.md
+        return CoachMarkBubble(
+            mark: mark,
+            arrowAlignment: side == .leading ? .leading : .trailing,
+            arrowInset: Theme.Layout.fabHorizontalInset + size / 2 - edgeInset,
+            onEvent: { onCoachMark(mark, $0) }
+        )
+        .padding(.horizontal, edgeInset)
+        .frame(width: area.width, height: bottom, alignment: side == .leading ? .bottomLeading : .bottomTrailing)
+        .position(x: area.width / 2, y: bottom / 2)
     }
 
     // MARK: 隠した時の案内(L6)
