@@ -95,10 +95,11 @@ fun DesktopApp(dsl: AppDSL, initialStore: MockStore = MockStore(), startScreen: 
     val io = rememberDesktopIo(dsl, { session.store }, session::replaceStore)
     // 落とした物・Ctrl+V は一番上に見えている画面へ
     val topComponents = { dsl.screen(session.top.screen)?.components.orEmpty() }
-    val topDraft = { session.form(session.top)?.let(::FormDraftStrings) ?: mutableMapOf() }
+    // 書けるフォームが無い(読み取りだけ・フォームの無い画面)なら写真・動画は入れない
+    val topDraft = { session.form(session.top)?.takeIf { !it.isReadOnly }?.let(::FormDraftStrings) }
     // 印刷(#1767): Ctrl+P・見出しの「印刷」で一番上の画面をプレビュー
     var printing by remember { mutableStateOf<PrintDocument?>(null) }
-    val openPrint = { printing = ScreenPrint.document(dsl, session.top.screen, session.store, session.form(session.top)) }
+    val openPrint = { printing = ScreenPrint.document(dsl, session.top.screen, session.store, session.form(session.top), locale = Strings.locale) }
     // キーボードだけで使う(#1765): Ctrl+K パレット・Ctrl+N/S/F・Delete・Esc・F1
     val keyboard = rememberDesktopKeyboard(dsl, session, dispatch, openPrint, onOpenApp)
 
@@ -106,9 +107,10 @@ fun DesktopApp(dsl: AppDSL, initialStore: MockStore = MockStore(), startScreen: 
         .onPreviewKeyEvent { if (DesktopPrint.isPrintKey(it)) true.also { openPrint() } else false }.then(keyboard.modifier)) {
         IoOverlay(io)
         Box(Modifier.fillMaxSize()) {
-            Column(Modifier.fillMaxSize()) {
+            // モーダルの間は下の画面とタブに Tab で入らず、読み上げにも出さない
+            Column(Modifier.fillMaxSize().then(keyboard.inert(nav.sheet != null || nav.fullScreen != null))) {
                 val base = NavigationResolver.dismissModals(nav).top(dsl)
-                Box(Modifier.weight(1f).then(keyboard.inert(nav.sheet != null || nav.fullScreen != null))) { ScreenView(dsl, session, base, io, dispatch, openPrint) }
+                Box(Modifier.weight(1f)) { ScreenView(dsl, session, base, io, dispatch, openPrint) }
                 if (dsl.app.hasTabs) {
                     HorizontalDivider()
                     // 読み上げでは「タブ・選択中」と読む
@@ -181,9 +183,11 @@ private fun ScreenView(dsl: AppDSL, session: DesktopSession, route: Route, io: D
     val perform = { a: Action, recordId: String? -> dispatch(a, ActionContext(route, form, recordId)) }
     val dataEnv = DataEnv(
         data, session.queries(route), perform,
-        { e, id, patch -> session.store.find(e, id)?.let { session.replaceStore(session.store.save(e, id, it.data + patch)) } },
+        { e, id, patch -> session.updateRecord(e, id, patch) },
         { e, id -> dispatch(ScreenShortcuts.withConfirm(Action(type = jp.kz2601.metamon.dsl.ActionType.DELETE_RECORD, entity = e)), ActionContext(route, form, id)) },
         { ListIoBar(it, io) },
+        canEdit = session::canEditRecord,
+        canDelete = session::canDeleteRecord,
     )
     val scope = ScreenScope(route, form, session, perform, io, data, dataEnv)
     Column(Modifier.fillMaxSize()) {
@@ -259,7 +263,8 @@ private fun FormBands(placed: List<Placed>, cellW: Dp, cellH: Dp, s: ScreenScope
         Box(Modifier.fillMaxWidth().padding(top = if (detached) 16.dp else 0.dp)) {
             band.items.forEach { (c, a) ->
                 val m = Modifier.offset(x = cellW * a.col1 + GAP / 2).width(cellW * a.colSpan - GAP)
-                Box(if (c.type in DISPLAY_LEAVES) m.heightIn(min = cellH * 2) else m) { Node(c, s) }
+                // 入力の rating(field あり)は入力と同じ高さ。表示の部品だけ 2 行ぶん取る
+                Box(if (c.type in DISPLAY_LEAVES && !InputLeaves.isInput(c)) m.heightIn(min = cellH * 2) else m) { Node(c, s) }
             }
         }
     }

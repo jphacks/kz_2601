@@ -47,6 +47,13 @@ import jp.kz2601.metamon.dsl.records.JSONValue
 import jp.kz2601.metamon.renderer.form.FormDraft
 import jp.kz2601.metamon.desktop.io.DesktopIo
 import jp.kz2601.metamon.desktop.io.MediaFieldLeaf
+import jp.kz2601.metamon.desktop.io.fileOf
+import jp.kz2601.metamon.desktop.i18n.Strings
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.unit.IntSize
 import java.awt.FileDialog
 import java.awt.Frame
 import java.awt.GraphicsEnvironment
@@ -107,7 +114,15 @@ object InputLeaves {
         MultiFormatReader().decode(BinaryBitmap(HybridBinarizer(RGBLuminanceSource(image.width, image.height, px)))).text
     }.getOrNull()
 
-    const val UNAVAILABLE = "このパソコンでは使えません"
+    /** 入力として描くか。rating は field がある時だけ入力(無ければ表示の部品)。 */
+    fun isInput(c: Component): Boolean = c.type in types && (c.type != ComponentType.RATING || c.field != null)
+
+    /** 値(file URI・Windows のパス・空白入りのパス)から見せるファイル名。読めない値でも投げない。 */
+    fun fileName(value: String): String {
+        fileOf(value)?.name?.takeIf { it.isNotEmpty() }?.let { return it }
+        val decoded = runCatching { java.net.URLDecoder.decode(value.replace("+", "%2B"), Charsets.UTF_8) }.getOrDefault(value)
+        return decoded.trimEnd('/', '\\').substringAfterLast('/').substringAfterLast('\\').ifEmpty { value }
+    }
 }
 
 /** 入力の部品 1 つ。隠す・フォームの外は呼ぶ側([DesktopSession.tapState])で決めてある。 */
@@ -137,7 +152,7 @@ fun InputLeaf(c: Component, form: FormDraft, onMessage: (String) -> Unit) {
                     visualTransformation = if (c.type == ComponentType.SECURE_FIELD) PasswordVisualTransformation() else VisualTransformation.None,
                     modifier = Modifier.fillMaxWidth(),
                 )
-                if (c.type == ComponentType.TRANSCRIBE_FIELD) Note("話して入力は $UNAVAILABLE_SHORT。キーボードで入力してください")
+                if (c.type == ComponentType.TRANSCRIBE_FIELD) Note(Strings["desktop_input_transcribe_unavailable"])
             }
             ComponentType.PICKER -> {
                 Caption(caption)
@@ -185,43 +200,41 @@ fun InputLeaf(c: Component, form: FormDraft, onMessage: (String) -> Unit) {
             ComponentType.COLOR_PICKER -> ColorInput(caption, value?.stringValue, ::set)
             // 写真・動画はファイル選択・ドロップ・Ctrl+V・外へ引き出し(io/DesktopIo の MediaFieldLeaf)
             ComponentType.PHOTO_FIELD, ComponentType.VIDEO_FIELD -> {
-                MediaFieldLeaf(c, caption, FormDraftStrings(form))
-                Note((if (c.type == ComponentType.PHOTO_FIELD) "撮影" else "動画の撮影") + "は $UNAVAILABLE_SHORT")
+                MediaFieldLeaf(c, caption, FormDraftStrings(form), readOnly)
+                Note(Strings[if (c.type == ComponentType.PHOTO_FIELD) "desktop_input_photo_capture_unavailable" else "desktop_input_video_capture_unavailable"])
             }
             ComponentType.AUDIO_RECORDER -> {
                 Caption(caption)
-                Note("録音は $UNAVAILABLE_SHORT。ファイルから選べます")
+                Note(Strings["desktop_input_audio_unavailable"])
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
-                    OutlinedButton(enabled = !readOnly, onClick = { pickFile(caption)?.let { set(JSONValue.Str(it.toURI().toString())) } }) { Text("ファイルを選ぶ") }
-                    value?.stringValue?.let { Text(File(java.net.URI(it).path ?: it).name, style = MaterialTheme.typography.bodySmall) }
-                    if (value != null && !value.isNull) TextButton(enabled = !readOnly, onClick = { set(JSONValue.Null) }) { Text("消す") }
+                    OutlinedButton(enabled = !readOnly, onClick = { pickFile(caption)?.let { set(JSONValue.Str(it.toURI().toString())) } }) { Text(Strings["desktop_io_choose_file"]) }
+                    value?.stringValue?.let { Text(InputLeaves.fileName(it), style = MaterialTheme.typography.bodySmall) }
+                    if (value != null && !value.isNull) TextButton(enabled = !readOnly, onClick = { set(JSONValue.Null) }) { Text(Strings["desktop_input_clear"]) }
                 }
             }
             ComponentType.DRAWING_FIELD -> DrawingInput(caption, value?.stringValue, readOnly, ::set)
             ComponentType.QR_SCANNER -> {
                 Caption(caption)
-                Note("カメラでの読み取りは $UNAVAILABLE_SHORT。画像ファイルかクリップボードの画像から読めます")
+                Note(Strings["desktop_input_qr_unavailable"])
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     OutlinedButton(enabled = !readOnly, onClick = {
                         val img = pickFile(caption)?.let { runCatching { ImageIO.read(it) }.getOrNull() }
                         readCode(img, onMessage)?.let { set(JSONValue.Str(it)) }
-                    }) { Text("画像から読む") }
-                    OutlinedButton(enabled = !readOnly, onClick = { readCode(clipboardImage(), onMessage)?.let { set(JSONValue.Str(it)) } }) { Text("クリップボードから") }
+                    }) { Text(Strings["desktop_input_qr_from_image"]) }
+                    OutlinedButton(enabled = !readOnly, onClick = { readCode(clipboardImage(), onMessage)?.let { set(JSONValue.Str(it)) } }) { Text(Strings["desktop_input_qr_from_clipboard"]) }
                 }
                 value?.stringValue?.let { Text(it, style = MaterialTheme.typography.bodyMedium) }
             }
             ComponentType.LOCATION_PICKER, ComponentType.LOCATION_BUTTON -> {
                 Caption(caption)
-                UnavailableFrame(if (c.type == ComponentType.LOCATION_BUTTON) "現在地の記録は$UNAVAILABLE_SHORT" else "地図で場所を選ぶのは$UNAVAILABLE_SHORT")
+                UnavailableFrame(Strings[if (c.type == ComponentType.LOCATION_BUTTON) "desktop_input_location_button_unavailable" else "desktop_input_location_picker_unavailable"])
                 value?.takeIf { !it.isNull }?.let { Text(it.displayString, style = MaterialTheme.typography.bodySmall) }
             }
-            else -> UnavailableFrame("デスクトップ版ではまだ使えない部品: ${DesktopLeaves.typeName(c)}")
+            else -> UnavailableFrame(Strings.format("desktop_unsupported_component", DesktopLeaves.typeName(c)))
         }
-        if (flagged) Text("$caption を入力してください", color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
+        if (flagged) Text(Strings.format("desktop_input_required", caption), color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
     }
 }
-
-private const val UNAVAILABLE_SHORT = "このパソコンでは使えません"
 
 /** 「このパソコンでは使えません」の枠。 */
 @Composable
@@ -286,7 +299,7 @@ private fun DateInput(caption: String, withTime: Boolean, value: JSONValue?, fla
             modifier = Modifier.weight(1f),
         )
         TextButton(onClick = { shift(-1) }) { Text("‹") }
-        TextButton(onClick = { shift(0) }) { Text("今日") }
+        TextButton(onClick = { shift(0) }) { Text(Strings["desktop_input_today"]) }
         TextButton(onClick = { shift(1) }) { Text("›") }
     }
 }
@@ -345,9 +358,11 @@ private fun parseHex(h: String): Color? = h.removePrefix("#").takeIf { it.length
 private fun DrawingInput(caption: String, saved: String?, readOnly: Boolean, set: (JSONValue) -> Unit) {
     val strokes = remember { mutableStateListOf<List<Offset>>() }
     val current = remember { mutableStateListOf<Offset>() }
+    var size by remember { mutableStateOf(IntSize.Zero) }
     Caption(caption)
     Canvas(
         Modifier.fillMaxWidth().height(200.dp).background(Color.White, RoundedCornerShape(8.dp)).border(1.dp, Color(0x33000000), RoundedCornerShape(8.dp))
+            .onSizeChanged { size = it }
             .pointerInput(readOnly) {
                 if (readOnly) return@pointerInput
                 detectDragGestures(
@@ -363,17 +378,20 @@ private fun DrawingInput(caption: String, saved: String?, readOnly: Boolean, set
     }
     Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
         TextButton(enabled = !readOnly && strokes.isNotEmpty(), onClick = {
-            val file = Drawing.writePng(strokes.toList(), 600, 300)
+            // 線は画面の Canvas の座標(px)なので、同じ大きさの PNG に書く(はみ出して切れない)
+            val file = Drawing.writePng(strokes.toList(), size.width, size.height)
             set(JSONValue.Str(file.toURI().toString()))
-        }) { Text("この絵を使う") }
-        TextButton(enabled = !readOnly, onClick = { strokes.clear(); set(JSONValue.Null) }) { Text("消す") }
-        if (saved != null) Text("保存済み", style = MaterialTheme.typography.bodySmall, color = Color.Gray)
+        }) { Text(Strings["desktop_input_drawing_use"]) }
+        TextButton(enabled = !readOnly, onClick = { strokes.clear(); set(JSONValue.Null) }) { Text(Strings["desktop_input_clear"]) }
+        if (saved != null) Text(Strings["desktop_input_drawing_saved"], style = MaterialTheme.typography.bodySmall, color = Color.Gray)
     }
 }
 
-/** 描いた線 → PNG(一時ファイル)。 */
+/** 描いた線 → PNG(一時ファイル)。[w]・[h] は線を描いた Canvas の大きさ(px)。 */
 object Drawing {
-    fun writePng(strokes: List<List<Offset>>, w: Int, h: Int): File {
+    fun writePng(strokes: List<List<Offset>>, width: Int, height: Int): File {
+        val w = width.coerceAtLeast(1)
+        val h = height.coerceAtLeast(1)
         val img = BufferedImage(w, h, BufferedImage.TYPE_INT_ARGB)
         val g = img.createGraphics()
         g.setRenderingHint(AwtHints.KEY_ANTIALIASING, AwtHints.VALUE_ANTIALIAS_ON)
@@ -391,7 +409,7 @@ object Drawing {
 
 private fun pickFile(title: String): File? {
     if (GraphicsEnvironment.isHeadless()) return null
-    val d = FileDialog(null as Frame?, title.ifEmpty { "ファイルを選ぶ" }, FileDialog.LOAD)
+    val d = FileDialog(null as Frame?, title.ifEmpty { Strings["desktop_io_choose_file"] }, FileDialog.LOAD)
     d.isVisible = true
     val name = d.file ?: return null
     return File(d.directory, name)
@@ -402,11 +420,11 @@ private fun clipboardImage(): BufferedImage? =
 
 private fun readCode(img: BufferedImage?, onMessage: (String) -> Unit): String? {
     if (img == null) {
-        onMessage("画像がありません")
+        onMessage(Strings["desktop_input_no_image"])
         return null
     }
     return InputLeaves.decodeCode(img) ?: run {
-        onMessage("コードを読み取れませんでした")
+        onMessage(Strings["desktop_input_code_unreadable"])
         null
     }
 }

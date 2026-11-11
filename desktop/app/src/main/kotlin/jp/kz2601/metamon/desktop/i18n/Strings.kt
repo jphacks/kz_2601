@@ -14,9 +14,9 @@ enum class Lang(val locale: Locale) {
     companion object {
         /**
          * 言語を決める。`override`(`-Dtailorit.lang`・`TAILORIT_LANG`)が先、無ければ OS の言語。
-         * `ja*` だけ日本語、それ以外は英語(conformance の `device.locale` と同じ規則)。
+         * `ja*` だけ日本語、それ以外は英語(conformance の `device.locale` と同じ規則)。OS の言語は表示の言語(Windows の表示言語)を見る。
          */
-        fun resolve(override: String?, system: Locale = Locale.getDefault()): Lang {
+        fun resolve(override: String?, system: Locale = Locale.getDefault(Locale.Category.DISPLAY)): Lang {
             val tag = override?.trim()?.takeIf { it.isNotEmpty() } ?: system.toLanguageTag()
             return if (tag.lowercase().replace('_', '-').startsWith("ja")) JA else EN
         }

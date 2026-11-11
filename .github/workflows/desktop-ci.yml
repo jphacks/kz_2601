@@ -6,6 +6,8 @@
 #   |-----------------------------------------------------------------|----------------------------|-----------------------------|
 #   | desktop/**(*.md 以外)                                          | :desktop:test :dsl:test    | push・手動の時だけ          |
 #   | android/dsl/**(*.md 以外)・android/gradle/libs.versions.toml   | 同上                       | 同上                        |
+#   | android/{renderer,services}/src/main/**(取り込むソース・文言)  | 同上                       | 同上                        |
+#   | android/app/src/main/res/values*/**(同梱する文言)              | 同上                       | 同上                        |
 #   | docs/dsl/{conformance,examples}/**(適合テストと同梱の例)      | 同上                       | 同上                        |
 #   | .github/workflows/desktop-ci.yml                                | 同上                       | 同上                        |
 #   | 上記以外                                                        | なし(desktop-ci は成功)  | なし                        |
@@ -62,6 +64,15 @@ jobs:
               - '!android/**/*.md'
             versions:
               - 'android/gradle/libs.versions.toml'
+            # desktop のビルドが取り込む android のソース・文言(app/build.gradle.kts・services/build.gradle.kts)
+            renderer:
+              - 'android/renderer/src/main/**'
+              - '!android/**/*.md'
+            services:
+              - 'android/services/src/main/**'
+              - '!android/**/*.md'
+            strings:
+              - 'android/app/src/main/res/values*/**'
             docs:
               - 'docs/dsl/{conformance,examples}/**'
             workflow:
@@ -74,6 +85,9 @@ jobs:
           DESKTOP: ${{ steps.filter.outputs.desktop }}
           DSL: ${{ steps.filter.outputs.dsl }}
           VERSIONS: ${{ steps.filter.outputs.versions }}
+          RENDERER: ${{ steps.filter.outputs.renderer }}
+          SERVICES: ${{ steps.filter.outputs.services }}
+          STRINGS: ${{ steps.filter.outputs.strings }}
           DOCS: ${{ steps.filter.outputs.docs }}
           WORKFLOW: ${{ steps.filter.outputs.workflow }}
         run: |
@@ -82,7 +96,7 @@ jobs:
           if [ "$EVENT" = workflow_dispatch ]; then
             run=true
           else
-            for v in "$DESKTOP" "$DSL" "$VERSIONS" "$DOCS" "$WORKFLOW"; do
+            for v in "$DESKTOP" "$DSL" "$VERSIONS" "$RENDERER" "$SERVICES" "$STRINGS" "$DOCS" "$WORKFLOW"; do
               if [ "$v" = true ]; then run=true; fi
             done
           fi

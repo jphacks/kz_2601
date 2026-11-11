@@ -9,7 +9,9 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.composed
+import androidx.compose.ui.focus.FocusDirection
 import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.focus.focusProperties
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.foundation.focusGroup
@@ -303,15 +305,19 @@ class DesktopKeyboard(
         .focusRequester(root)
         .focusable()
 
-    /** sheet・fullScreen が開いている間は下の画面に Tab で入らない。 */
-    fun inert(blocked: Boolean): Modifier = if (blocked) Modifier.focusProperties { onEnter = { cancelFocusChange() } }.focusGroup() else Modifier
+    /**
+     * sheet・fullScreen が開いている間の下の画面(タブも含む): Tab で入らず、読み上げにも出さない。
+     * 中にフォーカスが残っていたら [focusAfterNavigation] がモーダルへ移す。
+     */
+    fun inert(blocked: Boolean): Modifier =
+        if (blocked) Modifier.focusProperties { onEnter = { cancelFocusChange() } }.focusGroup().clearAndSetSemantics { } else Modifier
 
-    /** sheet・fullScreen の枠(開いたら中の最初の部品へ)。 */
-    val modalModifier: Modifier get() = Modifier.focusRequester(modal)
+    /** sheet・fullScreen の枠。開いたら中の最初の部品へ入る(入れる物が無ければ一番外に戻す)。 */
+    val modalModifier: Modifier get() = Modifier.focusRequester(modal).focusGroup()
 
     fun focusAfterNavigation(modalOpen: Boolean) {
         if (paletteOpen || helpOpen) return
-        if (modalOpen && runCatching { modal.requestFocus() }.isSuccess) return
+        if (modalOpen && runCatching { modal.requestFocus(FocusDirection.Enter) }.getOrDefault(false)) return
         runCatching { root.requestFocus() }
     }
 

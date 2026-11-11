@@ -92,6 +92,27 @@ class StringsTest {
     }
 
     @Test
+    fun desktopKeysAreSortedAndTheSameInBothLanguages() {
+        fun keys(dir: String) = Regex("""<string name="([a-z0-9_]+)"""")
+            .findAll(File("src/main/resources/i18n/desktop/$dir/strings_desktop.xml").readText()).map { it.groupValues[1] }.toList()
+        val ja = keys("values")
+        val en = keys("values-en")
+        assertEquals("名前順", ja.sorted(), ja)
+        assertEquals("日本語と英語で同じキー", ja, en)
+        assertTrue(ja.all { it.startsWith("desktop_") })
+    }
+
+    @Test
+    fun movedStringsKeepTheJapaneseText() {
+        assertEquals("このファイルは取り込めません", table.get(Lang.JA, "desktop_io_unsupported_file"))
+        assertEquals("CSV・TSV", listOf("CSV", "TSV").joinToString(table.get(Lang.JA, "desktop_io_kind_separator")))
+        assertEquals("CSV, TSV", listOf("CSV", "TSV").joinToString(table.get(Lang.EN, "desktop_io_kind_separator")))
+        assertEquals("印刷日 2026/11/12 09:30", table.format(Lang.JA, "desktop_print_date", "2026/11/12 09:30"))
+        assertEquals("80 件", table.format(Lang.JA, "host_export_count", 80))
+        assertEquals("牛乳 を入力してください", table.format(Lang.JA, "desktop_input_required", "牛乳"))
+    }
+
+    @Test
     fun withLangSwitchesAndRestores() {
         val before = Strings.lang
         val inside = Strings.withLang(Lang.EN) { Strings["renderer_back"] }

@@ -4,12 +4,10 @@ import jp.kz2601.metamon.desktop.io.IoLeaves
 import jp.kz2601.metamon.dsl.AppDSL
 import jp.kz2601.metamon.dsl.Component
 import jp.kz2601.metamon.dsl.ComponentType
-import jp.kz2601.metamon.dsl.Entity
 import jp.kz2601.metamon.dsl.decode
 import jp.kz2601.metamon.dsl.records.Record
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
-import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
 
@@ -105,13 +103,3 @@ data class MockStore(val rows: Map<String, List<Row>> = emptyMap(), val nextId: 
         }
     }
 }
-
-/** 新規のフォームの初期値(defaultValue の文字列)。"now" などの解決は後の Issue。 */
-fun Entity.defaultDraft(): Map<String, String> = fields.mapNotNull { f ->
-    val v = (f.defaultValue as? JsonPrimitive)?.content ?: return@mapNotNull null
-    if (v == "now") null else f.id to v
-}.toMap()
-
-/** 必須なのに空の項目の名前。 */
-fun Entity.missingRequired(draft: Map<String, String>): List<String> =
-    fields.filter { it.required == true && draft[it.id].isNullOrBlank() }.map { it.name }

@@ -493,7 +493,7 @@ private fun RandomPickerLeaf(c: Component, data: LeafData, perform: (Action, Str
                         horizontalAlignment = Alignment.CenterHorizontally,
                     ) {
                         Text(
-                            PlayRules.pickTitle(c, data, shown) ?: "(無題)",
+                            PlayRules.pickTitle(c, data, shown) ?: Strings["desktop_untitled"],
                             fontSize = 32.sp,
                             fontWeight = FontWeight.Bold,
                             color = if (isFinal) MaterialTheme.colorScheme.primary else Color.Gray,
@@ -503,8 +503,8 @@ private fun RandomPickerLeaf(c: Component, data: LeafData, perform: (Action, Str
                         if (isFinal) PlayRules.pickSubtitle(c, data, shown)?.let { Text(it, color = Color.Gray, maxLines = 1) }
                     }
                 }
-                candidates.isEmpty() -> Note("候補がありません")
-                else -> Note("ボタンを押すと 1 つ選びます")
+                candidates.isEmpty() -> Note(Strings["desktop_picker_empty"])
+                else -> Note(Strings["desktop_picker_hint"])
             }
         }
         Button(
@@ -523,7 +523,7 @@ private fun RandomPickerLeaf(c: Component, data: LeafData, perform: (Action, Str
             },
             enabled = candidates.isNotEmpty() && spinning == null,
             modifier = Modifier.fillMaxWidth(),
-        ) { Text(c.label?.takeIf { it.isNotEmpty() } ?: "選ぶ", fontWeight = FontWeight.SemiBold) }
+        ) { Text(c.label?.takeIf { it.isNotEmpty() } ?: Strings["desktop_picker_pick"], fontWeight = FontWeight.SemiBold) }
     }
 }
 
@@ -609,7 +609,7 @@ private fun TimerDisplayLeaf(c: Component, route: Route, form: FormDraft?) {
     val isCountdown = c.mode == ComponentMode.COUNTDOWN
     val total = maxOf(c.seconds ?: 0, 0)
     val key = "${route.screen}/${c.id.orEmpty()}"
-    val name = c.label?.takeIf { it.isNotEmpty() } ?: "タイマー"
+    val name = c.label?.takeIf { it.isNotEmpty() } ?: Strings["desktop_timer_name"]
     var run by remember(key) { mutableStateOf(DesktopTimers.get(key)) }
     var elapsed by remember(key) { mutableIntStateOf(run.elapsed(System.currentTimeMillis(), if (isCountdown) total else null)) }
     val shown = if (isCountdown) maxOf(total - elapsed, 0) else elapsed
@@ -668,9 +668,9 @@ private fun TimerDisplayLeaf(c: Component, route: Route, form: FormDraft?) {
             ) {
                 Text(
                     when {
-                        run.isRunning -> "一時停止"
-                        elapsed > 0 && !finished -> "再開"
-                        else -> "開始"
+                        run.isRunning -> Strings["desktop_timer_pause"]
+                        elapsed > 0 && !finished -> Strings["desktop_timer_resume"]
+                        else -> Strings["desktop_timer_start"]
                     },
                 )
             }
@@ -681,7 +681,7 @@ private fun TimerDisplayLeaf(c: Component, route: Route, form: FormDraft?) {
                 },
                 enabled = elapsed > 0 || run.isRunning,
                 modifier = Modifier.weight(1f),
-            ) { Text("リセット") }
+            ) { Text(Strings["desktop_timer_reset"]) }
         }
     }
 }
