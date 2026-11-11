@@ -240,6 +240,7 @@ private fun ScreenView(
         // 行のダブルクリック・右クリックで詳細を別のウィンドウに(#1763)。Ctrl+クリックは行を選ぶ(#1766)
         copyRows = { e, ids -> io.copyRows(e, ids) },
         copyText = io::copyText,
+        dragRows = io::rowsTransferable,
         openWindow = openRecord?.let { open -> { a: Action, id: String -> RecordWindows.target(a)?.let { open(it, id) } } },
     )
     val scope = ScreenScope(route, form, session, perform, io, data, dataEnv)
@@ -317,11 +318,18 @@ private fun FormBands(placed: List<Placed>, cellW: Dp, cellH: Dp, s: ScreenScope
         Box(Modifier.fillMaxWidth().padding(top = if (detached) 16.dp else 0.dp)) {
             band.items.forEach { (c, a) ->
                 val m = Modifier.offset(x = cellW * a.col1 + GAP / 2).width(cellW * a.colSpan - GAP)
-                // 入力の rating(field あり)は入力と同じ高さ。表示の部品だけ 2 行ぶん取る
-                Box(if (c.type in DISPLAY_LEAVES && !InputLeaves.isInput(c)) m.heightIn(min = cellH * 2) else m) { Node(c, s) }
+                val rows = FormBandSizing.minRows(c)
+                Box(if (rows > 0) m.heightIn(min = cellH * rows) else m) { Node(c, s) }
             }
         }
     }
+}
+
+/** フォームの段で部品が取る最小の行数(0 は中身の高さ)。 */
+object FormBandSizing {
+    /** 表示の部品は 2 行ぶん。入力の rating(field あり)は入力と同じ高さ、icon は 1 文字ぶんの絵なので中身の高さ。 */
+    fun minRows(c: Component): Int =
+        if (c.type in DISPLAY_LEAVES && c.type != ComponentType.ICON && !InputLeaves.isInput(c)) 2 else 0
 }
 
 /** Container の子。子が全員 area を持つ card / section / vstack はローカルグリッド(段で流す)。 */

@@ -52,6 +52,9 @@ import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import jp.kz2601.metamon.desktop.io.DragOut
+import jp.kz2601.metamon.desktop.io.ImageSource
+import jp.kz2601.metamon.desktop.io.dragOut
 import jp.kz2601.metamon.dsl.Component
 import jp.kz2601.metamon.dsl.ComponentKind
 import jp.kz2601.metamon.dsl.ComponentType
@@ -60,12 +63,10 @@ import jp.kz2601.metamon.dsl.records.Aggregator
 import jp.kz2601.metamon.dsl.records.FieldCoding
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
-import java.net.URI
 import java.time.DayOfWeek
 import java.time.LocalDate
 import java.time.YearMonth
 import java.time.temporal.TemporalAdjusters
-import java.util.Base64
 import kotlin.math.max
 import kotlin.math.min
 
@@ -217,38 +218,41 @@ object Markdown {
 
 // MARK: - image / avatar
 
-/** https・data URL の画像を読む(読めなければ null)。Coil は入れず JVM の HTTP + Skia で十分。 */
+/** 読んだ画像。[bytes] は外へ引き出す時に PNG にする元(#1764)。 */
+class LoadedImage(val bytes: ByteArray, val bitmap: ImageBitmap)
+
+/**
+ * https・data URL の画像を読む(読めなければ null)。Coil は入れず JVM の HTTP + Skia で十分。
+ * [allowFile] は記録・フォームの値の時だけ(photoField の値は file URI)。
+ */
 @Composable
-private fun rememberRemoteImage(src: String?): ImageBitmap? {
-    var bitmap by remember(src) { mutableStateOf<ImageBitmap?>(null) }
-    LaunchedEffect(src) {
+fun rememberImage(src: String?, allowFile: Boolean = false): LoadedImage? {
+    var loaded by remember(src, allowFile) { mutableStateOf<LoadedImage?>(null) }
+    LaunchedEffect(src, allowFile) {
         if (src.isNullOrBlank()) return@LaunchedEffect
-        bitmap = withContext(Dispatchers.IO) {
-            runCatching {
-                val bytes = if (src.startsWith("data:")) {
-                    Base64.getDecoder().decode(src.substringAfter("base64,"))
-                } else if (src.startsWith("https://")) {
-                    URI(src).toURL().openStream().use { it.readBytes() }
-                } else {
-                    return@runCatching null
-                }
-                org.jetbrains.skia.Image.makeFromEncoded(bytes).toComposeImageBitmap()
-            }.getOrNull()
+        loaded = withContext(Dispatchers.IO) {
+            val bytes = ImageSource.bytes(src, allowFile) ?: return@withContext null
+            runCatching { LoadedImage(bytes, org.jetbrains.skia.Image.makeFromEncoded(bytes).toComposeImageBitmap()) }.getOrNull()
         }
     }
-    return bitmap
+    return loaded
 }
 
 @Composable
+private fun rememberRemoteImage(src: String?): ImageBitmap? = rememberImage(src)?.bitmap
+
+/** `image`: 画像は外(エクスプローラー・他のアプリ)へ PNG のファイルで引き出せる(#1764)。 */
+@Composable
 fun ImageLeaf(c: Component, src: String?) {
-    val bitmap = rememberRemoteImage(src ?: c.url ?: c.image)
+    val image = if (src.isNullOrBlank()) rememberImage(c.url ?: c.image) else rememberImage(src, allowFile = true)
     val h = when (c.height?.wire) { "small" -> 120.dp; "large" -> 280.dp; else -> 200.dp }
     Box(
         Modifier.fillMaxWidth().heightIn(min = 80.dp).height(h).clip(RoundedCornerShape(10.dp)).background(Color(0x11000000)),
         contentAlignment = Alignment.Center,
     ) {
-        if (bitmap != null) {
-            Image(bitmap, c.label, Modifier.fillMaxSize(), contentScale = ContentScale.Crop)
+        if (image != null) {
+            val name = c.label ?: Strings["desktop_drag_image_name"]
+            Image(image.bitmap, c.label, Modifier.fillMaxSize().dragOut { DragOut.image(image.bytes, name) }, contentScale = ContentScale.Crop)
         } else {
             Text(Strings["desktop_image_none"], color = Color.Gray, style = MaterialTheme.typography.bodySmall)
         }
