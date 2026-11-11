@@ -173,6 +173,8 @@ fun SettingsSheet(
             HorizontalDivider(Modifier.padding(vertical = 8.dp))
             // 他の人の行動で届く通知(#887)。共有・公開の記録があり、作成者でない時だけ(下の区切り線も節が出す)
             PushConsentSection(container.push, container.membersStore, runtimeState.document.appId, runtimeState.document.dsl)
+            // 次の通知(#1124・iOS の通知の節)。通知のあるアプリだけ(下の区切り線も節が出す)
+            UpcomingNotificationsSection(runtimeState.document.appId, runtimeState.dsl.app.notifications.isNotEmpty())
             // 記録の自動削除(#482)。今のアプリに保存期間のある記録がある時だけ
             RetentionSettingsSection(container.runtime, onStop = { text ->
                 onStopRetention(text)

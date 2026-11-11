@@ -84,6 +84,7 @@ class LocalNotifications private constructor(private val appContext: Context) {
     /**
      * DSL の読み込み・記録の変化の後。時刻の通知を予約し直し、条件の通知を評価する。
      * 読み込み前(記録の無い entity がある)は評価しない(空の記録で前回を覚えて誤って鳴らさない)。
+     * 未読み込みの entity は呼ぶ側が端末内 DB で埋め、読めなかった entity は外して渡す(#1124・`NotificationRecords`)。
      */
     fun onRecordsChanged(appId: String, dsl: AppDSL, records: Map<String, List<Record>>) {
         val specs = dsl.app.notifications
@@ -184,6 +185,17 @@ class LocalNotifications private constructor(private val appContext: Context) {
     /** このアプリに場所の通知があるのに、位置が許可されていないので届かない(iOS の placesLocationOff)。 */
     fun placesLocationOff(appId: String): Boolean = synchronized(this) {
         GeofencePlanner.plan(registry().all, regionState(), geofences(), canWatchPlaces(), appId).locationOff
+    }
+
+    /** このアプリの次の通知と見張っている場所の数(設定の「次の通知」・#1124・iOS の `NotificationSyncResult`)。 */
+    fun upcoming(appId: String): UpcomingNotificationList = synchronized(this) {
+        val registry = registry()
+        val armed = geofences()
+        UpcomingNotificationList.of(
+            registry.upcoming(appId, Instant.now(), zone).map { (p, at) -> UpcomingNotification(p.title, p.body, at) },
+            places = registry.planned(appId).count { it.isRegion && it.identifier in armed },
+            locationOff = placesLocationOff(appId),
+        )
     }
 
     /** Geofencing に要る許可: 正確な位置と裏での位置(10+)。おおよそだけでは見張れない。 */

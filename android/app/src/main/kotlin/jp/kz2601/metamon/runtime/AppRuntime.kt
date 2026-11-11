@@ -291,7 +291,7 @@ class AppRuntime(
             .collect { (doc, recs) ->
                 if (doc.dsl.app.notifications.isEmpty()) return@collect
                 try {
-                    host.notificationsChanged(doc.appId, doc.dsl, recs)
+                    host.notificationsChanged(doc.appId, doc.dsl, notificationRecords(doc, recs))
                 } catch (e: CancellationException) {
                     throw e
                 } catch (_: Exception) {
@@ -299,6 +299,12 @@ class AppRuntime(
                 }
             }
     }
+
+    /** まだ読み込んでいない entity を端末内 DB で埋める・読めなかった entity は外す(#1124・[NotificationRecords])。 */
+    private suspend fun notificationRecords(doc: AppDocument, recs: Map<String, List<Record>>): Map<String, List<Record>> =
+        NotificationRecords.fill(doc.dsl.entities.map { it.id }, recs, _state.value.failed) { entity ->
+            social.hidingBlocked(mapOf(entity to recordSync.cached(doc.appId, entity).map { r -> r.toDsl() }))[entity].orEmpty()
+        }
 
     private suspend fun loadCached(appId: String): AppDocument? = try {
         cachedDocument?.invoke(appId)
@@ -545,7 +551,7 @@ class AppRuntime(
         val doc = document
         if (doc.dsl.app.notifications.isEmpty()) return
         try {
-            host.notificationsChanged(doc.appId, doc.dsl, _records.value)
+            host.notificationsChanged(doc.appId, doc.dsl, notificationRecords(doc, _records.value))
         } catch (e: CancellationException) {
             throw e
         } catch (_: Exception) {
