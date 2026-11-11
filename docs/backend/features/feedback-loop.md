@@ -163,7 +163,7 @@ flowchart LR
 
 `held` や外れた出力で分類が付かなかった項目は外れとして数える。`-model rules`(既定)はキーワードの基準線(`internal/loop/triage/eval/rules.go`・費用なし)。`-model ai` は振り分けのモデルを呼ぶので、`triage` と同じく段のスイッチと月の上限を見て、トークンを数える(監査は `eval_call`)。
 
-正解の組は `backend/internal/loop/triage/eval/testdata/labeled.jsonl`(28 件・すべて手で書いた架空の文)。テスト(`TestEvalRulesOnLabelledSet`)は基準線でこの組を回し、分類・優先度・束ねのどれかが 8 割を下回ったら落ちる。基準線の今の値は分類 26/28・優先度 25/28・束ね together 14/14・apart 364/364。
+正解の組は `backend/internal/loop/triage/eval/testdata/labeled.jsonl`(28 件・すべて手で書いた架空の文)。テスト(`TestEvalRulesOnLabelledSet`)は基準線でこの組を回し、分類・優先度・束ねのどれかが 8 割を下回ったら落ちる。基準線の今の値は分類 26/28・優先度 27/28・束ね together 14/14・apart 364/364。
 
 コマンドの入口は他と同じなので、接続先の環境変数は要る(読み書きはしない。ローカルは `make -C backend run-feedback-loop LOOP_ARGS="triage-eval -set ..."` でエミュレータに向く)。
 
@@ -182,6 +182,20 @@ LOOP_TRIAGE=on LOOP_ANTHROPIC_API_KEY=... \
 | 下書き | `cluster` が同じ項目を 1 つの下書きにまとめ、件数を足す。束にもう出した Issue があれば、その Issue への追記になる([既存の Issue への追記](#既存の-issue-への追記)) |
 
 埋め込み(ベクトルの近さ)での束ねはまだ無い([まだ無いもの](#まだ無いもの))。
+
+### 束の優先度
+
+項目の優先度(P1〜P3)は振り分けの時に 1 件ずつ付く(`triage.Priority`: 分類・影響・領域・同じ文の件数)。下書き(= Issue)の優先度は束の全部の項目から付け直す(`draft.BundlePriority`):
+
+| 順 | 決まり |
+|---|---|
+| 1 | 束の分類・領域(代表の項目の)、束の項目の中で一番高い影響(`high` > `medium` > `low`)、束の件数で `triage.Priority` を計算する |
+| 2 | 件数が `draft.ManyReports`(10)以上なら 1 段上げる。P1 より上にはしない |
+| 3 | `spam` と `praise` はいつも P3 で、上げない(そもそも下書きにならない) |
+
+- 影響はモデルの `impact` を項目に残したもの(`loop_inbox` の `impact`)。代表の P3 から影響を戻すことはしない(前は `feature` の `medium` が `low` に落ち、正解の組の g01・g02 が P3 になっていた)
+- `impact` を残す前に振り分けた項目は、その項目の優先度から影響を戻す(P1 → `high`・P2 → `medium`・P3 → `low`)
+- 件数は束の報告の数(クラッシュの急増は 1 件の中の件数を足す)
 
 週 1 回、人が回す(定期の実行は後で):
 
@@ -234,5 +248,4 @@ go run ./cmd/feedback-loop audit -summary
 | 生成の失敗の急増を自動で読む | 今はログを人が `gcloud logging read` で書き出して `LOOP_GENFAIL_LOGS` に渡す。Logging API か BigQuery から読む時は `ingest.GenLogSource` を実装する |
 | Google の機密データの検出(#367 の選択肢 2-B) | GCP の設定が要るので後で |
 | 埋め込みでの束ね(#376) | 束ねはモデルの `cluster` の名前に任せている。同じ問題に別の名前が付くと別の束になる(呼び出しをまたぐと特に)。既知の束として渡すのは待っている下書きの名前だけ |
-| 束の優先度で影響が落ちる | 下書きの優先度は、代表の項目の優先度(P1〜P3)から影響を戻して計算する(`draft.impactOf`)。項目が P3 になった `feature` の影響 `medium` は `low` に戻るので、件数が増えても P3 のまま(正解の組の g01・g02) |
 | 本物の 1 週間分での一致率 | `triage-score` で人が測る(#376 の完了の条件) |
