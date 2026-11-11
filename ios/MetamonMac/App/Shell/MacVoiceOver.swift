@@ -6,28 +6,35 @@ import AppKit
 /// VoiceOver が無効なら OS 側で何も起きない。
 @MainActor
 enum MacVoiceOver {
-    /// 実際に読み上げる関数。テストで差し替えて、呼ばれた文を確かめる。
-    static var post: (String) -> Void = { text in
+    /// 読み上げの優先度。`.high` は読んでいる途中の文を切って割り込むので失敗だけにする(続けて出した文が互いに消えないように)
+    enum Priority: Equatable {
+        case medium, high
+
+        var level: NSAccessibilityPriorityLevel { self == .high ? .high : .medium }
+    }
+
+    /// 実際に読み上げる関数。テストで差し替えて、呼ばれた文と優先度を確かめる。
+    static var post: (String, Priority) -> Void = { text, priority in
         // 前面のウインドウから送る(要素が無いと VoiceOver が拾わない)。シートの間も親のウインドウで届く
         guard let element = NSApp?.keyWindow ?? NSApp?.mainWindow else {
             AccessibilityNotification.Announcement(text).post()
             return
         }
         NSAccessibility.post(element: element, notification: .announcementRequested,
-                             userInfo: [.announcement: text, .priority: NSAccessibilityPriorityLevel.high.rawValue])
+                             userInfo: [.announcement: text, .priority: priority.level.rawValue])
     }
 
     /// VoiceOver が有効か。テストで差し替える。
     static var isVoiceOverRunning: () -> Bool = { NSWorkspace.shared.isVoiceOverEnabled }
 
-    static func announce(_ text: String) {
+    static func announce(_ text: String, priority: Priority = .medium) {
         let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { return }
-        post(trimmed)
+        post(trimmed, priority)
     }
 
     static func announce(_ event: MacAnnouncement) {
-        announce(event.text)
+        announce(event.text, priority: event.priority)
     }
 
     /// 自動で消えるまでの秒数。VoiceOver の時は読み上げを聞いてから探して押せるよう長くする。
@@ -59,6 +66,12 @@ enum MacAnnouncement: Equatable {
     case healthSkipped
     /// 一言(toast)
     case message(String)
+
+    /// 失敗だけ割り込んで読む。ほかは前の文を読み終えてから(「保存しました」→ ヘルスケアの一言など)
+    var priority: MacVoiceOver.Priority {
+        if case .failure = self { return .high }
+        return .medium
+    }
 
     var text: String {
         switch self {

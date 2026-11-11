@@ -1,6 +1,7 @@
 import Foundation
 import Observation
 import MetamonServices
+import MetamonDSL
 
 /// サイドバーの区分(#969)。「作ったアプリ」と「共有されたアプリ」(シェアのリンクから追加・参加したアプリ)。
 /// サーバーの一覧(`GET /v1/apps`)は持ち主を返さないので、この Mac で取り込んだ時に覚えておく。
@@ -69,11 +70,19 @@ struct MacAppOrigins: @unchecked Sendable {
 /// サイドバーの新着の数(#969・iOS の `NewItemsHost` と同じ数え方)。開いていないアプリについて、
 /// 前回開いた時刻より後に他の人が作った・更新した共有レコードを数える。基準の時刻は進めない(開いた時に `NewItemsCheck` が進める)。
 /// この Mac で一度も開いていない・中身(entity)をまだ取っていないアプリは数えない(初めて開いた時に基準を作るのと同じ)。
+/// 数は全ウインドウで 1 つ。どれかのウインドウで開いているアプリは数えない。数え直しは全ウインドウで 1 本・数分に 1 回まで。
 @MainActor @Observable
 final class MacSidebarBadges {
     static let shared = MacSidebarBadges()
 
+    /// 同じアカウント・同じ一覧なら、この間隔より短くは数え直さない(前面に戻るたびに全アプリへ問い合わせない)
+    nonisolated static let minInterval: TimeInterval = 180
+
     private(set) var counts: [String: Int] = [:]
+
+    @ObservationIgnored private let now: () -> Date
+
+    init(now: @escaping () -> Date = Date.init) { self.now = now }
 
     func count(_ appId: String) -> Int { counts[appId] ?? 0 }
 
@@ -85,13 +94,56 @@ final class MacSidebarBadges {
 
     /// 数え直している間に開いたアプリ(結果で印を戻さない)
     @ObservationIgnored private var opened: Set<String> = []
+    /// ウインドウごとに中央で開いているアプリ
+    @ObservationIgnored private var openByWindow: [UUID: String] = [:]
+    /// 最後に数え直しを始めた時の相手(アカウント・一覧)と時刻
+    @ObservationIgnored private var lastRun: (key: String, at: Date)?
+    @ObservationIgnored private var isRunning = false
+
+    /// どれかのウインドウで開いているアプリ
+    var openAppIds: Set<String> { Set(openByWindow.values) }
+
+    /// ウインドウの中央で開いたアプリ(nil は閉じた)。開いたアプリは既読にする
+    func setOpen(_ appId: String?, window: UUID) {
+        openByWindow[window] = appId
+        if let appId { markRead(appId) }
+    }
+
+    /// ウインドウを閉じた
+    func closeWindow(_ window: UUID) { openByWindow[window] = nil }
 
     struct Target: Equatable, Sendable {
         var appId: String
         var entities: [String]
     }
 
-    /// 数え直す。`openAppId`(中央で開いているアプリ)は数えない
+    /// 数える相手。共有の entity だけ(private の記録は他の人が書かない)。共有の entity が無ければ nil
+    nonisolated static func target(appId: String, entities: [Entity]) -> Target? {
+        let shared = entities.filter(\.isShared).map(\.id)
+        return shared.isEmpty ? nil : Target(appId: appId, entities: shared)
+    }
+
+    /// 全ウインドウから呼ぶ入口。同じアカウント・同じ一覧で `minInterval` 以内に数え直していれば何もしない。
+    /// 走っている間に来た分も捨てる(全ウインドウで 1 本)。サインアウトはすぐ消す
+    func refreshIfDue(_ targets: [Target], uid: String?, source: (any SharedRecordStampSource)?,
+                      store: LastOpenedStore = LastOpenedStore()) async {
+        guard let uid, source != nil else {
+            lastRun = nil
+            counts = [:]
+            return
+        }
+        let key = "\(uid)|" + targets.map { "\($0.appId):\($0.entities.joined(separator: ","))" }.joined(separator: ";")
+        let time = now()
+        if isRunning { return }
+        if let lastRun, lastRun.key == key, time.timeIntervalSince(lastRun.at) < Self.minInterval { return }
+        lastRun = (key, time)
+        isRunning = true
+        defer { isRunning = false }
+        await refresh(targets, openAppId: nil, uid: uid, source: source, store: store)
+        if Task.isCancelled { lastRun = nil } // 途中で止まった(ウインドウを閉じた等)ら次の呼び出しで数え直す
+    }
+
+    /// 数え直す。どれかのウインドウで開いているアプリと `openAppId` は数えない
     func refresh(_ targets: [Target], openAppId: String?, uid: String?,
                  source: (any SharedRecordStampSource)?, store: LastOpenedStore = LastOpenedStore()) async {
         guard let uid, let source else {
@@ -99,15 +151,17 @@ final class MacSidebarBadges {
             return
         }
         opened = []
+        var skip = openAppIds
+        if let openAppId { skip.insert(openAppId) }
         var next: [String: Int] = [:]
-        for target in targets where target.appId != openAppId {
+        for target in targets where !skip.contains(target.appId) {
             guard !Task.isCancelled else { return }
             if let count = await Self.peek(target, uid: uid, source: source, store: store), count > 0 {
                 next[target.appId] = count
             }
         }
         guard !Task.isCancelled else { return }
-        for id in opened { next[id] = nil }
+        for id in opened.union(openAppIds) { next[id] = nil }
         if let openAppId { next[openAppId] = nil }
         counts = next
     }

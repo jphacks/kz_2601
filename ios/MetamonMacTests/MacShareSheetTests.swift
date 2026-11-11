@@ -13,6 +13,8 @@ final class MacShareSheetTests: XCTestCase {
         var shared = true
         var role: SharedMember.Role = .owner
         var calls: [String] = []
+        /// 一覧を返す直前に呼ぶ(読み込み中のサインアウトを再現する)
+        var beforeMembers: (@Sendable () async -> Void)?
 
         private func log(_ s: String) throws {
             calls.append(s)
@@ -24,6 +26,7 @@ final class MacShareSheetTests: XCTestCase {
         func hasMembersOnlyData(appId: String) async throws -> Bool { shared }
         func members(appId: String) async throws -> SharedMemberList {
             calls.append("members")
+            await beforeMembers?()
             return SharedMemberList(items: [SharedMember(uid: "u-me", role: role, you: true),
                                             SharedMember(uid: "u-hanako", displayName: "はなこ"),
                                             SharedMember(uid: "u-owner", role: role == .owner ? .member : .owner)],
@@ -208,6 +211,19 @@ final class MacShareSheetTests: XCTestCase {
         let error = await model.leave()
         XCTAssertNotNil(error)
         XCTAssertEqual(model.phase, .loaded)
+    }
+
+    /// 読み込み中にサインアウトでシートを閉じたら、届いた一覧を書き戻さない
+    func testCloseDuringLoadDoesNotWriteMembersBack() async throws {
+        let social = MacSocial()
+        let fake = FakeMembers()
+        let share = MacShareAppModel(appId: "app-1", appName: "n", sharing: nil, membership: fake, social: social)
+        let model = try XCTUnwrap(share.members)
+        fake.beforeMembers = { await MainActor.run { share.close() } }
+        await model.load()
+        XCTAssertNil(model.list)
+        XCTAssertFalse(model.isVisible)
+        XCTAssertNil(social.memberEntries["app-1"])
     }
 
     func testShareModelCreatesMembersOnlyWithClient() {
