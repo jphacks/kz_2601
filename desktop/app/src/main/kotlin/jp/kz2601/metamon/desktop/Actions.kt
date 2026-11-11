@@ -1,6 +1,9 @@
 package jp.kz2601.metamon.desktop
 
 import androidx.compose.runtime.snapshots.Snapshot
+import jp.kz2601.metamon.desktop.io.PdfIo
+import jp.kz2601.metamon.desktop.io.RecordIo
+import jp.kz2601.metamon.desktop.io.Tsv
 import jp.kz2601.metamon.dsl.Action
 import jp.kz2601.metamon.dsl.ActionFormat
 import jp.kz2601.metamon.dsl.ActionType
@@ -11,7 +14,6 @@ import jp.kz2601.metamon.dsl.logic.BookLookupPlan
 import jp.kz2601.metamon.dsl.logic.CalendarEventDraft
 import jp.kz2601.metamon.dsl.logic.CalendarEventPlan
 import jp.kz2601.metamon.dsl.logic.CalendarEventRequest
-import jp.kz2601.metamon.dsl.logic.CsvWriter
 import jp.kz2601.metamon.dsl.logic.ExternalUrlPolicy
 import jp.kz2601.metamon.dsl.logic.RecordExport
 import jp.kz2601.metamon.dsl.records.FieldCoding
@@ -123,21 +125,26 @@ class DesktopActionHost(
         return "本の情報を探しています…"
     }
 
+    /**
+     * 表は io/RecordIo(ref は名前・古い順)、PDF は io/PdfIo(#1856)。format が pdf なら PDF、他は CSV(iOS と同じ形)。
+     * ファイルはダウンロードに書き、同じ表を表計算に貼れる TSV でクリップボードにも入れる(一覧の「表をコピー」と同じ形)。
+     */
     private fun export(action: Action, ctx: ActionContext, session: DesktopSession): String? {
         val entity = session.entityModel(action.entity ?: ctx.form?.entity?.id) ?: return "書き出す記録が見つかりません"
-        val records = RecordExport.chronological(session.records(entity.id), entity)
-        if (records.isEmpty()) return "記録がありません"
-        val title = action.title ?: entity.name
-        val table = RecordExport.table(title, entity, records, action.fields.ifEmpty { null }, session.uid) { v, f -> FieldCoding.display(v, f) }
-        val csv = CsvWriter.string(table)
-        val file = exportDir.resolve(RecordExport.fileName(title, "csv"))
+        val count = session.store.list(entity.id).size
+        if (count == 0) return "記録がありません"
+        val title = action.title?.trim()?.ifEmpty { null } ?: entity.name
+        val date = java.time.LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyy/MM/dd HH:mm"))
+        val table = RecordIo.exportTable(title, entity, session.store, session.models, action.fields, listOf("書き出し日 $date", "$count 件"))
+        val pdf = action.format == ActionFormat.PDF
+        val file = exportDir.resolve(RecordExport.fileName(title, if (pdf) "pdf" else "csv"))
         runCatching {
             exportDir.mkdirs()
-            file.writeBytes(CsvWriter.data(table))
+            file.writeBytes(if (pdf) PdfIo.data(table) else RecordIo.csv(table))
         }.getOrElse { return "書き出せませんでした" }
-        Clipboard.copy(csv)
-        val pdf = if (action.format == ActionFormat.PDF) "(PDF はまだなので CSV)" else ""
-        return "${records.size} 件を書き出しました$pdf: ${file.absolutePath}(クリップボードにも入れました)"
+        val copied = !GraphicsEnvironment.isHeadless() &&
+            runCatching { Toolkit.getDefaultToolkit().systemClipboard.setContents(StringSelection(Tsv.string(table)), null) }.isSuccess
+        return "$count 件を書き出しました: ${file.absolutePath}" + if (copied) "(表はクリップボードにも入れました)" else ""
     }
 
     companion object {
@@ -152,13 +159,6 @@ class DesktopActionHost(
     }
 }
 
-/** クリップボード(画面の無い環境では何もしない)。 */
-private object Clipboard {
-    fun copy(text: String) {
-        if (GraphicsEnvironment.isHeadless()) return
-        runCatching { Toolkit.getDefaultToolkit().systemClipboard.setContents(StringSelection(text), null) }
-    }
-}
 
 /** iCalendar(RFC 5545)の 1 件。終日は DATE、時刻ありは UTC。 */
 object Ics {

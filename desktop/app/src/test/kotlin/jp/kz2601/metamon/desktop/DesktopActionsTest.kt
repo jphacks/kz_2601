@@ -60,6 +60,10 @@ class DesktopActionsTest {
         assertTrue(csv.readText().contains("1200") || csv.readText().contains("1,200"))
         assertTrue(s.message!!.startsWith("1 件を書き出しました"))
         assertTrue(s.effects.last().toString().contains("\"type\":\"export\""))
+        s.run(Action(type = ActionType.EXPORT, entity = "expense", title = "支出", format = jp.kz2601.metamon.dsl.ActionFormat.PDF))
+        val pdf = dir.resolve("支出.pdf")
+        assertTrue(s.message.orEmpty(), pdf.isFile)
+        assertEquals("%PDF", pdf.readBytes().copyOfRange(0, 4).decodeToString())
     }
 
     @Test

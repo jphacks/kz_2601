@@ -49,6 +49,14 @@ import jp.kz2601.metamon.renderer.form.FormDraft
 import jp.kz2601.metamon.renderer.navigation.NavigationResolver
 import jp.kz2601.metamon.renderer.navigation.Route
 import jp.kz2601.metamon.renderer.navigation.top
+import jp.kz2601.metamon.desktop.io.DesktopIo
+import jp.kz2601.metamon.desktop.io.FileImportLeaf
+import jp.kz2601.metamon.desktop.io.IoOverlay
+import jp.kz2601.metamon.desktop.io.ListIoBar
+import jp.kz2601.metamon.desktop.io.ioDropTarget
+import jp.kz2601.metamon.desktop.io.previewKey
+import jp.kz2601.metamon.desktop.io.rememberDesktopIo
+import androidx.compose.ui.input.key.onPreviewKeyEvent
 
 /** 画面 1 枚の描画に要るもの。 */
 private class ScreenScope(
@@ -56,6 +64,7 @@ private class ScreenScope(
     val form: FormDraft?,
     val session: DesktopSession,
     val perform: (Action, String?) -> Unit,
+    val io: DesktopIo,
     val data: LeafData,
 )
 
@@ -69,12 +78,17 @@ fun DesktopApp(dsl: AppDSL, initialStore: MockStore = MockStore(), startScreen: 
     var pending by remember { mutableStateOf<Pair<Action, ActionContext>?>(null) }
     val nav = session.nav
     val dispatch = { a: Action, ctx: ActionContext -> if (a.confirmMessage != null) pending = a to ctx else session.dispatch(a, ctx) }
+    val io = rememberDesktopIo(dsl, { session.store }, session::replaceStore)
+    // 落とした物・Ctrl+V は一番上に見えている画面へ
+    val topComponents = { dsl.screen(session.top.screen)?.components.orEmpty() }
+    val topDraft = { session.form(session.top)?.let(::FormDraftStrings) ?: mutableMapOf() }
 
-    Surface(Modifier.fillMaxSize()) {
+    Surface(Modifier.fillMaxSize().ioDropTarget(io, topComponents, topDraft).onPreviewKeyEvent(io.previewKey(topComponents, topDraft))) {
+        IoOverlay(io)
         Box(Modifier.fillMaxSize()) {
             Column(Modifier.fillMaxSize()) {
                 val base = NavigationResolver.dismissModals(nav).top(dsl)
-                Box(Modifier.weight(1f)) { ScreenView(dsl, session, base, dispatch) }
+                Box(Modifier.weight(1f)) { ScreenView(dsl, session, base, io, dispatch) }
                 if (dsl.app.hasTabs) {
                     HorizontalDivider()
                     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly) {
@@ -95,7 +109,7 @@ fun DesktopApp(dsl: AppDSL, initialStore: MockStore = MockStore(), startScreen: 
                 ) {
                     val m = if (full) Modifier.fillMaxSize() else Modifier.widthIn(max = 640.dp).fillMaxWidth(0.92f).fillMaxSize(0.9f)
                     Surface(m, shape = MaterialTheme.shapes.large, tonalElevation = 6.dp) {
-                        ScreenView(dsl, session, top, dispatch)
+                        ScreenView(dsl, session, top, io, dispatch)
                     }
                 }
             }
@@ -125,12 +139,12 @@ private fun confirmLabel(a: Action): String = when (a.type) {
 
 /** route の画面 1 枚(見出し・戻る・toolbar・一言・グリッド)。 */
 @Composable
-private fun ScreenView(dsl: AppDSL, session: DesktopSession, route: Route, dispatch: (Action, ActionContext) -> Unit) {
+private fun ScreenView(dsl: AppDSL, session: DesktopSession, route: Route, io: DesktopIo, dispatch: (Action, ActionContext) -> Unit) {
     val screen = dsl.screen(route.screen) ?: dsl.screens.firstOrNull() ?: return
     val form = session.form(route)
     val data = remember(session.store) { session.leafData() }
     val perform = { a: Action, recordId: String? -> dispatch(a, ActionContext(route, form, recordId)) }
-    val scope = ScreenScope(route, form, session, perform, data)
+    val scope = ScreenScope(route, form, session, perform, io, data)
     Column(Modifier.fillMaxSize()) {
         Row(Modifier.fillMaxWidth().padding(8.dp), verticalAlignment = Alignment.CenterVertically) {
             if (NavigationResolver.canClose(session.nav, route)) {
@@ -144,6 +158,7 @@ private fun ScreenView(dsl: AppDSL, session: DesktopSession, route: Route, dispa
         HorizontalDivider()
         if (route == session.top) {
             session.message?.let { Text(it, color = MaterialTheme.colorScheme.error, modifier = Modifier.padding(12.dp)) }
+            io.notice?.let { Text(it, modifier = Modifier.padding(12.dp)) }
         }
         if (form?.isReadOnly == true) Text("このデータは作った人だけが変更できます", color = Color.Gray, modifier = Modifier.padding(horizontal = 12.dp))
         GridScreen(screen, scope)
@@ -259,6 +274,7 @@ private fun Node(c: Component, s: ScreenScope) {
             Text(c.text ?: c.label ?: c.url.orEmpty())
         }
         ComponentType.LIST -> ListLeaf(c, s)
+        ComponentType.FILE_IMPORT -> FileImportLeaf(c, s.io)
         in InputLeaves.types -> InputNode(c, s)
         else -> Text(
             if (c.type == ComponentType.UNKNOWN) "知らない部品: ${DesktopLeaves.typeName(c)}" else "デスクトップ版ではまだ使えない部品: ${DesktopLeaves.typeName(c)}",
@@ -295,6 +311,7 @@ private fun InputNode(c: Component, s: ScreenScope) {
 private fun ListLeaf(c: Component, s: ScreenScope) {
     val entity = s.data.entity(c.entity)
     val rows = s.session.rows(c, c.searchField?.let { s.session.queries(s.route)[it] })
+    c.entity?.let { ListIoBar(it, s.io) }
     if (rows.isEmpty()) {
         Text(c.emptyText ?: "まだありません", color = Color.Gray)
         return

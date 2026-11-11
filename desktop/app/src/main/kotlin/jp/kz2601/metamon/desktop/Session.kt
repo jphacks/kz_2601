@@ -80,6 +80,11 @@ class DesktopSession(
 
     val top: Route get() = nav.top(dsl)
 
+    /** 取り込み・貼り付け(io/DesktopIo)が記録を差し替える。 */
+    fun replaceStore(next: MockStore) {
+        store = next
+    }
+
     fun entityModel(id: String?): Entity? = id?.let { i -> models.firstOrNull { it.id == i } }
 
     fun records(entity: String): List<Record> = store.records(entity, entityModel(entity))
@@ -290,6 +295,21 @@ class DesktopSession(
 
         private fun obj(vararg pairs: Pair<String, JsonElement>) = JsonObject(mapOf(*pairs))
     }
+}
+
+/**
+ * 下書きを文字の map として見せる(io/DesktopIo の写真・動画・ドロップが field に file URI を書く口)。
+ * 書くと文字の値・消すと空になる。
+ */
+class FormDraftStrings(private val form: FormDraft) : AbstractMutableMap<String, String>() {
+    override fun get(key: String): String? = form.values[key]?.stringValue
+
+    override fun put(key: String, value: String): String? = get(key).also { form.values[key] = JSONValue.Str(value) }
+
+    override fun remove(key: String): String? = get(key).also { form.values[key] = JSONValue.Null }
+
+    override val entries: MutableSet<MutableMap.MutableEntry<String, String>>
+        get() = form.values.mapNotNull { (k, v) -> v.stringValue?.let { java.util.AbstractMap.SimpleEntry(k, it) } }.toMutableSet()
 }
 
 /** 画面の部品を子まで全部(押す対象を id で探す)。 */

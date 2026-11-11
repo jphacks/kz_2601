@@ -45,11 +45,12 @@ import jp.kz2601.metamon.dsl.ComponentType
 import jp.kz2601.metamon.dsl.records.FieldType
 import jp.kz2601.metamon.dsl.records.JSONValue
 import jp.kz2601.metamon.renderer.form.FormDraft
+import jp.kz2601.metamon.desktop.io.DesktopIo
+import jp.kz2601.metamon.desktop.io.MediaFieldLeaf
 import java.awt.FileDialog
 import java.awt.Frame
 import java.awt.GraphicsEnvironment
 import java.awt.Toolkit
-import java.awt.datatransfer.DataFlavor
 import java.awt.image.BufferedImage
 import java.io.File
 import javax.imageio.ImageIO
@@ -182,20 +183,19 @@ fun InputLeaf(c: Component, form: FormDraft, onMessage: (String) -> Unit) {
             }
             ComponentType.RATING -> RatingLeaf(c, value?.doubleValue?.toInt() ?: 0, caption) { set(JSONValue.Num(it.toDouble())) }
             ComponentType.COLOR_PICKER -> ColorInput(caption, value?.stringValue, ::set)
-            ComponentType.PHOTO_FIELD, ComponentType.VIDEO_FIELD, ComponentType.AUDIO_RECORDER -> {
-                val kind = when (c.type) {
-                    ComponentType.PHOTO_FIELD -> "撮影"
-                    ComponentType.VIDEO_FIELD -> "動画の撮影"
-                    else -> "録音"
-                }
+            // 写真・動画はファイル選択・ドロップ・Ctrl+V・外へ引き出し(io/DesktopIo の MediaFieldLeaf)
+            ComponentType.PHOTO_FIELD, ComponentType.VIDEO_FIELD -> {
+                MediaFieldLeaf(c, caption, FormDraftStrings(form))
+                Note((if (c.type == ComponentType.PHOTO_FIELD) "撮影" else "動画の撮影") + "は $UNAVAILABLE_SHORT")
+            }
+            ComponentType.AUDIO_RECORDER -> {
                 Caption(caption)
-                Note("$kind は $UNAVAILABLE_SHORT。ファイルから選べます")
+                Note("録音は $UNAVAILABLE_SHORT。ファイルから選べます")
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
                     OutlinedButton(enabled = !readOnly, onClick = { pickFile(caption)?.let { set(JSONValue.Str(it.toURI().toString())) } }) { Text("ファイルを選ぶ") }
                     value?.stringValue?.let { Text(File(java.net.URI(it).path ?: it).name, style = MaterialTheme.typography.bodySmall) }
                     if (value != null && !value.isNull) TextButton(enabled = !readOnly, onClick = { set(JSONValue.Null) }) { Text("消す") }
                 }
-                if (c.type == ComponentType.PHOTO_FIELD) value?.stringValue?.let { ImageLeaf(c, it) }
             }
             ComponentType.DRAWING_FIELD -> DrawingInput(caption, value?.stringValue, readOnly, ::set)
             ComponentType.QR_SCANNER -> {
@@ -397,12 +397,8 @@ private fun pickFile(title: String): File? {
     return File(d.directory, name)
 }
 
-private fun clipboardImage(): BufferedImage? = runCatching {
-    val clip = Toolkit.getDefaultToolkit().systemClipboard
-    if (!clip.isDataFlavorAvailable(DataFlavor.imageFlavor)) return null
-    val img = clip.getData(DataFlavor.imageFlavor) as java.awt.Image
-    BufferedImage(img.getWidth(null), img.getHeight(null), BufferedImage.TYPE_INT_RGB).also { it.createGraphics().drawImage(img, 0, 0, null) }
-}.getOrNull()
+private fun clipboardImage(): BufferedImage? =
+    runCatching { Toolkit.getDefaultToolkit().systemClipboard.getContents(null) }.getOrNull()?.let(DesktopIo::image)
 
 private fun readCode(img: BufferedImage?, onMessage: (String) -> Unit): String? {
     if (img == null) {
