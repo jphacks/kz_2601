@@ -1,0 +1,49 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 一覧・集計・カレンダー・表の固定の文言(#1070・#859)。文言の正は iOS の MetamonRenderer の Localizable.xcstrings -->
+<resources>
+    <string name="lists_add">Add</string>
+    <string name="lists_avg">Avg %1$s</string>
+    <string name="lists_cell_empty">Empty</string>
+    <string name="lists_chart_empty">No records yet. Add one to see the chart</string>
+    <string name="lists_chart_summary_many">%1$d items. Highest: %2$s (%3$s). Lowest: %4$s (%5$s)</string>
+    <plurals name="lists_chart_summary_one">
+        <item quantity="one">%1$d item. %2$s: %3$s</item>
+        <item quantity="other">%1$d items. %2$s: %3$s</item>
+    </plurals>
+    <string name="lists_check">Check</string>
+    <string name="lists_checked">Checked</string>
+    <string name="lists_clear">Clear</string>
+    <string name="lists_count">Count</string>
+    <string name="lists_count_unit">items</string>
+    <string name="lists_delete">Delete</string>
+    <string name="lists_edit">Edit</string>
+    <string name="lists_empty">Nothing yet</string>
+    <string name="lists_everyone">Everyone</string>
+    <string name="lists_gauge">Gauge</string>
+    <string name="lists_gauge_range">%1$s (range %2$s–%3$s)</string>
+    <string name="lists_list_last">", and "</string>
+    <string name="lists_list_pair">" and "</string>
+    <string name="lists_list_separator">", "</string>
+    <string name="lists_max">Max %1$s</string>
+    <string name="lists_member">Member</string>
+    <string name="lists_min">Min %1$s</string>
+    <string name="lists_next_month">Next month</string>
+    <string name="lists_no_data">No data yet</string>
+    <string name="lists_no_events">Nothing scheduled</string>
+    <string name="lists_no_records">No records</string>
+    <string name="lists_not_checked">Not checked</string>
+    <string name="lists_open">Open</string>
+    <string name="lists_previous_month">Previous month</string>
+    <string name="lists_progress">Progress</string>
+    <plurals name="lists_records_count">
+        <item quantity="one">%1$d record</item>
+        <item quantity="other">%1$d records</item>
+    </plurals>
+    <string name="lists_search">Search</string>
+    <string name="lists_sentence_separator">". "</string>
+    <string name="lists_sum">Total %1$s</string>
+    <string name="lists_today">%1$s, today</string>
+    <string name="lists_unavailable">Unavailable</string>
+    <string name="lists_uncheck">Uncheck</string>
+    <string name="lists_untitled">(Untitled)</string>
+</resources>

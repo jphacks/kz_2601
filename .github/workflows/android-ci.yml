@@ -1,0 +1,248 @@
+# Android(Kotlin / Compose)の CI(#837・形は docs/android/ci.md)。PR が Open(非Draft) / develop・main への push で発火。
+# ubuntu だけで回す。エミュレータは使わない(JVM の単体テストだけ)。
+#
+# 変更の判定(dorny/paths-filter)→ 回すもの:
+#   | 変わった場所                                           | mode  | 回すもの                                         |
+#   |--------------------------------------------------------|-------|--------------------------------------------------|
+#   | android/dsl/** だけ(PR)                               | light | :dsl:test                                        |
+#   | docs/dsl/conformance/expr/** だけ                      | light | :dsl:test(Expr の共有テストデータ #545)         |
+#   | docs/dsl/icon-map.json・backend の *.go(テスト以外)   | light | SymbolIconTableTest(アイコン表の漏れ検査)      |
+#   | iOS の ClientCapabilities.swift                         | light | DeviceCapabilitiesTest(機能のキーの突き合わせ)  |
+#   | iOS の Localizable.xcstrings                            | light | RuntimeCopyIosEnglishTest(英語の文言の突き合わせ)|
+#   | それ以外の android/**(*.md 以外)                      | full  | test・assembleStgDebug・lint(非ブロッキング)   |
+#   | docs/dsl/conformance/**(適合テスト #352)・examples/**・dsl.schema.json | full | 同上            |
+#   | .github/workflows/android-ci.yml                       | full  | 同上                                             |
+#   | develop / main への push(android/dsl/** を含む)       | full  | 同上(dsl だけの変更でも依存先まで確かめる)     |
+#   | 上記以外                                               | none  | なし(android-ci は成功で終わる)                |
+#
+# 設計メモ:
+# - workflow レベルの `paths:` は使わない(backend-ci.yml と同じ理由: required check が永遠に待ちになる)。
+# - required check 名 = 集約ジョブ `android-ci`。登録は人(scripts/github/setup-branch-protection.sh)。
+# - google-services.json は CI に置かない(Secret にも入れない)。無くてもビルドは通り、認証はモックになる
+#   (app/build.gradle.kts は json がある時だけ google-services のプラグインを当てる)。
+# - ライセンス一覧の検査(android/scripts/third-party-licenses.py --check)はまだ回さない(docs/android/ci.md)。
+name: android-ci
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+  push:
+    branches: [develop, main]
+
+concurrency:
+  group: android-ci-${{ github.event.pull_request.number || github.ref }}
+  # develop / main への push は取り消さない(ios-ci と同じ)
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+permissions:
+  contents: read
+  pull-requests: read
+
+jobs:
+  android-changes:
+    name: android-changes
+    if: github.event_name == 'push' || github.event.pull_request.draft == false
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    outputs:
+      # none / light / full
+      mode: ${{ steps.plan.outputs.mode }}
+      # light の時に回す Gradle のタスク(空白区切り)
+      tasks: ${{ steps.plan.outputs.tasks }}
+    steps:
+      - uses: actions/checkout@v7
+
+      # push では github.event.before との差分、PR では base との差分。
+      # every: 1 つのフィルタの中のパターンを全部満たすファイルだけ数える(! の除外を効かせるため)
+      - uses: dorny/paths-filter@v4
+        id: filter
+        with:
+          predicate-quantifier: every
+          filters: |
+            dsl:
+              - 'android/dsl/**'
+              - '!android/**/*.md'
+            other:
+              - 'android/**'
+              - '!android/dsl/**'
+              - '!android/**/*.md'
+            expr:
+              - 'docs/dsl/conformance/expr/**'
+            docs:
+              - 'docs/dsl/{conformance,examples}/**'
+              - '!docs/dsl/conformance/expr/**'
+            schema:
+              - 'docs/dsl/dsl.schema.json'
+            icons:
+              - '{docs/dsl/icon-map.json,backend/**/*.go}'
+              - '!backend/**/*_test.go'
+            # Android のテストが読む iOS のファイル(DeviceCapabilitiesTest・RuntimeCopyIosEnglishTest)
+            ioscaps:
+              - 'ios/Packages/MetamonDSL/Sources/MetamonDSL/Model/ClientCapabilities.swift'
+            iosstrings:
+              - 'ios/Metamon/Resources/Localizable.xcstrings'
+            workflow:
+              - '.github/workflows/android-ci.yml'
+
+      - name: 回すものを決める
+        id: plan
+        env:
+          EVENT: ${{ github.event_name }}
+          DSL: ${{ steps.filter.outputs.dsl }}
+          OTHER: ${{ steps.filter.outputs.other }}
+          EXPR: ${{ steps.filter.outputs.expr }}
+          DOCS: ${{ steps.filter.outputs.docs }}
+          SCHEMA: ${{ steps.filter.outputs.schema }}
+          ICONS: ${{ steps.filter.outputs.icons }}
+          IOSCAPS: ${{ steps.filter.outputs.ioscaps }}
+          IOSSTRINGS: ${{ steps.filter.outputs.iosstrings }}
+          WORKFLOW: ${{ steps.filter.outputs.workflow }}
+        run: |
+          set -eu
+          mode=none
+          tasks=""
+          if [ "$OTHER" = true ] || [ "$DOCS" = true ] || [ "$SCHEMA" = true ] || [ "$WORKFLOW" = true ] \
+            || { [ "$EVENT" = push ] && [ "$DSL" = true ]; }; then
+            mode=full
+          else
+            if [ "$DSL" = true ] || [ "$EXPR" = true ]; then
+              tasks=":dsl:test"
+            fi
+            # 同じタスクを 2 回並べないよう、:renderer の --tests はまとめて 1 回にする
+            renderer=""
+            if [ "$ICONS" = true ]; then
+              renderer="${renderer} --tests jp.kz2601.metamon.renderer.theme.SymbolIconTableTest"
+            fi
+            if [ "$IOSCAPS" = true ]; then
+              renderer="${renderer} --tests jp.kz2601.metamon.renderer.DeviceCapabilitiesTest"
+            fi
+            if [ -n "$renderer" ]; then
+              tasks="${tasks} :renderer:testDebugUnitTest${renderer}"
+            fi
+            if [ "$IOSSTRINGS" = true ]; then
+              tasks="${tasks} :app:testStgDebugUnitTest --tests jp.kz2601.metamon.language.RuntimeCopyIosEnglishTest"
+            fi
+            [ -n "$tasks" ] && mode=light
+          fi
+          echo "mode=${mode} tasks=${tasks}"
+          echo "mode=${mode}" >> "$GITHUB_OUTPUT"
+          echo "tasks=${tasks}" >> "$GITHUB_OUTPUT"
+
+  # DSL だけ・アイコン表だけの変更。アプリのビルドはしない
+  android-light:
+    name: android-light
+    needs: android-changes
+    if: needs.android-changes.outputs.mode == 'light'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: android
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: '17'
+      # Gradle の依存・ビルドキャッシュ。PR は読むだけ(書くのは develop / main への push)
+      - uses: gradle/actions/setup-gradle@v6
+        with:
+          cache-read-only: ${{ github.event_name == 'pull_request' }}
+      - name: gradle
+        env:
+          TASKS: ${{ needs.android-changes.outputs.tasks }}
+        run: |
+          set -eu
+          # TASKS は判定ジョブが組んだタスクと引数の並び。空白区切りで展開する
+          # shellcheck disable=SC2086
+          ./gradlew ${TASKS} --console=plain
+      - name: テストの結果を残す
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: android-light-test-reports
+          path: android/**/build/reports/tests/
+          retention-days: 7
+
+  android-build:
+    name: android-build
+    needs: android-changes
+    if: needs.android-changes.outputs.mode == 'full'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    defaults:
+      run:
+        working-directory: android
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: gradle/actions/setup-gradle@v6
+        with:
+          cache-read-only: ${{ github.event_name == 'pull_request' }}
+      # ubuntu-latest には Android SDK が入っている(ANDROID_HOME)。platform 36 が無ければ AGP が取ってくる
+      - name: test・assembleStgDebug
+        run: ./gradlew test assembleStgDebug --console=plain
+
+      # Android Lint。**今は非ブロッキング**: 既存の指摘の数がまだ分からないため、失敗しても android-ci には影響させない。
+      # ブロッキングにする時: 既存の指摘を直す(または lint-baseline.xml を置く)PR を先に入れてから continue-on-error を外す。
+      - name: lint(非ブロッキング)
+        id: lint
+        continue-on-error: true
+        run: ./gradlew :app:lintStgDebug :renderer:lintDebug :services:lintDebug --console=plain
+
+      - name: lint の結果を書く
+        if: always() && steps.lint.outcome != 'skipped'
+        env:
+          OUTCOME: ${{ steps.lint.outcome }}
+        run: |
+          echo "### Android Lint: ${OUTCOME}(非ブロッキング)" >> "$GITHUB_STEP_SUMMARY"
+          if [ "$OUTCOME" != success ]; then
+            echo "::warning::Android Lint が ${OUTCOME}(非ブロッキング)。レポートは android-lint-reports"
+          fi
+
+      - name: lint のレポートを残す
+        if: always() && steps.lint.outcome != 'skipped'
+        uses: actions/upload-artifact@v7
+        with:
+          name: android-lint-reports
+          path: android/**/build/reports/lint-results-*.html
+          retention-days: 7
+          if-no-files-found: ignore
+
+      - name: テストの結果を残す
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: android-test-reports
+          path: android/**/build/reports/tests/
+          retention-days: 7
+
+  # required check。ジョブがスキップでも成功、失敗/キャンセルなら失敗。
+  android-ci:
+    name: android-ci
+    needs: [android-changes, android-light, android-build]
+    if: always() && (github.event_name == 'push' || github.event.pull_request.draft == false)
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    steps:
+      - name: 結果を集約
+        env:
+          CHANGES: ${{ needs.android-changes.result }}
+          LIGHT: ${{ needs.android-light.result }}
+          BUILD: ${{ needs.android-build.result }}
+          MODE: ${{ needs.android-changes.outputs.mode }}
+        run: |
+          echo "mode=${MODE} android-changes=${CHANGES} android-light=${LIGHT} android-build=${BUILD}"
+          if [ "$CHANGES" != "success" ]; then
+            echo "::error::android-changes が ${CHANGES}"
+            exit 1
+          fi
+          for r in "$LIGHT" "$BUILD"; do
+            case "$r" in
+              success|skipped) ;;
+              *) echo "::error::ジョブが ${r}"; exit 1 ;;
+            esac
+          done

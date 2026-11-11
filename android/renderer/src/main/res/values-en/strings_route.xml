@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Route guidance component (routeGuide, #868). -->
+<resources>
+    <string name="renderer_route_choose_destination">Choose a destination</string>
+    <string name="renderer_route_choose_place">Choose a place to get directions there</string>
+    <string name="renderer_route_destination">Destination</string>
+    <string name="renderer_route_distance">%1$s from here (straight line)</string>
+    <string name="renderer_route_missing_destination">routeGuide needs a destination (address or locationField)</string>
+    <string name="renderer_route_mode">Travel mode</string>
+    <string name="renderer_route_mode_car">Car</string>
+    <string name="renderer_route_mode_walk">Walk</string>
+    <string name="renderer_route_no_app">No app can open maps</string>
+    <string name="renderer_route_no_places">No destinations with a place yet</string>
+    <string name="renderer_route_opens_maps">Directions open in your maps app. Don\'t use your phone while driving</string>
+    <string name="renderer_route_start">Get directions in Maps</string>
+</resources>

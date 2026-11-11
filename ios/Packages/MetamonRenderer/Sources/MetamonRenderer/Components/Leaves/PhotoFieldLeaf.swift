@@ -45,7 +45,7 @@ struct PhotoFieldLeaf: View {
     private func content(form: FormDraft, field: String) -> some View {
         let value = form.values[field] ?? .null
         let decoded = PhotoCodec.image(from: value)
-        let hasPhoto = decoded != nil || (value.stringValue?.hasPrefix("http") ?? false)
+        let hasPhoto = decoded != nil || ImageHostPolicy.loadableURL(value.stringValue) != nil
 
         VStack(alignment: .leading, spacing: 8) {
             if hasPhoto {

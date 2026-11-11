@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 生成アプリのローカル通知(#886)。チャンネルの名前は端末の設定 > 通知 に出る -->
+<resources>
+    <string name="notification_alarm_stop">止める</string>
+    <string name="notification_channel_alarms">アラーム</string>
+    <string name="notification_channel_alarms_description">止めるまで鳴り続けるお知らせ</string>
+    <string name="notification_channel_conditions">条件のお知らせ</string>
+    <string name="notification_channel_conditions_description">記録が条件を満たした時のお知らせ</string>
+    <string name="notification_channel_reminders">時刻のお知らせ</string>
+    <string name="notification_channel_reminders_description">生成したアプリで設定した時刻のお知らせ</string>
+</resources>
