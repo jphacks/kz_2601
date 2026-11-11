@@ -340,7 +340,10 @@ targets:
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: jp.kz2601.metamon$(METAMON_BUNDLE_ID_SUFFIX)
-        PRODUCT_NAME: Metamon
+        # Finder・Dock・アクティビティモニタに出るバンドル名(#1054)。Bundle ID は変えない(Keychain・UserDefaults を引き継ぐ)。
+        # Swift のモジュール名は Metamon のまま固定する(`@testable import Metamon`・型の名前が変わらないように)
+        PRODUCT_NAME: Tailor It
+        PRODUCT_MODULE_NAME: Metamon
         INFOPLIST_FILE: MetamonMac/Resources/Info.plist
         CODE_SIGN_ENTITLEMENTS: MetamonMac/MetamonMac.entitlements
         ARCHS: $(ARCHS_STANDARD)
@@ -353,6 +356,8 @@ targets:
         ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME: AccentColor
         # select-firebase-plist.sh が「あれば使う」plist を読むため(iOS と同じ理由・#292)
         ENABLE_USER_SCRIPT_SANDBOXING: NO
+        # 通常の版だけマニフェストに足す種類(#931)。Mac はプッシュを登録しないのでデバイス ID は足さない
+        METAMON_PRIVACY_EXTRA_TYPES: PurchaseHistory CustomerSupport
       configs:
         Review:
           SWIFT_ACTIVE_COMPILATION_CONDITIONS: "$(inherited) APP_STORE_REVIEW"
@@ -368,6 +373,13 @@ targets:
           - $(SRCROOT)/scripts/select-firebase-plist.sh
         outputFiles:
           - $(TARGET_BUILD_DIR)/$(UNLOCALIZED_RESOURCES_FOLDER_PATH)/GoogleService-Info.plist
+        basedOnDependencyAnalysis: false
+      # 通常の版(Debug / Staging / Release)だけ、マニフェストに通常の版で集める種類を足す(#931・iOS と同じスクリプト)。
+      # 元の MetamonMac/PrivacyInfo.xcprivacy は審査用の版の申告のまま
+      - name: Extend privacy manifest for normal builds
+        script: '"${SRCROOT}/scripts/extend-privacy-manifest.sh"'
+        inputFiles:
+          - $(SRCROOT)/scripts/extend-privacy-manifest.sh
         basedOnDependencyAnalysis: false
       # クラッシュ報告(#930): dSYM を Crashlytics へ。iOS と同じスクリプト(Release / Review だけ送る。Debug・Staging・plist 無しの CI は即終了)。
       # Mac は base でサンドボックスを外している(上の ENABLE_USER_SCRIPT_SANDBOXING)。docs/ios/crash-reporting.md
@@ -396,8 +408,8 @@ targets:
       base:
         GENERATE_INFOPLIST_FILE: YES
         PRODUCT_BUNDLE_IDENTIFIER: jp.kz2601.metamon.mactests
-        # アプリの PRODUCT_NAME は Metamon(ターゲット名と違う)ので、ホストの場所を書く
-        TEST_HOST: $(BUILT_PRODUCTS_DIR)/Metamon.app/Contents/MacOS/Metamon
+        # アプリの PRODUCT_NAME は Tailor It(ターゲット名と違う・#1054)ので、ホストの場所を書く
+        TEST_HOST: $(BUILT_PRODUCTS_DIR)/Tailor It.app/Contents/MacOS/Tailor It
         BUNDLE_LOADER: $(TEST_HOST)
 
 schemes:
