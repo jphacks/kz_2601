@@ -2641,6 +2641,23 @@
         }
       }
     },
+    "ほかの録音を終えてから、もう一度お試しください" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Finish the other recording, then try again."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ほかの録音を終えてから、もう一度お試しください"
+          }
+        }
+      }
+    },
     "ほぼ静止" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -3453,6 +3470,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "システム設定 > Apple Intelligence と Siri でオンにしてください"
+          }
+        }
+      }
+    },
+    "システム設定 > プライバシーとセキュリティ > マイク で Tailor It を許可してください。" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Allow Tailor It in System Settings > Privacy & Security > Microphone."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "システム設定 > プライバシーとセキュリティ > マイク で Tailor It を許可してください。"
           }
         }
       }
@@ -5430,6 +5464,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "再生"
+          }
+        }
+      }
+    },
+    "再生できません" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Can't Play"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "再生できません"
           }
         }
       }
@@ -9679,6 +9730,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "録音が長すぎます(%lld 分まで)。分けた録音を選んでください"
+          }
+        }
+      }
+    },
+    "録音している間は再生できません。録音を止めてから、もう一度お試しください" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "You can't play while recording. Stop the recording and try again."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "録音している間は再生できません。録音を止めてから、もう一度お試しください"
           }
         }
       }

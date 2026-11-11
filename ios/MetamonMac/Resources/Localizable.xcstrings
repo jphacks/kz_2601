@@ -3405,6 +3405,23 @@
         }
       }
     },
+    "ほかの録音を終えてから、もう一度お試しください" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Finish the other recording, then try again."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ほかの録音を終えてから、もう一度お試しください"
+          }
+        }
+      }
+    },
     "まだできないこと" : {
       "localizations" : {
         "en" : {
@@ -11882,6 +11899,23 @@
         }
       }
     },
+    "録音ファイルを文字にできませんでした。もう一度お試しください" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Couldn't transcribe the audio file. Please try again."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "録音ファイルを文字にできませんでした。もう一度お試しください"
+          }
+        }
+      }
+    },
     "録音中にマイクが外れました。つなぎ直すか、設定でマイクを選んでから、もう一度話してください" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -12123,6 +12157,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "音声モデルを読み込み中…(初回は1分ほど)"
+          }
+        }
+      }
+    },
+    "音声入力を使っている間は、録音ファイルを文字にできません" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "You can't transcribe an audio file while voice input is in use."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "音声入力を使っている間は、録音ファイルを文字にできません"
           }
         }
       }
