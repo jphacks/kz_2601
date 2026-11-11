@@ -135,15 +135,15 @@ class DesktopIo(dsl: AppDSL, private val read: () -> MockStore, private val upda
 
     // --- クリップボード(#1766) ---
 
-    /** 一覧の記録を表計算に貼れる形(TSV・見出し付き)でコピー。[ids] があれば選んだ行だけ(#1766)。 */
-    fun copyRows(entityId: String, ids: Set<String>? = null) {
+    /** 一覧の記録を表計算に貼れる形(TSV・見出し付き)でコピー。[ids] があれば選んだ行だけ・その並び(画面の並び・#1766)。 */
+    fun copyRows(entityId: String, ids: List<String>? = null) {
         val entity = entity(entityId) ?: return
         val table = RecordIo.exportTable(entity.name, entity, read(), entities, null, ids = ids?.takeIf { it.isNotEmpty() })
         copyText(Tsv.string(table), table.rows.size)
     }
 
-    /** 一覧の選んだ行を外へ引き出す形(TSV の文字 + CSV のファイル・#1764)。中身は [copyRows] と同じ。 */
-    fun rowsTransferable(entityId: String, ids: Set<String>): Transferable? {
+    /** 一覧の選んだ行を外へ引き出す形(TSV の文字 + CSV のファイル・#1764)。中身は [copyRows] と同じ([ids] の並び)。 */
+    fun rowsTransferable(entityId: String, ids: List<String>): Transferable? {
         val entity = entity(entityId) ?: return null
         if (ids.isEmpty()) return null
         return DragOut.rows(RecordIo.exportTable(entity.name, entity, read(), entities, null, ids = ids))
@@ -187,6 +187,8 @@ class DesktopIo(dsl: AppDSL, private val read: () -> MockStore, private val upda
      * [draft] は一番上の画面の書けるフォーム(無い・読み取りだけなら null。写真・動画は入れない)。
      */
     fun drop(t: Transferable, screen: List<Component>, draft: MutableMap<String, String>?): Boolean {
+        // このアプリの行を落とし直しても取り込まない(#1764)
+        if (InternalDrag.isInternal(t)) return false
         files(t)?.let { return dropFiles(it, screen, draft) }
         image(t)?.let { img ->
             val d = draft ?: return false
@@ -212,7 +214,8 @@ class DesktopIo(dsl: AppDSL, private val read: () -> MockStore, private val upda
                 val field = all.firstOrNull { it.type == media && it.field != null && draft[it.field!!].isNullOrEmpty() }?.field
                     ?: all.firstOrNull { it.type == media }?.field
                 if (field != null) {
-                    draft[field] = f.toURI().toString()
+                    // 引き出した一時ファイル(終わる時に消える)は残る場所へ写してから
+                    draft[field] = (if (DragOut.isTemp(f)) keep(f) else f).toURI().toString()
                     used = true
                     continue
                 }
@@ -272,10 +275,16 @@ class DesktopIo(dsl: AppDSL, private val read: () -> MockStore, private val upda
         }
 
         /** 貼った画像の置き場(一時フォルダ・モックの写真は端末に残すだけ)。 */
-        fun savePhoto(img: BufferedImage): File {
-            val dir = File(System.getProperty("java.io.tmpdir"), "tailorit-photos").apply { mkdirs() }
-            return File.createTempFile("paste-", ".png", dir).also { ImageIO.write(img, "png", it) }
+        fun savePhoto(img: BufferedImage): File =
+            File.createTempFile("paste-", ".png", photoDir()).also { ImageIO.write(img, "png", it) }
+
+        /** 落としたファイルを [savePhoto] と同じ置き場へ写す(拡張子は残す)。 */
+        fun keep(f: File): File {
+            val ext = f.name.substringAfterLast('.', "").takeIf { it.isNotEmpty() }?.let { ".$it" } ?: ""
+            return File.createTempFile("drop-", ext, photoDir()).also { f.copyTo(it, overwrite = true) }
         }
+
+        private fun photoDir(): File = File(System.getProperty("java.io.tmpdir"), "tailorit-photos").apply { mkdirs() }
 
         fun openDialog(title: String): File? {
             val d = FileDialog(null as Frame?, title, FileDialog.LOAD)
@@ -291,11 +300,11 @@ private fun List<Component>.flatten(): List<Component> = flatMap { listOf(it) + 
 @Composable
 fun rememberDesktopIo(dsl: AppDSL, read: () -> MockStore, update: (MockStore) -> Unit): DesktopIo = remember(dsl) { DesktopIo(dsl, read, update) }
 
-/** 画面全体でファイル・画像を受ける。 */
+/** 画面全体でファイル・画像を受ける。このアプリの中から引いた行は受けない(#1764)。 */
 @OptIn(ExperimentalComposeUiApi::class)
 fun Modifier.ioDropTarget(io: DesktopIo, screen: () -> List<Component>, draft: () -> MutableMap<String, String>?): Modifier =
     dragAndDropTarget(
-        shouldStartDragAndDrop = { true },
+        shouldStartDragAndDrop = { e -> !InternalDrag.isInternal(runCatching { e.awtTransferable }.getOrNull()) },
         target = object : DragAndDropTarget {
             override fun onDrop(event: DragAndDropEvent): Boolean = io.drop(event.awtTransferable, screen(), draft())
         },
@@ -342,7 +351,7 @@ fun fileOf(uri: String): File? = runCatching { File(java.net.URI(uri)) }.getOrNu
 
 /** 一覧の上のコピー・貼り付け(表計算と行き来する)。 */
 @Composable
-fun ListIoBar(entityId: String, io: DesktopIo, selected: Set<String> = emptySet()) {
+fun ListIoBar(entityId: String, io: DesktopIo, selected: List<String> = emptyList()) {
     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
         // 行を選んでいればその行だけ、無ければ全部(今までどおり)
         TextButton(onClick = { io.copyRows(entityId, selected) }) {

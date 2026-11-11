@@ -38,7 +38,6 @@ import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
-import androidx.compose.ui.graphics.toComposeImageBitmap
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.LinkAnnotation
@@ -53,7 +52,6 @@ import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import jp.kz2601.metamon.desktop.io.DragOut
-import jp.kz2601.metamon.desktop.io.ImageSource
 import jp.kz2601.metamon.desktop.io.dragOut
 import jp.kz2601.metamon.dsl.Component
 import jp.kz2601.metamon.dsl.ComponentKind
@@ -218,28 +216,26 @@ object Markdown {
 
 // MARK: - image / avatar
 
-/** 読んだ画像。[bytes] は外へ引き出す時に PNG にする元(#1764)。 */
-class LoadedImage(val bytes: ByteArray, val bitmap: ImageBitmap)
-
 /**
  * https・data URL の画像を読む(読めなければ null)。Coil は入れず JVM の HTTP + Skia で十分。
- * [allowFile] は記録・フォームの値の時だけ(photoField の値は file URI)。
+ * [allowFile] は記録・フォームの値の時だけ(photoField の値は file URI)。[maxPx] を渡すと縮めた絵だけ持つ(一覧の写真)。
+ * 読む・PNG にする・縮めるのは裏(IO)で。読んだ物は URL ごとに少しだけ覚える(ImageLoader)。
  */
 @Composable
-fun rememberImage(src: String?, allowFile: Boolean = false): LoadedImage? {
-    var loaded by remember(src, allowFile) { mutableStateOf<LoadedImage?>(null) }
-    LaunchedEffect(src, allowFile) {
-        if (src.isNullOrBlank()) return@LaunchedEffect
-        loaded = withContext(Dispatchers.IO) {
-            val bytes = ImageSource.bytes(src, allowFile) ?: return@withContext null
-            runCatching { LoadedImage(bytes, org.jetbrains.skia.Image.makeFromEncoded(bytes).toComposeImageBitmap()) }.getOrNull()
-        }
+fun rememberImage(src: String?, allowFile: Boolean = false, maxPx: Int? = null, withPng: Boolean = true): LoadedImage? {
+    var loaded by remember(src, allowFile, maxPx, withPng) { mutableStateOf(ImageLoader.cached(src, allowFile, maxPx, withPng)) }
+    LaunchedEffect(src, allowFile, maxPx, withPng) {
+        if (src.isNullOrBlank() || loaded != null) return@LaunchedEffect
+        loaded = withContext(Dispatchers.IO) { ImageLoader.load(src, allowFile, maxPx, withPng) }
     }
     return loaded
 }
 
+/** 顔写真(引き出さないので PNG にしない・88dp まで縮める)。 */
 @Composable
-private fun rememberRemoteImage(src: String?): ImageBitmap? = rememberImage(src)?.bitmap
+private fun rememberRemoteImage(src: String?): ImageBitmap? = rememberImage(src, maxPx = AVATAR_PX, withPng = false)?.bitmap
+
+private const val AVATAR_PX = 264
 
 /** `image`: 画像は外(エクスプローラー・他のアプリ)へ PNG のファイルで引き出せる(#1764)。 */
 @Composable
@@ -252,7 +248,7 @@ fun ImageLeaf(c: Component, src: String?) {
     ) {
         if (image != null) {
             val name = c.label ?: Strings["desktop_drag_image_name"]
-            Image(image.bitmap, c.label, Modifier.fillMaxSize().dragOut { DragOut.image(image.bytes, name) }, contentScale = ContentScale.Crop)
+            Image(image.bitmap, c.label, Modifier.fillMaxSize().dragOut { image.png?.let { DragOut.imageOfPng(it, name) } }, contentScale = ContentScale.Crop)
         } else {
             Text(Strings["desktop_image_none"], color = Color.Gray, style = MaterialTheme.typography.bodySmall)
         }

@@ -135,15 +135,16 @@ class RowSelectionTest {
             .save("member", null, mapOf("name" to "佐藤 花子", "part" to "未定", "joined" to "2025-04-01"))
         val ids = store.list("member").map { it.id }
         val all = RecordIo.exportTable("部員", member, store, entities, null, locale = Locale.JAPAN, now = now)
-        val picked = RecordIo.exportTable("部員", member, store, entities, null, locale = Locale.JAPAN, now = now, ids = setOf(ids[0], ids[2]))
+        // 画面の並び(作った順)で選んだ 2 件を渡す
+        val picked = RecordIo.exportTable("部員", member, store, entities, null, locale = Locale.JAPAN, now = now, ids = listOf(ids[0], ids[2]))
         assertEquals(all.headers, picked.headers)
         assertEquals(3, all.rows.size)
-        // 選んだ 2 件だけ・全部の時と同じ並び(古い順)と書式
-        assertEquals(all.rows.filter { it[0] != "鈴木 一郎" }, picked.rows)
+        // 選んだ 2 件だけ・渡した並び(画面の並び)・全部の時と同じ書式
+        assertEquals(listOf(all.rows[1], all.rows[0]), picked.rows)
         assertEquals(
             "名前\t学年\tパート\t入部日\r\n" +
-                "佐藤 花子\t\t未定\t2025/4/1(火)\r\n" +
-                "山田 太郎\t2\t前衛\t4/10(金)\r\n",
+                "山田 太郎\t2\t前衛\t4/10(金)\r\n" +
+                "佐藤 花子\t\t未定\t2025/4/1(火)\r\n",
             jp.kz2601.metamon.desktop.io.Tsv.string(picked),
         )
     }
