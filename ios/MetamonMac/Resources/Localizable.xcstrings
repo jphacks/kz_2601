@@ -586,6 +586,22 @@
         }
       }
     },
+    "CSV で書き出す…" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Export as CSV…"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "CSV で書き出す…"
+          }
+        }
+      }
+    },
     "ISBN を確かめてください(10 桁か 13 桁)" : {
       "localizations" : {
         "en" : {
@@ -664,6 +680,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "OS"
+          }
+        }
+      }
+    },
+    "PDF で書き出す…" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Export as PDF…"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "PDF で書き出す…"
           }
         }
       }
