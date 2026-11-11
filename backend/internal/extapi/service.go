@@ -341,7 +341,9 @@ func (s *Service) Call(ctx context.Context, r CallRequest) (res CallResult, err 
 	}
 	if cacheKeyOf != "" {
 		now := s.now()
-		s.cache.put(cacheKeyOf, out, now.Add(spec.CacheTTL), now)
+		if ttl := spec.cacheTTL(r.Args, now); ttl > 0 {
+			s.cache.put(cacheKeyOf, out, now.Add(ttl), now)
+		}
 	}
 	res.Output = out
 	return res, nil

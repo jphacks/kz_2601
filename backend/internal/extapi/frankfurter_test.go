@@ -213,3 +213,51 @@ func TestFrankfurterCachedCall(t *testing.T) {
 		t.Fatalf("cache without Pro: %v", err)
 	}
 }
+
+// historical: a past day is kept 1 day, today (UTC) or later only 1 hour,
+// since the ECB may not have published that day's rates yet.
+func TestFrankfurterHistoricalTTL(t *testing.T) {
+	now := time.Date(2026, 11, 11, 3, 0, 0, 0, time.UTC)
+	for date, want := range map[string]time.Duration{
+		"2026-11-10": 24 * time.Hour,
+		"1999-01-04": 24 * time.Hour,
+		"2026-11-11": time.Hour,
+		"2026-11-12": time.Hour, // a day ahead of UTC (e.g. JST)
+	} {
+		if got := fxHistoricalTTL(map[string]string{"date": date}, now); got != want {
+			t.Errorf("%s: %v, want %v", date, got, want)
+		}
+	}
+	// the cut is the UTC day, not the clock's zone
+	jst := time.Date(2026, 11, 11, 8, 0, 0, 0, time.FixedZone("JST", 9*3600)) // 2026-11-10 23:00 UTC
+	if got := fxHistoricalTTL(map[string]string{"date": "2026-11-10"}, jst); got != time.Hour {
+		t.Errorf("UTC today in JST: %v", got)
+	}
+}
+
+// Through the Service: today's historical answer is asked again after an
+// hour; a past day's stays for the day.
+func TestFrankfurterHistoricalCacheToday(t *testing.T) {
+	s := newFXServer(t)
+	e := newEnv(t, opts{cfg: func(c *Config) { c.Enabled[Frankfurter] = true }})
+	e.svc.ops[Frankfurter] = s.ops()
+	today := e.c.t.UTC().Format(time.DateOnly)
+	past := e.c.t.UTC().AddDate(0, 0, -1).Format(time.DateOnly)
+	ask := func(d string) {
+		t.Helper()
+		if _, err := e.call(e.req(Frankfurter, "historical", map[string]string{"date": d, "to": "JPY"})); err != nil {
+			t.Fatalf("%s: %v", d, err)
+		}
+	}
+	ask(today)
+	ask(past)
+	if s.hits.Load() != 2 {
+		t.Fatalf("hits=%d", s.hits.Load())
+	}
+	e.c.t = e.c.t.Add(time.Hour)
+	ask(today)
+	ask(past)
+	if s.hits.Load() != 3 {
+		t.Fatalf("after an hour: hits=%d, want only today asked again", s.hits.Load())
+	}
+}

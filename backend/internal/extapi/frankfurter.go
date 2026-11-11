@@ -19,7 +19,7 @@ import (
 // (https://frankfurter.dev). Free, no key, no OAuth: one call is one `runs`.
 // Only api.frankfurter.app is reached; the answer becomes rows (currency,
 // rate). ECB rates change once a working day, so an answer is cached
-// (latest 1 hour, a past date 1 day).
+// (latest and today's date 1 hour, a past date 1 day).
 //
 //	latest(from?, to?, amount?)          today's rates    EXT_FRANKFURTER_ENABLED=1
 //	historical(date, from?, to?, amount?) the rates of a day (from 1999-01-04)
@@ -50,7 +50,7 @@ func init() {
 	register(Provider{ID: Frankfurter, Billing: BillingFree, Hosts: frankfurterHosts,
 		Ops: []OpSpec{
 			{Name: "latest", Args: []string{"from", "to", "amount"}, Check: checkFXArgs, CacheTTL: time.Hour},
-			{Name: "historical", Args: []string{"date", "from", "to", "amount"}, Check: checkFXHistorical, CacheTTL: 24 * time.Hour},
+			{Name: "historical", Args: []string{"date", "from", "to", "amount"}, Check: checkFXHistorical, CacheTTL: 24 * time.Hour, CacheTTLFor: fxHistoricalTTL},
 		},
 		New: func(Secrets) (map[string]Operation, error) {
 			return newFrankfurter(frankfurterHosts[0], NewHTTPClient(frankfurterHosts, DefaultTimeout)), nil
@@ -96,6 +96,18 @@ func checkFXHistorical(a map[string]string) error {
 		return errors.New("date must be between 1999-01-04 and today")
 	}
 	return checkFXArgs(a)
+}
+
+// fxHistoricalTTL: a day before today (UTC) has its final rates (1 day);
+// today or later may still get them after the ECB publishes, so it is kept
+// only as long as latest (1 hour).
+func fxHistoricalTTL(a map[string]string, now time.Time) time.Duration {
+	t, err := time.Parse(time.DateOnly, a["date"])
+	y, m, d := now.UTC().Date()
+	if err != nil || !t.Before(time.Date(y, m, d, 0, 0, 0, 0, time.UTC)) {
+		return time.Hour
+	}
+	return 24 * time.Hour
 }
 
 // newFrankfurter builds the ops against base (tests pass an httptest server).

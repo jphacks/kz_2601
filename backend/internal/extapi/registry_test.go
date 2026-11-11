@@ -140,6 +140,7 @@ func TestCacheTTLOnlyForKeyReads(t *testing.T) {
 		{ID: "cacheWrite", Billing: BillingFree, New: newOps, Ops: []OpSpec{{Name: "put", Write: true, CacheTTL: time.Minute}}},
 		{ID: "cacheOauth", Billing: BillingFree, New: newOps, NeedsOAuth: true, NewOAuth: oauth, Ops: []OpSpec{{Name: "get", CacheTTL: time.Minute}}},
 		{ID: "cacheNeg", Billing: BillingFree, New: newOps, Ops: []OpSpec{{Name: "get", CacheTTL: -time.Minute}}},
+		{ID: "cacheForOnly", Billing: BillingFree, New: newOps, Ops: []OpSpec{{Name: "get", CacheTTLFor: func(map[string]string, time.Time) time.Duration { return time.Minute }}}},
 	} {
 		if p.check() == nil {
 			t.Errorf("%s: accepted", p.ID)
