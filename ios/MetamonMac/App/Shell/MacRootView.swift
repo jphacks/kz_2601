@@ -184,7 +184,7 @@ struct MacRootView: View {
         if selectedAppId == id { selectedAppId = LocalAppLibrary.neighbor(deleting: id, in: apps.map(\.id)) }
         if notices.summary?.appId == id { notices.summary = nil }
         library.delete(id)
-        MacRecordVault.purge(appId: id) // 記録も消す(#1284)
+        Task { await MacRecordVault.purge(appId: id) } // 記録も消す(#1284)。開いているエンジンを止めてから
         thumbs.remove(appId: id)
         Task { await MacRuntimeNotifications.removeApp(id) } // そのアプリの通知とタイマーの予約(#1324)
         MacVoiceOver.announce(L10n.tr("「\(name)」を削除しました"))
