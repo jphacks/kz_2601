@@ -78,10 +78,10 @@ flowchart LR
 | `ingest-crash -issue ID -type T -count N -version V` | intake | Crashlytics の急増を 1 件として記録(人が Crashlytics の画面を見て打つ) |
 | `triage [-max 200] [-batch 20]` | triage | 新しい項目を分類(`bug` / `feature` / `question` / `praise` / `spam`)・束ね・優先度(P1〜P3)付け。同じ文は 1 回だけ送る |
 | `triage-score -labels FILE` | — | 人が付けた正解(1 行 `itemId,category`)との一致率(#376 の完了の条件: 8 割) |
-| `draft [-max-new 20]` | draft | 束ごとに下書きを作る / 開いている下書きに足す |
+| `draft [-max-new 20]` | draft | 束ごとに下書きを作る / 開いている下書きに足す。束にもう出した Issue(まだ直っていないもの)があれば、その Issue への追記の下書きにする([既存の Issue への追記](#既存の-issue-への追記)) |
 | `drafts list [-status pending]` / `show <id>` | — | 待ち行列を見る。`show` は出口の検査の結果と、承認の前に見る点を出す |
 | `drafts edit -by NAME [-title T] [-body-file F] <id>` | — | 再現の手順などを人が書く(出口の検査を通す) |
-| `drafts approve -by NAME <id>` | publish | **承認 1**。`LOOP_ISSUE_REPO` があれば Issue を作る。無ければ dry run(作られる Issue を表示するだけ) |
+| `drafts approve -by NAME <id>` | publish | **承認 1**。`LOOP_ISSUE_REPO` があれば Issue を作る(追記の下書きはその Issue へのコメント)。無ければ dry run(作られる Issue / コメントを表示するだけ) |
 | `drafts reject -by NAME [-reason R] <id>` / `publish <id>` | publish | 却下 / dry run の後で投稿 |
 | `fixed [-dry-run]` | notify | 出した Issue がマージされた PR で閉じたかを見て、送り主にお知らせを作り、リリースノートの下書きを表示する |
 | `notices -uid UID` | — | ある人のお知らせを見る |
@@ -109,7 +109,7 @@ flowchart LR
 | `LOOP_SOURCE_TESTFLIGHT` | 空 | `on` で TestFlight のフィードバック(スクショ付き・クラッシュの送信)を取り込む。キーは下の `LOOP_ASC_*` を共用。既定の `LOOP_AI_SOURCES` に入っていないので、AI に回すなら `testflight` を足す |
 | `LOOP_ASC_ISSUER_ID` / `LOOP_ASC_KEY_ID` / `LOOP_ASC_PRIVATE_KEY` / `LOOP_ASC_APP_ID` | — | App Store Connect API のキー(役割は Customer Support で足りる)。鍵は `.p8` の中身そのもの |
 | `LOOP_ISSUE_REPO` | 空 = dry run | Issue を作るリポジトリ(`owner/name`) |
-| `LOOP_GITHUB_TOKEN` | — | Issue の作成と読み取りだけの権限(GitHub App のインストールのトークン、または fine-grained の PAT の `issues: write`)。マージ・ラベル・コードの権限は持たせない |
+| `LOOP_GITHUB_TOKEN` | — | Issue の作成・コメント・読み取りだけの権限(GitHub App のインストールのトークン、または fine-grained の PAT の `issues: write`)。マージ・ラベル・コードの権限は持たせない |
 | `LOOP_ISSUE_LABELS` | 空 | 作る Issue に付けるラベル(カンマ区切り)。`agent:ready` は入れない(人が付ける) |
 | `LOOP_NOTIFY_PUSH` | 空 | `on` で「直りました」を push でも送る(本人の同意 `users/{uid}/notifyConsent/_feedback_fixed` と週 1 回の上限つき) |
 | `APNS_AUTH_KEY` / `APNS_KEY_ID` / `APNS_TEAM_ID` / `APNS_TOPIC` / `LOOP_APNS_ENVIRONMENT` | — | push の時だけ。runner と同じ APNs のキー |
@@ -123,6 +123,22 @@ flowchart LR
 | 審査用の版 | フィードバックと一緒に外す(`docs/ios/review-build.md`)。API は残るが、審査用の版からは呼ばない |
 
 アプリ内のお知らせは同意なしで作る(送り主本人にだけ見える・push はしない)。
+
+## 既存の Issue への追記
+
+同じ束の Issue を二重に出さない(#369)。
+
+| 場面 | 下書き | 承認したら |
+|---|---|---|
+| 束にまだ Issue が無い / 前の Issue は直った(`fixed` が記録した) | 新しい Issue の下書き(症状・ほかの報告・件数・再現の手順・完了の条件) | Issue を作る |
+| 束に出した Issue があり、まだ直っていない | 追記の下書き(`drafts list` に `(adds to owner/name#N)`、`show` に `adds to:`)。中身は**前回の後に届いた分だけ**の件数・入口・版・OS と要約(代表 1 + 最大 3) | その Issue に**コメント**を足す(`POST /repos/{repo}/issues/{n}/comments`)。題名は出さない。監査は `issue_appended` |
+
+- 追記の下書きも同じ決まった形・同じ出口の検査(`draft.Check`: 個人情報・URL・内部の ID・原文の一致)を、保存の時・承認の時・投稿の直前に通す。`uid`・アプリの ID・`lin_`/`fb_` は載せない。
+- 既定は新しい Issue と同じ: `LOOP_ISSUE_REPO` が無ければ dry run(足されるコメントを表示するだけ)、投稿は人の `drafts approve` / `publish` だけ。
+- 投稿の直前に、相手の Issue がまだ束の直っていない Issue か・`LOOP_ISSUE_REPO` と同じリポジトリかを確かめる。違えば出さない(`drafts reject` して `draft` をやり直す)。
+- 直った後に同じ束が来たら、再発として新しい Issue の下書きになる。
+- 追記の下書きも `fixed` の対象(Issue が閉じたら送り主にお知らせ)。リリースノートの下書きは Issue ごとに 1 行。
+- GitHub の上で人が手で閉じた(直していない)Issue は、ループには分からないので追記の先に残る。その時は追記の下書きを却下する。
 
 ## 運用の手順
 
@@ -174,5 +190,4 @@ go run ./cmd/feedback-loop audit -summary
 | 定期の実行(Cloud Scheduler・workflow) | 足していない。上のコマンドを job にする |
 | Crashlytics を自動で読む | Crashlytics は安く読める API が無い。BigQuery のエクスポート(#296)ができたら `ingest.CrashSource` を実装する。それまでは `ingest-crash` で人が記録 |
 | 生成の失敗の急増 | 取り込みの口は同じ形で足せる(`ingest.Fetcher`) |
-| 既存の Issue に件数と例を足す案 | 今は束ごとに新しい下書き。開いている下書きには足す |
 | Google の機密データの検出(#367 の選択肢 2-B) | GCP の設定が要るので後で |

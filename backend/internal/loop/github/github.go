@@ -1,6 +1,6 @@
 // Package github is the loop's small GitHub client. It holds only what the
-// loop needs: create an issue (after a human approved the draft, #369) and
-// read how an issue was closed (#374). It cannot merge, label existing
+// loop needs: create an issue or add a comment to one the loop filed (after
+// a human approved the draft, #369) and read how an issue was closed (#374). It cannot merge, label existing
 // issues, push or change settings, and it is given a token scoped to
 // issues only (docs/backend/features/feedback-loop.md).
 package github
@@ -102,4 +102,27 @@ func (c *Client) CreateIssue(ctx context.Context, repo, title, body string, labe
 		return nil, errors.New("github: no issue number in the response")
 	}
 	return &out, nil
+}
+
+// CommentIssue adds body as a comment to issue n in repo (a draft whose
+// cluster already has an issue, #369). The returned Issue is that issue,
+// with URL pointing at the new comment.
+func (c *Client) CommentIssue(ctx context.Context, repo string, n int, body string) (*Issue, error) {
+	if !ValidRepo(repo) {
+		return nil, fmt.Errorf("github: bad repo %q", repo)
+	}
+	if n <= 0 {
+		return nil, fmt.Errorf("github: bad issue number %d", n)
+	}
+	var out struct {
+		ID  int64  `json:"id"`
+		URL string `json:"html_url"`
+	}
+	if err := c.do(ctx, http.MethodPost, fmt.Sprintf("/repos/%s/issues/%d/comments", repo, n), map[string]any{"body": body}, &out); err != nil {
+		return nil, err
+	}
+	if out.ID <= 0 {
+		return nil, errors.New("github: no comment id in the response")
+	}
+	return &Issue{Number: n, URL: out.URL}, nil
 }
