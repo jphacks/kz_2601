@@ -424,6 +424,7 @@ paths:
         public/shared entity は全ユーザーの投稿が返り、各レコードに `author`/`authorName` が付く。
         `filterField=author&filterOp=eq&filterValue=<uid>` で特定ユーザー (自分) の投稿だけに絞れる。
         `filterField=author&filterOp=in&filterValue=myFollows` で自分がフォローしている人の投稿だけ (`nin` = フォローしていない人の投稿・#270)。フォローは 1 文書なのでメモリで絞る (Firestore の `in` の 30 件の上限は関係しない)。
+        private entity でも `filterField=author` の `eq`/`neq` を受け付ける。レコードはすべて呼び出した人のものなので、`eq <自分>`/`neq <他人>` は全件、`neq <自分>`/`eq <他人>` は 0 件(新着の確認が全 entity に送るため・#1641)。entity が `author` という項目を持つ時はその項目で絞る。
         **scope:shared の entity は作成者と参加者だけ**が読み書きできる (この entity の records の全操作で同じ・それ以外は 403 `not_member`・#254)。public は従来どおり誰でも。
         ブロックの関係にある人(呼び出した人がブロックした・呼び出した人をブロックした・`/me/blocks`)の投稿は一覧から除き、id を指定しても 404(#321)。仲間探しのプロフィール・連絡先の entity は、18 歳以上の申告(`/me/age-confirmation`)が無い人には自分の分だけ返す(#507)。運営が非公開にした共有アプリ(`apps_public/{appId}.hidden`)は、public/shared の entity の records の全操作が 403 `unpublished`(details.reason = 運営の理由)。
         運営がアプリのサーバー機能を強制停止している間(#346・`moderate stop-app -force` / `stop-all -force`)は、サーバーのルールのきっかけになる作成・更新(POST / PATCH)が 403 `app_stopped`(details.level = `app` / `global`、期限つきなら details.until)。ルールに当たらない書き込み・読み出し・削除はそのまま。
