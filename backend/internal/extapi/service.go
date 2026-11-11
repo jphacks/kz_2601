@@ -1,6 +1,7 @@
 package extapi
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"fmt"
@@ -252,8 +253,10 @@ func (s *Service) Call(ctx context.Context, r CallRequest) (res CallResult, err 
 	// 2. the person's token (the creator's for a server rule)
 	in := Input{Args: r.Args, RequestID: r.RequestID}
 	who, anon := r.actor()
+	var sealed []byte // the stored form of the token used
 	if p.NeedsOAuth {
-		t, err := s.token(ctx, who, p.ID)
+		var t Token
+		t, sealed, err = s.token(ctx, who, p.ID)
 		if err != nil {
 			refundRuns()
 			return res, err
@@ -298,7 +301,7 @@ func (s *Service) Call(ctx context.Context, r CallRequest) (res CallResult, err 
 		}
 		refundRuns()
 		if errors.Is(err, ErrInvalidGrant) && s.Conns != nil {
-			_ = s.Conns.MarkError(context.WithoutCancel(ctx), who, p.ID)
+			_ = s.Conns.MarkError(context.WithoutCancel(ctx), who, p.ID, sealed)
 			return res, ErrNotConnected
 		}
 		return res, err
@@ -358,48 +361,52 @@ func (s *Service) check(r CallRequest) (Provider, OpSpec, error) {
 	return p, spec, nil
 }
 
-// token reads uid's token of provider, refreshing it when it expired.
-func (s *Service) token(ctx context.Context, uid, provider string) (Token, error) {
+// token reads uid's token of provider, refreshing it when it expired. It
+// also returns the stored (sealed) form of the token, which MarkError takes.
+func (s *Service) token(ctx context.Context, uid, provider string) (Token, []byte, error) {
 	if uid == "" {
-		return Token{}, ErrNotConnected
+		return Token{}, nil, ErrNotConnected
 	}
-	t, err := s.Conns.Token(ctx, uid, provider)
+	t, sealed, err := s.Conns.read(ctx, uid, provider)
 	if err != nil {
-		return t, err
+		return t, nil, err
 	}
 	if !t.expired(s.now()) {
-		return t, nil
+		return t, sealed, nil
 	}
 	// One refresh at a time per connection on this instance: providers that
 	// rotate the refresh token refuse the old one once it was used.
 	unlock, err := s.refreshing.lock(ctx, uid+"\x00"+provider)
 	if err != nil {
-		return Token{}, err
+		return Token{}, nil, err
 	}
 	defer unlock()
-	if t, err = s.Conns.Token(ctx, uid, provider); err != nil || !t.expired(s.now()) {
-		return t, err // renewed by the call this one waited for
+	if t, sealed, err = s.Conns.read(ctx, uid, provider); err != nil || !t.expired(s.now()) {
+		return t, sealed, err // renewed by the call this one waited for
 	}
 	nt, err := s.oauth[provider].Refresh(ctx, t)
 	if errors.Is(err, ErrInvalidGrant) {
 		// another instance may have renewed (and rotated) it meanwhile
-		if cur, cerr := s.Conns.Token(ctx, uid, provider); cerr == nil && !cur.expired(s.now()) &&
-			(cur.RefreshToken != t.RefreshToken || cur.AccessToken != t.AccessToken) {
-			return cur, nil
+		if cur, cs, cerr := s.Conns.read(ctx, uid, provider); cerr == nil && !cur.expired(s.now()) && !bytes.Equal(cs, sealed) {
+			return cur, cs, nil
 		}
-		_ = s.Conns.MarkError(ctx, uid, provider)
-		return Token{}, ErrNotConnected
+		_ = s.Conns.MarkError(ctx, uid, provider, sealed)
+		return Token{}, nil, ErrNotConnected
 	}
 	if err != nil {
-		return Token{}, fmt.Errorf("refresh: %w", err)
+		return Token{}, nil, fmt.Errorf("refresh: %w", err)
 	}
 	if nt.RefreshToken == "" {
 		nt.RefreshToken = t.RefreshToken // providers that do not rotate it
 	}
-	if err := s.Conns.Save(ctx, uid, provider, nt); err != nil {
+	ns, err := s.Conns.SaveRefreshed(ctx, uid, provider, sealed, nt)
+	if errors.Is(err, ErrNotConnected) {
+		return Token{}, nil, err // cut (or connected again) while it was renewed
+	}
+	if err != nil {
 		s.Log.WarnContext(ctx, "extapi: saving the refreshed token failed", slog.String("provider", provider), slog.Any("error", err))
 	}
-	return nt, nil
+	return nt, ns, nil
 }
 
 // Reasons are the internal answer's reason (the runner → appconfig body);

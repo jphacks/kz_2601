@@ -46,6 +46,25 @@ func (m *Memory) Put(_ context.Context, uid string, c Connection) error {
 	return nil
 }
 
+// Update implements ConnectionStore.
+func (m *Memory) Update(_ context.Context, uid, provider string, fn func(Connection, bool) (Connection, bool)) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	c, ok := m.conns[uid][provider]
+	c.Sealed = slices.Clone(c.Sealed)
+	nc, write := fn(c, ok)
+	if !write {
+		return nil
+	}
+	if m.conns[uid] == nil {
+		m.conns[uid] = map[string]Connection{}
+	}
+	nc.Provider = provider
+	nc.Sealed = slices.Clone(nc.Sealed)
+	m.conns[uid][provider] = nc
+	return nil
+}
+
 // Delete implements ConnectionStore.
 func (m *Memory) Delete(_ context.Context, uid, provider string) error {
 	m.mu.Lock()

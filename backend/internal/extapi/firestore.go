@@ -62,6 +62,32 @@ func (f *Firestore) Put(ctx context.Context, uid string, c Connection) error {
 	return err
 }
 
+// Update implements ConnectionStore in one transaction.
+func (f *Firestore) Update(ctx context.Context, uid, provider string, fn func(Connection, bool) (Connection, bool)) error {
+	ref := f.conns(uid).Doc(provider)
+	return f.c.RunTransaction(ctx, func(_ context.Context, tx *firestore.Transaction) error {
+		var c Connection
+		ok := false
+		s, err := tx.Get(ref)
+		switch {
+		case status.Code(err) == codes.NotFound:
+		case err != nil:
+			return err
+		default:
+			if err := s.DataTo(&c); err != nil {
+				return err
+			}
+			ok = true
+		}
+		nc, write := fn(c, ok)
+		if !write {
+			return nil
+		}
+		nc.Provider = provider
+		return tx.Set(ref, nc)
+	})
+}
+
 // Delete implements ConnectionStore.
 func (f *Firestore) Delete(ctx context.Context, uid, provider string) error {
 	_, err := f.conns(uid).Doc(provider).Delete(ctx)
