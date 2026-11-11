@@ -18,11 +18,14 @@ import (
 
 // Todoist (#1496, API v1): free (one `runs` a call), OAuth with PKCE.
 //
-//	listTasks(filter?, projectId?, limit?)                                  data:read
+//	listTasks(filter?, projectId?, project?, label?, limit?)                data:read
+//	projects(limit?)                                                        data:read
 //	addTask(content, description?, dueString?, dueDate?, priority?, projectId?)  task:add
+//	complete(taskId)                                                        data:read_write
 //
 // task:add only adds tasks (it cannot read or change any); data:read only
-// reads. data:read_write is never asked for. New Todoist apps get an access
+// reads. Completing a task needs data:read_write (Todoist has no narrower
+// scope); it is asked for only when complete is first used. New Todoist apps get an access
 // token for an hour and a rotated refresh token; legacy apps get a
 // long-lived token and no refresh token (then a refused token means connect
 // again).
@@ -36,7 +39,7 @@ const Todoist = "todoist"
 const (
 	todoistScopeRead  = "data:read"
 	todoistScopeAdd   = "task:add"
-	todoistScopeWrite = "data:read_write" // covers both; accepted, never asked for
+	todoistScopeWrite = "data:read_write" // covers both; asked for by complete only
 )
 
 // todoistWire is where the provider talks to; tests point it at httptest.
@@ -63,8 +66,10 @@ var todoistHosts = []string{"https://api.todoist.com"}
 func init() {
 	register(Provider{ID: Todoist, Billing: BillingFree, NeedsOAuth: true, NameJa: "Todoist", NameEn: "Todoist",
 		Ops: []OpSpec{
-			{Name: "listTasks", Scopes: []string{todoistScopeRead}, Args: []string{"filter", "projectId", "limit"}},
+			{Name: "listTasks", Scopes: []string{todoistScopeRead}, Args: []string{"filter", "projectId", "project", "label", "limit"}, Check: checkTodoistList},
+			{Name: "projects", Scopes: []string{todoistScopeRead}, Args: []string{"limit"}, Check: checkTodoistProjects},
 			{Name: "addTask", Write: true, Scopes: []string{todoistScopeAdd}, Args: []string{"content", "description", "dueString", "dueDate", "priority", "projectId"}},
+			{Name: "complete", Write: true, Scopes: []string{todoistScopeWrite}, Args: []string{"taskId"}, Check: checkTodoistComplete},
 		},
 		Hosts: todoistHosts,
 		New: func(sec Secrets) (map[string]Operation, error) {
@@ -72,7 +77,8 @@ func init() {
 			if err != nil {
 				return nil, err
 			}
-			return map[string]Operation{"listTasks": OperationFunc(c.listTasks), "addTask": OperationFunc(c.addTask)}, nil
+			return map[string]Operation{"listTasks": OperationFunc(c.listTasks), "projects": OperationFunc(c.projects),
+				"addTask": OperationFunc(c.addTask), "complete": OperationFunc(c.complete)}, nil
 		},
 		NewOAuth: func(sec Secrets) (OAuthClient, error) { return newTodoist(sec, todoistWireDefault) },
 	})
@@ -233,6 +239,14 @@ func todoistCanAdd(t *Token) bool {
 	return slices.Contains(t.Scopes, todoistScopeAdd) || slices.Contains(t.Scopes, todoistScopeWrite)
 }
 
+// todoistCanWrite: the granted scopes cover data:read_write (complete).
+func todoistCanWrite(t *Token) bool {
+	if t == nil || len(t.Scopes) == 0 {
+		return true
+	}
+	return slices.Contains(t.Scopes, todoistScopeWrite)
+}
+
 // --- ops ---
 
 const (
@@ -287,36 +301,105 @@ func (t todoistTask) row() Row {
 	return r
 }
 
-// listTasks lists the person's open tasks: a Todoist filter ("today |
-// overdue"), one project, or all; one page of limit (default 20).
-func (c *todoist) listTasks(ctx context.Context, in Input) (Output, error) {
-	filter, err := todoistText("filter", in.Args["filter"], 1024, false)
+// todoistLimit reads limit (default 20, 1-50).
+func todoistLimit(v string) (int, error) {
+	if v == "" {
+		return todoistDefaultLimit, nil
+	}
+	x, err := strconv.Atoi(v)
+	if err != nil || x < 1 || x > todoistMaxLimit {
+		return 0, fmt.Errorf("%w: limit must be 1-%d", ErrUnknown, todoistMaxLimit)
+	}
+	return x, nil
+}
+
+// todoistName checks a project / label name that goes into a Todoist
+// filter (#name, @name): one line, none of the filter's operators.
+func todoistName(name, v string) (string, error) {
+	v, err := todoistText(name, v, 120, false)
 	if err != nil {
-		return Output{}, err
+		return "", err
 	}
-	project, err := todoistProjectID(in.Args["projectId"])
+	if strings.ContainsAny(v, "&|!(),\\*#@\n\t") {
+		return "", fmt.Errorf("%w: %s cannot have & | ! ( ) , \\ * # @ or line breaks", ErrUnknown, name)
+	}
+	return v, nil
+}
+
+// todoistListQuery turns listTasks' arguments into the path and query.
+// filter, projectId and project (a name) each pick the tasks one way (only
+// one of them); label narrows any of them.
+func todoistListQuery(a map[string]string) (string, url.Values, error) {
+	filter, err := todoistText("filter", a["filter"], 1024, false)
 	if err != nil {
-		return Output{}, err
+		return "", nil, err
 	}
-	if filter != "" && project != "" {
-		return Output{}, fmt.Errorf("%w: filter and projectId cannot be used together", ErrUnknown)
+	projectID, err := todoistProjectID(a["projectId"])
+	if err != nil {
+		return "", nil, err
 	}
-	n := todoistDefaultLimit
-	if v := in.Args["limit"]; v != "" {
-		x, err := strconv.Atoi(v)
-		if err != nil || x < 1 || x > todoistMaxLimit {
-			return Output{}, fmt.Errorf("%w: limit must be 1-%d", ErrUnknown, todoistMaxLimit)
+	project, err := todoistName("project", a["project"])
+	if err != nil {
+		return "", nil, err
+	}
+	label, err := todoistName("label", a["label"])
+	if err != nil {
+		return "", nil, err
+	}
+	picked := 0
+	for _, s := range []string{filter, projectID, project} {
+		if s != "" {
+			picked++
 		}
-		n = x
+	}
+	if picked > 1 {
+		return "", nil, fmt.Errorf("%w: use only one of filter, projectId and project", ErrUnknown)
+	}
+	// a comma splits a filter into separate lists; a label cannot narrow those
+	if filter != "" && label != "" && strings.Contains(filter, ",") {
+		return "", nil, fmt.Errorf("%w: label cannot narrow a filter with commas", ErrUnknown)
+	}
+	n, err := todoistLimit(a["limit"])
+	if err != nil {
+		return "", nil, err
 	}
 	v := url.Values{"limit": {strconv.Itoa(n)}}
-	path := "/tasks"
+	var query []string
 	switch {
+	case filter != "" && label != "":
+		query = append(query, "("+filter+")")
 	case filter != "":
-		path = "/tasks/filter"
-		v.Set("query", filter)
+		query = append(query, filter)
 	case project != "":
-		v.Set("project_id", project)
+		query = append(query, "#"+project)
+	default:
+		if projectID != "" {
+			v.Set("project_id", projectID)
+		}
+		if label != "" {
+			v.Set("label", label)
+		}
+		return "/tasks", v, nil
+	}
+	if label != "" {
+		query = append(query, "@"+label)
+	}
+	v.Set("query", strings.Join(query, " & "))
+	return "/tasks/filter", v, nil
+}
+
+func checkTodoistList(a map[string]string) error {
+	_, _, err := todoistListQuery(a)
+	return err
+}
+
+// listTasks lists the person's open tasks: a Todoist filter ("today |
+// overdue"), one project (by id or by name), or all, narrowed to a label;
+// one page of limit (default 20).
+func (c *todoist) listTasks(ctx context.Context, in Input) (Output, error) {
+	path, v, err := todoistListQuery(in.Args)
+	if err != nil {
+		return Output{}, err
 	}
 	var r struct {
 		Results []todoistTask `json:"results"`
@@ -329,6 +412,67 @@ func (c *todoist) listTasks(ctx context.Context, in Input) (Output, error) {
 		out.Rows = append(out.Rows, t.row())
 	}
 	return out, nil
+}
+
+func checkTodoistProjects(a map[string]string) error {
+	_, err := todoistLimit(a["limit"])
+	return err
+}
+
+// projects lists the person's projects, one page of limit (default 20):
+// title = the name (listTasks' project), link = the project.
+func (c *todoist) projects(ctx context.Context, in Input) (Output, error) {
+	n, err := todoistLimit(in.Args["limit"])
+	if err != nil {
+		return Output{}, err
+	}
+	var r struct {
+		Results []struct {
+			ID   string `json:"id"`
+			Name string `json:"name"`
+		} `json:"results"`
+	}
+	if err := c.do(ctx, in, http.MethodGet, "/projects?"+url.Values{"limit": {strconv.Itoa(n)}}.Encode(), nil, &r); err != nil {
+		return Output{}, err
+	}
+	out := Output{Rows: make([]Row, 0, len(r.Results))}
+	for _, p := range r.Results {
+		row := Row{Title: p.Name}
+		if todoistIDRe.MatchString(p.ID) {
+			row.URL = "https://app.todoist.com/app/project/" + p.ID
+		}
+		out.Rows = append(out.Rows, row)
+	}
+	return out, nil
+}
+
+func todoistTaskID(v string) (string, error) {
+	if !todoistIDRe.MatchString(v) {
+		return "", fmt.Errorf("%w: taskId must be a Todoist task id", ErrUnknown)
+	}
+	return v, nil
+}
+
+func checkTodoistComplete(a map[string]string) error {
+	_, err := todoistTaskID(a["taskId"])
+	return err
+}
+
+// complete closes one task (a recurring one moves to its next date).
+// Closing it again changes nothing, so a retried request is harmless. A
+// task the person does not have is 400 bad_request.
+func (c *todoist) complete(ctx context.Context, in Input) (Output, error) {
+	if !todoistCanWrite(in.Token) {
+		return Output{}, ErrNotConnected
+	}
+	id, err := todoistTaskID(in.Args["taskId"])
+	if err != nil {
+		return Output{}, err
+	}
+	if err := c.do(ctx, in, http.MethodPost, "/tasks/"+id+"/close", nil, nil); err != nil {
+		return Output{}, err
+	}
+	return Output{ResultID: id}, nil
 }
 
 // addTask adds one task (to the inbox unless projectId). dueString is
@@ -391,8 +535,9 @@ func (c *todoist) addTask(ctx context.Context, in Input) (Output, error) {
 
 // do calls the API with the person's token. 401 is a token Todoist no
 // longer takes (ErrInvalidGrant: the connection turns to error); 403 is a
-// missing scope (ErrNotConnected: connect again with it); 429 / 5xx are
-// retryable provider errors.
+// missing scope (ErrNotConnected: connect again with it); 404 is a task or
+// project the person does not have (bad_request); 429 / 5xx are retryable
+// provider errors. A nil out reads no answer (204).
 func (c *todoist) do(ctx context.Context, in Input, method, path string, body []byte, out any) error {
 	if in.Token == nil || in.Token.AccessToken == "" {
 		return ErrNotConnected
@@ -420,6 +565,9 @@ func (c *todoist) do(ctx context.Context, in Input, method, path string, body []
 	}
 	switch {
 	case resp.StatusCode >= 200 && resp.StatusCode < 300:
+		if out == nil {
+			return nil
+		}
 		if err := json.Unmarshal(b, out); err != nil {
 			return fmt.Errorf("todoist: bad answer: %w", err)
 		}
@@ -428,6 +576,8 @@ func (c *todoist) do(ctx context.Context, in Input, method, path string, body []
 		return ErrInvalidGrant
 	case resp.StatusCode == http.StatusForbidden:
 		return ErrNotConnected
+	case resp.StatusCode == http.StatusNotFound:
+		return &ProviderError{Status: resp.StatusCode, Err: fmt.Errorf("%w: todoist has no such item", ErrUnknown)}
 	}
 	var e struct {
 		ErrorTag string `json:"error_tag"`
