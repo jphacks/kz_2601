@@ -3401,6 +3401,23 @@
         }
       }
     },
+    "このアプリの通知を受け取る" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Get notifications from this app"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "このアプリの通知を受け取る"
+          }
+        }
+      }
+    },
     "このアプリは上のオープンソースソフトウェアを使っています。" : {
       "localizations" : {
         "en" : {
@@ -8438,6 +8455,23 @@
         }
       }
     },
+    "他の人の書き込みなどで届く通知です。オフにすると、このアプリからは届きません。" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "These arrive when other people post or respond. Turn this off to stop them from this app."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "他の人の書き込みなどで届く通知です。オフにすると、このアプリからは届きません。"
+          }
+        }
+      }
+    },
     "他の人の行動で届く通知" : {
       "localizations" : {
         "en" : {
@@ -10630,6 +10664,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "変更しました"
+          }
+        }
+      }
+    },
+    "変更できませんでした。元に戻しました" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Couldn't change this. It's been set back."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "変更できませんでした。元に戻しました"
           }
         }
       }

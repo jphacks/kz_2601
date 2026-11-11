@@ -43,6 +43,11 @@
 	<array>
 		<string>applinks:$(METAMON_APPLINKS_DOMAIN)</string>
 	</array>
+	<!-- プッシュ通知(#982): APNs の端末トークンを取る。Mac のキーは com.apple.developer.aps-environment(iOS は aps-environment)。
+	     環境は iOS と同じ METAMON_APS_ENV(Debug / Staging は development・Release は production)。
+	     審査用の版はプッシュを外しているので MetamonMac-Review.entitlements に入れない(iOS の Metamon-Review.entitlements と同じ) -->
+	<key>com.apple.developer.aps-environment</key>
+	<string>$(METAMON_APS_ENV)</string>
 	<key>keychain-access-groups</key>
 	<array>
 		<string>$(AppIdentifierPrefix)$(PRODUCT_BUNDLE_IDENTIFIER)</string>
