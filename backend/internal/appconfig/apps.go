@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"log/slog"
 	"net/http"
+	"regexp"
 	"time"
 
 	"github.com/jphacks/kz_2601/backend/internal/httpx"
@@ -20,6 +21,7 @@ type appSummary struct {
 	CreatedAt      time.Time `json:"createdAt"`
 	UpdatedAt      time.Time `json:"updatedAt"`
 	SortIndex      int       `json:"sortIndex,omitempty"`
+	GlanceStat     string    `json:"glanceStat,omitempty"`
 }
 
 type appWithDSL struct {
@@ -28,7 +30,7 @@ type appWithDSL struct {
 }
 
 func summary(a *store.App) appSummary {
-	return appSummary{ID: a.ID, Name: a.Name, CurrentVersion: a.CurrentVersion, Status: a.Status, CreatedAt: a.CreatedAt, UpdatedAt: a.UpdatedAt, SortIndex: a.SortIndex}
+	return appSummary{ID: a.ID, Name: a.Name, CurrentVersion: a.CurrentVersion, Status: a.Status, CreatedAt: a.CreatedAt, UpdatedAt: a.UpdatedAt, SortIndex: a.SortIndex, GlanceStat: a.GlanceStat}
 }
 
 func (h *Handler) listApps(w http.ResponseWriter, r *http.Request) {
@@ -148,10 +150,15 @@ func (h *Handler) patchApp(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	var body struct {
-		Name   *string `json:"name"`
-		Status *string `json:"status"`
+		Name       *string `json:"name"`
+		Status     *string `json:"status"`
+		GlanceStat *string `json:"glanceStat"`
 	}
 	if !httpx.DecodeBody(w, r, &body) {
+		return
+	}
+	if body.GlanceStat != nil && !validGlanceStat(*body.GlanceStat) {
+		fail(w, apiErr(http.StatusBadRequest, httpx.CodeBadRequest, "glanceStat must be a component id, \"-\" or empty"))
 		return
 	}
 	if body.Status != nil && *body.Status != "active" && *body.Status != "archived" {
@@ -166,6 +173,12 @@ func (h *Handler) patchApp(w http.ResponseWriter, r *http.Request) {
 		}
 		if err := h.rename(r, id, name); err != nil {
 			fail(w, err)
+			return
+		}
+	}
+	if body.GlanceStat != nil {
+		if _, err := h.store.SetAppGlance(r.Context(), uidOf(r), id, *body.GlanceStat); err != nil {
+			fail(w, mapStoreErr(err, "app"))
 			return
 		}
 	}
@@ -204,4 +217,15 @@ func (h *Handler) deleteApp(w http.ResponseWriter, r *http.Request) {
 		slog.Bool("listing", res.Listing), slog.Bool("mirror", res.Mirror),
 		slog.Int("versions", res.Versions), slog.Int("records", res.Records))
 	w.WriteHeader(http.StatusNoContent)
+}
+
+// glanceIDRe is the DSL component id format (pkg/dsl idRe).
+var glanceIDRe = regexp.MustCompile(`^[a-z][a-z0-9_-]{0,39}$`)
+
+// validGlanceStat: which stat the app list card shows (link-10). A component
+// id of the app, "-" for none, or "" for the default (the first stat of the
+// first screen). Only the format is checked: an id the DSL no longer has falls
+// back to the default on the device.
+func validGlanceStat(s string) bool {
+	return s == "" || s == "-" || glanceIDRe.MatchString(s)
 }
