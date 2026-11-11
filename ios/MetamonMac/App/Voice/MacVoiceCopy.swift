@@ -1,6 +1,7 @@
 import Foundation
 import Darwin
 import MetamonServices
+import MetamonRenderer
 
 /// 声で頼む(#966)の文言。iOS の `VoiceModelCopy` / `ErrorCopy.transcriberFailure` と同じ言い方で、
 /// 「設定アプリ」「タップ」など iPhone の言い方だけ Mac の言い方にする。
@@ -66,6 +67,14 @@ enum MacVoiceCopy {
             L10n.tr("音声認識の許可がありません。システム設定 > プライバシーとセキュリティ > 音声認識 で許可するか、音声モデルの準備ができるまで文字で頼んでください")
         case .onDeviceRecognitionUnavailable: L10n.tr("この Mac では音声モデルの準備ができるまで声で頼めません。文字で頼んでください")
         }
+    }
+
+    /// 生成したアプリの話して入力(#1328)の失敗。許可が無い時はシステム設定の欄を開けるようにする
+    static func dictationFailure(_ error: Error) -> DictationFailure {
+        guard let f = error as? TranscriberFailure else {
+            return DictationFailure(L10n.tr("録音できませんでした。もう一度お試しください"))
+        }
+        return DictationFailure(message(f), settingsURL: privacyPane(for: f)?.url)
     }
 
     static func privacyPane(for f: TranscriberFailure) -> PrivacyPane? {

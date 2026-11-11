@@ -29,9 +29,14 @@ public enum DictationReadiness: Equatable, Sendable {
 }
 
 /// 録音・文字起こしの失敗。`message` はホストが表示言語で作った文言。
+/// `settingsURL`: 許可が無い時に「設定を開く」で開く先(Mac はシステム設定のマイク・音声認識の欄)。nil ならボタンを出さない。
 public struct DictationFailure: LocalizedError, Equatable, Sendable {
     public let message: String
-    public init(_ message: String) { self.message = message }
+    public let settingsURL: URL?
+    public init(_ message: String, settingsURL: URL? = nil) {
+        self.message = message
+        self.settingsURL = settingsURL
+    }
     public var errorDescription: String? { message }
 }
 
