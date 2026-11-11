@@ -318,6 +318,8 @@ targets:
       - path: Metamon/Features/AppLimit/AppReplacePlan.swift
       # ログイン(#930): サインインの状態(Firebase Auth の観測・Sign in with Apple の受け渡し・nonce)は iOS のファイルをそのまま使う
       - path: Metamon/Features/Auth/AuthSession.swift
+      # 共有のリンク(#1287): 参加できない理由(403)の文言は iOS のファイルをそのまま使う
+      - path: Metamon/Features/Share/SharedAccessCopy.swift
       # 規約・ポリシーは iOS と同じ同梱版をアプリ内で読む(#971)
       - path: ../docs/legal
         buildPhase: resources
@@ -351,6 +353,8 @@ targets:
         Review:
           SWIFT_ACTIVE_COMPILATION_CONDITIONS: "$(inherited) APP_STORE_REVIEW"
           METAMON_APP_STORE_REVIEW: "YES"
+          # 共有のリンクを外した版なので Associated Domains(#1286)を入れない(iOS の Metamon-Review.entitlements と同じ)
+          CODE_SIGN_ENTITLEMENTS: MetamonMac/MetamonMac-Review.entitlements
     postBuildScripts:
       # iOS と同じスクリプト・同じ plist(Bundle ID が iOS と同じなので、Firebase の Apple アプリ 1 つを Mac でも使う・#930)。
       # ios/Firebase/ に plist が無ければ何も入れない(秘密のファイルは repo に無い)。無い時はログインと AI がモックになる(MacServices)

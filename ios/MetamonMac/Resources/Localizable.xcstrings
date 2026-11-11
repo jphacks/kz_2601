@@ -488,22 +488,6 @@
         }
       }
     },
-    "Mac ではまだ共有のアプリを開けません" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Shared apps can't be opened on Mac yet"
-          }
-        },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Mac ではまだ共有のアプリを開けません"
-          }
-        }
-      }
-    },
     "OK" : {
       "localizations" : {
         "en" : {
@@ -851,6 +835,23 @@
         }
       }
     },
+    "。みんなの投稿も見られます" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : ". You can see everyone's posts too"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "。みんなの投稿も見られます"
+          }
+        }
+      }
+    },
     "。サインインすると上限が増えます" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -864,6 +865,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "。サインインすると上限が増えます"
+          }
+        }
+      }
+    },
+    "。参加している人の記録も見られます" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : ". You can also see records from everyone in it"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "。参加している人の記録も見られます"
           }
         }
       }
@@ -931,6 +949,40 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "「%@」には Tailor It Pro が必要です"
+          }
+        }
+      }
+    },
+    "「%@」に参加しました" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Joined “%@”"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "「%@」に参加しました"
+          }
+        }
+      }
+    },
+    "「%@」に参加しますか?" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Join “%@”?"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "「%@」に参加しますか?"
           }
         }
       }
@@ -1082,6 +1134,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "「%@」を削除しますか?"
+          }
+        }
+      }
+    },
+    "「%@」を追加しますか?" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Add “%@”?"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "「%@」を追加しますか?"
           }
         }
       }
@@ -1242,6 +1311,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "あなた: %@"
+          }
+        }
+      }
+    },
+    "あなたが付けた記録も、参加している人に見えます" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Records you add are visible to them too"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "あなたが付けた記録も、参加している人に見えます"
           }
         }
       }
@@ -1820,6 +1906,23 @@
         }
       }
     },
+    "このシェアリンクは取り消されたか、存在しません" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "This share link was revoked or doesn't exist"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "このシェアリンクは取り消されたか、存在しません"
+          }
+        }
+      }
+    },
     "このデータは作った人だけが変更できます" : {
       "localizations" : {
         "en" : {
@@ -1865,6 +1968,40 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "このボタンは Mac ではまだ使えません"
+          }
+        }
+      }
+    },
+    "このリンクを送った人はもう参加していないため、参加できません。参加している人に新しいリンクをもらってください" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The person who sent this link has left this share, so you can't join with it. Ask someone who's still in it for a new link."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "このリンクを送った人はもう参加していないため、参加できません。参加している人に新しいリンクをもらってください"
+          }
+        }
+      }
+    },
+    "この共有に参加していません。招待リンクから参加してください" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "You haven't joined this share. Join from an invite link."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "この共有に参加していません。招待リンクから参加してください"
           }
         }
       }
@@ -3419,6 +3556,23 @@
         }
       }
     },
+    "シェアされた「%@」を追加しました" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Added the shared app “%@”"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "シェアされた「%@」を追加しました"
+          }
+        }
+      }
+    },
     "シェアされたアプリに参加して、同じデータを使えます" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -3432,6 +3586,57 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "シェアされたアプリに参加して、同じデータを使えます"
+          }
+        }
+      }
+    },
+    "シェアされたアプリを追加しますか?" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Add the shared app?"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "シェアされたアプリを追加しますか?"
+          }
+        }
+      }
+    },
+    "シェアされたアプリを開けませんでした" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Couldn't open the shared app"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "シェアされたアプリを開けませんでした"
+          }
+        }
+      }
+    },
+    "シェアリンクはサーバー接続時のみ開けます" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Share links only open when connected to the server"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "シェアリンクはサーバー接続時のみ開けます"
           }
         }
       }
@@ -4674,6 +4879,23 @@
         }
       }
     },
+    "例: 父、たろう" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "e.g. Dad, Taro"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "例: 父、たろう"
+          }
+        }
+      }
+    },
     "価格を取得できませんでした。通信状態を確認してください。" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -5259,6 +5481,108 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "匿名で利用中"
+          }
+        }
+      }
+    },
+    "参加している人が上限(100 人)に達しているため、参加できません" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "This share is full (100 people), so you can't join."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "参加している人が上限(100 人)に達しているため、参加できません"
+          }
+        }
+      }
+    },
+    "参加している人が付けた記録が見られます" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "You can see the records added by people in this share"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "参加している人が付けた記録が見られます"
+          }
+        }
+      }
+    },
+    "参加している人の一覧に、下の名前で出ます" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "You appear in the member list with the name below"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "参加している人の一覧に、下の名前で出ます"
+          }
+        }
+      }
+    },
+    "参加しない" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Not now"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "参加しない"
+          }
+        }
+      }
+    },
+    "参加する" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Join"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "参加する"
+          }
+        }
+      }
+    },
+    "参加すると" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "When you join"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "参加すると"
           }
         }
       }
@@ -7378,6 +7702,23 @@
         }
       }
     },
+    "空欄のままなら、名前なしで一覧に出ます" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "If left blank, you appear without a name"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "空欄のままなら、名前なしで一覧に出ます"
+          }
+        }
+      }
+    },
     "端末内の AI が使えるか(非対応の端末・オフ・準備中)と、AI ボタンが答えを出せなかった回数を、ボタンの種類(要約・分類など)ごとに 1 日 1 回まとめて送ります。ユーザー ID・入力した文・記録は送りません。" : {
       "localizations" : {
         "en" : {
@@ -7619,6 +7960,40 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "表示できない言葉が含まれています"
+          }
+        }
+      }
+    },
+    "表示名" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Display name"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "表示名"
+          }
+        }
+      }
+    },
+    "表示名(任意)" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Display name (optional)"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "表示名(任意)"
           }
         }
       }
@@ -8234,6 +8609,57 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "追加"
+          }
+        }
+      }
+    },
+    "追加しない" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Not now"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "追加しない"
+          }
+        }
+      }
+    },
+    "追加する" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Add"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "追加する"
+          }
+        }
+      }
+    },
+    "追加すると、このアプリに切り替わります" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Adding it switches to this app."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "追加すると、このアプリに切り替わります"
           }
         }
       }
