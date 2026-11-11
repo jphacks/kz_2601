@@ -212,6 +212,13 @@ extension AppRuntime: MatchingHost {
         toast = L10n.tr("18 歳未満の方は「つながりたい」を使えません")
     }
 
+    /// 確認をスワイプで閉じた: 「18 歳未満」と同じ扱い(開いた時・読み込みでは聞き直さず、ボタンを押した時だけ聞く)。
+    /// 答えたわけではないので「使えません」は出さない。
+    func dismissAdult() {
+        MatchingUI.shared.askingAge = nil
+        MatchingUI.shared.declinedAge = true
+    }
+
     /// サーバーがプロフィールの投稿を断った(400 age_unconfirmed・`SyncEvent.ageUnconfirmed`)。同意したら投稿し直す。
     func profilePostNeedsAge(entity: String, data: [String: JSONValue]) {
         askAge(.post(entity: entity, data: data))
@@ -296,7 +303,7 @@ struct MatchingSheets: ViewModifier {
         }
         .sheet(item: Binding(
             get: { onModal == (rt.sheet != nil || rt.fullScreen != nil) ? ui.askingAge : nil },
-            set: { if $0 == nil, ui.askingAge != nil { ui.askingAge = nil } }
+            set: { if $0 == nil, ui.askingAge != nil { rt.dismissAdult() } } // スワイプで閉じた
         )) { pending in
             AdultConfirmSheet(
                 confirm: { Task { await rt.confirmAdult(pending) } },
