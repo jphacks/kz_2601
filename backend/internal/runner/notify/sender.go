@@ -9,9 +9,24 @@ import (
 	"strconv"
 )
 
+// Push platforms (the same strings as store.PlatformIOS / PlatformAndroid).
+const (
+	PlatformIOS     = "ios"     // APNs
+	PlatformAndroid = "android" // FCM (#918)
+)
+
+// Device is one push target of a recipient.
+type Device struct {
+	Token string
+	// Platform: PlatformIOS ("" counts as iOS) or PlatformAndroid.
+	Platform string
+}
+
 // Push is one notification to one device.
 type Push struct {
 	Token string
+	// Platform picks the provider (see PlatformSender); "" = iOS.
+	Platform string
 	// AppID opens the app on tap (inside Tailor It only, never a URL).
 	AppID string
 	// AppName is shown as the sender (#339: the app must be identifiable).
@@ -29,7 +44,8 @@ type Result struct {
 	Status int
 	// Reason is the provider's reason string ("" on success).
 	Reason string
-	// Unregistered: the token is no longer valid (APNs 410 / 400 BadDeviceToken).
+	// Unregistered: the token is no longer valid (APNs 410 / 400 BadDeviceToken,
+	// FCM UNREGISTERED / SENDER_ID_MISMATCH).
 	// Delete it; do not retry.
 	Unregistered bool
 	// Retryable: a later attempt may succeed (5xx, 429, network).
@@ -41,11 +57,11 @@ type Sender interface {
 	Send(ctx context.Context, p Push) (Result, error)
 }
 
-// TokenReader reads uid's device tokens. The runner reads users/{uid}/devices
+// TokenReader reads uid's devices. The runner reads users/{uid}/devices
 // (registered by PUT /v1/me/devices, #269) through its appId-bound handle;
-// tests may use MemoryTokens.
+// tests may use MemoryTokens or MemoryDevices.
 type TokenReader interface {
-	Tokens(ctx context.Context, uid string) ([]string, error)
+	Tokens(ctx context.Context, uid string) ([]Device, error)
 }
 
 // CollapseID derives an apns-collapse-id from the run's idempotency key and
@@ -80,7 +96,7 @@ type Outcome struct {
 	Skipped []Skip
 	// Retryable: some sends failed in a way a retry may fix.
 	Retryable bool
-	// Unregistered tokens should be deleted (APNs 410).
+	// Unregistered tokens should be deleted (APNs 410, FCM UNREGISTERED).
 	Unregistered []DeviceToken
 }
 
@@ -133,8 +149,9 @@ func (d *Dispatcher) Dispatch(ctx context.Context, res Resolution, c Content) (O
 			continue
 		}
 		sent, unregistered, retryable := false, 0, false
-		for _, tok := range tokens {
-			r, err := d.Sender.Send(ctx, Push{Token: tok, AppID: c.AppID, AppName: c.AppName,
+		for _, dev := range tokens {
+			tok := dev.Token
+			r, err := d.Sender.Send(ctx, Push{Token: tok, Platform: dev.Platform, AppID: c.AppID, AppName: c.AppName,
 				Title: c.Title, Body: c.Body, CollapseID: collapse})
 			switch {
 			case err == nil:

@@ -13,6 +13,13 @@ const (
 	DeviceProduction = "production"
 )
 
+// Push platforms of a device (#918): the provider its token is sent through.
+// A device stored before platforms existed is PlatformIOS.
+const (
+	PlatformIOS     = "ios"     // APNs
+	PlatformAndroid = "android" // FCM
+)
+
 // MaxDevicesPerUser bounds users/{uid}/devices: registering one more removes
 // the least recently updated.
 const MaxDevicesPerUser = 10
@@ -21,13 +28,17 @@ const MaxDevicesPerUser = 10
 // that can receive pushes (#269). Token is personal data: it is never
 // logged and never returned by the API.
 type Device struct {
-	InstallationID string    `json:"installationId"`
-	Token          string    `json:"-"`
-	Environment    string    `json:"environment"`
-	AppVersion     string    `json:"appVersion,omitempty"`
-	OS             string    `json:"os,omitempty"`
-	CreatedAt      time.Time `json:"createdAt"`
-	UpdatedAt      time.Time `json:"updatedAt"`
+	InstallationID string `json:"installationId"`
+	Token          string `json:"-"`
+	Platform       string `json:"platform"`
+	// Environment is the APNs host an iOS token is valid on. Android
+	// (FCM) tokens are valid in the Firebase project they were issued for,
+	// so the runner does not filter them by it.
+	Environment string    `json:"environment"`
+	AppVersion  string    `json:"appVersion,omitempty"`
+	OS          string    `json:"os,omitempty"`
+	CreatedAt   time.Time `json:"createdAt"`
+	UpdatedAt   time.Time `json:"updatedAt"`
 }
 
 // Devices stores the push tokens of a user's devices (#269). The runner

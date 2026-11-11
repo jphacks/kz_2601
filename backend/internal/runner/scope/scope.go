@@ -407,24 +407,26 @@ func (h *Handle) Allows(ctx context.Context, uid string) (bool, error) {
 	return h.b.NotifyAllowed(ctx, uid, h.appID)
 }
 
-// DeviceTokens are uid's tokens valid on the APNs environment env (all when
-// env is ""). The notifier asks only for recipients that passed the checks
-// (#337: tokens are personal data across apps).
-func (h *Handle) DeviceTokens(ctx context.Context, uid, env string) ([]string, error) {
+// PushDevices are uid's devices the runner can push to: iOS devices whose
+// APNs environment is env (all when env is "") and every Android device (an
+// FCM token is valid in the Firebase project it was issued for, #918). The
+// notifier asks only for recipients that passed the checks (#337: tokens are
+// personal data across apps).
+func (h *Handle) PushDevices(ctx context.Context, uid, env string) ([]store.Device, error) {
 	ds, err := h.b.ListDevices(ctx, uid)
 	if err != nil {
 		return nil, err
 	}
-	var out []string
+	var out []store.Device
 	for _, d := range ds {
-		if env == "" || d.Environment == env {
-			out = append(out, d.Token)
+		if d.Platform == store.PlatformAndroid || env == "" || d.Environment == env {
+			out = append(out, d)
 		}
 	}
 	return out, nil
 }
 
-// DropDeviceToken deletes uid's devices holding token (APNs 410).
+// DropDeviceToken deletes uid's devices holding token (APNs 410, FCM UNREGISTERED).
 func (h *Handle) DropDeviceToken(ctx context.Context, uid, token string) error {
 	_, err := h.b.DeleteDeviceToken(ctx, uid, token)
 	return err

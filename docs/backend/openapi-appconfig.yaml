@@ -1108,18 +1108,20 @@ paths:
       description: |
         `users/{uid}/devices/{installationId}` に保存(本人の分だけ。パスに uid は無い)。同じ `installationId` は上書き(`createdAt` は保つ)。
         1 人 10 台まで。11 台目を登録すると、最後の更新が古いものから消す。同じトークンが別のアカウント(または別の `installationId`)にあれば、そちらを消す(1 台の端末でアカウントを替えた時に前のアカウントの通知が届かないように)。
-        トークンはレスポンスにもログにも出さない。退会(`DELETE /me`)の時点で全部消す(決定 #337)。APNs が 410(Unregistered)を返したトークンは runner が消す。
+        トークンはレスポンスにもログにも出さない。退会(`DELETE /me`)の時点で全部消す(決定 #337)。APNs が 410(Unregistered)を返したトークン・FCM が UNREGISTERED / SENDER_ID_MISMATCH を返したトークンは runner が消す。
+        `platform` で送り先が決まる(#918): `ios` は APNs、`android` は FCM。
       requestBody:
         required: true
         content:
           application/json:
             schema:
               type: object
-              required: [token, environment]
+              required: [token]
               additionalProperties: false
               properties:
-                token: { type: string, pattern: '^([0-9a-fA-F]{2}){32,100}$', description: APNs の端末トークン(16 進。大文字は小文字にして保存) }
-                environment: { type: string, enum: [sandbox, production], description: トークンが有効な APNs の環境 }
+                platform: { type: string, enum: [ios, android], default: ios, description: '端末の OS。省略は ios(#918 より前の iOS アプリ)' }
+                token: { type: string, description: 'ios は APNs の端末トークン(`^([0-9a-fA-F]{2}){32,100}$`。大文字は小文字にして保存)。android は FCM の登録トークン(`^[A-Za-z0-9_:.-]{32,1000}$`。大文字小文字はそのまま保存)' }
+                environment: { type: string, enum: [sandbox, production], description: 'トークンが有効な APNs の環境。ios は必須。android は省略可(production として保存し、送り分けには使わない: FCM のトークンは発行した Firebase プロジェクトで有効)' }
                 appVersion: { type: string, maxLength: 32 }
                 os: { type: string, maxLength: 32, example: iOS 18.1 }
       responses:
@@ -2070,10 +2072,11 @@ components:
         createdAt: { type: string, format: date-time }
     Device:
       type: object
-      required: [installationId, environment, createdAt, updatedAt]
+      required: [installationId, platform, environment, createdAt, updatedAt]
       description: 登録した端末(トークンは返さない)
       properties:
         installationId: { type: string }
+        platform: { type: string, enum: [ios, android] }
         environment: { type: string, enum: [sandbox, production] }
         appVersion: { type: string }
         os: { type: string }
