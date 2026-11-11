@@ -3508,6 +3508,40 @@
         }
       }
     },
+    "ファイルはアプリの中では保存できません" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Files can’t be saved in the app."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ファイルはアプリの中では保存できません"
+          }
+        }
+      }
+    },
+    "ファイルはアプリの中では保存できません。「ブラウザで開く」から保存してください" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Files can’t be saved in the app. Use “Open in Browser” to save it."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ファイルはアプリの中では保存できません。「ブラウザで開く」から保存してください"
+          }
+        }
+      }
+    },
     "ファイルを開けませんでした" : {
       "extractionState" : "manual",
       "localizations" : {
