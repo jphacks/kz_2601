@@ -339,6 +339,34 @@
         }
       }
     },
+    "%lld 人" : {
+      "localizations" : {
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld person"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld people"
+                }
+              }
+            }
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld 人"
+          }
+        }
+      }
+    },
     "%lld 件の記録を送れませんでした。送らずにログアウトすると、この記録は消えます。" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -916,6 +944,22 @@
         }
       }
     },
+    "Discord に送る" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Send to Discord"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Discord に送る"
+          }
+        }
+      }
+    },
     "ISBN を確かめてください(10 桁か 13 桁)" : {
       "localizations" : {
         "en" : {
@@ -928,6 +972,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "ISBN を確かめてください(10 桁か 13 桁)"
+          }
+        }
+      }
+    },
+    "LINE で送る" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Send via LINE"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "LINE で送る"
           }
         }
       }
@@ -1250,6 +1310,22 @@
         }
       }
     },
+    "Slack に送る" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Send to Slack"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Slack に送る"
+          }
+        }
+      }
+    },
     "Tailor It Pro" : {
       "localizations" : {
         "en" : {
@@ -1278,6 +1354,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Tailor It β へようこそ"
+          }
+        }
+      }
+    },
+    "Tailor It で「%@」を使ってみて" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Try “%@” on Tailor It"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tailor It で「%@」を使ってみて"
           }
         }
       }
@@ -1832,6 +1924,38 @@
         }
       }
     },
+    "「%@」を外しました。あなたのシェアリンクはまだ使えるので、そのリンクからまた参加できます。リンクも止めますか?" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Removed “%@”. Your share link still works, so they could join again with it. Turn off the link too?"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "「%@」を外しました。あなたのシェアリンクはまだ使えるので、そのリンクからまた参加できます。リンクも止めますか?"
+          }
+        }
+      }
+    },
+    "「%@」を外しますか?" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Remove “%@”?"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "「%@」を外しますか?"
+          }
+        }
+      }
+    },
     "「%@」を読み込んでいます" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -2006,6 +2130,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "あとで"
+          }
+        }
+      }
+    },
+    "あなた" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "You"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "あなた"
           }
         }
       }
@@ -3087,6 +3227,70 @@
         }
       }
     },
+    "この人を共有から外す" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Remove this person from the share"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "この人を共有から外す"
+          }
+        }
+      }
+    },
+    "この共有から抜けました。もう一度参加するには、参加している人に招待リンクをもらってください" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "You left this share. To join again, ask someone in it for an invite link."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "この共有から抜けました。もう一度参加するには、参加している人に招待リンクをもらってください"
+          }
+        }
+      }
+    },
+    "この共有から抜けますか?" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Leave this share?"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "この共有から抜けますか?"
+          }
+        }
+      }
+    },
+    "この共有から抜ける" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Leave this share"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "この共有から抜ける"
+          }
+        }
+      }
+    },
     "この共有に参加していません。招待リンクから参加してください" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -3100,6 +3304,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "この共有に参加していません。招待リンクから参加してください"
+          }
+        }
+      }
+    },
+    "この共有の記録を見られるのは、ここにいる人だけです" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Only the people listed here can see this share's records"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "この共有の記録を見られるのは、ここにいる人だけです"
           }
         }
       }
@@ -3603,6 +3823,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "しばらく開かれていないため休んでいます(開くと再開します)"
+          }
+        }
+      }
+    },
+    "そのままにする" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Keep it"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "そのままにする"
           }
         }
       }
@@ -5195,6 +5431,22 @@
         }
       }
     },
+    "カメラで読み取ると Tailor It で開きます" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Scan with the camera to open in Tailor It"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "カメラで読み取ると Tailor It で開きます"
+          }
+        }
+      }
+    },
     "カメラ・写真" : {
       "localizations" : {
         "en" : {
@@ -5853,6 +6105,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "シェアリンクはサーバー接続時のみ開けます"
+          }
+        }
+      }
+    },
+    "シェア用 QR コード" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "QR code for sharing"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "シェア用 QR コード"
           }
         }
       }
@@ -7844,6 +8112,22 @@
         }
       }
     },
+    "作成者" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Creator"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "作成者"
+          }
+        }
+      }
+    },
     "使い方を見る" : {
       "localizations" : {
         "en" : {
@@ -8853,6 +9137,38 @@
         }
       }
     },
+    "参加している人" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "People in this share"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "参加している人"
+          }
+        }
+      }
+    },
+    "参加している人が上限(100 人)に達しています。これ以上は参加できません" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "This share is full (100 people). No one else can join."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "参加している人が上限(100 人)に達しています。これ以上は参加できません"
+          }
+        }
+      }
+    },
     "参加している人が上限(100 人)に達しているため、参加できません" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -8900,6 +9216,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "参加している人の一覧に、下の名前で出ます"
+          }
+        }
+      }
+    },
+    "参加している人を読み込めませんでした" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Couldn't load the members"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "参加している人を読み込めませんでした"
           }
         }
       }
@@ -9211,6 +9543,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "同梱の例"
+          }
+        }
+      }
+    },
+    "名前なし" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No name"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "名前なし"
           }
         }
       }
@@ -9620,6 +9968,54 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "変身一覧"
+          }
+        }
+      }
+    },
+    "外した人は、この共有の記録を見られなくなります。その人の端末のアプリと、これまでの記録は残ります。" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "They will no longer see this share's records. The app on their device and the records they added stay."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "外した人は、この共有の記録を見られなくなります。その人の端末のアプリと、これまでの記録は残ります。"
+          }
+        }
+      }
+    },
+    "外す" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Remove"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "外す"
+          }
+        }
+      }
+    },
+    "外せませんでした。元に戻しました" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Couldn't remove them, so the list was restored"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "外せませんでした。元に戻しました"
           }
         }
       }
@@ -10037,6 +10433,22 @@
         }
       }
     },
+    "抜けられませんでした。元に戻しました" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Couldn't leave, so nothing changed"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "抜けられませんでした。元に戻しました"
+          }
+        }
+      }
+    },
     "抜ける" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -10050,6 +10462,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "抜ける"
+          }
+        }
+      }
+    },
+    "抜けると、参加している人の記録は見られなくなります。もう一度参加するには招待リンクが要ります。" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "After leaving, you can no longer see their records. You'll need an invite link to join again."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "抜けると、参加している人の記録は見られなくなります。もう一度参加するには招待リンクが要ります。"
           }
         }
       }
@@ -10398,6 +10826,38 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "文書を読み込めませんでした"
+          }
+        }
+      }
+    },
+    "文面をコピーしました。Discord に貼り付けて送ってください" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Message copied. Paste it in Discord to send."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "文面をコピーしました。Discord に貼り付けて送ってください"
+          }
+        }
+      }
+    },
+    "文面をコピーしました。Slack に貼り付けて送ってください" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Message copied. Paste it in Slack to send."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "文面をコピーしました。Slack に貼り付けて送ってください"
           }
         }
       }
@@ -12024,6 +12484,54 @@
         }
       }
     },
+    "管理者" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Admin"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "管理者"
+          }
+        }
+      }
+    },
+    "管理者から外す" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Remove admin"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "管理者から外す"
+          }
+        }
+      }
+    },
+    "管理者にする" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Make admin"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "管理者にする"
+          }
+        }
+      }
+    },
     "管理者を変えられませんでした" : {
       "localizations" : {
         "en" : {
@@ -12036,6 +12544,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "管理者を変えられませんでした"
+          }
+        }
+      }
+    },
+    "管理者を変更できませんでした。元に戻しました" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Couldn't change the admin. Restored."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "管理者を変更できませんでした。元に戻しました"
           }
         }
       }
@@ -13126,6 +13650,22 @@
         }
       }
     },
+    "読み込み中" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Loading"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "読み込み中"
+          }
+        }
+      }
+    },
     "読み込み直す" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -14157,6 +14697,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "開く"
+          }
+        }
+      }
+    },
+    "開けませんでした" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Couldn't open it"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "開けませんでした"
           }
         }
       }

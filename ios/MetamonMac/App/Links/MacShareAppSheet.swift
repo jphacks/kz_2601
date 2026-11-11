@@ -2,10 +2,11 @@
 #if !APP_STORE_REVIEW
 import SwiftUI
 import AppKit
+import MetamonRenderer
 import MetamonServices
 
 /// ツールバーの「共有」(#1035): 今のアプリのシェアリンクを作り、コピー・共有メニュー・取り消しを出す。
-/// iOS の `ShareAppSheet` のリンクの部分の Mac 版(「探す」への公開は後で)。サーバーに保存したアプリだけ。
+/// iOS の `ShareAppSheet` のリンク・QR・送り先・参加している人の Mac 版(#974・「探す」への公開は後で)。サーバーに保存したアプリだけ。
 @MainActor
 @Observable
 final class MacShareAppModel: Identifiable {
@@ -19,12 +20,16 @@ final class MacShareAppModel: Identifiable {
     let appId: String
     let appName: String
     private(set) var state: State = .loading
+    /// 参加している人(共有の記録があるアプリだけ欄を出す)。参加者の API が無い時は nil
+    let members: MacSharedMembersModel?
     @ObservationIgnored private let sharing: (any SharingClient)?
 
-    init(appId: String, appName: String, sharing: (any SharingClient)?) {
+    init(appId: String, appName: String, sharing: (any SharingClient)?,
+         membership: (any MembershipClient)? = nil, social: MacSocial? = nil) {
         self.appId = appId
         self.appName = appName
         self.sharing = sharing
+        self.members = membership.map { MacSharedMembersModel(appId: appId, client: $0, social: social) }
     }
 
     /// ツールバーの「共有」を押せるか: 作ったアプリで、サーバーにあり、サインインしていて、共有の API がある時だけ。
@@ -73,6 +78,14 @@ final class MacShareAppModel: Identifiable {
         }
     }
 
+    /// 抜けた後: 自分が出したリンクはもう使えないので捨てる
+    func forgetLink() {
+        state = .failed(SharedAccessDenial.notMember.message)
+    }
+
+    /// QR に入れる文字列(iOS と同じくアプリのリンク。カメラで読むと Tailor It で開く)
+    static func qrText(_ info: ShareInfo) -> String { info.url.isEmpty ? info.webUrl : info.url }
+
     /// 「リンクをコピー」。コピーできたら true
     @discardableResult
     func copyLink(to board: NSPasteboard = .general) -> Bool {
@@ -86,6 +99,8 @@ struct MacShareAppSheet: View {
     @State var model: MacShareAppModel
     var onClose: () -> Void
     @State private var copied = false
+    /// 送った後・失敗の案内
+    @State private var notice: String?
 
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
@@ -100,7 +115,26 @@ struct MacShareAppSheet: View {
                 }
                 Spacer()
             }
-            content
+            ScrollView {
+                VStack(alignment: .leading, spacing: 16) {
+                    content
+                    if let members = model.members, members.isVisible {
+                        Divider()
+                        MacSharedMembersSection(model: members,
+                                                onRevokeLink: { await model.revoke() },
+                                                onLeft: { copied = false; model.forgetLink() },
+                                                onError: { notice = $0 })
+                    }
+                }
+            }
+            .frame(maxHeight: 560)
+            .fixedSize(horizontal: false, vertical: true)
+            if let notice {
+                Label(notice, systemImage: "info.circle")
+                    .font(.callout)
+                    .foregroundStyle(.secondary)
+                    .accessibilityAddTraits(.updatesFrequently)
+            }
             HStack {
                 Spacer()
                 Button("閉じる", action: onClose)
@@ -111,6 +145,7 @@ struct MacShareAppSheet: View {
         .padding(24)
         .frame(width: 460)
         .task { await model.issue() }
+        .task { await model.members?.load() }
     }
 
     @ViewBuilder
@@ -131,9 +166,10 @@ struct MacShareAppSheet: View {
                 Button("もう一度") { Task { await model.issue() } }
                     .help("リンクをもう一度作る")
             }
-        case .ready:
+        case .ready(let info):
             if let link = model.link {
                 VStack(alignment: .leading, spacing: 12) {
+                    qr(MacShareAppModel.qrText(info))
                     Text(link.absoluteString)
                         .font(.callout.monospaced())
                         .textSelection(.enabled)
@@ -163,8 +199,47 @@ struct MacShareAppSheet: View {
                         }
                         .help("今のリンクを開けなくして、新しいリンクを作る")
                     }
+                    targets(link)
                 }
             }
+        }
+    }
+
+    /// シェアリンクの QR(iOS と同じ中身・画像は Renderer の `QRCodeImage`)
+    @ViewBuilder
+    private func qr(_ text: String) -> some View {
+        HStack {
+            Spacer()
+            VStack(spacing: 6) {
+                if let image = QRCodeImage.image(for: text, scale: 6) {
+                    Image(nsImage: image)
+                        .interpolation(.none)
+                        .resizable()
+                        .scaledToFit()
+                        .frame(width: 168, height: 168)
+                        .accessibilityLabel(Text("シェア用 QR コード"))
+                }
+                Text("カメラで読み取ると Tailor It で開きます")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+            Spacer()
+        }
+    }
+
+    /// LINE / Slack / Discord で送る(アプリがあればアプリ、無ければ Web)
+    private func targets(_ link: URL) -> some View {
+        HStack(spacing: 8) {
+            ForEach(MacShareTarget.allCases) { target in
+                Button {
+                    notice = target.send(appName: model.appName, link: link) == nil
+                        ? L10n.tr("開けませんでした") : target.sentNotice
+                } label: {
+                    Label(target.label, systemImage: target.icon)
+                }
+                .help(target.label)
+            }
+            Spacer()
         }
     }
 }
