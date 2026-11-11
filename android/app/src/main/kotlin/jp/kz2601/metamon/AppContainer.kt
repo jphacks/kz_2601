@@ -16,6 +16,7 @@ import jp.kz2601.metamon.renderer.components.sensors.MockSensorSource
 import jp.kz2601.metamon.renderer.components.sensors.SensorSource
 import jp.kz2601.metamon.runtime.AiTextAccess
 import jp.kz2601.metamon.runtime.AndroidRuntimeHost
+import jp.kz2601.metamon.runtime.ExportSteps
 import jp.kz2601.metamon.runtime.AppAiHost
 import jp.kz2601.metamon.runtime.AppDirectory
 import jp.kz2601.metamon.runtime.AppFeedHost
@@ -81,6 +82,7 @@ import jp.kz2601.metamon.services.consent.CrashReportingPreference
 import jp.kz2601.metamon.services.consent.HttpAiButtonMetricsSender
 import jp.kz2601.metamon.release.ReleaseRequestsModel
 import jp.kz2601.metamon.services.consent.InMemoryKeyValueStore
+import jp.kz2601.metamon.services.live.HttpBookLookupClient
 import jp.kz2601.metamon.services.live.HttpReleaseRequestClient
 import jp.kz2601.metamon.services.release.MockReleaseRequestClient
 import jp.kz2601.metamon.services.release.ReleaseRequestClient
@@ -506,7 +508,7 @@ class AppContainer(
                 recordSync = recordSync(context, appConfig, "metamon-records"),
                 documentCache = documentCache,
                 hotReload = HotReload(sync, CoroutineScope(SupervisorJob() + Dispatchers.Default)),
-                host = AndroidRuntimeHost(context.applicationContext),
+                host = AndroidRuntimeHost(context.applicationContext, books = HttpBookLookupClient(appConfigHttp)),
                 push = push,
                 account = HttpAccountClient(appConfigHttp),
                 ownerStore = AccountOwnerStore(File(context.filesDir, "metamon-account")),
@@ -591,6 +593,7 @@ class AppContainer(
             LocalAudioStore.of(context).removeAll()
             DashcamStore.removeAll(context.filesDir)
             MediaTempFiles.removeAll(context.cacheDir)
+            ExportSteps.removeAll(context.cacheDir)
         }
 
         private fun recordSync(context: Context, client: AppConfigClient, dir: String) = RecordSyncEngine.create(

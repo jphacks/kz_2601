@@ -3,6 +3,8 @@
 <paths>
     <cache-path name="metamon_photos" path="metamon_photos/" />
     <cache-path name="metamon_videos" path="metamon_videos/" />
+    <!-- export(#911)の CSV / PDF。共有シートに渡す。次の書き出しで消す -->
+    <cache-path name="metamon_export" path="metamon_export/" />
     <!-- dashcam(#872)の保存した映像の共有。filesDir/metamon-dashcam の下だけ -->
     <files-path name="metamon_dashcam" path="metamon-dashcam/" />
 </paths>
