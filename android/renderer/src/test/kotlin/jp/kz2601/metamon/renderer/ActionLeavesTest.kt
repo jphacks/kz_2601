@@ -22,6 +22,9 @@ import jp.kz2601.metamon.renderer.components.actions.QrContent
 import jp.kz2601.metamon.renderer.components.actions.QrMatrix
 import jp.kz2601.metamon.renderer.components.actions.ShareAction
 import jp.kz2601.metamon.renderer.components.actions.WebViewNavigation
+import jp.kz2601.metamon.renderer.components.actions.openAppName
+import jp.kz2601.metamon.renderer.components.actions.openAppTo
+import jp.kz2601.metamon.renderer.components.actions.shareTarget
 import jp.kz2601.metamon.renderer.components.buttonDefaultIcon
 import jp.kz2601.metamon.renderer.form.FormDraft
 import jp.kz2601.metamon.renderer.registry.ComponentRegistry
@@ -87,6 +90,22 @@ class ActionLeavesTest {
             OpenUrlTarget.resolve("x", "@jphacks", "https://example.com", null),
         )
         assertEquals("知らない app は url があっても開かない(iOS と同じ)", OpenUrlTarget.Invalid, OpenUrlTarget.resolve("telegram", null, "https://example.com", null))
+    }
+
+    @Test
+    fun openUrlButtonReadsAppAndToFromTheDsl() {
+        fun decode(json: String) = DslJson.decodeFromString(Component.serializer(), json)
+        val c = decode("""{"type":"openUrlButton","app":"x","to":"@jphacks","url":"https://example.com"}""")
+        assertEquals(
+            OpenUrlTarget.App(OpenApp.X, listOf("https://x.com/jphacks")),
+            OpenUrlTarget.resolve(c.openAppName, c.openAppTo, c.url, null),
+        )
+        val unknown = decode("""{"type":"openUrlButton","app":"telegram","url":"https://example.com"}""")
+        assertEquals("知らない app は url があっても開かない", OpenUrlTarget.Invalid, OpenUrlTarget.resolve(unknown.openAppName, unknown.openAppTo, unknown.url, null))
+        val plain = decode("""{"type":"openUrlButton","url":"https://jphacks.com"}""")
+        assertEquals(OpenUrlTarget.Url("https://jphacks.com"), OpenUrlTarget.resolve(plain.openAppName, plain.openAppTo, plain.url, null))
+        val share = decode("""{"type":"shareButton","shareTo":"x","text":"a"}""")
+        assertEquals(ShareTarget.X, share.shareTarget)
     }
 
     @Test
