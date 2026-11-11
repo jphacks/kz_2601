@@ -23,17 +23,23 @@ import jp.kz2601.metamon.runtime.RetentionConsentStore
 import jp.kz2601.metamon.runtime.RuntimeHost
 import jp.kz2601.metamon.runtime.SocialServices
 import jp.kz2601.metamon.runtime.TranscriberDictationHost
+import jp.kz2601.metamon.runtime.WhisperAudioFileHost
 import jp.kz2601.metamon.dsl.decode
 import jp.kz2601.metamon.dsl.fallback
 import jp.kz2601.metamon.dsl.screen
 import jp.kz2601.metamon.language.AppLocales
 import jp.kz2601.metamon.notifications.LocalNotifications
 import jp.kz2601.metamon.services.sharing.AppMembersStore
+import jp.kz2601.metamon.services.purchase.EntitlementClient
+import jp.kz2601.metamon.services.purchase.HttpEntitlementClient
 import jp.kz2601.metamon.services.sharing.HttpMembersClient
-import jp.kz2601.metamon.services.sharing.LeaveCleanup
 import jp.kz2601.metamon.services.sharing.MembersClient
 import jp.kz2601.metamon.push.FcmTokens
 import jp.kz2601.metamon.push.PushHost
+import jp.kz2601.metamon.purchase.PaywallReason
+import jp.kz2601.metamon.purchase.PlayBilling
+import jp.kz2601.metamon.purchase.PlayProBilling
+import jp.kz2601.metamon.purchase.ProStore
 import jp.kz2601.metamon.services.AIClient
 import jp.kz2601.metamon.services.AppConfigClient
 import jp.kz2601.metamon.services.AppEnvironment
@@ -102,6 +108,7 @@ import jp.kz2601.metamon.services.local.CurrentAppStore
 import jp.kz2601.metamon.services.local.DocumentCache
 import jp.kz2601.metamon.services.feeds.FeedCache
 import jp.kz2601.metamon.renderer.components.feed.FeedHost
+import jp.kz2601.metamon.renderer.components.importing.AudioFileTranscriptionHost
 import jp.kz2601.metamon.services.local.RecordSyncEngine
 import jp.kz2601.metamon.services.mock.DslSamples
 import jp.kz2601.metamon.services.mock.InMemoryAppConfigClient
@@ -126,7 +133,6 @@ import jp.kz2601.metamon.update.PlayAppUpdates
 import jp.kz2601.metamon.update.UpdateGate
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.withContext
 import kotlinx.coroutines.SupervisorJob
 import java.io.File
 import java.time.Instant
@@ -153,6 +159,8 @@ class AppContainer(
     val ai: AIClient,
     /** 文字起こし。本物は端末内の認識、モックは決まった文を返す [MockTranscriber] */
     val transcriber: SpeechTranscriber,
+    /** fileImport の録音ファイルの文字起こし(whisper.cpp・端末内・#1180)。モックも端末内なので同じものを使う */
+    private val audioFiles: AudioFileTranscriptionHost? = null,
     /** 今のアプリの appId(端末に保存・次の起動で開き直す)。切り替え・新しいアプリはランタイムが書き換える */
     val appId: CurrentAppStore,
     /** 最後に取得したアプリの一覧(オフラインの一覧) */
@@ -205,10 +213,12 @@ class AppContainer(
     val discover: DiscoverServices? = null,
     /** 共有アプリの参加者(#903)。モックは null(参加者の欄を出さない) */
     val members: MembersClient? = null,
-    /** そのアプリの通知を消す(共有から抜けた後・#903) */
-    private val removeAppNotifications: (String) -> Unit = {},
     /** 近くの人に送る(#1382)の通り道と端末の設定。null なら送るボタンを押しても何もしない(テスト) */
     private val nearbyEnv: NearbyEnv? = null,
+    /** Pro の権利(`GET /v1/me/entitlements`)。モックは null(Pro はモックの購入だけ) */
+    private val entitlements: EntitlementClient? = null,
+    /** Play の購入(Google Play Billing)。モックは null */
+    private val playBilling: ((PlayBilling.Listener) -> PlayBilling)? = null,
 ) {
     /** 共有シートの「みんなに公開」に渡すもの(#902)。「探す」が無い構成は null */
     val publishEnv: PublishEnv? by lazy { discover?.let { PublishEnv(it.client, authorProfile) } }
@@ -224,6 +234,21 @@ class AppContainer(
 
     /** 同意の画面を出す時点(起動時・AI に送る直前・設定から・#888) */
     val consentPrompt = ConsentPrompt(consent)
+
+    /** Tailor It Pro(iOS の ProGate・#77)。AI ボタンのオンライン版などの Pro の判定はサーバーの答え */
+    val pro: ProStore = run {
+        lateinit var store: ProStore
+        val billing = playBilling?.invoke { result, purchases -> store.onPurchases(result, purchases) }
+        store = ProStore(
+            entitlements = entitlements,
+            billing = billing?.let(::PlayProBilling),
+            uid = { auth.currentUser.value?.uid },
+            scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate),
+            mock = knobs.mock,
+            log = { Log.i(TAG, it) },
+        )
+        store
+    }
 
     /** 初回のチュートリアルを出す時点(同意の後・設定の「使い方を見る」・#900) */
     val tutorialPrompt = TutorialPrompt(tutorial)
@@ -255,6 +280,7 @@ class AppContainer(
             forgetConsent = {
                 consent.forget()
                 consentPrompt.reset()
+                pro.reset() // Pro の状態と送った購入の記録も人ごと(次の人はサーバーに聞き直す)
                 aiButtonMetrics.clearCounts()
                 social?.ageGate?.reset() // 18 歳以上の確認(#877)も人ごと(iOS は UserDefaults ごと消す)
                 runtime.retention?.forget() // 記録の保存期間の確認(#482)も人ごと(iOS は UserDefaults ごと消す)
@@ -329,6 +355,7 @@ class AppContainer(
                 appConfig = records,
                 ai = ConsentGatedAiClient(MockAIClient(samples, delayMillis = delayMillis)) { consent.isGranted },
                 transcriber = MockTranscriber(),
+                audioFiles = WhisperAudioFileHost.create(context, CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)) { AppLocales.languageCode(context) },
                 // 本物のアプリ・記録と混ざらないよう、モックは別の置き場
                 appId = DeviceAppId.store(context, "metamon-app-mock", migrateLegacy = false),
                 appList = AppListCache(File(context.filesDir, "metamon-app-mock")),
@@ -397,6 +424,7 @@ class AppContainer(
                 ai = ConsentGatedAiClient(HttpAIClient(http(environment.aiBaseUrl), capabilities = deviceCapabilities(), log = log, cache = documentCache)) { consent.isGranted },
                 // 声は端末内だけで文字にする(#354 §3)。端末内が無い端末は文字入力に落とす
                 transcriber = AndroidSpeechTranscriber(context, language = language, log = { Log.i(TAG, it) }),
+                audioFiles = WhisperAudioFileHost.create(context, CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate), language),
                 appId = DeviceAppId.store(context, "metamon-app"),
                 appList = AppListCache(File(context.filesDir, "metamon-app")),
                 feedHost = AppFeedHost(HttpFeedClient(appConfigHttp), feedCache),
@@ -427,10 +455,12 @@ class AppContainer(
                 feedback = HttpFeedbackClient(appConfigHttp),
                 updateGate = UpdateGate.live(context, environment.appConfigBaseUrl, client, device),
                 inAppUpdater = InAppUpdater(PlayAppUpdates.ifInstalledFromPlay(context)),
-                discover = DiscoverServices(HttpDiscoverClient(appConfigHttp), moderation),
+                // 審査用の版(#1275)は「探す」(公開・インストール)を出さない
+                discover = if (ReviewBuild.enabled) null else DiscoverServices(HttpDiscoverClient(appConfigHttp), moderation),
                 members = HttpMembersClient(appConfigHttp),
-                removeAppNotifications = { LocalNotifications.get(context).removeApp(it) },
                 nearbyEnv = NearbyEnv.of(context, mock = false),
+                entitlements = HttpEntitlementClient(appConfigHttp),
+                playBilling = { PlayBilling(context, it) },
             )
         }
 
@@ -535,24 +565,6 @@ class AppContainer(
     /** 今のアプリの参加者と自分が管理者か(#903)。部品の member の選択肢・管理者の削除が読む */
     val membersStore = AppMembersStore(members, CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate))
 
-    /** 共有から抜けた後: 別のアプリへ切り替え、一覧から外し、自分のコピーと端末の記録・会話の履歴・通知を消す(#903) */
-    val leaveCleanup: LeaveCleanup by lazy {
-        LeaveCleanup(
-            currentAppId = { runtime.document.appId },
-            apps = { runtime.appsList() },
-            switchApp = { runtime.switchApp(it) },
-            startNewApp = { runtime.startNewApp() },
-            hideApp = { runtime.forgetApp(it) },
-            deleteCopy = { appConfig.deleteApp(it) },
-            purgeLocal = { id ->
-                recordSync.purge(id)
-                documentCache.remove(id)
-                withContext(Dispatchers.IO) { chatHistory.remove(id) }
-                removeAppNotifications(id)
-            },
-        )
-    }
-
     /** アプリ全体のランタイム(#889)。起動時に 1 つだけ作る。 */
     val runtime: AppRuntime by lazy {
         AppRuntime(
@@ -581,7 +593,10 @@ class AppContainer(
             ),
             undoGraceMillis = { TalkBack.recordUndoMillis(talkBackRunning()) },
             members = membersStore,
-        ).also { it.dictation = TranscriberDictationHost(transcriber, CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)) }
+        ).also {
+            it.dictation = TranscriberDictationHost(transcriber, CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate))
+            it.audioFileTranscription = audioFiles
+        }
     }
 
     /** 近くの人に送る(#1382)。作った時にランタイムの送るボタンとつなぐ。 */
@@ -595,17 +610,19 @@ class AppContainer(
 
     /**
      * aiButton のホスト(#873)。端末内 AI(Gemini Nano)はまだ入れていないので、いつもオンライン版に回る。
-     * 同意は [consent] を読み、未同意なら同意の画面を出す(#888)。モックは課金の制限なし。
+     * 同意は [consent] を読み、未同意なら同意の画面を出す(#888)。Pro は [pro](サーバーの答え)で、要る時は課金画面を出す。
+     * モックは課金の制限なし。
      */
     private val aiHost: AppAiHost by lazy {
         AppAiHost(
             ai = ai,
             appId = { runtime.document.appId },
-            access = { AiTextAccess(consentGranted = consent.isGranted, isPro = false, enforced = !knobs.mock) },
+            access = { AiTextAccess(consentGranted = consent.isGranted, isPro = pro.isPro, enforced = !knobs.mock) },
             sharedApp = { runtime.entityModels.any { it.isShared } },
             isMock = knobs.mock,
             metrics = aiButtonMetrics::record,
             onNeedsConsent = { consentPrompt.require() },
+            onNeedsPro = { chat -> pro.requestPaywall(if (chat) PaywallReason.AI_CHAT else PaywallReason.AI_TEXT) },
         )
     }
 }

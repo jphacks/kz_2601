@@ -80,6 +80,7 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LifecycleEventEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import jp.kz2601.metamon.R
+import jp.kz2601.metamon.ReviewBuild
 import jp.kz2601.metamon.permissions.PermissionCenter
 import jp.kz2601.metamon.permissions.rememberPermissionRequest
 import jp.kz2601.metamon.renderer.layout.imePaddingExcludingBelow
@@ -811,7 +812,7 @@ fun PromptTipsSheet(onDismiss: () -> Unit, onPick: (String) -> Unit) {
                     modifier = Modifier.padding(vertical = 8.dp),
                 )
             }
-            PromptTips.categories().forEach { category ->
+            PromptTips.categories(PromptTips.available(ReviewBuild.enabled)).forEach { category ->
                 item(key = "cat-" + category.id) {
                     Text(
                         stringResource(category.title),

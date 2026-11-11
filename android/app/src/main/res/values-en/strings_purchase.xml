@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="paywall_benefit_ai">Use the AI button and AI chat with the online AI, even when this device can\'t run AI</string>
+    <string name="paywall_benefit_cancel">Cancel anytime (from your Google Play subscriptions)</string>
+    <string name="paywall_benefit_edits">Asking to change the apps you made stays free</string>
+    <string name="paywall_benefit_join">Join apps shared with you and use the same data</string>
+    <string name="paywall_benefit_shared">Shared data everyone can add to (boards, rankings, bill splitting and more)</string>
+    <string name="paywall_benefit_unlimited">Make as many new apps as you like, every day</string>
+    <string name="paywall_benefits_title">What you get with Pro</string>
+    <string name="paywall_close_ai_chat">If you close this, the AI chat component won\'t work.</string>
+    <string name="paywall_close_ai_text">If you close this, the AI writing button won\'t work on this device.</string>
+    <string name="paywall_fine_print">This is a monthly auto-renewing subscription. Payment is charged to your Google Account when you confirm the purchase. It renews automatically at the end of each period unless you cancel. You can cancel anytime in Google Play under Payments &amp; subscriptions.</string>
+    <string name="paywall_headline_ai_chat">“Talk with AI” needs Tailor It Pro</string>
+    <string name="paywall_headline_ai_text">“Write with online AI” needs Tailor It Pro</string>
+    <string name="paywall_headline_settings">Sharing, online features and new apps, as many as you like</string>
+    <string name="paywall_manage">Manage subscription</string>
+    <string name="paywall_message_failed">The purchase didn\'t go through. Please try again later.</string>
+    <string name="paywall_message_not_verified">We couldn\'t confirm the purchase. If it stays unconfirmed, Google Play refunds it automatically within 3 days.</string>
+    <string name="paywall_message_pending">Waiting for the payment to complete. You\'ll get Pro automatically when it does.</string>
+    <string name="paywall_message_restore_failed">Couldn\'t restore. Please try again later.</string>
+    <string name="paywall_message_restore_none">No purchases to restore were found.</string>
+    <string name="paywall_message_restored">Your purchase was restored.</string>
+    <string name="paywall_message_unavailable">Google Play purchases aren\'t available on this device.</string>
+    <string name="paywall_plan_period">Renews every month</string>
+    <string name="paywall_price_per_month">%1$s / month</string>
+    <string name="paywall_price_unavailable">Couldn\'t get the price. Check your connection.</string>
+    <string name="paywall_pro_active">You\'re on Pro</string>
+    <string name="paywall_pro_now">You\'re now on Pro</string>
+    <string name="paywall_purchase">Get Pro</string>
+    <string name="paywall_purchase_price">Get Pro (%1$s / month)</string>
+    <string name="paywall_reason_ai_chat">Talking with AI needs Tailor It Pro. Replies come from the online AI.</string>
+    <string name="paywall_reason_ai_text">This device can\'t run AI on-device, so the online AI is used.</string>
+    <string name="paywall_restore">Restore purchase</string>
+    <string name="settings_pro_free">Free</string>
+    <string name="settings_pro_plan">Plan</string>
+    <string name="settings_pro_upgrade">Get Pro</string>
+</resources>

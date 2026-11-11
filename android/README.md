@@ -22,6 +22,7 @@ iOS の `Metamon{DSL,Renderer,Services}` + アプリ本体と 1 対 1。依存�
 | `:dsl` | 純 Kotlin(JVM) | `MetamonDSL` | DSL の型と読み込み(kotlinx.serialization)。知らない type・キー・値で落とさない |
 | `:renderer` | Android ライブラリ + Compose | `MetamonRenderer` | DSL を描く。`:services` は知らず、能力は `DSLRuntime` で受ける |
 | `:services` | Android ライブラリ | `MetamonServices` | 認証(Firebase / モック)・接続先・HTTP(OkHttp + kotlinx.serialization)・appconfig / ai のクライアント |
+| `:whisper` | Android ライブラリ + NDK | `WhisperKitRecognizer` | 端末内の文字起こし(whisper.cpp を CMake でビルドして JNI で呼ぶ)・音声モデルの取得と確認。版は `whisper/src/main/cpp/CMakeLists.txt` |
 | `:app` | Android アプリ | `ios/Metamon` | 起動・組み立て(`AppContainer`)・flavor |
 
 `:dsl` の型(`AppDSL`・`Screen`・`Component`・`Action`・`Expr`・enum・部品ごとのキー表 `DslKeys`)は `dsl/src/main/kotlin/.../dsl/generated/` にあり、スキーマ(`backend/pkg/dsl/schema.json`)から `backend/cmd/dslgen` が作る(#351 §7)。**手で直さない**。スキーマを変えたら作り直してコミットする。
@@ -67,6 +68,18 @@ product flavor `env` で分ける。値は `BuildConfig` に入る(iOS の `ios/
 | `prod` | `jp.kz2601.metamon` | Tailor It | `ai-prod-…` / `appconfig-prod-…` |
 
 stg の画面の下には接続先と認証の状態(`stg / auth=mock / uid=…`)が出る。
+
+### 審査用の版
+
+`-Pmetamon.playReview=true` を付けて組むと、iOS の審査用の版(`APP_STORE_REVIEW`・`docs/ios/review-build.md`)と同じく共有を外す(`BuildConfig.PLAY_REVIEW`・`ReviewBuild`)。既定はオフ。
+
+```sh
+./gradlew :app:bundleProdRelease -Pmetamon.playReview=true
+```
+
+- 出さないもの: 共有シート(変身一覧・設定の「このアプリをシェア」)・参加している人・「探す」(公開・インストール)・頼み方のコツの共有の例
+- シェアリンク(`tailorit://`)が届いても開かない
+- 生成の `disabledFeatures` に `sharedData` を足す(backend が記録を private に直す)
 
 ## モックとつまみ
 

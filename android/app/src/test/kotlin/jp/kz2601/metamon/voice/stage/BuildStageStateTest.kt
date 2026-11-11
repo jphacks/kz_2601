@@ -130,6 +130,30 @@ class BuildStageStateTest {
     }
 
     @Test
+    fun retentionWaitsForSummaryAndEditHintWaitsForRetention() {
+        // iOS の順番: 要約 → 保存期間の確認 → 直し方の例(#1271)
+        assertEquals(
+            setOf(PostBuildNotice.SUMMARY, PostBuildNotice.RETENTION, PostBuildNotice.EDIT_HINT),
+            PostBuildNotice.pending(summary = true, retention = true, editHint = true),
+        )
+        assertEquals(emptySet<PostBuildNotice>(), PostBuildNotice.pending(summary = false))
+
+        val hints = Hints()
+        val s = BuildStageState(hints.store)
+        s.update(initial().copy(phase = VoicePhase.SENDING, transcript = "x"), 0, reduceMotion = false)
+        val done = initial().copy(phase = VoicePhase.DONE, document = AppDocument("app1", 1, app(a)), summary = "できました")
+        s.update(done, 1, reduceMotion = false)
+        val closed = done.copy(summary = null)
+
+        assertEquals("要約が先", PostBuildNotice.SUMMARY, s.currentNotice(done, retentionPending = true))
+        assertFalse("要約の間は保存期間を出さない", BuildStageState.isRetentionTurn(done, retentionPending = true))
+        assertEquals("要約が閉じたら保存期間", PostBuildNotice.RETENTION, s.currentNotice(closed, retentionPending = true))
+        assertTrue(BuildStageState.isRetentionTurn(closed, retentionPending = true))
+        assertFalse("確認が無ければ番は来ない", BuildStageState.isRetentionTurn(closed, retentionPending = false))
+        assertEquals("確認が閉じたら直し方の例", PostBuildNotice.EDIT_HINT, s.currentNotice(closed, retentionPending = false))
+    }
+
+    @Test
     fun anchorClearsWhenSummaryCloses() {
         val s = BuildStageState()
         s.update(initial().copy(phase = VoicePhase.SENDING, transcript = "x"), 0, reduceMotion = false)

@@ -23,6 +23,7 @@ import jp.kz2601.metamon.renderer.ActionContext
 import jp.kz2601.metamon.renderer.DSLRuntime
 import jp.kz2601.metamon.renderer.FormMember
 import jp.kz2601.metamon.renderer.components.audio.DictationHost
+import jp.kz2601.metamon.renderer.components.importing.AudioFileTranscriptionHost
 import jp.kz2601.metamon.dsl.logic.ExternalUrlPolicy
 import jp.kz2601.metamon.renderer.NavigationHost
 import jp.kz2601.metamon.renderer.components.nearby.NearbyHost
@@ -640,6 +641,9 @@ class AppRuntime(
 
     /** transcribeField の話して入力(#864)。AppContainer が本体の認識器で差す。 */
     override var dictation: DictationHost? = null
+
+    /** fileImport の録音ファイルの文字起こし(whisper.cpp・#1180)。AppContainer が差す。 */
+    override var audioFileTranscription: AudioFileTranscriptionHost? = null
 
     override fun onAction(action: Action, context: ActionContext) {
         scope.launch { run(action, context) }

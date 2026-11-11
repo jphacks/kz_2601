@@ -2,9 +2,12 @@
 <!-- 実行時の権限(#890)。「オフ」のバーは iOS の NotificationsOffBar、理由は iOS の Info.plist の文に合わせる -->
 <resources>
     <string name="permission_allow">許可する</string>
+    <string name="permission_background_body">保存した場所の近くに着いた時に通知するには、アプリを閉じている間も位置情報を使う必要があります。\n\n次の画面で「%1$s」を選び、「正確な位置情報を使用」をオンにしてください。\n\n近くに着いたかは端末の中で判定し、位置を外に送りません。</string>
+    <string name="permission_background_title">場所に着いた時に知らせるには</string>
     <string name="permission_cancel">キャンセル</string>
     <string name="permission_continue">続ける</string>
     <string name="permission_dismiss">閉じる</string>
+    <string name="permission_name_background_location">アプリを閉じている間の位置情報</string>
     <string name="permission_name_camera">カメラ</string>
     <string name="permission_name_health">ヘルスコネクト</string>
     <string name="permission_name_location">位置情報</string>
@@ -12,6 +15,7 @@
     <string name="permission_name_nearby">近くのデバイス</string>
     <string name="permission_name_notifications">通知</string>
     <string name="permission_not_now">今はしない</string>
+    <string name="permission_off_background_location">位置情報が「常に許可」ではないため、場所に着いた時の通知は届きません</string>
     <string name="permission_off_camera">カメラがオフのため、このアプリで撮影できません</string>
     <string name="permission_off_health">ヘルスコネクトがオフのため、このアプリで歩数や体重を使えません</string>
     <string name="permission_off_location">位置情報がオフのため、このアプリで現在地を使えません</string>
@@ -19,6 +23,7 @@
     <string name="permission_off_nearby">近くのデバイスがオフのため、このアプリで近くの端末と送り合えません</string>
     <string name="permission_off_notifications">通知がオフのため、このアプリの通知は届きません</string>
     <string name="permission_open_settings">設定を開く</string>
+    <string name="permission_reason_background_location">保存した場所の近くに着いた時に通知するために、アプリを閉じている間も位置情報を使います。位置情報を「常に許可」にし、「正確な位置情報を使用」をオンにしてください。近くに着いたかは端末の中で判定し、位置を外に送りません。</string>
     <string name="permission_reason_camera">生成したアプリで写真や動画を撮影・記録したり、QR コードを読み取ったり、ドラレコとして画面を出している間に録画したりするために、カメラを使用します。</string>
     <string name="permission_reason_health">生成したアプリで歩数や体重を表示したり、記録した体重を保存したりするために、ヘルスコネクトのデータを使用します。</string>
     <string name="permission_reason_location">生成したアプリで現在地を記録・地図に表示したり、目的地まで道案内したり、保存した場所の近くに着いた時に通知したりするために使います(近くに着いたかは端末の中で判定します)。</string>

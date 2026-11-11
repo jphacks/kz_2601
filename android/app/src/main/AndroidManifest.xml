@@ -8,9 +8,13 @@
     <!-- 写真・動画・QR・ドラレコ。カメラの無い端末でも入れられるように required="false" -->
     <uses-permission android:name="android.permission.CAMERA" />
     <uses-feature android:name="android.hardware.camera" android:required="false" />
-    <!-- 現在地・道案内・近くに着いたら通知。おおよそだけの許可でも使う。裏での取得(ACCESS_BACKGROUND_LOCATION)は持たない -->
+    <!-- 現在地・道案内・近くに着いたら通知。現在地と道案内はおおよそだけの許可でも使う -->
     <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
     <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
+    <!-- 場所に着いたら知らせる(near)だけが使う。Geofencing はアプリを閉じている間に着いたかを OS が端末の中で見るので、
+         正確な位置と裏での位置の両方が要る。前面の位置が許可された後に、説明の画面を出してから聞く。
+         Play Console の申告の文: docs/android/play-background-location.md -->
+    <uses-permission android:name="android.permission.ACCESS_BACKGROUND_LOCATION" />
     <!-- 通知(13+ だけ実行時の権限。12 / 12L は設定のオン・オフのみ) -->
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <!-- 近くの端末と送り合う(nearbyShare・Nearby Connections・#1380)。minSdk 31 なので古い BLUETOOTH / BLUETOOTH_ADMIN は要らない。
@@ -60,12 +64,19 @@
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
-            <!-- シェアリンク tailorit://import/<token>(#901)。https の /s/<token>(App Links)は署名の指紋が決まってから -->
+            <!-- シェアリンク tailorit://import/<token>(#901) -->
             <intent-filter>
                 <action android:name="android.intent.action.VIEW" />
                 <category android:name="android.intent.category.DEFAULT" />
                 <category android:name="android.intent.category.BROWSABLE" />
                 <data android:scheme="tailorit" android:host="import" />
+            </intent-filter>
+            <!-- App Links https://tailor-it.app/s/<token>(#1272)。サイトに assetlinks.json が置かれるまではブラウザで開く(docs/infra/app-links) -->
+            <intent-filter android:autoVerify="true">
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="https" android:host="tailor-it.app" android:pathPrefix="/s/" />
             </intent-filter>
         </activity>
         <!-- 表示言語(#843)。端末の設定 > アプリ の「アプリの設定」からも開ける -->

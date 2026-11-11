@@ -26,6 +26,8 @@ fun stringProperty(name: String): String = (findProperty(name) as String?).orEmp
 android {
     namespace = "jp.kz2601.metamon"
     compileSdk = 36
+    // :whisper と同じ NDK。無いと .so の strip ができず、デバッグ情報付きのまま APK に入る(whisper だけで 1 ABI 14MB)
+    ndkVersion = "27.0.12077973"
 
     defaultConfig {
         applicationId = "jp.kz2601.metamon"
@@ -33,6 +35,8 @@ android {
         targetSdk = 36
         versionCode = 1
         versionName = "0.1.0"
+        // Play の審査用の版(#1275・iOS の APP_STORE_REVIEW)。-Pmetamon.playReview=true の時だけ共有・探すの入口を外す
+        buildConfigField("boolean", "PLAY_REVIEW", (stringProperty("metamon.playReview") == "true").toString())
     }
 
     // 接続先は iOS の ios/project.yml(METAMON_AI_BASE_URL / METAMON_APPCONFIG_BASE_URL)と同じ。
@@ -89,6 +93,8 @@ dependencies {
     implementation(project(":dsl"))
     implementation(project(":renderer"))
     implementation(project(":services"))
+    // fileImport の録音ファイルの端末内の文字起こし(whisper.cpp・#1180)
+    implementation(project(":whisper"))
 
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.activity.compose)
@@ -113,6 +119,10 @@ dependencies {
     implementation(libs.firebase.messaging)
     implementation(libs.play.app.update.ktx)
     implementation(libs.play.services.nearby)
+    // Tailor It Pro の購入(Google Play Billing)
+    implementation(libs.play.billing.ktx)
+    // 場所に着いたら知らせる(Geofencing)
+    implementation(libs.play.services.location)
 
     testImplementation(libs.junit)
     testImplementation(libs.kotlinx.coroutines.test)

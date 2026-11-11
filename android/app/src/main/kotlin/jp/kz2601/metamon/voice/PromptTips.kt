@@ -21,6 +21,10 @@ object PromptTips {
 
     data class Category(val id: String, @StringRes val title: Int, val tips: List<Tip>)
 
+    /** 版で使える機能。審査用の版(#1275)は共有の例を出さない(iOS の `Availability.review` の sharing: false) */
+    fun available(review: Boolean): Set<Feature> =
+        if (review) Feature.entries.toSet() - Feature.SHARING else Feature.entries.toSet()
+
     /** 版で使えない例を除いたカテゴリ。例が 0 になったカテゴリは出さない */
     fun categories(available: Set<Feature> = Feature.entries.toSet()): List<Category> = all.mapNotNull { c ->
         val tips = c.tips.filter { available.containsAll(it.requires) }

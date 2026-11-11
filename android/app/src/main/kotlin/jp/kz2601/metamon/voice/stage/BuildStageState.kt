@@ -113,11 +113,24 @@ class BuildStageState(private val editHints: EditHintStore? = null) {
         editHint = false
     }
 
-    /** いま出すお知らせ(要約 → 直し方の例。前のが閉じたら次) */
-    fun currentNotice(state: VoiceUiState): PostBuildNotice? = PostBuildNotice.current(
-        buildSet {
-            if (state.summary != null || state.undone != null) add(PostBuildNotice.SUMMARY)
-            if (editHint) add(PostBuildNotice.EDIT_HINT)
-        },
+    /**
+     * いま出すお知らせ(要約 → 保存期間の確認 → 直し方の例。前のが閉じたら次)。
+     * @param retentionPending 今のアプリの保存期間の確認が待っている(#1271)
+     */
+    fun currentNotice(state: VoiceUiState, retentionPending: Boolean = false): PostBuildNotice? = PostBuildNotice.current(
+        PostBuildNotice.pending(summary = summaryPending(state), retention = retentionPending, editHint = editHint),
     )
+
+    companion object {
+        /** 要約バナー(「元に戻す」を含む)が出ている */
+        fun summaryPending(state: VoiceUiState): Boolean = state.summary != null || state.undone != null
+
+        /**
+         * 保存期間の確認の番か(iOS の `isNoticeTurn(.retention)`)。前にあるのは要約だけ。
+         * 直し方の例は後ろなので見ない(確認が閉じるまで例の方が待つ)。
+         */
+        fun isRetentionTurn(state: VoiceUiState, retentionPending: Boolean): Boolean =
+            PostBuildNotice.current(PostBuildNotice.pending(summary = summaryPending(state), retention = retentionPending)) ==
+                PostBuildNotice.RETENTION
+    }
 }

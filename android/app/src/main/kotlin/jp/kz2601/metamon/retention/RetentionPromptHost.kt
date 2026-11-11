@@ -20,25 +20,38 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import jp.kz2601.metamon.R
 import jp.kz2601.metamon.language.AppLocales
 import jp.kz2601.metamon.runtime.AppRuntime
+import jp.kz2601.metamon.runtime.RetentionPrompt
 import kotlinx.coroutines.delay
+
+/** 今のアプリの保存期間の確認が待っているか(完成の後のお知らせの順番に入れる・#1271)。 */
+@Composable
+fun retentionPending(runtime: AppRuntime): Boolean = currentRetentionPrompt(runtime) != null
+
+@Composable
+private fun currentRetentionPrompt(runtime: AppRuntime): RetentionPrompt? {
+    val retention = runtime.retention ?: return null
+    val prompt by retention.prompt.collectAsStateWithLifecycle()
+    val runtimeState by runtime.state.collectAsStateWithLifecycle()
+    return prompt?.takeIf { it.appId == runtimeState.document.appId }
+}
 
 /**
  * 記録の保存期間の確認(#482・iOS の `RetentionPromptHost`)。「自動で消す」/「自動で消すのをやめる」/「あとで」。
- * 生成中・音声のシートの間は出さず、閉じてから少し待って出す(要約などの知らせと重ねない)。
+ * 完成の後のお知らせの順番(要約 → 保存期間 → 直し方の例・[jp.kz2601.metamon.voice.stage.PostBuildNotice])で自分の番の時だけ、
+ * 生成中・音声のシートの間を避けて、少し待ってから出す(#1271)。
  *
  * @param busy 生成中・音声のシートを開いている
+ * @param turn お知らせの順番で保存期間の番(前の要約が閉じている)
  * @param onStop 「自動で消すのをやめる」の指示文を送る(声で言うのと同じ既存の修正)
  */
 @Composable
-fun RetentionPromptHost(runtime: AppRuntime, busy: Boolean, onStop: (String) -> Unit) {
+fun RetentionPromptHost(runtime: AppRuntime, busy: Boolean, turn: Boolean, onStop: (String) -> Unit) {
     val retention = runtime.retention ?: return
-    val prompt by retention.prompt.collectAsStateWithLifecycle()
-    val runtimeState by runtime.state.collectAsStateWithLifecycle()
     var shown by remember { mutableStateOf(false) }
-    val current = prompt?.takeIf { it.appId == runtimeState.document.appId }
-    LaunchedEffect(current?.id, busy) {
+    val current = currentRetentionPrompt(runtime)
+    LaunchedEffect(current?.id, busy, turn) {
         shown = false
-        if (current == null || busy) return@LaunchedEffect
+        if (current == null || busy || !turn) return@LaunchedEffect
         delay(PROMPT_DELAY_MILLIS)
         shown = true
     }

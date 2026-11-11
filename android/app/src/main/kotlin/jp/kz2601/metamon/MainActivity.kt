@@ -40,6 +40,7 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import jp.kz2601.metamon.dsl.AppDSL
 import jp.kz2601.metamon.dsl.AppDocument
 import jp.kz2601.metamon.consent.AiConsentDialog
+import jp.kz2601.metamon.purchase.PaywallHost
 import jp.kz2601.metamon.discover.DiscoverHost
 import jp.kz2601.metamon.discover.LocalPublishEnv
 import jp.kz2601.metamon.onboarding.TutorialScreen
@@ -64,6 +65,7 @@ import jp.kz2601.metamon.renderer.components.feed.LocalFeedHost
 import jp.kz2601.metamon.renderer.theme.MetamonRenderTheme
 import jp.kz2601.metamon.renderer.theme.ReadableWidth
 import jp.kz2601.metamon.retention.RetentionPromptHost
+import jp.kz2601.metamon.retention.retentionPending
 import jp.kz2601.metamon.runtime.AppRuntime
 import jp.kz2601.metamon.runtime.NavigationSnapshot
 import jp.kz2601.metamon.runtime.TranscriberDictationHost
@@ -79,6 +81,7 @@ import jp.kz2601.metamon.voice.VoiceFab
 import jp.kz2601.metamon.voice.VoiceUiState
 import jp.kz2601.metamon.voice.VoiceViewModel
 import jp.kz2601.metamon.voice.stage.BuildStageHost
+import jp.kz2601.metamon.voice.stage.BuildStageState
 import jp.kz2601.metamon.services.AppSummary
 import jp.kz2601.metamon.services.sharing.IssuedShares
 import jp.kz2601.metamon.services.sharing.MembersModel
@@ -144,7 +147,7 @@ class MainActivity : ComponentActivity() {
     /** 通知のタップ(自分で出した通知も、FCM が裏で出した通知も extra の `appId`)と、シェアリンク(#901)。 */
     private fun offerPushOpen(intent: Intent?) {
         PushOpen.offer(PushMessage.appId(intent?.getStringExtra(LocalNotifications.EXTRA_APP_ID)))
-        ShareLinkIntents.offer(intent)
+        if (!ReviewBuild.enabled) ShareLinkIntents.offer(intent) // 審査用の版はシェアリンクを開かない(#1275)
     }
 }
 
@@ -205,6 +208,8 @@ fun MetamonApp(container: AppContainer) {
     }
     val state by vm.state.collectAsStateWithLifecycle()
     val runtime = container.runtime
+    // 保存期間の確認が待っているか(完成の後のお知らせの順番・#1271)
+    val retentionWaiting = retentionPending(runtime)
     val runtimeState by runtime.state.collectAsStateWithLifecycle()
     val hotReloadStatus by runtime.hotReloadStatus.collectAsStateWithLifecycle()
 
@@ -276,7 +281,8 @@ fun MetamonApp(container: AppContainer) {
     // 共有シート(#901)。発行したリンクは人が変わる(wipes)まで覚える。モックは mockSharing の時だけ
     var shareTarget by remember { mutableStateOf<ShareTarget?>(null) }
     val issuedShares = remember(wipes) { IssuedShares() }
-    val canShare = !container.knobs.mock || container.knobs.mockSharing
+    // 審査用の版(#1275)は共有の入口を出さない
+    val canShare = ReviewBuild.canShare(ReviewBuild.enabled, container.knobs.mock, container.knobs.mockSharing)
     // 「探す」(#902)。サーバーにつながる構成だけ入口を出す(iOS の canShare)
     var discoverOpen by rememberSaveable { mutableStateOf(false) }
     // 参加している人(#903)。入口は共有シートの下と設定
@@ -288,17 +294,13 @@ fun MetamonApp(container: AppContainer) {
     }
     fun membersModel(target: ShareTarget) =
         MembersModel(target.appId, membersClient, isShared = { ShareScope.of(loadDsl(target.appId)()) == ShareScope.MEMBERS }, container.membersStore)
-    // 抜けた後: 別のアプリへ切り替え、一覧から外し、端末の記録・会話の履歴を消す。画面が消えても止めない
+    // 抜けた後: シートを閉じて知らせるだけ。アプリと自分のコピーは一覧に残す(iOS と同じ・#1298)
     val onLeftShare = { target: ShareTarget ->
         shareTarget = null
         membersTarget = null
         issuedShares[target.appId] = null
-        container.accountScope.launch {
-            container.leaveCleanup.run(target.appId)
-            val name: Any = target.name.ifEmpty { null } ?: UiText.Res(R.string.share_untitled)
-            runtime.showToast(UiText.Res(R.string.members_left_toast, name))
-        }
-        Unit
+        val name: Any = target.name.ifEmpty { null } ?: UiText.Res(R.string.share_untitled)
+        runtime.showToast(UiText.Res(R.string.members_left_toast, name))
     }
 
     val openSwitcher = {
@@ -334,7 +336,13 @@ fun MetamonApp(container: AppContainer) {
     ) { padding ->
         Box(Modifier.fillMaxSize().padding(padding)) {
             // 生成中の組み立て台・変わった部品の印・完成の後のお知らせ(#894)
-            BuildStageHost(state, onCancel = vm::cancelGenerate, onOpenVoice = vm::openVoice, editHints = container.tutorial.editHints) {
+            BuildStageHost(
+                state,
+                onCancel = vm::cancelGenerate,
+                onOpenVoice = vm::openVoice,
+                editHints = container.tutorial.editHints,
+                retentionPending = retentionWaiting,
+            ) {
                 if (state.isInitial) {
                     VoiceRoute(vm, onMicLongPress = openSwitcher)
                 } else {
@@ -415,10 +423,17 @@ fun MetamonApp(container: AppContainer) {
         TutorialScreen(onFinish = container.tutorialPrompt::finish)
     }
 
-    // 記録の保存期間の確認(#482)。生成中・音声のシートの間は待つ
-    RetentionPromptHost(runtime, busy = state.isGenerating || state.voiceOpen, onStop = vm::generateNow)
+    // 記録の保存期間の確認(#482)。完成の後のお知らせの順番(要約の後・#1271)で、生成中・音声のシートの間は待つ
+    RetentionPromptHost(
+        runtime,
+        busy = state.isGenerating || state.voiceOpen,
+        turn = BuildStageState.isRetentionTurn(state, retentionWaiting),
+        onStop = vm::generateNow,
+    )
     // フィードバックの画面(#319)と端末を振って開く仕組み。設定から開いた時に上に重ねる
     FeedbackComposerHost(container)
+    // Tailor It Pro の課金画面(AI ボタン・設定から)。サインインのたびにサーバーの Pro を読み直す
+    PaywallHost(container.pro, user?.uid)
 
     if (switcherOpen) {
         AppSwitcherDialog(

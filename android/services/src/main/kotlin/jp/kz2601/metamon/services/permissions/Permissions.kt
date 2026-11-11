@@ -11,6 +11,12 @@ enum class AppPermission {
     /** おおよそ / 正確。どちらか許可されていれば使える(おおよそだけでも許可扱い)。 */
     LOCATION,
 
+    /**
+     * 裏での位置(ACCESS_BACKGROUND_LOCATION)。場所に着いたら知らせる(near・Geofencing)だけが使う。
+     * 11+ は前面の位置([LOCATION])が許可された後に、別に聞く(OS の設定の画面で「常に許可」を選んでもらう)。
+     */
+    BACKGROUND_LOCATION,
+
     /** 13+ は POST_NOTIFICATIONS。12 / 12L は実行時の権限が無く、設定のオン・オフだけ。 */
     NOTIFICATIONS,
 
@@ -29,6 +35,7 @@ enum class AppPermission {
         MICROPHONE -> listOf(RECORD_AUDIO)
         CAMERA -> listOf(CAMERA_PERMISSION)
         LOCATION -> listOf(ACCESS_COARSE_LOCATION, ACCESS_FINE_LOCATION)
+        BACKGROUND_LOCATION -> listOf(ACCESS_BACKGROUND_LOCATION)
         NOTIFICATIONS -> if (sdkInt >= TIRAMISU) listOf(POST_NOTIFICATIONS) else emptyList()
         NEARBY -> listOf(BLUETOOTH_SCAN, BLUETOOTH_ADVERTISE, BLUETOOTH_CONNECT) +
             if (sdkInt >= TIRAMISU) listOf(NEARBY_WIFI_DEVICES) else listOf(ACCESS_FINE_LOCATION)
@@ -49,6 +56,7 @@ enum class AppPermission {
         const val CAMERA_PERMISSION = "android.permission.CAMERA"
         const val ACCESS_COARSE_LOCATION = "android.permission.ACCESS_COARSE_LOCATION"
         const val ACCESS_FINE_LOCATION = "android.permission.ACCESS_FINE_LOCATION"
+        const val ACCESS_BACKGROUND_LOCATION = "android.permission.ACCESS_BACKGROUND_LOCATION"
         const val POST_NOTIFICATIONS = "android.permission.POST_NOTIFICATIONS"
         const val BLUETOOTH_SCAN = "android.permission.BLUETOOTH_SCAN"
         const val BLUETOOTH_ADVERTISE = "android.permission.BLUETOOTH_ADVERTISE"
@@ -129,5 +137,21 @@ object PermissionRules {
             val s = permission()
             if (s == PermissionStatus.GRANTED && !enabled) PermissionStatus.PERMANENTLY_DENIED else s
         }
+    }
+}
+
+/**
+ * 場所に着いたら知らせる(near)の許可の 2 段(Geofencing)。
+ * 1. 前面の位置([AppPermission.LOCATION])を理由の後に聞く(iOS が場所のあるアプリで 1 回だけ聞くのと同じ)
+ * 2. 許可されたら、裏での位置([AppPermission.BACKGROUND_LOCATION])を説明の画面の後に聞く(11+ は OS の設定の画面で「常に許可」)
+ * 断られた後は聞き直さず、「オフ」のバーが案内する。
+ */
+object NearPermissionFlow {
+    enum class Step { NONE, ASK_FOREGROUND, EXPLAIN_BACKGROUND }
+
+    fun next(foreground: PermissionStatus, background: PermissionStatus): Step = when {
+        foreground == PermissionStatus.NOT_ASKED -> Step.ASK_FOREGROUND
+        foreground == PermissionStatus.GRANTED && background == PermissionStatus.NOT_ASKED -> Step.EXPLAIN_BACKGROUND
+        else -> Step.NONE
     }
 }

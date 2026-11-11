@@ -6,7 +6,9 @@
     <string name="music_song_title">Song title</string>
     <string name="music_artist">Artist (optional)</string>
     <string name="music_search">Find in a music app</string>
-    <string name="music_search_note">Opens a Spotify search (in the browser if the app isn\'t installed). Playback can\'t be controlled here.</string>
+    <string name="music_search_note_spotify">Opens a Spotify search (in the browser if the app isn\'t installed). Playback can\'t be controlled here.</string>
+    <string name="music_search_note_youtube_music">Opens a YouTube Music search (in the browser if the app isn\'t installed). Playback can\'t be controlled here.</string>
+    <string name="music_service">Music app to open</string>
     <string name="music_recent">Songs you looked up</string>
     <string name="music_open">Open</string>
 </resources>
