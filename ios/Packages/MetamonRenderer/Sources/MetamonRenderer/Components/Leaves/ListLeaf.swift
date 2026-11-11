@@ -56,6 +56,9 @@ struct ListLeaf: View {
                         .accessibilityHint(c.onItemTap != nil ? L("ダブルタップで開きます") : "")
                         .accessibilityAction { open(row) }
                         .contextMenu {
+                            #if os(macOS)
+                            Button(L("コピー"), systemImage: "doc.on.doc") { copy(row, entity: entity) }
+                            #endif
                             if deletable(row, entity: entityId) {
                                 Button(L("削除"), systemImage: "trash", role: .destructive) { delete(row, entity: entityId) }
                             }
@@ -147,6 +150,13 @@ struct ListLeaf: View {
 
     private func delete(_ row: Record, entity: String) {
         Task { await rt.run(Action(type: .deleteRecord, entity: entity), ctx.actionContext(recordId: row.id)) }
+    }
+
+    /// 右クリックの「コピー」(Mac・#1332): 行に見えている項目をテキストにしてクリップボードへ。
+    private func copy(_ row: Record, entity: Entity?) {
+        let text = ListRowCopyText.text(item: c.item, record: row, entity: entity, rt: rt)
+        guard !text.isEmpty else { return }
+        PlatformPasteboard.setString(text)
     }
 
     private func open(_ row: Record) {

@@ -270,8 +270,7 @@ private struct MacDetailSettings: View {
                         }
                     }
                     Button {
-                        NSPasteboard.general.clearContents()
-                        NSPasteboard.general.setString(info.clipboardText, forType: .string)
+                        PlatformPasteboard.setString(info.clipboardText)
                         copiedSupportInfo = true
                     } label: {
                         Label(copiedSupportInfo ? L10n.tr("コピーしました") : L10n.tr("詳細をコピー"),

@@ -38,6 +38,10 @@ final class MacAppRuntime: RuntimeNavigating {
     var calendarDraft: CalendarEventDraft?
     /// AI の部品が同意(#246)の無いまま送ろうとした。中央の列に同意の説明を出す(`MacAppRuntime+AIText.swift`)
     var needsAIConsent = false
+    /// 保存していない入力を捨てる前の確認(Esc・⌘W・アプリの切り替え・#943)。確認ダイアログと同じ場所に出す
+    var discardRequest: DiscardRequest?
+    /// 描いているフォームの控え(`MacAppRuntime+Discard.swift`)
+    @ObservationIgnored let openForms = OpenFormRegistry()
 
     @ObservationIgnored let recordSync: RecordSyncEngine
     /// AI の部品のオンライン版の送り先(#962)
@@ -299,7 +303,7 @@ final class MacAppRuntime: RuntimeNavigating {
     // MARK: - メニューの「戻る」・Esc(#934)
 
     /// 今いちばん上に見えている画面: フルスクリーン → シート → 選択中タブ(無ければ main)の順。
-    private var topStack: String {
+    var topStack: String {
         if fullScreen != nil { return "full" }
         if sheet != nil { return "sheet" }
         guard dsl.app.hasTabs else { return "main" }

@@ -15,6 +15,8 @@ struct AppCanvas: View {
     var showsScreenMap: Binding<Bool> = .constant(false)
     /// 画面マップの「この画面について話す」。マップを閉じ終えてから呼ぶ(シートを 2 枚同時に出さない)
     var onTalk: (ScreenContext) -> Void = { _ in }
+    /// ウインドウの入力の見張り(#943)。作ったランタイムを渡す(アプリの切り替え・⌘W の前に確認する)
+    var discardGuard: MacDiscardGuard?
 
     var body: some View {
         Group {
@@ -29,9 +31,14 @@ struct AppCanvas: View {
         .navigationTitle(app.name)
         .task {
             // 見え直した時(.task は出るたびに走る)に作り直すと、メモリ上の記録が消える
-            guard runtime == nil, !loadFailed else { return }
+            guard runtime == nil, !loadFailed else {
+                discardGuard?.runtime = runtime
+                return
+            }
             do {
-                runtime = MacAppRuntime(appId: app.id, dsl: try dsl ?? app.loadDSL())
+                let created = MacAppRuntime(appId: app.id, dsl: try dsl ?? app.loadDSL())
+                runtime = created
+                discardGuard?.runtime = created
             } catch {
                 loadFailed = true
             }
@@ -74,6 +81,7 @@ private struct AppCanvasContent: View {
             .macNotificationsOffBar(runtime.notifications) // 通知がオフの時のバー(#965)
             .environment(\.dslRuntime, runtime)
             .environment(\.componentRegistry, ComponentRegistry.standard)
+            .environment(\.openForms, runtime.openForms)
             .focusedSceneValue(\.macAppRuntime, runtime) // メニューの「戻る」・削除の取り消し(#934)
     }
 
@@ -86,10 +94,11 @@ private struct AppCanvasContent: View {
     /// モーダルの中にも確認と一言を出す(根の上に重ねるとシートに隠れる・iOS の RootView と同じ理由)
     private func modal(_ route: Route) -> some View {
         ScreenStack(root: route)
-            .background { EscapeToDismiss { runtime.dismissTopModal() } }
+            .background { EscapeToDismiss { runtime.requestDismissTopModal() } } // 入力があれば先に確認(#943)
             .modifier(RuntimeOverlays(runtime: runtime))
             .environment(\.dslRuntime, runtime)
             .environment(\.componentRegistry, ComponentRegistry.standard)
+            .environment(\.openForms, runtime.openForms)
     }
 }
 
@@ -112,6 +121,12 @@ private struct RuntimeOverlays: ViewModifier {
                     Task { await confirm.perform() }
                 }
                 Button("キャンセル", role: .cancel) {}
+            }
+            // 保存していない入力の破棄(Esc・⌘[・⌘W・アプリの切り替え・#943)。iOS のフォームを閉じる時と同じ文言
+            .discardFormConfirmation(isPresented: discardShown) {
+                let request = runtime.discardRequest
+                runtime.discardRequest = nil
+                request?.perform()
             }
             // addToCalendar(#978): 中身を見せてから書く
             .sheet(item: calendarShown) { draft in
@@ -154,6 +169,10 @@ private struct RuntimeOverlays: ViewModifier {
 
     private var consentShown: Binding<Bool> {
         Binding(get: { active && runtime.needsAIConsent }, set: { if !$0 { runtime.needsAIConsent = false } })
+    }
+
+    private var discardShown: Binding<Bool> {
+        Binding(get: { active && runtime.discardRequest != nil }, set: { if !$0 { runtime.discardRequest = nil } })
     }
 
     private var calendarShown: Binding<CalendarEventDraft?> {
