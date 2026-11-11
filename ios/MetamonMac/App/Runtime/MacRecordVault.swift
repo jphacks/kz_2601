@@ -23,17 +23,45 @@ enum MacRecordVault {
     @MainActor
     static func recordSync(appId: String, server: (any AppConfigClient)? = nil, root: URL = root) -> RecordSyncEngine {
         let dir = directory(appId: appId, root: root)
+        let engine: RecordSyncEngine
         if let server {
-            return RecordSyncEngine(client: server, directory: dir.appendingPathComponent("live", isDirectory: true))
+            engine = RecordSyncEngine(client: server, directory: dir.appendingPathComponent("live", isDirectory: true))
+        } else {
+            let client = LocalAppConfigClient(directory: dir.appendingPathComponent("server", isDirectory: true))
+            engine = RecordSyncEngine(client: client, connectivity: ManualConnectivity(online: true),
+                                      directory: dir.appendingPathComponent("local", isDirectory: true))
         }
-        let client = LocalAppConfigClient(directory: dir.appendingPathComponent("server", isDirectory: true))
-        return RecordSyncEngine(client: client, connectivity: ManualConnectivity(online: true),
-                                directory: dir.appendingPathComponent("local", isDirectory: true))
+        live.removeAll { $0.engine == nil && $0.queue == nil }
+        live.append(LiveEngine(directory: dir, engine: engine, queue: engine.queue))
+        return engine
+    }
+
+    /// 作ったエンジン(ほかのウインドウ・送信の途中のものも)。消す前に止めるため弱く持つ。
+    /// ランタイムを捨てた後も送信の列が送っている途中なら列だけ残る
+    @MainActor private static var live: [LiveEngine] = []
+
+    private struct LiveEngine {
+        let directory: URL
+        weak var engine: RecordSyncEngine?
+        weak var queue: SyncQueue?
     }
 
     /// アプリを消したら記録も消す(iOS の `recordSync.purge` と同じ)。端末の動画・録音も同じフォルダの中にある。
-    /// サーバーの分はアプリごと消す(`MacRootView.deleteApp` が appconfig の deleteApp を呼ぶ)
-    static func purge(appId: String, root: URL = root) {
-        try? FileManager.default.removeItem(at: directory(appId: appId, root: root))
+    /// 先にそのアプリのエンジンを止めて送信待ちを捨て、送っている途中の 1 件が終わるのを待ってから消す
+    /// (後から書かれてフォルダが作り直されないように)。サーバーの分はアプリごと消す(`MacRootView.deleteApp` が appconfig の deleteApp を呼ぶ)。
+    /// ウインドウから呼ぶ時は `MacRecordEngines.purge`(共有のエンジンを手放してからここを呼ぶ)
+    @MainActor
+    static func purge(appId: String, root: URL = root, timeout: Duration = .seconds(5)) async {
+        let dir = directory(appId: appId, root: root)
+        let targets = live.filter { $0.directory == dir }
+        live.removeAll { $0.directory == dir || ($0.engine == nil && $0.queue == nil) }
+        let deadline = ContinuousClock.now + timeout
+        for target in targets {
+            if let engine = target.engine { await engine.wipe() } else { await target.queue?.discardAll() }
+            while let queue = target.queue, await queue.isDraining, ContinuousClock.now < deadline {
+                try? await Task.sleep(for: .milliseconds(20))
+            }
+        }
+        try? FileManager.default.removeItem(at: dir)
     }
 }
