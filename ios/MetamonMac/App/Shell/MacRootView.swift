@@ -130,6 +130,8 @@ struct MacRootView: View {
         .background { WindowCloseGuard(discardGuard: discardGuard) } // ⌘W・閉じるボタン(#943)
         #if !APP_STORE_REVIEW
         .onChange(of: shareFlow.adopted?.id) { adoptShared() }
+        // フィードバックに添える今のアプリ(#1330)。サーバーにあるアプリの時だけ(選択・版・保存先が変わったら入れ替える)
+        .onChange(of: feedbackAppKey, initial: true) { MacFeedbackCenter.shared.currentApp = feedbackApp }
         #endif
         .sheet(item: $compose, onDismiss: noteFinishedCompose) { session in
             ComposeSheet(session: session, onClose: { compose = nil }, undo: finishedUndo(session))
@@ -207,6 +209,16 @@ struct MacRootView: View {
     }
 
     #if !APP_STORE_REVIEW
+    private var feedbackAppKey: String {
+        guard let id = selectedAppId else { return "" }
+        return "\(id)#\(library.generated[id]?.version ?? 0)#\(library.isOnServer(id))"
+    }
+
+    private var feedbackApp: MacFeedbackContext.CurrentApp? {
+        guard let id = selectedAppId, library.isOnServer(id), let document = library.generated[id] else { return nil }
+        return .init(document: document, envelope: library.envelope(for: id))
+    }
+
     /// 共有のリンクから取り込んだ・参加したアプリ(#1287)。サーバーにあるアプリとして一覧に足し、入力の確認を通して開く
     private func adoptShared() {
         guard let adopted = shareFlow.adopted else { return }
