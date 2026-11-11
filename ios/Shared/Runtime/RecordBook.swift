@@ -82,6 +82,14 @@ final class RecordBook {
         return true
     }
 
+    /// `create` と同じ。作った行の id(仮 id `local-…`)を返す。書けなければ nil(aiChat の対の保存・#1326)
+    func createId(entity: String, data: [String: JSONValue]) async -> String? {
+        guard dsl.entity(entity) != nil else { return nil }
+        let written = await recordSync.write(appId: appId, entity: entity, recordId: nil, data: data)
+        records[entity] = written.records
+        return written.recordId
+    }
+
     enum SaveOutcome: Equatable {
         /// 書いた。画面を進める
         case saved

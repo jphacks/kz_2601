@@ -57,6 +57,10 @@ final class MacAppRuntime: RuntimeNavigating {
     @ObservationIgnored private let previewDirectory: URL?
     /// ローカル通知(#965・MacRuntimeNotifications)
     @ObservationIgnored let notifications = MacRuntimeNotifications()
+    #if !APP_STORE_REVIEW
+    /// roleField の無い aiChat の対(仮 id → 相方)。片方が断られたら相方も消す(`MacAppRuntime+AIText.swift`・#1326)
+    @ObservationIgnored let aiChatPairs = AIChatPairLedger()
+    #endif
     /// 話して入力(aiChat のマイク・transcribeField・#1328)。声で頼む(`MacVoiceInput`)と同じ認識を使う。nil なら使えない
     @ObservationIgnored let dictationSource: TranscriberDictation?
 
@@ -139,7 +143,12 @@ final class MacAppRuntime: RuntimeNavigating {
     }
 
     func createRecord(entity: String, data: [String: JSONValue]) async -> Bool {
-        await book.create(entity: entity, data: data)
+        await createRecordId(entity: entity, data: data) != nil
+    }
+
+    /// `createRecord` と同じ。作った行の id(仮 id `local-…`)を返す。保存できなければ nil(iOS と同じ)。
+    func createRecordId(entity: String, data: [String: JSONValue]) async -> String? {
+        await book.createId(entity: entity, data: data)
     }
 
     func notifyReadOnly(entity: String) { toast = RecordActionSteps.readOnlyMessage }
@@ -147,11 +156,14 @@ final class MacAppRuntime: RuntimeNavigating {
 
     private func record(_ entity: String, _ id: String) -> Record? { book.record(entity, id) }
 
-    private func reloadLocal(_ entity: String) async { await book.reloadLocal(entity) }
+    func reloadLocal(_ entity: String) async { await book.reloadLocal(entity) }
 
     /// 同期キューからの通知。送れたらローカルを読み直し、競合はサーバーから引き直す(iOS と同じくサーバー優先)。
     private func handle(_ event: SyncEvent) {
         Task { @MainActor in
+            #if !APP_STORE_REVIEW
+            await revertAIChatPartner(for: event)
+            #endif
             switch event {
             case .sent(let id, let entity) where id == appId:
                 await reloadLocal(entity)
@@ -162,20 +174,8 @@ final class MacAppRuntime: RuntimeNavigating {
             default:
                 toast = RecordActionSteps.saveFailedMessage
                 // 断られた書き込みは破棄済み(create はローカル行も消えた)。楽観的に出した分をサーバーの内容に戻す
-                if let refused = Self.refusedEntity(event), refused.appId == appId { await refresh(refused.entity) }
+                if let refused = event.refusedWrite, refused.appId == appId { await refresh(refused.entity) }
             }
-        }
-    }
-
-    private static func refusedEntity(_ event: SyncEvent) -> (appId: String, entity: String)? {
-        switch event {
-        case .forbidden(let appId, let entity, _), .rejected(let appId, let entity, _, _, _),
-             .notMember(let appId, let entity, _), .denied(let appId, let entity, _, _),
-             .proRequired(let appId, let entity, _, _), .planLimit(let appId, let entity, _, _),
-             .appStopped(let appId, let entity, _), .textNotAllowed(let appId, let entity, _, _):
-            return (appId, entity)
-        case .sent, .conflict, .paused, .drained:
-            return nil
         }
     }
 

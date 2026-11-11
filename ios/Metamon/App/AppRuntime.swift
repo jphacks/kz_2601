@@ -421,7 +421,7 @@ final class AppRuntime: RuntimeNavigating {
     @ObservationIgnored var lastSavedForm: SavedForm?
     #if !APP_STORE_REVIEW
     /// roleField の無い aiChat の対(仮 id → 相方)。片方が断られたら相方も消す(AppRuntime+AIChat.swift)
-    @ObservationIgnored var aiChatPartners: [String: AIChatPartner] = [:]
+    @ObservationIgnored let aiChatPairs = AIChatPairLedger()
     #endif
     struct SavedForm {
         let appId: String
@@ -1200,23 +1200,11 @@ final class AppRuntime: RuntimeNavigating {
     /// 保存は送信待ちに積んだ時点で数えるので、断られた分はここで戻す(画面を閉じた後なら toast・カードだけが残る)。
     /// 同じ entity の前に積んだ別の記録が断られても、今のフォームの表示は変えない(recordId で見分ける)。
     func revokeSaveFeedback(for event: SyncEvent) {
-        guard let refused = Self.refusedWrite(event), let recordId = refused.recordId,
+        guard let refused = event.refusedWrite, let recordId = refused.recordId,
               let saved = lastSavedForm, saved.appId == refused.appId, saved.entity == refused.entity,
               saved.recordId == recordId else { return }
         saved.form?.markSaveRefused()
         lastSavedForm = nil
-    }
-
-    static func refusedWrite(_ event: SyncEvent) -> (appId: String, entity: String, recordId: String?)? {
-        switch event {
-        case .forbidden(let appId, let entity, let id), .rejected(let appId, let entity, _, _, let id),
-             .notMember(let appId, let entity, let id), .denied(let appId, let entity, _, let id),
-             .proRequired(let appId, let entity, _, let id), .planLimit(let appId, let entity, _, let id),
-             .appStopped(let appId, let entity, let id), .textNotAllowed(let appId, let entity, _, let id):
-            return (appId, entity, id)
-        case .sent, .conflict, .paused, .drained:
-            return nil
-        }
     }
 
     // MARK: - Navigation

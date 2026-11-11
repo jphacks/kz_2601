@@ -35,3 +35,33 @@ extension MacAppRuntime: AITextHost {
     }
     #endif
 }
+
+#if !APP_STORE_REVIEW
+/// `roleField` の無い aiChat(stg で作られた古い DSL)の 1 往復を対で保存する(#1326・iOS の `AppRuntime+AIChat.swift` と同じ)。
+/// 役は並び順で読むので、返事を保存できなければ自分の発言も消し、後でどちらかが断られたらもう片方も消す。
+extension MacAppRuntime: AIChatPairSaving {
+    func saveAIChatPair(entity: String, user: [String: JSONValue], assistant: [String: JSONValue]) async -> Bool {
+        await saveAIChatPairIds(entity: entity, user: user, assistant: assistant) != nil
+    }
+
+    /// 保存した 2 件の id(仮 id)。どちらかを保存できなければ何も残さず nil。
+    func saveAIChatPairIds(entity: String, user: [String: JSONValue],
+                           assistant: [String: JSONValue]) async -> (user: String, assistant: String)? {
+        await aiChatPairs.save(appId: appId, entity: entity, user: user, assistant: assistant,
+                               create: { await self.createRecordId(entity: entity, data: $0) },
+                               remove: { await self.removeAIChatTurn(entity: entity, recordId: $0) })
+    }
+
+    /// 対の片方が断られた(ローカル行はキューが消した)なら、もう片方も消す。
+    func revertAIChatPartner(for event: SyncEvent) async {
+        guard let refused = event.refusedWrite, refused.appId == appId, let id = refused.recordId,
+              let partner = aiChatPairs.takePartner(appId: appId, entity: refused.entity, recordId: id) else { return }
+        await removeAIChatTurn(entity: refused.entity, recordId: partner)
+    }
+
+    private func removeAIChatTurn(entity: String, recordId: String) async {
+        _ = await recordSync.delete(appId: appId, entity: entity, recordId: recordId)
+        await reloadLocal(entity)
+    }
+}
+#endif
