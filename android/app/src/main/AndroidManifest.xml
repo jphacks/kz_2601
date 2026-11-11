@@ -15,6 +15,10 @@
          正確な位置と裏での位置の両方が要る。前面の位置が許可された後に、説明の画面を出してから聞く。
          Play Console の申告の文: docs/android/play-background-location.md -->
     <uses-permission android:name="android.permission.ACCESS_BACKGROUND_LOCATION" />
+    <!-- 位置の記録(locationTracker・#869)の Foreground Service(type location・宣言は :renderer)。前面で開始するので裏での位置は使わない。
+         Play Console の「フォアグラウンド サービスの権限」の申告が要る(人の作業) -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_LOCATION" />
     <!-- 通知(13+ だけ実行時の権限。12 / 12L は設定のオン・オフのみ) -->
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <!-- 近くの端末と送り合う(nearbyShare・Nearby Connections・#1380)。minSdk 31 なので古い BLUETOOTH / BLUETOOTH_ADMIN は要らない。

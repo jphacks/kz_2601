@@ -49,6 +49,7 @@ import jp.kz2601.metamon.purchase.PaywallHost
 import jp.kz2601.metamon.discover.DiscoverHost
 import jp.kz2601.metamon.discover.LocalPublishEnv
 import jp.kz2601.metamon.onboarding.TutorialScreen
+import jp.kz2601.metamon.renderer.components.location.LocationTrackingBarHost
 import jp.kz2601.metamon.renderer.components.sensors.LocalSensorSource
 import jp.kz2601.metamon.services.consent.AiConsentStatus
 import jp.kz2601.metamon.feedback.FeedbackComposerHost
@@ -661,6 +662,8 @@ fun MetamonApp(container: AppContainer) {
 @Composable
 private fun GeneratedApp(state: VoiceUiState, dsl: AppDSL, runtime: AppRuntime, appId: String) {
     Column(Modifier.fillMaxSize()) {
+        // 位置の記録中だけ「● 記録中 12:34 [停止]」(#869・iOS の TrackingBarHost)
+        LocationTrackingBarHost()
         // 部品が使う権限が断られていたら上に「オフ」のバー(#890・iOS の NotificationsOffBar)。要約は FeedbackHost が出す(#895)
         PermissionOffBarHost(dsl, appId, busy = state.isGenerating, summaryShowing = state.summary != null)
         // カメラなど部品が使う権限は使う直前にアプリの窓口で聞く(#862)
