@@ -81,6 +81,8 @@ struct LocationPickerSheet: View {
     @State private var region: MKCoordinateRegion?
     @State private var locating = false
     @State private var error: String?
+    /// 「現在地」の精度が低い時の一言(#1344)
+    @State private var accuracyNote: String?
 
     init(title: String, initial: CLLocationCoordinate2D?, onPick: @escaping (PickedPlace) -> Void) {
         self.title = title
@@ -185,6 +187,10 @@ struct LocationPickerSheet: View {
                 Text(L("地図を動かして、ピンの位置で決められます"))
                     .font(.caption).foregroundStyle(.secondary)
                 if let error { Text(error).font(.caption).foregroundStyle(.red) }
+                if let accuracyNote {
+                    Text(accuracyNote).font(.caption).foregroundStyle(.secondary)
+                        .accessibilityIdentifier("locationPicker.accuracy")
+                }
                 HStack(spacing: 12) {
                     Button { Task { await locate() } } label: {
                         HStack {
@@ -217,10 +223,15 @@ struct LocationPickerSheet: View {
         locating = true
         defer { locating = false }
         let here: CLLocationCoordinate2D
+        var accuracy = LocationAccuracy.precise
         if PlacePicking.isMock {
             here = PlacePicking.mockHere.coordinate
         } else {
-            do { here = try await OneShotLocation().request().coordinate } catch is OneShotLocation.LocationError {
+            do {
+                let loc = try await OneShotLocation().request()
+                here = loc.coordinate
+                accuracy = LocationAccuracy.classify(loc.horizontalAccuracy)
+            } catch is OneShotLocation.LocationError {
                 self.error = LocationPermissionCopy.notAllowed
                 return
             } catch {
@@ -229,6 +240,7 @@ struct LocationPickerSheet: View {
             }
         }
         error = nil
+        accuracyNote = accuracy.pickerNote
         center = here
         withAnimation { position = .region(MKCoordinateRegion(center: here, latitudinalMeters: 800, longitudinalMeters: 800)) }
     }

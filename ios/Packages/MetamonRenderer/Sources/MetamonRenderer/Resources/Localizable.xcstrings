@@ -1978,6 +1978,57 @@
         }
       }
     },
+    "おおよその位置(±%@)" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Approximate location (±%@)"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "おおよその位置(±%@)"
+          }
+        }
+      }
+    },
+    "おおよその位置(±%@)から探しました。距離は目安です" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Searched from an approximate location (±%@). Distances are rough"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "おおよその位置(±%@)から探しました。距離は目安です"
+          }
+        }
+      }
+    },
+    "おおよその位置(±%@)です。地図を動かしてピンで直せます" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Approximate location (±%@). Move the map to adjust the pin"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "おおよその位置(±%@)です。地図を動かしてピンで直せます"
+          }
+        }
+      }
+    },
     "お互いに連絡先が見えなくなります。相手に通知は送られません。" : {
       "extractionState" : "manual",
       "localizations" : {
