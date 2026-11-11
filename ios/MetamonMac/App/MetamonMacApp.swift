@@ -26,6 +26,7 @@ struct MetamonMacApp: App {
         FirstRunTutorialStore.shared.applyLaunchOverride()
         #if !APP_STORE_REVIEW
         BetaWelcomeStore.shared.applyLaunchOverride()
+        MacAIButtonMetrics.install() // 前の日までの AI ボタンの集計を、起動・前面に戻った時に送る(#446・#1327)
         #endif
         // 記録の一時フォルダ(MacAppRuntime.mockRecordSync)を起動時(前回の残り)と終了時に片付ける
         MacAppRuntime.removePreviewDirectories()
