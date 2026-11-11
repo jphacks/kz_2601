@@ -1730,6 +1730,23 @@
         }
       }
     },
+    "iPhone から写真を撮る / 書類をスキャン" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Take Photo or Scan Documents with iPhone"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "iPhone から写真を撮る / 書類をスキャン"
+          }
+        }
+      }
+    },
     "macOS 26 以降が必要です" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -9551,6 +9568,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "車"
+          }
+        }
+      }
+    },
+    "近くの iPhone で撮った写真やスキャンした書類を入れます" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Adds a photo or scanned document from your nearby iPhone"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "近くの iPhone で撮った写真やスキャンした書類を入れます"
           }
         }
       }
