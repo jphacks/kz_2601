@@ -19,13 +19,15 @@ enum MacRecordVault {
         return root.appendingPathComponent(safe, isDirectory: true)
     }
 
-    /// `server` があればサーバーの記録(iOS と同じく到達性は `NWPathMonitor`)、nil なら端末だけ
+    /// `server` があればサーバーの記録(iOS と同じく到達性は `NWPathMonitor`・テストは `connectivity` で差し替え)、nil なら端末だけ
     @MainActor
-    static func recordSync(appId: String, server: (any AppConfigClient)? = nil, root: URL = root) -> RecordSyncEngine {
+    static func recordSync(appId: String, server: (any AppConfigClient)? = nil, root: URL = root,
+                           connectivity: (any ConnectivityMonitor)? = nil) -> RecordSyncEngine {
         let dir = directory(appId: appId, root: root)
         let engine: RecordSyncEngine
         if let server {
-            engine = RecordSyncEngine(client: server, directory: dir.appendingPathComponent("live", isDirectory: true))
+            engine = RecordSyncEngine(client: server, connectivity: connectivity ?? NetworkPathConnectivity(),
+                                      directory: dir.appendingPathComponent("live", isDirectory: true))
         } else {
             let client = LocalAppConfigClient(directory: dir.appendingPathComponent("server", isDirectory: true))
             engine = RecordSyncEngine(client: client, connectivity: ManualConnectivity(online: true),

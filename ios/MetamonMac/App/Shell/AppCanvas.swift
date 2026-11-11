@@ -118,6 +118,7 @@ private struct AppCanvasContent: View {
             .modifier(RuntimeOverlays(runtime: runtime))
             .macNotificationsOffBar(runtime.notifications) // 通知がオフの時のバー(#965)
             .toolbar { MacUpcomingNotificationsToolbar(notifications: runtime.notifications) } // 次の通知(#1325)
+            .toolbar { MacSyncStatusToolbar(engine: runtime.recordSync) } // 未送信 N 件(#976)
             .environment(\.dslRuntime, runtime)
             .environment(\.componentRegistry, ComponentRegistry.standard)
             .environment(\.openForms, runtime.openForms)
