@@ -15,7 +15,7 @@ import MetamonServices
 /// メモリ上の appconfig(`InMemoryAppConfigClient`)に持つ。
 /// ローカル通知は `MacRuntimeNotifications`(#965)。AI の部品(aiButton・aiGenerate・aiChat)は `MacAppRuntime+AIText.swift`(#962)。
 /// 話して入力(aiChat のマイク・transcribeField)は `MacAppRuntime+Dictation.swift`(#1328)。
-/// 課金・フォローなど iOS 固有の機能は持たない(未対応のアクションは一言で知らせる)。export は保存・共有・プリント(`+Export`)。
+/// 会話・印・通報・参加者・仲間探しは `MacAppRuntime+Social.swift`(#963)。課金・フォローなど iOS 固有の機能は持たない(未対応のアクションは一言で知らせる)。export は保存・共有・プリント(`+Export`)。
 @MainActor
 @Observable
 final class MacAppRuntime: RuntimeNavigating {
@@ -56,6 +56,10 @@ final class MacAppRuntime: RuntimeNavigating {
     #if !APP_STORE_REVIEW
     /// feed の問い合わせ先(`MacAppRuntime+Feeds.swift`・#1288)。サーバーにつながっていない時は nil
     @ObservationIgnored var feedClient: (any FeedClient)?
+    #endif
+    #if !APP_STORE_REVIEW
+    /// 人とつながる部品(#963・`MacAppRuntime+Social.swift`)の問い合わせ先と状態。モックではクライアントが無く、ボタンを出さない
+    @ObservationIgnored var social: MacSocial = .shared
     #endif
     /// lookupBook の問い合わせ先(#1276)。サーバーにつながっている時は `MacServices.books`、モックの時は nil
     @ObservationIgnored var books: (any BookLookupClient)?
@@ -99,6 +103,7 @@ final class MacAppRuntime: RuntimeNavigating {
             previewDirectory = dir
         }
         book = RecordBook(appId: appId, dsl: dsl, recordSync: self.recordSync)
+        book.postAuthor = { [weak self] entity in self?.postAuthor(for: entity) } // 共有の投稿に作者を付ける(#963)
         if let recordLease {
             recordLease.onEvent = { [weak self] event in self?.handle(event) } // 同じエンジンの通知は借りている全員に届く
         } else {
@@ -147,7 +152,22 @@ final class MacAppRuntime: RuntimeNavigating {
 
     // MARK: - Records
 
-    func records(for entity: String) -> [Record] { book.records(for: entity) }
+    func records(for entity: String) -> [Record] {
+        #if APP_STORE_REVIEW
+        book.records(for: entity)
+        #else
+        hidingBlocked(book.records(for: entity), entity: entity) // ブロックした人の投稿は隠す(#963)
+        #endif
+    }
+
+    /// 共有レコードの作者判定(#249)と「自分の投稿」(#963)。サーバーにつながっていない時は nil
+    var currentUserId: String? {
+        #if APP_STORE_REVIEW
+        nil
+        #else
+        social.currentUserId()
+        #endif
+    }
 
     func load(entities: Set<String>, force: Bool) async {
         await book.load(entities: entities, force: force)

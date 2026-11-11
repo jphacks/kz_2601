@@ -1,5 +1,6 @@
 import XCTest
 import MetamonDSL
+import MetamonRenderer
 import MetamonServices
 @testable import Metamon
 
@@ -37,6 +38,7 @@ final class MacAccountWipeTests: XCTestCase {
         wipe.localList = AppListCache(directory: root.appendingPathComponent("local-list", isDirectory: true))
         #if !APP_STORE_REVIEW
         wipe.feeds = FeedCache()
+        wipe.social = MacSocial(ageGate: MatchingAgeGate(defaults: defaults))
         #endif
         wipe.defaults = defaults
         wipe.domain = suiteName
@@ -65,8 +67,19 @@ final class MacAccountWipeTests: XCTestCase {
         defaults.set(["a"], forKey: MacAppLibrary.serverIdsKey)
         defaults.set("ja", forKey: "metamon.appLanguage")
         defaults.set(false, forKey: "metamon.crashReporting.enabled")
+        #if !APP_STORE_REVIEW
+        wipe.social.blocked["u-x"] = "x" // ブロック・参加者(#963)
+        wipe.social.memberEntries["a"] = ([AppMember(uid: "u-x", displayName: "x")], true)
+        wipe.social.ageGate.markSent(uid: "u-me")
+        #endif
 
         await wipe.run()
+
+        #if !APP_STORE_REVIEW
+        XCTAssertTrue(wipe.social.blocked.isEmpty, "ブロックした人の一覧")
+        XCTAssertTrue(wipe.social.memberEntries.isEmpty, "参加者")
+        XCTAssertFalse(wipe.social.ageGate.isSent(uid: "u-me"), "仲間探しの申告を送った記録")
+        #endif
 
         XCTAssertFalse(exists(recordsRoot), "記録のフォルダごと消す")
         XCTAssertNil(engines.engine(appId: "a"), "エンジンを手放す")
