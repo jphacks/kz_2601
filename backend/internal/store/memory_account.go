@@ -183,6 +183,7 @@ func (m *Memory) MarkAccountPurged(_ context.Context, uid string) error {
 	}
 	delete(m.deleted, uid)
 	delete(m.firstSeen, uid) // the tombstone keeps status and purgedAt only
+	delete(m.ageOK, uid)
 	if m.purged == nil {
 		m.purged = map[string]bool{}
 	}

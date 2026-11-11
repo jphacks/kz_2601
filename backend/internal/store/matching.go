@@ -15,6 +15,7 @@ import (
 //
 //	apps_public/{appId}/match_pairs/{pairId} {uids,from,status,declinedBy,profiles,createdAt,updatedAt,matchedAt}
 //	match_quota/{uid}                         {day,n}  daily cap on sent interests
+//	users/{uid}.ageConfirmedAt                the person's own "18 or older" (no age)
 //
 // docs/backend/features/matching.md.
 
@@ -91,6 +92,11 @@ type Matching interface {
 	// BlockedEither returns the uids among others that uid blocked or that
 	// blocked uid (#321 blocks, both ways).
 	BlockedEither(ctx context.Context, uid string, others []string) (map[string]bool, error)
+	// ConfirmAge records that uid said they are 18 or older
+	// (users/{uid}.ageConfirmedAt). The age itself is never stored.
+	ConfirmAge(ctx context.Context, uid string) error
+	// AgeConfirmed reports whether ConfirmAge was called for uid.
+	AgeConfirmed(ctx context.Context, uid string) (bool, error)
 }
 
 // matchEntityIDs lists the profile and matched entities of a published DSL.
