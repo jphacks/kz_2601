@@ -16,12 +16,14 @@ class TrayTest {
     @After
     fun tearDown() = DesktopTimers.clear()
 
-    private fun labels(items: List<TrayItem>) = items.map {
+    private fun labels(items: List<TrayItem>): List<String> = items.map {
         when (it) {
             is TrayItem.Command -> "${it.label}${if (it.enabled) "" else " [off]"}"
             is TrayItem.Toggle -> "${it.label} [${if (it.checked) "x" else " "}]"
             is TrayItem.Info -> "(${it.label})"
             TrayItem.Separator -> "---"
+            is TrayItem.Submenu -> "${it.label} > ${labels(it.items).joinToString(" | ")}"
+            is TrayItem.OpenApp -> "${it.label} <${it.appId}>"
         }
     }
 

@@ -7,6 +7,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.composed
 import androidx.compose.ui.focus.FocusDirection
@@ -36,7 +37,6 @@ import jp.kz2601.metamon.dsl.Presentation
 import jp.kz2601.metamon.dsl.Screen
 import jp.kz2601.metamon.dsl.screen
 import jp.kz2601.metamon.renderer.form.FormDraft
-import jp.kz2601.metamon.renderer.navigation.NavigationResolver
 
 // キーボードだけで使う(#1765): ショートカット・コマンドパレット(CommandPalette.kt)・F1 の一覧。
 
@@ -60,6 +60,8 @@ object KeyboardText {
     val KIND_APP get() = Strings["desktop_keys_kind_app"]
     val HELP_CLOSE get() = Strings["desktop_close"]
     val HELP_TAB get() = Strings["desktop_keys_help_tab"]
+    val NEW_WINDOW get() = Strings["desktop_tray_new_window"]
+    val OPEN_RECORD_WINDOW get() = Strings["desktop_window_open_record"]
 }
 
 /** キーの決まりを分ける OS。Windows・Linux は Ctrl、macOS は ⌘。 */
@@ -199,8 +201,8 @@ object ScreenShortcuts {
             }
 }
 
-/** Ctrl+F の行き先: 今描いている searchBar。後から描いた物(sheet の中)を先に。 */
-object SearchTargets {
+/** Ctrl+F の行き先: 今描いている searchBar。後から描いた物(sheet の中)を先に。ウィンドウごとに 1 つ(#1763)。 */
+class SearchTargets {
     private val targets = mutableListOf<FocusRequester>()
 
     fun focusTop(): Boolean = synchronized(targets) { targets.toList() }.asReversed().any { runCatching { it.requestFocus() }.isSuccess }
@@ -214,10 +216,13 @@ object SearchTargets {
     }
 }
 
+/** 今のウィンドウの Ctrl+F の行き先(DesktopApp が渡す)。 */
+val LocalSearchTargets = staticCompositionLocalOf { SearchTargets() }
+
 /** searchBar に付ける(Ctrl+F で入る)。 */
 fun Modifier.searchShortcutTarget(): Modifier = composed {
     val r = remember { FocusRequester() }
-    SearchTargets.Register(r)
+    LocalSearchTargets.current.Register(r)
     focusRequester(r)
 }
 
@@ -233,6 +238,12 @@ class DesktopKeyboard(
     var dispatch: (Action, ActionContext) -> Unit = { a, ctx -> session.dispatch(a, ctx) }
     var print: () -> Unit = {}
     var openApp: ((String) -> Unit)? = null
+
+    /** 記録の詳細を別のウィンドウで開く(#1763)。(画面, recordId)。 */
+    var openRecord: ((String, String) -> Unit)? = null
+
+    /** このウィンドウの検索欄(Ctrl+F は他のウィンドウに入らない)。 */
+    val searchTargets = SearchTargets()
 
     var paletteOpen by mutableStateOf(false)
     var helpOpen by mutableStateOf(false)
@@ -260,9 +271,9 @@ class DesktopKeyboard(
             Shortcut.PRINT -> print()
             Shortcut.NEW -> ScreenShortcuts.newAction(dsl, screen)?.let { dispatch(it, ctx()) } ?: run { session.message = KeyboardText.NO_NEW }
             Shortcut.SAVE -> ScreenShortcuts.saveAction(screen, form)?.let { dispatch(it, ctx()) } ?: run { session.message = KeyboardText.NO_SAVE }
-            Shortcut.SEARCH -> if (!SearchTargets.focusTop()) paletteOpen = true
+            Shortcut.SEARCH -> if (!searchTargets.focusTop()) paletteOpen = true
             Shortcut.DELETE -> dispatch(ScreenShortcuts.deleteAction(screen, form) ?: return false, ctx())
-            Shortcut.CLOSE -> if (NavigationResolver.canClose(session.nav, session.top)) session.back(session.top) else return false
+            Shortcut.CLOSE -> if (session.canClose(session.top)) session.back(session.top) else return false
         }
         return true
     }
@@ -292,10 +303,18 @@ class DesktopKeyboard(
         val screens = dsl.screens.map { sc ->
             PaletteCommand("screen:${sc.id}", sc.title.ifEmpty { sc.id }, PaletteCommand.Kind.SCREEN, keywords = listOf(sc.id)) { openScreen(sc.id) }
         }
+        // アプリは別のウィンドウで開く(開いていればそれを前に出す)
         val apps = openApp?.let { open ->
-            BundledApps.all().map { (id, name) -> PaletteCommand("app:$id", name, PaletteCommand.Kind.APP, keywords = listOf(id)) { open(id) } }
+            BundledApps.all().map { (id, name) ->
+                PaletteCommand("app:$id", name, PaletteCommand.Kind.APP, keywords = listOf(id, KeyboardText.NEW_WINDOW)) { open(id) }
+            }
         }.orEmpty()
-        return shortcuts + buttons + screens + apps
+        // 今開いている記録を別のウィンドウに(詳細のウィンドウの根では出さない)
+        val top = session.top
+        val record = openRecord?.takeIf { top.recordId != null && top != session.detailRoot }?.let { open ->
+            listOf(PaletteCommand("window:record", KeyboardText.OPEN_RECORD_WINDOW, PaletteCommand.Kind.ACTION) { open(top.screen, top.recordId!!) })
+        }.orEmpty()
+        return shortcuts + buttons + record + screens + apps
     }
 
     /** 一番外に付ける: Ctrl の組みは入力欄より先に、Esc・Delete・F1 は入力欄の後に受ける。 */
@@ -348,8 +367,10 @@ fun rememberDesktopKeyboard(
     dispatch: (Action, ActionContext) -> Unit,
     print: () -> Unit,
     openApp: ((String) -> Unit)?,
+    openRecord: ((String, String) -> Unit)? = null,
 ): DesktopKeyboard = remember(dsl, session) { DesktopKeyboard(dsl, session) }.also {
     it.dispatch = dispatch
     it.print = print
     it.openApp = openApp
+    it.openRecord = openRecord
 }

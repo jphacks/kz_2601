@@ -28,6 +28,7 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -93,9 +94,18 @@ fun DesktopApp(
     startScreen: String? = null,
     onOpenApp: ((String) -> Unit)? = null,
     persistence: SessionPersistence? = null,
+    /** 複数のウィンドウ(#1763): 同じアプリのウィンドウと共有する記録・詳細を開く記録・別のウィンドウを開く口。 */
+    records: SharedRecords? = null,
+    startRecordId: String? = null,
+    onOpenRecord: ((screen: String, recordId: String) -> Unit)? = null,
+    onCloseWindow: (() -> Unit)? = null,
+    isActive: () -> Boolean = { true },
 ) {
-    val session = remember { DesktopSession(dsl, initialStore, startScreen = startScreen, host = DesktopActionHost(), persistence = persistence) }
-    TrayHook(session)
+    val session = remember {
+        DesktopSession(dsl, initialStore, startScreen = startScreen, host = DesktopActionHost(), persistence = persistence, shared = records, startRecordId = startRecordId)
+    }
+    session.onCloseWindow = onCloseWindow
+    TrayHook(session, isActive)
     var pending by remember { mutableStateOf<Pair<Action, ActionContext>?>(null) }
     val nav = session.nav
     val dispatch = { a: Action, ctx: ActionContext -> if (a.confirmMessage != null) pending = a to ctx else session.dispatch(a, ctx) }
@@ -108,8 +118,10 @@ fun DesktopApp(
     var printing by remember { mutableStateOf<PrintDocument?>(null) }
     val openPrint = { printing = ScreenPrint.document(dsl, session.top.screen, session.store, session.form(session.top), locale = Strings.locale) }
     // キーボードだけで使う(#1765): Ctrl+K パレット・Ctrl+N/S/F・Delete・Esc・F1
-    val keyboard = rememberDesktopKeyboard(dsl, session, dispatch, openPrint, onOpenApp)
+    val keyboard = rememberDesktopKeyboard(dsl, session, dispatch, openPrint, onOpenApp, onOpenRecord)
 
+    // Ctrl+F はこのウィンドウの検索欄にだけ入る
+    CompositionLocalProvider(LocalSearchTargets provides keyboard.searchTargets) {
     Surface(Modifier.fillMaxSize().ioDropTarget(io, topComponents, topDraft).onPreviewKeyEvent(io.previewKey(topComponents, topDraft))
         .onPreviewKeyEvent { if (DesktopPrint.isPrintKey(it)) true.also { openPrint() } else false }.then(keyboard.modifier)) {
         IoOverlay(io)
@@ -117,7 +129,7 @@ fun DesktopApp(
             // モーダルの間は下の画面とタブに Tab で入らず、読み上げにも出さない
             Column(Modifier.fillMaxSize().then(keyboard.inert(nav.sheet != null || nav.fullScreen != null))) {
                 val base = NavigationResolver.dismissModals(nav).top(dsl)
-                Box(Modifier.weight(1f)) { ScreenView(dsl, session, base, io, dispatch, openPrint) }
+                Box(Modifier.weight(1f)) { ScreenView(dsl, session, base, io, dispatch, openPrint, onOpenRecord) }
                 // 送り待ちがある時だけ小さく出す(#1887)
                 session.persistence?.pending?.takeIf { it > 0 }?.let { n ->
                     Text(
@@ -158,12 +170,13 @@ fun DesktopApp(
                     val m = if (full) Modifier.fillMaxSize() else Modifier.widthIn(max = 640.dp).fillMaxWidth(0.92f).fillMaxSize(0.9f)
                     val pane = dsl.screen(top.screen)?.title?.ifEmpty { null } ?: dsl.app.name
                     Surface(m.then(keyboard.modalModifier).semantics { paneTitle = pane; isTraversalGroup = true }, shape = MaterialTheme.shapes.large, tonalElevation = 6.dp) {
-                        ScreenView(dsl, session, top, io, dispatch, openPrint)
+                        ScreenView(dsl, session, top, io, dispatch, openPrint, onOpenRecord)
                     }
                 }
             }
             keyboard.Overlay()
         }
+    }
     }
 
     printing?.let { doc -> PrintPreview(doc, onDismiss = { printing = null }, onResult = { io.notice = it }) }
@@ -193,7 +206,15 @@ internal fun confirmLabel(a: Action): String = Strings[
 
 /** route の画面 1 枚(見出し・戻る・toolbar・一言・グリッド)。 */
 @Composable
-private fun ScreenView(dsl: AppDSL, session: DesktopSession, route: Route, io: DesktopIo, dispatch: (Action, ActionContext) -> Unit, print: () -> Unit) {
+private fun ScreenView(
+    dsl: AppDSL,
+    session: DesktopSession,
+    route: Route,
+    io: DesktopIo,
+    dispatch: (Action, ActionContext) -> Unit,
+    print: () -> Unit,
+    openRecord: ((String, String) -> Unit)?,
+) {
     val screen = dsl.screen(route.screen) ?: dsl.screens.firstOrNull() ?: return
     val form = session.form(route)
     val data = remember(session.store) { session.leafData() }
@@ -205,12 +226,15 @@ private fun ScreenView(dsl: AppDSL, session: DesktopSession, route: Route, io: D
         { ListIoBar(it, io) },
         canEdit = session::canEditRecord,
         canDelete = session::canDeleteRecord,
+        // 行のダブルクリック・Ctrl+クリック・右クリックで詳細を別のウィンドウに(#1763)
+        openWindow = openRecord?.let { open -> { a: Action, id: String -> RecordWindows.target(a)?.let { open(it, id) } } },
     )
     val scope = ScreenScope(route, form, session, perform, io, data, dataEnv)
     Column(Modifier.fillMaxSize()) {
         Row(Modifier.fillMaxWidth().padding(8.dp), verticalAlignment = Alignment.CenterVertically) {
-            if (NavigationResolver.canClose(session.nav, route)) {
-                TextButton(onClick = { session.back(route) }) { Text(Strings[if (route.stack == Route.SHEET || route.stack == Route.FULL) "desktop_close" else "renderer_back"]) }
+            if (session.canClose(route)) {
+                val close = route.stack == Route.SHEET || route.stack == Route.FULL || route == session.detailRoot
+                TextButton(onClick = { session.back(route) }) { Text(Strings[if (close) "desktop_close" else "renderer_back"]) }
             }
             Text(screen.title.ifEmpty { dsl.app.name }, style = MaterialTheme.typography.titleLarge, modifier = Modifier.weight(1f).semantics { heading() })
             screen.toolbar.forEach { b ->

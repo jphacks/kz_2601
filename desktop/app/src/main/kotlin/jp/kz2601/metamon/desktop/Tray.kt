@@ -14,6 +14,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.painter.Painter
 import androidx.compose.ui.window.ApplicationScope
+import androidx.compose.ui.window.MenuScope
 import androidx.compose.ui.window.Tray
 import androidx.compose.ui.window.isTraySupported
 import androidx.compose.ui.window.rememberTrayState
@@ -22,6 +23,7 @@ import jp.kz2601.metamon.dsl.Action
 import jp.kz2601.metamon.dsl.ActionType
 import jp.kz2601.metamon.dsl.AppDSL
 import jp.kz2601.metamon.dsl.records.entityModels
+import jp.kz2601.metamon.dsl.screen
 import kotlinx.coroutines.delay
 import java.util.prefs.Preferences
 import androidx.compose.ui.window.Notification as TrayNotification
@@ -34,6 +36,12 @@ sealed interface TrayItem {
     data class Toggle(val command: TrayCommand, val label: String, val checked: Boolean) : TrayItem
     data class Info(val label: String) : TrayItem
     data object Separator : TrayItem
+
+    /** 入れ子のメニュー(新しいウィンドウ ▸ アプリ)。 */
+    data class Submenu(val label: String, val items: List<TrayItem>) : TrayItem
+
+    /** そのアプリを別のウィンドウで開く(開いていれば前に出す・#1763)。 */
+    data class OpenApp(val appId: String, val label: String) : TrayItem
 }
 
 enum class TrayCommand { OPEN, QUICK_RECORD, VOICE, CLOSE_TO_TRAY, QUIT }
@@ -42,11 +50,19 @@ enum class TrayCommand { OPEN, QUICK_RECORD, VOICE, CLOSE_TO_TRAY, QUIT }
 data class TimerStatus(val key: String, val name: String, val seconds: Int, val countdown: Boolean, val running: Boolean)
 
 object TrayMenu {
-    fun items(appName: String, canQuickRecord: Boolean, timers: List<TimerStatus>, closeToTray: Boolean): List<TrayItem> = buildList {
+    /** [apps] は「新しいウィンドウ」に並べる同梱のアプリ(id, 名前)。空なら出さない。 */
+    fun items(
+        appName: String,
+        canQuickRecord: Boolean,
+        timers: List<TimerStatus>,
+        closeToTray: Boolean,
+        apps: List<Pair<String, String>> = emptyList(),
+    ): List<TrayItem> = buildList {
         add(TrayItem.Command(TrayCommand.OPEN, Strings.format("desktop_tray_open", appName)))
         add(TrayItem.Command(TrayCommand.QUICK_RECORD, Strings["desktop_tray_quick_record"], enabled = canQuickRecord))
         // 音声はデスクトップ版ではまだ使えない(openVoice と同じ)。押せない行で場所だけ取る
         add(TrayItem.Command(TrayCommand.VOICE, Strings["desktop_tray_voice"], enabled = false))
+        if (apps.isNotEmpty()) add(TrayItem.Submenu(Strings["desktop_tray_new_window"], apps.map { (id, name) -> TrayItem.OpenApp(id, name) }))
         if (timers.isNotEmpty()) {
             add(TrayItem.Separator)
             timers.forEach { add(TrayItem.Info(timerLabel(it))) }
@@ -120,12 +136,34 @@ object QuickRecordTarget {
  * @param traySupported OS にトレイがあるか(無ければトレイを出さず、× で終わる)
  */
 class TrayController(
-    val dsl: AppDSL,
+    dsl: AppDSL,
     val traySupported: Boolean,
     private val closeSetting: BoolSetting = PrefsBoolSetting("closeToTray", true),
     private val hintSetting: BoolSetting = PrefsBoolSetting("trayHintShown", false),
+    /** 「新しいウィンドウ」に並べるアプリ(id, 名前)。 */
+    val apps: List<Pair<String, String>> = emptyList(),
 ) {
-    val quickRecordAction: Action? = QuickRecordTarget.find(dsl)
+    /** 今前にあるウィンドウのアプリ(名前・すぐ記録の行き先)。 */
+    var dsl: AppDSL by mutableStateOf(dsl)
+        private set
+    var quickRecordAction: Action? by mutableStateOf(QuickRecordTarget.find(dsl))
+        private set
+
+    /** 「新しいウィンドウ」でアプリを選んだ(Main がウィンドウを開く)。 */
+    var onOpenApp: (String) -> Unit = {}
+
+    /** 前に出たウィンドウのアプリに替える(複数のウィンドウ・#1763)。 */
+    fun switchApp(next: AppDSL) {
+        if (next === dsl) return
+        dsl = next
+        quickRecordAction = QuickRecordTarget.find(next)
+    }
+
+    /** アプリを別のウィンドウで開く。隠れていたウィンドウも出す。 */
+    fun openApp(appId: String) {
+        windowVisible = true
+        onOpenApp(appId)
+    }
 
     var windowVisible by mutableStateOf(true)
         private set
@@ -170,10 +208,11 @@ class TrayController(
             }
         }
 
-    fun items(timers: List<TimerStatus>): List<TrayItem> = TrayMenu.items(dsl.app.name, quickRecordAction != null, timers, closeToTray)
+    fun items(timers: List<TimerStatus>): List<TrayItem> = TrayMenu.items(dsl.app.name, quickRecordAction != null, timers, closeToTray, apps)
 
     companion object {
-        fun create(dsl: AppDSL): TrayController = TrayController(dsl, runCatching { isTraySupported }.getOrDefault(false))
+        fun create(dsl: AppDSL): TrayController =
+            TrayController(dsl, runCatching { isTraySupported }.getOrDefault(false), apps = BundledApps.all())
     }
 }
 
@@ -197,33 +236,42 @@ fun ApplicationScope.DesktopTray(c: TrayController) {
         }
     }
     Tray(icon = TrayIconPainter, state = state, tooltip = TrayMenu.tooltip(c.dsl.app.name, timers), onAction = c::open) {
-        c.items(timers).forEach { item ->
-            when (item) {
-                is TrayItem.Command -> Item(item.label, enabled = item.enabled) {
-                    when (item.command) {
-                        TrayCommand.OPEN -> c.open()
-                        TrayCommand.QUICK_RECORD -> c.quickRecord()
-                        TrayCommand.QUIT -> exitApplication()
-                        else -> Unit
-                    }
+        TrayItems(c, c.items(timers), ::exitApplication)
+    }
+}
+
+@Composable
+private fun MenuScope.TrayItems(c: TrayController, items: List<TrayItem>, quit: () -> Unit) {
+    items.forEach { item ->
+        when (item) {
+            is TrayItem.Command -> Item(item.label, enabled = item.enabled) {
+                when (item.command) {
+                    TrayCommand.OPEN -> c.open()
+                    TrayCommand.QUICK_RECORD -> c.quickRecord()
+                    TrayCommand.QUIT -> quit()
+                    else -> Unit
                 }
-                is TrayItem.Toggle -> CheckboxItem(item.label, item.checked) { c.updateCloseToTray(it) }
-                is TrayItem.Info -> Item(item.label, enabled = false) {}
-                TrayItem.Separator -> Separator()
             }
+            is TrayItem.Toggle -> CheckboxItem(item.label, item.checked) { c.updateCloseToTray(it) }
+            is TrayItem.Info -> Item(item.label, enabled = false) {}
+            TrayItem.Separator -> Separator()
+            is TrayItem.Submenu -> Menu(item.label) { TrayItems(c, item.items, quit) }
+            is TrayItem.OpenApp -> Item(item.label) { c.openApp(item.appId) }
         }
     }
 }
 
-/** DesktopApp の中で呼ぶ: トレイの「すぐ記録」をこのセッションの遷移にする。 */
+/** DesktopApp の中で呼ぶ: トレイの「すぐ記録」をこのセッションの遷移にする。ウィンドウが複数ある時は前にある 1 枚だけ([isActive])。 */
 @Composable
-fun TrayHook(session: DesktopSession) {
+fun TrayHook(session: DesktopSession, isActive: () -> Boolean = { true }) {
     val c = LocalTray.current ?: return
     var handled by remember { mutableIntStateOf(c.quickRecordRequests) }
     LaunchedEffect(c.quickRecordRequests) {
         if (c.quickRecordRequests == handled) return@LaunchedEffect
         handled = c.quickRecordRequests
+        if (!isActive()) return@LaunchedEffect
         val a = c.quickRecordAction ?: return@LaunchedEffect
+        if (a.screen?.let { session.dsl.screen(it) } == null) return@LaunchedEffect
         // もう開いていれば重ねない
         if (session.top.screen != a.screen) session.dispatch(a, ActionContext(session.top, null))
     }
