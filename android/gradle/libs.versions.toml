@@ -35,7 +35,7 @@ playServicesCodeScanner = "16.1.0"
 playServicesLocation = "21.4.0"
 # fileImport の PDF: スキャンのページの文字認識(端末内・認識の部品は Play 開発者サービスが落とす・#1181)
 playServicesMlkitTextRecognitionJapanese = "16.0.2"
-# fileImport の PDF: 文字の層の取り出しとページの描画(Apache-2.0・#1181)。暗号化の BouncyCastle は外す
+# fileImport の PDF: 文字の層の取り出しとページの描画(Apache-2.0・#1181)。証明書の暗号化に使う BouncyCastle は外す(#1319)
 pdfboxAndroid = "2.0.27.0"
 # nearbyShare の送受信とすれ違い(Nearby Connections・#1380)。同じ OS どうしだけ(iOS とはつながらない・#1384)
 playServicesNearby = "19.5.1"
