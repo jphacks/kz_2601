@@ -41,13 +41,15 @@ data class SharedMemberList(
 ) {
     val isOwner: Boolean get() = role == ROLE_OWNER
     val isAdmin: Boolean get() = admin ?: isOwner
-    val isFull: Boolean get() = items.size >= MEMBER_LIMIT
+
+    /** 上限に達していて、これ以上は参加できない。backend は作成者を除いた参加者で数える(一覧には作成者も 1 行ある) */
+    val isFull: Boolean get() = items.count { !it.isOwner } >= MEMBER_LIMIT
 }
 
 const val ROLE_OWNER = "owner"
 const val ROLE_MEMBER = "member"
 
-/** 参加者の上限(backend の members_full と同じ) */
+/** 参加者の上限(backend の `store.MaxMembers`・members_full と同じ)。作成者はこの数に入らない */
 const val MEMBER_LIMIT = 100
 
 /** 役割ごとに押せる操作(iOS の SharedMembersSection と同じ判定)。 */
