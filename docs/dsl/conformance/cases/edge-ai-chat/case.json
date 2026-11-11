@@ -1,0 +1,49 @@
+{
+  "dsl": {
+    "schemaVersion": 1,
+    "app": { "name": "話して記録" },
+    "initialScreen": "home",
+    "entities": [
+      {
+        "id": "talk",
+        "name": "会話",
+        "scope": "shared",
+        "titleField": "body",
+        "fields": [ { "id": "body", "name": "本文", "type": "text", "required": true } ]
+      },
+      {
+        "id": "meal",
+        "name": "食事",
+        "titleField": "name",
+        "fields": [
+          { "id": "name", "name": "料理", "type": "string", "required": true },
+          { "id": "kcal", "name": "カロリー", "type": "number" }
+        ]
+      }
+    ],
+    "screens": [
+      {
+        "id": "home",
+        "title": "話して記録",
+        "components": [
+          { "type": "aiChat", "id": "coach", "area": "A1:F12", "entity": "talk", "textField": "body",
+            "persona": "食事の記録を手伝う", "inputEntity": "meal", "limit": 5,
+            "saveTo": { "entity": "meal", "fields": ["name", "kcal"] } }
+        ]
+      }
+    ]
+  },
+  "records": {
+    "talk": [
+      { "id": "a1", "data": { "body": "朝はパンでした" }, "author": "me", "createdAt": "2026-11-12T08:00:00+09:00" },
+      { "id": "b1", "data": { "body": "ほかの人の発言" }, "author": "other", "createdAt": "2026-11-12T08:00:05+09:00" },
+      { "id": "a2", "data": { "body": "パン 1 枚で約 160 kcal です" }, "author": "me", "createdAt": "2026-11-12T08:00:10+09:00" },
+      { "id": "s1", "data": { "body": "作者の無い記録" }, "createdAt": "2026-11-12T08:00:15+09:00" },
+      { "id": "a3", "data": { "body": "昼はうどん" }, "author": "me", "createdAt": "2026-11-12T08:00:20+09:00" }
+    ],
+    "meal": [
+      { "id": "m1", "data": { "name": "パン", "kcal": 160 }, "author": "me" }
+    ]
+  },
+  "device": { "userId": "me" }
+}
