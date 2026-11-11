@@ -81,6 +81,7 @@
     <string name="desktop_list_empty">Nothing yet</string>
     <string name="desktop_list_open_window">Open in new window</string>
     <string name="desktop_list_separator">", "</string>
+    <string name="desktop_loading">Loading…</string>
     <string name="desktop_match_offline">Matches appear after you sign in</string>
     <string name="desktop_notification_now">now</string>
     <string name="desktop_notification_scheduled">Notification scheduled (%1$s, only while the app is open)</string>
@@ -131,4 +132,8 @@
     <string name="desktop_window_open_record">Open this record in a new window</string>
     <string name="desktop_window_title">Tailor It — %1$s</string>
     <string name="desktop_window_title_record">Tailor It — %1$s — %2$s</string>
+    <string name="desktop_wipe">Erase data on this device</string>
+    <string name="desktop_wipe_confirm">This erases the records, unsent changes and settings kept on this device. Records that haven\'t been sent can\'t be recovered.</string>
+    <string name="desktop_wipe_confirm_button">Erase</string>
+    <string name="desktop_wipe_done">Erased the data on this device</string>
 </resources>

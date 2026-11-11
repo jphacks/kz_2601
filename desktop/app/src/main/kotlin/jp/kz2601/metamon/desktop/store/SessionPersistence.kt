@@ -25,7 +25,6 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.json.JsonObject
 import java.time.Instant
 import java.util.UUID
@@ -227,20 +226,16 @@ class SessionPersistence(
             if (config.isLive && !config.devToken.isNullOrEmpty()) DesktopApi.appConfig(config, store.documents) else null
 
         /**
-         * 起動時に開く: 端末の記録を読み、送り先があれば前回の送り待ちを送り直す。
-         * 返り値は (持ち物, 画面の最初の記録)。
+         * 起動時に作る(#1887)。記録・送り待ちはまだ読まない(読むのは [load])ので画面を止めない。
+         * 読み終えた後の送り直し([resendPending])まで含めた起動の流れは SharedRecords.opening。
          */
-        fun open(
+        fun create(
             store: DesktopStore,
             appId: String,
-            models: List<Entity>,
             config: DesktopApiConfig = DesktopApiConfig.fromEnvironment(),
-        ): Pair<SessionPersistence, MockStore> {
-            val p = SessionPersistence(store, appId, client(config, store))
+        ): SessionPersistence {
             store.lastAppId = appId
-            val initial = runBlocking { p.load(models) } // 端末のファイルだけ(小さい)
-            p.resendPending()
-            return p to initial
+            return SessionPersistence(store, appId, client(config, store))
         }
     }
 }

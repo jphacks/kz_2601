@@ -120,10 +120,25 @@ class DesktopSession(
 
     /** サインアウト・端末のデータを消す(#1887): 端末の記録・送り待ち・設定を消し、画面を空にして最初の画面へ。 */
     suspend fun wipeLocalData() {
-        persistence?.wipe()
-        records.reset()
+        records.wipe()
+        followWipe()
+    }
+
+    private var seenWipes = records.wipes
+
+    /**
+     * 同じ記録を見るどこか(他のウィンドウ・パレットの「この端末のデータを消す」)で消した後: 下書きを捨てて最初の画面へ。
+     * 詳細のウィンドウは記録が無くなったので閉じる。
+     */
+    fun followWipe() {
+        if (records.wipes == seenWipes) return
+        seenWipes = records.wipes
         drafts.clear()
         go(NavigationState.initial(dsl))
+        if (detailRoot != null) {
+            detailRoot = null
+            onCloseWindow?.invoke()
+        }
     }
 
     fun entityModel(id: String?): Entity? = id?.let { i -> models.firstOrNull { it.id == i } }
