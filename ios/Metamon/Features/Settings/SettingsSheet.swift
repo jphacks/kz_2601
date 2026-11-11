@@ -39,6 +39,9 @@ struct SettingsSheet: View {
                 ProSettingsSection() // 課金(#77)
                 CoinSettingsSection() // #630 コイン(サーバーが有効にした時だけ)
                 #endif
+                #if !APP_STORE_REVIEW // 審査用の版は OAuth の provider を外す(決定 6)
+                if ConnectedServicesPolicy.isAvailable { ConnectedServicesSection() } // #1493 つないだサービス
+                #endif
                 RemainingTodaySettingsSection() // #630 今日の残り(審査用の版も出す)
                 UsageSettingsSection() // #317 使っている量(作ったアプリの数・今のアプリの記録と写真)
                 languageSection

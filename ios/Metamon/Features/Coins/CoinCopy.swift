@@ -94,6 +94,7 @@ enum CoinCopy {
         case "spend_overflow": L10n.tr("枠を超えた分")
         case "spend_slot": L10n.tr("アプリの枠")
         case "spend_call": L10n.tr("通話")
+        case "spend_ext": L10n.tr("外部サービス") // #1493
         case "refund_failed": L10n.tr("戻した(失敗)")
         case "refund_apple": L10n.tr("返金")
         case "adjust": L10n.tr("調整")
