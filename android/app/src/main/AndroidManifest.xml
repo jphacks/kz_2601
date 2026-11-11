@@ -12,15 +12,9 @@
     <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
     <!-- 通知(13+ だけ実行時の権限。12 / 12L は設定のオン・オフのみ) -->
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
-    <!-- 近くの端末と送り合う(nearbyShare)。minSdk 31 なので古い BLUETOOTH / BLUETOOTH_ADMIN は要らない。位置の推定には使わない -->
-    <uses-permission
-        android:name="android.permission.BLUETOOTH_SCAN"
-        android:usesPermissionFlags="neverForLocation" />
-    <uses-permission android:name="android.permission.BLUETOOTH_ADVERTISE" />
-    <uses-permission android:name="android.permission.BLUETOOTH_CONNECT" />
-    <uses-permission
-        android:name="android.permission.NEARBY_WIFI_DEVICES"
-        android:usesPermissionFlags="neverForLocation" />
+    <!-- 近くの端末と送り合う(nearbyShare)は Android にまだ無いので、次の権限は持たない。近距離共有(#878)で戻す:
+         BLUETOOTH_SCAN(neverForLocation)・BLUETOOTH_ADVERTISE・BLUETOOTH_CONNECT・NEARBY_WIFI_DEVICES(neverForLocation)。
+         minSdk 31 なので古い BLUETOOTH / BLUETOOTH_ADMIN は戻す時も要らない -->
     <!-- 生成アプリの通知(#886): 再起動の後に予約し直す -->
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
     <!-- アラーム(alarm: true)だけ正確な時刻で鳴らす。利用者が設定で許可した時だけ使い、無ければ正確でないアラーム。
@@ -32,8 +26,10 @@
         android:name=".MetamonApplication"
         android:allowBackup="false"
         android:dataExtractionRules="@xml/data_extraction_rules"
+        android:icon="@mipmap/ic_launcher"
         android:label="@string/app_name"
         android:localeConfig="@xml/locales_config"
+        android:roundIcon="@mipmap/ic_launcher_round"
         android:supportsRtl="true"
         android:theme="@style/Theme.Metamon">
         <activity
