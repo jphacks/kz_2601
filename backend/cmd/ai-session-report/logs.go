@@ -36,6 +36,9 @@ type logEvent struct {
 	AreaFB    bool
 	Downgrade bool
 	LintRetry bool
+	ReplyKind string // ai.chat reply_kind
+	Turn      int    // ai.chat turn (1-based within the conversation)
+	Built     bool   // ai.chat clarify_ended_in_build
 }
 
 // Event names the report reads (backend/internal/ai, internal/httpx, internal/metrics).
@@ -44,6 +47,7 @@ const (
 	evUsage    = "ai.usage"
 	evRequest  = "http.request"
 	evOpened   = "app.opened"
+	evChat     = "ai.chat"
 )
 
 // rawPayload decodes numbers loosely: slog writes int64 as JSON numbers,
@@ -163,12 +167,17 @@ func decodeEntry(raw json.RawMessage) (logEvent, bool) {
 		AreaFB:    p.flag("area_fallback"),
 		Downgrade: p.flag("downgraded_to_full"),
 		LintRetry: p.flag("lint_retried"),
+		ReplyKind: p.str("reply_kind"),
+		Turn:      int(p.num("turn")),
+		Built:     p.flag("clarify_ended_in_build"),
 	}
 	switch ev.Event {
 	case evGenerate:
 		ev.Duration = time.Duration(p.num("duration_ms")) * time.Millisecond
 	case evRequest:
 		ev.Duration = parseDuration(p["duration"])
+	case evChat:
+		ev.Duration = time.Duration(p.num("duration_ms")) * time.Millisecond
 	}
 	if ev.Event == "" {
 		return logEvent{}, false

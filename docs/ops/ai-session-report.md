@@ -26,6 +26,7 @@
 | Firestore `feedback/{id}` | 種類・本文・`appId`(添付の画像・DSL は読まない) | — |
 | Cloud Logging `ai.generate` | 依頼ごとの結果(validated / regenerated / unchanged / restored / refused / failed)・作り直しの回数・lint の再試行・全体で作り直し・待ち時間・`uid_hash`・`app_hash` | 中身(依頼の文・DSL)は書かない約束 |
 | Cloud Logging `ai.usage` | Claude の呼び出しごとの `operation`(chat / chat_first / generate / patch ...)・待ち時間・トークン・`uid_hash` | `app_hash` が無いので、聞き返しは「同じ人の次の依頼(30 分以内)」に割り当てる |
+| Cloud Logging `ai.chat` | `/v1/chat` の往復ごとの返答の種類(`reply_kind`: question / ready / answer / proposal / other)・会話の中の何往復目(`turn`)・聞き返しの後に ready に至ったか(`clarify_ended_in_build`)・`mode`・`source`・待ち時間・トークン・`model`・`uid_hash`・`app_hash` → レポートの「会話の結果」 | 会話の文・返答の文・候補・transcript・brief。「できない・代わりに〜」の印はまだ無い |
 | Cloud Logging `http.request` | パス・ステータス(402・429・5xx)・`uid_hash` | 本文 |
 | Cloud Logging `app.opened` | アプリを開いた(`app_hash`) | — |
 | **聞き返しの会話の中身** | **サーバーには残らない**。ai サービスのプロセスのメモリに 30 分だけ(`internal/ai/chat.go`)。端末の UserDefaults(`ChatHistoryStore`、直近 200 件)にだけ残る | サーバー・ログ・Firestore のどこにも無い |
