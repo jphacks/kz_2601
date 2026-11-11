@@ -1,6 +1,9 @@
 package jp.kz2601.metamon.runtime
 
 import androidx.annotation.StringRes
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
 import jp.kz2601.metamon.dsl.Action
 import jp.kz2601.metamon.dsl.ActionType
 import jp.kz2601.metamon.dsl.AppDSL
@@ -17,6 +20,7 @@ import jp.kz2601.metamon.dsl.records.Record
 import jp.kz2601.metamon.dsl.records.RecordPermission
 import jp.kz2601.metamon.renderer.ActionContext
 import jp.kz2601.metamon.renderer.DSLRuntime
+import jp.kz2601.metamon.renderer.FormMember
 import jp.kz2601.metamon.renderer.components.audio.DictationHost
 import jp.kz2601.metamon.dsl.logic.ExternalUrlPolicy
 import jp.kz2601.metamon.renderer.NavigationHost
@@ -26,6 +30,7 @@ import jp.kz2601.metamon.renderer.components.ai.AiChatPairSaving
 import jp.kz2601.metamon.renderer.components.ai.AiHost
 import jp.kz2601.metamon.renderer.components.social.AuthorNameHost
 import jp.kz2601.metamon.renderer.components.social.BlockedUsersHost
+import jp.kz2601.metamon.renderer.components.social.FollowsHost
 import jp.kz2601.metamon.renderer.components.social.MatchingHost
 import jp.kz2601.metamon.renderer.components.social.ModerationHost
 import jp.kz2601.metamon.renderer.components.social.ReportReasonOption
@@ -38,6 +43,7 @@ import jp.kz2601.metamon.renderer.navigation.NavigationState
 import jp.kz2601.metamon.renderer.navigation.Presentation
 import jp.kz2601.metamon.renderer.navigation.Route
 import jp.kz2601.metamon.services.AppSummary
+import jp.kz2601.metamon.services.sharing.AppMembersStore
 import jp.kz2601.metamon.services.http.RecordWriteDenial
 import jp.kz2601.metamon.services.local.DeletionTicket
 import jp.kz2601.metamon.services.local.RecordSyncEngine
@@ -128,8 +134,10 @@ class AppRuntime(
     socialServices: SocialServices? = null,
     /** 記録の保存期間(#482)。null なら自動で消さない(モック・テスト) */
     val retention: RecordRetentionRunner? = null,
+    /** 共有アプリの参加者と自分が管理者か(#903)。null なら読まない(モック・テスト) */
+    val members: AppMembersStore? = null,
 ) : DSLRuntime, NavigationHost, RecordWriter, TimerHost, AiChatPairSaving, AuthorNameHost,
-    ModerationHost, MatchingHost, SocialPromptHost, BlockedUsersHost {
+    ModerationHost, MatchingHost, SocialPromptHost, BlockedUsersHost, FollowsHost {
     private val _state = MutableStateFlow(RuntimeState(document))
     val state: StateFlow<RuntimeState> = _state.asStateFlow()
 
@@ -266,6 +274,7 @@ class AppRuntime(
         _navigation.value = NavigationState.initial(doc.dsl)
         noteAppliedVersion(doc, switched)
         sweepRetention(noteDsl = true) // #482 保存期間の確認と期限切れの削除
+        members?.note(doc.appId, doc.dsl)
     }
 
     // アプリの持ち物(iOS の DeviceAppID・変身一覧・#881)
@@ -363,7 +372,9 @@ class AppRuntime(
         lastSavedForm = null
         entityCache = null
         _apps.value = emptyList()
+        members?.clear() // 前の人の参加者・管理者を次の人に見せない
         social.forget() // 前の人のブロックで次の人の投稿を隠さない(#877)
+        follows.forget()
         val next = directory?.let { it.fresh(it.store.rotate()) } ?: document
         _state.value = RuntimeState(next)
         _records.value = emptyMap()
@@ -644,7 +655,27 @@ class AppRuntime(
 
     override fun canEdit(entity: String, record: Record): Boolean = RecordPermission.canEdit(record, entityModel(entity), currentUserId())
 
-    override fun canDelete(entity: String, record: Record): Boolean = RecordPermission.canDelete(record, entityModel(entity), currentUserId())
+    override fun canDelete(entity: String, record: Record): Boolean =
+        RecordPermission.canDelete(record, entityModel(entity), currentUserId(), isAppAdmin)
+
+    /**
+     * 参加者の写し(Compose のスナップショット)。部品は描く時に [formMembers]・[canDelete] を読むだけなので、
+     * 届いた後に描き直されるよう StateFlow をここへ写す(写さないと「参加者を読み込めていません」のまま残る)。
+     */
+    private var memberEntries by mutableStateOf<Map<String, AppMembersStore.Entry>>(emptyMap())
+
+    init {
+        members?.let { store -> scope.launch { store.entries.collect { memberEntries = it } } }
+    }
+
+    /** 今のアプリで自分が管理者か(#272)。null = 分からない(読む前・読めなかった) */
+    val isAppAdmin: Boolean? get() = memberEntries[document.appId]?.isAdmin
+
+    override val formMembers: List<FormMember>
+        get() = memberEntries[document.appId]?.members.orEmpty().map { FormMember(it.uid, it.displayName) }
+
+    /** 一覧から外す(共有から抜けた後・#903)。保存した一覧はそのまま(次の取得で消える) */
+    fun forgetApp(appId: String) = _apps.update { list -> list.filter { it.id != appId } }
 
     suspend fun load(entities: Set<String>, force: Boolean = false) {
         for (e in entities) if (force || _state.value.records[e] == null) refresh(e)
@@ -765,6 +796,20 @@ class AppRuntime(
     override suspend fun declineInterest(item: MatchInterest, box: MatchBox) = social.declineInterest(item, box)
     override suspend fun unmatch(item: MatchInterest) = social.unmatch(item)
 
+    // フォロー(#1028・iOS の AppRuntime+Follows)
+
+    private val follows = FollowRuntime(socialServices?.follows, scope, object : FollowRuntime.Env {
+        override val appId: String get() = document.appId
+        override val dsl: AppDSL get() = this@AppRuntime.dsl
+        override fun currentUid(): String? = currentUserId()
+        override fun records(entity: String): List<Record> = this@AppRuntime.records(entity)
+        override fun toast(message: UiText) = showToast(message)
+    })
+
+    override val followsVersion: StateFlow<Int> get() = follows.version
+    override fun followedAuthors(): Set<String>? = follows.followedAuthors()
+    override fun followState(entity: String, recordId: String): Boolean? = follows.followState(entity, recordId)
+
     // AI と話す(#874)
 
     /**
@@ -860,8 +905,7 @@ class AppRuntime(
 
             ActionType.RESET_FORM -> ctx.form?.reset()
 
-            ActionType.FOLLOW, ActionType.UNFOLLOW ->
-                attempt(action.type) { host.follow(action, ctx, on = action.type == ActionType.FOLLOW) }
+            ActionType.FOLLOW, ActionType.UNFOLLOW -> follows.run(action, ctx)
 
             ActionType.SCHEDULE_NOTIFICATION -> {
                 val spec = action.notification ?: return

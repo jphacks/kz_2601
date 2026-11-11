@@ -73,4 +73,13 @@
     <string name="settings_title">設定</string>
     <string name="settings_unavailable">この端末では使えません</string>
     <string name="settings_undo">元に戻す</string>
+    <string name="settings_usage_a11y_amount">%1$d のうち %2$d</string>
+    <string name="settings_usage_a11y_no_limit">%1$d、上限なし</string>
+    <string name="settings_usage_apps">作ったアプリ</string>
+    <string name="settings_usage_footer_free">使わないものを消すと、空きが増えます</string>
+    <string name="settings_usage_footer_pro">Pro プランの上限です</string>
+    <string name="settings_usage_header">使っている量</string>
+    <string name="settings_usage_no_limit">%1$d(上限なし)</string>
+    <string name="settings_usage_photos">このアプリの写真</string>
+    <string name="settings_usage_records">このアプリの記録</string>
 </resources>

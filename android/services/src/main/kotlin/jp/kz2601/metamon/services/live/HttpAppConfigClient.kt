@@ -3,6 +3,7 @@ package jp.kz2601.metamon.services.live
 import jp.kz2601.metamon.dsl.AppDocument
 import jp.kz2601.metamon.services.AppConfigClient
 import jp.kz2601.metamon.services.AppSummary
+import jp.kz2601.metamon.services.AppUsage
 import jp.kz2601.metamon.services.AppWithDsl
 import jp.kz2601.metamon.services.FetchedDocument
 import jp.kz2601.metamon.services.InstallResult
@@ -163,6 +164,13 @@ class HttpAppConfigClient(
     /** `GET /v1/me/usage`。古いサーバー(まだ無い)は 404 → null */
     override suspend fun myUsage(): MyUsage? = try {
         MyUsage.decode(get(listOf("v1", "me", "usage")))
+    } catch (e: ApiError) {
+        if (e.status == 404) null else throw e
+    }
+
+    /** `GET /v1/apps/{appId}/usage`。古いサーバー・このアプリの写しが無い時は 404 → null */
+    override suspend fun appUsage(appId: String): AppUsage? = try {
+        AppUsage.decode(get(listOf("v1", "apps", appId, "usage")))
     } catch (e: ApiError) {
         if (e.status == 404) null else throw e
     }

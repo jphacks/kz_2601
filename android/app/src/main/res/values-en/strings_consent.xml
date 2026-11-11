@@ -72,4 +72,13 @@
     <string name="settings_title">Settings</string>
     <string name="settings_unavailable">Not available on this device</string>
     <string name="settings_undo">Undo</string>
+    <string name="settings_usage_a11y_amount">%2$d of %1$d</string>
+    <string name="settings_usage_a11y_no_limit">%1$d, no limit</string>
+    <string name="settings_usage_apps">Apps you made</string>
+    <string name="settings_usage_footer_free">Delete what you don\'t use to free up space</string>
+    <string name="settings_usage_footer_pro">These are the Pro plan limits</string>
+    <string name="settings_usage_header">Usage</string>
+    <string name="settings_usage_no_limit">%1$d (no limit)</string>
+    <string name="settings_usage_photos">Photos in this app</string>
+    <string name="settings_usage_records">Records in this app</string>
 </resources>

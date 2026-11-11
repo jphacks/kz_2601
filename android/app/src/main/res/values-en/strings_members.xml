@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 英語 -->
+<resources>
+    <string name="members_admin">Admin</string>
+    <string name="members_admin_failed">Couldn\'t change the admin, so it was reverted</string>
+    <string name="members_cancel">Cancel</string>
+    <string name="members_count">%1$d people</string>
+    <string name="members_creator">Creator</string>
+    <string name="members_footer">Only the people listed here can see this share\'s records</string>
+    <string name="members_full">This share is full (100 people). No one else can join.</string>
+    <string name="members_keep_link">Keep it</string>
+    <string name="members_leave">Leave this share</string>
+    <string name="members_leave_confirm">Leave</string>
+    <string name="members_leave_failed">Couldn\'t leave, so nothing changed</string>
+    <string name="members_leave_message">After leaving, you can no longer see their records. You\'ll need an invite link to join again.</string>
+    <string name="members_leave_title">Leave this share?</string>
+    <string name="members_left">You left this share. To join again, ask someone in it for an invite link.</string>
+    <string name="members_left_toast">Left “%1$s”</string>
+    <string name="members_load_failed">Couldn\'t load the members</string>
+    <string name="members_loading">Loading</string>
+    <string name="members_make_admin">Make admin</string>
+    <string name="members_make_admin_label">Make %1$s an admin</string>
+    <string name="members_no_name">No name</string>
+    <string name="members_offline">Couldn\'t connect, so it was reverted. Try again where you have a connection.</string>
+    <string name="members_remove">Remove</string>
+    <string name="members_remove_admin">Remove admin</string>
+    <string name="members_remove_admin_label">Remove %1$s as admin</string>
+    <string name="members_remove_failed">Couldn\'t remove them, so the list was restored</string>
+    <string name="members_remove_label">Remove %1$s</string>
+    <string name="members_remove_message">They will no longer see this share\'s records. The app on their device and the records they added stay.</string>
+    <string name="members_remove_title">Remove “%1$s”?</string>
+    <string name="members_removed_notice">Removed “%1$s”. Your share link still works, so they could join again with it. Turn off the link too?</string>
+    <string name="members_settings_footer">See who\'s in this share, choose admins, or leave it</string>
+    <string name="members_title">People in this share</string>
+    <string name="members_you">You</string>
+</resources>
