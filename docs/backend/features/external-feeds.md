@@ -52,7 +52,7 @@
 
 ## 出どころと規約
 
-2026-11-06 に規約を確かめた(warnings・pressure・arxiv・diet・NHK は 2026-11-08)。どれも鍵は要らない。
+2026-11-06 に規約を確かめた(warnings・pressure・arxiv・diet・NHK は 2026-11-08、rss の `soumu-news`・`osaka-city-news`・`go-blog` と外したものの厚生労働省以下は 2026-11-12・#1701)。どれも鍵は要らない。
 
 | provider | 出どころ(サーバーが取りに行く URL) | 規約 | 出典の表示 |
 |---|---|---|---|
@@ -63,6 +63,9 @@
 | rss `digital-news` | デジタル庁 新着・更新 `https://www.digital.go.jp/rss/news.xml`([RSS の案内](https://www.digital.go.jp/rss)) | [デジタル庁 著作権について](https://www.digital.go.jp/copyright-policy): 公共データ利用規約(第1.0版) | デジタル庁ホームページ |
 | rss `fdma-news` | 消防庁 新着情報 `https://www.fdma.go.jp/index.xml`([RSS の案内](https://www.fdma.go.jp/about/rss.html)) | [消防庁 このサイトについて](https://www.fdma.go.jp/about/others/post3.html): 公共データ利用規約(第1.0版) | 消防庁ホームページ |
 | rss `fdma-disaster` | 消防庁 災害情報 `https://www.fdma.go.jp/disaster/info/index.xml` | 同上 | 消防庁ホームページ |
+| rss `soumu-news` | 総務省 新着情報 `https://www.soumu.go.jp/news.rdf`(RSS 1.0・Shift_JIS・[RSS の案内](https://www.soumu.go.jp/menu_kyotsuu/rss_information.html)) | [総務省 著作権について](https://www.soumu.go.jp/menu_kyotsuu/policy/tyosaku.html): 権利表記の無いものは公共データ利用規約(第1.0版)。出典(例「出典：総務省ホームページ」)を書く・加工したらそう書く。ロゴ・シンボルは対象外。RSS の案内に再配布を禁じる文は無い(読んだ範囲) | 総務省ホームページ |
+| rss `osaka-city-news` | 大阪市 新着情報 `https://www.city.osaka.lg.jp/main/rss/rss_new.xml`(RSS 2.0・UTF-8・100 件) | [大阪市 RSS配信](https://www.city.osaka.lg.jp/main/site_policy/0000000148.html): 「当サイトから配信しているRSSデータについては、…CC-BYで提供いたします」(リンク先は CC BY 2.1 JP)。リンク先のページの中身は [著作権・免責](https://www.city.osaka.lg.jp/main/site_policy/0000000124.html)(CC BY 4.0 と互換・商用可・出典を書く・政府標準利用規約(第2.0版)に準拠)。予告なく止める・変えることがある | 大阪市ホームページ・「RSS は CC BY」 |
+| rss `go-blog` | The Go Blog `https://go.dev/blog/feed.atom`(Atom・英語・記事の本文ごと返る。10 件で約 360 KB) | [go.dev Copyright](https://go.dev/copyright): 「Except as noted, the contents of this site are licensed under the Creative Commons Attribution 4.0 License」(コードは BSD)。CC BY 4.0 は商用も再配布も可・出典の表示が要る。サーバーは題名・リンク・日付だけ使い、本文(`content`)は捨てる | The Go Blog(go.dev)・「CC BY 4.0」 |
 | arxiv `{分野}` | arXiv API `https://export.arxiv.org/api/query?search_query=cat:{分野}&sortBy=submittedDate&sortOrder=descending&max_results=20`(Atom)。[RSS](https://info.arxiv.org/help/rss.html)(`rss.arxiv.org/rss/{分野}`)は**土日に空になる**(毎日 1 回の告知分だけ)ので、いつでも新着が出る API にした。規約は同じ | [Terms of Use for arXiv APIs](https://info.arxiv.org/help/api/tou.html)(RSS も対象と明記): 論文の**メタデータ**(題名・著者など)は CC0 1.0 で、取得・保存・加工・共有してよい。PDF などの本文は arXiv が権利者でないので、サーバーに置いて配らない(取らない・リンクだけ)。**3 秒に 1 回まで・同時に 1 本まで**(複数の機械でも合計)。arXiv が承認・提携しているように見せない。決まった謝辞の文は求めていない。商用の扱いは書かれていない | arXiv.org・「論文の情報は CC0 1.0・arXiv の承認や提携はありません」。出典の URL はその分野の一覧(`arxiv.org/list/{分野}/recent`) |
 | diet | 国立国会図書館 国会会議録検索システムの検索用 API `https://kokkai.ndl.go.jp/api/speech?any={語}&maximumRecords=20&recordPacking=json`([API の仕様](https://kokkai.ndl.go.jp/api.html)) | API の仕様のページ: 手続きは要らない。**短い時間の大量のアクセスを控え、自動の取得は並列にせず数秒あけて次を送る**。運用に障ると判断したら予告なく止められる。利用は「[国立国会図書館ウェブサイトのコンテンツ利用規約](https://www.ndl.go.jp/sitepolicy/terms)」(公共データ利用規約(第1.0版)。第三者に権利があるもの・別の規則があるものは除く)に従う。**発言の著作権は各発言者**(国会図書館の職員の発言とデータベースは国会図書館)で、転載は原則として権利者の許諾が要る(引用などの例外を除く)。商用・出典の書き方・キャッシュは書かれていない | 国立国会図書館 国会会議録検索システム・「検索用 API・発言の著作権は各発言者」 |
 
@@ -72,6 +75,13 @@
 |---|---|
 | Open-Meteo(緯度経度の天気) | [利用規約](https://open-meteo.com/en/terms): 無料の API は**非商用だけ**(サブスクや広告のあるアプリは商用に当たる)。Tailor It は Pro の課金があるので使えない。商用は有料の契約(鍵が要る)。代わりに気象庁にした。気圧の予報も同じ理由で使わず、MET Norway にした(気象庁の公開の JSON に気圧の予報は無い) |
 | 内閣府の報道発表の RSS(`https://www.cao.go.jp/rss/news.rdf`) | [RSS の案内](https://www.cao.go.jp/rss/index.html): フィードの内容を元にサイトを作る・再配布することを、商用・非商用を問わず禁じている |
+| 厚生労働省の新着情報の RSS(`https://www.mhlw.go.jp/stf/news.rdf`) | [RSS の案内](https://www.mhlw.go.jp/rss/index.html): 「営利・非営利を問わず、その情報に基づいたホームページ・メールマガジンの作成、情報の再配布は固くお断りします」。サイト全体は公共データ利用規約だが、RSS はこの決まりが優先 |
+| 東京都の新着情報の RSS(`https://www.metro.tokyo.lg.jp/index.html/-/asset_publisher/knkg/rss`) | [RSS の案内](https://www.metro.tokyo.lg.jp/rss/index.html): RSS での再掲載・サイトの作成には**事前の申請**が要り、断ることもあるとある。申請していないので入れない(使うなら申請が要る・人の判断) |
+| 広島市の新着情報の RSS(`https://www.city.hiroshima.lg.jp/news.rss`) | RSS の案内に決まりは無いが、[リンク・著作権・免責事項](https://www.city.hiroshima.lg.jp/about/1010662.html): 私的使用・引用などを除き、無断の転用・複製・転載は禁止(事前に担当課へ相談) |
+| 千葉市の RSS(`https://www.city.chiba.jp/kinkyu.xml` ほか) | [リンク・著作権・免責事項](https://www.city.chiba.jp/front/link_copyright.html): 私的使用・引用などを除き、無断で複製・転用できない |
+| Qiita の記事のフィード(`https://qiita.com/popular-items/feed`) | [利用規約](https://qiita.com/terms): 記事の著作権は書いた人に残り(8.1.3)、ほかの利用者に許すのはコードとスニペットだけ(7.3)。第三者がプログラムで配り直すことを許す文は無い |
+| Zenn の記事のフィード(`https://zenn.dev/feed`) | [利用規約](https://zenn.dev/terms) 6 条 3 項: 「権利者の許可を得ることなく、無断で転載または二次配布等を行うことはできません」 |
+| 経済産業省の RSS(`https://www.meti.go.jp/`) | 規約のページ(https://www.meti.go.jp/main/rules.html)が自動の取得を断り(403)、規約を確かめられなかった。確かめるまで入れない |
 | NHK ニュースの RSS(`https://news.web.nhk/n-data/conf/na/rss/cat0.xml` 〜 `cat7.xml`: 主要・社会・文化・エンタメ・科学・医療・政治・経済・国際・スポーツ。旧 `www3.nhk.or.jp/rss/news/cat*.xml` は 2025-10 から転送) | [NHK ONE ニュース RSS](https://www.nhk.or.jp/toppage/rss/index.html)(2026-11-08 に読んだ): 「提供するRSSは個人の方の利用のためのみに使用することができます。ブログやプログラム等によって、商業目的での利用を含め再配信や再提供を許可するものではありません」。サーバーが取って利用者のアプリに出すのは「プログラムによる再提供」に当たるので入れない。使うなら NHK の許諾が要る(人の判断) |
 
 arxiv・diet の表示: どちらも**一覧(メタデータ)とリンクだけ**を出し、本文(論文の PDF・要約、発言の本文)は出さない・保存しない。国会会議録の API は本文ごと返すが、サーバーは解析で捨てる(キャッシュにも残らない)。発言の一覧(発言者・会議名・日付)の表示と、本文の扱い(著作権法 40 条 1 項は、公開の政治上の演説・陳述を、同じ人のものを編集する場合を除いて利用できるとする)で足りるかは**人が確かめる**。
@@ -79,6 +89,8 @@ arxiv・diet の表示: どちらも**一覧(メタデータ)とリンクだけ*
 加工の扱い: 公共データ利用規約は、編集・加工したら加工したことを書くよう求める。警報は気象庁のコードを名前に置き換え、種類と状態ごとに地域をまとめて出す(加工)。気圧は 1 時間ごとの値を 6 時間の行にまとめ、低下の印を足す(加工)ので、出典の license に「CC BY 4.0・6 時間ごとにまとめて加工」と書いた。天気は気象庁の天気のコードを「晴れ / くもり / 雨 / 雪」と絵に置き換えて出すので、出典の行は「出典: 気象庁ホームページ(公共データ利用規約(第1.0版))」とし、加工の表記の要否と書き方は**人が確かめる**(下の「まだ決めていないこと」)。
 
 許可リストを増やす時: `backend/internal/feeds/client.go` の `DefaultEndpoints` と `backend/pkg/dsl/feed.go` の `RSSFeeds` に 1 行ずつ足す(テストが両方の一致を見る)。arXiv の分野は `backend/pkg/dsl/feed_arxiv_diet.go` の `ArxivCategories`(スキーマの `feedId` の説明と AI の規則 `feed_arxiv_diet_rules.go` にも書く。テストが規則との一致を見る)。**規約(再配布・商用・出典)を確かめて、この表に URL を書いてから**。表に無い URL・https でない URL・「外したもの」の URL がコードの許可リストにあると、`TestAllowlistMatchesDoc`(`internal/feeds/allowlist_doc_test.go`)が落ちる。追加は人の判断(#339)。
+
+#1701 で足した `soumu-news`・`osaka-city-news`・`go-blog` は、AI の規則(`backend/internal/ai/feed_rules.go`)にはまだ書いていない(生成アプリから外の API を使う決まりは親の Issue の決定待ち)。DSL に書けば検証は通り、表示もできる。出典の license はフィードごと(`RSSFeed.License`。空なら公共データ利用規約(第1.0版))。
 
 ISBN から本の情報を引く `lookupBook` も同じ作り(専用のクライアント・固定の URL・上限・キャッシュ・止める)で、出どころは openBD だけ: [book-lookup.md](book-lookup.md)。
 
@@ -91,7 +103,7 @@ ISBN から本の情報を引く `lookupBook` も同じ作り(専用のクライ
 | 内部のアドレスに届かない | 専用のクライアントは、接続の直前に**実際の接続先のアドレス**を確かめ、公開のユニキャスト以外(ループバック・プライベート・リンクローカル(メタデータのサーバーを含む)・CGNAT・マルチキャスト・文書用・IPv4 を写した IPv6 など)には接続しない。名前を引き直して内部を指すようになっても同じ。環境のプロキシ設定は使わない。リダイレクトは許可リストのホストの同じ scheme の中だけ(3 回まで) |
 | 送る項目を最小にする | 送るのは府県予報区のコード・フィードの URL・arXiv の分野・国会会議録で探す語(diet の `query`)だけ。diet の語は**アプリを作った時に DSL に書いた決まった語**で、利用者がその場で打った文字や記録の値ではない(DSL から値を差し込む形は無い)。ただし API は認証した利用者なら任意の語(40 字まで)を送れるので、語は国会図書館に届く。アプリのログには語を残さない(取りに行くたびのログ `feeds.fetch` は語の文字数だけ・アクセスのログはパスだけ)。ただし Cloud Run の要求ログは URL を問い合わせごと残すので、語はそこに残る。利用者の uid・位置・記録の値は送らない。**緯度経度は受け取らない**(天気・警報・気圧は府県の単位)ので、ログにも座標は残らない。気圧の出どころには府県ごとに決まった代表地点(県庁などの所在地・`internal/feeds/pressure_points.go`)の座標を送るだけで、利用者の位置ではない |
 | 秘密は DSL に置かない | 鍵の要らない出どころだけなので、秘密は無い |
-| 量の上限 | 1 回 8 秒まで・応答の大きさの上限(天気 256 KiB・警報 512 KiB・気圧 256 KiB・祝日 128 KiB・RSS 512 KiB・arxiv 1 MiB・diet 3 MiB(発言の本文ごと返るため。20 件の実測は 84 KB))・保存する行は 60 まで・キャッシュは 2000 件まで(diet の語で増えないよう、古いものから捨てる)。arxiv と diet は出どころの求めに合わせ、インスタンスあたり**同時に 1 本**で、前の取得から間をあけて取りに行く(diet は 3 秒。arxiv は 3 秒 × appconfig の最大インスタンス数(`deploy-cloudrun.yml` の `--max-instances=3`)= 9 秒にして、全インスタンスが同時に取っても合計で 3 秒に 1 回を超えないようにした。最大インスタンス数を変える時は `backend/internal/feeds/feeds.go` の `appconfigMaxInstances` も変える)。順番待ちは来た順で 10 秒まで。超えたら 503。取得は待っていた要求の期限と切り離して 8 秒まで続け、結果はキャッシュに入る(要求の側の打ち切りは失敗として覚えない)。キャッシュ(天気 30 分・警報 10 分・気圧 30 分・祝日 12 時間・RSS 15 分・arxiv 3 時間・diet 3 時間。気圧の問い合わせは府県の 56 地点にまとまる)で同じ問い合わせはまとめ、同時の問い合わせも 1 回の取得にまとめる。出どころへの取得はインスタンスあたり 1 分 30 回まで(diet は別枠で 1 分 10 回。検索語はキャッシュに当たりにくいので、ほかの部品の枠を使わない)。利用者ごとに 1 時間 120 回まで。検索語のある問い合わせ(diet)で出どころまで取りに行くのは、利用者ごと・インスタンスごとに 1 時間 20 回まで(キャッシュにある語はこの数に入らない。超えたら 429)。失敗は 1 分覚えて、すぐに取り直さない |
+| 量の上限 | 1 回 8 秒まで・応答の大きさの上限(天気 256 KiB・警報 512 KiB・気圧 256 KiB・祝日 128 KiB・RSS 1 MiB(`go-blog` は記事の本文ごと返るため。2026-11-12 の実測は 10 件で約 360 KB)・arxiv 1 MiB・diet 3 MiB(発言の本文ごと返るため。20 件の実測は 84 KB))・保存する行は 60 まで・キャッシュは 2000 件まで(diet の語で増えないよう、古いものから捨てる)。arxiv と diet は出どころの求めに合わせ、インスタンスあたり**同時に 1 本**で、前の取得から間をあけて取りに行く(diet は 3 秒。arxiv は 3 秒 × appconfig の最大インスタンス数(`deploy-cloudrun.yml` の `--max-instances=3`)= 9 秒にして、全インスタンスが同時に取っても合計で 3 秒に 1 回を超えないようにした。最大インスタンス数を変える時は `backend/internal/feeds/feeds.go` の `appconfigMaxInstances` も変える)。順番待ちは来た順で 10 秒まで。超えたら 503。取得は待っていた要求の期限と切り離して 8 秒まで続け、結果はキャッシュに入る(要求の側の打ち切りは失敗として覚えない)。キャッシュ(天気 30 分・警報 10 分・気圧 30 分・祝日 12 時間・RSS 15 分・arxiv 3 時間・diet 3 時間。気圧の問い合わせは府県の 56 地点にまとまる)で同じ問い合わせはまとめ、同時の問い合わせも 1 回の取得にまとめる。出どころへの取得はインスタンスあたり 1 分 30 回まで(diet は別枠で 1 分 10 回。検索語はキャッシュに当たりにくいので、ほかの部品の枠を使わない)。利用者ごとに 1 時間 120 回まで。検索語のある問い合わせ(diet)で出どころまで取りに行くのは、利用者ごと・インスタンスごとに 1 時間 20 回まで(キャッシュにある語はこの数に入らない。超えたら 429)。失敗は 1 分覚えて、すぐに取り直さない |
 | ログ | 外へ取りに行くたびに 1 行(`event=feeds.fetch`・成功は INFO・失敗は WARN): provider・status(`ok` / HTTP の番号 / `timeout`・`network`・`too_large`・`bad_response` などの種類)・bytes・duration_ms と、許可リストの region・feed_id・語の文字数(q_runes)。キャッシュから返した時は外へ出ないので書かない。語・URL・応答の本文・uid は書かない(通信の失敗の中身は URL を含むので、種類だけを書く) |
 | 同意と開示 | 利用者の情報を外部へ送らないので、第三者への提供には当たらない(と考える)。ただしプライバシーポリシー・App Privacy の書き方は人が確かめる(下) |
 | 止められる | `FEEDS_DISABLED` で provider ごとに止められる(`all` で全部。今回足した出どころだけ止めるなら `FEEDS_DISABLED=arxiv,diet`)。止めた provider は 503 で、部品は「読み込めませんでした」 |
