@@ -65,6 +65,16 @@ android {
         }
     }
 
+    // release は R8 で縮小・難読化し、使わないリソースも落とす(#1134)。debug はそのまま。
+    // AGP は flavor ごとに minify を切り替えられないので stgRelease も同じ(配る前に stg で R8 後の挙動を確かめられる)
+    buildTypes {
+        getByName("release") {
+            isMinifyEnabled = true
+            isShrinkResources = true
+            proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
+        }
+    }
+
     // 初期の DSL は docs/dsl/examples をそのまま同梱する(iOS と同じ)。
     sourceSets {
         getByName("main") {
