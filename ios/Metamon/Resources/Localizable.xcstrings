@@ -3010,6 +3010,23 @@
         }
       }
     },
+    "いつもの" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Default"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "いつもの"
+          }
+        }
+      }
+    },
     "いまの状況" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -4162,6 +4179,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "この端末では AI を端末内で動かせないため、サーバーの AI を使います。"
+          }
+        }
+      }
+    },
+    "この端末ではアイコンを変えられません。" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "This device can't change the app icon."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "この端末ではアイコンを変えられません。"
           }
         }
       }
@@ -5437,6 +5471,74 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "やり直せませんでした"
+          }
+        }
+      }
+    },
+    "アイコン" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "App Icon"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "アイコン"
+          }
+        }
+      }
+    },
+    "アイコン: %@" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "App icon: %@"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "アイコン: %@"
+          }
+        }
+      }
+    },
+    "アイコンを変えられませんでした" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Couldn't Change the Icon"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "アイコンを変えられませんでした"
+          }
+        }
+      }
+    },
+    "アイコンを変えられませんでした。少し待ってからもう一度お試しください。" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Couldn't change the app icon. Wait a moment and try again."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "アイコンを変えられませんでした。少し待ってからもう一度お試しください。"
           }
         }
       }
@@ -7158,6 +7260,23 @@
         }
       }
     },
+    "ダーク" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Dark"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ダーク"
+          }
+        }
+      }
+    },
     "ダークモードにして" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -7940,6 +8059,23 @@
         }
       }
     },
+    "モノクロ" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mono"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "モノクロ"
+          }
+        }
+      }
+    },
     "ユーザー ID" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -7987,6 +8123,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "ライセンスを読み込めませんでした"
+          }
+        }
+      }
+    },
+    "ライト" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Light"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ライト"
           }
         }
       }
@@ -11489,6 +11642,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "声を文字にする準備(初回だけ約%lldMB)が終わる前でも、文字ならすぐに作れます。"
+          }
+        }
+      }
+    },
+    "変えると iOS の確認が出ます。" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "iOS shows a confirmation when you change it."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "変えると iOS の確認が出ます。"
           }
         }
       }
