@@ -456,6 +456,28 @@ func (h *Handle) ApplyOnce(ctx context.Context, entity, id, key string, fn func(
 	return h.b.ApplyRecordOnce(ctx, rs, id, h.env, key, fn)
 }
 
+// UpsertRecord creates entity/id with data, or, when it is there, applies
+// fn to it once per key (the scheduled import, #1712). data nil: update
+// only (a missing record is left missing). Unlike ApplyOnce the record need
+// not be readable by the trigger: the caller names only ids it derives from
+// its own key (store.IDFromClientID), inside this handle's app and side.
+func (h *Handle) UpsertRecord(ctx context.Context, entity, id string, data map[string]any, origin store.RecordOrigin, key string, fn func(map[string]any) map[string]any) (created, applied bool, err error) {
+	rs, err := h.recordSet(ctx, entity)
+	if err != nil {
+		return false, false, err
+	}
+	if data != nil {
+		if _, created, err = h.b.CreateRecord(ctx, rs, store.Record{ID: id, Data: data, Origin: &origin}); err != nil || created {
+			return created, false, err
+		}
+	}
+	applied, err = h.b.ApplyRecordOnce(ctx, rs, id, h.env, key, fn)
+	if errors.Is(err, store.ErrNotFound) {
+		return false, false, nil
+	}
+	return false, applied, err
+}
+
 // Marked reports whether the action key already ran.
 func (h *Handle) Marked(ctx context.Context, key string) (bool, error) {
 	return h.b.RunnerMarked(ctx, h.env, key)

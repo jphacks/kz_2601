@@ -214,7 +214,9 @@ func gsheetsCan(t *Token) bool {
 
 // --- answers ---
 
-func gsheetsCell(v any) string {
+// gsheetsRawCell is a cell as Output.Cells has it (the import): trimmed, at
+// most gsheetsCellMax runes.
+func gsheetsRawCell(v any) string {
 	var s string
 	switch x := v.(type) {
 	case nil:
@@ -224,7 +226,24 @@ func gsheetsCell(v any) string {
 		b, _ := json.Marshal(x)
 		s = string(b)
 	}
-	s = strings.TrimSpace(strings.ReplaceAll(s, "\n", " "))
+	s = strings.TrimSpace(s)
+	if utf8.RuneCountInString(s) > gsheetsCellMax {
+		s = string([]rune(s)[:gsheetsCellMax])
+	}
+	return s
+}
+
+// gsheetsRawCells are the first gsheetsMaxCols cells of a row.
+func gsheetsRawCells(cells []any) []string {
+	out := make([]string, min(len(cells), gsheetsMaxCols))
+	for i := range out {
+		out[i] = gsheetsRawCell(cells[i])
+	}
+	return out
+}
+
+func gsheetsCell(v any) string {
+	s := strings.TrimSpace(strings.ReplaceAll(gsheetsRawCell(v), "\n", " "))
 	if utf8.RuneCountInString(s) > gsheetsShownMax {
 		s = string([]rune(s)[:gsheetsShownMax]) + "…"
 	}
@@ -281,7 +300,8 @@ func gsheetsReadQuery(a map[string]string) (string, url.Values, int, error) {
 
 // readRange reads a range of a sheet the person picked: one row a sheet
 // row (empty rows left out), limit rows (default 50, at most 100), the
-// first 10 columns. Nothing is cached.
+// first 10 columns. Cells keeps the columns for the import. Nothing is
+// cached.
 func (s *googleSheets) readRange(ctx context.Context, in Input) (Output, error) {
 	if !gsheetsCan(in.Token) {
 		return Output{}, ErrNotConnected
@@ -306,6 +326,7 @@ func (s *googleSheets) readRange(ctx context.Context, in Input) (Output, error) 
 			continue
 		}
 		out.Rows = append(out.Rows, row)
+		out.Cells = append(out.Cells, gsheetsRawCells(cells))
 	}
 	return out, nil
 }
