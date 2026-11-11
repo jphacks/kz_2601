@@ -11,8 +11,8 @@ final class MacFeedbackCenter {
     static let shared = MacFeedbackCenter()
     static let windowId = "feedback"
 
-    /// Mac に Firebase が無い間(#930)はモック(送った内容を覚えるだけ)。iOS の `FeedbackServiceKey` の既定と同じ
-    let client: any FeedbackClient = MockFeedbackClient()
+    /// Firebase につながれば appconfig へ送る(#930)。つながらない時はモック(送った内容を覚えるだけ・iOS の `FeedbackServiceKey` の既定と同じ)
+    let client: any FeedbackClient = MacServices.shared.feedback
     private(set) var context: MacFeedbackContext?
 
     func open(_ openWindow: OpenWindowAction) {

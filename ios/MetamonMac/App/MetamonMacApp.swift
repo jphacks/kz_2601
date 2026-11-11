@@ -5,7 +5,7 @@ import MetamonRenderer
 import MetamonServices
 
 /// Mac の殻(#929)。画面の骨格は #933(Shell/)、メニューとキーボードは #934(MacCommands)。
-/// Firebase は #930、権限の説明は #931 で足す。
+/// Firebase(ログイン・App Check・クラッシュ報告)は #930(`MacServices`・`MacAccount`)、権限の説明は #931。
 @main
 struct MetamonMacApp: App {
     /// ⌘Q の前に保存していない入力を確かめる(#943)
@@ -17,6 +17,9 @@ struct MetamonMacApp: App {
     @State private var library = MacAppLibrary()
 
     init() {
+        // Firebase は接続(MacServices)を組み立てる前に初期化(plist が無ければ何もせず、ログインと AI はモック・#930)
+        MacFirebase.bootstrap()
+        Task { await MacAccount.shared.start() } // 未ログインなら匿名でログインし、状態の変化を追う
         MacNotificationDelegate.install() // 前面でも通知を出す・押されたらそのアプリを開く(#965)
         // UI テスト・手元の確認用(DEBUG のみ・iOS と同じ環境変数): METAMON_AI_CONSENT / METAMON_TUTORIAL / METAMON_BETA_WELCOME(#971)
         AIConsentDebug.applyLaunchOverride()
@@ -44,6 +47,7 @@ struct MetamonMacApp: App {
                     #if !APP_STORE_REVIEW
                     .modifier(MacLinkReceiver())
                     #endif
+                    .modifier(MacCrashReportUser())
             }
         }
         .defaultSize(width: 1100, height: 720)

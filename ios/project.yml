@@ -289,7 +289,8 @@ targets:
   # Mac のネイティブ版(#929・docs/decisions/363-desktop-strategy.md)。3 つのパッケージを iOS と共有し、殻は ios/MetamonMac/。
   # Bundle ID は iOS と同じ(ユニバーサル購入)。署名は project の base の自動署名・DEVELOPMENT_TEAM(METAMON_TEAM_ID)をそのまま使う。
   # Apple シリコンと Intel の両方(ARCHS_STANDARD = arm64 + x86_64。Debug は ONLY_ACTIVE_ARCH で手元の CPU だけ)。
-  # 同梱の DSL 例を中央で動かす(記録はメモリ上・#939)。画面の骨格は #933、Firebase の登録は #930、権限の説明は #931(マイク・音声認識は #966)。
+  # 同梱の DSL 例を中央で動かす(記録はメモリ上・#939)。画面の骨格は #933、権限の説明は #931(マイク・音声認識は #966)。
+  # Firebase(#930): ログイン(匿名・Sign in with Apple)・AI・フィードバック・App Check(DeviceCheck)・Crashlytics。plist が無ければモック(MacServices)。
   MetamonMac:
     type: application
     platform: macOS
@@ -315,6 +316,8 @@ targets:
       # 持てるアプリの数(#630)の状態カードの文言と置き換えの中身は iOS と共有する
       - path: Metamon/Features/AppLimit/AppLimitCopy.swift
       - path: Metamon/Features/AppLimit/AppReplacePlan.swift
+      # ログイン(#930): サインインの状態(Firebase Auth の観測・Sign in with Apple の受け渡し・nonce)は iOS のファイルをそのまま使う
+      - path: Metamon/Features/Auth/AuthSession.swift
       # 規約・ポリシーは iOS と同じ同梱版をアプリ内で読む(#971)
       - path: ../docs/legal
         buildPhase: resources
@@ -349,14 +352,21 @@ targets:
           SWIFT_ACTIVE_COMPILATION_CONDITIONS: "$(inherited) APP_STORE_REVIEW"
           METAMON_APP_STORE_REVIEW: "YES"
     postBuildScripts:
-      # iOS と同じスクリプト。ios/Firebase/ に plist が無ければ何も入れない(秘密のファイルは repo に無い)。
-      # Mac の Firebase の登録と初期化は #930
+      # iOS と同じスクリプト・同じ plist(Bundle ID が iOS と同じなので、Firebase の Apple アプリ 1 つを Mac でも使う・#930)。
+      # ios/Firebase/ に plist が無ければ何も入れない(秘密のファイルは repo に無い)。無い時はログインと AI がモックになる(MacServices)
       - name: Select Firebase plist
         script: '"${SRCROOT}/scripts/select-firebase-plist.sh"'
         inputFiles:
           - $(SRCROOT)/scripts/select-firebase-plist.sh
         outputFiles:
           - $(TARGET_BUILD_DIR)/$(UNLOCALIZED_RESOURCES_FOLDER_PATH)/GoogleService-Info.plist
+        basedOnDependencyAnalysis: false
+      # クラッシュ報告(#930): dSYM を Crashlytics へ。iOS と同じスクリプト(Release / Review だけ送る。Debug・Staging・plist 無しの CI は即終了)。
+      # Mac は base でサンドボックスを外している(上の ENABLE_USER_SCRIPT_SANDBOXING)。docs/ios/crash-reporting.md
+      - name: Upload dSYM to Crashlytics
+        script: '"${SRCROOT}/scripts/crashlytics-dsym.sh"'
+        inputFiles:
+          - $(SRCROOT)/scripts/crashlytics-dsym.sh
         basedOnDependencyAnalysis: false
     scheme:
       # Mac の単体テスト(#1212)。`xcodebuild -scheme MetamonMac test`(mac-ci の mac-build-test でも回す)
