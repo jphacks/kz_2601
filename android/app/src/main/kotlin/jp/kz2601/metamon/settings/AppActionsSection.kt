@@ -39,6 +39,7 @@ data class AppActionsState(
  * @param onOpenScreenMap 画面マップ(#897)を開く
  * @param onOpenAutomations 自動の動き(#905)を開く。null は使えない構成(審査用の版など)で、行を出さない
  * @param onShowTutorial シートを閉じてチュートリアルをもう一度出す
+ * @param onReplayCoachMarks シートを閉じて操作のヒント(吹き出し)を未読に戻す
  * @param onPickTip 選んだコツの文を入力欄に入れる(送らない・シートを閉じる)
  * @param onReset 初期状態に戻す(確認の後。シートを閉じる)
  */
@@ -49,6 +50,7 @@ fun AppActionsSection(
     onOpenScreenMap: () -> Unit,
     onOpenAutomations: (() -> Unit)?,
     onShowTutorial: () -> Unit,
+    onReplayCoachMarks: () -> Unit,
     onPickTip: (String) -> Unit,
     onReset: () -> Unit,
 ) {
@@ -71,6 +73,9 @@ fun AppActionsSection(
     }
     TextButton(onClick = onShowTutorial, modifier = Modifier.padding(horizontal = 4.dp).testTag("settings.tutorial")) {
         Text(stringResource(R.string.onboarding_replay))
+    }
+    TextButton(onClick = onReplayCoachMarks, modifier = Modifier.padding(horizontal = 4.dp).testTag("settings.coachMarks")) {
+        Text(stringResource(R.string.coach_mark_replay))
     }
     TextButton(onClick = { tipsOpen = true }, modifier = Modifier.padding(horizontal = 4.dp).testTag("settings.tips")) {
         Text(stringResource(R.string.settings_tips))

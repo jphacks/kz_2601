@@ -67,6 +67,7 @@ import java.time.format.FormatStyle
  * @param myUsage 同じく最後に読んだ `GET /v1/me/usage`。「使っている量」はこれを使い、自分では読まない(開くたびに 2 回呼ばない)
  * @param onStopRetention 「自動で消すのをやめる」の指示文を送る(送ったらシートを閉じる)
  * @param onShowTutorial 「使い方を見る」(#900)。シートを閉じて初回のチュートリアルをもう一度出す
+ * @param onReplayCoachMarks 「操作のヒントをもう一度見る」(#900)。シートを閉じて吹き出しを未読に戻す
  * @param canUndo 「元に戻す」を押せる(#1075)
  * @param onUndo シートを閉じて直前の版に戻す
  * @param onPickTip 「頼み方のコツ」で選んだ文を入力欄に入れる(シートを閉じる・送らない)
@@ -87,6 +88,7 @@ fun SettingsSheet(
     onRefreshUsage: () -> Unit = {},
     onStopRetention: (String) -> Unit = {},
     onShowTutorial: () -> Unit = {},
+    onReplayCoachMarks: () -> Unit = {},
     canUndo: Boolean = false,
     onUndo: () -> Unit = {},
     onPickTip: (String) -> Unit = {},
@@ -164,6 +166,7 @@ fun SettingsSheet(
                 onOpenScreenMap = { screenMapOpen = true },
                 onOpenAutomations = automations?.let { { automationsOpen = true } },
                 onShowTutorial = onShowTutorial,
+                onReplayCoachMarks = onReplayCoachMarks,
                 onPickTip = onPickTip,
                 onReset = onReset,
             )

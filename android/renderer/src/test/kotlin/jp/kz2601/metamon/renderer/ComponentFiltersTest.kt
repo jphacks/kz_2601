@@ -14,7 +14,6 @@ import jp.kz2601.metamon.renderer.components.lists.ListRows
 import jp.kz2601.metamon.renderer.components.lists.StatValue
 import jp.kz2601.metamon.renderer.components.lists.TableCells
 import jp.kz2601.metamon.renderer.components.play.FlashcardRules
-import jp.kz2601.metamon.renderer.components.play.PlayRecords
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import org.junit.Assert.assertEquals
@@ -86,7 +85,7 @@ class ComponentFiltersTest {
     @Test
     fun playLeavesApplyEveryFilter() {
         val picker = c("""{"type":"randomPicker","entity":"shop","titleField":"name","filter":$both}""")
-        assertEquals(listOf("s1", "s3"), PlayRecords.filtered(rt, all, picker).map { it.id }.sorted())
+        assertEquals(listOf("s1", "s3"), LeafData(rt, all).filtered(picker).map { it.id }.sorted())
         // 単語カード: toggle の filter(まだ)と他の filter を両方当てる → 金沢 かつ 未済み
         val cards = c(
             """{"type":"flashcards","entity":"shop","front":"name","toggle":"done",

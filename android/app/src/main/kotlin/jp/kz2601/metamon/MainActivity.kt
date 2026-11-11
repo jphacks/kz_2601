@@ -49,6 +49,7 @@ import jp.kz2601.metamon.consent.AiConsentDialog
 import jp.kz2601.metamon.purchase.PaywallHost
 import jp.kz2601.metamon.discover.DiscoverHost
 import jp.kz2601.metamon.discover.LocalPublishEnv
+import jp.kz2601.metamon.onboarding.CoachMark
 import jp.kz2601.metamon.onboarding.TutorialScreen
 import jp.kz2601.metamon.renderer.components.location.LocationTrackingBarHost
 import jp.kz2601.metamon.renderer.components.sensors.LocalSensorSource
@@ -435,6 +436,18 @@ fun MetamonApp(container: AppContainer) {
         onDispose { vm.appRequests = null }
     }
 
+    // 気づきにくい操作の吹き出し(#900・iOS の `AppRuntime+CoachMarks`)。出す順番: 同意 → チュートリアル → 最初のアプリ →
+    // 完成の後のお知らせ(こう話すと直せます・要約・保存期間・引き継ぎ)→ 吹き出し(1 日 1 つ)。先の案内・シート・生成中の間は出さない
+    val coachMarkState by container.coachMarks.state.collectAsStateWithLifecycle()
+    val tutorialShowing by container.tutorialPrompt.visible.collectAsStateWithLifecycle()
+    val seenTutorial by container.tutorial.hasSeenTutorial.collectAsStateWithLifecycle()
+    val coachMarkBlocked = !seenTutorial ||
+        !container.tutorial.hasShownEditHint || state.isGenerating || buildStage.showsFullScreen || buildStage.editHint ||
+        state.voiceOpen || switcherOpen || settingsOpen || consentVisible || tutorialShowing || discoverOpen || shareTarget != null ||
+        membersTarget != null || releaseTarget != null || proState.paywall != null || accountLinkVisible ||
+        BuildStageState.summaryPending(state) || retentionWaiting || state.publicDataPrompt != null || runtimeState.confirm != null
+    val fabCoachMark = if (coachMarkBlocked) null else container.coachMarks.next(CoachMark.FAB, coachMarkState)
+
     Scaffold(
         bottomBar = {
             Row(verticalAlignment = Alignment.CenterVertically) {
@@ -481,7 +494,14 @@ fun MetamonApp(container: AppContainer) {
                             GeneratedApp(state, runtimeState.dsl, runtime, appId = runtimeState.document.appId)
                         }
                         // マイク FAB(#892): タップ = このアプリを変える・長押し = 変身一覧・ドラッグで動かす / 端に隠す
-                        VoiceFab(busy = state.isGenerating, onTap = vm::openVoice, onLongPress = openSwitcher)
+                        VoiceFab(
+                            busy = state.isGenerating,
+                            onTap = vm::openVoice,
+                            onLongPress = openSwitcher,
+                            coachMark = fabCoachMark,
+                            onCoachMarkEvent = container.coachMarks::handle,
+                            onGesture = container.coachMarks::markPerformed,
+                        )
                     }
                 }
             }
@@ -522,6 +542,12 @@ fun MetamonApp(container: AppContainer) {
             onShowTutorial = {
                 settingsOpen = false
                 container.tutorialPrompt.replay()
+            },
+            // 設定のシートを閉じきってから、最初の吹き出しが出る画面(FAB)に戻る
+            onReplayCoachMarks = {
+                settingsOpen = false
+                switcherOpen = false
+                container.coachMarks.replay()
             },
             canUndo = state.canUndo && !state.undoing && !state.isGenerating,
             onUndo = {
