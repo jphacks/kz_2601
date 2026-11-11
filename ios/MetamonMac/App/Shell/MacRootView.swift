@@ -36,7 +36,7 @@ struct MacRootView: View {
     @Environment(MacOnboarding.self) private var onboarding: MacOnboarding?
     /// β の案内の依頼の例(#1214)など、ほかのシート・ウインドウから入力欄に入れる文
     private let draftRequest = MacDraftRequest.shared
-    /// サービスメニューで文字が届いた時にウインドウが無ければ開く(#1849)
+    /// ウインドウを開く(サービスメニューで文字が届いた時・#1849 / 生成アプリごとのウインドウ・#1853)
     @Environment(\.openWindow) private var openWindow
     /// 完成の後のお知らせ(#968)
     @State private var notices = MacPostBuildNotices()
@@ -80,7 +80,6 @@ struct MacRootView: View {
     @State private var windowToken = UUID()
     /// 生成アプリごとのウインドウ(#1853)で開いたアプリ。メインのウインドウでは nil
     private let windowApp: AppID?
-    @Environment(\.openWindow) private var openWindow
 
     init(apps: [SampleApp], window: AppID? = nil) {
         bundledApps = apps
