@@ -54,6 +54,9 @@ class ShareLinkInbox {
 /** 記録を共有するアプリのリンクを開いた時の、取り込む前の確認(iOS の `PendingJoin`・#254)。 */
 data class PendingJoin(val token: String, val preview: SharePreview)
 
+/** 記録を共有しないアプリのリンクを開いた時の、取り込む前の確認(iOS の `PendingImport`)。[preview] = null は確かめられなかった時。 */
+data class PendingAdd(val token: String, val preview: SharePreview?)
+
 /** 開けなかった理由(画面はこれで文言を選ぶ)。 */
 enum class ShareOpenFailure {
     /** サーバーにつながっていない構成(モック) */
@@ -80,6 +83,9 @@ sealed interface ShareOpenResult {
     /** 参加の確認画面を出す(表示名を聞く) */
     data class AskToJoin(val join: PendingJoin) : ShareOpenResult
 
+    /** 追加の確認画面を出す */
+    data class AskToAdd(val add: PendingAdd) : ShareOpenResult
+
     /** 取り込んだ・参加した。このアプリに切り替える。[viaJoin] = 確認画面から参加した */
     data class Added(val app: InstallResult, val viaJoin: Boolean) : ShareOpenResult
 
@@ -89,7 +95,7 @@ sealed interface ShareOpenResult {
 /**
  * `tailorit://import/<token>` を開く(iOS の `AppRuntime.importShared` / `joinShared`)。
  * 先に `GET /v1/shares/{token}` で確かめ、記録を共有するアプリ(自分のものでない)なら参加の確認へ。
- * それ以外はすぐ取り込む。確かめられなかった時も取り込みに進む(iOS と同じ)。
+ * それ以外は追加の確認へ。確かめられなかった時も名前なしで追加の確認を出す(iOS と同じ)。
  * @param client null = シェアが使えない構成
  * @param profile 参加の表示名の初期値と、入れた名前の覚え先(#1152)
  */
@@ -109,7 +115,13 @@ class ShareLinkOpener(
         if (preview != null && preview.sharedData && !preview.mine) {
             return ShareOpenResult.AskToJoin(PendingJoin(token, preview))
         }
-        return importNow(client, token, displayName = null, viaJoin = false)
+        return ShareOpenResult.AskToAdd(PendingAdd(token, preview))
+    }
+
+    /** 確認画面の「追加する」。 */
+    suspend fun add(add: PendingAdd): ShareOpenResult {
+        val client = client ?: return ShareOpenResult.Failed(ShareOpenFailure.UNAVAILABLE)
+        return importNow(client, add.token, displayName = null, viaJoin = false)
     }
 
     /** 確認画面の「参加する」。空欄なら名前なしで参加する。 */

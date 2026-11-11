@@ -117,10 +117,22 @@ class ShareLinkOpenerTest {
     }
 
     @Test
-    fun copyAppIsImportedRightAway() = runBlocking<Unit> {
+    fun copyAppAsksToAddBeforeImporting() = runBlocking<Unit> {
+        server.enqueue(json(200, previewJson(sharedData = false)))
+        val add = opener().open("tok").expect<ShareOpenResult.AskToAdd>().add
+        assertEquals("tok", add.token)
+        assertEquals("家族の買い物", add.preview?.name)
+        assertEquals("/v1/shares/tok", server.take().path)
+        assertEquals("確認の前に取り込まない", 1, server.requestCount)
+    }
+
+    @Test
+    fun addImportsAfterConfirm() = runBlocking<Unit> {
         server.enqueue(json(200, previewJson(sharedData = false)))
         server.enqueue(json(201, installJson()))
-        val result = opener().open("tok").expect<ShareOpenResult.Added>()
+        val o = opener()
+        val add = o.open("tok").expect<ShareOpenResult.AskToAdd>().add
+        val result = o.add(add).expect<ShareOpenResult.Added>()
         assertEquals("app9", result.app.id)
         assertFalse(result.viaJoin)
         server.take()
@@ -131,17 +143,31 @@ class ShareLinkOpenerTest {
     }
 
     @Test
-    fun ownSharedAppIsImportedWithoutAsking() = runBlocking<Unit> {
+    fun ownSharedAppAsksToAddNotToJoin() = runBlocking<Unit> {
         server.enqueue(json(200, previewJson(sharedData = true, mine = true)))
         server.enqueue(json(200, installJson(joined = true)))
-        assertTrue(opener().open("tok") is ShareOpenResult.Added)
+        val o = opener()
+        val add = o.open("tok").expect<ShareOpenResult.AskToAdd>().add
+        assertEquals(1, server.requestCount)
+        assertTrue(o.add(add) is ShareOpenResult.Added)
     }
 
     @Test
-    fun previewFailureStillImports() = runBlocking<Unit> {
+    fun previewFailureStillAsksToAddWithoutName() = runBlocking<Unit> {
         server.enqueue(json(500, errorBody("internal")))
         server.enqueue(json(201, installJson()))
-        assertTrue(opener().open("tok") is ShareOpenResult.Added)
+        val o = opener()
+        val add = o.open("tok").expect<ShareOpenResult.AskToAdd>().add
+        assertEquals(PendingAdd("tok", null), add)
+        assertEquals(1, server.requestCount)
+        assertTrue(o.add(add) is ShareOpenResult.Added)
+    }
+
+    @Test
+    fun addFailureReturnsReason() = runBlocking<Unit> {
+        server.enqueue(json(404, errorBody("not_found")))
+        assertEquals(ShareOpenResult.Failed(ShareOpenFailure.REVOKED), opener().add(PendingAdd("tok", null)))
+        assertEquals(ShareOpenResult.Failed(ShareOpenFailure.UNAVAILABLE), ShareLinkOpener(null, profile).add(PendingAdd("tok", null)))
     }
 
     @Test
@@ -193,6 +219,7 @@ class ShareLinkOpenerTest {
     fun offlineAndUnavailable() = runBlocking<Unit> {
         assertEquals(ShareOpenResult.Failed(ShareOpenFailure.UNAVAILABLE), ShareLinkOpener(null, profile).open("tok"))
         server.shutdown()
-        assertEquals(ShareOpenResult.Failed(ShareOpenFailure.OFFLINE), opener().open("tok"))
+        val add = opener().open("tok").expect<ShareOpenResult.AskToAdd>().add
+        assertEquals(ShareOpenResult.Failed(ShareOpenFailure.OFFLINE), opener().add(add))
     }
 }
