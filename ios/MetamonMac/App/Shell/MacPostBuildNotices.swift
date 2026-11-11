@@ -34,6 +34,9 @@ final class MacPostBuildNotices {
 
     var active: PostBuildNotice? { PostBuildNotice.current(pending) }
 
+    /// 中央の列の上にお知らせが出ているか(出ている間はサイドバーの写しを撮らない・#1281)
+    var isShowing: Bool { active != nil }
+
     /// いま出ているお知らせを閉じる(閉じるボタン・Esc・時間)。閉じたら次の番のものが出る
     func dismissActive() {
         switch active {

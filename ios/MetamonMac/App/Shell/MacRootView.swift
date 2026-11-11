@@ -138,9 +138,9 @@ struct MacRootView: View {
             let map = $showsScreenMap, tips = $showsTips
             discardGuard.beforeAsking = { map.wrappedValue = false; tips.wrappedValue = false }
         }
-        .onChange(of: notices.summary == nil) { _, closed in
-            guard closed else { return }
-            // お知らせが写り込んだ時は、閉じて消え終わってから撮り直す
+        .onChange(of: notices.isShowing) { _, showing in
+            guard !showing else { return }
+            // お知らせ(要約・直し方の例)が写り込まないよう、全部閉じて消え終わってから撮り直す
             Task { @MainActor in
                 try? await Task.sleep(for: .seconds(0.4))
                 captureThumbnail()
@@ -221,7 +221,7 @@ struct MacRootView: View {
 
     /// 中央のアプリを撮る。お知らせ・会話のシートが出ている間は撮らない(閉じた後に撮り直す)
     private func captureThumbnail() {
-        guard let app = selectedApp, notices.summary == nil, compose == nil else { return }
+        guard let app = selectedApp, !notices.isShowing, compose == nil else { return }
         let voiceOnly = library.generated[app.id]?.dsl.isVoiceOnly ?? false
         thumbs.capture(appId: app.id, isVoiceOnly: voiceOnly, anchor: thumbAnchor)
     }
