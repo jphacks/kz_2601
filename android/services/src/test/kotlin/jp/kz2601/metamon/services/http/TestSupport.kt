@@ -1,5 +1,6 @@
 package jp.kz2601.metamon.services.http
 
+import jp.kz2601.metamon.services.RemainingToday
 import okhttp3.mockwebserver.MockResponse
 import okhttp3.mockwebserver.MockWebServer
 import java.net.InetAddress
@@ -43,6 +44,7 @@ fun MockWebServer.metamonHttp(
     appCheck: AppCheckTokenProvider? = null,
     sleeps: MutableList<Long> = mutableListOf(),
     retry: RetryPolicy = RetryPolicy(),
+    remainingSink: ((RemainingToday) -> Unit)? = null,
 ): MetamonHttp = MetamonHttp(
     baseUrl = baseUrl(),
     tokens = tokens,
@@ -53,6 +55,7 @@ fun MockWebServer.metamonHttp(
     retry = retry,
     device = testDevice,
     sleep = { sleeps += it },
+    remainingSink = remainingSink,
 )
 
 fun json(status: Int, body: String, vararg headers: Pair<String, String>): MockResponse =

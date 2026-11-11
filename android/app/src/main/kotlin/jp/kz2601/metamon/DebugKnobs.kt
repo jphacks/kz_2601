@@ -28,6 +28,15 @@ data class DebugKnobs(
     val offlineSeconds: Double? = null,
     /** `METAMON_AUTO_FEEDBACK=<秒>`: その秒数後に、端末を振った時と同じくフィードバックの画面を開く(ヘッドレス E2E・#1314) */
     val autoFeedbackSeconds: Double? = null,
+    /** `METAMON_IAP_ENFORCE=1`: debug でも新規作成の無料枠を効かせる(#1261・上限の画面の確認用) */
+    val iapEnforce: Boolean = false,
+    /** `METAMON_IAP_FREE_LIMIT=<n>`: 1 日の無料作成の回数を上書き(確認用) */
+    val iapFreeLimit: Int? = null,
+    /**
+     * `METAMON_ACCOUNT_LINK_PROMPTED=1|0`: 引き継ぎの案内(#1316)を出した扱いにする / 出していない扱いに戻す
+     * (iOS の起動引数 `-metamon.accountLinkPrompted YES|NO`)。前のテストで作ったアプリの案内が画面を塞がないように
+     */
+    val accountLinkPrompted: Boolean? = null,
 ) {
     data class AutoNavStep(val screen: String, val presentation: String? = null) {
         override fun toString(): String = presentation?.let { "$screen:$it" } ?: screen

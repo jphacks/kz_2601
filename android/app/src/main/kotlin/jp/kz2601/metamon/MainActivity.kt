@@ -39,6 +39,8 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import jp.kz2601.metamon.dsl.AppDSL
 import jp.kz2601.metamon.dsl.AppDocument
+import jp.kz2601.metamon.dsl.isVoiceOnly
+import jp.kz2601.metamon.account.AccountLinkPromptHost
 import jp.kz2601.metamon.consent.AiConsentDialog
 import jp.kz2601.metamon.purchase.PaywallHost
 import jp.kz2601.metamon.discover.DiscoverHost
@@ -60,8 +62,13 @@ import jp.kz2601.metamon.auth.RootScreen
 import jp.kz2601.metamon.auth.SignInScreen
 import jp.kz2601.metamon.nearby.NearbyHostUi
 import jp.kz2601.metamon.permissions.ProvideRendererPermissions
+import jp.kz2601.metamon.release.ReleaseRequestSheet
+import jp.kz2601.metamon.services.release.ReleaseRequest
+import kotlinx.coroutines.flow.MutableStateFlow
 import jp.kz2601.metamon.renderer.DSLView
 import jp.kz2601.metamon.renderer.components.feed.LocalFeedHost
+import jp.kz2601.metamon.renderer.screen.FabCoordinator
+import jp.kz2601.metamon.renderer.screen.LocalFabCoordinator
 import jp.kz2601.metamon.renderer.theme.MetamonRenderTheme
 import jp.kz2601.metamon.renderer.theme.ReadableWidth
 import jp.kz2601.metamon.retention.RetentionPromptHost
@@ -82,6 +89,7 @@ import jp.kz2601.metamon.voice.VoiceUiState
 import jp.kz2601.metamon.voice.VoiceViewModel
 import jp.kz2601.metamon.voice.stage.BuildStageHost
 import jp.kz2601.metamon.voice.stage.BuildStageState
+import jp.kz2601.metamon.voice.stage.PostBuildWaiting
 import jp.kz2601.metamon.services.AppSummary
 import jp.kz2601.metamon.services.sharing.IssuedShares
 import jp.kz2601.metamon.services.sharing.MembersModel
@@ -204,6 +212,12 @@ fun MetamonApp(container: AppContainer) {
             speech = AndroidSpeechEngine.reader(context),
             // 「今日の残り」(`GET /v1/me/usage`・iOS と同じ口)。モックは出さない
             usage = if (container.knobs.mock) null else container.appConfig as? PlanUsageSource,
+            // 新規作成の無料枠と 402 の課金画面(#1261)。審査用の版は課金を持たない(iOS の APP_STORE_REVIEW と同じ)
+            creationGate = if (ReviewBuild.enabled) null else container.pro,
+            // ai の応答のヘッダーから「今日の残り」を入れる(#1203)。モックはヘッダーが無いので何も来ない
+            remainingFeed = container.remainingToday.value,
+            // 上限のカードの「Pro にする」(#1103)。Play もモックの購入も無い構成ではボタンを出さない
+            requestPaywall = container.pro.takeIf { it.isAvailable }?.let { pro -> pro::requestPaywall },
         )
     }
     val state by vm.state.collectAsStateWithLifecycle()
@@ -212,10 +226,19 @@ fun MetamonApp(container: AppContainer) {
     remember(container) { container.passby }
     // 保存期間の確認が待っているか(完成の後のお知らせの順番・#1271)
     val retentionWaiting = retentionPending(runtime)
+    // 課金画面を出している間は、後ろのお知らせ(位置語の印・保存期間・直し方の例)を待たせる(#1198)。
+    // 引き継ぎの案内(#1316)は出している間だけ印を立てる。公開の記録の確認は Android に画面がまだ無い
+    val proState by container.pro.state.collectAsStateWithLifecycle()
+    val accountLinkVisible by container.accountLinkPrompt.visible.collectAsStateWithLifecycle()
+    val noticeWaiting = PostBuildWaiting(paywall = proState.paywall != null, accountLink = accountLinkVisible)
     val runtimeState by runtime.state.collectAsStateWithLifecycle()
     val hotReloadStatus by runtime.hotReloadStatus.collectAsStateWithLifecycle()
 
-    LaunchedEffect(runtime) { runtime.bootstrap() }
+    LaunchedEffect(runtime) {
+        runtime.bootstrap()
+        // 前の起動で匿名のまま最初のアプリを作っていたら、引き継ぎの案内を 1 回だけ(#1316・iOS の bootstrap と同じ)
+        container.accountLinkPrompt.presentDeferredIfNeeded(isAnonymous = container.session.user.value?.isAnonymous == true)
+    }
     // AI の質問・返事・完成の要約・状態カード・トーストを出たのと同時に TalkBack に読ませる(H8)
     TalkBackAnnouncer(vm.state, runtime.state)
     // 初回起動・説明の版が上がった時に 1 回だけ同意の画面を出す(iOS の ConsentHost・#888)
@@ -241,7 +264,14 @@ fun MetamonApp(container: AppContainer) {
         }
     }
     // 生成の結果をランタイムに渡す(別の appId なら新しいアプリとして開いて保存し、記録を読む)
-    LaunchedEffect(state.document) { runtime.adoptGenerated(state.document) }
+    LaunchedEffect(state.document) {
+        val doc = state.document
+        // 話しかける前の画面から最初のアプリができた: 引き継ぎの案内を次の起動に予約する(#1316・H7 直後には出さない)
+        if (doc != runtime.document && runtime.document.dsl.isVoiceOnly && !doc.dsl.isVoiceOnly) {
+            container.accountLinkPrompt.offerIfNeeded(isAnonymous = container.session.user.value?.isAnonymous == true)
+        }
+        runtime.adoptGenerated(doc)
+    }
     // マイク FAB の音声入力が出ている間は transcribeField の録音を捨てる(#864)
     LaunchedEffect(state.voiceOpen) { (runtime.dictation as? TranscriberDictationHost)?.setVoiceInputActive(state.voiceOpen) }
     // ランタイムが開いたアプリ(起動時の開き直し・切り替え・ホットリロード)を音声の画面にも映す
@@ -277,6 +307,10 @@ fun MetamonApp(container: AppContainer) {
     }
 
     var switcherOpen by remember { mutableStateOf(false) }
+    // リリース申請(#1254): 申請のシートの対象と、変身一覧のバッジ
+    var releaseTarget by remember { mutableStateOf<AppSummary?>(null) }
+    val releaseFlow = remember(container) { container.releaseRequests?.byApp ?: MutableStateFlow(emptyMap<String, ReleaseRequest>()) }
+    val releases by releaseFlow.collectAsStateWithLifecycle()
     var settingsOpen by rememberSaveable { mutableStateOf(false) }
     val apps by runtime.apps.collectAsStateWithLifecycle()
     val scope = rememberCoroutineScope()
@@ -308,6 +342,7 @@ fun MetamonApp(container: AppContainer) {
     val openSwitcher = {
         switcherOpen = true
         scope.launch { runtime.appsList() }
+        scope.launch { container.releaseRequests?.refresh() } // カードのバッジ(#1254)
         Unit
     }
 
@@ -344,16 +379,21 @@ fun MetamonApp(container: AppContainer) {
                 onOpenVoice = vm::openVoice,
                 editHints = container.tutorial.editHints,
                 retentionPending = retentionWaiting,
+                waiting = noticeWaiting,
             ) {
                 if (state.isInitial) {
                     VoiceRoute(vm, onMicLongPress = openSwitcher)
                 } else {
-                    // 横向き・タブレット・折りたたみでは幅を絞って中央に寄せる(iOS の readableWidth・#842)。
-                    ReadableWidth {
-                        GeneratedApp(state, runtimeState.dsl, runtime, appId = runtimeState.document.appId)
+                    // 描画器と FAB のやり取り: 最下段の部品を FAB が避け、list の末尾は FAB ぶん余白を足す(#1204)
+                    val fabCoordinator = remember { FabCoordinator() }
+                    CompositionLocalProvider(LocalFabCoordinator provides fabCoordinator) {
+                        // 横向き・タブレット・折りたたみでは幅を絞って中央に寄せる(iOS の readableWidth・#842)。
+                        ReadableWidth {
+                            GeneratedApp(state, runtimeState.dsl, runtime, appId = runtimeState.document.appId)
+                        }
+                        // マイク FAB(#892): タップ = このアプリを変える・長押し = 変身一覧・ドラッグで動かす / 端に隠す
+                        VoiceFab(busy = state.isGenerating, onTap = vm::openVoice, onLongPress = openSwitcher)
                     }
-                    // マイク FAB(#892): タップ = このアプリを変える・長押し = 変身一覧・ドラッグで動かす / 端に隠す
-                    VoiceFab(busy = state.isGenerating, onTap = vm::openVoice, onLongPress = openSwitcher)
                 }
             }
             // 要約と元に戻す・状態カード・トースト・削除の取り消し・確認ダイアログ(#895)
@@ -425,11 +465,19 @@ fun MetamonApp(container: AppContainer) {
         TutorialScreen(onFinish = container.tutorialPrompt::finish)
     }
 
+    // 引き継ぎの案内(#1316)。他のシートと完成の後のお知らせ(要約・保存期間の確認)が閉じてから
+    AccountLinkPromptHost(
+        container.accountLinkPrompt,
+        container.session,
+        blocked = state.isGenerating || state.voiceOpen || consentVisible || tutorialVisible || settingsOpen || switcherOpen ||
+            discoverOpen || shareTarget != null || membersTarget != null ||
+            !BuildStageState.isAccountLinkTurn(state, retentionWaiting, noticeWaiting),
+    )
     // 記録の保存期間の確認(#482)。完成の後のお知らせの順番(要約の後・#1271)で、生成中・音声のシートの間は待つ
     RetentionPromptHost(
         runtime,
         busy = state.isGenerating || state.voiceOpen,
-        turn = BuildStageState.isRetentionTurn(state, retentionWaiting),
+        turn = BuildStageState.isRetentionTurn(state, retentionWaiting, noticeWaiting),
         onStop = vm::generateNow,
     )
     // フィードバックの画面(#319)と端末を振って開く仕組み。設定から開いた時に上に重ねる
@@ -457,7 +505,16 @@ fun MetamonApp(container: AppContainer) {
             } else {
                 null
             },
+            onRelease = container.releaseRequests?.let { { app ->
+                switcherOpen = false
+                releaseTarget = app
+            } },
+            releases = releases,
         )
+    }
+    // リリース申請(#1254)。入口は変身一覧の「…」
+    releaseTarget?.let { app ->
+        container.releaseRequests?.let { model -> ReleaseRequestSheet(app, model, onDismiss = { releaseTarget = null }) }
     }
 
     // アプリの共有シート(#901)。入口は変身一覧の各行と設定

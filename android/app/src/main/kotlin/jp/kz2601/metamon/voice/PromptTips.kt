@@ -2,6 +2,8 @@ package jp.kz2601.metamon.voice
 
 import androidx.annotation.StringRes
 import jp.kz2601.metamon.R
+import jp.kz2601.metamon.ReviewBuild
+import jp.kz2601.metamon.dsl.ComponentType
 
 /**
  * 「頼み方のコツ」(iOS の `PromptTips`・#415)。タブ・画面の行き来・一覧などを正確に頼める言い方をカテゴリ別に並べる。
@@ -21,9 +23,21 @@ object PromptTips {
 
     data class Category(val id: String, @StringRes val title: Int, val tips: List<Tip>)
 
-    /** 版で使える機能。審査用の版(#1275)は共有の例を出さない(iOS の `Availability.review` の sharing: false) */
-    fun available(review: Boolean): Set<Feature> =
-        if (review) Feature.entries.toSet() - Feature.SHARING else Feature.entries.toSet()
+    /**
+     * 版で使える機能。審査用の版(#1275)は iOS の `Availability.review` と同じく、共有・撮影(cameraCapture)と、
+     * 申告から外した部品(nearbyShare・healthStat・locationTracker)の例を出さない。
+     */
+    fun available(review: Boolean): Set<Feature> {
+        if (!review) return Feature.entries.toSet()
+        val has = { type: ComponentType -> type.wire !in ReviewBuild.EXCLUDED_COMPONENTS }
+        val disabled = ReviewBuild.DISABLED_FEATURES
+        return buildSet {
+            if ("cameraCapture" !in disabled) add(Feature.CAMERA_CAPTURE)
+            if (has(ComponentType.NEARBY_SHARE)) add(Feature.NEARBY)
+            if (has(ComponentType.HEALTH_STAT) && "fieldHealth" !in disabled) add(Feature.HEALTH)
+            if (has(ComponentType.LOCATION_TRACKER)) add(Feature.LOCATION_TRACKING)
+        }
+    }
 
     /** 版で使えない例を除いたカテゴリ。例が 0 になったカテゴリは出さない */
     fun categories(available: Set<Feature> = Feature.entries.toSet()): List<Category> = all.mapNotNull { c ->

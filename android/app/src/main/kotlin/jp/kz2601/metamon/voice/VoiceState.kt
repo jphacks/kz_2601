@@ -9,6 +9,8 @@ import jp.kz2601.metamon.services.RemainingToday
 import jp.kz2601.metamon.services.StreamedComponent
 import jp.kz2601.metamon.services.TranscriberFailure
 import jp.kz2601.metamon.services.http.FailureKind
+import jp.kz2601.metamon.services.http.PaidFeature
+import jp.kz2601.metamon.services.purchase.PaidFeatureCheck
 
 /**
  * 「話す → 文字 → 生成 → 変身」の段階(#359)。
@@ -99,6 +101,8 @@ data class VoiceUiState(
     val myUsage: MyUsage? = null,
     /** 入力欄に入れる文(設定の「頼み方のコツ」で選んだ例・#1161)。入れたら [VoiceViewModel.consumeDraft] で消す */
     val draft: String? = null,
+    /** 無料枠切れ・402 で作らずに止めた新規作成(#1261)。会話の下にカードを出す */
+    val heldBuild: HeldBuild? = null,
 ) {
     /** 初期状態(音声画面だけ)= 新規作成 */
     val isInitial: Boolean get() = document.dsl.isVoiceOnly
@@ -114,4 +118,21 @@ data class VoiceUiState(
     val isGenerating: Boolean get() = (phase == VoicePhase.SENDING && !chatPending) || phase == VoicePhase.GENERATING
 
     val isBusy: Boolean get() = phase == VoicePhase.TRANSCRIBING || phase == VoicePhase.SENDING || phase == VoicePhase.GENERATING
+}
+
+/**
+ * 作らずに止めた新規作成(#1261・iOS の `HeldBuild` / `PaidConfirmation`)。会話は消さずに残し、同じ依頼で続きから作る。
+ * [text] は作るはずだった依頼文(ready の transcript / 案の instruction)。
+ */
+sealed interface HeldBuild {
+    val text: String
+
+    /** 今日の無料作成を使い切った(課金画面を閉じた)。「続きから作る」 */
+    data class LimitReached(override val text: String, val dailyFreeLimit: Int) : HeldBuild
+
+    /** サーバーが 402 `pro_required` で止めた(課金画面を閉じた)。「Pro にする」/「この機能なしで作る」 */
+    data class ProRequired(override val text: String, val features: List<PaidFeature>) : HeldBuild {
+        /** 有料の機能を外して作る依頼文 */
+        val freeText: String get() = text + "\n" + PaidFeatureCheck.FALLBACK_FREE_SUFFIX
+    }
 }
