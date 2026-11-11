@@ -17,6 +17,7 @@
     <string name="lists_delete">削除</string>
     <string name="lists_edit">編集</string>
     <string name="lists_empty">まだありません</string>
+    <string name="lists_empty_add">最初の 1 件を追加しましょう</string>
     <string name="lists_everyone">全員</string>
     <string name="lists_gauge">ゲージ</string>
     <string name="lists_gauge_range">%1$s(範囲 %2$s〜%3$s)</string>
