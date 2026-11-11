@@ -87,21 +87,31 @@ func TestTemplateEligibility(t *testing.T) {
 }
 
 // The regexp runs in linear time: a prompt of many placeholders against a
-// long instruction that almost matches ends quickly.
+// long instruction that almost matches ends quickly. Wall-clock limits flake
+// on slow runners (-race), so compare input sizes n and 4n instead: linear
+// time grows about 4x, quadratic 16x.
 func TestTemplateMatchLinear(t *testing.T) {
 	tmpl := strings.Repeat("{{a}}あ", maxScopePlaceholders) + "終わり" + strings.Repeat("。", 20)
 	tm, err := compileTemplate(tmpl)
 	if err != nil {
 		t.Fatal(err)
 	}
-	s := strings.Repeat("あ", dsl.MaxAIInstructionRunes-1) + "x"
-	start := time.Now()
-	for range 50 {
-		tm.match(s, false)
-		tm.match(s, true)
+	cost := func(runes int) time.Duration {
+		s := strings.Repeat("あ", runes-1) + "x"
+		best := time.Duration(1<<63 - 1)
+		for range 5 {
+			start := time.Now()
+			if tm.match(s, false) || tm.match(s, true) {
+				t.Fatalf("%d runes: matched", runes)
+			}
+			best = min(best, time.Since(start))
+		}
+		return best
 	}
-	if d := time.Since(start); d > 2*time.Second {
-		t.Errorf("100 matches took %s", d)
+	n := dsl.MaxAIInstructionRunes
+	small, large := cost(n), cost(4*n)
+	if large > 8*small {
+		t.Errorf("%d runes took %s, %d runes %s: not linear", n, small, 4*n, large)
 	}
 }
 
