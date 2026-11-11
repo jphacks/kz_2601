@@ -1859,6 +1859,23 @@
         }
       }
     },
+    "「完了」を押すと保存されます。保存した後も「元に戻す」で戻せます。" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "It's saved when you tap Done. You can still bring it back with Undo afterwards."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "「完了」を押すと保存されます。保存した後も「元に戻す」で戻せます。"
+          }
+        }
+      }
+    },
     "「曲を探す」から追加できます" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -1974,6 +1991,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "お互いに連絡先が見えなくなります。相手に通知は送られません。"
+          }
+        }
+      }
+    },
+    "ここには置けません" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Can't place it here"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ここには置けません"
           }
         }
       }
@@ -2331,6 +2365,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "この端末は距離・方向の測定に対応していません"
+          }
+        }
+      }
+    },
+    "この部品を消しますか?" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Remove this part?"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "この部品を消しますか?"
           }
         }
       }
@@ -3916,6 +3967,23 @@
         }
       }
     },
+    "上へ動かす" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Move up"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "上へ動かす"
+          }
+        }
+      }
+    },
     "上限 %@・イヤホンのボタンでも開始・停止できます" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -3968,6 +4036,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "上限(1 回 %lld 件・合計 %lld 件)を超える %lld 行は入れません"
+          }
+        }
+      }
+    },
+    "下へ動かす" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Move down"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "下へ動かす"
           }
         }
       }
@@ -5859,6 +5944,23 @@
         }
       }
     },
+    "右へ動かす" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Move right"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "右へ動かす"
+          }
+        }
+      }
+    },
     "同じ曲がもう入っています" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -6025,6 +6127,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "実機のみ"
+          }
+        }
+      }
+    },
+    "左へ動かす" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Move left"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "左へ動かす"
           }
         }
       }
@@ -6977,6 +7096,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "消しゴム"
+          }
+        }
+      }
+    },
+    "消す" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Remove"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "消す"
           }
         }
       }
@@ -8883,6 +9019,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "選択してください"
+          }
+        }
+      }
+    },
+    "部品 %@" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Part %@"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "部品 %@"
           }
         }
       }

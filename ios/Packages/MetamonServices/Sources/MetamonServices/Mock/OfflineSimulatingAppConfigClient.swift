@@ -33,6 +33,9 @@ public final class OfflineSimulatingAppConfigClient: AppConfigClient, @unchecked
     }
     public func listVersions(appId: String) async throws -> [VersionSummary] { try await inner.listVersions(appId: appId) }
     public func restore(appId: String, toVersion version: Int) async throws -> AppDocument { try await inner.restore(appId: appId, toVersion: version) }
+    public func patchDSL(appId: String, baseVersion: Int, patch: [JSONPatchOp], summary: String) async throws -> AppDocument {
+        try await inner.patchDSL(appId: appId, baseVersion: baseVersion, patch: patch, summary: summary)
+    }
 
     public func list(appId: String, entity: String) async throws -> [Record] {
         try gate("list \(entity)")

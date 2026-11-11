@@ -222,6 +222,7 @@ struct VoiceInputView: View {
                 }
             } else {
                 UndoHeaderButtons() // #209 修正チャットの上部に「元に戻す」
+                GridEditEntryButton() // #1442 話さずに手で動かす
             }
             Spacer()
             if inChat {

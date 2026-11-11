@@ -24,6 +24,13 @@ public struct GridScreenLayout: View {
     @Environment(\.fabFrame) private var fabFrame
     /// 横向き(#625)は `GridMetrics` で幅を絞って中央に寄せ、行の高さを固定して縦スクロール
     @Environment(\.verticalSizeClass) private var verticalSizeClass
+    /// 手で動かす編集モード(#1442)。この画面を編集している時だけ使う
+    @Environment(\.gridEditSession) private var editSession
+
+    private var editing: GridEditSession? {
+        guard let s = editSession, s.screenId == screen.id, screen.isGridEditable else { return nil }
+        return s
+    }
 
     public init(screen: Screen, ctx: RenderContext) {
         self.screen = screen
@@ -42,9 +49,12 @@ public struct GridScreenLayout: View {
             #endif
             let cellW = metrics.cellW
             let cellH = metrics.cellH
-            let placement = screen.gridPlacement
+            let editing = editing
+            // 編集中は動かした後の配置で描き、下に動かせるよう最低 12 行・最後の部品の 2 行下まで広げる
+            let placement = (editing.map { $0.draft.applied(to: screen) } ?? screen).gridPlacement
             let lastRow = placement.placed.map(\.area.row2).max() ?? 0
-            let gridHeight = CGFloat(lastRow) * cellH
+            let gridRows = editing == nil ? lastRow : min(GridArea.maxRows, max(GridArea.visibleRows, lastRow + 2))
+            let gridHeight = CGFloat(gridRows) * cellH
 
             let content = VStack(alignment: .leading, spacing: gap) {
                 if screen.entity != nil, !placement.placed.isEmpty {
@@ -54,18 +64,24 @@ public struct GridScreenLayout: View {
                 } else if !placement.placed.isEmpty {
                     ZStack(alignment: .topLeading) {
                         Color.clear.frame(width: metrics.frameWidth - inset * 2, height: gridHeight)
+                        if editing != nil { GridEditLines(cellW: cellW, cellH: cellH, rows: gridRows) }
                         ForEach(Array(placement.placed.enumerated()), id: \.element.component.id) { index, item in
                             let (c, a) = item
                             GridCell(component: c, ctx: ctx)
                                 .frame(width: CGFloat(a.colSpan) * cellW - gap, height: CGFloat(a.rowSpan) * cellH - gap)
                                 .staggeredAppear(index: index, highlightKey: ChangeHighlight.key(screen: screen.id, component: c.id))
                                 .offset(x: CGFloat(a.col1) * cellW + gap / 2, y: CGFloat(a.row1 - 1) * cellH + gap / 2)
+                                .allowsHitTesting(editing == nil) // 編集中は部品を押させない(枠のドラッグだけ)
                         }
+                        if let editing { GridEditLayer(session: editing, cellW: cellW, cellH: cellH, gap: gap) }
                     }
                 }
                 ForEach(Array(placement.stacked.enumerated()), id: \.element.id) { index, c in
                     DSLView(component: c, ctx: ctx)
                         .staggeredAppear(index: placement.placed.count + index, highlightKey: ChangeHighlight.key(screen: screen.id, component: c.id))
+                        // area 無しで積んだ部品は v1 では動かせない。編集中は薄くして押させない
+                        .opacity(editing == nil ? 1 : 0.4)
+                        .allowsHitTesting(editing == nil)
                 }
             }
             .padding(inset)
@@ -90,6 +106,7 @@ public struct GridScreenLayout: View {
                                     ? 0 : FabClearance.contentMargin(viewport: geo.frame(in: .global), fab: fabFrame))
                         }
                         .scrollDismissesKeyboard(.interactively)
+                        .scrollDisabled(editing?.isDragging == true) // 枠を動かしている間は画面ごと流れない
                         .scrollBounceBehavior(.basedOnSize)
                         .modifier(RequiredFieldScroller(screen: screen, form: ctx.form, proxy: proxy))
                         // キーボードが上がり切ってから、フォーカスした入力欄を可視領域(保存バーとキーボードの上)の中央へ
