@@ -358,6 +358,7 @@ private fun NodeContent(c: Component, s: ScreenScope) {
         ComponentType.LABEL -> Text(c.label ?: c.text.orEmpty(), style = MaterialTheme.typography.labelLarge)
         ComponentType.BADGE -> BadgeLeaf(c)
         ComponentType.IMAGE -> ImageLeaf(c, c.field?.let { s.form?.values?.get(it)?.stringValue })
+        ComponentType.ICON -> IconLeaf(c)
         ComponentType.AVATAR -> AvatarLeaf(c, c.field?.let { s.form?.values?.get(it)?.stringValue })
         ComponentType.STAT -> StatLeaf(c, s.data)
         ComponentType.CHART -> ChartLeaf(c, s.data)

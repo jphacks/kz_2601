@@ -23,6 +23,9 @@ dependencies {
     implementation(project(":services"))
     implementation(compose.desktop.currentOs)
     implementation(compose.material3)
+    // icon の絵(#1742)。core だけ(extended は足さず、表で使う絵は Android の生成物を取り込む)。
+    // androidx の版は Compose の ui を古い版で混ぜるので、Compose Multiplatform が出している同じ物を使う
+    implementation("org.jetbrains.compose.material:material-icons-core:1.7.3")
     implementation(libs.zxing.core)
     // PDF の本文を読む・表を PDF に書く(#1753)。pdfbox + fontbox + pdfbox-io + commons-logging で約 3.8 MB
     implementation("org.apache.pdfbox:pdfbox:3.0.3")
@@ -57,6 +60,8 @@ val sharedRendererDir = rootDir.resolve("../android/renderer/src/main/kotlin/jp/
 val syncSharedRenderer by tasks.registering(Sync::class) {
     from(sharedRendererDir) {
         include("form/FormDraft.kt", "navigation/NavigationResolver.kt")
+        // icon の絵(android/scripts/gen-symbol-icons.py が icon-map.json から作った表・#1742)
+        include("theme/icons/SymbolIconTable.kt", "theme/icons/VendoredIcons.kt")
     }
     into(layout.buildDirectory.dir("generated/sharedRenderer"))
 }
@@ -81,6 +86,16 @@ val syncAndroidStrings by tasks.registering(Sync::class) {
     }
 }
 sourceSets.named("main") { resources.srcDir(syncAndroidStrings) }
+
+// icon の名前の表(SF Symbols → Material)は docs/dsl/icon-map.json をそのまま同梱して読む(#1742)。
+val syncIconMap by tasks.registering(Sync::class) {
+    from(dslDocsDir) {
+        include("icon-map.json")
+        into("icons")
+    }
+    into(layout.buildDirectory.dir("generated/iconMap"))
+}
+sourceSets.named("main") { resources.srcDir(syncIconMap) }
 
 // 手元の確かめ: TAILORIT_API=stg TAILORIT_DEV_TOKEN=<ID トークン> ./gradlew :desktop:listApps(stg のアプリの一覧を出す)
 tasks.register<JavaExec>("listApps") {

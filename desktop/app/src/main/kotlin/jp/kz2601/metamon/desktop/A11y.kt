@@ -11,7 +11,7 @@ import jp.kz2601.metamon.dsl.records.Aggregator
 
 /**
  * 読み上げ(Windows の Narrator・Linux の Orca)向けの説明(#1759)。
- * 絵で描く部品(stat・progressBar・gauge・chart・rating・image・avatar)は 1 つにまとめ、値を言葉にして読ませる。
+ * 絵で描く部品(stat・progressBar・gauge・chart・rating・image・avatar・label 付きの icon)は 1 つにまとめ、値を言葉にして読ませる。
  * 文字や Material のボタン・入力で描く部品は Compose の既定(文字・役割)のまま。
  */
 object A11y {
@@ -34,6 +34,8 @@ object A11y {
         }
         ComponentType.IMAGE -> c.label ?: Strings["desktop_a11y_image"]
         ComponentType.AVATAR -> c.label ?: c.title ?: Strings["inputs_avatar"]
+        // 飾り(読まない)。label があればそれを読む
+        ComponentType.ICON -> c.label?.takeIf { it.isNotBlank() }
         else -> null
     }
 
