@@ -8753,6 +8753,22 @@
         }
       }
     },
+    "再読み込み" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Reload"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "再読み込み"
+          }
+        }
+      }
+    },
     "切り替えられませんでした" : {
       "extractionState" : "manual",
       "localizations" : {
