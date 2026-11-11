@@ -114,11 +114,16 @@ class BuildStageState(private val editHints: EditHintStore? = null) {
     }
 
     /**
-     * いま出すお知らせ(要約 → 保存期間の確認 → 直し方の例。前のが閉じたら次)。
+     * いま出すお知らせ(課金画面 → 要約 → 公開の記録 → 保存期間の確認 → 直し方の例 → 引き継ぎ。前のが閉じたら次)。
      * @param retentionPending 今のアプリの保存期間の確認が待っている(#1271)
+     * @param waiting 課金画面・公開の記録・引き継ぎ(#1198)
      */
-    fun currentNotice(state: VoiceUiState, retentionPending: Boolean = false): PostBuildNotice? = PostBuildNotice.current(
-        PostBuildNotice.pending(summary = summaryPending(state), retention = retentionPending, editHint = editHint),
+    fun currentNotice(
+        state: VoiceUiState,
+        retentionPending: Boolean = false,
+        waiting: PostBuildWaiting = PostBuildWaiting.NONE,
+    ): PostBuildNotice? = PostBuildNotice.current(
+        PostBuildNotice.pending(summary = summaryPending(state), retention = retentionPending, editHint = editHint, waiting = waiting),
     )
 
     companion object {
@@ -126,20 +131,20 @@ class BuildStageState(private val editHints: EditHintStore? = null) {
         fun summaryPending(state: VoiceUiState): Boolean = state.summary != null || state.undone != null
 
         /**
-         * 保存期間の確認の番か(iOS の `isNoticeTurn(.retention)`)。前にあるのは要約だけ。
-         * 直し方の例は後ろなので見ない(確認が閉じるまで例の方が待つ)。
+         * 保存期間の確認の番か(iOS の `isNoticeTurn(.retention)`)。前にあるのは課金画面・要約・公開の記録。
+         * 直し方の例・引き継ぎは後ろなので見ない(確認が閉じるまで後ろの方が待つ)。
          */
-        fun isRetentionTurn(state: VoiceUiState, retentionPending: Boolean): Boolean =
-            PostBuildNotice.current(PostBuildNotice.pending(summary = summaryPending(state), retention = retentionPending)) ==
+        fun isRetentionTurn(state: VoiceUiState, retentionPending: Boolean, waiting: PostBuildWaiting = PostBuildWaiting.NONE): Boolean =
+            PostBuildNotice.current(PostBuildNotice.pending(summary = summaryPending(state), retention = retentionPending, waiting = waiting)) ==
                 PostBuildNotice.RETENTION
 
         /**
-         * 引き継ぎの案内の番か(iOS の `isNoticeTurn(.accountLink)`・#1316)。いちばん後ろなので、要約と保存期間の確認が閉じてから。
+         * 引き継ぎの案内の番か(iOS の `isNoticeTurn(.accountLink)`・#1316)。いちばん後ろなので、前のお知らせが全部閉じてから。
          * 直し方の例(画面の下のカード)は [BuildStageHost] の中だけで持つので見ない(最初のアプリの次の起動に出すので重ならない)。
          */
-        fun isAccountLinkTurn(state: VoiceUiState, retentionPending: Boolean): Boolean =
+        fun isAccountLinkTurn(state: VoiceUiState, retentionPending: Boolean, waiting: PostBuildWaiting = PostBuildWaiting.NONE): Boolean =
             PostBuildNotice.current(
-                PostBuildNotice.pending(summary = summaryPending(state), retention = retentionPending, accountLink = true),
+                PostBuildNotice.pending(summary = summaryPending(state), retention = retentionPending, waiting = waiting.copy(accountLink = true)),
             ) == PostBuildNotice.ACCOUNT_LINK
     }
 }

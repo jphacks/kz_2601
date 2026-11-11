@@ -1,7 +1,14 @@
 package jp.kz2601.metamon.services
 
 import jp.kz2601.metamon.services.http.ApiJson
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.update
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.json.contentOrNull
+import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
 import java.time.Instant
 import java.time.ZoneId
 
@@ -74,8 +81,50 @@ data class RemainingToday(
         return observedAt.atZone(JST).toLocalDate() != now.atZone(JST).toLocalDate()
     }
 
-    private companion object {
-        val JST: ZoneId = ZoneId.of("Asia/Tokyo")
+    companion object {
+        private val JST: ZoneId = ZoneId.of("Asia/Tokyo")
+
+        /**
+         * 応答の `X-RateLimit-Remaining` / `-Limit` / `-Reset`(docs/backend/rate-limit.md)から読む(iOS の `RemainingToday.parse`)。
+         * 残りが無い・壊れている(整数でない・負・上限より多い)時は null。ヘッダー名の大文字小文字は [header] が問わない。
+         * 429 は利用者の上限(`details.scope == "user"`)の時だけ使う(IP・全体の上限の数は本人の残りではない)。
+         */
+        fun parse(header: (String) -> String?, status: Int, body: String, now: Instant): RemainingToday? {
+            fun int(name: String): Int? = header(name)?.trim()?.toIntOrNull()?.takeIf { it >= 0 }
+            val remaining = int("X-RateLimit-Remaining") ?: return null
+            val limit = int("X-RateLimit-Limit")
+            if (limit != null && remaining > limit) return null
+            if (status == 429 && userScope(body) != true) return null
+            val resetAt = int("X-RateLimit-Reset")?.takeIf { it > 0 }?.let { Instant.ofEpochSecond(it.toLong()) }
+            return RemainingToday(remaining, limit, resetAt, now)
+        }
+
+        private fun userScope(body: String): Boolean? = runCatching {
+            val details = ApiJson.parseToJsonElement(body).jsonObject["error"]?.jsonObject?.get("details")?.jsonObject
+            details?.get("scope")?.jsonPrimitive?.contentOrNull == "user"
+        }.getOrNull()
+    }
+}
+
+/**
+ * 最後に分かった「今日の残り」(iOS の `RemainingTodayStore`)。ai の応答のヘッダー([RemainingToday.parse])と
+ * `GET /v1/me/usage` から入り、音声の画面と設定が読む。端末には残さない(起動し直したら次の依頼か usage で分かる)。
+ */
+class RemainingTodayStore {
+    private val _value = MutableStateFlow<RemainingToday?>(null)
+    val value: StateFlow<RemainingToday?> = _value.asStateFlow()
+
+    /** 古い応答(後から届いた前の依頼の分)では上書きしない。 */
+    fun record(value: RemainingToday) {
+        _value.update { last -> if (last != null && last.observedAt.isAfter(value.observedAt)) last else value }
+    }
+
+    /** 今使える値(古ければ null)。 */
+    fun current(now: Instant): RemainingToday? = _value.value?.takeUnless { it.isStale(now) }
+
+    /** サインアウト・アカウント削除で消す(別のアカウントの残りを出さない)。 */
+    fun clear() {
+        _value.value = null
     }
 }
 

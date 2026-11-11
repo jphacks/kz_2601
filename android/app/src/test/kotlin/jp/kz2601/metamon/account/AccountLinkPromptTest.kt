@@ -2,6 +2,7 @@ package jp.kz2601.metamon.account
 
 import jp.kz2601.metamon.services.consent.InMemoryKeyValueStore
 import jp.kz2601.metamon.voice.stage.PostBuildNotice
+import jp.kz2601.metamon.voice.stage.PostBuildWaiting
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
@@ -69,11 +70,11 @@ class AccountLinkPromptTest {
 
     @Test
     fun comesAfterTheOtherNotices() {
-        assertEquals(PostBuildNotice.SUMMARY, PostBuildNotice.current(PostBuildNotice.pending(summary = true, accountLink = true)))
+        assertEquals(PostBuildNotice.SUMMARY, PostBuildNotice.current(PostBuildNotice.pending(summary = true, waiting = PostBuildWaiting(accountLink = true))))
         assertEquals(
             PostBuildNotice.RETENTION,
-            PostBuildNotice.current(PostBuildNotice.pending(summary = false, retention = true, accountLink = true)),
+            PostBuildNotice.current(PostBuildNotice.pending(summary = false, retention = true, waiting = PostBuildWaiting(accountLink = true))),
         )
-        assertEquals(PostBuildNotice.ACCOUNT_LINK, PostBuildNotice.current(PostBuildNotice.pending(summary = false, accountLink = true)))
+        assertEquals(PostBuildNotice.ACCOUNT_LINK, PostBuildNotice.current(PostBuildNotice.pending(summary = false, waiting = PostBuildWaiting(accountLink = true))))
     }
 }

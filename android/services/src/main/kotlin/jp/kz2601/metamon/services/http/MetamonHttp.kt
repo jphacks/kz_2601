@@ -1,5 +1,6 @@
 package jp.kz2601.metamon.services.http
 
+import jp.kz2601.metamon.services.RemainingToday
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.serialization.json.Json
@@ -91,6 +92,8 @@ class MetamonHttp(
     private val device: DeviceContext = DeviceContext(),
     private val sleep: suspend (Long) -> Unit = { delay(it) },
     private val clock: () -> Instant = Instant::now,
+    /** 応答の `X-RateLimit-*` から読んだ「今日の残り」の行き先(iOS の `HTTP.noteRemaining`・#1203)。ai だけに付ける */
+    private val remainingSink: ((RemainingToday) -> Unit)? = null,
 ) {
     val baseUrl: HttpUrl = baseUrl.toHttpUrl()
 
@@ -135,7 +138,14 @@ class MetamonHttp(
                 r = perform(req, bearer, check)
             }
         }
+        noteRemaining(r.status, r.body, r.headers)
         return r
+    }
+
+    /** ヘッダーの無い応答(appconfig など)では何もしない */
+    private fun noteRemaining(status: Int, body: String, headers: Headers) {
+        val sink = remainingSink ?: return
+        RemainingToday.parse({ headers[it] }, status, body, clock())?.let(sink)
     }
 
     /**
@@ -146,7 +156,8 @@ class MetamonHttp(
     suspend fun openStream(req: HttpRequest, forceRefresh: Boolean = false): Response {
         val bearer = tokens.idToken(forceRefresh)
         val check = appCheck?.token(forceRefresh)
-        return clientFor(req).newCall(build(req, bearer, check)).await()
+        // 本文はまだ無いので、ヘッダーだけで読む(429 は本文の scope が要るので数えない)
+        return clientFor(req).newCall(build(req, bearer, check)).await().also { noteRemaining(it.code, "", it.headers) }
     }
 
     fun check(r: HttpResponse): String {

@@ -12,6 +12,8 @@
     <string name="paywall_fine_print">This is a monthly auto-renewing subscription. Payment is charged to your Google Account when you confirm the purchase. It renews automatically at the end of each period unless you cancel. You can cancel anytime in Google Play under Payments &amp; subscriptions.</string>
     <string name="paywall_headline_ai_chat">“Talk with AI” needs Tailor It Pro</string>
     <string name="paywall_headline_ai_text">“Write with online AI” needs Tailor It Pro</string>
+    <string name="paywall_headline_limit_reached">You\'ve used today\'s free new apps (%1$d)</string>
+    <string name="paywall_headline_paid_feature">“%1$s” requires Tailor It Pro</string>
     <string name="paywall_headline_settings">Sharing, online features and new apps, as many as you like</string>
     <string name="paywall_manage">Manage subscription</string>
     <string name="paywall_message_failed">The purchase didn\'t go through. Please try again later.</string>
@@ -30,7 +32,9 @@
     <string name="paywall_purchase_price">Get Pro (%1$s / month)</string>
     <string name="paywall_reason_ai_chat">Talking with AI needs Tailor It Pro. Replies come from the online AI.</string>
     <string name="paywall_reason_ai_text">This device can\'t run AI on-device, so the online AI is used.</string>
+    <string name="paywall_reason_shared_data">Data that everyone writes is stored in the cloud and synced to every device, which costs server resources.</string>
     <string name="paywall_restore">Restore purchase</string>
+    <string name="paywall_shared_data">Shared data</string>
     <string name="settings_pro_free">Free</string>
     <string name="settings_pro_plan">Plan</string>
     <string name="settings_pro_upgrade">Get Pro</string>
