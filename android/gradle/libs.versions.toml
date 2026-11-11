@@ -28,6 +28,8 @@ junit = "4.13.2"
 zxing = "3.5.3"
 # qrScanner の読み取り(Google Code Scanner・CAMERA の権限が要らない・#866)
 playServicesCodeScanner = "16.1.0"
+# 場所に着いたら知らせる(near)の見張り(Geofencing・端末の中で判定)
+playServicesLocation = "21.4.0"
 # fileImport の PDF: スキャンのページの文字認識(端末内・認識の部品は Play 開発者サービスが落とす・#1181)
 playServicesMlkitTextRecognitionJapanese = "16.0.2"
 # fileImport の PDF: 文字の層の取り出しとページの描画(Apache-2.0・#1181)。暗号化の BouncyCastle は外す
@@ -78,6 +80,7 @@ camerax-view = { module = "androidx.camera:camera-view", version.ref = "camerax"
 junit = { module = "junit:junit", version.ref = "junit" }
 play-app-update-ktx = { module = "com.google.android.play:app-update-ktx", version.ref = "playAppUpdate" }
 play-services-code-scanner = { module = "com.google.android.gms:play-services-code-scanner", version.ref = "playServicesCodeScanner" }
+play-services-location = { module = "com.google.android.gms:play-services-location", version.ref = "playServicesLocation" }
 play-services-mlkit-text-recognition-japanese = { module = "com.google.android.gms:play-services-mlkit-text-recognition-japanese", version.ref = "playServicesMlkitTextRecognitionJapanese" }
 pdfbox-android = { module = "com.tom-roush:pdfbox-android", version.ref = "pdfboxAndroid" }
 zxing-core = { module = "com.google.zxing:core", version.ref = "zxing" }
