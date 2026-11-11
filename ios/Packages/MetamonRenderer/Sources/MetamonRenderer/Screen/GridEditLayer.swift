@@ -81,6 +81,9 @@ struct GridEditLayer: View {
         var moving: Bool
     }
     @State private var drag: Drag?
+    /// 指が枠・つまみに触れている間 true。ドラッグが途中で打ち切られた時(着信・通知センター等)は
+    /// `onEnded` が呼ばれないので、これが戻ったのを見て片付ける(スクロールが止まったままにならない)
+    @GestureState private var touching = false
 
     private var conflicts: Set<String> {
         guard let drag else { return [] }
@@ -129,6 +132,15 @@ struct GridEditLayer: View {
             Text(L("「完了」を押すと保存されます。保存した後も「元に戻す」で戻せます。"))
         }
         .sensoryFeedback(.warning, trigger: blocked.isEmpty) { wasEmpty, isEmpty in wasEmpty && !isEmpty }
+        .onChange(of: touching) { _, now in
+            guard !now else { return }
+            // 普通に離した時は onEnded が先に置いている。次の周回で、残っていれば(打ち切られた)元へ戻す
+            Task { @MainActor in
+                guard !touching else { return }
+                if drag != nil { withAnimation(.spring(duration: 0.3, bounce: 0.15)) { drag = nil } }
+                session.isDragging = false
+            }
+        }
     }
 
     private func rect(_ a: GridArea) -> CGRect {
@@ -212,6 +224,7 @@ struct GridEditLayer: View {
 
     private func dragGesture(_ item: GridEditDraft.Item, mode: Mode) -> some Gesture {
         DragGesture(minimumDistance: 2)
+            .updating($touching) { _, state, _ in state = true }
             .onChanged { v in
                 let t = v.translation
                 let candidate = mode == .move
