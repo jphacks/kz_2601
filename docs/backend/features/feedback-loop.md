@@ -11,8 +11,9 @@
 5. [環境変数](#環境変数)
 6. [アプリで見る](#アプリで見る)
 7. [運用の手順](#運用の手順)
-8. [ループを始める前に人がすること](#ループを始める前に人がすること)
-9. [まだ無いもの](#まだ無いもの)
+8. [定期の実行](#定期の実行)
+9. [ループを始める前に人がすること](#ループを始める前に人がすること)
+10. [まだ無いもの](#まだ無いもの)
 
 ## 流れ
 
@@ -34,7 +35,7 @@ flowchart LR
   M --> N[fixed<br/>お知らせ・リリースノートの下書き]
 ```
 
-自動なのは「取り込み → 振り分け → 下書き」と「直ったお知らせ」だけ。**Issue を作るのは人の `drafts approve` だけ**で、エージェントの PR を起動するのも、マージするのも人。定期の実行(Cloud Scheduler・workflow)はまだ足していない([まだ無いもの](#まだ無いもの))。
+自動なのは「取り込み → 振り分け → 下書き」と「直ったお知らせ」だけ。**Issue を作るのは人の `drafts approve` だけ**で、エージェントの PR を起動するのも、マージするのも人。定期の実行は Cloud Run Job と Cloud Scheduler(`infra/feedback_loop.tf`)で、既定は止まっている([定期の実行](#定期の実行))。
 
 ## 守っていること
 
@@ -143,7 +144,7 @@ flowchart LR
 
 ## 運用の手順
 
-週 1 回、人が回す(定期の実行は後で):
+定期の実行を有効にするまでは週 1 回、人が回す(有効にした後も `drafts` の承認・`switch`・`audit` は人が回す):
 
 ```sh
 cd backend
@@ -171,7 +172,34 @@ go run ./cmd/feedback-loop audit -summary
 
 止める時: `go run ./cmd/feedback-loop switch set -by <名前> all off`(次の段の開始・振り分けの次の呼び出しから止まる)。それでも止まらない時は、Cloud Run の job の `LOOP_PAUSED=1`。
 
-後で定期にする時のコマンド(Cloud Run の job の引数にする。workflow には足さない): `ingest` → `triage` → `draft` を 1 日 1 回、`fixed` と `purge` を 1 日 1 回。`drafts approve` は定期にしない(人の承認)。
+定期にする時は [定期の実行](#定期の実行)。`drafts approve` は定期にしない(人の承認)。
+
+## 定期の実行
+
+`infra/feedback_loop.tf`(#368)。**既定は `feedback_loop_enabled = false` で、apply しても何も作らない。**
+
+| もの | 中身 |
+|---|---|
+| Cloud Run Job | `feedback-loop-ingest` / `-triage` / `-draft` / `-fixed` / `-purge`。1 コマンド = 1 ジョブ(イメージは distroless でシェルが無く、1 回の実行で 1 コマンドだけのため)。各ジョブはその段の `LOOP_<段>=on` だけを持つ(`purge` は止めない段なので無し) |
+| Cloud Scheduler | `feedback-loop-<コマンド>-daily`。既定は毎日 5:00 `ingest` → 5:20 `triage` → 6:00 `draft` → 6:30 `fixed` → 6:50 `purge`(JST・前の段の timeout より後にずらす。`feedback_loop_schedules` で変える)。失敗しても再試行しない(次の日に続きから拾う)。`triage` はジョブの再試行も無し(費用) |
+| SA | `feedback-loop-job`: Firestore(`roles/datastore.user`)と、下の Secret だけを 1 つずつ読める。Firebase Auth・アプリの `ANTHROPIC_API_KEY` は読めない。`feedback-loop-scheduler`: この 5 本のジョブだけの `roles/run.invoker` |
+| Secret | 名前だけを参照し、値はコードにも state にも入らない(Secret の ID = 環境変数の名前・`latest`)。既定は `triage` に `LOOP_ANTHROPIC_API_KEY`、`fixed` に `LOOP_GITHUB_TOKEN`。`LOOP_` で始まるものは入れ物を Terraform が作り、`run-backend` は読めない。ストアのレビュー(`LOOP_ASC_*`)・push(`APNS_*`)は `feedback_loop_secret_env` に足した時だけ |
+| 秘密でない設定 | `feedback_loop_env`(`LOOP_CONSENT_VERSIONS`・`LOOP_SOURCE_APPSTORE` など・全部のジョブに入る)。鍵の名前を入れると validate で止まる |
+
+有効にする手順(人・prod):
+
+1. 「[ループを始める前に人がすること](#ループを始める前に人がすること)」を済ませる(同意文の版・専用のキー・トークン)。
+2. `envs/prod.tfvars` に `feedback_loop_enabled = true` を入れ、`infra/bootstrap.sh prod plan` で差分を見てから apply(SA・IAM・Secret の入れ物ができる)。
+3. Secret に値を入れる(値の入っていない Secret を指すとジョブの起動が失敗する):
+   ```sh
+   gcloud secrets versions add LOOP_ANTHROPIC_API_KEY --project=jphacks-kz2601 --data-file=-
+   gcloud secrets versions add LOOP_GITHUB_TOKEN --project=jphacks-kz2601 --data-file=-
+   ```
+4. `/app/feedback-loop` を含むイメージ(backend の Dockerfile で同梱)の digest を `feedback_loop_job_image` に入れて、もう一度 plan → apply(ジョブ 5 本と Scheduler 5 本)。
+5. 最初は手で 1 回ずつ回して結果を見る: `gcloud run jobs execute feedback-loop-ingest --region=asia-northeast1 --wait`(`triage` / `draft` も同じ)。`go run ./cmd/feedback-loop audit -summary` で記録を確かめる。
+6. イメージの更新は Terraform が追わない(`ignore_changes`)。backend の更新ごとに `gcloud run jobs update feedback-loop-<コマンド> --image=...` で差し替える(消去ジョブと同じ)。
+
+止める: 段ごとは今までどおり `switch set -by <名前> <段|all> off`(次の実行から止まる)。Scheduler ごと止めるなら `feedback_loop_paused = true` で apply。ジョブも消すなら `feedback_loop_job_image = ""` だが、`deletion_protection` があるので先に外す。
 
 ## ループを始める前に人がすること
 
@@ -188,7 +216,7 @@ go run ./cmd/feedback-loop audit -summary
 
 | もの | 状態 |
 |---|---|
-| 定期の実行(Cloud Scheduler・workflow) | 足していない。上のコマンドを job にする |
+| 定期の実行を動かすこと | Terraform(`infra/feedback_loop.tf`)はあるが既定は止まっている。apply・Secret の値・有効化は人([定期の実行](#定期の実行)) |
 | Crashlytics を自動で読む | Crashlytics は安く読める API が無い。BigQuery のエクスポート(#296)ができたら `ingest.CrashSource` を実装する。それまでは `ingest-crash` で人が記録 |
 | 生成の失敗の急増を自動で読む | 今はログを人が `gcloud logging read` で書き出して `LOOP_GENFAIL_LOGS` に渡す。Logging API か BigQuery から読む時は `ingest.GenLogSource` を実装する |
 | Google の機密データの検出(#367 の選択肢 2-B) | GCP の設定が要るので後で |
