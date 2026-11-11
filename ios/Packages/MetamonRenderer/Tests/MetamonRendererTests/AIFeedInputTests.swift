@@ -84,12 +84,17 @@ final class AIFeedInputTests: XCTestCase {
         var delays: [String: Double] = [:]
         var failing: Set<String> = []
         var calls: [String] = []
+        /// 同時に待っている数と、その最大(順に待つと 1)。
+        private(set) var inFlight = 0, maxInFlight = 0
         let source: FeedSource
 
         init(source: FeedSource) { self.source = source }
 
         func feed(_ query: FeedQuery, force: Bool) async throws -> FeedResult {
             calls.append(query.provider)
+            inFlight += 1
+            maxInFlight = max(maxInFlight, inFlight)
+            defer { inFlight -= 1 }
             try await Task.sleep(nanoseconds: UInt64((delays[query.provider] ?? 0) * 1_000_000_000))
             if failing.contains(query.provider) { throw URLError(.notConnectedToInternet) }
             return FeedResult(provider: query.provider, title: "取得 \(query.provider)", items: [FeedItem(title: "新しい行")], source: source)
@@ -115,9 +120,9 @@ final class AIFeedInputTests: XCTestCase {
         let host = FakeHost(source: source)
         host.delays = ["weather": 0.4, "pressure": 0.4, "holidays": 0.4]
         host.failing = ["pressure"]
-        let started = Date()
         let loaded = await AIFeedInput.load(AIFeedInput.feeds(for: button, in: s), host: host, seconds: 5)
-        XCTAssertLessThan(Date().timeIntervalSince(started), 1.0, "3 つ × 0.4 秒を順に待たない")
+        // 時間ではなく同時に待った数で見る(CI の遅い・混んだシミュレータでは並行でも 1 秒を超える)
+        XCTAssertEqual(host.maxInFlight, 3, "3 つ × 0.4 秒を順に待たない")
         XCTAssertEqual(loaded.map(\.title), ["天気", "pressure", ""])
         XCTAssertEqual(loaded.map { $0.result?.title }, ["取得 weather", nil, "取得 holidays"])
     }
