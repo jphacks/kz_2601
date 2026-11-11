@@ -12,10 +12,12 @@ import jp.kz2601.metamon.services.ChatOption
 import jp.kz2601.metamon.services.ChatTurn
 import jp.kz2601.metamon.services.GenerateProgress
 import jp.kz2601.metamon.services.PlanUsageSource
+import jp.kz2601.metamon.services.RemainingToday
 import jp.kz2601.metamon.services.SpeechTranscriber
 import jp.kz2601.metamon.services.TranscriberFailure
 import jp.kz2601.metamon.services.TranscriberStatus
 import jp.kz2601.metamon.services.http.FailureKind
+import jp.kz2601.metamon.services.http.RateLimitInfo
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -72,6 +74,8 @@ class VoiceViewModel(
     /** 「今日の残り」を読む口(`GET /v1/me/usage`)。null = 出さない(モック) */
     private val usage: PlanUsageSource? = null,
     private val clock: () -> Instant = Instant::now,
+    /** ai の応答のヘッダーから入る「今日の残り」(#1203・iOS の `RemainingTodayStore`)。null = 読まない(モック) */
+    private val remainingFeed: StateFlow<RemainingToday?>? = null,
     scope: CoroutineScope? = null,
 ) : ViewModel() {
     private val scope: CoroutineScope = scope ?: viewModelScope
@@ -99,7 +103,11 @@ class VoiceViewModel(
     private var usageReadAt: Instant? = null
     private var usageJob: Job? = null
 
+    /** 0 の上限のカードを出した日(戻る時刻。分からなければ [Instant.MAX] = 起動中に 1 度)。閉じたら同じ日にはもう出さない */
+    private var exhaustedCardShownFor: Instant? = null
+
     init {
+        remainingFeed?.let { feed -> this.scope.launch { feed.collect { v -> if (v != null) noteRemaining(v) } } }
         this.scope.launch {
             transcriber.status.collect { s -> _state.update { it.copy(voiceAvailable = s !is TranscriberStatus.Unavailable) } }
         }
@@ -720,7 +728,34 @@ class VoiceViewModel(
                     myUsage = if (keep) it.myUsage ?: me else me,
                 )
             }
+            showExhaustedCardIfNeeded()
         }
+    }
+
+    /** ai の応答のヘッダーから届いた「今日の残り」(#1203)。古い値では上書きしない */
+    private fun noteRemaining(value: RemainingToday) {
+        _state.update {
+            val cur = it.remainingToday
+            if (cur != null && cur.observedAt.isAfter(value.observedAt)) it else it.copy(remainingToday = value)
+        }
+        showExhaustedCardIfNeeded()
+    }
+
+    /**
+     * 残りが 0 になったら上限のカードを同じ日に 1 度だけ出す(iOS の `RemainingTodayBadge.showExhaustedCardIfNeeded`)。
+     * ほかのカードが出ている・生成や相談の途中は出さない(終わった後の usage の読み直しでもう一度見る)。
+     */
+    private fun showExhaustedCardIfNeeded() {
+        val s = _state.value
+        val display = RemainingTodayDisplay.of(s.remainingToday, clock(), s.isPro) as? RemainingTodayDisplay.Exhausted ?: return
+        if (s.error != null || s.isGenerating || s.chatPending) return
+        val key = display.resetAt ?: Instant.MAX
+        if (exhaustedCardShownFor == key) return
+        exhaustedCardShownFor = key
+        val tier = if (s.isPro) "pro" else s.myUsage?.tier ?: "signed_in"
+        val info = RateLimitInfo(RateLimitInfo.Scope.USER, tier = tier, limit = s.remainingToday?.limit, remaining = 0, resetAt = display.resetAt)
+        retryAction = null
+        _state.update { it.copy(error = VoiceError.Request(FailureKind.RateLimited(info), VoiceError.Origin.GENERATE)) }
     }
 
     // MARK: - 状態カード

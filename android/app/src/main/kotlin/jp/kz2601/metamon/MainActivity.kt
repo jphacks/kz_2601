@@ -204,6 +204,8 @@ fun MetamonApp(container: AppContainer) {
             speech = AndroidSpeechEngine.reader(context),
             // 「今日の残り」(`GET /v1/me/usage`・iOS と同じ口)。モックは出さない
             usage = if (container.knobs.mock) null else container.appConfig as? PlanUsageSource,
+            // ai の応答のヘッダーから「今日の残り」を入れる(#1203)。モックはヘッダーが無いので何も来ない
+            remainingFeed = container.remainingToday.value,
         )
     }
     val state by vm.state.collectAsStateWithLifecycle()

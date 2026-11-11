@@ -62,6 +62,8 @@ import jp.kz2601.metamon.services.local.AccountOwnerStore
 import jp.kz2601.metamon.services.AuthService
 import jp.kz2601.metamon.services.CrashReporter
 import jp.kz2601.metamon.services.NoopCrashReporter
+import jp.kz2601.metamon.services.RemainingToday
+import jp.kz2601.metamon.services.RemainingTodayStore
 import jp.kz2601.metamon.services.SpeechTranscriber
 import jp.kz2601.metamon.services.consent.AiButtonMetricsRecorder
 import jp.kz2601.metamon.feedback.FeedbackComposerLauncher
@@ -220,6 +222,8 @@ class AppContainer(
     private val entitlements: EntitlementClient? = null,
     /** Play の購入(Google Play Billing)。モックは null */
     private val playBilling: ((PlayBilling.Listener) -> PlayBilling)? = null,
+    /** 最後に分かった「今日の残り」(ai の応答のヘッダーから入る・#1203)。モックは入らない */
+    val remainingToday: RemainingTodayStore = RemainingTodayStore(),
 ) {
     /** 共有シートの「みんなに公開」に渡すもの(#902)。「探す」が無い構成は null */
     val publishEnv: PublishEnv? by lazy { discover?.let { PublishEnv(it.client, authorProfile) } }
@@ -282,6 +286,7 @@ class AppContainer(
                 consent.forget()
                 consentPrompt.reset()
                 pro.reset() // Pro の状態と送った購入の記録も人ごと(次の人はサーバーに聞き直す)
+                remainingToday.clear() // 前の人の「今日の残り」を出さない
                 aiButtonMetrics.clearCounts()
                 social?.ageGate?.reset() // 18 歳以上の確認(#877)も人ごと(iOS は UserDefaults ごと消す)
                 runtime.retention?.forget() // 記録の保存期間の確認(#482)も人ごと(iOS は UserDefaults ごと消す)
@@ -396,7 +401,10 @@ class AppContainer(
             val client = MetamonHttp.defaultClient()
             // 画像も同じ接続を使う(トークンは付けない)
             RemoteImages.install(context, client)
-            fun http(baseUrl: String) = MetamonHttp(baseUrl, tokens, clientInfo, appCheck = appCheck, client = client, device = device)
+            fun http(baseUrl: String, remainingSink: ((RemainingToday) -> Unit)? = null) =
+                MetamonHttp(baseUrl, tokens, clientInfo, appCheck = appCheck, client = client, device = device, remainingSink = remainingSink)
+            // ai の応答の `X-RateLimit-*` から「今日の残り」を入れる(iOS の HTTP.noteRemaining・#1203)
+            val remainingToday = RemainingTodayStore()
             val log: (String) -> Unit = { Log.w(TAG, it) }
 
             val documentCache = DocumentCache(File(context.filesDir, "metamon-dsl"))
@@ -422,7 +430,7 @@ class AppContainer(
                 initialDsl = initialDsl,
                 appConfig = appConfig,
                 // 同意が無ければ一切送らない(最後の砦。画面側でも送る前に止めて同意の画面を出す)
-                ai = ConsentGatedAiClient(HttpAIClient(http(environment.aiBaseUrl), capabilities = deviceCapabilities(), log = log, cache = documentCache)) { consent.isGranted },
+                ai = ConsentGatedAiClient(HttpAIClient(http(environment.aiBaseUrl, remainingToday::record), capabilities = deviceCapabilities(), log = log, cache = documentCache)) { consent.isGranted },
                 // 声は端末内だけで文字にする(#354 §3)。端末内が無い端末は文字入力に落とす
                 transcriber = AndroidSpeechTranscriber(context, language = language, log = { Log.i(TAG, it) }),
                 audioFiles = WhisperAudioFileHost.create(context, CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate), language),
@@ -462,6 +470,7 @@ class AppContainer(
                 nearbyEnv = NearbyEnv.of(context, mock = false),
                 entitlements = HttpEntitlementClient(appConfigHttp),
                 playBilling = { PlayBilling(context, it) },
+                remainingToday = remainingToday,
             )
         }
 
