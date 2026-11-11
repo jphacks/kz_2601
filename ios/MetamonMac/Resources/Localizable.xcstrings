@@ -2100,6 +2100,23 @@
         }
       }
     },
+    "これ以上前の状態はありません" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "There's no earlier version"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "これ以上前の状態はありません"
+          }
+        }
+      }
+    },
     "ご利用中" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -2621,6 +2638,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "やり直す"
+          }
+        }
+      }
+    },
+    "やり直せませんでした" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Couldn't redo the change"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "やり直せませんでした"
           }
         }
       }

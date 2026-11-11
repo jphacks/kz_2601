@@ -263,6 +263,10 @@ struct MacRootView: View {
             session.startsWithVoice = voice
             session.screen = screen
             session.onResult = { document, envelope in apply(document, envelope: envelope, target: target) }
+            // 競合(409・#1279): サーバーにあるアプリは最新を取り直して当てる(iOS と同じ)。直す会話は取り直した版で送り直す
+            if case .edit(let appId, _, _) = target, library.isOnServer(appId) {
+                session.onConflict = { await library.refreshFromServer(appId) }
+            }
             notices.summary = nil // 会話を始めたら前の要約は下げる
             closingCompose = session
             compose = session
@@ -349,22 +353,35 @@ struct MacRootView: View {
         }
     }
 
-    /// 版を戻す・やり直すと中央のアプリを作り直す。入力があれば先に確認する(#943)
+    /// 版を戻す・やり直すと中央のアプリを作り直す。入力があれば先に確認する(#943)。
+    /// サーバーにあるアプリはサーバーの版で戻す(#1279・届かなければ端末の履歴)
     private func undoVersion(_ appId: String? = nil) {
         guard let id = appId ?? selectedAppId, library.canUndo(id) else { return }
         discardGuard.run {
-            guard library.undo(id) else { return }
-            selectedAppId = id
-            notices.summary = .init(appId: id, text: L10n.tr("元に戻しました"), action: .redo)
+            Task {
+                switch await library.undo(id) {
+                case .moved:
+                    selectedAppId = id
+                    notices.summary = .init(appId: id, text: L10n.tr("元に戻しました"), action: .redo)
+                case .nothing, .failed:
+                    notices.summary = .init(appId: id, text: L10n.tr("これ以上前の状態はありません"), action: nil)
+                }
+            }
         }
     }
 
     private func redoVersion(_ appId: String? = nil) {
         guard let id = appId ?? selectedAppId, library.canRedo(id) else { return }
         discardGuard.run {
-            guard library.redo(id) else { return }
-            selectedAppId = id
-            notices.summary = .init(appId: id, text: L10n.tr("やり直しました"), action: library.canUndo(id) ? .undo : nil)
+            Task {
+                switch await library.redo(id) {
+                case .moved:
+                    selectedAppId = id
+                    notices.summary = .init(appId: id, text: L10n.tr("やり直しました"), action: library.canUndo(id) ? .undo : nil)
+                case .nothing, .failed:
+                    notices.summary = .init(appId: id, text: L10n.tr("やり直せませんでした"), action: nil)
+                }
+            }
         }
     }
 

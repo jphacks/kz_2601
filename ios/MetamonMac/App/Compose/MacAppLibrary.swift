@@ -7,6 +7,8 @@ import MetamonServices
 /// - 作ったアプリは端末に残す(`LocalAppLibrary`: iOS のキャッシュと同じ置き方)。サーバー(#930)が入るまでは端末だけ
 /// - 同梱の例を会話で直した分も端末に残す(#1283)。右クリックの「元の例に戻す」で消す。版の履歴はアプリを終えると消える
 /// - 版の nil は「同梱の例のまま(会話で直す前)」。同梱の例を直して戻すと、元の例を表示し直す
+/// - サーバーにあるアプリの「元に戻す / やり直す」は、iOS と同じくサーバーの版(`GET /versions`・`POST /versions/{n}/restore`)で戻す。
+///   届かない時は端末の履歴(`LocalVersionHistory`)で戻す(#1279)
 /// - 本物の AI で作った・直したアプリはサーバー(appconfig)にも保存される。その印(`isOnServer`)を端末に残し、
 ///   記録をサーバーに読み書きするかを決める(#1284 の続き)。端末で複製したアプリはサーバーに無いので端末だけ
 /// ウインドウをまたいで 1 つだけ持つ(`MetamonMacApp` が作って渡す)。
@@ -28,14 +30,26 @@ final class MacAppLibrary {
     private var histories: [String: LocalVersionHistory<Version?>] = [:]
     /// サーバーにあるアプリの id(本物の AI の結果を当てた)
     private(set) var serverIds: Set<String>
+    /// サーバーの版で戻した後の「やり直す」先(戻す前の版の番号・iOS の `RedoPoint.viaServer`)。新しい版を当てたら消す
+    private var serverRedo: [String: Int] = [:]
+    /// サーバーで戻している途中(二重に押さない)
+    private(set) var restoring: Set<String> = []
     @ObservationIgnored private let store: LocalAppLibrary?
     @ObservationIgnored private let defaults: UserDefaults?
+    /// サーバーの版(#1279)。nil(モック)なら端末の履歴だけ
+    @ObservationIgnored private let server: (any AppConfigClient)?
+    /// サーバーから受けた版の封筒(端末に残す形)。既定は `HTTPAppConfigClient` が書く `DocumentCache`
+    @ObservationIgnored private let serverEnvelope: (String) -> Data?
     static let serverIdsKey = "metamon.mac.serverAppIds"
 
-    /// `store` が nil なら端末に残さない(プレビュー・テスト用)。`defaults` はサーバーにあるアプリの印の置き場(nil なら残さない)
-    init(store: LocalAppLibrary? = .standard, defaults: UserDefaults? = nil) {
+    /// `store` が nil なら端末に残さない(プレビュー・テスト用)。`defaults` はサーバーにあるアプリの印の置き場(nil なら残さない)。
+    /// `server` はサーバーの版で戻す時の相手(nil なら端末の履歴だけ)
+    init(store: LocalAppLibrary? = .standard, defaults: UserDefaults? = nil, server: (any AppConfigClient)? = nil,
+         serverEnvelope: @escaping (String) -> Data? = { DocumentCache.shared.loadData(appId: $0) }) {
         self.store = store
         self.defaults = defaults
+        self.server = server
+        self.serverEnvelope = serverEnvelope
         serverIds = Set(defaults?.stringArray(forKey: Self.serverIdsKey) ?? [])
         for entry in store?.load() ?? [] {
             generated[entry.summary.id] = entry.document
@@ -78,6 +92,7 @@ final class MacAppLibrary {
     func apply(_ document: AppDocument, envelope: Data? = nil, created: Bool, onServer: Bool = false) {
         let id = document.appId
         if onServer { markOnServer(id, true) }
+        serverRedo[id] = nil
         if !(created && generated[id] == nil) {
             histories[id, default: .init()].record(previous: current(id))
         }
@@ -85,25 +100,81 @@ final class MacAppLibrary {
         set(id, Version(document: document, envelope: envelope))
     }
 
-    func canUndo(_ appId: String) -> Bool { histories[appId]?.canUndo ?? false }
-    func canRedo(_ appId: String) -> Bool { histories[appId]?.canRedo ?? false }
-
-    /// 「元に戻す」。戻せたら true
-    @discardableResult
-    func undo(_ appId: String) -> Bool {
-        guard var history = histories[appId], let previous = history.undo(from: current(appId)) else { return false }
-        histories[appId] = history
-        set(appId, previous)
-        return true
+    /// 「元に戻す」を押せるか。サーバーにあるアプリは前の版がある(版が 2 以上)時も(iOS の `canUndo` と同じ)
+    func canUndo(_ appId: String) -> Bool {
+        guard !restoring.contains(appId) else { return false }
+        if usesServerVersions(appId), (generated[appId]?.version ?? 0) > 1 { return true }
+        return histories[appId]?.canUndo ?? false
     }
 
-    /// 「やり直す」。やり直せたら true
-    @discardableResult
-    func redo(_ appId: String) -> Bool {
-        guard var history = histories[appId], let next = history.redo(from: current(appId)) else { return false }
+    func canRedo(_ appId: String) -> Bool {
+        guard !restoring.contains(appId) else { return false }
+        return serverRedo[appId] != nil || (histories[appId]?.canRedo ?? false)
+    }
+
+    /// 版を戻す・やり直すの結果
+    enum VersionStep: Equatable {
+        case moved
+        /// 戻す先が無い(「これ以上前の状態はありません」)
+        case nothing
+        /// サーバーに届かず、端末の履歴でも戻せなかった
+        case failed
+    }
+
+    /// 「元に戻す」(iOS の `AppRuntime.undo` と同じ順): サーバーにあるアプリは直前の版を restore、
+    /// サーバーに届かない時は端末の履歴で戻す。restore は新しい版を作るので、やり直しは戻す前の版をもう一度 restore する
+    func undo(_ appId: String) async -> VersionStep {
+        guard !restoring.contains(appId) else { return .failed }
+        if usesServerVersions(appId), let server {
+            restoring.insert(appId)
+            defer { restoring.remove(appId) }
+            do {
+                let versions = try await server.listVersions(appId: appId)
+                guard let latest = versions.first else { throw APIError.server(status: 404, code: "not_found", message: "no versions") }
+                guard let target = versions.first(where: { $0.version < latest.version }) else { return .nothing }
+                let document = try await server.restore(appId: appId, toVersion: target.version)
+                applyFromServer(document)
+                serverRedo[appId] = latest.version
+                return .moved
+            } catch {
+                print("[Metamon] Mac: undo via server failed, falling back to local history: \(error)")
+            }
+        }
+        guard var history = histories[appId], let previous = history.undo(from: current(appId)) else { return .nothing }
+        histories[appId] = history
+        serverRedo[appId] = nil
+        set(appId, previous)
+        return .moved
+    }
+
+    /// 「やり直す」: サーバーで戻したなら戻す前の版を restore、端末の履歴で戻したなら当て直す
+    func redo(_ appId: String) async -> VersionStep {
+        guard !restoring.contains(appId) else { return .failed }
+        if let version = serverRedo[appId], let server {
+            restoring.insert(appId)
+            defer { restoring.remove(appId) }
+            do {
+                let document = try await server.restore(appId: appId, toVersion: version)
+                applyFromServer(document)
+                serverRedo[appId] = nil
+                return .moved
+            } catch {
+                print("[Metamon] Mac: redo failed: \(error)")
+                return .failed
+            }
+        }
+        guard var history = histories[appId], let next = history.redo(from: current(appId)) else { return .nothing }
         histories[appId] = history
         set(appId, next)
-        return true
+        return .moved
+    }
+
+    /// 競合(409)の後に取り直したサーバーの最新を当てる(iOS の `present(.conflict)` と同じ)。履歴には積まない。
+    /// 当てた版を返す(取り直せなければ nil)
+    func refreshFromServer(_ appId: String) async -> Int? {
+        guard usesServerVersions(appId), let server, let latest = try? await server.fetchDocument(appId: appId) else { return nil }
+        if latest.version != generated[appId]?.version { applyFromServer(latest) }
+        return latest.version
     }
 
     // MARK: - 一覧の整理(#969・iOS の AppRuntime+AppList / +Delete)
@@ -115,6 +186,7 @@ final class MacAppLibrary {
         guard let name = AppListEdit.normalizedName(raw) else { return false }
         guard isCreated(appId), var document = generated[appId], document.dsl.app.name != name else { return true }
         histories[appId, default: .init()].record(previous: current(appId))
+        serverRedo[appId] = nil
         document.dsl.app.name = name
         set(appId, Version(document: document, envelope: envelopes[appId].flatMap { DocumentEnvelope.renamed($0, to: name) }))
         return true
@@ -177,6 +249,16 @@ final class MacAppLibrary {
     }
 
     // MARK: - 内部
+
+    private func usesServerVersions(_ appId: String) -> Bool { server != nil && isOnServer(appId) }
+
+    /// サーバーの版を当てる(端末の DSL・一覧も揃える)。封筒が無ければ同じ版の DSL から作れないので中央だけ差し替える
+    private func applyFromServer(_ document: AppDocument) {
+        let envelope = serverEnvelope(document.appId).flatMap { data in
+            (try? AppDocument.decode(data)).map(\.version) == document.version ? data : nil
+        }
+        set(document.appId, Version(document: document, envelope: envelope))
+    }
 
     private func markOnServer(_ appId: String, _ on: Bool) {
         guard serverIds.contains(appId) != on else { return }
