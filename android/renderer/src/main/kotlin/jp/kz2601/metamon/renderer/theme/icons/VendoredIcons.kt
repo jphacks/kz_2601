@@ -157,6 +157,48 @@ internal val Icons.Filled.AcUnit: ImageVector
 
 private var _acUnit: ImageVector? = null
 
+internal val Icons.Filled.AlternateEmail: ImageVector
+    get() {
+        if (_alternateEmail != null) {
+            return _alternateEmail!!
+        }
+        _alternateEmail = materialIcon(name = "Filled.AlternateEmail") {
+            materialPath {
+                moveTo(12.0f, 2.0f)
+                curveTo(6.48f, 2.0f, 2.0f, 6.48f, 2.0f, 12.0f)
+                reflectiveCurveToRelative(4.48f, 10.0f, 10.0f, 10.0f)
+                horizontalLineToRelative(5.0f)
+                verticalLineToRelative(-2.0f)
+                horizontalLineToRelative(-5.0f)
+                curveToRelative(-4.34f, 0.0f, -8.0f, -3.66f, -8.0f, -8.0f)
+                reflectiveCurveToRelative(3.66f, -8.0f, 8.0f, -8.0f)
+                reflectiveCurveToRelative(8.0f, 3.66f, 8.0f, 8.0f)
+                verticalLineToRelative(1.43f)
+                curveToRelative(0.0f, 0.79f, -0.71f, 1.57f, -1.5f, 1.57f)
+                reflectiveCurveToRelative(-1.5f, -0.78f, -1.5f, -1.57f)
+                lineTo(17.0f, 12.0f)
+                curveToRelative(0.0f, -2.76f, -2.24f, -5.0f, -5.0f, -5.0f)
+                reflectiveCurveToRelative(-5.0f, 2.24f, -5.0f, 5.0f)
+                reflectiveCurveToRelative(2.24f, 5.0f, 5.0f, 5.0f)
+                curveToRelative(1.38f, 0.0f, 2.64f, -0.56f, 3.54f, -1.47f)
+                curveToRelative(0.65f, 0.89f, 1.77f, 1.47f, 2.96f, 1.47f)
+                curveToRelative(1.97f, 0.0f, 3.5f, -1.6f, 3.5f, -3.57f)
+                lineTo(22.0f, 12.0f)
+                curveToRelative(0.0f, -5.52f, -4.48f, -10.0f, -10.0f, -10.0f)
+                close()
+                moveTo(12.0f, 15.0f)
+                curveToRelative(-1.66f, 0.0f, -3.0f, -1.34f, -3.0f, -3.0f)
+                reflectiveCurveToRelative(1.34f, -3.0f, 3.0f, -3.0f)
+                reflectiveCurveToRelative(3.0f, 1.34f, 3.0f, 3.0f)
+                reflectiveCurveToRelative(-1.34f, 3.0f, -3.0f, 3.0f)
+                close()
+            }
+        }
+        return _alternateEmail!!
+    }
+
+private var _alternateEmail: ImageVector? = null
+
 internal val Icons.Filled.AttachMoney: ImageVector
     get() {
         if (_attachMoney != null) {
@@ -1027,6 +1069,58 @@ internal val Icons.Filled.DocumentScanner: ImageVector
     }
 
 private var _documentScanner: ImageVector? = null
+
+internal val Icons.Filled.EditCalendar: ImageVector
+    get() {
+        if (_editCalendar != null) {
+            return _editCalendar!!
+        }
+        _editCalendar = materialIcon(name = "Filled.EditCalendar") {
+            materialPath {
+                moveTo(12.0f, 22.0f)
+                horizontalLineTo(5.0f)
+                curveToRelative(-1.11f, 0.0f, -2.0f, -0.9f, -2.0f, -2.0f)
+                lineTo(3.01f, 6.0f)
+                curveToRelative(0.0f, -1.1f, 0.88f, -2.0f, 1.99f, -2.0f)
+                horizontalLineToRelative(1.0f)
+                verticalLineTo(2.0f)
+                horizontalLineToRelative(2.0f)
+                verticalLineToRelative(2.0f)
+                horizontalLineToRelative(8.0f)
+                verticalLineTo(2.0f)
+                horizontalLineToRelative(2.0f)
+                verticalLineToRelative(2.0f)
+                horizontalLineToRelative(1.0f)
+                curveToRelative(1.1f, 0.0f, 2.0f, 0.9f, 2.0f, 2.0f)
+                verticalLineToRelative(6.0f)
+                horizontalLineToRelative(-2.0f)
+                verticalLineToRelative(-2.0f)
+                horizontalLineTo(5.0f)
+                verticalLineToRelative(10.0f)
+                horizontalLineToRelative(7.0f)
+                verticalLineTo(22.0f)
+                close()
+                moveTo(22.13f, 16.99f)
+                lineToRelative(0.71f, -0.71f)
+                curveToRelative(0.39f, -0.39f, 0.39f, -1.02f, 0.0f, -1.41f)
+                lineToRelative(-0.71f, -0.71f)
+                curveToRelative(-0.39f, -0.39f, -1.02f, -0.39f, -1.41f, 0.0f)
+                lineToRelative(-0.71f, 0.71f)
+                lineTo(22.13f, 16.99f)
+                close()
+                moveTo(21.42f, 17.7f)
+                lineToRelative(-5.3f, 5.3f)
+                horizontalLineTo(14.0f)
+                verticalLineToRelative(-2.12f)
+                lineToRelative(5.3f, -5.3f)
+                lineTo(21.42f, 17.7f)
+                close()
+            }
+        }
+        return _editCalendar!!
+    }
+
+private var _editCalendar: ImageVector? = null
 
 internal val Icons.Filled.EditNote: ImageVector
     get() {
@@ -3105,6 +3199,62 @@ internal val Icons.Filled.Speed: ImageVector
     }
 
 private var _speed: ImageVector? = null
+
+internal val Icons.Filled.SportsEsports: ImageVector
+    get() {
+        if (_sportsEsports != null) {
+            return _sportsEsports!!
+        }
+        _sportsEsports = materialIcon(name = "Filled.SportsEsports") {
+            materialPath {
+                moveTo(21.58f, 16.09f)
+                lineToRelative(-1.09f, -7.66f)
+                curveTo(20.21f, 6.46f, 18.52f, 5.0f, 16.53f, 5.0f)
+                horizontalLineTo(7.47f)
+                curveTo(5.48f, 5.0f, 3.79f, 6.46f, 3.51f, 8.43f)
+                lineToRelative(-1.09f, 7.66f)
+                curveTo(2.2f, 17.63f, 3.39f, 19.0f, 4.94f, 19.0f)
+                horizontalLineToRelative(0.0f)
+                curveToRelative(0.68f, 0.0f, 1.32f, -0.27f, 1.8f, -0.75f)
+                lineTo(9.0f, 16.0f)
+                horizontalLineToRelative(6.0f)
+                lineToRelative(2.25f, 2.25f)
+                curveToRelative(0.48f, 0.48f, 1.13f, 0.75f, 1.8f, 0.75f)
+                horizontalLineToRelative(0.0f)
+                curveTo(20.61f, 19.0f, 21.8f, 17.63f, 21.58f, 16.09f)
+                close()
+                moveTo(11.0f, 11.0f)
+                horizontalLineTo(9.0f)
+                verticalLineToRelative(2.0f)
+                horizontalLineTo(8.0f)
+                verticalLineToRelative(-2.0f)
+                horizontalLineTo(6.0f)
+                verticalLineToRelative(-1.0f)
+                horizontalLineToRelative(2.0f)
+                verticalLineTo(8.0f)
+                horizontalLineToRelative(1.0f)
+                verticalLineToRelative(2.0f)
+                horizontalLineToRelative(2.0f)
+                verticalLineTo(11.0f)
+                close()
+                moveTo(15.0f, 10.0f)
+                curveToRelative(-0.55f, 0.0f, -1.0f, -0.45f, -1.0f, -1.0f)
+                curveToRelative(0.0f, -0.55f, 0.45f, -1.0f, 1.0f, -1.0f)
+                reflectiveCurveToRelative(1.0f, 0.45f, 1.0f, 1.0f)
+                curveTo(16.0f, 9.55f, 15.55f, 10.0f, 15.0f, 10.0f)
+                close()
+                moveTo(17.0f, 13.0f)
+                curveToRelative(-0.55f, 0.0f, -1.0f, -0.45f, -1.0f, -1.0f)
+                curveToRelative(0.0f, -0.55f, 0.45f, -1.0f, 1.0f, -1.0f)
+                reflectiveCurveToRelative(1.0f, 0.45f, 1.0f, 1.0f)
+                curveTo(18.0f, 12.55f, 17.55f, 13.0f, 17.0f, 13.0f)
+                close()
+            }
+        }
+        return _sportsEsports!!
+    }
+
+private var _sportsEsports: ImageVector? = null
 
 internal val Icons.Filled.SportsGymnastics: ImageVector
     get() {

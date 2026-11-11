@@ -44,6 +44,14 @@ class SymbolIconTableTest {
         for (m in materialVectorNames) assertNotNull(m, materialVector(m))
     }
 
+    /** 外へ出るボタンの既定アイコン(#861・#1088)。 */
+    @Test
+    fun outboundButtonDefaultIconsDraw() {
+        val names = listOf("gamecontroller", "yensign.circle", "at", "calendar.badge.plus", "text.book.closed", "bubble.left.fill")
+        val missing = names.filter { SymbolIcons.vector(it) == null }
+        assertTrue("表に無い既定アイコン: $missing", missing.isEmpty())
+    }
+
     @Test
     fun everyIconNameInExamplesSchemaAndBackendIsMapped() {
         val names = sortedMapOf<String, String>()

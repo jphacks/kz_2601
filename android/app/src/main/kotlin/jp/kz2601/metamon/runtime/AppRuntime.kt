@@ -1000,7 +1000,7 @@ class AppRuntime(
 
             ActionType.LOOKUP_BOOK -> attempt(action.type) { host.lookupBook(action, ctx, this) }
 
-            ActionType.UNKNOWN -> showToast(RuntimeCopy.unknownAction(action.type.wire))
+            ActionType.UNKNOWN -> showToast(RuntimeCopy.unknownAction(action.rawType))
         }
     }
 
