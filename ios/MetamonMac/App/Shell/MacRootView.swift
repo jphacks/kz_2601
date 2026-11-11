@@ -11,7 +11,7 @@ import MetamonServices
 ///   文字で頼む(⌘K)・新しいアプリ(⌘N)は会話のシート(#967・ComposeSheet)。作ったアプリは一覧の先頭に足し、直したアプリは差し替える
 ///   声で頼む(⇧⌘M・#966)は同じシートを開いてすぐ録音する。文字にした文をそのまま送る
 /// - 設定 → Mac の設定ウインドウ(⌘,)
-/// - 完成の後のお知らせ(要約・「元に戻す」)→ 中央の列の上に 1 つずつ(#968・順番は iOS と同じ `PostBuildNotice`)
+/// - 完成の後のお知らせ(要約・「元に戻す」・最初のアプリの後の直し方の例 #1278)→ 中央の列の上に 1 つずつ(#968・順番は iOS と同じ `PostBuildNotice`)
 /// - 生成したアプリの版の「元に戻す / やり直す」(#968)→「アプリ」メニュー(⌥⌘Z / ⇧⌥⌘Z)・完成の画面・要約のお知らせ。
 ///   ⌘Z / ⇧⌘Z は入力欄と記録の削除の取り消し(編集メニュー)のまま
 /// キーボード(#934): ⌘1 / ⌘2 でサイドバーと中央を行き来・一覧は ↑↓ で選び Return で中央へ・⌥⌘↑↓ で前 / 次のアプリ。
@@ -203,8 +203,13 @@ struct MacRootView: View {
             : library.generated[document.appId]?.dsl ?? (try? apps.first(where: { $0.id == document.appId })?.loadDSL())
         library.apply(document, envelope: envelope, created: target == .create)
         showChangeHighlight(previous: previous, next: document)
-        // 最初のアプリの印(iOS と同じ `hasShownEditHint`)。β の案内(`MacOnboarding`)は次の起動でこれを見て 1 回出す
-        if target == .create { FirstRunTutorialStore.shared.markEditHintShown() }
+        // 最初のアプリの印(iOS と同じ `hasShownEditHint`)。β の案内(`MacOnboarding`)は次の起動でこれを見て 1 回出す。
+        // 最初の 1 回だけ「こう頼むと直せます」を予約する(要約が閉じてから出る・#1278)
+        if target == .create {
+            let tutorial = FirstRunTutorialStore.shared
+            if tutorial.shouldShowEditHint(createdFromInitial: true), !document.dsl.isVoiceOnly { notices.showsEditHint = true }
+            tutorial.markEditHintShown()
+        }
         selectedAppId = document.appId
     }
 
@@ -304,11 +309,19 @@ struct MacRootView: View {
                         guard !Task.isCancelled, notices.summary == summary else { return }
                         withAnimation { notices.dismissActive() }
                     }
+            } else if compose == nil, notices.active == .editHint {
+                MacEditHintBar(ask: {
+                                   withAnimation { notices.dismissActive() }
+                                   ask()
+                               },
+                               dismiss: { withAnimation { notices.dismissActive() } })
+                    .task { MacVoiceOver.announce(L10n.tr("こう頼むと直せます")) }
             }
         }
         .padding(.top, 12)
         .padding(.horizontal, 16)
         .animation(reduceMotion ? nil : .easeInOut(duration: 0.2), value: notices.summary)
+        .animation(reduceMotion ? nil : .easeInOut(duration: 0.2), value: notices.showsEditHint)
     }
 
     /// サイドバーの選択。中央のアプリに保存していない入力があれば、確認して「破棄」の時だけ切り替える(#943)
