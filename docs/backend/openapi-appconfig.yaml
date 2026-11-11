@@ -26,7 +26,7 @@ tags:
   - { name: coins, description: 'コイン(#630・docs/decisions/630-token-billing.md)。残高・履歴・パック(消耗型)の購入の検証。`COIN_BILLING_MODE`(off / log / enforce・既定 off)の後ろ' }
   - { name: dsl }
   - { name: entities }
-  - { name: entitlements, description: 'Tailor It Pro の権利(#314)。StoreKit 2 の署名付き取引をサーバーで検証して保存する。features/pro.md' }
+  - { name: entitlements, description: 'Tailor It Pro の権利(#314)。StoreKit 2 の署名付き取引・Google Play の購入をサーバーで検証して保存する。features/pro.md・android/play-billing.md' }
   - { name: feedback, description: 'アプリ内のフィードバック(#319)。features/feedback.md' }
   - { name: feeds, description: '外部の公開データの読み取り(#348)。許可リストの出どころだけ。features/external-feeds.md' }
   - { name: lookup, description: 'ISBN から本の情報を引く(DSL の lookupBook)。鍵の要らない決まった出どころだけ。features/book-lookup.md' }
@@ -1274,6 +1274,7 @@ paths:
       description: |
         `users/{uid}/entitlements/pro` を返す。`isPro` は「取り消されていない・期限内(猶予期間 `graceExpiresAt` を含む)・許可された環境(`APPSTORE_ENVIRONMENTS`)」。
         ai の回数制限(#449)も同じ判定で Pro の上限にする。iOS は購入・復元・起動時に `POST /me/entitlements/apple` で送った結果をこれで確かめられる。
+        Android で買った Pro(`POST /me/entitlements/google`)も同じ文書に入る(`pro.platform: googlePlay`)。iOS で買った Pro は Android でも、Android で買った Pro は iOS でも効く。
       responses:
         '200': { description: OK, content: { application/json: { schema: { $ref: '#/components/schemas/Entitlements' } } } }
         '401': { $ref: '#/components/responses/Unauthenticated' }
@@ -1326,6 +1327,59 @@ paths:
             application/json:
               schema: { $ref: '#/components/schemas/Error' }
               example: { error: { code: invalid_transaction, message: 'the signed transaction could not be verified', details: { reason: signature } } }
+
+  /me/entitlements/google:
+    post:
+      tags: [entitlements]
+      summary: Google Play の購入(定期購入)を送って Pro を保存する
+      description: |
+        Android が購入・復元の後に、Play の `Purchase` の `productId` と `purchaseToken` を送る。サーバーは Google Play Developer API の
+        `purchases.subscriptionsv2.get`(パッケージ名 `GOOGLE_PLAY_PACKAGE_NAME`・サービスアカウントで呼ぶ)で購入を読み直して確かめる:
+        - `productId` が許可リスト(`GOOGLE_PLAY_PRODUCT_IDS`)にあり、購入の `lineItems` に入っていること
+        - `externalAccountIdentifiers.obfuscatedExternalAccountId` が呼んだ人の `AccountToken(uid)`(iOS の `appAccountToken` と同じ値)と合うこと。合わなければ **409 `account_mismatch`**
+        - `subscriptionState` が ACTIVE / IN_GRACE_PERIOD / CANCELED(自動更新を止めただけ)なら `lineItems[].expiryTime` まで Pro。ON_HOLD・PAUSED・EXPIRED は Pro にしない。支払い前(期限が無い)は 422 `pending`
+        - テスト購入(`testPurchase`・ライセンス テスター)は `environment: Sandbox`、それ以外は `Production`。`isPro` は `APPSTORE_ENVIRONMENTS` で絞る(iOS と同じ)
+
+        期限切れの購入もエラーにせず保存する(`isPro: false`)。古い購入が新しいものを上書きすることはない(iOS と同じ)。
+
+        **購入と uid の結びつき**: `googleplay_purchases/{sha256(purchaseToken)}` に uid を記録し、1 つの購入を 1 つの uid にだけ結びつける(`purchaseToken` そのものは保存しない)。
+        規則は `POST /me/entitlements/apple` と同じ(退会済みの uid からは移す・別の有効な uid なら **409 `transaction_owned_by_other`**)。
+        前の購入を置き換えた購入(`linkedPurchaseToken`・プラン変更や買い直し)は、前の購入が別の有効な uid に結びついていれば同じく 409。
+
+        まだ承認(acknowledge)されていない購入は、Pro にした後でサーバーが `purchases.subscriptions.acknowledge` で承認する(失敗してもエラーにしない。端末も承認する)。
+        更新・解約・返金は `POST /googleplay/notifications`(Real-time developer notifications)で反映する。
+
+        サービスアカウントの鍵(`GOOGLE_PLAY_SERVICE_ACCOUNT_JSON`)が無いサーバーは **503 `not_configured`**。
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [productId, purchaseToken]
+              properties:
+                productId: { type: string, example: jp.kz2601.metamon.pro.monthly }
+                purchaseToken: { type: string, maxLength: 4096, description: 'Play の `Purchase.purchaseToken`。ログ・画面に出さない' }
+      responses:
+        '200': { description: 保存後の状態, content: { application/json: { schema: { $ref: '#/components/schemas/Entitlements' } } } }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '409':
+          description: 'この購入は別のアカウント用(`account_mismatch`)か、別の有効なアカウントに結びついている(`transaction_owned_by_other`)'
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+              example: { error: { code: account_mismatch, message: 'this purchase was made for another account' } }
+        '410': { description: 退会済み(`account_deleted`), content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+        '422':
+          description: '確かめられない購入。`details.reason` は not_found(Play が知らない token)/ product_id(対象外の商品)/ pending(支払い前)'
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+              example: { error: { code: invalid_transaction, message: 'the purchase could not be verified', details: { reason: not_found } } }
+        '503':
+          description: 'Google Play の設定が無い(`not_configured`)か、Google Play Developer API に繋がらない(`upstream_unavailable`・あとで送り直す)'
+          content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } }
 
   /me/coins:
     get:
@@ -1562,6 +1616,47 @@ paths:
           description: '検証に失敗(Apple 以外の証明書・改ざん・対象外の bundleId / 環境など)。`details.reason` は `POST /me/entitlements/apple` と同じ'
           content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } }
         '500': { description: 一時的な失敗(Apple が再送する), content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+
+  /googleplay/notifications:
+    post:
+      tags: [entitlements]
+      security: []
+      summary: Google Play の Real-time developer notifications の受け口(Pub/Sub の push)
+      description: |
+        Play が購読の変化(更新・解約・保留・猶予期間・取り消し・返金など)を Pub/Sub に送り、push サブスクリプションがここに届ける。Firebase の認証・App Check は無し。
+        Pub/Sub が付ける OIDC トークン(`Authorization: Bearer`)の audience(`GOOGLE_PLAY_RTDN_AUDIENCE`)と送り手のサービスアカウント(`GOOGLE_PLAY_RTDN_SERVICE_ACCOUNT`)を確かめる。
+        - 通知は `purchaseToken` しか持たないので、`purchases.subscriptionsv2.get` で読み直して `POST /me/entitlements/google` と同じ規則で保存する。uid は `googleplay_purchases/{sha256(purchaseToken)}` の結びつきで引く
+        - `voidedPurchaseNotification`(返金・取り消し)の定期購入も読み直す
+        - 200 で Pub/Sub は再送をやめる。500 は再送される(一時的な失敗)
+        `GOOGLE_PLAY_SERVICE_ACCOUNT_JSON`・`GOOGLE_PLAY_RTDN_AUDIENCE`・`GOOGLE_PLAY_RTDN_SERVICE_ACCOUNT` がすべて設定された時だけ有効(無い時は 404)。
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [message]
+              properties:
+                message:
+                  type: object
+                  required: [data]
+                  properties:
+                    data: { type: string, format: byte, description: 'DeveloperNotification(JSON)の base64' }
+                    messageId: { type: string }
+                subscription: { type: string }
+      responses:
+        '200':
+          description: '処理済み。`applied`(反映)・`unbound`(まだどのアカウントにも結びついていない購入。Android が送った時に結びつく)・`test`(Play Console のテスト通知)・`ignored`(別のパッケージ・Pro 以外など)'
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [outcome]
+                properties:
+                  outcome: { type: string, enum: [applied, ignored, test, unbound] }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '500': { description: 一時的な失敗(Pub/Sub が再送する), content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
 
   /apps/{appId}/release-requests:
     parameters: [{ $ref: '#/components/parameters/AppId' }]
@@ -2123,6 +2218,7 @@ components:
               description: 機械可読コード。appconfig が返すものだけ(ai のコードは `openapi-ai.yaml` の `Error`)。`backend/internal/httpx/codes.go` と一致することをテストで確かめる(#523)
               enum:
                 - account_deleted
+                - account_mismatch
                 - allowance_exhausted
                 - app_check_failed
                 - app_limit_reached
@@ -2135,6 +2231,7 @@ components:
                 - invalid_dsl
                 - invalid_record
                 - invalid_transaction
+                - not_configured
                 - not_found
                 - overflow_cap_reached
                 - payload_too_large
@@ -2302,6 +2399,7 @@ components:
                 revokedAt: { type: string, format: date-time, description: '返金・取り消しの時刻(無ければ省略)' }
                 updatedAt: { type: string, format: date-time }
                 willRenew: { type: boolean, description: '自動更新が有効か(#315・通知か照合で分かるまで省略)' }
+                platform: { type: string, enum: [googlePlay], description: 'Google Play で買った Pro(App Store なら省略)。その時 `originalTransactionId` は購入の結びつきのキー、`transactionId` は Play の注文 ID' }
     AppSummary:
       type: object
       required: [id, name, currentVersion, status, createdAt, updatedAt]

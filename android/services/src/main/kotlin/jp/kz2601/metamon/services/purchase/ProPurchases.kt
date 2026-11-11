@@ -41,14 +41,14 @@ data class ServerEntitlements(val isPro: Boolean = false, val pro: Pro? = null) 
 
 /**
  * Pro の権利の API。`/v1/text` などの Pro の判定はサーバーがするので、画面もサーバーの答えを使う。
- * Play の購入を送る口([submitGooglePurchase])は backend にまだ無い(`POST /v1/me/entitlements/google` の案)。
+ * Play の購入は [submitGooglePurchase](`POST /v1/me/entitlements/google`)で送る。
  */
 interface EntitlementClient {
     /** `GET /v1/me/entitlements` */
     suspend fun current(): ServerEntitlements
 
     /**
-     * Play の購入を送り、サーバーが Google Play Developer API で確かめて Pro を保存する(案・未実装)。
+     * Play の購入を送り、サーバーが Google Play Developer API で確かめて Pro を保存する。
      * 確かめられた時だけ購入を承認(acknowledge)する。承認しないと 3 日で返金される(お金を取りっぱなしにしない)。
      */
     suspend fun submitGooglePurchase(productId: String, purchaseToken: String): ServerEntitlements
