@@ -6046,6 +6046,23 @@
         }
       }
     },
+    "地図をクリックするか動かして、ピンの位置で決められます" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Click or move the map to choose the spot under the pin"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "地図をクリックするか動かして、ピンの位置で決められます"
+          }
+        }
+      }
+    },
     "地図を動かして、ピンの位置で決められます" : {
       "extractionState" : "manual",
       "localizations" : {
