@@ -19,6 +19,7 @@ import jp.kz2601.metamon.runtime.RetentionConsentStore
 import jp.kz2601.metamon.runtime.RuntimeHost
 import jp.kz2601.metamon.runtime.SocialServices
 import jp.kz2601.metamon.runtime.TranscriberDictationHost
+import jp.kz2601.metamon.runtime.WhisperAudioFileHost
 import jp.kz2601.metamon.dsl.decode
 import jp.kz2601.metamon.dsl.fallback
 import jp.kz2601.metamon.dsl.screen
@@ -103,6 +104,7 @@ import jp.kz2601.metamon.services.local.CurrentAppStore
 import jp.kz2601.metamon.services.local.DocumentCache
 import jp.kz2601.metamon.services.feeds.FeedCache
 import jp.kz2601.metamon.renderer.components.feed.FeedHost
+import jp.kz2601.metamon.renderer.components.importing.AudioFileTranscriptionHost
 import jp.kz2601.metamon.services.local.RecordSyncEngine
 import jp.kz2601.metamon.services.mock.DslSamples
 import jp.kz2601.metamon.services.mock.InMemoryAppConfigClient
@@ -153,6 +155,8 @@ class AppContainer(
     val ai: AIClient,
     /** 文字起こし。本物は端末内の認識、モックは決まった文を返す [MockTranscriber] */
     val transcriber: SpeechTranscriber,
+    /** fileImport の録音ファイルの文字起こし(whisper.cpp・端末内・#1180)。モックも端末内なので同じものを使う */
+    private val audioFiles: AudioFileTranscriptionHost? = null,
     /** 今のアプリの appId(端末に保存・次の起動で開き直す)。切り替え・新しいアプリはランタイムが書き換える */
     val appId: CurrentAppStore,
     /** 最後に取得したアプリの一覧(オフラインの一覧) */
@@ -345,6 +349,7 @@ class AppContainer(
                 appConfig = records,
                 ai = ConsentGatedAiClient(MockAIClient(samples, delayMillis = delayMillis)) { consent.isGranted },
                 transcriber = MockTranscriber(),
+                audioFiles = WhisperAudioFileHost.create(context, CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)) { AppLocales.languageCode(context) },
                 // 本物のアプリ・記録と混ざらないよう、モックは別の置き場
                 appId = DeviceAppId.store(context, "metamon-app-mock", migrateLegacy = false),
                 appList = AppListCache(File(context.filesDir, "metamon-app-mock")),
@@ -412,6 +417,7 @@ class AppContainer(
                 ai = ConsentGatedAiClient(HttpAIClient(http(environment.aiBaseUrl), capabilities = deviceCapabilities(), log = log, cache = documentCache)) { consent.isGranted },
                 // 声は端末内だけで文字にする(#354 §3)。端末内が無い端末は文字入力に落とす
                 transcriber = AndroidSpeechTranscriber(context, language = language, log = { Log.i(TAG, it) }),
+                audioFiles = WhisperAudioFileHost.create(context, CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate), language),
                 appId = DeviceAppId.store(context, "metamon-app"),
                 appList = AppListCache(File(context.filesDir, "metamon-app")),
                 feedHost = AppFeedHost(HttpFeedClient(appConfigHttp), feedCache),
@@ -578,7 +584,10 @@ class AppContainer(
             ),
             undoGraceMillis = { TalkBack.recordUndoMillis(talkBackRunning()) },
             members = membersStore,
-        ).also { it.dictation = TranscriberDictationHost(transcriber, CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)) }
+        ).also {
+            it.dictation = TranscriberDictationHost(transcriber, CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate))
+            it.audioFileTranscription = audioFiles
+        }
     }
 
     /**

@@ -26,6 +26,8 @@ fun stringProperty(name: String): String = (findProperty(name) as String?).orEmp
 android {
     namespace = "jp.kz2601.metamon"
     compileSdk = 36
+    // :whisper と同じ NDK。無いと .so の strip ができず、デバッグ情報付きのまま APK に入る(whisper だけで 1 ABI 14MB)
+    ndkVersion = "27.0.12077973"
 
     defaultConfig {
         applicationId = "jp.kz2601.metamon"
@@ -89,6 +91,8 @@ dependencies {
     implementation(project(":dsl"))
     implementation(project(":renderer"))
     implementation(project(":services"))
+    // fileImport の録音ファイルの端末内の文字起こし(whisper.cpp・#1180)
+    implementation(project(":whisper"))
 
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.activity.compose)

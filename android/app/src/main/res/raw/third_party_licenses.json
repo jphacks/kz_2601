@@ -17,6 +17,38 @@
   },
   {
    "kind": "dependency",
+   "id": "whisper-cpp",
+   "name": "whisper.cpp",
+   "version": "1.9.5",
+   "url": "https://github.com/ggml-org/whisper.cpp",
+   "license": "MIT",
+   "copyright": [
+    "Copyright (c) 2023-2026 The ggml authors"
+   ],
+   "artifacts": [
+    "libmetamon_whisper.so(whisper.cpp + ggml)"
+   ],
+   "text": "MIT License\n\nCopyright (c) 2023-2026 The ggml authors\n\nPermission is hereby granted, free of charge, to any person obtaining a copy\nof this software and associated documentation files (the \"Software\"), to deal\nin the Software without restriction, including without limitation the rights\nto use, copy, modify, merge, publish, distribute, sublicense, and/or sell\ncopies of the Software, and to permit persons to whom the Software is\nfurnished to do so, subject to the following conditions:\n\nThe above copyright notice and this permission notice shall be included in all\ncopies or substantial portions of the Software.\n\nTHE SOFTWARE IS PROVIDED \"AS IS\", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR\nIMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,\nFITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE\nAUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER\nLIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,\nOUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE\nSOFTWARE.\n",
+   "notices": []
+  },
+  {
+   "kind": "dependency",
+   "id": "openai-whisper-model",
+   "name": "OpenAI Whisper(音声モデル ggml-base-q5_1)",
+   "version": null,
+   "url": "https://github.com/openai/whisper",
+   "license": "MIT",
+   "copyright": [
+    "Copyright (c) 2022 OpenAI"
+   ],
+   "artifacts": [
+    "ggml-base-q5_1.bin(初回に端末へダウンロード)"
+   ],
+   "text": "MIT License\n\nCopyright (c) 2022 OpenAI\n\nPermission is hereby granted, free of charge, to any person obtaining a copy\nof this software and associated documentation files (the \"Software\"), to deal\nin the Software without restriction, including without limitation the rights\nto use, copy, modify, merge, publish, distribute, sublicense, and/or sell\ncopies of the Software, and to permit persons to whom the Software is\nfurnished to do so, subject to the following conditions:\n\nThe above copyright notice and this permission notice shall be included in all\ncopies or substantial portions of the Software.\n\nTHE SOFTWARE IS PROVIDED \"AS IS\", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR\nIMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,\nFITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE\nAUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER\nLIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,\nOUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE\nSOFTWARE.\n",
+   "notices": []
+  },
+  {
+   "kind": "dependency",
    "id": "androidx-activity",
    "name": "androidx.activity",
    "version": "1.12.4",
