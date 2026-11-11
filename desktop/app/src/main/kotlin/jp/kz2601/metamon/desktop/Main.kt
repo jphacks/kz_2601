@@ -2,7 +2,11 @@ package jp.kz2601.metamon.desktop
 
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.unit.dp
@@ -23,9 +27,11 @@ import java.util.prefs.Preferences
  */
 @OptIn(FlowPreview::class)
 fun main(args: Array<String>) = application {
-    val name = args.firstOrNull() ?: System.getProperty("tailorit.example") ?: "shopping"
-    val dsl = remember { Examples.load(name) }
-    val store = remember { args.getOrNull(1)?.let { MockStore.fromJson(File(it).readText()) } ?: MockStore() }
+    val first = args.firstOrNull() ?: System.getProperty("tailorit.example") ?: "shopping"
+    // コマンドパレット(#1765)で同梱の別の例に切り替える。記録・最初の画面は起動時の例にだけ使う
+    var name by remember { mutableStateOf(first) }
+    val dsl = remember(name) { Examples.load(name) }
+    val store = remember(name) { args.getOrNull(1)?.takeIf { name == first }?.let { MockStore.fromJson(File(it).readText()) } ?: MockStore() }
     val saved = remember { WindowBounds.load() }
     val state = rememberWindowState(
         size = saved?.size ?: DpSize(480.dp, 820.dp),
@@ -37,7 +43,7 @@ fun main(args: Array<String>) = application {
             window.minimumSize = Dimension(360, 560)
             snapshotFlow { state.size to state.position }.debounce(500).collect { (size, pos) -> WindowBounds.save(size, pos) }
         }
-        MaterialTheme { DesktopApp(dsl, store, args.getOrNull(2)) }
+        MaterialTheme { key(name) { DesktopApp(dsl, store, args.getOrNull(2)?.takeIf { name == first }, onOpenApp = { name = it }) } }
     }
 }
 

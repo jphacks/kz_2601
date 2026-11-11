@@ -74,7 +74,7 @@ private class ScreenScope(
  * push はウィンドウの中で積み、sheet はウィンドウ内のダイアログ、fullScreen はウィンドウ全体に重ねる。タブは下に並べる。
  */
 @Composable
-fun DesktopApp(dsl: AppDSL, initialStore: MockStore = MockStore(), startScreen: String? = null) {
+fun DesktopApp(dsl: AppDSL, initialStore: MockStore = MockStore(), startScreen: String? = null, onOpenApp: ((String) -> Unit)? = null) {
     val session = remember { DesktopSession(dsl, initialStore, startScreen = startScreen, host = DesktopActionHost()) }
     var pending by remember { mutableStateOf<Pair<Action, ActionContext>?>(null) }
     val nav = session.nav
@@ -86,14 +86,16 @@ fun DesktopApp(dsl: AppDSL, initialStore: MockStore = MockStore(), startScreen: 
     // 印刷(#1767): Ctrl+P・見出しの「印刷」で一番上の画面をプレビュー
     var printing by remember { mutableStateOf<PrintDocument?>(null) }
     val openPrint = { printing = ScreenPrint.document(dsl, session.top.screen, session.store, session.form(session.top)) }
+    // キーボードだけで使う(#1765): Ctrl+K パレット・Ctrl+N/S/F・Delete・Esc・F1
+    val keyboard = rememberDesktopKeyboard(dsl, session, dispatch, openPrint, onOpenApp)
 
     Surface(Modifier.fillMaxSize().ioDropTarget(io, topComponents, topDraft).onPreviewKeyEvent(io.previewKey(topComponents, topDraft))
-        .onPreviewKeyEvent { if (DesktopPrint.isPrintKey(it)) true.also { openPrint() } else false }) {
+        .onPreviewKeyEvent { if (DesktopPrint.isPrintKey(it)) true.also { openPrint() } else false }.then(keyboard.modifier)) {
         IoOverlay(io)
         Box(Modifier.fillMaxSize()) {
             Column(Modifier.fillMaxSize()) {
                 val base = NavigationResolver.dismissModals(nav).top(dsl)
-                Box(Modifier.weight(1f)) { ScreenView(dsl, session, base, io, dispatch, openPrint) }
+                Box(Modifier.weight(1f).then(keyboard.inert(nav.sheet != null || nav.fullScreen != null))) { ScreenView(dsl, session, base, io, dispatch, openPrint) }
                 if (dsl.app.hasTabs) {
                     HorizontalDivider()
                     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly) {
@@ -113,11 +115,12 @@ fun DesktopApp(dsl: AppDSL, initialStore: MockStore = MockStore(), startScreen: 
                     contentAlignment = Alignment.Center,
                 ) {
                     val m = if (full) Modifier.fillMaxSize() else Modifier.widthIn(max = 640.dp).fillMaxWidth(0.92f).fillMaxSize(0.9f)
-                    Surface(m, shape = MaterialTheme.shapes.large, tonalElevation = 6.dp) {
+                    Surface(m.then(keyboard.modalModifier), shape = MaterialTheme.shapes.large, tonalElevation = 6.dp) {
                         ScreenView(dsl, session, top, io, dispatch, openPrint)
                     }
                 }
             }
+            keyboard.Overlay()
         }
     }
 
@@ -154,7 +157,7 @@ private fun ScreenView(dsl: AppDSL, session: DesktopSession, route: Route, io: D
     val dataEnv = DataEnv(
         data, session.queries(route), perform,
         { e, id, patch -> session.store.find(e, id)?.let { session.replaceStore(session.store.save(e, id, it.data + patch)) } },
-        { e, id -> dispatch(Action(type = jp.kz2601.metamon.dsl.ActionType.DELETE_RECORD, entity = e), ActionContext(route, form, id)) },
+        { e, id -> dispatch(ScreenShortcuts.withConfirm(Action(type = jp.kz2601.metamon.dsl.ActionType.DELETE_RECORD, entity = e)), ActionContext(route, form, id)) },
         { ListIoBar(it, io) },
     )
     val scope = ScreenScope(route, form, session, perform, io, data, dataEnv)
@@ -199,7 +202,7 @@ private fun GridScreen(screen: Screen, s: ScreenScope) {
                 if (screen.isFormLayout) {
                     FormBands(placement.placed, cellW, cellH, s)
                 } else if (placement.placed.isNotEmpty()) {
-                    PlacedGrid(placement.placed, cellW, cellH, placement.lastRow, s)
+                    PlacedGrid(placement.placedInReadingOrder, cellW, cellH, placement.lastRow, s)
                 }
                 placement.stacked.forEach { Node(it, s) }
             }
