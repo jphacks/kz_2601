@@ -9,6 +9,7 @@ import (
 
 	"github.com/jphacks/kz_2601/backend/internal/coins"
 	"github.com/jphacks/kz_2601/backend/internal/extapi"
+	"github.com/jphacks/kz_2601/backend/internal/ratelimit"
 	"github.com/jphacks/kz_2601/backend/internal/runner/quota"
 )
 
@@ -39,5 +40,8 @@ func extFromEnv(ctx context.Context, getenv func(string) string, q *quota.Quota,
 	// without a sealer no token is read or written; cutting and expiry
 	// still delete what is there
 	conns := &extapi.Connections{Store: store, Sealer: sealer, UnusedTTL: cfg.UnusedTTL, Log: logger}
-	return extapi.New(cfg, q, biller, conns, store, logger), nil
+	svc := extapi.New(cfg, q, biller, conns, store, logger)
+	// the call limits (#1715) share the rateLimits counters across instances
+	svc.UseLimitStore(ratelimit.NewFirestore(c, getenv("RATE_LIMIT_COLLECTION")))
+	return svc, nil
 }

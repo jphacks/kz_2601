@@ -135,6 +135,9 @@ func (h *Handler) extCall(w http.ResponseWriter, r *http.Request) {
 		if e.code == httpx.CodeProRequired && creator != uid {
 			e = e.With("reason", reasonCreatorNeedsPro)
 		}
+		if sec, ok := e.details["retryAfterSec"].(int); ok {
+			w.Header().Set("Retry-After", strconv.Itoa(sec))
+		}
 		fail(w, e)
 		return
 	}
@@ -219,6 +222,10 @@ func extErr(err error, provider string) *apiError {
 		return apiErr(http.StatusPaymentRequired, httpx.CodeOverflowCapReached, "the monthly coin cap for overflow is reached")
 	case extapi.ReasonCoinsInsufficient:
 		return apiErr(http.StatusPaymentRequired, httpx.CodeCoinsInsufficient, "not enough coins").With("payer", "self")
+	case extapi.ReasonRateLimited:
+		// a call limit of the provider (user / app / global) or its pause after a 429
+		return apiErr(http.StatusTooManyRequests, httpx.CodeRateLimited, "しばらくしてからもう一度試してください。").
+			With("scope", re.Scope).With("provider", provider).With("retryAfterSec", max(1, re.RetryAfterSec))
 	case extapi.ReasonUpstreamTimeout:
 		return apiErr(http.StatusGatewayTimeout, httpx.CodeUpstreamTimeout, "時間内に答えが返りませんでした。").With("provider", provider)
 	case extapi.ReasonUpstream:

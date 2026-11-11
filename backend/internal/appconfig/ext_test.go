@@ -230,6 +230,33 @@ func TestExtUserLimit(t *testing.T) {
 	}
 }
 
+// The runner's call limits (#1715) are 429 rate_limited with the scope,
+// the provider and Retry-After.
+func TestExtRunnerLimit(t *testing.T) {
+	t.Setenv("FIREBASE_AUTH_EMULATOR_HOST", "localhost:9099")
+	cases := []struct {
+		scope string
+		sec   int
+		want  string
+	}{
+		{extapi.LimitAppHourly, 1800, "1800"},
+		{extapi.LimitGlobalDaily, 43200, "43200"},
+		{extapi.LimitProviderPaused, 0, "1"},
+	}
+	for _, c := range cases {
+		st := store.NewMemory()
+		e := &env{t: t, h: auth.Middleware(nil, auth.ModeDev)(New(st, WithExt(stubRunner{err: &extapi.RunnerError{Status: 429,
+			Reason: extapi.ReasonRateLimited, Scope: c.scope, RetryAfterSec: c.sec}})))}
+		e.ownApp("solo", "/v1/apps/EXT-RL", kakeibo(t))
+		r := e.do("solo", http.MethodPost, "/v1/apps/EXT-RL/ext/fakeFree/listItems", `{"args":{}}`, nil)
+		wantExtErr(t, r, http.StatusTooManyRequests, httpx.CodeRateLimited, c.scope)
+		d, _ := r.body["error"].(map[string]any)["details"].(map[string]any)
+		if r.hdr.Get("Retry-After") != c.want || d["scope"] != c.scope || d["provider"] != "fakeFree" {
+			t.Fatalf("%s: Retry-After %q details %v", c.scope, r.hdr.Get("Retry-After"), d)
+		}
+	}
+}
+
 // providerIDs returns GET /v1/me/connections providers as "id:enabled".
 func providerIDs(t *testing.T, r resp) []string {
 	t.Helper()
@@ -304,6 +331,7 @@ func TestExtReasonCodes(t *testing.T) {
 		{&extapi.RunnerError{Status: 402, Reason: extapi.ReasonAllowanceExhausted}, 402, httpx.CodeAllowanceExhausted},
 		{&extapi.RunnerError{Status: 402, Reason: extapi.ReasonOverflowCap}, 402, httpx.CodeOverflowCapReached},
 		{&extapi.RunnerError{Status: 402, Reason: extapi.ReasonCoinsInsufficient}, 402, httpx.CodeCoinsInsufficient},
+		{&extapi.RunnerError{Status: 429, Reason: extapi.ReasonRateLimited, Scope: extapi.LimitUserDaily, RetryAfterSec: 60}, 429, httpx.CodeRateLimited},
 		{&extapi.RunnerError{Status: 504, Reason: extapi.ReasonUpstreamTimeout}, 504, httpx.CodeUpstreamTimeout},
 		{&extapi.RunnerError{Status: 502, Reason: extapi.ReasonUpstream}, 502, httpx.CodeUpstreamUnavailable},
 		{&extapi.RunnerError{Status: 500, Reason: extapi.ReasonInternal}, 500, httpx.CodeInternal},

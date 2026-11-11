@@ -16,7 +16,7 @@ import (
 //	fakePaid   paid, no OAuth   op echo(text, costUsd)           EXT_FAKE_PAID_ENABLED=1, COIN_RESERVE_EXT_FAKE_PAID
 //	fakeOauth  free, OAuth      ops listEvents, createEvent(title) EXT_FAKE_OAUTH_ENABLED=1
 //
-// Every op takes fail=5xx | 4xx | timeout to fail the way a provider does
+// Every op takes fail=5xx | 429 | 4xx | timeout | grant to fail the way a provider does
 // (4xx is billable: the provider charged it).
 const (
 	FakeFree  = "fakeFree"
@@ -73,6 +73,8 @@ func fakeOp(f func(Input) Output) Operation {
 		switch in.Args["fail"] {
 		case "5xx":
 			return Output{}, &ProviderError{Status: 503, Retryable: true, Err: errors.New("fake unavailable")}
+		case "429":
+			return Output{}, &ProviderError{Status: 429, Retryable: true, Err: errors.New("fake too many requests")}
 		case "4xx":
 			return Output{}, &ProviderError{Status: 400, Billable: true, Err: errors.New("fake bad request")}
 		case "timeout":

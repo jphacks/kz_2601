@@ -1,6 +1,7 @@
 package extapi
 
 import (
+	"errors"
 	"log/slog"
 	"net/http"
 
@@ -30,6 +31,8 @@ func StatusOf(reason string) int {
 		return http.StatusServiceUnavailable
 	case ReasonProRequired, ReasonAllowanceExhausted, ReasonOverflowCap, ReasonCoinsInsufficient:
 		return http.StatusPaymentRequired
+	case ReasonRateLimited:
+		return http.StatusTooManyRequests
 	case ReasonUpstreamTimeout:
 		return http.StatusGatewayTimeout
 	case ReasonUpstream:
@@ -67,9 +70,21 @@ type ConnBody struct {
 	Scopes   []string `json:"scopes,omitempty"`
 }
 
+// FailBody is the internal answer of a failed call: the reason, and for
+// rate_limited the scope (Limit*) and the seconds until it may be tried again.
+type FailBody struct {
+	Reason        string `json:"reason"`
+	Scope         string `json:"scope,omitempty"`
+	RetryAfterSec int    `json:"retryAfterSec,omitempty"`
+}
+
 func (s *Service) fail(w http.ResponseWriter, err error) {
-	reason := Reason(err)
-	httpx.WriteJSON(w, StatusOf(reason), map[string]string{"reason": reason})
+	b := FailBody{Reason: Reason(err)}
+	var le *LimitError
+	if errors.As(err, &le) {
+		b.Scope, b.RetryAfterSec = le.Scope, le.RetryAfterSec()
+	}
+	httpx.WriteJSON(w, StatusOf(b.Reason), b)
 }
 
 // Routes mounts the external API routes on mux.

@@ -10,6 +10,7 @@ import (
 
 	"github.com/jphacks/kz_2601/backend/internal/coins"
 	"github.com/jphacks/kz_2601/backend/internal/httpx"
+	"github.com/jphacks/kz_2601/backend/internal/ratelimit"
 	"github.com/jphacks/kz_2601/backend/internal/runner/quota"
 )
 
@@ -64,6 +65,8 @@ type Service struct {
 	cache *callCache
 	// refreshing serialises token refreshes per uid + provider.
 	refreshing keyedLock
+	// limits counts calls and keeps the provider pauses (limits.go).
+	limits limiter
 
 	Runs  RunsCounter
 	Coins CoinBiller
@@ -90,6 +93,7 @@ func New(cfg Config, runs RunsCounter, biller CoinBiller, conns *Connections, st
 	}
 	s := &Service{cfg: cfg, ops: map[string]map[string]Operation{}, oauth: map[string]OAuthClient{},
 		sem: make(chan struct{}, cfg.MaxConcurrent), cache: newCallCache(), Runs: runs, Coins: biller, Conns: conns, States: states, Log: logger}
+	s.limits = limiter{store: ratelimit.NewMemoryClock(s.now), fallback: ratelimit.NewMemoryClock(s.now)}
 	if cfg.Disabled {
 		logger.Info("extapi: EXT_DISABLED: every provider is off")
 		return s
@@ -202,15 +206,26 @@ func (s *Service) Call(ctx context.Context, r CallRequest) (res CallResult, err 
 	}
 	billing := "runs"
 	var charged int64
+	var paused bool // this call's 429 paused the provider
 	defer func() {
 		result := "ok"
 		if err != nil {
 			result = Reason(err)
 		}
 		uid, _ := r.actor()
-		s.Log.InfoContext(ctx, LogEvent, slog.String("event", LogEvent), slog.String("provider", r.Provider), slog.String("op", r.Op),
+		attrs := []any{slog.String("event", LogEvent), slog.String("provider", r.Provider), slog.String("op", r.Op),
 			slog.String("result", result), slog.Int64("ms", s.now().Sub(start).Milliseconds()), slog.String("billing", billing),
-			slog.Int64("coins", charged), slog.String("app_id", r.AppID), slog.String("uid_hash", httpx.UIDHash(uid)))
+			slog.Int64("coins", charged), slog.String("app_id", r.AppID), slog.String("uid_hash", httpx.UIDHash(uid))}
+		// the stopping reason: codes and counts only
+		var le *LimitError
+		if errors.As(err, &le) {
+			attrs = append(attrs, slog.String("limit", le.Scope), slog.Int("limit_max", le.Limit), slog.Int("limit_count", le.Count),
+				slog.Int("retry_after_sec", le.RetryAfterSec()))
+		}
+		if paused {
+			attrs = append(attrs, slog.String("paused", LimitProviderPaused))
+		}
+		s.Log.InfoContext(ctx, LogEvent, attrs...)
 	}()
 
 	run := quota.Run{AppID: r.AppID, CreatorUID: r.CreatorUID, CreatorAnonymous: r.CreatorAnonymous, ActorUID: r.UserUID, Attempt: 1}
@@ -237,14 +252,27 @@ func (s *Service) Call(ctx context.Context, r CallRequest) (res CallResult, err 
 		return res, ErrBusy
 	}
 
-	// 1. one `runs` of the creator's month (Pro only)
+	// 1. the call limits: the provider's 429 pause, then the user's, the
+	// app's and everyone's counts of this provider (limits.go)
+	if wait := s.limits.pausedFor(p.ID, s.now()); wait > 0 {
+		return res, &LimitError{Scope: LimitProviderPaused, RetryAfter: wait}
+	}
+	who, anon := r.actor()
+	lc, err := s.consumeLimits(ctx, p.ID, who, r.AppID)
+	if err != nil {
+		return res, err
+	}
+
+	// 2. one `runs` of the creator's month (Pro only)
 	var runs quota.Charge
 	if s.Runs != nil {
 		ch, blk, err := s.Runs.ExtRun(ctx, run, r.Run)
 		if err != nil {
+			s.refundLimits(ctx, p.ID, lc)
 			return res, fmt.Errorf("runs: %w", err)
 		}
 		if blk != nil {
+			s.refundLimits(ctx, p.ID, lc)
 			if blk.Scope == quota.ScopeExtNeedsPro {
 				return res, ErrProRequired
 			}
@@ -252,7 +280,7 @@ func (s *Service) Call(ctx context.Context, r CallRequest) (res CallResult, err 
 		}
 		runs = ch
 	}
-	refundRuns := func() {
+	giveBackRuns := func() {
 		if s.Runs == nil || runs.Empty() {
 			return
 		}
@@ -260,10 +288,15 @@ func (s *Service) Call(ctx context.Context, r CallRequest) (res CallResult, err 
 			s.Log.WarnContext(ctx, "extapi: refunding the run failed", slog.String("provider", r.Provider), slog.Any("error", err))
 		}
 	}
+	// refundRuns gives back a call that did not reach the provider: its
+	// `runs` and its limit counts
+	refundRuns := func() {
+		s.refundLimits(ctx, p.ID, lc)
+		giveBackRuns()
+	}
 
-	// 2. the person's token (the creator's for a server rule)
+	// 3. the person's token (the creator's for a server rule)
 	in := Input{Args: r.Args, RequestID: r.RequestID}
-	who, anon := r.actor()
 	var sealed []byte // the stored form of the token used
 	if p.NeedsOAuth {
 		var t Token
@@ -275,7 +308,7 @@ func (s *Service) Call(ctx context.Context, r CallRequest) (res CallResult, err 
 		in.Token = &t
 	}
 
-	// 3. hold coins (paid)
+	// 4. hold coins (paid)
 	var hold *coins.Hold
 	if p.Billing == BillingPaid && s.Coins != nil {
 		billing = "coins"
@@ -300,17 +333,22 @@ func (s *Service) Call(ctx context.Context, r CallRequest) (res CallResult, err 
 		}
 	}
 
-	// 4. the call
+	// 5. the call (it counts against the limits even when it fails: the
+	// provider was called)
 	cctx, cancel := context.WithTimeout(ctx, s.cfg.Timeout)
 	out, err := s.ops[p.ID][spec.Name].Do(cctx, in)
 	cancel()
+	if upstreamLimited(err) && s.cfg.UpstreamPause > 0 {
+		s.limits.pause(p.ID, s.now(), s.cfg.UpstreamPause)
+		paused = true
+	}
 	var perr *ProviderError
 	billable := errors.As(err, &perr) && perr.Billable
 	if err != nil && !billable {
 		if hold != nil {
 			release()
 		}
-		refundRuns()
+		giveBackRuns()
 		if errors.Is(err, ErrInvalidGrant) && s.Conns != nil {
 			_ = s.Conns.MarkError(context.WithoutCancel(ctx), who, p.ID, sealed)
 			return res, ErrNotConnected
@@ -318,7 +356,7 @@ func (s *Service) Call(ctx context.Context, r CallRequest) (res CallResult, err 
 		return res, err
 	}
 
-	// 5. commit the cost (the rest of the hold goes back)
+	// 6. commit the cost (the rest of the hold goes back)
 	usage := out.Usage
 	if perr != nil {
 		usage = perr.Usage
@@ -435,9 +473,12 @@ const (
 	ReasonAllowanceExhausted = "allowance_exhausted"
 	ReasonOverflowCap        = "overflow_cap_reached"
 	ReasonCoinsInsufficient  = "coins_insufficient"
-	ReasonUpstreamTimeout    = "upstream_timeout"
-	ReasonUpstream           = "upstream_unavailable"
-	ReasonInternal           = "internal"
+	// ReasonRateLimited is a call limit or a provider's pause (LimitError;
+	// the answer also has its scope and retryAfterSec).
+	ReasonRateLimited     = "rate_limited"
+	ReasonUpstreamTimeout = "upstream_timeout"
+	ReasonUpstream        = "upstream_unavailable"
+	ReasonInternal        = "internal"
 )
 
 // Reason is err's reason.
@@ -445,6 +486,7 @@ func Reason(err error) string {
 	var ae *AllowanceError
 	var ins *coins.InsufficientError
 	var pe *ProviderError
+	var le *LimitError
 	switch {
 	case err == nil:
 		return ReasonOK
@@ -460,6 +502,8 @@ func Reason(err error) string {
 		return ReasonDuplicateRequest
 	case errors.Is(err, ErrProRequired):
 		return ReasonProRequired
+	case errors.As(err, &le):
+		return ReasonRateLimited
 	case errors.As(err, &ae):
 		switch ae.Block.Stop {
 		case quota.OutcomeSkippedOverflowCap:
