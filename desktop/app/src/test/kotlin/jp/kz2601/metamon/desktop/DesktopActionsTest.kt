@@ -82,6 +82,32 @@ class DesktopActionsTest {
     }
 
     @Test
+    fun bareMailtoOpensMailerInsteadOfFailingToParse() {
+        val calls = mutableListOf<String>()
+        var mailSupported = true
+        val fake = object : SystemOpener {
+            override fun supports(action: java.awt.Desktop.Action) = action != java.awt.Desktop.Action.MAIL || mailSupported
+            override fun browse(uri: java.net.URI) { calls += "browse $uri" }
+            override fun mail() { calls += "mail" }
+        }
+        val s = DesktopSession(Examples.load("shopping"))
+        s.host = DesktopActionHost(BookLookupClient.mock, Files.createTempDirectory("desktop-actions").toFile(), silent, background = { it() }, system = fake)
+        // openUrlButton の mail で to が空・不正 → "mailto:"(URI にすると例外になる)
+        s.openFirst(jp.kz2601.metamon.dsl.logic.OpenApp.MAIL.urls(null), ActionContext(s.top, null))
+        assertNull(s.message)
+        assertEquals(listOf("mail"), calls)
+        s.run(Action(type = ActionType.OPEN_URL, url = "mailto:a@example.com"))
+        assertNull(s.message)
+        assertEquals("browse mailto:a@example.com", calls.last())
+        // メーラーが無いパソコンは理由を出す
+        mailSupported = false
+        s.run(Action(type = ActionType.OPEN_URL, url = "MAILTO:"))
+        assertTrue(s.message.orEmpty(), s.message!!.endsWith("MAILTO:"))
+        assertTrue(DesktopActionHost.isBareMailto("mailto: "))
+        assertTrue(!DesktopActionHost.isBareMailto("mailto:?body=x"))
+    }
+
+    @Test
     fun resetFormClearsDraft() {
         val (s, _) = session("kakeibo")
         s.run(Action(type = ActionType.NAVIGATE, screen = "expense_form"))
