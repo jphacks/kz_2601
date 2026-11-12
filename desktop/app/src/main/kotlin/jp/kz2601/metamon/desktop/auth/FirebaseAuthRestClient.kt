@@ -2,7 +2,9 @@ package jp.kz2601.metamon.desktop.auth
 
 import jp.kz2601.metamon.services.http.FailureKind
 import jp.kz2601.metamon.services.http.MetamonHttp
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.suspendCancellableCoroutine
+import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
@@ -92,21 +94,23 @@ class FirebaseAuthRestClient(
     private fun notConfigured(): AuthResult<Nothing> =
         AuthResult.Failed(FailureKind.Rejected("TAILORIT_FIREBASE_API_KEY is not set"))
 
-    private suspend fun <T : Any> call(request: Request, parse: (JsonObject) -> T?): AuthResult<T> {
-        val (status, body, retryAfter) = try {
-            client.newCall(request).await().use { r ->
-                Triple(r.code, r.body.string(), r.header("Retry-After")?.toDoubleOrNull())
+    /** 本文を読むのも I/O なので、呼び出し元のスレッド(画面など)ではなく IO で回す。 */
+    private suspend fun <T : Any> call(request: Request, parse: (JsonObject) -> T?): AuthResult<T> =
+        withContext(Dispatchers.IO) {
+            val (status, body, retryAfter) = try {
+                client.newCall(request).await().use { r ->
+                    Triple(r.code, r.body.string(), r.header("Retry-After")?.toDoubleOrNull())
+                }
+            } catch (e: IOException) {
+                return@withContext AuthResult.Failed(FailureKind.classify(e))
             }
-        } catch (e: IOException) {
-            return AuthResult.Failed(FailureKind.classify(e))
+            val json = runCatching { Json.parseToJsonElement(body).jsonObject }.getOrNull()
+            if (status in 200..299) {
+                val value = json?.let(parse) ?: return@withContext AuthResult.Failed(FailureKind.Other("unreadable auth response"))
+                return@withContext AuthResult.Ok(value)
+            }
+            return@withContext AuthResult.Failed(classify(status, json?.let(::errorMessage), retryAfter))
         }
-        val json = runCatching { Json.parseToJsonElement(body).jsonObject }.getOrNull()
-        if (status in 200..299) {
-            val value = json?.let(parse) ?: return AuthResult.Failed(FailureKind.Other("unreadable auth response"))
-            return AuthResult.Ok(value)
-        }
-        return AuthResult.Failed(classify(status, json?.let(::errorMessage), retryAfter))
-    }
 
     companion object {
         private val JSON = "application/json".toMediaType()
