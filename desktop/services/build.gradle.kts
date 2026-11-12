@@ -34,11 +34,18 @@ sourceSets {
                 "jp/kz2601/metamon/services/consent/AiConsentStore.kt",
                 "jp/kz2601/metamon/services/consent/CrashReportingPreference.kt",
                 "jp/kz2601/metamon/services/consent/KeyValueStore.kt",
+                "jp/kz2601/metamon/services/discover/DiscoverClient.kt",
+                "jp/kz2601/metamon/services/discover/DiscoverModel.kt",
+                "jp/kz2601/metamon/services/discover/PublishModel.kt",
                 "jp/kz2601/metamon/services/http/*.kt",
                 "jp/kz2601/metamon/services/live/HttpAppConfigClient.kt",
+                "jp/kz2601/metamon/services/live/HttpDiscoverClient.kt",
                 "jp/kz2601/metamon/services/local/DocumentCache.kt",
                 "jp/kz2601/metamon/services/local/RecordStore.kt",
                 "jp/kz2601/metamon/services/local/SyncQueue.kt",
+                // DiscoverModel・PublishModel が使う通報・ブロックの型と作者名の保存(純 Kotlin)
+                "jp/kz2601/metamon/services/social/AuthorProfile.kt",
+                "jp/kz2601/metamon/services/social/ModerationClient.kt",
             )
         }
     }
@@ -48,4 +55,8 @@ dependencies {
     api(project(":dsl"))
     api(libs.kotlinx.coroutines.core)
     api(libs.okhttp)
+
+    testImplementation(libs.junit)
+    testImplementation(libs.kotlinx.coroutines.test)
+    testImplementation(libs.okhttp.mockwebserver)
 }
