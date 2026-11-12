@@ -252,6 +252,7 @@ private fun ScreenView(
         copyText = io::copyText,
         dragRows = io::rowsTransferable,
         openWindow = openRecord?.let { open -> { a: Action, id: String -> RecordWindows.target(a)?.let { open(it, id) } } },
+        marks = session.persistence?.marks,
     )
     val scope = ScreenScope(route, form, session, perform, io, data, dataEnv)
     Column(Modifier.fillMaxSize()) {

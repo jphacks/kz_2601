@@ -16,8 +16,13 @@ import androidx.compose.ui.input.pointer.isMetaPressed
 import androidx.compose.ui.input.pointer.isShiftPressed
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.clearAndSetSemantics
+import androidx.compose.material3.Icon
+import kotlinx.coroutines.launch
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.foundation.gestures.Orientation
 import androidx.compose.foundation.gestures.draggable
@@ -57,6 +62,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -78,6 +84,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.layout.ContentScale
 import jp.kz2601.metamon.desktop.io.DragOut
 import jp.kz2601.metamon.desktop.io.dragOut
+import jp.kz2601.metamon.desktop.marks.RowMarks
 import jp.kz2601.metamon.dsl.Action
 import jp.kz2601.metamon.dsl.Component
 import jp.kz2601.metamon.dsl.ComponentType
@@ -93,6 +100,8 @@ import jp.kz2601.metamon.dsl.records.FieldCoding
 import jp.kz2601.metamon.dsl.records.FieldType
 import jp.kz2601.metamon.dsl.records.GridTableLayout
 import jp.kz2601.metamon.dsl.records.JSONValue
+import jp.kz2601.metamon.dsl.records.Mark
+import jp.kz2601.metamon.dsl.records.MarkState
 import jp.kz2601.metamon.dsl.records.Record
 import jp.kz2601.metamon.dsl.records.RecordQuery
 import jp.kz2601.metamon.dsl.records.Sort
@@ -133,6 +142,8 @@ class DataEnv(
     val copyText: (tsv: String, rows: Int) -> Unit = { _, _ -> },
     /** list の行を外へ引き出す形(TSV の文字 + CSV のファイル・#1764)。(entity, 画面の並びの recordId)。 */
     val dragRows: (entity: String, ids: List<String>) -> Transferable? = { _, _ -> null },
+    /** 行の印(いいね・保存・#2811)。サインインしていない時は null で、ボタンを出さない。 */
+    val marks: RowMarks? = null,
 )
 
 @Composable
@@ -359,6 +370,9 @@ private fun ListLeaf(c: Component, env: DataEnv) {
     val deletable = c.swipeToDelete == true && c.entity != null
     val keys = Modifier.rowSelectionKeys(selection, order) { ids -> c.entity?.let { env.copyRows(it, ids) } }
     val highlight = MaterialTheme.colorScheme.primary.copy(alpha = 0.14f)
+    val marks = env.marks?.takeIf { c.entity != null }
+    val mark = marks?.let { RowMarks.mark(c.item, entity) }
+    val scope = rememberCoroutineScope()
     LazyColumn(Modifier.fillMaxWidth().heightIn(max = LIST_MAX_HEIGHT).then(keys)) {
         itemsIndexed(rows, key = { _, r -> r.id }) { i, r ->
             val t = ListRows.texts(c.item, r, entity, data)
@@ -400,6 +414,10 @@ private fun ListLeaf(c: Component, env: DataEnv) {
                         t.subtitle?.let { Text(it, style = MaterialTheme.typography.bodySmall, color = Color.Gray, maxLines = 1, overflow = TextOverflow.Ellipsis) }
                     }
                     t.trailing?.let { Text(it, style = MaterialTheme.typography.bodyMedium, color = Color.Gray, maxLines = 1) }
+                    if (marks != null && mark != null) {
+                        val e = c.entity!!
+                        MarkButton(mark, marks.shown(e, r, mark.id)) { scope.launch { marks.press(e, r, mark.id) } }
+                    }
                 }
             }
             val menu = listOfNotNull(
@@ -410,6 +428,37 @@ private fun ListLeaf(c: Component, env: DataEnv) {
             if (i < rows.size - 1) HorizontalDivider()
         }
     }
+}
+
+/**
+ * 行の右の印(Android の ListLeaf の MarkButton)。行を押すのとは別のボタン。付けると塗り + 色、件数は 1 以上で出す。
+ * 読み上げは「いいね 3 件・付けています」、押す操作は「いいねを外す」。
+ */
+@Composable
+private fun MarkButton(mark: Mark, state: MarkState, onPress: () -> Unit) {
+    val tint = if (state.mine) markColor(mark) else Color.Gray
+    val value = A11y.mark(mark, state)
+    val action = A11y.markAction(mark, state)
+    Row(
+        Modifier.clip(RoundedCornerShape(8.dp))
+            .clickable(onClickLabel = action, role = Role.Button, onClick = onPress)
+            // 中の絵と数は読まず、まとめて 1 つの説明にする
+            .clearAndSetSemantics { contentDescription = value }
+            .padding(horizontal = 6.dp, vertical = 4.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(4.dp),
+    ) {
+        DesktopIcons.vector(RowMarks.symbol(mark.icon, state.mine))?.let { Icon(it, contentDescription = null, tint = tint, modifier = Modifier.size(20.dp)) }
+        if (state.count > 0) Text("${state.count}", style = MaterialTheme.typography.bodyMedium, color = tint)
+    }
+}
+
+/** いいねは赤系、お気に入りは橙、それ以外はテーマの色(Android の markColor)。 */
+@Composable
+private fun markColor(mark: Mark): Color = when (mark.icon) {
+    "heart" -> Color(0xFFE91E63)
+    "star" -> Color(0xFFFF9800)
+    else -> MaterialTheme.colorScheme.primary
 }
 
 private val THUMBNAIL = 44.dp

@@ -8,6 +8,8 @@ import jp.kz2601.metamon.dsl.Component
 import jp.kz2601.metamon.dsl.ComponentType
 import jp.kz2601.metamon.dsl.ExprNumber
 import jp.kz2601.metamon.dsl.records.Aggregator
+import jp.kz2601.metamon.dsl.records.Mark
+import jp.kz2601.metamon.dsl.records.MarkState
 
 /**
  * 読み上げ(Windows の Narrator・Linux の Orca)向けの説明(#1759)。
@@ -38,6 +40,14 @@ object A11y {
         ComponentType.ICON -> c.label?.takeIf { it.isNotBlank() }
         else -> null
     }
+
+    /** 一覧の行の印(#2811)。「いいね 3 件」「いいね 3 件・付けています」。 */
+    fun mark(mark: Mark, state: MarkState): String =
+        Strings.format(if (state.mine) "lists_mark_count_mine" else "lists_mark_count", mark.label, state.count)
+
+    /** 印のボタンを押した時の操作の名前。「いいねを付ける」「いいねを外す」。 */
+    fun markAction(mark: Mark, state: MarkState): String =
+        Strings.format(if (state.mine) "lists_mark_remove" else "lists_mark_add", mark.label)
 
     /** 写真のプレビュー(PhotoPreview.kt)のダイアログの名前。項目名を付ける。 */
     fun previewTitle(name: String): String = Strings.format("desktop_a11y_preview", name.ifBlank { Strings["desktop_a11y_image"] })

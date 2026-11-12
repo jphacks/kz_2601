@@ -5,6 +5,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import jp.kz2601.metamon.desktop.MockStore
 import jp.kz2601.metamon.desktop.Row
+import jp.kz2601.metamon.desktop.marks.RowMarks
 import jp.kz2601.metamon.desktop.net.DesktopApi
 import jp.kz2601.metamon.desktop.net.DesktopApiConfig
 import jp.kz2601.metamon.desktop.typedValue
@@ -52,6 +53,17 @@ class SessionPersistence(
 ) {
     val queue: SyncQueue? = client?.let { store.queue(it, policy) }
     val isLive: Boolean get() = queue != null
+
+    /**
+     * 一覧の行の印(#2811)。送り先がある(サインインしている)時だけ。画面の id は端末の行からサーバーの id に替えて送る。
+     * 端末に無い行(開発用の記録など)は画面の id のまま、まだ送っていない作成は送らない。
+     */
+    val marks: RowMarks? = client?.let { c ->
+        RowMarks.live(c, appId) { entity, id ->
+            val row = store.records.current(appId, entity, id) ?: return@live id
+            row.recordId.takeUnless { row.isTemporary }
+        }
+    }
 
     /** 送り待ちの件数(このアプリの分だけ・画面に小さく出す)。 */
     var pending: Int by mutableStateOf(0)
