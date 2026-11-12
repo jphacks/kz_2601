@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -34,6 +35,7 @@ type fakeHue struct {
 	links   int    // remote links made (application keys handed out)
 	apiNext int    // non-zero: the next remote API answer is this status
 	gets    []string
+	puts    []string // "<light id> <body>" of each light change
 }
 
 // remoteOK checks the bearer and, for CLIP v2, the application key. It
@@ -129,6 +131,22 @@ func newFakeHue(t *testing.T) (*fakeHue, *httptest.Server) {
 			return
 		}
 		_, _ = w.Write(b)
+	})
+	mux.HandleFunc("PUT /route/clip/v2/resource/light/{id}", func(w http.ResponseWriter, r *http.Request) {
+		if !f.remoteOK(w, r, true) {
+			return
+		}
+		b, _ := io.ReadAll(r.Body)
+		// the lights of testdata/hue/normal
+		if !strings.HasPrefix(r.PathValue("id"), "3f2a1c5e-0000-4000-8000-00000000000") {
+			w.WriteHeader(http.StatusNotFound)
+			_, _ = w.Write([]byte(`{"errors":[{"description":"Not Found"}],"data":[]}`))
+			return
+		}
+		f.mu.Lock()
+		f.puts = append(f.puts, r.PathValue("id")+" "+string(b))
+		f.mu.Unlock()
+		_, _ = w.Write([]byte(`{"errors":[],"data":[{"rid":"` + r.PathValue("id") + `","rtype":"light"}]}`))
 	})
 	srv := httptest.NewServer(mux)
 	t.Cleanup(srv.Close)
@@ -345,5 +363,95 @@ func TestHueLightsErrors(t *testing.T) {
 	f.apiNext = http.StatusForbidden
 	if _, err := c.lights(ctx, Input{Token: &Token{AccessToken: "hue-access-0"}}); !errors.As(err, &pe) || pe.Retryable || pe.Status != 403 {
 		t.Fatalf("403: %v", err)
+	}
+}
+
+func TestHueSetLightIsAWriteOp(t *testing.T) {
+	o, ok := hueProvider().Op("setLight")
+	if !ok || !o.Write {
+		t.Fatalf("setLight must be a write op (confirmation): %+v", o)
+	}
+}
+
+func TestHueSetLightArgs(t *testing.T) {
+	const id = "3f2a1c5e-0000-4000-8000-000000000001"
+	p := hueProvider()
+	for _, tc := range []struct {
+		args map[string]string
+		ok   bool
+	}{
+		{map[string]string{"id": id, "on": "true"}, true},
+		{map[string]string{"id": id, "on": "false"}, true},
+		{map[string]string{"id": id, "on": "true", "brightness": "1"}, true},
+		{map[string]string{"id": id, "on": "true", "brightness": "100"}, true},
+		{map[string]string{"id": id, "on": "true", "brightness": "0"}, false},
+		{map[string]string{"id": id, "on": "true", "brightness": "101"}, false},
+		{map[string]string{"id": id, "on": "true", "brightness": "50.5"}, false},
+		{map[string]string{"id": id, "on": "false", "brightness": "50"}, false},
+		{map[string]string{"id": id, "on": "yes"}, false},
+		{map[string]string{"id": id}, false},
+		{map[string]string{"id": "1", "on": "true"}, false},
+		{map[string]string{"id": "3F2A1C5E-0000-4000-8000-000000000001", "on": "true"}, false},
+		{map[string]string{"id": id + "/../x", "on": "true"}, false},
+		{map[string]string{"on": "true"}, false},
+		{map[string]string{"id": id, "on": "true", "color": "red"}, false},
+	} {
+		if _, err := p.CheckArgs("setLight", tc.args); (err == nil) != tc.ok {
+			t.Errorf("%v: %v", tc.args, err)
+		}
+	}
+}
+
+func TestHueSetLight(t *testing.T) {
+	const id = "3f2a1c5e-0000-4000-8000-000000000001"
+	ctx := context.Background()
+	tok := &Token{AccessToken: "hue-access-0"}
+	f, srv := newFakeHue(t)
+	c := newTestHue(t, srv)
+	for _, tc := range []struct {
+		args  map[string]string
+		title string
+		body  string
+	}{
+		{map[string]string{"id": id, "on": "true", "brightness": "60"}, "オン・明るさ 60%", `{"dimming":{"brightness":60},"on":{"on":true}}`},
+		{map[string]string{"id": id, "on": "true"}, "オン", `{"on":{"on":true}}`},
+		{map[string]string{"id": id, "on": "false"}, "オフ", `{"on":{"on":false}}`},
+	} {
+		out, err := c.setLight(ctx, Input{Args: tc.args, Token: tok})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if out.ResultID != id || out.Item == nil || out.Item.Title != tc.title || out.Item.Value != id {
+			t.Fatalf("%v: %+v", tc.args, out)
+		}
+		if got := f.puts[len(f.puts)-1]; got != id+" "+tc.body {
+			t.Fatalf("sent %s", got)
+		}
+	}
+	if f.links != 1 {
+		t.Fatalf("linked %d times", f.links)
+	}
+
+	// 404: a light the bridge does not have
+	_, err := c.setLight(ctx, Input{Args: map[string]string{"id": "aaaaaaaa-0000-4000-8000-000000000001", "on": "true"}, Token: tok})
+	var pe *ProviderError
+	if !errors.Is(err, ErrUnknown) || !errors.As(err, &pe) || pe.Status != 404 || pe.Retryable {
+		t.Fatalf("404: %v", err)
+	}
+	// 429
+	f.apiNext = http.StatusTooManyRequests
+	if _, err := c.setLight(ctx, Input{Args: map[string]string{"id": id, "on": "true"}, Token: tok}); !errors.As(err, &pe) || pe.Status != 429 {
+		t.Fatalf("429: %v", err)
+	}
+	// nothing is sent with bad arguments or without a connection
+	n := len(f.puts)
+	if _, err := c.setLight(ctx, Input{Args: map[string]string{"id": "x", "on": "true"}, Token: tok}); !errors.Is(err, ErrBadArgs) {
+		t.Fatalf("bad id: %v", err)
+	}
+	if _, err := c.setLight(ctx, Input{Args: map[string]string{"id": id, "on": "true"}}); !errors.Is(err, ErrNotConnected) {
+		t.Fatalf("no token: %v", err)
+	}
+	if len(f.puts) != n {
+		t.Fatal("sent with bad arguments")
 	}
 }
