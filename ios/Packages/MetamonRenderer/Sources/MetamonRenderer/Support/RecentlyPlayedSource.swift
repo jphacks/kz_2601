@@ -23,7 +23,7 @@ public enum RecentlyPlayed {
 }
 
 extension MusicAvailability {
-    /// 最近聞いた曲を読めるか。契約が無くても読んでみる(要るかは実機で確かめる・#1988)。
+    /// 最近聞いた曲を読めるか。許可があれば読む(契約の要否は実機で確かめる・#1988)。
     public var canReadRecentlyPlayed: Bool { self == .ready || self == .noSubscription }
 }
 
@@ -31,15 +31,19 @@ extension MusicAvailability {
 /// Mac で同じ実体が動くかはまだ確かめていない。
 @MainActor
 public final class AppleRecentlyPlayed: RecentlyPlayedSource {
-    private let playback: MusicPlayback
+    private let authorization: @MainActor (Bool) async -> MusicAvailability
 
-    /// 許可・契約の判定は再生元と同じもの(`AppleMusicPlayback.availability`)を使う。
-    public init(playback: MusicPlayback? = nil) {
-        self.playback = playback ?? AppleMusicPlayback()
+    /// 履歴を読むのに要るのは許可だけ。契約(`MusicSubscription.current`)は読み込まない。テストは `authorization` を差し替える。
+    public init(authorization: (@MainActor (Bool) async -> MusicAvailability)? = nil) {
+        self.authorization = authorization ?? { requesting in
+            var status = MusicAuthorization.currentStatus
+            if status == .notDetermined && requesting { status = await MusicAuthorization.request() }
+            return Self.availability(for: status)
+        }
     }
 
     public func availability(requesting: Bool) async -> MusicAvailability {
-        await playback.availability(requesting: requesting)
+        await authorization(requesting)
     }
 
     public func recentlyPlayed(limit: Int) async throws -> [MusicSong] {
@@ -49,10 +53,42 @@ public final class AppleRecentlyPlayed: RecentlyPlayedSource {
         guard state.canReadRecentlyPlayed else { throw MusicPlaybackError.unavailable(state) }
         var req = MusicRecentlyPlayedRequest<Song>()
         req.limit = n
-        return try await req.response().items.prefix(n).map {
-            MusicSong(id: $0.id.rawValue, title: $0.title, artist: $0.artistName,
-                      artworkURL: $0.artwork?.url(width: 200, height: 200)?.absoluteString)
+        let items: MusicItemCollection<Song>
+        do {
+            items = try await req.response().items
+        } catch is CancellationError {
+            throw CancellationError()
+        } catch {
+            // MusicKit の生のエラーは部品に出さない。契約が無いか、それ以外は「使えない」。
+            let sub = try? await MusicSubscription.current
+            throw MusicPlaybackError.unavailable(Self.failureState(canPlayCatalog: sub?.canPlayCatalogContent))
         }
+        return items.prefix(n).map {
+            MusicSong(id: $0.id.rawValue, title: $0.title, artist: $0.artistName,
+                      artworkURL: Self.httpsArtwork($0.artwork?.url(width: 200, height: 200)))
+        }
+    }
+
+    /// 許可の状態だけで決める(`.authorized` なら読める)。
+    nonisolated static func availability(for status: MusicAuthorization.Status) -> MusicAvailability {
+        switch status {
+        case .authorized: .ready
+        case .notDetermined: .notDetermined
+        case .denied: .denied
+        case .restricted: .restricted
+        @unknown default: .unavailable
+        }
+    }
+
+    /// 読み込みに失敗した時の状態。契約が無いと分かれば `.noSubscription`、それ以外は `.unavailable`。
+    nonisolated static func failureState(canPlayCatalog: Bool?) -> MusicAvailability {
+        canPlayCatalog == false ? .noSubscription : .unavailable
+    }
+
+    /// `https` の画像だけ使う(`musicKit://` などは画像部品で読めない)。
+    nonisolated static func httpsArtwork(_ url: URL?) -> String? {
+        guard let url, url.scheme?.lowercased() == "https" else { return nil }
+        return url.absoluteString
     }
 }
 

@@ -67,7 +67,7 @@ final class RecentlyPlayedSourceTests: XCTestCase {
 
     /// 実体も許可が無ければ MusicKit を呼ばずに `unavailable` を投げる(シミュレータ・許可なしで落ちない)。
     func testLiveSourceThrowsWithoutCallingMusicKitWhenBlocked() async {
-        let live = AppleRecentlyPlayed(playback: FakeMusicPlayback(state: .denied))
+        let live = AppleRecentlyPlayed(authorization: { _ in .denied })
         do {
             _ = try await live.recentlyPlayed(limit: 5)
             XCTFail("denied は読めない")
@@ -76,5 +76,27 @@ final class RecentlyPlayedSourceTests: XCTestCase {
         }
         let empty = try? await live.recentlyPlayed(limit: 0)
         XCTAssertEqual(empty, [])
+    }
+
+    /// 許可だけで決める(契約は読み込まない)。
+    func testLiveAvailabilityUsesAuthorizationOnly() {
+        XCTAssertEqual(AppleRecentlyPlayed.availability(for: .authorized), .ready)
+        XCTAssertEqual(AppleRecentlyPlayed.availability(for: .notDetermined), .notDetermined)
+        XCTAssertEqual(AppleRecentlyPlayed.availability(for: .denied), .denied)
+        XCTAssertEqual(AppleRecentlyPlayed.availability(for: .restricted), .restricted)
+    }
+
+    /// 読み込み失敗は MusicKit のエラーでなく `unavailable` の状態に寄せる。
+    func testFailureStateMapsToNoSubscriptionOrUnavailable() {
+        XCTAssertEqual(AppleRecentlyPlayed.failureState(canPlayCatalog: false), .noSubscription)
+        XCTAssertEqual(AppleRecentlyPlayed.failureState(canPlayCatalog: true), .unavailable)
+        XCTAssertEqual(AppleRecentlyPlayed.failureState(canPlayCatalog: nil), .unavailable)
+    }
+
+    func testArtworkKeepsOnlyHTTPS() {
+        XCTAssertEqual(AppleRecentlyPlayed.httpsArtwork(URL(string: "https://a.example/x.jpg")), "https://a.example/x.jpg")
+        XCTAssertNil(AppleRecentlyPlayed.httpsArtwork(URL(string: "http://a.example/x.jpg")))
+        XCTAssertNil(AppleRecentlyPlayed.httpsArtwork(URL(string: "musicKit://artwork/1")))
+        XCTAssertNil(AppleRecentlyPlayed.httpsArtwork(nil))
     }
 }
