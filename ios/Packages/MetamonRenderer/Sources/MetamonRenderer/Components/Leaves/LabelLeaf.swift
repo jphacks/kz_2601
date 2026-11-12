@@ -6,7 +6,7 @@ struct LabelLeaf: View {
     let c: Component
 
     var body: some View {
-        Label(c.text ?? "", systemImage: c.icon ?? "circle")
+        Label(c.text ?? "", systemImage: PlatformSymbol.name(c.icon, fallback: "circle"))
             .font(font)
             .frame(maxWidth: .infinity, alignment: .leading)
     }

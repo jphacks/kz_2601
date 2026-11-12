@@ -73,16 +73,11 @@ func (m *Memory) ListItems(_ context.Context, q ItemQuery) ([]Item, error) {
 	defer m.mu.Unlock()
 	out := []Item{}
 	for _, it := range m.items {
-		if q.Status == "" || it.Status == q.Status {
+		if (q.Status == "" || it.Status == q.Status) && (q.Source == "" || it.Source == q.Source) {
 			out = append(out, cloneItem(it))
 		}
 	}
-	sort.Slice(out, func(i, j int) bool {
-		if !out[i].IngestedAt.Equal(out[j].IngestedAt) {
-			return out[i].IngestedAt.Before(out[j].IngestedAt)
-		}
-		return out[i].ID < out[j].ID
-	})
+	sortItems(out)
 	if n := limitOr(q.Limit, 100); len(out) > n {
 		out = out[:n]
 	}

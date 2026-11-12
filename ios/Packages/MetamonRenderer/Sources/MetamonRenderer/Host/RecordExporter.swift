@@ -22,6 +22,17 @@ public enum ExportFiles {
     public static func removeAll() {
         try? FileManager.default.removeItem(at: directory)
     }
+
+    /// 1 回の書き出しのフォルダ(`file` の親)だけを消す。ほかのウインドウの共有・行のドラッグの写しは残す。
+    /// 置き場が空になったら置き場も消す。置き場の外のファイルには触らない
+    public static func remove(_ file: URL) {
+        let fm = FileManager.default
+        let folder = file.deletingLastPathComponent()
+        guard folder.deletingLastPathComponent().resolvingSymlinksInPath().path == directory.resolvingSymlinksInPath().path
+        else { return }
+        try? fm.removeItem(at: folder)
+        if (try? fm.contentsOfDirectory(atPath: directory.path))?.isEmpty == true { try? fm.removeItem(at: directory) }
+    }
 }
 
 public enum ExportError: Error, Equatable {
@@ -61,8 +72,11 @@ public extension DSLRuntime {
         }
     }
 
-    /// CSV / PDF を一時フォルダに書き、共有シートに渡すファイルを返す。
-    func makeExportFile(_ action: Action, screen: String?, now: Date = Date()) throws -> ExportFile {
+    /// CSV / PDF を一時フォルダ(書き出しごとのフォルダ)に書き、共有シートに渡すファイルを返す。
+    /// `clearingPrevious`: 前回までの書き出しを全部消す(iOS)。複数のウインドウで同時に共有する Mac は false にし、
+    /// 書き出しごとに `ExportFiles.remove` で消す
+    func makeExportFile(_ action: Action, screen: String?, now: Date = Date(),
+                        clearingPrevious: Bool = true) throws -> ExportFile {
         let table = try exportTable(action, now: now)
         let data: Data
         let ext: String
@@ -76,7 +90,7 @@ public extension DSLRuntime {
         default:
             throw ExportError.unknownFormat
         }
-        ExportFiles.removeAll() // 前回までの書き出し(記録の写し)を残さない。共有シートは閉じてから次を押す
+        if clearingPrevious { ExportFiles.removeAll() } // 前回までの書き出し(記録の写し)を残さない。共有シートは閉じてから次を押す
         let dir = ExportFiles.directory.appending(path: UUID().uuidString, directoryHint: .isDirectory)
         try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
         let url = dir.appending(path: RecordExport.fileName(table.title, ext: ext))

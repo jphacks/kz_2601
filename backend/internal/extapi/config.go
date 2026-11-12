@@ -67,7 +67,7 @@ type Config struct {
 //	EXT_DISABLED=1                   every provider off (the kill switch)
 //	EXT_<PROVIDER>_ENABLED=1         a provider on (default off)
 //	EXT_<PROVIDER>_API_KEY           the operator's key (Secret Manager)
-//	EXT_<PROVIDER>_CLIENT_ID / _CLIENT_SECRET  OAuth client (Secret Manager)
+//	EXT_<PROVIDER>_CLIENT_ID / _CLIENT_SECRET  OAuth client (Secret Manager; unset: Provider.ClientFrom's)
 //	EXT_COST_USD_<PROVIDER>_<OP>     USD of one call when the op does not measure it (default 0 = unknown)
 //	COIN_RESERVE_EXT_<PROVIDER>      coins a paid call holds (default 0)
 //	EXT_TIMEOUT                      one call, e.g. 8s (default 8s, 1s-60s)
@@ -129,6 +129,13 @@ func ConfigFromEnv(getenv func(string) string) (Config, error) {
 				return c, fmt.Errorf("%s must be an integer ≥ 0, got %q", key, v)
 			}
 			c.Reserve[p.ID] = r
+		}
+	}
+	for _, p := range Providers() {
+		if s := c.Secrets[p.ID]; p.ClientFrom != "" && s.ClientID == "" && s.ClientSecret == "" {
+			from := c.Secrets[p.ClientFrom]
+			s.ClientID, s.ClientSecret = from.ClientID, from.ClientSecret
+			c.Secrets[p.ID] = s
 		}
 	}
 	if v := strings.TrimSpace(getenv("EXT_TIMEOUT")); v != "" {

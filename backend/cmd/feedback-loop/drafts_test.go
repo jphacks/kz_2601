@@ -114,3 +114,23 @@ func TestDraftsArgs(t *testing.T) {
 		t.Fatal("missing id accepted")
 	}
 }
+
+func TestReviewerRefusesAgentLabels(t *testing.T) {
+	for _, labels := range []string{"agent:ready", "feedback, agent:ready", " Agent:Plan "} {
+		ta := newTestApp(t, env{envIssueLabels: labels})
+		if _, err := ta.reviewer(); err == nil || !strings.Contains(err.Error(), "refusing to start") {
+			t.Fatalf("%q: err = %v", labels, err)
+		}
+		if err := ta.run(context.Background(), []string{"drafts", "show", "drf_x"}); err == nil {
+			t.Fatalf("%q: drafts show ran", labels)
+		}
+	}
+	ta := newTestApp(t, env{envIssueLabels: "feedback,from-users"})
+	r, err := ta.reviewer()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Join(r.Labels, ",") != "feedback,from-users" {
+		t.Fatalf("labels %v", r.Labels)
+	}
+}

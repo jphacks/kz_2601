@@ -82,6 +82,8 @@ struct MacOnboardingHost: ViewModifier {
                 MacBetaWelcomeView { onboarding.finishBetaWelcome() }
             }
             #endif
+            // 中のアプリのウインドウが「直し方の例」を閉じた時に β の案内を出せるよう渡す(#1215)
+            .environment(onboarding)
             .onChange(of: onboarding.showConsent) { _, showing in
                 // 同意の説明が閉じたら、閉じるアニメーションを待ってからチュートリアル(重なると表示されない)
                 guard !showing else { return }

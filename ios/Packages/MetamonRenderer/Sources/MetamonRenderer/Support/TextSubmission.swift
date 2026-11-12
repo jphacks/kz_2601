@@ -54,9 +54,7 @@ extension KeyboardState {
     /// バインディングは確定より遅れて更新されるので、送る文字は入力欄から直接読む。
     public static func takeFocusedText() -> String? {
         #if os(macOS)
-        guard let text = focusedTextView() else { return nil }
-        text.unmarkText()
-        return text.string
+        return focusedTextView()?.commitMarkedTextNow()
         #else
         guard let input = focusedTextInput() else { return nil }
         input.unmarkText()
@@ -69,7 +67,7 @@ extension KeyboardState {
     public static func clearFocusedText() {
         #if os(macOS)
         guard let text = focusedTextView(), !text.string.isEmpty else { return }
-        text.unmarkText()
+        text.commitMarkedTextNow()
         text.selectAll(nil)
         text.insertText("", replacementRange: NSRange(location: 0, length: (text.string as NSString).length))
         #else

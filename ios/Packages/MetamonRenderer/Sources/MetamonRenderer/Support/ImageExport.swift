@@ -142,6 +142,26 @@ private struct ImageContextMenu: ViewModifier {
     }
 }
 
+/// 右クリックの「コピー」を、⌘C(クリックか Tab でフォーカスした時)と VoiceOver の「コピー」からも使えるようにする(#1370)。
+/// 右クリックのメニューは呼ぶ側が持つもの(QR コードなど)に使う。
+private struct ImageCopyCommand: ViewModifier {
+    let image: PlatformImage
+    @FocusState private var focused: Bool
+
+    func body(content: Content) -> some View {
+        content
+            .focusable()
+            .focused($focused)
+            .simultaneousGesture(TapGesture().onEnded { focused = true })
+            .onCopyCommand {
+                guard let target = ImageExport.copyTarget(focused: focused, textInputActive: ListRowCopyCommand.textInputActive,
+                                                          image: image) else { return [] }
+                return [NSItemProvider(object: target)]
+            }
+            .accessibilityAction(named: L("コピー")) { PlatformPasteboard.setImage(image) }
+    }
+}
+
 /// VoiceOver の「共有」から標準の共有メニューを出す位置(画像の枠)。
 @MainActor
 private final class ShareAnchor {
@@ -172,6 +192,16 @@ extension View {
     func imageContextMenu(_ image: PlatformImage?, title: String) -> some View {
         #if os(macOS)
         modifier(ImageContextMenu(image: image, title: title))
+        #else
+        self
+        #endif
+    }
+
+    /// Mac: 画像を ⌘C と VoiceOver の「コピー」でコピーできるようにする(#1370)。iOS は何もしない。
+    @ViewBuilder
+    func imageCopyCommand(_ image: PlatformImage) -> some View {
+        #if os(macOS)
+        modifier(ImageCopyCommand(image: image))
         #else
         self
         #endif

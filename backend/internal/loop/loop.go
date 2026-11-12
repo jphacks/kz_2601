@@ -101,6 +101,7 @@ type Item struct {
 	Category   string    `firestore:"category,omitempty"`
 	Area       string    `firestore:"area,omitempty"`
 	Priority   string    `firestore:"priority,omitempty"`
+	Impact     string    `firestore:"impact,omitempty"`  // the model's high / medium / low, for the bundle's priority
 	Summary    string    `firestore:"summary,omitempty"` // LLM-written, checked (検査器 1)
 	ClusterKey string    `firestore:"clusterKey,omitempty"`
 	DraftID    string    `firestore:"draftId,omitempty"`
@@ -213,6 +214,7 @@ type NoticeReader interface {
 // ItemQuery filters ListItems.
 type ItemQuery struct {
 	Status string // "" = any
+	Source Source // "" = any
 	Limit  int    // <= 0 = 100
 }
 
