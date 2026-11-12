@@ -72,9 +72,9 @@ object DragOut {
 
     private const val DAY_MS = 24L * 60 * 60 * 1000
 
-    /** 起動時: 落ちた時などに残った drag-* のフォルダのうち [maxAgeMs](既定 1 日)より古いものを消す。消した数を返す。 */
-    fun sweep(now: Long = System.currentTimeMillis(), maxAgeMs: Long = DAY_MS, root: File = tempRoot()): Int =
-        root.listFiles { f -> f.isDirectory && f.name.startsWith("drag-") && now - f.lastModified() > maxAgeMs }
+    /** 起動時: 落ちた時などに残った [prefix]* のフォルダのうち [maxAgeMs](既定 1 日)より古いものを消す。消した数を返す。 */
+    fun sweep(now: Long = System.currentTimeMillis(), maxAgeMs: Long = DAY_MS, root: File = tempRoot(), prefix: String = "drag-"): Int =
+        root.listFiles { f -> f.isDirectory && f.name.startsWith(prefix) && now - f.lastModified() > maxAgeMs }
             .orEmpty()
             .count { it.deleteRecursively() }
 
@@ -101,17 +101,30 @@ object ImageSource {
         if (src.isNullOrBlank()) return null
         return runCatching {
             when {
-                src.startsWith("data:") -> Base64.getDecoder().decode(src.substringAfter("base64,")).takeIf { it.size <= MAX_BYTES }
+                src.startsWith("data:") -> dataUrl(src)
                 src.startsWith("https://") -> URI(src).toURL().openConnection().run {
                     connectTimeout = CONNECT_TIMEOUT_MS
                     readTimeout = READ_TIMEOUT_MS
                     if (contentLengthLong > MAX_BYTES) null else getInputStream().use { capped(it) }
                 }
-                allowFile && src.startsWith("file:") -> fileOf(src)?.takeIf { it.isFile && FileKind.of(it.name) == FileKind.IMAGE }?.readBytes()
+                allowFile && src.startsWith("file:") -> fileOf(src)?.takeIf { it.isFile && FileKind.of(it.name) == FileKind.IMAGE }?.let { readFile(it) }
                 else -> null
             }
         }.getOrNull()
     }
+
+    /** data URL の base64。解く前に長さで上限を確かめる(大きな文字列を解いてから捨てない)。 */
+    internal fun dataUrl(src: String, max: Int = MAX_BYTES): ByteArray? {
+        val b64 = src.substringAfter("base64,")
+        if (b64.length.toLong() > base64Length(max)) return null
+        return Base64.getDecoder().decode(b64).takeIf { it.size <= max }
+    }
+
+    /** [bytes] バイトを base64 にした長さ(= の詰め物を含む)。 */
+    internal fun base64Length(bytes: Int): Long = (bytes.toLong() + 2) / 3 * 4
+
+    /** ファイルを [max] バイトまで読む。超えたら null(`length()` は当てにせず、読んだ量で数える)。 */
+    fun readFile(file: File, max: Int = MAX_BYTES): ByteArray? = file.inputStream().use { capped(it, max) }
 
     /** [MAX_BYTES] まで読む。超えたら null。 */
     fun capped(input: InputStream, max: Int = MAX_BYTES): ByteArray? {

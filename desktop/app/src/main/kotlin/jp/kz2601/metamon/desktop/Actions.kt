@@ -2,10 +2,12 @@ package jp.kz2601.metamon.desktop
 
 import jp.kz2601.metamon.desktop.i18n.Strings
 import androidx.compose.runtime.snapshots.Snapshot
+import jp.kz2601.metamon.desktop.io.DragOut
 import jp.kz2601.metamon.desktop.io.FileNames
 import jp.kz2601.metamon.desktop.io.PdfIo
 import jp.kz2601.metamon.desktop.io.RecordIo
 import jp.kz2601.metamon.desktop.io.Tsv
+import jp.kz2601.metamon.desktop.store.writeAtomically
 import jp.kz2601.metamon.dsl.Action
 import jp.kz2601.metamon.dsl.ActionFormat
 import jp.kz2601.metamon.dsl.ActionType
@@ -35,6 +37,7 @@ import java.net.URI
 import java.net.http.HttpClient
 import java.net.http.HttpRequest
 import java.net.http.HttpResponse
+import java.nio.file.Files
 import java.time.Duration
 import java.time.Instant
 import java.time.LocalDate
@@ -50,7 +53,7 @@ import kotlin.concurrent.thread
 /**
  * OS の機能に頼むアクション(iOS の AppRuntime の各 host・Android の app/runtime)。デスクトップで出来ない物は理由を一言で返す。
  * - openUrl: 既定のブラウザ(許可した scheme だけ)
- * - addToCalendar: .ics を書き出して既定のカレンダーで開く
+ * - addToCalendar: .ics を一時フォルダ(人ごと)に書いて既定のカレンダーで開く(ダウンロードには残さない)
  * - lookupBook: 本の情報(モックでは見本の本・`TAILORIT_API_BASE` があれば `POST /v1/lookup/book`)
  * - scheduleNotification / cancelNotification: トレイの通知(起動中だけ・時刻は次の 1 回)。常駐トレイ(#1761)があればそのアイコンから
  * - export: CSV を書き出し、同じ中身をクリップボードにも入れる
@@ -62,6 +65,10 @@ class DesktopActionHost(
     private val notifier: Notifier = Notifier.Tray,
     /** 重い書き出し(PDF の頁を描く)を画面のスレッドの外で。 */
     private val background: (() -> Unit) -> Unit = { thread(isDaemon = true, name = "export") { it() } },
+    /** カレンダーに渡す .ics を置く所(一時フォルダ・渡すたびに別のフォルダ)。 */
+    private val calendarDir: File = calendarTempRoot(),
+    /** 既定のアプリで開く。開けたら true。 */
+    private val openFile: (File) -> Boolean = { f -> runCatching { Desktop.getDesktop().open(f); true }.getOrDefault(false) },
 ) : ActionHost {
     override fun request(action: Action, ctx: ActionContext, session: DesktopSession): String? = when (action.type) {
         ActionType.OPEN_URL -> openUrl(action.url)
@@ -95,9 +102,9 @@ class DesktopActionHost(
             is CalendarEventPlan.Result.NoStart -> Strings.format("host_calendar_no_start", r.fieldName)
             is CalendarEventPlan.Result.Success -> {
                 val text = Ics.event(r.draft, uid = "${entity.id}-${ctx.currentRecordId ?: "new"}@tailorit")
-                val file = runCatching { writeNew(RecordExport.fileName(r.draft.title, "ics"), text.toByteArray(Charsets.UTF_8)) }
+                val file = runCatching { writeHandOff(RecordExport.fileName(r.draft.title, "ics"), text.toByteArray(Charsets.UTF_8)) }
                     .getOrElse { return Strings["desktop_calendar_write_failed"] }
-                val opened = runCatching { Desktop.getDesktop().open(file); true }.getOrDefault(false)
+                val opened = openFile(file)
                 if (opened) Strings.format("desktop_calendar_opened", file.name) else Strings.format("desktop_calendar_written", file.absolutePath)
             }
         }
@@ -148,18 +155,23 @@ class DesktopActionHost(
             val file = runCatching { writeNew(name, RecordIo.csv(table)) }.getOrElse { return Strings["host_export_failed"] }
             return done(file)
         }
+        val writing = Strings["desktop_export_writing"]
         background {
             val msg = runCatching { done(writeNew(name, PdfIo.data(table))) }.getOrElse { Strings["host_export_failed"] }
-            Snapshot.withMutableSnapshot { session.message = msg }
+            // 書いている間に別の一言(他の操作の結果)が出ていれば上書きしない
+            Snapshot.withMutableSnapshot { if (session.message == writing) session.message = msg }
         }
-        return Strings["desktop_export_writing"]
+        return writing
     }
 
-    /** [exportDir] に空いている名前で書く(既存のファイルは上書きしない・Windows の予約名は頭に `_`)。書けなければ作った空のファイルを消す。 */
+    /**
+     * [exportDir] に空いている名前で書く(既存のファイルは上書きしない・Windows の予約名は頭に `_`)。
+     * 名前を空のファイルで取ってから、同じフォルダの一時ファイルに書き切って置き換える(書きかけのファイルを見せない)。書けなければ取った名前を消す。
+     */
     private fun writeNew(name: String, bytes: ByteArray): File {
         val file = FileNames.createFree(exportDir, name)
         try {
-            file.writeBytes(bytes)
+            writeAtomically(file, bytes)
         } catch (e: Exception) {
             file.delete()
             throw e
@@ -167,7 +179,23 @@ class DesktopActionHost(
         return file
     }
 
+    /** 他のアプリに渡すだけのファイル。渡すたびに別のフォルダ(名前はそのまま・`(2)` を付けない)。古い物は起動時に消す。 */
+    private fun writeHandOff(name: String, bytes: ByteArray): File {
+        calendarDir.mkdirs()
+        val dir = Files.createTempDirectory(calendarDir.toPath(), CALENDAR_PREFIX).toFile()
+        return File(dir, FileNames.guard(name)).apply { writeBytes(bytes) }
+    }
+
     companion object {
+        const val CALENDAR_PREFIX = "ics-"
+
+        /** カレンダーに渡す .ics の置き場(OS の一時フォルダ・人ごと)。 */
+        fun calendarTempRoot(): File = File(System.getProperty("java.io.tmpdir"), "tailorit-calendar")
+
+        /** 起動時: 前に渡した .ics のうち 1 日より古い物を消す。 */
+        fun sweepCalendar(now: Long = System.currentTimeMillis(), root: File = calendarTempRoot()): Int =
+            DragOut.sweep(now = now, root = root, prefix = CALENDAR_PREFIX)
+
         val UNAVAILABLE_VOICE get() = Strings["desktop_unavailable_voice"]
         val UNAVAILABLE_ACTIVITY get() = Strings["desktop_unavailable_activity"]
         val UNAVAILABLE_FOLLOW get() = Strings["desktop_unavailable_follow"]

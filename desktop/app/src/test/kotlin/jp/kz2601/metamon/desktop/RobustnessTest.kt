@@ -4,7 +4,14 @@ import jp.kz2601.metamon.desktop.io.DesktopIo
 import jp.kz2601.metamon.desktop.io.DragOut
 import jp.kz2601.metamon.desktop.io.FileNames
 import jp.kz2601.metamon.desktop.io.PdfIo
+import jp.kz2601.metamon.desktop.io.ImageSource
+import jp.kz2601.metamon.desktop.store.DesktopStore
+import jp.kz2601.metamon.desktop.store.JsonKeyValueStore
+import jp.kz2601.metamon.desktop.store.MOVE_RETRIES
+import jp.kz2601.metamon.desktop.store.sweepTempFiles
 import jp.kz2601.metamon.desktop.store.writeAtomically
+import jp.kz2601.metamon.dsl.CalendarEvent
+import kotlinx.coroutines.runBlocking
 import jp.kz2601.metamon.dsl.Accept
 import jp.kz2601.metamon.dsl.Action
 import jp.kz2601.metamon.dsl.ActionFormat
@@ -24,6 +31,10 @@ import org.junit.rules.TemporaryFolder
 import java.io.File
 import java.io.RandomAccessFile
 import java.nio.file.AccessDeniedException
+import java.nio.file.FileSystemException
+import java.nio.file.Files
+import java.nio.file.StandardCopyOption
+import java.util.concurrent.LinkedBlockingQueue
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
@@ -64,29 +75,125 @@ class RobustnessTest {
     }
 
     @Test
-    fun concurrentAtomicWritesUseTheirOwnTempFilesAndLeaveNoneBehind() {
+    fun concurrentPutsThroughOneStoreKeepEveryKeyAndLeaveNoTempFiles() {
         val dir = tmp.newFolder()
         val f = File(dir, "kv.json")
+        val kv = JsonKeyValueStore(f)
         val pool = Executors.newFixedThreadPool(8)
         val start = CountDownLatch(1)
         val errors = java.util.Collections.synchronizedList(mutableListOf<Throwable>())
         repeat(40) { i ->
             pool.execute {
                 start.await()
-                runCatching { writeAtomically(f, "{\"n\":$i}") }.onFailure { errors += it }
+                runCatching { kv.putInt("k$i", i) }.onFailure { errors += it }
             }
         }
         start.countDown()
         pool.shutdown()
         assertTrue(pool.awaitTermination(30, TimeUnit.SECONDS))
-        // Windows の置き換えの失敗(AccessDenied)は試し直すが、一時ファイルの取り合いでは落ちない
-        assertTrue(errors.toString(), errors.none { it !is AccessDeniedException })
-        assertTrue(Regex("""\{"n":\d+}""").matches(f.readText()))
+        assertTrue(errors.toString(), errors.isEmpty())
+        // 読み直しても 40 件そろう(最後の置き換えが全部を持つ)
+        val reread = JsonKeyValueStore(f)
+        assertEquals((0 until 40).map { "k$it" }.toSet(), reread.keys())
+        assertEquals(39, reread.getInt("k39"))
         assertEquals("一時ファイルが残らない", listOf("kv.json"), dir.list()!!.toList())
 
         // 置き換えられなかった時も一時ファイルを残さない
         runCatching { writeAtomically(f, "{}", move = { _, to -> throw AccessDeniedException(to.toString()) }, pause = {}) }
         assertEquals(listOf("kv.json"), dir.list()!!.toList())
+    }
+
+    @Test
+    fun replaceRetriesAnyFileSystemExceptionThenGivesUp() {
+        val f = File(tmp.newFolder(), "kv.json")
+        var calls = 0
+        writeAtomically(f, "{\"a\":1}", move = { from, to ->
+            calls++
+            if (calls < 3) throw FileSystemException(to.toString(), null, "The process cannot access the file")
+            Files.move(from, to, StandardCopyOption.REPLACE_EXISTING)
+        }, pause = {})
+        assertEquals(3, calls)
+        assertEquals("{\"a\":1}", f.readText())
+
+        calls = 0
+        val failed = runCatching { writeAtomically(f, "{}", move = { _, to -> calls++; throw FileSystemException(to.toString()) }, pause = {}) }
+        assertTrue(failed.exceptionOrNull() is FileSystemException)
+        assertEquals(MOVE_RETRIES + 1, calls)
+        assertEquals("{\"a\":1}", f.readText())
+        assertEquals(listOf("kv.json"), f.parentFile.list()!!.toList())
+    }
+
+    @Test
+    fun leftoverTempFilesAreRemovedOnOpenAndWipe() = runBlocking {
+        val root = tmp.newFolder("store")
+        val records = File(root, "records/shopping").apply { mkdirs() }
+        File(root, "settings.json").writeText("{\"tailorit.lastAppId\": \"kakeibo\"}")
+        val leftovers = listOf(
+            File(root, "settings.json.123456789.tmp"),
+            File(root, "consent.json.tmp"),
+            File(records, "item.json.tmp"),
+            File(records, "item.json.42.tmp"),
+        ).onEach { it.writeText("half") }
+        val keep = File(records, "item.json").apply { writeText("{}") }
+
+        val store = DesktopStore.open(root)
+        assertTrue(leftovers.none { it.exists() })
+        assertTrue(keep.isFile)
+        assertEquals("kakeibo", store.lastAppId)
+
+        File(root, "settings.json.99.tmp").writeText("half")
+        store.wipe()
+        assertFalse(File(root, "settings.json.99.tmp").exists())
+        assertEquals(0, sweepTempFiles(null))
+    }
+
+    // MARK: - 1b. 2 つ目の起動は起動中の方へ引き継ぐ
+
+    @Test
+    fun handOffDeliversArgsOnlyWithTheRightToken() {
+        val dir = tmp.newFolder("handoff")
+        val got = LinkedBlockingQueue<List<String>>()
+        SingleInstance.Server.start(dir).use { server ->
+            // 受け手を決める前に届いた分も、決めた時に渡す
+            assertTrue(SingleInstance.handOff(dir, listOf("kakeibo", "", "home")))
+            server.setHandler { got += it }
+            assertEquals(listOf("kakeibo", "", "home"), got.poll(5, TimeUnit.SECONDS))
+            assertTrue(SingleInstance.handOff(dir, emptyList()))
+            assertEquals(emptyList<String>(), got.poll(5, TimeUnit.SECONDS))
+
+            // 合言葉が違えば受け取らない(2 つ目は「起動中です」を出す側に戻る)
+            val info = File(dir, SingleInstance.INSTANCE_FILE)
+            val port = info.readLines().first()
+            info.writeText("$port\nwrong\n")
+            assertFalse(SingleInstance.handOff(dir, listOf("shopping")))
+            assertNull(got.poll(300, TimeUnit.MILLISECONDS))
+        }
+        // 口が閉じている・ファイルが無い時も false(落ちない)
+        assertFalse(SingleInstance.handOff(dir, emptyList()))
+        assertFalse(SingleInstance.handOff(tmp.newFolder("none"), emptyList()))
+    }
+
+    @Test
+    fun anotherProcessHoldsTheLockAndReceivesTheHandOff() {
+        val dir = tmp.newFolder("two-process")
+        val java = File(System.getProperty("java.home"), "bin/java").path
+        val child = ProcessBuilder(java, "-cp", System.getProperty("java.class.path"), LockHolderMain::class.java.name, dir.absolutePath)
+            .redirectErrorStream(true)
+            .start()
+        try {
+            val out = child.inputStream.bufferedReader()
+            assertEquals("claimed", out.readLine())
+            assertNull("別のプロセスが持っている間は取れない", SingleInstance.acquire(dir))
+            assertTrue(SingleInstance.handOff(dir, listOf("kakeibo")))
+            assertEquals("got kakeibo", out.readLine())
+            child.outputStream.close()
+            assertTrue(child.waitFor(20, TimeUnit.SECONDS))
+        } finally {
+            child.destroyForcibly()
+        }
+        val again = SingleInstance.acquire(dir)
+        assertNotNull("終わったら取れる", again)
+        again!!.close()
     }
 
     // MARK: - 2. 長いセルを速く切る
@@ -153,8 +260,26 @@ class RobustnessTest {
         assertEquals(tooLarge, io.notice)
         assertNull(io.pending)
 
-        // 上限ちょうどまでは読む(中身が CSV でなければ別の一言)
-        assertFalse(DesktopIo.tooLarge(sparse("ok.csv", RecordImport.MAX_TEXT_BYTES.toLong()), RecordImport.MAX_TEXT_BYTES))
+        // 読んだ量で数える: 上限ちょうどは読み、1 バイトでも超えたら null
+        val exact = tmp.newFile("exact.bin").apply { writeBytes(ByteArray(1000)) }
+        assertEquals(1000, ImageSource.readFile(exact, 1000)?.size)
+        assertNull(ImageSource.readFile(exact, 999))
+        // 写真の値(file URI)も同じ上限
+        val bigImage = sparse("big.png", ImageSource.MAX_BYTES + 1L)
+        assertNull(ImageSource.bytes(bigImage.toURI().toString(), allowFile = true))
+    }
+
+    @Test
+    fun dataUrlIsRejectedByLengthBeforeDecoding() {
+        val ok = java.util.Base64.getEncoder().encodeToString(ByteArray(30))
+        assertEquals(30, ImageSource.dataUrl("data:image/png;base64,$ok", max = 30)?.size)
+        assertNull(ImageSource.dataUrl("data:image/png;base64,$ok", max = 29))
+        // 解けない文字列でも長ければ解く前に断る(例外にならない)
+        assertNull(ImageSource.dataUrl("data:image/png;base64," + "!".repeat(1000), max = 30))
+        assertEquals(40L, ImageSource.base64Length(30))
+        assertEquals(44L, ImageSource.base64Length(31))
+        val huge = "data:image/png;base64," + "A".repeat((ImageSource.base64Length(ImageSource.MAX_BYTES) + 4).toInt())
+        assertNull(ImageSource.bytes(huge, allowFile = false))
     }
 
     // MARK: - 4. 書き出しは上書きしない・Windows の予約名
@@ -216,6 +341,37 @@ class RobustnessTest {
         val pdf = File(dir, "支出.pdf")
         assertEquals("%PDF", pdf.readBytes().copyOfRange(0, 4).decodeToString())
         assertTrue(s.message!!.contains(pdf.absolutePath))
+        assertTrue("一時ファイルが残らない", dir.list()!!.none { it.endsWith(".tmp") })
+
+        // 描いている間に別の一言が出たら、描き終えても上書きしない
+        run(Action(type = ActionType.EXPORT, entity = "expense", title = "支出", format = ActionFormat.PDF))
+        s.message = "他の操作の結果"
+        jobs.last()()
+        assertEquals("他の操作の結果", s.message)
+        assertTrue(File(dir, "支出 (2).pdf").isFile)
+    }
+
+    @Test
+    fun calendarHandOffGoesToTheTempFolderNotDownloads() {
+        val store = MockStore.fromJson("""{"expense": [{"id": "a", "data": {"amount": 1200, "category": "食費", "date": "2026-11-10"}}]}""")
+        val dl = tmp.newFolder("dl")
+        val cal = File(tmp.root, "cal")
+        val opened = mutableListOf<File>()
+        val s = DesktopSession(Examples.load("kakeibo"), store)
+        s.host = DesktopActionHost(BookLookupClient.mock, dl, silent, calendarDir = cal, openFile = { opened += it; true })
+        val add = Action(type = ActionType.ADD_TO_CALENDAR, entity = "expense", calendarEvent = CalendarEvent(startField = "date", titleField = "category"))
+        repeat(2) { s.dispatch(add, ActionContext(s.top, null, recordId = "a")) }
+        assertEquals(s.message, 2, opened.size)
+        assertEquals("ダウンロードには残さない", 0, dl.list()!!.size)
+        assertEquals("名前は同じ・(2) を付けない", listOf("食費.ics", "食費.ics"), opened.map { it.name })
+        assertEquals("フォルダは別", 2, opened.map { it.parentFile }.toSet().size)
+        assertTrue(opened.all { it.parentFile.parentFile == cal && it.parentFile.name.startsWith(DesktopActionHost.CALENDAR_PREFIX) })
+        assertTrue(opened.first().readText().startsWith("BEGIN:VCALENDAR"))
+
+        // 1 日より古い物は起動時に消す
+        opened.first().parentFile.setLastModified(0)
+        assertEquals(1, DesktopActionHost.sweepCalendar(root = cal))
+        assertTrue(opened.last().isFile)
     }
 
     // MARK: - 5. 画面の無い DSL では印刷しない

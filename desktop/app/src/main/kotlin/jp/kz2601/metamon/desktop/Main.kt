@@ -43,11 +43,15 @@ import javax.swing.SwingUtilities
  * 引数が無ければ最後に開いたアプリ。記録は端末に残す(SessionPersistence)。端末の記録は裏で読み、読み終えるまでスケルトンを出す。
  * ウィンドウはアプリごとに 1 枚、記録の詳細も別の 1 枚で開ける(#1763・Windows.kt)。同じアプリのウィンドウは記録を共有する。
  * ウィンドウの大きさ・位置は種類(アプリ / 詳細)ごとに覚えて次の起動で戻す。トレイ / メニューバーに常駐する(Tray.kt)。サインインはまだ無い(モック)。
- * 同じ保存先ではプロセスを 1 つだけ起動する(SingleInstance.kt)。
+ * 同じ保存先ではプロセスを 1 つだけ起動する。2 つ目は起動中の方へ引数を渡して前に出させる(SingleInstance.kt)。
+ * 記録の JSON を渡した時(開発・スクリーンショット)は端末に残さないので、ロックを取らずに何本でも起動できる。
  */
 fun main(args: Array<String>) {
     // 同じ保存先で 2 つ目は起動しない(#1754 の JSON を 2 つのプロセスで書き合わない)
-    if (!SingleInstance.claim()) return SingleInstance.reportRunning()
+    if (args.getOrNull(1) == null && !SingleInstance.claim()) {
+        if (!SingleInstance.handOff(args = args.toList())) SingleInstance.reportRunning()
+        return
+    }
     runApp(args)
 }
 
@@ -60,8 +64,13 @@ private fun runApp(args: Array<String>) = application {
     }
     // 端末の記録は裏で読む。読み終えるまでウィンドウはスケルトン(SharedRecords.loading)
     val loadScope = remember { CoroutineScope(SupervisorJob() + Dispatchers.IO) }
-    // 前に落ちた時などに残った引き出しの一時フォルダ(1 日より古い物)を裏で消す
-    remember { loadScope.launch { runCatching { DragOut.sweep() } } }
+    // 前に落ちた時などに残った引き出し・カレンダーに渡した一時フォルダ(1 日より古い物)を裏で消す
+    remember {
+        loadScope.launch {
+            runCatching { DragOut.sweep() }
+            runCatching { DesktopActionHost.sweepCalendar() }
+        }
+    }
     val hub = remember {
         // 記録の JSON を渡した時(開発・スクリーンショット)は最初のアプリだけそれを使い、端末に残さない
         val fixture = args.getOrNull(1)?.let { MockStore.fromJson(File(it).readText()) }
@@ -91,6 +100,15 @@ private fun runApp(args: Array<String>) = application {
     // トレイに常駐(#1761): × はトレイに隠す(設定で off・トレイが無ければ終わる)。終わるのはトレイの「終了」
     val tray = remember { TrayController.create(hub.dsl(first)) }
     tray.onOpenApp = { registry.open(WindowKey.app(it)) }
+    // 2 つ目の起動: 渡されたアプリ(無ければ前にあるアプリ)を開いて前に出す。トレイに隠れていても出す
+    remember {
+        SingleInstance.onHandoff { a ->
+            SwingUtilities.invokeLater {
+                val id = a.firstOrNull()?.takeIf { it in BundledApps.ids() } ?: registry.active?.key?.appId ?: first
+                tray.openApp(id)
+            }
+        }
+    }
     // すぐ記録は前にあるアプリの、アプリのウィンドウへ(詳細には入れない・無ければ開く)
     tray.findQuickRecordWindow = { registry.quickRecordWindow()?.id }
     // トレイの名前・すぐ記録・集計は前にあるウィンドウのアプリ。閉じて開き直すと記録が替わるのでウィンドウごとに見直す

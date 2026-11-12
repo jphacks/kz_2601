@@ -87,15 +87,15 @@ class DesktopIo(dsl: AppDSL, private val read: () -> MockStore, private val upda
         when (FileKind.of(file.name)) {
             FileKind.CSV -> if (Accept.CSV in accept) importCsvFile(file, entity, c, c.label ?: file.name) else notice = Strings["desktop_io_unsupported_file"]
             FileKind.TEXT -> if (Accept.TEXT in accept) {
-                if (tooLarge(file, RecordImport.MAX_TEXT_BYTES)) return run { notice = Strings["desktop_io_file_too_large"] }
-                val text = RecordImport.plainText(file.readBytes()) ?: return run { notice = Strings["desktop_io_unreadable_encoding"] }
+                val bytes = ImageSource.readFile(file, RecordImport.MAX_TEXT_BYTES) ?: return run { notice = Strings["desktop_io_file_too_large"] }
+                val text = RecordImport.plainText(bytes) ?: return run { notice = Strings["desktop_io_unreadable_encoding"] }
                 addBody(text, file.name, entity, c)
             } else {
                 notice = Strings["desktop_io_unsupported_file"]
             }
             FileKind.PDF -> if (Accept.PDF in accept) {
-                if (tooLarge(file, RecordImport.MAX_PDF_BYTES)) return run { notice = Strings["desktop_io_file_too_large"] }
-                when (val r = PdfIo.text(file.readBytes())) {
+                val bytes = ImageSource.readFile(file, RecordImport.MAX_PDF_BYTES) ?: return run { notice = Strings["desktop_io_file_too_large"] }
+                when (val r = PdfIo.text(bytes)) {
                     is PdfIo.TextResult.Text -> addBody(r.text, file.name, entity, c)
                     PdfIo.TextResult.Locked -> notice = Strings["desktop_io_pdf_locked"]
                     PdfIo.TextResult.NoText -> notice = Strings["desktop_io_pdf_no_text"]
@@ -116,10 +116,10 @@ class DesktopIo(dsl: AppDSL, private val read: () -> MockStore, private val upda
         notice = Strings[if (body.truncated) "desktop_io_imported_truncated" else "desktop_io_imported"]
     }
 
-    /** CSV のファイル。大きすぎる物は読む前に断る(全部をメモリに読まない)。 */
+    /** CSV のファイル。上限までしか読まない(超えたら断る・全部をメモリに読まない)。 */
     fun importCsvFile(file: File, entity: Entity, c: Component?, label: String) {
-        if (tooLarge(file, RecordImport.MAX_TEXT_BYTES)) return run { notice = Strings["desktop_io_file_too_large"] }
-        importCsv(file.readBytes(), entity, c, label)
+        val bytes = ImageSource.readFile(file, RecordImport.MAX_TEXT_BYTES) ?: return run { notice = Strings["desktop_io_file_too_large"] }
+        importCsv(bytes, entity, c, label)
     }
 
     fun importCsv(bytes: ByteArray, entity: Entity, c: Component?, label: String) {
@@ -252,9 +252,6 @@ class DesktopIo(dsl: AppDSL, private val read: () -> MockStore, private val upda
     }
 
     companion object {
-        /** 読む前の大きさの確かめ(`length()` は読まずに分かる)。 */
-        internal fun tooLarge(file: File, max: Int): Boolean = file.length() > max
-
         fun files(t: Transferable): List<File>? =
             if (t.isDataFlavorSupported(DataFlavor.javaFileListFlavor)) {
                 runCatching { (t.getTransferData(DataFlavor.javaFileListFlavor) as List<*>).filterIsInstance<File>() }.getOrNull()?.takeIf { it.isNotEmpty() }
@@ -342,7 +339,7 @@ fun MediaFieldLeaf(c: Component, label: String, draft: MutableMap<String, String
     Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
         Text(label, style = MaterialTheme.typography.labelLarge)
         if (file != null && c.type == ComponentType.PHOTO_FIELD) {
-            val bitmap = remember(uri) { runCatching { SkiaImage.makeFromEncoded(file.readBytes()).toComposeImageBitmap() }.getOrNull() }
+            val bitmap = remember(uri) { runCatching { ImageSource.readFile(file)?.let { SkiaImage.makeFromEncoded(it).toComposeImageBitmap() } }.getOrNull() }
             bitmap?.let { Image(it, contentDescription = label, modifier = Modifier.heightIn(max = 160.dp).widthIn(max = 240.dp).fileDragSource(file)) }
         } else if (file != null) {
             Text(file.name, modifier = Modifier.fileDragSource(file))
