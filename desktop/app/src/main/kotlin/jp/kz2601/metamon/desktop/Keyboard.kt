@@ -282,14 +282,25 @@ class DesktopKeyboard(
     private val topScreen: Screen? get() = dsl.screen(session.top.screen)
     private fun ctx() = session.top.let { ActionContext(it, session.form(it)) }
 
-    fun handle(e: KeyEvent, bubble: Boolean): Boolean = KeyPress.of(e)?.let { handle(it, bubble) } ?: false
+    fun handle(e: KeyEvent, bubble: Boolean): Boolean {
+        // 離したことも見る(Space の押しっぱなしを見分けるため)
+        val repeat = e.isAutoRepeatSpace()
+        return KeyPress.of(e)?.let { handle(it, bubble, repeat) } ?: false
+    }
 
-    fun handle(p: KeyPress, bubble: Boolean): Boolean {
-        if (paletteOpen || helpOpen || wipeConfirmOpen || photos.isOpen) return false // パレット・一覧・確認・プレビューが自分で受ける
+    /** [repeat] は Space の押しっぱなしの 2 回目以降(開く・閉じるをしない)。 */
+    fun handle(p: KeyPress, bubble: Boolean, repeat: Boolean = false): Boolean {
+        if (photos.isOpen) {
+            // ダイアログが受けなかった閉じるキー(フォーカスがダイアログの外にある時)はここで閉じる。他は流す
+            if (!bubble || PhotoPreview.keyOf(p) != PreviewKey.CLOSE) return false
+            if (!repeat) closePreview()
+            return true
+        }
+        if (paletteOpen || helpOpen || wipeConfirmOpen) return false // パレット・一覧・確認が自分で受ける
         val s = Keymap.match(p, os) ?: return false
         if (s == Shortcut.PRINT || s.bubble != bubble) return false // 印刷は Print.kt の Ctrl+P
         // Space は何も選んでいない時だけ。見せる写真が無ければ流す(知らせも出さない)
-        if (s == Shortcut.PREVIEW) return rootFocused && openPreview()
+        if (s == Shortcut.PREVIEW) return rootFocused && !repeat && openPreview()
         return run(s)
     }
 

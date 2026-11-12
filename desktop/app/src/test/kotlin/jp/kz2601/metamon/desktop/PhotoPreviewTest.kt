@@ -14,6 +14,8 @@ import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.io.File
+import java.nio.file.Files
+import java.nio.file.attribute.PosixFilePermissions
 import java.util.Base64
 
 /** 写真を大きく見る(Mac の Quick Look・#1850 のデスクトップ版): 見せる物の集め方・開く / 閉じる・キー。 */
@@ -138,11 +140,86 @@ class PhotoPreviewTest {
         assertTrue(k.handle(KeyPress(Key.Spacebar), bubble = true))
         assertTrue(k.photos.isOpen)
         assertEquals(a, k.photos.current?.src)
-        // 開いている間は他のショートカットを取らない(Esc はダイアログが受ける)
-        assertFalse(k.handle(KeyPress(Key.Escape), bubble = true))
+        // 開いている間は他のショートカットを取らない
+        assertFalse(k.handle(KeyPress(Key.N, ctrl = true), bubble = true))
+        assertFalse(k.handle(KeyPress(Key.Escape), bubble = false))
+        assertTrue(k.photos.isOpen)
         assertEquals("recipe_form", s.top.screen)
         k.closePreview()
         assertFalse(k.photos.isOpen)
+    }
+
+    @Test
+    fun closeKeysReachingTheRootClosePreviewWithoutLeavingTheScreen() {
+        val (s, k) = recipeForm()
+        s.form(s.top)!!.values["photo"] = JSONValue.Str(a)
+        // フォーカスがダイアログの外にあり、閉じるキーが一番外まで来た時もプレビューを閉じる(画面は戻らない)
+        for (key in listOf(Key.Escape, Key.Spacebar)) {
+            assertTrue(k.openPreview())
+            assertTrue(k.handle(KeyPress(key), bubble = true))
+            assertFalse(k.photos.isOpen)
+            assertEquals("recipe_form", s.top.screen)
+        }
+        // ← → は流す
+        assertTrue(k.openPreview())
+        assertFalse(k.handle(KeyPress(Key.DirectionRight), bubble = true))
+        assertTrue(k.photos.isOpen)
+    }
+
+    @Test
+    fun heldSpaceDoesNotOpenAndThenClose() {
+        val (s, k) = recipeForm()
+        s.form(s.top)!!.values["photo"] = JSONValue.Str(a)
+        k.rootFocused = true
+        // 押しっぱなしの繰り返しでは開かない
+        assertFalse(k.handle(KeyPress(Key.Spacebar), bubble = true, repeat = true))
+        assertFalse(k.photos.isOpen)
+        assertTrue(k.handle(KeyPress(Key.Spacebar), bubble = true))
+        assertTrue(k.photos.isOpen)
+        // 開いた後の繰り返しでは閉じない(キーは受けて流さない)
+        assertTrue(k.handle(KeyPress(Key.Spacebar), bubble = true, repeat = true))
+        assertTrue(k.photos.isOpen)
+    }
+
+    @Test
+    fun repeatFilterActsOnTheFirstKeyDownOnly() {
+        val f = KeyRepeatFilter()
+        val down1 = Any()
+        assertFalse(f.isRepeat(down1, Key.Spacebar, down = true))
+        // 同じ出来事を外側と内側で見ても同じ答え
+        assertFalse(f.isRepeat(down1, Key.Spacebar, down = true))
+        assertTrue(f.isRepeat(Any(), Key.Spacebar, down = true))
+        assertTrue(f.isRepeat(Any(), Key.Spacebar, down = true))
+        assertFalse(f.isRepeat(Any(), Key.Spacebar, down = false))
+        assertFalse("離した後は 1 回目", f.isRepeat(Any(), Key.Spacebar, down = true))
+    }
+
+    @Test
+    fun networkFileUrisAreNotShown() {
+        assertTrue(PhotoPreviewSources.accepts("file:///tmp/a.png"))
+        assertTrue(PhotoPreviewSources.accepts("file:/tmp/a.png"))
+        assertTrue(PhotoPreviewSources.accepts("file:///C:/photos/a.png"))
+        // UNC・ホスト付きの file URI は手元のファイルとして扱わない
+        assertFalse(PhotoPreviewSources.accepts("file://host/share/a.png"))
+        assertFalse(PhotoPreviewSources.accepts("file:////host/share/a.png"))
+        assertFalse(PhotoPreviewSources.accepts("file://///host/share/a.png"))
+        assertFalse(PhotoPreviewSources.accepts("file://localhost/tmp/a.png"))
+        assertFalse(PhotoPreviewSources.accepts("file:/%5C%5Chost%5Cshare%5Ca.png"))
+        assertFalse(PhotoPreviewSources.accepts("\\\\host\\share\\a.png"))
+        assertFalse(PhotoPreviewSources.accepts("file:\\\\host\\share\\a.png"))
+        assertNull(PhotoPreviewSources.localFile("file:////host/share/a.png"))
+        // 「既定のアプリで開く」も書き出さない
+        val root = Files.createTempDirectory("preview-root").toFile()
+        try {
+            assertNull(PhotoOpen.export(PreviewPhoto("file:////host/share/a.png", "n"), root))
+            assertNull(PhotoOpen.export(PreviewPhoto("file://host/share/a.png", "n"), root))
+            assertEquals(0, root.listFiles()!!.size)
+        } finally {
+            root.deleteRecursively()
+        }
+        // 並びに入らない・押しても開かない
+        assertTrue(PhotoPreviewSources.photos(mapOf("p" to JSONValue.Str("file:////host/share/a.png")), listOf(photo("p"))).isEmpty())
+        assertFalse(PhotoPreview().openAt(emptyList(), "file://host/share/a.png", "n"))
     }
 
     @Test
@@ -160,16 +237,57 @@ class PhotoPreviewTest {
     // MARK: - 既定のアプリで開く
 
     @Test
-    fun exportWritesAPngIntoTheDragTempFolderOnly() {
-        val f = PhotoOpen.export(PreviewPhoto(a, "料理/写真"))
-        assertNotNull(f)
-        f!!
-        assertTrue("引き出しと同じ一時フォルダ", DragOut.isTemp(f))
-        assertEquals("料理_写真.png", f.name)
-        assertTrue(f.readBytes().contentEquals(png1x1))
-        // 画像として読めない物は書かない
-        assertNull(PhotoOpen.export(PreviewPhoto(b, "壊れた")))
-        assertNull(PhotoOpen.export(PreviewPhoto("https://example.com/a.png", "外")))
-        f.parentFile.deleteRecursively()
+    fun exportWritesAPngIntoThePerUserFolderOnly() {
+        val root = File(Files.createTempDirectory("preview-root").toFile(), "open")
+        try {
+            val f = PhotoOpen.export(PreviewPhoto(a, "料理/写真"), root)
+            assertNotNull(f)
+            f!!
+            assertEquals("渡した場所の下", root.canonicalFile, f.parentFile.parentFile.canonicalFile)
+            assertFalse("皆で使う引き出しの一時フォルダには置かない", DragOut.isTemp(f))
+            assertEquals("料理_写真.png", f.name)
+            assertTrue(f.readBytes().contentEquals(png1x1))
+            if (root.toPath().fileSystem.supportedFileAttributeViews().contains("posix")) {
+                assertEquals("rwx------", PosixFilePermissions.toString(Files.getPosixFilePermissions(root.toPath())))
+            }
+            // 画像として読めない物は書かない
+            assertNull(PhotoOpen.export(PreviewPhoto(b, "壊れた"), root))
+            assertNull(PhotoOpen.export(PreviewPhoto("https://example.com/a.png", "外"), root))
+            // この端末のデータを消す時に消える
+            PhotoOpen.clearTemp(root)
+            assertFalse(f.exists())
+            assertEquals(0, root.listFiles()!!.size)
+        } finally {
+            root.parentFile.deleteRecursively()
+        }
+    }
+
+    @Test
+    fun tempRootIsPerUser() {
+        val data = File("/home/u/.local/share/tailorit")
+        // Linux は XDG_RUNTIME_DIR(絶対パスの時だけ)
+        assertEquals(File(File("/run/user/1000", "tailorit"), "open"), PhotoOpen.tempRoot("Linux", mapOf("XDG_RUNTIME_DIR" to "/run/user/1000")) { data })
+        assertEquals(File(File(data, "tmp"), "open"), PhotoOpen.tempRoot("Linux", mapOf("XDG_RUNTIME_DIR" to "rel")) { data })
+        assertEquals(File(File(data, "tmp"), "open"), PhotoOpen.tempRoot("Linux", emptyMap()) { data })
+        // 他の OS は端末の保存先の下(XDG_RUNTIME_DIR は見ない)
+        val win = File("C:\\Users\\u\\AppData\\Roaming\\TailorIt")
+        assertEquals(File(File(win, "tmp"), "open"), PhotoOpen.tempRoot("Windows 11", mapOf("XDG_RUNTIME_DIR" to "/run/user/1000")) { win })
+        val tmp = File(System.getProperty("java.io.tmpdir")).canonicalFile
+        assertFalse(PhotoOpen.tempRoot("Linux", emptyMap()) { data }.startsWith(tmp))
+    }
+
+    @Test
+    fun previewSizeImagesStayOutOfTheSharedCache() {
+        ImageLoader.clear()
+        try {
+            assertNotNull(ImageLoader.load(a, allowFile = true, maxPx = 2048, withPng = false, useCache = false))
+            assertEquals(0, ImageLoader.size())
+            assertNull(ImageLoader.cached(a, allowFile = true, maxPx = 2048, withPng = false))
+            // 一覧の読み方は今までどおり覚える
+            assertNotNull(ImageLoader.load(a, allowFile = true, maxPx = ImageLoader.THUMBNAIL_PX))
+            assertEquals(1, ImageLoader.size())
+        } finally {
+            ImageLoader.clear()
+        }
     }
 }

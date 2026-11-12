@@ -36,12 +36,13 @@ object ImageLoader {
         return synchronized(cache) { cache[Key(src, allowFile, maxPx, withPng)] }
     }
 
-    fun load(src: String?, allowFile: Boolean, maxPx: Int? = null, withPng: Boolean = true): LoadedImage? {
+    /** [useCache] が false なら覚えた物を使わず、覚えもしない(写真のプレビューのような大きい絵は一覧の分を押し出さない)。 */
+    fun load(src: String?, allowFile: Boolean, maxPx: Int? = null, withPng: Boolean = true, useCache: Boolean = true): LoadedImage? {
         if (src.isNullOrBlank()) return null
-        cached(src, allowFile, maxPx, withPng)?.let { return it }
+        if (useCache) cached(src, allowFile, maxPx, withPng)?.let { return it }
         val bytes = ImageSource.bytes(src, allowFile) ?: return null
         val loaded = decode(bytes, maxPx, withPng) ?: return null
-        if (cacheable(src)) synchronized(cache) { cache[Key(src, allowFile, maxPx, withPng)] = loaded }
+        if (useCache && cacheable(src)) synchronized(cache) { cache[Key(src, allowFile, maxPx, withPng)] = loaded }
         return loaded
     }
 

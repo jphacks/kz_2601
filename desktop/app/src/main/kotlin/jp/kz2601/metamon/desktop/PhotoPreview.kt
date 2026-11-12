@@ -35,7 +35,11 @@ import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.key.Key
+import androidx.compose.ui.input.key.KeyEvent
+import androidx.compose.ui.input.key.KeyEventType
+import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.onKeyEvent
+import androidx.compose.ui.input.key.type
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
@@ -49,6 +53,7 @@ import jp.kz2601.metamon.desktop.io.DragOut
 import jp.kz2601.metamon.desktop.io.FileKind
 import jp.kz2601.metamon.desktop.io.ImageSource
 import jp.kz2601.metamon.desktop.io.fileOf
+import jp.kz2601.metamon.desktop.store.AppDataDir
 import jp.kz2601.metamon.dsl.records.Field
 import jp.kz2601.metamon.dsl.records.FieldType
 import jp.kz2601.metamon.dsl.records.JSONValue
@@ -58,6 +63,9 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.awt.Desktop
 import java.io.File
+import java.net.URI
+import java.nio.file.Files
+import java.nio.file.attribute.PosixFilePermissions
 
 // 記録の写真を大きく見る(Mac の Quick Look・#1850 に当たる)。クリック / Space で開き、Esc / Space で閉じ、← → で送る。
 
@@ -82,10 +90,46 @@ object PhotoPreviewSources {
     fun accepts(src: String?): Boolean = when {
         src.isNullOrBlank() -> false
         src.startsWith("data:image/") -> src.contains(";base64,")
-        src.startsWith("file:") -> fileOf(src)?.let { FileKind.of(it.name) == FileKind.IMAGE } == true
+        src.startsWith("file:") -> localFile(src)?.let { FileKind.of(it.name) == FileKind.IMAGE } == true
         else -> false
     }
+
+    /**
+     * この端末のファイルを指す file URI だけファイルにする。ホスト付き(`file://host/...`)・`file:////host/...`・
+     * `\\host\share` の形(UNC・ネットワーク上の場所)は null。
+     */
+    fun localFile(src: String): File? {
+        if (!src.startsWith("file:")) return null
+        val uri = runCatching { URI(src) }.getOrNull() ?: return null
+        if (!uri.rawAuthority.isNullOrEmpty()) return null
+        val path = uri.path ?: return null
+        if (path.startsWith("//") || '\\' in path) return null
+        val file = fileOf(src) ?: return null
+        return file.takeUnless { it.path.startsWith("\\\\") || it.path.startsWith("//") }
+    }
 }
+
+/** 押しっぱなしの自動の繰り返しを見分ける(Space で開いてすぐ閉じない)。同じ出来事を何度見ても同じ答え。 */
+class KeyRepeatFilter {
+    private val held = HashSet<Key>()
+    private var last: Any? = null
+    private var lastRepeat = false
+
+    /** [event] は出来事そのもの(同じ出来事を外側と内側で 2 回見るため)。押し下げで、離す前の 2 回目以降なら true。 */
+    fun isRepeat(event: Any, key: Key, down: Boolean): Boolean {
+        if (event === last) return lastRepeat
+        last = event
+        lastRepeat = if (down) !held.add(key) else false.also { held.remove(key) }
+        return lastRepeat
+    }
+}
+
+/** Space の押しっぱなしを見る所は 1 つ(キーボードは 1 つ・出来事は画面のスレッドでだけ来る)。部品・一番外・ダイアログが同じ物を見る。 */
+private val spaceRepeats = KeyRepeatFilter()
+
+/** Space の自動の繰り返し(押しっぱなし)か。プレビューを開く・閉じるのは押し下げた 1 回目だけ。 */
+fun KeyEvent.isAutoRepeatSpace(): Boolean =
+    key == Key.Spacebar && type != KeyEventType.Unknown && spaceRepeats.isRepeat(nativeKeyEvent, key, type == KeyEventType.KeyDown)
 
 /** プレビューの中のキー。 */
 enum class PreviewKey { CLOSE, PREVIOUS, NEXT }
@@ -144,14 +188,47 @@ class PhotoPreview {
     }
 }
 
-/** 「既定のアプリで開く」: 写真を引き出しと同じ一時フォルダへ PNG で書き、OS のビューアに渡す。元のファイルの場所は渡さない。 */
+/**
+ * 「既定のアプリで開く」: 写真をこの人専用の一時フォルダ([tempRoot])へ PNG で書き、OS のビューアに渡す。元のファイルの場所は渡さない。
+ * 書いた物は終わる時と「この端末のデータを消す」で消す。
+ */
 object PhotoOpen {
-    /** 書き出したファイル。読めない・画像でない時は null。裏のスレッドで呼ぶ。 */
-    fun export(photo: PreviewPhoto): File? {
+    /**
+     * 書く場所。Linux は XDG_RUNTIME_DIR(この人だけが読める)、無ければ・他の OS は端末の保存先の下。
+     * 皆で使う java.io.tmpdir には置かない。
+     */
+    fun tempRoot(
+        osName: String = System.getProperty("os.name").orEmpty(),
+        env: Map<String, String> = System.getenv(),
+        dataDir: () -> File = { AppDataDir.resolve() },
+    ): File {
+        val os = osName.lowercase()
+        val linux = !os.startsWith("windows") && !os.startsWith("mac") && !os.startsWith("darwin")
+        val runtime = env["XDG_RUNTIME_DIR"]?.takeIf { linux && it.startsWith("/") }
+        return if (runtime != null) File(File(runtime, "tailorit"), "open") else File(File(dataDir(), "tmp"), "open")
+    }
+
+    /** 書き出したファイル。読めない・画像でない・手元でない時は null。裏のスレッドで呼ぶ。 */
+    fun export(photo: PreviewPhoto, root: File = tempRoot()): File? {
         if (!PhotoPreviewSources.accepts(photo.src)) return null
         val bytes = ImageSource.bytes(photo.src, allowFile = true) ?: return null
         val png = DragOut.png(bytes)?.takeIf { decodes(it) } ?: return null
-        return runCatching { DragOut.temp(DragOut.fileName(photo.name, Strings["desktop_drag_image_name"]) + ".png", png) }.getOrNull()
+        return runCatching {
+            ownerOnly(root)
+            DragOut.temp(DragOut.fileName(photo.name, Strings["desktop_drag_image_name"]) + ".png", png, root)
+        }.getOrNull()
+    }
+
+    /** 書いた写真と、引き出しの一時ファイルを消す(この端末のデータを消す時)。 */
+    fun clearTemp(root: File = tempRoot()) {
+        runCatching { DragOut.clear(root) }
+        runCatching { DragOut.clear() }
+    }
+
+    /** POSIX ならこの人だけが読める形で作る(Windows は保存先がもとから人ごと)。 */
+    private fun ownerOnly(root: File) {
+        root.mkdirs()
+        runCatching { Files.setPosixFilePermissions(root.toPath(), PosixFilePermissions.fromString("rwx------")) }
     }
 
     private fun decodes(png: ByteArray): Boolean = runCatching { org.jetbrains.skia.Image.makeFromEncoded(png).close() }.isSuccess
@@ -175,7 +252,7 @@ fun Modifier.photoPreviewClick(src: String?, name: String): Modifier = composed 
     if (open == null || src == null || !PhotoPreviewSources.accepts(src)) return@composed Modifier
     val label = Strings["desktop_preview_open"]
     Modifier
-        .onKeyEvent { e -> KeyPress.of(e)?.takeIf { it.key == Key.Spacebar && !it.ctrl && !it.meta && !it.alt && !it.shift }?.let { open(src, name) } ?: false }
+        .onKeyEvent { e -> KeyPress.of(e)?.takeIf { it.key == Key.Spacebar && !it.ctrl && !it.meta && !it.alt && !it.shift && !e.isAutoRepeatSpace() }?.let { open(src, name) } ?: false }
         .clickable(role = Role.Button, onClickLabel = label) { open(src, name) }
 }
 
@@ -196,7 +273,7 @@ fun PhotoPreviewDialog(preview: PhotoPreview, onMessage: (String) -> Unit, onDis
     LaunchedEffect(Unit) { runCatching { focus.requestFocus() } }
     var loaded by remember(photo.src) { mutableStateOf<Loaded>(Loaded.Loading) }
     LaunchedEffect(photo.src) {
-        loaded = withContext(Dispatchers.IO) { ImageLoader.load(photo.src, allowFile = true, maxPx = PREVIEW_PX, withPng = false) }
+        loaded = withContext(Dispatchers.IO) { ImageLoader.load(photo.src, allowFile = true, maxPx = PREVIEW_PX, withPng = false, useCache = false) }
             ?.let { Loaded.Done(it) } ?: Loaded.Failed
     }
     val title = preview.title()
@@ -214,8 +291,10 @@ fun PhotoPreviewDialog(preview: PhotoPreview, onMessage: (String) -> Unit, onDis
             Modifier.widthIn(max = 1200.dp).fillMaxWidth(0.94f).fillMaxHeight(0.92f)
                 .semantics { paneTitle = pane; isTraversalGroup = true }
                 .onKeyEvent { e ->
+                    val repeat = e.isAutoRepeatSpace()
                     when (KeyPress.of(e)?.let(PhotoPreview::keyOf)) {
-                        PreviewKey.CLOSE -> true.also { onDismiss() }
+                        // 開いた時の Space を押しっぱなしでもすぐ閉じない
+                        PreviewKey.CLOSE -> true.also { if (!repeat) onDismiss() }
                         PreviewKey.PREVIOUS -> true.also { preview.previous() }
                         PreviewKey.NEXT -> true.also { preview.next() }
                         null -> false

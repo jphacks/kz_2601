@@ -54,7 +54,12 @@ fun main(args: Array<String>) = application {
     // 端末の記録は裏で読む。読み終えるまでウィンドウはスケルトン(SharedRecords.loading)
     val loadScope = remember { CoroutineScope(SupervisorJob() + Dispatchers.IO) }
     // 前に落ちた時などに残った引き出しの一時フォルダ(1 日より古い物)を裏で消す
-    remember { loadScope.launch { runCatching { DragOut.sweep() } } }
+    remember {
+        loadScope.launch {
+            runCatching { DragOut.sweep() }
+            runCatching { DragOut.sweep(root = PhotoOpen.tempRoot()) }
+        }
+    }
     val hub = remember {
         // 記録の JSON を渡した時(開発・スクリーンショット)は最初のアプリだけそれを使い、端末に残さない
         val fixture = args.getOrNull(1)?.let { MockStore.fromJson(File(it).readText()) }
