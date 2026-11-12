@@ -115,32 +115,45 @@ func (l *Limiter) Middleware(verifier auth.IdentityVerifier) func(http.Handler) 
 			out.waive = func(ctx context.Context) bool { return l.waive(ctx, w, id.UID, ClientIP(r), dec, weight) }
 			sw := &statusWriter{ResponseWriter: w}
 			next.ServeHTTP(sw, r.WithContext(context.WithValue(ctx, outcomeKey{}, out)))
-			l.settle(r, dec, weight, out, sw.status)
+			l.settle(r, id.UID, dec, weight, out, sw.status)
 		})
 	}
 }
 
 // settle refunds what the request should not pay after all (refund.go, #548).
-func (l *Limiter) settle(r *http.Request, dec Decision, charged int, out *outcome, httpStatus int) {
-	status, mode, waived := out.final(httpStatus)
+// It runs once per request, so a request is refunded at most once.
+func (l *Limiter) settle(r *http.Request, uid string, dec Decision, charged int, out *outcome, httpStatus int) {
+	status, mode, unchanged, waived := out.final(httpStatus)
 	if waived {
 		return
 	}
 	gone := r.Context().Err() != nil // the client disconnected before the end
-	units := l.cfg.Weights.refundUnits(charged, status, mode, gone)
+	units, reason := l.cfg.Weights.refundUnits(charged, status, mode, unchanged, gone)
 	if units <= 0 {
 		return
 	}
 	ctx, cancel := context.WithTimeout(context.WithoutCancel(r.Context()), refundTimeout)
 	defer cancel()
+	var taken unchangedTake
+	if reason == refundUnchanged {
+		var ok bool
+		if taken, ok = l.takeUnchanged(ctx, dec.charge.store, uid); !ok {
+			// past the daily cap: pay the resolved mode as usual
+			if units, reason = l.cfg.Weights.refundUnits(charged, status, mode, false, gone); units <= 0 {
+				return
+			}
+		}
+	}
 	if err := l.Refund(ctx, dec, units); err != nil {
 		l.log.WarnContext(ctx, "ratelimit: refund failed", slog.Any("error", err), slog.Int("units", units))
+		l.untakeUnchanged(ctx, dec.charge.store, taken) // not refunded after all
 		return
 	}
 	l.log.InfoContext(ctx, "ratelimit.refund",
 		slog.Int("units", units),
 		slog.Int("status", status),
 		slog.String("mode", mode),
+		slog.String("reason", reason),
 		slog.String("path", r.URL.Path),
 	)
 }

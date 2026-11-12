@@ -1,8 +1,5 @@
-// TODO mac-026: UIKit を直接使うテスト。Mac で回すには描画の仕方を置き換え層に寄せる
-#if os(iOS)
 import XCTest
 import SwiftUI
-import UIKit
 import MetamonDSL
 @testable import MetamonRenderer
 
@@ -141,7 +138,7 @@ final class AiGenerateTests: XCTestCase {
         ]
         var heights: [CGFloat] = []
         for r in results {
-            let host = UIHostingController(rootView: AITextResultView(result: r).frame(width: 320))
+            let host = TestHostingController(rootView: AITextResultView(result: r).frame(width: 320))
             let size = host.sizeThatFits(in: CGSize(width: 320, height: CGFloat.greatestFiniteMagnitude))
             XCTAssertGreaterThan(size.height, 20, "\(r.shape)")
             heights.append(size.height)
@@ -154,9 +151,8 @@ final class AiGenerateTests: XCTestCase {
         let dsl = try ideas()
         let batsu = try XCTUnwrap(dsl.screen("home")?.components.first { $0.id == "batsu" })
         let view = AiButtonLeaf(c: batsu, ctx: RenderContext(route: Route(screen: "home")))
-        let host = UIHostingController(rootView: view.frame(width: 320))
+        let host = TestHostingController(rootView: view.frame(width: 320))
         let size = host.sizeThatFits(in: CGSize(width: 320, height: 600))
         XCTAssertGreaterThan(size.height, 30)
     }
 }
-#endif

@@ -33,7 +33,10 @@ struct ComposeSheet: View {
         .frame(minWidth: Self.size.width, idealWidth: Self.size.width, minHeight: Self.size.height, idealHeight: Self.size.height)
         .background(.background)
         .modifier(MacModelDownloadConfirm())
-        .onDisappear { voice.cancel() } // 録音中に閉じたら録音を捨てる
+        .onDisappear { // 録音中に閉じたら録音を捨てる・走っている呼び出しを止める
+            voice.cancel()
+            session.close()
+        }
         // 同意していない時は送らずに説明を出す(#246)。閉じたら、同意していれば止めた 1 件を送る
         .sheet(isPresented: $session.needsConsent, onDismiss: { session.resumeAfterConsent() }) {
             MacAIConsentSheet()
@@ -60,6 +63,22 @@ struct ComposeSheet: View {
                 }
             }
             Spacer()
+            MacRemainingTodayBadge()
+            if session.phase == .chatting, !session.bubbles.isEmpty || session.hasHistory {
+                Button("最初から") { session.requestRestart() }
+                    .disabled(session.sending)
+                    .help("今の会話を消して、最初から話し直します")
+                    .accessibilityIdentifier("compose.restart")
+                    .confirmationDialog("最初からにしますか?", isPresented: $session.showsRestartConfirm, titleVisibility: .visible) {
+                        if !session.bubbles.isEmpty {
+                            Button("今の会話だけ消す") { session.restartLive() }
+                        }
+                        Button("これまでの会話も消す", role: .destructive) { session.restartAll() }
+                        Button("キャンセル", role: .cancel) {}
+                    } message: {
+                        Text("これまでの会話と反映の記録を消すと、元に戻せません。")
+                    }
+            }
             Button(action: close) { Image(systemName: "xmark.circle.fill").font(.title3) }
                 .buttonStyle(.plain)
                 .foregroundStyle(.secondary)
@@ -117,9 +136,19 @@ private struct ComposeChat: View {
             ScrollViewReader { proxy in
                 ScrollView {
                     VStack(alignment: .leading, spacing: MacTheme.Spacing.group) {
-                        if session.bubbles.isEmpty { greeting }
+                        // 閉じた会話と反映の区切り(#1211)。今の会話の上に続けて出す
+                        ForEach(session.history) { entry in
+                            MacHistoryRow(entry: entry) { role, text in
+                                ChatBubbleRow(role: role, text: text)
+                            }
+                            .id(entry.id)
+                        }
+                        if session.bubbles.isEmpty, !session.hasHistory { greeting }
                         ForEach(session.bubbles) { bubble in
-                            ChatBubbleRow(bubble: bubble).id(bubble.id)
+                            ChatBubbleRow(role: bubble.role, text: bubble.text).id(bubble.id)
+                        }
+                        if let n = session.questionNumber {
+                            MacQuestionProgressLabel(number: n) // あと何問か(iOS の M5)
                         }
                         if session.sending {
                             ProgressView().controlSize(.small).padding(.leading, 4)
@@ -134,14 +163,15 @@ private struct ComposeChat: View {
                     }
                     .padding(MacTheme.Spacing.window)
                 }
+                .onAppear { proxy.scrollTo("bottom", anchor: .bottom) } // 続きから話す(#1211)
                 .onChange(of: session.bubbles.count) {
-                    withAnimation { proxy.scrollTo("bottom", anchor: .bottom) }
+                    withMacAnimation { proxy.scrollTo("bottom", anchor: .bottom) }
                 }
                 .onChange(of: session.sending) {
-                    withAnimation { proxy.scrollTo("bottom", anchor: .bottom) }
+                    withMacAnimation { proxy.scrollTo("bottom", anchor: .bottom) }
                 }
                 .onChange(of: session.failure?.id) {
-                    withAnimation { proxy.scrollTo("bottom", anchor: .bottom) }
+                    withMacAnimation { proxy.scrollTo("bottom", anchor: .bottom) }
                 }
             }
             Divider()
@@ -160,28 +190,31 @@ private struct ComposeChat: View {
 
     /// 文字にした文を(書きかけがあればその後ろに足して)送る。送っている途中なら入力欄に足すだけ(送るのは本人が Return)
     private func deliver(_ text: String) {
-        let typed = session.draft.trimmingCharacters(in: .whitespacesAndNewlines)
+        // 変換中の文字があれば先に確定させ、その後ろに足す(#1047)
+        let typed = MacComposeInput.committedDraft(session.draft, inputFocused: inputFocused)
+            .trimmingCharacters(in: .whitespacesAndNewlines)
         session.draft = typed.isEmpty ? text : typed + " " + text
         if session.phase == .chatting, !session.sending { session.sendDraft(source: typed.isEmpty ? .voice : .text) }
     }
 
+    /// 入力欄の文を送る。変換中の文字は確定させてから送る(#1047)
+    private func submitDraft() {
+        session.draft = MacComposeInput.committedDraft(session.draft, inputFocused: inputFocused)
+        session.sendDraft()
+    }
+
+    /// 時間帯・初回 / 再訪で変わるあいさつ(#1211・iOS と同じ `Greeting`)
     private var greeting: some View {
-        HStack(alignment: .top, spacing: MacTheme.Spacing.group) {
+        let copy = MacComposeGreeting.copy(for: session.target)
+        return HStack(alignment: .top, spacing: MacTheme.Spacing.group) {
             CraneMascot(pose: .happy, size: 56)
             VStack(alignment: .leading, spacing: 4) {
-                switch session.target {
-                case .create:
-                    Text(L10n.key("どんなアプリを作りますか?", review: "どんな記録帳を用意しますか?")).font(.title3.weight(.semibold))
-                    Text("「毎日の支出を記録して、今月の合計を見たい」のように、使い道を書いてください。")
-                        .foregroundStyle(.secondary)
-                case .edit:
-                    Text("どこをどう直しますか?").font(.title3.weight(.semibold))
-                    Text("「合計をもっと大きく表示して」のように、変えたい所を書いてください。")
-                        .foregroundStyle(.secondary)
-                }
+                Text(copy.title).font(.title3.weight(.semibold))
+                Text(copy.subtitle).foregroundStyle(.secondary)
             }
         }
         .accessibilityElement(children: .combine)
+        .accessibilityIdentifier("compose.greeting")
     }
 
     @ViewBuilder private var offerView: some View {
@@ -210,12 +243,16 @@ private struct ComposeChat: View {
 
     private var inputBar: some View {
         HStack(spacing: 8) {
-            TextField(session.bubbles.isEmpty ? "ここに書いて Return で送る" : "答えや続きを書く",
+            TextField(session.bubbles.isEmpty && !session.hasHistory ? "ここに書いて Return で送る" : "答えや続きを書く",
                       text: $session.draft, axis: .vertical)
                 .textFieldStyle(.plain)
                 .lineLimit(1...4)
                 .focused($inputFocused)
-                .onSubmit { session.sendDraft() }
+                .onSubmit {
+                    // 変換中の Return は確定だけ(#1047)
+                    guard MacComposeInput.allowsReturnSubmit() else { return }
+                    submitDraft()
+                }
                 .disabled(session.sending || voice.isBusy)
             MacMicButton(disabled: session.sending, deliver: deliver)
             Button {
@@ -235,7 +272,7 @@ private struct ComposeChat: View {
                 .frame(width: 420, height: 440)
             }
             Button {
-                session.sendDraft()
+                submitDraft()
             } label: {
                 Image(systemName: "arrow.up.circle.fill").font(.title2)
             }
@@ -246,18 +283,22 @@ private struct ComposeChat: View {
         }
         .padding(.horizontal, MacTheme.Spacing.window)
         .padding(.vertical, MacTheme.Spacing.group)
+        // 押している間だけ録音(#1220): 入力欄が空の時のスペース長押し・⇧⌘M 長押し
+        .macHoldToTalkKeys(draftIsEmpty: session.draft.isEmpty, enabled: !session.sending,
+                           deliver: deliver, insertSpace: { session.draft += " " })
     }
 }
 
 private struct ChatBubbleRow: View {
-    let bubble: MacComposeSession.Bubble
+    let role: ChatMessage.Role
+    let text: String
 
-    private var isUser: Bool { bubble.role == .user }
+    private var isUser: Bool { role == .user }
 
     var body: some View {
         HStack {
             if isUser { Spacer(minLength: 60) }
-            Text(bubble.text)
+            Text(text)
                 .textSelection(.enabled)
                 .padding(.horizontal, 12).padding(.vertical, 8)
                 .foregroundStyle(isUser ? AnyShapeStyle(.white) : AnyShapeStyle(.primary))
@@ -266,7 +307,7 @@ private struct ChatBubbleRow: View {
             if !isUser { Spacer(minLength: 60) }
         }
         .accessibilityElement(children: .combine)
-        .accessibilityLabel(isUser ? Text("あなた: \(bubble.text)") : Text(bubble.text))
+        .accessibilityLabel(isUser ? Text("あなた: \(text)") : Text(text))
     }
 }
 

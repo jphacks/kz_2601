@@ -1,5 +1,5 @@
 #!/bin/sh
-# クラッシュ報告(#296): dSYM を Firebase Crashlytics に送る(Metamon ターゲットの postBuildScripts)。docs/ios/crash-reporting.md
+# クラッシュ報告(#296): dSYM を Firebase Crashlytics に送る(Metamon・MetamonMac(#930)ターゲットの postBuildScripts)。docs/ios/crash-reporting.md
 # 送るのは実機向けの Release / Review だけ。Debug・シミュレータ・plist 無し(CI)では何もしない(ローカルのビルドを遅くしない・
 # 手元の確認ビルドで本番の Firebase に書き込まない)。
 set -eu

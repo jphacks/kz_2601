@@ -1,28 +1,55 @@
 import Foundation
 
 /// appconfig `GET /v1/client-config`(#302・認証不要)。省略されたフィールド = 強制しない。
+/// iOS / macOS(#981)の版はそれぞれのフィールドで判定する(`ClientConfig.Platform`)。
 public struct ClientConfig: Decodable, Equatable, Sendable {
     public var minIOSBuild: Int?
     public var latestIOSBuild: Int?
     public var iosAppStoreUrl: String?
+    /// Mac アプリの CFBundleVersion(backend `MIN_MACOS_BUILD` など・#981)
+    public var minMacOSBuild: Int?
+    public var latestMacOSBuild: Int?
+    public var macAppStoreUrl: String?
     /// アプリ内のお知らせ(#333)。壊れていても nil にするだけで、版の判定は続ける
     public var notice: ServiceNotice?
 
-    public init(minIOSBuild: Int? = nil, latestIOSBuild: Int? = nil, iosAppStoreUrl: String? = nil, notice: ServiceNotice? = nil) {
+    /// どの OS の版のフィールドで判定するか
+    public enum Platform: Sendable {
+        case ios, macos
+    }
+
+    public init(minIOSBuild: Int? = nil, latestIOSBuild: Int? = nil, iosAppStoreUrl: String? = nil,
+                minMacOSBuild: Int? = nil, latestMacOSBuild: Int? = nil, macAppStoreUrl: String? = nil,
+                notice: ServiceNotice? = nil) {
         self.minIOSBuild = minIOSBuild
         self.latestIOSBuild = latestIOSBuild
         self.iosAppStoreUrl = iosAppStoreUrl
+        self.minMacOSBuild = minMacOSBuild
+        self.latestMacOSBuild = latestMacOSBuild
+        self.macAppStoreUrl = macAppStoreUrl
         self.notice = notice
     }
 
-    private enum CodingKeys: String, CodingKey { case minIOSBuild, latestIOSBuild, iosAppStoreUrl, notice }
+    private enum CodingKeys: String, CodingKey { case minIOSBuild, latestIOSBuild, iosAppStoreUrl, minMacOSBuild, latestMacOSBuild, macAppStoreUrl, notice }
 
     public init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
         minIOSBuild = try c.decodeIfPresent(Int.self, forKey: .minIOSBuild)
         latestIOSBuild = try c.decodeIfPresent(Int.self, forKey: .latestIOSBuild)
         iosAppStoreUrl = try c.decodeIfPresent(String.self, forKey: .iosAppStoreUrl)
+        minMacOSBuild = try? c.decodeIfPresent(Int.self, forKey: .minMacOSBuild)
+        latestMacOSBuild = try? c.decodeIfPresent(Int.self, forKey: .latestMacOSBuild)
+        macAppStoreUrl = try? c.decodeIfPresent(String.self, forKey: .macAppStoreUrl)
         notice = try? c.decodeIfPresent(ServiceNotice.self, forKey: .notice)
+    }
+
+    func minBuild(_ platform: Platform) -> Int? { platform == .macos ? minMacOSBuild : minIOSBuild }
+    func latestBuild(_ platform: Platform) -> Int? { platform == .macos ? latestMacOSBuild : latestIOSBuild }
+
+    /// サーバーが指定したストアの URL。OS ごとに許すスキームだけ(それ以外は nil = アプリ側の既定)
+    func storeURL(_ platform: Platform) -> URL? {
+        let (raw, schemes) = platform == .macos ? (macAppStoreUrl, ["https", "macappstore"]) : (iosAppStoreUrl, ["https", "itms-apps"])
+        return raw.flatMap(URL.init(string:)).flatMap { schemes.contains($0.scheme ?? "") ? $0 : nil }
     }
 }
 
@@ -34,10 +61,11 @@ public enum UpdateRequirement: Equatable, Sendable {
     /// 閉じられない「アップデートしてください」(MIN_IOS_BUILD 未満)
     case required(minimum: Int)
 
-    public static func evaluate(config: ClientConfig?, build: String) -> UpdateRequirement {
+    /// `platform` の既定は iOS(Mac は `.macos` を渡す・#981)
+    public static func evaluate(config: ClientConfig?, build: String, platform: ClientConfig.Platform = .ios) -> UpdateRequirement {
         guard let config, let current = BuildNumber(build) else { return .none }
-        if let min = config.minIOSBuild, min > 0, current < BuildNumber(min) { return .required(minimum: min) }
-        if let latest = config.latestIOSBuild, latest > 0, current < BuildNumber(latest) { return .recommended(latest: latest) }
+        if let min = config.minBuild(platform), min > 0, current < BuildNumber(min) { return .required(minimum: min) }
+        if let latest = config.latestBuild(platform), latest > 0, current < BuildNumber(latest) { return .recommended(latest: latest) }
         return .none
     }
 }
@@ -91,10 +119,13 @@ public struct HTTPClientConfigClient: ClientConfigClient {
 public struct UpdateChecker: Sendable {
     public var client: (any ClientConfigClient)?
     public var build: String
+    /// どの OS の版で判定するか(Mac は `.macos`・#981)
+    public var platform: ClientConfig.Platform
 
-    public init(client: (any ClientConfigClient)?, build: String = ClientInfo.current.build) {
+    public init(client: (any ClientConfigClient)?, build: String = ClientInfo.current.build, platform: ClientConfig.Platform = .ios) {
         self.client = client
         self.build = build
+        self.platform = platform
     }
 
     public struct Result: Equatable, Sendable {
@@ -113,8 +144,8 @@ public struct UpdateChecker: Sendable {
 
     public func check() async -> Result {
         guard let client, let config = try? await client.fetch() else { return Result(requirement: .none) }
-        let url = config.iosAppStoreUrl.flatMap(URL.init(string:)).flatMap { ["https", "itms-apps"].contains($0.scheme ?? "") ? $0 : nil }
         let notice = config.notice.flatMap { $0.isDisplayable && $0.applies(toBuild: build) ? $0 : nil }
-        return Result(requirement: UpdateRequirement.evaluate(config: config, build: build), appStoreURL: url, notice: notice)
+        return Result(requirement: UpdateRequirement.evaluate(config: config, build: build, platform: platform),
+                      appStoreURL: config.storeURL(platform), notice: notice)
     }
 }

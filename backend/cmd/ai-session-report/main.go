@@ -247,7 +247,7 @@ func logFilter(uids, services []string, since, until time.Time) string {
 		hashes[i] = httpx.UIDHash(u)
 	}
 	return fmt.Sprintf(`resource.type="cloud_run_revision" AND resource.labels.service_name=%s AND jsonPayload.event=%s AND jsonPayload.uid_hash=%s AND timestamp>=%q AND timestamp<=%q`,
-		quote(services), quote([]string{evGenerate, evUsage, evRequest, evOpened}), quote(hashes),
+		quote(services), quote([]string{evGenerate, evUsage, evRequest, evOpened, evChat}), quote(hashes),
 		since.UTC().Format(time.RFC3339), until.UTC().Format(time.RFC3339))
 }
 

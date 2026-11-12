@@ -181,7 +181,7 @@ func TestScoreRuns(t *testing.T) {
 	if len(recs) != 3 || total.Pass != 2 || total.Checked != 2 || total.Unchecked != 1 {
 		t.Errorf("recs %d, total %+v", len(recs), total)
 	}
-	if err := scoreRuns(filepath.Join(dir, "*.json")); err != nil {
+	if err := scoreRuns(filepath.Join(dir, "*.json"), evalOutput{}); err != nil {
 		t.Fatal(err)
 	}
 }

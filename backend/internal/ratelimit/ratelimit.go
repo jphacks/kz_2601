@@ -49,6 +49,10 @@ type Limits struct {
 	WaivedHourly int
 	// WaivedIPHourly is the same per client address (every tier).
 	WaivedIPHourly int
+	// UnchangedDaily caps, per uid and day, the generate requests refunded
+	// because the edit changed nothing (ReportUnchanged, unchanged_cap.go).
+	// Past it the request keeps its charge. 0 = never refunded.
+	UnchangedDaily int
 }
 
 // Weights are the units one request costs.
@@ -71,7 +75,7 @@ type Weights struct {
 
 // DefaultLimits / DefaultWeights: see docs/backend/rate-limit.md for the reasoning.
 var (
-	DefaultLimits  = Limits{Anonymous: 30, SignedIn: 60, Pro: 300, PerIP: 300, Global: 2000, WaivedHourly: 30, WaivedIPHourly: 120}
+	DefaultLimits  = Limits{Anonymous: 30, SignedIn: 60, Pro: 300, PerIP: 300, Global: 2000, WaivedHourly: 30, WaivedIPHourly: 120, UnchangedDaily: 5}
 	DefaultWeights = Weights{Create: 3, Edit: 2, Chat: 1, Text: 1, TextTask: 2, TextLong: 3, TextImage: 3}
 )
 

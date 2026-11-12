@@ -11,6 +11,7 @@ import (
 	"fmt"
 	"io"
 	"log/slog"
+	"slices"
 	"time"
 
 	"github.com/jphacks/kz_2601/backend/internal/httpx"
@@ -254,6 +255,13 @@ func (c *Connections) MarkError(ctx context.Context, uid, provider string, seale
 // Revoke cuts uid's connection: the provider's revoke endpoint is called
 // (best effort; client nil or ErrNoRevoke skips it), then the tokens are
 // deleted at once and only the revoked marker stays (決定 7).
+//
+// Providers on one OAuth client (ClientFrom: Google Calendar, Tasks and
+// Sheets) hold one grant at the provider, and revoking any of their tokens
+// ends all of them. So the revoke endpoint is skipped while another of them
+// is still connected for uid, and called when the last one is cut; until
+// then the grant stays listed in the person's Google account (only our
+// stored tokens are gone).
 func (c *Connections) Revoke(ctx context.Context, uid, provider string, client OAuthClient) error {
 	conn, ok, err := c.Store.Get(ctx, uid, provider)
 	if err != nil {
@@ -261,6 +269,9 @@ func (c *Connections) Revoke(ctx context.Context, uid, provider string, client O
 	}
 	if !ok {
 		return nil
+	}
+	if client != nil && c.grantInUse(ctx, uid, provider) {
+		client = nil
 	}
 	if client != nil && len(conn.Sealed) > 0 && c.Sealer != nil {
 		if t, err := c.open(ctx, uid, provider, conn.Sealed); err == nil {
@@ -273,6 +284,40 @@ func (c *Connections) Revoke(ctx context.Context, uid, provider string, client O
 	now := c.now()
 	marker := Connection{Provider: provider, Status: StatusRevoked, ConnectedAt: conn.ConnectedAt, RevokedAt: now, DeleteAt: now.Add(c.ttl())}
 	return c.Store.Put(ctx, uid, marker)
+}
+
+// grantInUse: another provider on provider's OAuth client is still connected
+// for uid (not revoked). A failed read counts as in use: not revoking
+// leaves a grant at the provider; revoking would break the others.
+func (c *Connections) grantInUse(ctx context.Context, uid, provider string) bool {
+	group := oauthClientOf(provider)
+	shared := false
+	for _, p := range Providers() {
+		if p.ID != provider && oauthClientOf(p.ID) == group {
+			shared = true
+		}
+	}
+	if !shared {
+		return false
+	}
+	list, err := c.Store.List(ctx, uid)
+	if err != nil {
+		c.log().WarnContext(ctx, "extapi: listing connections failed; the provider revoke is skipped",
+			slog.String("provider", provider), slog.Any("error", err))
+		return true
+	}
+	return slices.ContainsFunc(list, func(o Connection) bool {
+		return o.Provider != provider && o.Status != StatusRevoked && oauthClientOf(o.Provider) == group
+	})
+}
+
+// oauthClientOf is the provider whose OAuth client id uses (its ClientFrom,
+// or itself).
+func oauthClientOf(id string) string {
+	if p, ok := Lookup(id); ok && p.ClientFrom != "" {
+		return p.ClientFrom
+	}
+	return id
 }
 
 // RevokeAll cuts every connection of uid (account deletion).

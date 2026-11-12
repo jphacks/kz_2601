@@ -336,6 +336,8 @@ func (s *Service) ClearChat(uid, appID string) error {
 // still answering, so in practice it is already done).
 func (s *Service) Chat(ctx context.Context, req ChatRequest) (out *ChatResult, err error) {
 	started := time.Now()
+	ctx = withCostTally(ctx) // tokens of the turn for ai.chat
+	defer func() { s.logChat(ctx, req, out, err, time.Since(started)) }()
 	if req.AppID == "" {
 		return nil, &Error{Status: http.StatusBadRequest, Code: httpx.CodeBadRequest, Message: "appId is required"}
 	}
