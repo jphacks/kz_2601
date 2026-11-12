@@ -120,6 +120,39 @@ class TrayTest {
     }
 
     @Test
+    fun voiceRowStartsRecordingInTheFrontWindowWhenVoiceIsEnabled() = Strings.withLang(Lang.JA) {
+        val items = TrayMenu.items("家計簿", canQuickRecord = true, timers = emptyList(), closeToTray = true, voiceEnabled = true)
+        assertEquals("音声で話す(録音を始める / 止める)", labels(items)[2])
+        assertEquals(TrayCommand.VOICE, (items[2] as TrayItem.Command).command)
+
+        val c = TrayController(Examples.load("kakeibo"), true, MemoryBoolSetting(true), MemoryBoolSetting(true), voiceEnabled = true)
+        assertTrue((c.items(emptyList(), emptyList())[2] as TrayItem.Command).enabled)
+        c.onCloseRequest { _, _ -> }
+        c.voice()
+        assertTrue("結果を出すウィンドウを前に出す", c.windowVisible)
+        assertEquals(1, c.voiceRequests)
+        // 後ろのウィンドウは受け取らず、前のウィンドウが 1 回だけ受け取る
+        assertFalse(c.takeVoice { false })
+        assertTrue(c.takeVoice { true })
+        assertFalse(c.takeVoice { true })
+        // もう一度押すと止める側(同じ openVoice をもう 1 回)
+        c.voice()
+        assertEquals(2, c.voiceRequests)
+        assertTrue(c.takeVoice { true })
+    }
+
+    @Test
+    fun voiceRowStaysDisabledWhenVoiceIsDisabled() = Strings.withLang(Lang.JA) {
+        val c = TrayController(Examples.load("kakeibo"), true, MemoryBoolSetting(true), MemoryBoolSetting(true), voiceEnabled = false)
+        assertEquals("音声で話す(デスクトップ版ではまだ使えません) [off]", labels(c.items(emptyList(), emptyList()))[2])
+        c.onCloseRequest { _, _ -> }
+        c.voice()
+        assertFalse("押せない行からは何もしない", c.windowVisible)
+        assertEquals(0, c.voiceRequests)
+        assertFalse(c.takeVoice { true })
+    }
+
+    @Test
     fun quickRecordTargetUsesTheDslNavigateToTheFirstRecordableForm() {
         val kakeibo = QuickRecordTarget.find(Examples.load("kakeibo"))
         assertNotNull(kakeibo)
@@ -230,6 +263,7 @@ class TrayTest {
         val keys = listOf(
             "desktop_timer_done", "desktop_tray_close_to_tray", "desktop_tray_hidden_hint", "desktop_tray_open", "desktop_tray_quick_record",
             "desktop_tray_quit", "desktop_tray_timer_elapsed", "desktop_tray_timer_left", "desktop_tray_timer_paused", "desktop_tray_voice",
+            "desktop_tray_voice_toggle",
         )
         keys.forEach { k -> Lang.entries.forEach { l -> assertTrue("$k ($l)", Strings.table.hasString(l, k)) } }
         assertEquals("Time's up", Strings.withLang(Lang.EN) { Strings["desktop_timer_done"] })
