@@ -265,6 +265,9 @@ class DesktopKeyboard(
     /** 消す前の確認を出している。 */
     var wipeConfirmOpen by mutableStateOf(false)
 
+    /** アカウントの画面(AccountScreen.kt・#2505)。パレットから開く。開いている間のキーは画面が自分で受ける。 */
+    var accountOpen by mutableStateOf(false)
+
     /** このウィンドウの検索欄(Ctrl+F は他のウィンドウに入らない)。 */
     val searchTargets = SearchTargets()
 
@@ -293,6 +296,7 @@ class DesktopKeyboard(
 
     /** [repeat] は Space の押しっぱなしの 2 回目以降(開く・閉じるをしない)。 */
     fun handle(p: KeyPress, bubble: Boolean, repeat: Boolean = false): Boolean {
+        if (accountOpen) return false
         if (photos.isOpen) {
             // ダイアログが受けなかった閉じるキー(フォーカスがダイアログの外にある時)はここで閉じる。他は流す
             if (!bubble || PhotoPreview.keyOf(p) != PreviewKey.CLOSE) return false
@@ -381,7 +385,11 @@ class DesktopKeyboard(
             "about:licenses", LicensesText.TITLE, PaletteCommand.Kind.ACTION,
             keywords = listOf("licenses", "third-party", "oss", "notice", LicensesText.LICENSE),
         ) { licensesOpen = true }
-        return shortcuts + buttons + record + screens + apps + wipe + licenses
+        val account = PaletteCommand(
+            "about:account", Strings["account_menu"], PaletteCommand.Kind.ACTION,
+            keywords = listOf("account", "terms", "privacy", "contact", Strings["legal_terms"], Strings["legal_privacy_policy"], Strings["settings_contact"]),
+        ) { accountOpen = true }
+        return shortcuts + buttons + record + screens + apps + wipe + account + licenses
     }
 
     /** 確認で「消す」を押した: 全アプリの端末のデータを消し、このウィンドウを最初の画面に戻す。 */
@@ -457,6 +465,12 @@ class DesktopKeyboard(
                 confirmButton = { TextButton(onClick = { scope.launch { confirmWipe() } }) { Text(KeyboardText.WIPE_CONFIRM_BUTTON) } },
                 dismissButton = { TextButton(onClick = { dismiss() }) { Text(Strings["inputs_cancel"]) } },
             )
+        }
+        if (accountOpen) {
+            AccountDialog(onLicenses = { accountOpen = false; licensesOpen = true }) {
+                accountOpen = false
+                runCatching { root.requestFocus() }
+            }
         }
     }
 }
