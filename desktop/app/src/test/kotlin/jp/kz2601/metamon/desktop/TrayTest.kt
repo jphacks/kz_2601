@@ -5,7 +5,10 @@ import jp.kz2601.metamon.desktop.i18n.Strings
 import jp.kz2601.metamon.dsl.ActionType
 import jp.kz2601.metamon.dsl.AppDSL
 import jp.kz2601.metamon.dsl.decode
+import jp.kz2601.metamon.dsl.expr.DSLClock
+import jp.kz2601.metamon.dsl.records.FieldCoding
 import jp.kz2601.metamon.dsl.records.entityModels
+import java.time.Instant
 import java.time.LocalDate
 import org.junit.After
 import org.junit.Assert.assertEquals
@@ -179,13 +182,28 @@ class TrayTest {
         // 保存すると次に開いた時に新しい値
         records.update(kakeibo.entityModels(), store.save("expense", null, mapOf("amount" to "1", "date" to today)))
         assertEquals("3 件", c.stats()[1].value)
-        assertEquals("Tailor It — 家計簿\n今月の支出 ${c.stats()[0].value}", TrayMenu.tooltip("家計簿", emptyList(), c.stats()))
+        // 集計はメニューにだけ出し、ツールチップには出さない
+        assertEquals("Tailor It — 家計簿", TrayMenu.tooltip("家計簿", emptyList()))
 
         // stat の無いアプリは行を出さない(メニューは集計の無い形と同じ)
         val plain = Examples.load("chat")
         c.switchApp(plain, SharedRecords())
         assertEquals(emptyList<TrayStat>(), c.stats())
         assertEquals(labels(TrayMenu.items(plain.app.name, c.quickRecordAction != null, emptyList(), true)), labels(c.items(emptyList())))
+    }
+
+    @Test
+    fun statsDayFollowsDslClockInFieldZone() {
+        try {
+            // 2026-11-30T15:30Z は日本時間で 12/1
+            DSLClock.fixed = Instant.parse("2026-11-30T15:30:00Z")
+            assertEquals(LocalDate.ofInstant(DSLClock.fixed, FieldCoding.zone), TrayStats.today())
+            val before = TrayStats.today()
+            DSLClock.fixed = Instant.parse("2026-12-01T15:30:00Z")
+            assertTrue(TrayStats.today().isAfter(before))
+        } finally {
+            DSLClock.fixed = null
+        }
     }
 
     @Test
