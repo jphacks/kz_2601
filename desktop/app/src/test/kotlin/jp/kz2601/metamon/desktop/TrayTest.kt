@@ -231,7 +231,7 @@ class TrayTest {
             "desktop_timer_done", "desktop_tray_close_to_tray", "desktop_tray_hidden_hint", "desktop_tray_open", "desktop_tray_quick_record",
             "desktop_tray_quit", "desktop_tray_timer_elapsed", "desktop_tray_timer_left", "desktop_tray_timer_paused", "desktop_tray_voice",
         )
-        keys.forEach { k -> Lang.entries.forEach { l -> assertTrue("$k ($l)", Strings.table.has(l, k)) } }
+        keys.forEach { k -> Lang.entries.forEach { l -> assertTrue("$k ($l)", Strings.table.hasString(l, k)) } }
         assertEquals("Time's up", Strings.withLang(Lang.EN) { Strings["desktop_timer_done"] })
     }
 }

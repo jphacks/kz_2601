@@ -264,7 +264,7 @@ class WindowsTest {
     @Test
     fun windowStringsExistInBothLanguages() {
         listOf("desktop_list_open_window", "desktop_tray_new_window", "desktop_window_conflict", "desktop_window_open_record", "desktop_window_title_record").forEach { k ->
-            Lang.entries.forEach { l -> assertTrue("$k ($l)", Strings.table.has(l, k)) }
+            Lang.entries.forEach { l -> assertTrue("$k ($l)", Strings.table.hasString(l, k)) }
         }
         assertEquals("Tailor It — 買い物 — 詳細", Strings.withLang(Lang.JA) { Strings.format("desktop_window_title_record", "買い物", "詳細") })
     }

@@ -14,6 +14,8 @@ import jp.kz2601.metamon.dsl.records.entityModels
 import jp.kz2601.metamon.renderer.form.FormDraft
 import kotlinx.serialization.json.JsonNull
 import jp.kz2601.metamon.dsl.screen
+import jp.kz2601.metamon.dsl.targetExpr
+import jp.kz2601.metamon.dsl.targetNumber
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
@@ -53,10 +55,10 @@ class DesktopConformanceTest {
         "button" to listOf("label"),
         "link" to listOf("text", "url"),
         "openUrlButton" to listOf("label", "url"),
-        "stat" to listOf("value", "unavailable"),
-        "progressBar" to listOf("ratio", "percent"),
-        "gauge" to listOf("value", "unit"),
-        "chart" to listOf("buckets"),
+        "stat" to listOf("value", "unavailable") + DECLARED_STAT,
+        "progressBar" to listOf("ratio", "percent") + DECLARED_PROGRESS,
+        "gauge" to listOf("value", "unit") + DECLARED_GAUGE,
+        "chart" to listOf("buckets") + DECLARED_CHART,
         "list" to listOf("entity", "rows", "emptyText"),
         "table" to listOf("entity", "columns", "rows", "limit", "groupBy"),
         "timeline" to listOf("entity", "rows", "limit"),
@@ -356,6 +358,7 @@ class DesktopConformanceTest {
             v?.let { put(k, JsonPrimitive(it)) }
         }
         putAll(PlayLeaves.props(c, data, raw))
+        if (c.type.wire in CALC_LEAVES) putAll(declaredProps(c))
         when (c.type.wire) {
             "text", "markdown" -> putText("text", c.text)
             "label", "badge" -> putText("text", c.text ?: c.label)
@@ -375,6 +378,8 @@ class DesktopConformanceTest {
             "progressBar" -> {
                 put("ratio", JsonPrimitive(ProgressValue.ratio(c, data)))
                 put("percent", JsonPrimitive(ProgressValue.percent(c, data)))
+                // 目標が式({"setting"} など)なら解決した数(iOS の RenderTree と同じ)
+                if (c.targetExpr != null) ProgressValue.target(c, data)?.let { put("target", JsonPrimitive(it)) }
             }
             "gauge" -> GaugeValue.value(c, data).let { (v, unit) ->
                 put("value", JsonPrimitive(v))
@@ -387,6 +392,32 @@ class DesktopConformanceTest {
             else -> Unit
         }
         dataProps(c, data).forEach { (k, v) -> put(k, v) }
+    }
+
+    /**
+     * 計算の部品が DSL に書いた値(iOS の RenderTree.declared と同じキー・同じ形)。計算した値は resolvedProps が上書きする。
+     * `target` は数のリテラルだけ(式は解決した数を resolvedProps が入れる)。
+     */
+    private fun declaredProps(c: Component): Map<String, JsonElement> = buildMap {
+        fun put(k: String, v: String?) {
+            v?.let { put(k, JsonPrimitive(it)) }
+        }
+        fun put(k: String, v: Double?) {
+            v?.let { put(k, JsonPrimitive(it)) }
+        }
+        put("title", c.title)
+        put("label", c.label)
+        put("field", c.field)
+        put("entity", c.entity)
+        put("aggregate", c.aggregate?.wire)
+        put("format", c.format?.wire)
+        put("groupBy", c.groupBy)
+        put("bucket", c.bucket?.wire)
+        put("kind", c.kind?.wire)
+        put("unit", c.unit)
+        put("min", c.min)
+        put("max", c.max)
+        put("target", c.targetNumber)
     }
 
     /** データの部品(#1744)。行は画面と同じ ListRows・TableCells・TimelineRows から。検索欄は開いた時の空(検索の操作は runSteps が DesktopSession で回す)。 */
@@ -449,4 +480,13 @@ class DesktopConformanceTest {
     private fun key(id: String?, type: String?) = "${id ?: "-"}:${type.orEmpty()}"
 
     private fun JsonObject.str(k: String): String? = (this[k] as? JsonPrimitive)?.contentOrNull
+
+    private companion object {
+        /** 計算の部品(DSL に書いた値も iOS と同じ形で出して比べる)。 */
+        val CALC_LEAVES = setOf("chart", "gauge", "progressBar", "stat")
+        val DECLARED_CHART = listOf("aggregate", "bucket", "entity", "field", "groupBy", "kind", "title")
+        val DECLARED_GAUGE = listOf("aggregate", "entity", "field", "label", "max", "min")
+        val DECLARED_PROGRESS = listOf("aggregate", "entity", "field", "label", "target")
+        val DECLARED_STAT = listOf("aggregate", "entity", "field", "format", "label", "unit")
+    }
 }
