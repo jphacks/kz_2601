@@ -218,7 +218,7 @@ class SessionPersistence(
         writes.trySend(w)
     }
 
-    private sealed interface Change {
+    internal sealed interface Change {
         val entity: String
 
         data class Put(override val entity: String, val row: Row, val created: Boolean) : Change
@@ -235,7 +235,7 @@ class SessionPersistence(
         }
     }
 
-    private fun diff(old: MockStore, new: MockStore): List<Change> = buildList {
+    internal fun diff(old: MockStore, new: MockStore): List<Change> = buildList {
         for (entity in old.rows.keys + new.rows.keys) {
             val before = old.list(entity).associateBy { it.id }
             val after = new.list(entity)
@@ -302,7 +302,7 @@ class SessionPersistence(
         pending = queue?.operations()?.count { it.appId == appId } ?: 0
     }
 
-    private fun SyncEvent.needsReload(): Boolean = when (this) {
+    internal fun SyncEvent.needsReload(): Boolean = when (this) {
         is SyncEvent.Sent, is SyncEvent.Drained, is SyncEvent.Paused -> false
         else -> true // 断られた: 端末の行を戻した・消したので読み直す
     }
