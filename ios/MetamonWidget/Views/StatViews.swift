@@ -26,6 +26,9 @@ enum WidgetCopy {
 struct StatEntry: TimelineEntry {
     let date: Date
     let snapshot: WidgetSnapshot?
+    /// 集中モードのフィルタで選んでいない生成アプリの数字 → 数字を出さず「集中モード中」(#1992)。
+    /// 判定は `FocusFilterState.pausesWidget`(Mac のウィジェットは集中モードのフィルタを持たないので常に false)。
+    var pausedByFocus = false
 }
 
 // MARK: - Theme(本体 Theme.swift のブランド色を複製。Renderer を import できないため)
@@ -84,7 +87,9 @@ struct MetamonWidgetView: View {
     }
 
     var body: some View {
-        if let snapshot = entry.snapshot, !snapshot.stats.isEmpty {
+        if entry.pausedByFocus {
+            FocusPausedView(family: family)
+        } else if let snapshot = entry.snapshot, !snapshot.stats.isEmpty {
             switch family {
             case .systemMedium: MediumStatsView(snapshot: snapshot)
             case .systemLarge: LargeStatsView(snapshot: snapshot)
@@ -181,6 +186,47 @@ struct AppFooter: View {
 }
 
 /// データ無し(アプリ未生成 / stat 部品が無い)。
+/// 集中モードのフィルタで選んでいない生成アプリ(#1992)。アプリ名も数字も出さない。
+struct FocusPausedView: View {
+    let family: WidgetFamily
+
+    var body: some View {
+        switch family {
+        #if os(iOS)
+        case .accessoryCircular:
+            ZStack {
+                AccessoryWidgetBackground()
+                Image(systemName: "moon.fill").font(.system(size: 18, weight: .semibold))
+            }
+            .accessibilityLabel(Text("集中モード中"))
+        case .accessoryInline:
+            Label("集中モード中", systemImage: "moon.fill")
+        case .accessoryRectangular:
+            Label("集中モード中", systemImage: "moon.fill")
+                .font(.caption.weight(.semibold))
+                .frame(maxWidth: .infinity, alignment: .leading)
+        #endif
+        default:
+            VStack(alignment: .leading, spacing: 8) {
+                ZStack {
+                    Circle().fill(WidgetTheme.brandGradient)
+                    Image(systemName: "moon.fill")
+                        .font(.system(size: 14, weight: .semibold))
+                        .foregroundStyle(.white)
+                }
+                .frame(width: 30, height: 30)
+                .accessibilityHidden(true)
+                Spacer(minLength: 0)
+                Text("集中モード中")
+                    .font(.headline)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.8)
+            }
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
+        }
+    }
+}
+
 struct EmptyStateView: View {
     let appName: String?
 
