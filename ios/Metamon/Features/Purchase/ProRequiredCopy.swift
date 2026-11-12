@@ -16,4 +16,11 @@ extension ProRequired {
             ? L10n.tr("このアプリを作った人が Tailor It Pro ではないため、共有のデータに書き込めません(見ることはできます)")
             : L10n.tr("共有のデータに書き込むには Tailor It Pro が必要です(見ることはできます)")
     }
+
+    /// 外の API(#2001)を呼べなかった時。参加者は作成者の Pro が要る(払っても直らない)
+    var extMessage: String {
+        creatorNeedsPro
+            ? L10n.tr("このアプリを作った人が Tailor It Pro ではないため、外のサービスを使えません")
+            : L10n.tr("外のサービスを使うには Tailor It Pro が必要です")
+    }
 }
