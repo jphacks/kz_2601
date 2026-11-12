@@ -449,13 +449,23 @@ backend/
     appconfigclient/         # ai が今の DSL を読み書きする薄いクライアント(HTTP で Bearer 転送 / Memory)
     appstore/                # StoreKit 2 の署名付き取引(JWS)を Apple に問い合わせずに検証(#314)
     auth/                    # Firebase ID トークン検証 middleware・UID(ctx)・dev 用 verifier
+    books/                   # DSL の lookupBook で ISBN から本の情報を引く(openBD・キャッシュつき)。docs/backend/features/book-lookup.md
+    budget/                  # その日の環境の AI の費用がしきい値を超えたら、無料プランの AI の処理をその日止める(#317・AI_FREE_DAILY_BUDGET_USD)
+    calls/                   # shared のアプリの音声・ビデオ通話(#447)。LiveKit のトークン発行と分の課金だけ。docs/backend/features/calls.md
+    coins/                   # コインの財布と台帳(#630)。LLM の呼び出しを Reserve / Commit / Release で払う
     entitlement/             # Pro の権利のサーバー側の記録(#314)
+    extapi/                  # runner から外の API を呼ぶ口(#1493)。決まった provider と操作だけ。docs/backend/features/external-apis.md
     fsenv/                   # 接続する Firestore の DB を決め、stg が本番の DB を使うと止める(#290)
+    googleplay/              # Google Play の購読(Android の Pro)を Google Play Developer API で読む・acknowledge する
+    gtfsstatic/              # 静的な GTFS-JP の zip からバスの停留所・路線・時刻を読む(#1692)。読むだけ
     httpx/                   # JSON 書き出し・エラー封筒・RequestID・recover・アクセスログ middleware
     loop/                    # 自己改善ループ(#364)。pii(伏せ字)・ingest・triage(LLM・道具なし)・draft(出口の検査)・github・fixed
     metrics/                 # プロダクトの指標のイベントを構造化ログに出す(#297)
+    moderation/textfilter/   # 他の人が見る文字(共有の記録・参加者の名前・公開の一覧)で明らかに不適切な語を断る(#321)。docs/infra/moderation.md
     paid/                    # 有料機能のリスト(paid_features.json)と DSL での判定。ai / appconfig が 402 で止める(#316)
+    plan/                    # プランごとに使える量の表(#317・無料 / Pro)。docs/backend/rate-limit.md
     ratelimit/               # 1 人(と全体)が 1 日に起こせる Claude の処理量の上限(#280)
+    runner/                  # サーバーのルール(#341)。outbox から取り、直前に確かめ、評価・数え・1 回だけ書き・通知する
     store/                   # users/{uid}/apps/{appId} 以下の永続化(Firestore / Memory)
   pkg/
     dsl/                     # 全サービス共有の DSL: 型・schema.json(embed)・Parse / Validate
