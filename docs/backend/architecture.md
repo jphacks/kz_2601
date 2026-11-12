@@ -16,8 +16,10 @@
 - [アカウント削除(#119)](features/account-deletion.md)
 - [shared の参加者(#254)](features/members.md)
 - [プッシュ通知の端末と受け取りの同意(#269)](features/notifications.md)
+- [フォローとタイムライン(#270)](features/follows.md)
 - [フィードバック(#319)](features/feedback.md)
 - [自己改善ループ(#364)](features/feedback-loop.md)
+- [自己改善ループ: 承認された Issue からエージェントの PR を作る(#370)](features/feedback-loop-agent-pr.md)
 - [自動の動きの見える化(#347)](features/automations.md)
 - [外部の公開データの読み取り(#348)](features/external-feeds.md)
 - [外の API(runner の口・数え方・OAuth のトークン・#1493)](features/external-apis.md)
@@ -340,7 +342,7 @@ Cloud Run: ai は `min-instances=1`(コールドスタート回避・デモ中�
 ### ローカル
 
 ```sh
-# 前提: gcloud(cloud-firestore-emulator コンポーネント), Java 11+, Go 1.24
+# 前提: gcloud(cloud-firestore-emulator コンポーネント), Java 11+, Go 1.26(版は backend/go.mod の go 行を見る)
 cd backend
 make emulator        # Firestore :8089(CI と同じ gcloud のエミュレータ・demo-kz2601)
 make test-emulator   # エミュレータ試験を CI と同じ判定で回す
