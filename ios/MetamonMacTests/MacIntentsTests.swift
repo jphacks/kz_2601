@@ -44,14 +44,24 @@ final class MacIntentsTests: XCTestCase {
         XCTAssertEqual(IntentHost.shared.pending, .talk)
     }
 
-    func testRouteOpenSelectsKnownAppOnly() {
+    func testRouteOpenSelectsKnownAppOnly() async {
         var selected: [String] = []
         var talked = 0
-        MacIntentRoute.apply(.open(appId: "mine"), appIds: ["mine", "example"], select: { selected.append($0) }, talk: { talked += 1 })
-        MacIntentRoute.apply(.open(appId: "gone"), appIds: ["mine", "example"], select: { selected.append($0) }, talk: { talked += 1 })
+        var missing: [String] = []
+        let host = IntentHost.shared
+        func route(_ ids: [String]) {
+            guard let resolution = host.resolve(among: ids, listSettled: true) else { return }
+            MacIntentRoute.apply(resolution, select: { selected.append($0) }, talk: { talked += 1 }, missing: { missing.append($0) })
+        }
+        await host.request(.open(appId: "mine"))
+        route(["mine", "example"])
+        await host.request(.open(appId: "gone"))
+        route(["mine", "example"])
         XCTAssertEqual(selected, ["mine"])
+        XCTAssertEqual(missing, ["gone"], "一覧に無い時は一覧を出して知らせる(#1970)")
         XCTAssertEqual(talked, 0)
-        MacIntentRoute.apply(.talk, appIds: [], select: { selected.append($0) }, talk: { talked += 1 })
+        await host.request(.talk)
+        route([])
         XCTAssertEqual(talked, 1)
         XCTAssertEqual(selected, ["mine"])
     }
