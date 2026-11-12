@@ -95,7 +95,7 @@ func TestChatFirst_ModelErrors(t *testing.T) {
 		t.Run(c.name, func(t *testing.T) {
 			svc, f := newEditStepSvc(t, failWith(c.err), stepReply(goodEditAnswer))
 			_, err := editTurn(context.Background(), svc, "メモ欄を消して")
-			wantAIError(t, err, c.status, c.code)
+			_ = wantAIError(t, err, c.status, c.code)
 			if n := len(f.prompts()); n != 1 {
 				t.Fatalf("calls = %d, want 1 (no retry on a model error)", n)
 			}
@@ -120,7 +120,7 @@ func TestChatFirst_ModelTimeout(t *testing.T) {
 		return nil, ctx.Err()
 	})
 	svc.CallTimeout = 20 * time.Millisecond
-	wantAIError(t, failTurn(t, context.Background(), svc, "x"), http.StatusGatewayTimeout, httpx.CodeUpstreamTimeout)
+	_ = wantAIError(t, failTurn(t, context.Background(), svc, "x"), http.StatusGatewayTimeout, httpx.CodeUpstreamTimeout)
 }
 
 // The request going away while the model still runs: 504 timeout.
@@ -189,14 +189,14 @@ func TestChatFirst_RetryStillBad(t *testing.T) {
 // The retry itself failing returns that error.
 func TestChatFirst_RetryModelError(t *testing.T) {
 	svc, _ := newEditStepSvc(t, stepReply(`nope`), failWith(&APIError{Status: 529, Type: "overloaded_error"}))
-	wantAIError(t, failTurn(t, context.Background(), svc, "x"), http.StatusServiceUnavailable, httpx.CodeUpstreamUnavailable)
+	_ = wantAIError(t, failTurn(t, context.Background(), svc, "x"), http.StatusServiceUnavailable, httpx.CodeUpstreamUnavailable)
 }
 
 // A failed turn keeps nothing: the next turn starts from the user's message.
 func TestChatFirst_FailureLeavesNoHistory(t *testing.T) {
 	svc, f := newEditStepSvc(t, failWith(&APIError{Status: 503}), stepReply(goodEditAnswer))
 	ctx := context.Background()
-	failTurn(t, ctx, svc, "一つ目")
+	_ = failTurn(t, ctx, svc, "一つ目")
 	if _, err := editTurn(ctx, svc, "二つ目"); err != nil {
 		t.Fatal(err)
 	}
@@ -258,7 +258,7 @@ func TestChatMode(t *testing.T) {
 			svc := &Service{Store: c.store}
 			mode, app, err := svc.chatMode(context.Background(), ChatRequest{AppID: "a1", Mode: c.mode})
 			if c.errState != 0 {
-				wantAIError(t, err, c.errState, c.errCode)
+				_ = wantAIError(t, err, c.errState, c.errCode)
 				return
 			}
 			if err != nil || mode != c.want || (app != nil) != c.wantApp {
