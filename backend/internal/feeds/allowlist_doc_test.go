@@ -55,10 +55,17 @@ func TestAllowlistMatchesDoc(t *testing.T) {
 	allowed, excluded := docSourceURLs(t, feedsDoc)
 	code := map[string]string{
 		"weather": ep.WeatherBase, "warnings": ep.WarningBase, "pressure": ep.Pressure,
-		"holidays": ep.Holidays, "arxiv": ep.Arxiv, "diet": ep.Diet,
+		"holidays": ep.Holidays, "arxiv": ep.Arxiv, "diet": ep.Diet, "typhoon": ep.TyphoonBase,
 	}
 	for id, f := range ep.RSS {
 		code["rss "+id] = f.URL
+	}
+	for id, b := range ep.Bikeshare {
+		code["bikeshare "+id+" info"] = b.Info
+		code["bikeshare "+id+" status"] = b.Status
+	}
+	for id, p := range ep.Status {
+		code["status "+id] = p.URL
 	}
 	for name, raw := range code {
 		if !strings.HasPrefix(raw, "https://") {

@@ -37,6 +37,9 @@ type ReserveRequest struct {
 	RequestID string
 	// Kind picks COIN_RESERVE_<OP>_<KIND> when that is set (TextKinds).
 	Kind string
+	// Provider is the external API (extapi registry id) of an OpExt hold;
+	// its spend_ext row keeps it (#2145). Ignored for the other ops.
+	Provider string
 	// Max overrides the op's COIN_RESERVE_<OP> when > 0 (OpCall and OpExt need it).
 	Max int64
 	// TTL overrides COIN_HOLD_TTL when > 0 (a call block lives as long as
@@ -283,6 +286,9 @@ func (s *Service) Reserve(ctx context.Context, r ReserveRequest) (*Hold, error) 
 		ttl = r.TTL
 	}
 	h := Hold{Op: r.Op, AppID: r.AppID, RequestID: r.RequestID, Amount: amount, ExpireAt: now.Add(ttl)}
+	if r.Op == OpExt {
+		h.Provider = r.Provider
+	}
 	g, err := s.policy(ctx, r.UID, r.Anonymous)
 	if err != nil {
 		return nil, err

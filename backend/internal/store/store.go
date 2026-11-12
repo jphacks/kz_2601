@@ -51,6 +51,8 @@ type Source struct {
 	Summary      string `json:"summary,omitempty"`
 	Model        string `json:"model,omitempty"`
 	RestoredFrom int    `json:"restoredFrom,omitempty"`
+	// PromptVersion: the prompt that generated an ai version (#372, ai.PromptVersion).
+	PromptVersion string `json:"promptVersion,omitempty"`
 }
 
 // Version is users/{uid}/apps/{appId}/versions/{n} (full snapshot).

@@ -1,7 +1,6 @@
 package jp.kz2601.metamon.renderer.components
 
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
@@ -29,7 +28,7 @@ fun MarkdownLeaf(c: Component, modifier: Modifier = Modifier) {
     val linkColor = RenderTheme.colors.brandText
     val codeBg = RenderTheme.colors.surfaceElevated
     val text = remember(raw, linkColor, codeBg) { markdownAnnotated(raw, linkColor, codeBg) }
-    Text(text, modifier.fillMaxWidth(), style = MaterialTheme.typography.bodyLarge)
+    Text(text, modifier.fillMaxWidth(), style = RenderTheme.Fonts.body)
 }
 
 internal fun markdownAnnotated(

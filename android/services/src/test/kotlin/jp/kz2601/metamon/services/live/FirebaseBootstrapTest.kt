@@ -1,5 +1,6 @@
 package jp.kz2601.metamon.services.live
 
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.test.runTest
 import org.junit.After
@@ -75,6 +76,18 @@ class FirebaseAppCheckTokenProviderTest {
         val provider = FirebaseAppCheckTokenProvider(fetch = { throw IllegalStateException("integrity") }, log = { logs += it })
         assertNull(provider.token(false))
         assertTrue(logs.single().contains("unavailable"))
+    }
+
+    /** 利用者が画面を閉じた時のキャンセルは「トークンが取れなかった」ではないので握り潰さない。 */
+    @Test
+    fun cancellationIsNotSwallowed() = runTest {
+        val provider = FirebaseAppCheckTokenProvider(
+            fetch = { throw CancellationException("closed") },
+            log = { logs += it },
+        )
+        val thrown = runCatching { provider.token(false) }.exceptionOrNull()
+        assertTrue(thrown is CancellationException)
+        assertTrue(logs.isEmpty())
     }
 
     @Test

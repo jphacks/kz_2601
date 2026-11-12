@@ -13,6 +13,7 @@ import (
 	"strconv"
 	"strings"
 	"time"
+	"unicode/utf8"
 )
 
 // Asana (#1683, REST API 1.0): free (one `runs` a call), OAuth with PKCE
@@ -21,10 +22,12 @@ import (
 //	myTasks(workspaceId?, limit?)   tasks:read workspaces:read
 //	projectTasks(projectId, limit?) tasks:read
 //	complete(taskId)                tasks:write
+//	addTask(name, notes?, dueOn?, workspaceId?, projectId?)
+//	                                tasks:write workspaces:read
 //
 // Only open tasks are listed (completed_since=now). workspaces:read is for
 // myTasks without a workspaceId (the person's only workspace is used).
-// tasks:write is asked for only when complete is first used. Asana's access
+// tasks:write is asked for only when complete or addTask is first used. Asana's access
 // token lives an hour; the refresh token is long-lived and not rotated.
 // Asana's scopes are not additive, so a consent always asks for the reads too.
 //
@@ -68,6 +71,7 @@ func init() {
 			{Name: "myTasks", Scopes: []string{asanaScopeTasksRead, asanaScopeWorkspacesRead}, Args: []string{"workspaceId", "limit"}, Check: checkAsanaMyTasks},
 			{Name: "projectTasks", Scopes: []string{asanaScopeTasksRead}, Args: []string{"projectId", "limit"}, Check: checkAsanaProjectTasks},
 			{Name: "complete", Write: true, Scopes: []string{asanaScopeTasksWrite}, Args: []string{"taskId"}, Check: checkAsanaComplete},
+			{Name: "addTask", Write: true, Scopes: []string{asanaScopeTasksWrite, asanaScopeWorkspacesRead}, Args: []string{"name", "notes", "dueOn", "workspaceId", "projectId"}, Check: checkAsanaAdd},
 		},
 		Hosts: asanaHosts,
 		New: func(sec Secrets) (map[string]Operation, error) {
@@ -76,7 +80,7 @@ func init() {
 				return nil, err
 			}
 			return map[string]Operation{"myTasks": OperationFunc(c.myTasks), "projectTasks": OperationFunc(c.projectTasks),
-				"complete": OperationFunc(c.complete)}, nil
+				"complete": OperationFunc(c.complete), "addTask": OperationFunc(c.addTask)}, nil
 		},
 		NewOAuth: func(sec Secrets) (OAuthClient, error) { return newAsana(sec, asanaWireDefault) },
 	})
@@ -239,7 +243,7 @@ func asanaGID(name, v string, required bool) (string, error) {
 		return "", nil
 	}
 	if !asanaGIDRe.MatchString(v) {
-		return "", fmt.Errorf("%w: %s must be an Asana id (digits)", ErrUnknown, name)
+		return "", fmt.Errorf("%w: %s must be an Asana id (digits)", ErrBadArgs, name)
 	}
 	return v, nil
 }
@@ -251,7 +255,7 @@ func asanaLimit(v string) (int, error) {
 	}
 	x, err := strconv.Atoi(v)
 	if err != nil || x < 1 || x > asanaMaxLimit {
-		return 0, fmt.Errorf("%w: limit must be 1-%d", ErrUnknown, asanaMaxLimit)
+		return 0, fmt.Errorf("%w: limit must be 1-%d", ErrBadArgs, asanaMaxLimit)
 	}
 	return x, nil
 }
@@ -353,7 +357,8 @@ func (c *asana) onlyWorkspace(ctx context.Context, in Input) (string, error) {
 	case len(r.Data) > 1:
 		return "", fmt.Errorf("%w: several Asana workspaces: workspaceId is required", ErrUnknown)
 	}
-	return asanaGID("workspace", r.Data[0].GID, true)
+	gid, err := asanaGID("workspace", r.Data[0].GID, true)
+	return gid, afterCall(err)
 }
 
 // projectTasks lists the open tasks of one project, one page of limit.
@@ -398,6 +403,105 @@ func (c *asana) complete(ctx context.Context, in Input) (Output, error) {
 	}
 	row := r.Data.row()
 	return Output{ResultID: id, Item: &row}, nil
+}
+
+const (
+	asanaNameMax  = 500
+	asanaNotesMax = 1000 // in runes: 1,000 Japanese chars stay under MaxArgLen bytes
+)
+
+// asanaText checks a free-text argument's length (runes) and control chars.
+func asanaText(name, v string, max int, required bool) (string, error) {
+	v = strings.TrimSpace(v)
+	switch {
+	case v == "" && required:
+		return "", fmt.Errorf("%w: %s is required", ErrUnknown, name)
+	case !utf8.ValidString(v) || utf8.RuneCountInString(v) > max:
+		return "", fmt.Errorf("%w: %s is over %d characters", ErrUnknown, name, max)
+	case strings.ContainsFunc(v, func(r rune) bool { return (r < 0x20 && r != '\n' && r != '\t') || r == 0x7f }):
+		return "", fmt.Errorf("%w: %s has control characters", ErrUnknown, name)
+	}
+	return v, nil
+}
+
+// asanaAdd is addTask's checked arguments.
+type asanaAdd struct {
+	Name, Notes, DueOn, Workspace, Project string
+}
+
+func asanaAddArgs(a map[string]string) (asanaAdd, error) {
+	var r asanaAdd
+	var err error
+	if r.Name, err = asanaText("name", a["name"], asanaNameMax, true); err != nil {
+		return r, err
+	}
+	if r.Notes, err = asanaText("notes", a["notes"], asanaNotesMax, false); err != nil {
+		return r, err
+	}
+	if r.DueOn = a["dueOn"]; r.DueOn != "" {
+		if _, err := time.Parse(time.DateOnly, r.DueOn); err != nil {
+			return r, fmt.Errorf("%w: dueOn must be YYYY-MM-DD", ErrUnknown)
+		}
+	}
+	if r.Workspace, err = asanaGID("workspaceId", a["workspaceId"], false); err != nil {
+		return r, err
+	}
+	r.Project, err = asanaGID("projectId", a["projectId"], false)
+	return r, err
+}
+
+func checkAsanaAdd(a map[string]string) error {
+	_, err := asanaAddArgs(a)
+	return err
+}
+
+// addTask adds one task assigned to the person. With projectId it goes in
+// that project (Asana takes the project's workspace); otherwise in the
+// workspace, resolved like myTasks (0 or several without workspaceId: 400).
+// Asana has no idempotency key, and a write op is never retried.
+func (c *asana) addTask(ctx context.Context, in Input) (Output, error) {
+	if !asanaCanWrite(in.Token) {
+		return Output{}, ErrNotConnected
+	}
+	a, err := asanaAddArgs(in.Args)
+	if err != nil {
+		return Output{}, err
+	}
+	data := map[string]any{"name": a.Name, "assignee": "me"}
+	if a.Notes != "" {
+		data["notes"] = a.Notes
+	}
+	if a.DueOn != "" {
+		data["due_on"] = a.DueOn
+	}
+	if a.Project != "" {
+		data["projects"] = []string{a.Project}
+	}
+	switch {
+	case a.Workspace != "":
+		data["workspace"] = a.Workspace
+	case a.Project == "":
+		ws, err := c.onlyWorkspace(ctx, in)
+		if err != nil {
+			return Output{}, err
+		}
+		data["workspace"] = ws
+	}
+	b, err := json.Marshal(map[string]any{"data": data})
+	if err != nil {
+		return Output{}, err
+	}
+	var r struct {
+		Data asanaTask `json:"data"`
+	}
+	if err := c.do(ctx, in, http.MethodPost, "/tasks?"+url.Values{"opt_fields": {asanaTaskFields}}.Encode(), b, &r); err != nil {
+		return Output{}, err
+	}
+	if !asanaGIDRe.MatchString(r.Data.GID) {
+		return Output{}, errors.New("asana: bad answer: no task id")
+	}
+	row := r.Data.row()
+	return Output{ResultID: r.Data.GID, Item: &row}, nil
 }
 
 // do calls the API with the person's token. 401 is a token Asana no longer

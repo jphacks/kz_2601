@@ -43,6 +43,7 @@ import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.LinkAnnotation
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.TextLinkStyles
+import jp.kz2601.metamon.dsl.logic.ExternalUrlPolicy
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontStyle
@@ -98,10 +99,14 @@ fun BadgeLeaf(c: Component) {
 
 // MARK: - markdown
 
-/** 行単位(見出し・箇条書き・番号・引用・コード)+ 行内(**太字**・*斜体*・`コード`・[リンク](url))。 */
+/**
+ * 行単位(見出し・箇条書き・番号・引用・コード)+ 行内(**太字**・*斜体*・`コード`・[リンク](url))。
+ * リンクは [onOpenUrl] へ渡す(openUrl の操作として確認・URL の判定を通す)。開けない URL は文字だけ。
+ */
 @Composable
-fun MarkdownLeaf(text: String) {
-    val link = TextLinkStyles(SpanStyle(color = MaterialTheme.colorScheme.primary, textDecoration = TextDecoration.Underline))
+fun MarkdownLeaf(text: String, onOpenUrl: ((String) -> Unit)? = null) {
+    val style = TextLinkStyles(SpanStyle(color = MaterialTheme.colorScheme.primary, textDecoration = TextDecoration.Underline))
+    val link = onOpenUrl?.let { Markdown.Links(style, it) }
     val blocks = remember(text) { Markdown.blocks(text) }
     Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
         blocks.forEach { b ->
@@ -193,7 +198,13 @@ object Markdown {
 
     private val INLINE = Regex("\\*\\*(.+?)\\*\\*|__(.+?)__|\\*(.+?)\\*|_(.+?)_|`(.+?)`|\\[(.+?)]\\((.+?)\\)")
 
-    fun inline(s: String, link: TextLinkStyles? = null): AnnotatedString = buildAnnotatedString {
+    /** リンクの見た目と押した時。押しても既定の UriHandler では開かない。 */
+    class Links(val style: TextLinkStyles?, val open: (String) -> Unit)
+
+    /** リンクにする URL か(ExternalUrlPolicy が通す物だけ)。 */
+    fun linkable(url: String): Boolean = ExternalUrlPolicy.isAllowed(url.trim())
+
+    fun inline(s: String, link: Links? = null): AnnotatedString = buildAnnotatedString {
         var at = 0
         for (m in INLINE.findAll(s)) {
             append(s.substring(at, m.range.first))
@@ -203,9 +214,14 @@ object Markdown {
                 g[3].isNotEmpty() || g[4].isNotEmpty() -> withStyle(SpanStyle(fontStyle = FontStyle.Italic)) { append(g[3].ifEmpty { g[4] }) }
                 g[5].isNotEmpty() -> withStyle(SpanStyle(fontFamily = FontFamily.Monospace, background = Color(0x14000000))) { append(g[5]) }
                 else -> {
-                    pushLink(LinkAnnotation.Url(g[7], link))
-                    append(g[6])
-                    pop()
+                    val url = g[7].trim()
+                    if (link != null && linkable(url)) {
+                        pushLink(LinkAnnotation.Clickable(url, link.style) { link.open(url) })
+                        append(g[6])
+                        pop()
+                    } else {
+                        append(g[6])
+                    }
                 }
             }
             at = m.range.last + 1
@@ -222,25 +238,40 @@ object Markdown {
  * 読む・PNG にする・縮めるのは裏(IO)で。読んだ物は URL ごとに少しだけ覚える(ImageLoader)。
  */
 @Composable
-fun rememberImage(src: String?, allowFile: Boolean = false, maxPx: Int? = null, withPng: Boolean = true): LoadedImage? {
+fun rememberImage(src: String?, allowFile: Boolean = false, maxPx: Int = ImageLoader.DISPLAY_PX, withPng: Boolean = true): LoadedImage? {
+    val blocked = ImageLoader.blocked(src, fromRecord = allowFile)
     var loaded by remember(src, allowFile, maxPx, withPng) { mutableStateOf(ImageLoader.cached(src, allowFile, maxPx, withPng)) }
-    LaunchedEffect(src, allowFile, maxPx, withPng) {
-        if (src.isNullOrBlank() || loaded != null) return@LaunchedEffect
+    LaunchedEffect(src, allowFile, maxPx, withPng, blocked) {
+        if (src.isNullOrBlank() || loaded != null || blocked) return@LaunchedEffect
         loaded = withContext(Dispatchers.IO) { ImageLoader.load(src, allowFile, maxPx, withPng) }
     }
     return loaded
 }
 
-/** 顔写真(引き出さないので PNG にしない・88dp まで縮める)。 */
+/** 記録の https の画像で、アプリの置き場の外の物: 押すまで読まない(押したら同じ URL はこの間ずっと読む)。 */
 @Composable
-private fun rememberRemoteImage(src: String?): ImageBitmap? = rememberImage(src, maxPx = AVATAR_PX, withPng = false)?.bitmap
+fun LoadImageButton(src: String, modifier: Modifier = Modifier) {
+    Text(
+        Strings["desktop_image_load"],
+        color = MaterialTheme.colorScheme.primary,
+        style = MaterialTheme.typography.bodySmall,
+        modifier = modifier.clickable(role = androidx.compose.ui.semantics.Role.Button) { ImageLoader.approve(src) }.padding(4.dp),
+    )
+}
+
+/** 顔写真(引き出さないので PNG にしない・88dp まで縮める)。記録の値は [fromRecord]。 */
+@Composable
+private fun rememberRemoteImage(src: String?, fromRecord: Boolean): ImageBitmap? =
+    rememberImage(src, allowFile = fromRecord, maxPx = AVATAR_PX, withPng = false)?.bitmap
 
 private const val AVATAR_PX = 264
 
-/** `image`: 画像は外(エクスプローラー・他のアプリ)へ PNG のファイルで引き出せる(#1764)。 */
+/** `image`: 画像は外(エクスプローラー・他のアプリ)へ PNG のファイルで引き出せる(#1764)。記録の写真は押すと大きく見る。 */
 @Composable
 fun ImageLeaf(c: Component, src: String?) {
-    val image = if (src.isNullOrBlank()) rememberImage(c.url ?: c.image) else rememberImage(src, allowFile = true)
+    val fromRecord = !src.isNullOrBlank()
+    val shown = if (fromRecord) src else c.url ?: c.image
+    val image = rememberImage(shown, allowFile = fromRecord)
     val h = when (c.height?.wire) { "small" -> 120.dp; "large" -> 280.dp; else -> 200.dp }
     Box(
         Modifier.fillMaxWidth().heightIn(min = 80.dp).height(h).clip(RoundedCornerShape(10.dp)).background(Color(0x11000000)),
@@ -248,7 +279,11 @@ fun ImageLeaf(c: Component, src: String?) {
     ) {
         if (image != null) {
             val name = c.label ?: Strings["desktop_drag_image_name"]
-            Image(image.bitmap, c.label, Modifier.fillMaxSize().dragOut { image.png?.let { DragOut.imageOfPng(it, name) } }, contentScale = ContentScale.Crop)
+            // 記録の写真(field の値)は押す / Space で大きく見る。DSL に書いた画像(url・https)は出さない
+            val preview = if (src.isNullOrBlank()) Modifier else Modifier.photoPreviewClick(src, c.label ?: name)
+            Image(image.bitmap, c.label, Modifier.fillMaxSize().then(preview).dragOut { image.png?.let { DragOut.imageOfPng(it, name) } }, contentScale = ContentScale.Crop)
+        } else if (shown != null && ImageLoader.blocked(shown, fromRecord)) {
+            LoadImageButton(shown)
         } else {
             Text(Strings["desktop_image_none"], color = Color.Gray, style = MaterialTheme.typography.bodySmall)
         }
@@ -257,7 +292,9 @@ fun ImageLeaf(c: Component, src: String?) {
 
 @Composable
 fun AvatarLeaf(c: Component, src: String?) {
-    val bitmap = rememberRemoteImage(src ?: c.image)
+    val fromRecord = !src.isNullOrBlank()
+    val shown = if (fromRecord) src else c.image
+    val bitmap = rememberRemoteImage(shown, fromRecord)
     val d = when (c.size) { DslSize.SMALL, DslSize.COMPACT -> 40.dp; DslSize.LARGE -> 88.dp; else -> 60.dp }
     Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
         Box(
@@ -266,6 +303,8 @@ fun AvatarLeaf(c: Component, src: String?) {
         ) {
             if (bitmap != null) {
                 Image(bitmap, c.name, Modifier.fillMaxSize(), contentScale = ContentScale.Crop)
+            } else if (shown != null && ImageLoader.blocked(shown, fromRecord)) {
+                LoadImageButton(shown)
             } else {
                 Text(initials(c.name), style = MaterialTheme.typography.titleLarge, color = MaterialTheme.colorScheme.onPrimaryContainer)
             }

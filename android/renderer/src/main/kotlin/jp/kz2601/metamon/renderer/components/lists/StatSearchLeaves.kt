@@ -28,8 +28,6 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.stateDescription
-import androidx.compose.ui.text.TextStyle
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -82,9 +80,7 @@ fun StatLeaf(c: Component, ctx: RenderContext, modifier: Modifier = Modifier) {
             v.text,
             // 初回の読み込み中は 0 を見せず「—」を明滅(#1116)
             if (v.loading) Modifier.alpha(skeletonPulse()) else Modifier,
-            style = TextStyle(
-                fontWeight = FontWeight.Bold,
-                fontFeatureSettings = "tnum",
+            style = RenderTheme.Fonts.statValue.copy(
                 // 予算の残りが赤字など、マイナスは負の色(#131)
                 color = when {
                     v.loading || v.unavailable -> colors.tertiaryLabel
@@ -93,7 +89,8 @@ fun StatLeaf(c: Component, ctx: RenderContext, modifier: Modifier = Modifier) {
                 },
             ),
             maxLines = 1,
-            autoSize = TextAutoSize.StepBased(minFontSize = 11.sp, maxFontSize = 56.sp, stepSize = 2.sp),
+            // iOS の minimumScaleFactor 相当。セルに収まるまで段階的に縮める(省略記号は出さない)
+            autoSize = TextAutoSize.StepBased(minFontSize = 11.sp, maxFontSize = RenderTheme.Fonts.statValue.fontSize, stepSize = 2.sp),
         )
     }
 }

@@ -31,7 +31,9 @@ class StringTable(
     private val strings: Map<Lang, Map<String, String>>,
     private val plurals: Map<Lang, Map<String, Map<String, String>>> = emptyMap(),
 ) {
-    fun has(lang: Lang, key: String): Boolean = strings[lang]?.containsKey(key) == true
+    fun hasString(lang: Lang, key: String): Boolean = strings[lang]?.containsKey(key) == true
+
+    fun hasPlural(lang: Lang, key: String): Boolean = plurals[lang]?.containsKey(key) == true
 
     fun get(lang: Lang, key: String): String =
         order(lang).firstNotNullOfOrNull { strings[it]?.get(key) } ?: key
@@ -44,7 +46,7 @@ class StringTable(
         for (l in order(lang)) {
             val q = plurals[l]?.get(key) ?: continue
             val pick = (if (l == Lang.EN && count == 1) q["one"] else null) ?: q["other"] ?: q.values.first()
-            return String.format(l.locale, pick, *args)
+            return String.format(lang.locale, pick, *args)
         }
         return format(lang, key, *args)
     }

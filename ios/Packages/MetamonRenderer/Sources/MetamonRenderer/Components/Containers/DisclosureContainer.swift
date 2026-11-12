@@ -6,6 +6,7 @@ struct DisclosureContainer: View {
     let c: Component
     let ctx: RenderContext
     @State private var isExpanded: Bool
+    @Environment(\.formTabCoordinator) private var tabs
 
     init(c: Component, ctx: RenderContext) {
         self.c = c
@@ -27,6 +28,9 @@ struct DisclosureContainer: View {
         .disclosureGroupStyle(MacDisclosureStyle())
         #endif
         .renderCard()
+        // Mac の Tab の並び(#2065): 閉じている間は中の欄を飛ばす
+        .onAppear { tabs?.noteDisclosure(c.id, expanded: isExpanded) }
+        .onChange(of: isExpanded) { _, open in tabs?.noteDisclosure(c.id, expanded: open) }
     }
 }
 

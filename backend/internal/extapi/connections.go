@@ -78,6 +78,10 @@ type Sealer interface {
 // provider, cut it, or the provider refused the token.
 var ErrNotConnected = errors.New("extapi: not connected")
 
+// ErrCutSinceStart: the connection was cut (or the account deleted) after
+// its OAuth flow started; the callback does not save it.
+var ErrCutSinceStart = fmt.Errorf("%w: cut after the connection started", ErrNotConnected)
+
 // Connections stores and reads per-person tokens.
 type Connections struct {
 	Store  ConnectionStore
@@ -139,9 +143,16 @@ func (c *Connections) open(ctx context.Context, uid, provider string, sealed []b
 	return Token{AccessToken: s.A, RefreshToken: s.R, Expiry: s.E, Scopes: s.S}, nil
 }
 
-// Save stores t as uid's active connection of provider (a new connection
-// from the OAuth callback).
+// Save stores t as uid's active connection of provider.
 func (c *Connections) Save(ctx context.Context, uid, provider string, t Token) error {
+	return c.SaveSince(ctx, uid, provider, t, time.Time{})
+}
+
+// SaveSince is Save for an OAuth flow started at startedAt: nothing is
+// written and the error is ErrCutSinceStart when the connection was cut
+// after that (a revoked marker newer than startedAt). Zero startedAt checks
+// nothing.
+func (c *Connections) SaveSince(ctx context.Context, uid, provider string, t Token, startedAt time.Time) error {
 	if c.Sealer == nil {
 		return errors.New("extapi: no sealer")
 	}
@@ -150,13 +161,25 @@ func (c *Connections) Save(ctx context.Context, uid, provider string, t Token) e
 		return fmt.Errorf("seal: %w", err)
 	}
 	now := c.now()
-	return c.Store.Update(ctx, uid, provider, func(old Connection, ok bool) (Connection, bool) {
+	cut := false
+	err = c.Store.Update(ctx, uid, provider, func(old Connection, ok bool) (Connection, bool) {
+		cut = !startedAt.IsZero() && ok && old.Status == StatusRevoked && old.RevokedAt.After(startedAt)
+		if cut {
+			return old, false
+		}
 		conn := Connection{Provider: provider, Status: StatusActive, Sealed: sealed, Scopes: t.Scopes, ConnectedAt: now, LastUsedAt: now, DeleteAt: now.Add(c.ttl())}
 		if ok && old.Status == StatusActive && !old.ConnectedAt.IsZero() {
 			conn.ConnectedAt = old.ConnectedAt
 		}
 		return conn, true
 	})
+	if err != nil {
+		return err
+	}
+	if cut {
+		return ErrCutSinceStart
+	}
+	return nil
 }
 
 // SaveRefreshed stores t, renewed from the token sealed as from, and
@@ -254,7 +277,12 @@ func (c *Connections) MarkError(ctx context.Context, uid, provider string, seale
 
 // Revoke cuts uid's connection: the provider's revoke endpoint is called
 // (best effort; client nil or ErrNoRevoke skips it), then the tokens are
-// deleted at once and only the revoked marker stays (決定 7).
+// deleted at once and only the revoked marker stays (決定 7). The marker is
+// written in one transaction over the connection as it is then.
+//
+// A refused refresh token (ErrInvalidGrant) is read again once: when
+// another instance renewed (rotated) it meanwhile, the stored one is
+// revoked; when it is the same, it is already gone.
 //
 // Providers on one OAuth client (ClientFrom: Google Calendar, Tasks and
 // Sheets) hold one grant at the provider, and revoking any of their tokens
@@ -274,16 +302,46 @@ func (c *Connections) Revoke(ctx context.Context, uid, provider string, client O
 		client = nil
 	}
 	if client != nil && len(conn.Sealed) > 0 && c.Sealer != nil {
-		if t, err := c.open(ctx, uid, provider, conn.Sealed); err == nil {
-			if err := client.Revoke(ctx, t); err != nil && !errors.Is(err, ErrNoRevoke) {
-				c.log().WarnContext(ctx, "extapi: provider revoke failed; the stored token is deleted anyway",
-					slog.String("provider", provider), slog.String("uid_hash", httpx.UIDHash(uid)), slog.Any("error", err))
+		err := c.revokeAt(ctx, uid, provider, client, conn.Sealed)
+		if errors.Is(err, ErrInvalidGrant) {
+			err = nil
+			if cur, ok, gerr := c.Store.Get(ctx, uid, provider); gerr == nil && ok && len(cur.Sealed) > 0 && !bytes.Equal(cur.Sealed, conn.Sealed) {
+				err = c.revokeAt(ctx, uid, provider, client, cur.Sealed)
 			}
 		}
+		if err != nil && !errors.Is(err, ErrNoRevoke) && !errors.Is(err, ErrInvalidGrant) {
+			c.log().WarnContext(ctx, "extapi: provider revoke failed; the stored token is deleted anyway",
+				slog.String("provider", provider), slog.String("uid_hash", httpx.UIDHash(uid)), slog.Any("error", err))
+		}
 	}
+	return c.markRevoked(ctx, uid, provider, false)
+}
+
+// revokeAt revokes the sealed token at the provider (an unreadable one is
+// skipped).
+func (c *Connections) revokeAt(ctx context.Context, uid, provider string, client OAuthClient, sealed []byte) error {
+	t, err := c.open(ctx, uid, provider, sealed)
+	if err != nil {
+		return nil
+	}
+	return client.Revoke(ctx, t)
+}
+
+// markRevoked turns uid's connection of provider into the revoked marker
+// (revokedAt now) in one transaction. With always, a provider never
+// connected gets the marker too.
+func (c *Connections) markRevoked(ctx context.Context, uid, provider string, always bool) error {
 	now := c.now()
-	marker := Connection{Provider: provider, Status: StatusRevoked, ConnectedAt: conn.ConnectedAt, RevokedAt: now, DeleteAt: now.Add(c.ttl())}
-	return c.Store.Put(ctx, uid, marker)
+	return c.Store.Update(ctx, uid, provider, func(cur Connection, ok bool) (Connection, bool) {
+		if !ok && !always {
+			return cur, false
+		}
+		marker := Connection{Provider: provider, Status: StatusRevoked, RevokedAt: now, DeleteAt: now.Add(c.ttl())}
+		if ok {
+			marker.ConnectedAt = cur.ConnectedAt
+		}
+		return marker, true
+	})
 }
 
 // grantInUse: another provider on provider's OAuth client is still connected
@@ -320,13 +378,26 @@ func oauthClientOf(id string) string {
 	return id
 }
 
-// RevokeAll cuts every connection of uid (account deletion).
+// RevokeAll cuts every connection of uid (account deletion) and returns how
+// many were not cut before. Every OAuth provider that is on (clients gives
+// it a client; nil clients: every one) then has a revoked marker
+// dated now, so an OAuth flow started before is not saved (SaveSince).
 func (c *Connections) RevokeAll(ctx context.Context, uid string, clients func(provider string) OAuthClient) (int, error) {
+	return c.revokeAll(ctx, uid, clients, nil)
+}
+
+// connLock takes the lock of uid's connection of provider (Service: the
+// refresh lock) and returns its unlock.
+type connLock func(ctx context.Context, uid, provider string) (func(), error)
+
+// revokeAll is RevokeAll with each Revoke under lock (nil: none).
+func (c *Connections) revokeAll(ctx context.Context, uid string, clients func(provider string) OAuthClient, lock connLock) (int, error) {
 	list, err := c.Store.List(ctx, uid)
 	if err != nil {
 		return 0, err
 	}
 	n := 0
+	done := map[string]bool{}
 	for _, conn := range list {
 		if conn.Status == StatusRevoked {
 			continue
@@ -335,10 +406,28 @@ func (c *Connections) RevokeAll(ctx context.Context, uid string, clients func(pr
 		if clients != nil {
 			cl = clients(conn.Provider)
 		}
-		if err := c.Revoke(ctx, uid, conn.Provider, cl); err != nil {
+		unlock := func() {}
+		if lock != nil {
+			if unlock, err = lock(ctx, uid, conn.Provider); err != nil {
+				return n, err
+			}
+		}
+		rerr := c.Revoke(ctx, uid, conn.Provider, cl)
+		unlock()
+		if rerr != nil {
+			return n, rerr
+		}
+		done[conn.Provider] = true
+		n++
+	}
+	for _, p := range Providers() {
+		// the OAuth providers on now (an off one's callback saves nothing)
+		if !p.NeedsOAuth || done[p.ID] || (clients != nil && clients(p.ID) == nil) {
+			continue
+		}
+		if err := c.markRevoked(ctx, uid, p.ID, true); err != nil {
 			return n, err
 		}
-		n++
 	}
 	return n, nil
 }
