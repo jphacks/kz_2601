@@ -10,12 +10,14 @@ final class MacLaunchOrderTests: XCTestCase {
     private var defaults: UserDefaults!
     private var suite = ""
     private var hold: LaunchConsentHold!
+    private var owner: MacLaunchOwner!
 
     override func setUp() {
         super.setUp()
         suite = "macLaunchOrder-\(UUID().uuidString)"
         defaults = UserDefaults(suiteName: suite)
         hold = LaunchConsentHold()
+        owner = MacLaunchOwner()
     }
 
     override func tearDown() {
@@ -34,6 +36,7 @@ final class MacLaunchOrderTests: XCTestCase {
                                  betaWelcome: BetaWelcomeStore(defaults: defaults, isBeta: isBeta))
         #endif
         made.hold = hold
+        made.launchOwner = owner
         return made
     }
 
@@ -137,6 +140,23 @@ final class MacLaunchOrderTests: XCTestCase {
         XCTAssertFalse(hold.isHolding, "シートが捨てられて出なくても、後ろがずっと止まらない")
     }
 
+    /// ウインドウが 2 つ: 起動時の段は最初のウインドウだけが出す。ほかのウインドウは段を放さない
+    func testOnlyFirstWindowRunsLaunchSteps() async {
+        let first = onboarding()
+        let second = onboarding()
+        MacOnboarding.beginLaunchHold(consent: first.consent, tutorial: first.tutorial, hold: hold)
+        await first.presentLaunchConsent(delay: .zero)
+        XCTAssertTrue(first.showConsent)
+
+        await second.presentLaunchConsent(delay: .zero)
+        await second.runLaunchTutorialStep(settle: .zero)
+        XCTAssertFalse(second.showConsent, "2 つ目のウインドウは同意の画面を出さない")
+        XCTAssertFalse(second.showTutorial)
+        XCTAssertEqual(hold.pending, [.consent, .tutorial], "最初のウインドウのシートが出ている間に段を放さない")
+        XCTAssertFalse(second.ownsLaunchSteps)
+        XCTAssertTrue(first.ownsLaunchSteps)
+    }
+
     // MARK: - シェアリンク
 
     #if !APP_STORE_REVIEW
@@ -161,6 +181,35 @@ final class MacLaunchOrderTests: XCTestCase {
         await intent.value
         XCTAssertTrue(done)
         XCTAssertFalse(hold.isHolding)
+    }
+
+    /// 「サーバー接続時のみ」の案内が出ている間は、見張りの時間が過ぎても Intent を出さない
+    func testUnavailableAlertNotReleasedByDeadline() async throws {
+        let flow = MacShareFlow(sharing: nil, appConfig: nil, isSignedIn: { true })
+        flow.hold = hold
+        hold.deadlineOverride = .milliseconds(30)
+        flow.receive(URL(string: "https://tailor-it.app/s/tok_3")!)
+        XCTAssertTrue(flow.showsUnavailable)
+        flow.unavailableShown() // アラートが出た
+        hold.hostsAppeared()
+        try await Task.sleep(for: .milliseconds(200))
+        XCTAssertTrue(hold.pending.contains(.shareLink), "案内が出ている間は時間で放さない")
+        flow.unavailable = nil // 閉じた
+        flow.linkSettled()
+        XCTAssertFalse(hold.isHolding)
+    }
+
+    func testUnavailableNotMarkedShownWhileEarlierStepsRemain() async throws {
+        let flow = MacShareFlow(sharing: nil, appConfig: nil, isSignedIn: { true })
+        flow.hold = hold
+        hold.deadlineOverride = .milliseconds(30)
+        hold.begin(.tutorial)
+        flow.receive(URL(string: "https://tailor-it.app/s/tok_4")!)
+        XCTAssertFalse(flow.showsUnavailable, "チュートリアルの間は案内を出さない")
+        flow.unavailableShown() // まだ出ていないので何もしない
+        hold.hostsAppeared()
+        await hold.waitUntilReleased()
+        XCTAssertFalse(hold.isHolding, "出ていない段は見張りで放す")
     }
 
     func testShareLinkAfterLaunchDoesNotHold() {

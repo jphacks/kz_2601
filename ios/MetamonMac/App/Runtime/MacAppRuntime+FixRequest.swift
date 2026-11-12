@@ -18,11 +18,11 @@ extension MacAppRuntime {
 
     /// 保存の前段で止まった: フォームの無い画面の保存ボタンはアプリの作りの問題。入力漏れは利用者が直す(iOS と同じ)
     func reportInvalidSave(_ message: String, _ ctx: ActionContext) {
-        if ctx.form == nil { reportFixable(message, ctx: ctx, part: L10n.tr("保存")) } else { toast = message }
+        if ctx.form == nil { reportFixable(message, ctx: ctx, part: L10n.tr("保存")) } else { fixOffer = nil; toast = message }
     }
 
     /// 「直してと頼む」: 依頼文を入力欄に入れて中央のアプリを直す会話を開く(送らない)。
-    /// モーダルの中からは、入力を確かめてモーダルを閉じ、閉じ終えてから開く(openVoice と同じ)
+    /// モーダルの中からは、入力を確かめてモーダルを 1 枚ずつ閉じ、最後の 1 枚が閉じ終えてから開く
     func requestFix() {
         guard let offer = fixOffer, let onAskFix else { return }
         fixOffer = nil
@@ -31,13 +31,14 @@ extension MacAppRuntime {
         confirmDiscard(leaving: { $0.stack == "sheet" || $0.stack == "full" }) { [weak self] in
             guard let self else { return }
             pendingFixDraft = offer.draft
-            while sheet != nil || fullScreen != nil { dismissTopModal() }
+            dismissTopModal() // 残りは閉じ終わるたびに `askFixAfterModal` が 1 枚ずつ(同時に閉じると onDismiss が取りこぼす)
         }
     }
 
-    /// モーダルが閉じ終わった(`AppCanvas`)。「直してと頼む」を待っていれば会話を開く
+    /// モーダルが閉じ終わった(`AppCanvas`)。「直してと頼む」を待っていて、まだモーダルがあれば次の 1 枚を閉じ、無くなったら会話を開く
     func askFixAfterModal() {
-        guard let draft = pendingFixDraft, sheet == nil, fullScreen == nil else { return }
+        guard let draft = pendingFixDraft else { return }
+        guard sheet == nil, fullScreen == nil else { return dismissTopModal() }
         pendingFixDraft = nil
         onAskFix?(draft)
     }

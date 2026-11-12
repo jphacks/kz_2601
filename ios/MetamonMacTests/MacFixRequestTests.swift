@@ -91,6 +91,23 @@ final class MacFixRequestTests: XCTestCase {
         XCTAssertNil(rt.fixOffer, "別のトーストには付けない")
     }
 
+    /// 同じ文言でも、`reportFixable` 以外のトーストには付けない
+    func testPlainToastWithSameMessageDropsOffer() async throws {
+        let rt = try runtime()
+        _ = connected(rt)
+        rt.reportFixable("保存するフォームがありません", ctx: nil)
+        XCTAssertNotNil(rt.fixOffer)
+        rt.toast = "保存するフォームがありません"
+        XCTAssertNil(rt.fixOffer, "ふつうのトーストに替わったら外す")
+
+        // 入力漏れ(フォームあり)の保存: 前のトーストと同じ文言でも付けない
+        rt.reportFixable(L10n.tr("保存するフォームがありません"), ctx: nil)
+        let form = FormDraft(entity: try XCTUnwrap(rt.dsl.entity("expense")))
+        rt.reportInvalidSave(L10n.tr("保存するフォームがありません"), ActionContext(route: home, form: form))
+        XCTAssertEqual(rt.toast, L10n.tr("保存するフォームがありません"))
+        XCTAssertNil(rt.fixOffer, "入力漏れの分岐では外す")
+    }
+
     func testNoOfferWithoutComposerOrOnVoiceOnlyApp() async throws {
         let rt = try runtime()
         rt.reportFixable("x", ctx: nil)
@@ -118,6 +135,23 @@ final class MacFixRequestTests: XCTestCase {
         XCTAssertEqual(drafts.values.count, 1)
         rt.askFixAfterModal()
         XCTAssertEqual(drafts.values.count, 1, "1 回だけ開く")
+    }
+
+    /// シートの上に全画面: 1 枚ずつ閉じ、最後の 1 枚が閉じ終わってから会話を開く
+    func testFixFromStackedModalsClosesOneAtATime() async throws {
+        let rt = try runtime()
+        let drafts = connected(rt)
+        rt.sheet = Route(screen: "expense_form", stack: "sheet")
+        rt.fullScreen = Route(screen: "expense_form", stack: "full")
+        rt.reportFixable("x", ctx: nil)
+        rt.requestFix()
+        XCTAssertNil(rt.fullScreen, "上の 1 枚だけ閉じる")
+        XCTAssertNotNil(rt.sheet, "同時には閉じない")
+        rt.askFixAfterModal() // 全画面の onDismiss
+        XCTAssertNil(rt.sheet, "次の 1 枚を閉じる")
+        XCTAssertTrue(drafts.values.isEmpty, "最後の 1 枚が閉じ終わるまで開かない")
+        rt.askFixAfterModal() // シートの onDismiss
+        XCTAssertEqual(drafts.values, ["うまく動かない所があるから直して(「x」と出ます)"])
     }
 
     /// 直し方の例・頼み方のコツの一文。Mac は「話しかける」を ⌘K / ⇧⌘M の頼み方に言い換える

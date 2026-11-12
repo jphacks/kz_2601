@@ -188,10 +188,10 @@ private struct AppCanvasContent: View {
 
     /// モーダルが閉じ終わった。全画面とシートの両方を閉じた時は、両方が閉じてから開く
     private func talkAfterModal() {
+        runtime.askFixAfterModal() // 「直してと頼む」の待ち: 残りのモーダルを 1 枚ずつ閉じ、最後に会話を開く
         guard runtime.sheet == nil, runtime.fullScreen == nil else { return }
         talkAfterMap()
         runtime.openVoiceAfterModal()
-        runtime.askFixAfterModal()
     }
 
     /// 部品の右クリック・VoiceOver の操作の「この部品について話す」(#1323)

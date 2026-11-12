@@ -23,6 +23,9 @@ final class MacOnboarding {
     @ObservationIgnored var hold: LaunchConsentHold = .shared
     /// Mac にスプラッシュは無い(出ないまま)。iOS と同じ形で待つ
     @ObservationIgnored var splash: SplashPresence = .shared
+    /// 起動時の段(同意・チュートリアル)を出すウインドウ(最初に出た 1 つ)。テストでは別の物を渡す
+    @ObservationIgnored var launchOwner: MacLaunchOwner = .shared
+    @ObservationIgnored private let launchID = UUID()
 
     #if APP_STORE_REVIEW
     init(consent: AIConsentStore = .shared, tutorial: FirstRunTutorialStore = .shared) {
@@ -65,8 +68,13 @@ final class MacOnboarding {
         hold.finishLaunchIfIdle() // 待たせる段が無ければ、後から届いたリンクは待たせない
     }
 
+    /// 起動時の段を出すのはこのウインドウか。最初に聞いたウインドウが受け持ち、ほかのウインドウは何もしない
+    /// (別のウインドウのシートが出ている間に段を放さない)
+    var ownsLaunchSteps: Bool { launchOwner.claim(launchID) }
+
     /// 起動時の同意の画面。出さない(済み)・出す前に取り消された時は、待たせていた段をすぐ放す。
     func presentLaunchConsent(delay: Duration = .milliseconds(500)) async {
+        guard ownsLaunchSteps else { return }
         guard consent.shouldPromptOnLaunch else { hold.end(.consent); return }
         await splash.waitUntilHidden()
         try? await Task.sleep(for: delay)
@@ -81,6 +89,7 @@ final class MacOnboarding {
     /// 起動時のチュートリアルの段。同意の画面が閉じきってから、閉じるアニメーションの分だけ待って出す。
     /// 出さない(見た・同意の説明が済んでいない)・取り消された時はすぐ次の段へ。出した時は `tutorialDismissed()` で次へ。
     func runLaunchTutorialStep(settle: Duration = .milliseconds(700)) async {
+        guard ownsLaunchSteps else { return }
         await splash.waitUntilHidden()
         await hold.waitUntilReleased(before: .tutorial)
         try? await Task.sleep(for: settle)
@@ -109,6 +118,19 @@ final class MacOnboarding {
         showBetaWelcome = false
     }
     #endif
+}
+
+/// 起動時の段を受け持つウインドウ(#1885)。最初に名乗ったものだけ。ウインドウが増えても段を二重に出さない
+@MainActor
+final class MacLaunchOwner {
+    static let shared = MacLaunchOwner()
+    private var owner: UUID?
+
+    /// `id` が受け持ちなら true(まだ誰もいなければ受け持つ)
+    func claim(_ id: UUID) -> Bool {
+        if owner == nil { owner = id }
+        return owner == id
+    }
 }
 
 /// 本体のウィンドウに付ける: 初回の同意・チュートリアル・β の案内をシートで出す(#971)。
@@ -140,6 +162,7 @@ struct MacOnboardingHost: ViewModifier {
             .task {
                 // 起動時の順番(#1885・iOS と同じ): 同意 → (閉じきってから)チュートリアル → シェアリンク・Intent → β の案内
                 onboarding.hold.hostsAppeared() // 出せない段を時間で放す見張りはここから
+                guard onboarding.ownsLaunchSteps else { return } // 2 つ目からのウインドウは起動時の段を出さない
                 await onboarding.presentLaunchConsent()
                 await onboarding.runLaunchTutorialStep()
                 #if !APP_STORE_REVIEW

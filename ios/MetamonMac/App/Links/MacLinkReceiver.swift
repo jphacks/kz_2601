@@ -41,6 +41,8 @@ struct MacLinkReceiver: ViewModifier {
                 MacShareConfirmSheet(pending: $0, flow: flow)
                     .onAppear { flow.hold.markShown(.shareLink) } // 出た: 閉じるまで時間では放さない
             }
+            // アラートには onAppear が無いので、出す番になった時に出たとみなす
+            .onChange(of: flow.showsUnavailable, initial: true) { _, shows in if shows { flow.unavailableShown() } }
             .alert("シェアリンクはサーバー接続時のみ開けます", isPresented: unavailableShown, presenting: flow.unavailable) { url in
                 Button("リンクをコピー") { PlatformPasteboard.setString(url.absoluteString) }
                 Button("OK", role: .cancel) {}
@@ -51,7 +53,7 @@ struct MacLinkReceiver: ViewModifier {
 
     private var unavailableShown: Binding<Bool> {
         // 同意・チュートリアルが閉じてから出す(#1885)。閉じたら次の段(Intent)へ
-        Binding(get: { flow.unavailable != nil && !flow.waitsForEarlierSteps },
+        Binding(get: { flow.showsUnavailable },
                 set: { if !$0 { flow.unavailable = nil; flow.linkSettled() } })
     }
 }

@@ -35,7 +35,8 @@ final class MacAppRuntime: RuntimeNavigating {
     var confirm: RuntimeConfirm?
     /// 中央の列の上に出す一言
     var toast: String? {
-        didSet { if fixOffer != nil, fixOffer?.message != toast { fixOffer = nil } } // 別のトーストに替わったら外す(iOS と同じ)
+        // トーストを替えたら外す。付けるのは `reportFixable` だけ(トーストを出してから付ける)。同じ文言でも付け直さない
+        didSet { if fixOffer != nil { fixOffer = nil } }
     }
     /// いまのトーストに付ける「直してと頼む」(#1885・`MacAppRuntime+FixRequest.swift`)
     var fixOffer: FixOffer?

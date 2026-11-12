@@ -77,6 +77,15 @@ final class MacShareFlow {
     /// 前の段(同意・チュートリアル)がまだ閉じていない。リンクの確認・案内はその後に出す(#1885)
     var waitsForEarlierSteps: Bool { hold.isHolding(before: .shareLink) }
 
+    /// 「サーバー接続時のみ開けます」の案内を出す番か(前の段が閉じきった)
+    var showsUnavailable: Bool { unavailable != nil && !waitsForEarlierSteps }
+
+    /// 案内が出た: 閉じるまで時間では放さない(見張りの 20 秒で Intent を案内の上に出さない・#1885)
+    func unavailableShown() {
+        guard showsUnavailable else { return }
+        hold.markShown(.shareLink)
+    }
+
     /// 開いたリンクの確認・案内が閉じきったか、出さなかった時。次の段(Intent)へ進む
     func linkSettled() {
         guard link.url == nil, pending == nil, unavailable == nil else { return }
