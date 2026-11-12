@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"errors"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -135,5 +136,19 @@ func TestRunShow(t *testing.T) {
 		if !strings.Contains(out.String(), want) {
 			t.Errorf("missing %q in:\n%s", want, out.String())
 		}
+	}
+}
+
+// consent is shown like the other fields: quoted and cut to 64 runes
+func TestRunShowConsentQuoted(t *testing.T) {
+	fb := &store.Feedback{ID: "fb1", UID: "u1", Kind: "bug", Status: "received",
+		ConsentVersion: "v2\n\x1b[2J" + strings.Repeat("あ", 70), CreatedAt: time.Date(2026, 11, 12, 0, 0, 0, 0, time.UTC)}
+	var out bytes.Buffer
+	if err := run(context.Background(), &fakeReader{fb: fb}, []string{"show", "fb1"}, &out, time.Now()); err != nil {
+		t.Fatal(err)
+	}
+	want := "consent:   " + strconv.Quote("v2\n\x1b[2J"+strings.Repeat("あ", 57)+"…") + "\n"
+	if !strings.Contains(out.String(), want) || strings.Contains(out.String(), "\x1b") {
+		t.Fatalf("consent line not quoted:\n%s", out.String())
 	}
 }

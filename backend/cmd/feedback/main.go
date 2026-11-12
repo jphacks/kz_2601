@@ -118,7 +118,7 @@ func render(ctx context.Context, st store.FeedbackReader, args []string, out *st
 			return err
 		}
 		fmt.Fprintf(out, "id:        %s\ncreatedAt: %s\nstatus:    %s\nkind:      %s\nuid:       %s\nconsent:   %s\n",
-			fb.ID, fb.CreatedAt.In(jst).Format(time.RFC3339), fb.Status, fb.Kind, fb.UID, fb.ConsentVersion)
+			fb.ID, fb.CreatedAt.In(jst).Format(time.RFC3339), fb.Status, fb.Kind, fb.UID, quote(fb.ConsentVersion, 64))
 		if d := fb.Device; d != nil {
 			fmt.Fprintf(out, "device:    app %s (%s) / %s / %s / %s\n", quote(d.AppVersion, 64), quote(d.Build, 64), quote(d.OS, 64), quote(d.Model, 64), quote(d.Locale, 64))
 		}
