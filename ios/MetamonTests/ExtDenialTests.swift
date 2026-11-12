@@ -157,4 +157,47 @@ final class ExtDenialTests: XCTestCase {
     }
     #endif
     #endif
+    // MARK: - つなぐ案内の「つなぐ」
+
+    func testConnectButtonWaitsForProviders() {
+        XCTAssertEqual(ExtConnectAvailability.of(.loading, provider: "fakeOauth", providersKnown: false), .loading, "読む前は押せない")
+        XCTAssertEqual(ExtConnectAvailability.of(.hidden, provider: "fakeOauth", providersKnown: false), .unavailable)
+        XCTAssertEqual(ExtConnectAvailability.of(.failed("x"), provider: "fakeOauth", providersKnown: false), .available)
+        let on = ConnectedServiceRow(provider: "fakeOauth", name: "試験用のサービス", status: .notConnected, enabled: true)
+        let off = ConnectedServiceRow(provider: "fakeOauth", name: "試験用のサービス", status: .notConnected, enabled: false)
+        XCTAssertEqual(ExtConnectAvailability.of(.loaded([on]), provider: "fakeOauth", providersKnown: true), .available)
+        XCTAssertEqual(ExtConnectAvailability.of(.loaded([off]), provider: "fakeOauth", providersKnown: true), .unavailable)
+        XCTAssertEqual(ExtConnectAvailability.of(.loaded([]), provider: "fakeOauth", providersKnown: false), .available, "古いサーバー(providers 無し)はつなげる扱い")
+    }
+
+    /// 新しいサーバーが providers からこの provider を外した = 今つなげない(一覧の enabled=false と同じ)
+    func testConnectUnavailableWhenProvidersOmitIt() {
+        let other = ConnectedServiceRow(provider: "todoist", name: "Todoist", status: .notConnected)
+        XCTAssertEqual(ExtConnectAvailability.of(.loaded([other]), provider: "fakeOauth", providersKnown: true), .unavailable)
+        XCTAssertEqual(ExtConnectAvailability.of(.loaded([]), provider: "fakeOauth", providersKnown: true), .unavailable)
+    }
+
+    @MainActor
+    func testModelRemembersWhetherProvidersKnown() async {
+        let model = ConnectedServicesModel()
+        await model.load(MockExternalServicesClient())
+        XCTAssertTrue(model.providersKnown, "モックは providers を返す")
+    }
+
+    // MARK: - つなぐ案内を閉じる時
+
+    func testDismissOnlyOnRealConnect() {
+        let p = "fakeOauth"
+        let not = ConnectedServicesState.loaded([ConnectedServiceRow(provider: p, name: "x", status: .notConnected)])
+        let again = ConnectedServicesState.loaded([ConnectedServiceRow(provider: p, name: "x", status: .needsReconnect)])
+        let done = ConnectedServicesState.loaded([ConnectedServiceRow(provider: p, name: "x", status: .connected)])
+        XCTAssertFalse(ExtConnectAvailability.didConnect(from: .loading, to: done, provider: p),
+                       "最初の読み込みで「つないだ」でも閉じない(サーバーは ext_not_connected と言っている)")
+        XCTAssertTrue(ExtConnectAvailability.didConnect(from: not, to: done, provider: p))
+        XCTAssertTrue(ExtConnectAvailability.didConnect(from: again, to: done, provider: p))
+        XCTAssertTrue(ExtConnectAvailability.didConnect(from: .loaded([]), to: done, provider: p), "古いサーバーはつなぐ前は行が無い")
+        XCTAssertFalse(ExtConnectAvailability.didConnect(from: done, to: done, provider: p))
+        XCTAssertFalse(ExtConnectAvailability.didConnect(from: not, to: not, provider: p))
+        XCTAssertFalse(ExtConnectAvailability.didConnect(from: .failed("x"), to: done, provider: p))
+    }
 }
