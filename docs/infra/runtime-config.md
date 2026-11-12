@@ -63,6 +63,7 @@ runner は prod で GitHub の変数 `RUNNER_DEPLOY=1` の時だけデプロイ�
 | `LATEST_MACOS_BUILD` | appconfig | `LATEST_IOS_BUILD` の Mac 版(CFBundleVersion) | 無し |
 | `MAC_APP_STORE_URL` | appconfig | Mac の案内から開く Mac App Store の URL(`https://apps.apple.com/app/id<id>` / `macappstore://`) | 無し |
 | `FEEDBACK_DAILY_LIMIT` | appconfig | 1 人 1 日のフィードバック送信の上限。`0` で数えない | 5 |
+| `LOOP_GENFAIL_SOURCE` | feedback-loop(job・まだ定期の実行は無い) | 生成の失敗の急増(`LOOP_SOURCE_GENFAIL=on`)を読む先。`file` = `LOOP_GENFAIL_LOGS` のファイル、`logging` = Cloud Logging の API(#2146)。`logging` の時は `LOOP_GENFAIL_PROJECT`(既定 `GOOGLE_CLOUD_PROJECT`)・`LOOP_GENFAIL_SERVICES`(既定 `ai-<APP_ENV>`)・`LOOP_GENFAIL_MAX_LINES`(既定 50000)も読む。job の SA に `roles/logging.viewer` が要る([feedback-loop.md](../backend/features/feedback-loop.md#環境変数)) | `file` |
 | `FEEDS_DISABLED` | appconfig | 外部の公開データ(#348)の provider を止める(カンマ区切り・`all` = 全部)。止めた provider は 503 で、部品は「読み込めませんでした」([external-feeds.md](../backend/features/external-feeds.md)) | 無し(止めない) |
 | `FEEDS_USER_PER_HOUR` / `FEEDS_UPSTREAM_PER_MINUTE` | appconfig | 外部の公開データの 1 人 1 時間の回数 / インスタンスあたり 1 分の出どころへの取得 | 120 / 30 |
 | `BOOK_LOOKUP_ENABLED` | appconfig・ai(2 つとも同じ値にする) | ISBN から本の情報を引く `lookupBook` を動かす(`1` / `true`)。**既定で止めている**(openBD の利用条件が本の紹介のためなので・2026-11-08 のオーナー判断)。appconfig は止めている間 503 `reason=disabled`(ボタンは「本の情報の取得は今使えません」)、ai は止めている間 `lookupBook` を生成しない。片方だけに入れない([book-lookup.md](../backend/features/book-lookup.md#既定で止めている理由)) | 無し(止める) |
