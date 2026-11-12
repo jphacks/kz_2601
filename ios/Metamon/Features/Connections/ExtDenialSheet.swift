@@ -182,12 +182,7 @@ struct ExtConnectSheet: View {
             }
             .padding(Theme.Spacing.lg)
             .background(Theme.Colors.canvas.ignoresSafeArea())
-            .toolbar {
-                ToolbarItem(placement: .cancellationAction) {
-                    Button("閉じる") { dismiss() }
-                        .accessibilityIdentifier("ext.connect.close")
-                }
-            }
+            .toolbar { SheetCloseToolbarItem(identifier: "ext.connect.close") { dismiss() } }
         }
         .presentationDetents([.medium])
         .presentationDragIndicator(.visible)
