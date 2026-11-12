@@ -152,7 +152,7 @@ object ScreenPrint {
         val fieldDef = c.field?.let { entity?.field(it) }
         val count = c.aggregate?.wire == "count"
         val format = c.format?.wire ?: if (count) "plain" else if (fieldDef?.type == FieldType.CURRENCY) "currency" else null
-        val unit = if (count) StatValue.COUNT_UNIT else fieldDef?.unit
+        val unit = if (count) StatValue.countUnit else fieldDef?.unit
         val rows = ChartBuckets.buckets(c, data).map { listOf(it.label, Aggregator.format(it.value, format, unit, locale)) }
         return ExportTable(c.title ?: c.label ?: section ?: entity?.name.orEmpty(), listOf(group, if (count) Strings["desktop_print_count"] else fieldDef?.name ?: Strings["desktop_print_value"]), rows, numericColumns = listOf(false, true))
     }

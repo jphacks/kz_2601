@@ -1,5 +1,6 @@
 package jp.kz2601.metamon.desktop
 
+import jp.kz2601.metamon.desktop.i18n.Strings
 import jp.kz2601.metamon.dsl.AppDSL
 import jp.kz2601.metamon.dsl.Component
 import jp.kz2601.metamon.dsl.expr.ExprEvaluator
@@ -42,7 +43,8 @@ class LeafData(val entities: List<Entity>, source: (String) -> List<Record>, val
 
 /** `stat`: (書式後の文字, 評価できない)。 */
 object StatValue {
-    const val COUNT_UNIT = "件"
+    /** count の単位(「2 件」/「2 items」)。iOS の `L("件")`・Android の `lists_count_unit` と同じ文言。 */
+    val countUnit: String get() = Strings["lists_count_unit"]
 
     fun isValueMode(c: Component): Boolean = c.aggregate == null && c.value != null
 
@@ -65,7 +67,7 @@ object StatValue {
         val fieldDef = c.field?.let { entity?.field(it) }
         val value = Aggregator.aggregate(op, c.field, rows)
         val format = c.format?.wire ?: if (op == "count") "plain" else if (fieldDef?.type == FieldType.CURRENCY) "currency" else null
-        return Aggregator.format(value, format, if (op == "count") COUNT_UNIT else fieldDef?.unit, data.locale) to false
+        return Aggregator.format(value, format, if (op == "count") countUnit else fieldDef?.unit, data.locale) to false
     }
 }
 
@@ -107,7 +109,7 @@ object GaugeValue {
         val entityId = c.entity ?: return 0.0 to null
         val entity = data.entity(entityId)
         val op = c.aggregate?.wire ?: "sum"
-        val unit = if (op == "count") StatValue.COUNT_UNIT else c.field?.let { entity?.field(it)?.unit }
+        val unit = if (op == "count") StatValue.countUnit else c.field?.let { entity?.field(it)?.unit }
         return Aggregator.aggregate(op, c.field, data.filtered(c)) to unit
     }
 }

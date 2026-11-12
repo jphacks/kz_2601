@@ -1,0 +1,73 @@
+{
+  "dsl": "examples/kakeibo.json",
+  "records": {
+    "expense": [
+      {
+        "id": "e1",
+        "data": {
+          "amount": 1200,
+          "category": "食費",
+          "memo": "ランチ",
+          "date": "2026-11-10"
+        }
+      },
+      {
+        "id": "e2",
+        "data": {
+          "amount": 320,
+          "category": "交通",
+          "memo": "バス",
+          "date": "2026-11-03"
+        }
+      },
+      {
+        "id": "e3",
+        "data": {
+          "amount": 5000,
+          "category": "娯楽",
+          "memo": "映画",
+          "date": "2026-10-20"
+        }
+      }
+    ]
+  },
+  "device": {
+    "now": "2026-11-12T12:00:00+09:00",
+    "timeZone": "Asia/Tokyo",
+    "locale": "en_US"
+  },
+  "operations": [
+    {
+      "tap": "add"
+    },
+    {
+      "tap": "delete"
+    },
+    {
+      "tapToolbar": "保存"
+    },
+    {
+      "input": {
+        "field": "amount",
+        "value": 980
+      }
+    },
+    {
+      "input": {
+        "field": "memo",
+        "value": "パン"
+      }
+    },
+    {
+      "tapToolbar": "保存"
+    },
+    {
+      "tapRow": {
+        "index": 0
+      }
+    },
+    {
+      "tap": "delete"
+    }
+  ]
+}
