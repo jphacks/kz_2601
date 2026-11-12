@@ -12,12 +12,23 @@ struct AppSwitcherSheet: View {
     @State private var glance = AppGlanceStore.shared
     @State private var selected: String?
     @State private var showSettings = false
+    /// 集中モードのフィルタ(#1991)。nil = 置いていない
+    @State private var focus: FocusFilterState?
+    @State private var showsAllApps = false
     #if !APP_STORE_REVIEW
     @State private var sharingUI = SharingUI.shared
     @State private var releaseUI = ReleaseUI.shared
     #endif
 
-    private var apps: [AppSummary] { rt.visibleApps }
+    private var apps: [AppSummary] {
+        guard let focus, !showsAllApps else { return rt.visibleApps }
+        return focus.filter(rt.visibleApps)
+    }
+    /// フィルタで隠れているアプリがある(「すべて表示」を出すか)
+    private var isFocusNarrowing: Bool {
+        guard let focus else { return false }
+        return focus.filter(rt.visibleApps).count < rt.visibleApps.count
+    }
     private var showSkeleton: Bool { rt.appsLoading && apps.isEmpty }
 
     var body: some View {
@@ -29,6 +40,7 @@ struct AppSwitcherSheet: View {
                     .padding(.top, Theme.Spacing.lg)
                 AppsUsageNotice() // #317 作れるアプリの数が上限に近い(1 日 1 回)
                     .padding(.horizontal, Theme.Spacing.lg)
+                focusFilterBar // #1991
                 reorderCoachMark // #1441
                 cards
                     .padding(.top, Theme.Spacing.lg)
@@ -46,6 +58,7 @@ struct AppSwitcherSheet: View {
         .presentationDragIndicator(.visible)
         .sensoryFeedback(.selection, trigger: selected)
         .task { await rt.appsList() }
+        .task { focus = FocusFilterState.load(from: WidgetSnapshot.defaults) }
         .onChange(of: rt.apps.count) { PlanUsageStore.shared.invalidateMe() } // 作った・消した・複製した(#317)
         #if !APP_STORE_REVIEW // 審査用ビルドはシェア / リリース申請を外す(#245)
         .task { await releaseUI.refresh(rt.services.releaseRequests) }
@@ -81,6 +94,29 @@ struct AppSwitcherSheet: View {
             .accessibilityLabel("設定")
             .accessibilityIdentifier("switcher.settings")
             SheetCloseButton(identifier: "switcher.close") { dismiss() }
+        }
+    }
+
+    /// 集中モードのフィルタで一覧を絞っている時だけ出す。「すべて表示」で絞りを外す(このシートを閉じるまで)。
+    @ViewBuilder
+    private var focusFilterBar: some View {
+        if isFocusNarrowing || showsAllApps {
+            HStack(spacing: Theme.Spacing.sm) {
+                Image(systemName: "moon.fill")
+                    .foregroundStyle(.secondary)
+                    .accessibilityHidden(true)
+                Text(showsAllApps ? L10n.tr("集中モード中: すべて表示しています") : L10n.pick(L10n.tr("集中モード中: 選んだアプリだけを表示しています"), review: L10n.tr("集中モード中: 選んだ記録帳だけを表示しています")))
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+                Spacer(minLength: 0)
+                Toggle(L10n.tr("すべて表示"), isOn: $showsAllApps.animation())
+                    .font(.footnote.weight(.semibold))
+                    .fixedSize()
+                    .accessibilityIdentifier("switcher.focusShowAll")
+            }
+            .padding(.horizontal, Theme.Spacing.lg)
+            .padding(.top, Theme.Spacing.md)
         }
     }
 

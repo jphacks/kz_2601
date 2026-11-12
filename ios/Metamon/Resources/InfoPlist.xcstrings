@@ -1,6 +1,23 @@
 {
   "sourceLanguage" : "ja",
   "strings" : {
+    "NSCalendarsFullAccessUsageDescription" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Used to read your calendar so the apps you build can show your events in lists or as today's schedule. Event titles and details are never sent off this device."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "生成したアプリで、カレンダーの予定を一覧や今日の予定として表示するために、カレンダーを読み取ります。予定の題名や内容は端末の外に送りません。"
+          }
+        }
+      }
+    },
     "NSHealthShareUsageDescription" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -31,6 +48,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "生成したアプリで記録した体重をヘルスケアにも保存するために、ヘルスケアへ書き込みます。"
+          }
+        }
+      }
+    },
+    "NSRemindersFullAccessUsageDescription" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Used to read your reminders so the apps you build can show them in lists or by upcoming due date. Reminder titles and details are never sent off this device."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "生成したアプリで、リマインダーを一覧や期限の近いものとして表示するために、リマインダーを読み取ります。リマインダーの題名や内容は端末の外に送りません。"
           }
         }
       }
