@@ -53,7 +53,7 @@ func IsMember(ctx context.Context, g MemberGetter, appID, uid string) (bool, err
 // memberDocID: uid is a valid Firestore document ID.
 func memberDocID(uid string) bool {
 	return uid != "" && len(uid) <= 1500 && uid != "." && uid != ".." && !strings.Contains(uid, "/") &&
-		!(len(uid) >= 4 && strings.HasPrefix(uid, "__") && strings.HasSuffix(uid, "__"))
+		(len(uid) < 4 || !strings.HasPrefix(uid, "__") || !strings.HasSuffix(uid, "__"))
 }
 
 // Membership is the participant list of shared apps.
