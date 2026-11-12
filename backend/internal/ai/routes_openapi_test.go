@@ -80,7 +80,7 @@ func aiSpecOperations(t *testing.T) []string {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer f.Close()
+	defer func() { _ = f.Close() }()
 	var ops []string
 	inPaths, path := false, ""
 	sc := bufio.NewScanner(f)
