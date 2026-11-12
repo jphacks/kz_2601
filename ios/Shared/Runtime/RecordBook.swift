@@ -186,4 +186,5 @@ final class SaveFlight {
 
     func begin(_ form: FormDraft) -> Bool { forms.insert(ObjectIdentifier(form)).inserted }
     func end(_ form: FormDraft) { forms.remove(ObjectIdentifier(form)) }
+    func isSaving(_ form: FormDraft) -> Bool { forms.contains(ObjectIdentifier(form)) }
 }

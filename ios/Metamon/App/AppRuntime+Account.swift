@@ -19,8 +19,10 @@ extension AppRuntime {
         ExportFiles.removeAll()                         // 書き出した CSV / PDF(#421・記録の写し)
         RemoteImageLoader.removeAllCached()             // https の画像のキャッシュ(#1265・前の人が見た画像を残さない)
         URLCache.shared.removeAllCachedResponses()      // 共有の URL キャッシュも
-        WidgetSnapshot.defaults?.removePersistentDomain(forName: WidgetSnapshot.appGroupID) // App Group(ウィジェット)
+        IntentHost.shared.cancelPendingRefresh()        // 前の人の一覧をコントロール(#1993)の一覧に書き戻さない
+        WidgetSnapshot.defaults?.removePersistentDomain(forName: WidgetSnapshot.appGroupID) // App Group(ウィジェット・コントロールの一覧)
         WidgetCenter.shared.reloadAllTimelines()
+        ControlIntentBridge.reloadControls()            // コントロールの見出し(前の人のアプリ名)を消す
         LiveActivities.enqueue { await LiveActivities.endAll() } // ロック画面・Dynamic Island(#423)
         LocalWipe.clearDefaults(.standard, domain: Bundle.main.bundleIdentifier)
         RemainingTodayStore.shared.clear()              // 今日の残り(#630・前のアカウントの数を出さない)
@@ -40,6 +42,7 @@ extension AppRuntime {
         center.removeAllDeliveredNotifications()
         apps = []                                       // 変身一覧(オフラインだと前のアカウントの一覧が残る)
         resetToInitial()                                // 新しい appId を発行して初期 DSL に(UserDefaults を消した後に)
+        IntentHost.shared.cancelPendingRefresh()        // resetToInitial(apply)が積んだ引き直しも止める(初期状態の一覧を書き戻さない)
         chatHistoryStore.removeAll()                    // チャット履歴(#210)。resetToInitial が閉じた会話を書くので後で消す
         chatHistory = []
         DeviceAppID.set(document.appId)                 // 念のため保存し直す(次回起動で別 appId にならないように)
