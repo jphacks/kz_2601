@@ -22,13 +22,15 @@ import jp.kz2601.metamon.desktop.i18n.Strings
 import jp.kz2601.metamon.dsl.Action
 import jp.kz2601.metamon.dsl.ActionType
 import jp.kz2601.metamon.dsl.AppDSL
+import jp.kz2601.metamon.dsl.Component
+import jp.kz2601.metamon.dsl.ComponentType
 import jp.kz2601.metamon.dsl.records.entityModels
 import jp.kz2601.metamon.dsl.screen
 import kotlinx.coroutines.delay
 import java.util.prefs.Preferences
 import androidx.compose.ui.window.Notification as TrayNotification
 
-// トレイ / メニューバーに常駐する(#1761): 開く・すぐ記録・音声(使えない旨)・走っているタイマー・閉じてもトレイに残す・終了。
+// トレイ / メニューバーに常駐する(#1761): 前にあるアプリの集計・開く・すぐ記録・音声(使えない旨)・走っているタイマー・閉じてもトレイに残す・終了。
 
 /** トレイのメニューの 1 行(画面に頼らない形。テストはこれを比べる)。 */
 sealed interface TrayItem {
@@ -49,10 +51,36 @@ enum class TrayCommand { OPEN, QUICK_RECORD, VOICE, CLOSE_TO_TRAY, OPEN_AT_LOGIN
 /** 走っている(または止めてある)timerDisplay 1 つ。seconds は countdown なら残り、他は経過。 */
 data class TimerStatus(val key: String, val name: String, val seconds: Int, val countdown: Boolean, val running: Boolean)
 
+/** トレイに出す stat 1 個(値は書式後。記録を読み終える前は「—」)。 */
+data class TrayStat(val label: String, val value: String) {
+    val text: String get() = if (label.isEmpty()) value else "$label $value"
+}
+
+/** 前にあるアプリの先頭の `stat`(Mac のメニューバー `MacMenuBarStats`・iOS のウィジェットと同じ並び)。 */
+object TrayStats {
+    const val MAX = 3
+    const val LOADING = "—"
+
+    /** 画面順(initialScreen → タブ順 → 残り)で `stat` を並べる。 */
+    fun components(dsl: AppDSL): List<Component> {
+        val order = (listOf(dsl.initialScreen) + dsl.app.tabs.map { it.screen } + dsl.screens.map { it.id }).distinct()
+        return order.mapNotNull { dsl.screen(it) }.flatMap { it.allComponents() }.filter { it.type == ComponentType.STAT }
+    }
+
+    /** 先頭 [MAX] 個。値はアプリ内の stat と同じ [StatValue.resolve]。[store] が null(読み込み中)なら「—」。 */
+    fun make(dsl: AppDSL, store: MockStore?): List<TrayStat> {
+        val stats = components(dsl).take(MAX)
+        if (stats.isEmpty()) return emptyList()
+        val data = store?.let { LeafData.of(dsl, it) }
+        return stats.map { c -> TrayStat(c.label ?: c.title.orEmpty(), data?.let { StatValue.resolve(c, it).first } ?: LOADING) }
+    }
+}
+
 object TrayMenu {
     /**
      * [apps] は「新しいウィンドウ」に並べる同梱のアプリ(id, 名前)。空なら出さない。
      * [openAtLogin] は「ログイン時に開く」の今の状態。null(この OS・この動かし方では使えない)なら出さない。
+     * [stats] は前にあるアプリの集計。先頭に押せない行で出す(Mac のメニューバーと同じく上に)。
      */
     fun items(
         appName: String,
@@ -61,7 +89,12 @@ object TrayMenu {
         closeToTray: Boolean,
         apps: List<Pair<String, String>> = emptyList(),
         openAtLogin: Boolean? = null,
+        stats: List<TrayStat> = emptyList(),
     ): List<TrayItem> = buildList {
+        if (stats.isNotEmpty()) {
+            stats.forEach { add(TrayItem.Info(it.text)) }
+            add(TrayItem.Separator)
+        }
         add(TrayItem.Command(TrayCommand.OPEN, Strings.format("desktop_tray_open", appName)))
         add(TrayItem.Command(TrayCommand.QUICK_RECORD, Strings["desktop_tray_quick_record"], enabled = canQuickRecord))
         // 音声はデスクトップ版ではまだ使えない(openVoice と同じ)。押せない行で場所だけ取る
@@ -77,10 +110,10 @@ object TrayMenu {
         add(TrayItem.Command(TrayCommand.QUIT, Strings["desktop_tray_quit"]))
     }
 
-    /** ツールチップ: 「Tailor It — <アプリ名>」、タイマーが走っていれば後ろに並べる。 */
-    fun tooltip(appName: String, timers: List<TimerStatus>): String {
-        val title = Strings.format("desktop_window_title", appName)
-        return if (timers.isEmpty()) title else title + "\n" + timers.joinToString("\n") { timerLabel(it) }
+    /** ツールチップ: 「Tailor It — <アプリ名>」、1 つ目の stat・走っているタイマーを後ろに並べる。 */
+    fun tooltip(appName: String, timers: List<TimerStatus>, stats: List<TrayStat> = emptyList()): String {
+        val lines = listOf(Strings.format("desktop_window_title", appName)) + stats.take(1).map { it.text } + timers.map { timerLabel(it) }
+        return lines.joinToString("\n")
     }
 
     fun timerLabel(t: TimerStatus): String {
@@ -175,12 +208,20 @@ class TrayController(
     /** 「新しいウィンドウ」でアプリを選んだ(Main がウィンドウを開く)。 */
     var onOpenApp: (String) -> Unit = {}
 
-    /** 前に出たウィンドウのアプリに替える(複数のウィンドウ・#1763)。 */
-    fun switchApp(next: AppDSL) {
+    /** 前にあるアプリの記録(集計を出す)。null は未設定(集計は「—」)。 */
+    var records: SharedRecords? by mutableStateOf(null)
+        private set
+
+    /** 前に出たウィンドウのアプリ・その記録に替える(複数のウィンドウ・#1763)。 */
+    fun switchApp(next: AppDSL, records: SharedRecords? = null) {
+        this.records = records
         if (next === dsl) return
         dsl = next
         quickRecordAction = QuickRecordTarget.find(next)
     }
+
+    /** 前にあるアプリの集計。記録を読み終える前は「—」。記録は状態なので、保存・削除で読み直される。 */
+    fun stats(): List<TrayStat> = TrayStats.make(dsl, records?.takeUnless { it.loading }?.store)
 
     /** アプリを別のウィンドウで開く。隠れていたウィンドウも出す。 */
     fun openApp(appId: String) {
@@ -254,7 +295,8 @@ class TrayController(
             }
         }
 
-    fun items(timers: List<TimerStatus>): List<TrayItem> = TrayMenu.items(dsl.app.name, quickRecordAction != null, timers, closeToTray, apps, openAtLogin)
+    fun items(timers: List<TimerStatus>, stats: List<TrayStat> = stats()): List<TrayItem> =
+        TrayMenu.items(dsl.app.name, quickRecordAction != null, timers, closeToTray, apps, openAtLogin, stats)
 
     companion object {
         fun create(dsl: AppDSL): TrayController {
@@ -285,8 +327,9 @@ fun ApplicationScope.DesktopTray(c: TrayController) {
             delay(if (timers.any { it.running }) 1_000 else 3_000)
         }
     }
-    Tray(icon = TrayIconPainter, state = state, tooltip = TrayMenu.tooltip(c.dsl.app.name, timers), onAction = c::open) {
-        TrayItems(c, c.items(timers), ::exitApplication)
+    val stats = c.stats()
+    Tray(icon = TrayIconPainter, state = state, tooltip = TrayMenu.tooltip(c.dsl.app.name, timers, stats), onAction = c::open) {
+        TrayItems(c, c.items(timers, stats), ::exitApplication)
     }
 }
 

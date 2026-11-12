@@ -3,6 +3,10 @@ package jp.kz2601.metamon.desktop
 import jp.kz2601.metamon.desktop.i18n.Lang
 import jp.kz2601.metamon.desktop.i18n.Strings
 import jp.kz2601.metamon.dsl.ActionType
+import jp.kz2601.metamon.dsl.AppDSL
+import jp.kz2601.metamon.dsl.decode
+import jp.kz2601.metamon.dsl.records.entityModels
+import java.time.LocalDate
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -147,6 +151,60 @@ class TrayTest {
             ),
             DesktopTimers.active(now),
         )
+    }
+
+    @Test
+    fun statRowsComeFirstForAppsWithStatsAndAreAbsentOtherwise() = Strings.withLang(Lang.JA) {
+        val today = LocalDate.now().toString()
+        val store = MockStore()
+            .save("expense", null, mapOf("amount" to "1200", "category" to "食費", "date" to today))
+            .save("expense", null, mapOf("amount" to "300", "category" to "交通", "date" to today))
+        val kakeibo = Examples.load("kakeibo")
+        val c = TrayController(kakeibo, true, MemoryBoolSetting(true), MemoryBoolSetting(true))
+        // 記録を渡す前・読み込み中は「—」
+        assertEquals(listOf(TrayStat("今月の支出", "—"), TrayStat("今月の件数", "—")), c.stats())
+        val records = SharedRecords(loading = true)
+        c.switchApp(kakeibo, records)
+        assertEquals(listOf("—", "—"), c.stats().map { it.value })
+        records.loaded(store)
+        // 値はアプリ内の stat と同じ式
+        val data = LeafData.of(kakeibo, store)
+        val inApp = TrayStats.components(kakeibo).map { StatValue.resolve(it, data).first }
+        assertEquals(inApp, c.stats().map { it.value })
+        assertEquals("2 件", inApp[1])
+        assertEquals(
+            listOf("(今月の支出 ${inApp[0]})", "(今月の件数 2 件)", "---", "「家計簿」を開く", "すぐ記録"),
+            labels(c.items(emptyList())).take(5),
+        )
+        // 保存すると次に開いた時に新しい値
+        records.update(kakeibo.entityModels(), store.save("expense", null, mapOf("amount" to "1", "date" to today)))
+        assertEquals("3 件", c.stats()[1].value)
+        assertEquals("Tailor It — 家計簿\n今月の支出 ${c.stats()[0].value}", TrayMenu.tooltip("家計簿", emptyList(), c.stats()))
+
+        // stat の無いアプリは行を出さない(メニューは集計の無い形と同じ)
+        val plain = Examples.load("chat")
+        c.switchApp(plain, SharedRecords())
+        assertEquals(emptyList<TrayStat>(), c.stats())
+        assertEquals(labels(TrayMenu.items(plain.app.name, c.quickRecordAction != null, emptyList(), true)), labels(c.items(emptyList())))
+    }
+
+    @Test
+    fun statOrderFollowsInitialScreenThenTabsThenRestUpToThree() {
+        fun stat(label: String) = """{"type":"stat","label":"$label","entity":"e","aggregate":"count"}"""
+        val dsl = AppDSL.decode(
+            """
+            {"schemaVersion":1,"app":{"name":"順番","tabs":[{"screen":"b","title":"B"},{"screen":"a","title":"A"}]},"initialScreen":"a",
+             "entities":[{"id":"e","name":"E","fields":[{"id":"n","name":"N","type":"string"}]}],
+             "screens":[
+               {"id":"c","title":"C","components":[${stat("c1")}]},
+               {"id":"b","title":"B","components":[${stat("b1")},{"type":"card","children":[${stat("b2")}]}]},
+               {"id":"a","title":"A","components":[${stat("a1")}]}
+             ]}
+            """.trimIndent(),
+        )
+        assertEquals(listOf("a1", "b1", "b2", "c1"), TrayStats.components(dsl).map { it.label })
+        assertEquals(listOf("a1", "b1", "b2"), TrayStats.make(dsl, MockStore()).map { it.label })
+        assertEquals(listOf("0 件", "0 件", "0 件"), TrayStats.make(dsl, MockStore()).map { it.value })
     }
 
     @Test
