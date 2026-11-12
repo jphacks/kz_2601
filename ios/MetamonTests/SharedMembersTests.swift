@@ -118,6 +118,19 @@ final class SharedMembersTests: XCTestCase {
         XCTAssertEqual(model2.phase, .loaded, "失敗したら一覧に戻す")
     }
 
+    /// 上限(100 人)に達したら共有シートに案内を出す(Android #1298 と同じ)
+    func testMemberListFullAtLimit() {
+        let members = (0..<SharedMemberList.memberLimit).map { SharedMember(uid: "m\($0)") }
+        XCTAssertEqual(SharedMemberList.memberLimit, 100)
+        XCTAssertFalse(SharedMemberList(items: Array(members.dropLast()), role: .owner).isFull)
+        XCTAssertTrue(SharedMemberList(items: members, role: .owner).isFull)
+        // 一覧には作成者も 1 行あるが、backend の上限は作成者を除いた参加者の数
+        let owner = SharedMember(uid: "o", role: .owner)
+        XCTAssertFalse(SharedMemberList(items: [owner] + members.dropLast(), role: .owner).isFull,
+                       "作成者 + 99 人なら、まだ 1 人参加できる")
+        XCTAssertTrue(SharedMemberList(items: [owner] + members, role: .member).isFull)
+    }
+
     func testMemberLabel() {
         XCTAssertEqual(SharedMember(uid: "o", role: .owner).label, L10n.tr("作成者"))
         XCTAssertEqual(SharedMember(uid: "m").label, L10n.tr("名前なし"))

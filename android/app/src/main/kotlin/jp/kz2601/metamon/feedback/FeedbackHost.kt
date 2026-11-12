@@ -46,8 +46,13 @@ import androidx.compose.ui.semantics.customActions
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
+import androidx.compose.material3.OutlinedCard
+import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.semantics.LiveRegionMode
+import androidx.compose.ui.semantics.liveRegion
 import jp.kz2601.metamon.R
 import jp.kz2601.metamon.renderer.a11y.TalkBack
 import jp.kz2601.metamon.renderer.a11y.rememberTalkBackRunning
@@ -69,7 +74,7 @@ import kotlin.math.roundToInt
 /**
  * 生成したアプリの上に重ねる知らせ(#895・iOS の RootView の summaryCard / errorCardOverlay / ToastHost / alert)。
  * - 上: 変身の要約と「元に戻す」/「やり直す」、失敗の状態カード
- * - 下: トースト(3 秒・下に払って閉じる)と「削除しました・元に戻す」(5 秒。TalkBack の時は長め・H8)
+ * - 下: トースト(3 秒・下に払って閉じる)と「削除しました・元に戻す」(5 秒。TalkBack の時は長め・H8)。音声のシートを開いている間はシートが出す([ToastLayer]・#1106)
  * - 確認ダイアログ(confirmMessage 付きのアクション)
  */
 @Composable
@@ -83,8 +88,10 @@ fun BoxScope.FeedbackHost(vm: VoiceViewModel, state: VoiceUiState, runtime: AppR
         vm.dismissNotice()
     }
 
-    if (!state.isInitial) {
-        Column(Modifier.align(Alignment.TopCenter).fillMaxWidth().padding(horizontal = 12.dp)) {
+    Column(Modifier.align(Alignment.TopCenter).fillMaxWidth().padding(horizontal = 12.dp)) {
+        // 起動時にサーバーへ届かず保存した DSL も無い(#1107)。話しかける前の画面にも出す。つながったら自動で下がる
+        if (runtimeState.unreachable) UnreachableCard()
+        if (!state.isInitial) {
             // 変身の要約とホットリロードの「最新の内容に更新しました」(#1108)は 1 枠で、後から来た方に置き換える(#1320)
             TopBannerSlot(vm, state, runtime, runtimeState)
             // シートを閉じた後の失敗(生成は送るとシートを閉じる)。シートの中ではシートが出す
@@ -94,6 +101,7 @@ fun BoxScope.FeedbackHost(vm: VoiceViewModel, state: VoiceUiState, runtime: AppR
                     VoiceErrorCopy.of(error),
                     onRetry = vm::retry,
                     onDismiss = vm::dismissError,
+                    onUpgrade = vm.upgradeHandler(),
                     onOpenSettings = {
                         context.startActivity(
                             Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.fromParts("package", context.packageName, null))
@@ -105,16 +113,39 @@ fun BoxScope.FeedbackHost(vm: VoiceViewModel, state: VoiceUiState, runtime: AppR
         }
     }
 
+    // 音声のシートを開いている間はシートの中に出す(#1106)
+    if (ToastPlacement.of(state.isInitial, state.voiceOpen) == ToastPlacement.SCREEN) {
+        ToastLayer(runtime, runtimeState, bottomInset = TOAST_BOTTOM_INSET)
+    }
+
+    runtimeState.confirm?.let { ConfirmDialog(it, runtime) }
+}
+
+/**
+ * 下部のトーストと「削除しました・元に戻す」の層。画面([FeedbackHost])か音声のシートのどちらか 1 か所に置く(#1106・[ToastPlacement])。
+ * 時間(TalkBack の時は長め)と読み上げは置き場所によらず同じ。
+ */
+@Composable
+fun BoxScope.ToastLayer(runtime: AppRuntime, runtimeState: RuntimeState, bottomInset: Dp) {
     Column(
-        Modifier.align(Alignment.BottomCenter).padding(horizontal = 16.dp).padding(bottom = TOAST_BOTTOM_INSET),
+        Modifier.align(Alignment.BottomCenter).padding(horizontal = 16.dp).padding(bottom = bottomInset),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
         RecordUndoToast(runtime, runtimeState)
         RuntimeToast(runtime, runtimeState.toast)
     }
+}
 
-    runtimeState.confirm?.let { ConfirmDialog(it, runtime) }
+/** 「サーバーに接続できません」の消えない状態カード(iOS の `errorCard = .notice(unreachable…)`・#1107)。 */
+@Composable
+private fun UnreachableCard() {
+    OutlinedCard(Modifier.fillMaxWidth().padding(vertical = 8.dp).testTag("runtime.unreachable").semantics { liveRegion = LiveRegionMode.Polite }) {
+        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Text(stringResource(R.string.runtime_unreachable_title), style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
+            Text(stringResource(R.string.runtime_unreachable_body), style = MaterialTheme.typography.bodyMedium)
+        }
+    }
 }
 
 private val UndoNotice.text: Int
@@ -322,3 +353,6 @@ private const val TOAST_MILLIS = 3_000L
 
 /** マイク FAB(64dp + 余白 20dp)の上に出す(被せない) */
 private val TOAST_BOTTOM_INSET = 100.dp
+
+/** 音声のシートでは下の入力欄の上に出す(被せない) */
+val VOICE_SHEET_TOAST_BOTTOM_INSET = 88.dp

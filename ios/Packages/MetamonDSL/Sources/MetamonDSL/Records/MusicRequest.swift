@@ -133,6 +133,25 @@ public enum MusicLinks {
         guard let path = term.addingPercentEncoding(withAllowedCharacters: allowed) else { return nil }
         return URL(string: "https://open.spotify.com/search/" + path)
     }
+
+    /// Apple Music の曲のページ(#1348)。カタログの id(数字)があれば `https://music.apple.com/song/<id>`、
+    /// 無ければ「曲名 アーティスト」の検索 `https://music.apple.com/search?term=…`。
+    public static func appleMusicURL(_ song: MusicSong) -> URL? {
+        if let id = song.id?.trimmingCharacters(in: .whitespaces), !id.isEmpty, id.allSatisfy(\.isASCII), id.allSatisfy(\.isNumber) {
+            return URL(string: "https://music.apple.com/song/" + id)
+        }
+        let term = searchTerm(song)
+        guard !term.isEmpty else { return nil }
+        var c = URLComponents()
+        c.scheme = "https"
+        c.host = "music.apple.com"
+        c.path = "/search"
+        // queryItems は + & = を残すので、検索語の記号は自分で符号化する
+        var allowed = CharacterSet.urlQueryAllowed
+        allowed.remove(charactersIn: "+&=?#/")
+        c.percentEncodedQuery = term.addingPercentEncoding(withAllowedCharacters: allowed).map { "term=" + $0 }
+        return c.url
+    }
 }
 
 public extension AppDSL {

@@ -43,6 +43,7 @@ import jp.kz2601.metamon.dsl.records.Record
 import jp.kz2601.metamon.renderer.ActionContext
 import jp.kz2601.metamon.renderer.DSLRuntime
 import jp.kz2601.metamon.renderer.R
+import jp.kz2601.metamon.renderer.components.lists.LeafData
 import jp.kz2601.metamon.renderer.components.lists.ValueLabels
 import jp.kz2601.metamon.renderer.components.lists.rememberValueLabels
 import jp.kz2601.metamon.renderer.registry.RenderContext
@@ -62,7 +63,7 @@ import kotlinx.coroutines.launch
 @Composable
 fun RandomPickerLeaf(c: Component, ctx: RenderContext, modifier: Modifier = Modifier) {
     val all by rememberRecords(ctx.runtime)
-    val candidates = PlayRecords.filtered(ctx.runtime, all, c)
+    val candidates = LeafData(ctx.runtime, all).filtered(c)
     var pickedId by rememberSaveable(c.id) { mutableStateOf<String?>(null) }
     var spinning by remember { mutableStateOf<Record?>(null) }
     var job by remember { mutableStateOf<Job?>(null) }
@@ -167,14 +168,14 @@ private fun PickedResult(title: String, subtitle: String?, isFinal: Boolean, onO
 fun randomPickerTitle(c: Component, runtime: DSLRuntime, all: Map<String, List<Record>>, r: Record, labels: ValueLabels = ValueLabels.JAPANESE): String? {
     val entity = runtime.entityModel(c.entity.orEmpty())
     val f = c.titleField ?: entity?.displayTitleField ?: ""
-    return PlayRecords.display(runtime, all, r[f], entity?.field(f), labels).ifEmpty { null }
+    return LeafData(runtime, all, labels = labels).display(r[f], entity?.field(f)).ifEmpty { null }
 }
 
 /** 補足(subtitleField)。空・評価できない値は null。 */
 fun randomPickerSubtitle(c: Component, runtime: DSLRuntime, all: Map<String, List<Record>>, r: Record, labels: ValueLabels = ValueLabels.JAPANESE): String? {
     val f = c.subtitleField?.takeIf { it.isNotEmpty() } ?: return null
     val entity = runtime.entityModel(c.entity.orEmpty())
-    val s = PlayRecords.display(runtime, all, r[f] ?: JSONValue.Null, entity?.field(f), labels)
+    val s = LeafData(runtime, all, labels = labels).display(r[f] ?: JSONValue.Null, entity?.field(f))
     return s.takeUnless { it.isEmpty() || it == FieldCoding.UNAVAILABLE }
 }
 

@@ -5,11 +5,16 @@ import jp.kz2601.metamon.services.AuthService
 /** Bearer の供給(iOS の `TokenProvider`)。null なら Authorization を付けない。 */
 fun interface TokenProvider {
     suspend fun idToken(forceRefresh: Boolean): String?
+
+    /** いまトークンを付ける人の uid。セッション切れをその人に限るのに使う(#1102)。分からなければ null */
+    fun subject(): String? = null
 }
 
 /** [AuthService] の ID トークンを Bearer にする(iOS の `AuthTokenProvider`)。 */
 class AuthTokenProvider(private val auth: AuthService) : TokenProvider {
     override suspend fun idToken(forceRefresh: Boolean): String? = auth.idToken(forceRefresh)
+
+    override fun subject(): String? = auth.currentUser.value?.uid
 }
 
 /**

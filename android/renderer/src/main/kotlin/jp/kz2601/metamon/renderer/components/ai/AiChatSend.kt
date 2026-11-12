@@ -9,7 +9,7 @@ import jp.kz2601.metamon.dsl.ai.AiChatSaveToRules
 import jp.kz2601.metamon.dsl.ai.AiSaveTo
 import jp.kz2601.metamon.dsl.ai.AiTextError
 import jp.kz2601.metamon.dsl.ai.AiTextMaterial
-import jp.kz2601.metamon.dsl.ai.chatSaveTo
+import jp.kz2601.metamon.dsl.chatSaveTo
 import jp.kz2601.metamon.dsl.records.Entity
 import jp.kz2601.metamon.dsl.records.Field
 import jp.kz2601.metamon.dsl.records.FieldCoding

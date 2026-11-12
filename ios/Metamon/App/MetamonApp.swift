@@ -13,6 +13,8 @@ struct MetamonApp: App {
     /// 最低対応版・強制アップデート(#302)。サインイン前にも効く
     @State private var updateGate = UpdateGate()
     @Environment(\.scenePhase) private var scenePhase
+    /// 起動のスプラッシュ(コールド起動の 1 回だけ・UI テストのモック起動では出さない)
+    private let splashMode = SplashGate.decide()
     #if !APP_STORE_REVIEW
     @UIApplicationDelegateAdaptor(PushAppDelegate.self) private var pushDelegate // 端末トークンを受ける(#269)
     #endif
@@ -41,6 +43,7 @@ struct MetamonApp: App {
         // #246(5.1.2(i)): 同意が無ければ ai へ一切送らない。どの入口(Siri 等)から呼ばれても効くよう Services の ai を包む
         AIConsentDebug.applyLaunchOverride()
         FirstRunTutorialStore.shared.applyLaunchOverride() // #274(DEBUG のみ)
+        CoachMarkStore.shared.applyLaunchOverride() // #1441(DEBUG のみ)
         #if !APP_STORE_REVIEW
         BetaWelcomeStore.shared.applyLaunchOverride() // #313(DEBUG のみ)
         #endif
@@ -70,6 +73,7 @@ struct MetamonApp: App {
         runtime.migrateTimerKeysIfNeeded() // タイマーのキーをアプリ名 → appId に(1 回だけ・部品が描かれる前)
         runtime.aiConsent = .shared
         runtime.tutorial = .shared
+        runtime.coachMarks = .shared // #1441
         #if !APP_STORE_REVIEW
         runtime.betaWelcome = .shared // #313
         #endif
@@ -86,6 +90,7 @@ struct MetamonApp: App {
         #endif
         _runtime = State(initialValue: runtime)
         _session = State(initialValue: session)
+        if splashMode != .hidden { SplashPresence.shared.begin() } // 起動時のシート・リンク・吹き出しはスプラッシュの後に
     }
 
     var body: some Scene {
@@ -121,6 +126,7 @@ struct MetamonApp: App {
                 }
             }
             .animation(.easeInOut(duration: 0.3), value: session.user == nil)
+            .modifier(SplashOverlay(mode: splashMode)) // 下の起動処理は待たずに進む
             .modifier(UpdateGateModifier(gate: updateGate))
             #if !APP_STORE_REVIEW
             .modifier(ShareLinkReceiver()) // シェアリンクはサインイン前でも受けて保留(#278)

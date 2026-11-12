@@ -15,11 +15,19 @@ interface RecordWriter {
 }
 
 /**
- * timerDisplay の終了通知の口(iOS の `TimerNotifier`)。[endsAtEpochMillis] が null なら予約を取り消す。
- * Android の通知の予約は RuntimeHost の受け口だけ(実装は子 Issue)。
+ * timerDisplay の終了通知と走行状態の口(iOS の `TimerNotifier` / `TimerRunStore` / `TimerVisibility`)。
+ * [timerChanged] の [endsAtEpochMillis] が null なら予約を取り消す。キーは `<画面>/<部品 id>`(runtime が appId を前に付ける)。
  */
 interface TimerHost {
     fun timerChanged(key: String, name: String, endsAtEpochMillis: Long?)
+
+    /** 保存した走行状態(アプリを終了しても残る)。無ければ null。 */
+    fun loadTimer(key: String): TimerRun? = null
+
+    fun saveTimer(key: String, run: TimerRun) = Unit
+
+    /** 前面で見えている間は終了のバナーを出さない。 */
+    fun timerVisible(key: String, visible: Boolean) = Unit
 }
 
 /** 書き込みの順と失敗の扱い(iOS の `OptimisticSave`)。 */

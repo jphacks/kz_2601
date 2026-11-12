@@ -188,6 +188,14 @@ public final class AppleOnDeviceTranscriber: ProvisionalTranscriber {
         request.taskHint = .dictation
 
         let engine = AVAudioEngine()
+        #if os(macOS)
+        do {
+            try MacAudioInput.apply(to: engine) // 設定で選んだ入力の装置(#1221)
+        } catch {
+            diag.failure = "inputDevice: \(error.localizedDescription)"
+            throw TranscriberFailure.noInputAvailable
+        }
+        #endif
         let input = engine.inputNode
         let format = input.outputFormat(forBus: 0)
         let meter = AudioMeter()

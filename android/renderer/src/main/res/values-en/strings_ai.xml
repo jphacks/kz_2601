@@ -28,6 +28,13 @@
     <string name="ai_label_suggest">Get an AI suggestion</string>
     <string name="ai_label_summarize">Summarize with AI</string>
     <string name="ai_needs_form">This AI button works on a record form screen</string>
+    <string name="ai_outputs_announce">Filled: %1$s</string>
+    <string name="ai_outputs_kept">Already filled, left as is: %1$s</string>
+    <string name="ai_outputs_missed">Couldn\'t read, left empty: %1$s</string>
+    <plurals name="ai_outputs_filled">
+        <item quantity="one">Filled %1$d field. Check it and save.</item>
+        <item quantity="other">Filled %1$d fields. Check them and save.</item>
+    </plurals>
     <string name="ai_reason_device_not_eligible">This device doesn\'t support on-device AI (Gemini Nano)</string>
     <string name="ai_reason_long_only_online">Only online AI can write long text (not available in this version)</string>
     <string name="ai_reason_model_not_ready">The AI model is getting ready. Please try again in a moment</string>

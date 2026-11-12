@@ -6,7 +6,7 @@ import java.io.File
 /**
  * 端末内の録音ファイル置き場(iOS の `LocalAudioStore`: Application Support/metamon-audio/<id>.m4a)。
  * Android は noBackupFilesDir/metamon-audio(バックアップの対象外)。サーバーへは上げない。
- * レコード・アプリ・アカウントを消した時の後片付けは子 Issue([removeAll] / [remove] を呼ぶ口だけ置く)。
+ * 記録・アプリを消した時は RecordSyncEngine が [remove]、アカウント削除・サインアウトは LocalDataWipe が [removeAll] を呼ぶ(#1098)。
  */
 class LocalAudioStore(val directory: File) {
     fun file(id: String): File? = if (AudioValue.isValidId(id)) File(directory, "$id.$EXTENSION") else null

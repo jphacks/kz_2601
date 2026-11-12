@@ -99,9 +99,14 @@
     <string name="voice_option_selected">選択中</string>
     <string name="voice_option_unselected">未選択</string>
     <string name="voice_other_body">少し待ってから、もう一度お試しください</string>
+    <string name="voice_pending_cancel">送らない</string>
+    <string name="voice_pending_continue">続けて話す</string>
+    <string name="voice_pending_retake">言い直す</string>
+    <string name="voice_pending_title">声が途切れたので止めました。この内容で送りますか?</string>
     <string name="voice_placeholder_text">または文字で入力</string>
     <string name="voice_placeholder_text_first">文字で入力(今すぐ作れます)</string>
     <string name="voice_plan_limit_body">このアプリで使える量が上限に達しました。使わないものを消すと、続けて使えます</string>
+    <string name="voice_plan_limit_body_pro">このアプリで使える量が無料プランの上限に達しました。使わないものを消すか、Pro にすると増やせます</string>
     <string name="voice_plan_limit_title">上限に達しました</string>
     <string name="voice_pro_required_body">この内容には Pro の機能が必要です。言い方を変えて、もう一度お話しください</string>
     <string name="voice_progress_app">「%1$s」を作っています</string>
@@ -206,4 +211,6 @@
     <string name="voice_title_returning">おかえりなさい。\n今日は何を作りますか?</string>
     <string name="voice_tomorrow">明日</string>
     <string name="voice_unavailable_hint">この端末では声の入力を使えません。下の欄に文字で入力すれば、今すぐ作れます。</string>
+    <string name="voice_unchanged_reason">変更できませんでした。何をどう変えるか、もう少し詳しく教えてください。</string>
+    <string name="voice_upgrade_pro">Pro にする</string>
 </resources>

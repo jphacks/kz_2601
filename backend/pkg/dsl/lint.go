@@ -20,6 +20,7 @@ import (
 //   - stat label says 今日/今週/今月/今年 (today/this week/this month/this
 //     year) but the filter is missing or another period
 //   - screen graph (nav.go): unreachable screens, fullScreen without a way back
+//   - a form shown as a tab/home whose saveRecord has nowhere to go (root_form.go)
 //   - a toolbar item opening the same form as a button on the screen (#416)
 //   - a date/datetime defaultValue other than "now" or a date ("today" is
 //     saved as the text "today", which no date filter matches)
@@ -36,6 +37,7 @@ func (a *App) Lint() []string {
 	l.entityReach()
 	l.savedRecordReach() // saved_record.go
 	l.navGraph()
+	l.rootFormSave() // root_form.go
 	l.micSeat()
 	l.goalTarget()
 	l.progressTargetDefault() // progress_target.go

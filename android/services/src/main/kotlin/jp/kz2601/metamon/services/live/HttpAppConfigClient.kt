@@ -147,6 +147,10 @@ class HttpAppConfigClient(
         send("DELETE", records(appId, entity, id))
     }
 
+    override suspend fun deleteAllRecords(appId: String, entity: String) {
+        http.send(HttpRequest("DELETE", records(appId, entity), listOf("confirm" to "true")))
+    }
+
     override suspend fun setMark(appId: String, entity: String, id: String, mark: String, on: Boolean): MarkState =
         decode(send(if (on) "PUT" else "DELETE", records(appId, entity, id, "marks", mark)))
 

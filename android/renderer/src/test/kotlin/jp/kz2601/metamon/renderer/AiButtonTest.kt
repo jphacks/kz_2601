@@ -8,6 +8,8 @@ import jp.kz2601.metamon.dsl.Shape
 import jp.kz2601.metamon.dsl.Task
 import jp.kz2601.metamon.dsl.ai.AiSaveTo
 import jp.kz2601.metamon.dsl.ai.AiTextError
+import jp.kz2601.metamon.dsl.ai.AiTextField
+import jp.kz2601.metamon.dsl.ai.AiTextFormat
 import jp.kz2601.metamon.dsl.ai.AiTextRequest
 import jp.kz2601.metamon.dsl.ai.AiTextResult
 import jp.kz2601.metamon.dsl.ai.AiTextShape
@@ -219,6 +221,83 @@ class AiButtonTest {
         assertTrue(input.contains("本文"))
         assertFalse("他人の記録の hidden は渡さない", input.contains("答え"))
         assertTrue("オンラインは数えない", host.metrics.isEmpty())
+    }
+
+    // MARK: outputs(fields を項目ごとにフォームへ・iOS の AIOutputsTests / AiGenerateLeaf.fillOutputs)
+
+    private val event: Entity = Entity.from(
+        kotlinx.serialization.json.Json.parseToJsonElement(
+            """{"id":"ev","name":"予定","fields":[{"id":"title","name":"題名","type":"string"},{"id":"score","name":"点数","type":"integer"},
+            {"id":"kind","name":"種類","type":"enum","options":["講演","展示"]},{"id":"note","name":"メモ","type":"string"}]}""",
+        ),
+    )
+
+    private fun outputsButton() = Component(
+        type = ComponentType.AI_BUTTON, id = "ai", task = Task.GENERATE, prompt = "読み取って", shape = Shape.FIELDS,
+        items = listOf("題名", "点数", "種類"),
+        outputs = kotlinx.serialization.json.buildJsonObject {
+            put("題名", kotlinx.serialization.json.JsonPrimitive("title"))
+            put("点数", kotlinx.serialization.json.JsonPrimitive("score"))
+            put("種類", kotlinx.serialization.json.JsonPrimitive("kind"))
+        },
+    )
+
+    @Test
+    fun generateSendsFormatsForOutputs() {
+        val r = AiGenerateBuilder.build(outputsButton(), event, emptyMap(), null, emptyList(), "ja")
+        assertEquals(listOf("題名", "点数", "種類"), r.items)
+        assertEquals(listOf(AiTextFormat("点数", "number"), AiTextFormat("種類", "enum", listOf("講演", "展示"))), r.formats)
+        assertNull("フォームが無ければ送らない", AiGenerateBuilder.build(outputsButton(), null, emptyMap(), null, emptyList(), "ja").formats)
+    }
+
+    @Test
+    fun fillOutputsKeepsUserValuesAndReplacesInitialAndPreviousAi() {
+        val c = outputsButton()
+        val form = FormDraft(event).apply { values["title"] = JSONValue.Str("自分で書いた題") }
+        val previous = mutableMapOf<String, JSONValue>()
+        val out = AiTextResult(
+            AiTextShape.FIELDS, "",
+            fields = listOf(AiTextField("題名", "秋の音楽祭"), AiTextField("点数", "85 点"), AiTextField("種類", "ワークショップ")),
+        )
+        val fill = AiButtonRun.fillOutputs(c, out, form, previous)!!
+        assertEquals(listOf("score"), fill.applied.applied.map { it.field })
+        assertEquals("入力済みは上書きしない", listOf("題名"), fill.applied.kept.map { it.fieldName })
+        assertEquals("読めない項目は空のまま", listOf("種類"), fill.missed.map { it.fieldName })
+        assertEquals(JSONValue.Num(85.0), form.values["score"])
+        assertEquals(JSONValue.Str("講演"), form.values["kind"])
+
+        // 前回 AI が入れたままの値は入れ替える・新規で開いたままの初期値(enum の先頭)も入れ替える
+        val again = AiTextResult(AiTextShape.FIELDS, "", fields = listOf(AiTextField("点数", "90"), AiTextField("種類", "展示")))
+        val second = AiButtonRun.fillOutputs(c, again, form, previous)!!
+        assertEquals(listOf("score", "kind"), second.applied.applied.map { it.field })
+        assertEquals(JSONValue.Num(90.0), form.values["score"])
+        assertEquals(JSONValue.Str("展示"), form.values["kind"])
+
+        // 利用者が書き換えた値は残す
+        form.values["score"] = JSONValue.Num(70.0)
+        val third = AiButtonRun.fillOutputs(c, again, form, previous)!!
+        assertEquals(listOf("点数"), third.applied.kept.map { it.fieldName })
+        assertEquals(JSONValue.Num(70.0), form.values["score"])
+
+        assertNull("fields でなければ何もしない", AiButtonRun.fillOutputs(c, AiTextResult(AiTextShape.LINE, "x"), form, previous))
+    }
+
+    @Test
+    fun generateAttachesScreenFeeds() = runBlocking<Unit> {
+        val host = FakeHost(FakeOnDevice(available = false))
+        val screen = jp.kz2601.metamon.dsl.DslJson.decodeFromString(
+            jp.kz2601.metamon.dsl.Screen.serializer(),
+            """{"id":"s","title":"t","components":[{"type":"feed","id":"wx","title":"天気","provider":"weather","region":"170000"}]}""",
+        )
+        val feeds = object : jp.kz2601.metamon.renderer.components.feed.FeedHost {
+            override suspend fun feed(query: jp.kz2601.metamon.dsl.feed.FeedQuery, force: Boolean) = jp.kz2601.metamon.dsl.feed.FeedResult(
+                provider = "weather", title = "石川県の天気", items = listOf(jp.kz2601.metamon.dsl.feed.FeedItem(title = "晴れ")),
+                source = jp.kz2601.metamon.dsl.feed.FeedSource("気象庁", "https://www.jma.go.jp/", "公共データ利用規約"),
+            )
+        }
+        val c = Component(type = ComponentType.AI_BUTTON, task = Task.GENERATE, prompt = "服装", inputFeeds = listOf("wx"))
+        AiButtonRun.generate(c, null, FakeRuntime(host), "ja", screen = screen, feeds = feeds)
+        assertEquals("外部データ(アプリが表示している公開データ):\n■ 天気\n- 晴れ", host.sent.single().input)
     }
 
     @Test

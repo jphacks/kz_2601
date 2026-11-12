@@ -32,6 +32,7 @@ auto はミドルウェアの時点で修正か新規かが分からないので
 | 502 / 503 / 504(Claude の 5xx・タイムアウト・Claude や appconfig に届かない) | 数えた分の全部 | サーバー側の失敗。iOS の「もう一度」で 2 回分にならない |
 | 200 で、mode auto が修正(edit)になった | 3 − 2 = 1(新規 − 修正の重さ) | 修正の重さは表の 2。auto だけ安くも高くもしない |
 | 200 で、mode auto が「元に戻す」(undo)になった | 3 全部 | Claude を呼ばない |
+| 200 で、修正が何も変えなかった(`unchanged`・auto も含む) | 数えた分の全部。ただし 1 人 1 日 `RATE_LIMIT_UNCHANGED_DAILY` 回まで(既定 5・`0` で返さない)。超えた分は上の mode の行どおり | 「何も変わらないのに回数だけ減る」を無くす。handler が `ratelimit.ReportUnchanged` で伝え、1 依頼 1 回だけ返す。上限は `{env}_{日}_unchanged_{uid}` で数え、利用上限を返すのに失敗したら数えた 1 回も戻す。ログ `ratelimit.refund` の `reason=unchanged` |
 | 4xx(入力の誤り・422・Claude の 429 も含む)と 500 | 返さない | 利用者が起こせる失敗、または原因が分からない失敗 |
 | `/v1/text` の 402 `pro_required`(Pro が無い・`creator_needs_pro`)と 429 `scope: app`(作成者が払う呼び出しの 1 日の上限) | 数えた分の全部(応答の前)。ただし 1 人 1 時間 30 回まで(下の「返した依頼の上限」) | Claude を呼ばない。handler が `ratelimit.Waive` で応答の前に返し、`X-RateLimit-Remaining` もこの依頼を数えない値に書き直す。400 / 403(写真のスイッチ off)/ 413 は上の 4xx と同じく返さない |
 | 503 `ai_paused` | (数えていない) | 一時停止はレートリミットの手前で返す(`cmd/ai/main_test.go` で順番を固定) |
@@ -92,6 +93,7 @@ rateLimits/{env}_{yyyy-mm-dd}_creator_paid_{appId}_uid_{uid}   {count, scope: ap
 | `RATE_LIMIT_GLOBAL_DAILY` | 2000 | 環境全体の費用ブレーカー。新規作成なら約 660 回 |
 | `RATE_LIMIT_WAIVED_HOURLY` | 30 | 1 人 1 時間に数えずに返す依頼(上の「返した依頼の上限」)。`0` で数えない |
 | `RATE_LIMIT_WAIVED_IP_HOURLY` | 120 | 同じ IP から 1 時間に数えずに返す依頼(上の「返した依頼の上限」)。`0` で数えない |
+| `RATE_LIMIT_UNCHANGED_DAILY` | 5 | 1 人 1 日に、何も変えなかった修正(`unchanged`)を返す回数(上の「返す時」)。`0` で返さない |
 | `AI_CREATOR_PAID_APP_DAILY` / `AI_CREATOR_PAID_MEMBER_DAILY` | 300 / 30 | 作成者が払う呼び出しの、アプリごと / アプリ × 参加者ごとの 1 日の回数(上の「作成者が払う呼び出しの上限」)。`0` で数えない |
 | `RATE_LIMIT_WEIGHT_CREATE` / `_EDIT` / `_CHAT` / `_TEXT` / `_TEXT_TASK` / `_TEXT_LONG` / `_TEXT_IMAGE` | 3 / 2 / 1 / 1 / 2 / 3 / 3 | `_TEXT_TASK` は `/v1/text` の本文に generate 以外の `task` がある時。`_TEXT_LONG` は本文に `length: "long"` がある時と `task: "chat"`(aiChat)の時。`_TEXT_IMAGE` は本文に `image` がある時。重なった時は大きい方(max) |
 | `RATE_LIMIT` | on(GOOGLE_CLOUD_PROJECT があれば) | `off` で無効。ローカルで素の起動なら既定 off |

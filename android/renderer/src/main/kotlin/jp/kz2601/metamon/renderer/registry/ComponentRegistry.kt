@@ -6,6 +6,7 @@ import androidx.compose.ui.Modifier
 import jp.kz2601.metamon.dsl.Action
 import jp.kz2601.metamon.dsl.Component
 import jp.kz2601.metamon.dsl.ComponentType
+import jp.kz2601.metamon.dsl.Screen
 import jp.kz2601.metamon.renderer.ActionContext
 import jp.kz2601.metamon.renderer.DSLRuntime
 import jp.kz2601.metamon.renderer.NoopDSLRuntime
@@ -44,6 +45,7 @@ import jp.kz2601.metamon.renderer.components.map.registerMapLeaves
 import jp.kz2601.metamon.renderer.components.route.registerRouteLeaves
 import jp.kz2601.metamon.renderer.components.media.registerMediaLeaves
 import jp.kz2601.metamon.renderer.components.music.registerMusicLeaves
+import jp.kz2601.metamon.renderer.components.nearby.registerNearbyLeaves
 import jp.kz2601.metamon.renderer.components.scan.registerScanLeaves
 import jp.kz2601.metamon.renderer.components.sensors.registerSensorLeaves
 import jp.kz2601.metamon.renderer.components.social.registerSocialLeaves
@@ -56,13 +58,17 @@ class RenderContext(
     val runtime: DSLRuntime = NoopDSLRuntime,
     /** `screen.entity` を持つ画面の下書き(入力部品が書く)。無ければ入力部品は「フォームの外」の枠になる。 */
     val form: FormDraft? = null,
+    /** 描いている画面(aiButton の inputFeeds が同じ画面の feed を探す)。無ければ null。 */
+    val screen: Screen? = null,
     /** 押した場所つきのアクション。遷移は描画器が、それ以外は runtime が受ける。一覧の行タップは recordId 付きで呼ぶ。 */
     val dispatch: (Action, ActionContext) -> Unit = { _, _ -> },
 ) {
     /** button などが押された時(この画面・このフォームから)。 */
     val perform: (Action) -> Unit = { dispatch(it, ActionContext(route, form)) }
 
-    fun withForm(form: FormDraft?): RenderContext = RenderContext(route, runtime, form, dispatch)
+    fun withForm(form: FormDraft?): RenderContext = RenderContext(route, runtime, form, screen, dispatch)
+
+    fun withScreen(screen: Screen?): RenderContext = RenderContext(route, runtime, form, screen, dispatch)
 }
 
 typealias ComponentBuilder = @Composable (component: Component, ctx: RenderContext, modifier: Modifier) -> Unit
@@ -121,11 +127,12 @@ class ComponentRegistry private constructor(private val builders: Map<String, Co
             registerDashcamLeaves() // leaf: ドラレコ(#872)・components/dashcam/DashcamLeaves.kt
             registerSensorLeaves() // leaf: センサー(#871)・components/sensors/SensorLeaves.kt
             registerMusicLeaves() // leaf: 音楽の代わり(#879)・components/music/MusicLeaves.kt
+            registerNearbyLeaves() // leaf: 近くの端末と送り合う(#1382)・components/nearby/NearbyLeaves.kt
             registerFeedLeaves() // leaf: 外部の公開データ(#876)・components/feed/FeedLeaves.kt
             registerImportLeaves() // leaf: ファイルの取り込み(#865)・components/importing/ImportLeaves.kt
             registerSocialLeaves() // leaf: みんなで話す(#875)・components/social/SocialLeaves.kt
             // leaf: 表示(11・#857)
-            register(ComponentType.TEXT) { c, _, m -> TextLeaf(c, m) }
+            register(ComponentType.TEXT) { c, ctx, m -> TextLeaf(c, ctx, m) }
             register(ComponentType.LABEL) { c, _, m -> LabelLeaf(c, m) }
             register(ComponentType.ICON) { c, _, m -> IconLeaf(c, m) }
             register(ComponentType.MARKDOWN) { c, _, m -> MarkdownLeaf(c, m) }

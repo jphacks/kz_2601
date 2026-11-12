@@ -25,13 +25,58 @@ public enum ClientCapabilities {
         ComponentType.allCases.filter { $0 != .unknown && !reviewExcludedComponents.contains($0) }.map(\.rawValue)
     }
 
-    /// このビルドの値。通常 = 全部品(#302)、審査用 = 外した部品を除く。
-    public static var allowedComponents: [String]? {
-        #if APP_STORE_REVIEW
-        reviewAllowedComponents
+    /// この端末の OS(ヘッダ `X-Client-Platform`・#925)。backend はログに残すだけで、部品の絞り込みは allowedComponents で行う。
+    /// 値は docs/decisions/363-desktop-strategy.md の「AI への申告」に合わせて "macos"。
+    public static var platform: String {
+        #if os(macOS)
+        "macos"
         #else
-        allComponents
+        "ios"
         #endif
+    }
+
+    /// Mac で描けない部品(#925・#947)。Mac にハード / データが無い(HealthKit・加速度 / 気圧・持ち歩く位置の追跡・ドラレコ)。
+    /// 表は docs/decisions/363-desktop-strategy.md「部品の対応(Mac の列)」の ×。AI には作らせず、古い DSL で来た時は
+    /// Renderer が「この Mac では使えません」の枠(MacUnavailableView)で受ける。
+    public static let macUnavailableComponents: Set<ComponentType> = [.healthStat, .sensorValue, .locationTracker, .dashcam]
+    /// Mac で無効にする機能。fieldHealth = Field.health(HealthKit が無い)。
+    /// photoField / videoField の撮影(cameraCapture)は Mac のカメラで撮れる(#1043)ので外さない。カメラの無い Mac は Renderer が選ぶだけにする。
+    public static let macDisabledFeatures = ["fieldHealth"]
+
+    /// 通常のビルドの部品の allowlist(OS ごと)。Mac は描けない部品を外す。
+    public static func allowedComponents(macOS: Bool, review: Bool) -> [String] {
+        var excluded: Set<ComponentType> = [.unknown]
+        if review { excluded.formUnion(reviewExcludedComponents) }
+        if macOS { excluded.formUnion(macUnavailableComponents) }
+        return ComponentType.allCases.filter { !excluded.contains($0) }.map(\.rawValue)
+    }
+
+    /// 無効にする機能(OS ごと)。どれも無ければ nil(送らない)。
+    public static func disabledFeatures(macOS: Bool, review: Bool) -> [String]? {
+        var out: [String] = []
+        for f in (review ? reviewDisabledFeatures : []) + (macOS ? macDisabledFeatures : []) where !out.contains(f) { out.append(f) }
+        return out.isEmpty ? nil : out
+    }
+
+    private static var isMacOS: Bool {
+        #if os(macOS)
+        true
+        #else
+        false
+        #endif
+    }
+
+    private static var isReview: Bool {
+        #if APP_STORE_REVIEW
+        true
+        #else
+        false
+        #endif
+    }
+
+    /// このビルドの値。通常 = 全部品(#302)、審査用 = 外した部品を除く。Mac は描けない部品も除く(#925)。
+    public static var allowedComponents: [String]? {
+        allowedComponents(macOS: isMacOS, review: isReview)
     }
 
     /// 部品以外で、この版が実装している DSL の動作(#482)。backend は allowedComponents を送るのにここに無い動作(= v1.0)を AI に使わせない。
@@ -42,7 +87,7 @@ public enum ClientCapabilities {
     /// addressedMessages(#271・宛先を選ぶ members と宛先付きの記録): 同じく参加者を選ぶので審査用の版は送らない。
     /// notification.near(場所に着いたら知らせる・時刻の jitterMinutes): 知らない版は near の通知を 9:00 の 1 回きりとして予約してしまうので、無い版には生成させない。
     /// 審査用の版も同じ(位置の判定は端末の中だけ・使用中のみの許可)。
-    /// aiButton.long・aiButton.inputPhoto・aiButton.saveTo・aiButton.inputFeeds(画面の feed の行を AI に読ませる)・aiButton.outputs(fields を項目ごとにフォームへ)・action.lookupBook・text.highlight(text の {{fieldId}} も)・feed.v2(feed の warnings / pressure): 知らない版は黙って無視するか描けないので、無い版には生成させない。審査用の版も同じ(feed は部品ごと外す)。
+    /// aiButton.long・aiButton.inputPhoto・aiButton.saveTo・aiButton.inputFeeds(画面の feed の行を AI に読ませる)・aiButton.outputs(fields を項目ごとにフォームへ)・action.lookupBook・text.highlight(text の {{fieldId}} も)・feed.v2(feed の warnings / pressure): 知らない版は黙って無視するか描けないので、無い版には生成させない。審査用の版も同じ(feed は部品ごと外す)。ただし long・inputPhoto は送らない(下の #1640)。
     /// expr.addMinutes(計算式の op addMinutes・到着 − 所要分 = 出発): 知らない版は式を「—」にするので、無い版には生成させない。審査用の版も同じ(端末内の計算だけ)。
     /// aiChat.inputEntity(aiChat の inputEntity と limit・自分の記録を読んで話す): 知らない版は黙って無視するので、無い版には生成させない。審査用の版も同じ(aiChat は部品ごと外す)。
     /// component.bracket(トーナメント表): 知らない版は描けないので、無い版には生成させない。審査用の版も同じ。
@@ -52,21 +97,19 @@ public enum ClientCapabilities {
     /// component.callButton(#447・通話): 知らない版は描けないので、無い版には生成させない。審査用の版は部品ごと外し、キーも送らない。
     /// openUrlButton.app(openUrlButton の app / to・shareButton の shareTo x / mail): 知らない版は url の無いボタンを描けないので、無い版には生成させない。
     /// 審査用の版も送る(公開されているリンクを Safari / そのアプリで開くだけ)。
+    /// 審査用の版は aiButton.long・aiButton.inputPhoto を送らない(#1640): どちらもオンライン AI(POST /v1/text)だけで動き、審査用の版はそれを持たないので、
+    /// 送ると押せないボタンができる。送らなければ backend が length / inputPhoto を外し、端末内 AI で動く形にする。
     /// field.encrypted(#233・項目を端末で暗号化して保存・鍵は iCloud キーチェーン): 知らない版は平文で保存してしまうので、無い版には生成させない。
     /// Tailor It Pro の機能なので、App 内課金の無い審査用の版は送らない。
     public static var supportedFeatures: [String] {
         #if APP_STORE_REVIEW
-        ["recordRetention", "notification.when", "singleEntity", "notification.near", "aiButton.long", "aiButton.inputPhoto", "aiButton.saveTo", "aiButton.inputFeeds", "aiButton.outputs", "action.lookupBook", "text.highlight", "feed.v2", "expr.addMinutes", "aiChat.inputEntity", "component.bracket", "progressBar.settingTarget", "openUrlButton.app"]
+        ["recordRetention", "notification.when", "singleEntity", "notification.near", "aiButton.saveTo", "aiButton.inputFeeds", "aiButton.outputs", "action.lookupBook", "text.highlight", "feed.v2", "expr.addMinutes", "aiChat.inputEntity", "component.bracket", "progressBar.settingTarget", "openUrlButton.app"]
         #else
         ["recordRetention", "matching", "notification.when", "singleEntity", "dataRoles", "addressedMessages", "notification.near", "aiButton.long", "aiButton.inputPhoto", "aiButton.saveTo", "aiButton.inputFeeds", "aiButton.outputs", "action.lookupBook", "text.highlight", "feed.v2", "expr.addMinutes", "aiChat.inputEntity", "component.bracket", "progressBar.settingTarget", "photoField.illustrate", "component.callButton", "field.encrypted", "openUrlButton.app"]
         #endif
     }
 
     public static var disabledFeatures: [String]? {
-        #if APP_STORE_REVIEW
-        reviewDisabledFeatures
-        #else
-        nil
-        #endif
+        disabledFeatures(macOS: isMacOS, review: isReview)
     }
 }

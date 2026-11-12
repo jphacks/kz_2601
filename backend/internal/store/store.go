@@ -39,7 +39,8 @@ type App struct {
 	CreatedAt      time.Time       `json:"createdAt"`
 	UpdatedAt      time.Time       `json:"updatedAt"`
 	DSL            json.RawMessage `json:"dsl,omitempty"`
-	SortIndex      int             `json:"sortIndex,omitempty"` // manual list position (1 = first, 0 = never reordered, #277)
+	SortIndex      int             `json:"sortIndex,omitempty"`  // manual list position (1 = first, 0 = never reordered, #277)
+	GlanceStat     string          `json:"glanceStat,omitempty"` // stat shown on the app list card: component id, "-" = none, "" = first stat
 }
 
 // Source mirrors VersionSource in openapi-appconfig.yaml.
@@ -214,6 +215,9 @@ type Store interface {
 	// has (unknown ids are skipped, unlisted apps keep theirs). It does not
 	// touch updatedAt, which stays "last changed".
 	ReorderApps(ctx context.Context, uid string, ids []string) error
+	// SetAppGlance sets GlanceStat ("" removes it). Like ReorderApps it does
+	// not touch updatedAt.
+	SetAppGlance(ctx context.Context, uid, appID, glance string) (*App, error)
 	CommitVersion(ctx context.Context, uid, appID string, c Commit) (*Version, error)
 	ListVersions(ctx context.Context, uid, appID string, limit, offset int) ([]Version, error)
 	GetVersion(ctx context.Context, uid, appID string, n int) (*Version, error)

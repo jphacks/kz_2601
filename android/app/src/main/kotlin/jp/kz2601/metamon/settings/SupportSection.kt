@@ -50,7 +50,7 @@ const val CONTACT_URL = "https://tailor-it.app/contact"
 
 /**
  * 設定の一番下(iOS の `SettingsSheet.supportSection`・#279 / #306): お問い合わせ・ライセンス・詳細(サポート用)。
- * 詳細は 1 画面目に英数字を出さないよう既定で畳む。ユーザー ID などの識別子は出さない([SupportInfo])。
+ * 詳細は 1 画面目に英数字を出さないよう既定で畳む。
  */
 @Composable
 fun SupportSection(info: SupportInfo) {
@@ -102,6 +102,7 @@ fun SupportSection(info: SupportInfo) {
 
 @Composable
 private fun supportLabel(field: SupportInfo.Field): String = when (field) {
+    SupportInfo.Field.USER_ID -> stringResource(R.string.settings_support_user_id)
     SupportInfo.Field.VOICE_MODEL -> stringResource(R.string.settings_support_voice_model)
     SupportInfo.Field.AI -> "ai"
     SupportInfo.Field.APPCONFIG -> "appconfig"

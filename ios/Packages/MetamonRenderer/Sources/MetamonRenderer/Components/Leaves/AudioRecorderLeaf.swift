@@ -54,6 +54,8 @@ struct AudioRecorderPanel: View {
             }
             if recorder.failure == .failed {
                 Text(L("録音できませんでした。もう一度お試しください。")).font(.caption).foregroundStyle(.red)
+            } else if recorder.failure == .busy {
+                Text(L("ほかの録音を終えてから、もう一度お試しください")).font(.caption).foregroundStyle(.red)
             }
         }
         .accessibilityElement(children: .contain)
@@ -72,12 +74,12 @@ struct AudioRecorderPanel: View {
         .onChange(of: value?.id) { _, _ in recorder.sync(hasClip: value != nil) }
         .onChange(of: recorder.failure) { _, f in if f == .denied { showDenied = true } }
         .alert(L("マイクを使えません"), isPresented: $showDenied) {
-            Button(L("設定を開く")) {
-                if let url = PlatformSystem.appSettingsURL { openURL(url) }
+            Button(PlatformSystem.openSettingsTitle) {
+                if let url = PlatformSystem.microphoneSettingsURL { openURL(url) }
             }
             Button(L("キャンセル"), role: .cancel) {}
         } message: {
-            Text(L("設定アプリで Tailor It のマイクへのアクセスを許可してください。"))
+            Text(PlatformSystem.microphoneDeniedMessage)
         }
     }
 
@@ -130,7 +132,7 @@ struct AudioRecorderPanel: View {
                 AudioPlayButton(value: .string(v.encoded))
                 Spacer()
                 if !LocalAudioStore.shared.exists(v.id) {
-                    Label(L("この端末にはありません"), systemImage: "iphone.slash")
+                    Label(L("この端末にはありません"), systemImage: PlatformSystem.notOnDeviceSymbol)
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }

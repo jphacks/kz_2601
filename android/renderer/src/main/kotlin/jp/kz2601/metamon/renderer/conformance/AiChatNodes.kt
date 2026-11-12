@@ -2,7 +2,7 @@ package jp.kz2601.metamon.renderer.conformance
 
 import jp.kz2601.metamon.dsl.Component
 import jp.kz2601.metamon.dsl.ComponentType
-import jp.kz2601.metamon.dsl.ai.chatSaveTo
+import jp.kz2601.metamon.dsl.chatSaveTo
 import jp.kz2601.metamon.renderer.DSLRuntime
 import jp.kz2601.metamon.renderer.components.ai.AiChatSend
 import kotlinx.serialization.json.JsonArray

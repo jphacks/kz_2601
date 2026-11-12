@@ -1,7 +1,4 @@
-// TODO mac-026: UIKit を直接使うテスト。Mac で回すには描画の仕方を置き換え層に寄せる
-#if os(iOS)
 import XCTest
-import UIKit
 import CoreImage
 import MetamonDSL
 @testable import MetamonRenderer
@@ -16,15 +13,12 @@ final class PhotoAnalyzeTests: XCTestCase {
     }
 
     /// 白地に黒文字のレシート(1 行ずつ・右に金額)。
-    private func receiptImage(_ rows: [(String, String)]) -> UIImage {
-        let format = UIGraphicsImageRendererFormat.default()
-        format.scale = 1
-        format.opaque = true
+    private func receiptImage(_ rows: [(String, String)]) -> PlatformImage {
         let size = CGSize(width: 640, height: 80 + rows.count * 60)
-        return UIGraphicsImageRenderer(size: size, format: format).image { ctx in
-            UIColor.white.setFill()
+        return testImage(width: size.width, height: size.height, opaque: true) { ctx in
+            PlatformColor.white.setFill()
             ctx.fill(CGRect(origin: .zero, size: size))
-            let attrs: [NSAttributedString.Key: Any] = [.font: UIFont.systemFont(ofSize: 34, weight: .medium), .foregroundColor: UIColor.black]
+            let attrs: [NSAttributedString.Key: Any] = [.font: PlatformFont.systemFont(ofSize: 34, weight: .medium), .foregroundColor: PlatformColor.black]
             for (i, row) in rows.enumerated() {
                 let y = CGFloat(40 + i * 60)
                 (row.0 as NSString).draw(at: CGPoint(x: 40, y: y), withAttributes: attrs)
@@ -159,12 +153,10 @@ final class PhotoAnalyzeTests: XCTestCase {
 
     /// 中央の色を数え、人のいない画像は 0 人・バーコード無し。
     private func checkColorAndPeople() throws {
-        let format = UIGraphicsImageRendererFormat.default()
-        format.scale = 1
-        let red = UIGraphicsImageRenderer(size: CGSize(width: 200, height: 200), format: format).image { ctx in
-            UIColor.white.setFill()
+        let red = testImage(width: 200, height: 200) { ctx in
+            PlatformColor.white.setFill()
             ctx.fill(CGRect(x: 0, y: 0, width: 200, height: 200))
-            UIColor.systemRed.setFill()
+            PlatformColor.systemRed.setFill()
             ctx.fill(CGRect(x: 30, y: 30, width: 140, height: 140))
         }
         let cg = try XCTUnwrap(red.cgImage)
@@ -201,4 +193,3 @@ private extension CIImage {
         return composited(over: bg)
     }
 }
-#endif

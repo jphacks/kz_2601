@@ -9,6 +9,9 @@ package httpx
 
 const CodeAccountDeleted = "account_deleted"
 
+// a Google Play purchase made for another account (obfuscatedAccountId, POST /v1/me/entitlements/google)
+const CodeAccountMismatch = "account_mismatch"
+
 // AI_PAUSED=1 on the ai service (#511)
 const CodeAIPaused = "ai_paused"
 
@@ -64,6 +67,9 @@ const CodeInvalidDSL = "invalid_dsl"
 const CodeInvalidRecord = "invalid_record"
 
 const CodeInvalidTransaction = "invalid_transaction"
+
+// the server lacks the settings for this feature (e.g. Google Play credentials); 503
+const CodeNotConfigured = "not_configured"
 
 const CodeNotFound = "not_found"
 

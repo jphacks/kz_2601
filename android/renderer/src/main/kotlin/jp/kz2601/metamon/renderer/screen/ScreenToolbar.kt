@@ -1,5 +1,6 @@
 package jp.kz2601.metamon.renderer.screen
 
+import jp.kz2601.metamon.dsl.Action
 import jp.kz2601.metamon.dsl.ActionType
 import jp.kz2601.metamon.dsl.AppDSL
 import jp.kz2601.metamon.dsl.Component
@@ -33,6 +34,19 @@ object ScreenToolbar {
             if (a.type != ActionType.NAVIGATE || target == null || dsl.screen(target)?.entity == null) true
             else Opener(target, a.prefillRef) !in buttons
         }
+    }
+
+    /**
+     * 空の一覧の「最初の 1 件を追加しましょう」を押した時の動き(iOS の `DuplicateAddControl.emptyListAdd`・#1118)。
+     * 同じ画面にある、その entity のフォーム画面を開く button(先)/ 見出しに出している toolbar と同じ navigate。無ければ null。
+     */
+    fun emptyListAdd(entity: String, screen: Screen, dsl: AppDSL): Action? {
+        fun opens(a: Action?): Boolean {
+            val target = a?.screen
+            return a != null && a.type == ActionType.NAVIGATE && target != null && dsl.screen(target)?.entity == entity
+        }
+        screen.allComponents.firstOrNull { it.type == ComponentType.BUTTON && opens(it.action) }?.let { return it.action }
+        return deduplicated(screen, dsl).firstOrNull { opens(it.action) }?.action
     }
 
     /** フォーム画面の saveRecord は画面下の保存バーに移す(見出しからは外す)。 */

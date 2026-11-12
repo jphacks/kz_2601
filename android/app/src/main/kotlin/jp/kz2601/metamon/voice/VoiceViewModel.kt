@@ -5,17 +5,24 @@ import androidx.lifecycle.viewModelScope
 import jp.kz2601.metamon.dsl.AppDocument
 import jp.kz2601.metamon.dsl.isVoiceOnly
 import jp.kz2601.metamon.dsl.screen
+import jp.kz2601.metamon.purchase.CreationGate
+import jp.kz2601.metamon.purchase.PaywallReason
 import jp.kz2601.metamon.services.AIClient
 import jp.kz2601.metamon.services.ChatMessage
 import jp.kz2601.metamon.services.ChatMode
 import jp.kz2601.metamon.services.ChatOption
+import jp.kz2601.metamon.services.ChatPaidFeature
 import jp.kz2601.metamon.services.ChatTurn
 import jp.kz2601.metamon.services.GenerateProgress
 import jp.kz2601.metamon.services.PlanUsageSource
+import jp.kz2601.metamon.services.RemainingToday
 import jp.kz2601.metamon.services.SpeechTranscriber
 import jp.kz2601.metamon.services.TranscriberFailure
 import jp.kz2601.metamon.services.TranscriberStatus
 import jp.kz2601.metamon.services.http.FailureKind
+import jp.kz2601.metamon.services.http.PaidFeature
+import jp.kz2601.metamon.services.http.RateLimitInfo
+import jp.kz2601.metamon.services.privacy.PublicDataPrompt
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -65,13 +72,23 @@ class VoiceViewModel(
     private val chatHistory: ChatHistoryStore = ChatHistoryStore(null),
     /** 過去の変更の要約を AI に渡す時の見出し(UI の言語) */
     private val historyHeader: String = "(これまでに反映した変更)",
+    /** 生成しても何も変わらず、サーバーが理由を返さなかった時の文(画面は strings から渡す・#1177) */
+    private val unchangedFallback: String = "変更できませんでした。何をどう変えるか、もう少し詳しく教えてください。",
     /** 履歴の読み書き。順番が入れ替わらないよう 1 本ずつ */
     private val io: CoroutineContext = Dispatchers.IO.limitedParallelism(1),
     /** 挨拶・AI の質問・完成の要約の読み上げ(#43・設定で ON の時だけ読む) */
     private val speech: SpeechReader = SpeechReader.NONE,
     /** 「今日の残り」を読む口(`GET /v1/me/usage`)。null = 出さない(モック) */
     private val usage: PlanUsageSource? = null,
+    /** 新規作成の無料枠と 402 の課金画面(#1261)。null = 数えない(テスト・審査用の版) */
+    private val creationGate: CreationGate? = null,
     private val clock: () -> Instant = Instant::now,
+    /** ai の応答のヘッダーから入る「今日の残り」(#1203・iOS の `RemainingTodayStore`)。null = 読まない(モック) */
+    private val remainingFeed: StateFlow<RemainingToday?>? = null,
+    /** 状態カードの「Pro にする」で課金画面を開く(#1103)。null = 課金を持たない構成(カードにボタンを出さない) */
+    private val requestPaywall: ((PaywallReason) -> Unit)? = null,
+    /** 発話の「アプリ一覧」「〜に切り替えて」「別のアプリ」を画面へ渡す口(#884)。null = 拾わず AI へ。画面が出ている間だけ入れる */
+    var appRequests: VoiceAppRequests? = null,
     scope: CoroutineScope? = null,
 ) : ViewModel() {
     private val scope: CoroutineScope = scope ?: viewModelScope
@@ -99,7 +116,11 @@ class VoiceViewModel(
     private var usageReadAt: Instant? = null
     private var usageJob: Job? = null
 
+    /** 0 の上限のカードを出した日(戻る時刻。分からなければ [Instant.MAX] = 起動中に 1 度)。閉じたら同じ日にはもう出さない */
+    private var exhaustedCardShownFor: Instant? = null
+
     init {
+        remainingFeed?.let { feed -> this.scope.launch { feed.collect { v -> if (v != null) noteRemaining(v) } } }
         this.scope.launch {
             transcriber.status.collect { s -> _state.update { it.copy(voiceAvailable = s !is TranscriberStatus.Unavailable) } }
         }
@@ -126,11 +147,45 @@ class VoiceViewModel(
         transcriber.cancelRecording()
         stopListenJobs()
         speech.recordingFinished()
-        _state.update { it.copy(phase = VoicePhase.IDLE, partial = "") }
+        carried = null
+        _state.update { it.copy(phase = VoicePhase.IDLE, partial = "", inputLevel = 0f) }
+    }
+
+    // MARK: - 自分で止まった時の確認(#1014)
+
+    /** 「続けて話す」の前に聞き取った分。次の聞き取りとつなぐ */
+    private var carried: String? = null
+
+    /** 確認の「送る」 */
+    fun confirmPendingVoice() {
+        val text = _state.value.pendingVoice ?: return
+        _state.update { it.copy(pendingVoice = null) }
+        submit(text, InputSource.VOICE)
+    }
+
+    /** 確認の「続けて話す」: 聞き取った分を残して聞き直し、次の分とつなぐ */
+    fun continuePendingVoice() {
+        val text = _state.value.pendingVoice ?: return
+        carried = text
+        startListening()
+    }
+
+    /** 確認の「言い直す」: 聞き取った分を捨てて聞き直す */
+    fun retakePendingVoice() {
+        if (_state.value.pendingVoice == null) return
+        carried = null
+        startListening()
+    }
+
+    /** 確認を閉じる(送らない) */
+    fun dismissPendingVoice() {
+        carried = null
+        _state.update { it.copy(pendingVoice = null) }
     }
 
     private fun startListening() {
         clearVoiceError()
+        _state.update { it.copy(pendingVoice = null) }
         // 読み上げ中なら即止め、録音が終わるまで読まない(TTS の音をマイクが拾わない)
         speech.stopForRecording()
         scope.launch {
@@ -140,24 +195,33 @@ class VoiceViewModel(
                 throw e
             } catch (e: TranscriberFailure) {
                 speech.recordingFinished()
-                showError(VoiceError.Voice(e), retry = null)
+                if (!restoreCarried()) showError(VoiceError.Voice(e), retry = null)
                 return@launch
             }
-            _state.update { it.copy(phase = VoicePhase.LISTENING, partial = "") }
+            _state.update { it.copy(phase = VoicePhase.LISTENING, partial = "", inputLevel = 0f) }
             listenJobs = listOf(
                 scope.launch { transcriber.partial.collect { p -> _state.update { it.copy(partial = p) } } },
-                // 認識器が無音で自分から止まったら、タップを待たずに文字にする
+                scope.launch { transcriber.level.collect { l -> _state.update { it.copy(inputLevel = l) } } },
+                // 認識器が無音で自分から止まったら、文字にして送る前に確かめる(#1014)
                 scope.launch {
                     transcriber.listening.dropWhile { !it }.first { !it } // true になってから false に戻った時だけ
-                    if (_state.value.phase == VoicePhase.LISTENING) stopListening()
+                    if (_state.value.phase == VoicePhase.LISTENING) stopListening(autoStopped = true)
                 },
             )
         }
     }
 
-    private fun stopListening() {
+    /** 「続けて話す」の後に聞き取れなかった: 前の分を確認に戻す。戻したら true */
+    private fun restoreCarried(): Boolean {
+        val back = VoiceConfirm.afterFailure(carried) as? VoiceConfirm.Outcome.Confirm ?: return false
+        carried = null
+        _state.update { it.copy(phase = VoicePhase.IDLE, partial = "", inputLevel = 0f, pendingVoice = back.text) }
+        return true
+    }
+
+    private fun stopListening(autoStopped: Boolean = false) {
         if (_state.value.phase != VoicePhase.LISTENING) return
-        _state.update { it.copy(phase = VoicePhase.TRANSCRIBING) }
+        _state.update { it.copy(phase = VoicePhase.TRANSCRIBING, inputLevel = 0f) }
         stopListenJobs()
         scope.launch {
             val text = try {
@@ -165,17 +229,25 @@ class VoiceViewModel(
             } catch (e: CancellationException) {
                 throw e
             } catch (e: TranscriberFailure) {
-                showError(VoiceError.Voice(e), retry = null)
+                if (!restoreCarried()) showError(VoiceError.Voice(e), retry = null)
                 return@launch
             } finally {
                 speech.recordingFinished()
             }
             if (text.isEmpty()) {
-                showError(VoiceError.Voice(TranscriberFailure.NotHeard), retry = null)
+                if (!restoreCarried()) showError(VoiceError.Voice(TranscriberFailure.NotHeard), retry = null)
                 return@launch
             }
-            _state.update { it.copy(partial = "") }
-            submit(text, InputSource.VOICE)
+            val outcome = VoiceConfirm.afterTranscribe(autoStopped, carried, text)
+            carried = null
+            when (outcome) {
+                is VoiceConfirm.Outcome.Send -> {
+                    _state.update { it.copy(partial = "") }
+                    submit(outcome.text, InputSource.VOICE)
+                }
+                is VoiceConfirm.Outcome.Confirm ->
+                    _state.update { it.copy(phase = VoicePhase.IDLE, partial = "", pendingVoice = outcome.text) }
+            }
         }
     }
 
@@ -187,12 +259,54 @@ class VoiceViewModel(
     // MARK: - 依頼
 
     /** 文字入力・例文のチップ・声の書き起こし。新規作成で対話 ON なら相談へ、それ以外はすぐ生成する。 */
-    fun submit(text: String, source: InputSource = InputSource.TEXT) {
+    fun submit(text: String, source: InputSource = InputSource.TEXT) = send(text, source, intentHandled = false)
+
+    /** @param intentHandled 同意の後の送り直し。意図はもう処理した(「別のアプリ」で appId を作り直さない) */
+    private fun send(text: String, source: InputSource, intentHandled: Boolean) {
         val t = text.trim()
         val s = _state.value
         if (t.isEmpty() || s.isGenerating || s.chatPending) return
-        if (!requireConsent { submit(t, source) }) return
+        if (s.pendingVoice != null) _state.update { it.copy(pendingVoice = null) } // 文字で送ったら確認は閉じる
+        // 相談の途中の答えは意図を見ない(「前の状態」などを答えに使えるように)
+        if (!intentHandled && !s.isChatting && handleIntent(t)) return
+        if (!requireConsent { send(t, source, intentHandled = true) }) return
         if (clarifyEnabled()) say(t, source) else generate(t)
+    }
+
+    /**
+     * AI に送る前に端末で拾う発話(#884・iOS の `AppRuntime.morph` の分岐)。処理し終えたら true。
+     * 「別のアプリ」は新しいアプリに移してから、同じ文を従来どおり送る(false)。
+     */
+    private fun handleIntent(text: String): Boolean {
+        val intent = VoiceIntent.detect(text)
+        val requests = appRequests
+        if (intent != VoiceIntent.Undo && requests == null) return false
+        return when (intent) {
+            VoiceIntent.Undo -> {
+                log("voice intent: undo")
+                closeVoice()
+                undo()
+                true
+            }
+            VoiceIntent.ListApps -> {
+                log("voice intent: list apps")
+                closeVoice()
+                requests?.openAppList()
+                true
+            }
+            is VoiceIntent.SwitchApp -> {
+                log("voice intent: switch app")
+                closeVoice()
+                requests?.switchApp(intent.name)
+                true
+            }
+            VoiceIntent.NewApp -> {
+                log("voice intent: new app")
+                requests?.startNewApp()?.let { adopt(it) }
+                false
+            }
+            VoiceIntent.Morph -> false
+        }
     }
 
     /** 相談を飛ばしてすぐ生成する(DEBUG のつまみ `METAMON_AUTO_TRANSCRIPT` 用) */
@@ -201,15 +315,24 @@ class VoiceViewModel(
         if (t.isNotEmpty()) generate(t)
     }
 
-    /**
-     * 今のアプリの最初の画面を差し替える(DEBUG のつまみ `METAMON_AUTO_NAV` 用・遷移 #357 が入るまで)。
-     * その画面が無ければ何もせず false。
-     */
-    fun showScreen(screenId: String): Boolean {
-        val dsl = _state.value.document.dsl
-        if (dsl.screen(screenId) == null) return false
-        _state.update { it.copy(document = it.document.copy(dsl = it.document.dsl.copy(initialScreen = screenId))) }
-        return true
+    /** 公開の記録の確認(#899)の「公開のままにする」: 何もしない */
+    fun keepPublic() = _state.update { it.copy(publicDataPrompt = null) }
+
+    /** 「この欄を消す」: 既存の修正(generate)に指示文を送る。出した時の版から変わっていたら送らない(iOS の `removePublicPersonalFields`) */
+    fun removePublicPersonalFields(english: Boolean) {
+        takePublicDataPrompt()?.let { generate(it.removeInstruction(english)) }
+    }
+
+    /** 「自分だけにする」: 既存の修正に指示文を送る(iOS の `makePublicDataPrivate`) */
+    fun makePublicDataPrivate(english: Boolean) {
+        takePublicDataPrompt()?.let { generate(it.privateInstruction(english)) }
+    }
+
+    private fun takePublicDataPrompt(): PublicDataPrompt? {
+        val s = _state.value
+        val prompt = s.publicDataPrompt ?: return null
+        _state.update { it.copy(publicDataPrompt = null) }
+        return prompt.takeIf { it.version == s.document.version }
     }
 
     /**
@@ -242,7 +365,7 @@ class VoiceViewModel(
             it.copy(
                 document = doc, summary = null, chat = emptyList(), chatTurn = null, chatPending = false, transcript = "",
                 summaryAction = null, undone = null, canUndo = undoable, canRedo = false, notice = null,
-                history = emptyList(), restartConfirm = false,
+                history = emptyList(), restartConfirm = false, heldBuild = null, publicDataPrompt = null,
                 phase = if (it.chatPending && it.phase == VoicePhase.SENDING) VoicePhase.IDLE else it.phase,
                 error = if ((it.error as? VoiceError.Request)?.origin == VoiceError.Origin.CHAT) null else it.error,
             )
@@ -272,6 +395,15 @@ class VoiceViewModel(
         it.copy(error = null, phase = if (it.phase == VoicePhase.ERROR) VoicePhase.IDLE else it.phase)
     }
 
+    /** 状態カードの「Pro にする」の行き先。課金を持たない構成では null */
+    fun upgradeHandler(): ((PaywallReason) -> Unit)? = requestPaywall?.let { open -> { reason -> upgrade(reason, open) } }
+
+    /** 上限のカードの「Pro にする」(iOS の `upgradeFromRateLimit`)。カードは閉じずに課金画面を開く */
+    private fun upgrade(reason: PaywallReason, open: (PaywallReason) -> Unit) {
+        log("[Metamon] IAP: paywall from error card reason=$reason")
+        open(reason)
+    }
+
     fun retry() {
         val action = retryAction ?: return
         dismissError()
@@ -285,14 +417,33 @@ class VoiceViewModel(
         _state.update { it.copy(phase = VoicePhase.IDLE, progress = null) }
     }
 
+    /**
+     * 新規作成(初期画面から)は 1 日の無料枠を通す(#1261・iOS の `sendMetered`)。枠切れなら課金画面を出し、買えばそのまま作る。
+     * 閉じたら送らず、会話を残して「続きから作る」のカード(対話中でなければ入力欄に依頼を戻す)。成功した時だけ数える。
+     */
     private fun generate(text: String) {
         if (generateJob?.isActive == true) return
         if (!requireConsent { generate(text) }) return
+        val gate = creationGate
+        if (gate == null || !_state.value.document.dsl.isVoiceOnly) return startGenerate(text, metered = false)
+        cancelAutoBuild()
+        _state.update { it.copy(heldBuild = null) }
+        generateJob = scope.launch {
+            if (!gate.admitNewApp()) return@launch holdBuild(HeldBuild.LimitReached(text, gate.dailyFreeLimit))
+            startGenerate(text, metered = true)
+        }
+    }
+
+    /** @param paidRetry 402 の後に買って送り直した 1 回(もう一度 402 なら課金画面を出し直さない) */
+    private fun startGenerate(text: String, metered: Boolean, paidRetry: Boolean = false) {
         cancelAutoBuild()
         val before = _state.value.document
         retryAction = { generate(text) }
         _state.update {
-            it.copy(phase = VoicePhase.SENDING, transcript = text, error = null, progress = null, summary = null, voiceOpen = false)
+            it.copy(
+                phase = VoicePhase.SENDING, transcript = text, error = null, progress = null, summary = null, voiceOpen = false,
+                heldBuild = null,
+            )
         }
         val target = appId()
         log("generate: appId=$target version=${before.version} transcript=$text")
@@ -306,6 +457,16 @@ class VoiceViewModel(
                     return@launch
                 }
                 val hadChat = _state.value.isChatting
+                if (result.unchanged) {
+                    val reopenChat = hadChat && !before.dsl.isVoiceOnly
+                    if (hadChat && !reopenChat) {
+                        // 会話を閉じるので、反映した時と同じく相談を区切る(前の相談の答えを次へ持ち越さない)
+                        chatEpoch++
+                        lastInput = null
+                        scope.launch { ai.resetChat(target) }
+                    }
+                    return@launch presentUnchanged(result.summary, reopenChat)
+                }
                 val history = appliedHistory(_state.value, result.document.version, result.summary)
                 chatEpoch++
                 if (!before.dsl.isVoiceOnly && !result.unchanged) remember(before)
@@ -326,9 +487,12 @@ class VoiceViewModel(
                         chatTurn = null,
                         chatPending = false,
                         history = history,
+                        publicDataPrompt = PublicDataPrompt.fromMeta(result.publicPersonalData, result.document.version),
                     )
                 }
+                _state.value.publicDataPrompt?.let { p -> log("public personal data: ${p.fields.map { "${it.entity}.${it.field}(${it.kind})" }}") }
                 persist(result.document.appId, history)
+                if (metered && !result.document.dsl.isVoiceOnly) creationGate?.recordNewApp()
                 log("generate ok: version=${result.document.version} mode=${result.mode} unchanged=${result.unchanged}")
                 _state.value.summary?.let { speech.speak(it) } // #43 完成の要約(OFF なら何もしない)
                 refreshUsage(force = true)
@@ -340,10 +504,112 @@ class VoiceViewModel(
                 throw e
             } catch (e: Throwable) {
                 log("generate failed: $e")
-                showError(VoiceError.Request(FailureKind.classify(e), VoiceError.Origin.GENERATE), retry = retryAction)
+                val kind = FailureKind.classify(e)
+                if (metered && !paidRetry && kind is FailureKind.ProRequiredKind && !kind.info.creatorNeedsPro && holdForProRequired(text, kind, target)) {
+                    return@launch
+                }
+                showError(VoiceError.Request(kind, VoiceError.Origin.GENERATE), retry = retryAction)
             }
         }
     }
+
+    /**
+     * 生成しても何も変わらなかった(#211・#1177・iOS の `presentUnchanged`)。保存されていないので版・元に戻す・反映の区切りは触らない。
+     * 変更の相談から来たなら会話を残したまま理由の吹き出しを足してシートを開き直し(続けて話せる)、それ以外は要約のバナーに出す。
+     */
+    private fun presentUnchanged(summary: String?, reopenChat: Boolean) {
+        val reason = summary?.trim()?.ifEmpty { null } ?: unchangedFallback
+        log("generate unchanged: reopenChat=$reopenChat")
+        _state.update {
+            val base = it.copy(phase = VoicePhase.IDLE, progress = null, transcript = "")
+            if (reopenChat) {
+                base.copy(chat = it.chat + ChatBubble(fromUser = false, text = reason, kind = ChatTurn.Kind.ANSWER), chatTurn = null, voiceOpen = true)
+            } else {
+                base.copy(
+                    phase = VoicePhase.DONE, summary = reason, summaryAction = null, undone = null,
+                    chat = emptyList(), chatTurn = null, chatPending = false,
+                )
+            }
+        }
+        if (reopenChat) persistLive()
+        speech.speak(reason)
+        refreshUsage(force = true)
+    }
+
+    // MARK: - 止めた作成(#1261・iOS の AppRuntime+HeldBuild)
+
+    /**
+     * 402 `pro_required` で新規作成が止まった(何も保存されていない)。課金画面を出し、買えば同じ依頼を送り直す。
+     * 閉じたら対話中は会話を残して確認カード(Pro にする / この機能なしで作る)。対話中でなければ false(状態カードに任せる)。
+     */
+    private suspend fun holdForProRequired(text: String, kind: FailureKind.ProRequiredKind, target: String): Boolean {
+        val gate = creationGate ?: return false
+        _state.update { it.copy(phase = VoicePhase.IDLE, progress = null) }
+        val bought = gate.requestPro(kind.info.features)
+        if (appId() != target) return true
+        if (bought) {
+            startGenerate(text, metered = true, paidRetry = true)
+            return true
+        }
+        if (!_state.value.isChatting) return false
+        holdBuild(HeldBuild.ProRequired(text, kind.info.features))
+        return true
+    }
+
+    /** 作らずに止めた。対話中なら会話を残してカードを出し、そうでなければ入力欄に依頼を戻す(言い直さなくてよい)。 */
+    private fun holdBuild(held: HeldBuild) {
+        log("generate held: ${held::class.simpleName} chatting=${_state.value.isChatting}")
+        _state.update {
+            val idle = it.copy(phase = VoicePhase.IDLE, progress = null, transcript = "")
+            if (it.isChatting) idle.copy(heldBuild = held) else idle.copy(draft = held.text)
+        }
+    }
+
+    /** 「続きから作る」: 同じ依頼で作る。まだ枠が無く Pro でもなければ、もう一度課金画面を出す(閉じたらカードに戻る)。 */
+    fun continueHeldBuild() {
+        val held = _state.value.heldBuild ?: return
+        if (_state.value.isGenerating || generateJob?.isActive == true) return
+        _state.update { it.copy(heldBuild = null) }
+        log("continue held build")
+        generate(held.text)
+    }
+
+    /** 402 のカードの「Pro にする」: 課金画面を出し、買えば同じ依頼で作る。閉じたらカードのまま。 */
+    fun purchaseAndBuild() {
+        val held = _state.value.heldBuild as? HeldBuild.ProRequired ?: return
+        val gate = creationGate ?: return
+        if (_state.value.isGenerating || generateJob?.isActive == true) return
+        generateJob = scope.launch {
+            if (!gate.requestPro(held.features)) return@launch
+            if (_state.value.heldBuild != held) return@launch
+            // 変更の相談から出したカード(#1175)は新規作成ではないので数えない
+            startGenerate(held.text, metered = _state.value.isInitial, paidRetry = true)
+        }
+    }
+
+    /**
+     * 相談の「これでいく」の前に、有料の機能を含む案なら作らずに確認カードを出す(#1175・iOS の `holdForPaidConfirm`)。
+     * Pro・審査用の版([creationGate] が null)・古い backend(requiresPro が無い)では出さない。出したら true。
+     */
+    private fun holdForPaidConfirm(requiresPro: Boolean?, features: List<ChatPaidFeature>?, text: String, free: String?): Boolean {
+        val gate = creationGate ?: return false
+        if (requiresPro != true || gate.isPro || !_state.value.isChatting) return false
+        cancelAutoBuild()
+        log("paid feature confirm: features=${features.orEmpty().map { it.id }}")
+        holdBuild(HeldBuild.ProRequired(text, features.orEmpty().map { PaidFeature(it.id, it.title.orEmpty(), it.reason) }, free))
+        return true
+    }
+
+    /** 402 のカードの「この機能なしで作る」 */
+    fun buildWithoutPaidFeatures() {
+        val held = _state.value.heldBuild as? HeldBuild.ProRequired ?: return
+        if (_state.value.isGenerating || generateJob?.isActive == true) return
+        _state.update { it.copy(heldBuild = null) }
+        generate(held.freeText)
+    }
+
+    /** カードを閉じてチャットに戻る(会話は残る。「これでいく」からまた作れる) */
+    fun dismissHeldBuild() = _state.update { it.copy(heldBuild = null) }
 
     private fun onProgress(p: GenerateProgress) = _state.update { s ->
         if (!s.isGenerating) return@update s
@@ -461,7 +727,9 @@ class VoiceViewModel(
         val s = _state.value
         if (s.chatPending || s.isGenerating) return
         val text = option.instructionText.trim()
-        if (text.isNotEmpty()) generate(text)
+        if (text.isEmpty()) return
+        if (holdForPaidConfirm(option.requiresPro, option.paidFeatures, text, option.freeInstruction)) return
+        generate(text)
     }
 
     /** 複数選択の案の「これでいく(N 件)」: 選んだ案を 1 つにまとめて作る(#220) */
@@ -472,8 +740,17 @@ class VoiceViewModel(
     /** ready の「これでいく」。transcript が無ければこれまでの発話をつなぐ */
     fun buildFromChat() {
         val s = _state.value
-        val text = s.chatTurn?.transcript?.trim()?.ifEmpty { null } ?: fallbackTranscript(s.chat)
-        if (text.isNotEmpty()) generate(text)
+        val transcript = s.chatTurn?.transcript?.trim()?.ifEmpty { null }
+        val text = transcript ?: fallbackTranscript(s.chat)
+        if (text.isEmpty()) return
+        // ready の transcript で作る時だけ確かめる(予備の依頼文には判定の材料が無い・iOS と同じ)
+        val turn = s.chatTurn
+        if (transcript != null && turn?.kind == ChatTurn.Kind.READY &&
+            holdForPaidConfirm(turn.requiresPro, turn.paidFeatures, text, turn.freeTranscript)
+        ) {
+            return
+        }
+        generate(text)
     }
 
     /** 「このまま作る」: ready でなければ go-ahead 語を送り、返事を待って作る(返事が来なくてもこれまでの発話で作る) */
@@ -542,6 +819,7 @@ class VoiceViewModel(
                 chatTurn = null,
                 chatPending = false,
                 restartConfirm = false,
+                heldBuild = null,
                 phase = if (it.phase == VoicePhase.SENDING) VoicePhase.IDLE else it.phase,
                 error = if ((it.error as? VoiceError.Request)?.origin == VoiceError.Origin.CHAT) null else it.error,
             )
@@ -558,7 +836,8 @@ class VoiceViewModel(
         cancelAutoBuild()
         lastInput = source
         _state.update {
-            it.copy(chat = it.chat + ChatBubble(fromUser = true, text = text), transcript = "", error = null)
+            // 話し直したら止めた作成のカードは閉じる(iOS と同じ)
+            it.copy(chat = it.chat + ChatBubble(fromUser = true, text = text), transcript = "", error = null, heldBuild = null)
         }
         persistLive()
     }
@@ -720,7 +999,34 @@ class VoiceViewModel(
                     myUsage = if (keep) it.myUsage ?: me else me,
                 )
             }
+            showExhaustedCardIfNeeded()
         }
+    }
+
+    /** ai の応答のヘッダーから届いた「今日の残り」(#1203)。古い値では上書きしない */
+    private fun noteRemaining(value: RemainingToday) {
+        _state.update {
+            val cur = it.remainingToday
+            if (cur != null && cur.observedAt.isAfter(value.observedAt)) it else it.copy(remainingToday = value)
+        }
+        showExhaustedCardIfNeeded()
+    }
+
+    /**
+     * 残りが 0 になったら上限のカードを同じ日に 1 度だけ出す(iOS の `RemainingTodayBadge.showExhaustedCardIfNeeded`)。
+     * ほかのカードが出ている・生成や相談の途中は出さない(終わった後の usage の読み直しでもう一度見る)。
+     */
+    private fun showExhaustedCardIfNeeded() {
+        val s = _state.value
+        val display = RemainingTodayDisplay.of(s.remainingToday, clock(), s.isPro) as? RemainingTodayDisplay.Exhausted ?: return
+        if (s.error != null || s.isGenerating || s.chatPending) return
+        val key = display.resetAt ?: Instant.MAX
+        if (exhaustedCardShownFor == key) return
+        exhaustedCardShownFor = key
+        val tier = if (s.isPro) "pro" else s.myUsage?.tier ?: "signed_in"
+        val info = RateLimitInfo(RateLimitInfo.Scope.USER, tier = tier, limit = s.remainingToday?.limit, remaining = 0, resetAt = display.resetAt)
+        retryAction = null
+        _state.update { it.copy(error = VoiceError.Request(FailureKind.RateLimited(info), VoiceError.Origin.GENERATE)) }
     }
 
     // MARK: - 状態カード

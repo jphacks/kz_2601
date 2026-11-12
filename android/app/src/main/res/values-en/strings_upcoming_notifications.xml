@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="settings_upcoming_empty">No scheduled notifications</string>
+    <string name="settings_upcoming_footer">These arrive at this time even when the app is closed.</string>
+    <string name="settings_upcoming_header">Upcoming notifications</string>
+    <string name="settings_upcoming_places">You\'ll be notified when you arrive near a saved place (%1$d)</string>
+    <string name="settings_upcoming_places_off">Location access is off, so arrival notifications won\'t arrive (tap to open Settings)</string>
+</resources>

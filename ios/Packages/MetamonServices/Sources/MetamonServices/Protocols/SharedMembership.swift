@@ -77,6 +77,11 @@ public struct SharedMemberList: Decodable, Sendable, Equatable {
 
     enum CodingKeys: String, CodingKey { case items, role, admin }
 
+    /// 参加者の上限(backend の `store.MaxMembers`・members_full と同じ)。作成者はこの数に入らない
+    public static let memberLimit = 100
+    /// 上限に達していて、これ以上は参加できない。backend は作成者を除いた参加者で数える(一覧には作成者も 1 行ある)
+    public var isFull: Bool { items.filter { $0.role != .owner }.count >= Self.memberLimit }
+
     public init(items: [SharedMember], role: SharedMember.Role, isAdmin: Bool? = nil) {
         self.items = items
         self.role = role

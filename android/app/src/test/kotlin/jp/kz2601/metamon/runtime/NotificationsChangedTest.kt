@@ -27,7 +27,21 @@ class NotificationsChangedTest {
         advanceTimeBy(1_000)
         runCurrent()
         assertEquals("読み込みが続いても 1 回にまとめる", 1, host.calls.size)
-        assertEquals("train" to setOf("workout"), host.calls.single())
+        // 端末はオフラインで端末内にも記録が無い = 読めなかった entity は渡さない(#1124: 空で評価して後で誤って鳴らさない)
+        assertEquals("train" to emptySet<String>(), host.calls.single())
+    }
+
+    @Test
+    fun failedEntityIsPassedOnceSavedLocally() = runTest {
+        val host = Recorder()
+        val rt = runtime(RuntimeFixture.dsl("training"), appId = "train", host = host)
+        rt.bootstrap()
+        advanceTimeBy(1_000)
+        runCurrent()
+        rt.createRecord("workout", emptyMap())
+        advanceTimeBy(1_000)
+        runCurrent()
+        assertEquals("端末内に保存した記録で埋める", "train" to setOf("workout"), host.calls.last())
     }
 
     @Test

@@ -40,6 +40,9 @@ import jp.kz2601.metamon.language.AppLocales
 import jp.kz2601.metamon.language.LanguageSection
 import jp.kz2601.metamon.push.PushConsentSection
 import jp.kz2601.metamon.renderer.components.social.BlockedUsersSection
+import jp.kz2601.metamon.renderer.navigation.ScreenGraph
+import jp.kz2601.metamon.renderer.navigation.requestReveal
+import jp.kz2601.metamon.screenmap.ScreenMapSheet
 import jp.kz2601.metamon.services.MyUsage
 import jp.kz2601.metamon.services.RemainingToday
 import jp.kz2601.metamon.share.MembersSettingsRow
@@ -64,6 +67,7 @@ import java.time.format.FormatStyle
  * @param myUsage 同じく最後に読んだ `GET /v1/me/usage`。「使っている量」はこれを使い、自分では読まない(開くたびに 2 回呼ばない)
  * @param onStopRetention 「自動で消すのをやめる」の指示文を送る(送ったらシートを閉じる)
  * @param onShowTutorial 「使い方を見る」(#900)。シートを閉じて初回のチュートリアルをもう一度出す
+ * @param onReplayCoachMarks 「操作のヒントをもう一度見る」(#900)。シートを閉じて吹き出しを未読に戻す
  * @param canUndo 「元に戻す」を押せる(#1075)
  * @param onUndo シートを閉じて直前の版に戻す
  * @param onPickTip 「頼み方のコツ」で選んだ文を入力欄に入れる(シートを閉じる・送らない)
@@ -84,6 +88,7 @@ fun SettingsSheet(
     onRefreshUsage: () -> Unit = {},
     onStopRetention: (String) -> Unit = {},
     onShowTutorial: () -> Unit = {},
+    onReplayCoachMarks: () -> Unit = {},
     canUndo: Boolean = false,
     onUndo: () -> Unit = {},
     onPickTip: (String) -> Unit = {},
@@ -111,6 +116,8 @@ fun SettingsSheet(
             // 今日の残り(#630)。AI を使うまでは「AI を使うと表示されます」
             RemainingTodaySection(remainingToday, isPro)
             HorizontalDivider(Modifier.padding(vertical = 8.dp))
+            // Tailor It Pro(iOS の ProSettingsSection)。課金画面は本体の PaywallHost が上に重ねる
+            jp.kz2601.metamon.purchase.ProSettingsSection(container.pro, serverPro = isPro)
             UsageSection(container, myUsage, isPro) // 使っている量(#317・iOS と同じく「今日の残り」の次)
             HorizontalDivider(Modifier.padding(vertical = 8.dp))
             var language by remember { mutableStateOf(AppLocales.setting(context)) }
@@ -125,6 +132,26 @@ fun SettingsSheet(
             // 挨拶・AI の質問・完成の要約の読み上げ(#892・既定 OFF)
             SpeechSection(remember { SpeechSettings(context) })
             HorizontalDivider(Modifier.padding(vertical = 8.dp))
+            var screenMapOpen by rememberSaveable { mutableStateOf(false) }
+            if (screenMapOpen) {
+                // 画面マップ(#897)。選んだ画面を根から最短の道で開き、設定ごと閉じる
+                ScreenMapSheet(runtimeState.dsl, onDismiss = { screenMapOpen = false }, onOpen = { id ->
+                    val dsl = runtimeState.dsl
+                    // 保存していない入力のあるフォームが消えるなら破棄の確認を挟む
+                    container.runtime.requestReveal(id, ScreenGraph(dsl), dsl)
+                    screenMapOpen = false
+                    onDismiss()
+                })
+            }
+            var automationsOpen by rememberSaveable { mutableStateOf(false) }
+            val automations = container.automations
+            if (automationsOpen && automations != null) {
+                // 自動の動き(#905)。「直しますか?」は依頼を入力欄に入れて設定ごと閉じる(頼み方のコツと同じ)
+                AutomationsSheet(runtimeState.document.appId, automations, onDismiss = { automationsOpen = false }, onFix = { text ->
+                    automationsOpen = false
+                    onPickTip(text)
+                })
+            }
             // アプリ(#898・iOS の appSection): 元に戻す・画面マップ・自動の動き・使い方を見る(#900)・頼み方のコツ・リセット
             AppActionsSection(
                 AppActionsState(
@@ -136,13 +163,18 @@ fun SettingsSheet(
                     hasServerRules = runtimeState.dsl.serverRules.isNotEmpty(),
                 ),
                 onUndo = onUndo,
+                onOpenScreenMap = { screenMapOpen = true },
+                onOpenAutomations = automations?.let { { automationsOpen = true } },
                 onShowTutorial = onShowTutorial,
+                onReplayCoachMarks = onReplayCoachMarks,
                 onPickTip = onPickTip,
                 onReset = onReset,
             )
             HorizontalDivider(Modifier.padding(vertical = 8.dp))
             // 他の人の行動で届く通知(#887)。共有・公開の記録があり、作成者でない時だけ(下の区切り線も節が出す)
             PushConsentSection(container.push, container.membersStore, runtimeState.document.appId, runtimeState.document.dsl)
+            // 次の通知(#1124・iOS の通知の節)。通知のあるアプリだけ(下の区切り線も節が出す)
+            UpcomingNotificationsSection(runtimeState.document.appId, runtimeState.dsl.app.notifications.isNotEmpty())
             // 記録の自動削除(#482)。今のアプリに保存期間のある記録がある時だけ
             RetentionSettingsSection(container.runtime, onStop = { text ->
                 onStopRetention(text)
@@ -155,7 +187,8 @@ fun SettingsSheet(
             PrivacySection(container)
             HorizontalDivider(Modifier.padding(vertical = 8.dp))
             // お問い合わせ・ライセンス・詳細(サポート用)(#898・iOS の supportSection)
-            SupportSection(remember(runtimeState.document.version) { supportInfo(context, container, runtimeState.document.version) })
+            val uid = container.auth.currentUser.collectAsStateWithLifecycle().value?.uid
+            SupportSection(remember(runtimeState.document.version, uid) { supportInfo(context, container, uid, runtimeState.document.version) })
             // ログアウト・削除の後は本体の画面ごと消える(後片付けは画面より長く生きる scope で回る)
             container.accountGuard.active.collectAsStateWithLifecycle().value?.let { user ->
                 HorizontalDivider(Modifier.padding(vertical = 8.dp))
@@ -247,11 +280,12 @@ private fun ToggleRow(label: String, checked: Boolean, tag: String, onChange: (B
     }
 }
 
-/** 「詳細(サポート用)」の値(iOS の `SettingsSheet.supportInfo`)。ユーザー ID は入れない([SupportInfo])。 */
-private fun supportInfo(context: Context, container: AppContainer, revision: Int): SupportInfo {
+/** 「詳細(サポート用)」の値(iOS の `SettingsSheet.supportInfo`)。 */
+private fun supportInfo(context: Context, container: AppContainer, uid: String?, revision: Int): SupportInfo {
     val mock = container.knobs.mock
     val pkg = runCatching { context.packageManager.getPackageInfo(context.packageName, 0) }.getOrNull()
     return SupportInfo(
+        uid = uid,
         voiceModel = container.transcriber::class.simpleName ?: "-",
         aiEndpoint = if (mock) context.getString(R.string.settings_support_mock) else SupportInfo.host(container.environment.aiBaseUrl),
         appConfigEndpoint = if (mock) context.getString(R.string.settings_support_in_memory) else SupportInfo.host(container.environment.appConfigBaseUrl),

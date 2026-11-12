@@ -7,6 +7,9 @@ extension AppRuntime {
     /// サインアウト・退会の前に端末の登録を消す(`wipeLocalData` はサーバーに送らないので、その前に呼ぶ)。
     func unregisterPushDevice() async { await PushHost.shared.unregister() }
 
+    /// 消した登録を今の uid で戻す(アカウントの切り替えに失敗した時)。許可済みならトークンを求め直す。
+    func registerPushDevice() async { await PushHost.shared.refresh() }
+
     /// 開いているアプリの同意の控え。保存が無い = 受け取らない(#339)。
     var notifyConsentAllowed: Bool {
         guard let uid = services.auth.currentUser?.uid else { return false }
@@ -37,5 +40,6 @@ extension AppRuntime {
 #else
 extension AppRuntime {
     func unregisterPushDevice() async {}
+    func registerPushDevice() async {}
 }
 #endif

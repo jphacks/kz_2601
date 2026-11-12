@@ -18,6 +18,7 @@ import kotlinx.serialization.json.JsonPrimitive
  * - 招待時: [Header] を載せる(受信側は接続前に「誰から・何が・何件」と取り込めるかを判定できる)
  * - 接続後: [Payload](Header + レコード)を JSON で 1 回送り、受信側は [Ack] を返す
  * - 未知のキーは読み飛ばし、レコード内の未知フィールドは [sanitize] で捨てる
+ * - 受け取るものは先に全体のバイト数を確かめ、上限を超えたら読まずに捨てる([decodeHeader]・[decodePayload]・[decodeAck])
  */
 object NearbyShare {
     const val VERSION = 1
@@ -25,8 +26,20 @@ object NearbyShare {
     /** 一覧画面から送る最大件数(新しい順)。 */
     const val MAX_SEND_RECORDS = 50
 
-    /** 受信側が取り込む最大件数。 */
+    /** 受信側が取り込む最大件数(壊れた相手から大量に入れられないように)。 */
     const val MAX_RECEIVE_RECORDS = 200
+
+    /** 送るデータ(JSON)の上限。超える分は古い方から落とす。 */
+    const val MAX_SEND_BYTES = 512 * 1024
+
+    /** 受け取るデータの上限(送る側の上限 + 余裕)。超えたら読まずに捨てる。 */
+    const val MAX_RECEIVE_BYTES = 1024 * 1024
+
+    /** 接続の申し出に載る Header の上限。 */
+    const val MAX_HEADER_BYTES = 16 * 1024
+
+    /** 受け取りの結果(Ack)の上限。 */
+    const val MAX_ACK_BYTES = 4 * 1024
 
     /** 曲のリクエストの [Decision.Accept] に入れる印(entity ではない)。 */
     const val SONG_ENTITY_ID = "\$musicRequest"
@@ -68,6 +81,18 @@ object NearbyShare {
             },
         )
 
+        /** 受け取った Header を上限に揃える。id・項目一覧が長すぎるものは null。名前は切り詰め、空なら [NearbyLimits.ANONYMOUS_NAME]。 */
+        fun validated(): Header? {
+            if (!NearbyLimits.isValidId(appId) || !NearbyLimits.isValidId(entityId) || fields.size > NearbyLimits.MAX_FIELDS) return null
+            if (!fields.all { NearbyLimits.isValidId(it.id) && NearbyLimits.isValidId(it.type) }) return null
+            return copy(
+                sender = NearbyLimits.publicName(sender, anonymous = false),
+                appName = NearbyLimits.clip(appName, NearbyLimits.MAX_LABEL_LENGTH),
+                entityName = NearbyLimits.clip(entityName, NearbyLimits.MAX_LABEL_LENGTH),
+                count = count.coerceIn(0, MAX_RECEIVE_RECORDS),
+            )
+        }
+
         companion object {
             fun of(sender: String, appId: String, appName: String, entity: Entity, count: Int) = Header(
                 sender = sender, appId = appId, appName = appName, entityId = entity.id, entityName = entity.name,
@@ -101,6 +126,9 @@ object NearbyShare {
         fun toJson(): JsonObject = JsonObject(
             mapOf("header" to header.toJson(), "records" to JsonArray(records.map { NearbyJson.record(it) })),
         )
+
+        /** 送り主の名前を差し替えたもの(送る直前に今の端末の名前へ揃える。シートを開いた後に「名前を出さない」を切り替えても合う)。 */
+        fun sentAs(sender: String): Payload = copy(header = header.copy(sender = sender))
 
         companion object {
             fun from(e: JsonElement?): Payload {
@@ -148,8 +176,14 @@ object NearbyShare {
         val rows = records.take(MAX_SEND_RECORDS).mapNotNull { data ->
             data.filter { it.key in stored && !it.value.isNull }.takeIf { it.isNotEmpty() }
         }
-        return Payload(Header.of(sender, appId, appName, entity, rows.size), rows)
+        val kept = rows.toMutableList()
+        while (kept.isNotEmpty() && size(Payload(Header.of(sender, appId, appName, entity, kept.size), kept)) > MAX_SEND_BYTES) {
+            kept.removeAt(kept.lastIndex)
+        }
+        return Payload(Header.of(sender, appId, appName, entity, kept.size), kept.toList())
     }
+
+    internal fun size(p: Payload): Int = runCatching { encode(p).size }.getOrDefault(Int.MAX_VALUE)
 
     /** 一覧画面で送る範囲: 新しい順(createdAt 降順・無ければ元の順)に最大 [MAX_SEND_RECORDS] 件。 */
     fun recordsToSend(records: List<Record>): List<Map<String, JSONValue>> =
@@ -228,7 +262,28 @@ object NearbyShare {
     fun encode(header: Header): ByteArray = NearbyJson.bytes(header.toJson())
     fun encode(ack: Ack): ByteArray = NearbyJson.bytes(ack.toJson())
 
-    fun decodePayload(data: ByteArray): Payload = Payload.from(NearbyJson.parse(data))
-    fun decodeHeader(data: ByteArray): Header = Header.from(NearbyJson.parse(data))
-    fun decodeAck(data: ByteArray): Ack = Ack.from(NearbyJson.parse(data))
+    /** 接続の申し出に載った Header を読む。大きすぎる・上限を超える・読めないものは null(申し出を断る)。 */
+    fun decodeHeader(data: ByteArray): Header? {
+        if (data.size > MAX_HEADER_BYTES) return null
+        return runCatching { Header.from(NearbyJson.parse(data)) }.getOrNull()?.validated()
+    }
+
+    /** 届いた Payload を読む。全体のバイト数を先に確かめ、上限を超えたら読まずに捨てる。 */
+    fun decodePayload(data: ByteArray): Payload? {
+        if (data.size > MAX_RECEIVE_BYTES) return null
+        val p = runCatching { Payload.from(NearbyJson.parse(data)) }.getOrNull() ?: return null
+        val header = p.header.validated() ?: return null
+        if (p.records.size > MAX_RECEIVE_RECORDS) return null
+        return p.copy(header = header)
+    }
+
+    /** 送信側が受け取る Ack を読む。 */
+    fun decodeAck(data: ByteArray): Ack? {
+        if (data.size > MAX_ACK_BYTES) return null
+        val ack = runCatching { Ack.from(NearbyJson.parse(data)) }.getOrNull() ?: return null
+        return ack.copy(
+            added = ack.added.coerceIn(0, MAX_RECEIVE_RECORDS),
+            message = ack.message?.let { NearbyLimits.clip(it, NearbyLimits.MAX_MESSAGE_LENGTH) },
+        )
+    }
 }

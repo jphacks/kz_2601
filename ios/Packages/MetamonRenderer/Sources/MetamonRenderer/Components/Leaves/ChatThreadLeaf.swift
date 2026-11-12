@@ -64,6 +64,7 @@ struct ChatThreadLeaf: View {
                                 ComponentTalkMenuItem(component: c, ctx: ctx) // 吹き出しのメニューが先に出るので、ここにも置く(#1323)
                                 ModerationMenuItems(entity: entity.id, record: row)
                             }
+                            .accessibilityActions { ModerationAccessibilityActions(rt: rt, entity: entity.id, record: row) }
                             .id(row.id)
                         }
                     }

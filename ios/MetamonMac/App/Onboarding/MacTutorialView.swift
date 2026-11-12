@@ -41,7 +41,7 @@ struct MacTutorialView: View {
                 }
                 Spacer()
                 Button {
-                    if isLast { onFinish() } else { withAnimation { page += 1 } }
+                    if isLast { onFinish() } else { withMacAnimation { page += 1 } }
                 } label: {
                     Text(isLast ? "はじめる" : "次へ").frame(minWidth: 96)
                 }

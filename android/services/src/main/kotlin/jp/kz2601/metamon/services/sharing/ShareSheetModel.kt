@@ -13,19 +13,40 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 
-/** シェアリンクの形(iOS の `ShareURL`)。アプリで開く `tailorit://import/<token>`、ブラウザは backend の `/s/<token>`。 */
+/**
+ * シェアリンクの形(iOS の `ShareURL`)。受けるのは 2 つ:
+ * - `tailorit://import/<token>`(URL スキーム・QR / 共有ページの「アプリで開く」)
+ * - `https://tailor-it.app/s/<token>`(App Links・#1272。iOS の Universal Links と同じ URL)
+ */
 object ShareLinks {
     const val SCHEME = "tailorit"
     private const val HOST = "import"
+
+    /** App Links のドメイン(assetlinks.json を置くサイト・iOS の `ShareURL.webHost`) */
+    const val WEB_HOST = "tailor-it.app"
     private val TOKEN = Regex("^[A-Za-z0-9_.:-]{1,128}$")
 
-    /** `tailorit://import/<token>` のトークン。それ以外の URL は null。 */
+    /** 末尾の `/`・クエリ・フラグメントは許す。`/s/<token>/<他>` は扱わない(iOS と同じ) */
+    private val WEB = Regex("^https://([^/?#]*)/s/([^/?#]*)/?(?:[?#].*)?$", RegexOption.IGNORE_CASE)
+
+    /** シェアリンクのトークン。それ以外の URL は null。 */
     fun token(url: String): String? {
+        val token = appToken(url) ?: webToken(url) ?: return null
+        // 点だけのものは除く(発行されるトークンは base64url)
+        return token.takeIf { TOKEN.matches(it) && it.any { c -> c != '.' } }
+    }
+
+    private fun appToken(url: String): String? {
         val m = Regex("^([A-Za-z][A-Za-z0-9+.-]*)://([^/?#]*)/([^/?#]*)").find(url) ?: return null
         val (scheme, host, token) = m.destructured
         if (!scheme.equals(SCHEME, ignoreCase = true) || !host.equals(HOST, ignoreCase = true)) return null
-        // 点だけのものは除く(発行されるトークンは base64url)
-        return token.takeIf { TOKEN.matches(it) && it.any { c -> c != '.' } }
+        return token
+    }
+
+    /** host はちょうど [WEB_HOST](ポート・`www.`・userinfo は不可)。`http` は扱わない。 */
+    private fun webToken(url: String): String? {
+        val (host, token) = WEB.find(url)?.destructured ?: return null
+        return token.takeIf { host.equals(WEB_HOST, ignoreCase = true) }
     }
 
     fun appUrl(token: String): String = "$SCHEME://$HOST/$token"

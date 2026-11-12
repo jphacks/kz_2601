@@ -87,6 +87,12 @@ type Meta struct {
 	// returned document (create) or added by the patch (edit).
 	LintRetried bool     `json:"lintRetried,omitempty"`
 	Lint        []string `json:"lint,omitempty"`
+	// RetryReasons: why each rejected attempt was rejected, in order
+	// (retry_reasons of ai.generate). Labels only; never sent to the client.
+	RetryReasons []string `json:"-"`
+	// ValidationCodes: the dsl problem code of every problem of the attempts
+	// rejected by validation (validation_codes of ai.generate, #1772).
+	ValidationCodes []string `json:"-"`
 	// Omissions (#257): requested parts the app does not do and the model did
 	// not mention; the summary got a fixed sentence for each.
 	Omissions []string `json:"omissions,omitempty"`
@@ -278,6 +284,9 @@ func (s *Service) GenerateStream(ctx context.Context, req Request, sink Sink) (*
 	if err == nil {
 		// mode=auto is charged as create; the limiter refunds the rest (#548)
 		ratelimit.ReportMode(ctx, tr.mode)
+		if res != nil && res.Unchanged {
+			ratelimit.ReportUnchanged(ctx) // nothing changed: the charge comes back (daily cap)
+		}
 	}
 	return res, err
 }
@@ -476,6 +485,7 @@ func (s *Service) generateFull(ctx context.Context, transcript, refDSL string, m
 				lastCandidate, lastNeed, lastNeedSeen = raw, need, needSeen
 				problems = v
 				ar.meta.LastProblems = problems
+				ar.meta.RetryReasons = append(ar.meta.RetryReasons, RetryRestriction)
 				continue
 			}
 		}
@@ -541,6 +551,7 @@ func (s *Service) generateFull(ctx context.Context, transcript, refDSL string, m
 				kept := *ar
 				linted = &kept
 				problems = nil
+				ar.meta.RetryReasons = append(ar.meta.RetryReasons, contentRetryReasons(lintRetry, shareProblem != "")...)
 				if lintRetry {
 					ar.meta.LintRetried = true
 					problems = lintProblems(append(append([]string(nil), ar.meta.Lint...), omissionProblems(om)...))
@@ -560,6 +571,7 @@ func (s *Service) generateFull(ctx context.Context, transcript, refDSL string, m
 		lastNeed, lastNeedSeen = need, needSeen
 		problems = problemsOf(perr, resp)
 		ar.meta.LastProblems = problems
+		ar.meta.noteRejected(perr, resp)
 	}
 	if linted != nil {
 		ar.raw, ar.summary, ar.meta.Lint = linted.raw, linted.summary, linted.meta.Lint
@@ -612,6 +624,7 @@ func (s *Service) generateEdit(ctx context.Context, transcript string, env *appc
 				problems = append(problems, "output was truncated (max_tokens); make the patch smaller")
 			}
 			ar.meta.LastProblems = problems
+			ar.meta.noteRejected(uerr, resp)
 			continue
 		}
 		doc.Patch = fillPatchDefaults(doc.Patch, env.DSL)
@@ -623,6 +636,7 @@ func (s *Service) generateEdit(ctx context.Context, transcript string, env *appc
 				lastOps, lastSummary, lastNeed, lastNeedSeen = doc.Patch, doc.Summary, need, needSeen
 				problems = v
 				ar.meta.LastProblems = problems
+				ar.meta.RetryReasons = append(ar.meta.RetryReasons, RetryRestriction)
 				continue
 			}
 		}
@@ -645,6 +659,7 @@ func (s *Service) generateEdit(ctx context.Context, transcript string, env *appc
 				kept := *ar
 				linted = &kept
 				problems = nil
+				ar.meta.RetryReasons = append(ar.meta.RetryReasons, contentRetryReasons(lintRetry, shareProblem != "")...)
 				if lintRetry {
 					ar.meta.LintRetried = true
 					problems = lintProblems(ar.meta.Lint)
@@ -663,6 +678,7 @@ func (s *Service) generateEdit(ctx context.Context, transcript string, env *appc
 		lastOps, lastSummary, lastNeed, lastNeedSeen = doc.Patch, doc.Summary, need, needSeen
 		problems = problemsOf(perr, resp)
 		ar.meta.LastProblems = problems
+		ar.meta.noteRejected(perr, resp)
 	}
 	if linted != nil {
 		ar.raw, ar.ops, ar.summary, ar.meta.Lint = linted.raw, linted.ops, linted.summary, linted.meta.Lint

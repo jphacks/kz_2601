@@ -143,6 +143,23 @@ class NotificationPlannerTest {
     }
 
     @Test
+    fun upcomingIsThisAppOnlyNearestFirstWithinGlobalLimit() {
+        val a1 = PlannedNotification("dsl.a.late", "遅い", "", Trigger.Daily(21, 0))
+        val a2 = PlannedNotification("dsl.a.early", "早い", "本文", Trigger.Daily(11, 0))
+        val act = PlannedNotification("dsl.a.action.btn", "ボタン", "", Trigger.at(at(25, 12, 0)))
+        val past = PlannedNotification("dsl.a.past", "", "", Trigger.at(at(25, 9, 0)))
+        val region = PlannedNotification("dsl.a.place", "", "", Trigger.Region(36.5, 136.6, 200.0, false))
+        val other = PlannedNotification("dsl.b.x", "", "", Trigger.Daily(10, 30))
+        val reg = NotificationRegistry().set("a", listOf(a1, a2, past, region)).upsertAction("a", act).set("b", listOf(other))
+        val up = reg.upcoming("a", now, zone)
+        assertEquals(listOf("dsl.a.early", "dsl.a.action.btn", "dsl.a.late"), up.map { it.first.identifier })
+        assertEquals(listOf(at(25, 11, 0), at(25, 12, 0), at(25, 21, 0)), up.map { it.second })
+        // 全アプリの上限で予約から外れた分は出さない(b の 10:30 と a の 11:00 で 2 件)
+        assertEquals(listOf("dsl.a.early"), reg.upcoming("a", now, zone, limit = 2).map { it.first.identifier })
+        assertTrue(reg.upcoming("zzz", now, zone).isEmpty())
+    }
+
+    @Test
     fun scheduleDiffCancelsDropped() {
         val keep = PlannedNotification("dsl.a.k", "", "", Trigger.Daily(7, 0))
         val d = ScheduleDiff.of(listOf(keep to at(26, 7, 0)), setOf("dsl.a.k", "dsl.a.gone"))

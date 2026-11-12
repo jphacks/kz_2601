@@ -25,6 +25,7 @@ class AccountFailureTextTest {
         return when (ui) {
             is UiText.Raw -> ui.text
             is UiText.Res -> texts.getValue(R.string::class.java.fields.first { it.getInt(null) == ui.id }.name)
+            is UiText.Plural -> error("数で形が変わる文は使わない")
         }
     }
 
