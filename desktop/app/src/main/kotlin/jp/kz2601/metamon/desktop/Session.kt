@@ -12,6 +12,9 @@ import jp.kz2601.metamon.dsl.AppDSL
 import jp.kz2601.metamon.dsl.Component
 import jp.kz2601.metamon.dsl.ComponentType
 import jp.kz2601.metamon.dsl.Screen
+import jp.kz2601.metamon.dsl.logic.CsvReader
+import jp.kz2601.metamon.dsl.logic.ImportRowFailure
+import jp.kz2601.metamon.desktop.io.RecordIo
 import jp.kz2601.metamon.dsl.records.Aggregator
 import jp.kz2601.metamon.dsl.records.Entity
 import jp.kz2601.metamon.dsl.records.FieldCoding
@@ -437,10 +440,67 @@ class DesktopSession(
                 val key = (search["field"] as? JsonPrimitive)?.contentOrNull ?: return false
                 queries(route)[key] = (search["text"] as? JsonPrimitive)?.contentOrNull.orEmpty()
             }
+            op.containsKey("importCsv") -> {
+                // ファイル選択と確認ダイアログは含めない: CSV の中身を直に渡し、列の当て方と足す記録だけを比べる(Android の適合テストと同じ)
+                val imp = op["importCsv"] as? JsonObject ?: return false
+                val id = (imp["component"] as? JsonPrimitive)?.contentOrNull
+                val c = screen?.allComponents()?.firstOrNull { if (id == null) it.type.wire == "fileImport" else it.id == id } ?: return false
+                if (c.type.wire != "fileImport") return false
+                val entity = entityModel(c.entity) ?: return false
+                if (state(c, form) != "rendered") return false
+                importCsv(csvText(imp["text"]), c, entity)
+            }
             op.containsKey("back") -> back(route)
             else -> return false
         }
         return true
+    }
+
+    /** `importCsv.text`: 1 つの文字列、または 1 行 1 要素の配列(読みやすさのため)。 */
+    private fun csvText(v: JsonElement?): String = when (v) {
+        is JsonArray -> v.mapNotNull { (it as? JsonPrimitive)?.contentOrNull }.joinToString("\n") + "\n"
+        is JsonPrimitive -> v.contentOrNull.orEmpty()
+        else -> ""
+    }
+
+    /** fileImport の CSV の取り込み(画面の [jp.kz2601.metamon.desktop.io.DesktopIo] の計画 → 確認で足す、を確認なしで)。 */
+    private fun importCsv(text: String, c: Component, entity: Entity) {
+        val plan = RecordIo.plan(CsvReader.parse(text), entity, c.map.orEmpty(), store, models)
+        effects += obj(
+            "imported" to obj(
+                "entity" to JsonPrimitive(entity.id),
+                "matched" to JsonArray(plan.matched.map { obj("column" to JsonPrimitive(it.first), "field" to JsonPrimitive(it.second)) }),
+                "unused" to JsonArray(plan.unused.map(::JsonPrimitive)),
+                "failures" to JsonArray(
+                    plan.failures.map {
+                        obj(
+                            "line" to JsonPrimitive(it.line),
+                            "field" to JsonPrimitive(it.fieldName),
+                            "kind" to JsonPrimitive(importKind(it.kind)),
+                            "cell" to JsonPrimitive(it.cell),
+                        )
+                    },
+                ),
+                "overLimit" to JsonPrimitive(plan.overLimit),
+            ),
+        )
+        for (data in plan.rows) {
+            val id = persistence?.newRecordId() ?: "new-${store.nextId}"
+            store = store.save(entity.id, null, data.mapNotNull { (k, v) -> RecordIo.toStore(v)?.let { k to it } }.toMap(), newId = id)
+            effects += obj(
+                "saved" to obj(
+                    "entity" to JsonPrimitive(entity.id),
+                    "recordId" to JsonPrimitive(id),
+                    "data" to JsonObject(data.mapValues { it.value.toJsonElement() }),
+                ),
+            )
+        }
+    }
+
+    private fun importKind(kind: ImportRowFailure.Kind): String = when (kind) {
+        ImportRowFailure.Kind.INVALID -> "invalid"
+        ImportRowFailure.Kind.REQUIRED -> "required"
+        ImportRowFailure.Kind.TOO_LONG -> "tooLong"
     }
 
     companion object {

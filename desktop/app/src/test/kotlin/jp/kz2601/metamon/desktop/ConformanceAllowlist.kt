@@ -39,6 +39,7 @@ object ConformanceAllowlist {
         "datePicker" to echo("field"),
         "disclosure" to echo("expanded", "title"),
         "drawingField" to echo("field"),
+        "fileImport" to echo("entity", "label"),
         "emptyState" to echo("message", "title"),
         "flashcards" to echo("entity"),
         "grid" to echo("columns"),
