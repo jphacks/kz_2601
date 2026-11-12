@@ -4,9 +4,11 @@ import MetamonDSL
 import Translation
 #endif
 
-/// 記録の文字の長押しの「翻訳」(#2000)。OS の翻訳のシート(`.translationPresentation`・iOS 18+)を出すだけで、記録は変えない。
-/// 出す: 文字の field(string / text)の値を含む文字。出さない: iOS 17・Mac・空・秘密の field(`encrypted`・`FieldCipher`)を含む文字。
-/// 審査用の版(APP_STORE_REVIEW)でも出す: OS の機能だけで、外への通信も新しい画面の決まりも無い。
+/// 記録の文字の長押しの「翻訳」(#2000)。OS の翻訳のシート(`.translationPresentation`・iOS 18+)に文字を渡すだけで、記録は変えない。
+/// 訳す処理(端末内か外か)は OS 側の翻訳の機能と設定による。
+/// 出す: 文字の field(string / text)の値を含む文字。
+/// 出さない: iOS 17・Mac・空・秘密の field(`encrypted`・`FieldCipher`)を含む文字・計算の field(`computed`)を含む文字。
+/// 計算の field は式が秘密の field を参照しうる(他の entity・設定値経由も)ので、依存を辿らずまとめて出さない。
 enum RecordTranslation {
     /// OS の翻訳のシートが使えるか(iOS 18+ のみ)
     static var osSupports: Bool {
@@ -16,22 +18,13 @@ enum RecordTranslation {
         return false
     }
 
-    static var isReviewBuild: Bool {
-        #if APP_STORE_REVIEW
-        true
-        #else
-        false
-        #endif
-    }
-
     /// 訳す意味のある field: 文字(string / text)
     static func isText(_ field: Field) -> Bool { field.type == .string || field.type == .text }
 
     /// 「翻訳」を出すか。`fields` は `text` を作った field。
-    static func offers(text: String, fields: [Field], osSupports: Bool = osSupports, reviewBuild: Bool = isReviewBuild) -> Bool {
-        _ = reviewBuild // 審査用の版でも出す(上の説明)
+    static func offers(text: String, fields: [Field], osSupports: Bool = osSupports) -> Bool {
         guard osSupports, !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return false }
-        if fields.contains(where: \.encrypted) { return false }
+        if fields.contains(where: { $0.encrypted || $0.isComputed }) { return false }
         return fields.contains(where: isText)
     }
 
