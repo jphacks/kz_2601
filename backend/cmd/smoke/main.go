@@ -561,8 +561,13 @@ func trunc(s string, n int) string {
 	if len(s) <= n {
 		return s
 	}
-	for n > 0 && !utf8.RuneStart(s[n]) { // do not split a multi-byte rune
-		n--
+	cut := n
+	// do not split a multi-byte rune: a rune start is at most UTFMax-1 bytes back
+	for i := 0; i < utf8.UTFMax-1 && cut > 0 && !utf8.RuneStart(s[cut]); i++ {
+		cut--
 	}
-	return s[:n] + "…"
+	if !utf8.RuneStart(s[cut]) { // not UTF-8 here (a run of continuation bytes)
+		return strings.ToValidUTF8(s[:n], "") + "…"
+	}
+	return s[:cut] + "…"
 }
