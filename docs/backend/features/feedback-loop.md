@@ -197,7 +197,9 @@ LOOP_TRIAGE=on LOOP_ANTHROPIC_API_KEY=... \
 - `impact` を残す前に振り分けた項目は、その項目の優先度から影響を戻す(P1 → `high`・P2 → `medium`・P3 → `low`)
 - 件数は束の報告の数(クラッシュの急増は 1 件の中の件数を足す)
 
-週 1 回、人が回す(定期の実行は後で):
+## 運用の手順
+
+定期の実行を有効にするまでは週 1 回、人が回す(有効にした後も `drafts` の承認・`switch`・`audit` は人が回す):
 
 ```sh
 cd backend
