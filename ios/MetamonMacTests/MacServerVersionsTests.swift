@@ -13,6 +13,10 @@ final class MacServerVersionsTests: XCTestCase {
         var latest = 0
         var reachable = true
         var restored: [Int] = []
+        /// restore の途中に一度だけ走らせる(待つ間に新しい版が当たる競合を作る)
+        var duringRestore: (@Sendable () async -> Void)?
+
+        func setDuringRestore(_ hook: (@Sendable () async -> Void)?) { duringRestore = hook }
 
         func push(_ doc: AppDocument, restoredFrom: Int? = nil) {
             let parent = latest > 0 ? latest : nil
@@ -36,7 +40,12 @@ final class MacServerVersionsTests: XCTestCase {
         }
 
         func restore(appId: String, toVersion version: Int) async throws -> AppDocument {
-            guard reachable, var doc = docs[version] else { throw URLError(.notConnectedToInternet) }
+            guard reachable else { throw URLError(.notConnectedToInternet) }
+            if let hook = duringRestore {
+                duringRestore = nil
+                await hook()
+            }
+            guard var doc = docs[version] else { throw URLError(.notConnectedToInternet) }
             restored.append(version)
             doc.version = latest + 1
             push(doc, restoredFrom: version)
@@ -152,6 +161,64 @@ final class MacServerVersionsTests: XCTestCase {
         await server.push(next)
         library.apply(next, created: false, onServer: true)
         XCTAssertFalse(library.canRedo(appId))
+    }
+
+    /// 戻す restore を待つ間に AI の結果が当たったら、戻した古い版で上書きしない
+    func testUndoDoesNotOverwriteVersionAppliedDuringRestore() async throws {
+        let (library, server) = try await setUpServerApp(["A", "B", "C", "D"])
+        let e = try document("E", version: 5)
+        await server.setDuringRestore {
+            await server.push(e)
+            await MainActor.run { library.apply(e, created: false, onServer: true) }
+        }
+        let step = await library.undo(appId)
+        XCTAssertEqual(step, .failed)
+        XCTAssertEqual(library.generated[appId]?.dsl.app.name, "E")
+        XCTAssertEqual(library.generated[appId]?.version, 5)
+        XCTAssertFalse(library.canRedo(appId), "新しい版が当たったので「やり直す」は無い")
+    }
+
+    /// やり直す restore を待つ間に AI の結果が当たったら、古い「やり直す」を戻さない
+    func testRedoDoesNotOverwriteVersionAppliedDuringRestore() async throws {
+        let (library, server) = try await setUpServerApp(["A", "B", "C", "D"])
+        _ = await library.undo(appId)
+        XCTAssertEqual(library.generated[appId]?.dsl.app.name, "C")
+        let latest = await server.latest
+        let e = try document("E", version: latest + 1)
+        await server.setDuringRestore {
+            await server.push(e)
+            await MainActor.run { library.apply(e, created: false, onServer: true) }
+        }
+        let step = await library.redo(appId)
+        XCTAssertEqual(step, .failed)
+        XCTAssertEqual(library.generated[appId]?.dsl.app.name, "E")
+        XCTAssertFalse(library.canRedo(appId))
+    }
+
+    /// 競合(409)で取り直したら「やり直す」は消える(iOS は当てると redoStack を消す)
+    func testConflictRefreshDropsServerRedo() async throws {
+        let (library, server) = try await setUpServerApp(["A", "B", "C", "D"])
+        _ = await library.undo(appId)
+        _ = await library.undo(appId)
+        XCTAssertTrue(library.canRedo(appId))
+        let latest = await server.latest
+        await server.push(try document("別の端末で直した", version: latest + 1))
+        let version = await library.refreshFromServer(appId)
+        XCTAssertEqual(version, latest + 1)
+        XCTAssertFalse(library.canRedo(appId))
+    }
+
+    /// サーバーで 2 回戻した後に届かなくなっても、端末の履歴で先(C)へ飛ばない
+    func testOfflineUndoAfterServerUndosDoesNotJumpForward() async throws {
+        let (library, server) = try await setUpServerApp(["A", "B", "C", "D"])
+        _ = await library.undo(appId)
+        _ = await library.undo(appId)
+        XCTAssertEqual(library.generated[appId]?.dsl.app.name, "B")
+        await server.setReachable(false)
+        let step = await library.undo(appId)
+        let name = library.generated[appId]?.dsl.app.name
+        XCTAssertTrue(step == .nothing || name == "A", "got \(step) \(name ?? "nil")")
+        XCTAssertNotEqual(name, "C")
     }
 
     /// 端末の履歴で戻す時も、続けて戻した分を順にやり直せる(#1883)

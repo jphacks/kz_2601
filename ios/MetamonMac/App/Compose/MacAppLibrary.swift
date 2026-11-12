@@ -156,6 +156,7 @@ final class MacAppLibrary {
         if usesServerVersions(appId), let server {
             restoring.insert(appId)
             defer { restoring.remove(appId) }
+            let start = generated[appId]?.version
             do {
                 let versions = try await server.listVersions(appId: appId)
                 guard let latest = versions.map(\.version).max() else { throw APIError.server(status: 404, code: "not_found", message: "no versions") }
@@ -163,10 +164,12 @@ final class MacAppLibrary {
                 let byVersion = Dictionary(versions.map { ($0.version, $0) }, uniquingKeysWith: { a, _ in a })
                 let shown = UndoWalk.origin(of: before, in: byVersion)
                 guard let target = UndoWalk.undoTarget(current: before, versions: versions) else { return .nothing }
-                let stack = serverRedo[appId] ?? []
                 let document = try await server.restore(appId: appId, toVersion: target)
+                // 待つ間に新しい版(AI の結果など)が当たったら、古い版で上書きしない
+                guard generated[appId]?.version == start else { return .failed }
                 applyFromServer(document)
-                serverRedo[appId] = stack + [shown]
+                serverRedo[appId, default: []].append(shown)
+                histories[appId]?.reset() // 端末の履歴はサーバーの歩みとずれるので捨てる(届かない時に先へ飛ばない)
                 return .moved
             } catch {
                 print("[Metamon] Mac: undo via server failed, falling back to local history: \(error)")
@@ -182,13 +185,16 @@ final class MacAppLibrary {
     /// 「やり直す」: サーバーで戻したなら戻す前の版を restore、端末の履歴で戻したなら当て直す(続けて戻した分は 1 つずつ前へ進む)
     func redo(_ appId: String) async -> VersionStep {
         guard !restoring.contains(appId) else { return .failed }
-        if let stack = serverRedo[appId], let version = stack.last, let server {
+        if let version = serverRedo[appId]?.last, let server {
             restoring.insert(appId)
             defer { restoring.remove(appId) }
+            let start = generated[appId]?.version
             do {
                 let document = try await server.restore(appId: appId, toVersion: version)
+                guard generated[appId]?.version == start, serverRedo[appId]?.last == version else { return .failed }
                 applyFromServer(document)
-                serverRedo[appId] = Array(stack.dropLast()) // 続けて戻していたら、残りもやり直せる
+                serverRedo[appId]?.removeLast() // 続けて戻していたら、残りもやり直せる
+                histories[appId]?.reset()
                 return .moved
             } catch {
                 print("[Metamon] Mac: redo failed: \(error)")
@@ -205,6 +211,7 @@ final class MacAppLibrary {
     /// 当てた版を返す(取り直せなければ nil)
     func refreshFromServer(_ appId: String) async -> Int? {
         guard usesServerVersions(appId), let server, let latest = try? await server.fetchDocument(appId: appId) else { return nil }
+        serverRedo[appId] = nil // 新しい版を当てたのと同じ(iOS も当てると redoStack を消す)
         if latest.version != generated[appId]?.version { applyFromServer(latest) }
         return latest.version
     }
