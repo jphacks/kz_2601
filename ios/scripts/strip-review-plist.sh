@@ -9,10 +9,11 @@ PB=/usr/libexec/PlistBuddy
 
 # HealthKit / 位置の常時・背面 / 近くの端末(ローカルネットワーク・Bonjour・UWB の距離 #425)/ モーション(healthStat の歩数計・sensorValue の気圧計)/ 共有リンクの URL スキーム
 # / 止めるまで鳴るアラーム(AlarmKit。この版ではアラームの通知も普通の通知で届ける)
+# / 端末のカレンダー・リマインダーを読む(#1987。使う部品がまだ無い。説明文が無いと LiveDeviceCalendar は許可を求めず restricted を返す)
 for key in NSHealthShareUsageDescription NSHealthUpdateUsageDescription NSHealthClinicalHealthRecordsShareUsageDescription \
            NSLocationAlwaysUsageDescription NSLocationAlwaysAndWhenInUseUsageDescription \
            NSLocalNetworkUsageDescription NSBonjourServices NSNearbyInteractionUsageDescription NSMotionUsageDescription CFBundleURLTypes \
-           NSAlarmKitUsageDescription; do
+           NSAlarmKitUsageDescription NSCalendarsFullAccessUsageDescription NSRemindersFullAccessUsageDescription; do
   "$PB" -c "Delete :$key" "$PLIST" 2>/dev/null || true
 done
 
