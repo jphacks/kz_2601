@@ -6,6 +6,7 @@ import MetamonDSL
 final class FaultInjectionTests: XCTestCase {
     private var savedSession: URLSession!
     private var savedSleep: (@Sendable (TimeInterval) async -> Void)!
+    private var savedReal: URLSession!
     private let base = URL(string: "https://ai.example.test/")!
 
     private struct Token: TokenProvider {
@@ -22,6 +23,8 @@ final class FaultInjectionTests: XCTestCase {
         // 作り物 → 一致しなければスタブ(= 本物のサーバーの代わり)
         HTTP.session = HTTP.makeSession(protocolClasses: [FaultURLProtocol.self, StubURLProtocol.self])
         HTTP.sleep = { _ in }
+        savedReal = FaultURLProtocol.real
+        FaultURLProtocol.real = FaultURLProtocol.makePassThroughSession(protocolClasses: [StubURLProtocol.self])
     }
 
     override func tearDown() {
@@ -30,6 +33,7 @@ final class FaultInjectionTests: XCTestCase {
         FaultInjection.now = { Date() }
         HTTP.session = savedSession
         HTTP.sleep = savedSleep
+        FaultURLProtocol.real = savedReal
         super.tearDown()
     }
 
@@ -161,5 +165,35 @@ final class FaultInjectionTests: XCTestCase {
         XCTAssertEqual(info.scope, .global)
         let cut = FaultOutcome.events(frames: [FaultOutcome.frame(event: "app", data: "{\"name\":\"x\"}")], cut: true)
         XCTAssertNil(cut.expectedError, "切れたら通常の呼び方に戻る(エラーにしない)")
+    }
+
+    // MARK: 通す(passThrough)
+
+    private struct Body: Encodable { var prompt: String }
+
+    /// スタブが受けた本文(URLProtocol の中では `httpBodyStream` で来る)
+    private func receivedBody(_ request: URLRequest) -> Data? {
+        if let body = request.httpBody { return body }
+        return FaultURLProtocol.withBodyData(request).httpBody
+    }
+
+    func testPassThroughDeliversPostBody() async throws {
+        StubURLProtocol.reset([.init(status: 200, body: "{\"ok\":true}")])
+        FaultInjection.add(FaultRule(label: "x", match: FaultMatch(path: "v1/generate"), outcome: .passThrough, delay: 0.01))
+        let data = try await HTTP.send("POST", baseURL: base, path: "v1/generate", body: Body(prompt: "家計簿"), token: Token())
+        XCTAssertEqual(String(decoding: data, as: UTF8.self), "{\"ok\":true}")
+        let sent = try XCTUnwrap(StubURLProtocol.lock.withLock { StubURLProtocol.requests.first })
+        let body = try XCTUnwrap(receivedBody(sent))
+        let obj = try XCTUnwrap(JSONSerialization.jsonObject(with: body) as? [String: Any])
+        XCTAssertEqual(obj["prompt"] as? String, "家計簿", "POST の本文が本物のサーバーまで届く")
+        XCTAssertEqual(sent.httpMethod, "POST")
+    }
+
+    func testWithBodyDataReadsStream() {
+        var r = req("v1/generate")
+        r.httpBodyStream = InputStream(data: Data("abc".utf8))
+        let copy = FaultURLProtocol.withBodyData(r)
+        XCTAssertEqual(copy.httpBody, Data("abc".utf8))
+        XCTAssertNil(copy.httpBodyStream)
     }
 }

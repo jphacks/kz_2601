@@ -235,8 +235,8 @@ public enum FaultInjection {
 
 /// 決まりに一致した通信だけ受ける URLProtocol(`HTTP.session` に決まりがある間だけ入る)
 final class FaultURLProtocol: URLProtocol, @unchecked Sendable {
-    /// 本物へ通す時のセッション(この URLProtocol は入らない)
-    private static let real = HTTP.makeSession()
+    /// 本物へ通す時のセッション(この URLProtocol は入らない)。テストはスタブ入りに差し替える
+    nonisolated(unsafe) static var real = makePassThroughSession()
     private let lock = NSLock()
     private var stopped = false
     private var inner: URLSessionDataTask?
@@ -297,18 +297,87 @@ final class FaultURLProtocol: URLProtocol, @unchecked Sendable {
         client?.urlProtocol(self, didReceive: response, cacheStoragePolicy: .notAllowed)
     }
 
-    private func passThrough() {
-        let task = Self.real.dataTask(with: request) { [weak self] data, response, error in
-            guard let self, !self.isStopped else { return }
-            if let error {
-                self.client?.urlProtocol(self, didFailWithError: error)
-                return
-            }
-            if let response { self.client?.urlProtocol(self, didReceive: response, cacheStoragePolicy: .notAllowed) }
-            if let data { self.client?.urlProtocol(self, didLoad: data) }
-            self.client?.urlProtocolDidFinishLoading(self)
+    /// 受けた分を順に `client` へ流す(SSE が届いた分ずつ画面に出る)
+    static func makePassThroughSession(protocolClasses: [AnyClass]? = nil) -> URLSession {
+        let config = URLSessionConfiguration.ephemeral
+        config.urlCache = nil
+        config.requestCachePolicy = .reloadIgnoringLocalAndRemoteCacheData
+        config.waitsForConnectivity = false
+        if let protocolClasses { config.protocolClasses = protocolClasses }
+        return URLSession(configuration: config, delegate: PassThroughRelay.shared, delegateQueue: nil)
+    }
+
+    /// URLProtocol の中では body が `httpBodyStream` で来るので、読んで `httpBody` に入れ直す
+    static func withBodyData(_ request: URLRequest) -> URLRequest {
+        guard request.httpBody == nil, let stream = request.httpBodyStream else { return request }
+        var copy = request
+        var body = Data()
+        var buffer = [UInt8](repeating: 0, count: 16 * 1024)
+        stream.open()
+        defer { stream.close() }
+        while true {
+            let n = stream.read(&buffer, maxLength: buffer.count)
+            guard n > 0 else { break }
+            body.append(buffer, count: n)
         }
+        copy.httpBodyStream = nil
+        copy.httpBody = body
+        return copy
+    }
+
+    private func passThrough() {
+        let task = Self.real.dataTask(with: Self.withBodyData(request))
+        PassThroughRelay.shared.register(task, for: self)
         lock.withLock { inner = task }
         task.resume()
+    }
+
+    // 本物から受けた分(PassThroughRelay から呼ぶ)
+    fileprivate func relay(response: URLResponse) {
+        guard !isStopped else { return }
+        client?.urlProtocol(self, didReceive: response, cacheStoragePolicy: .notAllowed)
+    }
+
+    fileprivate func relay(data: Data) {
+        guard !isStopped else { return }
+        client?.urlProtocol(self, didLoad: data)
+    }
+
+    fileprivate func relayFinish(error: Error?) {
+        guard !isStopped else { return }
+        if let error {
+            client?.urlProtocol(self, didFailWithError: error)
+        } else {
+            client?.urlProtocolDidFinishLoading(self)
+        }
+    }
+}
+
+/// 本物へ通した task の delegate。task ごとに元の FaultURLProtocol へ流す
+private final class PassThroughRelay: NSObject, URLSessionDataDelegate, @unchecked Sendable {
+    static let shared = PassThroughRelay()
+    private let lock = NSLock()
+    private var owners: [ObjectIdentifier: FaultURLProtocol] = [:]
+
+    func register(_ task: URLSessionTask, for owner: FaultURLProtocol) {
+        lock.withLock { owners[ObjectIdentifier(task)] = owner }
+    }
+
+    private func owner(_ task: URLSessionTask, remove: Bool = false) -> FaultURLProtocol? {
+        lock.withLock { remove ? owners.removeValue(forKey: ObjectIdentifier(task)) : owners[ObjectIdentifier(task)] }
+    }
+
+    func urlSession(_ session: URLSession, dataTask: URLSessionDataTask, didReceive response: URLResponse,
+                    completionHandler: @escaping (URLSession.ResponseDisposition) -> Void) {
+        owner(dataTask)?.relay(response: response)
+        completionHandler(.allow)
+    }
+
+    func urlSession(_ session: URLSession, dataTask: URLSessionDataTask, didReceive data: Data) {
+        owner(dataTask)?.relay(data: data)
+    }
+
+    func urlSession(_ session: URLSession, task: URLSessionTask, didCompleteWithError error: Error?) {
+        owner(task, remove: true)?.relayFinish(error: error)
     }
 }
