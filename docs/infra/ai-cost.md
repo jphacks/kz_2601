@@ -35,6 +35,7 @@ scripts/ai-cost.sh prod --dry-run          # フィルタだけ出す(Logs Explo
 | 1 日の合計 | 見る日(既定は昨日・日本時間)の合計・呼び出し数・未ログインの分・料金表にない呼び出し・ユーザー数・**1 人あたりの中央値と上位 1%(p99)**・最大 |
 | 上位のユーザー | `uid_hash` ごとの費用の上位(既定 10 人、`TOP=20` で変更)。上位 1% に入る人に印 |
 | 処理ごと | `operation`(generate / patch / chat …)ごとの呼び出しと費用 |
+| OS ごと | `clientPlatform`(#2132 の語彙 ios / android / macos / windows / linux / other)ごとの呼び出し・ユーザー数・費用。値の無い行は `unknown` |
 | 日ごと | 期間の日ごとの費用・呼び出し・ユーザー数 |
 | 期間の 1 人あたりの費用 | 期間の合計を 1 人ずつ出した p50 / p90 / p99 / 最大 |
 | 1 生成ごとの費用 | `ai.generate` の `est_cost_usd`(mode ごとの平均・p50・p95) |
