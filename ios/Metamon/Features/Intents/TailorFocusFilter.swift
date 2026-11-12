@@ -1,35 +1,12 @@
 import AppIntents
 import Foundation
 import MetamonServices
+import WidgetKit
 
 // MARK: - 集中モードのフィルタ(#1991)
 
-/// 集中モードのフィルタで選んだ内容。App Group の UserDefaults に JSON で置く(サーバーには送らない)。
-struct FocusFilterState: Codable, Equatable {
-    /// 一覧に出す生成アプリ。空 = 絞らない
-    var appIds: [String]
-    /// 通知を止めるか(絞り込みは別 Issue。ここでは保存だけ)
-    var silencesNotifications: Bool
-
-    static let storageKey = "metamon.focusFilter"
-
-    /// 何も選んでいない = フィルタを置かないのと同じ
-    var isEmpty: Bool { appIds.isEmpty && !silencesNotifications }
-
-    static func load(from defaults: UserDefaults?) -> FocusFilterState? {
-        guard let data = defaults?.data(forKey: storageKey) else { return nil }
-        return try? JSONDecoder().decode(FocusFilterState.self, from: data)
-    }
-
-    /// 空なら消す(集中モードが切れた時もここに来る)。
-    static func apply(_ state: FocusFilterState?, to defaults: UserDefaults?) {
-        guard let state, !state.isEmpty, let data = try? JSONEncoder().encode(state) else {
-            defaults?.removeObject(forKey: storageKey)
-            return
-        }
-        defaults?.set(data, forKey: storageKey)
-    }
-
+/// 型と保存・出すかの判定は MetamonWidget/Shared/FocusFilterState.swift(ウィジェットも読む・#1992)。
+extension FocusFilterState {
     /// 選んだアプリだけを元の並びのまま残す。選んだアプリが 1 つも無い(消した等)時は絞らない(空の一覧にしない)。
     func filter(_ apps: [AppSummary]) -> [AppSummary] {
         guard !appIds.isEmpty else { return apps }
@@ -66,8 +43,14 @@ struct TailorFocusFilter: SetFocusFilterIntent {
 
     var state: FocusFilterState { FocusFilterState(appIds: apps.map(\.id), silencesNotifications: silencesNotifications) }
 
+    /// 「通知を止める」の間、選んでいない生成アプリの通知を OS が出さない(通知の `filterCriteria` = 生成アプリの id・#1992)。
+    var appContext: FocusFilterAppContext {
+        FocusFilterAppContext(notificationFilterPredicate: state.notificationFilterPredicate)
+    }
+
     func perform() async throws -> some IntentResult {
         FocusFilterState.apply(state, to: WidgetSnapshot.defaults)
+        WidgetCenter.shared.reloadAllTimelines() // 選んでいないアプリの数字を「集中モード中」に替える・切れたら戻す(#1992)
         return .result()
     }
 }
