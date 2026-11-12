@@ -3,6 +3,7 @@ package jp.kz2601.metamon.desktop
 import androidx.compose.ui.input.key.Key
 import jp.kz2601.metamon.desktop.io.DragOut
 import jp.kz2601.metamon.desktop.io.ImageSource
+import jp.kz2601.metamon.desktop.io.UserDirs
 import jp.kz2601.metamon.dsl.expr.Expr
 import jp.kz2601.metamon.dsl.records.Field
 import jp.kz2601.metamon.dsl.records.FieldType
@@ -305,7 +306,7 @@ class PhotoPreviewTest {
 
     @Test
     fun localImageFilesAreReadWithinTheCap() {
-        val dir = Files.createTempDirectory("preview-cap").toFile()
+        val dir = Files.createTempDirectory(UserDirs.photos.toPath(), "preview-cap").toFile()
         try {
             val f = File(dir, "p.png").apply { writeBytes(png1x1) }
             val uri = f.toURI().toString()

@@ -266,7 +266,7 @@ class RobustnessTest {
         assertNull(ImageSource.readFile(exact, 999))
         // 写真の値(file URI)も同じ上限
         val bigImage = sparse("big.png", ImageSource.MAX_BYTES + 1L)
-        assertNull(ImageSource.bytes(bigImage.toURI().toString(), allowFile = true))
+        assertNull(ImageSource.bytes(bigImage.toURI().toString(), allowFile = true, photoDir = bigImage.parentFile))
     }
 
     @Test
