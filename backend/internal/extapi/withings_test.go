@@ -207,8 +207,9 @@ func TestWithingsFlow(t *testing.T) {
 	if len(rows) != len(want) || rows[0] != want[0] || rows[1] != want[1] {
 		t.Fatalf("rows %+v", rows)
 	}
-	if c := res.Output.Cells; len(c) != 2 || c[1][0] != "2026-11-08T21:00:00+09:00" || c[1][1] != "65.75" || c[1][2] != "21.3" || c[0][2] != "" {
-		t.Fatalf("cells %v", c)
+	// display only: no Cells for the scheduled import (#1712)
+	if res.Output.Cells != nil {
+		t.Fatalf("cells %v", res.Output.Cells)
 	}
 	if f.lastForm.Get("meastypes") != "1,6" || f.lastForm.Get("enddate") != strconv.FormatInt(withingsTestNow.Unix(), 10) ||
 		f.lastForm.Get("startdate") != strconv.FormatInt(withingsTestNow.AddDate(0, 0, -30).Unix(), 10) {
@@ -227,8 +228,8 @@ func TestWithingsFlow(t *testing.T) {
 		rows[1] != (Row{Title: "2026/11/10 21:01", Subtitle: "脈拍 65", Value: "128/82 mmHg"}) {
 		t.Fatalf("bp rows %+v", rows)
 	}
-	if c := res.Output.Cells; len(c) != 2 || strings.Join(c[1], ",") != "2026-11-10T21:01:00+09:00,128,82,65" {
-		t.Fatalf("bp cells %v", c)
+	if res.Output.Cells != nil {
+		t.Fatalf("bp cells %v", res.Output.Cells)
 	}
 	if f.lastForm.Get("meastypes") != "9,10,11" {
 		t.Fatalf("form %v", f.lastForm)

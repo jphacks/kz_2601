@@ -23,7 +23,9 @@ import (
 // days 1-90 (default 30) is how far back; limit 1-50 (default 20). Only real
 // measures (category 1) are read; a measure the scale could not tell apart
 // from another family member's (attrib 1) is left out. Health data: never
-// cached (an OAuth provider never is) and never logged.
+// cached (an OAuth provider never is) and never logged. Rows are for display
+// only: Output.Cells is left nil so the scheduled import (#1712) cannot write
+// health values into records until the owner decides how they are handled.
 //
 // Withings answers HTTP 200 with its own status in the body (0 = ok). It
 // does not take PKCE (the client secret stays on the runner). Revoking needs
@@ -344,45 +346,42 @@ func (c *withings) measures(ctx context.Context, in Input, types []int, need int
 	return groups, limit, nil
 }
 
-func withingsWhen(unix int64) (title, cell string) {
-	t := time.Unix(unix, 0).In(withingsJST)
-	return t.Format("2006/1/2 15:04"), t.Format(time.RFC3339)
+func withingsWhen(unix int64) string {
+	return time.Unix(unix, 0).In(withingsJST).Format("2006/1/2 15:04")
 }
 
 // weight: title = when (JST), value = "65.75 kg", subtitle = body fat when
-// the scale measured it. Cells: when (RFC 3339), kg, fat %.
+// the scale measured it. Display only (no Cells).
 func (c *withings) weight(ctx context.Context, in Input) (Output, error) {
 	groups, limit, err := c.measures(ctx, in, []int{withingsTypeWeight, withingsTypeFatRatio}, withingsTypeWeight)
 	if err != nil {
 		return Output{}, err
 	}
-	out := Output{Rows: []Row{}, Cells: [][]string{}}
+	out := Output{Rows: []Row{}}
 	for _, g := range groups {
 		if len(out.Rows) == limit {
 			break
 		}
 		kg, _ := g.value(withingsTypeWeight)
-		title, when := withingsWhen(g.Date)
-		r := Row{Title: title, Value: kg + " kg"}
+		r := Row{Title: withingsWhen(g.Date), Value: kg + " kg"}
 		fat, ok := g.value(withingsTypeFatRatio)
 		if ok {
 			r.Subtitle = "体脂肪率 " + fat + "%"
 		}
 		out.Rows = append(out.Rows, r)
-		out.Cells = append(out.Cells, []string{when, kg, fat})
 	}
 	return out, nil
 }
 
 // bloodPressure: title = when (JST), value = "128/82 mmHg", subtitle =
-// pulse when measured. A reading without both numbers is left out. Cells:
-// when (RFC 3339), systolic, diastolic, pulse.
+// pulse when measured. A reading without both numbers is left out. Display
+// only (no Cells).
 func (c *withings) bloodPressure(ctx context.Context, in Input) (Output, error) {
 	groups, limit, err := c.measures(ctx, in, []int{withingsTypeDiastolic, withingsTypeSystolic, withingsTypePulse}, withingsTypeSystolic)
 	if err != nil {
 		return Output{}, err
 	}
-	out := Output{Rows: []Row{}, Cells: [][]string{}}
+	out := Output{Rows: []Row{}}
 	for _, g := range groups {
 		if len(out.Rows) == limit {
 			break
@@ -392,14 +391,12 @@ func (c *withings) bloodPressure(ctx context.Context, in Input) (Output, error) 
 		if !ok {
 			continue
 		}
-		title, when := withingsWhen(g.Date)
-		r := Row{Title: title, Value: sys + "/" + dia + " mmHg"}
+		r := Row{Title: withingsWhen(g.Date), Value: sys + "/" + dia + " mmHg"}
 		pulse, ok := g.value(withingsTypePulse)
 		if ok {
 			r.Subtitle = "脈拍 " + pulse
 		}
 		out.Rows = append(out.Rows, r)
-		out.Cells = append(out.Cells, []string{when, sys, dia, pulse})
 	}
 	return out, nil
 }
