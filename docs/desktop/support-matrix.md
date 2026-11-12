@@ -26,7 +26,7 @@ DSL の全部の type(Container 7・Leaf 70 = 77。`docs/dsl/dsl.schema.json` �
 | type | 状態 | 適合 state | 理由・代わりの形 | Mac | 関係する Issue |
 |---|---|---|---|---|---|
 | card | 描ける | rendered | カードの枠に子を並べる(子に area があれば枠の中も 6 列のグリッド) | 描ける | #1741 |
-| carousel | 代わり | rendered | 横に送らず、子を縦に並べる | 描ける | #1741 |
+| carousel | 描ける | rendered | 1 枚ずつ見せ、‹ ›・← →・ページの点で送る(端で止まる・動きは付けない)。読み上げは「2 / 5 枚目」 | 描ける | #1741 |
 | disclosure | 代わり | rendered | 畳まず、見出しの下に子をいつも出す(expanded はまだ見ない) | 描ける | #1741 |
 | grid | 代わり | rendered | 子に area があれば 6 列のグリッド、無ければ縦に並べる(columns はまだ見ない) | 描ける | #1741 |
 | hstack | 描ける | rendered | 子を同じ幅で横に並べる | 描ける | #1741 |
@@ -108,7 +108,7 @@ DSL の全部の type(Container 7・Leaf 70 = 77。`docs/dsl/dsl.schema.json` �
 | voiceInput | 使えません | unavailable | 音声入力(音声認識)をまだつないでいない。端末の中の文字起こし(whisper.cpp)で描く予定 | 描ける | #1751・#2172 |
 | webView | 未定 | unavailable | Web の埋め込みを入れていない。候補: JCEF(KCEF・Chromium 同梱で +100MB 前後)。推奨・未確定: 埋め込まず「ブラウザで開く」の枠(#2176) | 描ける | #1746・#2176 |
 
-数(Container と Leaf の合計 77): 描ける 46・代わり 12・使えません 13・未定 6。
+数(Container と Leaf の合計 77): 描ける 47・代わり 11・使えません 13・未定 6。
 
 ## アクション(16)
 
