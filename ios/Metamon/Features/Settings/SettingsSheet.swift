@@ -63,6 +63,9 @@ struct SettingsSheet: View {
                 PrivacySettingsSection() // #246: AI への送信の同意・プライバシーポリシー・利用規約
                 supportSection
                 if !Self.e2eDeleteAccount { deleteAccountSection }
+                #if METAMON_STG // 開発用メニュー(#2079): stg の版だけ・接続先が prod なら出さない
+                if DebugMenuPolicy.isAvailable { DebugMenuEntrySection() }
+                #endif
             }
             .navigationTitle("設定")
             .task { await rt.refreshPlanUsage() } // #317 使っている量(5 分キャッシュ)

@@ -160,6 +160,11 @@ targets:
         # サンドボックスは宣言した入力ファイルしか読めず、無いかもしれないファイルは入力に書けない(書くと無い時にビルドが落ちる・#292)
         ENABLE_USER_SCRIPT_SANDBOXING: NO
       configs:
+        # 開発用メニュー(#2079): stg の版(Debug / Staging)だけ METAMON_STG。Release・Review には足さない(コードごと入らない)
+        Debug:
+          SWIFT_ACTIVE_COMPILATION_CONDITIONS: "$(inherited) METAMON_STG"
+        Staging:
+          SWIFT_ACTIVE_COMPILATION_CONDITIONS: "$(inherited) METAMON_STG"
         # dSYM を Crashlytics へ送るスクリプト(#296)がサンドボックスの外(SourcePackages・ネット)を使うため
         Release:
           ENABLE_USER_SCRIPT_SANDBOXING: NO
@@ -235,6 +240,12 @@ targets:
         GENERATE_INFOPLIST_FILE: YES
         PRODUCT_BUNDLE_IDENTIFIER: jp.kz2601.metamon.tests
         TARGETED_DEVICE_FAMILY: "1"
+      # アプリと同じく stg の版だけ METAMON_STG(開発用メニューのテストを #if METAMON_STG で包む・#2079)
+      configs:
+        Debug:
+          SWIFT_ACTIVE_COMPILATION_CONDITIONS: "$(inherited) METAMON_STG"
+        Staging:
+          SWIFT_ACTIVE_COMPILATION_CONDITIONS: "$(inherited) METAMON_STG"
 
   # ホーム画面ウィジェット(WidgetKit)。本体が App Group に書いた集計済みスナップショットを描画するだけ(Renderer/DSL 非依存)。
   # Bundle ID は本体の子(jp.kz2601.metamon.widget)。実機は App ID 2 つ + App Group を自動署名が作る(§docs/ios/architecture.md ウィジェット)。
@@ -378,6 +389,11 @@ targets:
         ENABLE_USER_SCRIPT_SANDBOXING: NO
         # 通常の版だけマニフェストに足す種類(#931)。Mac もプッシュの端末を登録する(#982)ので iOS と同じ既定(デバイス ID 込み)を使う
       configs:
+        # 開発用メニュー(#2079): stg の版(Debug / Staging)だけ METAMON_STG。Release・Review には足さない(コードごと入らない)
+        Debug:
+          SWIFT_ACTIVE_COMPILATION_CONDITIONS: "$(inherited) METAMON_STG"
+        Staging:
+          SWIFT_ACTIVE_COMPILATION_CONDITIONS: "$(inherited) METAMON_STG"
         Review:
           SWIFT_ACTIVE_COMPILATION_CONDITIONS: "$(inherited) APP_STORE_REVIEW"
           METAMON_APP_STORE_REVIEW: "YES"

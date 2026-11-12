@@ -19578,23 +19578,6 @@
         }
       }
     },
-    "課金の制限を無効にする(デモ用・回数と有料機能)" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Disable purchase limits (demo: daily limit and paid features)"
-          }
-        },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "課金の制限を無効にする(デモ用・回数と有料機能)"
-          }
-        }
-      }
-    },
     "調整" : {
       "extractionState" : "manual",
       "localizations" : {

@@ -127,7 +127,7 @@ final class ProGate {
     // MARK: - 起動時の設定
 
     /// DEBUG ビルドは既定で制限なし(デモ端末で上限に当たらない)。Release は既定で制限あり。
-    private static var defaultLimitDisabled: Bool {
+    static var defaultLimitDisabled: Bool {
         #if DEBUG
         true
         #else
