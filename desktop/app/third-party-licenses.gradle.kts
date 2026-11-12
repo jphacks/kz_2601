@@ -103,6 +103,10 @@ abstract class GenerateThirdPartyLicenses : DefaultTask() {
         "mit" to "MIT",
     )
 
+    // 複数のライセンスから選べる依存(POM の <licenses> が「どれか」の意味の物)で選ぶ種類。group → SPDX
+    //   net.java.dev.jna: LGPL-2.1-or-later か Apache-2.0 を選べる(POM の comments)ので Apache-2.0
+    private val electedLicenses = mapOf("net.java.dev.jna" to "Apache-2.0")
+
     // 本文の正本(license-texts のファイル)。Apache-2.0 以外は著作権者の表示が要るので、依存ごとの正本を足してから使う
     private val textFiles = mapOf("Apache-2.0" to "Apache-2.0.txt")
 
@@ -132,7 +136,13 @@ abstract class GenerateThirdPartyLicenses : DefaultTask() {
                 continue
             }
             var notices = jarNotices(File(jarPath), artifact)
-            for (name in pom) {
+            val elected = electedLicenses[group]
+            val names = if (elected == null) pom else pom.filter { spdxByName[normalize(it)] == elected }
+            if (names.isEmpty()) {
+                errors += "$coord の POM に選んだライセンス($elected)がありません(electedLicenses を見直す)"
+                continue
+            }
+            for (name in names) {
                 val spdx = spdxByName[normalize(name)]
                 if (spdx == null) {
                     errors += "$coord のライセンス「$name」を判定できません(third-party-licenses.gradle.kts の spdxByName に足す)"
