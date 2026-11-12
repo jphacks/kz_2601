@@ -45,7 +45,7 @@
 | 呼び出しの流れ・数え方・理由(`Reason*`) | `service.go` |
 | 回数の上限・1 分止め | `limits.go`(数えるのは `ratelimit.Store`。runner では Firestore の `rateLimits`) |
 | 月の枠 `runs` を 1 足す | `backend/internal/runner/quota/external.go`(`ExtRun`) |
-| コインの op `ext`・履歴 `spend_ext` | `backend/internal/coins`(`OpExt`・`KindSpendExt`) |
+| コインの op `ext`・履歴 `spend_ext`(`provider` = registry の id・#2145) | `backend/internal/coins`(`OpExt`・`KindSpendExt`・`ReserveRequest.Provider`) |
 | トークンの保管・取り消し・90 日 | `connections.go`(`Connections`・`Sealer`・`LocalSealer`)・`kms.go`(`KMSSealer`)・`firestore.go` |
 | OAuth の state / PKCE | `oauth.go` |
 | 出口 | `egress.go` |
@@ -255,7 +255,7 @@ GTFS リアルタイム(protobuf)の読み方は [GTFS Realtime の仕様](https
 | 4. トークン | OAuth の provider は**押した人**(自動の動きは**作成者**)のトークンを読む。期限切れは更新 | 409 `ext_not_connected`。`runs` を戻す |
 | 5. 押さえる | 有料の provider だけ。押した人(自動の動きは作成者)のコインを `COIN_RESERVE_EXT_<PROVIDER>` だけ押さえる(op `ext`) | 402 `coins_insufficient`。同じ request id の押さえがもうある時は呼ばずに 409 `duplicate_request`。どちらも `runs` を戻す |
 | 6. 呼ぶ | `EXT_TIMEOUT`(既定 8 秒) | 時間切れ・5xx は押さえを全部戻し、`runs` も戻す。provider がトークンを拒んだら接続を `error` にして 409 |
-| 7. 確定 | 原価(op が測った値、無ければ `EXT_COST_USD_<PROVIDER>_<OP>`)× `COIN_PER_USD` を押さえの量まで引き、残りを戻す。どちらも無い時は押さえた量を引く(`coins.unpriced_model`)。履歴は `spend_ext`(`usd` つき) | 費用のかかった 4xx(`ProviderError.Billable`)だけは戻さず確定する |
+| 7. 確定 | 原価(op が測った値、無ければ `EXT_COST_USD_<PROVIDER>_<OP>`)× `COIN_PER_USD` を押さえの量まで引き、残りを戻す。どちらも無い時は押さえた量を引く(`coins.unpriced_model`)。履歴は `spend_ext`(`usd` と `provider` つき。`provider` は #2145 より前の行には無い) | 費用のかかった 4xx(`ProviderError.Billable`)だけは戻さず確定する |
 
 - `COIN_BILLING_MODE=off` は枠もコインも数えない(Pro の確認だけ)。`log` は数えるが止めず、コインは `coins.would_spend` を出すだけ。
 - ログは 1 回 1 行 `ext.call`(provider・op・結果・ms・`runs` か `coins` か `cache` か・引いたコイン・app id・uid のハッシュ)。引数・答え・トークンは出さない。上限で止めた時は `limit`(scope)・`limit_max`・`limit_count`・`retry_after_sec`、provider の 429 で止めた時は `paused: provider_paused` も出す(コードと数だけ)。
