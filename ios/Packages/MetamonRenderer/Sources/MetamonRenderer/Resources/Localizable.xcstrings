@@ -3423,6 +3423,40 @@
         }
       }
     },
+    "カレンダーの読み取りが許可されていません(追加だけ許可されています)" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Reading your calendar is not allowed (only adding events is allowed)"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "カレンダーの読み取りが許可されていません(追加だけ許可されています)"
+          }
+        }
+      }
+    },
+    "カレンダー・リマインダーへのアクセスが許可されていません" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Access to Calendars and Reminders is not allowed"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "カレンダー・リマインダーへのアクセスが許可されていません"
+          }
+        }
+      }
+    },
     "カードがありません" : {
       "extractionState" : "manual",
       "localizations" : {
