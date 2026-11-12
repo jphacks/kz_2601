@@ -5,6 +5,7 @@ import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
+import jp.kz2601.metamon.desktop.store.RecordChangeSubscriptions
 import jp.kz2601.metamon.desktop.store.SessionPersistence
 import jp.kz2601.metamon.dsl.Action
 import jp.kz2601.metamon.dsl.ActionType
@@ -251,6 +252,8 @@ class AppHub(
     private val wipeStore: suspend () -> Unit = {},
     /** 一時ファイル(写真の「既定のアプリで開く」・引き出し)を消す。 */
     private val clearTempFiles: () -> Unit = { PhotoOpen.clearTemp() },
+    /** サーバーにあるアプリの変化の通知(#2808)。アプリごとに 1 本・最後のウィンドウを閉じたらやめる。null は張らない(モック) */
+    val live: RecordChangeSubscriptions? = null,
 ) {
     class OpenedApp(val id: String, val dsl: AppDSL, val records: SharedRecords)
 
@@ -271,7 +274,7 @@ class AppHub(
     @Synchronized
     fun acquire(id: String): OpenedApp {
         refs[id] = (refs[id] ?: 0) + 1
-        return app(id)
+        return app(id).also { live?.open(id) }
     }
 
     /**
@@ -279,6 +282,7 @@ class AppHub(
      * 次に開く時は端末から読み直す。
      */
     fun release(id: String, timeoutMillis: Long = FLUSH_TIMEOUT_MILLIS) {
+        live?.close(id)
         val closing = synchronized(this) {
             val n = (refs[id] ?: 0) - 1
             if (n > 0) {
@@ -314,6 +318,7 @@ class AppHub(
 
     /** 終わる時: 全部のアプリの積んだ書き込みを書き終えるのを待ち([timeoutMillis] まで)、それから閉じる。 */
     fun close(timeoutMillis: Long = FLUSH_TIMEOUT_MILLIS) {
+        live?.closeAll()
         val all = synchronized(this) { apps.values.toList().also { apps.clear(); refs.clear() } }
         runBlocking { withTimeoutOrNull(timeoutMillis) { all.forEach { it.records.idle() } } }
         all.forEach { it.records.close() }
