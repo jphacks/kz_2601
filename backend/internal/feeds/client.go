@@ -26,6 +26,7 @@ type RSSFeed struct {
 	URL       string // https, fixed
 	Publisher string // attribution
 	SiteURL   string
+	License   string // shown with the source; "" = 公共データ利用規約(第1.0版)
 }
 
 // Endpoints are the only URLs the service fetches. Tests point them at an
@@ -49,9 +50,12 @@ func DefaultEndpoints() Endpoints {
 		Pressure:    "https://api.met.no/weatherapi/locationforecast/2.0/compact",
 		Holidays:    "https://www8.cao.go.jp/chosei/shukujitsu/syukujitsu.csv",
 		RSS: map[string]RSSFeed{
-			"digital-news":  {Name: "デジタル庁 新着・更新", URL: "https://www.digital.go.jp/rss/news.xml", Publisher: "デジタル庁", SiteURL: "https://www.digital.go.jp/"},
-			"fdma-news":     {Name: "消防庁 新着情報", URL: "https://www.fdma.go.jp/index.xml", Publisher: "消防庁", SiteURL: "https://www.fdma.go.jp/"},
-			"fdma-disaster": {Name: "消防庁 災害情報", URL: "https://www.fdma.go.jp/disaster/info/index.xml", Publisher: "消防庁", SiteURL: "https://www.fdma.go.jp/"},
+			"digital-news":    {Name: "デジタル庁 新着・更新", URL: "https://www.digital.go.jp/rss/news.xml", Publisher: "デジタル庁ホームページ", SiteURL: "https://www.digital.go.jp/"},
+			"fdma-disaster":   {Name: "消防庁 災害情報", URL: "https://www.fdma.go.jp/disaster/info/index.xml", Publisher: "消防庁ホームページ", SiteURL: "https://www.fdma.go.jp/"},
+			"fdma-news":       {Name: "消防庁 新着情報", URL: "https://www.fdma.go.jp/index.xml", Publisher: "消防庁ホームページ", SiteURL: "https://www.fdma.go.jp/"},
+			"go-blog":         {Name: "The Go Blog", URL: "https://go.dev/blog/feed.atom", Publisher: "The Go Blog(go.dev)", SiteURL: "https://go.dev/blog/", License: licenseGoBlog},
+			"osaka-city-news": {Name: "大阪市 新着情報", URL: "https://www.city.osaka.lg.jp/main/rss/rss_new.xml", Publisher: "大阪市ホームページ", SiteURL: "https://www.city.osaka.lg.jp/", License: licenseOsaka},
+			"soumu-news":      {Name: "総務省 新着情報", URL: "https://www.soumu.go.jp/news.rdf", Publisher: "総務省ホームページ", SiteURL: "https://www.soumu.go.jp/", License: licenseSoumu},
 		},
 		Arxiv: "https://export.arxiv.org/api/query",
 		Diet:  "https://kokkai.ndl.go.jp/api/speech",
@@ -59,6 +63,14 @@ func DefaultEndpoints() Endpoints {
 }
 
 const pdl = "公共データ利用規約(第1.0版)"
+
+// Per-feed licenses for RSS feeds whose terms ask for a specific credit.
+// The server keeps only titles, links and dates, so each says so.
+const (
+	licenseGoBlog = "CC BY 4.0 (https://creativecommons.org/licenses/by/4.0/)・題名と日付を抜き出して表示"
+	licenseOsaka  = "CC BY 2.1 JP (https://creativecommons.org/licenses/by/2.1/jp/)・題名と日付を抜き出して表示"
+	licenseSoumu  = "PDL1.0(https://www.digital.go.jp/resources/open_data/public_data_license_v1.0)・題名と日付を抜き出して表示"
+)
 
 func (ep Endpoints) source(q Query) Source {
 	switch q.Provider {
@@ -76,7 +88,11 @@ func (ep Endpoints) source(q Query) Source {
 		return Source{Name: "国立国会図書館 国会会議録検索システム", URL: "https://kokkai.ndl.go.jp/", License: "検索用 API・発言の著作権は各発言者"}
 	}
 	f := ep.RSS[q.FeedID]
-	return Source{Name: f.Publisher + "ホームページ", URL: f.SiteURL, License: pdl}
+	license := f.License
+	if license == "" {
+		license = pdl
+	}
+	return Source{Name: f.Publisher, URL: f.SiteURL, License: license}
 }
 
 // weatherURL builds the forecast URL. region was checked against

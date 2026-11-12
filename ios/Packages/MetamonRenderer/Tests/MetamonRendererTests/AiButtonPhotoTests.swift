@@ -1,7 +1,4 @@
-// TODO mac-026: UIKit を直接使うテスト。Mac で回すには描画の仕方を置き換え層に寄せる
-#if os(iOS)
 import XCTest
-import UIKit
 import MetamonDSL
 @testable import MetamonRenderer
 
@@ -15,16 +12,14 @@ final class AiButtonPhotoTests: XCTestCase {
         #"{"id":"m","name":"薬","fields":[{"id":"rx","name":"処方箋","type":"photo"},{"id":"note","name":"メモ","type":"text"}]}"#.utf8))
 
     /// ざらついた模様(JPEG で縮みにくい)の画像。
-    private func noisyImage(width: Int, height: Int) -> UIImage {
-        let format = UIGraphicsImageRendererFormat.default()
-        format.scale = 1
-        return UIGraphicsImageRenderer(size: CGSize(width: width, height: height), format: format).image { ctx in
+    private func noisyImage(width: Int, height: Int) -> PlatformImage {
+        testImage(width: CGFloat(width), height: CGFloat(height)) { ctx in
             var seed: UInt32 = 7
             for y in stride(from: 0, to: height, by: 4) {
                 for x in stride(from: 0, to: width, by: 4) {
                     seed = seed &* 1_103_515_245 &+ 12345
-                    UIColor(red: CGFloat(seed >> 24 & 0xff) / 255, green: CGFloat(seed >> 16 & 0xff) / 255,
-                            blue: CGFloat(seed >> 8 & 0xff) / 255, alpha: 1).setFill()
+                    ctx.setFillColor(red: CGFloat(seed >> 24 & 0xff) / 255, green: CGFloat(seed >> 16 & 0xff) / 255,
+                                     blue: CGFloat(seed >> 8 & 0xff) / 255, alpha: 1)
                     ctx.fill(CGRect(x: x, y: y, width: 4, height: 4))
                 }
             }
@@ -32,7 +27,7 @@ final class AiButtonPhotoTests: XCTestCase {
     }
 
     private func pixelSize(ofBase64 b64: String) -> CGSize? {
-        guard let data = Data(base64Encoded: b64), let img = UIImage(data: data) else { return nil }
+        guard let data = Data(base64Encoded: b64), let img = PlatformImage(data: data) else { return nil }
         return CGSize(width: img.size.width * img.scale, height: img.size.height * img.scale)
     }
 
@@ -149,4 +144,3 @@ final class AiButtonPhotoTests: XCTestCase {
         }
     }
 }
-#endif

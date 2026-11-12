@@ -12,11 +12,12 @@
 #   | ios/Packages/MetamonDSL/**・DSL のテストデータ(*1) | する               | DSL / Renderer / Services(DSL は全員の依存) |
 #   | ios/Packages/MetamonRenderer/**・docs/dsl の適合テストと例 | する       | Renderer                                 |
 #   | ios/Packages/MetamonServices/**                    | する               | Services                                 |
-#   | ios/MetamonMac/**・ios/Shared/**・ios/project.yml・docs/dsl/examples/** | する | なし                          |
+#   | ios/MetamonMac/**・ios/MetamonMacTests/**・ios/Shared/**・ios/project.yml・docs/dsl/examples/** | する | なし(*2) |
 #   | .github/workflows/mac-ci.yml・ios/scripts/mac-package-test.sh | する    | 全部                                     |
 #   | 上記以外                                           | しない             | なし(mac-ci は成功で終わる)            |
 #   | develop / main への push(上記のどれかが変更)      | する               | 全部                                     |
 #   (*1) docs/dsl/conformance/expr/**・docs/dsl/dsl.schema.json・docs/dsl/examples/**・テストが読む backend の JSON
+#   (*2) Mac アプリの単体テスト(MetamonMacTests・#1212)はアプリをビルドする時はいつも回す(ビルドの続きで数十秒)
 #
 # 設計メモ:
 # - テストは各パッケージのフォルダで `xcodebuild test -destination platform=macOS`。
@@ -78,6 +79,7 @@ jobs:
               - 'ios/Packages/MetamonServices/**'
             app:
               - 'ios/MetamonMac/**'
+              - 'ios/MetamonMacTests/**'
               # iOS と共有するランタイムの部品(#939)。Mac のターゲットにもコンパイルする
               - 'ios/Shared/**'
               - 'ios/project.yml'
@@ -204,6 +206,28 @@ jobs:
             -skipPackagePluginValidation \
             -skipMacroValidation \
             -parallelizeTargets \
+            -quiet \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGN_IDENTITY=""
+
+      # Mac アプリをホストにした単体テスト(#1212)。上のビルドの DerivedData をそのまま使う
+      - name: テスト MetamonMacTests(macOS)
+        working-directory: ios
+        run: |
+          set -euo pipefail
+          mkdir -p TestResults-mac
+          rm -rf TestResults-mac/MetamonMac.xcresult
+          xcodebuild test \
+            -project Metamon.xcodeproj \
+            -scheme MetamonMac \
+            -configuration Debug \
+            -destination 'platform=macOS' \
+            -derivedDataPath DerivedData-mac \
+            -clonedSourcePackagesDirPath SourcePackages \
+            -resultBundlePath TestResults-mac/MetamonMac.xcresult \
+            -skipPackagePluginValidation \
+            -skipMacroValidation \
             -quiet \
             CODE_SIGNING_ALLOWED=NO \
             CODE_SIGNING_REQUIRED=NO \

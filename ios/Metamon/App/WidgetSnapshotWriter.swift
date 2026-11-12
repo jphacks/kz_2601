@@ -5,6 +5,7 @@ import MetamonDSL
 /// DSL の `stat` 部品(先頭 3 個)を本体側で集計し、App Group 経由でウィジェットに渡す。
 /// systemLarge(#486)用に、先頭 stat の entity の「最近の記録」と「直近 7 日」の日ごとの集計も入れる。
 /// 呼び出し元は `AppRuntime.apply()`(DSL 差し替え)と `AppRuntime.refresh()`(レコード更新)の 2 箇所。
+/// Mac(#984)も同じファイルを使い、`AppCanvas` が記録の変化ごとに `appId` 付きで呼ぶ(押すとそのアプリを開く)。
 /// 集計ロジックは Renderer の `StatLeaf` と同じ(`Aggregator`)なので、アプリ内の表示と数字が一致する。
 @MainActor
 enum WidgetSnapshotWriter {
@@ -13,7 +14,7 @@ enum WidgetSnapshotWriter {
     static let maxRecent = 5
     static let trendDays = 7
 
-    static func write(dsl: AppDSL, records: [String: [Record]]) {
+    static func write(dsl: AppDSL, records: [String: [Record]], appId: String? = nil) {
         let previous = WidgetSnapshot.load()
         // 初期状態(音声画面のみ)はスナップショットを消して「アプリを作るとここに出ます」表示に戻す
         guard !dsl.isVoiceOnly else {
@@ -23,7 +24,7 @@ enum WidgetSnapshotWriter {
             }
             return
         }
-        let snapshot = makeSnapshot(dsl: dsl, records: records, previous: previous)
+        let snapshot = makeSnapshot(dsl: dsl, records: records, previous: previous, appId: appId)
         // 中身が変わっていなければ書き込み・reload しない(WidgetKit の更新回数予算を節約)
         guard !snapshot.hasSameContent(as: previous) else { return }
         snapshot.save()
@@ -31,7 +32,7 @@ enum WidgetSnapshotWriter {
     }
 
     /// スナップショットを組み立てる(保存はしない・テスト用に分けてある)。
-    static func makeSnapshot(dsl: AppDSL, records: [String: [Record]], previous: WidgetSnapshot?,
+    static func makeSnapshot(dsl: AppDSL, records: [String: [Record]], previous: WidgetSnapshot?, appId: String? = nil,
                              now: Date = .now, calendar: Calendar = .current) -> WidgetSnapshot {
         // computed field / Stat.value(#101)も StatLeaf と同じ評価器で数える
         let evaluator = ExprEvaluator(dsl: dsl, records: { records[$0] ?? [] })
@@ -44,6 +45,7 @@ enum WidgetSnapshotWriter {
             return WidgetSnapshot.Stat(key: key, label: c.label ?? "", value: value)
         }
         var snapshot = WidgetSnapshot(appName: dsl.app.name, stats: Array(stats), updatedAt: now)
+        snapshot.appId = appId
 
         // systemLarge(#486): 先頭の(entity を数える)stat の entity で「最近の記録」と「直近 7 日」を作る
         guard let primary = components.prefix(maxStats).first(where: { $0.entity.flatMap(dsl.entity) != nil && !($0.aggregate == nil && $0.valueExpr != nil) }),

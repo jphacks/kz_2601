@@ -8,6 +8,7 @@ import (
 	"bufio"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"slices"
@@ -17,6 +18,7 @@ import (
 
 	"github.com/jphacks/kz_2601/backend/internal/loop"
 	"github.com/jphacks/kz_2601/backend/internal/loop/draft"
+	"github.com/jphacks/kz_2601/backend/internal/loop/pii"
 	"github.com/jphacks/kz_2601/backend/internal/loop/triage"
 )
 
@@ -52,9 +54,11 @@ func Load(r io.Reader) ([]Case, error) {
 			return nil, fmt.Errorf("line %d: id and text are required", n)
 		case seen[c.ID]:
 			return nil, fmt.Errorf("line %d: duplicate id %q", n, c.ID)
+		case c.Category == "" || c.Priority == "":
+			return nil, fmt.Errorf("line %d (id %s): not labelled yet: fill category and priority", n, c.ID)
 		case !slices.Contains(triage.Categories, c.Category):
 			return nil, fmt.Errorf("line %d: unknown category %q", n, c.Category)
-		case !slices.Contains([]string{"P1", "P2", "P3"}, c.Priority):
+		case !slices.Contains(priorities, c.Priority):
 			return nil, fmt.Errorf("line %d: unknown priority %q", n, c.Priority)
 		}
 		seen[c.ID] = true
@@ -62,6 +66,8 @@ func Load(r io.Reader) ([]Case, error) {
 	}
 	return out, sc.Err()
 }
+
+var priorities = []string{"P1", "P2", "P3"}
 
 // Score is matched out of total.
 type Score struct{ Matched, Total int }
@@ -93,33 +99,67 @@ type Report struct {
 	// different clusters.
 	Together Score
 	Apart    Score
-	Misses   []Miss
-	Usage    triage.Usage
+	// CategoryTable and PriorityTable count (person's label, model's
+	// answer) per case; an unclassified case is "(held: …)" or "(none)".
+	CategoryTable Confusion
+	PriorityTable Confusion
+	Misses        []Miss
+	Usage         triage.Usage
 	// Drafts are the drafts the run built (one per bundle the model made).
 	Drafts []loop.Draft
 }
 
+// MaxCases bounds one set: with the triage batch of 20 a run makes at most
+// 10 model calls.
+const MaxCases = 200
+
+// Errors of Run.
+var (
+	// ErrTooManyCases: the set has more than MaxCases cases (nothing is called).
+	ErrTooManyCases = errors.New("triage eval: too many cases")
+	// ErrStopped: Hooks.BeforeCall refused a call; the report is partial.
+	ErrStopped = errors.New("triage eval: stopped")
+)
+
+// Hooks are the per-call checks the real triage run has (the loop's stop
+// switch, the monthly cap, the usage record). The zero Hooks checks nothing
+// (an offline model).
+type Hooks struct {
+	BeforeCall func(ctx context.Context) error
+	AfterCall  func(ctx context.Context, u triage.Usage, callErr error) error
+}
+
 // Run triages cases with m and compares the result with the labels. A case
-// the model did not classify (held, rejected) counts as a miss.
-func Run(ctx context.Context, m triage.Model, cases []Case) (Report, error) {
-	rep := Report{Cases: len(cases)}
+// the model did not classify (held, rejected) counts as a miss. h is
+// called around every model call, as in the triage run. Each text is masked
+// (pii.Mask) before the model sees it, as ingest does, so a hand-written set
+// cannot send personal data either.
+func Run(ctx context.Context, m triage.Model, cases []Case, h Hooks) (Report, error) {
+	rep := Report{Cases: len(cases), CategoryTable: newConfusion(triage.Categories), PriorityTable: newConfusion(priorities)}
+	if len(cases) > MaxCases {
+		return rep, fmt.Errorf("%w: %d (at most %d)", ErrTooManyCases, len(cases), MaxCases)
+	}
 	s := loop.NewMemory()
 	now := time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)
 	ids := make([]string, len(cases))
 	for i, c := range cases {
 		ids[i] = loop.ItemID(loop.SourceInApp, c.ID)
-		it := loop.Item{ID: ids[i], Source: loop.SourceInApp, SourceID: c.ID, Text: c.Text, AIAllowed: true,
+		it := loop.Item{ID: ids[i], Source: loop.SourceInApp, SourceID: c.ID, Text: pii.Mask(c.Text).Text, AIAllowed: true,
 			Status: loop.ItemNew, IngestedAt: now.Add(time.Duration(i) * time.Second), ExpiresAt: now.Add(loop.Retention)}
 		if _, err := s.PutItem(ctx, it); err != nil {
 			return rep, err
 		}
 	}
 	clock := func() time.Time { return now.Add(time.Hour) }
-	tr := &triage.Triager{Store: s, Model: m, MaxItems: max(len(cases), 1), Now: clock}
+	tr := &triage.Triager{Store: s, Model: m, MaxItems: max(len(cases), 1), Now: clock,
+		BeforeCall: h.BeforeCall, AfterCall: h.AfterCall}
 	res, err := tr.Run(ctx)
 	rep.Usage = res.Usage
 	if err != nil {
 		return rep, err
+	}
+	if res.Stopped != "" {
+		return rep, fmt.Errorf("%w: %s", ErrStopped, res.Stopped)
 	}
 	// the priority a human sees is the draft's: computed over the bundle
 	if _, err := (&draft.Builder{Store: s, Now: clock, MaxNew: len(cases) + 1}).Run(ctx); err != nil {
@@ -148,6 +188,8 @@ func Run(ctx context.Context, m triage.Model, cases []Case) (Report, error) {
 		}
 		rep.Category.Total++
 		rep.Priority.Total++
+		rep.CategoryTable.Add(c.Category, orNone(it.Category, it))
+		rep.PriorityTable.Add(c.Priority, orNone(p, it))
 		if it.Category == c.Category {
 			rep.Category.Matched++
 		} else {
@@ -201,6 +243,14 @@ func (r Report) String() string {
 	fmt.Fprintf(&b, "  category: %s\n", r.Category)
 	fmt.Fprintf(&b, "  priority: %s\n", r.Priority)
 	fmt.Fprintf(&b, "  bundle:   together %s, apart %s (drafts %d)\n", r.Together, r.Apart, len(r.Drafts))
+	b.WriteString(r.verdict(Bar))
+	b.WriteString("\n  category (rows: person, columns: model)\n")
+	r.CategoryTable.write(&b)
+	b.WriteString("\n  priority (rows: person, columns: model)\n")
+	r.PriorityTable.write(&b)
+	b.WriteString("\n  bundle pairs (rows: person, columns: model)\n")
+	bundleTable(r.Together, r.Apart).write(&b)
+	b.WriteString("\n")
 	for _, m := range r.Misses {
 		fmt.Fprintf(&b, "  miss %-16s %s: want %s, got %s\n", m.Field, m.ID, m.Want, m.Got)
 	}

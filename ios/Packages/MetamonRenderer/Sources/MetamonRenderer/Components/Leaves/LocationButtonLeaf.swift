@@ -10,6 +10,8 @@ struct LocationButtonLeaf: View {
     let ctx: RenderContext
     @State private var busy = false
     @State private var error: String?
+    /// 直前に取った位置の精度(低ければ「おおよその位置」と出す #1344)
+    @State private var accuracy: LocationAccuracy = .precise
 
     var body: some View {
         if let form = ctx.form, let field = c.field {
@@ -27,6 +29,10 @@ struct LocationButtonLeaf: View {
                 .disabled(busy)
                 if let s = (form.values[field] ?? .null).stringValue, !s.isEmpty {
                     Text("📍 \(s)").font(.caption).foregroundStyle(.secondary).monospacedDigit()
+                    if let note = accuracy.note {
+                        Text(note).font(.caption).foregroundStyle(.secondary)
+                            .accessibilityIdentifier("locationButton.accuracy")
+                    }
                 } else if let error {
                     Text(error).font(.caption).foregroundStyle(.red)
                 }
@@ -40,7 +46,9 @@ struct LocationButtonLeaf: View {
         busy = true
         defer { busy = false }
         do {
-            let coord = try await OneShotLocation().request().coordinate
+            let loc = try await OneShotLocation().request()
+            let coord = loc.coordinate
+            accuracy = LocationAccuracy.classify(loc.horizontalAccuracy)
             form.values[field] = .string(String(format: "%.6f,%.6f", coord.latitude, coord.longitude))
             error = nil
             // addressField: 住所にして入れる(端末から Apple に聞く)。取れなければ座標だけで、打った住所は消さない

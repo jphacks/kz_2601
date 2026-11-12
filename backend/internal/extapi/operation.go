@@ -52,6 +52,9 @@ type Output struct {
 	ResultID string `json:"resultId,omitempty"`
 	// Usage is the call's measured cost (paid providers).
 	Usage Usage `json:"-"`
+	// ValidUntil, when set, is when the first row stops being valid (ODPT
+	// dct:valid): the answer cache keeps the answer no longer than this.
+	ValidUntil time.Time `json:"-"`
 }
 
 // Usage is the measured cost of a paid call. Priced false: the op did not
@@ -136,6 +139,8 @@ type OAuthClient interface {
 	Exchange(ctx context.Context, code, codeVerifier, redirectURI string) (Token, error)
 	// Refresh renews the access token (ErrInvalidGrant when refused).
 	Refresh(ctx context.Context, t Token) (Token, error)
-	// Revoke revokes t at the provider (ErrNoRevoke when it cannot).
+	// Revoke revokes t at the provider (ErrNoRevoke when it cannot;
+	// ErrInvalidGrant when it renews t first and the refresh token is
+	// refused: gone, or renewed elsewhere meanwhile).
 	Revoke(ctx context.Context, t Token) error
 }

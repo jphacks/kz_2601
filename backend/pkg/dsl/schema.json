@@ -5464,7 +5464,7 @@
         },
         "feedId": {
           "type": "string",
-          "description": "rss: 許可されたフィードの id(digital-news = デジタル庁 新着・更新 / fdma-news = 消防庁 新着情報 / fdma-disaster = 消防庁 災害情報)。arxiv: 分野(cs.AI / cs.CL / cs.CV / cs.LG / cs.RO / cs.HC / cs.SE / cs.CR / stat.ML)。"
+          "description": "rss: 許可されたフィードの id(digital-news = デジタル庁 新着・更新 / fdma-news = 消防庁 新着情報 / fdma-disaster = 消防庁 災害情報 / soumu-news = 総務省 新着情報 / osaka-city-news = 大阪市 新着情報 / go-blog = The Go Blog)。arxiv: 分野(cs.AI / cs.CL / cs.CV / cs.LG / cs.RO / cs.HC / cs.SE / cs.CR / stat.ML)。"
         },
         "query": {
           "type": "string",

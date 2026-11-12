@@ -18,6 +18,11 @@ import (
 var (
 	// ErrUnknown: no such provider or op, or an argument it does not take.
 	ErrUnknown = errors.New("extapi: unknown provider, op or argument")
+	// ErrBadArgs: an op refused its arguments before any request to the
+	// provider. It is also ErrUnknown (bad_request); only this one gives the
+	// call's limit counts back. An answer the provider gave (no such item
+	// ...) stays plain ErrUnknown: that call was made.
+	ErrBadArgs = fmt.Errorf("%w: bad argument", ErrUnknown)
 	// ErrUnavailable is 503 ext_unavailable: EXT_DISABLED, the provider is
 	// off, has no key, or (paid, enforce) no COIN_RESERVE_EXT_<PROVIDER>.
 	ErrUnavailable = errors.New("extapi: provider unavailable")
@@ -254,10 +259,10 @@ func (s *Service) Call(ctx context.Context, r CallRequest) (res CallResult, err 
 
 	// 1. the call limits: the provider's 429 pause, then the user's, the
 	// app's and everyone's counts of this provider (limits.go)
-	if wait := s.limits.pausedFor(p.ID, s.now()); wait > 0 {
+	who, anon := r.actor()
+	if wait := s.limits.pausedFor(pauseKey(p, who), s.now()); wait > 0 {
 		return res, &LimitError{Scope: LimitProviderPaused, RetryAfter: wait}
 	}
-	who, anon := r.actor()
 	lc, err := s.consumeLimits(ctx, p.ID, who, r.AppID)
 	if err != nil {
 		return res, err
@@ -339,7 +344,7 @@ func (s *Service) Call(ctx context.Context, r CallRequest) (res CallResult, err 
 	out, err := s.ops[p.ID][spec.Name].Do(cctx, in)
 	cancel()
 	if upstreamLimited(err) && s.cfg.UpstreamPause > 0 {
-		s.limits.pause(p.ID, s.now(), s.cfg.UpstreamPause)
+		s.limits.pause(pauseKey(p, who), s.now(), s.cfg.UpstreamPause)
 		paused = true
 	}
 	var perr *ProviderError
@@ -348,7 +353,7 @@ func (s *Service) Call(ctx context.Context, r CallRequest) (res CallResult, err 
 		if hold != nil {
 			release()
 		}
-		if errors.Is(err, ErrUnknown) {
+		if errors.Is(err, ErrBadArgs) {
 			// the op refused the arguments before calling the provider
 			// (bad_request): the limits are given back too
 			s.refundLimits(ctx, p.ID, lc)
@@ -385,7 +390,13 @@ func (s *Service) Call(ctx context.Context, r CallRequest) (res CallResult, err 
 	if cacheKeyOf != "" {
 		now := s.now()
 		if ttl := spec.cacheTTL(r.Args, now); ttl > 0 {
-			s.cache.put(cacheKeyOf, out, now.Add(ttl), now)
+			expires := now.Add(ttl)
+			if !out.ValidUntil.IsZero() && out.ValidUntil.Before(expires) {
+				expires = out.ValidUntil // a row would outlive its valid time
+			}
+			if expires.After(now) {
+				s.cache.put(cacheKeyOf, out, expires, now)
+			}
 		}
 	}
 	res.Output = out
@@ -432,7 +443,7 @@ func (s *Service) token(ctx context.Context, uid, provider string) (Token, []byt
 	}
 	// One refresh at a time per connection on this instance: providers that
 	// rotate the refresh token refuse the old one once it was used.
-	unlock, err := s.refreshing.lock(ctx, uid+"\x00"+provider)
+	unlock, err := s.lockConn(ctx, uid, provider)
 	if err != nil {
 		return Token{}, nil, err
 	}
@@ -526,3 +537,19 @@ func Reason(err error) string {
 	}
 	return ReasonInternal
 }
+
+// afterCall is err of an op that has already called the provider: an
+// argument it then refuses (a property the database does not have ...) is
+// still bad_request, but no longer ErrBadArgs (the call was made).
+func afterCall(err error) error {
+	if errors.Is(err, ErrBadArgs) {
+		return calledError{err}
+	}
+	return err
+}
+
+// calledError is ErrUnknown and hides ErrBadArgs.
+type calledError struct{ err error }
+
+func (e calledError) Error() string        { return e.err.Error() }
+func (e calledError) Is(target error) bool { return target == ErrUnknown }

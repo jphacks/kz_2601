@@ -4,14 +4,19 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"math"
+	"reflect"
+	"regexp"
 	"slices"
 	"strconv"
 	"strings"
 	"time"
 
+	"golang.org/x/text/unicode/norm"
+
+	"github.com/jphacks/kz_2601/backend/internal/appconfig"
 	"github.com/jphacks/kz_2601/backend/internal/extapi"
 	"github.com/jphacks/kz_2601/backend/internal/runner/quota"
+	"github.com/jphacks/kz_2601/backend/internal/runner/schedule"
 	"github.com/jphacks/kz_2601/backend/internal/runner/scope"
 	"github.com/jphacks/kz_2601/backend/internal/store"
 	"github.com/jphacks/kz_2601/backend/pkg/dsl"
@@ -24,8 +29,12 @@ import (
 // an internal caller) runs with the run's quota.Decision.
 //
 // The first row of the range is the header. Each later row is one record
-// whose id is derived from the rule, the action and the id cell, so running
-// it again updates the same record and never adds a second one.
+// whose id is derived from the entity, the import's key and the id cell
+// (importClientID), so running it again updates the same record and never
+// adds a second one. The rule and the action are left out of the key on
+// purpose: renaming the rule or inserting an action before this one must
+// not duplicate every row. A row whose converted values equal the stored
+// record is not written (and not counted as a write).
 
 // Row caps of one import run (header not counted). readRange reads at most
 // 100 rows, the header included.
@@ -50,6 +59,10 @@ type SheetImport struct {
 	Entity string
 	// IDColumn is the header of the column rows are matched on.
 	IDColumn string
+	// ImportKey, when set, names the import in the record ids instead of
+	// IDColumn, so the id column's header can be renamed without
+	// duplicating rows. "" = IDColumn.
+	ImportKey string
 	// Fields maps a header to a field id of Entity. nil: a header that is a
 	// field id or a field name goes to that field. Other columns are ignored.
 	Fields map[string]string
@@ -68,6 +81,9 @@ type ImportRun struct {
 	Action           int
 	Version          int
 	ActorUID         string
+	// Location reads a date or time cell without a zone (the run's time
+	// zone, Runner.location). nil = schedule.DefaultZone (Japan).
+	Location *time.Location
 	// Decision is the run's quota.Begin answer: the ext call and the writes
 	// are counted against it, like the rule's other actions.
 	Decision quota.Decision
@@ -78,8 +94,9 @@ type ExtCaller interface {
 	Call(ctx context.Context, r extapi.CallRequest) (extapi.CallResult, error)
 }
 
-// ImportTarget writes the records (*scope.Handle).
+// ImportTarget reads and writes the records (*scope.Handle).
 type ImportTarget interface {
+	ImportedRecord(ctx context.Context, entity, id string) (data map[string]any, found bool, err error)
 	UpsertRecord(ctx context.Context, entity, id string, data map[string]any, origin store.RecordOrigin, key string, fn func(map[string]any) map[string]any) (created, applied bool, err error)
 }
 
@@ -103,10 +120,12 @@ type SheetImporter struct {
 
 // ImportResult counts what one run did.
 type ImportResult struct {
-	Rows      int // data rows read (header not counted)
-	Created   int
-	Updated   int
-	Unchanged int // already applied by an earlier attempt of the same event
+	Rows    int // data rows read (header not counted)
+	Created int
+	Updated int
+	// Unchanged: rows equal to the stored record (not written, not
+	// counted), or already applied by an earlier attempt of the same event.
+	Unchanged int
 	NoID      int // rows with an empty id cell
 	Duplicate int // later rows with an id an earlier row had
 	// Required: rows missing a required field that were not updated (no
@@ -114,15 +133,17 @@ type ImportResult struct {
 	Required  int
 	BadValues int // cells that did not fit their field's type (left out)
 	Dropped   int // rows the write limits cut
-	// Charge is what quota.Writes counted (kept with the run for a refund).
+	// Charge is what quota.Writes counted (kept with the run for a refund):
+	// only the rows that were to be written.
 	Charge quota.Charge
 	// Block is why rows were dropped (nil when none).
 	Block *quota.Block
 }
 
 type importRow struct {
-	id     string
+	recID  string
 	values map[string]any // nil value: the cell is empty
+	create map[string]any // nil: update only (the record is there)
 }
 
 // Import reads the range and upserts its rows into spec.Entity of app.
@@ -167,11 +188,16 @@ func (im SheetImporter) Import(ctx context.Context, app *dsl.App, run ImportRun,
 	if len(data) > maxRows {
 		data = data[:maxRows]
 	}
+	loc := run.Location
+	if loc == nil {
+		loc = schedule.Location("")
+	}
+	ns := importNamespace(spec)
 	res.Rows = len(data)
 	seen := map[string]bool{}
-	var todo []importRow
+	var read []importRow
 	for _, r := range data {
-		id := cell(r, idCol)
+		id := normalizeImportID(cell(r, idCol))
 		if id == "" {
 			res.NoID++
 			continue
@@ -191,14 +217,44 @@ func (im SheetImporter) Import(ctx context.Context, app *dsl.App, run ImportRun,
 				vals[f.ID] = nil
 				continue
 			}
-			v, ok := importValue(f, raw)
+			v, ok := importValue(f, raw, loc)
 			if !ok {
 				res.BadValues++
 				continue
 			}
 			vals[f.ID] = v
 		}
-		todo = append(todo, importRow{id: id, values: vals})
+		read = append(read, importRow{recID: store.IDFromClientID(importClientID(ent.ID, ns, id)), values: vals})
+	}
+
+	// only the rows that change something are written and counted
+	var todo []importRow
+	for _, r := range read {
+		cur, found, err := im.Target.ImportedRecord(ctx, ent.ID, r.recID)
+		if err != nil {
+			return res, fmt.Errorf("runner: sheet import: reading %s: %w", ent.ID, err)
+		}
+		if found {
+			if sameRecord(ent, cur, r.values) {
+				res.Unchanged++
+				continue
+			}
+		} else {
+			r.create = map[string]any{}
+			for k, v := range r.values {
+				if v != nil {
+					r.create[k] = v
+				}
+			}
+			if missingRequired(ent, r.create) {
+				res.Required++ // a new record needs it
+				continue
+			}
+		}
+		todo = append(todo, r)
+	}
+	if len(todo) == 0 {
+		return res, nil
 	}
 
 	grant, err := im.Quota.Writes(ctx, run.Decision, len(todo))
@@ -213,17 +269,6 @@ func (im SheetImporter) Import(ctx context.Context, app *dsl.App, run ImportRun,
 
 	origin := store.RecordOrigin{RuleID: run.RuleID, Version: run.Version, EventID: run.EventID, ActorUID: run.ActorUID}
 	for _, r := range todo {
-		recID := store.IDFromClientID(importClientID(run.RuleID, run.Action, r.id))
-		create := map[string]any{}
-		for k, v := range r.values {
-			if v != nil {
-				create[k] = v
-			}
-		}
-		if missingRequired(ent, create) {
-			// a new record needs it; an existing one keeps what it has
-			create = nil
-		}
 		fn := func(d map[string]any) map[string]any {
 			if d == nil {
 				d = map[string]any{}
@@ -237,7 +282,7 @@ func (im SheetImporter) Import(ctx context.Context, app *dsl.App, run ImportRun,
 			}
 			return d
 		}
-		created, applied, err := im.Target.UpsertRecord(ctx, ent.ID, recID, create, origin, markKeyOf(run, recID), fn)
+		created, applied, err := im.Target.UpsertRecord(ctx, ent.ID, r.recID, r.create, origin, markKeyOf(run, r.recID), fn)
 		if err != nil {
 			return res, rejectedWrite(err)
 		}
@@ -246,19 +291,114 @@ func (im SheetImporter) Import(ctx context.Context, app *dsl.App, run ImportRun,
 			res.Created++
 		case applied:
 			res.Updated++
-		case create == nil:
-			res.Required++
 		default:
+			// applied by an earlier attempt of this event, or deleted since
+			// it was read (the write it was counted for is not refunded)
 			res.Unchanged++
 		}
 	}
 	return res, nil
 }
 
-// importClientID names the record of one id cell: the same rule, action
-// and id give the same record on every run.
-func importClientID(rule string, action int, id string) string {
-	return "import/" + rule + "/" + strconv.Itoa(action) + "/" + id
+// importNamespace is the import's part of its record ids: ImportKey, or
+// else IDColumn (NFKC, trimmed).
+func importNamespace(spec SheetImport) string {
+	if k := strings.TrimSpace(norm.NFKC.String(spec.ImportKey)); k != "" {
+		return "key:" + k
+	}
+	return "col:" + strings.TrimSpace(norm.NFKC.String(spec.IDColumn))
+}
+
+// importClientID names the record of one id: the same entity, namespace and
+// normalized id give the same record on every run, whatever rule or action
+// runs the import. Each part is length-prefixed so no value can make two
+// different triples meet.
+func importClientID(entity, ns, id string) string {
+	var b strings.Builder
+	b.WriteString("import")
+	for _, p := range []string{entity, ns, id} {
+		b.WriteString("/")
+		b.WriteString(strconv.Itoa(len(p)))
+		b.WriteString(":")
+		b.WriteString(p)
+	}
+	return b.String()
+}
+
+// importNumberRe is an id cell that is a number: digits with optional
+// thousands separators and an optional fraction.
+var importNumberRe = regexp.MustCompile(`^([+-]?)(\d{1,3}(?:,\d{3})+|\d+)(?:\.(\d+))?$`)
+
+// normalizeImportID is the id an id cell is matched on: NFKC (full-width
+// digits and letters become ASCII), trimmed, and a number written in one
+// canonical form, so "1", "1.00", "001" and "１" match, and so do "1,000"
+// and "1000", whatever display format the column has.
+func normalizeImportID(s string) string {
+	s = strings.TrimSpace(norm.NFKC.String(s))
+	m := importNumberRe.FindStringSubmatch(s)
+	if m == nil {
+		return s
+	}
+	n := strings.TrimLeft(strings.ReplaceAll(m[2], ",", ""), "0")
+	if n == "" {
+		n = "0"
+	}
+	if frac := strings.TrimRight(m[3], "0"); frac != "" {
+		n += "." + frac
+	}
+	if m[1] == "-" && n != "0" {
+		n = "-" + n
+	}
+	return n
+}
+
+// sameRecord reports whether writing values to cur would change nothing.
+func sameRecord(ent *dsl.Entity, cur, values map[string]any) bool {
+	for k, v := range values {
+		f := ent.FieldByID(k)
+		old := cur[k]
+		if v == nil {
+			if old != nil && f != nil && !f.Required {
+				return false // the write would clear it
+			}
+			continue
+		}
+		if old == nil || !sameValue(f, old, v) {
+			return false
+		}
+	}
+	return true
+}
+
+// sameValue compares a stored value with a converted one: numbers by value
+// (the store may give back int64 or float64), datetimes by instant.
+func sameValue(f *dsl.Field, old, v any) bool {
+	if a, ok := importNumber(old); ok {
+		b, ok := importNumber(v)
+		return ok && a == b
+	}
+	if f != nil && f.Type == dsl.FieldDatetime {
+		as, _ := old.(string)
+		bs, _ := v.(string)
+		a, aerr := time.Parse(time.RFC3339, as)
+		b, berr := time.Parse(time.RFC3339, bs)
+		if aerr == nil && berr == nil {
+			return a.Equal(b)
+		}
+	}
+	return reflect.DeepEqual(old, v)
+}
+
+func importNumber(v any) (float64, bool) {
+	switch n := v.(type) {
+	case int64:
+		return float64(n), true
+	case int:
+		return float64(n), true
+	case float64:
+		return n, true
+	}
+	return 0, false
 }
 
 // markKeyOf is the once-per-event mark of one record's update, so a retry
@@ -279,6 +419,15 @@ func checkImport(app *dsl.App, spec SheetImport) (*dsl.Entity, func(string) *dsl
 	ent := app.EntityByID(spec.Entity)
 	if ent == nil {
 		return nil, nil, fmt.Errorf("%w: entity %q is not in the app", ErrImportSpec, spec.Entity)
+	}
+	// the same targets as fileImport (pkg/dsl/file_import.go)
+	switch {
+	case ent.EffectiveScope() == dsl.ScopePublic:
+		return nil, nil, fmt.Errorf("%w: cannot add to public entity %q", ErrImportSpec, ent.ID)
+	case ent.Single:
+		return nil, nil, fmt.Errorf("%w: cannot add to single entity %q", ErrImportSpec, ent.ID)
+	case ent.Match != "":
+		return nil, nil, fmt.Errorf("%w: cannot add to match entity %q", ErrImportSpec, ent.ID)
 	}
 	usable := func(f *dsl.Field) error {
 		if f.Computed != nil || f.Encrypted {
@@ -339,49 +488,52 @@ func cell(cells []string, i int) string {
 	return ""
 }
 
-// importZone: a date or time without a zone is Japan time.
-var importZone = time.FixedZone("JST", 9*60*60)
-
-// importValue turns a cell into f's stored form; ok=false when it does not fit.
-func importValue(f *dsl.Field, s string) (any, bool) {
+// importValue turns a cell into f's stored form; ok=false when it does not
+// fit. The cell is read into a typed value (a number, a bool, an RFC 3339
+// time) and then goes through the same check a device write does
+// (appconfig.NormalizeValue), so an import stores what the app would: an
+// integer or currency with a fraction is refused (not rounded), an enum
+// without options takes any string, the int64 bounds hold. A date or time
+// without a zone is read in loc.
+func importValue(f *dsl.Field, s string, loc *time.Location) (any, bool) {
+	var v any = s
 	switch f.Type {
-	case dsl.FieldString, dsl.FieldText:
-		return s, true
 	case dsl.FieldInteger, dsl.FieldNumber, dsl.FieldCurrency:
 		n, err := strconv.ParseFloat(strings.NewReplacer(",", "", "¥", "", "￥", "").Replace(s), 64)
-		if err != nil || math.IsNaN(n) || math.IsInf(n, 0) {
+		if err != nil {
 			return nil, false
 		}
-		if f.Type == dsl.FieldInteger {
-			n = math.Round(n)
-		}
-		return n, true
+		v = n
 	case dsl.FieldBoolean:
 		switch strings.ToLower(s) {
 		case "true", "1", "yes", "はい", "○", "◯":
-			return true, true
+			v = true
 		case "false", "0", "no", "いいえ", "×":
-			return false, true
+			v = false
+		default:
+			return nil, false
 		}
 	case dsl.FieldDate:
 		for _, l := range []string{"2006-01-02", "2006/1/2", "2006-1-2"} {
-			if t, err := time.ParseInLocation(l, s, importZone); err == nil {
-				return t.Format("2006-01-02"), true
+			if t, err := time.Parse(l, s); err == nil {
+				v = t.Format("2006-01-02")
+				break
 			}
 		}
 	case dsl.FieldDatetime:
-		if t, err := time.Parse(time.RFC3339, s); err == nil {
-			return t.UTC().Format("2006-01-02T15:04:05Z"), true
-		}
-		for _, l := range []string{"2006-01-02 15:04", "2006/1/2 15:04", "2006-01-02 15:04:05", "2006/1/2 15:04:05"} {
-			if t, err := time.ParseInLocation(l, s, importZone); err == nil {
-				return t.UTC().Format("2006-01-02T15:04:05Z"), true
+		if _, err := time.Parse(time.RFC3339, s); err != nil {
+			for _, l := range []string{"2006-01-02 15:04", "2006/1/2 15:04", "2006-01-02 15:04:05", "2006/1/2 15:04:05",
+				"2006-01-02", "2006/1/2", "2006-1-2"} {
+				if t, err := time.ParseInLocation(l, s, loc); err == nil {
+					v = t.Format(time.RFC3339)
+					break
+				}
 			}
 		}
-	case dsl.FieldEnum:
-		if slices.Contains(f.Options, s) {
-			return s, true
-		}
 	}
-	return nil, false
+	out, err := appconfig.NormalizeValue(f, v)
+	if err != nil {
+		return nil, false
+	}
+	return out, true
 }
