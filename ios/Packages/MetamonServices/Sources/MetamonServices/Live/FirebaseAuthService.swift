@@ -40,6 +40,13 @@ public enum FirebaseBootstrap {
     public static func currentUser(appName: String?) -> AuthUser? {
         auth(appName: appName)?.currentUser.map(AuthUser.init)
     }
+
+    /// 名前付きのアプリをサインアウトして新しい匿名で入り直す(#2084 の試験用の枠)。既定のアプリ(いつものアカウント)には使えない
+    public static func renewAnonymous(appName: String) async throws -> AuthUser? {
+        guard let auth = auth(appName: appName) else { return nil }
+        try auth.signOut()
+        return AuthUser(try await auth.signInAnonymously().user)
+    }
 }
 
 /// Firebase Auth 実装。Sign in with Apple(credential 交換)と匿名認証、ID トークン供給。

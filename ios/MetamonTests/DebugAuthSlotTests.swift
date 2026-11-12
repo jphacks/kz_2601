@@ -22,7 +22,7 @@ final class DebugAuthSlotTests: XCTestCase {
 
     func testDefaultAndUnknownValuesAreSlotZero() {
         XCTAssertEqual(DebugAuthSlot.current(in: defaults), 0)
-        for raw in ["", "x", "-1", "5", "99", "1.5"] {
+        for raw in ["", "x", "-1", "4", "99", "1.5"] {
             XCTAssertEqual(DebugAuthSlot.slot(from: raw), 0, raw)
         }
         XCTAssertEqual(DebugAuthSlot.slot(from: nil), 0)
@@ -39,19 +39,22 @@ final class DebugAuthSlotTests: XCTestCase {
 
     /// 「全部元に戻す」で枠が消えない(データを消さずに別の uid に戻らないように)
     func testResetAllKeepsSlot() {
-        DebugAuthSlot.save(4, in: defaults)
+        DebugAuthSlot.save(3, in: defaults)
+        DebugAuthSlot.markUsed(3, at: Date(timeIntervalSince1970: 100), in: defaults)
         DebugKnobStore(defaults: defaults, environment: { [:] }).resetAll()
-        XCTAssertEqual(DebugAuthSlot.current(in: defaults), 4)
+        XCTAssertEqual(DebugAuthSlot.current(in: defaults), 3)
+        XCTAssertNotNil(DebugAuthSlot.lastUsed(3, in: defaults))
         XCTAssertFalse(DebugAuthSlot.key.hasPrefix(DebugKnobs.keyPrefix))
     }
 
     func testAppNamePerSlot() {
         XCTAssertNil(DebugAuthSlot.appName(for: 0), "枠 0 は既定のアプリ")
         XCTAssertEqual(DebugAuthSlot.appName(for: 1), "metamon-slot-1")
-        XCTAssertEqual(DebugAuthSlot.appName(for: 4), "metamon-slot-4")
+        XCTAssertEqual(DebugAuthSlot.appName(for: 3), "metamon-slot-3")
+        XCTAssertNil(DebugAuthSlot.appName(for: 4))
         XCTAssertNil(DebugAuthSlot.appName(for: 9))
         let names = DebugAuthSlot.slots.compactMap(DebugAuthSlot.appName(for:))
-        XCTAssertEqual(Set(names).count, 4, "試験用の枠はそれぞれ別の名前")
+        XCTAssertEqual(Set(names).count, 3, "試験用の枠はそれぞれ別の名前")
     }
 
     /// BuildConfig の入口は保存した枠のアプリ名を使う
@@ -60,8 +63,10 @@ final class DebugAuthSlotTests: XCTestCase {
         defer { DebugKnobs.store.defaults.set(saved, forKey: DebugAuthSlot.key) }
         DebugAuthSlot.save(0, in: DebugKnobs.store.defaults)
         XCTAssertNil(BuildConfig.authAppName)
+        XCTAssertFalse(BuildConfig.isDebugTestAccount)
         DebugAuthSlot.save(3, in: DebugKnobs.store.defaults)
         XCTAssertEqual(BuildConfig.authAppName, "metamon-slot-3")
+        XCTAssertTrue(BuildConfig.isDebugTestAccount, "試験用の枠は Apple への引き継ぎと削除を出さない")
     }
 
     /// Firebase がある版では、名前付きのアプリの Auth を使う(ネットワークには出ない)
@@ -71,6 +76,27 @@ final class DebugAuthSlotTests: XCTestCase {
         XCTAssertEqual(FirebaseAuthService(appName: nil)?.firebaseAppName, "__FIRAPP_DEFAULT")
         XCTAssertEqual(FirebaseAuthService(appName: "metamon-slot-2")?.firebaseAppName, "metamon-slot-2")
         XCTAssertEqual(FirebaseAuthService(appName: "metamon-slot-2")?.firebaseAppName, "metamon-slot-2", "2 回目は作ったものを使う")
+    }
+
+    func testLastUsedPerSlot() {
+        XCTAssertNil(DebugAuthSlot.lastUsed(1, in: defaults))
+        DebugAuthSlot.markUsed(1, at: Date(timeIntervalSince1970: 1_000), in: defaults)
+        XCTAssertEqual(DebugAuthSlot.lastUsed(1, in: defaults), Date(timeIntervalSince1970: 1_000))
+        XCTAssertNil(DebugAuthSlot.lastUsed(2, in: defaults), "枠ごとに別")
+    }
+
+    /// 試験用の枠では引き継ぎの案内を予約しない
+    func testTestSlotDoesNotOfferAccountLink() throws {
+        let saved = DebugKnobs.store.defaults.object(forKey: DebugAuthSlot.key)
+        defer { DebugKnobs.store.defaults.set(saved, forKey: DebugAuthSlot.key) }
+        let rt = AppRuntime(document: try DSLExamples.document("kakeibo", version: 1), services: BuildConfig.make(environment: .mock))
+        rt.isAnonymousUser = { true }
+        DebugAuthSlot.save(2, in: DebugKnobs.store.defaults)
+        rt.offerAccountLinkIfNeeded(defaults: defaults, launch: "a")
+        XCTAssertNil(defaults.string(forKey: AccountLinkPrompt.pendingKey))
+        DebugAuthSlot.save(0, in: DebugKnobs.store.defaults)
+        rt.offerAccountLinkIfNeeded(defaults: defaults, launch: "a")
+        XCTAssertEqual(defaults.string(forKey: AccountLinkPrompt.pendingKey), "a", "枠 0 は今までどおり")
     }
 
     func testSwitchWipesThenSavesThenRelaunches() async {
