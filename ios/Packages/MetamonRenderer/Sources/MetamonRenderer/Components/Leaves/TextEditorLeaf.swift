@@ -23,7 +23,7 @@ struct TextEditorLeaf: View {
                         .font(RenderTheme.Fonts.inputValue)
                         .focused($focused)
                         .keyboardAnchor(c, $focused)
-                        .macFormTabStop(c, $focused)
+                        .macFormTabStop(c, $focused, insertsTab: true)
                 }
                 .renderInputChrome(focused: focused)
             }
