@@ -29,6 +29,7 @@ struct SettingsSheet: View {
             List {
                 if Self.e2eDeleteAccount { deleteAccountSection } // E2E: 削除ボタンを画面内に出す(シミュレータはスクロール操作できない)
                 accountSection
+                LinkedAccountsSection() // #361 つながっているサインインの方法・Apple をつなぐ
                 #if !APP_STORE_REVIEW // 審査用ビルドは共有を外しているので、投稿に出す名前も出さない(#247)
                 AuthorNameSettingsSection() // 共有アプリの投稿に出す名前(#250)
                 #endif
@@ -39,10 +40,14 @@ struct SettingsSheet: View {
                 ProSettingsSection() // 課金(#77)
                 CoinSettingsSection() // #630 コイン(サーバーが有効にした時だけ)
                 #endif
+                #if !APP_STORE_REVIEW // 審査用の版は OAuth の provider を外す(決定 6)
+                if ConnectedServicesPolicy.isAvailable { ConnectedServicesSection() } // #1493 つないだサービス
+                #endif
                 RemainingTodaySettingsSection() // #630 今日の残り(審査用の版も出す)
                 UsageSettingsSection() // #317 使っている量(作ったアプリの数・今のアプリの記録と写真)
                 languageSection
                 Section { AppIconSettingsRow() } // #232 ホーム画面のアイコン(全員・審査用の版も出す)
+                ActionButtonHintSection() // #1993 iOS 17 だけ: アクションボタンにショートカットを割り当てる案内
                 voiceModelSection
                 clarifySection
                 speechSection
@@ -60,6 +65,9 @@ struct SettingsSheet: View {
                 PrivacySettingsSection() // #246: AI への送信の同意・プライバシーポリシー・利用規約
                 supportSection
                 if !Self.e2eDeleteAccount { deleteAccountSection }
+                #if METAMON_STG // 開発用メニュー(#2079): stg の版だけ・接続先が prod なら出さない
+                if DebugMenuPolicy.isAvailable { DebugMenuEntrySection() }
+                #endif
             }
             .navigationTitle("設定")
             .task { await rt.refreshPlanUsage() } // #317 使っている量(5 分キャッシュ)
@@ -186,7 +194,7 @@ struct SettingsSheet: View {
             do {
                 if try await session.deleteAccount(account: services.account, runtime: rt) { dismiss() }
             } catch {
-                deleteError = error.localizedDescription
+                deleteError = ErrorCopy.accountFailureBody(error, context: "account delete")
             }
         }
     }
@@ -202,7 +210,7 @@ struct SettingsSheet: View {
                 case .unsent(let n): signOutUnsent = n
                 }
             } catch {
-                signOutError = error.localizedDescription
+                signOutError = ErrorCopy.accountFailureBody(error, context: "sign out")
             }
         }
     }
@@ -333,6 +341,14 @@ struct SettingsSheet: View {
                 Label("使い方を見る", systemImage: "questionmark.circle")
             }
             .accessibilityIdentifier("settings.tutorial")
+            Button {
+                dismiss()
+                rt.replayCoachMarks() // #1441
+            } label: {
+                Label("操作のヒントをもう一度見る", systemImage: "hand.tap")
+            }
+            .accessibilityHint("長押しやドラッグなど、見た目から分からない操作の案内をもう一度出します")
+            .accessibilityIdentifier("settings.coachMarks")
             NavigationLink {
                 // #415: 選んだ例は音声画面(か対話)の入力欄に入る。送らない
                 PromptTipsView { text in
@@ -343,6 +359,13 @@ struct SettingsSheet: View {
                 Label("頼み方のコツ", systemImage: "lightbulb")
             }
             .accessibilityIdentifier("settings.tips")
+            NavigationLink {
+                AutomationGuideView() // #1995 ショートカットのオートメーションの案内
+            } label: {
+                Label("ショートカットで自動にする", systemImage: "clock.arrow.2.circlepath")
+            }
+            .accessibilityHint("App を開いた時などをきっかけに「記録を追加」を動かす作り方を見ます")
+            .accessibilityIdentifier("settings.automationGuide")
             Button(role: .destructive) { confirmReset = true } label: {
                 Label(L10n.key("アプリをリセット(初期状態に戻す)", review: "記録帳をリセット(初期状態に戻す)"), systemImage: "arrow.counterclockwise")
             }

@@ -3,9 +3,10 @@
 import SwiftUI
 
 /// β の案内(#313)の Mac 版(#971)。文言は iOS と同じ `BetaWelcomeContent`。
-/// Mac にはまだ入力欄(#967)とフィードバックの送信(#319)が無いので、依頼の例は読むだけ・フィードバックの欄は出さない。
+/// 依頼の例はクリックで会話のシートの入力欄に入れる(送らない・#1214)。案内からフィードバックのウインドウ(#983)も開ける。
 struct MacBetaWelcomeView: View {
     let onFinish: () -> Void
+    @Environment(\.openWindow) private var openWindow
 
     var body: some View {
         NavigationStack {
@@ -23,11 +24,23 @@ struct MacBetaWelcomeView: View {
                         }
                     }
                 }
-                Section("試してほしい依頼") {
+                Section {
                     ForEach(BetaWelcomeContent.tryKeys, id: \.self) { key in
                         let text = L10n.tr(String.LocalizationValue(key))
-                        Label(L10n.tr("「\(text)」"), systemImage: "mic")
+                        Button {
+                            MacDraftRequest.shared.send(text)
+                            onFinish()
+                        } label: {
+                            Label(L10n.tr("「\(text)」"), systemImage: "mic")
+                        }
+                        .buttonStyle(.borderless)
+                        .help(L10n.tr("クリックすると入力欄に入ります(まだ送りません)。"))
+                        .accessibilityIdentifier("betaWelcome.example")
                     }
+                } header: {
+                    Text("試してほしい依頼")
+                } footer: {
+                    Text("クリックすると入力欄に入ります(まだ送りません)。")
                 }
                 Section("まだできないこと") {
                     ForEach(BetaWelcomeContent.limitKeys, id: \.self) { key in
@@ -37,6 +50,18 @@ struct MacBetaWelcomeView: View {
                 Section("データについて") {
                     Label("β の期間中は、作ったアプリや記録が消えることがあります。大事なデータは、ほかの場所にも残してください。",
                           systemImage: "externaldrive.badge.exclamationmark")
+                }
+                Section {
+                    Button {
+                        MacFeedbackCenter.shared.open(openWindow) // #983
+                    } label: {
+                        Label("フィードバックを送る", systemImage: "envelope")
+                    }
+                    .buttonStyle(.borderless)
+                    .help(L10n.tr("フィードバックのウインドウを開きます"))
+                    .accessibilityIdentifier("betaWelcome.feedback")
+                } footer: {
+                    Text("困ったこと・欲しい機能を、ここからそのまま送れます。")
                 }
             }
             .formStyle(.grouped)
@@ -49,7 +74,7 @@ struct MacBetaWelcomeView: View {
                 }
             }
         }
-        .frame(width: 520, height: 600)
+        .frame(width: 520, height: 640)
         .accessibilityIdentifier("betaWelcome.sheet")
     }
 }

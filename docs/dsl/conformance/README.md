@@ -124,6 +124,7 @@ case の名前: `example-*`(`docs/dsl/examples` をそのまま描く)・`flow-*
 | `grid` | `columns`(2〜4 に丸めた列数) |
 | `searchBar` | `query` |
 | `image` | `hasImage` |
+| `aiChat` | `textField`・`roleField`・`saveTo`(`{entity}`)・`inputEntity`・`turns: [{recordId, role, text}]`(自分の記録だけ・作成時刻の古い順・本文が空の記録は飛ばす・`roleField` が無ければ自分 → AI の交互。役は `user` / `assistant`)。返事は AI 次第なので入れない(`example-ai-counselor`・`edge-ai-chat`) |
 
 DSL に書いた値で `props` に入れるもの: `title text label message placeholder url field entity aggregate format groupBy bucket kind mode metric period sensor task output address unit min max step target seconds limit expanded show`。`style`・`icon`・`color`・`size`・`height` などの見た目のキーは入れない。
 
@@ -178,12 +179,12 @@ DSL に書いた値で `props` に入れるもの: `title text label message pla
 
 `ConformanceTests.testCoverageListIsUpToDate` が「全 case に出てくる部品の type + `coverage.json` の `notYetCovered` = スキーマの全 type」を確かめる(足りない・余計なら赤)。
 
-今: **74 / 77 の type が case に出てくる**(`notYetCovered` は `placeSearch`・`aiChat`・`callButton`。placeSearch の検索は `PlaceSearchTests`、aiChat は審査用の版から外す部品で、会話の並び・送る会話は `AIChatTests` で確かめる)。そのうち値まで解決して比べるもの:
+今: **75 / 77 の type が case に出てくる**(`notYetCovered` は `callButton`・`placeSearch`。placeSearch の検索は `PlaceSearchTests` で確かめる。aiChat は会話の並びまで木に出し、送る会話は `AIChatTests` で確かめる)。そのうち値まで解決して比べるもの:
 
 | 区分 | type |
 |---|---|
 | Container(7) | vstack hstack section card disclosure carousel grid(子の順・ローカルグリッドの位置・見出し・列数・開閉) |
-| 値まで解決する Leaf | text label badge markdown link emptyState button stat list table timeline chart progressBar gauge settlement flashcards searchBar image、入力 20 種(textField numberField picker toggle datePicker slider stepper textEditor secureField timePicker rating colorPicker photoField drawingField videoField audioRecorder transcribeField locationPicker locationButton qrScanner) |
+| 値まで解決する Leaf | text label badge markdown link emptyState button stat list table timeline chart progressBar gauge settlement flashcards searchBar image aiChat、入力 20 種(textField numberField picker toggle datePicker slider stepper textEditor secureField timePicker rating colorPicker photoField drawingField videoField audioRecorder transcribeField locationPicker locationButton qrScanner) |
 | state と DSL の値だけの Leaf | 上の「既知の隙間」に挙げた OS の機能に頼る部品・matchList(仲間探しのつながりの状態に頼る)・icon avatar spacer divider voiceInput shareButton openUrlButton videoPlayer speakButton・feed(行は appconfig の `/v1/feeds` から取るので木に入れない・`edge-feed`)・fileImport(木には `state` と DSL の値だけ。CSV の列の当て方と足す記録は `importCsv` の操作と `imported` / `saved` の effects で比べる・`flow-file-import`) |
 
 アクションは navigate(push / sheet / prefillRef なし)・back・saveRecord(必須の検証・新規・遷移)・deleteRecord(確認・閉じる)を操作で試している。CSV の取り込み(`fileImport`)は `importCsv` で試している。startActivity・endActivity・scheduleNotification は examples の木に `actions` として出る(実行は `request`)。

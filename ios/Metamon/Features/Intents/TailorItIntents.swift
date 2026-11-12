@@ -42,6 +42,8 @@ struct AddRecordIntent: AppIntent {
     static var description = IntentDescription("Tailor It で作ったアプリに、アプリを開かずに記録を 1 件追加します。例: 家計簿に「ランチ 800円」。")
     #endif
     static var openAppWhenRun = false
+    /// ロック中は端末のロック解除を求める(#1995)。記録先の名前や記録をロック画面から読み書きさせない
+    static var authenticationPolicy: IntentAuthenticationPolicy = .requiresLocalDeviceAuthentication
 
     #if APP_STORE_REVIEW
     @Parameter(title: "記録先", requestValueDialog: "どの記録帳に記録しますか?")
@@ -65,14 +67,15 @@ struct AddRecordIntent: AppIntent {
 
     @MainActor
     func perform() async throws -> some IntentResult & ProvidesDialog {
-        guard let runtime = IntentHost.shared.runtime else { throw TailorIntentError.notReady }
-        guard let doc = await IntentHost.shared.document(appId: target.appId),
+        let host = IntentHost.shared // iOS は IntentHost.swift、Mac は MetamonMac/App/Intents/MacIntentHost.swift(#1034)
+        guard host.canWriteRecords else { throw TailorIntentError.notReady }
+        guard let doc = await host.document(appId: target.appId),
               let entity = doc.dsl.entity(target.entityId) else { throw TailorIntentError.targetNotFound(target.title) }
 
         // ref 項目(カテゴリ台帳など)は参照先のレコードをローカル DB から読み、見出しで当てる
         var refRecords: [String: [Record]] = [:]
         for refEntity in Set(entity.fields.filter { $0.type == .ref }.compactMap(\.refEntity)) {
-            refRecords[refEntity] = await runtime.recordSync.cached(appId: target.appId, entity: refEntity)
+            refRecords[refEntity] = await host.cachedRecords(appId: target.appId, entity: refEntity)
         }
         let refChoices = QuickRecord.refChoices(for: entity, in: doc.dsl, records: refRecords)
 
@@ -85,8 +88,9 @@ struct AddRecordIntent: AppIntent {
         }
         guard draft.missing.isEmpty else { throw TailorIntentError.missingFields(draft.missing) }
 
-        runtime.recordSync.encryptedFields[target.appId] = doc.dsl.encryptedFields // #233 今のアプリでなくても暗号化する
-        let sent = await runtime.addRecordFromIntent(appId: target.appId, entity: entity.id, data: draft.data)
+        // #233 今のアプリでなくても暗号化する
+        let sent = try await host.addRecord(appId: target.appId, entity: entity.id, data: draft.data,
+                                            encryptedFields: doc.dsl.encryptedFields)
         let what = draft.summary.isEmpty ? content : draft.summary
         let message = Self.addedMessage(appName: target.appName, what: what, refs: draft.refs, sent: sent)
         print("[Metamon] intent: \(String(localized: message))")
@@ -126,6 +130,11 @@ enum TailorIntentError: Error, CustomLocalizedStringResourceConvertible {
     case notReady
     case targetNotFound(String)
     case missingFields([String])
+    /// 数字を読む(#1994): アプリか stat が消えた / 記録が端末に無い / 数で取れない
+    case statNotFound
+    case statNotLoaded(String)
+    case statNotNumber(String)
+    case statLocked(String)
 
     var localizedStringResource: LocalizedStringResource {
         switch self {
@@ -136,6 +145,14 @@ enum TailorIntentError: Error, CustomLocalizedStringResourceConvertible {
         case .targetNotFound(let name): "「\(name)」が見つかりませんでした。Tailor It でアプリを確認してください"
         #endif
         case .missingFields(let names): "「\(names.joined(separator: String(localized: "・")))」が必要です。Tailor It を開いて追加してください"
+        #if APP_STORE_REVIEW
+        case .statNotFound: "その数字が見つかりませんでした。Tailor It で記録帳を確認して、選び直してください"
+        #else
+        case .statNotFound: "その数字が見つかりませんでした。Tailor It でアプリを確認して、選び直してください"
+        #endif
+        case .statNotLoaded(let name): "まだ読み込んでいません。Tailor It で\(name)を一度開いてください"
+        case .statNotNumber(let label): "「\(label)」は数値で読めません。「数字を読む」を使ってください"
+        case .statLocked(let label): "「\(label)」はロック中です。Tailor It を開いて確認してください"
         }
     }
 }
@@ -180,6 +197,17 @@ struct TailorItShortcuts: AppShortcutsProvider {
             ],
             shortTitle: "アプリを開く",
             systemImageName: "square.grid.2x2"
+        )
+        #endif
+        #if os(iOS) // 数字を読む(#1994)は iOS だけ。Mac は #1034 の後で足す
+        AppShortcut(
+            intent: GetStatValueIntent(),
+            phrases: [
+                "\(.applicationName)で数字を読む",
+                "\(.applicationName)の数字を読む",
+            ],
+            shortTitle: "数字を読む",
+            systemImageName: "number"
         )
         #endif
         AppShortcut(

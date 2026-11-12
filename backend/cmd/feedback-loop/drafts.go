@@ -60,6 +60,10 @@ func (a *app) reviewer() (*draft.Reviewer, error) {
 		return nil, fmt.Errorf("%s must be owner/name", envIssueRepo)
 	}
 	for l := range ingest.ParseList(a.getenv(envIssueLabels)) {
+		// agent:* starts an agent (#370); only a person adds it, never the loop.
+		if strings.HasPrefix(strings.ToLower(strings.TrimSpace(l)), "agent:") {
+			return nil, fmt.Errorf("refusing to start: %s must not contain %q (a person adds agent:* labels, the loop never does)", envIssueLabels, l)
+		}
 		r.Labels = append(r.Labels, l)
 	}
 	sort.Strings(r.Labels)
@@ -76,7 +80,8 @@ const draftsUsage = `usage: feedback-loop drafts <list|show|edit|approve|reject|
   list [-status pending]
   show <id>
   edit -by NAME [-title T] [-body-file F] <id>
-  approve -by NAME <id>        承認 1: posts to LOOP_ISSUE_REPO (none = dry run)
+  approve -by NAME <id>        承認 1: posts to LOOP_ISSUE_REPO (none = dry run);
+                               a draft marked "adds to" becomes a comment there
   reject -by NAME [-reason R] <id>
   publish <id>                 post an approved draft (after a dry run)
 `
@@ -173,14 +178,27 @@ func (a *app) afterPost(ctx context.Context, verb, by string, d *loop.Draft, iss
 		if actor == "" {
 			actor = loop.ActorLoop
 		}
-		if err := a.gate().Record(ctx, loop.Event{Stage: loop.StagePublish, Action: "issue_created", Actor: actor, DraftID: d.ID,
+		action := "issue_created"
+		if d.AppendIssue > 0 {
+			action = "issue_appended"
+		}
+		if err := a.gate().Record(ctx, loop.Event{Stage: loop.StagePublish, Action: action, Actor: actor, DraftID: d.ID,
 			IssueRepo: d.IssueRepo, Issue: d.IssueNumber, BodyHash: d.BodyHash}); err != nil {
 			return err
 		}
 	}
 	if iss == nil {
+		if d.AppendIssue > 0 {
+			fmt.Fprintf(a.out, "%s %s (dry run: %s is not set, nothing was posted). This is the comment that would be added to %s#%d:\n\n", verb, d.ID, envIssueRepo, d.AppendRepo, d.AppendIssue)
+			fmt.Fprintf(a.out, "%s\n", d.Body)
+			return nil
+		}
 		fmt.Fprintf(a.out, "%s %s (dry run: %s is not set, nothing was posted). This is the issue that would be created:\n\n", verb, d.ID, envIssueRepo)
 		fmt.Fprintf(a.out, "title: %s\n\n%s\n", d.Title, d.Body)
+		return nil
+	}
+	if d.AppendIssue > 0 {
+		fmt.Fprintf(a.out, "%s %s -> added to %s#%d %s\n", verb, d.ID, d.IssueRepo, iss.Number, iss.URL)
 		return nil
 	}
 	fmt.Fprintf(a.out, "%s %s -> %s#%d %s\n", verb, d.ID, d.IssueRepo, iss.Number, iss.URL)
@@ -197,6 +215,8 @@ func (a *app) draftsList(ctx context.Context, status string) error {
 		issue := ""
 		if d.IssueNumber > 0 {
 			issue = fmt.Sprintf(" -> %s#%d", d.IssueRepo, d.IssueNumber)
+		} else if d.AppendIssue > 0 {
+			issue = fmt.Sprintf(" (adds to %s#%d)", d.AppendRepo, d.AppendIssue)
 		}
 		fmt.Fprintf(a.out, "%s  %-9s %s %-8s n=%-3d %s%s\n", d.ID, d.Status, d.Priority, d.Category, d.Count, d.Title, issue)
 	}
@@ -206,6 +226,9 @@ func (a *app) draftsList(ctx context.Context, status string) error {
 
 func (a *app) printDraft(d *loop.Draft, reasons []string) {
 	fmt.Fprintf(a.out, "id:       %s\nstatus:   %s\ncluster:  %s\npriority: %s\ncount:    %d (%s)\n", d.ID, d.Status, d.ClusterKey, d.Priority, d.Count, strings.Join(d.Sources, ", "))
+	if d.AppendIssue > 0 {
+		fmt.Fprintf(a.out, "adds to:  %s#%d (posted as a comment; the title is not posted)\n", d.AppendRepo, d.AppendIssue)
+	}
 	if len(reasons) > 0 {
 		fmt.Fprintf(a.out, "exit check: FAILS (%s)\n", strings.Join(reasons, ", "))
 	} else {

@@ -4,16 +4,28 @@ import MetamonDSL
 /// `text`: style(title|headline|body|caption)と align(leading|center|trailing)。
 /// screen.entity の画面では `{{fieldId}}` を開いているレコードの値にする(`TextHighlight.substitutes` の field だけ・他は文字のまま)。
 /// `highlight` の語に印(marker: 背景 + 太字 / bold)。印は見た目だけで、VoiceOver はふつうの文として読む。
+/// 記録の文字(string / text の値)は長押しで「翻訳」(#2000・iOS 18+・秘密の field は出さない)。
 struct TextLeaf: View {
     @Environment(\.dslRuntime) private var rt
     let c: Component
     var ctx: RenderContext? = nil
+    @State private var translating = false
 
     var body: some View {
-        Text(content)
+        let attributed = content
+        let text = String(attributed.characters)
+        Text(attributed)
             .font(font)
             .multilineTextAlignment(alignment)
+            .macTextSelection { text } // Mac: 選んでコピーできる(#941)
             .frame(maxWidth: .infinity, alignment: frameAlignment)
+            .modifier(TextTranslateMenu(offers: offersTranslation(text), text: text, isPresented: $translating))
+    }
+
+    /// 記録の画面で、文字の field を置き換えた文字だけ(固定の文言は訳さない)
+    private func offersTranslation(_ text: String) -> Bool {
+        guard RecordTranslation.osSupports, let entity = ctx?.form?.entity else { return false }
+        return RecordTranslation.offers(text: text, fields: RecordTranslation.substitutedFields(template: c.text ?? "", entity: entity))
     }
 
     private var content: AttributedString {
@@ -32,6 +44,23 @@ struct TextLeaf: View {
     }
     private var frameAlignment: Alignment {
         switch c.align { case "center": .center; case "trailing": .trailing; default: .leading }
+    }
+}
+
+/// 「翻訳」を出す時だけ長押しのメニューを付ける(出さない文字は長押しで浮かせない)
+private struct TextTranslateMenu: ViewModifier {
+    let offers: Bool
+    let text: String
+    @Binding var isPresented: Bool
+
+    func body(content: Content) -> some View {
+        if offers {
+            content
+                .contextMenu { RecordTranslateMenuItem(offers: true) { isPresented = true } }
+                .recordTranslation(isPresented: $isPresented, text: text)
+        } else {
+            content
+        }
     }
 }
 

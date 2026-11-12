@@ -102,6 +102,13 @@ struct MusicPlayerLeaf: View {
                             .font(.footnote.weight(.semibold))
                             .accessibilityIdentifier("music.openSettings")
                     }
+                    if MusicAppLink.offered(for: session.availability),
+                       let url = MusicAppLink.url(for: session.state.nowPlaying) {
+                        // Mac: アプリの中で再生できなくても、ミュージック アプリで聴ける(#1348)
+                        Button(MusicAppLink.label(for: session.state.nowPlaying)) { openURL(url) }
+                            .font(.footnote.weight(.semibold))
+                            .accessibilityIdentifier("music.openMusicApp")
+                    }
                 }
             }
         }
@@ -134,6 +141,13 @@ struct MusicPlayerLeaf: View {
         }
         .accessibilityElement(children: .combine)
         .accessibilityIdentifier("music.nowPlaying")
+        #if os(macOS)
+        .contextMenu {
+            if let song = session.state.nowPlaying, let url = MusicAppLink.url(for: song) {
+                Button(MusicAppLink.label(for: song), systemImage: "arrow.up.right.square") { openURL(url) }
+            }
+        }
+        #endif
     }
 
     private var controls: some View {
@@ -214,20 +228,24 @@ struct MusicArtwork: View {
 
     var body: some View {
         let shape = RoundedRectangle(cornerRadius: size * 0.18, style: .continuous)
-        AsyncImage(url: ImageHostPolicy.loadableURL(url)) { phase in
-            if let image = phase.image {
-                image.resizable().scaledToFill()
+        Group {
+            if let loadable = ImageHostPolicy.loadableURL(url) {
+                RemoteImage(url: loadable) { note }
             } else {
-                Image(systemName: "music.note")
-                    .font(.system(size: size * 0.4, weight: .semibold))
-                    .foregroundStyle(RenderTheme.Colors.brandA)
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
-                    .background(RenderTheme.Colors.brandSoft)
+                note
             }
         }
         .frame(width: size, height: size)
         .clipShape(shape)
         .accessibilityHidden(true)
+    }
+
+    private var note: some View {
+        Image(systemName: "music.note")
+            .font(.system(size: size * 0.4, weight: .semibold))
+            .foregroundStyle(RenderTheme.Colors.brandA)
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .background(RenderTheme.Colors.brandSoft)
     }
 }
 
@@ -297,6 +315,7 @@ struct MusicSearchSheet: View {
     let requests: Bool
     let onRequest: (MusicSong) -> Void
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.openURL) private var openURL
     @State private var term = ""
     @State private var results: [MusicSong] = []
     @State private var message: String?
@@ -327,6 +346,16 @@ struct MusicSearchSheet: View {
                                 .buttonStyle(.borderless)
                                 .iconButtonLabel(L("再生待ちに追加"))
                             }
+                            #if os(macOS)
+                            // Mac: アプリの中で再生できない時は、ミュージック アプリで開くを前に出す(#1348)
+                            if MusicAppLink.offered(for: session.availability), let url = MusicAppLink.url(for: song) {
+                                Button { openURL(url) } label: {
+                                    Image(systemName: "arrow.up.right.square").font(.title3)
+                                }
+                                .buttonStyle(.borderless)
+                                .iconButtonLabel(MusicAppLink.label(for: song))
+                            }
+                            #endif
                             if requests {
                                 Button {
                                     request(song)
@@ -337,6 +366,13 @@ struct MusicSearchSheet: View {
                                 .iconButtonLabel(L("近くの人にリクエスト"))
                             }
                         }
+                        #if os(macOS)
+                        .contextMenu {
+                            if let url = MusicAppLink.url(for: song) {
+                                Button(MusicAppLink.label(for: song), systemImage: "arrow.up.right.square") { openURL(url) }
+                            }
+                        }
+                        #endif
                     }
                 } footer: {
                     if !term.isEmpty, let url = MusicLinks.spotifySearchURL(MusicSong(title: term, artist: "")) {

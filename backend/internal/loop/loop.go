@@ -42,6 +42,8 @@ const (
 	SourceInApp       Source = "in_app"           // feedback/{id} (#319)
 	SourceStoreReview Source = "app_store_review" // App Store Connect customer reviews
 	SourceCrash       Source = "crash"            // a crash spike, recorded as one item (#296)
+	SourceTestFlight  Source = "testflight"       // TestFlight beta feedback (screenshot and crash submissions)
+	SourceGenFailure  Source = "gen_failure"      // a spike of one AI generation failure code, recorded as one item (#297)
 )
 
 // Item statuses.
@@ -99,6 +101,7 @@ type Item struct {
 	Category   string    `firestore:"category,omitempty"`
 	Area       string    `firestore:"area,omitempty"`
 	Priority   string    `firestore:"priority,omitempty"`
+	Impact     string    `firestore:"impact,omitempty"`  // the model's high / medium / low, for the bundle's priority
 	Summary    string    `firestore:"summary,omitempty"` // LLM-written, checked (検査器 1)
 	ClusterKey string    `firestore:"clusterKey,omitempty"`
 	DraftID    string    `firestore:"draftId,omitempty"`
@@ -149,6 +152,18 @@ type Draft struct {
 	IssueRepo    string    `firestore:"issueRepo,omitempty"`
 	IssueNumber  int       `firestore:"issueNumber,omitempty"`
 	BodyHash     string    `firestore:"bodyHash,omitempty"` // sha256 of the posted title+body (#366 decision 11)
+	// AppendRepo and AppendIssue: the cluster already has a published,
+	// not-fixed issue there, so this draft is a comment that adds the new
+	// counts and examples to it instead of a new issue (#369). Set by the
+	// builder; the approved body is posted as that comment.
+	AppendRepo  string `firestore:"appendRepo,omitempty"`
+	AppendIssue int    `firestore:"appendIssue,omitempty"`
+
+	// PublishedAt: when the issue or comment was posted. ClosedAt: the
+	// issue was found closed (any reason) when an append draft was about to
+	// be posted to it, so the loop stops adding to it.
+	PublishedAt time.Time `firestore:"publishedAt,omitempty"`
+	ClosedAt    time.Time `firestore:"closedAt,omitempty"`
 
 	FixedPR    int       `firestore:"fixedPr,omitempty"`
 	FixedAt    time.Time `firestore:"fixedAt,omitempty"`
@@ -199,6 +214,7 @@ type NoticeReader interface {
 // ItemQuery filters ListItems.
 type ItemQuery struct {
 	Status string // "" = any
+	Source Source // "" = any
 	Limit  int    // <= 0 = 100
 }
 

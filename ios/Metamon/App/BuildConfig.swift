@@ -127,6 +127,7 @@ enum BuildConfig {
         .books,
         .calls,
         .coins,
+        .connections,
         .entitlements,
         .feedback,
         .feeds,

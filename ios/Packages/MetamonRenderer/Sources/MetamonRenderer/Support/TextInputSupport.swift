@@ -78,7 +78,7 @@ extension KeyboardState {
     /// 日本語の変換中(未確定の文字)を確定させる。送信ボタンで未確定の文字が消えたり二重に残ったりしないよう、読む前に呼ぶ。
     public static func commitMarkedText() {
         #if os(macOS)
-        focusedTextView()?.unmarkText()
+        focusedTextView()?.commitMarkedTextNow()
         #else
         UIApplication.shared.sendAction(#selector(UITextInput.unmarkText), to: nil, from: nil, for: nil)
         #endif
@@ -89,6 +89,12 @@ extension View {
     /// 1 行の入力欄: return =「次へ」(最後の欄なら閉じる)。
     func singleLineSubmit() -> some View {
         submitLabel(.next)
-            .onSubmit { KeyboardState.focusNext() }
+            .onSubmit {
+                #if os(macOS)
+                // 日本語の変換中の Return は確定だけ。次の欄へ進まない(#942)
+                guard IMEReturnGuard.allowsReturn(KeyboardState.focusedTextView()) else { return }
+                #endif
+                KeyboardState.focusNext()
+            }
     }
 }

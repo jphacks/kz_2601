@@ -46,6 +46,7 @@
 //	go run ./cmd/ai-eval -compare-before 'raw/*-before-*.json' -compare-after 'raw/*-after-*.json'  # no API calls
 //	go run ./cmd/ai-eval -chat          # clarify phase (chat.go, chat_cases.json)
 //	go run ./cmd/ai-eval -score '../docs/backend/ai-eval/raw/*-jphacks*.json'  # pass rate of saved runs, no API calls
+//	go run ./cmd/ai-eval -score '<raw>/*.json' -min-pass 0.9 -thresholds th.json -report md -report-out r.md  # gate + PR table (gate.go, #371)
 //
 // Past JPHACKS works (coverage.go): jphacks_coverage_cases.json /
 // jphacks_coverage_pending_cases.json; `pendingExpect` holds keys an open PR adds.
@@ -232,7 +233,22 @@ func main() {
 	score := flag.String("score", "", "glob of raw run files: prints the pass rate per group from the saved runs (the latest record of each id) and exits (no API calls)")
 	check := flag.Bool("check", false, "validate the cases file (ids, bases, expect keys and types; generate / chat / DSL base detected from its shape) and exit (no API calls, #281)")
 	checkAllDir := flag.String("check-all", "", "validate every JSON file under this dir (internal/ai/eval) with the loader its shape needs; unknown shapes fail (no API calls)")
+	minPass := flag.Float64("min-pass", 0, "-score / generate run: exit 1 when the total pass rate (pass / checked) is below this rate, 0..1 (0 = no gate, #371)")
+	thresholds := flag.String("thresholds", "", "-score / generate run: JSON file {\"group\": 0.9, \"total\": 0.8}; exit 1 when a group is below its rate or has no checked case (#371)")
+	report := flag.String("report", "", "-score / generate run: md = write the pass rate per group, the minimums and the failed cases as a Markdown table (for a PR comment, #371)")
+	reportOut := flag.String("report-out", "", "-report md: file to write the report to (empty = stdout, replacing the plain table)")
 	flag.Parse()
+	if err := validateReportFormat(*report); err != nil {
+		log.Fatal(err)
+	}
+	g, err := loadGate(*minPass, *thresholds)
+	if err != nil {
+		log.Fatal(err)
+	}
+	output := evalOutput{Format: *report, Out: *reportOut, Gate: g}
+	if output.active() && (*checkAllDir != "" || *check || *chat || *cmpBefore != "" || *cmpAfter != "") {
+		log.Fatal("-min-pass / -thresholds / -report work with -score and generate runs only")
+	}
 	if *checkAllDir != "" {
 		counts, err := checkAll(*checkAllDir, ".")
 		if err != nil {
@@ -253,7 +269,7 @@ func main() {
 	}
 
 	if *score != "" {
-		if err := scoreRuns(*score); err != nil {
+		if err := scoreRuns(*score, output); err != nil {
 			log.Fatal(err)
 		}
 		return
@@ -353,8 +369,11 @@ func main() {
 	for _, c := range cases {
 		hasExpect[c.ID] = len(c.Expect) > 0
 	}
-	printPassByGroup(passByGroup(run.Cases, hasExpect))
+	gateErr := output.emit(os.Stdout, run.Cases, hasExpect, path, func() { printPassByGroup(passByGroup(run.Cases, hasExpect)) })
 	fmt.Printf("\nwrote %s\n", path)
+	if gateErr != nil {
+		log.Fatal(gateErr)
+	}
 }
 
 func runCase(ctx context.Context, svc *ai.Service, store *appconfigclient.Memory, c Case, forceLocale, effort string, stream bool, created map[string]json.RawMessage) Record {

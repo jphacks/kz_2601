@@ -35,8 +35,14 @@
 	<string>$(CURRENT_PROJECT_VERSION)</string>
 	<key>ITSAppUsesNonExemptEncryption</key>
 	<false/>
+	<key>UISupportsFullScreenInAssistiveAccess</key>
+	<true/>
+	<!-- 起動画面は SplashView の最初のコマ(無地の紺)と同じ色にして、つなぎ目を見せない -->
 	<key>UILaunchScreen</key>
-	<dict/>
+	<dict>
+		<key>UIColorName</key>
+		<string>LaunchBackground</string>
+	</dict>
 	<!-- 横向き(左右)も使える(#625)。上下逆さまは無し。iPad は対象外(TARGETED_DEVICE_FAMILY = 1) -->
 	<key>UISupportedInterfaceOrientations</key>
 	<array>
@@ -55,6 +61,9 @@
 	<string>$(METAMON_AI_BASE_URL)</string>
 	<key>MetamonAppConfigBaseURL</key>
 	<string>$(METAMON_APPCONFIG_BASE_URL)</string>
+	<!-- Firebase の環境(stg / prod)。build setting METAMON_FIREBASE_ENV(project.yml)。開発用メニューの「今の環境」に出す(#2079) -->
+	<key>MetamonFirebaseEnv</key>
+	<string>$(METAMON_FIREBASE_ENV)</string>
 	<!-- 「アップデートしてください」のボタンの行き先(#302)。build setting METAMON_APP_STORE_URL(project.yml)。空なら App Store で「Tailor It」を検索。
 	     appconfig の IOS_APP_STORE_URL があればそちらが優先 -->
 	<key>MetamonAppStoreURL</key>
@@ -86,6 +95,12 @@
 				<string>tailorit</string>
 			</array>
 		</dict>
+	</array>
+
+	<!-- 連係の Handoff(#1851): 開いている生成アプリの画面を iPhone ⇄ Mac で引き継ぐ。Shared/Runtime/HandoffActivity.swift の type と同じ -->
+	<key>NSUserActivityTypes</key>
+	<array>
+		<string>jp.kz2601.metamon.view</string>
 	</array>
 
 	<!-- WhisperKit モデル名。空なら `small`(約500MB・日本語精度優先)。環境変数 METAMON_WHISPER_MODEL でも上書き可 -->
@@ -127,14 +142,19 @@
 	<string>生成したアプリの共有ボタンや QR コードの画像、ドラレコで保存した映像を写真に保存するために、写真ライブラリへの追加を使用します。</string>
 	<key>NSLocationWhenInUseUsageDescription</key>
 	<string>生成したアプリで現在地を記録・地図に表示したり、目的地まで道案内したり、保存した場所の近くに着いた時に通知したりするために使います(近くに着いたかは端末の中で判定します)。「記録を開始」を押した時だけ、停止するまで(最長4時間)散歩などの道のりを記録し、その間はアプリを閉じても記録を続けます。</string>
-	<!-- healthStat(#167): 歩数は CoreMotion の歩数計(capability 不要)。体重の読み書き・ヘルスケアの歩数は HealthKit -->
+	<!-- healthStat(#167): 歩数は CoreMotion の歩数計(capability 不要)。体重の読み書き・ヘルスケアの歩数は HealthKit。睡眠・心拍などは読むだけ(#1986)。英訳は InfoPlist.xcstrings -->
 	<!-- sensorValue(#419): 気圧・高度(CMAltimeter)。傾き・加速度(device motion)は許可不要 -->
 	<key>NSMotionUsageDescription</key>
 	<string>生成したアプリで今日や最近の歩数、気圧や高度の変化を表示・記録するために、モーションとフィットネスのデータを使用します。</string>
 	<key>NSHealthShareUsageDescription</key>
-	<string>生成したアプリで歩数や体重を表示するために、ヘルスケアのデータを読み取ります。</string>
+	<string>生成したアプリで歩数・体重・睡眠・安静時心拍数・歩行と走行の距離・消費カロリー・エクササイズとマインドフルネスの時間を表示するために、ヘルスケアのデータを読み取ります。</string>
 	<key>NSHealthUpdateUsageDescription</key>
 	<string>生成したアプリで記録した体重をヘルスケアにも保存するために、ヘルスケアへ書き込みます。</string>
+	<!-- 端末のカレンダー・リマインダーを読む(#1987・DeviceCalendarSource)。英語は InfoPlist.xcstrings。審査用の版では外す(strip-review-plist.sh) -->
+	<key>NSCalendarsFullAccessUsageDescription</key>
+	<string>生成したアプリで、カレンダーの予定を一覧や今日の予定として表示するために、カレンダーを読み取ります。予定の題名や内容は端末の外に送りません。</string>
+	<key>NSRemindersFullAccessUsageDescription</key>
+	<string>生成したアプリで、リマインダーを一覧や期限の近いものとして表示するために、リマインダーを読み取ります。リマインダーの題名や内容は端末の外に送りません。</string>
 	<!-- nearbyShare(#36): MultipeerConnectivity で近くの Tailor It 端末と記録を送り合う。サービス名は NearbyService.serviceType と一致させる -->
 	<!-- すれ違い通信(#425): _tailorit-pb は MCPassbyTransport.serviceType と一致させる -->
 	<key>NSLocalNetworkUsageDescription</key>
@@ -147,6 +167,22 @@
 		<string>_tailorit-pb._udp</string>
 	</array>
 	<!-- すれ違い通信の distance(#425): Nearby Interaction(UWB)で近くの人との距離・方向を測る -->
+	<!-- 記録のコピー・貼り付け(#1871): クリップボードに載せる独自の型。RecordClipboard.typeIdentifier と一致させる -->
+	<key>UTExportedTypeDeclarations</key>
+	<array>
+		<dict>
+			<key>UTTypeIdentifier</key>
+			<string>app.tailorit.record</string>
+			<key>UTTypeDescription</key>
+			<string>Tailor It Record</string>
+			<key>UTTypeConformsTo</key>
+			<array>
+				<string>public.json</string>
+			</array>
+			<key>UTTypeTagSpecification</key>
+			<dict/>
+		</dict>
+	</array>
 	<key>NSNearbyInteractionUsageDescription</key>
 	<string>生成したアプリで、すれ違い通信でつながった近くの人との距離と方向を表示するために使います。</string>
 </dict>

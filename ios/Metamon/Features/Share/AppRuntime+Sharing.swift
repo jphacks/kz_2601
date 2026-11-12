@@ -23,14 +23,20 @@ final class SharingUI {
     /// 受け取ったシェアリンク(#278)。サインイン前・bootstrap 前に届いた分も捨てずに持ち、準備ができてから 1 回だけ開く。
     /// 未インストールの人が入れてから開き直すと、サインイン画面の上で届くため(RootView の onOpenURL では取りこぼす)。
     private(set) var pendingLink: URL?
+    /// 受け取るたびに増やす番号。開く処理(`SharingHooks` の .task)の id に使う(`takeLink` では変わらないので、開いている途中で取り消されない)
+    private(set) var linkSerial = 0
     /// RootView の bootstrap が終わったか(`MetamonApp`)。サインアウトで false に戻す
     var isReady = false
 
     /// シェアリンクなら保留して true。それ以外の URL は false(触らない)。
     @discardableResult
-    func receive(_ url: URL) -> Bool {
+    func receive(_ url: URL, hold: LaunchConsentHold = .shared) -> Bool {
         guard ShareURL.token(from: url) != nil else { return false }
         pendingLink = url
+        linkSerial += 1
+        // 起動の途中だけ、開き終わるまで Intent を待たせる(リンク → Intent の順)。
+        // 使っている途中に届いたリンクは待たせない(他のシートが出ていると確認が出せず、段が放されないまま残るため)
+        hold.beginDuringLaunch(.shareLink)
         return true
     }
 
@@ -39,6 +45,12 @@ final class SharingUI {
     func receive(activity: NSUserActivity) -> Bool {
         guard activity.activityType == NSUserActivityTypeBrowsingWeb, let url = activity.webpageURL else { return false }
         return receive(url)
+    }
+
+    /// 開いたリンクの確認(参加 / 追加)が閉じきったか、出さなかった時。次の段(Intent)へ進む。
+    func linkSettled(hold: LaunchConsentHold = .shared) {
+        guard pendingLink == nil, pendingJoin == nil, pendingImport == nil else { return }
+        hold.end(.shareLink)
     }
 
     /// 準備済みなら保留中のリンクを渡して空にする。まだなら nil(保留は残す)。
@@ -160,28 +172,55 @@ extension AppRuntime {
 
 /// WindowGroup の根に付ける(#278): サインイン画面の時に届いたシェアリンクも `SharingUI` に保留する。
 /// URL スキームは onOpenURL、Universal Links(`https://tailor-it.app/s/<token>`・#331)は Web 閲覧の NSUserActivity で届く。
+/// 連係の Handoff(#1851)も同じ所で受ける。
 struct ShareLinkReceiver: ViewModifier {
     func body(content: Content) -> some View {
         content
             .onOpenURL { url in SharingUI.shared.receive(url) }
             .onContinueUserActivity(NSUserActivityTypeBrowsingWeb) { SharingUI.shared.receive(activity: $0) }
+            // Mac からの Handoff(#1851)。シェアリンクと同じく、サインイン・bootstrap の前に届いたら準備の後に開く(`IntentHost`)
+            .onContinueUserActivity(HandoffActivity.type) { activity in
+                guard let target = HandoffTarget(activity: activity) else { return }
+                Task { await IntentHost.shared.request(.handoff(target)) }
+            }
     }
 }
 
 /// RootView に 1 行で付ける: URL スキーム受信・「探す」シート・DEBUG の自動操作フック。
 struct SharingHooks: ViewModifier {
     @Environment(AppRuntime.self) private var rt
+    @Environment(\.assistiveAccess) private var assistiveAccess
     @State private var ui = SharingUI.shared
+    private var splash: SplashPresence { .shared }
+    private var consentHold: LaunchConsentHold { .shared }
 
     func body(content: Content) -> some View {
-        content
+        let shows = assistiveAccess.shows(.shareLinks)
+        return content
             // リンクの受信は `ShareLinkReceiver`(サインイン画面の時も届く)。ここでは準備ができたら開く(#278)
-            .task(id: "\(ui.isReady)|\(ui.pendingLink?.absoluteString ?? "")") {
-                if let url = ui.takeLink() { await rt.openShareURL(url) }
+            .task(id: "\(ui.isReady)|\(splash.isShowing)|\(consentHold.isHolding(before: .shareLink))|\(ui.linkSerial)") {
+                // スプラッシュ → 起動時の同意 → チュートリアルが閉じてから開く(シートを同時に出すと片方が捨てられる)
+                guard !splash.isShowing, !consentHold.isHolding(before: .shareLink) else { return }
+                guard let url = ui.takeLink() else { return }
+                // アシスティブアクセス(#1997)では追加・参加の確認を出さず、リンクは捨てて一言だけ
+                guard shows else {
+                    print("[Metamon] share link dropped (assistive access)")
+                    rt.toast = AssistiveAccessPolicy.unavailableMessage
+                    ui.linkSettled()
+                    return
+                }
+                consentHold.beginDuringLaunch(.shareLink) // 起動の途中なら、受信時の段が放されていても Intent を待たせる
+                // 取り出したリンクは id が変わっても最後まで開く(.task の取り消しでプレビューの取得を止めない)
+                await Task { @MainActor in
+                    await rt.openShareURL(url)
+                    ui.linkSettled() // 確認を出さなかった(トースト等)時はここで次へ。出した時は閉じた時(onDismiss)
+                }.value
             }
-            .sheet(isPresented: $ui.showDiscover) { DiscoverSheet() }
-            .sheet(item: $ui.pendingJoin) { JoinShareSheet(join: $0) }
-            .sheet(item: $ui.pendingImport) { AddShareSheet(pending: $0) }
+            .sheet(isPresented: Binding(get: { shows && ui.showDiscover }, set: { ui.showDiscover = $0 })) { DiscoverSheet() }
+            .sheet(item: Binding(get: { shows ? ui.pendingJoin : nil }, set: { ui.pendingJoin = $0 }),
+                   onDismiss: { ui.linkSettled() }) { JoinShareSheet(join: $0).onAppear { consentHold.markShown(.shareLink) } }
+            .sheet(item: Binding(get: { shows ? ui.pendingImport : nil }, set: { ui.pendingImport = $0 }),
+                   onDismiss: { ui.linkSettled() }) { AddShareSheet(pending: $0).onAppear { consentHold.markShown(.shareLink) } }
             #if DEBUG
             .task { await debugHooks() }
             .modifier(ReleaseRequestHooks())

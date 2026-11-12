@@ -117,6 +117,8 @@ type report struct {
 	Sessions []*session
 	LogLines int
 	HasLogs  bool
+	Chat     chatOutcome
+	Retry    retryBreakdown
 }
 
 // signal weights: a stronger hint of "the AI guessed wrong" weighs more.
@@ -146,7 +148,8 @@ var signalOrder = []string{"quick_undo", "gen_failed", "unchanged", "abandoned",
 
 // buildReport reads uids' data and logs and cuts it into sessions.
 func buildReport(ctx context.Context, rd reader, uids []string, logs []logEvent, hasLogs bool, cfg config) (*report, error) {
-	rep := &report{Config: cfg, LogLines: len(logs), HasLogs: hasLogs}
+	rep := &report{Config: cfg, LogLines: len(logs), HasLogs: hasLogs, Chat: chatOutcomes(logs, cfg.Since, cfg.Until, cfg.Gap),
+		Retry: retryBreakdowns(logs, cfg.Since, cfg.Until)}
 	for i, uid := range uids {
 		u := &userReport{Label: fmt.Sprintf("U%d", i+1), UIDHash: httpx.UIDHash(uid)}
 		rep.Users = append(rep.Users, u)

@@ -15,6 +15,7 @@ struct AiButtonLeaf: View {
     @State private var error: String?
     @State private var done = false
     @State private var usedOnline = false
+    @State private var notice: AIUnavailableNotice? // #1640: 使えない時に押したら理由を出す
 
     private var route: AIGenerateRoute {
         AIGenerateRoute.choose(availability: availability, hostOnline: rt.aiText?.supportsOnlineAIText ?? false, mock: AIGenerateRoute.isMock,
@@ -32,7 +33,7 @@ struct AiButtonLeaf: View {
         } else if let form = ctx.form {
             VStack(alignment: .leading, spacing: 4) {
                 Button {
-                    Task { await run(form) }
+                    if let n = tapNotice() { notice = n } else { Task { await run(form) } }
                 } label: {
                     HStack(spacing: RenderTheme.Spacing.sm) {
                         if busy {
@@ -44,11 +45,12 @@ struct AiButtonLeaf: View {
                     }
                     .frame(maxWidth: .infinity)
                 }
-                .buttonStyle(RenderButtonStyle(kind: .secondary))
-                .disabled(busy || isUnavailable)
+                .buttonStyle(RenderButtonStyle(kind: .secondary, dimmed: isUnavailable))
+                .disabled(busy) // 使えない時も押せる(押すと理由のアラート・#1640)
                 .accessibilityHint(hint)
                 caption
             }
+            .aiUnavailableAlert($notice)
             .task { refreshAvailability() }
             .onChange(of: scenePhase) { _, phase in
                 // 設定で Apple Intelligence を ON にして戻ってきた時に反映する
@@ -88,6 +90,12 @@ struct AiButtonLeaf: View {
         case "suggest": return L("AI に提案してもらう")
         default: return L("AI で処理")
         }
+    }
+
+    /// 押した時点の状態で判定し、使えなければ理由を返す(何もせずに戻らない・#1640)。
+    private func tapNotice() -> AIUnavailableNotice? {
+        availability = AIAvailability.current
+        return route.unavailableNotice
     }
 
     private func refreshAvailability() {

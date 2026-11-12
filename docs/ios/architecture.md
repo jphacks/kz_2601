@@ -228,6 +228,7 @@ DSL 差し替え時(`apply`)は paths/sheet を全部リセットする(画面 i
 | 同意 | 設定の「他の人の行動で届く通知」(共有・公開の記録があるアプリで、作成者以外)が `PUT /v1/me/notify-consent/{appId}`。参加の画面で「参加する」を押すと有効。読む API が無いので値は端末の控え(`NotifyConsentStore`)で、ログアウトや入れ直しの後はオフに見える |
 | タップ | 本文の `appId` を `IntentHost` に渡して開く(bootstrap の前なら待つ)。ローカル通知に `appId` は無い |
 | entitlement | `Metamon.entitlements` の `aps-environment` = `$(METAMON_APS_ENV)`(`project.yml`。Debug / Staging は development、Release は production・#683)。審査用の `Metamon-Review.entitlements` には入れない。App ID の Push Notifications は自動署名が付ける(手動署名なら人が App ID で有効にして profile を作り直す)。登録に失敗しても利用者には何も出さない |
+| Mac(#982) | 同じ `PushDeviceRegistrar` を使い、OS とのやり取りだけ `MetamonMac/App/Push/MacPushHost.swift`。サーバーに platform は送らず(= ios・APNs)、`os` で Mac と分かる。タップは起動直後なら一覧が載るまで最大 30 秒待つ。詳細は [Mac の OS との連携](../mac/system-integration.md#プッシュ通知) |
 
 ## 6. 音声入力画面とホットリロード
 
@@ -504,6 +505,17 @@ DEBUG フック: `METAMON_FAB_POSITION=left|right[-hidden][:<下端距離>]`(例
         取得はキーウィンドウの drawHierarchy(ImageRenderer は NavigationStack/TabView を描けないため)
 ```
 
+**カードのひと目の数字(`AppGlance.swift`・#1943)** — カードの 2 行目に stat を 1 つ出す(例「未購入 4件」)。数え方はウィジェットと同じ `WidgetSnapshotWriter` なので、アプリの中の stat とそろう。使用中のアプリは画面に読み込んだ記録、ほかは端末の中の DSL(`DocumentCache`)とローカル DB の記録だけで数え、記録の API は呼ばない(ローカル DB から数える時、暗号化した項目の stat は「🔒」)。
+
+| 項目 | 決まり |
+|---|---|
+| main actor の外 | DSL の読み出し・暗号の復号・集計は detached task(`AppGlance.offMain`)で走らせる。main actor では入力の写し(DSL・記録・件数の単位)と結果の反映だけ。使用中のアプリの `AppGlanceStore.update` も集計は main actor の外(async) |
+| 言語 | 「件」と復号できない時の文言は main actor で引いて文字列で渡す(main actor の外で言語の設定を読まない) |
+| 外でも呼べる版 | `WidgetSnapshotWriter` の `statText`・`formatted`・`formattedValue`・`statComponents` に `countUnit` を受け取る版、`RecordSyncEngine` に復号前の記録を返す `cachedSealed` と外で復号する `opened(_:cipher:lockedText:)`。今までの呼び方もそのまま使える |
+| サインアウト | `clear()` で `generation` を進め、数えている間にサインアウトした時は前の人の数字を書き戻さない |
+| 変わらないもの | 同じアプリは 60 秒読み直さない(`recheckAfter`)・古い値は薄く出す・VoiceOver の読み上げ・端末に DSL の無いアプリは前の値のまま(読み込みの重複は `inFlight` で防ぐ) |
+| テスト | `MetamonTests/AppGlanceTests` |
+
 **起動時の挨拶(#42)** — 文言は `Features/Voice/Greeting.swift` の 1 箇所(多言語化 #44 ではこのファイルを差し替える)。時間帯(5〜10 時おはよう / 11〜17 時こんにちは / 他こんばんは)を前置き。
 
 | 状況(`Greeting.Context`) | 判定 | 見出し |
@@ -528,6 +540,7 @@ DEBUG フック: `METAMON_AUTO_SWITCHER=1`(起動 2.5 秒後に変身一覧を�
 
 - サービスは `MetamonServices` の `SharingClient`(`HTTPSharingClient`)。`Services.sharing` は appconfig が live の時だけ非 nil で、モック起動では導線ごと出さない。
 - 共有データ(scope: shared/public)を持つアプリは受け取ると**元の appId に参加**する([backend features/sharing.md](../backend/features/sharing.md))。要約カードに「みんなの投稿も見られます」を添える。
+- Handoff(#1851): 生成アプリを開いている間、`RootView` の `HandoffAdvertiser` が `jp.kz2601.metamon.view`(`appId`・`screenId`・`recordId` だけ・`ios/Shared/Runtime/HandoffActivity.swift`)を出し、Mac と引き継ぐ。受けるのは `ShareLinkReceiver` と同じ所で、`IntentHost` に保留してサインインと bootstrap の後に開く(60 秒で捨てる)。審査用の版では出さず受けない。詳細は [Mac の OS との連携](../mac/system-integration.md#handoff)。
 - DEBUG フック: `METAMON_AUTO_SHARE=1`(変身一覧 → 今のアプリのシェアシート)/ `METAMON_AUTO_IMPORT=<token>`(リンクを開いたのと同じ経路。`simctl openurl` は OS の確認ダイアログで止まるため)/ `METAMON_AUTO_DISCOVER=1`(+ `METAMON_AUTO_INSTALL=<公開 id>`)。
 - 注意: 端末ローカルの `DocumentCache` / レコードキャッシュは uid を区別しないので、同じ端末で `METAMON_DEV_UID` を切り替えると前ユーザーのキャッシュが一瞬見える(サーバーは正しく分離)。2 ユーザー検証はアプリを入れ直してから行う。
 
@@ -648,6 +661,7 @@ Renderer ──load(entities)──▶ AppRuntime.refresh(entity)
 |---|---|
 | DB | `MetamonServices/Local/RecordStore.swift`(actor)。**FileManager + JSON**: `Application Support/metamon-records/<appId>/<entity>.json` に `LocalRecord{appId, entity, recordId, data, createdAt, updatedAt, pendingOp, clientId}` の配列。SwiftData/SQLite にしなかった理由: 1 entity ≤ 1000 件・読みは entity 単位全件なのでファイル=索引(appId, entity)で足りる / `DocumentCache` と同じ流儀でスキーマ移行・ModelContainer を抱えない / macOS `swift test` でそのまま動く。万単位になったら同 I/F で SQLite 化 |
 | 差分取得 | appconfig の `GET /records` は `filterField` に entity の Field しか受けない(`buildFilter`)ため `updatedAfter` 相当が無い → **全件取得で置換**(`store.replace`)。未送信行(`pendingOp != none`)だけ残す。`lastUpdatedAt` は将来の差分 API 用に用意済み |
+| 並び(#2009) | `RecordStore.rows` は createdAt の降順(サーバーの既定と同じ)。文字列ではなく時刻(秒 + ナノ秒のキー)で比べるので、小数秒の桁が違うもの(`.123Z` と `.123456Z`)や `+09:00` などのオフセット付きも正しく並ぶ。小数秒は `Date` を通さず桁のまま持つ(`ISO8601DateFormatter` はミリ秒より細かい桁を落とすため)。同じ時刻の行は表に後から入った行を先に出す。表は古い順に持ち、`replace` はサーバーの一覧(新しい順・同時刻は id 降順)を逆にして入れるので、同時刻の並びがサーバーとそろう(デスクトップ・Android と同じやり方)。createdAt が無い・空・読めない(小数秒が 10 桁以上・オフセットが無い)行は末尾。テストは `MetamonServicesTests/RecordOrderTests` |
 | 書き込み | `RecordSyncEngine.save/delete`(`Local/RecordSyncEngine.swift`・`@MainActor @Observable`)。create は仮 id `local-<clientId>`、update はキー単位マージ(PATCH と同義・DSL から消えた項目もローカルで保持)、delete は行を `pendingOp=delete` にして一覧から隠す |
 | 削除の取り消し(M11) | `deleteRecord`(一覧の長押し・VoiceOver の操作「削除」・フォームの削除ボタン)は `RecordSyncEngine.deleteUndoably`(`Local/RecordSyncEngine+Undo.swift`)。5 秒(VoiceOver では 10 秒)はメモリ上で一覧から隠すだけで、ローカル DB にも送信の列にも触れない。下部の「削除しました・元に戻す」(`RecordUndoToast`)で戻せばサーバーには何も送らない(記録の id・作成日時・作者が変わらない)。時間が過ぎる・背面に回る・サインアウトの送り切りで `delete` と同じく列に積む。待ちの間にアプリが落ちたら記録は残る(消えすぎない側) |
 | キュー | `Local/SyncQueue.swift`(actor)。積む時に畳む: create+update → create に併合 / create+delete → 両方消す(サーバーに行かない)/ update+update → 1 つ。送信後は仮 id → サーバー id の別名表を持ち、後続の update/delete を引き直す。`BackoffPolicy(base 0.5s, ×2, maxAttempts 5)`。`sleep` を差し替えられるのでテストは待たない |
@@ -657,6 +671,21 @@ Renderer ──load(entities)──▶ AppRuntime.refresh(entity)
 | 設定シート | 「データ」節: `同期: 最新 / 未送信 N 件 / 送信中 / オフライン(・未送信 N 件)` + 「今すぐ同期」(`RecordSyncEngine.status/pendingCount/isOnline`) |
 | E2E | DEBUG `METAMON_E2E_OFFLINE_SECONDS=<n>`(`Metamon/App/RecordSyncFactory.swift`): n 秒間レコード API を `URLError(.notConnectedToInternet)` にし到達性も offline → n 秒後に online。`METAMON_AUTO_RECORD` と併用して「圏外保存 → 即表示 → 復帰で送信」を通す |
 | テスト | `MetamonServicesTests/RecordSyncTests.swift`: Store CRUD/永続化/置換、キューの順序・畳み込み・同一 clientId 再送・バックオフ・5 回で停止→再開・競合、エンジンのオフライン→オンライン送信 |
+
+### 記録のコピー・貼り付け(#1871・#1939)
+
+フォームのナビバーの「記録のコピーと貼り付け」メニュー(`RecordClipboardMenu`)と一覧の行の長押しメニュー(`ListLeaf`)から、記録を項目つきでコピーし、別の生成アプリのフォームに貼れます。中身の作り方と合わせ方は純粋ロジックの `MetamonDSL/Records/RecordClipboard.swift`、クリップボードの読み書きは `MetamonRenderer/Support/RecordPasteboard.swift` です。
+
+| 項目 | 決まり |
+|---|---|
+| 載せるもの | 保存フィールドのうち、hidden・暗号化・端末のファイル(photo / video / audio)・アプリが違うと意味の無い参照(ref / refs / member / members)以外。独自の型 `app.tailorit.record` と、メモなどに貼るための「名前: 値」の文字の 2 つを 1 項目に載せる |
+| 置き方 | 10 分で消え(`RecordClipboard.expiry`)、この端末の中だけに置く(`.localOnly`。Mac 側の貼り付けができるまで) |
+| 合わせ方 | 同じアプリ(appId)の同じ entity の時だけ field の id で合わせ、それ以外は名前(前後の空白・大文字小文字を無視)で合わせる。貼る先の 1 つの field には 1 回だけ入れる。合わないものは捨て、「合わなかった項目」に名前を出す |
+| 管理者だけの項目 | 管理者でなければ `editableBy: admins` の項目には入れない。管理者か分からない時は管理者でない扱い |
+| 値の確かめ方 | サーバー・CSV の読み込み(`RecordImport`)と同じ規則。integer は小数を断り、currency は四捨五入。どちらも絶対値が `Int64.max / 2` まで。文字は `RecordImport.characterLimit` まで(string 4000・text 20000)。日付・日時は `FieldCoding.date(from:)` で読んで書き直す(2/30 などは入れない・小数秒つきの日時も読める)。位置は緯度 90・経度 180 まで |
+| 貼った後 | フォームに値を入れるだけで保存はしない。「N 項目を入れました: …」と合わなかった項目を一言で出す |
+| 読めない時 | 記録が載っているのに読めない(貼り付けを許可されなかった等)時は「貼り付けが許可されませんでした」、載っていなければ「貼り付けられる記録がありません」 |
+| テスト | `MetamonTests/RecordClipboardTests` |
 
 ## 8. DSL スキーマ
 → 統一版 v1: `docs/dsl/README.md`(決定表)+ `docs/dsl/dsl.schema.json`。旧 iOS 案は `docs/ios/dsl-proposal.md`。
@@ -723,6 +752,7 @@ MetamonWidget(拡張) ──▶ WidgetSnapshot.load() を描画(systemSmall=1 �
 | 実機署名 | App Group capability を **本体と拡張の 2 つの App ID** に付ける必要がある。`xcodebuild -allowProvisioningUpdates DEVELOPMENT_TEAM=<TEAM>` の自動署名で付与される(有料 Program 必須)。通らない時は Apple Developer > Identifiers > App Groups で `group.jp.kz2601.metamon` を作成 → 両 App ID の Capabilities で App Groups にチェック |
 | シミュレータ | 署名なし(`CODE_SIGNING_ALLOWED=NO`)でも App Group の UserDefaults は動く。ウィジェットの配置はホーム画面長押し → + → 「Tailor It」 |
 | ロック画面(#423) | 同じウィジェット(`MetamonStatWidget`)の `supportedFamilies` に accessory 3 種を足しただけ。データ・更新経路はホーム画面と共通。ロック画面は単色(vibrant)で描かれるので色に頼らず太さで区別(`MetamonWidget/AccessoryViews.swift`)。配置はロック画面長押し → カスタマイズ → ロック画面 → ウィジェット |
+| Mac(#984) | 拡張 `MetamonMacWidget`(小・中・大)。見た目・`WidgetSnapshot`・`WidgetSnapshotWriter`・文言・App Group は共有し、スナップショットに `appId`(省略可)を足した。押すと `tailorit://widget?app=<appId>`。メニューバーの stat も同じ集計を使う。詳細は [Mac の OS との連携](../mac/system-integration.md#ウィジェット) |
 
 ### 12.1 ライブアクティビティ(ActivityKit・Issue #423)
 ロック画面のバナーと Dynamic Island(compact / expanded / minimal)に「タイマー」「いま◯◯中」を出す。**更新は端末内だけ(push しない)**。時間は日付で渡し OS が描くので、アプリが止まっていても数字は進む。
@@ -747,12 +777,12 @@ MetamonWidget(拡張) ──▶ WidgetSnapshot.load() を描画(systemSmall=1 �
 - シミュレータでもロック画面(⌘L)と Dynamic Island(iPhone 17)の表示は確認できる。
 
 ### 12.2 端末のカレンダーへの追加(EventKitUI・`addToCalendar`)
-生成アプリのレコードを iPhone のカレンダーに予定として入れる。**アプリは端末の予定を読まない・書き込みもしない**: OS の「新規イベント」画面(`EKEventEditViewController`)を中身を埋めて開き、ユーザーが「追加」を押した時だけ OS が入れる。
+生成アプリのレコードを iPhone のカレンダーに予定として入れる。**`addToCalendar` は端末の予定を読まない・書き込みもしない**(予定とリマインダーを読む口 `DeviceCalendarSource`・#1987 は別にあり、使う部品はまだ無い。[OS との連携](system-integration.md#カレンダーの予定とリマインダーを読むdevicecalendarsource)): OS の「新規イベント」画面(`EKEventEditViewController`)を中身を埋めて開き、ユーザーが「追加」を押した時だけ OS が入れる。
 
 | 項目 | 内容 |
 |---|---|
 | DSL | action `addToCalendar{entity, calendarEvent:{startField, endField?, durationMinutes?, titleField?, locationField?, notesField?, alertMinutes?}}`(`docs/dsl/README.md` §3.2) |
-| 権限 | 不要。iOS 17 以降 `EKEventEditViewController` は別プロセスで描かれ、`requestAccess` も `NSCalendars*UsageDescription` も entitlement も要らない(最低 iOS は 17.0)。`EKEventStore()` は event を作るためだけに使う |
+| 権限 | 不要。iOS 17 以降 `EKEventEditViewController` は別プロセスで描かれ、`requestAccess` も `NSCalendars*UsageDescription` も entitlement も要らない(Info.plist のフルアクセスの説明文は `DeviceCalendarSource` 用)(最低 iOS は 17.0)。`EKEventStore()` は event を作るためだけに使う |
 | 値 | フォーム画面なら `FormDraft.payload`(未保存でも今の値)、`list.onItemTap` なら `records` のその行。組み立ては純関数 `CalendarEventPlan.build`(MetamonDSL・`CalendarEventPlanTests`) |
 | 構成 | `Metamon/App/AppRuntime+Calendar.swift`(`addToCalendar` と `CalendarEventEditor`)・`AppRuntime.calendarDraft` が立つと `RootView` の `HostSheets` がシートで出す。「追加」で toast「カレンダーに追加しました」 |
 | 審査用の版 | 残す(権限ダイアログが無い・ユーザーの操作でだけ入る) |
@@ -829,7 +859,9 @@ Siri / ショートカット ──(本体プロセス内で実行。拡張タ�
 | Siri の聞き取り | `Info.plist` の `INAlternativeAppNames` に「テイラーイット」「テーラーイット」。フレーズは `CFBundleDevelopmentRegion = ja` なので日本語で直書き |
 | 背面起動の注意 | 記録追加は bootstrap 前でも動く(`recordSync.start()` を Intent 側で呼ぶ)。返した後にプロセスが止められても行とキューはファイルに残り、次回起動で送る。開く/話しかけるは bootstrap(`GET /dsl` の復元)と競合しないよう、準備前なら保留して `markReady()` で実行 |
 | E2E(DEBUG) | シミュレータはショートカットアプリのタップ自動化が無いので、`METAMON_E2E_INTENT=add:家計簿:ランチ 800円` / `open:筋トレ` / `talk` で起動直後に本物の Intent 型・Query 経由で実行する(`Features/Intents/IntentE2E.swift`) |
+| Mac(#1034) | Intent の型・Query・フレーズ(`TailorItIntents` / `IntentEntities` / `IntentE2E` / `AppShortcuts.xcstrings`)は同じファイルを Mac のターゲットにも入れる。本体との橋渡し `IntentHost` だけ Mac 用(`MetamonMac/App/Intents/MacIntentHost.swift`): 一覧は `MacAppLibrary` + 同梱の例、開く / 話しかけるは `MacRootView` が受けて一覧の選択・⇧⌘M の会話へ、記録の追加は端末に残る作ったアプリだけを `MacRecordEngines` のエンジンに書く。`MetamonMacApp.init` で `register` |
 | HealthKit | 実装済み(#167・下記 §15.1) |
+| 集中モード・Spotlight | `TailorAppEntity` を集中モードのフィルタ(#1991)と Spotlight(#1996・iOS 18 は `IndexedEntity`)でも使う。詳細は [iOS の OS との連携](system-integration.md) |
 
 ### 15.1 ヘルスデータ(`healthStat` / `Field.health`・Issue #167)
 
@@ -967,6 +999,8 @@ Siri / ショートカット ──(本体プロセス内で実行。拡張タ�
 Info.plist: `NSLocalNetworkUsageDescription` と `NSBonjourServices`(`_tailorit-mc._tcp` / `_udp`。`NearbyService.serviceType = "tailorit-mc"` と一致)。
 
 **Core Bluetooth(BLE 直叩き)は後続**: MultipeerConnectivity が Bluetooth を内部で使うので iOS 同士はこれで足りる。BLE を直接使う意味があるのは Android / マイコン等の非 Apple 端末やバックグラウンドでのビーコン的な検出だが、GATT のサービス設計・分割転送(MTU ~180B)・ペアリング UX・`NSBluetoothAlwaysUsageDescription` とバックグラウンドモードが要り、デモの範囲を超える。必要になったら `NearbyShare.Payload` をそのまま運ぶ別トランスポートとして足す。
+
+**Mac(#964)**: `NearbyService` をそのまま Mac のターゲットに入れ、`MacAppRuntime` が `NearbyHost`。待ち受けの判定 `AppDSL.usesNearbyReceive` は `ios/Shared/Runtime/NearbyReceive.swift` で共有。すれ違い通信(§19.1)は Mac では使えない枠。詳細は [Mac の OS との連携](../mac/system-integration.md#近くの端末に送るnearbyshare)。
 
 確認:
 - 単体: `NearbyShareTests`(MetamonDSL・`swift test` で macOS 上で回る)。エンコード/デコード・未知キー・取り込み判定・sanitize・件数上限。
@@ -1144,6 +1178,7 @@ iPhone は縦と横(左右)を使える(上下逆さま・iPad は対象外。`I
 | 生成・直し(`send`) | 何も保存されていない。課金画面(`.paidFeature(features)`)→ 買えばサーバーへの取引の送信(`serverSyncTask`)を待って同じ依頼を送り直す / 閉じたら「〇〇は Tailor It Pro が必要なため、保存しませんでした」。端末では Pro なのに 402 の時は課金画面を出さず案内だけ(送り直しを繰り返さない)。`AppRuntime+PaidGate.swift` の `presentProRequired` |
 | 共有の記録の書き込み(同期キュー) | `SyncEvent.proRequired`。書いた分は戻す。作成者なら課金画面、参加者(`creator_needs_pro`)は「作った人が Pro ではないため書き込めません(見ることはできます)」。印を付ける等の即時の書き込みは `message(for:)` の同じ文言 |
 | オンラインの AI(`POST /v1/text`) | `AITextError.needsPro` → 課金画面(`requestProForAIText`) |
+| 外の API の op(つないだサービス・#2001) | `MetamonServices/External/ExtDenial.swift` が 409 `ext_not_connected`(`details.provider`)・402(既存の `ProRequired` / `CoinDenial` で判定)・503 `ext_unavailable` / `ext_busy` を振り分け、`Features/Connections/ExtDenialSheet.swift` の `.extDenialSheets($denial, onMessage:)` が「次にすること」を出す。つないでいない → つなぐ案内のシート(名前は `GET /v1/me/connections` の `nameJa` / `nameEn` → 端末の名前 → id。「つなぐ」は設定の「つないだサービス」と同じ `ConnectFlow`・つなげたら閉じる。provider が分からない 409 はシートを出さず設定へ案内する一言)。Pro が要る → 課金画面(`features` が空なら「つないだサービス」)、作成者の Pro が要る時と端末は Pro なのにサーバーが知らない時は一言だけ。コイン → `CoinGate`(引き受けられなければ `CoinCopy.denialBody`)。止まっている・混んでいる → 一言だけ。一言の出し方は呼ぶ側に任せる。今の呼び出し口は DEBUG の設定の「開発用: 試験用のサービスを呼ぶ」(偽の provider `fakeOauth`・`METAMON_MOCK=1` + `METAMON_MOCK_EXT_ERROR=<code>` でエラーを仕込める)だけで、部品から呼ぶつなぎは部品の Issue で足す。審査用の版では案内の画面を外し、コインの断りは `.unavailable` 扱い |
 | 審査用の版 | 有料の機能を作らない(backend が共有を private に直し、serverRules を作らない)ので当たらない想定。当たっても課金画面は無いので文言だけ |
 | テスト | `MetamonTests/ProRequiredFlowTests.swift`・`MetamonServicesTests/RecordSyncTests.swift`(`testSyncQueueProRequired…`・`testProRequiredParsing`)・`AITextGateTests` |
 

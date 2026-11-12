@@ -24,8 +24,9 @@
 | Firestore `users/{uid}/apps/{appId}` | 名前・現在の DSL・更新時刻 | 消したアプリ(ログの `app_hash` にだけ残る) |
 | Firestore `.../versions/{n}` | 版ごとの DSL の全体・`source.kind`(ai / manual / restore / import / system)・`source.mode`(full / patch)・**`source.transcript`(AI に渡した依頼の文)**・`source.summary`(AI の要約)・`restoredFrom` | 失敗した生成・変化なしの修正(版を作らない) |
 | Firestore `feedback/{id}` | 種類・本文・`appId`(添付の画像・DSL は読まない) | — |
-| Cloud Logging `ai.generate` | 依頼ごとの結果(validated / regenerated / unchanged / restored / refused / failed)・作り直しの回数・lint の再試行・全体で作り直し・待ち時間・`uid_hash`・`app_hash` | 中身(依頼の文・DSL)は書かない約束 |
+| Cloud Logging `ai.generate` | 依頼ごとの結果(validated / regenerated / unchanged / restored / refused / failed)・作り直しの回数と理由(`retry_reasons`)・検証で落ちた問題のコードと数(`validation_codes`。例 `bad_ref:2,missing_field:1`・#1772)・lint の再試行・全体で作り直し・待ち時間・`uid_hash`・`app_hash` | 中身(依頼の文・DSL)は書かない約束 |
 | Cloud Logging `ai.usage` | Claude の呼び出しごとの `operation`(chat / chat_first / generate / patch ...)・待ち時間・トークン・`uid_hash` | `app_hash` が無いので、聞き返しは「同じ人の次の依頼(30 分以内)」に割り当てる |
+| Cloud Logging `ai.chat` | `/v1/chat` の往復ごとの返答の種類(`reply_kind`: question / ready / answer / proposal / other)・会話の中の何往復目(`turn`)・聞き返しの後に ready に至ったか(`clarify_ended_in_build`)・`mode`・`source`・待ち時間・トークン・`model`・`uid_hash`・`app_hash` → レポートの「会話の結果」 | 会話の文・返答の文・候補・transcript・brief。「できない・代わりに〜」の印はまだ無い |
 | Cloud Logging `http.request` | パス・ステータス(402・429・5xx)・`uid_hash` | 本文 |
 | Cloud Logging `app.opened` | アプリを開いた(`app_hash`) | — |
 | **聞き返しの会話の中身** | **サーバーには残らない**。ai サービスのプロセスのメモリに 30 分だけ(`internal/ai/chat.go`)。端末の UserDefaults(`ChatHistoryStore`、直近 200 件)にだけ残る | サーバー・ログ・Firestore のどこにも無い |
@@ -87,6 +88,8 @@ GOOGLE_CLOUD_PROJECT=jphacks-kz2601 go run ./cmd/ai-session-report \
 | 遅い(`slow`) | 1 | 生成が 60 秒を超えた |
 
 この他に全体の値として、依頼あたりの聞き返しの回数・**生成に至らなかった会話**(聞き返しの後 30 分以内に依頼が無い)・生成の時間の p50 / p90 を出す。
+
+「作り直しの理由」の節(#1772)には、作り直しのあった依頼の割合(mode ごと)・理由ごとの回数・検証のコードごとの問題の数を出す。コードは `backend/pkg/dsl` の `ProblemCode`(JSON Schema の問題は `schema_<キーワード>`、意味の検証は `bad_ref`・`missing_field`・`unknown_component` など)で、アプリの中身では変わらない。多いコードから AI の決まり・部品の説明を直す(`prompt.go`・`catalog.go` を変えるのは持ち主の判断)。
 
 点は優先順位を付けるための目安で、正解ではない。上位のセッションの「依頼」「AI の要約」「作られたもの(画面と部品の名前)」「その後の直しの依頼」を並べて読み、ずれの種類を拾う。
 

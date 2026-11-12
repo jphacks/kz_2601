@@ -161,6 +161,13 @@ enum ErrorCopy {
         return L10n.tr("\(what)。\(nextStep(for: error))")
     }
 
+    /// 設定のアカウント削除・ログアウトの失敗の本文(題は alert 側)。Firebase の英語の文は出さず、ログにだけ残す。
+    static func accountFailureBody(_ error: Error, context: String) -> String {
+        ErrorLog.record(error, context: context)
+        if case AuthError.requiresRecentLogin = error { return L10n.tr("もう一度サインインしてから削除してください") }
+        return nextStep(for: error)
+    }
+
     // 完成の読み上げ(H8)。要約が無い時だけ使う
     static func completedAnnouncement(appName: String, created: Bool) -> String {
         guard created, !appName.isEmpty else { return L10n.tr("変更しました") }

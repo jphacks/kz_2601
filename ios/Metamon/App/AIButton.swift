@@ -92,6 +92,7 @@ struct ModalVoiceFabLayer: ViewModifier {
     @State private var fabFrame: CGRect?
     private let keyboard = KeyboardState.shared
     private let layers = AIButtonLayers.shared
+    @Environment(\.assistiveAccess) private var assistiveAccess
 
     func body(content: Content) -> some View {
         let visible = rt.visibleScreen
@@ -106,14 +107,17 @@ struct ModalVoiceFabLayer: ViewModifier {
                 .onPreferenceChange(GridBottomTrailingObstructionKey.self) { trailingBottomObstructions = $0 }
                 .environment(\.fabFrame, fabFrame)
             ZStack {
-                if entry == .fab {
+                if entry == .fab, assistiveAccess.shows(.aiButton) { // アシスティブアクセス(#1997)では出さない
                     VoiceFab(
                         hasTabs: false, // シートにはタブバーが無い
                         leadingObstructionTop: bottomObstructions[visible.route.id],
                         trailingObstructionTop: trailingBottomObstructions[visible.route.id],
                         isBusy: rt.morphJob != nil,
                         onTap: { rt.openVoiceForVisibleScreen() },
-                        onLongPress: { rt.openSwitcher() }
+                        onLongPress: { rt.openSwitcher() },
+                        coachMark: rt.fabCoachMark, // #1441
+                        onCoachMark: { rt.handleCoachMark($0, $1) },
+                        onGesturePerformed: { rt.noteGesturePerformed($0) }
                     )
                     .transition(.scale(scale: 0.6).combined(with: .opacity))
                 }
@@ -179,7 +183,11 @@ struct VoiceToolbarButton: View {
         .buttonStyle(.plain)
         .simultaneousGesture(
             LongPressGesture(minimumDuration: Theme.Layout.fabLongPressSeconds)
-                .onEnded { _ in if target == nil, !isBusy { rt.openSwitcher() } }
+                .onEnded { _ in
+                    guard target == nil, !isBusy else { return }
+                    rt.noteGesturePerformed(.fabLongPress) // #1441
+                    rt.openSwitcher()
+                }
         )
         // 生成中・組み上げ中(#626)は FAB と同じく押せない(フォームのシートは本体の暗転の外なので、ここから設定の「初期状態に戻す」等に行けていた)
         .opacity(isBusy ? 0.35 : 1)

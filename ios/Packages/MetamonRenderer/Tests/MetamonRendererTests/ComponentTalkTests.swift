@@ -62,4 +62,12 @@ final class ComponentTalkTests: XCTestCase {
             XCTAssertFalse(ComponentTalk.offersAction(for: type), "\(type)")
         }
     }
+
+    /// text・markdown: 話せる時は文字を選ばせず、自前のメニューに「この部品について話す」を出す(OS の文字のメニューで隠れないように)
+    func testTextSelectionOnlyWhenNoTalk() {
+        XCTAssertTrue(MacTextSelectionPolicy.selectable(canTalk: false))
+        XCTAssertFalse(MacTextSelectionPolicy.selectable(canTalk: true))
+        XCTAssertTrue(ComponentTalk.offersMenu(for: .text))
+        XCTAssertTrue(ComponentTalk.offersMenu(for: .markdown))
+    }
 }

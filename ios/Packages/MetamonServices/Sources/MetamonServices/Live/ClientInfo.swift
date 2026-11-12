@@ -24,7 +24,7 @@ public struct ClientInfo: Equatable, Sendable {
 
     public var headers: [String: String] {
         [
-            "X-Client-Platform": "ios",
+            "X-Client-Platform": ClientCapabilities.platform, // ios / macos(#925)
             "X-Client-Version": version,
             "X-Client-Build": build,
             "X-Client-DSL-Version": String(dslVersion),

@@ -26,6 +26,9 @@ enum WidgetCopy {
 struct StatEntry: TimelineEntry {
     let date: Date
     let snapshot: WidgetSnapshot?
+    /// 集中モードのフィルタで選んでいない生成アプリの数字 → 数字を出さず「集中モード中」(#1992)。
+    /// 判定は `FocusFilterState.pausesWidget`(Mac のウィジェットは集中モードのフィルタを持たないので常に false)。
+    var pausedByFocus = false
 }
 
 // MARK: - Theme(本体 Theme.swift のブランド色を複製。Renderer を import できないため)
@@ -36,10 +39,17 @@ enum WidgetTheme {
     static let brandB = dynamic(light: (62, 154, 156), dark: (59, 158, 159))
 
     private static func dynamic(light: (Int, Int, Int), dark: (Int, Int, Int)) -> Color {
+        #if os(macOS) // Mac のウィジェット(#984)
+        Color(NSColor(name: nil) { appearance in
+            let c = appearance.bestMatch(from: [.darkAqua, .aqua]) == .darkAqua ? dark : light
+            return NSColor(srgbRed: CGFloat(c.0) / 255, green: CGFloat(c.1) / 255, blue: CGFloat(c.2) / 255, alpha: 1)
+        })
+        #else
         Color(UIColor { trait in
             let c = trait.userInterfaceStyle == .dark ? dark : light
             return UIColor(red: CGFloat(c.0) / 255, green: CGFloat(c.1) / 255, blue: CGFloat(c.2) / 255, alpha: 1)
         })
+        #endif
     }
 
     static let brandGradient = LinearGradient(
@@ -68,18 +78,32 @@ struct MetamonWidgetView: View {
     @Environment(\.widgetFamily) private var family
     let entry: StatEntry
 
+    private var isAccessory: Bool {
+        #if os(iOS)
+        family == .accessoryRectangular || family == .accessoryCircular || family == .accessoryInline
+        #else
+        false
+        #endif
+    }
+
     var body: some View {
-        if let snapshot = entry.snapshot, !snapshot.stats.isEmpty {
+        if entry.pausedByFocus {
+            FocusPausedView(family: family)
+        } else if let snapshot = entry.snapshot, !snapshot.stats.isEmpty {
             switch family {
             case .systemMedium: MediumStatsView(snapshot: snapshot)
             case .systemLarge: LargeStatsView(snapshot: snapshot)
+            #if os(iOS) // accessory(ロック画面)は Mac に無い(#984)
             case .accessoryRectangular: AccessoryRectangularView(snapshot: snapshot)
             case .accessoryCircular: AccessoryCircularView(stat: snapshot.stats[0])
             case .accessoryInline: AccessoryInlineView(stat: snapshot.stats[0])
+            #endif
             default: SmallStatView(snapshot: snapshot)
             }
-        } else if family == .accessoryRectangular || family == .accessoryCircular || family == .accessoryInline {
+        } else if isAccessory {
+            #if os(iOS)
             AccessoryEmptyView(family: family)
+            #endif
         } else {
             EmptyStateView(appName: entry.snapshot?.appName)
         }
@@ -162,6 +186,47 @@ struct AppFooter: View {
 }
 
 /// データ無し(アプリ未生成 / stat 部品が無い)。
+/// 集中モードのフィルタで選んでいない生成アプリ(#1992)。アプリ名も数字も出さない。
+struct FocusPausedView: View {
+    let family: WidgetFamily
+
+    var body: some View {
+        switch family {
+        #if os(iOS)
+        case .accessoryCircular:
+            ZStack {
+                AccessoryWidgetBackground()
+                Image(systemName: "moon.fill").font(.system(size: 18, weight: .semibold))
+            }
+            .accessibilityLabel(Text("集中モード中"))
+        case .accessoryInline:
+            Label("集中モード中", systemImage: "moon.fill")
+        case .accessoryRectangular:
+            Label("集中モード中", systemImage: "moon.fill")
+                .font(.caption.weight(.semibold))
+                .frame(maxWidth: .infinity, alignment: .leading)
+        #endif
+        default:
+            VStack(alignment: .leading, spacing: 8) {
+                ZStack {
+                    Circle().fill(WidgetTheme.brandGradient)
+                    Image(systemName: "moon.fill")
+                        .font(.system(size: 14, weight: .semibold))
+                        .foregroundStyle(.white)
+                }
+                .frame(width: 30, height: 30)
+                .accessibilityHidden(true)
+                Spacer(minLength: 0)
+                Text("集中モード中")
+                    .font(.headline)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.8)
+            }
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
+        }
+    }
+}
+
 struct EmptyStateView: View {
     let appName: String?
 

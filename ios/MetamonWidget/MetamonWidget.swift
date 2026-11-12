@@ -3,28 +3,39 @@ import SwiftUI
 
 // ホーム画面・ロック画面のウィジェット(ロック画面の accessory は #423)。本体が App Group に置いた `WidgetSnapshot`(集計済み文字列)を描画するだけ。
 // Renderer/DSL には依存しない(WidgetKit は静的タイムライン + メモリ上限 30MB のため軽量に保つ)。
-// 更新タイミング: 本体の `WidgetCenter.reloadAllTimelines()`(DSL 適用・レコード更新時)+ 30 分毎の自動リロード。
+// 更新タイミング: 本体の `WidgetCenter.reloadAllTimelines()`(DSL 適用・レコード更新時・集中モードのフィルタの切り替え)+ 30 分毎の自動リロード。
 
 @main
 struct MetamonWidgetBundle: WidgetBundle {
     var body: some Widget {
         MetamonStatWidget()
         TailorLiveActivity() // #423
+        if #available(iOS 18, *) { // コントロール(#1993)。iOS 17 では出さない
+            OpenAppControl()
+            RecordControl()
+        }
     }
 }
 
 struct StatProvider: TimelineProvider {
+    /// 置いてある数字。集中モードのフィルタで選んでいないアプリなら「集中モード中」(#1992・切り替えで本体が reload する)。
+    private static func current() -> StatEntry {
+        let snapshot = WidgetSnapshot.load()
+        let focus = FocusFilterState.load(from: WidgetSnapshot.defaults)
+        return StatEntry(date: .now, snapshot: snapshot, pausedByFocus: FocusFilterState.pausesWidget(snapshot, focus: focus))
+    }
+
     func placeholder(in context: Context) -> StatEntry {
         StatEntry(date: .now, snapshot: .sample)
     }
 
     func getSnapshot(in context: Context, completion: @escaping (StatEntry) -> Void) {
         // ギャラリー(追加画面)ではサンプルを見せる。実配置時は実データ。
-        completion(StatEntry(date: .now, snapshot: context.isPreview ? .sample : WidgetSnapshot.load()))
+        completion(context.isPreview ? StatEntry(date: .now, snapshot: .sample) : Self.current())
     }
 
     func getTimeline(in context: Context, completion: @escaping (Timeline<StatEntry>) -> Void) {
-        let entry = StatEntry(date: .now, snapshot: WidgetSnapshot.load())
+        let entry = Self.current()
         let next = Calendar.current.date(byAdding: .minute, value: 30, to: .now) ?? .now.addingTimeInterval(1800)
         completion(Timeline(entries: [entry], policy: .after(next)))
     }

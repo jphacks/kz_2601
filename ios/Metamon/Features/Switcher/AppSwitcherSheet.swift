@@ -9,14 +9,26 @@ struct AppSwitcherSheet: View {
     @Environment(AppRuntime.self) private var rt
     @Environment(\.dismiss) private var dismiss
     @State private var thumbs = AppThumbnailStore.shared
+    @State private var glance = AppGlanceStore.shared
     @State private var selected: String?
     @State private var showSettings = false
+    /// 集中モードのフィルタ(#1991)。nil = 置いていない
+    @State private var focus: FocusFilterState?
+    @State private var showsAllApps = false
     #if !APP_STORE_REVIEW
     @State private var sharingUI = SharingUI.shared
     @State private var releaseUI = ReleaseUI.shared
     #endif
 
-    private var apps: [AppSummary] { rt.visibleApps }
+    private var apps: [AppSummary] {
+        guard let focus, !showsAllApps else { return rt.visibleApps }
+        return focus.filter(rt.visibleApps)
+    }
+    /// フィルタで隠れているアプリがある(「すべて表示」を出すか)
+    private var isFocusNarrowing: Bool {
+        guard let focus else { return false }
+        return focus.filter(rt.visibleApps).count < rt.visibleApps.count
+    }
     private var showSkeleton: Bool { rt.appsLoading && apps.isEmpty }
 
     var body: some View {
@@ -28,6 +40,8 @@ struct AppSwitcherSheet: View {
                     .padding(.top, Theme.Spacing.lg)
                 AppsUsageNotice() // #317 作れるアプリの数が上限に近い(1 日 1 回)
                     .padding(.horizontal, Theme.Spacing.lg)
+                focusFilterBar // #1991
+                reorderCoachMark // #1441
                 cards
                     .padding(.top, Theme.Spacing.lg)
                 actions
@@ -44,6 +58,7 @@ struct AppSwitcherSheet: View {
         .presentationDragIndicator(.visible)
         .sensoryFeedback(.selection, trigger: selected)
         .task { await rt.appsList() }
+        .task { focus = FocusFilterState.load(from: WidgetSnapshot.defaults) }
         .onChange(of: rt.apps.count) { PlanUsageStore.shared.invalidateMe() } // 作った・消した・複製した(#317)
         #if !APP_STORE_REVIEW // 審査用ビルドはシェア / リリース申請を外す(#245)
         .task { await releaseUI.refresh(rt.services.releaseRequests) }
@@ -82,6 +97,40 @@ struct AppSwitcherSheet: View {
         }
     }
 
+    /// 集中モードのフィルタで一覧を絞っている時だけ出す。「すべて表示」で絞りを外す(このシートを閉じるまで)。
+    @ViewBuilder
+    private var focusFilterBar: some View {
+        if isFocusNarrowing || showsAllApps {
+            HStack(spacing: Theme.Spacing.sm) {
+                Image(systemName: "moon.fill")
+                    .foregroundStyle(.secondary)
+                    .accessibilityHidden(true)
+                Text(showsAllApps ? L10n.tr("集中モード中: すべて表示しています") : L10n.pick(L10n.tr("集中モード中: 選んだアプリだけを表示しています"), review: L10n.tr("集中モード中: 選んだ記録帳だけを表示しています")))
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+                Spacer(minLength: 0)
+                Toggle(L10n.tr("すべて表示"), isOn: $showsAllApps.animation())
+                    .font(.footnote.weight(.semibold))
+                    .fixedSize()
+                    .accessibilityIdentifier("switcher.focusShowAll")
+            }
+            .padding(.horizontal, Theme.Spacing.lg)
+            .padding(.top, Theme.Spacing.md)
+        }
+    }
+
+    /// カードが 2 枚以上ある時だけ、最初のカードを指して「長押しで並べ替え」を 1 回出す(#1441)。
+    @ViewBuilder
+    private var reorderCoachMark: some View {
+        if !showSkeleton, apps.count > 1, let mark = rt.coachMark(eligible: [.switcherReorder]) {
+            CoachMarkBubble(mark: mark, arrowAlignment: .leading, arrowInset: AppCard.width / 2) { rt.handleCoachMark(mark, $0) }
+                .padding(.horizontal, Theme.Spacing.lg)
+                .padding(.top, Theme.Spacing.md)
+                .transition(.opacity)
+        }
+    }
+
     @ViewBuilder
     private var cards: some View {
         if showSkeleton {
@@ -104,13 +153,16 @@ struct AppSwitcherSheet: View {
             .padding(.horizontal, Theme.Spacing.lg)
         } else {
             ScrollView(.horizontal, showsIndicators: false) {
-                HStack(spacing: Theme.Spacing.md) {
+                LazyHStack(spacing: Theme.Spacing.md) { // 見えているカードだけ数字を読む(link-10)
                     ForEach(apps) { app in
                         AppCard(app: app,
                                 isCurrent: app.id == rt.document.appId,
-                                thumbnail: thumbnail(for: app.id)) {
+                                thumbnail: thumbnail(for: app.id),
+                                glance: glance.values[app.id],
+                                glanceLoading: glance.loading.contains(app.id)) {
                             select(app)
                         }
+                        .task(id: app.glanceStat ?? "") { await rt.loadGlance(for: app) }
                         .overlay(alignment: .topTrailing) { AppCardActions(app: app) }
                         .overlay(alignment: .bottomTrailing) { if app.id == rt.document.appId { ScreenMapCardButton() } } // #116
                         .modifier(AppCardReorder(app: app)) // #277 長押しでドラッグして並べ替え
@@ -181,6 +233,9 @@ struct AppCard: View {
     let app: AppSummary
     let isCurrent: Bool
     let thumbnail: UIImage?
+    /// ひと目の数字(link-10)。無ければ最終更新を出す。
+    var glance: AppGlance.Value? = nil
+    var glanceLoading = false
     let action: () -> Void
 
     static let width: CGFloat = 150
@@ -205,18 +260,37 @@ struct AppCard: View {
                     Text(app.name)
                         .font(.subheadline.weight(.semibold))
                         .lineLimit(1)
-                    Text(updatedText)
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                        .lineLimit(1)
+                    secondLine
                 }
                 .padding(.horizontal, Theme.Spacing.xs)
             }
             .frame(width: Self.width)
         }
         .buttonStyle(CardPressStyle())
-        .accessibilityLabel(app.name + (isCurrent ? L10n.tr("(使用中)") : ""))
+        .accessibilityLabel(AppGlance.accessibilityLabel(appName: app.name + (isCurrent ? L10n.tr("(使用中)") : ""), value: glance))
         .accessibilityHint(isCurrent ? "" : L10n.tr("タップで切り替え"))
+    }
+
+    /// 2 行目: 数字(古ければ薄く)/ 読み込み中はスケルトン / 無ければ最終更新。
+    @ViewBuilder
+    private var secondLine: some View {
+        if let glance {
+            Text(AppGlance.line(glance))
+                .font(.caption.weight(.semibold).monospacedDigit())
+                .foregroundStyle(Date.now.timeIntervalSince(glance.at) > AppGlance.staleAfter ? AnyShapeStyle(.tertiary) : AnyShapeStyle(.secondary))
+                .lineLimit(1)
+                .minimumScaleFactor(0.8)
+        } else if glanceLoading {
+            RoundedRectangle(cornerRadius: 4)
+                .fill(Theme.Colors.surfaceElevated)
+                .frame(width: 80, height: 12)
+                .accessibilityHidden(true)
+        } else {
+            Text(updatedText)
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                .lineLimit(1)
+        }
     }
 
     @ViewBuilder

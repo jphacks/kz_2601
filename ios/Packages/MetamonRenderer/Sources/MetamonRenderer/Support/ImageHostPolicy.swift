@@ -37,21 +37,114 @@ private extension Character {
     var isASCIIDigitChar: Bool { ("0"..."9").contains(self) }
 }
 
-/// https の画像を読む。リダイレクトの先も [ImageHostPolicy] で確かめる。キャッシュは AsyncImage と同じ URLSession.shared。
-enum RemoteImageLoader {
-    private final class RedirectGuard: NSObject, URLSessionTaskDelegate {
+/// https の画像を読む。リダイレクトの先も [ImageHostPolicy] で確かめ、1 枚 [maxBytes] まで(Android の RemoteImages と同じ)。
+/// 大きさは宣言(Content-Length)で先に断り、宣言が無くても受けた量が超えた時点で止める。どちらも画像にはしない。
+/// キャッシュは画像専用の [cache](メモリ 16 MB・ディスク 64 MB)。サインアウト・アカウント削除で [removeAllCached] する。
+public enum RemoteImageLoader {
+    static let maxBytes = 10 * 1024 * 1024
+    static let memoryCapacity = 16 * 1024 * 1024
+    static let diskCapacity = 64 * 1024 * 1024
+
+    static let cache: URLCache = {
+        let dir = FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask).first?
+            .appendingPathComponent("metamon-images", isDirectory: true)
+        return URLCache(memoryCapacity: memoryCapacity, diskCapacity: diskCapacity, directory: dir)
+    }()
+
+    static let session: URLSession = {
+        let config = URLSessionConfiguration.default
+        config.urlCache = cache
+        return URLSession(configuration: config)
+    }()
+
+    /// 画像のキャッシュ(メモリ・ディスク)を消す。端末のデータ削除の一部。
+    public static func removeAllCached() {
+        cache.removeAllCachedResponses()
+    }
+
+    /// 宣言された大きさが上限を超えるか(不明 = -1 は受けながら数える)。
+    static func exceeds(_ length: Int64, limit: Int = maxBytes) -> Bool { length > Int64(limit) }
+
+    static func image(from url: URL) async -> PlatformImage? {
+        guard let data = await data(from: url) else { return nil }
+        return PlatformImage(data: data)
+    }
+
+    /// 上限内で読み切れた本文。https・公開のホスト・2xx 以外、上限超えは nil。
+    static func data(from url: URL, session: URLSession = session, limit: Int = maxBytes) async -> Data? {
+        guard ImageHostPolicy.isLoadable(url) else { return nil }
+        let load = CappedLoad(limit: limit)
+        let task = session.dataTask(with: url)
+        task.delegate = load
+        return await withTaskCancellationHandler {
+            await withCheckedContinuation { continuation in
+                load.start(task, continuation: continuation)
+            }
+        } onCancel: {
+            task.cancel()
+        }
+    }
+
+    /// 1 回分の読み込み。受けた量を数え、上限を超えたら止める。
+    private final class CappedLoad: NSObject, URLSessionDataDelegate, @unchecked Sendable {
+        private let limit: Int
+        private let lock = NSLock()
+        private var buffer = Data()
+        private var rejected = false
+        private var continuation: CheckedContinuation<Data?, Never>?
+
+        init(limit: Int) { self.limit = limit }
+
+        func start(_ task: URLSessionDataTask, continuation: CheckedContinuation<Data?, Never>) {
+            lock.withLock { self.continuation = continuation }
+            task.resume()
+        }
+
+        private func finish(_ data: Data?) {
+            let c = lock.withLock { () -> CheckedContinuation<Data?, Never>? in
+                defer { continuation = nil }
+                return continuation
+            }
+            c?.resume(returning: data)
+        }
+
         func urlSession(_ session: URLSession, task: URLSessionTask, willPerformHTTPRedirection response: HTTPURLResponse,
                         newRequest request: URLRequest, completionHandler: @escaping (URLRequest?) -> Void) {
             completionHandler(request.url.map(ImageHostPolicy.isLoadable) == true ? request : nil)
         }
-    }
 
-    static func image(from url: URL) async -> PlatformImage? {
-        guard ImageHostPolicy.isLoadable(url),
-              let (data, response) = try? await URLSession.shared.data(from: url, delegate: RedirectGuard()),
-              let http = response as? HTTPURLResponse, (200..<300).contains(http.statusCode),
-              http.url.map(ImageHostPolicy.isLoadable) ?? false else { return nil }
-        return PlatformImage(data: data)
+        func urlSession(_ session: URLSession, dataTask: URLSessionDataTask, didReceive response: URLResponse,
+                        completionHandler: @escaping (URLSession.ResponseDisposition) -> Void) {
+            guard let http = response as? HTTPURLResponse, (200..<300).contains(http.statusCode),
+                  http.url.map(ImageHostPolicy.isLoadable) ?? false,
+                  !RemoteImageLoader.exceeds(response.expectedContentLength, limit: limit) else {
+                lock.withLock { rejected = true }
+                completionHandler(.cancel)
+                return
+            }
+            completionHandler(.allow)
+        }
+
+        func urlSession(_ session: URLSession, dataTask: URLSessionDataTask, didReceive data: Data) {
+            let over = lock.withLock { () -> Bool in
+                guard !rejected else { return false }
+                buffer.append(data)
+                if buffer.count > limit {
+                    rejected = true
+                    buffer = Data()
+                    return true
+                }
+                return false
+            }
+            if over { dataTask.cancel() }
+        }
+
+        func urlSession(_ session: URLSession, task: URLSessionTask, didCompleteWithError error: Error?) {
+            let result = lock.withLock { () -> Data? in
+                error == nil && !rejected ? buffer : nil
+            }
+            finish(result)
+        }
     }
 }
 

@@ -59,9 +59,11 @@ extension AppRuntime {
     /// この端末のアプリがまだ空(音声画面だけ)なら、サーバーにある一番新しいアプリを開く。
     /// 再インストール後のサインイン・別アカウントへの切り替えの直後に使う。
     func resumeLatestAppIfEmpty() async {
+        let spotlightGeneration = spotlight.generation
         guard services.isLive, dsl.isVoiceOnly, morphJob == nil,
               let list = try? await services.appConfig.listApps() else { return }
         apps = list
+        await spotlight.sync(list, since: spotlightGeneration) // #1996 取った一覧で Spotlight も合わせる
         guard let latest = Self.latestApp(in: appDeletion.filter(list), excluding: document.appId) else { return }
         print("[Metamon] resume latest app: \(latest.id)")
         await switchApp(to: latest.id)
@@ -111,7 +113,8 @@ struct AppleLinkButton: View {
         .alert("この Apple ID は別のアカウントで使われています", isPresented: $session.linkConflict) {
             Button("そのアカウントに切り替える", role: .destructive) {
                 Task {
-                    guard await session.switchToExistingAppleAccount() else { return }
+                    guard await session.switchToExistingAppleAccount(beforeSwitch: { await rt.unregisterPushDevice() },
+                                                                     afterFailedSwitch: { await rt.registerPushDevice() }) else { return }
                     await rt.adoptSwitchedAccount()
                     onLinked()
                 }

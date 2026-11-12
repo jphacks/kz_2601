@@ -11,9 +11,12 @@ import (
 	"github.com/jphacks/kz_2601/backend/internal/loop/github"
 )
 
-// Publisher creates the issue (github.Client).
+// Publisher creates the issue, or comments on the filed one for an append
+// draft after checking that it is still open (github.Client).
 type Publisher interface {
 	CreateIssue(ctx context.Context, repo, title, body string, labels []string) (*github.Issue, error)
+	CommentIssue(ctx context.Context, repo string, n int, body string) (*github.Issue, error)
+	IssueOpen(ctx context.Context, repo string, n int) (bool, error)
 }
 
 // Reviewer is the human side of the queue: every method is run by a person
@@ -32,6 +35,11 @@ type Reviewer struct {
 
 // ErrCheck is a draft that fails the exit check.
 var ErrCheck = errors.New("draft fails the exit check")
+
+// ErrIssueClosed: an append draft's issue was closed on GitHub before the
+// comment was posted. The draft was drafted again as a new issue and waits
+// for approval.
+var ErrIssueClosed = errors.New("the filed issue is closed")
 
 func (r *Reviewer) now() time.Time {
 	if r.Now != nil {
@@ -166,10 +174,74 @@ func (r *Reviewer) publish(ctx context.Context, d *loop.Draft) (*loop.Draft, *gi
 	if len(reasons) > 0 {
 		return d, nil, fmt.Errorf("%w: %s", ErrCheck, strings.Join(reasons, ", "))
 	}
-	iss, err := r.Publisher.CreateIssue(ctx, r.Repo, d.Title, d.Body, r.Labels)
+	var iss *github.Issue
+	if d.AppendIssue > 0 {
+		iss, err = r.appendTo(ctx, d)
+	} else {
+		iss, err = r.Publisher.CreateIssue(ctx, r.Repo, d.Title, d.Body, r.Labels)
+	}
 	if err != nil {
 		return d, nil, err
 	}
-	d.Status, d.IssueRepo, d.IssueNumber, d.UpdatedAt = loop.DraftPublished, r.Repo, iss.Number, r.now()
+	now := r.now()
+	d.Status, d.IssueRepo, d.IssueNumber, d.PublishedAt, d.UpdatedAt = loop.DraftPublished, r.Repo, iss.Number, now, now
 	return d, iss, r.Store.PutDraft(ctx, *d)
+}
+
+// appendTo posts an append draft as a comment on its filed issue. The issue
+// must still be the cluster's open one in the target repo; otherwise the
+// approved text no longer fits, and the draft is rejected and drafted again.
+func (r *Reviewer) appendTo(ctx context.Context, d *loop.Draft) (*github.Issue, error) {
+	if d.AppendRepo != r.Repo {
+		return nil, fmt.Errorf("draft adds to %s#%d but the target is %s; reject it and run draft again", d.AppendRepo, d.AppendIssue, r.Repo)
+	}
+	filed, err := FiledIssues(ctx, r.Store)
+	if err != nil {
+		return nil, err
+	}
+	if f := filed[d.ClusterKey]; f.Repo != d.AppendRepo || f.Number != d.AppendIssue {
+		return nil, fmt.Errorf("%s#%d is no longer the open issue of this cluster (fixed?); reject the draft and run draft again", d.AppendRepo, d.AppendIssue)
+	}
+	// FixedAt is set only for issues closed by a merged PR, and only when
+	// the notifier has run: ask GitHub (closed as not planned or duplicate
+	// counts too)
+	open, err := r.Publisher.IssueOpen(ctx, d.AppendRepo, d.AppendIssue)
+	if err != nil {
+		return nil, err
+	}
+	if !open {
+		if err := r.redraftAsNew(ctx, d); err != nil {
+			return nil, err
+		}
+		return nil, fmt.Errorf("%w: %s#%d; drafted again as a new issue (%s), approve it again", ErrIssueClosed, d.AppendRepo, d.AppendIssue, d.ID)
+	}
+	return r.Publisher.CommentIssue(ctx, d.AppendRepo, d.AppendIssue, d.Body)
+}
+
+// redraftAsNew marks the closed issue so later runs stop adding to it, and
+// turns d back into a pending draft for a new issue.
+func (r *Reviewer) redraftAsNew(ctx context.Context, d *loop.Draft) error {
+	now := r.now()
+	ds, err := r.Store.ListDrafts(ctx, loop.DraftQuery{Status: loop.DraftPublished, Limit: 500})
+	if err != nil {
+		return err
+	}
+	for _, p := range ds {
+		if p.IssueRepo == d.AppendRepo && p.IssueNumber == d.AppendIssue && p.ClosedAt.IsZero() {
+			p.ClosedAt, p.UpdatedAt = now, now
+			if err := r.Store.PutDraft(ctx, p); err != nil {
+				return err
+			}
+		}
+	}
+	items, err := LoadItems(ctx, r.Store, d.ItemIDs)
+	if err != nil {
+		return err
+	}
+	d.AppendRepo, d.AppendIssue = "", 0
+	if len(items) > 0 {
+		fill(d, items, now)
+	}
+	d.Status, d.ReviewedBy, d.ReviewedAt, d.BodyHash, d.UpdatedAt = loop.DraftPending, "", time.Time{}, "", now
+	return r.Store.PutDraft(ctx, *d)
 }

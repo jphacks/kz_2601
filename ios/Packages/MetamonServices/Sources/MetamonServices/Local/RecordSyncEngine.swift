@@ -170,6 +170,11 @@ public final class RecordSyncEngine {
         await shown(appId: appId, entity: entity)
     }
 
+    /// `cached` の復号する前(暗号文のまま)。AES-GCM の復号を main actor の外で `Self.opened(_:cipher:)` でやる時に使う。
+    public func cachedSealed(appId: String, entity: String) async -> [Record] {
+        await sealedShown(appId: appId, entity: entity)
+    }
+
     /// サーバー全件を取り、ローカルを置換(未送信行は残す)して返す。失敗はそのまま投げる(呼び出し側がローカル表示を続ける)。
     public func pull(appId: String, entity: String) async throws -> [Record] {
         let server = try await client.list(appId: appId, entity: entity)
@@ -243,11 +248,16 @@ public final class RecordSyncEngine {
 
     /// 表示用: 暗号文を端末で復号する(#233)。鍵は暗号文がある時だけ引く。
     func opened(_ records: [Record]) -> [Record] {
+        Self.opened(records, cipher: cipher, lockedText: FieldCipher.lockedText)
+    }
+
+    /// `opened` の main actor の外でも呼べる版(鍵の読み出しと復号)。`lockedText` は main で `FieldCipher.lockedText` を引いて渡す。
+    public nonisolated static func opened(_ records: [Record], cipher: FieldCipher, lockedText: @autoclosure () -> String) -> [Record] {
         guard records.contains(where: { $0.data.values.contains(where: FieldCipher.isEnvelope) }) else { return records }
         let key = cipher.keys.load()
         return records.map { r in
             var r = r
-            r.data = cipher.opened(r.data, key: key)
+            r.data = cipher.opened(r.data, key: key, lockedText: lockedText())
             return r
         }
     }

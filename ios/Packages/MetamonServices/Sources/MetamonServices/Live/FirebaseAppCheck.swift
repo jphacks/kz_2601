@@ -5,7 +5,7 @@ import FirebaseCore
 
 /// App Check のプロバイダの選び方(#318)。アプリ本体が構成から決めて `FirebaseBootstrap.configureIfAvailable(appCheck:)` に渡す。
 public enum AppCheckMode: Sendable {
-    /// 実機の配布版: App Attest(非対応の端末は DeviceCheck)
+    /// 実機の配布版: iOS は App Attest(非対応の端末は DeviceCheck)、Mac は DeviceCheck(#930)
     case deviceAttestation
     /// シミュレータ・Debug 構成・CI: デバッグ用のトークン(Firebase コンソールに登録したものだけ通る)。
     /// 値は初回起動時にコンソールへ出る(`Firebase App Check debug token: …`)か、環境変数 `FIRAAppCheckDebugToken` で固定する
@@ -14,13 +14,19 @@ public enum AppCheckMode: Sendable {
     case off
 }
 
-/// App Attest を優先し、使えない端末(`DCAppAttestService.isSupported == false`)は DeviceCheck に落とす。
+/// iOS: App Attest を優先し、使えない端末(`DCAppAttestService.isSupported == false`)は DeviceCheck に落とす。
+/// Mac(#930): App Attest は Mac では `isSupported == false` なので、最初から DeviceCheck(macOS 10.15 から使える)。
+/// docs/infra/app-check.md「Mac のプロバイダ」
 final class AttestationProviderFactory: NSObject, AppCheckProviderFactory {
     func createProvider(with app: FirebaseApp) -> (any AppCheckProvider)? {
+        #if os(macOS)
+        return DeviceCheckProvider(app: app)
+        #else
         if DCAppAttestService.shared.isSupported, let attest = AppAttestProvider(app: app) {
             return attest
         }
         return DeviceCheckProvider(app: app)
+        #endif
     }
 }
 

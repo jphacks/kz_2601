@@ -13,12 +13,15 @@ final class LocalVersionHistoryTests: XCTestCase {
         XCTAssertEqual(history.undo(from: 2), 1)
         XCTAssertFalse(history.canUndo)
         XCTAssertNil(history.undo(from: 1))
-        // やり直す先は最後に戻す前の版(1 つだけ)
+        // 続けて戻した分は 1 つずつやり直せる(#1883)
         XCTAssertEqual(history.redo(from: 1), 2)
-        XCTAssertFalse(history.canRedo)
-        XCTAssertNil(history.redo(from: 2))
+        XCTAssertTrue(history.canRedo)
         // やり直した後はまた戻せる
         XCTAssertEqual(history.undo(from: 2), 1)
+        XCTAssertEqual(history.redo(from: 1), 2)
+        XCTAssertEqual(history.redo(from: 2), 3)
+        XCTAssertFalse(history.canRedo)
+        XCTAssertNil(history.redo(from: 3))
     }
 
     func testNewVersionDropsRedo() {

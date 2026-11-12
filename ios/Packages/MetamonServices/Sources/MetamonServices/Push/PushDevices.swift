@@ -6,16 +6,19 @@ public enum PushEnvironment: String, Sendable {
     case sandbox
     case production
 
-    /// 署名の `aps-environment` を読む。開発署名だけ development で、配布の版に profile は無いか production。
+    /// 署名の `aps-environment`(Mac は `com.apple.developer.aps-environment`・#982)を読む。開発署名だけ development で、配布の版に profile は無いか production。
     public static func from(provisioningProfile: Data?) -> PushEnvironment {
         guard let profile = provisioningProfile, let text = String(data: profile, encoding: .isoLatin1) else { return .production }
-        let development = #"<key>aps-environment</key>\s*<string>development</string>"#
+        let development = #"<key>(?:com\.apple\.developer\.)?aps-environment</key>\s*<string>development</string>"#
         return text.range(of: development, options: .regularExpression) == nil ? .production : .sandbox
     }
 
     public static var current: PushEnvironment {
         #if targetEnvironment(simulator)
         .sandbox
+        #elseif os(macOS)
+        // Mac の profile は Contents/embedded.provisionprofile(#982)
+        from(provisioningProfile: try? Data(contentsOf: Bundle.main.bundleURL.appending(path: "Contents/embedded.provisionprofile")))
         #else
         from(provisioningProfile: Bundle.main.url(forResource: "embedded", withExtension: "mobileprovision").flatMap { try? Data(contentsOf: $0) })
         #endif

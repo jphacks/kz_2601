@@ -32,6 +32,10 @@ struct RatingLeaf: View {
                     }
                     Spacer(minLength: 0)
                 }
+                // Mac: ←→・数字キー・VoiceOver の増減で付ける(#941)
+                .macRatingControl(label: c.label, current: current, count: count) { n in
+                    withAnimation(RenderTheme.Motion.press) { value.wrappedValue = Double(n) }
+                }
                 .renderInputChrome()
             }
         } else {

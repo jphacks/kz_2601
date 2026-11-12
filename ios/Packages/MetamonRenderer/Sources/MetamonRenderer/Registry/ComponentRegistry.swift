@@ -12,12 +12,15 @@ public struct ComponentRegistry: Sendable {
     public typealias Builder = @MainActor @Sendable (Component, RenderContext) -> AnyView
 
     private var builders: [String: Builder] = [:]
+    /// 「この Mac では使えません」の枠で登録した type(#947)。申告(`ClientCapabilities.macUnavailableComponents`)との一致をテストで確かめる。
+    public private(set) var unavailableTypes: Set<String> = []
 
     public init() {}
 
     /// `type` 文字列で登録(ホストが schema 外の独自コンポーネントを足す時もこちら)。
     public mutating func register<V: View>(_ type: String, @ViewBuilder _ build: @escaping @MainActor @Sendable (Component, RenderContext) -> V) {
         builders[type] = { AnyView(build($0, $1)) }
+        unavailableTypes.remove(type)
     }
 
     public mutating func register<V: View>(_ type: ComponentType, @ViewBuilder _ build: @escaping @MainActor @Sendable (Component, RenderContext) -> V) {
@@ -143,8 +146,31 @@ public struct ComponentRegistry: Sendable {
         // leaf(外部の公開データ・#348)。外部の Web の内容を出すので外す
         r.register(.feed) { c, _ in FeedLeaf(c: c) }
         #endif
+        #if os(macOS)
+        // Mac で描けない部品(#925・#947)。AI には申告で作らせず、古い DSL で来た時はこの枠で受ける。審査用ビルドでも同じ枠にする。
+        for type in ClientCapabilities.macUnavailableComponents { r.registerMacUnavailable(type) }
+        #endif
         return r
     }()
+
+    #if os(macOS)
+    /// Mac で使えない部品を「この Mac では使えません」の枠で登録する(#947)。
+    mutating func registerMacUnavailable(_ type: ComponentType) {
+        register(type) { c, _ in MacUnavailableView(feature: c.title ?? Self.macUnavailableFeatureName(type)).renderCard() }
+        unavailableTypes.insert(type.rawValue)
+    }
+
+    /// 枠に出す機能の名前(部品に title が無い時)。
+    static func macUnavailableFeatureName(_ type: ComponentType) -> String {
+        switch type {
+        case .healthStat: L("ヘルスケア")
+        case .sensorValue: L("センサー")
+        case .locationTracker: L("位置の記録")
+        case .dashcam: L("ドラレコ")
+        default: type.rawValue
+        }
+    }
+    #endif
 }
 
 #if APP_STORE_REVIEW

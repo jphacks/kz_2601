@@ -1,8 +1,11 @@
 package extapi
 
 import (
+	"context"
+	"errors"
 	"log/slog"
 	"net/http"
+	"time"
 
 	"github.com/jphacks/kz_2601/backend/internal/httpx"
 )
@@ -30,6 +33,8 @@ func StatusOf(reason string) int {
 		return http.StatusServiceUnavailable
 	case ReasonProRequired, ReasonAllowanceExhausted, ReasonOverflowCap, ReasonCoinsInsufficient:
 		return http.StatusPaymentRequired
+	case ReasonRateLimited:
+		return http.StatusTooManyRequests
 	case ReasonUpstreamTimeout:
 		return http.StatusGatewayTimeout
 	case ReasonUpstream:
@@ -67,10 +72,26 @@ type ConnBody struct {
 	Scopes   []string `json:"scopes,omitempty"`
 }
 
-func (s *Service) fail(w http.ResponseWriter, err error) {
-	reason := Reason(err)
-	httpx.WriteJSON(w, StatusOf(reason), map[string]string{"reason": reason})
+// FailBody is the internal answer of a failed call: the reason, and for
+// rate_limited the scope (Limit*) and the seconds until it may be tried again.
+type FailBody struct {
+	Reason        string `json:"reason"`
+	Scope         string `json:"scope,omitempty"`
+	RetryAfterSec int    `json:"retryAfterSec,omitempty"`
 }
+
+func (s *Service) fail(w http.ResponseWriter, err error) {
+	b := FailBody{Reason: Reason(err)}
+	var le *LimitError
+	if errors.As(err, &le) {
+		b.Scope, b.RetryAfterSec = le.Scope, le.RetryAfterSec()
+	}
+	httpx.WriteJSON(w, StatusOf(b.Reason), b)
+}
+
+// RevokeAllTimeout bounds one revokeAll, which does not stop when the
+// caller hangs up.
+const RevokeAllTimeout = time.Minute
 
 // Routes mounts the external API routes on mux.
 func (s *Service) Routes(mux *http.ServeMux) {
@@ -118,7 +139,11 @@ func (s *Service) Routes(mux *http.ServeMux) {
 		if !httpx.DecodeBody(w, r, &b) {
 			return
 		}
-		n, err := s.RevokeAll(r.Context(), b.UID)
+		// the caller may stop waiting (account deletion is best effort on
+		// its side); the revocation still runs to the end, bounded on its own
+		ctx, cancel := context.WithTimeout(context.WithoutCancel(r.Context()), RevokeAllTimeout)
+		defer cancel()
+		n, err := s.RevokeAll(ctx, b.UID)
 		if err != nil {
 			s.fail(w, err)
 			return

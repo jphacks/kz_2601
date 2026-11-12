@@ -1,8 +1,5 @@
-// TODO mac-026: UIKit を直接使うテスト。Mac で回すには描画の仕方を置き換え層に寄せる
-#if os(iOS)
 import XCTest
 import SwiftUI
-import UIKit
 import MetamonDSL
 @testable import MetamonRenderer
 
@@ -28,6 +25,17 @@ final class AiGenerateTests: XCTestCase {
                        .unavailable(off.message!), "プレビュー等オンラインの無いホストは理由を出して無効")
         XCTAssertEqual(AIGenerateRoute.choose(availability: .available, hostOnline: true, mock: true), .online, "モックは決まった文を返すホストへ")
         XCTAssertEqual(AIGenerateRoute.choose(availability: .available, hostOnline: false, mock: true), .onDevice)
+    }
+
+    /// #1640: 使えないボタンは押すと理由を出す(何もせずに戻らない)。使える時は知らせを出さず実行する。
+    func testUnavailableRouteGivesTapNotice() {
+        let off = AIAvailability.unavailable(.deviceNotEligible)
+        let route = AIGenerateRoute.choose(availability: off, hostOnline: false, mock: false)
+        XCTAssertEqual(route.unavailableNotice, AIUnavailableNotice(title: AIAvailability.title, message: off.message!))
+        let long = AIGenerateRoute.choose(availability: .available, hostOnline: false, mock: false, long: true)
+        XCTAssertEqual(long.unavailableNotice?.message, AIGenerateRoute.longUnavailable, "審査用の版の long も理由を出す")
+        XCTAssertNil(AIGenerateRoute.onDevice.unavailableNotice)
+        XCTAssertNil(AIGenerateRoute.online.unavailableNotice)
     }
 
     // MARK: 依頼
@@ -130,7 +138,7 @@ final class AiGenerateTests: XCTestCase {
         ]
         var heights: [CGFloat] = []
         for r in results {
-            let host = UIHostingController(rootView: AITextResultView(result: r).frame(width: 320))
+            let host = TestHostingController(rootView: AITextResultView(result: r).frame(width: 320))
             let size = host.sizeThatFits(in: CGSize(width: 320, height: CGFloat.greatestFiniteMagnitude))
             XCTAssertGreaterThan(size.height, 20, "\(r.shape)")
             heights.append(size.height)
@@ -143,9 +151,8 @@ final class AiGenerateTests: XCTestCase {
         let dsl = try ideas()
         let batsu = try XCTUnwrap(dsl.screen("home")?.components.first { $0.id == "batsu" })
         let view = AiButtonLeaf(c: batsu, ctx: RenderContext(route: Route(screen: "home")))
-        let host = UIHostingController(rootView: view.frame(width: 320))
+        let host = TestHostingController(rootView: view.frame(width: 320))
         let size = host.sizeThatFits(in: CGSize(width: 320, height: 600))
         XCTAssertGreaterThan(size.height, 30)
     }
 }
-#endif

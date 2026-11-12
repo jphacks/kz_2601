@@ -81,6 +81,7 @@ struct CarouselContainer: View {
                         .frame(width: 7, height: 7)
                         .contentShape(Rectangle().inset(by: -4))
                         .onTapGesture { scroll(to: i) }
+                        .macHelp(L("\(i + 1) 枚目を見る"))
                 }
             }
             .focusable()

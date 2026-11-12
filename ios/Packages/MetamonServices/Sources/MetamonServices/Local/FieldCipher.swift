@@ -101,11 +101,16 @@ public struct FieldCipher: Sendable {
 
     /// 表示用: 封筒の値を平文(読めなければ `lockedText`)に置き換える。
     public func opened(_ data: [String: JSONValue], key: SymmetricKey?) -> [String: JSONValue] {
+        opened(data, key: key, lockedText: Self.lockedText)
+    }
+
+    /// `lockedText` を先に引いて渡す版(言語の設定を main actor の外で読まない)。
+    public func opened(_ data: [String: JSONValue], key: SymmetricKey?, lockedText: @autoclosure () -> String) -> [String: JSONValue] {
         guard data.values.contains(where: Self.isEnvelope) else { return data }
         var out = data
         for (k, v) in data {
             guard case .string(let s) = v, s.hasPrefix(Self.prefix) else { continue }
-            out[k] = .string(open(s, with: key) ?? Self.lockedText)
+            out[k] = .string(open(s, with: key) ?? lockedText())
         }
         return out
     }

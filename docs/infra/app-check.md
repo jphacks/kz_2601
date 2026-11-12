@@ -9,6 +9,7 @@ ai / appconfig は Cloud Run で公開されていて、認可は Firebase の I
 - [モード](#モード)
 - [iOS の構成ごとのプロバイダ](#ios-の構成ごとのプロバイダ)
 - [Android の構成ごとのプロバイダ](#android-の構成ごとのプロバイダ)
+- [Mac のプロバイダ](#mac-のプロバイダ)
 - [人の作業](#人の作業)
 - [モードの切り替え](#モードの切り替え)
 - [ログの見方](#ログの見方)
@@ -72,6 +73,21 @@ ai / appconfig は Cloud Run で公開されていて、認可は Firebase の I
 - `google-services.json` が無いビルド(CI・json 未同期)は Firebase も App Check も動かず、ヘッダは付きません。CI のテストはモックなので影響しません。
 - デバッグ用のトークンは初回起動時に logcat に出ます(`DebugAppCheckProvider` で検索)。**秘密情報**なのでコード・PR・Issue・チャットに貼らないでください。
 
+## Mac のプロバイダ
+
+Mac のアプリ(MetamonMac・#930)も同じ `FirebaseBootstrap.configureIfAvailable(appCheck:)` でトークンを付けます。ただし **Mac では App Attest が使えません**(`DCAppAttestService.isSupported` が Mac では常に false。docs/decisions/363-desktop-strategy.md)。そのため Mac は最初から **DeviceCheck** を使います。
+
+| 構成 | プロバイダ | 決めている場所 |
+| --- | --- | --- |
+| Debug | デバッグ用(`AppCheckDebugProviderFactory`) | `MetamonMac/App/Services/MacServices.swift` の `MacFirebase.appCheckMode` |
+| Staging / Release / Review | DeviceCheck(`DeviceCheckProvider`・macOS 10.15 から) | `MetamonServices/Live/FirebaseAppCheck.swift` の `AttestationProviderFactory`(`#if os(macOS)`) |
+
+- SDK(firebase-ios-sdk 13.1.1)の `DeviceCheckProvider` は macOS で使えます(`FIR_DEVICE_CHECK_PROVIDER_AVAILABILITY` に macOS の制限が無い)。`AppAttestProvider` は macOS 11.3 からコンパイルはできますが、端末が対応していないので選びません。iOS は今まで通り App Attest を優先します。
+- Mac は App Attest の entitlement(`appattest-environment`)を持ちません。DeviceCheck に entitlement は要りません。
+- Bundle ID は iOS と同じ(`jp.kz2601.metamon`・ユニバーサル購入)なので、Firebase の Apple アプリ(iOS で登録済みのもの)と同じ `GoogleService-Info.plist` を使い、Mac 用のアプリ登録は作りません。App Check の登録もその 1 つのアプリに対して行います。
+- **DeviceCheck を Firebase に登録しないと、`enforce` で Mac がすべて 401 になります**(iOS では任意の手順 3 が、Mac では必須)。`enforce` にする前に、Mac の Staging 版を `log` で動かし、ログの `valid` を確かめます。
+- Mac の Debug 構成のデバッグ用トークンは、Xcode のコンソールに出る値を「デバッグ用トークンを管理」に足します(iOS と同じ手順 4)。
+
 ## 人の作業
 
 順番どおりに。stg で確かめてから prod。
@@ -86,7 +102,7 @@ ai / appconfig は Cloud Run で公開されていて、認可は Firebase の I
 
 1. Firebase コンソール →「App Check」→「アプリ」→ iOS アプリ(`jp.kz2601.metamon`)。
 2. **App Attest** を登録(Team ID を入れる)。トークンの有効期間は既定(1 時間)のままでよい。
-3. 任意: **DeviceCheck** も登録(Apple の DeviceCheck 用の鍵 `.p8`・Key ID・Team ID が要る。鍵は `~/Desktop/JPHACKS2026/secrets/` に置き、リポジトリには入れない)。登録しないと、App Attest 非対応の端末(ごく一部)は `enforce` で弾かれます。
+3. 任意(**Mac を使うなら必須**・[Mac のプロバイダ](#mac-のプロバイダ)): **DeviceCheck** も登録(Apple の DeviceCheck 用の鍵 `.p8`・Key ID・Team ID が要る。鍵は `~/Desktop/JPHACKS2026/secrets/` に置き、リポジトリには入れない)。登録しないと、App Attest 非対応の端末(ごく一部)は `enforce` で弾かれます。
 4. stg 用に別の Firebase iOS アプリを作った場合(#288)は、そちらにも同じ登録をします。
 
 ### 3. App Check API を有効にする
