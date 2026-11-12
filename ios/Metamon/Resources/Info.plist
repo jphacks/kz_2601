@@ -35,6 +35,8 @@
 	<string>$(CURRENT_PROJECT_VERSION)</string>
 	<key>ITSAppUsesNonExemptEncryption</key>
 	<false/>
+	<key>UISupportsFullScreenInAssistiveAccess</key>
+	<true/>
 	<!-- 起動画面は SplashView の最初のコマ(無地の紺)と同じ色にして、つなぎ目を見せない -->
 	<key>UILaunchScreen</key>
 	<dict>
