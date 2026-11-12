@@ -20,6 +20,7 @@ import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import java.awt.EventQueue
 import java.io.File
 import java.nio.file.Files
 
@@ -156,11 +157,13 @@ class VoiceInputTest {
         val voice = VoiceInput(FakeMic(), FakeTranscriber(text = "卵"))
         val s = DesktopSession(Examples.load("shopping"), MockStore())
         s.host = DesktopActionHost(BookLookupClient.mock, dir, silent, voice)
-        fun press() = s.dispatch(Action(type = ActionType.OPEN_VOICE), ActionContext(s.top, s.form(s.top)))
+        // アプリと同じく画面のスレッドで押す
+        fun press() = EventQueue.invokeAndWait { s.dispatch(Action(type = ActionType.OPEN_VOICE), ActionContext(s.top, s.form(s.top))) }
         press()
         assertEquals(Strings["desktop_voice_recording"], s.message)
         press()
         runBlocking { voice.job?.join() }
+        EventQueue.invokeAndWait {} // 画面のスレッドに出した結果を待つ
         assertEquals(Strings.format("desktop_voice_heard", "卵"), s.message)
 
         // 既定(フラグが無い)は今までどおり使えない旨

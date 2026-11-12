@@ -27,6 +27,7 @@ import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.contentOrNull
 import java.awt.Desktop
+import java.awt.EventQueue
 import java.awt.GraphicsEnvironment
 import java.awt.SystemTray
 import java.awt.Toolkit
@@ -102,7 +103,8 @@ class DesktopActionHost(
         ActionType.SCHEDULE_NOTIFICATION -> action.notification?.let { notifier.schedule(it) } ?: Strings["runtime_notification_failed"]
         ActionType.CANCEL_NOTIFICATION -> action.notificationId?.let { notifier.cancel(it) }
         ActionType.EXPORT -> export(action, ctx, session)
-        ActionType.OPEN_VOICE -> voice?.toggle { msg -> Snapshot.withMutableSnapshot { session.message = msg } } ?: UNAVAILABLE_VOICE
+        // 結果は画面のスレッドで出す。dispatch が toggle の返す一言を入れた後になるので、速く終わっても上書きされない
+        ActionType.OPEN_VOICE -> voice?.toggle { msg -> EventQueue.invokeLater { Snapshot.withMutableSnapshot { session.message = msg } } } ?: UNAVAILABLE_VOICE
         ActionType.START_ACTIVITY, ActionType.END_ACTIVITY -> UNAVAILABLE_ACTIVITY
         ActionType.FOLLOW, ActionType.UNFOLLOW -> UNAVAILABLE_FOLLOW
         else -> Strings.format("runtime_unknown_action", action.rawType.ifEmpty { action.type.wire })
