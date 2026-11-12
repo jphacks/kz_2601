@@ -7,6 +7,8 @@ import (
 	"errors"
 	"fmt"
 	"strconv"
+
+	"github.com/jphacks/kz_2601/backend/internal/metrics"
 )
 
 // Push platforms (the same strings as store.PlatformIOS / PlatformAndroid).
@@ -124,6 +126,10 @@ func (o Outcome) Summary() Summary {
 type Dispatcher struct {
 	Tokens TokenReader
 	Sender Sender
+	// CountShared writes a shared.usage notify line per recipient reached
+	// (#2298; off unless SHARED_USAGE_LOG=on). The automation run sets it;
+	// the notices to the creator (limits, allowance) do not.
+	CountShared bool
 }
 
 // Dispatch sends c to res.To. Skips of res are carried over. A recipient
@@ -166,6 +172,9 @@ func (d *Dispatcher) Dispatch(ctx context.Context, res Resolution, c Content) (O
 		switch {
 		case sent:
 			out.Sent = append(out.Sent, uid)
+			if d.CountShared {
+				metrics.EmitSharedUsage(ctx, c.AppID, uid, metrics.SharedNotify, 1)
+			}
 		case unregistered == len(tokens):
 			out.Skipped = append(out.Skipped, Skip{UID: uid, Reason: ReasonUnregistered})
 		default:

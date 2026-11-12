@@ -46,6 +46,7 @@
 | `app.shared` | `POST /v1/apps/{appId}/share` が成功した時 | `app_hash`・`uid_hash` | appconfig: `share.go` の `createShare` |
 | `app.published` | `POST /v1/apps/{appId}/publish` が成功した時 | `app_hash`・`uid_hash` | appconfig: `share.go` の `publishApp` |
 | `share.imported` | 共有リンクからの取り込み・「探す」からの追加でコピーを作った時(「探す」の入れ直しは数えない) | `app_hash`(入った先)・source(`share|public`)・joined・created・`uid_hash` | appconfig: `share.go` の `importShare`・`installPublicApp` |
+| `shared.usage` | `SHARED_USAGE_LOG=on` の時だけ(既定 off・#2298)。共有の項目(scope: shared/public)の記録を読んだ・作った・変えた・消した時、共有のアプリの自動の宛先付き通知が 1 人に届いた時 | `app_hash`・`uid_hash`・kind(`read`=1 回の取得で読んだ記録の数 / `write` / `notify`=届いた人)・count | appconfig: `records.go`(`shared_usage.go`)・runner: `notify/sender.go` |
 | `paywall.shown` / `paywall.purchased` | (未実装・将来)確認カードの表示・購入 | feature / product | iOS からの送信が要る(人の判断) |
 
 - `uid_hash` = `sha256("ai-usage:" + uid)` の先頭 8 バイト(16 桁)。`ai.usage`(#298)と同じ値で、1 人あたりの費用と継続を結べる。
@@ -65,6 +66,7 @@ scripts/product-metrics-weekly.sh --input backend/cmd/product-metrics/testdata/l
 - 要る権限: プロジェクトの `roles/logging.viewer` だけ(`gcloud auth login` 済み)。書き込みはしない。
 - 集計は `backend/cmd/product-metrics`(Go)。入力は `gcloud logging read --format=json` の配列か、JSON lines(ローカルの `make dev` のログもそのまま読める)。
 - 出力は 5 つの Markdown の表(生成の成功率・直しの回数・初回の生成までの時間・D1/D7・共有した率)。`* ` の付いた週はデータの始まりの週で、それ以前からいるユーザーが「新しい」に混ざるので参考にとどめる。
+- 共有のアプリの使われ方(#1450 を決めるための数え・`shared.usage`)は `go run ./cmd/product-metrics -report shared -in logs.json`。週ごとに「参加者 1 人あたりの回数の分布(p50・p90・最大)」と「その週の参加者の人数ごとのアプリの数と合計」を出す。コインからは引かない
 - 週の記録は β の品質ゲートと同じく `docs/release/beta-weekly/YYYY-MM-DD.md` に写す(`docs/release/beta-quality-gate.md`)。
 - Cloud Logging の既定の保存は 30 日なので、D7 は直近 3 週ぶんのコホートまでしか出ない。長く見るには 5 章のシンクが要る。
 

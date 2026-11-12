@@ -417,7 +417,7 @@ func (r *Runner) runRule(ctx context.Context, h *scope.Handle, ev store.OutboxEv
 	if r.cfg.Tokens != nil {
 		tokens = r.cfg.Tokens
 	}
-	disp := notify.Dispatcher{Tokens: tokens, Sender: r.cfg.Sender}
+	disp := notify.Dispatcher{Tokens: tokens, Sender: r.cfg.Sender, CountShared: app.HasSharedEntity()} // #2298
 	for _, row := range rows {
 		for _, n := range row.Plan.Notifies {
 			key := markKey(ev, rule, row.key, n.Action)
