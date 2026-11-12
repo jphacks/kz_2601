@@ -21,6 +21,8 @@
     <string name="desktop_export_done">%1$d 件を書き出しました: %2$s</string>
     <string name="desktop_export_writing">書き出しています…</string>
     <string name="desktop_feed_offline">フィードはデスクトップ版ではまだ取得しません</string>
+    <string name="desktop_flashcards_back_hint">裏(押すと表)</string>
+    <string name="desktop_flashcards_front_hint">表(押すと裏)</string>
     <string name="desktop_image_none">画像なし</string>
     <string name="desktop_input_audio_unavailable">録音は このパソコンでは使えません。ファイルから選べます</string>
     <string name="desktop_input_clear">消す</string>
@@ -123,6 +125,7 @@
     <string name="desktop_print_sent">%1$d 頁を印刷に送りました</string>
     <string name="desktop_print_title">印刷: %1$s</string>
     <string name="desktop_print_value">値</string>
+    <string name="desktop_qr_copy_image">画像をコピー</string>
     <string name="desktop_record_deleted_elsewhere">この記録は別のウィンドウで消されました</string>
     <string name="desktop_sync_pending">送信待ち %1$d 件</string>
     <string name="desktop_timer_done">時間になりました</string>
