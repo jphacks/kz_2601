@@ -24,10 +24,12 @@ struct AssistiveAccessPolicy: Equatable, Sendable {
         case launchPrompts
         /// 生成アプリの AI 部品から出す AI 送信の同意(`requireAIConsent`)。代わりに `unavailableMessage`
         case aiConsent
+        /// シェアリンクから開く追加・参加の確認と「探す」(`SharingHooks`)。届いたリンクは開かず `unavailableMessage`
+        case shareLinks
     }
 
     /// アシスティブアクセスで隠すもの(今は全部)。
-    static let hiddenFeatures: Set<Feature> = [.aiButton, .voiceSheet, .appSwitcher, .paywall, .launchPrompts, .aiConsent]
+    static let hiddenFeatures: Set<Feature> = [.aiButton, .voiceSheet, .appSwitcher, .paywall, .launchPrompts, .aiConsent, .shareLinks]
 
     func shows(_ feature: Feature) -> Bool { !isActive || !Self.hiddenFeatures.contains(feature) }
 
@@ -100,6 +102,15 @@ struct AssistiveAccessReader: ViewModifier {
         func body(content: Content) -> some View {
             content.environment(\.assistiveAccess, .detect(systemEnabled: enabled, debugOverride: AssistiveAccessReader.debugOverride))
         }
+    }
+}
+
+extension AppRuntime {
+    /// `feature` を出せるか。アシスティブアクセスで隠している時は `unavailableMessage` を出して false。
+    func showsOrToast(_ feature: AssistiveAccessPolicy.Feature) -> Bool {
+        guard !assistiveAccess.shows(feature) else { return true }
+        toast = AssistiveAccessPolicy.unavailableMessage
+        return false
     }
 }
 

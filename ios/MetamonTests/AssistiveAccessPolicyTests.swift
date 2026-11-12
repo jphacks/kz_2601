@@ -1,5 +1,6 @@
 import XCTest
 import MetamonDSL
+import MetamonRenderer
 import MetamonServices
 @testable import Metamon
 
@@ -22,6 +23,7 @@ final class AssistiveAccessPolicyTests: XCTestCase {
         XCTAssertFalse(active.shows(.paywall))
         XCTAssertFalse(active.shows(.launchPrompts))
         XCTAssertFalse(active.shows(.aiConsent))
+        XCTAssertFalse(active.shows(.shareLinks))
         // 新しい Feature を足したら、隠すかどうかをここで決める
         XCTAssertEqual(AssistiveAccessPolicy.hiddenFeatures, Set(AssistiveAccessPolicy.Feature.allCases))
     }
@@ -50,6 +52,79 @@ final class AssistiveAccessPolicyTests: XCTestCase {
         let rt = AppRuntime(document: try DSLExamples.document(DSLExamples.initial, version: 0), services: BuildConfig.make(environment: .mock))
         rt.aiConsent = AIConsentStore(defaults: UserDefaults(suiteName: "AssistiveAccessPolicyTests.\(UUID().uuidString)")!)
         return rt
+    }
+
+    // MARK: - 音声シート・直してと頼む(話しかける画面が無い)
+
+    @MainActor
+    func testVoiceSheetCannotOpen() throws {
+        let rt = try appRuntime()
+        rt.showVoiceSheet = true
+        rt.assistiveAccess = active
+        XCTAssertFalse(rt.showVoiceSheet, "入った時に開いていたら閉じる")
+        rt.showVoiceSheet = true
+        XCTAssertFalse(rt.showVoiceSheet, "隠している間は立たない")
+    }
+
+    @MainActor
+    func testIntentDoesNotCloseScreensAndShowsToast() throws {
+        let rt = try appRuntime()
+        rt.assistiveAccess = active
+        rt.sheet = Route(screen: "detail", stack: "sheet")
+        rt.openVoiceFromIntent()
+        XCTAssertFalse(rt.showVoiceSheet)
+        XCTAssertNotNil(rt.sheet, "開いている画面は閉じない")
+        XCTAssertEqual(rt.toast, AssistiveAccessPolicy.unavailableMessage)
+    }
+
+    @MainActor
+    func testFixRequestIsNotOffered() throws {
+        let rt = try appRuntime()
+        rt.assistiveAccess = active
+        rt.reportFixable("動きませんでした", ctx: nil)
+        XCTAssertNil(rt.fixOffer)
+        rt.fixOffer = FixOffer(message: "動きませんでした", draft: "直して")
+        rt.requestFix()
+        XCTAssertFalse(rt.showVoiceSheet)
+        XCTAssertEqual(rt.toast, AssistiveAccessPolicy.unavailableMessage)
+    }
+
+    #if !APP_STORE_REVIEW
+    // MARK: - 課金・コイン
+
+    @MainActor
+    func testProRequestsBecomeToast() throws {
+        let rt = try appRuntime()
+        rt.assistiveAccess = active
+        rt.requestProForAIText()
+        XCTAssertEqual(rt.toast, AssistiveAccessPolicy.unavailableMessage)
+        rt.toast = nil
+        rt.presentProRequiredWrite(ProRequired(features: []))
+        XCTAssertEqual(rt.toast, AssistiveAccessPolicy.unavailableMessage)
+    }
+
+    /// 記録の書き込みの 402(コイン): お店は出さず一言だけ
+    @MainActor
+    func testCoinDenialOnWriteDoesNotOpenShop() async throws {
+        let gate = CoinGate(store: CoinStore(mode: .mock, service: MockCoinService()))
+        await gate.store.refreshConfig()
+        let presenter = UUID()
+        gate.presenterAppeared(presenter)
+        XCTAssertTrue(gate.handle(CoinDenial(kind: .coinsInsufficient)))
+        XCTAssertNotNil(gate.request(for: presenter, assistiveAccess: .standard))
+        XCTAssertNil(gate.request(for: presenter, assistiveAccess: active), "アシスティブアクセスではお店を出さない")
+
+        let rt = try appRuntime()
+        let error = APIError.server(status: 402, code: CoinDenial.Kind.coinsInsufficient.rawValue, message: "coins", details: [:])
+        XCTAssertNotEqual(rt.message(for: error, entity: nil), AssistiveAccessPolicy.unavailableMessage)
+        rt.assistiveAccess = active
+        XCTAssertEqual(rt.message(for: error, entity: nil), AssistiveAccessPolicy.unavailableMessage)
+    }
+    #endif
+
+    @MainActor
+    private func appRuntime() throws -> AppRuntime {
+        AppRuntime(document: try DSLExamples.document("kakeibo"), services: BuildConfig.make(environment: .mock))
     }
 
     // MARK: - 最初の画面

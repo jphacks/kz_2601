@@ -109,6 +109,11 @@ final class ExtDenialTests: XCTestCase {
         XCTAssertEqual(ExtDenialRoute.of(.notConnected(provider: "todoist"), isPro: false, assistiveAccess: aa), .toast(off))
         XCTAssertEqual(ExtDenialRoute.of(.proRequired(ProRequired(features: [])), isPro: false, assistiveAccess: aa), .toast(off))
         XCTAssertEqual(ExtDenialRoute.of(.coins(coins), isPro: true, assistiveAccess: aa), .toast(off))
+        XCTAssertEqual(ExtDenialRoute.of(.notConnected(provider: nil), isPro: false, assistiveAccess: aa), .toast(off))
+        XCTAssertEqual(ExtDenialRoute.of(.proRequired(ProRequired(features: [])), isPro: true, assistiveAccess: aa), .toast(off))
+        XCTAssertEqual(ExtDenialRoute.of(.proRequired(ProRequired(features: [], creatorNeedsPro: true)), isPro: false, assistiveAccess: aa),
+                       .toast(off))
+        XCTAssertEqual(ExtDenialRoute.of(.unavailable, isPro: false, assistiveAccess: aa), ExtDenialRoute.of(.unavailable, isPro: false))
         XCTAssertEqual(ExtDenialRoute.of(.busy, isPro: true, assistiveAccess: aa), ExtDenialRoute.of(.busy, isPro: true))
         XCTAssertEqual(ExtDenialRoute.of(.coins(coins), isPro: true, assistiveAccess: .standard), .coins(coins))
     }

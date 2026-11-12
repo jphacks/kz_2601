@@ -15,11 +15,13 @@ enum ExtDenialRoute: Equatable {
     /// シートを出さず 1 文だけ
     case toast(String)
 
-    /// アシスティブアクセス(#1997)では課金・コイン・つなぐ案内を出さず、`AssistiveAccessPolicy.unavailableMessage` だけ出す。
+    /// アシスティブアクセス(#1997)では課金・コイン・つなぐ案内(設定・Pro を指す文も)を出さず、`AssistiveAccessPolicy.unavailableMessage` だけ出す。
     static func of(_ denial: ExtDenial, isPro: Bool, assistiveAccess: AssistiveAccessPolicy = .standard) -> ExtDenialRoute {
-        let route = of(denial, isPro: isPro)
-        if case .toast = route { return route }
-        return assistiveAccess.shows(.paywall) ? route : .toast(AssistiveAccessPolicy.unavailableMessage)
+        guard !assistiveAccess.shows(.paywall) else { return of(denial, isPro: isPro) }
+        switch denial {
+        case .unavailable, .busy: return of(denial, isPro: isPro) // 待てば直る。行き先を指さない
+        default: return .toast(AssistiveAccessPolicy.unavailableMessage)
+        }
     }
 
     static func of(_ denial: ExtDenial, isPro: Bool) -> ExtDenialRoute {

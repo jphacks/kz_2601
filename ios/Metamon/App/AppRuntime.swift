@@ -43,13 +43,17 @@ final class AppRuntime: RuntimeNavigating {
     var selectedTab: String = ""
     var sheet: Route?
     var fullScreen: Route?
-    var showVoiceSheet = false
+    var showVoiceSheet = false {
+        didSet { if showVoiceSheet, !assistiveAccess.shows(.voiceSheet) { showVoiceSheet = false } } // #1997 隠している間は立てない
+    }
     /// 第三者 AI への送信の同意(#246)。アプリ本体(MetamonApp)が `.shared` を入れる。nil(ユニットテスト等)は同意済み扱い。
     @ObservationIgnored var aiConsent: AIConsentStore?
     /// 同意の画面を出す(初回起動 / 同意前に生成・対話しようとした時)。
     var showAIConsent = false
     /// アシスティブアクセスの決まり(#1997)。`RootView` が入れる。同意の画面(`ConsentHost`)が無い間は出そうとしない。
-    @ObservationIgnored var assistiveAccess = AssistiveAccessPolicy.standard
+    @ObservationIgnored var assistiveAccess = AssistiveAccessPolicy.standard {
+        didSet { if !assistiveAccess.shows(.voiceSheet) { showVoiceSheet = false } }
+    }
     /// 同意の前に話した最後の 1 件(M2)。同意して画面が閉じたら続けて送る(`resumeUtteranceAfterConsent`)
     @ObservationIgnored var utteranceAwaitingConsent: (text: String, source: ClarifyFlow.InputSource)?
     /// 音声モデルのダウンロード確認(#246・4.2.3(ii))。端末にモデルが無く未承認の時だけ立つ。
@@ -1457,8 +1461,8 @@ final class AppRuntime: RuntimeNavigating {
         if let denial = RecordWriteDenial(api), let entity { return denialMessage(denial, entity: entity) } // #272 #273
         #if !APP_STORE_REVIEW
         if let denial = CoinDenial(api) { // #630 書き込みの枠・コイン。自分が払う時はお店 / コインの設定も開く
-            CoinGate.shared.handle(denial)
-            return CoinCopy.denialBody(denial)
+            CoinGate.shared.handle(denial) // アシスティブアクセス(#1997)ではお店を出さない(`CoinSheetPresenter`)
+            return assistiveAccess.shows(.paywall) ? CoinCopy.denialBody(denial) : AssistiveAccessPolicy.unavailableMessage
         }
         #endif
         if let pro = ProRequired(api) { return pro.writeMessage } // #316(印を付けるなど)

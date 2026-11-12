@@ -66,7 +66,10 @@ struct RootView: View {
                 .environment(\.gridEditSession, rt.gridEdit) // #1442 手で動かす編集モード
                 .safeAreaInset(edge: .top, spacing: 0) {
                     if assistiveHome == .openedApp {
-                        AssistiveAccessBackBar { assistiveOpenedAppId = nil }
+                        AssistiveAccessBackBar {
+                            rt.paths = [:] // 次に開いた時は最初の画面から
+                            assistiveOpenedAppId = nil
+                        }
                     }
                 }
 
@@ -321,13 +324,14 @@ struct RootView: View {
 private struct ToastHost: ViewModifier {
     let onModal: Bool
     @Environment(AppRuntime.self) private var rt
+    @Environment(\.assistiveAccess) private var assistiveAccess
 
     func body(content: Content) -> some View {
         let active = onModal == (rt.sheet != nil || rt.fullScreen != nil)
         content.overlay(alignment: .bottom) {
             if active, let message = rt.toast {
                 let dismiss = { withAnimation { rt.toast = nil } }
-                let fixable = rt.fixOffer?.message == message
+                let fixable = rt.fixOffer?.message == message && assistiveAccess.shows(.voiceSheet) // #1997
                 HStack(spacing: Theme.Spacing.sm) {
                     Text(message)
                     if fixable { FixRequestToastButton() }

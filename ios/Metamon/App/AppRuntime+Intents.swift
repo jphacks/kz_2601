@@ -16,6 +16,7 @@ extension AppRuntime {
 
     /// 「Tailor It で話しかける」。生成済みのアプリなら音声シート、初期画面なら音声画面そのものなので何もしない。
     func openVoiceFromIntent() {
+        guard showsOrToast(.voiceSheet) else { return } // アシスティブアクセス(#1997)では開いている画面を閉じない
         showAppSwitcher = false
         sheet = nil
         fullScreen = nil
