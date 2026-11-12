@@ -86,7 +86,7 @@ go run ./cmd/ai-eval -server-rules -cases internal/ai/eval/server_rules_cases.js
 | キー | 意味 |
 |---|---|
 | `base` | `kind: edit` の元。同じ実行の前のケースの `id`、または `example:<名前>`(`internal/ai/examples/<名前>.json`) |
-| `expect` | 結果の判定。使えるキーと型は `cmd/ai-eval/expect.go` の `expectKeys` |
+| `expect` | 結果の判定。使えるキーは [expect-keys.md](expect-keys.md) |
 | `group` | pass% を数える単位 |
 | `id` | ケースの名前。ファイルの中で重ねない |
 | `kind` | `create` か `edit` |
@@ -178,5 +178,6 @@ go run ./cmd/ai-eval -compare-before '../docs/backend/ai-eval/raw/*-before*.json
 ## 8. 関係する文書
 
 - [ci-gate.md](ci-gate.md) — `-min-pass` / `-thresholds` / `-report`
+- [expect-keys.md](expect-keys.md) — `expect` のキーの一覧
 - [m0disc-regression.md](m0disc-regression.md) — M0 のケースの回し方と期待値
 - [../architecture.md](../architecture.md) — 生成の流れ
