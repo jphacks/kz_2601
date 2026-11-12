@@ -31,7 +31,7 @@
 | バックグラウンドでの位置の記録(`locationTracker`) | 部品と登録 / `LocationTracking`、`UIBackgroundModes` の `location` | 4.7.2・5.1.5・2.5.4 |
 | 端末のセンサー(`sensorValue`・CoreMotion の device motion / CMAltimeter・#419) | 部品と登録 / `SensorData`、`NSMotionUsageDescription`(healthStat と共通) | 4.7.2 |
 | 止めるまで鳴るアラーム(`Notification.alarm`・AlarmKit) | `AlarmKitAlarms`(`AlarmBackend.make()` が nil を返す)、`NSAlarmKitUsageDescription`。`alarm: true` の通知は同じ時刻の普通のローカル通知で届く(DSL・AI はそのまま) | 新しい許可の画面が増え、審査メモに説明が要るため。最初の版では外し、戻す時は審査メモ(`docs/store/app-review-notes.md`)に「目覚ましを作った時だけ許可を求める」説明を足してから出す |
-| 集中モード中か(#1990・`INFocusStatusCenter`) | `NSFocusStatusUsageDescription`、entitlement `com.apple.developer.usernotifications.communication`(`Metamon-Review.entitlements` に入れない)。`FocusStatusSource` のコードは残るが、まだ呼ぶ所が無い(許可の画面も出ない) | 使う機能がまだ無い(#1799 の決定待ち)。新しい許可の画面が増えるので、戻す時は審査メモに説明を足してから出す |
+| 集中モード中か(#1990・`INFocusStatusCenter`) | `NSFocusStatusUsageDescription`、entitlement `com.apple.developer.usernotifications.communication`(`Metamon-Review.entitlements` に入れない)。`FocusStatusSource` のコードは残るが、`FocusStatusSources.make(reviewBuild: true)` は常に restricted の偽物を返し OS の許可を求めない(まだ呼ぶ所も無い)。英語の説明文(`InfoPlist.xcstrings`)も同じ一覧で消える | 使う機能がまだ無い(#1799 の決定待ち)。新しい許可の画面が増えるので、戻す時は審査メモに説明を足してから出す |
 | 近くの端末との共有(`nearbyShare`・MultipeerConnectivity。すれ違い通信と UWB の距離 #425 を含む) | 部品と登録 / `Features/Nearby` 全部 / `NearbyPassbyLeaf`・`NearbyPassbyHost`、`NSLocalNetworkUsageDescription` / `NSBonjourServices` / `NSNearbyInteractionUsageDescription` | 4.7.2 |
 | 音楽プレーヤーの友だちからの曲リクエスト(`musicPlayer.allowRequests`・#412) | 部品の中のリクエストの UI(`MusicPlayerLeaf` の `requests`)。送受信は上の `Features/Nearby` と一緒に外れる | 4.7.2(近くの端末との通信) |
 | DSL から使うカメラの撮影(`photoField` / `videoField`) | `CameraPicker` / `VideoCameraPicker`、撮影の選択肢 | 4.7.2・2.5.14 |

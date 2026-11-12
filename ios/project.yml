@@ -142,7 +142,8 @@ targets:
     # Push(aps-environment・#683。環境は METAMON_APS_ENV。自動署名で App ID に Push Notifications が付く)/
     # Associated Domains(Universal Links・#331。applinks:$(METAMON_APPLINKS_DOMAIN)。自動署名で App ID に Associated Domains が付く)。
     # Communication Notifications(集中モード中かを読む INFocusStatusCenter に要る・#1990。com.apple.developer.usernotifications.communication)。
-    # 開発者サイトで App ID に能力を足してプロファイルを作り直すのは人の作業。無いビルドでも落ちず restricted / nil になる。
+    # プロビジョニングプロファイルにこの能力が無いと、署名する実機 / Release のビルドはコード署名で失敗する。
+    # 自動署名なら次の実機ビルドで App ID に足される想定(未確認)。シミュレータは署名しないので影響しない。
     # 構成ごとに別ファイルにするため xcodegen の `entitlements:` ではなく CODE_SIGN_ENTITLEMENTS で指定する(#245)。
     # Review(審査用)は HealthKit・Push・Associated Domains・Communication Notifications を外した Metamon/Metamon-Review.entitlements。
     settings:

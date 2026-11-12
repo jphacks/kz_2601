@@ -145,6 +145,11 @@
 	<string>生成したアプリで歩数や体重を表示するために、ヘルスケアのデータを読み取ります。</string>
 	<key>NSHealthUpdateUsageDescription</key>
 	<string>生成したアプリで記録した体重をヘルスケアにも保存するために、ヘルスケアへ書き込みます。</string>
+	<!-- 端末のカレンダー・リマインダーを読む(#1987・DeviceCalendarSource)。英語は InfoPlist.xcstrings。審査用の版では外す(strip-review-plist.sh) -->
+	<key>NSCalendarsFullAccessUsageDescription</key>
+	<string>生成したアプリで、カレンダーの予定を一覧や今日の予定として表示するために、カレンダーを読み取ります。予定の題名や内容は端末の外に送りません。</string>
+	<key>NSRemindersFullAccessUsageDescription</key>
+	<string>生成したアプリで、リマインダーを一覧や期限の近いものとして表示するために、リマインダーを読み取ります。リマインダーの題名や内容は端末の外に送りません。</string>
 	<!-- nearbyShare(#36): MultipeerConnectivity で近くの Tailor It 端末と記録を送り合う。サービス名は NearbyService.serviceType と一致させる -->
 	<!-- すれ違い通信(#425): _tailorit-pb は MCPassbyTransport.serviceType と一致させる -->
 	<key>NSLocalNetworkUsageDescription</key>
@@ -175,7 +180,7 @@
 	</array>
 	<key>NSNearbyInteractionUsageDescription</key>
 	<string>生成したアプリで、すれ違い通信でつながった近くの人との距離と方向を表示するために使います。</string>
-	<!-- 集中モード中か(#1990)。取れるのは「集中中か」だけでモードの名前は取れない。審査用の版では strip-review-plist.sh が消す -->
+	<!-- 集中モード中か(#1990・FocusStatusSource)。取れるのは「集中中か」だけでモードの名前は取れない。英語は InfoPlist.xcstrings。審査用の版では外す(strip-review-plist.sh) -->
 	<key>NSFocusStatusUsageDescription</key>
 	<string>生成したアプリで、集中モードの間は表示や通知を控えめにするために、集中モード中かどうかを使用します。モードの名前は読み取らず、端末の外に送りません。</string>
 </dict>

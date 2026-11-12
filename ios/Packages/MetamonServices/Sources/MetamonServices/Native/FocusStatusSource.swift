@@ -13,7 +13,7 @@ import UIKit
 public enum FocusAuthorization: String, Equatable, Sendable, CaseIterable {
     case notDetermined
     case denied
-    /// entitlement(Communication Notifications)が無いビルド・Mac・保護者の制限など
+    /// Mac・保護者の制限・審査用の版など。entitlement(Communication Notifications)が無いビルドもこれになる想定(未確認)
     case restricted
     case authorized
 }
@@ -142,7 +142,12 @@ public final class LiveFocusStatusSource: FocusStatusSource {
 
     public func observe(_ onChange: @escaping @MainActor (FocusStatus) -> Void) -> FocusStatusObservation {
         let id = UUID()
-        if subscribers.isEmpty { start() }
+        if subscribers.isEmpty {
+            start()
+        } else {
+            // 前から見ている側にも、新しい値を先に知らせる(last だけ進めて取り残さない)
+            refresh()
+        }
         subscribers[id] = onChange
         let state = current
         last = state
@@ -187,7 +192,7 @@ extension FocusStatusReadings {
         FocusStatusReadings(
             authorization: { FocusAuthorization(INFocusStatusCenter.default.authorizationStatus) },
             requestAuthorization: { done in
-                // entitlement が無いビルドでは restricted が返る(落ちない)
+                // entitlement が無いビルドでは restricted が返る想定(未確認・実機で確かめる)
                 INFocusStatusCenter.default.requestAuthorization { done(FocusAuthorization($0)) }
             },
             isFocused: { INFocusStatusCenter.default.focusStatus.isFocused },
@@ -265,9 +270,15 @@ public final class FakeFocusStatusSource: FocusStatusSource {
 // MARK: - 選ぶ
 
 public enum FocusStatusSources {
-    /// `METAMON_MOCK=1`、または DEBUG で `METAMON_FAKE_FOCUS=1` なら偽物、それ以外は OS の実体。
+    /// 審査用の版(`reviewBuild`。アプリは `APP_STORE_REVIEW` を渡す)は常に restricted の偽物で、OS の許可を求めない
+    /// (説明文 NSFocusStatusUsageDescription を strip-review-plist.sh が消すため)。
+    /// それ以外は `METAMON_MOCK=1`、または DEBUG で `METAMON_FAKE_FOCUS=1` なら偽物、それ以外は OS の実体。
     @MainActor
-    public static func make(environment: [String: String] = ProcessInfo.processInfo.environment) -> FocusStatusSource {
+    public static func make(reviewBuild: Bool,
+                            environment: [String: String] = ProcessInfo.processInfo.environment) -> FocusStatusSource {
+        if reviewBuild {
+            return FakeFocusStatusSource(authorization: .restricted, focused: nil, grantOnRequest: .restricted)
+        }
         var fake = environment["METAMON_MOCK"] == "1"
         #if DEBUG
         fake = fake || environment["METAMON_FAKE_FOCUS"] == "1"

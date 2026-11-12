@@ -1,11 +1,15 @@
 import CoreSpotlight
 import SwiftUI
+import MetamonDSL
+import MetamonServices
 
 extension AppRuntime {
-    /// 起動時: 一覧を黙って取り、索引を合わせる(失敗してもトーストは出さない)
-    func refreshSpotlight() async {
-        guard let list = try? await services.appConfig.listApps() else { return }
-        await spotlight.sync(list)
+    /// 生成で新しいアプリができた時: 一覧を取り直さずにその 1 件を入れる。
+    /// 一覧全体は `appsList()`(変身一覧を開いた時など)の結果で合わせる(起動時に Spotlight のためだけに取らない)。
+    func indexCreatedApp(_ doc: AppDocument) async {
+        guard !doc.dsl.isVoiceOnly else { return }
+        let app = AppSummary(id: doc.appId, name: doc.dsl.app.name, currentVersion: doc.version)
+        await spotlight.upsert(app, icon: doc.dsl.app.icon)
     }
 }
 

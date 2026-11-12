@@ -80,8 +80,8 @@ final class FocusStatusSourceTests: XCTestCase {
         XCTAssertEqual(os.requests, 1)
     }
 
-    /// entitlement が無いビルドは restricted が返る想定。落ちずに nil
-    func testLiveRestrictedWithoutEntitlement() async {
+    /// entitlement が無いビルドは restricted が返る想定(未確認・実機では確かめていない)。restricted なら落ちずに nil
+    func testLiveRestrictedWithoutEntitlementAssumedUnverified() async {
         let os = FakeOS()
         os.grant = .restricted
         let source = LiveFocusStatusSource(readings: os.readings, center: NotificationCenter())
@@ -112,6 +112,23 @@ final class FocusStatusSourceTests: XCTestCase {
         os.focused = false
         center.post(name: FakeOS.active, object: nil)
         XCTAssertEqual(seen, [false, true])
+    }
+
+    /// 後から見始めた時、前から見ている側も新しい値を受け取る(取り残されない)
+    func testLiveNewObserverRefreshesExistingOnes() {
+        let os = FakeOS()
+        os.auth = .authorized
+        os.focused = false
+        let source = LiveFocusStatusSource(readings: os.readings, center: NotificationCenter())
+        var first: [Bool?] = []
+        var second: [Bool?] = []
+        let a = source.observe { first.append($0.isFocused) }
+        os.focused = true
+        let b = source.observe { second.append($0.isFocused) }
+        XCTAssertEqual(first, [false, true])
+        XCTAssertEqual(second, [true])
+        a.cancel()
+        b.cancel()
     }
 
     // MARK: - 偽物
@@ -145,8 +162,19 @@ final class FocusStatusSourceTests: XCTestCase {
         let denied = FakeFocusStatusSource(environment: ["METAMON_FOCUS_AUTH": "denied"])
         XCTAssertEqual(denied.current, FocusStatus(authorization: .denied, isFocused: nil))
 
-        XCTAssertTrue(FocusStatusSources.make(environment: ["METAMON_MOCK": "1"]) is FakeFocusStatusSource)
-        XCTAssertTrue(FocusStatusSources.make(environment: [:]) is LiveFocusStatusSource)
+        XCTAssertTrue(FocusStatusSources.make(reviewBuild: false, environment: ["METAMON_MOCK": "1"]) is FakeFocusStatusSource)
+        XCTAssertTrue(FocusStatusSources.make(reviewBuild: false, environment: [:]) is LiveFocusStatusSource)
+    }
+
+    /// 審査用の版は説明文が消えるので、OS の許可を求めず常に restricted / nil
+    func testReviewBuildFactoryIsRestrictedAndNeverRequests() async {
+        let source = FocusStatusSources.make(reviewBuild: true, environment: [:])
+        XCTAssertFalse(source is LiveFocusStatusSource)
+        XCTAssertEqual(source.current, .restricted)
+        let result = await source.authorization(requesting: true)
+        XCTAssertEqual(result, .restricted)
+        XCTAssertEqual((source as? FakeFocusStatusSource)?.requestCount, 0)
+        XCTAssertNil(source.isFocused)
     }
 
     #if !os(iOS)
