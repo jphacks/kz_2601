@@ -9,7 +9,8 @@ import (
 // DSL names a provider from a closed set plus that provider's typed params;
 // it can never carry a URL. Nothing about the user or the app's records is
 // sent out: weather / warnings / pressure take a forecast region code,
-// holidays and typhoon nothing, rss the id of an allowlisted feed. docs/backend/features/external-feeds.md
+// holidays and typhoon nothing, rss the id of an allowlisted feed, status the id of an
+// allowlisted status page; bikeshare's point stays on the server (feed_bikeshare.go). docs/backend/features/external-feeds.md
 
 // Feed providers (Component.Provider).
 const (
@@ -21,11 +22,14 @@ const (
 	FeedArxiv    = "arxiv"    // arXiv の分野ごとの新着論文(Component.FeedID = ArxivCategories)
 	FeedDiet     = "diet"     // 国会会議録検索システムの発言の検索(Component.Query)
 	FeedTyphoon  = "typhoon"  // 気象庁の今の台風の情報(引数なし)
+	// FeedBikeshare: GBFS の近いポートの空き(Component.FeedID = BikeshareSystems・Component.Query = "lat,lng")
+	FeedBikeshare = "bikeshare"
+	FeedStatus    = "status" // 許可したサービスの公開の status ページ(Component.FeedID = StatusPages)
 )
 
 // FeedProviders is the closed set of feed.provider values.
 var FeedProviders = map[string]bool{FeedWeather: true, FeedHolidays: true, FeedRSS: true, FeedWarnings: true, FeedPressure: true,
-	FeedArxiv: true, FeedDiet: true, FeedTyphoon: true}
+	FeedArxiv: true, FeedDiet: true, FeedTyphoon: true, FeedBikeshare: true, FeedStatus: true}
 
 // FeedUsesRegion reports whether a provider reads Component.Region (a key of
 // WeatherRegions). The same 56 forecast office codes serve all three.
@@ -59,14 +63,27 @@ var WeatherRegions = map[string]string{
 // RSSFeeds maps an allowlisted feed id to its name. The URLs live on the
 // server (internal/feeds); adding one is a reviewed change to both tables.
 var RSSFeeds = map[string]string{
-	"digital-news":  "デジタル庁 新着・更新",
-	"fdma-news":     "消防庁 新着情報",
-	"fdma-disaster": "消防庁 災害情報",
+	"digital-news":    "デジタル庁 新着・更新",
+	"fdma-disaster":   "消防庁 災害情報",
+	"fdma-news":       "消防庁 新着情報",
+	"go-blog":         "The Go Blog",
+	"osaka-city-news": "大阪市 新着情報",
+	"soumu-news":      "総務省 新着情報",
+}
+
+// StatusPages maps an allowlisted service id to its name (provider status).
+// The status page URLs live on the server (internal/feeds); adding one is a
+// reviewed change to both tables after its terms are checked.
+var StatusPages = map[string]string{
+	"claude":     "Claude(Anthropic)",
+	"cloudflare": "Cloudflare",
+	"github":     "GitHub",
+	"vercel":     "Vercel",
 }
 
 func checkFeed(where string, c *Component, add func(string, ...any)) {
 	if !FeedProviders[c.Provider] {
-		add("%s: feed provider must be weather, warnings, pressure, holidays, rss, arxiv, diet or typhoon (got %q); other sources and URLs are not available", where, c.Provider)
+		add("%s: feed provider must be weather, warnings, pressure, holidays, rss, arxiv, diet, typhoon, bikeshare or status (got %q); other sources and URLs are not available", where, c.Provider)
 		return
 	}
 	if FeedUsesRegion(c.Provider) {
@@ -81,9 +98,9 @@ func checkFeed(where string, c *Component, add func(string, ...any)) {
 			add("%s: feed %s needs feedId, one of the allowlisted ids (%s) (got %q)", where, c.Provider, strings.Join(sortedKeys(ids), ", "), c.FeedID)
 		}
 	} else if c.FeedID != "" {
-		add("%s: feed feedId is only for provider rss or arxiv", where)
+		add("%s: feed feedId is only for provider rss, arxiv, bikeshare or status", where)
 	}
-	checkFeedQuery(where, c, add) // feed_arxiv_diet.go
+	checkFeedQuery(where, c, add) // feed_arxiv_diet.go (bikeshare: feed_bikeshare.go)
 	if c.Limit < 0 || c.Limit > FeedMaxLimit {
 		add("%s: feed limit must be 1..%d (0 = %d)", where, FeedMaxLimit, FeedDefaultLimit)
 	}

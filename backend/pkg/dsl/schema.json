@@ -5455,9 +5455,11 @@
             "pressure",
             "arxiv",
             "diet",
-            "typhoon"
+            "typhoon",
+            "bikeshare",
+            "status"
           ],
-          "description": "データの出どころ(閉じた一覧)。weather = 気象庁の天気予報、warnings = 気象庁の今出ている警報・注意報、pressure = 48 時間の気圧の予報(6 時間ごとの最低 / 最高と急な低下の印)。この 3 つは region が要る。holidays = 内閣府の国民の祝日(これから来る祝日)、rss = 運営が許可したお知らせのフィード(feedId が要る)。arxiv = arXiv の分野の新着論文(feedId に分野)。diet = 国会会議録の発言の検索(query が要る)。typhoon = 気象庁の今の台風(番号と名前・中心気圧・最大風速・位置・予報の時刻。引数なし。台風が無い時は行が無い。お知らせ用で、警報の代わりにはならない)。任意の URL・Web サイトは指定できない。"
+          "description": "データの出どころ(閉じた一覧)。weather = 気象庁の天気予報、warnings = 気象庁の今出ている警報・注意報、pressure = 48 時間の気圧の予報(6 時間ごとの最低 / 最高と急な低下の印)。この 3 つは region が要る。holidays = 内閣府の国民の祝日(これから来る祝日)、rss = 運営が許可したお知らせのフィード(feedId が要る)。arxiv = arXiv の分野の新着論文(feedId に分野)。diet = 国会会議録の発言の検索(query が要る)。typhoon = 気象庁の今の台風(番号と名前・中心気圧・最大風速・位置・予報の時刻。引数なし。台風が無い時は行が無い。お知らせ用で、警報の代わりにはならない)。bikeshare = シェアサイクルの近いポートの自転車の台数と返せる空き(feedId に事業者・query に地点)。status = 許可したサービスの公開の status ページの稼働状況(全体の状態・対応中の障害・メンテナンス・止まっている部分。feedId にサービス)。任意の URL・Web サイトは指定できない。"
         },
         "region": {
           "type": "string",
@@ -5465,11 +5467,11 @@
         },
         "feedId": {
           "type": "string",
-          "description": "rss: 許可されたフィードの id(digital-news = デジタル庁 新着・更新 / fdma-news = 消防庁 新着情報 / fdma-disaster = 消防庁 災害情報)。arxiv: 分野(cs.AI / cs.CL / cs.CV / cs.LG / cs.RO / cs.HC / cs.SE / cs.CR / stat.ML)。"
+          "description": "rss: 許可されたフィードの id(digital-news = デジタル庁 新着・更新 / fdma-news = 消防庁 新着情報 / fdma-disaster = 消防庁 災害情報 / soumu-news = 総務省 新着情報 / osaka-city-news = 大阪市 新着情報 / go-blog = The Go Blog)。arxiv: 分野(cs.AI / cs.CL / cs.CV / cs.LG / cs.RO / cs.HC / cs.SE / cs.CR / stat.ML)。bikeshare: 事業者(docomo-cycle-tokyo = ドコモ・バイクシェア(東京)/ docomo-cycle = ドコモ・バイクシェア(東京以外)/ hellocycling = HELLO CYCLING)。status: サービス(github = GitHub / cloudflare = Cloudflare / vercel = Vercel / claude = Claude(Anthropic))。"
         },
         "query": {
           "type": "string",
-          "description": "diet だけ: 国会会議録で探す決まった語(40 字まで・空白区切りは AND)。例 こども家庭庁。"
+          "description": "diet: 国会会議録で探す決まった語(40 字まで・空白区切りは AND)。例 こども家庭庁。bikeshare: 近くのポートを探す決まった地点 \"緯度,経度\"(日本の範囲・例 \"35.681,139.767\" 東京駅)。地点から 2 km 以内を近い順に出す。"
         },
         "title": {
           "type": "string",

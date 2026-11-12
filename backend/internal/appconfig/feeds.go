@@ -3,10 +3,11 @@ package appconfig
 // External feeds (#348): POST /v1/feeds/{provider} (typed parameters in the
 // body; GET with a query is kept for older iOS builds) reads allowlisted public
 // data (weather / warnings / pressure / holidays / allowlisted rss / arxiv
-// category / diet speech search) for the DSL feed leaf. The
-// server is the only party that talks to the source (the device never does),
-// takes nothing from the request but the provider and its typed parameter,
-// and sends nothing about the user. internal/feeds holds the allowlist, the
+// category / diet speech search / bikeshare stations near a point) for the
+// DSL feed leaf. The server is the only party that talks to the source (the
+// device never does), takes nothing from the request but the provider and its
+// typed parameter, and sends nothing about the user (the bikeshare point
+// stays on the server). internal/feeds holds the allowlist, the
 // address check, the timeout, the body cap and the cache.
 // docs/backend/features/external-feeds.md
 
@@ -120,7 +121,12 @@ func (h *Handler) serveFeed(w http.ResponseWriter, r *http.Request, in feedInput
 	q := feeds.Query{Provider: r.PathValue("provider"), Region: in.Region, FeedID: in.FeedID}
 	if in.Q != nil {
 		q.Q = *in.Q
-		if _, ok := dsl.NormalizeFeedQuery(q.Q); q.Provider != dsl.FeedDiet || !ok {
+		if q.Provider == dsl.FeedBikeshare {
+			if _, _, ok := dsl.ParseFeedPoint(q.Q); !ok {
+				fail(w, apiErr(http.StatusBadRequest, httpx.CodeBadRequest, `q for bikeshare is the point "lat,lng" in Japan`).With("field", "q"))
+				return
+			}
+		} else if _, ok := dsl.NormalizeFeedQuery(q.Q); q.Provider != dsl.FeedDiet || !ok {
 			fail(w, apiErr(http.StatusBadRequest, httpx.CodeBadRequest,
 				fmt.Sprintf("q is for diet only: 1..%d characters, no control characters", dsl.FeedQueryMaxRunes)).With("field", "q"))
 			return
@@ -158,7 +164,11 @@ func (h *Handler) serveFeed(w http.ResponseWriter, r *http.Request, in feedInput
 		w.Header().Set("Retry-After", "60")
 		fail(w, apiErr(http.StatusServiceUnavailable, httpx.CodeUpstreamUnavailable, "データの提供元に今つながりません"))
 	default:
-		w.Header().Set("Cache-Control", "private, max-age=300")
+		maxAge := "300"
+		if q.Provider == dsl.FeedBikeshare { // free bikes change by the minute
+			maxAge = "60"
+		}
+		w.Header().Set("Cache-Control", "private, max-age="+maxAge)
 		httpx.WriteJSON(w, http.StatusOK, res)
 	}
 }

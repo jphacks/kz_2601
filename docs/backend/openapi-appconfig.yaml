@@ -1850,35 +1850,37 @@ paths:
       description: |
         **kept for older iOS builds**。新しい呼び出しは同じパラメータを本文で送る POST(利用者が入力した値を URL に載せない)。中身・上限・キャッシュは POST と同じ。
         DSL の `feed` 部品が表示するデータを、サーバーが**決まった出どころ**から取って返す。端末は外部へ直接つながらない。
-        - provider は閉じた一覧(weather / warnings / pressure / holidays / rss / arxiv / diet)。取りに行く URL はサーバーのコードで固定で、リクエストから URL・ホスト・パスは受け取らない。
+        - provider は閉じた一覧(weather / warnings / pressure / holidays / rss / arxiv / diet / bikeshare / status)。取りに行く URL はサーバーのコードで固定で、リクエストから URL・ホスト・パスは受け取らない。
         - weather: `region`(気象庁の府県予報区のコード・`dsl.WeatherRegions` のどれか)が必須。位置(緯度経度)は受け取らない。
         - warnings: `region`(同じコード)が必須。今出ている警報・注意報(解除・なしは出さない)を強いものから。無ければ items は空。
         - pressure: `region`(同じコード)が必須。サーバーがその地域の決まった 1 地点(県庁などの所在地)の 48 時間の海面気圧の予報を 6 時間ごとの行にする。端末の位置は使わない。
         - holidays: パラメータなし(今日以降の祝日)。
         - rss: `feedId`(許可したフィードの id)が必須。任意のフィードの URL は指定できない。
         - arxiv: `feedId`(許可した arXiv の分野・`dsl.ArxivCategories`)が必須。その分野の新着(投稿日の新しい順)。題名・著者(3 人まで)・投稿日・論文のページ。要約は返さない。
-        - diet: `q`(国会会議録で探す語・空白をまとめて 1〜40 字・制御文字や見えない文字は 400)が必須。発言の新しい会議の順に、発言者(会派)・院と会議名と号・会議の日付・発言のページ。発言の本文は返さない。`q` は diet 以外では 400。
+        - diet: `q`(国会会議録で探す語・空白をまとめて 1〜40 字・制御文字や見えない文字は 400)が必須。発言の新しい会議の順に、発言者(会派)・院と会議名と号・会議の日付・発言のページ。発言の本文は返さない。`q` は diet と bikeshare 以外では 400。
+        - bikeshare(#1694): `feedId`(GBFS の system id・`dsl.BikeshareSystems`)と `q`(探す地点 `"緯度,経度"`・日本の範囲の 10 進の数。違えば 400)が必須。地点から 2 km 以内のポートを近い順に、名前・「自転車 n 台・返せる空き n・約 n m」・事業者の最終更新(RFC 3339)。地点はサーバーが小数 3 桁に丸め、出どころには送らない(system の全ポートを取りサーバーで選ぶ)。キャッシュは台数 2 分・ポートの位置 6 時間で、地点を鍵にしない。`Cache-Control` は max-age=60。
+        - status: `feedId`(許可したサービス・`dsl.StatusPages`: claude / cloudflare / github / vercel)が必須。その status ページ(Atlassian Statuspage)の全体の状態・対応中の障害・実施中のメンテナンス・止まっている部分・予定のメンテナンス。障害の更新の本文は返さない。
         - 上の表に無いパラメータ・同じパラメータの重複は 400。
-        - サーバーはプロバイダごとにキャッシュする(天気 30 分・警報 10 分・気圧 30 分・祝日 12 時間・rss 15 分・arxiv 3 時間・diet 3 時間)。arxiv と diet は出どころの求めにより、インスタンスあたり 1 本ずつ 3 秒あけて取りに行く(順番待ちは 10 秒まで。超えたら 503)。出どころが落ちている時は 24 時間以内の最後の取得結果を `stale: true` で返す。
+        - サーバーはプロバイダごとにキャッシュする(天気 30 分・警報 10 分・気圧 30 分・祝日 12 時間・rss 15 分・arxiv 3 時間・diet 3 時間・status 5 分)。arxiv と diet は出どころの求めにより、インスタンスあたり 1 本ずつ 3 秒あけて取りに行く(順番待ちは 10 秒まで。超えたら 503)。出どころが落ちている時は 24 時間以内の最後の取得結果を `stale: true` で返す。
         - 1 ユーザー 1 時間 `FEEDS_USER_PER_HOUR` 回(既定 120)。超えると 429 `rate_limited`。出どころへの取得はインスタンスあたり 1 分 `FEEDS_UPSTREAM_PER_MINUTE` 回(既定 30)まで(diet は別枠で 1 分 10 回)。diet の検索語で出どころまで取りに行くのは 1 ユーザー 1 時間 20 回まで(キャッシュにある語は数えない・超えると 429 `rate_limited`)。
         - `FEEDS_DISABLED`(カンマ区切りの provider・`all`)で止められる。止めている provider は 503 `upstream_unavailable`(details.reason = disabled)。
         - 出典(`source`)を一覧の下に必ず出す(公共データ利用規約 第1.0版・pressure は CC BY 4.0 の出典の記載)。
       parameters:
-        - { name: provider, in: path, required: true, schema: { type: string, enum: [weather, holidays, rss, warnings, pressure, arxiv, diet] } }
+        - { name: provider, in: path, required: true, schema: { type: string, enum: [weather, holidays, rss, warnings, pressure, arxiv, diet, bikeshare, status] } }
         - { name: region, in: query, schema: { type: string, pattern: '^[0-9]{6}$' }, description: 'weather / warnings / pressure だけ・必須。例 130000(東京都)' }
-        - { name: feedId, in: query, schema: { type: string, enum: [digital-news, fdma-news, fdma-disaster, cs.AI, cs.CL, cs.CR, cs.CV, cs.HC, cs.LG, cs.RO, cs.SE, stat.ML] }, description: 'rss(digital-news / fdma-news / fdma-disaster)・arxiv(cs.AI など)だけ・必須' }
-        - { name: q, in: query, schema: { type: string, minLength: 1, maxLength: 40 }, description: 'diet だけ・必須。国会会議録で探す語(空白区切りは AND)' }
+        - { name: feedId, in: query, schema: { type: string, enum: [digital-news, fdma-disaster, fdma-news, go-blog, osaka-city-news, soumu-news, cs.AI, cs.CL, cs.CR, cs.CV, cs.HC, cs.LG, cs.RO, cs.SE, stat.ML, docomo-cycle, docomo-cycle-tokyo, hellocycling, claude, cloudflare, github, vercel] }, description: 'rss(digital-news / fdma-news / fdma-disaster / soumu-news / osaka-city-news / go-blog)・arxiv(cs.AI など)・bikeshare(GBFS の system id)・status(claude / cloudflare / github / vercel)だけ・必須' }
+        - { name: q, in: query, schema: { type: string, minLength: 1, maxLength: 40 }, description: 'diet・bikeshare だけ・必須。diet は国会会議録で探す語(空白区切りは AND)、bikeshare は地点 "緯度,経度"' }
         - { name: limit, in: query, schema: { type: integer, minimum: 1, maximum: 20, default: 5 } }
       responses:
         '200': &feedOK
-          description: 'OK(Cache-Control は private, max-age=300)'
+          description: 'OK(Cache-Control は private, max-age=300・bikeshare は 60)'
           content:
             application/json:
               schema:
                 type: object
                 required: [provider, title, items, source, fetchedAt]
                 properties:
-                  provider: { type: string, enum: [weather, holidays, rss, warnings, pressure, arxiv, diet] }
+                  provider: { type: string, enum: [weather, holidays, rss, warnings, pressure, arxiv, diet, bikeshare, status] }
                   title: { type: string, example: 石川県の天気 }
                   items:
                     type: array
@@ -1887,7 +1889,7 @@ paths:
                       type: object
                       required: [title]
                       properties:
-                        date: { type: string, description: 'weather / holidays / diet(会議の日)は YYYY-MM-DD、rss・arxiv(投稿)・warnings(発表の時刻)・pressure(6 時間の始まり)は RFC 3339' }
+                        date: { type: string, description: 'weather / holidays / diet(会議の日)は YYYY-MM-DD、rss・arxiv(投稿)・warnings(発表の時刻)・pressure(6 時間の始まり)・bikeshare(事業者の最終更新)は RFC 3339' }
                         title: { type: string, maxLength: 200 }
                         subtitle: { type: string, maxLength: 120 }
                         icon: { type: string, description: SF Symbols の名前(weather・warnings) }
@@ -1918,7 +1920,7 @@ paths:
         GET と同じ読み込み(許可リスト・検査・キャッシュ・1 ユーザー 1 時間の上限は GET と共通で数える)。利用者が入力した値(diet の `q`)を URL に載せないため、パラメータを JSON の本文で送る。
         - 本文は 4 KiB まで(超えると 413)。未知のキー・型の違い・クエリ文字列付きは 400。
       parameters:
-        - { name: provider, in: path, required: true, schema: { type: string, enum: [weather, holidays, rss, warnings, pressure, arxiv, diet] } }
+        - { name: provider, in: path, required: true, schema: { type: string, enum: [weather, holidays, rss, warnings, pressure, arxiv, diet, bikeshare, status] } }
       requestBody:
         required: true
         content:
@@ -1928,8 +1930,8 @@ paths:
               additionalProperties: false
               properties:
                 region: { type: string, pattern: '^[0-9]{6}$', description: 'weather / warnings / pressure だけ・必須' }
-                feedId: { type: string, description: 'rss・arxiv だけ・必須(GET の feedId と同じ一覧)' }
-                q: { type: string, minLength: 1, maxLength: 40, description: 'diet だけ・必須。国会会議録で探す語' }
+                feedId: { type: string, description: 'rss・arxiv・bikeshare・status だけ・必須(GET の feedId と同じ一覧)' }
+                q: { type: string, minLength: 1, maxLength: 40, description: 'diet・bikeshare だけ・必須。diet は国会会議録で探す語、bikeshare は地点 "緯度,経度"' }
                 limit: { type: integer, minimum: 1, maximum: 20, default: 5 }
             example: { q: 予算 委員会, limit: 5 }
       responses:
