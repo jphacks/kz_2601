@@ -92,8 +92,10 @@ func latestRecords(glob string) ([]Record, error) {
 }
 
 // scoreRuns prints the pass rate per group of saved runs and the cases that
-// did not pass (generation error or expect misses).
-func scoreRuns(glob string) error {
+// did not pass (generation error or expect misses). o adds the Markdown
+// report and the pass-rate gate (gate.go); the zero value keeps the plain
+// output only.
+func scoreRuns(glob string, o evalOutput) error {
 	recs, err := latestRecords(glob)
 	if err != nil {
 		return err
@@ -102,6 +104,10 @@ func scoreRuns(glob string) error {
 	for _, r := range recs {
 		hasExpect[r.ID] = r.Checked
 	}
+	return o.emit(os.Stdout, recs, hasExpect, glob, func() { printScore(recs, hasExpect) })
+}
+
+func printScore(recs []Record, hasExpect map[string]bool) {
 	printPassByGroup(passByGroup(recs, hasExpect))
 	var failed []string
 	for _, r := range recs {
@@ -118,5 +124,4 @@ func scoreRuns(glob string) error {
 		fmt.Println("|---|---|---|")
 		fmt.Println(strings.Join(failed, "\n"))
 	}
-	return nil
 }

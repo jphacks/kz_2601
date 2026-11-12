@@ -2,7 +2,9 @@ package loop
 
 import (
 	"context"
+	"fmt"
 	"os"
+	"sort"
 	"testing"
 	"time"
 
@@ -10,6 +12,36 @@ import (
 )
 
 func TestMemoryStore(t *testing.T) { testStore(t, NewMemory(), "m") }
+
+// ListItems on Firestore reads every page: with more than one page of
+// items the oldest come first even when their ids sort last.
+func TestOldestItemsReadsEveryPage(t *testing.T) {
+	base := time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)
+	all := make([]Item, 2500) // ids in id order; the last ids are the oldest
+	for i := range all {
+		all[i] = Item{ID: fmt.Sprintf("it%05d", i), IngestedAt: base.Add(time.Duration(len(all)-i) * time.Minute)}
+	}
+	var pages int
+	page := func(_ context.Context, after string, n int) ([]Item, error) {
+		pages++
+		start := sort.Search(len(all), func(i int) bool { return all[i].ID > after })
+		return all[start:min(start+n, len(all))], nil
+	}
+	got, err := oldestItems(context.Background(), 3, 1000, page)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if pages != 3 || len(got) != 3 || got[0].ID != "it02499" || got[1].ID != "it02498" || got[2].ID != "it02497" {
+		t.Fatalf("pages %d got %+v", pages, got)
+	}
+
+	// an exact page fills: one more (empty) page ends it
+	pages = 0
+	all = all[:2000]
+	if got, err = oldestItems(context.Background(), 5, 1000, page); err != nil || pages != 3 || got[0].ID != "it01999" {
+		t.Fatalf("pages %d got %+v %v", pages, got, err)
+	}
+}
 
 // Runs against the emulator only (FIRESTORE_EMULATOR_HOST=...); never staging/prod.
 func TestFirestoreLoopStore(t *testing.T) {
@@ -65,6 +97,24 @@ func testStore(t *testing.T, s Store, sfx string) {
 	}
 	if !found {
 		t.Fatal("triaged item not listed")
+	}
+	for _, q := range []ItemQuery{{Source: SourceStoreReview, Limit: 500}, {Status: ItemTriaged, Source: SourceTestFlight, Limit: 500}} {
+		other, err := s.ListItems(ctx, q)
+		must(err)
+		for _, x := range other {
+			if x.ID == it.ID || x.Source != q.Source {
+				t.Fatalf("source filter %+v returned %s (%s)", q, x.ID, x.Source)
+			}
+		}
+	}
+	bySrc, err := s.ListItems(ctx, ItemQuery{Status: ItemTriaged, Source: SourceInApp, Limit: 500})
+	must(err)
+	found = false
+	for _, x := range bySrc {
+		found = found || x.ID == it.ID
+	}
+	if !found {
+		t.Fatal("in_app item not listed by source")
 	}
 	if err := s.UpdateItem(ctx, Item{ID: "lin_missing" + sfx}); err != ErrNotFound {
 		t.Fatalf("update missing: %v", err)

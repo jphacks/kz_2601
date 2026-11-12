@@ -11,6 +11,7 @@ import (
 	"net/http/httptest"
 	"net/url"
 	"strings"
+	"sync/atomic"
 	"testing"
 	"time"
 )
@@ -279,3 +280,45 @@ func TestCallbackRoute(t *testing.T) {
 }
 
 func slicesEqual(a, b []string) bool { return strings.Join(a, ",") == strings.Join(b, ",") }
+
+// ctxRevoker fails a revoke whose context is already done, like a real
+// provider call would.
+type ctxRevoker struct {
+	fakeOAuthClient
+	calls *atomic.Int64
+}
+
+func (c ctxRevoker) Revoke(ctx context.Context, _ Token) error {
+	if err := ctx.Err(); err != nil {
+		return err
+	}
+	c.calls.Add(1)
+	return nil
+}
+
+// The caller hanging up (appconfig stops waiting) does not cut revokeAll
+// short: the provider is still asked to revoke and the token is deleted.
+func TestRevokeAllOutlivesCaller(t *testing.T) {
+	e := newEnv(t, opts{})
+	e.connect(user)
+	var calls atomic.Int64
+	e.svc.oauth[FakeOAuth] = ctxRevoker{calls: &calls}
+	mux := http.NewServeMux()
+	e.svc.Routes(mux)
+
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel() // the caller is gone before the runner starts
+	req := httptest.NewRequestWithContext(ctx, http.MethodPost, "/internal/ext/connections/revokeAll", strings.NewReader(`{"uid":"`+user+`"}`))
+	req.Header.Set("Content-Type", "application/json")
+	w := httptest.NewRecorder()
+	mux.ServeHTTP(w, req)
+	if w.Code != http.StatusOK || !strings.Contains(w.Body.String(), `"revoked":1`) {
+		t.Fatalf("revokeAll: %d %s", w.Code, w.Body.String())
+	}
+	if calls.Load() != 1 {
+		t.Fatalf("provider revoke calls = %d", calls.Load())
+	}
+	if c, ok := e.conn(user); !ok || c.Status != StatusRevoked || len(c.Sealed) != 0 {
+		t.Fatalf("connection %+v", c)
+	}
+}

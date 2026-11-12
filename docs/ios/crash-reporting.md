@@ -14,6 +14,7 @@
 - 既定はオン。設定の「プライバシー」→「クラッシュ報告を送る」でオフにできる(プライバシーポリシー 1.8 に記載)。AI ではないので、AI への送信の同意とは別。
 - 審査用の版(Review・`APP_STORE_REVIEW`)にも入れる。プライバシーマニフェスト(`ios/Metamon/PrivacyInfo.xcprivacy`)に「クラッシュのデータ」「パフォーマンスのデータ」「その他の診断データ」(本人に紐づく・トラッキングなし・アプリの機能)を書いた。栄養ラベルの答えは `docs/store/privacy-label.md`(#328)。
 - `GoogleService-Info.plist` が無い環境(CI・plist 未同期)では何もしない。
+- Mac のアプリ(MetamonMac・#930)も同じ送り先・同じ設定(「クラッシュ報告を送る」)。起動時の反映は `ios/MetamonMac/App/Services/MacServices.swift` の `MacFirebase.bootstrap`、uid の付け外しは `MacAccount.swift` の `MacCrashReportUser`。Mac の Crashlytics は捕まえていない例外でアプリを落とさないと報告が出ないので、起動時に `NSApplicationCrashOnExceptions` を true にしている。dSYM は Mac のターゲットの同じビルドフェーズ(同じスクリプト)で送る。
 
 ## コードの場所
 | 何 | ファイル |
@@ -43,6 +44,7 @@
   -gsp ios/Metamon/Resources/GoogleService-Info.plist -p ios <Archive>.xcarchive/dSYMs
 ```
 
+- Mac の版を手で送る時は `-p mac` にする。
 - CI(`ios-ci.yml`)はシミュレータ向けで plist も無いので送らない。CI から送るなら、plist を secrets から置いて実機向けアーカイブを作る工程が要る(今は無い)。
 - 送り先の Firebase プロジェクトは `GoogleService-Info.plist` のもの。prod の plist への切り替えは #292。
 

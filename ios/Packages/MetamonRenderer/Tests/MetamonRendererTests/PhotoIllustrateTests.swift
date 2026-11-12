@@ -1,7 +1,4 @@
-// TODO mac-026: UIKit を直接使うテスト。Mac で回すには描画の仕方を置き換え層に寄せる
-#if os(iOS)
 import XCTest
-import UIKit
 import MetamonDSL
 @testable import MetamonRenderer
 
@@ -60,10 +57,8 @@ final class PhotoIllustrateTests: XCTestCase {
 
     /// Image Playground が返すファイル(偽物の PNG)を、選んだ写真と同じ data URL(JPEG・800px 以下)にする。
     func testSavesGeneratedFileLikeAPickedPhoto() throws {
-        let format = UIGraphicsImageRendererFormat.default()
-        format.scale = 1
-        let img = UIGraphicsImageRenderer(size: CGSize(width: 1024, height: 1024), format: format).image { ctx in
-            UIColor.systemPink.setFill(); ctx.fill(CGRect(x: 0, y: 0, width: 1024, height: 1024))
+        let img = testImage(width: 1024, height: 1024) { ctx in
+            PlatformColor.systemPink.setFill(); ctx.fill(CGRect(x: 0, y: 0, width: 1024, height: 1024))
         }
         let url = FileManager.default.temporaryDirectory.appendingPathComponent("illustrate-\(UUID().uuidString).png")
         try XCTUnwrap(img.pngData()).write(to: url)
@@ -76,4 +71,3 @@ final class PhotoIllustrateTests: XCTestCase {
         XCTAssertNil(PhotoIllustrate.dataURL(fromFileAt: url.appendingPathExtension("missing")), "読めないファイルは何も入れない")
     }
 }
-#endif

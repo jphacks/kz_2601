@@ -1,6 +1,7 @@
 package appconfig
 
 import (
+	"context"
 	"fmt"
 	"log/slog"
 	"net/http"
@@ -24,13 +25,55 @@ func init() {
 // revokes its share links and takes down its catalog listings. The app deletes
 // the Firebase Auth user itself; cmd/purge erases the data (and the Auth user,
 // as a backstop) store.PurgeAfter later (#458). Idempotent: always 204.
+// The runner then revokes the external API connections at the providers
+// (#1716); best effort, as cmd/purge erases the tokens anyway.
 func (h *Handler) deleteMe(w http.ResponseWriter, r *http.Request) {
-	if err := h.store.DeactivateUser(r.Context(), uidOf(r)); err != nil {
+	uid := uidOf(r)
+	if err := h.store.DeactivateUser(r.Context(), uid); err != nil {
 		fail(w, fmt.Errorf("deactivate user: %w", err))
 		return
 	}
 	slog.Info("appconfig: account deleted (logical)")
+	h.revokeExt(r.Context(), uid)
 	w.WriteHeader(http.StatusNoContent)
+}
+
+// Account deletion waits at most revokeWait for the runner; the revocation
+// goes on in the background (bounded by revokeTimeout) when it takes longer,
+// so the person is not kept waiting and the runner's call is not cut off.
+var (
+	revokeWait    = 3 * time.Second
+	revokeTimeout = 30 * time.Second
+)
+
+// revokeExt asks the runner to revoke uid's connections. A failure is only
+// logged: it never fails the deletion.
+func (h *Handler) revokeExt(ctx context.Context, uid string) {
+	if h.ext == nil {
+		return
+	}
+	done := make(chan struct{})
+	bg, cancel := context.WithTimeout(context.WithoutCancel(ctx), revokeTimeout)
+	go func() {
+		defer close(done)
+		defer cancel()
+		n, err := h.ext.RevokeAll(bg, uid)
+		if err != nil {
+			slog.WarnContext(bg, "appconfig: revoking external connections on delete failed", slog.Any("error", err))
+			return
+		}
+		if n > 0 {
+			slog.InfoContext(bg, "appconfig: external connections revoked on delete", slog.Int("revoked", n))
+		}
+	}()
+	t := time.NewTimer(revokeWait)
+	defer t.Stop()
+	select {
+	case <-done:
+	case <-t.C:
+		slog.InfoContext(ctx, "appconfig: revoking external connections continues in the background")
+	case <-ctx.Done():
+	}
 }
 
 // recheckAfter bounds how long an instance trusts "not deleted" for a uid

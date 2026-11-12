@@ -7,7 +7,7 @@ import MetamonServices
 /// 使えない Mac・長い文・写真・aiChat はここのオンライン版に回す(iOS の `AppRuntime+AIText` と同じ道)。
 /// 送る前に同意(#246)を確かめ、無ければ同意の説明を出して送らない(押し直しで送る・iOS と同じ)。
 /// AI のクライアントは会話と同じ `MacComposeSession.gatedAI()`(Firebase が無い間はモック・#930)。
-/// 課金(Pro)の画面は Mac にまだ無いので出さない。サーバーが Pro を求めたら部品の下に理由を出す。
+/// サーバーが Pro を求めたら Mac の課金画面(`MacPro`・iOS と同じ商品)を出し、部品の下にも理由を出す(押し直しで再実行)。
 /// 審査用ビルド(APP_STORE_REVIEW)は iOS と同じくオンライン版を持たない(aiChat は部品ごと外れる)。
 extension MacAppRuntime: AITextHost {
     #if APP_STORE_REVIEW
@@ -26,7 +26,23 @@ extension MacAppRuntime: AITextHost {
             needsAIConsent = true
             throw AITextError.needsConsent
         }
-        return try await ai.text(request.inApp(appId))
+        do {
+            return try await ai.text(request.inApp(appId))
+        } catch AITextError.needsPro {
+            requestProForAIText(chat: request.isChat)
+            throw AITextError.needsPro
+        }
+    }
+
+    /// iOS の `requestProForAIText` と同じ文言で課金画面を出す(閉じるのは待たない)
+    func requestProForAIText(chat: Bool) {
+        let feature = chat
+            ? PaidFeature(id: "aiChat", title: L10n.tr("AI と話す"),
+                          reason: L10n.tr("AI と話すには Tailor It Pro が必要です。会話はサーバーの AI で返します。"))
+            : PaidFeature(id: "aiText", title: L10n.tr("オンラインの AI で書く"),
+                          reason: L10n.tr("この Mac では AI を端末内で動かせないため、サーバーの AI を使います。"))
+        let note = chat ? L10n.tr("閉じると、AI と話す部品は使えません。") : L10n.tr("閉じると、この Mac では AI で書くボタンは使えません。")
+        MacPro.shared.requestPro(.paidFeature([feature]), closeNote: note)
     }
 
     /// 端末内 AI の集計(#446)。設定の「AI ボタンの利用状況を送る」で止められる。送るのは appconfig につながってから(#930)

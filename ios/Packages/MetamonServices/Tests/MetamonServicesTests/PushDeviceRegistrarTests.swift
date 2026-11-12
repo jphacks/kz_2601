@@ -219,6 +219,8 @@ final class PushDeviceRegistrarTests: XCTestCase {
         XCTAssertEqual(PushEnvironment.from(provisioningProfile: profile("development")), .sandbox)
         XCTAssertEqual(PushEnvironment.from(provisioningProfile: profile("production")), .production)
         XCTAssertEqual(PushEnvironment.from(provisioningProfile: Data("no entitlement".utf8)), .production)
+        // Mac の profile のキー(#982)
+        XCTAssertEqual(PushEnvironment.from(provisioningProfile: Data("<key>com.apple.developer.aps-environment</key><string>development</string>".utf8)), .sandbox)
         XCTAssertEqual(PushEnvironment.from(provisioningProfile: nil), .production)
     }
 

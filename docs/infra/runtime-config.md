@@ -59,6 +59,9 @@ runner は prod で GitHub の変数 `RUNNER_DEPLOY=1` の時だけデプロイ�
 | `MIN_ANDROID_BUILD` | appconfig | `MIN_IOS_BUILD` の Android 版(versionCode) | 無し |
 | `LATEST_ANDROID_BUILD` | appconfig | `LATEST_IOS_BUILD` の Android 版(versionCode) | 無し |
 | `ANDROID_STORE_URL` | appconfig | Android の案内から開く Google Play の URL(`https://play.google.com/store/apps/details?id=<pkg>`) | 無し |
+| `MIN_MACOS_BUILD` | appconfig | `MIN_IOS_BUILD` の Mac 版(CFBundleVersion・#981) | 無し |
+| `LATEST_MACOS_BUILD` | appconfig | `LATEST_IOS_BUILD` の Mac 版(CFBundleVersion) | 無し |
+| `MAC_APP_STORE_URL` | appconfig | Mac の案内から開く Mac App Store の URL(`https://apps.apple.com/app/id<id>` / `macappstore://`) | 無し |
 | `FEEDBACK_DAILY_LIMIT` | appconfig | 1 人 1 日のフィードバック送信の上限。`0` で数えない | 5 |
 | `FEEDS_DISABLED` | appconfig | 外部の公開データ(#348)の provider を止める(カンマ区切り・`all` = 全部)。止めた provider は 503 で、部品は「読み込めませんでした」([external-feeds.md](../backend/features/external-feeds.md)) | 無し(止めない) |
 | `FEEDS_USER_PER_HOUR` / `FEEDS_UPSTREAM_PER_MINUTE` | appconfig | 外部の公開データの 1 人 1 時間の回数 / インスタンスあたり 1 分の出どころへの取得 | 120 / 30 |

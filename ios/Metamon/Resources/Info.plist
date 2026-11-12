@@ -92,6 +92,12 @@
 		</dict>
 	</array>
 
+	<!-- 連係の Handoff(#1851): 開いている生成アプリの画面を iPhone ⇄ Mac で引き継ぐ。Shared/Runtime/HandoffActivity.swift の type と同じ -->
+	<key>NSUserActivityTypes</key>
+	<array>
+		<string>jp.kz2601.metamon.view</string>
+	</array>
+
 	<!-- WhisperKit モデル名。空なら `small`(約500MB・日本語精度優先)。環境変数 METAMON_WHISPER_MODEL でも上書き可 -->
 	<key>MetamonWhisperModel</key>
 	<string></string>

@@ -108,6 +108,10 @@ func TestNotifyFixedSenders(t *testing.T) {
 	if !strings.Contains(ReleaseNotes([]Fixed{{Title: d.Title, Issue: 10}}), "- 写真の追加で終了する(#10)") {
 		t.Fatal("release notes")
 	}
+	// a draft appended to the same issue is not a second line
+	if notes := ReleaseNotes([]Fixed{{Title: d.Title, Repo: "o/r", Issue: 10}, {Title: d.Title, Repo: "o/r", Issue: 10}}); strings.Count(notes, "(#10)") != 1 {
+		t.Fatalf("release notes:\n%s", notes)
+	}
 }
 
 func TestPushRateLimit(t *testing.T) {

@@ -96,8 +96,8 @@ func TestTriageClassifiesAndGroupsDuplicates(t *testing.T) {
 	if a.Status != loop.ItemTriaged || a.ClusterKey != "photo-add-crash" || b.ClusterKey != a.ClusterKey || a.Category != "bug" {
 		t.Fatalf("dup: %+v / %+v", a, b)
 	}
-	if a.Priority != "P2" { // bug 3 + medium 1 + 2 reports 1 = 5
-		t.Fatalf("priority %s", a.Priority)
+	if a.Priority != "P2" || a.Impact != "medium" || b.Impact != "medium" { // bug 3 + medium 1 + 2 reports 1 = 5
+		t.Fatalf("priority %s impact %q / %q", a.Priority, a.Impact, b.Impact)
 	}
 	if sp := get(t, s, items[3].ID); sp.Status != loop.ItemSpam {
 		t.Fatalf("spam %+v", sp)

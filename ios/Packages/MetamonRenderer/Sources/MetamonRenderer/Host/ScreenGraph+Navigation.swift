@@ -65,13 +65,15 @@ public extension ScreenGraph {
 public extension NavigationResolver {
     /// 画面マップから画面を開く(Mac #970)。開いているモーダルは閉じ、根(タブ)から最短の道を `navigate` でたどる。
     /// たどる矢印は先頭の辺の出し方(push / sheet / fullScreen)で開くので、戻る・閉じるはアプリの中で押した時と同じに効く。
-    /// 記録は選ばずに開く(フォームは新規・詳細は空)。根から行けない画面は今のタブ(無ければ main)に積む。無い画面は nil。
-    static func reveal(_ screen: String, graph: ScreenGraph, dsl: AppDSL, from current: NavigationState) -> NavigationState? {
+    /// `recordId` を渡すと、最後の画面(一覧の行から開く詳細・フォーム)をその記録で開く(Mac #1322)。nil なら記録は選ばない
+    /// (フォームは新規・詳細は空)。根から行けない画面は今のタブ(無ければ main)に積む。無い画面は nil。
+    static func reveal(_ screen: String, recordId: String? = nil, graph: ScreenGraph, dsl: AppDSL,
+                       from current: NavigationState) -> NavigationState? {
         guard graph.node(screen) != nil else { return nil }
         var s = dismissModals(current)
         guard let steps = graph.path(to: screen) else {
             let root = mainRoot(state: s, dsl: dsl)
-            s.paths[root.stack] = [Route(screen: screen, stack: root.stack)]
+            s.paths[root.stack] = [Route(screen: screen, recordId: recordId, stack: root.stack)]
             return s
         }
         let start = steps.first?.from ?? screen
@@ -81,8 +83,9 @@ public extension NavigationResolver {
         } else {
             s.paths["main"] = []
         }
-        for link in steps {
-            s = navigate(s, to: link.to, presentation: link.edges.first?.presentation, recordId: nil, from: top(s, dsl: dsl), dsl: dsl)
+        for (index, link) in steps.enumerated() {
+            let id = index == steps.count - 1 ? recordId : nil
+            s = navigate(s, to: link.to, presentation: link.edges.first?.presentation, recordId: id, from: top(s, dsl: dsl), dsl: dsl)
         }
         return s
     }
