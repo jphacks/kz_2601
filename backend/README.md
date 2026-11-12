@@ -1,13 +1,29 @@
 # backend (Go)
 
-単一モジュール・複数サービス構成。`cmd/<service>` が1つの Cloud Run サービスに対応する。
+単一モジュール・複数バイナリ構成。`cmd/<名前>` が 1 つの実行ファイル(Cloud Run のサービス・Job か、人が回す道具)に対応する。
 設計: `docs/backend/architecture.md`、API契約: `docs/backend/openapi-*.yaml`、DSL: `docs/dsl/README.md` + `docs/dsl/dsl.schema.json`。
 
-| cmd | 担当 | 役割 |
-|---|---|---|
-| `cmd/appconfig` | @2410as | アプリ DSL JSON の CRUD・JSON Patch 適用・バージョン・汎用レコード |
-| `cmd/ai` | Claude Code | 音声/文字 → Claude → DSL(初回フル / 以後 JSON Patch) → appconfig |
-| `cmd/runner` | Claude Code | 自動の動き(serverRules)を outbox から実行(#341・**未デプロイ**)。`POST /internal/tick`・ローカルは `make run-runner` |
+`cmd/` の全部(1 行 1 本・名前順)。Cloud Run で動く 6 本(ai・appconfig・appstore-reconcile・feedback-loop・purge・runner)は同じ `backend/Dockerfile` のイメージに `/app/<名前>` として入り、`--command` で切り替える。ほかは人が手元で回す道具(smoke はデプロイの後にも回る)。
+
+| cmd | 役割 | どこで動くか | 手元で回す | 詳しい docs |
+|---|---|---|---|---|
+| `cmd/ai` | 音声/文字 → Claude → DSL(初回フル / 以後 JSON Patch) → appconfig | Cloud Run サービス `ai-stg` / `ai-prod` | `make run-ai`(`make dev` で appconfig と一緒に) | [openapi-ai.yaml](../docs/backend/openapi-ai.yaml) |
+| `cmd/ai-audit` | ai-eval の結果の DSL を「動くか」で採点する(押せないボタン・行けない画面など)。API は呼ばない | 手元 | `go run ./cmd/ai-audit` | [ai-eval の監査](../docs/backend/ai-eval/2026-10-24-audit.md) |
+| `cmd/ai-eval` | 評価ケース(`internal/ai/eval/cases.json`)を本物の Claude で回して指標と DSL を書き出す。`-check-all` はケースの検査だけ(API なし) | 手元・`backend-ci`(`-check-all` だけ) | `go run ./cmd/ai-eval` | [ci-gate.md](../docs/backend/ai-eval/ci-gate.md) |
+| `cmd/ai-session-report` | 指定したユーザーの AI とのやり取りをセッションに切り、AI が外した疑いの強い順に並べる(読むだけ) | 手元(人が回す・定期では回さない) | `go run ./cmd/ai-session-report` | [ai-session-report.md](../docs/ops/ai-session-report.md) |
+| `cmd/appconfig` | アプリ DSL JSON の CRUD・JSON Patch 適用・バージョン・汎用レコード・各機能の API | Cloud Run サービス `appconfig-stg` / `appconfig-prod` | `make run-appconfig`(`make dev` で ai と一緒に) | [openapi-appconfig.yaml](../docs/backend/openapi-appconfig.yaml) |
+| `cmd/appstore-reconcile` | App Store Server API から Pro の状態を取り直し、届かなかった通知の分を直す | Cloud Run Job `appstore-reconcile`(Cloud Scheduler で 1 日に数回・作るのは人) | `make run-appstore-reconcile`(エミュレータ・既定 `-dry-run`) | [app-store-notifications.md](../docs/infra/app-store-notifications.md) |
+| `cmd/coin-initial-backfill` | 初回コインの付与の記録(`coin_initial_grants`)を、記録が無かった頃のアカウントに書く | 手元(人が 1 回だけ) | `go run ./cmd/coin-initial-backfill` | [coin-initial-backfill.md](../docs/infra/coin-initial-backfill.md) |
+| `cmd/dslgen` | JSON Schema から Android(Kotlin)の DSL の型を作る。生成物は commit し、古いと `TestGeneratedKotlinIsUpToDate` が落ちる | 手元 | `make dsl-gen` | [351-dsl-cross-platform.md](../docs/decisions/351-dsl-cross-platform.md) |
+| `cmd/feedback` | アプリ内のフィードバックを読む(一覧・1 件)。書かない | 手元(運用する人) | `make run-feedback` | [feedback.md](../docs/backend/features/feedback.md) |
+| `cmd/feedback-loop` | 自己改善ループの各段(取り込み・振り分け・Issue の下書きと人の承認・直ったお知らせ・止める仕組み) | Cloud Run Job `feedback-loop-<段>`(Cloud Scheduler・既定は作らない)と手元 | `make run-feedback-loop`(エミュレータ・`LOOP_ARGS`) | [feedback-loop.md](../docs/backend/features/feedback-loop.md) |
+| `cmd/matching-age-backfill` | 18 歳以上の申告をした作者のマッチングのプロフィールに `ownerAgeConfirmed` を書く(既定は件数だけ) | 手元(人が 1 回だけ) | `go run ./cmd/matching-age-backfill` | [matching-age-backfill.md](../docs/infra/matching-age-backfill.md) |
+| `cmd/moderate` | 通報の一覧・処理と、掲載・共有アプリの公開の停止(運用する人の道具) | 手元(運用する人) | `make run-moderate` | [moderation.md](../docs/infra/moderation.md) |
+| `cmd/product-metrics` | ログの出力からプロダクトの指標(生成の成功・D1/D7 など)を週ごとの Markdown の表にする。API は呼ばない | 手元 | `go run ./cmd/product-metrics` | [product-metrics.md](../docs/metrics/product-metrics.md) |
+| `cmd/purge` | 退会して一定期間たったアカウントと、古いフィードバックを消す | Cloud Run Job `account-purge`(Cloud Scheduler で毎日・`infra/purge.tf`) | `make run-purge` | [account-purge.md](../docs/infra/account-purge.md) |
+| `cmd/runner` | 自動の動き(serverRules)を outbox から実行する(#341)。`POST /internal/tick` | Cloud Run サービス `runner-prod`(prod だけ・非公開。`RUNNER_DEPLOY=1` と `runner_enabled = true` の時だけ出す)と Scheduler `runner-tick` | `make run-runner` | [runner.md](../docs/infra/runner.md) |
+| `cmd/smoke` | デモの発話を動いている ai(+ appconfig)に流して、ステップごとの時間とトークンを表にする | 手元・`deploy-cloudrun` のデプロイの後(非ブロッキング) | `make smoke-local` / `make smoke-stg` / `make smoke-prod` | [deploy-cloudrun](../docs/02_github_workflow.md#deploy-cloudrunbackend-の自動デプロイ) |
+| `cmd/stg-cleanup` | stg のテストのデータ(smoke のアプリ・回数制限のカウンタ・指定したテストユーザー)を消す(既定は件数だけ) | 手元(人が回す・定期では回さない) | `make run-stg-cleanup` | [stg-cleanup.md](../docs/infra/stg-cleanup.md) |
 
 共有型は `pkg/dsl`:
 
