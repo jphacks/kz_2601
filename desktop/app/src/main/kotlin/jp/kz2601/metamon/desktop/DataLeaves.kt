@@ -154,8 +154,8 @@ fun DataLeaf(c: Component, env: DataEnv) {
 object DataText {
     /** 一覧などの空の一言。日本語は conformance の期待値と同じ「まだありません」。 */
     val EMPTY: String get() = Strings["desktop_list_empty"]
-    const val EVERYONE = "全員"
-    const val MEMBER = "参加者"
+    val EVERYONE: String get() = Strings["lists_everyone"]
+    val MEMBER: String get() = Strings["lists_member"]
 
     fun join(items: List<String>): String = items.joinToString("、")
 
@@ -266,11 +266,11 @@ object TableCells {
         col.title?.let { return it }
         val name = entity?.field(col.field)?.name ?: col.field
         return when (col.aggregate?.wire) {
-            "count" -> "件数"
-            "sum" -> "${name}の合計"
-            "avg" -> "${name}の平均"
-            "min" -> "${name}の最小"
-            "max" -> "${name}の最大"
+            "count" -> Strings["lists_count"]
+            "sum" -> Strings.format("lists_sum", name)
+            "avg" -> Strings.format("lists_avg", name)
+            "min" -> Strings.format("lists_min", name)
+            "max" -> Strings.format("lists_max", name)
             else -> name
         }
     }

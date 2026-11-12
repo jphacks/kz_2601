@@ -20,6 +20,8 @@
     <string name="desktop_export_done">Exported %1$d records: %2$s</string>
     <string name="desktop_export_writing">Exporting…</string>
     <string name="desktop_feed_offline">The desktop app doesn\'t load feeds yet</string>
+    <string name="desktop_flashcards_back_hint">Back (click for the front)</string>
+    <string name="desktop_flashcards_front_hint">Front (click for the back)</string>
     <string name="desktop_image_none">No image</string>
     <string name="desktop_input_audio_unavailable">Recording isn\'t available on this computer. You can choose a file instead</string>
     <string name="desktop_input_clear">Clear</string>
@@ -122,6 +124,7 @@
     <string name="desktop_print_sent">Sent %1$d pages to the printer</string>
     <string name="desktop_print_title">Print: %1$s</string>
     <string name="desktop_print_value">Value</string>
+    <string name="desktop_qr_copy_image">Copy image</string>
     <string name="desktop_record_deleted_elsewhere">This record was deleted in another window</string>
     <string name="desktop_sync_pending">%1$d waiting to send</string>
     <string name="desktop_timer_done">Time\'s up</string>
