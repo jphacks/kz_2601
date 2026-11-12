@@ -102,7 +102,7 @@ func (l *Limiter) Middleware(verifier auth.IdentityVerifier) func(http.Handler) 
 			// (anonymous too: an anonymous account gets no initial coins, #630); the
 			// tier's Pro check sees it as the verified caller (#2085)
 			ctx := auth.ContextWithIdentity(r.Context(), id)
-			dec, err := l.Allow(ctx, id, ClientIP(r), weight)
+			dec, err := l.AllowPlatform(ctx, id, ClientIP(r), httpx.ClientPlatform(r), weight)
 			if err != nil {
 				httpx.Error(w, http.StatusInternalServerError, httpx.CodeInternal, "rate limiter unavailable")
 				return

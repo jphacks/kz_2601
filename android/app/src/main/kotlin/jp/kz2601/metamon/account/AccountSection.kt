@@ -97,12 +97,31 @@ fun AccountSection(container: AppContainer, user: AuthUser, busy: Boolean) {
         }
     }
 
+    // #1165: Apple で入った人は、消す前に Apple のトークンを取り消す(Apple の「Apple でサインイン」の一覧から外す)。
+    // モック認証のビルドでは null になり、取り消しは行わない
+    val appleReauth = remember { FirebaseAppleReauth.createIfConfigured() }
+
+    suspend fun revokeAppleToken() {
+        val act = activity ?: return
+        val apple = appleReauth ?: return
+        AppleTokenRevocation.run(
+            provider = user.provider,
+            reauthenticate = { apple.reauthenticate(act) },
+            revoke = apple::revoke,
+        )
+    }
+
     fun deleteAccount() {
         dialog = null
         working = R.string.account_deleting
         work.launch {
             try {
-                session.deleteAccount(container.account, reauthenticate = ::reauthenticate, wipe = guard::wipeForSignOut)
+                session.deleteAccount(
+                    container.account,
+                    reauthenticate = ::reauthenticate,
+                    wipe = guard::wipeForSignOut,
+                    revokeAppleToken = ::revokeAppleToken,
+                )
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {

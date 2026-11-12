@@ -247,7 +247,7 @@ func gcalParseTime(name, v string) (gcalTime, error) {
 	if t, err := time.ParseInLocation(time.DateOnly, v, gcalJST); err == nil {
 		return gcalTime{t: t, allDay: true}, nil
 	}
-	return gcalTime{}, fmt.Errorf("%w: %s must be RFC 3339 or YYYY-MM-DD", ErrUnknown, name)
+	return gcalTime{}, fmt.Errorf("%w: %s must be RFC 3339 or YYYY-MM-DD", ErrBadArgs, name)
 }
 
 // gcalText checks a free-text argument's length (runes) and control chars.
@@ -255,11 +255,11 @@ func gcalText(name, v string, max int, required bool) (string, error) {
 	v = strings.TrimSpace(v)
 	switch {
 	case v == "" && required:
-		return "", fmt.Errorf("%w: %s is required", ErrUnknown, name)
+		return "", fmt.Errorf("%w: %s is required", ErrBadArgs, name)
 	case !utf8.ValidString(v) || utf8.RuneCountInString(v) > max:
-		return "", fmt.Errorf("%w: %s is over %d characters", ErrUnknown, name, max)
+		return "", fmt.Errorf("%w: %s is over %d characters", ErrBadArgs, name, max)
 	case strings.ContainsFunc(v, func(r rune) bool { return r < 0x20 && r != '\n' && r != '\t' }):
-		return "", fmt.Errorf("%w: %s has control characters", ErrUnknown, name)
+		return "", fmt.Errorf("%w: %s has control characters", ErrBadArgs, name)
 	}
 	return v, nil
 }
@@ -325,13 +325,13 @@ func (g *googleCalendar) listEvents(ctx context.Context, in Input) (Output, erro
 		to = t
 	}
 	if !to.t.After(from.t) || to.t.Sub(from.t) > gcalMaxRange {
-		return Output{}, fmt.Errorf("%w: timeMax must be after timeMin and within 366 days", ErrUnknown)
+		return Output{}, fmt.Errorf("%w: timeMax must be after timeMin and within 366 days", ErrBadArgs)
 	}
 	n := gcalDefaultResults
 	if v := in.Args["maxResults"]; v != "" {
 		x, err := strconv.Atoi(v)
 		if err != nil || x < 1 || x > gcalMaxResults {
-			return Output{}, fmt.Errorf("%w: maxResults must be 1-%d", ErrUnknown, gcalMaxResults)
+			return Output{}, fmt.Errorf("%w: maxResults must be 1-%d", ErrBadArgs, gcalMaxResults)
 		}
 		n = x
 	}
@@ -384,7 +384,7 @@ func (g *googleCalendar) createEvent(ctx context.Context, in Input) (Output, err
 		return Output{}, err
 	}
 	if in.Args["start"] == "" {
-		return Output{}, fmt.Errorf("%w: start is required", ErrUnknown)
+		return Output{}, fmt.Errorf("%w: start is required", ErrBadArgs)
 	}
 	start, err := gcalParseTime("start", in.Args["start"])
 	if err != nil {
@@ -396,7 +396,7 @@ func (g *googleCalendar) createEvent(ctx context.Context, in Input) (Output, err
 			return Output{}, err
 		}
 		if end.allDay != start.allDay {
-			return Output{}, fmt.Errorf("%w: start and end must both be dates or both be times", ErrUnknown)
+			return Output{}, fmt.Errorf("%w: start and end must both be dates or both be times", ErrBadArgs)
 		}
 	} else if !start.allDay {
 		end.t = start.t.Add(time.Hour)
@@ -408,13 +408,13 @@ func (g *googleCalendar) createEvent(ctx context.Context, in Input) (Output, err
 	var s, e when
 	if start.allDay {
 		if end.t.Before(start.t) || end.t.Sub(start.t) > gcalMaxRange {
-			return Output{}, fmt.Errorf("%w: end must be on or after start and within 366 days", ErrUnknown)
+			return Output{}, fmt.Errorf("%w: end must be on or after start and within 366 days", ErrBadArgs)
 		}
 		// Google's all-day end is exclusive
 		s, e = when{Date: start.t.Format(time.DateOnly)}, when{Date: end.t.AddDate(0, 0, 1).Format(time.DateOnly)}
 	} else {
 		if !end.t.After(start.t) || end.t.Sub(start.t) > gcalMaxRange {
-			return Output{}, fmt.Errorf("%w: end must be after start and within 366 days", ErrUnknown)
+			return Output{}, fmt.Errorf("%w: end must be after start and within 366 days", ErrBadArgs)
 		}
 		s, e = when{DateTime: start.t.Format(time.RFC3339)}, when{DateTime: end.t.Format(time.RFC3339)}
 	}

@@ -9,6 +9,7 @@ import android.net.Uri
 import android.os.Build
 import android.provider.Settings
 import androidx.core.app.NotificationManagerCompat
+import androidx.health.connect.client.HealthConnectClient
 import jp.kz2601.metamon.services.permissions.AppPermission
 import jp.kz2601.metamon.services.permissions.PermissionRules
 import jp.kz2601.metamon.services.permissions.PermissionStatus
@@ -83,6 +84,8 @@ class PermissionCenter private constructor(private val appContext: Context) {
     fun settingsIntent(permission: AppPermission): Intent = when (permission) {
         AppPermission.NOTIFICATIONS -> Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS)
             .putExtra(Settings.EXTRA_APP_PACKAGE, appContext.packageName)
+        // ヘルスコネクトの許可はアプリの情報からは外せない(#870)
+        AppPermission.HEALTH -> Intent(HealthConnectClient.ACTION_HEALTH_CONNECT_SETTINGS)
         else -> appDetailsIntent()
     }.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
 

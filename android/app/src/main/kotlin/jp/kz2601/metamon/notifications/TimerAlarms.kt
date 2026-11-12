@@ -41,6 +41,8 @@ class TimerAlarms private constructor(private val appContext: Context) {
     fun fired(key: String) {
         val alarm = synchronized(this) { store.alarms()[key].also { store.setAlarm(key, null) } } ?: return
         if (TimerVisibility.isShowing(key)) return
+        // 進行中の表示(liveActivity)は 0 を過ぎたら消す(#913)。終わったことはこの後の通知が伝える
+        ActivityNotifications.get(appContext).timerEnded(key)
         LocalNotifications.get(appContext).post(
             identifier = IDENTIFIER_PREFIX + key,
             title = alarm.title,
