@@ -4,7 +4,7 @@ import MetamonServices
 /// アシスティブアクセス(#1997)の中で出す・出さないの決まり。判定もここ 1 か所に集める。
 ///
 /// アシスティブアクセスでは作る機能(音声で生成・直す)・AI ボタン・設定・課金・起動時の案内を出さず、
-/// 最初の画面を生成アプリの一覧にする。開いた生成アプリの画面は今のまま出す。
+/// 最初の画面を生成アプリの一覧にする。開いた生成アプリは主な動作の大きなボタン(#1998・選べなければ今の画面)。
 struct AssistiveAccessPolicy: Equatable, Sendable {
     var isActive: Bool
 
@@ -32,7 +32,7 @@ struct AssistiveAccessPolicy: Equatable, Sendable {
         case standard
         /// 生成アプリの一覧
         case appList
-        /// 一覧から開いた生成アプリ(今の画面をそのまま)
+        /// 一覧から開いた生成アプリ(主な動作のボタン・選べなければ今の画面: `AssistiveActions.hasCandidates`)
         case openedApp
     }
 

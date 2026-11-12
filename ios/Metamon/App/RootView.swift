@@ -39,6 +39,8 @@ struct RootView: View {
                         .transition(.asymmetric(insertion: .identity, removal: .opacity))
                 } else if assistiveHome == .appList {
                     AssistiveAccessAppList { assistiveOpenedAppId = $0 }
+                } else if assistiveHome == .openedApp, AssistiveActions.hasCandidates(in: rt.dsl) {
+                    AssistiveAccessActionsView() // #1998 主な動作を大きなボタンで(選べない時は今の画面のまま)
                 } else if rt.dsl.isVoiceOnly {
                     // 初期状態(voiceEntry = fullscreen)はグリッドのセル内ではなく全面に描く(背景を画面いっぱいに敷くため)。
                     // 見出しは DSL の prompt ではなく Greeting(#42: 初回/再訪/時間帯で出し分け)
