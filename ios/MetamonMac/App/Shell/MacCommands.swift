@@ -5,7 +5,7 @@ import AppKit
 /// - ファイル: 新しいアプリ・文字で頼む(会話のシート・#967)・声で頼む(同じシートですぐ録音・#966)・新しいウインドウ・
 ///   保存 ⌘S(#1138)・クイックルック ⌘Y(#1850)・CSV / PDF で書き出す・プリント ⌘P(#1139・今の画面に一覧がある時だけ)
 /// - 編集: 元に戻す(記録を消した直後は削除の取り消し・それ以外は入力欄の取り消し)・やり直す・アプリを探す(⌘F・#1282)
-/// - アプリ: 生成したアプリの版の「変更を元に戻す」(⌥⌘Z)・「変更をやり直す」(⇧⌥⌘Z)(#968)・次の通知(#1325)。
+/// - アプリ: みんなのアプリを探す(⇧⌘F・#2069)・生成したアプリの版の「変更を元に戻す」(⌥⌘Z)・「変更をやり直す」(⇧⌥⌘Z)(#968)・次の通知(#1325)。
 ///   ⌘Z / ⇧⌘Z は入力欄と記録の削除に使っているので、版の取り消しは別のキーにする
 /// - 表示: サイドバー(`SidebarCommands`)・ツールバー(`ToolbarCommands`)・再読み込み ⌘R(#944)・画面マップ(⇧⌘E・#970)・
 ///   拡大 ⌘+ / 縮小 ⌘- / 実際のサイズ ⌘0(中央のアプリの文字・#1206)
@@ -94,6 +94,13 @@ struct MacCommands: Commands {
         }
 
         CommandMenu("アプリ") {
+            #if !APP_STORE_REVIEW // 審査用ビルドは「探す」を外す(iOS と同じ)
+            // 他の人が公開したアプリを探して入れる(#2069)。⌘F はサイドバーの検索なので ⇧⌘F
+            Button("みんなのアプリを探す…") { shell?.discover() }
+                .keyboardShortcut("f", modifiers: [.command, .shift])
+                .disabled(!(shell?.canDiscover ?? false))
+            Divider()
+            #endif
             Button("変更を元に戻す") { shell?.undoVersion() }
                 .keyboardShortcut("z", modifiers: [.command, .option])
                 .disabled(!(shell?.canUndoVersion ?? false))
@@ -190,6 +197,9 @@ struct ShellActions {
     /// 画面マップ(#970)を開けるか(中央にアプリがあり、会話のシートが閉じている)
     var canShowScreenMap: Bool = false
     var showScreenMap: () -> Void = {}
+    /// 「みんなのアプリを探す」(⇧⌘F・#2069)を開けるか(サインインしてサーバーにつながっている・ほかのシートが閉じている)
+    var canDiscover: Bool = false
+    var discover: () -> Void = {}
 }
 
 private struct ShellActionsKey: FocusedValueKey {

@@ -213,7 +213,7 @@ struct ShareAppSheet: View {
     private func publish() async {
         busy = true
         defer { busy = false }
-        let tagList = tags.split(whereSeparator: { $0 == " " || $0 == "　" || $0 == "," || $0 == "、" }).map(String.init)
+        let tagList = PublishCopy.tags(from: tags)
         do {
             listing = try await services.sharing?.publish(appId: app.id, description: desc, tags: tagList, authorName: nil)
             flaggedField = nil
@@ -228,15 +228,7 @@ struct ShareAppSheet: View {
     }
 
     /// 公開の文字の項目(#321)。どの欄かを名前で出す
-    static func textNotAllowedMessage(field: String?) -> String {
-        switch field {
-        case "description": ErrorCopy.textNotAllowed(fieldName: L10n.tr("ひとこと説明"))
-        case "tags": ErrorCopy.textNotAllowed(fieldName: L10n.tr("タグ"))
-        case "name": ErrorCopy.textNotAllowed(fieldName: L10n.tr("アプリの名前"))
-        case "authorName": ErrorCopy.textNotAllowed(fieldName: L10n.tr("表示名"))
-        default: ErrorCopy.textNotAllowed
-        }
-    }
+    static func textNotAllowedMessage(field: String?) -> String { PublishCopy.textNotAllowedMessage(field: field) }
 
     private func unpublish() async {
         busy = true
