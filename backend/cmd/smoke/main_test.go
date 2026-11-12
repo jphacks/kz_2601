@@ -111,7 +111,7 @@ func appOf(screens [][]dsl.Component) *dsl.App {
 	return app
 }
 
-func TestOverlaps(t *testing.T) {
+func TestOverlapsCases(t *testing.T) {
 	text := func(area string) dsl.Component { return comp(dsl.CompText, area) }
 	cases := map[string]struct {
 		screens [][]dsl.Component
@@ -136,7 +136,7 @@ func TestOverlaps(t *testing.T) {
 	}
 }
 
-func TestPhotoSource(t *testing.T) {
+func TestPhotoSourceCases(t *testing.T) {
 	photo := func(src string) dsl.Component { return dsl.Component{Type: dsl.CompPhotoField, Source: src} }
 	text := comp(dsl.CompText, "")
 	cases := map[string]struct {
@@ -160,7 +160,7 @@ func TestPhotoSource(t *testing.T) {
 	}
 }
 
-func TestCanon(t *testing.T) {
+func TestCanonCases(t *testing.T) {
 	cases := map[string]struct{ in, want string }{
 		"key order":   {`{"b":1, "a":[1, 2]}`, `{"a":[1,2],"b":1}`},
 		"whitespace":  {" [ 1 ,\n2 ] ", `[1,2]`},
