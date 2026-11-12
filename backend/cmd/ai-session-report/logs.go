@@ -44,6 +44,12 @@ type logEvent struct {
 	// and validation_codes (dsl problem code -> problems, #1772).
 	RetryReasons    []string
 	ValidationCodes map[string]int
+
+	// ai.usage cache tokens and est_cost_usd (HasCost: the model had a price, #2294)
+	CacheRead  int64
+	CacheWrite int64
+	CostUSD    float64
+	HasCost    bool
 }
 
 // Event names the report reads (backend/internal/ai, internal/httpx, internal/metrics).
@@ -98,7 +104,7 @@ type rawEntry struct {
 // parseLogs reads `gcloud logging read --format=json` output (a JSON array of
 // entries) or JSON lines (entries, or bare slog records with `time`).
 // Lines whose uid_hash is not in keep are dropped at once, so other users'
-// metadata is never held.
+// metadata is never held. A nil keep keeps every line (the log-only modes).
 func parseLogs(r io.Reader, keep map[string]bool) ([]logEvent, error) {
 	data, err := io.ReadAll(r)
 	if err != nil {
@@ -126,7 +132,7 @@ func parseLogs(r io.Reader, keep map[string]bool) ([]logEvent, error) {
 	var out []logEvent
 	for _, raw := range raws {
 		ev, ok := decodeEntry(raw)
-		if !ok || !keep[ev.UIDHash] {
+		if !ok || (keep != nil && !keep[ev.UIDHash]) {
 			continue
 		}
 		out = append(out, ev)
@@ -177,6 +183,11 @@ func decodeEntry(raw json.RawMessage) (logEvent, bool) {
 		Built:     p.flag("clarify_ended_in_build"),
 	}
 	switch ev.Event {
+	case evUsage:
+		ev.CacheRead = int64(p.num("cache_read_input_tokens"))
+		ev.CacheWrite = int64(p.num("cache_creation_input_tokens"))
+		_, ev.HasCost = p["est_cost_usd"]
+		ev.CostUSD = p.num("est_cost_usd")
 	case evGenerate:
 		ev.Duration = time.Duration(p.num("duration_ms")) * time.Millisecond
 		ev.RetryReasons = parseLabels(p.str("retry_reasons"))
