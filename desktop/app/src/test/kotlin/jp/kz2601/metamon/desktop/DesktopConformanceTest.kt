@@ -52,6 +52,7 @@ class DesktopConformanceTest {
         "markdown" to listOf("text"),
         "button" to listOf("label"),
         "link" to listOf("text", "url"),
+        "openUrlButton" to listOf("label", "url"),
         "stat" to listOf("value", "unavailable"),
         "progressBar" to listOf("ratio", "percent"),
         "gauge" to listOf("value", "unit"),
@@ -131,7 +132,7 @@ class DesktopConformanceTest {
                     val form = models.firstOrNull { it.id == screen.entity }?.let { e ->
                         FormDraft(e, if (e.single) SingleRecord.pick(records[e.id].orEmpty()) else null)
                     }
-                    compare(at, got, s["nodes"] as JsonArray, data, failures, compared, form)
+                    compare(at, got, s["nodes"] as JsonArray, data, failures, compared, form, uid)
                 }
                 steps += runSteps(dir.name, dsl, case, expected, uid, failures)
             }
@@ -241,6 +242,7 @@ class DesktopConformanceTest {
         failures: MutableList<String>,
         compared: MutableMap<String, Int>,
         form: FormDraft? = null,
+        uid: String? = null,
     ) {
         val want = nodes.map { it as JsonObject }
         val wantKeys = want.map { key(it.str("id"), it.str("type")) }
@@ -260,7 +262,7 @@ class DesktopConformanceTest {
             if (g.band != wantBand) failures += "$here: band ${g.band} != $wantBand"
 
             val state = n.str("state")
-            val mine = DesktopLeaves.state(c)
+            val mine = DesktopLeaves.state(c, form, uid)
             val type = DesktopLeaves.typeName(c)
             if (state != mine) stateDifference(type, state, mine)?.let { failures += "$here: $it" }
             val props = n["props"] as? JsonObject
@@ -290,7 +292,7 @@ class DesktopConformanceTest {
             } else {
                 c.children.map { Got(it, null, false, null) }
             }
-            compare(here, kids, children, data, failures, compared, form)
+            compare(here, kids, children, data, failures, compared, form, uid)
         }
     }
 
@@ -298,7 +300,6 @@ class DesktopConformanceTest {
     private fun stateDifference(type: String, want: String?, mine: String): String? {
         val key = when {
             want == "rendered" && mine == "unavailable" && type in ConformanceAllowlist.unavailableTypes -> "unavailable:$type"
-            mine == "rendered" && want in ConformanceAllowlist.statesNotJudged -> "state:$want"
             else -> return "state $mine != $want(ConformanceAllowlist に理由が無い)"
         }
         usedAllowlist += key
@@ -308,7 +309,6 @@ class DesktopConformanceTest {
     /** どの case にも出てこなかった allowlist の項目(描けるようになった・比べるようになったら外す)。 */
     private fun staleAllowlist(): List<String> {
         val all = ConformanceAllowlist.unavailableTypes.keys.map { "unavailable:$it" } +
-            ConformanceAllowlist.statesNotJudged.keys.map { "state:$it" } +
             ConformanceAllowlist.propsNotCompared.flatMap { (t, m) -> m.keys.map { "props:$t.$it" } }
         return (all - usedAllowlist).map { "ConformanceAllowlist の $it は使われていない(外す)" }
     }
@@ -360,6 +360,10 @@ class DesktopConformanceTest {
             "text", "markdown" -> putText("text", c.text)
             "label", "badge" -> putText("text", c.text ?: c.label)
             "button" -> putText("label", c.label)
+            "openUrlButton" -> {
+                putText("label", c.label)
+                putText("url", c.url)
+            }
             "link" -> {
                 putText("text", c.text ?: c.label ?: c.url)
                 putText("url", c.url)

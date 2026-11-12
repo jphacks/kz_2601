@@ -256,16 +256,8 @@ class DesktopSession(
     /** `list` の行(filter → sort → 検索)。iOS の `ListLeaf.rows`。 */
     fun rows(c: Component, query: String?): List<Record> = ListRows.rows(c, leafData(), query)
 
-    /** 押せるか: rendered / hidden / needsForm / unknown(iOS の「全部品が登録済み」の規則)。 */
-    fun tapState(c: Component, form: FormDraft?): String {
-        if (c.type == ComponentType.UNKNOWN) return "unknown"
-        if (InputLeaves.isInput(c)) {
-            if (form != null && form.hides(c, uid)) return "hidden"
-            if (form == null || c.field == null) return "needsForm"
-        }
-        if (c.type == ComponentType.BUTTON && !isButtonVisible(c.action, form)) return "hidden"
-        return "rendered"
-    }
+    /** 部品の state(押せるか・描くか)。[DesktopLeaves.state] に今の人を渡す。 */
+    fun state(c: Component, form: FormDraft?): String = DesktopLeaves.state(c, form, uid)
 
     // MARK: - 操作
 
@@ -274,6 +266,14 @@ class DesktopSession(
         message = null
         action.confirmMessage?.let { effects += obj("confirm" to JsonPrimitive(it)) }
         perform(action, ctx)
+    }
+
+    /** openUrlButton: 候補を先頭から openUrl(link と同じ・許可した scheme だけ)で開き、開けたら止める。全部だめなら最後の理由が残る。 */
+    fun openFirst(urls: List<String>, ctx: ActionContext) {
+        for (url in urls) {
+            dispatch(Action(type = ActionType.OPEN_URL, url = url), ctx)
+            if (message == null) return
+        }
     }
 
     fun back(route: Route = top) {
@@ -401,7 +401,7 @@ class DesktopSession(
                 val id = (op["tap"] as? JsonPrimitive)?.contentOrNull
                 val c = screen?.allComponents()?.firstOrNull { it.id == id } ?: return false
                 val a = c.action ?: return false
-                if (tapState(c, form) != "rendered") return false
+                if (state(c, form) != "rendered") return false
                 dispatch(a, ctx)
             }
             op.containsKey("tapToolbar") -> {
@@ -414,7 +414,7 @@ class DesktopSession(
                 val id = (row["component"] as? JsonPrimitive)?.contentOrNull
                 val c = screen?.allComponents()?.firstOrNull { if (id == null) it.onItemTap != null else it.id == id } ?: return false
                 val a = c.onItemTap ?: return false
-                if (tapState(c, form) != "rendered") return false
+                if (state(c, form) != "rendered") return false
                 val rows = rows(c, c.searchField?.let { queries(route)[it] })
                 val i = (row["index"] as? JsonPrimitive)?.doubleOrNull?.toInt() ?: 0
                 val r = rows.getOrNull(i) ?: return false

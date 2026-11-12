@@ -6,6 +6,7 @@ import jp.kz2601.metamon.dsl.Component
 import jp.kz2601.metamon.dsl.ComponentType
 import jp.kz2601.metamon.dsl.decode
 import jp.kz2601.metamon.dsl.records.Record
+import jp.kz2601.metamon.renderer.form.FormDraft
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.jsonArray
@@ -33,14 +34,22 @@ object DesktopLeaves {
         ComponentType.TOGGLE,
         ComponentType.PICKER,
         ComponentType.STEPPER,
+        ComponentType.OPEN_URL_BUTTON,
         *PlayLeaves.types.toTypedArray(),
     ) + DISPLAY_LEAVES + InputLeaves.types + DATA_LEAVES
 
-    /** 適合テストの `state`(rendered / unavailable / unknown)。hidden・needsForm はまだ見ない。 */
-    fun state(c: Component): String = when {
-        c.type == ComponentType.UNKNOWN -> "unknown"
-        c.type in containers || c.type in leaves || c.type in IoLeaves.types -> "rendered"
-        else -> "unavailable"
+    /**
+     * 部品の state: rendered / hidden / needsForm / unavailable / unknown(iOS の RenderTree.state と同じ順)。
+     * 描画・操作(押せるか)・適合テストの木はすべてこれを見る。[form] は開いている画面のフォーム(無ければ null)。
+     */
+    fun state(c: Component, form: FormDraft? = null, uid: String? = null): String {
+        if (form != null && form.hides(c, uid)) return "hidden"
+        if (c.type !in containers && c.type !in leaves && c.type !in IoLeaves.types) {
+            return if (c.type == ComponentType.UNKNOWN) "unknown" else "unavailable"
+        }
+        if (c.type == ComponentType.BUTTON && !isButtonVisible(c.action, form)) return "hidden"
+        if (InputLeaves.isInput(c) && (form == null || c.field == null)) return "needsForm"
+        return "rendered"
     }
 
     /** DSL に書いてある type の文字列そのまま(知らない type も)。 */
