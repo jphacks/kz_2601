@@ -23,10 +23,11 @@ final class MacRootFormSaveTests: XCTestCase {
     }
 
     private let json = """
-    {"schemaVersion":1,"app":{"name":"メモ","tabs":[{"screen":"form","title":"入力"},{"screen":"list","title":"一覧"}]},
+    {"schemaVersion":1,"initialScreen":"form","app":{"name":"メモ","tabs":[{"screen":"form","title":"入力"},{"screen":"list","title":"一覧"}]},
      "entities":[{"id":"notes","name":"メモ","fields":[{"id":"memo","name":"メモ","type":"string"}]}],
      "screens":[{"id":"form","title":"入力","entity":"notes","components":[{"type":"textField","field":"memo"}]},
-                {"id":"list","title":"一覧","components":[{"type":"list","entity":"notes"}]}]}
+                {"id":"list","title":"一覧","components":[{"type":"list","entity":"notes"}]},
+                {"id":"entry","title":"追加","entity":"notes","components":[{"type":"textField","field":"memo"}]}]}
     """
 
     private func runtime() throws -> MacAppRuntime {
@@ -70,7 +71,7 @@ final class MacRootFormSaveTests: XCTestCase {
         let edit = FormDraft(entity: try XCTUnwrap(rt.dsl.entity("notes")))
         edit.load(record)
         edit.values["memo"] = .string("夜")
-        await rt.run(try saveAction(), ActionContext(route: tabRoot, recordId: record.id, form: edit))
+        await rt.run(try saveAction(), ActionContext(route: tabRoot, form: edit, recordId: record.id))
 
         XCTAssertEqual(rt.toast, MacAnnouncement.saved.text)
         XCTAssertEqual(edit.values["memo"], .string("夜"), "既存の記録を直した時は入力を残す")
@@ -79,14 +80,14 @@ final class MacRootFormSaveTests: XCTestCase {
         // 何も変えずに保存: 書かず、何も出さない(M10)
         rt.toast = nil
         posted = []
-        await rt.run(try saveAction(), ActionContext(route: tabRoot, recordId: record.id, form: edit))
+        await rt.run(try saveAction(), ActionContext(route: tabRoot, form: edit, recordId: record.id))
         XCTAssertNil(rt.toast)
         XCTAssertEqual(posted, [])
     }
 
     func testSheetFormStillCloses() async throws {
         let rt = try runtime()
-        let nav = try JSONDecoder().decode(Action.self, from: Data(#"{"type":"navigate","screen":"form","presentation":"sheet"}"#.utf8))
+        let nav = try JSONDecoder().decode(Action.self, from: Data(#"{"type":"navigate","screen":"entry","presentation":"sheet"}"#.utf8))
         await rt.run(nav, ActionContext(route: tabRoot))
         let sheet = try XCTUnwrap(rt.sheet)
         await rt.run(try saveAction(), ActionContext(route: sheet, form: try form(rt, memo: "a")))
@@ -97,7 +98,7 @@ final class MacRootFormSaveTests: XCTestCase {
 
     func testPushedFormStillCloses() async throws {
         let rt = try runtime()
-        let nav = try JSONDecoder().decode(Action.self, from: Data(#"{"type":"navigate","screen":"form","presentation":"push"}"#.utf8))
+        let nav = try JSONDecoder().decode(Action.self, from: Data(#"{"type":"navigate","screen":"entry","presentation":"push"}"#.utf8))
         await rt.run(nav, ActionContext(route: tabRoot))
         let pushed = try XCTUnwrap(rt.paths[tabRoot.stack]?.last)
         await rt.run(try saveAction(), ActionContext(route: pushed, form: try form(rt, memo: "a")))
