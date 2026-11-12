@@ -83,7 +83,7 @@ flowchart LR
 | `ingest-crash -issue ID -type T -count N -version V` | intake | Crashlytics の急増を 1 件として記録(人が Crashlytics の画面を見て打つ) |
 | `triage [-max 200] [-batch 20]` | triage | 新しい項目を分類(`bug` / `feature` / `question` / `praise` / `spam`)・束ね・優先度(P1〜P3)付け。同じ文は 1 回だけ送る |
 | `triage-score -labels FILE` | — | 人が付けた正解(1 行 `itemId,category`)との一致率(#376 の完了の条件: 8 割) |
-| `triage-eval -set FILE [-model rules\|ai]` | (`ai` の時だけ triage) | 正解付きの組を、メモリの中だけで振り分け → 下書きまで通し、分類・優先度・束ねの一致率を出す([振り分けの精度を測る](#振り分けの精度を測る))。Firestore には書かない |
+| `triage-eval -set FILE [-model rules\|ai] [-embed off\|fake]` | (`ai` の時だけ triage) | 正解付きの組を、メモリの中だけで振り分け → 下書きまで通し、分類・優先度・束ねの一致率を出す([振り分けの精度を測る](#振り分けの精度を測る))。Firestore には書かない。`-embed fake` で、束の代表の要約が `-embed-threshold`(既定 0.7)以上近い束をまとめた時の束の数・取り違え(組の不一致)を前後で並べる(#2148 の測り。外の API は呼ばない) |
 | `triage-label-export -out FILE [-days 7]` | — | 直近の `loop_inbox` の文(伏せ字済み)を、正解欄が空の `triage-eval` の組として書き出す。人が正解を付けて `triage-eval` に渡す([一致を測る手順](feedback-loop-triage-agreement.md)) |
 | `draft [-max-new 20]` | draft | 束ごとに下書きを作る / 開いている下書きに足す。束にもう出した Issue(まだ直っていないもの)があれば、その Issue への追記の下書きにする([既存の Issue への追記](#既存の-issue-への追記)) |
 | `drafts list [-status pending]` / `show <id>` | — | 待ち行列を見る。`show` は出口の検査の結果と、承認の前に見る点を出す |

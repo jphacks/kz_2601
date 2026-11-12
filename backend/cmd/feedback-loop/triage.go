@@ -111,11 +111,24 @@ func (a *app) triageEval(ctx context.Context, args []string) error {
 	fs := flag.NewFlagSet("triage-eval", flag.ContinueOnError)
 	path := fs.String("set", "", "labelled set (JSON lines: id, text, category, priority, bundle)")
 	model := fs.String("model", "rules", "rules (offline keyword baseline) or ai (the triage model)")
+	embed := fs.String("embed", "off", "off, or fake: also print bundles and mistakes after merging near clusters (offline embedder)")
+	threshold := fs.Float64("embed-threshold", eval.DefaultEmbedThreshold, "cosine at or above which -embed merges two clusters")
 	if err := fs.Parse(args); err != nil {
 		return err
 	}
 	if *path == "" {
 		return errors.New("triage-eval needs -set")
+	}
+	var emb triage.Embedder
+	switch *embed {
+	case "off":
+	case "fake":
+		emb = triage.FakeEmbedder{Dim: 256}
+	default:
+		return fmt.Errorf("unknown -embed %q (off or fake)", *embed)
+	}
+	if *threshold <= 0 || *threshold > 1 {
+		return fmt.Errorf("-embed-threshold must be in (0, 1], got %v", *threshold)
 	}
 	f, err := os.Open(*path)
 	if err != nil {
@@ -150,6 +163,11 @@ func (a *app) triageEval(ctx context.Context, args []string) error {
 	rep, err := eval.Run(ctx, m, cases, h)
 	if err != nil {
 		return err
+	}
+	if emb != nil {
+		if err := rep.CompareEmbed(ctx, emb, *threshold); err != nil {
+			return err
+		}
 	}
 	a.out.WriteString(rep.String())
 	return nil

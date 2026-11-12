@@ -107,6 +107,14 @@ type Report struct {
 	Usage         triage.Usage
 	// Drafts are the drafts the run built (one per bundle the model made).
 	Drafts []loop.Draft
+	// Embed is the bundling before and after merging near clusters
+	// (CompareEmbed, `triage-eval -embed fake`); nil when not measured.
+	Embed *EmbedCompare
+
+	// per case, in order: the model's cluster and summary (CompareEmbed)
+	clusters  []string
+	summaries []string
+	labels    []Case
 }
 
 // MaxCases bounds one set: with the triage batch of 20 a run makes at most
@@ -201,29 +209,46 @@ func Run(ctx context.Context, m triage.Model, cases []Case, h Hooks) (Report, er
 			rep.Misses = append(rep.Misses, Miss{c.ID, "priority", c.Priority, orNone(p, it)})
 		}
 	}
+	rep.labels = cases
+	for _, it := range got {
+		rep.clusters = append(rep.clusters, it.ClusterKey)
+		rep.summaries = append(rep.summaries, it.Summary)
+	}
+	rep.Together, rep.Apart = pairScores(cases, rep.clusters, func(i, j int, field string) {
+		rep.Misses = append(rep.Misses, Miss{cases[i].ID + "+" + cases[j].ID, field,
+			cases[i].Bundle + "/" + cases[j].Bundle, got[i].ClusterKey + "/" + got[j].ClusterKey})
+	})
+	sort.SliceStable(rep.Misses, func(i, j int) bool { return rep.Misses[i].Field < rep.Misses[j].Field })
+	return rep, nil
+}
+
+// pairScores compares every pair of cases: labelled the same bundle and given
+// the same cluster (together), or labelled apart and given different ones
+// (apart). miss, when set, is called for each pair that differs.
+func pairScores(cases []Case, clusters []string, miss func(i, j int, field string)) (together, apart Score) {
 	for i := range cases {
 		for j := i + 1; j < len(cases); j++ {
 			wantSame := cases[i].Bundle != "" && cases[i].Bundle == cases[j].Bundle
-			gotSame := got[i].ClusterKey != "" && got[i].ClusterKey == got[j].ClusterKey
-			sc := &rep.Apart
+			gotSame := clusters[i] != "" && clusters[i] == clusters[j]
+			sc := &apart
 			if wantSame {
-				sc = &rep.Together
+				sc = &together
 			}
 			sc.Total++
 			if wantSame == gotSame {
 				sc.Matched++
 				continue
 			}
-			field := "bundle-apart"
-			if wantSame {
-				field = "bundle-together"
+			if miss != nil {
+				field := "bundle-apart"
+				if wantSame {
+					field = "bundle-together"
+				}
+				miss(i, j, field)
 			}
-			rep.Misses = append(rep.Misses, Miss{cases[i].ID + "+" + cases[j].ID, field,
-				cases[i].Bundle + "/" + cases[j].Bundle, got[i].ClusterKey + "/" + got[j].ClusterKey})
 		}
 	}
-	sort.SliceStable(rep.Misses, func(i, j int) bool { return rep.Misses[i].Field < rep.Misses[j].Field })
-	return rep, nil
+	return together, apart
 }
 
 func orNone(v string, it *loop.Item) string {
@@ -250,6 +275,10 @@ func (r Report) String() string {
 	r.PriorityTable.write(&b)
 	b.WriteString("\n  bundle pairs (rows: person, columns: model)\n")
 	bundleTable(r.Together, r.Apart).write(&b)
+	if r.Embed != nil {
+		b.WriteString("\n")
+		b.WriteString(r.Embed.String())
+	}
 	b.WriteString("\n")
 	for _, m := range r.Misses {
 		fmt.Fprintf(&b, "  miss %-16s %s: want %s, got %s\n", m.Field, m.ID, m.Want, m.Got)
