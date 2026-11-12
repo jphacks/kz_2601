@@ -11,7 +11,7 @@ import (
 	"google.golang.org/grpc/status"
 )
 
-func TestModeAndSource(t *testing.T) {
+func TestModeAndSourceArgs(t *testing.T) {
 	cases := []struct {
 		apply      bool
 		export     string
@@ -33,7 +33,7 @@ func TestModeAndSource(t *testing.T) {
 	}
 }
 
-func TestErrorCode(t *testing.T) {
+func TestErrorCodeArgs(t *testing.T) {
 	secret := "uid-abc user@example.com"
 	cases := []struct {
 		name string
