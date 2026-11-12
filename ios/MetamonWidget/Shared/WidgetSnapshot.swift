@@ -46,7 +46,7 @@ struct WidgetSnapshot: Codable, Equatable {
     /// 新しい順の記録。nil = 出さない(entity が無い・未取得)/ 空 = まだ記録が無い。
     var recent: [Row]? = nil
     var trend: Trend? = nil
-    /// どのアプリの数字か(Mac のウィジェットを押した時にそのアプリを開く・#984)。iOS は使わない。古いスナップショットは nil
+    /// どのアプリの数字か(Mac: 押した時にそのアプリを開く・#984 / iOS: 集中モードのフィルタで出すか決める・#1992)。古いスナップショットは nil
     var appId: String? = nil
 
     static let appGroupID = "group.jp.kz2601.metamon"

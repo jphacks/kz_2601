@@ -18,6 +18,23 @@
         }
       }
     },
+    "Tailor It で作ったアプリを開きます。" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Opens an app you made in Tailor It."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tailor It で作ったアプリを開きます。"
+          }
+        }
+      }
+    },
     "Tailor It で記録帳を用意するとここに数字が出ます" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -86,6 +103,23 @@
         }
       }
     },
+    "アプリ" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "App"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "アプリ"
+          }
+        }
+      }
+    },
     "アプリを作ると数字が出ます" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -99,6 +133,40 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "アプリを作ると数字が出ます"
+          }
+        }
+      }
+    },
+    "アプリを選ぶ" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Choose App"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "アプリを選ぶ"
+          }
+        }
+      }
+    },
+    "アプリを開く" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Open App"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "アプリを開く"
           }
         }
       }
@@ -222,6 +290,125 @@
         }
       }
     },
+    "記録する" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Log Entry"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "記録する"
+          }
+        }
+      }
+    },
+    "記録の画面を開く" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Open Entry Form"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "記録の画面を開く"
+          }
+        }
+      }
+    },
+    "記録の種類" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Entry Type"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "記録の種類"
+          }
+        }
+      }
+    },
+    "記録先" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Destination"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "記録先"
+          }
+        }
+      }
+    },
+    "記録先のアプリ" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Destination App"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "記録先のアプリ"
+          }
+        }
+      }
+    },
+    "記録先を選ぶ" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Choose Destination"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "記録先を選ぶ"
+          }
+        }
+      }
+    },
+    "記録帳" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tracker"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "記録帳"
+          }
+        }
+      }
+    },
     "記録帳を用意すると数字が出ます" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -235,6 +422,108 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "記録帳を用意すると数字が出ます"
+          }
+        }
+      }
+    },
+    "記録帳を選ぶ" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Choose Tracker"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "記録帳を選ぶ"
+          }
+        }
+      }
+    },
+    "記録帳を開く" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Open Tracker"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "記録帳を開く"
+          }
+        }
+      }
+    },
+    "選んだアプリの記録の入力画面を開きます。" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Opens the entry form of the app you chose."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "選んだアプリの記録の入力画面を開きます。"
+          }
+        }
+      }
+    },
+    "選んだ記録帳の入力画面を開きます。" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Opens the entry form of the tracker you chose."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "選んだ記録帳の入力画面を開きます。"
+          }
+        }
+      }
+    },
+    "選んだ記録帳を開きます。" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Opens the tracker you chose."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "選んだ記録帳を開きます。"
+          }
+        }
+      }
+    },
+    "集中モード中" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Focus is on"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "集中モード中"
           }
         }
       }

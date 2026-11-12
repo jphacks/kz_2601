@@ -15,6 +15,8 @@ final class IntentHost {
     enum Pending: Equatable {
         case open(appId: String)
         case talk
+        /// コントロール(iOS 18・#1993)。appId が nil・消したアプリなら一覧を開く。entityId があればその記録の入力画面
+        case control(appId: String?, entityId: String?)
         #if !APP_STORE_REVIEW
         /// 通知のタップ(#269)。すでに開いているアプリなら何も言わない
         case openFromNotification(appId: String)
@@ -27,6 +29,7 @@ final class IntentHost {
     private(set) var isReady = false
     private var pending: Pending?
     private var refreshTask: Task<Void, Never>?
+    private var refreshGeneration = 0
 
     func register(_ runtime: AppRuntime) {
         self.runtime = runtime
@@ -46,21 +49,28 @@ final class IntentHost {
     }
 
     /// 開く/話しかける: 準備済みなら今すぐ、まだなら bootstrap 後に。
-    func request(_ action: Pending) async {
+    /// 実行(スプラッシュ・同意・チュートリアルの後)は待たずに戻る: Siri の Intent は同意の画面を閉じるまで待つと時間切れになる。
+    /// 戻り値は実行の Task(テストで終わりを待つ用)。保留した時は nil。
+    @discardableResult
+    func request(_ action: Pending) async -> Task<Void, Never>? {
         guard isReady else {
             pending = action
             print("[Metamon] intent: queued \(action) until bootstrap")
-            return
+            return nil
         }
-        await perform(action)
+        return Task { await perform(action) }
     }
 
     private func perform(_ action: Pending) async {
         await SplashPresence.shared.waitUntilHidden() // 通知・Siri から開いた時もスプラッシュの後に
+        await LaunchConsentHold.shared.waitUntilReleased() // 起動時の同意の画面が閉じてから(シートを同時に出さない)
         guard let runtime else { return }
         switch action {
         case .open(let appId): await runtime.openFromIntent(appId: appId)
         case .talk: runtime.openVoiceFromIntent()
+        case .control(let appId, let entityId):
+            let exists = await appExists(appId)
+            await runtime.openFromControl(appId: exists ? appId : nil, entityId: entityId)
         #if !APP_STORE_REVIEW
         case .openFromNotification(let appId):
             if appId != runtime.document.appId { await runtime.switchApp(to: appId) }
@@ -71,13 +81,44 @@ final class IntentHost {
 
     /// DSL が差し替わった(生成・切替・アプリ名変更)ら、Siri のパラメータ付きフレーズ(「Tailor It で家計簿を開く」)を引き直す。
     /// `updateAppShortcutParameters()` は各 Entity の suggestedEntities を呼ぶ(=`GET /apps`)ので 2 秒まとめる。
-    func appsMayHaveChanged() {
+    /// コントロールの一覧(#1993)は DSL をキャッシュからだけ読む(この 2 秒ごとに最大 12 回 `GET /dsl` しない)。
+    /// 戻り値は引き直しの Task(テスト用)。
+    @discardableResult
+    func appsMayHaveChanged() -> Task<Void, Never> {
         refreshTask?.cancel()
-        refreshTask = Task {
-            try? await Task.sleep(for: .seconds(2))
+        refreshGeneration += 1
+        let generation = refreshGeneration
+        let delay = refreshDelay
+        let task = Task {
+            defer { if self.refreshGeneration == generation { self.refreshTask = nil } } // 終わったら待ちなし
+            try? await Task.sleep(for: delay)
             guard !Task.isCancelled else { return }
             TailorItShortcuts.updateAppShortcutParameters()
+            await ControlIntentBridge.refreshCatalog(
+                apps: { await self.apps() },
+                targets: { await RecordTargetEntity.all(host: self, cachedOnly: true) }
+            )
         }
+        refreshTask = task
+        return task
+    }
+
+    /// まとめる待ち時間(テストで縮める)
+    var refreshDelay: Duration = .seconds(2)
+
+    /// 引き直し待ちがあるか(テスト用)
+    var hasPendingRefresh: Bool { refreshTask != nil }
+
+    /// ログアウト・アカウント削除(`wipeLocalData`)で、前の人の一覧を書き戻さないよう引き直しをやめる
+    func cancelPendingRefresh() {
+        refreshTask?.cancel()
+        refreshTask = nil
+    }
+
+    /// 選んだアプリがまだあるか(消した後のコントロール・#1993)。サーバーに届かなければ `AppListCache` で見る
+    private func appExists(_ appId: String?) async -> Bool {
+        guard let appId else { return false }
+        return await apps().contains { $0.id == appId }
     }
 
     // MARK: - 記録の追加(AddRecordIntent)。Mac は同じ名前の口を MacIntentHost.swift に持つ(#1034)
@@ -96,6 +137,21 @@ final class IntentHost {
         guard let runtime else { throw TailorIntentError.notReady }
         runtime.recordSync.encryptedFields[appId] = encryptedFields
         return await runtime.addRecordFromIntent(appId: appId, entity: entity, data: data)
+    }
+
+    // MARK: - 数字を読む(GetStatValueIntent・#1994)
+
+    /// 数えるのに使う記録。表示中のアプリは画面の記録(届いていれば)、ほかはローカル DB(記録の API は呼ばない)。
+    /// この端末でまだ開いていないアプリは空なので「0 件」と言い切らず nil(一覧のひと目の数字と同じ判定)。
+    func statRecords(appId: String, entities: [String], isExpression: Bool) async -> [String: [Record]]? {
+        guard let runtime else { return nil }
+        if runtime.document.appId == appId, entities.allSatisfy({ runtime.records[$0] != nil }) {
+            return runtime.records
+        }
+        var out: [String: [Record]] = [:]
+        for e in entities { out[e] = await runtime.recordSync.cached(appId: appId, entity: e) }
+        guard isExpression || out.values.contains(where: { !$0.isEmpty }) else { return nil }
+        return out
     }
 
     // MARK: - カタログ(Entity の候補)
@@ -119,10 +175,11 @@ final class IntentHost {
     /// 記録先の候補になるアプリ。iOS は作ったアプリ全部(Mac は端末に残る作ったアプリだけ)
     func recordableApps() async -> [AppSummary] { await apps() }
 
-    /// アプリの DSL。表示中ならそれ、無ければキャッシュ(`DocumentCache`)、それも無ければ `GET /dsl`。
-    func document(appId: String) async -> AppDocument? {
+    /// アプリの DSL。表示中ならそれ、無ければキャッシュ(`DocumentCache`)、それも無ければ `GET /dsl`(cachedOnly なら取りに行かない)。
+    func document(appId: String, cachedOnly: Bool = false) async -> AppDocument? {
         if let runtime, runtime.document.appId == appId, !runtime.dsl.isVoiceOnly { return runtime.document }
         if let cached = DocumentCache.shared.load(appId: appId) { return cached }
+        guard !cachedOnly else { return nil }
         return try? await runtime?.services.appConfig.fetchDocument(appId: appId)
     }
 }

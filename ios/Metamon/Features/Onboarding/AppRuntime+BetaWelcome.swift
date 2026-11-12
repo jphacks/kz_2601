@@ -12,9 +12,9 @@ extension AppRuntime {
     /// 設定に「β 版のご案内」を出すか。
     var canOpenBetaWelcome: Bool { betaWelcome?.isBeta ?? false }
 
-    /// 起動時・最初のアプリの直後の「直し方の例」が閉じた時に呼ぶ。作っている途中・他のシートが出ている間は出さない。
+    /// 起動時・最初のアプリの直後の「直し方の例」が閉じた時に呼ぶ。作っている途中・他のシートが出ている間・スプラッシュの間は出さない。
     func presentBetaWelcomeIfNeeded() {
-        guard !showBetaWelcome, !showTutorial, !showAIConsent, !showVoiceSheet, !showFirstEditHint, !showLinkPrompt,
+        guard !SplashPresence.shared.isShowing, !LaunchConsentHold.shared.isHolding, !showBetaWelcome, !showTutorial, !showAIConsent, !showVoiceSheet, !showFirstEditHint, !showLinkPrompt,
               morphJob == nil, isBetaWelcomePending else { return }
         print("[Metamon] beta welcome: presenting")
         showBetaWelcome = true

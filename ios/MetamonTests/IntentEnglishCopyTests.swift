@@ -53,6 +53,29 @@ final class IntentEnglishCopyTests: XCTestCase {
         assertTranslated(keys)
     }
 
+    /// 数字を読む(#1994)
+    func testStatIntentCopyHasEnglish() {
+        var keys = [
+            GetStatValueIntent.title.key,
+            GetStatNumberIntent.title.key,
+            StatEntity.typeDisplayRepresentation.name.key,
+            GetStatValueIntent.valueMessage(label: "今月の支出", value: "¥12,340").key,
+            GetStatValueIntent.notLoadedValue.key,
+            GetStatValueIntent.notLoadedMessage(appName: "家計簿").key,
+            GetStatValueIntent.lockedValue.key,
+            GetStatValueIntent.lockedMessage(label: "メモ").key,
+            "見つからない数字", "どの数字を読みますか?",
+            "Tailor It を開かずに、記録の集計(ウィジェットと同じ数字)を読みます。例: 家計簿の今月の支出。",
+            "Tailor It を開かずに、記録の集計を数値で読みます。計算や比較に使えます。",
+            "${target} を読む", "${target} を数値で読む",
+        ]
+        keys += [TailorIntentError.statNotFound, .statNotLoaded("家計簿"), .statNotNumber("最新"), .statLocked("メモ")].map(\.localizedStringResource.key)
+        assertTranslated(keys)
+        let resource = GetStatValueIntent.valueMessage(label: "今月の支出", value: "¥12,340")
+        XCTAssertEqual(resource.key, "%@は%@です")
+        XCTAssertEqual(String(format: english(resource.key), "今月の支出", "¥12,340"), "今月の支出 is ¥12,340")
+    }
+
     /// Siri のフレーズ(AppShortcuts.xcstrings)。英語もアプリ名を含み、パラメータは日本語と同じ。
     func testShortcutPhrasesHaveEnglish() {
         let phrases = [
@@ -66,6 +89,8 @@ final class IntentEnglishCopyTests: XCTestCase {
             "${applicationName}でアプリを開く",
             "${applicationName}で話しかける",
             "${applicationName}に話しかける",
+            "${applicationName}で数字を読む",
+            "${applicationName}の数字を読む",
         ]
         for key in phrases {
             let value = en.localizedString(forKey: key, value: "__missing__", table: "AppShortcuts")
@@ -74,7 +99,7 @@ final class IntentEnglishCopyTests: XCTestCase {
             XCTAssertTrue(value.contains("${applicationName}"), "英語のフレーズにアプリ名が無い: \(value)")
             XCTAssertEqual(value.contains("${target}"), key.contains("${target}"), "パラメータが合わない: \(value)")
         }
-        let titles = ["記録を追加", "記録帳を開く", "アプリを開く", "話しかける"]
+        let titles = ["記録を追加", "記録帳を開く", "アプリを開く", "話しかける", "数字を読む"]
         assertTranslated(titles)
     }
 }
