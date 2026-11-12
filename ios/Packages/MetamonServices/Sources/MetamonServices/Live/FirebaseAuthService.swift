@@ -23,6 +23,23 @@ public enum FirebaseBootstrap {
         isConfigured = true
         return true
     }
+
+    /// 認証の入口(ここだけで `Auth` を作る)。`appName` が nil なら既定のアプリ(`Auth.auth()`・今までどおり)。
+    /// 名前があれば、既定のアプリと同じ options で名前付きのアプリを 1 回だけ作り、その `Auth` を返す
+    /// (サインインの状態はアプリの名前ごとに Firebase がキーチェーンに持つ・#2084 の試験用の枠)。
+    static func auth(appName: String?) -> Auth? {
+        guard isConfigured else { return nil }
+        guard let appName else { return Auth.auth() }
+        if let app = FirebaseApp.app(name: appName) { return Auth.auth(app: app) }
+        guard let options = FirebaseApp.app()?.options.copy() as? FirebaseOptions else { return nil }
+        FirebaseApp.configure(name: appName, options: options)
+        return FirebaseApp.app(name: appName).map { Auth.auth(app: $0) }
+    }
+
+    /// 名前付きのアプリ(nil は既定)でサインインしている人。切り替えずに見るだけ。Firebase 未初期化なら nil
+    public static func currentUser(appName: String?) -> AuthUser? {
+        auth(appName: appName)?.currentUser.map(AuthUser.init)
+    }
 }
 
 /// Firebase Auth 実装。Sign in with Apple(credential 交換)と匿名認証、ID トークン供給。
@@ -33,10 +50,14 @@ public final class FirebaseAuthService: AuthService, @unchecked Sendable {
     private var pendingAppleCredential: AuthCredential?
 
     /// Firebase 未初期化なら nil(呼び出し側が Mock に落とす)。
-    public init?() {
-        guard FirebaseBootstrap.isConfigured else { return nil }
-        auth = Auth.auth()
+    /// `appName`: nil = 既定のアプリ(今までどおり)。名前を渡すとその名前付きアプリの別のサインイン状態を使う(#2084)
+    public init?(appName: String? = nil) {
+        guard let auth = FirebaseBootstrap.auth(appName: appName) else { return nil }
+        self.auth = auth
     }
+
+    /// 使っている Firebase のアプリの名前(既定は `__FIRAPP_DEFAULT`)
+    public var firebaseAppName: String? { auth.app?.name }
 
     public var currentUser: AuthUser? { auth.currentUser.map(AuthUser.init) }
 

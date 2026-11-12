@@ -165,9 +165,19 @@ enum BuildConfig {
 
     /// Firebase が初期化済みなら本物、plist 未同期なら警告してモック(固定 uid・Bearer 無し)。
     static func makeAuth() -> any AuthService {
-        if let firebase = FirebaseAuthService() { return firebase }
+        if let firebase = FirebaseAuthService(appName: authAppName) { return firebase }
         print("[Metamon] Firebase 未初期化のため MockAuthService で起動します(Authorization ヘッダは付きません)")
         return MockAuthService(signedIn: true)
+    }
+
+    /// 認証に使う Firebase のアプリの名前。nil = 既定のアプリ(`Auth.auth()`)。
+    /// stg の版だけ開発用メニューで選んだ枠(#2084)。Release・Review の版は常に nil(今までどおり)
+    static var authAppName: String? {
+        #if METAMON_STG
+        DebugAuthSlot.appName(for: DebugAuthSlot.current)
+        #else
+        nil
+        #endif
     }
 
     /// 実機 = WhisperKit(モック API でも音声認識は本物)。シミュレータは CoreML/ANE が使えず実用不可なのでモック(文字入力フォールバック)。
