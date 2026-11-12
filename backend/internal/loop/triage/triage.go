@@ -198,7 +198,7 @@ func (t *Triager) call(ctx context.Context, chunk []group, clusters []string, re
 			continue
 		}
 		for i, it := range g.items {
-			it.Category, it.Area, it.Summary, it.ClusterKey, it.TriagedAt = v.Category, v.Area, v.Summary, v.Cluster, now
+			it.Category, it.Area, it.Impact, it.Summary, it.ClusterKey, it.TriagedAt = v.Category, v.Area, v.Impact, v.Summary, v.Cluster, now
 			it.Priority = Priority(v.Category, v.Impact, v.Area, max(len(g.items), it.Count))
 			switch v.Category {
 			case "spam":

@@ -1,6 +1,3 @@
-// TODO mac-026: UIKit を直接使うテスト。Mac で回すには描画の仕方を置き換え層に寄せる
-#if os(iOS)
-import UIKit
 import UniformTypeIdentifiers
 import XCTest
 @testable import MetamonDSL
@@ -42,13 +39,11 @@ final class FileImportTests: XCTestCase {
     }
 
     private static func pdf(pages: [String]) -> Data {
-        let renderer = UIGraphicsPDFRenderer(bounds: CGRect(x: 0, y: 0, width: 595, height: 842))
-        return renderer.pdfData { ctx in
+        PlatformPDF.data(page: CGRect(x: 0, y: 0, width: 595, height: 842), title: "test") { beginPage in
             for text in pages {
-                ctx.beginPage()
-                (text as NSString).draw(at: CGPoint(x: 40, y: 60), withAttributes: [.font: UIFont.systemFont(ofSize: 18)])
+                beginPage()
+                (text as NSString).draw(at: CGPoint(x: 40, y: 60), withAttributes: [.font: PlatformFont.systemFont(ofSize: 18)])
             }
         }
     }
 }
-#endif

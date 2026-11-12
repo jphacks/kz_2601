@@ -425,9 +425,10 @@ func (t *googleTasks) complete(ctx context.Context, in Input) (Output, error) {
 }
 
 // do is Google Calendar's do (401 → ErrInvalidGrant, a missing scope →
-// ErrNotConnected, 429 / 5xx / rate limits → retryable) plus: any other 403
-// is ErrNotConnected (connect again), 400 / 404 is a list or task the
-// person does not have (bad_request).
+// ErrNotConnected, 429 / 5xx / quota 403 → retryable) plus: an API not
+// enabled stays upstream_unavailable; any other 403, 400 and 404 are a list
+// or task the person cannot use (bad_request: connecting again would not
+// help).
 func (t *googleTasks) do(ctx context.Context, tok *Token, method, path string, body []byte, out any) error {
 	ctype := ""
 	if body != nil {
@@ -438,7 +439,10 @@ func (t *googleTasks) do(ctx context.Context, tok *Token, method, path string, b
 	if errors.As(err, &pe) && !pe.Retryable {
 		switch pe.Status {
 		case http.StatusForbidden:
-			return ErrNotConnected
+			if errors.Is(err, errGoogleAPIDisabled) {
+				return err
+			}
+			return &ProviderError{Status: pe.Status, Err: fmt.Errorf("%w: googleTasks: this person has no access to this list or task", ErrUnknown)}
 		case http.StatusBadRequest, http.StatusNotFound:
 			return &ProviderError{Status: pe.Status, Err: fmt.Errorf("%w: googleTasks has no such list or task", ErrUnknown)}
 		}

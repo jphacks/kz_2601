@@ -43,6 +43,14 @@ public enum PlacePicking {
         return .init(latitude: lat, longitude: lng)
     }
 
+    /// 地図をクリックした点を中心にした範囲(Mac #1345)。今の縮尺は保ち、無ければ 2km 四方。
+    static func recentered(_ region: MKCoordinateRegion?, on coordinate: CLLocationCoordinate2D) -> MKCoordinateRegion {
+        if let span = region?.span, span.latitudeDelta > 0, span.longitudeDelta > 0 {
+            return MKCoordinateRegion(center: coordinate, span: span)
+        }
+        return MKCoordinateRegion(center: coordinate, latitudinalMeters: 2_000, longitudinalMeters: 2_000)
+    }
+
     static var isMock: Bool { ProcessInfo.processInfo.environment["METAMON_MOCK"] == "1" }
 
     /// モックの現在地(金沢駅)。

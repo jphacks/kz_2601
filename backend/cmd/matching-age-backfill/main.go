@@ -32,6 +32,8 @@ import (
 
 	"github.com/jphacks/kz_2601/backend/internal/fsenv"
 	"github.com/jphacks/kz_2601/backend/internal/store"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 )
 
 func main() {
@@ -95,8 +97,17 @@ func run(ctx context.Context, st backfiller, apply bool, w io.Writer) int {
 	_, _ = fmt.Fprintf(w, "matching apps: %d\nprofile records: %d\nalready flagged: %d\n%s flag: %d\nauthor not declared (left hidden): %d\n",
 		c.Apps, c.Profiles, c.Marked, verb, c.ToMark, c.Undeclared)
 	if err != nil {
-		_, _ = fmt.Fprintf(w, "ERROR: %v (counts above are up to the failure; run again)\n", err)
+		_, _ = fmt.Fprintf(w, "ERROR: %s (counts above are up to the failure; run again)\n", errorCode(err))
 		return 1
 	}
 	return 0
+}
+
+// errorCode is err without its text (grpc code, or "unknown"). Same as
+// cmd/coin-initial-backfill: the raw error can carry document paths.
+func errorCode(err error) string {
+	if c := status.Code(err); c != codes.Unknown {
+		return c.String()
+	}
+	return "unknown"
 }

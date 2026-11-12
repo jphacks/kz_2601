@@ -68,7 +68,7 @@ func init() {
 		Ops: []OpSpec{
 			{Name: "listTasks", Scopes: []string{todoistScopeRead}, Args: []string{"filter", "projectId", "project", "label", "limit"}, Check: checkTodoistList},
 			{Name: "projects", Scopes: []string{todoistScopeRead}, Args: []string{"limit"}, Check: checkTodoistProjects},
-			{Name: "addTask", Write: true, Scopes: []string{todoistScopeAdd}, Args: []string{"content", "description", "dueString", "dueDate", "priority", "projectId"}},
+			{Name: "addTask", Write: true, Scopes: []string{todoistScopeAdd}, Args: []string{"content", "description", "dueString", "dueDate", "priority", "projectId"}, Check: checkTodoistAdd},
 			{Name: "complete", Write: true, Scopes: []string{todoistScopeWrite}, Args: []string{"taskId"}, Check: checkTodoistComplete},
 		},
 		Hosts: todoistHosts,
@@ -478,39 +478,37 @@ func (c *todoist) complete(ctx context.Context, in Input) (Output, error) {
 // addTask adds one task (to the inbox unless projectId). dueString is
 // Todoist's natural language ("明日 10時"); dueDate is YYYY-MM-DD. The
 // request id is Todoist's X-Request-Id, so a retried request adds no second task.
-func (c *todoist) addTask(ctx context.Context, in Input) (Output, error) {
-	if !todoistCanAdd(in.Token) {
-		return Output{}, ErrNotConnected
-	}
-	content, err := todoistText("content", in.Args["content"], 500, true)
+// todoistAddBody reads addTask's arguments into the request body.
+func todoistAddBody(a map[string]string) ([]byte, error) {
+	content, err := todoistText("content", a["content"], 500, true)
 	if err != nil {
-		return Output{}, err
+		return nil, err
 	}
-	desc, err := todoistText("description", in.Args["description"], 2000, false)
+	desc, err := todoistText("description", a["description"], 2000, false)
 	if err != nil {
-		return Output{}, err
+		return nil, err
 	}
-	dueString, err := todoistText("dueString", in.Args["dueString"], 150, false)
+	dueString, err := todoistText("dueString", a["dueString"], 150, false)
 	if err != nil {
-		return Output{}, err
+		return nil, err
 	}
-	dueDate := in.Args["dueDate"]
+	dueDate := a["dueDate"]
 	if dueDate != "" {
 		if _, err := time.Parse(time.DateOnly, dueDate); err != nil {
-			return Output{}, fmt.Errorf("%w: dueDate must be YYYY-MM-DD", ErrUnknown)
+			return nil, fmt.Errorf("%w: dueDate must be YYYY-MM-DD", ErrUnknown)
 		}
 	}
 	if dueString != "" && dueDate != "" {
-		return Output{}, fmt.Errorf("%w: dueString and dueDate cannot be used together", ErrUnknown)
+		return nil, fmt.Errorf("%w: dueString and dueDate cannot be used together", ErrUnknown)
 	}
-	project, err := todoistProjectID(in.Args["projectId"])
+	project, err := todoistProjectID(a["projectId"])
 	if err != nil {
-		return Output{}, err
+		return nil, err
 	}
 	var priority int
-	if v := in.Args["priority"]; v != "" {
+	if v := a["priority"]; v != "" {
 		if priority, err = strconv.Atoi(v); err != nil || priority < 1 || priority > 4 {
-			return Output{}, fmt.Errorf("%w: priority must be 1-4", ErrUnknown)
+			return nil, fmt.Errorf("%w: priority must be 1-4", ErrUnknown)
 		}
 	}
 	body := struct {
@@ -521,7 +519,19 @@ func (c *todoist) addTask(ctx context.Context, in Input) (Output, error) {
 		Priority    int    `json:"priority,omitempty"`
 		ProjectID   string `json:"project_id,omitempty"`
 	}{Content: content, Description: desc, DueString: dueString, DueDate: dueDate, Priority: priority, ProjectID: project}
-	b, err := json.Marshal(body)
+	return json.Marshal(body)
+}
+
+func checkTodoistAdd(a map[string]string) error {
+	_, err := todoistAddBody(a)
+	return err
+}
+
+func (c *todoist) addTask(ctx context.Context, in Input) (Output, error) {
+	if !todoistCanAdd(in.Token) {
+		return Output{}, ErrNotConnected
+	}
+	b, err := todoistAddBody(in.Args)
 	if err != nil {
 		return Output{}, err
 	}

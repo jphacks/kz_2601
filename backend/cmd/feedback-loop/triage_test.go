@@ -3,14 +3,17 @@ package main
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"os"
 	"path/filepath"
 	"regexp"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/jphacks/kz_2601/backend/internal/loop"
 	"github.com/jphacks/kz_2601/backend/internal/loop/triage"
+	"github.com/jphacks/kz_2601/backend/internal/loop/triage/eval"
 	"github.com/jphacks/kz_2601/backend/internal/store"
 )
 
@@ -72,5 +75,120 @@ func TestTriageNeedsLoopKey(t *testing.T) {
 	ta := newTestApp(t, env{"ANTHROPIC_API_KEY": "app-key-is-not-used"})
 	if err := ta.run(context.Background(), []string{"triage"}); err == nil || !strings.Contains(err.Error(), envTriageKey) {
 		t.Fatalf("err %v", err)
+	}
+}
+
+const labelledSet = "../../internal/loop/triage/eval/testdata/labeled.jsonl"
+
+func TestTriageEvalCommand(t *testing.T) {
+	ta := newTestApp(t, env{})
+	out := ta.must(t, "triage-eval", "-set", labelledSet)
+	if !strings.Contains(out, "28 cases") || !strings.Contains(out, "category: 26/28") {
+		t.Fatalf("out %s", out)
+	}
+	// rules is offline: no tokens counted
+	if used, _ := ta.ctl.Usage(context.Background(), loop.Month(ta.now())); used != 0 {
+		t.Fatalf("usage %d", used)
+	}
+	// nothing reaches the loop's store
+	if items, _ := ta.ls.ListItems(context.Background(), loop.ItemQuery{}); len(items) != 0 {
+		t.Fatalf("items written: %d", len(items))
+	}
+
+	// -model ai uses the (fake) triage model and counts its tokens
+	fm := &fakeModel{category: "bug", cluster: "all", summary: "落ちる。"}
+	ta.model = fm
+	out = ta.must(t, "triage-eval", "-set", labelledSet, "-model", "ai")
+	if fm.calls == 0 || !strings.Contains(out, "category: 12/28") {
+		t.Fatalf("calls %d out %s", fm.calls, out)
+	}
+	if used, _ := ta.ctl.Usage(context.Background(), loop.Month(ta.now())); used == 0 {
+		t.Fatal("ai eval tokens not counted")
+	}
+}
+
+// -model ai checks the monthly cap before every call and records each
+// call's usage: the cap reached after the first call stops the second.
+func TestTriageEvalAIStopsMidRun(t *testing.T) {
+	ta := newTestApp(t, env{"LOOP_MONTHLY_TOKEN_CAP": "15"})
+	fm := &fakeModel{category: "bug", cluster: "all", summary: "落ちる。"} // 15 tokens a call
+	ta.model = fm
+	err := ta.run(context.Background(), []string{"triage-eval", "-set", labelledSet, "-model", "ai"})
+	if !errors.Is(err, eval.ErrStopped) || fm.calls != 1 {
+		t.Fatalf("err %v calls %d", err, fm.calls)
+	}
+	if used, _ := ta.ctl.Usage(context.Background(), loop.Month(ta.now())); used != 15 {
+		t.Fatalf("usage %d, want 15", used)
+	}
+	evs, err := ta.ctl.ListAudit(context.Background(), loop.AuditQuery{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	var calls, stopped int
+	for _, e := range evs {
+		switch e.Action {
+		case "eval_call":
+			calls++
+		case "stopped":
+			stopped++
+		}
+	}
+	if calls != 1 || stopped != 1 {
+		t.Fatalf("audit %+v", evs)
+	}
+}
+
+// The week's inbox becomes a labelling template (masked text, empty labels)
+// that triage-eval refuses until labelled; an existing file is never
+// overwritten and no text reaches the printed output.
+func TestTriageLabelExportCommand(t *testing.T) {
+	ta := newTestApp(t, env{"LOOP_CONSENT_VERSIONS": "feedback-2027-01"})
+	seedFeedback(t, ta, "写真を追加するとアプリが落ちて、何度やり直しても同じところで止まってしまいます。連絡は taro@ex.jp", "ダークモードが欲しい", "taro@example.com")
+	ta.must(t, "ingest")
+	ctx := context.Background()
+	old := loop.Item{ID: "old", Source: loop.SourceInApp, Text: "先月の分", AIAllowed: true, Status: loop.ItemNew,
+		IngestedAt: ta.now().Add(-30 * 24 * time.Hour)}
+	if _, err := ta.ls.PutItem(ctx, old); err != nil {
+		t.Fatal(err)
+	}
+
+	path := filepath.Join(t.TempDir(), "week.jsonl")
+	out := ta.must(t, "triage-label-export", "-out", path)
+	if !strings.Contains(out, "2 items, wrote 2") || strings.Contains(out, "写真") || strings.Contains(out, "taro") {
+		t.Fatalf("out %s", out)
+	}
+	st, err := os.Stat(path)
+	if err != nil || st.Mode().Perm() != 0o600 {
+		t.Fatalf("stat %v %v", st, err)
+	}
+	b, _ := os.ReadFile(path)
+	if strings.Contains(string(b), "taro@") || !strings.Contains(string(b), "[メール]") || strings.Contains(string(b), "先月") || !strings.Contains(string(b), "ダークモード") {
+		t.Fatalf("template:\n%s", b)
+	}
+	if err := ta.run(ctx, []string{"triage-eval", "-set", path}); err == nil || !strings.Contains(err.Error(), "not labelled yet") {
+		t.Fatalf("unlabelled eval: %v", err)
+	}
+	if err := ta.run(ctx, []string{"triage-label-export", "-out", path}); err == nil {
+		t.Fatal("overwrote an existing template")
+	}
+
+	labelled := strings.ReplaceAll(string(b), `"category":"","priority":"","bundle":""`, `"category":"bug","priority":"P2","bundle":""`)
+	if err := os.WriteFile(path, []byte(labelled), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	out = ta.must(t, "triage-eval", "-set", path)
+	if !strings.Contains(out, "2 cases") || !strings.Contains(out, "verdict:") || !strings.Contains(out, "category (rows: person") {
+		t.Fatalf("eval %s", out)
+	}
+}
+
+func TestTriageEvalAIRespectsSwitch(t *testing.T) {
+	ta := newTestApp(t, env{"LOOP_TRIAGE": ""})
+	ta.model = &fakeModel{category: "bug", cluster: "all", summary: "落ちる。"}
+	if err := ta.run(context.Background(), []string{"triage-eval", "-set", labelledSet, "-model", "ai"}); err == nil {
+		t.Fatal("ai eval ran with the triage stage off")
+	}
+	if err := ta.run(context.Background(), []string{"triage-eval", "-set", labelledSet, "-model", "nope"}); err == nil {
+		t.Fatal("unknown model accepted")
 	}
 }

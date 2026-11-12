@@ -58,6 +58,11 @@ final class MacDiscardGuard {
 final class MacAppDelegate: NSObject, NSApplicationDelegate {
     private var quitConfirmed = false
 
+    /// サービスメニューの「Tailor It に送る」(#1849)
+    func applicationDidFinishLaunching(_ notification: Notification) {
+        MacTextServiceProvider.shared.register()
+    }
+
     func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
         if quitConfirmed { return .terminateNow }
         let asked = MacDiscardGuard.confirmQuit { [weak self] in
@@ -69,10 +74,22 @@ final class MacAppDelegate: NSObject, NSApplicationDelegate {
     }
 }
 
-/// ⌘W・閉じるボタンの前に `MacDiscardGuard` に聞く。SwiftUI のウインドウの delegate はそのまま残し、
+/// ⌘W・閉じるボタンの前に聞く(`MacDiscardGuard`・フィードバックの書きかけ #1309)。SwiftUI のウインドウの delegate はそのまま残し、
 /// `windowShouldClose` だけ前に挟む(他の呼び出しは元の delegate へ渡す)。
 struct WindowCloseGuard: NSViewRepresentable {
-    let discardGuard: MacDiscardGuard
+    /// 閉じてよいか。false なら確認を出しておき、「破棄」で `closeAgain` を呼ぶ(もう聞かずに閉じる)
+    let allowsClose: @MainActor (_ closeAgain: @escaping () -> Void) -> Bool
+    /// 見張るウインドウが決まった時
+    var onWindow: @MainActor (NSWindow) -> Void = { _ in }
+
+    init(allowsClose: @escaping @MainActor (_ closeAgain: @escaping () -> Void) -> Bool) {
+        self.allowsClose = allowsClose
+    }
+
+    init(discardGuard: MacDiscardGuard) {
+        allowsClose = { [weak discardGuard] close in discardGuard?.allowsClose(close) ?? true }
+        onWindow = { [weak discardGuard] in discardGuard?.window = $0 }
+    }
 
     func makeNSView(context: Context) -> NSView {
         let view = NSView(frame: .zero)
@@ -86,12 +103,12 @@ struct WindowCloseGuard: NSViewRepresentable {
 
     private func install(on window: NSWindow?) {
         guard let window else { return }
-        discardGuard.window = window
+        onWindow(window)
         if let proxy = window.delegate as? CloseGuardDelegate {
-            proxy.discardGuard = discardGuard
+            proxy.allowsClose = allowsClose
             return
         }
-        let proxy = CloseGuardDelegate(original: window.delegate, discardGuard: discardGuard)
+        let proxy = CloseGuardDelegate(original: window.delegate, allowsClose: allowsClose)
         objc_setAssociatedObject(window, &CloseGuardDelegate.key, proxy, .OBJC_ASSOCIATION_RETAIN_NONATOMIC) // delegate は弱参照
         window.delegate = proxy
     }
@@ -102,18 +119,18 @@ private final class CloseGuardDelegate: NSObject, NSWindowDelegate {
     static var key: UInt8 = 0
 
     weak var original: NSWindowDelegate?
-    weak var discardGuard: MacDiscardGuard?
+    var allowsClose: @MainActor (_ closeAgain: @escaping () -> Void) -> Bool
     /// 「破棄」の後の閉じ直し。もう聞かない
     private var confirmed = false
 
-    init(original: NSWindowDelegate?, discardGuard: MacDiscardGuard) {
+    init(original: NSWindowDelegate?, allowsClose: @escaping @MainActor (_ closeAgain: @escaping () -> Void) -> Bool) {
         self.original = original
-        self.discardGuard = discardGuard
+        self.allowsClose = allowsClose
     }
 
     func windowShouldClose(_ sender: NSWindow) -> Bool {
-        if !confirmed, let discardGuard,
-           !discardGuard.allowsClose({ [weak self, weak sender] in
+        if !confirmed,
+           !allowsClose({ [weak self, weak sender] in
                self?.confirmed = true
                sender?.performClose(nil)
            }) {

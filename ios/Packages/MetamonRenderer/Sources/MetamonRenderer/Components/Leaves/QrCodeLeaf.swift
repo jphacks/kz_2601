@@ -60,6 +60,7 @@ struct QrCodeLeaf: View {
             .accessibilityElement()
             .accessibilityLabel(caption ?? L("QR コード"))
             .accessibilityValue(content)
+            .imageCopyCommand(export) // ⌘C・VoiceOver の「コピー」も右クリックと同じ画像(#1370)
             .accessibilityIdentifier("qrCode.image")
             .layoutPriority(1)
         if let caption {
