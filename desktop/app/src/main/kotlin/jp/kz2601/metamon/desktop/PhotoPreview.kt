@@ -122,10 +122,20 @@ class KeyRepeatFilter {
         lastRepeat = if (down) !held.add(key) else false.also { held.remove(key) }
         return lastRepeat
     }
+
+    /** 押している物を忘れる(離した出来事を取りこぼしても、次の押し下げを 1 回目として扱う)。 */
+    fun reset() {
+        held.clear()
+        last = null
+        lastRepeat = false
+    }
 }
 
 /** Space の押しっぱなしを見る所は 1 つ(キーボードは 1 つ・出来事は画面のスレッドでだけ来る)。部品・一番外・ダイアログが同じ物を見る。 */
 private val spaceRepeats = KeyRepeatFilter()
+
+/** ウィンドウがフォーカスを失った時に呼ぶ(外で離した Space の出来事は届かない)。 */
+fun resetSpaceRepeats() = spaceRepeats.reset()
 
 /** Space の自動の繰り返し(押しっぱなし)か。プレビューを開く・閉じるのは押し下げた 1 回目だけ。 */
 fun KeyEvent.isAutoRepeatSpace(): Boolean =
@@ -194,18 +204,27 @@ class PhotoPreview {
  */
 object PhotoOpen {
     /**
-     * 書く場所。Linux は XDG_RUNTIME_DIR(この人だけが読める)、無ければ・他の OS は端末の保存先の下。
-     * 皆で使う java.io.tmpdir には置かない。
+     * 書く場所(この人だけの・消してよい場所)。皆で使う java.io.tmpdir には置かない。
+     * - Windows: `%LOCALAPPDATA%\TailorIt\tmp\open`(ローミングする %APPDATA% には置かない)
+     * - macOS: `~/Library/Caches/TailorIt/tmp/open`
+     * - Linux: `$XDG_RUNTIME_DIR/tailorit/open`(絶対パスの時だけ)、無ければ端末の保存先の下
      */
     fun tempRoot(
         osName: String = System.getProperty("os.name").orEmpty(),
         env: Map<String, String> = System.getenv(),
+        home: String = System.getProperty("user.home").orEmpty(),
         dataDir: () -> File = { AppDataDir.resolve() },
     ): File {
         val os = osName.lowercase()
-        val linux = !os.startsWith("windows") && !os.startsWith("mac") && !os.startsWith("darwin")
-        val runtime = env["XDG_RUNTIME_DIR"]?.takeIf { linux && it.startsWith("/") }
-        return if (runtime != null) File(File(runtime, "tailorit"), "open") else File(File(dataDir(), "tmp"), "open")
+        return when {
+            os.startsWith("windows") -> {
+                val base = env["LOCALAPPDATA"]?.takeIf { it.isNotBlank() } ?: File(home, "AppData/Local").path
+                File(File(File(base, "TailorIt"), "tmp"), "open")
+            }
+            os.startsWith("mac") || os.startsWith("darwin") -> File(File(File(home, "Library/Caches/TailorIt"), "tmp"), "open")
+            else -> env["XDG_RUNTIME_DIR"]?.takeIf { it.startsWith("/") }?.let { File(File(it, "tailorit"), "open") }
+                ?: File(File(dataDir(), "tmp"), "open")
+        }
     }
 
     /** 書き出したファイル。読めない・画像でない・手元でない時は null。裏のスレッドで呼ぶ。 */
@@ -219,10 +238,10 @@ object PhotoOpen {
         }.getOrNull()
     }
 
-    /** 書いた写真と、引き出しの一時ファイルを消す(この端末のデータを消す時)。 */
-    fun clearTemp(root: File = tempRoot()) {
+    /** 書いた写真([root])と、引き出しの一時ファイル([dragRoot])を消す(この端末のデータを消す時)。 */
+    fun clearTemp(root: File = tempRoot(), dragRoot: File = DragOut.tempRoot()) {
         runCatching { DragOut.clear(root) }
-        runCatching { DragOut.clear() }
+        runCatching { DragOut.clear(dragRoot) }
     }
 
     /** POSIX ならこの人だけが読める形で作る(Windows は保存先がもとから人ごと)。 */

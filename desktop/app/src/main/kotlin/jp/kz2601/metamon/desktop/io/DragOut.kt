@@ -106,18 +106,22 @@ object ImageSource {
     const val CONNECT_TIMEOUT_MS = 10_000
     const val READ_TIMEOUT_MS = 15_000
 
-    /** [allowFile] は記録・フォームの値の時だけ(photoField の値は file URI)。DSL に書かれた URL では手元のファイルを読まない。 */
-    fun bytes(src: String?, allowFile: Boolean): ByteArray? {
+    /**
+     * [allowFile] は記録・フォームの値の時だけ(photoField の値は file URI)。DSL に書かれた URL では手元のファイルを読まない。
+     * どの読み方も [max] バイトまで(手元のファイルも読みながら数える・途中で大きくなる物も止まる)。
+     */
+    fun bytes(src: String?, allowFile: Boolean, max: Int = MAX_BYTES): ByteArray? {
         if (src.isNullOrBlank()) return null
         return runCatching {
             when {
-                src.startsWith("data:") -> Base64.getDecoder().decode(src.substringAfter("base64,")).takeIf { it.size <= MAX_BYTES }
+                src.startsWith("data:") -> Base64.getDecoder().decode(src.substringAfter("base64,")).takeIf { it.size <= max }
                 src.startsWith("https://") -> URI(src).toURL().openConnection().run {
                     connectTimeout = CONNECT_TIMEOUT_MS
                     readTimeout = READ_TIMEOUT_MS
-                    if (contentLengthLong > MAX_BYTES) null else getInputStream().use { capped(it) }
+                    if (contentLengthLong > max) null else getInputStream().use { capped(it, max) }
                 }
-                allowFile && src.startsWith("file:") -> fileOf(src)?.takeIf { it.isFile && FileKind.of(it.name) == FileKind.IMAGE }?.readBytes()
+                allowFile && src.startsWith("file:") -> fileOf(src)?.takeIf { it.isFile && FileKind.of(it.name) == FileKind.IMAGE && it.length() <= max }
+                    ?.inputStream()?.use { capped(it, max) }
                 else -> null
             }
         }.getOrNull()

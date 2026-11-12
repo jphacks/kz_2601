@@ -2,6 +2,7 @@ package jp.kz2601.metamon.desktop
 
 import androidx.compose.ui.input.key.Key
 import jp.kz2601.metamon.desktop.io.DragOut
+import jp.kz2601.metamon.desktop.io.ImageSource
 import jp.kz2601.metamon.dsl.expr.Expr
 import jp.kz2601.metamon.dsl.records.Field
 import jp.kz2601.metamon.dsl.records.FieldType
@@ -195,6 +196,18 @@ class PhotoPreviewTest {
     }
 
     @Test
+    fun lostKeyUpIsForgottenOnReset() {
+        val f = KeyRepeatFilter()
+        assertFalse(f.isRepeat(Any(), Key.Spacebar, down = true))
+        // 押したままウィンドウを離れ、離した出来事が届かなかった
+        f.reset()
+        assertFalse("次の押し下げは 1 回目", f.isRepeat(Any(), Key.Spacebar, down = true))
+        assertTrue(f.isRepeat(Any(), Key.Spacebar, down = true))
+        // 共有の物も同じように忘れられる(呼んでも落ちない)
+        resetSpaceRepeats()
+    }
+
+    @Test
     fun networkFileUrisAreNotShown() {
         assertTrue(PhotoPreviewSources.accepts("file:///tmp/a.png"))
         assertTrue(PhotoPreviewSources.accepts("file:/tmp/a.png"))
@@ -238,7 +251,9 @@ class PhotoPreviewTest {
 
     @Test
     fun exportWritesAPngIntoThePerUserFolderOnly() {
-        val root = File(Files.createTempDirectory("preview-root").toFile(), "open")
+        val base = Files.createTempDirectory("preview-root").toFile()
+        val root = File(base, "open")
+        val drag = File(base, "drag").apply { mkdirs() }
         try {
             val f = PhotoOpen.export(PreviewPhoto(a, "料理/写真"), root)
             assertNotNull(f)
@@ -253,27 +268,58 @@ class PhotoPreviewTest {
             // 画像として読めない物は書かない
             assertNull(PhotoOpen.export(PreviewPhoto(b, "壊れた"), root))
             assertNull(PhotoOpen.export(PreviewPhoto("https://example.com/a.png", "外"), root))
-            // この端末のデータを消す時に消える
-            PhotoOpen.clearTemp(root)
+            // この端末のデータを消す時に消える(引き出しの一時ファイルも、渡した場所だけ)
+            val dragged = DragOut.temp("x.png", png1x1, drag)
+            PhotoOpen.clearTemp(root, dragRoot = drag)
             assertFalse(f.exists())
+            assertFalse(dragged.exists())
             assertEquals(0, root.listFiles()!!.size)
+            assertEquals(0, drag.listFiles()!!.size)
         } finally {
-            root.parentFile.deleteRecursively()
+            base.deleteRecursively()
         }
     }
 
     @Test
-    fun tempRootIsPerUser() {
+    fun tempRootIsPerUserAndLocal() {
         val data = File("/home/u/.local/share/tailorit")
-        // Linux は XDG_RUNTIME_DIR(絶対パスの時だけ)
-        assertEquals(File(File("/run/user/1000", "tailorit"), "open"), PhotoOpen.tempRoot("Linux", mapOf("XDG_RUNTIME_DIR" to "/run/user/1000")) { data })
-        assertEquals(File(File(data, "tmp"), "open"), PhotoOpen.tempRoot("Linux", mapOf("XDG_RUNTIME_DIR" to "rel")) { data })
-        assertEquals(File(File(data, "tmp"), "open"), PhotoOpen.tempRoot("Linux", emptyMap()) { data })
-        // 他の OS は端末の保存先の下(XDG_RUNTIME_DIR は見ない)
-        val win = File("C:\\Users\\u\\AppData\\Roaming\\TailorIt")
-        assertEquals(File(File(win, "tmp"), "open"), PhotoOpen.tempRoot("Windows 11", mapOf("XDG_RUNTIME_DIR" to "/run/user/1000")) { win })
+        // Linux は XDG_RUNTIME_DIR(絶対パスの時だけ)、無ければ端末の保存先の下
+        assertEquals(File(File("/run/user/1000", "tailorit"), "open"), PhotoOpen.tempRoot("Linux", mapOf("XDG_RUNTIME_DIR" to "/run/user/1000"), "/home/u") { data })
+        assertEquals(File(File(data, "tmp"), "open"), PhotoOpen.tempRoot("Linux", mapOf("XDG_RUNTIME_DIR" to "rel"), "/home/u") { data })
+        assertEquals(File(File(data, "tmp"), "open"), PhotoOpen.tempRoot("Linux", emptyMap(), "/home/u") { data })
+        // Windows は %LOCALAPPDATA%(ローミングする %APPDATA% ではない)。XDG_RUNTIME_DIR は見ない
+        val roaming = File("C:\\Users\\u\\AppData\\Roaming\\TailorIt")
+        val winEnv = mapOf("LOCALAPPDATA" to "C:\\Users\\u\\AppData\\Local", "APPDATA" to "C:\\Users\\u\\AppData\\Roaming", "XDG_RUNTIME_DIR" to "/run/user/1000")
+        val win = PhotoOpen.tempRoot("Windows 11", winEnv, "C:\\Users\\u") { roaming }
+        assertEquals(File(File(File("C:\\Users\\u\\AppData\\Local", "TailorIt"), "tmp"), "open"), win)
+        assertFalse(win.path.contains("Roaming"))
+        assertEquals(File(File(File(File("C:\\Users\\u", "AppData/Local"), "TailorIt"), "tmp"), "open"), PhotoOpen.tempRoot("Windows 10", emptyMap(), "C:\\Users\\u") { roaming })
+        // macOS は ~/Library/Caches(保存先の Application Support ではない)
+        assertEquals(
+            File(File(File("/Users/u", "Library/Caches/TailorIt"), "tmp"), "open"),
+            PhotoOpen.tempRoot("Mac OS X", mapOf("XDG_RUNTIME_DIR" to "/run/user/1000"), "/Users/u") { File("/Users/u/Library/Application Support/TailorIt") },
+        )
         val tmp = File(System.getProperty("java.io.tmpdir")).canonicalFile
-        assertFalse(PhotoOpen.tempRoot("Linux", emptyMap()) { data }.startsWith(tmp))
+        assertFalse(PhotoOpen.tempRoot("Linux", emptyMap(), "/home/u") { data }.startsWith(tmp))
+    }
+
+    @Test
+    fun localImageFilesAreReadWithinTheCap() {
+        val dir = Files.createTempDirectory("preview-cap").toFile()
+        try {
+            val f = File(dir, "p.png").apply { writeBytes(png1x1) }
+            val uri = f.toURI().toString()
+            assertTrue(ImageSource.bytes(uri, allowFile = true)!!.contentEquals(png1x1))
+            // 上限を超えるファイルは読まない(data URL・https と同じ)
+            assertNull(ImageSource.bytes(uri, allowFile = true, max = png1x1.size - 1))
+            assertEquals(png1x1.size, ImageSource.bytes(uri, allowFile = true, max = png1x1.size)!!.size)
+            // 手元のファイルを読まない時は読まない
+            assertNull(ImageSource.bytes(uri, allowFile = false))
+            // プレビューも同じ読み方
+            assertNotNull(ImageLoader.load(uri, allowFile = true, maxPx = 2048, withPng = false, useCache = false))
+        } finally {
+            dir.deleteRecursively()
+        }
     }
 
     @Test

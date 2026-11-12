@@ -151,6 +151,9 @@ private fun ApplicationScope.DesktopWindow(w: WindowEntry, registry: WindowRegis
                     // 前に出た: 続けて失敗して止まった送り待ちを起こす
                     app.records.persistence?.resume()
                 }
+
+                // 外で離した Space は届かない: 押しっぱなしの覚えを捨てる(次の押し下げを取りこぼさない)
+                override fun windowLostFocus(e: WindowEvent?) = resetSpaceRepeats()
             }
             window.addWindowFocusListener(l)
             onDispose { window.removeWindowFocusListener(l) }
