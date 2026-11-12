@@ -2,7 +2,9 @@
 <resources>
     <string name="desktop_a11y_chart">Chart: %1$s</string>
     <string name="desktop_a11y_image">Image</string>
+    <string name="desktop_a11y_preview">Photo preview: %1$s</string>
     <string name="desktop_a11y_rating">%1$s %2$d of %3$d</string>
+    <string name="desktop_already_running">Tailor It is already running</string>
     <string name="desktop_book_searching">Looking up the book…</string>
     <string name="desktop_calendar_month_pattern">MMMM y</string>
     <string name="desktop_calendar_opened">Opened the event (%1$s)</string>
@@ -16,7 +18,10 @@
     <string name="desktop_drag_table_name">table</string>
     <string name="desktop_export_clipboard">" (the table is also on the clipboard)"</string>
     <string name="desktop_export_done">Exported %1$d records: %2$s</string>
+    <string name="desktop_export_writing">Exporting…</string>
     <string name="desktop_feed_offline">The desktop app doesn\'t load feeds yet</string>
+    <string name="desktop_flashcards_back_hint">Back (click for the front)</string>
+    <string name="desktop_flashcards_front_hint">Front (click for the back)</string>
     <string name="desktop_image_none">No image</string>
     <string name="desktop_input_audio_unavailable">Recording isn\'t available on this computer. You can choose a file instead</string>
     <string name="desktop_input_clear">Clear</string>
@@ -80,8 +85,11 @@
     <string name="desktop_keys_palette">Command palette</string>
     <string name="desktop_keys_palette_empty">No matches</string>
     <string name="desktop_keys_palette_placeholder">Find a screen, action or app by name</string>
+    <string name="desktop_keys_preview">Preview photo</string>
     <string name="desktop_keys_save">Save</string>
     <string name="desktop_keys_search">Search</string>
+    <string name="desktop_licenses">Third-party notices</string>
+    <string name="desktop_licenses_browse_failed">Couldn\'t open the browser. %1$s</string>
     <string name="desktop_list_empty">Nothing yet</string>
     <string name="desktop_list_open_window">Open in new window</string>
     <string name="desktop_list_separator">", "</string>
@@ -92,6 +100,16 @@
     <string name="desktop_picker_empty">No candidates</string>
     <string name="desktop_picker_hint">Press the button to pick one</string>
     <string name="desktop_picker_pick">Pick</string>
+    <string name="desktop_preview_count">%1$s (%2$d of %3$d)</string>
+    <string name="desktop_preview_failed">Couldn\'t read this photo</string>
+    <string name="desktop_preview_hint">← → to browse · Esc / Space to close</string>
+    <string name="desktop_preview_loading">Loading…</string>
+    <string name="desktop_preview_next">Next</string>
+    <string name="desktop_preview_none">No photos to preview on this screen</string>
+    <string name="desktop_preview_open">Preview</string>
+    <string name="desktop_preview_open_default">Open in default app</string>
+    <string name="desktop_preview_open_failed">Couldn\'t open it in the default app</string>
+    <string name="desktop_preview_previous">Previous</string>
     <string name="desktop_print">Print</string>
     <string name="desktop_print_cancelled">Printing canceled</string>
     <string name="desktop_print_count">Count</string>
@@ -106,6 +124,7 @@
     <string name="desktop_print_sent">Sent %1$d pages to the printer</string>
     <string name="desktop_print_title">Print: %1$s</string>
     <string name="desktop_print_value">Value</string>
+    <string name="desktop_qr_copy_image">Copy image</string>
     <string name="desktop_record_deleted_elsewhere">This record was deleted in another window</string>
     <string name="desktop_sync_pending">%1$d waiting to send</string>
     <string name="desktop_timer_done">Time\'s up</string>
@@ -118,6 +137,8 @@
     <string name="desktop_tray_hidden_hint">Still running in the tray. To quit, choose Quit from the tray menu</string>
     <string name="desktop_tray_new_window">New window</string>
     <string name="desktop_tray_open">Open %1$s</string>
+    <string name="desktop_tray_open_at_login">Open at login</string>
+    <string name="desktop_tray_open_at_login_failed">Couldn\'t change the open-at-login setting</string>
     <string name="desktop_tray_quick_record">Quick record</string>
     <string name="desktop_tray_quit">Quit</string>
     <string name="desktop_tray_timer_elapsed">%1$s %2$s</string>

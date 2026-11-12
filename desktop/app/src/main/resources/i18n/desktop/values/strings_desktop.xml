@@ -3,7 +3,9 @@
 <resources>
     <string name="desktop_a11y_chart">グラフ: %1$s</string>
     <string name="desktop_a11y_image">画像</string>
+    <string name="desktop_a11y_preview">写真のプレビュー: %1$s</string>
     <string name="desktop_a11y_rating">%1$s %2$d / %3$d</string>
+    <string name="desktop_already_running">Tailor It はもう起動しています</string>
     <string name="desktop_book_searching">本の情報を探しています…</string>
     <string name="desktop_calendar_month_pattern">y年M月</string>
     <string name="desktop_calendar_opened">予定を開きました(%1$s)</string>
@@ -17,7 +19,10 @@
     <string name="desktop_drag_table_name">表</string>
     <string name="desktop_export_clipboard">(表はクリップボードにも入れました)</string>
     <string name="desktop_export_done">%1$d 件を書き出しました: %2$s</string>
+    <string name="desktop_export_writing">書き出しています…</string>
     <string name="desktop_feed_offline">フィードはデスクトップ版ではまだ取得しません</string>
+    <string name="desktop_flashcards_back_hint">裏(押すと表)</string>
+    <string name="desktop_flashcards_front_hint">表(押すと裏)</string>
     <string name="desktop_image_none">画像なし</string>
     <string name="desktop_input_audio_unavailable">録音は このパソコンでは使えません。ファイルから選べます</string>
     <string name="desktop_input_clear">消す</string>
@@ -81,8 +86,11 @@
     <string name="desktop_keys_palette">コマンドパレット</string>
     <string name="desktop_keys_palette_empty">見つかりません</string>
     <string name="desktop_keys_palette_placeholder">画面・アクション・アプリを名前で探す</string>
+    <string name="desktop_keys_preview">写真を大きく見る</string>
     <string name="desktop_keys_save">保存</string>
     <string name="desktop_keys_search">検索</string>
+    <string name="desktop_licenses">サードパーティのライセンス</string>
+    <string name="desktop_licenses_browse_failed">ブラウザで開けませんでした。%1$s</string>
     <string name="desktop_list_empty">まだありません</string>
     <string name="desktop_list_open_window">別のウィンドウで開く</string>
     <string name="desktop_list_separator">、</string>
@@ -93,6 +101,16 @@
     <string name="desktop_picker_empty">候補がありません</string>
     <string name="desktop_picker_hint">ボタンを押すと 1 つ選びます</string>
     <string name="desktop_picker_pick">選ぶ</string>
+    <string name="desktop_preview_count">%1$s(%2$d / %3$d)</string>
+    <string name="desktop_preview_failed">この写真は読めません</string>
+    <string name="desktop_preview_hint">← → で送る・Esc / Space で閉じる</string>
+    <string name="desktop_preview_loading">読み込み中…</string>
+    <string name="desktop_preview_next">次へ</string>
+    <string name="desktop_preview_none">この画面には大きく見られる写真がありません</string>
+    <string name="desktop_preview_open">大きく見る</string>
+    <string name="desktop_preview_open_default">既定のアプリで開く</string>
+    <string name="desktop_preview_open_failed">既定のアプリで開けませんでした</string>
+    <string name="desktop_preview_previous">前へ</string>
     <string name="desktop_print">印刷</string>
     <string name="desktop_print_cancelled">印刷をやめました</string>
     <string name="desktop_print_count">件数</string>
@@ -107,6 +125,7 @@
     <string name="desktop_print_sent">%1$d 頁を印刷に送りました</string>
     <string name="desktop_print_title">印刷: %1$s</string>
     <string name="desktop_print_value">値</string>
+    <string name="desktop_qr_copy_image">画像をコピー</string>
     <string name="desktop_record_deleted_elsewhere">この記録は別のウィンドウで消されました</string>
     <string name="desktop_sync_pending">送信待ち %1$d 件</string>
     <string name="desktop_timer_done">時間になりました</string>
@@ -119,6 +138,8 @@
     <string name="desktop_tray_hidden_hint">トレイに残っています。終わるにはトレイのメニューの「終了」を選びます</string>
     <string name="desktop_tray_new_window">新しいウィンドウ</string>
     <string name="desktop_tray_open">「%1$s」を開く</string>
+    <string name="desktop_tray_open_at_login">ログイン時に開く</string>
+    <string name="desktop_tray_open_at_login_failed">ログイン時に開く設定を変えられませんでした</string>
     <string name="desktop_tray_quick_record">すぐ記録</string>
     <string name="desktop_tray_quit">終了</string>
     <string name="desktop_tray_timer_elapsed">%1$s %2$s</string>

@@ -162,11 +162,24 @@ object PdfIo {
         }
     }
 
-    /** 列の幅に収まるよう末尾を「…」で切る。 */
+    /**
+     * 列の幅に収まるよう末尾を「…」で切る。長いセルも速く([CLIP_MAX_CHARS] 字で先に切り、切る位置は二分探索)。
+     * サロゲートペアの間では切らない。
+     */
     internal fun clip(s: String, width: Int, measure: (String) -> Int): String {
-        if (measure(s) <= width) return s
-        var end = s.length
-        while (end > 0 && measure(s.substring(0, end) + "…") > width) end--
-        return s.substring(0, end) + "…"
+        val head = if (s.length > CLIP_MAX_CHARS) s.substring(0, CLIP_MAX_CHARS) else s
+        if (head.length == s.length && measure(s) <= width) return s
+        // measure(head[0, end) + "…") <= width となる一番長い end
+        var lo = 0
+        var hi = head.length
+        while (lo < hi) {
+            val mid = (lo + hi + 1) / 2
+            if (measure(head.substring(0, mid) + "…") <= width) lo = mid else hi = mid - 1
+        }
+        if (lo > 0 && Character.isHighSurrogate(head[lo - 1])) lo--
+        return head.substring(0, lo) + "…"
     }
+
+    /** 1 マスに描く最大の字数(A4 の 1 列にこれより多くは入らない)。 */
+    internal const val CLIP_MAX_CHARS = 200
 }

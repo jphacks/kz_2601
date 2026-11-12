@@ -101,6 +101,7 @@ import jp.kz2601.metamon.renderer.form.FormPrefill
 import java.awt.Cursor
 import java.awt.datatransfer.Transferable
 import java.time.Instant
+import java.util.Locale
 
 // データの部品(#1744): list・table・timeline・gridTable・searchBar・feed・matchList。stat・chart・calendar は DisplayLeaves.kt。
 // 値は Android の renderer/components/lists/ListValues.kt(= iOS の各 Leaf の static な関数)と同じ規則。
@@ -150,19 +151,41 @@ fun DataLeaf(c: Component, env: DataEnv) {
 
 // MARK: - 値(画面と適合テストが同じ関数を使う)
 
+/**
+ * 値に入る文言(Android の ValueLabels)。描画の木(適合テスト)は iOS と突き合わせるので [JAPANESE]、
+ * 画面は [current](Strings)。書式の `%s` には列の名前が入る。
+ */
+data class DataLabels(
+    val everyone: String,
+    val member: String,
+    val count: String,
+    val sum: String,
+    val avg: String,
+    val min: String,
+    val max: String,
+) {
+    companion object {
+        val JAPANESE = DataLabels(everyone = "全員", member = "参加者", count = "件数", sum = "%sの合計", avg = "%sの平均", min = "%sの最小", max = "%sの最大")
+
+        /** 画面の言語の文言。composable から渡す。 */
+        fun current() = DataLabels(
+            everyone = Strings["lists_everyone"], member = Strings["lists_member"], count = Strings["lists_count"],
+            sum = Strings["lists_sum"], avg = Strings["lists_avg"], min = Strings["lists_min"], max = Strings["lists_max"],
+        )
+    }
+}
+
 /** 表示用の文字(Android の LeafData.display)。member の名簿はまだ無いので「参加者」。 */
 object DataText {
     /** 一覧などの空の一言。日本語は conformance の期待値と同じ「まだありません」。 */
     val EMPTY: String get() = Strings["desktop_list_empty"]
-    const val EVERYONE = "全員"
-    const val MEMBER = "参加者"
 
     fun join(items: List<String>): String = items.joinToString("、")
 
     fun display(data: LeafData, value: JSONValue, field: Field?): String = when (field?.type) {
-        FieldType.REFS -> Aggregator.refIds(value).mapNotNull { refTitle(data, it, field.refEntity) }.let { if (it.isEmpty()) EVERYONE else join(it) }
-        FieldType.MEMBER -> member(value.stringValue)
-        FieldType.MEMBERS -> join(Aggregator.refIds(value).map(::member))
+        FieldType.REFS -> Aggregator.refIds(value).mapNotNull { refTitle(data, it, field.refEntity) }.let { if (it.isEmpty()) data.labels.everyone else join(it) }
+        FieldType.MEMBER -> member(data, value.stringValue)
+        FieldType.MEMBERS -> join(Aggregator.refIds(value).map { member(data, it) })
         FieldType.REF -> {
             val id = value.stringValue?.takeIf { it.isNotEmpty() }
             when {
@@ -177,7 +200,7 @@ object DataText {
     fun text(data: LeafData, record: Record, fieldId: String?, entity: Entity?): String =
         fieldId?.let { display(data, record[it], entity?.field(it)) } ?: ""
 
-    private fun member(uid: String?): String = if (uid.isNullOrEmpty()) "" else MEMBER
+    private fun member(data: LeafData, uid: String?): String = if (uid.isNullOrEmpty()) "" else data.labels.member
 
     private fun refTitle(data: LeafData, id: String, refEntity: String?): String? {
         val target = data.entity(refEntity ?: return null) ?: return null
@@ -262,17 +285,19 @@ object TableCells {
         return DataText.display(data, JSONValue.Num(shown), field)
     }
 
-    fun header(col: TableColumn, entity: Entity?): String {
+    /** 見出し。描画の木は日本語のまま、画面は [DataLabels.current] を渡す。 */
+    fun header(col: TableColumn, entity: Entity?, labels: DataLabels = DataLabels.JAPANESE): String {
         col.title?.let { return it }
         val name = entity?.field(col.field)?.name ?: col.field
-        return when (col.aggregate?.wire) {
-            "count" -> "件数"
-            "sum" -> "${name}の合計"
-            "avg" -> "${name}の平均"
-            "min" -> "${name}の最小"
-            "max" -> "${name}の最大"
-            else -> name
+        val pattern = when (col.aggregate?.wire) {
+            "count" -> return labels.count
+            "sum" -> labels.sum
+            "avg" -> labels.avg
+            "min" -> labels.min
+            "max" -> labels.max
+            else -> return name
         }
+        return String.format(Locale.ROOT, pattern, name)
     }
 
     fun isNumeric(col: TableColumn, entity: Entity?): Boolean = col.aggregate != null || entity?.field(col.field)?.type?.isNumeric == true
@@ -472,7 +497,7 @@ private fun TableLeaf(c: Component, env: DataEnv) {
     val rows = TableCells.viewSorted(TableCells.rows(c, data), sortColumn, ascending)
     val order = rows.map { it.id }
     val selection = rememberRowSelection(c.id, order)
-    val headers = columns.map { TableCells.header(it, entity) }
+    val headers = columns.map { TableCells.header(it, entity, data.labels) }
     val title = c.title ?: entity?.name ?: Strings["desktop_drag_table_name"]
     val keys = Modifier.rowSelectionKeys(selection, order) { env.copyText(TableCopy.tsv(headers, rows, selection.value), it.size) }
     val highlight = MaterialTheme.colorScheme.primary.copy(alpha = 0.14f)

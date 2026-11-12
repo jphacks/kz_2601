@@ -132,13 +132,16 @@ fun DesktopApp(
     val keyboard = rememberDesktopKeyboard(dsl, session, dispatch, openPrint, onOpenApp, onOpenRecord, onWipeLocalData)
 
     // Ctrl+F はこのウィンドウの検索欄にだけ入る
-    CompositionLocalProvider(LocalSearchTargets provides keyboard.searchTargets) {
-    Surface(Modifier.fillMaxSize().ioDropTarget(io, topComponents, topDraft).onPreviewKeyEvent(io.previewKey(topComponents, topDraft))
-        .onPreviewKeyEvent { if (DesktopPrint.isPrintKey(it)) true.also { openPrint() } else false }.then(keyboard.modifier)) {
+    // 写真のプレビュー(PhotoPreview.kt): 写真の部品を押すとこのウィンドウのダイアログで開く。開いている間は貼り付け・印刷を取らない
+    val previewing = keyboard.photos.isOpen
+    val pasteKey = io.previewKey(topComponents, topDraft)
+    CompositionLocalProvider(LocalSearchTargets provides keyboard.searchTargets, LocalPhotoPreview provides keyboard::openPhoto) {
+    Surface(Modifier.fillMaxSize().ioDropTarget(io, topComponents, topDraft).onPreviewKeyEvent { !keyboard.photos.isOpen && pasteKey(it) }
+        .onPreviewKeyEvent { if (!keyboard.photos.isOpen && DesktopPrint.isPrintKey(it) && DesktopPrint.canPrint(dsl)) true.also { openPrint() } else false }.then(keyboard.modifier)) {
         IoOverlay(io)
         Box(Modifier.fillMaxSize()) {
             // モーダルの間は下の画面とタブに Tab で入らず、読み上げにも出さない
-            Column(Modifier.fillMaxSize().then(keyboard.inert(nav.sheet != null || nav.fullScreen != null))) {
+            Column(Modifier.fillMaxSize().then(keyboard.inert(nav.sheet != null || nav.fullScreen != null || previewing))) {
                 val base = NavigationResolver.dismissModals(nav).top(dsl)
                 Box(Modifier.weight(1f)) { ScreenView(dsl, session, base, io, dispatch, openPrint, onOpenRecord) }
                 // 送り待ちがある時だけ小さく出す(#1887)
@@ -170,7 +173,7 @@ fun DesktopApp(
             if (nav.sheet != null || nav.fullScreen != null) {
                 val top = nav.top(dsl)
                 val full = nav.fullScreen != null
-                Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                Box(Modifier.fillMaxSize().then(keyboard.inert(previewing)), contentAlignment = Alignment.Center) {
                     // 背景の暗幕は中身と兄弟にする(clickable で包むと中身ごと 1 つにまとまって読み上げで中が読めない)
                     val closeLabel = Strings["desktop_close"]
                     Box(
@@ -228,7 +231,7 @@ private fun ScreenView(
 ) {
     val screen = dsl.screen(route.screen) ?: dsl.screens.firstOrNull() ?: return
     val form = session.form(route)
-    val data = remember(session.store) { session.leafData() }
+    val data = remember(session.store) { session.leafData(DataLabels.current()) }
     val perform = { a: Action, recordId: String? -> dispatch(a, ActionContext(route, form, recordId)) }
     val dataEnv = DataEnv(
         data, session.queries(route), perform,
@@ -352,6 +355,8 @@ private fun LocalGridOrChildren(c: Component, s: ScreenScope, modifier: Modifier
 /** 部品 1 つ。絵で描く部品は読み上げ用に 1 つにまとめる(A11y.kt)。 */
 @Composable
 private fun Node(c: Component, s: ScreenScope) {
+    // 隠す部品(作者以外の hidden の項目・出さない削除 / 保存ボタン)は枠ごと描かない
+    if (s.session.state(c, s.form) == "hidden") return
     Box(Modifier.leafSemantics(c, s.data)) { NodeContent(c, s) }
 }
 
@@ -359,7 +364,8 @@ private fun Node(c: Component, s: ScreenScope) {
 private fun NodeContent(c: Component, s: ScreenScope) {
     when (c.type) {
         ComponentType.HSTACK -> Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-            c.children.forEach { Box1(Modifier.weight(1f)) { Node(it, s) } }
+            // 隠す子は先に外す(weight の枠だけ残って幅が空かないように)
+            c.children.filter { s.session.state(it, s.form) != "hidden" }.forEach { Box1(Modifier.weight(1f)) { Node(it, s) } }
         }
         ComponentType.CARD -> Card(Modifier.fillMaxWidth()) { LocalGridOrChildren(c, s, Modifier.padding(12.dp)) }
         in DesktopLeaves.containers -> LocalGridOrChildren(c, s)
@@ -383,12 +389,11 @@ private fun NodeContent(c: Component, s: ScreenScope) {
         ComponentType.EMPTY_STATE -> Text(c.title ?: c.message ?: c.text.orEmpty(), color = Color.Gray)
         ComponentType.SPACER -> Spacer(Modifier.height(8.dp))
         ComponentType.DIVIDER -> HorizontalDivider()
-        ComponentType.BUTTON -> if (s.session.tapState(c, s.form) == "rendered") {
-            Button(onClick = { c.action?.let { s.perform(it, null) } }) { Text(c.label ?: c.title ?: c.text.orEmpty()) }
-        }
+        ComponentType.BUTTON -> Button(onClick = { c.action?.let { s.perform(it, null) } }) { Text(c.label ?: c.title ?: c.text.orEmpty()) }
         ComponentType.LINK -> TextButton(onClick = { c.url?.let { s.perform(jp.kz2601.metamon.dsl.Action(type = jp.kz2601.metamon.dsl.ActionType.OPEN_URL, url = it), null) } }) {
             Text(c.text ?: c.label ?: c.url.orEmpty())
         }
+        ComponentType.OPEN_URL_BUTTON -> OpenUrlButtonLeaf(c, s.form) { urls -> s.session.openFirst(urls, ActionContext(s.route, s.form)) }
         in DATA_LEAVES -> DataLeaf(c, s.dataEnv)
         ComponentType.FILE_IMPORT -> FileImportLeaf(c, s.io)
         in PlayLeaves.types -> PlayLeaf(c, s.session, s.route, s.form, s.data, s.perform)
@@ -414,11 +419,10 @@ private fun Box1(modifier: Modifier, content: @Composable () -> Unit) {
     Column(modifier) { content() }
 }
 
-/** 入力の部品: 隠す・フォームの外を先に決めてから描く。 */
+/** 入力の部品: フォームの外を先に決めてから描く(隠すのは [Node] で済んでいる)。 */
 @Composable
 private fun InputNode(c: Component, s: ScreenScope) {
-    when (s.session.tapState(c, s.form)) {
-        "hidden" -> return
+    when (s.session.state(c, s.form)) {
         "needsForm" -> return Text(Strings["desktop_input_needs_form"], color = Color.Gray, style = MaterialTheme.typography.bodySmall)
     }
     InputLeaf(c, s.form!!) { s.session.message = it }

@@ -39,6 +39,9 @@ object A11y {
         else -> null
     }
 
+    /** 写真のプレビュー(PhotoPreview.kt)のダイアログの名前。項目名を付ける。 */
+    fun previewTitle(name: String): String = Strings.format("desktop_a11y_preview", name.ifBlank { Strings["desktop_a11y_image"] })
+
     private fun join(label: String?, value: String): String = listOfNotNull(label?.takeIf { it.isNotBlank() }, value).joinToString(" ")
 }
 
