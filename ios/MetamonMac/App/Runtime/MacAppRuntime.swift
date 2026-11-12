@@ -34,7 +34,12 @@ final class MacAppRuntime: RuntimeNavigating {
     /// 確認ダイアログ(アクションの confirm)。中央の列に `.confirmationDialog` で出す
     var confirm: RuntimeConfirm?
     /// 中央の列の上に出す一言
-    var toast: String?
+    var toast: String? {
+        // トーストを替えたら外す。付けるのは `reportFixable` だけ(トーストを出してから付ける)。同じ文言でも付け直さない
+        didSet { if fixOffer != nil { fixOffer = nil } }
+    }
+    /// いまのトーストに付ける「直してと頼む」(#1885・`MacAppRuntime+FixRequest.swift`)
+    var fixOffer: FixOffer?
     /// もう読み上げた toast(`AppCanvas` は読み直さない)
     @ObservationIgnored var announcedToast: String?
     /// 一覧の記録を消した直後の「削除しました・元に戻す」(iOS の M11 と同じく数秒は送らない)
@@ -88,6 +93,10 @@ final class MacAppRuntime: RuntimeNavigating {
     @ObservationIgnored var onOpenVoice: (@MainActor () -> Void)?
     /// モーダルの中の openVoice。モーダルを閉じ終えてから会話を開く(シートを重ねない)
     @ObservationIgnored var pendingOpenVoice = false
+    /// 「直してと頼む」(#1885): 依頼文を入れて中央のアプリを直す会話を開く(送らない)。`AppCanvas` が `MacRootView` の会話につなぐ
+    @ObservationIgnored var onAskFix: (@MainActor (String) -> Void)?
+    /// モーダルの中の「直してと頼む」。モーダルを閉じ終えてから会話を開く(シートを重ねない)
+    @ObservationIgnored var pendingFixDraft: String?
     /// Field.health を Mac では書かないことの一言(#958・アプリごとに 1 回)
     @ObservationIgnored var healthNote = MacHealthNote()
 
@@ -294,7 +303,7 @@ final class MacAppRuntime: RuntimeNavigating {
 
         case .openUrl:
             guard let url = ExternalURLPolicy.openable(action.url) else {
-                toast = L10n.tr("openUrl: url は https か line/slack/discord/tel/mailto/maps のみ")
+                reportFixable(L10n.tr("openUrl: url は https か line/slack/discord/tel/mailto/maps のみ"), ctx: ctx, part: L10n.tr("リンク"))
                 return
             }
             NSWorkspace.shared.open(url)
@@ -326,7 +335,7 @@ final class MacAppRuntime: RuntimeNavigating {
             toast = L10n.tr("フォローは Mac では使えません")
 
         default:
-            toast = L10n.tr("このボタンは Mac ではまだ使えません") // 知らない種類(.unknown)
+            reportFixable(L10n.tr("このボタンは Mac ではまだ使えません"), ctx: ctx) // 知らない種類(.unknown): アプリの作りで直せる
         }
     }
 
@@ -354,7 +363,7 @@ final class MacAppRuntime: RuntimeNavigating {
     private func save(_ action: Action, _ ctx: ActionContext) async {
         let target = RecordActionSteps.saveTarget(action, ctx, dsl: dsl) { self.records(for: $0) }
         guard case .ready(let entity, let form, let recordId) = target else {
-            if case .invalid(let message) = target { toast = message }
+            if case .invalid(let message) = target { reportInvalidSave(message, ctx) }
             return
         }
         let skipsHealth = MacHealthNote.applies(entity: dsl.entity(entity), data: form.payload, isNew: recordId == nil)

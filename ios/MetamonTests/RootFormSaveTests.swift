@@ -65,6 +65,48 @@ final class RootFormSaveTests: XCTestCase {
         XCTAssertNil(rt.toast, "何も変えずに保存したら何も出さない(M10)")
     }
 
+    /// 3 秒以内に 2 回保存: 文言は同じでも toastSerial が変わり、ToastHost の表示時間が出し直しになる。VoiceOver も 2 回読む
+    func testSecondSaveWithSameToastRestartsToast() async throws {
+        let original = VoiceOverAnnouncer.post
+        defer { VoiceOverAnnouncer.post = original }
+        var posted: [String] = []
+        VoiceOverAnnouncer.post = { posted.append($0) }
+        let rt = try runtime()
+        let draft = FormDraft(entity: try XCTUnwrap(rt.dsl.entity("memo")))
+        draft.values["body"] = .string("1")
+        await save(rt, draft, at: tabRoot)
+        let first = rt.toastSerial
+
+        draft.values["body"] = .string("2")
+        await save(rt, draft, at: tabRoot)
+
+        let saved = await rt.recordSync.cached(appId: appId, entity: "memo")
+        XCTAssertEqual(saved.count, 2)
+        XCTAssertEqual(rt.toast, L10n.tr("保存しました"))
+        XCTAssertNotEqual(rt.toastSerial, first, "同じ文言でも .task(id:) を出し直す")
+        XCTAssertEqual(posted, [L10n.tr("保存しました"), L10n.tr("保存しました")], "2 回目も読む")
+    }
+
+    /// 保存の間に入れ直した値は、保存の後で空に戻さない
+    func testTypingDuringSaveIsKept() async throws {
+        let rt = try runtime()
+        let draft = FormDraft(entity: try XCTUnwrap(rt.dsl.entity("memo")))
+        draft.values["body"] = .string("買い物")
+
+        let saving = Task { await save(rt, draft, at: tabRoot) }
+        // 書き込み(recordSync の actor)を待っている間に次の入力が入る。main actor で見えた時は必ず await の途中
+        for _ in 0..<1000 where !rt.saveFlight.isSaving(draft) { await Task.yield() }
+        XCTAssertTrue(rt.saveFlight.isSaving(draft), "保存の途中に入れる")
+        draft.values["body"] = .string("次のメモ")
+        await saving.value
+
+        let saved = await rt.recordSync.cached(appId: appId, entity: "memo")
+        XCTAssertEqual(saved.count, 1)
+        XCTAssertEqual(saved.first?.data["body"], .string("買い物"), "保存したのは押した時の値")
+        XCTAssertEqual(draft.payload["body"], .string("次のメモ"), "入れ直した値を消さない")
+        XCTAssertEqual(rt.toast, L10n.tr("保存しました"))
+    }
+
     /// single(#267)は 1 件を上書きし続ける。最初の保存(まだ記録が無い)でも入力を空に戻さない。
     func testSingleEntityKeepsValuesOnFirstSave() async throws {
         let rt = try runtime(single: true)

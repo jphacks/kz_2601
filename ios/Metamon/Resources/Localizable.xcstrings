@@ -86,6 +86,23 @@
         }
       }
     },
+    "%@ とつないでください" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Connect %@"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ とつないでください"
+          }
+        }
+      }
+    },
     "%@ とのつなぎを切りますか？" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -1300,6 +1317,23 @@
         }
       }
     },
+    "1 つのアカウントに複数のサインインの方法をつなぐと、iPhone でも Android でも同じアカウントに入れます。" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Link more than one sign-in method to your account to use the same account on both iPhone and Android."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "1 つのアカウントに複数のサインインの方法をつなぐと、iPhone でも Android でも同じアカウントに入れます。"
+          }
+        }
+      }
+    },
     "1 人 1 件までです。もう登録しています" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -1806,6 +1840,40 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Apple に引き継ぎました。機種変更のあとも同じ Apple ID で戻れます"
+          }
+        }
+      }
+    },
+    "Apple をつなぎました。次からは Apple でもこのアカウントに入れます。" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Apple is now linked. You can also sign in to this account with Apple from now on."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Apple をつなぎました。次からは Apple でもこのアカウントに入れます。"
+          }
+        }
+      }
+    },
+    "Apple をつなげませんでした" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Couldn't connect Apple"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Apple をつなげませんでした"
           }
         }
       }
@@ -4462,6 +4530,40 @@
         }
       }
     },
+    "この Apple ID のメールアドレスは、すでに別のアカウントで使われています。アカウントはまとめず、いまのアカウントはそのままです。そのアカウントを使うときは、ログアウトしてから、そのアカウントを作った方法でサインインしてください。" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The email address for this Apple ID is already used by another account. The accounts were not merged, and your current account is unchanged. To use that account, sign out and then sign in with the method you used to create it."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "この Apple ID のメールアドレスは、すでに別のアカウントで使われています。アカウントはまとめず、いまのアカウントはそのままです。そのアカウントを使うときは、ログアウトしてから、そのアカウントを作った方法でサインインしてください。"
+          }
+        }
+      }
+    },
+    "この Apple ID は、すでに別のアカウントで使われています。アカウントはまとめず、いまのアカウントはそのままです。この Apple ID のアカウントを使うときは、ログアウトしてから Apple でサインインしてください。" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "This Apple ID is already used by another account. The accounts were not merged, and your current account is unchanged. To use the account for this Apple ID, sign out and then sign in with Apple."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "この Apple ID は、すでに別のアカウントで使われています。アカウントはまとめず、いまのアカウントはそのままです。この Apple ID のアカウントを使うときは、ログアウトしてから Apple でサインインしてください。"
+          }
+        }
+      }
+    },
     "この Apple ID は別のアカウントで使われています" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -4849,6 +4951,40 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "このアプリを作った人が Tailor It Pro ではないため、共有のデータに書き込めません(見ることはできます)"
+          }
+        }
+      }
+    },
+    "このアプリを作った人が Tailor It Pro ではないため、外のサービスを使えません" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The creator of this app doesn't have Tailor It Pro, so outside services can't be used"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "このアプリを作った人が Tailor It Pro ではないため、外のサービスを使えません"
+          }
+        }
+      }
+    },
+    "このサービスはいまつなげません。しばらくしてからお試しください。" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "This service can't be connected right now. Please try again later."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "このサービスはいまつなげません。しばらくしてからお試しください。"
           }
         }
       }
@@ -5295,6 +5431,23 @@
         }
       }
     },
+    "この画面では使えません" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Not available here"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "この画面では使えません"
+          }
+        }
+      }
+    },
     "この画面について話す" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -5546,6 +5699,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "この部品について話す"
+          }
+        }
+      }
+    },
+    "この部品は %@ のデータを使います。つなぐと続けられます。つないだサービスは設定からいつでも切れます。" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "This part uses data from %@. Connect it to continue. You can disconnect anytime in Settings."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "この部品は %@ のデータを使います。つなぐと続けられます。つないだサービスは設定からいつでも切れます。"
           }
         }
       }
@@ -5954,6 +6124,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "つないでいません"
+          }
+        }
+      }
+    },
+    "つながっています" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Linked"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "つながっています"
           }
         }
       }
@@ -7307,6 +7494,57 @@
         }
       }
     },
+    "アクションボタン" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Action Button"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "アクションボタン"
+          }
+        }
+      }
+    },
+    "アクションボタンのある iPhone では、設定アプリの「アクションボタン」で「ショートカット」を選び、Tailor It の「アプリを開く」を割り当てると、押すだけで作ったアプリを開けます。" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "On an iPhone with the Action Button, open the Settings app, go to Action Button, choose Shortcut, and pick “Open App” from Tailor It to open your app with one press."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "アクションボタンのある iPhone では、設定アプリの「アクションボタン」で「ショートカット」を選び、Tailor It の「アプリを開く」を割り当てると、押すだけで作ったアプリを開けます。"
+          }
+        }
+      }
+    },
+    "アクションボタンのある iPhone では、設定アプリの「アクションボタン」で「ショートカット」を選び、Tailor It の「記録帳を開く」を割り当てると、押すだけで記録帳を開けます。" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "On an iPhone with the Action Button, open the Settings app, go to Action Button, choose Shortcut, and pick “Open Tracker” from Tailor It to open your tracker with one press."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "アクションボタンのある iPhone では、設定アプリの「アクションボタン」で「ショートカット」を選び、Tailor It の「記録帳を開く」を割り当てると、押すだけで記録帳を開けます。"
+          }
+        }
+      }
+    },
     "アップデート" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -7354,6 +7592,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "アプリ"
+          }
+        }
+      }
+    },
+    "アプリがまだありません" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No apps yet"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "アプリがまだありません"
           }
         }
       }
@@ -7422,6 +7677,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "アプリが落ちた時に、落ちた場所(プログラムの位置)・端末の機種・OS・アプリの版とユーザー ID を Google の Firebase Crashlytics に送り、不具合を直すのに使います。話した内容・記録・記録帳の中身は送りません。"
+          }
+        }
+      }
+    },
+    "アプリの一覧" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Apps"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "アプリの一覧"
           }
         }
       }
@@ -8612,6 +8884,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "サインインし直してから送ってください。"
+          }
+        }
+      }
+    },
+    "サインインの方法" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sign-in Methods"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "サインインの方法"
           }
         }
       }
@@ -10754,6 +11043,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "一覧に出す数字を選ぶ"
+          }
+        }
+      }
+    },
+    "一覧に戻る" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Back to list"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "一覧に戻る"
           }
         }
       }
@@ -14671,6 +14977,74 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "外せませんでした。元に戻しました"
+          }
+        }
+      }
+    },
+    "外のサービスが混み合っています。少し待ってから、もう一度お試しください。" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The outside service is busy. Please wait a moment and try again."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "外のサービスが混み合っています。少し待ってから、もう一度お試しください。"
+          }
+        }
+      }
+    },
+    "外のサービスとつながっていません。設定の「つないだサービス」からつないでください。" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Not connected to the outside service. Connect it in Settings > Connected services."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "外のサービスとつながっていません。設定の「つないだサービス」からつないでください。"
+          }
+        }
+      }
+    },
+    "外のサービスはいま使えません。しばらくしてからお試しください。" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Outside services aren't available right now. Please try again later."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "外のサービスはいま使えません。しばらくしてからお試しください。"
+          }
+        }
+      }
+    },
+    "外のサービスを使うには Tailor It Pro が必要です" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Using outside services needs Tailor It Pro"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "外のサービスを使うには Tailor It Pro が必要です"
           }
         }
       }
@@ -18937,6 +19311,40 @@
         }
       }
     },
+    "記録の画面を開く" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Open Entry Form"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "記録の画面を開く"
+          }
+        }
+      }
+    },
+    "記録の種類" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Entry Type"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "記録の種類"
+          }
+        }
+      }
+    },
     "記録の自動削除" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -19052,6 +19460,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "記録先と内容を決めて「完了」を押す"
+          }
+        }
+      }
+    },
+    "記録先のアプリ" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Destination App"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "記録先のアプリ"
           }
         }
       }
@@ -19833,23 +20258,6 @@
         }
       }
     },
-    "課金の制限を無効にする(デモ用・回数と有料機能)" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Disable purchase limits (demo: daily limit and paid features)"
-          }
-        },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "課金の制限を無効にする(デモ用・回数と有料機能)"
-          }
-        }
-      }
-    },
     "調整" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -19999,6 +20407,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "購入できませんでした。時間をおいて試してください。"
+          }
+        }
+      }
+    },
+    "購入の確認がまだサーバーに届いていません。少し待ってから、もう一度お試しください。" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Your purchase hasn't reached our server yet. Wait a moment, then try again."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "購入の確認がまだサーバーに届いていません。少し待ってから、もう一度お試しください。"
           }
         }
       }
@@ -21558,6 +21983,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "閉じると、この端末では AI で書くボタンは使えません。"
+          }
+        }
+      }
+    },
+    "閉じると、この部品は外のサービスを呼びません。" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "If you close this, this part won't call the outside service."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "閉じると、この部品は外のサービスを呼びません。"
           }
         }
       }

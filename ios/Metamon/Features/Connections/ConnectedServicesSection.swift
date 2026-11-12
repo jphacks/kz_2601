@@ -110,23 +110,33 @@ struct ConnectedServicesSection: View {
     }
 
     private func connect(_ provider: String) {
-        // 外の API は作成者の Pro を PRO_GATE_MODE に関係なく確かめるので、端末も Pro そのものを見る
-        guard ProGate.shared.isPro else {
+        if ConnectFlow.start(provider, model: model, client: services.external, authenticate: ConnectFlow.authenticate(webAuth)) == nil {
             showPaywall = true
-            return
-        }
-        let webAuth = webAuth
-        Task {
-            await model.connect(provider, client: services.external) { url in
-                // 前にサインインしていた人のブラウザのログインを使い回さない
-                try await webAuth.authenticate(using: url, callbackURLScheme: ConnectCallback.scheme, preferredBrowserSession: .ephemeral)
-            }
         }
     }
 
     static var paidFeature: PaidFeature {
         PaidFeature(id: "externalServices", title: L10n.tr("つないだサービス"),
                     reason: L10n.tr("外のサービスを呼ぶたびにサーバーの費用がかかるため、Pro の機能です。"))
+    }
+}
+
+/// 「つなぐ」の流れ(設定の一覧と、外の API の断りの案内 #2001 で同じものを呼ぶ)。
+@MainActor
+enum ConnectFlow {
+    /// 同意の画面へ進めば、その流れの Task。Pro でなければ何もせず nil(呼び出し側が課金画面を出す)
+    @discardableResult
+    static func start(_ provider: String, model: ConnectedServicesModel, client: any ExternalServicesClient,
+                      isPro: Bool? = nil,
+                      authenticate: @escaping ConnectedServicesModel.Authenticate) -> Task<Void, Never>? {
+        // 外の API は作成者の Pro を PRO_GATE_MODE に関係なく確かめるので、端末も Pro そのものを見る
+        guard isPro ?? ProGate.shared.isPro else { return nil }
+        return Task { await model.connect(provider, client: client, authenticate: authenticate) }
+    }
+
+    /// 同意の画面(前にサインインしていた人のブラウザのログインを使い回さない)
+    static func authenticate(_ webAuth: WebAuthenticationSession) -> ConnectedServicesModel.Authenticate {
+        { url in try await webAuth.authenticate(using: url, callbackURLScheme: ConnectCallback.scheme, preferredBrowserSession: .ephemeral) }
     }
 }
 

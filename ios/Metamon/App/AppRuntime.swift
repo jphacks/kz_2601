@@ -43,11 +43,17 @@ final class AppRuntime: RuntimeNavigating {
     var selectedTab: String = ""
     var sheet: Route?
     var fullScreen: Route?
-    var showVoiceSheet = false
+    var showVoiceSheet = false {
+        didSet { if showVoiceSheet, !assistiveAccess.shows(.voiceSheet) { showVoiceSheet = false } } // #1997 隠している間は立てない
+    }
     /// 第三者 AI への送信の同意(#246)。アプリ本体(MetamonApp)が `.shared` を入れる。nil(ユニットテスト等)は同意済み扱い。
     @ObservationIgnored var aiConsent: AIConsentStore?
     /// 同意の画面を出す(初回起動 / 同意前に生成・対話しようとした時)。
     var showAIConsent = false
+    /// アシスティブアクセスの決まり(#1997)。`RootView` が入れる。同意の画面(`ConsentHost`)が無い間は出そうとしない。
+    @ObservationIgnored var assistiveAccess = AssistiveAccessPolicy.standard {
+        didSet { if !assistiveAccess.shows(.voiceSheet) { showVoiceSheet = false } }
+    }
     /// 同意の前に話した最後の 1 件(M2)。同意して画面が閉じたら続けて送る(`resumeUtteranceAfterConsent`)
     @ObservationIgnored var utteranceAwaitingConsent: (text: String, source: ClarifyFlow.InputSource)?
     /// 音声モデルのダウンロード確認(#246・4.2.3(ii))。端末にモデルが無く未承認の時だけ立つ。
@@ -109,8 +115,11 @@ final class AppRuntime: RuntimeNavigating {
             #endif
             if let toast, toast != oldValue { VoiceOverAnnouncer.announce(toast) } // H8
             if fixOffer != nil, fixOffer?.message != toast { fixOffer = nil } // 別のトーストに替わったら外す
+            toastSerial &+= 1
         }
     }
+    /// toast を出した回数。同じ文言が 2 回続いても `ToastHost` の `.task(id:)` を出し直す(3 秒以内の 2 回目の保存など)
+    private(set) var toastSerial = 0
     /// いまのトーストに付ける「直してと頼む」(`AppRuntime+FixRequest.swift`)。
     var fixOffer: FixOffer?
 
@@ -310,7 +319,6 @@ final class AppRuntime: RuntimeNavigating {
             await restoreFromServer()
             if DeviceAppID.issuedThisLaunch { await resumeLatestAppIfEmpty() } // #276: 再インストール後のサインイン
             startSync()
-            Task { await refreshSpotlight() } // #1996
         }
         noteRetention() // #482 起動時の DSL(モック・オフラインでは apply を通らない)
         presentDeferredAccountLinkIfNeeded() // #276・H7 前の起動で最初のアプリを作っていたら引き継ぎの案内
@@ -436,7 +444,7 @@ final class AppRuntime: RuntimeNavigating {
     @ObservationIgnored private var pendingHotReloadTask: Task<Void, Never>?
     @ObservationIgnored private var recordsRefreshTasks: [String: Task<Void, Never>] = [:]
     /// 保存中のフォーム(saveRecord の連打で同じ記録を 2 件作らない)
-    @ObservationIgnored private let saveFlight = SaveFlight()
+    @ObservationIgnored let saveFlight = SaveFlight() // テストが保存の途中を見る
     /// 最後に書き込んだフォーム。送った後にサーバーが断ったら「保存しました」を取り消す(M10 × #317 / #346 / #321)
     @ObservationIgnored var lastSavedForm: SavedForm?
     #if !APP_STORE_REVIEW
@@ -682,6 +690,7 @@ final class AppRuntime: RuntimeNavigating {
             }
             scheduleFirstEditHint(createdFromInitial: createdFromInitial) // #274 最初のアプリの直後に 1 回だけ
             print("[Metamon] morph ok: version=\(result.document.version) mode=\(result.mode ?? "-") screens=\(result.document.dsl.screens.map(\.id)) summary=\(result.summary ?? "")")
+            if createdFromInitial { await indexCreatedApp(result.document) } // #1996 作ったアプリを Spotlight に
             if gatePaid { await gatePaidGeneration(before: previous) } // #414
         } catch {
             guard document.appId == previous.appId else { return } // 移った先に前のアプリの失敗を出さない
@@ -949,9 +958,10 @@ final class AppRuntime: RuntimeNavigating {
     func appsList() async -> [AppSummary] {
         appsLoading = apps.isEmpty
         defer { appsLoading = false }
+        let spotlightGeneration = spotlight.generation
         do {
             apps = try await services.appConfig.listApps()
-            await spotlight.sync(apps) // 一覧に無いアプリを Spotlight から消す(#1996)
+            await spotlight.sync(apps, since: spotlightGeneration) // 一覧に無いアプリを Spotlight から消す(#1996)
         } catch {
             print("[Metamon] listApps failed: \(error)")
             let cached = AppListCache.shared.load()
@@ -1330,6 +1340,7 @@ final class AppRuntime: RuntimeNavigating {
                     #endif
                     Task { await purgeExpired(entity) } // #482 保存の後(画面遷移を待たせない)
                 })
+            let sent = form.payload // 保存の間に入れ直した値を、保存の後で消さないための比較元
             let outcome = await RecordBook.save(
                 appId: appId, entity: entity, form: form, recordId: recordId,
                 recordSync: recordSync, flight: saveFlight, author: postAuthor(for: entity), hooks: hooks,
@@ -1338,8 +1349,8 @@ final class AppRuntime: RuntimeNavigating {
             switch outcome {
             case .readOnly: notifyReadOnly(entity: entity) // 送信待ちに積まない(#249)
             // 既存の記録を何も変えずに保存: 書き込まず(「保存しました」も出さず)に画面だけ進める(M10)
-            case .unchanged: leaveAfterSave(action, ctx, entity: entity, form: form, recordId: recordId, wrote: false)
-            case .saved: leaveAfterSave(action, ctx, entity: entity, form: form, recordId: recordId, wrote: true)
+            case .unchanged: leaveAfterSave(action, ctx, entity: entity, form: form, recordId: recordId, sent: sent, wrote: false)
+            case .saved: leaveAfterSave(action, ctx, entity: entity, form: form, recordId: recordId, sent: sent, wrote: true)
             case .inFlight, .held: break // 連打・名前を聞いている間
             }
 
@@ -1405,7 +1416,8 @@ final class AppRuntime: RuntimeNavigating {
 
     /// 保存の後: `screen` があればそこへ、無ければ閉じる。タブ / main の根なら留まり、書き込めた時だけ「保存しました」(#1719)。
     /// single の entity(#267)は 1 件を上書きし続けるので、最初の保存(recordId なし)でも新規として空に戻さない。
-    private func leaveAfterSave(_ action: Action, _ ctx: ActionContext, entity: String, form: FormDraft, recordId: String?, wrote: Bool) {
+    private func leaveAfterSave(_ action: Action, _ ctx: ActionContext, entity: String, form: FormDraft, recordId: String?,
+                                sent: [String: JSONValue], wrote: Bool) {
         let isNewRecord = recordId == nil && dsl.entity(entity)?.single != true
         switch NavigationResolver.afterSave(navigationState, from: ctx.route, screen: action.screen, isNewRecord: isNewRecord) {
         case .navigate(let screen):
@@ -1414,8 +1426,11 @@ final class AppRuntime: RuntimeNavigating {
             close(ctx.route)
         case .stay(let resetForm):
             guard wrote else { return } // 何も変えずに保存: 何も出さない(M10)
-            if resetForm { form.reset() } // 新規: 続けて入れられるよう空に戻す。既存の記録は値を残す
-            toast = L10n.tr("保存しました") // VoiceOver も読む(H8)
+            // 新規: 続けて入れられるよう空に戻す。既存の記録は値を残す。保存の間に入れ直した値があれば消さない
+            if resetForm, form.payload == sent { form.reset() }
+            let saved = L10n.tr("保存しました")
+            if toast == saved { VoiceOverAnnouncer.announce(saved) } // 出ている間の 2 回目: didSet は同じ文言を読み直さないのでここで読む
+            toast = saved // VoiceOver も読む(H8)
         }
     }
 
@@ -1454,8 +1469,8 @@ final class AppRuntime: RuntimeNavigating {
         if let denial = RecordWriteDenial(api), let entity { return denialMessage(denial, entity: entity) } // #272 #273
         #if !APP_STORE_REVIEW
         if let denial = CoinDenial(api) { // #630 書き込みの枠・コイン。自分が払う時はお店 / コインの設定も開く
-            CoinGate.shared.handle(denial)
-            return CoinCopy.denialBody(denial)
+            CoinGate.shared.handle(denial) // アシスティブアクセス(#1997)ではお店を出さない(`CoinSheetPresenter`)
+            return assistiveAccess.shows(.paywall) ? CoinCopy.denialBody(denial) : AssistiveAccessPolicy.unavailableMessage
         }
         #endif
         if let pro = ProRequired(api) { return pro.writeMessage } // #316(印を付けるなど)

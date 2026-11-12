@@ -50,6 +50,7 @@ struct MetamonApp: App {
         _ = ExpensiveNetworkProbe.shared // 音声モデルの確認(#275)より前に回線の種類の監視を始める
         services.ai = ConsentGatedAIClient(base: services.ai) { AIConsentStore.isGranted(in: .standard) }
         if BuildConfig.forceMock { MusicSession.shared.player = FakeMusicPlayback() } // musicPlayer(#412)は音を出さない偽物
+        if BuildConfig.forceMock { DeviceCalendar.source = FakeDeviceCalendar.sample } // 端末のカレンダー・リマインダー(#1987)は固定の中身
         #if !APP_STORE_REVIEW
         if BuildConfig.forceMock { HealthData.source = MockHealthData() } // healthStat(#167)は固定値
         if BuildConfig.forceMock { SensorData.source = MockSensorData() } // sensorValue(#419)は決まった波形
@@ -137,6 +138,7 @@ struct MetamonApp: App {
             .modifier(PushRegistrationObserver(uid: session.user?.uid)) // #269
             #endif
             .environment(session)
+            .modifier(AssistiveAccessReader())              // アシスティブアクセスの中か(#1997・判定はここだけ)
             .environment(\.services, services)              // protocol 越しのサービス
             // 表示言語(#44): 設定の「言語」で即時切替。`Text("…")` の解決と日付・数値の書式がこの Locale に従う
             .environment(\.locale, LanguagePreference.shared.locale)
