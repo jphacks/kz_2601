@@ -69,7 +69,7 @@ Firebase Auth の REST クライアント(`auth/FirebaseAuthRestClient.kt`・ま
 | `app/src/main/kotlin/.../desktop/voice/` | マイク(`Microphone`・Java Sound)・文字起こし(`Transcriber`・whisper.cpp)・openVoice の流れ(`VoiceInput`)・モデルの置き場 |
 | `services/` | `android/services` の純 Kotlin の部分(API クライアント・記録の保存・送信待ち・同意)を同じソースのまま取り込む。取り込むファイルは `services/build.gradle.kts` で名指し。宣言にだけ出る Android の型は `services/src/shim` の置き換え |
 | `app/src/main/kotlin/.../desktop/net/` | 接続先の設定(既定はモック)・`X-Client-Platform: windows / linux / macos`・User-Agent |
-| `app/src/main/kotlin/.../desktop/store/` | 端末の保存。`%APPDATA%\TailorIt`・`$XDG_DATA_HOME/tailorit`(無ければ `~/.local/share/tailorit`)・`~/Library/Application Support/TailorIt` に設定・同意・記録・送信待ち・DSL を JSON で置く。サインアウトで消す。書き込みは同じフォルダの一時ファイル(毎回別の名前の `*.tmp`)に書いてから置き換え、落ちて残った `*.tmp` は開く時・全部消す時に消す |
+| `app/src/main/kotlin/.../desktop/store/` | 端末の保存。`%APPDATA%\TailorIt`・`$XDG_DATA_HOME/tailorit`(無ければ `~/.local/share/tailorit`)・`~/Library/Application Support/TailorIt` に設定・同意・記録・送信待ち・DSL を JSON で置く。サインアウトで消す。書き込みは同じフォルダの一時ファイル(毎回別の名前の `*.tmp`)に書いてから置き換え、落ちて残った `*.tmp` は開く時・全部消す時に消す。詳しくは [docs/desktop/storage.md](../docs/desktop/storage.md) |
 | `app/src/main/kotlin/.../desktop/SingleInstance.kt` | 起動は保存先ごとに 1 つ。保存先の `.lock` をロックし(プロセスが終われば OS が外す)、127.0.0.1 の空いた口と合言葉を `.instance` に書いて 2 つ目の起動を待つ。2 つ目は合言葉と引数を送って前に出させて終わる。ロックを作れない時(保存先に書けないなど)は起動を止めない。記録の JSON を渡した起動はロックを取らない |
 | `app/src/main/kotlin/.../desktop/io/` | 取り込み・書き出し・ドラッグ & ドロップ・クリップボード(PDF は Apache PDFBox)。書き出しの名前は `io/FileNames.kt`(上書きしない・Windows の予約名)。外へ渡すファイルは OS の一時フォルダの `tailorit-drag/`(引き出し)・`tailorit-calendar/`(.ics)に置き、起動時に 1 日より古い物を消す |
 | `app/src/main/kotlin/.../desktop/PhotoPreview.kt` | 写真を大きく見るダイアログ・見せる写真の集め方(Mac の `MacQuickLook.sources` と同じ規則)・「既定のアプリで開く」の一時ファイル |
