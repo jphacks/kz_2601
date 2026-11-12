@@ -2,10 +2,18 @@ package ingest
 
 import (
 	"context"
+	"encoding/json"
+	"errors"
 	"fmt"
 	"log/slog"
 	"slices"
+	"sort"
+	"strings"
+	"sync"
 	"time"
+
+	"google.golang.org/api/googleapi"
+	logging "google.golang.org/api/logging/v2"
 
 	"github.com/jphacks/kz_2601/backend/internal/loop"
 	"github.com/jphacks/kz_2601/backend/internal/store"
@@ -111,4 +119,132 @@ func CrashRaw(s CrashSpike) Raw {
 		Text: fmt.Sprintf("クラッシュの急増: 種類 %s / %d 件 / 版 %s", truncate(s.Type, 80), s.Count, s.AppVersion),
 		Kind: "crash", Count: s.Count, AppVersion: s.AppVersion, CreatedAt: s.At,
 	}
+}
+
+// LoggingLister is the slice of the Cloud Logging API GenLogLogging uses
+// (entries.list), small enough to fake in tests (#2146).
+type LoggingLister interface {
+	ListEntries(ctx context.Context, req LoggingListRequest) (LoggingPage, error)
+}
+
+// LoggingListRequest is one entries.list call.
+type LoggingListRequest struct {
+	Project   string
+	Filter    string
+	PageSize  int
+	PageToken string
+}
+
+// LoggingPage is one page of entries, each in the `gcloud logging read
+// --format=json` entry shape ({"timestamp": ..., "jsonPayload": {...}}).
+type LoggingPage struct {
+	Entries       []json.RawMessage
+	NextPageToken string
+}
+
+// Paging defaults of GenLogLogging.
+const (
+	DefaultGenFailPageSize   = 1000
+	DefaultGenFailMaxEntries = 50000
+)
+
+// ErrGenFailTooMany is returned when the range has more lines than
+// MaxEntries: a cut-off read would drop the newest lines and skew the rates.
+var ErrGenFailTooMany = errors.New("generation-failure logs: too many ai.generate lines")
+
+// GenLogLogging is a GenLogSource reading the ai.generate lines straight from
+// the Cloud Logging API (LOOP_GENFAIL_SOURCE=logging). It asks only for the
+// GenFailFields, page by page, up to MaxEntries lines.
+type GenLogLogging struct {
+	Client     LoggingLister
+	Project    string
+	Services   []string
+	PageSize   int // default DefaultGenFailPageSize (the API caps it at 1000)
+	MaxEntries int // default DefaultGenFailMaxEntries
+}
+
+// GenerateEvents implements GenLogSource.
+func (g GenLogLogging) GenerateEvents(ctx context.Context, since, until time.Time) ([]GenEvent, error) {
+	filter, err := GenFailFilter{Since: since, Until: until, Services: g.Services}.Build()
+	if err != nil {
+		return nil, err
+	}
+	size, limit := g.PageSize, g.MaxEntries
+	if size <= 0 || size > DefaultGenFailPageSize {
+		size = DefaultGenFailPageSize
+	}
+	if limit <= 0 {
+		limit = DefaultGenFailMaxEntries
+	}
+	out := []GenEvent{}
+	read, token := 0, ""
+	for {
+		page, err := g.Client.ListEntries(ctx, LoggingListRequest{Project: g.Project, Filter: filter, PageSize: size, PageToken: token})
+		if err != nil {
+			return nil, fmt.Errorf("logging entries.list: %w", err)
+		}
+		if read += len(page.Entries); read > limit {
+			return nil, fmt.Errorf("%w: more than %d (narrow %s or raise %s)", ErrGenFailTooMany, limit, EnvGenFailServices, EnvGenFailMaxEntries)
+		}
+		for _, raw := range page.Entries {
+			if ev, ok := decodeGenEntry(raw); ok {
+				out = append(out, ev)
+			}
+		}
+		if page.NextPageToken == "" {
+			break
+		}
+		if page.NextPageToken == token {
+			return nil, errors.New("logging entries.list: the page token did not move")
+		}
+		token = page.NextPageToken
+	}
+	sort.SliceStable(out, func(i, j int) bool { return out[i].At.Before(out[j].At) })
+	return genInRange(out, since, until), nil
+}
+
+// loggingAPI is the LoggingLister over google.golang.org/api/logging/v2 with
+// the application default credentials (roles/logging.viewer on the project).
+// The service is made on the first call.
+type loggingAPI struct {
+	once sync.Once
+	svc  *logging.Service
+	err  error
+}
+
+// loggingEntryFields asks for the timestamp and the decoder's fields only, so
+// uid_hash, app_hash and anything else never leave Cloud Logging.
+func loggingEntryFields() googleapi.Field {
+	fs := make([]string, len(GenFailFields))
+	for i, f := range GenFailFields {
+		fs[i] = "jsonPayload/" + f
+	}
+	return googleapi.Field("nextPageToken,entries(timestamp," + strings.Join(fs, ",") + ")")
+}
+
+// ListEntries implements LoggingLister.
+func (l *loggingAPI) ListEntries(ctx context.Context, req LoggingListRequest) (LoggingPage, error) {
+	l.once.Do(func() { l.svc, l.err = logging.NewService(ctx) })
+	if l.err != nil {
+		return LoggingPage{}, l.err
+	}
+	resp, err := l.svc.Entries.List(&logging.ListLogEntriesRequest{
+		ResourceNames: []string{"projects/" + req.Project}, Filter: req.Filter, OrderBy: "timestamp asc",
+		PageSize: int64(req.PageSize), PageToken: req.PageToken,
+	}).Fields(loggingEntryFields()).Context(ctx).Do()
+	if err != nil {
+		return LoggingPage{}, err
+	}
+	page := LoggingPage{NextPageToken: resp.NextPageToken}
+	for _, e := range resp.Entries {
+		raw, err := json.Marshal(struct {
+			Timestamp   string          `json:"timestamp"`
+			JSONPayload json.RawMessage `json:"jsonPayload,omitempty"`
+		}{e.Timestamp, json.RawMessage(e.JsonPayload)})
+		if err != nil {
+			return LoggingPage{}, err
+		}
+		page.Entries = append(page.Entries, raw)
+	}
+	return page, nil
 }

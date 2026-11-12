@@ -115,6 +115,7 @@ flowchart LR
 | `LOOP_SOURCE_APPSTORE` | 空 | `on` でストアのレビューを取り込む |
 | `LOOP_SOURCE_TESTFLIGHT` | 空 | `on` で TestFlight のフィードバック(スクショ付き・クラッシュの送信)を取り込む。キーは下の `LOOP_ASC_*` を共用。既定の `LOOP_AI_SOURCES` に入っていないので、AI に回すなら `testflight` を足す |
 | `LOOP_SOURCE_GENFAIL` | 空 | `on` で生成の失敗の急増を取り込む。`LOOP_GENFAIL_LOGS`(`gcloud logging read --format=json` で書き出したファイル・カンマ区切り。`cmd/ai-session-report -logs` と同じ形)の `ai.generate` の行から、失敗のコード(`outcome:failed` / `outcome:refused` / `error:<error_code>` / `retry:<retry_reasons>` / `validation:<validation_codes>`)ごとに、直近 `LOOP_GENFAIL_WINDOW`(既定 `24h`)の割合をその前の `LOOP_GENFAIL_BASELINE`(既定 `168h`)と比べる。件数が `LOOP_GENFAIL_MIN_COUNT`(既定 5)以上・割合が `LOOP_GENFAIL_MIN_RATE`(既定 0.05)以上・基準の `LOOP_GENFAIL_FACTOR`(既定 2)倍以上なら、コード 1 つ・1 日に 1 件。項目はコードと件数だけ(入力文・uid・アプリの id・ハッシュは持たない)。既定の `LOOP_AI_SOURCES` に入っていないので、AI に回すなら `gen_failure` を足す |
+| `LOOP_GENFAIL_SOURCE` | `file` | `logging` で書き出したファイルの代わりに Cloud Logging の API(entries.list)から読む。`LOOP_GENFAIL_PROJECT`(必須)のプロジェクトの、`LOOP_GENFAIL_SERVICES`(任意・カンマ区切り)の Cloud Run の `ai.generate` の行を 1000 件ずつ読む。読む項目はファイルと同じ(uid_hash・app_hash は API にも頼まない)。`LOOP_GENFAIL_MAX_ENTRIES`(既定 50000)を超えたら途中で切らずに失敗する(切ると割合がずれる)。実行するサービスアカウントにそのプロジェクトの `roles/logging.viewer` が要る(IAM は人が付ける) |
 | `LOOP_ASC_ISSUER_ID` / `LOOP_ASC_KEY_ID` / `LOOP_ASC_PRIVATE_KEY` / `LOOP_ASC_APP_ID` | — | App Store Connect API のキー(役割は Customer Support で足りる)。鍵は `.p8` の中身そのもの |
 | `LOOP_ISSUE_REPO` | 空 = dry run | Issue を作るリポジトリ(`owner/name`) |
 | `LOOP_GITHUB_TOKEN` | — | Issue の作成・コメント・読み取りだけの権限(GitHub App のインストールのトークン、または fine-grained の PAT の `issues: write`)。マージ・ラベル・コードの権限は持たせない |
@@ -278,7 +279,7 @@ go run ./cmd/feedback-loop audit -summary
 |---|---|
 | 定期の実行を動かすこと | Terraform(`infra/feedback_loop.tf`)はあるが既定は止まっている。apply・Secret の値・有効化は人([定期の実行](#定期の実行)) |
 | Crashlytics を自動で読む | Crashlytics は安く読める API が無い。BigQuery のエクスポート(#296)ができたら `ingest.CrashSource` を実装する。それまでは `ingest-crash` で人が記録 |
-| 生成の失敗の急増を自動で読む | 今はログを人が `gcloud logging read` で書き出して `LOOP_GENFAIL_LOGS` に渡す。Logging API か BigQuery から読む時は `ingest.GenLogSource` を実装する |
+| 生成の失敗の急増を自動で読む | 既定はログを人が `gcloud logging read` で書き出して `LOOP_GENFAIL_LOGS` に渡す。`LOOP_GENFAIL_SOURCE=logging` で API から読めるが、定期の実行での有効化とサービスアカウントへの `roles/logging.viewer` は人 |
 | Google の機密データの検出(#367 の選択肢 2-B) | GCP の設定が要るので後で |
 | 埋め込みでの束ね(#376) | 束ねはモデルの `cluster` の名前に任せている。同じ問題に別の名前が付くと別の束になる(呼び出しをまたぐと特に)。既知の束として渡すのは待っている下書きの名前だけ |
 | 本物の 1 週間分での一致率 | `triage-label-export` で書き出し、人が正解を付けて `triage-eval -model ai` で測る([手順](feedback-loop-triage-agreement.md)・#376 の完了の条件) |

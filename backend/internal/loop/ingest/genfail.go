@@ -34,6 +34,17 @@ const (
 	EnvGenFailMinCount = "LOOP_GENFAIL_MIN_COUNT" // default 5
 	EnvGenFailMinRate  = "LOOP_GENFAIL_MIN_RATE"  // default 0.05
 	EnvGenFailFactor   = "LOOP_GENFAIL_FACTOR"    // default 2
+
+	EnvGenFailSource     = "LOOP_GENFAIL_SOURCE"      // file (default) / logging
+	EnvGenFailProject    = "LOOP_GENFAIL_PROJECT"     // logging: GCP project id
+	EnvGenFailServices   = "LOOP_GENFAIL_SERVICES"    // logging: comma-separated Cloud Run services (optional)
+	EnvGenFailMaxEntries = "LOOP_GENFAIL_MAX_ENTRIES" // logging: default 50000
+)
+
+// Values of LOOP_GENFAIL_SOURCE.
+const (
+	GenFailSourceFile    = "file"
+	GenFailSourceLogging = "logging"
 )
 
 // ErrGenFailOff is returned by GenFailConfigFromEnv when the source is off.
@@ -50,9 +61,10 @@ type GenEvent struct {
 	ValidationCodes map[string]int
 }
 
-// GenLogSource reads ai.generate lines in [since, until]. The real reader is
-// a file the operator exported with `gcloud logging read` (the same input as
-// cmd/ai-session-report); this package never calls the Logging API.
+// GenLogSource reads ai.generate lines in [since, until]. The default reader
+// is a file the operator exported with `gcloud logging read` (the same input
+// as cmd/ai-session-report); LOOP_GENFAIL_SOURCE=logging reads the Logging
+// API instead (GenLogLogging).
 type GenLogSource interface {
 	GenerateEvents(ctx context.Context, since, until time.Time) ([]GenEvent, error)
 }
@@ -407,19 +419,53 @@ func windowLabel(d time.Duration) string {
 	return d.String()
 }
 
+// genFailLogsFromEnv picks the reader: the exported files (default) or the
+// Logging API (LOOP_GENFAIL_SOURCE=logging).
+func genFailLogsFromEnv(getenv func(string) string) (GenLogSource, error) {
+	switch src := strings.TrimSpace(getenv(EnvGenFailSource)); src {
+	case "", GenFailSourceFile:
+		paths := []string{}
+		for p := range ParseList(getenv(EnvGenFailLogs)) {
+			paths = append(paths, p)
+		}
+		sort.Strings(paths)
+		if len(paths) == 0 {
+			return nil, fmt.Errorf("%s=on needs %s (gcloud logging read exports)", EnvGenFailOn, EnvGenFailLogs)
+		}
+		return GenLogFiles{Paths: paths}, nil
+	case GenFailSourceLogging:
+		project := strings.TrimSpace(getenv(EnvGenFailProject))
+		if project == "" {
+			return nil, fmt.Errorf("%s=%s needs %s", EnvGenFailSource, GenFailSourceLogging, EnvGenFailProject)
+		}
+		services := []string{}
+		for s := range ParseList(getenv(EnvGenFailServices)) {
+			services = append(services, s)
+		}
+		sort.Strings(services)
+		g := GenLogLogging{Client: &loggingAPI{}, Project: project, Services: services}
+		if v := getenv(EnvGenFailMaxEntries); v != "" {
+			n, err := strconv.Atoi(v)
+			if err != nil || n <= 0 {
+				return nil, fmt.Errorf("%s: want a positive integer, got %q", EnvGenFailMaxEntries, v)
+			}
+			g.MaxEntries = n
+		}
+		return g, nil
+	default:
+		return nil, fmt.Errorf("%s: want %s or %s, got %q", EnvGenFailSource, GenFailSourceFile, GenFailSourceLogging, src)
+	}
+}
+
 // GenFailConfigFromEnv reads LOOP_SOURCE_GENFAIL and the LOOP_GENFAIL_*
 // settings. On without logs is an error (not a silent skip).
 func GenFailConfigFromEnv(getenv func(string) string) (GenFailures, error) {
 	if getenv(EnvGenFailOn) != "on" {
 		return GenFailures{}, ErrGenFailOff
 	}
-	paths := []string{}
-	for p := range ParseList(getenv(EnvGenFailLogs)) {
-		paths = append(paths, p)
-	}
-	sort.Strings(paths)
-	if len(paths) == 0 {
-		return GenFailures{}, fmt.Errorf("%s=on needs %s (gcloud logging read exports)", EnvGenFailOn, EnvGenFailLogs)
+	logs, err := genFailLogsFromEnv(getenv)
+	if err != nil {
+		return GenFailures{}, err
 	}
 	th := DefaultGenFailThreshold
 	var errs []error
@@ -459,5 +505,5 @@ func GenFailConfigFromEnv(getenv func(string) string) (GenFailures, error) {
 	if err := errors.Join(errs...); err != nil {
 		return GenFailures{}, err
 	}
-	return GenFailures{Logs: GenLogFiles{Paths: paths}, Threshold: th}, nil
+	return GenFailures{Logs: logs, Threshold: th}, nil
 }
