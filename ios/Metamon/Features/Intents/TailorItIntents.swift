@@ -128,6 +128,11 @@ enum TailorIntentError: Error, CustomLocalizedStringResourceConvertible {
     case notReady
     case targetNotFound(String)
     case missingFields([String])
+    /// 数字を読む(#1994): アプリか stat が消えた / 記録が端末に無い / 数で取れない
+    case statNotFound
+    case statNotLoaded(String)
+    case statNotNumber(String)
+    case statLocked(String)
 
     var localizedStringResource: LocalizedStringResource {
         switch self {
@@ -138,6 +143,14 @@ enum TailorIntentError: Error, CustomLocalizedStringResourceConvertible {
         case .targetNotFound(let name): "「\(name)」が見つかりませんでした。Tailor It でアプリを確認してください"
         #endif
         case .missingFields(let names): "「\(names.joined(separator: String(localized: "・")))」が必要です。Tailor It を開いて追加してください"
+        #if APP_STORE_REVIEW
+        case .statNotFound: "その数字が見つかりませんでした。Tailor It で記録帳を確認して、選び直してください"
+        #else
+        case .statNotFound: "その数字が見つかりませんでした。Tailor It でアプリを確認して、選び直してください"
+        #endif
+        case .statNotLoaded(let name): "まだ読み込んでいません。Tailor It で\(name)を一度開いてください"
+        case .statNotNumber(let label): "「\(label)」は数値で読めません。「数字を読む」を使ってください"
+        case .statLocked(let label): "「\(label)」はロック中です。Tailor It を開いて確認してください"
         }
     }
 }
@@ -182,6 +195,17 @@ struct TailorItShortcuts: AppShortcutsProvider {
             ],
             shortTitle: "アプリを開く",
             systemImageName: "square.grid.2x2"
+        )
+        #endif
+        #if os(iOS) // 数字を読む(#1994)は iOS だけ。Mac は #1034 の後で足す
+        AppShortcut(
+            intent: GetStatValueIntent(),
+            phrases: [
+                "\(.applicationName)で数字を読む",
+                "\(.applicationName)の数字を読む",
+            ],
+            shortTitle: "数字を読む",
+            systemImageName: "number"
         )
         #endif
         AppShortcut(
