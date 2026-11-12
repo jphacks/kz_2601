@@ -26,7 +26,6 @@ enum AppGlance {
         var dsl: AppDSL
         var records: [String: [Record]]
         var setting: String?
-        var canDecrypt: Bool
         var countUnit: String
         var now: Date
     }
@@ -53,16 +52,53 @@ enum AppGlance {
         return c.entity.map { [$0] } ?? []
     }
 
-    /// 暗号化した field(#233)を数える stat。
-    static func isEncrypted(_ c: Component, in dsl: AppDSL) -> Bool {
-        guard let e = c.entity, let f = c.field else { return false }
-        return dsl.encryptedFields[e]?.contains(f) ?? false
+    /// 暗号化した項目を使う stat に出す印。値は端末に残さない。
+    static let locked = "🔒"
+
+    /// 暗号化した field(#233)を使う stat か。数える field・並べる field・絞り込み・式(valueExpr)・
+    /// それらが computed ならその式の参照先までたどる。一覧の数字は端末に平文で残るので、こうした stat は数えない。
+    static func touchesEncrypted(_ c: Component, in dsl: AppDSL) -> Bool {
+        let encrypted = dsl.encryptedFields
+        guard !encrypted.isEmpty else { return false }
+        var seen: Set<String> = []
+        func field(_ entity: String, _ id: String?) -> Bool {
+            guard let id else { return false }
+            if encrypted[entity]?.contains(id) == true { return true }
+            guard seen.insert("\(entity).\(id)").inserted, let computed = dsl.entity(entity)?.field(id)?.computed else { return false }
+            return expr(computed, row: entity)
+        }
+        /// `{"ref":"chore.points"}`: ref の field をたどった先の field も見る。
+        func refPath(_ entity: String, _ path: String) -> Bool {
+            var current = entity
+            for id in path.split(separator: ".").map(String.init) {
+                if field(current, id) { return true }
+                guard let next = dsl.entity(current)?.field(id)?.refEntity else { return false }
+                current = next
+            }
+            return false
+        }
+        func filters(_ entity: String, _ list: [Filter]) -> Bool {
+            list.contains { field(entity, $0.field) || $0.valueExpr.map { expr($0, row: nil) } == true }
+        }
+        func expr(_ e: Expr, row: String?) -> Bool {
+            switch e {
+            case .literal: return false
+            case .ref(let path): return row.map { refPath($0, path) } ?? false
+            case .setting(let id): return dsl.entities.contains { $0.single && field($0.id, id) }
+            case .agg(let a): return field(a.entity, a.field) || field(a.entity, a.by) || filters(a.entity, a.filters)
+            case .op(_, let args): return args.contains { expr($0, row: row) }
+            case .cond(let i, let t, let el): return expr(i, row: row) || expr(t, row: row) || expr(el, row: row)
+            }
+        }
+        if c.aggregate == nil, let v = c.valueExpr { return expr(v, row: nil) }
+        guard let e = c.entity else { return false }
+        return field(e, c.field) || field(e, c.by) || filters(e, (c.filter.map { [$0] } ?? []) + c.filters)
     }
 
-    /// 1 アプリの数字。stat が無い・出さない・記録が未取得なら nil。鍵の無い暗号化 field は「🔒」。
+    /// 1 アプリの数字。stat が無い・出さない・記録が未取得なら nil。暗号化した項目を使う stat は「🔒」(復号できても数えない)。
     @MainActor
-    static func compute(dsl: AppDSL, records: [String: [Record]], setting: String?, canDecrypt: Bool = true, now: Date = .now) -> Value? {
-        compute(Input(dsl: dsl, records: records, setting: setting, canDecrypt: canDecrypt,
+    static func compute(dsl: AppDSL, records: [String: [Record]], setting: String?, now: Date = .now) -> Value? {
+        compute(Input(dsl: dsl, records: records, setting: setting,
                       countUnit: WidgetSnapshotWriter.countUnit, now: now))
     }
 
@@ -70,7 +106,7 @@ enum AppGlance {
     static func compute(_ input: Input) -> Value? {
         guard let c = chosen(in: input.dsl, setting: input.setting) else { return nil }
         let label = c.label ?? ""
-        if !input.canDecrypt, isEncrypted(c, in: input.dsl) { return Value(statId: c.id, label: label, value: "🔒", at: input.now, statKey: WidgetSnapshotWriter.statKey(c)) }
+        if touchesEncrypted(c, in: input.dsl) { return Value(statId: c.id, label: label, value: locked, at: input.now, statKey: WidgetSnapshotWriter.statKey(c)) }
         let records = input.records
         let evaluator = ExprEvaluator(dsl: input.dsl, records: { records[$0] ?? [] })
         guard let text = WidgetSnapshotWriter.statText(c, dsl: input.dsl, records: records, evaluator: evaluator,
@@ -113,7 +149,9 @@ struct AppGlanceSource {
 @Observable
 final class AppGlanceStore {
     static let shared = AppGlanceStore()
-    static let defaultsKey = "metamon.appGlance.v1"
+    static let defaultsKey = "metamon.appGlance.v2"
+    /// 前の形式(暗号化した項目の値も残していた)。読まずに消す
+    static let legacyDefaultsKeys = ["metamon.appGlance.v1"]
     /// 同じアプリを読み直すまでの間(一覧を出し入れするたびにローカル DB を読まない)。
     static let recheckAfter: TimeInterval = 60
 
@@ -131,6 +169,7 @@ final class AppGlanceStore {
 
     init(defaults: UserDefaults = .standard) {
         self.defaults = defaults
+        Self.legacyDefaultsKeys.forEach { defaults.removeObject(forKey: $0) }
         if let data = defaults.data(forKey: Self.defaultsKey),
            let saved = try? JSONDecoder().decode([String: AppGlance.Value].self, from: data) {
             values = saved
@@ -161,16 +200,20 @@ final class AppGlanceStore {
             put(appId, nil)
             return
         }
+        if AppGlance.touchesEncrypted(c, in: dsl) { // 記録は読まない
+            put(appId, AppGlance.compute(.init(dsl: dsl, records: [:], setting: setting, countUnit: WidgetSnapshotWriter.countUnit, now: now)))
+            return
+        }
         var sealed: [String: [Record]] = [:]
         for e in AppGlance.entities(for: c, in: dsl) {
             sealed[e] = await source.cached(appId, e)
         }
+        guard started == generation else { return } // 読んでいる間にサインアウトした
         // この端末でまだ開いていないアプリは記録が空。「0 件」と言い切らず、前の値のまま(無ければ出さない)
         guard sealed.values.contains(where: { !$0.isEmpty }) || c.aggregate == nil && c.valueExpr != nil else { return }
-        // ローカル DB の記録は暗号化 field を開けないので、その stat は「🔒」
         let open = source.open, compute = source.compute, countUnit = WidgetSnapshotWriter.countUnit, rows = sealed
         let value = await AppGlance.offMain {
-            compute(.init(dsl: dsl, records: rows.mapValues(open), setting: setting, canDecrypt: false, countUnit: countUnit, now: now))
+            compute(.init(dsl: dsl, records: rows.mapValues(open), setting: setting, countUnit: countUnit, now: now))
         }
         guard started == generation else { return } // 数えている間にサインアウトした
         put(appId, value)
@@ -187,7 +230,7 @@ final class AppGlanceStore {
         // 記録がまだ届いていない間は前の値を残す
         guard AppGlance.entities(for: c, in: dsl).allSatisfy({ records[$0] != nil }) else { return }
         let started = generation
-        let input = AppGlance.Input(dsl: dsl, records: records, setting: setting, canDecrypt: true,
+        let input = AppGlance.Input(dsl: dsl, records: records, setting: setting,
                                     countUnit: WidgetSnapshotWriter.countUnit, now: now)
         let value = await AppGlance.offMain { compute(input) }
         guard started == generation else { return }
@@ -228,7 +271,8 @@ final class AppGlanceStore {
     private func put(_ appId: String, _ value: AppGlance.Value?) {
         guard values[appId] != value else { return }
         values[appId] = value
-        if let data = try? JSONEncoder().encode(values) {
+        // 「🔒」は端末に残さない(次に開いた時は読み直す)
+        if let data = try? JSONEncoder().encode(values.filter { $0.value.value != AppGlance.locked }) {
             defaults.set(data, forKey: Self.defaultsKey)
         }
     }
