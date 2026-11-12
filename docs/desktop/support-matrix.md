@@ -74,7 +74,7 @@ DSL の全部の type(Container 7・Leaf 70 = 77。`docs/dsl/dsl.schema.json` �
 | musicPlayer | 使えません | unavailable | 音楽のライブラリ(MusicKit など)がパソコンに無い | 描ける | #2179 |
 | nearbyShare | 使えません | unavailable | 近くの端末との共有(Nearby / MultipeerConnectivity)がパソコンに無い | 描ける | #2179 |
 | numberField | 描ける | rendered | | 描ける | #1743 |
-| openUrlButton | 使えません | unavailable | develop ではまだ描いていない。`origin/epic/desktop`(`4aedd62db`)には `OpenUrlButton.kt` があり描ける(develop に入ったらこの行を「描ける」に直す) | 描ける | #1740 |
+| openUrlButton | 描ける | rendered | 固定の URL か app(+ to)を既定のブラウザ・アプリで開く(許可した scheme だけ・app の候補を先頭から試す) | 描ける | #1740 |
 | photoField | 代わり | rendered | 撮影はしない。ファイルを選ぶ・落とす・Ctrl+V | 描ける | #1743・#1764 |
 | picker | 描ける | rendered | | 描ける | #1743 |
 | placeSearch | 未定 | unavailable | 場所の検索も地図も入れていない。推奨・未確定: 地図を出さず、検索の結果を一覧にして「地図で開く」(mapView と同じ形) | 描ける | #1746 |
@@ -108,7 +108,7 @@ DSL の全部の type(Container 7・Leaf 70 = 77。`docs/dsl/dsl.schema.json` �
 | voiceInput | 使えません | unavailable | 音声入力(音声認識)をまだつないでいない。端末の中の文字起こし(whisper.cpp)で描く予定 | 描ける | #1751・#2172 |
 | webView | 未定 | unavailable | Web の埋め込みを入れていない。候補: JCEF(KCEF・Chromium 同梱で +100MB 前後)。推奨・未確定: 埋め込まず「ブラウザで開く」の枠(#2176) | 描ける | #1746・#2176 |
 
-数(Container と Leaf の合計 77): 描ける 46・代わり 12・使えません 13・未定 6。
+数(Container と Leaf の合計 77): 描ける 47・代わり 12・使えません 12・未定 6。
 
 ## アクション(16)
 
@@ -135,6 +135,6 @@ DSL の全部の type(Container 7・Leaf 70 = 77。`docs/dsl/dsl.schema.json` �
 
 ## 直す時
 
-- `DesktopLeaves` か `ConformanceAllowlist.unavailableTypes` を変えたら、この表の状態と適合 state も同じコミットで直す。
+- `DesktopLeaves` か `ConformanceAllowlist.unavailableTypes` を変えたら、この表の状態と適合 state も同じコミットで直す(食い違いは `SupportMatrixDocTest` が落とす)。
 - 「未定」の行は #1746 でオーナーが決めたら、決まった形と子の Issue に書き換える。
 - AI に描けない部品を作らせない申告(#2161)は、この表の「使えません」「未定」を元にする。
