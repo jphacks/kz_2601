@@ -30,6 +30,7 @@ Mac 版が macOS の仕組み(メニューバー・ウィジェット・Handoff�
 | --- | --- |
 | メニューバーに表示する | アイコンを押すと窓が開き、選んだ作ったアプリの stat を最大 3 個と「アプリを開く」「声・文字で頼む」を出す。選んだアプリは次も同じ(消したアプリなら一覧の先頭) |
 | stat の並びと数え方 | ウィジェットと同じ(`WidgetSnapshotWriter`。最初の画面 → タブ順 → 残り・`Aggregator`)なので、アプリの中の数字とそろう。記録をまだ読めていない時は「—」。ショートカットで記録が増えた時も数え直す |
+| 集計の作り | `MacMenuBarStats`(`@MainActor`)は `WidgetSnapshotWriter.statComponents` / `statText` / `maxStats` を直接呼ぶ薄い入口で、写しは持たない(#1969)。メニューバーだけの決まり(行の id の作り方・記録を読む entity の一覧・読めていない時の「—」)だけをここに置く |
 | 開く・頼む | ショートカットの「開く / 話しかける」と同じ道(`IntentHost`)。ウインドウが無ければ作る |
 | 作り | SwiftUI の `MenuBarExtra` ではなく `NSStatusItem` + `NSPopover`(`App/MenuBar/`)。`MenuBarExtra` の scene は出し分けられず、OFF でも起動時に固まったため |
 | ログイン時に開く | `SMAppService.mainApp`。自分からは登録せず、状態は毎回 OS に聞く(システム設定で外されても合わせる)。許可待ち・失敗は一言で出す。未署名のビルドでは登録できないことがある |
@@ -43,7 +44,7 @@ Mac 版が macOS の仕組み(メニューバー・ウィジェット・Handoff�
 | 大きさ | 小・中・大。accessory(ロック画面)は Mac に無い。特大は入れていない |
 | 見た目・受け渡し | iOS の `MetamonWidget/Views/`・`Shared/WidgetSnapshot.swift`・文言を共有する |
 | 出すアプリ | 最後に記録が動いた作ったアプリ。同梱の例は書かない(ウインドウを閉じると記録が消えるため) |
-| 押した時 | `tailorit://widget?app=<appId>` でそのアプリを開く(`MacWidgetLinkReceiver` → `IntentHost` の「開く」)。appId が無ければ本体を前に出すだけ |
+| 押した時 | `tailorit://widget?app=<appId>` でそのアプリを開く(`MacWidgetLinkReceiver` → `IntentHost` の「開く」)。appId が無ければ本体を前に出すだけ。起動直後で一覧を読み終える前なら、読み終えてから開く(下の [ショートカット・Siri](#ショートカットsiriapp-intents)) |
 | ID | 拡張の Bundle ID・App Group は iOS と同じ(`jp.kz2601.metamon(.stg).widget`・`group.jp.kz2601.metamon`) |
 | 消す | サインアウト・アカウント削除で App Group を空にし、`reloadAllTimelines` |
 
@@ -118,6 +119,16 @@ iOS の `NearbyService`(MultipeerConnectivity)をそのまま使い、Mac の `n
 ## ショートカット・Siri(App Intents)
 
 iOS と同じ Intent を Mac でも使います。Mac 用は本体との橋渡し `MacIntentHost` だけです([§15 Siri / ショートカット](../ios/architecture.md#15-siri--ショートカットapp-intents実装済みissue-80) の Mac の行・#1034)。メニューバー・ウィジェット・プッシュのタップも同じ `IntentHost` を通ります。
+
+起動直後の「開く」(#1970・`App/Intents/MacIntentRouting.swift`):
+
+| 項目 | 決まり |
+| --- | --- |
+| 待つ | 開く先が一覧に無く、一覧をまだ読み終えていない間は「開く」を消さずに残す(`IntentHost.resolve(among:listSettled:)`)。一覧が変わった時・読み終えた時・待つ時間が過ぎた時に振り分け直す |
+| 読み終えた | `MacAppLibrary.isServerListSettled`: サーバーの一覧を取り終えたか、届かなかった時。サーバーが無い(モック)時と、サインインしていない時は端末の一覧だけで決まる |
+| 待つ長さ | 最大 30 秒(Mac の `IntentHost.openLifetime`・`App/Intents/MacIntentHost.swift`。押した通知と同じ長さ)。同じ「開く」がまた来たら測り直す。過ぎたら後から急に開かず「見つからない」にする |
+| 見つからない | 消したアプリ・待っても載らなかった時は、サイドバーを出し、上の要約のお知らせに「開こうとしたアプリが見つかりませんでした。一覧から選んでください」(英訳あり) |
+| 話しかける | 一覧を待たずにすぐ実行する |
 
 ## 設定の「つないだサービス」
 
