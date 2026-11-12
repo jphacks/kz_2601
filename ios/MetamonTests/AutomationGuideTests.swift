@@ -58,6 +58,17 @@ final class AutomationGuideTests: XCTestCase {
         XCTAssertTrue(AutomationGuide.noteKeys.contains { $0.contains("ロック中") })
     }
 
+    /// 「記録を追加」はロック中に端末のロック解除を求める。案内も「ロックを解除している時に動く」と書く(ja / en)。
+    func testAddRecordRequiresUnlockAndGuideSaysSo() {
+        guard case .requiresLocalDeviceAuthentication = AddRecordIntent.authenticationPolicy else {
+            return XCTFail("AddRecordIntent はロック解除が要る")
+        }
+        let note = AutomationGuide.noteKeys.first { $0.contains("ロック") } ?? ""
+        XCTAssertTrue(note.contains("ロックを解除"), note)
+        XCTAssertFalse(note.contains("確認が出ることがあります"), note)
+        XCTAssertTrue(english(note).contains("unlock"), english(note))
+    }
+
     /// 画面のスナップショット(日本語・英語)。描けて空でないことを確かめ、指定があれば PNG を書き出す。
     func testRendersInJapaneseAndEnglish() throws {
         for language in [AppLanguage.ja, .en] {

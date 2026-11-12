@@ -48,7 +48,7 @@ enum AutomationGuide {
     static let openButtonKey = "ショートカット App を開く"
     static let openFailedKey = "ショートカット App が見つかりません。App Store から入れ直してください。"
     static let noteKeys = [
-        "iPhone がロック中だと、動かす前に確認が出ることがあります。",
+        "「記録を追加」は iPhone のロックを解除している時に動きます。ロック中だと、先にロックの解除を求められます。",
         "先に Tailor It を一度開いておいてください。開いたことが無いと記録できません。",
     ]
 

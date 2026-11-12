@@ -2354,23 +2354,6 @@
         }
       }
     },
-    "iPhone がロック中だと、動かす前に確認が出ることがあります。" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "If your iPhone is locked, you may be asked to confirm before it runs."
-          }
-        },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "iPhone がロック中だと、動かす前に確認が出ることがあります。"
-          }
-        }
-      }
-    },
     "openUrl: url は https か line/slack/discord/tel/mailto/maps のみ" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -3693,6 +3676,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "「記録を追加」のほかに「話しかける」(音声入力を開く)も、きっかけに合わせて動かせます。"
+          }
+        }
+      }
+    },
+    "「記録を追加」は iPhone のロックを解除している時に動きます。ロック中だと、先にロックの解除を求められます。" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "“Add Record” runs while your iPhone is unlocked. If your iPhone is locked, you’ll be asked to unlock it first."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "「記録を追加」は iPhone のロックを解除している時に動きます。ロック中だと、先にロックの解除を求められます。"
           }
         }
       }
