@@ -90,6 +90,10 @@ final class MacServices: @unchecked Sendable {
         appConfigURL.map { HTTPAccountClient(baseURL: $0, token: token) } ?? MockAccountClient()
     }
 
+    /// 他の端末の変化の購読(#2072)。iOS の `BuildConfig.makeSync` と同じ `RealtimeDocumentSync`(SSE・切れたらポーリング)。
+    /// appconfig がある時だけ(モック・端末だけのアプリは購読しない)
+    var sync: (any DocumentSync)? { (appConfig as? HTTPAppConfigClient).map { RealtimeDocumentSync(client: $0) } }
+
     /// 作ったアプリをサーバーに置くか(本物の AI と appconfig の両方がある)。false なら記録は端末だけ
     var keepsAppsOnServer: Bool { appConfig != nil }
 
