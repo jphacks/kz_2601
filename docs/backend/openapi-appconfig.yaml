@@ -1866,7 +1866,7 @@ paths:
       parameters:
         - { name: provider, in: path, required: true, schema: { type: string, enum: [weather, holidays, rss, warnings, pressure, arxiv, diet] } }
         - { name: region, in: query, schema: { type: string, pattern: '^[0-9]{6}$' }, description: 'weather / warnings / pressure だけ・必須。例 130000(東京都)' }
-        - { name: feedId, in: query, schema: { type: string, enum: [digital-news, fdma-news, fdma-disaster, cs.AI, cs.CL, cs.CR, cs.CV, cs.HC, cs.LG, cs.RO, cs.SE, stat.ML] }, description: 'rss(digital-news / fdma-news / fdma-disaster)・arxiv(cs.AI など)だけ・必須' }
+        - { name: feedId, in: query, schema: { type: string, enum: [digital-news, fdma-disaster, fdma-news, go-blog, osaka-city-news, soumu-news, cs.AI, cs.CL, cs.CR, cs.CV, cs.HC, cs.LG, cs.RO, cs.SE, stat.ML] }, description: 'rss(digital-news / fdma-news / fdma-disaster / soumu-news / osaka-city-news / go-blog)・arxiv(cs.AI など)だけ・必須' }
         - { name: q, in: query, schema: { type: string, minLength: 1, maxLength: 40 }, description: 'diet だけ・必須。国会会議録で探す語(空白区切りは AND)' }
         - { name: limit, in: query, schema: { type: integer, minimum: 1, maximum: 20, default: 5 } }
       responses:
