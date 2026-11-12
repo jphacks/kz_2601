@@ -74,6 +74,8 @@ final class AppRuntime: RuntimeNavigating {
     var apps: [AppSummary] = []
     /// 削除中のアプリを一覧から先に隠す(#180 楽観的 UI)。`AppRuntime+Delete.swift`
     let appDeletion = OptimisticAppDeletion()
+    /// Spotlight の索引(#1996)。MetamonApp が本物を入れる。既定(ユニットテスト等)は何もしない
+    @ObservationIgnored var spotlight = SpotlightAppIndexer(index: NoopSpotlightIndex())
     private(set) var appsLoading = false
     /// 初期(音声)画面に来た経緯。挨拶文言(`Greeting`)の出し分けに使う。
     enum HomeEntry { case launch, newApp, home }
@@ -308,6 +310,7 @@ final class AppRuntime: RuntimeNavigating {
             await restoreFromServer()
             if DeviceAppID.issuedThisLaunch { await resumeLatestAppIfEmpty() } // #276: 再インストール後のサインイン
             startSync()
+            Task { await refreshSpotlight() } // #1996
         }
         noteRetention() // #482 起動時の DSL(モック・オフラインでは apply を通らない)
         presentDeferredAccountLinkIfNeeded() // #276・H7 前の起動で最初のアプリを作っていたら引き継ぎの案内
@@ -948,6 +951,7 @@ final class AppRuntime: RuntimeNavigating {
         defer { appsLoading = false }
         do {
             apps = try await services.appConfig.listApps()
+            await spotlight.sync(apps) // 一覧に無いアプリを Spotlight から消す(#1996)
         } catch {
             print("[Metamon] listApps failed: \(error)")
             let cached = AppListCache.shared.load()
