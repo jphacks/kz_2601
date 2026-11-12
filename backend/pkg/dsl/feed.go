@@ -60,9 +60,12 @@ var WeatherRegions = map[string]string{
 // RSSFeeds maps an allowlisted feed id to its name. The URLs live on the
 // server (internal/feeds); adding one is a reviewed change to both tables.
 var RSSFeeds = map[string]string{
-	"digital-news":  "デジタル庁 新着・更新",
-	"fdma-news":     "消防庁 新着情報",
-	"fdma-disaster": "消防庁 災害情報",
+	"digital-news":    "デジタル庁 新着・更新",
+	"fdma-disaster":   "消防庁 災害情報",
+	"fdma-news":       "消防庁 新着情報",
+	"go-blog":         "The Go Blog",
+	"osaka-city-news": "大阪市 新着情報",
+	"soumu-news":      "総務省 新着情報",
 }
 
 // StatusPages maps an allowlisted service id to its name (provider status).

@@ -106,7 +106,7 @@ const arxivGap = 3 * time.Second * appconfigMaxInstances
 var providerLimits = map[string]limits{
 	dsl.FeedWeather:  {ttl: 30 * time.Minute, maxBody: 256 << 10},
 	dsl.FeedHolidays: {ttl: 12 * time.Hour, maxBody: 128 << 10},
-	dsl.FeedRSS:      {ttl: 15 * time.Minute, maxBody: 512 << 10},
+	dsl.FeedRSS:      {ttl: 15 * time.Minute, maxBody: 1 << 20}, // go-blog carries full posts (~360 KB for 10)
 	dsl.FeedWarnings: {ttl: 10 * time.Minute, maxBody: 512 << 10},
 	dsl.FeedPressure: {ttl: 30 * time.Minute, maxBody: 256 << 10},
 	dsl.FeedArxiv:    {ttl: 3 * time.Hour, maxBody: 1 << 20, gap: arxivGap},
