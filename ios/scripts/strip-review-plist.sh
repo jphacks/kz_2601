@@ -8,11 +8,11 @@ PLIST="${TARGET_BUILD_DIR}/${INFOPLIST_PATH}"
 PB=/usr/libexec/PlistBuddy
 
 # HealthKit / 位置の常時・背面 / 近くの端末(ローカルネットワーク・Bonjour・UWB の距離 #425)/ モーション(healthStat の歩数計・sensorValue の気圧計)/ 共有リンクの URL スキーム
-# / 止めるまで鳴るアラーム(AlarmKit。この版ではアラームの通知も普通の通知で届ける)
+# / 止めるまで鳴るアラーム(AlarmKit。この版ではアラームの通知も普通の通知で届ける)/ 集中モード中か(#1990・まだ使う機能が無い)
 for key in NSHealthShareUsageDescription NSHealthUpdateUsageDescription NSHealthClinicalHealthRecordsShareUsageDescription \
            NSLocationAlwaysUsageDescription NSLocationAlwaysAndWhenInUseUsageDescription \
            NSLocalNetworkUsageDescription NSBonjourServices NSNearbyInteractionUsageDescription NSMotionUsageDescription CFBundleURLTypes \
-           NSAlarmKitUsageDescription; do
+           NSAlarmKitUsageDescription NSFocusStatusUsageDescription; do
   "$PB" -c "Delete :$key" "$PLIST" 2>/dev/null || true
 done
 

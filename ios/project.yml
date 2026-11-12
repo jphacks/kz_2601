@@ -141,8 +141,10 @@ targets:
     # App Attest(App Check・#318。環境は METAMON_APP_ATTEST_ENV。自動署名で App ID に App Attest が付く)/
     # Push(aps-environment・#683。環境は METAMON_APS_ENV。自動署名で App ID に Push Notifications が付く)/
     # Associated Domains(Universal Links・#331。applinks:$(METAMON_APPLINKS_DOMAIN)。自動署名で App ID に Associated Domains が付く)。
+    # Communication Notifications(集中モード中かを読む INFocusStatusCenter に要る・#1990。com.apple.developer.usernotifications.communication)。
+    # 開発者サイトで App ID に能力を足してプロファイルを作り直すのは人の作業。無いビルドでも落ちず restricted / nil になる。
     # 構成ごとに別ファイルにするため xcodegen の `entitlements:` ではなく CODE_SIGN_ENTITLEMENTS で指定する(#245)。
-    # Review(審査用)は HealthKit・Push・Associated Domains を外した Metamon/Metamon-Review.entitlements。
+    # Review(審査用)は HealthKit・Push・Associated Domains・Communication Notifications を外した Metamon/Metamon-Review.entitlements。
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: jp.kz2601.metamon$(METAMON_BUNDLE_ID_SUFFIX)

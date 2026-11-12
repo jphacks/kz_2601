@@ -175,5 +175,8 @@
 	</array>
 	<key>NSNearbyInteractionUsageDescription</key>
 	<string>生成したアプリで、すれ違い通信でつながった近くの人との距離と方向を表示するために使います。</string>
+	<!-- 集中モード中か(#1990)。取れるのは「集中中か」だけでモードの名前は取れない。審査用の版では strip-review-plist.sh が消す -->
+	<key>NSFocusStatusUsageDescription</key>
+	<string>生成したアプリで、集中モードの間は表示や通知を控えめにするために、集中モード中かどうかを使用します。モードの名前は読み取らず、端末の外に送りません。</string>
 </dict>
 </plist>
