@@ -1,8 +1,8 @@
-# iOS の OS との連携(集中モード・Spotlight・ショートカット・電池など)
+# iOS の OS との連携(集中モード・Spotlight・ショートカット・電池・カレンダー・翻訳など)
 
-iOS 版が iOS の仕組み(集中モードのフィルタ・Spotlight・ショートカット・電池の状態など)とどうつながるかの決まりです。`epic/ios` に入っているものだけを書き、作業中のものは最後の [開いている PR](#開いている-pr) に並べます。
+iOS 版が iOS の仕組み(集中モードのフィルタ・Spotlight・ショートカット・電池の状態・カレンダー・端末の中の翻訳など)とどうつながるかの決まりです。`epic/ios` に入っているものだけを書き、作業中のものは最後の [開いている PR](#開いている-pr) に並べます。
 
-- どれも **生成したアプリの DSL・スキーマ・AI の決まりは変えません**。アプリの殻(`ios/Metamon/`)と `ios/Packages/MetamonServices/` だけで作っています。
+- どれも **生成したアプリの DSL・スキーマ・AI の決まりは変えません**。アプリの殻(`ios/Metamon/`)と `ios/Packages/MetamonServices/`・`ios/Packages/MetamonRenderer/` の `Support/` だけで作っています。
 - どれも値を **サーバーに送りません**。
 - ウィジェット・ライブアクティビティ・Siri / ショートカット・プッシュ通知などは [architecture.md](architecture.md) の各章(§5.1・§12・§15)にあります。Mac で違う所は [Mac の OS との連携](../mac/system-integration.md) にあります。
 
@@ -12,6 +12,8 @@ iOS 版が iOS の仕組み(集中モードのフィルタ・Spotlight・ショ�
 - [Spotlight で生成アプリを探す](#spotlight-で生成アプリを探す)
 - [ショートカットで数字(stat)を読む](#ショートカットで数字statを読む)
 - [電池の残り・充電中・省電力モード(DevicePowerSource)](#電池の残り充電中省電力モードdevicepowersource)
+- [カレンダーの予定とリマインダーを読む(DeviceCalendarSource)](#カレンダーの予定とリマインダーを読むdevicecalendarsource)
+- [端末の中で文字を訳す(OnDeviceTranslator・iOS 18)](#端末の中で文字を訳すondevicetranslatorios-18)
 - [開いている PR](#開いている-pr)
 
 ## 集中モードのフィルタ
@@ -110,17 +112,54 @@ iOS 版が iOS の仕組み(集中モードのフィルタ・Spotlight・ショ�
 | 偽物 | `FakeDevicePowerSource`。`METAMON_MOCK=1` なら `DevicePowerSources.make()` が返す。初期値は `METAMON_BATTERY_LEVEL`・`METAMON_BATTERY_STATE`・`METAMON_LOW_POWER=1` |
 | テスト | `MetamonServicesTests/DevicePowerSourceTests` |
 
+## カレンダーの予定とリマインダーを読む(DeviceCalendarSource)
+
+端末のカレンダーの予定とリマインダーを読む口だけを置いています(#1987・`ios/Packages/MetamonRenderer/Sources/MetamonRenderer/Support/DeviceCalendar.swift`)。**読む部品・アクション・スキーマ・AI の決まりはまだありません**(決定待ち)。書き込み(#1810)も入れていません。記録を OS の画面からカレンダーに入れる `addToCalendar` は別の仕組みです([architecture.md §12.2](architecture.md#122-端末のカレンダーへの追加eventkituiaddtocalendar))。
+
+| 項目 | 決まり |
+| --- | --- |
+| 口 | `DeviceCalendarSource`: `events(from:to:calendarIds:)`・`reminders(includeCompleted:dueBefore:listIds:)`・`calendars()`・`reminderLists()`(名前順)・`authorization(for:requesting:)`・`changes()`(`EKEventStoreChanged` を知らせるだけで中身は渡さない)。形は `HealthDataSource` と同じ(protocol + 実体 + 偽物) |
+| 置き場 | `DeviceCalendar.source`。アプリ起動時に 1 回だけ差し替える(`METAMON_MOCK=1` は `FakeDeviceCalendar.sample`・`MetamonApp.swift`) |
+| 実体 | `LiveDeviceCalendar`(`EKEventStore` を 1 つだけ持つ) |
+| 許可 | 状態は自前の `DeviceCalendarAccess`(notDetermined / denied / restricted / writeOnly / fullAccess)。許可を求めるのは「未決定」の時だけで、iOS 17 のフルアクセス(`requestFullAccessToEvents` / `requestFullAccessToReminders`)。フルアクセスが無い時、読む関数は落ちずに `DeviceCalendarError.notAuthorized(状態)` を投げる(書き込みだけ許可の時は「追加だけ許可されています」と添える) |
+| 説明文 | `Info.plist` の `NSCalendarsFullAccessUsageDescription`・`NSRemindersFullAccessUsageDescription`。英語は `Metamon/Resources/InfoPlist.xcstrings` |
+| 読む範囲 | 予定は今日 0:00 の 31 日前から、31 日先の日の終わりまで。1 回 200 件まで。超えた分はエラーにせず切る(`DeviceCalendarLimits`・早い方を残す) |
+| 並び | 予定は始まりの早い順(同じ時刻なら終日が先・次に題名順)。リマインダーは期限の早い順で、期限なしは最後 |
+| 終日の予定 | 終わりを最終日の翌日 0:00 にそろえる(EventKit は 23:59:59 を返す) |
+| リマインダーの絞り込み | `dueBefore` を渡すと期限がそれより前のものだけ(期限なしは除く)。済んだものは直近 31 日に済ませたものだけ |
+| 題名・場所 | 予定とリマインダーの `description` / `debugDescription` に題名・場所を出さない。ログ・クラッシュ報告・サーバーにも出さない |
+| 審査用の版 | 2 つの説明文を `strip-review-plist.sh` で外す(使う部品がまだ無いため)。説明文の無いビルドでは `LiveDeviceCalendar` は許可を求めずに `.restricted` を返す([review-build.md](review-build.md)) |
+| Mac | 実体は作っていない(パッケージは macOS 向けにもコンパイルできる) |
+| テスト | `MetamonRendererTests/DeviceCalendarTests` |
+
+## 端末の中で文字を訳す(OnDeviceTranslator・iOS 18)
+
+Apple の Translation framework で、文字を端末の中だけで訳す口を置いています(#1999・`ios/Packages/MetamonRenderer/Sources/MetamonRenderer/Support/OnDeviceTranslator.swift`)。**アクション `translate`・スキーマ・AI の決まり・`supportedFeatures`・DeepL との切り替えはまだありません**(#1775 の決定待ち)。アプリの root に橋渡しの見えない View を付けるのも、使う側を作る時に回しています。
+
+| 項目 | 決まり |
+| --- | --- |
+| 口 | `OnDeviceTranslator`: `availability(from:to:)`・`prepare(from:to:)`・`translate(_:from:to:)`。言語は `Locale.Language` |
+| 状態 | `OnDeviceTranslationStatus`: `.installed`(機内モードでも訳せる)/ `.supported`(ダウンロードが要る・「翻訳する言語をダウンロードしてください」)/ `.unsupported`(「この端末ではこの言語を翻訳できません」) |
+| 失敗 | `OnDeviceTranslationError`: `unsupported` / `notInstalled`(先に `prepare`)/ `hostMissing`(見えない View が付いていない)/ `failed`(ダウンロードの画面を閉じた・OS の翻訳が失敗した)。後ろ 2 つの文言は「翻訳できませんでした」 |
+| 本物 | `SystemOnDeviceTranslator`(iOS 18 以上)。状態は `LanguageAvailability().status(from:to:)`。iOS 18〜25 は `TranslationSession` を `.translationTask` の中でしか作れないので、見えない View `.onDeviceTranslationHost(OnDeviceTranslationHost)` に載せて依頼を 1 件ずつ流す。iOS 26 以上で言語が入っていれば `TranslationSession(installedSource:target:)` で直接作る。ダウンロードの画面(`prepareTranslation`)は橋渡しから出す |
+| 待ち続けない | 見えない View が 1 つも付いていなければ待たずに `hostMissing`。View が外れた時に待っていた依頼も失敗で返す。流してから 10 秒以内に `.translationTask` が動かなければ `failed` |
+| 量の上限 | `OnDeviceTranslationLimit.clip`: 1 回 50 件・1 件 2000 文字・合計 10000 文字まで。合計に届いたら残りの件は落とすので、返す数は切った後の数 |
+| 選び方 | `OnDeviceTranslators.make(mock:host:)`: mock なら偽物、iOS 18 以上で橋渡しがあれば本物、それ以外は `UnsupportedOnDeviceTranslator`(常に unsupported) |
+| 偽物 | `FakeOnDeviceTranslator`(テストと `METAMON_MOCK=1` 用)。言語の組ごとに状態を決められ、ダウンロードの成功・失敗も切り替えられる。訳は `[<target>] 原文` |
+| 置き場の理由 | 橋渡しに SwiftUI が要り、MetamonServices は SwiftUI を import しないため MetamonRenderer に置く |
+| iOS 17・Mac | 本物は `os(iOS)` の時だけ作る。iOS 17 と macOS はビルドは通るが unsupported を返す |
+| 文言 | 日本語・英語(MetamonRenderer の `Localizable.xcstrings`) |
+| テスト | `MetamonRendererTests/OnDeviceTranslatorTests` |
+
 ## 開いている PR
 
 `epic/ios` にまだ入っていない、OS との連携のものです。入ったら上に章を足し、ここから消します。
 
 - #2010 設定に「サインインの方法」を出し、今のアカウントに Apple をつなげる(#361)
 - #2011 ヘルスケアから睡眠・心拍・距離・消費カロリー・運動・マインドフルネスを読む口(部品はまだ)(#1986・#2014 の上に積んである)
-- #2014 端末のカレンダーの予定とリマインダーを読む口(EventKit・部品はまだ)(#1987)
 - #2017 アシスティブアクセスで開けるようにし、作る機能を隠して生成アプリだけ出す(#1997)
 - #2033 iOS 18 のコントロール(コントロールセンター・ロック画面・アクションボタン)から生成アプリを開く(#1993)
 - #2038 「ショートカットで自動にする」の案内(今ある Intent でのオートメーションの例)(#1995)
 - #2042 Apple Music の最近聞いた曲を読む口(MusicKit・部品はまだ)(#1988)
-- #2043 iOS 18 の端末の中で文字を訳す口(Translation framework・アクションはまだ)(#1999)
 - #2044 iOS 18 の記録の文字を長押しで「翻訳」(OS の翻訳の表示だけ・記録は変えない)(#2000)
 - #2046 集中モード中かを読む口と許可の流れ(`INFocusStatusCenter`・式にはまだ出さない)(#1990)
