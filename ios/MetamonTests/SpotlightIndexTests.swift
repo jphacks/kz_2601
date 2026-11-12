@@ -12,10 +12,13 @@ final class SpotlightIndexTests: XCTestCase {
         var indexCalls: [[String]] = []
         var removeCalls: [[String]] = []
         var removeAllCount = 0
+        /// 索引に入れている途中に挟む(サインアウトの割り込み)
+        var onIndex: (() async -> Void)?
 
         func index(apps: [SpotlightAppItem]) async {
             indexCalls.append(apps.map(\.id))
             for app in apps { items[app.id] = app }
+            if let hook = onIndex { onIndex = nil; await hook() }
         }
         func remove(appIds: [String]) async {
             removeCalls.append(appIds)
@@ -119,6 +122,79 @@ final class SpotlightIndexTests: XCTestCase {
         XCTAssertEqual(fake.removeAllCount, 1)
         XCTAssertTrue(fake.items.isEmpty, "前の人のアプリ名を Spotlight に残さない")
         XCTAssertNil(defaults.object(forKey: SpotlightAppIndexer.indexedKey))
+    }
+
+    // MARK: - サインアウトとの競合
+
+    func testSyncStartedBeforeWipeDoesNotReindex() async {
+        let fake = FakeIndex()
+        let sut = indexer(fake)
+        let started = sut.generation // 一覧を取りに行く前
+        await sut.removeAll()        // 取っている間にサインアウト
+
+        await sut.sync([app("a", "前の人のアプリ")], since: started)
+
+        XCTAssertEqual(fake.indexCalls, [], "前の人の一覧を入れ直さない")
+        XCTAssertTrue(fake.items.isEmpty)
+        XCTAssertNil(defaults.object(forKey: SpotlightAppIndexer.indexedKey))
+    }
+
+    func testWipeDuringIndexCallUndoesAndSkipsWrite() async {
+        let fake = FakeIndex()
+        let sut = indexer(fake)
+        fake.onIndex = { await sut.removeAll() } // 索引に入れている最中にサインアウト
+
+        await sut.sync([app("a", "前の人のアプリ")])
+
+        XCTAssertTrue(fake.items.isEmpty, "入ってしまった分は消し直す")
+        XCTAssertNil(defaults.object(forKey: SpotlightAppIndexer.indexedKey), "覚えた id を書き戻さない")
+
+        // 次の人の同期は普通に入る
+        await sut.sync([app("b", "次の人のアプリ")])
+        XCTAssertEqual(Set(fake.items.keys), ["b"])
+    }
+
+    // MARK: - 作った時
+
+    func testCreatingAppByGenerationIndexesIt() async throws {
+        let fake = FakeIndex()
+        var services = BuildConfig.make(environment: .mock)
+        services.ai = MockAIClient(delay: .zero)
+        var initial = try DSLExamples.document(DSLExamples.initial, version: 0)
+        initial.appId = "new-\(UUID().uuidString.prefix(6))"
+        let rt = AppRuntime(document: initial, services: services)
+        rt.spotlight = indexer(fake)
+
+        await rt.send("家計簿アプリを作って。", gatePaid: false)
+
+        XCTAssertFalse(rt.dsl.isVoiceOnly, "生成でアプリができている")
+        XCTAssertEqual(fake.indexCalls, [[initial.appId]], "一覧を取り直さずに作ったアプリを入れる")
+        XCTAssertEqual(fake.items[initial.appId]?.name, rt.dsl.app.name)
+        XCTAssertEqual(fake.items[initial.appId]?.icon, rt.dsl.app.icon)
+    }
+
+    func testEditingExistingAppDoesNotUpsert() async throws {
+        let fake = FakeIndex()
+        var services = BuildConfig.make(environment: .mock)
+        services.ai = MockAIClient(delay: .zero)
+        let rt = AppRuntime(document: try DSLExamples.document("kakeibo", version: 3), services: services)
+        rt.spotlight = indexer(fake)
+
+        await rt.send("金額を大きくして", gatePaid: false)
+
+        XCTAssertEqual(fake.indexCalls, [], "作り直し・名前の変更は一覧(appsList)の同期で拾う")
+    }
+
+    func testCreatedAppIsNotReindexedByNextListSync() async throws {
+        let fake = FakeIndex()
+        let sut = indexer(fake)
+        await sut.upsert(app("a", "家計簿", version: 2), icon: "yensign.circle")
+        XCTAssertEqual(fake.items["a"]?.icon, "yensign.circle")
+        fake.indexCalls = []
+
+        await sut.sync([app("a", "家計簿", version: 2)])
+
+        XCTAssertEqual(fake.indexCalls, [], "同じ版・名前なら一覧の同期で入れ直さない")
     }
 
     // MARK: - 開く
