@@ -5057,6 +5057,23 @@
         }
       }
     },
+    "この画面では使えません" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Not available here"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "この画面では使えません"
+          }
+        }
+      }
+    },
     "この画面について話す" : {
       "extractionState" : "manual",
       "localizations" : {

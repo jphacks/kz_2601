@@ -209,7 +209,8 @@ struct RootView: View {
         #if !APP_STORE_REVIEW
         .unlessAssistiveAccess(.launchPrompts, BetaWelcomeHost()) // #313: β の版だけ、チュートリアルのあとに初回の案内
         #endif
-        .task {
+        .task(id: assistiveAccess) {
+            rt.assistiveAccess = assistiveAccess
             if !assistiveAccess.shows(.launchPrompts) { rt.launchPresentationsAbandoned() }
         }
         .alert(item: $rt.confirm) { confirm in

@@ -22,9 +22,17 @@ struct AssistiveAccessPolicy: Equatable, Sendable {
         case paywall
         /// 起動時の AI 送信の同意・チュートリアル・β の案内・引き継ぎの案内
         case launchPrompts
+        /// 生成アプリの AI 部品から出す AI 送信の同意(`requireAIConsent`)。代わりに `unavailableMessage`
+        case aiConsent
     }
 
-    func shows(_ feature: Feature) -> Bool { !isActive }
+    /// アシスティブアクセスで隠すもの(今は全部)。
+    static let hiddenFeatures: Set<Feature> = [.aiButton, .voiceSheet, .appSwitcher, .paywall, .launchPrompts, .aiConsent]
+
+    func shows(_ feature: Feature) -> Bool { !isActive || !Self.hiddenFeatures.contains(feature) }
+
+    /// 隠した機能を呼ばれた時の一言。
+    static var unavailableMessage: String { L10n.tr("この画面では使えません") }
 
     /// 根に出すもの。
     enum Home: Equatable, Sendable {
