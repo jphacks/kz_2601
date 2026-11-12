@@ -33,6 +33,8 @@ func FeedIDTable(provider string) map[string]string {
 		return RSSFeeds
 	case FeedArxiv:
 		return ArxivCategories
+	case FeedStatus:
+		return StatusPages
 	}
 	return nil
 }

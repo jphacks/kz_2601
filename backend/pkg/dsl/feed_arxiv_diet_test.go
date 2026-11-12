@@ -33,7 +33,7 @@ func TestFeedArxivDiet(t *testing.T) {
 		`feed rss needs feedId`,
 		`feed diet needs query, 1..40 characters`,
 		`(got "予算\n委員会")`,
-		`feed feedId is only for provider rss or arxiv`,
+		`feed feedId is only for provider rss, arxiv or status`,
 		`feed query is only for provider diet`,
 		`feed region is only for provider weather, warnings or pressure`,
 	} {

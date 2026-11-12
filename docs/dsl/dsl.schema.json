@@ -5454,9 +5454,10 @@
             "warnings",
             "pressure",
             "arxiv",
-            "diet"
+            "diet",
+            "status"
           ],
-          "description": "データの出どころ(閉じた一覧)。weather = 気象庁の天気予報、warnings = 気象庁の今出ている警報・注意報、pressure = 48 時間の気圧の予報(6 時間ごとの最低 / 最高と急な低下の印)。この 3 つは region が要る。holidays = 内閣府の国民の祝日(これから来る祝日)、rss = 運営が許可したお知らせのフィード(feedId が要る)。arxiv = arXiv の分野の新着論文(feedId に分野)。diet = 国会会議録の発言の検索(query が要る)。任意の URL・Web サイトは指定できない。"
+          "description": "データの出どころ(閉じた一覧)。weather = 気象庁の天気予報、warnings = 気象庁の今出ている警報・注意報、pressure = 48 時間の気圧の予報(6 時間ごとの最低 / 最高と急な低下の印)。この 3 つは region が要る。holidays = 内閣府の国民の祝日(これから来る祝日)、rss = 運営が許可したお知らせのフィード(feedId が要る)。arxiv = arXiv の分野の新着論文(feedId に分野)。diet = 国会会議録の発言の検索(query が要る)。status = 許可したサービスの公開の status ページの稼働状況(全体の状態・対応中の障害・メンテナンス・止まっている部分。feedId にサービス)。任意の URL・Web サイトは指定できない。"
         },
         "region": {
           "type": "string",
@@ -5464,7 +5465,7 @@
         },
         "feedId": {
           "type": "string",
-          "description": "rss: 許可されたフィードの id(digital-news = デジタル庁 新着・更新 / fdma-news = 消防庁 新着情報 / fdma-disaster = 消防庁 災害情報 / soumu-news = 総務省 新着情報 / osaka-city-news = 大阪市 新着情報 / go-blog = The Go Blog)。arxiv: 分野(cs.AI / cs.CL / cs.CV / cs.LG / cs.RO / cs.HC / cs.SE / cs.CR / stat.ML)。"
+          "description": "rss: 許可されたフィードの id(digital-news = デジタル庁 新着・更新 / fdma-news = 消防庁 新着情報 / fdma-disaster = 消防庁 災害情報 / soumu-news = 総務省 新着情報 / osaka-city-news = 大阪市 新着情報 / go-blog = The Go Blog)。arxiv: 分野(cs.AI / cs.CL / cs.CV / cs.LG / cs.RO / cs.HC / cs.SE / cs.CR / stat.ML)。status: サービス(github = GitHub / cloudflare = Cloudflare / vercel = Vercel / claude = Claude(Anthropic))。"
         },
         "query": {
           "type": "string",
