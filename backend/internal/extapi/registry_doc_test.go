@@ -12,8 +12,11 @@ const apisDoc = "../../../docs/backend/features/external-apis.md"
 
 var docTick = regexp.MustCompile("`([^`]+)`")
 
+const notYetRegistered = "まだ登録しない"
+
 // docProviderOps reads the "入っている provider" table of doc: the first
 // cell of a row is "`provider` の `op` / `op`(...)". It returns provider → ops.
+// Rows marked 「まだ登録しない」 (written down before they are registered) are skipped.
 func docProviderOps(t *testing.T, doc string) map[string][]string {
 	t.Helper()
 	_, sec, ok := strings.Cut(doc, "\n### 入っている provider\n")
@@ -27,6 +30,9 @@ func docProviderOps(t *testing.T, doc string) map[string][]string {
 			continue
 		}
 		cell, _, _ := strings.Cut(strings.TrimPrefix(line, "| "), " | ")
+		if strings.Contains(cell, notYetRegistered) {
+			continue
+		}
 		head, _, _ := strings.Cut(cell, "(")
 		prov, ops, ok := strings.Cut(head, " の ")
 		pm := docTick.FindAllStringSubmatch(prov, -1)
@@ -44,7 +50,7 @@ func docProviderOps(t *testing.T, doc string) map[string][]string {
 
 func TestDocProviderOpsParser(t *testing.T) {
 	doc := "x\n### 入っている provider\n\n| provider | op |\n|---|---|\n" +
-		"| `a` の `x` / `y`(読む・`z`) | `x()` |\n| `b` の `w` | 同上 |\n| `a` の `v` | |\n\n### 次\n| `c` の `u` | |\n"
+		"| `a` の `x` / `y`(読む・`z`) | `x()` |\n| `b` の `w` | 同上 |\n| `a` の `v` | |\n| `d` の `t`(未)**まだ登録しない** | |\n\n### 次\n| `c` の `u` | |\n"
 	got := docProviderOps(t, doc)
 	if len(got) != 2 || !slices.Equal(got["a"], []string{"x", "y", "v"}) || !slices.Equal(got["b"], []string{"w"}) {
 		t.Fatalf("got %v", got)
