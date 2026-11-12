@@ -335,6 +335,8 @@ targets:
       - path: Metamon/Features/Settings/RemainingTodaySettingsSection.swift
       - path: Metamon/Features/Usage/UsageCopy.swift
       - path: Metamon/Features/Voice/RemainingTodayDisplay.swift
+      # 設定の「お知らせ」(#364): 一覧・未読・既読・push の同意の状態と行は iOS のファイルをそのまま使う(タブは MacNoticesSettings)
+      - path: Metamon/Features/Notices/NoticesView.swift
       # ログイン(#930): サインインの状態(Firebase Auth の観測・Sign in with Apple の受け渡し・nonce)は iOS のファイルをそのまま使う
       - path: Metamon/Features/Auth/AuthSession.swift
       # 共有のリンク(#1287): 参加できない理由(403)の文言は iOS のファイルをそのまま使う
