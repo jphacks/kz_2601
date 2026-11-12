@@ -369,7 +369,7 @@ private fun ListLeaf(c: Component, env: DataEnv) {
                         // 毎日リセットのチェックは日付の履歴を持つので、デスクトップ版はまだ見せるだけ
                         Checkbox(checked = on, onCheckedChange = if (daily || !env.canEdit(c.entity!!, r.id)) null else { v -> env.update(c.entity!!, r.id, mapOf(f.id to v.toString())) })
                     }
-                    c.item?.image?.let { f -> ListThumbnail(r[f]?.stringValue, t.title) }
+                    c.item?.image?.let { f -> ListThumbnail(r[f].stringValue, t.title) }
                     Column(Modifier.weight(1f)) {
                         Text(t.title, maxLines = 2, overflow = TextOverflow.Ellipsis)
                         t.subtitle?.let { Text(it, style = MaterialTheme.typography.bodySmall, color = Color.Gray, maxLines = 1, overflow = TextOverflow.Ellipsis) }

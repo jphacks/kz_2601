@@ -480,7 +480,7 @@ fun Screen.allComponents(): List<Component> {
 
 /** ボタンを出すか(新規フォームの削除・読み取りだけの保存は隠す)。Android の components/Leaves.kt と同じ。 */
 fun isButtonVisible(action: Action?, form: FormDraft?): Boolean = when (action?.type) {
-    ActionType.DELETE_RECORD -> (form?.isEditing ?: false) && (form?.canDelete ?: true)
+    ActionType.DELETE_RECORD -> form?.isEditing == true && form.canDelete
     ActionType.SAVE_RECORD -> !(form?.isReadOnly ?: false)
     else -> true
 }
