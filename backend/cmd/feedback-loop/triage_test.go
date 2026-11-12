@@ -9,6 +9,7 @@ import (
 	"regexp"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/jphacks/kz_2601/backend/internal/loop"
 	"github.com/jphacks/kz_2601/backend/internal/loop/triage"
@@ -134,6 +135,50 @@ func TestTriageEvalAIStopsMidRun(t *testing.T) {
 	}
 	if calls != 1 || stopped != 1 {
 		t.Fatalf("audit %+v", evs)
+	}
+}
+
+// The week's inbox becomes a labelling template (masked text, empty labels)
+// that triage-eval refuses until labelled; an existing file is never
+// overwritten and no text reaches the printed output.
+func TestTriageLabelExportCommand(t *testing.T) {
+	ta := newTestApp(t, env{"LOOP_CONSENT_VERSIONS": "feedback-2027-01"})
+	seedFeedback(t, ta, "写真を追加するとアプリが落ちて、何度やり直しても同じところで止まってしまいます。連絡は taro@ex.jp", "ダークモードが欲しい", "taro@example.com")
+	ta.must(t, "ingest")
+	ctx := context.Background()
+	old := loop.Item{ID: "old", Source: loop.SourceInApp, Text: "先月の分", AIAllowed: true, Status: loop.ItemNew,
+		IngestedAt: ta.now().Add(-30 * 24 * time.Hour)}
+	if _, err := ta.ls.PutItem(ctx, old); err != nil {
+		t.Fatal(err)
+	}
+
+	path := filepath.Join(t.TempDir(), "week.jsonl")
+	out := ta.must(t, "triage-label-export", "-out", path)
+	if !strings.Contains(out, "2 items, wrote 2") || strings.Contains(out, "写真") || strings.Contains(out, "taro") {
+		t.Fatalf("out %s", out)
+	}
+	st, err := os.Stat(path)
+	if err != nil || st.Mode().Perm() != 0o600 {
+		t.Fatalf("stat %v %v", st, err)
+	}
+	b, _ := os.ReadFile(path)
+	if strings.Contains(string(b), "taro@") || !strings.Contains(string(b), "[メール]") || strings.Contains(string(b), "先月") || !strings.Contains(string(b), "ダークモード") {
+		t.Fatalf("template:\n%s", b)
+	}
+	if err := ta.run(ctx, []string{"triage-eval", "-set", path}); err == nil || !strings.Contains(err.Error(), "not labelled yet") {
+		t.Fatalf("unlabelled eval: %v", err)
+	}
+	if err := ta.run(ctx, []string{"triage-label-export", "-out", path}); err == nil {
+		t.Fatal("overwrote an existing template")
+	}
+
+	labelled := strings.ReplaceAll(string(b), `"category":"","priority":"","bundle":""`, `"category":"bug","priority":"P2","bundle":""`)
+	if err := os.WriteFile(path, []byte(labelled), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	out = ta.must(t, "triage-eval", "-set", path)
+	if !strings.Contains(out, "2 cases") || !strings.Contains(out, "verdict:") || !strings.Contains(out, "category (rows: person") {
+		t.Fatalf("eval %s", out)
 	}
 }
 

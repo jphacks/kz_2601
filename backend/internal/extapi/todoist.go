@@ -146,10 +146,9 @@ func (c *todoist) Refresh(ctx context.Context, t Token) (Token, error) {
 func (c *todoist) Revoke(ctx context.Context, t Token) error {
 	if !t.Expiry.IsZero() && t.expired(c.now()) && t.RefreshToken != "" {
 		nt, err := c.Refresh(ctx, t)
-		if errors.Is(err, ErrInvalidGrant) {
-			return nil // already gone at Todoist
-		}
 		if err != nil {
+			// ErrInvalidGrant: gone at Todoist, or renewed elsewhere
+			// (Connections.Revoke reads it again)
 			return err
 		}
 		t = nt
@@ -261,18 +260,18 @@ func todoistText(name, v string, max int, required bool) (string, error) {
 	v = strings.TrimSpace(v)
 	switch {
 	case v == "" && required:
-		return "", fmt.Errorf("%w: %s is required", ErrUnknown, name)
+		return "", fmt.Errorf("%w: %s is required", ErrBadArgs, name)
 	case !utf8.ValidString(v) || utf8.RuneCountInString(v) > max:
-		return "", fmt.Errorf("%w: %s is over %d characters", ErrUnknown, name, max)
+		return "", fmt.Errorf("%w: %s is over %d characters", ErrBadArgs, name, max)
 	case strings.ContainsFunc(v, func(r rune) bool { return r < 0x20 && r != '\n' && r != '\t' }):
-		return "", fmt.Errorf("%w: %s has control characters", ErrUnknown, name)
+		return "", fmt.Errorf("%w: %s has control characters", ErrBadArgs, name)
 	}
 	return v, nil
 }
 
 func todoistProjectID(v string) (string, error) {
 	if v != "" && !todoistIDRe.MatchString(v) {
-		return "", fmt.Errorf("%w: projectId", ErrUnknown)
+		return "", fmt.Errorf("%w: projectId", ErrBadArgs)
 	}
 	return v, nil
 }
@@ -308,7 +307,7 @@ func todoistLimit(v string) (int, error) {
 	}
 	x, err := strconv.Atoi(v)
 	if err != nil || x < 1 || x > todoistMaxLimit {
-		return 0, fmt.Errorf("%w: limit must be 1-%d", ErrUnknown, todoistMaxLimit)
+		return 0, fmt.Errorf("%w: limit must be 1-%d", ErrBadArgs, todoistMaxLimit)
 	}
 	return x, nil
 }
@@ -321,7 +320,7 @@ func todoistName(name, v string) (string, error) {
 		return "", err
 	}
 	if strings.ContainsAny(v, "&|!(),\\*#@\n\t") {
-		return "", fmt.Errorf("%w: %s cannot have & | ! ( ) , \\ * # @ or line breaks", ErrUnknown, name)
+		return "", fmt.Errorf("%w: %s cannot have & | ! ( ) , \\ * # @ or line breaks", ErrBadArgs, name)
 	}
 	return v, nil
 }
@@ -353,11 +352,11 @@ func todoistListQuery(a map[string]string) (string, url.Values, error) {
 		}
 	}
 	if picked > 1 {
-		return "", nil, fmt.Errorf("%w: use only one of filter, projectId and project", ErrUnknown)
+		return "", nil, fmt.Errorf("%w: use only one of filter, projectId and project", ErrBadArgs)
 	}
 	// a comma splits a filter into separate lists; a label cannot narrow those
 	if filter != "" && label != "" && strings.Contains(filter, ",") {
-		return "", nil, fmt.Errorf("%w: label cannot narrow a filter with commas", ErrUnknown)
+		return "", nil, fmt.Errorf("%w: label cannot narrow a filter with commas", ErrBadArgs)
 	}
 	n, err := todoistLimit(a["limit"])
 	if err != nil {
@@ -448,7 +447,7 @@ func (c *todoist) projects(ctx context.Context, in Input) (Output, error) {
 
 func todoistTaskID(v string) (string, error) {
 	if !todoistIDRe.MatchString(v) {
-		return "", fmt.Errorf("%w: taskId must be a Todoist task id", ErrUnknown)
+		return "", fmt.Errorf("%w: taskId must be a Todoist task id", ErrBadArgs)
 	}
 	return v, nil
 }
@@ -495,11 +494,11 @@ func todoistAddBody(a map[string]string) ([]byte, error) {
 	dueDate := a["dueDate"]
 	if dueDate != "" {
 		if _, err := time.Parse(time.DateOnly, dueDate); err != nil {
-			return nil, fmt.Errorf("%w: dueDate must be YYYY-MM-DD", ErrUnknown)
+			return nil, fmt.Errorf("%w: dueDate must be YYYY-MM-DD", ErrBadArgs)
 		}
 	}
 	if dueString != "" && dueDate != "" {
-		return nil, fmt.Errorf("%w: dueString and dueDate cannot be used together", ErrUnknown)
+		return nil, fmt.Errorf("%w: dueString and dueDate cannot be used together", ErrBadArgs)
 	}
 	project, err := todoistProjectID(a["projectId"])
 	if err != nil {
@@ -508,7 +507,7 @@ func todoistAddBody(a map[string]string) ([]byte, error) {
 	var priority int
 	if v := a["priority"]; v != "" {
 		if priority, err = strconv.Atoi(v); err != nil || priority < 1 || priority > 4 {
-			return nil, fmt.Errorf("%w: priority must be 1-4", ErrUnknown)
+			return nil, fmt.Errorf("%w: priority must be 1-4", ErrBadArgs)
 		}
 	}
 	body := struct {

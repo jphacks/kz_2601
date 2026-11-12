@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- ヘルスの部品(healthStat・#870)の文言。iOS の HealthStatLeaf の写し(ヘルスケア → ヘルスコネクト)。英語は values-en。 -->
+<resources>
+    <string name="renderer_health_allow">許可する</string>
+    <string name="renderer_health_average">1 日平均 %1$s 歩</string>
+    <string name="renderer_health_denied">ヘルスコネクトへのアクセスが許可されていません</string>
+    <string name="renderer_health_failed">ヘルスデータを取得できませんでした</string>
+    <string name="renderer_health_no_weight">ヘルスコネクトに体重の記録がありません</string>
+    <string name="renderer_health_recorded_on">%1$s の記録</string>
+    <string name="renderer_health_steps_unit">歩</string>
+    <string name="renderer_health_target">目標 %1$s 歩の %2$d%%</string>
+    <string name="renderer_health_unavailable">この端末ではヘルスコネクトを使えません</string>
+    <string name="renderer_health_update_required">ヘルスコネクトのアプリを入れると歩数・体重を使えます</string>
+    <string name="renderer_health_weight_summary">最新 %1$s kg(7 日で %2$s kg)</string>
+    <string name="renderer_health_weight_unit">kg</string>
+</resources>
