@@ -38,7 +38,7 @@ gh pr ready            # Draft 解除
 - `feature/*` → `develop`: Squash merge 推奨(履歴が1コミット=1PRになる)。タイトルは Conventional Commits に直す。
 - `develop` → `main`: **実機(iPhone 13)で E2E を通してから**。Merge commit(squash しない。develop と main の履歴を揃える)。マージすると Cloud Run prod に自動デプロイ。
 - 変更を触らない領域の CI(例: iOS だけ触った PR の `backend-ci`)は自動で skip され、required check は満たされる。
-- `scripts-ci`(`.github/workflows/scripts-ci.yml`)は `*.sh`・`scripts/**`・`.github/workflows/**` を触った時だけ走り、shellcheck・`scripts/ai-cost-test.sh`・actionlint を回す。required check ではない(ローカルでは `git ls-files -z '*.sh' | xargs -0 shellcheck` と `actionlint`)。
+- `scripts-ci`(`.github/workflows/scripts-ci.yml`)は `*.sh`・`scripts/**`・`.github/workflows/**` などを触った時だけ走る。required check ではない。回す物は [scripts-ci](#scripts-ciシェルスクリプトと-workflow-の検査)。
 
 ## hotfix / release
 
@@ -186,6 +186,35 @@ macOS runner は Linux の 10 倍の分単価なので、ubuntu の `ios-changes
 - **validate**: ログの `Error:` に、ファイルと行が出る。手元では `cd infra && terraform init -backend=false && terraform validate`(GCP の認証なしで回る)。
 - **import ブロックの validate だけ落ちる**: `imports.prod.tf.example` の `import` の `to` が、`.tf` から消えた・名前が変わったリソースを指している。リソースの名前を変えたら example も合わせる。
 - plan と apply は CI では回さない。人が手元で回す([`infra/README.md`](../infra/README.md))。
+
+## scripts-ci(シェルスクリプトと workflow の検査)
+
+`.github/workflows/scripts-ci.yml`(#574)。required check ではないので、workflow の `paths:` で対象を触った時だけ回る: `**/*.sh`・`scripts/**`・`.github/workflows/**`・`ios/scripts/**`・`**/Package.resolved`・`ios/Metamon/Resources/ThirdPartyLicenses.json`・`LICENSE`・`docs/infra/runtime-config.md`。PR は Open(非 Draft)の時だけ、ほかに `develop` / `main` への push。ジョブはどれも ubuntu・5 分上限。
+
+| ジョブ | 回す物 | 手元で同じことをする |
+|---|---|---|
+| `actionlint` | `.github/workflows/*.yml` の検査(actionlint `1.7.12` を公式の Release から版を固定して取る) | `actionlint` |
+| `ai-cost-test` | `scripts/ai-cost-test.sh`・`scripts/runner-usage-test.sh`・`scripts/demo-check-test.sh`・`scripts/rollout-test.sh` を順に | 各 `scripts/<名前>-test.sh` |
+| `deploy-env-check` | `scripts/check-deploy-env.sh`(`deploy-cloudrun.yml` の `--update-env-vars` と [`docs/infra/runtime-config.md`](infra/runtime-config.md) の表が合っているか・#509) | `scripts/check-deploy-env.sh` |
+| `licenses-check` | `python3 ios/scripts/third-party-licenses.py --check`(アプリに同梱するライセンスの一覧が `Package.resolved`・`LICENSE` と合っているか・#306) | 同じコマンド |
+| `shellcheck` | 追跡中の `*.sh` 全部(shellcheck `0.11.0` を版を固定して取る) | `git ls-files -z '*.sh' \| xargs -0 shellcheck` |
+
+- `ai-cost-test` のジョブ名は最初の 1 本の名前のままで、今は 4 本の `*-test.sh` をまとめて回している。
+- `scripts/agent-pr-guard-test.sh` はこの workflow では回っていない(手元で回す)。
+
+新しい `scripts/<名前>-test.sh` を足す時の決まり:
+
+- 外のサービス(GCP・ネットワーク・API キー)に触らない。`gcloud`・`curl` などは、使い捨てのフォルダ(`mktemp -d`・`trap` で消す)の `bin/` に偽のコマンドを書き、`PATH="$TMP/bin:$PATH"` で先に置く(例: `scripts/demo-check-test.sh`・`scripts/rollout-test.sh`)。
+- 固定の入力と期待値は `scripts/testdata/<名前>/` に置く(例: `scripts/testdata/ai-cost/`)。期待値を出力から直せるようにするなら `--update` を付ける(例: `scripts/ai-cost-test.sh --update`)。
+- 先頭で `set -euo pipefail` と `cd "$(dirname "$0")"`。落ちる時は `FAIL: <理由>` を出して 0 以外で終わる。shellcheck も通す。
+- 足したら `ai-cost-test` のジョブに `- run: scripts/<名前>-test.sh` の 1 行を足す。**workflow の変更なので、その 1 行は人が確かめてから入れる**。
+
+落ちた時の見方:
+
+- `shellcheck` / `actionlint`: ログにファイル・行・規則の番号(`SC2086` など)が出る。意図して外す時は、その行の上に `# shellcheck disable=SCxxxx` と理由を書く。
+- `ai-cost-test`: どの `run:` の step が赤いかで、どの `*-test.sh` かが分かる。`FAIL:` の行が理由。手元でその 1 本を回す。
+- `deploy-env-check`: env を足した・外した時に `docs/infra/runtime-config.md` の表を直していない。表を workflow に合わせる。
+- `licenses-check`: 依存を変えたのに一覧が古い。`python3 ios/scripts/third-party-licenses.py` で一覧を作り直して commit する(使い方はスクリプト冒頭のコメント)。
 
 ## backend-emulator(Firestore エミュレータ試験・必須ではない)
 
