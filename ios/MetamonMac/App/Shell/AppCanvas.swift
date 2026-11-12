@@ -25,6 +25,8 @@ struct AppCanvas: View {
     var onTalk: (ScreenContext) -> Void = { _ in }
     /// openVoice アクション(#946): 声で頼む会話を開く(⇧⌘M と同じ)。nil なら「使えません」を出す
     var onOpenVoice: (@MainActor () -> Void)?
+    /// 失敗のトーストの「直してと頼む」(#1885): 依頼文を入れて会話を開く(送らない)。nil ならボタンを出さない
+    var onAskFix: (@MainActor (String) -> Void)?
     /// ウインドウの入力の見張り(#943)。作ったランタイムを渡す(アプリの切り替え・⌘W の前に確認する)
     var discardGuard: MacDiscardGuard?
 
@@ -72,6 +74,7 @@ struct AppCanvas: View {
                 if server != nil { lease?.engine.encryptedFields[app.id] = appDSL.encryptedFields }
                 let created = MacAppRuntime(appId: app.id, dsl: appDSL, recordLease: lease, dictation: voice?.dictation)
                 created.onOpenVoice = onOpenVoice
+                created.onAskFix = onAskFix
                 created.books = MacServices.shared.books // 本の情報(#1276)。モックの時は nil
                 #if !APP_STORE_REVIEW
                 created.feedClient = MacServices.shared.feeds // 天気・祝日などの feed(#1288)。モックの時は nil
@@ -185,6 +188,7 @@ private struct AppCanvasContent: View {
 
     /// モーダルが閉じ終わった。全画面とシートの両方を閉じた時は、両方が閉じてから開く
     private func talkAfterModal() {
+        runtime.askFixAfterModal() // 「直してと頼む」の待ち: 残りのモーダルを 1 枚ずつ閉じ、最後に会話を開く
         guard runtime.sheet == nil, runtime.fullScreen == nil else { return }
         talkAfterMap()
         runtime.openVoiceAfterModal()
@@ -278,12 +282,15 @@ private struct RuntimeOverlays: ViewModifier {
             .overlay(alignment: .top) {
                 VStack(spacing: 8) {
                     if active, let message = runtime.toast {
-                        ToastCapsule(text: message) { withMacAnimation { runtime.toast = nil } }
+                        let fixable = runtime.fixOffer?.message == message
+                        let askFix: (() -> Void)? = fixable ? { withMacAnimation { runtime.requestFix() } } : nil
+                        ToastCapsule(text: message, askFix: askFix) { withMacAnimation { runtime.toast = nil } }
                             .task(id: runtime.toastSerial) { // 同じ文言が続いても出し直す
                                 // 出したのと同時に VoiceOver で読み、VoiceOver の時は長く出しておく(#937・iOS の H8 と同じ)
                                 if runtime.announcedToast != message { MacVoiceOver.announce(.message(message)) }
                                 runtime.announcedToast = nil
-                                try? await Task.sleep(for: .seconds(MacVoiceOver.holdSeconds(3)))
+                                // 「直してと頼む」付きは押す間を取る(#1885・iOS と同じ 6 秒)
+                                try? await Task.sleep(for: .seconds(MacVoiceOver.holdSeconds(fixable ? MacAppRuntime.fixToastSeconds : 3)))
                                 guard !Task.isCancelled, runtime.toast == message else { return }
                                 withMacAnimation { runtime.toast = nil }
                             }
@@ -329,11 +336,24 @@ private struct RuntimeOverlays: ViewModifier {
 
 private struct ToastCapsule: View {
     let text: String
+    /// 「直してと頼む」(#1885)。アプリの作りで直せる失敗の時だけ
+    var askFix: (() -> Void)?
     let dismiss: () -> Void
 
     var body: some View {
         HStack(spacing: 8) {
             Text(text).font(.callout)
+            if let askFix {
+                Button(action: askFix) {
+                    Label("直してと頼む", systemImage: "wand.and.stars").labelStyle(.titleAndIcon)
+                }
+                .buttonStyle(.borderless)
+                .foregroundStyle(Theme.Colors.brandText)
+                .fixedSize()
+                .help("直す依頼を入力欄に入れて、会話を開きます")
+                .accessibilityHint(Text("直す依頼を入力欄に入れて、会話を開きます"))
+                .accessibilityIdentifier("toast.fixRequest")
+            }
             Button(action: dismiss) { Image(systemName: "xmark") }
                 .buttonStyle(.plain)
                 .macSecondaryText() // コントラストを上げる時は本文の色(#1206)
@@ -343,7 +363,8 @@ private struct ToastCapsule: View {
         .padding(.horizontal, 14).padding(.vertical, 8)
         .macRaisedSurface(in: Capsule()) // 透明度を下げる・コントラストを上げる(#1206)
         .macTopTransition()
-        .accessibilityElement(children: .combine)
+        // 「直してと頼む」がある時は VoiceOver でボタンを別に押せるよう、まとめない
+        .accessibilityElement(children: askFix == nil ? .combine : .contain)
     }
 }
 

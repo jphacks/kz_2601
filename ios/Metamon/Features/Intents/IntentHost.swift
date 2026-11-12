@@ -15,6 +15,8 @@ final class IntentHost {
     enum Pending: Equatable {
         case open(appId: String)
         case talk
+        /// コントロール(iOS 18・#1993)。appId が nil・消したアプリなら一覧を開く。entityId があればその記録の入力画面
+        case control(appId: String?, entityId: String?)
         #if !APP_STORE_REVIEW
         /// 通知のタップ(#269)。すでに開いているアプリなら何も言わない
         case openFromNotification(appId: String)
@@ -27,6 +29,7 @@ final class IntentHost {
     private(set) var isReady = false
     private var pending: Pending?
     private var refreshTask: Task<Void, Never>?
+    private var refreshGeneration = 0
 
     func register(_ runtime: AppRuntime) {
         self.runtime = runtime
@@ -65,6 +68,9 @@ final class IntentHost {
         switch action {
         case .open(let appId): await runtime.openFromIntent(appId: appId)
         case .talk: runtime.openVoiceFromIntent()
+        case .control(let appId, let entityId):
+            let exists = await appExists(appId)
+            await runtime.openFromControl(appId: exists ? appId : nil, entityId: entityId)
         #if !APP_STORE_REVIEW
         case .openFromNotification(let appId):
             if appId != runtime.document.appId { await runtime.switchApp(to: appId) }
@@ -75,13 +81,44 @@ final class IntentHost {
 
     /// DSL が差し替わった(生成・切替・アプリ名変更)ら、Siri のパラメータ付きフレーズ(「Tailor It で家計簿を開く」)を引き直す。
     /// `updateAppShortcutParameters()` は各 Entity の suggestedEntities を呼ぶ(=`GET /apps`)ので 2 秒まとめる。
-    func appsMayHaveChanged() {
+    /// コントロールの一覧(#1993)は DSL をキャッシュからだけ読む(この 2 秒ごとに最大 12 回 `GET /dsl` しない)。
+    /// 戻り値は引き直しの Task(テスト用)。
+    @discardableResult
+    func appsMayHaveChanged() -> Task<Void, Never> {
         refreshTask?.cancel()
-        refreshTask = Task {
-            try? await Task.sleep(for: .seconds(2))
+        refreshGeneration += 1
+        let generation = refreshGeneration
+        let delay = refreshDelay
+        let task = Task {
+            defer { if self.refreshGeneration == generation { self.refreshTask = nil } } // 終わったら待ちなし
+            try? await Task.sleep(for: delay)
             guard !Task.isCancelled else { return }
             TailorItShortcuts.updateAppShortcutParameters()
+            await ControlIntentBridge.refreshCatalog(
+                apps: { await self.apps() },
+                targets: { await RecordTargetEntity.all(host: self, cachedOnly: true) }
+            )
         }
+        refreshTask = task
+        return task
+    }
+
+    /// まとめる待ち時間(テストで縮める)
+    var refreshDelay: Duration = .seconds(2)
+
+    /// 引き直し待ちがあるか(テスト用)
+    var hasPendingRefresh: Bool { refreshTask != nil }
+
+    /// ログアウト・アカウント削除(`wipeLocalData`)で、前の人の一覧を書き戻さないよう引き直しをやめる
+    func cancelPendingRefresh() {
+        refreshTask?.cancel()
+        refreshTask = nil
+    }
+
+    /// 選んだアプリがまだあるか(消した後のコントロール・#1993)。サーバーに届かなければ `AppListCache` で見る
+    private func appExists(_ appId: String?) async -> Bool {
+        guard let appId else { return false }
+        return await apps().contains { $0.id == appId }
     }
 
     // MARK: - 記録の追加(AddRecordIntent)。Mac は同じ名前の口を MacIntentHost.swift に持つ(#1034)
@@ -138,10 +175,11 @@ final class IntentHost {
     /// 記録先の候補になるアプリ。iOS は作ったアプリ全部(Mac は端末に残る作ったアプリだけ)
     func recordableApps() async -> [AppSummary] { await apps() }
 
-    /// アプリの DSL。表示中ならそれ、無ければキャッシュ(`DocumentCache`)、それも無ければ `GET /dsl`。
-    func document(appId: String) async -> AppDocument? {
+    /// アプリの DSL。表示中ならそれ、無ければキャッシュ(`DocumentCache`)、それも無ければ `GET /dsl`(cachedOnly なら取りに行かない)。
+    func document(appId: String, cachedOnly: Bool = false) async -> AppDocument? {
         if let runtime, runtime.document.appId == appId, !runtime.dsl.isVoiceOnly { return runtime.document }
         if let cached = DocumentCache.shared.load(appId: appId) { return cached }
+        guard !cachedOnly else { return nil }
         return try? await runtime?.services.appConfig.fetchDocument(appId: appId)
     }
 }
