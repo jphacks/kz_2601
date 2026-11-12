@@ -50,6 +50,24 @@ import java.util.Timer
 import java.util.TimerTask
 import kotlin.concurrent.thread
 
+/** OS に URL・メーラーを渡す口(java.awt.Desktop)。テストでは偽物に替える。 */
+interface SystemOpener {
+    fun supports(action: Desktop.Action): Boolean
+
+    fun browse(uri: URI)
+
+    fun mail()
+
+    object Awt : SystemOpener {
+        override fun supports(action: Desktop.Action): Boolean =
+            runCatching { Desktop.isDesktopSupported() && Desktop.getDesktop().isSupported(action) }.getOrDefault(false)
+
+        override fun browse(uri: URI) = Desktop.getDesktop().browse(uri)
+
+        override fun mail() = Desktop.getDesktop().mail()
+    }
+}
+
 /**
  * OS の機能に頼むアクション(iOS の AppRuntime の各 host・Android の app/runtime)。デスクトップで出来ない物は理由を一言で返す。
  * - openUrl: 既定のブラウザ(許可した scheme だけ)
@@ -69,6 +87,8 @@ class DesktopActionHost(
     private val calendarDir: File = calendarTempRoot(),
     /** 既定のアプリで開く。開けたら true。 */
     private val openFile: (File) -> Boolean = { f -> runCatching { Desktop.getDesktop().open(f); true }.getOrDefault(false) },
+    /** URL を渡す先(既定は java.awt.Desktop)。テストで替える。 */
+    private val system: SystemOpener = SystemOpener.Awt,
 ) : ActionHost {
     override fun request(action: Action, ctx: ActionContext, session: DesktopSession): String? = when (action.type) {
         ActionType.OPEN_URL -> openUrl(action.url)
@@ -86,9 +106,14 @@ class DesktopActionHost(
 
     private fun openUrl(url: String?): String? {
         if (url == null || !ExternalUrlPolicy.isAllowed(url)) return Strings["runtime_open_url_rejected"]
-        val ok = runCatching { Desktop.isDesktopSupported() && Desktop.getDesktop().isSupported(Desktop.Action.BROWSE) }.getOrDefault(false)
-        if (!ok) return Strings.format("desktop_url_unsupported", url)
-        return runCatching { Desktop.getDesktop().browse(URI(url)); null }.getOrElse { Strings["desktop_url_failed"] }
+        // 宛先の無い mailto:(openUrlButton の mail で to が空・不正)は URI にできないので、宛先なしでメーラーを開く
+        val bareMail = isBareMailto(url)
+        val action = if (bareMail) Desktop.Action.MAIL else Desktop.Action.BROWSE
+        if (!system.supports(action)) return Strings.format("desktop_url_unsupported", url)
+        return runCatching {
+            if (bareMail) system.mail() else system.browse(URI(url))
+            null
+        }.getOrElse { Strings["desktop_url_failed"] }
     }
 
     private fun addToCalendar(action: Action, ctx: ActionContext, session: DesktopSession): String? {
@@ -195,6 +220,10 @@ class DesktopActionHost(
         /** 起動時: 前に渡した .ics のうち 1 日より古い物を消す。 */
         fun sweepCalendar(now: Long = System.currentTimeMillis(), root: File = calendarTempRoot()): Int =
             DragOut.sweep(now = now, root = root, prefix = CALENDAR_PREFIX)
+
+        /** scheme が mailto で、その後ろが空(`mailto:`)。 */
+        fun isBareMailto(url: String): Boolean =
+            ExternalUrlPolicy.scheme(url) == "mailto" && url.substringAfter(':').isBlank()
 
         val UNAVAILABLE_VOICE get() = Strings["desktop_unavailable_voice"]
         val UNAVAILABLE_ACTIVITY get() = Strings["desktop_unavailable_activity"]

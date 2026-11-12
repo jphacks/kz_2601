@@ -46,11 +46,46 @@ class DevicePowerSourceTest {
     }
 
     @Test
-    fun notCharging_isTreatedAsPluggedFull() {
+    fun notCharging_belowFull_isPluggedAndHeld() {
+        // しきい値で 80% で止めている: つながっているが満杯ではない
         val s = readFixture("not-charging")
         assertLevel(0.80, s)
-        assertEquals(Charge.FULL, s.charge)
+        assertEquals(Charge.CHARGING, s.charge)
         assertTrue(s.isCharging)
+        assertFalse(s.isFull)
+    }
+
+    @Test
+    fun notCharging_atFull_isFull() {
+        val s = readFixture("not-charging-full")
+        assertLevel(1.0, s)
+        assertEquals(Charge.FULL, s.charge)
+    }
+
+    @Test
+    fun allChargersOffline_isUnplugged_evenWhenBatteryReportsFull() {
+        // Mains と USB の両方が online=0
+        val s = readFixture("mains-offline")
+        assertLevel(1.0, s)
+        assertEquals(Charge.UNPLUGGED, s.charge)
+    }
+
+    @Test
+    fun capacityMissing_fallsBackToEnergyNow_andAnyNonBatteryTypeIsCharger() {
+        val s = readFixture("capacity-missing")
+        // 15 / 60 = 25%
+        assertLevel(0.25, s)
+        // status は Unknown → type=Wireless の online=1 を充電器として見る
+        assertEquals(Charge.CHARGING, s.charge)
+        assertTrue(s.isPowerSaver)
+    }
+
+    @Test
+    fun capacityMissing_fallsBackToChargeNow() {
+        val s = readFixture("charge-only")
+        assertLevel(0.50, s)
+        assertEquals(Charge.UNPLUGGED, s.charge)
+        assertTrue(s.isPowerSaver)
     }
 
     @Test
@@ -68,14 +103,42 @@ class DevicePowerSourceTest {
     }
 
     @Test
-    fun combine_unweightedAverageWhenEnergyMissing() {
+    fun combine_unweightedAverageWhenWeightsAreMixed() {
+        // 片方は energy_full だけ、片方は charge_full だけ → どちらでも揃わないので単純な平均
         val s = LinuxSysfsPowerReader.combine(
-            listOf(LinuxSysfsPowerReader.Battery(30, "Discharging", null), LinuxSysfsPowerReader.Battery(70, "Full", 1)),
+            listOf(
+                LinuxSysfsPowerReader.Battery(30.0, "Discharging", energyFull = 10),
+                LinuxSysfsPowerReader.Battery(70.0, "Full", chargeFull = 1),
+            ),
             mainsOnline = emptyList(),
             isPowerSaver = false,
         )
         assertLevel(0.50, s)
         assertEquals(Charge.UNPLUGGED, s.charge)
+    }
+
+    @Test
+    fun combine_weightsByChargeFullWhenEnergyIsNotOnEvery() {
+        val s = LinuxSysfsPowerReader.combine(
+            listOf(
+                LinuxSysfsPowerReader.Battery(100.0, "Full", energyFull = 10, chargeFull = 1),
+                LinuxSysfsPowerReader.Battery(20.0, "Full", chargeFull = 3),
+            ),
+            mainsOnline = listOf(true),
+            isPowerSaver = false,
+        )
+        // (100×1 + 20×3) / 4 = 40%
+        assertLevel(0.40, s)
+    }
+
+    @Test
+    fun charge_notChargingDependsOnLevel() {
+        assertEquals(Charge.CHARGING, LinuxSysfsPowerReader.charge(listOf("Not charging"), emptyList(), 0.80))
+        assertEquals(Charge.FULL, LinuxSysfsPowerReader.charge(listOf("Not charging"), emptyList(), 0.995))
+        assertEquals(Charge.FULL, LinuxSysfsPowerReader.charge(listOf("Not charging"), listOf(true), 1.0))
+        assertEquals(Charge.UNPLUGGED, LinuxSysfsPowerReader.charge(listOf("Not charging"), listOf(false, false), 0.80))
+        // 一つでも online なら抜けていない
+        assertEquals(Charge.CHARGING, LinuxSysfsPowerReader.charge(listOf("Not charging"), listOf(false, true), 0.80))
     }
 
     @Test
