@@ -48,6 +48,8 @@ final class AppRuntime: RuntimeNavigating {
     @ObservationIgnored var aiConsent: AIConsentStore?
     /// 同意の画面を出す(初回起動 / 同意前に生成・対話しようとした時)。
     var showAIConsent = false
+    /// アシスティブアクセスの決まり(#1997)。`RootView` が入れる。同意の画面(`ConsentHost`)が無い間は出そうとしない。
+    @ObservationIgnored var assistiveAccess = AssistiveAccessPolicy.standard
     /// 同意の前に話した最後の 1 件(M2)。同意して画面が閉じたら続けて送る(`resumeUtteranceAfterConsent`)
     @ObservationIgnored var utteranceAwaitingConsent: (text: String, source: ClarifyFlow.InputSource)?
     /// 音声モデルのダウンロード確認(#246・4.2.3(ii))。端末にモデルが無く未承認の時だけ立つ。
