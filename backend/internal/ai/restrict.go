@@ -19,7 +19,8 @@ import (
 // not use what that binary cannot render. No restriction = the prompts,
 // schemas and outputs stay exactly as before (byte-identical prompt cache).
 
-// Known disabledFeatures values; unknown ones are ignored.
+// Known disabledFeatures values; unknown ones are ignored. FeatureNearbyPassby
+// (nearby_rules.go) is one too, through disabledClientFeatures.
 const (
 	FeatureFieldHealth   = "fieldHealth"   // Field.health (HealthKit write)
 	FeatureCameraCapture = "cameraCapture" // photoField / videoField source camera|both
@@ -128,6 +129,7 @@ func NewRestriction(allowed, disabled []string) Restriction {
 			r.noAddressed = true
 		}
 	}
+	r.off = disabledFeaturesOff(disabled) // #1955
 	r.withholdMatchingUI()
 	r.setKey()
 	return r
@@ -159,7 +161,12 @@ func NewClientRestriction(allowed, disabled, supported []string) Restriction {
 	if len(allowed) > 0 && !slices.Contains(supported, FeatureNotificationNear) {
 		r.noNear = true
 	}
-	r.off = clientFeaturesOff(allowed, supported)
+	for k := range clientFeaturesOff(allowed, supported) {
+		if r.off == nil {
+			r.off = map[string]bool{}
+		}
+		r.off[k] = true
+	}
 	r.withholdMatchingUI()
 	r.setKey()
 	return r
