@@ -165,7 +165,7 @@ object Keymap {
         }
     }
 
-    private fun keyName(k: Key, os: HostOs): String = when (k) {
+    internal fun keyName(k: Key, os: HostOs): String = when (k) {
         Key.Escape -> "Esc"
         Key.Delete -> if (os == HostOs.MAC) "⌦" else "Delete"
         Key.Backspace -> if (os == HostOs.MAC) "⌫" else "Backspace"
