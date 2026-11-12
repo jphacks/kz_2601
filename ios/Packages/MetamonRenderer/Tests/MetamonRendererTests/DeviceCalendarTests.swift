@@ -189,6 +189,14 @@ final class DeviceCalendarTests: XCTestCase {
         XCTAssertEqual(LiveDeviceCalendar.usageKey(for: .reminders), "NSRemindersFullAccessUsageDescription")
     }
 
+    func testUsageDescriptionCheckReadsRawInfoDictionary() {
+        let info: [String: Any] = ["NSCalendarsFullAccessUsageDescription": "予定を読みます", "NSRemindersFullAccessUsageDescription": ""]
+        XCTAssertTrue(LiveDeviceCalendar.hasUsageDescription(for: .events, in: info))
+        XCTAssertFalse(LiveDeviceCalendar.hasUsageDescription(for: .reminders, in: info)) // 空文字は無いのと同じ
+        XCTAssertFalse(LiveDeviceCalendar.hasUsageDescription(for: .events, in: [:]))
+        XCTAssertFalse(LiveDeviceCalendar.hasUsageDescription(for: .events, in: nil))
+    }
+
     func testSampleHasTodayData() async throws {
         let s = FakeDeviceCalendar.sample
         let today = Calendar.current.startOfDay(for: Date())

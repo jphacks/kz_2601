@@ -307,6 +307,13 @@ public final class LiveDeviceCalendar: DeviceCalendarSource, @unchecked Sendable
         }
     }
 
+    /// 説明文の有無は生の Info.plist で見る(`object(forInfoDictionaryKey:)` は訳を返すので、審査用ビルドで
+    /// Info.plist から消しても `.lproj` に訳が残っていると「ある」と判定してしまう)。
+    static func hasUsageDescription(for entity: DeviceCalendarEntity, in info: [String: Any]?) -> Bool {
+        guard let text = info?[usageKey(for: entity)] as? String else { return false }
+        return !text.isEmpty
+    }
+
     private static func ekType(_ entity: DeviceCalendarEntity) -> EKEntityType {
         entity == .events ? .event : .reminder
     }
@@ -314,7 +321,7 @@ public final class LiveDeviceCalendar: DeviceCalendarSource, @unchecked Sendable
     public func authorization(for entity: DeviceCalendarEntity, requesting: Bool) async -> DeviceCalendarAccess {
         let current = DeviceCalendarAccess(EKEventStore.authorizationStatus(for: Self.ekType(entity)))
         guard requesting, current == .notDetermined else { return current }
-        guard Bundle.main.object(forInfoDictionaryKey: Self.usageKey(for: entity)) != nil else { return .restricted }
+        guard Self.hasUsageDescription(for: entity, in: Bundle.main.infoDictionary) else { return .restricted }
         do {
             _ = entity == .events ? try await store.requestFullAccessToEvents() : try await store.requestFullAccessToReminders()
         } catch {
