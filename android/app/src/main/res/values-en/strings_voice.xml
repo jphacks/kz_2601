@@ -99,9 +99,14 @@
     <string name="voice_option_selected">Selected</string>
     <string name="voice_option_unselected">Not selected</string>
     <string name="voice_other_body">Please wait a moment and try again</string>
+    <string name="voice_pending_cancel">Don\'t send</string>
+    <string name="voice_pending_continue">Keep talking</string>
+    <string name="voice_pending_retake">Say it again</string>
+    <string name="voice_pending_title">Recording stopped after a pause. Send this?</string>
     <string name="voice_placeholder_text">Or type here</string>
     <string name="voice_placeholder_text_first">Type here (works right away)</string>
     <string name="voice_plan_limit_body">What this app can store has reached its limit. Delete what you don\'t use to keep going</string>
+    <string name="voice_plan_limit_body_pro">What this app can store has reached the free plan limit. Delete what you don\'t use, or go Pro for more</string>
     <string name="voice_plan_limit_title">Limit reached</string>
     <string name="voice_pro_required_body">This needs Pro features. Try saying it a different way</string>
     <string name="voice_progress_app">Building “%1$s”</string>
@@ -206,4 +211,6 @@
     <string name="voice_title_returning">Welcome back.\nWhat shall we make today?</string>
     <string name="voice_tomorrow">tomorrow</string>
     <string name="voice_unavailable_hint">Voice input isn\'t available on this device. Type below to start right away.</string>
+    <string name="voice_unchanged_reason">Couldn\'t make the change. Tell me a bit more about what to change and how.</string>
+    <string name="voice_upgrade_pro">Go Pro</string>
 </resources>

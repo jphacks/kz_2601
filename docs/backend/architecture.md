@@ -20,6 +20,7 @@
 - [自己改善ループ(#364)](features/feedback-loop.md)
 - [自動の動きの見える化(#347)](features/automations.md)
 - [外部の公開データの読み取り(#348)](features/external-feeds.md)
+- [外の API(runner の口・数え方・OAuth のトークン・#1493)](features/external-apis.md)
 - [ISBN から本の情報を入れる(lookupBook)](features/book-lookup.md)
 - [決まった形の文章(#417)](features/text.md)
 - [通話(#447・LiveKit Cloud)](features/calls.md)

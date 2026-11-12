@@ -73,6 +73,47 @@ class ConsentWiringTest {
     private val request = AiTextRequest(instruction = "", shape = AiTextShape.LINE, input = "x", locale = "ja", task = "summarize")
 
     @Test
+    fun aiButtonOpensThePaywallWhenProIsNeeded() = runBlocking {
+        consent.grant()
+        val asked = mutableListOf<Boolean>()
+        var pro = false
+        var serverSaysPro = true
+        val counting = object : AIClient by base {
+            override suspend fun text(request: AiTextRequest): AiTextResult {
+                if (!serverSaysPro) throw AiTextError.NeedsPro
+                return base.text(request)
+            }
+        }
+        val gated = AppAiHost(
+            ai = counting,
+            appId = { "app1" },
+            access = { AiTextAccess(consentGranted = true, isPro = pro, enforced = true) },
+            onNeedsPro = { asked += it },
+        )
+        // 端末の判定で Pro でない: 送らずに課金画面
+        try {
+            gated.generateText(request)
+            fail("Pro でないのに送った")
+        } catch (e: AiTextError) {
+            assertEquals(AiTextError.NeedsPro, e)
+        }
+        assertEquals(listOf(false), asked)
+        assertEquals(0, base.texts)
+        // Pro ならサーバーに送る
+        pro = true
+        assertEquals("ok", gated.generateText(request).text)
+        // サーバーが 402(端末の判定が古い): 課金画面を出す。会話(chat)はその印を渡す
+        serverSaysPro = false
+        try {
+            gated.generateText(request.copy(task = "chat"))
+            fail("402 を投げなかった")
+        } catch (e: AiTextError) {
+            assertEquals(AiTextError.NeedsPro, e)
+        }
+        assertEquals(listOf(false, true), asked)
+    }
+
+    @Test
     fun aiButtonAsksForConsentAndSendsNothingUntilGranted() = runBlocking {
         try {
             host.generateText(request)

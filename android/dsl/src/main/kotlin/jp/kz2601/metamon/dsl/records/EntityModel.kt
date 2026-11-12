@@ -1,5 +1,6 @@
 package jp.kz2601.metamon.dsl.records
 
+import jp.kz2601.metamon.dsl.DslReaders
 import jp.kz2601.metamon.dsl.expr.Expr
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
@@ -63,7 +64,7 @@ data class Field(
                 options = (o["options"] as? JsonArray)?.let { a ->
                     if (a.all { it is JsonPrimitive && it.isString }) a.map { (it as JsonPrimitive).content } else null
                 },
-                defaultValue = o["defaultValue"]?.takeIf { it != JsonNull }?.let { JSONValue.from(it) },
+                defaultValue = DslReaders.defaultValue(o["defaultValue"]),
                 unit = o.str("unit"),
                 refEntity = o.str("refEntity"),
                 computed = o["computed"]?.takeIf { it != JsonNull }?.let { runCatching { Expr.from(it) }.getOrNull() },

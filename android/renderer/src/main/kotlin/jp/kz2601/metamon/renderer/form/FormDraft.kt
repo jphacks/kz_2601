@@ -31,6 +31,8 @@ class FormDraft(val entity: Entity, record: Record? = null) {
         private set
     var flagCount by mutableIntStateOf(0)
         private set
+    /** スクロールしてフォーカスを移す field(M10)。押すたびに null を挟んで同じ欄にも移す。 */
+    var attentionField: String? by mutableStateOf(null)
     var saveCount by mutableIntStateOf(0)
         private set
     var lastSaveResult: FormSaveResult? by mutableStateOf(null)
@@ -47,6 +49,9 @@ class FormDraft(val entity: Entity, record: Record? = null) {
     }
 
     val isEditing: Boolean get() = recordId != null
+
+    /** 開いた時(最後に保存した時)の値。型に合わせて正規化済み・空は null。 */
+    fun baselineValue(field: String): JSONValue? = baseline[field]
     val hasUnsavedChanges: Boolean get() = !isReadOnly && normalized(values) != baseline
 
     /** 既存の記録を何も変えずに保存したら書かない(M10)。 */

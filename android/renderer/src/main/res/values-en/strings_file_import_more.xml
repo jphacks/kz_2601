@@ -1,6 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!-- fileImport PDF import (#1181) strings. -->
 <resources>
-    <string name="renderer_import_audio_note">Audio files can\'t be imported on this device yet</string>
     <string name="renderer_import_problem_pdf_unreadable">Couldn\'t get any text from the PDF</string>
 </resources>

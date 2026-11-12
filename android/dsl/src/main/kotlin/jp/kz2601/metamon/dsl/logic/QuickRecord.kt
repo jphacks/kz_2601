@@ -1,11 +1,13 @@
 package jp.kz2601.metamon.dsl.logic
 
+import jp.kz2601.metamon.dsl.AppDSL
 import jp.kz2601.metamon.dsl.records.Entity
 import jp.kz2601.metamon.dsl.records.Field
 import jp.kz2601.metamon.dsl.records.FieldCoding
 import jp.kz2601.metamon.dsl.records.FieldType
 import jp.kz2601.metamon.dsl.records.JSONValue
 import jp.kz2601.metamon.dsl.records.Record
+import jp.kz2601.metamon.dsl.records.entityModels
 import java.util.Locale
 import java.util.regex.Pattern
 
@@ -121,11 +123,11 @@ object QuickRecord {
         return entity.fields.firstOrNull { it.type.isNumeric && it.required == true } ?: entity.fields.firstOrNull { it.type.isNumeric }
     }
 
-    /**
-     * 「記録を追加」の対象に出す entity。フォーム画面(`screen.entity`)を持つものを先に、項目の無いものは除く。
-     * :dsl の Screen はまだ entity を持たないので、フォーム画面の entity id は呼び出し側が渡す。
-     */
-    fun recordableEntities(entities: List<Entity>, formEntityIds: Set<String>): List<Entity> {
+    /** 「記録を追加」の対象に出す entity(iOS の `recordableEntities(in:)`)。フォーム画面(`screen.entity`)を持つものを先に、項目の無いものは除く。 */
+    fun recordableEntities(dsl: AppDSL): List<Entity> = recordableEntities(dsl.entityModels(), dsl.formEntityIds)
+
+    /** [recordableEntities] の本体。`formEntityIds` はフォーム画面の entity id。 */
+    internal fun recordableEntities(entities: List<Entity>, formEntityIds: Set<String>): List<Entity> {
         val usable = entities.filter { it.fields.isNotEmpty() }
         return usable.filter { it.id in formEntityIds } + usable.filter { it.id !in formEntityIds }
     }

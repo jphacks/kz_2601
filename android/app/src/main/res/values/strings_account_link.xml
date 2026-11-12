@@ -13,6 +13,9 @@
     <string name="account_link_footer">Google か Apple でサインインすると、作ったアプリとデータをこのまま引き継げます。匿名のままアプリを消したり機種変更したりすると、作ったアプリに戻れません。</string>
     <string name="account_link_google">Google で続ける</string>
     <string name="account_link_no_pending">もう一度サインインしてください</string>
+    <string name="account_link_prompt_body">いまは匿名で使っています。Google か Apple でサインインしておくと、機種変更やアプリの入れ直しのあとも、作ったアプリとデータに戻れます。</string>
+    <string name="account_link_prompt_later">あとで</string>
+    <string name="account_link_prompt_title">作ったアプリを残しておきませんか</string>
     <string name="account_link_status_anonymous">匿名で使っています</string>
     <string name="account_link_switch">そのアカウントに切り替える</string>
 </resources>

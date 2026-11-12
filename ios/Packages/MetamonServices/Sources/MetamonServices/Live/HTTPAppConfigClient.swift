@@ -32,6 +32,11 @@ public struct HTTPAppConfigClient: AppConfigClient {
     }
     private struct NameBody: Encodable { var name: String }
     private struct OrderBody: Encodable { var ids: [String] }
+    private struct PatchBody: Encodable {
+        struct Source: Encodable { var kind = "manual"; var mode = "patch"; var summary: String }
+        var patch: [JSONPatchOp]
+        var source: Source
+    }
     private struct RecordBody: Encodable { var data: [String: JSONValue] }
     private struct CreateBody: Encodable {
         var data: [String: JSONValue]
@@ -106,6 +111,14 @@ public struct HTTPAppConfigClient: AppConfigClient {
     public func restore(appId: String, toVersion version: Int) async throws -> AppDocument {
         // 201 の本文は VersionSummary + 復元後の dsl(DSLEnvelope 互換・#67)。そのまま現行 DSL として使う
         let data = try await request("POST", "v1/apps/\(appId)/versions/\(version)/restore")
+        return try store(appId: appId, envelope: data)
+    }
+
+    /// 手で動かした配置(#1442)。`source.kind=manual` の版として積む(履歴・元に戻すは声の編集と同じ)。
+    public func patchDSL(appId: String, baseVersion: Int, patch: [JSONPatchOp], summary: String) async throws -> AppDocument {
+        let data = try await HTTP.send("PATCH", baseURL: baseURL, path: "v1/apps/\(appId)/dsl",
+                                       body: PatchBody(patch: patch, source: .init(summary: summary)), token: token,
+                                       headers: ["If-Match": Self.etag(baseVersion)])
         return try store(appId: appId, envelope: data)
     }
 

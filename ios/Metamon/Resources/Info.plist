@@ -35,8 +35,12 @@
 	<string>$(CURRENT_PROJECT_VERSION)</string>
 	<key>ITSAppUsesNonExemptEncryption</key>
 	<false/>
+	<!-- 起動画面は SplashView の最初のコマ(無地の紺)と同じ色にして、つなぎ目を見せない -->
 	<key>UILaunchScreen</key>
-	<dict/>
+	<dict>
+		<key>UIColorName</key>
+		<string>LaunchBackground</string>
+	</dict>
 	<!-- 横向き(左右)も使える(#625)。上下逆さまは無し。iPad は対象外(TARGETED_DEVICE_FAMILY = 1) -->
 	<key>UISupportedInterfaceOrientations</key>
 	<array>
@@ -86,6 +90,12 @@
 				<string>tailorit</string>
 			</array>
 		</dict>
+	</array>
+
+	<!-- 連係の Handoff(#1851): 開いている生成アプリの画面を iPhone ⇄ Mac で引き継ぐ。Shared/Runtime/HandoffActivity.swift の type と同じ -->
+	<key>NSUserActivityTypes</key>
+	<array>
+		<string>jp.kz2601.metamon.view</string>
 	</array>
 
 	<!-- WhisperKit モデル名。空なら `small`(約500MB・日本語精度優先)。環境変数 METAMON_WHISPER_MODEL でも上書き可 -->

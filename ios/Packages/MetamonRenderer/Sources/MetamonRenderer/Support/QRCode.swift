@@ -9,7 +9,7 @@ import MetamonDSL
 
 /// `qrCode`(#422)の画像。CoreImage `CIQRCodeGenerator`(誤り訂正 M)の 1 モジュール = 1px を整数倍に拡大し、
 /// 補間なしで白地に描く(ぼけない)。周りに 4 モジュールの余白(読み取りに要る quiet zone)。
-enum QRCodeImage {
+public enum QRCodeImage {
     static let quietZone = 4
     /// 保存・共有する画像の目安の辺(px)
     static let exportSide = 1024
@@ -32,7 +32,8 @@ enum QRCodeImage {
     }
 
     /// 1 モジュール `scale` px(余白込み)の白地・黒の QR 画像。`scale` nil = 辺が `exportSide` 前後になる倍率。
-    static func image(for text: String, scale: Int? = nil) -> PlatformImage? {
+    /// Mac の共有シート(#974)でも使う
+    public static func image(for text: String, scale: Int? = nil) -> PlatformImage? {
         let key = "\(scale ?? 0)|\(text)" as NSString
         if let hit = cache.object(forKey: key) { return hit }
         guard let cg = modules(for: text) else { return nil }

@@ -2,6 +2,7 @@ package jp.kz2601.metamon.services.permissions
 
 import jp.kz2601.metamon.dsl.AppDSL
 import jp.kz2601.metamon.dsl.decode
+import jp.kz2601.metamon.services.permissions.AppPermission.BACKGROUND_LOCATION
 import jp.kz2601.metamon.services.permissions.AppPermission.CAMERA
 import jp.kz2601.metamon.services.permissions.AppPermission.LOCATION
 import jp.kz2601.metamon.services.permissions.AppPermission.MICROPHONE
@@ -29,7 +30,13 @@ class PermissionNeedsTest {
             """[{"type":"vstack","children":[{"type":"photoField","field":"p"},{"type":"card","children":[{"type":"nearbyShare"}]}]},
                {"type":"audioRecorder","field":"a"},{"type":"locationButton","field":"l"}]""",
         )
-        assertEquals(setOf(CAMERA, MICROPHONE, LOCATION), PermissionNeeds.of(d))
+        assertEquals(setOf(CAMERA, AppPermission.NEARBY, MICROPHONE, LOCATION), PermissionNeeds.of(d))
+    }
+
+    @Test
+    fun countdownのタイマーは終了の通知が要る_stopwatchは要らない() {
+        assertEquals(setOf(NOTIFICATIONS), PermissionNeeds.of(dsl("""[{"type":"timerDisplay","id":"t","mode":"countdown","seconds":60}]""")))
+        assertEquals(emptySet<AppPermission>(), PermissionNeeds.of(dsl("""[{"type":"timerDisplay","id":"t","mode":"stopwatch"}]""")))
     }
 
     @Test
@@ -55,7 +62,7 @@ class PermissionNeedsTest {
         assertEquals(setOf(NOTIFICATIONS), PermissionNeeds.of(defined))
 
         val near = dsl("[]", notifications = """[{"id":"n","title":"t","body":"b","near":{"entity":"e","locationField":"loc"}}]""")
-        assertEquals(setOf(NOTIFICATIONS, LOCATION), PermissionNeeds.of(near))
+        assertEquals(setOf(NOTIFICATIONS, LOCATION, BACKGROUND_LOCATION), PermissionNeeds.of(near))
 
         val action = dsl(
             """[{"type":"button","label":"b","action":{"type":"scheduleNotification","notification":{"id":"n","title":"t","body":"b"}}}]""",
@@ -64,6 +71,33 @@ class PermissionNeedsTest {
 
         val toolbar = dsl("[]", toolbar = """[{"label":"b","action":{"type":"scheduleNotification","notification":{"id":"n","title":"t","body":"b"}}}]""")
         assertEquals(setOf(NOTIFICATIONS), PermissionNeeds.of(toolbar))
+
+        // 進行中の表示(#1030)は常駐の通知
+        val activity = dsl("""[{"type":"button","label":"b","action":{"type":"startActivity","activity":{"title":"t"}}}]""")
+        assertEquals(setOf(NOTIFICATIONS), PermissionNeeds.of(activity))
+    }
+
+    @Test
+    fun 裏での位置のバーは位置が許可された後だけ() {
+        val near = setOf(LOCATION, BACKGROUND_LOCATION)
+        // 位置が断られていれば、先に位置のバー
+        assertEquals(LOCATION, PermissionOffBarModel.pick(near, mapOf(LOCATION to DENIED, BACKGROUND_LOCATION to DENIED), emptySet(), busy = false, summaryShowing = false))
+        // 位置が未確認なら、裏での位置は聞けないので出さない
+        assertNull(PermissionOffBarModel.pick(near, mapOf(LOCATION to NOT_ASKED, BACKGROUND_LOCATION to DENIED), emptySet(), busy = false, summaryShowing = false))
+        // 位置が許可され、裏での位置が断られている
+        assertEquals(BACKGROUND_LOCATION, PermissionOffBarModel.pick(near, mapOf(LOCATION to GRANTED, BACKGROUND_LOCATION to PERMANENTLY_DENIED), emptySet(), busy = false, summaryShowing = false))
+        assertNull(PermissionOffBarModel.pick(near, mapOf(LOCATION to GRANTED, BACKGROUND_LOCATION to GRANTED), emptySet(), busy = false, summaryShowing = false))
+    }
+
+    @Test
+    fun 場所の通知の許可は位置から裏での位置の順() {
+        assertEquals(NearPermissionFlow.Step.ASK_FOREGROUND, NearPermissionFlow.next(NOT_ASKED, NOT_ASKED))
+        assertEquals(NearPermissionFlow.Step.EXPLAIN_BACKGROUND, NearPermissionFlow.next(GRANTED, NOT_ASKED))
+        // 断られた後は聞き直さない(バーが案内する)
+        assertEquals(NearPermissionFlow.Step.NONE, NearPermissionFlow.next(DENIED, NOT_ASKED))
+        assertEquals(NearPermissionFlow.Step.NONE, NearPermissionFlow.next(GRANTED, DENIED))
+        assertEquals(NearPermissionFlow.Step.NONE, NearPermissionFlow.next(GRANTED, GRANTED))
+        assertEquals(listOf("android.permission.ACCESS_BACKGROUND_LOCATION"), BACKGROUND_LOCATION.manifestPermissions(31))
     }
 
     @Test

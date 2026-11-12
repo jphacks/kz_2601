@@ -55,5 +55,8 @@ fun rememberScreenForm(screen: Screen, route: Route, runtime: DSLRuntime): FormD
     // 保存した後(新規 → 記録あり)は作り直さない。保存で recordId が付くのは AppRuntime の書き込みの後なので、
     // 開いた時に recordId が無かった新規フォームは、記録の一覧が変わっても下書きを残す
     if (current != null && route.recordId == null && !entity.single) return current
-    return ScreenForm.makeDraft(entity, record, runtime).also { holder[0] = it }
+    return ScreenForm.makeDraft(entity, record, runtime).also {
+        runtime.formDrafts?.restore(route.id, it) // プロセスが落とされる前の書きかけ(#1185)
+        holder[0] = it
+    }
 }

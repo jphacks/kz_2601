@@ -10,9 +10,9 @@ import jp.kz2601.metamon.dsl.records.JSONValue
 import jp.kz2601.metamon.dsl.records.Record
 import jp.kz2601.metamon.dsl.records.entityModels
 import jp.kz2601.metamon.dsl.screen
+import jp.kz2601.metamon.renderer.components.lists.LeafData
 import jp.kz2601.metamon.renderer.components.play.BracketRules
 import jp.kz2601.metamon.renderer.components.play.FlashcardRules
-import jp.kz2601.metamon.renderer.components.play.PlayRecords
 import jp.kz2601.metamon.renderer.components.play.PlaySave
 import jp.kz2601.metamon.renderer.components.play.RecordWriter
 import jp.kz2601.metamon.renderer.components.play.TimerRun
@@ -124,7 +124,7 @@ class PlayLeavesTest {
         val all = mapOf("player" to players)
         val rt = FakeRuntime(entities, all)
         val c = comp(1)
-        val candidates = PlayRecords.filtered(rt, all, c)
+        val candidates = LeafData(rt, all).filtered(c)
         assertEquals(listOf("p1", "p2"), candidates.map { it.id })
         assertEquals("一郎", randomPickerTitle(c, rt, all, players[0]))
         assertNull("空の見出しは呼び側が「(無題)」", randomPickerTitle(c, rt, all, players[1]))

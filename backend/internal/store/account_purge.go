@@ -69,6 +69,8 @@ type AccountPurgeResult struct {
 	MatchRecords int
 	// apps_public/*/follows/{uid}, and uid taken out of others' follows (#270)
 	Follows int
+	// users/{uid}/connections/* (external API OAuth tokens and revoked markers, #1493)
+	ExtConnections int
 }
 
 // LogAttrs returns the counts as slog attrs, one per line, for the
@@ -94,6 +96,7 @@ func (r AccountPurgeResult) LogAttrs() []any {
 		slog.Int("devices", r.Devices),
 		slog.Int("notifyConsents", r.NotifyConsents),
 		slog.Int("follows", r.Follows),
+		slog.Int("extConnections", r.ExtConnections),
 	}
 }
 

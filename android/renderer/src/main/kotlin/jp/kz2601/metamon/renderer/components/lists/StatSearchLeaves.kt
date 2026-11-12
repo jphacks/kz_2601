@@ -22,6 +22,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.clearAndSetSemantics
@@ -53,18 +54,24 @@ fun StatLeaf(c: Component, ctx: RenderContext, modifier: Modifier = Modifier) {
     val v = StatValue.resolve(c, data)
     val colors = RenderTheme.colors
     val label = c.label.orEmpty()
+    val iconName = StatIcon.name(c, c.field?.let { data.entity(c.entity)?.field(it) })
     val unavailable = stringResource(R.string.lists_unavailable)
+    val loading = stringResource(R.string.load_state_loading)
     Column(
         modifier
             .renderCard()
             .clearAndSetSemantics {
                 contentDescription = label
-                stateDescription = if (v.unavailable) unavailable else v.text
+                stateDescription = when {
+                    v.loading -> loading
+                    v.unavailable -> unavailable
+                    else -> v.text
+                }
             },
         verticalArrangement = Arrangement.spacedBy(RenderTheme.Spacing.xs),
     ) {
         Row(Modifier.defaultMinSize(minHeight = 18.dp), horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
-            c.icon?.let {
+            iconName?.let {
                 Box(Modifier.size(18.dp).background(colors.brandSoft, RoundedCornerShape(6.dp)), contentAlignment = Alignment.Center) {
                     SymbolIcon(it, 12.dp, colors.brandA)
                 }
@@ -73,11 +80,17 @@ fun StatLeaf(c: Component, ctx: RenderContext, modifier: Modifier = Modifier) {
         }
         BasicText(
             v.text,
+            // 初回の読み込み中は 0 を見せず「—」を明滅(#1116)
+            if (v.loading) Modifier.alpha(skeletonPulse()) else Modifier,
             style = TextStyle(
                 fontWeight = FontWeight.Bold,
                 fontFeatureSettings = "tnum",
                 // 予算の残りが赤字など、マイナスは負の色(#131)
-                color = if (v.text.startsWith("-")) colors.negative else MaterialTheme.colorScheme.onSurface,
+                color = when {
+                    v.loading || v.unavailable -> colors.tertiaryLabel
+                    v.text.startsWith("-") -> colors.negative
+                    else -> MaterialTheme.colorScheme.onSurface
+                },
             ),
             maxLines = 1,
             autoSize = TextAutoSize.StepBased(minFontSize = 11.sp, maxFontSize = 56.sp, stepSize = 2.sp),

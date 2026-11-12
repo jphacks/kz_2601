@@ -13,6 +13,7 @@ import jp.kz2601.metamon.services.local.RecordSyncEngine
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
+import java.util.concurrent.atomic.AtomicBoolean
 
 /** 起動後にどちらの画面を出すか(iOS の `user == nil ? SignInView : RootView`)。 */
 enum class RootScreen {
@@ -148,6 +149,25 @@ class AuthSession(val service: AuthService, private val beforeSignOut: suspend (
         runCatching { service.signOut() }.onFailure { error.value = SIGN_OUT_FAILED }
     }
 
+    private val expiring = AtomicBoolean(false)
+
+    /**
+     * セッション切れ(#1102・iOS の `expire`。トークンを取り直しても 401)。サインアウトしてサインイン画面に理由を出す。
+     * 端末のデータは持ち主の見張り(`AccountGuard`)がサインアウトを見て消す。同時に何本 401 が来ても 1 回だけ、
+     * サインインしていない時(既に戻した後)は何もしない。
+     * [uid] は 401 を受けたリクエストを送った人。今の人と違えば(サインアウトして別の人が入った後に遅れて届いた)何もしない。
+     */
+    suspend fun expire(uid: String?) {
+        val current = user.value ?: return
+        if (uid == null || uid != current.uid || !expiring.compareAndSet(false, true)) return
+        try {
+            signOut()
+            error.value = SESSION_EXPIRED
+        } finally {
+            expiring.set(false)
+        }
+    }
+
     /** 失敗してもサインアウトは続ける(次のサインインで登録し直す)。トークンを止める前に呼ぶ。 */
     private suspend fun runBeforeSignOut() {
         try {
@@ -210,6 +230,7 @@ class AuthSession(val service: AuthService, private val beforeSignOut: suspend (
     companion object {
         val SIGN_IN_FAILED: UiText = UiText.Res(R.string.auth_sign_in_failed)
         val SIGN_OUT_FAILED: UiText = UiText.Res(R.string.auth_sign_out_failed)
+        val SESSION_EXPIRED: UiText = UiText.Res(R.string.auth_session_expired)
 
         /**
          * [AuthError.Unavailable] だけはアプリが strings から作った文言なのでそのまま出す。ほかは固定の文言。

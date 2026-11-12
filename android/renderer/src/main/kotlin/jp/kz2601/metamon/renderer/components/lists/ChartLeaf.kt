@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
@@ -33,6 +34,7 @@ import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalLocale
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
@@ -55,6 +57,7 @@ import kotlin.math.min
 /**
  * `chart`: groupBy で束ねた集計を bar | line | pie で描く。iOS の `ChartLeaf`(Swift Charts)。
  * グラフのライブラリは足さず Compose の Canvas で描く。押した棒・点・扇の値を上に出し、読み上げには要約(最大・最小)を渡す(L4)。
+ * 読み上げでは棒・点・扇(凡例)ごとにも止まれ、「見出し, 値」と読む(#1118)。
  */
 @Composable
 fun ChartLeaf(c: Component, ctx: RenderContext, modifier: Modifier = Modifier) {
@@ -66,7 +69,7 @@ fun ChartLeaf(c: Component, ctx: RenderContext, modifier: Modifier = Modifier) {
         c.title?.let { Text(it, style = RenderTheme.Fonts.cardTitle) }
         if (buckets.isEmpty()) {
             // 記録すると出ることを伝える(L4)
-            EmptyPlaceholder("chart.bar", stringResource(R.string.lists_chart_empty))
+            RecordsPlaceholderView(data, c.entity, "chart.bar", stringResource(R.string.lists_chart_empty))
             return@Column
         }
         // 押していない時も高さを取っておく(押すたびにグラフが上下しない)
@@ -93,48 +96,52 @@ private fun BarOrLineChart(buckets: List<Aggregator.Bucket>, line: Boolean, sele
     val lo = min(buckets.minOf { it.value }, 0.0)
     val span = (hi - lo).takeIf { it > 0 } ?: 1.0
     Column(modifier) {
-        Canvas(
-            Modifier.fillMaxWidth().height(160.dp)
-                .pointerInput(buckets) {
-                    detectTapGestures { p ->
-                        val i = (p.x / (size.width / buckets.size.toFloat())).toInt().coerceIn(0, buckets.size - 1)
-                        onSelect(if (selected == i) null else i)
+        Box(Modifier.fillMaxWidth().height(160.dp)) {
+            Canvas(
+                Modifier.matchParentSize()
+                    .pointerInput(buckets) {
+                        detectTapGestures { p ->
+                            val i = (p.x / (size.width / buckets.size.toFloat())).toInt().coerceIn(0, buckets.size - 1)
+                            onSelect(if (selected == i) null else i)
+                        }
+                    },
+            ) {
+                val slot = size.width / buckets.size
+                fun y(v: Double) = (size.height * (1 - (v - lo) / span)).toFloat()
+                // 横の補助線(0 と最大)
+                listOf(lo, hi).distinct().forEach { v -> drawLine(colors.hairline, Offset(0f, y(v)), Offset(size.width, y(v)), 1.dp.toPx()) }
+                if (line) {
+                    val pts = buckets.mapIndexed { i, b -> Offset(slot * i + slot / 2, y(b.value)) }
+                    val area = Path().apply {
+                        moveTo(pts.first().x, y(0.0))
+                        pts.forEach { lineTo(it.x, it.y) }
+                        lineTo(pts.last().x, y(0.0))
+                        close()
                     }
-                },
-        ) {
-            val slot = size.width / buckets.size
-            fun y(v: Double) = (size.height * (1 - (v - lo) / span)).toFloat()
-            // 横の補助線(0 と最大)
-            listOf(lo, hi).distinct().forEach { v -> drawLine(colors.hairline, Offset(0f, y(v)), Offset(size.width, y(v)), 1.dp.toPx()) }
-            if (line) {
-                val pts = buckets.mapIndexed { i, b -> Offset(slot * i + slot / 2, y(b.value)) }
-                val area = Path().apply {
-                    moveTo(pts.first().x, y(0.0))
-                    pts.forEach { lineTo(it.x, it.y) }
-                    lineTo(pts.last().x, y(0.0))
-                    close()
-                }
-                drawPath(area, Brush.verticalGradient(listOf(colors.brandA.copy(alpha = 0.25f), colors.brandA.copy(alpha = 0.02f))))
-                val path = Path().apply { pts.forEachIndexed { i, p -> if (i == 0) moveTo(p.x, p.y) else lineTo(p.x, p.y) } }
-                drawPath(path, colors.brandA, style = Stroke(width = 2.5.dp.toPx(), cap = StrokeCap.Round))
-                pts.forEachIndexed { i, p -> drawCircle(colors.brandA, radius = (if (selected == i) 5.dp else 3.5.dp).toPx(), center = p) }
-            } else {
-                val barW = slot * 0.6f
-                buckets.forEachIndexed { i, b ->
-                    val top = y(max(b.value, 0.0))
-                    val bottom = y(min(b.value, 0.0))
-                    drawRoundRect(
-                        Brush.verticalGradient(listOf(colors.brandFillStart, colors.brandFillEnd), startY = top, endY = bottom),
-                        topLeft = Offset(slot * i + (slot - barW) / 2, top),
-                        size = Size(barW, max(bottom - top, 1f)),
-                        cornerRadius = CornerRadius(6.dp.toPx()),
-                        alpha = if (selected == null || selected == i) 1f else 0.4f,
-                    )
+                    drawPath(area, Brush.verticalGradient(listOf(colors.brandA.copy(alpha = 0.25f), colors.brandA.copy(alpha = 0.02f))))
+                    val path = Path().apply { pts.forEachIndexed { i, p -> if (i == 0) moveTo(p.x, p.y) else lineTo(p.x, p.y) } }
+                    drawPath(path, colors.brandA, style = Stroke(width = 2.5.dp.toPx(), cap = StrokeCap.Round))
+                    pts.forEachIndexed { i, p -> drawCircle(colors.brandA, radius = (if (selected == i) 5.dp else 3.5.dp).toPx(), center = p) }
+                } else {
+                    val barW = slot * 0.6f
+                    buckets.forEachIndexed { i, b ->
+                        val top = y(max(b.value, 0.0))
+                        val bottom = y(min(b.value, 0.0))
+                        drawRoundRect(
+                            Brush.verticalGradient(listOf(colors.brandFillStart, colors.brandFillEnd), startY = top, endY = bottom),
+                            topLeft = Offset(slot * i + (slot - barW) / 2, top),
+                            size = Size(barW, max(bottom - top, 1f)),
+                            cornerRadius = CornerRadius(6.dp.toPx()),
+                            alpha = if (selected == null || selected == i) 1f else 0.4f,
+                        )
+                    }
                 }
             }
+            // 棒・点ごとに読み上げで止まれる枠(Canvas の上・押す操作は Canvas が受ける)。要約はグラフ全体に残す
+            ChartPointTargets(buckets, Modifier.matchParentSize())
         }
-        // x 軸ラベル(#131: 長い名前は 5 文字 + …)
-        Row(Modifier.fillMaxWidth().padding(top = 4.dp)) {
+        // x 軸ラベル(#131: 長い名前は 5 文字 + …)。読み上げは棒・点の枠が見出しごと読むので出さない
+        Row(Modifier.fillMaxWidth().padding(top = 4.dp).clearAndSetSemantics {}) {
             buckets.forEach { b ->
                 Text(
                     ChartBuckets.axisLabel(b.label),
@@ -150,6 +157,17 @@ private fun BarOrLineChart(buckets: List<Aggregator.Bucket>, line: Boolean, sele
     }
 }
 
+/** 棒・点と同じ幅の透明な枠を並べ、それぞれ「見出し, 値」と読ませる(iOS の棒ごとの読み上げ・#1118)。 */
+@Composable
+private fun ChartPointTargets(buckets: List<Aggregator.Bucket>, modifier: Modifier) {
+    Row(modifier) {
+        buckets.forEach { b ->
+            val point = ChartReadout.point(b.label, b.value)
+            Box(Modifier.weight(1f).fillMaxHeight().semantics { contentDescription = point })
+        }
+    }
+}
+
 @Composable
 private fun PieChart(buckets: List<Aggregator.Bucket>, selected: Int?, onSelect: (Int?) -> Unit, modifier: Modifier) {
     val palette = RenderTheme.colors.chartPalette
@@ -160,7 +178,12 @@ private fun PieChart(buckets: List<Aggregator.Bucket>, selected: Int?, onSelect:
         // 凡例は上(iOS と同じ)
         FlowRow(horizontalArrangement = Arrangement.spacedBy(10.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
             buckets.forEachIndexed { i, b ->
-                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                val point = ChartReadout.point(b.label, b.value)
+                Row(
+                    Modifier.clearAndSetSemantics { contentDescription = point },
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(4.dp),
+                ) {
                     Box(Modifier.size(8.dp).background(color(i), CircleShape))
                     Text(b.label, style = RenderTheme.Fonts.legend, maxLines = 1)
                 }

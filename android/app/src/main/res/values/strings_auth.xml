@@ -7,6 +7,7 @@
     <string name="auth_google_failed">Google でログインできませんでした。もう一度お試しください</string>
     <string name="auth_google_no_account">この端末に Google アカウントがありません。端末の設定で追加してから、もう一度お試しください</string>
     <string name="auth_google_no_credential">Google の認証情報を受け取れませんでした。もう一度お試しください</string>
+    <string name="auth_session_expired">サインインの有効期限が切れました。もう一度サインインしてください</string>
     <string name="auth_sign_in_failed">サインインできませんでした。もう一度お試しください</string>
     <string name="auth_sign_out_failed">ログアウトできませんでした</string>
     <string name="auth_tagline">話しかけるだけで、アプリが生まれ変わる</string>

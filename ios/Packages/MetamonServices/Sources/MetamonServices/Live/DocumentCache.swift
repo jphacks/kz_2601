@@ -68,4 +68,13 @@ public enum DocumentEnvelope {
         root["dsl"] = dsl
         return try? JSONSerialization.data(withJSONObject: root)
     }
+
+    /// 複製(Mac の端末だけのアプリ・#1285): 新しい appId・版 1・名前で包み直す。画面の定義だけを写す。読めなければ nil
+    public static func duplicated(_ envelope: Data, appId: String, name: String) -> Data? {
+        guard let renamed = renamed(envelope, to: name),
+              var root = try? JSONSerialization.jsonObject(with: renamed) as? [String: Any] else { return nil }
+        root["appId"] = appId
+        root["version"] = 1
+        return try? JSONSerialization.data(withJSONObject: root)
+    }
 }

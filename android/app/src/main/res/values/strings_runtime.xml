@@ -21,6 +21,7 @@
     <string name="runtime_missing_required">%1$s を入力してください</string>
     <string name="runtime_no_form">保存するフォームがありません</string>
     <string name="runtime_not_member">この共有に参加していません。招待リンクから参加してください</string>
+    <string name="runtime_activity_notifications_off">通知がオフのため、進行中の表示を出せません(設定 &gt; 通知)</string>
     <string name="runtime_notification_failed">通知を予約できませんでした</string>
     <string name="runtime_notification_scheduled">通知を予約しました(%1$s)</string>
     <string name="runtime_offline_restored">オフラインです。最後に保存したアプリを表示しています</string>
@@ -40,4 +41,6 @@
     <string name="runtime_text_not_allowed_field">「%1$s」に表示できない言葉が含まれています</string>
     <string name="runtime_unavailable_on_android">この機能は Android ではまだ使えません</string>
     <string name="runtime_unknown_action">未対応のアクション: %1$s</string>
+    <string name="runtime_unreachable_body">接続を確認してください。つながると自動で読み込み直します</string>
+    <string name="runtime_unreachable_title">サーバーに接続できません</string>
 </resources>

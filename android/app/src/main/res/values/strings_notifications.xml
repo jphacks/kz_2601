@@ -1,11 +1,18 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!-- 生成アプリのローカル通知(#886)。チャンネルの名前は端末の設定 > 通知 に出る -->
 <resources>
+    <string name="exact_alarm_prompt_body">アラームやタイマーを決めた時刻ぴったりに鳴らすには「アラームとリマインダー」の許可が要ります。許可しない場合は最大 10 分ほど遅れて鳴ります。</string>
+    <string name="exact_alarm_prompt_later">あとで</string>
+    <string name="exact_alarm_prompt_open">設定を開く</string>
+    <string name="exact_alarm_prompt_title">時刻どおりに鳴らしますか？</string>
     <string name="notification_alarm_stop">止める</string>
+    <string name="notification_channel_activities">進行中の表示</string>
+    <string name="notification_channel_activities_description">アプリで始めた「いま◯◯中」の表示</string>
     <string name="notification_channel_alarms">アラーム</string>
     <string name="notification_channel_alarms_description">止めるまで鳴り続けるお知らせ</string>
     <string name="notification_channel_conditions">条件のお知らせ</string>
     <string name="notification_channel_conditions_description">記録が条件を満たした時のお知らせ</string>
     <string name="notification_channel_reminders">時刻のお知らせ</string>
     <string name="notification_channel_reminders_description">生成したアプリで設定した時刻のお知らせ</string>
+    <string name="timer_finished_body">%1$sのタイマーが終わりました</string>
 </resources>

@@ -61,7 +61,7 @@ import kotlinx.coroutines.delay
  * 生成中の演出と完成の後のお知らせをまとめて出す(#894)。本体の画面([content])を包み、上に重ねる。
  * - create: 全画面の組み立て台([GeneratingScreen])→ 結果の組み上げ → 本物の画面
  * - edit: 今の画面を薄くして上部にカプセル([EditingIndicator])→ 変わった部品の印(描画器の [LocalChangeHighlight])
- * - 完成の後: 要約の位置語のハイライト・最初のアプリの直後の「こう話すと直せます」(要約が閉じてから・[PostBuildNotice])
+ * - 完成の後: 要約の位置語のハイライト・最初のアプリの直後の「こう話すと直せます」(要約と保存期間の確認が閉じてから・[PostBuildNotice])
  * 要約のバナーそのものは FeedbackHost(#895)が出す。
  */
 @Composable
@@ -70,9 +70,13 @@ fun BoxScope.BuildStageHost(
     onCancel: () -> Unit,
     onOpenVoice: () -> Unit,
     editHints: EditHintStore? = null,
+    retentionPending: Boolean = false,
+    /** 課金画面・公開の記録・引き継ぎが待っているか(#1198) */
+    waiting: PostBuildWaiting = PostBuildWaiting.NONE,
+    /** 見せ方の状態。外で持つと組み上げ中か(切り替え一覧のサムネを撮ってよいか・#1199)を読める */
+    stage: BuildStageState = remember(editHints) { BuildStageState(editHints) },
     content: @Composable BoxScope.() -> Unit,
 ) {
-    val stage = remember(editHints) { BuildStageState(editHints) }
     val reduceMotion = LocalReduceMotion.current
     LaunchedEffect(state) { stage.update(state, SystemClock.elapsedRealtime(), reduceMotion) }
 
@@ -103,7 +107,7 @@ fun BoxScope.BuildStageHost(
         CompositionLocalProvider(LocalChangeHighlight provides stage.highlight) { content() }
     }
 
-    val notice = stage.currentNotice(state)
+    val notice = stage.currentNotice(state, retentionPending, waiting)
     // 要約の位置語(「右下のボタンから」)を領域のハイライトに
     val anchor = stage.anchor
     if (anchor != null && notice == PostBuildNotice.SUMMARY && state.summary != null && !stage.showsFullScreen && !state.isInitial) {

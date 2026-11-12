@@ -221,6 +221,23 @@ class HttpAppConfigClientTest {
         assertEquals("DELETE", server.take().method)
     }
 
+    @Test
+    fun deleteAllRecordsSendsConfirm() = runBlocking<Unit> {
+        server.enqueue(MockResponse().setResponseCode(204))
+        client.deleteAllRecords("app1", "expense")
+        val req = server.take()
+        assertEquals("DELETE", req.method)
+        assertEquals("/v1/apps/app1/entities/expense/records?confirm=true", req.path)
+    }
+
+    @Test
+    fun deleteAllRecordsAdminsOnlyIsApiError() = runBlocking<Unit> {
+        server.enqueue(json(403, errorBody("admins_only")))
+        val e = expectApiError { client.deleteAllRecords("app1", "expense") }
+        assertEquals(403, e.status)
+        assertEquals("admins_only", e.code)
+    }
+
     // MARK: 共有
 
     @Test

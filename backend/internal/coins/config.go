@@ -33,6 +33,10 @@ const (
 	// OpCall is a block of call minutes (#447, internal/calls). It has no
 	// COIN_RESERVE_<OP>: the caller passes the block as ReserveRequest.Max.
 	OpCall = "call"
+	// OpExt is a paid external API call (internal/extapi). Like OpCall it has
+	// no COIN_RESERVE_<OP>: extapi passes COIN_RESERVE_EXT_<PROVIDER> as
+	// ReserveRequest.Max, and its spend rows are spend_ext.
+	OpExt = "ext"
 )
 
 // Ops lists the ops in display order.

@@ -27,14 +27,17 @@ public final class FeedCache {
     public static let ttl: TimeInterval = 600
 
     private var entries: [FeedQuery: (result: FeedResult, at: Date)] = [:]
+    /// `reset` のたびに進める。取りに行っている間にサインアウトされたら、前の人の結果を書き戻さない
+    private var generation = 0
     private let now: () -> Date
 
     public init(now: @escaping () -> Date = Date.init) { self.now = now }
 
     public func load(_ query: FeedQuery, force: Bool, client: any FeedClient) async throws -> FeedResult {
         if !force, let e = entries[query], now().timeIntervalSince(e.at) < Self.ttl { return e.result }
+        let started = generation
         let result = try await client.feed(query)
-        entries[query] = (result, now())
+        if generation == started { entries[query] = (result, now()) }
         return result
     }
 
@@ -42,6 +45,9 @@ public final class FeedCache {
     public func cached(_ query: FeedQuery) -> FeedResult? { entries[query]?.result }
 
     /// サインアウト・テスト用。
-    public func reset() { entries = [:] }
+    public func reset() {
+        entries = [:]
+        generation += 1
+    }
 }
 #endif

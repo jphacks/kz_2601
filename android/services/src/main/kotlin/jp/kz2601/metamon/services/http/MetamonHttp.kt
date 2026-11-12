@@ -1,5 +1,6 @@
 package jp.kz2601.metamon.services.http
 
+import jp.kz2601.metamon.services.RemainingToday
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.serialization.json.Json
@@ -91,6 +92,13 @@ class MetamonHttp(
     private val device: DeviceContext = DeviceContext(),
     private val sleep: suspend (Long) -> Unit = { delay(it) },
     private val clock: () -> Instant = Instant::now,
+    /** 応答の `X-RateLimit-*` から読んだ「今日の残り」の行き先(iOS の `HTTP.noteRemaining`・#1203)。ai だけに付ける */
+    private val remainingSink: ((RemainingToday) -> Unit)? = null,
+    /**
+     * ID トークンを取り直しても 401 だった(iOS の `sessionExpired`・#1102)。サインイン画面に戻す口。
+     * 値は送った時の uid([TokenProvider.subject])
+     */
+    private val onSessionExpired: ((String?) -> Unit)? = null,
 ) {
     val baseUrl: HttpUrl = baseUrl.toHttpUrl()
 
@@ -107,6 +115,8 @@ class MetamonHttp(
 
     /** ステータスを問わず返す。転送のエラーだけ throw。401 / 429 の 1 回の再送と GET のやり直しはここで行う。 */
     suspend fun exchange(req: HttpRequest): HttpResponse {
+        // トークンより先に読む: 応答を待つ間に別の人へ替わっても、401 を送った人の分として知らせる
+        val subject = tokens.subject()
         var bearer = tokens.idToken(false)
         var check = appCheck?.token(false)
         var r = performWithRetry(req, bearer, check)
@@ -127,6 +137,8 @@ class MetamonHttp(
                 bearer = fresh
                 r = perform(req, bearer, check)
             }
+            // 取り直しても(取り直せなくても)401 = セッション切れ。トークンを付けていない(未サインイン)時は呼ばない
+            if (r.status == 401 && !isAppCheckRejection(r)) onSessionExpired?.invoke(subject)
         }
         if (r.status == 429) {
             val wait = retryAfterSeconds(r) ?: retry.defaultRetryAfterSeconds
@@ -135,7 +147,14 @@ class MetamonHttp(
                 r = perform(req, bearer, check)
             }
         }
+        noteRemaining(r.status, r.body, r.headers)
         return r
+    }
+
+    /** ヘッダーの無い応答(appconfig など)では何もしない */
+    private fun noteRemaining(status: Int, body: String, headers: Headers) {
+        val sink = remainingSink ?: return
+        RemainingToday.parse({ headers[it] }, status, body, clock())?.let(sink)
     }
 
     /**
@@ -146,7 +165,8 @@ class MetamonHttp(
     suspend fun openStream(req: HttpRequest, forceRefresh: Boolean = false): Response {
         val bearer = tokens.idToken(forceRefresh)
         val check = appCheck?.token(forceRefresh)
-        return clientFor(req).newCall(build(req, bearer, check)).await()
+        // 本文はまだ無いので、ヘッダーだけで読む(429 は本文の scope が要るので数えない)
+        return clientFor(req).newCall(build(req, bearer, check)).await().also { noteRemaining(it.code, "", it.headers) }
     }
 
     fun check(r: HttpResponse): String {

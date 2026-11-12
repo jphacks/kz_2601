@@ -22,21 +22,58 @@ final class ReviewBuildTests: XCTestCase {
     /// #482・#265: 記録の自動削除・条件の通知はどの版も持つ。#507: 仲間探しは審査用の版では送らない(backend が match・item.interest・matchList を使わない)。
     func testSupportedFeatures() {
         #if APP_STORE_REVIEW
-        XCTAssertEqual(ClientCapabilities.supportedFeatures, ["recordRetention", "notification.when", "singleEntity", "notification.near", "aiButton.long", "aiButton.inputPhoto", "aiButton.saveTo", "aiButton.inputFeeds", "aiButton.outputs", "action.lookupBook", "text.highlight", "feed.v2", "expr.addMinutes", "aiChat.inputEntity", "component.bracket", "progressBar.settingTarget", "openUrlButton.app"])
+        XCTAssertEqual(ClientCapabilities.supportedFeatures, ["recordRetention", "notification.when", "singleEntity", "notification.near", "aiButton.saveTo", "aiButton.inputFeeds", "aiButton.outputs", "action.lookupBook", "text.highlight", "feed.v2", "expr.addMinutes", "aiChat.inputEntity", "component.bracket", "progressBar.settingTarget", "openUrlButton.app"])
         #else
         XCTAssertEqual(ClientCapabilities.supportedFeatures, ["recordRetention", "matching", "notification.when", "singleEntity", "dataRoles", "addressedMessages", "notification.near", "aiButton.long", "aiButton.inputPhoto", "aiButton.saveTo", "aiButton.inputFeeds", "aiButton.outputs", "action.lookupBook", "text.highlight", "feed.v2", "expr.addMinutes", "aiChat.inputEntity", "component.bracket", "progressBar.settingTarget", "photoField.illustrate", "component.callButton", "field.encrypted", "openUrlButton.app"])
         #endif
     }
 
-    func testBuildFlagControlsWhatIsSent() {
+    /// #1640: long・inputPhoto はオンライン AI だけで動く。審査用の版は送らない(backend が外し、端末内 AI で動く形にする)。
+    func testOnlineOnlyAIButtonFeaturesFollowBuild() {
+        let online = ["aiButton.long", "aiButton.inputPhoto"]
         #if APP_STORE_REVIEW
-        XCTAssertEqual(ClientCapabilities.allowedComponents, ClientCapabilities.reviewAllowedComponents)
-        XCTAssertEqual(ClientCapabilities.disabledFeatures, ClientCapabilities.reviewDisabledFeatures)
+        for f in online { XCTAssertFalse(ClientCapabilities.supportedFeatures.contains(f), f) }
+        #else
+        for f in online { XCTAssertTrue(ClientCapabilities.supportedFeatures.contains(f), f) }
+        #endif
+    }
+
+    func testBuildFlagControlsWhatIsSent() {
+        #if os(macOS)
+        let macOS = true // Mac は描けない部品も外す(#925)
+        #else
+        let macOS = false
+        #endif
+        #if APP_STORE_REVIEW
+        XCTAssertEqual(ClientCapabilities.allowedComponents, ClientCapabilities.allowedComponents(macOS: macOS, review: true))
+        XCTAssertEqual(ClientCapabilities.disabledFeatures, ClientCapabilities.disabledFeatures(macOS: macOS, review: true))
+        XCTAssertEqual(ClientCapabilities.allowedComponents(macOS: false, review: true), ClientCapabilities.reviewAllowedComponents)
+        XCTAssertEqual(ClientCapabilities.disabledFeatures(macOS: false, review: true), ClientCapabilities.reviewDisabledFeatures)
         XCTAssertTrue(Set(DSLExamples.names).isDisjoint(with: DSLExamples.reviewExcluded))
         #else
-        XCTAssertEqual(ClientCapabilities.allowedComponents, ClientCapabilities.allComponents) // 通常ビルドも全部品を送る(#302)
-        XCTAssertNil(ClientCapabilities.disabledFeatures)
+        XCTAssertEqual(ClientCapabilities.allowedComponents, ClientCapabilities.allowedComponents(macOS: macOS, review: false))
+        XCTAssertEqual(ClientCapabilities.disabledFeatures, ClientCapabilities.disabledFeatures(macOS: macOS, review: false))
+        XCTAssertEqual(ClientCapabilities.allowedComponents(macOS: false, review: false), ClientCapabilities.allComponents) // 通常ビルドも全部品を送る(#302)
+        XCTAssertNil(ClientCapabilities.disabledFeatures(macOS: false, review: false))
         XCTAssertTrue(DSLExamples.reviewExcluded.isSubset(of: Set(DSLExamples.names)))
+        #endif
+    }
+
+    /// Mac の申告(#925): 描けない部品と機能を外す。iOS の値は変えない
+    func testMacDeclaration() {
+        let mac = Set(ClientCapabilities.allowedComponents(macOS: true, review: false))
+        XCTAssertEqual(ClientCapabilities.macUnavailableComponents, [.healthStat, .sensorValue, .locationTracker, .dashcam])
+        XCTAssertTrue(mac.isDisjoint(with: ClientCapabilities.macUnavailableComponents.map(\.rawValue)))
+        XCTAssertEqual(mac.count, ClientCapabilities.allComponents.count - ClientCapabilities.macUnavailableComponents.count)
+        XCTAssertEqual(ClientCapabilities.disabledFeatures(macOS: true, review: false), ["fieldHealth"])
+        XCTAssertEqual(ClientCapabilities.disabledFeatures(macOS: true, review: true), ["fieldHealth", "cameraCapture", "sharedData"])
+        let macReview = Set(ClientCapabilities.allowedComponents(macOS: true, review: true))
+        XCTAssertTrue(macReview.isDisjoint(with: ClientCapabilities.reviewExcludedComponents.map(\.rawValue)))
+        XCTAssertTrue(macReview.isDisjoint(with: ClientCapabilities.macUnavailableComponents.map(\.rawValue)))
+        #if os(macOS)
+        XCTAssertEqual(ClientCapabilities.platform, "macos")
+        #else
+        XCTAssertEqual(ClientCapabilities.platform, "ios")
         #endif
     }
 

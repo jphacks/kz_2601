@@ -1,6 +1,6 @@
 import SwiftUI
 
-/// Mac の本体の画面の寸法と文字(#935)。色は iOS の `Theme`(値の正典は Renderer の `RenderTheme`)をそのまま使い、Mac だけの色は作らない。
+/// Mac の本体の画面の寸法と文字(#935)。色は iOS の `Theme`(値の正典は Renderer の `RenderTheme`)をそのまま使い、Mac だけの色は作らない(例外はコントラストを上げる時の濃い枠 `MacTheme.Colors.strongHairline`・#1206)。
 /// 文字は text style のまま(Mac では body = 13pt など Mac の大きさになる)。余白は Mac のウィンドウの決まり(端 20pt)に合わせる。
 /// アクセントは Brand.xcassets の AccentColor(藍)。システム設定でアクセントを選んでいる人にはそちらが効くので、`.tint` で上書きしない。
 enum MacTheme {
@@ -47,7 +47,7 @@ struct MacEmptyState: View {
             if let message {
                 Text(message)
                     .font(MacTheme.Fonts.emptyBody)
-                    .foregroundStyle(.secondary)
+                    .macSecondaryText() // コントラストを上げる時は本文の色(#1206)
                     .multilineTextAlignment(.center)
             }
         }

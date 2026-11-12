@@ -57,8 +57,8 @@ val LocalShareSheetExtras: ProvidableCompositionLocal<@Composable () -> Unit> = 
  * 共有シートの「参加している人」(iOS の `SharedMembersSection`・#903)。
  * 作成者は各行に「外す」、管理者は「管理者にする / 外す」、参加者は「この共有から抜ける」。外す・抜けるは確認を取る。
  * @param onRevokeLink 外した後の「リンクを取り消す」。null なら誘導の文だけ出す
- * @param onLeft 抜けられた後(呼び出し側がシートを閉じ、別のアプリへ切り替えて後片付けする)
- * @param leaveScope 抜ける通信を走らせる scope。シートを閉じても止めない(止めると抜けたのに後片付けされない)
+ * @param onLeft 抜けられた後(呼び出し側がシートを閉じて知らせる。アプリと自分のコピーは残す)
+ * @param leaveScope 抜ける通信を走らせる scope。シートを閉じても止めない(止めると抜けたのに知らせが出ない)
  */
 @Composable
 fun MembersSection(model: MembersModel, onRevokeLink: (suspend () -> Unit)?, onLeft: () -> Unit, leaveScope: CoroutineScope? = null) {

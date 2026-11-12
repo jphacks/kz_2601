@@ -14,11 +14,10 @@ import jp.kz2601.metamon.renderer.form.FormDraft
 import jp.kz2601.metamon.renderer.registry.RenderContext
 
 /**
- * `openUrlButton.app` / `to`(iOS #989)。生成した型 [Component] にまだキーが無いので、#989 のスキーマが入って
- * `make dsl-gen` で型ができるまでは null(url だけで開く)。型ができたら `app` / `to` を返すように変える。
+ * `openUrlButton.app` / `to`(iOS #989)。知らない app(新しい版)は UNKNOWN の空文字になり、[OpenUrlTarget.resolve] で開かない。
  */
-internal val Component.openAppName: String? get() = null
-internal val Component.openAppTo: String? get() = null
+internal val Component.openAppName: String? get() = app?.wire
+internal val Component.openAppTo: String? get() = to
 
 /** openUrlButton が開く先(iOS の `OpenUrlButtonLeaf.body` の分岐)。 */
 sealed interface OpenUrlTarget {
