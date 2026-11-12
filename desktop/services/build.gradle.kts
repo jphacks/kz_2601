@@ -39,6 +39,11 @@ sourceSets {
                 "jp/kz2601/metamon/services/local/DocumentCache.kt",
                 "jp/kz2601/metamon/services/local/RecordStore.kt",
                 "jp/kz2601/metamon/services/local/SyncQueue.kt",
+                // 変化の通知(SSE `GET /v1/apps/{appId}/events`)とホットリロード(#2807)
+                "jp/kz2601/metamon/services/sync/ChangeEvents.kt",
+                "jp/kz2601/metamon/services/sync/DocumentSync.kt",
+                "jp/kz2601/metamon/services/sync/HotReload.kt",
+                "jp/kz2601/metamon/services/sync/RealtimeDocumentSync.kt",
             )
         }
     }
