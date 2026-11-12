@@ -4,6 +4,15 @@ import Observation
 import SwiftUI
 import MetamonServices
 
+/// 既存のアカウントに Apple をつないだ結果(#361)。iOS と Mac の両方で使う。
+enum AppleLinkOutcome: Equatable {
+    case linked
+    case cancelled
+    /// その Apple ID は別のアカウントで使われている(`credentialAlreadyInUse`)。何も変えない
+    case inUseByOtherAccount
+    case failed(String)
+}
+
 /// サインイン状態(`AuthService` の観測可能ラッパー)。`user == nil` なら `SignInView`、それ以外は `RootView`。
 @MainActor
 @Observable

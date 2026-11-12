@@ -5,15 +5,6 @@ import MetamonServices
 // #361: 1 つのアカウントを OS をまたいで使う。つながっているサインインの方法を見せ、Apple 以外のアカウントに Apple を足せる。
 // その Apple ID が別のアカウントにあっても、アカウントはまとめない(切り替えもしない)。
 
-/// 既存のアカウントに Apple をつないだ結果。
-enum AppleLinkOutcome: Equatable {
-    case linked
-    case cancelled
-    /// その Apple ID は別のアカウントで使われている(`credentialAlreadyInUse`)。何も変えない
-    case inUseByOtherAccount
-    case failed(String)
-}
-
 /// 設定の「サインインの方法」。匿名のユーザーには出さない(匿名 → Apple の引き継ぎはアカウントの欄・#276)。
 struct LinkedAccountsSection: View {
     @Environment(AuthSession.self) private var session
