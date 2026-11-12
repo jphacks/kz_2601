@@ -61,6 +61,9 @@
 	<string>$(METAMON_AI_BASE_URL)</string>
 	<key>MetamonAppConfigBaseURL</key>
 	<string>$(METAMON_APPCONFIG_BASE_URL)</string>
+	<!-- Firebase の環境(stg / prod)。build setting METAMON_FIREBASE_ENV(project.yml)。開発用メニューの「今の環境」に出す(#2079) -->
+	<key>MetamonFirebaseEnv</key>
+	<string>$(METAMON_FIREBASE_ENV)</string>
 	<!-- 「アップデートしてください」のボタンの行き先(#302)。build setting METAMON_APP_STORE_URL(project.yml)。空なら App Store で「Tailor It」を検索。
 	     appconfig の IOS_APP_STORE_URL があればそちらが優先 -->
 	<key>MetamonAppStoreURL</key>

@@ -45,11 +45,7 @@ struct ProSettingsSection: View {
             if !gate.isPro, ManageSubscriptionPlacement.placement(isPro: false) == .nearRestore {
                 ManageSubscriptionButton(accessibilityID: "settings.pro.manage")
             }
-            #if DEBUG
-            Toggle("課金の制限を無効にする(デモ用・回数と有料機能)", isOn: $gate.limitDisabled)
-                .tint(Theme.Colors.brandA)
-                .accessibilityIdentifier("settings.pro.limitDisabled")
-            #endif
+            // 「課金の制限を無効にする」は開発用メニューへ移した(#2079・Debug/Sections/DebugProSection.swift)
         } header: {
             Text(verbatim: "Tailor It Pro")
         } footer: {

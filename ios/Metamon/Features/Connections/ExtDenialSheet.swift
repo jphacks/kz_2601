@@ -204,7 +204,7 @@ struct ExtConnectSheet: View {
     }
 }
 
-#if DEBUG
+#if DEBUG || METAMON_STG // 開発用メニュー(#2079)から呼ぶ
 /// 開発用: 偽の provider `fakeOauth` に op を投げて、断りの案内を部品なしで出す(#2001)。
 /// `METAMON_MOCK=1` と `METAMON_MOCK_EXT_ERROR=<code>` を併せると、モックの次の呼び出しにそのエラーを仕込む(UI テスト用)。
 enum DebugExtDenial {
