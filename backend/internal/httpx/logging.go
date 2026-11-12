@@ -7,6 +7,7 @@ import (
 	"io"
 	"log/slog"
 	"os"
+	"slices"
 	"strconv"
 	"strings"
 	"sync/atomic"
@@ -167,8 +168,17 @@ func severity(lv slog.Level) string {
 }
 
 type cloudHandler struct {
+	// inner never has an open group, so the keys Handle adds stay at the
+	// top level, where Error Reporting reads them.
 	inner slog.Handler
 	cfg   CloudConfig
+	// groups are the WithGroup names, each with the attrs given after it.
+	groups []logGroup
+}
+
+type logGroup struct {
+	name  string
+	attrs []slog.Attr
 }
 
 func (h *cloudHandler) Enabled(ctx context.Context, lv slog.Level) bool {
@@ -176,14 +186,29 @@ func (h *cloudHandler) Enabled(ctx context.Context, lv slog.Level) bool {
 }
 
 func (h *cloudHandler) WithAttrs(attrs []slog.Attr) slog.Handler {
-	return &cloudHandler{inner: h.inner.WithAttrs(attrs), cfg: h.cfg}
+	if len(attrs) == 0 {
+		return h
+	}
+	if len(h.groups) == 0 {
+		return &cloudHandler{inner: h.inner.WithAttrs(attrs), cfg: h.cfg}
+	}
+	groups := slices.Clone(h.groups)
+	last := &groups[len(groups)-1]
+	last.attrs = append(slices.Clip(last.attrs), attrs...)
+	return &cloudHandler{inner: h.inner, cfg: h.cfg, groups: groups}
 }
 
 func (h *cloudHandler) WithGroup(name string) slog.Handler {
-	return &cloudHandler{inner: h.inner.WithGroup(name), cfg: h.cfg}
+	if name == "" {
+		return h
+	}
+	return &cloudHandler{inner: h.inner, cfg: h.cfg, groups: append(slices.Clip(h.groups), logGroup{name: name})}
 }
 
 func (h *cloudHandler) Handle(ctx context.Context, r slog.Record) error {
+	if len(h.groups) > 0 {
+		r = h.nest(r)
+	}
 	has := map[string]bool{}
 	r.Attrs(func(a slog.Attr) bool {
 		has[a.Key] = true
@@ -221,6 +246,23 @@ func (h *cloudHandler) Handle(ctx context.Context, r slog.Record) error {
 		}
 	}
 	return h.inner.Handle(ctx, r)
+}
+
+// nest moves the record's attrs into the open groups (as one top-level
+// group attr), so Handle can add its keys beside it at the top level.
+func (h *cloudHandler) nest(r slog.Record) slog.Record {
+	var own []slog.Attr
+	r.Attrs(func(a slog.Attr) bool {
+		own = append(own, a)
+		return true
+	})
+	for i := len(h.groups) - 1; i >= 0; i-- {
+		g := h.groups[i]
+		own = []slog.Attr{{Key: g.name, Value: slog.GroupValue(append(slices.Clip(g.attrs), own...)...)}}
+	}
+	out := slog.NewRecord(r.Time, r.Level, r.Message, r.PC)
+	out.AddAttrs(own...)
+	return out
 }
 
 // NewLogger is the service logger: Cloud Logging JSON on stdout, level from
