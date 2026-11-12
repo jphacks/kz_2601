@@ -1,6 +1,6 @@
 package jp.kz2601.metamon.desktop.i18n
 
-import jp.kz2601.metamon.desktop.DataText
+import jp.kz2601.metamon.desktop.DataLabels
 import jp.kz2601.metamon.desktop.PlayRules
 import jp.kz2601.metamon.desktop.PlayTexts
 import jp.kz2601.metamon.desktop.TableCells
@@ -11,7 +11,8 @@ import org.junit.Test
 
 /** 遊び・データの部品の文言(精算・トーナメント・カード・表の集計)を Android と同じキーで引く(#1759)。 */
 class LeafStringsTest {
-    private fun header(aggregate: TableColumnAggregate) = TableCells.header(TableColumn(field = "金額", aggregate = aggregate), null)
+    private fun header(aggregate: TableColumnAggregate, labels: DataLabels = DataLabels.current()) =
+        TableCells.header(TableColumn(field = "金額", aggregate = aggregate), null, labels)
 
     @Test
     fun englishShowsEnglishTexts() = Strings.withLang(Lang.EN) {
@@ -32,8 +33,8 @@ class LeafStringsTest {
         assertEquals("Count", header(TableColumnAggregate.COUNT))
         assertEquals("Total 金額", header(TableColumnAggregate.SUM))
         assertEquals("Avg 金額", header(TableColumnAggregate.AVG))
-        assertEquals("Everyone", DataText.EVERYONE)
-        assertEquals("Member", DataText.MEMBER)
+        assertEquals("Everyone", DataLabels.current().everyone)
+        assertEquals("Member", DataLabels.current().member)
     }
 
     @Test
@@ -44,8 +45,11 @@ class LeafStringsTest {
         assertEquals("金額の平均", header(TableColumnAggregate.AVG))
         assertEquals("金額の最小", header(TableColumnAggregate.MIN))
         assertEquals("金額の最大", header(TableColumnAggregate.MAX))
-        assertEquals("全員", DataText.EVERYONE)
-        assertEquals("参加者", DataText.MEMBER)
+        assertEquals("全員", DataLabels.current().everyone)
+        assertEquals("参加者", DataLabels.current().member)
+        // 描画の木の日本語と strings の日本語が同じ
+        TableColumnAggregate.entries.forEach { assertEquals(header(it, DataLabels.JAPANESE), header(it)) }
+        assertEquals(DataLabels.JAPANESE.everyone to DataLabels.JAPANESE.member, DataLabels.current().let { it.everyone to it.member })
         assertEquals("決勝", PlayTexts.roundTitle(3, 3))
         assertEquals("2 回戦", PlayTexts.roundTitle(2, 5))
         assertEquals("不戦勝", PlayTexts.emptySlot(1))
@@ -58,5 +62,15 @@ class LeafStringsTest {
         assertEquals("決勝", PlayRules.roundTitle(3, 3))
         assertEquals("準決勝", PlayRules.roundTitle(2, 3))
         assertEquals("1 回戦", PlayRules.roundTitle(1, 4))
+    }
+
+    @Test
+    fun treeValueLabelsStayJapaneseInEnglish() = Strings.withLang(Lang.EN) {
+        // 表の見出し・名簿の文字も描画の木は日本語(Android の ValueLabels.JAPANESE と同じ)。画面だけ英語
+        val tree = TableCells.header(TableColumn(field = "金額", aggregate = TableColumnAggregate.SUM), null)
+        assertEquals("金額の合計", tree)
+        assertEquals("件数", header(TableColumnAggregate.COUNT, DataLabels.JAPANESE))
+        assertEquals("全員", DataLabels.JAPANESE.everyone)
+        assertEquals("参加者", DataLabels.JAPANESE.member)
     }
 }

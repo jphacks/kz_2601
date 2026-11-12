@@ -231,7 +231,7 @@ private fun ScreenView(
 ) {
     val screen = dsl.screen(route.screen) ?: dsl.screens.firstOrNull() ?: return
     val form = session.form(route)
-    val data = remember(session.store) { session.leafData() }
+    val data = remember(session.store) { session.leafData(DataLabels.current()) }
     val perform = { a: Action, recordId: String? -> dispatch(a, ActionContext(route, form, recordId)) }
     val dataEnv = DataEnv(
         data, session.queries(route), perform,
