@@ -137,7 +137,7 @@ fun DesktopApp(
     val pasteKey = io.previewKey(topComponents, topDraft)
     CompositionLocalProvider(LocalSearchTargets provides keyboard.searchTargets, LocalPhotoPreview provides keyboard::openPhoto) {
     Surface(Modifier.fillMaxSize().ioDropTarget(io, topComponents, topDraft).onPreviewKeyEvent { !keyboard.photos.isOpen && pasteKey(it) }
-        .onPreviewKeyEvent { if (!keyboard.photos.isOpen && DesktopPrint.isPrintKey(it)) true.also { openPrint() } else false }.then(keyboard.modifier)) {
+        .onPreviewKeyEvent { if (!keyboard.photos.isOpen && DesktopPrint.isPrintKey(it) && DesktopPrint.canPrint(dsl)) true.also { openPrint() } else false }.then(keyboard.modifier)) {
         IoOverlay(io)
         Box(Modifier.fillMaxSize()) {
             // モーダルの間は下の画面とタブに Tab で入らず、読み上げにも出さない

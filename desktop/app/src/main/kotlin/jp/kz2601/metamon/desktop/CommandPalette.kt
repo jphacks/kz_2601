@@ -206,9 +206,9 @@ fun CommandPalette(commands: List<PaletteCommand>, os: HostOs, onDismiss: () -> 
     }
 }
 
-/** F1 のショートカット一覧。 */
+/** F1 のショートカット一覧。[onLicenses] があれば「ライセンス」も出す(デスクトップに「このアプリについて」が無いので、ここを入り口にする)。 */
 @Composable
-fun ShortcutHelp(os: HostOs, onDismiss: () -> Unit) {
+fun ShortcutHelp(os: HostOs, onLicenses: (() -> Unit)? = null, onDismiss: () -> Unit) {
     AlertDialog(
         onDismissRequest = onDismiss,
         title = { Text(KeyboardText.HELP) },
@@ -224,5 +224,6 @@ fun ShortcutHelp(os: HostOs, onDismiss: () -> Unit) {
             }
         },
         confirmButton = { TextButton(onClick = onDismiss) { Text(KeyboardText.HELP_CLOSE) } },
+        dismissButton = onLicenses?.let { open -> { TextButton(onClick = open) { Text(LicensesText.TITLE) } } },
     )
 }

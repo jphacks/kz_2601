@@ -50,6 +50,10 @@ tasks.test {
     inputs.dir(dslDocsDir.resolve("conformance")).withPropertyName("conformanceCases").withPathSensitivity(PathSensitivity.RELATIVE)
     inputs.dir(dslDocsDir.resolve("examples")).withPropertyName("dslExamples").withPathSensitivity(PathSensitivity.RELATIVE)
     systemProperty("metamon.dslDocsDir", dslDocsDir.absolutePath)
+    // アプリ自身のライセンスの欄をリポジトリの LICENSE と突き合わせる(LicensesTest)
+    val repoLicense = rootDir.resolve("../LICENSE")
+    inputs.file(repoLicense).withPropertyName("repoLicense").withPathSensitivity(PathSensitivity.RELATIVE)
+    systemProperty("metamon.repoLicense", repoLicense.absolutePath)
     // 文言・テーマはテストを動かす機械の言語・OS の設定に左右されないよう固定する(テストの中で切り替える)
     systemProperty("tailorit.lang", "ja")
     systemProperty("tailorit.theme", "light")
@@ -62,6 +66,11 @@ val syncSharedRenderer by tasks.registering(Sync::class) {
         include("form/FormDraft.kt", "navigation/NavigationResolver.kt")
         // icon の絵(android/scripts/gen-symbol-icons.py が icon-map.json から作った表・#1742)
         include("theme/icons/SymbolIconTable.kt", "theme/icons/VendoredIcons.kt")
+    }
+    // ライセンスの一覧の読み方・段落の分け方(Android の設定の「ライセンス」と同じ)
+    from(rootDir.resolve("../android/app/src/main/kotlin/jp/kz2601/metamon/settings")) {
+        include("ThirdPartyLicenses.kt")
+        into("settings")
     }
     into(layout.buildDirectory.dir("generated/sharedRenderer"))
 }
@@ -86,6 +95,10 @@ val syncAndroidStrings by tasks.registering(Sync::class) {
     }
 }
 sourceSets.named("main") { resources.srcDir(syncAndroidStrings) }
+
+// 同梱するライセンスの一覧(licenses/third_party_licenses.json)。作り方は third-party-licenses.gradle.kts
+apply(from = "third-party-licenses.gradle.kts")
+sourceSets.named("main") { resources.srcDir(tasks.named("thirdPartyLicenses")) }
 
 // icon の名前の表(SF Symbols → Material)は docs/dsl/icon-map.json をそのまま同梱して読む(#1742)。
 val syncIconMap by tasks.registering(Sync::class) {

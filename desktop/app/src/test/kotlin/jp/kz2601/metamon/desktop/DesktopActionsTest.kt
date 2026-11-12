@@ -30,7 +30,7 @@ class DesktopActionsTest {
     private fun session(name: String, store: MockStore = MockStore()): Pair<DesktopSession, java.io.File> {
         val dir = Files.createTempDirectory("desktop-actions").toFile()
         val s = DesktopSession(Examples.load(name), store)
-        s.host = DesktopActionHost(BookLookupClient.mock, dir, silent)
+        s.host = DesktopActionHost(BookLookupClient.mock, dir, silent, background = { it() })
         return s to dir
     }
 

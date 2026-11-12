@@ -11,7 +11,7 @@ import kotlinx.serialization.json.intOrNull
 import kotlinx.serialization.json.longOrNull
 import java.io.File
 import java.io.FileOutputStream
-import java.nio.file.AccessDeniedException
+import java.nio.file.FileSystemException
 import java.nio.file.Files
 import java.nio.file.Path
 import java.nio.file.StandardCopyOption
@@ -95,33 +95,63 @@ class JsonKeyValueStore(private val file: File?) : KeyValueStore {
 }
 
 /**
- * 一時ファイルに書いてから置き換える(書く途中で落ちても前の中身が残る)。
+ * 一時ファイル(同じフォルダ・毎回別の名前 `<名前>.<数字>.tmp`)に書いてから置き換える(書く途中で落ちても前の中身が残る)。
  * - 置き換える前に一時ファイルを disk まで書き切る(`force`。電源断で中身が空のファイルに置き換わらない)
- * - Windows はウイルス対策・検索の索引が開いている間 [AccessDeniedException] で置き換えられないので、少し待って [MOVE_RETRIES] 回まで試し直す
+ * - Windows はウイルス対策・検索の索引が開いている間 [FileSystemException](AccessDenied など)で置き換えられないので、少し待って [MOVE_RETRIES] 回まで試し直す
+ * - 落ちて残った一時ファイルは [sweepTempFiles] で消す
  */
 internal fun writeAtomically(
     file: File,
     text: String,
-    move: (Path, Path) -> Unit = { from, to -> Files.move(from, to, StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE) },
+    move: (Path, Path) -> Unit = ::replaceFile,
+    pause: (Long) -> Unit = Thread::sleep,
+) = writeAtomically(file, text.toByteArray(Charsets.UTF_8), move, pause)
+
+internal fun writeAtomically(
+    file: File,
+    bytes: ByteArray,
+    move: (Path, Path) -> Unit = ::replaceFile,
     pause: (Long) -> Unit = Thread::sleep,
 ) {
-    file.parentFile?.mkdirs()
-    val tmp = File(file.parentFile, "${file.name}.tmp")
-    FileOutputStream(tmp).use { out ->
-        out.write(text.toByteArray(Charsets.UTF_8))
-        out.channel.force(true)
-    }
-    var attempt = 0
-    while (true) {
-        try {
-            move(tmp.toPath(), file.toPath())
-            return
-        } catch (e: AccessDeniedException) {
-            if (attempt >= MOVE_RETRIES) throw e
-            attempt++
-            pause(MOVE_BACKOFF_MILLIS * attempt)
+    val dir = (file.absoluteFile.parentFile ?: File(".")).apply { mkdirs() }
+    // 一時ファイルは毎回別の名前(同時に 2 つ書いても同じ一時ファイルを取り合わない)。置き換えのため同じフォルダに
+    val tmp = Files.createTempFile(dir.toPath(), "${file.name}.", ".tmp").toFile()
+    try {
+        FileOutputStream(tmp).use { out ->
+            out.write(bytes)
+            out.channel.force(true)
         }
+        var attempt = 0
+        while (true) {
+            try {
+                move(tmp.toPath(), file.toPath())
+                return
+            } catch (e: FileSystemException) {
+                if (attempt >= MOVE_RETRIES) throw e
+                attempt++
+                pause(MOVE_BACKOFF_MILLIS * attempt)
+            }
+        }
+    } finally {
+        // 置き換えられなかった一時ファイルを残さない(置き換えた後は無い)
+        tmp.delete()
     }
+}
+
+private fun replaceFile(from: Path, to: Path) {
+    Files.move(from, to, StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE)
+}
+
+/** [writeAtomically] の一時ファイル `<名前>.<数字>.tmp` と、前の形 `<名前>.tmp`。 */
+private val TEMP_NAME = Regex("""^.+\.tmp$""")
+
+/**
+ * [root] の下に落ちて残った一時ファイル(`*.tmp`)を消す。消した数を返す。
+ * 保存先はこのアプリだけが書き、ロック([jp.kz2601.metamon.desktop.SingleInstance])で 1 プロセスなので、開く時・全部消す時に呼ぶ。
+ */
+internal fun sweepTempFiles(root: File?): Int {
+    if (root == null || !root.isDirectory) return 0
+    return root.walkTopDown().filter { it.isFile && TEMP_NAME.matches(it.name) }.count { it.delete() }
 }
 
 /** 置き換えを試し直す回数(初回の後)。 */

@@ -4,6 +4,7 @@
     <string name="desktop_a11y_image">Image</string>
     <string name="desktop_a11y_preview">Photo preview: %1$s</string>
     <string name="desktop_a11y_rating">%1$s %2$d of %3$d</string>
+    <string name="desktop_already_running">Tailor It is already running</string>
     <string name="desktop_book_searching">Looking up the book…</string>
     <string name="desktop_calendar_month_pattern">MMMM y</string>
     <string name="desktop_calendar_opened">Opened the event (%1$s)</string>
@@ -17,6 +18,7 @@
     <string name="desktop_drag_table_name">table</string>
     <string name="desktop_export_clipboard">" (the table is also on the clipboard)"</string>
     <string name="desktop_export_done">Exported %1$d records: %2$s</string>
+    <string name="desktop_export_writing">Exporting…</string>
     <string name="desktop_feed_offline">The desktop app doesn\'t load feeds yet</string>
     <string name="desktop_image_none">No image</string>
     <string name="desktop_input_audio_unavailable">Recording isn\'t available on this computer. You can choose a file instead</string>
@@ -84,6 +86,8 @@
     <string name="desktop_keys_preview">Preview photo</string>
     <string name="desktop_keys_save">Save</string>
     <string name="desktop_keys_search">Search</string>
+    <string name="desktop_licenses">Third-party notices</string>
+    <string name="desktop_licenses_browse_failed">Couldn\'t open the browser. %1$s</string>
     <string name="desktop_list_empty">Nothing yet</string>
     <string name="desktop_list_open_window">Open in new window</string>
     <string name="desktop_list_separator">", "</string>
