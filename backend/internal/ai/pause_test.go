@@ -25,11 +25,14 @@ type countingStore struct {
 	refunds     atomic.Int32
 	refundUnits atomic.Int32
 	waived      atomic.Int32
+	unchanged   atomic.Int32
 }
 
 func (s *countingStore) Consume(ctx context.Context, c []ratelimit.Counter, w int, exp time.Time) (ratelimit.Usage, error) {
 	if len(c) > 0 && c[0].Scope == ratelimit.ScopeWaived {
 		s.waived.Add(1) // the hourly count of waived requests, not a charge
+	} else if len(c) > 0 && c[0].Scope == ratelimit.ScopeUnchanged {
+		s.unchanged.Add(1) // the daily count of unchanged refunds, not a charge
 	} else {
 		s.n.Add(1)
 	}

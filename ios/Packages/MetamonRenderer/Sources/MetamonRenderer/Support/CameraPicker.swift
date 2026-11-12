@@ -59,11 +59,11 @@ struct CameraPicker: UIViewControllerRepresentable {
     }
 }
 #else
-/// Mac: 撮影はまだ無い(TODO mac-027: AVCaptureSession で内蔵 / 連係カメラ)。`isAvailable` が false なので撮影のボタンは出ない。
+/// Mac(#1043): AVCaptureSession で撮る sheet(`MacCameraSheet`・内蔵 / 連係 / 外付けカメラ)。カメラが無い Mac は `isAvailable` が false で撮影のボタンを出さない。
 struct CameraPicker: View {
     var onImage: (PlatformImage) -> Void
 
-    static var isAvailable: Bool { false }
+    static var isAvailable: Bool { MacCameraSession.hasCamera }
 
     static func requestAccess() async -> Bool {
         switch AVCaptureDevice.authorizationStatus(for: .video) {
@@ -73,7 +73,7 @@ struct CameraPicker: View {
         }
     }
 
-    var body: some View { MacUnavailableView(feature: L("カメラ")) }
+    var body: some View { MacCameraSheet(mode: .photo, onPhoto: onImage) }
 }
 #endif
 #endif

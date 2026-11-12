@@ -10,11 +10,12 @@ import MetamonServices
 /// - 確認ダイアログ: `RuntimeConfirm`(iOS と同じ文言・主ボタン)
 /// - 保存・削除の前段: `RecordActionSteps`、書き込みと同期: `RecordSyncEngine`(MetamonServices)
 ///
-/// サーバーへの接続(appconfig のクライアント・ログイン)は Mac に Firebase がまだ無い(#930)ので、
-/// iOS の `METAMON_MOCK=1` と同じくメモリ上の appconfig(`InMemoryAppConfigClient`)に記録を持つ。
+/// 記録の置き場は `MacRecordVault`(#1284): サーバーにある作ったアプリはサーバーの appconfig(`MacServices.appConfig`)、
+/// それ以外の作ったアプリは端末だけの appconfig。同梱の例は iOS の `METAMON_MOCK=1` と同じく
+/// メモリ上の appconfig(`InMemoryAppConfigClient`)に持つ。
 /// ローカル通知は `MacRuntimeNotifications`(#965)。AI の部品(aiButton・aiGenerate・aiChat)は `MacAppRuntime+AIText.swift`(#962)。
 /// 話して入力(aiChat のマイク・transcribeField)は `MacAppRuntime+Dictation.swift`(#1328)。
-/// 共有・課金など iOS 固有の機能は持たない(未対応のアクションは一言で知らせる)。
+/// 会話・印・通報・参加者・仲間探しは `MacAppRuntime+Social.swift`(#963)。課金・フォローなど iOS 固有の機能は持たない(未対応のアクションは一言で知らせる)。export は保存・共有・プリント(`+Export`)。
 @MainActor
 @Observable
 final class MacAppRuntime: RuntimeNavigating {
@@ -34,6 +35,8 @@ final class MacAppRuntime: RuntimeNavigating {
     var confirm: RuntimeConfirm?
     /// 中央の列の上に出す一言
     var toast: String?
+    /// もう読み上げた toast(`AppCanvas` は読み直さない)
+    @ObservationIgnored var announcedToast: String?
     /// 一覧の記録を消した直後の「削除しました・元に戻す」(iOS の M11 と同じく数秒は送らない)
     var recordUndo: DeletionTicket?
     static let undoSeconds: Double = 5
@@ -45,12 +48,28 @@ final class MacAppRuntime: RuntimeNavigating {
     var discardRequest: DiscardRequest?
     /// 描いているフォームの控え(`MacAppRuntime+Discard.swift`)
     @ObservationIgnored let openForms = OpenFormRegistry()
+    /// Quick Look(#1850・`MacQuickLook.swift`)。見ているファイルと、矢印で移れるファイル
+    var quickLookURL: URL?
+    var quickLookItems: [URL] = []
+    /// 写真の書き出し先。名前が `previewPrefix` で始まるので起動・終了時の片付けで消える
+    @ObservationIgnored let quickLookDirectory = FileManager.default.temporaryDirectory
+        .appendingPathComponent("metamon-mac-preview-quicklook-\(UUID().uuidString)", isDirectory: true)
 
     @ObservationIgnored let recordSync: RecordSyncEngine
+    /// 作ったアプリの記録のエンジンを借りている(`MacRecordEngines`)。同じアプリを開いた別のウインドウと同じエンジンを使う
+    @ObservationIgnored private let recordLease: MacRecordEngineLease?
     /// AI の部品のオンライン版の送り先(#962)
     @ObservationIgnored let ai: any AIClient
     @ObservationIgnored let isAIConsentGranted: @MainActor () -> Bool
-    /// lookupBook の問い合わせ先。appconfig への接続(#930)が来るまでは nil
+    #if !APP_STORE_REVIEW
+    /// feed の問い合わせ先(`MacAppRuntime+Feeds.swift`・#1288)。サーバーにつながっていない時は nil
+    @ObservationIgnored var feedClient: (any FeedClient)?
+    #endif
+    #if !APP_STORE_REVIEW
+    /// 人とつながる部品(#963・`MacAppRuntime+Social.swift`)の問い合わせ先と状態。モックではクライアントが無く、ボタンを出さない
+    @ObservationIgnored var social: MacSocial = .shared
+    #endif
+    /// lookupBook の問い合わせ先(#1276)。サーバーにつながっている時は `MacServices.books`、モックの時は nil
     @ObservationIgnored var books: (any BookLookupClient)?
     @ObservationIgnored var calendarWriter: any CalendarWriting = EventKitCalendarWriter()
     /// `mockRecordSync` の一時フォルダ。ランタイムを捨てる時(アプリの切り替え)に消す
@@ -63,8 +82,18 @@ final class MacAppRuntime: RuntimeNavigating {
     #endif
     /// 話して入力(aiChat のマイク・transcribeField・#1328)。声で頼む(`MacVoiceInput`)と同じ認識を使う。nil なら使えない
     @ObservationIgnored let dictationSource: TranscriberDictation?
+    /// 録音と再生は同時に 1 つだけ(#952)。audioRecorder の録音中は話して入力・録音ファイルの文字起こしを始めない
+    @ObservationIgnored var audioFocus: AudioFocus = .shared
+    /// openVoice(#946): 中央のアプリを直す会話を声で開く(⇧⌘M と同じ)。`AppCanvas` が `MacRootView` の会話につなぐ
+    @ObservationIgnored var onOpenVoice: (@MainActor () -> Void)?
+    /// モーダルの中の openVoice。モーダルを閉じ終えてから会話を開く(シートを重ねない)
+    @ObservationIgnored var pendingOpenVoice = false
+    /// Field.health を Mac では書かないことの一言(#958・アプリごとに 1 回)
+    @ObservationIgnored var healthNote = MacHealthNote()
 
-    init(appId: String, dsl: AppDSL, recordSync: RecordSyncEngine? = nil, ai: any AIClient = MacComposeSession.gatedAI(),
+    /// `recordLease` を渡したらそのエンジンを使い(止めるのは `MacRecordEngines`)、`recordSync` を渡したらこのランタイムだけのエンジン
+    init(appId: String, dsl: AppDSL, recordSync: RecordSyncEngine? = nil, recordLease: MacRecordEngineLease? = nil,
+         ai: any AIClient = MacComposeSession.gatedAI(),
          isAIConsentGranted: @escaping @MainActor () -> Bool = { AIConsentStore.shared.isGranted },
          dictation: TranscriberDictation? = nil) {
         self.appId = appId
@@ -73,7 +102,11 @@ final class MacAppRuntime: RuntimeNavigating {
         self.ai = ai
         self.isAIConsentGranted = isAIConsentGranted
         selectedTab = dsl.initialTab // iOS と同じ: initialScreen がタブならそのタブから
-        if let recordSync {
+        self.recordLease = recordLease
+        if let recordLease {
+            self.recordSync = recordLease.engine
+            previewDirectory = nil
+        } else if let recordSync {
             self.recordSync = recordSync
             previewDirectory = nil
         } else {
@@ -82,7 +115,15 @@ final class MacAppRuntime: RuntimeNavigating {
             previewDirectory = dir
         }
         book = RecordBook(appId: appId, dsl: dsl, recordSync: self.recordSync)
-        self.recordSync.onEvent = { [weak self] event in self?.handle(event) }
+        book.postAuthor = { [weak self] entity in self?.postAuthor(for: entity) } // 共有の投稿に作者を付ける(#963)
+        if let recordLease {
+            recordLease.onEvent = { [weak self] event in self?.handle(event) } // 同じエンジンの通知は借りている全員に届く
+            // 同じアプリを開いた別のウインドウ(#1853)へ、端末に書いた entity を知らせて読み直してもらう(送信を待たない)
+            book.onLocalWrite = { [weak recordLease] entity in recordLease?.announceLocalChange(entity: entity) }
+            recordLease.onLocalChange = { [weak self] entity in self?.reloadAfterOtherWindow(entity) }
+        } else {
+            self.recordSync.onEvent = { [weak self] event in self?.handle(event) }
+        }
         self.recordSync.start()
         notifications.start(self)
     }
@@ -91,9 +132,13 @@ final class MacAppRuntime: RuntimeNavigating {
     /// 一時フォルダも消す(切り替えのたびに増えないように)
     deinit {
         let engine = recordSync
+        let lease = recordLease
         let dir = previewDirectory
+        let quickLook = quickLookDirectory
         Task { @MainActor in
-            engine.stop()
+            try? FileManager.default.removeItem(at: quickLook)
+            // 借りたエンジンは返すだけ(最後のウインドウが返したら `MacRecordEngines` が止める)
+            if let lease { lease.release() } else { engine.stop() }
             if let dir { try? FileManager.default.removeItem(at: dir) }
         }
     }
@@ -124,7 +169,22 @@ final class MacAppRuntime: RuntimeNavigating {
 
     // MARK: - Records
 
-    func records(for entity: String) -> [Record] { book.records(for: entity) }
+    func records(for entity: String) -> [Record] {
+        #if APP_STORE_REVIEW
+        book.records(for: entity)
+        #else
+        hidingBlocked(book.records(for: entity), entity: entity) // ブロックした人の投稿は隠す(#963)
+        #endif
+    }
+
+    /// 共有レコードの作者判定(#249)と「自分の投稿」(#963)。サーバーにつながっていない時は nil
+    var currentUserId: String? {
+        #if APP_STORE_REVIEW
+        nil
+        #else
+        social.currentUserId()
+        #endif
+    }
 
     func load(entities: Set<String>, force: Bool) async {
         await book.load(entities: entities, force: force)
@@ -159,6 +219,12 @@ final class MacAppRuntime: RuntimeNavigating {
     func reloadLocal(_ entity: String) async { await book.reloadLocal(entity) }
 
     /// 同期キューからの通知。送れたらローカルを読み直し、競合はサーバーから引き直す(iOS と同じくサーバー優先)。
+    /// 別のウインドウが同じ entity を書いた(#1853)。読み込んだ entity だけ端末の内容で読み直す
+    private func reloadAfterOtherWindow(_ entity: String) {
+        guard records[entity] != nil else { return }
+        Task { await book.reloadLocal(entity) }
+    }
+
     private func handle(_ event: SyncEvent) {
         Task { @MainActor in
             #if !APP_STORE_REVIEW
@@ -242,10 +308,47 @@ final class MacAppRuntime: RuntimeNavigating {
         case .scheduleNotification, .cancelNotification:
             await notifications.perform(action)
 
+        case .export:
+            await export(action, ctx) // CSV / PDF を保存・共有・プリントで出す(`MacAppRuntime+Export.swift`・#1143・#946・#953)
+
+        case .startActivity:
+            // ライブアクティビティ(#423)は iPhone のロック画面のもの。Mac には無いので一言だけ
+            toast = L10n.tr("ライブアクティビティは iPhone だけで表示されます")
+
+        case .endActivity:
+            break // 出していないので止めるものも無い
+
+        case .openVoice:
+            openVoice()
+
+        case .follow, .unfollow:
+            // フォロー(#270)は投稿のある iOS のアプリの機能。Mac には投稿の画面もサインインの相手も無い
+            toast = L10n.tr("フォローは Mac では使えません")
+
         default:
-            // 共有・書き出しなどは Mac ではまだ動かない(後の Issue)
-            toast = L10n.tr("このボタンは Mac ではまだ使えません")
+            toast = L10n.tr("このボタンは Mac ではまだ使えません") // 知らない種類(.unknown)
         }
+    }
+
+    /// openVoice: 声で頼む会話を開く。モーダルの中からは、入力を確かめてモーダルを閉じ、閉じ終えてから開く
+    func openVoice() {
+        guard let onOpenVoice else {
+            toast = L10n.tr("このボタンは Mac ではまだ使えません")
+            return
+        }
+        guard sheet != nil || fullScreen != nil else { return onOpenVoice() }
+        confirmDiscard(leaving: { $0.stack == "sheet" || $0.stack == "full" }) { [weak self] in
+            guard let self else { return }
+            pendingOpenVoice = true
+            while sheet != nil || fullScreen != nil { dismissTopModal() }
+        }
+    }
+
+    /// モーダルが閉じ終わった(`AppCanvas`)。openVoice を待っていれば会話を開く
+    func openVoiceAfterModal() {
+        guard pendingOpenVoice, sheet == nil, fullScreen == nil else { return }
+        pendingOpenVoice = false
+        onOpenVoice?()
     }
 
     private func save(_ action: Action, _ ctx: ActionContext) async {
@@ -254,9 +357,20 @@ final class MacAppRuntime: RuntimeNavigating {
             if case .invalid(let message) = target { toast = message }
             return
         }
+        let skipsHealth = MacHealthNote.applies(entity: dsl.entity(entity), data: form.payload, isNew: recordId == nil)
         switch await book.save(entity: entity, form: form, recordId: recordId, canEdit: { self.canEdit(entity: $0, record: $1) }) {
         case .readOnly: notifyReadOnly(entity: entity)
-        case .saved, .unchanged: leaveAfterSave(action, ctx) // 何も変えずに保存したら書かずに画面だけ進める(M10)
+        case .saved:
+            // 保存の後は画面が閉じる・進むので、VoiceOver には先に結果を伝える(#937)
+            MacVoiceOver.announce(.saved)
+            // HealthKit が無いので書かない(#958)。一言はアプリごとに 1 回
+            if skipsHealth, let note = healthNote.noteOnce(appId: appId) {
+                MacVoiceOver.announce(.healthSkipped) // 「保存しました」に続けて読む。toast では読み直さない
+                announcedToast = note
+                toast = note
+            }
+            leaveAfterSave(action, ctx)
+        case .unchanged: leaveAfterSave(action, ctx) // 何も変えずに保存したら書かずに画面だけ進める(M10)
         case .inFlight, .held: break // 保存ボタンの連打(.held は beforeNew を渡さないので来ない)
         }
     }
@@ -305,23 +419,18 @@ final class MacAppRuntime: RuntimeNavigating {
     /// 今いちばん上に見えている画面の id(画面マップを開いた時に選んでおく)
     var currentScreen: String { NavigationResolver.top(navigationState, dsl: dsl).screen }
 
-    /// 画面マップから画面を開く。モーダルを閉じ、根(タブ)から矢印をたどって開く(戻るで来た道を戻れる)
-    func reveal(screen: String) {
-        guard let next = NavigationResolver.reveal(screen, graph: ScreenGraph(dsl: dsl), dsl: dsl, from: navigationState) else { return }
-        setNavigation(next)
-    }
+    // 画面マップから画面を開く `reveal(screen:recordId:)` は iOS と共有(`RuntimeNavigating`・Shared/Runtime/HandoffActivity.swift)
 
     // MARK: - 削除の取り消し(M11)
 
     func deleteUndoably(entity: String, recordId: String) async {
         let ticket = await book.deleteUndoably(entity: entity, recordId: recordId, grace: .seconds(Self.undoSeconds))
-        withAnimation { recordUndo = ticket }
-        AccessibilityNotification.Announcement(L10n.tr("削除しました")).post() // iOS と同じく VoiceOver に知らせる
+        withMacAnimation { recordUndo = ticket } // 「削除しました」の読み上げは AppCanvas の取り消しの一言が出す(二重に読まない・#937)
     }
 
     func undoRecordDelete() async {
         guard let ticket = recordUndo else { return }
-        withAnimation { recordUndo = nil }
+        withMacAnimation { recordUndo = nil }
         await book.undoDelete(ticket)
     }
 }

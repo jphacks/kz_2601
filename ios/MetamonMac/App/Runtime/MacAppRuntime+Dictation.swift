@@ -14,6 +14,7 @@ extension MacAppRuntime: DictationHost {
 
     func startDictation() async throws {
         guard let dictationSource else { throw Self.noDictation }
+        guard !audioFocus.isRecording else { throw DictationFailure(MacVoiceCopy.otherRecording) } // audioRecorder が録音中(#952)
         try await dictationSource.start()
     }
 

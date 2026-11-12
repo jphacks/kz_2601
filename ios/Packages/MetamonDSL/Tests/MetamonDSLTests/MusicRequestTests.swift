@@ -95,4 +95,31 @@ final class MusicRequestTests: XCTestCase {
         XCTAssertEqual(encoded.removingPercentEncoding, "夜に駆ける YOASOBI / ayase")
         XCTAssertNil(MusicLinks.spotifySearchURL(MusicSong(title: " ", artist: "")))
     }
+
+    /// Apple Music の URL(#1348): id があれば曲のページ、無ければ検索。
+    func testAppleMusicURLWithCatalogID() throws {
+        let url = try XCTUnwrap(MusicLinks.appleMusicURL(MusicSong(id: "1001", title: "夜明けのドライブ", artist: "テイラーズ")))
+        XCTAssertEqual(url.absoluteString, "https://music.apple.com/song/1001")
+    }
+
+    func testAppleMusicURLWithoutIDSearches() throws {
+        let url = try XCTUnwrap(MusicLinks.appleMusicURL(MusicSong(title: "夜に駆ける", artist: "YOASOBI")))
+        XCTAssertEqual(url.host, "music.apple.com")
+        XCTAssertEqual(url.path, "/search")
+        let items = URLComponents(url: url, resolvingAgainstBaseURL: false)?.queryItems
+        XCTAssertEqual(items?.first(where: { $0.name == "term" })?.value, "夜に駆ける YOASOBI")
+        // ライブラリの id(数字でない)はカタログのページにしない
+        let lib = try XCTUnwrap(MusicLinks.appleMusicURL(MusicSong(id: "i.abc123", title: "Night Radio", artist: "The Samples")))
+        XCTAssertEqual(lib.path, "/search")
+    }
+
+    func testAppleMusicURLEncodesSymbols() throws {
+        let url = try XCTUnwrap(MusicLinks.appleMusicURL(MusicSong(title: "R&B + Soul #1?", artist: "A/B = C")))
+        let query = try XCTUnwrap(url.query)
+        XCTAssertTrue(query.hasPrefix("term="))
+        let encoded = query.dropFirst("term=".count)
+        XCTAssertFalse(encoded.contains { "&+=?#/".contains($0) }, "記号はエンコードする")
+        XCTAssertEqual(String(encoded).removingPercentEncoding, "R&B + Soul #1? A/B = C")
+        XCTAssertNil(MusicLinks.appleMusicURL(MusicSong(id: " ", title: " ", artist: "")))
+    }
 }

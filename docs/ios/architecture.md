@@ -829,6 +829,7 @@ Siri / ショートカット ──(本体プロセス内で実行。拡張タ�
 | Siri の聞き取り | `Info.plist` の `INAlternativeAppNames` に「テイラーイット」「テーラーイット」。フレーズは `CFBundleDevelopmentRegion = ja` なので日本語で直書き |
 | 背面起動の注意 | 記録追加は bootstrap 前でも動く(`recordSync.start()` を Intent 側で呼ぶ)。返した後にプロセスが止められても行とキューはファイルに残り、次回起動で送る。開く/話しかけるは bootstrap(`GET /dsl` の復元)と競合しないよう、準備前なら保留して `markReady()` で実行 |
 | E2E(DEBUG) | シミュレータはショートカットアプリのタップ自動化が無いので、`METAMON_E2E_INTENT=add:家計簿:ランチ 800円` / `open:筋トレ` / `talk` で起動直後に本物の Intent 型・Query 経由で実行する(`Features/Intents/IntentE2E.swift`) |
+| Mac(#1034) | Intent の型・Query・フレーズ(`TailorItIntents` / `IntentEntities` / `IntentE2E` / `AppShortcuts.xcstrings`)は同じファイルを Mac のターゲットにも入れる。本体との橋渡し `IntentHost` だけ Mac 用(`MetamonMac/App/Intents/MacIntentHost.swift`): 一覧は `MacAppLibrary` + 同梱の例、開く / 話しかけるは `MacRootView` が受けて一覧の選択・⇧⌘M の会話へ、記録の追加は端末に残る作ったアプリだけを `MacRecordEngines` のエンジンに書く。`MetamonMacApp.init` で `register` |
 | HealthKit | 実装済み(#167・下記 §15.1) |
 
 ### 15.1 ヘルスデータ(`healthStat` / `Field.health`・Issue #167)

@@ -11,6 +11,8 @@ final class AudioPlayback: NSObject, AVAudioPlayerDelegate {
     private(set) var playingID: String?
     /// 再生位置(秒)。0.2 秒ごとに更新
     private(set) var position: Double = 0
+    /// 録音中で再生を断った時の案内(Mac・#952)。次に鳴らす時に消える
+    private(set) var refusal: String?
 
     @ObservationIgnored private var player: AVAudioPlayer?
     @ObservationIgnored private var lease: AudioSessionLease?
@@ -26,6 +28,7 @@ final class AudioPlayback: NSObject, AVAudioPlayerDelegate {
             return true
         }
         stop()
+        refusal = nil
         guard store.exists(value.id), let url = store.url(for: value.id) else { return false }
         do {
             let lease = try AudioSessionLease.forPlayback()
@@ -47,11 +50,18 @@ final class AudioPlayback: NSObject, AVAudioPlayerDelegate {
                 }
             }
             return true
+        } catch is AudioFocus.Refusal {
+            let message = Self.recordingRefusal
+            refusal = message
+            PlatformSystem.announce(message)
+            return false
         } catch {
             print("[Metamon] audio playback failed: \(error)")
             return false
         }
     }
+
+    static var recordingRefusal: String { L("録音している間は再生できません。録音を止めてから、もう一度お試しください") }
 
     func stop() {
         ticker?.cancel()
@@ -78,6 +88,7 @@ final class AudioPlayback: NSObject, AVAudioPlayerDelegate {
 struct AudioPlayButton: View {
     let value: JSONValue
     var store: LocalAudioStore = .shared
+    @State private var refused: String?
     private var playback: AudioPlayback { .shared }
 
     var body: some View {
@@ -85,7 +96,7 @@ struct AudioPlayButton: View {
             let playing = playback.isPlaying(audio.id)
             let available = store.exists(audio.id)
             Button {
-                playback.toggle(audio, store: store)
+                if !playback.toggle(audio, store: store) { refused = playback.refusal }
             } label: {
                 HStack(spacing: 6) {
                     Image(systemName: playing ? "stop.circle.fill" : "play.circle.fill")
@@ -103,6 +114,11 @@ struct AudioPlayButton: View {
             .padding(-8)
             .iconButtonLabel(playing ? L("停止") : L("録音を再生"))
             .disabled(!available)
+            .alert(L("再生できません"), isPresented: Binding(get: { refused != nil }, set: { if !$0 { refused = nil } })) {
+                Button(L("閉じる"), role: .cancel) {}
+            } message: {
+                Text(refused ?? "")
+            }
         }
     }
 }

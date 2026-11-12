@@ -149,7 +149,7 @@ func TestNoWriteCalls(t *testing.T) {
 func TestLogFilter(t *testing.T) {
 	since := time.Date(2026, 10, 23, 0, 0, 0, 0, time.UTC)
 	got := logFilter([]string{"u1", "u2"}, []string{"ai-prod"}, since, since.Add(14*24*time.Hour))
-	for _, want := range []string{`service_name=("ai-prod")`, hashOf("u1"), hashOf("u2"), `"ai.generate" OR "ai.usage"`, `timestamp>="2026-10-23T00:00:00Z"`} {
+	for _, want := range []string{`service_name=("ai-prod")`, hashOf("u1"), hashOf("u2"), `"ai.generate" OR "ai.usage"`, `"ai.chat"`, `timestamp>="2026-10-23T00:00:00Z"`} {
 		if !strings.Contains(got, want) {
 			t.Errorf("filter misses %s: %s", want, got)
 		}

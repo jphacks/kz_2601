@@ -91,11 +91,12 @@ type appDoc struct {
 	DSL            map[string]any `firestore:"dsl"`
 	DSLJSON        string         `firestore:"dslJson"`
 	SortIndex      int64          `firestore:"sortIndex,omitempty"`
+	GlanceStat     string         `firestore:"glanceStat,omitempty"`
 }
 
 func (d *appDoc) toApp(id string) *App {
 	return &App{ID: id, Name: d.Name, CurrentVersion: int(d.CurrentVersion), Status: d.Status,
-		CreatedAt: d.CreatedAt, UpdatedAt: d.UpdatedAt, SortIndex: int(d.SortIndex), DSL: json.RawMessage(d.DSLJSON)}
+		CreatedAt: d.CreatedAt, UpdatedAt: d.UpdatedAt, SortIndex: int(d.SortIndex), GlanceStat: d.GlanceStat, DSL: json.RawMessage(d.DSLJSON)}
 }
 
 type versionDoc struct {
@@ -332,6 +333,21 @@ func (f *Firestore) ReorderApps(ctx context.Context, uid string, ids []string) e
 		}
 		return nil
 	})
+}
+
+// SetAppGlance implements Store.
+func (f *Firestore) SetAppGlance(ctx context.Context, uid, appID, glance string) (*App, error) {
+	var v any = glance
+	if glance == "" {
+		v = firestore.Delete
+	}
+	if _, err := f.appRef(uid, appID).Update(ctx, []firestore.Update{{Path: "glanceStat", Value: v}}); err != nil {
+		if isNotFound(err) {
+			return nil, ErrNotFound
+		}
+		return nil, err
+	}
+	return f.GetApp(ctx, uid, appID)
 }
 
 // CommitVersion implements Store.

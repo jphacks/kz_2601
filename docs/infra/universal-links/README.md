@@ -29,6 +29,13 @@
 - 受け取り: `ShareLinkReceiver` が `onOpenURL`(URL スキーム)と `onContinueUserActivity(NSUserActivityTypeBrowsingWeb)`(Universal Links)の両方を `SharingUI.receive` に渡す。サインイン前に届いても保留し、準備ができてから 1 回だけ開く(#278 と同じ)。
 - 判定: `ShareURL.token(from:)`。`https` で host が `tailor-it.app`(大文字小文字は問わない)・ポート指定なし・パスがちょうど `/s/{token}` の時だけトークンを返す。`www.`・`http`・他のパスは扱わない。テスト: `SharingTests.testShareURLTokenFromUniversalLink`・`ShareLinkInboxTests.testReceivesUniversalLinkActivity`・`ShareJoinFlowTests.testOpenUniversalLinkRoutesToSameJoinFlow`。
 
+### Mac(#1286)
+
+- `ios/MetamonMac/MetamonMac.entitlements` にも同じ `applinks:$(METAMON_APPLINKS_DOMAIN)` を入れた。審査用の版(`MetamonMac-Review.entitlements`)には入れない(iOS と同じ理由)。
+- 受け取り: `MacLinkReceiver` が `onOpenURL` と `onContinueUserActivity(NSUserActivityTypeBrowsingWeb)` を `MacShareFlow` に渡す。ログインの前に届いたら保留し、ログインできてから 1 回だけ開く(`PendingShareLink`)。
+- AASA: Mac の Bundle ID は iOS と同じ `jp.kz2601.metamon` なので、`appIDs` の `CHP337D75C.jp.kz2601.metamon` が Mac にも効く(Mac 用の行は足さない)。Mac App Store の版の App ID の接頭辞が Team ID と違う場合だけ、その `<接頭辞>.jp.kz2601.metamon` を `appIDs` に足す。
+- Apple Developer: Mac の App ID(iOS と同じ ID)の Associated Domains がオンになっていること。Mac は AASA を `swcd` が取りに行く。確かめ方: Mac の Safari で `https://tailor-it.app/s/<token>` を開くとアプリで参加の画面が出る(出ない時は `swcutil show` で `tailor-it.app` の状態を見る)。
+
 ## AASA ファイル
 
 中身は [`apple-app-site-association`](apple-app-site-association)(このフォルダ)。そのままサイトに置く。

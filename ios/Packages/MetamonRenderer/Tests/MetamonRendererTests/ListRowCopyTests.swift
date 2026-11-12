@@ -5,6 +5,7 @@ import MetamonDSL
 @testable import MetamonRenderer
 #if os(macOS)
 import AppKit
+import UniformTypeIdentifiers
 #endif
 
 @MainActor
@@ -129,7 +130,29 @@ final class ListRowCopyTests: XCTestCase {
         XCTAssertEqual(ListRowDeleteCommand.confirmMessage(title: "Milk", fallback: "Shopping"), "Delete “Milk”?")
     }
 
+    /// #1398: 複数の行は書き出しと同じ列の CSV(写真は入れない。隠し項目は自分で書いた記録なので出る)
+    func testSelectedRowsAsExportCSV() throws {
+        let rt = try runtime()
+        let entity = rt.dsl.entity("expense")
+        let rows = [Record(id: "e1", data: ["amount": 1200, "memo": "ランチ", "receipt": "x"]),
+                    Record(id: "e2", data: ["amount": 300, "memo": "コーヒー, 2杯"])]
+        let csv = ListRowCopyText.csv(records: rows, entity: entity, rt: rt)
+        let lines = csv.components(separatedBy: "\r\n").filter { !$0.isEmpty }
+        XCTAssertEqual(lines.first, "日付,金額,メモ,正解", "写真は列にしない")
+        XCTAssertEqual(lines.count, 3)
+        XCTAssertTrue(lines[2].contains(",\"コーヒー, 2杯\","), "カンマを含む値は引用する")
+        XCTAssertEqual(ListRowCopyText.csv(records: [], entity: entity, rt: rt), "")
+    }
+
     #if os(macOS)
+    func testCSVDragCarriesFileAndText() throws {
+        let item = ListRowCopyText.csvDragItem("a,b\r\n", title: "支出")
+        XCTAssertEqual(item.suggestedName, "支出.csv")
+        XCTAssertTrue(item.hasItemConformingToTypeIdentifier(UTType.commaSeparatedText.identifier))
+        XCTAssertTrue(item.canLoadObject(ofClass: NSString.self))
+        XCTAssertTrue(ListRowCopyText.csvDragItem("", title: "支出").registeredTypeIdentifiers.isEmpty, "空なら何も載せない")
+    }
+
     func testPasteboardRoundTripOnNamedBoard() {
         let board = NSPasteboard(name: NSPasteboard.Name("metamon.test.\(UUID().uuidString)"))
         defer { board.releaseGlobally() }
