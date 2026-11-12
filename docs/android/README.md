@@ -5,6 +5,7 @@ Android アプリ(#354・#356〜#360)の文書の入口。
 | 文書 | 中身 |
 |---|---|
 | [`android/README.md`](../../android/README.md) | モジュール・ビルドとテストのコマンド・stg / prod・Firebase の設定 |
+| [`testing.md`](testing.md) | JVM のテスト・適合テスト・androidTest の回し方と重さ、CI で回す物・回さない物 |
 | [`ci.md`](ci.md) | CI の案(ワークフローの YAML。まだ置いていない) |
 | [`play-billing.md`](play-billing.md) | Tailor It Pro の購入(Google Play Billing)と、backend・Play Console で残っていること |
 | [`play-background-location.md`](play-background-location.md) | Play Console の裏での位置情報の申告の文(場所に着いたら知らせる) |
