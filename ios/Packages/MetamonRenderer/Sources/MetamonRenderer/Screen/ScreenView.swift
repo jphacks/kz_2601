@@ -23,6 +23,7 @@ public struct ScreenView: View {
                 .background(RenderTheme.Colors.canvas)
                 .modifier(FormSaveBar(screen: screen, ctx: ctx)) // saveRecord は画面下の固定バーへ(#89)
                 .modifier(PublicFormNotice(screen: screen)) // #253 公開の entity のフォームに「誰でも見られます」
+                .modifier(MacFormTabScope(screen: screen)) // Mac: Tab を DSL の並びで回す(#2065)
                 .navigationTitle(screen.title)
                 .inlineNavigationTitle()
                 .toolbar {

@@ -31,6 +31,7 @@ struct NumberFieldLeaf: View {
                         .font(RenderTheme.Fonts.number)
                         .focused($focused)
                         .keyboardAnchor(c, $focused)
+                        .macFormTabStop(c, $focused)
                         .macArrowStepping(form.number(field), c: c, type: ftype)
                     if let unit = Self.unitText(c.unit ?? fieldDef?.unit, isCurrency: isCurrency) {
                         Text(unit).font(.subheadline.weight(.medium)).foregroundStyle(.secondary)
