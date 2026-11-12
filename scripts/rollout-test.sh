@@ -100,6 +100,20 @@ PATH="$TMP/bin:$PATH" PROJECT_ID=fake-project ROLLOUT_MIN_REQUESTS=1 \
 code=$?
 set -e
 [ "$code" = 3 ] || fail "偽 gcloud: 新の 5xx 1/3 で終了コード 3 のはずが $code"
+# 巻き戻しの通知: Actions では ::error 注釈と job summary に出す(#372)
+: >"$TMP/calls"
+set +e
+PATH="$TMP/bin:$PATH" PROJECT_ID=fake-project ROLLOUT_MIN_REQUESTS=1 GITHUB_ACTIONS=true GITHUB_STEP_SUMMARY="$TMP/summary.md" \
+  ./rollout.sh --env stg --service ai --execute --wait 0 >"$TMP/notify.out" 2>/dev/null
+set -e
+grep -q '^::error title=rollout ai-stg rolled back::ai-stg を ai-stg-00001-old に 100%25 戻した' "$TMP/notify.out" \
+  || fail "巻き戻しの ::error 注釈が無い: $(cat "$TMP/notify.out")"
+grep -q '^### rollout ai-stg: rolled back' "$TMP/summary.md" || fail "巻き戻しが job summary に無い"
+# dry-run(模擬)の巻き戻しは注釈にしない
+GITHUB_ACTIONS=true GITHUB_STEP_SUMMARY=/dev/null ./rollout.sh --env stg --service ai --to-revision new --from-revision old \
+  --wait 0 --metrics-dir "$D/sim-bad" >"$TMP/dry-notify.out" 2>/dev/null || true
+grep -q 'to-revisions=old=100' "$TMP/dry-notify.out" || fail "模擬の巻き戻しが走っていない"
+if grep -q '^::error' "$TMP/dry-notify.out"; then fail "dry-run で ::error 注釈を出した"; fi
 grep -q 'update-traffic ai-stg --project=fake-project --region=asia-northeast1 --to-revisions=ai-stg-00002-new=5,ai-stg-00001-old=95' "$TMP/calls" \
   || fail "偽 gcloud: describe から新旧を読んでいない: $(cat "$TMP/calls")"
 tail -n 1 "$TMP/calls" | grep -q -- '--to-revisions=ai-stg-00001-old=100' || fail "偽 gcloud: 旧に戻していない: $(cat "$TMP/calls")"
