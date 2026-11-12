@@ -18,7 +18,6 @@ import jp.kz2601.metamon.renderer.EntityLoadState
 import jp.kz2601.metamon.renderer.components.lists.LeafData
 import jp.kz2601.metamon.renderer.components.lists.StatValue
 import java.time.Instant
-import java.time.LocalDate
 import java.time.ZoneId
 import java.util.Locale
 
@@ -109,11 +108,11 @@ object WidgetSnapshotBuilder {
         if (Aggregator.isPick(op) || Track.isTrackAggregate(op)) return null
         val rows = data.filtered(c, c.filters.filter { it.op !in periodOps })
         val dateField = entity.fields.firstOrNull { !it.hidden && it.type.isDate }
-        val today = LocalDate.ofInstant(now, zone)
+        val today = now.atZone(zone).toLocalDate()
         val first = today.minusDays((TREND_DAYS - 1).toLong())
         val byDay = rows.groupBy { r ->
             val d = dateField?.let { FieldCoding.date(r[it.id], zone) } ?: createdAt(r)
-            d?.let { LocalDate.ofInstant(it, zone) }
+            d?.let { it.atZone(zone).toLocalDate() }
         }.filterKeys { it != null && !it.isBefore(first) && !it.isAfter(today) }
         val days = (0 until TREND_DAYS).map { first.plusDays(it.toLong()) }
         val points = days.map { WidgetSnapshot.Trend.Point(it.toEpochDay(), Aggregator.aggregate(op, c.field, byDay[it].orEmpty())) }
