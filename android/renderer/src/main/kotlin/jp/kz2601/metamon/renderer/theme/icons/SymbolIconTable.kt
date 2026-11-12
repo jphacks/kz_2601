@@ -173,6 +173,7 @@ internal val symbolMaterialNames: Map<String, String> = mapOf(
     "trash" to "delete",
     "tray" to "inbox",
     "trophy" to "emoji_events",
+    "tropicalstorm" to "warning",
     "video" to "videocam",
     "waveform" to "graphic_eq",
     "wifi.slash" to "wifi_off",

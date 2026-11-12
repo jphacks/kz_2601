@@ -243,7 +243,7 @@ var notionHexRe = regexp.MustCompile(`^[0-9a-fA-F]{32}$`)
 func notionID(name, v string) (string, error) {
 	h := strings.ReplaceAll(strings.TrimSpace(v), "-", "")
 	if !notionHexRe.MatchString(h) {
-		return "", fmt.Errorf("%w: %s must be a Notion id (32 hex)", ErrUnknown, name)
+		return "", fmt.Errorf("%w: %s must be a Notion id (32 hex)", ErrBadArgs, name)
 	}
 	h = strings.ToLower(h)
 	return h[:8] + "-" + h[8:12] + "-" + h[12:16] + "-" + h[16:20] + "-" + h[20:], nil
@@ -450,7 +450,7 @@ func notionQueryArgs(a map[string]string) (dbID string, n int, sub, val string, 
 	if v := a["limit"]; v != "" {
 		x, err := strconv.Atoi(v)
 		if err != nil || x < 1 || x > notionMaxLimit {
-			return "", 0, "", "", fmt.Errorf("%w: limit must be 1-%d", ErrUnknown, notionMaxLimit)
+			return "", 0, "", "", fmt.Errorf("%w: limit must be 1-%d", ErrBadArgs, notionMaxLimit)
 		}
 		n = x
 	}
@@ -549,7 +549,7 @@ func (c *notion) addRow(ctx context.Context, in Input) (Output, error) {
 			}
 			v, err := notionPropValue(name, p.Type, props[name])
 			if err != nil {
-				return Output{}, err
+				return Output{}, afterCall(err)
 			}
 			values[name] = v
 		}
@@ -597,24 +597,24 @@ func checkNotionAdd(a map[string]string) error {
 func notionProps(v string, required bool) (map[string]any, error) {
 	if v == "" {
 		if required {
-			return nil, fmt.Errorf("%w: properties is required", ErrUnknown)
+			return nil, fmt.Errorf("%w: properties is required", ErrBadArgs)
 		}
 		return nil, nil
 	}
 	if len(v) > notionMaxPropsLen {
-		return nil, fmt.Errorf("%w: properties is over %d bytes", ErrUnknown, notionMaxPropsLen)
+		return nil, fmt.Errorf("%w: properties is over %d bytes", ErrBadArgs, notionMaxPropsLen)
 	}
 	var props map[string]any
 	d := json.NewDecoder(strings.NewReader(v))
 	d.UseNumber()
 	if err := d.Decode(&props); err != nil || d.More() {
-		return nil, fmt.Errorf("%w: properties must be a JSON object", ErrUnknown)
+		return nil, fmt.Errorf("%w: properties must be a JSON object", ErrBadArgs)
 	}
 	if len(props) > notionMaxProps {
-		return nil, fmt.Errorf("%w: properties has over %d entries", ErrUnknown, notionMaxProps)
+		return nil, fmt.Errorf("%w: properties has over %d entries", ErrBadArgs, notionMaxProps)
 	}
 	if required && len(props) == 0 {
-		return nil, fmt.Errorf("%w: properties is empty", ErrUnknown)
+		return nil, fmt.Errorf("%w: properties is empty", ErrBadArgs)
 	}
 	return props, nil
 }
@@ -629,7 +629,7 @@ func notionText(s string) []map[string]any {
 // formula ...) are refused.
 func notionPropValue(name, typ string, v any) (any, error) {
 	bad := func(want string) error {
-		return fmt.Errorf("%w: property %q must be %s", ErrUnknown, name, want)
+		return fmt.Errorf("%w: property %q must be %s", ErrBadArgs, name, want)
 	}
 	str := func(max int) (string, error) {
 		s, ok := v.(string)
@@ -756,7 +756,7 @@ func notionPropValue(name, typ string, v any) (any, error) {
 		}
 		return map[string]any{"phone_number": notionNullable(s)}, nil
 	}
-	return nil, fmt.Errorf("%w: property %q (%s) cannot be set", ErrUnknown, name, typ)
+	return nil, fmt.Errorf("%w: property %q (%s) cannot be set", ErrBadArgs, name, typ)
 }
 
 func notionNullable(s string) any {
@@ -832,14 +832,14 @@ func (c *notion) updateProperties(ctx context.Context, in Input) (Output, error)
 			}
 			s, err := gcalText(name, s, notionMaxText, true)
 			if err != nil {
-				return Output{}, err
+				return Output{}, afterCall(err)
 			}
 			values[name] = map[string]any{"title": notionText(s)}
 			continue
 		}
 		v, err := notionPropValue(name, p.Type, props[name])
 		if err != nil {
-			return Output{}, err
+			return Output{}, afterCall(err)
 		}
 		values[name] = v
 	}

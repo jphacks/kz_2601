@@ -1,5 +1,5 @@
 # Android(Kotlin / Compose)の CI(#837・形は docs/android/ci.md)。PR が Open(非Draft) / develop・main への push で発火。
-# ubuntu だけで回す。エミュレータは使わない(JVM の単体テストだけ)。
+# ubuntu だけで回す。エミュレータは使わない(JVM の単体テストだけ)。androidTest はコンパイルだけ確かめる(#2062)。
 #
 # 変更の判定(dorny/paths-filter)→ 回すもの:
 #   | 変わった場所                                           | mode  | 回すもの                                         |
@@ -9,7 +9,7 @@
 #   | docs/dsl/icon-map.json・backend の *.go(テスト以外)   | light | SymbolIconTableTest(アイコン表の漏れ検査)      |
 #   | iOS の ClientCapabilities.swift                         | light | DeviceCapabilitiesTest(機能のキーの突き合わせ)  |
 #   | iOS の Localizable.xcstrings                            | light | RuntimeCopyIosEnglishTest(英語の文言の突き合わせ)|
-#   | それ以外の android/**(*.md 以外)                      | full  | test・assembleStgDebug・lint(非ブロッキング)   |
+#   | それ以外の android/**(*.md 以外)                      | full  | test・assembleStgDebug・androidTest のコンパイル・lint(非ブロッキング) |
 #   | docs/dsl/conformance/**(適合テスト #352)・examples/**・dsl.schema.json | full | 同上            |
 #   | .github/workflows/android-ci.yml                       | full  | 同上                                             |
 #   | develop / main への push(android/dsl/** を含む)       | full  | 同上(dsl だけの変更でも依存先まで確かめる)     |
@@ -185,6 +185,11 @@ jobs:
       # ubuntu-latest には Android SDK が入っている(ANDROID_HOME)。platform 36 が無ければ AGP が取ってくる
       - name: test・assembleStgDebug
         run: ./gradlew test assembleStgDebug --console=plain
+
+      # androidTest(instrumented test)は実行しない(エミュレータを使わない方針)。
+      # コンパイルだけ通して、本番コードの変更で androidTest が壊れたことに気づけるようにする(#2062)。
+      - name: androidTest のコンパイル
+        run: ./gradlew :app:compileStgDebugAndroidTestKotlin --console=plain
 
       # Android Lint。**今は非ブロッキング**: 既存の指摘の数がまだ分からないため、失敗しても android-ci には影響させない。
       # ブロッキングにする時: 既存の指摘を直す(または lint-baseline.xml を置く)PR を先に入れてから continue-on-error を外す。

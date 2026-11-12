@@ -105,7 +105,7 @@ class PrintTest {
         val store = (1..80).fold(MockStore()) { s, i ->
             s.save("expense", null, mapOf("amount" to "100", "category" to "食費", "memo" to "メモ$i", "date" to today.toString()))
         }
-        val doc = ScreenPrint.document(dsl, "home", store, printedAt = printedAt)
+        val doc = ScreenPrint.document(dsl, "home", store, printedAt = printedAt)!!
         assertEquals("家計簿", doc.title)
         assertEquals(listOf("家計簿", "最近の支出"), doc.sections.map { it.title })
         val summary = doc.sections[0]
@@ -131,7 +131,7 @@ class PrintTest {
         val store = MockStore()
             .save("expense", null, mapOf("amount" to "300", "category" to "食費", "date" to today))
             .save("expense", null, mapOf("amount" to "200", "category" to "交通", "date" to today))
-        val doc = ScreenPrint.document(dsl, "stats", store, printedAt = printedAt)
+        val doc = ScreenPrint.document(dsl, "stats", store, printedAt = printedAt)!!
         assertEquals(listOf("カテゴリ別(今月)", "月ごとの支出"), doc.sections.map { it.title })
         val byCategory = doc.sections[0]
         assertEquals(listOf("カテゴリ", "金額"), byCategory.headers)
@@ -148,7 +148,7 @@ class PrintTest {
             .save("lecture", null, mapOf("subject" to "数学", "weekday" to "月", "period" to "1", "room" to "A101"))
             .save("lecture", null, mapOf("subject" to "英語", "weekday" to "水", "period" to "3"))
             .save("lecture", null, mapOf("subject" to "化学", "weekday" to "水", "period" to "3", "room" to "実験室"))
-        val doc = ScreenPrint.document(dsl, "home", store, printedAt = printedAt)
+        val doc = ScreenPrint.document(dsl, "home", store, printedAt = printedAt)!!
         assertEquals(1, doc.sections.size)
         val grid = doc.sections[0]
         assertEquals("今週の時間割", grid.title)
@@ -168,7 +168,7 @@ class PrintTest {
             values["amount"] = JSONValue.Num(1500.0)
             values["memo"] = JSONValue.Str("ランチ")
         }
-        val doc = ScreenPrint.document(dsl, "expense_form", MockStore(), form, printedAt = printedAt)
+        val doc = ScreenPrint.document(dsl, "expense_form", MockStore(), form, printedAt = printedAt)!!
         val rows = doc.sections.single().rows.associate { it[0] to it[1] }
         assertTrue(rows.toString(), rows.getValue("金額").contains("1,500"))
         assertEquals("ランチ", rows["メモ"])
@@ -179,7 +179,7 @@ class PrintTest {
     fun screenWithoutTablesStillPrintsOnePage() {
         val dsl = Examples.load("kakeibo")
         // フォームが無いフォーム画面: 印刷する値が無いので「記録がありません」の 1 頁
-        val doc = ScreenPrint.document(dsl, "expense_form", MockStore(), null, printedAt = printedAt)
+        val doc = ScreenPrint.document(dsl, "expense_form", MockStore(), null, printedAt = printedAt)!!
         assertEquals(1, doc.sections.size)
         assertTrue(doc.sections[0].rows.isEmpty())
         assertEquals(1, doc.pages.size)

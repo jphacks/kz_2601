@@ -393,7 +393,7 @@ func (s *Service) generateStream(ctx context.Context, req Request, sink Sink, st
 	if err := s.gatePaid(ctx, ar.raw, current, loc); err != nil {
 		return nil, err
 	}
-	src := appconfigclient.Source{Kind: "ai", Transcript: transcript, Summary: ar.summary, Model: s.Model}
+	src := appconfigclient.Source{Kind: "ai", Transcript: transcript, Summary: ar.summary, Model: s.Model, PromptVersion: PromptVersion()}
 	var saved *appconfigclient.Envelope
 	if len(ar.ops) > 0 && !ar.meta.AreaFallback && !ar.forceFull {
 		src.Mode = "patch"

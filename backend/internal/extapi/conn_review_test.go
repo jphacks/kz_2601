@@ -7,13 +7,14 @@ import (
 	"time"
 )
 
-// A connection cut while its token was being renewed stays cut: the
-// renewed token is not stored and the call is not made.
+// A connection cut (on another instance) while its token was being renewed
+// stays cut: the renewed token is not stored and the call is not made. (On
+// the same instance the revoke waits for the refresh: TestRevokeWaitsForRefresh.)
 func TestRevokeDuringRefreshStaysRevoked(t *testing.T) {
 	e := newEnv(t, opts{})
 	rc := expiredConnection(t, e)
 	rc.before = func() {
-		if err := e.svc.Revoke(context.Background(), user, FakeOAuth); err != nil {
+		if err := e.svc.Conns.Revoke(context.Background(), user, FakeOAuth, rc); err != nil {
 			t.Errorf("revoke: %v", err)
 		}
 	}

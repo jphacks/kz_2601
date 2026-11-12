@@ -72,6 +72,8 @@ struct MacRootView: View {
     @State private var shareFlow = MacShareFlow.shared
     /// ツールバーの「共有」(#1035)のシート
     @State private var shareApp: MacShareAppModel?
+    /// 「みんなのアプリを探す」(#2069)のシート
+    @State private var discover: MacDiscoverModel?
     #endif
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     /// サイドバーの新着の数(#969)
@@ -175,7 +177,9 @@ struct MacRootView: View {
         .frame(minWidth: Self.minWindowSize.width, minHeight: Self.minWindowSize.height)
         .focusedSceneValue(\.shellActions, shellActions)
         .macNotificationRouting(selection: notificationSelection, appIds: apps.map(\.id)) // 押された通知のアプリを開く(#965)。入力中なら確認を通す・シートの間は閉じるまで待つ(#943)
-        .macIntentRouting(selection: notificationSelection, appIds: apps.map(\.id), talk: speak) // ショートカット・Siri の「開く / 話しかける」(#1034)
+        // ショートカット・Siri・ウィジェットの「開く / 話しかける」(#1034)。一覧を読み終える前の「開く」は読み終えてから(#1970)
+        .macIntentRouting(selection: notificationSelection, appIds: apps.map(\.id), listSettled: library.isServerListSettled(signedIn: MacAccount.shared.session.user != nil),
+                          talk: speak, missing: intentTargetMissing)
         .onChange(of: apps.map(\.name)) { IntentHost.shared.appsMayHaveChanged() } // Siri のフレーズのアプリ名を引き直す(#1034)
         .background { WindowCloseGuard(discardGuard: discardGuard) } // ⌘W・閉じるボタン(#943)
         .background { if let windowApp { WindowFrameAutosave(name: MacAppWindows.frameAutosaveName(windowApp)) } } // #1853
@@ -189,6 +193,7 @@ struct MacRootView: View {
         .sheet(item: $shareApp) { model in
             MacShareAppSheet(model: model, onClose: { shareApp = nil })
         }
+        .modifier(MacDiscoverPresenter(model: $discover, replace: appReplaceContext, onInstalled: adoptInstalled)) // #2069
         #endif
         .sheet(item: $compose, onDismiss: noteFinishedCompose) { session in
             ComposeSheet(session: session, onClose: { compose = nil }, undo: finishedUndo(session))
@@ -234,6 +239,7 @@ struct MacRootView: View {
             #if !APP_STORE_REVIEW
             shareApp?.close() // 読み込み中の参加者を書き戻さない
             shareApp = nil
+            discover = nil
             #endif
             notices.resetAfterWipe()
             reopenLastApp()
@@ -326,6 +332,12 @@ struct MacRootView: View {
         }
     }
 
+    /// ショートカット・ウィジェットで開こうとしたアプリが一覧に無い(消した・#1970): 一覧を出して一言知らせる
+    private func intentTargetMissing(_ appId: String) {
+        withMacAnimation { columnVisibility = .all }
+        notices.summary = .init(appId: appId, text: L10n.tr("開こうとしたアプリが見つかりませんでした。一覧から選んでください"), action: nil)
+    }
+
     /// 起動時: ウインドウが覚えている選択(SceneStorage)が無い・もう無いアプリなら、前に開いていたアプリを開き直す
     private func reopenLastApp() {
         let ids = apps.map(\.id)
@@ -389,6 +401,26 @@ struct MacRootView: View {
         library.apply(adopted.document, envelope: adopted.envelope, created: true, onServer: true)
         switchApp(to: id)
         notices.summary = .init(appId: id, text: adopted.banner, action: nil)
+    }
+
+    /// 「みんなのアプリを探す」(#2069)を開けるか: サインインしていてサーバーにつながり、ほかのシートが閉じている
+    private var canDiscover: Bool {
+        guard discover == nil, compose == nil, !updateGate.isBlocking else { return false }
+        return MacDiscoverModel.isAvailable(signedIn: MacAccount.shared.session.user != nil, services: .shared)
+    }
+
+    private func openDiscover() {
+        guard canDiscover else { return }
+        discover = MacDiscoverModel(services: .shared)
+    }
+
+    /// 「探す」から入れたアプリ(#2069)。シートを閉じ、サーバーにあるアプリとして一覧に足して開く(共有のリンクと同じ)
+    private func adoptInstalled(_ installed: MacDiscoverModel.Installed) {
+        let id = installed.document.appId
+        if installed.shared { MacAppOrigins().markShared(id) } // 共有データに参加した時だけ「共有されたアプリ」
+        library.apply(installed.document, envelope: installed.envelope, created: true, onServer: true)
+        switchApp(to: id)
+        notices.summary = .init(appId: id, text: installed.banner, action: nil)
     }
     #endif
 
@@ -840,8 +872,25 @@ struct MacRootView: View {
             speak: speak,
             showTips: { showsTips = true },
             canShowScreenMap: canShowScreenMap,
-            showScreenMap: showScreenMap
+            showScreenMap: showScreenMap,
+            canDiscover: discoverEnabled,
+            discover: { openDiscoverIfAvailable() }
         )
+    }
+
+    /// 「みんなのアプリを探す」(#2069)。審査用ビルドには無い
+    private var discoverEnabled: Bool {
+        #if APP_STORE_REVIEW
+        false
+        #else
+        canDiscover
+        #endif
+    }
+
+    private func openDiscoverIfAvailable() {
+        #if !APP_STORE_REVIEW
+        openDiscover()
+        #endif
     }
 
     /// ⌘F: サイドバーを出して検索欄に入る(#1282)

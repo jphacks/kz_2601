@@ -114,11 +114,11 @@ func (d *deepl) translate(ctx context.Context, in Input) (Output, error) {
 	source := strings.ToUpper(strings.TrimSpace(in.Args["sourceLang"]))
 	switch {
 	case strings.TrimSpace(text) == "" || len(text) > deeplMaxBytes || !utf8.ValidString(text):
-		return Output{}, fmt.Errorf("%w: text must be 1-%d bytes of UTF-8", ErrUnknown, deeplMaxBytes)
+		return Output{}, fmt.Errorf("%w: text must be 1-%d bytes of UTF-8", ErrBadArgs, deeplMaxBytes)
 	case !deeplTargetRe.MatchString(target):
-		return Output{}, fmt.Errorf("%w: targetLang", ErrUnknown)
+		return Output{}, fmt.Errorf("%w: targetLang", ErrBadArgs)
 	case source != "" && !deeplSourceRe.MatchString(source):
-		return Output{}, fmt.Errorf("%w: sourceLang", ErrUnknown)
+		return Output{}, fmt.Errorf("%w: sourceLang", ErrBadArgs)
 	}
 	body, err := json.Marshal(deeplRequest{Text: []string{text}, TargetLang: target, SourceLang: source, ShowBilledCharacters: true})
 	if err != nil {
