@@ -91,6 +91,20 @@ extension View {
     }
 }
 
+/// つなぐ案内の「つなぐ」を押せるか。一覧を読み終わるまでは押せない(読む前に押すと今つなげない provider でも始めてしまう)。
+enum ExtConnectAvailability: Equatable {
+    case loading, available, unavailable
+
+    static func of(_ state: ConnectedServicesState, provider: String) -> ExtConnectAvailability {
+        switch state {
+        case .loading: .loading
+        case .hidden: .unavailable // サーバーが外の API を止めている
+        case .failed: .available // 一覧が読めないだけ。つなぐ流れ側でもう一度確かめる
+        case .loaded(let rows): rows.first { $0.provider == provider }.map { $0.enabled ? .available : .unavailable } ?? .available // 古いサーバーは providers が無い
+        }
+    }
+}
+
 /// つないでいない(409 `ext_not_connected`)時の案内。「つなぐ」は設定の「つないだサービス」と同じ流れ(`ConnectFlow`)。
 /// つなげたら閉じる。
 struct ExtConnectSheet: View {
@@ -111,8 +125,8 @@ struct ExtConnectSheet: View {
         row?.name ?? ConnectedServicesState.name(nil, id: provider, english: LanguagePreference.shared.code == "en")
     }
 
-    /// `providers` が今つなげないと言っている(古いサーバー・一覧が読めない時はつなげる扱い)
-    private var canConnect: Bool { row?.enabled ?? true }
+    private var availability: ExtConnectAvailability { .of(model.state, provider: provider) }
+    private var canConnect: Bool { availability == .available }
 
     var body: some View {
         NavigationStack {
@@ -127,7 +141,7 @@ struct ExtConnectSheet: View {
                         .fixedSize(horizontal: false, vertical: true)
                         .accessibilityIdentifier("ext.connect.title")
                 }
-                Text(canConnect ? ExtDenialCopy.connectBody(name) : ExtDenialCopy.connectUnavailable)
+                Text(availability == .unavailable ? ExtDenialCopy.connectUnavailable : ExtDenialCopy.connectBody(name))
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
@@ -143,7 +157,7 @@ struct ExtConnectSheet: View {
                     }
                 } label: {
                     Group {
-                        if model.busy == provider { ProgressView() } else { Text("つなぐ") }
+                        if model.busy == provider || availability == .loading { ProgressView() } else { Text("つなぐ") }
                     }
                     .frame(maxWidth: .infinity)
                 }

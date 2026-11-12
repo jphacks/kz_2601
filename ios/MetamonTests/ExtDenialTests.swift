@@ -157,4 +157,16 @@ final class ExtDenialTests: XCTestCase {
     }
     #endif
     #endif
+    // MARK: - つなぐ案内の「つなぐ」
+
+    func testConnectButtonWaitsForProviders() {
+        XCTAssertEqual(ExtConnectAvailability.of(.loading, provider: "fakeOauth"), .loading, "読む前は押せない")
+        XCTAssertEqual(ExtConnectAvailability.of(.hidden, provider: "fakeOauth"), .unavailable)
+        XCTAssertEqual(ExtConnectAvailability.of(.failed("x"), provider: "fakeOauth"), .available)
+        let on = ConnectedServiceRow(provider: "fakeOauth", name: "試験用のサービス", status: .notConnected, enabled: true)
+        let off = ConnectedServiceRow(provider: "fakeOauth", name: "試験用のサービス", status: .notConnected, enabled: false)
+        XCTAssertEqual(ExtConnectAvailability.of(.loaded([on]), provider: "fakeOauth"), .available)
+        XCTAssertEqual(ExtConnectAvailability.of(.loaded([off]), provider: "fakeOauth"), .unavailable)
+        XCTAssertEqual(ExtConnectAvailability.of(.loaded([]), provider: "fakeOauth"), .available, "古いサーバー(providers 無し)はつなげる扱い")
+    }
 }
