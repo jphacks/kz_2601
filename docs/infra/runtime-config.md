@@ -59,6 +59,7 @@ runner は prod で GitHub の変数 `RUNNER_DEPLOY=1` の時だけデプロイ�
 | `MIN_ANDROID_BUILD` | appconfig | `MIN_IOS_BUILD` の Android 版(versionCode) | 無し |
 | `LATEST_ANDROID_BUILD` | appconfig | `LATEST_IOS_BUILD` の Android 版(versionCode) | 無し |
 | `ANDROID_STORE_URL` | appconfig | Android の案内から開く Google Play の URL(`https://play.google.com/store/apps/details?id=<pkg>`) | 無し |
+| `LOOP_SOURCE_GOOGLEPLAY` | feedback-loop(job・まだ定期の実行は無い) | `on` で Google Play のレビューを改善ループに取り込む(#2147)。`LOOP_GP_PACKAGE_NAME`(既定 `GOOGLE_PLAY_PACKAGE_NAME`)と、任意の `LOOP_GP_SERVICE_ACCOUNT_JSON`(Secret Manager から・空なら job の ADC)も読む。SA に Play Console のレビューの返信の権限が要る([feedback-loop.md](../backend/features/feedback-loop.md#環境変数)) | 無し(off) |
 | `MIN_MACOS_BUILD` | appconfig | `MIN_IOS_BUILD` の Mac 版(CFBundleVersion・#981) | 無し |
 | `LATEST_MACOS_BUILD` | appconfig | `LATEST_IOS_BUILD` の Mac 版(CFBundleVersion) | 無し |
 | `MAC_APP_STORE_URL` | appconfig | Mac の案内から開く Mac App Store の URL(`https://apps.apple.com/app/id<id>` / `macappstore://`) | 無し |

@@ -73,6 +73,7 @@ ai → appconfig の結合をローカルで確認する時は、appconfig を�
 | `FIRESTORE_EMULATOR_HOST` | o | - | 設定時は Firestore クライアントが自動でエミュレータへ |
 | `FIREBASE_AUTH_EMULATOR_HOST` | o | o | ローカルのみ(`X-Debug-Uid` の有効条件) |
 | `LOG_LEVEL` | o | o | `info` |
+| `LOOP_SOURCE_GOOGLEPLAY` / `LOOP_GP_PACKAGE_NAME` / `LOOP_GP_SERVICE_ACCOUNT_JSON` | - | - | `cmd/feedback-loop` だけ。`on` で Google Play のレビューを改善ループに取り込む(既定 off・#2147)。パッケージ名の既定は `GOOGLE_PLAY_PACKAGE_NAME`、キーが空なら job の ADC。キーは Secret Manager から(JSON の中身・パスではない)([feedback-loop.md](../docs/backend/features/feedback-loop.md#環境変数)) |
 | `FEEDBACK_DAILY_LIMIT` | o | - | `POST /v1/feedback` の 1 uid 1 日(JST)の件数(既定 5・0 で無制限・#319) |
 | `APPCONFIG_BASE_URL` | - | o | ai → appconfig。未設定なら ai 内のインメモリ stub(永続なし)。staging は `https://appconfig-stg-378953239426.asia-northeast1.run.app` |
 | `ANTHROPIC_API_KEY` | - | o | Secret Manager。ローカルは `~/Desktop/JPHACKS2026/.env`(リポ外) |
