@@ -29,7 +29,6 @@ import (
 	"os"
 	"strings"
 	"time"
-	"unicode/utf8"
 
 	"github.com/jphacks/kz_2601/backend/internal/ai"
 	"github.com/jphacks/kz_2601/backend/internal/appconfigclient"
@@ -561,13 +560,6 @@ func trunc(s string, n int) string {
 	if len(s) <= n {
 		return s
 	}
-	cut := n
-	// do not split a multi-byte rune: a rune start is at most UTFMax-1 bytes back
-	for i := 0; i < utf8.UTFMax-1 && cut > 0 && !utf8.RuneStart(s[cut]); i++ {
-		cut--
-	}
-	if !utf8.RuneStart(s[cut]) { // not UTF-8 here (a run of continuation bytes)
-		return strings.ToValidUTF8(s[:n], "") + "…"
-	}
-	return s[:cut] + "…"
+	// drops a rune split at the cut and any invalid bytes before it
+	return strings.ToValidUTF8(s[:n], "") + "…"
 }
