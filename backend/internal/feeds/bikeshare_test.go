@@ -98,7 +98,7 @@ func TestBikeshareNearest(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if res.Title != "ドコモ・バイクシェア(東京)の近くのポート" || res.Source.Name != "事業者 / 公共交通オープンデータ協議会" ||
+	if res.Title != "ドコモ・バイクシェア(東京)の近くのポート" || res.Source.Name != "コンテンツ等の提供者名: 事業者 / 公共交通オープンデータ協議会" ||
 		res.Source.URL != "https://ckan.odpt.org/dataset/c_docomo-cycle-tokyo" || !strings.HasPrefix(res.Source.License, "CC BY 4.0") {
 		t.Errorf("title/source = %q %+v", res.Title, res.Source)
 	}
@@ -302,6 +302,17 @@ func TestBikeshareAllowlistMatchesDSL(t *testing.T) {
 			!ep.allowedURL(b.Info) || !strings.HasPrefix(b.DatasetURL, "https://ckan.odpt.org/dataset/") ||
 			!strings.HasSuffix(b.Credit, " / 公共交通オープンデータ協議会") || !strings.HasPrefix(b.License, "CC BY 4.0") {
 			t.Errorf("bikeshare %s: %+v", id, b)
+		}
+	}
+	// The credit and change note are the form ODPT's FAQ asks for.
+	for id, want := range map[string][2]string{
+		"docomo-cycle-tokyo": {"コンテンツ等の提供者名: 株式会社ドコモ・バイクシェア / 公共交通オープンデータ協議会",
+			"CC BY 4.0 (https://creativecommons.org/licenses/by/4.0/)・近くのポートを抜き出して近い順に並べ替えて表示"},
+		"hellocycling": {"コンテンツ等の提供者名: OpenStreet株式会社 / 公共交通オープンデータ協議会",
+			"CC BY 4.0 (https://creativecommons.org/licenses/by/4.0/)(3 つのライセンスから選択)・近くのポートを抜き出して近い順に並べ替えて表示"},
+	} {
+		if b := ep.Bikeshare[id]; b.Credit != want[0] || b.License != want[1] {
+			t.Errorf("bikeshare %s credit/license = %q %q", id, b.Credit, b.License)
 		}
 	}
 	slices.Sort(ids)

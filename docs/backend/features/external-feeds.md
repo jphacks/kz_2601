@@ -82,9 +82,9 @@
 
 | provider | 出どころ(サーバーが取りに行く URL) | 規約 | 出典の表示 |
 |---|---|---|---|
-| bikeshare `docomo-cycle-tokyo` | ドコモ・バイクシェア(東京エリア)`https://api-public.odpt.org/api/v4/gbfs/docomo-cycle-tokyo/station_information.json`・`https://api-public.odpt.org/api/v4/gbfs/docomo-cycle-tokyo/station_status.json`(1,937 ポート) | [ODPT のデータセット](https://ckan.odpt.org/dataset/c_bikeshare_gbfs-d-bikeshare): [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/deed.ja)(商用可・改変可・出典と変更の表示が要る)。鍵・登録は無し(鍵つきの `api.odpt.org` は使わない) | 株式会社ドコモ・バイクシェア / 公共交通オープンデータ協議会・「CC BY 4.0・近い順に並べ替えて表示」 |
+| bikeshare `docomo-cycle-tokyo` | ドコモ・バイクシェア(東京エリア)`https://api-public.odpt.org/api/v4/gbfs/docomo-cycle-tokyo/station_information.json`・`https://api-public.odpt.org/api/v4/gbfs/docomo-cycle-tokyo/station_status.json`(1,937 ポート) | [ODPT のデータセット](https://ckan.odpt.org/dataset/c_bikeshare_gbfs-d-bikeshare): [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/deed.ja)(商用可・改変可・出典と変更の表示が要る)。鍵・登録は無し(鍵つきの `api.odpt.org` は使わない) | 「コンテンツ等の提供者名: 株式会社ドコモ・バイクシェア / 公共交通オープンデータ協議会」・「CC BY 4.0 (https://creativecommons.org/licenses/by/4.0/)・近くのポートを抜き出して近い順に並べ替えて表示」(変更の表示) |
 | bikeshare `docomo-cycle` | ドコモ・バイクシェア(東京以外の全国)`https://api-public.odpt.org/api/v4/gbfs/docomo-cycle/station_information.json`・`https://api-public.odpt.org/api/v4/gbfs/docomo-cycle/station_status.json`(6,295 ポート) | [ODPT のデータセット](https://ckan.odpt.org/dataset/c_bikeshare_gbfs-d-nationwide-bikeshare): CC BY 4.0(同上) | 同上 |
-| bikeshare `hellocycling` | HELLO CYCLING(OpenStreet 株式会社)`https://api-public.odpt.org/api/v4/gbfs/hellocycling/station_information.json`(約 8 MB)・`https://api-public.odpt.org/api/v4/gbfs/hellocycling/station_status.json`(15,708 ステーション) | [ODPT のデータセット](https://ckan.odpt.org/dataset/c_bikeshare_gbfs-openstreet): CC BY 4.0・ODC BY 1.0・ODbL 1.0 から選べる([ライセンスの文](https://d1yl7kw204zjxn.cloudfront.net/gbfs/v2/public/hellocycling_gbfs_licence.txt)は 3 つから選ぶことだけを書く)。**CC BY 4.0 を選んで使う**(ODbL の継承の条件を避ける) | OpenStreet株式会社 / 公共交通オープンデータ協議会・「CC BY 4.0(3 つのライセンスから選択)・近い順に並べ替えて表示」 |
+| bikeshare `hellocycling` | HELLO CYCLING(OpenStreet 株式会社)`https://api-public.odpt.org/api/v4/gbfs/hellocycling/station_information.json`(約 8 MB)・`https://api-public.odpt.org/api/v4/gbfs/hellocycling/station_status.json`(15,708 ステーション) | [ODPT のデータセット](https://ckan.odpt.org/dataset/c_bikeshare_gbfs-openstreet): CC BY 4.0・ODC BY 1.0・ODbL 1.0 から選べる([ライセンスの文](https://d1yl7kw204zjxn.cloudfront.net/gbfs/v2/public/hellocycling_gbfs_licence.txt)は 3 つから選ぶことだけを書く)。**CC BY 4.0 を選んで使う**(ODbL の継承の条件を避ける) | 「コンテンツ等の提供者名: OpenStreet株式会社 / 公共交通オープンデータ協議会」・「CC BY 4.0 (https://creativecommons.org/licenses/by/4.0/)(3 つのライセンスから選択)・近くのポートを抜き出して近い順に並べ替えて表示」(変更の表示) |
 
 外したもの:
 
@@ -227,7 +227,7 @@ diet の検索語で出どころまで取りに行く回数は、利用者ごと
   - 国会会議録: 発言の著作権は各発言者にある。発言者・会議名・日付の一覧とリンクだけを出す今の形で足りるか。出典の書き方(国立国会図書館ウェブサイトのコンテンツ利用規約は公共データ利用規約(第1.0版)を指すが、会議録の発言は「第三者が著作権を有するコンテンツ」に当たる)。商用・キャッシュは API の仕様のページに書かれていない。
   - NHK: 入れていない。os_2401・sp_2512 のようなニュースのアプリを作るなら、NHK の許諾を取るか、再提供を許す別の出どころを探す。
 - **bikeshare(#1694)の追加は人の判断(#339)**。develop に入れる前にオーナーが下を確かめる(`FEEDS_DISABLED=bikeshare` で止められる):
-  - 規約: ライセンス(CC BY 4.0・HELLO CYCLING は 3 つから CC BY 4.0 を選ぶ)は ODPT のカタログで読んだ。`api-public.odpt.org` そのものの利用条件(回数・商用・キャッシュ)は、ODPT の開発者サイトが JavaScript で描くページで 2026-11-12 に機械で読めず、確かめられていない。出典の書き方(FAQ の「コンテンツ等の提供者名」の形・変更の表示「近い順に並べ替えて表示」)で足りるか。
+  - 規約: ライセンス(CC BY 4.0・HELLO CYCLING は 3 つから CC BY 4.0 を選ぶ)は ODPT のカタログで読んだ。`api-public.odpt.org` そのものの利用条件(回数・商用・キャッシュ)は、ODPT の開発者サイトが JavaScript で描くページで 2026-11-12 に機械で読めず、確かめられていない。出典の書き方は 2026-11-12 にオーナーが OK した(FAQ の「コンテンツ等の提供者名: 〇〇 / 公共交通オープンデータ協議会」の形・CC BY 4.0 のリンク・変更の表示「近くのポートを抜き出して近い順に並べ替えて表示」)。
   - 正典の変更: DSL のスキーマ(`feed.provider` の enum に `bikeshare`・`feedId` / `query` の説明)を変えた。
   - 出どころの量: HELLO CYCLING は 1 回に約 4.5 MB(6 時間に 1 回は +8 MB)を取る。使われる間はインスタンスごとに 2 分に 1 回。
   - 端末: iOS(`Feed.providers`)と Android は `bikeshare` をまだ知らない(この PR は backend だけ)。AI に選ばせる規則(`feed_rules.go` ほか)も足していない(#1694 の親の「部品と AI の決まり」の後)。

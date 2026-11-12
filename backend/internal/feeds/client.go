@@ -83,10 +83,10 @@ func DefaultEndpoints() Endpoints {
 		Arxiv: "https://export.arxiv.org/api/query",
 		Diet:  "https://kokkai.ndl.go.jp/api/speech",
 		Bikeshare: map[string]BikeshareSystem{
-			"docomo-cycle":       odptGBFS("docomo-cycle", "ドコモ・バイクシェア(東京以外)", "株式会社ドコモ・バイクシェア", "c_bikeshare_gbfs-d-nationwide-bikeshare", "CC BY 4.0"),
-			"docomo-cycle-tokyo": odptGBFS("docomo-cycle-tokyo", "ドコモ・バイクシェア(東京)", "株式会社ドコモ・バイクシェア", "c_bikeshare_gbfs-d-bikeshare", "CC BY 4.0"),
+			"docomo-cycle":       odptGBFS("docomo-cycle", "ドコモ・バイクシェア(東京以外)", "株式会社ドコモ・バイクシェア", "c_bikeshare_gbfs-d-nationwide-bikeshare", ccBY4),
+			"docomo-cycle-tokyo": odptGBFS("docomo-cycle-tokyo", "ドコモ・バイクシェア(東京)", "株式会社ドコモ・バイクシェア", "c_bikeshare_gbfs-d-bikeshare", ccBY4),
 			// OpenStreet offers CC BY 4.0, ODC BY 1.0 or ODbL 1.0; we take CC BY 4.0.
-			"hellocycling": odptGBFS("hellocycling", "HELLO CYCLING", "OpenStreet株式会社", "c_bikeshare_gbfs-openstreet", "CC BY 4.0(3 つのライセンスから選択)"),
+			"hellocycling": odptGBFS("hellocycling", "HELLO CYCLING", "OpenStreet株式会社", "c_bikeshare_gbfs-openstreet", ccBY4+"(3 つのライセンスから選択)"),
 		},
 		Status: map[string]StatusPage{
 			"claude":     {Name: "Claude(Anthropic)", URL: "https://status.claude.com/api/v2/summary.json", SiteURL: "https://status.claude.com"},
@@ -97,12 +97,15 @@ func DefaultEndpoints() Endpoints {
 	}
 }
 
-// odptGBFS is a system on ODPT's public (no key) GBFS API.
+const ccBY4 = "CC BY 4.0 (https://creativecommons.org/licenses/by/4.0/)"
+
+// odptGBFS is a system on ODPT's public (no key) GBFS API. The credit follows
+// ODPT's FAQ form; the license notes the change (nearby ports, sorted).
 func odptGBFS(id, name, operator, dataset, license string) BikeshareSystem {
 	base := "https://api-public.odpt.org/api/v4/gbfs/" + id + "/"
 	return BikeshareSystem{Name: name, Info: base + "station_information.json", Status: base + "station_status.json",
-		Credit: operator + " / 公共交通オープンデータ協議会", DatasetURL: "https://ckan.odpt.org/dataset/" + dataset,
-		License: license + "・近い順に並べ替えて表示"}
+		Credit: "コンテンツ等の提供者名: " + operator + " / 公共交通オープンデータ協議会", DatasetURL: "https://ckan.odpt.org/dataset/" + dataset,
+		License: license + "・近くのポートを抜き出して近い順に並べ替えて表示"}
 }
 
 const pdl = "公共データ利用規約(第1.0版)"
