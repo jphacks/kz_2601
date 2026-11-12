@@ -71,6 +71,7 @@ import androidx.compose.ui.semantics.paneTitle
 import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.semantics
 import jp.kz2601.metamon.desktop.i18n.Strings
+import jp.kz2601.metamon.desktop.os.NotificationsOffBar
 import jp.kz2601.metamon.desktop.store.SessionPersistence
 
 /** 画面 1 枚の描画に要るもの。 */
@@ -105,6 +106,8 @@ fun DesktopApp(
     windowId: Int? = null,
     /** パレットの「この端末のデータを消す」(#1887)。全アプリの分を消す。null なら出さない。 */
     onWipeLocalData: (suspend () -> Unit)? = null,
+    /** アプリの id。Windows で通知がオフの時の帯を閉じた覚えに使う。null なら帯を出さない。 */
+    appId: String? = null,
 ) {
     val session = remember {
         DesktopSession(dsl, initialStore, startScreen = startScreen, host = DesktopActionHost(), persistence = persistence, shared = records, startRecordId = startRecordId)
@@ -142,6 +145,7 @@ fun DesktopApp(
         Box(Modifier.fillMaxSize()) {
             // モーダルの間は下の画面とタブに Tab で入らず、読み上げにも出さない
             Column(Modifier.fillMaxSize().then(keyboard.inert(nav.sheet != null || nav.fullScreen != null || previewing))) {
+                appId?.let { NotificationsOffBar(it, dsl) }
                 val base = NavigationResolver.dismissModals(nav).top(dsl)
                 Box(Modifier.weight(1f)) { ScreenView(dsl, session, base, io, dispatch, openPrint, onOpenRecord) }
                 // 送り待ちがある時だけ小さく出す(#1887)
