@@ -35,6 +35,7 @@ extension AppRuntime {
         coachMarks?.reload()                            // 操作の吹き出し(#1441)
         let center = UNUserNotificationCenter.current()
         await services.notifications.removeAll()        // アプリごとの予約(#228)
+        await spotlight.removeAll()                     // Spotlight のアプリ名(#1996)
         center.removeAllPendingNotificationRequests()
         center.removeAllDeliveredNotifications()
         apps = []                                       // 変身一覧(オフラインだと前のアカウントの一覧が残る)
