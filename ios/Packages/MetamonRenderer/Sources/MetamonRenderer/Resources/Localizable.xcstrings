@@ -2522,6 +2522,23 @@
         }
       }
     },
+    "この端末ではこの言語を翻訳できません" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "This language can't be translated on this device"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "この端末ではこの言語を翻訳できません"
+          }
+        }
+      }
+    },
     "この端末ではヘルスデータを使えません" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -8791,6 +8808,40 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "縦に狭める"
+          }
+        }
+      }
+    },
+    "翻訳する言語をダウンロードしてください" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Download the languages to translate"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "翻訳する言語をダウンロードしてください"
+          }
+        }
+      }
+    },
+    "翻訳できませんでした" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Couldn't translate"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "翻訳できませんでした"
           }
         }
       }
