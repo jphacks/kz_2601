@@ -134,6 +134,9 @@ struct MetamonApp: App {
                 }
             }
             .animation(.easeInOut(duration: 0.3), value: session.user == nil)
+            #if METAMON_STG
+            .overlay(alignment: .bottomLeading) { DebugAuthSlotBadge() } // #2084 試験用の枠で動いている時だけ
+            #endif
             .modifier(SplashOverlay(mode: splashMode)) // 下の起動処理は待たずに進む
             .modifier(UpdateGateModifier(gate: updateGate))
             #if METAMON_STG
