@@ -49,14 +49,11 @@ object DragOut {
         }.getOrNull()
     }
 
-    /** Windows で使えない名前(拡張子の前が CON・PRN・AUX・NUL・COM0〜9・LPT0〜9)。 */
-    private val RESERVED = Regex("(?i)(CON|PRN|AUX|NUL|COM\\d|LPT\\d)")
-
     /** ファイル名に使えない文字(Windows の \ / : * ? " < > | と制御文字)を _ に。予約された名前は頭に _。空なら [fallback]。 */
     fun fileName(title: String, fallback: String): String {
         val s = title.map { if (it in "\\/:*?\"<>|" || it.isISOControl()) '_' else it }.joinToString("").trim().trimEnd('.').take(80)
         val name = s.ifEmpty { fallback }
-        return if (RESERVED.matches(name.substringBefore('.').trimEnd())) "_$name" else name
+        return FileNames.guard(name)
     }
 
     /** 引き出したファイルを書く場所。 */

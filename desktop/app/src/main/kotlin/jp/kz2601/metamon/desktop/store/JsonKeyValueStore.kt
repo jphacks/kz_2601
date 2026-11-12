@@ -95,7 +95,7 @@ class JsonKeyValueStore(private val file: File?) : KeyValueStore {
 }
 
 /**
- * 一時ファイルに書いてから置き換える(書く途中で落ちても前の中身が残る)。
+ * 一時ファイル(同じフォルダ・毎回別の名前)に書いてから置き換える(書く途中で落ちても前の中身が残る)。
  * - 置き換える前に一時ファイルを disk まで書き切る(`force`。電源断で中身が空のファイルに置き換わらない)
  * - Windows はウイルス対策・検索の索引が開いている間 [AccessDeniedException] で置き換えられないので、少し待って [MOVE_RETRIES] 回まで試し直す
  */
@@ -105,22 +105,28 @@ internal fun writeAtomically(
     move: (Path, Path) -> Unit = { from, to -> Files.move(from, to, StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE) },
     pause: (Long) -> Unit = Thread::sleep,
 ) {
-    file.parentFile?.mkdirs()
-    val tmp = File(file.parentFile, "${file.name}.tmp")
-    FileOutputStream(tmp).use { out ->
-        out.write(text.toByteArray(Charsets.UTF_8))
-        out.channel.force(true)
-    }
-    var attempt = 0
-    while (true) {
-        try {
-            move(tmp.toPath(), file.toPath())
-            return
-        } catch (e: AccessDeniedException) {
-            if (attempt >= MOVE_RETRIES) throw e
-            attempt++
-            pause(MOVE_BACKOFF_MILLIS * attempt)
+    val dir = (file.absoluteFile.parentFile ?: File(".")).apply { mkdirs() }
+    // 一時ファイルは毎回別の名前(同時に 2 つ書いても同じ一時ファイルを取り合わない)。置き換えのため同じフォルダに
+    val tmp = Files.createTempFile(dir.toPath(), "${file.name}.", ".tmp").toFile()
+    try {
+        FileOutputStream(tmp).use { out ->
+            out.write(text.toByteArray(Charsets.UTF_8))
+            out.channel.force(true)
         }
+        var attempt = 0
+        while (true) {
+            try {
+                move(tmp.toPath(), file.toPath())
+                return
+            } catch (e: AccessDeniedException) {
+                if (attempt >= MOVE_RETRIES) throw e
+                attempt++
+                pause(MOVE_BACKOFF_MILLIS * attempt)
+            }
+        }
+    } finally {
+        // 置き換えられなかった一時ファイルを残さない(置き換えた後は無い)
+        tmp.delete()
     }
 }
 

@@ -85,15 +85,16 @@ class DesktopIo(dsl: AppDSL, private val read: () -> MockStore, private val upda
         val entity = entity(c.entity) ?: return run { notice = Strings["desktop_io_no_import_target"] }
         val accept = c.accept.ifEmpty { listOf(Accept.CSV) }
         when (FileKind.of(file.name)) {
-            FileKind.CSV -> if (Accept.CSV in accept) importCsv(file.readBytes(), entity, c, c.label ?: file.name) else notice = Strings["desktop_io_unsupported_file"]
+            FileKind.CSV -> if (Accept.CSV in accept) importCsvFile(file, entity, c, c.label ?: file.name) else notice = Strings["desktop_io_unsupported_file"]
             FileKind.TEXT -> if (Accept.TEXT in accept) {
-                if (file.length() > RecordImport.MAX_TEXT_BYTES) return run { notice = Strings["desktop_io_file_too_large"] }
+                if (tooLarge(file, RecordImport.MAX_TEXT_BYTES)) return run { notice = Strings["desktop_io_file_too_large"] }
                 val text = RecordImport.plainText(file.readBytes()) ?: return run { notice = Strings["desktop_io_unreadable_encoding"] }
                 addBody(text, file.name, entity, c)
             } else {
                 notice = Strings["desktop_io_unsupported_file"]
             }
             FileKind.PDF -> if (Accept.PDF in accept) {
+                if (tooLarge(file, RecordImport.MAX_PDF_BYTES)) return run { notice = Strings["desktop_io_file_too_large"] }
                 when (val r = PdfIo.text(file.readBytes())) {
                     is PdfIo.TextResult.Text -> addBody(r.text, file.name, entity, c)
                     PdfIo.TextResult.Locked -> notice = Strings["desktop_io_pdf_locked"]
@@ -113,6 +114,12 @@ class DesktopIo(dsl: AppDSL, private val read: () -> MockStore, private val upda
         val body = RecordImport.bodyRecord(text, name, entity, field) ?: return run { notice = Strings["desktop_io_no_import_field"] }
         update(RecordIo.apply(read(), entity.id, listOf(body.data)))
         notice = Strings[if (body.truncated) "desktop_io_imported_truncated" else "desktop_io_imported"]
+    }
+
+    /** CSV のファイル。大きすぎる物は読む前に断る(全部をメモリに読まない)。 */
+    fun importCsvFile(file: File, entity: Entity, c: Component?, label: String) {
+        if (tooLarge(file, RecordImport.MAX_TEXT_BYTES)) return run { notice = Strings["desktop_io_file_too_large"] }
+        importCsv(file.readBytes(), entity, c, label)
     }
 
     fun importCsv(bytes: ByteArray, entity: Entity, c: Component?, label: String) {
@@ -236,7 +243,7 @@ class DesktopIo(dsl: AppDSL, private val read: () -> MockStore, private val upda
             val list = all.firstOrNull { it.type == ComponentType.LIST && it.entity != null }
             val entity = entity(list?.entity)
             if (kind == FileKind.CSV && entity != null) {
-                importCsv(f.readBytes(), entity, null, f.name)
+                importCsvFile(f, entity, null, f.name)
                 used = true
             }
         }
@@ -245,6 +252,9 @@ class DesktopIo(dsl: AppDSL, private val read: () -> MockStore, private val upda
     }
 
     companion object {
+        /** 読む前の大きさの確かめ(`length()` は読まずに分かる)。 */
+        internal fun tooLarge(file: File, max: Int): Boolean = file.length() > max
+
         fun files(t: Transferable): List<File>? =
             if (t.isDataFlavorSupported(DataFlavor.javaFileListFlavor)) {
                 runCatching { (t.getTransferData(DataFlavor.javaFileListFlavor) as List<*>).filterIsInstance<File>() }.getOrNull()?.takeIf { it.isNotEmpty() }

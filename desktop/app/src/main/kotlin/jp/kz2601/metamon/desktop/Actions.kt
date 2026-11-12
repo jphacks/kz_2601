@@ -2,6 +2,7 @@ package jp.kz2601.metamon.desktop
 
 import jp.kz2601.metamon.desktop.i18n.Strings
 import androidx.compose.runtime.snapshots.Snapshot
+import jp.kz2601.metamon.desktop.io.FileNames
 import jp.kz2601.metamon.desktop.io.PdfIo
 import jp.kz2601.metamon.desktop.io.RecordIo
 import jp.kz2601.metamon.desktop.io.Tsv
@@ -59,6 +60,8 @@ class DesktopActionHost(
     private val books: BookLookupClient = BookLookupClient.fromEnv(),
     private val exportDir: File = defaultExportDir(),
     private val notifier: Notifier = Notifier.Tray,
+    /** 重い書き出し(PDF の頁を描く)を画面のスレッドの外で。 */
+    private val background: (() -> Unit) -> Unit = { thread(isDaemon = true, name = "export") { it() } },
 ) : ActionHost {
     override fun request(action: Action, ctx: ActionContext, session: DesktopSession): String? = when (action.type) {
         ActionType.OPEN_URL -> openUrl(action.url)
@@ -91,11 +94,9 @@ class DesktopActionHost(
         return when (val r = CalendarEventPlan.build(request, entity, data)) {
             is CalendarEventPlan.Result.NoStart -> Strings.format("host_calendar_no_start", r.fieldName)
             is CalendarEventPlan.Result.Success -> {
-                val file = exportDir.resolve(RecordExport.fileName(r.draft.title, "ics"))
-                runCatching {
-                    exportDir.mkdirs()
-                    file.writeText(Ics.event(r.draft, uid = "${entity.id}-${ctx.currentRecordId ?: "new"}@tailorit"))
-                }.getOrElse { return Strings["desktop_calendar_write_failed"] }
+                val text = Ics.event(r.draft, uid = "${entity.id}-${ctx.currentRecordId ?: "new"}@tailorit")
+                val file = runCatching { writeNew(RecordExport.fileName(r.draft.title, "ics"), text.toByteArray(Charsets.UTF_8)) }
+                    .getOrElse { return Strings["desktop_calendar_write_failed"] }
                 val opened = runCatching { Desktop.getDesktop().open(file); true }.getOrDefault(false)
                 if (opened) Strings.format("desktop_calendar_opened", file.name) else Strings.format("desktop_calendar_written", file.absolutePath)
             }
@@ -129,6 +130,7 @@ class DesktopActionHost(
     /**
      * 表は io/RecordIo(ref は名前・古い順)、PDF は io/PdfIo(#1856)。format が pdf なら PDF、他は CSV(iOS と同じ形)。
      * ファイルはダウンロードに書き、同じ表を表計算に貼れる TSV でクリップボードにも入れる(一覧の「表をコピー」と同じ形)。
+     * 同じ名前のファイルがあれば上書きせず `名前 (2).csv` に。PDF は頁を描くので [background] で書き、終わったら一言を出し直す。
      */
     private fun export(action: Action, ctx: ActionContext, session: DesktopSession): String? {
         val entity = session.entityModel(action.entity ?: ctx.form?.entity?.id) ?: return Strings["host_export_no_entity"]
@@ -138,14 +140,31 @@ class DesktopActionHost(
         val date = java.time.LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyy/MM/dd HH:mm"))
         val table = RecordIo.exportTable(title, entity, session.store, session.models, action.fields, listOf(Strings.format("host_export_date", date), Strings.format("host_export_count", count)))
         val pdf = action.format == ActionFormat.PDF
-        val file = exportDir.resolve(RecordExport.fileName(title, if (pdf) "pdf" else "csv"))
-        runCatching {
-            exportDir.mkdirs()
-            file.writeBytes(if (pdf) PdfIo.data(table) else RecordIo.csv(table))
-        }.getOrElse { return Strings["host_export_failed"] }
+        val name = RecordExport.fileName(title, if (pdf) "pdf" else "csv")
         val copied = !GraphicsEnvironment.isHeadless() &&
             runCatching { Toolkit.getDefaultToolkit().systemClipboard.setContents(StringSelection(Tsv.string(table)), null) }.isSuccess
-        return Strings.format("desktop_export_done", count, file.absolutePath) + if (copied) Strings["desktop_export_clipboard"] else ""
+        fun done(file: File) = Strings.format("desktop_export_done", count, file.absolutePath) + if (copied) Strings["desktop_export_clipboard"] else ""
+        if (!pdf) {
+            val file = runCatching { writeNew(name, RecordIo.csv(table)) }.getOrElse { return Strings["host_export_failed"] }
+            return done(file)
+        }
+        background {
+            val msg = runCatching { done(writeNew(name, PdfIo.data(table))) }.getOrElse { Strings["host_export_failed"] }
+            Snapshot.withMutableSnapshot { session.message = msg }
+        }
+        return Strings["desktop_export_writing"]
+    }
+
+    /** [exportDir] に空いている名前で書く(既存のファイルは上書きしない・Windows の予約名は頭に `_`)。書けなければ作った空のファイルを消す。 */
+    private fun writeNew(name: String, bytes: ByteArray): File {
+        val file = FileNames.createFree(exportDir, name)
+        try {
+            file.writeBytes(bytes)
+        } catch (e: Exception) {
+            file.delete()
+            throw e
+        }
+        return file
     }
 
     companion object {

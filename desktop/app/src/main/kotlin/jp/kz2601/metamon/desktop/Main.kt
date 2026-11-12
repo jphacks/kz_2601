@@ -43,8 +43,15 @@ import javax.swing.SwingUtilities
  * 引数が無ければ最後に開いたアプリ。記録は端末に残す(SessionPersistence)。端末の記録は裏で読み、読み終えるまでスケルトンを出す。
  * ウィンドウはアプリごとに 1 枚、記録の詳細も別の 1 枚で開ける(#1763・Windows.kt)。同じアプリのウィンドウは記録を共有する。
  * ウィンドウの大きさ・位置は種類(アプリ / 詳細)ごとに覚えて次の起動で戻す。トレイ / メニューバーに常駐する(Tray.kt)。サインインはまだ無い(モック)。
+ * 同じ保存先ではプロセスを 1 つだけ起動する(SingleInstance.kt)。
  */
-fun main(args: Array<String>) = application {
+fun main(args: Array<String>) {
+    // 同じ保存先で 2 つ目は起動しない(#1754 の JSON を 2 つのプロセスで書き合わない)
+    if (!SingleInstance.claim()) return SingleInstance.reportRunning()
+    runApp(args)
+}
+
+private fun runApp(args: Array<String>) = application {
     // 端末の保存(#1887): 記録・設定は再起動しても残る。最後に開いたアプリから開く
     val desktopStore = remember { DesktopStore.open() }
     val first = remember {
