@@ -2,6 +2,8 @@
 
 Compose Multiplatform Desktop(JVM)で作る Windows・Linux 版。DSL の読み込み・式・レコードの規則は Android と同じ `android/dsl`(純 Kotlin)をそのまま使う。Android SDK は要らない。
 
+部品・アクションごとの対応(描ける / 代わり / 使えません / 未定): [docs/desktop/support-matrix.md](../docs/desktop/support-matrix.md)
+
 ## 目次
 
 - [動かす](#動かす)
@@ -42,6 +44,8 @@ stg の appconfig を手元で試す(サインインが入るまでの確かめ�
 TAILORIT_API=stg TAILORIT_DEV_TOKEN=<Firebase の ID トークン> ./gradlew :desktop:listApps
 ```
 
+Firebase Auth の REST クライアント(`auth/FirebaseAuthRestClient.kt`・まだ画面にはつながない)の API キーは `TAILORIT_FIREBASE_API_KEY` から読む(Firebase コンソールのプロジェクト設定 > 全般の「ウェブ API キー」。リポジトリ・ファイルには書かない)。`TAILORIT_IDENTITY_TOOLKIT_URL`・`TAILORIT_SECURE_TOKEN_URL` で接続先を差し替えられる(Auth エミュレーターなど)。
+
 ## 環境変数と JVM の引数
 
 コードが読む切り替えの一覧(`System.getenv`・`System.getProperty` と、それに渡す `env[...]` から集めた)。同じ意味の環境変数と `-D` の両方がある時は `-D` が勝つ。値の例にトークンは書かない。
@@ -60,8 +64,11 @@ TAILORIT_API=stg TAILORIT_DEV_TOKEN=<Firebase の ID トークン> ./gradlew :de
 | `TAILORIT_API_BASE` | 無し(モックの本) | lookupBook の送り先(`POST /v1/lookup/book`)。このホストの画像は押さずに読む | 効く |
 | `TAILORIT_APPCONFIG_URL` | stg の appconfig | `TAILORIT_API=stg` の時の接続先 | 効く |
 | `TAILORIT_DEV_TOKEN` | 無し | サインインが入るまでの Firebase の ID トークン。ファイルに書かない | 効く |
+| `TAILORIT_FIREBASE_API_KEY` | 無し(サインインしない) | Firebase Auth の REST クライアントの Web API キー(Firebase コンソールのプロジェクト設定 > 全般)。ファイルに書かない | 効く |
+| `TAILORIT_IDENTITY_TOOLKIT_URL` | Google の Identity Toolkit | Firebase Auth のサインインの接続先を差し替える(Auth エミュレーターなど) | 効く |
 | `TAILORIT_LANG` | OS の言語 | `ja` で始まれば日本語、それ以外は英語(`-Dtailorit.lang` が勝つ) | 効く |
 | `TAILORIT_MEDIA_HOSTS` | 無し | 押さずに読んでよい画像のホスト(カンマ区切り)。appconfig・`TAILORIT_API_BASE` のホストに足す | 効く |
+| `TAILORIT_SECURE_TOKEN_URL` | Google の Secure Token | Firebase Auth のトークン更新の接続先を差し替える(Auth エミュレーターなど) | 効く |
 | `TAILORIT_THEME` | OS に従う | `light` / `dark` で固定(`-Dtailorit.theme` が勝つ) | 効く |
 | `TAILORIT_VOICE` | off | `1` / `true` / `on` / `yes` で音声入力を使う(`-Dtailorit.voice` が勝つ) | 効く |
 | `TAILORIT_WHISPER_LIB` | 無し | whisper.cpp のライブラリのファイル(`-Dtailorit.whisper.lib` が勝つ) | 効く |
