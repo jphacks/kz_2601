@@ -239,7 +239,7 @@ provider ごとに「無料 / 有料」と原価の単位を**サーバーの表
 | 23 | ExchangeRate-API | 為替 | 無料と有料(どちらも商用可) | 鍵だけ | **データを再配布しない・API として出さない**(アプリの中で表示するだけ)・取引に使わない | 済 | [Terms](https://www.exchangerate-api.com/terms) |
 | 24 | Google Photos Picker API | 写真 | 無料 | 要る。**2025-03-31 に Library API の読む scope が無くなり**、利用者の写真は Picker で選んだものだけ | Photos API の利用者データのポリシー | 一部 | [Updates](https://developers.google.com/photos/support/updates) |
 | 25 | Unsplash API | 写真 | 無料(本番は承認の後に 1 時間 1,000 回) | 鍵だけ | 画像は返った URL を直接使う・撮影者と Unsplash の表示・ダウンロードの報告 | 済 | [API Terms](https://unsplash.com/api-terms) |
-| 26 | Strava API | 運動の記録 | 無料 | 要る | **[×課金]** 寄り: データは本人にだけ見せる・**AI / 機械学習に使うことを禁じる**(アプリの中の AI と組めない)・Strava の機能を真似ない | 一部 | [API Agreement](https://www.strava.com/legal/api) |
+| 26 | Strava API | 運動の記録 | 無料 | 要る | **入れない**(#1670)。**[×課金]** 寄り: データは本人にだけ見せる(共有のアプリと合わない)・**AI / 機械学習に使うことを禁じる**(アプリの中の AI と組めない)・Strava の機能を真似ない。代わりの道は [features/external-apis.md「作れないもの・代わりの道」](../backend/features/external-apis.md#作れないもの代わりの道) | 一部 | [API Agreement](https://www.strava.com/legal/api) |
 | 27 | Google Fit / Fitbit Web API | 運動の記録 | — | — | **入れない**。Google Fit の API は 2026 年末で終わり、古い Fitbit Web API は 2026-10 末に止まる予定(後継は Google Health API) | 一部 | [Fitbit の告知](https://dev.fitbit.com/blog/)・[Fit の移行 FAQ](https://developer.android.com/health-and-fitness/health-connect/migration/fit/faq) |
 
 ### 規約で課金できない・商用が縛られるもの
@@ -251,7 +251,7 @@ provider ごとに「無料 / 有料」と原価の単位を**サーバーの表
 | NewsAPI.org | 無料の版は本番で使えない。有料にしても記事の本文の権利があるので、最初は入れない(ニュースは #348 の RSS の許可リストで) |
 | Open-Meteo | 無料の版は使えない(#348 と同じ)。天気は気象庁と OpenWeatherMap |
 | 国立国会図書館サーチ | 申請が通るまで入れない |
-| Strava | AI に使えない・本人にだけ見せる決まりが共有アプリと合わない。入れない |
+| Strava | AI に使えない・本人にだけ見せる決まりが共有アプリと合わない。入れない(#1670)。代わりに Strava がヘルスケア / Health Connect に書いたワークアウトを端末から読む道を案内する。規約が変わったら見直す |
 | ExchangeRate-API・Edamam・Spoonacular | 商用は可だが、再配布・キャッシュの縛りが強い。為替は Frankfurter を先に |
 | DeepL | 無料の版は使わない(Pro だけ) |
 
