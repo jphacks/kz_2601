@@ -44,19 +44,23 @@ sealed interface TrayItem {
     data class OpenApp(val appId: String, val label: String) : TrayItem
 }
 
-enum class TrayCommand { OPEN, QUICK_RECORD, VOICE, CLOSE_TO_TRAY, QUIT }
+enum class TrayCommand { OPEN, QUICK_RECORD, VOICE, CLOSE_TO_TRAY, OPEN_AT_LOGIN, QUIT }
 
 /** 走っている(または止めてある)timerDisplay 1 つ。seconds は countdown なら残り、他は経過。 */
 data class TimerStatus(val key: String, val name: String, val seconds: Int, val countdown: Boolean, val running: Boolean)
 
 object TrayMenu {
-    /** [apps] は「新しいウィンドウ」に並べる同梱のアプリ(id, 名前)。空なら出さない。 */
+    /**
+     * [apps] は「新しいウィンドウ」に並べる同梱のアプリ(id, 名前)。空なら出さない。
+     * [openAtLogin] は「ログイン時に開く」の今の状態。null(この OS・この動かし方では使えない)なら出さない。
+     */
     fun items(
         appName: String,
         canQuickRecord: Boolean,
         timers: List<TimerStatus>,
         closeToTray: Boolean,
         apps: List<Pair<String, String>> = emptyList(),
+        openAtLogin: Boolean? = null,
     ): List<TrayItem> = buildList {
         add(TrayItem.Command(TrayCommand.OPEN, Strings.format("desktop_tray_open", appName)))
         add(TrayItem.Command(TrayCommand.QUICK_RECORD, Strings["desktop_tray_quick_record"], enabled = canQuickRecord))
@@ -69,6 +73,7 @@ object TrayMenu {
         }
         add(TrayItem.Separator)
         add(TrayItem.Toggle(TrayCommand.CLOSE_TO_TRAY, Strings["desktop_tray_close_to_tray"], closeToTray))
+        if (openAtLogin != null) add(TrayItem.Toggle(TrayCommand.OPEN_AT_LOGIN, Strings["desktop_tray_open_at_login"], openAtLogin))
         add(TrayItem.Command(TrayCommand.QUIT, Strings["desktop_tray_quit"]))
     }
 
@@ -142,7 +147,25 @@ class TrayController(
     private val hintSetting: BoolSetting = PrefsBoolSetting("trayHintShown", false),
     /** 「新しいウィンドウ」に並べるアプリ(id, 名前)。 */
     val apps: List<Pair<String, String>> = emptyList(),
+    /** ログイン時に開く口。null(使えない)ならトレイに出さない。 */
+    private val loginItem: LoginItem? = null,
 ) {
+    /** 「ログイン時に開く」の状態。OS 側から読む(起動時と切り替えた後)。null は使えない。 */
+    var openAtLogin: Boolean? by mutableStateOf(readOpenAtLogin())
+        private set
+
+    private fun readOpenAtLogin(): Boolean? = loginItem?.let { runCatching { it.isEnabled() }.getOrDefault(false) }
+
+    /** 切り替える。失敗したら知らせ、どちらでも OS 側の今の状態に合わせる。 */
+    fun updateOpenAtLogin(on: Boolean, notify: (String, String) -> Unit = Notifier.Tray::notify) {
+        val item = loginItem ?: return
+        runCatching { item.setEnabled(on) }.onFailure {
+            System.err.println("[TailorIt] open at login: ${if (on) "enable" else "disable"} failed $it")
+            notify(Strings.format("desktop_window_title", dsl.app.name), Strings["desktop_tray_open_at_login_failed"])
+        }
+        openAtLogin = readOpenAtLogin()
+    }
+
     /** 今前にあるウィンドウのアプリ(名前・すぐ記録の行き先)。 */
     var dsl: AppDSL by mutableStateOf(dsl)
         private set
@@ -231,11 +254,15 @@ class TrayController(
             }
         }
 
-    fun items(timers: List<TimerStatus>): List<TrayItem> = TrayMenu.items(dsl.app.name, quickRecordAction != null, timers, closeToTray, apps)
+    fun items(timers: List<TimerStatus>): List<TrayItem> = TrayMenu.items(dsl.app.name, quickRecordAction != null, timers, closeToTray, apps, openAtLogin)
 
     companion object {
-        fun create(dsl: AppDSL): TrayController =
-            TrayController(dsl, runCatching { isTraySupported }.getOrDefault(false), apps = BundledApps.all())
+        fun create(dsl: AppDSL): TrayController {
+            val traySupported = runCatching { isTraySupported }.getOrDefault(false)
+            // トレイが無いとメニューから切り替えられないので出さない
+            val loginItem = if (traySupported) Autostart.forCurrentOs() else null
+            return TrayController(dsl, traySupported, apps = BundledApps.all(), loginItem = loginItem)
+        }
     }
 }
 
@@ -275,7 +302,12 @@ private fun MenuScope.TrayItems(c: TrayController, items: List<TrayItem>, quit: 
                     else -> Unit
                 }
             }
-            is TrayItem.Toggle -> CheckboxItem(item.label, item.checked) { c.updateCloseToTray(it) }
+            is TrayItem.Toggle -> CheckboxItem(item.label, item.checked) {
+                when (item.command) {
+                    TrayCommand.OPEN_AT_LOGIN -> c.updateOpenAtLogin(it)
+                    else -> c.updateCloseToTray(it)
+                }
+            }
             is TrayItem.Info -> Item(item.label, enabled = false) {}
             TrayItem.Separator -> Separator()
             is TrayItem.Submenu -> Menu(item.label) { TrayItems(c, item.items, quit) }
