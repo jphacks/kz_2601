@@ -33,6 +33,8 @@ struct MetamonMacApp: App {
         // UI テスト・手元の確認用(DEBUG のみ・iOS と同じ環境変数): METAMON_AI_CONSENT / METAMON_TUTORIAL / METAMON_BETA_WELCOME(#971)
         AIConsentDebug.applyLaunchOverride()
         FirstRunTutorialStore.shared.applyLaunchOverride()
+        // 起動時の画面の順番(#1885・iOS と同じ): 同意・チュートリアルを出すなら、閉じるまでシェアリンク・Intent を待たせる
+        MacOnboarding.beginLaunchHold()
         #if !APP_STORE_REVIEW
         BetaWelcomeStore.shared.applyLaunchOverride()
         MacAIButtonMetrics.install() // 前の日までの AI ボタンの集計を、起動・前面に戻った時に送る(#446・#1327)

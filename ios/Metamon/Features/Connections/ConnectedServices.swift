@@ -18,7 +18,7 @@ enum ConnectedServicesPolicy {
 /// generate に送る `ClientCapabilities.supportedFeatures` とは別(外を呼ぶ DSL の部品はまだ無い)。
 enum ConnectedServicesFeatures {
     /// この画面で扱える provider(OAuth の要るもの)
-    static let providers = ["googleCalendar", "todoist", "outlookCalendar", "notion"]
+    static let providers = ["googleCalendar", "todoist", "outlookCalendar", "notion", "googleTasks", "github", "linear", "asana"]
 
     static var current: [String] {
         #if APP_STORE_REVIEW
@@ -35,6 +35,42 @@ enum ConnectedServicesFeatures {
         if reviewBuild { return [] }
         return (providers + (debug ? ["fakeOauth"] : [])).map { "externalCall.\($0)" }
     }
+}
+
+/// provider の端末側の名前とアイコン。名前はサーバーの `nameJa`/`nameEn` を優先し、無い時だけ使う。
+enum ConnectedServiceCatalog {
+    private static let names: [String: (ja: String, en: String)] = [
+        "asana": ("Asana", "Asana"),
+        "github": ("GitHub", "GitHub"),
+        "googleCalendar": ("Google カレンダー", "Google Calendar"),
+        "googleTasks": ("Google ToDo リスト", "Google Tasks"),
+        "linear": ("Linear", "Linear"),
+        "notion": ("Notion", "Notion"),
+        "outlookCalendar": ("Outlook カレンダー", "Outlook Calendar"),
+        "todoist": ("Todoist", "Todoist"),
+    ]
+
+    private static let symbols: [String: String] = [
+        "asana": "circle.hexagongrid",
+        "github": "chevron.left.forwardslash.chevron.right",
+        "googleCalendar": "calendar",
+        "googleTasks": "checklist",
+        "linear": "list.bullet.rectangle",
+        "notion": "doc.text",
+        "outlookCalendar": "calendar",
+        "todoist": "checklist",
+    ]
+
+    /// 知らない provider のアイコン
+    static let fallbackSymbol = "link"
+
+    /// 知らない provider は id のまま
+    static func name(_ id: String, english: Bool) -> String {
+        guard let n = names[id] else { return id }
+        return english ? n.en : n.ja
+    }
+
+    static func symbol(_ id: String) -> String { symbols[id] ?? fallbackSymbol }
 }
 
 #if !APP_STORE_REVIEW
@@ -77,17 +113,19 @@ enum ConnectedServicesState: Equatable {
         }
     }
 
+    /// provider の表示名。サーバーの `nameJa`/`nameEn` → 端末の名前 → id の順(#2001 のつなぐ案内でも使う)
+    static func name(_ provider: ExtProvider?, id: String, english: Bool) -> String {
+        let n = provider.map { english ? $0.nameEn : $0.nameJa } ?? ""
+        return n.isEmpty ? ConnectedServiceCatalog.name(id, english: english) : n
+    }
+
     /// つないだもの(サーバーの providers の順 → 知らないもの)の後に、まだつないでいない provider。
     /// `providers` が無い古いサーバーでは、つないだものだけ出す。
     static func rows(_ list: ExtConnectionList, english: Bool) -> [ConnectedServiceRow] {
         let providers = list.providers ?? []
         let byId = Dictionary(providers.map { ($0.id, $0) }, uniquingKeysWith: { a, _ in a })
         let order = providers.map(\.id)
-        func name(_ id: String) -> String {
-            guard let p = byId[id] else { return id }
-            let n = english ? p.nameEn : p.nameJa
-            return n.isEmpty ? id : n
-        }
+        func name(_ id: String) -> String { Self.name(byId[id], id: id, english: english) }
         // 古いサーバーは enabled を知らせないので、つないだものはつなぎ直せる扱い
         func enabled(_ id: String) -> Bool { byId[id]?.enabled ?? (list.providers == nil) }
         func rank(_ id: String) -> Int { order.firstIndex(of: id) ?? order.count }
@@ -135,6 +173,8 @@ enum ConnectCallback: Equatable {
 @Observable
 final class ConnectedServicesModel {
     private(set) var state: ConnectedServicesState = .loading
+    /// 直前の一覧に `providers` があったか(無いのは古いサーバー)。`.loaded` の時だけ意味がある
+    private(set) var providersKnown = false
     /// 操作中の provider(ボタンを止める)
     private(set) var busy: String?
     /// 直前の操作の失敗(セクションの下に出す)
@@ -145,8 +185,12 @@ final class ConnectedServicesModel {
 
     func load(_ client: any ExternalServicesClient) async {
         do {
-            state = .from(.success(try await client.connections(supportedFeatures: ConnectedServicesFeatures.current)))
+            let list = try await client.connections(supportedFeatures: ConnectedServicesFeatures.current)
+            providersKnown = list.providers != nil
+            state = .from(.success(list))
         } catch is CancellationError {
+            // 読み込み中のまま止まらないように。もう読めた一覧は上書きしない(画面に戻れば .task が読み直す)
+            if state == .loading { state = .failed(L10n.tr("一覧を読み込めませんでした。")) }
         } catch {
             state = .from(.failure(error))
         }

@@ -14,6 +14,24 @@ extension AppRuntime {
         showTutorial = true
     }
 
+    /// 起動時のチュートリアルの段(`LaunchConsentHold.Step.tutorial`)。スプラッシュ → 同意の画面が閉じきってから、
+    /// 閉じるアニメーションの分だけ待って出す。出さない(見た・同意の説明が済んでいない)・取り消された時はすぐ次の段へ。
+    /// 出した時は `tutorialDismissed()`(閉じきった時)で次の段へ進む。
+    func runLaunchTutorialStep(hold: LaunchConsentHold = .shared, splash: SplashPresence = .shared,
+                               settle: Duration = .milliseconds(700)) async {
+        await splash.waitUntilHidden()
+        await hold.waitUntilReleased(before: .tutorial)
+        try? await Task.sleep(for: settle)
+        guard !Task.isCancelled else { hold.end(.tutorial); return }
+        presentTutorialIfNeeded()
+        if !showTutorial { hold.end(.tutorial) }
+    }
+
+    /// チュートリアルが閉じきった時(`TutorialHost` の onDismiss)。待たせていたシェアリンク・Intent を出す。
+    func tutorialDismissed(hold: LaunchConsentHold = .shared) {
+        hold.end(.tutorial)
+    }
+
     /// 設定の「使い方を見る」。シートを閉じきってから出す(シートの同時表示は SwiftUI が無視する)。
     func replayTutorial() {
         showVoiceSheet = false

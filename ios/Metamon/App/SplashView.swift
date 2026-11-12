@@ -182,21 +182,24 @@ struct SplashView: View {
             return
         }
         // 最初のコマが描かれ、メインスレッドが空いてから縫い始める(起動処理で詰まったまま始めると縫う所が飛ぶ)
-        if await SplashStartWaiter.wait() == .fallback {
+        let start = await SplashStartWaiter.wait()
+        if start.decision == .fallback {
             ambience = true; stitch = 1; iconShown = true; wordShown = true; tagShown = true
             await wait(Timing.stillFinish)
             finish()
             return
         }
-        withAnimation(.easeOut(duration: 0.6)) { ambience = true }
-        withAnimation(.easeInOut(duration: Timing.stitch)) { stitch = 1 }
-        await wait(Timing.icon)
-        withAnimation(.spring(duration: 0.7, bounce: 0.28)) { iconShown = true }
-        await wait(Timing.word - Timing.icon)
-        withAnimation(.spring(duration: 0.6, bounce: 0.15)) { wordShown = true }
-        await wait(Timing.tag - Timing.word)
-        withAnimation(.easeOut(duration: 0.45)) { tagShown = true }
-        await wait(Timing.finish - Timing.tag)
+        // 開始を待った分だけ縮める(待つ + アニメ + フェードを 3 秒に収める)
+        let k = SplashStartGate.pace(waited: start.waited, animation: Timing.finish)
+        withAnimation(.easeOut(duration: 0.6 * k)) { ambience = true }
+        withAnimation(.easeInOut(duration: Timing.stitch * k)) { stitch = 1 }
+        await wait(Timing.icon * k)
+        withAnimation(.spring(duration: 0.7 * k, bounce: 0.28)) { iconShown = true }
+        await wait((Timing.word - Timing.icon) * k)
+        withAnimation(.spring(duration: 0.6 * k, bounce: 0.15)) { wordShown = true }
+        await wait((Timing.tag - Timing.word) * k)
+        withAnimation(.easeOut(duration: 0.45 * k)) { tagShown = true }
+        await wait((Timing.finish - Timing.tag) * k)
         finish()
     }
 
@@ -219,7 +222,7 @@ struct SplashOverlay: ViewModifier {
         content.overlay {
             if mode != .hidden {
                 SplashView(mode: mode) {
-                    withAnimation(.easeInOut(duration: mode == .reduced ? 0.2 : 0.3)) { mode = .hidden }
+                    withAnimation(.easeInOut(duration: mode == .reduced ? 0.2 : SplashStartGate.fadeOut)) { mode = .hidden }
                     SplashPresence.shared.end() // 待たせていたシート・リンク・吹き出しを出す
                 }
                 .transition(.opacity)

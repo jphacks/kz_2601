@@ -8,6 +8,13 @@ public struct VersionSummary: Decodable, Sendable, Equatable {
         public var mode: String?
         public var summary: String?
         public var restoredFrom: Int?
+
+        public init(kind: String? = nil, mode: String? = nil, summary: String? = nil, restoredFrom: Int? = nil) {
+            self.kind = kind
+            self.mode = mode
+            self.summary = summary
+            self.restoredFrom = restoredFrom
+        }
     }
 
     public var appId: String?
@@ -36,8 +43,10 @@ public struct AppSummary: Codable, Sendable, Equatable, Identifiable, Hashable {
     public var updatedAt: String?
     /// 変身一覧で自分が並べた位置(1 が先頭・#277)。並べ替えたことが無ければ nil。
     public var sortIndex: Int?
+    /// 一覧のカードに出す数字の部品の id(link-10)。"-" は出さない・nil は初期画面の先頭の stat。iPhone と Mac で同じにするためサーバーに置く。
+    public var glanceStat: String?
 
-    public init(id: String, name: String, currentVersion: Int, status: String = "active", createdAt: String? = nil, updatedAt: String? = nil, sortIndex: Int? = nil) {
+    public init(id: String, name: String, currentVersion: Int, status: String = "active", createdAt: String? = nil, updatedAt: String? = nil, sortIndex: Int? = nil, glanceStat: String? = nil) {
         self.id = id
         self.name = name
         self.currentVersion = currentVersion
@@ -45,6 +54,7 @@ public struct AppSummary: Codable, Sendable, Equatable, Identifiable, Hashable {
         self.createdAt = createdAt
         self.updatedAt = updatedAt
         self.sortIndex = sortIndex
+        self.glanceStat = glanceStat
     }
 
     public var isArchived: Bool { status == "archived" }
@@ -101,6 +111,8 @@ public protocol AppConfigClient: Sendable {
     func duplicateApp(appId: String, name: String) async throws -> AppSummary
     /// `PUT /v1/apps/order`(#277)。並べた順(先頭から)を保存する。
     func reorderApps(ids: [String]) async throws
+    /// `PATCH /v1/apps/{appId}` の `glanceStat`(link-10)。部品の id・"-"(出さない)・""(既定に戻す)。
+    func setAppGlance(appId: String, glanceStat: String) async throws -> AppSummary
     func fetchDocument(appId: String) async throws -> AppDocument
     /// ETag(`If-None-Match: "<version>"`)付き取得。サーバーが同じ version なら nil(304)。ホットリロードのポーリングが使う。
     func fetchDocumentIfChanged(appId: String, currentVersion: Int) async throws -> AppDocument?
@@ -135,6 +147,7 @@ public extension AppConfigClient {
     func renameApp(appId: String, name: String) async throws -> AppSummary { throw AppListEdit.unsupported }
     func duplicateApp(appId: String, name: String) async throws -> AppSummary { throw AppListEdit.unsupported }
     func reorderApps(ids: [String]) async throws { throw AppListEdit.unsupported }
+    func setAppGlance(appId: String, glanceStat: String) async throws -> AppSummary { throw AppListEdit.unsupported }
     /// DSL を書けない実装(古いモック等)。ホストは端末だけで当てる
     func patchDSL(appId: String, baseVersion: Int, patch: [JSONPatchOp], summary: String) async throws -> AppDocument {
         throw APIError.server(status: 501, code: "unsupported", message: "patchDSL is not supported by this client")

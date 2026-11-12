@@ -14,7 +14,7 @@ final class RecordBook {
     private(set) var loading: Set<String> = []
     private(set) var failed: Set<String> = []
     private(set) var records: [String: [Record]] = [:]
-    @ObservationIgnored private var savingForms: Set<ObjectIdentifier> = []
+    @ObservationIgnored private let flight = SaveFlight()
     /// shared / public の entity に新しく作る記録の投稿者(#250・#963)。nil を返す entity(private)・未設定は作者を付けない
     @ObservationIgnored var postAuthor: ((String) -> (uid: String?, name: String?)?)?
     /// 端末に書いた(足す・変える・消す・取り消す)entity。Mac で同じアプリを開いた別のウインドウに知らせる(#1853)
@@ -106,21 +106,58 @@ final class RecordBook {
         case inFlight
         /// 他人の記録。持ち主が `notifyReadOnly` を出す
         case readOnly
+        /// `beforeNew` が止めた(iOS: 共有アプリへの初めての投稿で名前を聞く #250)。持ち主が後でやり直す
+        case held
+    }
+
+    /// 書き込めた 1 件。`afterSave` に渡す
+    struct SavedWrite {
+        let entity: String
+        /// 書いた行の id(新規は仮 id `local-…`)
+        let recordId: String
+        let payload: [String: JSONValue]
+        let isNew: Bool
+    }
+
+    /// 持ち主だけの処理を足す所(iOS のウィジェット・ヘルスケア・期限切れ・名前の確認・断られた時の取り消し)。Mac は使わない
+    struct SaveHooks {
+        /// 新規の書き込みの前。false で書かずに止める(`.held`)
+        var beforeNew: () -> Bool = { true }
+        /// 書き込み・`markSaved` の後(画面を進める前)
+        var afterSave: (SavedWrite) -> Void = { _ in }
+
+        static let none = SaveHooks()
     }
 
     /// saveRecord の書き込み(前段の判定は `RecordActionSteps.saveTarget`)。
     func save(entity: String, form: FormDraft, recordId: String?,
+              author: (uid: String?, name: String?)? = nil, hooks: SaveHooks = .none,
               canEdit: (String, Record) -> Bool) async -> SaveOutcome {
-        if let id = recordId, let current = record(entity, id), !canEdit(entity, current) { return .readOnly }
+        await Self.save(appId: appId, entity: entity, form: form, recordId: recordId, recordSync: recordSync, flight: flight,
+                        author: author ?? (recordId == nil ? postAuthor?(entity) : nil), hooks: hooks, canEdit: canEdit,
+                        current: { self.record(entity, $0) },
+                        store: { self.records[entity] = $0; self.onLocalWrite?(entity) })
+    }
+
+    /// 保存の手順の本体。記録の置き場が違う iOS の `AppRuntime` もこれを使う(#1141)。
+    /// 他人の記録 → 新規の前 → 変更なし → 連打 → 書き込み → `markSaved` → `afterSave` の順。
+    static func save(appId: String, entity: String, form: FormDraft, recordId: String?,
+                     recordSync: RecordSyncEngine, flight: SaveFlight,
+                     author: (uid: String?, name: String?)?, hooks: SaveHooks,
+                     canEdit: (String, Record) -> Bool,
+                     current: (String) -> Record?, store: ([Record]) -> Void) async -> SaveOutcome {
+        if let id = recordId, let record = current(id), !canEdit(entity, record) { return .readOnly } // 送信待ちに積まない(#249)
+        if recordId == nil, !hooks.beforeNew() { return .held }
         guard form.needsWrite else { return .unchanged }
         // 保存ボタンの連打で同じ内容が 2 件できないように
-        guard savingForms.insert(ObjectIdentifier(form)).inserted else { return .inFlight }
-        defer { savingForms.remove(ObjectIdentifier(form)) }
-        let written = await recordSync.write(appId: appId, entity: entity, recordId: recordId, data: form.payload,
-                                             author: recordId == nil ? postAuthor?(entity) : nil)
-        records[entity] = written.records
-        onLocalWrite?(entity)
-        form.markSaved(queuedOffline: !recordSync.isOnline)
+        guard flight.begin(form) else { return .inFlight }
+        defer { flight.end(form) }
+        // 楽観的 UI: ローカル DB に即反映して画面を進める。送信は recordSync のキュー
+        let payload = form.payload
+        let written = await recordSync.write(appId: appId, entity: entity, recordId: recordId, data: payload, author: author)
+        store(written.records)
+        form.markSaved(queuedOffline: !recordSync.isOnline) // 閉じても破棄の確認を出さない・オフラインなら送信待ち(M10)
+        hooks.afterSave(SavedWrite(entity: entity, recordId: written.recordId, payload: payload, isNew: recordId == nil))
         return .saved
     }
 
@@ -140,4 +177,14 @@ final class RecordBook {
         onLocalWrite?(ticket.entity)
         return true
     }
+}
+
+/// 保存中のフォーム(saveRecord の連打で同じ記録を 2 件作らない)。await をまたぐので参照型で持つ
+@MainActor
+final class SaveFlight {
+    private var forms: Set<ObjectIdentifier> = []
+
+    func begin(_ form: FormDraft) -> Bool { forms.insert(ObjectIdentifier(form)).inserted }
+    func end(_ form: FormDraft) { forms.remove(ObjectIdentifier(form)) }
+    func isSaving(_ form: FormDraft) -> Bool { forms.contains(ObjectIdentifier(form)) }
 }

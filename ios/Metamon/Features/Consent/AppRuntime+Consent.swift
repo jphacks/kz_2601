@@ -6,10 +6,12 @@ extension AppRuntime {
     /// 同意済みか(`aiConsent` が無い = テスト等は同意済み扱い)。
     var hasAIConsent: Bool { aiConsent?.isGranted ?? true }
 
-    /// AI に送る直前に呼ぶ。未同意なら同意の画面を出して false(送らない)。
+    /// AI に送る直前に呼ぶ。未同意なら同意の画面を出して false(送らない)。アシスティブアクセスでは画面の代わりに一言。
     func requireAIConsent() -> Bool {
         if hasAIConsent { return true }
         print("[Metamon] AI consent not granted: not sending")
+        // アシスティブアクセス(#1997)では同意の画面を出せない → 一言だけ出して送らない
+        guard assistiveAccess.shows(.aiConsent) else { toast = AssistiveAccessPolicy.unavailableMessage; return false }
         guard showVoiceSheet else { showAIConsent = true; return false }
         // 音声シートを閉じきってから出す(シートの同時表示は SwiftUI が無視する)
         showVoiceSheet = false
@@ -23,6 +25,34 @@ extension AppRuntime {
     func grantAIConsent() {
         aiConsent?.grant()
         showAIConsent = false
+    }
+
+    /// 起動時に同意の画面・チュートリアルを出すなら、閉じるまで後ろ(シェアリンク・Intent)を待たせる(`MetamonApp` の起動時)。
+    func beginLaunchConsentHoldIfNeeded(hold: LaunchConsentHold = .shared) {
+        if aiConsent?.shouldPromptOnLaunch == true { hold.begin(.consent) }
+        if tutorial?.hasSeenTutorial == false { hold.begin(.tutorial) }
+    }
+
+    /// 起動時の同意の画面(`ConsentHost`)。スプラッシュが閉じてから少し待って出す。
+    /// 出さない(済み)・出す前に画面が消えた時は、待たせていたリンク・Intent をすぐ放す。
+    func presentLaunchConsentIfNeeded(hold: LaunchConsentHold = .shared, splash: SplashPresence = .shared,
+                                      delay: Duration = .milliseconds(500)) async {
+        guard aiConsent?.shouldPromptOnLaunch == true else { hold.end(.consent); return }
+        await splash.waitUntilHidden() // スプラッシュの上にシートを重ねない
+        try? await Task.sleep(for: delay)
+        guard !Task.isCancelled else { hold.end(.consent); return }
+        showAIConsent = true
+    }
+
+    /// 同意の画面が閉じきった時(同意・「あとで」どちらでも)。次の段(チュートリアル → リンク・Intent)へ進む。
+    func launchConsentDismissed(hold: LaunchConsentHold = .shared) {
+        hold.end(.consent)
+    }
+
+    /// サインアウトした時(`MetamonApp`)。待たせていた段を全部放す(止まらない)。
+    /// 画面の onDisappear では呼ばない: チュートリアルの全画面が上に重なっただけでも呼ばれ、順番待ちが早く崩れるため。
+    func launchPresentationsAbandoned(hold: LaunchConsentHold = .shared) {
+        hold.endAll()
     }
 
     /// 同意の画面が閉じた時(`ConsentHost`)。同意していれば、同意の前に話した 1 件を送り直す(M2: 話し直さなくてよい)。

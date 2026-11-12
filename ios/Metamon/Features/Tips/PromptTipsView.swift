@@ -39,6 +39,11 @@ struct PromptTipsView: View {
                 } header: {
                     Label(category.title, systemImage: category.symbol)
                         .accessibilityIdentifier("tips.category.\(category.id)")
+                } footer: {
+                    if category.id == "fix" {
+                        Text(PromptTips.fixRequest)
+                            .accessibilityIdentifier("tips.fixRequest")
+                    }
                 }
             }
         }
