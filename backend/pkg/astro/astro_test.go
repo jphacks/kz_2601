@@ -83,13 +83,6 @@ func parseDay(t *testing.T, date, tz string) (int, time.Month, int, *time.Locati
 	return d.Year(), d.Month(), d.Day(), loc
 }
 
-func hhmm(t time.Time) string {
-	if t.IsZero() {
-		return ""
-	}
-	return t.Round(time.Minute).Format("15:04")
-}
-
 // checkTime compares got with the fixture's HH:MM on the same local date.
 func checkTime(t *testing.T, name, want string, got time.Time, tol float64) {
 	t.Helper()
