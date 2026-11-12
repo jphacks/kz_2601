@@ -106,6 +106,7 @@ extension AppRuntime {
             toast = pro.writeMessage
             return
         }
+        guard showsOrToast(.paywall) else { return } // アシスティブアクセス(#1997)
         print("[Metamon] IAP: shared write needs Pro → paywall")
         Task { _ = await proGate.requestPro(.paidFeature(pro.features), closeNote: L10n.tr("閉じると、共有のデータは見るだけになります。")) }
     }

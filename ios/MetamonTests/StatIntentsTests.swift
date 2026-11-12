@@ -97,7 +97,7 @@ final class StatIntentsTests: XCTestCase {
         """
         let d = try JSONDecoder().decode(AppDSL.self, from: Data(json.utf8))
         let c = try XCTUnwrap(StatReading.stats(in: d).first)
-        XCTAssertTrue(AppGlance.isEncrypted(c, in: d))
+        XCTAssertTrue(AppGlance.touchesEncrypted(c, in: d))
         let rows = ["diary": [Record(id: "a", data: ["body": .string("ひみつ")], createdAt: "2026-10-31T01:00:00Z")]]
         let glance = AppGlance.Value(statId: c.id, label: "最新", value: "ひみつ", at: .now, statKey: WidgetSnapshotWriter.statKey(c))
         var readRecords = false

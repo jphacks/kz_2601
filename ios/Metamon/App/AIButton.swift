@@ -92,6 +92,7 @@ struct ModalVoiceFabLayer: ViewModifier {
     @State private var fabFrame: CGRect?
     private let keyboard = KeyboardState.shared
     private let layers = AIButtonLayers.shared
+    @Environment(\.assistiveAccess) private var assistiveAccess
 
     func body(content: Content) -> some View {
         let visible = rt.visibleScreen
@@ -106,7 +107,7 @@ struct ModalVoiceFabLayer: ViewModifier {
                 .onPreferenceChange(GridBottomTrailingObstructionKey.self) { trailingBottomObstructions = $0 }
                 .environment(\.fabFrame, fabFrame)
             ZStack {
-                if entry == .fab {
+                if entry == .fab, assistiveAccess.shows(.aiButton) { // アシスティブアクセス(#1997)では出さない
                     VoiceFab(
                         hasTabs: false, // シートにはタブバーが無い
                         leadingObstructionTop: bottomObstructions[visible.route.id],
