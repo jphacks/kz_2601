@@ -18,6 +18,7 @@ extension AppRuntime {
             if let j = apps.firstIndex(where: { $0.id == app.id }) {
                 apps[j] = saved.withSortIndex(apps[j].sortIndex)
             }
+            await spotlight.sync(apps) // Spotlight の名前も変える(#1996)
         } catch {
             print("[Metamon] renameApp failed: \(error)")
             if let j = apps.firstIndex(where: { $0.id == app.id }) { apps[j].name = before.name }
@@ -32,6 +33,7 @@ extension AppRuntime {
         do {
             let copy = try await services.appConfig.duplicateApp(appId: app.id, name: name)
             apps.append(copy)
+            await spotlight.sync(apps) // #1996
             toast = L10n.pick(L10n.tr("「\(copy.name)」を作りました"), review: L10n.tr("「\(copy.name)」を用意しました"))
             if visibleApps.contains(where: { $0.sortIndex != nil }), let at = order.firstIndex(of: app.id) {
                 var next = order
