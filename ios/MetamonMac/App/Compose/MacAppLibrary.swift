@@ -203,6 +203,17 @@ final class MacAppLibrary {
         return latest.version
     }
 
+    /// 他の端末で進んだ版(#2072・`MacRealtimeSync`)を当てる。サーバーにある作ったアプリで、今より新しい版だけ。履歴には積まない。
+    /// 当てたら true(中央はランタイムごと作り直される)
+    @discardableResult
+    func applyRemoteVersion(_ document: AppDocument) -> Bool {
+        let id = document.appId
+        guard isCreated(id), isOnServer(id), document.version > (generated[id]?.version ?? 0) else { return false }
+        serverRedo[id] = nil
+        applyFromServer(document)
+        return true
+    }
+
     // MARK: - 一覧の整理(#969・iOS の AppRuntime+AppList / +Delete)
 
     /// 名前を変える(作ったアプリだけ)。iOS と同じく版の履歴に積む(「元に戻す」で前の名前に戻せる)。
