@@ -56,6 +56,35 @@ Firebase Auth の REST クライアント(`auth/FirebaseAuthRestClient.kt`・ま
 - ライセンス: F1 の一覧の「サードパーティのライセンス」かコマンドパレットで、このアプリ・依存・同梱物・Java 実行環境のライセンスを出す(`Licenses.kt`)。一覧はビルド時に `app/third-party-licenses.gradle.kts` が runtimeClasspath の POM と jar の NOTICE から作る(本文の正本は `android/scripts/license-texts`)。複数の種類から選べる依存(JNA の LGPL-2.1-or-later / Apache-2.0)は同じファイルの `electedLicenses` で選んだ種類だけを載せる(JNA は Apache-2.0)。Maven を通らない同梱物は `app/licenses/vendored/*.properties` に 1 件 1 ファイルで足す。Java 実行環境の分は起動中の実行環境の `legal/` から読む。
 - まだ描けない部品は「デスクトップ版ではまだ使えない部品」の枠で残す。
 
+### 取り込んでいる android/services のファイル
+
+`:services` は `android/services/src/main/kotlin/jp/kz2601/metamon/services/` のファイルを、`services/build.gradle.kts` の `include` で名指しして同じソースのまま取り込む(`android/` は変えない)。「直接は使わない」は、取り込んだ別のファイルが使うので一緒に入れている物。置き換え(shim)は `services/src/shim/kotlin/` にあり、宣言にだけ出る Android の型の空の代わりで、デスクトップからは呼ばない。
+
+| ファイル | 何に使っているか | 置き換え(shim) |
+|---|---|---|
+| `AppConfigClient.kt` | appconfig の API の口(型)。`net/DesktopApi.kt`・`store/DesktopStore.kt`・`store/SessionPersistence.kt` | 要らない |
+| `AuthService.kt` | 直接は使わない(`http/TokenProvider.kt` が使う) | 要る(`android.app.Activity`) |
+| `CrashReporter.kt` | 直接は使わない(`consent/CrashReportingPreference.kt` が使う) | 要らない |
+| `PlanUsage.kt` | 直接は使わない(`live/HttpAppConfigClient.kt` の `GET /v1/me/usage` が使う) | 要らない |
+| `consent/AiConsentStore.kt` | AI へ送る同意の状態を端末に残す(`store/DesktopStore.kt`) | 要らない |
+| `consent/CrashReportingPreference.kt` | 「クラッシュ報告を送る」の設定を端末に残す(`store/DesktopStore.kt`) | 要らない |
+| `consent/KeyValueStore.kt` | 小さな設定の置き場の型。デスクトップの実装は `store/JsonKeyValueStore.kt` | 要る(`android.content.Context`・`android.content.SharedPreferences`) |
+| `http/ApiError.kt` | 直接は使わない(backend の失敗応答。`http/MetamonHttp.kt` などが使う) | 要らない |
+| `http/ClientInfo.kt` | 全リクエストに付ける版の申告と `X-Client-Platform`(`net/ClientPlatform.kt`・`net/DesktopApi.kt`) | 要らない |
+| `http/ErrorCodes.kt` | 直接は使わない(backend の `error.code`。`http/ApiError.kt` などが使う) | 要らない |
+| `http/FailureKind.kt` | 失敗の種類の分け方(`auth/FirebaseAuthRestClient.kt`) | 要らない |
+| `http/MetamonHttp.kt` | HTTP の口(OkHttp)。`net/DesktopApi.kt`・`auth/FirebaseAuthRestClient.kt` | 要らない |
+| `http/SessionExpirySignal.kt` | 直接は使わない(`http/MetamonHttp.kt` が使う) | 要らない |
+| `http/SseParser.kt` | 使っていない(`http/*.kt` でまとめて入る) | 要らない |
+| `http/TokenProvider.kt` | Bearer の供給(`net/DesktopApi.kt`) | 要らない |
+| `http/WriteDenials.kt` | 直接は使わない(`local/SyncQueue.kt` が使う) | 要らない |
+| `live/HttpAppConfigClient.kt` | appconfig の REST の実装(`net/DesktopApi.kt`) | 要らない |
+| `local/DocumentCache.kt` | 最後に取った DSL を appId ごとに残す(`net/DesktopApi.kt`・`store/DesktopStore.kt`) | 要らない |
+| `local/RecordStore.kt` | 記録の端末の保存(`store/DesktopStore.kt`) | 要らない |
+| `local/SyncQueue.kt` | 保存・削除の送信待ちの列(`store/DesktopStore.kt`・`store/SessionPersistence.kt`) | 要らない |
+
+取り込みを足す・外す PR では、`services/build.gradle.kts` の `include` と同じ PR でこの表にも 1 行足す・消す(名前順)。
+
 ## whisper モジュール(音声入力・#1751)
 
 `:whisper`(`whisper/`)は端末の中で音を文字にする部品。音声入力(`TAILORIT_VOICE=1`)を試す時だけ要る。Kotlin の部分は `android/whisper` のファイルをビルド時に写し(`whisper/build.gradle.kts` の `syncSharedWhisper`)、ライブラリの読み方(`WhisperNative`・`desktop/NativeLibrary.kt`)だけデスクトップの物を使う。
