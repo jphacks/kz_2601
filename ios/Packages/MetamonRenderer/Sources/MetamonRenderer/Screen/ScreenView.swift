@@ -12,6 +12,10 @@ public struct ScreenView: View {
     @State private var locals = ScreenLocals()
     /// 入力のあるフォームを閉じる前の確認(M10)
     @State private var confirmDiscard = false
+    #if os(iOS)
+    /// クリップボードに記録(#1871)が載っているか
+    @State private var pasteboardHasRecord = false
+    #endif
 
     public init(route: Route) { self.route = route }
 
@@ -30,6 +34,14 @@ public struct ScreenView: View {
                     if screen.entity != nil, let accessory = formToolbarAccessory {
                         ToolbarItem(placement: .platformTrailing) { accessory }
                     }
+                    #if os(iOS)
+                    // 記録のコピー・貼り付け(#1871)
+                    if let form, RecordClipboardMenu.isVisible(form: form, record: clipboardRecord(form), hasRecord: pasteboardHasRecord, rt: rt) {
+                        ToolbarItem(placement: .platformTrailing) {
+                            RecordClipboardMenu(form: form, record: clipboardRecord(form), hasRecord: pasteboardHasRecord)
+                        }
+                    }
+                    #endif
                     ToolbarItemGroup(placement: .platformTrailing) {
                         // 同じフォームを開く button がある画面では右上の＋を出さない(#416)
                         ForEach(DuplicateAddControl.toolbar(of: screen, in: rt.dsl).filter { tb in !FormSaveBar.pinned(in: screen).contains { $0.id == tb.id } && ButtonLeaf.isVisible(action: tb.action, form: form) }) { tb in
@@ -70,6 +82,9 @@ public struct ScreenView: View {
                 // M10: シートのフォームに入力があれば、下に払って閉じない(「閉じる」で破棄を確認する)
                 .interactiveDismissDisabled(hasUnsavedInput)
                 .discardFormConfirmation(isPresented: $confirmDiscard) { rt.close(route) }
+                #if os(iOS)
+                .modifier(RecordPasteboardWatcher(hasRecord: $pasteboardHasRecord))
+                #endif
                 .task(id: route) {
                     // 新規フォームは読み込みを待たずに用意する(FormPrefill は数秒で失効するため、通信待ちで落とさない)
                     if route.recordId == nil { setUpForm(screen) } // single(#267)は読み込み後に既存の 1 件へ差し替わる
@@ -83,6 +98,13 @@ public struct ScreenView: View {
             ContentUnavailableView(L("画面がありません: \(route.screen)"), systemImage: "questionmark.square.dashed")
         }
     }
+
+    #if os(iOS)
+    /// フォームの「記録をコピー」で載せる保存済みの記録(新規は nil)。
+    private func clipboardRecord(_ form: FormDraft) -> Record? {
+        form.recordId.flatMap { id in rt.records(for: form.entity.id).first { $0.id == id } }
+    }
+    #endif
 
     /// 戻る・閉じるで入力を失うか(M10)。push された画面も、シート・全画面の中ならシートを払って閉じられる。
     private var hasUnsavedInput: Bool {

@@ -8,7 +8,13 @@ struct ConsentHost: ViewModifier {
     func body(content: Content) -> some View {
         @Bindable var rt = rt
         content
-            .sheet(isPresented: $rt.showAIConsent, onDismiss: { Task { await rt.resumeUtteranceAfterConsent() } }) { AIConsentView() }
+            .sheet(isPresented: $rt.showAIConsent, onDismiss: {
+                rt.launchConsentDismissed() // 次の段へ(同意 → チュートリアル → シェアリンク → Intent)
+                Task { await rt.resumeUtteranceAfterConsent() }
+            }) {
+                AIConsentView()
+                    .onAppear { LaunchConsentHold.shared.markShown(.consent) } // 出た: 閉じるまで時間では放さない
+            }
             .alert(
                 Text("音声モデルをダウンロードしますか？"),
                 isPresented: Binding(get: { rt.canShowModelDownloadConfirm }, // 同意 → チュートリアル(#274)の後
@@ -20,13 +26,10 @@ struct ConsentHost: ViewModifier {
                 Text(Self.downloadMessage(advice: rt.modelDownloadAdvice))
             }
             .task {
+                LaunchConsentHold.shared.hostsAppeared() // 出せない段を時間で放す見張りはここから
                 // 初回起動: まだ説明を出していなければ 1 回だけ出す(「あとで」の人には、生成しようとした時にまた出る)。
                 // 説明の版が上がった時(古い版に同意した人)も、その版で 1 回だけ出し直す(ポリシー 6 章)
-                guard rt.aiConsent?.shouldPromptOnLaunch == true else { return }
-                await SplashPresence.shared.waitUntilHidden() // スプラッシュの上にシートを重ねない
-                try? await Task.sleep(for: .milliseconds(500))
-                guard !Task.isCancelled else { return }
-                rt.showAIConsent = true
+                await rt.presentLaunchConsentIfNeeded()
             }
     }
 

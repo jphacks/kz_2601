@@ -136,6 +136,12 @@ struct FirstEditHintCard: View {
                 .font(.subheadline.weight(.medium))
                 .foregroundStyle(Theme.Colors.brandText)
                 .fixedSize(horizontal: false, vertical: true)
+            // 動かない時も話しかけて直せる(テスターが気づかなかった)。直し方の例と同じく 1 回だけ
+            Label(FixRequest.hint, systemImage: "wrench.and.screwdriver")
+                .font(.footnote)
+                .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+                .accessibilityIdentifier("editHint.fixRequest")
             HStack {
                 Button("とじる") { withAnimation { rt.showFirstEditHint = false } }
                     .foregroundStyle(.secondary)

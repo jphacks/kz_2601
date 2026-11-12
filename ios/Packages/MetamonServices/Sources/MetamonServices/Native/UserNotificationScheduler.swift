@@ -11,6 +11,8 @@ import CoreLocation
 /// - 識別子は `dsl.<appId>.…`。それ以外(タイマー `timer.` 等)には触らない。
 /// - 場所の通知(`near`)は全アプリ分から `NotificationPlanner.regionLimit` か所(近い順・新しい順)を `UNLocationNotificationTrigger` で見張る。
 ///   位置情報(使用中のみ)の許可は、場所を保存したアプリの予約の時に未決定なら 1 回だけ聞く。判定は iOS が端末の中で行う。
+/// - 通知の `filterCriteria` は生成アプリの id。集中モードのフィルタ(`TailorFocusFilter`)の「通知を止める」で、
+///   選んでいないアプリの通知を OS が出さない(予約は今のまま・#1992)。
 /// - `alarm` の通知は、`alarms` があり許可されていれば止めるまで鳴るアラーム(AlarmKit)で届け、普通の通知は出さない。
 ///   無い(iOS 26.1 未満・審査用の版)・許可が無い・予約に失敗した時は普通の通知で届ける。
 public struct UserNotificationScheduler: NotificationScheduler {
@@ -60,6 +62,7 @@ public struct UserNotificationScheduler: NotificationScheduler {
         content.title = spec.title
         content.body = spec.body
         content.sound = .default
+        content.filterCriteria = appId // 集中モードのフィルタで絞る(#1992)
         // 予約(apply)が消す "dsl." とは別の名前空間。1 秒後に出るので登録簿には残さない
         let request = UNNotificationRequest(
             identifier: ConditionNotifications.identifier(appId: appId, specId: spec.id), content: content,
@@ -106,6 +109,7 @@ public struct UserNotificationScheduler: NotificationScheduler {
     private func applyNow(appId: String) async -> NotificationSyncResult {
         let now = Date()
         let all = await registry.pruned(now: now)
+        let owners = await registry.owners()
         let mine = NotificationPlanner.prefix + appId + "."
         let pending = await center.pendingIdentifiers().filter { $0.hasPrefix(NotificationPlanner.prefix) }
         let place = await places(all, appId: appId, pending: Set(pending))
@@ -121,7 +125,7 @@ public struct UserNotificationScheduler: NotificationScheduler {
         var armed: [PlannedNotification] = []
         for p in notify {
             do {
-                try await center.add(Self.request(p))
+                try await center.add(Self.request(p, appId: owners[p.identifier]))
                 if p.isRegion { armed.append(p) }
             } catch {
                 print("[Metamon] notification add failed id=\(p.identifier): \(error)")
@@ -164,11 +168,13 @@ public struct UserNotificationScheduler: NotificationScheduler {
         }
     }
 
-    static func request(_ p: PlannedNotification, calendar: Calendar = .current) -> UNNotificationRequest {
+    /// `appId` = 予約した生成アプリ。`filterCriteria` に入れ、集中モードのフィルタで OS が絞る(#1992)。
+    static func request(_ p: PlannedNotification, appId: String? = nil, calendar: Calendar = .current) -> UNNotificationRequest {
         let content = UNMutableNotificationContent()
         content.title = p.title
         content.body = p.body
         content.sound = .default
+        content.filterCriteria = appId
         let trigger: UNNotificationTrigger
         switch p.trigger {
         case .at(let d):
@@ -241,6 +247,16 @@ actor NotificationRegistry {
     /// そのアプリの予約(DSL 分とボタン分)。
     func planned(_ appId: String) -> [PlannedNotification] {
         (table[appId] ?? []) + (table[appId + "#action"] ?? [])
+    }
+
+    /// 予約の識別子 → 生成アプリの id(通知の `filterCriteria`・#1992)。
+    func owners() -> [String: String] {
+        var map: [String: String] = [:]
+        for (key, list) in table {
+            let appId = key.hasSuffix("#action") ? String(key.dropLast("#action".count)) : key
+            for p in list { map[p.identifier] = appId }
+        }
+        return map
     }
 
     func removeApp(_ appId: String) {

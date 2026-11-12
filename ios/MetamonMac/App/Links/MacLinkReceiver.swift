@@ -33,11 +33,16 @@ struct MacLinkReceiver: ViewModifier {
             // iPhone・ほかの Mac からの Handoff(#1851): 押された通知と同じ道でアプリを開き、画面は AppCanvas が開く
             .onContinueUserActivity(HandoffActivity.type) { MacHandoffInbox.shared.receive($0) }
             .handlesExternalEvents(preferring: ["*"], allowing: ["*"])
-            // 届いた時・ログインできた時に、保留のリンクを開く
-            .task(id: "\(session.user?.uid ?? "")|\(flow.link.url?.absoluteString ?? "")") {
+            // 届いた時・ログインできた時・前の段(同意・チュートリアル)が閉じた時に、保留のリンクを開く(#1885)
+            .task(id: "\(session.user?.uid ?? "")|\(flow.link.url?.absoluteString ?? "")|\(flow.waitsForEarlierSteps)") {
                 await flow.openPendingIfReady()
             }
-            .sheet(item: $flow.pending) { MacShareConfirmSheet(pending: $0, flow: flow) }
+            .sheet(item: $flow.pending, onDismiss: { flow.linkSettled() }) {
+                MacShareConfirmSheet(pending: $0, flow: flow)
+                    .onAppear { flow.hold.markShown(.shareLink) } // 出た: 閉じるまで時間では放さない
+            }
+            // アラートには onAppear が無いので、出す番になった時に出たとみなす
+            .onChange(of: flow.showsUnavailable, initial: true) { _, shows in if shows { flow.unavailableShown() } }
             .alert("シェアリンクはサーバー接続時のみ開けます", isPresented: unavailableShown, presenting: flow.unavailable) { url in
                 Button("リンクをコピー") { PlatformPasteboard.setString(url.absoluteString) }
                 Button("OK", role: .cancel) {}
@@ -47,7 +52,9 @@ struct MacLinkReceiver: ViewModifier {
     }
 
     private var unavailableShown: Binding<Bool> {
-        Binding(get: { flow.unavailable != nil }, set: { if !$0 { flow.unavailable = nil } })
+        // 同意・チュートリアルが閉じてから出す(#1885)。閉じたら次の段(Intent)へ
+        Binding(get: { flow.showsUnavailable },
+                set: { if !$0 { flow.unavailable = nil; flow.linkSettled() } })
     }
 }
 #endif
