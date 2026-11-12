@@ -251,13 +251,20 @@ class SyncQueue(
                     }
                     println("[Metamon] sync ${op.kind} ${op.entity}/${op.recordId} failed (attempt $attempt/${policy.maxAttempts}): $e")
                     if (attempt >= policy.maxAttempts) {
-                        isPaused = true
+                        // 止めると同時に isDraining も落とす。Paused を受けてすぐ resume された時の起こしを取りこぼさない
+                        lock.withLock {
+                            isPaused = true
+                            isDraining = false
+                            draining = false
+                            inFlight = null
+                        }
                         _events.emit(SyncEvent.Paused(count()))
                         return
                     }
                     sleep(policy.delayMillis(attempt)) // 止められたら次のきっかけで続き
                 } finally {
-                    lock.withLock { inFlight = null }
+                    // 止めた時は上で戻し済み(次の drain がもう持っているかもしれない)
+                    if (draining) lock.withLock { inFlight = null }
                 }
             }
             onIdle?.invoke()
