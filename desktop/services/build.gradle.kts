@@ -36,9 +36,11 @@ sourceSets {
                 "jp/kz2601/metamon/services/consent/KeyValueStore.kt",
                 "jp/kz2601/metamon/services/http/*.kt",
                 "jp/kz2601/metamon/services/live/HttpAppConfigClient.kt",
+                "jp/kz2601/metamon/services/live/HttpReleaseRequestClient.kt",
                 "jp/kz2601/metamon/services/local/DocumentCache.kt",
                 "jp/kz2601/metamon/services/local/RecordStore.kt",
                 "jp/kz2601/metamon/services/local/SyncQueue.kt",
+                "jp/kz2601/metamon/services/release/ReleaseRequests.kt",
             )
         }
     }
@@ -48,4 +50,8 @@ dependencies {
     api(project(":dsl"))
     api(libs.kotlinx.coroutines.core)
     api(libs.okhttp)
+
+    testImplementation(libs.junit)
+    testImplementation(libs.kotlinx.coroutines.test)
+    testImplementation(libs.okhttp.mockwebserver)
 }
