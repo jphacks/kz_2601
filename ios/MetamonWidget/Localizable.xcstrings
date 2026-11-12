@@ -238,6 +238,23 @@
           }
         }
       }
+    },
+    "集中モード中" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Focus is on"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "集中モード中"
+          }
+        }
+      }
     }
   },
   "version" : "1.0"

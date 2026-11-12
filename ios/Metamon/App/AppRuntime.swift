@@ -544,7 +544,7 @@ final class AppRuntime: RuntimeNavigating {
         scheduleNotificationSync()
         noteRetention() // #482 保存期間の確認と期限切れの削除
         noteAppMembers() // #272 参加者と管理者(member の選択肢・管理者だけのボタン)
-        WidgetSnapshotWriter.write(dsl: doc.dsl, records: records) // ホーム画面ウィジェットへ stat を反映
+        WidgetSnapshotWriter.write(dsl: doc.dsl, records: records, appId: doc.appId) // ホーム画面ウィジェットへ stat を反映
         IntentHost.shared.appsMayHaveChanged() // Siri のフレーズ候補(アプリ名)を引き直す(#80)
     }
 
@@ -1091,7 +1091,7 @@ final class AppRuntime: RuntimeNavigating {
             return false
         }
         records[entity] = await recordSync.save(appId: document.appId, entity: entity, recordId: recordId, data: data)
-        WidgetSnapshotWriter.write(dsl: dsl, records: records)
+        WidgetSnapshotWriter.write(dsl: dsl, records: records, appId: document.appId)
         return true
     }
 
@@ -1110,7 +1110,7 @@ final class AppRuntime: RuntimeNavigating {
         guard dsl.entity(entity) != nil else { return nil }
         let written = await recordSync.write(appId: document.appId, entity: entity, recordId: nil, data: data, author: postAuthor(for: entity))
         records[entity] = written.records
-        WidgetSnapshotWriter.write(dsl: dsl, records: records)
+        WidgetSnapshotWriter.write(dsl: dsl, records: records, appId: document.appId)
         await purgeExpired(entity) // #482
         return written.recordId
     }
@@ -1141,7 +1141,7 @@ final class AppRuntime: RuntimeNavigating {
             let cached = await recordSync.cached(appId: appId, entity: entity)
             if !cached.isEmpty, document.appId == appId {
                 records[entity] = cached
-                WidgetSnapshotWriter.write(dsl: dsl, records: records) // ローカル先出し分もウィジェットへ
+                WidgetSnapshotWriter.write(dsl: dsl, records: records, appId: document.appId) // ローカル先出し分もウィジェットへ
             }
         }
         loading.insert(entity)
@@ -1154,7 +1154,7 @@ final class AppRuntime: RuntimeNavigating {
             if fresh.isEmpty { await seedRefOptions(entity, appId: appId) }
             await purgeExpired(entity) // #482 サーバーから届いた期限切れ(別の端末で作った自分の記録など)
             print("[Metamon] records loaded: entity=\(entity) count=\(fresh.count)")
-            WidgetSnapshotWriter.write(dsl: dsl, records: records) // ホーム画面ウィジェットへ stat を反映
+            WidgetSnapshotWriter.write(dsl: dsl, records: records, appId: document.appId) // ホーム画面ウィジェットへ stat を反映
         } catch {
             guard document.appId == appId else { return }
             // ローカルにも無ければ「読み込めませんでした」(#85: 空状態と区別する)。ローカルがあればそのまま見せる
@@ -1174,7 +1174,7 @@ final class AppRuntime: RuntimeNavigating {
         let cached = await recordSync.cached(appId: appId, entity: entity)
         guard appId == document.appId else { return }
         records[entity] = cached
-        WidgetSnapshotWriter.write(dsl: dsl, records: records)
+        WidgetSnapshotWriter.write(dsl: dsl, records: records, appId: document.appId)
     }
 
     /// 同期キューからの通知。送信完了はローカル DB を読み直し、競合はサーバーから引き直す(サーバー優先)。
@@ -1191,7 +1191,7 @@ final class AppRuntime: RuntimeNavigating {
                 let cached = await recordSync.cached(appId: appId, entity: entity)
                 guard appId == document.appId else { return } // 読む間に別のアプリへ切り替わった
                 records[entity] = cached
-                WidgetSnapshotWriter.write(dsl: dsl, records: records)
+                WidgetSnapshotWriter.write(dsl: dsl, records: records, appId: document.appId)
             case .conflict(let appId, let entity, _):
                 guard appId == document.appId else { return }
                 toast = L10n.tr("他の端末で変更されていたため、サーバーの内容に合わせました")
@@ -1206,7 +1206,7 @@ final class AppRuntime: RuntimeNavigating {
                 let cached = await recordSync.cached(appId: appId, entity: entity)
                 guard appId == document.appId else { return } // 読む間に別のアプリへ切り替わった
                 records[entity] = cached
-                WidgetSnapshotWriter.write(dsl: dsl, records: records)
+                WidgetSnapshotWriter.write(dsl: dsl, records: records, appId: document.appId)
             case .paused(let pending):
                 toast = L10n.tr("送信に失敗しました(未送信 \(pending) 件)。接続を確認してください")
             case .drained:
@@ -1217,7 +1217,7 @@ final class AppRuntime: RuntimeNavigating {
                 let cached = await recordSync.cached(appId: appId, entity: entity)
                 guard appId == document.appId else { return } // 読む間に別のアプリへ切り替わった
                 records[entity] = cached
-                WidgetSnapshotWriter.write(dsl: dsl, records: records)
+                WidgetSnapshotWriter.write(dsl: dsl, records: records, appId: document.appId)
             case .denied(let appId, let entity, let denial, _):
                 guard appId == document.appId else { return }
                 toast = denialMessage(denial, entity: entity) // #272 #273
@@ -1226,27 +1226,27 @@ final class AppRuntime: RuntimeNavigating {
                 guard appId == document.appId else { return }
                 presentProRequiredWrite(pro) // #316: 書いた分は戻した。作成者なら課金画面、参加者なら案内
                 records[entity] = await recordSync.cached(appId: appId, entity: entity)
-                WidgetSnapshotWriter.write(dsl: dsl, records: records)
+                WidgetSnapshotWriter.write(dsl: dsl, records: records, appId: document.appId)
             case .planLimit(let appId, let entity, let limit, _):
                 guard appId == document.appId else { return }
                 // #317: 書いた分は戻した。課金画面は自動で開かない(作成者はカードの「Pro にする」から・参加者には出さない)
                 withAnimation(.easeInOut(duration: 0.3)) { errorCard = ErrorPresentation(kind: .planLimit(limit), transcript: "") }
                 records[entity] = await recordSync.cached(appId: appId, entity: entity)
-                WidgetSnapshotWriter.write(dsl: dsl, records: records)
+                WidgetSnapshotWriter.write(dsl: dsl, records: records, appId: document.appId)
             case .appStopped(let appId, let entity, _):
                 guard appId == document.appId else { return }
                 toast = ErrorCopy.appStoppedBody // #346
                 records[entity] = await recordSync.cached(appId: appId, entity: entity)
-                WidgetSnapshotWriter.write(dsl: dsl, records: records)
+                WidgetSnapshotWriter.write(dsl: dsl, records: records, appId: document.appId)
             case .textNotAllowed(let appId, let entity, let field, _):
                 guard appId == document.appId else { return }
                 toast = textNotAllowedToast(entity: entity, field: field) // #321
                 records[entity] = await recordSync.cached(appId: appId, entity: entity)
-                WidgetSnapshotWriter.write(dsl: dsl, records: records)
+                WidgetSnapshotWriter.write(dsl: dsl, records: records, appId: document.appId)
             case .ageUnconfirmed(let appId, let entity, let data, _):
                 guard appId == document.appId else { return }
                 records[entity] = await recordSync.cached(appId: appId, entity: entity)
-                WidgetSnapshotWriter.write(dsl: dsl, records: records)
+                WidgetSnapshotWriter.write(dsl: dsl, records: records, appId: document.appId)
                 #if !APP_STORE_REVIEW
                 profilePostNeedsAge(entity: entity, data: data) // #507: 18 歳以上の確認 → 同意したら投稿し直す
                 #endif
@@ -1320,7 +1320,7 @@ final class AppRuntime: RuntimeNavigating {
                 afterSave: { [self] saved in
                     // 送った後にサーバーが断ったら「保存しました」を取り消す
                     lastSavedForm = SavedForm(appId: appId, entity: entity, recordId: saved.recordId, form: form, payload: saved.payload)
-                    WidgetSnapshotWriter.write(dsl: dsl, records: records)
+                    WidgetSnapshotWriter.write(dsl: dsl, records: records, appId: document.appId)
                     #if !APP_STORE_REVIEW
                     writeHealthFields(entity: entity, data: saved.payload, isNew: saved.isNew) // Field.health(#167)
                     #endif
