@@ -237,7 +237,7 @@ private fun rememberRemoteImage(src: String?): ImageBitmap? = rememberImage(src,
 
 private const val AVATAR_PX = 264
 
-/** `image`: 画像は外(エクスプローラー・他のアプリ)へ PNG のファイルで引き出せる(#1764)。 */
+/** `image`: 画像は外(エクスプローラー・他のアプリ)へ PNG のファイルで引き出せる(#1764)。記録の写真は押すと大きく見る。 */
 @Composable
 fun ImageLeaf(c: Component, src: String?) {
     val image = if (src.isNullOrBlank()) rememberImage(c.url ?: c.image) else rememberImage(src, allowFile = true)
@@ -248,7 +248,9 @@ fun ImageLeaf(c: Component, src: String?) {
     ) {
         if (image != null) {
             val name = c.label ?: Strings["desktop_drag_image_name"]
-            Image(image.bitmap, c.label, Modifier.fillMaxSize().dragOut { image.png?.let { DragOut.imageOfPng(it, name) } }, contentScale = ContentScale.Crop)
+            // 記録の写真(field の値)は押す / Space で大きく見る。DSL に書いた画像(url・https)は出さない
+            val preview = if (src.isNullOrBlank()) Modifier else Modifier.photoPreviewClick(src, c.label ?: name)
+            Image(image.bitmap, c.label, Modifier.fillMaxSize().then(preview).dragOut { image.png?.let { DragOut.imageOfPng(it, name) } }, contentScale = ContentScale.Crop)
         } else {
             Text(Strings["desktop_image_none"], color = Color.Gray, style = MaterialTheme.typography.bodySmall)
         }
