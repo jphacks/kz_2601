@@ -101,6 +101,18 @@ final class ExtDenialTests: XCTestCase {
         XCTAssertEqual(ExtDenialRoute.of(.busy, isPro: true), .toast("外のサービスが混み合っています。少し待ってから、もう一度お試しください。"))
     }
 
+    /// アシスティブアクセス(#1997)では課金・コイン・つなぐ案内を出さず一言だけ。ほかのトーストはそのまま
+    func testRouteInAssistiveAccessIsToastOnly() {
+        let aa = AssistiveAccessPolicy(isActive: true)
+        let off = AssistiveAccessPolicy.unavailableMessage
+        let coins = CoinDenial(kind: .coinsInsufficient, required: 5, balance: 1)
+        XCTAssertEqual(ExtDenialRoute.of(.notConnected(provider: "todoist"), isPro: false, assistiveAccess: aa), .toast(off))
+        XCTAssertEqual(ExtDenialRoute.of(.proRequired(ProRequired(features: [])), isPro: false, assistiveAccess: aa), .toast(off))
+        XCTAssertEqual(ExtDenialRoute.of(.coins(coins), isPro: true, assistiveAccess: aa), .toast(off))
+        XCTAssertEqual(ExtDenialRoute.of(.busy, isPro: true, assistiveAccess: aa), ExtDenialRoute.of(.busy, isPro: true))
+        XCTAssertEqual(ExtDenialRoute.of(.coins(coins), isPro: true, assistiveAccess: .standard), .coins(coins))
+    }
+
     func testEnglishCopy() {
         LanguagePreference.shared.setting = .en
         XCTAssertEqual(ExtDenialCopy.connectTitle("Todoist"), "Connect Todoist")
