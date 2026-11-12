@@ -67,6 +67,7 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.isTraversalGroup
 import androidx.compose.ui.semantics.liveRegion
+import androidx.compose.ui.platform.LocalWindowInfo
 import androidx.compose.ui.semantics.paneTitle
 import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.semantics
@@ -117,6 +118,10 @@ fun DesktopApp(
     // 他のウィンドウで開いている記録が消えた: 下書きを捨て、詳細のウィンドウは閉じる
     val shown = session.store
     LaunchedEffect(shown) { session.followRemoval() }
+    // 保存期間を過ぎた記録を消す(#482): 端末の記録を読み終えた時(DSL を当てた時)・ウィンドウが前に来た時・保存の後
+    val focused = LocalWindowInfo.current.isWindowFocused
+    val loaded = !session.records.loading
+    LaunchedEffect(focused, loaded, session.saves) { if (focused && loaded) session.purgeExpired() }
     var pending by remember { mutableStateOf<Pair<Action, ActionContext>?>(null) }
     val nav = session.nav
     val dispatch = { a: Action, ctx: ActionContext -> if (a.confirmMessage != null) pending = a to ctx else session.dispatch(a, ctx) }
