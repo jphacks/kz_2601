@@ -28,9 +28,17 @@ done
 ROLLOUT_MAX_P95_RATIO=3 ./rollout.sh --decide <(jq '.[3].metrics' "$D/decide-cases.json") | grep -qx 'decision=promote' \
   || fail "ROLLOUT_MAX_P95_RATIO で閾値が変わらない"
 
+# 費用の倍率は環境変数と引数で変えられる(既定 2 で戻す case を 3 なら通す)
+cost_case="$(jq 'map(.name) | index("rollback: cost per call over old x ratio")' "$D/decide-cases.json")"
+jq ".[$cost_case].metrics" "$D/decide-cases.json" >"$TMP/cost.json"
+ROLLOUT_MAX_COST_RATIO=3 ./rollout.sh --decide "$TMP/cost.json" | grep -qx 'decision=promote' || fail "ROLLOUT_MAX_COST_RATIO で閾値が変わらない"
+./rollout.sh --decide "$TMP/cost.json" --max-cost-ratio 3 | grep -qx 'decision=promote' || fail "--max-cost-ratio で閾値が変わらない"
+if ./rollout.sh --decide "$TMP/cost.json" --max-cost-ratio x >/dev/null 2>&1; then fail "数でない --max-cost-ratio を通した"; fi
+
 # 2. 集計(summarize): リビジョンで分ける・/health を除く・p95 は ms
 ./rollout.sh --summarize "$D/logs.json" --new ai-stg-00002-new --old ai-stg-00001-old >"$TMP/s.json"
-want='{"new":{"requests":3,"errors_5xx":1,"p95_ms":2000,"claude_calls":2,"claude_errors":1},"old":{"requests":2,"errors_5xx":0,"p95_ms":50,"claude_calls":1,"claude_errors":0}}'
+# 費用は est_cost_usd がある ai.usage だけの平均(無い行は数えない)
+want='{"new":{"requests":3,"errors_5xx":1,"p95_ms":2000,"claude_calls":2,"claude_errors":1,"cost_calls":1,"cost_usd_per_call":0.03},"old":{"requests":2,"errors_5xx":0,"p95_ms":50,"claude_calls":1,"claude_errors":0,"cost_calls":1,"cost_usd_per_call":0.01}}'
 [ "$(jq -cS . "$TMP/s.json")" = "$(jq -cS . <<<"$want")" ] || fail "summarize: $(jq -c . "$TMP/s.json")"
 
 # 3. 段階(dry-run): 既定は 5 → 25 → 100 の順に update-traffic を出す・GCP には触らない
@@ -55,6 +63,18 @@ set -e
 [ "$code" = 3 ] || fail "sim-bad の終了コード 3 のはずが $code"
 tail -n 1 "$TMP/bad.out" | grep -q 'to-revisions=old=100' || fail "sim-bad で旧に戻さない: $(cat "$TMP/bad.out")"
 grep -q 'to-revisions=new=100' "$TMP/bad.out" && fail "sim-bad なのに 100% にした"
+# 費用が上がる版は戻す(終了コード 3)・--max-cost-ratio を緩めれば進む
+mkdir -p "$TMP/cost"
+cp "$D/sim-ok/5.json" "$D/sim-ok/100.json" "$TMP/cost/"
+jq '.new.cost_calls = 10 | .new.cost_usd_per_call = 0.05 | .old.cost_calls = 200 | .old.cost_usd_per_call = 0.02' "$D/sim-ok/25.json" >"$TMP/cost/25.json"
+set +e
+./rollout.sh --env stg --service ai --to-revision new --from-revision old --wait 0 --metrics-dir "$TMP/cost" >"$TMP/cost.out" 2>/dev/null
+code=$?
+set -e
+[ "$code" = 3 ] || fail "費用が上がる版の終了コード 3 のはずが $code"
+grep -q 'step 25%: rollback .*cost per call' "$TMP/cost.out" || fail "費用で戻した理由が出ない: $(cat "$TMP/cost.out")"
+./rollout.sh --env stg --service ai --to-revision new --from-revision old --wait 0 --metrics-dir "$TMP/cost" --max-cost-ratio 3 >/dev/null 2>&1 \
+  || fail "--max-cost-ratio 3 で進まない"
 # 指標が読めない(25% のファイルが無い・壊れている)時は戻す(終了コード 3)
 mkdir -p "$TMP/broken"
 cp "$D/sim-ok/5.json" "$TMP/broken/5.json"
@@ -100,6 +120,20 @@ PATH="$TMP/bin:$PATH" PROJECT_ID=fake-project ROLLOUT_MIN_REQUESTS=1 \
 code=$?
 set -e
 [ "$code" = 3 ] || fail "偽 gcloud: 新の 5xx 1/3 で終了コード 3 のはずが $code"
+# 巻き戻しの通知: Actions では ::error 注釈と job summary に出す(#372)
+: >"$TMP/calls"
+set +e
+PATH="$TMP/bin:$PATH" PROJECT_ID=fake-project ROLLOUT_MIN_REQUESTS=1 GITHUB_ACTIONS=true GITHUB_STEP_SUMMARY="$TMP/summary.md" \
+  ./rollout.sh --env stg --service ai --execute --wait 0 >"$TMP/notify.out" 2>/dev/null
+set -e
+grep -q '^::error title=rollout ai-stg rolled back::ai-stg を ai-stg-00001-old に 100%25 戻した' "$TMP/notify.out" \
+  || fail "巻き戻しの ::error 注釈が無い: $(cat "$TMP/notify.out")"
+grep -q '^### rollout ai-stg: rolled back' "$TMP/summary.md" || fail "巻き戻しが job summary に無い"
+# dry-run(模擬)の巻き戻しは注釈にしない
+GITHUB_ACTIONS=true GITHUB_STEP_SUMMARY=/dev/null ./rollout.sh --env stg --service ai --to-revision new --from-revision old \
+  --wait 0 --metrics-dir "$D/sim-bad" >"$TMP/dry-notify.out" 2>/dev/null || true
+grep -q 'to-revisions=old=100' "$TMP/dry-notify.out" || fail "模擬の巻き戻しが走っていない"
+if grep -q '^::error' "$TMP/dry-notify.out"; then fail "dry-run で ::error 注釈を出した"; fi
 grep -q 'update-traffic ai-stg --project=fake-project --region=asia-northeast1 --to-revisions=ai-stg-00002-new=5,ai-stg-00001-old=95' "$TMP/calls" \
   || fail "偽 gcloud: describe から新旧を読んでいない: $(cat "$TMP/calls")"
 tail -n 1 "$TMP/calls" | grep -q -- '--to-revisions=ai-stg-00001-old=100' || fail "偽 gcloud: 旧に戻していない: $(cat "$TMP/calls")"

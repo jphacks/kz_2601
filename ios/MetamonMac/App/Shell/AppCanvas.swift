@@ -74,6 +74,8 @@ struct AppCanvas: View {
                 if server != nil { lease?.engine.encryptedFields[app.id] = appDSL.encryptedFields }
                 let created = MacAppRuntime(appId: app.id, dsl: appDSL, recordLease: lease, dictation: voice?.dictation)
                 created.onOpenVoice = onOpenVoice
+                // 他の端末の変化(#2072): サーバーにあるアプリだけ購読する。同じアプリの別のウインドウとは 1 本を共有
+                if server != nil { created.attachRealtime(MacRealtimeSync.shared.acquire(appId: app.id, version: app.version)) }
                 created.onAskFix = onAskFix
                 created.books = MacServices.shared.books // 本の情報(#1276)。モックの時は nil
                 #if !APP_STORE_REVIEW

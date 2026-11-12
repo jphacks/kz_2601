@@ -37,18 +37,20 @@ final class MacPushTests: XCTestCase {
     private var status = UNAuthorizationStatus.authorized
     private var requests = 0
     private var opened: [String] = []
+    private var releases = 0
 
     override func setUp() async throws {
         suite = "MacPushTests.\(UUID().uuidString)"
         defaults = UserDefaults(suiteName: suite)
         MacPushHost.shared.install(client: client, defaults: defaults, environment: .sandbox, appVersion: "1.0",
                                    uid: { [unowned self] in uid }, authorization: { [unowned self] in status },
-                                   requestToken: { [unowned self] in requests += 1 }, openApp: { [unowned self] in opened.append($0) })
+                                   requestToken: { [unowned self] in requests += 1 }, openApp: { [unowned self] in opened.append($0) },
+                                   releaseToken: { [unowned self] in releases += 1 })
     }
 
     override func tearDown() async throws {
         MacPushHost.shared.install(client: nil, defaults: .standard, environment: .production, uid: { nil },
-                                   authorization: { .notDetermined }, requestToken: {}, openApp: { _ in })
+                                   authorization: { .notDetermined }, requestToken: {}, openApp: { _ in }, releaseToken: {})
         _ = MacNotificationRouter.shared.take()
         MacNotificationRouter.shared.now = Date.init
         defaults.removePersistentDomain(forName: suite)
@@ -113,6 +115,40 @@ final class MacPushTests: XCTestCase {
         await MacPushHost.shared.unregister()
         let deletes = await client.deletes
         XCTAssertEqual(deletes, 1)
+    }
+
+    /// サインアウトの後は次のサインイン(uid の変化)までトークンを求めない・遅れて届いても送らない
+    func testUnregisterStopsRegisteringUntilTheNextUser() async {
+        await MacPushHost.shared.receive(token: token)
+        await MacPushHost.shared.unregister()
+        XCTAssertEqual(releases, 1, "OS のトークンも手放す")
+        await MacPushHost.shared.refresh()
+        XCTAssertEqual(requests, 0, "同じ利用者では求めない")
+        await MacPushHost.shared.receive(token: token)
+        var puts = await client.puts.count
+        XCTAssertEqual(puts, 1, "遅れて届いたトークンで前の利用者を登録し直さない")
+
+        uid = "u2"
+        await MacPushHost.shared.refresh()
+        XCTAssertEqual(requests, 1, "次の利用者では求める")
+        await MacPushHost.shared.receive(token: token)
+        puts = await client.puts.count
+        XCTAssertEqual(puts, 2)
+        uid = "u1"
+        await MacPushHost.shared.receive(token: token)
+        puts = await client.puts.count
+        XCTAssertEqual(puts, 3, "一度 uid が変われば止めるのは終わり")
+    }
+
+    func testResumeAfterAFailedSwitchRegistersTheSameUserAgain() async {
+        await MacPushHost.shared.receive(token: token)
+        await MacPushHost.shared.unregister()
+        MacPushHost.shared.resume()
+        await MacPushHost.shared.refresh()
+        XCTAssertEqual(requests, 1)
+        await MacPushHost.shared.receive(token: token)
+        let puts = await client.puts.count
+        XCTAssertEqual(puts, 2)
     }
 
     func testMockServicesDoNotRegister() {
@@ -222,6 +258,27 @@ final class MacPushTests: XCTestCase {
     }
 
     // MARK: - 同意(#339)
+
+    /// 送っている間に利用者が変わる相手
+    private final class SwitchingConsentClient: PushDeviceClient, @unchecked Sendable {
+        let during: @MainActor @Sendable () -> Void
+        init(during: @escaping @MainActor @Sendable () -> Void) { self.during = during }
+        func putDevice(installationId: String, registration: PushDeviceRegistration) async throws {}
+        func deleteDevice(installationId: String) async throws {}
+        func setNotifyConsent(appId: String, allowed: Bool) async throws { await during() }
+    }
+
+    func testConsentIsNotWrittenAfterTheUserChanged() async {
+        let switching = SwitchingConsentClient { [unowned self] in uid = "u2" }
+        MacPushHost.shared.install(client: switching, defaults: defaults, environment: .sandbox,
+                                   uid: { [unowned self] in uid }, authorization: { .authorized }, requestToken: {},
+                                   openApp: { _ in }, releaseToken: {})
+        let ok = await MacPushHost.shared.setConsent(true, appId: "app1")
+        XCTAssertFalse(ok)
+        XCTAssertFalse(MacPushHost.shared.consentAllowed(appId: "app1"), "次の利用者の控えは変わらない")
+        uid = "u1"
+        XCTAssertFalse(MacPushHost.shared.consentAllowed(appId: "app1"), "前の利用者の控えも書き戻さない")
+    }
 
     func testConsentIsSavedOnlyWhenSent() async {
         XCTAssertFalse(MacPushHost.shared.consentAllowed(appId: "app1"), "保存が無い = 受け取らない")

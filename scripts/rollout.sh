@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Cloud Run の段階的なリリース(#372)。新しいリビジョンへトラフィックを段階的に移し(既定 5 → 25 → 100%)、
-# 段階ごとに新旧のリビジョンの 5xx 率・p95 の待ち時間・Claude の失敗率を比べ、基準を超えたら前のリビジョンに 100% 戻す。
+# 段階ごとに新旧のリビジョンの 5xx 率・p95 の待ち時間・Claude の失敗率・1 回あたりの費用を比べ、基準を超えたら前のリビジョンに 100% 戻す。
 # 見方・閾値の選び方・deploy の workflow への組み込み方は docs/infra/staged-rollout.md。
 #
 # 既定は --dry-run(コマンドを出すだけ・GCP に触らない)。実際に動かすには --execute。prod は --env prod --execute の両方が要る。
@@ -11,7 +11,7 @@
 #   scripts/rollout.sh --env prod --service appconfig --execute \
 #     --to-revision appconfig-prod-00043-xyz --steps 5,25,50,100 --wait 600
 #   scripts/rollout.sh --env stg --service ai --metrics-dir DIR             # dry-run で段階ごとの指標を DIR/<割合>.json から読む(模擬)
-#   scripts/rollout.sh --decide metrics.json                                # 判定だけ(オフライン・テスト用)
+#   scripts/rollout.sh --decide metrics.json [--max-cost-ratio N]           # 判定だけ(オフライン・テスト用)
 #   scripts/rollout.sh --summarize logs.json --new REV --old REV            # gcloud logging read の JSON を指標にする(オフライン)
 #
 # 終了コード: 0 = 100% まで進んだ(dry-run は最後まで出した) / 2 = 使い方の誤り / 3 = 巻き戻した / 4 = 指標が足りず巻き戻した
@@ -27,13 +27,15 @@ P95_SLACK_MS="${ROLLOUT_P95_SLACK_MS:-100}"                  # 差がこれ以�
 MAX_CLAUDE_FAILURE_RATE="${ROLLOUT_MAX_CLAUDE_FAILURE_RATE:-0.2}" # 新の Claude の失敗率の上限(監視のアラートと同じ 20%)
 CLAUDE_FAILURE_MIN_COUNT="${ROLLOUT_CLAUDE_FAILURE_MIN_COUNT:-3}" # 失敗がこの件数未満なら率は見ない
 MIN_REQUESTS="${ROLLOUT_MIN_REQUESTS:-20}"                   # 新のリクエストがこれ未満なら判定しない(insufficient)
+MAX_COST_RATIO="${ROLLOUT_MAX_COST_RATIO:-2}"                # 新の 1 回あたりの費用 / 旧の上限(--max-cost-ratio でも変えられる)
+COST_MIN_CALLS="${ROLLOUT_COST_MIN_CALLS:-5}"                # 新旧どちらかの費用つきの呼び出しがこれ未満なら費用は見ない
 
 usage() {
   cat >&2 <<'EOF'
 usage: scripts/rollout.sh --env <stg|prod> --service <appconfig|ai|NAME> [--execute]
          [--to-revision REV] [--from-revision REV] [--steps 5,25,100] [--wait SEC]
-         [--max-extends N] [--on-insufficient rollback|promote] [--metrics-dir DIR]
-       scripts/rollout.sh --decide metrics.json
+         [--max-extends N] [--on-insufficient rollback|promote] [--metrics-dir DIR] [--max-cost-ratio N]
+       scripts/rollout.sh --decide metrics.json [--max-cost-ratio N]
        scripts/rollout.sh --summarize logs.json --new REV --old REV
 EOF
 }
@@ -60,8 +62,9 @@ parse_steps() {
 }
 
 # decide <metrics.json> → 1 行目 decision=promote|rollback|insufficient、続けて reason=… を 1 行に 1 つ。
-# 入力: {"new":{"requests","errors_5xx","p95_ms","claude_calls","claude_errors"},"old":{同じ}}
+# 入力: {"new":{"requests","errors_5xx","p95_ms","claude_calls","claude_errors","cost_calls","cost_usd_per_call"},"old":{同じ}}
 # 旧のリクエストが 0(100% の段階など)なら、旧との比較はせず新の絶対値だけで見る。
+# 費用は新旧とも cost_calls が COST_MIN_CALLS 以上で、旧の 1 回あたりが 0 より大きい時だけ比べる。
 decide() {
   jq -r \
     --argjson maxErr "$MAX_ERROR_RATE" \
@@ -70,7 +73,9 @@ decide() {
     --argjson slack "$P95_SLACK_MS" \
     --argjson maxClaude "$MAX_CLAUDE_FAILURE_RATE" \
     --argjson claudeMin "$CLAUDE_FAILURE_MIN_COUNT" \
-    --argjson minReq "$MIN_REQUESTS" '
+    --argjson minReq "$MIN_REQUESTS" \
+    --argjson maxCost "$MAX_COST_RATIO" \
+    --argjson costMin "$COST_MIN_CALLS" '
     def n(x): (x // 0);
     def rate(a; b): if b > 0 then a / b else 0 end;
     def r4: (. * 10000 | round) / 10000;
@@ -82,6 +87,8 @@ decide() {
     n($n.p95_ms) as $np | n($o.p95_ms) as $op |
     n($n.claude_calls) as $nc | n($n.claude_errors) as $nce |
     (rate($nce; $nc) | r6) as $cRate |
+    n($n.cost_calls) as $ncc | n($o.cost_calls) as $occ |
+    n($n.cost_usd_per_call) as $ncpc | n($o.cost_usd_per_call) as $ocpc |
     [
       (if $nRate > $maxErr then "5xx rate \($nRate | r4) > \($maxErr)" else empty end),
       (if $or > 0 and (($nRate - $oRate) | r6) > $maxDelta
@@ -89,7 +96,9 @@ decide() {
       (if $or > 0 and $op > 0 and $np > $op * $maxRatio and ($np - $op) > $slack
         then "p95 \($np)ms > old \($op)ms x \($maxRatio)" else empty end),
       (if $nce >= $claudeMin and $cRate > $maxClaude
-        then "claude failure rate \($cRate | r4) > \($maxClaude) (\($nce)/\($nc))" else empty end)
+        then "claude failure rate \($cRate | r4) > \($maxClaude) (\($nce)/\($nc))" else empty end),
+      (if $ncc >= $costMin and $occ >= $costMin and $ocpc > 0 and ($ncpc | r6) > (($ocpc * $maxCost) | r6)
+        then "cost per call \($ncpc | r6) > old \($ocpc | r6) x \($maxCost) (\($ncc)/\($occ) calls)" else empty end)
     ] as $bad |
     if ($bad | length) > 0 then "decision=rollback", ($bad[] | "reason=" + .)
     elif $nr < $minReq then "decision=insufficient", "reason=new requests \($nr) < \($minReq)"
@@ -100,6 +109,7 @@ decide() {
 
 # summarize <logs.json> <new> <old> → decide の入力。logs は gcloud logging read --format=json の配列
 # (jsonPayload.event = http.request / ai.usage・resource.labels.revision_name)。duration は ns(slog.Duration)
+# 費用は ai.usage のうち est_cost_usd がある行(単価の無いモデルの行は数えない)の平均(1 回あたり)
 summarize() {
   jq --arg new "$2" --arg old "$3" '
     def p95: sort | if length == 0 then 0 else .[((length * 0.95 | ceil) - 1)] end;
@@ -111,7 +121,10 @@ summarize() {
         errors_5xx: ([ $h[] | select((.status // 0) >= 500) ] | length),
         p95_ms: ([ $h[] | (.duration // 0) / 1000000 ] | p95 | round),
         claude_calls: ($u | length),
-        claude_errors: ([ $u[] | select(.outcome == "error") ] | length) };
+        claude_errors: ([ $u[] | select(.outcome == "error") ] | length) } +
+      ([ $u[] | .est_cost_usd | numbers ] as $c |
+        { cost_calls: ($c | length),
+          cost_usd_per_call: (if ($c | length) > 0 then (($c | add) / ($c | length) * 1000000 | round) / 1000000 else 0 end) });
     { new: one($new), old: one($old) }
   ' "$1"
 }
@@ -119,7 +132,9 @@ summarize() {
 # ---- 判定だけ / 集計だけ(オフライン) ----------------------------------------------------------
 case "${1:-}" in
   --decide)
+    if [ $# -eq 4 ] && [ "$3" = --max-cost-ratio ]; then MAX_COST_RATIO="$4"; set -- "$1" "$2"; fi
     [ $# -eq 2 ] || { usage; exit 2; }
+    { is_num "$MAX_COST_RATIO" && is_num "$COST_MIN_CALLS"; } || { echo "閾値が数でない: $MAX_COST_RATIO / $COST_MIN_CALLS" >&2; exit 2; }
     command -v jq >/dev/null || { echo "jq が必要です" >&2; exit 2; }
     decide "$2"
     exit 0 ;;
@@ -154,6 +169,7 @@ while [ $# -gt 0 ]; do
     --max-extends) MAX_EXTENDS="${2:?--max-extends N}"; shift 2 ;;
     --on-insufficient) ON_INSUFFICIENT="${2:?--on-insufficient rollback|promote}"; shift 2 ;;
     --metrics-dir) METRICS_DIR="${2:?--metrics-dir DIR}"; shift 2 ;;
+    --max-cost-ratio) MAX_COST_RATIO="${2:?--max-cost-ratio N}"; shift 2 ;;
     -h|--help) usage; exit 0 ;;
     *) echo "unknown option: $1" >&2; usage; exit 2 ;;
   esac
@@ -174,7 +190,7 @@ is_int "$MAX_EXTENDS" || { echo "--max-extends は整数" >&2; exit 2; }
 case "$ON_INSUFFICIENT" in rollback|promote) ;; *) echo "--on-insufficient は rollback か promote" >&2; exit 2 ;; esac
 [ -z "$METRICS_DIR" ] || [ "$EXECUTE" = 0 ] || { echo "--metrics-dir は dry-run だけ(模擬)" >&2; exit 2; }
 for v in "$MAX_ERROR_RATE" "$MAX_ERROR_RATE_DELTA" "$MAX_P95_RATIO" "$P95_SLACK_MS" "$MAX_CLAUDE_FAILURE_RATE" \
-         "$CLAUDE_FAILURE_MIN_COUNT" "$MIN_REQUESTS"; do
+         "$CLAUDE_FAILURE_MIN_COUNT" "$MIN_REQUESTS" "$MAX_COST_RATIO" "$COST_MIN_CALLS"; do
   is_num "$v" || { echo "閾値が数でない: $v" >&2; exit 2; }
 done
 STEP_LIST="$(parse_steps "$STEPS")" || exit 2
@@ -216,6 +232,10 @@ notify() { # notify <見出し> <本文>
   echo "[$1] $2" >&2
   if [ -n "${GITHUB_STEP_SUMMARY:-}" ]; then
     printf '### rollout %s: %s\n\n%s\n' "$SERVICE" "$1" "$2" >>"$GITHUB_STEP_SUMMARY"
+  fi
+  # GitHub Actions で実際に戻した時は注釈(run の画面・Checks に出る)にもする。ジョブも失敗するので、いつもの失敗通知も飛ぶ
+  if [ "${GITHUB_ACTIONS:-}" = true ] && [ "$EXECUTE" = 1 ] && [ "$1" = "rolled back" ]; then
+    echo "::error title=rollout ${SERVICE} rolled back::$(printf '%s' "$2" | sed 's/%/%25/g' | tr '\n' ' ')"
   fi
 }
 

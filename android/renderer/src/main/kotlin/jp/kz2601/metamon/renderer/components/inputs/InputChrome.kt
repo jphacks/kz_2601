@@ -115,7 +115,7 @@ fun FormInput(c: Component, ctx: RenderContext, modifier: Modifier, content: @Co
         if (form.isFlagged(c.field!!)) {
             Text(
                 stringResource(R.string.inputs_required),
-                style = MaterialTheme.typography.labelSmall,
+                style = RenderTheme.Fonts.inputNote,
                 color = MaterialTheme.colorScheme.error,
                 modifier = Modifier.padding(start = 4.dp, top = 4.dp),
             )
@@ -129,7 +129,7 @@ fun NeedsForm(c: Component, modifier: Modifier = Modifier) {
     Row(modifier.fillMaxWidth().inputChrome(), verticalAlignment = Alignment.CenterVertically) {
         Text(
             stringResource(R.string.inputs_needs_form, c.type.wire),
-            style = MaterialTheme.typography.labelSmall,
+            style = RenderTheme.Fonts.inputNote,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
     }
@@ -142,7 +142,7 @@ fun LabeledInput(label: String?, modifier: Modifier = Modifier, content: @Compos
         if (!label.isNullOrEmpty()) {
             Text(
                 label,
-                style = MaterialTheme.typography.labelMedium,
+                style = RenderTheme.Fonts.inputLabel,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.padding(start = 2.dp),
             )
@@ -159,7 +159,7 @@ fun InputRow(label: String, modifier: Modifier = Modifier, trailing: @Composable
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(RenderTheme.Spacing.sm),
     ) {
-        Text(label, style = MaterialTheme.typography.bodyLarge, modifier = Modifier.weight(1f))
+        Text(label, style = RenderTheme.Fonts.inputValue, modifier = Modifier.weight(1f))
         trailing()
     }
 }
@@ -176,6 +176,6 @@ fun Modifier.inputChrome(color: Color = RenderTheme.colors.hairline): Modifier =
 @Composable
 fun InputNotice(text: String) {
     Row(Modifier.fillMaxWidth().inputChrome(), verticalAlignment = Alignment.CenterVertically) {
-        Text(text, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Text(text, style = RenderTheme.Fonts.rowSubtitle, color = MaterialTheme.colorScheme.onSurfaceVariant)
     }
 }

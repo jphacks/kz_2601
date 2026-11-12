@@ -13,7 +13,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -34,7 +33,7 @@ fun BadgeLeaf(c: Component, modifier: Modifier = Modifier) {
             .background(tint.copy(alpha = tint.alpha * BADGE_FILL_ALPHA), CircleShape)
             .padding(horizontal = 10.dp, vertical = 5.dp),
         color = tint,
-        style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.SemiBold),
+        style = RenderTheme.Fonts.badge,
         maxLines = 1,
         overflow = TextOverflow.Ellipsis,
     )
@@ -52,13 +51,13 @@ fun EmptyStateLeaf(c: Component, modifier: Modifier = Modifier) {
         Text(
             c.title.orEmpty(),
             Modifier.semantics { heading() },
-            style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold),
+            style = RenderTheme.Fonts.emptyTitle,
             textAlign = TextAlign.Center,
         )
         c.message?.let {
             Text(
                 it,
-                style = MaterialTheme.typography.bodyMedium,
+                style = RenderTheme.Fonts.body,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 textAlign = TextAlign.Center,
             )

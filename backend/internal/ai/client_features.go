@@ -217,15 +217,41 @@ var clientFeatures = []clientFeature{
 	},
 }
 
-// offFeatures lists the clientFeatures r turns off, in table order.
+// disabledClientFeatures (#1955) are judged by disabledFeatures instead: every
+// build has the part, but some platform cannot run it (Mac: nearbyShare
+// passby). Only a client that names the key loses it, so a client that does
+// not send it (today's iOS) is unchanged.
+var disabledClientFeatures []clientFeature
+
+// offFeatures lists the clientFeatures r turns off, in table order
+// (clientFeatures, then disabledClientFeatures).
 func (r Restriction) offFeatures() []*clientFeature {
 	var out []*clientFeature
-	for i := range clientFeatures {
-		if r.off[clientFeatures[i].key] {
-			out = append(out, &clientFeatures[i])
+	for _, table := range [][]clientFeature{clientFeatures, disabledClientFeatures} {
+		for i := range table {
+			if r.off[table[i].key] {
+				out = append(out, &table[i])
+			}
 		}
 	}
 	return out
+}
+
+// disabledFeaturesOff: the disabledClientFeatures named in disabled.
+func disabledFeaturesOff(disabled []string) map[string]bool {
+	var off map[string]bool
+	for _, d := range disabled {
+		d = strings.TrimSpace(d)
+		for _, f := range disabledClientFeatures {
+			if f.key == d {
+				if off == nil {
+					off = map[string]bool{}
+				}
+				off[d] = true
+			}
+		}
+	}
+	return off
 }
 
 // NoFeature reports whether a clientFeature (FeatureAILong, ...) is off.

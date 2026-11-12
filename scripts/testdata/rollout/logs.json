@@ -3,10 +3,10 @@
   {"resource": {"labels": {"revision_name": "ai-stg-00002-new"}}, "jsonPayload": {"event": "http.request", "path": "/v1/apps", "status": 500, "duration": 300000000}},
   {"resource": {"labels": {"revision_name": "ai-stg-00002-new"}}, "jsonPayload": {"event": "http.request", "path": "/v1/chat", "status": 200, "duration": 2000000000}},
   {"resource": {"labels": {"revision_name": "ai-stg-00002-new"}}, "jsonPayload": {"event": "http.request", "path": "/health", "status": 503, "duration": 1000000}},
-  {"resource": {"labels": {"revision_name": "ai-stg-00002-new"}}, "jsonPayload": {"event": "ai.usage", "outcome": "ok"}},
+  {"resource": {"labels": {"revision_name": "ai-stg-00002-new"}}, "jsonPayload": {"event": "ai.usage", "outcome": "ok", "est_cost_usd": 0.03}},
   {"resource": {"labels": {"revision_name": "ai-stg-00002-new"}}, "jsonPayload": {"event": "ai.usage", "outcome": "error"}},
   {"resource": {"labels": {"revision_name": "ai-stg-00001-old"}}, "jsonPayload": {"event": "http.request", "path": "/v1/apps", "status": 200, "duration": 50000000}},
   {"resource": {"labels": {"revision_name": "ai-stg-00001-old"}}, "jsonPayload": {"event": "http.request", "path": "/v1/apps", "status": 404, "duration": 10000000}},
-  {"resource": {"labels": {"revision_name": "ai-stg-00001-old"}}, "jsonPayload": {"event": "ai.usage", "outcome": "ok"}},
+  {"resource": {"labels": {"revision_name": "ai-stg-00001-old"}}, "jsonPayload": {"event": "ai.usage", "outcome": "ok", "est_cost_usd": 0.01}},
   {"resource": {"labels": {"revision_name": "ai-stg-00000-other"}}, "jsonPayload": {"event": "http.request", "path": "/v1/apps", "status": 500, "duration": 1}}
 ]
