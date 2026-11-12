@@ -262,6 +262,9 @@ class DesktopKeyboard(
 
     var paletteOpen by mutableStateOf(false)
     var helpOpen by mutableStateOf(false)
+
+    /** サードパーティのライセンス(Licenses.kt)。F1 の一覧とパレットから開く。 */
+    var licensesOpen by mutableStateOf(false)
     val root = FocusRequester()
     val modal = FocusRequester()
 
@@ -269,7 +272,7 @@ class DesktopKeyboard(
     private fun ctx() = session.top.let { ActionContext(it, session.form(it)) }
 
     fun handle(e: KeyEvent, bubble: Boolean): Boolean {
-        if (paletteOpen || helpOpen || wipeConfirmOpen) return false // パレット・一覧・確認が自分で受ける
+        if (paletteOpen || helpOpen || licensesOpen || wipeConfirmOpen) return false // パレット・一覧・確認が自分で受ける
         val p = KeyPress.of(e) ?: return false
         val s = Keymap.match(p, os) ?: return false
         if (s == Shortcut.PRINT || s.bubble != bubble) return false // 印刷は Print.kt の Ctrl+P
@@ -333,7 +336,11 @@ class DesktopKeyboard(
         val wipe = wipeLocalData?.let {
             listOf(PaletteCommand("data:wipe", KeyboardText.WIPE, PaletteCommand.Kind.ACTION, keywords = listOf("wipe", "sign out")) { wipeConfirmOpen = true })
         }.orEmpty()
-        return shortcuts + buttons + record + screens + apps + wipe
+        val licenses = PaletteCommand(
+            "about:licenses", LicensesText.TITLE, PaletteCommand.Kind.ACTION,
+            keywords = listOf("licenses", "third-party", "oss", "notice", LicensesText.LICENSE),
+        ) { licensesOpen = true }
+        return shortcuts + buttons + record + screens + apps + wipe + licenses
     }
 
     /** 確認で「消す」を押した: 全アプリの端末のデータを消し、このウィンドウを最初の画面に戻す。 */
@@ -363,7 +370,7 @@ class DesktopKeyboard(
     val modalModifier: Modifier get() = Modifier.focusRequester(modal).focusGroup()
 
     fun focusAfterNavigation(modalOpen: Boolean) {
-        if (paletteOpen || helpOpen) return
+        if (paletteOpen || helpOpen || licensesOpen) return
         if (modalOpen && runCatching { modal.requestFocus(FocusDirection.Enter) }.getOrDefault(false)) return
         runCatching { root.requestFocus() }
     }
@@ -380,8 +387,14 @@ class DesktopKeyboard(
             }
         }
         if (helpOpen) {
-            ShortcutHelp(os) {
+            ShortcutHelp(os, onLicenses = { helpOpen = false; licensesOpen = true }) {
                 helpOpen = false
+                runCatching { root.requestFocus() }
+            }
+        }
+        if (licensesOpen) {
+            LicensesDialog {
+                licensesOpen = false
                 runCatching { root.requestFocus() }
             }
         }

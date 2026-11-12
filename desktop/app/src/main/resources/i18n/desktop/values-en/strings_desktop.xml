@@ -84,6 +84,8 @@
     <string name="desktop_keys_palette_placeholder">Find a screen, action or app by name</string>
     <string name="desktop_keys_save">Save</string>
     <string name="desktop_keys_search">Search</string>
+    <string name="desktop_licenses">Third-party notices</string>
+    <string name="desktop_licenses_browse_failed">Couldn\'t open the browser. %1$s</string>
     <string name="desktop_list_empty">Nothing yet</string>
     <string name="desktop_list_open_window">Open in new window</string>
     <string name="desktop_list_separator">", "</string>
