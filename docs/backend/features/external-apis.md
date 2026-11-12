@@ -277,7 +277,7 @@ GTFS リアルタイム(protobuf)の読み方は [GTFS Realtime の仕様](https
 - 1 つの provider の env が全部の provider の env より勝つ。env が無ければコードの既定(`DefaultLimits`)。
 - 数えるのは provider を呼んだ時だけ。キャッシュから返した時は数えない。トークンが無い・コインが足りない・同じ request id・枠で止まった時(provider を呼ばなかった)は戻す。provider が失敗した時(5xx・時間切れ・429)は呼んだので戻さない。
 - 文書は `rateLimits/{APP_ENV}_{日 or 日T時}_ext_{provider}_{uid_… / app_… / global}`(TTL `expireAt`)。全体の数えは `ratelimit.GlobalShards` に分ける。Firestore が落ちた時は台のメモリで数える(開けっぱなしにしない)。
-- 今月の回数(#2144): 上の枠を通った呼び出しは、`rateLimits/{APP_ENV}_{年-月}_ext_{provider}_uid_{uid}`(scope `user_monthly`・止めない・TTL は月末の 1 日後)にも 1 足す。戻す時は一緒に戻す。1 回の呼び出しで Firestore の取引が 1 つ増える(読み 1・書き 1)。`GET /v1/me/connections` は各つなぎの `monthCalls` として、つなぎの数だけの文書を 1 回のまとめ読みで返す(書かない)。読めない時は `monthCalls` を省き、一覧は返す。上限の値は返さない(#1882)。
+- 今月の回数(#2144): 上の枠を通った呼び出しは、`rateLimits/{APP_ENV}_{年-月}_ext_{provider}_uid_{uid}`(scope `user_monthly`・止めない・TTL は月末の 1 日後)にも 1 足す。枠と同じ 1 回の取引の最後の数えとして足す(Limit は MaxInt32・枠と一緒に足すか足さないか・戻す時は一緒に戻す・保存先が落ちた時は枠と一緒にメモリで数える)。取引が同じなので、そろって書く文書の TTL も月末の 1 日後になる。`GET /v1/me/connections` は各つなぎの `monthCalls` として、つなぎの数だけの文書を 1 回のまとめ読みで返す(書かない)。読めない時は `monthCalls` を省き、一覧は返す。上限の値は返さない(#1882)。
 - runner の答えは `{"reason": "rate_limited", "scope": "<scope>", "retryAfterSec": <秒>}`(429)。appconfig は 429 `rate_limited`・`Retry-After`・`details`(`scope`・`provider`・`retryAfterSec`)にする。
 - 偽の provider は `fail=429` で 1 分止めを試せる。
 - appconfig の `EXT_USER_PER_HOUR`(provider をまたいだ 1 人 1 時間)はそのまま残る。

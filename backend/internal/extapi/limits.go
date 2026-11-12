@@ -139,14 +139,13 @@ type limitCharge struct {
 	store    ratelimit.Store
 	counters []ratelimit.Counter
 	expireAt time.Time
-	// month is the user's count of this month (#2144), refunded with it
-	month *limitCharge
 }
 
 // Monthly use (#2144): every call counted above also counts once on the
-// user's month of the provider, shown by GET /v1/me/connections. It is
-// never a limit (the cap only keeps evaluate from stopping it) and a store
-// failure skips it (the call goes on; the shown count is then short).
+// user's month of the provider, shown by GET /v1/me/connections. It is the
+// last counter of the same Consume (all or none with the limits, refunded
+// with them, counted in the fallback when the store fails) and never a
+// limit (Limit is MaxInt32).
 //
 //	rateLimits/{env}_{yyyy-mm}_ext_{provider}_uid_{uid}   expires a day after the month
 const scopeUserMonthly = "user_monthly"
@@ -158,21 +157,6 @@ func (s *Service) monthCounter(provider, uid string, now time.Time) ratelimit.Co
 	}
 	return ratelimit.Counter{ID: fmt.Sprintf("%s_%s_ext_%s_uid_%s", env, now.In(ratelimit.JST).Format("2006-01"), provider, docSafe(uid)),
 		Scope: scopeUserMonthly, Limit: math.MaxInt32}
-}
-
-// countMonth adds one call to uid's month of provider (nil when it was not counted).
-func (s *Service) countMonth(ctx context.Context, provider, uid string, now time.Time) *limitCharge {
-	if uid == "" {
-		return nil
-	}
-	y, m, _ := now.In(ratelimit.JST).Date()
-	expireAt := time.Date(y, m+1, 1, 0, 0, 0, 0, ratelimit.JST).Add(24 * time.Hour)
-	counters := []ratelimit.Counter{s.monthCounter(provider, uid, now)}
-	if _, err := s.limits.store.Consume(ctx, counters, 1, expireAt); err != nil {
-		s.Log.WarnContext(ctx, "extapi: counting the month failed", slog.String("provider", provider), slog.Any("error", err))
-		return nil
-	}
-	return &limitCharge{store: s.limits.store, counters: counters, expireAt: expireAt}
 }
 
 // MonthCalls is uid's calls of each provider this month (JST), read
@@ -289,15 +273,21 @@ func (s *Service) consumeLimits(ctx context.Context, provider, uid, app string) 
 		cs = append(cs, ctr{ratelimit.Counter{ID: fmt.Sprintf("%s_%s_ext_%s_global", env, day, provider), Scope: LimitGlobalDaily,
 			Limit: lim.GlobalDaily, Shards: ratelimit.GlobalShards}, dayEnd})
 	}
+	// TTL: a day of slack so the document outlives its own window
+	expireAt := dayEnd.Add(24 * time.Hour)
+	if uid != "" {
+		monthEnd := time.Date(y, m+1, 1, 0, 0, 0, 0, ratelimit.JST)
+		cs = append(cs, ctr{s.monthCounter(provider, uid, now), monthEnd})
+		// one expireAt per Consume: the month's, so its document outlives the month
+		expireAt = monthEnd.Add(24 * time.Hour)
+	}
 	if len(cs) == 0 {
-		return limitCharge{month: s.countMonth(ctx, provider, uid, now)}, nil
+		return limitCharge{}, nil
 	}
 	counters := make([]ratelimit.Counter, len(cs))
 	for i, c := range cs {
 		counters[i] = c.c
 	}
-	// TTL: a day of slack so the document outlives its own window
-	expireAt := dayEnd.Add(24 * time.Hour)
 	store := s.limits.store
 	u, err := store.Consume(ctx, counters, 1, expireAt)
 	if err != nil {
@@ -314,14 +304,11 @@ func (s *Service) consumeLimits(ctx context.Context, provider, uid, app string) 
 	if u.Charged != nil {
 		counters = u.Charged
 	}
-	return limitCharge{store: store, counters: counters, expireAt: expireAt, month: s.countMonth(ctx, provider, uid, now)}, nil
+	return limitCharge{store: store, counters: counters, expireAt: expireAt}, nil
 }
 
 // refundLimits gives back a call that did not reach the provider.
 func (s *Service) refundLimits(ctx context.Context, provider string, c limitCharge) {
-	if c.month != nil {
-		s.refundLimits(ctx, provider, *c.month)
-	}
 	if c.store == nil {
 		return
 	}

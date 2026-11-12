@@ -8,6 +8,8 @@ import (
 	"net/http/httptest"
 	"testing"
 	"time"
+
+	"github.com/jphacks/kz_2601/backend/internal/ratelimit"
 )
 
 // listMonthCalls is GET /v1/me/connections' monthCalls of uid as the runner
@@ -103,5 +105,28 @@ func TestMonthCallsRefund(t *testing.T) {
 	}
 	if counts, _ = e.svc.MonthCalls(context.Background(), user, []string{FakeOAuth, FakeFree}); counts[FakeFree] != 1 || counts[FakeOAuth] != 0 {
 		t.Fatalf("counts %v", counts)
+	}
+}
+
+// The month is the last counter of the limits' Consume: when the store is
+// down it is counted in the fallback with the limits, and a refused call
+// counts on neither.
+func TestMonthCallsFallback(t *testing.T) {
+	e := newEnv(t, opts{cfg: withLimits(Limits{UserHourly: 1})})
+	e.svc.UseLimitStore(failingStore{})
+	if _, err := e.call(e.req(FakeFree, "listItems", nil)); err != nil {
+		t.Fatal(err)
+	}
+	_ = limitErr(t, func() error { _, err := e.call(e.req(FakeFree, "listItems", nil)); return err }())
+	peeker, ok := e.svc.limits.fallback.(ratelimit.Peeker)
+	if !ok {
+		t.Fatal("fallback cannot peek")
+	}
+	counts, err := peeker.Peek(context.Background(), []ratelimit.Counter{e.svc.monthCounter(FakeFree, user, e.svc.now())})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if counts[0] != 1 {
+		t.Fatalf("fallback month = %d, want 1", counts[0])
 	}
 }
