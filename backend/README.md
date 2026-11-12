@@ -54,6 +54,10 @@ curl -H "Authorization: Bearer $DEV_UID" localhost:8080/v1/apps/my-device/dsl   
 運用コマンド(`run-purge` などの機能ごとのターゲット)は `mk/<feature>.mk` に置く(Makefile が末尾で `-include` する)。
 新しく足す時は `mk/<feature>.mk` を新規に作り、ターゲットの直上に専用の `.PHONY: <target>` を書く。Makefile の共有行には足さない。
 
+網羅率: `make cover` でパッケージごとの網羅率を低い順の表で出す(しきい値で落とさない・`COVER_PKGS=./cmd/ai` で絞れる)。
+エミュレータ試験の分は環境変数が無いと skip されて数字に入らない。`make emulator` を別ターミナルで起動し、
+`FIRESTORE_EMULATOR_HOST=127.0.0.1:8089 GOOGLE_CLOUD_PROJECT=demo-kz2601 make cover` で回すと、`make test-emulator` の分も合わせた数字になる(`internal/store` など)。
+
 ai → appconfig の結合をローカルで確認する時は、appconfig を上記で起動し、ai を
 `AUTH_MODE=dev APPCONFIG_BASE_URL=http://localhost:8080 ANTHROPIC_API_KEY=... PORT=8082 go run ./cmd/ai` で起動して
 `curl -H "Authorization: Bearer $DEV_UID" -d '{"appId":"my-device","transcript":"家計簿が欲しい"}' localhost:8082/v1/generate`
