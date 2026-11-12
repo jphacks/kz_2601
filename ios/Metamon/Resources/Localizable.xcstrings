@@ -866,6 +866,23 @@
         }
       }
     },
+    "%@を記録" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Record %@"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@を記録"
+          }
+        }
+      }
+    },
     "%@を買う" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -6586,6 +6603,40 @@
         }
       }
     },
+    "まだ" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Not yet"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "まだ"
+          }
+        }
+      }
+    },
+    "まだありません" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nothing yet"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "まだありません"
+          }
+        }
+      }
+    },
     "まだできないこと" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -9428,6 +9479,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "ダークモードにして"
+          }
+        }
+      }
+    },
+    "チェックを外しました" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Unchecked"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "チェックを外しました"
           }
         }
       }
@@ -17055,6 +17123,23 @@
         }
       }
     },
+    "済み" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Done"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "済み"
+          }
+        }
+      }
+    },
     "準備中" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -18886,6 +18971,23 @@
         }
       }
     },
+    "記録しました" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Recorded"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "記録しました"
+          }
+        }
+      }
+    },
     "記録する" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -18899,6 +19001,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "記録する"
+          }
+        }
+      }
+    },
+    "記録できませんでした" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Couldn't record"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "記録できませんでした"
           }
         }
       }
