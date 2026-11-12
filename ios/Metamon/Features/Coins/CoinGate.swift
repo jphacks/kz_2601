@@ -60,6 +60,12 @@ final class CoinGate {
 
     func dismiss() { request = nil }
 
+    /// `presenter` が出す要求。アシスティブアクセス(#1997)で課金を隠している時は出さない。
+    func request(for presenter: UUID, assistiveAccess: AssistiveAccessPolicy) -> Request? {
+        guard assistiveAccess.shows(.paywall), request?.presenter == presenter else { return nil }
+        return request
+    }
+
     func presenterAppeared(_ id: UUID) {
         presenters.removeAll { $0 == id }
         presenters.append(id)

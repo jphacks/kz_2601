@@ -2,6 +2,7 @@ import Foundation
 
 /// 「動かない時は話しかけると直せる」の案内と、「直してと頼む」で入力欄に入れる文(テスターの声: 直せると知らなかった)。
 /// 直し方の例(`FirstEditHintCard`)・頼み方のコツ・動きの失敗のトーストから使う。送信はしない(入力欄に入れるだけ)。
+/// iOS と Mac で共有する(#1885)。Mac は `MacAppRuntime+FixRequest.swift` から使う。
 enum FixRequest {
     /// 案内の一文(頼み方のコツと同じ文。Mac と共有する `PromptTips` に置く)
     static var hint: String { PromptTips.fixRequest }
@@ -27,7 +28,7 @@ enum FixRequest {
     }
 }
 
-/// 失敗のトーストに付ける「直してと頼む」(`AppRuntime.fixOffer`)。`message` がいまのトーストと同じ間だけ出す。
+/// 失敗のトーストに付ける「直してと頼む」(iOS の `AppRuntime.fixOffer`・Mac の `MacAppRuntime.fixOffer`)。`message` がいまのトーストと同じ間だけ出す。
 struct FixOffer: Equatable {
     var message: String
     var draft: String

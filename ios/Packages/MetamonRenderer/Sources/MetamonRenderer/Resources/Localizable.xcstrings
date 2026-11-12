@@ -8846,6 +8846,23 @@
         }
       }
     },
+    "翻訳" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Translate"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "翻訳"
+          }
+        }
+      }
+    },
     "翻訳する言語をダウンロードしてください" : {
       "extractionState" : "manual",
       "localizations" : {
