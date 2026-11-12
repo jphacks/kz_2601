@@ -65,6 +65,17 @@ Firebase Auth の REST クライアント(`auth/FirebaseAuthRestClient.kt`・ま
 | `app/src/main/kotlin/.../desktop/Session.kt` | 画面の状態と操作(遷移・下書き・保存・削除)。画面と適合テストが同じ物を使う |
 | `app/src/main/kotlin/.../desktop/InputLeaves.kt`・`Actions.kt` | 入力の部品 20 種・OS に頼むアクション |
 | `app/src/main/kotlin/.../desktop/DesktopSupport.kt` | 描ける type の一覧と部品の state(`DesktopLeaves.state`: rendered・hidden・needsForm・unavailable・unknown)。画面・操作・適合テストが同じ物を使う |
+| `app/src/main/kotlin/.../desktop/DataLeaves.kt` | データの部品(list・table・timeline・gridTable・searchBar・feed・matchList)。値は Android の `ListValues.kt` と同じ規則 |
+| `app/src/main/kotlin/.../desktop/DesktopApp.kt` | DSL を 1 本読み、`DesktopSession` の遷移で画面を描く。6 列のグリッド(フォームは段)・push はウィンドウの中・sheet はダイアログ・fullScreen は全体に重ねる・タブは下 |
+| `app/src/main/kotlin/.../desktop/DisplayLeaves.kt` | 表示の部品(image・avatar・badge・markdown・stat・chart・progressBar・gauge・rating・calendar)と DSL の色 |
+| `app/src/main/kotlin/.../desktop/GridLayout.kt` | 画面のグリッドの規則(`area` の読み方・6 列・行の上限)。Compose に依存しない Android の `GridArea.kt` の写し(`:renderer-core` ができたら消す) |
+| `app/src/main/kotlin/.../desktop/IconLeaf.kt` | DSL のアイコン名(SF Symbols の語彙)→ Material の絵。名前の表は `docs/dsl/icon-map.json` をビルド時に同梱して読む |
+| `app/src/main/kotlin/.../desktop/ImageLoader.kt` | 画像を読む(裏のスレッドから)。縮めた絵と引き出し用の PNG を作り、https・data URL は少しだけ覚える。大きすぎる画像は開かない |
+| `app/src/main/kotlin/.../desktop/LeafValues.kt` | stat・progressBar・gauge・chart の値。Android の `ListValues.kt` と同じ規則を `:dsl` の `Aggregator`・`ExprEvaluator`・`RecordQuery` で出す |
+| `app/src/main/kotlin/.../desktop/LoadingSkeleton.kt` | 起動時に端末の記録を読む間の形だけの画面。読み上げは「読み込み中」 |
+| `app/src/main/kotlin/.../desktop/Main.kt` | 起動。引数で同梱の例・記録の JSON・最初の画面を選ぶ(無ければ最後に開いたアプリ)。2 つ目の起動は `SingleInstance.kt` で前の方へ渡す・ウィンドウは `Windows.kt`・常駐は `Tray.kt` |
+| `app/src/main/kotlin/.../desktop/OpenUrlButton.kt` | openUrlButton の開く先(app・url・開けない)を決める。Android の `OpenUrlTarget` と同じ分岐 |
+| `app/src/main/kotlin/.../desktop/PlayLeaves.kt` | 計算・遊びの部品(settlement・bracket・flashcards・randomPicker・timerDisplay・qrCode)。規則は `:dsl` と Android の写し |
 | `whisper/` | 端末内の文字起こし。`android/whisper` の純 Kotlin の部分(音の区切り・モデルの取得・WhisperEngine)をビルド時に写して使い、`WhisperNative` だけデスクトップの読み方(`compose.application.resources.dir` など)。JNI の C++ と CMake は `whisper/native/` |
 | `app/src/main/kotlin/.../desktop/voice/` | マイク(`Microphone`・Java Sound)・文字起こし(`Transcriber`・whisper.cpp)・openVoice の流れ(`VoiceInput`)・モデルの置き場 |
 | `services/` | `android/services` の純 Kotlin の部分(API クライアント・記録の保存・送信待ち・同意)を同じソースのまま取り込む。取り込むファイルは `services/build.gradle.kts` で名指し。宣言にだけ出る Android の型は `services/src/shim` の置き換え |
