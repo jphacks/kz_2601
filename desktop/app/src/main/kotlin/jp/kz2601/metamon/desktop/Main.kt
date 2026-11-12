@@ -91,9 +91,12 @@ fun main(args: Array<String>) = application {
     tray.onOpenApp = { registry.open(WindowKey.app(it)) }
     // すぐ記録は前にあるアプリの、アプリのウィンドウへ(詳細には入れない・無ければ開く)
     tray.findQuickRecordWindow = { registry.quickRecordWindow()?.id }
-    // トレイの名前・すぐ記録は前にあるウィンドウのアプリ
-    val activeApp = registry.active?.key?.appId
-    LaunchedEffect(activeApp) { activeApp?.let { tray.switchApp(hub.dsl(it)) } }
+    // トレイの名前・すぐ記録・集計は前にあるウィンドウのアプリ。閉じて開き直すと記録が替わるのでウィンドウごとに見直す
+    val active = registry.active
+    LaunchedEffect(active?.id) {
+        val appId = active?.key?.appId ?: return@LaunchedEffect
+        tray.switchApp(hub.dsl(appId), hub.opened().firstOrNull { it.id == appId }?.records)
+    }
     DesktopTray(tray)
     registry.windows.toList().forEach { w ->
         key(w.id) {

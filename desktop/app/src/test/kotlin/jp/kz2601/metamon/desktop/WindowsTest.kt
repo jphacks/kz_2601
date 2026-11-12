@@ -237,7 +237,8 @@ class WindowsTest {
         left.addItem("牛乳")
         right.addItem("卵")
         p.idle()
-        assertEquals(listOf("牛乳", "卵"), store.records.rows("shopping", "groceries").reversed().map { it.data["name"].toString().trim('"') })
+        // 並びは createdAt 順で、Windows では 2 件が同じ時刻になり得るので順番は見ない
+        assertEquals(listOf("牛乳", "卵").sorted(), store.records.rows("shopping", "groceries").map { it.data["name"].toString().trim('"') }.sorted())
         // 開き直すと両方ある
         assertEquals(2, p.load(dsl.entityModels()).list("groceries").size)
         records.close()
