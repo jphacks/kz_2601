@@ -167,6 +167,7 @@ func TestFromEnvVerifierStates(t *testing.T) {
 		wantCode   int
 		wantLog    string
 		notWantLog string
+		wantBody   string
 	}{
 		{
 			// (nil, nil) is a broken constructor, not a pass: log records it
@@ -180,6 +181,7 @@ func TestFromEnvVerifierStates(t *testing.T) {
 			env:      map[string]string{"APP_CHECK_MODE": " Enforce "},
 			verifier: func() (Verifier, error) { return nil, nil },
 			token:    "good-ios", wantCode: http.StatusUnauthorized, wantLog: "no verifier",
+			wantBody: `"reason":"unconfigured"`,
 		},
 		{
 			name:     "enforce, app id allow list",
@@ -218,6 +220,9 @@ func TestFromEnvVerifierStates(t *testing.T) {
 			})).ServeHTTP(rec, req)
 			if rec.Code != tt.wantCode {
 				t.Fatalf("status = %d, want %d", rec.Code, tt.wantCode)
+			}
+			if tt.wantBody != "" && !strings.Contains(rec.Body.String(), tt.wantBody) {
+				t.Errorf("body lacks %q: %s", tt.wantBody, rec.Body)
 			}
 			if tt.wantLog != "" && !strings.Contains(logs.String(), tt.wantLog) {
 				t.Errorf("logs lack %q:\n%s", tt.wantLog, logs.String())

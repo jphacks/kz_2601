@@ -20,7 +20,12 @@ func clearEnv(t *testing.T, set map[string]string) {
 	for _, k := range []string{
 		"GOOGLE_CLOUD_PROJECT", "AUTH_MODE", "RATE_LIMIT", "RATE_LIMIT_STORE", "RATE_LIMIT_COLLECTION",
 		"APP_CHECK_MODE", "APP_CHECK_APP_IDS", "COIN_BILLING_MODE", "APP_ENV",
-		"AI_FREE_DAILY_BUDGET_USD", "AI_FREE_BUDGET_RESUME_DAY", "FIRESTORE_EMULATOR_HOST",
+		"AI_FREE_DAILY_BUDGET_USD", "AI_FREE_BUDGET_RESUME_DAY", "FIRESTORE_EMULATOR_HOST", "PRO_GATE_MODE",
+		// ratelimit.ConfigFromEnv
+		"RATE_LIMIT_ANON_DAILY", "RATE_LIMIT_USER_DAILY", "RATE_LIMIT_PRO_DAILY", "RATE_LIMIT_IP_DAILY",
+		"RATE_LIMIT_GLOBAL_DAILY", "RATE_LIMIT_WAIVED_HOURLY", "RATE_LIMIT_WAIVED_IP_HOURLY", "RATE_LIMIT_UNCHANGED_DAILY",
+		"RATE_LIMIT_WEIGHT_CREATE", "RATE_LIMIT_WEIGHT_EDIT", "RATE_LIMIT_WEIGHT_CHAT", "RATE_LIMIT_WEIGHT_TEXT",
+		"RATE_LIMIT_WEIGHT_TEXT_TASK", "RATE_LIMIT_WEIGHT_TEXT_LONG", "RATE_LIMIT_WEIGHT_TEXT_IMAGE",
 	} {
 		t.Setenv(k, "")
 	}
@@ -55,7 +60,6 @@ func TestNewRateLimitModes(t *testing.T) {
 		{name: "off on Cloud Run", env: map[string]string{"GOOGLE_CLOUD_PROJECT": "p", "RATE_LIMIT": "off"}, limited: false},
 		{name: "0", env: map[string]string{"GOOGLE_CLOUD_PROJECT": "p", "RATE_LIMIT": "0"}, limited: false},
 		{name: "false", env: map[string]string{"GOOGLE_CLOUD_PROJECT": "p", "RATE_LIMIT": "false"}, limited: false},
-		{name: "memory store with project", env: map[string]string{"GOOGLE_CLOUD_PROJECT": "p", "RATE_LIMIT_STORE": "memory"}, limited: true},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

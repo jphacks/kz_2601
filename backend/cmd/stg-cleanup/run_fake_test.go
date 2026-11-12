@@ -20,6 +20,7 @@ type fakeStore struct {
 	findErr  map[string]error // "smoke" | "rates" | "summarize"
 	purgeErr map[string]error // "app:<id>" | "owner:<id>" | "rates" | "user:<uid>" | "tree:<uid>"
 	calls    []string
+	onPurge  func(appID string) // called inside PurgeSmokeApp (to cancel midway)
 }
 
 func (f *fakeStore) FindSmokeData(context.Context) (store.SmokeData, error) {
@@ -40,8 +41,14 @@ func (f *fakeStore) SummarizeTestUser(_ context.Context, uid string) (store.Test
 	return store.TestUserSummary{UID: uid, Docs: map[string]int{}}, nil
 }
 
-func (f *fakeStore) PurgeSmokeApp(_ context.Context, uid, appID string) (store.PurgeResult, error) {
+func (f *fakeStore) PurgeSmokeApp(ctx context.Context, uid, appID string) (store.PurgeResult, error) {
 	f.calls = append(f.calls, "app:"+appID)
+	if f.onPurge != nil {
+		f.onPurge(appID)
+		if err := ctx.Err(); err != nil {
+			return store.PurgeResult{}, err
+		}
+	}
 	return store.PurgeResult{}, f.purgeErr["app:"+appID]
 }
 
@@ -270,6 +277,25 @@ func TestRunApplyInterruptedDeletesNothing(t *testing.T) {
 	}
 	if len(st.calls) != 0 || len(ents.calls) != 0 {
 		t.Fatalf("deleted after cancel: %v %v", st.calls, ents.calls)
+	}
+	if !strings.Contains(out.String(), "ERROR interrupted") {
+		t.Fatalf("output:\n%s", out.String())
+	}
+}
+
+func TestRunApplyInterruptedMidwayStops(t *testing.T) {
+	st, ents := newFake(), &fakeEnts{}
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	st.onPurge = func(string) { cancel() }
+	o := allOpts
+	o.apply, o.expect = true, allTargets
+	var out bytes.Buffer
+	if code := run(ctx, st, ents, o, &out); code != 1 {
+		t.Fatalf("code = %d, want 1", code)
+	}
+	if !slices.Equal(st.calls, []string{"app:smoke-1700000000"}) || len(ents.calls) != 0 {
+		t.Fatalf("calls after cancel: %v %v", st.calls, ents.calls)
 	}
 	if !strings.Contains(out.String(), "ERROR interrupted") {
 		t.Fatalf("output:\n%s", out.String())

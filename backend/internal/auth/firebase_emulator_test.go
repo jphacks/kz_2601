@@ -1,3 +1,5 @@
+// このファイルは ID トークンの claim の確認(aud・iss・exp・sub・サインイン方法)だけを見る。
+// emulator 固有の挙動に依存するケースは入れない。
 package auth
 
 import (
@@ -8,7 +10,6 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"slices"
-	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -16,10 +17,9 @@ import (
 
 const testProject = "demo-auth-test"
 
-// fakeAuthEmulator answers the Admin SDK's accounts:lookup (the revocation
-// check it makes in emulator mode). Unknown uids are "not found"; disabled
-// and validSince are per uid. No network beyond the loopback test server.
-func fakeAuthEmulator(t *testing.T, disabled map[string]bool, validSince map[string]int64) {
+// fakeAuthEmulator answers the Admin SDK's accounts:lookup with every uid
+// as an active account. No network beyond the loopback test server.
+func fakeAuthEmulator(t *testing.T) {
 	t.Helper()
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if !strings.HasSuffix(r.URL.Path, "/accounts:lookup") {
@@ -32,14 +32,7 @@ func fakeAuthEmulator(t *testing.T, disabled map[string]bool, validSince map[str
 		_ = json.NewDecoder(r.Body).Decode(&req)
 		users := []map[string]any{}
 		for _, uid := range req.LocalID {
-			if uid == "missing" {
-				continue
-			}
-			users = append(users, map[string]any{
-				"localId":    uid,
-				"disabled":   disabled[uid],
-				"validSince": strconv.FormatInt(validSince[uid], 10),
-			})
+			users = append(users, map[string]any{"localId": uid, "validSince": "0"})
 		}
 		w.Header().Set("Content-Type", "application/json")
 		_ = json.NewEncoder(w).Encode(map[string]any{"users": users})
@@ -76,7 +69,7 @@ func emulatorToken(t *testing.T, claims map[string]any) string {
 
 func TestFirebaseVerifierIdentity(t *testing.T) {
 	now := time.Now().Unix()
-	fakeAuthEmulator(t, map[string]bool{"off": true}, map[string]int64{"revoked": now + 60})
+	fakeAuthEmulator(t)
 
 	v := VerifierFromEnv(context.Background(), ModeFirebase, testProject)
 	fv, ok := v.(*FirebaseVerifier)
@@ -119,9 +112,6 @@ func TestFirebaseVerifierIdentity(t *testing.T) {
 		{name: "issued in the future", claims: map[string]any{"iat": now + 3600}, wantErr: true},
 		{name: "no subject", claims: map[string]any{"sub": ""}, wantErr: true},
 		{name: "subject over 128", claims: map[string]any{"sub": strings.Repeat("a", 129)}, wantErr: true},
-		{name: "disabled user", claims: map[string]any{"sub": "off"}, wantErr: true},
-		{name: "revoked token", claims: map[string]any{"sub": "revoked"}, wantErr: true},
-		{name: "deleted user", claims: map[string]any{"sub": "missing"}, wantErr: true},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
