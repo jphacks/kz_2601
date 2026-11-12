@@ -16,6 +16,14 @@ for key in NSHealthShareUsageDescription NSHealthUpdateUsageDescription NSHealth
   "$PB" -c "Delete :$key" "$PLIST" 2>/dev/null || true
 done
 
+# 訳(InfoPlist.xcstrings → *.lproj/InfoPlist.strings)に残るヘルスケアの説明も消す(#1986)
+for strings in "${TARGET_BUILD_DIR}/${UNLOCALIZED_RESOURCES_FOLDER_PATH}"/*.lproj/InfoPlist.strings; do
+  [ -f "$strings" ] || continue
+  for key in NSHealthShareUsageDescription NSHealthUpdateUsageDescription; do
+    "$PB" -c "Delete :$key" "$strings" 2>/dev/null || true
+  done
+done
+
 # UIBackgroundModes から location だけ外す(fetch = 裏の定期同期は残す)
 i=0
 while v=$("$PB" -c "Print :UIBackgroundModes:$i" "$PLIST" 2>/dev/null); do
