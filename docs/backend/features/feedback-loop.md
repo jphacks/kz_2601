@@ -113,6 +113,7 @@ flowchart LR
 | `LOOP_TRIAGE_MODEL` | `claude-haiku-5-5` | 振り分けのモデル |
 | `LOOP_MONTHLY_TOKEN_CAP` | `3000000` | 振り分けの月のトークンの上限 |
 | `LOOP_SOURCE_APPSTORE` | 空 | `on` でストアのレビューを取り込む |
+| `LOOP_SOURCE_GOOGLEPLAY` | 空 | `on` で Google Play のレビューを `LOOP_GOOGLEPLAY_PACKAGE`(必須・アプリのパッケージ名)の reviews.list から取り込む(`-source google_play_review`)。新しい順に 100 件ずつ・1 回 5 ページまで。続きの位置は `loop_control/cursor-google_play_review`。作者の名前・端末の詳細・返信の本文は持たない。鍵は env に置かず、実行するサービスアカウントの既定の認証で読む(Play Console でそのアカウントを招待するのは人)。Play の API は直近 1 週間ほどのレビューしか返さない。既定の `LOOP_AI_SOURCES` に入っていないので、AI に回すなら `google_play_review` を足す |
 | `LOOP_SOURCE_TESTFLIGHT` | 空 | `on` で TestFlight のフィードバック(スクショ付き・クラッシュの送信)を取り込む。キーは下の `LOOP_ASC_*` を共用。既定の `LOOP_AI_SOURCES` に入っていないので、AI に回すなら `testflight` を足す |
 | `LOOP_SOURCE_GENFAIL` | 空 | `on` で生成の失敗の急増を取り込む。`LOOP_GENFAIL_LOGS`(`gcloud logging read --format=json` で書き出したファイル・カンマ区切り。`cmd/ai-session-report -logs` と同じ形)の `ai.generate` の行から、失敗のコード(`outcome:failed` / `outcome:refused` / `error:<error_code>` / `retry:<retry_reasons>` / `validation:<validation_codes>`)ごとに、直近 `LOOP_GENFAIL_WINDOW`(既定 `24h`)の割合をその前の `LOOP_GENFAIL_BASELINE`(既定 `168h`)と比べる。件数が `LOOP_GENFAIL_MIN_COUNT`(既定 5)以上・割合が `LOOP_GENFAIL_MIN_RATE`(既定 0.05)以上・基準の `LOOP_GENFAIL_FACTOR`(既定 2)倍以上なら、コード 1 つ・1 日に 1 件。項目はコードと件数だけ(入力文・uid・アプリの id・ハッシュは持たない)。既定の `LOOP_AI_SOURCES` に入っていないので、AI に回すなら `gen_failure` を足す |
 | `LOOP_ASC_ISSUER_ID` / `LOOP_ASC_KEY_ID` / `LOOP_ASC_PRIVATE_KEY` / `LOOP_ASC_APP_ID` | — | App Store Connect API のキー(役割は Customer Support で足りる)。鍵は `.p8` の中身そのもの |

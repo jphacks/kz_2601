@@ -126,6 +126,25 @@ func TestIngestTestFlight(t *testing.T) {
 	}
 }
 
+func TestIngestGooglePlay(t *testing.T) {
+	ta := newTestApp(t, env{})
+	ta.googlePlay = fakeFetcher{src: ingest.SourceGooglePlay, raws: []ingest.Raw{{Source: ingest.SourceGooglePlay, SourceID: "gp:1", Text: "保存できない", CreatedAt: time.Now()}}}
+	if out := ta.must(t, "ingest"); strings.Contains(out, "google_play_review") {
+		t.Fatalf("google play ran while off: %s", out)
+	}
+	if err := ta.run(context.Background(), []string{"ingest", "-source", "google_play_review"}); !errors.Is(err, ingest.ErrGooglePlayOff) {
+		t.Fatalf("explicit source while off: %v", err)
+	}
+	ta.env[ingest.EnvGooglePlayOn] = "on"
+	if out := ta.must(t, "ingest", "-source", "google_play_review"); !strings.Contains(out, "ingest google_play_review: fetched 1, new 1 (held from AI 1)") {
+		t.Fatalf("out:\n%s", out)
+	}
+	ta.googlePlay = nil
+	if err := ta.run(context.Background(), []string{"ingest", "-source", "google_play_review"}); err == nil || !strings.Contains(err.Error(), ingest.EnvGooglePlayPackage) {
+		t.Fatalf("missing package: %v", err)
+	}
+}
+
 func TestIngestGenFailure(t *testing.T) {
 	ta := newTestApp(t, env{})
 	// hand-written export: 20 ai.generate lines in the last day, 6 failed

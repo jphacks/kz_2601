@@ -1,11 +1,19 @@
 package ingest
 
 import (
+	"bytes"
 	"context"
+	"encoding/json"
+	"errors"
 	"fmt"
 	"log/slog"
 	"slices"
+	"strings"
+	"sync"
 	"time"
+
+	androidpublisher "google.golang.org/api/androidpublisher/v3"
+	"google.golang.org/api/googleapi"
 
 	"github.com/jphacks/kz_2601/backend/internal/loop"
 	"github.com/jphacks/kz_2601/backend/internal/store"
@@ -111,4 +119,112 @@ func CrashRaw(s CrashSpike) Raw {
 		Text: fmt.Sprintf("クラッシュの急増: 種類 %s / %d 件 / 版 %s", truncate(s.Type, 80), s.Count, s.AppVersion),
 		Kind: "crash", Count: s.Count, AppVersion: s.AppVersion, CreatedAt: s.At,
 	}
+}
+
+// Google Play reviews (#2147). Off unless LOOP_SOURCE_GOOGLEPLAY=on; not in
+// the default LOOP_AI_SOURCES. The cursor is the Runner's
+// loop_control/cursor-google_play_review; masking happens at Normalize like
+// every other source.
+const (
+	EnvGooglePlayOn      = "LOOP_SOURCE_GOOGLEPLAY"
+	EnvGooglePlayPackage = "LOOP_GOOGLEPLAY_PACKAGE" // the app's package name
+)
+
+// ErrGooglePlayOff is returned by GooglePlayConfigFromEnv when the source is off.
+var ErrGooglePlayOff = errors.New("google play reviews are off (" + EnvGooglePlayOn + " != on)")
+
+// GooglePlayLister is the slice of reviews.list GooglePlayReviews uses,
+// small enough to fake in tests. token "" is the first page.
+type GooglePlayLister interface {
+	ListReviews(ctx context.Context, packageName, token string) (GooglePlayPage, error)
+}
+
+// GooglePlayReviews adapts reviews.list to Fetcher.
+type GooglePlayReviews struct {
+	Client  GooglePlayLister
+	Package string
+	// MaxPages bounds one run (100 reviews a page). Default 5.
+	MaxPages int
+}
+
+// Source implements Fetcher.
+func (GooglePlayReviews) Source() loop.Source { return SourceGooglePlay }
+
+// Fetch implements Fetcher: newest first (Play's order), stopping at the
+// first review last changed before since.
+func (g GooglePlayReviews) Fetch(ctx context.Context, since time.Time) ([]Raw, error) {
+	pages := g.MaxPages
+	if pages <= 0 {
+		pages = 5
+	}
+	out := []Raw{}
+	token := ""
+	for p := 0; p < pages; p++ {
+		page, err := g.Client.ListReviews(ctx, g.Package, token)
+		if err != nil {
+			return nil, fmt.Errorf("google play: %w", err)
+		}
+		for _, r := range page.Reviews {
+			if r.CreatedAt.Before(since) {
+				return out, nil
+			}
+			out = append(out, r.Raw())
+		}
+		if page.NextPageToken == "" {
+			return out, nil
+		}
+		if page.NextPageToken == token {
+			return nil, errors.New("google play: the page token did not move")
+		}
+		token = page.NextPageToken
+	}
+	slog.Warn("loop ingest: google play stopped at the page cap; older reviews after the cursor may be skipped", "pages", pages)
+	return out, nil
+}
+
+// GooglePlayConfigFromEnv reads LOOP_SOURCE_GOOGLEPLAY and the package. The
+// reader uses the application default credentials (the job's service
+// account, invited in the Play Console); no key is read from the env.
+func GooglePlayConfigFromEnv(getenv func(string) string) (GooglePlayReviews, error) {
+	if getenv(EnvGooglePlayOn) != "on" {
+		return GooglePlayReviews{}, ErrGooglePlayOff
+	}
+	pkg := strings.TrimSpace(getenv(EnvGooglePlayPackage))
+	if pkg == "" {
+		return GooglePlayReviews{}, fmt.Errorf("%s=on needs %s", EnvGooglePlayOn, EnvGooglePlayPackage)
+	}
+	return GooglePlayReviews{Client: &playAPI{}, Package: pkg}, nil
+}
+
+// playAPI is the GooglePlayLister over the Play Developer API. The service is
+// made on the first call. Error texts are the API's status, never a body.
+type playAPI struct {
+	once sync.Once
+	svc  *androidpublisher.Service
+	err  error
+}
+
+// ListReviews implements GooglePlayLister: the answer goes through the same
+// parser as the testdata.
+func (p *playAPI) ListReviews(ctx context.Context, pkg, token string) (GooglePlayPage, error) {
+	p.once.Do(func() { p.svc, p.err = androidpublisher.NewService(ctx) })
+	if p.err != nil {
+		return GooglePlayPage{}, p.err
+	}
+	call := p.svc.Reviews.List(pkg).MaxResults(100).Context(ctx)
+	if token != "" {
+		call = call.Token(token)
+	}
+	resp, err := call.Do()
+	if gerr := (*googleapi.Error)(nil); errors.As(err, &gerr) {
+		return GooglePlayPage{}, fmt.Errorf("status %d", gerr.Code)
+	}
+	if err != nil {
+		return GooglePlayPage{}, err
+	}
+	b, err := json.Marshal(resp)
+	if err != nil {
+		return GooglePlayPage{}, err
+	}
+	return ParseGooglePlayReviews(bytes.NewReader(b))
 }

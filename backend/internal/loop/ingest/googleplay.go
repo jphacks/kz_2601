@@ -14,8 +14,8 @@ import (
 )
 
 // Google Play reviews (#2147): the parser of one Play Developer API
-// reviews.list page. The reader (auth, paging, LOOP_SOURCE_GOOGLEPLAY) is a
-// follow-up; nothing here calls the API.
+// reviews.list page. The reader (auth, paging, LOOP_SOURCE_GOOGLEPLAY) is
+// GooglePlayReviews in sources.go; nothing here calls the API.
 //
 // Kept: the review's text, stars, app version, device, Android API level,
 // language, when it was last changed, and whether the developer replied.
