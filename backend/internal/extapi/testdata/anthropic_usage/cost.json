@@ -1,0 +1,21 @@
+{
+  "data": [
+    {
+      "starting_at": "2026-11-10T00:00:00Z",
+      "ending_at": "2026-11-11T00:00:00Z",
+      "results": [
+        {"currency": "USD", "amount": "123.5", "workspace_id": null, "description": "Claude Sonnet Usage - Input Tokens", "cost_type": "tokens", "context_window": "0-200k", "model": "claude-sonnet-4-5", "service_tier": "standard", "token_type": "uncached_input_tokens"},
+        {"currency": "USD", "amount": "76.5", "description": "Claude Sonnet Usage - Output Tokens", "cost_type": "tokens", "model": "claude-sonnet-4-5", "token_type": "output_tokens"}
+      ]
+    },
+    {
+      "starting_at": "2026-11-11T00:00:00Z",
+      "ending_at": "2026-11-12T00:00:00Z",
+      "results": [
+        {"currency": "USD", "amount": "5", "description": "Web Search", "cost_type": "web_search"}
+      ]
+    }
+  ],
+  "has_more": false,
+  "next_page": null
+}
