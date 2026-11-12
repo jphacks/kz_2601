@@ -267,6 +267,7 @@ flowchart LR
 - [決定事項](docs/00_decisions.md)
 - [目標と要件](docs/01_goals_and_requirements.md)
 - [DSL の仕様・部品一覧](docs/dsl/README.md)
+- [デスクトップ版(Windows・Linux)](desktop/README.md): 同じ画面の定義(DSL)を Windows・Linux で描く版。動かすには JDK 17 以上が要る
 - 設計: [iOS](docs/ios/architecture.md) / [バックエンド](docs/backend/architecture.md) / [GCP の構成](docs/infra/gcp-setup.md)
 - [生成の品質と速さの計測](docs/backend/ai-eval)
 - [発表のデモ台本](docs/03_demo_script.md)

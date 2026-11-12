@@ -168,7 +168,7 @@ func (h *Handler) getMyUsage(w http.ResponseWriter, r *http.Request) {
 		if n, err := pk.Peek(ctx, []ratelimit.Counter{{ID: u.cfg.Rate.UserCounterID(day, uid)}}); err != nil {
 			slog.WarnContext(ctx, "appconfig: usage: ai units read failed", slog.Any("error", err))
 		} else {
-			lim := u.cfg.Rate.DailyLimit(tier)
+			lim := u.cfg.Rate.PlatformDailyLimit(tier, httpx.ClientPlatform(r)) // same OS override as ai (#2133)
 			out.AI = &AIUsage{UsageMeter: *meter(n[0], lim, true), Weights: UsageWeights(u.cfg.Rate.Weights)}
 		}
 	}
