@@ -4,6 +4,7 @@
 //
 //	purchases.subscriptionsv2.get        Subscription
 //	purchases.subscriptions.acknowledge  Acknowledge
+//	purchases.voidedpurchases.list       VoidedPurchases
 package googleplay
 
 import (
@@ -84,6 +85,22 @@ func (s *Subscription) Item(productIDs []string) (LineItem, bool) {
 type API interface {
 	Subscription(ctx context.Context, packageName, token string) (*Subscription, error)
 	Acknowledge(ctx context.Context, packageName, productID, token string) error
+	VoidedPurchases(ctx context.Context, packageName string, since time.Time, pageToken string) (*VoidedPage, error)
+}
+
+// VoidedPurchase is one refunded / revoked / charged-back purchase. Token is a
+// purchase token: match it, never log it.
+type VoidedPurchase struct {
+	Token      string
+	OrderID    string // a subscription renewal has its own order id
+	VoidedTime time.Time
+	Reason     int64 // voidedReason: 0 other, 1 remorse, ... 7 chargeback, 8 unacknowledged
+}
+
+// VoidedPage is one page of voidedpurchases.list; NextPageToken is "" on the last.
+type VoidedPage struct {
+	Purchases     []VoidedPurchase
+	NextPageToken string
 }
 
 // Client implements API with androidpublisher v3.
@@ -151,6 +168,46 @@ func (c *Client) Acknowledge(ctx context.Context, packageName, productID, token 
 		return apiErr(err)
 	}
 	return nil
+}
+
+// voidedSubscriptions is voidedpurchases.list type=1 (in-app and
+// subscriptions; Tailor It sells only subscriptions).
+const voidedSubscriptions = 1
+
+// VoidedPurchases implements API (purchases.voidedpurchases.list). since is
+// the oldest voided time to list (Play keeps 30 days; zero = Play's default)
+// and is ignored with a pageToken.
+func (c *Client) VoidedPurchases(ctx context.Context, packageName string, since time.Time, pageToken string) (*VoidedPage, error) {
+	call := c.svc.Purchases.Voidedpurchases.List(packageName).Type(voidedSubscriptions).Context(ctx)
+	if pageToken != "" {
+		call = call.Token(pageToken)
+	} else if !since.IsZero() {
+		call = call.StartTime(since.UnixMilli())
+	}
+	r, err := call.Do()
+	if err != nil {
+		var gerr *googleapi.Error
+		if errors.As(err, &gerr) { // not a token lookup: no ErrNotFound
+			return nil, fmt.Errorf("googleplay: voidedpurchases: HTTP %d", gerr.Code)
+		}
+		return nil, apiErr(err)
+	}
+	page := &VoidedPage{}
+	if r.TokenPagination != nil {
+		page.NextPageToken = r.TokenPagination.NextPageToken
+	}
+	for _, v := range r.VoidedPurchases {
+		if v == nil {
+			continue
+		}
+		page.Purchases = append(page.Purchases, VoidedPurchase{
+			Token:      v.PurchaseToken,
+			OrderID:    v.OrderId,
+			VoidedTime: time.UnixMilli(v.VoidedTimeMillis).UTC(),
+			Reason:     v.VoidedReason,
+		})
+	}
+	return page, nil
 }
 
 // apiErr maps "no such token" answers to ErrNotFound. The error text never
