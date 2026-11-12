@@ -34,7 +34,7 @@ TAILORIT_API=stg TAILORIT_DEV_TOKEN=<Firebase の ID トークン> ./gradlew :de
 - サインインはまだ無い。
 - 言語: OS の言語が日本語なら日本語、それ以外は英語。`TAILORIT_LANG=en`(または `-Dtailorit.lang=en`)で替えられる。文言は Android の `strings*.xml` をビルド時にそのまま同梱し、同じキーで引く(引けなければ英語 → 日本語)。
 - 明暗: OS のダークモードに従う(Windows はレジストリ、Linux は freedesktop の color-scheme か GNOME の設定、起動中の切り替えも 5 秒ごとに追う)。`TAILORIT_THEME=light / dark` で固定できる。
-- 読み上げ: 見出し・タブ(選択中)・ダイアログの名前・知らせ(live region)・絵で描く部品(グラフ・進み具合・メーター・星・画像)の説明を付けている。Windows は Java Access Bridge を通す(`jabswitch -enable` が要る)。Linux の Orca は JDK に橋渡しが無く、まだ読めない。
+- 読み上げ: 見出し・タブ(選択中)・ダイアログの名前・知らせ(live region)・絵で描く部品(グラフ・進み具合・メーター・星・画像)の説明を付けている。Windows は Java Access Bridge を通す(`jabswitch -enable` が要る)。Linux の Orca は JDK に AT-SPI への橋渡しが無く、まだ読めない。ディストリの java-atk-wrapper で読む時の入れ方・確かめ方・限界は [docs/ux/desktop-linux-orca.md](../docs/ux/desktop-linux-orca.md)(#2066 は未決。今の deb / rpm は入れるだけでは読めない見込み)。
 - ファイル: `fileImport` で CSV(取り込みの確認を出す)・テキスト・PDF(本文)を取り込む。大きすぎるファイルは読む前に断る(CSV・テキストは 5 MB、PDF は 30 MB まで。一覧に落とした CSV も同じ)。
 - ドラッグ & ドロップ: 画面に写真・動画・CSV・テキスト・PDF を落とすと、photoField / videoField / fileImport / list に振り分ける。外へ引き出すこともできる(`io/DragOut.kt`): list・table の行は、選んだ行を引くと選んだ行全部、選んでいない行ならその 1 行を、文字はコピーと同じ TSV(見出し付き)、ファイルを受けるアプリ(エクスプローラーなど)には `<一覧名>.csv` で渡す。写真・image・一覧の行のサムネイルは PNG のファイルで渡す。ファイルは落とした時に OS の一時フォルダ(`tailorit-drag/`)へ書き、アプリを閉じると消える(落ちて残った分は次の起動で、1 日より古い物を消す)。
 - クリップボード: 一覧の「表をコピー」で表計算に貼れる TSV、「表を貼り付け」で表計算の行を取り込む。list・table の行はクリックで選び、Shift+クリックで範囲、Ctrl+クリック(macOS は ⌘)で足し引き、Ctrl+A で全部。選んでいる時は Ctrl+C と「表をコピー」が選んだ行だけを同じ TSV(見出し付き)でコピーする(table は見えている列)。詳細へ移る行(onItemTap)は修飾キー無しのクリックで今までどおり開く(`RowSelection.kt`)。画像は Ctrl+V で photoField へ。
