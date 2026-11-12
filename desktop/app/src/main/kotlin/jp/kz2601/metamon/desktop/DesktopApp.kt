@@ -218,7 +218,7 @@ internal fun confirmLabel(a: Action): String = Strings[
         jp.kz2601.metamon.dsl.ActionType.DELETE_RECORD -> "runtime_confirm_delete"
         jp.kz2601.metamon.dsl.ActionType.SAVE_RECORD -> "runtime_confirm_save"
         jp.kz2601.metamon.dsl.ActionType.EXPORT -> "runtime_confirm_export"
-        jp.kz2601.metamon.dsl.ActionType.OPEN_URL -> "runtime_confirm_open"
+        jp.kz2601.metamon.dsl.ActionType.NAVIGATE, jp.kz2601.metamon.dsl.ActionType.OPEN_URL -> "runtime_confirm_open"
         jp.kz2601.metamon.dsl.ActionType.RESET_FORM -> "runtime_confirm_reset"
         else -> "runtime_confirm_continue"
     },
