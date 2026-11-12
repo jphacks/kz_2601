@@ -325,6 +325,8 @@ targets:
       - path: Metamon/Features/Auth/AuthSession.swift
       # 共有のリンク(#1287): 参加できない理由(403)の文言は iOS のファイルをそのまま使う
       - path: Metamon/Features/Share/SharedAccessCopy.swift
+      # 「探す」(#2069): カード・部品のアイコン・並び順・文言は iOS のファイルをそのまま使う(画面と検索の状態は MacDiscoverView)
+      - path: Metamon/Features/Share/PublicAppCard.swift
       # 「みんなに公開」(#2070): 公開前の注意・タグの区切り・表示できない言葉の文言は iOS のファイルをそのまま使う
       - path: Metamon/Features/Share/PublishCopy.swift
       # 設定の「つないだサービス」(#1714): 一覧の並べ方・戻り先の読み方・つなぐ / 切るの状態は iOS のファイルをそのまま使う
