@@ -420,6 +420,15 @@ func checkImport(app *dsl.App, spec SheetImport) (*dsl.Entity, func(string) *dsl
 	if ent == nil {
 		return nil, nil, fmt.Errorf("%w: entity %q is not in the app", ErrImportSpec, spec.Entity)
 	}
+	// the same targets as fileImport (pkg/dsl/file_import.go)
+	switch {
+	case ent.EffectiveScope() == dsl.ScopePublic:
+		return nil, nil, fmt.Errorf("%w: cannot add to public entity %q", ErrImportSpec, ent.ID)
+	case ent.Single:
+		return nil, nil, fmt.Errorf("%w: cannot add to single entity %q", ErrImportSpec, ent.ID)
+	case ent.Match != "":
+		return nil, nil, fmt.Errorf("%w: cannot add to match entity %q", ErrImportSpec, ent.ID)
+	}
 	usable := func(f *dsl.Field) error {
 		if f.Computed != nil || f.Encrypted {
 			return fmt.Errorf("%w: field %q is computed or encrypted", ErrImportSpec, f.ID)
