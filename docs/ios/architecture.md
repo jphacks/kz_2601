@@ -228,6 +228,7 @@ DSL 差し替え時(`apply`)は paths/sheet を全部リセットする(画面 i
 | 同意 | 設定の「他の人の行動で届く通知」(共有・公開の記録があるアプリで、作成者以外)が `PUT /v1/me/notify-consent/{appId}`。参加の画面で「参加する」を押すと有効。読む API が無いので値は端末の控え(`NotifyConsentStore`)で、ログアウトや入れ直しの後はオフに見える |
 | タップ | 本文の `appId` を `IntentHost` に渡して開く(bootstrap の前なら待つ)。ローカル通知に `appId` は無い |
 | entitlement | `Metamon.entitlements` の `aps-environment` = `$(METAMON_APS_ENV)`(`project.yml`。Debug / Staging は development、Release は production・#683)。審査用の `Metamon-Review.entitlements` には入れない。App ID の Push Notifications は自動署名が付ける(手動署名なら人が App ID で有効にして profile を作り直す)。登録に失敗しても利用者には何も出さない |
+| Mac(#982) | 同じ `PushDeviceRegistrar` を使い、OS とのやり取りだけ `MetamonMac/App/Push/MacPushHost.swift`。サーバーに platform は送らず(= ios・APNs)、`os` で Mac と分かる。タップは起動直後なら一覧が載るまで最大 30 秒待つ。詳細は [Mac の OS との連携](../mac/system-integration.md#プッシュ通知) |
 
 ## 6. 音声入力画面とホットリロード
 
@@ -528,6 +529,7 @@ DEBUG フック: `METAMON_AUTO_SWITCHER=1`(起動 2.5 秒後に変身一覧を�
 
 - サービスは `MetamonServices` の `SharingClient`(`HTTPSharingClient`)。`Services.sharing` は appconfig が live の時だけ非 nil で、モック起動では導線ごと出さない。
 - 共有データ(scope: shared/public)を持つアプリは受け取ると**元の appId に参加**する([backend features/sharing.md](../backend/features/sharing.md))。要約カードに「みんなの投稿も見られます」を添える。
+- Handoff(#1851): 生成アプリを開いている間、`RootView` の `HandoffAdvertiser` が `jp.kz2601.metamon.view`(`appId`・`screenId`・`recordId` だけ・`ios/Shared/Runtime/HandoffActivity.swift`)を出し、Mac と引き継ぐ。受けるのは `ShareLinkReceiver` と同じ所で、`IntentHost` に保留してサインインと bootstrap の後に開く(60 秒で捨てる)。審査用の版では出さず受けない。詳細は [Mac の OS との連携](../mac/system-integration.md#handoff)。
 - DEBUG フック: `METAMON_AUTO_SHARE=1`(変身一覧 → 今のアプリのシェアシート)/ `METAMON_AUTO_IMPORT=<token>`(リンクを開いたのと同じ経路。`simctl openurl` は OS の確認ダイアログで止まるため)/ `METAMON_AUTO_DISCOVER=1`(+ `METAMON_AUTO_INSTALL=<公開 id>`)。
 - 注意: 端末ローカルの `DocumentCache` / レコードキャッシュは uid を区別しないので、同じ端末で `METAMON_DEV_UID` を切り替えると前ユーザーのキャッシュが一瞬見える(サーバーは正しく分離)。2 ユーザー検証はアプリを入れ直してから行う。
 
@@ -723,6 +725,7 @@ MetamonWidget(拡張) ──▶ WidgetSnapshot.load() を描画(systemSmall=1 �
 | 実機署名 | App Group capability を **本体と拡張の 2 つの App ID** に付ける必要がある。`xcodebuild -allowProvisioningUpdates DEVELOPMENT_TEAM=<TEAM>` の自動署名で付与される(有料 Program 必須)。通らない時は Apple Developer > Identifiers > App Groups で `group.jp.kz2601.metamon` を作成 → 両 App ID の Capabilities で App Groups にチェック |
 | シミュレータ | 署名なし(`CODE_SIGNING_ALLOWED=NO`)でも App Group の UserDefaults は動く。ウィジェットの配置はホーム画面長押し → + → 「Tailor It」 |
 | ロック画面(#423) | 同じウィジェット(`MetamonStatWidget`)の `supportedFamilies` に accessory 3 種を足しただけ。データ・更新経路はホーム画面と共通。ロック画面は単色(vibrant)で描かれるので色に頼らず太さで区別(`MetamonWidget/AccessoryViews.swift`)。配置はロック画面長押し → カスタマイズ → ロック画面 → ウィジェット |
+| Mac(#984) | 拡張 `MetamonMacWidget`(小・中・大)。見た目・`WidgetSnapshot`・`WidgetSnapshotWriter`・文言・App Group は共有し、スナップショットに `appId`(省略可)を足した。押すと `tailorit://widget?app=<appId>`。メニューバーの stat も同じ集計を使う。詳細は [Mac の OS との連携](../mac/system-integration.md#ウィジェット) |
 
 ### 12.1 ライブアクティビティ(ActivityKit・Issue #423)
 ロック画面のバナーと Dynamic Island(compact / expanded / minimal)に「タイマー」「いま◯◯中」を出す。**更新は端末内だけ(push しない)**。時間は日付で渡し OS が描くので、アプリが止まっていても数字は進む。
@@ -968,6 +971,8 @@ Siri / ショートカット ──(本体プロセス内で実行。拡張タ�
 Info.plist: `NSLocalNetworkUsageDescription` と `NSBonjourServices`(`_tailorit-mc._tcp` / `_udp`。`NearbyService.serviceType = "tailorit-mc"` と一致)。
 
 **Core Bluetooth(BLE 直叩き)は後続**: MultipeerConnectivity が Bluetooth を内部で使うので iOS 同士はこれで足りる。BLE を直接使う意味があるのは Android / マイコン等の非 Apple 端末やバックグラウンドでのビーコン的な検出だが、GATT のサービス設計・分割転送(MTU ~180B)・ペアリング UX・`NSBluetoothAlwaysUsageDescription` とバックグラウンドモードが要り、デモの範囲を超える。必要になったら `NearbyShare.Payload` をそのまま運ぶ別トランスポートとして足す。
+
+**Mac(#964)**: `NearbyService` をそのまま Mac のターゲットに入れ、`MacAppRuntime` が `NearbyHost`。待ち受けの判定 `AppDSL.usesNearbyReceive` は `ios/Shared/Runtime/NearbyReceive.swift` で共有。すれ違い通信(§19.1)は Mac では使えない枠。詳細は [Mac の OS との連携](../mac/system-integration.md#近くの端末に送るnearbyshare)。
 
 確認:
 - 単体: `NearbyShareTests`(MetamonDSL・`swift test` で macOS 上で回る)。エンコード/デコード・未知キー・取り込み判定・sanitize・件数上限。
