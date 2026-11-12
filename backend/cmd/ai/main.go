@@ -3,6 +3,7 @@ package main
 
 import (
 	"context"
+	"fmt"
 	"log"
 	"log/slog"
 	"net/http"
@@ -236,7 +237,11 @@ func newRateLimit(verifier auth.IdentityVerifier, client *firestore.Client, pro 
 		store = ratelimit.NewFirestore(client, plan.Collection)
 	}
 	cfg := plan.Config
-	log.Printf("ai: rate limit on (store=%s env=%q limits=%+v weights=%+v pro=%v)", plan.Store, cfg.Env, cfg.Limits, cfg.Weights, pro != nil)
+	perOS := ""
+	if len(cfg.PlatformLimits) > 0 { // RATE_LIMIT_*_DAILY_<OS> (#2133)
+		perOS = fmt.Sprintf(" platformLimits=%v", cfg.PlatformLimits)
+	}
+	log.Printf("ai: rate limit on (store=%s env=%q limits=%+v%s weights=%+v pro=%v)", plan.Store, cfg.Env, cfg.Limits, perOS, cfg.Weights, pro != nil)
 	return ratelimit.New(cfg, store, pro).Middleware(verifier)
 }
 

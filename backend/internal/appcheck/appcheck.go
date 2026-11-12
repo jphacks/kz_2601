@@ -1,6 +1,6 @@
 // Package appcheck verifies Firebase App Check tokens (#318).
 //
-// iOS sends the token in X-Firebase-AppCheck. APP_CHECK_MODE decides what a
+// iOS and Android send the token in X-Firebase-AppCheck. APP_CHECK_MODE decides what a
 // missing or bad token does:
 //
 //	off      (default) nothing is verified; the header is ignored
