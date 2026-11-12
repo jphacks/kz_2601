@@ -29,6 +29,7 @@ import (
 	"os"
 	"strings"
 	"time"
+	"unicode/utf8"
 
 	"github.com/jphacks/kz_2601/backend/internal/ai"
 	"github.com/jphacks/kz_2601/backend/internal/appconfigclient"
@@ -559,6 +560,9 @@ func cell(s string) string {
 func trunc(s string, n int) string {
 	if len(s) <= n {
 		return s
+	}
+	for n > 0 && !utf8.RuneStart(s[n]) { // do not split a multi-byte rune
+		n--
 	}
 	return s[:n] + "…"
 }
