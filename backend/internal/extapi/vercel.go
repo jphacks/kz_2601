@@ -20,13 +20,24 @@ import (
 //	projects(limit?)                     the projects and their production deployment
 //	deployments(project?, target?, limit?)  the newest deployments
 //
-// An integration's OAuth has no scope parameter, no PKCE and no refresh
-// token: what it may read is set on the integration (Vercel's console:
-// Projects read, Deployments read), and the token lasts until the person
-// removes the integration. Disconnecting here deletes the stored token
-// only (ErrNoRevoke); the integration is removed on Vercel's side.
-// A token installed on a team needs ?teamId=: the team id from the token
-// answer is kept with the token as the pseudo-scope "team:<id>".
+// An integration's OAuth has no scope parameter, no PKCE (the token
+// exchange takes no code_verifier; the client secret stays on the runner)
+// and no refresh token: what it may read is set on the integration
+// (Vercel's console: Projects read, Deployments read, Integration
+// Configuration read/write for the uninstall below), and the token lasts
+// until the integration is removed.
+//
+// Vercel has no token revoke; removing the integration's installation
+// (DELETE /v1/integrations/configuration/{installation_id}) is what ends
+// the token. Revoke does that, best effort: the stored token is deleted
+// either way, and without the installation id it is ErrNoRevoke.
+//
+// The team id is optional: null in the token answer is a personal account
+// (no ?teamId=). A token installed on a team needs ?teamId=: the team id is
+// validated (team_…) and kept with the token as the pseudo-scope
+// "team:<id>"; a team id that does not look like one fails the exchange
+// rather than silently reading the personal account. The installation id
+// is kept the same way ("installation:<id>").
 //
 // Env: EXT_VERCEL_ENABLED=1, EXT_VERCEL_CLIENT_ID / _CLIENT_SECRET (Secret
 // Manager), EXT_VERCEL_INTEGRATION_SLUG (the integration's URL name). Off
@@ -50,7 +61,10 @@ var vercelWireDefault = vercelWire{
 // only the API host: the consent page is opened by the device
 var vercelHosts = []string{"https://api.vercel.com"}
 
-const vercelTeamScope = "team:"
+const (
+	vercelTeamScope         = "team:"
+	vercelInstallationScope = "installation:"
+)
 
 func init() {
 	register(Provider{ID: Vercel, Billing: BillingFree, NeedsOAuth: true, NameJa: "Vercel", NameEn: "Vercel",
@@ -82,6 +96,7 @@ type vercel struct {
 var (
 	vercelSlugRe    = regexp.MustCompile(`^[a-z0-9][a-z0-9-]{0,63}$`)
 	vercelTeamRe    = regexp.MustCompile(`^team_[A-Za-z0-9]{1,64}$`)
+	vercelInstallRe = regexp.MustCompile(`^icfg_[A-Za-z0-9]{1,64}$`)
 	vercelProjectRe = regexp.MustCompile(`^(prj_[A-Za-z0-9]{1,64}|[a-z0-9][a-z0-9._-]{0,99})$`)
 	vercelHostRe    = regexp.MustCompile(`^[a-z0-9][a-z0-9.-]{0,252}\.vercel\.app$`)
 )
@@ -133,15 +148,22 @@ func (c *vercel) Exchange(ctx context.Context, code, _, redirectURI string) (Tok
 		return Token{}, statusError(resp.StatusCode)
 	}
 	var r struct {
-		AccessToken string  `json:"access_token"`
-		TeamID      *string `json:"team_id"`
+		AccessToken    string  `json:"access_token"`
+		TeamID         *string `json:"team_id"`
+		InstallationID string  `json:"installation_id"`
 	}
 	if err := json.Unmarshal(body, &r); err != nil || r.AccessToken == "" {
 		return Token{}, errors.New("vercel: bad token answer")
 	}
 	t := Token{AccessToken: r.AccessToken}
-	if r.TeamID != nil && vercelTeamRe.MatchString(*r.TeamID) {
-		t.Scopes = []string{vercelTeamScope + *r.TeamID}
+	if r.TeamID != nil && *r.TeamID != "" {
+		if !vercelTeamRe.MatchString(*r.TeamID) {
+			return Token{}, errors.New("vercel: bad team id in the token answer")
+		}
+		t.Scopes = append(t.Scopes, vercelTeamScope+*r.TeamID)
+	}
+	if vercelInstallRe.MatchString(r.InstallationID) {
+		t.Scopes = append(t.Scopes, vercelInstallationScope+r.InstallationID)
 	}
 	return t, nil
 }
@@ -150,16 +172,48 @@ func (c *vercel) Exchange(ctx context.Context, code, _, redirectURI string) (Tok
 // service only asks when an expiry was given).
 func (c *vercel) Refresh(context.Context, Token) (Token, error) { return Token{}, ErrInvalidGrant }
 
-// Revoke: Vercel has no token revoke; the person removes the integration.
-func (c *vercel) Revoke(context.Context, Token) error { return ErrNoRevoke }
+// Revoke removes the integration's installation, which ends the token
+// (Vercel has no token revoke). 2xx, and 401 / 404 / 410 (the token or the
+// installation is already gone) are done. Without the installation id it
+// is ErrNoRevoke: the person removes the integration on Vercel's side.
+func (c *vercel) Revoke(ctx context.Context, t Token) error {
+	id := vercelScope(&t, vercelInstallationScope, vercelInstallRe)
+	if id == "" || t.AccessToken == "" {
+		return ErrNoRevoke
+	}
+	u := c.wire.APIBase + "/v1/integrations/configuration/" + url.PathEscape(id)
+	if team := vercelTeam(&t); team != "" {
+		u += "?" + url.Values{"teamId": {team}}.Encode()
+	}
+	req, err := http.NewRequestWithContext(ctx, http.MethodDelete, u, nil)
+	if err != nil {
+		return err
+	}
+	req.Header.Set("Authorization", "Bearer "+t.AccessToken)
+	resp, err := c.hc.Do(req)
+	if err != nil {
+		return transportError(ctx, err)
+	}
+	defer func() { _ = resp.Body.Close() }()
+	_, _ = ReadBody(resp.Body)
+	switch {
+	case resp.StatusCode >= 200 && resp.StatusCode < 300,
+		resp.StatusCode == http.StatusUnauthorized, resp.StatusCode == http.StatusNotFound, resp.StatusCode == http.StatusGone:
+		return nil
+	}
+	return &ProviderError{Status: resp.StatusCode, Retryable: resp.StatusCode >= 500, Err: errors.New("vercel: uninstall refused")}
+}
 
 // vercelTeam is the team the token was installed on ("" = a personal account).
-func vercelTeam(t *Token) string {
+func vercelTeam(t *Token) string { return vercelScope(t, vercelTeamScope, vercelTeamRe) }
+
+// vercelScope reads a pseudo-scope kept with the token.
+func vercelScope(t *Token, prefix string, re *regexp.Regexp) string {
 	if t == nil {
 		return ""
 	}
 	for _, s := range t.Scopes {
-		if id, ok := strings.CutPrefix(s, vercelTeamScope); ok && vercelTeamRe.MatchString(id) {
+		if id, ok := strings.CutPrefix(s, prefix); ok && re.MatchString(id) {
 			return id
 		}
 	}

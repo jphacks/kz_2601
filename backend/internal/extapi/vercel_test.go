@@ -24,6 +24,8 @@ type fakeVercel struct {
 	teamID    any // the token answer's team_id (nil = a personal account)
 	lastPath  string
 	lastQuery url.Values
+	// uninstalled are the installation ids DELETEd (with their query)
+	uninstalled []string
 }
 
 func newFakeVercel(t *testing.T) (*fakeVercel, *httptest.Server) {
@@ -61,6 +63,28 @@ func newFakeVercel(t *testing.T) (*fakeVercel, *httptest.Server) {
 		}
 		return false
 	}
+	mux.HandleFunc("DELETE /v1/integrations/configuration/{id}", func(w http.ResponseWriter, r *http.Request) {
+		switch strings.TrimPrefix(r.Header.Get("Authorization"), "Bearer ") {
+		case "vc-access":
+		case "noaccess":
+			writeJSON(w, 403, map[string]any{"error": map[string]string{"code": "forbidden"}})
+			return
+		case "busy":
+			writeJSON(w, 503, map[string]any{})
+			return
+		default:
+			writeJSON(w, 401, map[string]any{"error": map[string]string{"code": "unauthorized"}})
+			return
+		}
+		if r.PathValue("id") == "icfg_gone" {
+			writeJSON(w, 404, map[string]any{})
+			return
+		}
+		f.mu.Lock()
+		defer f.mu.Unlock()
+		f.uninstalled = append(f.uninstalled, r.PathValue("id")+"?"+r.URL.RawQuery)
+		w.WriteHeader(http.StatusNoContent)
+	})
 	mux.HandleFunc("GET /v9/projects", func(w http.ResponseWriter, r *http.Request) {
 		if !authed(w, r) {
 			return
@@ -168,6 +192,46 @@ func TestVercelFlow(t *testing.T) {
 	if c, _, _ := e.mem.Get(ctx, user, Vercel); c.Status != StatusRevoked || len(c.Sealed) != 0 {
 		t.Fatalf("after revoke %+v", c)
 	}
+	// disconnecting removes the installation on Vercel's side (the token ends)
+	if len(f.uninstalled) != 1 || f.uninstalled[0] != "icfg_1?teamId=team_abc123" {
+		t.Fatalf("uninstalled %v", f.uninstalled)
+	}
+}
+
+func TestVercelRevoke(t *testing.T) {
+	c, f := vercelTestClient(t)
+	ctx := context.Background()
+	inst := func(tok, id string) Token {
+		return Token{AccessToken: tok, Scopes: []string{vercelInstallationScope + id}}
+	}
+	// a personal install: no teamId
+	if err := c.Revoke(ctx, inst("vc-access", "icfg_2")); err != nil || len(f.uninstalled) != 1 || f.uninstalled[0] != "icfg_2?" {
+		t.Fatalf("personal: %v %v", err, f.uninstalled)
+	}
+	// already gone (404) or the token already dead (401): done
+	if err := c.Revoke(ctx, inst("vc-access", "icfg_gone")); err != nil {
+		t.Fatalf("404: %v", err)
+	}
+	if err := c.Revoke(ctx, inst("dead", "icfg_3")); err != nil {
+		t.Fatalf("401: %v", err)
+	}
+	// not allowed to uninstall (403) / Vercel down: an error (logged; the token is deleted anyway)
+	var pe *ProviderError
+	if err := c.Revoke(ctx, inst("noaccess", "icfg_4")); !errors.As(err, &pe) || pe.Status != 403 || pe.Retryable {
+		t.Fatalf("403: %v", err)
+	}
+	if err := c.Revoke(ctx, inst("busy", "icfg_5")); !errors.As(err, &pe) || !pe.Retryable {
+		t.Fatalf("503: %v", err)
+	}
+	// no (or a bad) installation id, or no token: nothing to call
+	for _, tok := range []Token{{AccessToken: "vc-access"}, inst("vc-access", "../x"), inst("", "icfg_6")} {
+		if err := c.Revoke(ctx, tok); !errors.Is(err, ErrNoRevoke) {
+			t.Fatalf("%v: %v", tok.Scopes, err)
+		}
+	}
+	if len(f.uninstalled) != 1 {
+		t.Fatalf("uninstalled %v", f.uninstalled)
+	}
 }
 
 func TestVercelDeployments(t *testing.T) {
@@ -225,17 +289,23 @@ func TestVercelErrors(t *testing.T) {
 	if _, err := c.Refresh(ctx, Token{AccessToken: "vc-access"}); !errors.Is(err, ErrInvalidGrant) {
 		t.Fatalf("refresh: %v", err)
 	}
-	if err := c.Revoke(ctx, Token{AccessToken: "vc-access"}); !errors.Is(err, ErrNoRevoke) {
-		t.Fatalf("revoke: %v", err)
-	}
-	// a personal install has no team; a bad team id is not kept
-	for _, team := range []any{nil, "../x"} {
+	// a personal install has no team (the team id is optional)
+	for _, team := range []any{nil, ""} {
 		f, srv := newFakeVercel(t)
 		f.teamID = team
 		c, _ := newVercel(Secrets{ClientID: vercelTestID, ClientSecret: vercelTestSecret}, vercelTestSlug, vercelTestWire(srv))
 		tok, err := c.Exchange(ctx, "vc-code", "", "https://runner.example/oauth/callback/vercel")
-		if err != nil || len(tok.Scopes) != 0 || vercelTeam(&tok) != "" {
+		if err != nil || vercelTeam(&tok) != "" || strings.Join(tok.Scopes, ",") != "installation:icfg_1" {
 			t.Fatalf("team %v: %v %v", team, err, tok.Scopes)
+		}
+	}
+	// a team id that is not one fails the exchange (never falls back to the personal account)
+	for _, team := range []any{"../x", "team_a&teamId=team_b", 42} {
+		f, srv := newFakeVercel(t)
+		f.teamID = team
+		c, _ := newVercel(Secrets{ClientID: vercelTestID, ClientSecret: vercelTestSecret}, vercelTestSlug, vercelTestWire(srv))
+		if tok, err := c.Exchange(ctx, "vc-code", "", "https://runner.example/oauth/callback/vercel"); err == nil {
+			t.Fatalf("team %v: kept %v", team, tok.Scopes)
 		}
 	}
 }
