@@ -6,14 +6,19 @@ import MetamonServices
 /// 生成したアプリの「元に戻す / やり直す」をサーバーの版につなぐ(#1279)。届かない時は端末の履歴
 @MainActor
 final class MacServerVersionsTests: XCTestCase {
-    /// サーバーの版の偽物。restore は新しい版を積む(サーバーと同じ)
+    /// サーバーの版の偽物。restore は新しい版を積む(サーバーと同じく親の版と restore の元を返す)
     private actor FakeVersions: AppConfigClient {
         var docs: [Int: AppDocument] = [:]
+        var summaries: [Int: VersionSummary] = [:]
         var latest = 0
         var reachable = true
         var restored: [Int] = []
 
-        func push(_ doc: AppDocument) {
+        func push(_ doc: AppDocument, restoredFrom: Int? = nil) {
+            let parent = latest > 0 ? latest : nil
+            let kind = restoredFrom != nil ? "restore" : (parent == nil ? "create" : "edit")
+            summaries[doc.version] = VersionSummary(appId: doc.appId, version: doc.version, parentVersion: parent,
+                                                    source: .init(kind: kind, restoredFrom: restoredFrom))
             latest = doc.version
             docs[doc.version] = doc
         }
@@ -27,14 +32,14 @@ final class MacServerVersionsTests: XCTestCase {
 
         func listVersions(appId: String) async throws -> [VersionSummary] {
             guard reachable else { throw URLError(.notConnectedToInternet) }
-            return docs.keys.sorted(by: >).map { VersionSummary(appId: appId, version: $0) }
+            return summaries.keys.sorted(by: >).compactMap { summaries[$0] }
         }
 
         func restore(appId: String, toVersion version: Int) async throws -> AppDocument {
             guard reachable, var doc = docs[version] else { throw URLError(.notConnectedToInternet) }
             restored.append(version)
             doc.version = latest + 1
-            push(doc)
+            push(doc, restoredFrom: version)
             return doc
         }
 
@@ -81,6 +86,94 @@ final class MacServerVersionsTests: XCTestCase {
         let restored = await server.restored
         XCTAssertEqual(restored, [1, 2], "やり直しは戻す前の版をもう一度 restore する")
         XCTAssertFalse(library.canRedo(appId))
+    }
+
+    /// 名前を変えた版を順に作る(names[0] が v1)。全部サーバーにもある
+    private func setUpServerApp(_ names: [String]) async throws -> (MacAppLibrary, FakeVersions) {
+        let server = FakeVersions()
+        let library = MacAppLibrary(store: nil, server: server, serverEnvelope: { _ in nil })
+        for (i, name) in names.enumerated() {
+            let doc = try document(name, version: i + 1)
+            await server.push(doc)
+            library.apply(doc, created: i == 0, onServer: true)
+        }
+        return (library, server)
+    }
+
+    /// 3 回直した後に 3 回戻すと最初の版の中身に戻る(直前の 2 つを往復しない・#1883)
+    func testConsecutiveUndosWalkBackThroughServerVersions() async throws {
+        let (library, server) = try await setUpServerApp(["A", "B", "C", "D"])
+        for expected in ["C", "B", "A"] {
+            let step = await library.undo(appId)
+            XCTAssertEqual(step, .moved)
+            XCTAssertEqual(library.generated[appId]?.dsl.app.name, expected)
+        }
+        let restored = await server.restored
+        XCTAssertEqual(restored, [3, 2, 1], "restore の版番号は減っていく")
+        XCTAssertEqual(library.generated[appId]?.version, 7)
+
+        let step = await library.undo(appId)
+        XCTAssertEqual(step, .nothing, "最初の版より前は無い")
+        let after = await server.restored
+        XCTAssertEqual(after.count, 3)
+    }
+
+    /// 元に戻す → やり直す → 元に戻す: 続けて戻した分を 1 つずつやり直し、その後また戻せる
+    func testRedoWalksForwardThenUndoAgain() async throws {
+        let (library, server) = try await setUpServerApp(["A", "B", "C", "D"])
+        _ = await library.undo(appId)
+        _ = await library.undo(appId)
+        XCTAssertEqual(library.generated[appId]?.dsl.app.name, "B")
+
+        let first = await library.redo(appId)
+        XCTAssertEqual(first, .moved)
+        XCTAssertEqual(library.generated[appId]?.dsl.app.name, "C")
+        XCTAssertTrue(library.canRedo(appId), "もう 1 つやり直せる")
+        _ = await library.redo(appId)
+        XCTAssertEqual(library.generated[appId]?.dsl.app.name, "D")
+        XCTAssertFalse(library.canRedo(appId))
+        let none = await library.redo(appId)
+        XCTAssertEqual(none, .nothing)
+
+        _ = await library.undo(appId)
+        XCTAssertEqual(library.generated[appId]?.dsl.app.name, "C", "やり直した版(D の中身)の 1 つ前へ")
+        let restored = await server.restored
+        XCTAssertEqual(restored, [3, 2, 3, 4, 3])
+    }
+
+    /// 戻した後に新しい版が当たったら「やり直す」は消える
+    func testNewVersionAfterUndoDropsRedoStack() async throws {
+        let (library, server) = try await setUpServerApp(["A", "B", "C"])
+        _ = await library.undo(appId)
+        _ = await library.undo(appId)
+        XCTAssertTrue(library.canRedo(appId))
+        let latest = await server.latest
+        let next = try document("E", version: latest + 1)
+        await server.push(next)
+        library.apply(next, created: false, onServer: true)
+        XCTAssertFalse(library.canRedo(appId))
+    }
+
+    /// 端末の履歴で戻す時も、続けて戻した分を順にやり直せる(#1883)
+    func testLocalHistoryRedoesEachConsecutiveUndo() async throws {
+        let library = MacAppLibrary(store: nil, server: nil, serverEnvelope: { _ in nil })
+        for (i, name) in ["A", "B", "C", "D"].enumerated() {
+            library.apply(try document(name, version: i + 1), created: i == 0)
+        }
+        for expected in ["C", "B", "A"] {
+            _ = await library.undo(appId)
+            XCTAssertEqual(library.generated[appId]?.dsl.app.name, expected)
+        }
+        let none = await library.undo(appId)
+        XCTAssertEqual(none, .nothing)
+        for expected in ["B", "C", "D"] {
+            let step = await library.redo(appId)
+            XCTAssertEqual(step, .moved)
+            XCTAssertEqual(library.generated[appId]?.dsl.app.name, expected)
+        }
+        XCTAssertFalse(library.canRedo(appId))
+        _ = await library.undo(appId)
+        XCTAssertEqual(library.generated[appId]?.dsl.app.name, "C")
     }
 
     func testFallsBackToLocalHistoryWhenServerUnreachable() async throws {
