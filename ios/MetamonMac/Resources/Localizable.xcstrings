@@ -1,6 +1,23 @@
 {
   "sourceLanguage" : "ja",
   "strings" : {
+    " ・ あなたの公開" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : " · Published by you"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : " ・ あなたの公開"
+          }
+        }
+      }
+    },
     "${target} に ${content} を追加" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -68,6 +85,45 @@
         }
       }
     },
+    "%@ ・ %lld 人が利用" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%#@count@"
+          },
+          "substitutions" : {
+            "count" : {
+              "argNum" : 2,
+              "formatSpecifier" : "lld",
+              "variations" : {
+                "plural" : {
+                  "one" : {
+                    "stringUnit" : {
+                      "state" : "translated",
+                      "value" : "%1$@ · %arg user"
+                    }
+                  },
+                  "other" : {
+                    "stringUnit" : {
+                      "state" : "translated",
+                      "value" : "%1$@ · %arg users"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ ・ %lld 人が利用"
+          }
+        }
+      }
+    },
     "%@(終日)" : {
       "localizations" : {
         "en" : {
@@ -114,6 +170,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "%1$@, 新着 %2$lld 件"
+          }
+        }
+      }
+    },
+    "%@。%@" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$@. %2$@"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@。%@"
           }
         }
       }
@@ -651,6 +724,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "%@はいくつですか?"
+          }
+        }
+      }
+    },
+    "%@をインストール" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Install %@"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@をインストール"
           }
         }
       }
@@ -2282,6 +2372,23 @@
         }
       }
     },
+    "「%@」に合うアプリは見つかりませんでした" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No apps match “%@”"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "「%@」に合うアプリは見つかりませんでした"
+          }
+        }
+      }
+    },
     "「%@」に表示できない言葉が含まれています" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -2417,6 +2524,23 @@
         }
       }
     },
+    "「%@」をインストールしました" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Installed “%@”"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "「%@」をインストールしました"
+          }
+        }
+      }
+    },
     "「%@」を作りました" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -2480,6 +2604,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "「%@」を入力してください"
+          }
+        }
+      }
+    },
+    "「%@」を公開しますか?" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Publish “%@”?"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "「%@」を公開しますか?"
           }
         }
       }
@@ -2697,6 +2838,119 @@
         }
       }
     },
+    "「探す」から誰でも見つけて、自分のアプリとして入れられます" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Anyone can find it in Discover and add it as their own app"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "「探す」から誰でも見つけて、自分のアプリとして入れられます"
+          }
+        }
+      }
+    },
+    "「探す」から誰でも見つけてインストールできるようになります" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Anyone can find and install it from Discover"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "「探す」から誰でも見つけてインストールできるようになります"
+          }
+        }
+      }
+    },
+    "「探す」に公開しました" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Published on Discover"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "「探す」に公開しました"
+          }
+        }
+      }
+    },
+    "「探す」に公開中・%lld 人がインストール" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Published on Discover · %lld install"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Published on Discover · %lld installs"
+                }
+              }
+            }
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "「探す」に公開中・%lld 人がインストール"
+          }
+        }
+      }
+    },
+    "「探す」に出さないようにする" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Remove it from Discover"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "「探す」に出さないようにする"
+          }
+        }
+      }
+    },
+    "「探す」はサーバー接続時のみ使えます" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Discover only works when connected to the server"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "「探す」はサーバー接続時のみ使えます"
+          }
+        }
+      }
+    },
     "「毎日の支出を記録して、今月の合計を見たい」のように、使い道を書いてください。" : {
       "localizations" : {
         "en" : {
@@ -2806,6 +3060,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "あなたが付けた記録も、参加している人に見えます"
+          }
+        }
+      }
+    },
+    "あなただけの記録は含まれません" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Your private entries are not included"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "あなただけの記録は含まれません"
           }
         }
       }
@@ -3852,6 +4123,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "このアプリを直す"
+          }
+        }
+      }
+    },
+    "このシェアの画面から、いつでも公開をやめられます" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "You can unpublish it from this share screen at any time"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "このシェアの画面から、いつでも公開をやめられます"
           }
         }
       }
@@ -5084,6 +5372,40 @@
         }
       }
     },
+    "ひとこと説明" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Short description"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ひとこと説明"
+          }
+        }
+      }
+    },
+    "ひとこと説明(任意)" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Short description (optional)"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ひとこと説明(任意)"
+          }
+        }
+      }
+    },
     "ふつう 10 秒ほど" : {
       "localizations" : {
         "en" : {
@@ -5214,6 +5536,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "まだ他の記録帳はありません。\n「+ 新しい記録帳」から 2 つ目を用意できます"
+          }
+        }
+      }
+    },
+    "まだ公開されたアプリがありません" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No published apps yet"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "まだ公開されたアプリがありません"
           }
         }
       }
@@ -5361,6 +5700,23 @@
         }
       }
     },
+    "みんなに公開" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Publish to everyone"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "みんなに公開"
+          }
+        }
+      }
+    },
     "みんなに公開して、友達のスマホからも書き込めるようにして" : {
       "localizations" : {
         "en" : {
@@ -5373,6 +5729,38 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "みんなに公開して、友達のスマホからも書き込めるようにして"
+          }
+        }
+      }
+    },
+    "みんなのアプリを探す" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Discover Apps"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "みんなのアプリを探す"
+          }
+        }
+      }
+    },
+    "みんなのアプリを探す…" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Discover Apps…"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "みんなのアプリを探す…"
           }
         }
       }
@@ -6033,6 +6421,22 @@
         }
       }
     },
+    "アプリを検索" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Search apps"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "アプリを検索"
+          }
+        }
+      }
+    },
     "アプリを見る" : {
       "localizations" : {
         "en" : {
@@ -6142,6 +6546,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "アプリを開けませんでした"
+          }
+        }
+      }
+    },
+    "インストールできませんでした" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Couldn't install"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "インストールできませんでした"
           }
         }
       }
@@ -6651,6 +7072,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "ゲーム"
+          }
+        }
+      }
+    },
+    "コピー" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Copy"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "コピー"
           }
         }
       }
@@ -7233,6 +7671,40 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "ソースコード"
+          }
+        }
+      }
+    },
+    "タグ" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tags"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "タグ"
+          }
+        }
+      }
+    },
+    "タグ(スペース区切り・任意) 例: 健康 習慣" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tags (space-separated, optional) e.g. health habits"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "タグ(スペース区切り・任意) 例: 健康 習慣"
           }
         }
       }
@@ -8597,6 +9069,23 @@
         }
       }
     },
+    "並び順" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sort"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "並び順"
+          }
+        }
+      }
+    },
     "予定" : {
       "localizations" : {
         "en" : {
@@ -8625,6 +9114,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "予約中の通知はありません"
+          }
+        }
+      }
+    },
+    "人気" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Popular"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "人気"
           }
         }
       }
@@ -9801,6 +10307,23 @@
         }
       }
     },
+    "入れる" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Get"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "入れる"
+          }
+        }
+      }
+    },
     "入力の画面に「メモ」の欄を足して" : {
       "localizations" : {
         "en" : {
@@ -9866,6 +10389,90 @@
         }
       }
     },
+    "公開した人をブロック" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Block publisher"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "公開した人をブロック"
+          }
+        }
+      }
+    },
+    "公開する" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Publish"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "公開する"
+          }
+        }
+      }
+    },
+    "公開する…" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Publish…"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "公開する…"
+          }
+        }
+      }
+    },
+    "公開すると" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "When you publish"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "公開すると"
+          }
+        }
+      }
+    },
+    "公開できませんでした" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Couldn't publish"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "公開できませんでした"
+          }
+        }
+      }
+    },
     "公開のままにする" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -9879,6 +10486,72 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "公開のままにする"
+          }
+        }
+      }
+    },
+    "公開の前の注意を見てから公開する" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Review the notes, then publish"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "公開の前の注意を見てから公開する"
+          }
+        }
+      }
+    },
+    "公開の状態を確かめています…" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Checking whether it's published…"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "公開の状態を確かめています…"
+          }
+        }
+      }
+    },
+    "公開をやめました" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Unpublished"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "公開をやめました"
+          }
+        }
+      }
+    },
+    "公開をやめる" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Unpublish"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "公開をやめる"
           }
         }
       }
@@ -11045,6 +11718,23 @@
         }
       }
     },
+    "名前・説明・タグに、住所や電話番号などの個人の情報を書かないでください" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Don’t put personal info such as your address or phone number in the name, description or tags"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "名前・説明・タグに、住所や電話番号などの個人の情報を書かないでください"
+          }
+        }
+      }
+    },
     "問い合わせの時は、この内容を伝えてください。" : {
       "localizations" : {
         "en" : {
@@ -11613,6 +12303,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "家族・友達と"
+          }
+        }
+      }
+    },
+    "家計簿、筋トレ、散歩…" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Budget, workouts, walks…"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "家計簿、筋トレ、散歩…"
           }
         }
       }
@@ -12637,6 +13344,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "新しく用意する記録帳と質問もこの言語になります。用意済みの記録帳の文言は変わりません。"
+          }
+        }
+      }
+    },
+    "新着" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "New"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "新着"
           }
         }
       }
@@ -15465,6 +16189,23 @@
         }
       }
     },
+    "読み込めませんでした" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Couldn't load"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "読み込めませんでした"
+          }
+        }
+      }
+    },
     "読んだ本のメモ" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -16140,6 +16881,23 @@
         }
       }
     },
+    "通報する" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Report"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "通報する"
+          }
+        }
+      }
+    },
     "通報できませんでした" : {
       "localizations" : {
         "en" : {
@@ -16382,6 +17140,40 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "運営が止めています"
+          }
+        }
+      }
+    },
+    "運営により非公開" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Unpublished by the operator"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "運営により非公開"
+          }
+        }
+      }
+    },
+    "運営により非公開: %@" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Unpublished by the operator: %@"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "運営により非公開: %@"
           }
         }
       }
@@ -16685,6 +17477,23 @@
         }
       }
     },
+    "開こうとしたアプリが見つかりませんでした。一覧から選んでください" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Couldn't find the app you tried to open. Choose one from the list."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "開こうとしたアプリが見つかりませんでした。一覧から選んでください"
+          }
+        }
+      }
+    },
     "集計の画面に「記録する」ボタンを置いて、押したら入力の画面が開くようにして" : {
       "localizations" : {
         "en" : {
@@ -16697,6 +17506,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "集計の画面に「記録する」ボタンを置いて、押したら入力の画面が開くようにして"
+          }
+        }
+      }
+    },
+    "非公開にできませんでした" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Couldn't unpublish"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "非公開にできませんでした"
           }
         }
       }

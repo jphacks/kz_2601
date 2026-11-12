@@ -14,6 +14,7 @@ struct LinkLeaf: View {
                 }
             } else {
                 Text(c.text ?? "").foregroundStyle(.secondary)
+                    .macTextSelection { c.text ?? "" } // Mac: リンクにしない文字は選んでコピーできる(#941)
             }
         }
         .font(.body.weight(.medium))
