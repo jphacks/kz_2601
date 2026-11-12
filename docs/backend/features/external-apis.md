@@ -11,8 +11,9 @@
 5. [OAuth のトークン](#oauth-のトークン)
 6. [runner の口](#runner-の口)
 7. [appconfig の口(端末から)](#appconfig-の口端末から)
-8. [偽の provider(stg と試験)](#偽の-providerstg-と試験)
-9. [人の作業](#人の作業)
+8. [スプレッドシートの取り込み(自動の動き・#1712)](#スプレッドシートの取り込み自動の動き1712)
+9. [偽の provider(stg と試験)](#偽の-providerstg-と試験)
+10. [人の作業](#人の作業)
 
 ## できていること・まだのこと
 
@@ -28,6 +29,7 @@
 | 退会の 30 日後の消去(`cmd/purge`) | 済(`users/{uid}/connections/*` を消す・ログ `extConnections`) |
 | appconfig `POST /v1/apps/{appId}/ext/{provider}/{op}`・`/v1/me/connections/*`・エラーコード | 済(`internal/appconfig/ext.go`・runner の呼び出しは `extapi.Client`・`openapi-appconfig.yaml` の tag `ext`)。下の「appconfig の口」 |
 | DSL `externalCall` / `externalList`・自動の動きからの呼び出し | **まだ**(DSL の子 Issue。`CallRequest.Run` に run の `quota.Decision` を渡すだけで数え方は同じ) |
+| スプレッドシートを決まった時間に取り込む(#1712) | 実行する部分は済(`internal/runner/sheet_import.go`)。DSL の書き方と runner への組み込みは **まだ**(#1643 待ち)。下の「スプレッドシートの取り込み」 |
 | 退会(`DELETE /v1/me`)の時の provider 側の取り消し | 済(`account.go` の `deleteMe` が `extapi.Client.RevokeAll` で `/internal/ext/connections/revokeAll` を呼ぶ・#1716)。失敗してもログだけで退会は 204 |
 | キャッシュ | 済(`cache.go`・op の `CacheTTL`。鍵だけ・OAuth なしの読む op だけ。台の中のメモリ) |
 | 回数の上限 `EXT_LIMIT_*`・`EXT_GLOBAL_DAILY_<PROVIDER>`・provider ごとの 1 分止め | 済(`limits.go`・#1715)。下の「回数の上限」 |
@@ -73,7 +75,10 @@ op の `Check` は引数の値を確かめる(appconfig と runner の両方で�
 | `asana` の `myTasks`(自分のタスクを見る・#1683) | 無料・OAuth(`runs` だけ・scope `tasks:read` `workspaces:read`) | `myTasks(workspaceId?, limit?)`。自分に割り当てられた未完了のタスク(`assignee=me`・`completed_since=now`)。`workspaceId` は数字の id。無い時は利用者のワークスペースが 1 つならそれを使い、0 か 2 つ以上なら 400 `bad_request`(`workspaces:read` はこのためだけ)。`limit` 1〜50(既定 20)。行はタスク(見出し = 名前・値 = 期限(`due_at`、無ければ `due_on`)・リンク = `https://app.asana.com/` の permalink だけ)。規約: Asana API Terms(出典の表示・利用者の同意・データを売らない・Asana の機能そのものに課金しない)。回数: トークンごとに 1 分 150 回(無料の組織)/ 1,500 回(有料)・同時 GET 50。429 は `Retry-After` | `https://app.asana.com` だけ(認可・トークン・API が同じホスト) | なし | `EXT_ASANA_ENABLED=1`・`EXT_ASANA_CLIENT_ID` / `_CLIENT_SECRET` |
 | `asana` の `projectTasks`(プロジェクトのタスクを見る・#1683) | 無料・OAuth(`runs` だけ・scope `tasks:read`) | `projectTasks(projectId, limit?)`。プロジェクトの未完了のタスク。`projectId` は数字の id(Asana の URL の `/0/<id>/`)。持っていない id(Asana の 400 / 404)は 400 `bad_request`。行は `myTasks` と同じ。規約・回数は同上 | 同上 | なし | 同上 |
 | `asana` の `complete`(タスクを完了にする・#1683) | 無料・OAuth(`runs` だけ・scope `tasks:write`。初めて使う時につなぎ直す。Asana の scope は足し算にならないので、つなぎ直しでも読む scope を一緒に求める)・書く(確認必須) | `complete(taskId)`。`taskId` は数字の id。答えは `resultId`(= `taskId`)と 1 件(補足 = 「完了」)。完了済みをもう一度完了にしても変わらない。持っていないタスクは 400 `bad_request`。規約は同上。回数: 書き込みは同時 15 | 同上 | なし | 同上 |
+| `natureRemo` の `devices` / `appliances`(室温・湿度と家電の一覧を読む・Nature Remo Cloud API v1・#1705) | 無料・**利用者の**アクセストークン(`runs` だけ。Nature の上限は 1 トークン 5 分に 30 回。429 は 502 `upstream_unavailable`)・読むだけ | `devices(device?)`: 自分の Remo ごとに 1 行(見出し = 名前・値 = 温度(℃・数字)・補足 = 「湿度 45%」)。`appliances(appliance?)`: 家電ごとに 1 行(見出し = 名前・補足 = 種類(エアコン / テレビ / 照明 / 赤外線))。`device` / `appliance` は名前か id(1 行 64 文字まで)で 1 つに絞る・無ければ 400 `bad_request`。返すのは温度・湿度・家電の名前と種類だけで、在宅が分かる値(人感 `mo`・照度 `il`・エアコンの入 / 切)と id・シリアル・MAC は返さない。401 / 403(トークンを作り直した)は 409 `ext_not_connected`。トークンはヘッダーだけ。**家電を動かす op(信号を送る・エアコンの入 / 切)はまだ**(家の物を動かすので、自動の動きから送ってよいかはオーナーの判断・#1705 の続き)。**利用者の鍵を預かる土台(#1671)がまだなので、`EXT_NATURE_REMO_ENABLED=1` でも off のまま**(`New` が断る。鍵は `nature_remo.go` の `natureRemoKeys` で受ける) | `https://api.nature.global` だけ(`/1/devices`・`/1/appliances`) | なし(キャッシュは引数だけで引くので人ごとの答えを持たない) | #1671 の後に `EXT_NATURE_REMO_ENABLED=1`(運営の鍵は無い) |
 | `frankfurter`(為替・欧州中央銀行・#1499) | 無料・鍵なし(`runs` だけ) | `latest(from?, to?, amount?)`・`historical(date, from?, to?, amount?)`。`from` / `to` は大文字 3 文字の通貨(`to` はカンマ区切りで 10 個まで・重ならない)・`amount` は正の数・`date` は 1999-01-04 から今日まで。行は通貨ごと(見出し = 通貨・値 = レート・補足 = 「日付・量 基準」) | `https://api.frankfurter.app` だけ・本文 64 KiB まで | latest 1 時間・historical 1 日 | `EXT_FRANKFURTER_ENABLED=1` |
+| `gtfsRealtime` の `nextBuses` / `busPositions`(バスの次の便・今の位置・GTFS リアルタイム・#1692) | 無料・鍵なし(`runs` だけ) | `nextBuses(feed, stop, route?, limit?)`・`busPositions(feed, route?, limit?)`。`feed` は下の「GTFS リアルタイムのフィードと規約」の許可リストの id だけ(ほかは 400 `bad_request`)。`stop` / `route` はそのフィードの GTFS の `stop_id` / `route_id`(英数字と `_ . : -`・64 文字まで)。`limit` は `nextBuses` 1〜10(既定 3)・`busPositions` 1〜50(既定 20)。`nextBuses` は TripUpdate を読み、その停留所に来る便を時刻の順に出す(見出し = `route_id`・補足 = 「遅れ N 分」/「N 分早い」/「定刻」(遅れの無い便は空)・値 = 「HH:MM(あと N 分)」日本時間)。取り消し・通過(SKIPPED / NO_DATA)の便・1 分より前・3 時間より先の便は出さない。時刻が遅れだけで来る便(静的な時刻表が要る)はまだ出さない。`busPositions` は VehiclePosition を読み、バスごとに 1 行(見出し = 車両の表示名(無ければ id)・補足 = 「`route_id`・HH:MM 更新」・値 = 「緯度,経度」)。並びは `route_id`・見出しの順。フィードか車両の時刻が 10 分より古いものは出さない(古い予測は出さないより悪い)。停留所・系統の名前は静的な GTFS-JP を取り込むまで id のまま。TripUpdate を出すフィードはまだ許可リストに無い(人の作業)。出典(下の表)を出す。AI に選ばせる決まり(`prompt.go`・`catalog.go`)はまだ | 許可リストのフィードのホストだけ(今は `https://api-public.odpt.org`)・本文 1 MB まで・実体は 20000 件まで | 30 秒 | `EXT_GTFS_REALTIME_ENABLED=1` |
+| `openWeather` の `airForecast`(空気の汚れの予報・OpenWeatherMap Air Pollution の予報・#1656) | 無料・運営の鍵(`runs` だけ。OpenWeather の契約の範囲) | `airForecast(lat, lng, limit?)`。`lat` / `lng` は `airQuality` と同じ(小数 2 桁に丸める)・`limit` 1〜96(既定 24 = 1 日)。行は 1 時間ごと・今から順(見出し = 日本時間の「11/11 09:00」・補足 = PM2.5・PM10 の µg/m³・値 = `AQI n/5 <段階>(目安)`)。答えに時間帯が無いので時刻は日本時間で出す。AQI が 1〜5 でない時間は飛ばし、1 行も残らなければ 502 `upstream_unavailable`。健康の判断ではなく目安。出典は `airQuality` と同じ。AI に選ばせる決まり(`prompt.go`・`catalog.go`)はまだ | `https://api.openweathermap.org` だけ(`/data/2.5/air_pollution/forecast`) | なし | `EXT_OPEN_WEATHER_ENABLED=1`・`EXT_OPEN_WEATHER_API_KEY` |
 | `openWeather` の `airQuality`(空気の汚れ・OpenWeatherMap Air Pollution・#1656) | 無料・運営の鍵(`runs` だけ。OpenWeather の契約の範囲) | `airQuality(lat, lng)`。`lat` / `lng` は小数(10 進だけ)で小数 2 桁(約 1 km)に丸めて送る。答えは 1 件(見出し = 「空気 <AQI の段階>(目安)」・値 = `AQI n/5`・補足 = PM2.5・PM10・O₃・NO₂ の µg/m³)。AQI は OpenWeather の 1〜5(良い・まあまあ・ふつう・悪い・とても悪い)。1〜5 でない答えは 502 `upstream_unavailable`。健康の判断ではなく目安。出典「Weather data © OpenWeather (ODbL)」を出す。AI に選ばせる決まり(`prompt.go`・`catalog.go`)はまだ | `https://api.openweathermap.org` だけ(`/data/2.5/air_pollution`。天気と同じホスト・同じ鍵) | なし | `EXT_OPEN_WEATHER_ENABLED=1`・`EXT_OPEN_WEATHER_API_KEY` |
 | `todoist` の `listTasks`(タスクを見る・#1496・`project` / `label` は #1681) | 無料・OAuth(`runs` だけ・scope `data:read`) | `listTasks(filter?, projectId?, project?, label?, limit?)`。`filter`・`projectId`・`project`(プロジェクトの名前)はどれか 1 つ。`label` はどれとも組める(`project` か `filter` と組むと Todoist のフィルタ `#名前 & @ラベル`、ほかは `label` の引数)。名前は 120 文字まで・1 行・`& \| ! ( ) , \ * # @` は使えない。カンマを含む `filter` に `label` は付けられない。`limit` 1〜50(既定 20)。行はタスク(見出し = 内容・補足 = 期限の言葉・値 = 期限・リンク) | `https://api.todoist.com` だけ | なし | `EXT_TODOIST_ENABLED=1`・`EXT_TODOIST_CLIENT_ID` / `_CLIENT_SECRET` |
 | `todoist` の `projects`(プロジェクトの一覧・#1681) | 無料・OAuth(`runs` だけ・scope `data:read`) | `projects(limit?)`。`limit` 1〜50(既定 20)。行はプロジェクト(見出し = 名前。`listTasks` の `project` に渡せる・リンク) | 同上 | なし | 同上 |
@@ -93,17 +98,22 @@ op の `Check` は引数の値を確かめる(appconfig と runner の両方で�
 | `linear` の `createIssue`(Issue を足す・#1684) | 無料・OAuth(`runs` だけ・scope `issues:create`。つなぎ直す時も `read` を一緒に頼む)・書く(確認必須) | `createIssue(title, description?, team?)`。`title` は 1 行・255 文字まで・`description` は Markdown・10,000 文字まで。`team` はチームのキー(`ENG`・英字で始まる 7 文字まで)かチームの id。書かなければ本人のチームが 1 つの時だけそこ(2 つ以上は 400 `bad_request`)。無いチーム・Linear が受けない入力(`INVALID_INPUT`)も 400。状態はチームの最初の状態(Backlog か Triage)。答えは `resultId`(`ENG-123`)と 1 件 | 同上 | なし | 同上 |
 | `youtube` の `channelStats`(チャンネルの公開の数字・YouTube Data API v3・#1699) | 無料・運営の鍵(`runs` だけ。YouTube の 1 日の割り当てで 1 回 1 単位) | `channelStats(channel)`。`channel` はチャンネル id(`UC` + 22 文字)か `@ハンドル`(3〜30 文字・文字と数字と `.` `_` `-`)。答えは 1 件(見出し = チャンネル名・値 = 「登録者 n 人」・補足 = 「動画 n 本・再生 n 回」・リンク = チャンネル)。数は API の値をそのまま 3 桁区切りで出す(丸めない・作り直さない)。登録者を隠しているチャンネルは「登録者 非公開」。無いチャンネルは 400 `bad_request`。出典「YouTube」を出す(下の「YouTube の規約」)。AI に選ばせる決まり(`prompt.go`・`catalog.go`)はまだ | `https://www.googleapis.com` だけ(`/youtube/v3/channels`)・鍵は `X-Goog-Api-Key` ヘッダー | 1 時間 | `EXT_YOUTUBE_ENABLED=1`・`EXT_YOUTUBE_API_KEY` |
 | `youtube` の `latestVideos`(チャンネルの新しい動画・#1699) | 同上(1 回 2 単位: チャンネル + アップロードの再生リスト。`search` の 100 単位は使わない) | `latestVideos(channel, limit?)`。`channel` は同上・`limit` 1〜20(既定 5)。行は公開の動画だけ・新しい順(見出し = 題・補足 = 公開の日時(日本時間)・リンク = 動画)。動画が 1 本も無いチャンネルは 0 行 | 同上(`/youtube/v3/channels`・`/youtube/v3/playlistItems`) | 30 分 | 同上 |
+| `podcasts` の `searchPodcasts`(ポッドキャストの番組を探す・Apple の iTunes Search API・#1703) | 無料・鍵なし(`runs` だけ) | `searchPodcasts(term, limit?)`。`term` は 1〜100 文字・1 行(URL は 400)・`limit` 1〜20(既定 10)。日本のストア(`country=JP`・`lang=ja_jp`)の番組(`media=podcast`・`entity=podcast`)。行は番組ごと(見出し = 番組名・補足 = 作者・値 = 「RSS あり」/「RSS なし」・リンク = Apple Podcasts の番組のページ(クエリは落とす))。**RSS の URL そのものは返さない**(新しい回を読むのは #1702 の決定待ちで、URL は引数にも渡せないため)。アートワークの URL(`*.mzstatic.com`)と番組の id は `Output.Cells`(サーバーの中だけ)にあり、端末の行の形(`ExtRow`)に画像の欄が無いので今は端末に出ない。ストアのページが無い・`https` でない結果は出さない。出典 `PodcastsAttribution`(「provided courtesy of iTunes」)を出す(下の「iTunes Search API の規約」)。AI に選ばせる決まり(`prompt.go`・`catalog.go`)はまだ | `https://itunes.apple.com` だけ(`/search`) | 6 時間 | `EXT_PODCASTS_ENABLED=1` |
 | `slack` の `setStatus`(自分の状態を変える・#1679) | 無料・OAuth(`runs` だけ・ユーザーのトークン・scope `users.profile:write`)・書く(確認必須) | `setStatus(text?, emoji?, minutes?)`。`text` は 1 行 100 文字まで・`emoji` は `:tomato:` の形(肌の色 `:skin-tone-2:`〜`6` を 1 つ付けてよい)・`minutes` は 1〜10080(1 週間。無ければ消すまで)。`text` も `emoji` も無ければ状態を消す(その時 `minutes` は付けない)。同じ状態をもう一度入れても変わらない。答えは 1 件(見出し = 文・補足 = 絵文字・値 = 消える時刻)。Slack の上限は 1 人の状態を 1 分に 10 回まで | `https://slack.com` だけ(`/api/...`) | なし | `EXT_SLACK_ENABLED=1`・`EXT_SLACK_CLIENT_ID` / `_CLIENT_SECRET` |
 | `slack` の `postMessage`(チャンネルに本人として投稿・#1679) | 無料・OAuth(`runs` だけ・ユーザーのトークン・scope `chat:write`)・書く(確認必須) | `postMessage(channel, text)`。`channel` は会話の id(`C…` / `G…` / `D…`・名前は取らない)・`text` は 4000 文字まで(改行可・制御文字不可)。`<!channel>` `<!here>` `<!subteam^…>` などの一斉メンション(`<!`)は Slack に送らず 400 `bad_request`。`parse: none`・`link_names: false` で送る。本人が入っていない・無いチャンネル(`not_in_channel` / `channel_not_found`)は 400 `bad_request`。Slack に冪等のキーが無いので、二重にしないのは書く op をやり直さない決まりだけ。答えは `resultId`(メッセージの `ts`)と 1 件(見出し = 1 行目 120 文字まで・補足 = チャンネル)。本文は保存しない。Slack の上限は 1 チャンネルに 1 秒 1 通 | 同上 | なし | 同上 |
 | `slack` の `unread`(DM の未読の数・#1679) | 無料・OAuth(`runs` だけ・ユーザーのトークン・scope `im:read`) | `unread(channel)`。`channel` は DM の id(`D…`)だけ。`conversations.info` の `unread_count_display` を返す(Web API が未読の数を返すのは DM だけ。チャンネルの未読を数えるには本文を `conversations.history` で読むことになり、Marketplace に無い配布アプリは 1 分 1 回・15 件までなので入れない)。数が無い答えは 400 `bad_request`。答えは 1 件(見出し = 「未読」・補足 = id・値 = 数)。本文は読まない | 同上 | なし | 同上 |
+| `switchbot` の `devices` / `status`(自分の機器の一覧・温湿度などを読む・SwitchBot API v1.1・#1704) | 無料・**利用者の**トークンと秘密の値(`runs` だけ。SwitchBot の上限は 1 アカウント 1 日 10,000 回)・読むだけ | `devices()`: 自分の物理の機器(見出し = 名前・補足 = 種類・値 = 機器の id。100 件まで。赤外線のリモコンは出さない)。`status(deviceId)`: 1 件(見出し = 「24.5°C・湿度 52%」・補足 = 種類・値 = 温度(無ければ湿度・電源))と、読めた値ごとの行(温度・湿度・CO₂・電源 オン / オフ・電池)。返すのはこの許可リストの値だけで、在宅が分かる値(人感・開閉・鍵・明るさ)は返さない(それしか無い機器は 400 `bad_request`)。`deviceId` は英数字と `-` の 64 文字まで。無い機器・合わない種類(`statusCode` 151 / 152 / 160)は 400 `bad_request`、機器かハブがオフライン(161 / 171)・190 は 502 `upstream_unavailable`、401 / 403(トークンを作り直した・秘密の値が違う)は 409 `ext_not_connected`。毎回 `sign`(HMAC-SHA256)・`t`・`nonce` で署名し、トークンはヘッダーだけ。**機器を動かす `command` はまだ**(家の物を動かすので、自動の動きから送ってよいかはオーナーの判断・#1704 の続き)。**利用者の鍵を預かる土台(#1671)がまだなので、`EXT_SWITCHBOT_ENABLED=1` でも off のまま**(`New` が断る) | `https://api.switch-bot.com` だけ(`/v1.1/devices`・`/v1.1/devices/{id}/status`) | なし(キャッシュは引数だけで引くので人ごとの答えを持たない) | #1671 の後に `EXT_SWITCHBOT_ENABLED=1`(運営の鍵は無い) |
 | `googleSheets` の `readRange`(スプレッドシートの範囲を見る・#1685) | 無料・OAuth(`runs` だけ・scope `drive.file`。利用者が Google Picker で選んだファイルとアプリが作ったファイルだけ・センシティブでない) | `readRange(spreadsheetId, range, limit?)`。`spreadsheetId` は英数字と `_` `-` の 20〜128 文字(Picker で選んだファイルの id)。`range` はシート名か A1 の範囲(`Sheet1!A1:D50`・`'売上'!A:D`・シート名を省くと最初のシート)で 200 文字まで。`limit` 1〜100(既定 50)。行の範囲が無い・`limit` より広い範囲は `limit` 行に縮めて頼む。行はシートの 1 行(見出し = 1 列目・値 = 2 列目・補足 = 3〜10 列目を「・」でつなぐ。11 列目からは捨てる・空の行は飛ばす)。選んでいないファイル(Google の 404)は 400 `bad_request`(「Picker で選んで」の理由付き)・無いシートや範囲(400)も 400 `bad_request` | `https://sheets.googleapis.com` と `https://oauth2.googleapis.com` だけ | なし(シートの中身を持たない) | `EXT_GOOGLE_SHEETS_ENABLED=1`。OAuth のクライアントは Google カレンダーのもの(`EXT_GOOGLE_CALENDAR_CLIENT_ID` / `_CLIENT_SECRET`)。`EXT_GOOGLE_SHEETS_CLIENT_ID` / `_CLIENT_SECRET` を入れた時だけそちら(`Provider.ClientFrom`) |
 | `googleSheets` の `appendRow`(スプレッドシートに 1 行足す・#1685) | 無料・OAuth(`runs` だけ・scope `drive.file`)・書く(確認必須) | `appendRow(spreadsheetId, range, values)`。`range` は `readRange` と同じ(表のある範囲。その下に足す)。`values` は文字列の JSON 配列(1〜26 個・1 つ 1000 文字まで・改行とタブ以外の制御文字は不可)。値はそのまま入れる(`RAW`。`=` で始まっても式にしない)。答えは `resultId`(書いた範囲・例 `Sheet1!A5:C5`)と 1 件(リンク = そのシート)。Google に冪等のキーが無いので、二重にしないのは書く op をやり直さない決まりだけ | 同上 | なし | 同上 |
+| `odpt` の `trainStatus`(電車の運行情報・公共交通オープンデータセンター・#1691) | 無料・運営の鍵(`runs` だけ。ODPT の開発者登録の consumer key) | `trainStatus(operator?, railway?)`。`operator` は ODPT の事業者 id・`railway` は路線 id で、どちらも下の「ODPT の事業者と規約」の許可リストだけ(ほかは 400 `bad_request`)。両方あれば路線がその事業者のものであること。無ければ許可リストの全事業者。行は路線ごと(見出し = 路線名(路線の無い事業者全体の情報は事業者名)・補足 = 「状態: 案内の文」(状態が無ければ文だけ・200 文字で切る)・値 = 「M/D HH:MM 更新」(`dc:date`・日本時間))。並びは許可リストの順。`dct:valid` を過ぎた行・時刻の無い行・許可リストに無い事業者の行は出さない。出典(下の表)を出す。AI に選ばせる決まり(`prompt.go`・`catalog.go`)はまだ | `https://api.odpt.org` だけ(`/api/v4/odpt:TrainInformation`)・鍵は `acl:consumerKey` のクエリ(API の決まり。エラーに URL は出さない) | 1 分 | `EXT_ODPT_ENABLED=1`・`EXT_ODPT_API_KEY` |
 
-Google ToDo の 401 は接続を `error` にする(つなぎ直す)。403 は scope が足りない時もほかの拒否も 409 `ext_not_connected`(つなぎ直す)、ただし回数の上限の 403 と 429 / 5xx は 502 `upstream_unavailable`。
+Google(カレンダー・ToDo・スプレッドシート)の 401 は接続を `error` にする(つなぎ直す)。403 は理由で分ける: scope が足りない(`insufficientPermissions`・`ACCESS_TOKEN_SCOPE_INSUFFICIENT`)だけ 409 `ext_not_connected`(つなぎ直す)。回数の上限(`rateLimitExceeded`・`userRateLimitExceeded`・`quotaExceeded`・`dailyLimitExceeded`)は 429 として扱い、502 `upstream_unavailable` にして provider を止める(次の呼び出しは 429 `rate_limited` と `retryAfterSec`)。キーで呼ぶ YouTube などの 403 も同じ。API が有効でない(`accessNotConfigured`・`SERVICE_DISABLED`)はこちらの設定なので 502 `upstream_unavailable`。ほかの 403(そのリスト・シートを使えない)は ToDo とスプレッドシートでは 400 `bad_request`(つなぎ直しても直らない)。429 / 5xx は 502 `upstream_unavailable`。
+
+Asana の 403 も、メッセージが scope の不足を言う時だけ 409 `ext_not_connected`。ほかの 403(そのプロジェクトを見られないなど)は 400 `bad_request`。
 
 Slack は利用者ごとの OAuth v2 でユーザーのトークン(`user_scope` だけ・ボットのトークンは取らない)。PKCE は使わない(Slack の PKCE はアプリを公開クライアントに戻せない形で変えるため。runner はクライアントの秘密を Basic 認証で送る)。新しい scope は同じトークンに足されるので、書く op のためにつなぎ直しても読む op は残る。トークンの回転(12 時間・使い捨ての refresh token)を入れた時も入れない時も動く。Slack はほとんどの失敗を 200 の `ok:false` で返すので、コードで分ける: `invalid_auth`・`not_authed`・`token_revoked`・`token_expired`・`account_inactive`(と HTTP 401)は接続を `error` にする(つなぎ直す)。`missing_scope`・`not_allowed_token_type`・`no_permission`・`access_denied` など(と HTTP 403)は 409 `ext_not_connected`。`ratelimited`(HTTP 429)・`fatal_error`・`internal_error`・`service_unavailable`・`request_timeout`(と 5xx)は 502 `upstream_unavailable`。ほかのコードは 400 `bad_request`。Slack の API 規約: 商用の配布は Marketplace(か別の契約)が要る・データは機能に要る間だけ持つ・モデルの学習に使わない・プライバシーポリシーに読むものを書く。だから op は本人の状態・本人の投稿・DM の未読の数だけで、メッセージの本文を読む op・ためる op は入れない。
 
-Asana の `myTasks`・`projectTasks`・`complete`、Todoist の `complete`・`projects`・`project` / `label`、Notion の `updateProperties`・`pageText`、Google ToDo の全部の op、GitHub と Linear の op、YouTube の `channelStats`・`latestVideos`、Slack の全部の op は runner の op だけ。生成アプリから呼ぶ部品と AI に選ばせる決まり(`prompt.go`・`catalog.go`・`docs/dsl`)は #1643 の判断の後に足す。
+Asana の `myTasks`・`projectTasks`・`complete`、Todoist の `complete`・`projects`・`project` / `label`、Notion の `updateProperties`・`pageText`、Google ToDo の全部の op、GitHub と Linear の op、YouTube の `channelStats`・`latestVideos`、ポッドキャストの `searchPodcasts`、Slack の全部の op、GTFS リアルタイムの `nextBuses`・`busPositions`、ODPT の `trainStatus` は runner の op だけ。生成アプリから呼ぶ部品と AI に選ばせる決まり(`prompt.go`・`catalog.go`・`docs/dsl`)は #1643 の判断の後に足す。
 
 provider が 404 / 422(持っていない通貨・日)を返した時は 400 `bad_request`(`runs` は戻す)。429 / 5xx は 502 `upstream_unavailable`。
 
@@ -136,8 +146,10 @@ op の案: `boards()`(自分のボード・`GET /1/members/me/boards`。`/1/memb
 
 | もの | 入れない理由 |
 |---|---|
-| 黄砂(気象庁の黄砂情報) | 予測図が画像で出るだけで、数値で読める公式の API・使い方の決まり(仕様と規約)が無い。画像を読み取るのは壊れやすく、出典の決まりの外になる。数値の公式の出どころができたら入れ直す |
+| 黄砂(気象庁の黄砂情報) | 予測図が画像で出るだけで、数値で読める公式の API・使い方の決まり(仕様と規約)が無い。画像を読み取るのは壊れやすく、出典の決まりの外になる。数値の公式の出どころができたら入れ直す。数値で読める代わりの候補は Open-Meteo の Air Quality API(欧州の CAMS の予報の `dust` µg/m³・約 45 km の格子・鍵なし)だが、鍵なしの口は商用に使えない(商用は有料の契約と鍵)ので、入れるかはオーナーが決める(下の注)。OpenWeather の Air Pollution には黄砂(砂ぼこり)の項目が無く、PM10 が目安になるだけ |
 | 環境省「そらまめ君」(大気汚染物質広域監視システム) | 公式の API の仕様が無く、画面とデータのダウンロードだけ。機械から呼ぶ使い方の規約も無いので、runner から定期に読む形にできない。PM2.5 は上の `airQuality` で見る |
+
+黄砂を数値で入れる時の案(オーナーの判断が要る): provider `openMeteoAir`・op `dust(lat, lng, limit?)`(1 時間ごとの `dust` と `pm2_5`)。出口は `https://air-quality-api.open-meteo.com`(商用の契約なら `https://customer-air-quality-api.open-meteo.com` と鍵)。規約: Open-Meteo の鍵なしの口は非商用・1 日 1 万回まで、データは CC BY 4.0 で「Open-Meteo」と CAMS(Copernicus Atmosphere Monitoring Service)の出典を出す。コインのあるアプリは商用にあたるので、鍵なしのまま本番で使わない。
 
 
 ### YouTube の規約(#1699)
@@ -152,6 +164,82 @@ op の案: `boards()`(自分のボード・`GET /1/members/me/boards`。`/1/memb
 | 規約へのリンク(ポリシー III.A.1) | YouTube の利用規約(https://www.youtube.com/t/terms)へのリンクを出す | 部品と iOS の作業(#1643)。`docs/legal` にも書く(人の作業) |
 | プライバシーポリシー(規約 7・ポリシー III.A.2) | YouTube API サービスを使うと書き、Google のプライバシーポリシー(https://policies.google.com/privacy)へリンクする | 人の作業(`docs/legal`) |
 | 割り当て(規約 15・ポリシー III.D.3) | 割り当てを超えない・避けない。増やすには API Compliance Audit。認められた使い道にだけ使う | 1 回 1〜2 単位。回数の上限 `EXT_GLOBAL_DAILY_YOUTUBE` を 1 日の割り当てに合わせる(上限は回数で数えるので、`latestVideos` を 2 単位として見積もる・人の作業) |
+
+### GTFS リアルタイムのフィードと規約(#1692)
+
+GTFS リアルタイム(protobuf)の読み方は [GTFS Realtime の仕様](https://gtfs.org/documentation/realtime/reference/)の番号どおりで、要るフィールドだけを `google.golang.org/protobuf` の `protowire`(もとから依存にある・BSD-3-Clause)で読む。生成したバインディング(MobilityData の `gtfs-realtime-bindings`)は足していない。
+
+入れたフィード(許可リスト・`gtfs_realtime.go` の `gtfsFeeds`):
+
+| id | 事業者 | 読むもの | URL | ライセンス(人が確かめる) |
+|---|---|---|---|---|
+| `toeiBus` | 都営バス(東京都交通局) | VehiclePosition だけ(`busPositions`) | `https://api-public.odpt.org/api/v4/gtfs/realtime/ToeiBus` | CC BY 4.0(公共交通オープンデータセンターの公開の口・鍵なし) |
+
+フィードを足す時は、事業者ごとにライセンスと URL をデータカタログ([公共交通オープンデータセンター](https://ckan.odpt.org/)・[GTFS データリポジトリ](https://gtfs-data.jp/)・事業者のサイト)で確かめてから、コードと上の表を一緒に直す。CC BY 以外(独自の規約・非営利だけ・チャレンジ限定)のフィードは入れない。
+
+| 決まり | 中身 | この作りでの扱い |
+|---|---|---|
+| CC BY のクレジット | 提供者名・データの名前・ライセンス(リンク)を出す | フィードごとの `credit`(都営バスは「東京都交通局・公共交通オープンデータ協議会、都営バス GTFS-RT、CC BY 4.0」)を行のそばに出す |
+| 利用者への通知(公共交通オープンデータセンターのフィード) | センターのデータであること・正確・完全とは限らないこと・事業者に直接問い合わせないこと | センターの口(`api-public.odpt.org`)のフィードは `ODPTAttribution` も出す。ほかのフィードは `GTFSAttribution` |
+| 時刻の表示・古いデータ(センターのガイドライン 2.1) | 動的データは時刻を出す・古いデータは使わない | 位置の行に「HH:MM 更新」・フィードか車両の時刻が 10 分より古いものは出さない・キャッシュは 30 秒 |
+| 元の意味を変えない | 予測の時刻・位置をそのまま出す | 時刻は分に・位置は float32 のまま(丸めない)。生のデータは端末に返さない(決まった行の形だけ) |
+| 再配布 | CC BY は再配布できるが、センターの基本ライセンスは再配布を禁じる | 生成アプリの画面に出すだけ |
+
+まだのこと(後の Issue): 静的な GTFS-JP(停留所・系統の名前・時刻表)をサーバーで前処理して持ち、`nextBuses` の停留所を名前で選べるようにし、遅れだけの予測を時刻表に足して出す。
+
+### iTunes Search API の規約(#1703)
+
+[Search API の説明](https://performance-partners.apple.com/search-api)(2026-11-12 に読んだ)から、`podcasts` を出す時に守ること。
+
+| 決まり | 中身 | この作りでの扱い |
+|---|---|---|
+| 回数 | 「おおよそ 1 分 20 回(変わることがある)」。多く使うなら Enterprise Partner Feed。大きなサイトは検索の答えを持つ(キャッシュする) | キャッシュは 6 時間(同じ `term`・`limit`)。runner の台は出口の IP を共有するので、`EXT_GLOBAL_DAILY_PODCASTS` で 1 日の全体を絞る(人の作業) |
+| 使い道 | 中身はストアの中身を広めるためだけ・広める中身のページにだけ置く・別の商品やサービスの宣伝に使わない・それだけで楽しむ使い方にしない | 行は必ずその番組の Apple Podcasts のページへリンクする(ページの無い結果は出さない)。「通勤のお供」の一覧のように番組を開きに行く使い方にする |
+| バッジ | 「Download on iTunes」などの Apple が認めたバッジを近くに置き、ストアのページへリンクする | 出し方(バッジの画像・Listen on Apple Podcasts)は部品(#1643)と iOS で決める |
+| 出典 | 試聴(preview)は「provided courtesy of iTunes」と出す | 試聴は使わないが、行のそばに `PodcastsAttribution`(同じ文)を出す |
+| 音声 | 試聴は流すだけで、ダウンロード・保存・キャッシュしない | 音声のファイルはサーバーで読まない・置かない。再生は Podcasts アプリを開く |
+| 求めに応じて消す | Apple から求められたら中身をすぐ消す・苦情は Apple に回す | キャッシュは 6 時間で消える。止める時は `EXT_PODCASTS_ENABLED` を切る |
+
+**新しい回(番組の RSS の `enclosure`)はまだ作らない。** 利用者やアプリが渡す RSS の URL を runner から読むかは #1702 の決定待ち。決まったら、Search API の lookup(`/lookup?id=<番組の id>`)で RSS の URL をサーバーの中で引く形か、許可リストの形で足す(番組の id は今 `Output.Cells` に入れてある)。
+
+### ODPT の事業者と規約(#1691)
+
+[公共交通オープンデータセンター利用規約](https://developer.odpt.org/terms/center_use_rules.html)・[公共交通オープンデータ基本ライセンス](https://developer.odpt.org/terms/data_basic_license.html)・[開発者ガイドライン](https://developer.odpt.org/terms/data_basic_use_guideline.html)・[チャレンジ限定ライセンス](https://developer.odpt.org/challenge_license)と、[データカタログ](https://ckan.odpt.org/dataset?tags=%E9%81%8B%E8%A1%8C%E6%83%85%E5%A0%B1-train_status_information)の各事業者の「運行情報」のライセンス(2026-11-12 に読んだ)から決めた。
+
+入れた事業者(許可リスト・`odpt.go` の `odptOperators`):
+
+| 事業者 id | 路線 id(`odpt.Railway:` の後) | ライセンス | データセット |
+|---|---|---|---|
+| `odpt.Operator:TokyoMetro` | `TokyoMetro.Ginza`・`.Marunouchi`・`.MarunouchiBranch`・`.Hibiya`・`.Tozai`・`.Chiyoda`・`.Yurakucho`・`.Hanzomon`・`.Namboku`・`.Fukutoshin` | 基本ライセンス | [東京メトロ 運行情報](https://ckan.odpt.org/dataset/r_train_status-tokyometro) |
+| `odpt.Operator:Toei` | `Toei.Asakusa`・`.Mita`・`.Shinjuku`・`.Oedo`・`.Arakawa`・`.NipporiToneri` | CC BY 4.0 | [東京都交通局 運行情報](https://ckan.odpt.org/dataset/r_train_status-toei) |
+| `odpt.Operator:TWR` | `TWR.Rinkai` | 基本ライセンス | [東京臨海高速鉄道 運行情報](https://ckan.odpt.org/dataset/r_train_status-twr) |
+| `odpt.Operator:MIR` | `MIR.TsukubaExpress` | 基本ライセンス | [首都圏新都市鉄道 運行情報](https://ckan.odpt.org/dataset/r_train_status-mir) |
+| `odpt.Operator:TamaMonorail` | `TamaMonorail.TamaMonorail` | 基本ライセンス | [多摩都市モノレール 運行情報](https://ckan.odpt.org/dataset/r_train_status-tamamonorail) |
+| `odpt.Operator:YokohamaMunicipal` | `YokohamaMunicipal.Blue`・`.Green` | 基本ライセンス | [横浜市交通局 運行情報](https://ckan.odpt.org/dataset/r_train_status-yokohamamunicipal) |
+
+入れない事業者(運行情報が「公共交通オープンデータチャレンジ限定ライセンス」。チャレンジの期間中・作品の応募が前提で、常に動くアプリには使えない):
+
+| 事業者 | データセット |
+|---|---|
+| JR 東日本(JR東日本アイステイションズ提供・特定利用条件つき) | [JR東日本アイステイションズ 運行情報](https://ckan.odpt.org/dataset/jr-train-status-information-by-jr-east-i-stations) |
+| 東急電鉄 | [東急電鉄 運行情報](https://ckan.odpt.org/dataset/tokyu__r_train_status) |
+| 東武鉄道 | [東武鉄道 運行情報](https://ckan.odpt.org/dataset/tobu__r_train_status) |
+| 京王電鉄 | [京王電鉄 運行情報](https://ckan.odpt.org/dataset/keio__r_train_status) |
+| 西武鉄道 | [西武鉄道 運行情報](https://ckan.odpt.org/dataset/seibu__r_train_status) |
+| 京急電鉄 | [京急電鉄 運行情報](https://ckan.odpt.org/dataset/keikyu__r_train_status) |
+
+ライセンスが基本ライセンスか CC BY に変わったら、カタログで確かめてから許可リストに足す(コードと上の表を一緒に直す)。
+
+| 決まり | 中身 | この作りでの扱い |
+|---|---|---|
+| 利用者への通知(ガイドライン「利用者への通知」) | センターのデータであること・正確・完全とは限らないこと・事業者に直接問い合わせないこと・アプリの問い合わせ先を出す | 出典 `ODPTAttribution`(「公共交通オープンデータセンターのデータです。正確・完全とは限りません。遅れの情報は事業者の公式の案内を確かめてください(事業者への問い合わせはしないでください)」)を行のそばに出す。アプリの問い合わせ先の出し方は部品(#1643)と iOS で決める |
+| CC BY のクレジット(都営・FAQ) | 「提供者名、名称、CC BY 4.0(リンク)」 | 都営の行を出す時は `ODPTToeiCredit`(「東京都交通局・公共交通オープンデータ協議会、運行情報、CC BY 4.0」)も出す |
+| 時刻の表示(ガイドライン 2.1.1) | 動的データは `dc:date` を画面に出す | 行の値 = 「M/D HH:MM 更新」。時刻の無い行は出さない |
+| 新しい情報だけ(ガイドライン 2.1.2) | `odpt:frequency` の間隔で更新・`dct:valid` を過ぎたデータは使わない | `dct:valid` を過ぎた行は出さない。キャッシュは 1 分だけで、行の一番早い `dct:valid` を過ぎたら捨てる(`Output.ValidUntil`) |
+| 元の意味を変えない(基本ライセンス 4 条 2 項) | 分解・修正で意味を損なわない・成果物の外で表示しない | 案内の文はそのまま(長い時だけ末尾を切って `…`)。生のデータは端末に返さない(決まった行の形だけ) |
+| 再配布しない(基本ライセンス 8 条 4 項) | データ(復元できる派生データを含む)を第三者が再利用できる形で公開しない | 生成アプリの画面に出すだけ。**生成アプリが運行情報を一覧として外に出す(書き出し・公開の API)のは規約の外**(部品の決まりは #1643) |
+| 鍵(利用規約 5 条 1 項 5 号) | アクセストークンを第三者に開示しない | 鍵は Secret Manager の `EXT_ODPT_API_KEY` だけ・エラーとログに URL を出さない |
+| 営利 | 基本ライセンス 4 条 7 項で営利・非営利を問わず使える | Pro の機能として出してよい |
 
 ## 呼び出しの流れと数え方
 
@@ -202,6 +290,7 @@ op の案: `boards()`(自分のボード・`GET /1/members/me/boards`。`/1/memb
 - **暗号化**: `Sealer` が暗号化する。本番は Cloud KMS の対称鍵(`KMSSealer`・`EXT_TOKEN_KMS_KEY`)で、鍵の encrypt / decrypt は runner の SA だけに渡す。uid と provider を追加の認証データにするので、別の人・別の provider の文書に写しても開けない。エミュレータでは起動ごとの使い捨ての鍵(`LocalSealer`)。鍵が無い時は OAuth の provider が動かない(暗号化しないで保存する道は無い)。
 - **クライアントから見えない**: Firestore のルールで許していない(サーバーだけ)。`GET /v1/me/connections` には provider・状態・scope・日付だけを返す(`ConnectionView`)。トークンの型(`Token`・`Secrets`)はログ・`%v`・JSON に出すと `[redacted]` になる。
 - **切る(取り消し)**: provider の取り消しの口を呼び(無い provider は呼ばない)、**すぐ**トークンを消して `revoked` の印だけ残す(決定 7)。印は 90 日で消える。
+- **Google は 1 つの許可**: カレンダー・ToDo・スプレッドシートは同じ OAuth クライアント(`Provider.ClientFrom`)で `include_granted_scopes=true` なので、Google 側では 1 つの許可にまとまる。どれか 1 つのトークンを取り消すと全部が切れる。だから 1 つを切る時は、同じクライアントのほかの provider がまだつながっていれば Google の取り消しの口を呼ばない(トークンはすぐ消す)。最後の 1 つを切る時に取り消す。引き換え: ほかがつながっている間は、切った provider の scope も Google のアカウントの「接続したアプリ」に残る(こちらはトークンを持たない)。`EXT_GOOGLE_TASKS_CLIENT_ID` などで別のクライアントにした時も、同じグループとして扱う(取り消しが最後まで遅れるだけ)。接続の一覧が読めない時も取り消さない(ほかを壊さない方を取る)。
 - **90 日使わない**: 使うたび(1 時間に 1 回まで書く)に `deleteAt` を 90 日先にする。過ぎたものは次に読んだ時に消し、`POST /internal/ext/expire`(`ExpireUnused`)と Firestore の TTL(`deleteAt`)でも消える。
 - **Pro が切れた**: トークンは残し、使わない(呼び出しが枠の段で止まる)。使わなければ 90 日で消える。
 - **退会**: 30 日後の消去(`cmd/purge`)で `users/{uid}/connections/*` を消す。退会の時は appconfig が runner の `revokeAll` を呼び、provider 側の許可も取り消す(#1716)。runner が失敗・落ちていても退会は止めず(ログ `revoking external connections on delete failed`)、30 日後の消去でトークンは必ず消える。
@@ -258,6 +347,23 @@ op の案: `boards()`(自分のボード・`GET /1/members/me/boards`。`/1/memb
 
 DSL に `externalCall` / `externalList` があるかの確かめは、DSL の子 Issue で部品と一緒に足す(今は provider が既定で off・Pro だけなので、一覧と引数だけを見る)。
 
+## スプレッドシートの取り込み(自動の動き・#1712)
+
+自動の動き(serverRules)の 1 回の中で `googleSheets` の `readRange` を呼び、表の行を entity に入れる(id の列で上書き)。実行する部分だけが入っている(`runner.SheetImporter`)。**DSL の書き方(serverRules の action)と runner の tick への組み込みはまだ**: 生成アプリから外の API を使う部品と AI の決まり(#1643)が決まってから、その形で足す。それまで DSL のスキーマ・`prompt.go`・`catalog.go` は変えない。
+
+| 項目 | 中身 |
+|---|---|
+| 入力(`SheetImport`) | `SpreadsheetID`・`Range`(`readRange` と同じ)・`Entity`・`IDColumn`(見出しの名前)・`ImportKey`(任意。記録の id で `IDColumn` の代わりに使う名前)・`Fields`(見出し → field id。無ければ field の id か名前と同じ見出しの列)・`MaxRows` |
+| 見出し | 範囲の最初の行(空の行は飛ばした後)。`IDColumn` が見出しに無い・範囲が空は `ErrImportNoIDColumn`(何も書かない・数えない) |
+| 上書き | 記録の id は `store.IDFromClientID` に entity・`ImportKey`(無ければ `IDColumn`)・正規化した id の値を渡したもの(`importClientID`)。rule や action は入れない: rule の名前を変える・前に action を足すと全部の行が二重になるため。id の値は NFKC・前後の空白を外し、数に見えるものは 1 つの書き方にそろえる(`1` / `1.00` / `001` / `１` は同じ・`1,000` と `1000` は同じ)。表示の形式を変えても同じ記録になる。列の見出しの名前を変えるなら `ImportKey` を決めておく。何回走っても同じ id の行は同じ記録になり、二つにならない。新しい id は作る(`CreateRecord`・作った記録は `origin` に rule・版・event)、ある id は変わった field を書く(`ApplyRecordOnce`。印は event + rule + action + 記録の id なので、同じ event のやり直しで二度書かない) |
+| 空のセル | 新しい記録には入れない。ある記録では消す(必須の field は消さず前の値のまま) |
+| 飛ばす行 | id が空(`NoID`)・前の行と同じ id(`Duplicate`・最初の行が勝つ)・新しい行で必須の field が無い(`Required`)。型に合わないセル(`BadValues`)はその field だけ入れない |
+| 型 | セルを型のある値にしてから、端末の書き込みと同じ確かめ(`appconfig.NormalizeValue`)を通す。integer / number / currency は数(`,` `¥` を外す)。integer / currency に小数があれば入れない(丸めない)・int64 の範囲を超えるものも入れない。boolean は true / false / 1 / 0 / yes / no / はい / いいえ / ○ / ×。date は `2026-11-12` か `2026/11/12`。datetime は RFC 3339・`2026-11-12 06:00`・日付だけ(その日の 0 時)。時差の無い日時は run の地域(`ImportRun.Location`・無ければ日本時間)で読む。enum は選択肢にある値だけ(選択肢の無い enum は何でも)。ほかの型・computed・encrypted の field は `ErrImportSpec`(呼ぶ前に止める) |
+| 1 回の行数 | `MaxRows`(既定 `DefaultImportRows` = 50・上限 `MaxImportRows` = 99)。`readRange` の `limit` は見出しを足した数(最大 100)なので、それより先の行は読みもしない。列は `readRange` と同じ 10 列まで・1 セル 1000 文字まで |
+| 数え方 | 呼び出しは `CallRequest.Run` に run の `quota.Decision` を渡す(自動の動きの外の API と同じ。`runs` 1・Pro だけ・回数の上限は作成者・トークンは作成者のもの)。request id は `import/<event>/<rule>/<action>`。記録と同じ値の行は書かず数えない(`Unchanged`)。書く行だけを `quota.Writes` で数え、1 回の上限・アプリの 1 日の上限で切った行は `Dropped`(書かない) |
+| 列の受け渡し | `readRange` の答えの `Output.Cells`(列のまま・サーバーの中だけ。JSON には出さず端末に返らない)。端末に返す `rows` の形は変わらない |
+| プライバシー | シートの中身は記録として保存する(今の記録と同じ扱い)。`readRange` の答え自体はキャッシュしない |
+
 ## 偽の provider(stg と試験)
 
 決定 5 のとおり、stg は偽の provider で通す(本物の鍵は prod の runner だけ)。`APP_ENV=production` では `EXT_*_ENABLED` を入れても動かない。
@@ -280,9 +386,14 @@ DSL に `externalCall` / `externalList` があるかの確かめは、DSL の子
 - runner の最小 1 台(決定 4)・`#288` までは runner が prod だけなので、stg で偽の provider を通す時の runner の置き場所。
 - 各社の鍵・OAuth のクライアント(Secret Manager・`EXT_<PROVIDER>_*`)と、原価・押さえの量(非公開の資料から env)。
 - Google ToDo(#1677): カレンダーの OAuth クライアントに戻り先 `/oauth/callback/googleTasks` を足し、Google Cloud のプロジェクトで Tasks API を有効にし、同意の画面に scope `tasks.readonly`・`tasks`(センシティブ)を足して Google の確認を受け直す。
+- Nature Remo(#1705): 利用者の鍵を預かる土台(#1671)で、Nature のアクセストークン 1 つを預かる形にする(`nature_remo.go` の `natureRemoKeys` に渡す)。Nature のトークンは scope が無く家の全部を動かせるので、預かる画面でそのことを利用者に示す。Nature の API の利用規約(個人向けのトークンを多くの利用者が使うサービスに預けて呼んでよいか・商用の利用・トークンを第三者が保管してよいか)を確かめる。本物のアカウントで `/1/devices` の `newest_events` の形を一度確かめる。家電を動かす op を入れるか・自動の動きから送ってよいかを決める。プライバシーポリシーに「家の機器の値(室温・湿度)を読む」ことを書く(`docs/legal`)。
 - GitHub App の登録(#1674): 権限は Issues・Pull requests・Metadata を読むだけ・「Expire user authorization tokens」を入れたまま・コールバックは runner の `/oauth/callback/github`・Webhook は切る。利用者は App を自分の repo / org に入れる(org は管理者の承認が要ることがある)。
 - Linear の OAuth の App の登録(#1684): コールバックは runner の `/oauth/callback/linear`・公開にするか(ほかのワークスペースから使えるように)を決める。
 - Google スプレッドシート(#1685): カレンダーの OAuth クライアントに戻り先 `/oauth/callback/googleSheets` を足し、Google Cloud のプロジェクトで Sheets API と Picker API を有効にし、同意の画面に scope `drive.file`(センシティブでない)を足す。iOS の Google Picker でファイルを選ばせる部分は別の Issue。
 - 回数の上限の値(`EXT_LIMIT_*`・`EXT_GLOBAL_DAILY*`)を各社の割り当てに合わせて runner の env に入れる(非公開の資料から。入れなければコードの既定)。
 - プライバシーポリシー・利用規約(`docs/legal`)に外の API への送信とトークンの保管・消し方を書く。
+- SwitchBot(#1704): 利用者の鍵を預かる土台(#1671)で、SwitchBot はトークンと秘密の値の **2 つ**を預かる形にする(`switchbot.go` の `switchBotKeys` に渡す)。本物のアカウントで署名(`sign` が大文字にしない base64 で通るか)を一度確かめる。SwitchBot の API の規約(個人の開発者向けの API を多くの利用者が使うサービスから呼んでよいか・商用の利用)を確かめる。機器を動かす op を入れるか・自動の動きから送ってよいかを決める。プライバシーポリシーに「在宅が分かり得る家の機器の値を読む」ことを書く(`docs/legal`)。
 - YouTube(#1699): Google Cloud で YouTube Data API v3 を有効にし、鍵(使える API を YouTube Data API v3 だけに絞る)を Secret Manager の `EXT_YOUTUBE_API_KEY` に入れる。1 日の割り当て(Cloud Console の Quotas)を確かめて `EXT_GLOBAL_DAILY_YOUTUBE` を合わせる。上の「YouTube の規約」を読み直し、プライバシーポリシーに YouTube API サービスの利用と Google のプライバシーポリシーへのリンク、アプリに YouTube の利用規約へのリンクを足す。
+- GTFS リアルタイム(#1692): 上の「GTFS リアルタイムのフィードと規約」の都営バスの URL とライセンスを一度確かめる(このコードは実際のフィードを読んでいない)。TripUpdate を出すフィード(金沢・北陸の事業者を含む)を探し、ライセンスが CC BY なら許可リストに足す。足すまで `nextBuses` は使えない。
+- ODPT(#1691): [公共交通オープンデータセンターの開発者サイト](https://developer.odpt.org/)で開発者登録(運営のアカウント・審査に数日かかることがある)をし、発行された consumer key を Secret Manager の `EXT_ODPT_API_KEY` に入れる。上の「ODPT の事業者と規約」を読み直し、アプリの問い合わせ先(開発者のメールアドレスなど)を決める。路線 id は登録後に `odpt:Railway` で一度確かめる。
+- ポッドキャスト(#1703): 上の「iTunes Search API の規約」を読み直し、「ストアの中身を広めるためだけ」の使い道に当たるか(番組を探して Apple Podcasts を開く使い方)を決める。`EXT_GLOBAL_DAILY_PODCASTS` を 1 分 20 回の目安に合わせて入れる。バッジ(Listen on Apple Podcasts)の出し方を iOS と決める。アートワークを端末に出すなら `ExtRow` に画像の欄を足すか(API の契約の変更)を決める。

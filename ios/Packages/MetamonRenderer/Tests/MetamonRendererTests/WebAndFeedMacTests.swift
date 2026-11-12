@@ -35,21 +35,37 @@ final class WebAndFeedMacTests: XCTestCase {
         XCTAssertEqual(WebLinkPolicy.decide(nil, opensNewWindow: false), .ignore)
     }
 
-    /// 新しいウインドウで開くリンク: Mac は既定のブラウザに渡す、iOS は今まで通り(WKWebView に任せる)。
+    /// 新しいウインドウ(#1289): リンクは既定のブラウザ、スクリプトと http は今の枠。iOS も Mac も同じ
     func testNewWindowLinks() throws {
         let https = try XCTUnwrap(URL(string: "https://example.com/blank"))
-        XCTAssertEqual(WebLinkPolicy.decide(https, opensNewWindow: true, externalNewWindows: true), .openExternally(https))
-        XCTAssertEqual(WebLinkPolicy.decide(https, opensNewWindow: true, externalNewWindows: false), .allow)
-        XCTAssertEqual(WebLinkPolicy.decide(https, opensNewWindow: true, linkActivated: false, externalNewWindows: true), .ignore,
-                       "スクリプトが開くウインドウはブラウザに渡さない")
+        XCTAssertEqual(WebLinkPolicy.decide(https, opensNewWindow: true), .openExternally(https))
+        XCTAssertEqual(WebLinkPolicy.decide(https, opensNewWindow: true, linkActivated: false), .openInPlace(https),
+                       "スクリプトが開くウインドウはブラウザに渡さず今の枠で開く")
         let http = try XCTUnwrap(URL(string: "http://example.com/blank"))
-        XCTAssertEqual(WebLinkPolicy.decide(http, opensNewWindow: true, externalNewWindows: true), .allow, "http は外に渡さない")
-        #if os(macOS)
-        XCTAssertTrue(WebLinkPolicy.isMac)
-        #else
-        XCTAssertFalse(WebLinkPolicy.isMac)
-        #endif
+        XCTAssertEqual(WebLinkPolicy.decide(http, opensNewWindow: true), .openInPlace(http), "http は外に渡さない")
+        XCTAssertEqual(WebLinkPolicy.decide(URL(string: "about:blank"), opensNewWindow: true, linkActivated: false), .ignore)
     }
+
+    /// ダウンロード(#1289): 表示できない種類と添付は止める
+    func testDownloadPolicy() {
+        XCTAssertTrue(WebDownloadPolicy.blocks(canShowMIMEType: false, contentDisposition: nil))
+        XCTAssertTrue(WebDownloadPolicy.blocks(canShowMIMEType: true, contentDisposition: "attachment; filename=\"a.pdf\""))
+        XCTAssertTrue(WebDownloadPolicy.blocks(canShowMIMEType: true, contentDisposition: " Attachment"))
+        XCTAssertFalse(WebDownloadPolicy.blocks(canShowMIMEType: true, contentDisposition: "inline"))
+        XCTAssertFalse(WebDownloadPolicy.blocks(canShowMIMEType: true, contentDisposition: nil))
+        XCTAssertFalse(WebDownloadPolicy.notice.isEmpty)
+    }
+
+    #if os(macOS)
+    /// Mac の右クリック(#1289): 新しいウインドウ・ダウンロードの項目だけ外す
+    func testContextMenuPolicy() {
+        XCTAssertFalse(WebContextMenuPolicy.keeps("WKMenuItemIdentifierOpenLinkInNewWindow"))
+        XCTAssertFalse(WebContextMenuPolicy.keeps("WKMenuItemIdentifierDownloadLinkedFile"))
+        XCTAssertFalse(WebContextMenuPolicy.keeps("WKMenuItemIdentifierDownloadImage"))
+        XCTAssertTrue(WebContextMenuPolicy.keeps("WKMenuItemIdentifierCopyLink"))
+        XCTAssertTrue(WebContextMenuPolicy.keeps(nil))
+    }
+    #endif
 
     func testWebViewIsRegistered() {
         XCTAssertNotNil(ComponentRegistry.standard.builder(for: ComponentType.webView.rawValue))

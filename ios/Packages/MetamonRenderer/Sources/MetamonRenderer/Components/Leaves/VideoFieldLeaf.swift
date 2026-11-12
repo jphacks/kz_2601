@@ -112,6 +112,9 @@ struct VideoFieldLeaf: View {
         .confirmationDialog(c.label ?? L("動画"), isPresented: $showChooser, titleVisibility: .hidden) {
             Button(L("撮影")) { openCamera() }
             Button(L("ライブラリから選ぶ")) { showLibrary = true }
+            #if os(macOS)
+            Button(L("ファイルから選ぶ")) { showFileImporter = true }
+            #endif
             Button(L("キャンセル"), role: .cancel) {}
         }
         .platformFullScreenCover(isPresented: $showCamera) {
@@ -138,12 +141,12 @@ struct VideoFieldLeaf: View {
         #if !APP_STORE_REVIEW
         .alert(L("カメラを使えません"), isPresented: $showDenied) {
             Button(L("設定を開く")) {
-                if let url = PlatformSystem.appSettingsURL { openURL(url) }
+                if let url = PlatformSystem.cameraSettingsURL { openURL(url) }
             }
             Button(L("ライブラリから選ぶ")) { showLibrary = true }
             Button(L("キャンセル"), role: .cancel) {}
         } message: {
-            Text(L("設定アプリで Tailor It のカメラへのアクセスを許可してください。"))
+            Text(PlatformSystem.cameraDeniedMessage)
         }
         #endif
     }
@@ -258,7 +261,7 @@ struct VideoPreview: View {
     var body: some View {
         Group {
             if let url = playableURL {
-                VideoPlayer(player: player)
+                playerView
                     .onAppear { if player == nil { player = AVPlayer(url: url) } }
                     .onChange(of: url) { _, new in player = AVPlayer(url: new) }
                     .onDisappear { player?.pause() }
@@ -272,7 +275,7 @@ struct VideoPreview: View {
                 PhotoView(value: value, height: height, accessibilityLabel: L("この端末にはありません"))
                     .overlay(alignment: .bottom) {
                         if video != nil {
-                            Label(L("この端末にはありません"), systemImage: "iphone.slash")
+                            Label(L("この端末にはありません"), systemImage: PlatformSystem.notOnDeviceSymbol)
                                 .font(.caption.weight(.semibold))
                                 .padding(.horizontal, 10).padding(.vertical, 6)
                                 .background(.ultraThinMaterial, in: Capsule())
@@ -284,5 +287,15 @@ struct VideoPreview: View {
         .frame(height: height)
         .frame(maxWidth: .infinity)
         .clipShape(RoundedRectangle(cornerRadius: RenderTheme.Radius.inner, style: .continuous))
+    }
+
+    /// Mac は全画面のボタン・しまった時に止める `AVPlayerView`(#1340)。iOS は SwiftUI の `VideoPlayer`
+    @ViewBuilder
+    private var playerView: some View {
+        #if os(macOS)
+        MacVideoPlayerView(player: player)
+        #else
+        VideoPlayer(player: player)
+        #endif
     }
 }

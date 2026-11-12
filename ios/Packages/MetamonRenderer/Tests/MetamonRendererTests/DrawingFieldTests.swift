@@ -1,7 +1,10 @@
-// TODO mac-026: UIKit を直接使うテスト。Mac で回すには描画の仕方を置き換え層に寄せる
-#if os(iOS)
 import XCTest
 import PencilKit
+#if canImport(UIKit)
+import UIKit
+#else
+import AppKit
+#endif
 import MetamonDSL
 @testable import MetamonRenderer
 
@@ -20,7 +23,7 @@ final class DrawingFieldTests: XCTestCase {
     }
 
     /// 画像の (x, y)(0...1 の割合)の明るさ 0...255。
-    private func brightness(_ image: UIImage, atX fx: CGFloat, y fy: CGFloat) throws -> Int {
+    private func brightness(_ image: PlatformImage, atX fx: CGFloat, y fy: CGFloat) throws -> Int {
         let cg = try XCTUnwrap(image.cgImage)
         var px = [UInt8](repeating: 0, count: 4)
         let ctx = try XCTUnwrap(CGContext(data: &px, width: 1, height: 1, bitsPerComponent: 8, bytesPerRow: 4,
@@ -45,9 +48,12 @@ final class DrawingFieldTests: XCTestCase {
     /// ダークモードでもインクは黒・地は白で保存する。
     func testDarkModeStillSavesBlackOnWhite() throws {
         var value: JSONValue = .null
-        UITraitCollection(userInterfaceStyle: .dark).performAsCurrent {
-            value = DrawingCodec.fieldValue(drawing: line(), background: nil, canvasSize: canvas)
-        }
+        let draw = { value = DrawingCodec.fieldValue(drawing: self.line(), background: nil, canvasSize: self.canvas) }
+        #if canImport(UIKit)
+        UITraitCollection(userInterfaceStyle: .dark).performAsCurrent(draw)
+        #else
+        try XCTUnwrap(NSAppearance(named: .darkAqua)).performAsCurrentDrawingAppearance(draw)
+        #endif
         let image = try XCTUnwrap(PhotoCodec.image(from: value))
         XCTAssertLessThan(try brightness(image, atX: 170 / canvas.width, y: 40 / canvas.height), 100)
         XCTAssertGreaterThan(try brightness(image, atX: 0.5, y: 0.8), 230)
@@ -94,4 +100,3 @@ final class DrawingFieldTests: XCTestCase {
         XCTAssertTrue(RenderTree.formBound.contains(.drawingField))
     }
 }
-#endif

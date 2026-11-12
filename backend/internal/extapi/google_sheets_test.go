@@ -84,6 +84,13 @@ func newFakeSheets(t *testing.T) (*fakeSheets, gcalWire) {
 		case "limited":
 			gerr(w, 429, "rateLimitExceeded")
 			return
+		case "daily":
+			gerr(w, 403, "dailyLimitExceeded")
+			return
+		case "disabled":
+			writeJSON(w, 403, map[string]any{"error": map[string]any{"code": 403, "status": "PERMISSION_DENIED",
+				"errors": []map[string]string{{"reason": "accessNotConfigured"}}}})
+			return
 		case "busy":
 			gerr(w, 503, "backendError")
 			return
@@ -182,6 +189,15 @@ func TestGoogleSheetsFlow(t *testing.T) {
 	if len(r) != 3 || r[0].Title != "商品" || r[0].Value != "売上" || r[0].Subtitle != "店・メモ" ||
 		r[1].Title != "りんご" || r[1].Value != "1,200" || r[1].Subtitle != "金沢" || r[2].Title != "みかん" {
 		t.Fatalf("rows %+v", r)
+	}
+	// Cells (the import, #1712): the columns as they are, 10 at most, empty
+	// rows left out like Rows; never in the answer's JSON
+	cells := res.Output.Cells
+	if len(cells) != 3 || fmt.Sprint(cells[0]) != "[商品 売上 店 メモ]" || len(cells[1]) != 10 || cells[1][2] != "金沢" || fmt.Sprint(cells[2]) != "[みかん 800]" {
+		t.Fatalf("cells %q", cells)
+	}
+	if b, _ := json.Marshal(res.Output); strings.Contains(string(b), "金沢\",\"\"") || strings.Contains(string(b), "ells") {
+		t.Fatalf("cells in JSON: %s", b)
 	}
 	if f.lastRange != "Sheet1!A1:D50" || f.lastQuery.Get("valueRenderOption") != "FORMATTED_VALUE" {
 		t.Fatalf("range %s %v", f.lastRange, f.lastQuery)
@@ -298,7 +314,8 @@ func TestGoogleSheetsArgs(t *testing.T) {
 	}
 }
 
-// 401 → the connection turns to error; 403 → connect again; 404 (a file
+// 401 → the connection turns to error; a scope 403 → connect again; another
+// 403 or 404 (a file
 // not picked) and 400 → 400 bad_request; 429 / 5xx / rate-limit 403 → 502
 // upstream_unavailable.
 func TestGoogleSheetsErrors(t *testing.T) {
@@ -314,16 +331,26 @@ func TestGoogleSheetsErrors(t *testing.T) {
 	if err := read("dead", nil); !errors.Is(err, ErrInvalidGrant) {
 		t.Fatalf("401: %v", err)
 	}
-	for _, tok := range []string{"narrow", "forbidden"} {
-		if err := read(tok, nil); !errors.Is(err, ErrNotConnected) || Reason(err) != ReasonNotConnected {
-			t.Fatalf("403 %s: %v", tok, err)
-		}
+	// only a missing scope asks to connect again; no access to the item is
+	// bad_request, an API not enabled on our project upstream_unavailable
+	if err := read("narrow", nil); !errors.Is(err, ErrNotConnected) || Reason(err) != ReasonNotConnected {
+		t.Fatalf("403 scope: %v", err)
 	}
-	for _, tok := range []string{"limited", "busy", "quota"} {
+	if err := read("forbidden", nil); errors.Is(err, ErrNotConnected) || Reason(err) != ReasonBadRequest {
+		t.Fatalf("403 forbidden: %v", err)
+	}
+	if err := read("disabled", nil); errors.Is(err, ErrNotConnected) || Reason(err) != ReasonUpstream {
+		t.Fatalf("403 accessNotConfigured: %v", err)
+	}
+	for _, tok := range []string{"limited", "busy", "quota", "daily"} {
 		err := read(tok, nil)
 		var pe *ProviderError
 		if !errors.As(err, &pe) || !pe.Retryable || Reason(err) != ReasonUpstream {
 			t.Fatalf("%s: %v", tok, err)
+		}
+		// a quota 403 is the provider's 429: it pauses the provider
+		if tok != "busy" && !upstreamLimited(err) {
+			t.Fatalf("%s is not a 429: %v", tok, err)
 		}
 	}
 	other := strings.Repeat("Z", 30)

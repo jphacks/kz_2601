@@ -214,7 +214,9 @@ func gsheetsCan(t *Token) bool {
 
 // --- answers ---
 
-func gsheetsCell(v any) string {
+// gsheetsRawCell is a cell as Output.Cells has it (the import): trimmed, at
+// most gsheetsCellMax runes.
+func gsheetsRawCell(v any) string {
 	var s string
 	switch x := v.(type) {
 	case nil:
@@ -224,7 +226,24 @@ func gsheetsCell(v any) string {
 		b, _ := json.Marshal(x)
 		s = string(b)
 	}
-	s = strings.TrimSpace(strings.ReplaceAll(s, "\n", " "))
+	s = strings.TrimSpace(s)
+	if utf8.RuneCountInString(s) > gsheetsCellMax {
+		s = string([]rune(s)[:gsheetsCellMax])
+	}
+	return s
+}
+
+// gsheetsRawCells are the first gsheetsMaxCols cells of a row.
+func gsheetsRawCells(cells []any) []string {
+	out := make([]string, min(len(cells), gsheetsMaxCols))
+	for i := range out {
+		out[i] = gsheetsRawCell(cells[i])
+	}
+	return out
+}
+
+func gsheetsCell(v any) string {
+	s := strings.TrimSpace(strings.ReplaceAll(gsheetsRawCell(v), "\n", " "))
 	if utf8.RuneCountInString(s) > gsheetsShownMax {
 		s = string([]rune(s)[:gsheetsShownMax]) + "…"
 	}
@@ -281,7 +300,8 @@ func gsheetsReadQuery(a map[string]string) (string, url.Values, int, error) {
 
 // readRange reads a range of a sheet the person picked: one row a sheet
 // row (empty rows left out), limit rows (default 50, at most 100), the
-// first 10 columns. Nothing is cached.
+// first 10 columns. Cells keeps the columns for the import. Nothing is
+// cached.
 func (s *googleSheets) readRange(ctx context.Context, in Input) (Output, error) {
 	if !gsheetsCan(in.Token) {
 		return Output{}, ErrNotConnected
@@ -306,6 +326,7 @@ func (s *googleSheets) readRange(ctx context.Context, in Input) (Output, error) 
 			continue
 		}
 		out.Rows = append(out.Rows, row)
+		out.Cells = append(out.Cells, gsheetsRawCells(cells))
 	}
 	return out, nil
 }
@@ -366,9 +387,10 @@ func (s *googleSheets) appendRow(ctx context.Context, in Input) (Output, error) 
 }
 
 // do is Google Calendar's do (401 → ErrInvalidGrant, a missing scope →
-// ErrNotConnected, 429 / 5xx / rate limits → retryable) plus: any other 403
-// is ErrNotConnected (connect again), 404 is a sheet the person did not
-// pick (bad_request), 400 a range the sheet does not have (bad_request).
+// ErrNotConnected, 429 / 5xx / quota 403 → retryable) plus: an API not
+// enabled stays upstream_unavailable; any other 403 and 404 are a sheet the
+// person did not pick (bad_request), 400 a range the sheet does not have
+// (bad_request).
 func (s *googleSheets) do(ctx context.Context, tok *Token, method, path string, body []byte, out any) error {
 	ctype := ""
 	if body != nil {
@@ -379,7 +401,10 @@ func (s *googleSheets) do(ctx context.Context, tok *Token, method, path string, 
 	if errors.As(err, &pe) && !pe.Retryable {
 		switch pe.Status {
 		case http.StatusForbidden:
-			return ErrNotConnected
+			if errors.Is(err, errGoogleAPIDisabled) {
+				return err
+			}
+			return &ProviderError{Status: pe.Status, Err: fmt.Errorf("%w: googleSheets cannot open this spreadsheet; pick it in the Google Picker first", ErrUnknown)}
 		case http.StatusNotFound:
 			return &ProviderError{Status: pe.Status, Err: fmt.Errorf("%w: googleSheets cannot see this spreadsheet; pick it in the Google Picker first", ErrUnknown)}
 		case http.StatusBadRequest:

@@ -15,6 +15,10 @@ final class RecordBook {
     private(set) var failed: Set<String> = []
     private(set) var records: [String: [Record]] = [:]
     @ObservationIgnored private var savingForms: Set<ObjectIdentifier> = []
+    /// shared / public の entity に新しく作る記録の投稿者(#250・#963)。nil を返す entity(private)・未設定は作者を付けない
+    @ObservationIgnored var postAuthor: ((String) -> (uid: String?, name: String?)?)?
+    /// 端末に書いた(足す・変える・消す・取り消す)entity。Mac で同じアプリを開いた別のウインドウに知らせる(#1853)
+    @ObservationIgnored var onLocalWrite: ((String) -> Void)?
 
     init(appId: String, dsl: AppDSL, recordSync: RecordSyncEngine) {
         self.appId = appId
@@ -72,21 +76,24 @@ final class RecordBook {
         guard let current = record(entity, recordId) else { return .missing }
         guard canEdit(entity, current) else { return .readOnly }
         records[entity] = await recordSync.save(appId: appId, entity: entity, recordId: recordId, data: data)
+        onLocalWrite?(entity)
         return .saved
     }
 
     /// フォームを通さずに 1 件足す。DSL に無い entity には書かない。
     func create(entity: String, data: [String: JSONValue]) async -> Bool {
         guard dsl.entity(entity) != nil else { return false }
-        records[entity] = await recordSync.save(appId: appId, entity: entity, recordId: nil, data: data)
+        records[entity] = await recordSync.save(appId: appId, entity: entity, recordId: nil, data: data, author: postAuthor?(entity))
+        onLocalWrite?(entity)
         return true
     }
 
     /// `create` と同じ。作った行の id(仮 id `local-…`)を返す。書けなければ nil(aiChat の対の保存・#1326)
     func createId(entity: String, data: [String: JSONValue]) async -> String? {
         guard dsl.entity(entity) != nil else { return nil }
-        let written = await recordSync.write(appId: appId, entity: entity, recordId: nil, data: data)
+        let written = await recordSync.write(appId: appId, entity: entity, recordId: nil, data: data, author: postAuthor?(entity))
         records[entity] = written.records
+        onLocalWrite?(entity)
         return written.recordId
     }
 
@@ -109,8 +116,10 @@ final class RecordBook {
         // 保存ボタンの連打で同じ内容が 2 件できないように
         guard savingForms.insert(ObjectIdentifier(form)).inserted else { return .inFlight }
         defer { savingForms.remove(ObjectIdentifier(form)) }
-        let written = await recordSync.write(appId: appId, entity: entity, recordId: recordId, data: form.payload)
+        let written = await recordSync.write(appId: appId, entity: entity, recordId: recordId, data: form.payload,
+                                             author: recordId == nil ? postAuthor?(entity) : nil)
         records[entity] = written.records
+        onLocalWrite?(entity)
         form.markSaved(queuedOffline: !recordSync.isOnline)
         return .saved
     }
@@ -119,6 +128,7 @@ final class RecordBook {
     func deleteUndoably(entity: String, recordId: String, grace: Duration) async -> DeletionTicket {
         let ticket = await recordSync.deleteUndoably(appId: appId, entity: entity, recordId: recordId, grace: grace).ticket
         await reloadLocal(entity)
+        onLocalWrite?(entity)
         return ticket
     }
 
@@ -127,6 +137,7 @@ final class RecordBook {
     func undoDelete(_ ticket: DeletionTicket) async -> Bool {
         guard await recordSync.undoDelete(ticket) != nil else { return false }
         await reloadLocal(ticket.entity)
+        onLocalWrite?(ticket.entity)
         return true
     }
 }

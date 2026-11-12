@@ -11,6 +11,11 @@ struct CalendarLeaf: View {
     @State private var month: Date = Calendar.current.startOfMonth(for: .now)
     @State private var selected: Date = Calendar.current.startOfDay(for: .now)
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    #if os(macOS)
+    /// Mac: 月の表の幅(広いウインドウで日の枠を高くする)と、矢印キーを受けるか(#944)
+    @State private var gridWidth: CGFloat = 0
+    @FocusState private var gridFocused: Bool
+    #endif
 
     /// 曜日記号もアプリの表示言語に合わせる(#44)
     private var cal: Calendar {
@@ -83,21 +88,50 @@ struct CalendarLeaf: View {
         return LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 0), count: 7), spacing: 4) {
             ForEach(Array(cells.enumerated()), id: \.offset) { _, date in
                 if let date {
-                    dayCell(date, recordCount: days[date]?.count ?? 0)
+                    dayCell(date, records: days[date] ?? [])
                 } else {
-                    Color.clear.frame(height: 36)
+                    Color.clear.frame(height: cellHeight)
                 }
             }
         }
+        #if os(macOS)
+        .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { gridWidth = $0 }
+        .macCalendarKeys(focused: $gridFocused) { key in
+            guard let next = MacCalendarKeys.move(selected, by: key, calendar: cal) else { return false }
+            select(next)
+            return true
+        }
+        #endif
+    }
+
+    /// 日の枠の高さ。iOS は 36pt、Mac はウインドウの幅に合わせる
+    private var cellHeight: CGFloat {
+        #if os(macOS)
+        MacCalendarLayout.cellHeight(gridWidth: gridWidth)
+        #else
+        36
+        #endif
+    }
+
+    /// 選んだ日を変え、別の月なら表示の月も合わせる(Mac の矢印キー)
+    private func select(_ date: Date) {
+        selected = date
+        let m = cal.startOfMonth(for: date)
+        if m != month { withAnimation(reduceMotion ? nil : .snappy) { month = m } }
     }
 
     /// VoiceOver: 「10月24日 金曜日, 記録2件(, 今日)(, 選択中)」。日の数字は Dynamic Type で 36pt 枠に収まるよう縮小。
-    private func dayCell(_ date: Date, recordCount: Int) -> some View {
+    private func dayCell(_ date: Date, records: [Record]) -> some View {
+        let recordCount = records.count
+        let lines = MacCalendarLayout.titleLines(cellHeight: cellHeight)
         let isSelected = date == selected
         let isToday = cal.isDateInToday(date)
         let hasRecords = recordCount > 0
         return Button {
             selected = date
+            #if os(macOS)
+            gridFocused = true
+            #endif
         } label: {
             VStack(spacing: 2) {
                 Text("\(cal.component(.day, from: date))")
@@ -109,9 +143,21 @@ struct CalendarLeaf: View {
                 Circle()
                     .fill(hasRecords ? (isSelected ? Color.white : RenderTheme.Colors.brandA) : Color.clear)
                     .frame(width: 5, height: 5)
+                // Mac の広い枠: その日の記録の題を数件(読み上げは下の「記録n件」と一覧に任せる)
+                if lines > 0 {
+                    ForEach(records.prefix(lines)) { r in
+                        Text(cellTitle(r))
+                            .font(.caption2)
+                            .lineLimit(1)
+                            .foregroundStyle(isSelected ? Color.white : Color.secondary)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .padding(.horizontal, 4)
+                    }
+                    .accessibilityHidden(true)
+                }
             }
             .frame(maxWidth: .infinity)
-            .frame(height: 36)
+            .frame(height: cellHeight, alignment: lines > 0 ? .top : .center)
             .background(isSelected ? AnyShapeStyle(RenderTheme.brandFill) : AnyShapeStyle(.clear), in: RoundedRectangle(cornerRadius: 10, style: .continuous))
         }
         .buttonStyle(.plain)
@@ -153,12 +199,18 @@ struct CalendarLeaf: View {
                             guard let action = c.onDateTap else { return }
                             Task { await rt.run(action, ctx.actionContext(recordId: row.id)) }
                         }
+                        .macHelp(c.onDateTap != nil ? L("クリックで開きます") : nil)
                 }
             }
         }
     }
 
     // MARK: - helpers
+
+    private func cellTitle(_ r: Record) -> String {
+        guard let f = entity?.titleField else { return "" }
+        return rt.display(r[f], field: entity?.field(f))
+    }
 
     private func shift(_ delta: Int) {
         if let m = cal.date(byAdding: .month, value: delta, to: month) {

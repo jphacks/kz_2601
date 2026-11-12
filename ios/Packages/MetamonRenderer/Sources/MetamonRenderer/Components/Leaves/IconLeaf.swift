@@ -6,7 +6,7 @@ struct IconLeaf: View {
     let c: Component
 
     var body: some View {
-        Image(systemName: c.name ?? "questionmark.circle")
+        Image(systemName: PlatformSymbol.name(c.name, fallback: "questionmark.circle"))
             .font(.system(size: c.symbolPointSize))
             .foregroundStyle(Color.semantic(c.color))
             .frame(maxWidth: .infinity)
