@@ -34,6 +34,7 @@ import androidx.compose.ui.input.key.type
 import androidx.compose.ui.unit.dp
 import jp.kz2601.metamon.desktop.MockStore
 import jp.kz2601.metamon.desktop.i18n.Strings
+import jp.kz2601.metamon.desktop.photoPreviewClick
 import jp.kz2601.metamon.dsl.Accept
 import jp.kz2601.metamon.dsl.AppDSL
 import jp.kz2601.metamon.dsl.Component
@@ -323,7 +324,7 @@ fun FileImportLeaf(c: Component, io: DesktopIo) {
     }
 }
 
-/** `photoField` / `videoField`: ファイルを選ぶ・落とす・Ctrl+V。写真は縮小して見せ、外へ引き出せる。[readOnly] の時は見せるだけ。 */
+/** `photoField` / `videoField`: ファイルを選ぶ・落とす・Ctrl+V。写真は縮小して見せ、押すと大きく見る・外へ引き出せる。[readOnly] の時は見せるだけ。 */
 @Composable
 fun MediaFieldLeaf(c: Component, label: String, draft: MutableMap<String, String>, readOnly: Boolean = false) {
     val field = c.field ?: return
@@ -333,7 +334,7 @@ fun MediaFieldLeaf(c: Component, label: String, draft: MutableMap<String, String
         Text(label, style = MaterialTheme.typography.labelLarge)
         if (file != null && c.type == ComponentType.PHOTO_FIELD) {
             val bitmap = remember(uri) { runCatching { SkiaImage.makeFromEncoded(file.readBytes()).toComposeImageBitmap() }.getOrNull() }
-            bitmap?.let { Image(it, contentDescription = label, modifier = Modifier.heightIn(max = 160.dp).widthIn(max = 240.dp).fileDragSource(file)) }
+            bitmap?.let { Image(it, contentDescription = label, modifier = Modifier.heightIn(max = 160.dp).widthIn(max = 240.dp).photoPreviewClick(uri, label).fileDragSource(file)) }
         } else if (file != null) {
             Text(file.name, modifier = Modifier.fileDragSource(file))
         }

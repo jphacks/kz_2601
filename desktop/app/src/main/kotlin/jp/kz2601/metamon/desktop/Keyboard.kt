@@ -20,6 +20,7 @@ import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.focus.focusProperties
 import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.foundation.focusGroup
 import androidx.compose.foundation.focusable
 import androidx.compose.ui.input.key.Key
@@ -55,6 +56,8 @@ object KeyboardText {
     val CLOSE get() = Strings["desktop_keys_close"]
     val HELP get() = Strings["desktop_keys_help"]
     val PRINT get() = Strings["desktop_print"]
+    val PREVIEW get() = Strings["desktop_keys_preview"]
+    val NO_PREVIEW get() = Strings["desktop_preview_none"]
     val DELETE_CONFIRM get() = Strings["desktop_keys_delete_confirm"]
     val NO_NEW get() = Strings["desktop_keys_no_new"]
     val NO_SAVE get() = Strings["desktop_keys_no_save"]
@@ -100,6 +103,9 @@ enum class Shortcut(private val text: () -> String, val bubble: Boolean = false)
     CLOSE({ KeyboardText.CLOSE }, bubble = true),
     PRINT({ KeyboardText.PRINT }),
     HELP({ KeyboardText.HELP }, bubble = true),
+
+    /** 写真を大きく見る(PhotoPreview.kt)。Space は入力欄・ボタンが先に受け、何も選んでいない時だけ開く。 */
+    PREVIEW({ KeyboardText.PREVIEW }, bubble = true),
     ;
 
     val title: String get() = text()
@@ -132,6 +138,7 @@ object Keymap {
         Shortcut.PRINT -> listOf(KeyChord(Key.P, primary = true))
         Shortcut.CLOSE -> listOf(KeyChord(Key.Escape))
         Shortcut.HELP -> listOf(KeyChord(Key.F1), KeyChord(Key.Slash, primary = true))
+        Shortcut.PREVIEW -> listOf(KeyChord(Key.Spacebar))
         // macOS のキーボードの delete は Backspace。項目の削除は ⌘⌫(Finder と同じ)。fn+delete(前方削除)も受ける
         Shortcut.DELETE -> if (os == HostOs.MAC) listOf(KeyChord(Key.Backspace, primary = true), KeyChord(Key.Delete)) else listOf(KeyChord(Key.Delete))
     }
@@ -163,6 +170,7 @@ object Keymap {
         Key.Delete -> if (os == HostOs.MAC) "⌦" else "Delete"
         Key.Backspace -> if (os == HostOs.MAC) "⌫" else "Backspace"
         Key.F1 -> "F1"
+        Key.Spacebar -> "Space"
         Key.Slash -> "/"
         Key.K -> "K"
         Key.N -> "N"
@@ -262,18 +270,39 @@ class DesktopKeyboard(
 
     var paletteOpen by mutableStateOf(false)
     var helpOpen by mutableStateOf(false)
+
+    /** 写真のプレビュー(#1850 のデスクトップ版)。 */
+    val photos = PhotoPreview()
+
+    /** 一番外そのものがフォーカスを持つ(入力欄・ボタンなど中の部品を選んでいない)。Space で写真を開くのはこの時だけ。 */
+    internal var rootFocused = false
     val root = FocusRequester()
     val modal = FocusRequester()
 
     private val topScreen: Screen? get() = dsl.screen(session.top.screen)
     private fun ctx() = session.top.let { ActionContext(it, session.form(it)) }
 
-    fun handle(e: KeyEvent, bubble: Boolean): Boolean {
-        if (paletteOpen || helpOpen || wipeConfirmOpen) return false // パレット・一覧・確認が自分で受ける
-        val p = KeyPress.of(e) ?: return false
+    fun handle(e: KeyEvent, bubble: Boolean): Boolean = KeyPress.of(e)?.let { handle(it, bubble) } ?: false
+
+    fun handle(p: KeyPress, bubble: Boolean): Boolean {
+        if (paletteOpen || helpOpen || wipeConfirmOpen || photos.isOpen) return false // パレット・一覧・確認・プレビューが自分で受ける
         val s = Keymap.match(p, os) ?: return false
         if (s == Shortcut.PRINT || s.bubble != bubble) return false // 印刷は Print.kt の Ctrl+P
+        // Space は何も選んでいない時だけ。見せる写真が無ければ流す(知らせも出さない)
+        if (s == Shortcut.PREVIEW) return rootFocused && openPreview()
         return run(s)
+    }
+
+    /** 一番上の画面の記録の写真を開く([start] から)。見せる物が無ければ false。 */
+    fun openPreview(start: String? = null): Boolean = photos.open(PhotoPreviewSources.of(session.form(session.top)), start)
+
+    /** 写真の部品を押した: その写真から開く。 */
+    fun openPhoto(src: String, name: String): Boolean = photos.openAt(PhotoPreviewSources.of(session.form(session.top)), src, name)
+
+    /** プレビューを閉じてフォーカスを戻す(sheet の中から開いた時は sheet へ)。 */
+    fun closePreview() {
+        photos.close()
+        focusAfterNavigation(session.nav.sheet != null || session.nav.fullScreen != null)
     }
 
     /** ショートカット 1 つ。この画面で使えなければ false(キーは他へ流す)。 */
@@ -289,6 +318,7 @@ class DesktopKeyboard(
             Shortcut.SEARCH -> if (!searchTargets.focusTop()) paletteOpen = true
             Shortcut.DELETE -> dispatch(ScreenShortcuts.deleteAction(screen, form) ?: return false, ctx())
             Shortcut.CLOSE -> if (session.canClose(session.top)) session.back(session.top) else return false
+            Shortcut.PREVIEW -> if (!openPreview()) session.message = KeyboardText.NO_PREVIEW
         }
         return true
     }
@@ -350,6 +380,7 @@ class DesktopKeyboard(
         .onPreviewKeyEvent { handle(it, bubble = false) }
         .onKeyEvent { handle(it, bubble = true) }
         .focusRequester(root)
+        .onFocusChanged { rootFocused = it.isFocused }
         .focusable()
 
     /**
@@ -372,7 +403,11 @@ class DesktopKeyboard(
     @Composable
     fun Overlay() {
         val modalOpen = session.nav.sheet != null || session.nav.fullScreen != null
-        LaunchedEffect(session.nav) { focusAfterNavigation(modalOpen) }
+        LaunchedEffect(session.nav) {
+            photos.close() // 画面が変わったら前の記録の写真は閉じる
+            focusAfterNavigation(modalOpen)
+        }
+        if (photos.isOpen) PhotoPreviewDialog(photos, onMessage = { session.message = it }, onDismiss = ::closePreview)
         if (paletteOpen) {
             CommandPalette(remember(session.nav, session.store) { commands() }, os) {
                 paletteOpen = false

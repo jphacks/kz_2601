@@ -3,6 +3,7 @@
 <resources>
     <string name="desktop_a11y_chart">グラフ: %1$s</string>
     <string name="desktop_a11y_image">画像</string>
+    <string name="desktop_a11y_preview">写真のプレビュー: %1$s</string>
     <string name="desktop_a11y_rating">%1$s %2$d / %3$d</string>
     <string name="desktop_book_searching">本の情報を探しています…</string>
     <string name="desktop_calendar_month_pattern">y年M月</string>
@@ -81,6 +82,7 @@
     <string name="desktop_keys_palette">コマンドパレット</string>
     <string name="desktop_keys_palette_empty">見つかりません</string>
     <string name="desktop_keys_palette_placeholder">画面・アクション・アプリを名前で探す</string>
+    <string name="desktop_keys_preview">写真を大きく見る</string>
     <string name="desktop_keys_save">保存</string>
     <string name="desktop_keys_search">検索</string>
     <string name="desktop_list_empty">まだありません</string>
@@ -93,6 +95,16 @@
     <string name="desktop_picker_empty">候補がありません</string>
     <string name="desktop_picker_hint">ボタンを押すと 1 つ選びます</string>
     <string name="desktop_picker_pick">選ぶ</string>
+    <string name="desktop_preview_count">%1$s(%2$d / %3$d)</string>
+    <string name="desktop_preview_failed">この写真は読めません</string>
+    <string name="desktop_preview_hint">← → で送る・Esc / Space で閉じる</string>
+    <string name="desktop_preview_loading">読み込み中…</string>
+    <string name="desktop_preview_next">次へ</string>
+    <string name="desktop_preview_none">この画面には大きく見られる写真がありません</string>
+    <string name="desktop_preview_open">大きく見る</string>
+    <string name="desktop_preview_open_default">既定のアプリで開く</string>
+    <string name="desktop_preview_open_failed">既定のアプリで開けませんでした</string>
+    <string name="desktop_preview_previous">前へ</string>
     <string name="desktop_print">印刷</string>
     <string name="desktop_print_cancelled">印刷をやめました</string>
     <string name="desktop_print_count">件数</string>

@@ -81,8 +81,8 @@ object DragOut {
             .orEmpty()
             .count { it.deleteRecursively() }
 
-    /** 引き出すたびに別のフォルダ(名前はそのまま見せたいので、ファイル名ではなくフォルダで重ならないようにする)。 */
-    private fun temp(name: String, bytes: ByteArray): File {
+    /** 引き出すたびに別のフォルダ(名前はそのまま見せたいので、ファイル名ではなくフォルダで重ならないようにする)。写真のプレビューの「既定のアプリで開く」も使う。 */
+    internal fun temp(name: String, bytes: ByteArray): File {
         val root = tempRoot().apply { mkdirs() }
         val dir = Files.createTempDirectory(root.toPath(), "drag-").toFile().apply { deleteOnExit() }
         return File(dir, name).apply {

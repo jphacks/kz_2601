@@ -132,13 +132,16 @@ fun DesktopApp(
     val keyboard = rememberDesktopKeyboard(dsl, session, dispatch, openPrint, onOpenApp, onOpenRecord, onWipeLocalData)
 
     // Ctrl+F はこのウィンドウの検索欄にだけ入る
-    CompositionLocalProvider(LocalSearchTargets provides keyboard.searchTargets) {
-    Surface(Modifier.fillMaxSize().ioDropTarget(io, topComponents, topDraft).onPreviewKeyEvent(io.previewKey(topComponents, topDraft))
-        .onPreviewKeyEvent { if (DesktopPrint.isPrintKey(it)) true.also { openPrint() } else false }.then(keyboard.modifier)) {
+    // 写真のプレビュー(PhotoPreview.kt): 写真の部品を押すとこのウィンドウのダイアログで開く。開いている間は貼り付け・印刷を取らない
+    val previewing = keyboard.photos.isOpen
+    val pasteKey = io.previewKey(topComponents, topDraft)
+    CompositionLocalProvider(LocalSearchTargets provides keyboard.searchTargets, LocalPhotoPreview provides keyboard::openPhoto) {
+    Surface(Modifier.fillMaxSize().ioDropTarget(io, topComponents, topDraft).onPreviewKeyEvent { !keyboard.photos.isOpen && pasteKey(it) }
+        .onPreviewKeyEvent { if (!keyboard.photos.isOpen && DesktopPrint.isPrintKey(it)) true.also { openPrint() } else false }.then(keyboard.modifier)) {
         IoOverlay(io)
         Box(Modifier.fillMaxSize()) {
             // モーダルの間は下の画面とタブに Tab で入らず、読み上げにも出さない
-            Column(Modifier.fillMaxSize().then(keyboard.inert(nav.sheet != null || nav.fullScreen != null))) {
+            Column(Modifier.fillMaxSize().then(keyboard.inert(nav.sheet != null || nav.fullScreen != null || previewing))) {
                 val base = NavigationResolver.dismissModals(nav).top(dsl)
                 Box(Modifier.weight(1f)) { ScreenView(dsl, session, base, io, dispatch, openPrint, onOpenRecord) }
                 // 送り待ちがある時だけ小さく出す(#1887)
@@ -170,7 +173,7 @@ fun DesktopApp(
             if (nav.sheet != null || nav.fullScreen != null) {
                 val top = nav.top(dsl)
                 val full = nav.fullScreen != null
-                Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                Box(Modifier.fillMaxSize().then(keyboard.inert(previewing)), contentAlignment = Alignment.Center) {
                     // 背景の暗幕は中身と兄弟にする(clickable で包むと中身ごと 1 つにまとまって読み上げで中が読めない)
                     val closeLabel = Strings["desktop_close"]
                     Box(
