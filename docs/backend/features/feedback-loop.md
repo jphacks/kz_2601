@@ -112,7 +112,8 @@ flowchart LR
 | `LOOP_MONTHLY_TOKEN_CAP` | `3000000` | 振り分けの月のトークンの上限 |
 | `LOOP_SOURCE_APPSTORE` | 空 | `on` でストアのレビューを取り込む |
 | `LOOP_SOURCE_TESTFLIGHT` | 空 | `on` で TestFlight のフィードバック(スクショ付き・クラッシュの送信)を取り込む。キーは下の `LOOP_ASC_*` を共用。既定の `LOOP_AI_SOURCES` に入っていないので、AI に回すなら `testflight` を足す |
-| `LOOP_SOURCE_GENFAIL` | 空 | `on` で生成の失敗の急増を取り込む。`LOOP_GENFAIL_LOGS`(`gcloud logging read --format=json` で書き出したファイル・カンマ区切り。`cmd/ai-session-report -logs` と同じ形)の `ai.generate` の行から、失敗のコード(`outcome:failed` / `outcome:refused` / `error:<error_code>` / `retry:<retry_reasons>` / `validation:<validation_codes>`)ごとに、直近 `LOOP_GENFAIL_WINDOW`(既定 `24h`)の割合をその前の `LOOP_GENFAIL_BASELINE`(既定 `168h`)と比べる。件数が `LOOP_GENFAIL_MIN_COUNT`(既定 5)以上・割合が `LOOP_GENFAIL_MIN_RATE`(既定 0.05)以上・基準の `LOOP_GENFAIL_FACTOR`(既定 2)倍以上なら、コード 1 つ・1 日に 1 件。項目はコードと件数だけ(入力文・uid・アプリの id・ハッシュは持たない)。既定の `LOOP_AI_SOURCES` に入っていないので、AI に回すなら `gen_failure` を足す |
+| `LOOP_SOURCE_GENFAIL` | 空 | `on` で生成の失敗の急増を取り込む。読む先は `LOOP_GENFAIL_SOURCE` で選ぶ(下の行)。既定は `LOOP_GENFAIL_LOGS`(`gcloud logging read --format=json` で書き出したファイル・カンマ区切り。`cmd/ai-session-report -logs` と同じ形)。`ai.generate` の行から、失敗のコード(`outcome:failed` / `outcome:refused` / `error:<error_code>` / `retry:<retry_reasons>` / `validation:<validation_codes>`)ごとに、直近 `LOOP_GENFAIL_WINDOW`(既定 `24h`)の割合をその前の `LOOP_GENFAIL_BASELINE`(既定 `168h`)と比べる。件数が `LOOP_GENFAIL_MIN_COUNT`(既定 5)以上・割合が `LOOP_GENFAIL_MIN_RATE`(既定 0.05)以上・基準の `LOOP_GENFAIL_FACTOR`(既定 2)倍以上なら、コード 1 つ・1 日に 1 件。項目はコードと件数だけ(入力文・uid・アプリの id・ハッシュは持たない)。既定の `LOOP_AI_SOURCES` に入っていないので、AI に回すなら `gen_failure` を足す |
+| `LOOP_GENFAIL_SOURCE` | 空 = `file` | 生成の失敗のログを読む先。`file` = `LOOP_GENFAIL_LOGS` のファイル。`logging` = Cloud Logging の API(`entries.list`・#2146)で、`LOOP_GENFAIL_PROJECT`(既定 `GOOGLE_CLOUD_PROJECT`)の Cloud Run のサービス `LOOP_GENFAIL_SERVICES`(カンマ区切り・既定 `ai-<APP_ENV>`)の `jsonPayload.event="ai.generate"` の行を、比べるのに要る期間(`LOOP_GENFAIL_WINDOW` + `LOOP_GENFAIL_BASELINE`)だけ新しい順に読む。上限は `LOOP_GENFAIL_MAX_LINES`(既定 50000 行・1 回 1000 行ずつ)。上限に届いたら古い基準の行を読まずに警告を出す(直近の窓は必ず読む)。成功の行も読む(割合の分母に要る)。認証は job の ADC。要る権限は `roles/logging.viewer` だけ |
 | `LOOP_ASC_ISSUER_ID` / `LOOP_ASC_KEY_ID` / `LOOP_ASC_PRIVATE_KEY` / `LOOP_ASC_APP_ID` | — | App Store Connect API のキー(役割は Customer Support で足りる)。鍵は `.p8` の中身そのもの |
 | `LOOP_ISSUE_REPO` | 空 = dry run | Issue を作るリポジトリ(`owner/name`) |
 | `LOOP_GITHUB_TOKEN` | — | Issue の作成・コメント・読み取りだけの権限(GitHub App のインストールのトークン、または fine-grained の PAT の `issues: write`)。マージ・ラベル・コードの権限は持たせない |
@@ -238,6 +239,7 @@ go run ./cmd/feedback-loop audit -summary
 | ループ専用の Anthropic の API キーと予算を作り、Secret Manager に入れる | プロダクトの費用と分ける(#365 の決定 7) |
 | Issue だけを書ける GitHub のトークン(GitHub App か fine-grained の PAT)を作る | エージェントの権限と分ける |
 | App Store Connect の API キー(Customer Support)を作る(ストアのレビューを取り込むなら) | 取り込みの口は作ってあり、既定は止めてある |
+| ループの job の SA に `roles/logging.viewer` を付ける(生成の失敗を Cloud Logging の API から読むなら・`LOOP_GENFAIL_SOURCE=logging`) | 読むだけの役割。既定はファイルからの読み込みのままで、付けるまでは使えない |
 | Firestore のルールで `loop_*` をクライアントから読み書きできないことを確かめる。必要なら `expiresAt` の TTL を設定する | `purge` でも消えるが、二重にしておくと安全 |
 | `loop_*` の集まりを、アカウントの削除(`PurgeAccount`)にも足すかを決める | 今は `purge` が、元が消えた写しと削除したアカウントの写しを消す |
 
@@ -247,7 +249,7 @@ go run ./cmd/feedback-loop audit -summary
 |---|---|
 | 定期の実行(Cloud Scheduler・workflow) | 足していない。上のコマンドを job にする |
 | Crashlytics を自動で読む | Crashlytics は安く読める API が無い。BigQuery のエクスポート(#296)ができたら `ingest.CrashSource` を実装する。それまでは `ingest-crash` で人が記録 |
-| 生成の失敗の急増を自動で読む | 今はログを人が `gcloud logging read` で書き出して `LOOP_GENFAIL_LOGS` に渡す。Logging API か BigQuery から読む時は `ingest.GenLogSource` を実装する |
+| 生成の失敗の急増を BigQuery から読む | Cloud Logging の API からは読める(`LOOP_GENFAIL_SOURCE=logging`・#2146)。ログの保存期間(既定 30 日)より長く比べたい・件数が `LOOP_GENFAIL_MAX_LINES` に収まらない時は、BigQuery のシンクを作って `ingest.GenLogSource` をもう 1 つ実装する |
 | Google の機密データの検出(#367 の選択肢 2-B) | GCP の設定が要るので後で |
 | 埋め込みでの束ね(#376) | 束ねはモデルの `cluster` の名前に任せている。同じ問題に別の名前が付くと別の束になる(呼び出しをまたぐと特に)。既知の束として渡すのは待っている下書きの名前だけ |
 | 本物の 1 週間分での一致率 | `triage-score` で人が測る(#376 の完了の条件) |
