@@ -130,6 +130,41 @@ macOS runner は Linux の 10 倍の分単価なので、ubuntu の `ios-changes
 - **androidTest のコンパイル**: 本番コードの変更で `androidTest` のコードが壊れた印。`./gradlew :app:compileStgDebugAndroidTestKotlin` で再現する。実行はしていないので、端末での確認は [`docs/android/ci.md`](android/ci.md#ci-で検証されるもの--手元で確かめるもの) の手順で手元で行う。
 - **lint**: 非ブロッキング(`continue-on-error`)なので `android-ci` は落ちない。結果は job summary と警告に出て、レポートは成果物 `android-lint-reports`。手元では `./gradlew :app:lintStgDebug :renderer:lintDebug :services:lintDebug`。
 
+## desktop-ci(Windows・Linux のデスクトップ版のテスト・配布物)
+
+`.github/workflows/desktop-ci.yml`(#1757)。`desktop/`(Compose Multiplatform Desktop)を ubuntu と windows の両方で確かめる。PR が Open(非 Draft)の時・`develop` / `main` への push・手動(`workflow_dispatch`)で回る。workflow の `paths:` は使わない(android-ci と同じ理由)。
+
+| ジョブ | いつ回るか | 回すもの |
+|---|---|---|
+| `desktop-build (ubuntu-latest)` | `run` が true | `./gradlew :desktop:test :dsl:test :whisper:test`。`package` が true なら `:desktop:packageDeb` で deb を作り、成果物 `desktop-deb` に残す |
+| `desktop-build (windows-latest)` | `run` が true | `.\gradlew.bat :desktop:test :dsl:test :whisper:test`。`package` が true なら `:desktop:packageMsi` で msi を作り、成果物 `desktop-msi` に残す |
+| `desktop-changes` | 毎回 | `dorny/paths-filter` で `run`(テストを回すか)と `package`(配布物を作るか)を決める |
+| `desktop-ci` | 毎回(集約) | ほかのジョブの結果をまとめる。スキップは成功、失敗・キャンセルは失敗 |
+
+`run` が true になる変更(1 つでも当たれば回す。手動の時は必ず true):
+
+| 変わった場所 | 理由 |
+|---|---|
+| `.github/workflows/desktop-ci.yml` | この workflow 自身 |
+| `android/app/src/main/res/values*/**` | 同梱する文言 |
+| `android/dsl/**`(`*.md` 以外) | 取り込む DSL |
+| `android/gradle/libs.versions.toml` | 依存の版 |
+| `android/renderer/src/main/**`・`android/services/src/main/**`(`*.md` 以外) | 取り込むソース・文言 |
+| `android/whisper/src/**`(`*.md` 以外) | 取り込む純 Kotlin の部分とそのテスト(#1751) |
+| `desktop/**`(`*.md` 以外) | デスクトップ版そのもの |
+| `docs/dsl/conformance/**`・`docs/dsl/examples/**` | 適合テストと同梱の例 |
+
+- **PR では配布物を作らない**(`package` は push と手動の時だけ true)。PR で確かめたいのはテストで、jpackage で deb・msi を 2 つの OS で作るのは時間がかかるため。配布物は 7 日で消える。署名はしない・秘密は使わない。
+- 配布物を手で作る: `gh workflow run desktop-ci.yml --ref <ブランチ>`(Actions タブの「Run workflow」でも同じ)。終わったら `gh run download <run-id> -n desktop-deb`(Windows 版は `-n desktop-msi`)。
+- 集約ジョブ `desktop-ci` は required check にできる形だが、`scripts/github/setup-branch-protection.sh` の `REQUIRED_CHECKS` にはまだ入っていない。**必須にするかはオーナーが判断する**。
+
+落ちた時の見方:
+
+- `desktop-build` は OS ごとに分かれ、片方が落ちてももう片方は最後まで回る(`fail-fast: false`)。どちらの OS かを先に見る。
+- テストが落ちたら、成果物 `desktop-test-reports-ubuntu-latest` / `desktop-test-reports-windows-latest` にレポート(HTML)がある(`desktop/app/build/reports/tests/`・`desktop/build/dsl/reports/tests/`・`desktop/whisper/build/reports/tests/`)。
+- 手元では `cd desktop && ./gradlew :desktop:test :dsl:test :whisper:test`(JDK 17 以上)。Windows だけで落ちる時は、パスの区切りや改行(CRLF)の違いを疑う。
+- 「配布物を作る」の step が落ちたら jpackage のエラーをログで見る(手元では `./gradlew :desktop:packageDeb`)。「配布物を残す」が落ちたら `desktop/app/build/compose/binaries/main/<deb|msi>/` が空だった(`if-no-files-found: error`)。
+
 ## backend-emulator(Firestore エミュレータ試験・必須ではない)
 
 `.github/workflows/backend-emulator.yml`(#546)。`backend-ci` は 5 分上限なので別 workflow。
