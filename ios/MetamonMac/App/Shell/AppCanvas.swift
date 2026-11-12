@@ -175,6 +175,7 @@ private struct AppCanvasContent: View {
             .macNotificationsOffBar(runtime.notifications) // 通知がオフの時のバー(#965)
             .toolbar { MacUpcomingNotificationsToolbar(notifications: runtime.notifications) } // 次の通知(#1325)
             .toolbar { MacSyncStatusToolbar(engine: runtime.recordSync) } // 未送信 N 件(#976)
+            .modifier(MacFabGutter(runtime: runtime)) // FAB を余白に置く試作(#2327・既定 off)
             .environment(\.dslRuntime, runtime)
             .environment(\.componentRegistry, ComponentRegistry.standard)
             .environment(\.openForms, runtime.openForms)

@@ -65,8 +65,9 @@ public struct GridMetrics: Equatable, Sendable {
     /// Mac のウィンドウ(横長で大きさが自由に変わる)の寸法。列は 6 のまま(DSL の area をそのまま読む)。
     /// - 幅は「高さ × 3/4」を 480〜720 に収め、領域より広ければ中央に寄せる(横に引き伸ばさない)
     /// - 行の高さは縦向きと同じく高さ ÷ 12。低いウィンドウで iOS の横向きの行の高さ(52)を下回る時はそれで止め、はみ出す分は縦スクロール
-    /// - マイク FAB は中央の列の外(ツールバー)にあるので、余白に FAB を収める計算はしない
-    public static func resolveDesktop(width: CGFloat, height: CGFloat, inset: CGFloat) -> GridMetrics {
+    /// - マイク FAB は中央の列の外(ツールバー)にあるので、既定では余白に FAB を収める計算はしない。
+    ///   `fabInGutter` の試作(#2327・既定 off)の時だけ、左右の余白が `fabGutter` 以上あるかを返す
+    public static func resolveDesktop(width: CGFloat, height: CGFloat, inset: CGFloat, fabInGutter: Bool = false) -> GridMetrics {
         let preferred = min(max(height * desktopAspect, minDesktopWidth), maxDesktopWidth)
         let frameWidth = min(width, preferred)
         let fitted = max(0, height - inset * 2) / CGFloat(GridArea.visibleRows)
@@ -75,7 +76,7 @@ public struct GridMetrics: Equatable, Sendable {
             cellW: max(0, frameWidth - inset * 2) / CGFloat(GridArea.columns),
             cellH: max(landscapeCellHeight, fitted),
             scrollsVertically: fitted < landscapeCellHeight,
-            fabInGutter: false
+            fabInGutter: fabInGutter && (width - frameWidth) / 2 >= fabGutter
         )
     }
 }
@@ -84,9 +85,10 @@ public struct GridMetrics: Equatable, Sendable {
 import SwiftUI
 
 /// Mac の中央の列(グリッドの外枠)の幅(#1337)。画面下の保存バーを同じ幅に収めるために `GridScreenLayout` が上げる。
-struct GridColumnWidthKey: PreferenceKey {
-    static let defaultValue: CGFloat? = nil
-    static func reduce(value: inout CGFloat?, nextValue: () -> CGFloat?) {
+/// FAB を余白に置く試作(#2327)のホストも読む。
+public struct GridColumnWidthKey: PreferenceKey {
+    public static let defaultValue: CGFloat? = nil
+    public static func reduce(value: inout CGFloat?, nextValue: () -> CGFloat?) {
         value = nextValue() ?? value
     }
 }
