@@ -95,32 +95,72 @@ struct DevicePowerReadings {
     var notificationNames: [Notification.Name]
 }
 
-/// OS の値を読む実体。電池の監視(`isBatteryMonitoringEnabled`)は見ている間だけ有効にし、最後の監視が止まったら元の値に戻す。
+/// 電池の監視(`isBatteryMonitoringEnabled`)はプロセスで 1 つなので、使っている数を数えて出し入れする。
+/// 最初の 1 つで有効にし、全部が手放したら(始める前に無効だった時だけ)無効に戻す。実体どうしで消し合わない。
+@MainActor
+final class BatteryMonitoringCount {
+    private let isEnabled: () -> Bool
+    private let setEnabled: (Bool) -> Void
+    /// 使っている数
+    private(set) var count = 0
+    /// 最初に有効にした時の元の値
+    private var before = false
+
+    init(isEnabled: @escaping () -> Bool, setEnabled: @escaping (Bool) -> Void) {
+        self.isEnabled = isEnabled
+        self.setEnabled = setEnabled
+    }
+
+    convenience init(_ readings: DevicePowerReadings) {
+        self.init(isEnabled: readings.isMonitoringEnabled, setEnabled: readings.setMonitoringEnabled)
+    }
+
+    /// OS の監視の数(全ての `LiveDevicePowerSource()` で共有)
+    static let system = BatteryMonitoringCount(.system)
+
+    func acquire() {
+        if count == 0 {
+            before = isEnabled()
+            if !before { setEnabled(true) }
+        }
+        count += 1
+    }
+
+    func release() {
+        guard count > 0 else { return }
+        count -= 1
+        if count == 0, !before { setEnabled(false) }
+    }
+}
+
+/// OS の値を読む実体。電池の監視は見ている間だけ有効にし、プロセス全体で最後の監視が止まったら元の値に戻す(`BatteryMonitoringCount`)。
+/// 札(`DevicePowerObservation`)が実体を握るので、実体を先に手放しても札を捨てるか cancel するまで監視は片付かずに残らない。
 @MainActor
 public final class LiveDevicePowerSource: DevicePowerSource {
     private let readings: DevicePowerReadings
     private let center: NotificationCenter
+    private let monitoring: BatteryMonitoringCount
     private var subscribers: [UUID: @MainActor (DevicePowerState) -> Void] = [:]
     private var tokens: [NSObjectProtocol] = []
-    /// 監視を始める前の値(戻す用)。監視していない時は nil
-    private var monitoringBefore: Bool?
+    private var observing = false
     private var last: DevicePowerState?
 
     public convenience init() {
-        self.init(readings: .system, center: .default)
+        self.init(readings: .system, center: .default, monitoring: .system)
     }
 
-    init(readings: DevicePowerReadings, center: NotificationCenter) {
+    /// `monitoring` を省くとこの実体だけの数え方(テスト用)。同じ端末を見る実体どうしは同じものを渡す
+    init(readings: DevicePowerReadings, center: NotificationCenter, monitoring: BatteryMonitoringCount? = nil) {
         self.readings = readings
         self.center = center
+        self.monitoring = monitoring ?? BatteryMonitoringCount(readings)
     }
 
     public var current: DevicePowerState {
-        if monitoringBefore != nil { return read() }
-        // 監視が無効だと UIDevice は -1/unknown を返すので、読む間だけ有効にして戻す
-        let before = readings.isMonitoringEnabled()
-        if !before { readings.setMonitoringEnabled(true) }
-        defer { if !before { readings.setMonitoringEnabled(false) } }
+        if observing { return read() }
+        // 監視が無効だと UIDevice は -1/unknown を返すので、読む間だけ有効にして戻す(他が有効にしていれば消さない)
+        monitoring.acquire()
+        defer { monitoring.release() }
         return read()
     }
 
@@ -131,19 +171,20 @@ public final class LiveDevicePowerSource: DevicePowerSource {
         let state = read()
         last = state
         onChange(state)
-        return DevicePowerObservation { [weak self] in self?.remove(id) }
+        // 札が実体を握る: 実体だけ先に手放されても、札を捨てた時に通知の登録と監視の数を片付ける
+        return DevicePowerObservation { self.remove(id) }
     }
 
     /// 監視中か(テスト用)
-    var isObserving: Bool { monitoringBefore != nil }
+    var isObserving: Bool { observing }
 
     private func read() -> DevicePowerState {
         .from(rawLevel: readings.rawLevel(), charge: readings.charge(), isLowPowerMode: readings.isLowPowerMode())
     }
 
     private func start() {
-        monitoringBefore = readings.isMonitoringEnabled()
-        readings.setMonitoringEnabled(true)
+        observing = true
+        monitoring.acquire()
         tokens = readings.notificationNames.map { name in
             // 省電力モードの通知は main 以外で届くことがあるので main に寄せる
             center.addObserver(forName: name, object: nil, queue: nil) { [weak self] _ in
@@ -160,13 +201,13 @@ public final class LiveDevicePowerSource: DevicePowerSource {
         guard subscribers.removeValue(forKey: id) != nil, subscribers.isEmpty else { return }
         tokens.forEach(center.removeObserver)
         tokens = []
-        if let before = monitoringBefore { readings.setMonitoringEnabled(before) }
-        monitoringBefore = nil
+        monitoring.release()
+        observing = false
         last = nil
     }
 
     func refresh() {
-        guard monitoringBefore != nil else { return }
+        guard observing else { return }
         let state = read()
         guard state != last else { return }
         last = state
@@ -249,7 +290,7 @@ public final class FakeDevicePowerSource: DevicePowerSource {
         let id = UUID()
         subscribers[id] = onChange
         onChange(state)
-        return DevicePowerObservation { [weak self] in self?.subscribers[id] = nil }
+        return DevicePowerObservation { self.subscribers[id] = nil }
     }
 }
 

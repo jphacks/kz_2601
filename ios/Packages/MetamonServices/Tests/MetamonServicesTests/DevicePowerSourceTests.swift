@@ -111,6 +111,65 @@ final class DevicePowerSourceTests: XCTestCase {
         XCTAssertFalse(device.monitoring, "読んだら元に戻す")
     }
 
+    func testSourcesSharingMonitoringDoNotTurnEachOtherOff() {
+        for initial in [false, true] {
+            let device = FakeDevice()
+            device.monitoring = initial
+            let count = BatteryMonitoringCount(device.readings)
+            let a = LiveDevicePowerSource(readings: device.readings, center: NotificationCenter(), monitoring: count)
+            let b = LiveDevicePowerSource(readings: device.readings, center: NotificationCenter(), monitoring: count)
+            let obsA = a.observe { _ in }
+            XCTAssertEqual(b.current.batteryLevel ?? 0, 0.5, accuracy: 0.0001)
+            XCTAssertTrue(device.monitoring, "別の実体が読んでも、見ている実体の監視は消さない")
+            let obsB = b.observe { _ in }
+            obsA.cancel()
+            XCTAssertTrue(device.monitoring, "別の実体がまだ見ている")
+            obsB.cancel()
+            XCTAssertEqual(device.monitoring, initial, "全部止まったら元の値に戻る")
+            XCTAssertEqual(count.count, 0)
+            if initial { XCTAssertFalse(device.monitoringSets.contains(false), "元から有効なら一度も無効にしない") }
+        }
+    }
+
+    func testSystemSourcesShareOneCount() {
+        let a = LiveDevicePowerSource()
+        let b = LiveDevicePowerSource()
+        let before = BatteryMonitoringCount.system.count
+        let obs = a.observe { _ in }
+        _ = b.current
+        XCTAssertEqual(BatteryMonitoringCount.system.count, before + 1, "make() のたびの実体も同じ数を使う")
+        obs.cancel()
+        XCTAssertEqual(BatteryMonitoringCount.system.count, before)
+    }
+
+    func testReleasingSourceWhileObservedCleansUpWhenObservationEnds() async {
+        let device = FakeDevice()
+        let center = NotificationCenter()
+        weak var weakSource: LiveDevicePowerSource?
+        var got = 0
+        var observation: DevicePowerObservation?
+        do {
+            let source = LiveDevicePowerSource(readings: device.readings, center: center)
+            weakSource = source
+            observation = source.observe { _ in got += 1 }
+        }
+        XCTAssertNotNil(weakSource, "札が実体を握る(先に手放しても通知と監視が宙に浮かない)")
+        XCTAssertTrue(device.monitoring)
+        device.charge = .charging
+        center.post(name: FakeDevice.changed, object: nil)
+        XCTAssertEqual(got, 2, "実体を手放しても見ている間は届く")
+
+        observation = nil // 札を捨てる → main で片付ける
+        _ = observation
+        for _ in 0..<20 where device.monitoring { await Task.yield() }
+        XCTAssertFalse(device.monitoring, "札を捨てたら監視を元に戻す")
+        for _ in 0..<20 where weakSource != nil { await Task.yield() }
+        XCTAssertNil(weakSource, "片付けた後は実体も手放される")
+        device.charge = .full
+        center.post(name: FakeDevice.changed, object: nil)
+        XCTAssertEqual(got, 2, "通知の登録も残らない")
+    }
+
     func testSystemReadingsDoNotCrash() {
         // シミュレータ・Mac では不明になる(落ちないこと)
         let source = LiveDevicePowerSource()
