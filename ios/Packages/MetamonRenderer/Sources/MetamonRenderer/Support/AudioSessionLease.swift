@@ -61,10 +61,22 @@ struct AudioSessionLease {
 #else
 import AVFoundation
 
-/// Mac: AVAudioSession が無い(入出力はシステムの設定のまま)ので、借りる / 戻すは何もしない。
+/// Mac: AVAudioSession が無い(入出力はシステムの設定のまま)ので、`AudioFocus` の「同時に 1 つだけ」の約束だけを守る(#952)。
+/// 録音は再生・読み上げを止めてから始め、録音中の再生・別の録音は `AudioFocus.Refusal` で断る。
+@MainActor
 struct AudioSessionLease {
-    static func forRecording() throws -> AudioSessionLease { AudioSessionLease() }
-    static func forPlayback() throws -> AudioSessionLease { AudioSessionLease() }
-    func end() {}
+    private let token: Int
+    private let focus: AudioFocus
+
+    static func forRecording(_ focus: AudioFocus = .shared) throws -> AudioSessionLease {
+        AudioSessionLease(token: try focus.beginRecording(), focus: focus)
+    }
+
+    static func forPlayback(_ focus: AudioFocus = .shared) throws -> AudioSessionLease {
+        AudioSessionLease(token: try focus.beginPlayback(), focus: focus)
+    }
+
+    /// 返す。何度呼んでもよい。
+    func end() { focus.end(token) }
 }
 #endif

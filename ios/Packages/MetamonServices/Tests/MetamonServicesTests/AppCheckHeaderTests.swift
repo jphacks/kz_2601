@@ -1,4 +1,5 @@
 import XCTest
+import MetamonDSL
 @testable import MetamonServices
 
 /// `forceRefresh: true` のたびに新しい値を返す App Check のトークン(呼び出しも記録)。
@@ -49,7 +50,7 @@ final class AppCheckHeaderTests: XCTestCase {
         XCTAssertEqual(appCheckHeaders, ["ac-1"])
         let req = try XCTUnwrap(StubURLProtocol.requests.first)
         XCTAssertEqual(req.value(forHTTPHeaderField: "Authorization"), "Bearer tok-1")
-        XCTAssertEqual(req.value(forHTTPHeaderField: "X-Client-Platform"), "ios")
+        XCTAssertEqual(req.value(forHTTPHeaderField: "X-Client-Platform"), ClientCapabilities.platform)
         XCTAssertEqual(req.value(forHTTPHeaderField: "Accept-Language"), ClientInfo.languageCode())
     }
 

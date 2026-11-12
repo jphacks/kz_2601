@@ -1,26 +1,40 @@
 import SwiftUI
+import Observation
 
 /// 今描いているフォームの控え(M10 の Mac 版・#943)。Esc・⌘W・アプリの切り替えのように
 /// `ScreenView` の外から入力を失わせる操作の前に、保存していない入力があるかを確かめる。
 /// ホストが `\.openForms` に入れた時だけ `ScreenView` が登録する(iOS は入れない)。
 /// フォームは弱く持つ(画面が消えたら控えからも消える)。
+/// メニューの「保存」(#1138)が押せるかを追えるよう、登録が変わるたびに `revision` を進める(Observation)。
 @MainActor
+@Observable
 public final class OpenFormRegistry {
     private struct Entry {
         weak var form: FormDraft?
         let route: Route
+        let order: Int
     }
 
-    private var entries: [ObjectIdentifier: Entry] = [:]
+    @ObservationIgnored private var entries: [ObjectIdentifier: Entry] = [:]
+    /// 登録・解除の回数。読んだ側は登録が変わると描き直される
+    public private(set) var revision = 0
 
     public init() {}
 
     public func track(_ form: FormDraft, at route: Route) {
-        entries[ObjectIdentifier(form)] = Entry(form: form, route: route)
+        revision += 1
+        entries[ObjectIdentifier(form)] = Entry(form: form, route: route, order: revision)
     }
 
     public func untrack(_ form: FormDraft) {
-        entries[ObjectIdentifier(form)] = nil
+        guard entries.removeValue(forKey: ObjectIdentifier(form)) != nil else { return }
+        revision += 1
+    }
+
+    /// `route` の画面で描いているフォーム(同じ画面を開き直したら、あとから登録した方)。
+    public func form(at route: Route) -> FormDraft? {
+        _ = revision
+        return entries.values.filter { $0.route == route && $0.form != nil }.max { $0.order < $1.order }?.form
     }
 
     /// 保存していない入力のあるフォームの画面のうち、`shown` が今も出ているとみなすもの。

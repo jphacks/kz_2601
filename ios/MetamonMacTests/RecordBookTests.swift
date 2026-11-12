@@ -7,7 +7,7 @@ import MetamonServices
 @testable import Metamon
 
 /// Mac のランタイムの記録の読み書き(`Shared/Runtime/RecordBook.swift`・#1338)。
-/// Mac にはまだ単体テストのターゲットが無い(#1212)ので、Mac と同じ型を iOS のテストで確かめる。
+/// Mac の単体テスト(#1212)。
 /// 圏外のエンジンを使う(列を流さないので、作った記録の id がサーバーの id に替わらない)。
 @MainActor
 final class RecordBookTests: XCTestCase {
@@ -15,7 +15,7 @@ final class RecordBookTests: XCTestCase {
     private let allowAll: (String, Record) -> Bool = { _, _ in true }
 
     private func kakeibo() throws -> AppDSL {
-        let url = try XCTUnwrap(Bundle(for: AppRuntime.self).url(forResource: "kakeibo", withExtension: "json"),
+        let url = try XCTUnwrap(Bundle(for: MacAppRuntime.self).url(forResource: "kakeibo", withExtension: "json"),
                                 "docs/dsl/examples の kakeibo.json がアプリに入っていない")
         return try AppDSL.load(contentsOf: url)
     }
