@@ -42,10 +42,10 @@ struct OpenRecordFromControlIntent: AppIntent {
     static var openAppWhenRun = true
     static var isDiscoverable = false
 
-    @Parameter(title: "記録先")
+    @Parameter(title: "記録先のアプリ")
     var appId: String?
 
-    @Parameter(title: "記録先")
+    @Parameter(title: "記録の種類")
     var entityId: String?
 
     init() {}

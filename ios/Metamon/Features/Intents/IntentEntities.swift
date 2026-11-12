@@ -77,12 +77,18 @@ struct RecordTargetEntity: AppEntity {
     }
 
     /// 全アプリの記録先(フォームのある entity を先に)。DSL はキャッシュ優先で、未取得のアプリだけ `GET /dsl` する。
-    /// cachedOnly なら取りに行かず、キャッシュの無いアプリは飛ばす(コントロールの一覧・#1993)。
+    /// cachedOnly なら取りに行かず、キャッシュの無いアプリは飛ばす(コントロールの一覧・#1993)。limit はキャッシュのあるアプリで数える。
+    /// host は既定引数にしない(Mac の `IntentHost.shared` は `static var` で、既定引数は呼び出し側の文脈で評価される)。
     @MainActor
-    static func all(limit: Int = 12, host: IntentHost = .shared, cachedOnly: Bool = false) async -> [RecordTargetEntity] {
+    static func all(limit: Int = 12, host: IntentHost? = nil, cachedOnly: Bool = false) async -> [RecordTargetEntity] {
+        let host = host ?? .shared
         var out: [RecordTargetEntity] = []
-        for app in await host.recordableApps().prefix(limit) {
+        var used = 0
+        for app in await host.recordableApps() {
+            guard used < limit else { break }
+            if !cachedOnly { used += 1 } // 取りに行く時は取れなかったアプリも 1 回と数える(GET /dsl の回数の上限)
             guard let doc = await host.document(appId: app.id, cachedOnly: cachedOnly) else { continue }
+            if cachedOnly { used += 1 }
             let entities = QuickRecord.recordableEntities(in: doc.dsl)
             out += entities.map { RecordTargetEntity(app: app, entity: $0, showsEntity: entities.count > 1) }
         }

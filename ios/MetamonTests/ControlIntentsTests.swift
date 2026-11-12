@@ -38,6 +38,7 @@ final class ControlIntentsTests: XCTestCase {
 
     func testOpenAppControlOnCurrentAppStaysOnRoot() async throws {
         let rt = try runtime()
+        rt.sheet = Route(screen: "add", stack: "sheet")
         await rt.openFromControl(appId: rt.document.appId, entityId: nil)
         XCTAssertNil(rt.sheet)
         XCTAssertEqual(NavigationResolver.top(rt.navigationState, dsl: rt.dsl).screen, "home")
@@ -46,7 +47,9 @@ final class ControlIntentsTests: XCTestCase {
     /// 未選択・消したアプリは一覧を開く(落ちない)
     func testMissingAppOpensSwitcher() async throws {
         let rt = try runtime()
+        rt.sheet = Route(screen: "add", stack: "sheet")
         await rt.openFromControl(appId: nil, entityId: "expense")
+        XCTAssertNil(rt.sheet) // 一覧の前にシートを閉じる
         let opened = expectation(description: "switcher")
         Task {
             for _ in 0..<50 where !rt.showAppSwitcher { try? await Task.sleep(for: .milliseconds(20)) }
@@ -64,6 +67,7 @@ final class ControlIntentsTests: XCTestCase {
         XCTAssertEqual(record.entityId, "expense")
         XCTAssertTrue(OpenAppFromControlIntent.openAppWhenRun)
         XCTAssertTrue(OpenRecordFromControlIntent.openAppWhenRun)
+        XCTAssertNotEqual(record.$appId.title.key, record.$entityId.title.key) // 設定で見分けられる
     }
 
     func testCopyWording() {
@@ -81,6 +85,7 @@ final class ControlIntentsTests: XCTestCase {
         let en = try XCTUnwrap(Bundle(path: path))
         let keys = [
             OpenAppFromControlIntent.title.key, OpenRecordFromControlIntent.title.key, "アクションボタン",
+            "記録先のアプリ", "記録の種類",
             "アクションボタンのある iPhone では、設定アプリの「アクションボタン」で「ショートカット」を選び、Tailor It の「アプリを開く」を割り当てると、押すだけで作ったアプリを開けます。",
             "アクションボタンのある iPhone では、設定アプリの「アクションボタン」で「ショートカット」を選び、Tailor It の「記録帳を開く」を割り当てると、押すだけで記録帳を開けます。",
         ]
@@ -100,7 +105,18 @@ final class ControlIntentsTests: XCTestCase {
         XCTAssertTrue(IntentHost.shared.hasPendingRefresh)
         await rt.wipeLocalData()
         XCTAssertTrue(pending.isCancelled)
-        IntentHost.shared.cancelPendingRefresh()
+        // resetToInitial(apply)が積み直した引き直しも止まっている
+        XCTAssertFalse(IntentHost.shared.hasPendingRefresh)
+    }
+
+    /// 引き直しが終われば待ちなしに戻る
+    func testRefreshClearsPendingWhenDone() async throws {
+        let host = IntentHost()
+        host.refreshDelay = .zero
+        let task = host.appsMayHaveChanged()
+        XCTAssertTrue(host.hasPendingRefresh)
+        await task.value
+        XCTAssertFalse(host.hasPendingRefresh)
     }
 
     /// 集めている間に取り消されたら書かない

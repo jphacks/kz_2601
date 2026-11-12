@@ -16,20 +16,26 @@ extension AppRuntime {
 
     /// コントロール(iOS 18・#1993)。選んだアプリに切り替え、記録先なら その entity のフォーム画面を開く。
     /// appId が nil(未選択・消したアプリ)なら一覧を開く。フォーム画面の無い entity はアプリを開くだけ
+    /// 出ていたシートは閉じ、閉じ終わるのを待ってから一覧・フォームを出す(二重 present を避ける)
     func openFromControl(appId: String?, entityId: String?) async {
+        let hadModal = showVoiceSheet || sheet != nil || fullScreen != nil
         showVoiceSheet = false
+        sheet = nil
+        fullScreen = nil
         guard let appId else {
-            sheet = nil
-            fullScreen = nil
-            openSwitcher()
+            openSwitcher(afterSheetDismiss: hadModal)
             return
         }
-        if appId != document.appId { await switchApp(to: appId) }
+        if appId != document.appId { await switchApp(to: appId, afterSheetDismiss: hadModal) }
         guard document.appId == appId else { return } // 切替に失敗(トーストは switchApp が出す)
         showAppSwitcher = false
         guard let entityId, let form = Self.formScreen(for: entityId, in: dsl) else { return }
+        if hadModal { try? await Task.sleep(for: Self.sheetDismissDelay) }
         reveal(screen: form)
     }
+
+    /// シートが閉じ終わるまでの待ち(`openSwitcher` と同じ)
+    nonisolated static let sheetDismissDelay: Duration = .milliseconds(500)
 
     /// entity の入力画面(`screen.entity`)。複数あれば DSL の先頭
     nonisolated static func formScreen(for entityId: String, in dsl: AppDSL) -> String? {

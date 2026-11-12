@@ -42,6 +42,7 @@ extension AppRuntime {
         center.removeAllDeliveredNotifications()
         apps = []                                       // 変身一覧(オフラインだと前のアカウントの一覧が残る)
         resetToInitial()                                // 新しい appId を発行して初期 DSL に(UserDefaults を消した後に)
+        IntentHost.shared.cancelPendingRefresh()        // resetToInitial(apply)が積んだ引き直しも止める(初期状態の一覧を書き戻さない)
         chatHistoryStore.removeAll()                    // チャット履歴(#210)。resetToInitial が閉じた会話を書くので後で消す
         chatHistory = []
         DeviceAppID.set(document.appId)                 // 念のため保存し直す(次回起動で別 appId にならないように)

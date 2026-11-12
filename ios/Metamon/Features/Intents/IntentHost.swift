@@ -29,6 +29,7 @@ final class IntentHost {
     private(set) var isReady = false
     private var pending: Pending?
     private var refreshTask: Task<Void, Never>?
+    private var refreshGeneration = 0
 
     func register(_ runtime: AppRuntime) {
         self.runtime = runtime
@@ -85,8 +86,11 @@ final class IntentHost {
     @discardableResult
     func appsMayHaveChanged() -> Task<Void, Never> {
         refreshTask?.cancel()
+        refreshGeneration += 1
+        let generation = refreshGeneration
         let delay = refreshDelay
         let task = Task {
+            defer { if self.refreshGeneration == generation { self.refreshTask = nil } } // 終わったら待ちなし
             try? await Task.sleep(for: delay)
             guard !Task.isCancelled else { return }
             TailorItShortcuts.updateAppShortcutParameters()
