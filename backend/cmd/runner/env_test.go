@@ -13,7 +13,7 @@ import (
 	"github.com/jphacks/kz_2601/backend/internal/extapi"
 )
 
-func TestEnvOr(t *testing.T) {
+func TestEnvOrCases(t *testing.T) {
 	const key = "RUNNER_TEST_ENV_OR"
 	cases := []struct {
 		name, set, fallback, want string
