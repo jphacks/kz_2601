@@ -16,39 +16,40 @@ enum AutomationGuide {
         var action: String { L10n.tr(String.LocalizationValue(actionKey)) }
     }
 
+    /// どれも iPhone を使っている(ロックを解除している)時に起きるきっかけ。「記録を追加」はロック解除が要るため。
     static let examples: [Example] = [
-        Example(id: "time", symbol: "clock",
-                triggerKey: "毎晩 21 時になった時",
-                actionKey: "「記録を追加」で、内容を「毎回尋ねる」にしておくと、その場で声で入れられます"),
-        Example(id: "arrive", symbol: "location",
-                triggerKey: "ジムに着いた時",
-                actionKey: "「記録を追加」で、記録先「筋トレ」に「ジム 1回」を入れる"),
+        Example(id: "appOpen", symbol: "apps.iphone",
+                triggerKey: "ゲームアプリを開いた時",
+                actionKey: "「記録を追加」で、記録先「ゲーム時間」に「開始」を入れる"),
+        Example(id: "appClose", symbol: "xmark.app",
+                triggerKey: "ゲームアプリを閉じた時",
+                actionKey: "「記録を追加」で、記録先「ゲーム時間」に「終了」を入れる"),
         Example(id: "nfc", symbol: "wave.3.right",
                 triggerKey: "植木鉢に貼った NFC タグにかざした時",
                 actionKey: "「記録を追加」で、記録先「水やり」に「水やり」を入れる"),
-        Example(id: "charging", symbol: "battery.100.bolt",
-                triggerKey: "寝る前に充電を始めた時",
-                actionKey: "「記録を追加」で、記録先「睡眠」に「就寝」を入れる"),
+        Example(id: "nfcAsk", symbol: "tag",
+                triggerKey: "冷蔵庫に貼った NFC タグにかざした時",
+                actionKey: "「記録を追加」で記録先を「食事」にし、内容を「毎回尋ねる」にしておくと、その場で入れられます"),
     ]
 
     /// 作り方の手順(ショートカット App の中での操作)。
     static let stepKeys = [
         "ショートカット App を開き、下の「オートメーション」を選ぶ",
-        "右上の「+」を押し、きっかけ(時刻・場所に到着・NFC・充電器)を選ぶ",
+        "右上の「+」を押し、きっかけ(App・NFC など)を選ぶ",
         "「すぐに実行」を選ぶ(動かす前に確かめたい時は「確認後に実行」)",
         "アクションの検索で「Tailor It」と入れ、「記録を追加」を選ぶ",
         "記録先と内容を決めて「完了」を押す",
     ]
 
     static let titleKey = "ショートカットで自動にする"
-    static let introKey = "決まった時刻や場所に着いた時などに、Tailor It の「記録を追加」を自動で動かせます。オートメーションはショートカット App で作ります。"
+    static let introKey = "App を開いた時や NFC タグにかざした時など、iPhone を使っている時に Tailor It の「記録を追加」を自動で動かせます。オートメーションはショートカット App で作ります。"
     static let examplesHeaderKey = "きっかけの例"
     static let stepsHeaderKey = "作り方"
     static let otherActionsKey = "「記録を追加」のほかに「話しかける」(音声入力を開く)も、きっかけに合わせて動かせます。"
     static let openButtonKey = "ショートカット App を開く"
     static let openFailedKey = "ショートカット App が見つかりません。App Store から入れ直してください。"
     static let noteKeys = [
-        "「記録を追加」は iPhone のロックを解除している時に動きます。ロック中だと、先にロックの解除を求められます。",
+        "「記録を追加」で記録するには、iPhone のロックを解除している必要があります。ロック中に起きるきっかけ(夜の決まった時刻など)ではなく、iPhone を使っている時に起きるきっかけを選んでください。",
         "先に Tailor It を一度開いておいてください。開いたことが無いと記録できません。",
     ]
 

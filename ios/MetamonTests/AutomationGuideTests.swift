@@ -16,9 +16,13 @@ final class AutomationGuideTests: XCTestCase {
 
     override func tearDown() { LanguagePreference.shared.setting = saved }
 
-    /// issue の 4 つのきっかけ(時刻・場所・NFC・充電)が揃っていて、どれも今ある「記録を追加」を使う。
-    func testExamplesCoverIssueTriggers() {
-        XCTAssertEqual(AutomationGuide.examples.map(\.id), ["time", "arrive", "nfc", "charging"])
+    /// 例は iPhone を使っている時のきっかけ(App を開く・閉じる・NFC)だけで、どれも今ある「記録を追加」を使う。
+    /// 「記録を追加」はロック解除が要るので、ロック中になりやすい時刻・場所・充電の例は出さない。
+    func testExamplesUseInUseTriggers() {
+        XCTAssertEqual(AutomationGuide.examples.map(\.id), ["appOpen", "appClose", "nfc", "nfcAsk"])
+        for banned in ["時になった時", "着いた時", "充電"] {
+            XCTAssertFalse(AutomationGuide.allKeys.contains { $0.contains(banned) }, banned)
+        }
         for example in AutomationGuide.examples {
             XCTAssertTrue(example.actionKey.contains("「記録を追加」"), example.id)
         }
@@ -28,12 +32,11 @@ final class AutomationGuideTests: XCTestCase {
 
     /// 案内に出す動きの名前 = 実際の Intent の名前(ショートカット App で探す時の名前)。ja / en とも。
     func testActionNamesMatchExistingIntents() {
-        let addRecord = String(localized: AddRecordIntent.title)
-        let talk = String(localized: TalkToTailorItIntent.title)
-        XCTAssertEqual(english("記録を追加"), "Add Record")
-        XCTAssertEqual(english("話しかける"), "Talk")
-        XCTAssertTrue(["記録を追加", "Add Record"].contains(addRecord), addRecord)
-        XCTAssertTrue(["話しかける", "Talk"].contains(talk), talk)
+        // Intent の名前を en.lproj で引き、案内の英訳と同じ名前になることを確かめる(実行環境の言語に左右されない)
+        XCTAssertEqual(AddRecordIntent.title.key, "記録を追加")
+        XCTAssertEqual(TalkToTailorItIntent.title.key, "話しかける")
+        XCTAssertEqual(english(AddRecordIntent.title.key), "Add Record")
+        XCTAssertEqual(english(TalkToTailorItIntent.title.key), "Talk")
         XCTAssertTrue(AutomationGuide.otherActionsKey.contains("「話しかける」"))
         XCTAssertTrue(AutomationGuide.stepKeys.contains { $0.contains("「記録を追加」") })
         XCTAssertTrue(english(AutomationGuide.stepKeys[3]).contains("“Add Record”"))
@@ -41,7 +44,7 @@ final class AutomationGuideTests: XCTestCase {
     }
 
     func testEnglishTranslationsExist() {
-        for key in AutomationGuide.allKeys + ["ショートカットで自動にする", "時刻や場所をきっかけに「記録を追加」を動かす作り方を見ます"] {
+        for key in AutomationGuide.allKeys + ["ショートカットで自動にする", "App を開いた時などをきっかけに「記録を追加」を動かす作り方を見ます"] {
             XCTAssertNotEqual(english(key), key, "英訳が無い: \(key)")
         }
         LanguagePreference.shared.setting = .en
@@ -58,7 +61,7 @@ final class AutomationGuideTests: XCTestCase {
         XCTAssertTrue(AutomationGuide.noteKeys.contains { $0.contains("ロック中") })
     }
 
-    /// 「記録を追加」はロック中に端末のロック解除を求める。案内も「ロックを解除している時に動く」と書く(ja / en)。
+    /// 「記録を追加」はロック解除が要る。案内も「記録するにはロックの解除が要る」と書く(ja / en)。
     func testAddRecordRequiresUnlockAndGuideSaysSo() {
         guard case .requiresLocalDeviceAuthentication = AddRecordIntent.authenticationPolicy else {
             return XCTFail("AddRecordIntent はロック解除が要る")

@@ -1759,6 +1759,40 @@
         }
       }
     },
+    "App を開いた時などをきっかけに「記録を追加」を動かす作り方を見ます" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Shows how to run “Add Record” when you open an app and more"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "App を開いた時などをきっかけに「記録を追加」を動かす作り方を見ます"
+          }
+        }
+      }
+    },
+    "App を開いた時や NFC タグにかざした時など、iPhone を使っている時に Tailor It の「記録を追加」を自動で動かせます。オートメーションはショートカット App で作ります。" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tailor It’s “Add Record” can run on its own while you’re using your iPhone, such as when you open an app or tap an NFC tag. You set up the automation in the Shortcuts app."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "App を開いた時や NFC タグにかざした時など、iPhone を使っている時に Tailor It の「記録を追加」を自動で動かせます。オートメーションはショートカット App で作ります。"
+          }
+        }
+      }
+    },
     "Apple でサインイン" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -3663,19 +3697,36 @@
         }
       }
     },
-    "「記録を追加」で、内容を「毎回尋ねる」にしておくと、その場で声で入れられます" : {
+    "「記録を追加」で、記録先「ゲーム時間」に「終了」を入れる" : {
       "extractionState" : "manual",
       "localizations" : {
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "“Add Record” with the content set to “Ask Each Time”, so you can say it right then"
+            "value" : "“Add Record” puts “Stop” into “Game Time”"
           }
         },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "「記録を追加」で、内容を「毎回尋ねる」にしておくと、その場で声で入れられます"
+            "value" : "「記録を追加」で、記録先「ゲーム時間」に「終了」を入れる"
+          }
+        }
+      }
+    },
+    "「記録を追加」で、記録先「ゲーム時間」に「開始」を入れる" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "“Add Record” puts “Start” into “Game Time”"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "「記録を追加」で、記録先「ゲーム時間」に「開始」を入れる"
           }
         }
       }
@@ -3697,36 +3748,36 @@
         }
       }
     },
-    "「記録を追加」で、記録先「睡眠」に「就寝」を入れる" : {
+    "「記録を追加」で記録するには、iPhone のロックを解除している必要があります。ロック中に起きるきっかけ(夜の決まった時刻など)ではなく、iPhone を使っている時に起きるきっかけを選んでください。" : {
       "extractionState" : "manual",
       "localizations" : {
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "“Add Record” puts “Went to bed” into “Sleep”"
+            "value" : "“Add Record” needs your iPhone to be unlocked to record. Choose a trigger that happens while you’re using your iPhone, not one that happens while it’s locked (such as a set time at night)."
           }
         },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "「記録を追加」で、記録先「睡眠」に「就寝」を入れる"
+            "value" : "「記録を追加」で記録するには、iPhone のロックを解除している必要があります。ロック中に起きるきっかけ(夜の決まった時刻など)ではなく、iPhone を使っている時に起きるきっかけを選んでください。"
           }
         }
       }
     },
-    "「記録を追加」で、記録先「筋トレ」に「ジム 1回」を入れる" : {
+    "「記録を追加」で記録先を「食事」にし、内容を「毎回尋ねる」にしておくと、その場で入れられます" : {
       "extractionState" : "manual",
       "localizations" : {
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "“Add Record” puts “Gym 1 time” into “Workouts”"
+            "value" : "“Add Record” into “Meals” with the content set to “Ask Each Time”, so you can enter it right then"
           }
         },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "「記録を追加」で、記録先「筋トレ」に「ジム 1回」を入れる"
+            "value" : "「記録を追加」で記録先を「食事」にし、内容を「毎回尋ねる」にしておくと、その場で入れられます"
           }
         }
       }
@@ -3744,23 +3795,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "「記録を追加」のほかに「話しかける」(音声入力を開く)も、きっかけに合わせて動かせます。"
-          }
-        }
-      }
-    },
-    "「記録を追加」は iPhone のロックを解除している時に動きます。ロック中だと、先にロックの解除を求められます。" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "“Add Record” runs while your iPhone is unlocked. If your iPhone is locked, you’ll be asked to unlock it first."
-          }
-        },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "「記録を追加」は iPhone のロックを解除している時に動きます。ロック中だと、先にロックの解除を求められます。"
           }
         }
       }
@@ -8633,6 +8667,40 @@
         }
       }
     },
+    "ゲームアプリを閉じた時" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "When you close a game app"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ゲームアプリを閉じた時"
+          }
+        }
+      }
+    },
+    "ゲームアプリを開いた時" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "When you open a game app"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ゲームアプリを開いた時"
+          }
+        }
+      }
+    },
     "コイン" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -9326,23 +9394,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "シートで開く"
-          }
-        }
-      }
-    },
-    "ジムに着いた時" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "When you arrive at the gym"
-          }
-        },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "ジムに着いた時"
           }
         }
       }
@@ -13371,6 +13422,23 @@
         }
       }
     },
+    "冷蔵庫に貼った NFC タグにかざした時" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "When you tap the NFC tag on the fridge"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "冷蔵庫に貼った NFC タグにかざした時"
+          }
+        }
+      }
+    },
     "出さない" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -14323,19 +14391,19 @@
         }
       }
     },
-    "右上の「+」を押し、きっかけ(時刻・場所に到着・NFC・充電器)を選ぶ" : {
+    "右上の「+」を押し、きっかけ(App・NFC など)を選ぶ" : {
       "extractionState" : "manual",
       "localizations" : {
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Tap “+” at the top right and choose a trigger (Time of Day, Arrive, NFC, Charger)"
+            "value" : "Tap “+” at the top right and choose a trigger (App, NFC and more)"
           }
         },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "右上の「+」を押し、きっかけ(時刻・場所に到着・NFC・充電器)を選ぶ"
+            "value" : "右上の「+」を押し、きっかけ(App・NFC など)を選ぶ"
           }
         }
       }
@@ -15232,23 +15300,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "家計簿アプリを作って"
-          }
-        }
-      }
-    },
-    "寝る前に充電を始めた時" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "When you plug in to charge before bed"
-          }
-        },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "寝る前に充電を始めた時"
           }
         }
       }
@@ -16324,23 +16375,6 @@
         }
       }
     },
-    "時刻や場所をきっかけに「記録を追加」を動かす作り方を見ます" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Shows how to run “Add Record” at a set time, place and more"
-          }
-        },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "時刻や場所をきっかけに「記録を追加」を動かす作り方を見ます"
-          }
-        }
-      }
-    },
     "時間がかかっています。もう少しだけお待ちください" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -17259,23 +17293,6 @@
         }
       }
     },
-    "毎晩 21 時になった時" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Every night at 9 PM"
-          }
-        },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "毎晩 21 時になった時"
-          }
-        }
-      }
-    },
     "毎晩9時に、記録を忘れないよう通知して" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -17323,23 +17340,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "毎週月曜の朝8時にお知らせして"
-          }
-        }
-      }
-    },
-    "決まった時刻や場所に着いた時などに、Tailor It の「記録を追加」を自動で動かせます。オートメーションはショートカット App で作ります。" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Tailor It’s “Add Record” can run on its own at a set time, when you arrive somewhere, and more. You set up the automation in the Shortcuts app."
-          }
-        },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "決まった時刻や場所に着いた時などに、Tailor It の「記録を追加」を自動で動かせます。オートメーションはショートカット App で作ります。"
           }
         }
       }
