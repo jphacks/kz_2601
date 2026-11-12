@@ -8,6 +8,7 @@ import (
 	"regexp"
 
 	cloudkms "google.golang.org/api/cloudkms/v1"
+	"google.golang.org/api/option"
 )
 
 // kmsKeyRe is a Cloud KMS key name (no version: encrypt uses the primary).
@@ -25,11 +26,12 @@ type KMSSealer struct {
 }
 
 // NewKMSSealer uses the default credentials (the runner's SA on Cloud Run).
-func NewKMSSealer(ctx context.Context, key string) (*KMSSealer, error) {
+// opts go to the client (tests: option.WithEndpoint).
+func NewKMSSealer(ctx context.Context, key string, opts ...option.ClientOption) (*KMSSealer, error) {
 	if !kmsKeyRe.MatchString(key) {
 		return nil, fmt.Errorf("EXT_TOKEN_KMS_KEY must be projects/…/locations/…/keyRings/…/cryptoKeys/…, got %q", key)
 	}
-	svc, err := cloudkms.NewService(ctx)
+	svc, err := cloudkms.NewService(ctx, opts...)
 	if err != nil {
 		return nil, err
 	}
