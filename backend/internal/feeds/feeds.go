@@ -26,11 +26,11 @@ import (
 
 // Item is one row of a feed. Fields a provider does not use are omitted.
 type Item struct {
-	Date     string    `json:"date,omitempty"` // YYYY-MM-DD (weather, holidays, diet) or RFC 3339 (rss, arxiv, warnings, pressure, bikeshare)
+	Date     string    `json:"date,omitempty"` // YYYY-MM-DD (weather, holidays, diet) or RFC 3339 (rss, arxiv, warnings, pressure, bikeshare, status)
 	Title    string    `json:"title"`
 	Subtitle string    `json:"subtitle,omitempty"`
-	Icon     string    `json:"icon,omitempty"`   // SF Symbols name (weather, warnings)
-	URL      string    `json:"url,omitempty"`    // https only (rss, arxiv, diet)
+	Icon     string    `json:"icon,omitempty"`   // SF Symbols name (weather, warnings, status)
+	URL      string    `json:"url,omitempty"`    // https only (rss, arxiv, diet, status)
 	Max      *float64  `json:"max,omitempty"`    // °C (weather) / hPa (pressure)
 	Min      *float64  `json:"min,omitempty"`    // °C (weather) / hPa (pressure)
 	Pop      *int      `json:"pop,omitempty"`    // precipitation probability %
@@ -61,9 +61,9 @@ type Result struct {
 }
 
 // Query names what to read. Region is for weather / warnings / pressure,
-// FeedID for rss / arxiv, Q (search words) for diet. UID and IP (a hashed
-// client address) are the caller, not part of the cache key: they count the
-// source fetches search words cause.
+// FeedID for rss / arxiv / status, Q (search words) for diet. UID and IP (a
+// hashed client address) are the caller, not part of the cache key: they
+// count the source fetches search words cause.
 type Query struct {
 	Provider string
 	Region   string
@@ -117,7 +117,7 @@ const arxivGap = 3 * time.Second * appconfigMaxInstances
 var providerLimits = map[string]limits{
 	dsl.FeedWeather:  {ttl: 30 * time.Minute, maxBody: 256 << 10},
 	dsl.FeedHolidays: {ttl: 12 * time.Hour, maxBody: 128 << 10},
-	dsl.FeedRSS:      {ttl: 15 * time.Minute, maxBody: 512 << 10},
+	dsl.FeedRSS:      {ttl: 15 * time.Minute, maxBody: 1 << 20}, // go-blog carries full posts (~360 KB for 10)
 	dsl.FeedWarnings: {ttl: 10 * time.Minute, maxBody: 512 << 10},
 	dsl.FeedPressure: {ttl: 30 * time.Minute, maxBody: 256 << 10},
 	dsl.FeedArxiv:    {ttl: 3 * time.Hour, maxBody: 1 << 20, gap: arxivGap},
@@ -125,6 +125,9 @@ var providerLimits = map[string]limits{
 	// HELLO CYCLING's station_information is about 8 MB (15,700 stations,
 	// 2026-11-12); station_status about 4.5 MB. The source's own ttl is 60 s.
 	dsl.FeedBikeshare: {ttl: 2 * time.Minute, maxBody: 16 << 20},
+	// Cloudflare's summary is ~230 KB on a calm day (480 components) and
+	// grows with open incidents.
+	dsl.FeedStatus: {ttl: 5 * time.Minute, maxBody: 2 << 20},
 }
 
 const (
@@ -355,6 +358,10 @@ func (s *Service) check(q Query) error {
 		}
 	case dsl.FeedArxiv:
 		if _, ok := dsl.ArxivCategories[q.FeedID]; !ok || q.Region != "" {
+			return ErrUnknown
+		}
+	case dsl.FeedStatus:
+		if _, ok := s.ep.Status[q.FeedID]; !ok || q.Region != "" {
 			return ErrUnknown
 		}
 	case dsl.FeedDiet:
@@ -716,6 +723,10 @@ func (s *Service) fetch(ctx context.Context, q Query) (string, []Item, int, erro
 		rawURL, title, parse = s.ep.dietURL(q.Q), "国会会議録「"+q.Q+"」", parseDiet
 	case dsl.FeedBikeshare:
 		return s.fetchBikeshare(ctx, q)
+	case dsl.FeedStatus:
+		p := s.ep.Status[q.FeedID]
+		rawURL, title = p.URL, p.Name+"の稼働状況"
+		parse = func(b []byte) ([]Item, error) { return parseStatus(b, p.Name, p.SiteURL) }
 	default:
 		return "", nil, 0, ErrUnknown
 	}

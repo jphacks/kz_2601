@@ -35,6 +35,8 @@ func FeedIDTable(provider string) map[string]string {
 		return ArxivCategories
 	case FeedBikeshare:
 		return BikeshareSystems
+	case FeedStatus:
+		return StatusPages
 	}
 	return nil
 }

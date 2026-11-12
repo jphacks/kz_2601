@@ -64,6 +64,9 @@ func TestAllowlistMatchesDoc(t *testing.T) {
 		code["bikeshare "+id+" info"] = b.Info
 		code["bikeshare "+id+" status"] = b.Status
 	}
+	for id, p := range ep.Status {
+		code["status "+id] = p.URL
+	}
 	for name, raw := range code {
 		if !strings.HasPrefix(raw, "https://") {
 			t.Errorf("%s: %s is not https", name, raw)

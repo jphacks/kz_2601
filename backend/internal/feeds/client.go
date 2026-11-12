@@ -26,6 +26,7 @@ type RSSFeed struct {
 	URL       string // https, fixed
 	Publisher string // attribution
 	SiteURL   string
+	License   string // shown with the source; "" = 公共データ利用規約(第1.0版)
 }
 
 // Endpoints are the only URLs the service fetches. Tests point them at an
@@ -39,6 +40,7 @@ type Endpoints struct {
 	Arxiv       string // + "?search_query=cat:{category}&..." (dsl.ArxivCategories)
 	Diet        string // + "?any={q}&..." (国会会議録 speech search)
 	Bikeshare   map[string]BikeshareSystem
+	Status      map[string]StatusPage
 }
 
 // BikeshareSystem is one allowlisted GBFS system (#1694). Adding one is a
@@ -53,6 +55,15 @@ type BikeshareSystem struct {
 	License    string
 }
 
+// StatusPage is one allowlisted public status page (Atlassian Statuspage
+// summary.json). Adding one is a reviewed change here and in dsl.StatusPages
+// (TestStatusAllowlistMatchesDSL keeps them equal).
+type StatusPage struct {
+	Name    string // the service, shown in the title
+	URL     string // https, fixed: {SiteURL}/api/v2/summary.json
+	SiteURL string // the human status page; attribution and the incident links
+}
+
 // DefaultEndpoints are the production sources (terms checked 2026-11-06,
 // docs/backend/features/external-feeds.md).
 func DefaultEndpoints() Endpoints {
@@ -62,9 +73,12 @@ func DefaultEndpoints() Endpoints {
 		Pressure:    "https://api.met.no/weatherapi/locationforecast/2.0/compact",
 		Holidays:    "https://www8.cao.go.jp/chosei/shukujitsu/syukujitsu.csv",
 		RSS: map[string]RSSFeed{
-			"digital-news":  {Name: "デジタル庁 新着・更新", URL: "https://www.digital.go.jp/rss/news.xml", Publisher: "デジタル庁", SiteURL: "https://www.digital.go.jp/"},
-			"fdma-news":     {Name: "消防庁 新着情報", URL: "https://www.fdma.go.jp/index.xml", Publisher: "消防庁", SiteURL: "https://www.fdma.go.jp/"},
-			"fdma-disaster": {Name: "消防庁 災害情報", URL: "https://www.fdma.go.jp/disaster/info/index.xml", Publisher: "消防庁", SiteURL: "https://www.fdma.go.jp/"},
+			"digital-news":    {Name: "デジタル庁 新着・更新", URL: "https://www.digital.go.jp/rss/news.xml", Publisher: "デジタル庁ホームページ", SiteURL: "https://www.digital.go.jp/"},
+			"fdma-disaster":   {Name: "消防庁 災害情報", URL: "https://www.fdma.go.jp/disaster/info/index.xml", Publisher: "消防庁ホームページ", SiteURL: "https://www.fdma.go.jp/"},
+			"fdma-news":       {Name: "消防庁 新着情報", URL: "https://www.fdma.go.jp/index.xml", Publisher: "消防庁ホームページ", SiteURL: "https://www.fdma.go.jp/"},
+			"go-blog":         {Name: "The Go Blog", URL: "https://go.dev/blog/feed.atom", Publisher: "The Go Blog(go.dev)", SiteURL: "https://go.dev/blog/", License: licenseGoBlog},
+			"osaka-city-news": {Name: "大阪市 新着情報", URL: "https://www.city.osaka.lg.jp/main/rss/rss_new.xml", Publisher: "大阪市ホームページ", SiteURL: "https://www.city.osaka.lg.jp/", License: licenseOsaka},
+			"soumu-news":      {Name: "総務省 新着情報", URL: "https://www.soumu.go.jp/news.rdf", Publisher: "総務省ホームページ", SiteURL: "https://www.soumu.go.jp/", License: licenseSoumu},
 		},
 		Arxiv: "https://export.arxiv.org/api/query",
 		Diet:  "https://kokkai.ndl.go.jp/api/speech",
@@ -73,6 +87,12 @@ func DefaultEndpoints() Endpoints {
 			"docomo-cycle-tokyo": odptGBFS("docomo-cycle-tokyo", "ドコモ・バイクシェア(東京)", "株式会社ドコモ・バイクシェア", "c_bikeshare_gbfs-d-bikeshare", "CC BY 4.0"),
 			// OpenStreet offers CC BY 4.0, ODC BY 1.0 or ODbL 1.0; we take CC BY 4.0.
 			"hellocycling": odptGBFS("hellocycling", "HELLO CYCLING", "OpenStreet株式会社", "c_bikeshare_gbfs-openstreet", "CC BY 4.0(3 つのライセンスから選択)"),
+		},
+		Status: map[string]StatusPage{
+			"claude":     {Name: "Claude(Anthropic)", URL: "https://status.claude.com/api/v2/summary.json", SiteURL: "https://status.claude.com"},
+			"cloudflare": {Name: "Cloudflare", URL: "https://www.cloudflarestatus.com/api/v2/summary.json", SiteURL: "https://www.cloudflarestatus.com"},
+			"github":     {Name: "GitHub", URL: "https://www.githubstatus.com/api/v2/summary.json", SiteURL: "https://www.githubstatus.com"},
+			"vercel":     {Name: "Vercel", URL: "https://www.vercel-status.com/api/v2/summary.json", SiteURL: "https://www.vercel-status.com"},
 		},
 	}
 }
@@ -86,6 +106,18 @@ func odptGBFS(id, name, operator, dataset, license string) BikeshareSystem {
 }
 
 const pdl = "公共データ利用規約(第1.0版)"
+
+// statusLicense: each company publishes the status API for programmatic
+// access; the app is not endorsed by them.
+const statusLicense = "各社が公開する status の API・各社の承認や提携はありません"
+
+// Per-feed licenses for RSS feeds whose terms ask for a specific credit.
+// The server keeps only titles, links and dates, so each says so.
+const (
+	licenseGoBlog = "CC BY 4.0 (https://creativecommons.org/licenses/by/4.0/)・題名と日付を抜き出して表示"
+	licenseOsaka  = "CC BY 2.1 JP (https://creativecommons.org/licenses/by/2.1/jp/)・題名と日付を抜き出して表示"
+	licenseSoumu  = "PDL1.0(https://www.digital.go.jp/resources/open_data/public_data_license_v1.0)・題名と日付を抜き出して表示"
+)
 
 func (ep Endpoints) source(q Query) Source {
 	switch q.Provider {
@@ -104,9 +136,16 @@ func (ep Endpoints) source(q Query) Source {
 	case dsl.FeedBikeshare:
 		b := ep.Bikeshare[q.FeedID]
 		return Source{Name: b.Credit, URL: b.DatasetURL, License: b.License}
+	case dsl.FeedStatus:
+		p := ep.Status[q.FeedID]
+		return Source{Name: p.Name + " の status ページ", URL: p.SiteURL, License: statusLicense}
 	}
 	f := ep.RSS[q.FeedID]
-	return Source{Name: f.Publisher + "ホームページ", URL: f.SiteURL, License: pdl}
+	license := f.License
+	if license == "" {
+		license = pdl
+	}
+	return Source{Name: f.Publisher, URL: f.SiteURL, License: license}
 }
 
 // weatherURL builds the forecast URL. region was checked against
@@ -162,6 +201,9 @@ func (ep Endpoints) hosts() map[string]bool {
 	for _, b := range ep.Bikeshare {
 		add(b.Info)
 		add(b.Status)
+	}
+	for _, p := range ep.Status {
+		add(p.URL)
 	}
 	return out
 }
