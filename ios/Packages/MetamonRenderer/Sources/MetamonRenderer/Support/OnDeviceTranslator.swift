@@ -171,18 +171,24 @@ public actor FakeOnDeviceTranslator: OnDeviceTranslator {
     var attachedCount = 0
 
     #if canImport(Translation) && os(iOS)
-    struct Job {
-        enum Kind { case prepare, translate([String]) }
-        let kind: Kind
-        let source: Locale.Language
-        let target: Locale.Language
-        let continuation: CheckedContinuation<[String], Error>
-    }
+    enum Kind { case prepare, translate([String]) }
 
     /// `TranslationSession.Configuration` を型消去で持つ(iOS 18 限定の型は stored property に置けないため)。
     @Published private var configurationBox: Any?
-    private var queue: [Job] = []
-    private var running = false
+    private lazy var jobs: OnDeviceTranslationJobQueue<Kind> = {
+        let q = OnDeviceTranslationJobQueue<Kind>()
+        q.dispatch = { [weak self] source, target in
+            guard let self else { return }
+            guard #available(iOS 18.0, *) else { return }
+            if var current = self.configuration, current.source == source, current.target == target {
+                current.invalidate() // 同じ組でも action をもう一度走らせる
+                self.configuration = current
+            } else {
+                self.configuration = TranslationSession.Configuration(source: source, target: target)
+            }
+        }
+        return q
+    }()
 
     @available(iOS 18.0, *)
     var configuration: TranslationSession.Configuration? {
@@ -191,59 +197,133 @@ public actor FakeOnDeviceTranslator: OnDeviceTranslator {
     }
 
     @available(iOS 18.0, *)
-    func submit(_ kind: Job.Kind, from source: Locale.Language, to target: Locale.Language) async throws -> [String] {
+    func submit(_ kind: Kind, from source: Locale.Language, to target: Locale.Language) async throws -> [String] {
         guard attachedCount > 0 else { throw OnDeviceTranslationError.hostMissing }
-        return try await withCheckedThrowingContinuation { c in
-            queue.append(Job(kind: kind, source: source, target: target, continuation: c))
-            pump()
-        }
+        return try await jobs.submit(kind, from: source, to: target)
     }
 
-    @available(iOS 18.0, *)
-    private func pump() {
-        guard !running, let job = queue.first else { return }
-        running = true
-        if var current = configuration, current.source == job.source, current.target == job.target {
-            current.invalidate() // 同じ組でも action をもう一度走らせる
-            configuration = current
-        } else {
-            configuration = TranslationSession.Configuration(source: job.source, target: job.target)
-        }
-    }
-
-    /// `.translationTask` の action。先頭の依頼をこの session で処理する。
+    /// `.translationTask` の action。今の依頼と組が合う時だけこの session で処理する。
     @available(iOS 18.0, *)
     func handle(_ session: TranslationSession) async {
-        guard !queue.isEmpty else { running = false; return }
-        let job = queue.removeFirst()
+        guard let job = jobs.begin(source: session.sourceLanguage, target: session.targetLanguage) else { return }
         do {
-            switch job.kind {
+            switch job.payload {
             case .prepare:
                 try await session.prepareTranslation()
-                job.continuation.resume(returning: [])
+                jobs.finish(job.token, .success([]))
             case .translate(let texts):
                 let responses = try await session.translations(from: texts.map { .init(sourceText: $0) })
-                job.continuation.resume(returning: responses.map(\.targetText))
+                jobs.finish(job.token, .success(responses.map(\.targetText)))
             }
         } catch {
-            job.continuation.resume(throwing: OnDeviceTranslationError.failed)
+            jobs.finish(job.token, .failure(OnDeviceTranslationError.failed))
         }
-        running = false
-        pump()
     }
 
     /// 見えない View が外れたら積んだ依頼を失敗で返す(待ち続けない)。
     func detach() {
         attachedCount -= 1
         guard attachedCount == 0 else { return }
-        let pending = queue
-        queue = []
-        running = false
-        pending.forEach { $0.continuation.resume(throwing: OnDeviceTranslationError.hostMissing) }
+        jobs.failAll(OnDeviceTranslationError.hostMissing)
     }
     #else
     func detach() { attachedCount -= 1 }
     #endif
+}
+
+// MARK: - 依頼の順番待ち(OS に依らない・テスト対象)
+
+/// 依頼を 1 件ずつ流す。流した依頼は token で追い、別の依頼の action・遅れた結果で取り違えない。
+/// `dispatch` してから `fireTimeout` 以内に action が来なければ `.failed` で返す。
+@MainActor final class OnDeviceTranslationJobQueue<Payload> {
+    struct Job {
+        let token: Int
+        let payload: Payload
+        let source: Locale.Language
+        let target: Locale.Language
+        let continuation: CheckedContinuation<[String], Error>
+    }
+
+    /// 先頭を流す時に呼ぶ(host は configuration を立てる)。
+    var dispatch: (Locale.Language, Locale.Language) -> Void = { _, _ in }
+    let fireTimeout: Duration
+
+    private var pending: [Job] = []
+    private var current: Job?
+    private var started = false
+    private var timeout: Task<Void, Never>?
+    private var nextToken = 0
+
+    init(fireTimeout: Duration = .seconds(10)) { self.fireTimeout = fireTimeout }
+
+    /// 待っている依頼(流し中を含む)の数
+    var count: Int { pending.count + (current == nil ? 0 : 1) }
+
+    func submit(_ payload: Payload, from source: Locale.Language, to target: Locale.Language) async throws -> [String] {
+        try await withCheckedThrowingContinuation { c in
+            nextToken += 1
+            pending.append(Job(token: nextToken, payload: payload, source: source, target: target, continuation: c))
+            pump()
+        }
+    }
+
+    /// action が来た。今の依頼と組が合えば返す。合わなければ同じ依頼をもう一度流して nil(時間切れは延ばさない)。
+    func begin(source: Locale.Language?, target: Locale.Language?) -> Job? {
+        guard let job = current, !started else { return nil }
+        guard Self.same(source, job.source), Self.same(target, job.target) else {
+            dispatch(job.source, job.target)
+            return nil
+        }
+        started = true
+        timeout?.cancel()
+        timeout = nil
+        return job
+    }
+
+    /// 結果を返して次へ。もう今の依頼でない token(時間切れ・外れた後)は捨てる。
+    func finish(_ token: Int, _ result: Result<[String], Error>) {
+        guard let job = current, job.token == token else { return }
+        clearCurrent()
+        job.continuation.resume(with: result)
+        pump()
+    }
+
+    func failAll(_ error: Error) {
+        let all = (current.map { [$0] } ?? []) + pending
+        clearCurrent()
+        pending = []
+        all.forEach { $0.continuation.resume(throwing: error) }
+    }
+
+    private func pump() {
+        guard current == nil, !pending.isEmpty else { return }
+        let job = pending.removeFirst()
+        current = job
+        started = false
+        let token = job.token, wait = fireTimeout
+        timeout = Task { [weak self] in
+            try? await Task.sleep(for: wait)
+            guard !Task.isCancelled else { return }
+            self?.timedOut(token)
+        }
+        dispatch(job.source, job.target)
+    }
+
+    private func timedOut(_ token: Int) {
+        guard current?.token == token, !started else { return }
+        finish(token, .failure(OnDeviceTranslationError.failed))
+    }
+
+    private func clearCurrent() {
+        timeout?.cancel()
+        timeout = nil
+        current = nil
+        started = false
+    }
+
+    private static func same(_ a: Locale.Language?, _ b: Locale.Language) -> Bool {
+        a?.minimalIdentifier == b.minimalIdentifier
+    }
 }
 
 #if canImport(Translation) && os(iOS)

@@ -114,4 +114,95 @@ final class OnDeviceTranslatorTests: XCTestCase {
             XCTAssertEqual(error as? OnDeviceTranslationError, .unsupported)
         }
     }
+
+    // MARK: 依頼の順番待ち(本物の host が使う)
+
+    /// 投げた Task が submit まで進むのを待つ
+    @MainActor private func waitCount(_ q: OnDeviceTranslationJobQueue<String>, _ n: Int) async {
+        for _ in 0..<1000 where q.count < n { await Task.yield() }
+        XCTAssertEqual(q.count, n)
+    }
+
+    @MainActor func testQueueIgnoresActionForOtherPairAndRedispatches() async throws {
+        let q = OnDeviceTranslationJobQueue<String>()
+        var dispatched: [String] = []
+        q.dispatch = { s, t in dispatched.append("\(s.minimalIdentifier)>\(t.minimalIdentifier)") }
+        let task = Task { try await q.submit("a", from: ja, to: en) }
+        await waitCount(q, 1)
+        XCTAssertEqual(dispatched, ["ja>en"])
+        XCTAssertNil(q.begin(source: en, target: ja), "前の組の session で処理してしまった")
+        XCTAssertEqual(dispatched, ["ja>en", "ja>en"])
+        let job = try XCTUnwrap(q.begin(source: ja, target: en))
+        XCTAssertNil(q.begin(source: ja, target: en), "同じ依頼を二重に始めた")
+        q.finish(job.token, .success(["A"]))
+        let out = try await task.value
+        XCTAssertEqual(out, ["A"])
+        XCTAssertEqual(q.count, 0)
+    }
+
+    @MainActor func testQueueStaleActionDoesNotDropRunningJob() async throws {
+        let q = OnDeviceTranslationJobQueue<String>()
+        let first = Task { try await q.submit("1", from: ja, to: en) }
+        await waitCount(q, 1)
+        let job1 = try XCTUnwrap(q.begin(source: ja, target: en))
+        let second = Task { try await q.submit("2", from: ja, to: en) }
+        await waitCount(q, 2)
+        // 処理中に action がもう一度来ても、流し中の印は消えず 2 件目は先に始まらない
+        XCTAssertNil(q.begin(source: ja, target: en))
+        XCTAssertEqual(q.count, 2)
+        q.finish(job1.token, .success(["one"]))
+        let job2 = try XCTUnwrap(q.begin(source: ja, target: en))
+        XCTAssertEqual(job2.payload, "2")
+        q.finish(job1.token, .success(["late"])) // 古い token は捨てる
+        q.finish(job2.token, .success(["two"]))
+        let a = try await first.value
+        let b = try await second.value
+        XCTAssertEqual(a, ["one"])
+        XCTAssertEqual(b, ["two"])
+    }
+
+    @MainActor func testQueueTimesOutWhenActionNeverFires() async throws {
+        let q = OnDeviceTranslationJobQueue<String>(fireTimeout: .milliseconds(50))
+        let first = Task { try await q.submit("1", from: ja, to: en) }
+        let second = Task { try await q.submit("2", from: ja, to: en) }
+        do {
+            _ = try await first.value
+            XCTFail("action が来ないのに返ってきた")
+        } catch {
+            XCTAssertEqual(error as? OnDeviceTranslationError, .failed)
+        }
+        // 次の依頼は流れる
+        let job2 = try XCTUnwrap(q.begin(source: ja, target: en))
+        q.finish(job2.token, .success(["two"]))
+        let b = try await second.value
+        XCTAssertEqual(b, ["two"])
+    }
+
+    @MainActor func testQueueStartedJobDoesNotTimeOut() async throws {
+        let q = OnDeviceTranslationJobQueue<String>(fireTimeout: .milliseconds(30))
+        let task = Task { try await q.submit("1", from: ja, to: en) }
+        await waitCount(q, 1)
+        let job = try XCTUnwrap(q.begin(source: ja, target: en))
+        try await Task.sleep(for: .milliseconds(100)) // ダウンロードの画面などで長くかかる
+        q.finish(job.token, .success(["ok"]))
+        let out = try await task.value
+        XCTAssertEqual(out, ["ok"])
+    }
+
+    @MainActor func testQueueFailAllReturnsEveryJob() async {
+        let q = OnDeviceTranslationJobQueue<String>()
+        let a = Task { try await q.submit("1", from: ja, to: en) }
+        let b = Task { try await q.submit("2", from: ja, to: en) }
+        await waitCount(q, 2)
+        q.failAll(OnDeviceTranslationError.hostMissing)
+        for t in [a, b] {
+            do {
+                _ = try await t.value
+                XCTFail()
+            } catch {
+                XCTAssertEqual(error as? OnDeviceTranslationError, .hostMissing)
+            }
+        }
+        XCTAssertEqual(q.count, 0)
+    }
 }
