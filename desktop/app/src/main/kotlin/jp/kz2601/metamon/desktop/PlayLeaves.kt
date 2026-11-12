@@ -236,6 +236,7 @@ object PlayRules {
         return if (starts.values.any { !it.isNull }) only + winWrites else winWrites + only
     }
 
+    /** 描画の木の値(iOS の日本語と突き合わせるので日本語のまま。Android の BracketRules と同じ)。画面は [PlayTexts.roundTitle]。 */
     fun roundTitle(round: Int, total: Int): String = when (total - round) {
         0 -> "決勝"
         1 -> "準決勝"
@@ -310,17 +311,33 @@ private fun PlayCard(content: @Composable () -> Unit) {
 @Composable
 private fun Note(text: String) = Text(text, color = Color.Gray, style = MaterialTheme.typography.bodyMedium)
 
+/** 画面に出す遊びの部品の文言(Android と同じキー・#1759)。描画の木の値は [PlayRules] の日本語のまま。 */
+object PlayTexts {
+    fun roundTitle(round: Int, total: Int): String = when (total - round) {
+        0 -> Strings["play_bracket_final"]
+        1 -> Strings["play_bracket_semifinal"]
+        2 -> Strings["play_bracket_quarterfinal"]
+        else -> Strings.format("play_bracket_round", round)
+    }
+
+    /** 組み合わせがまだ無い時。1 人だけなら 2 人以上で表ができる、0 人なら追加を促す。 */
+    fun bracketEmpty(entrants: Int): String = if (entrants == 1) Strings["play_bracket_need_two"] else Strings["play_bracket_add_entrants"]
+
+    /** 相手のいない枠。1 回戦は不戦勝、それより後は未定。 */
+    fun emptySlot(round: Int): String = if (round == 1) Strings["play_bracket_bye"] else Strings["play_bracket_tbd"]
+}
+
 // MARK: - settlement
 
 @Composable
 private fun SettlementLeaf(c: Component, data: LeafData) {
     val transfers = PlayRules.transfers(c, data)
     PlayCard {
-        Text(c.title ?: "精算", style = MaterialTheme.typography.titleMedium)
+        Text(c.title ?: Strings["play_settlement_title"], style = MaterialTheme.typography.titleMedium)
         HorizontalDivider()
         when {
-            PlayRules.visible(data, c.entity.orEmpty()).isEmpty() -> Note("メンバーを追加すると精算を出します")
-            transfers.isEmpty() -> Note("精算は不要です")
+            PlayRules.visible(data, c.entity.orEmpty()).isEmpty() -> Note(Strings["play_settlement_empty"])
+            transfers.isEmpty() -> Note(Strings["play_settlement_none"])
             else -> transfers.forEach { t ->
                 Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     Text(t.from, maxLines = 1, overflow = TextOverflow.Ellipsis)
@@ -347,7 +364,7 @@ private fun BracketLeaf(c: Component, session: DesktopSession, data: LeafData) {
         val winsField = PlayRules.winsField(c, entity) ?: return
         when (val result = draw.tap(m, side, winsField)) {
             BracketDraw.TapResult.NotPlayable -> Unit
-            BracketDraw.TapResult.Locked -> session.message = "先の試合の結果を取り消してから変えてください"
+            BracketDraw.TapResult.Locked -> session.message = Strings["play_bracket_locked"]
             is BracketDraw.TapResult.Update -> {
                 val started = PlayRules.startedField(c, entity)
                 val starts = draw.startWrites(result.wins, records, winsField, started, now = FieldCoding.formatDatetime(DSLClock.now()))
@@ -362,16 +379,16 @@ private fun BracketLeaf(c: Component, session: DesktopSession, data: LeafData) {
     PlayCard {
         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
             Text(c.title.orEmpty(), Modifier.weight(1f), style = MaterialTheme.typography.titleSmall, color = Color.Gray)
-            draw.champion?.let { Text("優勝 ${PlayRules.entrantName(c, data, it)}", fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.primary) }
+            draw.champion?.let { Text(Strings.format("play_bracket_champion", PlayRules.entrantName(c, data, it)), fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.primary) }
         }
         if (draw.rounds.isEmpty()) {
-            Note(if (draw.entrants.size == 1) "2 人以上で組み合わせを作ります" else "出場者を追加してください")
+            Note(PlayTexts.bracketEmpty(draw.entrants.size))
         } else {
             Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 draw.rounds.forEachIndexed { i, matches ->
                     val round = i + 1
                     Column(Modifier.width(160.dp)) {
-                        Text(PlayRules.roundTitle(round, draw.rounds.size), Modifier.height(20.dp), style = MaterialTheme.typography.labelMedium, color = Color.Gray)
+                        Text(PlayTexts.roundTitle(round, draw.rounds.size), Modifier.height(20.dp), style = MaterialTheme.typography.labelMedium, color = Color.Gray)
                         matches.forEach { m ->
                             // 後の回戦ほど 2 倍ずつ高くして、上がる先の試合が真ん中に来る
                             Column(Modifier.height(76.dp * (1 shl i)), verticalArrangement = Arrangement.Center) { MatchCard(c, data, m, ::tap) }
@@ -380,7 +397,7 @@ private fun BracketLeaf(c: Component, session: DesktopSession, data: LeafData) {
                 }
             }
         }
-        if (draw.lateEntrants > 0) Text("開始後に追加した ${draw.lateEntrants} 人は入っていません", style = MaterialTheme.typography.bodySmall, color = Color.Gray)
+        if (draw.lateEntrants > 0) Text(Strings.plural("play_bracket_late", draw.lateEntrants, draw.lateEntrants), style = MaterialTheme.typography.bodySmall, color = Color.Gray)
     }
 }
 
@@ -398,7 +415,7 @@ private fun MatchCard(c: Component, data: LeafData, m: BracketDraw.Match, onTap:
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 Text(
-                    r?.let { PlayRules.entrantName(c, data, it) } ?: if (m.round == 1) "不戦勝" else "未定",
+                    r?.let { PlayRules.entrantName(c, data, it) } ?: PlayTexts.emptySlot(m.round),
                     Modifier.weight(1f),
                     fontWeight = if (won) FontWeight.Bold else FontWeight.Normal,
                     color = if (r == null || lost) Color.Gray else Color.Unspecified,
@@ -440,10 +457,10 @@ private fun FlashcardsLeaf(c: Component, session: DesktopSession, data: LeafData
             if (total > 0 && current != null) Text("$position / $total", color = Color.Gray)
         }
         when {
-            cards.isEmpty() && !deck.isDone(cards) -> Note("カードがありません")
+            cards.isEmpty() && !deck.isDone(cards) -> Note(Strings["play_flashcards_empty"])
             current == null -> {
-                Note("全部終わりました")
-                OutlinedButton(onClick = { deck.restart(); tick++ }) { Text("もう一度") }
+                Note(Strings["play_flashcards_done"])
+                OutlinedButton(onClick = { deck.restart(); tick++ }) { Text(Strings["play_flashcards_again"]) }
             }
             else -> {
                 val face = if (deck.flipped) c.back else c.front
@@ -458,10 +475,10 @@ private fun FlashcardsLeaf(c: Component, session: DesktopSession, data: LeafData
                         textAlign = TextAlign.Center,
                     )
                 }
-                Text(if (deck.flipped) "裏(押すと表)" else "表(押すと裏)", style = MaterialTheme.typography.bodySmall, color = Color.Gray)
+                Text(if (deck.flipped) Strings["desktop_flashcards_back_hint"] else Strings["desktop_flashcards_front_hint"], style = MaterialTheme.typography.bodySmall, color = Color.Gray)
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                    OutlinedButton(onClick = { answer(current, false) }, Modifier.weight(1f)) { Text("まだ") }
-                    Button(onClick = { answer(current, true) }, Modifier.weight(1f)) { Text("覚えた") }
+                    OutlinedButton(onClick = { answer(current, false) }, Modifier.weight(1f)) { Text(Strings["play_flashcards_not_yet"]) }
+                    Button(onClick = { answer(current, true) }, Modifier.weight(1f)) { Text(Strings["play_flashcards_learned"]) }
                 }
             }
         }
@@ -753,8 +770,8 @@ private fun QrCodeLeaf(c: Component, form: FormDraft?, data: LeafData) {
     Column(Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(8.dp)) {
         c.title?.takeIf { it.isNotEmpty() }?.let { Text(it, Modifier.fillMaxWidth(), style = MaterialTheme.typography.titleSmall, color = Color.Gray) }
         when {
-            content.isBlank() -> Note("QR にする内容がありません")
-            matrix == null -> Note("長すぎて QR にできません")
+            content.isBlank() -> Note(Strings["renderer_qr_empty"])
+            matrix == null -> Note(Strings["renderer_qr_too_long"])
             else -> {
                 Canvas(Modifier.widthIn(max = 320.dp).fillMaxWidth().aspectRatio(1f).background(Color.White)) {
                     val cell = size.width / matrix.size
@@ -763,7 +780,7 @@ private fun QrCodeLeaf(c: Component, form: FormDraft?, data: LeafData) {
                     }
                 }
                 c.label?.takeIf { it.isNotEmpty() }?.let { Text(it, style = MaterialTheme.typography.bodySmall, color = Color.Gray) }
-                TextButton(onClick = { QrClipboard.copy(matrix) }) { Text("画像をコピー") }
+                TextButton(onClick = { QrClipboard.copy(matrix) }) { Text(Strings["desktop_qr_copy_image"]) }
             }
         }
     }

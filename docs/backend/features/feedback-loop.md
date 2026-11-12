@@ -12,8 +12,9 @@
 6. [アプリで見る](#アプリで見る)
 7. [振り分けの精度を測る](#振り分けの精度を測る)
 8. [運用の手順](#運用の手順)
-9. [ループを始める前に人がすること](#ループを始める前に人がすること)
-10. [まだ無いもの](#まだ無いもの)
+9. [定期の実行](#定期の実行)
+10. [ループを始める前に人がすること](#ループを始める前に人がすること)
+11. [まだ無いもの](#まだ無いもの)
 
 ## 流れ
 
@@ -38,7 +39,7 @@ flowchart LR
   M --> N[fixed<br/>お知らせ・リリースノートの下書き]
 ```
 
-自動なのは「取り込み → 振り分け → 下書き」と「直ったお知らせ」だけ。**Issue を作るのは人の `drafts approve` だけ**で、エージェントの PR を起動するのも、マージするのも人。定期の実行(Cloud Scheduler・workflow)はまだ足していない([まだ無いもの](#まだ無いもの))。
+自動なのは「取り込み → 振り分け → 下書き」と「直ったお知らせ」だけ。**Issue を作るのは人の `drafts approve` だけ**で、エージェントの PR を起動するのも、マージするのも人。定期の実行は Cloud Run Job と Cloud Scheduler(`infra/feedback_loop.tf`)で、既定は止まっている([定期の実行](#定期の実行))。
 
 ## 守っていること
 
@@ -79,11 +80,13 @@ flowchart LR
 | コマンド | 段 | すること |
 |---|---|---|
 | `ingest [-source in_app\|app_store_review\|google_play_review\|testflight\|gen_failure]` | intake | 新しいフィードバックを伏せ字して `loop_inbox` へ。ストアのレビューは `LOOP_SOURCE_APPSTORE=on`、Google Play のレビューは `LOOP_SOURCE_GOOGLEPLAY=on`、TestFlight は `LOOP_SOURCE_TESTFLIGHT=on`、生成の失敗の急増は `LOOP_SOURCE_GENFAIL=on` の時だけ |
+| `ingest -source all` | intake | アプリ内と `LOOP_SOURCE_*=on` の出どころを順に全部回す(定期の実行の 1 ジョブ用)。1 つが失敗しても次へ進み、最後に失敗した出どころをまとめて非 0 で終わる。監査ログに出どころごとの件数(`source_done`)と失敗(`source_failed`)を残す。`-source` 無しの既定は今のまま(最初の失敗で止まる) |
 | `inbox [-source S] [-status S] [-limit N]` | (止めない・読むだけ) | すべての出どころ(アプリ内・ストアのレビュー・Google Play のレビュー・クラッシュ・TestFlight・生成の失敗)を 1 つの一覧で見る(#368)。ID・出どころ・状態・`held` の理由・アプリの版・OS・届いた日時だけ出し、**本文は出さない**。取り込んだ古い順。`-source` は `in_app` / `app_store_review` / `google_play_review` / `crash` / `testflight` / `gen_failure`、`-status` は `new` / `held` / `triaged` / `spam` / `drafted`、`-limit` は既定 100(最大 2000) |
 | `ingest-crash -issue ID -type T -count N -version V` | intake | Crashlytics の急増を 1 件として記録(人が Crashlytics の画面を見て打つ) |
 | `triage [-max 200] [-batch 20]` | triage | 新しい項目を分類(`bug` / `feature` / `question` / `praise` / `spam`)・束ね・優先度(P1〜P3)付け。同じ文は 1 回だけ送る |
 | `triage-score -labels FILE` | — | 人が付けた正解(1 行 `itemId,category`)との一致率(#376 の完了の条件: 8 割) |
 | `triage-eval -set FILE [-model rules\|ai]` | (`ai` の時だけ triage) | 正解付きの組を、メモリの中だけで振り分け → 下書きまで通し、分類・優先度・束ねの一致率を出す([振り分けの精度を測る](#振り分けの精度を測る))。Firestore には書かない |
+| `triage-label-export -out FILE [-days 7]` | — | 直近の `loop_inbox` の文(伏せ字済み)を、正解欄が空の `triage-eval` の組として書き出す。人が正解を付けて `triage-eval` に渡す([一致を測る手順](feedback-loop-triage-agreement.md)) |
 | `draft [-max-new 20]` | draft | 束ごとに下書きを作る / 開いている下書きに足す。束にもう出した Issue(まだ直っていないもの)があれば、その Issue への追記の下書きにする([既存の Issue への追記](#既存の-issue-への追記)) |
 | `drafts list [-status pending]` / `show <id>` | — | 待ち行列を見る。`show` は出口の検査の結果と、承認の前に見る点を出す |
 | `drafts edit -by NAME [-title T] [-body-file F] <id>` | — | 再現の手順などを人が書く(出口の検査を通す) |
@@ -115,7 +118,8 @@ flowchart LR
 | `LOOP_SOURCE_GOOGLEPLAY` | 空 | `on` で Google Play のレビューを取り込む(Play Developer API の `reviews.list`・#2147)。Play が返すのは直近 1 週間ほどに書かれた・直されたレビューだけなので、週 1 回以上動かす。日時は最後に直された時刻。同じレビューを直しても最初の写しのまま(項目の ID はレビューの ID)。返信済みのレビューも取り込む(返信の文は読まない)。訳さず書いた人の言葉のまま。既定の `LOOP_AI_SOURCES` に入っていないので、AI に回すなら `google_play_review` を足す |
 | `LOOP_GP_PACKAGE_NAME` / `LOOP_GP_SERVICE_ACCOUNT_JSON` | `GOOGLE_PLAY_PACKAGE_NAME` / 空 = job の ADC | Google Play のレビューを読むアプリのパッケージ名と、サービスアカウントのキー(JSON の中身そのもの・Secret Manager から入れる)。キーが無ければ job の SA で読む(鍵を作らずに済むのでこちらを勧める)。どちらの SA も Play Console で「返信」の権限(レビューを読むのに要る)を付ける |
 | `LOOP_SOURCE_TESTFLIGHT` | 空 | `on` で TestFlight のフィードバック(スクショ付き・クラッシュの送信)を取り込む。キーは下の `LOOP_ASC_*` を共用。既定の `LOOP_AI_SOURCES` に入っていないので、AI に回すなら `testflight` を足す |
-| `LOOP_SOURCE_GENFAIL` | 空 | `on` で生成の失敗の急増を取り込む。`LOOP_GENFAIL_LOGS`(`gcloud logging read --format=json` で書き出したファイル・カンマ区切り。`cmd/ai-session-report -logs` と同じ形)の `ai.generate` の行から、失敗のコード(`outcome:failed` / `outcome:refused` / `error:<error_code>` / `retry:<retry_reasons>` / `validation:<validation_codes>`)ごとに、直近 `LOOP_GENFAIL_WINDOW`(既定 `24h`)の割合をその前の `LOOP_GENFAIL_BASELINE`(既定 `168h`)と比べる。件数が `LOOP_GENFAIL_MIN_COUNT`(既定 5)以上・割合が `LOOP_GENFAIL_MIN_RATE`(既定 0.05)以上・基準の `LOOP_GENFAIL_FACTOR`(既定 2)倍以上なら、コード 1 つ・1 日に 1 件。項目はコードと件数だけ(入力文・uid・アプリの id・ハッシュは持たない)。既定の `LOOP_AI_SOURCES` に入っていないので、AI に回すなら `gen_failure` を足す |
+| `LOOP_SOURCE_GENFAIL` | 空 | `on` で生成の失敗の急増を取り込む。読む先は `LOOP_GENFAIL_SOURCE` で選ぶ(下の行)。既定は `LOOP_GENFAIL_LOGS`(`gcloud logging read --format=json` で書き出したファイル・カンマ区切り。`cmd/ai-session-report -logs` と同じ形)。`ai.generate` の行から、失敗のコード(`outcome:failed` / `outcome:refused` / `error:<error_code>` / `retry:<retry_reasons>` / `validation:<validation_codes>`)ごとに、直近 `LOOP_GENFAIL_WINDOW`(既定 `24h`)の割合をその前の `LOOP_GENFAIL_BASELINE`(既定 `168h`)と比べる。件数が `LOOP_GENFAIL_MIN_COUNT`(既定 5)以上・割合が `LOOP_GENFAIL_MIN_RATE`(既定 0.05)以上・基準の `LOOP_GENFAIL_FACTOR`(既定 2)倍以上なら、コード 1 つ・1 日に 1 件。項目はコードと件数だけ(入力文・uid・アプリの id・ハッシュは持たない)。既定の `LOOP_AI_SOURCES` に入っていないので、AI に回すなら `gen_failure` を足す |
+| `LOOP_GENFAIL_SOURCE` | 空 = `file` | 生成の失敗のログを読む先。`file` = `LOOP_GENFAIL_LOGS` のファイル。`logging` = Cloud Logging の API(`entries.list`・#2146)で、`LOOP_GENFAIL_PROJECT`(既定 `GOOGLE_CLOUD_PROJECT`)の Cloud Run のサービス `LOOP_GENFAIL_SERVICES`(カンマ区切り・既定 `ai-<APP_ENV>`)の `jsonPayload.event="ai.generate"` の行を、比べるのに要る期間(`LOOP_GENFAIL_WINDOW` + `LOOP_GENFAIL_BASELINE`)だけ新しい順に読む。上限は `LOOP_GENFAIL_MAX_LINES`(既定 50000 行・1 回 1000 行ずつ)。上限に届いたら古い基準の行を読まずに警告を出す(直近の窓は必ず読む)。成功の行も読む(割合の分母に要る)。認証は job の ADC。要る権限は `roles/logging.viewer` だけ |
 | `LOOP_ASC_ISSUER_ID` / `LOOP_ASC_KEY_ID` / `LOOP_ASC_PRIVATE_KEY` / `LOOP_ASC_APP_ID` | — | App Store Connect API のキー(役割は Customer Support で足りる)。鍵は `.p8` の中身そのもの |
 | `LOOP_ISSUE_REPO` | 空 = dry run | Issue を作るリポジトリ(`owner/name`) |
 | `LOOP_GITHUB_TOKEN` | — | Issue の作成・コメント・読み取りだけの権限(GitHub App のインストールのトークン、または fine-grained の PAT の `issues: write`)。マージ・ラベル・コードの権限は持たせない |
@@ -157,12 +161,14 @@ flowchart LR
 |---|---|---|
 | `triage-score -labels FILE` | 本番の `loop_inbox` の項目に人が付けた分類(`itemId,category`) | 1 週間分を振り分けた後、人が同じ項目に分類を付けて比べる |
 | `triage-eval -set FILE` | 手で書いた架空のフィードバックの組(JSON の行: `id` `text` `category` `priority` `bundle`) | モデル・プロンプトを変える前後。本物のフィードバックを使わずに比べられる |
+| `triage-label-export` → `triage-eval -set FILE -model ai` | 本番の 1 週間分を書き出し、人が分類・優先度・束を付けた組 | #376 の完了の条件を測る。手順は [feedback-loop-triage-agreement.md](feedback-loop-triage-agreement.md) |
 
 `triage-eval` は本物の `Triager` と `draft.Builder` をメモリの店に対して回す。数えるもの:
 
 - 分類: `category` が正解と同じ項目の割合
 - 優先度: 下書き(= Issue に出る)の優先度が正解と同じ割合。束にならない `praise` / `spam` は項目の優先度
 - 束ね: 正解で同じ `bundle` の 2 件が同じ束になった割合(together)と、違う `bundle` の 2 件が別の束になった割合(apart)
+- 結果には、欄ごとの取り違えの表(行が正解・列がモデル)と、8 割を下回った欄(`verdict`)も出す。文はモデルに渡す前に伏せ字にする
 
 `held` や外れた出力で分類が付かなかった項目は外れとして数える。`-model rules`(既定)はキーワードの基準線(`internal/loop/triage/eval/rules.go`・費用なし)。`-model ai` は振り分けのモデルを呼ぶので、`triage` と同じく段のスイッチと月の上限を見て、トークンを数える(監査は `eval_call`)。
 
@@ -231,7 +237,34 @@ go run ./cmd/feedback-loop audit -summary
 
 止める時: `go run ./cmd/feedback-loop switch set -by <名前> all off`(次の段の開始・振り分けの次の呼び出しから止まる)。それでも止まらない時は、Cloud Run の job の `LOOP_PAUSED=1`。
 
-後で定期にする時のコマンド(Cloud Run の job の引数にする。workflow には足さない): `ingest` → `triage` → `draft` を 1 日 1 回、`fixed` と `purge` を 1 日 1 回。`drafts approve` は定期にしない(人の承認)。
+定期にする時は [定期の実行](#定期の実行)。`drafts approve` は定期にしない(人の承認)。
+
+## 定期の実行
+
+`infra/feedback_loop.tf`(#368)。**既定は `feedback_loop_enabled = false` で、apply しても何も作らない。**
+
+| もの | 中身 |
+|---|---|
+| Cloud Run Job | `feedback-loop-ingest` / `-triage` / `-draft` / `-fixed` / `-purge`。1 コマンド = 1 ジョブ(イメージは distroless でシェルが無く、1 回の実行で 1 コマンドだけのため)。各ジョブはその段の `LOOP_<段>=on` だけを持つ(`purge` は止めない段なので無し) |
+| Cloud Scheduler | `feedback-loop-<コマンド>-daily`。既定は毎日 5:00 `ingest` → 5:20 `triage` → 6:00 `draft` → 6:30 `fixed` → 6:50 `purge`(JST・前の段の timeout より後にずらす。`feedback_loop_schedules` で変える)。失敗しても再試行しない(次の日に続きから拾う)。`triage` はジョブの再試行も無し(費用) |
+| SA | `feedback-loop-job`: Firestore(`roles/datastore.user`)と、下の Secret だけを 1 つずつ読める。Firebase Auth・アプリの `ANTHROPIC_API_KEY` は読めない。`feedback-loop-scheduler`: この 5 本のジョブだけの `roles/run.invoker` |
+| Secret | 名前だけを参照し、値はコードにも state にも入らない(Secret の ID = 環境変数の名前・`latest`)。既定は `triage` に `LOOP_ANTHROPIC_API_KEY`、`fixed` に `LOOP_GITHUB_TOKEN`。`LOOP_` で始まるものは入れ物を Terraform が作り、`run-backend` は読めない。ストアのレビュー(`LOOP_ASC_*`)・push(`APNS_*`)は `feedback_loop_secret_env` に足した時だけ |
+| 秘密でない設定 | `feedback_loop_env`(`LOOP_CONSENT_VERSIONS`・`LOOP_SOURCE_APPSTORE` など・全部のジョブに入る)。鍵の名前を入れると validate で止まる |
+
+有効にする手順(人・prod):
+
+1. 「[ループを始める前に人がすること](#ループを始める前に人がすること)」を済ませる(同意文の版・専用のキー・トークン)。
+2. `envs/prod.tfvars` に `feedback_loop_enabled = true` を入れ、`infra/bootstrap.sh prod plan` で差分を見てから apply(SA・IAM・Secret の入れ物ができる)。
+3. Secret に値を入れる(値の入っていない Secret を指すとジョブの起動が失敗する):
+   ```sh
+   gcloud secrets versions add LOOP_ANTHROPIC_API_KEY --project=jphacks-kz2601 --data-file=-
+   gcloud secrets versions add LOOP_GITHUB_TOKEN --project=jphacks-kz2601 --data-file=-
+   ```
+4. `/app/feedback-loop` を含むイメージ(backend の Dockerfile で同梱)の digest を `feedback_loop_job_image` に入れて、もう一度 plan → apply(ジョブ 5 本と Scheduler 5 本)。
+5. 最初は手で 1 回ずつ回して結果を見る: `gcloud run jobs execute feedback-loop-ingest --region=asia-northeast1 --wait`(`triage` / `draft` も同じ)。`go run ./cmd/feedback-loop audit -summary` で記録を確かめる。
+6. イメージの更新は Terraform が追わない(`ignore_changes`)。backend の更新ごとに `gcloud run jobs update feedback-loop-<コマンド> --image=...` で差し替える(消去ジョブと同じ)。
+
+止める: 段ごとは今までどおり `switch set -by <名前> <段|all> off`(次の実行から止まる)。Scheduler ごと止めるなら `feedback_loop_paused = true` で apply。ジョブも消すなら `feedback_loop_job_image = ""` だが、`deletion_protection` があるので先に外す。
 
 ## ループを始める前に人がすること
 
@@ -242,6 +275,7 @@ go run ./cmd/feedback-loop audit -summary
 | Issue だけを書ける GitHub のトークン(GitHub App か fine-grained の PAT)を作る | エージェントの権限と分ける |
 | App Store Connect の API キー(Customer Support)を作る(ストアのレビューを取り込むなら) | 取り込みの口は作ってあり、既定は止めてある |
 | Play Console の「ユーザーと権限」でループの job の SA を招き、アプリにレビューの返信の権限だけを付ける(Google Play のレビューを取り込むなら) | 取り込みの口は作ってあり(`LOOP_SOURCE_GOOGLEPLAY`)、既定は止めてある。購入の確認の SA(`GOOGLE_PLAY_SERVICE_ACCOUNT_JSON`)とは分ける |
+| ループの job の SA に `roles/logging.viewer` を付ける(生成の失敗を Cloud Logging の API から読むなら・`LOOP_GENFAIL_SOURCE=logging`) | 読むだけの役割。既定はファイルからの読み込みのままで、付けるまでは使えない |
 | Firestore のルールで `loop_*` をクライアントから読み書きできないことを確かめる。必要なら `expiresAt` の TTL を設定する | `purge` でも消えるが、二重にしておくと安全 |
 | `loop_*` の集まりを、アカウントの削除(`PurgeAccount`)にも足すかを決める | 今は `purge` が、元が消えた写しと削除したアカウントの写しを消す |
 
@@ -249,9 +283,9 @@ go run ./cmd/feedback-loop audit -summary
 
 | もの | 状態 |
 |---|---|
-| 定期の実行(Cloud Scheduler・workflow) | 足していない。上のコマンドを job にする |
+| 定期の実行を動かすこと | Terraform(`infra/feedback_loop.tf`)はあるが既定は止まっている。apply・Secret の値・有効化は人([定期の実行](#定期の実行)) |
 | Crashlytics を自動で読む | Crashlytics は安く読める API が無い。BigQuery のエクスポート(#296)ができたら `ingest.CrashSource` を実装する。それまでは `ingest-crash` で人が記録 |
-| 生成の失敗の急増を自動で読む | 今はログを人が `gcloud logging read` で書き出して `LOOP_GENFAIL_LOGS` に渡す。Logging API か BigQuery から読む時は `ingest.GenLogSource` を実装する |
+| 生成の失敗の急増を BigQuery から読む | Cloud Logging の API からは読める(`LOOP_GENFAIL_SOURCE=logging`・#2146)。ログの保存期間(既定 30 日)より長く比べたい・件数が `LOOP_GENFAIL_MAX_LINES` に収まらない時は、BigQuery のシンクを作って `ingest.GenLogSource` をもう 1 つ実装する |
 | Google の機密データの検出(#367 の選択肢 2-B) | GCP の設定が要るので後で |
 | 埋め込みでの束ね(#376) | 束ねはモデルの `cluster` の名前に任せている。同じ問題に別の名前が付くと別の束になる(呼び出しをまたぐと特に)。既知の束として渡すのは待っている下書きの名前だけ |
-| 本物の 1 週間分での一致率 | `triage-score` で人が測る(#376 の完了の条件) |
+| 本物の 1 週間分での一致率 | `triage-label-export` で書き出し、人が正解を付けて `triage-eval -model ai` で測る([手順](feedback-loop-triage-agreement.md)・#376 の完了の条件) |

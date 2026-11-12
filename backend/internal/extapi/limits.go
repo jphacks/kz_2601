@@ -17,8 +17,10 @@ import (
 // Every call that reaches a provider counts once against the user's and the
 // app's hourly and daily counters of that provider and the provider's
 // environment-wide daily counter (all or none, ratelimit.Store). A provider
-// that answered 429 is paused for UpstreamPause on this instance. A limited
-// call is 429 rate_limited with the scope (LimitError).
+// that answered 429 is paused for UpstreamPause on this instance: for the
+// person whose token it was (NeedsOAuth: the provider counts per token), for
+// everyone otherwise (the operator's key). A limited call is 429
+// rate_limited with the scope (LimitError).
 
 // The scopes of LimitError (the answer's "scope" and the ext.call log's "limit").
 const (
@@ -44,7 +46,9 @@ type Limits struct {
 
 // DefaultLimits apply when no env is set: low enough to stay under a
 // provider's free allocation, high enough for a person pressing buttons.
-// The real values are the owner's (env, not written in the docs).
+// The real values are the owner's (env, not written in the docs). A
+// NeedsOAuth provider has no GlobalDaily by default (its allocation is per
+// person's token): only EXT_GLOBAL_DAILY_<PROVIDER> sets one.
 var DefaultLimits = Limits{UserHourly: 30, UserDaily: 100, AppHourly: 100, AppDaily: 300, GlobalDaily: 500}
 
 // limitEnv are the scopes of EXT_LIMIT_<SCOPE> / EXT_LIMIT_<PROVIDER>_<SCOPE>.
@@ -62,10 +66,11 @@ var limitEnv = []struct {
 //
 //	EXT_LIMIT_<SCOPE>               every provider (SCOPE = USER_HOURLY / USER_DAILY / APP_HOURLY / APP_DAILY)
 //	EXT_LIMIT_<PROVIDER>_<SCOPE>    one provider (wins over the above)
-//	EXT_GLOBAL_DAILY                every provider's environment-wide day
+//	EXT_GLOBAL_DAILY                every provider's environment-wide day (not NeedsOAuth ones)
 //	EXT_GLOBAL_DAILY_<PROVIDER>     one provider's (wins over the above)
 //
-// Unset = DefaultLimits; 0 = that counter is off.
+// Unset = DefaultLimits (GlobalDaily: 0 for NeedsOAuth, Provider.GlobalDaily
+// when the provider has one); 0 = that counter is off.
 func limitsFromEnv(getenv func(string) string) (map[string]Limits, error) {
 	base := DefaultLimits
 	for _, s := range limitEnv {
@@ -76,9 +81,16 @@ func limitsFromEnv(getenv func(string) string) (map[string]Limits, error) {
 	if err := envCount(getenv, "EXT_GLOBAL_DAILY", &base.GlobalDaily); err != nil {
 		return nil, err
 	}
+	globalSet := strings.TrimSpace(getenv("EXT_GLOBAL_DAILY")) != ""
 	out := map[string]Limits{}
 	for _, p := range Providers() {
 		l, n := base, p.EnvName()
+		switch {
+		case p.NeedsOAuth:
+			l.GlobalDaily = 0
+		case p.GlobalDaily > 0 && !globalSet:
+			l.GlobalDaily = p.GlobalDaily
+		}
 		for _, s := range limitEnv {
 			if err := envCount(getenv, "EXT_LIMIT_"+n+"_"+s.name, s.of(&l)); err != nil {
 				return nil, err
@@ -129,8 +141,18 @@ type limiter struct {
 	store    ratelimit.Store
 	fallback ratelimit.Store
 
-	mu     sync.Mutex
+	mu sync.Mutex
+	// paused is until when a pause key (pauseKey) is not called.
 	paused map[string]time.Time
+}
+
+// pauseKey is what a provider's 429 pauses: the person's own token for a
+// NeedsOAuth provider (uid + provider), the provider for everyone otherwise.
+func pauseKey(p Provider, uid string) string {
+	if p.NeedsOAuth {
+		return p.ID + "\x00uid_" + uid
+	}
+	return p.ID
 }
 
 // limitCharge is what consume wrote, for refund.
@@ -148,29 +170,35 @@ func (s *Service) UseLimitStore(store ratelimit.Store) {
 	}
 }
 
-// pausedFor is how long provider is still paused (0 = not paused).
-func (l *limiter) pausedFor(provider string, now time.Time) time.Duration {
+// pausedFor is how long key is still paused (0 = not paused).
+func (l *limiter) pausedFor(key string, now time.Time) time.Duration {
 	l.mu.Lock()
 	defer l.mu.Unlock()
-	until, ok := l.paused[provider]
+	until, ok := l.paused[key]
 	if !ok {
 		return 0
 	}
 	if !now.Before(until) {
-		delete(l.paused, provider)
+		delete(l.paused, key)
 		return 0
 	}
 	return until.Sub(now)
 }
 
-// pause stops calls to provider until now + d.
-func (l *limiter) pause(provider string, now time.Time, d time.Duration) {
+// pause stops calls under key until now + d. Ended pauses go at the same
+// time (per-person keys would otherwise pile up).
+func (l *limiter) pause(key string, now time.Time, d time.Duration) {
 	l.mu.Lock()
 	defer l.mu.Unlock()
 	if l.paused == nil {
 		l.paused = map[string]time.Time{}
 	}
-	l.paused[provider] = now.Add(d)
+	for k, until := range l.paused {
+		if !now.Before(until) {
+			delete(l.paused, k)
+		}
+	}
+	l.paused[key] = now.Add(d)
 }
 
 // consume counts one call of provider for uid and app. A blocked call

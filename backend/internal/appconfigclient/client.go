@@ -33,6 +33,8 @@ type Source struct {
 	Summary      string `json:"summary,omitempty"`
 	Model        string `json:"model,omitempty"`
 	RestoredFrom int    `json:"restoredFrom,omitempty"`
+	// PromptVersion is ai.PromptVersion of the binary that generated it (#372).
+	PromptVersion string `json:"promptVersion,omitempty"`
 }
 
 // VersionSummary mirrors VersionSummary (GET /versions item, no DSL body).

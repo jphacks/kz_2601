@@ -35,7 +35,7 @@ struct AvatarLeaf: View {
         .clipShape(Circle())
         .overlay(Circle().strokeBorder(.quaternary, lineWidth: 1))
         .frame(maxWidth: .infinity)
-        .accessibilityLabel(c.name ?? "avatar")
+        .accessibilityLabel(c.name ?? L("アバター")) // 名前が無い時も訳のある文言で読む(#941)
     }
 
     private var placeholder: some View {

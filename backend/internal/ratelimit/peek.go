@@ -40,6 +40,16 @@ func (c Config) DailyLimit(t Tier) int {
 	}
 }
 
+// PlatformDailyLimit is DailyLimit on platform (a normalised
+// X-Client-Platform, httpx.NormalizePlatform): the per-OS override when one is
+// set (#2133), else DailyLimit. "" never has an override.
+func (c Config) PlatformDailyLimit(t Tier, platform string) int {
+	if n, ok := c.PlatformLimits[platform][t]; ok {
+		return n
+	}
+	return c.DailyLimit(t)
+}
+
 // Today is the day id and the next 0:00 (JST unless Location is set) of now.
 func (c Config) Today(now time.Time) (day string, resetAt time.Time) {
 	loc := c.Location
