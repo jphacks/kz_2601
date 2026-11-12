@@ -134,7 +134,9 @@ struct MacRootView: View {
                     AppCanvas(app: app, dsl: library.generated[app.id]?.dsl, keepsRecords: library.isCreated(app.id),
                               server: library.isCreated(app.id) && library.isOnServer(app.id) ? MacServices.shared.appConfig : nil,
                               showsScreenMap: $showsScreenMap,
-                              onTalk: { talk(about: $0) }, onOpenVoice: { speak() }, discardGuard: discardGuard)
+                              onTalk: { talk(about: $0) }, onOpenVoice: { speak() },
+                              onAskFix: { ask(draft: $0) }, // 失敗のトーストの「直してと頼む」(#1885): 入力欄に入れて開く(送らない)
+                              discardGuard: discardGuard)
                         .environment(\.changeHighlight, highlight?.canvas == Self.canvasKey(app) ? highlight?.value ?? .none : .none)
                         .id(Self.canvasKey(app))
                         .background { MacThumbnailAnchorView(anchor: thumbAnchor) }

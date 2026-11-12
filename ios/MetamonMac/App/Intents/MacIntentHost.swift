@@ -94,10 +94,13 @@ final class IntentHost {
         }
     }
 
-    /// アプリの DSL。中身をまだ取っていないサーバーのアプリは取ってから
-    func document(appId: String) async -> AppDocument? {
+    /// アプリの DSL。中身をまだ取っていないサーバーのアプリは取ってから(cachedOnly なら取りに行かない)
+    func document(appId: String, cachedOnly: Bool = false) async -> AppDocument? {
         guard let library else { return nil }
-        if library.isServerOnly(appId) { await library.download(appId) }
+        if library.isServerOnly(appId) {
+            guard !cachedOnly else { return nil }
+            await library.download(appId)
+        }
         if let document = library.generated[appId] { return document }
         guard let app = bundled.first(where: { $0.id == appId }), let dsl = try? app.loadDSL() else { return nil }
         return AppDocument(appId: appId, version: 0, dsl: dsl)

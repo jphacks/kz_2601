@@ -53,6 +53,7 @@ final class TutorialUITests: XCTestCase {
         XCTAssertTrue(app.buttons["voice.fab"].waitForExistence(timeout: 30), "アプリができない")
         let hint = app.buttons["editHint.close"]
         XCTAssertTrue(hint.waitForExistence(timeout: 15), "最初のアプリの直後に直し方の例が出ない")
+        XCTAssertTrue(app.descendants(matching: .any)["editHint.fixRequest"].firstMatch.exists, "「動かないから直して」の一文が無い")
         attach("first-edit-hint")
         hint.tap()
         XCTAssertTrue(waitGone(hint), "直し方の例が閉じない")

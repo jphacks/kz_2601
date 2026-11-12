@@ -38,8 +38,7 @@ enum WidgetSnapshotWriter {
         let evaluator = ExprEvaluator(dsl: dsl, records: { records[$0] ?? [] })
         let components = statComponents(in: dsl)
         let stats = components.prefix(maxStats).map { c -> WidgetSnapshot.Stat in
-            let entityId = c.entity ?? ""
-            let key = [entityId, c.aggregate ?? "count", c.field ?? "", c.label ?? ""].joined(separator: "|")
+            let key = statKey(c)
             // レコード未取得(apply 直後など)は前回値を引き継ぎ、ウィジェットが一瞬 0 にならないようにする
             let value = statText(c, dsl: dsl, records: records, evaluator: evaluator) ?? previous?.stats.first { $0.key == key }?.value
             return WidgetSnapshot.Stat(key: key, label: c.label ?? "", value: value)
@@ -67,6 +66,14 @@ enum WidgetSnapshotWriter {
 
     /// stat 1 個の表示文字列。レコード未取得なら nil(ライブアクティビティの数字 #423 と共用)。
     static func statText(_ c: Component, dsl: AppDSL, records: [String: [Record]], evaluator: ExprEvaluator) -> String? {
+        statText(c, dsl: dsl, records: records, evaluator: evaluator, countUnit: countUnit)
+    }
+
+    /// 件数の単位(「件」)。言語の設定を読むので main actor で引き、main の外で数える時は文字列で渡す。
+    static var countUnit: String { L10n.tr("件") }
+
+    /// main actor の外でも呼べる版(一覧の数字は main の外で数える)。件数の単位は main で引いて渡す。
+    nonisolated static func statText(_ c: Component, dsl: AppDSL, records: [String: [Record]], evaluator: ExprEvaluator, countUnit: String) -> String? {
         if c.aggregate == nil, let expr = c.valueExpr {
             return evaluator.evaluate(expr).map { v in
                 if case .number(let n) = v { return Aggregator.format(n, as: c.format, unit: c.unit) }
@@ -75,11 +82,17 @@ enum WidgetSnapshotWriter {
         }
         let entityId = c.entity ?? ""
         guard records[entityId] != nil else { return nil }
-        return formatted(c, entity: dsl.entity(entityId), records: evaluator.viewRecords(for: entityId))
+        return formatted(c, entity: dsl.entity(entityId), records: evaluator.viewRecords(for: entityId), countUnit: countUnit)
+    }
+
+    /// stat の見分け方(前回値の引き継ぎ・ショートカットの「数字を読む」#1994)。
+    /// id を書かない stat は読むたびに id が変わるので、中身から作る。
+    nonisolated static func statKey(_ c: Component) -> String {
+        [c.entity ?? "", c.aggregate ?? "count", c.field ?? "", c.label ?? ""].joined(separator: "|")
     }
 
     /// 画面順(initialScreen → タブ順 → 残り)で `stat` を列挙する。
-    static func statComponents(in dsl: AppDSL) -> [Component] {
+    nonisolated static func statComponents(in dsl: AppDSL) -> [Component] {
         var order = [dsl.initialScreen] + dsl.app.tabs.map(\.screen)
         order += dsl.screens.map(\.id).filter { !order.contains($0) }
         var seen = Set<String>()
@@ -92,18 +105,26 @@ enum WidgetSnapshotWriter {
 
     /// `StatLeaf` と同じ式で表示文字列にする。
     static func formatted(_ c: Component, entity: Entity?, records: [Record]) -> String {
+        formatted(c, entity: entity, records: records, countUnit: countUnit)
+    }
+
+    nonisolated static func formatted(_ c: Component, entity: Entity?, records: [Record], countUnit: String) -> String {
         let rows = Aggregator.apply(c.filter, entity: entity, to: records) // filter.value の Expr は未対応(ウィジェットは行コンテキスト無し)
         if Aggregator.isPick(c.aggregate) { return Aggregator.pickText(c, entity: entity, records: rows) ?? "—" } // latest / earliest(#133)
-        return formattedValue(c, entity: entity, value: Aggregator.aggregate(c.aggregate, field: c.field, over: rows))
+        return formattedValue(c, entity: entity, value: Aggregator.aggregate(c.aggregate, field: c.field, over: rows), countUnit: countUnit)
     }
 
     /// 集計値 → stat と同じ書式の文字列。
     static func formattedValue(_ c: Component, entity: Entity?, value: Double) -> String {
+        formattedValue(c, entity: entity, value: value, countUnit: countUnit)
+    }
+
+    nonisolated static func formattedValue(_ c: Component, entity: Entity?, value: Double, countUnit: String) -> String {
         let unit = c.field.flatMap { entity?.field($0)?.unit }
         return Aggregator.format(
             value,
             as: c.format ?? (c.aggregate == "count" ? "plain" : nil),
-            unit: c.aggregate == "count" ? L10n.tr("件") : unit
+            unit: c.aggregate == "count" ? countUnit : unit
         )
     }
 

@@ -22,8 +22,12 @@ struct BetaWelcomeHost: ViewModifier {
                 }
             }
             .task {
-                // 前の起動で最初のアプリを作った人(直し方の例を閉じる前に終了した・β に入れ直した等)は、起動して少し待ってから出す
+                // 前の起動で最初のアプリを作った人(直し方の例を閉じる前に終了した・β に入れ直した等)は、
+                // スプラッシュ・起動時の同意の画面が閉じてから少し待って出す
+                await SplashPresence.shared.waitUntilHidden()
+                await LaunchConsentHold.shared.waitUntilReleased()
                 try? await Task.sleep(for: .milliseconds(1200))
+                guard !Task.isCancelled else { return }
                 rt.presentBetaWelcomeIfNeeded()
             }
     }

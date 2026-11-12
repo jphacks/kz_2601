@@ -11,6 +11,7 @@ import AppKit
 /// `item.toggle`(#108): 行頭の丸で boolean を反転して即保存(楽観的 UI。失敗したら戻す)。
 /// 他人の共有レコード(#249): 丸は薄く描いて押すと理由を出し、長押しの削除は出さない(`RecordPermission`)。
 /// `item.interest`(#507): 仲間探しのプロフィールの行に「つながりたい」(`InterestButton`・審査用の版には無い)。
+/// 長押しの「翻訳」(#2000・iOS 18+): 行の title / subtitle の文字を OS の翻訳のシートで見せるだけ(記録は変えない)。
 struct ListLeaf: View {
     @Environment(\.dslRuntime) private var rt
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
@@ -23,6 +24,8 @@ struct ListLeaf: View {
     @State private var toggleTaps = 0
     /// 押した直後の印の表示(recordId → 楽観的な状態・#255)。確定したら外す
     @State private var markOverrides: [String: MarkState] = [:]
+    /// 翻訳のシートに出す行の文字(#2000)。nil なら閉じている
+    @State private var translateText: String?
     #if os(macOS)
     /// 選んでいる行(#1387)。クリックか ↑↓ で選び、⌘C・⌫ の対象にする(#1332)。⌘・⇧ クリックで複数(#1398)
     @State private var selection = ListRowMultiSelection()
@@ -103,6 +106,15 @@ struct ListLeaf: View {
                                 Divider()
                             }
                             #endif
+                            #if os(iOS)
+                            RecordTranslateMenuItem(offers: translationText(row, entity: entity) != nil) {
+                                translateText = translationText(row, entity: entity)
+                            }
+                            // 記録を項目つきで別の生成アプリへ(#1871)
+                            if let entity, RecordPasteboard.payload(record: row, entity: entity, rt: rt) != nil {
+                                Button(L("記録をコピー"), systemImage: "doc.on.doc") { RecordPasteboard.copy(record: row, entity: entity, rt: rt) }
+                            }
+                            #endif
                             if deletable(row, entity: entityId) {
                                 Button(L("削除"), systemImage: "trash", role: .destructive) { delete(row, entity: entityId) }
                             }
@@ -114,6 +126,11 @@ struct ListLeaf: View {
                             // 行の写真も右クリックと同じく VoiceOver からコピーできる(#1370)
                             if let photo = rowImage(row, entity: entity) {
                                 Button(L("画像をコピー")) { PlatformPasteboard.setImage(photo.image) }
+                            }
+                            #endif
+                            #if os(iOS)
+                            if let entity, RecordPasteboard.payload(record: row, entity: entity, rt: rt) != nil {
+                                Button(L("記録をコピー")) { RecordPasteboard.copy(record: row, entity: entity, rt: rt) }
                             }
                             #endif
                             if deletable(row, entity: entityId) { Button(L("削除")) { delete(row, entity: entityId) } }
@@ -152,6 +169,8 @@ struct ListLeaf: View {
             .onDeleteCommand { deleteCommand(rows: rows, entity: entity, entityId: entityId) }
             #endif
             .renderCard(padding: 0)
+            .recordTranslation(isPresented: Binding(get: { translateText != nil }, set: { if !$0 { translateText = nil } }),
+                               text: translateText ?? "")
             #if os(macOS)
             .imageSaveExporter($imageToSave)
             #endif
@@ -179,6 +198,14 @@ struct ListLeaf: View {
             }
             #endif
         }
+    }
+
+    /// 行の「翻訳」に渡す文字(title と subtitle)。出さない行は nil(#2000)
+    private func translationText(_ row: Record, entity: Entity?) -> String? {
+        guard RecordTranslation.osSupports else { return nil }
+        let t = ListRow.texts(item: c.item, record: row, entity: entity, rt: rt)
+        let text = [t.title, t.subtitle].compactMap { $0 }.filter { !$0.isEmpty }.joined(separator: "\n")
+        return RecordTranslation.offers(text: text, fields: RecordTranslation.rowFields(item: c.item, entity: entity)) ? text : nil
     }
 
     /// 楽観的に反転 → ローカル DB へ保存(同期キューが送る)→ 結果で保存待ち表示を外す(失敗ならストアの値 = 元に戻る)。

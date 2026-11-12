@@ -50,6 +50,8 @@ struct MetamonApp: App {
         _ = ExpensiveNetworkProbe.shared // 音声モデルの確認(#275)より前に回線の種類の監視を始める
         services.ai = ConsentGatedAIClient(base: services.ai) { AIConsentStore.isGranted(in: .standard) }
         if BuildConfig.forceMock { MusicSession.shared.player = FakeMusicPlayback() } // musicPlayer(#412)は音を出さない偽物
+        if BuildConfig.forceMock { DeviceCalendar.source = FakeDeviceCalendar.sample } // 端末のカレンダー・リマインダー(#1987)は固定の中身
+        if BuildConfig.forceMock { RecentlyPlayed.source = FakeRecentlyPlayed() } // 最近聞いた曲(#1988)は固定の履歴
         #if !APP_STORE_REVIEW
         if BuildConfig.forceMock { HealthData.source = MockHealthData() } // healthStat(#167)は固定値
         if BuildConfig.forceMock { SensorData.source = MockSensorData() } // sensorValue(#419)は決まった波形
@@ -74,6 +76,7 @@ struct MetamonApp: App {
         runtime.aiConsent = .shared
         runtime.tutorial = .shared
         runtime.coachMarks = .shared // #1441
+        runtime.spotlight = SpotlightAppIndexer(index: CoreSpotlightIndex()) // #1996
         #if !APP_STORE_REVIEW
         runtime.betaWelcome = .shared // #313
         #endif
@@ -91,6 +94,7 @@ struct MetamonApp: App {
         _runtime = State(initialValue: runtime)
         _session = State(initialValue: session)
         if splashMode != .hidden { SplashPresence.shared.begin() } // 起動時のシート・リンク・吹き出しはスプラッシュの後に
+        runtime.beginLaunchConsentHoldIfNeeded() // 起動時の同意 → シェアリンク・Intent の順(シートを同時に出さない)
     }
 
     var body: some Scene {
@@ -112,6 +116,7 @@ struct MetamonApp: App {
                         .task {
                             await runtime.bootstrap()
                             IntentHost.shared.markReady() // 保留中の「開く/話しかける」を実行(#80)
+                            LaunchConsentHold.shared.finishLaunchIfIdle() // 待たせる段が無ければ、以後のリンクは順番待ちにしない
                             #if !APP_STORE_REVIEW
                             SharingUI.shared.isReady = true // 保留中のシェアリンクを開く(#278)
                             #endif
@@ -128,16 +133,21 @@ struct MetamonApp: App {
             .animation(.easeInOut(duration: 0.3), value: session.user == nil)
             .modifier(SplashOverlay(mode: splashMode)) // 下の起動処理は待たずに進む
             .modifier(UpdateGateModifier(gate: updateGate))
+            .modifier(SpotlightOpenReceiver()) // Spotlight の結果のタップ(#1996)。サインイン前でも受けて保留
             #if !APP_STORE_REVIEW
             .modifier(ShareLinkReceiver()) // シェアリンクはサインイン前でも受けて保留(#278)
             .modifier(PushRegistrationObserver(uid: session.user?.uid)) // #269
             #endif
             .environment(session)
+            .modifier(AssistiveAccessReader())              // アシスティブアクセスの中か(#1997・判定はここだけ)
             .environment(\.services, services)              // protocol 越しのサービス
             // 表示言語(#44): 設定の「言語」で即時切替。`Text("…")` の解決と日付・数値の書式がこの Locale に従う
             .environment(\.locale, LanguagePreference.shared.locale)
             .task { await session.observe() }
             // クラッシュ報告に付ける本人の区別は uid だけ(名前・内容は付けない・#296)
+            .onChange(of: session.user == nil) { _, signedOut in
+                if signedOut { runtime.launchPresentationsAbandoned() } // サインアウト: 起動時の順番待ちを全部放す
+            }
             .onChange(of: session.user?.uid, initial: true) { _, uid in CrashReportingPreference.shared.updateUser(uid: uid) }
             .onChange(of: scenePhase) { _, phase in
                 if phase == .background { BackgroundRefresh.schedule() } // #38: 裏の定期同期を予約
