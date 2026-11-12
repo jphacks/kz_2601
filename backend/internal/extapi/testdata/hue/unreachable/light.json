@@ -1,0 +1,4 @@
+{"errors": [], "data": [
+  {"id": "3f2a1c5e-0000-4000-8000-000000000001", "type": "light", "owner": {"rid": "d0000000-0000-4000-8000-000000000001", "rtype": "device"}, "metadata": {"name": "リビング"}, "on": {"on": true}, "dimming": {"brightness": 100}},
+  {"id": "3f2a1c5e-0000-4000-8000-000000000004", "type": "light", "owner": {"rid": "d0000000-0000-4000-8000-000000000004", "rtype": "device"}, "metadata": {"name": "書斎"}, "on": {"on": true}, "dimming": {"brightness": 0.4}}
+]}

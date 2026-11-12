@@ -1,0 +1,5 @@
+{"errors": [], "data": [
+  {"id": "3f2a1c5e-0000-4000-8000-000000000001", "type": "light", "owner": {"rid": "d0000000-0000-4000-8000-000000000001", "rtype": "device"}, "metadata": {"name": "リビング"}, "on": {"on": true}, "dimming": {"brightness": 75.4}},
+  {"id": "3f2a1c5e-0000-4000-8000-000000000002", "type": "light", "owner": {"rid": "d0000000-0000-4000-8000-000000000002", "rtype": "device"}, "metadata": {"name": "寝室"}, "on": {"on": false}, "dimming": {"brightness": 40}},
+  {"id": "3f2a1c5e-0000-4000-8000-000000000003", "type": "light", "owner": {"rid": "d0000000-0000-4000-8000-000000000003", "rtype": "device"}, "metadata": {"name": "玄関のプラグ"}, "on": {"on": true}}
+]}
