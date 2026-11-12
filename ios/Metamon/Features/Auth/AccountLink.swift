@@ -59,9 +59,11 @@ extension AppRuntime {
     /// この端末のアプリがまだ空(音声画面だけ)なら、サーバーにある一番新しいアプリを開く。
     /// 再インストール後のサインイン・別アカウントへの切り替えの直後に使う。
     func resumeLatestAppIfEmpty() async {
+        let spotlightGeneration = spotlight.generation
         guard services.isLive, dsl.isVoiceOnly, morphJob == nil,
               let list = try? await services.appConfig.listApps() else { return }
         apps = list
+        await spotlight.sync(list, since: spotlightGeneration) // #1996 取った一覧で Spotlight も合わせる
         guard let latest = Self.latestApp(in: appDeletion.filter(list), excluding: document.appId) else { return }
         print("[Metamon] resume latest app: \(latest.id)")
         await switchApp(to: latest.id)

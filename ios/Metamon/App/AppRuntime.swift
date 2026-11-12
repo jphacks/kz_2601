@@ -310,7 +310,6 @@ final class AppRuntime: RuntimeNavigating {
             await restoreFromServer()
             if DeviceAppID.issuedThisLaunch { await resumeLatestAppIfEmpty() } // #276: 再インストール後のサインイン
             startSync()
-            Task { await refreshSpotlight() } // #1996
         }
         noteRetention() // #482 起動時の DSL(モック・オフラインでは apply を通らない)
         presentDeferredAccountLinkIfNeeded() // #276・H7 前の起動で最初のアプリを作っていたら引き継ぎの案内
@@ -682,6 +681,7 @@ final class AppRuntime: RuntimeNavigating {
             }
             scheduleFirstEditHint(createdFromInitial: createdFromInitial) // #274 最初のアプリの直後に 1 回だけ
             print("[Metamon] morph ok: version=\(result.document.version) mode=\(result.mode ?? "-") screens=\(result.document.dsl.screens.map(\.id)) summary=\(result.summary ?? "")")
+            if createdFromInitial { await indexCreatedApp(result.document) } // #1996 作ったアプリを Spotlight に
             if gatePaid { await gatePaidGeneration(before: previous) } // #414
         } catch {
             guard document.appId == previous.appId else { return } // 移った先に前のアプリの失敗を出さない
@@ -949,9 +949,10 @@ final class AppRuntime: RuntimeNavigating {
     func appsList() async -> [AppSummary] {
         appsLoading = apps.isEmpty
         defer { appsLoading = false }
+        let spotlightGeneration = spotlight.generation
         do {
             apps = try await services.appConfig.listApps()
-            await spotlight.sync(apps) // 一覧に無いアプリを Spotlight から消す(#1996)
+            await spotlight.sync(apps, since: spotlightGeneration) // 一覧に無いアプリを Spotlight から消す(#1996)
         } catch {
             print("[Metamon] listApps failed: \(error)")
             let cached = AppListCache.shared.load()
