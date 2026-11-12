@@ -98,7 +98,7 @@ type rawEntry struct {
 // parseLogs reads `gcloud logging read --format=json` output (a JSON array of
 // entries) or JSON lines (entries, or bare slog records with `time`).
 // Lines whose uid_hash is not in keep are dropped at once, so other users'
-// metadata is never held.
+// metadata is never held. A nil keep keeps every line (the log-only modes).
 func parseLogs(r io.Reader, keep map[string]bool) ([]logEvent, error) {
 	data, err := io.ReadAll(r)
 	if err != nil {
@@ -126,7 +126,7 @@ func parseLogs(r io.Reader, keep map[string]bool) ([]logEvent, error) {
 	var out []logEvent
 	for _, raw := range raws {
 		ev, ok := decodeEntry(raw)
-		if !ok || !keep[ev.UIDHash] {
+		if !ok || (keep != nil && !keep[ev.UIDHash]) {
 			continue
 		}
 		out = append(out, ev)
