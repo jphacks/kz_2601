@@ -35,6 +35,40 @@
         }
       }
     },
+    "${target} を数値で読む" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Read ${target} as a value"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "${target} を数値で読む"
+          }
+        }
+      }
+    },
+    "${target} を読む" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Read ${target}"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "${target} を読む"
+          }
+        }
+      }
+    },
     "%@ / 月" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -709,6 +743,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "%@のメニュー"
+          }
+        }
+      }
+    },
+    "%@は%@です" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$@ is %2$@"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@は%@です"
           }
         }
       }
@@ -2218,6 +2269,40 @@
         }
       }
     },
+    "Tailor It を開かずに、記録の集計(ウィジェットと同じ数字)を読みます。例: 家計簿の今月の支出。" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Reads a total from your records (the same number as the widget) without opening Tailor It. Example: this month's spending in Budget."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tailor It を開かずに、記録の集計(ウィジェットと同じ数字)を読みます。例: 家計簿の今月の支出。"
+          }
+        }
+      }
+    },
+    "Tailor It を開かずに、記録の集計を数値で読みます。計算や比較に使えます。" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Reads a total from your records as a numeric value without opening Tailor It. Use it for calculations and comparisons."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tailor It を開かずに、記録の集計を数値で読みます。計算や比較に使えます。"
+          }
+        }
+      }
+    },
     "Tailor It を開かずに、記録帳に記録を 1 件追加します。例: 家計簿に「ランチ 800円」。" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -2933,6 +3018,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "「%@」は Tailor It Pro が必要なため、保存しませんでした"
+          }
+        }
+      }
+    },
+    "「%@」は数値で読めません。「数字を読む」を使ってください" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "“%@” can't be read as a numeric value. Use “Read a Number” instead"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "「%@」は数値で読めません。「数字を読む」を使ってください"
           }
         }
       }
@@ -5516,6 +5618,40 @@
         }
       }
     },
+    "その数字が見つかりませんでした。Tailor It でアプリを確認して、選び直してください" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Couldn't find that number. Check your apps in Tailor It and choose it again"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "その数字が見つかりませんでした。Tailor It でアプリを確認して、選び直してください"
+          }
+        }
+      }
+    },
+    "その数字が見つかりませんでした。Tailor It で記録帳を確認して、選び直してください" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Couldn't find that number. Check your trackers in Tailor It and choose it again"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "その数字が見つかりませんでした。Tailor It で記録帳を確認して、選び直してください"
+          }
+        }
+      }
+    },
     "たとえば" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -5835,6 +5971,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "どのアプリを開きますか?"
+          }
+        }
+      }
+    },
+    "どの数字を読みますか?" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Which number do you want to read?"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "どの数字を読みますか?"
           }
         }
       }
@@ -6293,6 +6446,40 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "まだ履歴はありません。"
+          }
+        }
+      }
+    },
+    "まだ読み込んでいません" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Not loaded yet"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "まだ読み込んでいません"
+          }
+        }
+      }
+    },
+    "まだ読み込んでいません。Tailor It で%@を一度開いてください" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Not loaded yet. Open %@ in Tailor It once"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "まだ読み込んでいません。Tailor It で%@を一度開いてください"
           }
         }
       }
@@ -14862,6 +15049,57 @@
         }
       }
     },
+    "数字" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Number"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "数字"
+          }
+        }
+      }
+    },
+    "数字を読む" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Read a Number"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "数字を読む"
+          }
+        }
+      }
+    },
+    "数字を読む(数値)" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Read a Number as Value"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "数字を読む(数値)"
+          }
+        }
+      }
+    },
     "文字で入力(今すぐ作れます)" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -17947,6 +18185,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "要望"
+          }
+        }
+      }
+    },
+    "見つからない数字" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Missing number"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "見つからない数字"
           }
         }
       }
