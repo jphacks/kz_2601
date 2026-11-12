@@ -364,23 +364,37 @@ final class MacAppRuntime: RuntimeNavigating {
             // 保存の後は画面が閉じる・進むので、VoiceOver には先に結果を伝える(#937)
             MacVoiceOver.announce(.saved)
             // HealthKit が無いので書かない(#958)。一言はアプリごとに 1 回
+            var notedHealth = false
             if skipsHealth, let note = healthNote.noteOnce(appId: appId) {
                 MacVoiceOver.announce(.healthSkipped) // 「保存しました」に続けて読む。toast では読み直さない
                 announcedToast = note
                 toast = note
+                notedHealth = true
             }
-            leaveAfterSave(action, ctx)
-        case .unchanged: leaveAfterSave(action, ctx) // 何も変えずに保存したら書かずに画面だけ進める(M10)
+            leaveAfterSave(action, ctx, entity: entity, form: form, recordId: recordId, wrote: true, notedHealth: notedHealth)
+        // 何も変えずに保存したら書かずに画面だけ進める(M10)
+        case .unchanged: leaveAfterSave(action, ctx, entity: entity, form: form, recordId: recordId, wrote: false, notedHealth: false)
         case .inFlight, .held: break // 保存ボタンの連打(.held は beforeNew を渡さないので来ない)
         }
     }
 
-    /// 保存の後: `screen` があればそこへ、無ければ閉じる。
-    private func leaveAfterSave(_ action: Action, _ ctx: ActionContext) {
-        if let screen = action.screen {
+    /// 保存の後: `screen` があればそこへ、無ければ閉じる。タブ / main の根なら留まり、書き込めた時だけ「保存しました」(#1884・iOS #1719 と同じ)。
+    /// single の entity(#267)は 1 件を上書きし続けるので、最初の保存でも新規として空に戻さない。
+    private func leaveAfterSave(_ action: Action, _ ctx: ActionContext, entity: String, form: FormDraft,
+                                recordId: String?, wrote: Bool, notedHealth: Bool) {
+        let isNewRecord = recordId == nil && dsl.entity(entity)?.single != true
+        switch NavigationResolver.afterSave(navigationState, from: ctx.route, screen: action.screen, isNewRecord: isNewRecord) {
+        case .navigate(let screen):
             navigate(to: screen, presentation: action.presentation, recordId: nil, from: ctx.route)
-        } else {
+        case .close:
             close(ctx.route)
+        case .stay(let resetForm):
+            guard wrote else { return } // 何も変えずに保存: 何も出さない(M10)
+            if resetForm { form.reset() } // 新規: 続けて入れられるよう空に戻す。既存の記録は値を残す
+            guard !notedHealth else { return } // ヘルスケアの一言(アプリごとに 1 回)を上書きしない
+            let saved = MacAnnouncement.saved.text
+            announcedToast = saved // VoiceOver は上で読んだ。toast の側では読み直さない
+            toast = saved
         }
     }
 

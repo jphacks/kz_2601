@@ -60,7 +60,7 @@ final class MacHealthNoteTests: XCTestCase {
         posted = []
         try await save(rt, entity: "weights", ["kg": .number(61)])
         XCTAssertEqual(rt.records(for: "weights").count, 2)
-        XCTAssertNil(rt.toast, "2 回目は出さない")
+        XCTAssertEqual(rt.toast, MacAnnouncement.saved.text, "2 回目は出さない(根なので「保存しました」だけ・#1884)")
         XCTAssertEqual(posted, [MacAnnouncement.saved.text])
 
         let other = try runtime()
@@ -74,16 +74,16 @@ final class MacHealthNoteTests: XCTestCase {
         XCTAssertEqual(first.toast, MacHealthNote.message)
         let reopened = try runtime(appId: "test-health-same")
         try await save(reopened, entity: "weights", ["kg": .number(60)])
-        XCTAssertNil(reopened.toast, "開き直しても同じアプリには出さない(UserDefaults)")
+        XCTAssertEqual(reopened.toast, MacAnnouncement.saved.text, "開き直しても同じアプリには出さない(UserDefaults)")
     }
 
     func testOnlyForHealthFields() async throws {
         let rt = try runtime()
         try await save(rt, entity: "notes", ["memo": .string("買い物")])
         XCTAssertEqual(rt.records(for: "notes").count, 1)
-        XCTAssertNil(rt.toast, "health の無い entity では出さない")
+        XCTAssertEqual(rt.toast, MacAnnouncement.saved.text, "health の無い entity では出さない")
         try await save(rt, entity: "weights", ["memo": .string("朝")])
-        XCTAssertNil(rt.toast, "health の項目が空なら書く物が無いので出さない")
+        XCTAssertEqual(rt.toast, MacAnnouncement.saved.text, "health の項目が空なら書く物が無いので出さない")
         XCTAssertEqual(posted, [MacAnnouncement.saved.text, MacAnnouncement.saved.text])
         XCTAssertFalse(defaults.bool(forKey: MacHealthNote.key(rt.appId)), "出していないので印も付けない")
     }
