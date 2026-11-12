@@ -147,6 +147,24 @@ func (f *Firestore) PutState(ctx context.Context, state string, s OAuthState) er
 	return err
 }
 
+// DeleteStates implements StateStore (a single-field query on uid).
+func (f *Firestore) DeleteStates(ctx context.Context, uid string) error {
+	it := f.c.Collection(statesCollection).Where("uid", "==", uid).Documents(ctx)
+	defer it.Stop()
+	for {
+		s, err := it.Next()
+		if errors.Is(err, iterator.Done) {
+			return nil
+		}
+		if err != nil {
+			return err
+		}
+		if _, err := s.Ref.Delete(ctx); err != nil {
+			return err
+		}
+	}
+}
+
 // TakeState implements StateStore in one transaction (a state works once).
 func (f *Firestore) TakeState(ctx context.Context, state string) (OAuthState, bool, error) {
 	var out OAuthState

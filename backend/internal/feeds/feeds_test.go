@@ -118,6 +118,7 @@ func (f *fake) endpoints() *Endpoints {
 		WarningBase: f.srv.URL + "/warning/",
 		Pressure:    f.srv.URL + "/met/compact",
 		Holidays:    f.srv.URL + "/syukujitsu.csv",
+		TyphoonBase: f.srv.URL + "/typhoon/",
 		RSS: map[string]RSSFeed{
 			"digital-news":  {Name: "RSS2", URL: f.srv.URL + "/rss2.xml", Publisher: "A", SiteURL: "https://a.example/"},
 			"fdma-news":     {Name: "RDF", URL: f.srv.URL + "/rdf.xml", Publisher: "B", SiteURL: "https://b.example/"},
@@ -360,7 +361,7 @@ func TestUpstreamBudget(t *testing.T) {
 
 func TestBodyCap(t *testing.T) {
 	f := newFake(t)
-	f.body["/rss2.xml"] = []byte("<rss><channel>" + strings.Repeat("<item><title>x</title></item>", (512<<10)/28+10) + "</channel></rss>")
+	f.body["/rss2.xml"] = []byte("<rss><channel>" + strings.Repeat("<item><title>x</title></item>", int(providerLimits[dsl.FeedRSS].maxBody)/28+10) + "</channel></rss>")
 	s := newSvc(f, &clock{t: testNow}, Options{})
 	if _, err := s.Get(context.Background(), Query{Provider: dsl.FeedRSS, FeedID: "digital-news"}, 5); !errors.Is(err, ErrUpstream) {
 		t.Errorf("oversized body: %v, want ErrUpstream", err)

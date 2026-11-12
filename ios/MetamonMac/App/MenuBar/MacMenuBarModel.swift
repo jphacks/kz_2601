@@ -10,57 +10,26 @@ struct MacMenuBarStat: Equatable, Identifiable {
     let value: String
 }
 
-/// 生成アプリの先頭の `stat` を集計する(#1848)。iOS のウィジェット(`WidgetSnapshotWriter`)と同じ並び・同じ式なので、
-/// アプリ内の stat と数字がそろう。iOS のファイルは WidgetKit と App Group に頼るので、純粋な部分だけ Mac に持つ
+/// 生成アプリの先頭の `stat` を集計する(#1848)。並びと式はウィジェットの `WidgetSnapshotWriter` をそのまま使うので(#1969)、
+/// アプリ内の stat・ウィジェットと数字がそろう
+@MainActor
 enum MacMenuBarStats {
-    static let maxStats = 3
-
-    /// 画面順(initialScreen → タブ順 → 残り)で `stat` を列挙する
-    static func statComponents(in dsl: AppDSL) -> [Component] {
-        var order = [dsl.initialScreen] + dsl.app.tabs.map(\.screen)
-        order += dsl.screens.map(\.id).filter { !order.contains($0) }
-        var seen = Set<String>()
-        return order
-            .filter { seen.insert($0).inserted }
-            .compactMap { dsl.screen($0) }
-            .flatMap(\.allComponents)
-            .filter { $0.type == .stat }
-    }
+    static var maxStats: Int { WidgetSnapshotWriter.maxStats }
 
     /// 先頭 `maxStats` 個の表示。記録をまだ読めていない stat は「—」
     static func make(dsl: AppDSL, records: [String: [Record]]) -> [MacMenuBarStat] {
         let evaluator = ExprEvaluator(dsl: dsl, records: { records[$0] ?? [] })
-        return statComponents(in: dsl).prefix(maxStats).enumerated().map { index, c in
+        return WidgetSnapshotWriter.statComponents(in: dsl).prefix(maxStats).enumerated().map { index, c in
             MacMenuBarStat(id: "\(index)|\(c.entity ?? "")|\(c.aggregate ?? "count")|\(c.field ?? "")",
                            label: c.label ?? "",
-                           value: text(c, dsl: dsl, records: records, evaluator: evaluator) ?? "—")
+                           value: WidgetSnapshotWriter.statText(c, dsl: dsl, records: records, evaluator: evaluator) ?? "—")
         }
     }
 
     /// 集計に要る entity(記録を読むもの)
     static func entities(in dsl: AppDSL) -> [String] {
         var seen = Set<String>()
-        return statComponents(in: dsl).prefix(maxStats).compactMap(\.entity).filter { seen.insert($0).inserted }
-    }
-
-    private static func text(_ c: Component, dsl: AppDSL, records: [String: [Record]], evaluator: ExprEvaluator) -> String? {
-        if c.aggregate == nil, let expr = c.valueExpr {
-            return evaluator.evaluate(expr).map { v in
-                if case .number(let n) = v { return Aggregator.format(n, as: c.format, unit: c.unit) }
-                return v.text
-            }
-        }
-        let entityId = c.entity ?? ""
-        guard records[entityId] != nil else { return nil }
-        let entity = dsl.entity(entityId)
-        let rows = Aggregator.apply(c.filter, entity: entity, to: evaluator.viewRecords(for: entityId))
-        if Aggregator.isPick(c.aggregate) { return Aggregator.pickText(c, entity: entity, records: rows) }
-        let unit = c.field.flatMap { entity?.field($0)?.unit }
-        return Aggregator.format(
-            Aggregator.aggregate(c.aggregate, field: c.field, over: rows),
-            as: c.format ?? (c.aggregate == "count" ? "plain" : nil),
-            unit: c.aggregate == "count" ? L10n.tr("件") : unit
-        )
+        return WidgetSnapshotWriter.statComponents(in: dsl).prefix(maxStats).compactMap(\.entity).filter { seen.insert($0).inserted }
     }
 }
 

@@ -54,6 +54,7 @@ class DesktopStore(val root: File?) {
         documents.removeAll()
         settings.clear()
         aiConsent.forget()
+        sweepTempFiles(root)
     }
 
     companion object {
@@ -61,6 +62,10 @@ class DesktopStore(val root: File?) {
         const val CONSENT_FILE = "consent.json"
         const val LAST_APP_ID = "tailorit.lastAppId"
 
-        fun open(dir: File = AppDataDir.resolve()): DesktopStore = DesktopStore(dir)
+        /** 開く前に、前に落ちた時の一時ファイル(`<名前>.<数字>.tmp`・`<名前>.tmp`)を消す。 */
+        fun open(dir: File = AppDataDir.resolve()): DesktopStore {
+            sweepTempFiles(dir)
+            return DesktopStore(dir)
+        }
     }
 }

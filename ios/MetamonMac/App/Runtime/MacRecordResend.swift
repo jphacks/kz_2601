@@ -18,6 +18,9 @@ final class MacRecordResend {
     let activity: MacSendActivity
     /// 送り終わるまで待つ上限(1 回の送り直しで)
     var timeout: Duration
+    /// 同じ合図で他の端末の変化の購読を張り直す(#2072・`MacRealtimeSync.resume`)。
+    /// `force`: スリープ明け・回線の復帰(購読が生きて見えても張り直す)。false はウインドウが前に来ただけ
+    var onResume: (@MainActor (_ force: Bool) -> Void)?
     /// 何回送り直したか(テスト用)
     private(set) var resendCount = 0
 
@@ -37,16 +40,16 @@ final class MacRecordResend {
         guard observers.isEmpty else { return }
         let app = NotificationCenter.default
         let workspace = NSWorkspace.shared.notificationCenter
-        observe(app, NSApplication.didBecomeActiveNotification) { $0.resendAll() }
-        observe(workspace, NSWorkspace.didWakeNotification) { $0.resendAll() }
-        observe(workspace, NSWorkspace.screensDidWakeNotification) { $0.resendAll() }
+        observe(app, NSApplication.didBecomeActiveNotification) { $0.resume(force: false) }
+        observe(workspace, NSWorkspace.didWakeNotification) { $0.resume(force: true) }
+        observe(workspace, NSWorkspace.screensDidWakeNotification) { $0.resume(force: true) }
         observe(workspace, NSWorkspace.willSleepNotification) { $0.prepareForSleep() }
         tasks.append(Task { [weak self] in
             var wasOnline = true
             for await online in connectivity.updates() {
                 if online, !wasOnline {
                     try? await Task.sleep(for: .seconds(1)) // 各エンジンの到達性が追いつくのを待つ
-                    self?.resendAll()
+                    self?.resume(force: true)
                 }
                 wasOnline = online
             }
@@ -72,6 +75,12 @@ final class MacRecordResend {
         observers = []
         tasks.forEach { $0.cancel() }
         tasks = []
+    }
+
+    /// 前面・スリープ明け・回線の復帰: 送信待ちを流し直し、購読も張り直す
+    func resume(force: Bool) {
+        resendAll()
+        onResume?(force)
     }
 
     /// 全部のエンジンの送信待ちを流し直す(待たない)

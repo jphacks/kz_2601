@@ -260,7 +260,7 @@ func linearFilter(state string) (map[string]any, error) {
 		return nil, nil
 	}
 	if !slices.Contains(linearStates, state) {
-		return nil, fmt.Errorf("%w: state must be one of %s", ErrUnknown, strings.Join(linearStates, ", "))
+		return nil, fmt.Errorf("%w: state must be one of %s", ErrBadArgs, strings.Join(linearStates, ", "))
 	}
 	return map[string]any{"state": map[string]any{"type": map[string]any{"eq": state}}}, nil
 }
@@ -271,7 +271,7 @@ func linearLimit(v string) (int, error) {
 	}
 	x, err := strconv.Atoi(v)
 	if err != nil || x < 1 || x > linearMaxLimit {
-		return 0, fmt.Errorf("%w: limit must be 1-%d", ErrUnknown, linearMaxLimit)
+		return 0, fmt.Errorf("%w: limit must be 1-%d", ErrBadArgs, linearMaxLimit)
 	}
 	return x, nil
 }
@@ -354,7 +354,7 @@ func linearCreateParse(a map[string]string) (linearCreateArgs, error) {
 		return linearCreateArgs{}, err
 	}
 	if strings.ContainsAny(title, "\n\t") {
-		return linearCreateArgs{}, fmt.Errorf("%w: title must be one line", ErrUnknown)
+		return linearCreateArgs{}, fmt.Errorf("%w: title must be one line", ErrBadArgs)
 	}
 	desc, err := todoistText("description", a["description"], linearMaxDesc, false)
 	if err != nil {
@@ -362,7 +362,7 @@ func linearCreateParse(a map[string]string) (linearCreateArgs, error) {
 	}
 	team := strings.TrimSpace(a["team"])
 	if team != "" && !linearTeamKeyRe.MatchString(team) && !linearUUIDRe.MatchString(team) {
-		return linearCreateArgs{}, fmt.Errorf("%w: team must be a team key (ENG) or id", ErrUnknown)
+		return linearCreateArgs{}, fmt.Errorf("%w: team must be a team key (ENG) or id", ErrBadArgs)
 	}
 	return linearCreateArgs{title: title, desc: desc, team: team}, nil
 }

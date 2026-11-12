@@ -2,26 +2,7 @@
 #if !APP_STORE_REVIEW
 import SwiftUI
 
-/// 「みんなに公開」の前に出す注意(Android #1297 と同じ 4 つ)。
-enum PublishConfirmCopy {
-    struct Point: Equatable {
-        var icon: String
-        var text: String
-    }
-
-    static func title(appName: String) -> String { L10n.tr("「\(appName)」を公開しますか?") }
-
-    static var points: [Point] {
-        [
-            Point(icon: "magnifyingglass", text: L10n.tr("「探す」から誰でも見つけて、自分のアプリとして入れられます")),
-            Point(icon: "lock", text: L10n.tr("あなただけの記録は含まれません")),
-            Point(icon: "person.crop.circle.badge.exclamationmark", text: L10n.tr("名前・説明・タグに、住所や電話番号などの個人の情報を書かないでください")),
-            Point(icon: "globe.badge.chevron.backward", text: L10n.tr("このシェアの画面から、いつでも公開をやめられます")),
-        ]
-    }
-}
-
-/// 公開の確認。「公開する」で `onPublish`、閉じる・「やめる」で何もしない。
+/// 公開の確認(注意の文言は Mac と共有の `PublishConfirmCopy`・PublishCopy.swift)。「公開する」で `onPublish`、閉じる・「やめる」で何もしない。
 struct PublishConfirmSheet: View {
     let appName: String
     let onPublish: () -> Void
