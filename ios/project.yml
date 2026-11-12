@@ -243,6 +243,8 @@ targets:
     platform: iOS
     sources:
       - path: MetamonWidget
+      # コントロール(iOS 18・#1993)を押した時の Intent。本体にも同じ型があると、OS が本体を開いて本体のプロセスで動かす
+      - path: Metamon/Features/Intents/ControlIntents.swift
     entitlements:
       path: MetamonWidget/MetamonWidget.entitlements
       properties:

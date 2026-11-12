@@ -46,6 +46,7 @@ struct SettingsSheet: View {
                 UsageSettingsSection() // #317 使っている量(作ったアプリの数・今のアプリの記録と写真)
                 languageSection
                 Section { AppIconSettingsRow() } // #232 ホーム画面のアイコン(全員・審査用の版も出す)
+                ActionButtonHintSection() // #1993 iOS 17 だけ: アクションボタンにショートカットを割り当てる案内
                 voiceModelSection
                 clarifySection
                 speechSection

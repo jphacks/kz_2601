@@ -44,6 +44,7 @@ extension AppRuntime {
         AppThumbnailStore.shared.remove(appId: app.id)
         AppGlanceStore.shared.forget(app.id)            // 一覧のひと目の数字(link-10)
         chatHistoryStore.remove(appId: app.id)          // チャット履歴(#210)
+        IntentHost.shared.appsMayHaveChanged()          // Siri の候補・コントロールの一覧(#1993)から外す
         toast = L10n.tr("「\(app.name)」を削除しました")
         print("[Metamon] deleted app: \(app.id) fallback=\(String(describing: fallback))")
         return true

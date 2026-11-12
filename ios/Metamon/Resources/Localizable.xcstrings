@@ -6950,6 +6950,57 @@
         }
       }
     },
+    "アクションボタン" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Action Button"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "アクションボタン"
+          }
+        }
+      }
+    },
+    "アクションボタンのある iPhone では、設定アプリの「アクションボタン」で「ショートカット」を選び、Tailor It の「アプリを開く」を割り当てると、押すだけで作ったアプリを開けます。" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "On an iPhone with the Action Button, open the Settings app, go to Action Button, choose Shortcut, and pick “Open App” from Tailor It to open your app with one press."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "アクションボタンのある iPhone では、設定アプリの「アクションボタン」で「ショートカット」を選び、Tailor It の「アプリを開く」を割り当てると、押すだけで作ったアプリを開けます。"
+          }
+        }
+      }
+    },
+    "アクションボタンのある iPhone では、設定アプリの「アクションボタン」で「ショートカット」を選び、Tailor It の「記録帳を開く」を割り当てると、押すだけで記録帳を開けます。" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "On an iPhone with the Action Button, open the Settings app, go to Action Button, choose Shortcut, and pick “Open Tracker” from Tailor It to open your tracker with one press."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "アクションボタンのある iPhone では、設定アプリの「アクションボタン」で「ショートカット」を選び、Tailor It の「記録帳を開く」を割り当てると、押すだけで記録帳を開けます。"
+          }
+        }
+      }
+    },
     "アップデート" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -18270,6 +18321,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "記録の書き込み"
+          }
+        }
+      }
+    },
+    "記録の画面を開く" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Open Entry Form"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "記録の画面を開く"
           }
         }
       }

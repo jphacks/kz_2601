@@ -15,6 +15,8 @@ final class IntentHost {
     enum Pending: Equatable {
         case open(appId: String)
         case talk
+        /// コントロール(iOS 18・#1993)。appId が nil・消したアプリなら一覧を開く。entityId があればその記録の入力画面
+        case control(appId: String?, entityId: String?)
         #if !APP_STORE_REVIEW
         /// 通知のタップ(#269)。すでに開いているアプリなら何も言わない
         case openFromNotification(appId: String)
@@ -65,6 +67,9 @@ final class IntentHost {
         switch action {
         case .open(let appId): await runtime.openFromIntent(appId: appId)
         case .talk: runtime.openVoiceFromIntent()
+        case .control(let appId, let entityId):
+            let exists = await appExists(appId)
+            await runtime.openFromControl(appId: exists ? appId : nil, entityId: entityId)
         #if !APP_STORE_REVIEW
         case .openFromNotification(let appId):
             if appId != runtime.document.appId { await runtime.switchApp(to: appId) }
@@ -81,7 +86,14 @@ final class IntentHost {
             try? await Task.sleep(for: .seconds(2))
             guard !Task.isCancelled else { return }
             TailorItShortcuts.updateAppShortcutParameters()
+            await ControlIntentBridge.writeCatalog(apps: apps(), targets: RecordTargetEntity.all()) // #1993 コントロールの設定の一覧
         }
+    }
+
+    /// 選んだアプリがまだあるか(消した後のコントロール・#1993)。サーバーに届かなければ `AppListCache` で見る
+    private func appExists(_ appId: String?) async -> Bool {
+        guard let appId else { return false }
+        return await apps().contains { $0.id == appId }
     }
 
     // MARK: - 記録の追加(AddRecordIntent)。Mac は同じ名前の口を MacIntentHost.swift に持つ(#1034)

@@ -14,6 +14,28 @@ extension AppRuntime {
         await switchApp(to: appId)
     }
 
+    /// コントロール(iOS 18・#1993)。選んだアプリに切り替え、記録先なら その entity のフォーム画面を開く。
+    /// appId が nil(未選択・消したアプリ)なら一覧を開く。フォーム画面の無い entity はアプリを開くだけ
+    func openFromControl(appId: String?, entityId: String?) async {
+        showVoiceSheet = false
+        guard let appId else {
+            sheet = nil
+            fullScreen = nil
+            openSwitcher()
+            return
+        }
+        if appId != document.appId { await switchApp(to: appId) }
+        guard document.appId == appId else { return } // 切替に失敗(トーストは switchApp が出す)
+        showAppSwitcher = false
+        guard let entityId, let form = Self.formScreen(for: entityId, in: dsl) else { return }
+        reveal(screen: form)
+    }
+
+    /// entity の入力画面(`screen.entity`)。複数あれば DSL の先頭
+    nonisolated static func formScreen(for entityId: String, in dsl: AppDSL) -> String? {
+        dsl.screens.first { $0.entity == entityId }?.id
+    }
+
     /// 「Tailor It で話しかける」。生成済みのアプリなら音声シート、初期画面なら音声画面そのものなので何もしない。
     func openVoiceFromIntent() {
         showAppSwitcher = false
