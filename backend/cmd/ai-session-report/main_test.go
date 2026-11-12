@@ -86,12 +86,28 @@ func TestValidate(t *testing.T) {
 	if err := validate(long); err == nil {
 		t.Error("days > 90 accepted")
 	}
-	// this test runs inside the repository: an out-dir here must be refused
-	wd, _ := os.Getwd()
-	inRepo := ok
-	inRepo.outDir = filepath.Join(wd, "reports")
-	if err := validate(inRepo); err == nil || !strings.Contains(err.Error(), "git repository") {
-		t.Errorf("out-dir inside the repository accepted: %v", err)
+	// build a repository in a temp dir so the check does not depend on where
+	// the test runs (an extracted source tree has no .git)
+	for _, tc := range []struct {
+		name    string
+		makeGit func(path string) error
+	}{
+		{"dir", func(p string) error { return os.Mkdir(p, 0o755) }},
+		{"file (worktree)", func(p string) error { return os.WriteFile(p, []byte("gitdir: elsewhere\n"), 0o600) }},
+	} {
+		t.Run(".git "+tc.name, func(t *testing.T) {
+			repo := t.TempDir()
+			if err := tc.makeGit(filepath.Join(repo, ".git")); err != nil {
+				t.Fatal(err)
+			}
+			for _, dir := range []string{repo, filepath.Join(repo, "reports"), filepath.Join(repo, "a", "b")} {
+				inRepo := ok
+				inRepo.outDir = dir
+				if err := validate(inRepo); err == nil || !strings.Contains(err.Error(), "git repository") {
+					t.Errorf("out-dir %s inside the repository accepted: %v", dir, err)
+				}
+			}
+		})
 	}
 }
 
