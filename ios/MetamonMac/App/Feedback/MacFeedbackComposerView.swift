@@ -11,18 +11,20 @@ final class MacFeedbackCenter {
     static let shared = MacFeedbackCenter()
     static let windowId = "feedback"
 
-    /// Mac に Firebase が無い間(#930)はモック(送った内容を覚えるだけ)。iOS の `FeedbackServiceKey` の既定と同じ
-    let client: any FeedbackClient = MockFeedbackClient()
+    /// Firebase につながれば appconfig へ送る(#930)。つながらない時はモック(送った内容を覚えるだけ・iOS の `FeedbackServiceKey` の既定と同じ)
+    let client: any FeedbackClient = MacServices.shared.feedback
     private(set) var context: MacFeedbackContext?
+    /// 中央に出しているアプリ(サーバーにある時だけ・#1330)。`MacRootView` が選択と版の変化で入れ替える
+    var currentApp: MacFeedbackContext.CurrentApp?
 
     func open(_ openWindow: OpenWindowAction) {
-        if context == nil { context = .capture(screenshot: MacFeedbackScreenshot.captureAppWindow()) }
+        if context == nil { context = .capture(screenshot: MacFeedbackScreenshot.captureAppWindow(), app: currentApp) }
         openWindow(id: Self.windowId)
     }
 
     /// 前の起動から戻ったウインドウなど、撮らずに開いた時
     func ensureContext() {
-        if context == nil { context = .capture(screenshot: nil) }
+        if context == nil { context = .capture(screenshot: nil, app: currentApp) }
     }
 
     func close() { context = nil }
@@ -53,6 +55,7 @@ struct MacFeedbackWindow: View {
 /// - 添付はどれも既定でオフ。オンにした添付は、送る中身をその場で見せる
 /// - 送る前に同意文を見せ、同意のチェックを入れるまで送れない(`FeedbackConsent.version` を一緒に送る)
 /// - 記録(入力したデータ)の中身は送らない
+/// - 書きかけ(送っていない文)のまま閉じる(キャンセル・Esc・⌘W・閉じるボタン)と、捨てるかを聞く(#1309)
 struct MacFeedbackComposerView: View {
     let context: MacFeedbackContext
     let client: any FeedbackClient
@@ -62,12 +65,23 @@ struct MacFeedbackComposerView: View {
     @State private var message = ""
     @State private var attachScreenshot = false
     @State private var attachDevice = false
+    @State private var attachApp = false
     @State private var agreed = false
     @State private var sending = false
     @State private var error: String?
     @State private var receipt: FeedbackReceipt?
+    /// 書きかけを捨てるかの確認。「捨てる」で呼ぶ閉じ方
+    @State private var discardThen: (() -> Void)?
 
     private var trimmed: String { message.trimmingCharacters(in: .whitespacesAndNewlines) }
+    /// 送っていない文がある(送った後・空白だけは書きかけにしない)
+    private var hasDraft: Bool { MacFeedbackDraft.isUnsent(message: message, sent: receipt != nil) }
+
+    /// 閉じる前に、書きかけなら確認を出す
+    private func requestClose(_ close: @escaping () -> Void) {
+        if hasDraft { discardThen = close } else { close() }
+    }
+
     private var canSend: Bool {
         !trimmed.isEmpty && trimmed.count <= FeedbackConsent.maxMessageLength && agreed && !sending && receipt == nil
     }
@@ -83,7 +97,7 @@ struct MacFeedbackComposerView: View {
             Divider()
             HStack {
                 Spacer()
-                Button("キャンセル", action: onClose)
+                Button("キャンセル") { requestClose(onClose) }
                     .keyboardShortcut(.cancelAction)
                     .disabled(sending)
                 if sending {
@@ -98,6 +112,26 @@ struct MacFeedbackComposerView: View {
         }
         .frame(width: 520)
         .frame(minHeight: 560)
+        // ⌘W・閉じるボタンも、書きかけなら同じ確認を出す
+        .background {
+            WindowCloseGuard { closeAgain in
+                guard hasDraft, !sending else { return true }
+                requestClose(closeAgain)
+                return false
+            }
+        }
+        .confirmationDialog("書いた内容を捨てますか?",
+                            isPresented: Binding(get: { discardThen != nil }, set: { if !$0 { discardThen = nil } }),
+                            titleVisibility: .visible) {
+            Button("捨てる", role: .destructive) {
+                let close = discardThen
+                discardThen = nil
+                close?()
+            }
+            Button("書き続ける", role: .cancel) { discardThen = nil }
+        } message: {
+            Text("送っていないフィードバックは残りません。")
+        }
         .alert("送れませんでした", isPresented: Binding(get: { error != nil }, set: { if !$0 { error = nil } })) {
             Button("OK", role: .cancel) {}
         } message: {
@@ -156,6 +190,11 @@ struct MacFeedbackComposerView: View {
                         .font(.footnote).foregroundStyle(.secondary)
                 }
             }
+            if let app = context.app {
+                Toggle("今のアプリの設計(DSL)", isOn: $attachApp)
+                    .accessibilityIdentifier("feedback.attachApp")
+                if attachApp { appPreview(app) }
+            }
             Toggle("アプリの版・OS・機種", isOn: $attachDevice)
                 .accessibilityIdentifier("feedback.attachDevice")
             if attachDevice {
@@ -169,6 +208,32 @@ struct MacFeedbackComposerView: View {
             Text("添付(どれも任意)")
         } footer: {
             Text("記録(入力したデータ)の中身は送りません。オンにしたものだけを送ります。")
+        }
+    }
+
+    /// 送る設計の中身(iOS と同じ: 名前・画面・項目・送る DSL の全文)
+    @ViewBuilder
+    private func appPreview(_ app: MacFeedbackContext.AppSummary) -> some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Text(L10n.tr("「\(app.name)」の画面と項目の設計")).font(.subheadline.weight(.medium))
+            Text(L10n.tr("画面: \(app.screens.joined(separator: "、"))")).font(.footnote)
+            if !app.entities.isEmpty {
+                Text(L10n.tr("項目: \(app.entities.joined(separator: "、"))")).font(.footnote)
+            }
+            Text("アプリの名前・画面の文言・項目の名前が含まれます。記録は含まれません。")
+                .font(.footnote).foregroundStyle(.secondary)
+        }
+        if let json = app.json {
+            DisclosureGroup("送る DSL をすべて見る") {
+                ScrollView([.vertical, .horizontal]) {
+                    Text(verbatim: json)
+                        .font(.caption2.monospaced())
+                        .textSelection(.enabled)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                }
+                .frame(maxHeight: 240)
+            }
+            .font(.footnote)
         }
     }
 
@@ -195,6 +260,7 @@ struct MacFeedbackComposerView: View {
             submission.screenshotJPEG = jpeg
         }
         if attachDevice { submission.device = context.device }
+        if attachApp { submission.app = context.app?.ref } // 送るのは appId と版だけ。記録は送らない
         sending = true
         Task {
             defer { sending = false }
@@ -204,6 +270,12 @@ struct MacFeedbackComposerView: View {
                 self.error = FeedbackCopy.message(for: error)
             }
         }
+    }
+}
+/// 書きかけの判定(#1309)。送った後と、空白・改行だけは捨てても失うものが無いので聞かない
+enum MacFeedbackDraft {
+    static func isUnsent(message: String, sent: Bool) -> Bool {
+        !sent && !message.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
     }
 }
 #endif

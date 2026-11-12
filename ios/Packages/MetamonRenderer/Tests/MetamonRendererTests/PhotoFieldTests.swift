@@ -1,7 +1,4 @@
-// TODO mac-026: UIKit を直接使うテスト。Mac で回すには描画の仕方を置き換え層に寄せる
-#if os(iOS)
 import XCTest
-import UIKit
 @testable import MetamonRenderer
 
 /// photoField の `source` 分岐とカメラ可否フォールバック、PhotoCodec の縮小仕様(長辺 ≤800px・JPEG data URL)。
@@ -37,8 +34,9 @@ final class PhotoFieldTests: XCTestCase {
     }
 
     @MainActor func testDataURLShrinksToMaxSideAndIsJPEG() throws {
-        let big = UIGraphicsImageRenderer(size: CGSize(width: 2400, height: 1600)).image { ctx in
-            UIColor.systemOrange.setFill(); ctx.fill(CGRect(x: 0, y: 0, width: 2400, height: 1600))
+        // 既定の画面倍率(iPhone は 3x)と同じ
+        let big = testImage(width: 2400, height: 1600, scale: 3) { ctx in
+            PlatformColor.systemOrange.setFill(); ctx.fill(CGRect(x: 0, y: 0, width: 2400, height: 1600))
         }
         let url = try XCTUnwrap(PhotoCodec.dataURL(from: big))
         XCTAssertTrue(url.hasPrefix("data:image/jpeg;base64,"))
@@ -51,10 +49,9 @@ final class PhotoFieldTests: XCTestCase {
     }
 
     @MainActor func testDataURLKeepsSmallImageSize() throws {
-        let format = UIGraphicsImageRendererFormat.default()
-        format.scale = 1   // 300x200 ピクセル(既定の 3x だと 900px になり縮小対象)
-        let small = UIGraphicsImageRenderer(size: CGSize(width: 300, height: 200), format: format).image { ctx in
-            UIColor.systemBlue.setFill(); ctx.fill(CGRect(x: 0, y: 0, width: 300, height: 200))
+        // scale 1 で 300x200 ピクセル(3x だと 900px になり縮小対象)
+        let small = testImage(width: 300, height: 200) { ctx in
+            PlatformColor.systemBlue.setFill(); ctx.fill(CGRect(x: 0, y: 0, width: 300, height: 200))
         }
         let data = try XCTUnwrap(small.pngData())
         let url = try XCTUnwrap(PhotoCodec.dataURL(from: data))
@@ -62,4 +59,3 @@ final class PhotoFieldTests: XCTestCase {
         XCTAssertEqual(decoded.size.width * decoded.scale, 300, accuracy: 1, "800px 未満は拡大しない")
     }
 }
-#endif

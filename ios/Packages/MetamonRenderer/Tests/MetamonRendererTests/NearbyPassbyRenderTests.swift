@@ -1,5 +1,3 @@
-// TODO mac-026: UIKit を直接使うテスト。Mac で回すには描画の仕方を置き換え層に寄せる
-#if os(iOS)
 #if !APP_STORE_REVIEW
 import XCTest
 import SwiftUI
@@ -31,6 +29,21 @@ final class NearbyPassbyRenderTests: XCTestCase {
        {"type":"nearbyShare","id":"pb","label":"すれ違い通信","entity":"profile","mode":"passby","fields":["name","hobby"],"distance":true}]}]}
     """
 
+    /// 送る方はどの OS でもボタン。passby は iOS だけ専用の表示で、Mac は「この Mac では使えません」の枠(#964)
+    @MainActor func testKindPerPlatform() throws {
+        let dsl = try JSONDecoder().decode(AppDSL.self, from: Data(json.utf8))
+        let c = try XCTUnwrap(dsl.screens.first?.components.first)
+        #if os(macOS)
+        XCTAssertEqual(NearbyShareLeaf.kind(of: c), .unavailable(feature: "すれ違い通信"))
+        #else
+        XCTAssertEqual(NearbyShareLeaf.kind(of: c), .passby(try XCTUnwrap(NearbyPassby.Config(c))))
+        #endif
+        var send = c
+        send.mode = nil
+        XCTAssertEqual(NearbyShareLeaf.kind(of: send), .send)
+    }
+
+    #if os(iOS) // Mac ではすれ違い通信を描かない(#964)
     @MainActor func testPassbyRendersAndAttachesWhileVisible() throws {
         let dsl = try JSONDecoder().decode(AppDSL.self, from: Data(json.utf8))
         let c = try XCTUnwrap(dsl.screens.first?.components.first)
@@ -50,11 +63,9 @@ final class NearbyPassbyRenderTests: XCTestCase {
             .environment(\.dslRuntime, PassbyRuntime(dsl: dsl))
             .environment(\.scenePhase, .active)
             .frame(width: 360, height: 480)
-        let window = UIWindow(frame: CGRect(x: 0, y: 0, width: 360, height: 480))
-        let vc = UIHostingController(rootView: view)
-        window.rootViewController = vc
-        window.makeKeyAndVisible()
-        vc.view.layoutIfNeeded()
+        let window = TestWindow(size: CGSize(width: 360, height: 480))
+        let vc = TestHostingController(rootView: view)
+        window.show(vc)
 
         let attached = expectation(description: "attach")
         Task { @MainActor in
@@ -66,8 +77,7 @@ final class NearbyPassbyRenderTests: XCTestCase {
         XCTAssertTrue(host.isAdvertising)
         XCTAssertGreaterThan(vc.sizeThatFits(in: CGSize(width: 360, height: 480)).height, 0)
 
-        window.rootViewController = nil
-        window.isHidden = true
+        window.remove()
         let detached = expectation(description: "detach")
         Task { @MainActor in
             for _ in 0..<50 where host.attached != nil { try? await Task.sleep(for: .milliseconds(20)) }
@@ -77,6 +87,7 @@ final class NearbyPassbyRenderTests: XCTestCase {
         XCTAssertNil(host.attached, "画面を離れたら止める")
         XCTAssertFalse(host.isAdvertising)
     }
+    #endif
 
     @MainActor func testStaticControllerNeedsOptInAndAttach() throws {
         let config = NearbyPassby.Config(componentId: "pb", entityId: "profile", label: "", fields: ["name"])
@@ -91,5 +102,4 @@ final class NearbyPassbyRenderTests: XCTestCase {
         XCTAssertFalse(host.isAdvertising)
     }
 }
-#endif
 #endif

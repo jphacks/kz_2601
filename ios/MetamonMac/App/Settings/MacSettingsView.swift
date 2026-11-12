@@ -15,6 +15,10 @@ struct MacSettingsView: View {
                 .tabItem { Label("アカウント", systemImage: "person.crop.circle") }
             MacNotificationSettings()
                 .tabItem { Label("通知", systemImage: "bell") }
+            #if !APP_STORE_REVIEW // 審査用の版は OAuth の provider を外す(決定 6)
+            MacConnectedServicesSettings()
+                .tabItem { Label("つないだサービス", systemImage: "link") }
+            #endif
             MacPrivacySettings()
                 .tabItem { Label("プライバシー", systemImage: "hand.raised") }
             MacDetailSettings()
@@ -53,9 +57,12 @@ private struct MacGeneralSettings: View {
     // 対話(#75 / #160)。iOS と同じ保存先(`ClarifySettings`)。会話のシート(#967)が開く時に読む
     @State private var clarifyEnabled = ClarifySettings.enabled
     @State private var clarifyAutoBuild = ClarifySettings.autoBuild
+    /// 作ったアプリの文字の大きさ(#937)。表示メニューの ⌘+ / ⌘- / ⌘0 と同じ保存先
+    @AppStorage(MacTextZoom.storageKey) private var zoomStep = MacTextZoom.defaultStep
 
     var body: some View {
         @Bindable var language = LanguagePreference.shared
+        @Bindable var reader = MacSpeechReader.shared
         Form {
             // 表示言語(#44)。iOS と同じ `LanguagePreference`(キー metamon.appLanguage)。
             Section {
@@ -86,12 +93,42 @@ private struct MacGeneralSettings: View {
                                   review: "新しい記録帳を声だけで相談している時は、内容がそろうと少し待ってから自動で用意し始めます。用意した記録帳の変更は、意図しない変更を防ぐため必ず「これでいく」を押してから反映します。"))
                 }
             }
-            // 読み上げは Mac の読み上げ(後の Issue)ができてから切り替えられるようにする
-            Section("読み上げ") {
-                MacUnavailableSettingRow(title: "挨拶と質問を読み上げる")
+            // 文字の大きさ(#937)。Mac に Dynamic Type は無いので、作ったアプリの文字の段をここと表示メニューで選ぶ
+            Section {
+                Picker("文字の大きさ", selection: Binding(get: { MacTextZoom.clamped(zoomStep) },
+                                                    set: { zoomStep = MacTextZoom.clamped($0) })) {
+                    ForEach(MacTextZoom.steps.indices, id: \.self) { step in
+                        zoomLabel(step).tag(step)
+                    }
+                }
+                .accessibilityIdentifier("settings.textZoom")
+            } header: {
+                Text("表示")
+            } footer: {
+                Text("作ったアプリの文字の大きさです。表示メニューの「拡大」(⌘+)・「縮小」(⌘-)・「実際のサイズ」(⌘0)でも変えられます。")
+            }
+            // 声で頼むのマイク(#1221)
+            MacInputDeviceSection()
+            // メニューバーの常駐・ログイン時に開く(#1848)
+            MacMenuBarSettingsSection()
+            // 読み上げ(#1210・#1216)。iOS と同じ保存先(metamon.speech.enabled)。Mac が読むのは完成の要約だけ
+            Section {
+                Toggle("アプリができた時の説明を読み上げる", isOn: $reader.enabled)
+                    .help("アプリができた時の説明を Mac の声で読み上げます。VoiceOver を使っている時は重ねて読みません")
+                    .accessibilityIdentifier("settings.speech")
+            } header: {
+                Text("読み上げ")
+            } footer: {
+                Text("ON にすると、アプリができた時の説明を声で読み上げます。新しく頼むとすぐ止まります。")
             }
         }
         .formStyle(.grouped)
+    }
+
+    private func zoomLabel(_ step: Int) -> Text {
+        let percent = Text(verbatim: "\(MacTextZoom.percent(at: step))%")
+        guard MacTextZoom.isActualSize(step) else { return percent }
+        return Text("標準") + Text(verbatim: " (") + percent + Text(verbatim: ")")
     }
 }
 
@@ -100,23 +137,163 @@ private struct MacGeneralSettings: View {
 private struct MacAccountSettings: View {
     var body: some View {
         Form {
-            // Mac はサインイン(Firebase)がまだ無い(#930)
+            // サインイン(#930)。Firebase につながっていない版(plist 無し)は今まで通り「使えない」
             Section {
-                MacUnavailableSettingRow(title: "アカウント")
+                if MacAccount.shared.isLive {
+                    MacAccountRow()
+                } else {
+                    MacUnavailableSettingRow(title: "アカウント")
+                }
             }
             #if !APP_STORE_REVIEW // 審査用ビルドは App 内課金を持たない(#450 G1)
             Section {
-                MacUnavailableSettingRow(title: "Tailor It Pro")
+                MacProSettingsRow()
             }
             #endif
-            Section {
-                MacUnavailableSettingRow(title: "今日の残り")
-                MacUnavailableSettingRow(title: "使っている量")
+            // 今日の残り(#630・#1219)。AI の応答のヘッダーと「使っている量」から入る(iOS と同じ表示・審査用の版も出す)
+            RemainingTodaySettingsSection()
+            // 使っている量(#317・#1219)。サーバーにつながっている版だけ
+            if MacAccount.shared.isLive {
+                MacUsageSettingsSection()
+            } else {
+                Section { MacUnavailableSettingRow(title: "使っている量") }
             }
         }
         .formStyle(.grouped)
     }
 }
+
+/// アカウントの状態と「Apple でサインイン」(#930)。匿名なら Apple に引き継ぐ(uid はそのまま)。
+/// ログアウトとアカウント削除(#972)は iOS の設定と同じ確認・同じ文言で、この Mac のデータを消してから行う
+private struct MacAccountRow: View {
+    private let account = MacAccount.shared
+    @State private var signOutPrompt: SignOutFlow.Prompt?
+    @State private var signOutUnsent: Int?
+    @State private var signOutError: String?
+    @State private var confirmDelete = false
+    @State private var deleteError: String?
+
+    var body: some View {
+        LabeledContent("アカウント") {
+            if let user = account.session.user {
+                VStack(alignment: .trailing, spacing: 6) {
+                    Text(SupportInfo.accountStatus(isAnonymous: user.isAnonymous))
+                    if user.isAnonymous { MacAppleSignInButton() }
+                }
+            } else {
+                MacAppleSignInButton()
+            }
+        }
+        if let message = account.errorMessage {
+            Text(message)
+                .font(.callout)
+                .foregroundStyle(.secondary)
+        }
+        if account.session.user != nil {
+            LabeledContent {
+                HStack {
+                    if let busy = account.busy {
+                        ProgressView(LocalizedStringKey(busy == .deleting ? "削除しています…" : "ログアウトしています…"))
+                            .controlSize(.small)
+                    }
+                    Button("ログアウト", role: .destructive) {
+                        Task { signOutPrompt = await account.signOutPrompt() }
+                    }
+                    .help("この Mac のデータを消してからログアウトします")
+                    .accessibilityIdentifier("settings.signOut")
+                    Button("アカウントを削除", role: .destructive) { confirmDelete = true }
+                        .help("アカウントを削除し、この Mac のデータも消します。元に戻せません")
+                        .accessibilityIdentifier("settings.deleteAccount")
+                }
+                .disabled(account.busy != nil)
+            } label: {
+                Text(L10n.key("作ったアプリが使えなくなり、共有リンクと「探す」への掲載も取り下げます。この端末のデータも消えます。ほかの人と共有しているアプリへの投稿は残ります。", review: "用意した記録帳が使えなくなります。この端末のデータも消えます。"))
+                    .font(.callout)
+                    .foregroundStyle(.secondary)
+            }
+            .alert("ログアウトしますか？", isPresented: Binding(get: { signOutPrompt != nil }, set: { if !$0 { signOutPrompt = nil } }),
+                   presenting: signOutPrompt) { prompt in
+                switch prompt {
+                case .plain:
+                    Button("ログアウト", role: .destructive) { signOut(.discardAndWipe) }
+                case .unsent(_, let canSend):
+                    if canSend {
+                        Button("送ってからログアウト") { signOut(.sendThenWipe) }
+                            .keyboardShortcut(.defaultAction)
+                    }
+                    Button("送らずにログアウト", role: .destructive) { signOut(.discardAndWipe) }
+                }
+                Button("キャンセル", role: .cancel) {}
+            } message: { prompt in
+                Text(SignOutCopy.message(isAnonymous: account.session.user?.isAnonymous == true, prompt: prompt))
+            }
+            .alert("送れなかった記録があります", isPresented: Binding(get: { signOutUnsent != nil }, set: { if !$0 { signOutUnsent = nil } }),
+                   presenting: signOutUnsent) { _ in
+                Button("送らずにログアウト", role: .destructive) { signOut(.discardAndWipe) }
+                Button("キャンセル", role: .cancel) {}
+            } message: { n in
+                Text(SignOutCopy.unsentAfterFlush(n))
+            }
+            .alert("ログアウトできませんでした", isPresented: Binding(get: { signOutError != nil }, set: { if !$0 { signOutError = nil } })) {
+                Button("OK", role: .cancel) {}
+            } message: {
+                Text(signOutError ?? "")
+            }
+            .alert("アカウントを削除しますか？", isPresented: $confirmDelete) {
+                Button("削除する", role: .destructive) { deleteAccount() }
+                Button("キャンセル", role: .cancel) {}
+            } message: {
+                Text(L10n.key("アカウントとすべてのアプリが使えなくなります。元に戻せません。", review: "アカウントとすべての記録帳が使えなくなります。元に戻せません。"))
+            }
+            .alert("アカウントを削除できませんでした", isPresented: Binding(get: { deleteError != nil }, set: { if !$0 { deleteError = nil } })) {
+                Button("OK", role: .cancel) {}
+            } message: {
+                Text(deleteError ?? "")
+            }
+        }
+    }
+
+    private func signOut(_ choice: SignOutFlow.Choice) {
+        Task {
+            do {
+                if case .unsent(let n) = try await account.signOutAndWipe(choice: choice) { signOutUnsent = n }
+            } catch {
+                signOutError = error.localizedDescription
+            }
+        }
+    }
+
+    private func deleteAccount() {
+        Task {
+            do {
+                _ = try await account.deleteAccount()
+            } catch {
+                deleteError = error.localizedDescription
+            }
+        }
+    }
+}
+
+#if !APP_STORE_REVIEW
+/// Tailor It Pro の状態と課金画面の入口(iOS の「Pro にする」と同じ商品・同じ購入)
+private struct MacProSettingsRow: View {
+    var body: some View {
+        LabeledContent("Tailor It Pro") {
+            if MacPro.shared.isPro {
+                HStack {
+                    Label("ご利用中", systemImage: "checkmark.seal.fill")
+                        .foregroundStyle(Theme.Colors.brandText)
+                    Button("サブスクリプションを管理") { MacPro.openManageSubscriptions() }
+                        .help("App Store のアカウントのページを開きます")
+                }
+            } else {
+                MacUpgradeProButton(reason: .settings)
+            }
+        }
+        .task { MacPro.shared.start() }
+    }
+}
+#endif
 
 // MARK: - 通知
 

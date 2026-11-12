@@ -1,5 +1,3 @@
-// TODO mac-026: UIKit を直接使うテスト。Mac で回すには描画の仕方を置き換え層に寄せる
-#if os(iOS)
 import XCTest
 import SwiftUI
 import Observation
@@ -99,19 +97,15 @@ final class RouteGuideLeafTests: XCTestCase {
             ("no destination", broken, RenderContext(route: Route(screen: "home"))),
         ]
         for (name, c, ctx) in cases {
-            let host = UIHostingController(rootView: RouteGuideLeaf(c: c, ctx: ctx)
+            let host = TestHostingController(rootView: RouteGuideLeaf(c: c, ctx: ctx)
                 .environment(\.dslRuntime, rt)
                 .frame(width: 360, height: 420))
-            let window = UIWindow(frame: CGRect(x: 0, y: 0, width: 390, height: 844))
-            window.rootViewController = host
-            window.makeKeyAndVisible()
-            host.view.setNeedsLayout()
-            host.view.layoutIfNeeded()
+            let window = TestWindow(size: CGSize(width: 390, height: 844))
+            window.show(host)
             let size = host.sizeThatFits(in: CGSize(width: 360, height: 420))
             XCTAssertGreaterThan(size.width, 0, name)
             XCTAssertGreaterThan(size.height, 0, name)
-            window.isHidden = true
+            window.hide()
         }
     }
 }
-#endif

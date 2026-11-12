@@ -2,13 +2,20 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
-	<!-- Mac App Store に必須のサンドボックスと、通信(backend・音声モデルの取得)・マイク。Sign in with Apple・カメラなどは各 Issue で足す -->
+	<!-- Mac App Store に必須のサンドボックスと、通信(backend・音声モデルの取得)・マイク。カメラなどは各 Issue で足す -->
 	<key>com.apple.security.app-sandbox</key>
 	<true/>
 	<key>com.apple.security.network.client</key>
 	<true/>
+	<!-- 近くの人に送る(#964): MultipeerConnectivity は相手からの接続を受けるので、サンドボックスでは受ける側(server)も要る。
+	     審査用の版は nearbyShare を外しているので MetamonMac-Review.entitlements には入れない -->
+	<key>com.apple.security.network.server</key>
+	<true/>
 	<!-- 声で頼む(#966): マイク。サンドボックスとハードンドランタイムの両方がこのキーを見る -->
 	<key>com.apple.security.device.audio-input</key>
+	<true/>
+	<!-- 写真・動画の撮影(#1043)と QR の読み取り(#1045): 内蔵 / 連係 / 外付けカメラ。サンドボックスではこのキーが無いと AVCaptureDevice に届かない -->
+	<key>com.apple.security.device.camera</key>
 	<true/>
 	<!-- カレンダーに追加(#978): 予定を足す(書き込みだけの許可を求める)。サンドボックスではこのキーが無いと EventKit に届かない -->
 	<key>com.apple.security.personal-information.calendars</key>
@@ -19,5 +26,36 @@
 	<!-- 利用者が選んだファイル: 取り込む(#956・fileImport)と、画像を保存…(#1333・保存パネルで選んだ場所へ書く) -->
 	<key>com.apple.security.files.user-selected.read-write</key>
 	<true/>
+	<!-- プリント(#946・export の「プリント…」): サンドボックスではこのキーが無いとプリンタに出せない -->
+	<key>com.apple.security.print</key>
+	<true/>
+	<!-- サインイン(#930): Sign in with Apple(iOS と同じ App ID の capability) -->
+	<key>com.apple.developer.applesignin</key>
+	<array>
+		<string>Default</string>
+	</array>
+	<!-- Firebase Auth は Mac ではログインの状態を Keychain(データ保護の Keychain)に置くので、Keychain Sharing が要る(firebase-ios-sdk の決まり・#930)。
+	     グループは自分の App ID だけ(ほかのアプリとは共有しない) -->
+	<!-- 共有のリンク(#1286): https://tailor-it.app/s/<token> を Universal Links で開く(iOS と同じ applinks)。
+	     AASA の appIDs(Team ID + Bundle ID)は iOS と同じ jp.kz2601.metamon なので、Mac にも同じ行が効く(実機で確かめる)。
+	     審査用の版は共有を外しているので MetamonMac-Review.entitlements に入れない -->
+	<key>com.apple.developer.associated-domains</key>
+	<array>
+		<string>applinks:$(METAMON_APPLINKS_DOMAIN)</string>
+	</array>
+	<!-- プッシュ通知(#982): APNs の端末トークンを取る。Mac のキーは com.apple.developer.aps-environment(iOS は aps-environment)。
+	     環境は iOS と同じ METAMON_APS_ENV(Debug / Staging は development・Release は production)。
+	     審査用の版はプッシュを外しているので MetamonMac-Review.entitlements に入れない(iOS の Metamon-Review.entitlements と同じ) -->
+	<key>com.apple.developer.aps-environment</key>
+	<string>$(METAMON_APS_ENV)</string>
+	<key>keychain-access-groups</key>
+	<array>
+		<string>$(AppIdentifierPrefix)$(PRODUCT_BUNDLE_IDENTIFIER)</string>
+	</array>
+	<!-- App Group(#931): Mac のウィジェットとデータを共有するため。iOS(Metamon・MetamonWidget)と同じグループ名 -->
+	<key>com.apple.security.application-groups</key>
+	<array>
+		<string>group.jp.kz2601.metamon</string>
+	</array>
 </dict>
 </plist>
