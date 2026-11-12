@@ -117,22 +117,79 @@ ai → appconfig の結合をローカルで確認する時は、appconfig を�
 
 ## 環境変数
 
-| 変数 | appconfig | ai | 既定 / 備考 |
-|---|---|---|---|
-| `PORT` | o | o | Cloud Run が注入。ローカル 8080 / 8081 |
-| `GOOGLE_CLOUD_PROJECT` | o | o | Firestore と Firebase Admin の初期化。**appconfig は未設定ならインメモリ store** |
-| `AUTH_MODE` | o | o | `firebase`(既定・本番)/ `dev`。dev では Bearer 値を uid として受理(`DevVerifier`)、`FIREBASE_AUTH_EMULATOR_HOST` も設定時は `X-Debug-Uid` も可 |
-| `FIRESTORE_DATABASE` | o | o | Firestore の DB ID。既定 `(default)`。全バイナリ(appconfig / ai の回数制限 / cmd/purge / cmd/stg-cleanup)が `internal/fsenv` から読む(#290) |
-| `APP_ENV` | o | o | `stg` / `prod`。`stg` が本番の接続先(`PROD_FIRESTORE_PROJECT`/`PROD_FIRESTORE_DATABASE`、既定 `jphacks-kz2601`/`(default)`)を使うと**起動を止める**(エミュレータ時は対象外) |
-| `ALLOW_SHARED_PROD_DB` | o | o | `1` のときだけ上の停止を外す(警告ログは出る)。stg が本番と DB を共有している間(#291・#293 の分離まで)は stg に必須。deploy-cloudrun.yml が stg=`1` / prod=`0` を入れる |
-| `STORE` | o | - | `memory` でインメモリ store を強制(既定は `GOOGLE_CLOUD_PROJECT` があれば Firestore) |
-| `FIRESTORE_EMULATOR_HOST` | o | - | 設定時は Firestore クライアントが自動でエミュレータへ |
-| `FIREBASE_AUTH_EMULATOR_HOST` | o | o | ローカルのみ(`X-Debug-Uid` の有効条件) |
-| `LOG_LEVEL` | o | o | `info` |
-| `FEEDBACK_DAILY_LIMIT` | o | - | `POST /v1/feedback` の 1 uid 1 日(JST)の件数(既定 5・0 で無制限・#319) |
-| `APPCONFIG_BASE_URL` | - | o | ai → appconfig。未設定なら ai 内のインメモリ stub(永続なし)。staging は `https://appconfig-stg-378953239426.asia-northeast1.run.app` |
-| `ANTHROPIC_API_KEY` | - | o | Secret Manager。ローカルは `~/Desktop/JPHACKS2026/.env`(リポ外) |
-| `APPSTORE_BUNDLE_IDS` / `APPSTORE_PRODUCT_IDS` | o | - | StoreKit 取引の許可リスト(#314)。既定 `jp.kz2601.metamon` / `jp.kz2601.metamon.pro.monthly` |
-| `APPSTORE_ENVIRONMENTS` | o | o | 受け入れる App Store の環境。既定 `Sandbox,Production`(審査・TestFlight は Sandbox)。ai は Pro の判定(#449)に使う |
+Cloud Run の appconfig・ai・runner の値(デプロイが決める値・運用で変える値)の一覧と変え方は [`docs/infra/runtime-config.md`](../docs/infra/runtime-config.md) が正。ここには、全部に共通の物と、cmd ごとの入口(runtime-config.md や各 docs に無い物)だけを書く。
 
-Cloud Run 上の appconfig は `AUTH_MODE` 未設定(= `firebase`)で、`run-backend` SA の ADC で Firestore と Firebase Admin を使う。
+### 全部に共通
+
+Firestore に繋ぐ cmd は、どれも `internal/fsenv` で同じ読み方をする(#290)。
+
+| 変数 | 既定 / 備考 |
+|---|---|
+| `ALLOW_SHARED_PROD_DB` | `1` のときだけ下の `APP_ENV` の停止を外す(警告ログは出る)。stg が本番と DB を共有している間(#291・#293 の分離まで)は stg に必須。deploy-cloudrun.yml が stg=`1` / prod=`0` を入れる |
+| `APP_ENV` | `stg` / `prod`。`stg` が本番の接続先(`PROD_FIRESTORE_PROJECT`/`PROD_FIRESTORE_DATABASE`、既定 `jphacks-kz2601`/`(default)`)を使うと**起動を止める**(エミュレータ時は対象外)。`GET /health` にも出る |
+| `FIRESTORE_DATABASE` | Firestore の DB ID。既定 `(default)` |
+| `FIRESTORE_EMULATOR_HOST` | 設定時は Firestore クライアントが自動でエミュレータへ(`make emulator` は `localhost:8089`) |
+| `GIT_SHA` | デプロイしたコミット。`GET /health` の `version`(先頭 7 文字)。サーバーだけ |
+| `GOOGLE_CLOUD_PROJECT` | Firestore と Firebase Admin の初期化。**appconfig は未設定ならインメモリ store** |
+| `K_SERVICE` / `K_REVISION` | Cloud Run が注入。ログの項目に使う([observability.md](../docs/infra/observability.md)) |
+| `LOG_LEVEL` | ログの詳しさ。既定 `info` |
+| `PORT` | サーバー(appconfig・ai・runner)だけ。Cloud Run が注入。ローカル 8080 / 8081 |
+
+### cmd/ai
+
+運用で変える値(`AI_PAUSED`・`RATE_LIMIT_*`・`COIN_*` など)は [runtime-config.md](../docs/infra/runtime-config.md#運用で変える値)。
+
+| 変数 | 既定 / 備考 |
+|---|---|
+| `AI_CHAT_EFFORT` / `AI_CHAT_MODEL` / `AI_CHAT_THINKING` | チャットの呼び出しの設定([chat.md](../docs/backend/features/chat.md)) |
+| `AI_LINT_RETRY` | `1` で生成の後の検査の警告でも作り直す(既定は警告を返すだけ) |
+| `AI_LOGIC_PASS` | `1` で UI の後に計算の段を足す(#100・[expr.md](../docs/backend/features/expr.md)) |
+| `AI_TEXT_IMAGE` | `1` で aiButton の写真の入力(`inputPhoto`)を作れるようにする(既定 off・[text.md](../docs/backend/features/text.md)) |
+| `ANTHROPIC_API_KEY` | Secret Manager。ローカルは `~/Desktop/JPHACKS2026/.env`(リポ外) |
+| `APPCONFIG_BASE_URL` | ai → appconfig。未設定なら ai 内のインメモリ stub(永続なし) |
+| `APPSTORE_ENVIRONMENTS` | 受け入れる App Store の環境。既定 `Sandbox,Production`(審査・TestFlight は Sandbox)。Pro の判定(#449)に使う |
+| `APP_CHECK_APP_IDS` / `APP_CHECK_MODE` | App Check([app-check.md](../docs/infra/app-check.md))。appconfig と同じ |
+| `AUTH_MODE` | `firebase`(既定・本番)/ `dev`。dev では Bearer 値を uid として受理(`DevVerifier`)、`FIREBASE_AUTH_EMULATOR_HOST` も設定時は `X-Debug-Uid` も可 |
+| `CLAUDE_STRUCTURED_OUTPUT` | `1` で Claude の構造化出力を使う([architecture.md](../docs/backend/architecture.md)) |
+| `FIREBASE_AUTH_EMULATOR_HOST` | ローカルのみ(`X-Debug-Uid` の有効条件) |
+| `RATE_LIMIT_COLLECTION` / `RATE_LIMIT_STORE` | 回数制限の数え先のコレクション / `memory` で手元のメモリで数える([rate-limit.md](../docs/backend/rate-limit.md)) |
+
+### cmd/appconfig
+
+運用で変える値(`MIN_IOS_BUILD`・`PLAN_*`・`CALL_*` など)は [runtime-config.md](../docs/infra/runtime-config.md#運用で変える値)。
+
+| 変数 | 既定 / 備考 |
+|---|---|
+| `APPSTORE_BUNDLE_IDS` / `APPSTORE_PRODUCT_IDS` | StoreKit 取引の許可リスト(#314)。既定 `jp.kz2601.metamon` / `jp.kz2601.metamon.pro.monthly` |
+| `APPSTORE_ENVIRONMENTS` | 受け入れる App Store の環境。既定 `Sandbox,Production` |
+| `APP_CHECK_APP_IDS` / `APP_CHECK_MODE` | App Check([app-check.md](../docs/infra/app-check.md)) |
+| `AUTH_MODE` | ai と同じ。Cloud Run では未設定(= `firebase`)で、`run-backend` SA の ADC で Firestore と Firebase Admin を使う |
+| `EVENTS_MAX_STREAM` | 変更の通知のストリーム 1 本の長さ(`5m` のように書く・Cloud Run の時間切れより短く)([events.md](../docs/backend/features/events.md)) |
+| `FEEDBACK_DAILY_LIMIT` | `POST /v1/feedback` の 1 uid 1 日(JST)の件数(既定 5・0 で無制限・#319) |
+| `FIREBASE_AUTH_EMULATOR_HOST` | ローカルのみ(`X-Debug-Uid` の有効条件) |
+| `GOOGLE_PLAY_*` | Android の Pro の購入の確認とリアルタイム通知([play-billing.md](../docs/android/play-billing.md)) |
+| `RATE_LIMIT_COLLECTION` / `RATE_LIMIT_STORE` | ai と同じ([rate-limit.md](../docs/backend/rate-limit.md)) |
+| `SHARE_WEB_BASE_URL` | 共有リンク(`GET /s/{token}`)を出す Web の頭。無ければ appconfig 自身のホスト([sharing.md](../docs/backend/features/sharing.md)) |
+| `STORE` | `memory` でインメモリ store を強制(既定は `GOOGLE_CLOUD_PROJECT` があれば Firestore) |
+
+### cmd/runner
+
+本番で動かす手順は [runner.md](../docs/infra/runner.md)、値は [runtime-config.md](../docs/infra/runtime-config.md#運用で変える値)(`RUNNER_*`・`APNS_*`・`EXT_*`)、外部 API は [external-apis.md](../docs/backend/features/external-apis.md)。そこに無い物:
+
+| 変数 | 既定 / 備考 |
+|---|---|
+| `FCM_PROJECT_ID` | FCM を送る Firebase のプロジェクト。無ければ下の鍵の `project_id` |
+| `FCM_SERVICE_ACCOUNT_JSON` | Android へ送る FCM の SA の鍵(Secret Manager から注入・ログに出さない)。無ければ runner は起動し、Android への通知だけを飛ばす(#918) |
+
+### cmd/appstore-reconcile・cmd/feedback-loop・cmd/purge(Cloud Run Job)
+
+- `cmd/appstore-reconcile`: `APPSTORE_API_*`(App Store Server API のキー)と appconfig と同じ `APPSTORE_*`。[app-store-notifications.md](../docs/infra/app-store-notifications.md#照合ジョブ)
+- `cmd/feedback-loop`: `LOOP_*`。[feedback-loop.md](../docs/backend/features/feedback-loop.md#環境変数)
+- `cmd/purge`: 共通の物と `FIREBASE_AUTH_EMULATOR_HOST`(ローカルだけ)。消す期間はフラグ。[account-purge.md](../docs/infra/account-purge.md)
+
+### 人が回す道具
+
+- `cmd/ai-eval`: `ANTHROPIC_API_KEY`(`-env-file` でファイルからも読める)。
+- `cmd/ai-session-report`・`cmd/coin-initial-backfill`・`cmd/feedback`・`cmd/matching-age-backfill`・`cmd/moderate`・`cmd/stg-cleanup`: 共通の Firestore の物だけ(`coin-initial-backfill` はエミュレータの時 `FIREBASE_AUTH_EMULATOR_HOST` も)。本番の DB に向ける時のフラグは各 docs(上の cmd の表)。
+- `cmd/smoke`: `FIREBASE_WEB_API_KEY`(Firebase の匿名ユーザーの ID トークンを取る)・`SMOKE_UID`(`AUTH_MODE=dev` の時の uid・既定 `dev-smoke`)。
+- `cmd/ai-audit`・`cmd/dslgen`・`cmd/product-metrics`: 読まない。
