@@ -193,7 +193,7 @@ func TestNormalizeText(t *testing.T) {
 		"落ちる!":                 "落ちる",
 		"ＡＢＣ　ｄｅｆ":              "abcdef",
 		"[メール] に送れない。":         "[メール]に送れない",
-		"a​b":                  "ab",
+		"a\u200bb":             "ab",
 		strings.Repeat(" ", 5): "",
 	} {
 		if got := NormalizeText(in); got != want {

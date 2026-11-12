@@ -37,8 +37,9 @@ func TestExpiresFrom(t *testing.T) {
 }
 
 func TestIDsAreDeterministicAndSeparated(t *testing.T) {
-	if ItemID(SourceInApp, "fb_1") != ItemID(SourceInApp, "fb_1") {
-		t.Fatal("ItemID not deterministic")
+	first, second := ItemID(SourceInApp, "fb_1"), ItemID(SourceInApp, "fb_1")
+	if first != second {
+		t.Fatalf("ItemID not deterministic: %q vs %q", first, second)
 	}
 	// the same source id from two sources is two items
 	if ItemID(SourceInApp, "x") == ItemID(SourceTestFlight, "x") {
