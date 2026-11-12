@@ -80,6 +80,23 @@ class HardcodedJapaneseTest {
     }
 
     @Test
+    fun scannerSkipsCharLiteralsInsideTemplates() {
+        // テンプレートの中の '}' や '\'' でテンプレートを閉じない
+        val text = """
+            |val a = "${'$'}{s.trimEnd('}')} 閉じ"
+            |val b = "${'$'}{s.replace('\'', '"')} 引用"
+            |val c = "次"
+            |""".trimMargin()
+        val got = literals(text).map { it.first to it.third }
+        val want = listOf(
+            1 to """${'$'}{s.trimEnd('}')} 閉じ""",
+            2 to """${'$'}{s.replace('\'', '"')} 引用""",
+            3 to "次",
+        )
+        assertTrue(got.toString(), got == want)
+    }
+
+    @Test
     fun developerOnlyIsTheCallRightBeforeTheLiteral() {
         fun skipped(line: String) = developerOnly.containsMatchIn(line.substring(0, literals(line).first().second))
         assertTrue(skipped("""    ?: error("同梱の DSL が無い")"""))
@@ -127,11 +144,18 @@ class HardcodedJapaneseTest {
                             sb.append("\${"); advance(2)
                             var depth = 1
                             while (depth > 0 && i < text.length) {
-                                val c = text[i]
-                                if (c == '{') depth++ else if (c == '}') depth--
-                                if (c == '"') {
-                                    sb.append(c); advance(1)
-                                    while (i < text.length && text[i] != '"' && text[i] != '\n') take(sb)
+                                when (text[i]) {
+                                    '{' -> depth++
+                                    '}' -> depth--
+                                    '"' -> {
+                                        sb.append('"'); advance(1)
+                                        while (i < text.length && text[i] != '"' && text[i] != '\n') take(sb)
+                                    }
+                                    // 文字('}' や '\'')の中身で深さを変えない
+                                    '\'' -> {
+                                        sb.append('\''); advance(1)
+                                        while (i < text.length && text[i] != '\'' && text[i] != '\n') take(sb)
+                                    }
                                 }
                                 if (i < text.length) { sb.append(text[i]); advance(1) }
                             }
