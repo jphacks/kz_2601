@@ -9,7 +9,7 @@ final class DebugClockSection: DebugMenuSection {
     override class var title: String { "日付" }
     override class var footer: String? {
         "式の評価の「今日」(期間の絞り込み・today / now・毎日リセットのチェック・連続記録・日付の既定値)だけをずらします。"
-            + "記録の作成日時(createdAt)はずらしません。通知の予約・保存期間を過ぎた記録の削除はずらした日付で次に組み直す時に効きます。"
+            + "記録の作成日時(createdAt)はずらしません。通知の予約は今の本当の時刻で組むので、ずらした日付では鳴りません。保存期間を過ぎた記録の削除は、ずらした日付で次に組み直す時に効きます。"
             + "起動時に METAMON_DEBUG_TODAY=YYYY-MM-DD を渡すとそちらが優先です。"
     }
     @MainActor override class func makeBody() -> AnyView { AnyView(DebugClockRows()) }
