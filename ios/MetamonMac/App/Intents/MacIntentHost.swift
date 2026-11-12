@@ -7,7 +7,8 @@ import MetamonServices
 /// (`Metamon/Features/Intents/`)を使い、そこから呼ばれる `IntentHost` の口だけ Mac 用に持つ。
 ///
 /// - 一覧: `MacAppLibrary`(作ったアプリ・サーバーのアプリ)と同梱の例。`MetamonMacApp` が起動時に `register` する
-/// - 開く / 話しかける: `pending` に積み、`MacRootView`(`macIntentRouting`)が受け取って一覧の選択・⇧⌘M の会話につなぐ
+/// - 開く / 話しかける: `pending` に積み、`MacRootView`(`macIntentRouting`)が受け取って一覧の選択・⇧⌘M の会話につなぐ。
+///   起動直後で一覧を読み終える前の「開く」は残しておき、読み終えてから開く(#1970)
 /// - 記録の追加: 端末に残る作ったアプリだけ。中央と同じ `MacRecordEngines` のエンジンに書く(画面を開かない)
 @MainActor
 @Observable
@@ -29,6 +30,10 @@ final class IntentHost {
     @ObservationIgnored private var refreshTask: Task<Void, Never>?
     /// ウインドウが受け取る前の「開く / 話しかける」(ウインドウがまだ無ければ出来てから受け取る)
     private(set) var pending: Pending?
+    /// 一覧を読み終えるのを待つ長さ。過ぎたら「見つからない」にする(後から急に開かない・#1970)
+    static let openLifetime: TimeInterval = 30
+    @ObservationIgnored var now: () -> Date = Date.init
+    @ObservationIgnored private var pendingSince = Date.distantPast
 
     /// `records` を省くと中央と同じエンジンに書く(`MacIntentEngineWriter`)
     init(records: (any MacIntentRecordWriting)? = nil,
@@ -50,7 +55,35 @@ final class IntentHost {
 
     func request(_ action: Pending) async {
         print("[Metamon] intent: requested \(action)")
+        pendingSince = now()
         pending = action
+    }
+
+    /// 受け取った「開く / 話しかける」を一覧でどうするか
+    enum Resolution: Equatable {
+        case select(String)
+        case talk
+        /// 開く先が一覧に無い(消した・待っても載らなかった)。一覧を出して知らせる
+        case missing(String)
+    }
+
+    /// `pending` を一覧に当てる。決まったら消す。
+    /// 開く先が一覧に無く、一覧をまだ読み終えていない(`listSettled` が false)間は残して nil(読み終えたら呼び直す・#1970)
+    func resolve(among ids: [String], listSettled: Bool) -> Resolution? {
+        guard let action = pending else { return nil }
+        switch action {
+        case .talk:
+            pending = nil
+            return .talk
+        case .open(let appId):
+            if ids.contains(appId) {
+                pending = nil
+                return .select(appId)
+            }
+            if !listSettled, now().timeIntervalSince(pendingSince) < Self.openLifetime { return nil }
+            pending = nil
+            return .missing(appId)
+        }
     }
 
     func take() -> Pending? {

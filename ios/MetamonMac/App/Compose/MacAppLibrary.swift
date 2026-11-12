@@ -327,6 +327,12 @@ final class MacAppLibrary {
         case offline
     }
 
+    /// 一覧を読み終えた(サーバーの一覧を取り終えた・届かなかった。モックは端末の一覧だけなので常に)。
+    /// 起動直後のショートカット・ウィジェットの「開く」は、これを待ってから開く(#1970)
+    var isServerListSettled: Bool {
+        server == nil || serverListState == .loaded || serverListState == .offline
+    }
+
     /// サーバーの一覧の行(中身を取る前のアプリの名前・版)
     func serverSummary(_ appId: String) -> AppSummary? { serverApps.first { $0.id == appId } }
 

@@ -16532,6 +16532,23 @@
         }
       }
     },
+    "開こうとしたアプリが見つかりませんでした。一覧から選んでください" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Couldn't find the app you tried to open. Choose one from the list."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "開こうとしたアプリが見つかりませんでした。一覧から選んでください"
+          }
+        }
+      }
+    },
     "集計の画面に「記録する」ボタンを置いて、押したら入力の画面が開くようにして" : {
       "localizations" : {
         "en" : {

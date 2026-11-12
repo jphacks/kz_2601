@@ -173,7 +173,9 @@ struct MacRootView: View {
         .frame(minWidth: Self.minWindowSize.width, minHeight: Self.minWindowSize.height)
         .focusedSceneValue(\.shellActions, shellActions)
         .macNotificationRouting(selection: notificationSelection, appIds: apps.map(\.id)) // 押された通知のアプリを開く(#965)。入力中なら確認を通す・シートの間は閉じるまで待つ(#943)
-        .macIntentRouting(selection: notificationSelection, appIds: apps.map(\.id), talk: speak) // ショートカット・Siri の「開く / 話しかける」(#1034)
+        // ショートカット・Siri・ウィジェットの「開く / 話しかける」(#1034)。一覧を読み終える前の「開く」は読み終えてから(#1970)
+        .macIntentRouting(selection: notificationSelection, appIds: apps.map(\.id), listSettled: library.isServerListSettled,
+                          talk: speak, missing: intentTargetMissing)
         .onChange(of: apps.map(\.name)) { IntentHost.shared.appsMayHaveChanged() } // Siri のフレーズのアプリ名を引き直す(#1034)
         .background { WindowCloseGuard(discardGuard: discardGuard) } // ⌘W・閉じるボタン(#943)
         .background { if let windowApp { WindowFrameAutosave(name: MacAppWindows.frameAutosaveName(windowApp)) } } // #1853
@@ -322,6 +324,12 @@ struct MacRootView: View {
         if let id = MacNotificationRouter.shared.resolve(among: apps.map(\.id), listRefreshed: true) {
             notificationSelection.wrappedValue = id
         }
+    }
+
+    /// ショートカット・ウィジェットで開こうとしたアプリが一覧に無い(消した・#1970): 一覧を出して一言知らせる
+    private func intentTargetMissing(_ appId: String) {
+        withMacAnimation { columnVisibility = .all }
+        notices.summary = .init(appId: appId, text: L10n.tr("開こうとしたアプリが見つかりませんでした。一覧から選んでください"), action: nil)
     }
 
     /// 起動時: ウインドウが覚えている選択(SceneStorage)が無い・もう無いアプリなら、前に開いていたアプリを開き直す
