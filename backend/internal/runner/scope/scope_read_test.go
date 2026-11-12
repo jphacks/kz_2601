@@ -229,6 +229,11 @@ func TestHandleCreatedAt(t *testing.T) {
 		}
 		return a.CreatedAt
 	}
+	// The shared app and the private copy must differ, or the cases below
+	// cannot tell which app was read.
+	if created("creator", "S").Equal(created("u", "S")) {
+		t.Fatal("seeded creator/S and u/S share createdAt")
+	}
 	for _, c := range []struct {
 		name string
 		ev   store.OutboxEvent
