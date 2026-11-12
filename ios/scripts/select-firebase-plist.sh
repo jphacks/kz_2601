@@ -1,6 +1,6 @@
 #!/bin/sh
 # 構成に合う Firebase の plist をアプリのバンドルへ GoogleService-Info.plist として入れる(#292)。
-# Metamon ターゲットのビルドフェーズ(project.yml の postBuildScripts「Select Firebase plist」)。署名の前に走る。
+# Metamon・MetamonMac(#930)ターゲットのビルドフェーズ(project.yml の postBuildScripts「Select Firebase plist」)。署名の前に走る。
 #   METAMON_FIREBASE_ENV=prod(Release / Review) : ios/Firebase/GoogleService-Info.plist
 #   METAMON_FIREBASE_ENV=stg (Debug / Staging)  : ios/Firebase/GoogleService-Info-Staging.plist。
 #                                                無ければ prod の plist に戻して警告(stg の Firebase プロジェクトができるまでの暫定)

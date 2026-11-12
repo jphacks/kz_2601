@@ -43,6 +43,7 @@ const (
 	SourceStoreReview Source = "app_store_review" // App Store Connect customer reviews
 	SourceCrash       Source = "crash"            // a crash spike, recorded as one item (#296)
 	SourceTestFlight  Source = "testflight"       // TestFlight beta feedback (screenshot and crash submissions)
+	SourceGenFailure  Source = "gen_failure"      // a spike of one AI generation failure code, recorded as one item (#297)
 )
 
 // Item statuses.
@@ -100,6 +101,7 @@ type Item struct {
 	Category   string    `firestore:"category,omitempty"`
 	Area       string    `firestore:"area,omitempty"`
 	Priority   string    `firestore:"priority,omitempty"`
+	Impact     string    `firestore:"impact,omitempty"`  // the model's high / medium / low, for the bundle's priority
 	Summary    string    `firestore:"summary,omitempty"` // LLM-written, checked (検査器 1)
 	ClusterKey string    `firestore:"clusterKey,omitempty"`
 	DraftID    string    `firestore:"draftId,omitempty"`
@@ -212,6 +214,7 @@ type NoticeReader interface {
 // ItemQuery filters ListItems.
 type ItemQuery struct {
 	Status string // "" = any
+	Source Source // "" = any
 	Limit  int    // <= 0 = 100
 }
 

@@ -33,6 +33,11 @@ public final class AppListCache: @unchecked Sendable {
         }
     }
 
+    /// 一度でも保存したか(空の一覧を保存した後も true)
+    public var exists: Bool {
+        lock.withLock { FileManager.default.fileExists(atPath: fileURL.path) }
+    }
+
     public func clear() {
         lock.withLock { try? FileManager.default.removeItem(at: fileURL) }
     }

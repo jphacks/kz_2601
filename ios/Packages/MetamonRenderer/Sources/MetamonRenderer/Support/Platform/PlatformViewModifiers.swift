@@ -75,6 +75,19 @@ extension View {
         #endif
     }
 
+    /// Mac: 日付は欄 + クリックでカレンダー、時刻だけは欄 + ステッパー(#942)。iOS は今までどおり。
+    @ViewBuilder
+    func macDatePickerStyle(includesDate: Bool) -> some View {
+        #if os(macOS)
+        switch MacDatePickerStyle.choose(includesDate: includesDate) {
+        case .fieldWithCalendar: datePickerStyle(.compact)
+        case .fieldWithStepper: datePickerStyle(.stepperField)
+        }
+        #else
+        self
+        #endif
+    }
+
     /// iOS: ホイールの picker。Mac は既定(ポップアップ)。
     @ViewBuilder
     func wheelPickerStyle() -> some View {
@@ -99,6 +112,16 @@ extension View {
     /// `hoverHighlight` ならホバー中に背景を薄く敷く(borderless のボタンに近い見た目)。iOS は `accessibilityLabel` だけ。
     func iconButtonLabel(_ label: String, hoverHighlight: Bool = true) -> some View {
         accessibilityLabel(label).macIconButtonHelp(label, hoverHighlight: hoverHighlight)
+    }
+
+    /// クリックできる行・カードのヘルプのタグ(ホバーの説明・#1373)。nil(押しても何も起きない)なら付けない。iOS は何もしない。
+    @ViewBuilder
+    func macHelp(_ label: String?) -> some View {
+        #if os(macOS)
+        if let label { help(label) } else { self }
+        #else
+        self
+        #endif
     }
 
     /// `iconButtonLabel` の Mac の部分だけ(名前は `Label` や行の操作が既に持つボタン用)。iOS は何もしない。

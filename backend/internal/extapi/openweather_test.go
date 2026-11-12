@@ -31,6 +31,13 @@ func owServer(t *testing.T, status *atomic.Int64, seen *atomic.Value) *httptest.
 				{"dt":1762830000,"main":{"temp":9.5},"weather":[],"pop":0},
 				{"dt":0,"main":{"temp":1}},
 				{"dt":1762840800,"main":{}}]}`))
+		case "/data/2.5/air_pollution/forecast":
+			_, _ = w.Write([]byte(`{"list":[
+				{"dt":1762819200,"main":{"aqi":3},"components":{"pm2_5":35.04,"pm10":50}},
+				{"dt":1762822800,"main":{"aqi":0},"components":{"pm2_5":1}},
+				{"dt":0,"main":{"aqi":1},"components":{}},
+				{"dt":1762826400,"main":{"aqi":1},"components":{}},
+				{"dt":1762830000,"main":{"aqi":5},"components":{"pm2_5":120}}]}`))
 		case "/data/2.5/air_pollution":
 			if r.URL.Query().Get("lat") == "1" {
 				_, _ = w.Write([]byte(`{"list":[{"main":{"aqi":0},"components":{}}]}`))
@@ -249,5 +256,64 @@ func TestOpenWeatherThroughService(t *testing.T) {
 	}})
 	if _, err := e2.call(e2.req(OpenWeather, "current", map[string]string{"lat": "1", "lng": "1"})); Reason(err) != ReasonUnavailable {
 		t.Fatalf("EXT_DISABLED: %v", err)
+	}
+}
+
+func TestOpenWeatherAirForecast(t *testing.T) {
+	var status atomic.Int64
+	status.Store(200)
+	var seen atomic.Value
+	ops := owOps(t, owServer(t, &status, &seen))
+	out, err := ops["airForecast"].Do(t.Context(), Input{Args: map[string]string{"lat": "36.56133", "lng": "136.65621", "limit": "2"}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if q := seen.Load().(url.Values); q.Get("lat") != "36.56" || q.Get("lon") != "136.66" || q.Get("appid") != owTestKey {
+		t.Fatalf("query %v", q)
+	}
+	// JST hours; hours without a valid AQI or time are skipped
+	want := []Row{
+		{Title: "11/11 09:00", Subtitle: "PM2.5 35・PM10 50 µg/m³", Value: "AQI 3/5 ふつう(目安)"},
+		{Title: "11/11 11:00", Value: "AQI 1/5 良い(目安)"},
+	}
+	if out.Item != nil || len(out.Rows) != len(want) || out.Usage.Priced {
+		t.Fatalf("output %+v", out)
+	}
+	for i := range want {
+		if out.Rows[i] != want[i] {
+			t.Fatalf("row %d: %+v", i, out.Rows[i])
+		}
+	}
+	// default limit takes every valid hour (3 here)
+	out, err = ops["airForecast"].Do(t.Context(), Input{Args: map[string]string{"lat": "35", "lng": "139"}})
+	if err != nil || len(out.Rows) != 3 || out.Rows[2].Value != "AQI 5/5 とても悪い(目安)" {
+		t.Fatalf("default: %+v %v", out.Rows, err)
+	}
+	status.Store(401)
+	if _, err := ops["airForecast"].Do(t.Context(), Input{Args: map[string]string{"lat": "35", "lng": "139"}}); err == nil || strings.Contains(err.Error(), owTestKey) {
+		t.Fatalf("401: %v", err)
+	}
+}
+
+func TestOpenWeatherAirForecastRefusesBadArgs(t *testing.T) {
+	p, _ := Lookup(OpenWeather)
+	for _, a := range []map[string]string{{}, {"lat": "35"}, {"lat": "35", "lng": "139", "limit": "0"}, {"lat": "35", "lng": "139", "limit": "97"}, {"lat": "35", "lng": "139", "limit": "x"}} {
+		if _, err := p.CheckArgs("airForecast", a); Reason(err) != ReasonBadRequest {
+			t.Fatalf("%v: %s (%v)", a, Reason(err), err)
+		}
+	}
+	if _, err := p.CheckArgs("airForecast", map[string]string{"lat": "35", "lng": "139", "limit": "96"}); err != nil {
+		t.Fatal(err)
+	}
+}
+
+// An hourly forecast with no valid hour is the provider's fault.
+func TestOpenWeatherAirForecastEmpty(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_, _ = w.Write([]byte(`{"list":[{"dt":1762819200,"main":{"aqi":9}}]}`))
+	}))
+	t.Cleanup(srv.Close)
+	if _, err := owOps(t, srv)["airForecast"].Do(t.Context(), Input{Args: map[string]string{"lat": "35", "lng": "139"}}); Reason(err) != ReasonUpstream {
+		t.Fatalf("%s (%v)", Reason(err), err)
 	}
 }

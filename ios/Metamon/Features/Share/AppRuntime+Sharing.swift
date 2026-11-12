@@ -160,11 +160,17 @@ extension AppRuntime {
 
 /// WindowGroup の根に付ける(#278): サインイン画面の時に届いたシェアリンクも `SharingUI` に保留する。
 /// URL スキームは onOpenURL、Universal Links(`https://tailor-it.app/s/<token>`・#331)は Web 閲覧の NSUserActivity で届く。
+/// 連係の Handoff(#1851)も同じ所で受ける。
 struct ShareLinkReceiver: ViewModifier {
     func body(content: Content) -> some View {
         content
             .onOpenURL { url in SharingUI.shared.receive(url) }
             .onContinueUserActivity(NSUserActivityTypeBrowsingWeb) { SharingUI.shared.receive(activity: $0) }
+            // Mac からの Handoff(#1851)。シェアリンクと同じく、サインイン・bootstrap の前に届いたら準備の後に開く(`IntentHost`)
+            .onContinueUserActivity(HandoffActivity.type) { activity in
+                guard let target = HandoffTarget(activity: activity) else { return }
+                Task { await IntentHost.shared.request(.handoff(target)) }
+            }
     }
 }
 

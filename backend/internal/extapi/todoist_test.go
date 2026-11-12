@@ -31,6 +31,7 @@ type fakeTodoist struct {
 	refreshes  int
 	revoked    []string
 	tasks      map[string]map[string]any // by X-Request-Id
+	closed     []string
 	lastPath   string
 	lastQuery  url.Values
 	rotateNext int
@@ -86,16 +87,48 @@ func newFakeTodoist(t *testing.T) (*fakeTodoist, *httptest.Server) {
 		f.mu.Unlock()
 		writeJSON(w, 200, nil)
 	})
-	api := func(w http.ResponseWriter, r *http.Request) {
+	authed := func(w http.ResponseWriter, r *http.Request) bool {
 		switch tok := strings.TrimPrefix(r.Header.Get("Authorization"), "Bearer "); {
 		case tok == "noscope":
 			writeJSON(w, 403, map[string]any{"error": "Forbidden", "error_tag": "AUTH_INSUFFICIENT_TOKEN_SCOPE"})
-			return
+			return false
 		case tok == "busy":
 			writeJSON(w, 503, map[string]any{"error_tag": "SERVICE_UNAVAILABLE"})
-			return
+			return false
 		case !strings.HasPrefix(tok, "td-access-") && tok != "legacy":
 			writeJSON(w, 401, map[string]any{"error_tag": "AUTH_INVALID_TOKEN"})
+			return false
+		}
+		return true
+	}
+	mux.HandleFunc("GET /api/v1/projects", func(w http.ResponseWriter, r *http.Request) {
+		if !authed(w, r) {
+			return
+		}
+		f.mu.Lock()
+		f.lastPath, f.lastQuery = r.URL.Path, r.URL.Query()
+		f.mu.Unlock()
+		writeJSON(w, 200, map[string]any{"results": []map[string]any{
+			{"id": "6Jf8VQXxpwv56VQ7", "name": "Inbox", "inbox_project": true},
+			{"id": "bad id", "name": "仕事"},
+		}, "next_cursor": nil})
+	})
+	mux.HandleFunc("POST /api/v1/tasks/{id}/close", func(w http.ResponseWriter, r *http.Request) {
+		if !authed(w, r) {
+			return
+		}
+		f.mu.Lock()
+		defer f.mu.Unlock()
+		f.lastPath = r.URL.Path
+		if r.PathValue("id") == "missing" {
+			writeJSON(w, 404, map[string]any{"error_tag": "NOT_FOUND"})
+			return
+		}
+		f.closed = append(f.closed, r.PathValue("id"))
+		w.WriteHeader(http.StatusNoContent)
+	})
+	api := func(w http.ResponseWriter, r *http.Request) {
+		if !authed(w, r) {
 			return
 		}
 		f.mu.Lock()
@@ -393,11 +426,16 @@ func TestTodoistDefinition(t *testing.T) {
 			t.Errorf("%s not on the allowlist", raw)
 		}
 	}
+	// only complete asks for data:read_write (Todoist has no narrower scope
+	// to close a task); nothing asks for data:delete
 	for _, o := range p.Ops {
 		for _, s := range o.Scopes {
-			if s == todoistScopeWrite || s == "data:delete" {
+			if (s == todoistScopeWrite && o.Name != "complete") || s == "data:delete" {
 				t.Errorf("%s asks for a wide scope %s", o.Name, s)
 			}
+		}
+		if o.Name == "complete" && !o.Write {
+			t.Error("complete is a write op")
 		}
 	}
 	c, err := newTodoist(Secrets{ClientID: "a", ClientSecret: "b"}, w)
@@ -417,6 +455,119 @@ func TestTodoistDefinition(t *testing.T) {
 	for _, f := range ReviewBuildFeatures() {
 		if f == p.FeatureKey() {
 			t.Fatal("in the review build")
+		}
+	}
+}
+
+// project (a name) and label become Todoist's filter / label query.
+func TestTodoistListProjectLabel(t *testing.T) {
+	c, f := todoistTestClient(t)
+	ctx := context.Background()
+	tok := &Token{AccessToken: "legacy"}
+	cases := []struct {
+		args        map[string]string
+		path, query string
+		label, pid  string
+	}{
+		{map[string]string{"project": "買い物 リスト"}, "/api/v1/tasks/filter", "#買い物 リスト", "", ""},
+		{map[string]string{"project": "仕事", "label": "急ぎ"}, "/api/v1/tasks/filter", "#仕事 & @急ぎ", "", ""},
+		{map[string]string{"filter": "today | overdue", "label": "急ぎ"}, "/api/v1/tasks/filter", "(today | overdue) & @急ぎ", "", ""},
+		{map[string]string{"label": "急ぎ"}, "/api/v1/tasks", "", "急ぎ", ""},
+		{map[string]string{"projectId": "6Jf8VQXxpwv56VQ7", "label": "急ぎ"}, "/api/v1/tasks", "", "急ぎ", "6Jf8VQXxpwv56VQ7"},
+	}
+	for i, tc := range cases {
+		out, err := c.listTasks(ctx, Input{Token: tok, Args: tc.args})
+		if err != nil {
+			t.Fatalf("case %d: %v", i, err)
+		}
+		q := f.lastQuery
+		if f.lastPath != tc.path || q.Get("query") != tc.query || q.Get("label") != tc.label || q.Get("project_id") != tc.pid || len(out.Rows) != 3 {
+			t.Errorf("case %d: %s %v", i, f.lastPath, q)
+		}
+	}
+}
+
+func TestTodoistProjects(t *testing.T) {
+	c, f := todoistTestClient(t)
+	ctx := context.Background()
+	out, err := c.projects(ctx, Input{Token: &Token{AccessToken: "legacy"}, Args: map[string]string{"limit": "5"}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if f.lastPath != "/api/v1/projects" || f.lastQuery.Get("limit") != "5" || len(out.Rows) != 2 ||
+		out.Rows[0] != (Row{Title: "Inbox", URL: "https://app.todoist.com/app/project/6Jf8VQXxpwv56VQ7"}) ||
+		out.Rows[1] != (Row{Title: "仕事"}) {
+		t.Fatalf("%s %v %+v", f.lastPath, f.lastQuery, out.Rows)
+	}
+	if _, err := c.projects(ctx, Input{Token: &Token{AccessToken: "noscope"}}); !errors.Is(err, ErrNotConnected) {
+		t.Fatalf("403: %v", err)
+	}
+}
+
+func TestTodoistComplete(t *testing.T) {
+	c, f := todoistTestClient(t)
+	ctx := context.Background()
+	write := &Token{AccessToken: "td-access-0", Scopes: []string{todoistScopeRead, todoistScopeWrite}}
+	out, err := c.complete(ctx, Input{Token: write, RequestID: "c1", Args: map[string]string{"taskId": "6X7rM8997g3RQmvh"}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if out.ResultID != "6X7rM8997g3RQmvh" || f.lastPath != "/api/v1/tasks/6X7rM8997g3RQmvh/close" || len(f.closed) != 1 {
+		t.Fatalf("out %+v path %s closed %v", out, f.lastPath, f.closed)
+	}
+	// task:add / data:read do not cover closing: connect again for data:read_write
+	for _, s := range [][]string{{todoistScopeRead}, {todoistScopeRead, todoistScopeAdd}} {
+		if _, err := c.complete(ctx, Input{Token: &Token{AccessToken: "td-access-0", Scopes: s}, Args: map[string]string{"taskId": "x1"}}); !errors.Is(err, ErrNotConnected) {
+			t.Fatalf("complete with %v: %v", s, err)
+		}
+	}
+	// a task the person does not have is a bad request, not a retry
+	_, err = c.complete(ctx, Input{Token: write, Args: map[string]string{"taskId": "missing"}})
+	var pe *ProviderError
+	if Reason(err) != ReasonBadRequest || !errors.As(err, &pe) || pe.Retryable {
+		t.Fatalf("404: %v", err)
+	}
+	if _, err := c.complete(ctx, Input{Token: &Token{AccessToken: "busy"}, Args: map[string]string{"taskId": "x1"}}); Reason(err) != ReasonUpstream {
+		t.Fatalf("503: %v", err)
+	}
+	if len(f.closed) != 1 {
+		t.Fatalf("closed %v", f.closed)
+	}
+}
+
+// Check refuses bad arguments before anything is counted (and nothing
+// reaches Todoist).
+func TestTodoistCheck(t *testing.T) {
+	p, _ := Lookup(Todoist)
+	bad := map[string][]map[string]string{
+		"listTasks": {
+			{"filter": "today", "project": "仕事"},
+			{"projectId": "p1", "project": "仕事"},
+			{"filter": "today", "projectId": "p1"},
+			{"project": "a & b"}, {"project": "a|b"}, {"project": "(a)"}, {"project": "#a"},
+			{"label": "@a"}, {"label": "a,b"}, {"label": "a\\b"}, {"label": "a\nb"}, {"label": "a*"},
+			{"project": strings.Repeat("あ", 121)},
+			{"filter": "today, overdue", "label": "急ぎ"},
+			{"limit": "0"}, {"limit": "51"},
+			{"projectId": "a b"},
+		},
+		"projects": {{"limit": "0"}, {"limit": "x"}, {"limit": "51"}, {"project": "x"}},
+		"complete": {{}, {"taskId": ""}, {"taskId": "../x"}, {"taskId": "a b"}, {"taskId": strings.Repeat("a", 65)}, {"taskId": "x", "content": "y"}},
+	}
+	for op, cases := range bad {
+		for i, a := range cases {
+			if _, err := p.CheckArgs(op, a); !errors.Is(err, ErrUnknown) {
+				t.Errorf("%s case %d: %v", op, i, err)
+			}
+		}
+	}
+	for op, a := range map[string]map[string]string{
+		"listTasks": {"project": "買い物 リスト", "label": "急ぎ", "limit": "10"},
+		"projects":  {},
+		"complete":  {"taskId": "6X7rM8997g3RQmvh"},
+	} {
+		if _, err := p.CheckArgs(op, a); err != nil {
+			t.Errorf("%s: %v", op, err)
 		}
 	}
 }

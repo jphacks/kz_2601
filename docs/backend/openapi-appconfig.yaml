@@ -337,6 +337,9 @@ paths:
     get:
       tags: [versions]
       summary: バージョン履歴 (新しい順・DSL 本体は含まない)
+      description: |
+        restore で作られた版は `source.kind=restore` と `source.restoredFrom`(中身の元の版番号)を持つ。
+        「元に戻す」を続けて押す時は、restore の版を `restoredFrom` に読み替えてその親へ戻る(#1774)。
       parameters: [{ $ref: '#/components/parameters/PageSize' }, { $ref: '#/components/parameters/PageToken' }]
       responses:
         '200':
@@ -2742,12 +2745,17 @@ components:
       description: このバージョンが生まれた経緯
       required: [kind]
       properties:
-        kind: { type: string, enum: [ai, manual, restore, system, import] }
+        kind: { type: string, enum: [ai, manual, restore, system, import], description: 'restore は POST .../restore だけが付ける。PUT / PATCH で送った restore は manual として保存' }
         mode: { type: string, enum: [full, patch], description: 'full = PUT (初回/create/fallback), patch = PATCH (編集)' }
         transcript: { type: string, description: ユーザー発話 (ai) }
         summary: { type: string, description: 変更の一文要約 (iOS が読み上げ) }
         model: { type: string }
-        restoredFrom: { type: integer }
+        restoredFrom:
+          type: integer
+          minimum: 1
+          description: |
+            kind=restore の版だけが持つ、中身の元の版番号(省略可・古いクライアントは無視してよい)。
+            サーバーが restore の時に記録する。PUT / PATCH で送った値は捨てる(#1774)。
     VersionSummary:
       type: object
       required: [appId, version, createdAt]

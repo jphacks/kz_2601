@@ -89,7 +89,7 @@ final class UpdateCheckTests: XCTestCase {
         StubURLProtocol.reset([.init(status: 200, body: "{}")])
         _ = try await HTTP.send("GET", baseURL: base, path: "v1/apps", body: nil, token: NoAuthTokenProvider())
         let req = try XCTUnwrap(StubURLProtocol.requests.first)
-        XCTAssertEqual(req.value(forHTTPHeaderField: "X-Client-Platform"), "ios")
+        XCTAssertEqual(req.value(forHTTPHeaderField: "X-Client-Platform"), ClientCapabilities.platform)
         XCTAssertEqual(req.value(forHTTPHeaderField: "X-Client-Build"), ClientInfo.current.build)
         XCTAssertEqual(req.value(forHTTPHeaderField: "X-Client-Version"), ClientInfo.current.version)
         XCTAssertEqual(req.value(forHTTPHeaderField: "X-Client-DSL-Version"), String(ClientCapabilities.supportedSchemaVersion))
@@ -101,7 +101,11 @@ final class UpdateCheckTests: XCTestCase {
         let sent = try XCTUnwrap(body.allowedComponents)
         XCTAssertFalse(sent.contains(ComponentType.unknown.rawValue))
         #if !APP_STORE_REVIEW
-        XCTAssertEqual(Set(sent), Set(ComponentType.allCases.filter { $0 != .unknown }.map(\.rawValue)))
+        var expected = Set(ComponentType.allCases.filter { $0 != .unknown })
+        #if os(macOS)
+        expected.subtract(ClientCapabilities.macUnavailableComponents) // Mac で描けない部品は送らない(#925・#947)
+        #endif
+        XCTAssertEqual(Set(sent), Set(expected.map(\.rawValue)))
         #endif
         let chat = HTTPAIClient.ChatBody(appId: "a", messages: [])
         XCTAssertEqual(chat.allowedComponents, body.allowedComponents, "generate と chat は同じ一覧")

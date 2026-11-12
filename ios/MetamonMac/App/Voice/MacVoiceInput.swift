@@ -6,7 +6,7 @@ import MetamonServices
 /// Mac の声で頼む(#966)。マイクは 1 つなのでアプリで 1 つだけ持ち、どのウインドウの会話のシートからも使う。
 /// 認識は iOS と同じ `FallbackTranscriber`: 本命は WhisperKit(端末内・CoreML)、準備中は Apple の端末内の認識(SFSpeechRecognizer の
 /// requiresOnDeviceRecognition)。声も文字にした内容もサーバーへは送らず、ログにも出さない(文字にした文は会話に入れて送るだけ)。
-/// 押して録音 → もう一度押して止める → 文字にする。モデルの取得は `VoiceStartPlan`(Intel の Mac では先に Apple の認識を使う)。
+/// 押して録音 → もう一度押して止める → 文字にする。長く押した時は離したら止めて送る(#1220)。入力の装置は設定で選べる(#1221)。モデルの取得は `VoiceStartPlan`(Intel の Mac では先に Apple の認識を使う)。
 @MainActor
 @Observable
 final class MacVoiceInput {
@@ -36,15 +36,36 @@ final class MacVoiceInput {
     @ObservationIgnored private var recordsAfterConfirm = false
     /// 録音の回。`cancel()` で進め、待っている間に捨てられた録音・文字を後から使わない
     @ObservationIgnored private var attempt = 0
+    /// 録音の開始待ち(マイクの許可など)。この間に離された・止められたら、始まってすぐ止めて送る(#1220)
+    @ObservationIgnored private var startPending = false
+    @ObservationIgnored private var stopWhenStarted: ((String) -> Void)?
+    /// 録音に使っている入力の装置の UID(抜けたかを見る・#1221)
+    @ObservationIgnored private var recordingDeviceUID: String?
+    @ObservationIgnored private let currentInputUID: () -> String?
+    /// 録音と再生は同時に 1 つだけ(#952)。部品の録音中は声で頼まない・録音を始める時は再生を止める
+    @ObservationIgnored let audioFocus: AudioFocus
 
     init(transcriber: (any SpeechTranscriber)? = nil,
          defaults: UserDefaults = .standard,
          slowHardware: Bool = !MacHardware.isAppleSilicon,
-         isExpensiveNetwork: @escaping () -> Bool = { ExpensiveNetworkProbe.shared.isExpensive }) {
+         isExpensiveNetwork: @escaping () -> Bool = { ExpensiveNetworkProbe.shared.isExpensive },
+         currentInputUID: @escaping () -> String? = { MacInputDevices.inUseUID() },
+         audioFocus: AudioFocus = .shared) {
         self.transcriber = transcriber ?? Self.makeTranscriber()
         self.defaults = defaults
         self.slowHardware = slowHardware
         self.isExpensiveNetwork = isExpensiveNetwork
+        self.currentInputUID = currentInputUID
+        self.audioFocus = audioFocus
+    }
+
+    /// 起動時に 1 回: 声の入力(声で頼む・話して入力)がマイクを使っている間は、部品の録音・再生を断る(#952)
+    func attachAudioFocus() {
+        audioFocus.isMicBusyElsewhere = { [weak self] in
+            guard let self else { return false }
+            return self.isBusy || self.dictation.isRecording
+        }
+        audioFocus.stopHostPlayback = { MacSpeechReader.shared.stop() }
     }
 
     /// 本命は WhisperKit(モデル名は iOS と同じ `MetamonWhisperModel` / `METAMON_WHISPER_MODEL`・既定 small)、準備中は Apple の端末内の認識。
@@ -76,7 +97,10 @@ final class MacVoiceInput {
     @ObservationIgnored private(set) lazy var dictation = TranscriberDictation(
         transcriber: transcriber,
         voiceInputActive: { [weak self] in self?.isBusy ?? false },
-        stopSpeech: { LeafSpeech.shared.stopForRecording() },
+        stopSpeech: { [weak self] in
+            self?.audioFocus.micWillStart() // 音声の再生も止める(#952)
+            LeafSpeech.shared.stopForRecording()
+        },
         resumeSpeech: { LeafSpeech.shared.recordingFinished() },
         failure: { MacVoiceCopy.dictationFailure($0) },
         requestModel: { [weak self] in self?.requestDownloadFromApp() })
@@ -98,15 +122,42 @@ final class MacVoiceInput {
     func toggle(deliver: @escaping (String) -> Void) {
         switch state {
         case .idle: begin()
-        case .recording: Task { await finish(deliver: deliver) }
+        case .recording: holdStop(deliver: deliver)
         case .transcribing: break
         }
+    }
+
+    /// 押している間だけ録音(#1220)の押下。録音していなければ始める
+    func holdStart(deliver: @escaping (String) -> Void) {
+        guard state == .idle else { return }
+        begin()
+    }
+
+    /// 押している間だけ録音(#1220)の離し。録音中なら止めて送る。開始待ちなら始まってすぐ止める
+    func holdStop(deliver: @escaping (String) -> Void) {
+        guard state == .recording else { return }
+        if startPending {
+            stopWhenStarted = deliver
+        } else {
+            Task { await finish(deliver: deliver) }
+        }
+    }
+
+    /// 入力の装置の抜き差し(#1221)。録音に使っている装置が無くなったら録音を捨て、理由を出す
+    func inputDevicesChanged(available uids: Set<String>) {
+        guard state == .recording, let uid = recordingDeviceUID, !uids.contains(uid) else { return }
+        cancel()
+        failure = MacVoiceCopy.inputDeviceLost
     }
 
     private func begin() {
         dictation.cancel() // 部品が録音していたら捨てる(マイクは 1 つ)
         failure = nil
         settingsPane = nil
+        guard !audioFocus.isRecording else { // audioRecorder が録音中(#952)
+            failure = MacVoiceCopy.otherRecording
+            return
+        }
         if case .failed = transcriber.status { Task { try? await transcriber.prepare() } } // 失敗後は作り直す
         let plan = VoiceStartPlan.decide(
             needsDownload: transcriber.needsDownload && transcriber.status == .notDownloaded,
@@ -117,7 +168,7 @@ final class MacVoiceInput {
             askedThisLaunch: askedThisLaunch)
         switch plan {
         case .record:
-            Task { await start() }
+            startRecording()
         case .askDownload:
             askedThisLaunch = true
             recordsAfterConfirm = true
@@ -169,23 +220,43 @@ final class MacVoiceInput {
         guard recordsAfterConfirm else { return }
         recordsAfterConfirm = false
         if provisionalAvailable {
-            Task { await start() }
+            startRecording()
         } else if !downloading {
             failure = MacVoiceCopy.textFirst
         }
     }
 
-    private func start() async {
+    /// 状態はすぐ録音中にしてからマイクを開く(開くのを待つ間に離された時に止められるように・#1220)
+    private func startRecording() {
         guard state == .idle else { return }
+        MacSpeechReader.shared.stop() // 読み上げの声をマイクが拾わない(#1210)
+        audioFocus.micWillStart() // 音声の再生・speakButton も止める(#952)
         state = .recording
+        startPending = true
+        stopWhenStarted = nil
+        recordingDeviceUID = currentInputUID()
         let current = attempt
+        Task { await start(current) }
+    }
+
+    private func start(_ current: Int) async {
+        guard current == attempt, state == .recording else { return }
         do {
             try await transcriber.startRecording()
             // マイクの許可を待つ間に閉じられた(cancel 済み): 始まったマイクをすぐ止める
             guard current == attempt else { transcriber.cancelRecording(); return }
+            startPending = false
+            if let deliver = stopWhenStarted {
+                // 開始を待つ間に離された(#1220): すぐ止めて送る
+                stopWhenStarted = nil
+                await finish(deliver: deliver)
+                return
+            }
             MacVoiceOver.announce(MacVoiceCopy.listening)
         } catch {
             guard current == attempt else { return }
+            startPending = false
+            stopWhenStarted = nil
             state = .idle
             report(error)
         }
@@ -214,6 +285,8 @@ final class MacVoiceInput {
     /// 録音を捨てる(シートを閉じた時など)。録音の開始待ち・文字にしている途中も捨てる
     func cancel() {
         recordsAfterConfirm = false
+        startPending = false
+        stopWhenStarted = nil
         guard state != .idle else { return }
         attempt += 1
         if state == .recording { transcriber.cancelRecording() }

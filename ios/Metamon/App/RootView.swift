@@ -132,6 +132,7 @@ struct RootView: View {
         .modifier(HostSheets(onModal: false))
         #if !APP_STORE_REVIEW // 審査用ビルドはシェアリンク・探す・近くの端末との共有を外す(#245)
         .modifier(SharingHooks()) // シェアリンク受信・「探す」シート(#49 #50)
+        .modifier(HandoffAdvertiser()) // 今の画面と記録を Mac へ(連係の Handoff・#1851)
         .modifier(NearbySheets(onModal: false)) // 近くの端末と送り合う(#36)
         .modifier(ModerationDialogs()) // 通報・ブロック(#321)
         .modifier(MatchingSheets()) // 仲間探しの 18 歳以上の確認(#507)
