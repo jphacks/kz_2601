@@ -7,6 +7,7 @@ import jp.kz2601.metamon.dsl.AppDSL
 import jp.kz2601.metamon.dsl.Notification
 import jp.kz2601.metamon.dsl.records.Record
 import jp.kz2601.metamon.notifications.ActivityStatReading
+import jp.kz2601.metamon.notifications.TimerActivityUpdate
 import jp.kz2601.metamon.renderer.ActionContext
 import jp.kz2601.metamon.renderer.components.health.HealthSource
 import jp.kz2601.metamon.renderer.components.play.TimerRun
@@ -58,6 +59,12 @@ interface RuntimeHost {
 
     /** そのタイマーが前面で見えているか(iOS の TimerVisibility)。見えている間は終了のバナーを出さない。 */
     fun timerVisible(key: String, visible: Boolean) {}
+
+    /**
+     * `timerDisplay.liveActivity` の進行中の表示(#913)。開始・一時停止・リセット・終了のたびに来る。
+     * 既定は何もしない(表示を持たないホスト)。通知の許可が無く出せなければ false。
+     */
+    suspend fun timerActivity(update: TimerActivityUpdate): Boolean = true
 
     /**
      * 進行中の表示(iOS の Live Activity。Android は常駐の通知・#1030)。同じアプリの表示は差し替える。
