@@ -50,4 +50,18 @@ final class ControlCatalogTests: XCTestCase {
         XCTAssertTrue(ControlCatalog.matches("家計簿", ""))
         XCTAssertFalse(ControlCatalog.matches("家計簿", "日記"))
     }
+    /// 見出しは今の一覧から引く: 名前を変えたら新しい名前、消したら nil(「アプリを選ぶ」)
+    func testControlTitleFollowsCurrentCatalog() {
+        XCTAssertEqual(sample.controlTitle(appId: "a1"), "家計簿")
+        XCTAssertEqual(sample.controlTitle(recordTargetId: "a1/expense"), "家計簿 › 支出")
+        var renamed = sample
+        renamed.apps[0].name = "おこづかい帳"
+        renamed.recordTargets[0].appName = "おこづかい帳"
+        XCTAssertEqual(renamed.controlTitle(appId: "a1"), "おこづかい帳")
+        XCTAssertEqual(renamed.controlTitle(recordTargetId: "a1/expense"), "おこづかい帳 › 支出")
+        XCTAssertNil(ControlCatalog().controlTitle(appId: "a1"))
+        XCTAssertNil(ControlCatalog().controlTitle(recordTargetId: "a1/expense"))
+        XCTAssertNil(sample.controlTitle(appId: nil))
+        XCTAssertNil(sample.controlTitle(recordTargetId: nil))
+    }
 }

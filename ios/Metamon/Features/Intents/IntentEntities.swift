@@ -77,11 +77,12 @@ struct RecordTargetEntity: AppEntity {
     }
 
     /// 全アプリの記録先(フォームのある entity を先に)。DSL はキャッシュ優先で、未取得のアプリだけ `GET /dsl` する。
+    /// cachedOnly なら取りに行かず、キャッシュの無いアプリは飛ばす(コントロールの一覧・#1993)。
     @MainActor
-    static func all(limit: Int = 12) async -> [RecordTargetEntity] {
+    static func all(limit: Int = 12, host: IntentHost = .shared, cachedOnly: Bool = false) async -> [RecordTargetEntity] {
         var out: [RecordTargetEntity] = []
-        for app in await IntentHost.shared.recordableApps().prefix(limit) {
-            guard let doc = await IntentHost.shared.document(appId: app.id) else { continue }
+        for app in await host.recordableApps().prefix(limit) {
+            guard let doc = await host.document(appId: app.id, cachedOnly: cachedOnly) else { continue }
             let entities = QuickRecord.recordableEntities(in: doc.dsl)
             out += entities.map { RecordTargetEntity(app: app, entity: $0, showsEntity: entities.count > 1) }
         }

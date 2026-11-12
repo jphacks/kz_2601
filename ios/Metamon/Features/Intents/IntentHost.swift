@@ -80,14 +80,35 @@ final class IntentHost {
 
     /// DSL が差し替わった(生成・切替・アプリ名変更)ら、Siri のパラメータ付きフレーズ(「Tailor It で家計簿を開く」)を引き直す。
     /// `updateAppShortcutParameters()` は各 Entity の suggestedEntities を呼ぶ(=`GET /apps`)ので 2 秒まとめる。
-    func appsMayHaveChanged() {
+    /// コントロールの一覧(#1993)は DSL をキャッシュからだけ読む(この 2 秒ごとに最大 12 回 `GET /dsl` しない)。
+    /// 戻り値は引き直しの Task(テスト用)。
+    @discardableResult
+    func appsMayHaveChanged() -> Task<Void, Never> {
         refreshTask?.cancel()
-        refreshTask = Task {
-            try? await Task.sleep(for: .seconds(2))
+        let delay = refreshDelay
+        let task = Task {
+            try? await Task.sleep(for: delay)
             guard !Task.isCancelled else { return }
             TailorItShortcuts.updateAppShortcutParameters()
-            await ControlIntentBridge.writeCatalog(apps: apps(), targets: RecordTargetEntity.all()) // #1993 コントロールの設定の一覧
+            await ControlIntentBridge.refreshCatalog(
+                apps: { await self.apps() },
+                targets: { await RecordTargetEntity.all(host: self, cachedOnly: true) }
+            )
         }
+        refreshTask = task
+        return task
+    }
+
+    /// まとめる待ち時間(テストで縮める)
+    var refreshDelay: Duration = .seconds(2)
+
+    /// 引き直し待ちがあるか(テスト用)
+    var hasPendingRefresh: Bool { refreshTask != nil }
+
+    /// ログアウト・アカウント削除(`wipeLocalData`)で、前の人の一覧を書き戻さないよう引き直しをやめる
+    func cancelPendingRefresh() {
+        refreshTask?.cancel()
+        refreshTask = nil
     }
 
     /// 選んだアプリがまだあるか(消した後のコントロール・#1993)。サーバーに届かなければ `AppListCache` で見る
@@ -150,10 +171,11 @@ final class IntentHost {
     /// 記録先の候補になるアプリ。iOS は作ったアプリ全部(Mac は端末に残る作ったアプリだけ)
     func recordableApps() async -> [AppSummary] { await apps() }
 
-    /// アプリの DSL。表示中ならそれ、無ければキャッシュ(`DocumentCache`)、それも無ければ `GET /dsl`。
-    func document(appId: String) async -> AppDocument? {
+    /// アプリの DSL。表示中ならそれ、無ければキャッシュ(`DocumentCache`)、それも無ければ `GET /dsl`(cachedOnly なら取りに行かない)。
+    func document(appId: String, cachedOnly: Bool = false) async -> AppDocument? {
         if let runtime, runtime.document.appId == appId, !runtime.dsl.isVoiceOnly { return runtime.document }
         if let cached = DocumentCache.shared.load(appId: appId) { return cached }
+        guard !cachedOnly else { return nil }
         return try? await runtime?.services.appConfig.fetchDocument(appId: appId)
     }
 }

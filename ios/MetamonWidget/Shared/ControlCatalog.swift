@@ -44,6 +44,11 @@ struct ControlCatalog: Codable, Equatable {
     func app(id: String) -> App? { apps.first { $0.id == id } }
     func recordTarget(id: String) -> RecordTarget? { recordTargets.first { $0.id == id } }
 
+    /// コントロールの見出し: 設定に残った名前でなく今の一覧から引く(名前を変えた・消したアプリを古い名前で出さない)。
+    /// 無ければ nil(「アプリを選ぶ」と出す)
+    func controlTitle(appId: String?) -> String? { appId.flatMap { app(id: $0)?.name } }
+    func controlTitle(recordTargetId: String?) -> String? { recordTargetId.flatMap { recordTarget(id: $0)?.title } }
+
     /// 設定の検索欄。名前の一部(大文字小文字・全角半角を無視)で絞る
     static func matches(_ name: String, _ query: String) -> Bool {
         let q = query.trimmingCharacters(in: .whitespacesAndNewlines)

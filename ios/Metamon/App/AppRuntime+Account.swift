@@ -19,8 +19,10 @@ extension AppRuntime {
         ExportFiles.removeAll()                         // 書き出した CSV / PDF(#421・記録の写し)
         RemoteImageLoader.removeAllCached()             // https の画像のキャッシュ(#1265・前の人が見た画像を残さない)
         URLCache.shared.removeAllCachedResponses()      // 共有の URL キャッシュも
-        WidgetSnapshot.defaults?.removePersistentDomain(forName: WidgetSnapshot.appGroupID) // App Group(ウィジェット)
+        IntentHost.shared.cancelPendingRefresh()        // 前の人の一覧をコントロール(#1993)の一覧に書き戻さない
+        WidgetSnapshot.defaults?.removePersistentDomain(forName: WidgetSnapshot.appGroupID) // App Group(ウィジェット・コントロールの一覧)
         WidgetCenter.shared.reloadAllTimelines()
+        ControlIntentBridge.reloadControls()            // コントロールの見出し(前の人のアプリ名)を消す
         LiveActivities.enqueue { await LiveActivities.endAll() } // ロック画面・Dynamic Island(#423)
         LocalWipe.clearDefaults(.standard, domain: Bundle.main.bundleIdentifier)
         RemainingTodayStore.shared.clear()              // 今日の残り(#630・前のアカウントの数を出さない)

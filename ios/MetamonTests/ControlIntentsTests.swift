@@ -1,6 +1,7 @@
 import XCTest
 import MetamonDSL
 import MetamonRenderer
+import MetamonServices
 @testable import Metamon
 
 /// コントロール(iOS 18・#1993)を押した時の本体の動き・文言。
@@ -89,4 +90,86 @@ final class ControlIntentsTests: XCTestCase {
             XCTAssertNotEqual(value, key, "英語が日本語のまま: \(key)")
         }
     }
+
+    // MARK: - コントロールの一覧(#1993 レビュー)
+
+    /// ログアウト・アカウント削除で、待っている引き直しを止める(前の人の一覧を書き戻さない)
+    func testWipeCancelsPendingCatalogRefresh() async throws {
+        let rt = try runtime()
+        let pending = IntentHost.shared.appsMayHaveChanged()
+        XCTAssertTrue(IntentHost.shared.hasPendingRefresh)
+        await rt.wipeLocalData()
+        XCTAssertTrue(pending.isCancelled)
+        IntentHost.shared.cancelPendingRefresh()
+    }
+
+    /// 集めている間に取り消されたら書かない
+    func testRefreshCatalogSkipsWriteWhenCancelledWhileCollecting() async throws {
+        let suite = "control-catalog-\(UUID().uuidString)"
+        let defaults = try XCTUnwrap(UserDefaults(suiteName: suite))
+        defer { defaults.removePersistentDomain(forName: suite) }
+        let apps = [AppSummary(id: "a1", name: "家計簿", currentVersion: 3)]
+
+        let cancelled = Task { @MainActor in
+            await ControlIntentBridge.refreshCatalog(
+                apps: { apps },
+                targets: { withUnsafeCurrentTask { $0?.cancel() }; return [] },
+                defaults: defaults)
+        }
+        let wroteWhenCancelled = await cancelled.value
+        XCTAssertFalse(wroteWhenCancelled)
+        XCTAssertEqual(ControlCatalog.load(from: defaults), ControlCatalog())
+
+        let wrote = await ControlIntentBridge.refreshCatalog(apps: { apps }, targets: { [] }, defaults: defaults)
+        XCTAssertTrue(wrote)
+        XCTAssertEqual(ControlCatalog.load(from: defaults).app(id: "a1")?.name, "家計簿")
+        let again = await ControlIntentBridge.refreshCatalog(apps: { apps }, targets: { [] }, defaults: defaults)
+        XCTAssertFalse(again, "変わっていなければ書かない(コントロールを読み直さない)")
+    }
+
+    /// コントロールの一覧はキャッシュの DSL だけで作る(`GET /dsl` を呼ばない)
+    func testCatalogTargetsDoNotFetchDocuments() async throws {
+        let spy = CountingAppConfig(apps: [
+            AppSummary(id: "ctl-\(UUID().uuidString)", name: "家計簿", currentVersion: 3),
+            AppSummary(id: "ctl-\(UUID().uuidString)", name: "日記", currentVersion: 3),
+        ])
+        let doc = try runtime().document
+        var services = BuildConfig.make(environment: .mock)
+        services.appConfig = spy
+        let rt = AppRuntime(document: doc, services: services)
+        let host = IntentHost()
+        host.register(rt)
+
+        _ = await RecordTargetEntity.all(host: host, cachedOnly: true)
+        XCTAssertEqual(spy.fetches, 0)
+        _ = await RecordTargetEntity.all(host: host) // Siri の候補は従来どおり取りに行く
+        XCTAssertEqual(spy.fetches, 2)
+    }
+}
+
+/// `GET /dsl` の回数を数える appconfig
+private final class CountingAppConfig: AppConfigClient, @unchecked Sendable {
+    private let lock = NSLock()
+    private var count = 0
+    private let apps: [AppSummary]
+    init(apps: [AppSummary]) { self.apps = apps }
+    var fetches: Int { lock.withLock { count } }
+
+    func listApps() async throws -> [AppSummary] { apps }
+    func fetchDocument(appId: String) async throws -> AppDocument {
+        lock.withLock { count += 1 }
+        throw APIError.server(status: 404, code: "not_found", message: "spy")
+    }
+    func listVersions(appId: String) async throws -> [VersionSummary] { [] }
+    func restore(appId: String, toVersion version: Int) async throws -> AppDocument {
+        throw APIError.server(status: 404, code: "not_found", message: "spy")
+    }
+    func list(appId: String, entity: String) async throws -> [Record] { [] }
+    func create(appId: String, entity: String, data: [String: JSONValue]) async throws -> Record {
+        throw APIError.server(status: 501, code: "unsupported", message: "spy")
+    }
+    func update(appId: String, entity: String, id: String, data: [String: JSONValue]) async throws -> Record {
+        throw APIError.server(status: 501, code: "unsupported", message: "spy")
+    }
+    func delete(appId: String, entity: String, id: String) async throws {}
 }

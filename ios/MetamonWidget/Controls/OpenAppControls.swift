@@ -56,8 +56,8 @@ struct OpenAppControl: ControlWidget {
     var body: some ControlWidgetConfiguration {
         AppIntentControlConfiguration(kind: Self.kind, intent: SelectControlAppIntent.self) { config in
             ControlWidgetButton(action: OpenAppFromControlIntent(appId: config.app?.id)) {
-                if let app = config.app {
-                    Label(app.name, systemImage: ControlCopy.openAppSymbol) // アプリ名はデータなので訳さない
+                if let name = ControlCatalog.load().controlTitle(appId: config.app?.id) {
+                    Label(name, systemImage: ControlCopy.openAppSymbol) // アプリ名はデータなので訳さない
                 } else {
                     Label { Text(ControlCopy.openAppUnselected) } icon: { Image(systemName: ControlCopy.openAppSymbol) }
                 }
@@ -76,8 +76,8 @@ struct RecordControl: ControlWidget {
     var body: some ControlWidgetConfiguration {
         AppIntentControlConfiguration(kind: Self.kind, intent: SelectControlRecordTargetIntent.self) { config in
             ControlWidgetButton(action: OpenRecordFromControlIntent(appId: config.target?.appId, entityId: config.target?.entityId)) {
-                if let target = config.target {
-                    Label(target.title, systemImage: ControlCopy.recordSymbol)
+                if let title = ControlCatalog.load().controlTitle(recordTargetId: config.target?.id) {
+                    Label(title, systemImage: ControlCopy.recordSymbol)
                 } else {
                     Label { Text(ControlCopy.recordUnselected) } icon: { Image(systemName: ControlCopy.recordSymbol) }
                 }
