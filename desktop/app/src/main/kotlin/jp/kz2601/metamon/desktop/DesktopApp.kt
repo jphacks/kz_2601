@@ -134,7 +134,7 @@ fun DesktopApp(
     // Ctrl+F はこのウィンドウの検索欄にだけ入る
     CompositionLocalProvider(LocalSearchTargets provides keyboard.searchTargets) {
     Surface(Modifier.fillMaxSize().ioDropTarget(io, topComponents, topDraft).onPreviewKeyEvent(io.previewKey(topComponents, topDraft))
-        .onPreviewKeyEvent { if (DesktopPrint.isPrintKey(it)) true.also { openPrint() } else false }.then(keyboard.modifier)) {
+        .onPreviewKeyEvent { if (DesktopPrint.isPrintKey(it) && DesktopPrint.canPrint(dsl)) true.also { openPrint() } else false }.then(keyboard.modifier)) {
         IoOverlay(io)
         Box(Modifier.fillMaxSize()) {
             // モーダルの間は下の画面とタブに Tab で入らず、読み上げにも出さない

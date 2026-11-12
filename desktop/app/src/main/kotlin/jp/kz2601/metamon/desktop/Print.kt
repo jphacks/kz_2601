@@ -7,11 +7,14 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -43,6 +46,8 @@ import jp.kz2601.metamon.dsl.records.JSONValue
 import jp.kz2601.metamon.dsl.records.entityModels
 import jp.kz2601.metamon.dsl.screen
 import jp.kz2601.metamon.renderer.form.FormDraft
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import java.awt.Graphics
 import java.awt.Graphics2D
 import java.awt.RenderingHints
@@ -77,7 +82,7 @@ class PrintDocument(val title: String, val sections: List<ExportTable>) {
     fun pdf(): ByteArray = PdfIo.pdf(pages.map { it.pdf.image })
 }
 
-/** 今の画面 → 印刷する表。画面に触らない(JVM で確かめる)。 */
+/** 今の画面 → 印刷する表。画面に触らない(JVM で確かめる)。画面が 1 つも無ければ null。 */
 object ScreenPrint {
     fun document(
         dsl: AppDSL,
@@ -86,8 +91,8 @@ object ScreenPrint {
         form: FormDraft? = null,
         printedAt: LocalDateTime = LocalDateTime.now(),
         locale: Locale = Locale.JAPAN,
-    ): PrintDocument {
-        val screen = dsl.screen(screenId) ?: dsl.screens.first()
+    ): PrintDocument? {
+        val screen = dsl.screen(screenId) ?: dsl.screens.firstOrNull() ?: return null
         val title = screen.title.ifEmpty { dsl.app.name }
         val entities = dsl.entityModels()
         val data = LeafData.of(dsl, store)
@@ -193,6 +198,9 @@ object DesktopPrint {
     /** Ctrl+P(macOS は ⌘P)。 */
     fun isPrintKey(e: KeyEvent): Boolean = e.type == KeyEventType.KeyDown && e.key == Key.P && (e.isCtrlPressed || e.isMetaPressed)
 
+    /** 印刷できる画面があるか(画面の無い DSL では Ctrl+P を受けない)。 */
+    fun canPrint(dsl: AppDSL): Boolean = dsl.screens.isNotEmpty()
+
     /** 印刷ダイアログで選んだ印刷。[job] が null ならやめた・送れない(理由は [message])。 */
     class Prepared(val job: PrinterJob?, val attrs: HashPrintRequestAttributeSet, val message: String?)
 
@@ -255,32 +263,38 @@ class PrintRunner(private val background: (() -> Unit) -> Unit = { thread(isDaem
     }
 }
 
-/** 印刷のプレビュー。頁を送って見て、「印刷…」で OS の印刷ダイアログへ。 */
+/** 印刷のプレビュー。頁を送って見て、「印刷…」で OS の印刷ダイアログへ。頁は画面のスレッドの外で描き、描き終えるまで回る印を出す。 */
 @Composable
 fun PrintPreview(doc: PrintDocument, onDismiss: () -> Unit, onResult: (String) -> Unit) {
     var index by remember(doc) { mutableIntStateOf(0) }
     val runner = remember(doc) { PrintRunner() }
-    val pages = doc.pages
-    val bitmap = remember(doc, index) { pages[index].pdf.image.toComposeImageBitmap() }
+    var built by remember(doc) { mutableStateOf<List<PrintDocument.Page>?>(null) }
+    LaunchedEffect(doc) { built = withContext(Dispatchers.Default) { doc.pages } }
+    val pages = built
     AlertDialog(
         onDismissRequest = onDismiss,
         title = { Text(Strings.format("desktop_print_title", doc.title)) },
         text = {
             Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                Image(bitmap, Strings.format("desktop_print_page", index + 1), Modifier.heightIn(max = 520.dp).border(1.dp, Color.LightGray))
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    TextButton(onClick = { index-- }, enabled = index > 0) { Text("‹") }
-                    Text(Strings.format("desktop_print_page_of", index + 1, pages.size), style = MaterialTheme.typography.bodySmall)
-                    TextButton(onClick = { index++ }, enabled = index < pages.lastIndex) { Text("›") }
+                if (pages == null) {
+                    CircularProgressIndicator(Modifier.padding(32.dp))
+                } else {
+                    val bitmap = remember(pages, index) { pages[index].pdf.image.toComposeImageBitmap() }
+                    Image(bitmap, Strings.format("desktop_print_page", index + 1), Modifier.heightIn(max = 520.dp).border(1.dp, Color.LightGray))
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        TextButton(onClick = { index-- }, enabled = index > 0) { Text("‹") }
+                        Text(Strings.format("desktop_print_page_of", index + 1, pages.size), style = MaterialTheme.typography.bodySmall)
+                        TextButton(onClick = { index++ }, enabled = index < pages.lastIndex) { Text("›") }
+                    }
                 }
             }
         },
         confirmButton = {
-            // ダイアログは画面のスレッド、プリンターへ送るのは別のスレッド。送っている間は押せない
-            TextButton(enabled = !runner.busy, onClick = {
+            // ダイアログは画面のスレッド、プリンターへ送るのは別のスレッド。頁を描いている間・送っている間は押せない
+            TextButton(enabled = pages != null && !runner.busy, onClick = {
                 runner.start(
                     dialog = { DesktopPrint.prepare(doc) },
-                    send = { DesktopPrint.send(it, pages.size) },
+                    send = { DesktopPrint.send(it, doc.pages.size) },
                     onDone = { msg ->
                         onResult(msg)
                         onDismiss()
