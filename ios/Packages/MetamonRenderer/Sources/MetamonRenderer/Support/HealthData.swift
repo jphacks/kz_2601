@@ -246,7 +246,7 @@ public final class LiveHealthData: HealthDataSource, @unchecked Sendable {
         switch metric {
         case .sleep:
             let type = HKCategoryType(.sleepAnalysis)
-            try await authorize(read: type)
+            try await authorizeMetrics()
             // 前の晩に寝始めた眠りも拾う(起きた日が範囲内なら数える)
             let since = Calendar.current.date(byAdding: .day, value: -1, to: from) ?? from
             let samples = try await categorySamples(type, since: since)
@@ -254,7 +254,7 @@ public final class LiveHealthData: HealthDataSource, @unchecked Sendable {
                                          dayStarts: starts)
         case .mindfulness:
             let type = HKCategoryType(.mindfulSession)
-            try await authorize(read: type)
+            try await authorizeMetrics()
             let blocks = healthUnion(try await categorySamples(type, since: from).map { ($0.startDate, $0.endDate) })
             var byDay: [Date: Double] = [:]
             for b in blocks { byDay[Calendar.current.startOfDay(for: b.start), default: 0] += b.end.timeIntervalSince(b.start) / 60 }
@@ -274,11 +274,21 @@ public final class LiveHealthData: HealthDataSource, @unchecked Sendable {
     }
 
     #if os(iOS)
-    /// 読むだけの値の許可。その値の分だけ、初めて読む時に求める(書き込みの許可は求めない)。
-    private func authorize(read type: HKObjectType) async throws {
+    /// HealthMetric で読む値(すべて)。許可は 1 枚のシートでまとめて求める。
+    private static let metricReadTypes: Set<HKObjectType> = [
+        HKCategoryType(.sleepAnalysis),
+        HKCategoryType(.mindfulSession),
+        HKQuantityType(.restingHeartRate),
+        HKQuantityType(.distanceWalkingRunning),
+        HKQuantityType(.activeEnergyBurned),
+        HKQuantityType(.appleExerciseTime),
+    ]
+
+    /// 読むだけの値の許可。HealthMetric の全種類を 1 回で求める(書き込みの許可は求めない)。
+    private func authorizeMetrics() async throws {
         guard HKHealthStore.isHealthDataAvailable() else { throw HealthDataError.unavailable }
         do {
-            try await store.requestAuthorization(toShare: [], read: [type])
+            try await store.requestAuthorization(toShare: [], read: Self.metricReadTypes)
         } catch {
             throw HealthDataError.unavailable
         }
@@ -288,8 +298,8 @@ public final class LiveHealthData: HealthDataSource, @unchecked Sendable {
         switch HKCategoryValueSleepAnalysis(rawValue: raw) {
         case .inBed: .inBed
         case .awake: .awake
-        case .some: .asleep // asleepUnspecified / Core / Deep / REM
-        case .none: .awake // 知らない値は数えない
+        case .asleepUnspecified, .asleepCore, .asleepDeep, .asleepREM: .asleep
+        default: .awake // 知らない値は眠りに数えない
         }
     }
 
@@ -306,7 +316,7 @@ public final class LiveHealthData: HealthDataSource, @unchecked Sendable {
     private func statistics(_ id: HKQuantityTypeIdentifier, unit: HKUnit, average: Bool, starts: [Date]) async throws -> [HealthDailyValue] {
         guard let from = starts.first else { return [] }
         let type = HKQuantityType(id)
-        try await authorize(read: type)
+        try await authorizeMetrics()
         let descriptor = HKStatisticsCollectionQueryDescriptor(
             predicate: .quantitySample(type: type, predicate: HKQuery.predicateForSamples(withStart: from, end: nil)),
             options: average ? .discreteAverage : .cumulativeSum,
