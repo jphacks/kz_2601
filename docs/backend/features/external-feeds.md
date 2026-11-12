@@ -2,7 +2,7 @@
 
 > 状態: 実装(2026-11-06)。オーナーの決定(2026-11-06): **鍵の要らない公開の API の許可リストから始める。任意の URL は許さない。**
 > 対象 Issue: [#348](https://github.com/jphacks/kz_2601/issues/348)。前提: [#339 悪用と脅威のモデル](../../decisions/339-abuse-threat-model.md) の「3. 外部への送信」の条件。
-> コード: `backend/pkg/dsl/feed.go`・`feed_arxiv_diet.go`(DSL の検証)・`backend/internal/feeds`(取得・許可リスト・キャッシュ・警報 `parse_jma_warning.go`・気圧 `parse_pressure.go`・arXiv と国会会議録 `parse_arxiv_diet.go`)・`backend/internal/appconfig/feeds.go`(API)・`backend/internal/ai/feed_rules.go` ほか `feed_*_rules.go`(AI の規則)・iOS `FeedLeaf` / `FeedHost` / `HTTPFeedClient`。
+> コード: `backend/pkg/dsl/feed.go`・`feed_arxiv_diet.go`・`feed_bikeshare.go`(DSL の検証)・`backend/internal/feeds`(取得・許可リスト・キャッシュ・警報 `parse_jma_warning.go`・気圧 `parse_pressure.go`・arXiv と国会会議録 `parse_arxiv_diet.go`・シェアサイクル `parse_gbfs.go`)・`backend/internal/appconfig/feeds.go`(API)・`backend/internal/ai/feed_rules.go` ほか `feed_*_rules.go`(AI の規則)・iOS `FeedLeaf` / `FeedHost` / `HTTPFeedClient`。
 
 ## 目次
 
@@ -28,6 +28,7 @@
 - 国会会議録(`diet`): アプリに決めて書いた語(`query`・40 字まで)で発言を探し、新しい会議から。行は発言者(会派)・院と会議名と号・会議の日付。タップで会議録の発言のページを開く。発言の本文は出さない。利用者がその場で語を打って検索する形は無い(DSL に書いた語だけ)。
 - 使っているサービスの稼働状況(`status`・#1675): 許可したサービス(`dsl.StatusPages` の GitHub・Cloudflare・Vercel・Claude(Anthropic))の公開の status ページから、全体の状態・対応中の障害・実施中のメンテナンス・止まっている部分(コンポーネント)・予定のメンテナンスを出す。障害の説明の本文(更新の文)は出さない。タップでその障害のページ(status ページ)を開く。OpenAI・Slack は入れていない(下の「外したもの」)。**オーナーの規約の確認と正典のスキーマの変更の OK を待っている**(#339。develop へ入れる前に)。AI の規則(`feed_rules.go` など)は親の決定を待つので、まだ AI は `status` を作らない。iOS / Android は `status` をまだ知らない(プレースホルダ)ので、描くのは別の作業。
 - NHK のニュースは**入れていない**(下の「外したもの」: RSS の規約が個人の利用だけで、プログラムでの再提供を許していない)。
+- シェアサイクル(`bikeshare`・#1694): アプリに決めて書いた地点(`query` に `"緯度,経度"`。例: いつもの駅・家の近く)から **2 km 以内の近いポート** を近い順に。行はポートの名前・「自転車 3 台・返せる空き 5・約 250 m」・事業者の最終更新の時刻。貸出を止めているポートは「貸出停止中」。事業者は許可した GBFS(`dsl.BikeshareSystems`: ドコモ・バイクシェア(東京)/ ドコモ・バイクシェア(東京以外)/ HELLO CYCLING)。今いる場所(端末の位置)で探す形・予約・ポートを名前で選ぶ形は無い。
 
 ## DSL の形
 
@@ -39,15 +40,17 @@
 {"type": "feed", "provider": "pressure", "region": "016000", "title": "札幌の気圧", "limit": 8}
 {"type": "feed", "provider": "arxiv", "feedId": "cs.CL", "title": "自然言語処理の新着論文", "limit": 10}
 {"type": "feed", "provider": "diet", "query": "こども家庭庁", "title": "国会で「こども家庭庁」", "limit": 10}
+{"type": "feed", "provider": "bikeshare", "feedId": "docomo-cycle-tokyo", "query": "35.681,139.767", "title": "東京駅の近くのポート", "limit": 5}
 {"type": "feed", "provider": "status", "feedId": "github", "title": "GitHub の稼働状況", "limit": 10}
 ```
 
 | キー | 中身 |
 |---|---|
-| `provider` | 必須。`weather` / `warnings` / `pressure` / `holidays` / `rss` / `arxiv` / `diet` / `status`(スキーマの閉じた enum) |
+| `provider` | 必須。`weather` / `warnings` / `pressure` / `holidays` / `rss` / `arxiv` / `diet` / `bikeshare` / `status`(スキーマの閉じた enum) |
 | `region` | weather / warnings / pressure だけ・必須。気象庁の府県予報区のコード(`dsl.WeatherRegions` の 56 個。3 つで同じ一覧) |
-| `feedId` | rss・arxiv・status だけ・必須。rss は許可したフィードの id(`dsl.RSSFeeds`)、arxiv は分野(`dsl.ArxivCategories`: cs.AI / cs.CL / cs.CR / cs.CV / cs.HC / cs.LG / cs.RO / cs.SE / stat.ML)、status はサービス(`dsl.StatusPages`: claude / cloudflare / github / vercel) |
+| `feedId` | rss・arxiv・bikeshare・status だけ・必須。rss は許可したフィードの id(`dsl.RSSFeeds`)、arxiv は分野(`dsl.ArxivCategories`: cs.AI / cs.CL / cs.CR / cs.CV / cs.HC / cs.LG / cs.RO / cs.SE / stat.ML)、bikeshare は事業者(`dsl.BikeshareSystems`: docomo-cycle-tokyo / docomo-cycle / hellocycling)、status はサービス(`dsl.StatusPages`: claude / cloudflare / github / vercel) |
 | `query` | diet だけ・必須。国会会議録で探す語。空白(全角も)をまとめて 1〜40 字・改行やタブ・制御文字・見えない文字(Cf)は不可。空白区切りは AND。API には `q` で渡す |
+| bikeshare の `feedId` / `query` | bikeshare だけ・どちらも必須。`feedId` は GBFS の system id(`dsl.BikeshareSystems`: `docomo-cycle-tokyo` / `docomo-cycle` / `hellocycling`)。`query` は探す地点 `"緯度,経度"`(10 進の数だけ・日本の範囲(緯度 20〜46・経度 122〜154))。サーバーが小数 3 桁(約 100 m)に丸めて使い、**出どころには送らない** |
 | `title` / `limit`(1〜20・既定 5)/ `emptyText` | 任意 |
 
 「データの出どころ」を一覧・数字・グラフの部品の `source` として宣言する形も考えたが、最初は**専用の部品 1 つ**にした。外部のデータを記録の集計(iOS のクライアント集計)と混ぜないため、描き方を 1 か所に閉じて審査用の版から部品ごと外せるようにするため。数字・グラフに使う形は、需要を見てから足す。
@@ -75,6 +78,14 @@
 | status `vercel` | Vercel の status ページ `https://www.vercel-status.com/api/v2/summary.json`([API の案内](https://www.vercel-status.com/api)) | API の案内のページ: GitHub と同じ文(プログラムで触れられるように公開)。規約のリンクは無い。[Vercel Terms of Service](https://vercel.com/legal/terms) は Vercel の顧客向けの契約で、公開の status ページを読むことには触れていない | 「Vercel の status ページ」・同上 |
 | status `claude` | Claude(Anthropic)の status ページ `https://status.claude.com/api/v2/summary.json`(`status.anthropic.com` から 301 で移った・[API の案内](https://status.claude.com/api)) | API の案内のページ: GitHub と同じ文(プログラムで触れられるように公開)。規約のリンクは無い。[Consumer Terms](https://www.anthropic.com/legal/consumer-terms) は Claude.ai などとその Web サイトへの bot・スクリプトでの自動の利用を、**Anthropic が明示に許した場合を除いて**禁じる。status の API の案内を明示の許しと読んだ(人が確かめる) | 「Claude(Anthropic)の status ページ」・同上 |
 
+シェアサイクル(bikeshare・#1694。2026-11-12 に規約を確かめた): どれも公共交通オープンデータ協議会(ODPT)の**登録の要らない公開の API**(`api-public.odpt.org`)の GBFS 2.3。取りに行くのは system ごとに `station_information.json`(ポートの名前と位置。6 時間に 1 回)と `station_status.json`(台数。2 分に 1 回)の 2 つだけ。ODPT のカタログ(CKAN)の各データセットのページにライセンスと出典の書き方(「コンテンツ等の提供者名: 〇〇 / 公共交通オープンデータ協議会」・詳しくは [ODPT の FAQ](https://developer.odpt.org/ja/faq-info#cc-by-credit))が書いてある。各 system の `system_information.json` の `license_url` も同じライセンスを指す。
+
+| provider | 出どころ(サーバーが取りに行く URL) | 規約 | 出典の表示 |
+|---|---|---|---|
+| bikeshare `docomo-cycle-tokyo` | ドコモ・バイクシェア(東京エリア)`https://api-public.odpt.org/api/v4/gbfs/docomo-cycle-tokyo/station_information.json`・`https://api-public.odpt.org/api/v4/gbfs/docomo-cycle-tokyo/station_status.json`(1,937 ポート) | [ODPT のデータセット](https://ckan.odpt.org/dataset/c_bikeshare_gbfs-d-bikeshare): [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/deed.ja)(商用可・改変可・出典と変更の表示が要る)。鍵・登録は無し(鍵つきの `api.odpt.org` は使わない) | 「コンテンツ等の提供者名: 株式会社ドコモ・バイクシェア / 公共交通オープンデータ協議会」・「CC BY 4.0 (https://creativecommons.org/licenses/by/4.0/)・近くのポートを抜き出して近い順に並べ替えて表示」(変更の表示) |
+| bikeshare `docomo-cycle` | ドコモ・バイクシェア(東京以外の全国)`https://api-public.odpt.org/api/v4/gbfs/docomo-cycle/station_information.json`・`https://api-public.odpt.org/api/v4/gbfs/docomo-cycle/station_status.json`(6,295 ポート) | [ODPT のデータセット](https://ckan.odpt.org/dataset/c_bikeshare_gbfs-d-nationwide-bikeshare): CC BY 4.0(同上) | 同上 |
+| bikeshare `hellocycling` | HELLO CYCLING(OpenStreet 株式会社)`https://api-public.odpt.org/api/v4/gbfs/hellocycling/station_information.json`(約 8 MB)・`https://api-public.odpt.org/api/v4/gbfs/hellocycling/station_status.json`(15,708 ステーション) | [ODPT のデータセット](https://ckan.odpt.org/dataset/c_bikeshare_gbfs-openstreet): CC BY 4.0・ODC BY 1.0・ODbL 1.0 から選べる([ライセンスの文](https://d1yl7kw204zjxn.cloudfront.net/gbfs/v2/public/hellocycling_gbfs_licence.txt)は 3 つから選ぶことだけを書く)。**CC BY 4.0 を選んで使う**(ODbL の継承の条件を避ける) | 「コンテンツ等の提供者名: OpenStreet株式会社 / 公共交通オープンデータ協議会」・「CC BY 4.0 (https://creativecommons.org/licenses/by/4.0/)(3 つのライセンスから選択)・近くのポートを抜き出して近い順に並べ替えて表示」(変更の表示) |
+
 外したもの:
 
 | 候補 | 外した理由 |
@@ -98,7 +109,14 @@ arxiv・diet の表示: どちらも**一覧(メタデータ)とリンクだけ*
 
 加工の扱い: 公共データ利用規約は、編集・加工したら加工したことを書くよう求める。警報は気象庁のコードを名前に置き換え、種類と状態ごとに地域をまとめて出す(加工)。気圧は 1 時間ごとの値を 6 時間の行にまとめ、低下の印を足す(加工)ので、出典の license に「CC BY 4.0・6 時間ごとにまとめて加工」と書いた。天気は気象庁の天気のコードを「晴れ / くもり / 雨 / 雪」と絵に置き換えて出すので、出典の行は「出典: 気象庁ホームページ(公共データ利用規約(第1.0版))」とし、加工の表記の要否と書き方は**人が確かめる**(下の「まだ決めていないこと」)。
 
-許可リストを増やす時: `backend/internal/feeds/client.go` の `DefaultEndpoints` と `backend/pkg/dsl/feed.go` の `RSSFeeds` に 1 行ずつ足す(テストが両方の一致を見る)。status ページは `DefaultEndpoints` の `Status` と `backend/pkg/dsl/feed.go` の `StatusPages`(`TestStatusAllowlistMatchesDSL` が一致を見る。Atlassian Statuspage の `/api/v2/summary.json` の形だけ読める)。arXiv の分野は `backend/pkg/dsl/feed_arxiv_diet.go` の `ArxivCategories`(スキーマの `feedId` の説明と AI の規則 `feed_arxiv_diet_rules.go` にも書く。テストが規則との一致を見る)。**規約(再配布・商用・出典)を確かめて、この表に URL を書いてから**。表に無い URL・https でない URL・「外したもの」の URL がコードの許可リストにあると、`TestAllowlistMatchesDoc`(`internal/feeds/allowlist_doc_test.go`)が落ちる。追加は人の判断(#339)。
+シェアサイクルで外した・まだ入れていない候補(#1694。2026-11-12 に調べた。日本の GBFS は [MobilityData の systems.csv](https://github.com/MobilityData/gbfs/blob/master/systems.csv) の JP の 4 件と [ODPT のカタログの GBFS の 3 件](https://ckan.odpt.org/dataset/?q=GBFS) がすべてで、入れた 3 つ以外は下の 2 つ):
+
+| 候補 | 外した理由 |
+|---|---|
+| シクロシティ富山(CyclOcity・JCDecaux)`https://api.cyclocity.fr/contracts/toyama/gbfs/v3/gbfs.json` | [Mobility Database の掲載](https://mobilitydatabase.org/feeds/gbfs/gbfs-toyama) のライセンスは [JCDecaux の Open Licence](https://developer.jcdecaux.com/files/Open-Licence-fr.pdf)(Etalab の Licence Ouverte 1.0 と同じ文。商用・再配布可・出典(提供者の名前と最終更新日)が要る)。ただしこのライセンスは**集約サイトの掲載から辿ったもの**で、富山の事業者・富山市のページで確かめられていない。形も GBFS 3.0(ほかの 3 つは 2.3)。事業者のページでライセンスを確かめてから足す(人の判断) |
+| ODPT の鍵つきの API(`https://api.odpt.org/api/v4/gbfs/{system}/...?acl:consumerKey=...`) | 中身は公開の API と同じで、開発者サイトの登録と鍵(秘密)が要る。公開の API で足りるので使わない |
+
+許可リストを増やす時: `backend/internal/feeds/client.go` の `DefaultEndpoints` と `backend/pkg/dsl/feed.go` の `RSSFeeds` に 1 行ずつ足す(テストが両方の一致を見る)。status ページは `DefaultEndpoints` の `Status` と `backend/pkg/dsl/feed.go` の `StatusPages`(`TestStatusAllowlistMatchesDSL` が一致を見る。Atlassian Statuspage の `/api/v2/summary.json` の形だけ読める)。arXiv の分野は `backend/pkg/dsl/feed_arxiv_diet.go` の `ArxivCategories`(スキーマの `feedId` の説明と AI の規則 `feed_arxiv_diet_rules.go` にも書く。テストが規則との一致を見る)。**規約(再配布・商用・出典)を確かめて、この表に URL を書いてから**。表に無い URL・https でない URL・「外したもの」の URL がコードの許可リストにあると、`TestAllowlistMatchesDoc`(`internal/feeds/allowlist_doc_test.go`)が落ちる。追加は人の判断(#339)。シェアサイクルの system は `client.go` の `Bikeshare` と `backend/pkg/dsl/feed_bikeshare.go` の `BikeshareSystems`(`TestBikeshareAllowlistMatchesDSL` が一致を見る)とスキーマの `feedId` の説明。
 
 #1701 で足した `soumu-news`・`osaka-city-news`・`go-blog` は、AI の規則(`backend/internal/ai/feed_rules.go`)にはまだ書いていない(生成アプリから外の API を使う決まりは親の Issue の決定待ち)。DSL に書けば検証は通り、表示もできる。出典の license はフィードごと(`RSSFeed.License`。空なら公共データ利用規約(第1.0版))。3 本はどれも本文を使わず題名と日付だけを抜き出すので、license にその旨(変更の表示)とライセンスの URL を入れる。
 
@@ -111,9 +129,9 @@ ISBN から本の情報を引く `lookupBook` も同じ作り(専用のクライ
 | 宛先は運営の許可リストだけ | provider は閉じた enum。取りに行く URL はサーバーのコードで固定。DSL・リクエストから受け取るのは provider と型の決まった値(6 桁の府県予報区・フィードの id・件数)だけで、どれも許可リストと照合してから使う。許可リストに無いものは、通信の前に 400 で断る |
 | 仲介を通す | 端末は appconfig にだけ聞き、外部へは直接つながらない。appconfig の外への通信は `internal/feeds` の専用のクライアントだけ |
 | 内部のアドレスに届かない | 専用のクライアントは、接続の直前に**実際の接続先のアドレス**を確かめ、公開のユニキャスト以外(ループバック・プライベート・リンクローカル(メタデータのサーバーを含む)・CGNAT・マルチキャスト・文書用・IPv4 を写した IPv6 など)には接続しない。名前を引き直して内部を指すようになっても同じ。環境のプロキシ設定は使わない。リダイレクトは許可リストのホストの同じ scheme の中だけ(3 回まで) |
-| 送る項目を最小にする | 送るのは府県予報区のコード・フィードの URL・arXiv の分野・国会会議録で探す語(diet の `query`)だけ。diet の語は**アプリを作った時に DSL に書いた決まった語**で、利用者がその場で打った文字や記録の値ではない(DSL から値を差し込む形は無い)。ただし API は認証した利用者なら任意の語(40 字まで)を送れるので、語は国会図書館に届く。アプリのログには語を残さない(取りに行くたびのログ `feeds.fetch` は語の文字数だけ・アクセスのログはパスだけ)。ただし Cloud Run の要求ログは URL を問い合わせごと残すので、語はそこに残る。利用者の uid・位置・記録の値は送らない。**緯度経度は受け取らない**(天気・警報・気圧は府県の単位)ので、ログにも座標は残らない。気圧の出どころには府県ごとに決まった代表地点(県庁などの所在地・`internal/feeds/pressure_points.go`)の座標を送るだけで、利用者の位置ではない |
+| 送る項目を最小にする | 送るのは府県予報区のコード・フィードの URL・arXiv の分野・国会会議録で探す語(diet の `query`)だけ。diet の語は**アプリを作った時に DSL に書いた決まった語**で、利用者がその場で打った文字や記録の値ではない(DSL から値を差し込む形は無い)。ただし API は認証した利用者なら任意の語(40 字まで)を送れるので、語は国会図書館に届く。アプリのログには語を残さない(取りに行くたびのログ `feeds.fetch` は語の文字数だけ・アクセスのログはパスだけ)。ただし Cloud Run の要求ログは URL を問い合わせごと残すので、語はそこに残る。利用者の uid・位置・記録の値は送らない。**緯度経度は受け取らない**(天気・警報・気圧は府県の単位)ので、ログにも座標は残らない。気圧の出どころには府県ごとに決まった代表地点(県庁などの所在地・`internal/feeds/pressure_points.go`)の座標を送るだけで、利用者の位置ではない。bikeshare は例外で地点(`query` の緯度経度)を受け取るが、サーバーは小数 3 桁(約 100 m)に丸め、**出どころには送らない**(system の全ポートを決まった URL で取り、近い順はサーバーで選ぶ)。キャッシュは system ごとに 1 つで地点を鍵にしない。`feeds.fetch` のログにも地点は書かない。地点は DSL に書いた決まった値(いつもの駅など)で、端末の今の位置ではない |
 | 秘密は DSL に置かない | 鍵の要らない出どころだけなので、秘密は無い |
-| 量の上限 | 1 回 8 秒まで・応答の大きさの上限(天気 256 KiB・警報 512 KiB・気圧 256 KiB・祝日 128 KiB・RSS 1 MiB(`go-blog` は記事の本文ごと返るため。2026-11-12 の実測は 10 件で約 360 KB)・arxiv 1 MiB・diet 3 MiB(発言の本文ごと返るため。20 件の実測は 84 KB)・status 2 MiB(Cloudflare はふだんで約 230 KB))・保存する行は 60 まで・キャッシュは 2000 件まで(diet の語で増えないよう、古いものから捨てる)。arxiv と diet は出どころの求めに合わせ、インスタンスあたり**同時に 1 本**で、前の取得から間をあけて取りに行く(diet は 3 秒。arxiv は 3 秒 × appconfig の最大インスタンス数(`deploy-cloudrun.yml` の `--max-instances=3`)= 9 秒にして、全インスタンスが同時に取っても合計で 3 秒に 1 回を超えないようにした。最大インスタンス数を変える時は `backend/internal/feeds/feeds.go` の `appconfigMaxInstances` も変える)。順番待ちは来た順で 10 秒まで。超えたら 503。取得は待っていた要求の期限と切り離して 8 秒まで続け、結果はキャッシュに入る(要求の側の打ち切りは失敗として覚えない)。キャッシュ(天気 30 分・警報 10 分・気圧 30 分・祝日 12 時間・RSS 15 分・arxiv 3 時間・diet 3 時間・status 5 分。気圧の問い合わせは府県の 56 地点にまとまる)で同じ問い合わせはまとめ、同時の問い合わせも 1 回の取得にまとめる。出どころへの取得はインスタンスあたり 1 分 30 回まで(diet は別枠で 1 分 10 回。検索語はキャッシュに当たりにくいので、ほかの部品の枠を使わない)。利用者ごとに 1 時間 120 回まで。検索語のある問い合わせ(diet)で出どころまで取りに行くのは、利用者ごと・インスタンスごとに 1 時間 20 回まで(キャッシュにある語はこの数に入らない。超えたら 429)。失敗は 1 分覚えて、すぐに取り直さない |
+| 量の上限 | 1 回 8 秒まで・応答の大きさの上限(天気 256 KiB・警報 512 KiB・気圧 256 KiB・祝日 128 KiB・RSS 1 MiB(`go-blog` は記事の本文ごと返るため。2026-11-12 の実測は 10 件で約 360 KB)・arxiv 1 MiB・diet 3 MiB(発言の本文ごと返るため。20 件の実測は 84 KB)・status 2 MiB(Cloudflare はふだんで約 230 KB))・保存する行は 60 まで・キャッシュは 2000 件まで(diet の語で増えないよう、古いものから捨てる)。arxiv と diet は出どころの求めに合わせ、インスタンスあたり**同時に 1 本**で、前の取得から間をあけて取りに行く(diet は 3 秒。arxiv は 3 秒 × appconfig の最大インスタンス数(`deploy-cloudrun.yml` の `--max-instances=3`)= 9 秒にして、全インスタンスが同時に取っても合計で 3 秒に 1 回を超えないようにした。最大インスタンス数を変える時は `backend/internal/feeds/feeds.go` の `appconfigMaxInstances` も変える)。順番待ちは来た順で 10 秒まで。超えたら 503。取得は待っていた要求の期限と切り離して 8 秒まで続け、結果はキャッシュに入る(要求の側の打ち切りは失敗として覚えない)。キャッシュ(天気 30 分・警報 10 分・気圧 30 分・祝日 12 時間・RSS 15 分・arxiv 3 時間・diet 3 時間・status 5 分。気圧の問い合わせは府県の 56 地点にまとまる)で同じ問い合わせはまとめ、同時の問い合わせも 1 回の取得にまとめる。出どころへの取得はインスタンスあたり 1 分 30 回まで(diet は別枠で 1 分 10 回。検索語はキャッシュに当たりにくいので、ほかの部品の枠を使わない)。利用者ごとに 1 時間 120 回まで。検索語のある問い合わせ(diet)で出どころまで取りに行くのは、利用者ごと・インスタンスごとに 1 時間 20 回まで(キャッシュにある語はこの数に入らない。超えたら 429)。失敗は 1 分覚えて、すぐに取り直さない。bikeshare: 応答の上限は 16 MiB(HELLO CYCLING の `station_information.json` が 2026-11-12 に約 8 MB・`station_status.json` が約 4.5 MB)・キャッシュは台数 2 分(出どころの `ttl` は 60 秒)・ポートの名前と位置 6 時間。1 回の取得は出どころへ 1〜2 本で、1 分の枠は 1 回と数える。全ポートを持つので保存する行の 60 の上限は当てない(HELLO CYCLING で約 1.6 万行)。地点は出どころに届かないので、利用者ごとの検索語の数にも入れない。端末のキャッシュは 60 秒(ほかは 300 秒) |
 | ログ | 外へ取りに行くたびに 1 行(`event=feeds.fetch`・成功は INFO・失敗は WARN): provider・status(`ok` / HTTP の番号 / `timeout`・`network`・`too_large`・`bad_response` などの種類)・bytes・duration_ms と、許可リストの region・feed_id・語の文字数(q_runes)。キャッシュから返した時は外へ出ないので書かない。語・URL・応答の本文・uid は書かない(通信の失敗の中身は URL を含むので、種類だけを書く) |
 | 同意と開示 | 利用者の情報を外部へ送らないので、第三者への提供には当たらない(と考える)。ただしプライバシーポリシー・App Privacy の書き方は人が確かめる(下) |
 | 止められる | `FEEDS_DISABLED` で provider ごとに止められる(`all` で全部。今回足した出どころだけ止めるなら `FEEDS_DISABLED=arxiv,diet`)。止めた provider は 503 で、部品は「読み込めませんでした」 |
@@ -123,7 +141,7 @@ ISBN から本の情報を引く `lookupBook` も同じ作り(専用のクライ
 
 ## API
 
-`POST /v1/feeds/{provider}` に `{"region","feedId","q","limit"}`(認証が要る。`q` は diet だけ。利用者が入力した値を URL に載せないため本文で送る・`GET ?region=&feedId=&q=&limit=` は古い iOS ビルドのために残している)。形は [openapi-appconfig.yaml](../openapi-appconfig.yaml) の `/feeds/{provider}`。
+`POST /v1/feeds/{provider}` に `{"region","feedId","q","limit"}`(認証が要る。`q` は diet(検索語)と bikeshare(地点 `"緯度,経度"`)だけ。利用者が入力した値を URL に載せないため本文で送る・`GET ?region=&feedId=&q=&limit=` は古い iOS ビルドのために残している)。形は [openapi-appconfig.yaml](../openapi-appconfig.yaml) の `/feeds/{provider}`。
 
 ```json
 {"provider": "weather", "title": "石川県の天気",
@@ -166,6 +184,7 @@ diet の検索語で出どころまで取りに行く回数は、利用者ごと
 - arxiv・diet: `backend/internal/feeds/arxiv_diet_test.go`(2026-11-08 に 1 回だけ実際に取った応答を 4 件に切って `testdata/arxiv_api_cs_AI.xml`・`testdata/kokkai_speech_kodomo.json` に置いた。解析・送る問い合わせ・通信の前に断る値・3 秒あける・1 つずつ止める・キャッシュの上限)・`backend/pkg/dsl/feed_arxiv_diet_test.go`・`backend/internal/appconfig/feeds_arxiv_diet_test.go`(`q` の検証)・AI の規則 `feed_arxiv_diet_rules.go`(`TestFeedArxivDietRules`)・ai-eval `feed_arxiv_diet_cases.json`(4 件・NHK は作らない)・iOS `FeedTests` / `FeedLeafTests`。
 - status: `backend/internal/feeds/status_test.go`(2026-11-12 に 1 回だけ実際に取った応答を `testdata/status_cloudflare_summary.json`(切ったもの)・`testdata/status_claude_summary.json` に置いた。行の順・本文を出さない・リンクを id から作る・知らない値・許可リストの外を通信の前に断る・壊れた応答・失敗を覚える・大きさの上限・止めるスイッチ・コードと DSL の一覧の一致)・`backend/pkg/dsl/feed_status_test.go`。
 - iOS: `FeedTests`(DSL から問い合わせ)・`FeedLeafTests`(表示の組み立て)・`FeedClientTests`(appconfig だけに聞く・キャッシュ)。
+- bikeshare: `backend/internal/feeds/bikeshare_test.go`(2026-11-12 に 1 回だけ実際に取った応答を、東京駅の近くの 6 ポート + 2.8 km 先の 1 つ(ドコモ・東京)・新御徒町の近くの 4 ステーション + 2.8 km 先の 1 つ(HELLO CYCLING)に切って `testdata/gbfs_*_station_{information,status}.json` に置いた。近い順・2 km の外を出さない・貸出停止・数の station_id・撤去済み・地点を出どころに送らない・地点が違ってもキャッシュは 1 つ・台数は 2 分 / 位置は 6 時間で取り直す・通信の前に断る値・応答の上限・止めるスイッチ)・`backend/pkg/dsl/feed_bikeshare_test.go`(`Validate()` と地点の読み取り・丸め)。
 
 ## 記録に残す(サーバーの自動の動き saveFeed)
 
@@ -207,6 +226,13 @@ diet の検索語で出どころまで取りに行く回数は、利用者ごと
   - arXiv: 商用の扱いが規約に無い。「arXiv の承認や提携はない」の書き方。間隔はインスタンスごとなので、3 秒 × 最大インスタンス数(今は 9 秒)にして合計が 3 秒に 1 回を超えないようにした(キャッシュ 3 時間・9 分野なので実際はもっと少ない)。
   - 国会会議録: 発言の著作権は各発言者にある。発言者・会議名・日付の一覧とリンクだけを出す今の形で足りるか。出典の書き方(国立国会図書館ウェブサイトのコンテンツ利用規約は公共データ利用規約(第1.0版)を指すが、会議録の発言は「第三者が著作権を有するコンテンツ」に当たる)。商用・キャッシュは API の仕様のページに書かれていない。
   - NHK: 入れていない。os_2401・sp_2512 のようなニュースのアプリを作るなら、NHK の許諾を取るか、再提供を許す別の出どころを探す。
+- **bikeshare(#1694)の追加は人の判断(#339)**。develop に入れる前にオーナーが下を確かめる(`FEEDS_DISABLED=bikeshare` で止められる):
+  - 規約: ライセンス(CC BY 4.0・HELLO CYCLING は 3 つから CC BY 4.0 を選ぶ)は ODPT のカタログで読んだ。`api-public.odpt.org` そのものの利用条件(回数・商用・キャッシュ)は、ODPT の開発者サイトが JavaScript で描くページで 2026-11-12 に機械で読めず、確かめられていない。出典の書き方は 2026-11-12 にオーナーが OK した(FAQ の「コンテンツ等の提供者名: 〇〇 / 公共交通オープンデータ協議会」の形・CC BY 4.0 のリンク・変更の表示「近くのポートを抜き出して近い順に並べ替えて表示」)。
+  - 正典の変更: DSL のスキーマ(`feed.provider` の enum に `bikeshare`・`feedId` / `query` の説明)を変えた。
+  - 出どころの量: HELLO CYCLING は 1 回に約 4.5 MB(6 時間に 1 回は +8 MB)を取る。使われる間はインスタンスごとに 2 分に 1 回。
+  - 端末: iOS(`Feed.providers`)と Android は `bikeshare` をまだ知らない(この PR は backend だけ)。AI に選ばせる規則(`feed_rules.go` ほか)も足していない(#1694 の親の「部品と AI の決まり」の後)。
+  - 地点: DSL に書いた決まった地点だけ。端末の今の位置で探す形は、位置を送ることになるので別に決める。
+  - ドコモのポート名は事業者の番号つき(「B2-33.新槇町ビル」)をそのまま出す。
 - 府県予報区のコードの一覧は、気象庁の公開の情報と開発者の資料から作った。十勝・奄美は別のファイルが無い(釧路・根室、鹿児島のファイルに入る)ので一覧に入れていない。
 - **status の追加(#339・#1675)は 2026-11-12 にオーナーが OK した**(4 社(GitHub・Cloudflare・Vercel・Claude)と、正典のスキーマの `provider` の enum に `status`)。`FEEDS_DISABLED=status` で止められる。読んだ時の前提(規約が変わったら見直す):
   - どの status ページにも「出し直してよい」とはっきり書いた規約は無い。API の案内の「プログラムで触れられるように公開」(Cloudflare は「自動の取得は API で」)を、サーバーが取って利用者のアプリに出すことの許しと読んだ。Cloudflare の Website Terms と Anthropic の Consumer Terms は、明示の許しが無い自動の利用を禁じる形なので、その読みで足りるか。

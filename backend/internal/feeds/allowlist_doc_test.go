@@ -60,6 +60,10 @@ func TestAllowlistMatchesDoc(t *testing.T) {
 	for id, f := range ep.RSS {
 		code["rss "+id] = f.URL
 	}
+	for id, b := range ep.Bikeshare {
+		code["bikeshare "+id+" info"] = b.Info
+		code["bikeshare "+id+" status"] = b.Status
+	}
 	for id, p := range ep.Status {
 		code["status "+id] = p.URL
 	}

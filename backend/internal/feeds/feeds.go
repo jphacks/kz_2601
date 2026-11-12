@@ -26,7 +26,7 @@ import (
 
 // Item is one row of a feed. Fields a provider does not use are omitted.
 type Item struct {
-	Date     string    `json:"date,omitempty"` // YYYY-MM-DD (weather, holidays, diet) or RFC 3339 (rss, arxiv, warnings, pressure, status)
+	Date     string    `json:"date,omitempty"` // YYYY-MM-DD (weather, holidays, diet) or RFC 3339 (rss, arxiv, warnings, pressure, bikeshare, status)
 	Title    string    `json:"title"`
 	Subtitle string    `json:"subtitle,omitempty"`
 	Icon     string    `json:"icon,omitempty"`   // SF Symbols name (weather, warnings, status)
@@ -36,6 +36,11 @@ type Item struct {
 	Pop      *int      `json:"pop,omitempty"`    // precipitation probability %
 	Drop     *bool     `json:"drop,omitempty"`   // pressure fell 6 hPa or more within 24 hours (pressure)
 	Series   []float64 `json:"series,omitempty"` // hourly hPa in the row (pressure)
+
+	// bikeshare: the station's place, kept on the server to pick the
+	// nearest ones (parse_gbfs.go); never sent.
+	lat, lon float64
+	located  bool
 }
 
 // Source is the attribution shown under the list (PDL1.0 asks for it).
@@ -68,7 +73,13 @@ type Query struct {
 	IP       string
 }
 
-func (q Query) key() string { return q.Provider + "|" + q.Region + "|" + q.FeedID + "|" + q.Q }
+// key: bikeshare caches the whole system once, whatever the point.
+func (q Query) key() string {
+	if q.Provider == dsl.FeedBikeshare {
+		return q.Provider + "||" + q.FeedID + "|"
+	}
+	return q.Provider + "|" + q.Region + "|" + q.FeedID + "|" + q.Q
+}
 
 // Errors returned by Get.
 var (
@@ -111,6 +122,9 @@ var providerLimits = map[string]limits{
 	dsl.FeedPressure: {ttl: 30 * time.Minute, maxBody: 256 << 10},
 	dsl.FeedArxiv:    {ttl: 3 * time.Hour, maxBody: 1 << 20, gap: arxivGap},
 	dsl.FeedDiet:     {ttl: 3 * time.Hour, maxBody: 3 << 20, gap: 3 * time.Second},
+	// HELLO CYCLING's station_information is about 8 MB (15,700 stations,
+	// 2026-11-12); station_status about 4.5 MB. The source's own ttl is 60 s.
+	dsl.FeedBikeshare: {ttl: 2 * time.Minute, maxBody: 16 << 20},
 	// Cloudflare's summary is ~230 KB on a calm day (480 components) and
 	// grows with open incidents.
 	dsl.FeedStatus: {ttl: 5 * time.Minute, maxBody: 2 << 20},
@@ -160,6 +174,9 @@ type Service struct {
 	turns    map[string]chan struct{} // one fetch at a time per gap provider, in arrival order
 	lastAt   map[string]time.Time     // last fetch start per provider
 	misses   hourly                   // source fetches per "u:"uid / "i:"ip (search-word providers)
+	// bikeshare station_information per system and when it was read (parse_gbfs.go)
+	gbfsInfo   map[string]map[string]gbfsStation
+	gbfsInfoAt map[string]time.Time
 }
 
 // budget is a fixed per-minute window of upstream fetches.
@@ -212,6 +229,7 @@ func New(o Options) *Service {
 	s := &Service{client: o.Client, now: o.Now, log: o.Logger, disabled: map[string]bool{},
 		cache: map[string]*entry{}, inflight: map[string]*call{},
 		turns: map[string]chan struct{}{}, lastAt: map[string]time.Time{},
+		gbfsInfo: map[string]map[string]gbfsStation{}, gbfsInfoAt: map[string]time.Time{},
 		userMissesHour: cmp.Or(max(o.UserMissesPerHour, 0), DefaultUserMissesPerHour),
 		ipMissesHour:   cmp.Or(max(o.IPMissesPerHour, 0), DefaultIPMissesPerHour),
 		budgets: map[string]*budget{
@@ -287,6 +305,13 @@ func (s *Service) Get(ctx context.Context, q Query, limit int) (*Result, error) 
 	if q.Provider == dsl.FeedDiet {
 		q.Q, _ = dsl.NormalizeFeedQuery(q.Q) // "" (rejected by check) when invalid
 	}
+	var lat, lng float64
+	if q.Provider == dsl.FeedBikeshare {
+		var ok bool
+		if lat, lng, ok = dsl.ParseFeedPoint(q.Q); !ok {
+			return nil, ErrUnknown
+		}
+	}
 	if err := s.check(q); err != nil {
 		return nil, err
 	}
@@ -304,6 +329,8 @@ func (s *Service) Get(ctx context.Context, q Query, limit int) (*Result, error) 
 		items = fromToday(items, s.now())
 	case dsl.FeedPressure:
 		items = notEnded(items, s.now(), pressureBlock)
+	case dsl.FeedBikeshare:
+		items = nearest(items, lat, lng, limit)
 	}
 	if len(items) > limit {
 		items = items[:limit]
@@ -345,6 +372,11 @@ func (s *Service) check(q Query) error {
 		if q.Region != "" || q.FeedID != "" {
 			return ErrUnknown
 		}
+	case dsl.FeedBikeshare: // the point was checked by Get
+		if _, ok := s.ep.Bikeshare[q.FeedID]; !ok || q.Region != "" {
+			return ErrUnknown
+		}
+		return nil
 	}
 	if q.Provider != dsl.FeedDiet && q.Q != "" {
 		return ErrUnknown
@@ -462,7 +494,7 @@ func (s *Service) run(ctx context.Context, k string, q Query, e *entry, c *call,
 	start := time.Now()
 	title, items, n, err := s.fetch(ctx, q)
 	feedAttrs := []slog.Attr{slog.String("region", q.Region), slog.String("feed_id", q.FeedID)}
-	if q.Q != "" { // the length only: the words stay out of the logs
+	if q.Q != "" && q.Provider != dsl.FeedBikeshare { // the length only: the words stay out of the logs
 		feedAttrs = append(feedAttrs, slog.Int("q_runes", len([]rune(q.Q))))
 	}
 	LogFetch(ctx, s.log, FetchLine{Provider: q.Provider, Err: err, Bytes: n, Duration: time.Since(start), Attrs: feedAttrs})
@@ -477,7 +509,7 @@ func (s *Service) run(ctx context.Context, k string, q Query, e *entry, c *call,
 	keep := true
 	switch {
 	case err == nil:
-		if len(items) > maxStoredItems {
+		if len(items) > maxStoredItems && q.Provider != dsl.FeedBikeshare { // bikeshare keeps every station
 			items = items[:maxStoredItems]
 		}
 		*ne = entry{items: items, title: title, fetchedAt: now, expires: now.Add(providerLimits[q.Provider].ttl)}
@@ -572,7 +604,7 @@ type missKey struct {
 }
 
 func (s *Service) missKeys(q Query) []missKey {
-	if q.Q == "" {
+	if q.Q == "" || q.Provider == dsl.FeedBikeshare { // the point never reaches the source
 		return nil
 	}
 	var out []missKey
@@ -689,6 +721,8 @@ func (s *Service) fetch(ctx context.Context, q Query) (string, []Item, int, erro
 		rawURL, title, parse = s.ep.arxivURL(q.FeedID), "arXiv "+q.FeedID+"("+dsl.ArxivCategories[q.FeedID]+")の新着", parseArxiv
 	case dsl.FeedDiet:
 		rawURL, title, parse = s.ep.dietURL(q.Q), "国会会議録「"+q.Q+"」", parseDiet
+	case dsl.FeedBikeshare:
+		return s.fetchBikeshare(ctx, q)
 	case dsl.FeedStatus:
 		p := s.ep.Status[q.FeedID]
 		rawURL, title = p.URL, p.Name+"の稼働状況"

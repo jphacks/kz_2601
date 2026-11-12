@@ -39,7 +39,20 @@ type Endpoints struct {
 	RSS         map[string]RSSFeed
 	Arxiv       string // + "?search_query=cat:{category}&..." (dsl.ArxivCategories)
 	Diet        string // + "?any={q}&..." (国会会議録 speech search)
+	Bikeshare   map[string]BikeshareSystem
 	Status      map[string]StatusPage
+}
+
+// BikeshareSystem is one allowlisted GBFS system (#1694). Adding one is a
+// reviewed change here and in dsl.BikeshareSystems
+// (TestBikeshareAllowlistMatchesDSL keeps them equal).
+type BikeshareSystem struct {
+	Name       string // shown in the title
+	Info       string // https, fixed: station_information.json
+	Status     string // https, fixed: station_status.json
+	Credit     string // the credit line the license asks for
+	DatasetURL string // the catalogue page with the license
+	License    string
 }
 
 // StatusPage is one allowlisted public status page (Atlassian Statuspage
@@ -69,6 +82,12 @@ func DefaultEndpoints() Endpoints {
 		},
 		Arxiv: "https://export.arxiv.org/api/query",
 		Diet:  "https://kokkai.ndl.go.jp/api/speech",
+		Bikeshare: map[string]BikeshareSystem{
+			"docomo-cycle":       odptGBFS("docomo-cycle", "ドコモ・バイクシェア(東京以外)", "株式会社ドコモ・バイクシェア", "c_bikeshare_gbfs-d-nationwide-bikeshare", ccBY4),
+			"docomo-cycle-tokyo": odptGBFS("docomo-cycle-tokyo", "ドコモ・バイクシェア(東京)", "株式会社ドコモ・バイクシェア", "c_bikeshare_gbfs-d-bikeshare", ccBY4),
+			// OpenStreet offers CC BY 4.0, ODC BY 1.0 or ODbL 1.0; we take CC BY 4.0.
+			"hellocycling": odptGBFS("hellocycling", "HELLO CYCLING", "OpenStreet株式会社", "c_bikeshare_gbfs-openstreet", ccBY4+"(3 つのライセンスから選択)"),
+		},
 		Status: map[string]StatusPage{
 			"claude":     {Name: "Claude(Anthropic)", URL: "https://status.claude.com/api/v2/summary.json", SiteURL: "https://status.claude.com"},
 			"cloudflare": {Name: "Cloudflare", URL: "https://www.cloudflarestatus.com/api/v2/summary.json", SiteURL: "https://www.cloudflarestatus.com"},
@@ -76,6 +95,17 @@ func DefaultEndpoints() Endpoints {
 			"vercel":     {Name: "Vercel", URL: "https://www.vercel-status.com/api/v2/summary.json", SiteURL: "https://www.vercel-status.com"},
 		},
 	}
+}
+
+const ccBY4 = "CC BY 4.0 (https://creativecommons.org/licenses/by/4.0/)"
+
+// odptGBFS is a system on ODPT's public (no key) GBFS API. The credit follows
+// ODPT's FAQ form; the license notes the change (nearby ports, sorted).
+func odptGBFS(id, name, operator, dataset, license string) BikeshareSystem {
+	base := "https://api-public.odpt.org/api/v4/gbfs/" + id + "/"
+	return BikeshareSystem{Name: name, Info: base + "station_information.json", Status: base + "station_status.json",
+		Credit: "コンテンツ等の提供者名: " + operator + " / 公共交通オープンデータ協議会", DatasetURL: "https://ckan.odpt.org/dataset/" + dataset,
+		License: license + "・近くのポートを抜き出して近い順に並べ替えて表示"}
 }
 
 const pdl = "公共データ利用規約(第1.0版)"
@@ -106,6 +136,9 @@ func (ep Endpoints) source(q Query) Source {
 		return Source{Name: "arXiv.org", URL: "https://arxiv.org/list/" + q.FeedID + "/recent", License: "論文の情報は CC0 1.0・arXiv の承認や提携はありません"}
 	case dsl.FeedDiet:
 		return Source{Name: "国立国会図書館 国会会議録検索システム", URL: "https://kokkai.ndl.go.jp/", License: "検索用 API・発言の著作権は各発言者"}
+	case dsl.FeedBikeshare:
+		b := ep.Bikeshare[q.FeedID]
+		return Source{Name: b.Credit, URL: b.DatasetURL, License: b.License}
 	case dsl.FeedStatus:
 		p := ep.Status[q.FeedID]
 		return Source{Name: p.Name + " の status ページ", URL: p.SiteURL, License: statusLicense}
@@ -168,6 +201,10 @@ func (ep Endpoints) hosts() map[string]bool {
 	}
 	add(ep.Arxiv)
 	add(ep.Diet)
+	for _, b := range ep.Bikeshare {
+		add(b.Info)
+		add(b.Status)
+	}
 	for _, p := range ep.Status {
 		add(p.URL)
 	}

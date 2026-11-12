@@ -10,7 +10,7 @@ import (
 // it can never carry a URL. Nothing about the user or the app's records is
 // sent out: weather / warnings / pressure take a forecast region code,
 // holidays nothing, rss the id of an allowlisted feed, status the id of an
-// allowlisted status page. docs/backend/features/external-feeds.md
+// allowlisted status page; bikeshare's point stays on the server (feed_bikeshare.go). docs/backend/features/external-feeds.md
 
 // Feed providers (Component.Provider).
 const (
@@ -21,12 +21,14 @@ const (
 	FeedPressure = "pressure" // MET Norway の気圧の予報(Component.Region の代表地点)
 	FeedArxiv    = "arxiv"    // arXiv の分野ごとの新着論文(Component.FeedID = ArxivCategories)
 	FeedDiet     = "diet"     // 国会会議録検索システムの発言の検索(Component.Query)
-	FeedStatus   = "status"   // 許可したサービスの公開の status ページ(Component.FeedID = StatusPages)
+	// FeedBikeshare: GBFS の近いポートの空き(Component.FeedID = BikeshareSystems・Component.Query = "lat,lng")
+	FeedBikeshare = "bikeshare"
+	FeedStatus    = "status" // 許可したサービスの公開の status ページ(Component.FeedID = StatusPages)
 )
 
 // FeedProviders is the closed set of feed.provider values.
 var FeedProviders = map[string]bool{FeedWeather: true, FeedHolidays: true, FeedRSS: true, FeedWarnings: true, FeedPressure: true,
-	FeedArxiv: true, FeedDiet: true, FeedStatus: true}
+	FeedArxiv: true, FeedDiet: true, FeedBikeshare: true, FeedStatus: true}
 
 // FeedUsesRegion reports whether a provider reads Component.Region (a key of
 // WeatherRegions). The same 56 forecast office codes serve all three.
@@ -80,7 +82,7 @@ var StatusPages = map[string]string{
 
 func checkFeed(where string, c *Component, add func(string, ...any)) {
 	if !FeedProviders[c.Provider] {
-		add("%s: feed provider must be weather, warnings, pressure, holidays, rss, arxiv, diet or status (got %q); other sources and URLs are not available", where, c.Provider)
+		add("%s: feed provider must be weather, warnings, pressure, holidays, rss, arxiv, diet, bikeshare or status (got %q); other sources and URLs are not available", where, c.Provider)
 		return
 	}
 	if FeedUsesRegion(c.Provider) {
@@ -95,9 +97,9 @@ func checkFeed(where string, c *Component, add func(string, ...any)) {
 			add("%s: feed %s needs feedId, one of the allowlisted ids (%s) (got %q)", where, c.Provider, strings.Join(sortedKeys(ids), ", "), c.FeedID)
 		}
 	} else if c.FeedID != "" {
-		add("%s: feed feedId is only for provider rss, arxiv or status", where)
+		add("%s: feed feedId is only for provider rss, arxiv, bikeshare or status", where)
 	}
-	checkFeedQuery(where, c, add) // feed_arxiv_diet.go
+	checkFeedQuery(where, c, add) // feed_arxiv_diet.go (bikeshare: feed_bikeshare.go)
 	if c.Limit < 0 || c.Limit > FeedMaxLimit {
 		add("%s: feed limit must be 1..%d (0 = %d)", where, FeedMaxLimit, FeedDefaultLimit)
 	}
