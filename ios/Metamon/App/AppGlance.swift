@@ -17,6 +17,8 @@ enum AppGlance {
         var label: String
         var value: String
         var at: Date
+        /// `WidgetSnapshotWriter.statKey`。id を書かない stat は読むたびに id が変わるので、ショートカットはこちらで突き合わせる(#1994)。古い保存値は nil
+        var statKey: String? = nil
     }
 
     /// 数えるのに要るものの写し。言語の設定(件数の単位)は main actor で引いて入れる。
@@ -68,12 +70,12 @@ enum AppGlance {
     static func compute(_ input: Input) -> Value? {
         guard let c = chosen(in: input.dsl, setting: input.setting) else { return nil }
         let label = c.label ?? ""
-        if !input.canDecrypt, isEncrypted(c, in: input.dsl) { return Value(statId: c.id, label: label, value: "🔒", at: input.now) }
+        if !input.canDecrypt, isEncrypted(c, in: input.dsl) { return Value(statId: c.id, label: label, value: "🔒", at: input.now, statKey: WidgetSnapshotWriter.statKey(c)) }
         let records = input.records
         let evaluator = ExprEvaluator(dsl: input.dsl, records: { records[$0] ?? [] })
         guard let text = WidgetSnapshotWriter.statText(c, dsl: input.dsl, records: records, evaluator: evaluator,
                                                         countUnit: input.countUnit) else { return nil }
-        return Value(statId: c.id, label: label, value: text, at: input.now)
+        return Value(statId: c.id, label: label, value: text, at: input.now, statKey: WidgetSnapshotWriter.statKey(c))
     }
 
     /// 重い処理を main actor の外で走らせる。
