@@ -129,9 +129,9 @@ func load(raw json.RawMessage) (*app, error) {
 		for _, e := range a.indexed(so, "components", "screen "+sid) {
 			co := e.o
 			a.comps = append(a.comps, comp{sid, co})
-			at := "screen " + sid + " " + str(co, "type")
-			if str(co, "type") == "" { // no type to name the container by: use its index
-				at = fmt.Sprintf("screen %s.components[%d]", sid, e.i)
+			at := fmt.Sprintf("screen %s.components[%d]", sid, e.i) // index keeps same-type containers apart
+			if t := str(co, "type"); t != "" {
+				at += " " + t
 			}
 			for _, cho := range a.objs(co, "children", at) {
 				a.comps = append(a.comps, comp{sid, cho})
