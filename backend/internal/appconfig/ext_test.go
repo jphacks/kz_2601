@@ -197,6 +197,9 @@ func TestExtConnections(t *testing.T) {
 	if r.code != http.StatusOK || len(list) != 1 || list[0].(map[string]any)["provider"] != extapi.FakeOAuth || list[0].(map[string]any)["status"] != "active" {
 		t.Fatalf("list: %d %s", r.code, r.raw)
 	}
+	if n, ok := list[0].(map[string]any)["monthCalls"]; !ok || n != float64(0) { // #2144
+		t.Fatalf("monthCalls before a call: %s", r.raw)
+	}
 	if strings.Contains(string(r.raw), "fake-access") || strings.Contains(string(r.raw), "sealed") {
 		t.Fatalf("a token reached the device: %s", r.raw)
 	}
@@ -204,6 +207,9 @@ func TestExtConnections(t *testing.T) {
 	e.ownApp("solo", "/v1/apps/EXT-CAL", kakeibo(t))
 	if r := e.do("solo", http.MethodPost, "/v1/apps/EXT-CAL/ext/fakeOauth/listEvents", `{"args":{}}`, nil); r.code != http.StatusOK || len(r.body["rows"].([]any)) != 1 {
 		t.Fatalf("connected call: %d %s", r.code, r.raw)
+	}
+	if r := e.do("solo", http.MethodGet, "/v1/me/connections", nil, nil); r.body["connections"].([]any)[0].(map[string]any)["monthCalls"] != float64(1) {
+		t.Fatalf("monthCalls after a call: %s", r.raw)
 	}
 	// revoke: 204, then the list is empty and the op is 409 again
 	if r := e.do("solo", http.MethodDelete, "/v1/me/connections/fakeOauth", nil, nil); r.code != http.StatusNoContent {

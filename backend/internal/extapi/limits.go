@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"math"
 	"strconv"
 	"strings"
 	"sync"
@@ -138,6 +139,84 @@ type limitCharge struct {
 	store    ratelimit.Store
 	counters []ratelimit.Counter
 	expireAt time.Time
+	// month is the user's count of this month (#2144), refunded with it
+	month *limitCharge
+}
+
+// Monthly use (#2144): every call counted above also counts once on the
+// user's month of the provider, shown by GET /v1/me/connections. It is
+// never a limit (the cap only keeps evaluate from stopping it) and a store
+// failure skips it (the call goes on; the shown count is then short).
+//
+//	rateLimits/{env}_{yyyy-mm}_ext_{provider}_uid_{uid}   expires a day after the month
+const scopeUserMonthly = "user_monthly"
+
+func (s *Service) monthCounter(provider, uid string, now time.Time) ratelimit.Counter {
+	env := s.cfg.Env
+	if env == "" {
+		env = "local"
+	}
+	return ratelimit.Counter{ID: fmt.Sprintf("%s_%s_ext_%s_uid_%s", env, now.In(ratelimit.JST).Format("2006-01"), provider, docSafe(uid)),
+		Scope: scopeUserMonthly, Limit: math.MaxInt32}
+}
+
+// countMonth adds one call to uid's month of provider (nil when it was not counted).
+func (s *Service) countMonth(ctx context.Context, provider, uid string, now time.Time) *limitCharge {
+	if uid == "" {
+		return nil
+	}
+	y, m, _ := now.In(ratelimit.JST).Date()
+	expireAt := time.Date(y, m+1, 1, 0, 0, 0, 0, ratelimit.JST).Add(24 * time.Hour)
+	counters := []ratelimit.Counter{s.monthCounter(provider, uid, now)}
+	if _, err := s.limits.store.Consume(ctx, counters, 1, expireAt); err != nil {
+		s.Log.WarnContext(ctx, "extapi: counting the month failed", slog.String("provider", provider), slog.Any("error", err))
+		return nil
+	}
+	return &limitCharge{store: s.limits.store, counters: counters, expireAt: expireAt}
+}
+
+// MonthCalls is uid's calls of each provider this month (JST), read
+// without writing (one batched read). A store that cannot peek is an error.
+func (s *Service) MonthCalls(ctx context.Context, uid string, providers []string) (map[string]int, error) {
+	peeker, ok := s.limits.store.(ratelimit.Peeker)
+	if !ok {
+		return nil, errors.New("extapi: the limit store cannot peek")
+	}
+	if uid == "" || len(providers) == 0 {
+		return map[string]int{}, nil
+	}
+	now := s.now()
+	counters := make([]ratelimit.Counter, len(providers))
+	for i, p := range providers {
+		counters[i] = s.monthCounter(p, uid, now)
+	}
+	counts, err := peeker.Peek(ctx, counters)
+	if err != nil {
+		return nil, err
+	}
+	out := make(map[string]int, len(providers))
+	for i, p := range providers {
+		out[p] = counts[i]
+	}
+	return out, nil
+}
+
+// addMonthCalls fills each connection's MonthCalls (left absent when the
+// counts cannot be read: the list itself still answers).
+func (s *Service) addMonthCalls(ctx context.Context, uid string, conns []ConnectionView) {
+	ids := make([]string, len(conns))
+	for i, c := range conns {
+		ids[i] = c.Provider
+	}
+	counts, err := s.MonthCalls(ctx, uid, ids)
+	if err != nil {
+		s.Log.WarnContext(ctx, "extapi: reading the month counts failed", slog.Any("error", err))
+		return
+	}
+	for i := range conns {
+		n := counts[conns[i].Provider]
+		conns[i].MonthCalls = &n
+	}
 }
 
 // UseLimitStore counts the call limits in store (Firestore `rateLimits` in
@@ -211,7 +290,7 @@ func (s *Service) consumeLimits(ctx context.Context, provider, uid, app string) 
 			Limit: lim.GlobalDaily, Shards: ratelimit.GlobalShards}, dayEnd})
 	}
 	if len(cs) == 0 {
-		return limitCharge{}, nil
+		return limitCharge{month: s.countMonth(ctx, provider, uid, now)}, nil
 	}
 	counters := make([]ratelimit.Counter, len(cs))
 	for i, c := range cs {
@@ -235,11 +314,14 @@ func (s *Service) consumeLimits(ctx context.Context, provider, uid, app string) 
 	if u.Charged != nil {
 		counters = u.Charged
 	}
-	return limitCharge{store: store, counters: counters, expireAt: expireAt}, nil
+	return limitCharge{store: store, counters: counters, expireAt: expireAt, month: s.countMonth(ctx, provider, uid, now)}, nil
 }
 
 // refundLimits gives back a call that did not reach the provider.
 func (s *Service) refundLimits(ctx context.Context, provider string, c limitCharge) {
+	if c.month != nil {
+		s.refundLimits(ctx, provider, *c.month)
+	}
 	if c.store == nil {
 		return
 	}
