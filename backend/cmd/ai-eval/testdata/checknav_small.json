@@ -1,0 +1,63 @@
+{
+  "schemaVersion": 1,
+  "app": {
+    "name": "持ち物",
+    "description": "checkNav のテスト用の小さなアプリ",
+    "icon": "bag",
+    "voiceEntry": "floating",
+    "tabs": [
+      { "screen": "home", "title": "持ち物", "icon": "bag" },
+      { "screen": "people", "title": "人", "icon": "person.2" }
+    ]
+  },
+  "initialScreen": "home",
+  "entities": [
+    {
+      "id": "people",
+      "name": "人",
+      "titleField": "name",
+      "fields": [
+        { "id": "name", "name": "名前", "type": "string", "required": true }
+      ]
+    },
+    {
+      "id": "items",
+      "name": "持ち物",
+      "titleField": "title",
+      "fields": [
+        { "id": "title", "name": "持ち物", "type": "string", "required": true },
+        { "id": "owners", "name": "持ち主", "type": "refs", "refEntity": "people" }
+      ]
+    }
+  ],
+  "screens": [
+    {
+      "id": "home",
+      "title": "持ち物",
+      "toolbar": [
+        { "label": "追加", "icon": "plus", "action": { "type": "navigate", "screen": "item_form", "presentation": "sheet" } }
+      ],
+      "components": [
+        { "type": "list", "id": "items", "area": "A1:F12", "entity": "items", "swipeToDelete": true,
+          "item": { "title": "title" }, "emptyText": "まだありません" }
+      ]
+    },
+    {
+      "id": "people",
+      "title": "人",
+      "components": [
+        { "type": "stat", "id": "count", "area": "A1:F2", "label": "人数", "entity": "people", "aggregate": "count" },
+        { "type": "table", "id": "people_table", "area": "A3:F12", "entity": "people", "columns": [{ "field": "name" }] }
+      ]
+    },
+    {
+      "id": "item_form",
+      "title": "持ち物",
+      "entity": "items",
+      "toolbar": [{ "label": "保存", "icon": "checkmark", "action": { "type": "saveRecord", "entity": "items" } }],
+      "components": [
+        { "type": "textField", "id": "title", "area": "A1:F2", "field": "title", "label": "持ち物" }
+      ]
+    }
+  ]
+}
