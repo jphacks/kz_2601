@@ -31,10 +31,14 @@ class AutostartTest {
 
     @Test
     fun xdgDirFollowsConfigHome() {
-        assertEquals(File("/x/cfg/autostart"), XdgAutostart.dir(mapOf("XDG_CONFIG_HOME" to "/x/cfg"), "/home/u"))
-        assertEquals(File("/home/u/.config/autostart"), XdgAutostart.dir(emptyMap(), "/home/u"))
+        // "/x" は Windows では絶対パスでないので、どの OS でも絶対になる tmp から作る
+        val cfg = File(tmp.root, "cfg").absolutePath
+        val home = File(tmp.root, "home").absolutePath
+        val fallback = File(File(home, ".config"), "autostart")
+        assertEquals(File(cfg, "autostart"), XdgAutostart.dir(mapOf("XDG_CONFIG_HOME" to cfg), home))
+        assertEquals(fallback, XdgAutostart.dir(emptyMap(), home))
         // 相対の XDG_CONFIG_HOME は決まりどおり無視する
-        assertEquals(File("/home/u/.config/autostart"), XdgAutostart.dir(mapOf("XDG_CONFIG_HOME" to "rel"), "/home/u"))
+        assertEquals(fallback, XdgAutostart.dir(mapOf("XDG_CONFIG_HOME" to "rel"), home))
     }
 
     @Test
