@@ -7,13 +7,36 @@ set -eu
 PLIST="${TARGET_BUILD_DIR}/${INFOPLIST_PATH}"
 PB=/usr/libexec/PlistBuddy
 
+# 審査用ビルドで消すキー(1 行 1 つ・名前順)。Info.plist と訳(*.lproj/InfoPlist.strings)の両方をこの一覧で消す。
 # HealthKit / 位置の常時・背面 / 近くの端末(ローカルネットワーク・Bonjour・UWB の距離 #425)/ モーション(healthStat の歩数計・sensorValue の気圧計)/ 共有リンクの URL スキーム
 # / 止めるまで鳴るアラーム(AlarmKit。この版ではアラームの通知も普通の通知で届ける)
-for key in NSHealthShareUsageDescription NSHealthUpdateUsageDescription NSHealthClinicalHealthRecordsShareUsageDescription \
-           NSLocationAlwaysUsageDescription NSLocationAlwaysAndWhenInUseUsageDescription \
-           NSLocalNetworkUsageDescription NSBonjourServices NSNearbyInteractionUsageDescription NSMotionUsageDescription CFBundleURLTypes \
-           NSAlarmKitUsageDescription; do
+# / 端末のカレンダー・リマインダーを読む(#1987。使う部品がまだ無い。説明文が無いと LiveDeviceCalendar は許可を求めず restricted を返す)
+REVIEW_REMOVED_KEYS="
+CFBundleURLTypes
+NSAlarmKitUsageDescription
+NSBonjourServices
+NSCalendarsFullAccessUsageDescription
+NSHealthClinicalHealthRecordsShareUsageDescription
+NSHealthShareUsageDescription
+NSHealthUpdateUsageDescription
+NSLocalNetworkUsageDescription
+NSLocationAlwaysAndWhenInUseUsageDescription
+NSLocationAlwaysUsageDescription
+NSMotionUsageDescription
+NSNearbyInteractionUsageDescription
+NSRemindersFullAccessUsageDescription
+"
+
+for key in $REVIEW_REMOVED_KEYS; do
   "$PB" -c "Delete :$key" "$PLIST" 2>/dev/null || true
+done
+
+# 訳(InfoPlist.xcstrings -> *.lproj/InfoPlist.strings)に残る説明も同じ一覧で消す
+for strings in "${TARGET_BUILD_DIR}/${UNLOCALIZED_RESOURCES_FOLDER_PATH}"/*.lproj/InfoPlist.strings; do
+  [ -f "$strings" ] || continue
+  for key in $REVIEW_REMOVED_KEYS; do
+    "$PB" -c "Delete :$key" "$strings" 2>/dev/null || true
+  done
 done
 
 # UIBackgroundModes から location だけ外す(fetch = 裏の定期同期は残す)
