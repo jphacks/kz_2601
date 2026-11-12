@@ -23,6 +23,8 @@ TAILORIT_API=stg TAILORIT_DEV_TOKEN=<Firebase の ID トークン> ./gradlew :de
 
 - `docs/dsl/examples` の DSL を 1 本読み、画面を 6 列のグリッド(`area`)に並べる。area の無い部品は下に全幅で積み、フォーム画面は段(band)で積む。広いウィンドウでは幅 720dp で止めて中央に寄せる。最小 360×560、大きさと位置は次の起動で戻す。
 - 描ける部品: 並び・見出し・text・label・badge・markdown(書式付き)・button・link・list(LazyColumn・チェック・右クリック / Delete キーで削除)・table(列の幅を引いて変える・見出しで並べ替え)・timeline・gridTable・searchBar・feed / matchList(見出しと案内だけ)・入力 20 種(textField〜qrScanner)・fileImport・image・avatar・icon(`docs/dsl/icon-map.json` をビルド時に同梱し、Material の絵に写す。表に無い名前は細い円)・stat・chart(棒・線・扇)・progressBar・gauge・calendar(今月の表)。
+- openUrlButton(`OpenUrlButton.kt`): link と同じ openUrl(許可した scheme だけ)で開く。`app` があればそれを先に使い、`to` の `{{fieldId}}` はフォームの値で埋める(Android の `OpenApp`・`FormTemplate` をビルド時に取り込む)。app の候補は先頭から試し、開けなければ次(slack:// が無ければ Web)。ラベル・アイコンの既定は Android と同じ(`renderer_open_<app>`)。style は primary / secondary(既定)/ plain。知らない app・許可しない URL はボタンを出さず一言だけ出す。
+- 出さない部品: hidden の項目につながった部品は、入力に限らず枠ごと描かない。フォームの外の入力(field の無い入力も)は「この入力はフォームの画面で使えます」の一言にする。判定は `DesktopLeaves.state`(iOS の `RenderTree.state` と同じ順: hidden の項目 → 描けない type → 出さない削除・保存ボタン → フォームの外の入力)で、画面・操作・適合テストが同じ関数を見る。
 - 記録を入れて開く: `./gradlew :desktop:run --args="kakeibo /path/records.json stats"`(2 つ目は `{"<entity>": [{"id", "data"}]}`、3 つ目は最初の画面)。
 - 入力: 日付・時刻は文字で入れて「今日」「‹ ›」で動かす。写真・動画はファイルを選ぶ・落とす・Ctrl+V、録音はファイルを選ぶ(撮影・録音・位置はこのパソコンでは使えない旨の枠)。手書きはマウス・ペンで描いて PNG に。QR は画像ファイルかクリップボードの画像から読む(zxing)。
 - 遷移: push はウィンドウの中で積み、sheet はウィンドウ内のダイアログ、fullScreen はウィンドウ全体に重ねる。タブは下に並べる。confirmMessage は確認ダイアログ。規則は Android と同じ `NavigationResolver`・`FormDraft`(`android/renderer` のソースをビルド時に取り込む。`android/` は変えない)。
@@ -33,10 +35,13 @@ TAILORIT_API=stg TAILORIT_DEV_TOKEN=<Firebase の ID トークン> ./gradlew :de
 - 起動は 1 つだけ: 同じ保存先ではアプリを 1 つしか起動しない。もう一度起動すると、起動中の方が前に出る(トレイに隠れていても出す。`--args=kakeibo` のようにアプリを渡すとそのアプリを開く)。起動中の方に渡せない時は「Tailor It はもう起動しています」と出して終わる。保存先を分ければ同時に起動できる(`-Dtailorit.dataDir=<フォルダ>`。`gradlew run` では `JAVA_TOOL_OPTIONS=-Dtailorit.dataDir=/tmp/tailorit-b ./gradlew :desktop:run` のように渡す)。記録の JSON を渡して開く時(上の「記録を入れて開く」)は端末に残さないので、この制限は無く何本でも起動できる。
 - サインインはまだ無い。
 - 言語: OS の言語が日本語なら日本語、それ以外は英語。`TAILORIT_LANG=en`(または `-Dtailorit.lang=en`)で替えられる。文言は Android の `strings*.xml` をビルド時にそのまま同梱し、同じキーで引く(引けなければ英語 → 日本語)。
+- 遊び・データの部品の文言(精算・トーナメント・カード・QR・表の集計の見出し・「全員」「参加者」)も Android と同じキーで引き、英語の時は英語で出す。Android に無い文言だけ `desktop_` のキーで足す。適合テストの描画の木の値(精算の題・回戦の名前)は Android と同じく日本語のまま。画面の文字の直書きは `HardcodedJapaneseTest` が見つけ、残してよい物は理由付きで一覧にする。
 - 明暗: OS のダークモードに従う(Windows はレジストリ、Linux は freedesktop の color-scheme か GNOME の設定、起動中の切り替えも 5 秒ごとに追う)。`TAILORIT_THEME=light / dark` で固定できる。
+- 電池(`power/`): 電池の残り・充電の状態・省電力を読む口(iOS の `DevicePowerSource` と同じ形)。Linux は `/sys/class/power_supply`(マウスなどの電池は数えない・複数の電池は容量で重みを付けた平均)と `/sys/firmware/acpi/platform_profile` を 60 秒ごとに読み、変わった時だけ流す。Windows と macOS は今は「不明」。`METAMON_MOCK=1` の時は `METAMON_BATTERY_LEVEL`・`METAMON_BATTERY_STATE`・`METAMON_LOW_POWER` の偽物。式と画面にはまだ出さず、値は送らない。
 - 読み上げ: 見出し・タブ(選択中)・ダイアログの名前・知らせ(live region)・絵で描く部品(グラフ・進み具合・メーター・星・画像)の説明を付けている。Windows は Java Access Bridge を通す(`jabswitch -enable` が要る)。Linux の Orca は JDK に橋渡しが無く、まだ読めない。
 - ファイル: `fileImport` で CSV(取り込みの確認を出す)・テキスト・PDF(本文)を取り込む。大きすぎるファイルは読む前に断る(CSV・テキストは 5 MB、PDF は 30 MB まで。一覧に落とした CSV も同じ)。
 - ドラッグ & ドロップ: 画面に写真・動画・CSV・テキスト・PDF を落とすと、photoField / videoField / fileImport / list に振り分ける。外へ引き出すこともできる(`io/DragOut.kt`): list・table の行は、選んだ行を引くと選んだ行全部、選んでいない行ならその 1 行を、文字はコピーと同じ TSV(見出し付き)、ファイルを受けるアプリ(エクスプローラーなど)には `<一覧名>.csv` で渡す。写真・image・一覧の行のサムネイルは PNG のファイルで渡す。ファイルは落とした時に OS の一時フォルダ(`tailorit-drag/`)へ書き、アプリを閉じると消える(落ちて残った分は次の起動で、1 日より古い物を消す)。
+- 写真を大きく見る(`PhotoPreview.kt`): 記録・フォームの写真(data URL と手元の画像ファイル)を押す(フォーカスして Space でも)か、何も選んでいない時に Space で、ウィンドウ内のダイアログに大きく出す。コマンドパレットの「写真を大きく見る」からも開ける。← → で送り(端で止まる)、Esc / Space / 暗幕のクリックで閉じる。並びは DSL の項目順で、隠す項目・算出項目・https の写真は出さない。開いている間は下の画面に Tab で入らず、画面が移ったら閉じる。読み上げの名前は「写真のプレビュー: <項目名>」。「既定のアプリで開く」は PNG にしてこの人だけの一時フォルダ(Windows は `%LOCALAPPDATA%\TailorIt\tmp\open`、macOS は `~/Library/Caches/TailorIt/tmp/open`、Linux は `$XDG_RUNTIME_DIR/tailorit/open`、無ければ端末の保存先の `tmp/open`)へ書き、OS のビューアに渡す(元のファイルの場所は渡さない)。書いた物はアプリを閉じる時・「この端末のデータを消す」で消し、残った分は次の起動で 1 日より古い物を消す。
 - クリップボード: 一覧の「表をコピー」で表計算に貼れる TSV、「表を貼り付け」で表計算の行を取り込む。list・table の行はクリックで選び、Shift+クリックで範囲、Ctrl+クリック(macOS は ⌘)で足し引き、Ctrl+A で全部。選んでいる時は Ctrl+C と「表をコピー」が選んだ行だけを同じ TSV(見出し付き)でコピーする(table は見えている列)。詳細へ移る行(onItemTap)は修飾キー無しのクリックで今までどおり開く(`RowSelection.kt`)。画像は Ctrl+V で photoField へ。
 - 印刷: Ctrl+P(または見出しの「印刷」)で一番上の画面をプレビューし、OS の印刷ダイアログから A4 縦で印刷する。頁は export の PDF と同じ(`io/PdfIo.pages`)。一覧・table・gridTable・chart は表ごとに頁を改めて全行を複数頁に割り、stat などの値とフォームの入力は「項目 / 値」の表にする(`Print.kt`)。プレビューの頁は裏で描き、描き終えるまでは回る印を出して「印刷…」を押せない。画面の無い DSL では Ctrl+P は効かない。
 - キーボード: Ctrl+K(または Ctrl+Shift+P)でコマンドパレット(画面・アクション・同梱のアプリを名前で選ぶ)、Ctrl+N 新規・Ctrl+S 保存・Ctrl+F 検索・Delete 削除(確認あり)・Esc 閉じる / 戻る・F1(または Ctrl+/)で一覧。macOS は Ctrl の代わりに ⌘、削除は ⌘⌫。Tab はグリッドの行 → 列の順(`Keyboard.kt`・`CommandPalette.kt`)。
@@ -51,11 +56,14 @@ TAILORIT_API=stg TAILORIT_DEV_TOKEN=<Firebase の ID トークン> ./gradlew :de
 | `app/src/main/kotlin/.../desktop/` | ウィンドウ・画面の描画・モックのレコード |
 | `app/src/main/kotlin/.../desktop/Session.kt` | 画面の状態と操作(遷移・下書き・保存・削除)。画面と適合テストが同じ物を使う |
 | `app/src/main/kotlin/.../desktop/InputLeaves.kt`・`Actions.kt` | 入力の部品 20 種・OS に頼むアクション |
+| `app/src/main/kotlin/.../desktop/DesktopSupport.kt` | 描ける type の一覧と部品の state(`DesktopLeaves.state`: rendered・hidden・needsForm・unavailable・unknown)。画面・操作・適合テストが同じ物を使う |
 | `services/` | `android/services` の純 Kotlin の部分(API クライアント・記録の保存・送信待ち・同意)を同じソースのまま取り込む。取り込むファイルは `services/build.gradle.kts` で名指し。宣言にだけ出る Android の型は `services/src/shim` の置き換え |
 | `app/src/main/kotlin/.../desktop/net/` | 接続先の設定(既定はモック)・`X-Client-Platform: windows / linux / macos`・User-Agent |
 | `app/src/main/kotlin/.../desktop/store/` | 端末の保存。`%APPDATA%\TailorIt`・`$XDG_DATA_HOME/tailorit`(無ければ `~/.local/share/tailorit`)・`~/Library/Application Support/TailorIt` に設定・同意・記録・送信待ち・DSL を JSON で置く。サインアウトで消す。書き込みは同じフォルダの一時ファイル(毎回別の名前の `*.tmp`)に書いてから置き換え、落ちて残った `*.tmp` は開く時・全部消す時に消す |
 | `app/src/main/kotlin/.../desktop/SingleInstance.kt` | 起動は保存先ごとに 1 つ。保存先の `.lock` をロックし(プロセスが終われば OS が外す)、127.0.0.1 の空いた口と合言葉を `.instance` に書いて 2 つ目の起動を待つ。2 つ目は合言葉と引数を送って前に出させて終わる。ロックを作れない時(保存先に書けないなど)は起動を止めない。記録の JSON を渡した起動はロックを取らない |
 | `app/src/main/kotlin/.../desktop/io/` | 取り込み・書き出し・ドラッグ & ドロップ・クリップボード(PDF は Apache PDFBox)。書き出しの名前は `io/FileNames.kt`(上書きしない・Windows の予約名)。外へ渡すファイルは OS の一時フォルダの `tailorit-drag/`(引き出し)・`tailorit-calendar/`(.ics)に置き、起動時に 1 日より古い物を消す |
+| `app/src/main/kotlin/.../desktop/PhotoPreview.kt` | 写真を大きく見るダイアログ・見せる写真の集め方(Mac の `MacQuickLook.sources` と同じ規則)・「既定のアプリで開く」の一時ファイル |
 | `app/src/main/kotlin/.../desktop/i18n/`・`app/src/main/resources/i18n/desktop/` | 文言。Android の `renderer`・`app` の `values`(日本語)・`values-en`(英語)をビルド時に `i18n/` へ同梱して読む。デスクトップだけの文言は同じ形の XML(キーは `desktop_`) |
 | `app/src/main/kotlin/.../desktop/theme/`・`A11y.kt` | OS に従う明暗・読み上げの説明 |
-| `app/src/test/kotlin/.../desktop/DesktopConformanceTest.kt` | 全 OS 共通の適合テストのうち、今比べられる部分(画面・入力の値とラベル・操作の steps)。違ってよい所(描けない type・まだ比べない props)は `ConformanceAllowlist.kt` に理由付きで書き、無い違いは落ちる |
+| `app/src/main/kotlin/.../desktop/power/` | 電池の残り・充電・省電力を読む口(Linux は sysfs、Windows・macOS は今は不明、`METAMON_MOCK=1` で偽物)。まだどこからも使っていない |
+| `app/src/test/kotlin/.../desktop/DesktopConformanceTest.kt` | 全 OS 共通の適合テストのうち、今比べられる部分(画面・部品の state(hidden・needsForm を含む)・入力の値とラベル・操作の steps・openUrlButton の label / url・stat / gauge / progressBar / chart の DSL の値と計算した値)。違ってよい所(描けない type・まだ比べない props)は `ConformanceAllowlist.kt` に理由付きで書き、無い違いは落ちる |
