@@ -116,7 +116,7 @@ func TestNeedOnSmall(t *testing.T) {
 	}
 }
 
-func TestEvaluateAndScore(t *testing.T) {
+func TestEvaluateAndScoreFiles(t *testing.T) {
 	cases := []auditCase{{ID: "small", Needs: []string{"agg", "filter_month", "toggle", "tabs3", "filter_today"}}}
 	res, rf := evaluate(cases, "testdata/run.json")
 	if rf.Model != "test-model" || len(rf.Cases) != 3 {
