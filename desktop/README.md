@@ -35,7 +35,7 @@ TAILORIT_API=stg TAILORIT_DEV_TOKEN=<Firebase の ID トークン> ./gradlew :de
 - 明暗: OS のダークモードに従う(Windows はレジストリ、Linux は freedesktop の color-scheme か GNOME の設定、起動中の切り替えも 5 秒ごとに追う)。`TAILORIT_THEME=light / dark` で固定できる。
 - 読み上げ: 見出し・タブ(選択中)・ダイアログの名前・知らせ(live region)・絵で描く部品(グラフ・進み具合・メーター・星・画像)の説明を付けている。Windows は Java Access Bridge を通す(`jabswitch -enable` が要る)。Linux の Orca は JDK に橋渡しが無く、まだ読めない。
 - ファイル: `fileImport` で CSV(取り込みの確認を出す)・テキスト・PDF(本文)を取り込む。
-- ドラッグ & ドロップ: 画面に写真・動画・CSV・テキスト・PDF を落とすと、photoField / videoField / fileImport / list に振り分ける。写真は外へ引き出せる。
+- ドラッグ & ドロップ: 画面に写真・動画・CSV・テキスト・PDF を落とすと、photoField / videoField / fileImport / list に振り分ける。外へ引き出すこともできる(`io/DragOut.kt`): list・table の行は、選んだ行を引くと選んだ行全部、選んでいない行ならその 1 行を、文字はコピーと同じ TSV(見出し付き)、ファイルを受けるアプリ(エクスプローラーなど)には `<一覧名>.csv` で渡す。写真・image・一覧の行のサムネイルは PNG のファイルで渡す。ファイルは落とした時に一時フォルダ(`tailorit-drag/`)へ書き、アプリを閉じると消える。
 - クリップボード: 一覧の「表をコピー」で表計算に貼れる TSV、「表を貼り付け」で表計算の行を取り込む。list・table の行はクリックで選び、Shift+クリックで範囲、Ctrl+クリック(macOS は ⌘)で足し引き、Ctrl+A で全部。選んでいる時は Ctrl+C と「表をコピー」が選んだ行だけを同じ TSV(見出し付き)でコピーする(table は見えている列)。詳細へ移る行(onItemTap)は修飾キー無しのクリックで今までどおり開く(`RowSelection.kt`)。画像は Ctrl+V で photoField へ。
 - 印刷: Ctrl+P(または見出しの「印刷」)で一番上の画面をプレビューし、OS の印刷ダイアログから A4 縦で印刷する。頁は export の PDF と同じ(`io/PdfIo.pages`)。一覧・table・gridTable・chart は表ごとに頁を改めて全行を複数頁に割り、stat などの値とフォームの入力は「項目 / 値」の表にする(`Print.kt`)。
 - キーボード: Ctrl+K(または Ctrl+Shift+P)でコマンドパレット(画面・アクション・同梱のアプリを名前で選ぶ)、Ctrl+N 新規・Ctrl+S 保存・Ctrl+F 検索・Delete 削除(確認あり)・Esc 閉じる / 戻る・F1(または Ctrl+/)で一覧。macOS は Ctrl の代わりに ⌘、削除は ⌘⌫。Tab はグリッドの行 → 列の順(`Keyboard.kt`・`CommandPalette.kt`)。
