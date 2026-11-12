@@ -1,11 +1,52 @@
 package main
 
 import (
+	"go/ast"
+	"go/parser"
+	"go/token"
 	"os"
 	"path/filepath"
+	"sort"
+	"strconv"
 	"strings"
 	"testing"
 )
+
+// needNames lists every need name that need() handles, read from the case
+// clauses of its switch in main.go so new needs are swept automatically.
+func needNames(t *testing.T) []string {
+	t.Helper()
+	f, err := parser.ParseFile(token.NewFileSet(), "main.go", nil, 0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var names []string
+	for _, d := range f.Decls {
+		fn, ok := d.(*ast.FuncDecl)
+		if !ok || fn.Name.Name != "need" {
+			continue
+		}
+		for _, st := range fn.Body.List {
+			sw, ok := st.(*ast.SwitchStmt)
+			if !ok {
+				continue
+			}
+			for _, cl := range sw.Body.List {
+				for _, e := range cl.(*ast.CaseClause).List {
+					if lit, ok := e.(*ast.BasicLit); ok && lit.Kind == token.STRING {
+						n, _ := strconv.Unquote(lit.Value)
+						names = append(names, n)
+					}
+				}
+			}
+		}
+	}
+	if len(names) == 0 {
+		t.Fatal("no need names found in main.go")
+	}
+	sort.Strings(names)
+	return names
+}
 
 func mustLoad(t *testing.T, raw string) *app {
 	t.Helper()
@@ -88,6 +129,15 @@ func TestNeedMarks(t *testing.T) {
 		{"streak", screen(``, ""), "×"},
 		{"bulk_delete", screen(``, ""), "×"},
 		{"no_such_need", screen(``, ""), "?"},
+	}
+	covered := map[string]bool{}
+	for _, c := range cases {
+		covered[c.need] = true
+	}
+	for _, n := range needNames(t) {
+		if !covered[n] {
+			t.Errorf("need %q has no case in TestNeedMarks", n)
+		}
 	}
 	for _, c := range cases {
 		m, why := need(mustLoad(t, c.dsl), c.need)
