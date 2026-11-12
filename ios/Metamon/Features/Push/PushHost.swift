@@ -13,7 +13,7 @@ final class PushHost {
     private var uid: () -> String? = { nil }
     private var authorization: () async -> UNAuthorizationStatus = { await UNUserNotificationCenter.current().notificationSettings().authorizationStatus }
     private var requestToken: () -> Void = { UIApplication.shared.registerForRemoteNotifications() }
-    private var openApp: (String) async -> Void = { await IntentHost.shared.request(.openFromNotification(appId: $0)) }
+    private var openApp: (String) async -> Void = { _ = await IntentHost.shared.request(.openFromNotification(appId: $0)) }
 
     /// モック(`pushDevices` が nil)では何もしない。
     func install(services: Services) {

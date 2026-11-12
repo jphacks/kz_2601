@@ -51,6 +51,14 @@ public actor InMemoryAppConfigClient: AppConfigClient {
         apps = AppListEdit.applyingOrder(ids, to: apps)
     }
 
+    public func setAppGlance(appId: String, glanceStat: String) async throws -> AppSummary {
+        guard let i = apps.firstIndex(where: { $0.id == appId }) else {
+            throw APIError.server(status: 404, code: "not_found", message: "app not found (in-memory)")
+        }
+        apps[i].glanceStat = glanceStat.isEmpty ? nil : glanceStat
+        return apps[i]
+    }
+
     /// 履歴は持たない(モックの undo は `AppRuntime` のローカル履歴にフォールバックする)。
     public func listVersions(appId: String) async throws -> [VersionSummary] { [] }
 

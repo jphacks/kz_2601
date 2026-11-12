@@ -849,6 +849,23 @@
         }
       }
     },
+    "(「%@」と出ます)" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : " (it says \"%@\")"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "(「%@」と出ます)"
+          }
+        }
+      }
+    },
     "(これまでに反映した変更)" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -2114,6 +2131,23 @@
         }
       }
     },
+    "「%@」が動かないから直して" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "\"%@\" isn't working, fix it"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "「%@」が動かないから直して"
+          }
+        }
+      }
+    },
     "「%@」が必要です。Tailor It を開いて追加してください" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -2298,6 +2332,23 @@
         }
       }
     },
+    "「%@」の画面がうまく動かないから直して" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The \"%@\" screen isn't working right, fix it"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "「%@」の画面がうまく動かないから直して"
+          }
+        }
+      }
+    },
     "「%@」の画面と項目の設計" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -2311,6 +2362,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "「%@」の画面と項目の設計"
+          }
+        }
+      }
+    },
+    "「%@」の画面の「%@」が動かないから直して" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The \"%2$@\" on the \"%1$@\" screen isn't working, fix it"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "「%@」の画面の「%@」が動かないから直して"
           }
         }
       }
@@ -2870,6 +2938,40 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "うまく作れませんでした"
+          }
+        }
+      }
+    },
+    "うまく動かない所があったら「〇〇が動かないから直して」と ⌘K か ⇧⌘M で頼むと直せます" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "If something doesn't work, just ask \"X isn't working, fix it\" with ⌘K or ⇧⌘M."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "うまく動かない所があったら「〇〇が動かないから直して」と ⌘K か ⇧⌘M で頼むと直せます"
+          }
+        }
+      }
+    },
+    "うまく動かない所があるから直して" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Something isn't working, fix it"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "うまく動かない所があるから直して"
           }
         }
       }
@@ -7981,6 +8083,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "ライブアクティビティは iPhone だけで表示されます"
+          }
+        }
+      }
+    },
+    "リンク" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Link"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "リンク"
           }
         }
       }
@@ -13682,6 +13801,23 @@
         }
       }
     },
+    "直してと頼む" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ask to fix"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "直してと頼む"
+          }
+        }
+      }
+    },
     "直しますか?" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -13711,6 +13847,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "直し方"
+          }
+        }
+      }
+    },
+    "直す依頼を入力欄に入れて、会話を開きます" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Puts a fix request in the text field and opens the conversation"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "直す依頼を入力欄に入れて、会話を開きます"
           }
         }
       }

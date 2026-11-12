@@ -95,12 +95,15 @@ final class CallSessionTests: XCTestCase {
         XCTAssertTrue(s.participants.isEmpty)
     }
 
-    func testRenewalIsScheduledBeforeTheBlockEnds() async {
+    func testRenewalIsScheduledBeforeTheBlockEnds() async throws {
         let client = FakeCallClient(results: [.success(join(until: 1800)), .success(join(until: 3600)), .failure(Self.coins)])
         let waits = Waits()
         let s = session(client: client, room: FakeCallRoom(), sleep: { await waits.add($0) })
         await s.join()
-        for _ in 0..<200 where client.requests.count < 3 { await Task.yield() }
+        // 押さえ直しは Waits(actor)と client.join を行き来するので、yield の回数ではなく時間で待つ。
+        // 3 回目の要求の後に出る(phase が変わる)まで待つ
+        let deadline = ContinuousClock.now + .seconds(5)
+        while s.phase == .connected, ContinuousClock.now < deadline { try await Task.sleep(for: .milliseconds(10)) }
         XCTAssertEqual(client.requests.count, 3)
         let got = await waits.all
         XCTAssertEqual(got.first, 1800 - CallSession.renewLead, "切れる 1 分前に押さえ直す")

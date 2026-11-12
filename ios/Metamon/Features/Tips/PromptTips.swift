@@ -128,4 +128,7 @@ enum PromptTips {
     static let introKey = "できた画面に向かって、こう話すと思いどおりに直せます。例をタップすると入力欄に入るので、言葉を足してから送ってください。"
     static var title: String { L10n.tr(String.LocalizationValue(titleKey)) }
     static var intro: String { L10n.tr(String.LocalizationValue(introKey)) }
+    /// 「直し方」の下に出す一文: 動かない所も話しかけて直せる(テスターの声。直し方の例・失敗のトーストと同じ文・`FixRequest`)
+    static let fixRequestKey = "うまく動かない所があったら「〇〇が動かないから直して」と話しかけると直せます"
+    static var fixRequest: String { L10n.tr(String.LocalizationValue(fixRequestKey)) }
 }
