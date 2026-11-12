@@ -1,6 +1,23 @@
 {
   "sourceLanguage" : "ja",
   "strings" : {
+    " ・ あなたの公開" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : " · Published by you"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : " ・ あなたの公開"
+          }
+        }
+      }
+    },
     "${target} に ${content} を追加" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -64,6 +81,45 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "%@ を入力してください"
+          }
+        }
+      }
+    },
+    "%@ ・ %lld 人が利用" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%#@count@"
+          },
+          "substitutions" : {
+            "count" : {
+              "argNum" : 2,
+              "formatSpecifier" : "lld",
+              "variations" : {
+                "plural" : {
+                  "one" : {
+                    "stringUnit" : {
+                      "state" : "translated",
+                      "value" : "%1$@ · %arg user"
+                    }
+                  },
+                  "other" : {
+                    "stringUnit" : {
+                      "state" : "translated",
+                      "value" : "%1$@ · %arg users"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ ・ %lld 人が利用"
           }
         }
       }
@@ -651,6 +707,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "%@はいくつですか?"
+          }
+        }
+      }
+    },
+    "%@をインストール" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Install %@"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@をインストール"
           }
         }
       }
@@ -2248,6 +2321,23 @@
         }
       }
     },
+    "「%@」に合うアプリは見つかりませんでした" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No apps match “%@”"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "「%@」に合うアプリは見つかりませんでした"
+          }
+        }
+      }
+    },
     "「%@」に表示できない言葉が含まれています" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -2345,6 +2435,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "「%@」の設定"
+          }
+        }
+      }
+    },
+    "「%@」をインストールしました" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Installed “%@”"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "「%@」をインストールしました"
           }
         }
       }
@@ -2625,6 +2732,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "「合計をもっと大きく表示して」のように、変えたい所を書いてください。"
+          }
+        }
+      }
+    },
+    "「探す」はサーバー接続時のみ使えます" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Discover only works when connected to the server"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "「探す」はサーバー接続時のみ使えます"
           }
         }
       }
@@ -5116,6 +5240,23 @@
         }
       }
     },
+    "まだ公開されたアプリがありません" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No published apps yet"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "まだ公開されたアプリがありません"
+          }
+        }
+      }
+    },
     "まだ動いていません" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -5271,6 +5412,38 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "みんなに公開して、友達のスマホからも書き込めるようにして"
+          }
+        }
+      }
+    },
+    "みんなのアプリを探す" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Discover Apps"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "みんなのアプリを探す"
+          }
+        }
+      }
+    },
+    "みんなのアプリを探す…" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Discover Apps…"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "みんなのアプリを探す…"
           }
         }
       }
@@ -5931,6 +6104,22 @@
         }
       }
     },
+    "アプリを検索" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Search apps"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "アプリを検索"
+          }
+        }
+      }
+    },
     "アプリを見る" : {
       "localizations" : {
         "en" : {
@@ -6040,6 +6229,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "アプリを開けませんでした"
+          }
+        }
+      }
+    },
+    "インストールできませんでした" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Couldn't install"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "インストールできませんでした"
           }
         }
       }
@@ -6549,6 +6755,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "ゲーム"
+          }
+        }
+      }
+    },
+    "コピー" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Copy"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "コピー"
           }
         }
       }
@@ -8478,6 +8701,23 @@
         }
       }
     },
+    "並び順" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sort"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "並び順"
+          }
+        }
+      }
+    },
     "予定" : {
       "localizations" : {
         "en" : {
@@ -8506,6 +8746,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "予約中の通知はありません"
+          }
+        }
+      }
+    },
+    "人気" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Popular"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "人気"
           }
         }
       }
@@ -9682,6 +9939,23 @@
         }
       }
     },
+    "入れる" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Get"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "入れる"
+          }
+        }
+      }
+    },
     "入力の画面に「メモ」の欄を足して" : {
       "localizations" : {
         "en" : {
@@ -9743,6 +10017,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "入力欄に入れる"
+          }
+        }
+      }
+    },
+    "公開した人をブロック" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Block publisher"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "公開した人をブロック"
           }
         }
       }
@@ -11498,6 +11789,23 @@
         }
       }
     },
+    "家計簿、筋トレ、散歩…" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Budget, workouts, walks…"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "家計簿、筋トレ、散歩…"
+          }
+        }
+      }
+    },
     "家計簿をつけたい" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -12518,6 +12826,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "新しく用意する記録帳と質問もこの言語になります。用意済みの記録帳の文言は変わりません。"
+          }
+        }
+      }
+    },
+    "新着" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "New"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "新着"
           }
         }
       }
@@ -15312,6 +15637,23 @@
         }
       }
     },
+    "読み込めませんでした" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Couldn't load"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "読み込めませんでした"
+          }
+        }
+      }
+    },
     "読んだ本のメモ" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -15987,6 +16329,23 @@
         }
       }
     },
+    "通報する" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Report"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "通報する"
+          }
+        }
+      }
+    },
     "通報できませんでした" : {
       "localizations" : {
         "en" : {
@@ -16229,6 +16588,40 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "運営が止めています"
+          }
+        }
+      }
+    },
+    "運営により非公開" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Unpublished by the operator"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "運営により非公開"
+          }
+        }
+      }
+    },
+    "運営により非公開: %@" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Unpublished by the operator: %@"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "運営により非公開: %@"
           }
         }
       }
