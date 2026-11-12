@@ -14,6 +14,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/jphacks/kz_2601/backend/internal/debugoverride"
 	"github.com/jphacks/kz_2601/backend/internal/httpx"
 	"github.com/jphacks/kz_2601/backend/pkg/dsl"
 )
@@ -130,6 +131,10 @@ func (h *HTTP) do(ctx context.Context, method, path string, headers map[string]s
 	}
 	if token := appCheckFrom(ctx); token != "" {
 		req.Header.Set(AppCheckHeader, token)
+	}
+	if p := debugoverride.Requested(ctx); p != "" {
+		// stg test plan (#2085); appconfig applies it only under its own checks
+		req.Header.Set(debugoverride.Header, string(p))
 	}
 	for k, v := range headers {
 		req.Header.Set(k, v)
