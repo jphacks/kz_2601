@@ -48,8 +48,8 @@ class LeafFixesTest {
         assertFalse(InputLeaves.isInput(display))
         assertTrue(InputLeaves.isInput(input))
         val s = DesktopSession(Examples.load("shopping"))
-        assertEquals("表示の rating はフォームが無くても出す", "rendered", s.tapState(display, null))
-        assertEquals("needsForm", s.tapState(input, null))
+        assertEquals("表示の rating はフォームが無くても出す", "rendered", s.state(display, null))
+        assertEquals("needsForm", s.state(input, null))
         assertTrue(InputLeaves.isInput(Component(type = ComponentType.PHOTO_FIELD, field = "p")))
     }
 

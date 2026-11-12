@@ -2,9 +2,15 @@ package jp.kz2601.metamon.desktop
 
 import jp.kz2601.metamon.desktop.i18n.Strings
 import androidx.compose.runtime.snapshots.Snapshot
+import jp.kz2601.metamon.desktop.io.DragOut
+import jp.kz2601.metamon.desktop.io.FileNames
+import jp.kz2601.metamon.desktop.io.ExportClipboard
 import jp.kz2601.metamon.desktop.io.PdfIo
 import jp.kz2601.metamon.desktop.io.RecordIo
 import jp.kz2601.metamon.desktop.io.Tsv
+import jp.kz2601.metamon.desktop.io.UserDirs
+import jp.kz2601.metamon.desktop.store.writeAtomically
+import jp.kz2601.metamon.desktop.voice.VoiceInput
 import jp.kz2601.metamon.dsl.Action
 import jp.kz2601.metamon.dsl.ActionFormat
 import jp.kz2601.metamon.dsl.ActionType
@@ -23,17 +29,17 @@ import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.contentOrNull
 import java.awt.Desktop
+import java.awt.EventQueue
 import java.awt.GraphicsEnvironment
 import java.awt.SystemTray
-import java.awt.Toolkit
 import java.awt.TrayIcon
-import java.awt.datatransfer.StringSelection
 import java.awt.image.BufferedImage
 import java.io.File
 import java.net.URI
 import java.net.http.HttpClient
 import java.net.http.HttpRequest
 import java.net.http.HttpResponse
+import java.nio.file.Files
 import java.time.Duration
 import java.time.Instant
 import java.time.LocalDate
@@ -46,19 +52,48 @@ import java.util.Timer
 import java.util.TimerTask
 import kotlin.concurrent.thread
 
+/** OS に URL・メーラーを渡す口(java.awt.Desktop)。テストでは偽物に替える。 */
+interface SystemOpener {
+    fun supports(action: Desktop.Action): Boolean
+
+    fun browse(uri: URI)
+
+    fun mail()
+
+    object Awt : SystemOpener {
+        override fun supports(action: Desktop.Action): Boolean =
+            runCatching { Desktop.isDesktopSupported() && Desktop.getDesktop().isSupported(action) }.getOrDefault(false)
+
+        override fun browse(uri: URI) = Desktop.getDesktop().browse(uri)
+
+        override fun mail() = Desktop.getDesktop().mail()
+    }
+}
+
 /**
  * OS の機能に頼むアクション(iOS の AppRuntime の各 host・Android の app/runtime)。デスクトップで出来ない物は理由を一言で返す。
  * - openUrl: 既定のブラウザ(許可した scheme だけ)
- * - addToCalendar: .ics を書き出して既定のカレンダーで開く
+ * - addToCalendar: .ics を一時フォルダ(人ごと)に書いて既定のカレンダーで開く(ダウンロードには残さない)
  * - lookupBook: 本の情報(モックでは見本の本・`TAILORIT_API_BASE` があれば `POST /v1/lookup/book`)
  * - scheduleNotification / cancelNotification: トレイの通知(起動中だけ・時刻は次の 1 回)。常駐トレイ(#1761)があればそのアイコンから
  * - export: CSV を書き出し、同じ中身をクリップボードにも入れる
- * - openVoice・startActivity・endActivity・follow・unfollow: 今は使えない旨
+ * - openVoice: `TAILORIT_VOICE=1` の時だけマイクで録って端末の中で文字にする(voice/VoiceInput・#1751)。既定は使えない旨
+ * - startActivity・endActivity・follow・unfollow: 今は使えない旨
  */
 class DesktopActionHost(
     private val books: BookLookupClient = BookLookupClient.fromEnv(),
     private val exportDir: File = defaultExportDir(),
     private val notifier: Notifier = Notifier.Tray,
+    /** null なら openVoice は使えない旨(既定はフラグが立っている時だけ作る) */
+    private val voice: VoiceInput? = VoiceInput.fromEnv(),
+    /** 重い書き出し(PDF の頁を描く)を画面のスレッドの外で。 */
+    private val background: (() -> Unit) -> Unit = { thread(isDaemon = true, name = "export") { it() } },
+    /** カレンダーに渡す .ics を置く所(一時フォルダ・渡すたびに別のフォルダ)。 */
+    private val calendarDir: File = calendarTempRoot(),
+    /** 既定のアプリで開く。開けたら true。 */
+    private val openFile: (File) -> Boolean = { f -> runCatching { Desktop.getDesktop().open(f); true }.getOrDefault(false) },
+    /** URL を渡す先(既定は java.awt.Desktop)。テストで替える。 */
+    private val system: SystemOpener = SystemOpener.Awt,
 ) : ActionHost {
     override fun request(action: Action, ctx: ActionContext, session: DesktopSession): String? = when (action.type) {
         ActionType.OPEN_URL -> openUrl(action.url)
@@ -68,7 +103,8 @@ class DesktopActionHost(
         ActionType.SCHEDULE_NOTIFICATION -> action.notification?.let { notifier.schedule(it) } ?: Strings["runtime_notification_failed"]
         ActionType.CANCEL_NOTIFICATION -> action.notificationId?.let { notifier.cancel(it) }
         ActionType.EXPORT -> export(action, ctx, session)
-        ActionType.OPEN_VOICE -> UNAVAILABLE_VOICE
+        // 結果は画面のスレッドで出す。dispatch が toggle の返す一言を入れた後になるので、速く終わっても上書きされない
+        ActionType.OPEN_VOICE -> voice?.toggle { msg -> EventQueue.invokeLater { Snapshot.withMutableSnapshot { session.message = msg } } } ?: UNAVAILABLE_VOICE
         ActionType.START_ACTIVITY, ActionType.END_ACTIVITY -> UNAVAILABLE_ACTIVITY
         ActionType.FOLLOW, ActionType.UNFOLLOW -> UNAVAILABLE_FOLLOW
         else -> Strings.format("runtime_unknown_action", action.rawType.ifEmpty { action.type.wire })
@@ -76,9 +112,14 @@ class DesktopActionHost(
 
     private fun openUrl(url: String?): String? {
         if (url == null || !ExternalUrlPolicy.isAllowed(url)) return Strings["runtime_open_url_rejected"]
-        val ok = runCatching { Desktop.isDesktopSupported() && Desktop.getDesktop().isSupported(Desktop.Action.BROWSE) }.getOrDefault(false)
-        if (!ok) return Strings.format("desktop_url_unsupported", url)
-        return runCatching { Desktop.getDesktop().browse(URI(url)); null }.getOrElse { Strings["desktop_url_failed"] }
+        // 宛先の無い mailto:(openUrlButton の mail で to が空・不正)は URI にできないので、宛先なしでメーラーを開く
+        val bareMail = isBareMailto(url)
+        val action = if (bareMail) Desktop.Action.MAIL else Desktop.Action.BROWSE
+        if (!system.supports(action)) return Strings.format("desktop_url_unsupported", url)
+        return runCatching {
+            if (bareMail) system.mail() else system.browse(URI(url))
+            null
+        }.getOrElse { Strings["desktop_url_failed"] }
     }
 
     private fun addToCalendar(action: Action, ctx: ActionContext, session: DesktopSession): String? {
@@ -91,12 +132,10 @@ class DesktopActionHost(
         return when (val r = CalendarEventPlan.build(request, entity, data)) {
             is CalendarEventPlan.Result.NoStart -> Strings.format("host_calendar_no_start", r.fieldName)
             is CalendarEventPlan.Result.Success -> {
-                val file = exportDir.resolve(RecordExport.fileName(r.draft.title, "ics"))
-                runCatching {
-                    exportDir.mkdirs()
-                    file.writeText(Ics.event(r.draft, uid = "${entity.id}-${ctx.currentRecordId ?: "new"}@tailorit"))
-                }.getOrElse { return Strings["desktop_calendar_write_failed"] }
-                val opened = runCatching { Desktop.getDesktop().open(file); true }.getOrDefault(false)
+                val text = Ics.event(r.draft, uid = "${entity.id}-${ctx.currentRecordId ?: "new"}@tailorit")
+                val file = runCatching { writeHandOff(RecordExport.fileName(r.draft.title, "ics"), text.toByteArray(Charsets.UTF_8)) }
+                    .getOrElse { return Strings["desktop_calendar_write_failed"] }
+                val opened = openFile(file)
                 if (opened) Strings.format("desktop_calendar_opened", file.name) else Strings.format("desktop_calendar_written", file.absolutePath)
             }
         }
@@ -129,6 +168,7 @@ class DesktopActionHost(
     /**
      * 表は io/RecordIo(ref は名前・古い順)、PDF は io/PdfIo(#1856)。format が pdf なら PDF、他は CSV(iOS と同じ形)。
      * ファイルはダウンロードに書き、同じ表を表計算に貼れる TSV でクリップボードにも入れる(一覧の「表をコピー」と同じ形)。
+     * 同じ名前のファイルがあれば上書きせず `名前 (2).csv` に。PDF は頁を描くので [background] で書き、終わったら一言を出し直す。
      */
     private fun export(action: Action, ctx: ActionContext, session: DesktopSession): String? {
         val entity = session.entityModel(action.entity ?: ctx.form?.entity?.id) ?: return Strings["host_export_no_entity"]
@@ -138,17 +178,58 @@ class DesktopActionHost(
         val date = java.time.LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyy/MM/dd HH:mm"))
         val table = RecordIo.exportTable(title, entity, session.store, session.models, action.fields, listOf(Strings.format("host_export_date", date), Strings.format("host_export_count", count)))
         val pdf = action.format == ActionFormat.PDF
-        val file = exportDir.resolve(RecordExport.fileName(title, if (pdf) "pdf" else "csv"))
-        runCatching {
-            exportDir.mkdirs()
-            file.writeBytes(if (pdf) PdfIo.data(table) else RecordIo.csv(table))
-        }.getOrElse { return Strings["host_export_failed"] }
-        val copied = !GraphicsEnvironment.isHeadless() &&
-            runCatching { Toolkit.getDefaultToolkit().systemClipboard.setContents(StringSelection(Tsv.string(table)), null) }.isSuccess
-        return Strings.format("desktop_export_done", count, file.absolutePath) + if (copied) Strings["desktop_export_clipboard"] else ""
+        val name = RecordExport.fileName(title, if (pdf) "pdf" else "csv")
+        val copied = ExportClipboard.put(Tsv.string(table))
+        fun done(file: File) = Strings.format("desktop_export_done", count, file.absolutePath) + if (copied) Strings["desktop_export_clipboard"] else ""
+        if (!pdf) {
+            val file = runCatching { writeNew(name, RecordIo.csv(table)) }.getOrElse { return Strings["host_export_failed"] }
+            return done(file)
+        }
+        val writing = Strings["desktop_export_writing"]
+        background {
+            val msg = runCatching { done(writeNew(name, PdfIo.data(table))) }.getOrElse { Strings["host_export_failed"] }
+            // 書いている間に別の一言(他の操作の結果)が出ていれば上書きしない
+            Snapshot.withMutableSnapshot { if (session.message == writing) session.message = msg }
+        }
+        return writing
+    }
+
+    /**
+     * [exportDir] に空いている名前で書く(既存のファイルは上書きしない・Windows の予約名は頭に `_`)。
+     * 名前を空のファイルで取ってから、同じフォルダの一時ファイルに書き切って置き換える(書きかけのファイルを見せない)。書けなければ取った名前を消す。
+     */
+    private fun writeNew(name: String, bytes: ByteArray): File {
+        val file = FileNames.createFree(exportDir, name)
+        try {
+            writeAtomically(file, bytes)
+        } catch (e: Exception) {
+            file.delete()
+            throw e
+        }
+        return file
+    }
+
+    /** 他のアプリに渡すだけのファイル。渡すたびに別のフォルダ(名前はそのまま・`(2)` を付けない)。古い物は起動時に消す。 */
+    private fun writeHandOff(name: String, bytes: ByteArray): File {
+        calendarDir.mkdirs()
+        val dir = Files.createTempDirectory(calendarDir.toPath(), CALENDAR_PREFIX).toFile()
+        return File(dir, FileNames.guard(name)).apply { writeBytes(bytes) }
     }
 
     companion object {
+        const val CALENDAR_PREFIX = "ics-"
+
+        /** カレンダーに渡す .ics の置き場(利用者ごとのフォルダ・[UserDirs.calendar])。 */
+        fun calendarTempRoot(): File = UserDirs.calendar
+
+        /** 起動時: 前に渡した .ics のうち 1 日より古い物を消す。 */
+        fun sweepCalendar(now: Long = System.currentTimeMillis(), root: File = calendarTempRoot()): Int =
+            DragOut.sweep(now = now, root = root, prefix = CALENDAR_PREFIX)
+
+        /** scheme が mailto で、その後ろが空(`mailto:`)。 */
+        fun isBareMailto(url: String): Boolean =
+            ExternalUrlPolicy.scheme(url) == "mailto" && url.substringAfter(':').isBlank()
+
         val UNAVAILABLE_VOICE get() = Strings["desktop_unavailable_voice"]
         val UNAVAILABLE_ACTIVITY get() = Strings["desktop_unavailable_activity"]
         val UNAVAILABLE_FOLLOW get() = Strings["desktop_unavailable_follow"]
@@ -184,10 +265,55 @@ object Ics {
             lines += listOf("BEGIN:VALARM", "ACTION:DISPLAY", "DESCRIPTION:${escape(d.title)}", "TRIGGER:-PT${-it / 60}M", "END:VALARM")
         }
         lines += listOf("END:VEVENT", "END:VCALENDAR")
-        return lines.joinToString("\r\n", postfix = "\r\n")
+        return lines.joinToString("\r\n", postfix = "\r\n") { fold(it) }
     }
 
-    fun escape(s: String): String = s.replace("\\", "\\\\").replace(";", "\\;").replace(",", "\\,").replace("\r\n", "\\n").replace("\n", "\\n")
+    /** TEXT の値(RFC 5545 §3.3.11)。改行(CRLF・CR・LF・U+2028/2029)は `\n`、他の制御文字は落とす。 */
+    fun escape(s: String): String {
+        val sb = StringBuilder(s.length)
+        var i = 0
+        while (i < s.length) {
+            val c = s[i]
+            when {
+                c == '\r' -> {
+                    sb.append("\\n")
+                    if (i + 1 < s.length && s[i + 1] == '\n') i++
+                }
+                c == '\n' || c == '\u2028' || c == '\u2029' -> sb.append("\\n")
+                c == '\\' -> sb.append("\\\\")
+                c == ';' -> sb.append("\\;")
+                c == ',' -> sb.append("\\,")
+                c.code < 0x20 && c != '\t' -> {}
+                c.code == 0x7F -> {}
+                else -> sb.append(c)
+            }
+            i++
+        }
+        return sb.toString()
+    }
+
+    /** 1 行を 75 オクテット(UTF-8)ごとに折る(RFC 5545 §3.1)。続きの行は空白 1 つで始める。文字の途中では切らない。 */
+    fun fold(line: String, max: Int = 75): String {
+        if (line.toByteArray(Charsets.UTF_8).size <= max) return line
+        val out = StringBuilder()
+        var used = 0
+        var limit = max
+        var i = 0
+        while (i < line.length) {
+            val cp = line.codePointAt(i)
+            val len = Character.charCount(cp)
+            val bytes = String(Character.toChars(cp)).toByteArray(Charsets.UTF_8).size
+            if (used + bytes > limit) {
+                out.append("\r\n ")
+                used = 0
+                limit = max - 1
+            }
+            out.appendCodePoint(cp)
+            used += bytes
+            i += len
+        }
+        return out.toString()
+    }
 }
 
 /** 本の情報の取得(iOS の `BookLookupClient`)。見つからなければ null。 */
@@ -277,6 +403,16 @@ interface Notifier {
             synchronized(this) { timers.remove(id) }?.cancel()
             return null
         }
+
+        /** 予約した通知を全部取り消す(この端末のデータを消す時)。取り消した数。 */
+        fun cancelAll(): Int {
+            val all = synchronized(this) { timers.values.toList().also { timers.clear() } }
+            all.forEach { it.cancel() }
+            return all.size
+        }
+
+        /** 予約している数(テスト用)。 */
+        internal fun pendingCount(): Int = synchronized(this) { timers.size }
 
         /** [id] の前の予約を消して [delayMillis] 後に [fire] を 1 回。鳴ったら表から外す。 */
         internal fun arm(id: String, delayMillis: Long, fire: () -> Unit) {

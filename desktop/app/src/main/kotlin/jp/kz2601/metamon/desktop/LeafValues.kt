@@ -24,7 +24,7 @@ import java.util.Locale
 // Aggregator・ExprEvaluator・RecordQuery で出す(読み込み中・取得失敗の状態はモックなので無い)。:renderer-core(#1739)で共有にする。
 
 /** 1 画面ぶんの記録と評価器。 */
-class LeafData(val entities: List<Entity>, source: (String) -> List<Record>, val uid: String? = "me") {
+class LeafData(val entities: List<Entity>, source: (String) -> List<Record>, val uid: String? = "me", val labels: DataLabels = DataLabels.JAPANESE) {
     val evaluator = ExprEvaluator(entities, source)
     val locale: Locale = Locale.JAPAN
 

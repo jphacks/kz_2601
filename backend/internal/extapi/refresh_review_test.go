@@ -2,7 +2,9 @@ package extapi
 
 import (
 	"context"
+	"slices"
 	"strconv"
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -17,10 +19,37 @@ type rotatingClient struct {
 	gate chan struct{}
 	// before runs once at the start of the next refresh (sequential tests).
 	before func()
+	// beforeRevoke runs once at the start of the next revoke.
+	beforeRevoke func()
 
 	mu      sync.Mutex
 	current string
 	n       int
+	// revoked / refused are the refresh tokens Revoke took / refused.
+	revoked, refused []string
+}
+
+// Revoke refuses a refresh token that is no longer the current one (like a
+// provider that renews the token before revoking it).
+func (c *rotatingClient) Revoke(_ context.Context, t Token) error {
+	if f := c.beforeRevoke; f != nil {
+		c.beforeRevoke = nil
+		f()
+	}
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	if t.RefreshToken != c.current {
+		c.refused = append(c.refused, t.RefreshToken)
+		return ErrInvalidGrant
+	}
+	c.revoked = append(c.revoked, t.RefreshToken)
+	return nil
+}
+
+func (c *rotatingClient) revokes() (revoked, refused []string) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	return slices.Clone(c.revoked), slices.Clone(c.refused)
 }
 
 func (c *rotatingClient) Refresh(_ context.Context, t Token) (Token, error) {
@@ -154,4 +183,84 @@ func TestKeyedLockContext(t *testing.T) {
 	if len(l.m) != 0 {
 		t.Fatalf("entries left: %d", len(l.m))
 	}
+}
+
+// A revoke on this instance waits for the refresh in progress and then
+// revokes the token that refresh stored.
+func TestRevokeWaitsForRefresh(t *testing.T) {
+	e := newEnv(t, opts{})
+	rc := expiredConnection(t, e)
+	rc.gate = make(chan struct{})
+	started := make(chan struct{})
+	rc.before = func() { close(started) }
+	callDone := make(chan error, 1)
+	go func() {
+		_, err := e.call(e.req(FakeOAuth, "listEvents", nil))
+		callDone <- err
+	}()
+	<-started
+	revokeDone := make(chan error, 1)
+	go func() { revokeDone <- e.svc.Revoke(context.Background(), user, FakeOAuth) }()
+	select {
+	case err := <-revokeDone:
+		t.Fatalf("the revoke did not wait for the refresh: %v", err)
+	case <-time.After(50 * time.Millisecond):
+	}
+	close(rc.gate)
+	if err := <-callDone; err != nil {
+		t.Fatalf("call: %v", err)
+	}
+	if err := <-revokeDone; err != nil {
+		t.Fatalf("revoke: %v", err)
+	}
+	if revoked, refused := rc.revokes(); !slices.Equal(revoked, []string{"r2"}) || len(refused) != 0 {
+		t.Fatalf("revoked %v refused %v", revoked, refused)
+	}
+	if c, ok := e.conn(user); !ok || c.Status != StatusRevoked || len(c.Sealed) != 0 {
+		t.Fatalf("connection %+v", c)
+	}
+}
+
+// The provider refusing the refresh token while revoking: the stored token
+// is read again once. Renewed by another instance meanwhile, the new one is
+// revoked; the same token is already gone and is not tried again.
+func TestRevokeRefusedRereadsToken(t *testing.T) {
+	t.Run("renewed elsewhere", func(t *testing.T) {
+		e := newEnv(t, opts{})
+		rc := expiredConnection(t, e)
+		other := New(e.svc.cfg, e.q, e.coins, e.svc.Conns, e.mem, e.svc.Log)
+		other.Now = e.c.now
+		other.oauth[FakeOAuth] = rc
+		rc.beforeRevoke = func() {
+			if _, err := other.Call(context.Background(), e.req(FakeOAuth, "listEvents", nil)); err != nil {
+				t.Errorf("other instance: %v", err)
+			}
+		}
+		if err := e.svc.Revoke(context.Background(), user, FakeOAuth); err != nil {
+			t.Fatal(err)
+		}
+		if revoked, refused := rc.revokes(); !slices.Equal(revoked, []string{"r2"}) || !slices.Equal(refused, []string{"r1"}) {
+			t.Fatalf("revoked %v refused %v", revoked, refused)
+		}
+		if c, ok := e.conn(user); !ok || c.Status != StatusRevoked || len(c.Sealed) != 0 {
+			t.Fatalf("connection %+v", c)
+		}
+	})
+	t.Run("already gone", func(t *testing.T) {
+		e := newEnv(t, opts{})
+		rc := expiredConnection(t, e)
+		rc.current = "rotated-and-gone"
+		if err := e.svc.Revoke(context.Background(), user, FakeOAuth); err != nil {
+			t.Fatal(err)
+		}
+		if revoked, refused := rc.revokes(); len(revoked) != 0 || !slices.Equal(refused, []string{"r1"}) {
+			t.Fatalf("revoked %v refused %v", revoked, refused)
+		}
+		if c, ok := e.conn(user); !ok || c.Status != StatusRevoked || len(c.Sealed) != 0 {
+			t.Fatalf("connection %+v", c)
+		}
+		if strings.Contains(e.logs.String(), "provider revoke failed") {
+			t.Fatalf("a token already gone is logged as a failure: %s", e.logs.String())
+		}
+	})
 }

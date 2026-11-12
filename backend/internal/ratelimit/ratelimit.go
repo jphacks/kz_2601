@@ -12,6 +12,7 @@ import (
 	"encoding/hex"
 	"fmt"
 	"log/slog"
+	"net"
 	"strings"
 	"time"
 
@@ -360,13 +361,15 @@ func IPKey(ip string) string {
 
 // ipKey hashes the address (no raw IPs at rest). IPv6 is grouped by /64:
 // one device/home usually owns a whole /64 and can rotate inside it.
+// The /64 is taken from the parsed address, so "::" compression and other
+// spellings of one prefix share a key; IPv4-mapped IPv6 counts as IPv4.
 func ipKey(ip string) string {
-	if strings.Contains(ip, ":") {
-		parts := strings.Split(ip, ":")
-		if len(parts) > 4 {
-			parts = parts[:4]
+	if a := net.ParseIP(ip); a != nil {
+		if v4 := a.To4(); v4 != nil {
+			ip = v4.String()
+		} else {
+			ip = a.Mask(net.CIDRMask(64, 128)).String() + "/64"
 		}
-		ip = strings.Join(parts, ":") + "::/64"
 	}
 	sum := sha256.Sum256([]byte(ip))
 	return hex.EncodeToString(sum[:8])

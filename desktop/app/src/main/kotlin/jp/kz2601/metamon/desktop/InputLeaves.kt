@@ -47,6 +47,7 @@ import jp.kz2601.metamon.dsl.records.JSONValue
 import jp.kz2601.metamon.renderer.form.FormDraft
 import jp.kz2601.metamon.desktop.io.DesktopIo
 import jp.kz2601.metamon.desktop.io.MediaFieldLeaf
+import jp.kz2601.metamon.desktop.io.UserDirs
 import jp.kz2601.metamon.desktop.io.fileOf
 import jp.kz2601.metamon.desktop.i18n.Strings
 import androidx.compose.runtime.getValue
@@ -125,7 +126,7 @@ object InputLeaves {
     }
 }
 
-/** 入力の部品 1 つ。隠す・フォームの外は呼ぶ側([DesktopSession.tapState])で決めてある。 */
+/** 入力の部品 1 つ。隠す・フォームの外は呼ぶ側([DesktopSession.state])で決めてある。 */
 @Composable
 fun InputLeaf(c: Component, form: FormDraft, onMessage: (String) -> Unit) {
     val field = c.field ?: return
@@ -401,7 +402,7 @@ object Drawing {
         g.stroke = AwtStroke(4f, AwtStroke.CAP_ROUND, AwtStroke.JOIN_ROUND)
         strokes.forEach { s -> s.zipWithNext().forEach { (a, b) -> g.drawLine(a.x.toInt(), a.y.toInt(), b.x.toInt(), b.y.toInt()) } }
         g.dispose()
-        val file = File.createTempFile("drawing-", ".png")
+        val file = File.createTempFile("drawing-", ".png", UserDirs.photos)
         ImageIO.write(img, "png", file)
         return file
     }
