@@ -72,6 +72,68 @@ final class FocusFilterStateTests: XCTestCase {
         XCTAssertEqual(intent.state, FocusFilterState(appIds: ["a"], silencesNotifications: true))
     }
 
+    // MARK: - 通知とウィジェット(#1992)
+
+    func testNotificationAllowedWithoutSilence() {
+        let state = FocusFilterState(appIds: ["a"], silencesNotifications: false)
+        XCTAssertTrue(state.allowsNotification(appId: "a"))
+        XCTAssertTrue(state.allowsNotification(appId: "b"), "通知を止めない時は絞らない")
+        XCTAssertNil(state.notificationFilterPredicate)
+    }
+
+    func testSilenceKeepsOnlyPickedApps() {
+        let state = FocusFilterState(appIds: ["a", "c"], silencesNotifications: true)
+        XCTAssertTrue(state.allowsNotification(appId: "a"))
+        XCTAssertTrue(state.allowsNotification(appId: "c"))
+        XCTAssertFalse(state.allowsNotification(appId: "b"))
+    }
+
+    func testSilenceWithoutPickedAppsStopsAll() {
+        let state = FocusFilterState(appIds: [], silencesNotifications: true)
+        XCTAssertFalse(state.allowsNotification(appId: "a"))
+    }
+
+    /// OS に渡す絞り込みは `allowsNotification` と同じ答え(通知の filterCriteria = 生成アプリの id)。
+    func testPredicateMatchesDecision() throws {
+        for state in [FocusFilterState(appIds: ["a", "c.d"], silencesNotifications: true),
+                      FocusFilterState(appIds: [], silencesNotifications: true)] {
+            let predicate = try XCTUnwrap(state.notificationFilterPredicate)
+            for id in ["a", "b", "c.d", "c", ""] {
+                XCTAssertEqual(predicate.evaluate(with: id), state.allowsNotification(appId: id), "\(state.appIds) \(id)")
+            }
+        }
+    }
+
+    func testIntentHandsPredicateToOS() {
+        var intent = TailorFocusFilter()
+        intent.apps = [TailorAppEntity(app("a"))]
+        intent.silencesNotifications = true
+        XCTAssertEqual(intent.appContext.notificationFilterPredicate?.evaluate(with: "a"), true)
+        XCTAssertEqual(intent.appContext.notificationFilterPredicate?.evaluate(with: "b"), false)
+        intent.silencesNotifications = false
+        XCTAssertNil(intent.appContext.notificationFilterPredicate)
+    }
+
+    func testWidgetShowsOnlyPickedApps() {
+        let narrowed = FocusFilterState(appIds: ["a"], silencesNotifications: false)
+        XCTAssertTrue(narrowed.allowsWidget(appId: "a"))
+        XCTAssertFalse(narrowed.allowsWidget(appId: "b"))
+        XCTAssertFalse(narrowed.allowsWidget(appId: nil), "どのアプリか分からない古いデータは出さない")
+        // 一覧を絞らない(通知だけ止める)時はウィジェットはそのまま
+        XCTAssertTrue(FocusFilterState(appIds: [], silencesNotifications: true).allowsWidget(appId: "b"))
+    }
+
+    func testWidgetPauseUnchangedWithoutFilterOrSnapshot() {
+        var snapshot = WidgetSnapshot.sample
+        snapshot.appId = "b"
+        let narrowed = FocusFilterState(appIds: ["a"], silencesNotifications: false)
+        XCTAssertFalse(FocusFilterState.pausesWidget(snapshot, focus: nil), "フィルタが無い人は今まで通り")
+        XCTAssertFalse(FocusFilterState.pausesWidget(nil, focus: narrowed), "まだアプリが無い時の案内はそのまま")
+        XCTAssertTrue(FocusFilterState.pausesWidget(snapshot, focus: narrowed))
+        snapshot.appId = "a"
+        XCTAssertFalse(FocusFilterState.pausesWidget(snapshot, focus: narrowed))
+    }
+
     func testCopyHasEnglish() throws {
         let path = try XCTUnwrap(Bundle(for: AppRuntime.self).path(forResource: "en", ofType: "lproj"))
         let en = try XCTUnwrap(Bundle(path: path))
