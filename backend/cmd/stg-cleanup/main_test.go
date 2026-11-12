@@ -405,7 +405,7 @@ func TestUIDHash(t *testing.T) {
 	if uidHash("a") == uidHash("b") {
 		t.Error("different uids hash the same")
 	}
-	if uidHash("a") != uidHash("a") {
+	if first, again := uidHash("a"), uidHash("a"); first != again {
 		t.Error("hash is not stable")
 	}
 }
