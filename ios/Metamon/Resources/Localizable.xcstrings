@@ -594,6 +594,23 @@
         }
       }
     },
+    "%@だけ" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Only %@"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@だけ"
+          }
+        }
+      }
+    },
     "%@に「%@」(%@)を追加しました" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -2180,6 +2197,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Tailor It で作ったアプリに変身した状態で開きます。"
+          }
+        }
+      }
+    },
+    "Tailor It のフィルタ" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tailor It Filter"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tailor It のフィルタ"
           }
         }
       }
@@ -5495,6 +5529,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "しばらく開かれていないため休んでいます(開くと再開します)"
+          }
+        }
+      }
+    },
+    "すべて表示" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Show All"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "すべて表示"
           }
         }
       }
@@ -12606,6 +12657,40 @@
         }
       }
     },
+    "出すアプリ" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Apps to Show"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "出すアプリ"
+          }
+        }
+      }
+    },
+    "出す記録帳" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Record Books to Show"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "出す記録帳"
+          }
+        }
+      }
+    },
     "切り替えられませんでした" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -17594,6 +17679,23 @@
         }
       }
     },
+    "絞らない" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "All"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "絞らない"
+          }
+        }
+      }
+    },
     "続きから作る" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -20287,6 +20389,23 @@
         }
       }
     },
+    "通知を止める" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Silence Notifications"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "通知を止める"
+          }
+        }
+      }
+    },
     "通知を送れませんでした" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -20997,6 +21116,91 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "開く"
+          }
+        }
+      }
+    },
+    "集中モードの間、選んだアプリだけを変身一覧に出します。" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "During a Focus, show only the apps you choose in your app list."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "集中モードの間、選んだアプリだけを変身一覧に出します。"
+          }
+        }
+      }
+    },
+    "集中モードの間、選んだ記録帳だけを一覧に出します。" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "During a Focus, show only the record books you choose in the list."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "集中モードの間、選んだ記録帳だけを一覧に出します。"
+          }
+        }
+      }
+    },
+    "集中モード中: すべて表示しています" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Focus is on: showing everything"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "集中モード中: すべて表示しています"
+          }
+        }
+      }
+    },
+    "集中モード中: 選んだアプリだけを表示しています" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Focus is on: showing only the apps you chose"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "集中モード中: 選んだアプリだけを表示しています"
+          }
+        }
+      }
+    },
+    "集中モード中: 選んだ記録帳だけを表示しています" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Focus is on: showing only the record books you chose"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "集中モード中: 選んだ記録帳だけを表示しています"
           }
         }
       }
