@@ -160,6 +160,7 @@ final class MacAccount {
 
     private static func registerPush() async {
         #if !APP_STORE_REVIEW
+        MacPushHost.shared.resume()
         await MacPushHost.shared.refresh()
         #endif
     }

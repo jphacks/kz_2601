@@ -1,0 +1,364 @@
+{
+  "screens" : [
+    {
+      "id" : "home",
+      "layout" : "grid",
+      "nodes" : [
+        {
+          "cell" : {
+            "col" : 0,
+            "colSpan" : 6,
+            "row" : 0,
+            "rowSpan" : 2
+          },
+          "id" : "count",
+          "props" : {
+            "aggregate" : "count",
+            "entity" : "member",
+            "label" : "部員",
+            "unavailable" : false,
+            "value" : "1 件"
+          },
+          "state" : "rendered",
+          "type" : "stat"
+        },
+        {
+          "cell" : {
+            "col" : 0,
+            "colSpan" : 6,
+            "row" : 2,
+            "rowSpan" : 7
+          },
+          "id" : "members",
+          "props" : {
+            "entity" : "member",
+            "rows" : [
+              {
+                "recordId" : "m1",
+                "subtitle" : "A チーム",
+                "title" : "高橋",
+                "trailing" : "3"
+              }
+            ]
+          },
+          "state" : "rendered",
+          "type" : "list"
+        },
+        {
+          "cell" : {
+            "col" : 0,
+            "colSpan" : 6,
+            "row" : 9,
+            "rowSpan" : 2
+          },
+          "id" : "import_members",
+          "props" : {
+            "entity" : "member",
+            "label" : "名簿の CSV を取り込む"
+          },
+          "state" : "rendered",
+          "type" : "fileImport"
+        }
+      ],
+      "route" : {
+        "recordId" : null,
+        "screen" : "home",
+        "stack" : "main"
+      },
+      "title" : "部員名簿",
+      "toolbar" : [
+
+      ]
+    }
+  ],
+  "steps" : [
+    {
+      "effects" : [
+        {
+          "imported" : {
+            "entity" : "member",
+            "failures" : [
+              {
+                "cell" : "いち",
+                "field" : "学年",
+                "kind" : "invalid",
+                "line" : 4
+              },
+              {
+                "cell" : "",
+                "field" : "名前",
+                "kind" : "required",
+                "line" : 5
+              }
+            ],
+            "matched" : [
+              {
+                "column" : "氏名",
+                "field" : "名前"
+              },
+              {
+                "column" : "学年",
+                "field" : "学年"
+              },
+              {
+                "column" : "チーム",
+                "field" : "チーム"
+              },
+              {
+                "column" : "入部日",
+                "field" : "入部日"
+              },
+              {
+                "column" : "在籍",
+                "field" : "在籍"
+              }
+            ],
+            "overLimit" : 0,
+            "unused" : [
+              "備考"
+            ]
+          }
+        },
+        {
+          "saved" : {
+            "data" : {
+              "active" : true,
+              "grade" : 1,
+              "joined" : "2026-04-01",
+              "name" : "山田",
+              "team" : "t1"
+            },
+            "entity" : "member",
+            "recordId" : "new-1"
+          }
+        },
+        {
+          "saved" : {
+            "data" : {
+              "active" : false,
+              "grade" : 2,
+              "joined" : "2026-04-02",
+              "name" : "佐藤",
+              "team" : "t2"
+            },
+            "entity" : "member",
+            "recordId" : "new-2"
+          }
+        }
+      ],
+      "op" : {
+        "importCsv" : {
+          "component" : "import_members",
+          "text" : [
+            "氏名,学年,チーム,入部日,在籍,備考",
+            "山田,1,A チーム,2026/4/1,はい,新入生",
+            "佐藤,2,B チーム,2026-04-02,いいえ,",
+            "鈴木,いち,A チーム,2026/4/3,はい,",
+            ",3,A チーム,2026/4/4,はい,"
+          ]
+        }
+      },
+      "screen" : {
+        "id" : "home",
+        "layout" : "grid",
+        "nodes" : [
+          {
+            "cell" : {
+              "col" : 0,
+              "colSpan" : 6,
+              "row" : 0,
+              "rowSpan" : 2
+            },
+            "id" : "count",
+            "props" : {
+              "aggregate" : "count",
+              "entity" : "member",
+              "label" : "部員",
+              "unavailable" : false,
+              "value" : "3 件"
+            },
+            "state" : "rendered",
+            "type" : "stat"
+          },
+          {
+            "cell" : {
+              "col" : 0,
+              "colSpan" : 6,
+              "row" : 2,
+              "rowSpan" : 7
+            },
+            "id" : "members",
+            "props" : {
+              "entity" : "member",
+              "rows" : [
+                {
+                  "recordId" : "new-2",
+                  "subtitle" : "B チーム",
+                  "title" : "佐藤",
+                  "trailing" : "2"
+                },
+                {
+                  "recordId" : "new-1",
+                  "subtitle" : "A チーム",
+                  "title" : "山田",
+                  "trailing" : "1"
+                },
+                {
+                  "recordId" : "m1",
+                  "subtitle" : "A チーム",
+                  "title" : "高橋",
+                  "trailing" : "3"
+                }
+              ]
+            },
+            "state" : "rendered",
+            "type" : "list"
+          },
+          {
+            "cell" : {
+              "col" : 0,
+              "colSpan" : 6,
+              "row" : 9,
+              "rowSpan" : 2
+            },
+            "id" : "import_members",
+            "props" : {
+              "entity" : "member",
+              "label" : "名簿の CSV を取り込む"
+            },
+            "state" : "rendered",
+            "type" : "fileImport"
+          }
+        ],
+        "route" : {
+          "recordId" : null,
+          "screen" : "home",
+          "stack" : "main"
+        },
+        "title" : "部員名簿",
+        "toolbar" : [
+
+        ]
+      },
+      "top" : {
+        "recordId" : null,
+        "screen" : "home",
+        "stack" : "main"
+      }
+    },
+    {
+      "effects" : [
+        {
+          "imported" : {
+            "entity" : "member",
+            "failures" : [
+
+            ],
+            "matched" : [
+
+            ],
+            "overLimit" : 0,
+            "unused" : [
+              "名簿"
+            ]
+          }
+        }
+      ],
+      "op" : {
+        "importCsv" : {
+          "text" : [
+            "名簿",
+            "山田"
+          ]
+        }
+      },
+      "screen" : {
+        "id" : "home",
+        "layout" : "grid",
+        "nodes" : [
+          {
+            "cell" : {
+              "col" : 0,
+              "colSpan" : 6,
+              "row" : 0,
+              "rowSpan" : 2
+            },
+            "id" : "count",
+            "props" : {
+              "aggregate" : "count",
+              "entity" : "member",
+              "label" : "部員",
+              "unavailable" : false,
+              "value" : "3 件"
+            },
+            "state" : "rendered",
+            "type" : "stat"
+          },
+          {
+            "cell" : {
+              "col" : 0,
+              "colSpan" : 6,
+              "row" : 2,
+              "rowSpan" : 7
+            },
+            "id" : "members",
+            "props" : {
+              "entity" : "member",
+              "rows" : [
+                {
+                  "recordId" : "new-2",
+                  "subtitle" : "B チーム",
+                  "title" : "佐藤",
+                  "trailing" : "2"
+                },
+                {
+                  "recordId" : "new-1",
+                  "subtitle" : "A チーム",
+                  "title" : "山田",
+                  "trailing" : "1"
+                },
+                {
+                  "recordId" : "m1",
+                  "subtitle" : "A チーム",
+                  "title" : "高橋",
+                  "trailing" : "3"
+                }
+              ]
+            },
+            "state" : "rendered",
+            "type" : "list"
+          },
+          {
+            "cell" : {
+              "col" : 0,
+              "colSpan" : 6,
+              "row" : 9,
+              "rowSpan" : 2
+            },
+            "id" : "import_members",
+            "props" : {
+              "entity" : "member",
+              "label" : "名簿の CSV を取り込む"
+            },
+            "state" : "rendered",
+            "type" : "fileImport"
+          }
+        ],
+        "route" : {
+          "recordId" : null,
+          "screen" : "home",
+          "stack" : "main"
+        },
+        "title" : "部員名簿",
+        "toolbar" : [
+
+        ]
+      },
+      "top" : {
+        "recordId" : null,
+        "screen" : "home",
+        "stack" : "main"
+      }
+    }
+  ]
+}

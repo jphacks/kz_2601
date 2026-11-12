@@ -25,6 +25,12 @@ final class MacDisplayLeavesTests: XCTestCase {
         XCTAssertEqual(MacRatingKeys.value(after: .digit(9), current: 1, count: 5), 5, "数より大きい数字は最大")
     }
 
+    func testRatingDeleteClears() {
+        XCTAssertEqual(MacRatingKeys.value(after: .delete, current: 3, count: 5), 0, "delete で未評価(#2016)")
+        XCTAssertEqual(MacRatingKeys.value(after: .delete, current: 0, count: 5), 0)
+        XCTAssertNil(MacFlashcardKeys.command(for: .delete), "flashcards は delete を使わない")
+    }
+
     func testRatingIgnoresOtherKeysAndClampsBadCurrent() {
         XCTAssertNil(MacRatingKeys.value(after: .space, current: 1, count: 5))
         XCTAssertNil(MacRatingKeys.value(after: .other, current: 1, count: 5))

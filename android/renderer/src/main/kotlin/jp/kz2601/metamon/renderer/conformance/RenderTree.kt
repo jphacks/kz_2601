@@ -4,6 +4,8 @@ import jp.kz2601.metamon.dsl.Action
 import jp.kz2601.metamon.dsl.AppDSL
 import jp.kz2601.metamon.dsl.Component
 import jp.kz2601.metamon.dsl.ComponentType
+import jp.kz2601.metamon.dsl.Metric
+import jp.kz2601.metamon.dsl.Period
 import jp.kz2601.metamon.dsl.Show
 import jp.kz2601.metamon.dsl.screen
 import jp.kz2601.metamon.dsl.targetNumber
@@ -161,6 +163,9 @@ class RenderTree(
         c.expanded?.let { put("expanded", JsonPrimitive(it)) }
         // matchList の届いた / 送った / つながった(#877)
         c.show?.takeIf { it != Show.UNKNOWN }?.let { put("show", JsonPrimitive(it.wire)) }
+        // healthStat の metric / period(#870)
+        c.metric?.takeIf { it != Metric.UNKNOWN }?.let { put("metric", JsonPrimitive(it.wire)) }
+        c.period?.takeIf { it != Period.UNKNOWN }?.let { put("period", JsonPrimitive(it.wire)) }
     }
 
     /** 解決した値。View と同じ関数を使う。 */

@@ -26,6 +26,7 @@ type RSSFeed struct {
 	URL       string // https, fixed
 	Publisher string // attribution
 	SiteURL   string
+	License   string // shown with the source; "" = 公共データ利用規約(第1.0版)
 }
 
 // Endpoints are the only URLs the service fetches. Tests point them at an
@@ -38,6 +39,30 @@ type Endpoints struct {
 	RSS         map[string]RSSFeed
 	Arxiv       string // + "?search_query=cat:{category}&..." (dsl.ArxivCategories)
 	Diet        string // + "?any={q}&..." (国会会議録 speech search)
+	TyphoonBase string // + "targetTc.json" / "{TC0000}/specifications.json"
+	Bikeshare   map[string]BikeshareSystem
+	Status      map[string]StatusPage
+}
+
+// BikeshareSystem is one allowlisted GBFS system (#1694). Adding one is a
+// reviewed change here and in dsl.BikeshareSystems
+// (TestBikeshareAllowlistMatchesDSL keeps them equal).
+type BikeshareSystem struct {
+	Name       string // shown in the title
+	Info       string // https, fixed: station_information.json
+	Status     string // https, fixed: station_status.json
+	Credit     string // the credit line the license asks for
+	DatasetURL string // the catalogue page with the license
+	License    string
+}
+
+// StatusPage is one allowlisted public status page (Atlassian Statuspage
+// summary.json). Adding one is a reviewed change here and in dsl.StatusPages
+// (TestStatusAllowlistMatchesDSL keeps them equal).
+type StatusPage struct {
+	Name    string // the service, shown in the title
+	URL     string // https, fixed: {SiteURL}/api/v2/summary.json
+	SiteURL string // the human status page; attribution and the incident links
 }
 
 // DefaultEndpoints are the production sources (terms checked 2026-11-06,
@@ -49,16 +74,58 @@ func DefaultEndpoints() Endpoints {
 		Pressure:    "https://api.met.no/weatherapi/locationforecast/2.0/compact",
 		Holidays:    "https://www8.cao.go.jp/chosei/shukujitsu/syukujitsu.csv",
 		RSS: map[string]RSSFeed{
-			"digital-news":  {Name: "デジタル庁 新着・更新", URL: "https://www.digital.go.jp/rss/news.xml", Publisher: "デジタル庁", SiteURL: "https://www.digital.go.jp/"},
-			"fdma-news":     {Name: "消防庁 新着情報", URL: "https://www.fdma.go.jp/index.xml", Publisher: "消防庁", SiteURL: "https://www.fdma.go.jp/"},
-			"fdma-disaster": {Name: "消防庁 災害情報", URL: "https://www.fdma.go.jp/disaster/info/index.xml", Publisher: "消防庁", SiteURL: "https://www.fdma.go.jp/"},
+			"digital-news":    {Name: "デジタル庁 新着・更新", URL: "https://www.digital.go.jp/rss/news.xml", Publisher: "デジタル庁ホームページ", SiteURL: "https://www.digital.go.jp/"},
+			"fdma-disaster":   {Name: "消防庁 災害情報", URL: "https://www.fdma.go.jp/disaster/info/index.xml", Publisher: "消防庁ホームページ", SiteURL: "https://www.fdma.go.jp/"},
+			"fdma-news":       {Name: "消防庁 新着情報", URL: "https://www.fdma.go.jp/index.xml", Publisher: "消防庁ホームページ", SiteURL: "https://www.fdma.go.jp/"},
+			"go-blog":         {Name: "The Go Blog", URL: "https://go.dev/blog/feed.atom", Publisher: "The Go Blog(go.dev)", SiteURL: "https://go.dev/blog/", License: licenseGoBlog},
+			"osaka-city-news": {Name: "大阪市 新着情報", URL: "https://www.city.osaka.lg.jp/main/rss/rss_new.xml", Publisher: "大阪市ホームページ", SiteURL: "https://www.city.osaka.lg.jp/", License: licenseOsaka},
+			"soumu-news":      {Name: "総務省 新着情報", URL: "https://www.soumu.go.jp/news.rdf", Publisher: "総務省ホームページ", SiteURL: "https://www.soumu.go.jp/", License: licenseSoumu},
 		},
-		Arxiv: "https://export.arxiv.org/api/query",
-		Diet:  "https://kokkai.ndl.go.jp/api/speech",
+		Arxiv:       "https://export.arxiv.org/api/query",
+		Diet:        "https://kokkai.ndl.go.jp/api/speech",
+		TyphoonBase: "https://www.jma.go.jp/bosai/typhoon/data/",
+		Bikeshare: map[string]BikeshareSystem{
+			"docomo-cycle":       odptGBFS("docomo-cycle", "ドコモ・バイクシェア(東京以外)", "株式会社ドコモ・バイクシェア", "c_bikeshare_gbfs-d-nationwide-bikeshare", ccBY4),
+			"docomo-cycle-tokyo": odptGBFS("docomo-cycle-tokyo", "ドコモ・バイクシェア(東京)", "株式会社ドコモ・バイクシェア", "c_bikeshare_gbfs-d-bikeshare", ccBY4),
+			// OpenStreet offers CC BY 4.0, ODC BY 1.0 or ODbL 1.0; we take CC BY 4.0.
+			"hellocycling": odptGBFS("hellocycling", "HELLO CYCLING", "OpenStreet株式会社", "c_bikeshare_gbfs-openstreet", ccBY4+"(3 つのライセンスから選択)"),
+		},
+		Status: map[string]StatusPage{
+			"claude":     {Name: "Claude(Anthropic)", URL: "https://status.claude.com/api/v2/summary.json", SiteURL: "https://status.claude.com"},
+			"cloudflare": {Name: "Cloudflare", URL: "https://www.cloudflarestatus.com/api/v2/summary.json", SiteURL: "https://www.cloudflarestatus.com"},
+			"github":     {Name: "GitHub", URL: "https://www.githubstatus.com/api/v2/summary.json", SiteURL: "https://www.githubstatus.com"},
+			"vercel":     {Name: "Vercel", URL: "https://www.vercel-status.com/api/v2/summary.json", SiteURL: "https://www.vercel-status.com"},
+		},
 	}
 }
 
+const ccBY4 = "CC BY 4.0 (https://creativecommons.org/licenses/by/4.0/)"
+
+// odptGBFS is a system on ODPT's public (no key) GBFS API. The credit follows
+// ODPT's FAQ form; the license notes the change (nearby ports, sorted).
+func odptGBFS(id, name, operator, dataset, license string) BikeshareSystem {
+	base := "https://api-public.odpt.org/api/v4/gbfs/" + id + "/"
+	return BikeshareSystem{Name: name, Info: base + "station_information.json", Status: base + "station_status.json",
+		Credit: "コンテンツ等の提供者名: " + operator + " / 公共交通オープンデータ協議会", DatasetURL: "https://ckan.odpt.org/dataset/" + dataset,
+		License: license + "・近くのポートを抜き出して近い順に並べ替えて表示"}
+}
+
 const pdl = "公共データ利用規約(第1.0版)"
+
+// typhoonCredit is the processed-content note for typhoon (編集責任は Tailor It).
+const typhoonCredit = "気象庁「台風情報」(https://www.jma.go.jp/bosai/typhoon/)をもとに Tailor It 作成(編集責任は Tailor It)"
+
+// statusLicense: each company publishes the status API for programmatic
+// access; the app is not endorsed by them.
+const statusLicense = "各社が公開する status の API・各社の承認や提携はありません"
+
+// Per-feed licenses for RSS feeds whose terms ask for a specific credit.
+// The server keeps only titles, links and dates, so each says so.
+const (
+	licenseGoBlog = "CC BY 4.0 (https://creativecommons.org/licenses/by/4.0/)・題名と日付を抜き出して表示"
+	licenseOsaka  = "CC BY 2.1 JP (https://creativecommons.org/licenses/by/2.1/jp/)・題名と日付を抜き出して表示"
+	licenseSoumu  = "PDL1.0(https://www.digital.go.jp/resources/open_data/public_data_license_v1.0)・題名と日付を抜き出して表示"
+)
 
 func (ep Endpoints) source(q Query) Source {
 	switch q.Provider {
@@ -66,6 +133,9 @@ func (ep Endpoints) source(q Query) Source {
 		return Source{Name: "気象庁ホームページ", URL: "https://www.jma.go.jp/", License: pdl}
 	case dsl.FeedWarnings:
 		return Source{Name: "気象庁ホームページ", URL: "https://www.jma.go.jp/bosai/warning/", License: pdl}
+	case dsl.FeedTyphoon:
+		// 加工: the parts are put into one line per cyclone (the doc's 出どころと規約).
+		return Source{Name: "気象庁ホームページ", URL: "https://www.jma.go.jp/bosai/typhoon/", License: pdl + "・" + typhoonCredit}
 	case dsl.FeedPressure:
 		return Source{Name: "MET Norway(ノルウェー気象研究所)", URL: "https://api.met.no/", License: "CC BY 4.0・6 時間ごとにまとめて加工"}
 	case dsl.FeedHolidays:
@@ -74,9 +144,19 @@ func (ep Endpoints) source(q Query) Source {
 		return Source{Name: "arXiv.org", URL: "https://arxiv.org/list/" + q.FeedID + "/recent", License: "論文の情報は CC0 1.0・arXiv の承認や提携はありません"}
 	case dsl.FeedDiet:
 		return Source{Name: "国立国会図書館 国会会議録検索システム", URL: "https://kokkai.ndl.go.jp/", License: "検索用 API・発言の著作権は各発言者"}
+	case dsl.FeedBikeshare:
+		b := ep.Bikeshare[q.FeedID]
+		return Source{Name: b.Credit, URL: b.DatasetURL, License: b.License}
+	case dsl.FeedStatus:
+		p := ep.Status[q.FeedID]
+		return Source{Name: p.Name + " の status ページ", URL: p.SiteURL, License: statusLicense}
 	}
 	f := ep.RSS[q.FeedID]
-	return Source{Name: f.Publisher + "ホームページ", URL: f.SiteURL, License: pdl}
+	license := f.License
+	if license == "" {
+		license = pdl
+	}
+	return Source{Name: f.Publisher, URL: f.SiteURL, License: license}
 }
 
 // weatherURL builds the forecast URL. region was checked against
@@ -85,6 +165,15 @@ func (ep Endpoints) weatherURL(region string) string { return ep.WeatherBase + r
 
 // warningURL builds the warning URL (region checked like weatherURL).
 func (ep Endpoints) warningURL(region string) string { return ep.WarningBase + region + ".json" }
+
+// typhoonListURL is the list of cyclones JMA reports on now.
+func (ep Endpoints) typhoonListURL() string { return ep.TyphoonBase + "targetTc.json" }
+
+// typhoonSpecURL builds a cyclone's file. id was checked against tcIDRe
+// (TC + 4 digits), so it cannot add a path or a query.
+func (ep Endpoints) typhoonSpecURL(id string) string {
+	return ep.TyphoonBase + id + "/specifications.json"
+}
 
 // pressureURL builds the forecast URL for the region's fixed point. MET
 // Norway asks for at most 4 decimals; the points have 2.
@@ -129,6 +218,14 @@ func (ep Endpoints) hosts() map[string]bool {
 	}
 	add(ep.Arxiv)
 	add(ep.Diet)
+	add(ep.TyphoonBase)
+	for _, b := range ep.Bikeshare {
+		add(b.Info)
+		add(b.Status)
+	}
+	for _, p := range ep.Status {
+		add(p.URL)
+	}
 	return out
 }
 

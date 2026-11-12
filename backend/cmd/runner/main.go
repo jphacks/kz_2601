@@ -174,7 +174,7 @@ func main() {
 	t := &serial{t: r}
 	mux := newMux(t, logger)
 	ext.Routes(mux)
-	if err := serve(ctx, envOr("PORT", "8080"), mux, t, interval, logger); err != nil {
+	if err := serve(ctx, ":"+envOr("PORT", "8080"), mux, t, interval, logger); err != nil {
 		logger.Error("runner: serve failed", slog.Any("error", err))
 		os.Exit(1)
 	}
@@ -322,9 +322,9 @@ func newMux(t *serial, logger *slog.Logger) *http.ServeMux {
 	return mux
 }
 
-// serve runs the HTTP server and, when interval > 0, the local tick loop.
-func serve(ctx context.Context, port string, h http.Handler, t *serial, interval time.Duration, logger *slog.Logger) error {
-	ln, err := net.Listen("tcp", ":"+port)
+// serve runs the HTTP server on addr and, when interval > 0, the local tick loop.
+func serve(ctx context.Context, addr string, h http.Handler, t *serial, interval time.Duration, logger *slog.Logger) error {
+	ln, err := net.Listen("tcp", addr)
 	if err != nil {
 		return err
 	}
@@ -347,6 +347,9 @@ func serve(ctx context.Context, port string, h http.Handler, t *serial, interval
 	}
 }
 
+// tickBudget is the budget of one local tick: the interval, at most TickBudget.
+func tickBudget(interval time.Duration) time.Duration { return min(interval, TickBudget) }
+
 // loop ticks every interval until ctx ends (local development).
 func loop(ctx context.Context, t *serial, interval time.Duration, logger *slog.Logger) {
 	tk := time.NewTicker(interval)
@@ -356,7 +359,7 @@ func loop(ctx context.Context, t *serial, interval time.Duration, logger *slog.L
 		case <-ctx.Done():
 			return
 		case <-tk.C:
-			res, _, err := t.tick(ctx, min(interval, TickBudget))
+			res, _, err := t.tick(ctx, tickBudget(interval))
 			if err != nil {
 				logger.ErrorContext(ctx, "runner: tick failed", slog.Any("error", err))
 				continue

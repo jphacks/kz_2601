@@ -81,7 +81,6 @@ import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.compositionLocalOf
 import androidx.compose.runtime.rememberUpdatedState
-import androidx.compose.ui.platform.LocalContext
 import jp.kz2601.metamon.renderer.form.DiscardGuard
 import jp.kz2601.metamon.renderer.form.FormDraftRestore
 import jp.kz2601.metamon.renderer.form.FormDraft
@@ -313,7 +312,7 @@ fun ScreenView(
 @Composable
 private fun RequiredFieldAttention(screen: Screen, form: FormDraft, ctx: RenderContext) {
     val announce = rememberAnnouncer()
-    val context = LocalContext.current
+    val requiredFillIn = stringResource(R.string.renderer_required_fill_in)
     val count = form.flagCount
     LaunchedEffect(form, count) {
         if (count == 0) return@LaunchedEffect
@@ -321,7 +320,7 @@ private fun RequiredFieldAttention(screen: Screen, form: FormDraft, ctx: RenderC
         val field = RequiredFieldFocus.firstFlagged(screen, form, ctx.runtime.currentUid()) ?: return@LaunchedEffect
         delay(RequiredFieldFocus.SETTLE_MILLIS)
         form.attentionField = field
-        announce(context.getString(R.string.renderer_required_fill_in, form.entity.field(field)?.name ?: field))
+        announce(requiredFillIn.format(form.entity.field(field)?.name ?: field))
     }
 }
 
