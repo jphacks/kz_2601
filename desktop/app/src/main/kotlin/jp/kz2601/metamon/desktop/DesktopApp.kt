@@ -364,7 +364,8 @@ private fun Node(c: Component, s: ScreenScope) {
 private fun NodeContent(c: Component, s: ScreenScope) {
     when (c.type) {
         ComponentType.HSTACK -> Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-            c.children.forEach { Box1(Modifier.weight(1f)) { Node(it, s) } }
+            // 隠す子は先に外す(weight の枠だけ残って幅が空かないように)
+            c.children.filter { s.session.state(it, s.form) != "hidden" }.forEach { Box1(Modifier.weight(1f)) { Node(it, s) } }
         }
         ComponentType.CARD -> Card(Modifier.fillMaxWidth()) { LocalGridOrChildren(c, s, Modifier.padding(12.dp)) }
         in DesktopLeaves.containers -> LocalGridOrChildren(c, s)

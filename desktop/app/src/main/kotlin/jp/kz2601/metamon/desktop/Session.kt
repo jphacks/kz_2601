@@ -268,11 +268,16 @@ class DesktopSession(
         perform(action, ctx)
     }
 
-    /** openUrlButton: 候補を先頭から openUrl(link と同じ・許可した scheme だけ)で開き、開けたら止める。全部だめなら最後の理由が残る。 */
+    /**
+     * openUrlButton: 候補を先頭から openUrl(link と同じ・許可した scheme だけ)で開き、開けたら止める。全部だめなら最後の理由が残る。
+     * effects は 1 回押して 1 つ(開けた候補、全部だめなら最後に試した候補)。開けなかった候補の分は消す。
+     */
     fun openFirst(urls: List<String>, ctx: ActionContext) {
-        for (url in urls) {
+        for ((i, url) in urls.withIndex()) {
+            val mark = effects.size
             dispatch(Action(type = ActionType.OPEN_URL, url = url), ctx)
             if (message == null) return
+            if (i < urls.lastIndex) while (effects.size > mark) effects.removeAt(effects.lastIndex)
         }
     }
 
