@@ -19,6 +19,7 @@ import jp.kz2601.metamon.dsl.records.MatchInterest
 import jp.kz2601.metamon.dsl.records.Record
 import jp.kz2601.metamon.dsl.records.RecordPermission
 import jp.kz2601.metamon.nearby.NearbyShareController
+import jp.kz2601.metamon.notifications.TimerActivityUpdate
 import jp.kz2601.metamon.renderer.ActionContext
 import jp.kz2601.metamon.renderer.components.media.PhotoReader
 import jp.kz2601.metamon.renderer.DSLRuntime
@@ -850,6 +851,19 @@ class AppRuntime(
     override fun saveTimer(key: String, run: TimerRun) = host.saveTimer("${document.appId}/$key", run)
 
     override fun timerVisible(key: String, visible: Boolean) = host.timerVisible("${document.appId}/$key", visible)
+
+    /** timerDisplay.liveActivity の進行中の表示(#913・iOS の `AppRuntime.timerActivity`)。 */
+    override fun timerActivity(key: String, name: String, totalSeconds: Int?, run: TimerRun) {
+        val appId = document.appId
+        val update = TimerActivityUpdate("$appId/$key", appId, dsl.app.name, name, totalSeconds, run)
+        val generation = accountGeneration
+        scope.launch {
+            // サインアウト・アカウントの切り替えがあった: 前の人の表示を出し直さない
+            if (accountGeneration != generation) return@launch
+            // 出せない(通知の許可が無い)のは始めた時だけ伝える。止めた・消した時は黙る
+            if (!host.timerActivity(update) && run.isRunning) showToast(RuntimeCopy.ACTIVITY_NOTIFICATIONS_OFF)
+        }
+    }
 
     /** フォームを通さず 1 件足す。作った行の id(仮 id)。entity が無ければ null。 */
     suspend fun createRecord(entity: String, data: Map<String, JSONValue>): String? {

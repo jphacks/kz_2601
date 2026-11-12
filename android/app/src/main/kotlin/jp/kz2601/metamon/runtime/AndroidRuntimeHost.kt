@@ -19,6 +19,7 @@ import jp.kz2601.metamon.notifications.ActivityNotificationPlanner
 import jp.kz2601.metamon.notifications.ActivityNotifications
 import jp.kz2601.metamon.notifications.ActivityStatReading
 import jp.kz2601.metamon.notifications.LocalNotifications
+import jp.kz2601.metamon.notifications.TimerActivityUpdate
 import jp.kz2601.metamon.notifications.TimerAlarms
 import jp.kz2601.metamon.notifications.TimerVisibility
 import jp.kz2601.metamon.renderer.ActionContext
@@ -75,6 +76,9 @@ class AndroidRuntimeHost(
     override fun saveTimer(key: String, run: TimerRun) = timers.save(key, run)
 
     override fun timerVisible(key: String, visible: Boolean) = TimerVisibility.set(key, visible)
+
+    override suspend fun timerActivity(update: TimerActivityUpdate): Boolean =
+        withContext(Dispatchers.IO) { activities.timer(update) }
 
     override suspend fun notificationsChanged(appId: String, dsl: AppDSL, records: Map<String, List<Record>>) = withContext(Dispatchers.IO) {
         notifications.onRecordsChanged(appId, dsl, records)
