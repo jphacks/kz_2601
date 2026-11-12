@@ -22,6 +22,7 @@ import jp.kz2601.metamon.notifications.LocalNotifications
 import jp.kz2601.metamon.notifications.TimerAlarms
 import jp.kz2601.metamon.notifications.TimerVisibility
 import jp.kz2601.metamon.renderer.ActionContext
+import jp.kz2601.metamon.renderer.components.health.HealthSource
 import jp.kz2601.metamon.renderer.components.lists.ValueLabels
 import jp.kz2601.metamon.renderer.components.play.TimerRun
 import jp.kz2601.metamon.services.books.BookLookupClient
@@ -38,6 +39,8 @@ import java.time.format.FormatStyle
 class AndroidRuntimeHost(
     private val context: Context,
     private val books: BookLookupClient? = null,
+    /** `Field.health` の書き込み先(#870)。モックの構成は [jp.kz2601.metamon.renderer.components.health.MockHealthSource] */
+    override val health: HealthSource? = null,
 ) : RuntimeHost {
     private val notifications by lazy { LocalNotifications.get(context) }
 

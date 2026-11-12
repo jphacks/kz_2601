@@ -52,6 +52,7 @@ import jp.kz2601.metamon.discover.LocalPublishEnv
 import jp.kz2601.metamon.onboarding.CoachMark
 import jp.kz2601.metamon.onboarding.TutorialScreen
 import jp.kz2601.metamon.renderer.components.location.LocationTrackingBarHost
+import jp.kz2601.metamon.renderer.components.health.LocalHealthSource
 import jp.kz2601.metamon.renderer.components.sensors.LocalSensorSource
 import jp.kz2601.metamon.services.consent.AiConsentStatus
 import jp.kz2601.metamon.feedback.FeedbackComposerHost
@@ -203,6 +204,7 @@ fun MetamonRoot(container: AppContainer) {
             RootScreen.App -> CompositionLocalProvider(
                 LocalFeedHost provides container.feedHost,
                 LocalSensorSource provides container.sensorSource,
+                LocalHealthSource provides container.healthSource,
             ) { MetamonApp(container) }
         }
     }

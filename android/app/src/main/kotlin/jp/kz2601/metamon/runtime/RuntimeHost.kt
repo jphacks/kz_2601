@@ -8,6 +8,7 @@ import jp.kz2601.metamon.dsl.Notification
 import jp.kz2601.metamon.dsl.records.Record
 import jp.kz2601.metamon.notifications.ActivityStatReading
 import jp.kz2601.metamon.renderer.ActionContext
+import jp.kz2601.metamon.renderer.components.health.HealthSource
 import jp.kz2601.metamon.renderer.components.play.TimerRun
 
 /** 端末の機能がまだ無い(Android で未実装)。AppRuntime が決まったトーストにする。 */
@@ -66,6 +67,9 @@ interface RuntimeHost {
         throw HostUnavailableException(ActionType.START_ACTIVITY)
 
     suspend fun endActivity(appId: String): Unit = throw HostUnavailableException(ActionType.END_ACTIVITY)
+
+    /** `Field.health` の書き込み先(#870・Health Connect)。null なら書かない(テスト・未接続)。 */
+    val health: HealthSource? get() = null
 }
 
 /** 何も持たないホスト(テスト・未接続)。 */
