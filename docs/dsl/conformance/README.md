@@ -58,6 +58,7 @@ case の名前: `example-*`(`docs/dsl/examples` をそのまま描く)・`flow-*
 | `{"tapRow": {"component": "<list id>", "index": 0}}` | 一覧の行を押す(`onItemTap` に行の recordId を渡す)。`component` 省略時は最初の `onItemTap` を持つ部品 |
 | `{"input": {"field": "<field id>", "value": <JSON>}}` | 今のフォームの値を変える |
 | `{"search": {"field": "<searchBar.field>", "text": "…"}}` | 検索欄に入力する |
+| `{"importCsv": {"component": "<fileImport id>", "text": "…"}}` | `fileImport` に CSV の中身を渡す(ファイルを選ぶ操作は含めない)。`component` 省略時は画面の最初の `fileImport`。`text` は 1 つの文字列、または 1 行 1 要素の配列(読みやすさのため) |
 | `{"back": true}` | 戻る(スタックを 1 つ戻す・最下層のモーダルは閉じる) |
 
 確認ダイアログ(`confirmMessage`)は「はい」で進める。
@@ -135,6 +136,7 @@ DSL に書いた値で `props` に入れるもの: `title text label message pla
 | `{"rejected": {"missing": ["金額"]}}` | 必須が空で保存しなかった(項目の名前) |
 | `{"rejected": "noForm" / "unsavedParent"}` | フォームが無い / 親が未保存で子を作れない |
 | `{"deleted": {entity, recordId}}` | 削除した |
+| `{"imported": {entity, matched, unused, failures, overLimit}}` | CSV を読んで列を当てた(`importCsv` の後)。`matched` は `[{column, field}]`(当てた列 → field の**名前**・列の順)、`unused` はどの field にも当たらない列の見出し、`failures` は読めなかった行 `[{line, field, kind, cell}]`(`line` は見出しを 1 行目とする行番号・`kind` は `invalid` / `required` / `tooLong`)、`overLimit` は上限(1 回 500 件・entity の合計 2000 件)で入れない行の数。確認ダイアログの文言は比べない(件数はここで比べる)。続けて足した記録が `saved` で 1 件ずつ出る |
 | `{"request": <action>}` | OS の機能(URL・通知・書き出し・ライブアクティビティ・音声入力)を頼んだ。結果は比べない |
 
 ## 期待値の更新(iOS だけ)
@@ -176,15 +178,15 @@ DSL に書いた値で `props` に入れるもの: `title text label message pla
 
 `ConformanceTests.testCoverageListIsUpToDate` が「全 case に出てくる部品の type + `coverage.json` の `notYetCovered` = スキーマの全 type」を確かめる(足りない・余計なら赤)。
 
-今: **72 / 75 の type が case に出てくる**(`notYetCovered` は `fileImport`・`placeSearch`・`aiChat`。ファイル選択の後の動きは描画の木に出ないので、取り込みの中身は `RecordImportTests`、placeSearch の検索は `PlaceSearchTests` で確かめる。aiChat は審査用の版から外す部品で、会話の並び・送る会話は `AIChatTests` で確かめる)。そのうち値まで解決して比べるもの:
+今: **74 / 77 の type が case に出てくる**(`notYetCovered` は `placeSearch`・`aiChat`・`callButton`。placeSearch の検索は `PlaceSearchTests`、aiChat は審査用の版から外す部品で、会話の並び・送る会話は `AIChatTests` で確かめる)。そのうち値まで解決して比べるもの:
 
 | 区分 | type |
 |---|---|
 | Container(7) | vstack hstack section card disclosure carousel grid(子の順・ローカルグリッドの位置・見出し・列数・開閉) |
 | 値まで解決する Leaf | text label badge markdown link emptyState button stat list table timeline chart progressBar gauge settlement flashcards searchBar image、入力 20 種(textField numberField picker toggle datePicker slider stepper textEditor secureField timePicker rating colorPicker photoField drawingField videoField audioRecorder transcribeField locationPicker locationButton qrScanner) |
-| state と DSL の値だけの Leaf | 上の「既知の隙間」に挙げた OS の機能に頼る部品・matchList(仲間探しのつながりの状態に頼る)・icon avatar spacer divider voiceInput shareButton openUrlButton videoPlayer speakButton・feed(行は appconfig の `/v1/feeds` から取るので木に入れない・`edge-feed`) |
+| state と DSL の値だけの Leaf | 上の「既知の隙間」に挙げた OS の機能に頼る部品・matchList(仲間探しのつながりの状態に頼る)・icon avatar spacer divider voiceInput shareButton openUrlButton videoPlayer speakButton・feed(行は appconfig の `/v1/feeds` から取るので木に入れない・`edge-feed`)・fileImport(木には `state` と DSL の値だけ。CSV の列の当て方と足す記録は `importCsv` の操作と `imported` / `saved` の effects で比べる・`flow-file-import`) |
 
-アクションは navigate(push / sheet / prefillRef なし)・back・saveRecord(必須の検証・新規・遷移)・deleteRecord(確認・閉じる)を操作で試している。startActivity・endActivity・scheduleNotification は examples の木に `actions` として出る(実行は `request`)。
+アクションは navigate(push / sheet / prefillRef なし)・back・saveRecord(必須の検証・新規・遷移)・deleteRecord(確認・閉じる)を操作で試している。CSV の取り込み(`fileImport`)は `importCsv` で試している。startActivity・endActivity・scheduleNotification は examples の木に `actions` として出る(実行は `request`)。
 
 ## Android で合わせる時の注意
 
