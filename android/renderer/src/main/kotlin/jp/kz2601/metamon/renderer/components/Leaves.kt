@@ -7,7 +7,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.Button
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
@@ -107,7 +106,7 @@ fun VoiceInputLeaf(c: Component, ctx: RenderContext, modifier: Modifier = Modifi
     ) {
         Text(
             c.prompt ?: stringResource(R.string.inputs_voice_prompt),
-            style = MaterialTheme.typography.headlineSmall,
+            style = RenderTheme.Fonts.title,
             textAlign = TextAlign.Center,
         )
         val buttonSize = if (c.size == Size.LARGE) 120.dp else 72.dp
@@ -116,7 +115,7 @@ fun VoiceInputLeaf(c: Component, ctx: RenderContext, modifier: Modifier = Modifi
             shape = CircleShape,
             modifier = Modifier.size(buttonSize),
         ) {
-            Text(stringResource(R.string.inputs_voice_talk), style = MaterialTheme.typography.titleMedium)
+            Text(stringResource(R.string.inputs_voice_talk), style = RenderTheme.Fonts.button)
         }
     }
 }
