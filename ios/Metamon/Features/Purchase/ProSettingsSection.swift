@@ -10,7 +10,7 @@ struct ProSettingsSection: View {
     @State private var note: String?
 
     var body: some View {
-        @Bindable var gate = ProGate.shared
+        let gate = ProGate.shared
         return Section {
             LabeledContent("プラン") {
                 Text(gate.isPro ? "Pro" : L10n.tr("無料"))
@@ -45,11 +45,6 @@ struct ProSettingsSection: View {
             if !gate.isPro, ManageSubscriptionPlacement.placement(isPro: false) == .nearRestore {
                 ManageSubscriptionButton(accessibilityID: "settings.pro.manage")
             }
-            #if DEBUG
-            Toggle("課金の制限を無効にする(デモ用・回数と有料機能)", isOn: $gate.limitDisabled)
-                .tint(Theme.Colors.brandA)
-                .accessibilityIdentifier("settings.pro.limitDisabled")
-            #endif
         } header: {
             Text(verbatim: "Tailor It Pro")
         } footer: {

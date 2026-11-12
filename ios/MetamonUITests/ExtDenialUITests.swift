@@ -1,7 +1,7 @@
 import XCTest
 
-/// #2001: 外の API の 402 / 409 の案内。設定の開発用の呼び出し口から、偽の provider `fakeOauth` の op を
-/// `METAMON_MOCK_EXT_ERROR`(モックの `setNextError`)で断らせて、シートが出ることを確かめる。
+/// #2001: 外の API の 402 / 409 の案内。設定の末尾の「開発用メニュー」(#2079)の呼び出し口から、
+/// 偽の provider `fakeOauth` の op を `METAMON_MOCK_EXT_ERROR`(モックの `setNextError`)で断らせて、シートが出ることを確かめる。
 final class ExtDenialUITests: XCTestCase {
     private var app: XCUIApplication!
 
@@ -28,11 +28,17 @@ final class ExtDenialUITests: XCTestCase {
         XCTAssertTrue(gear.waitForExistence(timeout: 15))
         gear.tap()
         XCTAssertTrue(app.navigationBars.firstMatch.waitForExistence(timeout: 5))
-        let button = app.buttons["settings.connections.debugCall"]
+        let menu = app.buttons["settings.debugMenu"]
+        for _ in 0..<12 where !(menu.exists && menu.isHittable) {
+            app.swipeUp()
+        }
+        XCTAssertTrue(menu.isHittable, "設定の末尾に開発用メニューが無い")
+        menu.tap()
+        let button = app.buttons["debugMenu.extCall"]
         for _ in 0..<8 where !(button.exists && button.isHittable) {
             app.swipeUp()
         }
-        XCTAssertTrue(button.isHittable, "設定に開発用の呼び出し口が無い")
+        XCTAssertTrue(button.isHittable, "開発用メニューに呼び出し口が無い")
         button.tap()
     }
 

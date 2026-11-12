@@ -63,6 +63,9 @@ struct SettingsSheet: View {
                 PrivacySettingsSection() // #246: AI への送信の同意・プライバシーポリシー・利用規約
                 supportSection
                 if !Self.e2eDeleteAccount { deleteAccountSection }
+                #if METAMON_STG // stg の版だけ。Release / Review にはコードごと入らない(#2079)
+                if DebugMenuPolicy.isAvailable { debugMenuSection }
+                #endif
             }
             .navigationTitle("設定")
             .task { await rt.refreshPlanUsage() } // #317 使っている量(5 分キャッシュ)
@@ -518,6 +521,22 @@ struct SettingsSheet: View {
         }
         .font(.footnote)
     }
+
+    #if METAMON_STG
+    /// 開発用メニュー(#2079)。設定の末尾に置く。出すかどうかの判定は `DebugMenuPolicy` だけが持つ
+    private var debugMenuSection: some View {
+        Section {
+            NavigationLink {
+                DebugMenuView()
+            } label: {
+                Label { Text(verbatim: "開発用メニュー") } icon: { Image(systemName: "hammer") }
+            }
+            .accessibilityIdentifier("settings.debugMenu")
+        } footer: {
+            Text(verbatim: "stg の版だけに出ます(配布する版には入りません)。")
+        }
+    }
+    #endif
 
     private var supportInfo: SupportInfo {
         let bundle = Bundle.main

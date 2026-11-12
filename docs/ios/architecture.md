@@ -1088,7 +1088,7 @@ iPhone は縦と横(左右)を使える(上下逆さま・iPad は対象外。`I
 - **サーバーの権利(#314)**: `ProEntitlementStore.refreshEntitlements`(起動・購入・復元・`Transaction.updates`・サインインし直した時)が、検証済みの取引の `jwsRepresentation` を `HTTPEntitlementClient`(`POST /v1/me/entitlements/apple`)で送る。待たずに裏で送り、同じ uid + 取引は 1 回だけ。失敗は次の機会に送り直す。Xcode の StoreKit 構成の取引(`environment == .xcode`)は Apple の署名ではないので送らない。購入時は `appAccountToken` に `ProAccountToken.uuid(for: uid)` を入れる。サーバーは検証して `users/{uid}/entitlements/pro` に保存し、ai の回数制限が Pro の上限になる(#449・[backend features/pro.md](../backend/features/pro.md))。端末の表示(`isPro`)はまだ StoreKit の値(サーバーを正にするのは後続)。審査用ビルドにはこの部品ごと無い。
 
 ### 22.4 デモ端末で上限に当たらないようにする
-- **DEBUG ビルドは既定で制限なし**(設定の「Tailor It Pro」に DEBUG のみ「回数制限を無効にする(デモ用)」トグル・既定 ON)。Release は既定で制限あり・トグルは出ない。
+- **DEBUG ビルドは既定で制限なし**(トグル「課金の制限を無効にする(デモ用・回数と有料機能)」・既定 ON)。トグルの置き場所は設定の末尾の**開発用メニュー**(`METAMON_STG` の構成だけ・#2079)。Release・Review は既定で制限あり・メニューごと出ない。
 - 上限シートを確認したい時は起動時の環境変数 `METAMON_IAP_ENFORCE=1`(トグルに関係なく制限を有効)・`METAMON_IAP_FREE_LIMIT=<n>`(無料回数の上書き)。
 
 ### 22.5 StoreKit Configuration(ローカルのテスト購入)
@@ -1151,7 +1151,7 @@ iPhone は縦と横(左右)を使える(上下逆さま・iPad は対象外。`I
 - 課金画面の中身: 見出し(理由ごと)・なぜ有料か・プラン名 / 期間 / 価格(`ProOffer`)・購入・復元・閉じたらどうなるか・Pro でできること・自動更新の説明・利用規約 / プライバシーポリシー(`LegalDocumentLink`。同梱文書を開き、その画面から公開ページ https://tailor-it.app/terms ・ /privacy も開ける)。
 - 出す場所: 確認カードの課金画面は `ClarifyChatView`(音声シートの中にも重ねられる・placement `.chat`)、それ以外は `PaywallHost`(placement `.root`。音声シートは閉じてから出す)。
 - オンデバイスの `aiButton`(§18)はサーバーを使わないので無料。
-- 課金の制限の無効化(DEBUG の既定・22.4)中は、回数も有料機能も課金画面を出さない。設定のトグル名は「課金の制限を無効にする(デモ用・回数と有料機能)」。
+- 課金の制限の無効化(DEBUG の既定・22.4)中は、回数も有料機能も課金画面を出さない。トグル名は「課金の制限を無効にする(デモ用・回数と有料機能)」(置き場所は開発用メニュー・22.4)。
 - モックのストア: DEBUG で `METAMON_MOCK_STORE=1` なら App Store に触れず購入が即成功(¥500)。DEBUG のシミュレータは StoreKit の商品が取れなければ自動でモック(`simctl launch` で起動した時)。`0` で常に StoreKit。Release は常に StoreKit。
 - テスト: `MetamonServicesTests/PaidGateTests.swift`(判定・モックのストア)・`MetamonTests/PaidGateFlowTests.swift`(チャット / 即生成 / 修正 / 元に戻す / 無効化中)・UI `testPaidFeaturePaywallPurchaseThenBuildsSharedApp`(未購入 → 確認カード →「Pro にする」→ 課金画面 → モック購入 → 共有の掲示板ができる)・`testPaidFeatureCardBuildWithoutFeature`・`testDirectGenerationWithSharedDataGoesThroughPaywall`。モック ai の「掲示板」は public のひとこと投稿を返す(無料版・「自分だけ」の指示なら家計簿)。
 - 限界(後続): サーバー側で止める(#316)。Pro が切れた後に、自分で作った共有アプリを開く経路は止めていない(自分のデータが見られなくなるため・要判断)。

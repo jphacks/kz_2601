@@ -160,6 +160,10 @@ grep -a -c -F -e 'ManageSubscriptionButton' -e 'サブスクリプションを�
 #   → 0(サブスクの管理の導線も無い・#326)
 otool -L "$APP/Metamon" | grep StoreKit
 #   → 何も出ないこと(App 内課金なし・#450 G1)
+strings "$APP/Metamon" | grep -E 'DebugMenuView|DebugMenuPolicy|DebugKnobs|DebugKnobCatalog|debugMenu\.'
+#   → 何も出ないこと(開発用メニュー・#2079。Release / Review は METAMON_STG を立てないのでコードごと入らない)
+grep -a -c -F -e '開発用メニュー' -e '開発用のつまみを全部元に戻しますか' -e 'metamon.debug.' "$APP/Metamon"
+#   → 0(日本語の文言は strings では出ないので grep -a で見る)
 ls "$APP" | grep -E '^(health|walk_route|attendance_nearby|dashcam|sensors|gallery-web|chat|board|ranking|post_comments|recipes)\.json$'
 #   → 何も出ないこと
 grep -l '"scope" *: *"\(public\|shared\)"' "$APP"/*.json
