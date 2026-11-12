@@ -422,6 +422,7 @@ private fun ListThumbnail(src: String?, name: String) {
         image?.let { img ->
             Image(img.bitmap, name, Modifier.fillMaxSize().dragOut { img.png?.let { DragOut.imageOfPng(it, name.ifEmpty { Strings["desktop_drag_image_name"] }) } }, contentScale = ContentScale.Crop)
         }
+        if (image == null && src != null && ImageLoader.blocked(src, fromRecord = true)) LoadImageButton(src, Modifier.align(Alignment.Center))
     }
 }
 

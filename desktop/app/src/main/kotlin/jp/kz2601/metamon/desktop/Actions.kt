@@ -4,6 +4,7 @@ import jp.kz2601.metamon.desktop.i18n.Strings
 import androidx.compose.runtime.snapshots.Snapshot
 import jp.kz2601.metamon.desktop.io.DragOut
 import jp.kz2601.metamon.desktop.io.FileNames
+import jp.kz2601.metamon.desktop.io.ExportClipboard
 import jp.kz2601.metamon.desktop.io.PdfIo
 import jp.kz2601.metamon.desktop.io.RecordIo
 import jp.kz2601.metamon.desktop.io.Tsv
@@ -31,9 +32,7 @@ import java.awt.Desktop
 import java.awt.EventQueue
 import java.awt.GraphicsEnvironment
 import java.awt.SystemTray
-import java.awt.Toolkit
 import java.awt.TrayIcon
-import java.awt.datatransfer.StringSelection
 import java.awt.image.BufferedImage
 import java.io.File
 import java.net.URI
@@ -180,8 +179,7 @@ class DesktopActionHost(
         val table = RecordIo.exportTable(title, entity, session.store, session.models, action.fields, listOf(Strings.format("host_export_date", date), Strings.format("host_export_count", count)))
         val pdf = action.format == ActionFormat.PDF
         val name = RecordExport.fileName(title, if (pdf) "pdf" else "csv")
-        val copied = !GraphicsEnvironment.isHeadless() &&
-            runCatching { Toolkit.getDefaultToolkit().systemClipboard.setContents(StringSelection(Tsv.string(table)), null) }.isSuccess
+        val copied = ExportClipboard.put(Tsv.string(table))
         fun done(file: File) = Strings.format("desktop_export_done", count, file.absolutePath) + if (copied) Strings["desktop_export_clipboard"] else ""
         if (!pdf) {
             val file = runCatching { writeNew(name, RecordIo.csv(table)) }.getOrElse { return Strings["host_export_failed"] }
@@ -267,10 +265,55 @@ object Ics {
             lines += listOf("BEGIN:VALARM", "ACTION:DISPLAY", "DESCRIPTION:${escape(d.title)}", "TRIGGER:-PT${-it / 60}M", "END:VALARM")
         }
         lines += listOf("END:VEVENT", "END:VCALENDAR")
-        return lines.joinToString("\r\n", postfix = "\r\n")
+        return lines.joinToString("\r\n", postfix = "\r\n") { fold(it) }
     }
 
-    fun escape(s: String): String = s.replace("\\", "\\\\").replace(";", "\\;").replace(",", "\\,").replace("\r\n", "\\n").replace("\n", "\\n")
+    /** TEXT の値(RFC 5545 §3.3.11)。改行(CRLF・CR・LF・U+2028/2029)は `\n`、他の制御文字は落とす。 */
+    fun escape(s: String): String {
+        val sb = StringBuilder(s.length)
+        var i = 0
+        while (i < s.length) {
+            val c = s[i]
+            when {
+                c == '\r' -> {
+                    sb.append("\\n")
+                    if (i + 1 < s.length && s[i + 1] == '\n') i++
+                }
+                c == '\n' || c == '\u2028' || c == '\u2029' -> sb.append("\\n")
+                c == '\\' -> sb.append("\\\\")
+                c == ';' -> sb.append("\\;")
+                c == ',' -> sb.append("\\,")
+                c.code < 0x20 && c != '\t' -> {}
+                c.code == 0x7F -> {}
+                else -> sb.append(c)
+            }
+            i++
+        }
+        return sb.toString()
+    }
+
+    /** 1 行を 75 オクテット(UTF-8)ごとに折る(RFC 5545 §3.1)。続きの行は空白 1 つで始める。文字の途中では切らない。 */
+    fun fold(line: String, max: Int = 75): String {
+        if (line.toByteArray(Charsets.UTF_8).size <= max) return line
+        val out = StringBuilder()
+        var used = 0
+        var limit = max
+        var i = 0
+        while (i < line.length) {
+            val cp = line.codePointAt(i)
+            val len = Character.charCount(cp)
+            val bytes = String(Character.toChars(cp)).toByteArray(Charsets.UTF_8).size
+            if (used + bytes > limit) {
+                out.append("\r\n ")
+                used = 0
+                limit = max - 1
+            }
+            out.appendCodePoint(cp)
+            used += bytes
+            i += len
+        }
+        return out.toString()
+    }
 }
 
 /** 本の情報の取得(iOS の `BookLookupClient`)。見つからなければ null。 */
@@ -360,6 +403,16 @@ interface Notifier {
             synchronized(this) { timers.remove(id) }?.cancel()
             return null
         }
+
+        /** 予約した通知を全部取り消す(この端末のデータを消す時)。取り消した数。 */
+        fun cancelAll(): Int {
+            val all = synchronized(this) { timers.values.toList().also { timers.clear() } }
+            all.forEach { it.cancel() }
+            return all.size
+        }
+
+        /** 予約している数(テスト用)。 */
+        internal fun pendingCount(): Int = synchronized(this) { timers.size }
 
         /** [id] の前の予約を消して [delayMillis] 後に [fire] を 1 回。鳴ったら表から外す。 */
         internal fun arm(id: String, delayMillis: Long, fire: () -> Unit) {

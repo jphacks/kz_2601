@@ -23,6 +23,7 @@
     <string name="desktop_feed_offline">フィードはデスクトップ版ではまだ取得しません</string>
     <string name="desktop_flashcards_back_hint">裏(押すと表)</string>
     <string name="desktop_flashcards_front_hint">表(押すと裏)</string>
+    <string name="desktop_image_load">画像を読む</string>
     <string name="desktop_image_none">画像なし</string>
     <string name="desktop_input_audio_unavailable">録音は このパソコンでは使えません。ファイルから選べます</string>
     <string name="desktop_input_clear">消す</string>
@@ -95,6 +96,7 @@
     <string name="desktop_list_open_window">別のウィンドウで開く</string>
     <string name="desktop_list_separator">、</string>
     <string name="desktop_loading">読み込み中…</string>
+    <string name="desktop_markdown_link_confirm">%1$s を開きますか？</string>
     <string name="desktop_match_offline">仲間探しのつながりはサインインした後に出ます</string>
     <string name="desktop_notification_now">今</string>
     <string name="desktop_notification_scheduled">通知を予約しました(%1$s・アプリを開いている間だけ)</string>

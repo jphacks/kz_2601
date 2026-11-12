@@ -23,7 +23,6 @@ import androidx.compose.ui.draganddrop.DragAndDropEvent
 import androidx.compose.ui.draganddrop.DragAndDropTarget
 import androidx.compose.ui.draganddrop.awtTransferable
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.toComposeImageBitmap
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.input.key.KeyEvent
 import androidx.compose.ui.input.key.KeyEventType
@@ -35,6 +34,7 @@ import androidx.compose.ui.unit.dp
 import jp.kz2601.metamon.desktop.MockStore
 import jp.kz2601.metamon.desktop.i18n.Strings
 import jp.kz2601.metamon.desktop.photoPreviewClick
+import jp.kz2601.metamon.desktop.rememberImage
 import jp.kz2601.metamon.dsl.Accept
 import jp.kz2601.metamon.dsl.AppDSL
 import jp.kz2601.metamon.dsl.Component
@@ -43,12 +43,10 @@ import jp.kz2601.metamon.dsl.logic.ImportPlan
 import jp.kz2601.metamon.dsl.logic.RecordImport
 import jp.kz2601.metamon.dsl.records.Entity
 import jp.kz2601.metamon.dsl.records.entityModels
-import org.jetbrains.skia.Image as SkiaImage
 import java.awt.FileDialog
 import java.awt.Frame
 import java.awt.Toolkit
 import java.awt.datatransfer.DataFlavor
-import java.awt.datatransfer.StringSelection
 import java.awt.datatransfer.Transferable
 import java.awt.datatransfer.UnsupportedFlavorException
 import java.awt.image.BufferedImage
@@ -159,8 +157,9 @@ class DesktopIo(dsl: AppDSL, private val read: () -> MockStore, private val upda
 
     /** 作った TSV をクリップボードへ(table の選んだ行など)。 */
     fun copyText(tsv: String, rows: Int) {
-        runCatching { Toolkit.getDefaultToolkit().systemClipboard.setContents(StringSelection(tsv), null) }
-            .onFailure { return run { notice = Strings["desktop_io_copy_failed"] } }
+        if (!ExportClipboard.put(tsv, runCatching { Toolkit.getDefaultToolkit().systemClipboard }.getOrNull())) {
+            return run { notice = Strings["desktop_io_copy_failed"] }
+        }
         notice = Strings.format("desktop_io_copied_rows", rows)
     }
 
@@ -345,8 +344,9 @@ fun MediaFieldLeaf(c: Component, label: String, draft: MutableMap<String, String
     Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
         Text(label, style = MaterialTheme.typography.labelLarge)
         if (file != null && c.type == ComponentType.PHOTO_FIELD) {
-            val bitmap = remember(uri) { runCatching { ImageSource.bytes(uri, allowFile = true)?.let { SkiaImage.makeFromEncoded(it).toComposeImageBitmap() } }.getOrNull() }
-            bitmap?.let { Image(it, contentDescription = label, modifier = Modifier.heightIn(max = 160.dp).widthIn(max = 240.dp).photoPreviewClick(uri, label).fileDragSource(file)) }
+            // 読む・縮めるのは裏(IO)で・大きさの上限つき(ImageLoader)
+            val image = rememberImage(uri, allowFile = true, maxPx = PREVIEW_PX, withPng = false)
+            image?.let { Image(it.bitmap, contentDescription = label, modifier = Modifier.heightIn(max = 160.dp).widthIn(max = 240.dp).photoPreviewClick(uri, label).fileDragSource(file)) }
         } else if (file != null) {
             Text(file.name, modifier = Modifier.fileDragSource(file))
         }
@@ -363,6 +363,9 @@ fun MediaFieldLeaf(c: Component, label: String, draft: MutableMap<String, String
         Text(Strings[if (c.type == ComponentType.PHOTO_FIELD) "desktop_io_photo_hint" else "desktop_io_video_hint"], style = MaterialTheme.typography.bodySmall, color = Color.Gray)
     }
 }
+
+/** photoField の見本の絵の長い辺(240dp × 高解像度)。 */
+private const val PREVIEW_PX = 480
 
 /** file URI(file:/C:/a%20b.png など)→ File。読めない値は null(描く途中で投げない)。 */
 fun fileOf(uri: String): File? = runCatching { File(java.net.URI(uri)) }.getOrNull()

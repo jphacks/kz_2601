@@ -205,6 +205,13 @@ fun DesktopApp(
     }
 }
 
+/** Markdown のリンク: 見える文字と行き先が違い得るので、行き先を見せて確かめてから openUrl で開く。 */
+internal fun markdownLinkAction(url: String): Action = Action(
+    type = jp.kz2601.metamon.dsl.ActionType.OPEN_URL,
+    url = url,
+    confirmMessage = Strings.format("desktop_markdown_link_confirm", url),
+)
+
 /** 確認ダイアログの主ボタン(iOS と同じ語)。 */
 internal fun confirmLabel(a: Action): String = Strings[
     when (a.type) {
@@ -370,7 +377,7 @@ private fun NodeContent(c: Component, s: ScreenScope) {
         ComponentType.CARD -> Card(Modifier.fillMaxWidth()) { LocalGridOrChildren(c, s, Modifier.padding(12.dp)) }
         in DesktopLeaves.containers -> LocalGridOrChildren(c, s)
         ComponentType.TEXT -> Text(c.text.orEmpty())
-        ComponentType.MARKDOWN -> MarkdownLeaf(c.text.orEmpty())
+        ComponentType.MARKDOWN -> MarkdownLeaf(c.text.orEmpty()) { url -> s.perform(markdownLinkAction(url), null) }
         ComponentType.LABEL -> Text(c.label ?: c.text.orEmpty(), style = MaterialTheme.typography.labelLarge)
         ComponentType.BADGE -> BadgeLeaf(c)
         ComponentType.IMAGE -> ImageLeaf(c, c.field?.let { s.form?.values?.get(it)?.stringValue })

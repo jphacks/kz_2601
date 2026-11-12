@@ -29,6 +29,7 @@ import java.awt.event.WindowEvent
 import jp.kz2601.metamon.desktop.i18n.Strings
 import jp.kz2601.metamon.desktop.io.DragOut
 import jp.kz2601.metamon.desktop.store.DesktopStore
+import jp.kz2601.metamon.desktop.store.DeviceWipe
 import jp.kz2601.metamon.desktop.store.SessionPersistence
 import jp.kz2601.metamon.desktop.theme.TailorItTheme
 import jp.kz2601.metamon.dsl.records.entityModels
@@ -86,7 +87,10 @@ private fun runApp(args: Array<String>) = application {
                     SharedRecords.opening(p, loadScope, post = { SwingUtilities.invokeLater(it) }) { p.load(models) }
                 }
             },
-            wipeStore = { desktopStore.wipe() },
+            wipeStore = {
+                desktopStore.wipe()
+                DeviceWipe.run(desktopStore.root)
+            },
         )
     }
     DisposableEffect(hub) {

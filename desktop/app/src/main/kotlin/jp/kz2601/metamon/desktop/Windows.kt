@@ -139,6 +139,11 @@ class SharedRecords(
     var loading: Boolean by mutableStateOf(loading)
         private set
 
+    /** 端末のデータを消している間。他のウィンドウからの書き換え・断られた行の混ぜ込みを受けない。 */
+    @Volatile
+    var wiping: Boolean = false
+        private set
+
     /** 端末のデータを消した回数。増えたら各ウィンドウが下書き・遷移を戻す。 */
     var wipes: Int by mutableIntStateOf(0)
         private set
@@ -147,12 +152,12 @@ class SharedRecords(
 
     init {
         // 送れずに断られて端末の行が戻った時は、戻った行だけを画面のスレッドで混ぜる(端末にはもう書いてあるので persistence には渡さない)
-        persistence?.onReload = { delta -> post { store = delta.applyTo(store) } }
+        persistence?.onReload = { delta -> post { if (!wiping) store = delta.applyTo(store) } }
     }
 
     /** 画面から書き換えた。前後の差を端末に渡す。読み終わる前は捨てる(読んだ記録で上書きされるため)。 */
     fun update(models: List<Entity>, next: MockStore) {
-        if (loading) return
+        if (loading || wiping) return
         val old = store
         store = next
         persistence?.changed(models, old, next)
@@ -174,10 +179,25 @@ class SharedRecords(
         wipes++
     }
 
-    /** 端末のデータを消す(#1887): 積んだ書き込みを流し終えてから端末の記録・送り待ち・設定を消し、画面を空にする。 */
+    /** 消し始める: ここから先の書き換えは受けない([endWipe] まで)。 */
+    fun beginWipe() {
+        wiping = true
+    }
+
+    fun endWipe() {
+        wiping = false
+    }
+
+    /** 端末のデータを消す(#1887): 書き換えを止め、積んだ書き込みを流し終えてから端末の記録・送り待ち・設定を消し、画面を空にする。 */
     suspend fun wipe() {
-        persistence?.wipe()
-        reset()
+        val outer = wiping
+        beginWipe()
+        try {
+            persistence?.wipe()
+            reset()
+        } finally {
+            if (!outer) endWipe()
+        }
     }
 
     fun close() {
@@ -279,8 +299,16 @@ class AppHub(
      * 開いているアプリごとに書き込みを流し終えてから消して画面を空にし、保存先をまるごと消す。最後に書き出した一時ファイルも消す。
      */
     suspend fun wipeLocalData() {
-        opened().forEach { it.records.wipe() }
-        wipeStore()
+        val all = opened()
+        // 先に全部のアプリの書き換えを止め、積んだ書き込みを流し終えてから消す(消した後に古い書き込みが残らないように)
+        all.forEach { it.records.beginWipe() }
+        try {
+            all.forEach { it.records.idle() }
+            all.forEach { it.records.wipe() }
+            wipeStore()
+        } finally {
+            all.forEach { it.records.endWipe() }
+        }
         runCatching { clearTempFiles() }
     }
 
