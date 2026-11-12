@@ -333,6 +333,9 @@ final class MacAppLibrary {
         server == nil || serverListState == .loaded || serverListState == .offline
     }
 
+    /// サインインしていない(サインアウト・削除の後で `.idle` のまま)時は一覧を取りに行かないので、端末の一覧で決まり
+    func isServerListSettled(signedIn: Bool) -> Bool { !signedIn || isServerListSettled }
+
     /// サーバーの一覧の行(中身を取る前のアプリの名前・版)
     func serverSummary(_ appId: String) -> AppSummary? { serverApps.first { $0.id == appId } }
 

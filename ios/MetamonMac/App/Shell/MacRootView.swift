@@ -174,7 +174,7 @@ struct MacRootView: View {
         .focusedSceneValue(\.shellActions, shellActions)
         .macNotificationRouting(selection: notificationSelection, appIds: apps.map(\.id)) // 押された通知のアプリを開く(#965)。入力中なら確認を通す・シートの間は閉じるまで待つ(#943)
         // ショートカット・Siri・ウィジェットの「開く / 話しかける」(#1034)。一覧を読み終える前の「開く」は読み終えてから(#1970)
-        .macIntentRouting(selection: notificationSelection, appIds: apps.map(\.id), listSettled: library.isServerListSettled,
+        .macIntentRouting(selection: notificationSelection, appIds: apps.map(\.id), listSettled: library.isServerListSettled(signedIn: MacAccount.shared.session.user != nil),
                           talk: speak, missing: intentTargetMissing)
         .onChange(of: apps.map(\.name)) { IntentHost.shared.appsMayHaveChanged() } // Siri のフレーズのアプリ名を引き直す(#1034)
         .background { WindowCloseGuard(discardGuard: discardGuard) } // ⌘W・閉じるボタン(#943)

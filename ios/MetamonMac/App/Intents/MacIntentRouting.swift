@@ -24,11 +24,12 @@ private struct MacIntentRouting: ViewModifier {
             .onChange(of: host.pending) { route() }
             .onChange(of: appIds) { route() } // 起動直後: 一覧が載ってから開く(#1970)
             .onChange(of: listSettled) { route() }
-            .task(id: host.pending) { // 一覧が読み終わらないまま待つ長さを過ぎたら諦める
-                guard host.pending != nil else { return }
-                try? await Task.sleep(for: .seconds(IntentHost.openLifetime))
-                guard !Task.isCancelled else { return }
-                route()
+            .task(id: host.requestSerial) { // 一覧が読み終わらないまま待つ長さを過ぎたら諦める(同じ「開く」が来ても測り直す)
+                while let remaining = host.openWaitRemaining {
+                    try? await Task.sleep(for: .seconds(remaining))
+                    guard !Task.isCancelled else { return }
+                    route()
+                }
             }
     }
 

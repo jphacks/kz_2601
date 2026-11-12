@@ -85,6 +85,43 @@ final class MacIntentOpenBeforeListTests: XCTestCase {
         XCTAssertEqual(host.resolve(among: [], listSettled: false), .talk)
     }
 
+    func testSignedOutLibraryCountsAsSettled() async throws {
+        let (host, library) = makeHost(serverApps: [])
+        library.resetAfterWipe() // サインアウトの後: `.idle` のまま取り直さない
+        XCTAssertFalse(library.isServerListSettled)
+        XCTAssertTrue(library.isServerListSettled(signedIn: false), "サインインしていなければ一覧を待たない")
+        XCTAssertFalse(library.isServerListSettled(signedIn: true))
+        await host.request(.open(appId: "gone"))
+        XCTAssertEqual(host.resolve(among: library.createdIds, listSettled: library.isServerListSettled(signedIn: false)),
+                       .missing("gone"), "30 秒待たずにすぐ知らせる")
+    }
+
+    func testRepeatedOpenRestartsWait() async throws {
+        var clock = Date(timeIntervalSince1970: 1_000)
+        let host = IntentHost(server: { nil })
+        host.now = { clock }
+        await host.request(.open(appId: "srv"))
+        let first = host.requestSerial
+        XCTAssertEqual(host.openWaitRemaining, IntentHost.openLifetime)
+        clock += 20
+        await host.request(.open(appId: "srv")) // 同じ「開く」をもう一度
+        XCTAssertNotEqual(host.requestSerial, first, "同じ中身でも待ちを測り直すきっかけになる")
+        XCTAssertEqual(host.openWaitRemaining, IntentHost.openLifetime, "待ち時間は測り直す")
+        clock += 15
+        XCTAssertNil(host.resolve(among: [], listSettled: false), "最初の受け取りから 30 秒でも、まだ待つ")
+        XCTAssertEqual(host.openWaitRemaining, IntentHost.openLifetime - 15)
+        clock += IntentHost.openLifetime - 15
+        XCTAssertEqual(host.openWaitRemaining, 0)
+        XCTAssertEqual(host.resolve(among: [], listSettled: false), .missing("srv"))
+        XCTAssertNil(host.openWaitRemaining, "決まったら待たない")
+    }
+
+    func testTalkHasNoOpenWait() async {
+        let host = IntentHost(server: { nil })
+        await host.request(.talk)
+        XCTAssertNil(host.openWaitRemaining)
+    }
+
     func testLocalOnlyLibraryIsAlwaysSettled() {
         XCTAssertTrue(MacAppLibrary(store: nil).isServerListSettled, "サーバーの無い時は端末の一覧だけで決める")
     }

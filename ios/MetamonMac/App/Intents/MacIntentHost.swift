@@ -34,6 +34,8 @@ final class IntentHost {
     static let openLifetime: TimeInterval = 30
     @ObservationIgnored var now: () -> Date = Date.init
     @ObservationIgnored private var pendingSince = Date.distantPast
+    /// 「開く / 話しかける」を受けるたびに増える。同じ `.open(id)` が続いても待ち時間を測り直す(#1970)
+    private(set) var requestSerial = 0
 
     /// `records` を省くと中央と同じエンジンに書く(`MacIntentEngineWriter`)
     init(records: (any MacIntentRecordWriting)? = nil,
@@ -56,7 +58,14 @@ final class IntentHost {
     func request(_ action: Pending) async {
         print("[Metamon] intent: requested \(action)")
         pendingSince = now()
+        requestSerial += 1
         pending = action
+    }
+
+    /// 一覧を待っている「開く」が諦めるまでの残り。待っていなければ nil
+    var openWaitRemaining: TimeInterval? {
+        guard case .open = pending else { return nil }
+        return max(0, Self.openLifetime - now().timeIntervalSince(pendingSince))
     }
 
     /// 受け取った「開く / 話しかける」を一覧でどうするか
