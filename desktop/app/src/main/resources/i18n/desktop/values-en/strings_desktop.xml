@@ -156,6 +156,7 @@
     <string name="desktop_untitled">(Untitled)</string>
     <string name="desktop_url_failed">Couldn\'t open the URL</string>
     <string name="desktop_url_unsupported">This computer can\'t open URLs: %1$s</string>
+    <string name="desktop_usage_reset_pattern">MMM d, H:mm</string>
     <string name="desktop_voice_busy">Still transcribing. Please wait a moment</string>
     <string name="desktop_voice_downloading">Downloading the voice model (%1$d MB) once before transcribing. Audio and the model stay on this PC</string>
     <string name="desktop_voice_failed">Couldn\'t transcribe. Please try again</string>
