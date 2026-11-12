@@ -538,3 +538,17 @@ func TestTruncAllContinuationBytes(t *testing.T) {
 		t.Fatalf("mixed = %q", got)
 	}
 }
+
+// A valid rune right before the cut is kept, and invalid bytes before the cut
+// are dropped instead of leaking into the table.
+func TestTruncDropsOnlyInvalid(t *testing.T) {
+	mixed := "abc\x80\x80\x80\x80def"
+	for n, want := range map[int]string{3: "abc…", 4: "abc…", 5: "abc…", 6: "abc…"} {
+		if got := trunc(mixed, n); got != want {
+			t.Fatalf("trunc(mixed, %d) = %q, want %q", n, got, want)
+		}
+	}
+	if got := trunc("\xffabc", 3); got != "ab…" {
+		t.Fatalf("trunc(\\xffabc, 3) = %q, want %q", got, "ab…")
+	}
+}
