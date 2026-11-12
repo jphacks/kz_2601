@@ -75,6 +75,7 @@ func render(ctx context.Context, st store.FeedbackReader, args []string, out *st
 	switch args[0] {
 	case "list":
 		fs := flag.NewFlagSet("list", flag.ContinueOnError)
+		fs.SetOutput(io.Discard) // the parse error is returned; do not also print flag usage
 		since := fs.Duration("since", 7*24*time.Hour, "only feedback newer than this (0 = all)")
 		status := fs.String("status", "", "only this status (received / triaged / done)")
 		limit := fs.Int("limit", 50, "max rows (<= 500)")
@@ -104,6 +105,7 @@ func render(ctx context.Context, st store.FeedbackReader, args []string, out *st
 		return nil
 	case "show":
 		fs := flag.NewFlagSet("show", flag.ContinueOnError)
+		fs.SetOutput(io.Discard) // the parse error is returned; do not also print flag usage
 		dir := fs.String("out", "", "save screenshot.jpg / dsl.json into this directory (created if missing)")
 		if err := fs.Parse(args[1:]); err != nil {
 			return err
