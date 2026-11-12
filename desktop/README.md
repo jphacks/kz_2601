@@ -27,7 +27,7 @@ TAILORIT_API=stg TAILORIT_DEV_TOKEN=<Firebase の ID トークン> ./gradlew :de
 - 入力: 日付・時刻は文字で入れて「今日」「‹ ›」で動かす。写真・動画はファイルを選ぶ・落とす・Ctrl+V、録音はファイルを選ぶ(撮影・録音・位置はこのパソコンでは使えない旨の枠)。手書きはマウス・ペンで描いて PNG に。QR は画像ファイルかクリップボードの画像から読む(zxing)。
 - 遷移: push はウィンドウの中で積み、sheet はウィンドウ内のダイアログ、fullScreen はウィンドウ全体に重ねる。タブは下に並べる。confirmMessage は確認ダイアログ。規則は Android と同じ `NavigationResolver`・`FormDraft`(`android/renderer` のソースをビルド時に取り込む。`android/` は変えない)。
 - アクション: 保存・削除は端末に残す(下の「端末の保存」)。resetForm は下書きを戻す。openUrl はブラウザ、addToCalendar は .ics を書き出して既定のカレンダーで開く、export は CSV か PDF(format)をダウンロードに書き出し、表を TSV でクリップボードにも入れる、scheduleNotification はトレイの通知(起動中だけ)、lookupBook はモックの本(`TAILORIT_API_BASE` を付けると `POST /v1/lookup/book`)。openVoice・startActivity・endActivity・follow は「使えない」旨を出す。
-- トレイ / メニューバーに常駐する(`Tray.kt`): 開く・すぐ記録(最初の記録できるフォーム画面を DSL と同じ開き方で開く)・音声(まだ使えない旨)・走っている timerDisplay の残り / 経過(メニューとツールチップ)・終了。ウィンドウの × はトレイに隠す(メニューの「ウィンドウを閉じてもトレイに残す」で切り替え・次の起動にも残る)。トレイが無い環境では × で終わる。通知(scheduleNotification・タイマーの終わり)もこのアイコンから出す。Linux は GNOME だと拡張(AppIndicator)が要る。
+- トレイ / メニューバーに常駐する(`Tray.kt`): 開く・すぐ記録(最初の記録できるフォーム画面を DSL と同じ開き方で開く)・音声(まだ使えない旨)・走っている timerDisplay の残り / 経過(メニューとツールチップ)・終了。ウィンドウの × はトレイに隠す(メニューの「ウィンドウを閉じてもトレイに残す」で切り替え・次の起動にも残る)。トレイが無い環境では × で終わる。通知(scheduleNotification・タイマーの終わり)もこのアイコンから出す。Linux は GNOME だと拡張(AppIndicator)が要る。メニューの「ログイン時に開く」(既定 off・`Autostart.kt`)は Windows で `HKCU\Software\Microsoft\Windows\CurrentVersion\Run` の `TailorIt`、Linux で `$XDG_CONFIG_HOME/autostart/tailorit.desktop`(無ければ `~/.config/autostart`)に書く。配布した形(jpackage)で動いている時だけ出し、`gradlew run` と macOS(Mac 版がある)では出さない。
 - 複数のウィンドウ(`Windows.kt`): アプリごとに 1 枚。コマンドパレットでアプリを選ぶ・トレイの「新しいウィンドウ」で開く(開いていれば前に出す)。一覧の行をダブルクリック / 右クリックの「別のウィンドウで開く」、またはパレットの「この記録を別のウィンドウで開く」で記録の詳細を別の 1 枚に(同じ記録は 1 枚)。遷移・下書き・ショートカット・Ctrl+F はウィンドウごと、記録はアプリごとに共有するので、片方で保存すると他方の一覧にすぐ出る。同じ記録を 2 枚で直した時は後に保存した方が勝ち、上書きしたことを知らせる。詳細のウィンドウは保存・閉じる・Esc で閉じる。× は他にウィンドウがあればその 1 枚だけ閉じ、最後の 1 枚はトレイに隠す。大きさ・位置はアプリ / 詳細の種類ごとに覚え、2 枚目からは少しずらして画面の中に収める。
 - 端末の保存(`store/SessionPersistence.kt`): 記録は端末の置き場(`store/`)に書き、再起動しても残る。最後に開いたアプリから開く。既定は通信しない。`TAILORIT_API=stg` と `TAILORIT_DEV_TOKEN` が両方ある時だけ、保存・削除を送信待ちに積んで stg へ送り、起動時に前回送れなかった分を送り直す(送り待ちがあれば画面の下に件数)。記録の JSON を引数で渡した時は端末に残さない。起動時は端末の記録を裏で読み、読み終えるまでウィンドウにスケルトン(形だけの画面)を出す。サインアウトの画面(#1749)ができるまでは、コマンドパレットの「この端末のデータを消す」で確認のあと開いている全アプリの記録・送り待ち・設定を消す(`AppHub.wipeLocalData()`)。
 - サインインはまだ無い。
@@ -36,9 +36,11 @@ TAILORIT_API=stg TAILORIT_DEV_TOKEN=<Firebase の ID トークン> ./gradlew :de
 - 読み上げ: 見出し・タブ(選択中)・ダイアログの名前・知らせ(live region)・絵で描く部品(グラフ・進み具合・メーター・星・画像)の説明を付けている。Windows は Java Access Bridge を通す(`jabswitch -enable` が要る)。Linux の Orca は JDK に橋渡しが無く、まだ読めない。
 - ファイル: `fileImport` で CSV(取り込みの確認を出す)・テキスト・PDF(本文)を取り込む。
 - ドラッグ & ドロップ: 画面に写真・動画・CSV・テキスト・PDF を落とすと、photoField / videoField / fileImport / list に振り分ける。写真は外へ引き出せる。
+- 写真を大きく見る(`PhotoPreview.kt`): 記録・フォームの写真(data URL と手元の画像ファイル)を押すか、何も選んでいない時に Space で、ウィンドウ内のダイアログに大きく出す。← → で送り、Esc / Space で閉じる。並びは DSL の項目順で、隠す項目・算出項目・https の写真は出さない。「既定のアプリで開く」は PNG にして一時フォルダへ書き、OS のビューアに渡す。
 - クリップボード: 一覧の「表をコピー」で表計算に貼れる TSV、「表を貼り付け」で表計算の行を取り込む。list・table の行はクリックで選び、Shift+クリックで範囲、Ctrl+クリック(macOS は ⌘)で足し引き、Ctrl+A で全部。選んでいる時は Ctrl+C と「表をコピー」が選んだ行だけを同じ TSV(見出し付き)でコピーする(table は見えている列)。詳細へ移る行(onItemTap)は修飾キー無しのクリックで今までどおり開く(`RowSelection.kt`)。画像は Ctrl+V で photoField へ。
 - 印刷: Ctrl+P(または見出しの「印刷」)で一番上の画面をプレビューし、OS の印刷ダイアログから A4 縦で印刷する。頁は export の PDF と同じ(`io/PdfIo.pages`)。一覧・table・gridTable・chart は表ごとに頁を改めて全行を複数頁に割り、stat などの値とフォームの入力は「項目 / 値」の表にする(`Print.kt`)。
 - キーボード: Ctrl+K(または Ctrl+Shift+P)でコマンドパレット(画面・アクション・同梱のアプリを名前で選ぶ)、Ctrl+N 新規・Ctrl+S 保存・Ctrl+F 検索・Delete 削除(確認あり)・Esc 閉じる / 戻る・F1(または Ctrl+/)で一覧。macOS は Ctrl の代わりに ⌘、削除は ⌘⌫。Tab はグリッドの行 → 列の順(`Keyboard.kt`・`CommandPalette.kt`)。
+- ライセンス: F1 の一覧の「サードパーティのライセンス」かコマンドパレットで、このアプリ・依存・同梱物・Java 実行環境のライセンスを出す(`Licenses.kt`)。一覧はビルド時に `app/third-party-licenses.gradle.kts` が runtimeClasspath の POM と jar の NOTICE から作る(本文の正本は `android/scripts/license-texts`)。Maven を通らない同梱物は `app/licenses/vendored/*.properties` に 1 件 1 ファイルで足す。Java 実行環境の分は起動中の実行環境の `legal/` から読む。
 - まだ描けない部品は「デスクトップ版ではまだ使えない部品」の枠で残す。
 
 ## 構成

@@ -93,12 +93,14 @@ paths:
         '404': { $ref: '#/components/responses/NotFound' }
     patch:
       tags: [apps]
-      summary: メタ更新 (名前・status)
+      summary: メタ更新 (名前・status・一覧に出す数字)
       description: |
         `name`(変身一覧の「名前を変える」・#277)は前後の空白を除いて 1〜40 文字。名前は `dsl.app.name` にも書き込み、
         **新しい version として積む**(`source.kind=manual`・`mode=patch`・`patch=[{op:add,path:/app/name}]`)。
         DSL の書き込みは毎回 `dsl.app.name` をアプリの名前に写すので、メタだけ変えると次の音声編集で元に戻るため。
         同じ名前なら version は進めない。`status` だけの時は version を進めない。
+        `glanceStat`(アプリの一覧のカードに出す数字・link-10)は DSL の部品の id・`"-"`(出さない)・`""`(既定 = 初期画面の先頭の stat)。
+        形だけ確かめる(DSL に無い id は端末が既定に戻す)。version も `updatedAt` も変えない。
       requestBody:
         content:
           application/json:
@@ -107,6 +109,7 @@ paths:
               properties:
                 name: { type: string, minLength: 1, maxLength: 40 }
                 status: { type: string, enum: [active, archived] }
+                glanceStat: { type: string, pattern: '^$|^-$|^[a-z][a-z0-9_-]{0,39}$' }
       responses:
         '200': { description: OK, content: { application/json: { schema: { $ref: '#/components/schemas/AppSummary' } } } }
         '400': { $ref: '#/components/responses/BadRequest' }
@@ -334,6 +337,9 @@ paths:
     get:
       tags: [versions]
       summary: バージョン履歴 (新しい順・DSL 本体は含まない)
+      description: |
+        restore で作られた版は `source.kind=restore` と `source.restoredFrom`(中身の元の版番号)を持つ。
+        「元に戻す」を続けて押す時は、restore の版を `restoredFrom` に読み替えてその親へ戻る(#1774)。
       parameters: [{ $ref: '#/components/parameters/PageSize' }, { $ref: '#/components/parameters/PageToken' }]
       responses:
         '200':
@@ -424,6 +430,7 @@ paths:
         public/shared entity は全ユーザーの投稿が返り、各レコードに `author`/`authorName` が付く。
         `filterField=author&filterOp=eq&filterValue=<uid>` で特定ユーザー (自分) の投稿だけに絞れる。
         `filterField=author&filterOp=in&filterValue=myFollows` で自分がフォローしている人の投稿だけ (`nin` = フォローしていない人の投稿・#270)。フォローは 1 文書なのでメモリで絞る (Firestore の `in` の 30 件の上限は関係しない)。
+        private entity でも `filterField=author` の `eq`/`neq` を受け付ける。レコードはすべて呼び出した人のものなので、`eq <自分>`/`neq <他人>` は全件、`neq <自分>`/`eq <他人>` は 0 件(新着の確認が全 entity に送るため・#1641)。entity が `author` という項目を持つ時はその項目で絞る。
         **scope:shared の entity は作成者と参加者だけ**が読み書きできる (この entity の records の全操作で同じ・それ以外は 403 `not_member`・#254)。public は従来どおり誰でも。
         ブロックの関係にある人(呼び出した人がブロックした・呼び出した人をブロックした・`/me/blocks`)の投稿は一覧から除き、id を指定しても 404(#321)。仲間探しのプロフィール・連絡先の entity は、18 歳以上の申告(`/me/age-confirmation`)が無い人には自分の分だけ返す(#507)。運営が非公開にした共有アプリ(`apps_public/{appId}.hidden`)は、public/shared の entity の records の全操作が 403 `unpublished`(details.reason = 運営の理由)。
         運営がアプリのサーバー機能を強制停止している間(#346・`moderate stop-app -force` / `stop-all -force`)は、サーバーのルールのきっかけになる作成・更新(POST / PATCH)が 403 `app_stopped`(details.level = `app` / `global`、期限つきなら details.until)。ルールに当たらない書き込み・読み出し・削除はそのまま。
@@ -1556,7 +1563,7 @@ paths:
         '403': { $ref: '#/components/responses/NotMember' }
         '404': { description: '通話が off(`details.reason: calls_disabled`)・共有のアプリでない(`no_shared_data`)・その部屋の callButton が無い(`no_call_button`)・続けようとした通話が終わっている(`call_ended`)', content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
         '410': { description: 退会済み(`account_deleted`), content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
-        '429': { description: 1 時間の上限。`Retry-After` と details(scope=user・limit・retryAfterSec), content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+        '429': { description: '1 時間の上限(`EXT_USER_PER_HOUR`)。`Retry-After` と details(scope=user・limit・retryAfterSec)。runner の provider ごとの回数の上限(#1715)も 429 で、details の scope は user_hourly / user_daily / app_hourly / app_daily / global_daily / provider_paused(provider が 429 を返した後の 1 分)・provider・retryAfterSec', content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
 
   /calls/webhook:
     post:
@@ -2029,6 +2036,7 @@ paths:
         - **冪等**: `X-Request-Id` を有料の provider のコインの押さえの鍵にする(送らなければサーバーが作る)
         - **数え方**: 1 回 = `runs` 1(Pro の月の枠・超えた後のコイン払い)。有料の provider は押さえる → 実費 × `COIN_PER_USD` → 差額を戻す。失敗(時間切れ・5xx)は両方戻す。鍵だけの読む op(為替など)は同じ引数の答えを決まった時間キャッシュし、キャッシュから返した時は数えない(Pro の確認はする)
         - 1 ユーザー 1 時間 `EXT_USER_PER_HOUR` 回(既定 120)。超えると 429 `rate_limited`
+        - runner でも provider ごとに数える: 利用者・アプリの 1 時間 / 1 日(`EXT_LIMIT_*`)・環境全体の 1 日(`EXT_GLOBAL_DAILY*`)・provider が 429 を返した後の 1 分止め。超えると 429 `rate_limited`(`details.scope`・`Retry-After`)
         - `EXT_RUNNER_URL` が無い時・provider が止まっている(`EXT_<PROVIDER>_ENABLED` が無い・`EXT_DISABLED`・鍵が無い)時は 503 `ext_unavailable`
       requestBody:
         required: true
@@ -2148,16 +2156,18 @@ paths:
   /client-config:
     get:
       security: []
-      summary: iOS / Android の最低対応版と最新版(#302)・アプリ内のお知らせ(#333)・認証不要
+      summary: iOS / Android / macOS の最低対応版と最新版(#302・#981)・アプリ内のお知らせ(#333)・認証不要
       description: |
-        サインイン前にも iOS / Android が起動時・前面に戻った時に読む。値は appconfig の環境変数(起動時に 1 回読む)。**未設定・不正な値のフィールドは省略 = 強制しない**。
+        サインイン前にも iOS / Android / macOS が起動時・前面に戻った時に読む。値は appconfig の環境変数(起動時に 1 回読む)。**未設定・不正な値のフィールドは省略 = 強制しない**。
         - `MIN_IOS_BUILD`: これ未満の CFBundleVersion は閉じられない「アップデートしてください」画面
         - `LATEST_IOS_BUILD`: これ未満は閉じられるお知らせ(MIN より小さければ MIN に揃える)
         - `IOS_APP_STORE_URL`: App Store のページ(https / itms-apps のみ)。省略時は iOS 側の既定
         - `MIN_ANDROID_BUILD` / `LATEST_ANDROID_BUILD`: Android の versionCode で、意味は iOS の 2 つと同じ(LATEST が MIN より小さければ MIN に揃える)。iOS の値とは別に判定する
         - `ANDROID_STORE_URL`: Google Play のページ(https / market のみ)。省略時は Android 側の既定
+        - `MIN_MACOS_BUILD` / `LATEST_MACOS_BUILD`: Mac アプリの CFBundleVersion で、意味は iOS の 2 つと同じ(LATEST が MIN より小さければ MIN に揃える)。iOS の値とは別に判定する(#981)
+        - `MAC_APP_STORE_URL`: Mac App Store のページ(https / macappstore のみ)。省略時は Mac 側の既定
         - `NOTICE_JSON`: アプリ内のお知らせ(`notice`・#333)。1 行のバナーで、利用者が閉じられる。iOS は閉じた `id` を覚えるので、文面を変えて出し直す時は `id` も変える。JSON が壊れている・必須が無い・未知のフィールドがある時は `notice` を省略する(他のフィールドは出す)。手順は `docs/ops/incident-runbook.md`
-        iOS / Android は通信失敗・不正な応答では何もしない(fail open)。`notice` だけが不正な時も版の判定は続ける。`Cache-Control: public, max-age=300`(変更が届くまで最大 5 分)。
+        iOS / Android / macOS は通信失敗・不正な応答では何もしない(fail open)。`notice` だけが不正な時も版の判定は続ける。`Cache-Control: public, max-age=300`(変更が届くまで最大 5 分)。
       responses:
         '200':
           description: OK
@@ -2172,6 +2182,9 @@ paths:
                   minAndroidBuild: { type: integer, minimum: 1 }
                   latestAndroidBuild: { type: integer, minimum: 1 }
                   androidStoreUrl: { type: string, format: uri }
+                  minMacOSBuild: { type: integer, minimum: 1 }
+                  latestMacOSBuild: { type: integer, minimum: 1 }
+                  macAppStoreUrl: { type: string, format: uri }
                   notice: { $ref: '#/components/schemas/Notice' }
               example:
                 minIOSBuild: 12
@@ -2180,6 +2193,9 @@ paths:
                 minAndroidBuild: 7
                 latestAndroidBuild: 9
                 androidStoreUrl: 'https://play.google.com/store/apps/details?id=jp.kz2601.metamon'
+                minMacOSBuild: 40
+                latestMacOSBuild: 42
+                macAppStoreUrl: 'https://apps.apple.com/app/id0000000000'
                 notice:
                   id: 2026-11-02-ai
                   severity: warning
@@ -2596,6 +2612,7 @@ components:
         createdAt: { type: string, format: date-time }
         updatedAt: { type: string, format: date-time }
         sortIndex: { type: integer, minimum: 1, description: '変身一覧で自分が並べた位置(1 が先頭・#277)。並べ替えたことが無いアプリには無い' }
+        glanceStat: { type: string, description: 'アプリの一覧のカードに出す数字の部品の id(link-10)。"-" は出さない。無ければ初期画面の先頭の stat' }
     AppWithDSL:
       allOf:
         - { $ref: '#/components/schemas/AppSummary' }
@@ -2728,12 +2745,17 @@ components:
       description: このバージョンが生まれた経緯
       required: [kind]
       properties:
-        kind: { type: string, enum: [ai, manual, restore, system, import] }
+        kind: { type: string, enum: [ai, manual, restore, system, import], description: 'restore は POST .../restore だけが付ける。PUT / PATCH で送った restore は manual として保存' }
         mode: { type: string, enum: [full, patch], description: 'full = PUT (初回/create/fallback), patch = PATCH (編集)' }
         transcript: { type: string, description: ユーザー発話 (ai) }
         summary: { type: string, description: 変更の一文要約 (iOS が読み上げ) }
         model: { type: string }
-        restoredFrom: { type: integer }
+        restoredFrom:
+          type: integer
+          minimum: 1
+          description: |
+            kind=restore の版だけが持つ、中身の元の版番号(省略可・古いクライアントは無視してよい)。
+            サーバーが restore の時に記録する。PUT / PATCH で送った値は捨てる(#1774)。
     VersionSummary:
       type: object
       required: [appId, version, createdAt]

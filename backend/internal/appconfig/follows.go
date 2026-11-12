@@ -146,6 +146,9 @@ func (h *Handler) setFollow(w http.ResponseWriter, r *http.Request, on bool) {
 // filterValue=myFollows. The follows are one document, so the filter runs in
 // memory like the others (no Firestore `in` query and its 30-value cap).
 func (h *Handler) recordFilter(r *http.Request, appID string, ent *dsl.Entity, field, op, value string) (func(*store.Record) bool, error) {
+	if field == authorField && !ent.IsShared() && ent.FieldByID(authorField) == nil {
+		return privateAuthorFilter(uidOf(r), op, value)
+	}
 	if field != authorField || !ent.IsShared() || (op != "in" && op != "nin") {
 		return buildFilter(ent, field, op, value)
 	}
@@ -162,4 +165,22 @@ func (h *Handler) recordFilter(r *http.Request, appID string, ent *dsl.Entity, f
 	}
 	want := op == "in"
 	return func(rec *store.Record) bool { return followed[rec.Author] == want }, nil
+}
+
+// privateAuthorFilter: filterField=author on a private entity (#1641). Every
+// record there is the caller's, so eq/neq compare the value with the caller's
+// uid. Lets clients ask "others' records" of every entity (iOS NewItems sends
+// author neq <me> to all entities, build 2026110601 included) and get an empty
+// list instead of 400. An entity with its own "author" field keeps the data filter.
+func privateAuthorFilter(me, op, value string) (func(*store.Record) bool, error) {
+	var keep bool
+	switch op {
+	case "eq":
+		keep = value == me
+	case "neq":
+		keep = value != me
+	default:
+		return nil, apiErr(http.StatusBadRequest, httpx.CodeBadRequest, "filterOp for author on a private entity must be eq or neq")
+	}
+	return func(*store.Record) bool { return keep }, nil
 }

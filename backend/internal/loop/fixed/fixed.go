@@ -238,7 +238,14 @@ func ReleaseNotes(fs []Fixed) string {
 		return ""
 	}
 	out := "## 直したこと(フィードバックから)\n\n"
+	seen := map[string]bool{}
 	for _, f := range fs {
+		// drafts appended to one issue (#369) are one line
+		key := fmt.Sprintf("%s#%d", f.Repo, f.Issue)
+		if seen[key] {
+			continue
+		}
+		seen[key] = true
 		out += fmt.Sprintf("- %s(#%d)\n", publicTitle(f.Title), f.Issue)
 	}
 	return out

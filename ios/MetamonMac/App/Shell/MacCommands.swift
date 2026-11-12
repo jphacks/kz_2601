@@ -2,11 +2,13 @@ import SwiftUI
 import AppKit
 
 /// メニューバー(#934)。ウインドウの状態は `focusedSceneValue` で受け取り、今の画面に合わせて有効 / 無効を変える。
-/// - ファイル: 新しいアプリ・文字で頼む(会話のシート・#967)・声で頼む(同じシートですぐ録音・#966)・新しいウインドウ
-/// - 編集: 元に戻す(記録を消した直後は削除の取り消し・それ以外は入力欄の取り消し)・やり直す
+/// - ファイル: 新しいアプリ・文字で頼む(会話のシート・#967)・声で頼む(同じシートですぐ録音・#966)・新しいウインドウ・
+///   保存 ⌘S(#1138)・クイックルック ⌘Y(#1850)・CSV / PDF で書き出す・プリント ⌘P(#1139・今の画面に一覧がある時だけ)
+/// - 編集: 元に戻す(記録を消した直後は削除の取り消し・それ以外は入力欄の取り消し)・やり直す・アプリを探す(⌘F・#1282)
 /// - アプリ: 生成したアプリの版の「変更を元に戻す」(⌥⌘Z)・「変更をやり直す」(⇧⌥⌘Z)(#968)・次の通知(#1325)。
 ///   ⌘Z / ⇧⌘Z は入力欄と記録の削除に使っているので、版の取り消しは別のキーにする
-/// - 表示: サイドバー(`SidebarCommands`)・ツールバー(`ToolbarCommands`)・画面マップ(⇧⌘E・#970)
+/// - 表示: サイドバー(`SidebarCommands`)・ツールバー(`ToolbarCommands`)・再読み込み ⌘R(#944)・画面マップ(⇧⌘E・#970)・
+///   拡大 ⌘+ / 縮小 ⌘- / 実際のサイズ ⌘0(中央のアプリの文字・#1206)
 /// - 移動: 戻る・アプリの一覧 / 中央へ・前 / 次のアプリ
 /// - ヘルプ: 頼み方のコツ(#967)・お問い合わせ・フィードバックを送る(#983)
 struct MacCommands: Commands {
@@ -17,6 +19,11 @@ struct MacCommands: Commands {
     @FocusedValue(\.macAppRuntime) private var runtime
     @Environment(\.openWindow) private var openWindow
     @Environment(\.openURL) private var openURL
+    /// 中央のアプリの文字の段(#1206)。`AppCanvas` と同じ値を読む
+    @AppStorage(MacTextZoom.storageKey) private var zoomStep = MacTextZoom.defaultStep
+
+    /// 会話のシート・画面マップが開いている間は中央のアプリに向けた操作(保存・書き出し)を押せない
+    private var canUseCanvas: Bool { shell?.canCompose ?? true }
 
     var body: some Commands {
         SidebarCommands()
@@ -38,6 +45,8 @@ struct MacCommands: Commands {
                 .disabled(!(shell?.canCompose ?? false))
         }
 
+        saveAndExportCommands
+
         CommandGroup(replacing: .undoRedo) {
             if let runtime, runtime.recordUndo != nil {
                 Button("削除を元に戻す") { Task { await runtime.undoRecordDelete() } }
@@ -51,13 +60,37 @@ struct MacCommands: Commands {
                 .keyboardShortcut("z", modifiers: [.command, .shift])
         }
 
+        // サイドバーの検索欄に入る(#1282)
+        CommandGroup(after: .pasteboard) {
+            Divider()
+            Button("アプリを探す") { shell?.focusSearch() }
+                .keyboardShortcut("f", modifiers: .command)
+                .disabled(shell == nil)
+        }
+
         CommandGroup(after: .toolbar) {
+            Divider()
+            // iOS の「下に引いて更新」の代わり: 今の画面の記録を読み直す(#944)
+            Button("再読み込み") { Task { await runtime?.reloadFromMenu() } }
+                .keyboardShortcut("r", modifiers: .command)
+                .disabled(!canUseCanvas || !(runtime?.canReloadFromMenu ?? false))
             Divider()
             // 中央のアプリのシート(sheet / fullScreen)が開いている間は出さない(シートを重ねない)
             Button("画面マップ") { shell?.showScreenMap() }
                 .keyboardShortcut("e", modifiers: [.command, .shift])
                 .disabled(!(shell?.canShowScreenMap ?? false) || runtime?.sheet != nil || runtime?.fullScreen != nil
                            || runtime?.calendarDraft != nil)
+            Divider()
+            // 中央のアプリの文字の大きさ(#1206)。端の段と、画面マップ・会話のシートの間は押せない(マップは自分の拡大縮小に同じキーを使う)
+            Button("拡大") { zoomStep = MacTextZoom.zoomedIn(zoomStep) }
+                .keyboardShortcut("+", modifiers: .command)
+                .disabled(!canUseCanvas || !MacTextZoom.canZoomIn(zoomStep))
+            Button("縮小") { zoomStep = MacTextZoom.zoomedOut(zoomStep) }
+                .keyboardShortcut("-", modifiers: .command)
+                .disabled(!canUseCanvas || !MacTextZoom.canZoomOut(zoomStep))
+            Button("実際のサイズ") { zoomStep = MacTextZoom.defaultStep }
+                .keyboardShortcut("0", modifiers: .command)
+                .disabled(!canUseCanvas || MacTextZoom.isActualSize(zoomStep))
         }
 
         CommandMenu("アプリ") {
@@ -102,6 +135,32 @@ struct MacCommands: Commands {
             #endif
         }
     }
+
+    /// ファイルの保存・書き出し・プリント(`body` の項目数の上限を超えないよう分ける)
+    @CommandsBuilder private var saveAndExportCommands: some Commands {
+        // 中央のフォームを保存バーと同じ流れで保存する(#1138)。⌘Return は中央の列の隠しボタン(`AppCanvas`)
+        CommandGroup(after: .saveItem) {
+            Button("保存") { Task { await runtime?.saveFromMenu() } }
+                .keyboardShortcut("s", modifiers: .command)
+                .disabled(!canUseCanvas || !(runtime?.canSaveFromMenu ?? false))
+            // 開いている記録の写真・動画・録音(#1850)。Finder と同じ ⌘Y・中央の列ではスペースでも
+            Button("クイックルック") { runtime?.toggleQuickLook() }
+                .keyboardShortcut("y", modifiers: .command)
+                .disabled(!canUseCanvas || !((runtime?.canQuickLook ?? false) || runtime?.quickLookURL != nil))
+        }
+
+        // 今の画面の一覧(list / table)を export と同じ流れで出す(#1139)
+        CommandGroup(replacing: .printItem) {
+            Button("CSV で書き出す…") { Task { await runtime?.exportFromMenu(format: "csv") } }
+                .disabled(!canUseCanvas || !(runtime?.canExportFromMenu ?? false))
+            Button("PDF で書き出す…") { Task { await runtime?.exportFromMenu(format: "pdf") } }
+                .disabled(!canUseCanvas || !(runtime?.canExportFromMenu ?? false))
+            Divider()
+            Button("プリント…") { Task { await runtime?.printFromMenu() } }
+                .keyboardShortcut("p", modifiers: .command)
+                .disabled(!canUseCanvas || !(runtime?.canExportFromMenu ?? false))
+        }
+    }
 }
 
 /// ウインドウ(MacRootView)がメニューに渡す操作と状態。
@@ -113,6 +172,8 @@ struct ShellActions {
     var selectNext: () -> Void
     var focusSidebar: () -> Void
     var focusCanvas: () -> Void
+    /// ⌘F: サイドバーの検索欄に入る(#1282)
+    var focusSearch: () -> Void = {}
     /// 会話のシートを開けるか(開いている間は新しく開かない)
     var canCompose: Bool
     /// 中央のアプリの版を戻せる / やり直せるか(#968・会話のシートが開いている間は押せない)

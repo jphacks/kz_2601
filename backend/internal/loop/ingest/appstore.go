@@ -64,9 +64,15 @@ func AppStoreConfigFromEnv(getenv func(string) string) (AppStoreConfig, error) {
 	if getenv(EnvAppStoreOn) != "on" {
 		return AppStoreConfig{}, ErrAppStoreOff
 	}
+	return ascConfigFromEnv(getenv, EnvAppStoreOn)
+}
+
+// ascConfigFromEnv reads the LOOP_ASC_* key shared by the App Store Connect
+// sources; on names the switch in the error.
+func ascConfigFromEnv(getenv func(string) string, on string) (AppStoreConfig, error) {
 	cfg := AppStoreConfig{IssuerID: getenv(EnvAppStoreIssuer), KeyID: getenv(EnvAppStoreKeyID), AppID: getenv(EnvAppStoreAppID)}
 	if cfg.IssuerID == "" || cfg.KeyID == "" || cfg.AppID == "" || getenv(EnvAppStoreKey) == "" {
-		return AppStoreConfig{}, fmt.Errorf("%s=on needs %s, %s, %s and %s", EnvAppStoreOn, EnvAppStoreIssuer, EnvAppStoreKeyID, EnvAppStoreKey, EnvAppStoreAppID)
+		return AppStoreConfig{}, fmt.Errorf("%s=on needs %s, %s, %s and %s", on, EnvAppStoreIssuer, EnvAppStoreKeyID, EnvAppStoreKey, EnvAppStoreAppID)
 	}
 	key, err := ParseP8([]byte(getenv(EnvAppStoreKey)))
 	if err != nil {
@@ -151,33 +157,42 @@ func (a AppStoreReviews) Fetch(ctx context.Context, since time.Time) ([]Raw, err
 }
 
 func (a AppStoreReviews) get(ctx context.Context, hc *http.Client, u string) (*reviewPage, error) {
-	now := time.Now
-	if a.Now != nil {
-		now = a.Now
-	}
-	tok, err := signASC(a.Cfg, now())
-	if err != nil {
+	var page reviewPage
+	if err := ascGet(ctx, hc, a.Cfg, a.Now, u, "app store", &page); err != nil {
 		return nil, err
+	}
+	return &page, nil
+}
+
+// ascGet GETs one App Store Connect page into out with a fresh token. Error
+// texts carry the status only, never the body (it may echo tester data).
+func ascGet(ctx context.Context, hc *http.Client, cfg AppStoreConfig, nowFn func() time.Time, u, name string, out any) error {
+	now := time.Now
+	if nowFn != nil {
+		now = nowFn
+	}
+	tok, err := signASC(cfg, now())
+	if err != nil {
+		return err
 	}
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, u, nil)
 	if err != nil {
-		return nil, err
+		return err
 	}
 	req.Header.Set("Authorization", "Bearer "+tok)
 	resp, err := hc.Do(req)
 	if err != nil {
-		return nil, fmt.Errorf("app store: %w", err)
+		return fmt.Errorf("%s: %w", name, err)
 	}
 	defer func() { _ = resp.Body.Close() }()
 	if resp.StatusCode != http.StatusOK {
 		_, _ = io.Copy(io.Discard, io.LimitReader(resp.Body, 1<<16))
-		return nil, fmt.Errorf("app store: status %d", resp.StatusCode)
+		return fmt.Errorf("%s: status %d", name, resp.StatusCode)
 	}
-	var page reviewPage
-	if err := json.NewDecoder(io.LimitReader(resp.Body, 8<<20)).Decode(&page); err != nil {
-		return nil, fmt.Errorf("app store: decode: %w", err)
+	if err := json.NewDecoder(io.LimitReader(resp.Body, 8<<20)).Decode(out); err != nil {
+		return fmt.Errorf("%s: decode: %w", name, err)
 	}
-	return &page, nil
+	return nil
 }
 
 // signASC makes the ES256 token App Store Connect expects (at most 20 minutes).

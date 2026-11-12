@@ -19,6 +19,13 @@ import (
 //
 //	current(lat, lng)            Item: description / feels, humidity, wind / temperature
 //	forecast(lat, lng, limit)    Rows (3-hourly, limit 1-40, default 8 = 24 h)
+//	airQuality(lat, lng)         Item: AQI 1-5 label (目安) / PM2.5, PM10, O₃, NO₂ / "AQI n/5"
+//	airForecast(lat, lng, limit) Rows (hourly, limit 1-96, default 24): time (JST) / PM2.5, PM10 / "AQI n/5 label"
+//
+// airQuality and airForecast (#1656) are the Air Pollution API
+// (/data/2.5/air_pollution and /air_pollution/forecast, same host and key).
+// The level is a guide only, never a health judgement. The forecast has no
+// time zone, so its times are shown in JST (the app is for Japan).
 //
 // lat / lng are rounded to 2 places (about 1 km) before they leave the
 // runner. The key (EXT_OPEN_WEATHER_API_KEY, Secret Manager) goes in the
@@ -40,14 +47,51 @@ var owKeyRe = regexp.MustCompile(`^[A-Za-z0-9]{16,64}$`)
 func init() {
 	register(Provider{ID: OpenWeather, Billing: BillingFree,
 		Ops: []OpSpec{
-			{Name: "current", Args: []string{"lat", "lng"}},
-			{Name: "forecast", Args: []string{"lat", "lng", "limit"}},
+			{Name: "current", Args: []string{"lat", "lng"}, Check: checkOWLatLng},
+			{Name: "forecast", Args: []string{"lat", "lng", "limit"}, Check: checkOWForecast},
+			{Name: "airQuality", Args: []string{"lat", "lng"}, Check: checkOWLatLng},
+			{Name: "airForecast", Args: []string{"lat", "lng", "limit"}, Check: checkOWAirForecast},
 		},
 		Hosts: []string{openWeatherHost},
 		New: func(sec Secrets) (map[string]Operation, error) {
 			return newOpenWeather(sec.APIKey, openWeatherHost, NewHTTPClient([]string{openWeatherHost}, DefaultTimeout))
 		}})
 }
+
+// checkOWLatLng rejects a call without a valid lat / lng at CheckArgs, before
+// it counts against any limit.
+func checkOWLatLng(args map[string]string) error {
+	_, _, ok, err := argLatLng(args, 2)
+	if err != nil {
+		return err
+	}
+	if !ok {
+		return errors.New("lat and lng are required")
+	}
+	return nil
+}
+
+func checkOWForecast(args map[string]string) error {
+	if err := checkOWLatLng(args); err != nil {
+		return err
+	}
+	_, err := argInt(args, "limit", 8, 1, 40)
+	return err
+}
+
+func checkOWAirForecast(args map[string]string) error {
+	if err := checkOWLatLng(args); err != nil {
+		return err
+	}
+	_, err := argInt(args, "limit", owAirForecastDefault, 1, owAirForecastMax)
+	return err
+}
+
+// The air forecast is hourly for about 4 days.
+const (
+	owAirForecastDefault = 24
+	owAirForecastMax     = 96
+)
 
 // newOpenWeather builds the ops against base (the API, or a test server).
 func newOpenWeather(key, base string, hc *http.Client) (map[string]Operation, error) {
@@ -56,8 +100,10 @@ func newOpenWeather(key, base string, hc *http.Client) (map[string]Operation, er
 	}
 	w := &openWeather{key: key, base: base, hc: hc}
 	return map[string]Operation{
-		"current":  OperationFunc(w.current),
-		"forecast": OperationFunc(w.forecast),
+		"current":     OperationFunc(w.current),
+		"forecast":    OperationFunc(w.forecast),
+		"airQuality":  OperationFunc(w.airQuality),
+		"airForecast": OperationFunc(w.airForecast),
 	}, nil
 }
 
@@ -167,6 +213,89 @@ func (w *openWeather) forecast(ctx context.Context, in Input) (Output, error) {
 		return Output{}, &ProviderError{Status: http.StatusOK, Err: errors.New("openweather: no forecast rows")}
 	}
 	return Output{Rows: rows}, nil
+}
+
+type owAirPollution struct {
+	List []struct {
+		Dt   int64 `json:"dt"`
+		Main struct {
+			AQI int `json:"aqi"`
+		} `json:"main"`
+		Components struct {
+			PM25 *float64 `json:"pm2_5"`
+			PM10 *float64 `json:"pm10"`
+			O3   *float64 `json:"o3"`
+			NO2  *float64 `json:"no2"`
+		} `json:"components"`
+	} `json:"list"`
+}
+
+// owAQILabels are OpenWeather's AQI 1-5 (Good … Very Poor).
+var owAQILabels = [...]string{1: "良い", 2: "まあまあ", 3: "ふつう", 4: "悪い", 5: "とても悪い"}
+
+func (w *openWeather) airQuality(ctx context.Context, in Input) (Output, error) {
+	var a owAirPollution
+	if err := w.get(ctx, "/data/2.5/air_pollution", in.Args, nil, &a); err != nil {
+		return Output{}, err
+	}
+	if len(a.List) == 0 || a.List[0].Main.AQI < 1 || a.List[0].Main.AQI > 5 {
+		return Output{}, &ProviderError{Status: http.StatusOK, Err: errors.New("openweather: no air quality index")}
+	}
+	it := a.List[0]
+	c := it.Components
+	return Output{Item: &Row{
+		Title:    "空気 " + owAQILabels[it.Main.AQI] + "(目安)",
+		Subtitle: micrograms([]string{"PM2.5", "PM10", "O₃", "NO₂"}, c.PM25, c.PM10, c.O3, c.NO2),
+		Value:    "AQI " + strconv.Itoa(it.Main.AQI) + "/5",
+	}}, nil
+}
+
+// jst labels the air forecast's hours (the API gives no time zone).
+var jst = time.FixedZone("JST", 9*60*60)
+
+// airForecast is the hourly forecast: one row an hour from now, skipping
+// hours without a valid AQI.
+func (w *openWeather) airForecast(ctx context.Context, in Input) (Output, error) {
+	limit, err := argInt(in.Args, "limit", owAirForecastDefault, 1, owAirForecastMax)
+	if err != nil {
+		return Output{}, err
+	}
+	var a owAirPollution
+	if err := w.get(ctx, "/data/2.5/air_pollution/forecast", in.Args, nil, &a); err != nil {
+		return Output{}, err
+	}
+	rows := make([]Row, 0, min(limit, len(a.List)))
+	for _, it := range a.List {
+		if len(rows) == limit {
+			break
+		}
+		if it.Dt <= 0 || it.Main.AQI < 1 || it.Main.AQI > 5 {
+			continue
+		}
+		rows = append(rows, Row{
+			Title:    time.Unix(it.Dt, 0).In(jst).Format("1/2 15:04"),
+			Subtitle: micrograms([]string{"PM2.5", "PM10"}, it.Components.PM25, it.Components.PM10),
+			Value:    "AQI " + strconv.Itoa(it.Main.AQI) + "/5 " + owAQILabels[it.Main.AQI] + "(目安)",
+		})
+	}
+	if len(rows) == 0 {
+		return Output{}, &ProviderError{Status: http.StatusOK, Err: errors.New("openweather: no air forecast rows")}
+	}
+	return Output{Rows: rows}, nil
+}
+
+// micrograms writes "PM2.5 12.3・PM10 20.1 µg/m³", leaving out missing values.
+func micrograms(names []string, vs ...*float64) string {
+	var sub []string
+	for i, v := range vs {
+		if v != nil {
+			sub = append(sub, names[i]+" "+strconv.FormatFloat(math.Round(*v*10)/10+0, 'f', -1, 64))
+		}
+	}
+	if len(sub) == 0 {
+		return ""
+	}
+	return strings.Join(sub, "・") + " µg/m³"
 }
 
 func celsius(v float64) string {

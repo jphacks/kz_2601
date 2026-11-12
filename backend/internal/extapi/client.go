@@ -24,6 +24,9 @@ type Client struct {
 type RunnerError struct {
 	Status int
 	Reason string
+	// Scope and RetryAfterSec come with rate_limited (FailBody).
+	Scope         string
+	RetryAfterSec int
 }
 
 func (e *RunnerError) Error() string { return fmt.Sprintf("runner %d: %s", e.Status, e.Reason) }
@@ -62,13 +65,11 @@ func (c *Client) post(ctx context.Context, path string, body, out any) error {
 		return fmt.Errorf("%w: body over %d bytes", ErrRunnerAnswer, maxRunnerAnswer)
 	}
 	if resp.StatusCode != http.StatusOK {
-		var e struct {
-			Reason string `json:"reason"`
-		}
+		var e FailBody
 		if json.Unmarshal(raw, &e) != nil || e.Reason == "" {
 			return fmt.Errorf("%w: status %d", ErrRunnerAnswer, resp.StatusCode)
 		}
-		return &RunnerError{Status: resp.StatusCode, Reason: e.Reason}
+		return &RunnerError{Status: resp.StatusCode, Reason: e.Reason, Scope: e.Scope, RetryAfterSec: e.RetryAfterSec}
 	}
 	if err := json.Unmarshal(raw, out); err != nil {
 		return fmt.Errorf("%w: %v", ErrRunnerAnswer, err)
@@ -101,6 +102,18 @@ func (c *Client) Start(ctx context.Context, uid, provider string, scopes []strin
 func (c *Client) Revoke(ctx context.Context, uid, provider string) error {
 	var out map[string]bool
 	return c.post(ctx, "/internal/ext/connections/revoke", ConnBody{UID: uid, Provider: provider}, &out)
+}
+
+// RevokeAll is POST /internal/ext/connections/revokeAll (DELETE /v1/me):
+// every connection of uid is cut; the answer is how many were.
+func (c *Client) RevokeAll(ctx context.Context, uid string) (int, error) {
+	var out struct {
+		Revoked int `json:"revoked"`
+	}
+	if err := c.post(ctx, "/internal/ext/connections/revokeAll", ConnBody{UID: uid}, &out); err != nil {
+		return 0, err
+	}
+	return out.Revoked, nil
 }
 
 // ConnectionList is the runner's answer to /internal/ext/connections/list:

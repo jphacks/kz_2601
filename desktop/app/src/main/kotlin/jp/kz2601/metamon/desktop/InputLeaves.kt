@@ -125,7 +125,7 @@ object InputLeaves {
     }
 }
 
-/** 入力の部品 1 つ。隠す・フォームの外は呼ぶ側([DesktopSession.tapState])で決めてある。 */
+/** 入力の部品 1 つ。隠す・フォームの外は呼ぶ側([DesktopSession.state])で決めてある。 */
 @Composable
 fun InputLeaf(c: Component, form: FormDraft, onMessage: (String) -> Unit) {
     val field = c.field ?: return

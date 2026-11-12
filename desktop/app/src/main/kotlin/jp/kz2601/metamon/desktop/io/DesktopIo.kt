@@ -34,6 +34,7 @@ import androidx.compose.ui.input.key.type
 import androidx.compose.ui.unit.dp
 import jp.kz2601.metamon.desktop.MockStore
 import jp.kz2601.metamon.desktop.i18n.Strings
+import jp.kz2601.metamon.desktop.photoPreviewClick
 import jp.kz2601.metamon.dsl.Accept
 import jp.kz2601.metamon.dsl.AppDSL
 import jp.kz2601.metamon.dsl.Component
@@ -85,16 +86,17 @@ class DesktopIo(dsl: AppDSL, private val read: () -> MockStore, private val upda
         val entity = entity(c.entity) ?: return run { notice = Strings["desktop_io_no_import_target"] }
         val accept = c.accept.ifEmpty { listOf(Accept.CSV) }
         when (FileKind.of(file.name)) {
-            FileKind.CSV -> if (Accept.CSV in accept) importCsv(file.readBytes(), entity, c, c.label ?: file.name) else notice = Strings["desktop_io_unsupported_file"]
+            FileKind.CSV -> if (Accept.CSV in accept) importCsvFile(file, entity, c, c.label ?: file.name) else notice = Strings["desktop_io_unsupported_file"]
             FileKind.TEXT -> if (Accept.TEXT in accept) {
-                if (file.length() > RecordImport.MAX_TEXT_BYTES) return run { notice = Strings["desktop_io_file_too_large"] }
-                val text = RecordImport.plainText(file.readBytes()) ?: return run { notice = Strings["desktop_io_unreadable_encoding"] }
+                val bytes = ImageSource.readFile(file, RecordImport.MAX_TEXT_BYTES) ?: return run { notice = Strings["desktop_io_file_too_large"] }
+                val text = RecordImport.plainText(bytes) ?: return run { notice = Strings["desktop_io_unreadable_encoding"] }
                 addBody(text, file.name, entity, c)
             } else {
                 notice = Strings["desktop_io_unsupported_file"]
             }
             FileKind.PDF -> if (Accept.PDF in accept) {
-                when (val r = PdfIo.text(file.readBytes())) {
+                val bytes = ImageSource.readFile(file, RecordImport.MAX_PDF_BYTES) ?: return run { notice = Strings["desktop_io_file_too_large"] }
+                when (val r = PdfIo.text(bytes)) {
                     is PdfIo.TextResult.Text -> addBody(r.text, file.name, entity, c)
                     PdfIo.TextResult.Locked -> notice = Strings["desktop_io_pdf_locked"]
                     PdfIo.TextResult.NoText -> notice = Strings["desktop_io_pdf_no_text"]
@@ -113,6 +115,12 @@ class DesktopIo(dsl: AppDSL, private val read: () -> MockStore, private val upda
         val body = RecordImport.bodyRecord(text, name, entity, field) ?: return run { notice = Strings["desktop_io_no_import_field"] }
         update(RecordIo.apply(read(), entity.id, listOf(body.data)))
         notice = Strings[if (body.truncated) "desktop_io_imported_truncated" else "desktop_io_imported"]
+    }
+
+    /** CSV のファイル。上限までしか読まない(超えたら断る・全部をメモリに読まない)。 */
+    fun importCsvFile(file: File, entity: Entity, c: Component?, label: String) {
+        val bytes = ImageSource.readFile(file, RecordImport.MAX_TEXT_BYTES) ?: return run { notice = Strings["desktop_io_file_too_large"] }
+        importCsv(bytes, entity, c, label)
     }
 
     fun importCsv(bytes: ByteArray, entity: Entity, c: Component?, label: String) {
@@ -236,7 +244,7 @@ class DesktopIo(dsl: AppDSL, private val read: () -> MockStore, private val upda
             val list = all.firstOrNull { it.type == ComponentType.LIST && it.entity != null }
             val entity = entity(list?.entity)
             if (kind == FileKind.CSV && entity != null) {
-                importCsv(f.readBytes(), entity, null, f.name)
+                importCsvFile(f, entity, null, f.name)
                 used = true
             }
         }
@@ -323,7 +331,7 @@ fun FileImportLeaf(c: Component, io: DesktopIo) {
     }
 }
 
-/** `photoField` / `videoField`: ファイルを選ぶ・落とす・Ctrl+V。写真は縮小して見せ、外へ引き出せる。[readOnly] の時は見せるだけ。 */
+/** `photoField` / `videoField`: ファイルを選ぶ・落とす・Ctrl+V。写真は縮小して見せ、押すと大きく見る・外へ引き出せる。[readOnly] の時は見せるだけ。 */
 @Composable
 fun MediaFieldLeaf(c: Component, label: String, draft: MutableMap<String, String>, readOnly: Boolean = false) {
     val field = c.field ?: return
@@ -332,8 +340,8 @@ fun MediaFieldLeaf(c: Component, label: String, draft: MutableMap<String, String
     Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
         Text(label, style = MaterialTheme.typography.labelLarge)
         if (file != null && c.type == ComponentType.PHOTO_FIELD) {
-            val bitmap = remember(uri) { runCatching { SkiaImage.makeFromEncoded(file.readBytes()).toComposeImageBitmap() }.getOrNull() }
-            bitmap?.let { Image(it, contentDescription = label, modifier = Modifier.heightIn(max = 160.dp).widthIn(max = 240.dp).fileDragSource(file)) }
+            val bitmap = remember(uri) { runCatching { ImageSource.readFile(file)?.let { SkiaImage.makeFromEncoded(it).toComposeImageBitmap() } }.getOrNull() }
+            bitmap?.let { Image(it, contentDescription = label, modifier = Modifier.heightIn(max = 160.dp).widthIn(max = 240.dp).photoPreviewClick(uri, label).fileDragSource(file)) }
         } else if (file != null) {
             Text(file.name, modifier = Modifier.fileDragSource(file))
         }

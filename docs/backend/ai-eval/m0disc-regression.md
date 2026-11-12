@@ -57,6 +57,7 @@ go run ./cmd/ai-eval -chat -env-file ../.env -cases internal/ai/eval/m0disc_chat
 - **pass** = 生成が成功し、`expect` の外れが 0 本のケース。`expect` の無いケースは `no expect` に数え、割合には入れない。
 - M0 の判定には `total` の pass% と、共有系のグループ(`m0-social` `m0-booking` `m0-work` `m0-edit`)の pass% を使う。
 - 洗い出しの「○ 53%・共有系 35%」は人が DSL を読んだ判定で、この pass% とは別物。期待値には「M4 に回す機能は正直に断る(`substitution: true`)」も含むので、○ でなくても pass になるケースがある。最初の実 API の実行で基準値を取り、以後はそこから下がらないことを見る。
+- 基準を下回ったら終了コード 1 にする `-min-pass` / `-thresholds` と、PR コメント用の表を出す `-report md` は [ci-gate.md](ci-gate.md)。
 
 ## 4. 生成ケースの期待値
 
