@@ -47,6 +47,9 @@ struct MetamonApp: App {
         #if !APP_STORE_REVIEW
         BetaWelcomeStore.shared.applyLaunchOverride() // #313(DEBUG のみ)
         #endif
+        #if METAMON_STG
+        DebugClock.applyLaunch() // 開発用メニューの日付ずらし(#2082)
+        #endif
         _ = ExpensiveNetworkProbe.shared // 音声モデルの確認(#275)より前に回線の種類の監視を始める
         services.ai = ConsentGatedAIClient(base: services.ai) { AIConsentStore.isGranted(in: .standard) }
         if BuildConfig.forceMock { MusicSession.shared.player = FakeMusicPlayback() } // musicPlayer(#412)は音を出さない偽物
@@ -133,6 +136,9 @@ struct MetamonApp: App {
             .animation(.easeInOut(duration: 0.3), value: session.user == nil)
             .modifier(SplashOverlay(mode: splashMode)) // 下の起動処理は待たずに進む
             .modifier(UpdateGateModifier(gate: updateGate))
+            #if METAMON_STG
+            .modifier(DebugClockBanner()) // 日付をずらしている間の印(#2082)
+            #endif
             .modifier(SpotlightOpenReceiver()) // Spotlight の結果のタップ(#1996)。サインイン前でも受けて保留
             #if !APP_STORE_REVIEW
             .modifier(ShareLinkReceiver()) // シェアリンクはサインイン前でも受けて保留(#278)
