@@ -5,6 +5,10 @@ Compose Multiplatform Desktop(JVM)で作る Windows・Linux 版。DSL の読み�
 ## 目次
 
 - [動かす](#動かす)
+- [環境変数と JVM の引数](#環境変数と-jvm-の引数)
+  - [環境変数](#環境変数)
+  - [JVM の引数(`-D`)](#jvm-の引数-d)
+  - [OS や道具が入れる値(読むだけ)](#os-や道具が入れる値読むだけ)
 - [今できること](#今できること)
   - [描画](#描画)
   - [入力](#入力)
@@ -37,6 +41,64 @@ stg の appconfig を手元で試す(サインインが入るまでの確かめ�
 ```
 TAILORIT_API=stg TAILORIT_DEV_TOKEN=<Firebase の ID トークン> ./gradlew :desktop:listApps
 ```
+
+## 環境変数と JVM の引数
+
+コードが読む切り替えの一覧(`System.getenv`・`System.getProperty` と、それに渡す `env[...]` から集めた)。同じ意味の環境変数と `-D` の両方がある時は `-D` が勝つ。値の例にトークンは書かない。
+
+- 「配布物」= msi・deb などで入れた形。環境変数は起動する前に設定すれば効く。`-D` は配布物の起動に引数で渡せないので `JAVA_TOOL_OPTIONS=-D…` で渡す(推測: jpackage の実行環境も `JAVA_TOOL_OPTIONS` を読む。配布物ではまだ試していない)。
+
+### 環境変数
+
+| 名前 | 既定 | 意味 | 配布物で効くか |
+|---|---|---|---|
+| `METAMON_BATTERY_LEVEL` | 無し(不明) | `METAMON_MOCK=1` の時の電池の残り(0〜1) | 効く |
+| `METAMON_BATTERY_STATE` | 残りがあれば unplugged、無ければ unknown | `METAMON_MOCK=1` の時の充電の状態(`unknown` / `unplugged` / `charging` / `full`) | 効く |
+| `METAMON_LOW_POWER` | 無し | `METAMON_MOCK=1` の時、`1` で省電力 | 効く |
+| `METAMON_MOCK` | 無し | `1` で電池を偽物にする(上の 3 つを読む) | 効く |
+| `TAILORIT_API` | モック | `stg` で stg の appconfig につなぐ(`TAILORIT_DEV_TOKEN` も要る)。それ以外の値はモック | 効く |
+| `TAILORIT_API_BASE` | 無し(モックの本) | lookupBook の送り先(`POST /v1/lookup/book`)。このホストの画像は押さずに読む | 効く |
+| `TAILORIT_APPCONFIG_URL` | stg の appconfig | `TAILORIT_API=stg` の時の接続先 | 効く |
+| `TAILORIT_DEV_TOKEN` | 無し | サインインが入るまでの Firebase の ID トークン。ファイルに書かない | 効く |
+| `TAILORIT_LANG` | OS の言語 | `ja` で始まれば日本語、それ以外は英語(`-Dtailorit.lang` が勝つ) | 効く |
+| `TAILORIT_MEDIA_HOSTS` | 無し | 押さずに読んでよい画像のホスト(カンマ区切り)。appconfig・`TAILORIT_API_BASE` のホストに足す | 効く |
+| `TAILORIT_THEME` | OS に従う | `light` / `dark` で固定(`-Dtailorit.theme` が勝つ) | 効く |
+| `TAILORIT_VOICE` | off | `1` / `true` / `on` / `yes` で音声入力を使う(`-Dtailorit.voice` が勝つ) | 効く |
+| `TAILORIT_WHISPER_LIB` | 無し | whisper.cpp のライブラリのファイル(`-Dtailorit.whisper.lib` が勝つ) | 効く |
+| `TAILORIT_WHISPER_MODEL` | 無し(初回に落とす) | 手元のモデルのファイルを使う(`-Dtailorit.whisper.model` が勝つ)。`:whisper:transcribeWav` も読む | 効く |
+
+### JVM の引数(`-D`)
+
+| 名前 | 既定 | 意味 | 配布物で効くか |
+|---|---|---|---|
+| `-Dmetamon.dslDocsDir` | テストで Gradle が入れる | 適合テストが読む `docs/dsl` の場所 | 使わない(テストだけ) |
+| `-Dmetamon.repoLicense` | テストで Gradle が入れる | `LicensesTest` が比べる repo の `LICENSE` | 使わない(テストだけ) |
+| `-Dtailorit.dataDir` | OS ごとの保存先 | 端末の保存先を差し替える(テスト・複数の人を試す・同時に起動する) | `JAVA_TOOL_OPTIONS` で(推測) |
+| `-Dtailorit.example` | 前に開いたアプリ、無ければ `shopping` | 最初に開く同梱の例(引数の 1 つ目が勝つ) | `JAVA_TOOL_OPTIONS` で(推測) |
+| `-Dtailorit.lang` | 無し | `TAILORIT_LANG` と同じ。テストでは Gradle が `ja` に固定する | `JAVA_TOOL_OPTIONS` で(推測) |
+| `-Dtailorit.theme` | 無し | `TAILORIT_THEME` と同じ。テストでは Gradle が `light` に固定する | `JAVA_TOOL_OPTIONS` で(推測) |
+| `-Dtailorit.voice` | 無し | `TAILORIT_VOICE` と同じ | `JAVA_TOOL_OPTIONS` で(推測) |
+| `-Dtailorit.whisper.lib` | 無し | `TAILORIT_WHISPER_LIB` と同じ | `JAVA_TOOL_OPTIONS` で(推測) |
+| `-Dtailorit.whisper.model` | 無し | `TAILORIT_WHISPER_MODEL` と同じ | `JAVA_TOOL_OPTIONS` で(推測) |
+| `-Dtailorit.whisper.modelDir` | `:whisper:transcribeWav` で Gradle が入れる | `transcribeWav` がモデルを落とす場所 | 使わない(手元の確かめだけ) |
+| `-Dtailorit.whisper.nativeDir` | `:whisper:transcribeWav` で Gradle が入れる | whisper.cpp のライブラリを `<dir>/<os>-<arch>/` から探す | `JAVA_TOOL_OPTIONS` で(推測) |
+
+### OS や道具が入れる値(読むだけ)
+
+| 名前 | 使う所 |
+|---|---|
+| `APPDATA` | Windows の端末の保存先(`%APPDATA%\TailorIt`) |
+| `GTK_THEME` | Linux の明暗の最後の手がかり(`:dark`) |
+| `LOCALAPPDATA` | Windows で写真を既定のアプリで開く時の一時フォルダ |
+| `SystemRoot` | Windows の「ログイン時に開く」で使う `reg.exe` の場所 |
+| `XDG_CACHE_HOME` | Linux の一時ファイルの置き場(無ければ `~/.cache`) |
+| `XDG_CONFIG_HOME` | Linux の「ログイン時に開く」の置き場(無ければ `~/.config`) |
+| `XDG_DATA_HOME` | Linux の端末の保存先(無ければ `~/.local/share`) |
+| `XDG_RUNTIME_DIR` | Linux で写真を既定のアプリで開く時の一時フォルダ |
+| `-Dcompose.application.resources.dir` | Compose が入れる。配る形に同梱した whisper.cpp のライブラリの場所 |
+| `-Djpackage.app-path` | jpackage が入れる。あれば配布物として動いている(「ログイン時に開く」を出す) |
+
+ほかに Java の標準の値(`os.name`・`os.arch`・`os.version`・`user.home`・`user.name`・`java.io.tmpdir`・`java.home` など)を OS の判定と置き場に読む。
 
 ## 今できること
 
