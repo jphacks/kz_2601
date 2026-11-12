@@ -355,6 +355,8 @@ private fun LocalGridOrChildren(c: Component, s: ScreenScope, modifier: Modifier
 /** 部品 1 つ。絵で描く部品は読み上げ用に 1 つにまとめる(A11y.kt)。 */
 @Composable
 private fun Node(c: Component, s: ScreenScope) {
+    // 隠す部品(作者以外の hidden の項目・出さない削除 / 保存ボタン)は枠ごと描かない
+    if (s.session.state(c, s.form) == "hidden") return
     Box(Modifier.leafSemantics(c, s.data)) { NodeContent(c, s) }
 }
 
@@ -386,12 +388,11 @@ private fun NodeContent(c: Component, s: ScreenScope) {
         ComponentType.EMPTY_STATE -> Text(c.title ?: c.message ?: c.text.orEmpty(), color = Color.Gray)
         ComponentType.SPACER -> Spacer(Modifier.height(8.dp))
         ComponentType.DIVIDER -> HorizontalDivider()
-        ComponentType.BUTTON -> if (s.session.tapState(c, s.form) == "rendered") {
-            Button(onClick = { c.action?.let { s.perform(it, null) } }) { Text(c.label ?: c.title ?: c.text.orEmpty()) }
-        }
+        ComponentType.BUTTON -> Button(onClick = { c.action?.let { s.perform(it, null) } }) { Text(c.label ?: c.title ?: c.text.orEmpty()) }
         ComponentType.LINK -> TextButton(onClick = { c.url?.let { s.perform(jp.kz2601.metamon.dsl.Action(type = jp.kz2601.metamon.dsl.ActionType.OPEN_URL, url = it), null) } }) {
             Text(c.text ?: c.label ?: c.url.orEmpty())
         }
+        ComponentType.OPEN_URL_BUTTON -> OpenUrlButtonLeaf(c, s.form) { urls -> s.session.openFirst(urls, ActionContext(s.route, s.form)) }
         in DATA_LEAVES -> DataLeaf(c, s.dataEnv)
         ComponentType.FILE_IMPORT -> FileImportLeaf(c, s.io)
         in PlayLeaves.types -> PlayLeaf(c, s.session, s.route, s.form, s.data, s.perform)
@@ -417,11 +418,10 @@ private fun Box1(modifier: Modifier, content: @Composable () -> Unit) {
     Column(modifier) { content() }
 }
 
-/** 入力の部品: 隠す・フォームの外を先に決めてから描く。 */
+/** 入力の部品: フォームの外を先に決めてから描く(隠すのは [Node] で済んでいる)。 */
 @Composable
 private fun InputNode(c: Component, s: ScreenScope) {
-    when (s.session.tapState(c, s.form)) {
-        "hidden" -> return
+    when (s.session.state(c, s.form)) {
         "needsForm" -> return Text(Strings["desktop_input_needs_form"], color = Color.Gray, style = MaterialTheme.typography.bodySmall)
     }
     InputLeaf(c, s.form!!) { s.session.message = it }
