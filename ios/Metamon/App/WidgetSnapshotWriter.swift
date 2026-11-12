@@ -38,8 +38,7 @@ enum WidgetSnapshotWriter {
         let evaluator = ExprEvaluator(dsl: dsl, records: { records[$0] ?? [] })
         let components = statComponents(in: dsl)
         let stats = components.prefix(maxStats).map { c -> WidgetSnapshot.Stat in
-            let entityId = c.entity ?? ""
-            let key = [entityId, c.aggregate ?? "count", c.field ?? "", c.label ?? ""].joined(separator: "|")
+            let key = statKey(c)
             // レコード未取得(apply 直後など)は前回値を引き継ぎ、ウィジェットが一瞬 0 にならないようにする
             let value = statText(c, dsl: dsl, records: records, evaluator: evaluator) ?? previous?.stats.first { $0.key == key }?.value
             return WidgetSnapshot.Stat(key: key, label: c.label ?? "", value: value)
@@ -84,6 +83,12 @@ enum WidgetSnapshotWriter {
         let entityId = c.entity ?? ""
         guard records[entityId] != nil else { return nil }
         return formatted(c, entity: dsl.entity(entityId), records: evaluator.viewRecords(for: entityId), countUnit: countUnit)
+    }
+
+    /// stat の見分け方(前回値の引き継ぎ・ショートカットの「数字を読む」#1994)。
+    /// id を書かない stat は読むたびに id が変わるので、中身から作る。
+    nonisolated static func statKey(_ c: Component) -> String {
+        [c.entity ?? "", c.aggregate ?? "count", c.field ?? "", c.label ?? ""].joined(separator: "|")
     }
 
     /// 画面順(initialScreen → タブ順 → 残り)で `stat` を列挙する。
