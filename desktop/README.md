@@ -19,6 +19,8 @@ stg の appconfig を手元で試す(サインインが入るまでの確かめ�
 TAILORIT_API=stg TAILORIT_DEV_TOKEN=<Firebase の ID トークン> ./gradlew :desktop:listApps
 ```
 
+Firebase Auth の REST クライアント(`auth/FirebaseAuthRestClient.kt`・まだ画面にはつながない)の API キーは `TAILORIT_FIREBASE_API_KEY` から読む(Firebase コンソールのプロジェクト設定 > 全般の「ウェブ API キー」。リポジトリ・ファイルには書かない)。`TAILORIT_IDENTITY_TOOLKIT_URL`・`TAILORIT_SECURE_TOKEN_URL` で接続先を差し替えられる(Auth エミュレーターなど)。
+
 ## 今できること
 
 - `docs/dsl/examples` の DSL を 1 本読み、画面を 6 列のグリッド(`area`)に並べる。area の無い部品は下に全幅で積み、フォーム画面は段(band)で積む。広いウィンドウでは幅 720dp で止めて中央に寄せる。最小 360×560、大きさと位置は次の起動で戻す。
