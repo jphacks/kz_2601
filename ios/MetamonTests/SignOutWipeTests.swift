@@ -104,6 +104,7 @@ final class SignOutWipeTests: XCTestCase {
             "metamon.aiButtonMetrics.enabled",
             PushDeviceRegistrar.installationIdKey,
             TimerKeyMigration.doneKey,
+            "mac.textZoom.step",
         ])
     }
 

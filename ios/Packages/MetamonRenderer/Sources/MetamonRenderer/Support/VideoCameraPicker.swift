@@ -64,15 +64,23 @@ struct VideoCameraPicker: UIViewControllerRepresentable {
     }
 }
 #else
-/// Mac: 動画の撮影はまだ無い(TODO mac-029)。`isAvailable` が false なので撮影のボタンは出ない。
+/// Mac(#1043): AVCaptureMovieFileOutput で撮る sheet。上限の秒数・中程度の画質は iOS と同じ。カメラが無い Mac は撮影のボタンを出さない。
 struct VideoCameraPicker: View {
     var maxDuration: TimeInterval
     var onVideo: (URL) -> Void
 
-    static var isAvailable: Bool { false }
-    static func requestAccess() async -> Bool { await CameraPicker.requestAccess() }
+    static var isAvailable: Bool { MacCameraSession.hasCamera }
 
-    var body: some View { MacUnavailableView(feature: L("カメラ")) }
+    /// カメラは必須。マイクは拒否されても無音で撮れる(iOS と同じ)
+    static func requestAccess() async -> Bool {
+        let camera = await CameraPicker.requestAccess()
+        if AVCaptureDevice.authorizationStatus(for: .audio) == .notDetermined {
+            _ = await AVCaptureDevice.requestAccess(for: .audio)
+        }
+        return camera
+    }
+
+    var body: some View { MacCameraSheet(mode: .video(maxDuration: maxDuration), onVideo: onVideo) }
 }
 #endif
 #endif

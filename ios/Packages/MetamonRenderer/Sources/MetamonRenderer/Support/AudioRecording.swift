@@ -8,7 +8,11 @@ import MetamonDSL
 /// 止めたら `LocalAudioStore` に取り込んで `onRecorded` で値を返す。上限は `record(forDuration:)` が止める。
 @MainActor @Observable
 final class AudioRecorderController: NSObject, AVAudioRecorderDelegate {
-    enum Failure: Equatable { case denied, failed }
+    enum Failure: Equatable {
+        case denied, failed
+        /// Mac: ほかの録音(声で頼む・話して入力)がマイクを使っている(#952)
+        case busy
+    }
 
     private(set) var machine: AudioRecorderMachine
     /// 録音中の経過秒・音量(0...1)。0.1 秒ごとに更新
@@ -71,6 +75,9 @@ final class AudioRecorderController: NSObject, AVAudioRecorderDelegate {
             level = 0
             startTicker()
             observeInterruptions()
+        } catch is AudioFocus.Refusal {
+            machine.send(.fail)
+            failure = .busy
         } catch {
             print("[Metamon] audio record failed: \(error)")
             machine.send(.fail)

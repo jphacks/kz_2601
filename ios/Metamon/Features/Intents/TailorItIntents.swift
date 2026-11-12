@@ -65,14 +65,15 @@ struct AddRecordIntent: AppIntent {
 
     @MainActor
     func perform() async throws -> some IntentResult & ProvidesDialog {
-        guard let runtime = IntentHost.shared.runtime else { throw TailorIntentError.notReady }
-        guard let doc = await IntentHost.shared.document(appId: target.appId),
+        let host = IntentHost.shared // iOS は IntentHost.swift、Mac は MetamonMac/App/Intents/MacIntentHost.swift(#1034)
+        guard host.canWriteRecords else { throw TailorIntentError.notReady }
+        guard let doc = await host.document(appId: target.appId),
               let entity = doc.dsl.entity(target.entityId) else { throw TailorIntentError.targetNotFound(target.title) }
 
         // ref 項目(カテゴリ台帳など)は参照先のレコードをローカル DB から読み、見出しで当てる
         var refRecords: [String: [Record]] = [:]
         for refEntity in Set(entity.fields.filter { $0.type == .ref }.compactMap(\.refEntity)) {
-            refRecords[refEntity] = await runtime.recordSync.cached(appId: target.appId, entity: refEntity)
+            refRecords[refEntity] = await host.cachedRecords(appId: target.appId, entity: refEntity)
         }
         let refChoices = QuickRecord.refChoices(for: entity, in: doc.dsl, records: refRecords)
 
@@ -85,8 +86,9 @@ struct AddRecordIntent: AppIntent {
         }
         guard draft.missing.isEmpty else { throw TailorIntentError.missingFields(draft.missing) }
 
-        runtime.recordSync.encryptedFields[target.appId] = doc.dsl.encryptedFields // #233 今のアプリでなくても暗号化する
-        let sent = await runtime.addRecordFromIntent(appId: target.appId, entity: entity.id, data: draft.data)
+        // #233 今のアプリでなくても暗号化する
+        let sent = try await host.addRecord(appId: target.appId, entity: entity.id, data: draft.data,
+                                            encryptedFields: doc.dsl.encryptedFields)
         let what = draft.summary.isEmpty ? content : draft.summary
         let message = Self.addedMessage(appName: target.appName, what: what, refs: draft.refs, sent: sent)
         print("[Metamon] intent: \(String(localized: message))")

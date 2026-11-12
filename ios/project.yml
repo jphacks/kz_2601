@@ -289,7 +289,9 @@ targets:
   # Mac のネイティブ版(#929・docs/decisions/363-desktop-strategy.md)。3 つのパッケージを iOS と共有し、殻は ios/MetamonMac/。
   # Bundle ID は iOS と同じ(ユニバーサル購入)。署名は project の base の自動署名・DEVELOPMENT_TEAM(METAMON_TEAM_ID)をそのまま使う。
   # Apple シリコンと Intel の両方(ARCHS_STANDARD = arm64 + x86_64。Debug は ONLY_ACTIVE_ARCH で手元の CPU だけ)。
-  # 同梱の DSL 例を中央で動かす(記録はメモリ上・#939)。画面の骨格は #933、Firebase の登録は #930、権限の説明は #931(マイク・音声認識は #966)。
+  # 同梱の DSL 例を中央で動かす(記録はメモリ上・#939)。画面の骨格は #933、権限の説明は #931(マイク・音声認識は #966)。
+  # Firebase(#930): ログイン(匿名・Sign in with Apple)・AI・フィードバック・App Check(DeviceCheck)・Crashlytics。plist が無ければモック(MacServices)。
+  # プッシュ(#982): 通常の版だけ APNs の端末を登録する(MacPushHost・entitlement は com.apple.developer.aps-environment = METAMON_APS_ENV)。
   MetamonMac:
     type: application
     platform: macOS
@@ -315,6 +317,26 @@ targets:
       # 持てるアプリの数(#630)の状態カードの文言と置き換えの中身は iOS と共有する
       - path: Metamon/Features/AppLimit/AppLimitCopy.swift
       - path: Metamon/Features/AppLimit/AppReplacePlan.swift
+      # 設定の「今日の残り」「使っている量」(#1219)は iOS の文言と出し分けをそのまま使う(Pro かどうかは Mac の `RemainingTodayPlan`)
+      - path: Metamon/Features/Settings/RemainingTodaySettingsSection.swift
+      - path: Metamon/Features/Usage/UsageCopy.swift
+      - path: Metamon/Features/Voice/RemainingTodayDisplay.swift
+      # ログイン(#930): サインインの状態(Firebase Auth の観測・Sign in with Apple の受け渡し・nonce)は iOS のファイルをそのまま使う
+      - path: Metamon/Features/Auth/AuthSession.swift
+      # 共有のリンク(#1287): 参加できない理由(403)の文言は iOS のファイルをそのまま使う
+      - path: Metamon/Features/Share/SharedAccessCopy.swift
+      # 設定の「つないだサービス」(#1714): 一覧の並べ方・戻り先の読み方・つなぐ / 切るの状態は iOS のファイルをそのまま使う
+      - path: Metamon/Features/Connections/ConnectedServices.swift
+      # 近くの人に送る(#964): MultipeerConnectivity の通信は iOS のファイルをそのまま使う(iPhone・iPad と送り合える)。
+      # すれ違い通信(passby)は NearbyInteraction・持ち歩く前提なので Mac には入れない(「この Mac では使えません」)
+      - path: Metamon/Features/Nearby/NearbyService.swift
+      # ショートカット・Siri・Spotlight(App Intents・#1034): Intent の型・Query・フレーズは iOS のファイルをそのまま使う。
+      # 本体との橋渡し(IntentHost)だけ Mac 用(MetamonMac/App/Intents/MacIntentHost.swift)。iOS の IntentHost.swift は AppRuntime を使うので入れない
+      - path: Metamon/Features/Intents/TailorItIntents.swift
+      - path: Metamon/Features/Intents/IntentEntities.swift
+      - path: Metamon/Features/Intents/IntentE2E.swift
+      - path: Metamon/Resources/AppShortcuts.xcstrings
+        buildPhase: resources
       # 規約・ポリシーは iOS と同じ同梱版をアプリ内で読む(#971)
       - path: ../docs/legal
         buildPhase: resources
@@ -324,33 +346,46 @@ targets:
       - path: ../docs/dsl/examples
         buildPhase: resources
         type: group
+      # Mac のウィジェット(#984): 受け渡しモデルと集計は iOS のファイルをそのまま使う(TailorActivityAttributes は iOS だけ)。
+      # 押した時の URL(tailorit://widget?app=…)はウィジェットと共有
+      - path: MetamonWidget/Shared/WidgetSnapshot.swift
+      - path: Metamon/App/WidgetSnapshotWriter.swift
+      - path: MetamonMacWidget/Shared
     dependencies:
       - package: MetamonDSL
       - package: MetamonRenderer
       - package: MetamonServices
+      # デスクトップ・通知センターのウィジェット(埋め込み・#984)
+      - target: MetamonMacWidget
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: jp.kz2601.metamon$(METAMON_BUNDLE_ID_SUFFIX)
-        PRODUCT_NAME: Metamon
+        # Finder・Dock・アクティビティモニタに出るバンドル名(#1054)。Bundle ID は変えない(Keychain・UserDefaults を引き継ぐ)。
+        # Swift のモジュール名は Metamon のまま固定する(`@testable import Metamon`・型の名前が変わらないように)
+        PRODUCT_NAME: Tailor It
+        PRODUCT_MODULE_NAME: Metamon
         INFOPLIST_FILE: MetamonMac/Resources/Info.plist
         CODE_SIGN_ENTITLEMENTS: MetamonMac/MetamonMac.entitlements
         ARCHS: $(ARCHS_STANDARD)
         COMBINE_HIDPI_IMAGES: YES
         ENABLE_HARDENED_RUNTIME: YES
         ENABLE_PREVIEWS: YES
-        # アイコンはまだ無い(Mac 用のサイズを作る時に戻す)
-        ASSETCATALOG_COMPILER_APPICON_NAME: ""
+        # Mac 用のアイコン(16〜512pt・1x/2x。iOS の絵を macOS の角丸の枠に入れたもの・#1052)
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
         # ブランドの藍をアクセントに(システム設定のアクセントが「マルチカラー」の時だけ効く・#935)
         ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME: AccentColor
         # select-firebase-plist.sh が「あれば使う」plist を読むため(iOS と同じ理由・#292)
         ENABLE_USER_SCRIPT_SANDBOXING: NO
+        # 通常の版だけマニフェストに足す種類(#931)。Mac もプッシュの端末を登録する(#982)ので iOS と同じ既定(デバイス ID 込み)を使う
       configs:
         Review:
           SWIFT_ACTIVE_COMPILATION_CONDITIONS: "$(inherited) APP_STORE_REVIEW"
           METAMON_APP_STORE_REVIEW: "YES"
+          # 共有のリンクとプッシュを外した版なので Associated Domains(#1286)と aps-environment(#982)を入れない(iOS の Metamon-Review.entitlements と同じ)
+          CODE_SIGN_ENTITLEMENTS: MetamonMac/MetamonMac-Review.entitlements
     postBuildScripts:
-      # iOS と同じスクリプト。ios/Firebase/ に plist が無ければ何も入れない(秘密のファイルは repo に無い)。
-      # Mac の Firebase の登録と初期化は #930
+      # iOS と同じスクリプト・同じ plist(Bundle ID が iOS と同じなので、Firebase の Apple アプリ 1 つを Mac でも使う・#930)。
+      # ios/Firebase/ に plist が無ければ何も入れない(秘密のファイルは repo に無い)。無い時はログインと AI がモックになる(MacServices)
       - name: Select Firebase plist
         script: '"${SRCROOT}/scripts/select-firebase-plist.sh"'
         inputFiles:
@@ -358,8 +393,93 @@ targets:
         outputFiles:
           - $(TARGET_BUILD_DIR)/$(UNLOCALIZED_RESOURCES_FOLDER_PATH)/GoogleService-Info.plist
         basedOnDependencyAnalysis: false
+      # 通常の版(Debug / Staging / Release)だけ、マニフェストに通常の版で集める種類を足す(#931・iOS と同じスクリプト)。
+      # 元の MetamonMac/PrivacyInfo.xcprivacy は審査用の版の申告のまま
+      - name: Extend privacy manifest for normal builds
+        script: '"${SRCROOT}/scripts/extend-privacy-manifest.sh"'
+        inputFiles:
+          - $(SRCROOT)/scripts/extend-privacy-manifest.sh
+        basedOnDependencyAnalysis: false
+      # クラッシュ報告(#930): dSYM を Crashlytics へ。iOS と同じスクリプト(Release / Review だけ送る。Debug・Staging・plist 無しの CI は即終了)。
+      # Mac は base でサンドボックスを外している(上の ENABLE_USER_SCRIPT_SANDBOXING)。docs/ios/crash-reporting.md
+      - name: Upload dSYM to Crashlytics
+        script: '"${SRCROOT}/scripts/crashlytics-dsym.sh"'
+        inputFiles:
+          - $(SRCROOT)/scripts/crashlytics-dsym.sh
+        basedOnDependencyAnalysis: false
     scheme:
+      # Mac の単体テスト(#1212)。`xcodebuild -scheme MetamonMac test`(mac-ci の mac-build-test でも回す)
+      testTargets:
+        - MetamonMacTests
+        # キーボード操作の UI テスト(#1140)。既定では回さない(CI の時間を増やさない)。手元で回す: -only-testing:MetamonMacUITests
+        - name: MetamonMacUITests
+          skipped: true
+          parallelizable: false
       gatherCoverageData: false
+      # 課金: iOS と同じローカルの StoreKit の構成で Run 時にテスト購入できる(本番では使われない)
+      storeKitConfiguration: StoreKit/TailorItPro.storekit
+
+  # Mac のウィジェット(WidgetKit・#984)。デスクトップと通知センターに小・中・大。iOS の MetamonWidget と同じく、本体が App Group に書いた
+  # WidgetSnapshot を描くだけ(Renderer/DSL 非依存)。見た目は iOS の Views を共有(AccessoryViews は Mac に無いので入れない)。
+  # Bundle ID は iOS のウィジェットと同じ(本体が iOS と同じ ID なので、その子を揃える)。App Group も iOS と同じ名前。
+  MetamonMacWidget:
+    type: app-extension
+    platform: macOS
+    sources:
+      - path: MetamonMacWidget
+      - path: MetamonWidget/Shared/WidgetSnapshot.swift
+      - path: MetamonWidget/Views/StatViews.swift
+      - path: MetamonWidget/Views/LargeStatsView.swift
+      - path: MetamonWidget/Localizable.xcstrings
+      - path: MetamonWidget/PrivacyInfo.xcprivacy
+        buildPhase: resources
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: jp.kz2601.metamon$(METAMON_BUNDLE_ID_SUFFIX).widget
+        PRODUCT_NAME: MetamonMacWidget
+        INFOPLIST_FILE: MetamonMacWidget/Info.plist
+        CODE_SIGN_ENTITLEMENTS: MetamonMacWidget/MetamonMacWidget.entitlements
+        ARCHS: $(ARCHS_STANDARD)
+        ENABLE_HARDENED_RUNTIME: YES
+        SKIP_INSTALL: YES
+        ENABLE_PREVIEWS: YES
+      configs:
+        Review:
+          SWIFT_ACTIVE_COMPILATION_CONDITIONS: "$(inherited) APP_STORE_REVIEW"
+
+  # Mac アプリをホストにした単体テスト(#1212)。MacAppRuntime(画面の移動・一言・同期の知らせ)と Mac だけが使う共有の部品
+  MetamonMacTests:
+    type: bundle.unit-test
+    platform: macOS
+    sources:
+      - path: MetamonMacTests
+        # スナップショットの参照の PNG(#1136)はテストがソースの場所から読む。バンドルには入れない
+        excludes:
+          - "__Snapshots__/**"
+    dependencies:
+      - target: MetamonMac
+    settings:
+      base:
+        GENERATE_INFOPLIST_FILE: YES
+        PRODUCT_BUNDLE_IDENTIFIER: jp.kz2601.metamon.mactests
+        # アプリの PRODUCT_NAME は Tailor It(ターゲット名と違う・#1054)ので、ホストの場所を書く
+        TEST_HOST: $(BUILT_PRODUCTS_DIR)/Tailor It.app/Contents/MacOS/Tailor It
+        BUNDLE_LOADER: $(TEST_HOST)
+
+  # Mac のキーボード操作の UI テスト(XCUITest・#1140)。モック(METAMON_MOCK=1)で起動し、⌘1 / ⌘2・Return・Esc・⌘[・⌘Z をキーだけで通す。
+  # scheme では skipped(CI の `xcodebuild test -scheme MetamonMac` では回らない)。手元で回す方法は MetamonMacUITests/KeyboardShellUITests.swift の頭
+  MetamonMacUITests:
+    type: bundle.ui-testing
+    platform: macOS
+    sources:
+      - path: MetamonMacUITests
+    dependencies:
+      - target: MetamonMac
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: jp.kz2601.metamon.macuitests
+        GENERATE_INFOPLIST_FILE: YES
+        TEST_TARGET_NAME: MetamonMac
 
 schemes:
   # Mac の検証版・審査用(#929)。iOS の Metamon-Staging / Metamon-Review と同じ形

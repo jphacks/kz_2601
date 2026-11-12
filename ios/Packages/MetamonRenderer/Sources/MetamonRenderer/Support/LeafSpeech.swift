@@ -33,6 +33,9 @@ public final class LeafSpeech: NSObject, AVSpeechSynthesizerDelegate {
     public func speak(_ text: String, owner: String) -> Bool {
         let text = text.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !text.isEmpty, !micBusy else { return false }
+        #if os(macOS)
+        guard !AudioFocus.shared.isRecordingAnywhere else { return false } // Mac: 録音中は読まない(#952)
+        #endif
         if synthesizer.isSpeaking { synthesizer.stopSpeaking(at: .immediate) }
         let utterance = AVSpeechUtterance(string: text)
         utterance.voice = AVSpeechSynthesisVoice(language: Self.voiceLanguage(uiCode: LanguagePreference.shared.code))

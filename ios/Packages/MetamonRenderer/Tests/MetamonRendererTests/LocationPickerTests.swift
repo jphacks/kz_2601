@@ -1,4 +1,5 @@
 import XCTest
+import MapKit
 import MetamonDSL
 @testable import MetamonRenderer
 
@@ -52,5 +53,29 @@ final class LocationPickerTests: XCTestCase {
         XCTAssertEqual(c.field, "place")
         XCTAssertEqual(c.nameField, "name")
         XCTAssertNotNil(ComponentRegistry.standard.builder(for: "locationPicker"))
+    }
+
+    /// Mac で地図をクリックした点を中心にする(#1345): 縮尺は今のまま、無ければ 2km 四方。
+    func testRecenteredKeepsSpan() {
+        let tapped = CLLocationCoordinate2D(latitude: 36.562128, longitude: 136.662652)
+        let now = MKCoordinateRegion(center: .init(latitude: 35, longitude: 139),
+                                     span: MKCoordinateSpan(latitudeDelta: 0.05, longitudeDelta: 0.07))
+        let r = PlacePicking.recentered(now, on: tapped)
+        XCTAssertEqual(r.center.latitude, tapped.latitude, accuracy: 1e-9)
+        XCTAssertEqual(r.center.longitude, tapped.longitude, accuracy: 1e-9)
+        XCTAssertEqual(r.span.latitudeDelta, 0.05, accuracy: 1e-9)
+        XCTAssertEqual(r.span.longitudeDelta, 0.07, accuracy: 1e-9)
+        // クリックした点の "lat,lng" は iPhone のピンと同じ形
+        XCTAssertEqual(PickedPlace(name: nil, latitude: r.center.latitude, longitude: r.center.longitude).locationValue,
+                       "36.562128,136.662652")
+    }
+
+    func testRecenteredWithoutRegionUsesDefault() {
+        let tapped = CLLocationCoordinate2D(latitude: 35.681236, longitude: 139.767125)
+        let r = PlacePicking.recentered(nil, on: tapped)
+        XCTAssertEqual(r.center.latitude, tapped.latitude, accuracy: 1e-9)
+        XCTAssertGreaterThan(r.span.latitudeDelta, 0)
+        XCTAssertEqual(r.span.latitudeDelta, MKCoordinateRegion(center: tapped, latitudinalMeters: 2_000, longitudinalMeters: 2_000).span.latitudeDelta,
+                       accuracy: 1e-9)
     }
 }

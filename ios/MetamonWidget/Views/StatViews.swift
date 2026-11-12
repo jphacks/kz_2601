@@ -36,10 +36,17 @@ enum WidgetTheme {
     static let brandB = dynamic(light: (62, 154, 156), dark: (59, 158, 159))
 
     private static func dynamic(light: (Int, Int, Int), dark: (Int, Int, Int)) -> Color {
+        #if os(macOS) // Mac のウィジェット(#984)
+        Color(NSColor(name: nil) { appearance in
+            let c = appearance.bestMatch(from: [.darkAqua, .aqua]) == .darkAqua ? dark : light
+            return NSColor(srgbRed: CGFloat(c.0) / 255, green: CGFloat(c.1) / 255, blue: CGFloat(c.2) / 255, alpha: 1)
+        })
+        #else
         Color(UIColor { trait in
             let c = trait.userInterfaceStyle == .dark ? dark : light
             return UIColor(red: CGFloat(c.0) / 255, green: CGFloat(c.1) / 255, blue: CGFloat(c.2) / 255, alpha: 1)
         })
+        #endif
     }
 
     static let brandGradient = LinearGradient(
@@ -68,18 +75,30 @@ struct MetamonWidgetView: View {
     @Environment(\.widgetFamily) private var family
     let entry: StatEntry
 
+    private var isAccessory: Bool {
+        #if os(iOS)
+        family == .accessoryRectangular || family == .accessoryCircular || family == .accessoryInline
+        #else
+        false
+        #endif
+    }
+
     var body: some View {
         if let snapshot = entry.snapshot, !snapshot.stats.isEmpty {
             switch family {
             case .systemMedium: MediumStatsView(snapshot: snapshot)
             case .systemLarge: LargeStatsView(snapshot: snapshot)
+            #if os(iOS) // accessory(ロック画面)は Mac に無い(#984)
             case .accessoryRectangular: AccessoryRectangularView(snapshot: snapshot)
             case .accessoryCircular: AccessoryCircularView(stat: snapshot.stats[0])
             case .accessoryInline: AccessoryInlineView(stat: snapshot.stats[0])
+            #endif
             default: SmallStatView(snapshot: snapshot)
             }
-        } else if family == .accessoryRectangular || family == .accessoryCircular || family == .accessoryInline {
+        } else if isAccessory {
+            #if os(iOS)
             AccessoryEmptyView(family: family)
+            #endif
         } else {
             EmptyStateView(appName: entry.snapshot?.appName)
         }
