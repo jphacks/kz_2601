@@ -126,6 +126,9 @@ type app struct {
 	model triage.Model
 	// publisher, when set, replaces the GitHub client (tests).
 	publisher draft.Publisher
+	// issueReader, when set, replaces the GitHub client that reads open
+	// issues for related issues (tests).
+	issueReader issueReader
 	// issues and pusher, when set, replace GitHub and APNs (tests).
 	issues  fixed.Issues
 	pusher  fixed.Pusher

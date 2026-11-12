@@ -119,6 +119,7 @@ flowchart LR
 | `LOOP_ISSUE_REPO` | 空 = dry run | Issue を作るリポジトリ(`owner/name`) |
 | `LOOP_GITHUB_TOKEN` | — | Issue の作成・コメント・読み取りだけの権限(GitHub App のインストールのトークン、または fine-grained の PAT の `issues: write`)。マージ・ラベル・コードの権限は持たせない |
 | `LOOP_ISSUE_LABELS` | 空 | 作る Issue に付けるラベル(カンマ区切り)。`agent:` で始まるラベル(`agent:ready` など)が入っていたら `drafts show` / `edit` / `approve` / `reject` / `publish` は起動を拒む(人が付ける・ループは付けない) |
+| `LOOP_RELATED_ISSUES` | 空 = 止まっている | `on` で `draft` が `LOOP_ISSUE_REPO` の開いている Issue の題名とラベルを読み、`drafts show` に「関係しそうな Issue」を出す([下](#関係しそうな-issue2288))。`LOOP_GITHUB_TOKEN` も要る |
 | `LOOP_NOTIFY_PUSH` | 空 | `on` で「直りました」を push でも送る(本人の同意 `users/{uid}/notifyConsent/_feedback_fixed` と週 1 回の上限つき) |
 | `APNS_AUTH_KEY` / `APNS_KEY_ID` / `APNS_TEAM_ID` / `APNS_TOPIC` / `LOOP_APNS_ENVIRONMENT` | — | push の時だけ。runner と同じ APNs のキー |
 
@@ -147,6 +148,20 @@ flowchart LR
 - 直った後に同じ束が来たら、再発として新しい Issue の下書きになる。
 - 追記の下書きも `fixed` の対象(Issue が閉じたら送り主にお知らせ)。リリースノートの下書きは Issue ごとに 1 行。
 - GitHub の上で人が手で閉じた(直していない)Issue は、ループには分からないので追記の先に残る。その時は追記の下書きを却下する。
+
+### 関係しそうな Issue(#2288)
+
+人や他のエージェントが先に作った同じ不具合の Issue に気づけるように、新しい Issue の下書きに「関係しそうな Issue」を最大 3 件つける。**既定は止めてある**(`LOOP_RELATED_ISSUES=on` で動く)。
+
+| 項目 | 中身 |
+|---|---|
+| 読むもの | `LOOP_ISSUE_REPO` の開いている Issue の番号・題名・URL・ラベルだけ(GraphQL。本文は求めない・持たない)。新しい順に最大 500 件、1 回の `draft` で 1 度だけ読む(`github.Client.OpenIssues`) |
+| 除くもの | ループが出した Issue(出した下書きの番号と、`LOOP_ISSUE_LABELS` のラベルの付いた物) |
+| 近さ | 束の代表の要約と題名を、日本語は文字の 2-gram・英語は小文字の語にして Dice 係数で比べる。0.25 未満は出さない。同点は番号の新しい順(`draft.FindRelated`) |
+| 置き場所 | 下書きの `related`(`loop_drafts`)。Issue の本文・題名には入れない(投稿されない・出口の検査の対象外) |
+| 見る所 | `drafts show` の「関係しそうな Issue」(`owner/name#N  題名`)。結び付ける・追記に変えるかは人が決める。ループは自動では何もしない |
+| 読めない時 | 通信・権限の失敗でも下書きは作る。`draft` の出力に `draft: related issues not read: <理由>` を 1 行。前の実行で付いた分は残る |
+| 追記の下書き | 付けない(相手の Issue が決まっているため) |
 
 ## 振り分けの精度を測る
 

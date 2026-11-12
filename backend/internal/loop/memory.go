@@ -277,5 +277,6 @@ func cloneDraft(d Draft) Draft {
 	d.ItemIDs = append([]string(nil), d.ItemIDs...)
 	d.Sources = append([]string(nil), d.Sources...)
 	d.AppVersions = append([]string(nil), d.AppVersions...)
+	d.Related = append([]RelatedIssue(nil), d.Related...)
 	return d
 }

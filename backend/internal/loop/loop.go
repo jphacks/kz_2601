@@ -128,6 +128,13 @@ const (
 	DraftRejected  = "rejected"
 )
 
+// RelatedIssue is an open issue that looks related to a draft (#2288).
+type RelatedIssue struct {
+	Repo   string `firestore:"repo"`
+	Number int    `firestore:"number"`
+	Title  string `firestore:"title"`
+}
+
 // Draft is loop_drafts/{id}: an issue draft for one cluster (#369). Title and
 // Body are what would be posted; they hold summaries only, never feedback
 // text, and pass the exit check before they are stored and again before
@@ -158,6 +165,11 @@ type Draft struct {
 	// builder; the approved body is posted as that comment.
 	AppendRepo  string `firestore:"appendRepo,omitempty"`
 	AppendIssue int    `firestore:"appendIssue,omitempty"`
+
+	// Related: open issues the loop did not file whose titles are close to
+	// the cluster's summary (#2288). Only shown by drafts show for a person
+	// to decide; never posted, never linked automatically.
+	Related []RelatedIssue `firestore:"related,omitempty"`
 
 	// PublishedAt: when the issue or comment was posted. ClosedAt: the
 	// issue was found closed (any reason) when an append draft was about to

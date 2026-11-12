@@ -44,6 +44,15 @@ type Builder struct {
 	// OnItem, when set, is called for each item whose status changed. An
 	// error stops the run.
 	OnItem func(ctx context.Context, it loop.Item) error
+	// OpenIssues, when set, reads the open issues of RelatedRepo that the
+	// loop did not file (#2288). It is called at most once per run; each
+	// new-issue draft then lists the closest titles in Draft.Related. An
+	// error does not stop the run (Result.RelatedErr).
+	OpenIssues  func(ctx context.Context) ([]IssueTitle, error)
+	RelatedRepo string
+
+	issues     []IssueTitle // read once per run
+	issuesRead bool
 }
 
 // Result counts one run.
@@ -54,6 +63,9 @@ type Result struct {
 	Held     int // clusters whose draft failed the exit check
 	Attached int // items that predate the filed issue, added to it without a comment
 	Capped   int // clusters left for the next run (MaxNew)
+	// RelatedErr: the open issues could not be read; drafts were built
+	// without (new) related issues.
+	RelatedErr error
 }
 
 func (b *Builder) now() time.Time {
@@ -66,6 +78,7 @@ func (b *Builder) now() time.Time {
 // Run drafts every triaged cluster.
 func (b *Builder) Run(ctx context.Context) (Result, error) {
 	var res Result
+	b.issues, b.issuesRead = nil, false
 	items, err := b.Store.ListItems(ctx, loop.ItemQuery{Status: loop.ItemTriaged, Limit: 500})
 	if err != nil {
 		return res, err
@@ -140,6 +153,7 @@ func (b *Builder) Run(ctx context.Context) (Result, error) {
 		}
 		d.AppendRepo, d.AppendIssue = t.Repo, t.Number
 		fill(&d, all, now)
+		b.relate(ctx, &d, all[0].Summary, &res) // fill put the representative first
 		if reasons := Check(d.Title, d.Body, texts(all)); len(reasons) > 0 {
 			// do not store a draft that would fail at approval; the items
 			// go to the weekly manual triage

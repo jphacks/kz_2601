@@ -8,6 +8,7 @@ import (
 	"os"
 	"sort"
 	"strings"
+	"unicode"
 
 	"github.com/jphacks/kz_2601/backend/internal/loop"
 	"github.com/jphacks/kz_2601/backend/internal/loop/draft"
@@ -21,7 +22,52 @@ const (
 	envIssueRepo   = "LOOP_ISSUE_REPO"   // owner/name
 	envGitHubToken = "LOOP_GITHUB_TOKEN" // issues: write only
 	envIssueLabels = "LOOP_ISSUE_LABELS" // comma separated, default none
+	// envRelated = on: draft reads the open issues of LOOP_ISSUE_REPO (titles
+	// and labels only) and lists related ones in drafts show (#2288).
+	envRelated = "LOOP_RELATED_ISSUES"
 )
+
+type issueReader interface {
+	OpenIssues(ctx context.Context, repo string, opt github.OpenIssuesOptions) ([]github.OpenIssue, error)
+}
+
+// relatedSource returns what draft.Builder needs to list related issues, or
+// a reason why it is off (empty = off by default, nothing to say).
+func (a *app) relatedSource() (string, func(context.Context) ([]draft.IssueTitle, error), string) {
+	if a.getenv(envRelated) != "on" {
+		return "", nil, ""
+	}
+	repo := strings.TrimSpace(a.getenv(envIssueRepo))
+	if !github.ValidRepo(repo) {
+		return "", nil, envIssueRepo + " is not owner/name"
+	}
+	r := a.issueReader
+	if r == nil {
+		if a.getenv(envGitHubToken) == "" {
+			return "", nil, envGitHubToken + " is not set"
+		}
+		r = &github.Client{Token: a.getenv(envGitHubToken)}
+	}
+	var labels []string
+	for l := range ingest.ParseList(a.getenv(envIssueLabels)) {
+		labels = append(labels, l)
+	}
+	return repo, func(ctx context.Context) ([]draft.IssueTitle, error) {
+		mine, err := draft.LoopIssueNumbers(ctx, a.loop, repo)
+		if err != nil {
+			return nil, err
+		}
+		got, err := r.OpenIssues(ctx, repo, github.OpenIssuesOptions{ExcludeLabels: labels, ExcludeNumbers: mine})
+		if err != nil {
+			return nil, err
+		}
+		out := make([]draft.IssueTitle, len(got))
+		for i, iss := range got {
+			out[i] = draft.IssueTitle{Number: iss.Number, Title: iss.Title}
+		}
+		return out, nil
+	}, ""
+}
 
 func (a *app) draftBuild(ctx context.Context, args []string) error {
 	fs := flag.NewFlagSet("draft", flag.ContinueOnError)
@@ -45,11 +91,20 @@ func (a *app) draftBuild(ctx context.Context, args []string) error {
 			return g.Record(ctx, loop.Event{Stage: loop.StageDraft, Action: it.Status, ItemID: it.ID, DraftID: it.DraftID, Reason: it.HoldReason})
 		},
 	}
+	repo, read, off := a.relatedSource()
+	b.RelatedRepo, b.OpenIssues = repo, read
 	res, err := b.Run(ctx)
 	if err != nil {
 		return err
 	}
 	fmt.Fprintf(a.out, "draft: new %d, extended %d, items %d, held %d, left for next run %d\n", res.Created, res.Extended, res.Items, res.Held, res.Capped)
+	switch {
+	case off != "":
+		fmt.Fprintf(a.out, "draft: related issues off (%s=on but %s)\n", envRelated, off)
+	case res.RelatedErr != nil:
+		// one line; drafts are built anyway
+		fmt.Fprintf(a.out, "draft: related issues not read: %v\n", res.RelatedErr)
+	}
 	return nil
 }
 
@@ -234,6 +289,23 @@ func (a *app) printDraft(d *loop.Draft, reasons []string) {
 	} else {
 		fmt.Fprintln(a.out, "exit check: ok")
 	}
+	if len(d.Related) > 0 {
+		fmt.Fprintln(a.out, "関係しそうな Issue (ループが作っていない開いている Issue。結び付けるかは人が決める・自動では何もしない):")
+		for _, r := range d.Related {
+			fmt.Fprintf(a.out, "  %s#%d  %s\n", r.Repo, r.Number, printable(r.Title))
+		}
+	}
 	fmt.Fprintln(a.out, "before approving: no instructions to an agent (merge, labels, secrets, settings) in the text, no billing/auth/deletion/.github work, nothing that identifies a person.")
 	fmt.Fprintf(a.out, "\ntitle: %s\n\n%s\n", d.Title, d.Body)
+}
+
+// printable replaces control characters (an issue title is someone else's
+// text) so it cannot move the terminal.
+func printable(s string) string {
+	return strings.Map(func(r rune) rune {
+		if unicode.IsControl(r) {
+			return ' '
+		}
+		return r
+	}, s)
 }
