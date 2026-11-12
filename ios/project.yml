@@ -299,6 +299,7 @@ targets:
       - path: MetamonMac
       # iOS の AppRuntime と共有する部品(遷移・確認・保存/削除の前段・文言)。#939
       # Brand.xcassets(アクセント色・ツルの絵)も iOS と共有する(#935)
+      # 「直してと頼む」の依頼文(Runtime/FixRequest.swift)と起動時の画面の順番(Runtime/LaunchConsentHold.swift)も iOS と共有する(#1885)
       - path: Shared
       # 本体のデザイントークンとツルは iOS のファイルをそのまま使う(#935)
       - path: Metamon/App/Theme.swift

@@ -9,6 +9,7 @@ import MetamonServices
 /// プレビュー → (記録を共有するアプリなら)参加の確認 / (それ以外は)追加の確認 → 取り込み → そのアプリを開く。
 /// - サインインの前に届いたリンクは保留し、ログインできてから 1 回だけ開く(`PendingShareLink`・iOS の `SharingUI.pendingLink`)
 /// - サーバーにつながっていない時(モック・plist 無し)は開かずに案内を出す(リンクはコピーできる)
+/// - 起動の途中に届いたリンクは、同意・チュートリアルが閉じきってから開き、開き終わるまで Intent を待たせる(`LaunchConsentHold`・#1885)
 /// - 取り込んだアプリはサーバーにあるので、一覧に足して記録・版をサーバーにつなぐ(`MacRootView` が `adopted` を受けて当てる)
 @MainActor
 @Observable
@@ -43,6 +44,8 @@ final class MacShareFlow {
     @ObservationIgnored private let appConfig: (any AppConfigClient)?
     @ObservationIgnored private let isSignedIn: @MainActor () -> Bool
     @ObservationIgnored private let envelope: (String) -> Data?
+    /// 起動時の画面の順番待ち(iOS と共有・#1885)。テストでは別の物を渡す
+    @ObservationIgnored var hold: LaunchConsentHold = .shared
 
     init(sharing: (any SharingClient)?, appConfig: (any AppConfigClient)?, isSignedIn: @escaping @MainActor () -> Bool,
          envelope: @escaping (String) -> Data? = { DocumentCache.shared.loadData(appId: $0) }) {
@@ -62,6 +65,8 @@ final class MacShareFlow {
     /// 届いた URL(URL スキーム・Universal Links)。共有のリンクでなければ何もしない
     func receive(_ url: URL) {
         guard ShareURL.token(from: url) != nil else { return }
+        // 起動の途中だけ、開き終わるまで Intent を待たせる(リンク → Intent の順)。使っている途中に届いたリンクは待たせない
+        hold.beginDuringLaunch(.shareLink)
         guard isAvailable else {
             unavailable = url
             return
@@ -69,8 +74,18 @@ final class MacShareFlow {
         link.receive(url)
     }
 
+    /// 前の段(同意・チュートリアル)がまだ閉じていない。リンクの確認・案内はその後に出す(#1885)
+    var waitsForEarlierSteps: Bool { hold.isHolding(before: .shareLink) }
+
+    /// 開いたリンクの確認・案内が閉じきったか、出さなかった時。次の段(Intent)へ進む
+    func linkSettled() {
+        guard link.url == nil, pending == nil, unavailable == nil else { return }
+        hold.end(.shareLink)
+    }
+
     /// 準備(ログイン)ができていれば保留のリンクを開く。`MacLinkReceiver` が届いた時とログインの変化で呼ぶ
     func openPendingIfReady() async {
+        guard !waitsForEarlierSteps else { return } // 同意・チュートリアルのシートと重ねない(片方が捨てられる)
         guard let url = link.take(isReady: isSignedIn()), let token = ShareURL.token(from: url) else { return }
         await open(token: token)
     }
