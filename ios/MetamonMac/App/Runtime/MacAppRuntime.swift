@@ -58,6 +58,8 @@ final class MacAppRuntime: RuntimeNavigating {
     @ObservationIgnored let recordSync: RecordSyncEngine
     /// 作ったアプリの記録のエンジンを借りている(`MacRecordEngines`)。同じアプリを開いた別のウインドウと同じエンジンを使う
     @ObservationIgnored private let recordLease: MacRecordEngineLease?
+    /// 他の端末の変化の購読を借りている(`MacRealtimeSync`・`MacAppRuntime+Realtime.swift`・#2072)。サーバーにあるアプリだけ
+    @ObservationIgnored var realtimeLease: MacRealtimeLease?
     /// AI の部品のオンライン版の送り先(#962)
     @ObservationIgnored let ai: any AIClient
     @ObservationIgnored let isAIConsentGranted: @MainActor () -> Bool
@@ -133,12 +135,14 @@ final class MacAppRuntime: RuntimeNavigating {
     deinit {
         let engine = recordSync
         let lease = recordLease
+        let realtime = realtimeLease
         let dir = previewDirectory
         let quickLook = quickLookDirectory
         Task { @MainActor in
             try? FileManager.default.removeItem(at: quickLook)
             // 借りたエンジンは返すだけ(最後のウインドウが返したら `MacRecordEngines` が止める)
             if let lease { lease.release() } else { engine.stop() }
+            realtime?.release() // 最後のウインドウなら購読をやめる(#2072)
             if let dir { try? FileManager.default.removeItem(at: dir) }
         }
     }
