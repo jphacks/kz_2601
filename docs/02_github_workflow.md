@@ -165,6 +165,33 @@ macOS runner は Linux の 10 倍の分単価なので、ubuntu の `ios-changes
 | `workflow_dispatch` | 選んだ環境(backend 未変更でも強制デプロイ) | 選んだ環境 |
 
 - push では `backend/**` かこの workflow 自身に変更がある時だけ本体ジョブが走る(`dorny/paths-filter`。workflow の `paths:` は required check 対策で使わない)。
+- 手で回す: Actions の deploy-cloudrun → Run workflow で `environment`(`staging` / `production`)と `staged_rollout`(`dry-run` / `execute`・staging だけ効く)を選ぶ。`gh workflow run deploy-cloudrun.yml -f environment=staging` でも同じ。
+- 同じ環境へのデプロイは直列(`concurrency: deploy-<環境>`・`cancel-in-progress: false`)。後から来た実行は前の実行が終わるまで待つ(途中で切らない)。待っている実行が 2 本になると、古い方は GitHub が取り消す(最新の版だけが出る)。
+
+**ジョブ**(名前は workflow の `name:` と同じ):
+
+| ジョブ | 役割 |
+|---|---|
+| `deploy-changes` | 変更の判定と、行き先(`environment`・`suffix` = `stg` / `prod`)・段階的なリリースの形(`rollout` = `off` / `dry-run` / `execute`)を決める |
+| `deploy` | 下の流れ全部。GitHub Environment(`staging` / `production`)に紐づく。上限は 20 分(`execute` の時だけ 70 分) |
+
+**環境ごとの違い**:
+
+| | staging(`develop` / 手で staging) | production(`main` / 手で production) |
+|---|---|---|
+| サービス | `appconfig-stg` / `ai-stg` | `appconfig-prod` / `ai-prod`、変数 `RUNNER_DEPLOY=1` の時だけ `runner-prod`(非公開・手順は [docs/infra/runner.md](infra/runner.md)) |
+| `APP_ENV` / `ALLOW_SHARED_PROD_DB` | `stg` / `1`(DB の分離まで本番と同じ DB を使う) | `prod` / `0` |
+| 段階的なリリース | push は `dry-run`(100% で出してコマンドを log に出すだけ)。手で `execute` を選ぶと `--no-traffic` で出して 5 → 25 → 100%([staged-rollout.md](infra/staged-rollout.md#deploy-の-workflow-での動き)) | `off`(いつも 100%。`execute` を選んでも warning を出して無視) |
+| スモーク(非ブロッキング) | デモ 3 本 | 家計簿 1 本 + `-cleanup` |
+| `APP_CHECK_MODE`・`FIRESTORE_DATABASE` | GitHub の Environment 変数(未設定なら `off`・`(default)`) | 同じ(Environment ごとに別の値を入れられる) |
+
+**env の表の検査(`scripts/check-deploy-env.sh`)との関係**: `deploy` の最初の step で `scripts/check-deploy-env.sh` を回し、workflow の `--update-env-vars` のキーが [runtime-config.md の「デプロイが決める値」](infra/runtime-config.md#デプロイが決める値)の表と合っているか(`--set-env-vars` を使っていないか・「運用で変える値」の表のキーを上書きしていないか)を見る。ずれていればビルドの前に止まる。同じ検査は `scripts-ci` でも回るので、workflow か runtime-config.md を変える PR の時点で気づける。env を足す・外す時は workflow と runtime-config.md の表を同じ PR で直す。
+
+**止める・戻す(人の操作)**:
+
+- 走っているデプロイを止める: Actions の画面で Cancel。`execute` の段階の途中なら、旧のリビジョンに 100% 戻してから終わる([staged-rollout.md の「人が途中で止める」](infra/staged-rollout.md#人が途中で止める))。それ以外の step の途中で止めると、そこまでに出したサービスは新しい版のまま。
+- 出てしまった悪い版を戻す: 前のリビジョンにトラフィックを戻す([incident-runbook.md 手順 B](ops/incident-runbook.md#6-手順-b-悪いデプロイを戻す))。次の push で同じ版がまた出ないよう、`develop` / `main` に戻すコミットを入れる。
+- 推測: 自動デプロイそのものを一時的に止めたい時は、Actions の画面で workflow を Disable するのが一番早い(workflow に止めるための変数は無い)。止めるかどうか・誰が戻すかは決めること。
 - 流れ: `backend/Dockerfile` を 1 回 `docker build`(appconfig / ai 両バイナリ同梱)→ Artifact Registry `asia-northeast1-docker.pkg.dev/jphacks-kz2601/backend/backend:<sha>` → 同じイメージで `appconfig-<env>` と `ai-<env>`(`--command=/app/ai`、`ANTHROPIC_API_KEY` は Secret Manager から注入)を `gcloud run deploy --image`。
 - 最後に両サービスの **`GET /health`** が 200 であることを確認し、URL を job summary に出す。**ヘルスパスは `/health`**(Cloud Run の Google Front End は `/healthz` をコンテナに届けず HTML 404 を返すため。`/healthz` はローカル用に残っている)。
 - その後 **スモーク(`backend/cmd/smoke`・非ブロッキング)** を流して表を job summary に貼る(失敗してもデプロイは成功扱い)。staging はデモ 3 本(Claude 3 回)、**production は家計簿 1 本だけ(`-only kakeibo`・Claude 2 回)+ `-cleanup`** で作った `smoke-*` アプリを `DELETE /v1/apps/{id}`(archive)する。認証は `FIREBASE_WEB_API_KEY`(repo Variable)で Firebase 匿名ユーザーの ID トークンを取る。手元から同じことをするには `cd backend && FIREBASE_WEB_API_KEY=<key> make smoke-stg` / `make smoke-prod`(#66)。
