@@ -114,6 +114,21 @@ final class IntentHost {
         return await runtime.addRecordFromIntent(appId: appId, entity: entity, data: data)
     }
 
+    // MARK: - 数字を読む(GetStatValueIntent・#1994)
+
+    /// 数えるのに使う記録。表示中のアプリは画面の記録(届いていれば)、ほかはローカル DB(記録の API は呼ばない)。
+    /// この端末でまだ開いていないアプリは空なので「0 件」と言い切らず nil(一覧のひと目の数字と同じ判定)。
+    func statRecords(appId: String, entities: [String], isExpression: Bool) async -> [String: [Record]]? {
+        guard let runtime else { return nil }
+        if runtime.document.appId == appId, entities.allSatisfy({ runtime.records[$0] != nil }) {
+            return runtime.records
+        }
+        var out: [String: [Record]] = [:]
+        for e in entities { out[e] = await runtime.recordSync.cached(appId: appId, entity: e) }
+        guard isExpression || out.values.contains(where: { !$0.isEmpty }) else { return nil }
+        return out
+    }
+
     // MARK: - カタログ(Entity の候補)
 
     /// 作ったアプリ(変身一覧と同じ並び・未生成は除く)。サーバーに届かなければ `AppListCache`。
