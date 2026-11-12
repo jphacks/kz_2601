@@ -79,4 +79,6 @@ ai → appconfig の結合をローカルで確認する時は、appconfig を�
 | `APPSTORE_BUNDLE_IDS` / `APPSTORE_PRODUCT_IDS` | o | - | StoreKit 取引の許可リスト(#314)。既定 `jp.kz2601.metamon` / `jp.kz2601.metamon.pro.monthly` |
 | `APPSTORE_ENVIRONMENTS` | o | o | 受け入れる App Store の環境。既定 `Sandbox,Production`(審査・TestFlight は Sandbox)。ai は Pro の判定(#449)に使う |
 
+この表と docs/ に無い環境変数の一覧: `go test -run TestEnvDocs -v ./internal/envdoc`(表示だけで落とさない)。
+
 Cloud Run 上の appconfig は `AUTH_MODE` 未設定(= `firebase`)で、`run-backend` SA の ADC で Firestore と Firebase Admin を使う。
