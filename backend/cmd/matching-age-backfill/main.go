@@ -36,17 +36,27 @@ import (
 	"google.golang.org/grpc/status"
 )
 
+// options are the command-line flags.
+type options struct {
+	apply, allowProd bool
+}
+
+func parseFlags(fs *flag.FlagSet, args []string) (options, error) {
+	var o options
+	fs.BoolVar(&o.apply, "apply", false, "write the flags (default: dry run, write nothing)")
+	fs.BoolVar(&o.allowProd, "allow-prod-db", false, "allow running against the production Firestore database")
+	return o, fs.Parse(args)
+}
+
 func main() {
-	apply := flag.Bool("apply", false, "write the flags (default: dry run, write nothing)")
-	allowProd := flag.Bool("allow-prod-db", false, "allow running against the production Firestore database")
-	flag.Parse()
+	o, _ := parseFlags(flag.CommandLine, os.Args[1:]) // flag.CommandLine exits on a bad flag
 
 	target := fsenv.FromEnv(os.Getenv)
-	if err := guard(target, *allowProd, os.Getenv); err != nil {
+	if err := guard(target, o.allowProd, os.Getenv); err != nil {
 		fmt.Fprintln(os.Stderr, "matching-age-backfill: refusing to start:", err)
 		os.Exit(2)
 	}
-	fmt.Printf("target: %s (emulator=%t) mode=%s\n", target, target.Emulator != "", mode(*apply))
+	fmt.Printf("target: %s (emulator=%t) mode=%s\n", target, target.Emulator != "", mode(o.apply))
 
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
@@ -56,7 +66,7 @@ func main() {
 		os.Exit(1)
 	}
 	defer func() { _ = st.Close() }()
-	if code := run(ctx, st, *apply, os.Stdout); code != 0 {
+	if code := run(ctx, st, o.apply, os.Stdout); code != 0 {
 		os.Exit(code)
 	}
 }
