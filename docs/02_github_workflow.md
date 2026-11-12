@@ -69,6 +69,47 @@ gh pr create --base main --title "release: Day2 デモ版"
 
 scope は `ios` / `appconfig` / `ai` / `dsl` / `infra` あたり。1コミット1意図。`WIP` コミットは squash 前提なら可。
 
+## backend-ci(Go のビルド・lint・テスト・5 分以内)
+
+`.github/workflows/backend-ci.yml`。発火は PR(opened・synchronize・reopened・ready_for_review)と `develop` / `main` への push。同じ PR(push ならブランチ)の古い実行は取り消す(`concurrency`)。
+
+workflow の `paths:` は使わない。required check にした時、backend を触らない PR では check が "Expected" のまま待ち続けてマージできなくなるため。代わりに ubuntu の `backend-changes` ジョブ(`dorny/paths-filter`)で変わった場所を見て、本体の `backend-ci` を `if:` でスキップする(スキップは required check 上は成功扱い)。required check の名前はジョブ名 `backend-ci`(`scripts/github/setup-branch-protection.sh` の `REQUIRED_CHECKS` と一致させる)。
+
+| ジョブ | 走る時 | 上限 | 中身 |
+|---|---|---|---|
+| `backend-changes` | push・非 Draft の PR | 2 分 | PR では下の場所が変わったかを見る。push は常に「回す」 |
+| `backend-ci` | `backend-changes` が「回す」と出した時 | **5 分** | 下の step |
+
+`backend-changes` が「回す」とする場所(PR の時):
+
+| 変わった場所 | 理由 |
+|---|---|
+| `backend/**` | 本体 |
+| `docs/dsl/conformance/expr/**`・`docs/dsl/examples/**` | backend のテストが読む |
+| `android/dsl/src/main/kotlin/**/generated/**` | `cmd/dslgen` の生成物(`TestGeneratedKotlinIsUpToDate` が古さを見る・#1006) |
+| `.github/workflows/backend-ci.yml` | この workflow 自身 |
+
+`backend-ci` の step(`backend/` で動く):
+
+| step | すること |
+|---|---|
+| `actions/setup-go` | `backend/go.mod` の版。キャッシュの鍵は `go.sum` と `go.mod` |
+| `go mod download` | 依存を落とす |
+| `go vet` | `go vet ./...` |
+| `golangci-lint` | `golangci-lint-action`(`version: latest`・`--timeout=3m`・設定は `backend/.golangci.yml`)。1 回目は `continue-on-error` |
+| `golangci-lint(再試行)` | 1 回目が失敗した時だけもう 1 回。2 回目の結果がジョブの成否(バイナリの取得の 5xx を拾うため。本当の指摘なら 2 回目も落ちる) |
+| `go build` | `go build ./...` |
+| `ai-eval cases (offline)` | `go run ./cmd/ai-eval -check-all internal/ai/eval`。評価ケース・編集の土台の JSON を形に合った読み方で検証する(API は呼ばない)。形の分からないファイルは失敗にする |
+| `go test (-race)` | `go test ./... -race -count=1` |
+
+- **5 分を超えたら**(`timeout-minutes: 5` でジョブが止まる)、lint の対象やテストを削らずに遅い原因を直す。Firestore エミュレータの試験は 5 分に収まらないので別の workflow(下の backend-emulator)。
+- 落ちた時の見方:
+  - `go vet`・`go build`: ログの `file:line` をそのまま直す
+  - `golangci-lint`: 1 回目だけ赤で 2 回目が緑ならジョブは成功(取得の一時的な失敗)。2 回目も赤なら指摘を直す。手元は `cd backend && golangci-lint run --timeout=3m`
+  - `ai-eval cases (offline)`: `internal/ai/eval` の JSON の形の誤り。手元は `cd backend && go run ./cmd/ai-eval -check-all internal/ai/eval`
+  - `go test (-race)`: `WARNING: DATA RACE` があればデータ競合。手元は `cd backend && go test ./... -race -count=1`
+  - backend を触っていないのに走った時は、上の表の場所(`docs/dsl/examples/**` など)を触っていないか見る
+
 ## ios-ci の仕組み(変更のあったモジュールだけテスト)
 
 macOS runner は Linux の 10 倍の分単価なので、ubuntu の `ios-changes` ジョブ(`dorny/paths-filter`)で変わった場所を見て、必要なテストだけ macOS で回す。required check は ubuntu の集約ジョブ `ios-ci`(macOS ジョブがスキップでも成功で終わる)。
