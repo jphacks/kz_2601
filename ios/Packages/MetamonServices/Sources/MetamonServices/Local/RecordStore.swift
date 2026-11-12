@@ -97,8 +97,14 @@ public actor RecordStore {
             .map(\.record)
     }
 
+    /// createdAt 降順。文字列ではなく時刻で比べる(小数秒の桁が違う `.1Z` と `.123456Z`・オフセット付きを取り違えない)。
+    /// 同じ時刻は後から入った行を先に出す(表は古い → 新しいの順に持つ。`replace` 参照)。読めない・無い createdAt は末尾。
     public func rows(appId: String, entity: String) -> [LocalRecord] {
-        table(appId, entity).sorted { ($0.createdAt ?? "") > ($1.createdAt ?? "") }
+        let parser = CreatedAtKey.Parser()
+        return table(appId, entity).enumerated()
+            .map { (key: parser.key($0.element.createdAt), index: $0.offset, row: $0.element) }
+            .sorted { $0.key != $1.key ? $0.key > $1.key : $0.index > $1.index }
+            .map(\.row)
     }
 
     public func row(appId: String, entity: String, recordId: String) -> LocalRecord? {
@@ -149,7 +155,8 @@ public actor RecordStore {
     @discardableResult
     public func replace(appId: String, entity: String, with server: [Record]) -> [Record] {
         let pending = table(appId, entity).filter { $0.pendingOp != .none }
-        var t = server.map { LocalRecord(appId: appId, entity: entity, server: $0) }
+        // サーバーは新しい順(同時刻は id 降順)で返す。表は古い順に持つので逆にして入れる(同時刻の並びがサーバーと揃う)
+        var t = server.reversed().map { LocalRecord(appId: appId, entity: entity, server: $0) }
         for p in pending {
             if let i = t.firstIndex(where: { $0.recordId == p.recordId }) { t[i] = p } else { t.append(p) }
         }
@@ -243,6 +250,37 @@ public actor RecordStore {
 
     private func url(_ appId: String, _ entity: String) -> URL {
         directory.appendingPathComponent(Self.safe(appId), isDirectory: true).appendingPathComponent("\(Self.safe(entity)).json")
+    }
+
+    /// createdAt の比較キー(秒 + ナノ秒)。読めない・無いものは最小。
+    struct CreatedAtKey: Comparable {
+        static let missing = CreatedAtKey(seconds: .min, nanos: 0)
+        let seconds: Int64
+        let nanos: Int
+
+        static func < (a: Self, b: Self) -> Bool { (a.seconds, a.nanos) < (b.seconds, b.nanos) }
+
+        /// ISO-8601(`Z` / `±hh:mm`、小数秒は 0〜9 桁)。小数秒は Date(Double)を通さず桁のまま持つ。
+        struct Parser {
+            private let formatter: ISO8601DateFormatter = {
+                let f = ISO8601DateFormatter()
+                f.formatOptions = [.withInternetDateTime]
+                return f
+            }()
+
+            func key(_ s: String?) -> CreatedAtKey {
+                guard var s, !s.isEmpty else { return .missing }
+                var nanos = 0
+                if let t = s.firstIndex(of: "T"), let dot = s[t...].firstIndex(of: ".") {
+                    let digits = s[s.index(after: dot)...].prefix { $0.isASCII && $0.isNumber }
+                    guard !digits.isEmpty, digits.count <= 9 else { return .missing }
+                    nanos = Int(digits.padding(toLength: 9, withPad: "0", startingAt: 0)) ?? 0
+                    s.removeSubrange(dot..<s.index(dot, offsetBy: digits.count + 1))
+                }
+                guard let date = formatter.date(from: s) else { return .missing }
+                return CreatedAtKey(seconds: Int64(date.timeIntervalSince1970.rounded()), nanos: nanos)
+            }
+        }
     }
 
     static func safe(_ s: String) -> String {
