@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"log/slog"
+	"net/http"
 	"strconv"
 	"time"
 
@@ -39,6 +40,29 @@ func operationOf(ctx context.Context) string {
 		return op
 	}
 	return OpUnknown
+}
+
+type clientPlatformKey struct{}
+
+// WithClientPlatform labels the Claude calls made with ctx with the caller's
+// OS (raw X-Client-Platform, normalised by httpx.NormalizePlatform).
+func WithClientPlatform(ctx context.Context, raw string) context.Context {
+	return context.WithValue(ctx, clientPlatformKey{}, httpx.NormalizePlatform(raw))
+}
+
+// clientPlatformOf is "" for calls made outside an HTTP request (batch, ai-eval).
+func clientPlatformOf(ctx context.Context) string {
+	p, _ := ctx.Value(clientPlatformKey{}).(string)
+	return p
+}
+
+// ClientPlatformMiddleware puts the request's OS on its context for the usage
+// log. A request without the header is "other", as in the request log.
+func ClientPlatformMiddleware(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		ctx := WithClientPlatform(r.Context(), r.Header.Get(httpx.ClientPlatformHeader))
+		next.ServeHTTP(w, r.WithContext(ctx))
+	})
 }
 
 // UIDHash is the pseudonymous user key of the usage log, never the raw uid.
@@ -146,6 +170,9 @@ func (c *Client) logUsage(ctx context.Context, r usageRecord) {
 	}
 	if r.err != nil {
 		attrs = append(attrs, slog.String("error_kind", errorKind(r.err)))
+	}
+	if p := clientPlatformOf(ctx); p != "" {
+		attrs = append(attrs, slog.String("clientPlatform", p))
 	}
 	if h := UIDHash(auth.UID(ctx)); h != "" {
 		attrs = append(attrs, slog.String("uid_hash", h))

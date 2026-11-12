@@ -140,7 +140,7 @@ func main() {
 	if paused {
 		log.Printf("ai: AI_PAUSED is on; generate/chat/text answer 503 ai_paused")
 	}
-	handler := newAIHandler(ai.NewHandler(svc), logger,
+	handler := newAIHandler(ai.ClientPlatformMiddleware(ai.NewHandler(svc)), logger,
 		newAppCheck(),
 		ai.Pause(paused, logger),
 		withBudget(newRateLimit(verifier, fsClient, pro), breaker),
