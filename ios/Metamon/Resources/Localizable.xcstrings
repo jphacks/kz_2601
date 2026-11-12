@@ -1317,6 +1317,23 @@
         }
       }
     },
+    "1 つのアカウントに複数のサインインの方法をつなぐと、iPhone でも Android でも同じアカウントに入れます。" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Link more than one sign-in method to your account to use the same account on both iPhone and Android."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "1 つのアカウントに複数のサインインの方法をつなぐと、iPhone でも Android でも同じアカウントに入れます。"
+          }
+        }
+      }
+    },
     "1 人 1 件までです。もう登録しています" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -1823,6 +1840,40 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Apple に引き継ぎました。機種変更のあとも同じ Apple ID で戻れます"
+          }
+        }
+      }
+    },
+    "Apple をつなぎました。次からは Apple でもこのアカウントに入れます。" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Apple is now linked. You can also sign in to this account with Apple from now on."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Apple をつなぎました。次からは Apple でもこのアカウントに入れます。"
+          }
+        }
+      }
+    },
+    "Apple をつなげませんでした" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Couldn't connect Apple"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Apple をつなげませんでした"
           }
         }
       }
@@ -4343,6 +4394,40 @@
         }
       }
     },
+    "この Apple ID のメールアドレスは、すでに別のアカウントで使われています。アカウントはまとめず、いまのアカウントはそのままです。そのアカウントを使うときは、ログアウトしてから、そのアカウントを作った方法でサインインしてください。" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The email address for this Apple ID is already used by another account. The accounts were not merged, and your current account is unchanged. To use that account, sign out and then sign in with the method you used to create it."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "この Apple ID のメールアドレスは、すでに別のアカウントで使われています。アカウントはまとめず、いまのアカウントはそのままです。そのアカウントを使うときは、ログアウトしてから、そのアカウントを作った方法でサインインしてください。"
+          }
+        }
+      }
+    },
+    "この Apple ID は、すでに別のアカウントで使われています。アカウントはまとめず、いまのアカウントはそのままです。この Apple ID のアカウントを使うときは、ログアウトしてから Apple でサインインしてください。" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "This Apple ID is already used by another account. The accounts were not merged, and your current account is unchanged. To use the account for this Apple ID, sign out and then sign in with Apple."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "この Apple ID は、すでに別のアカウントで使われています。アカウントはまとめず、いまのアカウントはそのままです。この Apple ID のアカウントを使うときは、ログアウトしてから Apple でサインインしてください。"
+          }
+        }
+      }
+    },
     "この Apple ID は別のアカウントで使われています" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -5903,6 +5988,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "つないでいません"
+          }
+        }
+      }
+    },
+    "つながっています" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Linked"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "つながっています"
           }
         }
       }
@@ -8629,6 +8731,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "サインインし直してから送ってください。"
+          }
+        }
+      }
+    },
+    "サインインの方法" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sign-in Methods"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "サインインの方法"
           }
         }
       }
