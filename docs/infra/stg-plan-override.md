@@ -40,7 +40,7 @@ stg で、決めた試験用の uid のリクエストに限り、サーバー�
 
 ## 入れる・外す
 
-Cloud Run の設定を変える作業なので、持ち主が行います。uid は repo・Issue・PR に書きません。ai と appconfig の両方に同じ値を入れます(ai は appconfig への呼び出しにヘッダを渡し、appconfig は自分の設定で判断します)。
+Cloud Run の設定を変える作業なので、持ち主が行います。`DEBUG_OVERRIDE_UIDS` には試験用のアカウントの uid だけを入れます(実際に使っている人のアカウントは入れません)。uid は repo・Issue・PR に書きません。ai と appconfig の両方に同じ値を入れます(ai は appconfig への呼び出しにヘッダを渡し、appconfig は自分の設定で判断します)。
 
 ```sh
 # 入れる(uid はカンマ区切り。値にカンマを含むので区切りを ^@^ に替える)
@@ -60,7 +60,9 @@ gcloud run services update appconfig-stg --region asia-northeast1 --remove-env-v
 
 ## 使い方
 
-端末(Debug / Staging の版のデバッグメニュー、#2086)は、リクエストにヘッダを付けます。
+リクエストに次のヘッダを付けると効きます。端末のデバッグメニュー(Debug / Staging の版)から付けるのは今後の作業です(#2086)。今は curl などで付けて試します。
+
+開発用メニューの「Pro として見る」(#2170)は端末の中の表示だけを変えるもので、サーバーの判定には効きません。サーバーの判定まで変えるのは、このヘッダが付いた時だけです。
 
 ```
 X-Debug-Plan: pro
