@@ -92,7 +92,8 @@ public final class FirebaseAuthService: AuthService, @unchecked Sendable {
         guard let user = auth.currentUser else {
             return try await signInWithApple(idToken: idToken, nonce: nonce, fullName: fullName)
         }
-        guard user.isAnonymous else { throw AuthError.alreadyLinked }
+        // 匿名 → Apple(#276)と、Apple 以外の既存アカウントに Apple を足す(#361)の両方。統合はしない
+        guard !user.providerData.contains(where: { $0.providerID == SignInProvider.apple.rawValue }) else { throw AuthError.alreadyLinked }
         let credential = OAuthProvider.appleCredential(withIDToken: idToken, rawNonce: nonce, fullName: fullName)
         do {
             let result = try await user.link(with: credential)
@@ -100,7 +101,8 @@ public final class FirebaseAuthService: AuthService, @unchecked Sendable {
             return AuthUser(auth.currentUser ?? result.user)
         } catch let error as NSError where error.code == AuthErrorCode.credentialAlreadyInUse.rawValue {
             let updated = error.userInfo[AuthErrorUserInfoUpdatedCredentialKey] as? AuthCredential
-            lock.withLock { pendingAppleCredential = updated }
+            // 切り替えを出すのは匿名の時だけ(#276)。既存アカウントは切り替えもまとめもしない(#361)
+            lock.withLock { pendingAppleCredential = user.isAnonymous ? updated : nil }
             throw AuthError.credentialAlreadyInUse
         } catch let error as NSError where error.code == AuthErrorCode.providerAlreadyLinked.rawValue {
             throw AuthError.alreadyLinked
@@ -119,6 +121,7 @@ public final class FirebaseAuthService: AuthService, @unchecked Sendable {
 
 private extension AuthUser {
     init(_ user: User) {
-        self.init(uid: user.uid, isAnonymous: user.isAnonymous, displayName: user.displayName)
+        self.init(uid: user.uid, isAnonymous: user.isAnonymous, displayName: user.displayName,
+                  providers: SignInProvider.from(providerIDs: user.providerData.map(\.providerID)))
     }
 }

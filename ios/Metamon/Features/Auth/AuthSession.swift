@@ -113,6 +113,34 @@ final class AuthSession {
         }
     }
 
+    /// 既にあるアカウント(Apple 以外)に Apple をつなぐ(#361・設定の「サインインの方法」)。
+    /// その Apple ID が別のアカウントにあっても、切り替えもまとめもせず `.inUseByOtherAccount` を返すだけ。
+    func linkAppleToCurrentAccount(_ result: Result<ASAuthorization, Error>, nonce: String) async -> AppleLinkOutcome {
+        switch result {
+        case .failure(let error):
+            if (error as? ASAuthorizationError)?.code == .canceled { return .cancelled }
+            return .failed(error.localizedDescription)
+        case .success(let authorization):
+            guard let apple = Self.appleToken(authorization) else {
+                return .failed(AuthError.invalidAppleCredential.localizedDescription)
+            }
+            return await linkAppleToCurrentAccount(idToken: apple.idToken, nonce: nonce, fullName: apple.fullName)
+        }
+    }
+
+    func linkAppleToCurrentAccount(idToken: String, nonce: String, fullName: PersonNameComponents?) async -> AppleLinkOutcome {
+        isBusy = true
+        defer { isBusy = false }
+        do {
+            user = try await service.linkWithApple(idToken: idToken, nonce: nonce, fullName: fullName)
+            return .linked
+        } catch AuthError.credentialAlreadyInUse {
+            return .inUseByOtherAccount
+        } catch {
+            return .failed(error.localizedDescription)
+        }
+    }
+
     private static func appleToken(_ authorization: ASAuthorization) -> (idToken: String, fullName: PersonNameComponents?)? {
         guard let credential = authorization.credential as? ASAuthorizationAppleIDCredential,
               let data = credential.identityToken,

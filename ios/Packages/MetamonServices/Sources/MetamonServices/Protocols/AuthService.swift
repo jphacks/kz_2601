@@ -5,11 +5,14 @@ public struct AuthUser: Sendable, Equatable {
     public var uid: String
     public var isAnonymous: Bool
     public var displayName: String?
+    /// このアカウントにつながっているサインインの方法(#361)。匿名は含めない。
+    public var providers: [SignInProvider]
 
-    public init(uid: String, isAnonymous: Bool, displayName: String? = nil) {
+    public init(uid: String, isAnonymous: Bool, displayName: String? = nil, providers: [SignInProvider] = []) {
         self.uid = uid
         self.isAnonymous = isAnonymous
         self.displayName = displayName
+        self.providers = providers
     }
 }
 
@@ -57,8 +60,9 @@ public protocol AuthService: AnyObject, Sendable {
     /// Apple の idToken で現在のユーザーを再認証する(`deleteCurrentUser` の前・requiresRecentLogin の回避)。
     func reauthenticateWithApple(idToken: String, nonce: String) async throws
     /// 匿名ユーザーに Apple ID を結びつける(#276・Firebase の credential link)。uid は変わらないので、作ったアプリとデータはそのまま。
+    /// 匿名でない既存のアカウント(Apple 以外)にも Apple を足せる(#361)。
     /// その Apple ID が既に別のアカウントにあれば `AuthError.credentialAlreadyInUse`(その時の資格情報はサービスが持ち、
-    /// `switchToPendingAppleAccount()` で使う)。匿名でなければ `AuthError.alreadyLinked`。
+    /// `switchToPendingAppleAccount()` で使う)。既に Apple がつながっていれば `AuthError.alreadyLinked`。
     func linkWithApple(idToken: String, nonce: String, fullName: PersonNameComponents?) async throws -> AuthUser
     /// `credentialAlreadyInUse` の後、その Apple ID の既存アカウントに切り替える。匿名で作ったアプリは引き継がれない(uid が変わる)。
     func switchToPendingAppleAccount() async throws -> AuthUser

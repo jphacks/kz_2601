@@ -29,6 +29,7 @@ struct SettingsSheet: View {
             List {
                 if Self.e2eDeleteAccount { deleteAccountSection } // E2E: 削除ボタンを画面内に出す(シミュレータはスクロール操作できない)
                 accountSection
+                LinkedAccountsSection() // #361 つながっているサインインの方法・Apple をつなぐ
                 #if !APP_STORE_REVIEW // 審査用ビルドは共有を外しているので、投稿に出す名前も出さない(#247)
                 AuthorNameSettingsSection() // 共有アプリの投稿に出す名前(#250)
                 #endif

@@ -36,7 +36,13 @@ public final class MockAuthService: AuthService, @unchecked Sendable {
 
     public func signInWithApple(idToken: String, nonce: String, fullName: PersonNameComponents?) async throws -> AuthUser {
         let name = fullName.map { PersonNameComponentsFormatter.localizedString(from: $0, style: .default) }
-        return set(AuthUser(uid: Self.fixedUID, isAnonymous: false, displayName: name?.isEmpty == false ? name : nil))
+        return set(AuthUser(uid: Self.fixedUID, isAnonymous: false, displayName: name?.isEmpty == false ? name : nil, providers: [.apple]))
+    }
+
+    /// Apple 以外(Android の Google など)で作ったアカウントでサインインした状態にする(#361 のテスト・Preview 用)。
+    @discardableResult
+    public func signIn(providers: [SignInProvider], uid: String = fixedUID) -> AuthUser {
+        set(AuthUser(uid: uid, isAnonymous: false, providers: providers))
     }
 
     public func signInAnonymously() async throws -> AuthUser {
@@ -50,12 +56,12 @@ public final class MockAuthService: AuthService, @unchecked Sendable {
         guard let current = currentUser else {
             return try await signInWithApple(idToken: idToken, nonce: nonce, fullName: fullName)
         }
-        guard current.isAnonymous else { throw AuthError.alreadyLinked }
+        guard !current.providers.contains(.apple) else { throw AuthError.alreadyLinked }
         if lock.withLock({ appleIDInUse }) {
-            lock.withLock { hasPending = true }
+            lock.withLock { hasPending = current.isAnonymous } // 既存アカウント(#361)は切り替え先を持たない
             throw AuthError.credentialAlreadyInUse
         }
-        return set(AuthUser(uid: current.uid, isAnonymous: false, displayName: current.displayName))
+        return set(AuthUser(uid: current.uid, isAnonymous: false, displayName: current.displayName, providers: current.providers + [.apple]))
     }
 
     public func switchToPendingAppleAccount() async throws -> AuthUser {
@@ -64,7 +70,7 @@ public final class MockAuthService: AuthService, @unchecked Sendable {
             return hasPending
         }
         guard pending else { throw AuthError.noPendingAppleAccount }
-        return set(AuthUser(uid: Self.existingAppleUID, isAnonymous: false))
+        return set(AuthUser(uid: Self.existingAppleUID, isAnonymous: false, providers: [.apple]))
     }
 
     /// モックはトークンを持たない(Authorization ヘッダ無しで送る)。
