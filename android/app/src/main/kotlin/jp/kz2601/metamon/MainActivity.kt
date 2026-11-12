@@ -225,6 +225,7 @@ fun MetamonApp(container: AppContainer) {
     val buildNow = stringResource(R.string.voice_build_now_utterance)
     val historyHeader = stringResource(R.string.voice_history_header)
     val unchangedReason = stringResource(R.string.voice_unchanged_reason)
+    val copyNameFormat = stringResource(R.string.app_menu_copy_name)
     // 前の人の ViewModel はキーで隠すだけでなく置き場ごと捨てる(#1167)
     val perAccount: PerAccountViewModels = viewModel()
     val voiceOwner = remember(perAccount, wipes) { perAccount.ownerFor(wipes) }
@@ -677,7 +678,7 @@ fun MetamonApp(container: AppContainer) {
             thumbnails = container.thumbnails,
             edits = AppSwitcherEdits(
                 onRename = { app, name -> scope.launch { appEditor.rename(app, name) } },
-                onDuplicate = { app -> scope.launch { appEditor.duplicate(app) { context.getString(R.string.app_menu_copy_name, it) } } },
+                onDuplicate = { app -> scope.launch { appEditor.duplicate(app) { copyNameFormat.format(it) } } },
                 onMove = { app, index -> scope.launch { appEditor.move(app.id, index) } },
                 // 回転で画面が作り直されても途中で止めない(サーバーで消えたのに端末のデータが残らないよう)
                 onDelete = { app -> container.accountScope.launch { appEditor.delete(app) } },
