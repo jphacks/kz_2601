@@ -171,7 +171,8 @@ class DesktopSession(
 
     fun records(entity: String): List<Record> = store.records(entity, entityModel(entity))
 
-    fun leafData(): LeafData = LeafData(models, ::records, uid)
+    /** 画面は [DataLabels.current] を渡す(既定は描画の木と同じ日本語)。 */
+    fun leafData(labels: DataLabels = DataLabels.JAPANESE): LeafData = LeafData(models, ::records, uid, labels)
 
     /**
      * route の下書き(entity の無い画面は null)。開いた時に 1 回作り、保存するか閉じるまで入力を残す。
