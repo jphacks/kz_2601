@@ -125,7 +125,7 @@ object PdfIo {
         if (table.rows.isEmpty()) {
             y += lineH
             g!!.color = Color.GRAY
-            g!!.drawString(emptyText, m, y)
+            g.drawString(emptyText, m, y)
         }
         for (r in table.rows) {
             if (y + lineH > h - m) newPage(first = false)

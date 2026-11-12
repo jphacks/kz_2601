@@ -44,7 +44,7 @@ TAILORIT_API=stg TAILORIT_DEV_TOKEN=<Firebase の ID トークン> ./gradlew :de
 - クリップボード: 一覧の「表をコピー」で表計算に貼れる TSV、「表を貼り付け」で表計算の行を取り込む。list・table の行はクリックで選び、Shift+クリックで範囲、Ctrl+クリック(macOS は ⌘)で足し引き、Ctrl+A で全部。選んでいる時は Ctrl+C と「表をコピー」が選んだ行だけを同じ TSV(見出し付き)でコピーする(table は見えている列)。詳細へ移る行(onItemTap)は修飾キー無しのクリックで今までどおり開く(`RowSelection.kt`)。画像は Ctrl+V で photoField へ。
 - 印刷: Ctrl+P(または見出しの「印刷」)で一番上の画面をプレビューし、OS の印刷ダイアログから A4 縦で印刷する。頁は export の PDF と同じ(`io/PdfIo.pages`)。一覧・table・gridTable・chart は表ごとに頁を改めて全行を複数頁に割り、stat などの値とフォームの入力は「項目 / 値」の表にする(`Print.kt`)。
 - キーボード: Ctrl+K(または Ctrl+Shift+P)でコマンドパレット(画面・アクション・同梱のアプリを名前で選ぶ)、Ctrl+N 新規・Ctrl+S 保存・Ctrl+F 検索・Delete 削除(確認あり)・Esc 閉じる / 戻る・F1(または Ctrl+/)で一覧。macOS は Ctrl の代わりに ⌘、削除は ⌘⌫。Tab はグリッドの行 → 列の順(`Keyboard.kt`・`CommandPalette.kt`)。
-- ライセンス: F1 の一覧の「サードパーティのライセンス」かコマンドパレットで、このアプリ・依存・同梱物・Java 実行環境のライセンスを出す(`Licenses.kt`)。一覧はビルド時に `app/third-party-licenses.gradle.kts` が runtimeClasspath の POM と jar の NOTICE から作る(本文の正本は `android/scripts/license-texts`)。Maven を通らない同梱物は `app/licenses/vendored/*.properties` に 1 件 1 ファイルで足す。Java 実行環境の分は起動中の実行環境の `legal/` から読む。
+- ライセンス: F1 の一覧の「サードパーティのライセンス」かコマンドパレットで、このアプリ・依存・同梱物・Java 実行環境のライセンスを出す(`Licenses.kt`)。一覧はビルド時に `app/third-party-licenses.gradle.kts` が runtimeClasspath の POM と jar の NOTICE から作る(本文の正本は `android/scripts/license-texts`)。複数の種類から選べる依存(JNA の LGPL-2.1-or-later / Apache-2.0)は同じファイルの `electedLicenses` で選んだ種類だけを載せる(JNA は Apache-2.0)。Maven を通らない同梱物は `app/licenses/vendored/*.properties` に 1 件 1 ファイルで足す。Java 実行環境の分は起動中の実行環境の `legal/` から読む。
 - まだ描けない部品は「デスクトップ版ではまだ使えない部品」の枠で残す。
 
 ## 構成

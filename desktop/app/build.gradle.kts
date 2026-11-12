@@ -31,6 +31,9 @@ dependencies {
     implementation(libs.zxing.core)
     // PDF の本文を読む・表を PDF に書く(#1753)。pdfbox + fontbox + pdfbox-io + commons-logging で約 3.8 MB
     implementation("org.apache.pdfbox:pdfbox:3.0.3")
+    // Windows の電池・充電・省電力を kernel32 の GetSystemPowerStatus で読む(WindowsPowerReader)。jna だけで約 1.9 MB(jna-platform は足さない)。
+    // LGPL-2.1-or-later と Apache-2.0 から選べるので Apache-2.0 を選ぶ(third-party-licenses.gradle.kts の electedLicenses)
+    implementation("net.java.dev.jna:jna:5.19.1")
 
     testImplementation(libs.junit)
     testImplementation(libs.kotlinx.coroutines.test)

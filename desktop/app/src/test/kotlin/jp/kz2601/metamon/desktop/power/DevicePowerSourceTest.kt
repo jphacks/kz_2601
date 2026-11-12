@@ -200,7 +200,7 @@ class DevicePowerSourceTest {
     fun make_picksImplementationByOs() {
         assertTrue(DevicePowerSources.make(mapOf("METAMON_MOCK" to "1"), "Linux") is FakeDevicePowerSource)
         assertTrue(DevicePowerSources.make(emptyMap(), "Linux") is PollingDevicePowerSource)
-        // Windows は JNA が無いので今は不明(TODO)
+        // Windows の実体は Windows の上でしか JNA を載せないので、ここ(Windows でない機械)では不明
         assertEquals(DevicePowerState.Unknown, DevicePowerSources.make(emptyMap(), "Windows 11").current)
         assertEquals(DevicePowerState.Unknown, DevicePowerSources.make(emptyMap(), "Mac OS X").current)
     }
