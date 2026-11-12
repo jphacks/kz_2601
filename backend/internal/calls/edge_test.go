@@ -15,26 +15,30 @@ import (
 
 func TestConfigFromEnvRejects(t *testing.T) {
 	for name, m := range map[string]map[string]string{
-		"bad CALLS_ENABLED":       {"CALLS_ENABLED": "yes please"},
-		"URL without host":        onEnv(map[string]string{"LIVEKIT_URL": "wss://"}),
-		"key only spaces":         onEnv(map[string]string{"LIVEKIT_API_KEY": "   "}),
-		"block 0":                 onEnv(map[string]string{"CALL_BLOCK_MINUTES": "0"}),
-		"block 241":               onEnv(map[string]string{"CALL_BLOCK_MINUTES": "241"}),
-		"block not a number":      onEnv(map[string]string{"CALL_BLOCK_MINUTES": "ten"}),
-		"participants 1":          onEnv(map[string]string{"CALL_MAX_PARTICIPANTS": "1"}),
-		"participants 51":         onEnv(map[string]string{"CALL_MAX_PARTICIPANTS": "51"}),
-		"tokens per hour < 0":     onEnv(map[string]string{"CALL_TOKENS_PER_HOUR": "-1"}),
-		"grace over a day":        onEnv(map[string]string{"CALL_HOLD_GRACE": "25h"}),
-		"grace not a duration":    onEnv(map[string]string{"CALL_HOLD_GRACE": "10"}),
-		"token ttl under 1m":      onEnv(map[string]string{"CALL_TOKEN_TTL": "30s"}),
-		"token ttl over 1h":       onEnv(map[string]string{"CALL_TOKEN_TTL": "61m"}),
-		"price not a number":      onEnv(map[string]string{"COIN_PER_CALL_MINUTE": "1.5"}),
-		"price huge":              onEnv(map[string]string{"COIN_PER_CALL_MINUTE": strings.Repeat("9", 30)}),
-		"first error is reported": onEnv(map[string]string{"CALL_BLOCK_MINUTES": "0", "CALL_TOKEN_TTL": "1h"}),
+		"bad CALLS_ENABLED":    {"CALLS_ENABLED": "yes please"},
+		"URL without host":     onEnv(map[string]string{"LIVEKIT_URL": "wss://"}),
+		"key only spaces":      onEnv(map[string]string{"LIVEKIT_API_KEY": "   "}),
+		"block 0":              onEnv(map[string]string{"CALL_BLOCK_MINUTES": "0"}),
+		"block 241":            onEnv(map[string]string{"CALL_BLOCK_MINUTES": "241"}),
+		"block not a number":   onEnv(map[string]string{"CALL_BLOCK_MINUTES": "ten"}),
+		"participants 1":       onEnv(map[string]string{"CALL_MAX_PARTICIPANTS": "1"}),
+		"participants 51":      onEnv(map[string]string{"CALL_MAX_PARTICIPANTS": "51"}),
+		"tokens per hour < 0":  onEnv(map[string]string{"CALL_TOKENS_PER_HOUR": "-1"}),
+		"grace over a day":     onEnv(map[string]string{"CALL_HOLD_GRACE": "25h"}),
+		"grace not a duration": onEnv(map[string]string{"CALL_HOLD_GRACE": "10"}),
+		"token ttl under 1m":   onEnv(map[string]string{"CALL_TOKEN_TTL": "30s"}),
+		"token ttl over 1h":    onEnv(map[string]string{"CALL_TOKEN_TTL": "61m"}),
+		"price not a number":   onEnv(map[string]string{"COIN_PER_CALL_MINUTE": "1.5"}),
+		"price huge":           onEnv(map[string]string{"COIN_PER_CALL_MINUTE": strings.Repeat("9", 30)}),
 	} {
 		if _, err := ConfigFromEnv(env(m)); err == nil {
 			t.Errorf("%s: want an error", name)
 		}
+	}
+	// two bad keys: the first one checked is the one reported
+	_, err := ConfigFromEnv(env(onEnv(map[string]string{"CALL_BLOCK_MINUTES": "0", "CALL_TOKEN_TTL": "30s"})))
+	if err == nil || !strings.Contains(err.Error(), "CALL_BLOCK_MINUTES") || strings.Contains(err.Error(), "CALL_TOKEN_TTL") {
+		t.Errorf("first error is reported: got %v", err)
 	}
 }
 
@@ -65,7 +69,8 @@ func TestConfigFromEnvValues(t *testing.T) {
 // failingStore fails the operations named in fail.
 type failingStore struct {
 	*Memory
-	fail map[string]bool
+	fail  map[string]bool
+	opens int
 }
 
 var errStore = errors.New("store unavailable")
@@ -85,6 +90,7 @@ func (s *failingStore) Update(ctx context.Context, id string, fn func(*Session) 
 }
 
 func (s *failingStore) Open(ctx context.Context, room string) ([]Session, error) {
+	s.opens++
 	if s.fail["open"] {
 		return nil, errStore
 	}
@@ -121,6 +127,10 @@ func TestExpireEdgeCases(t *testing.T) {
 	f.now = f.now.Add(time.Minute)
 	_ = f.svc.Handle(ctx, Event{Kind: KindLeft, Room: j.Room, Identity: j.Identity, At: f.now})
 	f.now = f.now.Add(time.Hour)
+	f.svc.arm(j.SessionID, f.now.Add(time.Hour)) // a stale timer left over
+	if len(timers.pending()) != 1 {
+		t.Fatalf("setup: want 1 armed timer, got %v", timers.pending())
+	}
 	if err := f.svc.Expire(ctx, j.SessionID); err != nil {
 		t.Fatal(err)
 	}
@@ -155,10 +165,15 @@ func TestSweepRoomStoreError(t *testing.T) {
 	f, rooms, _ := limitedFixture(t, 100)
 	j, _ := f.svc.Join(ctx, JoinRequest{UID: "u1", AppID: "a1"})
 	_ = f.svc.Handle(ctx, Event{Kind: KindJoined, Room: j.Room, Identity: j.Identity, JoinedAt: f.now})
-	f.svc.Store = &failingStore{Memory: f.svc.Store.(*Memory), fail: map[string]bool{"open": true}}
+	st := &failingStore{Memory: f.svc.Store.(*Memory), fail: map[string]bool{"open": true}}
+	f.svc.Store = st
 	f.now = f.now.Add(time.Hour)
-	if err := f.svc.Handle(ctx, Event{Kind: KindJoined, Room: j.Room, Identity: "someone-else", At: f.now}); err != nil {
+	// KindLeft of an unknown identity: settle ignores ErrNotFound, the sweep still runs
+	if err := f.svc.Handle(ctx, Event{Kind: KindLeft, Room: j.Room, Identity: "someone-else", At: f.now}); err != nil {
 		t.Fatalf("a failed sweep must not fail the webhook: %v", err)
+	}
+	if st.opens < 1 {
+		t.Fatal("the sweep must have tried to list the room")
 	}
 	if rooms.count() != 0 {
 		t.Fatalf("removed = %v", rooms.removed)
