@@ -36,7 +36,7 @@ func TestTyphoon(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if res.Title != "台風の情報" || res.Source.Name != "気象庁ホームページ" || !strings.HasPrefix(res.Source.License, pdl) ||
+	if res.Title != "台風の情報" || res.Source.Name != "気象庁ホームページ" || res.Source.License != "公共データ利用規約(第1.0版)・気象庁「台風情報」(https://www.jma.go.jp/bosai/typhoon/)をもとに Tailor It 作成(編集責任は Tailor It)" ||
 		res.Source.URL != "https://www.jma.go.jp/bosai/typhoon/" {
 		t.Errorf("title/source = %q %+v", res.Title, res.Source)
 	}

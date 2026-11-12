@@ -112,6 +112,9 @@ func odptGBFS(id, name, operator, dataset, license string) BikeshareSystem {
 
 const pdl = "公共データ利用規約(第1.0版)"
 
+// typhoonCredit is the processed-content note for typhoon (編集責任は Tailor It).
+const typhoonCredit = "気象庁「台風情報」(https://www.jma.go.jp/bosai/typhoon/)をもとに Tailor It 作成(編集責任は Tailor It)"
+
 // statusLicense: each company publishes the status API for programmatic
 // access; the app is not endorsed by them.
 const statusLicense = "各社が公開する status の API・各社の承認や提携はありません"
@@ -132,7 +135,7 @@ func (ep Endpoints) source(q Query) Source {
 		return Source{Name: "気象庁ホームページ", URL: "https://www.jma.go.jp/bosai/warning/", License: pdl}
 	case dsl.FeedTyphoon:
 		// 加工: the parts are put into one line per cyclone (the doc's 出どころと規約).
-		return Source{Name: "気象庁ホームページ", URL: "https://www.jma.go.jp/bosai/typhoon/", License: pdl + "・1 行にまとめて加工"}
+		return Source{Name: "気象庁ホームページ", URL: "https://www.jma.go.jp/bosai/typhoon/", License: pdl + "・" + typhoonCredit}
 	case dsl.FeedPressure:
 		return Source{Name: "MET Norway(ノルウェー気象研究所)", URL: "https://api.met.no/", License: "CC BY 4.0・6 時間ごとにまとめて加工"}
 	case dsl.FeedHolidays:
