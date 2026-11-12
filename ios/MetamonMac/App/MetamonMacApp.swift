@@ -25,6 +25,9 @@ struct MetamonMacApp: App {
         Task { await MacAccount.shared.start() } // 未ログインなら匿名でログインし、状態の変化を追う
         MacNotificationDelegate.install() // 前面でも通知を出す・押されたらそのアプリを開く(#965)
         MacRecordResend.shared.install() // 記録の送信待ちを前面・スリープ明け・回線の復帰・一定間隔で送り直す(#976)
+        // 他の端末の変化(#2072): 進んだ版は一覧に当てる(中央が作り直される)。購読は同じ合図で張り直す
+        MacRealtimeSync.shared.onDocument = { [weak library] doc in library?.applyRemoteVersion(doc) }
+        MacRecordResend.shared.onResume = { MacRealtimeSync.shared.resume(force: $0) }
         // ショートカット・Siri・Spotlight(App Intents・#1034)。記録の追加はウインドウを開かずに来るので、一覧は起動の最初に渡す
         IntentHost.shared.register(library: library, bundled: apps)
         // UI テスト・手元の確認用(DEBUG のみ・iOS と同じ環境変数): METAMON_AI_CONSENT / METAMON_TUTORIAL / METAMON_BETA_WELCOME(#971)
