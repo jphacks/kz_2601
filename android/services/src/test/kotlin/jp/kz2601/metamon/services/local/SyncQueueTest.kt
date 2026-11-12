@@ -1,7 +1,6 @@
 package jp.kz2601.metamon.services.local
 
 import jp.kz2601.metamon.services.http.ApiError
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.toList
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
@@ -11,7 +10,6 @@ import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 import org.junit.Assert.assertEquals
-import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Rule
@@ -99,47 +97,6 @@ class SyncQueueTest {
         assertEquals(0, q.count())
         assertEquals(SyncEvent.Drained, events.last())
         job.cancel()
-    }
-
-    // 止まった知らせを受けてすぐ resume しても取りこぼさない(前は drain がまだ isDraining のままで、resume が素通りした)
-    @Test
-    fun resumeRightAfterPausedIsNotLost() = runTest(UnconfinedTestDispatcher()) {
-        val q = SyncQueue(null, store, client, BackoffPolicy(baseMillis = 0, multiplier = 1.0, maxAttempts = 1), { }, EmptyCoroutineContext)
-        create(q, "c1")
-        client.offline = true
-        var drainingAtPause: Boolean? = null
-        // Unconfined: 知らせを出した drain の中でそのまま受ける(出した直後に別のスレッドで受けたのと同じ)
-        val job = launch(Dispatchers.Unconfined) {
-            q.events.collect { ev ->
-                if (ev is SyncEvent.Paused) {
-                    drainingAtPause = q.isDraining
-                    client.offline = false
-                    q.resume()
-                }
-            }
-        }
-        q.drain()
-        assertEquals(false, drainingAtPause)
-        assertFalse(q.isPaused)
-        assertEquals(0, q.count())
-        assertEquals(2, client.calls.size)
-        job.cancel()
-    }
-
-    // 送っている間に resume されたら、その 1 回が失敗しても止めずにもう一度送る
-    @Test
-    fun resumeWhileSendingRetriesInsteadOfPausing() = runTest(UnconfinedTestDispatcher()) {
-        val q = SyncQueue(null, store, client, BackoffPolicy(baseMillis = 0, multiplier = 1.0, maxAttempts = 1), { }, EmptyCoroutineContext)
-        create(q, "c1")
-        client.offline = true
-        client.onCall = {
-            if (client.calls.size == 1) q.resume() else client.offline = false
-        }
-        q.drain()
-        assertFalse(q.isPaused)
-        assertFalse(q.isDraining)
-        assertEquals(0, q.count())
-        assertEquals(2, client.calls.size)
     }
 
     @Test

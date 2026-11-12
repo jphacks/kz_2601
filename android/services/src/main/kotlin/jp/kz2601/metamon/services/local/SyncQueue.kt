@@ -124,9 +124,6 @@ class SyncQueue(
     var isPaused = false
         private set
 
-    /** 流している最中に resume が来た(lock の中で読み書き)。止める代わりに続ける。 */
-    private var resumeRequested = false
-
     private val _events = MutableSharedFlow<SyncEvent>(extraBufferCapacity = 64)
     val events: SharedFlow<SyncEvent> = _events.asSharedFlow()
 
@@ -202,34 +199,20 @@ class SyncQueue(
             load()
             isPaused = false
             if (ops.isNotEmpty()) ops[0] = ops[0].copy(attempts = 0)
-            // 流している最中なら、その drain に「止まらず続けて」と伝える(下の drain はすぐ帰る)
-            if (isDraining) resumeRequested = true
         }
         drain()
     }
 
-    /**
-     * 先頭から順に送る。空になるか、続けて失敗して止まるまで戻らない。同時に 2 本は走らない。
-     * 終わる判断(空・止める)と isDraining を落とすのは同じ lock の中でする(間に来た enqueue・resume を取りこぼさない)。
-     */
+    /** 先頭から順に送る。空になるか、続けて失敗して止まるまで戻らない。同時に 2 本は走らない。 */
     suspend fun drain() {
         lock.withLock {
             load()
             if (isDraining || isPaused) return
             isDraining = true
-            resumeRequested = false
         }
-        var released = false
         try {
             while (true) {
-                val op = lock.withLock {
-                    ops.firstOrNull()?.also { inFlight = it.id } ?: run {
-                        isDraining = false
-                        resumeRequested = false
-                        released = true
-                        null
-                    }
-                } ?: break
+                val op = lock.withLock { ops.firstOrNull()?.also { inFlight = it.id } } ?: break
                 try {
                     perform(op)
                     finish(op)
@@ -245,48 +228,27 @@ class SyncQueue(
                         _events.emit(refusal.first)
                         continue
                     }
-                    var attempt = 0
-                    var retryNow = false
-                    val pausedWith = lock.withLock {
+                    val attempt = lock.withLock {
                         val i = ops.indexOfFirst { it.id == op.id }
-                        if (i >= 0) {
-                            ops[i] = ops[i].copy(attempts = ops[i].attempts + 1)
-                            persist()
-                            attempt = ops[i].attempts
-                        }
-                        when {
-                            attempt < policy.maxAttempts -> null
-                            // 送っている間に resume された: 止めずにすぐもう一度
-                            resumeRequested -> {
-                                resumeRequested = false
-                                if (i >= 0) ops[i] = ops[i].copy(attempts = 0)
-                                retryNow = true
-                                null
-                            }
-                            else -> {
-                                isPaused = true
-                                isDraining = false
-                                inFlight = null
-                                released = true
-                                ops.size
-                            }
-                        }
+                        if (i < 0) return@withLock 0
+                        ops[i] = ops[i].copy(attempts = ops[i].attempts + 1)
+                        persist()
+                        ops[i].attempts
                     }
                     println("[Metamon] sync ${op.kind} ${op.entity}/${op.recordId} failed (attempt $attempt/${policy.maxAttempts}): $e")
-                    if (pausedWith != null) {
-                        _events.emit(SyncEvent.Paused(pausedWith))
+                    if (attempt >= policy.maxAttempts) {
+                        isPaused = true
+                        _events.emit(SyncEvent.Paused(count()))
                         return
                     }
-                    if (!retryNow) sleep(policy.delayMillis(attempt)) // 止められたら次のきっかけで続き
+                    sleep(policy.delayMillis(attempt)) // 止められたら次のきっかけで続き
                 } finally {
-                    // 止めた後は別の drain が inFlight を持っているかもしれない。自分の分だけ消す
-                    lock.withLock { if (inFlight == op.id) inFlight = null }
+                    lock.withLock { inFlight = null }
                 }
             }
             _events.emit(SyncEvent.Drained)
         } finally {
-            // 例外で抜けた時だけ落とす(手放していなければ他の drain は走っていない)
-            if (!released) isDraining = false
+            isDraining = false
         }
     }
 

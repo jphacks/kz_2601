@@ -23,8 +23,6 @@ class FakeRecordsClient : AppConfigClient {
     val failures = ArrayDeque<Throwable>()
     var offline = false
     var server = mutableListOf<Record>()
-    /** 記録の作成を受けた時(送っている最中)に呼ぶ口 */
-    var onCall: (suspend () -> Unit)? = null
     private var next = 1
 
     private fun gate() {
@@ -40,7 +38,6 @@ class FakeRecordsClient : AppConfigClient {
 
     override suspend fun createRecord(appId: String, entity: String, data: JsonObject, clientId: String, authorName: String?): Record {
         calls += Call("create", entity, null, data, clientId)
-        onCall?.invoke()
         gate()
         return Record(id = "srv-${next++}", entity = entity, data = data, createdAt = "2026-11-11T00:00:00Z").also { server += it }
     }
