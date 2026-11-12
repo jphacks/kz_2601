@@ -6,8 +6,11 @@ import (
 	"errors"
 	"flag"
 	"fmt"
+	"maps"
 	"os"
+	"slices"
 	"strings"
+	"time"
 
 	"github.com/jphacks/kz_2601/backend/internal/ai"
 	"github.com/jphacks/kz_2601/backend/internal/loop"
@@ -198,5 +201,111 @@ func (a *app) triageScore(ctx context.Context, args []string) error {
 		return nil
 	}
 	fmt.Fprintf(a.out, "triage-score: %d/%d agree (%.0f%%)\n", m, n, 100*float64(m)/float64(n))
+	writeScoreBreakdown(a.out, items, labels)
 	return nil
 }
+
+// scoreConfusionTop is how many (label -> model) mix-ups are listed.
+const scoreConfusionTop = 5
+
+// writeScoreBreakdown prints where the agreement is lost: per source, per
+// labelled category, and the most frequent mix-ups (label -> model).
+func writeScoreBreakdown(w *strings.Builder, items []loop.Item, labels map[string]string) {
+	type tally struct{ n, ok int }
+	bySource, byCategory := map[string]*tally{}, map[string]*tally{}
+	confused := map[string]int{}
+	add := func(m map[string]*tally, k string, ok bool) {
+		t := m[k]
+		if t == nil {
+			t = &tally{}
+			m[k] = t
+		}
+		t.n++
+		if ok {
+			t.ok++
+		}
+	}
+	for _, it := range items {
+		want, ok := labels[it.ID]
+		if !ok || it.Category == "" {
+			continue
+		}
+		hit := it.Category == want
+		add(bySource, string(it.Source), hit)
+		add(byCategory, want, hit)
+		if !hit {
+			confused[want+" -> "+it.Category]++
+		}
+	}
+	table := func(title string, m map[string]*tally) {
+		fmt.Fprintf(w, "\n%-18s %5s %5s %6s\n", title, "n", "agree", "rate")
+		for _, k := range slices.Sorted(maps.Keys(m)) {
+			t := m[k]
+			fmt.Fprintf(w, "%-18s %5d %5d %5.0f%%\n", k, t.n, t.ok, 100*float64(t.ok)/float64(t.n))
+		}
+	}
+	table("source", bySource)
+	table("category (label)", byCategory)
+	if len(confused) == 0 {
+		return
+	}
+	pairs := slices.Collect(maps.Keys(confused))
+	slices.SortFunc(pairs, func(a, b string) int {
+		if c := confused[b] - confused[a]; c != 0 {
+			return c
+		}
+		return strings.Compare(a, b)
+	})
+	fmt.Fprintf(w, "\nmix-ups (label -> model), top %d\n", scoreConfusionTop)
+	for _, p := range pairs[:min(len(pairs), scoreConfusionTop)] {
+		fmt.Fprintf(w, "%-24s %5d\n", p, confused[p])
+	}
+}
+
+// triageLabelExport writes the labelling template for triage-eval (#376):
+// the inbox items ingested in the last -days that the model may see, their
+// masked text, and empty labels for a person to fill. Nothing is printed
+// but counts; the file is created 0600 and an existing file is never
+// overwritten (it may hold a person's labels).
+func (a *app) triageLabelExport(ctx context.Context, args []string) error {
+	fs := flag.NewFlagSet("triage-label-export", flag.ContinueOnError)
+	path := fs.String("out", "", "template file to create (keep it outside the repository)")
+	days := fs.Int("days", 7, "items ingested in the last N days")
+	if err := fs.Parse(args); err != nil {
+		return err
+	}
+	if *path == "" {
+		return errors.New("triage-label-export needs -out")
+	}
+	if *days <= 0 {
+		return errors.New("-days must be positive")
+	}
+	until := a.now().UTC()
+	since := until.Add(-time.Duration(*days) * 24 * time.Hour)
+	items, err := a.loop.ListItems(ctx, loop.ItemQuery{Limit: exportScanLimit})
+	if err != nil {
+		return err
+	}
+	f, err := os.OpenFile(*path, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0o600)
+	if err != nil {
+		return err
+	}
+	ex, err := eval.Template(f, items, since, until)
+	if cerr := f.Close(); err == nil {
+		err = cerr
+	}
+	if err != nil {
+		_ = os.Remove(*path)
+		return err
+	}
+	fmt.Fprintf(a.out, "triage-label-export: %s..%s: %d items, wrote %d, skipped %d (personal data after masking)\n",
+		since.Format("2006-01-02"), until.Format("2006-01-02"), ex.InWindow, ex.Written, ex.Skipped)
+	if ex.InWindow > eval.MaxCases {
+		fmt.Fprintf(a.out, "triage-label-export: more than %d items: spread %d evenly over the window\n", eval.MaxCases, eval.MaxCases)
+	}
+	fmt.Fprintf(a.out, "next: fill category, priority, bundle in %s, then: feedback-loop triage-eval -set %s -model ai\n", *path, *path)
+	return nil
+}
+
+// exportScanLimit bounds the inbox read (the inbox keeps 90 days).
+const exportScanLimit = 20000

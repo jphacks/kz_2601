@@ -11,6 +11,8 @@ import (
 	"time"
 
 	"google.golang.org/protobuf/encoding/protowire"
+
+	"github.com/jphacks/kz_2601/backend/internal/gtfsstatic"
 )
 
 // gtfsNow is the fake clock: 2026-11-12 08:20 JST.
@@ -109,6 +111,12 @@ func gtfsTestFeeds(t *testing.T) {
 
 func gtfsOps(t *testing.T, fake *gtfsFake) map[string]Operation {
 	t.Helper()
+	return gtfsOpsWith(t, fake, nil)
+}
+
+// gtfsOpsWith also gives testBus a static table.
+func gtfsOpsWith(t *testing.T, fake *gtfsFake, tbl *gtfsstatic.Table) map[string]Operation {
+	t.Helper()
 	fake.status.Store(200)
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		fake.hits.Add(1)
@@ -124,7 +132,13 @@ func gtfsOps(t *testing.T, fake *gtfsFake) map[string]Operation {
 		_, _ = w.Write(fake.body.Load().(pb))
 	}))
 	t.Cleanup(srv.Close)
-	return newGTFSRealtime(func(string) string { return srv.URL }, srv.Client(), func() time.Time { return gtfsNow })
+	return newGTFSRealtime(func(string) string { return srv.URL }, srv.Client(), func() time.Time { return gtfsNow },
+		func(feed string) *gtfsstatic.Table {
+			if feed == "testBus" {
+				return tbl
+			}
+			return nil
+		})
 }
 
 func gtfsRows(t *testing.T, got, want []Row) {
@@ -193,6 +207,100 @@ func TestGTFSBusPositions(t *testing.T) {
 	out, err = ops["busPositions"].Do(t.Context(), Input{Args: map[string]string{"feed": "testBus", "route": "R2", "limit": "1"}})
 	if err != nil || len(out.Rows) != 1 || out.Rows[0].Title != "品97" {
 		t.Fatalf("route filter: %+v %v", out.Rows, err)
+	}
+}
+
+// gtfsTestTable: names for S1 / R1 / R2, trip-k (route only in the
+// timetable) at S1 at 08:30, trip-m at 08:50, trip-n past midnight.
+func gtfsTestTable() *gtfsstatic.Table {
+	return &gtfsstatic.Table{
+		Stops:     map[string]string{"S1": "香林坊"},
+		Routes:    map[string]string{"R1": "10", "R2": "兼六園シャトル"},
+		TripRoute: map[string]string{"trip-k": "R2", "trip-m": "R1"},
+		Times: map[gtfsstatic.Key]int{
+			{Trip: "trip-k", Stop: "S1"}: 8*3600 + 30*60,
+			{Trip: "trip-m", Stop: "S1"}: 8*3600 + 50*60,
+		},
+	}
+}
+
+// gtfsDelayOnlyEntity is a trip whose stop update has only a delay (stop
+// delay, else the trip's), with no route_id in the feed.
+func gtfsDelayOnlyEntity(id, startDate string, stopDelay, tripDelay int32) pb {
+	trip := pb{}.str(1, id)
+	if startDate != "" {
+		trip = trip.str(3, startDate)
+	}
+	ev := pb{}
+	if stopDelay != gtfsNoDelay {
+		ev = ev.varint(1, uint64(int64(stopDelay)))
+	}
+	tu := pb{}.msg(1, trip).msg(2, pb{}.str(4, "S1").msg(2, ev))
+	if tripDelay != gtfsNoDelay {
+		tu = tu.varint(5, uint64(int64(tripDelay)))
+	}
+	return pb{}.msg(2, pb{}.str(1, id).msg(3, tu))
+}
+
+func TestGTFSNextBusesWithStatic(t *testing.T) {
+	gtfsTestFeeds(t)
+	var fake gtfsFake
+	ops := gtfsOpsWith(t, &fake, gtfsTestTable())
+	f := gtfsHeader(gtfsAt(0))
+	f = append(f, gtfsTripEntity("a", "R1", false, gtfsStop("S1", 12, 180))...)
+	f = append(f, gtfsDelayOnlyEntity("trip-k", "20261112", 120, gtfsNoDelay)...)
+	f = append(f, gtfsDelayOnlyEntity("trip-m", "", gtfsNoDelay, 60)...)
+	f = append(f, gtfsDelayOnlyEntity("trip-x", "", 60, gtfsNoDelay)...)        // not in the timetable
+	f = append(f, gtfsDelayOnlyEntity("trip-k", "20261111", 0, gtfsNoDelay)...) // yesterday's run: gone
+	fake.body.Store(f)
+	out, err := ops["nextBuses"].Do(t.Context(), Input{Args: map[string]string{"feed": "testBus", "stop": "S1", "limit": "10"}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	gtfsRows(t, out.Rows, []Row{
+		{Title: "10", Subtitle: "香林坊・遅れ 3 分", Value: "08:32(あと 12 分)"},
+		{Title: "兼六園シャトル", Subtitle: "香林坊・遅れ 2 分(時刻表 08:30)", Value: "08:32(あと 12 分)"},
+		{Title: "10", Subtitle: "香林坊・遅れ 1 分(時刻表 08:50)", Value: "08:51(あと 31 分)"},
+	})
+	// the route filter uses the timetable's route when the feed has none
+	out, err = ops["nextBuses"].Do(t.Context(), Input{Args: map[string]string{"feed": "testBus", "stop": "S1", "route": "R2"}})
+	if err != nil || len(out.Rows) != 1 || out.Rows[0].Title != "兼六園シャトル" {
+		t.Fatalf("route filter: %+v %v", out.Rows, err)
+	}
+}
+
+func TestGTFSBusPositionsWithStatic(t *testing.T) {
+	gtfsTestFeeds(t)
+	var fake gtfsFake
+	ops := gtfsOpsWith(t, &fake, gtfsTestTable())
+	fake.body.Store(gtfsVehiclesFeed(gtfsAt(0)))
+	out, err := ops["busPositions"].Do(t.Context(), Input{Args: map[string]string{"feed": "testBus"}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	gtfsRows(t, out.Rows, []Row{
+		{Title: "都01", Subtitle: "10・08:20 更新", Value: "35.665,139.712"},
+		{Title: "品97", Subtitle: "兼六園シャトル・08:19 更新", Value: "35.68951,139.6917"},
+	})
+}
+
+func TestGTFSScheduled(t *testing.T) {
+	for _, c := range []struct {
+		date string
+		sec  int
+		now  time.Time
+		want time.Time
+	}{
+		{"20261112", 8*3600 + 30*60, gtfsNow, time.Date(2026, 11, 12, 8, 30, 0, 0, gtfsJST)},
+		{"", 8*3600 + 30*60, gtfsNow, time.Date(2026, 11, 12, 8, 30, 0, 0, gtfsJST)},
+		// past midnight: 24:30 of the 11th, not of the 12th
+		{"", 24*3600 + 30*60, time.Date(2026, 11, 12, 0, 20, 0, 0, gtfsJST), time.Date(2026, 11, 12, 0, 30, 0, 0, gtfsJST)},
+		{"20261111", 24*3600 + 30*60, gtfsNow, time.Date(2026, 11, 12, 0, 30, 0, 0, gtfsJST)},
+		{"bad", 8 * 3600, gtfsNow, time.Date(2026, 11, 12, 8, 0, 0, 0, gtfsJST)},
+	} {
+		if got := gtfsScheduled(c.date, c.sec, c.now); !got.Equal(c.want) {
+			t.Fatalf("%q %d: %v, want %v", c.date, c.sec, got, c.want)
+		}
 	}
 }
 

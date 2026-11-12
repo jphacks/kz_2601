@@ -125,10 +125,36 @@ object RecordIo {
     }
 }
 
-/** 表計算(Excel・LibreOffice)のクリップボードの形: タブ区切り・CRLF・タブ / 改行 / `"` を含むセルは `"` で囲む。 */
+/**
+ * 表計算(Excel・LibreOffice)のクリップボードの形: タブ区切り・CRLF・タブ / 改行 / `"` を含むセルは `"` で囲む。
+ * 式に見える先頭には CSV(:dsl の CsvWriter)と同じく `'` を付け、読む時に外す。
+ */
 object Tsv {
-    fun escape(cell: String): String =
-        if (cell.none { it == '\t' || it == '\n' || it == '\r' || it == '"' }) cell else "\"" + cell.replace("\"", "\"\"") + "\""
+    fun escape(cell: String): String {
+        val s = guard(cell)
+        return if (s.none { it == '\t' || it == '\n' || it == '\r' || it == '"' }) s else "\"" + s.replace("\"", "\"\"") + "\""
+    }
+
+    /** CsvWriter.escape と同じ判定(`-500` / `-¥500` は数のまま)。 */
+    fun guard(cell: String): String {
+        if (cell.isEmpty()) return cell
+        val first = cell.codePointAt(0)
+        val nextIndex = Character.charCount(first)
+        val next = if (nextIndex < cell.length) cell.codePointAt(nextIndex) else null
+        return if (isFormulaLead(first, next)) "'$cell" else cell
+    }
+
+    /** [guard] が付けた `'` を外す(RecordImport と同じ規則)。 */
+    fun unguard(cell: String): String =
+        if (cell.length >= 2 && cell[0] == '\'' && FORMULA_GUARDED.indexOf(cell[1]) >= 0) cell.substring(1) else cell
+
+    private const val FORMULA_GUARDED = "=+-@\t\r"
+
+    private fun isFormulaLead(c: Int, next: Int?): Boolean = when (c) {
+        '='.code, '+'.code, '@'.code, '\t'.code, '\r'.code -> true
+        '-'.code -> next != null && !(Character.getType(next) == Character.DECIMAL_DIGIT_NUMBER.toInt() || next == '¥'.code || next == '.'.code)
+        else -> false
+    }
 
     fun string(headers: List<String>?, rows: List<List<String>>): String =
         (listOfNotNull(headers) + rows).joinToString("\r\n") { r -> r.joinToString("\t") { escape(it) } } + "\r\n"
@@ -143,7 +169,7 @@ object Tsv {
         var quoted = false
         var i = if (text.startsWith("﻿")) 1 else 0
         fun endRow() {
-            row.add(cell.toString())
+            row.add(unguard(cell.toString()))
             cell.setLength(0)
             if (!(row.size == 1 && row[0].isEmpty())) rows.add(row)
             row = mutableListOf()
@@ -167,7 +193,7 @@ object Tsv {
             when {
                 c == '"' && cell.isEmpty() -> quoted = true
                 c == '\t' -> {
-                    row.add(cell.toString())
+                    row.add(unguard(cell.toString()))
                     cell.setLength(0)
                 }
                 c == '\r' -> {

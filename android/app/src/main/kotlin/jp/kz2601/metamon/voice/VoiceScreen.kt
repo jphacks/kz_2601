@@ -505,7 +505,7 @@ private fun Composer(
         OutlinedTextField(
             value = text,
             onValueChange = onText,
-            modifier = Modifier.weight(1f),
+            modifier = Modifier.weight(1f).testTag("voice.composer"),
             placeholder = { Text(placeholder) },
             enabled = enabled,
             maxLines = 4,
@@ -515,7 +515,11 @@ private fun Composer(
         if (text.isBlank() && onMic != null) {
             MicButton(state, size = 48.dp, onClick = onMic)
         } else {
-            TextButton(onClick = { onSend(text) }, enabled = enabled && text.isNotBlank()) { Text(stringResource(R.string.voice_send)) }
+            TextButton(
+                onClick = { onSend(text) },
+                enabled = enabled && text.isNotBlank(),
+                modifier = Modifier.testTag("voice.send"),
+            ) { Text(stringResource(R.string.voice_send)) }
         }
     }
 }

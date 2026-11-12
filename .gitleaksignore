@@ -7,3 +7,6 @@ e92d242d4414af9573ebef21175e474489e46a74:backend/internal/appconfig/calls_test.g
 e92d242d4414af9573ebef21175e474489e46a74:backend/internal/calls/calls_test.go:generic-api-key:23
 # SharedPreferences のキー名(exactAlarm.prompted.v1)の誤検知。秘密情報ではない。
 860439072a981a5daabedf24da7f85a1036fbfef:android/app/src/main/kotlin/jp/kz2601/metamon/notifications/ExactAlarmAsk.kt:generic-api-key:45
+# SwitchBot のテスト用の偽の値(b57df1d・feat/backend-switchbot-1704 に残る。develop では strings.Repeat の偽の値に置き換え済み)。実の鍵ではない。
+b57df1d257b3b4ccd89cc4244b1c4ffc2ee9083f:backend/internal/extapi/switchbot_test.go:generic-api-key:19
+b57df1d257b3b4ccd89cc4244b1c4ffc2ee9083f:backend/internal/extapi/switchbot_test.go:generic-api-key:20

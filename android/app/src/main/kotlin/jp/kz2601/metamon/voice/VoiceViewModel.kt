@@ -110,7 +110,9 @@ class VoiceViewModel(
 
     /** 端末の版の履歴(サーバーが履歴を返せない時の undo) */
     private val localHistory = ArrayDeque<AppDocument>()
-    private var redoPoint: RedoPoint? = null
+
+    /** 「やり直す」の戻り先。続けて戻すと積み、やり直すと 1 つずつ降ろす(iOS の `redoStack`) */
+    private var redoStack: List<RedoPoint> = emptyList()
 
     /** 使用量を最後に読んだ時刻(5 分は読み直さない・iOS の PlanUsageStore と同じ) */
     private var usageReadAt: Instant? = null
@@ -359,7 +361,7 @@ class VoiceViewModel(
         cancelAutoBuild()
         lastInput = null
         localHistory.clear()
-        redoPoint = null
+        redoStack = emptyList()
         val undoable = canUndo(doc)
         _state.update {
             it.copy(
@@ -470,7 +472,7 @@ class VoiceViewModel(
                 val history = appliedHistory(_state.value, result.document.version, result.summary)
                 chatEpoch++
                 if (!before.dsl.isVoiceOnly && !result.unchanged) remember(before)
-                redoPoint = null
+                redoStack = emptyList()
                 val undoable = canUndo(result.document)
                 _state.update {
                     it.copy(
@@ -626,25 +628,27 @@ class VoiceViewModel(
     // MARK: - 元に戻す / やり直す(#895・iOS の `AppRuntime.undo` / `redo`)
 
     /**
-     * 直前の版に戻す。サーバーの履歴(`GET /versions` → `POST /versions/{n}/restore`)が使えなければ端末の履歴。
+     * 1 つ前の版に戻す。サーバーの履歴(`GET /versions` → `POST /versions/{n}/restore`)が使えなければ端末の履歴。
+     * 戻す先は [UndoWalk] が選ぶので、続けて押すと履歴を遡る(restore で増えた版と往復しない・#1786)。
      * [expectedVersion] はボタンを押した時点の版。押した後に版が変わっていたら(連打の 2 回目など)何もしない。
      */
     fun undo(expectedVersion: Int? = null) {
         val s = _state.value
         if (s.undoing || s.isGenerating || (expectedVersion != null && expectedVersion != s.document.version)) return
         val before = s.document
+        val stack = redoStack
         _state.update { it.copy(undoing = true, notice = null) }
         scope.launch {
             versions?.let { store ->
                 try {
                     val list = store.versions(appId())
-                    val current = list.firstOrNull()
-                    if (current != null) {
-                        val target = list.firstOrNull { it < current } ?: return@launch finishUndo(UndoNotice.NO_EARLIER)
+                    if (list.isNotEmpty()) {
+                        val shown = UndoWalk.origin(before.version, UndoWalk.byVersion(list))
+                        val target = UndoWalk.undoTarget(before.version, list) ?: return@launch finishUndo(UndoNotice.NO_EARLIER)
                         val doc = store.restore(appId(), target)
                         log("undo ok: restored $target -> version ${doc.version}")
-                        // restore は新しい版を作るので、「やり直す」は戻す前の版(current)をもう一度 restore すればよい
-                        return@launch applyVersion(doc, RedoPoint(current, before, viaServer = true), UndoAction.UNDO)
+                        // restore は新しい版を作るので、「やり直す」は戻す前の中身の版(shown)をもう一度 restore すればよい
+                        return@launch applyVersion(doc, stack + RedoPoint(shown, before, viaServer = true), UndoAction.UNDO)
                     }
                 } catch (e: CancellationException) {
                     throw e
@@ -653,15 +657,19 @@ class VoiceViewModel(
                 }
             }
             val previous = localHistory.removeLastOrNull() ?: return@launch finishUndo(UndoNotice.NO_EARLIER)
-            applyVersion(previous, RedoPoint(before.version, before, viaServer = false), UndoAction.UNDO)
+            applyVersion(previous, stack + RedoPoint(before.version, before, viaServer = false), UndoAction.UNDO)
         }
     }
 
-    /** 戻す前の版に戻る。サーバー経由で戻したならその版を restore、端末の履歴で戻したなら当て直す。 */
+    /**
+     * 戻す前の版に戻る(続けて戻した分は 1 つずつ前へ進む)。
+     * サーバー経由で戻したならその版を restore、端末の履歴で戻したなら当て直す。
+     */
     fun redo(expectedVersion: Int? = null) {
         val s = _state.value
-        val point = redoPoint ?: return
+        val point = redoStack.lastOrNull() ?: return
         if (s.undoing || s.isGenerating || (expectedVersion != null && expectedVersion != s.document.version)) return
+        val rest = redoStack.dropLast(1)
         val current = s.document
         _state.update { it.copy(undoing = true, notice = null) }
         scope.launch {
@@ -674,18 +682,18 @@ class VoiceViewModel(
                     log("redo failed: $e")
                     return@launch finishUndo(UndoNotice.REDO_FAILED)
                 }
-                applyVersion(doc, null, UndoAction.REDO)
+                applyVersion(doc, rest, UndoAction.REDO)
             } else {
                 remember(current)
-                applyVersion(point.document, null, UndoAction.REDO)
+                applyVersion(point.document, rest, UndoAction.REDO)
             }
         }
     }
 
-    private fun applyVersion(doc: AppDocument, redo: RedoPoint?, done: UndoAction) {
+    private fun applyVersion(doc: AppDocument, redo: List<RedoPoint>, done: UndoAction) {
         // 戻す間に別のアプリへ切り替わった: 前のアプリの版を移った先に出さない
         if (doc.appId != _state.value.document.appId) return _state.update { it.copy(undoing = false) }
-        redoPoint = redo
+        redoStack = redo
         val undoable = canUndo(doc)
         _state.update {
             it.copy(
@@ -693,9 +701,9 @@ class VoiceViewModel(
                 undoing = false,
                 summary = null,
                 undone = done,
-                summaryAction = if (redo != null) UndoAction.REDO else if (undoable) UndoAction.UNDO else null,
+                summaryAction = if (redo.isNotEmpty()) UndoAction.REDO else if (undoable) UndoAction.UNDO else null,
                 canUndo = undoable,
-                canRedo = redo != null,
+                canRedo = redo.isNotEmpty(),
                 error = null,
             )
         }

@@ -44,6 +44,8 @@ type logEvent struct {
 	// and validation_codes (dsl problem code -> problems, #1772).
 	RetryReasons    []string
 	ValidationCodes map[string]int
+	RequestID       string // requestId (every line of a request)
+	Platform        string // clientPlatform (http.request: X-Client-Platform)
 }
 
 // Event names the report reads (backend/internal/ai, internal/httpx, internal/metrics).
@@ -98,7 +100,7 @@ type rawEntry struct {
 // parseLogs reads `gcloud logging read --format=json` output (a JSON array of
 // entries) or JSON lines (entries, or bare slog records with `time`).
 // Lines whose uid_hash is not in keep are dropped at once, so other users'
-// metadata is never held.
+// metadata is never held. A nil keep keeps every line (the log-only modes).
 func parseLogs(r io.Reader, keep map[string]bool) ([]logEvent, error) {
 	data, err := io.ReadAll(r)
 	if err != nil {
@@ -126,7 +128,7 @@ func parseLogs(r io.Reader, keep map[string]bool) ([]logEvent, error) {
 	var out []logEvent
 	for _, raw := range raws {
 		ev, ok := decodeEntry(raw)
-		if !ok || !keep[ev.UIDHash] {
+		if !ok || (keep != nil && !keep[ev.UIDHash]) {
 			continue
 		}
 		out = append(out, ev)
@@ -175,6 +177,8 @@ func decodeEntry(raw json.RawMessage) (logEvent, bool) {
 		ReplyKind: p.str("reply_kind"),
 		Turn:      int(p.num("turn")),
 		Built:     p.flag("clarify_ended_in_build"),
+		RequestID: p.str("requestId"),
+		Platform:  p.str("clientPlatform"),
 	}
 	switch ev.Event {
 	case evGenerate:
