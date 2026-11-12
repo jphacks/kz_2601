@@ -322,7 +322,7 @@ private struct ToastHost: ViewModifier {
                     .swipeToDismiss(edge: .bottom, onDismiss: dismiss) // 下に出るので下に払って閉じる
                     .padding(.bottom, Theme.Layout.fabBottomInset(hasTabs: true) + Theme.Layout.fabSize + Theme.Spacing.md)
                     .transition(.move(edge: .bottom).combined(with: .opacity))
-                    .task(id: message) {
+                    .task(id: rt.toastSerial) { // 同じ文言が続いても出し直す
                         // H8: VoiceOver の時は長く。「直してと頼む」付きは押す間を取る
                         try? await Task.sleep(for: .seconds(VoiceOverAnnouncer.holdSeconds(fixable ? 6 : 3)))
                         guard !Task.isCancelled else { return }
