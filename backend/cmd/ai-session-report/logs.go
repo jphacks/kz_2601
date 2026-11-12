@@ -44,6 +44,8 @@ type logEvent struct {
 	// and validation_codes (dsl problem code -> problems, #1772).
 	RetryReasons    []string
 	ValidationCodes map[string]int
+	RequestID       string // requestId (every line of a request)
+	Platform        string // clientPlatform (http.request: X-Client-Platform)
 
 	// ai.usage cache tokens and est_cost_usd (HasCost: the model had a price, #2294)
 	CacheRead  int64
@@ -181,6 +183,8 @@ func decodeEntry(raw json.RawMessage) (logEvent, bool) {
 		ReplyKind: p.str("reply_kind"),
 		Turn:      int(p.num("turn")),
 		Built:     p.flag("clarify_ended_in_build"),
+		RequestID: p.str("requestId"),
+		Platform:  p.str("clientPlatform"),
 	}
 	switch ev.Event {
 	case evUsage:
