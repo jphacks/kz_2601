@@ -95,13 +95,26 @@ extension View {
 enum ExtConnectAvailability: Equatable {
     case loading, available, unavailable
 
-    static func of(_ state: ConnectedServicesState, provider: String) -> ExtConnectAvailability {
+    /// `providersKnown`: 一覧に `providers` があったか。あるのにこの provider が無ければ今つなげない
+    /// (`ConnectedServicesState.rows` と同じく enabled=false 扱い)。無い古いサーバーだけつなげる扱い。
+    static func of(_ state: ConnectedServicesState, provider: String, providersKnown: Bool) -> ExtConnectAvailability {
         switch state {
         case .loading: .loading
         case .hidden: .unavailable // サーバーが外の API を止めている
         case .failed: .available // 一覧が読めないだけ。つなぐ流れ側でもう一度確かめる
-        case .loaded(let rows): rows.first { $0.provider == provider }.map { $0.enabled ? .available : .unavailable } ?? .available // 古いサーバーは providers が無い
+        case .loaded(let rows):
+            rows.first { $0.provider == provider }.map { $0.enabled ? .available : .unavailable }
+                ?? (providersKnown ? .unavailable : .available)
         }
+    }
+
+    /// つなぐ案内を閉じるか。読み終わった一覧で「つないでいない」→「つないだ」に変わった時だけ。
+    /// 最初の読み込み(.loading → つないだ)は閉じない: サーバーは ext_not_connected と言っている(トークン切れ等)。
+    static func didConnect(from old: ConnectedServicesState, to new: ConnectedServicesState, provider: String) -> Bool {
+        guard case .loaded(let after) = new, after.first(where: { $0.provider == provider })?.status == .connected else { return false }
+        // 前が読めていない時は、つないだ結果か最初からつながっていたか区別できないので閉じない(閉じるボタンはある)
+        guard case .loaded(let before) = old else { return false }
+        return before.first { $0.provider == provider }?.status != .connected
     }
 }
 
@@ -125,7 +138,7 @@ struct ExtConnectSheet: View {
         row?.name ?? ConnectedServicesState.name(nil, id: provider, english: LanguagePreference.shared.code == "en")
     }
 
-    private var availability: ExtConnectAvailability { .of(model.state, provider: provider) }
+    private var availability: ExtConnectAvailability { .of(model.state, provider: provider, providersKnown: model.providersKnown) }
     private var canConnect: Bool { availability == .available }
 
     var body: some View {
@@ -179,8 +192,8 @@ struct ExtConnectSheet: View {
         .presentationDetents([.medium])
         .presentationDragIndicator(.visible)
         .task { await model.load(services.external) }
-        .onChange(of: row?.status) { _, status in
-            if status == .connected { dismiss() } // つなげた
+        .onChange(of: model.state) { old, new in
+            if ExtConnectAvailability.didConnect(from: old, to: new, provider: provider) { dismiss() } // つなげた
         }
         .sheet(isPresented: $showPaywall) { PaywallSheet(reason: .paidFeature([ConnectedServicesSection.paidFeature])) }
     }
