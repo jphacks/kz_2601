@@ -226,6 +226,9 @@ class DesktopSession(
     /** 下書きを持っている route の id(テスト用)。 */
     internal val draftRouteIds: Set<String> get() = drafts.keys.toSet()
 
+    /** 保存していないフォームがある(入力中)。この間はアプリの DSL を差し替えない(#2809)。 */
+    val hasUnsavedForms: Boolean get() = drafts.values.any { it.draft.hasUnsavedChanges }
+
     /**
      * 一覧のチェックなど、1 件の記録の field を書き換える。フォームと同じ記録の規則(作った人だけ・membersCanEdit)を通す。
      * 書けたら true。書けない時は理由を [message] に出す。

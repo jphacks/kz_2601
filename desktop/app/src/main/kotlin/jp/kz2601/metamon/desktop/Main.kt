@@ -91,6 +91,8 @@ private fun runApp(args: Array<String>) = application {
                 desktopStore.wipe()
                 DeviceWipe.run(desktopStore.root)
             },
+            // DSL の差し替え(#2809)は画面のスレッドで
+            post = { SwingUtilities.invokeLater(it) },
         )
     }
     DisposableEffect(hub) {
@@ -194,7 +196,9 @@ private fun ApplicationScope.DesktopWindow(w: WindowEntry, registry: WindowRegis
                 if (app.records.loading) {
                     LoadingSkeleton()
                 } else {
-    DesktopApp(
+                    // アプリの版が変わって DSL を差し替えたら(#2809)、画面を新しい DSL で作り直して一言出す
+                    key(app.dsl) {
+                    DesktopApp(
                         app.dsl,
                         startScreen = w.key.screen ?: startScreen,
                         onOpenApp = { registry.open(WindowKey.app(it)) },
@@ -206,7 +210,9 @@ private fun ApplicationScope.DesktopWindow(w: WindowEntry, registry: WindowRegis
                         isActive = { registry.active?.id == w.id },
                         windowId = w.id,
                         onWipeLocalData = hub::wipeLocalData,
+                        notice = if (app.reloads > 0) Strings["runtime_hot_reloaded"] else null,
                     )
+                    }
                 }
             }
         }

@@ -16,6 +16,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeoutOrNull
+import java.util.concurrent.CopyOnWriteArraySet
 
 // 複数のウィンドウ(#1763): アプリごとに 1 枚・記録の詳細を別の 1 枚。画面の状態(遷移・下書き・キー)はウィンドウごと、記録はアプリごとに 1 つを共有する。
 
@@ -151,6 +152,28 @@ class SharedRecords(
 
     private val ready = CompletableDeferred<Unit>().also { if (!loading) it.complete(Unit) }
 
+    /** このアプリのウィンドウの「入力中か」(#2809)。1 枚でも入力中なら DSL の差し替えを待つ。 */
+    private val editors = CopyOnWriteArraySet<() -> Boolean>()
+
+    /** 入力が終わった(保存・閉じた・ウィンドウを閉じた)時に呼ぶ口。待っている差し替えを当てる。 */
+    @Volatile
+    var onEditsSettled: (() -> Unit)? = null
+
+    val editing: Boolean get() = editors.any { it() }
+
+    /** ウィンドウの入力中かを見せる。返り値で外す(ウィンドウを閉じた時)。 */
+    fun trackEdits(probe: () -> Boolean): () -> Unit {
+        editors += probe
+        return {
+            editors -= probe
+            editsSettled()
+        }
+    }
+
+    fun editsSettled() {
+        if (!editing) onEditsSettled?.invoke()
+    }
+
     init {
         // 送れずに断られて端末の行が戻った時は、戻った行だけを画面のスレッドで混ぜる(端末にはもう書いてあるので persistence には渡さない)
         persistence?.onReload = { delta -> post { if (!wiping) store = delta.applyTo(store) } }
@@ -252,10 +275,23 @@ class AppHub(
     private val wipeStore: suspend () -> Unit = {},
     /** 一時ファイル(写真の「既定のアプリで開く」・引き出し)を消す。 */
     private val clearTempFiles: () -> Unit = { PhotoOpen.clearTemp() },
+    /** 画面のスレッドで動かす口(DSL の差し替え・#2809)。Main は Swing の EDT */
+    private val post: (() -> Unit) -> Unit = { it() },
     /** サーバーにあるアプリの変化の通知(#2808)。アプリごとに 1 本・最後のウィンドウを閉じたらやめる。null は張らない(モック) */
     val live: RecordChangeSubscriptions? = null,
 ) {
-    class OpenedApp(val id: String, val dsl: AppDSL, val records: SharedRecords)
+    class OpenedApp(val id: String, dsl: AppDSL, val records: SharedRecords) {
+        /** 版が変わった通知(#2809)で差し替える。ウィンドウはこれが変わったら画面を作り直す。 */
+        var dsl: AppDSL by mutableStateOf(dsl)
+            internal set
+
+        /** 差し替えた回数。1 以上なら作り直した画面に「最新の内容に更新しました」を出す。 */
+        var reloads: Int by mutableIntStateOf(0)
+            internal set
+    }
+
+    /** 入力中で待っている新しい DSL(アプリごとに最後の 1 つ)。 */
+    private val waiting = HashMap<String, AppDSL>()
 
     private val apps = LinkedHashMap<String, OpenedApp>()
     private val dsls = HashMap<String, AppDSL>()
@@ -290,6 +326,7 @@ class AppHub(
                 return
             }
             refs.remove(id)
+            waiting.remove(id)
             apps.remove(id)
         } ?: return
         runBlocking { withTimeoutOrNull(timeoutMillis) { closing.records.shutdown() } }
@@ -297,6 +334,47 @@ class AppHub(
 
     @Synchronized
     fun opened(): List<OpenedApp> = apps.values.toList()
+
+    /**
+     * アプリの版が変わった(SSE の `dsl`・#2809)。開いていなければ次に開く時の DSL を替えるだけ。
+     * 開いていて入力中なら待ち、入力が終わったら差し替える。返り値はすぐ差し替えたか。
+     */
+    fun offerDsl(id: String, next: AppDSL): Boolean {
+        val app = synchronized(this) {
+            // 次に開く時・トレイの名前もこの版
+            dsls[id] = next
+            val app = apps[id] ?: return false
+            if (app.records.editing) {
+                waiting[id] = next
+                app.records.onEditsSettled = { applyWaiting(id) }
+                return false
+            }
+            waiting.remove(id)
+            app
+        }
+        post { swap(app, next) }
+        return true
+    }
+
+    /** 待っている差し替えがあれば当てる(入力が終わった)。 */
+    fun applyWaiting(id: String): Boolean {
+        val (app, next) = synchronized(this) {
+            val app = apps[id] ?: return false
+            if (app.records.editing) return false
+            val next = waiting.remove(id) ?: return false
+            app to next
+        }
+        post { swap(app, next) }
+        return true
+    }
+
+    @Synchronized
+    fun isWaiting(id: String): Boolean = id in waiting
+
+    private fun swap(app: OpenedApp, next: AppDSL) {
+        app.dsl = next
+        app.reloads++
+    }
 
     /**
      * 「この端末のデータを消す」(#1887・サインアウトの画面 #1749 までの口)。

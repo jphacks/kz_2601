@@ -29,7 +29,9 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -105,10 +107,27 @@ fun DesktopApp(
     windowId: Int? = null,
     /** パレットの「この端末のデータを消す」(#1887)。全アプリの分を消す。null なら出さない。 */
     onWipeLocalData: (suspend () -> Unit)? = null,
+    /** 開いた時に出す一言(DSL を差し替えて作り直した時の「最新の内容に更新しました」・#2809) */
+    notice: String? = null,
 ) {
     val session = remember {
         DesktopSession(dsl, initialStore, startScreen = startScreen, host = DesktopActionHost(), persistence = persistence, shared = records, startRecordId = startRecordId)
+            .also { it.message = notice }
     }
+    // 入力中は DSL の差し替えを待つ(#2809): 入力中かを見せ、入力が終わったら(保存・閉じた)待っている差し替えを当てる
+    DisposableEffect(session) {
+        val untrack = session.records.trackEdits { session.hasUnsavedForms }
+        onDispose { untrack() }
+    }
+    // 下書きの一覧は Compose の状態ではないので、捨てる時に変わる遷移(閉じた)と記録(保存した)も読んで見直す
+    val unsaved by remember(session) {
+        derivedStateOf {
+            session.nav
+            session.store
+            session.hasUnsavedForms
+        }
+    }
+    LaunchedEffect(unsaved) { if (!unsaved) session.records.editsSettled() }
     session.onCloseWindow = onCloseWindow
     TrayHook(session, windowId, isActive)
     // 他のウィンドウで端末のデータを消した: 下書きを捨てて最初の画面へ(詳細のウィンドウは閉じる)
