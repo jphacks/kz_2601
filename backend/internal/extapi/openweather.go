@@ -150,7 +150,7 @@ func (w *openWeather) get(ctx context.Context, path string, args map[string]stri
 		return err
 	}
 	if !ok {
-		return fmt.Errorf("%w: lat and lng are required", ErrUnknown)
+		return fmt.Errorf("%w: lat and lng are required", ErrBadArgs)
 	}
 	q := url.Values{"lat": {formatCoord(lat)}, "lon": {formatCoord(lng)}, "units": {"metric"}, "lang": {"ja"}, "appid": {w.key}}
 	for k, v := range extra {

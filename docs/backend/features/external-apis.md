@@ -283,11 +283,14 @@ GTFS-JP の zip から `stops.txt`(停留所の名前)・`routes.txt`(系統の�
 | `user_daily` | 押した人の 1 日(JST) | `EXT_LIMIT_USER_DAILY` / `EXT_LIMIT_<PROVIDER>_USER_DAILY` | 次の 0:00 JST |
 | `app_hourly` | アプリの 1 時間 | `EXT_LIMIT_APP_HOURLY` / `EXT_LIMIT_<PROVIDER>_APP_HOURLY` | 次の正時 |
 | `app_daily` | アプリの 1 日 | `EXT_LIMIT_APP_DAILY` / `EXT_LIMIT_<PROVIDER>_APP_DAILY` | 次の 0:00 JST |
-| `global_daily` | その provider の環境全体の 1 日(provider の割り当ての手前で止める) | `EXT_GLOBAL_DAILY` / `EXT_GLOBAL_DAILY_<PROVIDER>` | 次の 0:00 JST |
-| `provider_paused` | provider が 429 を返した後の 1 分(台ごと・メモリ) | なし(1 分で固定) | 1 分たった時 |
+| `global_daily` | その provider の環境全体の 1 日(provider の割り当ての手前で止める) | `EXT_GLOBAL_DAILY` / `EXT_GLOBAL_DAILY_<PROVIDER>`(OAuth の provider は `_<PROVIDER>` だけ) | 次の 0:00 JST |
+| `provider_paused` | provider が 429 を返した後の 1 分(台ごと・メモリ)。運営の鍵で呼ぶ provider は全員、OAuth の provider はそのトークンの人(uid + provider)だけ | なし(1 分で固定) | 1 分たった時 |
 
 - 1 つの provider の env が全部の provider の env より勝つ。env が無ければコードの既定(`DefaultLimits`)。
+- OAuth の provider は利用者ごとの枠なので全体の上限は既定で外す(`global_daily` は `EXT_GLOBAL_DAILY_<PROVIDER>` を入れた時だけ)。利用者・アプリの上限は他の provider と同じ既定。
+- 運営の鍵で呼ぶ provider は、割り当てが公開されていれば `global_daily` の既定をそれに合わせてコードに持つ(`Provider.GlobalDaily`。YouTube は 1 日の単位数と 1 回の単位数から)。`EXT_GLOBAL_DAILY` / `EXT_GLOBAL_DAILY_<PROVIDER>` を入れればそちらが勝つ。
 - 数えるのは provider を呼んだ時だけ。キャッシュから返した時は数えない。トークンが無い・コインが足りない・同じ request id・枠で止まった時(provider を呼ばなかった)は戻す。provider が失敗した時(5xx・時間切れ・429)は呼んだので戻さない。
+- op が provider を呼ぶ前に引数を拒んだ時(`ErrBadArgs`)は戻す。provider を呼んだ後の 400 `bad_request`(無い id・無いチャンネル・無い列など)は呼んだので戻さない。
 - 文書は `rateLimits/{APP_ENV}_{日 or 日T時}_ext_{provider}_{uid_… / app_… / global}`(TTL `expireAt`)。全体の数えは `ratelimit.GlobalShards` に分ける。Firestore が落ちた時は台のメモリで数える(開けっぱなしにしない)。
 - runner の答えは `{"reason": "rate_limited", "scope": "<scope>", "retryAfterSec": <秒>}`(429)。appconfig は 429 `rate_limited`・`Retry-After`・`details`(`scope`・`provider`・`retryAfterSec`)にする。
 - 偽の provider は `fail=429` で 1 分止めを試せる。
@@ -298,15 +301,16 @@ GTFS-JP の zip から `stops.txt`(停留所の名前)・`routes.txt`(系統の�
 | もの | 場所・中身 |
 |---|---|
 | トークン | `users/{uid}/connections/{provider}`: `status`(`active` / `revoked` / `error`)・`sealed`(暗号化したトークン)・`scopes`・`connectedAt`・`lastUsedAt`・`revokedAt`・`deleteAt` |
-| state / PKCE | `oauthStates/{state}`: uid・provider・`code_verifier`・scope・`expireAt`(10 分)。1 回だけ使える(取り出しと削除を 1 つのトランザクションで) |
+| state / PKCE | `oauthStates/{state}`: uid・provider・`code_verifier`・scope・`expireAt`(10 分)・`createdAt`。1 回だけ使える(取り出しと削除を 1 つのトランザクションで) |
 
 - **暗号化**: `Sealer` が暗号化する。本番は Cloud KMS の対称鍵(`KMSSealer`・`EXT_TOKEN_KMS_KEY`)で、鍵の encrypt / decrypt は runner の SA だけに渡す。uid と provider を追加の認証データにするので、別の人・別の provider の文書に写しても開けない。エミュレータでは起動ごとの使い捨ての鍵(`LocalSealer`)。鍵が無い時は OAuth の provider が動かない(暗号化しないで保存する道は無い)。
 - **クライアントから見えない**: Firestore のルールで許していない(サーバーだけ)。`GET /v1/me/connections` には provider・状態・scope・日付だけを返す(`ConnectionView`)。トークンの型(`Token`・`Secrets`)はログ・`%v`・JSON に出すと `[redacted]` になる。
-- **切る(取り消し)**: provider の取り消しの口を呼び(無い provider は呼ばない)、**すぐ**トークンを消して `revoked` の印だけ残す(決定 7)。印は 90 日で消える。
+- **切る(取り消し)**: provider の取り消しの口を呼び(無い provider は呼ばない)、**すぐ**トークンを消して `revoked` の印だけ残す(決定 7)。印はその時の文書に 1 つのトランザクションで書く。印は 90 日で消える。切る時はトークンの更新と同じ鍵(uid + provider・台ごと)を取り、更新の途中なら終わるのを待って更新後のトークンを取り消す。取り消しの前の更新で provider がリフレッシュトークンを拒んだ時(`ErrInvalidGrant`)は保存を 1 回読み直し、別の台が入れ替えていれば新しい方を取り消す。同じなら取り消し済みとする。
+- **切った後に戻った同意**: callback は、state を作った時刻(`createdAt`)より後の `revokedAt` がある時は保存しない(`ErrCutSinceStart`・受け取ったトークンは provider 側でも取り消す)。切った後に始めた接続はふつうに保存する。
 - **Google は 1 つの許可**: カレンダー・ToDo・スプレッドシートは同じ OAuth クライアント(`Provider.ClientFrom`)で `include_granted_scopes=true` なので、Google 側では 1 つの許可にまとまる。どれか 1 つのトークンを取り消すと全部が切れる。だから 1 つを切る時は、同じクライアントのほかの provider がまだつながっていれば Google の取り消しの口を呼ばない(トークンはすぐ消す)。最後の 1 つを切る時に取り消す。引き換え: ほかがつながっている間は、切った provider の scope も Google のアカウントの「接続したアプリ」に残る(こちらはトークンを持たない)。`EXT_GOOGLE_TASKS_CLIENT_ID` などで別のクライアントにした時も、同じグループとして扱う(取り消しが最後まで遅れるだけ)。接続の一覧が読めない時も取り消さない(ほかを壊さない方を取る)。
 - **90 日使わない**: 使うたび(1 時間に 1 回まで書く)に `deleteAt` を 90 日先にする。過ぎたものは次に読んだ時に消し、`POST /internal/ext/expire`(`ExpireUnused`)と Firestore の TTL(`deleteAt`)でも消える。
 - **Pro が切れた**: トークンは残し、使わない(呼び出しが枠の段で止まる)。使わなければ 90 日で消える。
-- **退会**: 30 日後の消去(`cmd/purge`)で `users/{uid}/connections/*` を消す。退会の時は appconfig が runner の `revokeAll` を呼び、provider 側の許可も取り消す(#1716)。runner が失敗・落ちていても退会は止めず(ログ `revoking external connections on delete failed`)、30 日後の消去でトークンは必ず消える。
+- **退会**: 30 日後の消去(`cmd/purge`)で `users/{uid}/connections/*` を消す。退会の時は appconfig が runner の `revokeAll` を呼び、provider 側の許可も取り消す(#1716)。`revokeAll` はその人の `oauthStates` を消し、動いている OAuth の provider 全部に `revoked` の印を付ける(つないでいない provider も)。runner が失敗・落ちていても退会は止めず(ログ `revoking external connections on delete failed`)、30 日後の消去でトークンは必ず消える。
 
 ## runner の口
 

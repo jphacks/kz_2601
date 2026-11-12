@@ -144,10 +144,9 @@ func (c *github) Refresh(ctx context.Context, t Token) (Token, error) {
 func (c *github) Revoke(ctx context.Context, t Token) error {
 	if t.expired(c.now()) && t.RefreshToken != "" {
 		nt, err := c.Refresh(ctx, t)
-		if errors.Is(err, ErrInvalidGrant) {
-			return nil // already gone at GitHub
-		}
 		if err != nil {
+			// ErrInvalidGrant: gone at GitHub, or renewed elsewhere
+			// (Connections.Revoke reads it again)
 			return err
 		}
 		t = nt
@@ -253,7 +252,7 @@ func githubDates(a map[string]string, now time.Time) (time.Time, time.Time, erro
 	parse := func(name, v string) (time.Time, error) {
 		d, err := time.ParseInLocation(time.DateOnly, v, githubZone)
 		if err != nil {
-			return time.Time{}, fmt.Errorf("%w: %s must be YYYY-MM-DD", ErrUnknown, name)
+			return time.Time{}, fmt.Errorf("%w: %s must be YYYY-MM-DD", ErrBadArgs, name)
 		}
 		return d, nil
 	}
@@ -275,13 +274,13 @@ func githubDates(a map[string]string, now time.Time) (time.Time, time.Time, erro
 	}
 	switch {
 	case to.After(today):
-		return time.Time{}, time.Time{}, fmt.Errorf("%w: to is after today", ErrUnknown)
+		return time.Time{}, time.Time{}, fmt.Errorf("%w: to is after today", ErrBadArgs)
 	case from.After(to):
-		return time.Time{}, time.Time{}, fmt.Errorf("%w: from is after to", ErrUnknown)
+		return time.Time{}, time.Time{}, fmt.Errorf("%w: from is after to", ErrBadArgs)
 	case from.Year() < 2008:
-		return time.Time{}, time.Time{}, fmt.Errorf("%w: from is before GitHub", ErrUnknown)
+		return time.Time{}, time.Time{}, fmt.Errorf("%w: from is before GitHub", ErrBadArgs)
 	case to.Sub(from) >= githubMaxDays*24*time.Hour:
-		return time.Time{}, time.Time{}, fmt.Errorf("%w: from - to is over %d days", ErrUnknown, githubMaxDays)
+		return time.Time{}, time.Time{}, fmt.Errorf("%w: from - to is over %d days", ErrBadArgs, githubMaxDays)
 	}
 	return from, to, nil
 }
@@ -347,7 +346,7 @@ func githubLimit(v string) (int, error) {
 	}
 	x, err := strconv.Atoi(v)
 	if err != nil || x < 1 || x > githubMaxLimit {
-		return 0, fmt.Errorf("%w: limit must be 1-%d", ErrUnknown, githubMaxLimit)
+		return 0, fmt.Errorf("%w: limit must be 1-%d", ErrBadArgs, githubMaxLimit)
 	}
 	return x, nil
 }
@@ -367,9 +366,9 @@ func githubState(v string, pr bool) (string, error) {
 		return "", nil
 	}
 	if pr {
-		return "", fmt.Errorf("%w: state must be open, closed, merged or all", ErrUnknown)
+		return "", fmt.Errorf("%w: state must be open, closed, merged or all", ErrBadArgs)
 	}
-	return "", fmt.Errorf("%w: state must be open, closed or all", ErrUnknown)
+	return "", fmt.Errorf("%w: state must be open, closed or all", ErrBadArgs)
 }
 
 // githubPullsQuery is pullRequests' search query: role reviewRequested
@@ -382,7 +381,7 @@ func githubPullsQuery(a map[string]string) (string, int, error) {
 	case "author":
 		role = "author:@me"
 	default:
-		return "", 0, fmt.Errorf("%w: role must be reviewRequested or author", ErrUnknown)
+		return "", 0, fmt.Errorf("%w: role must be reviewRequested or author", ErrBadArgs)
 	}
 	state, err := githubState(a["state"], true)
 	if err != nil {
