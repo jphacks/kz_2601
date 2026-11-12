@@ -132,6 +132,7 @@ enum TailorIntentError: Error, CustomLocalizedStringResourceConvertible {
     case statNotFound
     case statNotLoaded(String)
     case statNotNumber(String)
+    case statLocked(String)
 
     var localizedStringResource: LocalizedStringResource {
         switch self {
@@ -149,6 +150,7 @@ enum TailorIntentError: Error, CustomLocalizedStringResourceConvertible {
         #endif
         case .statNotLoaded(let name): "まだ読み込んでいません。Tailor It で\(name)を一度開いてください"
         case .statNotNumber(let label): "「\(label)」は数値で読めません。「数字を読む」を使ってください"
+        case .statLocked(let label): "「\(label)」はロック中です。Tailor It を開いて確認してください"
         }
     }
 }

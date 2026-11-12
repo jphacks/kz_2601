@@ -146,6 +146,8 @@ enum StatLookup: Equatable {
     case value(StatReading.Value)
     case cached(String)
     case notLoaded
+    /// 暗号化した field を数える stat。値は返さない(アプリの中でだけ見られる)
+    case locked
 }
 
 @MainActor
@@ -156,14 +158,30 @@ enum StatLookupRunner {
               let c = StatReading.stat(target.statKey, in: doc.dsl) else { throw TailorIntentError.statNotFound }
         var stat = target
         stat.label = StatReading.label(of: c, in: doc.dsl)
-        if let records = await IntentHost.shared.statRecords(appId: target.appId, entities: StatReading.entities(for: c, in: doc.dsl),
-                                                             isExpression: c.aggregate == nil && c.valueExpr != nil),
-           let value = StatReading.read(c, dsl: doc.dsl, records: records, countUnit: WidgetSnapshotWriter.countUnit) {
-            return (stat, .value(value))
+        let result = await resolve(c, dsl: doc.dsl, glance: AppGlanceStore.shared.values[target.appId]) {
+            await IntentHost.shared.statRecords(appId: target.appId, entities: StatReading.entities(for: c, in: doc.dsl),
+                                                isExpression: c.aggregate == nil && c.valueExpr != nil)
         }
-        // 一覧のひと目の数字が同じ stat ならその値(古くても無いよりよい)
-        if let glance = AppGlanceStore.shared.values[target.appId], glance.statId == c.id { return (stat, .cached(glance.value)) }
-        return (stat, .notLoaded)
+        return (stat, result)
+    }
+
+    /// 値を決める。暗号化した field の stat は記録を読まずに `.locked`(一覧のひと目の数字の「🔒」と同じ判定)。
+    /// 記録で数えられなければ一覧のひと目の数字(古くても無いよりよい)、それも無ければ未読み込み
+    static func resolve(_ c: Component, dsl: AppDSL, glance: AppGlance.Value?,
+                        records: () async -> [String: [Record]]?) async -> StatLookup {
+        if AppGlance.isEncrypted(c, in: dsl) { return .locked }
+        if let records = await records(),
+           let value = StatReading.read(c, dsl: dsl, records: records, countUnit: WidgetSnapshotWriter.countUnit) {
+            return .value(value)
+        }
+        if let text = cachedGlance(glance, for: c) { return .cached(text) }
+        return .notLoaded
+    }
+
+    /// 一覧のひと目の数字のうち、この stat のもの。`statKey` で突き合わせる(id を書かない stat は読むたびに id が変わる)
+    nonisolated static func cachedGlance(_ glance: AppGlance.Value?, for c: Component) -> String? {
+        guard let glance, glance.statKey == WidgetSnapshotWriter.statKey(c) else { return nil }
+        return glance.value
     }
 }
 
@@ -172,6 +190,8 @@ struct GetStatValueIntent: AppIntent {
     static var title: LocalizedStringResource = "数字を読む"
     static var description = IntentDescription("Tailor It を開かずに、記録の集計(ウィジェットと同じ数字)を読みます。例: 家計簿の今月の支出。")
     static var openAppWhenRun = false
+    /// 記録の集計を返すので、ロック中は端末のロックを解いてから
+    static var authenticationPolicy: IntentAuthenticationPolicy = .requiresAuthentication
 
     @Parameter(title: "数字", requestValueDialog: "どの数字を読みますか?")
     var target: StatEntity
@@ -189,6 +209,8 @@ struct GetStatValueIntent: AppIntent {
         case .notLoaded:
             return .result(value: String(localized: Self.notLoadedValue),
                            dialog: IntentDialog(Self.notLoadedMessage(appName: stat.appName)))
+        case .locked:
+            return .result(value: String(localized: Self.lockedValue), dialog: IntentDialog(Self.lockedMessage(label: stat.label)))
         }
     }
 
@@ -199,6 +221,12 @@ struct GetStatValueIntent: AppIntent {
     static func notLoadedMessage(appName: String) -> LocalizedStringResource {
         "まだ読み込んでいません。Tailor It で\(appName)を一度開いてください"
     }
+
+    static let lockedValue: LocalizedStringResource = "ロック中です。Tailor It を開いて確認してください"
+
+    static func lockedMessage(label: String) -> LocalizedStringResource {
+        "「\(label)」はロック中です。Tailor It を開いて確認してください"
+    }
 }
 
 /// 「数字を読む(数値)」: 計算に使えるよう Double で返す。latest / earliest・文字の式・未読み込みは分かる文で失敗する
@@ -206,6 +234,7 @@ struct GetStatNumberIntent: AppIntent {
     static var title: LocalizedStringResource = "数字を読む(数値)"
     static var description = IntentDescription("Tailor It を開かずに、記録の集計を数値で読みます。計算や比較に使えます。")
     static var openAppWhenRun = false
+    static var authenticationPolicy: IntentAuthenticationPolicy = .requiresAuthentication
 
     @Parameter(title: "数字", requestValueDialog: "どの数字を読みますか?")
     var target: StatEntity
@@ -222,6 +251,7 @@ struct GetStatNumberIntent: AppIntent {
             guard let n = v.number else { throw TailorIntentError.statNotNumber(stat.label) }
             return .result(value: n)
         case .cached, .notLoaded: throw TailorIntentError.statNotLoaded(stat.appName)
+        case .locked: throw TailorIntentError.statLocked(stat.label)
         }
     }
 }

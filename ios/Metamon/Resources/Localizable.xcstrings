@@ -3056,6 +3056,23 @@
         }
       }
     },
+    "「%@」はロック中です。Tailor It を開いて確認してください" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "“%@” is locked. Open Tailor It to see it"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "「%@」はロック中です。Tailor It を開いて確認してください"
+          }
+        }
+      }
+    },
     "「%@」は数値で読めません。「数字を読む」を使ってください" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -10363,6 +10380,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "ログインせずに使う(匿名)"
+          }
+        }
+      }
+    },
+    "ロック中です。Tailor It を開いて確認してください" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Locked. Open Tailor It to see it"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ロック中です。Tailor It を開いて確認してください"
           }
         }
       }

@@ -1,4 +1,5 @@
 import XCTest
+import AppIntents
 import MetamonDSL
 import MetamonServices
 @testable import Metamon
@@ -83,6 +84,61 @@ final class StatIntentsTests: XCTestCase {
     func testLabelFallsBackToEntityName() throws {
         let d = try dsl(stats: #"{"type":"stat","entity":"expense","aggregate":"count"}"#)
         XCTAssertEqual(StatReading.label(of: StatReading.stats(in: d)[0], in: d), "支出")
+    }
+
+    /// 暗号化した field の stat は値を返さず、記録も読まない(一覧のひと目の数字と同じ判定)
+    func testEncryptedStatIsLocked() async throws {
+        let json = """
+        {"schemaVersion":1,"app":{"name":"日記"},"initialScreen":"home",
+         "entities":[{"id":"diary","name":"日記","titleField":"body","fields":[
+           {"id":"body","name":"本文","type":"text","encrypted":true}]}],
+         "screens":[{"id":"home","title":"日記","components":[
+           {"type":"stat","label":"最新","entity":"diary","aggregate":"latest","field":"body"}]}]}
+        """
+        let d = try JSONDecoder().decode(AppDSL.self, from: Data(json.utf8))
+        let c = try XCTUnwrap(StatReading.stats(in: d).first)
+        XCTAssertTrue(AppGlance.isEncrypted(c, in: d))
+        let rows = ["diary": [Record(id: "a", data: ["body": .string("ひみつ")], createdAt: "2026-10-31T01:00:00Z")]]
+        let glance = AppGlance.Value(statId: c.id, label: "最新", value: "ひみつ", at: .now, statKey: WidgetSnapshotWriter.statKey(c))
+        var readRecords = false
+        let result = await StatLookupRunner.resolve(c, dsl: d, glance: glance) {
+            readRecords = true
+            return rows
+        }
+        XCTAssertEqual(result, .locked, "記録・一覧の値があっても返さない")
+        XCTAssertFalse(readRecords, "記録を読まない")
+        XCTAssertFalse(String(localized: GetStatValueIntent.lockedValue).contains("🔒"), "Siri に記号を読ませない")
+    }
+
+    func testPlainStatResolvesValue() async throws {
+        let d = try dsl(stats: sum)
+        let c = StatReading.stats(in: d)[0]
+        let result = await StatLookupRunner.resolve(c, dsl: d, glance: nil) { self.records }
+        XCTAssertEqual(result, .value(.init(text: read(c, d, records)!.text, number: 1800)))
+    }
+
+    /// 記録を読むので、端末のロック中は解いてから
+    func testIntentsRequireAuthentication() {
+        guard case .requiresAuthentication = GetStatValueIntent.authenticationPolicy else { return XCTFail("値") }
+        guard case .requiresAuthentication = GetStatNumberIntent.authenticationPolicy else { return XCTFail("数値") }
+    }
+
+    /// 一覧のひと目の数字は statKey で突き合わせる(id を書かない stat は DSL を読み直すと id が変わる)
+    func testCachedGlanceMatchesByKey() async throws {
+        let first = try dsl(stats: sum), second = try dsl(stats: sum)
+        let saved = try XCTUnwrap(AppGlance.compute(dsl: first, records: records, setting: nil))
+        let c = StatReading.stats(in: second)[0]
+        XCTAssertNotEqual(saved.statId, c.id, "id を書かない stat は読み直すと id が変わる")
+        XCTAssertEqual(StatLookupRunner.cachedGlance(saved, for: c), saved.value)
+        let result = await StatLookupRunner.resolve(c, dsl: second, glance: saved) { nil }
+        XCTAssertEqual(result, .cached(saved.value))
+
+        var other = saved
+        other.statKey = "expense|count||件数"
+        XCTAssertNil(StatLookupRunner.cachedGlance(other, for: c), "別の stat の値は使わない")
+        var legacy = saved
+        legacy.statKey = nil
+        XCTAssertNil(StatLookupRunner.cachedGlance(legacy, for: c), "key の無い古い保存値は使わない")
     }
 
     /// 消えたアプリ・stat は落ちずに分かる文で失敗する

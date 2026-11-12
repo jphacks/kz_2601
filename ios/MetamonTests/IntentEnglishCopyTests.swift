@@ -62,12 +62,14 @@ final class IntentEnglishCopyTests: XCTestCase {
             GetStatValueIntent.valueMessage(label: "今月の支出", value: "¥12,340").key,
             GetStatValueIntent.notLoadedValue.key,
             GetStatValueIntent.notLoadedMessage(appName: "家計簿").key,
+            GetStatValueIntent.lockedValue.key,
+            GetStatValueIntent.lockedMessage(label: "メモ").key,
             "見つからない数字", "どの数字を読みますか?",
             "Tailor It を開かずに、記録の集計(ウィジェットと同じ数字)を読みます。例: 家計簿の今月の支出。",
             "Tailor It を開かずに、記録の集計を数値で読みます。計算や比較に使えます。",
             "${target} を読む", "${target} を数値で読む",
         ]
-        keys += [TailorIntentError.statNotFound, .statNotLoaded("家計簿"), .statNotNumber("最新")].map(\.localizedStringResource.key)
+        keys += [TailorIntentError.statNotFound, .statNotLoaded("家計簿"), .statNotNumber("最新"), .statLocked("メモ")].map(\.localizedStringResource.key)
         assertTranslated(keys)
         let resource = GetStatValueIntent.valueMessage(label: "今月の支出", value: "¥12,340")
         XCTAssertEqual(resource.key, "%@は%@です")
