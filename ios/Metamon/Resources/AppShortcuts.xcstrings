@@ -86,6 +86,23 @@
         }
       }
     },
+    "${applicationName}で数字を読む" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Read a number in ${applicationName}"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "${applicationName}で数字を読む"
+          }
+        }
+      }
+    },
     "${applicationName}で記録を追加" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -167,6 +184,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "${applicationName}に話しかける"
+          }
+        }
+      }
+    },
+    "${applicationName}の数字を読む" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Read ${applicationName} numbers"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "${applicationName}の数字を読む"
           }
         }
       }
