@@ -73,6 +73,8 @@ ai → appconfig の結合をローカルで確認する時は、appconfig を�
 | `FIRESTORE_EMULATOR_HOST` | o | - | 設定時は Firestore クライアントが自動でエミュレータへ |
 | `FIREBASE_AUTH_EMULATOR_HOST` | o | o | ローカルのみ(`X-Debug-Uid` の有効条件) |
 | `LOG_LEVEL` | o | o | `info` |
+| `MIN_WINDOWS_BUILD` / `LATEST_WINDOWS_BUILD` | o | - | `GET /v1/client-config` の Windows の最低の版 / 最新の版(未設定 = 出さない・最新 < 最低なら最低に揃える・#2131)。詳しくは `docs/infra/runtime-config.md` |
+| `MIN_LINUX_BUILD` / `LATEST_LINUX_BUILD` | o | - | 同じく Linux(#2131) |
 | `FEEDBACK_DAILY_LIMIT` | o | - | `POST /v1/feedback` の 1 uid 1 日(JST)の件数(既定 5・0 で無制限・#319) |
 | `APPCONFIG_BASE_URL` | - | o | ai → appconfig。未設定なら ai 内のインメモリ stub(永続なし)。staging は `https://appconfig-stg-378953239426.asia-northeast1.run.app` |
 | `ANTHROPIC_API_KEY` | - | o | Secret Manager。ローカルは `~/Desktop/JPHACKS2026/.env`(リポ外) |
