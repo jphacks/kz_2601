@@ -2235,6 +2235,23 @@
         }
       }
     },
+    "iPhone がロック中だと、動かす前に確認が出ることがあります。" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "If your iPhone is locked, you may be asked to confirm before it runs."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "iPhone がロック中だと、動かす前に確認が出ることがあります。"
+          }
+        }
+      }
+    },
     "openUrl: url は https か line/slack/discord/tel/mailto/maps のみ" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -3260,6 +3277,23 @@
         }
       }
     },
+    "「すぐに実行」を選ぶ(動かす前に確かめたい時は「確認後に実行」)" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Choose “Run Immediately” (or “Run After Confirmation” if you want to check first)"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "「すぐに実行」を選ぶ(動かす前に確かめたい時は「確認後に実行」)"
+          }
+        }
+      }
+    },
     "「メモ」という言葉を「ひとこと」に変えて" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -3421,6 +3455,91 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "「直ったら知らせてほしい」は保存できませんでした。設定の「お知らせ」から変えられます。"
+          }
+        }
+      }
+    },
+    "「記録を追加」で、内容を「毎回尋ねる」にしておくと、その場で声で入れられます" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "“Add Record” with the content set to “Ask Each Time”, so you can say it right then"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "「記録を追加」で、内容を「毎回尋ねる」にしておくと、その場で声で入れられます"
+          }
+        }
+      }
+    },
+    "「記録を追加」で、記録先「水やり」に「水やり」を入れる" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "“Add Record” puts “Watered” into “Watering”"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "「記録を追加」で、記録先「水やり」に「水やり」を入れる"
+          }
+        }
+      }
+    },
+    "「記録を追加」で、記録先「睡眠」に「就寝」を入れる" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "“Add Record” puts “Went to bed” into “Sleep”"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "「記録を追加」で、記録先「睡眠」に「就寝」を入れる"
+          }
+        }
+      }
+    },
+    "「記録を追加」で、記録先「筋トレ」に「ジム 1回」を入れる" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "“Add Record” puts “Gym 1 time” into “Workouts”"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "「記録を追加」で、記録先「筋トレ」に「ジム 1回」を入れる"
+          }
+        }
+      }
+    },
+    "「記録を追加」のほかに「話しかける」(音声入力を開く)も、きっかけに合わせて動かせます。" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Besides “Add Record”, “Talk” (opens voice input) can also run from a trigger."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "「記録を追加」のほかに「話しかける」(音声入力を開く)も、きっかけに合わせて動かせます。"
           }
         }
       }
@@ -4067,6 +4186,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "お金"
+          }
+        }
+      }
+    },
+    "きっかけの例" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Trigger ideas"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "きっかけの例"
           }
         }
       }
@@ -6899,6 +7035,23 @@
         }
       }
     },
+    "アクションの検索で「Tailor It」と入れ、「記録を追加」を選ぶ" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Search actions for “Tailor It” and choose “Add Record”"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "アクションの検索で「Tailor It」と入れ、「記録を追加」を選ぶ"
+          }
+        }
+      }
+    },
     "アップデート" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -8548,6 +8701,74 @@
         }
       }
     },
+    "ショートカット App が見つかりません。App Store から入れ直してください。" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Couldn’t find the Shortcuts app. Reinstall it from the App Store."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ショートカット App が見つかりません。App Store から入れ直してください。"
+          }
+        }
+      }
+    },
+    "ショートカット App を開き、下の「オートメーション」を選ぶ" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Open the Shortcuts app and tap “Automation” at the bottom"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ショートカット App を開き、下の「オートメーション」を選ぶ"
+          }
+        }
+      }
+    },
+    "ショートカット App を開く" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Open Shortcuts"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ショートカット App を開く"
+          }
+        }
+      }
+    },
+    "ショートカットで自動にする" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Automate with Shortcuts"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ショートカットで自動にする"
+          }
+        }
+      }
+    },
     "シートで開く" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -8561,6 +8782,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "シートで開く"
+          }
+        }
+      }
+    },
+    "ジムに着いた時" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "When you arrive at the gym"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ジムに着いた時"
           }
         }
       }
@@ -11472,6 +11710,23 @@
         }
       }
     },
+    "作り方" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "How to set it up"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "作り方"
+          }
+        }
+      }
+    },
     "作るのをやめました" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -12075,6 +12330,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "先に ISBN を入力してください"
+          }
+        }
+      }
+    },
+    "先に Tailor It を一度開いておいてください。開いたことが無いと記録できません。" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Open Tailor It once first. It can’t record until it has been opened."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "先に Tailor It を一度開いておいてください。開いたことが無いと記録できません。"
           }
         }
       }
@@ -13439,6 +13711,23 @@
         }
       }
     },
+    "右上の「+」を押し、きっかけ(時刻・場所に到着・NFC・充電器)を選ぶ" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tap “+” at the top right and choose a trigger (Time of Day, Arrive, NFC, Charger)"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "右上の「+」を押し、きっかけ(時刻・場所に到着・NFC・充電器)を選ぶ"
+          }
+        }
+      }
+    },
     "右下に「+ 追加」ボタンを置いて、押したら入力の画面が開くようにして" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -14263,6 +14552,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "家計簿アプリを作って"
+          }
+        }
+      }
+    },
+    "寝る前に充電を始めた時" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "When you plug in to charge before bed"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "寝る前に充電を始めた時"
           }
         }
       }
@@ -15287,6 +15593,23 @@
         }
       }
     },
+    "時刻や場所をきっかけに「記録を追加」を動かす作り方を見ます" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Shows how to run “Add Record” at a set time, place and more"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "時刻や場所をきっかけに「記録を追加」を動かす作り方を見ます"
+          }
+        }
+      }
+    },
     "時間がかかっています。もう少しだけお待ちください" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -15967,6 +16290,23 @@
         }
       }
     },
+    "植木鉢に貼った NFC タグにかざした時" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "When you tap the NFC tag on a plant pot"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "植木鉢に貼った NFC タグにかざした時"
+          }
+        }
+      }
+    },
     "検討中" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -16188,6 +16528,23 @@
         }
       }
     },
+    "毎晩 21 時になった時" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Every night at 9 PM"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "毎晩 21 時になった時"
+          }
+        }
+      }
+    },
     "毎晩9時に、記録を忘れないよう通知して" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -16235,6 +16592,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "毎週月曜の朝8時にお知らせして"
+          }
+        }
+      }
+    },
+    "決まった時刻や場所に着いた時などに、Tailor It の「記録を追加」を自動で動かせます。オートメーションはショートカット App で作ります。" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tailor It’s “Add Record” can run on its own at a set time, when you arrive somewhere, and more. You set up the automation in the Shortcuts app."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "決まった時刻や場所に着いた時などに、Tailor It の「記録を追加」を自動で動かせます。オートメーションはショートカット App で作ります。"
           }
         }
       }
@@ -18270,6 +18644,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "記録先"
+          }
+        }
+      }
+    },
+    "記録先と内容を決めて「完了」を押す" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Set where to record and what to add, then tap “Done”"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "記録先と内容を決めて「完了」を押す"
           }
         }
       }

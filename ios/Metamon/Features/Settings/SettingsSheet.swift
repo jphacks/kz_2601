@@ -354,6 +354,13 @@ struct SettingsSheet: View {
                 Label("頼み方のコツ", systemImage: "lightbulb")
             }
             .accessibilityIdentifier("settings.tips")
+            NavigationLink {
+                AutomationGuideView() // #1995 ショートカットのオートメーションの案内
+            } label: {
+                Label("ショートカットで自動にする", systemImage: "clock.arrow.2.circlepath")
+            }
+            .accessibilityHint("時刻や場所をきっかけに「記録を追加」を動かす作り方を見ます")
+            .accessibilityIdentifier("settings.automationGuide")
             Button(role: .destructive) { confirmReset = true } label: {
                 Label(L10n.key("アプリをリセット(初期状態に戻す)", review: "記録帳をリセット(初期状態に戻す)"), systemImage: "arrow.counterclockwise")
             }
