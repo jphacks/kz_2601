@@ -37,15 +37,16 @@ struct AssistiveAccessActionsView: View {
     }
 
     private func tap(_ action: AssistiveActions.Action) {
+        guard pending[action.id] == nil else { return } // 保存待ちの間の 2 回目は無視(逆の値を書かない)
         guard let data = AssistiveActions.write(for: action, in: rt.dsl, records: rt.records) else {
             show(.failed)
             return
         }
+        if case .check = action.kind { pending[action.id] = !action.isOn } // Task の前に同期で立てる
         Task {
             let saved: Bool
             switch action.kind {
             case .check(let e, let rid, _, _):
-                pending[action.id] = !action.isOn
                 saved = await rt.updateRecord(entity: e, recordId: rid, data: data)
                 pending[action.id] = nil
             case .quickRecord(let e):

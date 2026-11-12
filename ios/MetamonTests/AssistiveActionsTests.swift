@@ -82,7 +82,12 @@ final class AssistiveActionsTests: XCTestCase {
         let actions = AssistiveActions.pick(dsl: d, records: ["e": [Record(id: "a", data: ["amount": .number(800)])]], today: today)
         XCTAssertEqual(actions.map(\.kind), [.stat(componentId: "sum")])
         XCTAssertEqual(actions[0].title, "合計")
-        XCTAssertTrue(AssistiveActions.hasCandidates(in: d))
+        XCTAssertFalse(AssistiveActions.hasCandidates(in: d), "押せるボタンが無い(stat だけ)なら今の画面のまま")
+    }
+
+    func testStatWithPressableActionStillUsesLargeButtons() throws {
+        XCTAssertTrue(AssistiveActions.hasCandidates(in: try medication()), "チェックがあれば stat も一緒に並べる")
+        XCTAssertTrue(AssistiveActions.hasCandidates(in: try water()), "すぐ記録があれば stat も一緒に並べる")
     }
 
     func testAppWithNothingKeepsCurrentScreen() throws {
@@ -127,6 +132,15 @@ final class AssistiveActionsTests: XCTestCase {
         XCTAssertEqual(on["taken"], .string("2026-11-12"), "夜の薬に今日を付ける")
         let off = try XCTUnwrap(AssistiveActions.write(for: actions[0], in: d, records: meds, today: today))
         XCTAssertEqual(off["taken"], .null, "朝の薬は今日を外す")
+    }
+
+    func testCheckWriteFollowsShownStateNotStaleRecords() throws {
+        let d = try medication()
+        var shown = AssistiveActions.pick(dsl: d, records: meds, today: today)[1] // 夜の薬(まだ)
+        XCTAssertEqual(AssistiveActions.write(for: shown, in: d, records: meds, today: today)?["taken"], .string("2026-11-12"))
+        shown.isOn = true // 1 回目を押した直後(保存待ち・records はまだ古い)
+        let second = try XCTUnwrap(AssistiveActions.write(for: shown, in: d, records: meds, today: today))
+        XCTAssertFalse(DailyCheck.isDone(second["taken"] ?? .null, today: today), "2 回目は表示どおり外す(古い records から同じ値を書かない)")
     }
 
     func testBooleanCheckWrite() throws {

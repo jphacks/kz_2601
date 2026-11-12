@@ -37,10 +37,10 @@ enum AssistiveActions {
     }
 
     /// 簡単な画面を出すか(DSL の形だけで決める。記録の読み込みを待って画面が切り替わらないように)。
-    /// 何も選べないアプリは今の画面をそのまま出す(#1997)。
+    /// 押せるボタン(チェック・すぐ記録)が無いアプリは今の画面をそのまま出す(#1997)。stat だけだと何もできない画面になるため。
     static func hasCandidates(in dsl: AppDSL) -> Bool {
         guard !dsl.isVoiceOnly else { return false }
-        return !checkLists(in: dsl).isEmpty || !quickEntities(in: dsl).isEmpty || !stats(in: dsl).isEmpty
+        return !checkLists(in: dsl).isEmpty || !quickEntities(in: dsl).isEmpty
     }
 
     /// 読む entity(チェックの一覧と stat)。
@@ -85,11 +85,12 @@ enum AssistiveActions {
     }
 
     /// 押した時に保存する差分(チェック)・1 件分の data(すぐ記録)。stat は nil。
+    /// チェックは表示中の状態(`action.isOn`・保存待ちの楽観的な値を含む)の逆を書く。保存前の `records` から決めると素早い 2 回押しで同じ値を書く。
     static func write(for action: Action, in dsl: AppDSL, records: [String: [Record]], today: Date = DSLClock.now()) -> [String: JSONValue]? {
         switch action.kind {
         case .check(let e, let rid, let field, let daily):
             guard let r = records[e]?.first(where: { $0.id == rid }) else { return nil }
-            let next = !isOn(r, field: field, daily: daily, today: today)
+            let next = !action.isOn
             return daily ? DailyCheck.patch(r, field: field, on: next, today: today) : [field: .bool(next)]
         case .quickRecord(let e):
             guard let entity = dsl.entity(e) else { return nil }
