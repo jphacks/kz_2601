@@ -13,6 +13,7 @@ import (
 	"github.com/jphacks/kz_2601/backend/internal/loop/draft"
 	"github.com/jphacks/kz_2601/backend/internal/loop/github"
 	"github.com/jphacks/kz_2601/backend/internal/loop/ingest"
+	"github.com/jphacks/kz_2601/backend/internal/loop/triage"
 )
 
 // Env of the issue target. No repo = dry run: approving records the
@@ -32,8 +33,12 @@ func (a *app) draftBuild(ctx context.Context, args []string) error {
 	if err := a.allow(ctx, loop.StageDraft); err != nil {
 		return err
 	}
+	emb, th, err := triage.EmbedFromEnv(a.getenv)
+	if err != nil {
+		return err
+	}
 	g := a.gate()
-	b := &draft.Builder{Store: a.loop, Now: a.now, MaxNew: *maxNew,
+	b := &draft.Builder{Store: a.loop, Now: a.now, MaxNew: *maxNew, Embedder: emb, SimilarThreshold: th,
 		OnDraft: func(ctx context.Context, d loop.Draft, created bool) error {
 			action := "draft_extended"
 			if created {

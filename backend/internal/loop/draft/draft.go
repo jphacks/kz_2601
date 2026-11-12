@@ -44,6 +44,12 @@ type Builder struct {
 	// OnItem, when set, is called for each item whose status changed. An
 	// error stops the run.
 	OnItem func(ctx context.Context, it loop.Item) error
+	// Embedder, when set (LOOP_EMBED=on), lists the existing clusters near a
+	// new draft's in its body (「同じかもしれない束」). It never merges them.
+	Embedder triage.Embedder
+	// SimilarThreshold is the cosine for a candidate (0 =
+	// triage.DefaultSimilarThreshold).
+	SimilarThreshold float64
 }
 
 // Result counts one run.
@@ -99,6 +105,12 @@ func (b *Builder) Run(ctx context.Context) (Result, error) {
 		maxNew = 20
 	}
 	now := b.now()
+	var reps []triage.ClusterRep
+	if b.Embedder != nil {
+		if reps, err = b.clusterReps(ctx, pending, filed); err != nil {
+			return res, err
+		}
+	}
 	for _, key := range keys {
 		newItems := clusters[key]
 		d, exists := open[key]
@@ -140,6 +152,14 @@ func (b *Builder) Run(ctx context.Context) (Result, error) {
 		}
 		d.AppendRepo, d.AppendIssue = t.Repo, t.Number
 		fill(&d, all, now)
+		// recomputed on every rebuild, so an extended draft keeps its list
+		if b.Embedder != nil && d.AppendIssue == 0 {
+			sims, err := triage.SimilarClusters(ctx, b.Embedder, key, all[0].Summary, reps, b.threshold())
+			if err != nil {
+				return res, fmt.Errorf("similar clusters of %s: %w", key, err)
+			}
+			addSimilar(&d, sims)
+		}
 		if reasons := Check(d.Title, d.Body, texts(all)); len(reasons) > 0 {
 			// do not store a draft that would fail at approval; the items
 			// go to the weekly manual triage
@@ -159,6 +179,9 @@ func (b *Builder) Run(ctx context.Context) (Result, error) {
 			res.Extended++
 		} else {
 			res.Created++
+			if b.Embedder != nil && d.AppendIssue == 0 {
+				reps = append(reps, triage.ClusterRep{Key: key, Count: d.Count, Summary: all[0].Summary})
+			}
 		}
 		if b.OnDraft != nil {
 			if err := b.OnDraft(ctx, d, !exists); err != nil {
@@ -174,6 +197,71 @@ func (b *Builder) Run(ctx context.Context) (Result, error) {
 		}
 	}
 	return res, nil
+}
+
+func (b *Builder) threshold() float64 {
+	if b.SimilarThreshold > 0 {
+		return b.SimilarThreshold
+	}
+	return triage.DefaultSimilarThreshold
+}
+
+// clusterReps are the clusters a new draft is compared with: the pending
+// drafts and the filed, still open issues. A draft's first item is its
+// representative (fill orders them).
+func (b *Builder) clusterReps(ctx context.Context, pending []loop.Draft, filed map[string]Filed) ([]triage.ClusterRep, error) {
+	ds := slices.Clone(pending)
+	keys := make([]string, 0, len(filed))
+	for k := range filed {
+		keys = append(keys, k)
+	}
+	sort.Strings(keys)
+	for _, k := range keys {
+		d, err := b.Store.GetDraft(ctx, filed[k].DraftID)
+		if err == loop.ErrNotFound {
+			continue
+		}
+		if err != nil {
+			return nil, err
+		}
+		ds = append(ds, *d)
+	}
+	out := []triage.ClusterRep{}
+	seen := map[string]bool{}
+	for _, d := range ds {
+		if d.ClusterKey == "" || seen[d.ClusterKey] || len(d.ItemIDs) == 0 {
+			continue
+		}
+		items, err := LoadItems(ctx, b.Store, d.ItemIDs[:1])
+		if err != nil {
+			return nil, err
+		}
+		if len(items) == 0 {
+			continue
+		}
+		seen[d.ClusterKey] = true
+		out = append(out, triage.ClusterRep{Key: d.ClusterKey, Count: d.Count, Summary: items[0].Summary})
+	}
+	return out, nil
+}
+
+// addSimilar writes the candidates (cluster key and count only) above the
+// footer. No candidates, no section.
+func addSimilar(d *loop.Draft, sims []triage.Similar) {
+	if len(sims) == 0 {
+		return
+	}
+	var b strings.Builder
+	b.WriteString("\n## 同じかもしれない束\n\n")
+	for _, s := range sims {
+		fmt.Fprintf(&b, "- %s(%d 件)\n", s.Key, s.Count)
+	}
+	b.WriteString("\n要約の近さで選んだ候補。束ねるかは承認する人が決める。\n")
+	if i := strings.LastIndex(d.Body, "\n---\n"); i >= 0 {
+		d.Body = d.Body[:i] + b.String() + d.Body[i:]
+		return
+	}
+	d.Body += b.String()
 }
 
 func (b *Builder) updateItem(ctx context.Context, it loop.Item) error {

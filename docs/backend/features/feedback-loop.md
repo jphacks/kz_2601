@@ -112,6 +112,7 @@ flowchart LR
 | `LOOP_ANTHROPIC_API_KEY` | — | 振り分け専用のキー(アプリの `ANTHROPIC_API_KEY` とは分ける) |
 | `LOOP_TRIAGE_MODEL` | `claude-haiku-5-5` | 振り分けのモデル |
 | `LOOP_MONTHLY_TOKEN_CAP` | `3000000` | 振り分けの月のトークンの上限 |
+| `LOOP_EMBED` | 空 = off | `on` で `draft` が、下書きの代表の要約と、待っている下書き・出した Issue(まだ直っていない)の束の代表の要約の近さを測り、`LOOP_EMBED_THRESHOLD`(既定 0.7)以上の束を最大 3 つ「同じかもしれない束」(束の名前と件数だけ)として本文に書く。自動では束ねない。今の埋め込みは文字の 2 字組の作り物(外の API を呼ばない)で、モデルの埋め込みは後で差し替える |
 | `LOOP_SOURCE_APPSTORE` | 空 | `on` でストアのレビューを取り込む |
 | `LOOP_SOURCE_TESTFLIGHT` | 空 | `on` で TestFlight のフィードバック(スクショ付き・クラッシュの送信)を取り込む。キーは下の `LOOP_ASC_*` を共用。既定の `LOOP_AI_SOURCES` に入っていないので、AI に回すなら `testflight` を足す |
 | `LOOP_SOURCE_GENFAIL` | 空 | `on` で生成の失敗の急増を取り込む。`LOOP_GENFAIL_LOGS`(`gcloud logging read --format=json` で書き出したファイル・カンマ区切り。`cmd/ai-session-report -logs` と同じ形)の `ai.generate` の行から、失敗のコード(`outcome:failed` / `outcome:refused` / `error:<error_code>` / `retry:<retry_reasons>` / `validation:<validation_codes>`)ごとに、直近 `LOOP_GENFAIL_WINDOW`(既定 `24h`)の割合をその前の `LOOP_GENFAIL_BASELINE`(既定 `168h`)と比べる。件数が `LOOP_GENFAIL_MIN_COUNT`(既定 5)以上・割合が `LOOP_GENFAIL_MIN_RATE`(既定 0.05)以上・基準の `LOOP_GENFAIL_FACTOR`(既定 2)倍以上なら、コード 1 つ・1 日に 1 件。項目はコードと件数だけ(入力文・uid・アプリの id・ハッシュは持たない)。既定の `LOOP_AI_SOURCES` に入っていないので、AI に回すなら `gen_failure` を足す |
@@ -280,5 +281,5 @@ go run ./cmd/feedback-loop audit -summary
 | Crashlytics を自動で読む | Crashlytics は安く読める API が無い。BigQuery のエクスポート(#296)ができたら `ingest.CrashSource` を実装する。それまでは `ingest-crash` で人が記録 |
 | 生成の失敗の急増を自動で読む | 今はログを人が `gcloud logging read` で書き出して `LOOP_GENFAIL_LOGS` に渡す。Logging API か BigQuery から読む時は `ingest.GenLogSource` を実装する |
 | Google の機密データの検出(#367 の選択肢 2-B) | GCP の設定が要るので後で |
-| 埋め込みでの束ね(#376) | 束ねはモデルの `cluster` の名前に任せている。同じ問題に別の名前が付くと別の束になる(呼び出しをまたぐと特に)。既知の束として渡すのは待っている下書きの名前だけ |
+| 埋め込みでの束ね(#376) | 束ねはモデルの `cluster` の名前に任せている。同じ問題に別の名前が付くと別の束になる(呼び出しをまたぐと特に)。既知の束として渡すのは待っている下書きの名前だけ。`LOOP_EMBED=on` で近い束を下書きに候補として書く(束ねるのは人)。モデルの埋め込みはまだ |
 | 本物の 1 週間分での一致率 | `triage-label-export` で書き出し、人が正解を付けて `triage-eval -model ai` で測る([手順](feedback-loop-triage-agreement.md)・#376 の完了の条件) |
