@@ -173,6 +173,8 @@ enum ConnectCallback: Equatable {
 @Observable
 final class ConnectedServicesModel {
     private(set) var state: ConnectedServicesState = .loading
+    /// 直前の一覧に `providers` があったか(無いのは古いサーバー)。`.loaded` の時だけ意味がある
+    private(set) var providersKnown = false
     /// 操作中の provider(ボタンを止める)
     private(set) var busy: String?
     /// 直前の操作の失敗(セクションの下に出す)
@@ -183,8 +185,12 @@ final class ConnectedServicesModel {
 
     func load(_ client: any ExternalServicesClient) async {
         do {
-            state = .from(.success(try await client.connections(supportedFeatures: ConnectedServicesFeatures.current)))
+            let list = try await client.connections(supportedFeatures: ConnectedServicesFeatures.current)
+            providersKnown = list.providers != nil
+            state = .from(.success(list))
         } catch is CancellationError {
+            // 読み込み中のまま止まらないように。もう読めた一覧は上書きしない(画面に戻れば .task が読み直す)
+            if state == .loading { state = .failed(L10n.tr("一覧を読み込めませんでした。")) }
         } catch {
             state = .from(.failure(error))
         }

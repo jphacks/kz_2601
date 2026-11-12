@@ -99,6 +99,33 @@ extension View {
     }
 }
 
+/// つなぐ案内の「つなぐ」を押せるか。一覧を読み終わるまでは押せない(読む前に押すと今つなげない provider でも始めてしまう)。
+enum ExtConnectAvailability: Equatable {
+    case loading, available, unavailable
+
+    /// `providersKnown`: 一覧に `providers` があったか。あるのにこの provider が無ければ今つなげない
+    /// (`ConnectedServicesState.rows` と同じく enabled=false 扱い)。無い古いサーバーだけつなげる扱い。
+    static func of(_ state: ConnectedServicesState, provider: String, providersKnown: Bool) -> ExtConnectAvailability {
+        switch state {
+        case .loading: .loading
+        case .hidden: .unavailable // サーバーが外の API を止めている
+        case .failed: .available // 一覧が読めないだけ。つなぐ流れ側でもう一度確かめる
+        case .loaded(let rows):
+            rows.first { $0.provider == provider }.map { $0.enabled ? .available : .unavailable }
+                ?? (providersKnown ? .unavailable : .available)
+        }
+    }
+
+    /// つなぐ案内を閉じるか。読み終わった一覧で「つないでいない」→「つないだ」に変わった時だけ。
+    /// 最初の読み込み(.loading → つないだ)は閉じない: サーバーは ext_not_connected と言っている(トークン切れ等)。
+    static func didConnect(from old: ConnectedServicesState, to new: ConnectedServicesState, provider: String) -> Bool {
+        guard case .loaded(let after) = new, after.first(where: { $0.provider == provider })?.status == .connected else { return false }
+        // 前が読めていない時は、つないだ結果か最初からつながっていたか区別できないので閉じない(閉じるボタンはある)
+        guard case .loaded(let before) = old else { return false }
+        return before.first { $0.provider == provider }?.status != .connected
+    }
+}
+
 /// つないでいない(409 `ext_not_connected`)時の案内。「つなぐ」は設定の「つないだサービス」と同じ流れ(`ConnectFlow`)。
 /// つなげたら閉じる。
 struct ExtConnectSheet: View {
@@ -119,8 +146,8 @@ struct ExtConnectSheet: View {
         row?.name ?? ConnectedServicesState.name(nil, id: provider, english: LanguagePreference.shared.code == "en")
     }
 
-    /// `providers` が今つなげないと言っている(古いサーバー・一覧が読めない時はつなげる扱い)
-    private var canConnect: Bool { row?.enabled ?? true }
+    private var availability: ExtConnectAvailability { .of(model.state, provider: provider, providersKnown: model.providersKnown) }
+    private var canConnect: Bool { availability == .available }
 
     var body: some View {
         NavigationStack {
@@ -135,7 +162,7 @@ struct ExtConnectSheet: View {
                         .fixedSize(horizontal: false, vertical: true)
                         .accessibilityIdentifier("ext.connect.title")
                 }
-                Text(canConnect ? ExtDenialCopy.connectBody(name) : ExtDenialCopy.connectUnavailable)
+                Text(availability == .unavailable ? ExtDenialCopy.connectUnavailable : ExtDenialCopy.connectBody(name))
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
@@ -151,7 +178,7 @@ struct ExtConnectSheet: View {
                     }
                 } label: {
                     Group {
-                        if model.busy == provider { ProgressView() } else { Text("つなぐ") }
+                        if model.busy == provider || availability == .loading { ProgressView() } else { Text("つなぐ") }
                     }
                     .frame(maxWidth: .infinity)
                 }
@@ -173,8 +200,8 @@ struct ExtConnectSheet: View {
         .presentationDetents([.medium])
         .presentationDragIndicator(.visible)
         .task { await model.load(services.external) }
-        .onChange(of: row?.status) { _, status in
-            if status == .connected { dismiss() } // つなげた
+        .onChange(of: model.state) { old, new in
+            if ExtConnectAvailability.didConnect(from: old, to: new, provider: provider) { dismiss() } // つなげた
         }
         .sheet(isPresented: $showPaywall) { PaywallSheet(reason: .paidFeature([ConnectedServicesSection.paidFeature])) }
     }

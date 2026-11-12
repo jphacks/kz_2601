@@ -17,7 +17,8 @@ final class ExtDenialUITests: XCTestCase {
     private func launch(error code: String) {
         app = XCUIApplication()
         app.launchEnvironment = ["METAMON_MOCK": "1", "METAMON_FAB_POSITION": "auto", "METAMON_AI_CONSENT": "granted",
-                                 "METAMON_MOCK_EXT_ERROR": code]
+                                 "METAMON_MOCK_EXT_ERROR": code,
+                                 "METAMON_MOCK_STORE": "1"] // 課金はモック(起動時は Pro でない)。結果を 1 つに決める
         app.launchArguments = ["-AppleLanguages", "(ja)", "-AppleLocale", "ja_JP", "-metamon.appLanguage", "ja"]
         app.launch()
     }
@@ -35,7 +36,7 @@ final class ExtDenialUITests: XCTestCase {
         button.tap()
     }
 
-    /// 409 `ext_not_connected` → つなぐ案内 →「つなぐ」で今のつなぐ流れ(Pro でなければ課金画面)
+    /// 409 `ext_not_connected` → つなぐ案内 →「つなぐ」で今のつなぐ流れ(Pro でないので課金画面)
     func testNotConnectedShowsConnectSheet() {
         launch(error: "ext_not_connected")
         callFakeProvider()
@@ -43,10 +44,11 @@ final class ExtDenialUITests: XCTestCase {
         XCTAssertTrue(title.waitForExistence(timeout: 5), "つなぐ案内が出ない")
         XCTAssertTrue(title.label.contains("試験用のサービス"), "provider の表示名が出ない: \(title.label)")
         attach("ext-not-connected")
-        app.buttons["ext.connect.button"].tap()
-        let paywall = app.descendants(matching: .any)["paywall.headline"].firstMatch
-        let connected = waitGone(title, timeout: 5)
-        XCTAssertTrue(connected || paywall.waitForExistence(timeout: 5), "「つなぐ」で今のつなぐ流れに入らない")
+        let connect = app.buttons["ext.connect.button"]
+        XCTAssertTrue(waitEnabled(connect, timeout: 5), "一覧を読んでも「つなぐ」が押せない")
+        connect.tap()
+        XCTAssertTrue(app.descendants(matching: .any)["paywall.headline"].firstMatch.waitForExistence(timeout: 5),
+                      "Pro でないのに「つなぐ」で課金画面が出ない")
         attach("ext-connect-tapped")
     }
 
@@ -58,8 +60,8 @@ final class ExtDenialUITests: XCTestCase {
         attach("ext-pro-required")
     }
 
-    private func waitGone(_ element: XCUIElement, timeout: TimeInterval) -> Bool {
-        let exp = XCTNSPredicateExpectation(predicate: NSPredicate(format: "exists == false"), object: element)
+    private func waitEnabled(_ element: XCUIElement, timeout: TimeInterval) -> Bool {
+        let exp = XCTNSPredicateExpectation(predicate: NSPredicate(format: "exists == true AND isEnabled == true"), object: element)
         return XCTWaiter().wait(for: [exp], timeout: timeout) == .completed
     }
 
