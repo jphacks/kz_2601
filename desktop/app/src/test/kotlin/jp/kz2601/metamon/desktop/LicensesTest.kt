@@ -9,6 +9,7 @@ import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 import org.junit.rules.TemporaryFolder
+import java.io.File
 
 /** サードパーティのライセンス: ビルド時に作る一覧・実行環境の legal・パレットの入り口。 */
 class LicensesTest {
@@ -22,8 +23,12 @@ class LicensesTest {
         assertTrue("一覧が空", bundled.size > 10)
         val app = bundled.first()
         assertEquals(LicenseEntry.Kind.APP, app.kind)
-        assertEquals("MIT", app.license)
-        assertTrue("アプリの著作権の表示", app.copyright.any { it.contains("JPHACKS") })
+        // 種類・本文・著作権の表示はリポジトリの LICENSE と一致する(LICENSE を差し替えたら一覧も追従する)
+        val repoLicense = File(checkNotNull(System.getProperty("metamon.repoLicense")) { "metamon.repoLicense が無い" }).readText()
+        assertEquals(normalize(repoLicense), normalize(app.text))
+        val heading = repoLicense.lineSequence().map { it.trim() }.first { it.isNotEmpty() }
+        assertTrue("LICENSE の 1 行目「$heading」に ${app.license} が無い", heading.contains(app.license))
+        assertEquals(repoLicense.lines().map { it.trim() }.filter { it.startsWith("Copyright") }, app.copyright)
         // 実際に使っている依存(PDF・QR・Kotlin)が POM の種類・版付きで入っている
         val pdfbox = bundled.single { it.name == "org.apache.pdfbox" }
         assertEquals("Apache-2.0", pdfbox.license)
@@ -39,6 +44,8 @@ class LicensesTest {
         val icons = bundled.single { it.id == "material-icons-extended" }
         assertEquals(listOf("Copyright The Android Open Source Project"), icons.copyright)
     }
+
+    private fun normalize(s: String) = s.replace("\r\n", "\n").lines().joinToString("\n") { it.trimEnd() }.trim('\n')
 
     @Test
     fun everyEntryHasTextAndUniqueId() {

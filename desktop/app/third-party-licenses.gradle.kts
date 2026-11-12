@@ -1,5 +1,9 @@
 import org.gradle.api.artifacts.component.ModuleComponentIdentifier
+import org.gradle.api.artifacts.result.ResolvedArtifactResult
+import org.gradle.maven.MavenModule
+import org.gradle.maven.MavenPomArtifact
 import java.io.File
+import javax.xml.XMLConstants
 import java.util.Properties
 import java.util.zip.ZipFile
 import javax.xml.parsers.DocumentBuilderFactory
@@ -9,11 +13,45 @@ import org.w3c.dom.Element
 // 形は Android の res/raw/third_party_licenses.json(android/scripts/third-party-licenses.py)と同じ。
 // 材料:
 //   - リポジトリの LICENSE(このアプリ自身)
-//   - runtimeClasspath の jar と、Gradle のキャッシュにある POM の <licenses>(無ければ親 POM)
+//   - runtimeClasspath の jar と、Gradle で解決した POM の <licenses>(無ければ親 POM)
 //   - jar の META-INF の NOTICE と、LICENSE のうち Apache-2.0 の本文の後ろ(取り込んだ部品の表示。PDFBox の Adobe・Liberation など)
 //   - 本文の正本は android/scripts/license-texts(POM には本文が無い)
 //   - Maven を通らない同梱物は licenses/vendored/*.properties(1 件 1 ファイル。whisper.cpp・ggml・音声モデルは #2004 でここに足す)
 // 種類が判定できない・本文の正本が無い依存があれば、推測で埋めずにビルドを止める。
+
+/** POM の読み込み。DOCTYPE・外部実体を受け付けない(POM はリポジトリから落とした物なので信用しない)。 */
+object PomXml {
+    private val factory: DocumentBuilderFactory = DocumentBuilderFactory.newInstance().apply {
+        setFeature(XMLConstants.FEATURE_SECURE_PROCESSING, true)
+        setFeature("http://apache.org/xml/features/disallow-doctype-decl", true)
+        setFeature("http://xml.org/sax/features/external-general-entities", false)
+        setFeature("http://xml.org/sax/features/external-parameter-entities", false)
+        setFeature("http://apache.org/xml/features/nonvalidating/load-external-dtd", false)
+        setAttribute(XMLConstants.ACCESS_EXTERNAL_DTD, "")
+        setAttribute(XMLConstants.ACCESS_EXTERNAL_SCHEMA, "")
+        isXIncludeAware = false
+        isExpandEntityReferences = false
+    }
+
+    fun parse(file: File): Element = synchronized(factory) { factory.newDocumentBuilder() }.parse(file).documentElement
+
+    fun child(e: Element, name: String): Element? {
+        val nodes = e.childNodes
+        for (i in 0 until nodes.length) (nodes.item(i) as? Element)?.takeIf { it.tagName == name }?.let { return it }
+        return null
+    }
+
+    fun text(e: Element, name: String): String? = child(e, name)?.textContent?.trim()?.takeIf { it.isNotEmpty() }
+
+    fun licenseNames(root: Element): List<String> = child(root, "licenses")?.let { ls ->
+        (0 until ls.childNodes.length).mapNotNull { (ls.childNodes.item(it) as? Element)?.let { l -> text(l, "name") } }
+    }.orEmpty()
+
+    /** 親 POM の group:artifact:version。無ければ null。 */
+    fun parent(root: Element): String? = child(root, "parent")?.let { p ->
+        listOf(text(p, "groupId"), text(p, "artifactId"), text(p, "version")).takeIf { it.all { v -> v != null } }?.joinToString(":")
+    }
+}
 
 abstract class GenerateThirdPartyLicenses : DefaultTask() {
     /** group:artifact:version → jar の場所(場所は機械ごとに違うので入力は [jars] と [components] で見る)。 */
@@ -43,9 +81,13 @@ abstract class GenerateThirdPartyLicenses : DefaultTask() {
     @get:Internal
     abstract val repoDir: DirectoryProperty
 
-    /** POM を読むキャッシュ(~/.gradle/caches/modules-2/files-2.1)。中身は版ごとに変わらない。 */
+    /** group:artifact:version → Gradle で解決した POM(<licenses> が無い物は親 POM も)。 */
     @get:Internal
-    abstract val gradleCache: DirectoryProperty
+    abstract val pomsByComponent: MapProperty<String, String>
+
+    @get:InputFiles
+    @get:PathSensitive(PathSensitivity.NAME_ONLY)
+    abstract val poms: ConfigurableFileCollection
 
     @get:OutputDirectory
     abstract val outputDir: DirectoryProperty
@@ -64,6 +106,11 @@ abstract class GenerateThirdPartyLicenses : DefaultTask() {
     // 本文の正本(license-texts のファイル)。Apache-2.0 以外は著作権者の表示が要るので、依存ごとの正本を足してから使う
     private val textFiles = mapOf("Apache-2.0" to "Apache-2.0.txt")
 
+    companion object {
+        /** 親 POM を辿る深さの上限。 */
+        const val MAX_PARENT_DEPTH = 5
+    }
+
     @TaskAction
     fun generate() {
         val errors = mutableListOf<String>()
@@ -77,7 +124,7 @@ abstract class GenerateThirdPartyLicenses : DefaultTask() {
             val (group, artifact, version) = coord.split(":")
             val pom = pomLicenses(group, artifact, version)
             if (pom == null) {
-                errors += "POM がキャッシュにありません: $coord"
+                errors += "POM を解決できません: $coord"
                 continue
             }
             if (pom.isEmpty()) {
@@ -162,35 +209,23 @@ abstract class GenerateThirdPartyLicenses : DefaultTask() {
         out.writeText(json(mapOf("source" to "desktop :desktop runtimeClasspath", "entries" to listOf(app) + vendored + deps)) + "\n")
     }
 
-    private fun pomFile(group: String, artifact: String, version: String): File? =
-        gradleCache.get().asFile.resolve("$group/$artifact/$version").listFiles().orEmpty()
-            .flatMap { it.listFiles().orEmpty().toList() }.firstOrNull { it.extension == "pom" }
-
-    private fun parse(file: File): Element =
-        DocumentBuilderFactory.newInstance().newDocumentBuilder().parse(file).documentElement
-
-    private fun Element.child(name: String): Element? {
-        val nodes = childNodes
-        for (i in 0 until nodes.length) (nodes.item(i) as? Element)?.takeIf { it.tagName == name }?.let { return it }
-        return null
-    }
-
-    private fun Element.text(name: String): String? = child(name)?.textContent?.trim()?.takeIf { it.isNotEmpty() }
+    private fun pomFile(coord: String): File? = pomsByComponent.get()[coord]?.let(::File)
 
     /** POM の <licenses> の名前。無ければ親を辿る。POM が無ければ null。 */
-    private fun pomLicenses(group: String, artifact: String, version: String, depth: Int = 0): List<String>? {
-        val root = parse(pomFile(group, artifact, version) ?: return null)
-        val licenses = root.child("licenses")?.let { ls ->
-            (0 until ls.childNodes.length).mapNotNull { (ls.childNodes.item(it) as? Element)?.text("name") }
-        }.orEmpty()
-        if (licenses.isNotEmpty() || depth >= 5) return licenses
-        val parent = root.child("parent") ?: return emptyList()
-        return pomLicenses(parent.text("groupId")!!, parent.text("artifactId")!!, parent.text("version")!!, depth + 1)
+    private fun pomLicenses(group: String, artifact: String, version: String): List<String>? {
+        var root = PomXml.parse(pomFile("$group:$artifact:$version") ?: return null)
+        repeat(MAX_PARENT_DEPTH) {
+            val licenses = PomXml.licenseNames(root)
+            if (licenses.isNotEmpty()) return licenses
+            val parent = PomXml.parent(root) ?: return emptyList()
+            root = PomXml.parse(pomFile(parent) ?: return null)
+        }
+        return PomXml.licenseNames(root)
     }
 
     private fun pomUrl(group: String, artifact: String, version: String): String? {
-        val root = parse(pomFile(group, artifact, version) ?: return null)
-        return root.child("scm")?.text("url") ?: root.text("url")
+        val root = PomXml.parse(pomFile("$group:$artifact:$version") ?: return null)
+        return PomXml.child(root, "scm")?.let { PomXml.text(it, "url") } ?: PomXml.text(root, "url")
     }
 
     /** jar の META-INF の NOTICE(そのまま)と LICENSE(Apache-2.0 の本文より後ろだけ・違う種類なら全文)。 */
@@ -255,6 +290,30 @@ abstract class GenerateThirdPartyLicenses : DefaultTask() {
 
 val runtimeArtifacts = configurations.named("runtimeClasspath").flatMap { it.incoming.artifacts.resolvedArtifacts }
 
+/**
+ * POM を Gradle の解決で取る(キャッシュの置き場所に依存しない)。<licenses> が無い POM は親 POM も段ごとに解決する。
+ * 解決できなかった物は入れない(タスクがエラーにする)。
+ */
+fun resolvePoms(coords: Collection<String>): Map<String, String> {
+    val out = sortedMapOf<String, String>()
+    var pending = coords.toSortedSet()
+    repeat(GenerateThirdPartyLicenses.MAX_PARENT_DEPTH + 1) {
+        if (pending.isEmpty()) return out
+        val query = dependencies.createArtifactResolutionQuery()
+        pending.forEach { val (g, a, v) = it.split(":"); query.forModule(g, a, v) }
+        val next = sortedSetOf<String>()
+        for (c in query.withArtifacts(MavenModule::class.java, MavenPomArtifact::class.java).execute().resolvedComponents) {
+            val id = c.id as? ModuleComponentIdentifier ?: continue
+            val pom = c.getArtifacts(MavenPomArtifact::class.java).filterIsInstance<ResolvedArtifactResult>().firstOrNull()?.file ?: continue
+            out["${id.group}:${id.module}:${id.version}"] = pom.absolutePath
+            val root = PomXml.parse(pom)
+            if (PomXml.licenseNames(root).isEmpty()) PomXml.parent(root)?.takeIf { it !in out }?.let { next += it }
+        }
+        pending = next
+    }
+    return out
+}
+
 tasks.register<GenerateThirdPartyLicenses>("thirdPartyLicenses") {
     group = "build"
     description = "同梱するライセンスの一覧(licenses/third_party_licenses.json)を runtimeClasspath の POM から作る"
@@ -263,12 +322,20 @@ tasks.register<GenerateThirdPartyLicenses>("thirdPartyLicenses") {
             (a.id.componentIdentifier as? ModuleComponentIdentifier)?.let { "${it.group}:${it.module}:${it.version}" to a.file.absolutePath }
         }.toMap()
     })
+    // 解決は 1 回だけ(一覧とタスクの入力の両方で使う)
+    val resolvedPoms = objects.mapProperty(String::class.java, String::class.java).apply {
+        set(runtimeArtifacts.map { arts ->
+            resolvePoms(arts.mapNotNull { (it.id.componentIdentifier as? ModuleComponentIdentifier)?.let { c -> "${c.group}:${c.module}:${c.version}" } })
+        })
+        finalizeValueOnRead()
+    }
+    pomsByComponent.set(resolvedPoms)
+    poms.from(resolvedPoms.map { it.values.map(::File) })
     jars.from(runtimeArtifacts.map { arts -> arts.filter { it.id.componentIdentifier is ModuleComponentIdentifier }.map { it.file } })
     val repo = rootDir.resolve("..")
     repoDir.set(repo)
     appLicense.set(repo.resolve("LICENSE"))
     textsDir.set(repo.resolve("android/scripts/license-texts"))
     vendoredDir.set(projectDir.resolve("licenses/vendored"))
-    gradleCache.set(gradle.gradleUserHomeDir.resolve("caches/modules-2/files-2.1"))
     outputDir.set(layout.buildDirectory.dir("generated/thirdPartyLicenses"))
 }

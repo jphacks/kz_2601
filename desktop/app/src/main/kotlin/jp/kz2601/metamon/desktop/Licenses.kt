@@ -20,6 +20,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.semantics.heading
@@ -29,6 +30,7 @@ import jp.kz2601.metamon.desktop.i18n.Strings
 import jp.kz2601.metamon.settings.LicenseEntry
 import jp.kz2601.metamon.settings.ThirdPartyLicenses
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.awt.Desktop
 import java.io.File
@@ -72,6 +74,14 @@ object DesktopLicenses {
             text = text,
             notices = notices,
         )
+    }
+
+    /** 既定のブラウザで開く。対応していない環境・失敗なら false。UI のスレッドから呼ばない。 */
+    fun browse(uri: URI): Boolean {
+        if (!Desktop.isDesktopSupported()) return false
+        val desktop = Desktop.getDesktop()
+        if (!desktop.isSupported(Desktop.Action.BROWSE)) return false
+        return runCatching { desktop.browse(uri) }.isSuccess
     }
 
     /** 画面に出す一覧: このアプリ → 同梱物と依存 → 実行環境。一覧が読めなければ null。 */
@@ -121,6 +131,7 @@ object LicensesText {
     val SOURCE get() = Strings["settings_licenses_source"]
     val BACK get() = Strings["renderer_back"]
     val CLOSE get() = Strings["desktop_close"]
+    fun browseFailed(url: String) = Strings.format("desktop_licenses_browse_failed", url)
 }
 
 @Composable
@@ -173,9 +184,7 @@ private fun LicenseDetail(entry: LicenseEntry) {
                 entry.version?.let { DetailRow(LicensesText.VERSION, it) }
                 DetailRow(LicensesText.LICENSE, entry.license)
                 entry.copyright.forEach { Text(it, style = MaterialTheme.typography.bodySmall) }
-                entry.url?.takeIf { it.startsWith("https://") || it.startsWith("http://") }?.let { url ->
-                    TextButton(onClick = { runCatching { Desktop.getDesktop().browse(URI(url)) } }) { Text(LicensesText.SOURCE) }
-                }
+                entry.url?.takeIf { it.startsWith("https://") || it.startsWith("http://") }?.let { url -> SourceLink(url) }
             }
         }
         items(ThirdPartyLicenses.paragraphs(entry.text)) { Paragraph(it) }
@@ -188,6 +197,28 @@ private fun LicenseDetail(entry: LicenseEntry) {
                 )
             }
             items(ThirdPartyLicenses.paragraphs(notice.text)) { Paragraph(it) }
+        }
+    }
+}
+
+/** 出典を既定のブラウザで開く。開けない環境・失敗した時は URL を添えて知らせる(選んで写せる)。 */
+@Composable
+private fun SourceLink(url: String) {
+    val scope = rememberCoroutineScope()
+    var failed by remember(url) { mutableStateOf(false) }
+    TextButton(onClick = {
+        scope.launch {
+            // browse は OS の起動を待つことがあるので UI のスレッドで呼ばない
+            failed = !withContext(Dispatchers.IO) { DesktopLicenses.browse(URI(url)) }
+        }
+    }) { Text(LicensesText.SOURCE) }
+    if (failed) {
+        SelectionContainer {
+            Text(
+                LicensesText.browseFailed(url),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.error,
+            )
         }
     }
 }
