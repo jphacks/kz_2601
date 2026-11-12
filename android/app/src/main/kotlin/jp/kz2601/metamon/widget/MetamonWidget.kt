@@ -41,7 +41,6 @@ import jp.kz2601.metamon.MainActivity
 import jp.kz2601.metamon.R
 import jp.kz2601.metamon.ReviewBuild
 import java.time.LocalDate
-import java.util.Locale
 
 /**
  * ホーム画面のウィジェット(#912・iOS の `MetamonStatWidget`)。本体が書いた [WidgetSnapshot] を描くだけ(DSL・記録は読まない)。
@@ -186,7 +185,7 @@ private fun Large(snapshot: WidgetSnapshot) {
 @Composable
 private fun Bars(trend: WidgetSnapshot.Trend) {
     val max = trend.points.maxOfOrNull { it.value }?.takeIf { it > 0 } ?: 1.0
-    val locale = Locale.getDefault()
+    val locale = LocalContext.current.resources.configuration.locales[0]
     val barArea = 40
     Row(GlanceModifier.fillMaxWidth(), verticalAlignment = Alignment.Bottom) {
         trend.points.forEach { p ->

@@ -112,6 +112,18 @@ func (m *Memory) PutState(_ context.Context, state string, s OAuthState) error {
 	return nil
 }
 
+// DeleteStates implements StateStore.
+func (m *Memory) DeleteStates(_ context.Context, uid string) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	for k, s := range m.states {
+		if s.UID == uid {
+			delete(m.states, k)
+		}
+	}
+	return nil
+}
+
 // TakeState implements StateStore.
 func (m *Memory) TakeState(_ context.Context, state string) (OAuthState, bool, error) {
 	m.mu.Lock()

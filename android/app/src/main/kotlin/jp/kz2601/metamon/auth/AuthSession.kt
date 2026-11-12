@@ -200,13 +200,28 @@ class AuthSession(val service: AuthService, private val beforeSignOut: suspend (
     }
 
     /**
-     * アカウント削除(#841・iOS の `deleteAccount`)。`DELETE /v1/me` → Firebase のユーザー削除(要れば入り直し)
-     * → 端末のデータ → サインアウト。失敗(サーバーに届かない等)は throw して何も消さない。
+     * アカウント削除(#841・iOS の `deleteAccount`)。Apple のトークンの取り消し(#1165)→ `DELETE /v1/me`
+     * → Firebase のユーザー削除(要れば入り直し) → 端末のデータ → サインアウト。
+     * 失敗(サーバーに届かない等)は throw して何も消さない。
      * @param reauthenticate 入り直せたら true。匿名・キャンセルは false
+     * @param revokeAppleToken Apple で入った人なら削除の前に Apple のトークンを取り消す(`AppleTokenRevocation`)。
+     * 失敗しても削除は続ける
      */
-    suspend fun deleteAccount(account: AccountClient, reauthenticate: suspend () -> Boolean, wipe: suspend () -> Unit) {
+    suspend fun deleteAccount(
+        account: AccountClient,
+        reauthenticate: suspend () -> Boolean,
+        wipe: suspend () -> Unit,
+        revokeAppleToken: suspend () -> Unit = {},
+    ) {
         // 通知の登録はアカウントを消す前に消す(消した後はトークンが通らない)・#887
         runBeforeSignOut()
+        // Apple の取り消しは Firebase のユーザーを消す前(消した後は本人として取り消せない)・#1165
+        try {
+            revokeAppleToken()
+        } catch (e: CancellationException) {
+            throw e
+        } catch (_: Exception) {
+        }
         AccountDeletionFlow.run(account, service, reauthenticate = reauthenticate, wipeLocal = wipe)
     }
 

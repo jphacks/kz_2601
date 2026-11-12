@@ -59,22 +59,35 @@ class VoiceUndoTest {
         override suspend fun resetChat(appId: String) = Unit
     }
 
-    /** サーバーの版の履歴。restore は新しい版を作る(履歴は消さない)。 */
+    /** サーバーの版の履歴。appconfig と同じく restore も新しい版(kind=restore・restoredFrom)を積む。 */
     private class FakeVersions(private val ai: FakeAI) : AppVersions {
         val names = mutableMapOf<Int, String>()
+        val infos = mutableMapOf<Int, VersionInfo>()
         val restored = mutableListOf<Int>()
         var fail = false
 
-        override suspend fun versions(appId: String): List<Int> {
+        /** 生成・修正で増えた版を履歴に積む */
+        fun record(version: Int, name: String) {
+            names[version] = name
+            infos[version] = VersionInfo(
+                version = version,
+                parentVersion = if (version > 1) version - 1 else null,
+                kind = if (version == 1) "create" else "edit",
+            )
+        }
+
+        override suspend fun versions(appId: String): List<VersionInfo> {
             if (fail) throw IOException("offline")
-            return names.keys.sortedDescending()
+            return infos.keys.sortedDescending().map { infos.getValue(it) }
         }
 
         override suspend fun restore(appId: String, version: Int): AppDocument {
             if (fail) throw IOException("offline")
             restored += version
+            val parent = ai.version
             val v = ++ai.version
             names[v] = names.getValue(version)
+            infos[v] = VersionInfo(v, parentVersion = parent, kind = "restore", restoredFrom = version)
             return AppDocument(appId, v, AppDSL.decode(
                 """{"schemaVersion":1,"app":{"name":"${names.getValue(version)}"},"initialScreen":"home",
                    "screens":[{"id":"home","components":[]}]}""",
@@ -97,7 +110,7 @@ class VoiceUndoTest {
     private fun TestScope.generate(vm: VoiceViewModel, text: String, versions: FakeVersions? = null) {
         vm.generateNow(text)
         advanceUntilIdle()
-        versions?.names?.put(vm.state.value.document.version, text)
+        versions?.record(vm.state.value.document.version, text)
     }
 
     @Test
@@ -272,5 +285,126 @@ class VoiceUndoTest {
         assertEquals("前のアプリの版を当てない", "app-2", vm.state.value.document.appId)
         assertEquals("割り勘", vm.appName)
         assertEquals(UndoNotice.NO_EARLIER, vm.state.value.notice)
+    }
+
+    // MARK: 続けて戻す / やり直す(#1786・iOS の UndoWalk と同じ選び方)
+
+    /** 完了の条件 1: 3 回直した後に 3 回戻すと最初の版の中身になる(直前 2 版の往復にならない)。 */
+    @Test
+    fun threeUndosWalkBackToTheFirstVersion() = runTest {
+        val ai = FakeAI()
+        val versions = FakeVersions(ai)
+        val vm = vm(ai, versions)
+        generate(vm, "A", versions) // v1
+        generate(vm, "B", versions) // v2
+        generate(vm, "C", versions) // v3
+        generate(vm, "D", versions) // v4
+        assertEquals(4, vm.state.value.document.version)
+
+        vm.undo(vm.state.value.document.version)
+        advanceUntilIdle()
+        assertEquals("C", vm.appName)
+        vm.undo(vm.state.value.document.version)
+        advanceUntilIdle()
+        assertEquals("直前の D に戻らず、さらに前へ", "B", vm.appName)
+        vm.undo(vm.state.value.document.version)
+        advanceUntilIdle()
+        assertEquals("A", vm.appName)
+        assertEquals("restore する版は減っていく", listOf(3, 2, 1), versions.restored)
+        assertEquals("restore は新しい版を作る", 7, vm.state.value.document.version)
+
+        vm.undo(vm.state.value.document.version)
+        advanceUntilIdle()
+        assertEquals(UndoNotice.NO_EARLIER, vm.state.value.notice)
+        assertEquals("最初の版より前へは restore しない", 3, versions.restored.size)
+        assertEquals("A", vm.appName)
+    }
+
+    /** 完了の条件 2: 2 回戻した後に 2 回やり直せる。 */
+    @Test
+    fun twoUndosThenTwoRedos() = runTest {
+        val ai = FakeAI()
+        val versions = FakeVersions(ai)
+        val vm = vm(ai, versions)
+        generate(vm, "A", versions)
+        generate(vm, "B", versions)
+        generate(vm, "C", versions)
+        generate(vm, "D", versions)
+
+        vm.undo(vm.state.value.document.version)
+        advanceUntilIdle()
+        vm.undo(vm.state.value.document.version)
+        advanceUntilIdle()
+        assertEquals("B", vm.appName)
+        assertTrue(vm.state.value.canRedo)
+
+        vm.redo(vm.state.value.document.version)
+        advanceUntilIdle()
+        assertEquals("C", vm.appName)
+        assertTrue("もう 1 つやり直せる", vm.state.value.canRedo)
+
+        vm.redo(vm.state.value.document.version)
+        advanceUntilIdle()
+        assertEquals("D", vm.appName)
+        assertFalse(vm.state.value.canRedo)
+        assertTrue("やり直した後はもう一度戻せる", vm.state.value.canUndo)
+
+        // 戻す → やり直す → 戻す も往復しない
+        vm.undo(vm.state.value.document.version)
+        advanceUntilIdle()
+        assertEquals("C", vm.appName)
+        vm.undo(vm.state.value.document.version)
+        advanceUntilIdle()
+        assertEquals("B", vm.appName)
+    }
+
+    /** 完了の条件 3: 同じ版を見て押された連打は restore 1 回。 */
+    @Test
+    fun rapidTapsRestoreOnce() = runTest {
+        val ai = FakeAI()
+        val versions = FakeVersions(ai)
+        val vm = vm(ai, versions)
+        generate(vm, "A", versions)
+        generate(vm, "B", versions)
+        generate(vm, "C", versions)
+
+        val pressedAt = vm.state.value.document.version
+        vm.undo(pressedAt)
+        vm.undo(pressedAt)
+        vm.undo(pressedAt)
+        advanceUntilIdle()
+        assertEquals("同じ版を見て押した連打は 1 回", listOf(2), versions.restored)
+        assertEquals("B", vm.appName)
+
+        // 画面が変わってから押し直せば、さらに前へ
+        vm.undo(vm.state.value.document.version)
+        advanceUntilIdle()
+        assertEquals("A", vm.appName)
+        assertEquals(listOf(2, 1), versions.restored)
+    }
+
+    /** 戻した後に新しく直したら、その修正の前(戻した先の中身)へ戻り、やり直すは消える。 */
+    @Test
+    fun editAfterUndoClearsRedoAndUndoesToTheRestoredContent() = runTest {
+        val ai = FakeAI()
+        val versions = FakeVersions(ai)
+        val vm = vm(ai, versions)
+        generate(vm, "A", versions)
+        generate(vm, "B", versions)
+        generate(vm, "C", versions)
+        vm.undo(vm.state.value.document.version)
+        advanceUntilIdle()
+        vm.undo(vm.state.value.document.version)
+        advanceUntilIdle()
+        assertEquals("A", vm.appName)
+        assertTrue(vm.state.value.canRedo)
+
+        generate(vm, "A2", versions)
+        assertFalse("新しい修正で「やり直す」は消える", vm.state.value.canRedo)
+
+        vm.undo(vm.state.value.document.version)
+        advanceUntilIdle()
+        assertEquals("修正の前の中身へ", "A", vm.appName)
+        assertEquals(1, versions.restored.last())
     }
 }

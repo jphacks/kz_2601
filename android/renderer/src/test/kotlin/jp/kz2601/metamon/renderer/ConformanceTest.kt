@@ -8,6 +8,7 @@ import jp.kz2601.metamon.dsl.records.JSONValue
 import jp.kz2601.metamon.renderer.components.lists.LeafData
 import jp.kz2601.metamon.renderer.components.lists.ListRows
 import jp.kz2601.metamon.renderer.components.lists.ScreenLocals
+import jp.kz2601.metamon.renderer.form.FormChoices
 import jp.kz2601.metamon.renderer.form.FormDraft
 import jp.kz2601.metamon.renderer.form.FormPrefill
 import jp.kz2601.metamon.dsl.AppDSL
@@ -16,6 +17,10 @@ import jp.kz2601.metamon.dsl.screen
 import jp.kz2601.metamon.dsl.ComponentType
 import jp.kz2601.metamon.dsl.DslJson
 import jp.kz2601.metamon.dsl.expr.DSLClock
+import jp.kz2601.metamon.dsl.logic.CsvReader
+import jp.kz2601.metamon.dsl.logic.ImportRowFailure
+import jp.kz2601.metamon.dsl.logic.RecordImport
+import jp.kz2601.metamon.dsl.logic.csvMappings
 import jp.kz2601.metamon.dsl.records.Entity
 import jp.kz2601.metamon.dsl.records.FieldCoding
 import jp.kz2601.metamon.dsl.records.Record
@@ -298,6 +303,16 @@ private class CaseSession(private val dsl: AppDSL, private val runtime: CaseRunt
                 if (form == null || f == null) return false
                 form.values[f] = JSONValue.from(input["value"] ?: JsonNull)
             }
+            op.containsKey("importCsv") -> {
+                // ファイルを選ぶ操作は含めない: CSV の中身を直に渡し、列の当て方と足す記録だけを比べる
+                val imp = op["importCsv"]!!.jsonObject
+                val id = (imp["component"] as? JsonPrimitive)?.contentOrNull
+                val c = screen?.allComponents?.firstOrNull { if (id == null) it.rawType == "fileImport" else it.id == id } ?: return false
+                if (c.rawType != "fileImport") return false
+                val entity = c.entity?.let(runtime::entityModel) ?: return false
+                if (tapTree.state(c, form) != "rendered") return false
+                importCsv(csvText(imp["text"]), c, entity)
+            }
             op.containsKey("search") -> {
                 val search = op["search"]!!.jsonObject
                 val key = (search["field"] as? JsonPrimitive)?.contentOrNull ?: return false
@@ -307,6 +322,60 @@ private class CaseSession(private val dsl: AppDSL, private val runtime: CaseRunt
             else -> return false
         }
         return true
+    }
+
+    /** `importCsv.text`: 1 つの文字列、または 1 行 1 要素の配列(読みやすさのため)。 */
+    private fun csvText(v: JsonElement?): String = when (v) {
+        is JsonArray -> v.mapNotNull { (it as? JsonPrimitive)?.contentOrNull }.joinToString("\n") + "\n"
+        is JsonPrimitive -> v.contentOrNull.orEmpty()
+        else -> ""
+    }
+
+    private fun importKind(kind: ImportRowFailure.Kind): String = when (kind) {
+        ImportRowFailure.Kind.INVALID -> "invalid"
+        ImportRowFailure.Kind.REQUIRED -> "required"
+        ImportRowFailure.Kind.TOO_LONG -> "tooLong"
+    }
+
+    /**
+     * `fileImport` の CSV の取り込み(iOS の `importCSV`・アプリの [FileImportFlow] の plan → 1 件ずつ足す を写したもの。
+     * ファイル選択と確認ダイアログの文言は含めない)。
+     */
+    private fun importCsv(text: String, c: Component, entity: Entity) {
+        val plan = RecordImport.plan(CsvReader.parse(text), entity, c.map.csvMappings, runtime.records(entity.id).size) { field, name ->
+            field.refEntity?.let { target ->
+                FormChoices.records(runtime, target).firstOrNull { FormChoices.refTitle(it, target, runtime) == name }?.id
+            }
+        }
+        effects += obj(
+            "imported" to obj(
+                "entity" to JsonPrimitive(entity.id),
+                "matched" to JsonArray(plan.matched.map { obj("column" to JsonPrimitive(it.first), "field" to JsonPrimitive(it.second)) }),
+                "unused" to JsonArray(plan.unused.map(::JsonPrimitive)),
+                "failures" to JsonArray(
+                    plan.failures.map {
+                        obj(
+                            "line" to JsonPrimitive(it.line),
+                            "field" to JsonPrimitive(it.fieldName),
+                            "kind" to JsonPrimitive(importKind(it.kind)),
+                            "cell" to JsonPrimitive(it.cell),
+                        )
+                    },
+                ),
+                "overLimit" to JsonPrimitive(plan.overLimit),
+            ),
+        )
+        for (data in plan.rows) {
+            val id = "new-${nextId++}"
+            runtime.put(entity.id, runtime.records(entity.id) + Record(id, data))
+            effects += obj(
+                "saved" to obj(
+                    "entity" to JsonPrimitive(entity.id),
+                    "recordId" to JsonPrimitive(id),
+                    "data" to JsonObject(data.mapValues { it.value.toJsonElement() }),
+                ),
+            )
+        }
     }
 
     private fun dispatch(action: Action, ctx: ActionContext) {

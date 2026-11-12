@@ -11,6 +11,7 @@ extension MacLeafKey {
         case .upArrow: self = .up
         case .downArrow: self = .down
         case .space: self = .space
+        case .delete, .deleteForward: self = .delete
         default:
             // 修飾キー付き(⌘1 など)はメニューへ渡す
             if press.modifiers.isDisjoint(with: [.command, .control, .option]),
@@ -37,7 +38,7 @@ extension View {
         #endif
     }
 
-    /// Mac: rating をキーボードと VoiceOver で付ける。Tab で入り、←→↑↓ で 1 つずつ・数字キーでその数(0 で消す)。
+    /// Mac: rating をキーボードと VoiceOver で付ける。Tab で入り、←→↑↓ で 1 つずつ・数字キーでその数(0 と delete で消す)。
     /// VoiceOver は 1 つの調整できる部品として「評価, 5 段階中 3」と読み、上下の操作で増減する。
     @ViewBuilder
     func macRatingControl(label: String?, current: Int, count: Int, set: @escaping (Int) -> Void) -> some View {

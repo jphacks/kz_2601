@@ -20,7 +20,7 @@ data class DeviceCapabilities(
     internal class Feature(val key: String, val implemented: Boolean, val needs: ComponentType? = null)
 
     companion object {
-        /** Field.health(健康のデータへの書き込み)。Health Connect が未実装(#890 の子 Issue)。 */
+        /** Field.health(健康のデータへの書き込み)。Health Connect で入れた(#870)ので通常の版では外さない。 */
         const val FIELD_HEALTH = "fieldHealth"
 
         /**
@@ -81,7 +81,7 @@ data class DeviceCapabilities(
 
         fun of(registry: ComponentRegistry = ComponentRegistry.standard): DeviceCapabilities = DeviceCapabilities(
             allowedComponents = allowedComponents(registry),
-            disabledFeatures = listOf(FIELD_HEALTH),
+            disabledFeatures = emptyList(),
             supportedFeatures = supportedFeatures(registry),
         )
     }

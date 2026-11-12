@@ -134,8 +134,12 @@ final class MacShareFlow {
     /// iOS の `adopt` と同じ一言(共有データ付きは「みんなと同じデータ」を添える)
     static func banner(_ app: InstalledApp, kind: Pending.Kind) -> String {
         let head = kind == .join ? L10n.tr("「\(app.name)」に参加しました") : L10n.tr("シェアされた「\(app.name)」を追加しました")
-        let extra = app.member ? L10n.tr("。参加している人の記録も見られます") : app.joined ? L10n.tr("。みんなの投稿も見られます") : ""
-        return head + extra
+        return head + bannerExtra(app)
+    }
+
+    /// 共有データ付きのアプリに添える一言(「探す」から入れた時も同じ・#2069)
+    static func bannerExtra(_ app: InstalledApp) -> String {
+        app.member ? L10n.tr("。参加している人の記録も見られます") : app.joined ? L10n.tr("。みんなの投稿も見られます") : ""
     }
 
     /// 参加の表示名に表示できない言葉があった(#321)

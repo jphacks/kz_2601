@@ -28,6 +28,12 @@ interface TimerHost {
 
     /** 前面で見えている間は終了のバナーを出さない。 */
     fun timerVisible(key: String, visible: Boolean) = Unit
+
+    /**
+     * `timerDisplay.liveActivity`: 走行状態を進行中の表示(iOS の Live Activity / Android は常駐の通知)に映す(#913)。
+     * [totalSeconds] は countdown の合計秒(stopwatch は null)。既定は何もしない(表示を持たないホスト)。
+     */
+    fun timerActivity(key: String, name: String, totalSeconds: Int?, run: TimerRun) = Unit
 }
 
 /** 書き込みの順と失敗の扱い(iOS の `OptimisticSave`)。 */

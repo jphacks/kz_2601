@@ -19,6 +19,7 @@ import jp.kz2601.metamon.dsl.records.MatchInterest
 import jp.kz2601.metamon.dsl.records.Record
 import jp.kz2601.metamon.dsl.records.RecordPermission
 import jp.kz2601.metamon.nearby.NearbyShareController
+import jp.kz2601.metamon.notifications.TimerActivityUpdate
 import jp.kz2601.metamon.renderer.ActionContext
 import jp.kz2601.metamon.renderer.components.media.PhotoReader
 import jp.kz2601.metamon.renderer.DSLRuntime
@@ -851,6 +852,19 @@ class AppRuntime(
 
     override fun timerVisible(key: String, visible: Boolean) = host.timerVisible("${document.appId}/$key", visible)
 
+    /** timerDisplay.liveActivity の進行中の表示(#913・iOS の `AppRuntime.timerActivity`)。 */
+    override fun timerActivity(key: String, name: String, totalSeconds: Int?, run: TimerRun) {
+        val appId = document.appId
+        val update = TimerActivityUpdate("$appId/$key", appId, dsl.app.name, name, totalSeconds, run)
+        val generation = accountGeneration
+        scope.launch {
+            // サインアウト・アカウントの切り替えがあった: 前の人の表示を出し直さない
+            if (accountGeneration != generation) return@launch
+            // 出せない(通知の許可が無い)のは始めた時だけ伝える。止めた・消した時は黙る
+            if (!host.timerActivity(update) && run.isRunning) showToast(RuntimeCopy.ACTIVITY_NOTIFICATIONS_OFF)
+        }
+    }
+
     /** フォームを通さず 1 件足す。作った行の id(仮 id)。entity が無ければ null。 */
     suspend fun createRecord(entity: String, data: Map<String, JSONValue>): String? {
         if (dsl.entities.none { it.id == entity }) return null
@@ -1121,9 +1135,11 @@ class AppRuntime(
         if (!form.needsWrite) return leaveAfterSave(action, ctx)
         // 連打: 1 回目のローカル保存を待つ間の 2 回目は捨てる
         if (!savingLock.withLock { savingForms.add(form) }) return
+        // 保存すると下書きは消える(markSaved)ので、ヘルスに書く値は先に取る
+        val payload = form.payload
         try {
             val appId = document.appId
-            val (list, written) = write(entity, recordId, form.payload)
+            val (list, written) = write(entity, recordId, payload)
             setRecords(appId, entity, list)
             form.markSaved(queuedOffline = !recordSync.isOnline)
             formDrafts.forget(form) // 保存したら端末の書きかけも消す(#1185)
@@ -1132,7 +1148,31 @@ class AppRuntime(
         } finally {
             savingLock.withLock { savingForms.remove(form) }
         }
+        writeHealthFields(entity, payload, isNew = recordId == null)
         leaveAfterSave(action, ctx)
+    }
+
+    /**
+     * `Field.health`(#870・iOS の `AppRuntime+Health`): 新しく保存した体重をヘルスコネクトにも書く。
+     * 記録の保存とは別で、失敗しても記録は保存済み。理由だけトーストで出す。
+     * 編集の保存では書かない(同じ計測が二重に入る)。
+     */
+    private fun writeHealthFields(entity: String, data: Map<String, JSONValue>, isNew: Boolean) {
+        if (!isNew) return
+        val health = host.health ?: return
+        val model = entityModel(entity) ?: return
+        val kilograms = model.fields.filter { it.health == "weight" }.mapNotNull { data[it.id]?.doubleValue }.filter { it > 0 }
+        if (kilograms.isEmpty()) return
+        scope.launch {
+            try {
+                for (kg in kilograms) health.saveWeight(kg)
+                showToast(RuntimeCopy.HEALTH_SAVED)
+            } catch (e: CancellationException) {
+                throw e
+            } catch (_: Exception) {
+                showToast(RuntimeCopy.HEALTH_SAVE_FAILED)
+            }
+        }
     }
 
     /** 保存の後: screen があればそこへ、無ければ閉じる。 */
