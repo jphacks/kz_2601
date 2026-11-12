@@ -21,6 +21,8 @@ dependencies {
     implementation(project(":dsl"))
     // API クライアント・記録の保存・送信待ち(android/services と同じソース・#1748 #1754)
     implementation(project(":services"))
+    // 音声入力(マイク + whisper.cpp を JNI で・#1751)。既定は使わない(TAILORIT_VOICE=1 で使う)
+    implementation(project(":whisper"))
     implementation(compose.desktop.currentOs)
     implementation(compose.material3)
     // icon の絵(#1742)。core だけ(extended は足さず、表で使う絵は Android の生成物を取り込む)。
@@ -115,6 +117,9 @@ compose.desktop {
             packageVersion = "0.1.0"
             // 読み上げ(Windows の Java Access Bridge)を同梱の実行環境に入れる(#1759)
             modules("jdk.accessibility")
+            // whisper.cpp の JNI のライブラリ(whisper/native/build.sh・build.ps1 で out/<os>-<arch>/ に作る・#1751)を配る形に入れる。
+            // 作っていなければ入らず、音声入力は「この PC では用意できていません」になる。モデルは入れない(初回に落とす)
+            appResourcesRootDir.set(project(":whisper").layout.projectDirectory.dir("native/out"))
         }
     }
 }

@@ -5,6 +5,7 @@ import androidx.compose.runtime.snapshots.Snapshot
 import jp.kz2601.metamon.desktop.io.PdfIo
 import jp.kz2601.metamon.desktop.io.RecordIo
 import jp.kz2601.metamon.desktop.io.Tsv
+import jp.kz2601.metamon.desktop.voice.VoiceInput
 import jp.kz2601.metamon.dsl.Action
 import jp.kz2601.metamon.dsl.ActionFormat
 import jp.kz2601.metamon.dsl.ActionType
@@ -53,12 +54,15 @@ import kotlin.concurrent.thread
  * - lookupBook: 本の情報(モックでは見本の本・`TAILORIT_API_BASE` があれば `POST /v1/lookup/book`)
  * - scheduleNotification / cancelNotification: トレイの通知(起動中だけ・時刻は次の 1 回)。常駐トレイ(#1761)があればそのアイコンから
  * - export: CSV を書き出し、同じ中身をクリップボードにも入れる
- * - openVoice・startActivity・endActivity・follow・unfollow: 今は使えない旨
+ * - openVoice: `TAILORIT_VOICE=1` の時だけマイクで録って端末の中で文字にする(voice/VoiceInput・#1751)。既定は使えない旨
+ * - startActivity・endActivity・follow・unfollow: 今は使えない旨
  */
 class DesktopActionHost(
     private val books: BookLookupClient = BookLookupClient.fromEnv(),
     private val exportDir: File = defaultExportDir(),
     private val notifier: Notifier = Notifier.Tray,
+    /** null なら openVoice は使えない旨(既定はフラグが立っている時だけ作る) */
+    private val voice: VoiceInput? = VoiceInput.fromEnv(),
 ) : ActionHost {
     override fun request(action: Action, ctx: ActionContext, session: DesktopSession): String? = when (action.type) {
         ActionType.OPEN_URL -> openUrl(action.url)
@@ -68,7 +72,7 @@ class DesktopActionHost(
         ActionType.SCHEDULE_NOTIFICATION -> action.notification?.let { notifier.schedule(it) } ?: Strings["runtime_notification_failed"]
         ActionType.CANCEL_NOTIFICATION -> action.notificationId?.let { notifier.cancel(it) }
         ActionType.EXPORT -> export(action, ctx, session)
-        ActionType.OPEN_VOICE -> UNAVAILABLE_VOICE
+        ActionType.OPEN_VOICE -> voice?.toggle { msg -> Snapshot.withMutableSnapshot { session.message = msg } } ?: UNAVAILABLE_VOICE
         ActionType.START_ACTIVITY, ActionType.END_ACTIVITY -> UNAVAILABLE_ACTIVITY
         ActionType.FOLLOW, ActionType.UNFOLLOW -> UNAVAILABLE_FOLLOW
         else -> Strings.format("runtime_unknown_action", action.rawType.ifEmpty { action.type.wire })
