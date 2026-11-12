@@ -75,6 +75,7 @@ struct MetamonApp: App {
         runtime.aiConsent = .shared
         runtime.tutorial = .shared
         runtime.coachMarks = .shared // #1441
+        runtime.spotlight = SpotlightAppIndexer(index: CoreSpotlightIndex()) // #1996
         #if !APP_STORE_REVIEW
         runtime.betaWelcome = .shared // #313
         #endif
@@ -131,6 +132,7 @@ struct MetamonApp: App {
             .animation(.easeInOut(duration: 0.3), value: session.user == nil)
             .modifier(SplashOverlay(mode: splashMode)) // 下の起動処理は待たずに進む
             .modifier(UpdateGateModifier(gate: updateGate))
+            .modifier(SpotlightOpenReceiver()) // Spotlight の結果のタップ(#1996)。サインイン前でも受けて保留
             #if !APP_STORE_REVIEW
             .modifier(ShareLinkReceiver()) // シェアリンクはサインイン前でも受けて保留(#278)
             .modifier(PushRegistrationObserver(uid: session.user?.uid)) // #269
