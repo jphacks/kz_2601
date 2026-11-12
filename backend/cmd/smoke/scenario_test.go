@@ -519,3 +519,22 @@ func TestPrintFallbackCounts(t *testing.T) {
 		t.Fatalf("failed = %d, want 2", n)
 	}
 }
+
+// A body of only continuation bytes has no rune start to walk back to: trunc
+// must stop after UTFMax-1 bytes and still return valid UTF-8.
+func TestTruncAllContinuationBytes(t *testing.T) {
+	s := strings.Repeat("\x80", 300)
+	for _, n := range []int{1, 3, 120, 299} {
+		got := trunc(s, n)
+		if !utf8.ValidString(got) {
+			t.Fatalf("trunc(%d) produced invalid UTF-8: %q", n, got)
+		}
+		if got != "…" {
+			t.Fatalf("trunc(%d) = %q, want only the ellipsis", n, got)
+		}
+	}
+	// valid text before the broken tail is kept
+	if got := trunc("ab"+strings.Repeat("\x80", 10), 6); got != "ab…" {
+		t.Fatalf("mixed = %q", got)
+	}
+}

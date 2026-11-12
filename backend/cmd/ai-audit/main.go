@@ -74,9 +74,24 @@ func kind(v any) string {
 // objs returns the object elements of m[k], recording the others in a.bad.
 func (a *app) objs(m obj, k, at string) []obj {
 	var out []obj
+	for _, e := range a.indexed(m, k, at) {
+		out = append(out, e.o)
+	}
+	return out
+}
+
+// item is an object element of an array with its index in the original array.
+type item struct {
+	i int
+	o obj
+}
+
+// indexed is objs that keeps each object's original index (for location labels).
+func (a *app) indexed(m obj, k, at string) []item {
+	var out []item
 	for i, v := range arr(m, k) {
 		if o, ok := v.(obj); ok {
-			out = append(out, o)
+			out = append(out, item{i, o})
 		} else {
 			a.bad = append(a.bad, fmt.Sprintf("malformed: %s.%s[%d] がオブジェクトでない(%s)", at, k, i, kind(v)))
 		}
@@ -95,6 +110,10 @@ func load(raw json.RawMessage) (*app, error) {
 		return nil, err
 	}
 	a := &app{raw: root, screens: map[string]obj{}, entities: map[string]obj{}, fields: map[string]map[string]obj{}}
+	if root == nil { // "dsl": null decodes without error; do not pass it off as an empty app
+		a.bad = append(a.bad, "malformed: dsl がオブジェクトでない(null)")
+		return a, nil
+	}
 	for _, eo := range a.objs(root, "entities", "dsl") {
 		id := str(eo, "id")
 		a.entities[id] = eo
@@ -107,9 +126,14 @@ func load(raw json.RawMessage) (*app, error) {
 		sid := str(so, "id")
 		a.screens[sid] = so
 		a.objs(so, "toolbar", "screen "+sid) // report only; actions() skips non-objects
-		for _, co := range a.objs(so, "components", "screen "+sid) {
+		for _, e := range a.indexed(so, "components", "screen "+sid) {
+			co := e.o
 			a.comps = append(a.comps, comp{sid, co})
-			for _, cho := range a.objs(co, "children", "screen "+sid+" "+str(co, "type")) {
+			at := "screen " + sid + " " + str(co, "type")
+			if str(co, "type") == "" { // no type to name the container by: use its index
+				at = fmt.Sprintf("screen %s.components[%d]", sid, e.i)
+			}
+			for _, cho := range a.objs(co, "children", at) {
 				a.comps = append(a.comps, comp{sid, cho})
 			}
 		}

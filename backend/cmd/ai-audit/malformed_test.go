@@ -35,10 +35,12 @@ func TestMalformedRuns(t *testing.T) {
 			[]string{"screen s.toolbar[0]", "screen s.toolbar[1]"}},
 		{"nested action not object", `{"initialScreen":"s","screens":[{"id":"s","components":[{"type":"button","action":"go"},{"type":"list","onItemTap":[1]}]}]}`, nil},
 		{"filter / item non-object", `{"screens":[{"id":"s","components":[{"type":"stat","label":"今月","filter":"x","value":[null]},{"type":"list","item":3,"sort":"a"}]}]}`, nil},
-		{"null dsl", `null`, nil},
+		{"null dsl", `null`, []string{"malformed: dsl がオブジェクトでない(null)"}},
+		{"children of untyped container", `{"screens":[{"id":"s","components":[{"type":"text"},{"children":[null]}]}]}`,
+			[]string{"screen s.components[1].children[0] がオブジェクトでない(null)"}},
 		{"empty object", `{}`, nil},
 	}
-	needs := []string{"agg", "filter_month", "filter_week", "filter_year", "toggle", "tabs3", "filter_bool", "notify", "sort_time", "ref", "calc", "remaining", "streak", "group_by_member"}
+	needs := needNames(t)
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
 			a, err := load([]byte(tc.dsl))
@@ -77,7 +79,8 @@ func TestEvaluateMalformedRun(t *testing.T) {
 		{"id":"c1","ok":true,"dsl":{"app":{"tabs":["home",null,3]}}},
 		{"id":"c2","ok":true,"dsl":[1,2]},
 		{"id":"c3","ok":true},
-		{"id":"c4","ok":true,"dsl":{"screens":[{"id":"s","components":[{"type":"stack","children":[null]}]}]}}]}`
+		{"id":"c4","ok":true,"dsl":{"screens":[{"id":"s","components":[{"type":"stack","children":[null]}]}]}},
+		{"id":"c5","ok":true,"dsl":null}]}`
 	p := filepath.Join(t.TempDir(), "run.json")
 	if err := os.WriteFile(p, []byte(run), 0o600); err != nil {
 		t.Fatal(err)
@@ -93,6 +96,9 @@ func TestEvaluateMalformedRun(t *testing.T) {
 		if r := res[id]; r.ok || r.err == "" {
 			t.Errorf("%s should fail to load: %+v", id, r)
 		}
+	}
+	if r := res["c5"]; !r.ok || !strings.Contains(strings.Join(r.lint, "\n"), "malformed: dsl がオブジェクトでない(null)") {
+		t.Errorf("c5 (dsl null) should be reported, not loaded as an empty app: %+v", r)
 	}
 	if r := res["c4"]; !strings.Contains(strings.Join(r.lint, "\n"), "children[0] がオブジェクトでない(null)") {
 		t.Errorf("c4: %v", r.lint)
