@@ -2,6 +2,8 @@
 
 Compose Multiplatform Desktop(JVM)で作る Windows・Linux 版。DSL の読み込み・式・レコードの規則は Android と同じ `android/dsl`(純 Kotlin)をそのまま使う。Android SDK は要らない。
 
+部品・アクションごとの対応(描ける / 代わり / 使えません / 未定): [docs/desktop/support-matrix.md](../docs/desktop/support-matrix.md)
+
 ## 動かす
 
 JDK 17 以上が要る。
