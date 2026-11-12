@@ -1929,7 +1929,7 @@ paths:
               additionalProperties: false
               properties:
                 region: { type: string, pattern: '^[0-9]{6}$', description: 'weather / warnings / pressure だけ・必須' }
-                feedId: { type: string, description: 'rss・arxiv だけ・必須(GET の feedId と同じ一覧)' }
+                feedId: { type: string, description: 'rss・arxiv・status だけ・必須(GET の feedId と同じ一覧)' }
                 q: { type: string, minLength: 1, maxLength: 40, description: 'diet だけ・必須。国会会議録で探す語' }
                 limit: { type: integer, minimum: 1, maximum: 20, default: 5 }
             example: { q: 予算 委員会, limit: 5 }
