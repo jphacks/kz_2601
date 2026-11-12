@@ -18,6 +18,9 @@ struct RootView: View {
     @State private var fabFrame: CGRect?
     /// ソフトキーボードの表示状態(FAB を隠す・#143)
     private let keyboard = KeyboardState.shared
+    @Environment(\.assistiveAccess) private var assistiveAccess
+    /// アシスティブアクセスの一覧から開いたアプリ(#1997)
+    @State private var assistiveOpenedAppId: String?
 
     var body: some View {
         @Bindable var rt = rt
@@ -34,6 +37,10 @@ struct RootView: View {
                     // 結果が届いた後も組み上げ(#626)の間はここに留まる(`rootViewID` で作り直さない)
                     GeneratingView(job: stage.job, reveal: stage.reveal)
                         .transition(.asymmetric(insertion: .identity, removal: .opacity))
+                } else if assistiveHome == .appList {
+                    AssistiveAccessAppList { assistiveOpenedAppId = $0 }
+                } else if assistiveHome == .openedApp, AssistiveActions.hasCandidates(in: rt.dsl) {
+                    AssistiveAccessActionsView() // #1998 主な動作を大きなボタンで(選べない時は今の画面のまま)
                 } else if rt.dsl.isVoiceOnly {
                     // 初期状態(voiceEntry = fullscreen)はグリッドのセル内ではなく全面に描く(背景を画面いっぱいに敷くため)。
                     // 見出しは DSL の prompt ではなく Greeting(#42: 初回/再訪/時間帯で出し分け)
@@ -59,13 +66,21 @@ struct RootView: View {
                 .environment(\.fabFrame, fabFrame)
                 .environment(\.changeHighlight, rt.changeHighlight) // #626 編集で変わった部品だけ光らせる
                 .environment(\.gridEditSession, rt.gridEdit) // #1442 手で動かす編集モード
+                .safeAreaInset(edge: .top, spacing: 0) {
+                    if assistiveHome == .openedApp {
+                        AssistiveAccessBackBar {
+                            rt.paths = [:] // 次に開いた時は最初の画面から
+                            assistiveOpenedAppId = nil
+                        }
+                    }
+                }
 
             // フォーム画面(push)では FAB を出さず、ナビバー右上のマイク(`formToolbarAccessory`)が入口になる(#83)
             // キーボード表示中も隠す(入力欄・キーボードのツールバーに被るため・#143)
             // シート・部品のシートが上にある間はそちらの層が出す(#629 `ModalVoiceFabLayer` / `ComponentAIButtonLayer`)
             ZStack {
                 // create の全画面「変身中」の上には出さない(重ねる方式の時は GeneratingView が覆っていた)
-                if mainEntry == .fab, rt.gridEdit == nil { // 編集モード中は FAB を出さない(部品のつまみに被る)
+                if mainEntry == .fab, rt.gridEdit == nil, assistiveAccess.shows(.aiButton) { // 編集モード中は FAB を出さない(部品のつまみに被る)
                     VoiceFab(
                         hasTabs: rt.dsl.app.hasTabs,
                         leadingObstructionTop: bottomObstructions[visibleMainRoute.id],
@@ -138,8 +153,9 @@ struct RootView: View {
         .modifier(MatchingSheets()) // 仲間探しの 18 歳以上の確認(#507)
         .modifier(CallSheets()) // 通話の画面(#447)
         #endif
-        .environment(\.formToolbarAccessory, AnyView(VoiceToolbarButton()))
-        .environment(\.aiButtonLayer, ComponentAIButtonLayer.wrapper) // #629 部品から開くシートにも AI ボタン
+        // アシスティブアクセス(#1997)では AI ボタンを出さない
+        .environment(\.formToolbarAccessory, assistiveAccess.shows(.aiButton) ? AnyView(VoiceToolbarButton()) : nil)
+        .environment(\.aiButtonLayer, assistiveAccess.shows(.aiButton) ? ComponentAIButtonLayer.wrapper : nil) // #629 部品から開くシートにも AI ボタン
         .sensoryFeedback(.impact(weight: .medium), trigger: rt.showAppSwitcher) { _, opened in opened }
         .modifier(PublicDataPromptHost()) // #253 生成直後の「個人の情報も公開されます」
         .modifier(RetentionPromptHost()) // #482 記録の保存期間の確認
@@ -189,12 +205,17 @@ struct RootView: View {
             }
         }
         #endif
-        .modifier(ConsentHost()) // #246: AI への送信の同意・音声モデルのダウンロード確認
-        .modifier(AccountLinkPromptHost()) // #276: 匿名で初めて作った後の「引き継ぎのためにサインイン」
-        .modifier(TutorialHost()) // #274: 同意のあとに初回のチュートリアル・最初のアプリの直後に直し方の例
+        // アシスティブアクセス(#1997)では起動時の案内を出さない(待たせていたリンク・Intent は下の task で放す)
+        .unlessAssistiveAccess(.launchPrompts, ConsentHost()) // #246: AI への送信の同意・音声モデルのダウンロード確認
+        .unlessAssistiveAccess(.launchPrompts, AccountLinkPromptHost()) // #276: 匿名で初めて作った後の「引き継ぎのためにサインイン」
+        .unlessAssistiveAccess(.launchPrompts, TutorialHost()) // #274: 同意のあとに初回のチュートリアル・最初のアプリの直後に直し方の例
         #if !APP_STORE_REVIEW
-        .modifier(BetaWelcomeHost()) // #313: β の版だけ、チュートリアルのあとに初回の案内
+        .unlessAssistiveAccess(.launchPrompts, BetaWelcomeHost()) // #313: β の版だけ、チュートリアルのあとに初回の案内
         #endif
+        .task(id: assistiveAccess) {
+            rt.assistiveAccess = assistiveAccess
+            if !assistiveAccess.shows(.launchPrompts) { rt.launchPresentationsAbandoned() }
+        }
         .alert(item: $rt.confirm) { confirm in
             let run: () -> Void = { Task { await confirm.perform() } }
             return Alert(title: Text(confirm.message),
@@ -212,6 +233,11 @@ struct RootView: View {
         .onChange(of: scenePhase) { _, phase in
             rt.setForeground(phase == .active) // ホットリロードのポーリングは前面時のみ
         }
+    }
+
+    /// アシスティブアクセス(#1997)の根に出すもの。
+    private var assistiveHome: AssistiveAccessPolicy.Home {
+        assistiveAccess.home(openedAppId: assistiveOpenedAppId, currentAppId: rt.document.appId)
     }
 
     /// 上部の要約・失敗のカードを出すか。編集モード(#1442)中は編集のバーを隠さないよう出さない
@@ -300,13 +326,14 @@ struct RootView: View {
 private struct ToastHost: ViewModifier {
     let onModal: Bool
     @Environment(AppRuntime.self) private var rt
+    @Environment(\.assistiveAccess) private var assistiveAccess
 
     func body(content: Content) -> some View {
         let active = onModal == (rt.sheet != nil || rt.fullScreen != nil)
         content.overlay(alignment: .bottom) {
             if active, let message = rt.toast {
                 let dismiss = { withAnimation { rt.toast = nil } }
-                let fixable = rt.fixOffer?.message == message
+                let fixable = rt.fixOffer?.message == message && assistiveAccess.shows(.voiceSheet) // #1997
                 HStack(spacing: Theme.Spacing.sm) {
                     Text(message)
                     if fixable { FixRequestToastButton() }
@@ -383,18 +410,20 @@ private struct UITestMorphProbe: View {
 private struct HostSheets: ViewModifier {
     let onModal: Bool
     @Environment(AppRuntime.self) private var rt
+    @Environment(\.assistiveAccess) private var assistiveAccess
 
     func body(content: Content) -> some View {
         let active = onModal == (rt.sheet != nil || rt.fullScreen != nil)
         content
-            // 部品から開いたシートが上にある間は、そちらが出す(#629 `ComponentAIButtonLayer`)
-            .sheet(isPresented: Binding(get: { active && rt.showVoiceSheet && AIButtonLayers.shared.isEmpty },
+            // 部品から開いたシートが上にある間は、そちらが出す(#629 `ComponentAIButtonLayer`)。アシスティブアクセス(#1997)では出さない
+            .sheet(isPresented: Binding(get: { active && rt.showVoiceSheet && AIButtonLayers.shared.isEmpty && assistiveAccess.shows(.voiceSheet) },
                                         set: { rt.showVoiceSheet = $0 })) {
                 VoiceInputView()
                     .presentationDetents([.large])
                     .presentationDragIndicator(.visible)
             }
-            .sheet(isPresented: Binding(get: { active && rt.showAppSwitcher }, set: { rt.showAppSwitcher = $0 })) {
+            .sheet(isPresented: Binding(get: { active && rt.showAppSwitcher && assistiveAccess.shows(.appSwitcher) },
+                                        set: { rt.showAppSwitcher = $0 })) {
                 AppSwitcherSheet()
             }
             .sheet(item: Binding(get: { active ? rt.exportFile : nil }, set: { rt.exportFile = $0 })) { file in

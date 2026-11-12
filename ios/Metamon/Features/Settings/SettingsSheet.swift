@@ -29,6 +29,7 @@ struct SettingsSheet: View {
             List {
                 if Self.e2eDeleteAccount { deleteAccountSection } // E2E: 削除ボタンを画面内に出す(シミュレータはスクロール操作できない)
                 accountSection
+                LinkedAccountsSection() // #361 つながっているサインインの方法・Apple をつなぐ
                 #if !APP_STORE_REVIEW // 審査用ビルドは共有を外しているので、投稿に出す名前も出さない(#247)
                 AuthorNameSettingsSection() // 共有アプリの投稿に出す名前(#250)
                 #endif
@@ -46,6 +47,7 @@ struct SettingsSheet: View {
                 UsageSettingsSection() // #317 使っている量(作ったアプリの数・今のアプリの記録と写真)
                 languageSection
                 Section { AppIconSettingsRow() } // #232 ホーム画面のアイコン(全員・審査用の版も出す)
+                ActionButtonHintSection() // #1993 iOS 17 だけ: アクションボタンにショートカットを割り当てる案内
                 voiceModelSection
                 clarifySection
                 speechSection
@@ -63,6 +65,9 @@ struct SettingsSheet: View {
                 PrivacySettingsSection() // #246: AI への送信の同意・プライバシーポリシー・利用規約
                 supportSection
                 if !Self.e2eDeleteAccount { deleteAccountSection }
+                #if METAMON_STG // 開発用メニュー(#2079): stg の版だけ・接続先が prod なら出さない
+                if DebugMenuPolicy.isAvailable { DebugMenuEntrySection() }
+                #endif
             }
             .navigationTitle("設定")
             .task { await rt.refreshPlanUsage() } // #317 使っている量(5 分キャッシュ)
@@ -354,6 +359,13 @@ struct SettingsSheet: View {
                 Label("頼み方のコツ", systemImage: "lightbulb")
             }
             .accessibilityIdentifier("settings.tips")
+            NavigationLink {
+                AutomationGuideView() // #1995 ショートカットのオートメーションの案内
+            } label: {
+                Label("ショートカットで自動にする", systemImage: "clock.arrow.2.circlepath")
+            }
+            .accessibilityHint("App を開いた時などをきっかけに「記録を追加」を動かす作り方を見ます")
+            .accessibilityIdentifier("settings.automationGuide")
             Button(role: .destructive) { confirmReset = true } label: {
                 Label(L10n.key("アプリをリセット(初期状態に戻す)", review: "記録帳をリセット(初期状態に戻す)"), systemImage: "arrow.counterclockwise")
             }

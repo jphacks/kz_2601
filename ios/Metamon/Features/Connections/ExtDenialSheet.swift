@@ -15,6 +15,15 @@ enum ExtDenialRoute: Equatable {
     /// シートを出さず 1 文だけ
     case toast(String)
 
+    /// アシスティブアクセス(#1997)では課金・コイン・つなぐ案内(設定・Pro を指す文も)を出さず、`AssistiveAccessPolicy.unavailableMessage` だけ出す。
+    static func of(_ denial: ExtDenial, isPro: Bool, assistiveAccess: AssistiveAccessPolicy = .standard) -> ExtDenialRoute {
+        guard !assistiveAccess.shows(.paywall) else { return of(denial, isPro: isPro) }
+        switch denial {
+        case .unavailable, .busy: return of(denial, isPro: isPro) // 待てば直る。行き先を指さない
+        default: return .toast(AssistiveAccessPolicy.unavailableMessage)
+        }
+    }
+
     static func of(_ denial: ExtDenial, isPro: Bool) -> ExtDenialRoute {
         switch denial {
         case .notConnected(let provider?):
@@ -57,6 +66,7 @@ struct ExtDenialPresenter: ViewModifier {
     var onConnectClosed: () -> Void = {}
     @State private var connect: ConnectTarget?
     @State private var paywall: PaywallTarget?
+    @Environment(\.assistiveAccess) private var assistiveAccess
 
     struct ConnectTarget: Identifiable { var provider: String; var id: String { provider } }
     struct PaywallTarget: Identifiable { let id = UUID(); var features: [PaidFeature] }
@@ -74,7 +84,7 @@ struct ExtDenialPresenter: ViewModifier {
 
     private func present(_ denial: ExtDenial) {
         print("[Metamon] ext: denied \(denial)")
-        switch ExtDenialRoute.of(denial, isPro: ProGate.shared.isPro) {
+        switch ExtDenialRoute.of(denial, isPro: ProGate.shared.isPro, assistiveAccess: assistiveAccess) {
         case .connect(let provider): connect = ConnectTarget(provider: provider)
         case .paywall(let features): paywall = PaywallTarget(features: features)
         case .coins(let coins): if !CoinGate.shared.handle(coins) { onMessage(CoinCopy.denialBody(coins)) }
@@ -182,12 +192,7 @@ struct ExtConnectSheet: View {
             }
             .padding(Theme.Spacing.lg)
             .background(Theme.Colors.canvas.ignoresSafeArea())
-            .toolbar {
-                ToolbarItem(placement: .cancellationAction) {
-                    Button("閉じる") { dismiss() }
-                        .accessibilityIdentifier("ext.connect.close")
-                }
-            }
+            .toolbar { SheetCloseToolbarItem(identifier: "ext.connect.close") { dismiss() } }
         }
         .presentationDetents([.medium])
         .presentationDragIndicator(.visible)
@@ -199,7 +204,7 @@ struct ExtConnectSheet: View {
     }
 }
 
-#if DEBUG
+#if DEBUG || METAMON_STG // 開発用メニュー(#2079)から呼ぶ
 /// 開発用: 偽の provider `fakeOauth` に op を投げて、断りの案内を部品なしで出す(#2001)。
 /// `METAMON_MOCK=1` と `METAMON_MOCK_EXT_ERROR=<code>` を併せると、モックの次の呼び出しにそのエラーを仕込む(UI テスト用)。
 enum DebugExtDenial {
