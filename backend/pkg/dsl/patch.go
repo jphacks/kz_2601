@@ -35,29 +35,29 @@ const MaxPatchOps = 50
 // untouched; errors are *ValidationError so the ai can re-prompt with them.
 func ApplyPatch(current []byte, ops []PatchOp) ([]byte, *App, error) {
 	if len(ops) == 0 {
-		return nil, nil, &ValidationError{Problems: []string{"patch is empty"}}
+		return nil, nil, problem(CodePatchEmpty, "patch is empty")
 	}
 	if len(ops) > MaxPatchOps {
-		return nil, nil, &ValidationError{Problems: []string{fmt.Sprintf("too many patch ops (%d > %d)", len(ops), MaxPatchOps)}}
+		return nil, nil, problem(CodePatchTooMany, fmt.Sprintf("too many patch ops (%d > %d)", len(ops), MaxPatchOps))
 	}
 	raw, err := json.Marshal(ops)
 	if err != nil {
-		return nil, nil, &ValidationError{Problems: []string{"encode patch: " + err.Error()}}
+		return nil, nil, problem(CodePatchInvalid, "encode patch: "+err.Error())
 	}
 	p, err := jsonpatch.DecodePatch(raw)
 	if err != nil {
-		return nil, nil, &ValidationError{Problems: []string{"invalid JSON Patch: " + err.Error()}}
+		return nil, nil, problem(CodePatchInvalid, "invalid JSON Patch: "+err.Error())
 	}
 	opts := jsonpatch.NewApplyOptions()
 	opts.EnsurePathExistsOnAdd = false
 	opts.AllowMissingPathOnRemove = false
 	next, err := p.ApplyWithOptions(current, opts)
 	if err != nil {
-		return nil, nil, &ValidationError{Problems: []string{"apply patch: " + err.Error()}}
+		return nil, nil, problem(CodePatchApply, "apply patch: "+err.Error())
 	}
 	var buf bytes.Buffer
 	if err := json.Compact(&buf, next); err != nil {
-		return nil, nil, &ValidationError{Problems: []string{"compact: " + err.Error()}}
+		return nil, nil, problem(CodePatchApply, "compact: "+err.Error())
 	}
 	app, err := Parse(buf.Bytes())
 	if err != nil {
@@ -113,12 +113,12 @@ var compiledPatch = func() *jsonschema.Schema {
 func ValidatePatchDocument(raw []byte) error {
 	doc, err := jsonschema.UnmarshalJSON(bytes.NewReader(raw))
 	if err != nil {
-		return &ValidationError{Problems: []string{"invalid JSON: " + err.Error()}}
+		return problem(CodeInvalidJSON, "invalid JSON: "+err.Error())
 	}
 	if err := compiledPatch.Validate(doc); err != nil {
 		var ve *jsonschema.ValidationError
 		if errors.As(err, &ve) {
-			return &ValidationError{Problems: flatten(ve)}
+			return flatten(ve)
 		}
 		return &ValidationError{Problems: []string{err.Error()}}
 	}

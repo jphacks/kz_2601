@@ -14,6 +14,7 @@ import (
 //	RATE_LIMIT_GLOBAL_DAILY    units/day for the environment    (2000)
 //	RATE_LIMIT_WAIVED_HOURLY   waived requests/hour per uid     (30)
 //	RATE_LIMIT_WAIVED_IP_HOURLY waived requests/hour per IP     (120)
+//	RATE_LIMIT_UNCHANGED_DAILY unchanged edits refunded/day per uid (5)
 //	RATE_LIMIT_WEIGHT_CREATE   generate, new app                (3)
 //	RATE_LIMIT_WEIGHT_EDIT     generate, edit                   (2)
 //	RATE_LIMIT_WEIGHT_CHAT     chat turn                        (1)
@@ -34,6 +35,7 @@ func ConfigFromEnv(getenv func(string) string) (Config, error) {
 		{"RATE_LIMIT_GLOBAL_DAILY", &cfg.Limits.Global},
 		{"RATE_LIMIT_WAIVED_HOURLY", &cfg.Limits.WaivedHourly},
 		{"RATE_LIMIT_WAIVED_IP_HOURLY", &cfg.Limits.WaivedIPHourly},
+		{"RATE_LIMIT_UNCHANGED_DAILY", &cfg.Limits.UnchangedDaily},
 		{"RATE_LIMIT_WEIGHT_CREATE", &cfg.Weights.Create},
 		{"RATE_LIMIT_WEIGHT_EDIT", &cfg.Weights.Edit},
 		{"RATE_LIMIT_WEIGHT_CHAT", &cfg.Weights.Chat},

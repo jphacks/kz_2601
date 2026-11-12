@@ -43,11 +43,18 @@ type Row struct {
 // JSON never goes back to the device.
 type Output struct {
 	Rows []Row `json:"rows,omitempty"`
-	Item *Row  `json:"item,omitempty"`
+	// Cells are Rows' cells in column order (Cells[i] is Rows[i]) for
+	// server-side readers only (the scheduled import, #1712); an op that
+	// has no columns leaves it nil. Never sent to a device.
+	Cells [][]string `json:"-"`
+	Item  *Row       `json:"item,omitempty"`
 	// ResultID is the id of what a write op made (resultIdField).
 	ResultID string `json:"resultId,omitempty"`
 	// Usage is the call's measured cost (paid providers).
 	Usage Usage `json:"-"`
+	// ValidUntil, when set, is when the first row stops being valid (ODPT
+	// dct:valid): the answer cache keeps the answer no longer than this.
+	ValidUntil time.Time `json:"-"`
 }
 
 // Usage is the measured cost of a paid call. Priced false: the op did not

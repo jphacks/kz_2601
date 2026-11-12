@@ -7,17 +7,25 @@ import (
 	"regexp"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/jphacks/kz_2601/backend/internal/loop"
 	"github.com/jphacks/kz_2601/backend/internal/loop/github"
 )
 
-type fakePublisher struct{ titles, bodies []string }
+type fakePublisher struct{ titles, bodies, comments []string }
 
 func (f *fakePublisher) CreateIssue(_ context.Context, repo, title, body string, _ []string) (*github.Issue, error) {
 	f.titles, f.bodies = append(f.titles, title), append(f.bodies, body)
 	return &github.Issue{Number: 77, URL: "https://github.com/" + repo + "/issues/77"}, nil
 }
+
+func (f *fakePublisher) CommentIssue(_ context.Context, repo string, n int, body string) (*github.Issue, error) {
+	f.comments = append(f.comments, body)
+	return &github.Issue{Number: n, URL: "https://github.com/" + repo + "/issues/77#issuecomment-1"}, nil
+}
+
+func (f *fakePublisher) IssueOpen(context.Context, string, int) (bool, error) { return true, nil }
 
 var reDraftID = regexp.MustCompile(`drf_[0-9a-f]+`)
 
@@ -70,6 +78,27 @@ func TestDraftsFlow(t *testing.T) {
 	if d.Status != loop.DraftPublished || d.IssueNumber != 77 {
 		t.Fatalf("draft %+v", d)
 	}
+
+	// a later report of the same cluster is added to #77, not filed again
+	later := loop.Item{ID: loop.ItemID(loop.SourceInApp, "later"), Source: loop.SourceInApp, SourceID: "later", UID: "u-later",
+		Text: "写真を足すと落ちる", AIAllowed: true, Status: loop.ItemTriaged, Category: "bug", Area: "render", Priority: "P2",
+		Summary: "写真を足すとアプリが終了する。", ClusterKey: "photo-add-crash", IngestedAt: d.PublishedAt.Add(time.Minute), ExpiresAt: d.ExpiresAt}
+	if _, err := ta.ls.PutItem(context.Background(), later); err != nil {
+		t.Fatal(err)
+	}
+	ta.must(t, "draft")
+	out = ta.must(t, "drafts", "list")
+	if !strings.Contains(out, "(adds to owner/repo#77)") {
+		t.Fatalf("list: %s", out)
+	}
+	id2 := reDraftID.FindString(out)
+	out = ta.must(t, "drafts", "approve", "-by", "ko-tarou", id2)
+	if !strings.Contains(out, "added to owner/repo#77") || len(pub.comments) != 1 || len(pub.bodies) != 1 {
+		t.Fatalf("append: %s (%d comments, %d issues)", out, len(pub.comments), len(pub.bodies))
+	}
+	if !strings.Contains(pub.comments[0], "- 件数: 1") || strings.Contains(pub.comments[0], "u-later") {
+		t.Fatalf("comment:\n%s", pub.comments[0])
+	}
 }
 
 func TestDraftsArgs(t *testing.T) {
@@ -83,5 +112,25 @@ func TestDraftsArgs(t *testing.T) {
 	ta.env[envIssueRepo] = ""
 	if err := ta.run(context.Background(), []string{"drafts", "approve", "-by", "x"}); err == nil {
 		t.Fatal("missing id accepted")
+	}
+}
+
+func TestReviewerRefusesAgentLabels(t *testing.T) {
+	for _, labels := range []string{"agent:ready", "feedback, agent:ready", " Agent:Plan "} {
+		ta := newTestApp(t, env{envIssueLabels: labels})
+		if _, err := ta.reviewer(); err == nil || !strings.Contains(err.Error(), "refusing to start") {
+			t.Fatalf("%q: err = %v", labels, err)
+		}
+		if err := ta.run(context.Background(), []string{"drafts", "show", "drf_x"}); err == nil {
+			t.Fatalf("%q: drafts show ran", labels)
+		}
+	}
+	ta := newTestApp(t, env{envIssueLabels: "feedback,from-users"})
+	r, err := ta.reviewer()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Join(r.Labels, ",") != "feedback,from-users" {
+		t.Fatalf("labels %v", r.Labels)
 	}
 }

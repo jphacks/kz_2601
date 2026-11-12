@@ -224,6 +224,12 @@ func asFloat(v any) (float64, bool) {
 	return 0, false
 }
 
+// NormalizeValue is the check and stored form of one value of f that a
+// device write gets (normalizeValue), for server writers that must store
+// the same thing: the scheduled sheet import (#1712). f must not be
+// encrypted (normalizeEncrypted is the device's door for those).
+func NormalizeValue(f *dsl.Field, v any) (any, error) { return normalizeValue(f, v) }
+
 func normalizeValue(f *dsl.Field, v any) (any, error) {
 	switch f.Type {
 	case dsl.FieldString, dsl.FieldText:

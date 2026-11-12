@@ -12,6 +12,7 @@ import (
 	"github.com/jphacks/kz_2601/backend/internal/ai"
 	"github.com/jphacks/kz_2601/backend/internal/loop"
 	"github.com/jphacks/kz_2601/backend/internal/loop/triage"
+	"github.com/jphacks/kz_2601/backend/internal/loop/triage/eval"
 )
 
 // Env of the triage model. The key is the loop's own (#365 decision 7: not
@@ -37,6 +38,32 @@ func (a *app) triageModel() (triage.Model, error) {
 	return triage.AIModel{C: ai.NewClient(key, model, "")}, nil
 }
 
+// llmHooks are the checks around every call of the loop's model. Before:
+// the stop switches and the monthly cap are read again, so a switch flipped
+// mid-run, or the cap reached, stops the next call. After: the call's
+// tokens go to the month's usage and the audit log (action, or
+// action+"_failed").
+func (a *app) llmHooks(g *loop.Gate, action string) eval.Hooks {
+	return eval.Hooks{
+		BeforeCall: func(ctx context.Context) error {
+			if err := g.AllowLLM(ctx); err != nil {
+				return g.Stopped(ctx, loop.StageTriage, err)
+			}
+			return nil
+		},
+		AfterCall: func(ctx context.Context, u triage.Usage, callErr error) error {
+			if _, err := a.control.AddUsage(ctx, loop.Month(a.now()), u.Total()); err != nil {
+				return err
+			}
+			e := loop.Event{Stage: loop.StageTriage, Action: action, Tokens: u.Total()}
+			if callErr != nil {
+				e.Action, e.Reason = action+"_failed", "error"
+			}
+			return g.Record(ctx, e)
+		},
+	}
+}
+
 func (a *app) triage(ctx context.Context, args []string) error {
 	fs := flag.NewFlagSet("triage", flag.ContinueOnError)
 	maxItems := fs.Int("max", triage.DefaultMaxItems, "max items per run")
@@ -52,25 +79,9 @@ func (a *app) triage(ctx context.Context, args []string) error {
 	if err != nil {
 		return err
 	}
+	h := a.llmHooks(g, "llm_call")
 	t := &triage.Triager{Store: a.loop, Model: m, Batch: *batch, MaxItems: *maxItems, Now: a.now,
-		// re-checked before every call: a switch flipped mid-run, or the
-		// monthly cap reached, stops the next call
-		BeforeCall: func(ctx context.Context) error {
-			if err := g.AllowLLM(ctx); err != nil {
-				return g.Stopped(ctx, loop.StageTriage, err)
-			}
-			return nil
-		},
-		AfterCall: func(ctx context.Context, u triage.Usage, callErr error) error {
-			if _, err := a.control.AddUsage(ctx, loop.Month(a.now()), u.Total()); err != nil {
-				return err
-			}
-			e := loop.Event{Stage: loop.StageTriage, Action: "llm_call", Tokens: u.Total()}
-			if callErr != nil {
-				e.Action, e.Reason = "llm_call_failed", "error"
-			}
-			return g.Record(ctx, e)
-		},
+		BeforeCall: h.BeforeCall, AfterCall: h.AfterCall,
 		OnItem: func(ctx context.Context, it loop.Item) error {
 			e := loop.Event{Stage: loop.StageTriage, Action: it.Status, ItemID: it.ID, Reason: it.HoldReason}
 			if it.Status == loop.ItemTriaged || it.Status == loop.ItemSpam {
@@ -88,6 +99,58 @@ func (a *app) triage(ctx context.Context, args []string) error {
 	if res.Stopped != "" {
 		fmt.Fprintf(a.out, "triage: stopped early: %s\n", res.Stopped)
 	}
+	return nil
+}
+
+// triageEval runs triage on a hand-labelled set in memory (nothing is
+// written to Firestore) and prints the agreement. It reports; it does not
+// fail on a low score. -model ai calls the loop's model under the triage
+// switch and the monthly cap; -model rules (default) is offline.
+func (a *app) triageEval(ctx context.Context, args []string) error {
+	fs := flag.NewFlagSet("triage-eval", flag.ContinueOnError)
+	path := fs.String("set", "", "labelled set (JSON lines: id, text, category, priority, bundle)")
+	model := fs.String("model", "rules", "rules (offline keyword baseline) or ai (the triage model)")
+	if err := fs.Parse(args); err != nil {
+		return err
+	}
+	if *path == "" {
+		return errors.New("triage-eval needs -set")
+	}
+	f, err := os.Open(*path)
+	if err != nil {
+		return err
+	}
+	defer func() { _ = f.Close() }()
+	cases, err := eval.Load(f)
+	if err != nil {
+		return fmt.Errorf("%s: %w", *path, err)
+	}
+	if len(cases) > eval.MaxCases {
+		return fmt.Errorf("%s: %d cases, at most %d", *path, len(cases), eval.MaxCases)
+	}
+	var m triage.Model
+	var h eval.Hooks
+	switch *model {
+	case "rules":
+		m = eval.Rules{}
+	case "ai":
+		g := a.gate()
+		if err := g.AllowLLM(ctx); err != nil {
+			return g.Stopped(ctx, loop.StageTriage, err)
+		}
+		if m, err = a.triageModel(); err != nil {
+			return err
+		}
+		// the same per-call checks and usage record as triage
+		h = a.llmHooks(g, "eval_call")
+	default:
+		return fmt.Errorf("unknown -model %q (rules or ai)", *model)
+	}
+	rep, err := eval.Run(ctx, m, cases, h)
+	if err != nil {
+		return err
+	}
+	a.out.WriteString(rep.String())
 	return nil
 }
 

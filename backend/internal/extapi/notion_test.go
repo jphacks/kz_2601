@@ -13,22 +13,25 @@ import (
 	"sync/atomic"
 	"testing"
 	"time"
+	"unicode/utf8"
 )
 
 // fakeNotion is Notion's OAuth endpoints and API on httptest (no live calls).
 type fakeNotion struct {
 	url string
 
-	mu        sync.Mutex
-	expiring  bool // the token answer has a refresh token and an expiry
-	refreshOK bool
-	revoked   []string
-	pages     []map[string]any // created pages' bodies
-	lastQuery map[string]any
-	versions  []string
-	inFlight  atomic.Int32
-	maxFlight atomic.Int32
-	slow      time.Duration
+	mu         sync.Mutex
+	expiring   bool // the token answer has a refresh token and an expiry
+	refreshOK  bool
+	revoked    []string
+	pages      []map[string]any // created pages' bodies
+	patches    []map[string]any // updated pages' bodies
+	blockReads []url.Values
+	lastQuery  map[string]any
+	versions   []string
+	inFlight   atomic.Int32
+	maxFlight  atomic.Int32
+	slow       time.Duration
 }
 
 const (
@@ -37,6 +40,11 @@ const (
 	notionTestDB     = "1a2b3c4d5e6f40718293a4b5c6d7e8f9"
 	notionTestDBDash = "1a2b3c4d-5e6f-4071-8293-a4b5c6d7e8f9"
 	notionTestDS     = "aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee"
+
+	notionTestPage         = "0b1c2d3e4f5a46b7a8c9d0e1f2a3b4c5"
+	notionTestPageDash     = "0b1c2d3e-4f5a-46b7-a8c9-d0e1f2a3b4c5"
+	notionTestLongPageDash = "11111111-2222-4333-8444-555555555555"
+	notionTestManyPageDash = "66666666-7777-4888-8999-aaaaaaaaaaaa"
 )
 
 func newFakeNotion(t *testing.T) (*fakeNotion, *httptest.Server) {
@@ -192,6 +200,86 @@ func newFakeNotion(t *testing.T) (*fakeNotion, *httptest.Server) {
 		id := "page-" + string(rune('0'+len(f.pages)))
 		f.mu.Unlock()
 		writeJSON(w, 200, map[string]any{"object": "page", "id": id, "url": "https://www.notion.so/" + id, "properties": props})
+	})
+	pageProps := map[string]any{
+		"名前": map[string]any{"type": "title", "title": []map[string]string{{"plain_text": "読書メモ"}}},
+		"メモ": map[string]any{"type": "rich_text", "rich_text": []map[string]string{}},
+		"数":  map[string]any{"type": "number", "number": nil},
+		"済":  map[string]any{"type": "checkbox", "checkbox": false},
+		"分類": map[string]any{"type": "select", "select": nil},
+		"期限": map[string]any{"type": "date", "date": nil},
+		"状態": map[string]any{"type": "status", "status": map[string]string{"name": "未着手"}},
+		"担当": map[string]any{"type": "people", "people": []any{}},
+	}
+	mux.HandleFunc("GET /v1/pages/{id}", func(w http.ResponseWriter, r *http.Request) {
+		if !auth(w, r) {
+			return
+		}
+		switch r.PathValue("id") {
+		case notionTestPageDash, notionTestLongPageDash, notionTestManyPageDash:
+			writeJSON(w, 200, map[string]any{"object": "page", "id": r.PathValue("id"), "url": "https://www.notion.so/" + r.PathValue("id"), "properties": pageProps})
+		default:
+			writeJSON(w, 404, map[string]any{"object": "error", "code": "object_not_found"})
+		}
+	})
+	mux.HandleFunc("PATCH /v1/pages/{id}", func(w http.ResponseWriter, r *http.Request) {
+		if !auth(w, r) {
+			return
+		}
+		var b map[string]any
+		_ = json.NewDecoder(r.Body).Decode(&b)
+		props, _ := b["properties"].(map[string]any)
+		if n, ok := props["数"].(map[string]any); ok && n["number"] == float64(-1) {
+			writeJSON(w, 400, map[string]any{"object": "error", "status": 400, "code": "validation_error"})
+			return
+		}
+		f.mu.Lock()
+		f.patches = append(f.patches, b)
+		f.mu.Unlock()
+		writeJSON(w, 200, map[string]any{"object": "page", "id": r.PathValue("id"), "url": "https://www.notion.so/x", "properties": pageProps})
+	})
+	text := func(typ, s string, extra map[string]any) map[string]any {
+		c := map[string]any{"rich_text": []map[string]string{{"plain_text": s}}}
+		for k, v := range extra {
+			c[k] = v
+		}
+		return map[string]any{"object": "block", "type": typ, typ: c}
+	}
+	mux.HandleFunc("GET /v1/blocks/{id}/children", func(w http.ResponseWriter, r *http.Request) {
+		if !auth(w, r) {
+			return
+		}
+		f.mu.Lock()
+		f.blockReads = append(f.blockReads, r.URL.Query())
+		f.mu.Unlock()
+		cursor := r.URL.Query().Get("start_cursor")
+		switch r.PathValue("id") {
+		case notionTestPageDash:
+			if cursor == "" {
+				writeJSON(w, 200, map[string]any{"object": "list", "has_more": true, "next_cursor": notionTestDS, "results": []map[string]any{
+					text("heading_1", "第1章", nil),
+					text("paragraph", "本文です。", nil),
+					text("numbered_list_item", "一", nil),
+					text("numbered_list_item", "二", nil),
+					{"object": "block", "type": "image", "image": map[string]any{"type": "external"}},
+					text("bulleted_list_item", "点", nil),
+				}})
+				return
+			}
+			writeJSON(w, 200, map[string]any{"object": "list", "has_more": false, "next_cursor": nil, "results": []map[string]any{
+				text("to_do", "読む", map[string]any{"checked": true}),
+				text("to_do", "書く", map[string]any{"checked": false}),
+				{"object": "block", "type": "child_page", "child_page": map[string]any{"title": "子ページ"}},
+			}})
+		case notionTestLongPageDash:
+			results := make([]map[string]any, 100)
+			for i := range results {
+				results[i] = text("paragraph", strings.Repeat("あ", 400), nil)
+			}
+			writeJSON(w, 200, map[string]any{"object": "list", "has_more": true, "next_cursor": notionTestDS, "results": results})
+		default: // never ends
+			writeJSON(w, 200, map[string]any{"object": "list", "has_more": true, "next_cursor": notionTestDS, "results": []map[string]any{text("paragraph", "行", nil)}})
+		}
 	})
 	srv := httptest.NewServer(mux)
 	t.Cleanup(srv.Close)
@@ -561,5 +649,138 @@ func TestNotionDefinition(t *testing.T) {
 	}
 	if id, err := notionID("x", notionTestDB); err != nil || id != notionTestDBDash {
 		t.Fatalf("id %q %v", id, err)
+	}
+}
+
+func TestNotionUpdateProperties(t *testing.T) {
+	c, f := notionTestClient(t)
+	ctx := context.Background()
+	tok := &Token{AccessToken: "access-1"}
+	props := `{"名前":"読了した本","メモ":"良かった","数":"4","済":true,"分類":"小説","期限":"2026-11-12"}`
+	out, err := c.updateProperties(ctx, Input{Token: tok, RequestID: "u1", Args: map[string]string{"pageId": notionTestPage, "properties": props}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if out.ResultID != notionTestPageDash || out.Item == nil || out.Item.Title != "読書メモ" {
+		t.Fatalf("out %+v", out)
+	}
+	p := f.patches[0]["properties"].(map[string]any)
+	got := func(name, key string) any { return p[name].(map[string]any)[key] }
+	if len(p) != 6 ||
+		got("名前", "title").([]any)[0].(map[string]any)["text"].(map[string]any)["content"] != "読了した本" ||
+		got("メモ", "rich_text").([]any)[0].(map[string]any)["text"].(map[string]any)["content"] != "良かった" ||
+		got("数", "number") != 4.0 || got("済", "checkbox") != true ||
+		got("分類", "select").(map[string]any)["name"] != "小説" ||
+		got("期限", "date").(map[string]any)["start"] != "2026-11-12" {
+		t.Fatalf("body %v", f.patches[0])
+	}
+	// types outside the closed set, unknown properties and bad values are
+	// refused before anything is written
+	for i, props := range []string{
+		`{"状態":"完了"}`,   // status
+		`{"担当":"a"}`,    // people
+		`{"無い":"x"}`,    // no such property
+		`{"名前":""}`,     // empty title
+		`{"名前":1}`,      // not a string
+		`{"数":"多い"}`,    // not a number
+		`{"済":"maybe"}`, // not a bool
+		`{"期限":"明日"}`,   // not a date
+	} {
+		_, err := c.updateProperties(ctx, Input{Token: tok, Args: map[string]string{"pageId": notionTestPage, "properties": props}})
+		if !errors.Is(err, ErrUnknown) {
+			t.Errorf("case %d: %v", i, err)
+		}
+	}
+	if len(f.patches) != 1 {
+		t.Fatalf("a refused value reached Notion (%d patches)", len(f.patches))
+	}
+	// Notion refusing a value is a bad request; a page not shared is not connected
+	if _, err := c.updateProperties(ctx, Input{Token: tok, Args: map[string]string{"pageId": notionTestPage, "properties": `{"数":-1}`}}); Reason(err) != ReasonBadRequest {
+		t.Fatalf("validation_error: %v", err)
+	}
+	if _, err := c.updateProperties(ctx, Input{Token: tok, Args: map[string]string{"pageId": notionTestDB, "properties": `{"済":true}`}}); !errors.Is(err, ErrNotConnected) {
+		t.Fatalf("not shared: %v", err)
+	}
+	if _, err := c.updateProperties(ctx, Input{Args: map[string]string{"pageId": notionTestPage, "properties": `{"済":true}`}}); !errors.Is(err, ErrNotConnected) {
+		t.Fatalf("no token: %v", err)
+	}
+}
+
+func TestNotionPageText(t *testing.T) {
+	c, f := notionTestClient(t)
+	ctx := context.Background()
+	tok := &Token{AccessToken: "access-1"}
+	out, err := c.pageText(ctx, Input{Token: tok, Args: map[string]string{"pageId": notionTestPage}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := "第1章\n本文です。\n1. 一\n2. 二\n• 点\n☑ 読む\n☐ 書く\n子ページ"
+	if out.Item == nil || out.Item.Title != "読書メモ" || out.Item.Value != want || out.ResultID != "" || out.Rows != nil {
+		t.Fatalf("out %+v", out.Item)
+	}
+	if len(f.blockReads) != 2 || f.blockReads[0].Get("page_size") != "100" || f.blockReads[1].Get("start_cursor") != notionTestDS {
+		t.Fatalf("reads %v", f.blockReads)
+	}
+	// a long page is cut at the limit (on a rune boundary, ending in …)
+	out, err = c.pageText(ctx, Input{Token: tok, Args: map[string]string{"pageId": notionTestLongPageDash}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if v := out.Item.Value; len(v) > notionMaxPageText || !strings.HasSuffix(v, "…") || !utf8.ValidString(v) || len(v) < notionMaxPageText-8 {
+		t.Fatalf("cut to %d bytes", len(v))
+	}
+	// a page that never ends stops after notionMaxBlockReads reads
+	f.blockReads = nil
+	out, err = c.pageText(ctx, Input{Token: tok, Args: map[string]string{"pageId": notionTestManyPageDash}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(f.blockReads) != notionMaxBlockReads || out.Item.Value != strings.Repeat("行\n", notionMaxBlockReads-1)+"行…" {
+		t.Fatalf("%d reads, %q", len(f.blockReads), out.Item.Value)
+	}
+	if _, err := c.pageText(ctx, Input{Token: tok, Args: map[string]string{"pageId": notionTestDB}}); !errors.Is(err, ErrNotConnected) {
+		t.Fatalf("not shared: %v", err)
+	}
+	if _, err := c.pageText(ctx, Input{Token: &Token{AccessToken: "busy"}, Args: map[string]string{"pageId": notionTestPage}}); Reason(err) != ReasonUpstream {
+		t.Fatalf("429: %v", err)
+	}
+}
+
+// Check refuses bad arguments of the new ops before anything is counted.
+func TestNotionNewOpsCheck(t *testing.T) {
+	p, _ := Lookup(Notion)
+	bad := map[string][]map[string]string{
+		"updateProperties": {
+			{"properties": `{"済":true}`},                          // no page
+			{"pageId": "../x", "properties": `{"済":true}`},        // not an id
+			{"pageId": notionTestPage},                            // no properties
+			{"pageId": notionTestPage, "properties": `{}`},        // empty
+			{"pageId": notionTestPage, "properties": `[1]`},       // not an object
+			{"pageId": notionTestPage, "properties": `{"":true}`}, // no name
+			{"pageId": notionTestPage, "properties": `{"a":1} {}`},
+			{"pageId": notionTestPage, "properties": `{"a":1,"b":2,"c":3,"d":4,"e":5,"f":6,"g":7,"h":8,"i":9,"j":10,"k":11,"l":12,"m":13,"n":14,"o":15,"p":16,"q":17,"r":18,"s":19,"t":20,"u":21}`},
+		},
+		"pageText": {{}, {"pageId": "x"}, {"pageId": notionTestPage, "limit": "1"}},
+	}
+	for op, cases := range bad {
+		for i, a := range cases {
+			if _, err := p.CheckArgs(op, a); !errors.Is(err, ErrUnknown) {
+				t.Errorf("%s case %d: %v", op, i, err)
+			}
+		}
+	}
+	for op, a := range map[string]map[string]string{
+		"updateProperties": {"pageId": notionTestPageDash, "properties": `{"済":true}`},
+		"pageText":         {"pageId": notionTestPage},
+	} {
+		if _, err := p.CheckArgs(op, a); err != nil {
+			t.Errorf("%s: %v", op, err)
+		}
+	}
+	if o, _ := p.Op("updateProperties"); !o.Write {
+		t.Fatal("updateProperties is a write op")
+	}
+	if o, _ := p.Op("pageText"); o.Write {
+		t.Fatal("pageText is a read op")
 	}
 }
