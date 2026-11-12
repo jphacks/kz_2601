@@ -521,8 +521,14 @@ func TestNotionArgs(t *testing.T) {
 		{"databaseId": db, "title": "x", "properties": `{"メモ":"` + strings.Repeat("m", 9000) + `"}`},
 	}
 	for i, a := range bad {
-		if _, err := c.addRow(ctx, Input{Token: tok, RequestID: "bad", Args: a}); !errors.Is(err, ErrUnknown) {
+		_, err := c.addRow(ctx, Input{Token: tok, RequestID: "bad", Args: a})
+		if !errors.Is(err, ErrUnknown) {
 			t.Errorf("addRow case %d: %v", i, err)
+		}
+		// before the schema is read: ErrBadArgs; a value the schema refuses
+		// (cases 7-18) comes after a call to Notion, so it is not
+		if before := i <= 6 || i >= 19; errors.Is(err, ErrBadArgs) != before {
+			t.Errorf("addRow case %d: ErrBadArgs = %v, want %v (%v)", i, !before, before, err)
 		}
 	}
 	badQ := []map[string]string{

@@ -1,6 +1,7 @@
 package extapi
 
 import (
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -114,8 +115,9 @@ func TestYouTubeChannelStats(t *testing.T) {
 		t.Fatalf("hidden: %+v %v", out.Item, err)
 	}
 
-	// no such channel is the caller's argument (bad_request)
-	if _, err := ops["channelStats"].Do(t.Context(), Input{Args: map[string]string{"channel": "@nobody"}}); Reason(err) != ReasonBadRequest {
+	// no such channel is the caller's argument (bad_request), but the API
+	// was called: not ErrBadArgs (its limit counts are kept)
+	if _, err := ops["channelStats"].Do(t.Context(), Input{Args: map[string]string{"channel": "@nobody"}}); Reason(err) != ReasonBadRequest || errors.Is(err, ErrBadArgs) {
 		t.Fatalf("nobody: %s (%v)", Reason(err), err)
 	}
 }
@@ -185,7 +187,7 @@ func TestYouTubeRefusesBadArgs(t *testing.T) {
 		if _, ok := a["q"]; ok {
 			continue // only CheckArgs refuses unknown names
 		}
-		if _, err := ops["latestVideos"].Do(t.Context(), Input{Args: a}); Reason(err) != ReasonBadRequest {
+		if _, err := ops["latestVideos"].Do(t.Context(), Input{Args: a}); Reason(err) != ReasonBadRequest || !errors.Is(err, ErrBadArgs) {
 			t.Fatalf("do %v: %s (%v)", a, Reason(err), err)
 		}
 	}

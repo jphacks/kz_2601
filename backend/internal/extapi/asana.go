@@ -243,7 +243,7 @@ func asanaGID(name, v string, required bool) (string, error) {
 		return "", nil
 	}
 	if !asanaGIDRe.MatchString(v) {
-		return "", fmt.Errorf("%w: %s must be an Asana id (digits)", ErrUnknown, name)
+		return "", fmt.Errorf("%w: %s must be an Asana id (digits)", ErrBadArgs, name)
 	}
 	return v, nil
 }
@@ -255,7 +255,7 @@ func asanaLimit(v string) (int, error) {
 	}
 	x, err := strconv.Atoi(v)
 	if err != nil || x < 1 || x > asanaMaxLimit {
-		return 0, fmt.Errorf("%w: limit must be 1-%d", ErrUnknown, asanaMaxLimit)
+		return 0, fmt.Errorf("%w: limit must be 1-%d", ErrBadArgs, asanaMaxLimit)
 	}
 	return x, nil
 }
@@ -357,7 +357,8 @@ func (c *asana) onlyWorkspace(ctx context.Context, in Input) (string, error) {
 	case len(r.Data) > 1:
 		return "", fmt.Errorf("%w: several Asana workspaces: workspaceId is required", ErrUnknown)
 	}
-	return asanaGID("workspace", r.Data[0].GID, true)
+	gid, err := asanaGID("workspace", r.Data[0].GID, true)
+	return gid, afterCall(err)
 }
 
 // projectTasks lists the open tasks of one project, one page of limit.
