@@ -171,7 +171,8 @@ class DesktopSession(
 
     fun records(entity: String): List<Record> = store.records(entity, entityModel(entity))
 
-    fun leafData(): LeafData = LeafData(models, ::records, uid)
+    /** 画面は [DataLabels.current] を渡す(既定は描画の木と同じ日本語)。 */
+    fun leafData(labels: DataLabels = DataLabels.JAPANESE): LeafData = LeafData(models, ::records, uid, labels)
 
     /**
      * route の下書き(entity の無い画面は null)。開いた時に 1 回作り、保存するか閉じるまで入力を残す。
@@ -256,16 +257,8 @@ class DesktopSession(
     /** `list` の行(filter → sort → 検索)。iOS の `ListLeaf.rows`。 */
     fun rows(c: Component, query: String?): List<Record> = ListRows.rows(c, leafData(), query)
 
-    /** 押せるか: rendered / hidden / needsForm / unknown(iOS の「全部品が登録済み」の規則)。 */
-    fun tapState(c: Component, form: FormDraft?): String {
-        if (c.type == ComponentType.UNKNOWN) return "unknown"
-        if (InputLeaves.isInput(c)) {
-            if (form != null && form.hides(c, uid)) return "hidden"
-            if (form == null || c.field == null) return "needsForm"
-        }
-        if (c.type == ComponentType.BUTTON && !isButtonVisible(c.action, form)) return "hidden"
-        return "rendered"
-    }
+    /** 部品の state(押せるか・描くか)。[DesktopLeaves.state] に今の人を渡す。 */
+    fun state(c: Component, form: FormDraft?): String = DesktopLeaves.state(c, form, uid)
 
     // MARK: - 操作
 
@@ -274,6 +267,19 @@ class DesktopSession(
         message = null
         action.confirmMessage?.let { effects += obj("confirm" to JsonPrimitive(it)) }
         perform(action, ctx)
+    }
+
+    /**
+     * openUrlButton: 候補を先頭から openUrl(link と同じ・許可した scheme だけ)で開き、開けたら止める。全部だめなら最後の理由が残る。
+     * effects は 1 回押して 1 つ(開けた候補、全部だめなら最後に試した候補)。開けなかった候補の分は消す。
+     */
+    fun openFirst(urls: List<String>, ctx: ActionContext) {
+        for ((i, url) in urls.withIndex()) {
+            val mark = effects.size
+            dispatch(Action(type = ActionType.OPEN_URL, url = url), ctx)
+            if (message == null) return
+            if (i < urls.lastIndex) while (effects.size > mark) effects.removeAt(effects.lastIndex)
+        }
     }
 
     fun back(route: Route = top) {
@@ -401,7 +407,7 @@ class DesktopSession(
                 val id = (op["tap"] as? JsonPrimitive)?.contentOrNull
                 val c = screen?.allComponents()?.firstOrNull { it.id == id } ?: return false
                 val a = c.action ?: return false
-                if (tapState(c, form) != "rendered") return false
+                if (state(c, form) != "rendered") return false
                 dispatch(a, ctx)
             }
             op.containsKey("tapToolbar") -> {
@@ -414,7 +420,7 @@ class DesktopSession(
                 val id = (row["component"] as? JsonPrimitive)?.contentOrNull
                 val c = screen?.allComponents()?.firstOrNull { if (id == null) it.onItemTap != null else it.id == id } ?: return false
                 val a = c.onItemTap ?: return false
-                if (tapState(c, form) != "rendered") return false
+                if (state(c, form) != "rendered") return false
                 val rows = rows(c, c.searchField?.let { queries(route)[it] })
                 val i = (row["index"] as? JsonPrimitive)?.doubleOrNull?.toInt() ?: 0
                 val r = rows.getOrNull(i) ?: return false
@@ -480,7 +486,7 @@ fun Screen.allComponents(): List<Component> {
 
 /** ボタンを出すか(新規フォームの削除・読み取りだけの保存は隠す)。Android の components/Leaves.kt と同じ。 */
 fun isButtonVisible(action: Action?, form: FormDraft?): Boolean = when (action?.type) {
-    ActionType.DELETE_RECORD -> (form?.isEditing ?: false) && (form?.canDelete ?: true)
+    ActionType.DELETE_RECORD -> form?.isEditing == true && form.canDelete
     ActionType.SAVE_RECORD -> !(form?.isReadOnly ?: false)
     else -> true
 }
