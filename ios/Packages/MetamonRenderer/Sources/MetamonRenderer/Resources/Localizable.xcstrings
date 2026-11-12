@@ -2522,6 +2522,23 @@
         }
       }
     },
+    "この端末ではこの言語を翻訳できません" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "This language can't be translated on this device"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "この端末ではこの言語を翻訳できません"
+          }
+        }
+      }
+    },
     "この端末ではヘルスデータを使えません" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -3419,6 +3436,40 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "カレンダー"
+          }
+        }
+      }
+    },
+    "カレンダーの読み取りが許可されていません(追加だけ許可されています)" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Reading your calendar is not allowed (only adding events is allowed)"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "カレンダーの読み取りが許可されていません(追加だけ許可されています)"
+          }
+        }
+      }
+    },
+    "カレンダー・リマインダーへのアクセスが許可されていません" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Access to Calendars and Reminders is not allowed"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "カレンダー・リマインダーへのアクセスが許可されていません"
           }
         }
       }
@@ -8808,6 +8859,40 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "翻訳"
+          }
+        }
+      }
+    },
+    "翻訳する言語をダウンロードしてください" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Download the languages to translate"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "翻訳する言語をダウンロードしてください"
+          }
+        }
+      }
+    },
+    "翻訳できませんでした" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Couldn't translate"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "翻訳できませんでした"
           }
         }
       }

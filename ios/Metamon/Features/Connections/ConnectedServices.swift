@@ -113,16 +113,19 @@ enum ConnectedServicesState: Equatable {
         }
     }
 
+    /// provider の表示名。サーバーの `nameJa`/`nameEn` → 端末の名前 → id の順(#2001 のつなぐ案内でも使う)
+    static func name(_ provider: ExtProvider?, id: String, english: Bool) -> String {
+        let n = provider.map { english ? $0.nameEn : $0.nameJa } ?? ""
+        return n.isEmpty ? ConnectedServiceCatalog.name(id, english: english) : n
+    }
+
     /// つないだもの(サーバーの providers の順 → 知らないもの)の後に、まだつないでいない provider。
     /// `providers` が無い古いサーバーでは、つないだものだけ出す。
     static func rows(_ list: ExtConnectionList, english: Bool) -> [ConnectedServiceRow] {
         let providers = list.providers ?? []
         let byId = Dictionary(providers.map { ($0.id, $0) }, uniquingKeysWith: { a, _ in a })
         let order = providers.map(\.id)
-        func name(_ id: String) -> String {
-            let n = byId[id].map { english ? $0.nameEn : $0.nameJa } ?? ""
-            return n.isEmpty ? ConnectedServiceCatalog.name(id, english: english) : n
-        }
+        func name(_ id: String) -> String { Self.name(byId[id], id: id, english: english) }
         // 古いサーバーは enabled を知らせないので、つないだものはつなぎ直せる扱い
         func enabled(_ id: String) -> Bool { byId[id]?.enabled ?? (list.providers == nil) }
         func rank(_ id: String) -> Int { order.firstIndex(of: id) ?? order.count }
@@ -170,6 +173,8 @@ enum ConnectCallback: Equatable {
 @Observable
 final class ConnectedServicesModel {
     private(set) var state: ConnectedServicesState = .loading
+    /// 直前の一覧に `providers` があったか(無いのは古いサーバー)。`.loaded` の時だけ意味がある
+    private(set) var providersKnown = false
     /// 操作中の provider(ボタンを止める)
     private(set) var busy: String?
     /// 直前の操作の失敗(セクションの下に出す)
@@ -180,8 +185,12 @@ final class ConnectedServicesModel {
 
     func load(_ client: any ExternalServicesClient) async {
         do {
-            state = .from(.success(try await client.connections(supportedFeatures: ConnectedServicesFeatures.current)))
+            let list = try await client.connections(supportedFeatures: ConnectedServicesFeatures.current)
+            providersKnown = list.providers != nil
+            state = .from(.success(list))
         } catch is CancellationError {
+            // 読み込み中のまま止まらないように。もう読めた一覧は上書きしない(画面に戻れば .task が読み直す)
+            if state == .loading { state = .failed(L10n.tr("一覧を読み込めませんでした。")) }
         } catch {
             state = .from(.failure(error))
         }

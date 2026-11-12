@@ -11,6 +11,8 @@ struct ConnectedServicesSection: View {
     @State private var model = ConnectedServicesModel()
     @State private var confirmDisconnect: ConnectedServiceRow?
     @State private var showPaywall = false
+    /// 外の API の断り(#2001)。今は DEBUG の呼び出し口だけが入れる
+    @State private var denial: ExtDenial?
 
     var body: some View {
         Group {
@@ -28,11 +30,15 @@ struct ConnectedServicesSection: View {
             case .loaded(let rows):
                 section {
                     ForEach(rows) { row($0) }
+                    #if DEBUG
+                    debugCallRow
+                    #endif
                 }
             }
         }
         .task { await model.load(services.external) }
         .sheet(isPresented: $showPaywall) { PaywallSheet(reason: .paidFeature([Self.paidFeature])) }
+        .extDenialSheets($denial, onConnectClosed: { Task { await model.load(services.external) } }) { model.message = $0 }
         .confirmationDialog(confirmTitle, isPresented: Binding(get: { confirmDisconnect != nil }, set: { if !$0 { confirmDisconnect = nil } }),
                             titleVisibility: .visible, presenting: confirmDisconnect) { row in
             Button("切る", role: .destructive) {
@@ -85,6 +91,22 @@ struct ConnectedServicesSection: View {
         .accessibilityIdentifier("settings.connections.\(row.provider)")
     }
 
+    #if DEBUG
+    /// 開発用: 偽の provider に op を投げ、断りの案内(#2001)を部品なしで出す。審査用・リリースの版には入らない
+    private var debugCallRow: some View {
+        Button {
+            Task {
+                let (d, text) = await DebugExtDenial.call(services.external)
+                model.message = text
+                denial = d
+            }
+        } label: {
+            Text(verbatim: "開発用: 試験用のサービスを呼ぶ") // 開発用なので訳さない
+        }
+        .accessibilityIdentifier("settings.connections.debugCall")
+    }
+    #endif
+
     @ViewBuilder
     private func actions(_ row: ConnectedServiceRow) -> some View {
         switch row.status {
@@ -110,23 +132,33 @@ struct ConnectedServicesSection: View {
     }
 
     private func connect(_ provider: String) {
-        // 外の API は作成者の Pro を PRO_GATE_MODE に関係なく確かめるので、端末も Pro そのものを見る
-        guard ProGate.shared.isPro else {
+        if ConnectFlow.start(provider, model: model, client: services.external, authenticate: ConnectFlow.authenticate(webAuth)) == nil {
             showPaywall = true
-            return
-        }
-        let webAuth = webAuth
-        Task {
-            await model.connect(provider, client: services.external) { url in
-                // 前にサインインしていた人のブラウザのログインを使い回さない
-                try await webAuth.authenticate(using: url, callbackURLScheme: ConnectCallback.scheme, preferredBrowserSession: .ephemeral)
-            }
         }
     }
 
     static var paidFeature: PaidFeature {
         PaidFeature(id: "externalServices", title: L10n.tr("つないだサービス"),
                     reason: L10n.tr("外のサービスを呼ぶたびにサーバーの費用がかかるため、Pro の機能です。"))
+    }
+}
+
+/// 「つなぐ」の流れ(設定の一覧と、外の API の断りの案内 #2001 で同じものを呼ぶ)。
+@MainActor
+enum ConnectFlow {
+    /// 同意の画面へ進めば、その流れの Task。Pro でなければ何もせず nil(呼び出し側が課金画面を出す)
+    @discardableResult
+    static func start(_ provider: String, model: ConnectedServicesModel, client: any ExternalServicesClient,
+                      isPro: Bool? = nil,
+                      authenticate: @escaping ConnectedServicesModel.Authenticate) -> Task<Void, Never>? {
+        // 外の API は作成者の Pro を PRO_GATE_MODE に関係なく確かめるので、端末も Pro そのものを見る
+        guard isPro ?? ProGate.shared.isPro else { return nil }
+        return Task { await model.connect(provider, client: client, authenticate: authenticate) }
+    }
+
+    /// 同意の画面(前にサインインしていた人のブラウザのログインを使い回さない)
+    static func authenticate(_ webAuth: WebAuthenticationSession) -> ConnectedServicesModel.Authenticate {
+        { url in try await webAuth.authenticate(using: url, callbackURLScheme: ConnectCallback.scheme, preferredBrowserSession: .ephemeral) }
     }
 }
 
