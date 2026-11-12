@@ -103,7 +103,7 @@ class FakeDevicePowerSource(
 }
 
 object DevicePowerSources {
-    /** `METAMON_MOCK=1` なら偽物。それ以外は OS ごとの実体(Linux は sysfs・Windows と Mac は今は不明を返す)。 */
+    /** `METAMON_MOCK=1` なら偽物。それ以外は OS ごとの実体(Linux は sysfs・Windows は GetSystemPowerStatus・Mac は不明を返す)。 */
     fun make(
         env: Map<String, String> = System.getenv(),
         osName: String = System.getProperty("os.name").orEmpty(),
@@ -114,13 +114,4 @@ object DevicePowerSources {
         // Mac は Mac 版(Swift)が受け持つ。iOS 版も Mac の電池は読まない
         else -> PollingDevicePowerSource({ DevicePowerState.Unknown })
     }
-}
-
-/**
- * Windows: 今は不明を返す。
- * TODO: kernel32 の GetSystemPowerStatus(ACLineStatus・BatteryFlag・BatteryLifePercent・SystemStatusFlag=省電力)で読む。
- *  JNA がまだ依存に無いので足すかの判断と一緒に入れる(powershell・WMI を毎分起こす方法は取らない)。
- */
-object WindowsPowerReader : DevicePowerReader {
-    override fun read(): DevicePowerState = DevicePowerState.Unknown
 }
