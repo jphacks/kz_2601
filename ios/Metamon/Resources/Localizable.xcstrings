@@ -1861,6 +1861,23 @@
         }
       }
     },
+    "Apple をつなげませんでした" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Couldn't connect Apple"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Apple をつなげませんでした"
+          }
+        }
+      }
+    },
     "ISBN を確かめてください(10 桁か 13 桁)" : {
       "extractionState" : "manual",
       "localizations" : {

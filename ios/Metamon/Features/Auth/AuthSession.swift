@@ -4,7 +4,7 @@ import Observation
 import SwiftUI
 import MetamonServices
 
-/// 既存のアカウントに Apple をつないだ結果(#361)。iOS と Mac の両方で使う。
+/// 既存のアカウントに Apple をつないだ結果(#361)。画面は iOS の設定だけ(Mac にはつなぐ UI が無い)。
 enum AppleLinkOutcome: Equatable {
     case linked
     case cancelled
@@ -130,7 +130,7 @@ final class AuthSession {
         switch result {
         case .failure(let error):
             if (error as? ASAuthorizationError)?.code == .canceled { return .cancelled }
-            return .failed(error.localizedDescription)
+            return Self.linkFailed(error)
         case .success(let authorization):
             guard let apple = Self.appleToken(authorization) else {
                 return .failed(AuthError.invalidAppleCredential.localizedDescription)
@@ -149,9 +149,29 @@ final class AuthSession {
             return .inUseByOtherAccount
         } catch AuthError.appleEmailInUse {
             return .emailInUseByOtherAccount
+        } catch AuthError.alreadyLinked {
+            // 手元の providers が古い(別の端末でつないだ)。読み直して「つながっています」にする
+            await refreshUser()
+            return .linked
         } catch {
-            return .failed(error.localizedDescription)
+            return Self.linkFailed(error)
         }
+    }
+
+    /// サーバーから読み直して `user` を最新にする(設定の「サインインの方法」を開いた時・#361)。失敗しても手元の値のまま。
+    func refreshUser() async {
+        do {
+            if let fresh = try await service.reloadCurrentUser() { user = fresh }
+        } catch {
+            ErrorLog.record(error, context: "auth reload")
+        }
+    }
+
+    /// 訳していない失敗(Firebase・Apple の英語の文)は画面に出さず、ログにだけ残す。
+    private static func linkFailed(_ error: Error) -> AppleLinkOutcome {
+        if let known = error as? AuthError { return .failed(known.localizedDescription) }
+        ErrorLog.record(error, context: "link Apple")
+        return .failed(L10n.tr("Apple をつなげませんでした"))
     }
 
     private static func appleToken(_ authorization: ASAuthorization) -> (idToken: String, fullName: PersonNameComponents?)? {

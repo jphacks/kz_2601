@@ -29,6 +29,7 @@ struct LinkedAccountsSection: View {
             } footer: {
                 Text("1 つのアカウントに複数のサインインの方法をつなぐと、iPhone でも Android でも同じアカウントに入れます。")
             }
+            .task { await session.refreshUser() } // 別の端末でつないだ方法も出す(providerData は手元のキャッシュ)
         }
     }
 

@@ -44,7 +44,7 @@ public final class MockAuthService: AuthService, @unchecked Sendable {
     /// Apple 以外(Android の Google など)で作ったアカウントでサインインした状態にする(#361 のテスト・Preview 用)。
     @discardableResult
     public func signIn(providers: [SignInProvider], uid: String = fixedUID) -> AuthUser {
-        set(AuthUser(uid: uid, isAnonymous: false, providers: providers))
+        set(AuthUser(uid: uid, isAnonymous: false, providers: Self.normalized(providers)))
     }
 
     public func signInAnonymously() async throws -> AuthUser {
@@ -64,7 +64,12 @@ public final class MockAuthService: AuthService, @unchecked Sendable {
             lock.withLock { hasPending = current.isAnonymous } // 既存アカウント(#361)は切り替え先を持たない
             throw AuthError.credentialAlreadyInUse
         }
-        return set(AuthUser(uid: current.uid, isAnonymous: false, displayName: current.displayName, providers: current.providers + [.apple]))
+        return set(AuthUser(uid: current.uid, isAnonymous: false, displayName: current.displayName, providers: Self.normalized(current.providers + [.apple])))
+    }
+
+    /// Firebase と同じ並び(`SignInProvider.from(providerIDs:)`)にそろえる。
+    private static func normalized(_ providers: [SignInProvider]) -> [SignInProvider] {
+        SignInProvider.from(providerIDs: providers.map(\.rawValue))
     }
 
     public func switchToPendingAppleAccount() async throws -> AuthUser {

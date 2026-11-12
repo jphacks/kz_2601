@@ -120,6 +120,13 @@ public final class FirebaseAuthService: AuthService, @unchecked Sendable {
         guard let credential else { throw AuthError.noPendingAppleAccount }
         return AuthUser(try await auth.signIn(with: credential).user)
     }
+
+    /// `providerData` は手元のキャッシュなので、別の端末でつないだ方法はサーバーから読み直さないと見えない(#361)。
+    public func reloadCurrentUser() async throws -> AuthUser? {
+        guard let user = auth.currentUser else { return nil }
+        try await user.reload()
+        return AuthUser(auth.currentUser ?? user)
+    }
 }
 
 private extension AuthUser {

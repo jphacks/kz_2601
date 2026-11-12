@@ -27,7 +27,7 @@ final class LinkedAccountsTests: XCTestCase {
 
         XCTAssertEqual(outcome, .linked)
         XCTAssertEqual(session.user?.uid, "android-uid")
-        XCTAssertEqual(session.user?.providers, [.google, .apple])
+        XCTAssertEqual(session.user?.providers, [.apple, .google], "Firebase と同じ並び")
         XCTAssertEqual(session.user?.isAnonymous, false)
     }
 
@@ -50,15 +50,60 @@ final class LinkedAccountsTests: XCTestCase {
         } catch AuthError.noPendingAppleAccount {}
     }
 
-    func testAppleAccountCannotLinkAppleAgain() async throws {
+    /// 既に Apple がつながっている(alreadyLinked)は失敗にせず「つながっています」
+    func testAppleAccountLinkingAgainIsTreatedAsLinked() async throws {
         let auth = MockAuthService(signedIn: false)
         _ = try await auth.signInWithApple(idToken: "t", nonce: "n", fullName: nil)
         let session = AuthSession(service: auth)
 
         let outcome = await session.linkAppleToCurrentAccount(idToken: "t", nonce: "n", fullName: nil)
 
-        XCTAssertEqual(outcome, .failed(AuthError.alreadyLinked.localizedDescription))
+        XCTAssertEqual(outcome, .linked)
         XCTAssertEqual(session.user?.providers, [.apple])
+    }
+
+    /// 別の端末で Apple をつないだ後(手元の providers が古い): alreadyLinked で読み直し、つながった表示にする
+    func testStaleProvidersAreReloadedOnAlreadyLinked() async {
+        let auth = MockAuthService(signedIn: false)
+        auth.signIn(providers: [.google], uid: "android-uid")
+        let session = AuthSession(service: auth)
+        auth.signIn(providers: [.google, .apple], uid: "android-uid") // 別の端末でつないだ
+        XCTAssertEqual(session.user?.providers, [.google], "まだ古い")
+
+        let outcome = await session.linkAppleToCurrentAccount(idToken: "t", nonce: "n", fullName: nil)
+
+        XCTAssertEqual(outcome, .linked)
+        XCTAssertEqual(session.user?.providers, [.apple, .google])
+        XCTAssertFalse(LinkedAccountsSection.offersApple(to: try! XCTUnwrap(session.user)))
+    }
+
+    /// 設定を開いた時の読み直しで、別の端末でつないだ方法が出る
+    func testRefreshUserPicksUpProvidersLinkedElsewhere() async {
+        let auth = MockAuthService(signedIn: false)
+        auth.signIn(providers: [.google], uid: "android-uid")
+        let session = AuthSession(service: auth)
+        auth.signIn(providers: [.apple, .google], uid: "android-uid")
+
+        await session.refreshUser()
+
+        XCTAssertEqual(session.user?.providers, [.apple, .google])
+    }
+
+    /// 訳していない失敗(Firebase の英語の文など)はそのまま出さず、訳した決まり文句にする
+    func testUnmappedLinkErrorShowsLocalizedGenericMessage() async {
+        let saved = LanguagePreference.shared.setting
+        defer { LanguagePreference.shared.setting = saved }
+        let auth = FailingLinkAuthService()
+        auth.signIn(providers: [.google])
+        let session = AuthSession(service: auth)
+
+        LanguagePreference.shared.setting = .ja
+        let ja = await session.linkAppleToCurrentAccount(idToken: "t", nonce: "n", fullName: nil)
+        XCTAssertEqual(ja, .failed("Apple をつなげませんでした"))
+        LanguagePreference.shared.setting = .en
+        let en = await session.linkAppleToCurrentAccount(idToken: "t", nonce: "n", fullName: nil)
+        XCTAssertEqual(en, .failed("Couldn't connect Apple"))
+        XCTAssertEqual(session.user?.providers, [.google])
     }
     /// iOS で作ったアカウント(Apple)は Apple の行だけ・ボタンなし
     func testAppleAccountShowsOnlyAppleRowAndNoButton() async throws {
@@ -118,5 +163,23 @@ final class LinkedAccountsTests: XCTestCase {
         XCTAssertEqual(AuthError.appleEmailInUse.errorDescription, "この Apple ID のメールアドレスは、すでに別のアカウントで使われています")
         LanguagePreference.shared.setting = .en
         XCTAssertEqual(AuthError.appleEmailInUse.errorDescription, "The email address for this Apple ID is already used by another account")
+    }
+}
+
+/// link で Firebase の訳していないエラー(英語の文)を返すモック
+private final class FailingLinkAuthService: AuthService, @unchecked Sendable {
+    private let mock = MockAuthService(signedIn: false)
+    var currentUser: AuthUser? { mock.currentUser }
+    func stateChanges() -> AsyncStream<AuthUser?> { mock.stateChanges() }
+    func signInWithApple(idToken: String, nonce: String, fullName: PersonNameComponents?) async throws -> AuthUser {
+        try await mock.signInWithApple(idToken: idToken, nonce: nonce, fullName: fullName)
+    }
+    func signInAnonymously() async throws -> AuthUser { try await mock.signInAnonymously() }
+    func signOut() throws { try mock.signOut() }
+    func idToken(forceRefresh: Bool) async throws -> String? { nil }
+    func signIn(providers: [SignInProvider]) { mock.signIn(providers: providers) }
+    func linkWithApple(idToken: String, nonce: String, fullName: PersonNameComponents?) async throws -> AuthUser {
+        throw NSError(domain: "FIRAuthErrorDomain", code: 17999,
+                      userInfo: [NSLocalizedDescriptionKey: "An internal error has occurred, print and inspect the error details for more information."])
     }
 }

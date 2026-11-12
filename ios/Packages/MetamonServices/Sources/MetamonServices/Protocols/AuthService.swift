@@ -71,6 +71,8 @@ public protocol AuthService: AnyObject, Sendable {
     func linkWithApple(idToken: String, nonce: String, fullName: PersonNameComponents?) async throws -> AuthUser
     /// `credentialAlreadyInUse` の後、その Apple ID の既存アカウントに切り替える。匿名で作ったアプリは引き継がれない(uid が変わる)。
     func switchToPendingAppleAccount() async throws -> AuthUser
+    /// サーバーから現在のユーザーを読み直す(別の端末でつないだ方法を `providers` に反映する・#361)。
+    func reloadCurrentUser() async throws -> AuthUser?
 }
 
 public extension AuthService {
@@ -84,4 +86,6 @@ public extension AuthService {
         throw AuthError.notConfigured
     }
     func switchToPendingAppleAccount() async throws -> AuthUser { throw AuthError.noPendingAppleAccount }
+    /// 既定は手元の値をそのまま返す(モック)。
+    func reloadCurrentUser() async throws -> AuthUser? { currentUser }
 }
