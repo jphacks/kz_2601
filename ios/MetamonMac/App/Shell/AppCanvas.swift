@@ -279,7 +279,7 @@ private struct RuntimeOverlays: ViewModifier {
                 VStack(spacing: 8) {
                     if active, let message = runtime.toast {
                         ToastCapsule(text: message) { withMacAnimation { runtime.toast = nil } }
-                            .task(id: message) {
+                            .task(id: runtime.toastSerial) { // 同じ文言が続いても出し直す
                                 // 出したのと同時に VoiceOver で読み、VoiceOver の時は長く出しておく(#937・iOS の H8 と同じ)
                                 if runtime.announcedToast != message { MacVoiceOver.announce(.message(message)) }
                                 runtime.announcedToast = nil

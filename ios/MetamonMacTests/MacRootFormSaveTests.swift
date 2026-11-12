@@ -61,6 +61,41 @@ final class MacRootFormSaveTests: XCTestCase {
         XCTAssertEqual(rt.paths[tabRoot.stack] ?? [], [])
     }
 
+    /// 3 秒以内に 2 回保存: 文言は同じでも toastSerial が変わり、AppCanvas の表示と読み上げの印が出し直しになる
+    func testSecondSaveWithSameToastRestartsToast() async throws {
+        let rt = try runtime()
+        let form = try form(rt, memo: "1")
+        await rt.run(try saveAction(), ActionContext(route: tabRoot, form: form))
+        let first = rt.toastSerial
+        rt.announcedToast = nil // AppCanvas が表示して印を戻した
+
+        form.values["memo"] = .string("2")
+        await rt.run(try saveAction(), ActionContext(route: tabRoot, form: form))
+
+        XCTAssertEqual(rt.records(for: "notes").count, 2)
+        XCTAssertEqual(rt.toast, MacAnnouncement.saved.text)
+        XCTAssertNotEqual(rt.toastSerial, first, "同じ文言でも .task(id:) を出し直す")
+        XCTAssertEqual(rt.announcedToast, MacAnnouncement.saved.text, "2 回目も toast の側では読み直さない")
+        XCTAssertEqual(posted, [MacAnnouncement.saved.text, MacAnnouncement.saved.text])
+    }
+
+    /// 保存の間に入れ直した値は、保存の後で空に戻さない
+    func testTypingDuringSaveIsKept() async throws {
+        let rt = try runtime()
+        let form = try form(rt, memo: "買い物")
+        // 書き込みの await が終わった直後(保存しましたを読む時)に、次の入力が入っていた
+        MacVoiceOver.post = { [weak self] text, _ in
+            self?.posted.append(text)
+            if text == MacAnnouncement.saved.text { form.values["memo"] = .string("次のメモ") }
+        }
+        await rt.run(try saveAction(), ActionContext(route: tabRoot, form: form))
+
+        XCTAssertEqual(rt.records(for: "notes").count, 1)
+        XCTAssertEqual(rt.records(for: "notes").first?.data["memo"], .string("買い物"), "保存したのは押した時の値")
+        XCTAssertEqual(form.values["memo"], .string("次のメモ"), "入れ直した値を消さない")
+        XCTAssertEqual(rt.toast, MacAnnouncement.saved.text)
+    }
+
     func testEditingExistingRecordKeepsValues() async throws {
         let rt = try runtime()
         await rt.run(try saveAction(), ActionContext(route: tabRoot, form: try form(rt, memo: "朝")))
