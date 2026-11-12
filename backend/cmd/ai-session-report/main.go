@@ -85,6 +85,7 @@ func main() {
 	flag.DurationVar(&o.cfg.QuickFix, "quick-fix", 5*time.Minute, "AI edit within this after an AI version counts as a possible miss")
 	flag.DurationVar(&o.cfg.Slow, "slow", 60*time.Second, "generation slower than this is flagged")
 	flag.IntVar(&o.cfg.ManyClarify, "many-clarify", 3, "clarify turns before one request that count as many")
+	flag.BoolVar(&o.cfg.ByPlatform, "by-platform", false, "add generations and failures per client OS (X-Client-Platform)")
 	flag.Parse()
 	o.cfg.RecordLimit = 1000
 
