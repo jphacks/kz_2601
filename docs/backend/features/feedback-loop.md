@@ -84,6 +84,7 @@ flowchart LR
 | `triage [-max 200] [-batch 20]` | triage | 新しい項目を分類(`bug` / `feature` / `question` / `praise` / `spam`)・束ね・優先度(P1〜P3)付け。同じ文は 1 回だけ送る |
 | `triage-score -labels FILE` | — | 人が付けた正解(1 行 `itemId,category`)との一致率(#376 の完了の条件: 8 割) |
 | `triage-eval -set FILE [-model rules\|ai]` | (`ai` の時だけ triage) | 正解付きの組を、メモリの中だけで振り分け → 下書きまで通し、分類・優先度・束ねの一致率を出す([振り分けの精度を測る](#振り分けの精度を測る))。Firestore には書かない |
+| `triage-label-export -out FILE [-days 7]` | — | 直近の `loop_inbox` の文(伏せ字済み)を、正解欄が空の `triage-eval` の組として書き出す。人が正解を付けて `triage-eval` に渡す([一致を測る手順](feedback-loop-triage-agreement.md)) |
 | `draft [-max-new 20]` | draft | 束ごとに下書きを作る / 開いている下書きに足す。束にもう出した Issue(まだ直っていないもの)があれば、その Issue への追記の下書きにする([既存の Issue への追記](#既存の-issue-への追記)) |
 | `drafts list [-status pending]` / `show <id>` | — | 待ち行列を見る。`show` は出口の検査の結果と、承認の前に見る点を出す |
 | `drafts edit -by NAME [-title T] [-body-file F] <id>` | — | 再現の手順などを人が書く(出口の検査を通す) |
@@ -155,12 +156,14 @@ flowchart LR
 |---|---|---|
 | `triage-score -labels FILE` | 本番の `loop_inbox` の項目に人が付けた分類(`itemId,category`) | 1 週間分を振り分けた後、人が同じ項目に分類を付けて比べる |
 | `triage-eval -set FILE` | 手で書いた架空のフィードバックの組(JSON の行: `id` `text` `category` `priority` `bundle`) | モデル・プロンプトを変える前後。本物のフィードバックを使わずに比べられる |
+| `triage-label-export` → `triage-eval -set FILE -model ai` | 本番の 1 週間分を書き出し、人が分類・優先度・束を付けた組 | #376 の完了の条件を測る。手順は [feedback-loop-triage-agreement.md](feedback-loop-triage-agreement.md) |
 
 `triage-eval` は本物の `Triager` と `draft.Builder` をメモリの店に対して回す。数えるもの:
 
 - 分類: `category` が正解と同じ項目の割合
 - 優先度: 下書き(= Issue に出る)の優先度が正解と同じ割合。束にならない `praise` / `spam` は項目の優先度
 - 束ね: 正解で同じ `bundle` の 2 件が同じ束になった割合(together)と、違う `bundle` の 2 件が別の束になった割合(apart)
+- 結果には、欄ごとの取り違えの表(行が正解・列がモデル)と、8 割を下回った欄(`verdict`)も出す。文はモデルに渡す前に伏せ字にする
 
 `held` や外れた出力で分類が付かなかった項目は外れとして数える。`-model rules`(既定)はキーワードの基準線(`internal/loop/triage/eval/rules.go`・費用なし)。`-model ai` は振り分けのモデルを呼ぶので、`triage` と同じく段のスイッチと月の上限を見て、トークンを数える(監査は `eval_call`)。
 
@@ -278,4 +281,4 @@ go run ./cmd/feedback-loop audit -summary
 | 生成の失敗の急増を自動で読む | 今はログを人が `gcloud logging read` で書き出して `LOOP_GENFAIL_LOGS` に渡す。Logging API か BigQuery から読む時は `ingest.GenLogSource` を実装する |
 | Google の機密データの検出(#367 の選択肢 2-B) | GCP の設定が要るので後で |
 | 埋め込みでの束ね(#376) | 束ねはモデルの `cluster` の名前に任せている。同じ問題に別の名前が付くと別の束になる(呼び出しをまたぐと特に)。既知の束として渡すのは待っている下書きの名前だけ |
-| 本物の 1 週間分での一致率 | `triage-score` で人が測る(#376 の完了の条件) |
+| 本物の 1 週間分での一致率 | `triage-label-export` で書き出し、人が正解を付けて `triage-eval -model ai` で測る([手順](feedback-loop-triage-agreement.md)・#376 の完了の条件) |

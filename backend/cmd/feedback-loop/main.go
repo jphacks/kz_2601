@@ -13,6 +13,7 @@
 //	feedback-loop triage [-max 200] [-batch 20]
 //	feedback-loop triage-score -labels FILE
 //	feedback-loop triage-eval -set FILE [-model rules|ai]
+//	feedback-loop triage-label-export -out FILE [-days 7]
 //	feedback-loop draft [-max-new 20]
 //	feedback-loop drafts list|show|edit|approve|reject|publish ...
 //	feedback-loop fixed [-dry-run]
@@ -95,7 +96,8 @@ const usageText = `usage: feedback-loop <command> [flags]
   inbox [-source S] [-status S] [-limit N]   every source in one list (metadata only, never the text)
   triage [-max 200] [-batch 20]              classify, cluster and prioritise new items (LLM, no tools)
   triage-score -labels FILE                  agreement with a human's labels (lines: itemId,category)
-  triage-eval -set FILE [-model rules|ai]    triage a labelled set in memory, print agreement (category, priority, bundles)
+  triage-eval -set FILE [-model rules|ai]    triage a labelled set in memory, print agreement and confusion tables
+  triage-label-export -out FILE [-days 7]    write a week of inbox text (masked) as a template for triage-eval labels
   draft [-max-new 20]                        build issue drafts from triaged clusters (private queue)
   drafts list|show|edit|approve|reject|publish   the human review of drafts (see: drafts)
   fixed [-dry-run]                           tell senders when a merged PR fixed their issue (#374)
@@ -157,6 +159,8 @@ func (a *app) run(ctx context.Context, args []string) error {
 		return a.triageScore(ctx, rest)
 	case "triage-eval":
 		return a.triageEval(ctx, rest)
+	case "triage-label-export":
+		return a.triageLabelExport(ctx, rest)
 	case "draft":
 		return a.draftBuild(ctx, rest)
 	case "drafts":
