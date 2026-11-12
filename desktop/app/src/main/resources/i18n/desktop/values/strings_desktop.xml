@@ -120,6 +120,8 @@
     <string name="desktop_tray_hidden_hint">トレイに残っています。終わるにはトレイのメニューの「終了」を選びます</string>
     <string name="desktop_tray_new_window">新しいウィンドウ</string>
     <string name="desktop_tray_open">「%1$s」を開く</string>
+    <string name="desktop_tray_open_at_login">ログイン時に開く</string>
+    <string name="desktop_tray_open_at_login_failed">ログイン時に開く設定を変えられませんでした</string>
     <string name="desktop_tray_quick_record">すぐ記録</string>
     <string name="desktop_tray_quit">終了</string>
     <string name="desktop_tray_timer_elapsed">%1$s %2$s</string>

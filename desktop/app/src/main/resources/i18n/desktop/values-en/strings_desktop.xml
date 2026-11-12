@@ -119,6 +119,8 @@
     <string name="desktop_tray_hidden_hint">Still running in the tray. To quit, choose Quit from the tray menu</string>
     <string name="desktop_tray_new_window">New window</string>
     <string name="desktop_tray_open">Open %1$s</string>
+    <string name="desktop_tray_open_at_login">Open at login</string>
+    <string name="desktop_tray_open_at_login_failed">Couldn\'t change the open-at-login setting</string>
     <string name="desktop_tray_quick_record">Quick record</string>
     <string name="desktop_tray_quit">Quit</string>
     <string name="desktop_tray_timer_elapsed">%1$s %2$s</string>
