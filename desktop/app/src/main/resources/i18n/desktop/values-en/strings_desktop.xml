@@ -22,6 +22,7 @@
     <string name="desktop_feed_offline">The desktop app doesn\'t load feeds yet</string>
     <string name="desktop_flashcards_back_hint">Back (click for the front)</string>
     <string name="desktop_flashcards_front_hint">Front (click for the back)</string>
+    <string name="desktop_image_load">Load image</string>
     <string name="desktop_image_none">No image</string>
     <string name="desktop_input_audio_unavailable">Recording isn\'t available on this computer. You can choose a file instead</string>
     <string name="desktop_input_clear">Clear</string>
@@ -94,6 +95,7 @@
     <string name="desktop_list_open_window">Open in new window</string>
     <string name="desktop_list_separator">", "</string>
     <string name="desktop_loading">Loading…</string>
+    <string name="desktop_markdown_link_confirm">Open %1$s?</string>
     <string name="desktop_match_offline">Matches appear after you sign in</string>
     <string name="desktop_notification_now">now</string>
     <string name="desktop_notification_scheduled">Notification scheduled (%1$s, only while the app is open)</string>

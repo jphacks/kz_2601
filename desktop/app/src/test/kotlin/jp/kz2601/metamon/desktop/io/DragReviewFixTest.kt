@@ -140,7 +140,7 @@ class DragReviewFixTest {
 
         val f = File.createTempFile("photo-", ".png", UserDirs.photos).apply { writeBytes(encoded("png")); deleteOnExit() }
         assertNotNull(ImageLoader.load(f.toURI().toString(), allowFile = true))
-        assertNull("手元のファイルは覚えない", ImageLoader.cached(f.toURI().toString(), allowFile = true, maxPx = null))
+        assertNull("手元のファイルは覚えない", ImageLoader.cached(f.toURI().toString(), allowFile = true))
         ImageLoader.clear()
     }
 

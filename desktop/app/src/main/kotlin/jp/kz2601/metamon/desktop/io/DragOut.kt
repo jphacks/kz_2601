@@ -40,6 +40,7 @@ object DragOut {
     /** PNG にそろえる。PNG はそのまま、他は ImageIO(JPEG・GIF・BMP)、だめなら Skia(WebP など)。 */
     fun png(bytes: ByteArray): ByteArray? {
         if (bytes.size >= 4 && bytes.copyOfRange(0, 4).contentEquals(PNG_MAGIC)) return bytes
+        if (!ImageSource.withinPixelLimit(bytes)) return null
         runCatching { ImageIO.read(ByteArrayInputStream(bytes)) }.getOrNull()?.let { img ->
             val out = ByteArrayOutputStream()
             if (ImageIO.write(img, "png", out)) return out.toByteArray()
@@ -122,6 +123,30 @@ object ImageSource {
                 else -> null
             }
         }.getOrNull()
+    }
+
+    /** 開いてよい画素数の既定(約 40 MP)。 */
+    const val MAX_PIXELS = 40_000_000L
+
+    /** 中身を開かずに縦横だけ読む(見出しだけ)。読めなければ null。 */
+    fun dimensions(bytes: ByteArray): Pair<Int, Int>? = runCatching {
+        org.jetbrains.skia.Codec.makeFromData(org.jetbrains.skia.Data.makeFromBytes(bytes)).use { it.width to it.height }
+    }.getOrNull() ?: runCatching {
+        ImageIO.createImageInputStream(ByteArrayInputStream(bytes)).use { input ->
+            val reader = ImageIO.getImageReaders(input).asSequence().firstOrNull() ?: return@use null
+            try {
+                reader.input = input
+                reader.getWidth(0) to reader.getHeight(0)
+            } finally {
+                reader.dispose()
+            }
+        }
+    }.getOrNull()
+
+    /** 縦横が読めて、画素数が [max] 以下か。 */
+    fun withinPixelLimit(bytes: ByteArray, max: Long = MAX_PIXELS): Boolean {
+        val (w, h) = dimensions(bytes) ?: return false
+        return w > 0 && h > 0 && w.toLong() * h.toLong() <= max
     }
 
     /** data URL の base64。解く前に長さで上限を確かめる(大きな文字列を解いてから捨てない)。 */
