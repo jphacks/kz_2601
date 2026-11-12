@@ -135,6 +135,7 @@ struct MetamonApp: App {
             .modifier(PushRegistrationObserver(uid: session.user?.uid)) // #269
             #endif
             .environment(session)
+            .modifier(AssistiveAccessReader())              // アシスティブアクセスの中か(#1997・判定はここだけ)
             .environment(\.services, services)              // protocol 越しのサービス
             // 表示言語(#44): 設定の「言語」で即時切替。`Text("…")` の解決と日付・数値の書式がこの Locale に従う
             .environment(\.locale, LanguagePreference.shared.locale)

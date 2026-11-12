@@ -6950,6 +6950,23 @@
         }
       }
     },
+    "アプリがまだありません" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No apps yet"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "アプリがまだありません"
+          }
+        }
+      }
+    },
     "アプリが使えない状態だったため動きませんでした" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -7014,6 +7031,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "アプリが落ちた時に、落ちた場所(プログラムの位置)・端末の機種・OS・アプリの版とユーザー ID を Google の Firebase Crashlytics に送り、不具合を直すのに使います。話した内容・記録・記録帳の中身は送りません。"
+          }
+        }
+      }
+    },
+    "アプリの一覧" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Apps"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "アプリの一覧"
           }
         }
       }
@@ -10244,6 +10278,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "一覧に出す数字を選ぶ"
+          }
+        }
+      }
+    },
+    "一覧に戻る" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Back to list"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "一覧に戻る"
           }
         }
       }

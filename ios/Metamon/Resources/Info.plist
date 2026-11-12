@@ -36,6 +36,8 @@
 	<key>ITSAppUsesNonExemptEncryption</key>
 	<false/>
 	<!-- 起動画面は SplashView の最初のコマ(無地の紺)と同じ色にして、つなぎ目を見せない -->
+	<key>UISupportsFullScreenInAssistiveAccess</key>
+	<true/>
 	<key>UILaunchScreen</key>
 	<dict>
 		<key>UIColorName</key>
