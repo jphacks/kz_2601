@@ -63,6 +63,11 @@ val syncSharedRenderer by tasks.registering(Sync::class) {
         // icon の絵(android/scripts/gen-symbol-icons.py が icon-map.json から作った表・#1742)
         include("theme/icons/SymbolIconTable.kt", "theme/icons/VendoredIcons.kt")
     }
+    // ライセンスの一覧の読み方・段落の分け方(Android の設定の「ライセンス」と同じ)
+    from(rootDir.resolve("../android/app/src/main/kotlin/jp/kz2601/metamon/settings")) {
+        include("ThirdPartyLicenses.kt")
+        into("settings")
+    }
     into(layout.buildDirectory.dir("generated/sharedRenderer"))
 }
 kotlin.sourceSets.named("main") { kotlin.srcDir(syncSharedRenderer) }
@@ -86,6 +91,10 @@ val syncAndroidStrings by tasks.registering(Sync::class) {
     }
 }
 sourceSets.named("main") { resources.srcDir(syncAndroidStrings) }
+
+// 同梱するライセンスの一覧(licenses/third_party_licenses.json)。作り方は third-party-licenses.gradle.kts
+apply(from = "third-party-licenses.gradle.kts")
+sourceSets.named("main") { resources.srcDir(tasks.named("thirdPartyLicenses")) }
 
 // icon の名前の表(SF Symbols → Material)は docs/dsl/icon-map.json をそのまま同梱して読む(#1742)。
 val syncIconMap by tasks.registering(Sync::class) {
