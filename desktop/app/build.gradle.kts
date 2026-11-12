@@ -64,6 +64,8 @@ val sharedRendererDir = rootDir.resolve("../android/renderer/src/main/kotlin/jp/
 val syncSharedRenderer by tasks.registering(Sync::class) {
     from(sharedRendererDir) {
         include("form/FormDraft.kt", "navigation/NavigationResolver.kt")
+        // openUrlButton の to の {{fieldId}} を埋める(Android と同じ規則)
+        include("components/actions/FormTemplate.kt")
         // icon の絵(android/scripts/gen-symbol-icons.py が icon-map.json から作った表・#1742)
         include("theme/icons/SymbolIconTable.kt", "theme/icons/VendoredIcons.kt")
     }
