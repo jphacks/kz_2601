@@ -44,6 +44,7 @@ func TestUsage(t *testing.T) {
 // fakeReader records the query and returns err.
 type fakeReader struct {
 	q   store.FeedbackQuery
+	fb  *store.Feedback
 	err error
 }
 
@@ -53,7 +54,7 @@ func (f *fakeReader) ListFeedback(_ context.Context, q store.FeedbackQuery) ([]s
 }
 
 func (f *fakeReader) GetFeedback(context.Context, string) (*store.Feedback, error) {
-	return nil, f.err
+	return f.fb, f.err
 }
 
 func TestRunArgs(t *testing.T) {
@@ -115,5 +116,24 @@ func TestRunWriteError(t *testing.T) {
 	err := run(context.Background(), &fakeReader{err: errors.New("down")}, []string{"list"}, failWriter{}, time.Now())
 	if err == nil || err.Error() != "down" {
 		t.Fatalf("err %v", err)
+	}
+}
+
+func TestRunShow(t *testing.T) {
+	fb := &store.Feedback{
+		ID: "fb1", UID: "u1", Kind: "bug", Status: "received", ConsentVersion: "v1",
+		Message: "動かない\n\x1b[31m", AppID: "app1", DSLVersion: 3, DSL: []byte(`{"screens":[]}`),
+		Screenshot: []byte{0xff, 0xd8}, Device: &store.FeedbackDevice{AppVersion: "1.0", Build: "7", OS: "iOS 18", Model: "iPhone"},
+		CreatedAt: time.Date(2026, 11, 12, 0, 0, 0, 0, time.UTC),
+	}
+	var out bytes.Buffer
+	if err := run(context.Background(), &fakeReader{fb: fb}, []string{"show", "fb1"}, &out, time.Now()); err != nil {
+		t.Fatal(err)
+	}
+	for _, want := range []string{"id:        fb1", "createdAt: 2026-11-12T09:00:00+09:00", "device:    app \"1.0\" (\"7\")",
+		"dsl:       app app1 v3 (14 bytes)", "screenshot: 2 bytes", `"動かない\n\x1b[31m"`} {
+		if !strings.Contains(out.String(), want) {
+			t.Errorf("missing %q in:\n%s", want, out.String())
+		}
 	}
 }

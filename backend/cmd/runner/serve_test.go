@@ -145,33 +145,29 @@ func TestLoop(t *testing.T) {
 		t.Fatalf("logs: %s", logs.String())
 	}
 
-	// an interval above TickBudget is capped
-	ft = &scriptTicker{ticked: make(chan time.Duration, 1)}
-	s := &serial{t: ft}
-	ctx, cancel = context.WithCancel(t.Context())
-	defer cancel()
-	go loop(ctx, s, time.Millisecond, slog.New(slog.DiscardHandler))
-	select {
-	case b := <-ft.ticked:
-		if b > TickBudget {
-			t.Fatalf("budget %v over TickBudget", b)
-		}
-	case <-time.After(5 * time.Second):
-		t.Fatal("loop did not tick")
+}
+
+func TestTickBudget(t *testing.T) {
+	if got := tickBudget(2 * TickBudget); got != TickBudget {
+		t.Fatalf("2*TickBudget: %v, want TickBudget", got)
+	}
+	if got := tickBudget(5 * time.Millisecond); got != 5*time.Millisecond {
+		t.Fatalf("small interval: %v, want the interval", got)
 	}
 }
 
 func TestServe(t *testing.T) {
-	if err := serve(t.Context(), "not-a-port", http.NotFoundHandler(), &serial{t: &scriptTicker{}}, 0, slog.New(slog.DiscardHandler)); err == nil {
+	if err := serve(t.Context(), "127.0.0.1:not-a-port", http.NotFoundHandler(), &serial{t: &scriptTicker{}}, 0, slog.New(slog.DiscardHandler)); err == nil {
 		t.Fatal("a bad port was accepted")
 	}
 
-	// ctx ends: the server shuts down cleanly; interval > 0 starts the loop
+	// ctx ends: the server shuts down cleanly; interval > 0 starts the loop.
+	// Loopback only, so macOS does not ask to allow incoming connections.
 	ft := &scriptTicker{ticked: make(chan time.Duration, 1)}
 	ctx, cancel := context.WithCancel(t.Context())
 	errc := make(chan error, 1)
 	go func() {
-		errc <- serve(ctx, "0", http.NotFoundHandler(), &serial{t: ft}, 5*time.Millisecond, slog.New(slog.DiscardHandler))
+		errc <- serve(ctx, "127.0.0.1:0", http.NotFoundHandler(), &serial{t: ft}, 5*time.Millisecond, slog.New(slog.DiscardHandler))
 	}()
 	select {
 	case <-ft.ticked:
