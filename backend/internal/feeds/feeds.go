@@ -26,10 +26,10 @@ import (
 
 // Item is one row of a feed. Fields a provider does not use are omitted.
 type Item struct {
-	Date     string    `json:"date,omitempty"` // YYYY-MM-DD (weather, holidays, diet) or RFC 3339 (rss, arxiv, warnings, pressure, bikeshare, status)
+	Date     string    `json:"date,omitempty"` // YYYY-MM-DD (weather, holidays, diet) or RFC 3339 (rss, arxiv, warnings, pressure, typhoon, bikeshare, status)
 	Title    string    `json:"title"`
 	Subtitle string    `json:"subtitle,omitempty"`
-	Icon     string    `json:"icon,omitempty"`   // SF Symbols name (weather, warnings, status)
+	Icon     string    `json:"icon,omitempty"`   // SF Symbols name (weather, warnings, typhoon, status)
 	URL      string    `json:"url,omitempty"`    // https only (rss, arxiv, diet, status)
 	Max      *float64  `json:"max,omitempty"`    // °C (weather) / hPa (pressure)
 	Min      *float64  `json:"min,omitempty"`    // °C (weather) / hPa (pressure)
@@ -122,6 +122,8 @@ var providerLimits = map[string]limits{
 	dsl.FeedPressure: {ttl: 30 * time.Minute, maxBody: 256 << 10},
 	dsl.FeedArxiv:    {ttl: 3 * time.Hour, maxBody: 1 << 20, gap: arxivGap},
 	dsl.FeedDiet:     {ttl: 3 * time.Hour, maxBody: 3 << 20, gap: 3 * time.Second},
+	// typhoon: per file (the list and each of up to maxTyphoons spec files).
+	dsl.FeedTyphoon: {ttl: 10 * time.Minute, maxBody: 128 << 10},
 	// HELLO CYCLING's station_information is about 8 MB (15,700 stations,
 	// 2026-11-12); station_status about 4.5 MB. The source's own ttl is 60 s.
 	dsl.FeedBikeshare: {ttl: 2 * time.Minute, maxBody: 16 << 20},
@@ -368,7 +370,7 @@ func (s *Service) check(q Query) error {
 		if q.Q == "" || q.Region != "" || q.FeedID != "" {
 			return ErrUnknown
 		}
-	case dsl.FeedHolidays:
+	case dsl.FeedHolidays, dsl.FeedTyphoon:
 		if q.Region != "" || q.FeedID != "" {
 			return ErrUnknown
 		}
@@ -721,6 +723,8 @@ func (s *Service) fetch(ctx context.Context, q Query) (string, []Item, int, erro
 		rawURL, title, parse = s.ep.arxivURL(q.FeedID), "arXiv "+q.FeedID+"("+dsl.ArxivCategories[q.FeedID]+")の新着", parseArxiv
 	case dsl.FeedDiet:
 		rawURL, title, parse = s.ep.dietURL(q.Q), "国会会議録「"+q.Q+"」", parseDiet
+	case dsl.FeedTyphoon:
+		return s.fetchTyphoon(ctx) // a list, then one file per cyclone
 	case dsl.FeedBikeshare:
 		return s.fetchBikeshare(ctx, q)
 	case dsl.FeedStatus:

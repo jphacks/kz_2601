@@ -39,6 +39,7 @@ type Endpoints struct {
 	RSS         map[string]RSSFeed
 	Arxiv       string // + "?search_query=cat:{category}&..." (dsl.ArxivCategories)
 	Diet        string // + "?any={q}&..." (国会会議録 speech search)
+	TyphoonBase string // + "targetTc.json" / "{TC0000}/specifications.json"
 	Bikeshare   map[string]BikeshareSystem
 	Status      map[string]StatusPage
 }
@@ -80,8 +81,9 @@ func DefaultEndpoints() Endpoints {
 			"osaka-city-news": {Name: "大阪市 新着情報", URL: "https://www.city.osaka.lg.jp/main/rss/rss_new.xml", Publisher: "大阪市ホームページ", SiteURL: "https://www.city.osaka.lg.jp/", License: licenseOsaka},
 			"soumu-news":      {Name: "総務省 新着情報", URL: "https://www.soumu.go.jp/news.rdf", Publisher: "総務省ホームページ", SiteURL: "https://www.soumu.go.jp/", License: licenseSoumu},
 		},
-		Arxiv: "https://export.arxiv.org/api/query",
-		Diet:  "https://kokkai.ndl.go.jp/api/speech",
+		Arxiv:       "https://export.arxiv.org/api/query",
+		Diet:        "https://kokkai.ndl.go.jp/api/speech",
+		TyphoonBase: "https://www.jma.go.jp/bosai/typhoon/data/",
 		Bikeshare: map[string]BikeshareSystem{
 			"docomo-cycle":       odptGBFS("docomo-cycle", "ドコモ・バイクシェア(東京以外)", "株式会社ドコモ・バイクシェア", "c_bikeshare_gbfs-d-nationwide-bikeshare", ccBY4),
 			"docomo-cycle-tokyo": odptGBFS("docomo-cycle-tokyo", "ドコモ・バイクシェア(東京)", "株式会社ドコモ・バイクシェア", "c_bikeshare_gbfs-d-bikeshare", ccBY4),
@@ -110,6 +112,9 @@ func odptGBFS(id, name, operator, dataset, license string) BikeshareSystem {
 
 const pdl = "公共データ利用規約(第1.0版)"
 
+// typhoonCredit is the processed-content note for typhoon (編集責任は Tailor It).
+const typhoonCredit = "気象庁「台風情報」(https://www.jma.go.jp/bosai/typhoon/)をもとに Tailor It 作成(編集責任は Tailor It)"
+
 // statusLicense: each company publishes the status API for programmatic
 // access; the app is not endorsed by them.
 const statusLicense = "各社が公開する status の API・各社の承認や提携はありません"
@@ -128,6 +133,9 @@ func (ep Endpoints) source(q Query) Source {
 		return Source{Name: "気象庁ホームページ", URL: "https://www.jma.go.jp/", License: pdl}
 	case dsl.FeedWarnings:
 		return Source{Name: "気象庁ホームページ", URL: "https://www.jma.go.jp/bosai/warning/", License: pdl}
+	case dsl.FeedTyphoon:
+		// 加工: the parts are put into one line per cyclone (the doc's 出どころと規約).
+		return Source{Name: "気象庁ホームページ", URL: "https://www.jma.go.jp/bosai/typhoon/", License: pdl + "・" + typhoonCredit}
 	case dsl.FeedPressure:
 		return Source{Name: "MET Norway(ノルウェー気象研究所)", URL: "https://api.met.no/", License: "CC BY 4.0・6 時間ごとにまとめて加工"}
 	case dsl.FeedHolidays:
@@ -157,6 +165,15 @@ func (ep Endpoints) weatherURL(region string) string { return ep.WeatherBase + r
 
 // warningURL builds the warning URL (region checked like weatherURL).
 func (ep Endpoints) warningURL(region string) string { return ep.WarningBase + region + ".json" }
+
+// typhoonListURL is the list of cyclones JMA reports on now.
+func (ep Endpoints) typhoonListURL() string { return ep.TyphoonBase + "targetTc.json" }
+
+// typhoonSpecURL builds a cyclone's file. id was checked against tcIDRe
+// (TC + 4 digits), so it cannot add a path or a query.
+func (ep Endpoints) typhoonSpecURL(id string) string {
+	return ep.TyphoonBase + id + "/specifications.json"
+}
 
 // pressureURL builds the forecast URL for the region's fixed point. MET
 // Norway asks for at most 4 decimals; the points have 2.
@@ -201,6 +218,7 @@ func (ep Endpoints) hosts() map[string]bool {
 	}
 	add(ep.Arxiv)
 	add(ep.Diet)
+	add(ep.TyphoonBase)
 	for _, b := range ep.Bikeshare {
 		add(b.Info)
 		add(b.Status)
