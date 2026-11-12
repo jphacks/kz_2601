@@ -30,6 +30,7 @@ val sharedIncludes = listOf(
     "jp/kz2601/metamon/services/AppConfigClient.kt",
     "jp/kz2601/metamon/services/CrashReporter.kt",
     "jp/kz2601/metamon/services/PlanUsage.kt",
+    "jp/kz2601/metamon/services/consent/AiButtonMetrics.kt",
     "jp/kz2601/metamon/services/consent/AiConsentStore.kt",
     "jp/kz2601/metamon/services/consent/CrashReportingPreference.kt",
     "jp/kz2601/metamon/services/consent/KeyValueStore.kt",

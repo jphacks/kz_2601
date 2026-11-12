@@ -1,6 +1,7 @@
 package jp.kz2601.metamon.desktop.store
 
 import jp.kz2601.metamon.services.AppConfigClient
+import jp.kz2601.metamon.services.consent.AiButtonMetricsRecorder
 import jp.kz2601.metamon.services.consent.AiConsentStore
 import jp.kz2601.metamon.services.consent.CrashReportingPreference
 import jp.kz2601.metamon.services.local.BackoffPolicy
@@ -28,6 +29,9 @@ class DesktopStore(val root: File?) {
     private val consentValues = JsonKeyValueStore(root?.resolve(CONSENT_FILE))
     val aiConsent = AiConsentStore(consentValues)
     val crashReporting = CrashReportingPreference(consentValues)
+
+    /** aiButton の集計(#2817・Android と同じく設定の側に貯める)。送るのは DesktopAiButtonMetrics が同意を見てから */
+    val aiButtonMetrics = AiButtonMetricsRecorder(settings)
     val records = RecordStore(root?.resolve("records"))
     val documents = DocumentCache(root?.resolve("documents"))
 
@@ -53,6 +57,7 @@ class DesktopStore(val root: File?) {
         records.removeEverything()
         documents.removeAll()
         settings.clear()
+        aiButtonMetrics.clearCounts()
         aiConsent.forget()
         sweepTempFiles(root)
     }
