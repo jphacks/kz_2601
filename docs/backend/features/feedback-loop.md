@@ -40,6 +40,20 @@ flowchart LR
 
 自動なのは「取り込み → 振り分け → 下書き」と「直ったお知らせ」だけ。**Issue を作るのは人の `drafts approve` だけ**で、エージェントの PR を起動するのも、マージするのも人。定期の実行は Cloud Run Job と Cloud Scheduler(`infra/feedback_loop.tf`)で、既定は止まっている([定期の実行](#定期の実行))。
 
+### 流れとパッケージ
+
+`backend/internal/loop/` の下のパッケージと、上の図の段の対応。呼び出す口はどれも `backend/cmd/feedback-loop`。段の外の部品(店・停止スイッチ・監査・`purge`)は `internal/loop` そのものにある。
+
+| パッケージ | 段 | すること | 呼ぶ所 |
+|---|---|---|---|
+| [`draft`](../../../backend/internal/loop/draft) | draft・publish | 束ごとに決まった形の下書きを作り、`loop_drafts` に置く。出口の検査(`draft.Check`)・束の優先度(`draft.BundlePriority`)・承認と投稿(`review.go`)もここ | `cmd/feedback-loop`(`draft`・`drafts`)・`triage/eval` |
+| [`fixed`](../../../backend/internal/loop/fixed) | notify | 出した Issue がマージされた PR で閉じたら、送り主にお知らせ(`loop_notices`)を作る。push は `push.go` | `cmd/feedback-loop`(`fixed`) |
+| [`github`](../../../backend/internal/loop/github) | publish・notify | ループ専用の小さな GitHub の口。Issue を作る・コメントを足す・Issue がどう閉じたか(`fix.go`)を読むだけ | `cmd/feedback-loop`(`drafts`・`fixed`) |
+| [`ingest`](../../../backend/internal/loop/ingest) | intake | 出どころ(アプリ内・クラッシュ・ストアのレビュー・TestFlight・生成の失敗)を 1 つの形にして、伏せ字してから `loop_inbox` へ | `cmd/feedback-loop`(`ingest`・`ingest-crash`・`inbox`・`drafts`) |
+| [`pii`](../../../backend/internal/loop/pii) | intake(ほかの段の検査でも使う) | 決まった形で個人情報を伏せ字にする(`pii.Mask`)。LLM は呼ばない | `ingest`・`draft`・`triage` |
+| [`triage`](../../../backend/internal/loop/triage) | triage | LLM で分類・束ね・優先度付け。出力はスキーマと検査器 1(`check.go`)を通った物だけ使う | `cmd/feedback-loop`(`triage`・`triage-score`)・`triage/eval` |
+| [`triage/eval`](../../../backend/internal/loop/triage/eval) | (`-model ai` の時だけ triage) | 正解付きの組で振り分けの一致率を測る・`loop_inbox` を正解欄が空の組として書き出す([振り分けの精度を測る](#振り分けの精度を測る)) | `cmd/feedback-loop`(`triage-eval`・`triage-label-export`) |
+
 ## 守っていること
 
 | 決まり | どこで |
