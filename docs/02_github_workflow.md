@@ -165,6 +165,28 @@ macOS runner は Linux の 10 倍の分単価なので、ubuntu の `ios-changes
 - 手元では `cd desktop && ./gradlew :desktop:test :dsl:test :whisper:test`(JDK 17 以上)。Windows だけで落ちる時は、パスの区切りや改行(CRLF)の違いを疑う。
 - 「配布物を作る」の step が落ちたら jpackage のエラーをログで見る(手元では `./gradlew :desktop:packageDeb`)。「配布物を残す」が落ちたら `desktop/app/build/compose/binaries/main/<deb|msi>/` が空だった(`if-no-files-found: error`)。
 
+## infra-ci(Terraform の書式と構文の検査)
+
+`.github/workflows/infra-ci.yml`。`infra/`(GCP の構成の Terraform・[`infra/README.md`](../infra/README.md))を検査する。**GCP には触らない**(state の backend を使わずに init するので、認証も秘密も要らない)。
+
+- いつ回るか: `infra/**` かこの workflow を触る PR(Draft でも回る)と、`develop` / `main` への push。required check ではないので、ほかの CI と違って workflow の `paths:` で絞っている。
+- ジョブは `terraform` の 1 つ(ubuntu・5 分上限・Terraform `1.9.8`)。
+
+| step | 検査すること |
+|---|---|
+| `terraform fmt -check -recursive` | 書式。直していない `.tf` があると落ちる |
+| `terraform init -backend=false -input=false` | provider を取ってくる(state には繋がない) |
+| `terraform validate` | 構文・参照・型 |
+| import ブロックも含めて validate | `imports.prod.tf.example` を `imports.tf` に写して、もう一度 `terraform validate`(prod を取り込む `import` ブロックが壊れていないか。[取り込みの手順](../infra/README.md#既存の-prod-を取り込む)) |
+
+落ちた時の見方:
+
+- **fmt**: 手元で `cd infra && terraform fmt -recursive` をかけて commit する。ログに書式のずれたファイル名が出る。
+- **init**: provider の版の指定(`versions.tf`)か、取ってくる時の通信の失敗。後者なら Re-run。
+- **validate**: ログの `Error:` に、ファイルと行が出る。手元では `cd infra && terraform init -backend=false && terraform validate`(GCP の認証なしで回る)。
+- **import ブロックの validate だけ落ちる**: `imports.prod.tf.example` の `import` の `to` が、`.tf` から消えた・名前が変わったリソースを指している。リソースの名前を変えたら example も合わせる。
+- plan と apply は CI では回さない。人が手元で回す([`infra/README.md`](../infra/README.md))。
+
 ## backend-emulator(Firestore エミュレータ試験・必須ではない)
 
 `.github/workflows/backend-emulator.yml`(#546)。`backend-ci` は 5 分上限なので別 workflow。
