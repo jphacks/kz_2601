@@ -27,7 +27,7 @@ final class UXAuditSmall3Tests: XCTestCase {
                      "答えた後(返事待ち)は出さない")
         let ready = asked + [Bubble(role: .user, text: "食費"), Bubble(role: .assistant, text: "では作りますね。", kind: .ready)]
         XCTAssertNil(QuestionProgress.number(bubbles: ready, mode: .create, latest: .ready), "案・作る前は出さない")
-        XCTAssertNil(QuestionProgress.number(bubbles: [], mode: .create, latest: nil))
+        XCTAssertNil(QuestionProgress.number(bubbles: [Bubble](), mode: .create, latest: nil))
     }
 
     func testQuestionNumberHiddenBeyondMax() {

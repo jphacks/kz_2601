@@ -18,6 +18,8 @@ final class IntentHost {
         #if !APP_STORE_REVIEW
         /// 通知のタップ(#269)。すでに開いているアプリなら何も言わない
         case openFromNotification(appId: String)
+        /// 連係の Handoff(#1851)。そのアプリに切り替えてから画面と記録を開く
+        case handoff(HandoffTarget)
         #endif
     }
 
@@ -62,6 +64,7 @@ final class IntentHost {
         #if !APP_STORE_REVIEW
         case .openFromNotification(let appId):
             if appId != runtime.document.appId { await runtime.switchApp(to: appId) }
+        case .handoff(let target): await runtime.openHandoff(target)
         #endif
         }
     }
@@ -75,6 +78,24 @@ final class IntentHost {
             guard !Task.isCancelled else { return }
             TailorItShortcuts.updateAppShortcutParameters()
         }
+    }
+
+    // MARK: - 記録の追加(AddRecordIntent)。Mac は同じ名前の口を MacIntentHost.swift に持つ(#1034)
+
+    /// 背面起動(bootstrap 前)でも `runtime` があれば書ける
+    var canWriteRecords: Bool { runtime != nil }
+
+    /// ref 項目の候補(参照先の記録)をローカル DB から読む
+    func cachedRecords(appId: String, entity: String) async -> [Record] {
+        await runtime?.recordSync.cached(appId: appId, entity: entity) ?? []
+    }
+
+    /// 1 件足す。戻り値はサーバーへ送り終えたか
+    func addRecord(appId: String, entity: String, data: [String: JSONValue],
+                   encryptedFields: [String: Set<String>]) async throws -> Bool {
+        guard let runtime else { throw TailorIntentError.notReady }
+        runtime.recordSync.encryptedFields[appId] = encryptedFields
+        return await runtime.addRecordFromIntent(appId: appId, entity: entity, data: data)
     }
 
     // MARK: - カタログ(Entity の候補)
@@ -94,6 +115,9 @@ final class IntentHost {
         }
         return AppSummary.visible(all, current: nil)
     }
+
+    /// 記録先の候補になるアプリ。iOS は作ったアプリ全部(Mac は端末に残る作ったアプリだけ)
+    func recordableApps() async -> [AppSummary] { await apps() }
 
     /// アプリの DSL。表示中ならそれ、無ければキャッシュ(`DocumentCache`)、それも無ければ `GET /dsl`。
     func document(appId: String) async -> AppDocument? {
