@@ -36,9 +36,13 @@ sourceSets {
                 "jp/kz2601/metamon/services/consent/KeyValueStore.kt",
                 "jp/kz2601/metamon/services/http/*.kt",
                 "jp/kz2601/metamon/services/live/HttpAppConfigClient.kt",
+                // 通報・ブロック(と仲間探し)の API クライアント(#2805)
+                "jp/kz2601/metamon/services/live/HttpSocialClients.kt",
                 "jp/kz2601/metamon/services/local/DocumentCache.kt",
                 "jp/kz2601/metamon/services/local/RecordStore.kt",
                 "jp/kz2601/metamon/services/local/SyncQueue.kt",
+                "jp/kz2601/metamon/services/social/MatchingClient.kt",
+                "jp/kz2601/metamon/services/social/ModerationClient.kt",
             )
         }
     }
