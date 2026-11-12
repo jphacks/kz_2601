@@ -217,6 +217,10 @@ notify() { # notify <見出し> <本文>
   if [ -n "${GITHUB_STEP_SUMMARY:-}" ]; then
     printf '### rollout %s: %s\n\n%s\n' "$SERVICE" "$1" "$2" >>"$GITHUB_STEP_SUMMARY"
   fi
+  # GitHub Actions で実際に戻した時は注釈(run の画面・Checks に出る)にもする。ジョブも失敗するので、いつもの失敗通知も飛ぶ
+  if [ "${GITHUB_ACTIONS:-}" = true ] && [ "$EXECUTE" = 1 ] && [ "$1" = "rolled back" ]; then
+    echo "::error title=rollout ${SERVICE} rolled back::$(printf '%s' "$2" | sed 's/%/%25/g' | tr '\n' ' ')"
+  fi
 }
 
 # ---- 新旧のリビジョン ---------------------------------------------------------------------------

@@ -33,5 +33,9 @@ project(":dsl").projectDir = file("../android/dsl")
 include(":services")
 project(":services").projectDir = file("services")
 
+// 端末内の文字起こし(android/whisper の純 Kotlin の部分 + デスクトップの JNI・#1751)
+include(":whisper")
+project(":whisper").projectDir = file("whisper")
+
 include(":desktop")
 project(":desktop").projectDir = file("app")

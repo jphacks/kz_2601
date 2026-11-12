@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="renderer_health_allow">Allow</string>
+    <string name="renderer_health_average">%1$s steps a day on average</string>
+    <string name="renderer_health_denied">Access to Health Connect isn\'t allowed</string>
+    <string name="renderer_health_failed">Couldn\'t read health data</string>
+    <string name="renderer_health_no_weight">No weight records in Health Connect</string>
+    <string name="renderer_health_recorded_on">Recorded %1$s</string>
+    <string name="renderer_health_steps_unit">steps</string>
+    <string name="renderer_health_target">Goal %1$s steps · %2$d%%</string>
+    <string name="renderer_health_unavailable">Health Connect isn\'t available on this device</string>
+    <string name="renderer_health_update_required">Install Health Connect to use steps and weight</string>
+    <string name="renderer_health_weight_summary">Latest %1$s kg (%2$s kg over 7 days)</string>
+    <string name="renderer_health_weight_unit">kg</string>
+</resources>

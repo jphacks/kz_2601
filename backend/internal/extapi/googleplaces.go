@@ -120,7 +120,7 @@ func placesCircleArg(args map[string]string, defRadius int) (*placesCircle, erro
 	lat, lng, ok, err := argLatLng(args, 4)
 	if err != nil || !ok {
 		if err == nil && strings.TrimSpace(args["radius"]) != "" {
-			err = fmt.Errorf("%w: radius needs lat and lng", ErrUnknown)
+			err = fmt.Errorf("%w: radius needs lat and lng", ErrBadArgs)
 		}
 		return nil, err
 	}
@@ -137,7 +137,7 @@ func placesCircleArg(args map[string]string, defRadius int) (*placesCircle, erro
 func (g *googlePlaces) searchText(ctx context.Context, in Input) (Output, error) {
 	q := strings.TrimSpace(in.Args["q"])
 	if q == "" || utf8.RuneCountInString(q) > placesMaxQuery {
-		return Output{}, fmt.Errorf("%w: q must be 1-%d characters", ErrUnknown, placesMaxQuery)
+		return Output{}, fmt.Errorf("%w: q must be 1-%d characters", ErrBadArgs, placesMaxQuery)
 	}
 	limit, err := argInt(in.Args, "limit", 10, 1, 20)
 	if err != nil {
@@ -153,7 +153,7 @@ func (g *googlePlaces) searchText(ctx context.Context, in Input) (Output, error)
 func (g *googlePlaces) searchNearby(ctx context.Context, in Input) (Output, error) {
 	typ := strings.TrimSpace(in.Args["type"])
 	if typ != "" && !placesTypeRe.MatchString(typ) {
-		return Output{}, fmt.Errorf("%w: type", ErrUnknown)
+		return Output{}, fmt.Errorf("%w: type", ErrBadArgs)
 	}
 	limit, err := argInt(in.Args, "limit", 10, 1, 20)
 	if err != nil {
@@ -164,7 +164,7 @@ func (g *googlePlaces) searchNearby(ctx context.Context, in Input) (Output, erro
 		return Output{}, err
 	}
 	if c == nil {
-		return Output{}, fmt.Errorf("%w: lat and lng are required", ErrUnknown)
+		return Output{}, fmt.Errorf("%w: lat and lng are required", ErrBadArgs)
 	}
 	body := placesNearbyRequest{MaxResultCount: limit, LanguageCode: "ja", LocationRestriction: *c}
 	if typ != "" {
