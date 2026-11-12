@@ -35,6 +35,8 @@ import androidx.compose.ui.input.key.onKeyEvent
 import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.input.key.type
 import jp.kz2601.metamon.desktop.i18n.Strings
+import jp.kz2601.metamon.desktop.usage.UsageDialog
+import jp.kz2601.metamon.desktop.usage.UsageLoader
 import jp.kz2601.metamon.dsl.Action
 import jp.kz2601.metamon.dsl.ActionType
 import jp.kz2601.metamon.dsl.AppDSL
@@ -43,6 +45,7 @@ import jp.kz2601.metamon.dsl.Presentation
 import jp.kz2601.metamon.dsl.Screen
 import jp.kz2601.metamon.dsl.screen
 import jp.kz2601.metamon.renderer.form.FormDraft
+import jp.kz2601.metamon.services.PlanUsageSource
 
 // キーボードだけで使う(#1765): ショートカット・コマンドパレット(CommandPalette.kt)・F1 の一覧。
 
@@ -279,6 +282,10 @@ class DesktopKeyboard(
 
     /** サードパーティのライセンス(Licenses.kt)。F1 の一覧とパレットから開く。 */
     var licensesOpen by mutableStateOf(false)
+
+    /** 設定の「使っている量」(#2814)。サインイン中だけパレットに出す。 */
+    var usage: UsageLoader? = null
+    var usageOpen by mutableStateOf(false)
     val root = FocusRequester()
     val modal = FocusRequester()
 
@@ -299,7 +306,7 @@ class DesktopKeyboard(
             if (!repeat) closePreview()
             return true
         }
-        if (paletteOpen || helpOpen || licensesOpen || wipeConfirmOpen) return false // パレット・一覧・確認が自分で受ける
+        if (paletteOpen || helpOpen || licensesOpen || usageOpen || wipeConfirmOpen) return false // パレット・一覧・確認が自分で受ける
         val s = Keymap.match(p, os) ?: return false
         if (s == Shortcut.PRINT || s.bubble != bubble) return false // 印刷は Print.kt の Ctrl+P
         // Space は何も選んでいない時だけ。見せる写真が無ければ流す(知らせも出さない)
@@ -381,7 +388,10 @@ class DesktopKeyboard(
             "about:licenses", LicensesText.TITLE, PaletteCommand.Kind.ACTION,
             keywords = listOf("licenses", "third-party", "oss", "notice", LicensesText.LICENSE),
         ) { licensesOpen = true }
-        return shortcuts + buttons + record + screens + apps + wipe + licenses
+        val usage = usage?.let {
+            listOf(PaletteCommand("account:usage", Strings["settings_usage_header"], PaletteCommand.Kind.ACTION, keywords = listOf("usage", "plan", "limit")) { usageOpen = true })
+        }.orEmpty()
+        return shortcuts + buttons + record + screens + apps + usage + wipe + licenses
     }
 
     /** 確認で「消す」を押した: 全アプリの端末のデータを消し、このウィンドウを最初の画面に戻す。 */
@@ -412,7 +422,7 @@ class DesktopKeyboard(
     val modalModifier: Modifier get() = Modifier.focusRequester(modal).focusGroup()
 
     fun focusAfterNavigation(modalOpen: Boolean) {
-        if (paletteOpen || helpOpen || licensesOpen) return
+        if (paletteOpen || helpOpen || licensesOpen || usageOpen) return
         if (modalOpen && runCatching { modal.requestFocus(FocusDirection.Enter) }.getOrDefault(false)) return
         runCatching { root.requestFocus() }
     }
@@ -444,6 +454,12 @@ class DesktopKeyboard(
                 runCatching { root.requestFocus() }
             }
         }
+        usage?.takeIf { usageOpen }?.let { loader ->
+            UsageDialog(loader) {
+                usageOpen = false
+                runCatching { root.requestFocus() }
+            }
+        }
         if (wipeConfirmOpen) {
             val scope = rememberCoroutineScope()
             val dismiss = {
@@ -470,10 +486,12 @@ fun rememberDesktopKeyboard(
     openApp: ((String) -> Unit)?,
     openRecord: ((String, String) -> Unit)? = null,
     wipeLocalData: (suspend () -> Unit)? = null,
+    usage: PlanUsageSource? = null,
 ): DesktopKeyboard = remember(dsl, session) { DesktopKeyboard(dsl, session) }.also {
     it.dispatch = dispatch
     it.print = print
     it.openApp = openApp
     it.openRecord = openRecord
     it.wipeLocalData = wipeLocalData
+    if (it.usage == null && usage != null) it.usage = UsageLoader(usage)
 }
