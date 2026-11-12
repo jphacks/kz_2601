@@ -84,7 +84,7 @@ class DesktopActionHost(
     private val exportDir: File = defaultExportDir(),
     private val notifier: Notifier = Notifier.Tray,
     /** null なら openVoice は使えない旨(既定はフラグが立っている時だけ作る) */
-    private val voice: VoiceInput? = VoiceInput.fromEnv(),
+    private val voice: VoiceInput? = VoiceInput.shared,
     /** 重い書き出し(PDF の頁を描く)を画面のスレッドの外で。 */
     private val background: (() -> Unit) -> Unit = { thread(isDaemon = true, name = "export") { it() } },
     /** カレンダーに渡す .ics を置く所(一時フォルダ・渡すたびに別のフォルダ)。 */

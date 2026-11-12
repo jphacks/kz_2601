@@ -40,6 +40,8 @@
     <string name="desktop_input_qr_unavailable">カメラでの読み取りは このパソコンでは使えません。画像ファイルかクリップボードの画像から読めます</string>
     <string name="desktop_input_required">%1$s を入力してください</string>
     <string name="desktop_input_today">今日</string>
+    <string name="desktop_input_transcribe_speak">話して入れる</string>
+    <string name="desktop_input_transcribe_stop">止めて文字にする</string>
     <string name="desktop_input_transcribe_unavailable">話して入力は このパソコンでは使えません。キーボードで入力してください</string>
     <string name="desktop_input_video_capture_unavailable">動画の撮影は このパソコンでは使えません</string>
     <string name="desktop_io_added_rows">%1$d 件を追加しました</string>
