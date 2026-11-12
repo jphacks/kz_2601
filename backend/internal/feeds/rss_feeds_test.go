@@ -78,9 +78,9 @@ func TestRSSSourceAttribution(t *testing.T) {
 		"digital-news":    {Name: "デジタル庁ホームページ", URL: "https://www.digital.go.jp/", License: pdl},
 		"fdma-news":       {Name: "消防庁ホームページ", URL: "https://www.fdma.go.jp/", License: pdl},
 		"fdma-disaster":   {Name: "消防庁ホームページ", URL: "https://www.fdma.go.jp/", License: pdl},
-		"soumu-news":      {Name: "総務省ホームページ", URL: "https://www.soumu.go.jp/", License: pdl},
-		"osaka-city-news": {Name: "大阪市ホームページ", URL: "https://www.city.osaka.lg.jp/", License: "RSS は CC BY"},
-		"go-blog":         {Name: "The Go Blog(go.dev)", URL: "https://go.dev/blog/", License: "CC BY 4.0"},
+		"soumu-news":      {Name: "総務省ホームページ", URL: "https://www.soumu.go.jp/", License: "PDL1.0(https://www.digital.go.jp/resources/open_data/public_data_license_v1.0)・題名と日付を抜き出して表示"},
+		"osaka-city-news": {Name: "大阪市ホームページ", URL: "https://www.city.osaka.lg.jp/", License: "CC BY 2.1 JP (https://creativecommons.org/licenses/by/2.1/jp/)・題名と日付を抜き出して表示"},
+		"go-blog":         {Name: "The Go Blog(go.dev)", URL: "https://go.dev/blog/", License: "CC BY 4.0 (https://creativecommons.org/licenses/by/4.0/)・題名と日付を抜き出して表示"},
 	} {
 		if got := ep.source(Query{Provider: dsl.FeedRSS, FeedID: id}); got != want {
 			t.Errorf("%s source = %+v, want %+v", id, got, want)
