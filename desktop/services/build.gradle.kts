@@ -39,6 +39,9 @@ sourceSets {
                 "jp/kz2601/metamon/services/local/DocumentCache.kt",
                 "jp/kz2601/metamon/services/local/RecordStore.kt",
                 "jp/kz2601/metamon/services/local/SyncQueue.kt",
+                // client-config の notice(#333)。ServiceNotice の読み方の関数は ClientConfig.kt にある
+                "jp/kz2601/metamon/services/update/ClientConfig.kt",
+                "jp/kz2601/metamon/services/update/ServiceNotice.kt",
             )
         }
     }
