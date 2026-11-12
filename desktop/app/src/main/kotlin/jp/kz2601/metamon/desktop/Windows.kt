@@ -229,6 +229,8 @@ class AppHub(
     private val openRecords: (appId: String, dsl: AppDSL) -> SharedRecords = { _, _ -> SharedRecords() },
     /** 端末の保存先をまるごと消す(開いていないアプリの分も)。 */
     private val wipeStore: suspend () -> Unit = {},
+    /** 一時ファイル(写真の「既定のアプリで開く」・引き出し)を消す。 */
+    private val clearTempFiles: () -> Unit = { PhotoOpen.clearTemp() },
 ) {
     class OpenedApp(val id: String, val dsl: AppDSL, val records: SharedRecords)
 
@@ -274,11 +276,12 @@ class AppHub(
 
     /**
      * 「この端末のデータを消す」(#1887・サインアウトの画面 #1749 までの口)。
-     * 開いているアプリごとに書き込みを流し終えてから消して画面を空にし、最後に保存先をまるごと消す。
+     * 開いているアプリごとに書き込みを流し終えてから消して画面を空にし、保存先をまるごと消す。最後に書き出した一時ファイルも消す。
      */
     suspend fun wipeLocalData() {
         opened().forEach { it.records.wipe() }
         wipeStore()
+        runCatching { clearTempFiles() }
     }
 
     /** 終わる時: 全部のアプリの積んだ書き込みを書き終えるのを待ち([timeoutMillis] まで)、それから閉じる。 */

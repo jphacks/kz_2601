@@ -78,9 +78,16 @@ object DragOut {
             .orEmpty()
             .count { it.deleteRecursively() }
 
-    /** 引き出すたびに別のフォルダ(名前はそのまま見せたいので、ファイル名ではなくフォルダで重ならないようにする)。 */
-    private fun temp(name: String, bytes: ByteArray): File {
-        val root = tempRoot().apply { mkdirs() }
+    /** [root] の drag-* のフォルダを古さに関わらず全部消す(この端末のデータを消す時)。消した数を返す。 */
+    fun clear(root: File = tempRoot()): Int =
+        root.listFiles { f -> f.isDirectory && f.name.startsWith("drag-") }.orEmpty().count { it.deleteRecursively() }
+
+    /**
+     * 引き出すたびに別のフォルダ(名前はそのまま見せたいので、ファイル名ではなくフォルダで重ならないようにする)。
+     * 写真のプレビューの「既定のアプリで開く」は [root] に自分の場所(PhotoOpen.tempRoot)を渡す。
+     */
+    internal fun temp(name: String, bytes: ByteArray, root: File = tempRoot()): File {
+        root.mkdirs()
         val dir = Files.createTempDirectory(root.toPath(), "drag-").toFile().apply { deleteOnExit() }
         return File(dir, name).apply {
             writeBytes(bytes)
@@ -96,18 +103,21 @@ object ImageSource {
     const val CONNECT_TIMEOUT_MS = 10_000
     const val READ_TIMEOUT_MS = 15_000
 
-    /** [allowFile] は記録・フォームの値の時だけ(photoField の値は file URI)。DSL に書かれた URL では手元のファイルを読まない。 */
-    fun bytes(src: String?, allowFile: Boolean): ByteArray? {
+    /**
+     * [allowFile] は記録・フォームの値の時だけ(photoField の値は file URI)。DSL に書かれた URL では手元のファイルを読まない。
+     * どの読み方も [max] バイトまで(手元のファイルも読みながら数える・途中で大きくなる物も止まる)。
+     */
+    fun bytes(src: String?, allowFile: Boolean, max: Int = MAX_BYTES): ByteArray? {
         if (src.isNullOrBlank()) return null
         return runCatching {
             when {
-                src.startsWith("data:") -> dataUrl(src)
+                src.startsWith("data:") -> dataUrl(src, max)
                 src.startsWith("https://") -> URI(src).toURL().openConnection().run {
                     connectTimeout = CONNECT_TIMEOUT_MS
                     readTimeout = READ_TIMEOUT_MS
-                    if (contentLengthLong > MAX_BYTES) null else getInputStream().use { capped(it) }
+                    if (contentLengthLong > max) null else getInputStream().use { capped(it, max) }
                 }
-                allowFile && src.startsWith("file:") -> fileOf(src)?.takeIf { it.isFile && FileKind.of(it.name) == FileKind.IMAGE }?.let { readFile(it) }
+                allowFile && src.startsWith("file:") -> fileOf(src)?.takeIf { it.isFile && FileKind.of(it.name) == FileKind.IMAGE }?.let { readFile(it, max) }
                 else -> null
             }
         }.getOrNull()
@@ -126,7 +136,7 @@ object ImageSource {
     /** ファイルを [max] バイトまで読む。超えたら null(`length()` は当てにせず、読んだ量で数える)。 */
     fun readFile(file: File, max: Int = MAX_BYTES): ByteArray? = file.inputStream().use { capped(it, max) }
 
-    /** [MAX_BYTES] まで読む。超えたら null。 */
+    /** [max] バイトまで読む。超えたら null。 */
     fun capped(input: InputStream, max: Int = MAX_BYTES): ByteArray? {
         val out = ByteArrayOutputStream()
         val buf = ByteArray(16 * 1024)

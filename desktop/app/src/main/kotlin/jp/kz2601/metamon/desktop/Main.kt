@@ -64,10 +64,11 @@ private fun runApp(args: Array<String>) = application {
     }
     // 端末の記録は裏で読む。読み終えるまでウィンドウはスケルトン(SharedRecords.loading)
     val loadScope = remember { CoroutineScope(SupervisorJob() + Dispatchers.IO) }
-    // 前に落ちた時などに残った引き出し・カレンダーに渡した一時フォルダ(1 日より古い物)を裏で消す
+    // 前に落ちた時などに残った引き出し・写真・カレンダーに渡した一時フォルダ(1 日より古い物)を裏で消す
     remember {
         loadScope.launch {
             runCatching { DragOut.sweep() }
+            runCatching { DragOut.sweep(root = PhotoOpen.tempRoot()) }
             runCatching { DesktopActionHost.sweepCalendar() }
         }
     }
@@ -171,6 +172,9 @@ private fun ApplicationScope.DesktopWindow(w: WindowEntry, registry: WindowRegis
                     // 前に出た: 続けて失敗して止まった送り待ちを起こす
                     app.records.persistence?.resume()
                 }
+
+                // 外で離した Space は届かない: 押しっぱなしの覚えを捨てる(次の押し下げを取りこぼさない)
+                override fun windowLostFocus(e: WindowEvent?) = resetSpaceRepeats()
             }
             window.addWindowFocusListener(l)
             onDispose { window.removeWindowFocusListener(l) }
