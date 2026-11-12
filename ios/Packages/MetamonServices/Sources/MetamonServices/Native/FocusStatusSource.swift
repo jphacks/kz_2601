@@ -4,6 +4,8 @@ import Intents
 #endif
 #if os(iOS)
 import UIKit
+#elseif os(macOS)
+import AppKit
 #endif
 
 // 集中モード中か(#1990・親 #1799)。式・スキーマ・AI の決まりにはまだ出さない(#1775 の決定待ち)。
@@ -13,7 +15,7 @@ import UIKit
 public enum FocusAuthorization: String, Equatable, Sendable, CaseIterable {
     case notDetermined
     case denied
-    /// Mac・保護者の制限・審査用の版など。entitlement(Communication Notifications)が無いビルドもこれになる想定(未確認)
+    /// 保護者の制限・審査用の版など。entitlement(Communication Notifications)が無いビルドもこれになる想定(未確認)
     case restricted
     case authorized
 }
@@ -188,7 +190,8 @@ public final class LiveFocusStatusSource: FocusStatusSource {
 
 extension FocusStatusReadings {
     static var system: FocusStatusReadings {
-        #if os(iOS)
+        #if os(iOS) || os(macOS)
+        // Mac(#2328)も同じ INFocusStatusCenter(macOS 12 以降)。読み直すのはアプリが前に来た時
         FocusStatusReadings(
             authorization: { FocusAuthorization(INFocusStatusCenter.default.authorizationStatus) },
             requestAuthorization: { done in
@@ -196,16 +199,27 @@ extension FocusStatusReadings {
                 INFocusStatusCenter.default.requestAuthorization { done(FocusAuthorization($0)) }
             },
             isFocused: { INFocusStatusCenter.default.focusStatus.isFocused },
-            notificationNames: [UIApplication.didBecomeActiveNotification]
+            notificationNames: [didBecomeActive]
         )
         #else
-        // Mac は対象外(#1990)。常に restricted / nil
+        // それ以外の OS は対象外。常に restricted / nil
         FocusStatusReadings(
             authorization: { .restricted },
             requestAuthorization: { $0(.restricted) },
             isFocused: { nil },
             notificationNames: []
         )
+        #endif
+    }
+
+    /// アプリが前に来た時の通知
+    static var didBecomeActive: Notification.Name {
+        #if os(iOS)
+        UIApplication.didBecomeActiveNotification
+        #elseif os(macOS)
+        NSApplication.didBecomeActiveNotification
+        #else
+        Notification.Name("FocusStatusReadings.didBecomeActive")
         #endif
     }
 }

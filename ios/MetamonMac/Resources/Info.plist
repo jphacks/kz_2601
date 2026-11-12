@@ -113,6 +113,10 @@
 	<string>生成したアプリで現在地を記録・地図に表示したり、目的地までの道順を表示したり、保存した場所の近くに着いた時に通知したりするために使います(近くに着いたかはこの Mac の中で判定します)。道のりは「記録を開始」を押した時だけ、停止するまで(最長4時間)記録します。</string>
 	<key>NSLocationUsageDescription</key>
 	<string>生成したアプリで現在地を記録・地図に表示したり、目的地までの道順を表示したり、保存した場所の近くに着いた時に通知したりするために使います(近くに着いたかはこの Mac の中で判定します)。道のりは「記録を開始」を押した時だけ、停止するまで(最長4時間)記録します。</string>
+	<!-- 集中モード中か(#2328・#1990 の Mac・FocusStatusSource)。取れるのは「集中中か」だけでモードの名前は取れない。英語は InfoPlist.xcstrings。
+	     審査用の版は FocusStatusSources.make(reviewBuild: true) が偽物を返し許可を求めない -->
+	<key>NSFocusStatusUsageDescription</key>
+	<string>生成したアプリで、集中モードの間は表示や通知を控えめにするために、集中モード中かどうかを使用します。モードの名前は読み取らず、この Mac の外に送りません。</string>
 	<!-- 写真・動画の撮影(#1043)と QR の読み取り(#1045)。Mac に無い機能(ドラレコ・ビデオ通話)は書かない。英語は InfoPlist.xcstrings -->
 	<key>NSCameraUsageDescription</key>
 	<string>生成したアプリで写真や動画を撮影・記録したり、QR コードを読み取ったりするために、カメラを使用します。</string>
