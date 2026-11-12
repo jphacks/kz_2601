@@ -3,6 +3,7 @@ import SwiftUI
 import MetamonServices
 
 // #361: 1 つのアカウントを OS をまたいで使う。つながっているサインインの方法を見せ、Apple 以外のアカウントに Apple を足せる。
+// iOS のサインインは Apple と匿名だけなので、ボタンが出るのは他の OS(Android の Google など)で作ったアカウントの時だけ。
 // その Apple ID が別のアカウントにあっても、アカウントはまとめない(切り替えもしない)。
 
 /// 設定の「サインインの方法」。匿名のユーザーには出さない(匿名 → Apple の引き継ぎはアカウントの欄・#276)。
@@ -15,10 +16,10 @@ struct LinkedAccountsSection: View {
     var body: some View {
         if let user = session.user, !user.isAnonymous {
             Section {
-                ForEach(SignInProvider.allCases) { provider in
-                    row(provider, linked: user.providers.contains(provider))
+                ForEach(Self.rows(for: user)) { provider in
+                    row(provider)
                 }
-                if !user.providers.contains(.apple) {
+                if Self.offersApple(to: user) {
                     appleButton
                         .listRowInsets(EdgeInsets(top: Theme.Spacing.sm, leading: Theme.Spacing.md, bottom: Theme.Spacing.sm, trailing: Theme.Spacing.md))
                 }
@@ -31,19 +32,23 @@ struct LinkedAccountsSection: View {
         }
     }
 
-    private func row(_ provider: SignInProvider, linked: Bool) -> some View {
+    /// つながっている方法だけ(iOS からつなげない Google の「つながっていません」は出さない)
+    static func rows(for user: AuthUser) -> [SignInProvider] {
+        SignInProvider.allCases.filter(user.providers.contains)
+    }
+
+    /// 「Apple で続ける」は Apple がまだつながっていない時だけ
+    static func offersApple(to user: AuthUser) -> Bool { !user.providers.contains(.apple) }
+
+    private func row(_ provider: SignInProvider) -> some View {
         HStack(spacing: Theme.Spacing.md) {
             Image(systemName: provider == .apple ? "apple.logo" : "g.circle")
                 .frame(width: 24)
             Text(verbatim: provider == .apple ? "Apple" : "Google")
             Spacer()
-            if linked {
-                Label("つながっています", systemImage: "checkmark.circle.fill")
-                    .labelStyle(.titleAndIcon)
-                    .foregroundStyle(.green)
-            } else {
-                Text("つながっていません").foregroundStyle(.secondary)
-            }
+            Label("つながっています", systemImage: "checkmark.circle.fill")
+                .labelStyle(.titleAndIcon)
+                .foregroundStyle(.green)
         }
         .font(.subheadline)
         .accessibilityElement(children: .combine)
@@ -76,6 +81,10 @@ struct LinkedAccountsSection: View {
             Text("この Apple ID は、すでに別のアカウントで使われています。アカウントはまとめず、いまのアカウントはそのままです。この Apple ID のアカウントを使うときは、ログアウトしてから Apple でサインインしてください。")
                 .font(.footnote).foregroundStyle(.red)
                 .accessibilityIdentifier("settings.linkApple.inUse")
+        case .emailInUseByOtherAccount:
+            Text("この Apple ID のメールアドレスは、すでに別のアカウントで使われています。アカウントはまとめず、いまのアカウントはそのままです。そのアカウントを使うときは、ログアウトしてから、そのアカウントを作った方法でサインインしてください。")
+                .font(.footnote).foregroundStyle(.red)
+                .accessibilityIdentifier("settings.linkApple.emailInUse")
         case .failed(let message):
             Text(message).font(.footnote).foregroundStyle(.red)
         case .cancelled, nil:

@@ -9,6 +9,8 @@ public final class MockAuthService: AuthService, @unchecked Sendable {
 
     /// true なら `linkWithApple` が `credentialAlreadyInUse` で失敗する(既に別のアカウントにある Apple ID を再現)。
     public var appleIDInUse = false
+    /// true なら `linkWithApple` が `appleEmailInUse` で失敗する(Apple ID のメールが別のアカウントにある・#361)。
+    public var appleEmailInUse = false
     private var hasPending = false
 
     private let lock = NSLock()
@@ -57,6 +59,7 @@ public final class MockAuthService: AuthService, @unchecked Sendable {
             return try await signInWithApple(idToken: idToken, nonce: nonce, fullName: fullName)
         }
         guard !current.providers.contains(.apple) else { throw AuthError.alreadyLinked }
+        if lock.withLock({ appleEmailInUse }) { throw AuthError.appleEmailInUse }
         if lock.withLock({ appleIDInUse }) {
             lock.withLock { hasPending = current.isAnonymous } // 既存アカウント(#361)は切り替え先を持たない
             throw AuthError.credentialAlreadyInUse

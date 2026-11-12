@@ -10,6 +10,8 @@ enum AppleLinkOutcome: Equatable {
     case cancelled
     /// その Apple ID は別のアカウントで使われている(`credentialAlreadyInUse`)。何も変えない
     case inUseByOtherAccount
+    /// その Apple ID のメールアドレスが別のアカウントで使われている(`appleEmailInUse`)。何も変えない
+    case emailInUseByOtherAccount
     case failed(String)
 }
 
@@ -145,6 +147,8 @@ final class AuthSession {
             return .linked
         } catch AuthError.credentialAlreadyInUse {
             return .inUseByOtherAccount
+        } catch AuthError.appleEmailInUse {
+            return .emailInUseByOtherAccount
         } catch {
             return .failed(error.localizedDescription)
         }

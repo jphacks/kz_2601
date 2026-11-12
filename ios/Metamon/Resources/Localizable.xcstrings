@@ -4207,6 +4207,23 @@
         }
       }
     },
+    "この Apple ID のメールアドレスは、すでに別のアカウントで使われています。アカウントはまとめず、いまのアカウントはそのままです。そのアカウントを使うときは、ログアウトしてから、そのアカウントを作った方法でサインインしてください。" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The email address for this Apple ID is already used by another account. The accounts were not merged, and your current account is unchanged. To use that account, sign out and then sign in with the method you used to create it."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "この Apple ID のメールアドレスは、すでに別のアカウントで使われています。アカウントはまとめず、いまのアカウントはそのままです。そのアカウントを使うときは、ログアウトしてから、そのアカウントを作った方法でサインインしてください。"
+          }
+        }
+      }
+    },
     "この Apple ID は、すでに別のアカウントで使われています。アカウントはまとめず、いまのアカウントはそのままです。この Apple ID のアカウントを使うときは、ログアウトしてから Apple でサインインしてください。" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -5682,23 +5699,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "つながっています"
-          }
-        }
-      }
-    },
-    "つながっていません" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Not linked"
-          }
-        },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "つながっていません"
           }
         }
       }

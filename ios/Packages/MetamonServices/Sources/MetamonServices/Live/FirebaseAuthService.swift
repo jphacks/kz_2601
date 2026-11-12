@@ -106,6 +106,9 @@ public final class FirebaseAuthService: AuthService, @unchecked Sendable {
             throw AuthError.credentialAlreadyInUse
         } catch let error as NSError where error.code == AuthErrorCode.providerAlreadyLinked.rawValue {
             throw AuthError.alreadyLinked
+        } catch let error as NSError where error.code == AuthErrorCode.emailAlreadyInUse.rawValue
+                    || error.code == AuthErrorCode.accountExistsWithDifferentCredential.rawValue {
+            throw AuthError.appleEmailInUse // Firebase の英語の文をそのまま出さない
         }
     }
 
