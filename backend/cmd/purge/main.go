@@ -26,6 +26,7 @@ import (
 	"encoding/hex"
 	"errors"
 	"flag"
+	"io"
 	"log/slog"
 	"os"
 	"os/signal"
@@ -42,14 +43,13 @@ import (
 )
 
 func main() {
-	var opts options
-	flag.BoolVar(&opts.dryRun, "dry-run", false, "only list the accounts that would be purged")
-	flag.IntVar(&opts.limit, "limit", 50, "max accounts per run")
-	flag.DurationVar(&opts.olderThan, "older-than", store.PurgeAfter, "purge accounts deleted longer ago than this")
-	flag.BoolVar(&opts.deleteAuth, "delete-auth", true, "also delete the Firebase Auth user")
-	flag.DurationVar(&opts.feedbackOlderThan, "feedback-older-than", store.FeedbackRetention, "erase feedback created longer ago than this")
-	flag.IntVar(&opts.feedbackLimit, "feedback-limit", 500, "max feedback documents erased per run")
-	flag.Parse()
+	opts, err := parseFlags(os.Args[1:], os.Stderr)
+	if err != nil {
+		if errors.Is(err, flag.ErrHelp) {
+			os.Exit(0)
+		}
+		os.Exit(2)
+	}
 
 	logger := httpx.NewLogger()
 	slog.SetDefault(logger)
@@ -93,6 +93,24 @@ func main() {
 	if failed := run(ctx, st, users, opts, logger, time.Now()); failed > 0 {
 		os.Exit(1)
 	}
+}
+
+// parseFlags reads the command line (args without the program name); usage
+// and parse errors go to out. It changes nothing else.
+func parseFlags(args []string, out io.Writer) (options, error) {
+	var opts options
+	fs := flag.NewFlagSet("purge", flag.ContinueOnError)
+	fs.SetOutput(out)
+	fs.BoolVar(&opts.dryRun, "dry-run", false, "only list the accounts that would be purged")
+	fs.IntVar(&opts.limit, "limit", 50, "max accounts per run")
+	fs.DurationVar(&opts.olderThan, "older-than", store.PurgeAfter, "purge accounts deleted longer ago than this")
+	fs.BoolVar(&opts.deleteAuth, "delete-auth", true, "also delete the Firebase Auth user")
+	fs.DurationVar(&opts.feedbackOlderThan, "feedback-older-than", store.FeedbackRetention, "erase feedback created longer ago than this")
+	fs.IntVar(&opts.feedbackLimit, "feedback-limit", 500, "max feedback documents erased per run")
+	if err := fs.Parse(args); err != nil {
+		return options{}, err
+	}
+	return opts, nil
 }
 
 type options struct {
