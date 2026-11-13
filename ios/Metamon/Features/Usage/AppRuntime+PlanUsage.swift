@@ -5,7 +5,7 @@ import MetamonServices
 /// 量はサーバー(`GET /v1/me/usage`・`/v1/apps/{appId}/usage`)から 5 分だけキャッシュして読む。モックは出さない。
 extension AppRuntime {
     var planUsageSource: (any PlanUsageSource)? {
-        #if DEBUG
+        #if DEBUG || METAMON_STG
         if let mock = DebugMockUsage.source { return mock }
         #endif
         return services.appConfig as? PlanUsageSource

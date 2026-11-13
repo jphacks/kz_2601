@@ -10,7 +10,8 @@
 // (this tool never calls the Logging API).
 //
 // Targets are only the uids given (-uids / -uids-file). There is no "all
-// users" mode.
+// users" session report. The log-only modes (modes.go: `ai-session-report
+// <mode> -logs FILE`) count every user's log lines but print counts only.
 //
 // What users said (the request text kept in versions/{n}.source, feedback
 // messages, names in the DSL) goes only to the report file, written outside
@@ -66,6 +67,13 @@ type options struct {
 }
 
 func main() {
+	if handled, err := runLogMode(os.Args[1:], os.Stdout); handled {
+		if err != nil {
+			fmt.Fprintln(os.Stderr, "ai-session-report:", err)
+			os.Exit(2)
+		}
+		return
+	}
 	var (
 		o         options
 		uidList   = flag.String("uids", "", "comma-separated uids to report on (required, or -uids-file)")
@@ -85,7 +93,12 @@ func main() {
 	flag.DurationVar(&o.cfg.QuickFix, "quick-fix", 5*time.Minute, "AI edit within this after an AI version counts as a possible miss")
 	flag.DurationVar(&o.cfg.Slow, "slow", 60*time.Second, "generation slower than this is flagged")
 	flag.IntVar(&o.cfg.ManyClarify, "many-clarify", 3, "clarify turns before one request that count as many")
+	flag.BoolVar(&o.cfg.ByPlatform, "by-platform", false, "add generations and failures per client OS (X-Client-Platform)")
 	flag.Parse()
+	if flag.NArg() > 0 {
+		fmt.Fprintf(os.Stderr, "ai-session-report: unknown mode %q (log modes: %s)\n", flag.Arg(0), logModeNames())
+		os.Exit(2)
+	}
 	o.cfg.RecordLimit = 1000
 
 	err := func() error {

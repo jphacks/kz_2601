@@ -136,7 +136,7 @@ func TestHandleMembersAndAccounts(t *testing.T) {
 
 // PushDevices: iOS only on the asked APNs environment (all when ""),
 // Android always; DropDeviceToken removes that token only.
-func TestHandlePushDevices(t *testing.T) {
+func TestHandlePushDevicesAndDrop(t *testing.T) {
 	ctx := context.Background()
 	st := store.NewMemory()
 	tok := func(c string) string { return strings.Repeat(c, 64) }
