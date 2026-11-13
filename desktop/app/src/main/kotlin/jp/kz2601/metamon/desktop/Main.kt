@@ -34,6 +34,8 @@ import jp.kz2601.metamon.desktop.consent.LocalAiButtonMetrics
 import jp.kz2601.metamon.desktop.gridedit.LayoutEditStore
 import jp.kz2601.metamon.desktop.hotkey.GlobalHotkey
 import jp.kz2601.metamon.desktop.hotkey.GlobalHotkeys
+import jp.kz2601.metamon.desktop.debug.DevOnboardingItems
+import jp.kz2601.metamon.desktop.debug.SeenFlagsOnboardingReplay
 import jp.kz2601.metamon.desktop.i18n.Strings
 import jp.kz2601.metamon.desktop.io.DragOut
 import jp.kz2601.metamon.desktop.io.OpenWithFiles
@@ -105,7 +107,7 @@ fun main(rawArgs: Array<String>) {
 
 private fun runApp(args: Array<String>, launchAction: LaunchAction?, jump: JumpCommand? = null, sent: List<File>? = null) = application {
     // 端末の保存(#1887): 記録・設定は再起動しても残る。最後に開いたアプリから開く
-    val desktopStore = remember { DesktopStore.open() }
+    val desktopStore = remember { DesktopStore.open().also { DevOnboardingItems.hook = SeenFlagsOnboardingReplay(it.settings) } }
     // 並びを直した分(#3207)。同梱の DSL に当て直して開く
     val layouts = remember { LayoutEditStore(desktopStore.root?.resolve("layouts")) }
     val first = remember {
