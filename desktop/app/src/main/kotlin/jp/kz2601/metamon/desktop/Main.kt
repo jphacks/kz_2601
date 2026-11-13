@@ -32,6 +32,7 @@ import jp.kz2601.metamon.desktop.store.DesktopStore
 import jp.kz2601.metamon.desktop.store.DeviceWipe
 import jp.kz2601.metamon.desktop.store.SessionPersistence
 import jp.kz2601.metamon.desktop.theme.TailorItTheme
+import jp.kz2601.metamon.desktop.usage.UsageNotices
 import jp.kz2601.metamon.dsl.records.entityModels
 import jp.kz2601.metamon.dsl.screen
 import java.io.File
@@ -100,6 +101,8 @@ private fun runApp(args: Array<String>) = application {
             loadScope.cancel()
         }
     }
+    // 上限に近い時のお知らせ(#3352)。本物の API の時だけ(モックの間は出さない)
+    val usage = remember { UsageNotices.create(desktopStore) }
     val registry = remember { WindowRegistry().also { it.open(WindowKey.app(first)) } }
     val firstWindowId = remember { registry.windows.first().id }
     // トレイに常駐(#1761): × はトレイに隠す(設定で off・トレイが無ければ終わる)。終わるのはトレイの「終了」
@@ -125,7 +128,7 @@ private fun runApp(args: Array<String>) = application {
     DesktopTray(tray)
     registry.windows.toList().forEach { w ->
         key(w.id) {
-            DesktopWindow(w, registry, hub, tray, startScreen = args.getOrNull(2)?.takeIf { w.id == firstWindowId })
+            DesktopWindow(w, registry, hub, tray, startScreen = args.getOrNull(2)?.takeIf { w.id == firstWindowId }, usage = usage)
         }
     }
 }
@@ -133,7 +136,7 @@ private fun runApp(args: Array<String>) = application {
 /** ウィンドウ 1 枚。画面の状態(遷移・下書き・キー)はウィンドウごと、記録はアプリごとに共有。 */
 @OptIn(FlowPreview::class)
 @Composable
-private fun ApplicationScope.DesktopWindow(w: WindowEntry, registry: WindowRegistry, hub: AppHub, tray: TrayController, startScreen: String?) {
+private fun ApplicationScope.DesktopWindow(w: WindowEntry, registry: WindowRegistry, hub: AppHub, tray: TrayController, startScreen: String?, usage: UsageNotices? = null) {
     // アプリの記録はウィンドウの数で数える。最後の 1 枚を閉じたら書き終えて閉じる
     val app = remember(w) { hub.acquire(w.key.appId) }
     DisposableEffect(w) { onDispose { hub.release(w.key.appId) } }
@@ -206,6 +209,8 @@ private fun ApplicationScope.DesktopWindow(w: WindowEntry, registry: WindowRegis
                         isActive = { registry.active?.id == w.id },
                         windowId = w.id,
                         onWipeLocalData = hub::wipeLocalData,
+                        // 記録の詳細のウィンドウには出さない(アプリのウィンドウだけ)
+                        usageNotice = usage?.takeIf { w.key.recordId == null }?.let { u -> suspend { u.nextForApp(app.id) } },
                     )
                 }
             }
