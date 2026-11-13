@@ -165,6 +165,14 @@ LLM に「何の部品を置くか」だけでなく、**どこに置くか**ま
 * WhisperKit(argmax-oss-swift・`small` モデル・CoreML/ANE)
 * Go(Claude 呼び出しは `net/http` 直叩き。外部依存は `santhosh-tekuri/jsonschema/v6` と `evanphx/json-patch/v5` のみ)
 * xcodegen(`.xcodeproj` をコミットしない)、ローカル Swift Package × 3(マルチモジュール)
+* Android(`android/`): Kotlin 2.4.21 + Jetpack Compose(BOM 2026.06.01)+ Material 3 + Coil(`android/app`・`android/renderer`)
+* Android の端末内音声認識: whisper.cpp 1.9.5 を NDK でビルドして JNI で呼ぶ(arm64-v8a・x86_64。モデルは初回に取得・`android/whisper/src/main/cpp/`)
+* Android のネイティブ機能: Health Connect(`healthStat`・`android/renderer/.../components/health/`)、CameraX・Media3(撮影と動画・`android/renderer`)、MapLibre(地図・`android/renderer`)、ML Kit(文字・QR・画像ラベル・顔・`android/app`・`android/renderer`)、Google Play Billing(Tailor It Pro・`android/app`)
+* Android の Firebase: Auth・App Check・Cloud Messaging・Crashlytics(`android/services`・`android/app`)
+* デスクトップ(`desktop/`): Compose Multiplatform Desktop 1.12.2(JVM 17・msi / deb / rpm / dmg を jpackage で作る形・`desktop/app`)。DSL・API・保存は Android の `android/dsl`・`android/services` の純 Kotlin を取り込んで共用
+* デスクトップの端末内音声認識: Android と同じ版の whisper.cpp を JNI で(Windows x64・arm64 / Linux x64 / 手元の macOS・既定は off・`desktop/whisper/native/`)
+* デスクトップのその他: OkHttp(`desktop/services`)、zxing(QR)・PDFBox(PDF の読み書き)・JNA(Windows の電池の読み取り)(`desktop/app`)
+* Mac(`ios/MetamonMac/`): SwiftUI。iOS の 3 パッケージと `ios/Shared/` を共有
 * GitHub Actions(backend-ci / ios-ci / secrets-scan / deploy-cloudrun)、golangci-lint、gitleaks、Firebase Emulator Suite、XCUITest
 
 ### デバイス
