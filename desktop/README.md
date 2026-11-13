@@ -4,6 +4,8 @@ Compose Multiplatform Desktop(JVM)で作る Windows・Linux 版。DSL の読み�
 
 部品・アクションごとの対応(描ける / 代わり / 使えません / 未定): [docs/desktop/support-matrix.md](../docs/desktop/support-matrix.md)
 
+iOS の機能の入口ごとの対応(有る / 代わり / 作らない / Issue): [docs/parity.md](docs/parity.md)
+
 ## 目次
 
 - [動かす](#動かす)
