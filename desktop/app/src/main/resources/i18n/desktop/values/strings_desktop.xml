@@ -12,6 +12,12 @@
     <string name="desktop_calendar_write_failed">予定を書き出せませんでした</string>
     <string name="desktop_calendar_written">予定を書き出しました: %1$s</string>
     <string name="desktop_chart_empty">まだデータがありません</string>
+    <string name="desktop_chat_help">会話の画面</string>
+    <string name="desktop_chat_keys_close">会話を閉じる</string>
+    <string name="desktop_chat_keys_newline">改行</string>
+    <string name="desktop_chat_keys_send">送る</string>
+    <string name="desktop_chat_new_app">新しいアプリを作る</string>
+    <string name="desktop_chat_placeholder">作りたいアプリを文字で(Enter で送る・Shift+Enter で改行)</string>
     <string name="desktop_close">閉じる</string>
     <string name="desktop_data_add">追加</string>
     <string name="desktop_delete_not_allowed">このデータは削除できません</string>

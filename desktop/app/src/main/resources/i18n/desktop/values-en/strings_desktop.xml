@@ -11,6 +11,12 @@
     <string name="desktop_calendar_write_failed">Couldn\'t save the event</string>
     <string name="desktop_calendar_written">Saved the event: %1$s</string>
     <string name="desktop_chart_empty">No data yet</string>
+    <string name="desktop_chat_help">Chat</string>
+    <string name="desktop_chat_keys_close">Close the chat</string>
+    <string name="desktop_chat_keys_newline">New line</string>
+    <string name="desktop_chat_keys_send">Send</string>
+    <string name="desktop_chat_new_app">Create a new app</string>
+    <string name="desktop_chat_placeholder">Describe the app you want (Enter to send, Shift+Enter for a new line)</string>
     <string name="desktop_close">Close</string>
     <string name="desktop_data_add">Add</string>
     <string name="desktop_delete_not_allowed">You can\'t delete this data</string>

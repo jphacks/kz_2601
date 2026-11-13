@@ -34,6 +34,9 @@ import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.onKeyEvent
 import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.input.key.type
+import jp.kz2601.metamon.desktop.chat.ChatBuild
+import jp.kz2601.metamon.desktop.chat.ChatOverlay
+import jp.kz2601.metamon.desktop.chat.ChatSession
 import jp.kz2601.metamon.desktop.i18n.Strings
 import jp.kz2601.metamon.dsl.Action
 import jp.kz2601.metamon.dsl.ActionType
@@ -167,6 +170,7 @@ object Keymap {
 
     private fun keyName(k: Key, os: HostOs): String = when (k) {
         Key.Escape -> "Esc"
+        Key.Enter -> if (os == HostOs.MAC) "↩" else "Enter"
         Key.Delete -> if (os == HostOs.MAC) "⌦" else "Delete"
         Key.Backspace -> if (os == HostOs.MAC) "⌫" else "Backspace"
         Key.F1 -> "F1"
@@ -262,6 +266,24 @@ class DesktopKeyboard(
     /** 「この端末のデータを消す」(#1887)。全アプリの分を消す口(AppHub.wipeLocalData)。null ならパレットに出さない。 */
     var wipeLocalData: (suspend () -> Unit)? = null
 
+    /**
+     * 「新しいアプリを作る」の会話(#2381)。AI の接続先(#2160)がある時だけ渡す。null ならパレットに出さない。
+     */
+    var newChat: (() -> ChatSession)? = null
+
+    /** 会話の ready・案から作る(作る流れは #2163)。 */
+    var buildFromChat: (ChatBuild) -> Unit = {}
+
+    /** 開いている会話。 */
+    var chat by mutableStateOf<ChatSession?>(null)
+
+    /** 会話を開く。接続先が無ければ false。 */
+    fun openChat(): Boolean {
+        val make = newChat ?: return false
+        if (chat == null) chat = make()
+        return true
+    }
+
     /** 消す前の確認を出している。 */
     var wipeConfirmOpen by mutableStateOf(false)
 
@@ -299,7 +321,7 @@ class DesktopKeyboard(
             if (!repeat) closePreview()
             return true
         }
-        if (paletteOpen || helpOpen || licensesOpen || wipeConfirmOpen) return false // パレット・一覧・確認が自分で受ける
+        if (paletteOpen || helpOpen || licensesOpen || wipeConfirmOpen || chat != null) return false // パレット・一覧・確認・会話が自分で受ける
         val s = Keymap.match(p, os) ?: return false
         if (s == Shortcut.PRINT || s.bubble != bubble) return false // 印刷は Print.kt の Ctrl+P
         // Space は何も選んでいない時だけ。見せる写真が無ければ流す(知らせも出さない)
@@ -377,11 +399,14 @@ class DesktopKeyboard(
         val wipe = wipeLocalData?.let {
             listOf(PaletteCommand("data:wipe", KeyboardText.WIPE, PaletteCommand.Kind.ACTION, keywords = listOf("wipe", "sign out")) { wipeConfirmOpen = true })
         }.orEmpty()
+        val newApp = newChat?.let {
+            listOf(PaletteCommand("chat:new", Strings["desktop_chat_new_app"], PaletteCommand.Kind.ACTION, keywords = listOf("new app", "create", "chat")) { openChat() })
+        }.orEmpty()
         val licenses = PaletteCommand(
             "about:licenses", LicensesText.TITLE, PaletteCommand.Kind.ACTION,
             keywords = listOf("licenses", "third-party", "oss", "notice", LicensesText.LICENSE),
         ) { licensesOpen = true }
-        return shortcuts + buttons + record + screens + apps + wipe + licenses
+        return shortcuts + buttons + newApp + record + screens + apps + wipe + licenses
     }
 
     /** 確認で「消す」を押した: 全アプリの端末のデータを消し、このウィンドウを最初の画面に戻す。 */
@@ -412,7 +437,7 @@ class DesktopKeyboard(
     val modalModifier: Modifier get() = Modifier.focusRequester(modal).focusGroup()
 
     fun focusAfterNavigation(modalOpen: Boolean) {
-        if (paletteOpen || helpOpen || licensesOpen) return
+        if (paletteOpen || helpOpen || licensesOpen || chat != null) return
         if (modalOpen && runCatching { modal.requestFocus(FocusDirection.Enter) }.getOrDefault(false)) return
         runCatching { root.requestFocus() }
     }
@@ -444,6 +469,13 @@ class DesktopKeyboard(
                 runCatching { root.requestFocus() }
             }
         }
+        chat?.let { c ->
+            val close = {
+                chat = null
+                runCatching { root.requestFocus() }
+            }
+            ChatOverlay(c, onBuild = { b -> close(); buildFromChat(b) }, onClose = { close() })
+        }
         if (wipeConfirmOpen) {
             val scope = rememberCoroutineScope()
             val dismiss = {
@@ -470,10 +502,14 @@ fun rememberDesktopKeyboard(
     openApp: ((String) -> Unit)?,
     openRecord: ((String, String) -> Unit)? = null,
     wipeLocalData: (suspend () -> Unit)? = null,
+    newChat: (() -> ChatSession)? = null,
+    buildFromChat: (ChatBuild) -> Unit = {},
 ): DesktopKeyboard = remember(dsl, session) { DesktopKeyboard(dsl, session) }.also {
     it.dispatch = dispatch
     it.print = print
     it.openApp = openApp
     it.openRecord = openRecord
     it.wipeLocalData = wipeLocalData
+    it.newChat = newChat
+    it.buildFromChat = buildFromChat
 }
