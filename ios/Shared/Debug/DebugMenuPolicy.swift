@@ -1,6 +1,6 @@
 import Foundation
 
-/// 開発用メニュー(#2079)を出すかの判定。ここだけで決める。
+/// 開発用メニュー(#2079)を出すかの判定。ここだけで決める(iOS と Mac で共有・#2247)。
 /// メニューの中身(画面・つまみ・各セクション)は `#if METAMON_STG` の中にあり、Release / Review の版には入らない。
 /// この型だけは全部の版に入る(判定の単体テストを Release の条件でも書けるように。文言は持たない)。
 enum DebugMenuPolicy {
@@ -13,9 +13,10 @@ enum DebugMenuPolicy {
         #endif
     }
 
-    /// 出すか。Staging の構成で prod に向けてビルドした時の取りこぼしを防ぐため、接続先が prod なら出さない
+    /// 出すか。Staging の構成で prod に向けてビルドした時の取りこぼしを防ぐため、接続先が prod なら出さない。
+    /// 接続先の読み方は OS ごと(`currentAIURL` / `currentAppConfigURL` は iOS・Mac それぞれの拡張・#2247)
     static var isAvailable: Bool {
-        isAvailable(compiledIn: isCompiledIn, aiURL: BuildConfig.aiBaseURL, appConfigURL: BuildConfig.appConfigBaseURL)
+        isAvailable(compiledIn: isCompiledIn, aiURL: currentAIURL, appConfigURL: currentAppConfigURL)
     }
 
     static func isAvailable(compiledIn: Bool, aiURL: URL?, appConfigURL: URL?) -> Bool {
