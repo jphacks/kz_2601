@@ -32,6 +32,7 @@ cd desktop
 ./gradlew :desktop:run                    # 同梱の例 shopping を開く
 ./gradlew :desktop:run --args=kakeibo     # docs/dsl/examples の別の例
 ./gradlew :desktop:test :dsl:test         # 適合テスト(docs/dsl/conformance)と :dsl のテスト
+./gradlew :desktop:koverHtmlReport :desktop:koverXmlReport   # 網羅率(任意・CI では使わない)。app/build/reports/kover/ に html と report.xml(ファイルごとの数字)
 ```
 
 配布物(msi・deb・rpm)の作り方・入れ方・決まっていないことは [docs/desktop/packaging.md](../docs/desktop/packaging.md)。

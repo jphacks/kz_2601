@@ -155,6 +155,9 @@
 	<string>生成したアプリで、カレンダーの予定を一覧や今日の予定として表示するために、カレンダーを読み取ります。予定の題名や内容は端末の外に送りません。</string>
 	<key>NSRemindersFullAccessUsageDescription</key>
 	<string>生成したアプリで、リマインダーを一覧や期限の近いものとして表示するために、リマインダーを読み取ります。リマインダーの題名や内容は端末の外に送りません。</string>
+	<!-- 端末の連絡先の名前・誕生日・グループを読む(#2218・DeviceContactsSource)。1 人を選ぶ ContactPick は許可不要。英語は InfoPlist.xcstrings。審査用の版では外す(strip-review-plist.sh) -->
+	<key>NSContactsUsageDescription</key>
+	<string>生成したアプリで、連絡先の名前・誕生日・グループを一覧などに表示するために、連絡先を読み取ります。連絡先の内容は端末の外に送りません。</string>
 	<!-- nearbyShare(#36): MultipeerConnectivity で近くの Tailor It 端末と記録を送り合う。サービス名は NearbyService.serviceType と一致させる -->
 	<!-- すれ違い通信(#425): _tailorit-pb は MCPassbyTransport.serviceType と一致させる -->
 	<key>NSLocalNetworkUsageDescription</key>

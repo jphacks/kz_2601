@@ -5098,6 +5098,23 @@
         }
       }
     },
+    "すべてを選択" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Select All"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "すべてを選択"
+          }
+        }
+      }
+    },
     "そのままにする" : {
       "localizations" : {
         "en" : {
@@ -7108,6 +7125,23 @@
         }
       }
     },
+    "カット" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cut"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "カット"
+          }
+        }
+      }
+    },
     "カテゴリごとの割合を円グラフで見せて" : {
       "localizations" : {
         "en" : {
@@ -8577,6 +8611,40 @@
         }
       }
     },
+    "ペースト" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Paste"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ペースト"
+          }
+        }
+      }
+    },
+    "ペーストしてスタイルを合わせる" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Paste and Match Style"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ペーストしてスタイルを合わせる"
+          }
+        }
+      }
+    },
     "ホームに「使い方」ボタンを置いて、押したら説明を書いた画面に移るようにして" : {
       "localizations" : {
         "en" : {
@@ -8807,6 +8875,23 @@
         }
       }
     },
+    "メッセージ" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Message"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "メッセージ"
+          }
+        }
+      }
+    },
     "メッセージ・メールなどでリンクを送る" : {
       "localizations" : {
         "en" : {
@@ -8867,6 +8952,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "メニューバーのアイコンから、選んだアプリの集計を見て、アプリを開いたり頼んだりできます。"
+          }
+        }
+      }
+    },
+    "メニューバーの表示を止めます" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Stops showing this in the menu bar"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "メニューバーの表示を止めます"
           }
         }
       }
@@ -14425,6 +14527,23 @@
         }
       }
     },
+    "本体を開く" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Open App"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "本体を開く"
+          }
+        }
+      }
+    },
     "本日の受付を終了しました" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -14535,6 +14654,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "止まっている理由について確かめる"
+          }
+        }
+      }
+    },
+    "止める" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Stop"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "止める"
           }
         }
       }
@@ -16094,6 +16230,23 @@
         }
       }
     },
+    "記録する" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Record"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "記録する"
+          }
+        }
+      }
+    },
     "記録に写真を付けられるようにして" : {
       "localizations" : {
         "en" : {
@@ -16421,6 +16574,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "試してほしい依頼"
+          }
+        }
+      }
+    },
+    "試験用の通知" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Test notification"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "試験用の通知"
           }
         }
       }
@@ -16949,6 +17119,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "近くの端末を探せませんでした(ローカルネットワークの許可を確認してください)"
+          }
+        }
+      }
+    },
+    "返信" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Reply"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "返信"
           }
         }
       }
@@ -17969,6 +18156,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "録音中にマイクが外れました。つなぎ直すか、設定でマイクを選んでから、もう一度話してください"
+          }
+        }
+      }
+    },
+    "長押しして「記録する」か「返信」を押してください" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Press and hold, then tap Record or Reply"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "長押しして「記録する」か「返信」を押してください"
           }
         }
       }
