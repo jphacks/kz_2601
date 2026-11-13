@@ -65,6 +65,7 @@ scripts/product-metrics-weekly.sh --input backend/cmd/product-metrics/testdata/l
 
 - 要る権限: プロジェクトの `roles/logging.viewer` だけ(`gcloud auth login` 済み)。書き込みはしない。
 - 集計は `backend/cmd/product-metrics`(Go)。入力は `gcloud logging read --format=json` の配列か、JSON lines(ローカルの `make dev` のログもそのまま読める)。
+- OS ごとの内訳: `go run ./cmd/product-metrics -in logs.json -by-platform`(backend/ から)で、週 × OS(clientPlatform、無ければ同じ requestId の http.request の行)の生成の表を末尾に足す。付けなければ出力は変わらない。
 - 出力は 5 つの Markdown の表(生成の成功率・直しの回数・初回の生成までの時間・D1/D7・共有した率)。`* ` の付いた週はデータの始まりの週で、それ以前からいるユーザーが「新しい」に混ざるので参考にとどめる。
 - 共有のアプリの使われ方(#1450 を決めるための数え・`shared.usage`)は `go run ./cmd/product-metrics -report shared -in logs.json`。週ごとに「参加者 1 人あたりの回数の分布(p50・p90・最大)」と「その週の参加者の人数ごとのアプリの数と合計」を出す。コインからは引かない
 - 週の記録は β の品質ゲートと同じく `docs/release/beta-weekly/YYYY-MM-DD.md` に写す(`docs/release/beta-quality-gate.md`)。
