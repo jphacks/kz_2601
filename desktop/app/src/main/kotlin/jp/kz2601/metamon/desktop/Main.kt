@@ -32,12 +32,15 @@ import jp.kz2601.metamon.desktop.i18n.Strings
 import jp.kz2601.metamon.desktop.io.DragOut
 import jp.kz2601.metamon.desktop.io.OpenWithFiles
 import jp.kz2601.metamon.desktop.io.OpenWithInbox
+import jp.kz2601.metamon.desktop.net.DesktopApiConfig
 import jp.kz2601.metamon.desktop.power.ScreenAwake
 import jp.kz2601.metamon.desktop.store.DesktopStore
 import jp.kz2601.metamon.desktop.store.DeviceWipe
 import jp.kz2601.metamon.desktop.store.SessionPersistence
 import jp.kz2601.metamon.desktop.theme.ProvideTextZoom
 import jp.kz2601.metamon.desktop.theme.TailorItTheme
+import jp.kz2601.metamon.desktop.update.UpdateGate
+import jp.kz2601.metamon.desktop.update.UpdateState
 import jp.kz2601.metamon.desktop.voice.VoiceFlag
 import jp.kz2601.metamon.dsl.records.entityModels
 import jp.kz2601.metamon.dsl.screen
@@ -158,11 +161,14 @@ private fun runApp(args: Array<String>, launchAction: LaunchAction?) = applicati
             hotkey.getAndSet(null)?.close()
         }
     }
+    // 版の確認(#2377): 起動時と 6 時間ごと。MOCK(通信しない)では読まない
+    val updates = remember { UpdateState.create(DesktopApiConfig.fromEnvironment()) }
+    LaunchedEffect(updates) { updates.run() }
     // 画面を順に移る(開発用・環境変数)。最初のウィンドウだけ
     val autoNav = remember { AutoNavPlan.fromEnvironment() }
     registry.windows.toList().forEach { w ->
         key(w.id) {
-            DesktopWindow(w, registry, hub, tray, startScreen = args.getOrNull(2)?.takeIf { w.id == firstWindowId }, autoNav = autoNav?.takeIf { w.id == firstWindowId })
+            DesktopWindow(w, registry, hub, tray, updates, startScreen = args.getOrNull(2)?.takeIf { w.id == firstWindowId }, autoNav = autoNav?.takeIf { w.id == firstWindowId })
         }
     }
 }
@@ -170,7 +176,7 @@ private fun runApp(args: Array<String>, launchAction: LaunchAction?) = applicati
 /** ウィンドウ 1 枚。画面の状態(遷移・下書き・キー)はウィンドウごと、記録はアプリごとに共有。 */
 @OptIn(FlowPreview::class)
 @Composable
-private fun ApplicationScope.DesktopWindow(w: WindowEntry, registry: WindowRegistry, hub: AppHub, tray: TrayController, startScreen: String?, autoNav: AutoNavPlan?) {
+private fun ApplicationScope.DesktopWindow(w: WindowEntry, registry: WindowRegistry, hub: AppHub, tray: TrayController, updates: UpdateState, startScreen: String?, autoNav: AutoNavPlan?) {
     // アプリの記録はウィンドウの数で数える。最後の 1 枚を閉じたら書き終えて閉じる
     val app = remember(w) { hub.acquire(w.key.appId) }
     DisposableEffect(w) { onDispose { hub.release(w.key.appId) } }
@@ -233,8 +239,8 @@ private fun ApplicationScope.DesktopWindow(w: WindowEntry, registry: WindowRegis
         }
         // 明暗は OS に従う・文言は OS の言語(日本語か英語)・#1759
         CompositionLocalProvider(LocalTray provides tray) {
-            // 文字の大きさは Ctrl + / Ctrl - / Ctrl 0(#2208)
-            TailorItTheme {
+            // 更新が要る時は中身を出さない・新しい版があれば上に帯(#2377)。文字の大きさは Ctrl + / Ctrl - / Ctrl 0(#2208)
+            TailorItTheme { UpdateGate(updates) {
                 ProvideTextZoom {
                 if (app.records.loading) {
                     LoadingSkeleton()
@@ -256,7 +262,7 @@ private fun ApplicationScope.DesktopWindow(w: WindowEntry, registry: WindowRegis
                     )
                 }
                 }
-            }
+            } }
         }
     }
 }
