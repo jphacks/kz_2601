@@ -57,8 +57,9 @@ type modelPrice struct {
 // modelPrices is the only pricing table. Check every row against
 // https://platform.claude.com/docs/en/about-claude/pricing before relying on
 // the cost or adding a model, then bump PricingAsOf. A model id missing here
-// logs no cost rather than a wrong one. The client only writes 5-minute cache
-// entries, so cache_creation is priced at the 5m write rate. Claude Haiku 5.5
+// logs no cost rather than a wrong one. cache_creation is priced at the 5m
+// write rate: a line with cache_ttl=1h (AI_GENERATE_CACHE_TTL, #2295) wrote
+// 1-hour entries, which cost more than this estimate. Claude Haiku 5.5
 // has two rate cards by prompt length: its row here is the one for prompts up
 // to haikuShortPromptTokens, haikuLongPrice the one above (EstimateCostUSD).
 // Both are from the model's release notes (input / output, cache reads 0.1x,
@@ -99,6 +100,9 @@ type usageRecord struct {
 	resp    *Response
 	err     error
 	latency time.Duration
+	// cacheTTL is the lifetime the cached system blocks were sent with
+	// (CacheTTL5m / CacheTTL1h, #2295); "" when the call had none.
+	cacheTTL string
 }
 
 // logger is c.Logger, or slog.Default() when unset.
@@ -137,6 +141,9 @@ func (c *Client) logUsage(ctx context.Context, r usageRecord) {
 		slog.Int("cache_creation_input_tokens", u.CacheCreationInputTokens),
 		slog.Int("cache_read_input_tokens", u.CacheReadInputTokens),
 		slog.Int64("latency_ms", r.latency.Milliseconds()),
+	}
+	if r.cacheTTL != "" {
+		attrs = append(attrs, slog.String("cache_ttl", r.cacheTTL))
 	}
 	if respModel != "" {
 		attrs = append(attrs, slog.String("response_model", respModel))
