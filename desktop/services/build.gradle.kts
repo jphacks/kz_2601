@@ -39,6 +39,7 @@ sourceSets {
                 "jp/kz2601/metamon/services/local/DocumentCache.kt",
                 "jp/kz2601/metamon/services/local/RecordStore.kt",
                 "jp/kz2601/metamon/services/local/SyncQueue.kt",
+                "jp/kz2601/metamon/services/sharing/ShareSheetModel.kt",
             )
         }
     }
