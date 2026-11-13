@@ -26,6 +26,10 @@
     <string name="desktop_hotkey_in_use">%1$s is used by another app. Choose a different key</string>
     <string name="desktop_hotkey_invalid">Couldn\'t read the talk-anywhere key: %1$s (e.g. ctrl+shift+space)</string>
     <string name="desktop_hotkey_title">Talk-anywhere key</string>
+    <string name="desktop_hotkey_unavailable_cancelled">Registering the key was cancelled. You can register it again in Settings</string>
+    <string name="desktop_hotkey_unavailable_no_display">The key can\'t be used without a display</string>
+    <string name="desktop_hotkey_unavailable_os">The key can\'t be used on this OS. Use the tray menu or the keys inside the window instead</string>
+    <string name="desktop_hotkey_unavailable_wayland">The key can\'t be used in this environment (a Wayland limitation). Use the tray menu or the keys inside the window instead</string>
     <string name="desktop_image_load">Load image</string>
     <string name="desktop_image_none">No image</string>
     <string name="desktop_input_audio_unavailable">Recording isn\'t available on this computer. You can choose a file instead</string>

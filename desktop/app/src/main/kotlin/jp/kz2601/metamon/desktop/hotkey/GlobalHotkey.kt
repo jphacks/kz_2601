@@ -155,14 +155,21 @@ object HotkeySettings {
 }
 
 object GlobalHotkeys {
-    /** OS ごとの実体。Windows は RegisterHotKey、Linux の X11 は XGrabKey(#2202)、他はまだ受けない。 */
+    /**
+     * OS ごとの実体。Windows は RegisterHotKey、Linux の X11 は XGrabKey(#2202)、
+     * Wayland は GlobalShortcuts のポータル(#2203)、他はまだ受けない。
+     */
     fun forOs(
         osName: String = System.getProperty("os.name").orEmpty(),
         env: (String) -> String? = System::getenv,
     ): GlobalHotkey = when {
         osName.startsWith("Windows", ignoreCase = true) -> WindowsGlobalHotkey()
-        osName.startsWith("Linux", ignoreCase = true) && LinuxDisplay.detect(env) == LinuxDisplay.X11 -> X11GlobalHotkey()
-        else -> UnsupportedGlobalHotkey
+        !osName.startsWith("Linux", ignoreCase = true) -> UnsupportedGlobalHotkey
+        else -> when (LinuxDisplay.detect(env)) {
+            LinuxDisplay.X11 -> X11GlobalHotkey()
+            LinuxDisplay.WAYLAND -> PortalGlobalHotkey()
+            LinuxDisplay.NONE -> UnsupportedGlobalHotkey
+        }
     }
 
     /**
@@ -179,6 +186,7 @@ object GlobalHotkeys {
         post: (Runnable) -> Unit,
         requests: HotkeyVoiceRequests = HotkeyVoiceRequests.shared,
         log: (String) -> Unit = { System.err.println(it) },
+        status: HotkeyStatus = HotkeyStatus.shared,
     ): GlobalHotkey? {
         raw ?: return null
         val parse = HotkeySpec.parse(raw)
@@ -187,6 +195,8 @@ object GlobalHotkeys {
         val registration = h?.register(chord) {
             post { requests.press(voiceEnabled(), notify, bringToFront) }
         }
+        // 設定に理由を出す(#2203)。画面のスレッドで書く
+        post { status.last = registration }
         HotkeyMessages.of(raw, parse, registration)?.let { notify(Strings["desktop_hotkey_title"], it) }
         if (registration is HotkeyRegistration.Failed) log("[TailorIt] global hotkey: ${registration.reason} ${registration.detail.orEmpty()}")
         return h.takeIf { registration is HotkeyRegistration.Registered }

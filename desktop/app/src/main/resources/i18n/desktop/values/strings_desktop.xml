@@ -27,6 +27,10 @@
     <string name="desktop_hotkey_in_use">%1$s は他のアプリが使っています。別のキーを設定してください</string>
     <string name="desktop_hotkey_invalid">どこからでも話しかけるキーの指定「%1$s」を読めませんでした(例: ctrl+shift+space)</string>
     <string name="desktop_hotkey_title">どこからでも話しかけるキー</string>
+    <string name="desktop_hotkey_unavailable_cancelled">キーの登録が取り消されました。設定からもう一度登録できます</string>
+    <string name="desktop_hotkey_unavailable_no_display">画面の無い環境ではキーで呼び出せません</string>
+    <string name="desktop_hotkey_unavailable_os">この OS ではキーで呼び出せません。トレイのメニューか、ウィンドウの中のキーを使ってください</string>
+    <string name="desktop_hotkey_unavailable_wayland">この環境ではキーで呼び出せません(Wayland の制限)。トレイのメニューか、ウィンドウの中のキーを使ってください</string>
     <string name="desktop_image_load">画像を読む</string>
     <string name="desktop_image_none">画像なし</string>
     <string name="desktop_input_audio_unavailable">録音は このパソコンでは使えません。ファイルから選べます</string>

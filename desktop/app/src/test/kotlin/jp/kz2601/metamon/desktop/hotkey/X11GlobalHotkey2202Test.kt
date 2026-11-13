@@ -28,7 +28,7 @@ class X11GlobalHotkey2202Test {
     @Test
     fun picksImplementationPerOsAndDisplay() {
         assertTrue(GlobalHotkeys.forOs("Linux", mapOf("DISPLAY" to ":0")::get) is X11GlobalHotkey)
-        assertSame(UnsupportedGlobalHotkey, GlobalHotkeys.forOs("Linux", mapOf("WAYLAND_DISPLAY" to "wayland-0", "DISPLAY" to ":0")::get))
+        assertTrue("Wayland はポータル(#2203)", GlobalHotkeys.forOs("Linux", mapOf("WAYLAND_DISPLAY" to "wayland-0", "DISPLAY" to ":0")::get) is PortalGlobalHotkey)
         assertSame(UnsupportedGlobalHotkey, GlobalHotkeys.forOs("Linux", mapOf<String, String>()::get))
         assertSame(UnsupportedGlobalHotkey, GlobalHotkeys.forOs("Mac OS X", mapOf("DISPLAY" to ":0")::get))
         assertNull("Linux 以外では libX11 を載せない", JnaXlib.load("Windows 11", mapOf("DISPLAY" to ":0")::get))
