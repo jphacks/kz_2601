@@ -7,7 +7,6 @@ import (
 	"math"
 	"net/http"
 	"net/url"
-	"os"
 	"strconv"
 	"strings"
 	"time"
@@ -30,8 +29,8 @@ import (
 // cache is keyed by the arguments, not by the person). Until #1671 lands
 // New refuses, so the provider stays off even when registered.
 //
-// Registered only with EXT_OPENAI_USAGE_ENABLED=1 (without it the provider
-// is not in the registry at all).
+// Always registered, on only with EXT_OPENAI_USAGE_ENABLED=1 (like the
+// other default-off providers).
 const (
 	OpenAIUsage = "openaiUsage"
 
@@ -53,11 +52,7 @@ var openaiUsageProvider = Provider{ID: OpenAIUsage, Billing: BillingFree,
 	},
 }
 
-func init() {
-	if flag(os.Getenv("EXT_OPENAI_USAGE_ENABLED")) {
-		register(openaiUsageProvider)
-	}
-}
+func init() { register(openaiUsageProvider) }
 
 // newOpenAIUsage builds the ops against base (the API's origin, or a test
 // server).

@@ -6,7 +6,6 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"net/url"
-	"os"
 	"slices"
 	"strconv"
 	"strings"
@@ -154,8 +153,8 @@ func TestParseOpenAICost(t *testing.T) {
 	}
 }
 
-// Read ops only, api.openai.com only, never cached; not in the registry
-// without EXT_OPENAI_USAGE_ENABLED=1; and until #1671 New refuses.
+// Read ops only, api.openai.com only, never cached; registered (off by
+// default); and until #1671 New refuses.
 func TestOpenAIUsageDefinition(t *testing.T) {
 	p := openaiUsageProvider
 	if err := p.check(); err != nil || p.NeedsOAuth || p.Billing != BillingFree || p.Fake || p.EnvName() != "OPENAI_USAGE" || !slices.Equal(p.Hosts, []string{openaiHost}) {
@@ -169,8 +168,8 @@ func TestOpenAIUsageDefinition(t *testing.T) {
 	if _, err := p.CheckArgs("cost", map[string]string{"project": "x"}); !errors.Is(err, ErrUnknown) {
 		t.Fatalf("other arg: %v", err)
 	}
-	if _, ok := Lookup(OpenAIUsage); ok != flag(os.Getenv("EXT_OPENAI_USAGE_ENABLED")) {
-		t.Fatalf("registered=%v, but EXT_OPENAI_USAGE_ENABLED=%q", ok, os.Getenv("EXT_OPENAI_USAGE_ENABLED"))
+	if _, ok := Lookup(OpenAIUsage); !ok {
+		t.Fatal("not registered")
 	}
 	if _, err := p.New(Secrets{APIKey: "operator"}); !errors.Is(err, errOpenAIUsageNoKeyStore) {
 		t.Fatalf("built before #1671: %v", err)
