@@ -25,6 +25,11 @@
     <string name="desktop_dev_environment">今の環境</string>
     <string name="desktop_dev_item">開発用: %1$s</string>
     <string name="desktop_dev_menu">開発用メニュー</string>
+    <string name="desktop_dev_power">電池: %1$s</string>
+    <string name="desktop_dev_power_charging">充電中</string>
+    <string name="desktop_dev_power_low">15%・省電力</string>
+    <string name="desktop_dev_power_off">元に戻す</string>
+    <string name="desktop_dev_power_unknown">不明</string>
     <string name="desktop_drag_image_name">画像</string>
     <string name="desktop_drag_table_name">表</string>
     <string name="desktop_export_clipboard">(表はクリップボードにも入れました)</string>

@@ -24,6 +24,11 @@
     <string name="desktop_dev_environment">Current environment</string>
     <string name="desktop_dev_item">Developer: %1$s</string>
     <string name="desktop_dev_menu">Developer menu</string>
+    <string name="desktop_dev_power">Battery: %1$s</string>
+    <string name="desktop_dev_power_charging">Charging</string>
+    <string name="desktop_dev_power_low">15% · Low Power</string>
+    <string name="desktop_dev_power_off">Use the real value</string>
+    <string name="desktop_dev_power_unknown">Unknown</string>
     <string name="desktop_drag_image_name">image</string>
     <string name="desktop_drag_table_name">table</string>
     <string name="desktop_export_clipboard">" (the table is also on the clipboard)"</string>

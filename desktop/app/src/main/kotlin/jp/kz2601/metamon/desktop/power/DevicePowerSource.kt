@@ -1,11 +1,14 @@
 package jp.kz2601.metamon.desktop.power
 
+import jp.kz2601.metamon.desktop.debug.DevMenu
+import jp.kz2601.metamon.desktop.net.DesktopApiConfig
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.flowOn
@@ -102,12 +105,51 @@ class FakeDevicePowerSource(
     }
 }
 
+/**
+ * 開発用メニューで差し替えた値(#3212)。[override] が null の間は [base] の値をそのまま流す。
+ * 差し替えた値は端末の中だけ・この起動の間だけ。
+ */
+class SwitchableDevicePowerSource(
+    private val base: DevicePowerSource,
+    private val override: StateFlow<DevicePowerState?> = DevPowerOverride.state,
+) : DevicePowerSource {
+    override val current: DevicePowerState get() = override.value ?: base.current
+
+    override val changes: Flow<DevicePowerState> = combine(base.changes, override) { b, o -> o ?: b }.distinctUntilChanged()
+}
+
+/** 開発用メニューから選ぶ電池の状態。[state] が null は「元に戻す」。 */
+enum class DevPowerPreset(val state: DevicePowerState?) {
+    LOW_POWER_SAVER(DevicePowerState.of(0.15, DevicePowerState.Charge.UNPLUGGED, isPowerSaver = true)),
+    CHARGING(DevicePowerState.of(0.5, DevicePowerState.Charge.CHARGING, isPowerSaver = false)),
+    UNKNOWN(DevicePowerState.Unknown),
+    OFF(null),
+}
+
+/** 開発用メニューの差し替え(起動の間だけ・全部のウィンドウで 1 つ)。 */
+object DevPowerOverride {
+    val state = MutableStateFlow<DevicePowerState?>(null)
+
+    fun select(preset: DevPowerPreset) {
+        state.value = preset.state
+    }
+
+    /** 今選んでいる物。差し替えていなければ OFF。 */
+    val selected: DevPowerPreset get() = DevPowerPreset.entries.firstOrNull { it.state == state.value } ?: DevPowerPreset.OFF
+}
+
 object DevicePowerSources {
-    /** `METAMON_MOCK=1` なら偽物。それ以外は OS ごとの実体(Linux は sysfs・Windows は GetSystemPowerStatus・Mac は不明を返す)。 */
+    /**
+     * `METAMON_MOCK=1` なら偽物。それ以外は OS ごとの実体(Linux は sysfs・Windows は GetSystemPowerStatus・Mac は不明を返す)。
+     * [devMenu](開発用メニューが出る時)なら、メニューで差し替えられるように包む。
+     */
     fun make(
         env: Map<String, String> = System.getenv(),
         osName: String = System.getProperty("os.name").orEmpty(),
-    ): DevicePowerSource = when {
+        devMenu: Boolean = DevMenu.isEnabled(DesktopApiConfig.fromEnvironment(env)),
+    ): DevicePowerSource = base(env, osName).let { if (devMenu) SwitchableDevicePowerSource(it) else it }
+
+    private fun base(env: Map<String, String>, osName: String): DevicePowerSource = when {
         env["METAMON_MOCK"] == "1" -> FakeDevicePowerSource.fromEnvironment(env)
         osName.startsWith("Linux", ignoreCase = true) -> PollingDevicePowerSource(LinuxSysfsPowerReader())
         osName.startsWith("Windows", ignoreCase = true) -> PollingDevicePowerSource(WindowsPowerReader)

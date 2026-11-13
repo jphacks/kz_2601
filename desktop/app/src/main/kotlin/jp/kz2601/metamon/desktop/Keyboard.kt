@@ -281,6 +281,7 @@ class DesktopKeyboard(
         override val canWipe: Boolean get() = wipeLocalData != null
         override fun showInfo(title: String, lines: List<String>) { devInfo = title to lines }
         override fun askWipe() { wipeConfirmOpen = true }
+        override fun message(text: String) { session.message = text }
     }
 
     /** このウィンドウの検索欄(Ctrl+F は他のウィンドウに入らない)。 */
