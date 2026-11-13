@@ -267,15 +267,20 @@ xcodebuild -scheme Metamon -destination 'platform=iOS Simulator,name=iPhone 17' 
 
 ## リポジトリ構成とドキュメント
 
-iOS アプリ(`ios/`)とバックエンド(`backend/`)を同居させたモノレポ。
+iOS・Android・Mac・デスクトップ(Windows・Linux)のクライアントと、バックエンド・インフラ・文書を同居させたモノレポ。表はフォルダ名順。内容は `origin/epic/god` のフォルダと各 README から書いた。
 
-| パス | 内容 |
-|---|---|
-| `ios/` | iOS アプリ本体(SwiftUI、xcodegen)。`Packages/{MetamonDSL,MetamonRenderer,MetamonServices}` + 薄いアプリ本体 `Metamon/` + ウィジェット・UI テスト |
-| `backend/` | Go サービス群(`cmd/appconfig`, `cmd/ai`, `cmd/runner`, `cmd/ai-eval`, `cmd/ai-audit` ほか)、共有型 `pkg/dsl`、生成パイプライン `internal/ai` |
-| `docs/` | 設計・運用ドキュメント(正典は `00_decisions.md`) |
-| `.github/` | CI・PR/Issue テンプレート・CODEOWNERS |
-| `scripts/` | 運用スクリプト(`github/` ブランチ保護) |
+| パス | 内容 | 入口 |
+|---|---|---|
+| `.claude/` | エージェント向けのスキル(`skills/`) | [`CLAUDE.md`](../CLAUDE.md) |
+| `.github/` | CI・PR/Issue テンプレート・CODEOWNERS | [`02_github_workflow.md`](02_github_workflow.md) |
+| `android/` | Android アプリ(Kotlin・Jetpack Compose)。`app` `dsl` `renderer` `services` `whisper` の 5 モジュール。`dsl` は純 Kotlin でデスクトップも取り込む | [`android/README.md`](../android/README.md)、[`docs/android/README.md`](android/README.md) |
+| `backend/` | Go サービス群(`cmd/appconfig`, `cmd/ai`, `cmd/runner`, `cmd/ai-eval`, `cmd/ai-audit` ほか)、共有型 `pkg/dsl`、生成パイプライン `internal/ai` | [`backend/README.md`](../backend/README.md)、[`docs/backend/architecture.md`](backend/architecture.md) |
+| `desktop/` | Windows・Linux 版(Compose Multiplatform Desktop・JVM)。`android/dsl` を取り込み、`app` `services` `whisper` を持つ | [`desktop/README.md`](../desktop/README.md)、[`docs/desktop/architecture.md`](desktop/architecture.md) |
+| `docs/` | 設計・運用ドキュメント(正典は `00_decisions.md`) | [`00_decisions.md`](00_decisions.md) |
+| `infra/` | GCP の構成の Terraform(prod と stg を同じコードと環境ごとの変数で作る) | [`infra/README.md`](../infra/README.md)、[`docs/infra/gcp-setup.md`](infra/gcp-setup.md) |
+| `ios/` | iOS アプリ本体(SwiftUI、xcodegen)。`Packages/{MetamonDSL,MetamonRenderer,MetamonServices}` + 薄いアプリ本体 `Metamon/` + ウィジェット・UI テスト。Mac 版(`MetamonMac*`)と共有コード(`Shared/`)も同じフォルダにある | [`ios/README.md`](../ios/README.md)、[`docs/ios/architecture.md`](ios/architecture.md)、[`docs/mac/architecture.md`](mac/architecture.md) |
+| `scripts/` | 運用スクリプト(`github/` ブランチ保護ほか) | なし |
+| `web/` | 発表用の静的ページ。`pv/`(PV の映像)と `splash/`(起動スプラッシュ)。ビルド不要の HTML | [`web/pv/README.md`](../web/pv/README.md) |
 
 | ドキュメント | 内容 |
 |---|---|
