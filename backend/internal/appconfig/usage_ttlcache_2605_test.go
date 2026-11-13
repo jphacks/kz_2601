@@ -33,7 +33,7 @@ func TestTTLCache_2605(t *testing.T) {
 	t.Run("keys are independent", func(t *testing.T) {
 		loads = 0
 		c := newTTLCache[int](time.Minute, 8, clock)
-		c.get("a", loader(1))
+		_, _ = c.get("a", loader(1))
 		if v, _ := c.get("b", loader(2)); v != 2 || loads != 2 {
 			t.Fatalf("b: v=%d loads=%d", v, loads)
 		}
@@ -59,9 +59,9 @@ func TestTTLCache_2605(t *testing.T) {
 	t.Run("full cache drops everything then stores the new key", func(t *testing.T) {
 		loads = 0
 		c := newTTLCache[int](time.Minute, 2, clock)
-		c.get("a", loader(1))
-		c.get("b", loader(2))
-		c.get("c", loader(3)) // len==max: reset, only c remains
+		_, _ = c.get("a", loader(1))
+		_, _ = c.get("b", loader(2))
+		_, _ = c.get("c", loader(3)) // len==max: reset, only c remains
 		if len(c.m) != 1 {
 			t.Fatalf("size %d", len(c.m))
 		}
@@ -69,7 +69,7 @@ func TestTTLCache_2605(t *testing.T) {
 			t.Fatalf("new key missing: %v", c.m)
 		}
 		before := loads
-		c.get("a", loader(10)) // dropped earlier: loads again
+		_, _ = c.get("a", loader(10)) // dropped earlier: loads again
 		if loads != before+1 {
 			t.Fatalf("a should reload, loads=%d", loads)
 		}
