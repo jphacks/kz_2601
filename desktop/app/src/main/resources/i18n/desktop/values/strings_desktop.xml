@@ -129,6 +129,8 @@
     <string name="desktop_print_value">値</string>
     <string name="desktop_qr_copy_image">画像をコピー</string>
     <string name="desktop_record_deleted_elsewhere">この記録は別のウィンドウで消されました</string>
+    <string name="desktop_signin_loopback_done">サインインを受け取りました。このタブを閉じて Tailor It に戻ってください。</string>
+    <string name="desktop_signin_loopback_failed">サインインを終えられませんでした。このタブを閉じて Tailor It からやり直してください。</string>
     <string name="desktop_sync_pending">送信待ち %1$d 件</string>
     <string name="desktop_timer_done">時間になりました</string>
     <string name="desktop_timer_name">タイマー</string>

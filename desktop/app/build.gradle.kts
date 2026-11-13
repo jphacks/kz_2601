@@ -134,7 +134,8 @@ compose.desktop {
             packageName = "Tailor It"
             packageVersion = "0.1.0"
             // 読み上げ(Windows の Java Access Bridge)を同梱の実行環境に入れる(#1759)
-            modules("jdk.accessibility")
+            // Google のサインインの戻り先(127.0.0.1 の受け口・LoopbackReceiver)に com.sun.net.httpserver を使う
+            modules("jdk.accessibility", "jdk.httpserver")
             // whisper.cpp の JNI のライブラリ(whisper/native/build.sh・build.ps1 で out/<os>-<arch>/ に作る・#1751)を配る形に入れる。
             // 作っていなければ入らず、音声入力は「この PC では用意できていません」になる。モデルは入れない(初回に落とす)
             appResourcesRootDir.set(project(":whisper").layout.projectDirectory.dir("native/out"))
