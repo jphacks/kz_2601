@@ -34,6 +34,16 @@
     <string name="desktop_denial_inviter_left">The person who sent this link has left, so you can\'t join. Ask a member for a new link</string>
     <string name="desktop_denial_members_full">This share has reached its limit of 100 members, so you can\'t join</string>
     <string name="desktop_denial_not_member">You haven\'t joined this share. Join from an invite link (what you entered is kept)</string>
+    <string name="desktop_dev_env_mock">Mock (offline)</string>
+    <string name="desktop_dev_env_pending">Waiting to send: %1$s</string>
+    <string name="desktop_dev_env_target">Server: %1$s</string>
+    <string name="desktop_dev_env_token">Token: %1$s</string>
+    <string name="desktop_dev_env_token_none">none</string>
+    <string name="desktop_dev_env_token_set">set</string>
+    <string name="desktop_dev_env_version">Version: %1$s (%2$s)</string>
+    <string name="desktop_dev_environment">Current environment</string>
+    <string name="desktop_dev_item">Developer: %1$s</string>
+    <string name="desktop_dev_menu">Developer menu</string>
     <string name="desktop_drag_image_name">image</string>
     <string name="desktop_drag_table_name">table</string>
     <string name="desktop_error_app_check">We couldn\'t verify the connection from this app. Please wait a moment and try again. If it keeps happening, reinstall the latest version</string>

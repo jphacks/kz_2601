@@ -35,6 +35,16 @@
     <string name="desktop_denial_inviter_left">このリンクを送った人はもう参加していないため、参加できません。参加している人に新しいリンクをもらってください</string>
     <string name="desktop_denial_members_full">参加している人が上限(100 人)に達しているため、参加できません</string>
     <string name="desktop_denial_not_member">この共有に参加していません。招待リンクから参加してください(入力した内容は残してあります)</string>
+    <string name="desktop_dev_env_mock">モック(通信しない)</string>
+    <string name="desktop_dev_env_pending">送信待ち: %1$s 件</string>
+    <string name="desktop_dev_env_target">接続先: %1$s</string>
+    <string name="desktop_dev_env_token">トークン: %1$s</string>
+    <string name="desktop_dev_env_token_none">なし</string>
+    <string name="desktop_dev_env_token_set">あり</string>
+    <string name="desktop_dev_env_version">版: %1$s (%2$s)</string>
+    <string name="desktop_dev_environment">今の環境</string>
+    <string name="desktop_dev_item">開発用: %1$s</string>
+    <string name="desktop_dev_menu">開発用メニュー</string>
     <string name="desktop_drag_image_name">画像</string>
     <string name="desktop_drag_table_name">表</string>
     <string name="desktop_error_app_check">このアプリからの接続を確認できませんでした。少し待ってもう一度お試しください。続く時は最新版を入れ直してください</string>
