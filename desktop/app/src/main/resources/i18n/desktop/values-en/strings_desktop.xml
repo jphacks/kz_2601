@@ -10,6 +10,8 @@
     <string name="desktop_app_badge_shared">Shared</string>
     <string name="desktop_app_badges_a11y">%1$s (%2$s)</string>
     <string name="desktop_app_badges_separator">", "</string>
+    <string name="desktop_automation_fix_offer">The automation “%1$s” keeps failing. Fix it?</string>
+    <string name="desktop_automation_fix_offer_fix">Fix</string>
     <string name="desktop_book_searching">Looking up the book…</string>
     <string name="desktop_calendar_month_pattern">MMMM y</string>
     <string name="desktop_calendar_opened">Opened the event (%1$s)</string>
