@@ -147,6 +147,9 @@
     <string name="desktop_tray_timer_left">%1$s %2$s left</string>
     <string name="desktop_tray_timer_paused">%1$s (paused)</string>
     <string name="desktop_tray_unavailable">This computer can\'t show notifications (no system tray)</string>
+    <string name="desktop_tray_upcoming">Scheduled notifications</string>
+    <string name="desktop_tray_upcoming_hint">Choose one to cancel it (shown only while the app is open)</string>
+    <string name="desktop_tray_upcoming_more">%1$d more</string>
     <string name="desktop_tray_voice">Talk by voice (not available on desktop yet)</string>
     <string name="desktop_unavailable_activity">Live activities aren\'t available on this computer</string>
     <string name="desktop_unavailable_follow">Following isn\'t available on desktop yet (sign-in is required)</string>

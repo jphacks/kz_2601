@@ -148,6 +148,9 @@
     <string name="desktop_tray_timer_left">%1$s 残り %2$s</string>
     <string name="desktop_tray_timer_paused">%1$s(一時停止)</string>
     <string name="desktop_tray_unavailable">このパソコンでは通知を出せません(トレイがありません)</string>
+    <string name="desktop_tray_upcoming">予約した通知</string>
+    <string name="desktop_tray_upcoming_hint">選ぶと取り消します(アプリを開いている間だけ出ます)</string>
+    <string name="desktop_tray_upcoming_more">ほか %1$d 件</string>
     <string name="desktop_tray_voice">音声で話す(デスクトップ版ではまだ使えません)</string>
     <string name="desktop_unavailable_activity">進行中の表示(ライブアクティビティ)はこのパソコンでは使えません</string>
     <string name="desktop_unavailable_follow">フォローはデスクトップ版ではまだ使えません(サインインが要ります)</string>

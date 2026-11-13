@@ -22,6 +22,7 @@ import androidx.compose.ui.window.isTraySupported
 import androidx.compose.ui.window.rememberTrayState
 import jp.kz2601.metamon.desktop.i18n.Strings
 import jp.kz2601.metamon.desktop.notify.TrayNotifier
+import jp.kz2601.metamon.desktop.settings.UpcomingNotifications
 import jp.kz2601.metamon.dsl.Action
 import jp.kz2601.metamon.dsl.ActionType
 import jp.kz2601.metamon.dsl.AppDSL
@@ -59,6 +60,9 @@ sealed interface TrayItem {
 
     /** そのアプリを別のウィンドウで開く(開いていれば前に出す・#1763)。 */
     data class OpenApp(val appId: String, val label: String) : TrayItem
+
+    /** 予約した通知 1 件。選ぶと取り消す。 */
+    data class CancelNotification(val id: String, val label: String) : TrayItem
 }
 
 enum class TrayCommand { OPEN, QUICK_RECORD, VOICE, CLOSE_TO_TRAY, OPEN_AT_LOGIN, QUIT }
@@ -111,6 +115,7 @@ object TrayMenu {
         stats: List<TrayStat> = emptyList(),
         openAtLoginBusy: Boolean = false,
         openAtLoginRevision: Int = 0,
+        upcoming: UpcomingNotifications = UpcomingNotifications.EMPTY,
     ): List<TrayItem> = buildList {
         if (stats.isNotEmpty()) {
             stats.forEach { add(TrayItem.Info(it.text)) }
@@ -124,6 +129,19 @@ object TrayMenu {
         if (timers.isNotEmpty()) {
             add(TrayItem.Separator)
             timers.forEach { add(TrayItem.Info(timerLabel(it))) }
+        }
+        if (!upcoming.isEmpty) {
+            add(TrayItem.Separator)
+            add(
+                TrayItem.Submenu(
+                    Strings["desktop_tray_upcoming"],
+                    buildList {
+                        add(TrayItem.Info(Strings["desktop_tray_upcoming_hint"]))
+                        upcoming.rows.forEach { add(TrayItem.CancelNotification(it.id, UpcomingNotifications.label(it))) }
+                        if (upcoming.hidden > 0) add(TrayItem.Info(Strings.format("desktop_tray_upcoming_more", upcoming.hidden)))
+                    },
+                ),
+            )
         }
         add(TrayItem.Separator)
         add(TrayItem.Toggle(TrayCommand.CLOSE_TO_TRAY, Strings["desktop_tray_close_to_tray"], closeToTray))
@@ -351,8 +369,8 @@ class TrayController(
             }
         }
 
-    fun items(timers: List<TimerStatus>, stats: List<TrayStat> = stats()): List<TrayItem> =
-        TrayMenu.items(dsl.app.name, quickRecordAction != null, timers, closeToTray, apps, openAtLogin, stats, openAtLoginBusy, openAtLoginRevision)
+    fun items(timers: List<TimerStatus>, stats: List<TrayStat> = stats(), upcoming: UpcomingNotifications = UpcomingNotifications.EMPTY): List<TrayItem> =
+        TrayMenu.items(dsl.app.name, quickRecordAction != null, timers, closeToTray, apps, openAtLogin, stats, openAtLoginBusy, openAtLoginRevision, upcoming)
 
     companion object {
         fun create(dsl: AppDSL): TrayController {
@@ -376,6 +394,7 @@ fun ApplicationScope.DesktopTray(c: TrayController) {
         onDispose { TrayNotifier.sink = null }
     }
     var timers by remember { mutableStateOf(DesktopTimers.active()) }
+    var upcoming by remember { mutableStateOf(UpcomingNotifications.of(Notifier.Tray.upcoming())) }
     // 「今月」などの集計の基準日。日付が替わったら集計を計算し直す
     var today by remember { mutableStateOf(TrayStats.today()) }
     val scope = rememberCoroutineScope()
@@ -383,6 +402,7 @@ fun ApplicationScope.DesktopTray(c: TrayController) {
     LaunchedEffect(Unit) {
         while (true) {
             timers = DesktopTimers.active()
+            upcoming = UpcomingNotifications.of(Notifier.Tray.upcoming())
             today = TrayStats.today()
             // 走っているタイマーがある間だけ毎秒、無ければ間を空ける
             delay(if (timers.any { it.running }) 1_000 else 3_000)
@@ -394,7 +414,7 @@ fun ApplicationScope.DesktopTray(c: TrayController) {
     val loading = records?.loading
     val stats = remember(c.dsl, store, loading, today) { c.stats() }
     Tray(icon = TrayIconPainter, state = state, tooltip = TrayMenu.tooltip(c.dsl.app.name, timers), onAction = c::open) {
-        TrayItems(c, c.items(timers, stats), scope, ::exitApplication)
+        TrayItems(c, c.items(timers, stats, upcoming), scope, ::exitApplication)
     }
 }
 
@@ -423,6 +443,7 @@ private fun MenuScope.TrayItems(c: TrayController, items: List<TrayItem>, scope:
             TrayItem.Separator -> Separator()
             is TrayItem.Submenu -> Menu(item.label) { TrayItems(c, item.items, scope, quit) }
             is TrayItem.OpenApp -> Item(item.label) { c.openApp(item.appId) }
+            is TrayItem.CancelNotification -> Item(item.label) { Notifier.Tray.cancel(item.id) }
         }
     }
 }

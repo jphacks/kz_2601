@@ -107,7 +107,7 @@ fun DesktopApp(
     onWipeLocalData: (suspend () -> Unit)? = null,
 ) {
     val session = remember {
-        DesktopSession(dsl, initialStore, startScreen = startScreen, host = DesktopActionHost(), persistence = persistence, shared = records, startRecordId = startRecordId)
+        DesktopSession(dsl, initialStore, startScreen = startScreen, host = DesktopActionHost(appName = dsl.app.name), persistence = persistence, shared = records, startRecordId = startRecordId)
     }
     session.onCloseWindow = onCloseWindow
     TrayHook(session, windowId, isActive)
