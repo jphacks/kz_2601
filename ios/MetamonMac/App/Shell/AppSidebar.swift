@@ -28,6 +28,10 @@ struct AppSidebar: View {
     var onResetExample: (String) -> Void = { _ in }
     /// 「新しいウインドウで開く」(#1853)
     var onOpenInNewWindow: (String) -> Void = { _ in }
+    /// 右クリックに「リリースを申請…」を出すか(#2249)。サーバーに保存した自分のアプリだけ
+    var canRequestRelease: (String) -> Bool = { _ in false }
+    /// 「リリースを申請…」(#2249)
+    var onRequestRelease: (String) -> Void = { _ in }
     /// サーバーの一覧を初めて読んでいる(前回の一覧が無い・#1057)。作ったアプリの所にスケルトンを出す
     var loadingServerApps = false
     /// サーバーに届かず、前回の一覧を出している(#1057)
@@ -209,6 +213,11 @@ struct AppSidebar: View {
             renameTarget = app
         }
         Button("複製") { onDuplicate(app.id) }
+        #if !APP_STORE_REVIEW // 審査用ビルドはリリース申請を外す(iOS と同じ・#245)
+        if canRequestRelease(app.id) {
+            Button("リリースを申請…") { onRequestRelease(app.id) }
+        }
+        #endif
         let ids = section(of: app.id).map(\.id)
         if !isSearching, ids.count > 1, let index = ids.firstIndex(of: app.id) {
             Divider()

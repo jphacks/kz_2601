@@ -1865,6 +1865,23 @@
         }
       }
     },
+    "Tailor It の外でも使える 1 つのアプリとして公開してほしい、と運営に申請します。みんなに需要があると判断したら、運営がリリース作業を行います。" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ask the Tailor It team to publish this as its own app that works outside Tailor It. If there is demand, the team will handle the release."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tailor It の外でも使える 1 つのアプリとして公開してほしい、と運営に申請します。みんなに需要があると判断したら、運営がリリース作業を行います。"
+          }
+        }
+      }
+    },
     "Tailor It の音声入力を開きます。" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -2692,6 +2709,23 @@
         }
       }
     },
+    "「%@」を単体アプリに" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Make “%@” a standalone app"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "「%@」を単体アプリに"
+          }
+        }
+      }
+    },
     "「%@」を外しました。あなたのシェアリンクはまだ使えるので、そのリンクからまた参加できます。リンクも止めますか?" : {
       "localizations" : {
         "en" : {
@@ -3110,6 +3144,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "いつでも解約できます(App Store のアカウントから)"
+          }
+        }
+      }
+    },
+    "いまの状況" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Status"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "いまの状況"
           }
         }
       }
@@ -5303,6 +5354,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "どんなアプリを作りますか?"
+          }
+        }
+      }
+    },
+    "どんな用途で使っていますか?" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "What do you use it for?"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "どんな用途で使っていますか?"
           }
         }
       }
@@ -8559,6 +8627,74 @@
         }
       }
     },
+    "リリースを申請…" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Request a Release…"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "リリースを申請…"
+          }
+        }
+      }
+    },
+    "リリース予定" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Release planned"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "リリース予定"
+          }
+        }
+      }
+    },
+    "リリース申請: %@" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Release request: %@"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "リリース申請: %@"
+          }
+        }
+      }
+    },
+    "リリース申請はサーバー接続時のみ使えます" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Release requests are only available when connected to the server"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "リリース申請はサーバー接続時のみ使えます"
+          }
+        }
+      }
+    },
     "リンク" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -9197,6 +9333,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "今のアプリの設計(画面・項目・アプリ名など)"
+          }
+        }
+      }
+    },
+    "今のバージョンの画面構成が一緒に送られます(記録の中身は送られません)" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The current version's screen layout is sent with the request (your records are not)."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "今のバージョンの画面構成が一緒に送られます(記録の中身は送られません)"
           }
         }
       }
@@ -11405,6 +11558,23 @@
         }
       }
     },
+    "受け付けました" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Request received"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "受け付けました"
+          }
+        }
+      }
+    },
     "受け取った人は、リンクから自分のアプリとして使えます" : {
       "localizations" : {
         "en" : {
@@ -11468,6 +11638,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "受け取ると「%@」に追加します。"
+          }
+        }
+      }
+    },
+    "受付" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Received"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "受付"
           }
         }
       }
@@ -13915,6 +14102,23 @@
         }
       }
     },
+    "検討中" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Under review"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "検討中"
+          }
+        }
+      }
+    },
     "標準" : {
       "localizations" : {
         "en" : {
@@ -14304,6 +14508,74 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "用意を取りやめました"
+          }
+        }
+      }
+    },
+    "用途の一言(必須) 例: 毎朝の体調記録に使っています" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "What you use it for (required), e.g. I log my health every morning"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "用途の一言(必須) 例: 毎朝の体調記録に使っています"
+          }
+        }
+      }
+    },
+    "申請する" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Send Request"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "申請する"
+          }
+        }
+      }
+    },
+    "申請できませんでした" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Couldn't send the request"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "申請できませんでした"
+          }
+        }
+      }
+    },
+    "申請済みです" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Already requested"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "申請済みです"
           }
         }
       }
@@ -15382,6 +15654,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "要望"
+          }
+        }
+      }
+    },
+    "見送り" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Declined"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "見送り"
           }
         }
       }
@@ -17040,6 +17329,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "通知を送れませんでした"
+          }
+        }
+      }
+    },
+    "連絡先(任意) メールや SNS など" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Contact (optional), e.g. email or social"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "連絡先(任意) メールや SNS など"
           }
         }
       }
