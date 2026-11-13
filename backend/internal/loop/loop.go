@@ -46,6 +46,9 @@ const (
 	SourceGenFailure  Source = "gen_failure"      // a spike of one AI generation failure code, recorded as one item (#297)
 )
 
+// SourceGooglePlayReview is Google Play reviews (#2147).
+const SourceGooglePlayReview Source = "google_play_review"
+
 // Item statuses.
 const (
 	// ItemNew: ingested, waiting for triage.
