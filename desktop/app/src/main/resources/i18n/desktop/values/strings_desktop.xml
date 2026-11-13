@@ -6,6 +6,8 @@
     <string name="desktop_a11y_preview">写真のプレビュー: %1$s</string>
     <string name="desktop_a11y_rating">%1$s %2$d / %3$d</string>
     <string name="desktop_already_running">Tailor It はもう起動しています</string>
+    <string name="desktop_automation_fix_offer">自動の動き「%1$s」が続けて失敗しています。直しますか?</string>
+    <string name="desktop_automation_fix_offer_fix">直す</string>
     <string name="desktop_book_searching">本の情報を探しています…</string>
     <string name="desktop_calendar_month_pattern">y年M月</string>
     <string name="desktop_calendar_opened">予定を開きました(%1$s)</string>
