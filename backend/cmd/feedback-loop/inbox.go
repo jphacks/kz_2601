@@ -12,7 +12,7 @@ import (
 )
 
 var (
-	inboxSources  = []loop.Source{loop.SourceInApp, loop.SourceStoreReview, loop.SourceCrash, loop.SourceTestFlight, loop.SourceGenFailure}
+	inboxSources  = []loop.Source{loop.SourceInApp, loop.SourceStoreReview, loop.SourceGooglePlayReview, loop.SourceCrash, loop.SourceTestFlight, loop.SourceGenFailure}
 	inboxStatuses = []string{loop.ItemNew, loop.ItemHeld, loop.ItemTriaged, loop.ItemSpam, loop.ItemDrafted}
 )
 
@@ -20,7 +20,7 @@ var (
 // Metadata only: the text is never printed. Read-only, so not behind a stop switch.
 func (a *app) inbox(ctx context.Context, args []string) error {
 	fs := flag.NewFlagSet("inbox", flag.ContinueOnError)
-	src := fs.String("source", "", "only this source (in_app / app_store_review / crash / testflight / gen_failure)")
+	src := fs.String("source", "", "only this source (in_app / app_store_review / google_play_review / crash / testflight / gen_failure)")
 	status := fs.String("status", "", "only this status (new / held / triaged / spam / drafted)")
 	limit := fs.Int("limit", 100, "max items (1-2000)")
 	if err := fs.Parse(args); err != nil {
