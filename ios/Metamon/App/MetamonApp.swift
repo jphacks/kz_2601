@@ -54,6 +54,7 @@ struct MetamonApp: App {
         services.ai = ConsentGatedAIClient(base: services.ai) { AIConsentStore.isGranted(in: .standard) }
         if BuildConfig.forceMock { MusicSession.shared.player = FakeMusicPlayback() } // musicPlayer(#412)は音を出さない偽物
         if BuildConfig.forceMock { DeviceCalendar.source = FakeDeviceCalendar.sample } // 端末のカレンダー・リマインダー(#1987)は固定の中身
+        if BuildConfig.forceMock { DeviceContacts.source = FakeDeviceContacts.sample } // 端末の連絡先の一覧(#2218)は固定の中身
         if BuildConfig.forceMock { RecentlyPlayed.source = FakeRecentlyPlayed() } // 最近聞いた曲(#1988)は固定の履歴
         #if !APP_STORE_REVIEW
         if BuildConfig.forceMock { HealthData.source = MockHealthData() } // healthStat(#167)は固定値
