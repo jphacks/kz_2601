@@ -52,6 +52,8 @@ val sharedIncludes = listOf(
     "jp/kz2601/metamon/services/live/HttpFeedClient.kt",
     "jp/kz2601/metamon/services/live/HttpFollowsClient.kt",
     "jp/kz2601/metamon/services/live/HttpReleaseRequestClient.kt",
+    // 通報・ブロック(と仲間探し)の API クライアント(#2805)
+    "jp/kz2601/metamon/services/live/HttpSocialClients.kt",
     "jp/kz2601/metamon/services/local/DocumentCache.kt",
     "jp/kz2601/metamon/services/local/RecordStore.kt",
     "jp/kz2601/metamon/services/local/SyncQueue.kt",
@@ -60,6 +62,7 @@ val sharedIncludes = listOf(
     "jp/kz2601/metamon/services/sharing/ShareSheetModel.kt",
     // DiscoverModel・PublishModel が使う通報・ブロックの型と作者名の保存(純 Kotlin)
     "jp/kz2601/metamon/services/social/AuthorProfile.kt",
+    "jp/kz2601/metamon/services/social/MatchingClient.kt",
     "jp/kz2601/metamon/services/social/ModerationClient.kt",
     // client-config の notice(#333)。ServiceNotice の読み方の関数は ClientConfig.kt にある
     "jp/kz2601/metamon/services/update/ClientConfig.kt",
