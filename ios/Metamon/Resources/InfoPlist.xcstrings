@@ -18,6 +18,23 @@
         }
       }
     },
+    "NSContactsUsageDescription" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Used to read the names, birthdays, and groups in your contacts so the apps you build can show them in lists. Contact details are never sent off this device."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "生成したアプリで、連絡先の名前・誕生日・グループを一覧などに表示するために、連絡先を読み取ります。連絡先の内容は端末の外に送りません。"
+          }
+        }
+      }
+    },
     "NSHealthShareUsageDescription" : {
       "extractionState" : "manual",
       "localizations" : {

@@ -10196,6 +10196,23 @@
         }
       }
     },
+    "連絡先へのアクセスが許可されていません" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Access to Contacts is not allowed"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "連絡先へのアクセスが許可されていません"
+          }
+        }
+      }
+    },
     "進捗" : {
       "extractionState" : "manual",
       "localizations" : {
