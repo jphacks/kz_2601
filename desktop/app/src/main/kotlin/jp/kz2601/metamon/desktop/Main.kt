@@ -36,6 +36,11 @@ import jp.kz2601.metamon.desktop.i18n.Strings
 import jp.kz2601.metamon.desktop.io.DragOut
 import jp.kz2601.metamon.desktop.io.OpenWithFiles
 import jp.kz2601.metamon.desktop.io.OpenWithInbox
+import jp.kz2601.metamon.desktop.platform.JumpArgs
+import jp.kz2601.metamon.desktop.platform.JumpCommand
+import jp.kz2601.metamon.desktop.platform.JumpListPlan
+import jp.kz2601.metamon.desktop.platform.JumpListPublisher
+import jp.kz2601.metamon.desktop.platform.RecentApps
 import jp.kz2601.metamon.desktop.power.ScreenAwake
 import jp.kz2601.metamon.desktop.store.DesktopStore
 import jp.kz2601.metamon.desktop.store.DeviceWipe
@@ -60,7 +65,9 @@ import javax.swing.SwingUtilities
  * 記録の JSON を渡した時(開発・スクリーンショット)は端末に残さないので、ロックを取らずに何本でも起動できる。
  */
 fun main(rawArgs: Array<String>) {
-    // `--quick-record` などの旗(.desktop の Actions・#2992)は位置の引数と分ける
+    // ジャンプリストの項目(#3208)は `--jump=…` を足して起動する。ほかの引数の並びは崩さない
+    val jump = JumpArgs.parse(rawArgs.toList())
+    // `--quick-record` などの旗(.desktop の Actions・#2992)は位置の引数と分ける(`--jump=…` もここで落ちる)
     val parsed = LaunchArgs.parse(rawArgs.toList())
     // 「別のアプリで開く」のファイル(#2994)は位置の引数(アプリ名など)から外す
     val openFiles = OpenWithFiles.fromArgs(parsed.positional)
@@ -71,10 +78,10 @@ fun main(rawArgs: Array<String>) {
         return
     }
     OpenWithInbox.offer(openFiles)
-    runApp(args, parsed.action)
+    runApp(args, parsed.action, jump)
 }
 
-private fun runApp(args: Array<String>, launchAction: LaunchAction?) = application {
+private fun runApp(args: Array<String>, launchAction: LaunchAction?, jump: JumpCommand? = null) = application {
     // 端末の保存(#1887): 記録・設定は再起動しても残る。最後に開いたアプリから開く
     val desktopStore = remember { DesktopStore.open() }
     // 並びを直した分(#3207)。同梱の DSL に当て直して開く
@@ -137,11 +144,12 @@ private fun runApp(args: Array<String>, launchAction: LaunchAction?) = applicati
     // 2 つ目の起動: 渡されたアプリ(無ければ前にあるアプリ)を開いて前に出す。トレイに隠れていても出す
     remember {
         SingleInstance.onHandoff { raw ->
+            val cmd = JumpArgs.parse(raw)
             SwingUtilities.invokeLater {
                 val p = LaunchArgs.parse(raw)
                 val id = OpenWithFiles.withoutFiles(p.positional).firstOrNull()?.takeIf { it in BundledApps.ids() } ?: registry.active?.key?.appId ?: first
                 tray.openApp(id)
-                if (p.action == LaunchAction.QUICK_RECORD) tray.quickRecord()
+                if (p.action == LaunchAction.QUICK_RECORD || cmd == JumpCommand.QUICK_RECORD) tray.quickRecord()
                 OpenWithInbox.offer(OpenWithFiles.fromArgs(p.positional))
             }
         }
@@ -150,11 +158,25 @@ private fun runApp(args: Array<String>, launchAction: LaunchAction?) = applicati
     LaunchedEffect(Unit) { if (launchAction == LaunchAction.QUICK_RECORD) tray.quickRecord() }
     // すぐ記録は前にあるアプリの、アプリのウィンドウへ(詳細には入れない・無ければ開く)
     tray.findQuickRecordWindow = { registry.quickRecordWindow()?.id }
+    // ジャンプリストの「すぐ記録」で起動した(#3208)
+    LaunchedEffect(Unit) { if (jump == JumpCommand.QUICK_RECORD) tray.quickRecord() }
+    // ジャンプリスト(#3208・既定は出さない)。前に出たアプリを「最近」の頭に足して出し直す
+    val jumpList = remember { JumpListPublisher.create() }
     // トレイの名前・すぐ記録・集計は前にあるウィンドウのアプリ。閉じて開き直すと記録が替わるのでウィンドウごとに見直す
     val active = registry.active
     LaunchedEffect(active?.id) {
         val appId = active?.key?.appId ?: return@LaunchedEffect
         tray.switchApp(hub.dsl(appId), hub.opened().firstOrNull { it.id == appId }?.records)
+        if (jumpList !== JumpListPublisher.Noop) {
+            val before = RecentApps.decode(desktopStore.settings.getString(RecentApps.KEY))
+            val recent = RecentApps.touch(before, appId)
+            if (recent != before) desktopStore.settings.putString(RecentApps.KEY, RecentApps.encode(recent))
+            val content = JumpListPlan.build(
+                recent, BundledApps.all().toMap(), QuickRecordTarget.find(hub.dsl(appId)) != null, VoiceFlag.enabled(),
+                JumpListPlan.Labels(Strings["desktop_jumplist_recent"], Strings["desktop_tray_quick_record"], Strings["desktop_jumplist_voice"]),
+            )
+            loadScope.launch { jumpList.publish(content) }
+        }
     }
     DesktopTray(tray)
     // どこからでも話しかけるキー(#2201): 既定は off。TAILORIT_HOTKEY か端末の設定がある時だけ裏で登録する
