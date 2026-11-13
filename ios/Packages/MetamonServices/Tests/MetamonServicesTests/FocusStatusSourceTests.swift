@@ -177,13 +177,27 @@ final class FocusStatusSourceTests: XCTestCase {
         XCTAssertNil(source.isFocused)
     }
 
-    #if !os(iOS)
-    /// Mac は対象外: 常に restricted / nil
-    func testMacSystemReadingsAreRestricted() async {
-        let source = LiveFocusStatusSource()
+    /// 対象外の OS の読み口(`.unsupported`)は常に restricted / nil で、許可も求めない。
+    /// 実機の `INFocusStatusCenter` は読まない(署名・entitlement の有無で値が変わり、CI と手元で結果が違う・#2328)
+    func testUnsupportedSystemReadingsAreRestricted() async {
+        let source = LiveFocusStatusSource(readings: .unsupported, center: NotificationCenter())
         XCTAssertEqual(source.current, .restricted)
+        XCTAssertNil(source.isFocused)
         let result = await source.authorization(requesting: true)
         XCTAssertEqual(result, .restricted)
+        XCTAssertEqual(source.current, .restricted)
+    }
+
+    #if os(macOS)
+    /// Mac も `INFocusStatusCenter` を読む(#2328)。値は実行環境しだいなので決め打ちせず、矛盾しないことだけ見る
+    func testMacSystemReadingsAreConsistentWithoutRequesting() async {
+        XCTAssertEqual(FocusStatusReadings.system.notificationNames, [FocusStatusReadings.didBecomeActive])
+        let source = LiveFocusStatusSource()
+        let auth = await source.authorization(requesting: false)
+        XCTAssertEqual(source.current.authorization, auth)
+        if auth != .authorized {
+            XCTAssertNil(source.isFocused, "許可が無ければ nil")
+        }
     }
     #endif
 }

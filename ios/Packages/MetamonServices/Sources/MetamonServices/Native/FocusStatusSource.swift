@@ -15,7 +15,8 @@ import AppKit
 public enum FocusAuthorization: String, Equatable, Sendable, CaseIterable {
     case notDetermined
     case denied
-    /// 保護者の制限・審査用の版など。entitlement(Communication Notifications)が無いビルドもこれになる想定(未確認)
+    /// 保護者の制限・審査用の版・対象外の OS など。
+    /// entitlement(Communication Notifications)が無い Mac の版は restricted ではなく notDetermined で、求めると denied になる(署名なしのテスト実行役で確認・#2328)
     case restricted
     case authorized
 }
@@ -195,21 +196,25 @@ extension FocusStatusReadings {
         FocusStatusReadings(
             authorization: { FocusAuthorization(INFocusStatusCenter.default.authorizationStatus) },
             requestAuthorization: { done in
-                // entitlement が無いビルドでは restricted が返る想定(未確認・実機で確かめる)
+                // entitlement が無いビルドでは denied が返る(署名なしの Mac で確認)。restricted ではない
                 INFocusStatusCenter.default.requestAuthorization { done(FocusAuthorization($0)) }
             },
             isFocused: { INFocusStatusCenter.default.focusStatus.isFocused },
             notificationNames: [didBecomeActive]
         )
         #else
-        // それ以外の OS は対象外。常に restricted / nil
+        unsupported
+        #endif
+    }
+
+    /// 対象外の OS(iOS / macOS 以外)。常に restricted / nil で、許可も求めない
+    static var unsupported: FocusStatusReadings {
         FocusStatusReadings(
             authorization: { .restricted },
             requestAuthorization: { $0(.restricted) },
             isFocused: { nil },
             notificationNames: []
         )
-        #endif
     }
 
     /// アプリが前に来た時の通知
