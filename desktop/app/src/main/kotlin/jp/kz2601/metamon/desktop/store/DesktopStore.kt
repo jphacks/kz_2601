@@ -19,6 +19,7 @@ import java.io.File
  *   records/<appId>/<entity>.json   記録のキャッシュ(未送信の印つき)
  *   queue/queue.json  送信待ちの列(通信が切れても消えない・再起動後に送る)
  *   documents/        取得した DSL の封筒(オフライン起動)
+ *   thumbnails/<appId>.png  アプリの最後に見た画面の写し(#3203)
  * ```
  *
  * @param root null ならメモリだけ(テスト用)
@@ -30,6 +31,7 @@ class DesktopStore(val root: File?) {
     val crashReporting = CrashReportingPreference(consentValues)
     val records = RecordStore(root?.resolve("records"))
     val documents = DocumentCache(root?.resolve("documents"))
+    val thumbnails = ThumbnailStore(root?.resolve(ThumbnailStore.DIR_NAME))
 
     private val queueDir: File? = root?.resolve("queue")
     private var queue: SyncQueue? = null
@@ -46,12 +48,13 @@ class DesktopStore(val root: File?) {
 
     /**
      * サインアウト・アカウント削除・別の人のサインイン(Android の後片付けと同じ範囲)。
-     * 記録・送信待ち・DSL・設定・AI の同意(人ごと)を消す。クラッシュ報告の設定(端末ごと)とウィンドウの位置は残す。
+     * 記録・送信待ち・DSL・画面の写し・設定・AI の同意(人ごと)を消す。クラッシュ報告の設定(端末ごと)とウィンドウの位置は残す。
      */
     suspend fun wipe() {
         queue?.discardAll() ?: queueDir?.deleteRecursively()
         records.removeEverything()
         documents.removeAll()
+        thumbnails.removeAll()
         settings.clear()
         aiConsent.forget()
         sweepTempFiles(root)
