@@ -21,7 +21,8 @@ struct AddShareSheet: View {
         VStack(alignment: .leading, spacing: Theme.Spacing.lg) {
             VStack(alignment: .leading, spacing: Theme.Spacing.xs) {
                 title
-                    .font(.system(size: 22, weight: .bold, design: .rounded))
+                    .font(.system(.title2, design: .rounded).weight(.bold))
+                    .accessibilityAddTraits(.isHeader)
                     .accessibilityIdentifier("addShare.title")
                 if let description = pending.preview?.description, !description.isEmpty {
                     Text(description)

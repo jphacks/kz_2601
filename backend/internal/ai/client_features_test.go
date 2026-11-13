@@ -118,6 +118,7 @@ func TestClientFeaturesRestriction(t *testing.T) {
 	}
 	for _, f := range clientFeatures {
 		t.Run(f.key, func(t *testing.T) {
+			t.Parallel()
 			g := gone[f.key]
 			r := NewClientRestriction(all, nil, featuresWithout(f.key))
 			if !r.Active() || !r.NoFeature(f.key) || r.NoNear() {

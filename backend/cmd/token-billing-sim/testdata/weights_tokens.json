@@ -1,0 +1,6 @@
+{
+  "name": "tokens: by input / output tokens",
+  "operations": {
+    "*": {"call": 0, "input_per_1k": 1, "output_per_1k": 4, "cache_read_per_1k": 0, "cache_write_per_1k": 1}
+  }
+}

@@ -39,6 +39,9 @@ import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.input.key.type
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import jp.kz2601.metamon.desktop.chat.ChatKey
+import jp.kz2601.metamon.desktop.i18n.Strings
+import jp.kz2601.metamon.desktop.voice.PromptTipsText
 import java.io.File
 import java.net.JarURLConnection
 import java.text.Normalizer
@@ -63,7 +66,14 @@ class PaletteCommand(
             }
     }
 
+    /** アプリの行ならそのアプリの id(行にサムネイルを出す・#3204)。 */
+    val appId: String? get() = if (kind == Kind.APP) id.removePrefix(APP_PREFIX).takeIf { it != id } else null
+
     override fun toString(): String = "$kind:$title"
+
+    companion object {
+        const val APP_PREFIX = "app:"
+    }
 }
 
 /**
@@ -100,10 +110,10 @@ object CommandRanking {
             .sortedWith(compareByDescending<Triple<PaletteCommand, Int, Int>> { it.second }.thenBy { it.third })
             .map { it.first }
 
-    private fun words(s: String): List<String> = s.split(Regex("[\\s/・_\\-()（）]+")).filter { it.isNotEmpty() }
+    internal fun words(s: String): List<String> = s.split(Regex("[\\s/・_\\-()（）]+")).filter { it.isNotEmpty() }
 
     /** q の文字が t に順に現れるなら、間に挟まった文字の数。 */
-    private fun subsequenceGap(t: String, q: String): Int? {
+    internal fun subsequenceGap(t: String, q: String): Int? {
         var at = 0
         var gap = 0
         var started = false
@@ -151,6 +161,7 @@ fun CommandPalette(commands: List<PaletteCommand>, os: HostOs, onDismiss: () -> 
     LaunchedEffect(shown) { selected = 0 }
     LaunchedEffect(selected) { if (shown.isNotEmpty()) list.scrollToItem(selected.coerceIn(0, shown.lastIndex)) }
     val runAt = { i: Int -> shown.getOrNull(i)?.let { onDismiss(); it.run() } }
+    val thumbnails = LocalAppThumbnails.current
 
     Box(
         Modifier.fillMaxSize().background(Color(0x66000000)).clickable(onClick = onDismiss),
@@ -196,6 +207,8 @@ fun CommandPalette(commands: List<PaletteCommand>, os: HostOs, onDismiss: () -> 
                             horizontalArrangement = Arrangement.spacedBy(8.dp),
                         ) {
                             Text(c.kind.label, style = MaterialTheme.typography.labelSmall, color = Color.Gray, modifier = Modifier.widthIn(min = 64.dp))
+                            // 最後に見た画面の写し(無ければ今のまま)
+                            c.appId?.let { rememberAppThumbnail(it, thumbnails) }?.let { AppRowThumbnail(it) }
                             Text(c.title, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
                             c.hint?.let { Text(it, style = MaterialTheme.typography.labelMedium, color = Color.Gray) }
                         }
@@ -206,9 +219,14 @@ fun CommandPalette(commands: List<PaletteCommand>, os: HostOs, onDismiss: () -> 
     }
 }
 
-/** F1 のショートカット一覧。[onLicenses] があれば「ライセンス」も出す(デスクトップに「このアプリについて」が無いので、ここを入り口にする)。 */
+/**
+ * F1 のショートカット一覧。[onLicenses] があれば「ライセンス」も出す(デスクトップに「このアプリについて」が無いので、ここを入り口にする)。
+ * [onTips] があれば「頼み方のコツ」も出す。
+ * [onOnboarding] があれば「使い方を見る」(初回の流れを見直す・#3201)。
+ * [onCopyDiagnostics] があれば「診断の情報をコピー」も出す(#2200)。
+ */
 @Composable
-fun ShortcutHelp(os: HostOs, onLicenses: (() -> Unit)? = null, onDismiss: () -> Unit) {
+fun ShortcutHelp(os: HostOs, onLicenses: (() -> Unit)? = null, onTips: (() -> Unit)? = null, onOnboarding: (() -> Unit)? = null, onCopyDiagnostics: (() -> Unit)? = null, onDismiss: () -> Unit) {
     AlertDialog(
         onDismissRequest = onDismiss,
         title = { Text(KeyboardText.HELP) },
@@ -220,10 +238,29 @@ fun ShortcutHelp(os: HostOs, onLicenses: (() -> Unit)? = null, onDismiss: () -> 
                         Text(Keymap.chords(s, os).joinToString(" / ") { Keymap.label(it, os) }, color = Color.Gray)
                     }
                 }
+                // 会話の画面の入力欄(#2381)
+                Text(Strings["desktop_chat_help"], style = MaterialTheme.typography.labelMedium, color = Color.Gray)
+                ChatKey.help(os).forEach { (title, label) ->
+                    Row(Modifier.fillMaxWidth()) {
+                        Text(title, modifier = Modifier.weight(1f))
+                        Text(label, color = Color.Gray)
+                    }
+                }
                 Text(KeyboardText.HELP_TAB, style = MaterialTheme.typography.bodySmall, color = Color.Gray)
+                onCopyDiagnostics?.let { copy -> TextButton(onClick = copy) { Text(Strings["desktop_diagnostics_copy"]) } }
             }
         },
         confirmButton = { TextButton(onClick = onDismiss) { Text(KeyboardText.HELP_CLOSE) } },
-        dismissButton = onLicenses?.let { open -> { TextButton(onClick = open) { Text(LicensesText.TITLE) } } },
+        dismissButton = if (onLicenses == null && onTips == null && onOnboarding == null) {
+            null
+        } else {
+            {
+                Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                    onOnboarding?.let { open -> TextButton(onClick = open) { Text(Strings["onboarding_replay"]) } }
+                    onTips?.let { open -> TextButton(onClick = open) { Text(PromptTipsText.TITLE) } }
+                    onLicenses?.let { open -> TextButton(onClick = open) { Text(LicensesText.TITLE) } }
+                }
+            }
+        },
     )
 }

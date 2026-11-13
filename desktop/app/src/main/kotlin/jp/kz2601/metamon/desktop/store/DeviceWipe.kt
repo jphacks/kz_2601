@@ -2,6 +2,7 @@ package jp.kz2601.metamon.desktop.store
 
 import jp.kz2601.metamon.desktop.ImageLoader
 import jp.kz2601.metamon.desktop.Notifier
+import jp.kz2601.metamon.desktop.auth.TokenStore
 import jp.kz2601.metamon.desktop.io.ExportClipboard
 import jp.kz2601.metamon.desktop.io.UserDirs
 import java.awt.datatransfer.Clipboard
@@ -43,4 +44,26 @@ object DeviceWipe {
     /** [dir] の中身を消す(フォルダそのものは残す)。消した数。 */
     fun emptyDir(dir: File): Int =
         dir.listFiles().orEmpty().count { if (it.isDirectory && !java.nio.file.Files.isSymbolicLink(it.toPath())) it.deleteRecursively() else it.delete() }
+}
+
+/** サインアウトの確認(#2375)で選んだ物。 */
+enum class SignOutChoice { WIPE, KEEP, CANCEL }
+
+/**
+ * サインアウトの片付け(#2375)。
+ * - [SignOutChoice.WIPE]: この端末のデータ(`AppHub.wipeLocalData`)を消してから、保存したトークンを消す
+ * - [SignOutChoice.KEEP]: トークンだけ消す(記録・送信待ち・設定は残す)
+ * - [SignOutChoice.CANCEL]: 何もしない
+ * 戻り値はサインアウトしたか。データを消せなかった時はトークンも残す(サインインのまま・例外は呼んだ側へ)。
+ */
+object SignOutCleanup {
+    suspend fun run(choice: SignOutChoice, wipeLocalData: suspend () -> Unit, tokens: TokenStore?): Boolean {
+        when (choice) {
+            SignOutChoice.CANCEL -> return false
+            SignOutChoice.WIPE -> wipeLocalData()
+            SignOutChoice.KEEP -> Unit
+        }
+        tokens?.clear()
+        return true
+    }
 }
