@@ -17,6 +17,8 @@ import org.junit.Before
 import org.junit.Test
 import java.nio.file.Files
 import java.util.Collections
+import java.util.concurrent.CountDownLatch
+import java.util.concurrent.TimeUnit
 
 /** 本の検索(lookupBook): ISBN の形・見つからない・フォームに入る値。検索は作り物の BookLookupClient で通信しない。 */
 class LookupBookTest {
@@ -49,6 +51,14 @@ class LookupBookTest {
     private val asked: MutableList<String> = Collections.synchronizedList(mutableListOf())
     private var langBefore = Strings.lang
 
+    /** 検索の別スレッドは awaitResult まで待たせる。先に終わると dispatch の「探しています」で答えが上書きされる。 */
+    private val gate = CountDownLatch(1)
+
+    private fun gated(block: (String) -> BookInfo?) = BookLookupClient { isbn ->
+        gate.await(5, TimeUnit.SECONDS)
+        block(isbn)
+    }
+
     @Before
     fun setUp() {
         langBefore = Strings.lang
@@ -62,7 +72,7 @@ class LookupBookTest {
 
     private fun session(book: BookInfo?): DesktopSession {
         val s = DesktopSession(dsl, MockStore())
-        val client = BookLookupClient { isbn -> asked += isbn; book }
+        val client = gated { isbn -> asked += isbn; book }
         s.host = DesktopActionHost(client, Files.createTempDirectory("lookup-book").toFile().apply { deleteOnExit() }, NoopNotifier, voice = null)
         return s
     }
@@ -76,6 +86,7 @@ class LookupBookTest {
     /** 検索は別のスレッド。「探しています」から変わるまで待つ(最大 5 秒)。 */
     private fun DesktopSession.awaitResult(): String? {
         val searching = Strings["desktop_book_searching"]
+        gate.countDown()
         val until = System.nanoTime() + 5_000_000_000L
         while (message == searching && System.nanoTime() < until) Thread.sleep(10)
         return message
@@ -118,7 +129,7 @@ class LookupBookTest {
     @Test
     fun lookupBookFailureSaysUnavailable() {
         val s = DesktopSession(dsl, MockStore())
-        s.host = DesktopActionHost({ error("落ちた") }, Files.createTempDirectory("lookup-book").toFile().apply { deleteOnExit() }, NoopNotifier, voice = null)
+        s.host = DesktopActionHost(gated { error("落ちた") }, Files.createTempDirectory("lookup-book").toFile().apply { deleteOnExit() }, NoopNotifier, voice = null)
         s.lookupWith("9784000000000")
         assertEquals(Strings["host_book_unavailable"], s.awaitResult())
     }
