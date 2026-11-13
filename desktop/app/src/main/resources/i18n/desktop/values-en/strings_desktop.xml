@@ -72,6 +72,8 @@
     <string name="desktop_io_unreadable_encoding">Couldn\'t read the text encoding</string>
     <string name="desktop_io_unsupported_file">This file can\'t be imported</string>
     <string name="desktop_io_video_hint">You can drop a video here</string>
+    <string name="desktop_jumplist_recent">Recent apps</string>
+    <string name="desktop_jumplist_voice">Talk to Tailor It</string>
     <string name="desktop_keys_close">Close / Back</string>
     <string name="desktop_keys_delete">Delete</string>
     <string name="desktop_keys_delete_confirm">Delete this item?</string>

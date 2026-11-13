@@ -28,10 +28,16 @@ import java.awt.event.WindowAdapter
 import java.awt.event.WindowEvent
 import jp.kz2601.metamon.desktop.i18n.Strings
 import jp.kz2601.metamon.desktop.io.DragOut
+import jp.kz2601.metamon.desktop.platform.JumpArgs
+import jp.kz2601.metamon.desktop.platform.JumpCommand
+import jp.kz2601.metamon.desktop.platform.JumpListPlan
+import jp.kz2601.metamon.desktop.platform.JumpListPublisher
+import jp.kz2601.metamon.desktop.platform.RecentApps
 import jp.kz2601.metamon.desktop.store.DesktopStore
 import jp.kz2601.metamon.desktop.store.DeviceWipe
 import jp.kz2601.metamon.desktop.store.SessionPersistence
 import jp.kz2601.metamon.desktop.theme.TailorItTheme
+import jp.kz2601.metamon.desktop.voice.VoiceFlag
 import jp.kz2601.metamon.dsl.records.entityModels
 import jp.kz2601.metamon.dsl.screen
 import java.io.File
@@ -47,16 +53,19 @@ import javax.swing.SwingUtilities
  * 同じ保存先ではプロセスを 1 つだけ起動する。2 つ目は起動中の方へ引数を渡して前に出させる(SingleInstance.kt)。
  * 記録の JSON を渡した時(開発・スクリーンショット)は端末に残さないので、ロックを取らずに何本でも起動できる。
  */
-fun main(args: Array<String>) {
+fun main(argv: Array<String>) {
+    // ジャンプリストの項目(#3208)は `--jump=…` を足して起動する。ほかの引数の並びは崩さない
+    val jump = JumpArgs.parse(argv.toList())
+    val args = JumpArgs.strip(argv.toList()).toTypedArray()
     // 同じ保存先で 2 つ目は起動しない(#1754 の JSON を 2 つのプロセスで書き合わない)
     if (args.getOrNull(1) == null && !SingleInstance.claim()) {
-        if (!SingleInstance.handOff(args = args.toList())) SingleInstance.reportRunning()
+        if (!SingleInstance.handOff(args = argv.toList())) SingleInstance.reportRunning()
         return
     }
-    runApp(args)
+    runApp(args, jump)
 }
 
-private fun runApp(args: Array<String>) = application {
+private fun runApp(args: Array<String>, jump: JumpCommand? = null) = application {
     // 端末の保存(#1887): 記録・設定は再起動しても残る。最後に開いたアプリから開く
     val desktopStore = remember { DesktopStore.open() }
     val first = remember {
@@ -107,20 +116,37 @@ private fun runApp(args: Array<String>) = application {
     tray.onOpenApp = { registry.open(WindowKey.app(it)) }
     // 2 つ目の起動: 渡されたアプリ(無ければ前にあるアプリ)を開いて前に出す。トレイに隠れていても出す
     remember {
-        SingleInstance.onHandoff { a ->
+        SingleInstance.onHandoff { argv ->
+            val cmd = JumpArgs.parse(argv)
+            val a = JumpArgs.strip(argv)
             SwingUtilities.invokeLater {
                 val id = a.firstOrNull()?.takeIf { it in BundledApps.ids() } ?: registry.active?.key?.appId ?: first
                 tray.openApp(id)
+                if (cmd == JumpCommand.QUICK_RECORD) tray.quickRecord()
             }
         }
     }
     // すぐ記録は前にあるアプリの、アプリのウィンドウへ(詳細には入れない・無ければ開く)
     tray.findQuickRecordWindow = { registry.quickRecordWindow()?.id }
+    // ジャンプリストの「すぐ記録」で起動した(#3208)
+    LaunchedEffect(Unit) { if (jump == JumpCommand.QUICK_RECORD) tray.quickRecord() }
+    // ジャンプリスト(#3208・既定は出さない)。前に出たアプリを「最近」の頭に足して出し直す
+    val jumpList = remember { JumpListPublisher.create() }
     // トレイの名前・すぐ記録・集計は前にあるウィンドウのアプリ。閉じて開き直すと記録が替わるのでウィンドウごとに見直す
     val active = registry.active
     LaunchedEffect(active?.id) {
         val appId = active?.key?.appId ?: return@LaunchedEffect
         tray.switchApp(hub.dsl(appId), hub.opened().firstOrNull { it.id == appId }?.records)
+        if (jumpList !== JumpListPublisher.Noop) {
+            val before = RecentApps.decode(desktopStore.settings.getString(RecentApps.KEY))
+            val recent = RecentApps.touch(before, appId)
+            if (recent != before) desktopStore.settings.putString(RecentApps.KEY, RecentApps.encode(recent))
+            val content = JumpListPlan.build(
+                recent, BundledApps.all().toMap(), QuickRecordTarget.find(hub.dsl(appId)) != null, VoiceFlag.enabled(),
+                JumpListPlan.Labels(Strings["desktop_jumplist_recent"], Strings["desktop_tray_quick_record"], Strings["desktop_jumplist_voice"]),
+            )
+            loadScope.launch { jumpList.publish(content) }
+        }
     }
     DesktopTray(tray)
     registry.windows.toList().forEach { w ->

@@ -73,6 +73,8 @@
     <string name="desktop_io_unreadable_encoding">文字コードが読めません</string>
     <string name="desktop_io_unsupported_file">このファイルは取り込めません</string>
     <string name="desktop_io_video_hint">動画を落とせます</string>
+    <string name="desktop_jumplist_recent">最近使ったアプリ</string>
+    <string name="desktop_jumplist_voice">話しかける</string>
     <string name="desktop_keys_close">閉じる / 戻る</string>
     <string name="desktop_keys_delete">削除</string>
     <string name="desktop_keys_delete_confirm">削除しますか？</string>
