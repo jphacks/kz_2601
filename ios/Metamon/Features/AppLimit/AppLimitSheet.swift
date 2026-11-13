@@ -56,7 +56,7 @@ struct AppLimitSheet: View {
     private var header: some View {
         VStack(alignment: .leading, spacing: Theme.Spacing.sm) {
             Text("上限に達しています。どのアプリと置き換えますか?")
-                .font(.system(size: 20, weight: .bold, design: .rounded))
+                .font(.system(.title3, design: .rounded).weight(.bold))
                 .fixedSize(horizontal: false, vertical: true)
                 .accessibilityIdentifier("appLimit.title")
             Text(AppLimitCopy.subtitle(plan: plan ?? makePlan()))
