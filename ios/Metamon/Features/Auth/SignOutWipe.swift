@@ -12,14 +12,19 @@ extension AuthSession {
             choice: choice,
             auth: service,
             flush: { await runtime.recordSync.flush() },
-            wipeLocal: {
-                await runtime.unregisterPushDevice() // 送れなくても続ける(#269)
-                await runtime.wipeLocalData()
-            }
+            wipeLocal: { await runtime.wipeBeforeAccountChange() }
         )
         guard outcome == .signedOut else { return outcome }
         signOut() // セッションの表示を即反映(サインアウト済みでも安全)
         farewell = wasSignedIn // #102
         return outcome
+    }
+}
+
+extension AppRuntime {
+    /// ログアウト・アカウントの切り替え(#2084 の開発用メニューの枠)の前の端末の後片付け。サインインには触らない
+    func wipeBeforeAccountChange() async {
+        await unregisterPushDevice() // 送れなくても続ける(#269)
+        await wipeLocalData()
     }
 }
