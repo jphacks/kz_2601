@@ -89,6 +89,9 @@
     <string name="desktop_keys_preview">Preview photo</string>
     <string name="desktop_keys_save">Save</string>
     <string name="desktop_keys_search">Search</string>
+    <string name="desktop_keys_zoom_in">Larger text</string>
+    <string name="desktop_keys_zoom_out">Smaller text</string>
+    <string name="desktop_keys_zoom_reset">Reset text size</string>
     <string name="desktop_licenses">Third-party notices</string>
     <string name="desktop_licenses_browse_failed">Couldn\'t open the browser. %1$s</string>
     <string name="desktop_list_empty">Nothing yet</string>
@@ -129,6 +132,7 @@
     <string name="desktop_qr_copy_image">Copy image</string>
     <string name="desktop_record_deleted_elsewhere">This record was deleted in another window</string>
     <string name="desktop_sync_pending">%1$d waiting to send</string>
+    <string name="desktop_text_zoom_now">Text size %1$s</string>
     <string name="desktop_timer_done">Time\'s up</string>
     <string name="desktop_timer_name">Timer</string>
     <string name="desktop_timer_pause">Pause</string>

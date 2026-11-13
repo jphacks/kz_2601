@@ -115,10 +115,12 @@ data class DesktopGridMetrics(val frameWidth: Float, val cellW: Float, val cellH
         const val MIN_CELL_HEIGHT = 44f
         const val MAX_CELL_HEIGHT = 96f
 
-        fun resolve(width: Float, height: Float, inset: Float): DesktopGridMetrics {
+        /** [fontScale] は文字の倍率(Ctrl + / -・#2208)。行の高さの上下限を掛けて、大きい文字でも段の中に収める。 */
+        fun resolve(width: Float, height: Float, inset: Float, fontScale: Float = 1f): DesktopGridMetrics {
             val frame = minOf(width, MAX_WIDTH)
             val cellW = maxOf(0f, frame - inset * 2) / GridArea.COLUMNS
-            val cellH = (maxOf(0f, height - inset * 2) / GridArea.VISIBLE_ROWS).coerceIn(MIN_CELL_HEIGHT, MAX_CELL_HEIGHT)
+            val scale = fontScale.takeIf { it.isFinite() && it > 0f } ?: 1f
+            val cellH = (maxOf(0f, height - inset * 2) / GridArea.VISIBLE_ROWS).coerceIn(MIN_CELL_HEIGHT * scale, MAX_CELL_HEIGHT * scale)
             return DesktopGridMetrics(frame, cellW, cellH)
         }
     }

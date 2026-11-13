@@ -31,6 +31,7 @@ import jp.kz2601.metamon.desktop.io.DragOut
 import jp.kz2601.metamon.desktop.store.DesktopStore
 import jp.kz2601.metamon.desktop.store.DeviceWipe
 import jp.kz2601.metamon.desktop.store.SessionPersistence
+import jp.kz2601.metamon.desktop.theme.ProvideTextZoom
 import jp.kz2601.metamon.desktop.theme.TailorItTheme
 import jp.kz2601.metamon.dsl.records.entityModels
 import jp.kz2601.metamon.dsl.screen
@@ -190,7 +191,9 @@ private fun ApplicationScope.DesktopWindow(w: WindowEntry, registry: WindowRegis
         }
         // 明暗は OS に従う・文言は OS の言語(日本語か英語)・#1759
         CompositionLocalProvider(LocalTray provides tray) {
+            // 文字の大きさは Ctrl + / Ctrl - / Ctrl 0(#2208)
             TailorItTheme {
+                ProvideTextZoom {
                 if (app.records.loading) {
                     LoadingSkeleton()
                 } else {
@@ -207,6 +210,7 @@ private fun ApplicationScope.DesktopWindow(w: WindowEntry, registry: WindowRegis
                         windowId = w.id,
                         onWipeLocalData = hub::wipeLocalData,
                     )
+                }
                 }
             }
         }
