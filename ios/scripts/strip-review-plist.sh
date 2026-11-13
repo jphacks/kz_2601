@@ -12,6 +12,7 @@ PB=/usr/libexec/PlistBuddy
 # / 止めるまで鳴るアラーム(AlarmKit。この版ではアラームの通知も普通の通知で届ける)/ 集中モード中か(#1990・まだ使う機能が無い)
 # / Bluetooth の心拍ベルト(#2237。使う部品がまだ無い。コードも APP_STORE_REVIEW で外す)
 # / 端末のカレンダー・リマインダーを読む(#1987。使う部品がまだ無い。説明文が無いと LiveDeviceCalendar は許可を求めず restricted を返す)
+# / HomeKit の家・部屋・機器を読む(#2245。使う部品がまだ無い。説明文が無いと LiveDeviceHome は許可を求めず restricted を返す)
 # / 端末の連絡先の一覧を読む(#2218。同じく部品がまだ無い。LiveDeviceContacts も説明文が無ければ restricted)
 REVIEW_REMOVED_KEYS="
 CFBundleURLTypes
@@ -24,6 +25,7 @@ NSFocusStatusUsageDescription
 NSHealthClinicalHealthRecordsShareUsageDescription
 NSHealthShareUsageDescription
 NSHealthUpdateUsageDescription
+NSHomeKitUsageDescription
 NSLocalNetworkUsageDescription
 NSLocationAlwaysAndWhenInUseUsageDescription
 NSLocationAlwaysUsageDescription

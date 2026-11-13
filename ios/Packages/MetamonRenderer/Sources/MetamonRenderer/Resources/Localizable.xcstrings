@@ -2556,6 +2556,23 @@
         }
       }
     },
+    "この端末ではホームを使えません" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Home isn't available on this device"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "この端末ではホームを使えません"
+          }
+        }
+      }
+    },
     "この端末では使えません" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -2705,6 +2722,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "すれ違い通信をはじめますか？"
+          }
+        }
+      }
+    },
+    "その他の機器" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Other device"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "その他の機器"
           }
         }
       }
@@ -3202,6 +3236,57 @@
         }
       }
     },
+    "エアコン" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Air conditioner"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "エアコン"
+          }
+        }
+      }
+    },
+    "オフ" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Off"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "オフ"
+          }
+        }
+      }
+    },
+    "オン" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "On"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "オン"
+          }
+        }
+      }
+    },
     "オンにすると、この画面を開いている間 近くの同じアプリの人と%@を交換します" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -3491,6 +3576,23 @@
         }
       }
     },
+    "カーテン" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Window covering"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "カーテン"
+          }
+        }
+      }
+    },
     "カードがありません" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -3712,6 +3814,40 @@
         }
       }
     },
+    "コンセント" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Outlet"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "コンセント"
+          }
+        }
+      }
+    },
+    "サーモスタット" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Thermostat"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "サーモスタット"
+          }
+        }
+      }
+    },
     "システム設定 > Apple Intelligence と Siri でオンにしてください" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -3814,6 +3950,23 @@
         }
       }
     },
+    "スイッチ" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Switch"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "スイッチ"
+          }
+        }
+      }
+    },
     "スタート" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -3827,6 +3980,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "スタート"
+          }
+        }
+      }
+    },
+    "スピーカー" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Speaker"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "スピーカー"
           }
         }
       }
@@ -4065,6 +4235,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "ドラレコ"
+          }
+        }
+      }
+    },
+    "ハブ" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Hub"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ハブ"
           }
         }
       }
@@ -4320,6 +4507,40 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "ページ"
+          }
+        }
+      }
+    },
+    "ホーム App に家がありません" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No home in the Home app"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ホーム App に家がありません"
+          }
+        }
+      }
+    },
+    "ホームへのアクセスが許可されていません" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Access to Home isn't allowed"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ホームへのアクセスが許可されていません"
           }
         }
       }
@@ -6403,6 +6624,23 @@
         }
       }
     },
+    "加湿器" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Humidifier"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "加湿器"
+          }
+        }
+      }
+    },
     "動画" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -7032,6 +7270,23 @@
         }
       }
     },
+    "扇風機" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Fan"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "扇風機"
+          }
+        }
+      }
+    },
     "手書き" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -7436,6 +7691,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "文字起こしをやめました"
+          }
+        }
+      }
+    },
+    "明るさ" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Brightness"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "明るさ"
           }
         }
       }
@@ -8052,6 +8324,23 @@
         }
       }
     },
+    "温度" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Temperature"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "温度"
+          }
+        }
+      }
+    },
     "測定中" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -8065,6 +8354,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "測定中"
+          }
+        }
+      }
+    },
+    "湿度" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Humidity"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "湿度"
           }
         }
       }
@@ -8099,6 +8405,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "準決勝"
+          }
+        }
+      }
+    },
+    "照明" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Light"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "照明"
           }
         }
       }
@@ -8575,6 +8898,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "空き"
+          }
+        }
+      }
+    },
+    "空気清浄機" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Air purifier"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "空気清浄機"
           }
         }
       }
@@ -10686,6 +11026,23 @@
         }
       }
     },
+    "鍵" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Lock"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "鍵"
+          }
+        }
+      }
+    },
     "長いので先頭の %lld 文字だけ入れます。" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -10910,6 +11267,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "降水確率 %lld パーセント"
+          }
+        }
+      }
+    },
+    "電源" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Power"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "電源"
           }
         }
       }
