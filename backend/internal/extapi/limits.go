@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"math"
 	"strconv"
 	"strings"
 	"sync"
@@ -162,6 +163,68 @@ type limitCharge struct {
 	expireAt time.Time
 }
 
+// Monthly use (#2144): every call counted above also counts once on the
+// user's month of the provider, shown by GET /v1/me/connections. It is the
+// last counter of the same Consume (all or none with the limits, refunded
+// with them, counted in the fallback when the store fails) and never a
+// limit (Limit is MaxInt32).
+//
+//	rateLimits/{env}_{yyyy-mm}_ext_{provider}_uid_{uid}   expires a day after the month
+const scopeUserMonthly = "user_monthly"
+
+func (s *Service) monthCounter(provider, uid string, now time.Time) ratelimit.Counter {
+	env := s.cfg.Env
+	if env == "" {
+		env = "local"
+	}
+	return ratelimit.Counter{ID: fmt.Sprintf("%s_%s_ext_%s_uid_%s", env, now.In(ratelimit.JST).Format("2006-01"), provider, docSafe(uid)),
+		Scope: scopeUserMonthly, Limit: math.MaxInt32}
+}
+
+// MonthCalls is uid's calls of each provider this month (JST), read
+// without writing (one batched read). A store that cannot peek is an error.
+func (s *Service) MonthCalls(ctx context.Context, uid string, providers []string) (map[string]int, error) {
+	peeker, ok := s.limits.store.(ratelimit.Peeker)
+	if !ok {
+		return nil, errors.New("extapi: the limit store cannot peek")
+	}
+	if uid == "" || len(providers) == 0 {
+		return map[string]int{}, nil
+	}
+	now := s.now()
+	counters := make([]ratelimit.Counter, len(providers))
+	for i, p := range providers {
+		counters[i] = s.monthCounter(p, uid, now)
+	}
+	counts, err := peeker.Peek(ctx, counters)
+	if err != nil {
+		return nil, err
+	}
+	out := make(map[string]int, len(providers))
+	for i, p := range providers {
+		out[p] = counts[i]
+	}
+	return out, nil
+}
+
+// addMonthCalls fills each connection's MonthCalls (left absent when the
+// counts cannot be read: the list itself still answers).
+func (s *Service) addMonthCalls(ctx context.Context, uid string, conns []ConnectionView) {
+	ids := make([]string, len(conns))
+	for i, c := range conns {
+		ids[i] = c.Provider
+	}
+	counts, err := s.MonthCalls(ctx, uid, ids)
+	if err != nil {
+		s.Log.WarnContext(ctx, "extapi: reading the month counts failed", slog.Any("error", err))
+		return
+	}
+	for i := range conns {
+		n := counts[conns[i].Provider]
+		conns[i].MonthCalls = &n
+	}
+}
+
 // UseLimitStore counts the call limits in store (Firestore `rateLimits` in
 // the runner, shared by every instance). Without it they are per instance.
 func (s *Service) UseLimitStore(store ratelimit.Store) {
@@ -238,6 +301,14 @@ func (s *Service) consumeLimits(ctx context.Context, provider, uid, app string) 
 		cs = append(cs, ctr{ratelimit.Counter{ID: fmt.Sprintf("%s_%s_ext_%s_global", env, day, provider), Scope: LimitGlobalDaily,
 			Limit: lim.GlobalDaily, Shards: ratelimit.GlobalShards}, dayEnd})
 	}
+	// TTL: a day of slack so the document outlives its own window
+	expireAt := dayEnd.Add(24 * time.Hour)
+	if uid != "" {
+		monthEnd := time.Date(y, m+1, 1, 0, 0, 0, 0, ratelimit.JST)
+		cs = append(cs, ctr{s.monthCounter(provider, uid, now), monthEnd})
+		// one expireAt per Consume: the month's, so its document outlives the month
+		expireAt = monthEnd.Add(24 * time.Hour)
+	}
 	if len(cs) == 0 {
 		return limitCharge{}, nil
 	}
@@ -245,8 +316,6 @@ func (s *Service) consumeLimits(ctx context.Context, provider, uid, app string) 
 	for i, c := range cs {
 		counters[i] = c.c
 	}
-	// TTL: a day of slack so the document outlives its own window
-	expireAt := dayEnd.Add(24 * time.Hour)
 	store := s.limits.store
 	u, err := store.Consume(ctx, counters, 1, expireAt)
 	if err != nil {

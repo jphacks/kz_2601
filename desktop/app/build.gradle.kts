@@ -6,6 +6,7 @@ plugins {
     alias(libs.plugins.kotlin.jvm)
     alias(libs.plugins.kotlin.compose)
     alias(libs.plugins.compose.multiplatform)
+    id("org.jetbrains.kotlinx.kover")
 }
 
 java {
@@ -35,6 +36,9 @@ dependencies {
     // LGPL-2.1-or-later と Apache-2.0 から選べるので Apache-2.0 を選ぶ(third-party-licenses.gradle.kts の electedLicenses)
     implementation("net.java.dev.jna:jna:5.19.1")
 
+    // 画面のテスト(runComposeUiTest・#2415)。版は Compose Multiplatform plugin に揃う
+    @OptIn(org.jetbrains.compose.ExperimentalComposeLibrary::class)
+    testImplementation(compose.uiTest)
     testImplementation(libs.junit)
     testImplementation(libs.kotlinx.coroutines.test)
     testImplementation(libs.okhttp.mockwebserver)
@@ -62,6 +66,10 @@ tasks.test {
     // 文言・テーマはテストを動かす機械の言語・OS の設定に左右されないよう固定する(テストの中で切り替える)
     systemProperty("tailorit.lang", "ja")
     systemProperty("tailorit.theme", "light")
+    // 適合テストで DSL_ECHO として比べていない props の表(ConformanceEchoReportTest)だけ、標準出力を Gradle の出力に流す
+    addTestOutputListener { descriptor, event ->
+        if (descriptor.className == "jp.kz2601.metamon.desktop.ConformanceEchoReportTest") logger.lifecycle(event.message.trimEnd())
+    }
 }
 
 // Android の :renderer のうち Compose の状態しか使わない純 Kotlin(フォームの下書き・遷移の規則)は、android/ を変えずにそのまま取り込む。
@@ -138,6 +146,9 @@ compose.desktop {
             // whisper.cpp の JNI のライブラリ(whisper/native/build.sh・build.ps1 で out/<os>-<arch>/ に作る・#1751)を配る形に入れる。
             // 作っていなければ入らず、音声入力は「この PC では用意できていません」になる。モデルは入れない(初回に落とす)
             appResourcesRootDir.set(project(":whisper").layout.projectDirectory.dir("native/out"))
+            // CSV を「プログラムから開く」に出す(#2995・jpackage の --file-associations)。既定のアプリは奪わない(OS 側で選ぶ)。
+            // Deb・Rpm・Dmg にも同じ指定が入る
+            fileAssociation(mimeType = "text/csv", extension = "csv", description = "CSV")
         }
     }
 }

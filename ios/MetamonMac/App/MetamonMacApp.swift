@@ -18,27 +18,40 @@ struct MetamonMacApp: App {
     @State private var library: MacAppLibrary
 
     init() {
-        let library = MacAppLibrary(defaults: .standard, server: MacServices.shared.appConfig, serverCache: .shared)
-        _library = State(initialValue: library)
+        // NSApplication はメインスレッドで先に作る。Crashlytics は背景のキューで sharedApplication を呼ぶので、
+        // そちらが先だと別のスレッドにイベントのキューができ、起動直後に AppKit の assert で落ちる
+        _ = NSApplication.shared
         // Firebase は接続(MacServices)を組み立てる前に初期化(plist が無ければ何もせず、ログインと AI はモック・#930)
         MacFirebase.bootstrap()
+        let library = MacAppLibrary(defaults: .standard, server: MacServices.shared.appConfig, serverCache: .shared)
+        _library = State(initialValue: library)
         Task { await MacAccount.shared.start() } // 未ログインなら匿名でログインし、状態の変化を追う
         MacNotificationDelegate.install() // 前面でも通知を出す・押されたらそのアプリを開く(#965)
         MacRecordResend.shared.install() // 記録の送信待ちを前面・スリープ明け・回線の復帰・一定間隔で送り直す(#976)
         // 他の端末の変化(#2072): 進んだ版は一覧に当てる(中央が作り直される)。購読は同じ合図で張り直す
         MacRealtimeSync.shared.onDocument = { [weak library] doc in library?.applyRemoteVersion(doc) }
         MacRecordResend.shared.onResume = { MacRealtimeSync.shared.resume(force: $0) }
+        // ウインドウが閉じていても時々取り直す(#2253・iOS の BGAppRefreshTask に当たる): 送信待ち → 一覧 → 開いているアプリ
+        MacBackgroundRefresh.shared.refetch = { [weak library] in
+            guard let library else { return }
+            await library.refreshServerApps()
+            for appId in MacRealtimeSync.shared.openAppIds { _ = await library.refreshFromServer(appId) }
+            MacRealtimeSync.shared.catchUpAll()
+        }
+        MacBackgroundRefresh.shared.install()
         // ショートカット・Siri・Spotlight(App Intents・#1034)。記録の追加はウインドウを開かずに来るので、一覧は起動の最初に渡す
         IntentHost.shared.register(library: library, bundled: apps)
         // UI テスト・手元の確認用(DEBUG のみ・iOS と同じ環境変数): METAMON_AI_CONSENT / METAMON_TUTORIAL / METAMON_BETA_WELCOME(#971)
         AIConsentDebug.applyLaunchOverride()
         FirstRunTutorialStore.shared.applyLaunchOverride()
+        CoachMarkStore.shared.applyLaunchOverride() // 吹き出し(#3249): METAMON_COACH_MARKS / METAMON_AI_CONSENT=granted の UI テストでは出さない
         // 起動時の画面の順番(#1885・iOS と同じ): 同意・チュートリアルを出すなら、閉じるまでシェアリンク・Intent を待たせる
         MacOnboarding.beginLaunchHold()
         #if !APP_STORE_REVIEW
         BetaWelcomeStore.shared.applyLaunchOverride()
         MacAIButtonMetrics.install() // 前の日までの AI ボタンの集計を、起動・前面に戻った時に送る(#446・#1327)
         MacPushHost.shared.install(services: MacServices.shared) // プッシュの端末の登録(#982)
+        MacUnreadNotices.shared.install() // 未読の直ったお知らせの数をサイドバーと Dock に(#3245)。前面に来た時に読み直す
         #endif
         // 記録の一時フォルダ(MacAppRuntime.mockRecordSync)と共有に渡した書き出しの写し(#946)を起動時(前回の残り)と終了時に片付ける
         MacAppRuntime.removePreviewDirectories()
