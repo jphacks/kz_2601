@@ -26,9 +26,9 @@ DSL の全部の type(Container 7・Leaf 70 = 77。`docs/dsl/dsl.schema.json` �
 | type | 状態 | 適合 state | 理由・代わりの形 | Mac | 関係する Issue |
 |---|---|---|---|---|---|
 | card | 描ける | rendered | カードの枠に子を並べる(子に area があれば枠の中も 6 列のグリッド) | 描ける | #1741 |
-| carousel | 代わり | rendered | 横に送らず、子を縦に並べる | 描ける | #1741 |
-| disclosure | 代わり | rendered | 畳まず、見出しの下に子をいつも出す(expanded はまだ見ない) | 描ける | #1741 |
-| grid | 代わり | rendered | 子に area があれば 6 列のグリッド、無ければ縦に並べる(columns はまだ見ない) | 描ける | #1741 |
+| carousel | 描ける | rendered | 1 枚ずつ見せ、‹ ›・← →・ページの点で送る(端で止まる・動きは付けない)。読み上げは「2 / 5 枚目」 | 描ける | #1741 |
+| disclosure | 描ける | rendered | `expanded`(無ければ閉じる)で始め、見出しを押す・Enter / Space で開け閉めする。開け閉めはウィンドウの間だけ覚える。読み上げは「開いています / 閉じています」(#3214) | 描ける | #1741 |
+| grid | 描ける | rendered | `columnCount`(2〜4・無ければ 2)の列で子を左から詰めて並べる(iOS と同じ・#3215) | 描ける | #1741 |
 | hstack | 描ける | rendered | 子を同じ幅で横に並べる | 描ける | #1741 |
 | section | 描ける | rendered | 見出しと子 | 描ける | #1741 |
 | vstack | 描ける | rendered | 子を縦に並べる | 描ける | #1741 |
@@ -102,13 +102,13 @@ DSL の全部の type(Container 7・Leaf 70 = 77。`docs/dsl/dsl.schema.json` �
 | timeline | 描ける | rendered | | 描ける | #1744 |
 | timerDisplay | 描ける | rendered | 走っている残り / 経過はトレイにも出す | 描ける | #1745・#1761 |
 | toggle | 描ける | rendered | | 描ける | #1743 |
-| transcribeField | 代わり | rendered | 話して入れない。キーボードで入れる | 描ける | #1743・#1751 |
+| transcribeField | 代わり | rendered | 既定はキーボードで入れる。音声入力が有効(`TAILORIT_VOICE=1`)で文字にできる PC なら、欄の下のボタンで話して後ろに足す(端末の中の whisper.cpp) | 描ける | #1743・#1751 |
 | videoField | 代わり | rendered | 撮影はしない。ファイルを選ぶ・落とす | 描ける | #1743・#1764 |
 | videoPlayer | 未定 | unavailable | 動画の再生を入れていない。候補: VLCJ(VLC が要る)・JavaFX Media。推奨・未確定: 埋め込まず「既定のアプリで再生」の枠(#2175) | 描ける | #1746・#2175 |
 | voiceInput | 使えません | unavailable | 音声入力(音声認識)をまだつないでいない。端末の中の文字起こし(whisper.cpp)で描く予定 | 描ける | #1751・#2172 |
 | webView | 未定 | unavailable | Web の埋め込みを入れていない。候補: JCEF(KCEF・Chromium 同梱で +100MB 前後)。推奨・未確定: 埋め込まず「ブラウザで開く」の枠(#2176) | 描ける | #1746・#2176 |
 
-数(Container と Leaf の合計 77): 描ける 47・代わり 12・使えません 12・未定 6。
+数(Container と Leaf の合計 77): 描ける 49・代わり 10・使えません 12・未定 6。
 
 ## アクション(16)
 
@@ -135,6 +135,6 @@ DSL の全部の type(Container 7・Leaf 70 = 77。`docs/dsl/dsl.schema.json` �
 
 ## 直す時
 
-- `DesktopLeaves` か `ConformanceAllowlist.unavailableTypes` を変えたら、この表の状態と適合 state も同じコミットで直す。
+- `DesktopLeaves` か `ConformanceAllowlist.unavailableTypes` を変えたら、この表の状態と適合 state も同じコミットで直す(食い違いは `SupportMatrixDocTest` が落とす)。
 - 「未定」の行は #1746 でオーナーが決めたら、決まった形と子の Issue に書き換える。
 - AI に描けない部品を作らせない申告(#2161)は、この表の「使えません」「未定」を元にする。

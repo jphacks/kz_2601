@@ -1,0 +1,7 @@
+[
+  {"httpRequest":{"status":200,"latency":"12.04s"}},
+  {"httpRequest":{"status":200,"latency":"20.5s"}},
+  {"httpRequest":{"status":200,"latency":"35.123s"}},
+  {"httpRequest":{"status":503,"latency":"60s"}},
+  {"httpRequest":{"status":400}}
+]

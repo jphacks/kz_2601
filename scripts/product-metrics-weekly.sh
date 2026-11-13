@@ -28,6 +28,12 @@ while [ $# -gt 0 ]; do
   esac
 done
 case "$DAYS" in ''|*[!0-9]*) echo "--days must be a number" >&2; exit 2 ;; esac
+# ログの保存は既定 30 日・延ばす推奨でも 90 日(docs/metrics/product-metrics.md 8 章 #3)。それより長い窓は読めないので止める
+MAX_DAYS=90
+if [ "$((10#$DAYS))" -lt 1 ] || [ "$((10#$DAYS))" -gt "$MAX_DAYS" ]; then
+  echo "--days must be 1..$MAX_DAYS" >&2
+  exit 2
+fi
 
 run() { (cd "$ROOT/backend" && go run ./cmd/product-metrics -in "$1"); }
 
