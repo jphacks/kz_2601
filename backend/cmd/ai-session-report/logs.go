@@ -46,6 +46,12 @@ type logEvent struct {
 	ValidationCodes map[string]int
 	RequestID       string // requestId (every line of a request)
 	Platform        string // clientPlatform (http.request: X-Client-Platform)
+
+	// ai.usage cache tokens and est_cost_usd (HasCost: the model had a price, #2294)
+	CacheRead  int64
+	CacheWrite int64
+	CostUSD    float64
+	HasCost    bool
 }
 
 // Event names the report reads (backend/internal/ai, internal/httpx, internal/metrics).
@@ -181,6 +187,11 @@ func decodeEntry(raw json.RawMessage) (logEvent, bool) {
 		Platform:  p.str("clientPlatform"),
 	}
 	switch ev.Event {
+	case evUsage:
+		ev.CacheRead = int64(p.num("cache_read_input_tokens"))
+		ev.CacheWrite = int64(p.num("cache_creation_input_tokens"))
+		_, ev.HasCost = p["est_cost_usd"]
+		ev.CostUSD = p.num("est_cost_usd")
 	case evGenerate:
 		ev.Duration = time.Duration(p.num("duration_ms")) * time.Millisecond
 		ev.RetryReasons = parseLabels(p.str("retry_reasons"))

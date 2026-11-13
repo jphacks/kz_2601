@@ -58,16 +58,22 @@ object OsTheme {
     /** `GTK_THEME=Adwaita:dark` のような指定。 */
     fun parseGtkTheme(value: String?): Boolean? = value?.takeIf { it.isNotBlank() }?.let { it.lowercase().endsWith(":dark") || it.lowercase().endsWith("-dark") }
 
-    fun detect(os: String = System.getProperty("os.name").orEmpty().lowercase()): Boolean? = when {
+    fun detect(os: String = System.getProperty("os.name").orEmpty().lowercase()): Boolean? =
+        detect(os, run = { cmd -> run(*cmd.toTypedArray()) }, gtkTheme = { System.getenv("GTK_THEME") })
+
+    /** [detect] の本体。コマンドの実行([run]・失敗は null)と `GTK_THEME` を外から渡せる(テスト用)。 */
+    internal fun detect(os: String, run: (List<String>) -> String?, gtkTheme: () -> String?): Boolean? = when {
         os.startsWith("windows") ->
-            run("reg", "query", """HKCU\Software\Microsoft\Windows\CurrentVersion\Themes\Personalize""", "/v", "AppsUseLightTheme")?.let(::parseWindowsRegistry)
-        os.contains("mac") -> run("defaults", "read", "-g", "AppleInterfaceStyle").let { it?.trim()?.equals("Dark", ignoreCase = true) ?: false }
+            run(listOf("reg", "query", """HKCU\Software\Microsoft\Windows\CurrentVersion\Themes\Personalize""", "/v", "AppsUseLightTheme"))?.let(::parseWindowsRegistry)
+        os.contains("mac") -> run(listOf("defaults", "read", "-g", "AppleInterfaceStyle")).let { it?.trim()?.equals("Dark", ignoreCase = true) ?: false }
         else -> run(
-            "gdbus", "call", "--session", "--dest", "org.freedesktop.portal.Desktop", "--object-path", "/org/freedesktop/portal/desktop",
-            "--method", "org.freedesktop.portal.Settings.Read", "org.freedesktop.appearance", "color-scheme",
+            listOf(
+                "gdbus", "call", "--session", "--dest", "org.freedesktop.portal.Desktop", "--object-path", "/org/freedesktop/portal/desktop",
+                "--method", "org.freedesktop.portal.Settings.Read", "org.freedesktop.appearance", "color-scheme",
+            ),
         )?.let(::parsePortal)
-            ?: run("gsettings", "get", "org.gnome.desktop.interface", "color-scheme")?.let(::parseGsettings)
-            ?: parseGtkTheme(System.getenv("GTK_THEME"))
+            ?: run(listOf("gsettings", "get", "org.gnome.desktop.interface", "color-scheme"))?.let(::parseGsettings)
+            ?: parseGtkTheme(gtkTheme())
     }
 
     /** 明暗を決める。固定があればそれ、無ければ OS、OS が読めなければ Compose の判定。 */
