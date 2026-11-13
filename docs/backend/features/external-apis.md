@@ -15,6 +15,7 @@
 9. [偽の provider(stg と試験)](#偽の-providerstg-と試験)
 10. [作れないもの・代わりの道](#作れないもの代わりの道)
 11. [人の作業](#人の作業)
+12. [設計メモ: 乗換の検索の出どころの比較(#2314)](#設計メモ-乗換の検索の出どころの比較2314)
 
 ## できていること・まだのこと
 
@@ -460,3 +461,41 @@ DSL に `externalCall` / `externalList` があるかの確かめは、DSL の子
 - GTFS リアルタイム(#1692): 上の「GTFS リアルタイムのフィードと規約」の都営バスの URL とライセンスを一度確かめる(このコードは実際のフィードを読んでいない)。TripUpdate を出すフィード(金沢・北陸の事業者を含む)を探し、ライセンスが CC BY なら許可リストに足す。足すまで `nextBuses` は使えない。
 - ODPT(#1691): [公共交通オープンデータセンターの開発者サイト](https://developer.odpt.org/)で開発者登録(運営のアカウント・審査に数日かかることがある)をし、発行された consumer key を Secret Manager の `EXT_ODPT_API_KEY` に入れる。上の「ODPT の事業者と規約」を読み直し、アプリの問い合わせ先(開発者のメールアドレスなど)を決める。路線 id は登録後に `odpt:Railway` で一度確かめる。
 - ポッドキャスト(#1703): 上の「iTunes Search API の規約」を読み直し、「ストアの中身を広めるためだけ」の使い道に当たるか(番組を探して Apple Podcasts を開く使い方)を決める。`EXT_GLOBAL_DAILY_PODCASTS` を 1 分 20 回の目安に合わせて入れる。バッジ(Listen on Apple Podcasts)の出し方を iOS と決める。アートワークを端末に出すなら `ExtRow` に画像の欄を足すか(API の契約の変更)を決める。
+
+## 設計メモ: 乗換の検索の出どころの比較(#2314)
+
+#1693(乗換の検索を生成アプリで使う)で、どれを使うかを決める前の下書き。**決めるのは #1693**。入れる・入れないの決定は [decisions/external-apis.md](../../decisions/external-apis.md) のまま。金額は書かない(料金は各社の公式ページで確認)。確かめた日: 2026-11-13。確かめきれなかったことは **未確認** と書いた。
+
+### 比べる表
+
+「有料 / 無料の枠あり」は、公式の案内にその語があったかだけを書いた。
+
+| 候補 | 鍵 | 回数 | 規約の要点 | 返る項目 | runner の今の仕組みに合うか |
+|---|---|---|---|---|---|
+| 駅すぱあと API(旧「駅すぱあと Webサービス」・ヴァル研究所) | 法人向けの API。発行の手順は **未確認** | **未確認**(プランごとに違う見込み) | API の規約は **未確認**。同じ会社の「駅すぱあと for web」の規約は、本文にある許諾の範囲を超えた複製・抽出・二次利用を禁じる(API の規約ではない) | 経路検索の結果(経路・時刻・運賃など)。項目の一覧は **未確認** | 運営の鍵を 1 つ持つ形なら合う(ODPT と同じ作り)。生成アプリの利用者ごとの表示・保存が規約に収まるかが未確認 |
+| NAVITIME API(ナビタイムジャパン) | 提供の入口は Rakuten RapidAPI など。直接契約の流れは **未確認** | **未確認**。期間限定の無料お試しの案内あり(期間・条件は公式ページで確認) | API の規約は公式サイトに見当たらず **未確認**(RapidAPI のページ経由で確認する見込み) | RapidAPI の「NAVITIME Route(totalnavi)」は公共交通と徒歩のドアツードアの経路と運賃(`/route_transit`・`/shape_transit`・`/fare_table`・`/fare_comparison`) | RapidAPI の鍵(運営の鍵 1 つ)なら合う。再配布・保存の規約が未確認 |
+| ODPT の時刻表から自分で作る(公共交通オープンデータセンター) | 開発者登録でトークンをもらう(運営の鍵。ODPT の `trainStatus` で既に使っている) | 公式の上限は **未確認** | データごとにライセンスが違う(CC BY 4.0・基本ライセンスなど)。出典の表示と「事業者に直接問い合わせない」旨の通知が要る(上の「ODPT の事業者と規約」) | 事業者・路線・駅・時刻表・運行情報など。**経路検索(乗換の案内)そのものは返らない**。乗換は自分で作る必要がある | 取る部分は合う。経路の計算は runner の外の大きな作り込み。対象の事業者が公開している範囲に限られる |
+| Google の Directions API | Google Cloud の API キー | 公式の割り当てあり(量は Cloud Console で確認) | Google Maps Platform の規約に従う(表示・保存の決まりは **未確認**) | `transit` モードで経路(routes)・区間(legs)・手順(steps)。JSON / XML | キーを 1 つ持つ形なら合う。**Directions API は Legacy で、2026 年 10 月以降は新しいプロジェクトでは有効にできない**(既存のプロジェクトは使える)。Routes API への移行が案内されている。日本の `transit` の対応範囲は **未確認** |
+
+### 気づいたこと
+
+- 4 つとも「画面を読み取る(スクレイピング)・利用者のログイン情報を預かる」形にはならない。鍵は運営が持つ形(利用者の鍵を預かる土台は要らない)。
+- 駅すぱあと・NAVITIME は API の規約を公式のページで確かめられなかった。**表示・保存・再配布・課金**の項目が、生成アプリ(利用者が作ったアプリの中で結果を出す)に合うかは、規約を読むまで言えない。
+- Directions API は新しいプロジェクトでは使えなくなる。使うなら Routes API の `transit` を別に調べる必要がある(**未確認**)。
+- ODPT は既に provider(`odpt`・`trainStatus`)があり、鍵と規約の手当てがある。ただし乗換の経路は返らない。
+
+### 推奨(未確定)
+
+- 規約の確認ができるまでは、どれも「作る」と決めない。
+- 規約の確認が先: 駅すぱあと API と NAVITIME API の規約を、公式のページか窓口で読む(人の作業)。
+- 代わりの道の候補: 乗換のアプリの画面を `openUrlButton` で開く(出発・到着を渡せるかは **未確認**)・地図のアプリを開く。決めるのは #1693。
+
+### 出典(確かめた日: 2026-11-13)
+
+- [駅すぱあと API](https://api-info.ekispert.jp/)(この環境では開けず、中身は **未確認**)
+- [ヴァル研究所の「駅すぱあと API」への改称の記事(2024-02-26・BCN)](https://www.bcnretail.com/topics_detail9/20240226_404198.html)
+- [駅すぱあと for web 利用規約(API の規約ではない)](https://roote.ekispert.net/help/terms)
+- [NAVITIME API](https://api-sdk.navitime.co.jp/information/)
+- [NAVITIME Route(totalnavi)・Rakuten RapidAPI](https://rapidapi.com/navitimejapan-navitimejapan/api/navitime-route-totalnavi)
+- [公共交通オープンデータセンター 開発者サイト](https://developer.odpt.org/)
+- [Directions API (Legacy) の概要・Google](https://developers.google.com/maps/documentation/directions/overview)
