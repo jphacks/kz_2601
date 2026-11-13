@@ -1,4 +1,5 @@
 import SwiftUI
+import MetamonRenderer
 
 /// 共有シートの拡張(MetamonShare)が App Group に置いた物を読む側(#2224)。
 /// 拡張が `tailorit://share-inbox` で本体を開き、ここが受け取った一覧を出す。
@@ -69,13 +70,11 @@ struct ShareInboxSheet: View {
             .navigationTitle(L10n.tr("受け取りました"))
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
-                ToolbarItem(placement: .cancellationAction) {
-                    Button(L10n.tr("閉じる")) { dismiss() }
-                }
                 ToolbarItem(placement: .primaryAction) {
                     Button(L10n.tr("全部消す"), role: .destructive) { ui.removeAll() }
                         .disabled(ui.items.isEmpty)
                 }
+                SheetCloseToolbarItem(identifier: "shareInbox.close") { dismiss() }
             }
         }
         .accessibilityIdentifier("shareInbox.sheet")
