@@ -35,6 +35,7 @@ import androidx.compose.ui.input.key.onKeyEvent
 import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.input.key.type
 import jp.kz2601.metamon.desktop.i18n.Strings
+import jp.kz2601.metamon.desktop.usage.UsageNotice
 import jp.kz2601.metamon.dsl.Action
 import jp.kz2601.metamon.dsl.ActionType
 import jp.kz2601.metamon.dsl.AppDSL
@@ -262,6 +263,9 @@ class DesktopKeyboard(
     /** 「この端末のデータを消す」(#1887)。全アプリの分を消す口(AppHub.wipeLocalData)。null ならパレットに出さない。 */
     var wipeLocalData: (suspend () -> Unit)? = null
 
+    /** パレットの一覧の上の「作れるアプリの数」(#3353)。アプリを一覧に出す時([openApp] がある時)だけ使う。 */
+    var appsNotice: (suspend () -> UsageNotice?)? = null
+
     /** 消す前の確認を出している。 */
     var wipeConfirmOpen by mutableStateOf(false)
 
@@ -427,7 +431,7 @@ class DesktopKeyboard(
         }
         if (photos.isOpen) PhotoPreviewDialog(photos, onMessage = { session.message = it }, onDismiss = ::closePreview)
         if (paletteOpen) {
-            CommandPalette(remember(session.nav, session.store) { commands() }, os) {
+            CommandPalette(remember(session.nav, session.store) { commands() }, os, appsNotice.takeIf { openApp != null }) {
                 paletteOpen = false
                 runCatching { root.requestFocus() }
             }
@@ -470,10 +474,12 @@ fun rememberDesktopKeyboard(
     openApp: ((String) -> Unit)?,
     openRecord: ((String, String) -> Unit)? = null,
     wipeLocalData: (suspend () -> Unit)? = null,
+    appsNotice: (suspend () -> UsageNotice?)? = null,
 ): DesktopKeyboard = remember(dsl, session) { DesktopKeyboard(dsl, session) }.also {
     it.dispatch = dispatch
     it.print = print
     it.openApp = openApp
     it.openRecord = openRecord
     it.wipeLocalData = wipeLocalData
+    it.appsNotice = appsNotice
 }

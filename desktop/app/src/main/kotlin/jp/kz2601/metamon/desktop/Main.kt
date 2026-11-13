@@ -211,6 +211,7 @@ private fun ApplicationScope.DesktopWindow(w: WindowEntry, registry: WindowRegis
                         onWipeLocalData = hub::wipeLocalData,
                         // 記録の詳細のウィンドウには出さない(アプリのウィンドウだけ)
                         usageNotice = usage?.takeIf { w.key.recordId == null }?.let { u -> suspend { u.nextForApp(app.id) } },
+                        appsNotice = usage?.let { u -> suspend { u.nextForApps() } },
                     )
                 }
             }

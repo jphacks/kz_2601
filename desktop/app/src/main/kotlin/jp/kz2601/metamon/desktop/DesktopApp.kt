@@ -109,6 +109,8 @@ fun DesktopApp(
     onWipeLocalData: (suspend () -> Unit)? = null,
     /** ウィンドウの上に出す「上限に近い」お知らせを選ぶ口(#3352)。null・選ばれなければ出さない。 */
     usageNotice: (suspend () -> UsageNotice?)? = null,
+    /** パレットのアプリの一覧の上に出す「作れるアプリの数」を選ぶ口(#3353)。 */
+    appsNotice: (suspend () -> UsageNotice?)? = null,
 ) {
     val session = remember {
         DesktopSession(dsl, initialStore, startScreen = startScreen, host = DesktopActionHost(), persistence = persistence, shared = records, startRecordId = startRecordId)
@@ -133,7 +135,7 @@ fun DesktopApp(
     var printing by remember { mutableStateOf<PrintDocument?>(null) }
     val openPrint = { printing = ScreenPrint.document(dsl, session.top.screen, session.store, session.form(session.top), locale = Strings.locale) }
     // キーボードだけで使う(#1765): Ctrl+K パレット・Ctrl+N/S/F・Delete・Esc・F1
-    val keyboard = rememberDesktopKeyboard(dsl, session, dispatch, openPrint, onOpenApp, onOpenRecord, onWipeLocalData)
+    val keyboard = rememberDesktopKeyboard(dsl, session, dispatch, openPrint, onOpenApp, onOpenRecord, onWipeLocalData, appsNotice)
 
     // Ctrl+F はこのウィンドウの検索欄にだけ入る
     // 写真のプレビュー(PhotoPreview.kt): 写真の部品を押すとこのウィンドウのダイアログで開く。開いている間は貼り付け・印刷を取らない

@@ -39,6 +39,8 @@ import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.input.key.type
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import jp.kz2601.metamon.desktop.usage.UsageNotice
+import jp.kz2601.metamon.desktop.usage.UsageNoticeSlot
 import java.io.File
 import java.net.JarURLConnection
 import java.text.Normalizer
@@ -141,7 +143,13 @@ object BundledApps {
 
 /** Ctrl+K のパレット。↑↓ で選び Enter で実行、Esc で閉じる。 */
 @Composable
-fun CommandPalette(commands: List<PaletteCommand>, os: HostOs, onDismiss: () -> Unit) {
+fun CommandPalette(
+    commands: List<PaletteCommand>,
+    os: HostOs,
+    /** 一覧の上に出す「作れるアプリの数」のお知らせを選ぶ口(#3353)。null・選ばれなければ出さない。 */
+    appsNotice: (suspend () -> UsageNotice?)? = null,
+    onDismiss: () -> Unit,
+) {
     var query by remember { mutableStateOf("") }
     var selected by remember { mutableIntStateOf(0) }
     val shown = remember(commands, query) { CommandRanking.rank(commands, query) }
@@ -181,6 +189,7 @@ fun CommandPalette(commands: List<PaletteCommand>, os: HostOs, onDismiss: () -> 
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth().focusRequester(input),
                 )
+                UsageNoticeSlot(Unit, appsNotice)
                 if (shown.isEmpty()) {
                     Text(KeyboardText.PALETTE_EMPTY, color = Color.Gray, modifier = Modifier.padding(8.dp))
                 }

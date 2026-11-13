@@ -111,9 +111,11 @@ class UsageNotices(
     suspend fun nextForApp(appId: String): UsageNotice? =
         pick(UsageNoticeRules.appNotices(read { it.appUsage(appId) }))
 
-    /** アプリの一覧の上に出す「作れるアプリの数」。 */
-    suspend fun nextForApps(): UsageNotice? =
-        pick(listOfNotNull(UsageNoticeRules.appsNotice(read { it.myUsage() })))
+    /** アプリの一覧の上に出す「作れるアプリの数」。今日もう出していれば読みに行かない(パレットを開くたびに通信しない)。 */
+    suspend fun nextForApps(): UsageNotice? {
+        if (!log.shouldShow(UsageNotice(UsageResource.APPS, UsageMeter()), uid(), now())) return null
+        return pick(listOfNotNull(UsageNoticeRules.appsNotice(read { it.myUsage() })))
+    }
 
     fun pick(candidates: List<UsageNotice>): UsageNotice? {
         val at = now()
