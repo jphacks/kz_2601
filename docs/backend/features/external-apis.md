@@ -45,7 +45,7 @@
 | 呼び出しの流れ・数え方・理由(`Reason*`) | `service.go` |
 | 回数の上限・1 分止め | `limits.go`(数えるのは `ratelimit.Store`。runner では Firestore の `rateLimits`) |
 | 月の枠 `runs` を 1 足す | `backend/internal/runner/quota/external.go`(`ExtRun`) |
-| コインの op `ext`・履歴 `spend_ext` | `backend/internal/coins`(`OpExt`・`KindSpendExt`) |
+| コインの op `ext`・履歴 `spend_ext`(`provider` = registry の id・#2145) | `backend/internal/coins`(`OpExt`・`KindSpendExt`・`ReserveRequest.Provider`) |
 | トークンの保管・取り消し・90 日 | `connections.go`(`Connections`・`Sealer`・`LocalSealer`)・`kms.go`(`KMSSealer`)・`firestore.go` |
 | OAuth の state / PKCE | `oauth.go` |
 | 出口 | `egress.go` |
@@ -68,6 +68,8 @@ provider は `Provider` で定義し、そのファイルの `init()` で `regis
 機能のキーは `externalCall.<provider>`(`FeatureKey`)。provider は既定で off(`EXT_<PROVIDER>_ENABLED`)、`EXT_DISABLED=1` で全部止まる。
 
 op の `Check` は引数の値を確かめる(appconfig と runner の両方で、数える前に。だめなら 400)。`CacheTTL` は同じ引数の答えを持つ時間(下の「キャッシュ」)。
+
+provider ごとの規約の条項の場所(課金・出典・保存・人が確かめる欄)は [external-api-terms.md](external-api-terms.md)(#2313)。
 
 ### 入っている provider
 
@@ -292,7 +294,7 @@ GTFS-JP の zip から `stops.txt`(停留所の名前)・`routes.txt`(系統の�
 | 4. トークン | OAuth の provider は**押した人**(自動の動きは**作成者**)のトークンを読む。期限切れは更新 | 409 `ext_not_connected`。`runs` を戻す |
 | 5. 押さえる | 有料の provider だけ。押した人(自動の動きは作成者)のコインを `COIN_RESERVE_EXT_<PROVIDER>` だけ押さえる(op `ext`) | 402 `coins_insufficient`。同じ request id の押さえがもうある時は呼ばずに 409 `duplicate_request`。どちらも `runs` を戻す |
 | 6. 呼ぶ | `EXT_TIMEOUT`(既定 8 秒) | 時間切れ・5xx は押さえを全部戻し、`runs` も戻す。provider がトークンを拒んだら接続を `error` にして 409 |
-| 7. 確定 | 原価(op が測った値、無ければ `EXT_COST_USD_<PROVIDER>_<OP>`)× `COIN_PER_USD` を押さえの量まで引き、残りを戻す。どちらも無い時は押さえた量を引く(`coins.unpriced_model`)。履歴は `spend_ext`(`usd` つき) | 費用のかかった 4xx(`ProviderError.Billable`)だけは戻さず確定する |
+| 7. 確定 | 原価(op が測った値、無ければ `EXT_COST_USD_<PROVIDER>_<OP>`)× `COIN_PER_USD` を押さえの量まで引き、残りを戻す。どちらも無い時は押さえた量を引く(`coins.unpriced_model`)。履歴は `spend_ext`(`usd` と `provider` つき。`provider` は #2145 より前の行には無い) | 費用のかかった 4xx(`ProviderError.Billable`)だけは戻さず確定する |
 
 - `COIN_BILLING_MODE=off` は枠もコインも数えない(Pro の確認だけ)。`log` は数えるが止めず、コインは `coins.would_spend` を出すだけ。
 - ログは 1 回 1 行 `ext.call`(provider・op・結果・ms・`runs` か `coins` か `cache` か・引いたコイン・app id・uid のハッシュ)。引数・答え・トークンは出さない。上限で止めた時は `limit`(scope)・`limit_max`・`limit_count`・`retry_after_sec`、provider の 429 で止めた時は `paused: provider_paused` も出す(コードと数だけ)。
@@ -317,6 +319,7 @@ GTFS-JP の zip から `stops.txt`(停留所の名前)・`routes.txt`(系統の�
 - 数えるのは provider を呼んだ時だけ。キャッシュから返した時は数えない。トークンが無い・コインが足りない・同じ request id・枠で止まった時(provider を呼ばなかった)は戻す。provider が失敗した時(5xx・時間切れ・429)は呼んだので戻さない。
 - op が provider を呼ぶ前に引数を拒んだ時(`ErrBadArgs`)は戻す。provider を呼んだ後の 400 `bad_request`(無い id・無いチャンネル・無い列など)は呼んだので戻さない。
 - 文書は `rateLimits/{APP_ENV}_{日 or 日T時}_ext_{provider}_{uid_… / app_… / global}`(TTL `expireAt`)。全体の数えは `ratelimit.GlobalShards` に分ける。Firestore が落ちた時は台のメモリで数える(開けっぱなしにしない)。
+- 今月の回数(#2144): 上の枠を通った呼び出しは、`rateLimits/{APP_ENV}_{年-月}_ext_{provider}_uid_{uid}`(scope `user_monthly`・止めない・TTL は月末の 1 日後)にも 1 足す。枠と同じ 1 回の取引の最後の数えとして足す(Limit は MaxInt32・枠と一緒に足すか足さないか・戻す時は一緒に戻す・保存先が落ちた時は枠と一緒にメモリで数える)。取引が同じなので、そろって書く文書の TTL も月末の 1 日後になる。`GET /v1/me/connections` は各つなぎの `monthCalls` として、つなぎの数だけの文書を 1 回のまとめ読みで返す(書かない)。読めない時は `monthCalls` を省き、一覧は返す。上限の値は返さない(#1882)。
 - runner の答えは `{"reason": "rate_limited", "scope": "<scope>", "retryAfterSec": <秒>}`(429)。appconfig は 429 `rate_limited`・`Retry-After`・`details`(`scope`・`provider`・`retryAfterSec`)にする。
 - 偽の provider は `fail=429` で 1 分止めを試せる。
 - appconfig の `EXT_USER_PER_HOUR`(provider をまたいだ 1 人 1 時間)はそのまま残る。
@@ -329,7 +332,7 @@ GTFS-JP の zip から `stops.txt`(停留所の名前)・`routes.txt`(系統の�
 | state / PKCE | `oauthStates/{state}`: uid・provider・`code_verifier`・scope・`expireAt`(10 分)・`createdAt`。1 回だけ使える(取り出しと削除を 1 つのトランザクションで) |
 
 - **暗号化**: `Sealer` が暗号化する。本番は Cloud KMS の対称鍵(`KMSSealer`・`EXT_TOKEN_KMS_KEY`)で、鍵の encrypt / decrypt は runner の SA だけに渡す。uid と provider を追加の認証データにするので、別の人・別の provider の文書に写しても開けない。エミュレータでは起動ごとの使い捨ての鍵(`LocalSealer`)。鍵が無い時は OAuth の provider が動かない(暗号化しないで保存する道は無い)。
-- **クライアントから見えない**: Firestore のルールで許していない(サーバーだけ)。`GET /v1/me/connections` には provider・状態・scope・日付だけを返す(`ConnectionView`)。トークンの型(`Token`・`Secrets`)はログ・`%v`・JSON に出すと `[redacted]` になる。
+- **クライアントから見えない**: Firestore のルールで許していない(サーバーだけ)。`GET /v1/me/connections` には provider・状態・scope・日付・今月の回数だけを返す(`ConnectionView`)。トークンの型(`Token`・`Secrets`)はログ・`%v`・JSON に出すと `[redacted]` になる。
 - **切る(取り消し)**: provider の取り消しの口を呼び(無い provider は呼ばない)、**すぐ**トークンを消して `revoked` の印だけ残す(決定 7)。印はその時の文書に 1 つのトランザクションで書く。印は 90 日で消える。切る時はトークンの更新と同じ鍵(uid + provider・台ごと)を取り、更新の途中なら終わるのを待って更新後のトークンを取り消す。取り消しの前の更新で provider がリフレッシュトークンを拒んだ時(`ErrInvalidGrant`)は保存を 1 回読み直し、別の台が入れ替えていれば新しい方を取り消す。同じなら取り消し済みとする。
 - **切った後に戻った同意**: callback は、state を作った時刻(`createdAt`)より後の `revokedAt` がある時は保存しない(`ErrCutSinceStart`・受け取ったトークンは provider 側でも取り消す)。切った後に始めた接続はふつうに保存する。
 - **Google は 1 つの許可**: カレンダー・ToDo・スプレッドシートは同じ OAuth クライアント(`Provider.ClientFrom`)で `include_granted_scopes=true` なので、Google 側では 1 つの許可にまとまる。どれか 1 つのトークンを取り消すと全部が切れる。だから 1 つを切る時は、同じクライアントのほかの provider がまだつながっていれば Google の取り消しの口を呼ばない(トークンはすぐ消す)。最後の 1 つを切る時に取り消す。引き換え: ほかがつながっている間は、切った provider の scope も Google のアカウントの「接続したアプリ」に残る(こちらはトークンを持たない)。`EXT_GOOGLE_TASKS_CLIENT_ID` などで別のクライアントにした時も、同じグループとして扱う(取り消しが最後まで遅れるだけ)。接続の一覧が読めない時も取り消さない(ほかを壊さない方を取る)。

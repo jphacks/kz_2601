@@ -106,6 +106,9 @@ var Default = Table{
 //	PLAN_FREE_PHOTOS_PER_APP / PLAN_PRO_PHOTOS_PER_APP   (500 / 5000)
 //	PLAN_LIMITS_MODE                                     enforce | log | off
 //	RATE_LIMIT_USER_DAILY / RATE_LIMIT_PRO_DAILY         AIUnitsDaily (ratelimit)
+//
+// AIUnitsDaily is the base value; the per-OS overrides
+// RATE_LIMIT_*_DAILY_<OS> (#2133) apply per request (ratelimit.Config.PlatformDailyLimit).
 func FromEnv(getenv func(string) string) (Table, error) {
 	t := Default
 	rl, err := ratelimit.ConfigFromEnv(getenv)

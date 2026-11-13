@@ -21,6 +21,7 @@ import androidx.compose.ui.window.Tray
 import androidx.compose.ui.window.isTraySupported
 import androidx.compose.ui.window.rememberTrayState
 import jp.kz2601.metamon.desktop.i18n.Strings
+import jp.kz2601.metamon.desktop.notify.TrayNotifier
 import jp.kz2601.metamon.dsl.Action
 import jp.kz2601.metamon.dsl.ActionType
 import jp.kz2601.metamon.dsl.AppDSL
@@ -365,14 +366,14 @@ class TrayController(
 
 val LocalTray = compositionLocalOf<TrayController?> { null }
 
-/** トレイのアイコンとメニュー。トレイが無い OS では何も出さない。通知([Notifier.Tray])もこのアイコンから出す。 */
+/** トレイのアイコンとメニュー。トレイが無い OS では何も出さない。通知([TrayNotifier])もこのアイコンから出す。 */
 @Composable
 fun ApplicationScope.DesktopTray(c: TrayController) {
     if (!c.traySupported) return
     val state = rememberTrayState()
     DisposableEffect(state) {
-        Notifier.Tray.sink = { title, body -> state.sendNotification(TrayNotification(title, body, TrayNotification.Type.Info)) }
-        onDispose { Notifier.Tray.sink = null }
+        TrayNotifier.sink = { title, body -> state.sendNotification(TrayNotification(title, body, TrayNotification.Type.Info)) }
+        onDispose { TrayNotifier.sink = null }
     }
     var timers by remember { mutableStateOf(DesktopTimers.active()) }
     // 「今月」などの集計の基準日。日付が替わったら集計を計算し直す
