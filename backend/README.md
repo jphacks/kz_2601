@@ -45,7 +45,7 @@
 | `internal/appconfig` | `openapi-appconfig.yaml` のハンドラ(apps / dsl / versions / entities / records) |
 | `internal/appconfigclient` | ai が appconfig を叩く薄い HTTP クライアント(Bearer 転送) |
 
-機能(共有・メンバー・通報など)のルートは、その機能のファイルの `init()` から `registerRoutes` で足す(AI のプロンプトと同じ形)。`handler.go` の `New()` には core(apps / dsl / versions / entities / records)だけを置く。足したルートは `routes_test.go` の `wantRoutes` にも書く。
+機能(共有・メンバー・通報など)のルートは、その機能のファイルの `init()` から `registerRoutes` で足す(AI のプロンプトと同じ形)。`handler.go` の `New()` には core(apps / dsl / versions / entities / records)だけを置く。足したルートは `routes_test.go` の `wantRoutes` にも書く。各機能の設計は [機能の文書の索引](../docs/backend/features/README.md)。
 
 並行 PR の衝突を減らす書き方(#516): slog の属性は 1 行に 1 つ。purge の新しい件数は `store.AccountPurgeResult` のフィールド(コメントは行の上)と `LogAttrs` に足す。`store.Memory` の新しい状態は空行で区切った自分の機能のブロックに置く(gofmt の桁揃えがほかの行に波及しない)。
 
