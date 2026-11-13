@@ -86,6 +86,8 @@ final class MacServices: @unchecked Sendable {
 
     /// 「あなたの声で直りました」のお知らせと「直ったら知らせてほしい」の同意(#374・#364)。iOS の `LiveWiring.notices` と同じく appconfig の URL がある時だけ
     var loopNotices: (any LoopNoticesClient)? { appConfigURL.map { HTTPLoopNoticesClient(baseURL: $0, token: token) } }
+    /// リリース申請(#76・#2249)。iOS の `ReleaseRequests+Wiring` と同じく appconfig の URL がある時だけ(審査用ビルドは外す)
+    var releaseRequests: (any ReleaseRequestClient)? { appConfigURL.map { HTTPReleaseRequestClient(baseURL: $0, token: token) } }
     #endif
 
     /// アカウント削除(#972・`DELETE /v1/me`)。iOS の `Account+Wiring` と同じく appconfig の URL がある時だけ本物

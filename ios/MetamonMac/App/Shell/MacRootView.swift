@@ -74,6 +74,8 @@ struct MacRootView: View {
     @State private var shareApp: MacShareAppModel?
     /// 「みんなのアプリを探す」(#2069)のシート
     @State private var discover: MacDiscoverModel?
+    /// サイドバーの「リリースを申請…」(#2249)のシート
+    @State private var releaseRequest: MacReleaseRequestModel?
     #endif
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     /// サイドバーの新着の数(#969)
@@ -121,6 +123,8 @@ struct MacRootView: View {
                        thumbnail: thumbnail(for:), searchText: searchText, selection: guardedSelection,
                        onOpen: { focus = .canvas }, onDelete: deleteApp, onDuplicate: duplicateApp,
                        onResetExample: resetExample, onOpenInNewWindow: openAppWindow,
+                       canRequestRelease: canRequestRelease, onRequestRelease: openReleaseRequest,
+                       onDropRecord: dropRecord,
                        loadingServerApps: library.serverListState == .loading,
                        offline: library.serverListState == .offline)
                 .focused($focus, equals: .sidebar)
@@ -196,6 +200,9 @@ struct MacRootView: View {
             MacShareAppSheet(model: model, onClose: { shareApp = nil })
         }
         .modifier(MacDiscoverPresenter(model: $discover, replace: appReplaceContext, onInstalled: adoptInstalled)) // #2069
+        .sheet(item: $releaseRequest) { model in // #2249
+            MacReleaseRequestSheet(model: model, onClose: { releaseRequest = nil })
+        }
         #endif
         .sheet(item: $compose, onDismiss: noteFinishedCompose) { session in
             ComposeSheet(session: session, onClose: { compose = nil }, undo: finishedUndo(session))
@@ -242,6 +249,8 @@ struct MacRootView: View {
             shareApp?.close() // 読み込み中の参加者を書き戻さない
             shareApp = nil
             discover = nil
+            releaseRequest = nil
+            MacReleaseRequests.shared.clear() // 前のアカウントの申請の状況を残さない(#2249)
             #endif
             notices.resetAfterWipe()
             reopenLastApp()
@@ -321,6 +330,12 @@ struct MacRootView: View {
     private func refreshBadges() async {
         await badges.refreshIfDue(badgeTargets, uid: MacAccount.shared.session.user?.uid,
                                   source: MacServices.shared.appConfig as? SharedRecordStampSource)
+    }
+
+    /// サイドバーのアプリの行に記録が落とされた(#2252): 預けてそのアプリを開く。中央ができたら値の入ったフォームを開く
+    private func dropRecord(_ appId: String, _ payload: RecordClipboard.Payload) {
+        MacRecordDropInbox.shared.put(payload, appId: appId)
+        notificationSelection.wrappedValue = appId // 入力中なら確認を通す・シートの間は閉じるまで待つ
     }
 
     /// サーバーの一覧を取り直す(#1057)。サインインしていなければ取らない(サインアウトの後は wipe が空にしている)
@@ -626,6 +641,25 @@ struct MacRootView: View {
         return MacShareAppModel.canShare(isCreated: library.isCreated(app.id), isOnServer: library.isOnServer(app.id),
                                          signedIn: MacAccount.shared.session.user != nil,
                                          sharingAvailable: MacServices.shared.sharing != nil)
+        #endif
+    }
+
+    /// サイドバーの右クリックの「リリースを申請…」を出すか(#2249)
+    private func canRequestRelease(_ appId: String) -> Bool {
+        #if APP_STORE_REVIEW
+        false
+        #else
+        MacReleaseRequestModel.canRequest(isCreated: library.isCreated(appId), isOnServer: library.isOnServer(appId),
+                                          isSharedWithMe: MacAppOrigins().isShared(appId),
+                                          signedIn: MacAccount.shared.session.user != nil,
+                                          available: MacServices.shared.releaseRequests != nil)
+        #endif
+    }
+
+    private func openReleaseRequest(_ appId: String) {
+        #if !APP_STORE_REVIEW
+        guard canRequestRelease(appId), let app = apps.first(where: { $0.id == appId }) else { return }
+        releaseRequest = MacReleaseRequestModel(appId: appId, appName: app.name, client: MacServices.shared.releaseRequests)
         #endif
     }
 

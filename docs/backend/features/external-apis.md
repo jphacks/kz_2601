@@ -16,6 +16,7 @@
 10. [作れないもの・代わりの道](#作れないもの代わりの道)
 11. [人の作業](#人の作業)
 12. [設計メモ: 乗換の検索の出どころの比較(#2314)](#設計メモ-乗換の検索の出どころの比較2314)
+13. [設計メモ: 荷物の追跡の取れ方(#2316)](#設計メモ-荷物の追跡の取れ方2316)
 
 ## できていること・まだのこと
 
@@ -98,7 +99,7 @@ provider ごとの規約の条項の場所(課金・出典・保存・人が確�
 | `googleCalendar` の `listEvents` / `createEvent`(主のカレンダーを見る・予定を足す・#1494) | 無料・OAuth(PKCE・`runs` だけ・scope `calendar.events.owned.readonly` / `calendar.events.owned`。本人が持つカレンダーだけ)・`createEvent` は書く(確認必須) | `listEvents(timeMin?, timeMax?, maxResults?, q?)`・`createEvent(title, start, end?, description?, location?)`。`listEvents` は `[timeMin, timeMax)`(既定は今から 7 日・366 日まで)の予定を始まりの順に 1 ページ(`maxResults` 1〜50)。`createEvent` の `start` が日付だけなら終日、時刻で `end` が無ければ 1 時間。予定の id は request id から作るので再送で 2 つできない | `https://oauth2.googleapis.com`・`https://www.googleapis.com` だけ | なし | `EXT_GOOGLE_CALENDAR_ENABLED=1`・`EXT_GOOGLE_CALENDAR_CLIENT_ID` / `_CLIENT_SECRET` |
 | `outlookCalendar` の `listEvents` / `createEvent`(既定のカレンダーを見る・予定を足す・Microsoft Graph v1.0・#1495) | 無料・OAuth(PKCE・common テナント・`runs` だけ・scope `Calendars.Read` / `Calendars.ReadWrite`・いつも `offline_access`)・`createEvent` は書く(確認必須) | 引数と行は `googleCalendar` と同じ。Microsoft に取り消しの口が無いので、切ると保存したトークンを消す(本人は Microsoft アカウントの設定でアプリを外せる) | `https://login.microsoftonline.com`・`https://graph.microsoft.com` だけ | なし | `EXT_OUTLOOK_CALENDAR_ENABLED=1`・`EXT_OUTLOOK_CALENDAR_CLIENT_ID` / `_CLIENT_SECRET` |
 | `deepl` の `translate`(文を訳す・DeepL API Pro・#1500) | 有料(文字ごと)・運営の鍵(`runs` とコイン。`COIN_RESERVE_EXT_DEEPL` を押さえ、原価を確定して残りを戻す) | `translate(text, targetLang, sourceLang?)`。`text` は 4 KB まで。答えは 1 件(見出し・値 = 訳・補足 = 「EN → JA」)。原価は DeepL が数えた文字数(無ければ文の文字数)× `EXT_COST_USD_DEEPL_PER_CHAR`。無ければ `EXT_COST_USD_DEEPL_TRANSLATE` か押さえた量。規約: Pro だけ(文を残さず学習に使わない)。無料の鍵(`:fx`)だと provider は off のまま。文はキャッシュもログもしない | `https://api.deepl.com` だけ(鍵は `Authorization` ヘッダー) | なし | `EXT_DEEPL_ENABLED=1`・`EXT_DEEPL_API_KEY`・`COIN_RESERVE_EXT_DEEPL` |
-| `googlePlaces` の `searchText` / `searchNearby`(場所を探す・Google Places API (New)・#1501) | 有料(1 回ごと)・運営の鍵(`runs` とコイン・`EXT_COST_USD_GOOGLE_PLACES_SEARCH_TEXT` / `_SEARCH_NEARBY`) | `searchText(q, lat?, lng?, radius?, limit?)`・`searchNearby(type?, lat, lng, radius?, limit?)`。行は場所(見出し = 名前・補足 = 短い住所・値 = place id・リンク = Google マップ)。field mask はこの 4 つだけ(名前のある一番安い SKU)。`radius` は m で 1〜50000(既定は点つきの文字検索 5000・近く 1000)・`limit` 1〜20(既定 10)・`lat` / `lng` は小数 4 桁に丸める。規約: 残してよいのは place id だけなのでキャッシュしない。出典「Google Maps」を出す | `https://places.googleapis.com` だけ(鍵は `X-Goog-Api-Key` ヘッダー) | なし | `EXT_GOOGLE_PLACES_ENABLED=1`・`EXT_GOOGLE_PLACES_API_KEY`・`COIN_RESERVE_EXT_GOOGLE_PLACES` |
+| `googlePlaces` の `searchText` / `searchNearby` / `details`(場所を探す・Google Places API (New)・#1501。`details` は #2140 の試作で既定 off) | 有料(1 回ごと)・運営の鍵(`runs` とコイン・`EXT_COST_USD_GOOGLE_PLACES_SEARCH_TEXT` / `_SEARCH_NEARBY`) | `searchText(q, lat?, lng?, radius?, limit?)`・`searchNearby(type?, lat, lng, radius?, limit?)`。行は場所(見出し = 名前・補足 = 短い住所・値 = place id・リンク = Google マップ)。field mask はこの 4 つだけ(名前のある一番安い SKU)。`radius` は m で 1〜50000(既定は点つきの文字検索 5000・近く 1000)・`limit` 1〜20(既定 10)・`lat` / `lng` は小数 4 桁に丸める。規約: 残してよいのは place id だけなのでキャッシュしない。出典「Google Maps」を出す。`details(placeId, lang?)`(#2140)は `EXT_GOOGLE_PLACES_DETAILS=1` の時だけ使える(無い時は `ext_unavailable`): `GET /v1/places/{placeId}` で、項目 = 場所(見出し = 名前・補足 = 今開いているか・評価と件数・値 = place id・リンク = Google マップ)、行 = 曜日ごとの営業時間。`lang` は `ja`(既定)か `en`。field mask に営業時間と評価が入るので検索より上の SKU。検索の 2 つの field mask は変えない | `https://places.googleapis.com` だけ(鍵は `X-Goog-Api-Key` ヘッダー) | なし | `EXT_GOOGLE_PLACES_ENABLED=1`・`EXT_GOOGLE_PLACES_API_KEY`・`COIN_RESERVE_EXT_GOOGLE_PLACES`・`EXT_GOOGLE_PLACES_DETAILS=1`(`details`)・`EXT_COST_USD_GOOGLE_PLACES_DETAILS` |
 | `todoist` の `listTasks`(タスクを見る・#1496・`project` / `label` は #1681) | 無料・OAuth(`runs` だけ・scope `data:read`) | `listTasks(filter?, projectId?, project?, label?, limit?)`。`filter`・`projectId`・`project`(プロジェクトの名前)はどれか 1 つ。`label` はどれとも組める(`project` か `filter` と組むと Todoist のフィルタ `#名前 & @ラベル`、ほかは `label` の引数)。名前は 120 文字まで・1 行・`& \| ! ( ) , \ * # @` は使えない。カンマを含む `filter` に `label` は付けられない。`limit` 1〜50(既定 20)。行はタスク(見出し = 内容・補足 = 期限の言葉・値 = 期限・リンク) | `https://api.todoist.com` だけ | なし | `EXT_TODOIST_ENABLED=1`・`EXT_TODOIST_CLIENT_ID` / `_CLIENT_SECRET` |
 | `todoist` の `projects`(プロジェクトの一覧・#1681) | 無料・OAuth(`runs` だけ・scope `data:read`) | `projects(limit?)`。`limit` 1〜50(既定 20)。行はプロジェクト(見出し = 名前。`listTasks` の `project` に渡せる・リンク) | 同上 | なし | 同上 |
 | `todoist` の `addTask`(タスクを足す・#1496) | 無料・OAuth(`runs` だけ・scope `task:add`)・書く(確認必須) | `addTask(content, description?, dueString?, dueDate?, priority?, projectId?)`。答えは `resultId` と 1 件 | 同上 | なし | 同上 |
@@ -505,3 +506,30 @@ DSL に `externalCall` / `externalList` があるかの確かめは、DSL の子
 - [NAVITIME Route(totalnavi)・Rakuten RapidAPI](https://rapidapi.com/navitimejapan-navitimejapan/api/navitime-route-totalnavi)
 - [公共交通オープンデータセンター 開発者サイト](https://developer.odpt.org/)
 - [Directions API (Legacy) の概要・Google](https://developers.google.com/maps/documentation/directions/overview)
+## 設計メモ: 荷物の追跡の取れ方(#2316)
+#1708(荷物の追跡を生成アプリに出す)で、入れるか・どの方法かを決める前の下書き。**決めるのは #1708**。金額は書かない(料金は各社の公式ページで確認)。確かめた日: 2026-11-13。確かめきれなかったことは **未確認** と書いた。上の「作れないもの・代わりの道」の共通の決まり(スクレイピング・ログイン情報を預かる形では作らない)をそのまま使う。
+### 3 社の比べる表
+| 会社 | 追跡の公開 API | 取り方 | 規約の要点(機械で読む扱い) | runner の今の仕組みに合うか |
+|---|---|---|---|---|
+| ヤマト運輸 | 追跡の公開 API は確認できなかった(**未確認**)。公開が確認できたのは、送り状を発行する「B2クラウドAPI」(2024-06 公開・法人向け)と、開発者向けページ「YBM For Developers」の受け取り場所などの API(2018 年の記事)で、どちらも追跡ではない | 法人向けの契約・申込が要る見込み(条件は **未確認**) | 追跡のページに、プログラムによるアクセスの扱いは書かれていなかった。規約(ヤマトビジネスメンバーズ・YBM For Developers)は **未確認** | 追跡の API が無い・契約が要る間は合わない。**画面を読み取る形では作らない** |
+| 佐川急便 | 法人向けの「お荷物問い合わせAPI」の話が第三者の記事にあるが、公式の案内は **未確認**。第三者の記事は 2026 年 11 月 7 日時点で API は停止中としている(未確認) | 送り状の API は、API の利用申請とオプションの契約が要るとの情報(第三者のマニュアル)。追跡の API の条件は **未確認** | 規約は **未確認** | 提供の状況が不明な間は合わない。**スクレイピングはしない** |
+| 日本郵便 | 追跡の公開 API は確認できなかった(**未確認**)。法人向けのポータル「JP Business ToolBox」に郵便番号のデータ・お届け日数の計算の API があるとの案内(2022 年のお知らせ)はあるが、追跡かは **未確認** | 追跡は同社の Web の追跡サービス(約 100 日間・追跡の対象外の郵便物あり)。API の取り方は **未確認** | EMS の追跡のページは「同社の Web サイト以外の追跡情報の問い合わせには対応しない」と書く。機械で読む扱いの規約は **未確認** | API が確認できない間は合わない |
+### 佐川急便の不正アクセス(2026-09-30)
+- 佐川急便は 2026-09-30 に「お荷物問い合わせサービス」への不正アクセスを確認し、10-23 に Web の問い合わせを再開した、と報じられている([ITmedia ほか・出典は下](https://internet.watch.impress.co.jp/docs/news/2145343.html))。API の再開は公式の発表を **未確認**。
+- 追跡の情報には送り主・届け先の氏名・住所・電話番号が含まれうる。**番号を預かって追跡する形は、個人情報の扱いの決めが先に要る**(#1708 で決める)。
+### 作れない場合の代わり(「作れないもの」の形・案)
+下の表は、**#1708 で追跡の API を入れないと決まった時**に、上の「作れないもの・代わりの道」へ足す案。今は足していない。
+| もの | 作れない理由 | 代わりにできること |
+|---|---|---|
+| 荷物の追跡(ヤマト運輸・佐川急便・日本郵便・#1708) | 3 社とも、生成アプリが追跡の状況を読む公開の口を確認できなかった(2026-11-13 の確認の範囲)。残る道はスクレイピングかログイン情報を預かる形で、どちらもしない | 手で入れる記録のアプリ(品名・追跡番号・出した日)。各社の公式の追跡のページを `openUrlButton` で開く(番号を渡せるかは各社のページで確認)。確認メールの本文を貼る text の field を置き、`aiButton`(task `extract`)で番号を下書きに入れる(保存は利用者) |
+- 公式の追跡 API が確認できるまで、3 社とも「作る」とは決めない。
+- まず人が各社の法人窓口・開発者ページで、追跡の API の有無と規約(機械で読む扱い)を確かめる。
+- 代わりの道(公式ページを開く・番号の記録)を先に出せる。
+- [ヤマト運輸「B2クラウドAPI」の記事(Impress Watch・2024-06)](https://www.watch.impress.co.jp/docs/news/1599549.html)
+- [ヤマト運輸の配送データ API の記事(ネットショップ担当者フォーラム)](https://netshop.impress.co.jp/node/5155)
+- [ヤマト運輸 荷物お問い合わせ(追跡のページ)](https://toi.kuronekoyamato.co.jp/cgi-bin/tneko)
+- [佐川急便の不正アクセスの報道(INTERNET Watch)](https://internet.watch.impress.co.jp/docs/news/2145343.html)
+- [佐川急便の第 1〜3 報のまとめ(ecnomikata)](https://ecnomikata.com/ecnews/51852/)
+- [日本郵便 追跡サービス](https://trackings.post.japanpost.jp/services/srv/search/)
+- [日本郵便 EMS の追跡](https://www.post.japanpost.jp/int/ems/delivery/ems_search.html)
+- [日本郵便 JP Business ToolBox の発表(2022)](https://www.post.japanpost.jp/notification/pressrelease/2022/00_honsha/0620_01_01.pdf)

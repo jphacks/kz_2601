@@ -319,7 +319,7 @@ fun initials(name: String?): String {
     return if (words.size >= 2 && words[0].first().isLetter() && words[0].first().code < 128) {
         "${words[0].first()}${words[1].first()}".uppercase()
     } else {
-        words[0].take(1).uppercase()
+        words[0].let { it.substring(0, it.offsetByCodePoints(0, 1)) }.uppercase() // 絵文字(サロゲートペア)を割らない
     }
 }
 
