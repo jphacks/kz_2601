@@ -268,6 +268,10 @@ targets:
         TARGETED_DEVICE_FAMILY: "1"
         SKIP_INSTALL: YES
         ENABLE_PREVIEWS: YES
+      configs:
+        # 審査用の版はウィジェットとコントロールも審査用の文言にする(本体・Mac と揃える)
+        Review:
+          SWIFT_ACTIVE_COMPILATION_CONDITIONS: "$(inherited) APP_STORE_REVIEW"
 
   # ウィジェットの描画テスト(#486)。ウィジェットの View(MetamonWidget/Views)と受け渡しモデルを直接コンパイルし、ImageRenderer で描く。
   # 環境変数 WIDGET_SHOTS_DIR(xcodebuild では TEST_RUNNER_WIDGET_SHOTS_DIR)があれば PNG を書き出す(PR のスクショ用)。
