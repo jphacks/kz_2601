@@ -12,7 +12,7 @@ struct PublishConfirmSheet: View {
         ScrollView {
             VStack(alignment: .leading, spacing: Theme.Spacing.lg) {
                 Text(PublishConfirmCopy.title(appName: appName))
-                    .font(.system(size: 22, weight: .bold, design: .rounded))
+                    .font(.system(.title2, design: .rounded).weight(.bold))
                     .accessibilityAddTraits(.isHeader)
                     .accessibilityIdentifier("publish.confirm.title")
                 VStack(alignment: .leading, spacing: Theme.Spacing.md) {
