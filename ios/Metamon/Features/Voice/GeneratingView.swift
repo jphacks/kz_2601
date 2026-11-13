@@ -7,6 +7,7 @@ import MetamonDSL
 struct GeneratingView: View {
     @Environment(AppRuntime.self) private var rt
     @Environment(\.colorScheme) private var scheme
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     let job: AppRuntime.MorphJob
     /// 結果の組み上げ中(#626)。nil なら待っている間
     var reveal: BuildReveal? = nil
@@ -74,7 +75,7 @@ struct GeneratingView: View {
                 .lineLimit(3)
                 .minimumScaleFactor(0.8)
         }
-        .animation(.easeInOut(duration: 0.3), value: job.draft.appName)
+        .animation(reduceMotion ? nil : .easeInOut(duration: 0.3), value: job.draft.appName)
     }
 
     /// 見出しには「別のアプリ。」などの切替キーワードを出さない(VoiceIntent.newAppPrefixes と同じ語)。
@@ -94,7 +95,7 @@ struct GeneratingView: View {
                     .foregroundStyle(warn ? Theme.Colors.warning : .secondary)
                     .contentTransition(.opacity)
             }
-            .animation(.easeInOut(duration: 0.3), value: message)
+            .animation(reduceMotion ? nil : .easeInOut(duration: 0.3), value: message)
 
             Text(elapsedLabel)
                 .font(.caption2.monospacedDigit())
@@ -118,7 +119,7 @@ struct GeneratingView: View {
                 }
             }
         }
-        .animation(.easeInOut(duration: 0.3), value: stage)
+        .animation(reduceMotion ? nil : .easeInOut(duration: 0.3), value: stage)
     }
 
     /// 「3 秒・ふつう 10 秒ほど」(目安は最初の段だけ・M6)
@@ -144,6 +145,7 @@ enum MorphProbe {
 
 /// edit(2 回目以降)の軽いインジケータ。現在の画面は RootView 側で薄くし、上部に小さなカプセルを出す。
 struct EditingIndicator: View {
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Environment(AppRuntime.self) private var rt
     let job: AppRuntime.MorphJob
     @State private var elapsed: TimeInterval = 0
@@ -182,7 +184,7 @@ struct EditingIndicator: View {
             .accessibilityElement(children: .contain)
             .accessibilityIdentifier("generating.edit") // UI テスト(#182)
         }
-        .animation(.easeInOut(duration: 0.3), value: stage)
+        .animation(reduceMotion ? nil : .easeInOut(duration: 0.3), value: stage)
         .task(id: job.startedAt) {
             while !Task.isCancelled {
                 elapsed = Date.now.timeIntervalSince(job.startedAt)
