@@ -14,6 +14,8 @@ iOS 版が iOS の仕組み(集中モードのフィルタ・Spotlight・ショ�
 - [電池の残り・充電中・省電力モード(DevicePowerSource)](#電池の残り充電中省電力モードdevicepowersource)
 - [カレンダーの予定とリマインダーを読む(DeviceCalendarSource)](#カレンダーの予定とリマインダーを読むdevicecalendarsource)
 - [端末の中で文字を訳す(OnDeviceTranslator・iOS 18)](#端末の中で文字を訳すondevicetranslatorios-18)
+- [連絡先から 1 人選ぶ口(ContactPick)](#連絡先から-1-人選ぶ口contactpick)
+- [画面を消さない(ScreenAwake)](#画面を消さないscreenawake)
 - [開いている PR](#開いている-pr)
 
 ## 集中モードのフィルタ
@@ -150,6 +152,50 @@ Apple の Translation framework で、文字を端末の中だけで訳す口を
 | iOS 17・Mac | 本物は `os(iOS)` の時だけ作る。iOS 17 と macOS はビルドは通るが unsupported を返す |
 | 文言 | 日本語・英語(MetamonRenderer の `Localizable.xcstrings`) |
 | テスト | `MetamonRendererTests/OnDeviceTranslatorTests` |
+
+## 連絡先から 1 人選ぶ口(ContactPick)
+
+連絡先アプリの画面で 1 人を選んでもらい、その 1 人の名前・電話・メール・誕生日だけを受け取る口です(#2217・`ios/Packages/MetamonRenderer/Sources/MetamonRenderer/Support/ContactPick.swift`)。**部品・アクションはまだありません**(決定待ち)。使っているのは、開発用メニューの試す口(`DebugContactPickSection`・#2079)だけです。
+
+| 項目 | 決まり |
+|---|---|
+| 許可 | **要らない**。`CNContactPickerViewController` は、選んだ 1 人だけがアプリに渡る仕組みなので、許可のダイアログも `NSContactsUsageDescription` も要らない |
+| やらないこと | `CNContactStore` を使わない(store で一覧を読むと許可のダイアログが出る。この口の肝) |
+| 出す画面 | `ContactPickerSheet`(`.sheet` に入れる。`os(iOS)` だけ)。選ぶか取り消すと閉じる |
+| 取り出す項目 | `ContactItem`(`name`・`phone`・`email`・`birthday`)。頼まれた項目だけを `ContactPick.read` で取り出す(既定は全部) |
+| 返す値 | `PickedContact`(項目 → 文字)。無い項目・空の項目は入らない。`isEmpty` で空かを見る |
+| 名前 | 地域の並び順の氏名。取れなければ「姓 名」を並べる |
+| 電話・メール | 複数ある時は最初の 1 つ |
+| 誕生日 | `YYYY-MM-DD`(date の field と同じ形)。年が無い誕生日は入れない(日付として表せない) |
+| 見せない | 値はログ・クラッシュ報告・サーバーに出さない。`description` も項目名だけ(`PickedContact(items: [...])`) |
+| 入れる先 | `ContactPick.prefill(_:fields:)` が、項目 → field の id の対応で値を作り、次に開く新規フォームへ `FormPrefill` で積む。値が無ければ何もしない(前に積んだ値を消さない)。`FormPrefill` は 3 秒で失効する |
+| テスト | `MetamonRendererTests/ContactPickTests` |
+
+- 決めること: 生成アプリの部品・アクションにするか、DSL の名前(決定待ち。#1775 の範囲との関係は推測)。
+- 推測: Mac では `ContactPickerSheet` が無い(`os(iOS)` の中)ので、Mac で使うなら別の口が要る。
+
+## 画面を消さない(ScreenAwake)
+
+画面が勝手に暗くならないようにする口です(`ios/Packages/MetamonRenderer/Sources/MetamonRenderer/Support/ScreenAwake.swift`)。使う所ごとに持ち、**持っている所が 1 つでもあれば消さない**作りです。直接 `isIdleTimerDisabled = false` にすると、他の使い手の分まで戻してしまうためです。
+
+| 項目 | 決まり |
+|---|---|
+| 持つ | `ScreenAwake.shared.hold()` が `Hold` を返す。最初の 1 つで画面を消さない状態にする |
+| 戻す | `Hold.release()`。最後の 1 つが戻した時だけ元に戻す。`release()` は何度呼んでもよく、2 回目は他の持ち主の分を減らさない |
+| 効かせる先 | iOS は `UIApplication.isIdleTimerDisabled`。Mac はディスプレイのスリープを止める電源の assertion(`IOPMAssertion`)。いずれも `PlatformSystem.setIdleTimerDisabled` |
+| テスト | `MetamonRendererTests/ScreenAwakeTests`(持ち主が残る間は戻さない・`release` を重ねても減らない) |
+
+どの画面で効かせて、いつ戻すか(いまの使い手は 3 つ)。
+
+| 使い手 | 効かせる時 | 戻す時 | コード |
+|---|---|---|---|
+| ドラレコ(`dashcam`) | 録画を始めた時(`start`) | 止めた時(`stop`) | `DashcamRecorder` |
+| 道案内 | 案内が始まり、経路を計算できた後(`guiding` に入る時) | 案内をやめた時(`stop`)・着いた時(`arrived`) | `RouteGuideSession` |
+| 録音ファイルの文字起こし | 文字にしている間 | 終わった・失敗・取り消した時(`defer`) | `FileImportLeaf` |
+
+- 同じ使い手が 2 回持たないよう、持っている間は `Hold` を覚えて、`nil` の時だけ `hold()` します(ドラレコ・道案内)。
+- `BackgroundGrace`(背面に回った時に、今の処理を区切りよく止めるまでの猶予)も同じファイルにあります。画面を消さないこととは別の物で、文字起こしが `begin` / `end` を一緒に呼びます。Mac は背面でも止められないので何もしません。
+- 決めること: 新しく使う所を足す時は、必ず `ScreenAwake.shared.hold()` を使い、直接 `isIdleTimerDisabled` を触らない。
 
 ## 開いている PR
 
