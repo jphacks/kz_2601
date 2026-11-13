@@ -64,6 +64,7 @@ class DesktopConformanceTest {
         "timeline" to listOf("entity", "rows", "limit"),
         "searchBar" to listOf("field", "placeholder", "query"),
         "calendar" to listOf("entity", "title"),
+        "disclosure" to listOf("expanded", "title"),
         "gridTable" to listOf("entity", "title"),
         "feed" to listOf("title", "limit"),
         "matchList" to listOf("entity", "show", "title"),
@@ -363,6 +364,10 @@ class DesktopConformanceTest {
             "text", "markdown" -> putText("text", c.text)
             "label", "badge" -> putText("text", c.text ?: c.label)
             "button" -> putText("label", c.label)
+            "disclosure" -> {
+                putText("title", Disclosure.title(c))
+                put("expanded", JsonPrimitive(Disclosure.initiallyExpanded(c)))
+            }
             "openUrlButton" -> {
                 putText("label", c.label)
                 putText("url", c.url)
