@@ -490,7 +490,7 @@ private fun PieChart(buckets: List<Aggregator.Bucket>) {
     }
 }
 
-private fun chartNumber(v: Double): String = Aggregator.format(v, null)
+internal fun chartNumber(v: Double): String = Aggregator.format(v, null)
 
 // MARK: - calendar
 
