@@ -66,6 +66,8 @@ final class MacComposeSession: Identifiable {
     private(set) var sending = false
     /// 失敗の状態カード(#968・会話の下に出す)。分け方と文言は iOS と同じ `ErrorPresentation`
     private(set) var failure: ErrorPresentation?
+    /// 1 日の枠が切れて作れなかった依頼(#3079・iOS の `AppRuntime.heldBuild`)。会話は残したまま「続きから作る」を出す
+    private(set) var heldBuild: HeldBuild?
     var draft: String
     /// 声で頼む(⇧⌘M・#966)で開いた。シートが出たらすぐ録音を始める(1 回だけ)
     var startsWithVoice = false
@@ -212,6 +214,7 @@ final class MacComposeSession: Identifiable {
         selectedChips = []
         selectedOptions = []
         failure = nil
+        heldBuild = nil // 話し直したら残した依頼は閉じる(iOS と同じ)
         sending = true
         let context = contextMessages
         let mode = mode
@@ -313,6 +316,7 @@ final class MacComposeSession: Identifiable {
         task?.cancel()
         sending = false
         failure = nil
+        heldBuild = nil
         let job = Job(transcript: transcript, started: .now, script: .init(transcript: transcript))
         withMacAnimation { phase = .generating(job) }
         MacVoiceOver.announce(.building)
@@ -336,8 +340,32 @@ final class MacComposeSession: Identifiable {
                     show(ErrorPresentation(kind: .failed(message: ErrorCopy.conflictBanner), transcript: transcript, origin: .generate))
                     return
                 }
-                show(Self.presentation(for: error, transcript: transcript, origin: .generate))
+                let presentation = Self.presentation(for: error, transcript: transcript, origin: .generate)
+                heldBuild = Self.heldBuild(for: presentation)
+                show(presentation)
             }
+        }
+    }
+
+    /// 1 日の枠切れ(利用者の上限)で止めた生成なら、依頼を残す。それ以外の失敗は「もう一度」で足りる
+    static func heldBuild(for presentation: ErrorPresentation?) -> HeldBuild? {
+        guard let presentation, presentation.origin == .generate,
+              case .rateLimited(let info) = presentation.kind, HeldBuild.holds(for: info) else { return nil }
+        return HeldBuild(text: presentation.transcript)
+    }
+
+    /// 「続きから作る」: 同じ依頼でもう一度作る(枠が戻った・Pro を買った後)。まだ枠が無ければ、また依頼を残す
+    func continueHeldBuild() {
+        guard let held = heldBuild, phase == .chatting else { return }
+        heldBuild = nil
+        build(held.text)
+    }
+
+    /// 残した依頼のカードを閉じる(会話は残る。「これでいく」からまた作れる)
+    func dismissHeldBuild() {
+        withMacAnimation {
+            heldBuild = nil
+            failure = nil
         }
     }
 
@@ -451,6 +479,7 @@ final class MacComposeSession: Identifiable {
         selectedChips = []
         selectedOptions = []
         failure = nil
+        heldBuild = nil
         // サーバーの会話は消しに行かない: 次の 1 発目は `ClarifyFlow.startConversation` が古い会話を検出してやり直す(iOS と同じ)
     }
 
@@ -496,7 +525,7 @@ final class MacComposeSession: Identifiable {
     }
 
     /// カードの「閉じる」
-    func dismissFailure() { withMacAnimation { failure = nil } }
+    func dismissFailure() { withMacAnimation { failure = nil; heldBuild = nil } }
 
     /// シートを閉じる時。走っている呼び出しを止める
     func close() {

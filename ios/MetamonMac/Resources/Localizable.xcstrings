@@ -9613,6 +9613,23 @@
         }
       }
     },
+    "会話はこのまま残っています。枠が戻るか Pro にすると、続きから同じ依頼で作れます。" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Your conversation is still here. Once your daily limit resets or you upgrade to Pro, you can pick up and build the same request."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "会話はこのまま残っています。枠が戻るか Pro にすると、続きから同じ依頼で作れます。"
+          }
+        }
+      }
+    },
     "何も変えずに閉じます" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -14965,6 +14982,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "細部を整えています…"
+          }
+        }
+      }
+    },
+    "続きから作る" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Continue building"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "続きから作る"
           }
         }
       }

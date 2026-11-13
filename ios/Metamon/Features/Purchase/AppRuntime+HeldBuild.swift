@@ -3,11 +3,7 @@
 import SwiftUI
 import MetamonServices
 
-/// 無料枠切れで止めた新規作成(H3)。会話は消さずに残し、Pro を買う・枠が戻ったら同じ依頼で続きから作る。
-struct HeldBuild: Equatable {
-    /// 作るはずだった依頼文(ready の transcript / 案の instruction)
-    var text: String
-}
+// `HeldBuild`(残した依頼)は Mac と共有する(Shared/Runtime/HeldBuild.swift・#3079)。
 
 /// 上限・402 `pro_required` で作らずに止めた時、聞き返しに答えた会話を消さない(H3)。
 /// - 無料枠切れ: 課金画面で買えばそのまま作る(`sendMetered`)。閉じたら会話を残し、チャットに「続きから作る」のカード
