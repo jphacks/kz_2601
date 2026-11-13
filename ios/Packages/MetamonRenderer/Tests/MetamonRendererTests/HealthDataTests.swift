@@ -74,7 +74,7 @@ final class HealthDataTests: XCTestCase {
             sleep("2026-10-24T23:00:00", "2026-10-25T06:00:00"),
         ]
         let out = sleepMinutesByWakeDay(samples, dayStarts: week, calendar: tokyo)
-        XCTAssertEqual(out.map(\.value), [7 * 60])
+        XCTAssertEqual(out.map(\.value), [Double(7 * 60)])
     }
 
     func testSleepDaysWithoutDataAreOmittedAndOutOfRangeDropped() {

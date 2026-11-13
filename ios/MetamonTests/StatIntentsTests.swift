@@ -151,4 +151,116 @@ final class StatIntentsTests: XCTestCase {
             XCTFail("別のエラー: \(error)")
         }
     }
+
+    // MARK: - id の組み立てと分解(#2241)
+
+    /// `id` と `split` は往復する。`/` は最初の 1 つだけが区切りなので、statKey に `/` が入っても壊れない
+    func testIdRoundTripsThroughSplit() {
+        let cases: [(appId: String, statKey: String)] = [
+            ("app1", "expense|sum|amount|支出の合計"),
+            ("app1", "expense|sum|amount|今月の支出/予算"),
+            ("app1", "expense|sum|amount|a/b/c"),
+            ("app1", "/先頭が区切り"),
+            ("app1", ""),
+        ]
+        for (appId, statKey) in cases {
+            let id = StatEntity.id(appId: appId, statKey: statKey)
+            let parts = StatEntity.split(id)
+            XCTAssertEqual(parts?.appId, appId, "appId: \(id)")
+            XCTAssertEqual(parts?.statKey, statKey, "statKey: \(id)")
+        }
+    }
+
+    /// 区切りが無い id は分解できない(別の数字を当てずに nil を返す)
+    func testSplitRejectsIdWithoutSeparator() {
+        XCTAssertNil(StatEntity.split(""), "空の id")
+        XCTAssertNil(StatEntity.split("app1"), "appId だけ")
+        XCTAssertNil(StatEntity.split("expense|sum|amount|支出の合計"), "statKey だけ")
+    }
+
+    /// 分解できない id でも実体は id を落とさず、`isMissing` で残す
+    func testMissingEntityKeepsRawId() {
+        let broken = StatEntity(missingId: "appIdだけ")
+        XCTAssertEqual(broken.id, "appIdだけ", "id は原文のまま残す")
+        XCTAssertEqual(broken.appId, "appIdだけ")
+        XCTAssertEqual(broken.statKey, "")
+        XCTAssertTrue(broken.isMissing)
+        XCTAssertEqual(broken.title, String(localized: "見つからない数字"))
+
+        let empty = StatEntity(missingId: "")
+        XCTAssertEqual(empty.id, "")
+        XCTAssertEqual(empty.appId, "")
+        XCTAssertEqual(empty.statKey, "")
+        XCTAssertTrue(empty.isMissing)
+
+        let slashed = StatEntity(missingId: "app1/expense|sum|amount|今月の支出/予算")
+        XCTAssertEqual(slashed.appId, "app1")
+        XCTAssertEqual(slashed.statKey, "expense|sum|amount|今月の支出/予算", "statKey の `/` を切り落とさない")
+    }
+
+    /// `/` を含む題の stat も、id を分解した statKey で引き直せる(ショートカットに保存した id からの復元)
+    func testStatKeyWithSlashResolvesBackToStat() throws {
+        let slashLabel = #"{"type":"stat","label":"今月の支出/予算","entity":"expense","aggregate":"sum","field":"amount"}"#
+        let d = try dsl(stats: slashLabel)
+        let app = AppSummary(id: "app1", name: "家計簿", currentVersion: 2)
+        let e = StatEntity(app: app, stat: StatReading.stats(in: d)[0], dsl: d)
+        XCTAssertTrue(e.statKey.contains("/"))
+        let parts = try XCTUnwrap(StatEntity.split(e.id))
+        XCTAssertEqual(parts.appId, "app1")
+        XCTAssertEqual(parts.statKey, e.statKey)
+        XCTAssertNotNil(StatReading.stat(parts.statKey, in: d), "保存した id から同じ stat を引ける")
+    }
+
+    // MARK: - 選べる数字は一覧のひと目の数字と同じ(#2241)
+
+    /// `StatReading.stats` は `AppGlance.choices` そのもの(ウィジェット・一覧・ショートカットで並びと中身がそろう)
+    func testStatsAreAppGlanceChoices() throws {
+        let d = try dsl(stats: [sum, count, latest, expr].joined(separator: ","))
+        let stats = StatReading.stats(in: d)
+        let choices = AppGlance.choices(in: d)
+        XCTAssertEqual(stats.count, choices.count)
+        XCTAssertEqual(stats.map(\.id), choices.map(\.id))
+        XCTAssertEqual(stats.map { WidgetSnapshotWriter.statKey($0) }, choices.map { WidgetSnapshotWriter.statKey($0) })
+    }
+
+    /// 初期状態(音声画面のみ)のアプリは選べる数字が無い。ここも `AppGlance.choices` と同じ答え
+    func testVoiceOnlyAppHasNoStats() throws {
+        let json = """
+        {"schemaVersion":1,"app":{"name":"家計簿","voiceEntry":"fullscreen"},"initialScreen":"home","entities":[],
+         "screens":[{"id":"home","title":"家計簿","components":[\(sum)]}]}
+        """
+        let d = try JSONDecoder().decode(AppDSL.self, from: Data(json.utf8))
+        XCTAssertTrue(d.isVoiceOnly)
+        XCTAssertTrue(AppGlance.choices(in: d).isEmpty)
+        XCTAssertTrue(StatReading.stats(in: d).isEmpty, "一覧のひと目の数字と同じ判定")
+        XCTAssertNil(StatReading.stat("expense|sum|amount|支出の合計", in: d))
+    }
+
+    // MARK: - 題の無い stat の label(#2241)
+
+    /// label → entity 名 → 「数字」の順に落ちる
+    func testLabelFallbackOrder() throws {
+        let labeled = try dsl(stats: sum)
+        XCTAssertEqual(StatReading.label(of: StatReading.stats(in: labeled)[0], in: labeled), "支出の合計", "label があればそれ")
+
+        let blank = try dsl(stats: #"{"type":"stat","label":"","entity":"expense","aggregate":"count"}"#)
+        XCTAssertEqual(StatReading.label(of: StatReading.stats(in: blank)[0], in: blank), "支出", "空の label は無いものとして entity 名")
+
+        let noEntity = try dsl(stats: #"{"type":"stat","value":120}"#)
+        XCTAssertEqual(StatReading.label(of: StatReading.stats(in: noEntity)[0], in: noEntity),
+                       String(localized: "数字"), "entity も無い式の stat は既定の題")
+
+        let unknownEntity = try dsl(stats: #"{"type":"stat","entity":"消えたentity","aggregate":"count"}"#)
+        XCTAssertEqual(StatReading.label(of: StatReading.stats(in: unknownEntity)[0], in: unknownEntity),
+                       String(localized: "数字"), "DSL に無い entity を指していても落ちない")
+    }
+
+    /// 題の無い stat の実体名も label の決まりに従う
+    func testEntityTitleUsesLabelFallback() throws {
+        let d = try dsl(stats: #"{"type":"stat","entity":"expense","aggregate":"count"}"#)
+        let app = AppSummary(id: "app1", name: "家計簿", currentVersion: 2)
+        let e = StatEntity(app: app, stat: StatReading.stats(in: d)[0], dsl: d)
+        XCTAssertEqual(e.label, "支出")
+        XCTAssertEqual(e.title, "家計簿 › 支出")
+    }
 }

@@ -23,6 +23,7 @@ extension AppRuntime {
         WidgetSnapshot.defaults?.removePersistentDomain(forName: WidgetSnapshot.appGroupID) // App Group(ウィジェット・コントロールの一覧)
         WidgetCenter.shared.reloadAllTimelines()
         ControlIntentBridge.reloadControls()            // コントロールの見出し(前の人のアプリ名)を消す
+        HomeQuickActions.clear()                        // 長押しメニューの前の人のアプリ名(#2232)
         LiveActivities.enqueue { await LiveActivities.endAll() } // ロック画面・Dynamic Island(#423)
         LocalWipe.clearDefaults(.standard, domain: Bundle.main.bundleIdentifier)
         RemainingTodayStore.shared.clear()              // 今日の残り(#630・前のアカウントの数を出さない)

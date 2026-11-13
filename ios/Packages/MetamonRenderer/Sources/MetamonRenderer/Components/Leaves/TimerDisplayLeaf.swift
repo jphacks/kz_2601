@@ -13,6 +13,7 @@ struct TimerDisplayLeaf: View {
     @Environment(\.dslRuntime) private var rt
     @State private var elapsed: Int = 0
     @State private var run = TimerRun()
+    @ScaledMetric(relativeTo: .largeTitle) private var timeSize: CGFloat = 44
     private var running: Bool { run.isRunning }
 
     private let tick = Timer.publish(every: 0.25, on: .main, in: .common).autoconnect()
@@ -28,7 +29,9 @@ struct TimerDisplayLeaf: View {
                 Text(label).font(.caption).foregroundStyle(.secondary)
             }
             Text(Self.format(shown))
-                .font(.system(size: 44, weight: .semibold, design: .rounded).monospacedDigit())
+                .font(.system(size: timeSize, weight: .semibold, design: .rounded).monospacedDigit())
+                .lineLimit(1)
+                .minimumScaleFactor(0.4)
                 .foregroundStyle(finished ? AnyShapeStyle(RenderTheme.Colors.negative) : AnyShapeStyle(RenderTheme.brandFill))
                 .contentTransition(.numericText())
             HStack(spacing: 12) {

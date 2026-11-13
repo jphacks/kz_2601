@@ -111,6 +111,7 @@ func TestStoreWatchApp(t *testing.T) {
 }
 
 func TestStoreWatchRecords(t *testing.T) {
+	t.Parallel() // waits out real quiet timers
 	bothStores(t, func(t *testing.T, s Store, sfx string) {
 		w := watcherOf(t, s)
 		ctx, cancel := context.WithCancel(t.Context())
@@ -189,6 +190,7 @@ func TestStoreWatchRecords(t *testing.T) {
 // a mark or a delete on an older record is not signalled, an update brings the
 // record back into the window (#553: an intentional limit, same in both stores).
 func TestStoreWatchRecordsWindow(t *testing.T) {
+	t.Parallel() // waits out real quiet timers
 	bothStores(t, func(t *testing.T, s Store, sfx string) {
 		w := watcherOf(t, s)
 		ctx, cancel := context.WithCancel(t.Context())

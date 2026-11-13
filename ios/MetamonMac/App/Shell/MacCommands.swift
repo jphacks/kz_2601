@@ -8,7 +8,7 @@ import AppKit
 /// - アプリ: みんなのアプリを探す(⇧⌘F・#2069)・生成したアプリの版の「変更を元に戻す」(⌥⌘Z)・「変更をやり直す」(⇧⌥⌘Z)(#968)・次の通知(#1325)。
 ///   ⌘Z / ⇧⌘Z は入力欄と記録の削除に使っているので、版の取り消しは別のキーにする
 /// - 表示: サイドバー(`SidebarCommands`)・ツールバー(`ToolbarCommands`)・再読み込み ⌘R(#944)・画面マップ(⇧⌘E・#970)・
-///   拡大 ⌘+ / 縮小 ⌘- / 実際のサイズ ⌘0(中央のアプリの文字・#1206)
+///   拡大 ⌘+ / 縮小 ⌘- / 実際のサイズ ⌘0(中央のアプリの文字・#1206)・画面の並びを編集(#2323)
 /// - 移動: 戻る・アプリの一覧 / 中央へ・前 / 次のアプリ
 /// - ヘルプ: 頼み方のコツ(#967)・お問い合わせ・フィードバックを送る(#983)
 struct MacCommands: Commands {
@@ -60,13 +60,7 @@ struct MacCommands: Commands {
                 .keyboardShortcut("z", modifiers: [.command, .shift])
         }
 
-        // サイドバーの検索欄に入る(#1282)
-        CommandGroup(after: .pasteboard) {
-            Divider()
-            Button("アプリを探す") { shell?.focusSearch() }
-                .keyboardShortcut("f", modifiers: .command)
-                .disabled(shell == nil)
-        }
+        pasteboardCommands
 
         CommandGroup(after: .toolbar) {
             Divider()
@@ -80,6 +74,9 @@ struct MacCommands: Commands {
                 .keyboardShortcut("e", modifiers: [.command, .shift])
                 .disabled(!(shell?.canShowScreenMap ?? false) || runtime?.sheet != nil || runtime?.fullScreen != nil
                            || runtime?.calendarDraft != nil)
+            // 中央の画面の部品をドラッグで並べ替える(#2323)。編集中は Esc で終わる
+            Button("画面の並びを編集") { runtime?.startGridEdit() }
+                .disabled(!canUseCanvas || !(runtime?.canStartGridEdit ?? false))
             Divider()
             // 中央のアプリの文字の大きさ(#1206)。端の段と、画面マップ・会話のシートの間は押せない(マップは自分の拡大縮小に同じキーを使う)
             Button("拡大") { zoomStep = MacTextZoom.zoomedIn(zoomStep) }
@@ -140,6 +137,40 @@ struct MacCommands: Commands {
             #if !APP_STORE_REVIEW // 審査用ビルドはフィードバックを外す(#319)
             Button("フィードバックを送る…") { MacFeedbackCenter.shared.open(openWindow) } // #983
             #endif
+        }
+    }
+
+    /// 編集のカット・コピー・ペースト(#2251)と「アプリを探す」(`body` の項目数の上限を超えないよう分ける)。ペーストだけ、入力欄にフォーカスが無くフォームが開いていてクリップボードに記録があれば
+    /// 記録の貼り付けにする(別の生成アプリの記録の合う項目を入れる・保存はしない)。それ以外は今まで通りレスポンダチェーンに送る
+    @CommandsBuilder private var pasteboardCommands: some Commands {
+        CommandGroup(replacing: .pasteboard) {
+            Button("カット") { NSApp.sendAction(#selector(NSText.cut(_:)), to: nil, from: nil) }
+                .keyboardShortcut("x", modifiers: .command)
+            Button("コピー") { NSApp.sendAction(#selector(NSText.copy(_:)), to: nil, from: nil) }
+                .keyboardShortcut("c", modifiers: .command)
+            Button("ペースト") {
+                if canUseCanvas, let runtime, runtime.pastesRecord(textInputActive: MacRecordPaste.textInputActive) {
+                    runtime.pasteRecordFromMenu()
+                } else {
+                    NSApp.sendAction(#selector(NSText.paste(_:)), to: nil, from: nil)
+                }
+            }
+            .keyboardShortcut("v", modifiers: .command)
+            Button("ペーストしてスタイルを合わせる") {
+                NSApp.sendAction(#selector(NSTextView.pasteAsPlainText(_:)), to: nil, from: nil)
+            }
+            .keyboardShortcut("v", modifiers: [.command, .option, .shift])
+            Button("削除") { NSApp.sendAction(#selector(NSText.delete(_:)), to: nil, from: nil) }
+            Button("すべてを選択") { NSApp.sendAction(#selector(NSText.selectAll(_:)), to: nil, from: nil) }
+                .keyboardShortcut("a", modifiers: .command)
+        }
+
+        // サイドバーの検索欄に入る(#1282)
+        CommandGroup(after: .pasteboard) {
+            Divider()
+            Button("アプリを探す") { shell?.focusSearch() }
+                .keyboardShortcut("f", modifiers: .command)
+                .disabled(shell == nil)
         }
     }
 
