@@ -2082,7 +2082,7 @@ paths:
       tags: [ext]
       summary: つないだサービスの一覧(#1493)
       description: |
-        利用者ごとの OAuth のつなぎ(`users/{uid}/connections/*`)。provider・状態・scope・日付だけを返す(トークンは返さない)。切ったもの(印だけ残っている)は出さない。
+        利用者ごとの OAuth のつなぎ(`users/{uid}/connections/*`)。provider・状態・scope・日付・今月の回数(`monthCalls`・#2144)だけを返す(トークンは返さない)。切ったもの(印だけ残っている)は出さない。
         `EXT_RUNNER_URL` が無い時は空の一覧。
         `providers` はつなげるサービスの一覧(#1566・OAuth の要る provider だけ・id の順)。`enabled` は runner が今動かしているか(`EXT_RUNNER_URL` が無い時はみな false)。偽の provider は runner が動かしている時だけ(本番では出ない)。
         `supportedFeatures` を付けると `externalCall.<id>` が入っている provider だけ。審査用の版は OAuth の provider のキーを送らないので何も出ない(決定 6)。
@@ -2169,6 +2169,7 @@ paths:
         - `ANDROID_STORE_URL`: Google Play のページ(https / market のみ)。省略時は Android 側の既定
         - `MIN_MACOS_BUILD` / `LATEST_MACOS_BUILD`: Mac アプリの CFBundleVersion で、意味は iOS の 2 つと同じ(LATEST が MIN より小さければ MIN に揃える)。iOS の値とは別に判定する(#981)
         - `MAC_APP_STORE_URL`: Mac App Store のページ(https / macappstore のみ)。省略時は Mac 側の既定
+        - `MIN_WINDOWS_BUILD` / `LATEST_WINDOWS_BUILD`・`MIN_LINUX_BUILD` / `LATEST_LINUX_BUILD`: Windows・Linux アプリのビルド番号で、意味は iOS の 2 つと同じ(LATEST が MIN より小さければ MIN に揃える)。OS ごとに別に判定する(#2131)
         - `NOTICE_JSON`: アプリ内のお知らせ(`notice`・#333)。1 行のバナーで、利用者が閉じられる。iOS は閉じた `id` を覚えるので、文面を変えて出し直す時は `id` も変える。JSON が壊れている・必須が無い・未知のフィールドがある時は `notice` を省略する(他のフィールドは出す)。手順は `docs/ops/incident-runbook.md`
         iOS / Android / macOS は通信失敗・不正な応答では何もしない(fail open)。`notice` だけが不正な時も版の判定は続ける。`Cache-Control: public, max-age=300`(変更が届くまで最大 5 分)。
       responses:
@@ -2188,6 +2189,10 @@ paths:
                   minMacOSBuild: { type: integer, minimum: 1 }
                   latestMacOSBuild: { type: integer, minimum: 1 }
                   macAppStoreUrl: { type: string, format: uri }
+                  minWindowsBuild: { type: integer, minimum: 1 }
+                  latestWindowsBuild: { type: integer, minimum: 1 }
+                  minLinuxBuild: { type: integer, minimum: 1 }
+                  latestLinuxBuild: { type: integer, minimum: 1 }
                   notice: { $ref: '#/components/schemas/Notice' }
               example:
                 minIOSBuild: 12
@@ -2199,6 +2204,10 @@ paths:
                 minMacOSBuild: 40
                 latestMacOSBuild: 42
                 macAppStoreUrl: 'https://apps.apple.com/app/id0000000000'
+                minWindowsBuild: 50
+                latestWindowsBuild: 52
+                minLinuxBuild: 60
+                latestLinuxBuild: 61
                 notice:
                   id: 2026-11-02-ai
                   severity: warning
@@ -2426,6 +2435,10 @@ components:
         scopes: { type: array, items: { type: string } }
         connectedAt: { type: string, format: date-time }
         lastUsedAt: { type: string, format: date-time }
+        monthCalls:
+          type: integer
+          minimum: 0
+          description: 'この人が今月(JST)その provider を呼んだ回数(#2144)。回数の上限と同じ数え方(キャッシュから返した分・呼ぶ前に止まった分は数えない)で、自動の動きの分も入る。上限の値は返さない。読めなかった時・古い runner の時は省く'
     ExtProvider:
       type: object
       description: つなげるサービス(GET /me/connections の providers)
@@ -2537,6 +2550,7 @@ components:
               amount: { type: integer, description: 符号つきの増減 }
               op: { type: string, description: 'spend_ai の処理(generate / edit / chat / text)。spend_ext は ext' }
               appId: { type: string }
+              provider: { type: string, example: openWeather, description: 'spend_ext の外のサービス(registry の id・#2145)。この前に書いた行には無い(端末は今の文言)。表示名は端末が id から引く' }
               transactionId: { type: string, description: purchase の App Store の取引 }
               productId: { type: string }
               at: { type: string, format: date-time }
