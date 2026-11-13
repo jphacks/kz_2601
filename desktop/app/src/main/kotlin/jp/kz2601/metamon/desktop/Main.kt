@@ -28,6 +28,7 @@ import java.awt.event.WindowAdapter
 import java.awt.event.WindowEvent
 import jp.kz2601.metamon.desktop.i18n.Strings
 import jp.kz2601.metamon.desktop.io.DragOut
+import jp.kz2601.metamon.desktop.power.ScreenAwake
 import jp.kz2601.metamon.desktop.store.DesktopStore
 import jp.kz2601.metamon.desktop.store.DeviceWipe
 import jp.kz2601.metamon.desktop.store.SessionPersistence
@@ -168,6 +169,12 @@ private fun ApplicationScope.DesktopWindow(w: WindowEntry, registry: WindowRegis
                 window.toFront()
                 window.requestFocus()
             }
+        }
+        // 見えている間だけ画面を消さない効きを許す(最小化・トレイに隠す・閉じるで戻す)
+        val shown = tray.windowVisible && !state.isMinimized
+        DisposableEffect(w.id, shown) {
+            ScreenAwake.shared.setWindowShown(w.id.toString(), shown)
+            onDispose { ScreenAwake.shared.setWindowShown(w.id.toString(), false) }
         }
         DisposableEffect(window) {
             val l = object : WindowAdapter() {
