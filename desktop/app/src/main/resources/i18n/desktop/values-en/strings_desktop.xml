@@ -1,9 +1,9 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
+    <string name="desktop_a11y_account">Account: %1$s</string>
     <string name="desktop_a11y_bridge_body">Narrator is running, but the Java Access Bridge is not enabled, so this app may not be read aloud. Run "jabswitch -enable" in a command prompt, then restart this app. You can open this notice again from the command palette ("Screen reader help").</string>
     <string name="desktop_a11y_bridge_command">Screen reader help</string>
     <string name="desktop_a11y_bridge_title">Setting up screen reading</string>
-    <string name="desktop_a11y_account">Account: %1$s</string>
     <string name="desktop_a11y_chart">Chart: %1$s</string>
     <string name="desktop_a11y_image">Image</string>
     <string name="desktop_a11y_preview">Photo preview: %1$s</string>
@@ -254,6 +254,8 @@
     <string name="desktop_retention_confirmed">Confirmed</string>
     <string name="desktop_retention_review">Records deleted automatically</string>
     <string name="desktop_retention_unconfirmed">Not confirmed</string>
+    <string name="desktop_server_app_open_failed">Couldn\'t open the app. Try again where you\'re online.</string>
+    <string name="desktop_server_apps_cached">Last saved list</string>
     <string name="desktop_share_qr_copied">Copied the QR code image</string>
     <string name="desktop_share_qr_description">QR code for the invite link</string>
     <string name="desktop_share_qr_failed">Couldn\'t save the QR code image</string>
@@ -270,8 +272,6 @@
     <string name="desktop_sync_not_signed_in">Not sending (not signed in)</string>
     <string name="desktop_sync_now">Send now</string>
     <string name="desktop_sync_offline_pending">Not sending (%1$d waiting to send)</string>
-    <string name="desktop_server_app_open_failed">Couldn\'t open the app. Try again where you\'re online.</string>
-    <string name="desktop_server_apps_cached">Last saved list</string>
     <string name="desktop_sync_pending">%1$d waiting to send</string>
     <string name="desktop_sync_synced">Up to date</string>
     <string name="desktop_text_zoom_now">Text size %1$s</string>
