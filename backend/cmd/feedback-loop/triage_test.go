@@ -94,6 +94,18 @@ func TestTriageEvalCommand(t *testing.T) {
 	if items, _ := ta.ls.ListItems(context.Background(), loop.ItemQuery{}); len(items) != 0 {
 		t.Fatalf("items written: %d", len(items))
 	}
+	if strings.Contains(out, "embedding merge") {
+		t.Fatalf("-embed is off by default: %s", out)
+	}
+	out = ta.must(t, "triage-eval", "-set", labelledSet, "-embed", "fake", "-embed-threshold", "0.9")
+	if !strings.Contains(out, "embedding merge (cosine >= 0.90)") || !strings.Contains(out, "before ") || !strings.Contains(out, "after ") {
+		t.Fatalf("-embed fake: %s", out)
+	}
+	for _, bad := range [][]string{{"-embed", "openai"}, {"-embed", "fake", "-embed-threshold", "0"}} {
+		if err := ta.run(context.Background(), append([]string{"triage-eval", "-set", labelledSet}, bad...)); err == nil {
+			t.Fatalf("%v accepted", bad)
+		}
+	}
 
 	// -model ai uses the (fake) triage model and counts its tokens
 	fm := &fakeModel{category: "bug", cluster: "all", summary: "落ちる。"}
@@ -191,4 +203,35 @@ func TestTriageEvalAIRespectsSwitch(t *testing.T) {
 	if err := ta.run(context.Background(), []string{"triage-eval", "-set", labelledSet, "-model", "nope"}); err == nil {
 		t.Fatal("unknown model accepted")
 	}
+}
+
+func TestTriageModel(t *testing.T) {
+	t.Run("injected model wins", func(t *testing.T) {
+		ta := newTestApp(t, env{}) // no key set
+		fm := &fakeModel{}
+		ta.model = fm
+		m, err := ta.triageModel()
+		if err != nil || m != triage.Model(fm) {
+			t.Fatalf("got %v, %v", m, err)
+		}
+	})
+	t.Run("missing key", func(t *testing.T) {
+		ta := newTestApp(t, env{})
+		_, err := ta.triageModel()
+		if err == nil || err.Error() != envTriageKey+" is not set" {
+			t.Fatalf("err %v", err)
+		}
+	})
+	t.Run("key with default and named model", func(t *testing.T) {
+		for _, e := range []env{{envTriageKey: "test-key"}, {envTriageKey: "test-key", envTriageModel: "test-model"}} {
+			ta := newTestApp(t, e)
+			m, err := ta.triageModel()
+			if err != nil {
+				t.Fatal(err)
+			}
+			if _, ok := m.(triage.AIModel); !ok {
+				t.Fatalf("type %T", m)
+			}
+		}
+	})
 }

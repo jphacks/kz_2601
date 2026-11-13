@@ -67,23 +67,20 @@ enum PlatformSystem {
         #endif
     }
 
-    /// カメラが拒否された時の「設定を開く」(#1043)。Mac はシステム設定のカメラの欄へ直接。
-    static var cameraSettingsURL: URL? {
+    /// 権限が拒否された時の「設定を開く」の行き先(#2257)。iOS はどれもこのアプリの設定、Mac はその権限の欄へ直接
+    static func settingsURL(for pane: PrivacySettingsPane) -> URL? {
         #if canImport(UIKit)
         appSettingsURL
         #else
-        URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Camera")
+        pane.url
         #endif
     }
 
+    /// カメラが拒否された時の「設定を開く」(#1043)。Mac はシステム設定のカメラの欄へ直接。
+    static var cameraSettingsURL: URL? { settingsURL(for: .camera) }
+
     /// マイクが拒否された時の「設定を開く」(#952)。Mac はシステム設定 > プライバシーとセキュリティ > マイク へ直接。
-    static var microphoneSettingsURL: URL? {
-        #if canImport(UIKit)
-        appSettingsURL
-        #else
-        URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Microphone")
-        #endif
-    }
+    static var microphoneSettingsURL: URL? { settingsURL(for: .microphone) }
 
     /// マイクが拒否された時の説明(Mac は「システム設定 > プライバシーとセキュリティ > マイク」)
     static var microphoneDeniedMessage: String {

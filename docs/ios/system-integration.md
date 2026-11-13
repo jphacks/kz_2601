@@ -1,6 +1,6 @@
 # iOS の OS との連携(集中モード・Spotlight・ショートカット・電池・カレンダー・翻訳など)
 
-iOS 版が iOS の仕組み(集中モードのフィルタ・Spotlight・ショートカット・電池の状態・カレンダー・端末の中の翻訳など)とどうつながるかの決まりです。`epic/ios` に入っているものだけを書き、作業中のものは最後の [開いている PR](#開いている-pr) に並べます。
+iOS 版が iOS の仕組み(集中モードのフィルタ・Spotlight・ショートカット・電池の状態・カレンダー・端末の中の翻訳・Handoff など)とどうつながるかの決まりです。`epic/ios` に入っているものだけを書き、作業中のものは最後の [開いている PR](#開いている-pr) に並べます。
 
 - どれも **生成したアプリの DSL・スキーマ・AI の決まりは変えません**。アプリの殻(`ios/Metamon/`)と `ios/Packages/MetamonServices/`・`ios/Packages/MetamonRenderer/` の `Support/` だけで作っています。
 - どれも値を **サーバーに送りません**。
@@ -14,6 +14,9 @@ iOS 版が iOS の仕組み(集中モードのフィルタ・Spotlight・ショ�
 - [電池の残り・充電中・省電力モード(DevicePowerSource)](#電池の残り充電中省電力モードdevicepowersource)
 - [カレンダーの予定とリマインダーを読む(DeviceCalendarSource)](#カレンダーの予定とリマインダーを読むdevicecalendarsource)
 - [端末の中で文字を訳す(OnDeviceTranslator・iOS 18)](#端末の中で文字を訳すondevicetranslatorios-18)
+- [連絡先から 1 人選ぶ口(ContactPick)](#連絡先から-1-人選ぶ口contactpick)
+- [画面を消さない(ScreenAwake)](#画面を消さないscreenawake)
+- [Handoff(iPhone 側)](#handoffiphone-側)
 - [開いている PR](#開いている-pr)
 
 ## 集中モードのフィルタ
@@ -169,6 +172,72 @@ Apple の Translation framework で、文字を端末の中だけで訳す口を
 | iOS 17・Mac | 本物は `os(iOS)` の時だけ作る。iOS 17 と macOS はビルドは通るが unsupported を返す |
 | 文言 | 日本語・英語(MetamonRenderer の `Localizable.xcstrings`) |
 | テスト | `MetamonRendererTests/OnDeviceTranslatorTests` |
+
+## 連絡先から 1 人選ぶ口(ContactPick)
+
+連絡先アプリの画面で 1 人を選んでもらい、その 1 人の名前・電話・メール・誕生日だけを受け取る口です(#2217・`ios/Packages/MetamonRenderer/Sources/MetamonRenderer/Support/ContactPick.swift`)。**部品・アクションはまだありません**(決定待ち)。使っているのは、開発用メニューの試す口(`DebugContactPickSection`・#2079)だけです。
+
+| 項目 | 決まり |
+|---|---|
+| 許可 | **要らない**。`CNContactPickerViewController` は、選んだ 1 人だけがアプリに渡る仕組みなので、許可のダイアログも `NSContactsUsageDescription` も要らない |
+| やらないこと | `CNContactStore` を使わない(store で一覧を読むと許可のダイアログが出る。この口の肝) |
+| 出す画面 | `ContactPickerSheet`(`.sheet` に入れる。`os(iOS)` だけ)。選ぶか取り消すと閉じる |
+| 取り出す項目 | `ContactItem`(`name`・`phone`・`email`・`birthday`)。頼まれた項目だけを `ContactPick.read` で取り出す(既定は全部) |
+| 返す値 | `PickedContact`(項目 → 文字)。無い項目・空の項目は入らない。`isEmpty` で空かを見る |
+| 名前 | 地域の並び順の氏名。取れなければ「姓 名」を並べる |
+| 電話・メール | 複数ある時は最初の 1 つ |
+| 誕生日 | `YYYY-MM-DD`(date の field と同じ形)。年が無い誕生日は入れない(日付として表せない) |
+| 見せない | 値はログ・クラッシュ報告・サーバーに出さない。`description` も項目名だけ(`PickedContact(items: [...])`) |
+| 入れる先 | `ContactPick.prefill(_:fields:)` が、項目 → field の id の対応で値を作り、次に開く新規フォームへ `FormPrefill` で積む。値が無ければ何もしない(前に積んだ値を消さない)。`FormPrefill` は 3 秒で失効する |
+| テスト | `MetamonRendererTests/ContactPickTests` |
+
+- 決めること: 生成アプリの部品・アクションにするか、DSL の名前(決定待ち。#1775 の範囲との関係は推測)。
+- 推測: Mac では `ContactPickerSheet` が無い(`os(iOS)` の中)ので、Mac で使うなら別の口が要る。
+
+## 画面を消さない(ScreenAwake)
+
+画面が勝手に暗くならないようにする口です(`ios/Packages/MetamonRenderer/Sources/MetamonRenderer/Support/ScreenAwake.swift`)。使う所ごとに持ち、**持っている所が 1 つでもあれば消さない**作りです。直接 `isIdleTimerDisabled = false` にすると、他の使い手の分まで戻してしまうためです。
+
+| 項目 | 決まり |
+|---|---|
+| 持つ | `ScreenAwake.shared.hold()` が `Hold` を返す。最初の 1 つで画面を消さない状態にする |
+| 戻す | `Hold.release()`。最後の 1 つが戻した時だけ元に戻す。`release()` は何度呼んでもよく、2 回目は他の持ち主の分を減らさない |
+| 効かせる先 | iOS は `UIApplication.isIdleTimerDisabled`。Mac はディスプレイのスリープを止める電源の assertion(`IOPMAssertion`)。いずれも `PlatformSystem.setIdleTimerDisabled` |
+| テスト | `MetamonRendererTests/ScreenAwakeTests`(持ち主が残る間は戻さない・`release` を重ねても減らない) |
+
+どの画面で効かせて、いつ戻すか(いまの使い手は 3 つ)。
+
+| 使い手 | 効かせる時 | 戻す時 | コード |
+|---|---|---|---|
+| ドラレコ(`dashcam`) | 録画を始めた時(`start`) | 止めた時(`stop`) | `DashcamRecorder` |
+| 道案内 | 案内が始まり、経路を計算できた後(`guiding` に入る時) | 案内をやめた時(`stop`)・着いた時(`arrived`) | `RouteGuideSession` |
+| 録音ファイルの文字起こし | 文字にしている間 | 終わった・失敗・取り消した時(`defer`) | `FileImportLeaf` |
+
+- 同じ使い手が 2 回持たないよう、持っている間は `Hold` を覚えて、`nil` の時だけ `hold()` します(ドラレコ・道案内)。
+- `BackgroundGrace`(背面に回った時に、今の処理を区切りよく止めるまでの猶予)も同じファイルにあります。画面を消さないこととは別の物で、文字起こしが `begin` / `end` を一緒に呼びます。Mac は背面でも止められないので何もしません。
+- 決めること: 新しく使う所を足す時は、必ず `ScreenAwake.shared.hold()` を使い、直接 `isIdleTimerDisabled` を触らない。
+
+## Handoff(iPhone 側)
+
+開いている生成アプリの画面を、同じ Apple アカウントの Mac へ渡し、Mac から渡された画面を iPhone で開きます(#1851)。決まりの本体は両方に共通の `ios/Shared/Runtime/HandoffActivity.swift` で、Mac 側の動きは [Mac の OS との連携の Handoff](../mac/system-integration.md#handoff) にあります。ここは iPhone で違う所だけを書きます。内容は `origin/epic/god` のコードから書きました。
+
+| 項目 | 決まり |
+| --- | --- |
+| 受けた時 | `ShareLinkReceiver`(`AppRuntime+Sharing.swift`)が `.onContinueUserActivity(HandoffActivity.type)` で受け、`IntentHost` の `.handoff` に積む。準備(bootstrap)が済んでいればすぐ、まだなら済んでから、スプラッシュと起動時の同意の画面が閉じるのを待って実行する |
+| 受けた後に開く所 | `AppRuntime.openHandoff`。別のアプリ宛てなら `switchApp` で切り替え(切り替えに失敗したら何もしない・トーストは `switchApp` が出す)、`reveal` でモーダルを閉じて根(タブ)から矢印をたどり、画面と記録を開く。画面の id が無い・DSL にも無い時は、アプリを開くだけ |
+| 渡さない物 | 記録の中身・題名・書きかけのフォーム。activity の題名はアプリ名だけ。検索(Spotlight)・予測・公開索引には出さない |
+| 渡す物 | `appId`・`screenId`・`recordId` だけ(Info.plist の `NSUserActivityTypes` は `jp.kz2601.metamon.view`) |
+| 渡す時 | `handoffTarget`(`AppRuntime+Handoff.swift`)。生成したアプリを開いている間だけで、最初の音声の画面・生成中・アプリ id が空の時は渡さない。`RootView` の `HandoffAdvertiser` が画面と記録が変わるたびに activity を更新する |
+| 渡す画面 | 今いちばん上に見えている画面(モーダル → 選択中のタブ / main の順)と、その画面の記録。根の画面だけの時は画面を付けない |
+| 審査用の版 | 渡さず・受けない(`#if !APP_STORE_REVIEW`・Mac と同じ) |
+| `webpageURL` | このアプリのシェアリンクを iPhone で発行済みで、https の時だけ付ける(受ける端末にアプリが無い時にブラウザで開く) |
+| テスト | iOS 側の単体テストは見つからない。`HandoffTarget`・`PendingHandoff` は Mac 側の `MetamonMacTests/MacHandoffTests` が通す |
+
+### Mac の節との違い(推測・決めること)
+
+- **保留の時間切れ**: Mac の節と [architecture.md](architecture.md) は「開けない間は 60 秒だけ持つ」と書くが、iPhone の `IntentHost.pending` には時間切れの処理が見当たらない(60 秒で捨てる `PendingHandoff` は Mac だけが使っている)。実際の動きは未確認(推測)。決めること: iPhone にも 60 秒の時間切れを入れるか、文書を直すか。
+- **書きかけの入力**: Mac の節は「iOS は保存していない入力があれば破棄の確認を通す」と書くが、`openHandoff` と `switchApp` にその確認は見当たらない(推測)。決めること: 確認を入れるか、文書を直すか。
+- **ユーザーの設定**: Handoff をアプリ内でオフにする設定は見当たらない(OS の設定に従う)。
 
 ## 開いている PR
 

@@ -10,7 +10,10 @@ import jp.kz2601.metamon.desktop.io.RecordIo
 import jp.kz2601.metamon.desktop.io.Tsv
 import jp.kz2601.metamon.desktop.io.UserDirs
 import jp.kz2601.metamon.desktop.notify.DesktopNotice
+import jp.kz2601.metamon.desktop.notify.NoticeAction
+import jp.kz2601.metamon.desktop.notify.NoticeActions
 import jp.kz2601.metamon.desktop.notify.TrayNotifier
+import jp.kz2601.metamon.desktop.settings.UpcomingNotification
 import jp.kz2601.metamon.desktop.notify.Notifier as DisplayNotifier
 import jp.kz2601.metamon.desktop.store.writeAtomically
 import jp.kz2601.metamon.desktop.voice.VoiceInput
@@ -84,7 +87,7 @@ class DesktopActionHost(
     private val exportDir: File = defaultExportDir(),
     private val notifier: Notifier = Notifier.Tray,
     /** null なら openVoice は使えない旨(既定はフラグが立っている時だけ作る) */
-    private val voice: VoiceInput? = VoiceInput.fromEnv(),
+    private val voice: VoiceInput? = VoiceInput.shared,
     /** 重い書き出し(PDF の頁を描く)を画面のスレッドの外で。 */
     private val background: (() -> Unit) -> Unit = { thread(isDaemon = true, name = "export") { it() } },
     /** カレンダーに渡す .ics を置く所(一時フォルダ・渡すたびに別のフォルダ)。 */
@@ -93,13 +96,17 @@ class DesktopActionHost(
     private val openFile: (File) -> Boolean = { f -> runCatching { Desktop.getDesktop().open(f); true }.getOrDefault(false) },
     /** URL を渡す先(既定は java.awt.Desktop)。テストで替える。 */
     private val system: SystemOpener = SystemOpener.Awt,
+    /** 予約した通知の一覧に出すアプリの名前。 */
+    private val appName: String? = null,
+    /** 本の検索を画面のスレッドの外で。テストではその場で走らせて「すぐ終わる」を作る。 */
+    private val lookupThread: (() -> Unit) -> Unit = { thread(isDaemon = true, name = "lookupBook") { it() } },
 ) : ActionHost {
     override fun request(action: Action, ctx: ActionContext, session: DesktopSession): String? = when (action.type) {
         ActionType.OPEN_URL -> openUrl(action.url)
         ActionType.RESET_FORM -> null
         ActionType.ADD_TO_CALENDAR -> addToCalendar(action, ctx, session)
         ActionType.LOOKUP_BOOK -> lookupBook(action, ctx, session)
-        ActionType.SCHEDULE_NOTIFICATION -> action.notification?.let { notifier.schedule(it) } ?: Strings["runtime_notification_failed"]
+        ActionType.SCHEDULE_NOTIFICATION -> action.notification?.let { notifier.schedule(it, appName) } ?: Strings["runtime_notification_failed"]
         ActionType.CANCEL_NOTIFICATION -> action.notificationId?.let { notifier.cancel(it) }
         ActionType.EXPORT -> export(action, ctx, session)
         // 結果は画面のスレッドで出す。dispatch が toggle の返す一言を入れた後になるので、速く終わっても上書きされない
@@ -146,7 +153,10 @@ class DesktopActionHost(
         val raw = form.values[spec.isbnField]?.stringValue?.takeIf { it.isNotBlank() } ?: return Strings["host_book_isbn_empty"]
         val isbn = BookLookupPlan.normalizeISBN(raw) ?: return Strings["host_book_isbn_invalid"]
         val fields = BookLookupFields(spec.isbnField, spec.titleField, spec.authorsField, spec.publisherField, spec.publishedDateField)
-        thread(isDaemon = true, name = "lookupBook") {
+        // 「探しています」を先に出してから検索を始める(返り値にすると、すぐ終わった答えを dispatch が上書きする)
+        val id = synchronized(lookupIds) { (lookupIds[session] ?: 0L).plus(1).also { lookupIds[session] = it } }
+        session.message = Strings["desktop_book_searching"]
+        lookupThread {
             val msg = try {
                 val book = books.lookup(isbn)
                 if (book == null) {
@@ -159,10 +169,14 @@ class DesktopActionHost(
             } catch (e: Exception) {
                 Strings["host_book_unavailable"]
             }
-            Snapshot.withMutableSnapshot { session.message = msg }
+            // 後から頼んだ検索があれば、古い答えで上書きしない
+            if (synchronized(lookupIds) { lookupIds[session] == id }) Snapshot.withMutableSnapshot { session.message = msg }
         }
-        return Strings["desktop_book_searching"]
+        return null
     }
+
+    /** 画面ごとの最新の検索の番号。 */
+    private val lookupIds = java.util.WeakHashMap<DesktopSession, Long>()
 
     /**
      * 表は io/RecordIo(ref は名前・古い順)、PDF は io/PdfIo(#1856)。format が pdf なら PDF、他は CSV(iOS と同じ形)。
@@ -197,10 +211,10 @@ class DesktopActionHost(
      * [exportDir] に空いている名前で書く(既存のファイルは上書きしない・Windows の予約名は頭に `_`)。
      * 名前を空のファイルで取ってから、同じフォルダの一時ファイルに書き切って置き換える(書きかけのファイルを見せない)。書けなければ取った名前を消す。
      */
-    private fun writeNew(name: String, bytes: ByteArray): File {
+    internal fun writeNew(name: String, bytes: ByteArray, write: (File, ByteArray) -> Unit = { f, b -> writeAtomically(f, b) }): File {
         val file = FileNames.createFree(exportDir, name)
         try {
-            writeAtomically(file, bytes)
+            write(file, bytes)
         } catch (e: Exception) {
             file.delete()
             throw e
@@ -233,8 +247,7 @@ class DesktopActionHost(
         val UNAVAILABLE_ACTIVITY get() = Strings["desktop_unavailable_activity"]
         val UNAVAILABLE_FOLLOW get() = Strings["desktop_unavailable_follow"]
 
-        fun defaultExportDir(): File {
-            val home = File(System.getProperty("user.home"))
+        fun defaultExportDir(home: File = File(System.getProperty("user.home"))): File {
             return home.resolve("Downloads").takeIf { it.isDirectory } ?: home
         }
     }
@@ -366,6 +379,10 @@ class HttpBookLookupClient(private val base: String, private val client: HttpCli
 /** 通知の予約。鳴らす時は [Tray.display](既定はトレイの吹き出し・[jp.kz2601.metamon.desktop.notify.TrayNotifier])で出す(アプリが起動している間だけ・OS の予約は無い)。 */
 interface Notifier {
     fun schedule(n: Notification): String
+
+    /** 一覧([jp.kz2601.metamon.desktop.settings.UpcomingNotifications])に出すアプリの名前つきで予約する。既定は名前なし。 */
+    fun schedule(n: Notification, appName: String?): String = schedule(n)
+
     fun cancel(id: String): String?
 
     /** 次に鳴らす時刻(`time` の HH:mm。過ぎていれば明日)。時刻が無ければ null(すぐ出す)。 */
@@ -378,6 +395,7 @@ interface Notifier {
     /** 予約・取り消しは画面のスレッドからもタイマーのスレッドからも来るので、[timers] はこの object で同期する。 */
     object Tray : Notifier {
         private val timers = HashMap<String, Timer>()
+        private val upcoming = HashMap<String, UpcomingNotification>()
 
         /** 通知を出す口。テストで作り物に替える。 */
         @Volatile
@@ -388,22 +406,46 @@ interface Notifier {
             display.show(DesktopNotice(title, body))
         }
 
-        override fun schedule(n: Notification): String {
+        /**
+         * ボタン(開く・あとで)付きですぐ出す(#3210)。出す口がボタンを出せなければボタン無しで出す。
+         * 押された印は [jp.kz2601.metamon.desktop.notify.NoticeActions] に届き、[onAction] にもどのボタンかを渡す。
+         */
+        fun notifyWithActions(
+            id: String,
+            title: String,
+            body: String,
+            actions: List<NoticeAction> = listOf(NoticeAction.OPEN, NoticeAction.LATER),
+            onAction: ((NoticeAction) -> Unit)? = null,
+        ): Boolean {
+            val d = display
+            if (!d.supportsActions) return d.show(DesktopNotice(title, body))
+            val notice = DesktopNotice(title, body, id = id, actions = actions, onAction = onAction)
+            NoticeActions.remember(notice)
+            return d.show(notice)
+        }
+
+        override fun schedule(n: Notification): String = schedule(n, null)
+
+        override fun schedule(n: Notification, appName: String?): String {
             if (!display.available) return Strings["desktop_tray_unavailable"]
             val at = nextFire(n)
-            arm(n.id, at?.let { Duration.between(ZonedDateTime.now(it.zone), it).toMillis().coerceAtLeast(0) } ?: 0) { display.show(DesktopNotice(n.title, n.body)) }
+            val info = at?.let { UpcomingNotification(n.id, n.title, n.body, appName, it.toInstant()) }
+            arm(n.id, at?.let { Duration.between(ZonedDateTime.now(it.zone), it).toMillis().coerceAtLeast(0) } ?: 0, info) { display.show(DesktopNotice(n.title, n.body)) }
             val whenText = at?.let { DateTimeFormatter.ofPattern("M/d HH:mm").format(it) } ?: Strings["desktop_notification_now"]
             return Strings.format("desktop_notification_scheduled", whenText)
         }
 
         override fun cancel(id: String): String? {
-            synchronized(this) { timers.remove(id) }?.cancel()
+            synchronized(this) { upcoming.remove(id); timers.remove(id) }?.cancel()
             return null
         }
 
+        /** 予約中の通知(次に出る時刻つき)。時刻の無い(すぐ出した)物は入らない。並べ方は [UpcomingNotifications.of]。 */
+        fun upcoming(): List<UpcomingNotification> = synchronized(this) { upcoming.values.toList() }
+
         /** 予約した通知を全部取り消す(この端末のデータを消す時)。取り消した数。 */
         fun cancelAll(): Int {
-            val all = synchronized(this) { timers.values.toList().also { timers.clear() } }
+            val all = synchronized(this) { upcoming.clear(); timers.values.toList().also { timers.clear() } }
             all.forEach { it.cancel() }
             return all.size
         }
@@ -412,9 +454,12 @@ interface Notifier {
         internal fun pendingCount(): Int = synchronized(this) { timers.size }
 
         /** [id] の前の予約を消して [delayMillis] 後に [fire] を 1 回。鳴ったら表から外す。 */
-        internal fun arm(id: String, delayMillis: Long, fire: () -> Unit) {
+        internal fun arm(id: String, delayMillis: Long, info: UpcomingNotification? = null, fire: () -> Unit) {
             val timer = Timer("notify-$id", true)
-            val previous = synchronized(this) { timers.put(id, timer) }
+            val previous = synchronized(this) {
+                if (info != null) upcoming[id] = info else upcoming.remove(id)
+                timers.put(id, timer)
+            }
             previous?.cancel()
             timer.schedule(
                 object : TimerTask() {
@@ -422,7 +467,7 @@ interface Notifier {
                         try {
                             fire()
                         } finally {
-                            synchronized(this@Tray) { if (timers[id] === timer) timers.remove(id) }
+                            synchronized(this@Tray) { if (timers[id] === timer) { timers.remove(id); upcoming.remove(id) } }
                             timer.cancel()
                         }
                     }

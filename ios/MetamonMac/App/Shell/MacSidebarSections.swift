@@ -183,8 +183,34 @@ final class MacSidebarBadges {
     /// 行の右に出す文字(100 以上は 99+)
     nonisolated static func badgeText(_ count: Int) -> String { count > 99 ? "99+" : "\(count)" }
 
-    /// VoiceOver: 「アプリ名, 新着 N 件」
-    static func accessibilityLabel(name: String, count: Int) -> String {
-        count > 0 ? L10n.tr("\(name), 新着 \(count) 件") : name
+    /// VoiceOver: 「アプリ名, 新着 N 件」。リリース申請の札(#2250)があれば「, リリース申請: 検討中」を続ける
+    static func accessibilityLabel(name: String, count: Int, release: MacSidebarReleaseBadge? = nil) -> String {
+        let base = count > 0 ? L10n.tr("\(name), 新着 \(count) 件") : name
+        guard let release else { return base }
+        return "\(base), \(release.accessibilityLabel)"
     }
 }
+
+/// サイドバーの行のリリース申請の状況の札(#2250)。iOS の `ReleaseStatusBadge` と同じ語・記号・色。
+/// 審査用ビルドでは作らない(申請が無い)ので、行は審査用ビルドでも同じ型で受け取る。
+struct MacSidebarReleaseBadge: Equatable {
+    var label: String
+    var symbol: String
+    var accessibilityLabel: String
+    /// 見送りは薄く(iOS と同じ)
+    var dimmed: Bool
+}
+
+#if !APP_STORE_REVIEW
+extension MacSidebarReleaseBadge {
+    init(_ status: ReleaseStatus) {
+        self.init(label: status.label, symbol: status.symbol, accessibilityLabel: status.accessibilityLabel,
+                  dimmed: status == .declined)
+    }
+
+    /// 行に出す札。申請していないアプリは nil
+    static func badge(appId: String, in byApp: [String: ReleaseRequest]) -> MacSidebarReleaseBadge? {
+        byApp[appId].map { MacSidebarReleaseBadge($0.kind) }
+    }
+}
+#endif

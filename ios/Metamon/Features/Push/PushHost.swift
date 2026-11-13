@@ -59,22 +59,14 @@ final class PushHost {
 }
 
 /// `registerForRemoteNotifications` の結果を受ける。aps-environment が無い間は失敗するだけで、利用者には何も出さない。
-final class PushAppDelegate: NSObject, UIApplicationDelegate {
+/// シーンの代理(長押しメニュー #2232)は `MetamonAppDelegate` から継ぐ。
+final class PushAppDelegate: MetamonAppDelegate {
     func application(_ application: UIApplication, didRegisterForRemoteNotificationsWithDeviceToken deviceToken: Data) {
         Task { await PushHost.shared.receive(token: deviceToken) }
     }
 
     func application(_ application: UIApplication, didFailToRegisterForRemoteNotificationsWithError error: Error) {
         print("[Metamon] push: registerForRemoteNotifications failed")
-    }
-}
-
-extension ForegroundNotificationPresenter {
-    /// プッシュのタップで該当アプリを開く。ローカル通知には appId が無いので今までどおり何もしない。
-    func userNotificationCenter(_ center: UNUserNotificationCenter, didReceive response: UNNotificationResponse) async {
-        guard response.actionIdentifier == UNNotificationDefaultActionIdentifier,
-              let appId = PushPayload.appId(from: response.notification.request.content.userInfo) else { return }
-        await PushHost.shared.open(appId: appId)
     }
 }
 

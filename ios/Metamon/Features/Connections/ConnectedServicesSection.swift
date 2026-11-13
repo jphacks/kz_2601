@@ -115,10 +115,7 @@ struct ConnectedServicesSection: View {
         }
     }
 
-    static var paidFeature: PaidFeature {
-        PaidFeature(id: "externalServices", title: L10n.tr("つないだサービス"),
-                    reason: L10n.tr("外のサービスを呼ぶたびにサーバーの費用がかかるため、Pro の機能です。"))
-    }
+    static var paidFeature: PaidFeature { ExtDenialCopy.externalServicesFeature }
 }
 
 /// 「つなぐ」の流れ(設定の一覧と、外の API の断りの案内 #2001 で同じものを呼ぶ)。
