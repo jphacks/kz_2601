@@ -18,6 +18,7 @@ struct PublishConfirmSheet: View {
                 VStack(alignment: .leading, spacing: Theme.Spacing.md) {
                     Label("公開すると", systemImage: "globe.asia.australia")
                         .font(.headline)
+                        .accessibilityAddTraits(.isHeader)
                     ForEach(PublishConfirmCopy.points, id: \.text) { p in
                         HStack(alignment: .firstTextBaseline, spacing: Theme.Spacing.sm) {
                             Image(systemName: p.icon)

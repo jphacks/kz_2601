@@ -56,6 +56,7 @@ struct ScreenMapSheet: View {
             VStack(alignment: .leading, spacing: Theme.Spacing.xs) {
                 Text(ScreenMapCopy.title)
                     .font(.system(size: titleSize, weight: .bold, design: .rounded))
+                    .accessibilityAddTraits(.isHeader)
                 Text(L10n.tr("「\(rt.dsl.app.name)」の画面のつながり"))
                     .font(.footnote)
                     .foregroundStyle(.secondary)

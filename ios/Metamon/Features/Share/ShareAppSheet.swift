@@ -133,6 +133,7 @@ struct ShareAppSheet: View {
         VStack(alignment: .leading, spacing: Theme.Spacing.md) {
             Label("みんなに公開", systemImage: "globe.asia.australia")
                 .font(.headline)
+                .accessibilityAddTraits(.isHeader)
             if !listingLoaded {
                 RoundedRectangle(cornerRadius: 6).fill(Theme.Colors.surfaceElevated).frame(height: 44)
             } else if let listing {
