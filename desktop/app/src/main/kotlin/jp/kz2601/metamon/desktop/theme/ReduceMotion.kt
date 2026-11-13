@@ -114,3 +114,11 @@ fun rememberReduceMotion(override: Boolean? = ReduceMotion.overrideFromEnv()): S
     }
     return state
 }
+
+/** 動きを止める所の規則(#2999)。Compose に依らず試せるようにここに置く。 */
+object MotionRules {
+    /** 読み込みの形の明るさ。動きを減らす時は明滅の中間で固定する。 */
+    fun skeletonAlpha(reduceMotion: Boolean, animated: Float): Float = if (reduceMotion) SKELETON_STATIC_ALPHA else animated
+
+    const val SKELETON_STATIC_ALPHA = 0.65f
+}
