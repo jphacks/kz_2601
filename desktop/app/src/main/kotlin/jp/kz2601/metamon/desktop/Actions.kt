@@ -10,6 +10,8 @@ import jp.kz2601.metamon.desktop.io.RecordIo
 import jp.kz2601.metamon.desktop.io.Tsv
 import jp.kz2601.metamon.desktop.io.UserDirs
 import jp.kz2601.metamon.desktop.notify.DesktopNotice
+import jp.kz2601.metamon.desktop.notify.NoticeAction
+import jp.kz2601.metamon.desktop.notify.NoticeActions
 import jp.kz2601.metamon.desktop.notify.TrayNotifier
 import jp.kz2601.metamon.desktop.notify.Notifier as DisplayNotifier
 import jp.kz2601.metamon.desktop.store.writeAtomically
@@ -386,6 +388,24 @@ interface Notifier {
         /** すぐ出す(予約しない)。出せなければ何もしない。 */
         fun notify(title: String, body: String) {
             display.show(DesktopNotice(title, body))
+        }
+
+        /**
+         * ボタン(開く・あとで)付きですぐ出す(#3210)。出す口がボタンを出せなければボタン無しで出す。
+         * 押された印は [jp.kz2601.metamon.desktop.notify.NoticeActions] に届き、[onAction] にもどのボタンかを渡す。
+         */
+        fun notifyWithActions(
+            id: String,
+            title: String,
+            body: String,
+            actions: List<NoticeAction> = listOf(NoticeAction.OPEN, NoticeAction.LATER),
+            onAction: ((NoticeAction) -> Unit)? = null,
+        ): Boolean {
+            val d = display
+            if (!d.supportsActions) return d.show(DesktopNotice(title, body))
+            val notice = DesktopNotice(title, body, id = id, actions = actions, onAction = onAction)
+            NoticeActions.remember(notice)
+            return d.show(notice)
         }
 
         override fun schedule(n: Notification): String {

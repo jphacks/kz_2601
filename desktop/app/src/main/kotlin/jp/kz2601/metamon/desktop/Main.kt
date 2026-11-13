@@ -28,6 +28,9 @@ import java.awt.event.WindowAdapter
 import java.awt.event.WindowEvent
 import jp.kz2601.metamon.desktop.i18n.Strings
 import jp.kz2601.metamon.desktop.io.DragOut
+import jp.kz2601.metamon.desktop.notify.NoticeAction
+import jp.kz2601.metamon.desktop.notify.NoticeActions
+import jp.kz2601.metamon.desktop.notify.NoticeArgs
 import jp.kz2601.metamon.desktop.store.DesktopStore
 import jp.kz2601.metamon.desktop.store.DeviceWipe
 import jp.kz2601.metamon.desktop.store.SessionPersistence
@@ -47,12 +50,16 @@ import javax.swing.SwingUtilities
  * 同じ保存先ではプロセスを 1 つだけ起動する。2 つ目は起動中の方へ引数を渡して前に出させる(SingleInstance.kt)。
  * 記録の JSON を渡した時(開発・スクリーンショット)は端末に残さないので、ロックを取らずに何本でも起動できる。
  */
-fun main(args: Array<String>) {
+fun main(argv: Array<String>) {
+    // 通知のボタン(#3210)で起動した時は `tailorit-notice:…` の引数が付く。ほかの引数の並びは崩さない
+    val press = NoticeArgs.parse(argv.toList())
+    val args = NoticeArgs.strip(argv.toList()).toTypedArray()
     // 同じ保存先で 2 つ目は起動しない(#1754 の JSON を 2 つのプロセスで書き合わない)
     if (args.getOrNull(1) == null && !SingleInstance.claim()) {
-        if (!SingleInstance.handOff(args = args.toList())) SingleInstance.reportRunning()
+        if (!SingleInstance.handOff(args = argv.toList())) SingleInstance.reportRunning()
         return
     }
+    press?.let(NoticeActions::deliver)
     runApp(args)
 }
 
@@ -107,7 +114,17 @@ private fun runApp(args: Array<String>) = application {
     tray.onOpenApp = { registry.open(WindowKey.app(it)) }
     // 2 つ目の起動: 渡されたアプリ(無ければ前にあるアプリ)を開いて前に出す。トレイに隠れていても出す
     remember {
-        SingleInstance.onHandoff { a ->
+        // 通知のボタン(#3210): 開くはアプリを前に出す。どのボタンかは通知の onAction にも渡る
+        NoticeActions.onPress { p ->
+            SwingUtilities.invokeLater { if (p.action == NoticeAction.OPEN) tray.open() }
+        }
+        SingleInstance.onHandoff { argv ->
+            val press = NoticeArgs.parse(argv)
+            if (press != null) {
+                NoticeActions.deliver(press)
+                return@onHandoff
+            }
+            val a = NoticeArgs.strip(argv)
             SwingUtilities.invokeLater {
                 val id = a.firstOrNull()?.takeIf { it in BundledApps.ids() } ?: registry.active?.key?.appId ?: first
                 tray.openApp(id)

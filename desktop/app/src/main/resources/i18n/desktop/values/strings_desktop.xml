@@ -98,6 +98,8 @@
     <string name="desktop_loading">読み込み中…</string>
     <string name="desktop_markdown_link_confirm">%1$s を開きますか？</string>
     <string name="desktop_match_offline">仲間探しのつながりはサインインした後に出ます</string>
+    <string name="desktop_notice_action_later">あとで</string>
+    <string name="desktop_notice_action_open">開く</string>
     <string name="desktop_notification_now">今</string>
     <string name="desktop_notification_scheduled">通知を予約しました(%1$s・アプリを開いている間だけ)</string>
     <string name="desktop_picker_empty">候補がありません</string>
