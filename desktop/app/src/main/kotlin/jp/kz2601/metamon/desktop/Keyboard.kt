@@ -40,6 +40,8 @@ import jp.kz2601.metamon.desktop.i18n.Strings
 import jp.kz2601.metamon.desktop.share.ShareLinkDialog
 import jp.kz2601.metamon.desktop.share.ShareLinkEntry
 import jp.kz2601.metamon.desktop.net.DesktopApiConfig
+import jp.kz2601.metamon.desktop.theme.TextZoom
+import jp.kz2601.metamon.desktop.theme.TextZoomState
 import jp.kz2601.metamon.dsl.Action
 import jp.kz2601.metamon.dsl.ActionType
 import jp.kz2601.metamon.dsl.AppDSL
@@ -80,6 +82,9 @@ object KeyboardText {
     val WIPE_CONFIRM get() = Strings["desktop_wipe_confirm"]
     val WIPE_CONFIRM_BUTTON get() = Strings["desktop_wipe_confirm_button"]
     val WIPE_DONE get() = Strings["desktop_wipe_done"]
+    val ZOOM_IN get() = Strings["desktop_keys_zoom_in"]
+    val ZOOM_OUT get() = Strings["desktop_keys_zoom_out"]
+    val ZOOM_RESET get() = Strings["desktop_keys_zoom_reset"]
 }
 
 /** キーの決まりを分ける OS。Windows・Linux は Ctrl、macOS は ⌘。 */
@@ -115,6 +120,10 @@ enum class Shortcut(private val text: () -> String, val bubble: Boolean = false)
 
     /** 一覧・表で消した行を戻す(#3351)。入力欄の Ctrl+Z(文字の取り消し)を先に通す。戻す物が無ければ流す。 */
     UNDO({ KeyboardText.UNDO }, bubble = true),
+    /** 画面全体の文字の大きさ(#2208・theme/TextZoom.kt)。 */
+    ZOOM_IN({ KeyboardText.ZOOM_IN }),
+    ZOOM_OUT({ KeyboardText.ZOOM_OUT }),
+    ZOOM_RESET({ KeyboardText.ZOOM_RESET }),
     ;
 
     val title: String get() = text()
@@ -151,6 +160,25 @@ object Keymap {
         Shortcut.UNDO -> listOf(KeyChord(Key.Z, primary = true))
         // macOS のキーボードの delete は Backspace。項目の削除は ⌘⌫(Finder と同じ)。fn+delete(前方削除)も受ける
         Shortcut.DELETE -> if (os == HostOs.MAC) listOf(KeyChord(Key.Backspace, primary = true), KeyChord(Key.Delete)) else listOf(KeyChord(Key.Delete))
+        Shortcut.ZOOM_IN -> listOf(KeyChord(Key.Plus, primary = true))
+        Shortcut.ZOOM_OUT -> listOf(KeyChord(Key.Minus, primary = true))
+        Shortcut.ZOOM_RESET -> listOf(KeyChord(Key.Zero, primary = true))
+    }
+
+    /**
+     * 一覧には出さないが受ける組み。「+」は配列で押し方が違う: US は Shift+=(= だけでも受ける)、JIS は Shift+;。テンキーも受ける。
+     */
+    private fun aliases(s: Shortcut): List<KeyChord> = when (s) {
+        Shortcut.ZOOM_IN -> listOf(
+            KeyChord(Key.Plus, primary = true, shift = true),
+            KeyChord(Key.Equals, primary = true),
+            KeyChord(Key.Equals, primary = true, shift = true),
+            KeyChord(Key.Semicolon, primary = true, shift = true),
+            KeyChord(Key.NumPadAdd, primary = true),
+        )
+        Shortcut.ZOOM_OUT -> listOf(KeyChord(Key.Minus, primary = true, shift = true), KeyChord(Key.NumPadSubtract, primary = true))
+        Shortcut.ZOOM_RESET -> listOf(KeyChord(Key.NumPad0, primary = true))
+        else -> emptyList()
     }
 
     fun matches(c: KeyChord, p: KeyPress, os: HostOs): Boolean {
@@ -161,7 +189,7 @@ object Keymap {
     }
 
     /** 押したキーのショートカット。印刷も返す(処理は Print.kt)。 */
-    fun match(p: KeyPress, os: HostOs): Shortcut? = Shortcut.entries.firstOrNull { s -> chords(s, os).any { matches(it, p, os) } }
+    fun match(p: KeyPress, os: HostOs): Shortcut? = Shortcut.entries.firstOrNull { s -> (chords(s, os) + aliases(s)).any { matches(it, p, os) } }
 
     /** 一覧・パレットに出す表記(最初の組み)。Windows・Linux は「Ctrl+Shift+P」、macOS は「⇧⌘P」。 */
     fun label(s: Shortcut, os: HostOs): String = label(chords(s, os).first(), os)
@@ -188,6 +216,9 @@ object Keymap {
         Key.S -> "S"
         Key.F -> "F"
         Key.Z -> "Z"
+        Key.Plus -> "+"
+        Key.Minus -> "-"
+        Key.Zero -> "0"
         else -> k.toString()
     }
 }
@@ -306,6 +337,9 @@ class DesktopKeyboard(
     /** 一番外そのものがフォーカスを持つ(入力欄・ボタンなど中の部品を選んでいない)。Space で写真を開くのはこの時だけ。 */
     internal var rootFocused = false
 
+    /** 画面全体の文字の倍率(#2208)。全部のウィンドウで 1 つ。 */
+    var textZoom: TextZoomState = TextZoom.app
+
     /** サードパーティのライセンス(Licenses.kt)。F1 の一覧とパレットから開く。 */
     var licensesOpen by mutableStateOf(false)
 
@@ -355,6 +389,10 @@ class DesktopKeyboard(
 
     /** ショートカット 1 つ。この画面で使えなければ false(キーは他へ流す)。 */
     fun run(s: Shortcut): Boolean {
+        zoom(s)?.let { v ->
+            session.message = Strings.format("desktop_text_zoom_now", TextZoom.percent(v))
+            return true
+        }
         val screen = topScreen ?: return false
         val form = session.form(session.top)
         when (s) {
@@ -368,8 +406,17 @@ class DesktopKeyboard(
             Shortcut.CLOSE -> if (session.canClose(session.top)) session.back(session.top) else return false
             Shortcut.PREVIEW -> if (!openPreview()) session.message = KeyboardText.NO_PREVIEW
             Shortcut.UNDO -> return session.undoDelete()
+            Shortcut.ZOOM_IN, Shortcut.ZOOM_OUT, Shortcut.ZOOM_RESET -> Unit // 上の zoom で済んでいる
         }
         return true
+    }
+
+    /** 文字の大きさのショートカットなら倍率を変えて新しい値を返す。他は null。 */
+    private fun zoom(s: Shortcut): Float? = when (s) {
+        Shortcut.ZOOM_IN -> textZoom.zoomIn()
+        Shortcut.ZOOM_OUT -> textZoom.zoomOut()
+        Shortcut.ZOOM_RESET -> textZoom.reset()
+        else -> null
     }
 
     /** 画面へ移る(タブはタブを選ぶ・他は push)。 */

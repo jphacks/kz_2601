@@ -38,6 +38,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import jp.kz2601.metamon.dsl.Screen
@@ -322,6 +323,9 @@ private fun ScreenView(
 private val GAP = 8.dp
 private val INSET = 16.dp
 
+/** Container 内グリッドの 1 行(文字の倍率を掛けて使う)。 */
+private val LOCAL_ROW = 40.dp
+
 /**
  * 画面グリッド(iOS の GridScreenLayout・Android の screen/GridScreenLayout.kt)。
  * area のある部品は 6 列 × 行の矩形に絶対配置、area の無い部品はその下に全幅で積む。フォーム画面は段ごとに中身の高さで積む。
@@ -330,7 +334,7 @@ private val INSET = 16.dp
 @Composable
 private fun GridScreen(screen: Screen, s: ScreenScope) {
     BoxWithConstraints(Modifier.fillMaxSize()) {
-        val m = DesktopGridMetrics.resolve(maxWidth.value, maxHeight.value, INSET.value)
+        val m = DesktopGridMetrics.resolve(maxWidth.value, maxHeight.value, INSET.value, LocalDensity.current.fontScale)
         val cellW = m.cellW.dp
         val cellH = m.cellH.dp
         val placement = screen.gridPlacement
@@ -397,7 +401,7 @@ private fun LocalGridOrChildren(c: Component, s: ScreenScope, modifier: Modifier
         val cellW = maxWidth / GridArea.COLUMNS
         Column(verticalArrangement = Arrangement.spacedBy(GAP)) {
             c.title?.let { Text(it, style = MaterialTheme.typography.titleMedium) }
-            FormBands(local, cellW, 40.dp, s)
+            FormBands(local, cellW, LOCAL_ROW * LocalDensity.current.fontScale, s)
         }
     }
 }

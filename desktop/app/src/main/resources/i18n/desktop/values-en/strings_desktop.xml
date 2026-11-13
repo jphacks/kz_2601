@@ -142,6 +142,9 @@
     <string name="desktop_keys_preview">Preview photo</string>
     <string name="desktop_keys_save">Save</string>
     <string name="desktop_keys_search">Search</string>
+    <string name="desktop_keys_zoom_in">Larger text</string>
+    <string name="desktop_keys_zoom_out">Smaller text</string>
+    <string name="desktop_keys_zoom_reset">Reset text size</string>
     <string name="desktop_language_restart_note">The language change takes effect the next time you start the app</string>
     <string name="desktop_launch_action_new_window">New window</string>
     <string name="desktop_launch_action_quick_record">Quick record</string>
@@ -209,6 +212,7 @@
     <string name="desktop_sync_offline_pending">Not sending (%1$d waiting to send)</string>
     <string name="desktop_sync_pending">%1$d waiting to send</string>
     <string name="desktop_sync_synced">Up to date</string>
+    <string name="desktop_text_zoom_now">Text size %1$s</string>
     <string name="desktop_timer_done">Time\'s up</string>
     <string name="desktop_timer_name">Timer</string>
     <string name="desktop_timer_pause">Pause</string>
