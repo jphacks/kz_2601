@@ -5,6 +5,7 @@
 #   wait       起動済みのエミュレータが応答するまで待つ(最大 90 秒)
 #   test       起動済みのエミュレータに対してエミュレータ試験を回す
 #   test-all   起動していなければ一時的に起動 → test → 自分で起動した分だけ止める
+#   summary F  go test -json の出力 F から、パッケージごとの回った数・Skip の数を表で出す(落とさない・#3267)
 # 接続先は FIRESTORE_EMULATOR_HOST(既定 127.0.0.1:8089)。プロジェクトは demo-kz2601 固定
 # (demo- プロジェクトは実 GCP に繋がらない。テスト側もハードコード)。必要なもの: gcloud
 # (cloud-firestore-emulator コンポーネント)・Java 11+・Go・jq・curl。
@@ -37,6 +38,36 @@ cmd_wait() {
   return 1
 }
 
+# go test -json の出力から、エミュレータ試験を持つパッケージごとの pass / skip の数と回ったかを表で出す。
+# 読むだけ。Skip があっても失敗にはしない(失敗の判定は cmd_test)。回った = Skip 0 かつ pass 1 以上。
+cmd_summary() {
+  local f="${1:-}"
+  [ -f "$f" ] || { echo "usage: $0 summary <go-test-json-file>" >&2; return 2; }
+  local rows
+  rows=$(jq -rs '
+    [ .[] | select(.Test != null and .Package != null and (.Action=="pass" or .Action=="skip")) ]
+    | group_by(.Package)
+    | map({pkg: .[0].Package,
+           pass: (map(select(.Action=="pass")) | length),
+           skip: (map(select(.Action=="skip")) | length)})
+    | sort_by(.pkg)[]
+    | [.pkg, .pass, .skip, (if .skip > 0 then "SKIP" elif .pass > 0 then "ran" else "none" end)] | @tsv' "$f")
+  local ran=0 skipped=0 total=0 pkg pass skip st
+  echo "== emulator test packages =="
+  printf '%-60s %5s %5s  %s\n' PACKAGE PASS SKIP STATUS
+  while IFS=$'\t' read -r pkg pass skip st; do
+    [ -n "$pkg" ] || continue
+    printf '%-60s %5s %5s  %s\n' "${pkg#*/backend/}" "$pass" "$skip" "$st"
+    total=$((total + 1))
+    case "$st" in ran) ran=$((ran + 1)) ;; SKIP) skipped=$((skipped + 1)) ;; esac
+  done <<<"$rows"
+  echo "packages: $total / ran: $ran / skipped: $skipped"
+  if [ -n "${GITHUB_STEP_SUMMARY:-}" ]; then
+    echo "Emulator test packages: $total, ran: $ran, skipped: $skipped" >> "$GITHUB_STEP_SUMMARY"
+  fi
+  return 0
+}
+
 cmd_test() {
   up || { echo "::error::no emulator at $FIRESTORE_EMULATOR_HOST" >&2; return 1; }
   local out status=0
@@ -50,6 +81,7 @@ cmd_test() {
   # shellcheck disable=SC2086
   go test -count=1 -json $pkgs > "$out" || status=$?
   jq -rj 'select(.Action=="output") | .Output' "$out"
+  cmd_summary "$out" || true
 
   # 黙ってスキップさせない: スキップ理由にエミュレータが出たら、または
   # Firestore 系テスト(TestFirestore* / */firestore)が 1 件でもスキップされたら失敗
@@ -83,5 +115,6 @@ case "${1:-}" in
   wait) cmd_wait ;;
   test) cmd_test ;;
   test-all) cmd_test_all ;;
-  *) echo "usage: $0 start|wait|test|test-all" >&2; exit 2 ;;
+  summary) shift; cmd_summary "$@" ;;
+  *) echo "usage: $0 start|wait|test|test-all|summary <json>" >&2; exit 2 ;;
 esac
