@@ -3,6 +3,7 @@ package ai
 import (
 	"context"
 	"encoding/json"
+	"math"
 	"net/http"
 	"regexp"
 	"strings"
@@ -88,8 +89,8 @@ func TestTemplateEligibility(t *testing.T) {
 
 // The regexp runs in linear time: a prompt of many placeholders against a
 // long instruction that almost matches ends quickly. Wall-clock limits flake
-// on slow runners (-race), so compare input sizes n and 4n instead: linear
-// time grows about 4x, quadratic 16x.
+// on slow runners (-race), so compare input sizes n and 8n instead: linear
+// time grows about 8x, quadratic 64x.
 func TestTemplateMatchLinear(t *testing.T) {
 	tmpl := strings.Repeat("{{a}}あ", maxScopePlaceholders) + "終わり" + strings.Repeat("。", 20)
 	tm, err := compileTemplate(tmpl)
@@ -98,21 +99,57 @@ func TestTemplateMatchLinear(t *testing.T) {
 	}
 	cost := func(runes int) time.Duration {
 		s := strings.Repeat("あ", runes-1) + "x"
-		best := time.Duration(1<<63 - 1)
-		for range 5 {
-			start := time.Now()
-			if tm.match(s, false) || tm.match(s, true) {
-				t.Fatalf("%d runes: matched", runes)
-			}
-			best = min(best, time.Since(start))
+		start := time.Now()
+		if tm.match(s, false) || tm.match(s, true) {
+			t.Fatalf("%d runes: matched", runes)
 		}
-		return best
+		return time.Since(start)
 	}
-	n := dsl.MaxAIInstructionRunes
-	small, large := cost(n), cost(4*n)
-	if large > 8*small {
-		t.Errorf("%d runes took %s, %d runes %s: not linear", n, small, 4*n, large)
+	if r, ok := linearGrowth(cost, dsl.MaxAIInstructionRunes); !ok {
+		t.Errorf("%d -> %d runes took %.1fx longer: not linear", dsl.MaxAIInstructionRunes, growthFactor*dsl.MaxAIInstructionRunes, r)
 	}
+}
+
+// The check itself still catches a quadratic cost.
+func TestLinearGrowthCatchesQuadratic(t *testing.T) {
+	var sink int
+	quadratic := func(n int) time.Duration {
+		start := time.Now()
+		for i := range n * n / 2 {
+			sink += i & 1
+		}
+		return time.Since(start)
+	}
+	if r, ok := linearGrowth(quadratic, dsl.MaxAIInstructionRunes); ok {
+		t.Errorf("quadratic grew %.1fx and passed as linear", r)
+	}
+	_ = sink
+}
+
+const (
+	growthFactor   = 8  // the large input is growthFactor times the small one
+	maxGrowthRatio = 24 // linear ~8x, quadratic ~64x: 3x headroom for noise
+)
+
+// linearGrowth compares cost(n) and cost(growthFactor*n). Each size takes
+// the fastest of several interleaved runs (noise only adds time), and a
+// ratio over maxGrowthRatio is measured again before it counts, so a burst
+// of load on a shared runner does not fail it. It returns the best ratio.
+func linearGrowth(cost func(n int) time.Duration, n int) (float64, bool) {
+	best := math.Inf(1)
+	for range 3 {
+		small, large := time.Duration(math.MaxInt64), time.Duration(math.MaxInt64)
+		for range 7 {
+			small = min(small, cost(n))
+			large = min(large, cost(growthFactor*n))
+		}
+		r := float64(large) / float64(max(small, 1))
+		best = min(best, r)
+		if r <= maxGrowthRatio {
+			return best, true
+		}
+	}
+	return best, false
 }
 
 // The compiled published DSL is cached per app for a short while, so a burst

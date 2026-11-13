@@ -1,28 +1,82 @@
 package extapi
 
 import (
+	"bytes"
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
+	"fmt"
+	"math"
 	"net/http"
 	"net/url"
+	"os"
+	"regexp"
+	"strconv"
 	"strings"
+	"sync"
 	"time"
 )
 
 // Philips Hue remote API (#2142): the person's lights through Hue's cloud.
+//
+//	lights()   Rows: name / on・brightness 0-100 (or not reachable) / light id;
+//	           Cells: id, name, on, brightness, reachable
+//	setLight(id, on, brightness?)   write (the DSL asks for a confirmation):
+//	           Item: the new state / light id; ResultID: the light id
+//
+// setLight's id is a light id from lights() (a UUID); on is true / false;
+// brightness 1-100 only with on=true. A write op is never retried.
+//
+// Off by default and registered only with EXT_HUE_ENABLED=1. Answers are
+// never cached (an OAuth provider never is).
+//
+// The remote CLIP v2 API needs, besides the bearer token, an application key
+// of the person's bridge (hue-application-key). It is made by the remote
+// link (PUT /route/api/0/config linkbutton, then POST /route/api) and kept
+// in memory per access token only: Token has no place for it. Storing it
+// sealed with the connection is a follow-up.
+//
 // Per-user OAuth 2.0 (Hue's v2 endpoints). The client id and secret go to
 // the token endpoint as HTTP Basic, never in a URL. Hue has no scopes, does
 // not take PKCE, and has no revoke endpoint (Revoke is ErrNoRevoke: the
 // tokens are deleted; the person removes the app in the Hue account).
 //
-// Env: EXT_HUE_CLIENT_ID, EXT_HUE_CLIENT_SECRET (Secret Manager).
+// Env: EXT_HUE_ENABLED=1, EXT_HUE_CLIENT_ID, EXT_HUE_CLIENT_SECRET (Secret
+// Manager).
 const Hue = "hue"
+
+func init() {
+	if flag(os.Getenv("EXT_HUE_ENABLED")) {
+		register(hueProvider())
+	}
+}
+
+// hueProvider is Hue's definition (registered only when enabled).
+func hueProvider() Provider {
+	return Provider{ID: Hue, Billing: BillingFree, NeedsOAuth: true, NameJa: "Philips Hue", NameEn: "Philips Hue",
+		Ops: []OpSpec{
+			{Name: "lights"},
+			{Name: "setLight", Write: true, Args: []string{"id", "on", "brightness"}, Check: checkHueSetLight},
+		},
+		Hosts: hueHosts,
+		New: func(sec Secrets) (map[string]Operation, error) {
+			c, err := newHue(sec, hueWireDefault)
+			if err != nil {
+				return nil, err
+			}
+			return map[string]Operation{"lights": OperationFunc(c.lights), "setLight": OperationFunc(c.setLight)}, nil
+		},
+		NewOAuth: func(sec Secrets) (OAuthClient, error) { return newHue(sec, hueWireDefault) },
+	}
+}
 
 // hueWire is where the provider talks to; tests point it at httptest.
 type hueWire struct {
 	AuthURL  string // opened in the browser, not reached by the runner
 	TokenURL string
+	APIBase  string
 	// Client is nil in production: NewHTTPClient on hueHosts.
 	Client *http.Client
 	// Now is nil in production (time.Now).
@@ -32,6 +86,7 @@ type hueWire struct {
 var hueWireDefault = hueWire{
 	AuthURL:  "https://api.meethue.com/v2/oauth2/authorize",
 	TokenURL: "https://api.meethue.com/v2/oauth2/token",
+	APIBase:  "https://api.meethue.com",
 }
 
 // hueHosts: the only host the runner reaches (token and remote API).
@@ -42,6 +97,10 @@ type hue struct {
 	wire hueWire
 	hc   *http.Client
 	now  func() time.Time
+
+	// keys are the bridges' application keys by sha256(access token).
+	mu   sync.Mutex
+	keys map[string]string
 }
 
 func newHue(sec Secrets, w hueWire) (*hue, error) {
@@ -56,7 +115,7 @@ func newHue(sec Secrets, w hueWire) (*hue, error) {
 	if now == nil {
 		now = time.Now
 	}
-	return &hue{sec: sec, wire: w, hc: hc, now: now}, nil
+	return &hue{sec: sec, wire: w, hc: hc, now: now, keys: map[string]string{}}, nil
 }
 
 // --- OAuth ---
@@ -130,4 +189,268 @@ func (c *hue) token(ctx context.Context, form url.Values, prev Token) (Token, er
 		t.RefreshToken = prev.RefreshToken
 	}
 	return t, nil
+}
+
+// --- remote API ---
+
+// hueMaxKeys bounds the in-memory application keys (dropped all at once past it).
+const hueMaxKeys = 1000
+
+// hueDeviceType is the name the bridge lists the runner's key under.
+const hueDeviceType = "tailorit#runner"
+
+func hueTokenKey(t *Token) string {
+	sum := sha256.Sum256([]byte(t.AccessToken))
+	return hex.EncodeToString(sum[:])
+}
+
+// send makes one call to the remote API and reads a 2xx answer into out.
+// 401 is a token Hue no longer takes; 404 a light the bridge does not have;
+// 429 / 5xx are retryable.
+func (c *hue) send(ctx context.Context, tok *Token, appKey, method, path string, body, out any) error {
+	var payload []byte
+	if body != nil {
+		b, err := json.Marshal(body)
+		if err != nil {
+			return err
+		}
+		payload = b
+	}
+	req, err := http.NewRequestWithContext(ctx, method, c.wire.APIBase+path, bytes.NewReader(payload))
+	if err != nil {
+		return errors.New("hue: building the request failed")
+	}
+	req.Header.Set("Authorization", "Bearer "+tok.AccessToken)
+	req.Header.Set("Accept", "application/json")
+	if body != nil {
+		req.Header.Set("Content-Type", "application/json")
+	}
+	if appKey != "" {
+		req.Header.Set("hue-application-key", appKey)
+	}
+	resp, err := c.hc.Do(req)
+	if err != nil {
+		return err
+	}
+	defer func() { _ = resp.Body.Close() }()
+	b, err := ReadBody(resp.Body)
+	if err != nil {
+		return err
+	}
+	switch {
+	case resp.StatusCode == http.StatusUnauthorized:
+		return ErrInvalidGrant
+	case resp.StatusCode == http.StatusNotFound:
+		return &ProviderError{Status: resp.StatusCode, Err: fmt.Errorf("%w: hue has no such light", ErrUnknown)}
+	case resp.StatusCode == http.StatusTooManyRequests || resp.StatusCode >= 500:
+		return &ProviderError{Status: resp.StatusCode, Retryable: true, Err: errors.New("hue unavailable")}
+	case resp.StatusCode < 200 || resp.StatusCode > 299:
+		return &ProviderError{Status: resp.StatusCode, Err: errors.New("hue refused")}
+	}
+	if out == nil {
+		return nil
+	}
+	if err := json.Unmarshal(b, out); err != nil {
+		return &ProviderError{Status: resp.StatusCode, Err: errors.New("hue: bad answer")}
+	}
+	return nil
+}
+
+// appKey is the bridge's application key for tok: from memory, or made by
+// the remote link.
+func (c *hue) appKey(ctx context.Context, tok *Token) (string, error) {
+	k := hueTokenKey(tok)
+	c.mu.Lock()
+	key, ok := c.keys[k]
+	c.mu.Unlock()
+	if ok {
+		return key, nil
+	}
+	if err := c.send(ctx, tok, "", http.MethodPut, "/route/api/0/config", map[string]bool{"linkbutton": true}, nil); err != nil {
+		return "", err
+	}
+	var r []struct {
+		Success *struct {
+			Username string `json:"username"`
+		} `json:"success"`
+	}
+	if err := c.send(ctx, tok, "", http.MethodPost, "/route/api", map[string]string{"devicetype": hueDeviceType}, &r); err != nil {
+		return "", err
+	}
+	if len(r) == 0 || r[0].Success == nil || r[0].Success.Username == "" {
+		return "", &ProviderError{Status: http.StatusBadGateway, Err: errors.New("hue: the bridge gave no application key")}
+	}
+	key = r[0].Success.Username
+	c.mu.Lock()
+	if len(c.keys) >= hueMaxKeys {
+		c.keys = map[string]string{}
+	}
+	c.keys[k] = key
+	c.mu.Unlock()
+	return key, nil
+}
+
+// get reads a CLIP v2 resource list (data[]) into out.
+func (c *hue) get(ctx context.Context, tok *Token, resource string, out any) error {
+	key, err := c.appKey(ctx, tok)
+	if err != nil {
+		return err
+	}
+	var r struct {
+		Data json.RawMessage `json:"data"`
+	}
+	if err := c.send(ctx, tok, key, http.MethodGet, "/route/clip/v2/resource/"+resource, nil, &r); err != nil {
+		return err
+	}
+	if len(r.Data) == 0 || string(r.Data) == "null" {
+		return nil
+	}
+	if err := json.Unmarshal(r.Data, out); err != nil {
+		return &ProviderError{Status: http.StatusBadGateway, Err: errors.New("hue: bad answer data")}
+	}
+	return nil
+}
+
+type hueLight struct {
+	ID       string `json:"id"`
+	Metadata struct {
+		Name string `json:"name"`
+	} `json:"metadata"`
+	Owner struct {
+		RID string `json:"rid"`
+	} `json:"owner"`
+	On struct {
+		On bool `json:"on"`
+	} `json:"on"`
+	Dimming *struct {
+		Brightness float64 `json:"brightness"`
+	} `json:"dimming"`
+}
+
+type hueConnectivity struct {
+	Owner struct {
+		RID string `json:"rid"`
+	} `json:"owner"`
+	Status string `json:"status"`
+}
+
+// brightness is 0-100 as an integer ("" for a light that cannot dim).
+func (l hueLight) brightness() string {
+	if l.Dimming == nil {
+		return ""
+	}
+	return strconv.Itoa(int(math.Max(0, math.Min(100, math.Round(l.Dimming.Brightness)))))
+}
+
+// lights: title = name, subtitle = on / off and brightness (or not
+// reachable), value = the light id. Kept in Hue's order.
+func (c *hue) lights(ctx context.Context, in Input) (Output, error) {
+	if in.Token == nil || in.Token.AccessToken == "" {
+		return Output{}, ErrNotConnected
+	}
+	var ls []hueLight
+	if err := c.get(ctx, in.Token, "light", &ls); err != nil {
+		return Output{}, err
+	}
+	out := Output{Rows: []Row{}, Cells: [][]string{}}
+	if len(ls) == 0 {
+		return out, nil
+	}
+	var conns []hueConnectivity
+	if err := c.get(ctx, in.Token, "zigbee_connectivity", &conns); err != nil {
+		return Output{}, err
+	}
+	unreachable := map[string]bool{}
+	for _, z := range conns {
+		if z.Status != "connected" {
+			unreachable[z.Owner.RID] = true
+		}
+	}
+	for _, l := range ls {
+		name := clip(strings.TrimSpace(l.Metadata.Name), 100)
+		bri := l.brightness()
+		reach := !unreachable[l.Owner.RID]
+		var sub string
+		switch {
+		case !reach:
+			sub = "つながっていません"
+		case !l.On.On:
+			sub = "オフ"
+		case bri != "":
+			sub = "オン・明るさ " + bri + "%"
+		default:
+			sub = "オン"
+		}
+		out.Rows = append(out.Rows, Row{Title: name, Subtitle: sub, Value: l.ID})
+		out.Cells = append(out.Cells, []string{l.ID, name, strconv.FormatBool(l.On.On), bri, strconv.FormatBool(reach)})
+	}
+	return out, nil
+}
+
+// hueIDRe is a CLIP v2 resource id (a UUID, lower case).
+var hueIDRe = regexp.MustCompile(`^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$`)
+
+type hueSet struct {
+	id         string
+	on         bool
+	brightness int // 0 = not changed
+}
+
+func hueSetArgs(a map[string]string) (hueSet, error) {
+	id := strings.TrimSpace(a["id"])
+	if !hueIDRe.MatchString(id) {
+		return hueSet{}, fmt.Errorf("%w: id must be a light id from lights()", ErrBadArgs)
+	}
+	s := hueSet{id: id}
+	switch strings.TrimSpace(a["on"]) {
+	case "true":
+		s.on = true
+	case "false":
+	default:
+		return hueSet{}, fmt.Errorf("%w: on must be true or false", ErrBadArgs)
+	}
+	b, err := argInt(a, "brightness", 0, 1, 100)
+	if err != nil {
+		return hueSet{}, err
+	}
+	if b > 0 && !s.on {
+		return hueSet{}, fmt.Errorf("%w: brightness is only for on=true", ErrBadArgs)
+	}
+	s.brightness = b
+	return s, nil
+}
+
+func checkHueSetLight(a map[string]string) error {
+	_, err := hueSetArgs(a)
+	return err
+}
+
+// setLight turns a light on or off (and sets its brightness).
+func (c *hue) setLight(ctx context.Context, in Input) (Output, error) {
+	if in.Token == nil || in.Token.AccessToken == "" {
+		return Output{}, ErrNotConnected
+	}
+	s, err := hueSetArgs(in.Args)
+	if err != nil {
+		return Output{}, err
+	}
+	key, err := c.appKey(ctx, in.Token)
+	if err != nil {
+		return Output{}, err
+	}
+	body := map[string]any{"on": map[string]bool{"on": s.on}}
+	if s.brightness > 0 {
+		body["dimming"] = map[string]int{"brightness": s.brightness}
+	}
+	if err := c.send(ctx, in.Token, key, http.MethodPut, "/route/clip/v2/resource/light/"+s.id, body, nil); err != nil {
+		return Output{}, err
+	}
+	title := "オフ"
+	switch {
+	case s.on && s.brightness > 0:
+		title = "オン・明るさ " + strconv.Itoa(s.brightness) + "%"
+	case s.on:
+		title = "オン"
+	}
+	return Output{ResultID: s.id, Item: &Row{Title: title, Value: s.id}}, nil
 }

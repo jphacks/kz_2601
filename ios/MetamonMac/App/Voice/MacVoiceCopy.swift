@@ -49,12 +49,8 @@ enum MacVoiceCopy {
 
     // MARK: - 失敗
 
-    enum PrivacyPane: String {
-        case microphone = "Privacy_Microphone"
-        case speechRecognition = "Privacy_SpeechRecognition"
-
-        var url: URL { URL(string: "x-apple.systempreferences:com.apple.preference.security?\(rawValue)")! }
-    }
+    /// 開く欄は renderer の `PrivacySettingsPane`(権限ごとの URL・#2257)
+    typealias PrivacyPane = PrivacySettingsPane
 
     static var openSettings: String { L10n.tr("システム設定を開く") }
 

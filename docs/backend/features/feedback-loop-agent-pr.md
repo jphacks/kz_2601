@@ -94,6 +94,7 @@ scripts/agent-pr-guard.sh origin/develop HEAD    # 引数を省くと origin/dev
 ## PR の形
 
 - 本文: `Closes #<Issue>`・変更の要点・試したこと(テストのコマンドと結果)・対象外の領域に触れていないこと(`scripts/agent-pr-guard.sh` の結果)
+  - この形の本文は `scripts/agent-pr-body.sh --issue <N> --summary <file> --tests <file> --guard <file> [--stat <file>]` が標準出力に出す(GitHub には何も書かない。入力に URL・メンション・画像の埋め込みが有れば 1 で止まる)。「作者のインラインの自己レビュー」は PR の後に付けるので本文には含めない
 - 作者のインラインの自己レビュー(CONTRIBUTING の規約どおり)
 - 1 Issue 1 PR。Issue の範囲の外の変更を混ぜない
 - PR の本文・コミットのメッセージに、URL(リポジトリの中と Issue の番号以外)・メンション・画像の埋め込み・秘密の形を入れない(#366 の検査器 3)
@@ -110,5 +111,5 @@ scripts/agent-pr-guard.sh origin/develop HEAD    # 引数を省くと origin/dev
 
 - 起動は `issues: labeled`(`agent:ready`)だけ。付けた人の権限を LLM を含まないステップで確かめ、本文のハッシュを比べる
 - ジョブを 2 つに分ける: エージェントは読み取りだけで差分を作り、別のジョブが検査してから push と PR の作成をする(#366 の選択肢 1-A)
-- 同時に 1 本・1 本 30 分・5 USD まで、月の上限で全停止(#365 の決定 7)
+- 同時に 1 本・1 本 30 分・5 USD まで、月の上限で全停止(#365 の決定 7)。数え方と起動のコマンドは `scripts/agent-run.sh`(既定 dry-run。`plan` で始めてよい Issue、`check` で 1 本の時間・費用の超過、`fail` で止めた時の決まった文。ラベルは付けず、ブランチ `agent/<番号>-*` と止めた印のコメントで数える。テストは `scripts/agent-run-test.sh`)
 - 停止スイッチ(`LOOP_AGENT`)を足す

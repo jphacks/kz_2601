@@ -74,6 +74,8 @@ struct MacRootView: View {
     @State private var shareApp: MacShareAppModel?
     /// 「みんなのアプリを探す」(#2069)のシート
     @State private var discover: MacDiscoverModel?
+    /// サイドバーの「リリースを申請…」(#2249)のシート
+    @State private var releaseRequest: MacReleaseRequestModel?
     #endif
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     /// サイドバーの新着の数(#969)
@@ -118,13 +120,17 @@ struct MacRootView: View {
                        shared: sidebarSections.shared.filter { $0.matches(searchText) },
                        examples: exampleApps.filter { $0.matches(searchText) },
                        newItems: { badges.count($0) },
+                       releaseBadge: releaseBadge(for:),
                        thumbnail: thumbnail(for:), searchText: searchText, selection: guardedSelection,
                        onOpen: { focus = .canvas }, onDelete: deleteApp, onDuplicate: duplicateApp,
                        onResetExample: resetExample, onOpenInNewWindow: openAppWindow,
+                       canRequestRelease: canRequestRelease, onRequestRelease: openReleaseRequest,
+                       onDropRecord: dropRecord,
                        loadingServerApps: library.serverListState == .loading,
                        offline: library.serverListState == .offline)
                 .focused($focus, equals: .sidebar)
                 .navigationSplitViewColumnWidth(min: 180, ideal: 220, max: 320)
+                .macCoachMarks(coachMarkEligible) // 並べ替えの吹き出し(#3249)
         } detail: {
             Group {
                 if let app = selectedApp, library.isServerOnly(app.id) {
@@ -138,6 +144,7 @@ struct MacRootView: View {
                               showsScreenMap: $showsScreenMap,
                               onTalk: { talk(about: $0) }, onOpenVoice: { speak() },
                               onAskFix: { ask(draft: $0) }, // 失敗のトーストの「直してと頼む」(#1885): 入力欄に入れて開く(送らない)
+                              onSaveGridEdit: { await saveGridEdit($0, app: app) }, // 画面の並びの編集(#2323)
                               discardGuard: discardGuard)
                         .environment(\.changeHighlight, highlight?.canvas == Self.canvasKey(app) ? highlight?.value ?? .none : .none)
                         .id(Self.canvasKey(app))
@@ -194,6 +201,9 @@ struct MacRootView: View {
             MacShareAppSheet(model: model, onClose: { shareApp = nil })
         }
         .modifier(MacDiscoverPresenter(model: $discover, replace: appReplaceContext, onInstalled: adoptInstalled)) // #2069
+        .sheet(item: $releaseRequest) { model in // #2249
+            MacReleaseRequestSheet(model: model, onClose: { releaseRequest = nil })
+        }
         #endif
         .sheet(item: $compose, onDismiss: noteFinishedCompose) { session in
             ComposeSheet(session: session, onClose: { compose = nil }, undo: finishedUndo(session))
@@ -240,6 +250,8 @@ struct MacRootView: View {
             shareApp?.close() // 読み込み中の参加者を書き戻さない
             shareApp = nil
             discover = nil
+            releaseRequest = nil
+            MacReleaseRequests.shared.clear() // 前のアカウントの申請の状況を残さない(#2249)
             #endif
             notices.resetAfterWipe()
             reopenLastApp()
@@ -321,10 +333,20 @@ struct MacRootView: View {
                                   source: MacServices.shared.appConfig as? SharedRecordStampSource)
     }
 
+    /// サイドバーのアプリの行に記録が落とされた(#2252): 預けてそのアプリを開く。中央ができたら値の入ったフォームを開く
+    private func dropRecord(_ appId: String, _ payload: RecordClipboard.Payload) {
+        MacRecordDropInbox.shared.put(payload, appId: appId)
+        notificationSelection.wrappedValue = appId // 入力中なら確認を通す・シートの間は閉じるまで待つ
+    }
+
     /// サーバーの一覧を取り直す(#1057)。サインインしていなければ取らない(サインアウトの後は wipe が空にしている)
     private func refreshServerApps() async {
         guard MacAccount.shared.session.user != nil else { return }
         await library.refreshServerApps()
+        #if !APP_STORE_REVIEW
+        // リリース申請の状況(#2250)も一覧と一緒に取り直す(iOS は変身一覧を開くたび)
+        await MacReleaseRequests.shared.refresh(MacServices.shared.releaseRequests)
+        #endif
         reopenLastApp() // 前に開いていたサーバーのアプリが一覧に載ったら開き直す
         // 待っていた通知のアプリを開く。取り直しても無ければ諦める
         if let id = MacNotificationRouter.shared.resolve(among: apps.map(\.id), listRefreshed: true) {
@@ -367,6 +389,7 @@ struct MacRootView: View {
         library.delete(id)
         MacAppOrigins().remove(id)
         badges.markRead(id)
+        MacMenuBarActivity.shared.remove(appId: id) // メニューバーの表示(#2254)も消す
         // 記録も消す(#1284)。開いているウインドウのエンジンを止めて手放してから消す(動いたままだと書き戻される)
         Task { await MacRecordEngines.shared.purge(appId: id) }
         // サーバーにあるアプリはサーバーからも消す(iOS の deleteApp と同じ)。届かなくても端末からは消す
@@ -546,6 +569,34 @@ struct MacRootView: View {
         selectedAppId = document.appId
     }
 
+    /// 画面の並びの編集(#2323)の「完了」: 新しい版にして中央を作り直し、編集していた画面を開き直す。
+    /// 履歴に積むので「変更を元に戻す」(⌥⌘Z)で戻せる
+    private func saveGridEdit(_ draft: GridEditDraft, app: SampleApp) async -> MacGridEditSave.Outcome {
+        let id = app.id
+        guard let base = library.generated[id] ?? (try? app.loadDSL()).map({ AppDocument(appId: id, version: app.version, dsl: $0) })
+        else { return .failed }
+        let baseEnvelope = library.envelope(for: id) ?? app.url.flatMap { try? Data(contentsOf: $0) }
+            .flatMap { DocumentEnvelope.make(appId: id, version: base.version, dsl: $0) }
+        let server = library.isCreated(id) && library.isOnServer(id) ? MacServices.shared.appConfig : nil
+        do {
+            let saved = try await MacGridEditSave.save(draft, base: base, baseEnvelope: baseEnvelope, server: server)
+            guard library.generated[id]?.version ?? app.version == base.version else { return .conflict } // 待つ間に版が進んだ
+            MacGridEditReturn.set(appId: id, screen: draft.screenId)
+            library.apply(saved.document, envelope: saved.envelope, created: false)
+            let moved = draft.items.filter { !$0.removed && $0.area != $0.original }
+                .map { ChangeHighlight.key(screen: draft.screenId, component: $0.componentId) }
+            highlight = moved.isEmpty ? nil
+                : ("\(id)#\(saved.document.version)", ChangeHighlight(components: Set(moved), screens: [draft.screenId]))
+            notices.summary = .init(appId: id, text: MacGridEditSave.summary, action: library.canUndo(id) ? .undo : nil)
+            return .saved
+        } catch MacGridEditSave.SaveError.conflict {
+            _ = await library.refreshFromServer(id) // 最新の版で開き直す(iOS と同じ)
+            return .conflict
+        } catch {
+            return .failed
+        }
+    }
+
     /// 中央のアプリを作り直す印(版が変わったら作り直す)
     private static func canvasKey(_ app: SampleApp) -> String { "\(app.id)#\(app.version)" }
 
@@ -565,6 +616,22 @@ struct MacRootView: View {
         }
     }
 
+    // MARK: - 吹き出し(#3249)
+
+    /// サイドバーの並べ替えの吹き出しを出せる場面。案内・シート・お知らせ・会話の間は出さない(iOS の `canShowCoachMarks` と同じ順番)
+    private var coachMarkEligible: Set<CoachMark> {
+        var busy = compose != nil || notices.isShowing || showsTips || showsAppSettings || showsScreenMap || appLimit != nil
+            || updateGate.isBlocking || onboarding?.showConsent == true || onboarding?.showTutorial == true
+        #if !APP_STORE_REVIEW
+        busy = busy || shareApp != nil || onboarding?.showBetaWelcome == true
+        #endif
+        let sections = sidebarSections
+        return MacCoachMarks.eligible(hasOpenApp: selectedApp != nil && windowApp == nil,
+                                      reorderableCount: max(sections.own.count, sections.shared.count),
+                                      isSearching: !searchText.trimmingCharacters(in: .whitespaces).isEmpty,
+                                      tutorialSeen: FirstRunTutorialStore.shared.hasSeenTutorial, busy: busy)
+    }
+
     // MARK: - 画面マップ(#970)
 
     /// 中央にアプリがあり、会話のシートが閉じている時だけ開ける
@@ -579,6 +646,34 @@ struct MacRootView: View {
         return MacShareAppModel.canShare(isCreated: library.isCreated(app.id), isOnServer: library.isOnServer(app.id),
                                          signedIn: MacAccount.shared.session.user != nil,
                                          sharingAvailable: MacServices.shared.sharing != nil)
+        #endif
+    }
+
+    /// サイドバーの行のリリース申請の札(#2250)
+    private func releaseBadge(for appId: String) -> MacSidebarReleaseBadge? {
+        #if APP_STORE_REVIEW
+        nil
+        #else
+        MacSidebarReleaseBadge.badge(appId: appId, in: MacReleaseRequests.shared.byApp)
+        #endif
+    }
+
+    /// サイドバーの右クリックの「リリースを申請…」を出すか(#2249)
+    private func canRequestRelease(_ appId: String) -> Bool {
+        #if APP_STORE_REVIEW
+        false
+        #else
+        MacReleaseRequestModel.canRequest(isCreated: library.isCreated(appId), isOnServer: library.isOnServer(appId),
+                                          isSharedWithMe: MacAppOrigins().isShared(appId),
+                                          signedIn: MacAccount.shared.session.user != nil,
+                                          available: MacServices.shared.releaseRequests != nil)
+        #endif
+    }
+
+    private func openReleaseRequest(_ appId: String) {
+        #if !APP_STORE_REVIEW
+        guard canRequestRelease(appId), let app = apps.first(where: { $0.id == appId }) else { return }
+        releaseRequest = MacReleaseRequestModel(appId: appId, appName: app.name, client: MacServices.shared.releaseRequests)
         #endif
     }
 

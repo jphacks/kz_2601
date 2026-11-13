@@ -63,7 +63,7 @@ struct ShareAppSheet: View {
         HStack(alignment: .top) {
             VStack(alignment: .leading, spacing: Theme.Spacing.xs) {
                 Text("「\(app.name)」をシェア")
-                    .font(.system(size: 22, weight: .bold, design: .rounded))
+                    .font(.system(.title2, design: .rounded).weight(.bold))
                 Text(members?.isVisible == true
                      ? L10n.tr("受け取った人はリンクから参加して、記録を一緒に使えます")
                      : L10n.tr("受け取った人は自分のアプリとして使えます(記録は共有されません)"))
@@ -133,6 +133,7 @@ struct ShareAppSheet: View {
         VStack(alignment: .leading, spacing: Theme.Spacing.md) {
             Label("みんなに公開", systemImage: "globe.asia.australia")
                 .font(.headline)
+                .accessibilityAddTraits(.isHeader)
             if !listingLoaded {
                 RoundedRectangle(cornerRadius: 6).fill(Theme.Colors.surfaceElevated).frame(height: 44)
             } else if let listing {
