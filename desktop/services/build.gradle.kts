@@ -33,11 +33,15 @@ val sharedIncludes = listOf(
     "jp/kz2601/metamon/services/consent/AiConsentStore.kt",
     "jp/kz2601/metamon/services/consent/CrashReportingPreference.kt",
     "jp/kz2601/metamon/services/consent/KeyValueStore.kt",
+    "jp/kz2601/metamon/services/follows/FollowStore.kt",
+    "jp/kz2601/metamon/services/follows/FollowsClient.kt",
     "jp/kz2601/metamon/services/http/*.kt",
     "jp/kz2601/metamon/services/live/HttpAppConfigClient.kt",
+    "jp/kz2601/metamon/services/live/HttpFollowsClient.kt",
     "jp/kz2601/metamon/services/local/DocumentCache.kt",
     "jp/kz2601/metamon/services/local/RecordStore.kt",
     "jp/kz2601/metamon/services/local/SyncQueue.kt",
+    "jp/kz2601/metamon/services/sharing/ShareSheetModel.kt",
 )
 
 sourceSets {

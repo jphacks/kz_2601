@@ -226,5 +226,9 @@ func (h *cloudHandler) Handle(ctx context.Context, r slog.Record) error {
 // NewLogger is the service logger: Cloud Logging JSON on stdout, level from
 // LOG_LEVEL.
 func NewLogger() *slog.Logger {
-	return slog.New(NewCloudHandler(os.Stdout, LogLevel(os.Getenv("LOG_LEVEL")), CloudConfigFromEnv(os.Getenv)))
+	return newLogger(os.Stdout, os.Getenv)
+}
+
+func newLogger(w io.Writer, getenv func(string) string) *slog.Logger {
+	return slog.New(NewCloudHandler(w, LogLevel(getenv("LOG_LEVEL")), CloudConfigFromEnv(getenv)))
 }

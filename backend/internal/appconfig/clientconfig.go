@@ -11,7 +11,7 @@ import (
 	"github.com/jphacks/kz_2601/backend/internal/httpx"
 )
 
-// Client config (#302, macOS #981): the oldest iOS / Android / macOS build the backend still
+// Client config (#302, macOS #981, Windows/Linux #2131): the oldest iOS / Android / macOS / Windows / Linux build the backend still
 // serves and the newest one in the store. Read from env at startup; an unset or
 // invalid value means "no enforcement" (the field is omitted and the client
 // does nothing).
@@ -27,6 +27,11 @@ const (
 	EnvMinMacOSBuild    = "MIN_MACOS_BUILD"    // CFBundleVersion of the Mac app; same meaning as MIN_IOS_BUILD
 	EnvLatestMacOSBuild = "LATEST_MACOS_BUILD" // same meaning as LATEST_IOS_BUILD
 	EnvMacAppStoreURL   = "MAC_APP_STORE_URL"  // https://apps.apple.com/app/id<id> or macappstore:// (optional)
+
+	EnvMinWindowsBuild    = "MIN_WINDOWS_BUILD"    // build number of the Windows app; same meaning as MIN_IOS_BUILD
+	EnvLatestWindowsBuild = "LATEST_WINDOWS_BUILD" // same meaning as LATEST_IOS_BUILD
+	EnvMinLinuxBuild      = "MIN_LINUX_BUILD"      // build number of the Linux app; same meaning as MIN_IOS_BUILD
+	EnvLatestLinuxBuild   = "LATEST_LINUX_BUILD"   // same meaning as LATEST_IOS_BUILD
 )
 
 // ClientConfigValues is the body of GET /v1/client-config.
@@ -42,6 +47,12 @@ type ClientConfigValues struct {
 	MinMacOSBuild    int    `json:"minMacOSBuild,omitempty"`
 	LatestMacOSBuild int    `json:"latestMacOSBuild,omitempty"`
 	MacAppStoreURL   string `json:"macAppStoreUrl,omitempty"`
+
+	MinWindowsBuild    int `json:"minWindowsBuild,omitempty"`
+	LatestWindowsBuild int `json:"latestWindowsBuild,omitempty"`
+
+	MinLinuxBuild    int `json:"minLinuxBuild,omitempty"`
+	LatestLinuxBuild int `json:"latestLinuxBuild,omitempty"`
 
 	Notice *Notice `json:"notice,omitempty"` // #333 (notice.go)
 }
@@ -82,6 +93,10 @@ func ClientConfigFromEnv(getenv func(string) string) ClientConfigValues {
 		MinMacOSBuild:      build(EnvMinMacOSBuild),
 		LatestMacOSBuild:   build(EnvLatestMacOSBuild),
 		MacAppStoreURL:     storeURL(EnvMacAppStoreURL, "https", "macappstore"),
+		MinWindowsBuild:    build(EnvMinWindowsBuild),
+		LatestWindowsBuild: build(EnvLatestWindowsBuild),
+		MinLinuxBuild:      build(EnvMinLinuxBuild),
+		LatestLinuxBuild:   build(EnvLatestLinuxBuild),
 		Notice:             NoticeFromEnv(getenv),
 	}
 	// A latest below min would only confuse: min wins.
@@ -93,6 +108,12 @@ func ClientConfigFromEnv(getenv func(string) string) ClientConfigValues {
 	}
 	if v.LatestMacOSBuild != 0 && v.LatestMacOSBuild < v.MinMacOSBuild {
 		v.LatestMacOSBuild = v.MinMacOSBuild
+	}
+	if v.LatestWindowsBuild != 0 && v.LatestWindowsBuild < v.MinWindowsBuild {
+		v.LatestWindowsBuild = v.MinWindowsBuild
+	}
+	if v.LatestLinuxBuild != 0 && v.LatestLinuxBuild < v.MinLinuxBuild {
+		v.LatestLinuxBuild = v.MinLinuxBuild
 	}
 	return v
 }
