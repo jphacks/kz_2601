@@ -105,6 +105,47 @@ rateLimits/{env}_{yyyy-mm-dd}_creator_paid_{appId}_uid_{uid}   {count, scope: ap
 
 費用ブレーカーの目安: 1 回の新規作成を $0.03〜0.10 と置くと(入力 1〜2 万トークン + 出力数千トークン。実測で直す)、2000 単位 ≒ 最大 $20〜65/日/環境。stg と prod は別々に数える。
 
+### OS ごとの上書き(#2133)
+
+上の表の `_<OS>` の行を 1 つずつ並べたもの。読むのは `ratelimit.ConfigFromEnv`(`backend/internal/ratelimit/config.go`)、選ぶのは `Config.PlatformDailyLimit`(`peek.go`)。OS は `X-Client-Platform` を `httpx.NormalizePlatform` でそろえた値(大文字小文字と前後の空白は無視・ヘッダ無し・未知・33 文字以上は `other`)。上書きできるのは 1 人 1 日の枠だけで、IP・global・waived・unchanged・重みは OS で変わらない。
+
+| 環境変数 | 既定(未設定の時) | 効く依頼 |
+| --- | --- | --- |
+| `RATE_LIMIT_ANON_DAILY_ANDROID` | `RATE_LIMIT_ANON_DAILY` の値 | 匿名・`X-Client-Platform: android` |
+| `RATE_LIMIT_ANON_DAILY_IOS` | `RATE_LIMIT_ANON_DAILY` の値 | 匿名・`ios` |
+| `RATE_LIMIT_ANON_DAILY_LINUX` | `RATE_LIMIT_ANON_DAILY` の値 | 匿名・`linux` |
+| `RATE_LIMIT_ANON_DAILY_MACOS` | `RATE_LIMIT_ANON_DAILY` の値 | 匿名・`macos` |
+| `RATE_LIMIT_ANON_DAILY_OTHER` | `RATE_LIMIT_ANON_DAILY` の値 | 匿名・ヘッダ無し / 未知の値 |
+| `RATE_LIMIT_ANON_DAILY_WINDOWS` | `RATE_LIMIT_ANON_DAILY` の値 | 匿名・`windows` |
+| `RATE_LIMIT_PRO_DAILY_ANDROID` | `RATE_LIMIT_PRO_DAILY` の値 | Pro・`android` |
+| `RATE_LIMIT_PRO_DAILY_IOS` | `RATE_LIMIT_PRO_DAILY` の値 | Pro・`ios` |
+| `RATE_LIMIT_PRO_DAILY_LINUX` | `RATE_LIMIT_PRO_DAILY` の値 | Pro・`linux` |
+| `RATE_LIMIT_PRO_DAILY_MACOS` | `RATE_LIMIT_PRO_DAILY` の値 | Pro・`macos` |
+| `RATE_LIMIT_PRO_DAILY_OTHER` | `RATE_LIMIT_PRO_DAILY` の値 | Pro・ヘッダ無し / 未知の値 |
+| `RATE_LIMIT_PRO_DAILY_WINDOWS` | `RATE_LIMIT_PRO_DAILY` の値 | Pro・`windows` |
+| `RATE_LIMIT_USER_DAILY_ANDROID` | `RATE_LIMIT_USER_DAILY` の値 | サインイン済み・`android` |
+| `RATE_LIMIT_USER_DAILY_IOS` | `RATE_LIMIT_USER_DAILY` の値 | サインイン済み・`ios` |
+| `RATE_LIMIT_USER_DAILY_LINUX` | `RATE_LIMIT_USER_DAILY` の値 | サインイン済み・`linux` |
+| `RATE_LIMIT_USER_DAILY_MACOS` | `RATE_LIMIT_USER_DAILY` の値 | サインイン済み・`macos` |
+| `RATE_LIMIT_USER_DAILY_OTHER` | `RATE_LIMIT_USER_DAILY` の値 | サインイン済み・ヘッダ無し / 未知の値 |
+| `RATE_LIMIT_USER_DAILY_WINDOWS` | `RATE_LIMIT_USER_DAILY` の値 | サインイン済み・`windows` |
+
+- 変数の名前は大文字だけ読む(`_ios` のような小文字は読まない)。負の数・数でない値は起動の時にエラー。
+- `0` はほかの上限と同じく「数えない」。下げるつもりで `0` を入れない。
+- ai と appconfig の両方に同じ値を入れる(appconfig の `GET /v1/me/usage` も同じ上書きで上限を出すため。ずれると ai の `X-RateLimit-Limit` と画面の上限が合わない)。
+- 入っているかは ai の起動ログ `ai: rate limit on (...)` の `platformLimits=` で見る(上書きがある時だけ出る)。
+
+上書きの例(値は例。どの OS にどの値を入れるかは #1750 で決める)。サインイン済みの Windows だけ 1 日 20 単位に絞る:
+
+```sh
+for SERVICE in ai-stg appconfig-stg; do
+  gcloud run services update "$SERVICE" --region asia-northeast1 --project jphacks-kz2601 \
+    --update-env-vars RATE_LIMIT_USER_DAILY_WINDOWS=20
+done
+```
+
+戻す時は `--remove-env-vars RATE_LIMIT_USER_DAILY_WINDOWS`(上の `RATE_LIMIT_USER_DAILY` に戻る)。
+
 ## 数える場所(Firestore・appconfig と同じ DB)
 
 ```

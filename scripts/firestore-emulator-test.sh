@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
-# scripts/firestore-emulator.sh の起動待ち(wait・test-all)を偽の curl・gcloud で確かめる(#2864)。
+# scripts/firestore-emulator.sh を確かめる。前半は起動待ち(wait・test-all)を偽の curl・gcloud で(#2864)、
+# 後半は「黙ってスキップさせない」判定(judge)を作り物の go test -json で(jq だけ)。
 # エミュレータ・Java・GCP は不要。本物の gcloud は呼ばない。上限は短く(1〜2 秒)して回す。
 #   偽の curl: $FAKE_STATE/up_after(N)があれば N 回目の問い合わせから応答する。無ければずっと応答しない
 #   偽の gcloud: ログに数行書いてすぐ終わる(起動に失敗したエミュレータ)
@@ -80,4 +81,45 @@ has "fake gcloud emulators firestore start --host-port=127.0.0.1:65530 --project
 has "Exception in thread main: port in use"
 [ -z "$(ls -A "$TMP/tmpdir")" ] || fail "一時ログが残った: $(ls -A "$TMP/tmpdir")"
 
+# --- judge: testdata/firestore-emulator/*.json は go test -json の形の JSON lines ---
+D="$HERE/testdata/firestore-emulator"
+
+# expect <期待コード> <入力> [go test の終了コード]: 出力を OUT に入れる
+expect() {
+  local want="$1" code; shift
+  set +e; OUT="$(env -u GITHUB_STEP_SUMMARY "$HERE/firestore-emulator.sh" judge "$@" 2>&1)"; code=$?; set -e
+  [ "$code" = "$want" ] || fail "judge $*: 終了コード $want のはずが $code"
+}
+hasline() { grep -qxF -- "$1" <<<"$OUT" || fail "出力に「${1}」の行が無い"; }
+
+# 7. 全部通る: TestFirestore* と */firestore を数える(関係ないテストのスキップは気にしない)
+expect 0 "$D/pass.json"
+hasline "Firestore emulator tests passed: 2"
+# summary にも書く
+GITHUB_STEP_SUMMARY="$TMP/summary.md" "$HERE/firestore-emulator.sh" judge "$D/pass.json" >/dev/null
+[ "$(cat "$TMP/summary.md")" = "Firestore emulator tests passed: 2" ] || fail "summary: $(cat "$TMP/summary.md")"
+
+# 8. エミュレータが無くてスキップ(理由に FIRESTORE_EMULATOR_HOST not set)
+expect 1 "$D/skip-emulator.json"
+hasline "::error::emulator tests were skipped"
+
+# 9. Firestore 系がほかの理由でスキップ: スキップした名前を全部出す
+expect 1 "$D/skip-firestore.json"
+hasline "::error::skipped Firestore tests:"
+hasline "TestFirestoreIndex"
+hasline "TestStoreContract/firestore"
+
+# 10. 失敗: go test の終了コードを返す(通った数は出す)
+expect 1 "$D/fail.json" 1
+hasline "Firestore emulator tests passed: 1"
+expect 2 "$D/fail.json" 2
+
+# 11. Firestore 系が 1 件も無い(どれも通っていない)
+grep -v -e 'Firestore' -e '/firestore' "$D/pass.json" >"$TMP/none.json"
+expect 1 "$TMP/none.json"
+hasline "Firestore emulator tests passed: 0"
+hasline "::error::no Firestore emulator test ran"
+
+# 12. 入力が無ければ使い方で 2
+expect 2
 echo "ok"
