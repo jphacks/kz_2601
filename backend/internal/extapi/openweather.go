@@ -7,6 +7,7 @@ import (
 	"math"
 	"net/http"
 	"net/url"
+	"os"
 	"regexp"
 	"strconv"
 	"strings"
@@ -21,6 +22,7 @@ import (
 //	forecast(lat, lng, limit, uv)    Rows (3-hourly, limit 1-40, default 8 = 24 h)
 //	airQuality(lat, lng)             Item: AQI 1-5 label (目安) / PM2.5, PM10, O₃, NO₂ / "AQI n/5"
 //	airForecast(lat, lng, limit)     Rows (hourly, limit 1-96, default 24): time (JST) / PM2.5, PM10 / "AQI n/5 label"
+//	nowcast(lat, lng)                Item: "12分後に降り出す" ... / Rows: 10-minute precipitation (openweather_nowcast.go)
 //
 // forecast's uv (#1658) asks for the UV index, which only One Call 3.0
 // (/data/3.0/onecall, same host and key) carries: with uv=1 the rows come
@@ -58,10 +60,12 @@ func init() {
 			{Name: "forecast", Args: []string{"lat", "lng", "limit", "uv"}, Check: checkOWForecast},
 			{Name: "airQuality", Args: []string{"lat", "lng"}, Check: checkOWLatLng},
 			{Name: "airForecast", Args: []string{"lat", "lng", "limit"}, Check: checkOWAirForecast},
+			{Name: "nowcast", Args: []string{"lat", "lng"}, Check: checkOWLatLng},
 		},
 		Hosts: []string{openWeatherHost},
 		New: func(sec Secrets) (map[string]Operation, error) {
-			return newOpenWeather(sec.APIKey, openWeatherHost, NewHTTPClient([]string{openWeatherHost}, DefaultTimeout))
+			return newOpenWeatherOps(sec.APIKey, openWeatherHost, NewHTTPClient([]string{openWeatherHost}, DefaultTimeout),
+				flag(os.Getenv(EnvOpenWeatherNowcast)))
 		}})
 }
 
@@ -123,18 +127,30 @@ func argOWUV(args map[string]string) (bool, error) {
 	return false, fmt.Errorf("%w: uv must be 1 or 0", ErrUnknown)
 }
 
-// newOpenWeather builds the ops against base (the API, or a test server).
+// newOpenWeather builds the ops against base (the API, or a test server),
+// nowcast left off.
 func newOpenWeather(key, base string, hc *http.Client) (map[string]Operation, error) {
+	return newOpenWeatherOps(key, base, hc, false)
+}
+
+// newOpenWeatherOps also builds nowcast when it is switched on
+// (EnvOpenWeatherNowcast); off, the op is not built and a call to it is
+// ext_unavailable (Service.check).
+func newOpenWeatherOps(key, base string, hc *http.Client, nowcast bool) (map[string]Operation, error) {
 	if !owKeyRe.MatchString(key) {
 		return nil, errors.New("EXT_OPEN_WEATHER_API_KEY is not set or not a key")
 	}
 	w := &openWeather{key: key, base: base, hc: hc}
-	return map[string]Operation{
+	ops := map[string]Operation{
 		"current":     OperationFunc(w.current),
 		"forecast":    OperationFunc(w.forecast),
 		"airQuality":  OperationFunc(w.airQuality),
 		"airForecast": OperationFunc(w.airForecast),
-	}, nil
+	}
+	if nowcast {
+		ops["nowcast"] = OperationFunc(w.nowcast)
+	}
+	return ops, nil
 }
 
 type openWeather struct {
