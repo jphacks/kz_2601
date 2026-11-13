@@ -37,6 +37,13 @@ func TestClientConfigFromEnv(t *testing.T) {
 		{"macos store url", map[string]string{EnvMacAppStoreURL: "https://apps.apple.com/app/id123"}, ClientConfigValues{MacAppStoreURL: "https://apps.apple.com/app/id123"}},
 		{"macos macappstore url", map[string]string{EnvMacAppStoreURL: "macappstore://apps.apple.com/app/id123"}, ClientConfigValues{MacAppStoreURL: "macappstore://apps.apple.com/app/id123"}},
 		{"macos bad store url", map[string]string{EnvMacAppStoreURL: "market://details?id=x"}, ClientConfigValues{}},
+		{"windows both set", map[string]string{EnvMinWindowsBuild: "50", EnvLatestWindowsBuild: " 52 "}, ClientConfigValues{MinWindowsBuild: 50, LatestWindowsBuild: 52}},
+		{"windows invalid ignored", map[string]string{EnvMinWindowsBuild: "0", EnvLatestWindowsBuild: "1.2"}, ClientConfigValues{}},
+		{"windows latest below min is raised", map[string]string{EnvMinWindowsBuild: "20", EnvLatestWindowsBuild: "10"}, ClientConfigValues{MinWindowsBuild: 20, LatestWindowsBuild: 20}},
+		{"linux both set", map[string]string{EnvMinLinuxBuild: "60", EnvLatestLinuxBuild: "61"}, ClientConfigValues{MinLinuxBuild: 60, LatestLinuxBuild: 61}},
+		{"linux invalid ignored", map[string]string{EnvMinLinuxBuild: "-1", EnvLatestLinuxBuild: "x"}, ClientConfigValues{}},
+		{"linux latest below min is raised", map[string]string{EnvMinLinuxBuild: "30", EnvLatestLinuxBuild: "3"}, ClientConfigValues{MinLinuxBuild: 30, LatestLinuxBuild: 30}},
+		{"desktop platforms are independent", map[string]string{EnvMinMacOSBuild: "40", EnvMinWindowsBuild: "5", EnvLatestLinuxBuild: "7"}, ClientConfigValues{MinMacOSBuild: 40, MinWindowsBuild: 5, LatestLinuxBuild: 7}},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -74,6 +81,10 @@ func TestClientConfigHandler(t *testing.T) {
 	body = get(ClientConfigValues{MinMacOSBuild: 8, LatestMacOSBuild: 9, MacAppStoreURL: "https://apps.apple.com/app/id1"})
 	if len(body) != 3 || body["minMacOSBuild"] != float64(8) || body["latestMacOSBuild"] != float64(9) || body["macAppStoreUrl"] != "https://apps.apple.com/app/id1" {
 		t.Fatalf("macos body: %v", body)
+	}
+	body = get(ClientConfigValues{MinWindowsBuild: 10, LatestWindowsBuild: 11, MinLinuxBuild: 12, LatestLinuxBuild: 13})
+	if len(body) != 4 || body["minWindowsBuild"] != float64(10) || body["latestWindowsBuild"] != float64(11) || body["minLinuxBuild"] != float64(12) || body["latestLinuxBuild"] != float64(13) {
+		t.Fatalf("windows/linux body: %v", body)
 	}
 }
 
