@@ -124,6 +124,23 @@
         }
       }
     },
+    "%@(%@)" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$@ (%2$@)"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$@(%2$@)"
+          }
+        }
+      }
+    },
     "%@(終日)" : {
       "localizations" : {
         "en" : {
@@ -5406,6 +5423,23 @@
         }
       }
     },
+    "ふつう" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Normal"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ふつう"
+          }
+        }
+      }
+    },
     "ふつう 10 秒ほど" : {
       "localizations" : {
         "en" : {
@@ -5927,6 +5961,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "やり直せませんでした"
+          }
+        }
+      }
+    },
+    "ゆっくり" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Slow"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ゆっくり"
           }
         }
       }
@@ -7891,6 +7942,40 @@
         }
       }
     },
+    "パーソナルボイス" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Personal Voice"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "パーソナルボイス"
+          }
+        }
+      }
+    },
+    "パーソナルボイスを使う" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Use Personal Voice"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "パーソナルボイスを使う"
+          }
+        }
+      }
+    },
     "フィードバック" : {
       "localizations" : {
         "en" : {
@@ -8115,6 +8200,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "プリントできませんでした"
+          }
+        }
+      }
+    },
+    "プレミアム" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Premium"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "プレミアム"
           }
         }
       }
@@ -11978,6 +12080,40 @@
         }
       }
     },
+    "声と速さは、生成したアプリの読み上げボタンと道案内にも効きます。選んだ声が端末から消えた時は自動に戻ります。" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The voice and rate also apply to read-aloud buttons and directions in the apps you build. If the chosen voice is removed from this device, it goes back to Automatic."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "声と速さは、生成したアプリの読み上げボタンと道案内にも効きます。選んだ声が端末から消えた時は自動に戻ります。"
+          }
+        }
+      }
+    },
+    "声と速さは、記録帳の読み上げボタンと道案内にも効きます。選んだ声が端末から消えた時は自動に戻ります。" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The voice and rate also apply to read-aloud buttons and directions in your record books. If the chosen voice is removed from this device, it goes back to Automatic."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "声と速さは、記録帳の読み上げボタンと道案内にも効きます。選んだ声が端末から消えた時は自動に戻ります。"
+          }
+        }
+      }
+    },
     "声・文字で頼む" : {
       "localizations" : {
         "en" : {
@@ -12683,6 +12819,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "拡大"
+          }
+        }
+      }
+    },
+    "拡張" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Enhanced"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "拡張"
           }
         }
       }
@@ -13411,6 +13564,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "日時"
+          }
+        }
+      }
+    },
+    "日本語の声" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Japanese voice"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "日本語の声"
           }
         }
       }
@@ -15270,6 +15440,23 @@
         }
       }
     },
+    "英語の声" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "English voice"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "英語の声"
+          }
+        }
+      }
+    },
     "薬の飲み忘れ防止" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -16136,6 +16323,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "読み上げ"
+          }
+        }
+      }
+    },
+    "読み上げの速さ" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Speaking rate"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "読み上げの速さ"
           }
         }
       }
@@ -17040,6 +17244,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "通知を送れませんでした"
+          }
+        }
+      }
+    },
+    "速め" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Fast"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "速め"
           }
         }
       }

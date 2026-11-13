@@ -316,10 +316,11 @@ struct SettingsSheet: View {
             Toggle(SpeechCopy.settingTitle, isOn: $reader.enabled)
                 .tint(Theme.Colors.brandA)
                 .accessibilityIdentifier("settings.speech")
+            SpeechVoiceSettingsRows() // 声と速さ(#2229)
         } header: {
             Text(SpeechCopy.sectionTitle)
         } footer: {
-            Text(SpeechCopy.settingFooter)
+            Text(SpeechCopy.settingFooter + "\n" + SpeechVoiceCopy.footer)
         }
     }
 
