@@ -35,6 +35,8 @@ import androidx.compose.ui.input.key.onKeyEvent
 import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.input.key.type
 import jp.kz2601.metamon.desktop.i18n.Strings
+import jp.kz2601.metamon.desktop.share.ShareLinkDialog
+import jp.kz2601.metamon.desktop.share.ShareLinkEntry
 import jp.kz2601.metamon.dsl.Action
 import jp.kz2601.metamon.dsl.ActionType
 import jp.kz2601.metamon.dsl.AppDSL
@@ -165,7 +167,7 @@ object Keymap {
         }
     }
 
-    private fun keyName(k: Key, os: HostOs): String = when (k) {
+    internal fun keyName(k: Key, os: HostOs): String = when (k) {
         Key.Escape -> "Esc"
         Key.Delete -> if (os == HostOs.MAC) "⌦" else "Delete"
         Key.Backspace -> if (os == HostOs.MAC) "⌫" else "Backspace"
@@ -279,6 +281,11 @@ class DesktopKeyboard(
 
     /** サードパーティのライセンス(Licenses.kt)。F1 の一覧とパレットから開く。 */
     var licensesOpen by mutableStateOf(false)
+
+    /** 共有のリンク(share/ShareLink.kt・#2503)。サーバーのアプリを開いている時に入れる。null ならパレットに出さない。 */
+    var share: ShareLinkEntry? = null
+
+    private val shareOpen: Boolean get() = share?.open == true
     val root = FocusRequester()
     val modal = FocusRequester()
 
@@ -299,7 +306,7 @@ class DesktopKeyboard(
             if (!repeat) closePreview()
             return true
         }
-        if (paletteOpen || helpOpen || licensesOpen || wipeConfirmOpen) return false // パレット・一覧・確認が自分で受ける
+        if (paletteOpen || helpOpen || licensesOpen || wipeConfirmOpen || shareOpen) return false // パレット・一覧・確認が自分で受ける
         val s = Keymap.match(p, os) ?: return false
         if (s == Shortcut.PRINT || s.bubble != bubble) return false // 印刷は Print.kt の Ctrl+P
         // Space は何も選んでいない時だけ。見せる写真が無ければ流す(知らせも出さない)
@@ -381,7 +388,8 @@ class DesktopKeyboard(
             "about:licenses", LicensesText.TITLE, PaletteCommand.Kind.ACTION,
             keywords = listOf("licenses", "third-party", "oss", "notice", LicensesText.LICENSE),
         ) { licensesOpen = true }
-        return shortcuts + buttons + record + screens + apps + wipe + licenses
+        val shareLink = share?.let { listOf(it.command()) }.orEmpty()
+        return shortcuts + buttons + record + screens + apps + wipe + shareLink + licenses
     }
 
     /** 確認で「消す」を押した: 全アプリの端末のデータを消し、このウィンドウを最初の画面に戻す。 */
@@ -412,7 +420,7 @@ class DesktopKeyboard(
     val modalModifier: Modifier get() = Modifier.focusRequester(modal).focusGroup()
 
     fun focusAfterNavigation(modalOpen: Boolean) {
-        if (paletteOpen || helpOpen || licensesOpen) return
+        if (paletteOpen || helpOpen || licensesOpen || shareOpen) return
         if (modalOpen && runCatching { modal.requestFocus(FocusDirection.Enter) }.getOrDefault(false)) return
         runCatching { root.requestFocus() }
     }
@@ -441,6 +449,12 @@ class DesktopKeyboard(
         if (licensesOpen) {
             LicensesDialog {
                 licensesOpen = false
+                runCatching { root.requestFocus() }
+            }
+        }
+        share?.takeIf { it.open }?.let { entry ->
+            ShareLinkDialog(entry) {
+                entry.open = false
                 runCatching { root.requestFocus() }
             }
         }

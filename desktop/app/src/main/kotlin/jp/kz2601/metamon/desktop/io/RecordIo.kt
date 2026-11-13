@@ -150,7 +150,7 @@ object Tsv {
 
     private const val FORMULA_GUARDED = "=+-@\t\r"
 
-    private fun isFormulaLead(c: Int, next: Int?): Boolean = when (c) {
+    internal fun isFormulaLead(c: Int, next: Int?): Boolean = when (c) {
         '='.code, '+'.code, '@'.code, '\t'.code, '\r'.code -> true
         '-'.code -> next != null && !(Character.getType(next) == Character.DECIMAL_DIGIT_NUMBER.toInt() || next == '¥'.code || next == '.'.code)
         else -> false

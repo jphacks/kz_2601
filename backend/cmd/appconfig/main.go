@@ -18,6 +18,7 @@ import (
 	"github.com/jphacks/kz_2601/backend/internal/auth"
 	"github.com/jphacks/kz_2601/backend/internal/calls"
 	"github.com/jphacks/kz_2601/backend/internal/coins/coinsapi"
+	"github.com/jphacks/kz_2601/backend/internal/debugoverride"
 	"github.com/jphacks/kz_2601/backend/internal/entitlement"
 	"github.com/jphacks/kz_2601/backend/internal/fsenv"
 	"github.com/jphacks/kz_2601/backend/internal/httpx"
@@ -37,6 +38,7 @@ func main() {
 	project := os.Getenv("GOOGLE_CLOUD_PROJECT")
 	target := fsenv.FromEnv(os.Getenv)
 	guardTarget(target, logger)
+	dbg := debugOverride(logger) // stg-only per-request Pro / free (#2085)
 
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
@@ -74,7 +76,7 @@ func main() {
 	limits := planLimits(logger) // #317
 	cs := newCoins(st, ents, logger)
 	cl := newCalls(st, cs, logger) // calls (#447)
-	api := appconfig.New(st, appconfig.WithPro(pro), appconfig.WithProMode(proMode), appconfig.WithPlanLimits(limits),
+	api := appconfig.New(st, appconfig.WithPro(debugoverride.Wrap(pro, dbg, logger)), appconfig.WithProMode(proMode), appconfig.WithPlanLimits(limits),
 		appconfig.WithAppSlots(cs), // coin-bought app slots raise the held-app limit (#630)
 		appconfig.WithTextFilter(textMode), usage(st, logger), appconfig.WithCalls(cl),
 		appconfig.WithExt(newExt(ctx, logger))) // external APIs through the runner (#1493)
@@ -82,7 +84,7 @@ func main() {
 	coinsapi.Register(api, cs)      // coins (#630)
 	handler := newHandler(authed, logger, api, appconfig.SharePage(st), appconfig.MountAccountDeletePage, appStoreNotifications(ents, logger), playNotifications(ents, os.Getenv, logger), coinsapi.Public(cs.Config), calls.Public(cl))
 	server := &http.Server{
-		Handler:           handler,
+		Handler:           debugoverride.Middleware(dbg)(handler),
 		ReadHeaderTimeout: 10 * time.Second,
 	}
 
@@ -281,4 +283,18 @@ func newAuthed(appCheck, authenticate func(http.Handler) http.Handler, accounts 
 // rejectDeleted is appconfig.RejectDeleted as a chain item.
 func rejectDeleted(accounts store.Accounts) func(http.Handler) http.Handler {
 	return func(h http.Handler) http.Handler { return appconfig.RejectDeleted(accounts, h) }
+}
+
+// debugOverride reads DEBUG_OVERRIDES / DEBUG_OVERRIDE_UIDS (#2085) and
+// refuses to start when the flag is set outside stg.
+func debugOverride(logger *slog.Logger) *debugoverride.Config {
+	c, err := debugoverride.FromEnv(os.Getenv)
+	if err != nil {
+		logger.Error("debug override: refusing to start", slog.Any("error", err))
+		os.Exit(1)
+	}
+	if c != nil {
+		logger.Warn("debug override on", slog.String("header", debugoverride.Header), slog.Int("uids", c.Len()))
+	}
+	return c
 }

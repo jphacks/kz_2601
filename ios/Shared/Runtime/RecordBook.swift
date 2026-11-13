@@ -129,6 +129,9 @@ final class RecordBook {
         static let none = SaveHooks()
     }
 
+    /// `form` を保存している途中(書き込みの await の間)か。テストが保存の途中に入力する
+    func isSaving(_ form: FormDraft) -> Bool { flight.isSaving(form) }
+
     /// saveRecord の書き込み(前段の判定は `RecordActionSteps.saveTarget`)。
     func save(entity: String, form: FormDraft, recordId: String?,
               author: (uid: String?, name: String?)? = nil, hooks: SaveHooks = .none,
@@ -156,7 +159,8 @@ final class RecordBook {
         let payload = form.payload
         let written = await recordSync.write(appId: appId, entity: entity, recordId: recordId, data: payload, author: author)
         store(written.records)
-        form.markSaved(queuedOffline: !recordSync.isOnline) // 閉じても破棄の確認を出さない・オフラインなら送信待ち(M10)
+        // 送った値を保存済みとする(保存の間に入れ直した値は未保存のまま)。オフラインなら送信待ち(M10)
+        form.markSaved(queuedOffline: !recordSync.isOnline, sent: payload)
         hooks.afterSave(SavedWrite(entity: entity, recordId: written.recordId, payload: payload, isNew: recordId == nil))
         return .saved
     }

@@ -102,7 +102,7 @@ DSL の全部の type(Container 7・Leaf 70 = 77。`docs/dsl/dsl.schema.json` �
 | timeline | 描ける | rendered | | 描ける | #1744 |
 | timerDisplay | 描ける | rendered | 走っている残り / 経過はトレイにも出す | 描ける | #1745・#1761 |
 | toggle | 描ける | rendered | | 描ける | #1743 |
-| transcribeField | 代わり | rendered | 話して入れない。キーボードで入れる | 描ける | #1743・#1751 |
+| transcribeField | 代わり | rendered | 既定はキーボードで入れる。音声入力が有効(`TAILORIT_VOICE=1`)で文字にできる PC なら、欄の下のボタンで話して後ろに足す(端末の中の whisper.cpp) | 描ける | #1743・#1751 |
 | videoField | 代わり | rendered | 撮影はしない。ファイルを選ぶ・落とす | 描ける | #1743・#1764 |
 | videoPlayer | 未定 | unavailable | 動画の再生を入れていない。候補: VLCJ(VLC が要る)・JavaFX Media。推奨・未確定: 埋め込まず「既定のアプリで再生」の枠(#2175) | 描ける | #1746・#2175 |
 | voiceInput | 使えません | unavailable | 音声入力(音声認識)をまだつないでいない。端末の中の文字起こし(whisper.cpp)で描く予定 | 描ける | #1751・#2172 |
