@@ -1,6 +1,23 @@
 {
   "sourceLanguage" : "ja",
   "strings" : {
+    "NSBluetoothAlwaysUsageDescription" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Used to read your heart rate from a Bluetooth heart rate monitor (such as a chest strap) so the apps you build can show and record it."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "生成したアプリで、Bluetooth の心拍計(胸のベルトなど)から心拍数を読み取って表示・記録するために、Bluetooth を使用します。"
+          }
+        }
+      }
+    },
     "NSCalendarsFullAccessUsageDescription" : {
       "extractionState" : "manual",
       "localizations" : {
