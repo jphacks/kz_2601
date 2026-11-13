@@ -202,6 +202,16 @@ flowchart LR
     Ren --> DSL["MetamonDSL<br/>Codable / GridArea / 式"]
     Svc --> DSL
   end
+  subgraph AND["Android (Compose・5 モジュール)"]
+    ASvc["services<br/>HTTP / Firebase Auth"] --> ADSL["dsl (純 Kotlin)"]
+    AApp["app<br/>whisper.cpp (JNI) / Health Connect"] --> ASvc
+  end
+  subgraph MAC["Mac (SwiftUI・MetamonMac)"]
+    MApp["MacAppRuntime<br/>3 パッケージを iOS と共有"]
+  end
+  subgraph DT["デスクトップ (Compose Desktop・Windows / Linux)"]
+    DApp["desktop app<br/>Android の dsl / services を取り込み"]
+  end
   subgraph GCP["GCP (Cloud Run / asia-northeast1)"]
     AI["ai (Go)<br/>chat / generate / validate / patch"]
     AC["appconfig (Go)<br/>DSL version / records / share"]
@@ -209,8 +219,13 @@ flowchart LR
     FS[("Firestore")]
     SM["Secret Manager"]
   end
-  Svc -- "Bearer: Firebase ID token<br/>POST /v1/chat・/v1/generate" --> AI
-  Svc -- "records / versions / SSE" --> AC
+  Svc -- "Bearer: Firebase ID token<br/>X-Client-Platform: ios<br/>POST /v1/chat・/v1/generate" --> AI
+  Svc -- "X-Client-Platform: ios<br/>records / versions / SSE" --> AC
+  ASvc -- "X-Client-Platform: android<br/>/v1/chat・/v1/generate" --> AI
+  ASvc -- "X-Client-Platform: android<br/>records / versions" --> AC
+  MApp -- "X-Client-Platform: macos" --> AI
+  MApp -- "X-Client-Platform: macos" --> AC
+  DApp -- "X-Client-Platform: windows / linux / macos<br/>(stg の appconfig のみ)" --> AC
   AI -- "PUT / PATCH /apps/{id}/dsl" --> AC
   AC --> FS
   FS -- "outbox / 時刻" --> RN
@@ -220,6 +235,8 @@ flowchart LR
   Svc -- "Sign in with Apple / 匿名" --> FA[(Firebase Auth)]
   GH["GitHub Actions<br/>develop→stg / main→prod (WIF)"] -. deploy .-> GCP
 ```
+
+`X-Client-Platform` は全クライアントが付けるヘッダで、値は `ios` / `android` / `macos` / `windows` / `linux`(それ以外は `other`)。backend はログに出すだけで、部品の絞り込みは body の `allowedComponents` で行います([`backend/internal/httpx/client.go`](../backend/internal/httpx/client.go))。Android とデスクトップの作りは [`android/README.md`](../android/README.md)・[`docs/desktop/architecture.md`](desktop/architecture.md)、Mac は [`docs/mac/architecture.md`](mac/architecture.md)。デスクトップは今 stg の appconfig にだけ話します(既定はモック。サインインと AI の呼び出しは未接続)。Mac は iOS のパッケージを共有し、Android は `AIClient` / `AppConfigClient` を持ちます(図の矢印は iOS と同じ 2 サービスへ)。
 
 iOS の依存の向きは `App → Renderer → DSL`、`App → Services → DSL`。Renderer は Services を知らず、`DSLRuntime` protocol 経由で能力を注入されます(詳細: [`docs/ios/architecture.md`](ios/architecture.md))。backend は単一 Go モジュールに `cmd/appconfig`・`cmd/ai`・`cmd/runner` を置き、共有型 `pkg/dsl` に検証・JSON Patch を集約(詳細: [`docs/backend/architecture.md`](backend/architecture.md))。API は [`openapi-ai.yaml`](backend/openapi-ai.yaml) / [`openapi-appconfig.yaml`](backend/openapi-appconfig.yaml)。
 
@@ -305,15 +322,20 @@ cd desktop
 
 ## リポジトリ構成とドキュメント
 
-iOS アプリ(`ios/`)とバックエンド(`backend/`)を同居させたモノレポ。
+iOS・Android・Mac・デスクトップ(Windows・Linux)のクライアントと、バックエンド・インフラ・文書を同居させたモノレポ。表はフォルダ名順。内容は `origin/epic/god` のフォルダと各 README から書いた。
 
-| パス | 内容 |
-|---|---|
-| `ios/` | iOS アプリ本体(SwiftUI、xcodegen)。`Packages/{MetamonDSL,MetamonRenderer,MetamonServices}` + 薄いアプリ本体 `Metamon/` + ウィジェット・UI テスト |
-| `backend/` | Go サービス群(`cmd/appconfig`, `cmd/ai`, `cmd/runner`, `cmd/ai-eval`, `cmd/ai-audit` ほか)、共有型 `pkg/dsl`、生成パイプライン `internal/ai` |
-| `docs/` | 設計・運用ドキュメント(正典は `00_decisions.md`) |
-| `.github/` | CI・PR/Issue テンプレート・CODEOWNERS |
-| `scripts/` | 運用スクリプト(`github/` ブランチ保護) |
+| パス | 内容 | 入口 |
+|---|---|---|
+| `.claude/` | エージェント向けのスキル(`skills/`) | [`CLAUDE.md`](../CLAUDE.md) |
+| `.github/` | CI・PR/Issue テンプレート・CODEOWNERS | [`02_github_workflow.md`](02_github_workflow.md) |
+| `android/` | Android アプリ(Kotlin・Jetpack Compose)。`app` `dsl` `renderer` `services` `whisper` の 5 モジュール。`dsl` は純 Kotlin でデスクトップも取り込む | [`android/README.md`](../android/README.md)、[`docs/android/README.md`](android/README.md) |
+| `backend/` | Go サービス群(`cmd/appconfig`, `cmd/ai`, `cmd/runner`, `cmd/ai-eval`, `cmd/ai-audit` ほか)、共有型 `pkg/dsl`、生成パイプライン `internal/ai` | [`backend/README.md`](../backend/README.md)、[`docs/backend/architecture.md`](backend/architecture.md) |
+| `desktop/` | Windows・Linux 版(Compose Multiplatform Desktop・JVM)。`android/dsl` を取り込み、`app` `services` `whisper` を持つ | [`desktop/README.md`](../desktop/README.md)、[`docs/desktop/architecture.md`](desktop/architecture.md) |
+| `docs/` | 設計・運用ドキュメント(正典は `00_decisions.md`) | [`00_decisions.md`](00_decisions.md) |
+| `infra/` | GCP の構成の Terraform(prod と stg を同じコードと環境ごとの変数で作る) | [`infra/README.md`](../infra/README.md)、[`docs/infra/gcp-setup.md`](infra/gcp-setup.md) |
+| `ios/` | iOS アプリ本体(SwiftUI、xcodegen)。`Packages/{MetamonDSL,MetamonRenderer,MetamonServices}` + 薄いアプリ本体 `Metamon/` + ウィジェット・UI テスト。Mac 版(`MetamonMac*`)と共有コード(`Shared/`)も同じフォルダにある | [`ios/README.md`](../ios/README.md)、[`docs/ios/architecture.md`](ios/architecture.md)、[`docs/mac/architecture.md`](mac/architecture.md) |
+| `scripts/` | 運用スクリプト(`github/` ブランチ保護ほか) | なし |
+| `web/` | 発表用の静的ページ。`pv/`(PV の映像)と `splash/`(起動スプラッシュ)。ビルド不要の HTML | [`web/pv/README.md`](../web/pv/README.md) |
 
 | ドキュメント | 内容 |
 |---|---|

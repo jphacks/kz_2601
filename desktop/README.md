@@ -4,6 +4,8 @@ Compose Multiplatform Desktop(JVM)で作る Windows・Linux 版。DSL の読み�
 
 部品・アクションごとの対応(描ける / 代わり / 使えません / 未定): [docs/desktop/support-matrix.md](../docs/desktop/support-matrix.md)
 
+iOS の機能の入口ごとの対応(有る / 代わり / 作らない / Issue): [docs/parity.md](docs/parity.md)
+
 ## 目次
 
 - [動かす](#動かす)
@@ -32,6 +34,7 @@ cd desktop
 ./gradlew :desktop:run                    # 同梱の例 shopping を開く
 ./gradlew :desktop:run --args=kakeibo     # docs/dsl/examples の別の例
 ./gradlew :desktop:test :dsl:test         # 適合テスト(docs/dsl/conformance)と :dsl のテスト
+./gradlew :desktop:koverHtmlReport :desktop:koverXmlReport   # 網羅率(任意・CI では使わない)。app/build/reports/kover/ に html と report.xml(ファイルごとの数字)
 ```
 
 配布物(msi・deb・rpm)の作り方・入れ方・決まっていないことは [docs/desktop/packaging.md](../docs/desktop/packaging.md)。
@@ -91,7 +94,7 @@ Firebase Auth の REST クライアント(`auth/FirebaseAuthRestClient.kt`・ま
 
 ### 電池
 
-- 電池(`power/`): 電池の残り・充電の状態・省電力を読む口(iOS の `DevicePowerSource` と同じ形)。Linux は `/sys/class/power_supply`(マウスなどの電池は数えない・複数の電池は容量で重みを付けた平均)と `/sys/firmware/acpi/platform_profile` を 60 秒ごとに読み、変わった時だけ流す。Windows と macOS は今は「不明」。`METAMON_MOCK=1` の時は `METAMON_BATTERY_LEVEL`・`METAMON_BATTERY_STATE`・`METAMON_LOW_POWER` の偽物。式と画面にはまだ出さず、値は送らない。
+- 電池(`power/`): 電池の残り・充電の状態・省電力を読む口(iOS の `DevicePowerSource` と同じ形)。Linux は `/sys/class/power_supply`(マウスなどの電池は数えない・複数の電池は容量で重みを付けた平均)と `/sys/firmware/acpi/platform_profile`、Windows は kernel32 の `GetSystemPowerStatus`(JNA・電池の有無・残量・電源につながっているか・バッテリー節約機能)を 60 秒ごとに読み、変わった時だけ流す。macOS は今は「不明」。`METAMON_MOCK=1` の時は `METAMON_BATTERY_LEVEL`・`METAMON_BATTERY_STATE`・`METAMON_LOW_POWER` の偽物。式と画面にはまだ出さず、値は送らない。
 
 ### 読み上げ
 
@@ -194,5 +197,13 @@ whisper/native/build.sh                                       # Windows は whis
 | `app/src/main/kotlin/.../desktop/PhotoPreview.kt` | 写真を大きく見るダイアログ・見せる写真の集め方(Mac の `MacQuickLook.sources` と同じ規則)・「既定のアプリで開く」の一時ファイル |
 | `app/src/main/kotlin/.../desktop/i18n/`・`app/src/main/resources/i18n/desktop/` | 文言。Android の `renderer`・`app` の `values`(日本語)・`values-en`(英語)をビルド時に `i18n/` へ同梱して読む。デスクトップだけの文言は同じ形の XML(キーは `desktop_`) |
 | `app/src/main/kotlin/.../desktop/theme/`・`A11y.kt` | OS に従う明暗・読み上げの説明 |
-| `app/src/main/kotlin/.../desktop/power/` | 電池の残り・充電・省電力を読む口(Linux は sysfs、Windows・macOS は今は不明、`METAMON_MOCK=1` で偽物)。まだどこからも使っていない |
+| `app/src/main/kotlin/.../desktop/power/` | 電池の残り・充電・省電力を読む口(Linux は sysfs、Windows は `GetSystemPowerStatus`(JNA)、macOS は今は不明、`METAMON_MOCK=1` で偽物)。まだどこからも使っていない |
+| `app/src/main/kotlin/.../desktop/auth/` | サインインの部品。Firebase Auth の REST クライアント(`FirebaseAuthRestClient.kt`・設定は `FirebaseAuthConfig.kt`)と、リフレッシュトークンの置き場の口(`TokenStore.kt`・今はメモリだけの実体)。まだ画面にはつながない([今できること](#今できること)) |
+| `app/src/main/kotlin/.../desktop/Autostart.kt` | ログイン時に開く(既定は off)。Windows は HKCU の Run、Linux は XDG の autostart に登録する([今できること](#今できること)のトレイ) |
+| `app/src/main/kotlin/.../desktop/CommandPalette.kt` | Ctrl+K のコマンドパレット(画面・アクション・アプリを名前で選ぶ・絞り込みの点の付け方)([今できること](#今できること)のキーボード) |
+| `app/src/main/kotlin/.../desktop/Keyboard.kt` | ショートカットの決まり(Windows・Linux は Ctrl、macOS は ⌘)とその文言([今できること](#今できること)のキーボード) |
+| `app/src/main/kotlin/.../desktop/Licenses.kt` | サードパーティのライセンスの一覧と本文を出す([今できること](#今できること)のライセンス) |
+| `app/src/main/kotlin/.../desktop/Print.kt` | 今の画面を表に直して A4 で印刷する([今できること](#今できること)の印刷) |
+| `app/src/main/kotlin/.../desktop/Tray.kt` | トレイ / メニューバーの常駐・メニュー・通知の吹き出し([今できること](#今できること)のトレイ) |
+| `app/src/main/kotlin/.../desktop/Windows.kt` | 複数のウィンドウ(アプリごとに 1 枚・記録の詳細は別の 1 枚)の管理([今できること](#今できること)の複数のウィンドウ) |
 | `app/src/test/kotlin/.../desktop/DesktopConformanceTest.kt` | 全 OS 共通の適合テストのうち、今比べられる部分(画面・部品の state(hidden・needsForm を含む)・入力の値とラベル・操作の steps・openUrlButton の label / url・stat / gauge / progressBar / chart の DSL の値と計算した値)。違ってよい所(描けない type・まだ比べない props)は `ConformanceAllowlist.kt` に理由付きで書き、無い違いは落ちる |

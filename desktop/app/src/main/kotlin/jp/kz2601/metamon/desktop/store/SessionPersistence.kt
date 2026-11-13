@@ -5,8 +5,10 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import jp.kz2601.metamon.desktop.MockStore
 import jp.kz2601.metamon.desktop.Row
+import jp.kz2601.metamon.desktop.marks.RowMarks
 import jp.kz2601.metamon.desktop.net.DesktopApi
 import jp.kz2601.metamon.desktop.net.DesktopApiConfig
+import jp.kz2601.metamon.desktop.settings.SyncSnapshot
 import jp.kz2601.metamon.desktop.typedValue
 import jp.kz2601.metamon.dsl.records.Entity
 import jp.kz2601.metamon.dsl.records.JSONValue
@@ -54,6 +56,17 @@ class SessionPersistence(
     val queue: SyncQueue? = client?.let { store.queue(it, policy) }
     val isLive: Boolean get() = queue != null
 
+    /**
+     * 一覧の行の印(#2811)。送り先がある(サインインしている)時だけ。画面の id は端末の行からサーバーの id に替えて送る。
+     * 端末に無い行(開発用の記録など)は画面の id のまま、まだ送っていない作成は送らない。
+     */
+    val marks: RowMarks? = client?.let { c ->
+        RowMarks.live(c, appId) { entity, id ->
+            val row = store.records.current(appId, entity, id) ?: return@live id
+            row.recordId.takeUnless { row.isTemporary }
+        }
+    }
+
     /** 送り待ちの件数(このアプリの分だけ・画面に小さく出す)。 */
     var pending: Int by mutableStateOf(0)
         private set
@@ -64,6 +77,32 @@ class SessionPersistence(
      */
     @Volatile
     var onReload: ((Reload) -> Unit)? = null
+
+    /** 最後に 1 件送れた時刻(このアプリの分・起動してから。まだなら null)。設定の「同期」に出す。 */
+    var lastSentAtMillis: Long? by mutableStateOf(null)
+        private set
+
+    /** 続けて失敗して止まっているか(圏外など)。次に送れたら戻る。 */
+    var isPaused: Boolean by mutableStateOf(false)
+        private set
+
+    /** 設定の「同期」に出す今の様子。 */
+    fun syncSnapshot(): SyncSnapshot = SyncSnapshot(isLive, pending, lastSentAtMillis, isPaused)
+
+    /** 「今送る」: 止まっている列も流し直す(送り先がある時だけ。無ければ null)。 */
+    fun syncNow(): Job? = resume()
+
+    private fun trackSync(ev: SyncEvent) {
+        when (ev) {
+            is SyncEvent.Sent -> {
+                isPaused = false
+                if (ev.appId == appId) lastSentAtMillis = System.currentTimeMillis()
+            }
+            is SyncEvent.Paused -> isPaused = true
+            is SyncEvent.Drained -> isPaused = false
+            else -> Unit
+        }
+    }
 
     @Volatile
     private var models: List<Entity> = emptyList()
@@ -81,6 +120,7 @@ class SessionPersistence(
             // 送り始める前に受け口を付ける(SharedFlow は後から来た人に過去を渡さない)
             scope.launch(start = CoroutineStart.UNDISPATCHED) {
                 q.events.collect { ev ->
+                    trackSync(ev)
                     // 列は端末に 1 本でアプリをまたぐ。他のアプリの知らせは件数を数え直すだけ
                     refreshPending()
                     if (ev.appIdOrNull == appId && ev.needsReload()) submit { reload(ev) }

@@ -111,6 +111,9 @@ private struct MacGeneralSettings: View {
             } footer: {
                 Text("作ったアプリの文字の大きさです。表示メニューの「拡大」(⌘+)・「縮小」(⌘-)・「実際のサイズ」(⌘0)でも変えられます。")
             }
+            #if !APP_STORE_REVIEW // 共有の投稿に出す表示名(#3077)
+            MacAuthorNameSettingsSection()
+            #endif
             // 声で頼むのマイク(#1221)
             MacInputDeviceSection()
             // メニューバーの常駐・ログイン時に開く(#1848)
@@ -148,6 +151,10 @@ private struct MacAccountSettings: View {
                 } else {
                     MacUnavailableSettingRow(title: "アカウント")
                 }
+            }
+            // サインインの方法(#361)。匿名の人には出さない
+            if MacAccount.shared.isLive {
+                MacLinkedAccountsSection()
             }
             #if !APP_STORE_REVIEW // 審査用ビルドは App 内課金を持たない(#450 G1)
             Section {
@@ -397,6 +404,7 @@ private struct MacDetailSettings: View {
     @Environment(\.openWindow) private var openWindow
     @State private var showLicenses = false
     @State private var showTutorial = false // #971
+    @State private var showAutomationGuide = false // #3080
     #if !APP_STORE_REVIEW
     @State private var showBetaWelcome = false // #971(β の版だけ)
     private let betaWelcome = BetaWelcomeStore.shared
@@ -414,6 +422,14 @@ private struct MacDetailSettings: View {
                     Label("使い方を見る", systemImage: "questionmark.circle")
                 }
                 .accessibilityIdentifier("settings.tutorial")
+                // ショートカットのオートメーションの案内(#3080・iOS の #1995)。審査用の版でも出す
+                Button {
+                    showAutomationGuide = true
+                } label: {
+                    Label("ショートカットで自動にする", systemImage: "clock.arrow.2.circlepath")
+                }
+                .help("App を開いた時などをきっかけに「記録を追加」を動かす作り方を見ます")
+                .accessibilityIdentifier("settings.automationGuide")
                 #if !APP_STORE_REVIEW
                 if betaWelcome.isBeta {
                     Button {
@@ -474,6 +490,7 @@ private struct MacDetailSettings: View {
         }
         .formStyle(.grouped)
         .sheet(isPresented: $showLicenses) { MacLicensesView() }
+        .sheet(isPresented: $showAutomationGuide) { MacAutomationGuideView() }
         .sheet(isPresented: $showTutorial) {
             MacTutorialView {
                 FirstRunTutorialStore.shared.markTutorialSeen()

@@ -125,6 +125,7 @@ struct MacRootView: View {
                        offline: library.serverListState == .offline)
                 .focused($focus, equals: .sidebar)
                 .navigationSplitViewColumnWidth(min: 180, ideal: 220, max: 320)
+                .macCoachMarks(coachMarkEligible) // 並べ替えの吹き出し(#3249)
         } detail: {
             Group {
                 if let app = selectedApp, library.isServerOnly(app.id) {
@@ -368,6 +369,7 @@ struct MacRootView: View {
         library.delete(id)
         MacAppOrigins().remove(id)
         badges.markRead(id)
+        MacMenuBarActivity.shared.remove(appId: id) // メニューバーの表示(#2254)も消す
         // 記録も消す(#1284)。開いているウインドウのエンジンを止めて手放してから消す(動いたままだと書き戻される)
         Task { await MacRecordEngines.shared.purge(appId: id) }
         // サーバーにあるアプリはサーバーからも消す(iOS の deleteApp と同じ)。届かなくても端末からは消す
@@ -592,6 +594,22 @@ struct MacRootView: View {
             try? await Task.sleep(for: .seconds(2))
             if highlight?.canvas == canvas, highlight?.value == value { highlight = nil } // 後でタブを開いた時に光らせ直さない
         }
+    }
+
+    // MARK: - 吹き出し(#3249)
+
+    /// サイドバーの並べ替えの吹き出しを出せる場面。案内・シート・お知らせ・会話の間は出さない(iOS の `canShowCoachMarks` と同じ順番)
+    private var coachMarkEligible: Set<CoachMark> {
+        var busy = compose != nil || notices.isShowing || showsTips || showsAppSettings || showsScreenMap || appLimit != nil
+            || updateGate.isBlocking || onboarding?.showConsent == true || onboarding?.showTutorial == true
+        #if !APP_STORE_REVIEW
+        busy = busy || shareApp != nil || onboarding?.showBetaWelcome == true
+        #endif
+        let sections = sidebarSections
+        return MacCoachMarks.eligible(hasOpenApp: selectedApp != nil && windowApp == nil,
+                                      reorderableCount: max(sections.own.count, sections.shared.count),
+                                      isSearching: !searchText.trimmingCharacters(in: .whitespaces).isEmpty,
+                                      tutorialSeen: FirstRunTutorialStore.shared.hasSeenTutorial, busy: busy)
     }
 
     // MARK: - 画面マップ(#970)

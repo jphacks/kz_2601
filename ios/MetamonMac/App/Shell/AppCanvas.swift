@@ -183,6 +183,7 @@ private struct AppCanvasContent: View {
             .toolbar { MacGridEditToolbar(runtime: runtime) } // 画面の並びを編集(#2323)
             .overlay(alignment: .top) { if runtime.gridEdit != nil { MacGridEditBar(runtime: runtime) } }
             .environment(\.gridEditSession, runtime.gridEdit) // 編集中の画面だけ枠とつまみを出す(#2323)
+            .modifier(MacFabGutter(runtime: runtime)) // FAB を余白に置く試作(#2327・既定 off)
             .environment(\.dslRuntime, runtime)
             .environment(\.componentRegistry, ComponentRegistry.standard)
             .environment(\.openForms, runtime.openForms)
