@@ -26,7 +26,7 @@ object ConformanceAllowlist {
     )
 
     /** DSL に書いた値をそのまま写すだけの props。読み込みは :dsl(iOS・Android と同じ)のテストで見るので、ここではまだ比べない。 */
-    private const val DSL_ECHO = "DSL に書いた値をそのまま写すだけ(読み込みは :dsl のテストで見る)"
+    internal const val DSL_ECHO = "DSL に書いた値をそのまま写すだけ(読み込みは :dsl のテストで見る)"
 
     private fun echo(vararg keys: String): Map<String, String> = keys.associateWith { DSL_ECHO }
 
@@ -37,12 +37,10 @@ object ConformanceAllowlist {
         "card" to echo("title"),
         "colorPicker" to echo("field"),
         "datePicker" to echo("field"),
-        "disclosure" to echo("expanded", "title"),
         "drawingField" to echo("field"),
         "fileImport" to echo("entity", "label"),
         "emptyState" to echo("message", "title"),
         "flashcards" to echo("entity"),
-        "grid" to echo("columns"),
         "image" to echo("field") + ("hasImage" to "画像が有るか(読み込みの結果)をまだ出していない"),
         "link" to mapOf("opens" to "押した先(アプリ内 / ブラウザ)の判定をまだ出していない"),
         "locationButton" to echo("field"),

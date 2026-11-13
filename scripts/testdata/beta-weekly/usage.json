@@ -1,0 +1,6 @@
+[
+  {"jsonPayload":{"outcome":"ok"}},
+  {"jsonPayload":{"outcome":"ok"}},
+  {"jsonPayload":{"outcome":"error"}},
+  {"jsonPayload":{"outcome":"ok"}}
+]

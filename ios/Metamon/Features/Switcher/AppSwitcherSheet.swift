@@ -342,6 +342,7 @@ struct AppCard: View {
 /// 読み込み中のスケルトン(データ無しと区別するため必ず出す)。
 struct SkeletonCard: View {
     @State private var pulse = false
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
         VStack(alignment: .leading, spacing: Theme.Spacing.sm) {
@@ -352,8 +353,8 @@ struct SkeletonCard: View {
             RoundedRectangle(cornerRadius: 4).fill(Theme.Colors.surfaceElevated).frame(width: 60, height: 10)
         }
         .opacity(pulse ? 0.45 : 1)
-        .animation(.easeInOut(duration: 0.9).repeatForever(autoreverses: true), value: pulse)
-        .onAppear { pulse = true }
+        .animation(reduceMotion ? nil : .easeInOut(duration: 0.9).repeatForever(autoreverses: true), value: pulse)
+        .onAppear { pulse = !reduceMotion }
         .accessibilityLabel("読み込み中")
     }
 }
