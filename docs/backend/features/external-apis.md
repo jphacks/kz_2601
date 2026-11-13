@@ -15,6 +15,7 @@
 9. [偽の provider(stg と試験)](#偽の-providerstg-と試験)
 10. [作れないもの・代わりの道](#作れないもの代わりの道)
 11. [人の作業](#人の作業)
+12. [設計メモ: 乗換の検索の出どころの比較(#2314)](#設計メモ-乗換の検索の出どころの比較2314)
 
 ## できていること・まだのこと
 
@@ -69,6 +70,8 @@ provider は `Provider` で定義し、そのファイルの `init()` で `regis
 
 op の `Check` は引数の値を確かめる(appconfig と runner の両方で、数える前に。だめなら 400)。`CacheTTL` は同じ引数の答えを持つ時間(下の「キャッシュ」)。
 
+provider ごとの規約の条項の場所(課金・出典・保存・人が確かめる欄)は [external-api-terms.md](external-api-terms.md)(#2313)。
+
 ### 入っている provider
 
 | provider | 種類 | op | 出口 | キャッシュ | 入れ方 |
@@ -84,11 +87,13 @@ op の `Check` は引数の値を確かめる(appconfig と runner の両方で�
 | `vercel` の `projects`(プロジェクトと本番のデプロイ・#1676) | 無料・OAuth(Vercel の integration。`runs` だけ・読むだけ・下の注) | `projects(limit?)`。`limit` 1〜50(既定 20)。行はプロジェクト(見出し = 名前・値 = 本番のデプロイの状態(成功・失敗・ビルド中・待ち・取り消し。本番がまだ無ければ一番新しいデプロイ・1 つも無ければ値なし)・補足 = 「本番 / プレビュー · ブランチ · コミットの 1 行目 · 日時(日本時間)」・リンク = Vercel の inspector か `*.vercel.app` だけ) | `https://api.vercel.com` だけ(トークンも API も。インストールの画面は端末が開く) | なし | `EXT_VERCEL_ENABLED=1`・`EXT_VERCEL_CLIENT_ID` / `_CLIENT_SECRET`・`EXT_VERCEL_INTEGRATION_SLUG`(integration の URL の名前) |
 | `vercel` の `deployments`(最新のデプロイ・#1676) | 同上 | `deployments(project?, target?, limit?)`。`project` はプロジェクトの id(`prj_…`)か名前・`target` は `production` か `preview`・`limit` 1〜50(既定 20)。新しい順。行は `projects` と同じ形(見出し = プロジェクト名)。無いプロジェクト(404)は 400 `bad_request` | 同上 | なし | 同上 |
 | `frankfurter` の `latest` / `historical`(為替・欧州中央銀行・#1499) | 無料・鍵なし(`runs` だけ) | `latest(from?, to?, amount?)`・`historical(date, from?, to?, amount?)`。`from` / `to` は大文字 3 文字の通貨(`to` はカンマ区切りで 10 個まで・重ならない)・`amount` は正の数・`date` は 1999-01-04 から今日まで。行は通貨ごと(見出し = 通貨・値 = レート・補足 = 「日付・量 基準」) | `https://api.frankfurter.app` だけ・本文 64 KiB まで | latest 1 時間・historical 1 日 | `EXT_FRANKFURTER_ENABLED=1` |
+| `coingecko` の `price` / `history`(暗号資産の価格・CoinGecko・#2139 の試作・既定 off) | 無料・鍵なし(`runs` だけ。デモの鍵があれば `x-cg-demo-api-key` ヘッダー) | `price(ids, vs?)`・`history(id, vs?, days?)`。`ids` は CoinGecko の id(小文字・数字・`-`)をカンマ区切りで 10 個まで(重ならない)・`vs` は通貨 1 つ(小文字・既定 `jpy`)・`days` 1〜90(既定 7)。`price` の行は id ごと(見出し = id・値 = 価格と通貨・補足 = 「24時間 +1.23%」)。知らない id は行なし(全部知らなければ 400 `bad_request`)。`history` の行は日本時間の日ごとの最後の値(新しい順)。入れるか・規約・出典の文言は #1688 の判断待ち | `https://api.coingecko.com` だけ | price 1 分・history 1 時間 | `EXT_COINGECKO_ENABLED=1`(既定 off)・任意で `EXT_COINGECKO_API_KEY`(デモの鍵) |
 | `gtfsRealtime` の `nextBuses` / `busPositions`(バスの次の便・今の位置・GTFS リアルタイム・#1692) | 無料・鍵なし(`runs` だけ) | `nextBuses(feed, stop, route?, limit?)`・`busPositions(feed, route?, limit?)`。`feed` は下の「GTFS リアルタイムのフィードと規約」の許可リストの id だけ(ほかは 400 `bad_request`)。`stop` / `route` はそのフィードの GTFS の `stop_id` / `route_id`(英数字と `_ . : -`・64 文字まで)。`limit` は `nextBuses` 1〜10(既定 3)・`busPositions` 1〜50(既定 20)。`nextBuses` は TripUpdate を読み、その停留所に来る便を時刻の順に出す(見出し = `route_id`・補足 = 「遅れ N 分」/「N 分早い」/「定刻」(遅れの無い便は空)・値 = 「HH:MM(あと N 分)」日本時間)。取り消し・通過(SKIPPED / NO_DATA)の便・1 分より前・3 時間より先の便は出さない。時刻が遅れだけで来る便は、そのフィードの静的な時刻表(下の「静的な GTFS-JP の読み込み」)がある時だけ「時刻表の時刻 + 遅れ」で出す(補足に「遅れ N 分(時刻表 HH:MM)」・運行日は TripDescriptor の `start_date`、無ければ今日か昨日のうち近い方)。時刻表が無ければ出さない。`busPositions` は VehiclePosition を読み、バスごとに 1 行(見出し = 車両の表示名(無ければ id)・補足 = 「`route_id`・HH:MM 更新」・値 = 「緯度,経度」)。並びは `route_id`・見出しの順。フィードか車両の時刻が 10 分より古いものは出さない(古い予測は出さないより悪い)。静的な時刻表がある時は、見出し・補足の `route_id` を系統の名前(`route_short_name`、無ければ `route_long_name`)にし、`nextBuses` の補足の頭に停留所の名前を付け(「香林坊・遅れ 3 分」)、フィードに `route_id` の無い便は時刻表の `trips.txt` の系統で `route` を絞る。無い時は id のまま。TripUpdate を出すフィードはまだ許可リストに無い(人の作業)。出典(下の表)を出す。AI に選ばせる決まり(`prompt.go`・`catalog.go`)はまだ | 許可リストのフィードのホストだけ(今は `https://api-public.odpt.org`)・本文 1 MB まで・実体は 20000 件まで | 30 秒 | `EXT_GTFS_REALTIME_ENABLED=1` |
 | `openWeather` の `current` / `forecast`(今の天気・3 時間ごとの予報・OpenWeatherMap・#1498) | 無料・運営の鍵(`runs` だけ。OpenWeather の契約の範囲) | `current(lat, lng)`・`forecast(lat, lng, limit?)`。`lat` / `lng` は `airQuality` と同じ(小数 2 桁に丸める)。`current` は 1 件(見出し = 天気・補足 = 体感・湿度・風・値 = 気温)。`forecast` は 3 時間ごとの行(見出し = 日本時間の「11/11 09:00」・補足 = 天気・値 = 気温と降水の確率)、`limit` 1〜40(既定 8 = 24 時間)。出典は `airQuality` と同じ | `https://api.openweathermap.org` だけ(`/data/2.5/weather`・`/data/2.5/forecast`) | なし | `EXT_OPEN_WEATHER_ENABLED=1`・`EXT_OPEN_WEATHER_API_KEY` |
 | `openWeather` の `airForecast`(空気の汚れの予報・OpenWeatherMap Air Pollution の予報・#1656) | 無料・運営の鍵(`runs` だけ。OpenWeather の契約の範囲) | `airForecast(lat, lng, limit?)`。`lat` / `lng` は `airQuality` と同じ(小数 2 桁に丸める)・`limit` 1〜96(既定 24 = 1 日)。行は 1 時間ごと・今から順(見出し = 日本時間の「11/11 09:00」・補足 = PM2.5・PM10 の µg/m³・値 = `AQI n/5 <段階>(目安)`)。答えに時間帯が無いので時刻は日本時間で出す。AQI が 1〜5 でない時間は飛ばし、1 行も残らなければ 502 `upstream_unavailable`。健康の判断ではなく目安。出典は `airQuality` と同じ。AI に選ばせる決まり(`prompt.go`・`catalog.go`)はまだ | `https://api.openweathermap.org` だけ(`/data/2.5/air_pollution/forecast`) | なし | `EXT_OPEN_WEATHER_ENABLED=1`・`EXT_OPEN_WEATHER_API_KEY` |
 | `openWeather` の `airQuality`(空気の汚れ・OpenWeatherMap Air Pollution・#1656) | 無料・運営の鍵(`runs` だけ。OpenWeather の契約の範囲) | `airQuality(lat, lng)`。`lat` / `lng` は小数(10 進だけ)で小数 2 桁(約 1 km)に丸めて送る。答えは 1 件(見出し = 「空気 <AQI の段階>(目安)」・値 = `AQI n/5`・補足 = PM2.5・PM10・O₃・NO₂ の µg/m³)。AQI は OpenWeather の 1〜5(良い・まあまあ・ふつう・悪い・とても悪い)。1〜5 でない答えは 502 `upstream_unavailable`。健康の判断ではなく目安。出典「Weather data © OpenWeather (ODbL)」を出す。AI に選ばせる決まり(`prompt.go`・`catalog.go`)はまだ | `https://api.openweathermap.org` だけ(`/data/2.5/air_pollution`。天気と同じホスト・同じ鍵) | なし | `EXT_OPEN_WEATHER_ENABLED=1`・`EXT_OPEN_WEATHER_API_KEY` |
 | `openWeather` の `forecast` の紫外線(UV)(OpenWeatherMap One Call 3.0 の `uvi`・#1658) | 無料・運営の鍵(`runs` だけ)。ただし One Call 3.0 は 1 日の無料の回数を超えると**1 回ごと**に原価がかかるので、`uv` は既定で off | `forecast(lat, lng, limit?, uv?)` の `uv` が増えた。`uv` は `1` / `true` / `on` で紫外線を付ける・空か `0` / `false` / `off` で今までどおり・ほかは 400 `bad_request`。既定が off なので `uv` を渡さない `forecast` の答えと回数は変わらない。`uv=1` の時だけ 5 日 / 3 時間の API の代わりに One Call 3.0(`/data/3.0/onecall`・`exclude=current,minutely,daily,alerts`)を**1 回だけ**呼び(両方は呼ばない)、行は 1 時間ごとになる(見出し = 現地時間の「11/11 09:00」・補足 = 天気 +「UV 6.8 強い(目安)」・値 = 気温と降水で `forecast` と同じ)。段階は WHO の 1〜2(弱い)・3〜5(中程度)・6〜7(強い)・8〜10(非常に強い)・11 以上(極端に強い)で、日焼け止めの目安であり健康の判断ではない。`uvi` の無い時間・負の値は UV を出さない。1 行も残らなければ 502 `upstream_unavailable`。出典は `airQuality` と同じ。気象庁の紫外線情報は画像と表なので使わない。AI に選ばせる決まり(`prompt.go`・`catalog.go`)はまだ | `https://api.openweathermap.org` だけ(`/data/3.0/onecall`。天気と同じホスト・同じ鍵) | なし | `EXT_OPEN_WEATHER_ENABLED=1`・`EXT_OPEN_WEATHER_API_KEY` |
+| `openWeather` の `nowcast`(1 時間先までの降水・OpenWeatherMap One Call 3.0 の `minutely`・#2134 の試作・既定 off) | 無料の扱い・運営の鍵(`runs` だけ。One Call は 1 回ごとの課金なので既定 off) | `nowcast(lat, lng)`。`exclude=current,hourly,daily,alerts` で分ごとの降水だけ取る。Item = 「12分後に降り出す」「25分後に止む」「1時間は降らない」「1時間は降り続く」(値 = 今の mm/h・0.1 mm/h 以上を雨とみなす)・行は 10 分ごと(見出し = 時刻・値 = その 10 分の最大の mm/h)。分ごとのデータが無い場所はエラー。`lat` / `lng` の丸めと検査は `forecast` と同じ。どの出どころを使うかは #1655 の判断待ち | `https://api.openweathermap.org` だけ(`/data/3.0/onecall`) | なし | `EXT_OPEN_WEATHER_ENABLED=1` に加えて `EXT_OPEN_WEATHER_NOWCAST=1`(無ければ op は作らず、呼ぶと 503 `ext_unavailable`) |
 | `googleCalendar` の `listEvents` / `createEvent`(主のカレンダーを見る・予定を足す・#1494) | 無料・OAuth(PKCE・`runs` だけ・scope `calendar.events.owned.readonly` / `calendar.events.owned`。本人が持つカレンダーだけ)・`createEvent` は書く(確認必須) | `listEvents(timeMin?, timeMax?, maxResults?, q?)`・`createEvent(title, start, end?, description?, location?)`。`listEvents` は `[timeMin, timeMax)`(既定は今から 7 日・366 日まで)の予定を始まりの順に 1 ページ(`maxResults` 1〜50)。`createEvent` の `start` が日付だけなら終日、時刻で `end` が無ければ 1 時間。予定の id は request id から作るので再送で 2 つできない | `https://oauth2.googleapis.com`・`https://www.googleapis.com` だけ | なし | `EXT_GOOGLE_CALENDAR_ENABLED=1`・`EXT_GOOGLE_CALENDAR_CLIENT_ID` / `_CLIENT_SECRET` |
 | `outlookCalendar` の `listEvents` / `createEvent`(既定のカレンダーを見る・予定を足す・Microsoft Graph v1.0・#1495) | 無料・OAuth(PKCE・common テナント・`runs` だけ・scope `Calendars.Read` / `Calendars.ReadWrite`・いつも `offline_access`)・`createEvent` は書く(確認必須) | 引数と行は `googleCalendar` と同じ。Microsoft に取り消しの口が無いので、切ると保存したトークンを消す(本人は Microsoft アカウントの設定でアプリを外せる) | `https://login.microsoftonline.com`・`https://graph.microsoft.com` だけ | なし | `EXT_OUTLOOK_CALENDAR_ENABLED=1`・`EXT_OUTLOOK_CALENDAR_CLIENT_ID` / `_CLIENT_SECRET` |
 | `deepl` の `translate`(文を訳す・DeepL API Pro・#1500) | 有料(文字ごと)・運営の鍵(`runs` とコイン。`COIN_RESERVE_EXT_DEEPL` を押さえ、原価を確定して残りを戻す) | `translate(text, targetLang, sourceLang?)`。`text` は 4 KB まで。答えは 1 件(見出し・値 = 訳・補足 = 「EN → JA」)。原価は DeepL が数えた文字数(無ければ文の文字数)× `EXT_COST_USD_DEEPL_PER_CHAR`。無ければ `EXT_COST_USD_DEEPL_TRANSLATE` か押さえた量。規約: Pro だけ(文を残さず学習に使わない)。無料の鍵(`:fx`)だと provider は off のまま。文はキャッシュもログもしない | `https://api.deepl.com` だけ(鍵は `Authorization` ヘッダー) | なし | `EXT_DEEPL_ENABLED=1`・`EXT_DEEPL_API_KEY`・`COIN_RESERVE_EXT_DEEPL` |
@@ -115,6 +120,7 @@ op の `Check` は引数の値を確かめる(appconfig と runner の両方で�
 | `withings` の `weight`(体重計・#1669) | 無料・OAuth(`runs` だけ・scope `user.metrics`)・読むだけ | `weight(days?, limit?)`。`days` 1〜90(既定 30・何日前まで)・`limit` 1〜50(既定 20)。行は 1 回の計測(見出し = 日時(日本時間)・値 = `65.75 kg`・補足 = 体脂肪率(測った時だけ))。新しい順。本物の計測(category 1)だけで、体重計が家族の誰のものか決められなかった計測(attrib 1)は出さない | `https://wbsapi.withings.net` だけ | なし(健康のデータ・利用者ごと) | `EXT_WITHINGS_ENABLED=1`・`EXT_WITHINGS_CLIENT_ID` / `_CLIENT_SECRET` |
 | `withings` の `bloodPressure`(血圧計・#1669) | 同上 | `bloodPressure(days?, limit?)`。引数は `weight` と同じ。行は 1 回の計測(見出し = 日時・値 = `128/82 mmHg`(上/下)・補足 = 脈拍(測った時だけ))。上と下の両方が無い計測は出さない | 同上 | なし | 同上 |
 | `podcasts` の `newEpisodes`(番組の新しい回・Apple の iTunes Lookup API・#1703) | 同上 | `newEpisodes(collectionId, limit?)`。`collectionId` は数字だけ 1〜15 桁(`searchPodcasts` の `Output.Cells` にある番組の id・それ以外は 400)・`limit` は整数で 1〜20 に丸める(既定 10)。日本のストア(`/lookup?id=…&entity=podcastEpisode&country=JP`)。行は回ごと・新しい順(見出し = 回の題・補足 = 番組名・値 = 配信日(日本時間)・リンク = Apple Podcasts の回のリンク(クエリは落とすので、今は番組のページに着く))。**音声の URL(`episodeUrl`・`previewUrl`)は読み取りもせず、返さない・キャッシュにも残らない**。ストアのリンクが無い・`https` でない回は出さない。回が無い番組は 0 行。出典 `PodcastsAttribution` を出す | 同上(`/lookup`) | 6 時間(同じ `collectionId`・`limit`) | 同上 |
+| `rakutenRecipe` の `categories` / `ranking`(楽天レシピのカテゴリ別ランキング・#2141 の試作・既定 off) | 無料・運営のアプリ ID(`runs` だけ。クエリの `applicationId`) | `categories(parent?)`・`ranking(categoryId)`。言葉での検索は無い。`categories` は `parent` 無しで大分類・大分類の id(`30`)で中分類・中分類の id(`30-300`)で小分類(見出し = 名前・値 = `ranking` に渡す id・補足 = 大 / 中 / 小分類)。`ranking` は上位(API は 4 件)の行(見出し = 題・値 = 「1位」・補足 = 「時間の目安・費用の目安・材料: …」(材料は 6 つまで)・リンク = 楽天レシピのページ(rakuten.co.jp の https だけ))。画像は行の形に無いので返さない。無いカテゴリは 400 `bad_request`。入れるか・規約(出典・アプリ ID の扱い)は #1700 の判断待ち | `https://app.rakuten.co.jp` だけ | categories 1 日・ranking 1 時間 | `EXT_RAKUTEN_RECIPE_ENABLED=1`(既定 off)・`EXT_RAKUTEN_RECIPE_API_KEY`(アプリ ID) |
 | `slack` の `setStatus`(自分の状態を変える・#1679) | 無料・OAuth(`runs` だけ・ユーザーのトークン・scope `users.profile:write`)・書く(確認必須) | `setStatus(text?, emoji?, minutes?)`。`text` は 1 行 100 文字まで・`emoji` は `:tomato:` の形(肌の色 `:skin-tone-2:`〜`6` を 1 つ付けてよい)・`minutes` は 1〜10080(1 週間。無ければ消すまで)。`text` も `emoji` も無ければ状態を消す(その時 `minutes` は付けない)。同じ状態をもう一度入れても変わらない。答えは 1 件(見出し = 文・補足 = 絵文字・値 = 消える時刻)。Slack の上限は 1 人の状態を 1 分に 10 回まで | `https://slack.com` だけ(`/api/...`) | なし | `EXT_SLACK_ENABLED=1`・`EXT_SLACK_CLIENT_ID` / `_CLIENT_SECRET` |
 | `slack` の `postMessage`(チャンネルに本人として投稿・#1679) | 無料・OAuth(`runs` だけ・ユーザーのトークン・scope `chat:write`)・書く(確認必須) | `postMessage(channel, text)`。`channel` は会話の id(`C…` / `G…` / `D…`・名前は取らない)・`text` は 4000 文字まで(改行可・制御文字不可)。`<!channel>` `<!here>` `<!subteam^…>` などの一斉メンション(`<!`)は Slack に送らず 400 `bad_request`。`parse: none`・`link_names: false` で送る。本人が入っていない・無いチャンネル(`not_in_channel` / `channel_not_found`)は 400 `bad_request`。Slack に冪等のキーが無いので、二重にしないのは書く op をやり直さない決まりだけ。答えは `resultId`(メッセージの `ts`)と 1 件(見出し = 1 行目 120 文字まで・補足 = チャンネル)。本文は保存しない。Slack の上限は 1 チャンネルに 1 秒 1 通 | 同上 | なし | 同上 |
 | `slack` の `unread`(DM の未読の数・#1679) | 無料・OAuth(`runs` だけ・ユーザーのトークン・scope `im:read`) | `unread(channel)`。`channel` は DM の id(`D…`)だけ。`conversations.info` の `unread_count_display` を返す(Web API が未読の数を返すのは DM だけ。チャンネルの未読を数えるには本文を `conversations.history` で読むことになり、Marketplace に無い配布アプリは 1 分 1 回・15 件までなので入れない)。数が無い答えは 400 `bad_request`。答えは 1 件(見出し = 「未読」・補足 = id・値 = 数)。本文は読まない | 同上 | なし | 同上 |
@@ -460,3 +466,41 @@ DSL に `externalCall` / `externalList` があるかの確かめは、DSL の子
 - GTFS リアルタイム(#1692): 上の「GTFS リアルタイムのフィードと規約」の都営バスの URL とライセンスを一度確かめる(このコードは実際のフィードを読んでいない)。TripUpdate を出すフィード(金沢・北陸の事業者を含む)を探し、ライセンスが CC BY なら許可リストに足す。足すまで `nextBuses` は使えない。
 - ODPT(#1691): [公共交通オープンデータセンターの開発者サイト](https://developer.odpt.org/)で開発者登録(運営のアカウント・審査に数日かかることがある)をし、発行された consumer key を Secret Manager の `EXT_ODPT_API_KEY` に入れる。上の「ODPT の事業者と規約」を読み直し、アプリの問い合わせ先(開発者のメールアドレスなど)を決める。路線 id は登録後に `odpt:Railway` で一度確かめる。
 - ポッドキャスト(#1703): 上の「iTunes Search API の規約」を読み直し、「ストアの中身を広めるためだけ」の使い道に当たるか(番組を探して Apple Podcasts を開く使い方)を決める。`EXT_GLOBAL_DAILY_PODCASTS` を 1 分 20 回の目安に合わせて入れる。バッジ(Listen on Apple Podcasts)の出し方を iOS と決める。アートワークを端末に出すなら `ExtRow` に画像の欄を足すか(API の契約の変更)を決める。
+
+## 設計メモ: 乗換の検索の出どころの比較(#2314)
+
+#1693(乗換の検索を生成アプリで使う)で、どれを使うかを決める前の下書き。**決めるのは #1693**。入れる・入れないの決定は [decisions/external-apis.md](../../decisions/external-apis.md) のまま。金額は書かない(料金は各社の公式ページで確認)。確かめた日: 2026-11-13。確かめきれなかったことは **未確認** と書いた。
+
+### 比べる表
+
+「有料 / 無料の枠あり」は、公式の案内にその語があったかだけを書いた。
+
+| 候補 | 鍵 | 回数 | 規約の要点 | 返る項目 | runner の今の仕組みに合うか |
+|---|---|---|---|---|---|
+| 駅すぱあと API(旧「駅すぱあと Webサービス」・ヴァル研究所) | 法人向けの API。発行の手順は **未確認** | **未確認**(プランごとに違う見込み) | API の規約は **未確認**。同じ会社の「駅すぱあと for web」の規約は、本文にある許諾の範囲を超えた複製・抽出・二次利用を禁じる(API の規約ではない) | 経路検索の結果(経路・時刻・運賃など)。項目の一覧は **未確認** | 運営の鍵を 1 つ持つ形なら合う(ODPT と同じ作り)。生成アプリの利用者ごとの表示・保存が規約に収まるかが未確認 |
+| NAVITIME API(ナビタイムジャパン) | 提供の入口は Rakuten RapidAPI など。直接契約の流れは **未確認** | **未確認**。期間限定の無料お試しの案内あり(期間・条件は公式ページで確認) | API の規約は公式サイトに見当たらず **未確認**(RapidAPI のページ経由で確認する見込み) | RapidAPI の「NAVITIME Route(totalnavi)」は公共交通と徒歩のドアツードアの経路と運賃(`/route_transit`・`/shape_transit`・`/fare_table`・`/fare_comparison`) | RapidAPI の鍵(運営の鍵 1 つ)なら合う。再配布・保存の規約が未確認 |
+| ODPT の時刻表から自分で作る(公共交通オープンデータセンター) | 開発者登録でトークンをもらう(運営の鍵。ODPT の `trainStatus` で既に使っている) | 公式の上限は **未確認** | データごとにライセンスが違う(CC BY 4.0・基本ライセンスなど)。出典の表示と「事業者に直接問い合わせない」旨の通知が要る(上の「ODPT の事業者と規約」) | 事業者・路線・駅・時刻表・運行情報など(運行情報は上の `odpt` で使用中)。経路検索(乗換の案内)の口があるかは **未確認**(開発者サイトの本文は読めなかった)。無ければ乗換は自分で作る必要がある | 取る部分は合う。経路の計算は runner の外の大きな作り込み。対象の事業者が公開している範囲に限られる |
+| Google の Directions API | Google Cloud の API キー | 割り当ての量は **未確認**(Cloud Console で確認) | Google Maps Platform の規約に従う(表示・保存の決まりは **未確認**) | `transit` モードで経路(routes)・区間(legs)・手順(steps)。JSON / XML | キーを 1 つ持つ形なら合う。**Directions API は Legacy で、2026 年 10 月以降は新しいプロジェクトでは有効にできない**(既存のプロジェクトは使える)。Routes API への移行が案内されている。日本の `transit` の対応範囲は **未確認** |
+
+### 気づいたこと
+
+- 4 つとも「画面を読み取る(スクレイピング)・利用者のログイン情報を預かる」形にはならない。鍵は運営が持つ形(利用者の鍵を預かる土台は要らない)。
+- 駅すぱあと・NAVITIME は API の規約を公式のページで確かめられなかった。**表示・保存・再配布・課金**の項目が、生成アプリ(利用者が作ったアプリの中で結果を出す)に合うかは、規約を読むまで言えない。
+- Directions API は新しいプロジェクトでは使えなくなる。使うなら Routes API の `transit` を別に調べる必要がある(**未確認**)。
+- ODPT は既に provider(`odpt`・`trainStatus`)があり、鍵と規約の手当てがある。乗換の経路が返るかは未確認。
+
+### 推奨(未確定)
+
+- 規約の確認ができるまでは、どれも「作る」と決めない。
+- 規約の確認が先: 駅すぱあと API と NAVITIME API の規約を、公式のページか窓口で読む(人の作業)。
+- 代わりの道の候補: 乗換のアプリの画面を `openUrlButton` で開く(出発・到着を渡せるかは **未確認**)・地図のアプリを開く。決めるのは #1693。
+
+### 出典(確かめた日: 2026-11-13)
+
+- [駅すぱあと API](https://api-info.ekispert.jp/)(この環境では開けず、中身は **未確認**)
+- [ヴァル研究所の「駅すぱあと API」への改称の記事(2024-02-26・BCN)](https://www.bcnretail.com/topics_detail9/20240226_404198.html)
+- [駅すぱあと for web 利用規約(API の規約ではない)](https://roote.ekispert.net/help/terms)
+- [NAVITIME API](https://api-sdk.navitime.co.jp/information/)
+- [NAVITIME Route(totalnavi)・Rakuten RapidAPI](https://rapidapi.com/navitimejapan-navitimejapan/api/navitime-route-totalnavi)
+- [公共交通オープンデータセンター 開発者サイト](https://developer.odpt.org/)
+- [Directions API (Legacy) の概要・Google](https://developers.google.com/maps/documentation/directions/overview)

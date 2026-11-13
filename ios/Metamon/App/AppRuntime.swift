@@ -444,7 +444,9 @@ final class AppRuntime: RuntimeNavigating {
     @ObservationIgnored private var pendingHotReloadTask: Task<Void, Never>?
     @ObservationIgnored private var recordsRefreshTasks: [String: Task<Void, Never>] = [:]
     /// 保存中のフォーム(saveRecord の連打で同じ記録を 2 件作らない)
-    @ObservationIgnored let saveFlight = SaveFlight() // テストが保存の途中を見る
+    @ObservationIgnored private let saveFlight = SaveFlight()
+    /// `form` を保存している途中(書き込みの await の間)か。テストが保存の途中に入力する
+    func isSaving(_ form: FormDraft) -> Bool { saveFlight.isSaving(form) }
     /// 最後に書き込んだフォーム。送った後にサーバーが断ったら「保存しました」を取り消す(M10 × #317 / #346 / #321)
     @ObservationIgnored var lastSavedForm: SavedForm?
     #if !APP_STORE_REVIEW
@@ -556,6 +558,7 @@ final class AppRuntime: RuntimeNavigating {
         noteRetention() // #482 保存期間の確認と期限切れの削除
         noteAppMembers() // #272 参加者と管理者(member の選択肢・管理者だけのボタン)
         WidgetSnapshotWriter.write(dsl: doc.dsl, records: records, appId: doc.appId) // ホーム画面ウィジェットへ stat を反映
+        HomeQuickActions.noteOpened(doc.appId) // 長押しメニューの最近の順(#2232)。描き直しは下の引き直しで
         IntentHost.shared.appsMayHaveChanged() // Siri のフレーズ候補(アプリ名)を引き直す(#80)
     }
 

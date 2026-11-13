@@ -74,6 +74,47 @@ func TestFailureReason(t *testing.T) {
 	}
 }
 
+func TestIsFailureReason(t *testing.T) {
+	failures := []string{
+		FailureInternal,
+		FailureMismatch,
+		FailureNotifyFailed,
+		FailureRecordUnavailable,
+		FailureSourceUnavailable,
+		FailureTimeout,
+		FailureWriteRejected,
+	}
+	// a new Failure* constant must be added above too
+	sorted := slices.Sorted(slices.Values(failures))
+	if all := constWords(t, "Failure"); !slices.Equal(sorted, all) {
+		t.Fatalf("table %v, Failure* constants %v", sorted, all)
+	}
+	for _, w := range failures {
+		if !IsFailureReason(w) {
+			t.Errorf("IsFailureReason(%q) = false", w)
+		}
+	}
+	for _, w := range []string{
+		"",
+		"Timeout",
+		"TIMEOUT",
+		" timeout",
+		"timeout ",
+		"Notify_Failed",
+		CodeSendFailed,
+		CodeScopeViolation,
+		CodeNotFound,
+		CodeError,
+		ResultFailed,
+		ResultOther,
+		"unknown",
+	} {
+		if IsFailureReason(w) {
+			t.Errorf("IsFailureReason(%q) = true", w)
+		}
+	}
+}
+
 // TestResultsMatchSpec keeps the Result* words equal to the openapi
 // AutomationResult enum iOS decodes (#347).
 func TestResultsMatchSpec(t *testing.T) {
