@@ -137,17 +137,41 @@ macOS runner は Linux の 10 倍の分単価なので、ubuntu の `ios-changes
 
 ## mac-ci(Mac アプリと共有パッケージの macOS ビルド・テスト)
 
-`.github/workflows/mac-ci.yml`(#928)。ios-ci と同じく ubuntu の `mac-changes` で変わった場所を見て、必要な時だけ macOS で回す。集約ジョブは `mac-ci`(macOS ジョブがスキップでも成功で終わる)。**required check にするかはオーナーが判断する**。
+`.github/workflows/mac-ci.yml`(#928)。ios-ci と同じく ubuntu の `mac-changes` で変わった場所を見て、必要な時だけ macOS で回す。**required check にするかはオーナーが判断する**(今の `REQUIRED_CHECKS` には入っていない)。
 
-| 変わった場所 | Mac アプリ(MetamonMac)のビルド | macOS で回るテスト |
+- きっかけ: PR(opened / synchronize / reopened / ready_for_review・Draft は除く)と `develop` / `main` への push。PR では新しい push で古い実行を取り消す。push では取り消さない。
+- ジョブ(名前は workflow と同じ): `mac-changes`(ubuntu・判定)→ `mac-build-test`(`macos-26`・上限 40 分)→ `mac-ci`(ubuntu・集約。`mac-build-test` がスキップでも成功、失敗・キャンセルなら失敗)。
+- `ios/MetamonMac` が無いブランチでは `mac-build-test` を飛ばす。
+
+| 変わった場所 | Mac アプリ(MetamonMac)のビルドと MetamonMacTests | パッケージのテスト(macOS) |
 |---|---|---|
-| `ios/Packages/MetamonDSL/**`・DSL のテストデータ(`docs/dsl/**` の一部・テストが読む backend の JSON) | する | DSL / Renderer / Services |
+| `ios/Packages/MetamonDSL/**`・DSL のテストデータ(`docs/dsl/conformance/expr/**`・`docs/dsl/dsl.schema.json`・`docs/dsl/examples/**`・`backend/internal/ai/examples/**`・`backend/pkg/dsl/testdata/**`) | する | DSL / Renderer / Services(DSL は全員の依存) |
 | `ios/Packages/MetamonRenderer/**`・`docs/dsl/conformance/**`・`docs/dsl/examples/**` | する | Renderer |
 | `ios/Packages/MetamonServices/**` | する | Services |
-| `ios/MetamonMac/**`・`ios/Shared/**`(iOS と共有するランタイムの部品)・`ios/project.yml` | する | なし |
-| `.github/workflows/mac-ci.yml`・`ios/scripts/mac-package-test.sh`・develop / main への push(上記のどれかが変更) | する | 全部 |
+| `ios/MetamonMac/**`・`ios/MetamonMacTests/**`・`ios/Shared/**`(iOS と共有するランタイムの部品)・`ios/project.yml`・`ios/scripts/select-firebase-plist.sh` | する | なし |
+| `.github/workflows/mac-ci.yml`・`ios/scripts/mac-package-test.sh` | する | 全部 |
+| 上のどれも変わっていない | しない | なし(`mac-ci` は成功) |
+| `develop` / `main` への push(上のどれかが変更) | する | 全部 |
 
-- テストは各パッケージのフォルダで `xcodebuild test -destination platform=macOS`(`ios/scripts/mac-package-test.sh <パッケージ名>`)。署名しない・秘密を使わない。
+**回す物**: `xcodegen generate` → `MetamonMac` の Debug ビルド(`platform=macOS`)→ Mac アプリをホストにした単体テスト `MetamonMacTests`(ビルドする時はいつも)→ 表で決まったパッケージのテスト(`ios/scripts/mac-package-test.sh <パッケージ名>`・各パッケージのフォルダで `xcodebuild test -destination platform=macOS`)。
+
+**回さない物**(重い・要らない物は macOS の分を使わない):
+
+- 署名・アーカイブ・配布用のビルド(`CODE_SIGNING_ALLOWED=NO`。証明書や Firebase の plist などの秘密を使わない)。
+- iOS のシミュレータ・iOS アプリ・UI テスト(iOS は ios-ci が受け持つ)。
+- 関係の無い変更の時の macOS ジョブ(判定は ubuntu の `mac-changes` で済ませる)。
+
+**時間の目安**: `mac-build-test` は全部を回す時(develop への push)で 10〜15 分。キャッシュ(SwiftPM・`DerivedData-mac`)が効かない時は延びる。判定と集約は数十秒。macOS runner は分単価が高いので、原因を見ずに Re-run を重ねない。失敗した時はテスト結果(`mac-test-results`・3 日)が artifact に上がる。
+
+**ios-ci との分担**:
+
+| | ios-ci | mac-ci |
+|---|---|---|
+| 対象 | iOS アプリ(シミュレータ)と、それが使うパッケージ | Mac アプリ(MetamonMac)と、それが使うパッケージ |
+| MetamonDSL だけの変更 | `ios-dsl` が macOS で MetamonDSLTests を回す | `mac-build-test` が DSL / Renderer / Services を回す |
+| UI テスト | develop / main への push(PR は `ui-tests` ラベルの時) | 無し |
+
+- 今は MetamonDSL だけを変えた PR で、DSL のテストが ios-ci と mac-ci の両方で回る(二重)。まとめ方は #1135 で決める(案: ios-ci の `ios-dsl` をやめて mac-ci に任せる)。**#1135 の決まりが出たら、この節と ios-ci の表をそれに合わせて直す。**
 - 手元で回す時、repo か DerivedData が `~/Desktop`・`~/Documents`・`~/Downloads` の下にあると、テストの実行役が読めずに落ちる(macOS の保護)。repo(clone)と DerivedData(`MAC_DERIVED_DATA`)の両方を保護の外(例: `~/src`)に置く。CI では起きない。
 
 ## android-ci(Android アプリの JVM テスト・ビルド)
@@ -205,6 +229,28 @@ macOS runner は Linux の 10 倍の分単価なので、ubuntu の `ios-changes
 - テストが落ちたら、成果物 `desktop-test-reports-ubuntu-latest` / `desktop-test-reports-windows-latest` にレポート(HTML)がある(`desktop/app/build/reports/tests/`・`desktop/build/dsl/reports/tests/`・`desktop/whisper/build/reports/tests/`)。
 - 手元では `cd desktop && ./gradlew :desktop:test :dsl:test :whisper:test`(JDK 17 以上)。Windows だけで落ちる時は、パスの区切りや改行(CRLF)の違いを疑う。
 - 「配布物を作る」の step が落ちたら jpackage のエラーをログで見る(手元では `./gradlew :desktop:packageDeb`)。「配布物を残す」が落ちたら `desktop/app/build/compose/binaries/main/<deb|msi>/` が空だった(`if-no-files-found: error`)。
+
+## infra-ci(Terraform の書式と構文の検査)
+
+`.github/workflows/infra-ci.yml`。`infra/`(GCP の構成の Terraform・[`infra/README.md`](../infra/README.md))を検査する。**GCP には触らない**(state の backend を使わずに init するので、認証も秘密も要らない)。
+
+- いつ回るか: `infra/**` かこの workflow を触る PR(Draft でも回る)と、`develop` / `main` への push。required check ではないので、ほかの CI と違って workflow の `paths:` で絞っている。
+- ジョブは `terraform` の 1 つ(ubuntu・5 分上限・Terraform `1.9.8`)。
+
+| step | 検査すること |
+|---|---|
+| `terraform fmt -check -recursive` | 書式。直していない `.tf` があると落ちる |
+| `terraform init -backend=false -input=false` | provider を取ってくる(state には繋がない) |
+| `terraform validate` | 構文・参照・型 |
+| import ブロックも含めて validate | `imports.prod.tf.example` を `imports.tf` に写して、もう一度 `terraform validate`(prod を取り込む `import` ブロックが壊れていないか。[取り込みの手順](../infra/README.md#既存の-prod-を取り込む)) |
+
+落ちた時の見方:
+
+- **fmt**: 手元で `cd infra && terraform fmt -recursive` をかけて commit する。ログに書式のずれたファイル名が出る。
+- **init**: provider の版の指定(`versions.tf`)か、取ってくる時の通信の失敗。後者なら Re-run。
+- **validate**: ログの `Error:` に、ファイルと行が出る。手元では `cd infra && terraform init -backend=false && terraform validate`(GCP の認証なしで回る)。
+- **import ブロックの validate だけ落ちる**: `imports.prod.tf.example` の `import` の `to` が、`.tf` から消えた・名前が変わったリソースを指している。リソースの名前を変えたら example も合わせる。
+- plan と apply は CI では回さない。人が手元で回す([`infra/README.md`](../infra/README.md))。
 
 ## backend-emulator(Firestore エミュレータ試験・必須ではない)
 

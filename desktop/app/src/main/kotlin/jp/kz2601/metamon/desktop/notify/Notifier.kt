@@ -5,11 +5,17 @@ import java.awt.SystemTray
 import java.awt.TrayIcon
 import java.awt.image.BufferedImage
 
-/** 1 件の通知。[onClick] は押された時(出す口が受けられる時だけ呼ぶ)。 */
+/**
+ * 1 件の通知。[onClick] は押された時(出す口が受けられる時だけ呼ぶ)。
+ * [actions] は通知のボタン(#3210・出す口が [Notifier.supportsActions] の時だけ出す)。押されたら [NoticeActions] に [id] と一緒に届く。
+ */
 data class DesktopNotice(
     val title: String,
     val body: String,
     val onClick: (() -> Unit)? = null,
+    val id: String? = null,
+    val actions: List<NoticeAction> = emptyList(),
+    val onAction: ((NoticeAction) -> Unit)? = null,
 )
 
 /**
@@ -22,6 +28,9 @@ interface Notifier {
 
     /** 出せたら true。 */
     fun show(notice: DesktopNotice): Boolean
+
+    /** ボタン付きの通知を出し、押された印を [NoticeActions] に届けられるか(トーストの actions・freedesktop の ActionInvoked)。 */
+    val supportsActions: Boolean get() = false
 }
 
 /**

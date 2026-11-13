@@ -38,6 +38,9 @@ type event struct {
 	Mode    string
 	Outcome string
 	Passed  bool
+	// Platform is the raw clientPlatform of the line, or else that of the
+	// http.request line with the same requestId (only -by-platform reads it).
+	Platform string
 }
 
 type payload struct {
@@ -50,6 +53,8 @@ type payload struct {
 	Kind             string `json:"kind"`  // shared.usage
 	Count            int    `json:"count"` // shared.usage
 	Time             string `json:"time"`  // bare slog record
+	RequestID        string `json:"requestId"`
+	ClientPlatform   string `json:"clientPlatform"`
 }
 
 type entry struct {
@@ -69,6 +74,17 @@ func parse(r io.Reader) ([]event, error) {
 	if err != nil {
 		return nil, err
 	}
+	// requestId -> clientPlatform, from any line (http.request carries it).
+	byReq := map[string]string{}
+	for _, e := range entries {
+		p := e.JSONPayload
+		if p == nil {
+			p = &e.payload
+		}
+		if p.RequestID != "" && p.ClientPlatform != "" {
+			byReq[p.RequestID] = p.ClientPlatform
+		}
+	}
 	var out []event
 	for _, e := range entries {
 		p, ts := e.JSONPayload, e.Timestamp
@@ -82,8 +98,12 @@ func parse(r io.Reader) ([]event, error) {
 		if err != nil {
 			continue
 		}
+		plat := p.ClientPlatform
+		if plat == "" {
+			plat = byReq[p.RequestID]
+		}
 		out = append(out, event{At: at, Event: p.Event, UID: p.UIDHash, App: p.AppHash, Mode: p.Mode,
-			Outcome: p.Outcome, Passed: p.ValidationPassed})
+			Outcome: p.Outcome, Passed: p.ValidationPassed, Platform: plat})
 	}
 	sort.SliceStable(out, func(i, j int) bool { return out[i].At.Before(out[j].At) })
 	return out, nil
@@ -399,6 +419,7 @@ func render(r *report) string {
 func main() {
 	in := flag.String("in", "-", "log export (JSON array or JSON lines); - for stdin")
 	which := flag.String("report", "product", "product (the weekly product tables) or shared (shared.usage per participant, #2298)")
+	byPlatform := flag.Bool("by-platform", false, "add a per-OS (clientPlatform) generation table per week")
 	flag.Parse()
 	if *which != "product" && *which != "shared" {
 		log.Fatalf("unknown -report %q (product or shared)", *which)
@@ -426,7 +447,11 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
-	if _, err := os.Stdout.WriteString(render(aggregate(evs))); err != nil {
+	out := render(aggregate(evs))
+	if *byPlatform {
+		out += renderByPlatform(evs)
+	}
+	if _, err := os.Stdout.WriteString(out); err != nil {
 		log.Fatal(err)
 	}
 }
