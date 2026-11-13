@@ -1,0 +1,14 @@
+# check-deploy-env-test.sh 用の小さな workflow(正しい組)
+name: deploy-fake
+on: workflow_dispatch
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      # --set-env-vars はコメントの中なら数えない
+      - run: |
+          gcloud run deploy appconfig-stg \
+            --update-env-vars="APP_ENV=stg,GIT_SHA=${GITHUB_SHA}"
+      - run: |
+          gcloud run deploy ai-stg \
+            --update-env-vars="APP_ENV=stg,AI_MODEL=claude-test"

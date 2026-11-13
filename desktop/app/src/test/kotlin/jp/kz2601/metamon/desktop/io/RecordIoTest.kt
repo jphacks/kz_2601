@@ -3,8 +3,12 @@ package jp.kz2601.metamon.desktop.io
 import jp.kz2601.metamon.desktop.Examples
 import jp.kz2601.metamon.desktop.MockStore
 import jp.kz2601.metamon.dsl.ImportColumn
+import jp.kz2601.metamon.dsl.logic.CsvColumnMapping
 import jp.kz2601.metamon.dsl.logic.CsvWriter
+import jp.kz2601.metamon.dsl.records.Entity
+import jp.kz2601.metamon.dsl.records.Field
 import jp.kz2601.metamon.dsl.records.FieldCoding
+import jp.kz2601.metamon.dsl.records.FieldType
 import jp.kz2601.metamon.dsl.records.JSONValue
 import jp.kz2601.metamon.dsl.records.entityModels
 import org.apache.pdfbox.pdmodel.PDDocument
@@ -15,6 +19,8 @@ import org.apache.pdfbox.pdmodel.encryption.StandardProtectionPolicy
 import org.apache.pdfbox.pdmodel.font.PDType1Font
 import org.apache.pdfbox.pdmodel.font.Standard14Fonts
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.io.ByteArrayOutputStream
@@ -152,6 +158,93 @@ class RecordIoTest {
     fun clipText() {
         assertEquals("abc", PdfIo.clip("abc", 3) { it.length })
         assertEquals("ab…", PdfIo.clip("abcdef", 3) { it.length })
+    }
+
+    // MARK: unguard / isFormulaLead(#2613)
+
+    @Test
+    fun unguardStripsOnlyGuardQuote() {
+        // 止めの ' を外すのは = + - @ タブ CR の前だけ
+        for (lead in listOf("=", "+", "-", "@", "\t", "\r")) assertEquals(lead, "${lead}x", Tsv.unguard("'${lead}x"))
+        assertEquals("-3", Tsv.unguard("'-3"))
+        // それ以外・' だけ・止めの無いセル・'' の後ろはそのまま
+        assertEquals("'a", Tsv.unguard("'a"))
+        assertEquals("'\nx", Tsv.unguard("'\nx"))
+        assertEquals("'", Tsv.unguard("'"))
+        assertEquals("", Tsv.unguard(""))
+        assertEquals("=1", Tsv.unguard("=1"))
+        assertEquals("''=1", Tsv.unguard("''=1"))
+    }
+
+    @Test
+    fun formulaLeadKeepsNegativeNumbers() {
+        fun lead(s: String): Boolean = Tsv.isFormulaLead(s.codePointAt(0), s.getOrNull(1)?.code)
+        for (s in listOf("=1", "+1", "@x", "\tx", "\rx", "-a", "-\t", "--1", "-=1")) assertTrue(s, lead(s))
+        // 負の数・-¥・-. と、改行・ふつうの文字・- だけは式に見えない
+        for (s in listOf("-3", "-0", "-３", "-¥500", "-.5", "\nx", "a", "'=1", "-")) assertFalse(s, lead(s))
+        assertEquals("-3", Tsv.guard("-3"))
+        assertEquals("'-a", Tsv.guard("-a"))
+        assertEquals("'\t-3", Tsv.guard("\t-3"))
+        // 止め → 外すで元に戻る
+        for (s in listOf("-3", "-a", "=x", "\tx", "\rx", "@", "plain")) assertEquals(s, Tsv.unguard(Tsv.guard(s)))
+    }
+
+    // MARK: mapping / refId / refName(#2613)
+
+    @Test
+    fun mappingKeepsColumnToFieldPairs() {
+        assertEquals(
+            listOf(CsvColumnMapping("氏名", "name"), CsvColumnMapping("学年", "grade")),
+            RecordIo.mapping(listOf(ImportColumn("氏名", "name"), ImportColumn("学年", "grade"))),
+        )
+        assertEquals(emptyList<CsvColumnMapping>(), RecordIo.mapping(emptyList()))
+    }
+
+    private val person = Entity(id = "person", titleField = "name", fields = listOf(Field("name")))
+    private val noTitle = Entity(id = "blank")
+    private val task = Entity(
+        id = "task",
+        fields = listOf(
+            Field("title"),
+            Field("owner", type = FieldType.REF, refEntity = "person"),
+            Field("helpers", type = FieldType.REFS, refEntity = "person"),
+            Field("ghost", type = FieldType.REF, refEntity = "missing"),
+            Field("blankRef", type = FieldType.REF, refEntity = "blank"),
+        ),
+    )
+    private val refEntities = listOf(person, noTitle, task)
+    private val people = MockStore()
+        .save("person", null, mapOf("name" to "山田"), newId = "p1")
+        .save("person", null, mapOf("name" to "佐藤"), newId = "p2")
+        .save("person", null, mapOf("name" to "山田"), newId = "p3")
+        .save("blank", null, emptyMap(), newId = "b1")
+
+    @Test
+    fun refIdLooksUpTitleName() {
+        val refId = RecordIo.refId(people, refEntities)
+        val owner = task.fields.first { it.id == "owner" }
+        assertEquals("p2", refId(owner, "佐藤"))
+        // 同じ名前が 2 つなら先に入った方
+        assertEquals("p1", refId(owner, "山田"))
+        // 無い名前・参照先の entity が無い・参照先に見出しが無い
+        assertNull(refId(owner, "鈴木"))
+        assertNull(refId(owner, ""))
+        assertNull(refId(task.fields.first { it.id == "ghost" }, "山田"))
+        assertNull(refId(task.fields.first { it.id == "blankRef" }, "山田"))
+    }
+
+    @Test
+    fun displayShowsRefNames() {
+        val display = RecordIo.display(people, refEntities)
+        fun f(id: String) = task.fields.first { it.id == id }
+        assertEquals("佐藤", display(JSONValue.Str("p2"), f("owner")))
+        // 無い id・参照先が無い・見出しが無い時は id のまま
+        assertEquals("p9", display(JSONValue.Str("p9"), f("owner")))
+        assertEquals("p1", display(JSONValue.Str("p1"), f("ghost")))
+        assertEquals("b1", display(JSONValue.Str("b1"), f("blankRef")))
+        assertEquals("", display(JSONValue.Null, f("owner")))
+        assertEquals("山田、p9、佐藤", display(JSONValue.Arr(listOf(JSONValue.Str("p1"), JSONValue.Str("p9"), JSONValue.Str("p2"))), f("helpers")))
+        assertEquals("", display(JSONValue.Null, f("helpers")))
     }
 
     private fun textPdf(text: String, encrypt: Boolean): ByteArray = PDDocument().use { doc ->

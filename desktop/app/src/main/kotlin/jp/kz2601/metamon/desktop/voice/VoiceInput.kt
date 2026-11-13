@@ -1,7 +1,10 @@
 package jp.kz2601.metamon.desktop.voice
 
 import jp.kz2601.metamon.desktop.i18n.Lang
+import androidx.compose.runtime.snapshots.Snapshot
 import jp.kz2601.metamon.desktop.i18n.Strings
+import jp.kz2601.metamon.dsl.records.JSONValue
+import jp.kz2601.metamon.renderer.form.FormDraft
 import jp.kz2601.metamon.whisper.ModelException
 import jp.kz2601.metamon.whisper.ModelFailure
 import jp.kz2601.metamon.whisper.WhisperAudio
@@ -11,6 +14,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
+import java.awt.EventQueue
 import kotlin.coroutines.cancellation.CancellationException
 
 /** 音声入力を使うか(既定は使わない・#1751)。`TAILORIT_VOICE=1`(か `-Dtailorit.voice=true`)で使う。 */
@@ -48,13 +52,34 @@ class VoiceInput(
     internal var job: Job? = null
         private set
 
-    /** 押した時。すぐ出す文言を返し、文字にし終えた後の文言は [post] に渡す。 */
+    /** 文字にできる PC か(whisper.cpp が読める)。できなければ transcribeField はマイクを出さない。 */
+    val isAvailable: Boolean get() = transcriber.isAvailable
+
+    /**
+     * 押した時。すぐ出す文言を返し、文字にし終えた後の文言は [post] に渡す。
+     * [onText] があれば、聞き取れた文字([post] より先・画面のスレッドではない)を渡す。
+     */
     @Synchronized
-    fun toggle(post: (String) -> Unit): String = when (state) {
+    fun toggle(onText: ((String) -> Unit)? = null, post: (String) -> Unit): String = when (state) {
         State.IDLE -> start()
-        State.RECORDING -> stopAndTranscribe(post)
+        State.RECORDING -> stopAndTranscribe(onText, post)
         State.TRANSCRIBING -> Strings["desktop_voice_busy"]
     }
+
+    /**
+     * transcribeField のマイク: 聞き取れた文字を [form] の [field] の今の文の後ろに足す(iOS の DictationText.appending)。
+     * 書くのは [onUi] の中(既定は画面のスレッド)。
+     */
+    fun toggleInto(
+        form: FormDraft,
+        field: String,
+        post: (String) -> Unit,
+        onUi: (() -> Unit) -> Unit = { EventQueue.invokeLater { Snapshot.withMutableSnapshot(it) } },
+    ): String = toggle(onText = { text ->
+        onUi {
+            if (!form.isReadOnly) form.values[field] = JSONValue.Str(DictationText.appending(text, form.values[field]?.stringValue.orEmpty()))
+        }
+    }, post = post)
 
     /** 録音をやめて捨てる(ウィンドウを閉じる時など)。 */
     @Synchronized
@@ -76,7 +101,7 @@ class VoiceInput(
         return Strings["desktop_voice_recording"]
     }
 
-    private fun stopAndTranscribe(post: (String) -> Unit): String {
+    private fun stopAndTranscribe(onText: ((String) -> Unit)?, post: (String) -> Unit): String {
         val samples = recording?.stop() ?: FloatArray(0)
         recording = null
         silenceMessage(samples)?.let {
@@ -89,6 +114,7 @@ class VoiceInput(
         job = scope.launch {
             val msg = try {
                 val text = transcriber.transcribe(samples, lang).trim()
+                if (text.isNotEmpty()) onText?.invoke(text)
                 if (text.isEmpty()) Strings["voice_b_not_heard"] else Strings.format("desktop_voice_heard", text)
             } catch (e: CancellationException) {
                 throw e
@@ -127,5 +153,18 @@ class VoiceInput(
 
         /** フラグが立っている時だけ作る(既定は null = openVoice は「まだ使えない」)。 */
         fun fromEnv(): VoiceInput? = if (VoiceFlag.enabled()) VoiceInput(JavaSoundMicrophone(), WhisperCppTranscriber()) else null
+
+        /** アプリで 1 つ(openVoice と transcribeField が同じマイクを使う・二重に開かない)。 */
+        val shared: VoiceInput? by lazy { fromEnv() }
+    }
+}
+
+/** 文字起こしの結果を今の文の後ろに足す(空なら置き換え、それ以外は改行で区切る)。iOS の `DictationText` と同じ。 */
+object DictationText {
+    fun appending(new: String, existing: String): String {
+        val n = new.trim()
+        if (n.isEmpty()) return existing
+        if (existing.isBlank()) return n
+        return if (existing.endsWith("\n")) existing + n else existing + "\n" + n
     }
 }

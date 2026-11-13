@@ -1,0 +1,5 @@
+prodReleaseRuntimeClasspath - Runtime classpath of compilation 'prodRelease' (target  (androidJvm)).
++--- project :dsl
++--- com.example:alpha:0.9.0 -> 1.0.0
+|    \--- com.example:beta:2.0.0
+\--- com.example:alpha:1.0.0 (c)
