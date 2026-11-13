@@ -89,6 +89,8 @@
 
 署名は「Tailor It サポート」/ "Tailor It Support"。`{}` は書き換える。
 
+作れなかった依頼・データの書き出し・その他のテンプレと、不具合の時に聞く項目の表は [reply-templates.md](reply-templates.md)。
+
 ### A. 使い方(FAQ を案内)
 
 ```text
