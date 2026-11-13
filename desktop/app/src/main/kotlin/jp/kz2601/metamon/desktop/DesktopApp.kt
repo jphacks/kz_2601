@@ -216,6 +216,8 @@ fun DesktopApp(
         )
         session.message = Strings[if (ExportClipboard.put(text)) "desktop_diagnostics_copied" else "desktop_diagnostics_copy_failed"]
     }
+    // トレイの「アカウント」(#2374): 前にあるウィンドウで開く
+    LocalTray.current?.let { tray -> LaunchedEffect(tray.accountRequests) { if (tray.takeAccount(isActive)) keyboard.accountOpen = true } }
 
     // Ctrl+F はこのウィンドウの検索欄にだけ入る
     // 写真のプレビュー(PhotoPreview.kt): 写真の部品を押すとこのウィンドウのダイアログで開く。開いている間は貼り付け・印刷を取らない

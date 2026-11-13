@@ -3,10 +3,13 @@
     <string name="desktop_a11y_bridge_body">Narrator is running, but the Java Access Bridge is not enabled, so this app may not be read aloud. Run "jabswitch -enable" in a command prompt, then restart this app. You can open this notice again from the command palette ("Screen reader help").</string>
     <string name="desktop_a11y_bridge_command">Screen reader help</string>
     <string name="desktop_a11y_bridge_title">Setting up screen reading</string>
+    <string name="desktop_a11y_account">Account: %1$s</string>
     <string name="desktop_a11y_chart">Chart: %1$s</string>
     <string name="desktop_a11y_image">Image</string>
     <string name="desktop_a11y_preview">Photo preview: %1$s</string>
     <string name="desktop_a11y_rating">%1$s %2$d of %3$d</string>
+    <string name="desktop_account_signed_in">Signed in</string>
+    <string name="desktop_account_signed_out">Not signed in</string>
     <string name="desktop_already_running">Tailor It is already running</string>
     <string name="desktop_app_badge_published">Published</string>
     <string name="desktop_app_badge_requested">Release requested</string>

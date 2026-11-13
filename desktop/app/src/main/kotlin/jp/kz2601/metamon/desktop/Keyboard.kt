@@ -347,7 +347,7 @@ class DesktopKeyboard(
         override fun showInfo(title: String, lines: List<String>) { devInfo = title to lines }
         override fun askWipe() { wipeConfirmOpen = true }
     }
-    /** アカウントの画面(AccountScreen.kt・#2505)。パレットから開く。開いている間のキーは画面が自分で受ける。 */
+    /** アカウントの画面(AccountScreen.kt・#2374・#2505)。パレット・トレイから開く。開いている間のキーは画面が自分で受ける。 */
     var accountOpen by mutableStateOf(false)
 
     /** このウィンドウの検索欄(Ctrl+F は他のウィンドウに入らない)。 */
@@ -549,7 +549,7 @@ class DesktopKeyboard(
         ) { licensesOpen = true }
         val account = PaletteCommand(
             "about:account", Strings["account_menu"], PaletteCommand.Kind.ACTION,
-            keywords = listOf("account", "terms", "privacy", "contact", Strings["legal_terms"], Strings["legal_privacy_policy"], Strings["settings_contact"]),
+            keywords = listOf("account", "sign in", "sign out", "login", "terms", "privacy", "contact", Strings["legal_terms"], Strings["legal_privacy_policy"], Strings["settings_contact"]),
         ) { accountOpen = true }
         val shareLink = share?.let { listOf(it.command()) }.orEmpty()
         val usage = usage?.let {

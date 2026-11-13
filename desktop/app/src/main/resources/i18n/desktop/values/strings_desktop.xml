@@ -4,10 +4,13 @@
     <string name="desktop_a11y_bridge_body">ナレーターが動いていますが、Java Access Bridge が有効でないため、このアプリの画面を読み上げられない場合があります。コマンドプロンプトで「jabswitch -enable」を実行して有効にし、このアプリを起動し直してください。この案内はコマンドパレットの「読み上げの案内」からもう一度開けます。</string>
     <string name="desktop_a11y_bridge_command">読み上げの案内</string>
     <string name="desktop_a11y_bridge_title">読み上げを使うための設定</string>
+    <string name="desktop_a11y_account">アカウント: %1$s</string>
     <string name="desktop_a11y_chart">グラフ: %1$s</string>
     <string name="desktop_a11y_image">画像</string>
     <string name="desktop_a11y_preview">写真のプレビュー: %1$s</string>
     <string name="desktop_a11y_rating">%1$s %2$d / %3$d</string>
+    <string name="desktop_account_signed_in">サインインしています</string>
+    <string name="desktop_account_signed_out">サインインしていません</string>
     <string name="desktop_already_running">Tailor It はもう起動しています</string>
     <string name="desktop_app_badge_published">公開中</string>
     <string name="desktop_app_badge_requested">申請中</string>
