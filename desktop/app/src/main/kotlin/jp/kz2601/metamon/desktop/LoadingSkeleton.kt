@@ -27,16 +27,25 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.unit.dp
 import jp.kz2601.metamon.desktop.i18n.Strings
+import jp.kz2601.metamon.desktop.theme.LocalReduceMotion
+import jp.kz2601.metamon.desktop.theme.MotionRules
 
 /** 起動時に端末の記録を読む間の形だけの画面(#1887)。見出し 1 本と行をいくつか、ゆっくり明滅させる。読み上げは「読み込み中」。 */
 @Composable
 fun LoadingSkeleton() {
     val label = Strings["desktop_loading"]
-    val pulse by rememberInfiniteTransition().animateFloat(
-        initialValue = 0.4f,
-        targetValue = 0.9f,
-        animationSpec = infiniteRepeatable(tween(800), RepeatMode.Reverse),
-    )
+    val reduceMotion = LocalReduceMotion.current
+    // 動きを減らす時はアニメ自体を作らない(フレームも回さない)
+    val pulse = if (reduceMotion) {
+        MotionRules.skeletonAlpha(true, 1f)
+    } else {
+        val animated by rememberInfiniteTransition().animateFloat(
+            initialValue = 0.4f,
+            targetValue = 0.9f,
+            animationSpec = infiniteRepeatable(tween(800), RepeatMode.Reverse),
+        )
+        MotionRules.skeletonAlpha(false, animated)
+    }
     Surface(Modifier.fillMaxSize().clearAndSetSemantics { contentDescription = label; liveRegion = LiveRegionMode.Polite }) {
         Box(Modifier.fillMaxSize(), contentAlignment = Alignment.TopCenter) {
             Column(
