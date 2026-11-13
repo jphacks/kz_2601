@@ -23,6 +23,14 @@
     <string name="desktop_feed_offline">フィードはデスクトップ版ではまだ取得しません</string>
     <string name="desktop_flashcards_back_hint">裏(押すと表)</string>
     <string name="desktop_flashcards_front_hint">表(押すと裏)</string>
+    <string name="desktop_grid_edit">並びを直す</string>
+    <string name="desktop_grid_edit_blocked">ほかの部品と重なるので動かせません</string>
+    <string name="desktop_grid_edit_cancel">やめる</string>
+    <string name="desktop_grid_edit_hint">ドラッグか矢印のキーで 1 マスずつ動かします。Tab で次の部品、Enter で保存、Esc でやめる</string>
+    <string name="desktop_grid_edit_position">%1$s 行 %2$d・列 %3$s</string>
+    <string name="desktop_grid_edit_save">保存</string>
+    <string name="desktop_grid_edit_unavailable">この画面には動かせる部品がありません</string>
+    <string name="desktop_grid_edit_untitled">部品</string>
     <string name="desktop_image_load">画像を読む</string>
     <string name="desktop_image_none">画像なし</string>
     <string name="desktop_input_audio_unavailable">録音は このパソコンでは使えません。ファイルから選べます</string>

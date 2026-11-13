@@ -34,6 +34,9 @@ import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.onKeyEvent
 import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.input.key.type
+import jp.kz2601.metamon.desktop.gridedit.GridEditDraft
+import jp.kz2601.metamon.desktop.gridedit.GridEditLayer
+import jp.kz2601.metamon.desktop.gridedit.gridEditDraft
 import jp.kz2601.metamon.desktop.i18n.Strings
 import jp.kz2601.metamon.dsl.Action
 import jp.kz2601.metamon.dsl.ActionType
@@ -262,6 +265,12 @@ class DesktopKeyboard(
     /** 「この端末のデータを消す」(#1887)。全アプリの分を消す口(AppHub.wipeLocalData)。null ならパレットに出さない。 */
     var wipeLocalData: (suspend () -> Unit)? = null
 
+    /** 並びを直す編集の保存(#3207)。null ならパレットに出さない。 */
+    var saveLayout: ((GridEditDraft) -> Unit)? = null
+
+    /** 並びを直す編集の最中(その画面の下書き)。 */
+    var gridEdit by mutableStateOf<GridEditDraft?>(null)
+
     /** 消す前の確認を出している。 */
     var wipeConfirmOpen by mutableStateOf(false)
 
@@ -299,7 +308,7 @@ class DesktopKeyboard(
             if (!repeat) closePreview()
             return true
         }
-        if (paletteOpen || helpOpen || licensesOpen || wipeConfirmOpen) return false // パレット・一覧・確認が自分で受ける
+        if (paletteOpen || helpOpen || licensesOpen || wipeConfirmOpen || gridEdit != null) return false // パレット・一覧・確認・並びの編集が自分で受ける
         val s = Keymap.match(p, os) ?: return false
         if (s == Shortcut.PRINT || s.bubble != bubble) return false // 印刷は Print.kt の Ctrl+P
         // Space は何も選んでいない時だけ。見せる写真が無ければ流す(知らせも出さない)
@@ -346,6 +355,16 @@ class DesktopKeyboard(
         dispatch(Action(type = ActionType.NAVIGATE, screen = id, presentation = Presentation.PUSH), ctx())
     }
 
+    /** 並びを直す編集を始める(メインの層の、動かせる部品がある画面だけ)。 */
+    fun startGridEdit() {
+        val draft = if (session.nav.sheet == null && session.nav.fullScreen == null) dsl.gridEditDraft(session.top.screen) else null
+        if (draft == null) {
+            session.message = Strings["desktop_grid_edit_unavailable"]
+            return
+        }
+        gridEdit = draft
+    }
+
     /** パレットの中身: ショートカット → この画面のボタン → 画面 → アプリ。 */
     fun commands(): List<PaletteCommand> {
         val screen = topScreen
@@ -381,7 +400,10 @@ class DesktopKeyboard(
             "about:licenses", LicensesText.TITLE, PaletteCommand.Kind.ACTION,
             keywords = listOf("licenses", "third-party", "oss", "notice", LicensesText.LICENSE),
         ) { licensesOpen = true }
-        return shortcuts + buttons + record + screens + apps + wipe + licenses
+        val layout = saveLayout?.let {
+            listOf(PaletteCommand("layout:edit", Strings["desktop_grid_edit"], PaletteCommand.Kind.ACTION, keywords = listOf("layout", "grid", "area")) { startGridEdit() })
+        }.orEmpty()
+        return shortcuts + buttons + record + layout + screens + apps + wipe + licenses
     }
 
     /** 確認で「消す」を押した: 全アプリの端末のデータを消し、このウィンドウを最初の画面に戻す。 */
@@ -424,6 +446,13 @@ class DesktopKeyboard(
         LaunchedEffect(session.nav) {
             photos.close() // 画面が変わったら前の記録の写真は閉じる
             focusAfterNavigation(modalOpen)
+        }
+        gridEdit?.let { draft ->
+            val close = {
+                gridEdit = null
+                runCatching { root.requestFocus() }
+            }
+            GridEditLayer(draft, Strings["desktop_grid_edit"], onSave = { d -> close(); saveLayout?.invoke(d) }, onCancel = { close() })
         }
         if (photos.isOpen) PhotoPreviewDialog(photos, onMessage = { session.message = it }, onDismiss = ::closePreview)
         if (paletteOpen) {
@@ -470,10 +499,12 @@ fun rememberDesktopKeyboard(
     openApp: ((String) -> Unit)?,
     openRecord: ((String, String) -> Unit)? = null,
     wipeLocalData: (suspend () -> Unit)? = null,
+    saveLayout: ((GridEditDraft) -> Unit)? = null,
 ): DesktopKeyboard = remember(dsl, session) { DesktopKeyboard(dsl, session) }.also {
     it.dispatch = dispatch
     it.print = print
     it.openApp = openApp
     it.openRecord = openRecord
     it.wipeLocalData = wipeLocalData
+    it.saveLayout = saveLayout
 }

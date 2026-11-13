@@ -4,8 +4,11 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.unit.dp
@@ -26,6 +29,7 @@ import java.awt.GraphicsEnvironment
 import java.awt.Rectangle
 import java.awt.event.WindowAdapter
 import java.awt.event.WindowEvent
+import jp.kz2601.metamon.desktop.gridedit.LayoutEditStore
 import jp.kz2601.metamon.desktop.i18n.Strings
 import jp.kz2601.metamon.desktop.io.DragOut
 import jp.kz2601.metamon.desktop.store.DesktopStore
@@ -59,6 +63,8 @@ fun main(args: Array<String>) {
 private fun runApp(args: Array<String>) = application {
     // 端末の保存(#1887): 記録・設定は再起動しても残る。最後に開いたアプリから開く
     val desktopStore = remember { DesktopStore.open() }
+    // 並びを直した分(#3207)。同梱の DSL に当て直して開く
+    val layouts = remember { LayoutEditStore(desktopStore.root?.resolve("layouts")) }
     val first = remember {
         args.firstOrNull() ?: System.getProperty("tailorit.example")
             ?: desktopStore.lastAppId?.takeIf { it in BundledApps.ids() } ?: "shopping"
@@ -77,6 +83,7 @@ private fun runApp(args: Array<String>) = application {
         // 記録の JSON を渡した時(開発・スクリーンショット)は最初のアプリだけそれを使い、端末に残さない
         val fixture = args.getOrNull(1)?.let { MockStore.fromJson(File(it).readText()) }
         AppHub(
+            load = { id -> layouts.applyTo(id, Examples.load(id)) },
             openRecords = { id, dsl ->
                 if (fixture != null && id == first) {
                     SharedRecords(fixture)
@@ -89,6 +96,7 @@ private fun runApp(args: Array<String>) = application {
             },
             wipeStore = {
                 desktopStore.wipe()
+                layouts.removeAll()
                 DeviceWipe.run(desktopStore.root)
             },
         )
@@ -125,7 +133,7 @@ private fun runApp(args: Array<String>) = application {
     DesktopTray(tray)
     registry.windows.toList().forEach { w ->
         key(w.id) {
-            DesktopWindow(w, registry, hub, tray, startScreen = args.getOrNull(2)?.takeIf { w.id == firstWindowId })
+            DesktopWindow(w, registry, hub, tray, layouts, startScreen = args.getOrNull(2)?.takeIf { w.id == firstWindowId })
         }
     }
 }
@@ -133,7 +141,7 @@ private fun runApp(args: Array<String>) = application {
 /** ウィンドウ 1 枚。画面の状態(遷移・下書き・キー)はウィンドウごと、記録はアプリごとに共有。 */
 @OptIn(FlowPreview::class)
 @Composable
-private fun ApplicationScope.DesktopWindow(w: WindowEntry, registry: WindowRegistry, hub: AppHub, tray: TrayController, startScreen: String?) {
+private fun ApplicationScope.DesktopWindow(w: WindowEntry, registry: WindowRegistry, hub: AppHub, tray: TrayController, layouts: LayoutEditStore, startScreen: String?) {
     // アプリの記録はウィンドウの数で数える。最後の 1 枚を閉じたら書き終えて閉じる
     val app = remember(w) { hub.acquire(w.key.appId) }
     DisposableEffect(w) { onDispose { hub.release(w.key.appId) } }
@@ -148,6 +156,8 @@ private fun ApplicationScope.DesktopWindow(w: WindowEntry, registry: WindowRegis
     val close = {
         if (registry.requestClose(w.id) { tray.onCloseRequest() }) exitApplication()
     }
+    // 並びを直して保存した後に開き直す画面
+    var reopenScreen by remember(w) { mutableStateOf<String?>(null) }
     val screenTitle = w.key.screen?.let { app.dsl.screen(it)?.title?.ifEmpty { null } }
     Window(
         onCloseRequest = close,
@@ -193,10 +203,11 @@ private fun ApplicationScope.DesktopWindow(w: WindowEntry, registry: WindowRegis
             TailorItTheme {
                 if (app.records.loading) {
                     LoadingSkeleton()
-                } else {
-    DesktopApp(
+                } else key(app.dsl) {
+                    // 並びを直して保存したら DSL が替わるので作り直し、編集していた画面から開く(#3207)
+                    DesktopApp(
                         app.dsl,
-                        startScreen = w.key.screen ?: startScreen,
+                        startScreen = reopenScreen ?: w.key.screen ?: startScreen,
                         onOpenApp = { registry.open(WindowKey.app(it)) },
                         records = app.records,
                         startRecordId = w.key.recordId,
@@ -206,6 +217,11 @@ private fun ApplicationScope.DesktopWindow(w: WindowEntry, registry: WindowRegis
                         isActive = { registry.active?.id == w.id },
                         windowId = w.id,
                         onWipeLocalData = hub::wipeLocalData,
+                        onSaveLayout = { draft ->
+                            layouts.append(app.id, draft.patch)
+                            reopenScreen = draft.screenId
+                            hub.replaceDsl(app.id, draft.applied(app.dsl))
+                        },
                     )
                 }
             }

@@ -22,6 +22,14 @@
     <string name="desktop_feed_offline">The desktop app doesn\'t load feeds yet</string>
     <string name="desktop_flashcards_back_hint">Back (click for the front)</string>
     <string name="desktop_flashcards_front_hint">Front (click for the back)</string>
+    <string name="desktop_grid_edit">Rearrange layout</string>
+    <string name="desktop_grid_edit_blocked">That would overlap another item</string>
+    <string name="desktop_grid_edit_cancel">Cancel</string>
+    <string name="desktop_grid_edit_hint">Drag, or use the arrow keys to move one cell. Tab for the next item, Enter to save, Esc to cancel</string>
+    <string name="desktop_grid_edit_position">%1$s, row %2$d, column %3$s</string>
+    <string name="desktop_grid_edit_save">Save</string>
+    <string name="desktop_grid_edit_unavailable">Nothing on this screen can be moved</string>
+    <string name="desktop_grid_edit_untitled">Item</string>
     <string name="desktop_image_load">Load image</string>
     <string name="desktop_image_none">No image</string>
     <string name="desktop_input_audio_unavailable">Recording isn\'t available on this computer. You can choose a file instead</string>
