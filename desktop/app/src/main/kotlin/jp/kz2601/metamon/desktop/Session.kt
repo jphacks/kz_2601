@@ -26,6 +26,9 @@ import jp.kz2601.metamon.dsl.records.SingleRecord
 import jp.kz2601.metamon.dsl.records.entityModels
 import jp.kz2601.metamon.dsl.screen
 import jp.kz2601.metamon.renderer.form.FormDraft
+import jp.kz2601.metamon.services.http.ApiError
+import jp.kz2601.metamon.services.http.RecordWriteDenial
+import jp.kz2601.metamon.services.http.SharedAccessDenial
 import jp.kz2601.metamon.renderer.form.FormPrefill
 import jp.kz2601.metamon.renderer.navigation.NavigationResolver
 import jp.kz2601.metamon.renderer.navigation.NavigationState
@@ -99,6 +102,16 @@ class DesktopSession(
 
     /** 画面に出す一言(保存できない理由・OS の機能の結果)。 */
     var message: String? by mutableStateOf(null)
+
+    /**
+     * 共有のアプリの保存・削除をサーバーが断った時(403 / 409)の一言を [message] に出す。下書き([drafts])には触らない。
+     * 断りに当たらない失敗なら何もせず false([entity] は項目の表示名を引く)。
+     */
+    fun showWriteDenial(error: Throwable, entity: String? = null): Boolean {
+        val text = WriteDenialMessage.of(error) { id -> models.firstOrNull { it.id == entity }?.storedFields?.firstOrNull { it.id == id }?.name } ?: return false
+        message = text
+        return true
+    }
 
     /** 起きたこと(適合テストの effects と同じ形)。 */
     val effects = mutableListOf<JsonElement>()
@@ -549,4 +562,30 @@ fun isButtonVisible(action: Action?, form: FormDraft?): Boolean = when (action?.
     ActionType.DELETE_RECORD -> form?.isEditing == true && form.canDelete
     ActionType.SAVE_RECORD -> !(form?.isReadOnly ?: false)
     else -> true
+}
+
+/** サーバーの書き込みの断り(#272 #273 #254)の一言。知らない理由は汎用の文言。 */
+object WriteDenialMessage {
+    /** 断りでなければ null。[fieldName] は項目 id → 表示名(分からなければ null で id のまま)。 */
+    fun of(error: Throwable, fieldName: (String) -> String? = { null }): String? {
+        SharedAccessDenial.from(error)?.let {
+            return Strings[
+                when (it) {
+                    SharedAccessDenial.NOT_MEMBER -> "desktop_denial_not_member"
+                    SharedAccessDenial.INVITER_LEFT -> "desktop_denial_inviter_left"
+                    SharedAccessDenial.MEMBERS_FULL -> "desktop_denial_members_full"
+                },
+            ]
+        }
+        return when (val d = RecordWriteDenial.from(error)) {
+            is RecordWriteDenial.AdminsOnly -> d.field?.let { Strings.format("desktop_denial_admins_only_field", fieldName(it) ?: it) } ?: Strings["desktop_denial_admins_only"]
+            is RecordWriteDenial.Duplicate ->
+                if (d.fields.isEmpty()) {
+                    Strings["desktop_denial_duplicate"]
+                } else {
+                    Strings.format("desktop_denial_duplicate_fields", d.fields.joinToString(Strings["desktop_list_separator"]) { fieldName(it) ?: it })
+                }
+            null -> if ((error as? ApiError)?.status == 403) Strings["desktop_denial_generic"] else null
+        }
+    }
 }
