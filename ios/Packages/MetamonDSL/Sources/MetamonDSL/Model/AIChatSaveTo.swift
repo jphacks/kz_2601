@@ -30,7 +30,7 @@ public struct AIChatSaveTo: Decodable, Sendable, Equatable {
     }
 
     /// 依頼に付ける saveTo(backend `chatSaveToOf` と同じ値: 共有のアプリで作成者が払う時はこれが DSL と一致する)。
-    public func request(in entity: Entity, today: Date = Date()) -> AITextSaveTo? {
+    public func request(in entity: Entity, today: Date = DSLClock.now()) -> AITextSaveTo? {
         guard let fs = saveFields(in: entity) else { return nil }
         func trim(_ s: String?) -> String { (s ?? "").trimmingCharacters(in: .whitespacesAndNewlines) }
         let unit: (Field) -> String? = { f in trim(f.unit).isEmpty ? nil : trim(f.unit) }

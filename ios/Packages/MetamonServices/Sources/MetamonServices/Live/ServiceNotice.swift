@@ -28,17 +28,21 @@ public struct ServiceNotice: Decodable, Equatable, Sendable {
     public var linkUrl: String?
     public var minIOSBuild: Int?
     public var maxIOSBuild: Int?
+    /// 出す OS(#3244・backend #2964 の `platforms`)。小文字の `ios` `macos` など。nil / 空 = 全部の OS
+    public var platforms: [String]?
 
-    public init(id: String, severity: Severity = .info, message: Message, linkUrl: String? = nil, minIOSBuild: Int? = nil, maxIOSBuild: Int? = nil) {
+    public init(id: String, severity: Severity = .info, message: Message, linkUrl: String? = nil, minIOSBuild: Int? = nil, maxIOSBuild: Int? = nil,
+                platforms: [String]? = nil) {
         self.id = id
         self.severity = severity
         self.message = message
         self.linkUrl = linkUrl
         self.minIOSBuild = minIOSBuild
         self.maxIOSBuild = maxIOSBuild
+        self.platforms = platforms
     }
 
-    private enum CodingKeys: String, CodingKey { case id, severity, message, linkUrl, minIOSBuild, maxIOSBuild }
+    private enum CodingKeys: String, CodingKey { case id, severity, message, linkUrl, minIOSBuild, maxIOSBuild, platforms }
 
     public init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
@@ -48,6 +52,9 @@ public struct ServiceNotice: Decodable, Equatable, Sendable {
         linkUrl = try? c.decodeIfPresent(String.self, forKey: .linkUrl)
         minIOSBuild = try? c.decodeIfPresent(Int.self, forKey: .minIOSBuild)
         maxIOSBuild = try? c.decodeIfPresent(Int.self, forKey: .maxIOSBuild)
+        // 壊れた platforms は「指定なし」と同じ(notice ごと捨てない・backend が先に絞っている)
+        platforms = (try? c.decodeIfPresent([String].self, forKey: .platforms))
+            .map { $0.map { $0.trimmingCharacters(in: .whitespaces).lowercased() }.filter { !$0.isEmpty } }
     }
 
     /// 表示する言語の文面。英語で `en` が無ければ日本語。
@@ -71,6 +78,13 @@ public struct ServiceNotice: Decodable, Equatable, Sendable {
         if let min, current < BuildNumber(min) { return false }
         if let max, BuildNumber(max) < current { return false }
         return true
+    }
+
+    /// この OS に出すか(#3244)。platforms が無ければ全部の OS。
+    /// backend は `X-Client-Platform` で先に絞って platforms を消して返すので、これは古い backend・キャッシュへの念のため。
+    public func applies(to platform: ClientConfig.Platform) -> Bool {
+        guard let platforms, !platforms.isEmpty else { return true }
+        return platforms.contains(platform.noticeName)
     }
 
     /// 出してよい形か(id と日本語の文面がある)。

@@ -158,6 +158,11 @@ func evaluate(counters []Counter, counts []int, weight int) Usage {
 type Config struct {
 	Limits  Limits
 	Weights Weights
+	// PlatformLimits overrides the per-user daily limit by OS (#2133):
+	// normalised X-Client-Platform -> tier -> units. A missing entry keeps
+	// Limits. The user counter is the same on every OS, so a lower OS limit
+	// counts what the user already spent elsewhere.
+	PlatformLimits map[string]map[Tier]int
 	// Env prefixes counter ids: staging and production share one Firestore.
 	Env string
 	// Location sets the day boundary; nil = JST.
@@ -237,26 +242,22 @@ func (l *Limiter) tier(ctx context.Context, id auth.Identity) Tier {
 	}
 }
 
-func (l *Limiter) userLimit(t Tier) int {
-	switch t {
-	case TierAnonymous:
-		return l.cfg.Limits.Anonymous
-	case TierPro:
-		return l.cfg.Limits.Pro
-	default:
-		return l.cfg.Limits.SignedIn
-	}
-}
-
 // Allow charges weight units for id (and its client ip) and reports whether
 // the request may run. weight <= 0 is always allowed and charges nothing.
+// No per-OS override applies (AllowPlatform).
 func (l *Limiter) Allow(ctx context.Context, id auth.Identity, ip string, weight int) (Decision, error) {
+	return l.AllowPlatform(ctx, id, ip, "", weight)
+}
+
+// AllowPlatform is Allow with the user limit of platform (a normalised
+// X-Client-Platform; Config.PlatformDailyLimit).
+func (l *Limiter) AllowPlatform(ctx context.Context, id auth.Identity, ip, platform string, weight int) (Decision, error) {
 	now := l.cfg.Now().In(l.cfg.Location)
 	day := now.Format("2006-01-02")
 	y, m, d := now.Date()
 	reset := time.Date(y, m, d+1, 0, 0, 0, 0, l.cfg.Location)
 	tier := l.tier(ctx, id)
-	limit := l.userLimit(tier)
+	limit := l.cfg.PlatformDailyLimit(tier, platform)
 	dec := Decision{Allowed: true, Tier: tier, Limit: limit, Remaining: limit, ResetAt: reset, Unmetered: limit <= 0}
 
 	prefix := l.cfg.Env

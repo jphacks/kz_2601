@@ -158,7 +158,7 @@ struct SettingsSheet: View {
     /// アカウント削除(#119・App Store 5.1.1(v))。サーバーで論理削除 → 端末のデータ → サインアウト。
     @ViewBuilder
     private var deleteAccountSection: some View {
-        if session.user != nil {
+        if session.user != nil, !BuildConfig.isDebugTestAccount { // 試験用の枠は消さない(#2084)
             Section {
                 Button(role: .destructive) { confirmDelete = true } label: {
                     Label("アカウントを削除", systemImage: "person.crop.circle.badge.xmark")
@@ -227,7 +227,7 @@ struct SettingsSheet: View {
                         .font(.body.weight(.medium))
                         .accessibilityIdentifier("settings.accountStatus")
                 }
-                if user.isAnonymous {
+                if user.isAnonymous && !BuildConfig.isDebugTestAccount { // 試験用の枠は Apple に引き継がない(#2084)
                     // #276: uid を保ったまま Apple に昇格(作ったアプリとデータはそのまま)
                     AppleLinkButton()
                         .listRowInsets(EdgeInsets(top: Theme.Spacing.sm, leading: Theme.Spacing.md, bottom: Theme.Spacing.sm, trailing: Theme.Spacing.md))
@@ -249,7 +249,9 @@ struct SettingsSheet: View {
         } header: {
             Text("アカウント")
         } footer: {
-            if session.user?.isAnonymous == true {
+            if BuildConfig.isDebugTestAccount {
+                Text(verbatim: "開発用メニューの試験用の枠です。いつもの Apple ID と結びつかないように、Apple への引き継ぎとアカウントの削除は出しません。")
+            } else if session.user?.isAnonymous == true {
                 Text(L10n.key("Apple でサインインすると、作ったアプリとデータをこのまま引き継げます。匿名のままアプリを消したり機種変更したりすると、作ったアプリに戻れません。",
                                review: "Apple でサインインすると、用意した記録帳とデータをこのまま引き継げます。匿名のままアプリを消したり機種変更したりすると、用意した記録帳に戻れません。"))
             }
