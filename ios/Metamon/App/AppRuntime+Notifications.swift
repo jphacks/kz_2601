@@ -95,4 +95,15 @@ final class ForegroundNotificationPresenter: NSObject, UNUserNotificationCenterD
         if await MainActor.run(body: { TimerVisibility.isShowing(notificationId: id) }) { return [] }
         return [.banner, .list, .sound]
     }
+
+    /// 通知の応答。ボタン・文字入力(#2231)は `NotificationReplyInbox` へ。通知そのもののタップは、
+    /// プッシュなら本文の appId のアプリを開く(#269)。ローカル通知には appId が無いので今までどおり何もしない。
+    func userNotificationCenter(_ center: UNUserNotificationCenter, didReceive response: UNNotificationResponse) async {
+        let reply = NotificationReply(response: response)
+        await NotificationReplyInbox.shared.receive(reply)
+        #if !APP_STORE_REVIEW
+        guard reply.isPlainOpen, let appId = PushPayload.appId(from: response.notification.request.content.userInfo) else { return }
+        await PushHost.shared.open(appId: appId)
+        #endif
+    }
 }

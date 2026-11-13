@@ -69,15 +69,6 @@ final class PushAppDelegate: NSObject, UIApplicationDelegate {
     }
 }
 
-extension ForegroundNotificationPresenter {
-    /// プッシュのタップで該当アプリを開く。ローカル通知には appId が無いので今までどおり何もしない。
-    func userNotificationCenter(_ center: UNUserNotificationCenter, didReceive response: UNNotificationResponse) async {
-        guard response.actionIdentifier == UNNotificationDefaultActionIdentifier,
-              let appId = PushPayload.appId(from: response.notification.request.content.userInfo) else { return }
-        await PushHost.shared.open(appId: appId)
-    }
-}
-
 /// サインイン(uid の変化)と前面復帰で登録を確かめる。
 struct PushRegistrationObserver: ViewModifier {
     let uid: String?

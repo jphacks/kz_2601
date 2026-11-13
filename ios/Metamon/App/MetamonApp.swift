@@ -39,6 +39,7 @@ struct MetamonApp: App {
         // クラッシュ報告(#296): 設定の「クラッシュ報告を送る」を反映(Firebase が無ければ何もしない)
         CrashReportingPreference.shared.activate(reporter: FirebaseCrashReporter() ?? NoopCrashReporter())
         UNUserNotificationCenter.current().delegate = ForegroundNotificationPresenter.shared // 前面でも通知を出す(#228)
+        NotificationCategories.register() // 通知のボタン・返信のカテゴリ(#2231)
         var services = BuildConfig.make()
         // #246(5.1.2(i)): 同意が無ければ ai へ一切送らない。どの入口(Siri 等)から呼ばれても効くよう Services の ai を包む
         AIConsentDebug.applyLaunchOverride()
@@ -80,6 +81,12 @@ struct MetamonApp: App {
         runtime.tutorial = .shared
         runtime.coachMarks = .shared // #1441
         runtime.spotlight = SpotlightAppIndexer(index: CoreSpotlightIndex()) // #1996
+        NotificationReplyInbox.shared.install { [weak runtime] reply in
+            // 受けた後の動き(記録を足すなど)は決定(#1775)のあと。今はログ(Inbox)と DEBUG のトーストだけ(#2231)
+            #if DEBUG
+            runtime?.toast = "通知の応答: \(reply.action)" + (reply.text == nil ? "" : "(文字あり)")
+            #endif
+        }
         #if !APP_STORE_REVIEW
         runtime.betaWelcome = .shared // #313
         #endif
