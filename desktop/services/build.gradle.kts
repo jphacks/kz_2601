@@ -34,6 +34,7 @@ val sharedIncludes = listOf(
     "jp/kz2601/metamon/services/PlanUsage.kt",
     // 自動の動きの一覧と「直しますか?」の規則(#3356)
     "jp/kz2601/metamon/services/automations/Automations.kt",
+    "jp/kz2601/metamon/services/consent/AiButtonMetrics.kt",
     "jp/kz2601/metamon/services/consent/AiConsentStore.kt",
     "jp/kz2601/metamon/services/consent/CrashReportingPreference.kt",
     "jp/kz2601/metamon/services/consent/KeyValueStore.kt",

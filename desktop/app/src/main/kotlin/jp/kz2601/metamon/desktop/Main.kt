@@ -29,6 +29,8 @@ import java.awt.GraphicsEnvironment
 import java.awt.Rectangle
 import java.awt.event.WindowAdapter
 import java.awt.event.WindowEvent
+import jp.kz2601.metamon.desktop.consent.DesktopAiButtonMetrics
+import jp.kz2601.metamon.desktop.consent.LocalAiButtonMetrics
 import jp.kz2601.metamon.desktop.gridedit.LayoutEditStore
 import jp.kz2601.metamon.desktop.hotkey.GlobalHotkey
 import jp.kz2601.metamon.desktop.hotkey.GlobalHotkeys
@@ -36,6 +38,7 @@ import jp.kz2601.metamon.desktop.i18n.Strings
 import jp.kz2601.metamon.desktop.io.DragOut
 import jp.kz2601.metamon.desktop.io.OpenWithFiles
 import jp.kz2601.metamon.desktop.io.OpenWithInbox
+import jp.kz2601.metamon.desktop.net.DesktopApi
 import jp.kz2601.metamon.desktop.net.DesktopApiConfig
 import jp.kz2601.metamon.desktop.notify.NoticeAction
 import jp.kz2601.metamon.desktop.notify.NoticeActions
@@ -116,6 +119,11 @@ private fun runApp(args: Array<String>, launchAction: LaunchAction?, jump: JumpC
             runCatching { DragOut.sweep(root = PhotoOpen.tempRoot()) }
             runCatching { DesktopActionHost.sweepCalendar() }
         }
+    }
+    // aiButton の集計(#2817): 前の日までの分を起動時に 1 回まとめて送る(AI の同意が無い・モックなら送らない)
+    val aiButtonMetrics = remember {
+        DesktopAiButtonMetrics(desktopStore.aiButtonMetrics, desktopStore.aiConsent, DesktopApi.aiButtonMetricsSender(DesktopApiConfig.fromEnvironment()))
+            .also { m -> loadScope.launch { m.flush() } }
     }
     val hub = remember {
         // 記録の JSON を渡した時(開発・スクリーンショット)は最初のアプリだけそれを使い、端末に残さない
@@ -234,15 +242,17 @@ private fun runApp(args: Array<String>, launchAction: LaunchAction?, jump: JumpC
     LaunchedEffect(updates) { updates.run() }
     // 画面を順に移る(開発用・環境変数)。最初のウィンドウだけ
     val autoNav = remember { AutoNavPlan.fromEnvironment() }
-    registry.windows.toList().forEach { w ->
-        key(w.id) {
-            DesktopWindow(
-                w, registry, hub, tray, updates, layouts, sendTo,
-                startScreen = args.getOrNull(2)?.takeIf { w.id == firstWindowId },
-                autoNav = autoNav?.takeIf { w.id == firstWindowId },
-                onboarding = onboarding,
-                showOnboarding = onboardingAtLaunch && w.id == firstWindowId,
-            )
+    CompositionLocalProvider(LocalAiButtonMetrics provides aiButtonMetrics) {
+        registry.windows.toList().forEach { w ->
+            key(w.id) {
+                DesktopWindow(
+                    w, registry, hub, tray, updates, layouts, sendTo,
+                    startScreen = args.getOrNull(2)?.takeIf { w.id == firstWindowId },
+                    autoNav = autoNav?.takeIf { w.id == firstWindowId },
+                    onboarding = onboarding,
+                    showOnboarding = onboardingAtLaunch && w.id == firstWindowId,
+                )
+            }
         }
     }
 }

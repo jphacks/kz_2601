@@ -1,6 +1,7 @@
 package jp.kz2601.metamon.desktop.store
 
 import jp.kz2601.metamon.services.AppConfigClient
+import jp.kz2601.metamon.services.consent.AiButtonMetricsRecorder
 import jp.kz2601.metamon.services.consent.AiConsentStore
 import jp.kz2601.metamon.services.consent.CrashReportingPreference
 import jp.kz2601.metamon.services.local.BackoffPolicy
@@ -33,6 +34,9 @@ class DesktopStore(val root: File?) {
     val crashReporting = CrashReportingPreference(consentValues)
     /** 共有の投稿に出す表示名(本人が決めた名前だけ。OS のユーザー名・PC の名前は使わない)。設定ファイルに持つ。 */
     val authorProfile = AuthorProfile(settings)
+
+    /** aiButton の集計(#2817・Android と同じく設定の側に貯める)。送るのは DesktopAiButtonMetrics が同意を見てから */
+    val aiButtonMetrics = AiButtonMetricsRecorder(settings)
     val records = RecordStore(root?.resolve("records"))
     val documents = DocumentCache(root?.resolve("documents"))
     val chatHistory = ChatHistoryStore(root?.resolve("chat_history"))
@@ -63,6 +67,7 @@ class DesktopStore(val root: File?) {
         chatHistory.removeAll()
         thumbnails.removeAll()
         settings.clear()
+        aiButtonMetrics.clearCounts()
         aiConsent.forget()
         sweepTempFiles(root)
     }
