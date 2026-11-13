@@ -55,9 +55,11 @@ import jp.kz2601.metamon.desktop.io.DesktopIo
 import jp.kz2601.metamon.desktop.io.FileImportLeaf
 import jp.kz2601.metamon.desktop.io.IoOverlay
 import jp.kz2601.metamon.desktop.io.ListIoBar
+import jp.kz2601.metamon.desktop.io.OpenWithInbox
 import jp.kz2601.metamon.desktop.io.ioDropTarget
 import jp.kz2601.metamon.desktop.io.previewKey
 import jp.kz2601.metamon.desktop.io.rememberDesktopIo
+import jp.kz2601.metamon.desktop.hotkey.HotkeyVoiceHook
 import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.selection.selectableGroup
@@ -67,10 +69,12 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.isTraversalGroup
 import androidx.compose.ui.semantics.liveRegion
+import androidx.compose.ui.platform.LocalWindowInfo
 import androidx.compose.ui.semantics.paneTitle
 import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.semantics
 import jp.kz2601.metamon.desktop.i18n.Strings
+import jp.kz2601.metamon.desktop.os.NotificationsOffBar
 import jp.kz2601.metamon.desktop.store.SessionPersistence
 
 /** 画面 1 枚の描画に要るもの。 */
@@ -105,18 +109,28 @@ fun DesktopApp(
     windowId: Int? = null,
     /** パレットの「この端末のデータを消す」(#1887)。全アプリの分を消す。null なら出さない。 */
     onWipeLocalData: (suspend () -> Unit)? = null,
+    /** ヘッドレスで画面を順に移る(開発用・AutoNav.kt)。null なら何もしない。 */
+    autoNav: AutoNavPlan? = null,
+    /** アプリの id。Windows で通知がオフの時の帯を閉じた覚えに使う。null なら帯を出さない。 */
+    appId: String? = null,
 ) {
     val session = remember {
-        DesktopSession(dsl, initialStore, startScreen = startScreen, host = DesktopActionHost(), persistence = persistence, shared = records, startRecordId = startRecordId)
+        DesktopSession(dsl, initialStore, startScreen = startScreen, host = DesktopActionHost(appName = dsl.app.name), persistence = persistence, shared = records, startRecordId = startRecordId)
     }
+    if (autoNav != null) LaunchedEffect(session) { runAutoNav(autoNav, session) }
     session.onCloseWindow = onCloseWindow
     TrayHook(session, windowId, isActive)
+    HotkeyVoiceHook(session, isActive)
     // 他のウィンドウで端末のデータを消した: 下書きを捨てて最初の画面へ(詳細のウィンドウは閉じる)
     val wipes = session.records.wipes
     LaunchedEffect(wipes) { session.followWipe() }
     // 他のウィンドウで開いている記録が消えた: 下書きを捨て、詳細のウィンドウは閉じる
     val shown = session.store
     LaunchedEffect(shown) { session.followRemoval() }
+    // 保存期間を過ぎた記録を消す(#482): 端末の記録を読み終えた時(DSL を当てた時)・ウィンドウが前に来た時・保存の後
+    val focused = LocalWindowInfo.current.isWindowFocused
+    val loaded = !session.records.loading
+    LaunchedEffect(focused, loaded, session.saves) { if (focused && loaded) session.purgeExpired() }
     var pending by remember { mutableStateOf<Pair<Action, ActionContext>?>(null) }
     val nav = session.nav
     val dispatch = { a: Action, ctx: ActionContext -> if (a.confirmMessage != null) pending = a to ctx else session.dispatch(a, ctx) }
@@ -125,6 +139,11 @@ fun DesktopApp(
     val topComponents = { dsl.screen(session.top.screen)?.components.orEmpty() }
     // 書けるフォームが無い(読み取りだけ・フォームの無い画面)なら写真・動画は入れない
     val topDraft = { session.form(session.top)?.takeIf { !it.isReadOnly }?.let(::FormDraftStrings) }
+    // 「別のアプリで開く」で渡されたファイル(#2994)は、前にあるウィンドウがドロップと同じ規則で受ける
+    val openWithRevision = OpenWithInbox.revision
+    LaunchedEffect(openWithRevision) {
+        if (openWithRevision > 0 && isActive()) OpenWithInbox.take().takeIf { it.isNotEmpty() }?.let { io.dropFiles(it, topComponents(), topDraft()) }
+    }
     // 印刷(#1767): Ctrl+P・見出しの「印刷」で一番上の画面をプレビュー
     var printing by remember { mutableStateOf<PrintDocument?>(null) }
     val openPrint = { printing = ScreenPrint.document(dsl, session.top.screen, session.store, session.form(session.top), locale = Strings.locale) }
@@ -135,13 +154,16 @@ fun DesktopApp(
     // 写真のプレビュー(PhotoPreview.kt): 写真の部品を押すとこのウィンドウのダイアログで開く。開いている間は貼り付け・印刷を取らない
     val previewing = keyboard.photos.isOpen
     val pasteKey = io.previewKey(topComponents, topDraft)
-    CompositionLocalProvider(LocalSearchTargets provides keyboard.searchTargets, LocalPhotoPreview provides keyboard::openPhoto) {
+    // disclosure の開け閉めはこのウィンドウの間だけ覚える(#3214)
+    val disclosures = remember { DisclosureMemory() }
+    CompositionLocalProvider(LocalSearchTargets provides keyboard.searchTargets, LocalPhotoPreview provides keyboard::openPhoto, LocalDisclosures provides disclosures) {
     Surface(Modifier.fillMaxSize().ioDropTarget(io, topComponents, topDraft).onPreviewKeyEvent { !keyboard.photos.isOpen && pasteKey(it) }
         .onPreviewKeyEvent { if (!keyboard.photos.isOpen && DesktopPrint.isPrintKey(it) && DesktopPrint.canPrint(dsl)) true.also { openPrint() } else false }.then(keyboard.modifier)) {
         IoOverlay(io)
         Box(Modifier.fillMaxSize()) {
             // モーダルの間は下の画面とタブに Tab で入らず、読み上げにも出さない
             Column(Modifier.fillMaxSize().then(keyboard.inert(nav.sheet != null || nav.fullScreen != null || previewing))) {
+                appId?.let { NotificationsOffBar(it, dsl) }
                 val base = NavigationResolver.dismissModals(nav).top(dsl)
                 Box(Modifier.weight(1f)) { ScreenView(dsl, session, base, io, dispatch, openPrint, onOpenRecord) }
                 // 送り待ちがある時だけ小さく出す(#1887)
@@ -218,7 +240,7 @@ internal fun confirmLabel(a: Action): String = Strings[
         jp.kz2601.metamon.dsl.ActionType.DELETE_RECORD -> "runtime_confirm_delete"
         jp.kz2601.metamon.dsl.ActionType.SAVE_RECORD -> "runtime_confirm_save"
         jp.kz2601.metamon.dsl.ActionType.EXPORT -> "runtime_confirm_export"
-        jp.kz2601.metamon.dsl.ActionType.OPEN_URL -> "runtime_confirm_open"
+        jp.kz2601.metamon.dsl.ActionType.NAVIGATE, jp.kz2601.metamon.dsl.ActionType.OPEN_URL -> "runtime_confirm_open"
         jp.kz2601.metamon.dsl.ActionType.RESET_FORM -> "runtime_confirm_reset"
         else -> "runtime_confirm_continue"
     },
@@ -252,6 +274,7 @@ private fun ScreenView(
         copyText = io::copyText,
         dragRows = io::rowsTransferable,
         openWindow = openRecord?.let { open -> { a: Action, id: String -> RecordWindows.target(a)?.let { open(it, id) } } },
+        marks = session.persistence?.marks,
     )
     val scope = ScreenScope(route, form, session, perform, io, data, dataEnv)
     Column(Modifier.fillMaxSize()) {
@@ -375,6 +398,11 @@ private fun NodeContent(c: Component, s: ScreenScope) {
             c.children.filter { s.session.state(it, s.form) != "hidden" }.forEach { Box1(Modifier.weight(1f)) { Node(it, s) } }
         }
         ComponentType.CARD -> Card(Modifier.fillMaxWidth()) { LocalGridOrChildren(c, s, Modifier.padding(12.dp)) }
+        ComponentType.CAROUSEL -> CarouselContainer(c, c.children.filter { s.session.state(it, s.form) != "hidden" }) { Node(it, s) }
+        ComponentType.DISCLOSURE -> DisclosureView(c, s.route.screen) {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) { c.children.forEach { Node(it, s) } }
+        }
+        ComponentType.GRID -> GridColumns(c, s)
         in DesktopLeaves.containers -> LocalGridOrChildren(c, s)
         ComponentType.TEXT -> Text(c.text.orEmpty())
         ComponentType.MARKDOWN -> MarkdownLeaf(c.text.orEmpty()) { url -> s.perform(markdownLinkAction(url), null) }
@@ -418,6 +446,22 @@ private fun Children(c: Component, s: ScreenScope, modifier: Modifier = Modifier
     Column(modifier, verticalArrangement = Arrangement.spacedBy(8.dp)) {
         c.title?.let { Text(it, style = MaterialTheme.typography.titleMedium) }
         c.children.forEach { Node(it, s) }
+    }
+}
+
+/** grid: [gridColumns] 列で左から詰めて並べる(iOS の GridContainer と同じ)。隠す子は先に外す(空いた枠を残さない)。 */
+@Composable
+private fun GridColumns(c: Component, s: ScreenScope) {
+    val n = c.gridColumns
+    val kids = c.children.filter { s.session.state(it, s.form) != "hidden" }
+    val cells = gridColumnCells(kids.size, n)
+    Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        kids.indices.groupBy { cells[it].first }.values.forEach { row ->
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                row.forEach { Box1(Modifier.weight(1f)) { Node(kids[it], s) } }
+                repeat(n - row.size) { Spacer(Modifier.weight(1f)) }
+            }
+        }
     }
 }
 

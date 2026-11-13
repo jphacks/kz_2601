@@ -22,6 +22,27 @@ feedback/{id}  # {uid, kind, message, untrusted: true, consentVersion, status, d
 
 **自己改善ループ(#364)**: 伏せ字した写しを `loop_inbox` に取り込み、振り分け・Issue の下書きに使う。原文はループの外に出さない。[feedback-loop.md](feedback-loop.md)。
 
+## 「直ったら知らせてほしい」の同意(#374)
+
+送ったフィードバックが直った時に、アプリ内のお知らせに加えて push でも知らせてよいか、という本人の同意です。コードは `backend/internal/appconfig/loop_notices.go`。
+
+| 項目 | 決定 |
+|---|---|
+| 読む | `GET /v1/me/notify-consent/feedback-fixed` → `{enabled, updatedAt?}`。保存が無ければ `enabled: false` |
+| 書く | `PUT /v1/me/notify-consent/feedback-fixed` `{enabled: true / false}`。`enabled` が無いと 400。保存したら `{enabled, updatedAt}` を返す |
+| 既定 | **off**。本人が選ぶまで push はしない |
+| 本人の分だけ | パスに uid は無い。呼び出した本人の値だけを読み書きする |
+| 置き場 | `users/{uid}/notifyConsent/_feedback_fixed`。`/v1/me/notify-consent/{appId}`(アプリごとの通知の同意)と同じ置き場の、予約した 1 件(`appId` の代わりの固定の名前) |
+| 経路の順 | `/v1/me/notify-consent/{appId}` より具体的なパスなので、`feedback-fixed` はこちらが先に当たる |
+
+**知らせが届く流れ**: 自己改善ループの `fixed` の段(`cmd/feedback-loop fixed`)が、出した Issue がマージされた PR で閉じたのを見つけると、送り主に決まった文のお知らせ(`loop_notices`)を作る。
+
+- アプリ内のお知らせ(`GET /v1/me/notices`)は**同意なしで**作る。送り主本人にだけ見える。
+- push は、`LOOP_NOTIFY_PUSH=on` の時だけ、かつ**同意した人にだけ**送る(`fixed` が push の前に `_feedback_fixed` を読む)。1 人に週 1 回まで。
+- 同意していない人・同意の保存が無い人には push は送らない(お知らせは届く)。
+
+iOS はフィードバックの画面の「直ったら知らせてほしい」(既定はオフ)をオンにして送った後に `enabled: true` を送る。オフに戻すのはお知らせの画面のトグル。API の形は [openapi-appconfig.yaml](../openapi-appconfig.yaml)(`/me/notify-consent/feedback-fixed`・`/me/notices`)。ループ全体・お知らせの保存期間(90 日)・環境変数は [feedback-loop.md](feedback-loop.md)。
+
 **セキュリティルール**: クライアントは Firestore を直接読まず API 経由のみ。`feedback` にはスクショ(画面に出ていた個人の情報)が入りうるので、ルールでクライアントからの読み書きを許可しないこと。
 
 ## 環境変数
