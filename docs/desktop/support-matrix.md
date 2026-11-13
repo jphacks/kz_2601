@@ -2,7 +2,7 @@
 
 DSL の全部の type(Container 7・Leaf 70 = 77。`docs/dsl/dsl.schema.json` と同じ数)とアクション 16 種を、デスクトップ版でどう出すかを 1 行ずつ書く。親は #1746。
 
-- 事実の元: `origin/develop` の `748767fd6`。
+- 事実の元: `origin/develop` の `748767fd6`(openUrlButton の行と数は `origin/epic/god` の `abe167e0f`)。
 - 描ける type: `desktop/app/src/main/kotlin/jp/kz2601/metamon/desktop/DesktopSupport.kt` の `DesktopLeaves`(`containers`・`leaves`)と `io/DesktopIo.kt` の `IoLeaves.types`。
 - 描けない type: 上に無い type。適合テストの `state` は `unavailable` になり、画面には「デスクトップ版ではまだ使えない部品」の一言を出す。
 - 適合テストで違ってよい所: `desktop/app/src/test/kotlin/jp/kz2601/metamon/desktop/ConformanceAllowlist.kt` の `unavailableTypes`。この表の state が `unavailable` の行と一致する(placeSearch・callButton は適合テストの case に出てこない(`docs/dsl/conformance/coverage.json` の `notYetCovered`)ので一覧に無い)。
@@ -26,9 +26,9 @@ DSL の全部の type(Container 7・Leaf 70 = 77。`docs/dsl/dsl.schema.json` �
 | type | 状態 | 適合 state | 理由・代わりの形 | Mac | 関係する Issue |
 |---|---|---|---|---|---|
 | card | 描ける | rendered | カードの枠に子を並べる(子に area があれば枠の中も 6 列のグリッド) | 描ける | #1741 |
-| carousel | 代わり | rendered | 横に送らず、子を縦に並べる | 描ける | #1741 |
-| disclosure | 代わり | rendered | 畳まず、見出しの下に子をいつも出す(expanded はまだ見ない) | 描ける | #1741 |
-| grid | 代わり | rendered | 子に area があれば 6 列のグリッド、無ければ縦に並べる(columns はまだ見ない) | 描ける | #1741 |
+| carousel | 描ける | rendered | 1 枚ずつ見せ、‹ ›・← →・ページの点で送る(端で止まる・動きは付けない)。読み上げは「2 / 5 枚目」 | 描ける | #1741 |
+| disclosure | 描ける | rendered | `expanded`(無ければ閉じる)で始め、見出しを押す・Enter / Space で開け閉めする。開け閉めはウィンドウの間だけ覚える。読み上げは「開いています / 閉じています」(#3214) | 描ける | #1741 |
+| grid | 描ける | rendered | `columnCount`(2〜4・無ければ 2)の列で子を左から詰めて並べる(iOS と同じ・#3215) | 描ける | #1741 |
 | hstack | 描ける | rendered | 子を同じ幅で横に並べる | 描ける | #1741 |
 | section | 描ける | rendered | 見出しと子 | 描ける | #1741 |
 | vstack | 描ける | rendered | 子を縦に並べる | 描ける | #1741 |
@@ -74,7 +74,7 @@ DSL の全部の type(Container 7・Leaf 70 = 77。`docs/dsl/dsl.schema.json` �
 | musicPlayer | 使えません | unavailable | 音楽のライブラリ(MusicKit など)がパソコンに無い | 描ける | #2179 |
 | nearbyShare | 使えません | unavailable | 近くの端末との共有(Nearby / MultipeerConnectivity)がパソコンに無い | 描ける | #2179 |
 | numberField | 描ける | rendered | | 描ける | #1743 |
-| openUrlButton | 使えません | unavailable | develop ではまだ描いていない。`origin/epic/desktop`(`4aedd62db`)には `OpenUrlButton.kt` があり描ける(develop に入ったらこの行を「描ける」に直す) | 描ける | #1740 |
+| openUrlButton | 描ける | rendered | `OpenUrlButton.kt`。link と同じ openUrl(許可した scheme だけ)で開く。`app` があれば先に試し、開けなければ次(slack:// が無ければ Web)。知らない app・許可しない URL はボタンを出さず一言だけ出す | 描ける | #1740 |
 | photoField | 代わり | rendered | 撮影はしない。ファイルを選ぶ・落とす・Ctrl+V | 描ける | #1743・#1764 |
 | picker | 描ける | rendered | | 描ける | #1743 |
 | placeSearch | 未定 | unavailable | 場所の検索も地図も入れていない。推奨・未確定: 地図を出さず、検索の結果を一覧にして「地図で開く」(mapView と同じ形) | 描ける | #1746 |
@@ -102,13 +102,13 @@ DSL の全部の type(Container 7・Leaf 70 = 77。`docs/dsl/dsl.schema.json` �
 | timeline | 描ける | rendered | | 描ける | #1744 |
 | timerDisplay | 描ける | rendered | 走っている残り / 経過はトレイにも出す | 描ける | #1745・#1761 |
 | toggle | 描ける | rendered | | 描ける | #1743 |
-| transcribeField | 代わり | rendered | 話して入れない。キーボードで入れる | 描ける | #1743・#1751 |
+| transcribeField | 代わり | rendered | 既定はキーボードで入れる。音声入力が有効(`TAILORIT_VOICE=1`)で文字にできる PC なら、欄の下のボタンで話して後ろに足す(端末の中の whisper.cpp) | 描ける | #1743・#1751 |
 | videoField | 代わり | rendered | 撮影はしない。ファイルを選ぶ・落とす | 描ける | #1743・#1764 |
 | videoPlayer | 未定 | unavailable | 動画の再生を入れていない。候補: VLCJ(VLC が要る)・JavaFX Media。推奨・未確定: 埋め込まず「既定のアプリで再生」の枠(#2175) | 描ける | #1746・#2175 |
 | voiceInput | 使えません | unavailable | 音声入力(音声認識)をまだつないでいない。端末の中の文字起こし(whisper.cpp)で描く予定 | 描ける | #1751・#2172 |
 | webView | 未定 | unavailable | Web の埋め込みを入れていない。候補: JCEF(KCEF・Chromium 同梱で +100MB 前後)。推奨・未確定: 埋め込まず「ブラウザで開く」の枠(#2176) | 描ける | #1746・#2176 |
 
-数(Container と Leaf の合計 77): 描ける 46・代わり 12・使えません 13・未定 6。
+数(Container と Leaf の合計 77): 描ける 49・代わり 10・使えません 12・未定 6。
 
 ## アクション(16)
 
@@ -135,6 +135,6 @@ DSL の全部の type(Container 7・Leaf 70 = 77。`docs/dsl/dsl.schema.json` �
 
 ## 直す時
 
-- `DesktopLeaves` か `ConformanceAllowlist.unavailableTypes` を変えたら、この表の状態と適合 state も同じコミットで直す。
+- `DesktopLeaves` か `ConformanceAllowlist.unavailableTypes` を変えたら、この表の状態と適合 state も同じコミットで直す(食い違いは `SupportMatrixDocTest` が落とす)。
 - 「未定」の行は #1746 でオーナーが決めたら、決まった形と子の Issue に書き換える。
 - AI に描けない部品を作らせない申告(#2161)は、この表の「使えません」「未定」を元にする。

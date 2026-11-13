@@ -4,6 +4,8 @@ Compose Multiplatform Desktop(JVM)で作る Windows・Linux 版。DSL の読み�
 
 部品・アクションごとの対応(描ける / 代わり / 使えません / 未定): [docs/desktop/support-matrix.md](../docs/desktop/support-matrix.md)
 
+iOS の機能の入口ごとの対応(有る / 代わり / 作らない / Issue): [docs/parity.md](docs/parity.md)
+
 ## 目次
 
 - [動かす](#動かす)
@@ -36,7 +38,10 @@ cd desktop
 ./gradlew :desktop:run                    # 同梱の例 shopping を開く
 ./gradlew :desktop:run --args=kakeibo     # docs/dsl/examples の別の例
 ./gradlew :desktop:test :dsl:test         # 適合テスト(docs/dsl/conformance)と :dsl のテスト
+./gradlew :desktop:koverHtmlReport :desktop:koverXmlReport   # 網羅率(任意・CI では使わない)。app/build/reports/kover/ に html と report.xml(ファイルごとの数字)
 ```
+
+配布物(msi・deb・rpm)の作り方・入れ方・決まっていないことは [docs/desktop/packaging.md](../docs/desktop/packaging.md)。
 
 stg の appconfig を手元で試す(サインインが入るまでの確かめ用。トークンはファイルに書かない):
 
@@ -154,7 +159,7 @@ Firebase Auth の REST クライアント(`auth/FirebaseAuthRestClient.kt`・ま
 
 ### 電池
 
-- 電池(`power/`): 電池の残り・充電の状態・省電力を読む口(iOS の `DevicePowerSource` と同じ形)。Linux は `/sys/class/power_supply`(マウスなどの電池は数えない・複数の電池は容量で重みを付けた平均)と `/sys/firmware/acpi/platform_profile` を 60 秒ごとに読み、変わった時だけ流す。Windows と macOS は今は「不明」。`METAMON_MOCK=1` の時は `METAMON_BATTERY_LEVEL`・`METAMON_BATTERY_STATE`・`METAMON_LOW_POWER` の偽物。式と画面にはまだ出さず、値は送らない。
+- 電池(`power/`): 電池の残り・充電の状態・省電力を読む口(iOS の `DevicePowerSource` と同じ形)。Linux は `/sys/class/power_supply`(マウスなどの電池は数えない・複数の電池は容量で重みを付けた平均)と `/sys/firmware/acpi/platform_profile`、Windows は kernel32 の `GetSystemPowerStatus`(JNA・電池の有無・残量・電源につながっているか・バッテリー節約機能)を 60 秒ごとに読み、変わった時だけ流す。macOS は今は「不明」。`METAMON_MOCK=1` の時は `METAMON_BATTERY_LEVEL`・`METAMON_BATTERY_STATE`・`METAMON_LOW_POWER` の偽物。式と画面にはまだ出さず、値は送らない。
 
 ### 読み上げ
 
@@ -178,6 +183,55 @@ Firebase Auth の REST クライアント(`auth/FirebaseAuthRestClient.kt`・ま
 
 - ライセンス: F1 の一覧の「サードパーティのライセンス」かコマンドパレットで、このアプリ・依存・同梱物・Java 実行環境のライセンスを出す(`Licenses.kt`)。一覧はビルド時に `app/third-party-licenses.gradle.kts` が runtimeClasspath の POM と jar の NOTICE から作る(本文の正本は `android/scripts/license-texts`)。複数の種類から選べる依存(JNA の LGPL-2.1-or-later / Apache-2.0)は同じファイルの `electedLicenses` で選んだ種類だけを載せる(JNA は Apache-2.0)。Maven を通らない同梱物は `app/licenses/vendored/*.properties` に 1 件 1 ファイルで足す。Java 実行環境の分は起動中の実行環境の `legal/` から読む。
 
+## whisper モジュール(音声入力・#1751)
+
+`:whisper`(`whisper/`)は端末の中で音を文字にする部品。音声入力(`TAILORIT_VOICE=1`)を試す時だけ要る。Kotlin の部分は `android/whisper` のファイルをビルド時に写し(`whisper/build.gradle.kts` の `syncSharedWhisper`)、ライブラリの読み方(`WhisperNative`・`desktop/NativeLibrary.kt`)だけデスクトップの物を使う。
+
+### ネイティブのライブラリを作る
+
+whisper.cpp と JNI の口(`whisper/native/whisper_jni.cpp`)を CMake で 1 つのライブラリにする。whisper.cpp の版とハッシュは `whisper/native/CMakeLists.txt` で固定(Android と同じ)。初回だけ取得のための通信が要る。
+
+| OS | コマンド | 要る物 | できる物 |
+|---|---|---|---|
+| Linux(x64・arm64) | `whisper/native/build.sh` | CMake 3.22 以上・C/C++ コンパイラ・JDK(`JAVA_HOME` か PATH の `java`) | `whisper/native/out/linux-<arch>/libmetamon_whisper.so` |
+| macOS(試す時だけ・配るのは Mac 版) | `whisper/native/build.sh` | Linux と同じ | `whisper/native/out/macos-<arch>/libmetamon_whisper.dylib` |
+| Windows(x64・arm64) | PowerShell で `whisper\native\build.ps1 [-Arch x64\|arm64]`(既定は今の機械) | Visual Studio 2022 の「C++ によるデスクトップ開発」(MSVC・CMake)・JDK(`JAVA_HOME`) | `whisper\native\out\windows-<arch>\metamon_whisper.dll` |
+
+`out/` も途中の `build/` も git には入れない。`out/` は Compose の `appResourcesRootDir`(`app/build.gradle.kts`)なので、`:desktop:run` と配る形(msi・deb など)にそのまま入る。
+
+ライブラリは次の順に探し、最初に読めた物を使う(`NativeLibrary.candidates`)。どれも無ければ音声入力は「この PC では用意できていません」になる。
+
+1. `-Dtailorit.whisper.lib=<ファイル>` か `TAILORIT_WHISPER_LIB=<ファイル>`(作った物を直接指す)
+2. 配った形の中(Compose が渡す `compose.application.resources.dir`)
+3. `-Dtailorit.whisper.nativeDir=<native/out>` の `<os>-<arch>/`(`:whisper:transcribeWav` が付ける)
+4. `java.library.path`
+
+### モデルの置き場(VoiceModels)
+
+モデルは Android と同じ `ggml-base-q5_1.bin`(約 60MB・取得先・版・ハッシュは `android/whisper/.../WhisperModels.kt` で固定)。git にも配る形にも入れず、初回に落としてハッシュを確かめる。置き場はアプリ(`app/.../voice/Transcriber.kt` の `VoiceModels`)では次のとおり。
+
+| 決め方 | 置き場 |
+|---|---|
+| 既定 | 端末の保存先の `models/`(Windows `%APPDATA%\TailorIt\models`・Linux `$XDG_DATA_HOME/tailorit/models`(無ければ `~/.local/share/tailorit/models`)・macOS `~/Library/Application Support/TailorIt/models`)。`-Dtailorit.dataDir` で保存先を変えるとその下 |
+| `-Dtailorit.whisper.model=<ファイル>` か `TAILORIT_WHISPER_MODEL=<ファイル>` | そのファイルを落とさずに使う |
+
+「この端末のデータを消す」でもモデルは消さない。
+
+### 手元の WAV を文字にする(TranscribeWav)
+
+ライブラリを作っておけば、アプリを起動せずに読み込みと文字にする時間を測れる(`whisper/.../desktop/TranscribeWav.kt`)。
+
+```
+cd desktop
+whisper/native/build.sh                                       # Windows は whisper\native\build.ps1
+./gradlew :whisper:transcribeWav --args="/path/to/voice.wav"     # 言語の既定は ja
+./gradlew :whisper:transcribeWav --args="/path/to/voice.wav en"
+```
+
+- 音は Java Sound で読める形(WAV など)。16kHz モノラルでなくても 16kHz に直してから渡す。
+- モデルは `TAILORIT_WHISPER_MODEL` があればそれ、無ければ `whisper/build/whisper-models/` に落とす(アプリの `models/` とは別)。
+- 出るのは音の長さ・モデルの名前・読み込みと文字にする時間(ms)・文字にした結果。ライブラリが読めない時は理由を出して 1 で終わる。
+
 ## 構成
 
 | 場所 | 中身 |
@@ -187,15 +241,34 @@ Firebase Auth の REST クライアント(`auth/FirebaseAuthRestClient.kt`・ま
 | `app/src/main/kotlin/.../desktop/Session.kt` | 画面の状態と操作(遷移・下書き・保存・削除)。画面と適合テストが同じ物を使う |
 | `app/src/main/kotlin/.../desktop/InputLeaves.kt`・`Actions.kt` | 入力の部品 20 種・OS に頼むアクション |
 | `app/src/main/kotlin/.../desktop/DesktopSupport.kt` | 描ける type の一覧と部品の state(`DesktopLeaves.state`: rendered・hidden・needsForm・unavailable・unknown)。画面・操作・適合テストが同じ物を使う |
+| `app/src/main/kotlin/.../desktop/DataLeaves.kt` | データの部品(list・table・timeline・gridTable・searchBar・feed・matchList)。値は Android の `ListValues.kt` と同じ規則 |
+| `app/src/main/kotlin/.../desktop/DesktopApp.kt` | DSL を 1 本読み、`DesktopSession` の遷移で画面を描く。6 列のグリッド(フォームは段)・push はウィンドウの中・sheet はダイアログ・fullScreen は全体に重ねる・タブは下 |
+| `app/src/main/kotlin/.../desktop/DisplayLeaves.kt` | 表示の部品(image・avatar・badge・markdown・stat・chart・progressBar・gauge・rating・calendar)と DSL の色 |
+| `app/src/main/kotlin/.../desktop/GridLayout.kt` | 画面のグリッドの規則(`area` の読み方・6 列・行の上限)。Compose に依存しない Android の `GridArea.kt` の写し(`:renderer-core` ができたら消す) |
+| `app/src/main/kotlin/.../desktop/IconLeaf.kt` | DSL のアイコン名(SF Symbols の語彙)→ Material の絵。名前の表は `docs/dsl/icon-map.json` をビルド時に同梱して読む |
+| `app/src/main/kotlin/.../desktop/ImageLoader.kt` | 画像を読む(裏のスレッドから)。縮めた絵と引き出し用の PNG を作り、https・data URL は少しだけ覚える。大きすぎる画像は開かない |
+| `app/src/main/kotlin/.../desktop/LeafValues.kt` | stat・progressBar・gauge・chart の値。Android の `ListValues.kt` と同じ規則を `:dsl` の `Aggregator`・`ExprEvaluator`・`RecordQuery` で出す |
+| `app/src/main/kotlin/.../desktop/LoadingSkeleton.kt` | 起動時に端末の記録を読む間の形だけの画面。読み上げは「読み込み中」 |
+| `app/src/main/kotlin/.../desktop/Main.kt` | 起動。引数で同梱の例・記録の JSON・最初の画面を選ぶ(無ければ最後に開いたアプリ)。2 つ目の起動は `SingleInstance.kt` で前の方へ渡す・ウィンドウは `Windows.kt`・常駐は `Tray.kt` |
+| `app/src/main/kotlin/.../desktop/OpenUrlButton.kt` | openUrlButton の開く先(app・url・開けない)を決める。Android の `OpenUrlTarget` と同じ分岐 |
+| `app/src/main/kotlin/.../desktop/PlayLeaves.kt` | 計算・遊びの部品(settlement・bracket・flashcards・randomPicker・timerDisplay・qrCode)。規則は `:dsl` と Android の写し |
 | `whisper/` | 端末内の文字起こし。`android/whisper` の純 Kotlin の部分(音の区切り・モデルの取得・WhisperEngine)をビルド時に写して使い、`WhisperNative` だけデスクトップの読み方(`compose.application.resources.dir` など)。JNI の C++ と CMake は `whisper/native/` |
 | `app/src/main/kotlin/.../desktop/voice/` | マイク(`Microphone`・Java Sound)・文字起こし(`Transcriber`・whisper.cpp)・openVoice の流れ(`VoiceInput`)・モデルの置き場 |
 | `services/` | `android/services` の純 Kotlin の部分(API クライアント・記録の保存・送信待ち・同意)を同じソースのまま取り込む。取り込むファイルは `services/build.gradle.kts` で名指し。宣言にだけ出る Android の型は `services/src/shim` の置き換え |
 | `app/src/main/kotlin/.../desktop/net/` | 接続先の設定(既定はモック)・`X-Client-Platform: windows / linux / macos`・User-Agent |
-| `app/src/main/kotlin/.../desktop/store/` | 端末の保存。`%APPDATA%\TailorIt`・`$XDG_DATA_HOME/tailorit`(無ければ `~/.local/share/tailorit`)・`~/Library/Application Support/TailorIt` に設定・同意・記録・送信待ち・DSL を JSON で置く。サインアウトで消す。書き込みは同じフォルダの一時ファイル(毎回別の名前の `*.tmp`)に書いてから置き換え、落ちて残った `*.tmp` は開く時・全部消す時に消す |
+| `app/src/main/kotlin/.../desktop/store/` | 端末の保存。`%APPDATA%\TailorIt`・`$XDG_DATA_HOME/tailorit`(無ければ `~/.local/share/tailorit`)・`~/Library/Application Support/TailorIt` に設定・同意・記録・送信待ち・DSL を JSON で置く。サインアウトで消す。書き込みは同じフォルダの一時ファイル(毎回別の名前の `*.tmp`)に書いてから置き換え、落ちて残った `*.tmp` は開く時・全部消す時に消す。詳しくは [docs/desktop/storage.md](../docs/desktop/storage.md) |
 | `app/src/main/kotlin/.../desktop/SingleInstance.kt` | 起動は保存先ごとに 1 つ。保存先の `.lock` をロックし(プロセスが終われば OS が外す)、127.0.0.1 の空いた口と合言葉を `.instance` に書いて 2 つ目の起動を待つ。2 つ目は合言葉と引数を送って前に出させて終わる。ロックを作れない時(保存先に書けないなど)は起動を止めない。記録の JSON を渡した起動はロックを取らない |
 | `app/src/main/kotlin/.../desktop/io/` | 取り込み・書き出し・ドラッグ & ドロップ・クリップボード(PDF は Apache PDFBox)。書き出しの名前は `io/FileNames.kt`(上書きしない・Windows の予約名)。外へ渡すファイルは OS の一時フォルダの `tailorit-drag/`(引き出し)・`tailorit-calendar/`(.ics)に置き、起動時に 1 日より古い物を消す |
 | `app/src/main/kotlin/.../desktop/PhotoPreview.kt` | 写真を大きく見るダイアログ・見せる写真の集め方(Mac の `MacQuickLook.sources` と同じ規則)・「既定のアプリで開く」の一時ファイル |
 | `app/src/main/kotlin/.../desktop/i18n/`・`app/src/main/resources/i18n/desktop/` | 文言。Android の `renderer`・`app` の `values`(日本語)・`values-en`(英語)をビルド時に `i18n/` へ同梱して読む。デスクトップだけの文言は同じ形の XML(キーは `desktop_`) |
 | `app/src/main/kotlin/.../desktop/theme/`・`A11y.kt` | OS に従う明暗・読み上げの説明 |
-| `app/src/main/kotlin/.../desktop/power/` | 電池の残り・充電・省電力を読む口(Linux は sysfs、Windows・macOS は今は不明、`METAMON_MOCK=1` で偽物)。まだどこからも使っていない |
+| `app/src/main/kotlin/.../desktop/power/` | 電池の残り・充電・省電力を読む口(Linux は sysfs、Windows は `GetSystemPowerStatus`(JNA)、macOS は今は不明、`METAMON_MOCK=1` で偽物)。まだどこからも使っていない |
+| `app/src/main/kotlin/.../desktop/auth/` | サインインの部品。Firebase Auth の REST クライアント(`FirebaseAuthRestClient.kt`・設定は `FirebaseAuthConfig.kt`)と、リフレッシュトークンの置き場の口(`TokenStore.kt`・今はメモリだけの実体)。まだ画面にはつながない([今できること](#今できること)) |
+| `app/src/main/kotlin/.../desktop/Autostart.kt` | ログイン時に開く(既定は off)。Windows は HKCU の Run、Linux は XDG の autostart に登録する([今できること](#今できること)のトレイ) |
+| `app/src/main/kotlin/.../desktop/CommandPalette.kt` | Ctrl+K のコマンドパレット(画面・アクション・アプリを名前で選ぶ・絞り込みの点の付け方)([今できること](#今できること)のキーボード) |
+| `app/src/main/kotlin/.../desktop/Keyboard.kt` | ショートカットの決まり(Windows・Linux は Ctrl、macOS は ⌘)とその文言([今できること](#今できること)のキーボード) |
+| `app/src/main/kotlin/.../desktop/Licenses.kt` | サードパーティのライセンスの一覧と本文を出す([今できること](#今できること)のライセンス) |
+| `app/src/main/kotlin/.../desktop/Print.kt` | 今の画面を表に直して A4 で印刷する([今できること](#今できること)の印刷) |
+| `app/src/main/kotlin/.../desktop/Tray.kt` | トレイ / メニューバーの常駐・メニュー・通知の吹き出し([今できること](#今できること)のトレイ) |
+| `app/src/main/kotlin/.../desktop/Windows.kt` | 複数のウィンドウ(アプリごとに 1 枚・記録の詳細は別の 1 枚)の管理([今できること](#今できること)の複数のウィンドウ) |
 | `app/src/test/kotlin/.../desktop/DesktopConformanceTest.kt` | 全 OS 共通の適合テストのうち、今比べられる部分(画面・部品の state(hidden・needsForm を含む)・入力の値とラベル・操作の steps・openUrlButton の label / url・stat / gauge / progressBar / chart の DSL の値と計算した値)。違ってよい所(描けない type・まだ比べない props)は `ConformanceAllowlist.kt` に理由付きで書き、無い違いは落ちる |

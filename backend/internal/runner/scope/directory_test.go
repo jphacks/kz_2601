@@ -113,6 +113,19 @@ func TestHandleMembersAndAccounts(t *testing.T) {
 	if err != nil || strings.Join(sorted(ms), ",") != "m1,m2" {
 		t.Fatalf("members: %v %v", ms, err)
 	}
+	// #2297: one uid at a time, this app only; a private handle has no members
+	for uid, want := range map[string]bool{"m1": true, "m2": true, "m3": false, "x": false, "": false, "a/b": false} {
+		if ok, err := h.IsMember(ctx, uid); err != nil || ok != want {
+			t.Errorf("IsMember(%q) = %v %v, want %v", uid, ok, err, want)
+		}
+	}
+	priv, err := New(st, "test", store.OutboxEvent{AppID: "X", UID: "m1"}, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if ok, err := priv.IsMember(ctx, "m1"); err != nil || ok {
+		t.Errorf("private IsMember: %v %v", ok, err)
+	}
 	if bs, err := h.Blocks(ctx, "m1"); err != nil || len(bs) != 1 || bs[0] != "m2" {
 		t.Fatalf("blocks: %v %v", bs, err)
 	}
@@ -136,7 +149,7 @@ func TestHandleMembersAndAccounts(t *testing.T) {
 
 // PushDevices: iOS only on the asked APNs environment (all when ""),
 // Android always; DropDeviceToken removes that token only.
-func TestHandlePushDevices(t *testing.T) {
+func TestHandlePushDevicesAndDrop(t *testing.T) {
 	ctx := context.Background()
 	st := store.NewMemory()
 	tok := func(c string) string { return strings.Repeat(c, 64) }

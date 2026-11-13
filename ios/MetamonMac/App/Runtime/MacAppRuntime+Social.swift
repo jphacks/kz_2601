@@ -19,7 +19,7 @@ extension MacAppRuntime: RecordPosting {
     /// shared / public の entity に作る記録の投稿者(#250)。private は nil
     func postAuthor(for entity: String) -> (uid: String?, name: String?)? {
         guard dsl.entity(entity)?.isShared == true else { return nil }
-        return (currentUserId, nil)
+        return (currentUserId, AuthorProfile.name) // 設定の名前だけ。未設定は nil で backend が「匿名」を付ける(#3077)
     }
 }
 
