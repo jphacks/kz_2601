@@ -34,7 +34,10 @@ import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.onKeyEvent
 import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.input.key.type
+import jp.kz2601.metamon.desktop.debug.DevMenu
+import jp.kz2601.metamon.desktop.debug.DevMenuHost
 import jp.kz2601.metamon.desktop.i18n.Strings
+import jp.kz2601.metamon.desktop.net.DesktopApiConfig
 import jp.kz2601.metamon.dsl.Action
 import jp.kz2601.metamon.dsl.ActionType
 import jp.kz2601.metamon.dsl.AppDSL
@@ -265,6 +268,21 @@ class DesktopKeyboard(
     /** 消す前の確認を出している。 */
     var wipeConfirmOpen by mutableStateOf(false)
 
+    /** 接続先(開発用メニューを出すかを決める)。 */
+    var apiConfig: DesktopApiConfig = DesktopApiConfig.fromEnvironment()
+
+    /** 開発用メニューの「今の環境」の中身。null なら閉じている。 */
+    var devInfo by mutableStateOf<Pair<String, List<String>>?>(null)
+
+    /** 開発用メニュー(debug/DevMenu.kt)から触る口。 */
+    val devHost: DevMenuHost = object : DevMenuHost {
+        override val config: DesktopApiConfig get() = apiConfig
+        override val pendingCount: Int? get() = session.persistence?.pending
+        override val canWipe: Boolean get() = wipeLocalData != null
+        override fun showInfo(title: String, lines: List<String>) { devInfo = title to lines }
+        override fun askWipe() { wipeConfirmOpen = true }
+    }
+
     /** このウィンドウの検索欄(Ctrl+F は他のウィンドウに入らない)。 */
     val searchTargets = SearchTargets()
 
@@ -299,7 +317,7 @@ class DesktopKeyboard(
             if (!repeat) closePreview()
             return true
         }
-        if (paletteOpen || helpOpen || licensesOpen || wipeConfirmOpen) return false // パレット・一覧・確認が自分で受ける
+        if (paletteOpen || helpOpen || licensesOpen || wipeConfirmOpen || devInfo != null) return false // パレット・一覧・確認が自分で受ける
         val s = Keymap.match(p, os) ?: return false
         if (s == Shortcut.PRINT || s.bubble != bubble) return false // 印刷は Print.kt の Ctrl+P
         // Space は何も選んでいない時だけ。見せる写真が無ければ流す(知らせも出さない)
@@ -381,7 +399,9 @@ class DesktopKeyboard(
             "about:licenses", LicensesText.TITLE, PaletteCommand.Kind.ACTION,
             keywords = listOf("licenses", "third-party", "oss", "notice", LicensesText.LICENSE),
         ) { licensesOpen = true }
-        return shortcuts + buttons + record + screens + apps + wipe + licenses
+        // stg の時だけ・配布物では出ない
+        val dev = DevMenu.commands(devHost)
+        return shortcuts + buttons + record + screens + apps + wipe + licenses + dev
     }
 
     /** 確認で「消す」を押した: 全アプリの端末のデータを消し、このウィンドウを最初の画面に戻す。 */
@@ -412,7 +432,7 @@ class DesktopKeyboard(
     val modalModifier: Modifier get() = Modifier.focusRequester(modal).focusGroup()
 
     fun focusAfterNavigation(modalOpen: Boolean) {
-        if (paletteOpen || helpOpen || licensesOpen) return
+        if (paletteOpen || helpOpen || licensesOpen || devInfo != null) return
         if (modalOpen && runCatching { modal.requestFocus(FocusDirection.Enter) }.getOrDefault(false)) return
         runCatching { root.requestFocus() }
     }
@@ -443,6 +463,18 @@ class DesktopKeyboard(
                 licensesOpen = false
                 runCatching { root.requestFocus() }
             }
+        }
+        devInfo?.let { (title, lines) ->
+            val dismiss = {
+                devInfo = null
+                runCatching { root.requestFocus() }
+            }
+            AlertDialog(
+                onDismissRequest = { dismiss() },
+                title = { Text(title) },
+                text = { Text(lines.joinToString("\n")) },
+                confirmButton = { TextButton(onClick = { dismiss() }) { Text(KeyboardText.HELP_CLOSE) } },
+            )
         }
         if (wipeConfirmOpen) {
             val scope = rememberCoroutineScope()

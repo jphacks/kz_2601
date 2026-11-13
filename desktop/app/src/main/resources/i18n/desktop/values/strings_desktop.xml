@@ -15,6 +15,16 @@
     <string name="desktop_close">閉じる</string>
     <string name="desktop_data_add">追加</string>
     <string name="desktop_delete_not_allowed">このデータは削除できません</string>
+    <string name="desktop_dev_env_mock">モック(通信しない)</string>
+    <string name="desktop_dev_env_pending">送信待ち: %1$s 件</string>
+    <string name="desktop_dev_env_target">接続先: %1$s</string>
+    <string name="desktop_dev_env_token">トークン: %1$s</string>
+    <string name="desktop_dev_env_token_none">なし</string>
+    <string name="desktop_dev_env_token_set">あり</string>
+    <string name="desktop_dev_env_version">版: %1$s (%2$s)</string>
+    <string name="desktop_dev_environment">今の環境</string>
+    <string name="desktop_dev_item">開発用: %1$s</string>
+    <string name="desktop_dev_menu">開発用メニュー</string>
     <string name="desktop_drag_image_name">画像</string>
     <string name="desktop_drag_table_name">表</string>
     <string name="desktop_export_clipboard">(表はクリップボードにも入れました)</string>

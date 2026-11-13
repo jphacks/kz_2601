@@ -14,6 +14,16 @@
     <string name="desktop_close">Close</string>
     <string name="desktop_data_add">Add</string>
     <string name="desktop_delete_not_allowed">You can\'t delete this data</string>
+    <string name="desktop_dev_env_mock">Mock (offline)</string>
+    <string name="desktop_dev_env_pending">Waiting to send: %1$s</string>
+    <string name="desktop_dev_env_target">Server: %1$s</string>
+    <string name="desktop_dev_env_token">Token: %1$s</string>
+    <string name="desktop_dev_env_token_none">none</string>
+    <string name="desktop_dev_env_token_set">set</string>
+    <string name="desktop_dev_env_version">Version: %1$s (%2$s)</string>
+    <string name="desktop_dev_environment">Current environment</string>
+    <string name="desktop_dev_item">Developer: %1$s</string>
+    <string name="desktop_dev_menu">Developer menu</string>
     <string name="desktop_drag_image_name">image</string>
     <string name="desktop_drag_table_name">table</string>
     <string name="desktop_export_clipboard">" (the table is also on the clipboard)"</string>
