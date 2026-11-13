@@ -138,6 +138,9 @@ compose.desktop {
             // whisper.cpp の JNI のライブラリ(whisper/native/build.sh・build.ps1 で out/<os>-<arch>/ に作る・#1751)を配る形に入れる。
             // 作っていなければ入らず、音声入力は「この PC では用意できていません」になる。モデルは入れない(初回に落とす)
             appResourcesRootDir.set(project(":whisper").layout.projectDirectory.dir("native/out"))
+            // CSV を「プログラムから開く」に出す(#2995・jpackage の --file-associations)。既定のアプリは奪わない(OS 側で選ぶ)。
+            // Deb・Rpm・Dmg にも同じ指定が入る
+            fileAssociation(mimeType = "text/csv", extension = "csv", description = "CSV")
         }
     }
 }
