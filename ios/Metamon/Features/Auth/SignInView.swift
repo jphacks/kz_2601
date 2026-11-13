@@ -27,6 +27,7 @@ struct SignInView: View {
                 VStack(spacing: Theme.Spacing.sm) {
                     Text("Tailor It")
                         .font(.system(size: 40, weight: .bold, design: .rounded))
+                        .accessibilityAddTraits(.isHeader)
                         .brandText()
                     Text(L10n.key("話しかけるだけで、アプリが生まれ変わる", review: "話すだけで、自分専用の記録帳に"))
                         .font(.subheadline)

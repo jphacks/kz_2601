@@ -161,6 +161,7 @@ struct ExtConnectSheet: View {
                         .accessibilityHidden(true)
                     Text(ExtDenialCopy.connectTitle(name))
                         .font(.system(size: 20, weight: .bold, design: .rounded))
+                        .accessibilityAddTraits(.isHeader)
                         .fixedSize(horizontal: false, vertical: true)
                         .accessibilityIdentifier("ext.connect.title")
                 }

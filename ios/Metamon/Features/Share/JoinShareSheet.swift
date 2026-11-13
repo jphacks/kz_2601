@@ -68,6 +68,7 @@ struct JoinShareSheet: View {
         VStack(alignment: .leading, spacing: Theme.Spacing.md) {
             Label("参加すると", systemImage: "person.2.fill")
                 .font(.headline)
+                .accessibilityAddTraits(.isHeader)
             point("eye", "参加している人が付けた記録が見られます")
             point("square.and.pencil", "あなたが付けた記録も、参加している人に見えます")
             point("list.bullet", "参加している人の一覧に、下の名前で出ます")

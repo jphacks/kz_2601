@@ -219,6 +219,7 @@ struct ReleaseRequestSheet: View {
         VStack(alignment: .leading, spacing: Theme.Spacing.md) {
             Text("どんな用途で使っていますか?")
                 .font(.headline)
+                .accessibilityAddTraits(.isHeader)
             TextField("用途の一言(必須) 例: 毎朝の体調記録に使っています", text: $purpose, axis: .vertical)
                 .lineLimit(2...5)
                 .metamonInputField() // 複数行(return で改行)・#196
@@ -258,6 +259,7 @@ struct ReleaseRequestSheet: View {
                 .foregroundStyle(Theme.brandGradient)
             Text(justSent ? L10n.tr("受け付けました") : L10n.tr("申請済みです"))
                 .font(.title3.weight(.bold))
+                .accessibilityAddTraits(.isHeader)
             HStack(spacing: Theme.Spacing.sm) {
                 Text("いまの状況")
                     .font(.subheadline)
