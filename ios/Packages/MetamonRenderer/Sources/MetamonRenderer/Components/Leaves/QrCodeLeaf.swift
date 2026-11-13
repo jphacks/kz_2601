@@ -1,5 +1,4 @@
 import SwiftUI
-import Photos
 import MetamonDSL
 
 /// `qrCode`(#422): text / field / value から QR を作って表示する(作り方は `QRCodeImage`・中身は `QRCodeContent`)。
@@ -10,7 +9,17 @@ struct QrCodeLeaf: View {
     let c: Component
     let ctx: RenderContext
 
-    enum SaveState: Equatable { case idle, saving, saved, failed }
+    enum SaveState: Equatable {
+        case idle, saving, saved, failed
+
+        /// 許可なしも失敗も同じ文言(前からの動きを変えない)。出し分けるなら `.notAuthorized` をここで分ける
+        init(_ result: PhotoSaveResult) {
+            switch result {
+            case .saved: self = .saved
+            case .notAuthorized, .failed: self = .failed
+            }
+        }
+    }
     @State private var saveState: SaveState = .idle
 
     var body: some View {
@@ -113,23 +122,11 @@ struct QrCodeLeaf: View {
         .accessibilityIdentifier("qrCode.placeholder")
     }
 
-    /// 写真に追加(`NSPhotoLibraryAddUsageDescription`・追加のみ)。拒否・失敗は文言で知らせる。
+    /// 写真に追加(`PhotoLibrarySaver`・`NSPhotoLibraryAddUsageDescription`・追加のみ)。拒否・失敗は文言で知らせる。
     private func save(_ image: PlatformImage) {
         saveState = .saving
         Task { @MainActor in
-            let status = await PHPhotoLibrary.requestAuthorization(for: .addOnly)
-            guard status == .authorized || status == .limited else {
-                saveState = .failed
-                return
-            }
-            do {
-                try await PHPhotoLibrary.shared().performChanges {
-                    PHAssetChangeRequest.creationRequestForAsset(from: image)
-                }
-                saveState = .saved
-            } catch {
-                saveState = .failed
-            }
+            saveState = SaveState(await PhotoLibrarySaver.save(image))
         }
     }
 }
