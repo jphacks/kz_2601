@@ -65,6 +65,7 @@ class DesktopConformanceTest {
         "searchBar" to listOf("field", "placeholder", "query"),
         "calendar" to listOf("entity", "title"),
         "disclosure" to listOf("expanded", "title"),
+        "grid" to listOf("columns"),
         "gridTable" to listOf("entity", "title"),
         "feed" to listOf("title", "limit"),
         "matchList" to listOf("entity", "show", "title"),
@@ -368,6 +369,7 @@ class DesktopConformanceTest {
                 putText("title", Disclosure.title(c))
                 put("expanded", JsonPrimitive(Disclosure.initiallyExpanded(c)))
             }
+            "grid" -> put("columns", JsonPrimitive(c.gridColumns))
             "openUrlButton" -> {
                 putText("label", c.label)
                 putText("url", c.url)

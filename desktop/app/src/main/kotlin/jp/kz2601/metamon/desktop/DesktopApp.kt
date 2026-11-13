@@ -380,6 +380,7 @@ private fun NodeContent(c: Component, s: ScreenScope) {
         ComponentType.DISCLOSURE -> DisclosureView(c, s.route.screen) {
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) { c.children.forEach { Node(it, s) } }
         }
+        ComponentType.GRID -> GridColumns(c, s)
         in DesktopLeaves.containers -> LocalGridOrChildren(c, s)
         ComponentType.TEXT -> Text(c.text.orEmpty())
         ComponentType.MARKDOWN -> MarkdownLeaf(c.text.orEmpty()) { url -> s.perform(markdownLinkAction(url), null) }
@@ -423,6 +424,22 @@ private fun Children(c: Component, s: ScreenScope, modifier: Modifier = Modifier
     Column(modifier, verticalArrangement = Arrangement.spacedBy(8.dp)) {
         c.title?.let { Text(it, style = MaterialTheme.typography.titleMedium) }
         c.children.forEach { Node(it, s) }
+    }
+}
+
+/** grid: [gridColumns] 列で左から詰めて並べる(iOS の GridContainer と同じ)。隠す子は先に外す(空いた枠を残さない)。 */
+@Composable
+private fun GridColumns(c: Component, s: ScreenScope) {
+    val n = c.gridColumns
+    val kids = c.children.filter { s.session.state(it, s.form) != "hidden" }
+    val cells = gridColumnCells(kids.size, n)
+    Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        kids.indices.groupBy { cells[it].first }.values.forEach { row ->
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                row.forEach { Box1(Modifier.weight(1f)) { Node(kids[it], s) } }
+                repeat(n - row.size) { Spacer(Modifier.weight(1f)) }
+            }
+        }
     }
 }
 
