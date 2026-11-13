@@ -6,7 +6,7 @@ enum LocationPermissionCopy {
     /// 「設定を開く」の行き先
     static var settingsURL: URL? {
         #if os(macOS)
-        URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_LocationServices")
+        PrivacySettingsPane.location.url
         #else
         URL(string: "app-settings:")
         #endif

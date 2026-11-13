@@ -171,6 +171,41 @@ macOS runner は Linux の 10 倍の分単価なので、ubuntu の `ios-changes
 - **androidTest のコンパイル**: 本番コードの変更で `androidTest` のコードが壊れた印。`./gradlew :app:compileStgDebugAndroidTestKotlin` で再現する。実行はしていないので、端末での確認は [`docs/android/ci.md`](android/ci.md#ci-で検証されるもの--手元で確かめるもの) の手順で手元で行う。
 - **lint**: 非ブロッキング(`continue-on-error`)なので `android-ci` は落ちない。結果は job summary と警告に出て、レポートは成果物 `android-lint-reports`。手元では `./gradlew :app:lintStgDebug :renderer:lintDebug :services:lintDebug`。
 
+## desktop-ci(Windows・Linux のデスクトップ版のテスト・配布物)
+
+`.github/workflows/desktop-ci.yml`(#1757)。`desktop/`(Compose Multiplatform Desktop)を ubuntu と windows の両方で確かめる。PR が Open(非 Draft)の時・`develop` / `main` への push・手動(`workflow_dispatch`)で回る。workflow の `paths:` は使わない(android-ci と同じ理由)。
+
+| ジョブ | いつ回るか | 回すもの |
+|---|---|---|
+| `desktop-build (ubuntu-latest)` | `run` が true | `./gradlew :desktop:test :dsl:test :whisper:test`。`package` が true なら `:desktop:packageDeb` で deb を作り、成果物 `desktop-deb` に残す |
+| `desktop-build (windows-latest)` | `run` が true | `.\gradlew.bat :desktop:test :dsl:test :whisper:test`。`package` が true なら `:desktop:packageMsi` で msi を作り、成果物 `desktop-msi` に残す |
+| `desktop-changes` | 毎回 | `dorny/paths-filter` で `run`(テストを回すか)と `package`(配布物を作るか)を決める |
+| `desktop-ci` | 毎回(集約) | ほかのジョブの結果をまとめる。スキップは成功、失敗・キャンセルは失敗 |
+
+`run` が true になる変更(1 つでも当たれば回す。手動の時は必ず true):
+
+| 変わった場所 | 理由 |
+|---|---|
+| `.github/workflows/desktop-ci.yml` | この workflow 自身 |
+| `android/app/src/main/res/values*/**` | 同梱する文言 |
+| `android/dsl/**`(`*.md` 以外) | 取り込む DSL |
+| `android/gradle/libs.versions.toml` | 依存の版 |
+| `android/renderer/src/main/**`・`android/services/src/main/**`(`*.md` 以外) | 取り込むソース・文言 |
+| `android/whisper/src/**`(`*.md` 以外) | 取り込む純 Kotlin の部分とそのテスト(#1751) |
+| `desktop/**`(`*.md` 以外) | デスクトップ版そのもの |
+| `docs/dsl/conformance/**`・`docs/dsl/examples/**` | 適合テストと同梱の例 |
+
+- **PR では配布物を作らない**(`package` は push と手動の時だけ true)。PR で確かめたいのはテストで、jpackage で deb・msi を 2 つの OS で作るのは時間がかかるため。配布物は 7 日で消える。署名はしない・秘密は使わない。
+- 配布物を手で作る: `gh workflow run desktop-ci.yml --ref <ブランチ>`(Actions タブの「Run workflow」でも同じ)。終わったら `gh run download <run-id> -n desktop-deb`(Windows 版は `-n desktop-msi`)。
+- 集約ジョブ `desktop-ci` は required check にできる形だが、`scripts/github/setup-branch-protection.sh` の `REQUIRED_CHECKS` にはまだ入っていない。**必須にするかはオーナーが判断する**。
+
+落ちた時の見方:
+
+- `desktop-build` は OS ごとに分かれ、片方が落ちてももう片方は最後まで回る(`fail-fast: false`)。どちらの OS かを先に見る。
+- テストが落ちたら、成果物 `desktop-test-reports-ubuntu-latest` / `desktop-test-reports-windows-latest` にレポート(HTML)がある(`desktop/app/build/reports/tests/`・`desktop/build/dsl/reports/tests/`・`desktop/whisper/build/reports/tests/`)。
+- 手元では `cd desktop && ./gradlew :desktop:test :dsl:test :whisper:test`(JDK 17 以上)。Windows だけで落ちる時は、パスの区切りや改行(CRLF)の違いを疑う。
+- 「配布物を作る」の step が落ちたら jpackage のエラーをログで見る(手元では `./gradlew :desktop:packageDeb`)。「配布物を残す」が落ちたら `desktop/app/build/compose/binaries/main/<deb|msi>/` が空だった(`if-no-files-found: error`)。
+
 ## backend-emulator(Firestore エミュレータ試験・必須ではない)
 
 `.github/workflows/backend-emulator.yml`(#546)。`backend-ci` は 5 分上限なので別 workflow。
@@ -227,6 +262,33 @@ macOS runner は Linux の 10 倍の分単価なので、ubuntu の `ios-changes
 | `workflow_dispatch` | 選んだ環境(backend 未変更でも強制デプロイ) | 選んだ環境 |
 
 - push では `backend/**` かこの workflow 自身に変更がある時だけ本体ジョブが走る(`dorny/paths-filter`。workflow の `paths:` は required check 対策で使わない)。
+- 手で回す: Actions の deploy-cloudrun → Run workflow で `environment`(`staging` / `production`)と `staged_rollout`(`dry-run` / `execute`・staging だけ効く)を選ぶ。`gh workflow run deploy-cloudrun.yml -f environment=staging` でも同じ。
+- 同じ環境へのデプロイは直列(`concurrency: deploy-<環境>`・`cancel-in-progress: false`)。後から来た実行は前の実行が終わるまで待つ(途中で切らない)。待っている実行が 2 本になると、古い方は GitHub が取り消す(最新の版だけが出る)。
+
+**ジョブ**(名前は workflow の `name:` と同じ):
+
+| ジョブ | 役割 |
+|---|---|
+| `deploy-changes` | 変更の判定と、行き先(`environment`・`suffix` = `stg` / `prod`)・段階的なリリースの形(`rollout` = `off` / `dry-run` / `execute`)を決める |
+| `deploy` | 下の流れ全部。GitHub Environment(`staging` / `production`)に紐づく。上限は 20 分(`execute` の時だけ 70 分) |
+
+**環境ごとの違い**:
+
+| | staging(`develop` / 手で staging) | production(`main` / 手で production) |
+|---|---|---|
+| サービス | `appconfig-stg` / `ai-stg` | `appconfig-prod` / `ai-prod`、変数 `RUNNER_DEPLOY=1` の時だけ `runner-prod`(非公開・手順は [docs/infra/runner.md](infra/runner.md)) |
+| `APP_ENV` / `ALLOW_SHARED_PROD_DB` | `stg` / `1`(DB の分離まで本番と同じ DB を使う) | `prod` / `0` |
+| 段階的なリリース | push は `dry-run`(100% で出してコマンドを log に出すだけ)。手で `execute` を選ぶと `--no-traffic` で出して 5 → 25 → 100%([staged-rollout.md](infra/staged-rollout.md#deploy-の-workflow-での動き)) | `off`(いつも 100%。`execute` を選んでも warning を出して無視) |
+| スモーク(非ブロッキング) | デモ 3 本 | 家計簿 1 本 + `-cleanup` |
+| `APP_CHECK_MODE`・`FIRESTORE_DATABASE` | GitHub の Environment 変数(未設定なら `off`・`(default)`) | 同じ(Environment ごとに別の値を入れられる) |
+
+**env の表の検査(`scripts/check-deploy-env.sh`)との関係**: `deploy` の最初の step で `scripts/check-deploy-env.sh` を回し、workflow の `--update-env-vars` のキーが [runtime-config.md の「デプロイが決める値」](infra/runtime-config.md#デプロイが決める値)の表と合っているか(`--set-env-vars` を使っていないか・「運用で変える値」の表のキーを上書きしていないか)を見る。ずれていればビルドの前に止まる。同じ検査は `scripts-ci` でも回るので、workflow か runtime-config.md を変える PR の時点で気づける。env を足す・外す時は workflow と runtime-config.md の表を同じ PR で直す。
+
+**止める・戻す(人の操作)**:
+
+- 走っているデプロイを止める: Actions の画面で Cancel。`execute` の段階の途中なら、旧のリビジョンに 100% 戻してから終わる([staged-rollout.md の「人が途中で止める」](infra/staged-rollout.md#人が途中で止める))。それ以外の step の途中で止めると、そこまでに出したサービスは新しい版のまま。
+- 出てしまった悪い版を戻す: 前のリビジョンにトラフィックを戻す([incident-runbook.md 手順 B](ops/incident-runbook.md#6-手順-b-悪いデプロイを戻す))。次の push で同じ版がまた出ないよう、`develop` / `main` に戻すコミットを入れる。
+- 推測: 自動デプロイそのものを一時的に止めたい時は、Actions の画面で workflow を Disable するのが一番早い(workflow に止めるための変数は無い)。止めるかどうか・誰が戻すかは決めること。
 - 流れ: `backend/Dockerfile` を 1 回 `docker build`(appconfig / ai 両バイナリ同梱)→ Artifact Registry `asia-northeast1-docker.pkg.dev/jphacks-kz2601/backend/backend:<sha>` → 同じイメージで `appconfig-<env>` と `ai-<env>`(`--command=/app/ai`、`ANTHROPIC_API_KEY` は Secret Manager から注入)を `gcloud run deploy --image`。
 - 最後に両サービスの **`GET /health`** が 200 であることを確認し、URL を job summary に出す。**ヘルスパスは `/health`**(Cloud Run の Google Front End は `/healthz` をコンテナに届けず HTML 404 を返すため。`/healthz` はローカル用に残っている)。
 - その後 **スモーク(`backend/cmd/smoke`・非ブロッキング)** を流して表を job summary に貼る(失敗してもデプロイは成功扱い)。staging はデモ 3 本(Claude 3 回)、**production は家計簿 1 本だけ(`-only kakeibo`・Claude 2 回)+ `-cleanup`** で作った `smoke-*` アプリを `DELETE /v1/apps/{id}`(archive)する。認証は `FIREBASE_WEB_API_KEY`(repo Variable)で Firebase 匿名ユーザーの ID トークンを取る。手元から同じことをするには `cd backend && FIREBASE_WEB_API_KEY=<key> make smoke-stg` / `make smoke-prod`(#66)。

@@ -6,6 +6,7 @@ plugins {
     alias(libs.plugins.kotlin.jvm)
     alias(libs.plugins.kotlin.compose)
     alias(libs.plugins.compose.multiplatform)
+    id("org.jetbrains.kotlinx.kover")
 }
 
 java {
@@ -35,6 +36,9 @@ dependencies {
     // LGPL-2.1-or-later と Apache-2.0 から選べるので Apache-2.0 を選ぶ(third-party-licenses.gradle.kts の electedLicenses)
     implementation("net.java.dev.jna:jna:5.19.1")
 
+    // 画面のテスト(runComposeUiTest・#2415)。版は Compose Multiplatform plugin に揃う
+    @OptIn(org.jetbrains.compose.ExperimentalComposeLibrary::class)
+    testImplementation(compose.uiTest)
     testImplementation(libs.junit)
     testImplementation(libs.kotlinx.coroutines.test)
     testImplementation(libs.okhttp.mockwebserver)
@@ -142,6 +146,9 @@ compose.desktop {
             // whisper.cpp の JNI のライブラリ(whisper/native/build.sh・build.ps1 で out/<os>-<arch>/ に作る・#1751)を配る形に入れる。
             // 作っていなければ入らず、音声入力は「この PC では用意できていません」になる。モデルは入れない(初回に落とす)
             appResourcesRootDir.set(project(":whisper").layout.projectDirectory.dir("native/out"))
+            // CSV を「プログラムから開く」に出す(#2995・jpackage の --file-associations)。既定のアプリは奪わない(OS 側で選ぶ)。
+            // Deb・Rpm・Dmg にも同じ指定が入る
+            fileAssociation(mimeType = "text/csv", extension = "csv", description = "CSV")
         }
     }
 }

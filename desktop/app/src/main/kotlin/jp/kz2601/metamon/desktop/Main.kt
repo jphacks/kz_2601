@@ -26,15 +26,22 @@ import java.awt.GraphicsEnvironment
 import java.awt.Rectangle
 import java.awt.event.WindowAdapter
 import java.awt.event.WindowEvent
+import jp.kz2601.metamon.desktop.hotkey.GlobalHotkey
+import jp.kz2601.metamon.desktop.hotkey.GlobalHotkeys
 import jp.kz2601.metamon.desktop.i18n.Strings
 import jp.kz2601.metamon.desktop.io.DragOut
+import jp.kz2601.metamon.desktop.io.OpenWithFiles
+import jp.kz2601.metamon.desktop.io.OpenWithInbox
+import jp.kz2601.metamon.desktop.power.ScreenAwake
 import jp.kz2601.metamon.desktop.store.DesktopStore
 import jp.kz2601.metamon.desktop.store.DeviceWipe
 import jp.kz2601.metamon.desktop.store.SessionPersistence
 import jp.kz2601.metamon.desktop.theme.TailorItTheme
+import jp.kz2601.metamon.desktop.voice.VoiceFlag
 import jp.kz2601.metamon.dsl.records.entityModels
 import jp.kz2601.metamon.dsl.screen
 import java.io.File
+import java.util.concurrent.atomic.AtomicReference
 import java.util.prefs.Preferences
 import javax.swing.SwingUtilities
 
@@ -47,16 +54,22 @@ import javax.swing.SwingUtilities
  * 同じ保存先ではプロセスを 1 つだけ起動する。2 つ目は起動中の方へ引数を渡して前に出させる(SingleInstance.kt)。
  * 記録の JSON を渡した時(開発・スクリーンショット)は端末に残さないので、ロックを取らずに何本でも起動できる。
  */
-fun main(args: Array<String>) {
+fun main(rawArgs: Array<String>) {
+    // `--quick-record` などの旗(.desktop の Actions・#2992)は位置の引数と分ける
+    val parsed = LaunchArgs.parse(rawArgs.toList())
+    // 「別のアプリで開く」のファイル(#2994)は位置の引数(アプリ名など)から外す
+    val openFiles = OpenWithFiles.fromArgs(parsed.positional)
+    val args = OpenWithFiles.withoutFiles(parsed.positional).toTypedArray()
     // 同じ保存先で 2 つ目は起動しない(#1754 の JSON を 2 つのプロセスで書き合わない)
     if (args.getOrNull(1) == null && !SingleInstance.claim()) {
-        if (!SingleInstance.handOff(args = args.toList())) SingleInstance.reportRunning()
+        if (!SingleInstance.handOff(args = rawArgs.toList())) SingleInstance.reportRunning()
         return
     }
-    runApp(args)
+    OpenWithInbox.offer(openFiles)
+    runApp(args, parsed.action)
 }
 
-private fun runApp(args: Array<String>) = application {
+private fun runApp(args: Array<String>, launchAction: LaunchAction?) = application {
     // 端末の保存(#1887): 記録・設定は再起動しても残る。最後に開いたアプリから開く
     val desktopStore = remember { DesktopStore.open() }
     val first = remember {
@@ -107,13 +120,18 @@ private fun runApp(args: Array<String>) = application {
     tray.onOpenApp = { registry.open(WindowKey.app(it)) }
     // 2 つ目の起動: 渡されたアプリ(無ければ前にあるアプリ)を開いて前に出す。トレイに隠れていても出す
     remember {
-        SingleInstance.onHandoff { a ->
+        SingleInstance.onHandoff { raw ->
             SwingUtilities.invokeLater {
-                val id = a.firstOrNull()?.takeIf { it in BundledApps.ids() } ?: registry.active?.key?.appId ?: first
+                val p = LaunchArgs.parse(raw)
+                val id = OpenWithFiles.withoutFiles(p.positional).firstOrNull()?.takeIf { it in BundledApps.ids() } ?: registry.active?.key?.appId ?: first
                 tray.openApp(id)
+                if (p.action == LaunchAction.QUICK_RECORD) tray.quickRecord()
+                OpenWithInbox.offer(OpenWithFiles.fromArgs(p.positional))
             }
         }
     }
+    // 最初の起動が右クリックの操作から: ウィンドウを開いた後に 1 回だけ動かす
+    LaunchedEffect(Unit) { if (launchAction == LaunchAction.QUICK_RECORD) tray.quickRecord() }
     // すぐ記録は前にあるアプリの、アプリのウィンドウへ(詳細には入れない・無ければ開く)
     tray.findQuickRecordWindow = { registry.quickRecordWindow()?.id }
     // トレイの名前・すぐ記録・集計は前にあるウィンドウのアプリ。閉じて開き直すと記録が替わるのでウィンドウごとに見直す
@@ -123,9 +141,27 @@ private fun runApp(args: Array<String>) = application {
         tray.switchApp(hub.dsl(appId), hub.opened().firstOrNull { it.id == appId }?.records)
     }
     DesktopTray(tray)
+    // どこからでも話しかけるキー(#2201): 既定は off。TAILORIT_HOTKEY か端末の設定がある時だけ裏で登録する
+    DisposableEffect(tray) {
+        val hotkey = AtomicReference<GlobalHotkey?>(null)
+        val job = loadScope.launch {
+            hotkey.set(GlobalHotkeys.startFromSettings(
+                voiceEnabled = { VoiceFlag.enabled() },
+                bringToFront = { tray.open() },
+                notify = Notifier.Tray::notify,
+                post = { SwingUtilities.invokeLater(it) },
+            ))
+        }
+        onDispose {
+            job.cancel()
+            hotkey.getAndSet(null)?.close()
+        }
+    }
+    // 画面を順に移る(開発用・環境変数)。最初のウィンドウだけ
+    val autoNav = remember { AutoNavPlan.fromEnvironment() }
     registry.windows.toList().forEach { w ->
         key(w.id) {
-            DesktopWindow(w, registry, hub, tray, startScreen = args.getOrNull(2)?.takeIf { w.id == firstWindowId })
+            DesktopWindow(w, registry, hub, tray, startScreen = args.getOrNull(2)?.takeIf { w.id == firstWindowId }, autoNav = autoNav?.takeIf { w.id == firstWindowId })
         }
     }
 }
@@ -133,7 +169,7 @@ private fun runApp(args: Array<String>) = application {
 /** ウィンドウ 1 枚。画面の状態(遷移・下書き・キー)はウィンドウごと、記録はアプリごとに共有。 */
 @OptIn(FlowPreview::class)
 @Composable
-private fun ApplicationScope.DesktopWindow(w: WindowEntry, registry: WindowRegistry, hub: AppHub, tray: TrayController, startScreen: String?) {
+private fun ApplicationScope.DesktopWindow(w: WindowEntry, registry: WindowRegistry, hub: AppHub, tray: TrayController, startScreen: String?, autoNav: AutoNavPlan?) {
     // アプリの記録はウィンドウの数で数える。最後の 1 枚を閉じたら書き終えて閉じる
     val app = remember(w) { hub.acquire(w.key.appId) }
     DisposableEffect(w) { onDispose { hub.release(w.key.appId) } }
@@ -168,6 +204,12 @@ private fun ApplicationScope.DesktopWindow(w: WindowEntry, registry: WindowRegis
                 window.toFront()
                 window.requestFocus()
             }
+        }
+        // 見えている間だけ画面を消さない効きを許す(最小化・トレイに隠す・閉じるで戻す)
+        val shown = tray.windowVisible && !state.isMinimized
+        DisposableEffect(w.id, shown) {
+            ScreenAwake.shared.setWindowShown(w.id.toString(), shown)
+            onDispose { ScreenAwake.shared.setWindowShown(w.id.toString(), false) }
         }
         DisposableEffect(window) {
             val l = object : WindowAdapter() {
@@ -206,6 +248,7 @@ private fun ApplicationScope.DesktopWindow(w: WindowEntry, registry: WindowRegis
                         isActive = { registry.active?.id == w.id },
                         windowId = w.id,
                         onWipeLocalData = hub::wipeLocalData,
+                        autoNav = autoNav,
                         appId = app.id,
                     )
                 }

@@ -1,6 +1,7 @@
 package jp.kz2601.metamon.desktop
 
 import jp.kz2601.metamon.desktop.i18n.Strings
+import jp.kz2601.metamon.desktop.power.ScreenAwake
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -645,6 +646,11 @@ private fun TimerDisplayLeaf(c: Component, route: Route, form: FormDraft?) {
     DisposableEffect(key) {
         DesktopTimers.visible(key, true)
         onDispose { DesktopTimers.visible(key, false) }
+    }
+    // 動いている間は画面を消さない(画面を離れる・止める・終わる・ウィンドウを閉じる/最小化で戻す)
+    DisposableEffect(key, ScreenAwake.timerWantsAwake(run.isRunning && !finished)) {
+        val hold = if (ScreenAwake.timerWantsAwake(run.isRunning && !finished)) ScreenAwake.shared.hold() else null
+        onDispose { hold?.release() }
     }
     LaunchedEffect(run, key) {
         while (run.isRunning) {
