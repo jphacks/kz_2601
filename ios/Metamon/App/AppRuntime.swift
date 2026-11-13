@@ -556,6 +556,7 @@ final class AppRuntime: RuntimeNavigating {
         noteRetention() // #482 保存期間の確認と期限切れの削除
         noteAppMembers() // #272 参加者と管理者(member の選択肢・管理者だけのボタン)
         WidgetSnapshotWriter.write(dsl: doc.dsl, records: records, appId: doc.appId) // ホーム画面ウィジェットへ stat を反映
+        HomeQuickActions.noteOpened(doc.appId) // 長押しメニューの最近の順(#2232)。描き直しは下の引き直しで
         IntentHost.shared.appsMayHaveChanged() // Siri のフレーズ候補(アプリ名)を引き直す(#80)
     }
 

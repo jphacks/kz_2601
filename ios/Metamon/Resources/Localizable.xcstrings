@@ -14867,6 +14867,23 @@
         }
       }
     },
+    "声で頼む" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ask by voice"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "声で頼む"
+          }
+        }
+      }
+    },
     "声を文字にする準備(初回だけ約%lldMB)が終わる前でも、文字ならすぐに作れます。" : {
       "extractionState" : "manual",
       "localizations" : {

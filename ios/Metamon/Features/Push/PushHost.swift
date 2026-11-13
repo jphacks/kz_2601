@@ -59,7 +59,8 @@ final class PushHost {
 }
 
 /// `registerForRemoteNotifications` の結果を受ける。aps-environment が無い間は失敗するだけで、利用者には何も出さない。
-final class PushAppDelegate: NSObject, UIApplicationDelegate {
+/// シーンの代理(長押しメニュー #2232)は `MetamonAppDelegate` から継ぐ。
+final class PushAppDelegate: MetamonAppDelegate {
     func application(_ application: UIApplication, didRegisterForRemoteNotificationsWithDeviceToken deviceToken: Data) {
         Task { await PushHost.shared.receive(token: deviceToken) }
     }
