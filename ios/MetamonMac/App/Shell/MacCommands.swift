@@ -62,14 +62,6 @@ struct MacCommands: Commands {
 
         pasteboardCommands
 
-        // サイドバーの検索欄に入る(#1282)
-        CommandGroup(after: .pasteboard) {
-            Divider()
-            Button("アプリを探す") { shell?.focusSearch() }
-                .keyboardShortcut("f", modifiers: .command)
-                .disabled(shell == nil)
-        }
-
         CommandGroup(after: .toolbar) {
             Divider()
             // iOS の「下に引いて更新」の代わり: 今の画面の記録を読み直す(#944)
@@ -145,7 +137,7 @@ struct MacCommands: Commands {
         }
     }
 
-    /// 編集のカット・コピー・ペースト(#2251)。ペーストだけ、入力欄にフォーカスが無くフォームが開いていてクリップボードに記録があれば
+    /// 編集のカット・コピー・ペースト(#2251)と「アプリを探す」(`body` の項目数の上限を超えないよう分ける)。ペーストだけ、入力欄にフォーカスが無くフォームが開いていてクリップボードに記録があれば
     /// 記録の貼り付けにする(別の生成アプリの記録の合う項目を入れる・保存はしない)。それ以外は今まで通りレスポンダチェーンに送る
     @CommandsBuilder private var pasteboardCommands: some Commands {
         CommandGroup(replacing: .pasteboard) {
@@ -168,6 +160,14 @@ struct MacCommands: Commands {
             Button("削除") { NSApp.sendAction(#selector(NSText.delete(_:)), to: nil, from: nil) }
             Button("すべてを選択") { NSApp.sendAction(#selector(NSText.selectAll(_:)), to: nil, from: nil) }
                 .keyboardShortcut("a", modifiers: .command)
+        }
+
+        // サイドバーの検索欄に入る(#1282)
+        CommandGroup(after: .pasteboard) {
+            Divider()
+            Button("アプリを探す") { shell?.focusSearch() }
+                .keyboardShortcut("f", modifiers: .command)
+                .disabled(shell == nil)
         }
     }
 
