@@ -30,9 +30,9 @@ extension View {
     /// 「この部品について話す」(#1323)がある時は、選べる文字の右クリックが OS の文字のメニューになって話す項目が隠れるので、
     /// 選ぶ代わりに自前のメニュー(話す・全文をコピー)を出す。`copy` は全文(コピーの項目で使う)。
     @ViewBuilder
-    func macTextSelection(copy: @escaping () -> String) -> some View {
+    func macTextSelection(copy: @escaping () -> String, translate: (() -> Void)? = nil) -> some View {
         #if os(macOS)
-        modifier(MacSelectableText(copy: copy))
+        modifier(MacSelectableText(copy: copy, translate: translate))
         #else
         self
         #endif
@@ -103,16 +103,28 @@ private struct MacSelectableText: ViewModifier {
     @Environment(\.componentTalk) private var talk
     @Environment(\.componentTalkTarget) private var target
     let copy: () -> String
+    /// 記録の文字の「翻訳」(#2273)。nil なら出さない
+    let translate: (() -> Void)?
 
     func body(content: Content) -> some View {
         if MacTextSelectionPolicy.selectable(canTalk: talk != nil && target != nil) {
-            content.textSelection(.enabled)
+            if let translate {
+                content.textSelection(.enabled).contextMenu { menu(translate: translate) }
+            } else {
+                content.textSelection(.enabled)
+            }
         } else {
             content.contextMenu {
                 ComponentTalkImageMenuItem() // 外側の部品のメニューより先に出るので、ここにも置く
-                Button(L("コピー"), systemImage: "doc.on.doc") { PlatformPasteboard.setString(copy()) }
+                menu(translate: translate)
             }
         }
+    }
+
+    @ViewBuilder
+    private func menu(translate: (() -> Void)?) -> some View {
+        Button(L("コピー"), systemImage: "doc.on.doc") { PlatformPasteboard.setString(copy()) }
+        if let translate { RecordTranslateMenuItem(offers: true, action: translate) }
     }
 }
 #endif
