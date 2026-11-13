@@ -138,6 +138,7 @@ struct MacRootView: View {
                               showsScreenMap: $showsScreenMap,
                               onTalk: { talk(about: $0) }, onOpenVoice: { speak() },
                               onAskFix: { ask(draft: $0) }, // 失敗のトーストの「直してと頼む」(#1885): 入力欄に入れて開く(送らない)
+                              onSaveGridEdit: { await saveGridEdit($0, app: app) }, // 画面の並びの編集(#2323)
                               discardGuard: discardGuard)
                         .environment(\.changeHighlight, highlight?.canvas == Self.canvasKey(app) ? highlight?.value ?? .none : .none)
                         .id(Self.canvasKey(app))
@@ -544,6 +545,34 @@ struct MacRootView: View {
             tutorial.markEditHintShown()
         }
         selectedAppId = document.appId
+    }
+
+    /// 画面の並びの編集(#2323)の「完了」: 新しい版にして中央を作り直し、編集していた画面を開き直す。
+    /// 履歴に積むので「変更を元に戻す」(⌥⌘Z)で戻せる
+    private func saveGridEdit(_ draft: GridEditDraft, app: SampleApp) async -> MacGridEditSave.Outcome {
+        let id = app.id
+        guard let base = library.generated[id] ?? (try? app.loadDSL()).map({ AppDocument(appId: id, version: app.version, dsl: $0) })
+        else { return .failed }
+        let baseEnvelope = library.envelope(for: id) ?? app.url.flatMap { try? Data(contentsOf: $0) }
+            .flatMap { DocumentEnvelope.make(appId: id, version: base.version, dsl: $0) }
+        let server = library.isCreated(id) && library.isOnServer(id) ? MacServices.shared.appConfig : nil
+        do {
+            let saved = try await MacGridEditSave.save(draft, base: base, baseEnvelope: baseEnvelope, server: server)
+            guard library.generated[id]?.version ?? app.version == base.version else { return .conflict } // 待つ間に版が進んだ
+            MacGridEditReturn.set(appId: id, screen: draft.screenId)
+            library.apply(saved.document, envelope: saved.envelope, created: false)
+            let moved = draft.items.filter { !$0.removed && $0.area != $0.original }
+                .map { ChangeHighlight.key(screen: draft.screenId, component: $0.componentId) }
+            highlight = moved.isEmpty ? nil
+                : ("\(id)#\(saved.document.version)", ChangeHighlight(components: Set(moved), screens: [draft.screenId]))
+            notices.summary = .init(appId: id, text: MacGridEditSave.summary, action: library.canUndo(id) ? .undo : nil)
+            return .saved
+        } catch MacGridEditSave.SaveError.conflict {
+            _ = await library.refreshFromServer(id) // 最新の版で開き直す(iOS と同じ)
+            return .conflict
+        } catch {
+            return .failed
+        }
     }
 
     /// 中央のアプリを作り直す印(版が変わったら作り直す)

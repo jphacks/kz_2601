@@ -26,11 +26,15 @@ struct GridTableLeaf: View {
                 Text(title).font(RenderTheme.Fonts.sectionTitle).foregroundStyle(.secondary)
                     .accessibilityAddTraits(.isHeader)
             }
-            ScrollView(.horizontal, showsIndicators: false) {
-                grid(layout, today: today, columnW: columnWidth(count: layout.columns.count))
+            if usesMacTable {
+                macTable(layout)
+            } else {
+                ScrollView(.horizontal, showsIndicators: false) {
+                    grid(layout, today: today, columnW: columnWidth(count: layout.columns.count))
+                }
+                .scrollDisabled(fits(count: layout.columns.count))
+                .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { width = $0 }
             }
-            .scrollDisabled(fits(count: layout.columns.count))
-            .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { width = $0 }
             if case .unavailable = rt.emptyState(for: entityId) {
                 HStack(spacing: RenderTheme.Spacing.sm) {
                     Text(EmptyPlaceholder.unavailableText).font(.caption).foregroundStyle(.secondary)
@@ -198,3 +202,81 @@ struct GridTableLeaf: View {
         Task { await rt.run(action, ctx.actionContext()) }
     }
 }
+
+// MARK: - Mac の Table の試作(#2326・既定 off)
+
+extension GridTableLeaf {
+    /// フラグ on の Mac(14.4 以降)だけ Table で描く。それ以外は今のマス目
+    fileprivate var usesMacTable: Bool {
+        #if os(macOS)
+        if #available(macOS 14.4, *) { return MacTableExperiment.isEnabled() }
+        #endif
+        return false
+    }
+
+    @ViewBuilder
+    fileprivate func macTable(_ layout: GridTableLayout) -> some View {
+        #if os(macOS)
+        if #available(macOS 14.4, *) {
+            MacGridTableTable(layout: layout, title: title, edit: edit, add: { add(layout, $0) }, canTap: c.onItemTap != nil)
+        }
+        #endif
+    }
+}
+
+#if os(macOS)
+/// gridTable を Mac の Table で描く(#2326)。並び(`GridTableLayout`)は今と同じ。左端の列は行の見出しで固定、
+/// ほかの列はドラッグで並べ替え・境目で幅を変えられる。マスの右クリックで記録を開く・追加する
+@available(macOS 14.4, *)
+struct MacGridTableTable: View {
+    struct Row: Identifiable {
+        var id: Int
+        var label: String
+    }
+
+    let layout: GridTableLayout
+    let title: (Record) -> String
+    let edit: (Record) -> Void
+    let add: (GridTableLayout.Cell) -> Void
+    let canTap: Bool
+    @State private var selection = Set<Int>()
+    @State private var customization = TableColumnCustomization<Row>()
+
+    private var columns: [MacTableColumn] {
+        layout.columns.enumerated().map { i, col in MacTableColumn(index: i, title: col.label, field: col.label, numeric: false) }
+    }
+
+    var body: some View {
+        Table(layout.rows.enumerated().map { Row(id: $0.offset, label: $0.element.label) }, selection: $selection,
+              columnCustomization: $customization) {
+            TableColumn("") { row in
+                Text(row.label).font(RenderTheme.Fonts.tableHeader.monospacedDigit()).foregroundStyle(.secondary)
+            }
+            .width(min: 30, ideal: 44)
+            .customizationID("rowHeader")
+            .disabledCustomizationBehavior(.all)
+            TableColumnForEach(columns) { col in
+                TableColumn(col.title) { row in cell(GridTableLayout.Cell(column: col.index, row: row.id)) }
+                    .customizationID(col.id)
+            }
+        }
+        .frame(minHeight: min(CGFloat(layout.rows.count + 1) * 26 + 8, 420))
+        .accessibilityIdentifier("gridTable.macTable")
+    }
+
+    private func cell(_ cell: GridTableLayout.Cell) -> some View {
+        let records = layout.records(at: cell)
+        return Text(records.map(title).joined(separator: "、"))
+            .font(.caption)
+            .lineLimit(2)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .contentShape(Rectangle())
+            .contextMenu {
+                if canTap {
+                    ForEach(records) { r in Button(L("「\(title(r))」を開く")) { edit(r) } }
+                    Button { add(cell) } label: { Label(L("追加"), systemImage: "plus") }
+                }
+            }
+    }
+}
+#endif
