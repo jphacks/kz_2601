@@ -426,18 +426,25 @@ backend/
   Dockerfile                 # 1 イメージに全サービス。既定は /app/appconfig、ai は --command=/app/ai
   Makefile                   # build / test / schema-check / dev。運用コマンドは mk/<feature>.mk
   go.mod                     # module github.com/jphacks/kz_2601/backend
-  mk/                        # feedback.mk / feedback-loop.mk / moderate.mk / purge.mk
+  mk/                        # appstore.mk / feedback-loop.mk / feedback.mk / moderate.mk / purge.mk / runner.mk / stg-cleanup.mk
   cmd/
     ai/                      # ai サービス: 文字(iOS が端末内で文字起こし済み)-> Claude -> DSL(全体 or JSON Patch)-> appconfig
     ai-audit/                # ai-eval の結果を機能面で採点(押しても動かないボタン・辿れない画面など)。API を呼ばない
     ai-eval/                 # internal/ai/eval/cases.json を実 Claude で流し、ケースごとの指標と DSL を JSON に出す
+    ai-session-report/       # 人ごとの操作をセッションに切り、AI が外したらしい所(言い直し・すぐの undo・やめた等)を順位づけ。人が手で回す(docs/ops/ai-session-report.md)
     appconfig/               # appconfig サービス: 配線のみ(env -> store -> handlers -> http.Server)
+    appstore-reconcile/      # App Store Server API で Pro の購読を読み直し、通知(v2)で届かなかった変化を保存(#315)。Cloud Run Job(docs/infra/app-store-notifications.md)
+    coin-initial-backfill/   # 記録が始まる前に初回のコインを受けたアカウントへ coin_initial_grants を書く(#1429)。1 回だけ人が回す(docs/infra/coin-initial-backfill.md)
+    dslgen/                  # docs/dsl/dsl.schema.json から Android(Kotlin)の DSL の型を生成(#351・make dsl-gen)
     feedback/                # アプリ内フィードバックを運営が読む(#319)。読み取りだけ
     feedback-loop/           # 自己改善ループ(#364): 取り込み・振り分け・Issue の下書きと人の承認・直ったお知らせ・停止スイッチ
+    matching-age-backfill/   # 18 歳以上の申告(#507)より前に出た仲間探しのプロフィールに ownerAgeConfirmed を付ける。1 回だけ人が回す(docs/infra/matching-age-backfill.md)
     moderate/                # 通報の確認と運営による非公開化(#321)。手順は docs/infra/moderation.md
     product-metrics/         # 指標のログ(#297)から週ごとの Markdown 表を出す。ログのエクスポートだけを読む
     purge/                   # 退会から一定期間たったアカウントと古いフィードバックを消す Cloud Run Job(#458・#319)
+    runner/                  # サーバーのルール(#341)。appconfig が貯めた outbox を POST /internal/tick で流す(docs/infra/runner.md)
     smoke/                   # デモの発話を実 API で流して表を出す(make smoke-local / smoke-stg)
+    stg-cleanup/             # stg のテストのデータ(smoke のアプリ・回数制限のカウンタ・指定した uid)を消す(#293)。既定は dry run(docs/infra/stg-cleanup.md)
   internal/                  # サービス実装(外部 import 不可)
     ai/                      # 文字 -> DSL の変更。pkg/dsl で検証し、問題があれば上限つきで再生成
     appcheck/                # Firebase App Check のトークン検証(#318・APP_CHECK_MODE)
