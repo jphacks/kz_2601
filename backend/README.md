@@ -83,5 +83,7 @@ ai → appconfig の結合をローカルで確認する時は、appconfig を�
 | `ANTHROPIC_API_KEY` | - | o | Secret Manager。ローカルは `~/Desktop/JPHACKS2026/.env`(リポ外) |
 | `APPSTORE_BUNDLE_IDS` / `APPSTORE_PRODUCT_IDS` | o | - | StoreKit 取引の許可リスト(#314)。既定 `jp.kz2601.metamon` / `jp.kz2601.metamon.pro.monthly` |
 | `APPSTORE_ENVIRONMENTS` | o | o | 受け入れる App Store の環境。既定 `Sandbox,Production`(審査・TestFlight は Sandbox)。ai は Pro の判定(#449)に使う |
+| `DEBUG_OVERRIDES` | o | o | **stg だけ**。`1` で、`DEBUG_OVERRIDE_UIDS` の uid のリクエストに限り `X-Debug-Plan: pro` / `free` で Pro の判定をそのリクエストだけ変える(#2085)。`APP_ENV` が `stg` でない時に入っていると**起動しない**。デプロイは入れない([stg-plan-override.md](../docs/infra/stg-plan-override.md)) |
+| `DEBUG_OVERRIDE_UIDS` | o | o | 上の対象にする uid(カンマ区切り)。`DEBUG_OVERRIDES=1` の時は空だと起動しない。repo には書かない |
 
 Cloud Run 上の appconfig は `AUTH_MODE` 未設定(= `firebase`)で、`run-backend` SA の ADC で Firestore と Firebase Admin を使う。
