@@ -1181,6 +1181,23 @@
         }
       }
     },
+    "%lld 項目は入りませんでした" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld fields couldn't be filled in"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld 項目は入りませんでした"
+          }
+        }
+      }
+    },
     "%lld(上限なし)" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -4781,6 +4798,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "このアプリで使える量"
+          }
+        }
+      }
+    },
+    "このアプリには入力の画面がありません" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "This app has no input screen"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "このアプリには入力の画面がありません"
           }
         }
       }
