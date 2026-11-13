@@ -5,6 +5,7 @@ import java.util.concurrent.TimeUnit
 /**
  * OS の「文字の大きさ」(iOS の Dynamic Type に当たる)を Compose の文字の倍率にする(#3000)。
  * - Windows: `HKCU\Software\Microsoft\Accessibility` の `TextScaleFactor`(100〜225 の %)
+ * - Linux: `gsettings get org.gnome.desktop.interface text-scaling-factor`(1.0〜3.0。1 未満は 1.0 に上げる)
  * 読めない時は 1.0。
  */
 object TextScale {
@@ -21,6 +22,15 @@ object TextScale {
         return percent.coerceIn(WINDOWS_MIN_PERCENT, WINDOWS_MAX_PERCENT) / 100f
     }
 
+    const val GNOME_MIN = 1.0f
+    const val GNOME_MAX = 3.0f
+
+    /** `gsettings get …` の出力。`1.25`(型付きで `double 1.25` と出る版もある)。範囲外は 1.0〜3.0 に丸め、読めなければ null。 */
+    fun parseGsettings(out: String): Float? {
+        val v = Regex("""-?\d+(?:\.\d+)?""").find(out.trim())?.value?.toFloatOrNull() ?: return null
+        return if (v.isFinite()) v.coerceIn(GNOME_MIN, GNOME_MAX) else null
+    }
+
     /** OS の倍率と Ctrl の倍率を掛け、[MIN_COMBINED]〜[MAX_COMBINED] に収める。 */
     fun combine(os: Float, ctrl: Float): Float = (os * ctrl).coerceIn(MIN_COMBINED, MAX_COMBINED)
 
@@ -31,7 +41,8 @@ object TextScale {
     ): Float = when {
         os.startsWith("windows") ->
             run(arrayOf("reg", "query", """HKCU\Software\Microsoft\Accessibility""", "/v", "TextScaleFactor"))?.let(::parseWindowsRegistry)
-        else -> null
+        os.contains("mac") -> null
+        else -> run(arrayOf("gsettings", "get", "org.gnome.desktop.interface", "text-scaling-factor"))?.let(::parseGsettings)
     } ?: 1f
 
     private fun runCommand(cmd: Array<String>): String? = runCatching {
