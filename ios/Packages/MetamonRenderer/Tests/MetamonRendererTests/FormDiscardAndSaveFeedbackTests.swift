@@ -94,6 +94,26 @@ final class FormDiscardAndSaveFeedbackTests: XCTestCase {
         XCTAssertEqual(FormDraft.saveFeedback(savesBefore: again, form: draft), .saved, "直して保存し直せば出す")
     }
 
+    func testSavedWithSentKeepsLaterInputUnsaved() throws {
+        let draft = try dirtyDraft()
+        let sent = draft.payload
+        draft.values["title"] = .string("卵") // 書き込みの await の間に入れ直した
+        draft.markSaved(queuedOffline: false, sent: sent)
+        XCTAssertTrue(draft.hasUnsavedChanges, "送ったのは「牛乳」。入れ直した値は未保存")
+        draft.values["title"] = .string("牛乳")
+        XCTAssertFalse(draft.hasUnsavedChanges, "送った値に戻せば保存済み")
+    }
+
+    func testRefusedDoesNotOverwriteInputTypedDuringSave() throws {
+        let draft = try dirtyDraft()
+        let sent = draft.payload
+        draft.values["title"] = .string("卵")
+        draft.markSaved(queuedOffline: false, sent: sent)
+        draft.markSaveRefused(restoring: sent)
+        XCTAssertEqual(draft.payload["title"], .string("卵"), "入れ直した値を送った値で上書きしない")
+        XCTAssertTrue(draft.hasUnsavedChanges)
+    }
+
     func testNeedsWrite() throws {
         let fresh = FormDraft(entity: try entity())
         XCTAssertTrue(fresh.needsWrite, "新規は初期値のままでも保存する")
