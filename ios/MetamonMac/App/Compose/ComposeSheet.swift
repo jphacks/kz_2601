@@ -154,6 +154,11 @@ private struct ComposeChat: View {
                             ProgressView().controlSize(.small).padding(.leading, 4)
                                 .accessibilityLabel("考えています")
                         }
+                        #if !APP_STORE_REVIEW
+                        if let fix = session.automationFix, !session.sending, session.failure == nil {
+                            MacAutomationFixOfferRow(model: fix) { session.applyAutomationFix() }
+                        }
+                        #endif
                         if !session.sending { offerView }
                         if let failure = session.failure {
                             MacErrorCard(presentation: failure, retry: session.retryFailure, dismiss: session.dismissFailure)
@@ -529,3 +534,44 @@ private struct ComposeFinished: View {
         .accessibilityElement(children: .contain)
     }
 }
+
+#if !APP_STORE_REVIEW
+/// 続けて失敗している自動の動きの「直しますか?」(#347・iOS の `AutomationFixOfferRow` の Mac 版)。
+/// 「直す」は依頼を入力欄に入れる(送らない)・「閉じる」で今の連続は出さない
+private struct MacAutomationFixOfferRow: View {
+    let model: AutomationFixOfferModel
+    let fix: () -> Void
+
+    var body: some View {
+        if let rule = model.rule {
+            HStack(spacing: MacTheme.Spacing.group) {
+                Image(systemName: "wrench.and.screwdriver")
+                    .foregroundStyle(Theme.brandGradient)
+                    .accessibilityHidden(true)
+                Text(verbatim: AutomationFixOffer.message(for: rule))
+                    .font(.callout)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                Button("直す", action: fix)
+                    .buttonStyle(.borderedProminent)
+                    .controlSize(.small)
+                    .help("直す依頼を入力欄に入れます(まだ送りません)")
+                    .accessibilityIdentifier("compose.automationFix.fix")
+                Button { model.dismiss() } label: {
+                    Image(systemName: "xmark.circle.fill").foregroundStyle(.secondary)
+                }
+                .buttonStyle(.plain)
+                .help("閉じる")
+                .accessibilityLabel("閉じる")
+                .accessibilityIdentifier("compose.automationFix.dismiss")
+            }
+            .padding(.horizontal, MacTheme.Spacing.group)
+            .padding(.vertical, 8)
+            .background(Theme.Colors.surface, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+            .overlay(RoundedRectangle(cornerRadius: 12, style: .continuous).strokeBorder(Theme.Colors.brandA.opacity(0.35)))
+            .accessibilityElement(children: .contain)
+            .accessibilityIdentifier("compose.automationFix")
+        }
+    }
+}
+#endif

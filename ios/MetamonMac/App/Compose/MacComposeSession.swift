@@ -113,6 +113,34 @@ final class MacComposeSession: Identifiable {
     /// 直すアプリの今の版(競合で取り直したら進める)
     @ObservationIgnored private var editVersion: Int
 
+    #if !APP_STORE_REVIEW
+    /// 続けて失敗している自動の動きの「直しますか?」(#347・iOS の `AutomationFixOfferModel`)。nil = 出さない
+    private(set) var automationFix: AutomationFixOfferModel?
+
+    /// 直す会話で、サーバーにある作ったアプリが自動の動きを持つ時だけ(iOS の VoiceInputView と同じ条件)
+    static func offersAutomationFix(target: Target, hasServerRules: Bool, hasClient: Bool) -> Bool {
+        guard case .edit = target else { return false }
+        return hasServerRules && hasClient
+    }
+
+    /// 開いた時に 1 回だけ取りに行く(待たせない・取れなければ何も出さない)
+    func loadAutomationFix(client: (any AutomationsClient)?, hasServerRules: Bool, defaults: UserDefaults = .standard) async {
+        guard Self.offersAutomationFix(target: target, hasServerRules: hasServerRules, hasClient: client != nil),
+              let client else { automationFix = nil; return }
+        let model = AutomationFixOfferModel(appId: appId, client: client, defaults: defaults)
+        await model.load()
+        guard !closed, !Task.isCancelled else { return }
+        automationFix = model
+    }
+
+    /// 「直す」: 依頼を入力欄に入れる(送るのは本人)。書きかけがあればその後ろに足す
+    func applyAutomationFix() {
+        guard let text = automationFix?.fix() else { return }
+        let typed = draft.trimmingCharacters(in: .whitespacesAndNewlines)
+        draft = typed.isEmpty ? text : typed + "\n" + text
+    }
+    #endif
+
     var mode: ChatMode {
         if case .edit = target { return .edit }
         return .create

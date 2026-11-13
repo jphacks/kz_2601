@@ -518,6 +518,13 @@ struct MacRootView: View {
             if case .edit(let appId, _, _) = target, library.isOnServer(appId) {
                 session.onConflict = { await library.refreshFromServer(appId) }
             }
+            #if !APP_STORE_REVIEW
+            // 続けて失敗している自動の動きの「直しますか?」(#347): サーバーにあるアプリで、自動の動き(serverRules)を持つ時だけ
+            if case .edit(let appId, _, _) = target, library.isCreated(appId), library.isOnServer(appId) {
+                let rules = (library.generated[appId]?.dsl ?? (try? apps.first(where: { $0.id == appId })?.loadDSL()))?.serverRuleCount ?? 0
+                Task { await session.loadAutomationFix(client: MacServices.shared.automations, hasServerRules: rules > 0) }
+            }
+            #endif
             notices.summary = nil // 会話を始めたら前の要約は下げる
             MacSpeechReader.shared.stop() // 読み上げも止める(#1210)
             closingCompose = session
