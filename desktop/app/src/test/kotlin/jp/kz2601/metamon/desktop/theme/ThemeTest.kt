@@ -55,4 +55,45 @@ class ThemeTest {
         // build.gradle.kts でテストは -Dtailorit.theme=light(機械の設定に左右されない)
         assertEquals(ThemeMode.LIGHT, ThemeMode.fromEnv())
     }
+
+    // MARK: - detect: OS の名前で読み方を選ぶ(読む所は作り物)・#2627
+
+    /** 呼ばれたコマンドの先頭の語を記録し、[answers] の出力を返す(無ければ失敗 = null)。 */
+    private class FakeRunner(private val answers: Map<String, String>) {
+        val called = mutableListOf<String>()
+        fun run(cmd: List<String>): String? = cmd.first().also { called += it }.let(answers::get)
+    }
+
+    private fun detect(os: String, answers: Map<String, String>, gtk: String? = null): Pair<Boolean?, List<String>> {
+        val r = FakeRunner(answers)
+        return OsTheme.detect(os, r::run) { gtk } to r.called
+    }
+
+    @Test
+    fun detectWindowsReadsTheRegistry() {
+        val dark = "    AppsUseLightTheme    REG_DWORD    0x0\r\n"
+        assertEquals(true to listOf("reg"), detect("windows 11", mapOf("reg" to dark)))
+        assertEquals(false, detect("windows 10", mapOf("reg" to dark.replace("0x0", "0x1"))).first)
+        assertEquals("読めなければ Compose に任せる", null to listOf("reg"), detect("windows 11", emptyMap(), gtk = "Adwaita:dark"))
+    }
+
+    @Test
+    fun detectMacReadsDefaults() {
+        assertEquals(true to listOf("defaults"), detect("mac os x", mapOf("defaults" to "Dark\n")))
+        assertEquals("キーが無い(明るい)は失敗 = false", false to listOf("defaults"), detect("mac os x", emptyMap()))
+    }
+
+    @Test
+    fun detectLinuxFallsBackFromPortalToGsettingsToGtkTheme() {
+        assertEquals(true to listOf("gdbus"), detect("linux", mapOf("gdbus" to "(<<uint32 1>>,)", "gsettings" to "'prefer-light'")))
+        assertEquals("ポータルが指定なしなら gsettings", false to listOf("gdbus", "gsettings"), detect("linux", mapOf("gdbus" to "(<<uint32 0>>,)", "gsettings" to "'default'")))
+        assertEquals(true to listOf("gdbus", "gsettings"), detect("linux", emptyMap(), gtk = "Adwaita:dark"))
+        assertEquals(null to listOf("gdbus", "gsettings"), detect("linux", emptyMap()))
+    }
+
+    @Test
+    fun detectUnknownOsUsesTheLinuxWay() {
+        assertEquals(true to listOf("gdbus", "gsettings"), detect("freebsd", mapOf("gsettings" to "'prefer-dark'")))
+        assertEquals(null to listOf("gdbus", "gsettings"), detect("", emptyMap()))
+    }
 }
