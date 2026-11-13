@@ -145,6 +145,10 @@ private struct MacAccountSettings: View {
                     MacUnavailableSettingRow(title: "アカウント")
                 }
             }
+            // サインインの方法(#361)。匿名の人には出さない
+            if MacAccount.shared.isLive {
+                MacLinkedAccountsSection()
+            }
             #if !APP_STORE_REVIEW // 審査用ビルドは App 内課金を持たない(#450 G1)
             Section {
                 MacProSettingsRow()
