@@ -36,6 +36,9 @@ sourceSets {
                 "jp/kz2601/metamon/services/consent/AiConsentStore.kt",
                 "jp/kz2601/metamon/services/consent/CrashReportingPreference.kt",
                 "jp/kz2601/metamon/services/consent/KeyValueStore.kt",
+                "jp/kz2601/metamon/services/discover/DiscoverClient.kt",
+                "jp/kz2601/metamon/services/discover/DiscoverModel.kt",
+                "jp/kz2601/metamon/services/discover/PublishModel.kt",
                 // 外の公開データ(feed)の読み込みと前回の写し(#2806)
                 "jp/kz2601/metamon/services/feeds/FeedCache.kt",
                 "jp/kz2601/metamon/services/feeds/FeedClient.kt",
@@ -46,6 +49,7 @@ sourceSets {
                 "jp/kz2601/metamon/services/live/GenerateStreamEvent.kt",
                 "jp/kz2601/metamon/services/live/HttpAIClient.kt",
                 "jp/kz2601/metamon/services/live/HttpAppConfigClient.kt",
+                "jp/kz2601/metamon/services/live/HttpDiscoverClient.kt",
                 "jp/kz2601/metamon/services/live/HttpFeedClient.kt",
                 "jp/kz2601/metamon/services/live/HttpFollowsClient.kt",
                 "jp/kz2601/metamon/services/live/HttpReleaseRequestClient.kt",
@@ -55,6 +59,9 @@ sourceSets {
                 "jp/kz2601/metamon/services/privacy/PublicPersonalData.kt",
                 "jp/kz2601/metamon/services/release/ReleaseRequests.kt",
                 "jp/kz2601/metamon/services/sharing/ShareSheetModel.kt",
+                // DiscoverModel・PublishModel が使う通報・ブロックの型と作者名の保存(純 Kotlin)
+                "jp/kz2601/metamon/services/social/AuthorProfile.kt",
+                "jp/kz2601/metamon/services/social/ModerationClient.kt",
                 // client-config の notice(#333)。ServiceNotice の読み方の関数は ClientConfig.kt にある
                 "jp/kz2601/metamon/services/update/ClientConfig.kt",
                 "jp/kz2601/metamon/services/update/ServiceNotice.kt",
