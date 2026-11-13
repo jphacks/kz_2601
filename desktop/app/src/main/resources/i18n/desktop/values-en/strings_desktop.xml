@@ -12,6 +12,9 @@
     <string name="desktop_calendar_written">Saved the event: %1$s</string>
     <string name="desktop_chart_empty">No data yet</string>
     <string name="desktop_close">Close</string>
+    <string name="desktop_coin_estimate">About %1$d coins</string>
+    <string name="desktop_coin_estimate_a11y">Sending uses about %1$d coins</string>
+    <string name="desktop_coin_estimate_a11y_balance">Sending uses about %1$d coins. %2$d coins left</string>
     <string name="desktop_data_add">Add</string>
     <string name="desktop_delete_not_allowed">You can\'t delete this data</string>
     <string name="desktop_drag_image_name">image</string>
