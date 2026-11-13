@@ -457,6 +457,9 @@ type ConnectionView struct {
 	Scopes      []string  `json:"scopes,omitempty"`
 	ConnectedAt time.Time `json:"connectedAt,omitzero"`
 	LastUsedAt  time.Time `json:"lastUsedAt,omitzero"`
+	// MonthCalls is the user's calls of the provider this month (JST,
+	// #2144). Absent when it could not be read (or from an older runner).
+	MonthCalls *int `json:"monthCalls,omitempty"`
 }
 
 // List returns uid's connections without tokens (revoked markers left out).

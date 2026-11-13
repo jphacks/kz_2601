@@ -26,7 +26,7 @@ object ConformanceAllowlist {
     )
 
     /** DSL に書いた値をそのまま写すだけの props。読み込みは :dsl(iOS・Android と同じ)のテストで見るので、ここではまだ比べない。 */
-    private const val DSL_ECHO = "DSL に書いた値をそのまま写すだけ(読み込みは :dsl のテストで見る)"
+    internal const val DSL_ECHO = "DSL に書いた値をそのまま写すだけ(読み込みは :dsl のテストで見る)"
 
     private fun echo(vararg keys: String): Map<String, String> = keys.associateWith { DSL_ECHO }
 

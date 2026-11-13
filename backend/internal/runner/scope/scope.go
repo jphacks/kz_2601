@@ -46,6 +46,7 @@ type Backend interface {
 	GetVersion(ctx context.Context, uid, appID string, n int) (*store.Version, error)
 	GetPublicApp(ctx context.Context, appID string) (*store.PublicApp, error)
 	AppOwner(ctx context.Context, appID string) (string, error)
+	GetMember(ctx context.Context, appID, uid string) (*store.Member, error)
 	ListMembers(ctx context.Context, appID string, limit int) ([]store.Member, error)
 	GetRecord(ctx context.Context, rs store.RecordSet, id string) (*store.Record, error)
 	ListRecords(ctx context.Context, rs store.RecordSet, limit int) ([]store.Record, error)
@@ -355,7 +356,17 @@ func (h *Handle) Owner(ctx context.Context) (string, error) {
 	return o, nil
 }
 
-// Members implements notify.Directory (none for private data).
+// IsMember implements notify.Directory: one members/{uid} read (#2297). The
+// creator has no document (check Owner first); false for private data.
+func (h *Handle) IsMember(ctx context.Context, uid string) (bool, error) {
+	if !h.shared {
+		return false, nil
+	}
+	return store.IsMember(ctx, h.b, h.appID, uid)
+}
+
+// Members implements notify.Directory: the whole list, for a notification to
+// every member (none for private data).
 func (h *Handle) Members(ctx context.Context) ([]string, error) {
 	if !h.shared {
 		return nil, nil

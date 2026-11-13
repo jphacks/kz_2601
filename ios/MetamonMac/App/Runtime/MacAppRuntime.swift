@@ -107,6 +107,11 @@ final class MacAppRuntime: RuntimeNavigating {
     @ObservationIgnored var pendingFixDraft: String?
     /// Field.health を Mac では書かないことの一言(#958・アプリごとに 1 回)
     @ObservationIgnored var healthNote = MacHealthNote()
+    /// 画面の並びを手で直す編集(#2323・iOS の #1442 と同じ `GridEditSession`)。`MacAppRuntime+GridEdit.swift`
+    var gridEdit: GridEditSession?
+    var gridEditSaving = false
+    /// 編集の「完了」の保存先。`AppCanvas` が `MacRootView`(版の一覧)につなぐ。nil なら編集に入らない
+    @ObservationIgnored var onSaveGridEdit: (@MainActor (GridEditDraft) async -> MacGridEditSave.Outcome)?
 
     /// `recordLease` を渡したらそのエンジンを使い(止めるのは `MacRecordEngines`)、`recordSync` を渡したらこのランタイムだけのエンジン
     init(appId: String, dsl: AppDSL, recordSync: RecordSyncEngine? = nil, recordLease: MacRecordEngineLease? = nil,

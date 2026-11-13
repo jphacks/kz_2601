@@ -773,12 +773,7 @@ private fun QrCodeLeaf(c: Component, form: FormDraft?, data: LeafData) {
             content.isBlank() -> Note(Strings["renderer_qr_empty"])
             matrix == null -> Note(Strings["renderer_qr_too_long"])
             else -> {
-                Canvas(Modifier.widthIn(max = 320.dp).fillMaxWidth().aspectRatio(1f).background(Color.White)) {
-                    val cell = size.width / matrix.size
-                    for (y in 0 until matrix.size) for (x in 0 until matrix.size) {
-                        if (matrix[x, y]) drawRect(Color.Black, Offset(x * cell, y * cell), Size(cell + 0.5f, cell + 0.5f))
-                    }
-                }
+                QrImage(matrix, Modifier.widthIn(max = 320.dp).fillMaxWidth())
                 c.label?.takeIf { it.isNotEmpty() }?.let { Text(it, style = MaterialTheme.typography.bodySmall, color = Color.Gray) }
                 TextButton(onClick = { QrClipboard.copy(matrix) }) { Text(Strings["desktop_qr_copy_image"]) }
             }
@@ -786,7 +781,18 @@ private fun QrCodeLeaf(c: Component, form: FormDraft?, data: LeafData) {
     }
 }
 
-private object QrClipboard {
+/** QR の絵(白地に黒)。共有のリンク(share/ShareLink.kt)も同じ描き方。 */
+@Composable
+internal fun QrImage(matrix: QrMatrix, modifier: Modifier = Modifier) {
+    Canvas(modifier.aspectRatio(1f).background(Color.White)) {
+        val cell = size.width / matrix.size
+        for (y in 0 until matrix.size) for (x in 0 until matrix.size) {
+            if (matrix[x, y]) drawRect(Color.Black, Offset(x * cell, y * cell), Size(cell + 0.5f, cell + 0.5f))
+        }
+    }
+}
+
+internal object QrClipboard {
     fun copy(m: QrMatrix, scale: Int = 8) {
         if (GraphicsEnvironment.isHeadless()) return
         val px = m.size * scale
