@@ -163,6 +163,18 @@ class SharedRecords(
         persistence?.changed(models, old, next)
     }
 
+    /**
+     * サーバーから取り直した共有の記録を混ぜる(#2214)。端末には書かない(他の人の記録を送り直さない)。
+     * [merge] は画面のスレッドで今の行に当てる(取り直しの間に足した自分の分を落とさない)。
+     */
+    fun mergeRemote(entity: String, merge: (List<Row>) -> List<Row>) {
+        post {
+            if (loading || wiping) return@post
+            val next = merge(store.list(entity))
+            if (next != store.list(entity)) store = store.copy(rows = store.rows + (entity to next))
+        }
+    }
+
     /** 端末から読み終えた。 */
     fun loaded(initial: MockStore) {
         store = initial
