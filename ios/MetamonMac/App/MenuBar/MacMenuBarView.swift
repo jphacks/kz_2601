@@ -7,9 +7,17 @@ struct MacMenuBarView: View {
     @State private var model = MacMenuBarModel()
     /// 窓を閉じて本体のウインドウを前に出す(`MacStatusItem`)
     let bringMainWindow: () -> Void
+    /// 窓を閉じる(表示を止めた後)
+    var closePopover: () -> Void = {}
+    /// タイマー・記録中の表示(#2254・試作のフラグが on の時だけ出る)
+    @State private var activity = MacMenuBarActivity.shared
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
+            if let current = activity.current {
+                activitySection(current)
+                Divider()
+            }
             if model.apps.isEmpty {
                 Text(model.isLoading ? "読み込み中…" : "作ったアプリがありません")
                     .foregroundStyle(.secondary)
@@ -57,6 +65,37 @@ struct MacMenuBarView: View {
                 }
             }
         }
+    }
+
+    /// いま出している表示(#2254): 名前・経過時間(countdown は残り)と「止める」「本体を開く」
+    private func activitySection(_ item: MacMenuBarActivity.Item) -> some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack(spacing: 8) {
+                Image(systemName: item.icon).accessibilityHidden(true)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(verbatim: item.title).font(.headline).lineLimit(1)
+                    Text(verbatim: item.appName).font(.caption).foregroundStyle(.secondary).lineLimit(1)
+                }
+                Spacer()
+                TimelineView(.periodic(from: .now, by: 1)) { context in
+                    Text(verbatim: MacMenuBarActivity.statusTitle(item, now: context.date))
+                        .font(.title3.monospacedDigit().weight(.semibold))
+                }
+            }
+            .accessibilityElement(children: .combine)
+            HStack(spacing: 8) {
+                Button { activity.stop(); closePopover() } label: { Label("止める", systemImage: "stop.fill") }
+                    .help("メニューバーの表示を止めます")
+                    .accessibilityIdentifier("menuBar.activity.stop")
+                Button { openActivityApp(item.appId) } label: { Label("本体を開く", systemImage: "macwindow") }
+                    .accessibilityIdentifier("menuBar.activity.open")
+            }
+        }
+    }
+
+    private func openActivityApp(_ appId: String) {
+        Task { await IntentHost.shared.request(.open(appId: appId)) }
+        bringMainWindow()
     }
 
     /// ショートカットの「開く」と同じ経路(`IntentHost.pending`)。ウインドウが無ければ作る

@@ -110,11 +110,11 @@ struct ListLeaf: View {
                             RecordTranslateMenuItem(offers: translationText(row, entity: entity) != nil) {
                                 translateText = translationText(row, entity: entity)
                             }
-                            // 記録を項目つきで別の生成アプリへ(#1871)
+                            #endif
+                            // 記録を項目つきで別の生成アプリへ(#1871・Mac は #2251)
                             if let entity, RecordPasteboard.payload(record: row, entity: entity, rt: rt) != nil {
                                 Button(L("記録をコピー"), systemImage: "doc.on.doc") { RecordPasteboard.copy(record: row, entity: entity, rt: rt) }
                             }
-                            #endif
                             if deletable(row, entity: entityId) {
                                 Button(L("削除"), systemImage: "trash", role: .destructive) { delete(row, entity: entityId) }
                             }
@@ -128,11 +128,9 @@ struct ListLeaf: View {
                                 Button(L("画像をコピー")) { PlatformPasteboard.setImage(photo.image) }
                             }
                             #endif
-                            #if os(iOS)
                             if let entity, RecordPasteboard.payload(record: row, entity: entity, rt: rt) != nil {
                                 Button(L("記録をコピー")) { RecordPasteboard.copy(record: row, entity: entity, rt: rt) }
                             }
-                            #endif
                             if deletable(row, entity: entityId) { Button(L("削除")) { delete(row, entity: entityId) } }
                             ModerationAccessibilityActions(rt: rt, entity: entityId, record: row)
                         }
@@ -279,6 +277,10 @@ struct ListLeaf: View {
         guard let row = ListRowCopyCommand.target(focusedRowId: keyboardRowId,
                                                   textInputActive: ListRowCopyCommand.textInputActive, rows: rows) else { return [] }
         let text = ListRowCopyText.text(item: c.item, record: row, entity: entity, rt: rt)
+        // 項目つきの記録も載せる(#2251)。別の生成アプリのフォームで ⌘V すると合う項目に入る
+        if let entity, let payload = RecordPasteboard.payload(record: row, entity: entity, rt: rt) {
+            return [RecordPasteboard.itemProvider(payload, text: text)]
+        }
         return text.isEmpty ? [] : [NSItemProvider(object: text as NSString)]
     }
 
