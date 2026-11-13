@@ -31,6 +31,7 @@ class TrayTest {
             TrayItem.Separator -> "---"
             is TrayItem.Submenu -> "${it.label} > ${labels(it.items).joinToString(" | ")}"
             is TrayItem.OpenApp -> "${it.label} <${it.appId}>"
+            is TrayItem.CancelNotification -> "${it.label} <cancel ${it.id}>"
         }
     }
 
