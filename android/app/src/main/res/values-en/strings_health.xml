@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="health_rationale_close">Close</string>
+    <string name="health_rationale_title">How we use Health Connect data</string>
+    <string name="health_rationale_read">Steps and weight are read only to show them in the app you built. The values are shown on this device and never sent to our servers.</string>
+    <string name="health_rationale_write">In apps that record weight, the weight you save is also written to Health Connect. We write only when you save.</string>
+    <string name="health_rationale_note">You can revoke access any time in Health Connect settings. Your records in the app stay.</string>
+</resources>

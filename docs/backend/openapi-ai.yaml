@@ -674,7 +674,10 @@ components:
         #245。部品単位より細かく無効にする機能。既知の値: `fieldHealth`(Field.health を使わない。生成結果の health 属性は落とす)、
         `cameraCapture`(photoField / videoField の source に camera / both を使わない = library のみ。生成結果は library に直す)、
         `sharedData`(#451 G2。entity の scope shared / public・edit・marks を使わない = 記録はすべて private。生成結果は scope / edit / marks /
-        list.item.mark を落とす。chat の ready / 案に requiresPro・paidFeatures を付けない)。未知の値は無視。省略 = 何も無効にしない。
+        list.item.mark を落とす。chat の ready / 案に requiresPro・paidFeatures を付けない)、
+        `nearbyShare.passby`(#1955・Mac など、nearbyShare は描けるがすれ違い通信を動かせない端末。nearbyShare は send だけにし、mode passby・fields・limit・distance を使わない。
+        すれ違い通信を頼まれたら summary で「この端末ではすれ違い通信は使えない」と伝える。新しく作られた passby は作り直させ、残った passby の nearbyShare は部品ごと落とす。
+        この値を送らないクライアント(今の iOS)は今までどおり passby を作れる)。未知の値は無視。省略 = 何も無効にしない。
       example: [fieldHealth, cameraCapture, sharedData]
     SupportedFeatures:
       type: array

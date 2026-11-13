@@ -96,6 +96,21 @@ class RecordIoTest {
     }
 
     @Test
+    fun tsvGuardsFormulaLeadsLikeCsv() {
+        val cells = listOf("=SUM(A1)", "+1", "@x", "-a", "\tx", "-500", "-¥500", "-.5", "a=b", "", "'plain")
+        val tsv = Tsv.string(null, listOf(cells))
+        assertEquals(
+            "CSV と同じ止め",
+            cells.map { CsvWriter.escape(it).removeSurrounding("\"") },
+            cells.map { Tsv.guard(it) },
+        )
+        assertTrue(tsv.startsWith("'=SUM(A1)\t'+1\t'@x\t'-a\t\"'\tx\"\t-500\t-¥500\t-.5\ta=b\t\t'plain"))
+        // 貼り付けで戻ってきたら止めの ' を外す
+        assertEquals(listOf(cells), Tsv.parse(tsv))
+        assertEquals(listOf(listOf("=1", "'x")), RecordIo.pastedTable("'=1\t'x\r\n"))
+    }
+
+    @Test
     fun pastedTableDetectsTabsOrCommas() {
         assertEquals(listOf(listOf("a", "b"), listOf("1", "2")), RecordIo.pastedTable("a\tb\n1\t2\n"))
         assertEquals(listOf(listOf("a", "b"), listOf("1", "2")), RecordIo.pastedTable("a,b\r\n1,2"))
