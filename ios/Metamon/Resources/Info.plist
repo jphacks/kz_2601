@@ -142,14 +142,14 @@
 	<string>生成したアプリの共有ボタンや QR コードの画像、ドラレコで保存した映像を写真に保存するために、写真ライブラリへの追加を使用します。</string>
 	<key>NSLocationWhenInUseUsageDescription</key>
 	<string>生成したアプリで現在地を記録・地図に表示したり、目的地まで道案内したり、保存した場所の近くに着いた時に通知したりするために使います(近くに着いたかは端末の中で判定します)。「記録を開始」を押した時だけ、停止するまで(最長4時間)散歩などの道のりを記録し、その間はアプリを閉じても記録を続けます。</string>
-	<!-- healthStat(#167): 歩数は CoreMotion の歩数計(capability 不要)。体重の読み書き・ヘルスケアの歩数は HealthKit。睡眠・心拍などは読むだけ(#1986)。英訳は InfoPlist.xcstrings -->
+	<!-- healthStat(#167): 歩数は CoreMotion の歩数計(capability 不要)。体重の読み書き・ヘルスケアの歩数は HealthKit。睡眠・心拍などは読むだけ(#1986)。気分(State of Mind)は読み書き(#2234)。英訳は InfoPlist.xcstrings -->
 	<!-- sensorValue(#419): 気圧・高度(CMAltimeter)。傾き・加速度(device motion)は許可不要 -->
 	<key>NSMotionUsageDescription</key>
 	<string>生成したアプリで今日や最近の歩数、気圧や高度の変化を表示・記録するために、モーションとフィットネスのデータを使用します。</string>
 	<key>NSHealthShareUsageDescription</key>
-	<string>生成したアプリで歩数・体重・睡眠・安静時心拍数・歩行と走行の距離・消費カロリー・エクササイズとマインドフルネスの時間を表示するために、ヘルスケアのデータを読み取ります。</string>
+	<string>生成したアプリで歩数・体重・睡眠・安静時心拍数・歩行と走行の距離・消費カロリー・エクササイズとマインドフルネスの時間・気分を表示するために、ヘルスケアのデータを読み取ります。</string>
 	<key>NSHealthUpdateUsageDescription</key>
-	<string>生成したアプリで記録した体重をヘルスケアにも保存するために、ヘルスケアへ書き込みます。</string>
+	<string>生成したアプリで記録した体重と気分をヘルスケアにも保存するために、ヘルスケアへ書き込みます。</string>
 	<!-- 端末のカレンダー・リマインダーを読む(#1987・DeviceCalendarSource)。英語は InfoPlist.xcstrings。審査用の版では外す(strip-review-plist.sh) -->
 	<key>NSCalendarsFullAccessUsageDescription</key>
 	<string>生成したアプリで、カレンダーの予定を一覧や今日の予定として表示するために、カレンダーを読み取ります。予定の題名や内容は端末の外に送りません。</string>

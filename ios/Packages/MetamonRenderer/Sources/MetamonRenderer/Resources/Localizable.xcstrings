@@ -7933,6 +7933,23 @@
         }
       }
     },
+    "気分の値は -1 から 1 の間で指定してください" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mood value must be between -1 and 1"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "気分の値は -1 から 1 の間で指定してください"
+          }
+        }
+      }
+    },
     "気圧が大きく下がります" : {
       "extractionState" : "manual",
       "localizations" : {
