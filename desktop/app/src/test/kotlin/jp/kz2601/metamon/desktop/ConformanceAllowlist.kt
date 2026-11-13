@@ -41,7 +41,6 @@ object ConformanceAllowlist {
         "fileImport" to echo("entity", "label"),
         "emptyState" to echo("message", "title"),
         "flashcards" to echo("entity"),
-        "grid" to echo("columns"),
         "image" to echo("field") + ("hasImage" to "画像が有るか(読み込みの結果)をまだ出していない"),
         "link" to mapOf("opens" to "押した先(アプリ内 / ブラウザ)の判定をまだ出していない"),
         "locationButton" to echo("field"),
