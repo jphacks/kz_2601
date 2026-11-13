@@ -35,6 +35,9 @@ dependencies {
     // LGPL-2.1-or-later と Apache-2.0 から選べるので Apache-2.0 を選ぶ(third-party-licenses.gradle.kts の electedLicenses)
     implementation("net.java.dev.jna:jna:5.19.1")
 
+    // 画面のテスト(runComposeUiTest・#2415)。版は Compose Multiplatform plugin に揃う
+    @OptIn(org.jetbrains.compose.ExperimentalComposeLibrary::class)
+    testImplementation(compose.uiTest)
     testImplementation(libs.junit)
     testImplementation(libs.kotlinx.coroutines.test)
     testImplementation(libs.okhttp.mockwebserver)
