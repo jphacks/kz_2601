@@ -107,7 +107,7 @@ flowchart LR
 | 流れ | 太い所 | 代表の Issue |
 |---|---|---|
 | 全体 | ゴールと完了の判定 | #350(エピック) |
-| DSL の共通化 | 版・部品の対応表・適合テスト・対応の申告 | #351(open)・#352・#353(close 済み)。`docs/decisions/351-dsl-cross-platform.md`・`docs/dsl/conformance/README.md`) |
+| DSL の共通化 | 版・部品の対応表・適合テスト・対応の申告 | #351(open)・#352・#353(close 済み)。`docs/decisions/351-dsl-cross-platform.md`・`docs/dsl/conformance/README.md` |
 | Android | Compose で描画・アクション・音声・Play の課金 | #354(技術の選び方)・#356〜#360。入口は `docs/android/README.md` |
 | Mac | ネイティブの SwiftUI。iOS のコードを共有し、置き換え層で OS の違いを吸収 | #929(ターゲット)・#976・#1050。入口は `docs/mac/architecture.md`・方針は `docs/decisions/363-desktop-strategy.md` |
 | デスクトップ(Windows・Linux) | Compose Multiplatform Desktop(JVM)で作り、Android の純 Kotlin を共有する案(#1738 は推奨・未確定。`desktop/` に骨格がある) | #1738(作り方を決める)・#1759(日本語 / 英語・ダークモード・読み上げ)。入口は `desktop/README.md`・`docs/desktop/architecture.md` |
