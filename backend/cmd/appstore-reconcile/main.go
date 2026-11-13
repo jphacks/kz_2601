@@ -37,11 +37,22 @@ import (
 	"github.com/jphacks/kz_2601/backend/internal/store"
 )
 
+type options struct {
+	dryRun bool
+	limit  int
+	window time.Duration
+}
+
+func parseFlags(fs *flag.FlagSet, args []string) (options, error) {
+	var o options
+	fs.BoolVar(&o.dryRun, "dry-run", false, "only log what would change")
+	fs.IntVar(&o.limit, "limit", 1000, "max App Store Server API calls per run")
+	fs.DurationVar(&o.window, "window", 35*24*time.Hour, "skip Pro that ended longer ago than this")
+	return o, fs.Parse(args)
+}
+
 func main() {
-	dryRun := flag.Bool("dry-run", false, "only log what would change")
-	limit := flag.Int("limit", 1000, "max App Store Server API calls per run")
-	window := flag.Duration("window", 35*24*time.Hour, "skip Pro that ended longer ago than this")
-	flag.Parse()
+	o, _ := parseFlags(flag.CommandLine, os.Args[1:]) // flag.CommandLine exits on a bad flag
 
 	logger := httpx.NewLogger()
 	slog.SetDefault(logger)
@@ -77,10 +88,10 @@ func main() {
 		Verifier: &appstore.Verifier{Policy: policy},
 		Store:    entitlement.NewFirestore(st.Client()),
 		API:      api,
-		Window:   *window,
+		Window:   o.window,
 		Log:      logger,
 	}
-	if run(ctx, r, *limit, *dryRun, logger) {
+	if run(ctx, r, o.limit, o.dryRun, logger) {
 		os.Exit(1)
 	}
 }
