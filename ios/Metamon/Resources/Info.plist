@@ -158,6 +158,10 @@
 	<!-- HomeKit の家・部屋・機器と今の状態を読む(#2245・DeviceHomeSource)。読むだけで機器は操作しない。英語は InfoPlist.xcstrings。審査用の版では外す(strip-review-plist.sh) -->
 	<key>NSHomeKitUsageDescription</key>
 	<string>生成したアプリで、家の部屋と機器の名前・電源・明るさ・温度・湿度を表示するために、ホームのデータを読み取ります。機器の操作はしません。機器の名前は端末の外に送りません。</string>
+	<!-- NFC タグ(NDEF)を読む・書く(#2233・NFCTagSessionSource)。英語は InfoPlist.xcstrings。審査用の版では外す(strip-review-plist.sh)。
+	     entitlement com.apple.developer.nfc.readersession.formats = NDEF(Metamon.entitlements)。App ID 側に NFC Tag Reading の capability が要る -->
+	<key>NFCReaderUsageDescription</key>
+	<string>生成したアプリで、NFC タグに書かれた文字や URL を読み取ったり、タグに書き込んだりするために使用します。読み取った内容は端末の外に送りません。</string>
 	<!-- 端末の連絡先の名前・誕生日・グループを読む(#2218・DeviceContactsSource)。1 人を選ぶ ContactPick は許可不要。英語は InfoPlist.xcstrings。審査用の版では外す(strip-review-plist.sh) -->
 	<key>NSContactsUsageDescription</key>
 	<string>生成したアプリで、連絡先の名前・誕生日・グループを一覧などに表示するために、連絡先を読み取ります。連絡先の内容は端末の外に送りません。</string>

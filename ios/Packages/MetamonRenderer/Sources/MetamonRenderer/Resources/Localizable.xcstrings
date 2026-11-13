@@ -1577,6 +1577,28 @@
         }
       }
     },
+    "NFC タグの読み取りに失敗しました" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Couldn't read the NFC tag"
+          }
+        }
+      }
+    },
+    "NFC タグの読み取りを中止しました" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "NFC scanning was canceled"
+          }
+        }
+      }
+    },
     "OK" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -1760,6 +1782,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "iPhone から写真を撮る / 書類をスキャン"
+          }
+        }
+      }
+    },
+    "iPhone をタグに近づけてください" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Hold your iPhone near the tag"
           }
         }
       }
@@ -2267,6 +2300,28 @@
         }
       }
     },
+    "このタグには書き込めません" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "This tag is read-only"
+          }
+        }
+      }
+    },
+    "このタグに読み取れる内容がありません" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "This tag has nothing to read"
+          }
+        }
+      }
+    },
     "このデータは作った人だけが変更できます" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -2518,6 +2573,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "この端末では Apple Music を使えません"
+          }
+        }
+      }
+    },
+    "この端末では NFC タグを読み取れません" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "This device can't read NFC tags"
           }
         }
       }
@@ -4031,6 +4097,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "タイマー"
+          }
+        }
+      }
+    },
+    "タグに近づけ直してください" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Move your iPhone near the tag again"
           }
         }
       }
@@ -6012,6 +6089,17 @@
         }
       }
     },
+    "内容がタグの容量を超えています" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The content is too large for this tag"
+          }
+        }
+      }
+    },
     "再生" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -7844,6 +7932,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "書き出し日 %@"
+          }
+        }
+      }
+    },
+    "書き込むタグに iPhone を近づけてください" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Hold your iPhone near the tag you want to write to"
           }
         }
       }
