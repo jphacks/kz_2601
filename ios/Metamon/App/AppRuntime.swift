@@ -449,6 +449,8 @@ final class AppRuntime: RuntimeNavigating {
     func isSaving(_ form: FormDraft) -> Bool { saveFlight.isSaving(form) }
     /// 最後に書き込んだフォーム。送った後にサーバーが断ったら「保存しました」を取り消す(M10 × #317 / #346 / #321)
     @ObservationIgnored var lastSavedForm: SavedForm?
+    /// 別のアプリから値入りで開いたフォーム(#2235)を保存したら戻る先(AppRuntime+OpenForm.swift)
+    @ObservationIgnored var openFormReturn: OpenFormReturn?
     #if !APP_STORE_REVIEW
     /// roleField の無い aiChat の対(仮 id → 相方)。片方が断られたら相方も消す(AppRuntime+AIChat.swift)
     @ObservationIgnored let aiChatPairs = AIChatPairLedger()
@@ -987,6 +989,7 @@ final class AppRuntime: RuntimeNavigating {
         let fromSwitcher = showAppSwitcher // 一覧から来たなら開く直前に撮ってある(今撮るとシートが写る)
         showAppSwitcher = false
         guard morphJob == nil, appId != document.appId else { return }
+        openFormReturn = nil // 別の用で切り替えたら、値入りで開いたフォームの戻り先は捨てる(#2235)
         if !fromSwitcher {
             if afterSheetDismiss { try? await Task.sleep(for: .milliseconds(500)) }
             AppThumbnailStore.shared.capture(appId: document.appId, isVoiceOnly: dsl.isVoiceOnly)
@@ -1313,6 +1316,7 @@ final class AppRuntime: RuntimeNavigating {
             navigate(to: screen, presentation: action.presentation, recordId: ctx.recordId, from: ctx.route)
 
         case .back:
+            if let r = openFormReturn, r.screen == ctx.route.screen { openFormReturn = nil } // 保存せずに閉じた(#2235)
             close(ctx.route)
 
         case .saveRecord:
@@ -1353,7 +1357,10 @@ final class AppRuntime: RuntimeNavigating {
             case .readOnly: notifyReadOnly(entity: entity) // 送信待ちに積まない(#249)
             // 既存の記録を何も変えずに保存: 書き込まず(「保存しました」も出さず)に画面だけ進める(M10)
             case .unchanged: leaveAfterSave(action, ctx, entity: entity, form: form, recordId: recordId, sent: sent, wrote: false)
-            case .saved: leaveAfterSave(action, ctx, entity: entity, form: form, recordId: recordId, sent: sent, wrote: true)
+            case .saved:
+                let back = takeOpenFormReturn(appId: appId, entityId: entity, route: ctx.route) // #2235
+                leaveAfterSave(action, ctx, entity: entity, form: form, recordId: recordId, sent: sent, wrote: true)
+                if let back { Task { await returnAfterOpenForm(back) } }
             case .inFlight, .held: break // 連打・名前を聞いている間
             }
 
