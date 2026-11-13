@@ -22,6 +22,14 @@
     <string name="desktop_coin_estimate_a11y_balance">Sending uses about %1$d coins. %2$d coins left</string>
     <string name="desktop_data_add">Add</string>
     <string name="desktop_delete_not_allowed">You can\'t delete this data</string>
+    <string name="desktop_denial_admins_only">Only admins can do this (what you entered is kept)</string>
+    <string name="desktop_denial_admins_only_field">Only admins can change %1$s (what you entered is kept)</string>
+    <string name="desktop_denial_duplicate">A record with the same details already exists (what you entered is kept)</string>
+    <string name="desktop_denial_duplicate_fields">A record with the same %1$s already exists (what you entered is kept)</string>
+    <string name="desktop_denial_generic">The server refused this. What you entered is kept</string>
+    <string name="desktop_denial_inviter_left">The person who sent this link has left, so you can\'t join. Ask a member for a new link</string>
+    <string name="desktop_denial_members_full">This share has reached its limit of 100 members, so you can\'t join</string>
+    <string name="desktop_denial_not_member">You haven\'t joined this share. Join from an invite link (what you entered is kept)</string>
     <string name="desktop_drag_image_name">image</string>
     <string name="desktop_drag_table_name">table</string>
     <string name="desktop_error_app_check">We couldn\'t verify the connection from this app. Please wait a moment and try again. If it keeps happening, reinstall the latest version</string>

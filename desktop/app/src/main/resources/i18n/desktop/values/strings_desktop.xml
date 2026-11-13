@@ -23,6 +23,14 @@
     <string name="desktop_coin_estimate_a11y_balance">送ると約 %1$d コインを使います。残り %2$d コイン</string>
     <string name="desktop_data_add">追加</string>
     <string name="desktop_delete_not_allowed">このデータは削除できません</string>
+    <string name="desktop_denial_admins_only">管理者だけができる操作です(入力した内容は残してあります)</string>
+    <string name="desktop_denial_admins_only_field">「%1$s」は管理者だけが変更できます(入力した内容は残してあります)</string>
+    <string name="desktop_denial_duplicate">同じ内容の記録がもうあります(入力した内容は残してあります)</string>
+    <string name="desktop_denial_duplicate_fields">「%1$s」が同じ記録がもうあります(入力した内容は残してあります)</string>
+    <string name="desktop_denial_generic">サーバーに断られました。入力した内容は残してあります</string>
+    <string name="desktop_denial_inviter_left">このリンクを送った人はもう参加していないため、参加できません。参加している人に新しいリンクをもらってください</string>
+    <string name="desktop_denial_members_full">参加している人が上限(100 人)に達しているため、参加できません</string>
+    <string name="desktop_denial_not_member">この共有に参加していません。招待リンクから参加してください(入力した内容は残してあります)</string>
     <string name="desktop_drag_image_name">画像</string>
     <string name="desktop_drag_table_name">表</string>
     <string name="desktop_error_app_check">このアプリからの接続を確認できませんでした。少し待ってもう一度お試しください。続く時は最新版を入れ直してください</string>
