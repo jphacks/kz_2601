@@ -60,6 +60,12 @@ final class CoinGate {
 
     func dismiss() { request = nil }
 
+    /// `presenter` が出す要求。アシスティブアクセス(#1997)で課金を隠している時は出さない。
+    func request(for presenter: UUID, assistiveAccess: AssistiveAccessPolicy) -> Request? {
+        guard assistiveAccess.shows(.paywall), request?.presenter == presenter else { return nil }
+        return request
+    }
+
     func presenterAppeared(_ id: UUID) {
         presenters.removeAll { $0 == id }
         presenters.append(id)
@@ -90,8 +96,8 @@ final class CoinGate {
     }
 
     private static var storeMode: CoinStore.Mode {
-        #if DEBUG
-        switch ProcessInfo.processInfo.environment["METAMON_MOCK_STORE"] {
+        #if DEBUG || METAMON_STG
+        switch DebugPlanKnobs.string(DebugPlanKnobs.mockStore) {
         case "1": return .mock
         case "0": return .storeKit
         default:
@@ -106,10 +112,11 @@ final class CoinGate {
         #endif
     }
 
-    /// DEBUG のみ: `METAMON_COINS=1` でサーバー無しにコインの画面を確かめる(端末内のモック・仮の数)
-    private static var debugService: (any CoinService)? {
-        #if DEBUG
-        if ProcessInfo.processInfo.environment["METAMON_COINS"] == "1" { return MockCoinService() }
+    /// DEBUG・stg のみ: `METAMON_COINS=1`(開発用メニューでも・#2080)でサーバー無しにコインの画面を確かめる(端末内のモック・仮の数)。
+    /// 残高は `METAMON_COINS_BALANCE`、無効は `METAMON_COINS_DISABLED=1`
+    static var debugService: (any CoinService)? {
+        #if DEBUG || METAMON_STG
+        if DebugPlanKnobs.coinsMocked { return DebugPlanKnobs.coinService() }
         #endif
         return nil
     }

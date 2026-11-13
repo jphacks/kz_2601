@@ -53,10 +53,11 @@ type Config struct {
 	AppReturnURL string
 	// Limits per provider (EXT_LIMIT_* / EXT_GLOBAL_DAILY*, limits.go).
 	// A provider missing here is not limited (tests); ConfigFromEnv fills
-	// every provider with DefaultLimits.
+	// every provider with DefaultLimits (no GlobalDaily for NeedsOAuth).
 	Limits map[string]Limits
 	// UpstreamPause is how long a provider is not called after it answered
-	// 429 (ConfigFromEnv: UpstreamPause, 1 minute; 0 = no pause).
+	// 429 (ConfigFromEnv: UpstreamPause, 1 minute; 0 = no pause). For a
+	// NeedsOAuth provider only the person whose token it was is paused.
 	UpstreamPause time.Duration
 	// Env prefixes the limit counters (APP_ENV: stg and prod share Firestore).
 	Env string
@@ -75,7 +76,7 @@ type Config struct {
 //	EXT_OAUTH_CALLBACK_BASE          https origin of the runner's /oauth/callback (default none = OAuth off)
 //	EXT_OAUTH_APP_RETURN             where the callback returns the device (default tailorit://connected)
 //	EXT_LIMIT_<SCOPE> / EXT_LIMIT_<PROVIDER>_<SCOPE>   calls per user / app per hour / day (limits.go)
-//	EXT_GLOBAL_DAILY / EXT_GLOBAL_DAILY_<PROVIDER>     a provider's calls per day, everyone together
+//	EXT_GLOBAL_DAILY / EXT_GLOBAL_DAILY_<PROVIDER>     a provider's calls per day, everyone together (NeedsOAuth: only the <PROVIDER> form)
 //	APP_ENV                          production never runs fake providers
 func ConfigFromEnv(getenv func(string) string) (Config, error) {
 	c := Config{

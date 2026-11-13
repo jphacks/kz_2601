@@ -286,6 +286,99 @@ func NormalizeText(s string) string {
 	return b.String()
 }
 
+// Cluster suggestions (#2148): with LOOP_EMBED=on, a draft lists the existing
+// clusters whose summary is near its own as 「同じかもしれない束」. Nothing is
+// merged: a human decides.
+const (
+	EnvEmbed          = "LOOP_EMBED"           // on = suggest similar clusters (default off)
+	EnvEmbedThreshold = "LOOP_EMBED_THRESHOLD" // cosine in (0, 1], default DefaultSimilarThreshold
+)
+
+// DefaultSimilarThreshold is the cosine at or above which a cluster is a
+// candidate; MaxSimilar bounds the list.
+const (
+	DefaultSimilarThreshold = 0.7
+	MaxSimilar              = 3
+)
+
+// EmbedFromEnv reads LOOP_EMBED and LOOP_EMBED_THRESHOLD. Off gives a nil
+// Embedder. On uses FakeEmbedder (character bigrams, offline, no API) until a
+// model-backed Embedder is wired in.
+func EmbedFromEnv(getenv func(string) string) (Embedder, float64, error) {
+	switch v := strings.TrimSpace(getenv(EnvEmbed)); v {
+	case "", "off":
+		return nil, 0, nil
+	case "on":
+	default:
+		return nil, 0, fmt.Errorf("%s: want on or off, got %q", EnvEmbed, v)
+	}
+	th := DefaultSimilarThreshold
+	if v := getenv(EnvEmbedThreshold); v != "" {
+		f, err := strconv.ParseFloat(v, 64)
+		if err != nil || f <= 0 || f > 1 {
+			return nil, 0, fmt.Errorf("%s: want a cosine in (0, 1], got %q", EnvEmbedThreshold, v)
+		}
+		th = f
+	}
+	return FakeEmbedder{Dim: 256}, th, nil
+}
+
+// ClusterRep is an existing cluster: its key, its number of reports and the
+// summary of its representative item.
+type ClusterRep struct {
+	Key     string
+	Count   int
+	Summary string
+}
+
+// Similar is a candidate cluster and its similarity.
+type Similar struct {
+	Key   string
+	Count int
+	Sim   float64
+}
+
+// SimilarClusters embeds summary and the reps' summaries in one call and
+// returns the reps at or above threshold, nearest first (ties by key), at
+// most MaxSimilar. A rep with the same key or no summary is skipped.
+func SimilarClusters(ctx context.Context, e Embedder, key, summary string, reps []ClusterRep, threshold float64) ([]Similar, error) {
+	cands := []ClusterRep{}
+	texts := []string{summary}
+	for _, r := range reps {
+		if r.Key != key && strings.TrimSpace(r.Summary) != "" {
+			cands = append(cands, r)
+			texts = append(texts, r.Summary)
+		}
+	}
+	if len(cands) == 0 || strings.TrimSpace(summary) == "" {
+		return []Similar{}, nil
+	}
+	vs, err := Embed(ctx, e, texts)
+	if err != nil {
+		return nil, err
+	}
+	out := []Similar{}
+	for i, r := range cands {
+		s, err := Cosine(vs[0], vs[i+1])
+		if err != nil {
+			return nil, err
+		}
+		if s >= threshold {
+			out = append(out, Similar{Key: r.Key, Count: r.Count, Sim: s})
+		}
+	}
+	sort.Slice(out, func(i, j int) bool {
+		if out[i].Sim != out[j].Sim {
+			return out[i].Sim > out[j].Sim
+		}
+		return out[i].Key < out[j].Key
+	})
+	if len(out) > MaxSimilar {
+		out = out[:MaxSimilar]
+	}
+	return out, nil
+}
+
 // Priority is computed from the verdict and the number of reports, not taken
 // from the model: P1 / P2 / P3.
 func Priority(category, impact, area string, count int) string {

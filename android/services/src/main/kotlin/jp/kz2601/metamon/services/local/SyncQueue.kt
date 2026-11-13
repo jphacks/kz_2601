@@ -120,6 +120,9 @@ class SyncQueue(
     var isDraining = false
         private set
 
+    /** 列が空と見て抜ける直前に呼ぶ割り込み口。テストが「抜けぎわの enqueue」の順序を作るために使う。 */
+    internal var onIdle: (suspend () -> Unit)? = null
+
     @Volatile
     var isPaused = false
         private set
@@ -210,9 +213,20 @@ class SyncQueue(
             if (isDraining || isPaused) return
             isDraining = true
         }
+        var draining = true
         try {
             while (true) {
-                val op = lock.withLock { ops.firstOrNull()?.also { inFlight = it.id } } ?: break
+                // 「空なら isDraining を落として抜ける」を 1 つの lock で行い、抜けぎわに積まれた操作を取りこぼさない
+                val op = lock.withLock {
+                    val next = ops.firstOrNull()
+                    if (next == null) {
+                        isDraining = false
+                        draining = false
+                    } else {
+                        inFlight = next.id
+                    }
+                    next
+                } ?: break
                 try {
                     perform(op)
                     finish(op)
@@ -237,18 +251,26 @@ class SyncQueue(
                     }
                     println("[Metamon] sync ${op.kind} ${op.entity}/${op.recordId} failed (attempt $attempt/${policy.maxAttempts}): $e")
                     if (attempt >= policy.maxAttempts) {
-                        isPaused = true
+                        // 止めると同時に isDraining も落とす。Paused を受けてすぐ resume された時の起こしを取りこぼさない
+                        lock.withLock {
+                            isPaused = true
+                            isDraining = false
+                            draining = false
+                            inFlight = null
+                        }
                         _events.emit(SyncEvent.Paused(count()))
                         return
                     }
                     sleep(policy.delayMillis(attempt)) // 止められたら次のきっかけで続き
                 } finally {
-                    lock.withLock { inFlight = null }
+                    // 止めた時は上で戻し済み(次の drain がもう持っているかもしれない)
+                    if (draining) lock.withLock { inFlight = null }
                 }
             }
+            onIdle?.invoke()
             _events.emit(SyncEvent.Drained)
         } finally {
-            isDraining = false
+            if (draining) lock.withLock { isDraining = false }
         }
     }
 

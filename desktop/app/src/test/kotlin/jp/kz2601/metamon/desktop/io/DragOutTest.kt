@@ -21,6 +21,9 @@ import java.awt.datatransfer.UnsupportedFlavorException
 import java.awt.image.BufferedImage
 import java.io.ByteArrayOutputStream
 import java.io.File
+import java.nio.file.FileSystems
+import java.nio.file.Files
+import java.nio.file.attribute.PosixFilePermissions
 import java.time.ZoneId
 import java.util.Base64
 import java.util.TimeZone
@@ -134,12 +137,62 @@ class DragOutTest {
         val png = encoded("png")
         val dataUrl = "data:image/png;base64," + Base64.getEncoder().encodeToString(png)
         assertArrayEquals(png, ImageSource.bytes(dataUrl, allowFile = false))
-        val f = File.createTempFile("photo-", ".png").apply { writeBytes(png); deleteOnExit() }
+        val f = File.createTempFile("photo-", ".png", UserDirs.photos).apply { writeBytes(png); deleteOnExit() }
         assertArrayEquals("photoField の値(file URI)", png, ImageSource.bytes(f.toURI().toString(), allowFile = true))
         assertNull("DSL に書かれた URL では手元のファイルを読まない", ImageSource.bytes(f.toURI().toString(), allowFile = false))
-        val txt = File.createTempFile("note-", ".txt").apply { writeText("x"); deleteOnExit() }
+        val txt = File.createTempFile("note-", ".txt", UserDirs.photos).apply { writeText("x"); deleteOnExit() }
         assertNull("画像でないファイルは読まない", ImageSource.bytes(txt.toURI().toString(), allowFile = true))
         assertNull(ImageSource.bytes("http://example.com/a.png", allowFile = true))
         assertNull(ImageSource.bytes(null, allowFile = true))
+    }
+
+    @Test
+    fun recordFileValuesAreReadOnlyUnderThePhotoFolder() {
+        val png = encoded("png")
+        val dir = Files.createTempDirectory("photos-").toFile().apply { deleteOnExit() }
+        val inside = File(dir, "a.png").apply { writeBytes(png); deleteOnExit() }
+        assertArrayEquals(png, ImageSource.bytes(inside.toURI().toString(), allowFile = true, photoDir = dir))
+        val outside = File.createTempFile("elsewhere-", ".png").apply { writeBytes(png); deleteOnExit() }
+        assertNull("写真フォルダの外", ImageSource.bytes(outside.toURI().toString(), allowFile = true, photoDir = dir))
+        val escaped = dir.toURI().toString() + "../" + outside.name
+        assertNull("../ で外へ出ない", ImageSource.bytes(escaped, allowFile = true, photoDir = dir))
+        listOf(
+            "file:////server/share/a.png",
+            "file://server/share/a.png",
+            "file:\\\\server\\share\\a.png",
+            "file://///server/share/a.png",
+            "file://localhost" + inside.toURI().path,
+        ).forEach { assertNull(it, UserDirs.photoFile(it, dir)) }
+        assertNull("フォルダそのもの", UserDirs.photoFile(dir.toURI().toString(), dir))
+        // 選んだ・落とした写真は写真フォルダへ写して読む
+        val adopted = UserDirs.adoptPhoto(outside, dir).apply { deleteOnExit() }
+        assertEquals(dir.canonicalFile, adopted.canonicalFile.parentFile)
+        assertArrayEquals(png, ImageSource.bytes(adopted.toURI().toString(), allowFile = true, photoDir = dir))
+        assertEquals("既に下にあればそのまま", inside.canonicalFile, UserDirs.adoptPhoto(inside, dir))
+    }
+
+    @Test
+    fun appFoldersArePerUserAndOwnerOnly() {
+        val root = UserDirs.root.canonicalFile
+        assertTrue(UserDirs.drag.canonicalFile.toPath().startsWith(root.toPath()))
+        assertTrue(UserDirs.photos.canonicalFile.toPath().startsWith(root.toPath()))
+        val csv = files(io.rowsTransferable("member", store.list("member").map { it.id })!!).single().apply { deleteOnExit() }
+        assertTrue("引き出すファイルは利用者のフォルダの下", csv.canonicalFile.toPath().startsWith(UserDirs.drag.canonicalFile.toPath()))
+        if ("posix" in FileSystems.getDefault().supportedFileAttributeViews()) {
+            val owner = PosixFilePermissions.fromString("rwx------")
+            assertEquals(owner, Files.getPosixFilePermissions(root.toPath()))
+            assertEquals(owner, Files.getPosixFilePermissions(UserDirs.drag.toPath()))
+            assertEquals(owner, Files.getPosixFilePermissions(UserDirs.photos.toPath()))
+            // 他の物(リンク)が先に置いてあれば使わない
+            val base = Files.createTempDirectory("ud-").toFile().apply { deleteOnExit() }
+            val link = File(base, "taken")
+            Files.createSymbolicLink(link.toPath(), base.toPath())
+            assertNull(UserDirs.ownedDir(link.toPath()))
+            link.delete()
+            val made = UserDirs.ownedDir(File(base, "mine").toPath())!!
+            assertEquals(owner, Files.getPosixFilePermissions(made))
+            made.toFile().delete()
+        }
+        if (!System.getProperty("os.name").lowercase().contains("linux")) assertTrue(root.name.endsWith(UserDirs.userTag()))
     }
 }

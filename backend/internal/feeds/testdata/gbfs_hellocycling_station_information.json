@@ -1,0 +1,94 @@
+{
+ "ttl": 60,
+ "data": {
+  "stations": [
+   {
+    "lat": 35.707126,
+    "lon": 139.777687,
+    "name": "ファミリーマート　台東四丁目店",
+    "address": "東京都台東区台東4-30-6",
+    "station_id": "4760",
+    "rental_uris": {
+     "ios": "https://www.hellocycling.jp/app/port/detail/4760?referrer=odpt",
+     "web": "https://www.hellocycling.jp/app/port/detail/4760?referrer=odpt",
+     "android": "https://www.hellocycling.jp/app/port/detail/4760?referrer=odpt"
+    },
+    "parking_hoop": false,
+    "parking_type": "street_parking",
+    "contact_phone": "+8105038218282",
+    "vehicle_capacity": "5",
+    "is_charging_station": false
+   },
+   {
+    "lat": 35.707252,
+    "lon": 139.777587,
+    "name": "新御徒町ステーション",
+    "address": "東京都台東区台東４丁目３１－１",
+    "station_id": "17",
+    "rental_uris": {
+     "ios": "https://www.hellocycling.jp/app/port/detail/17?referrer=odpt",
+     "web": "https://www.hellocycling.jp/app/port/detail/17?referrer=odpt",
+     "android": "https://www.hellocycling.jp/app/port/detail/17?referrer=odpt"
+    },
+    "parking_hoop": false,
+    "parking_type": "street_parking",
+    "contact_phone": "+8105038218282",
+    "vehicle_capacity": "8",
+    "is_charging_station": false
+   },
+   {
+    "lat": 35.706878,
+    "lon": 139.77891,
+    "name": "上野御徒町プレイス（旧山口ビル7・ヴィラルヴェロ）",
+    "address": "東京都台東区台東4-19-9",
+    "station_id": "4499",
+    "rental_uris": {
+     "ios": "https://www.hellocycling.jp/app/port/detail/4499?referrer=odpt",
+     "web": "https://www.hellocycling.jp/app/port/detail/4499?referrer=odpt",
+     "android": "https://www.hellocycling.jp/app/port/detail/4499?referrer=odpt"
+    },
+    "parking_hoop": false,
+    "parking_type": "street_parking",
+    "contact_phone": "+8105038218282",
+    "vehicle_capacity": "7",
+    "is_charging_station": false
+   },
+   {
+    "lat": 35.707966,
+    "lon": 139.776449,
+    "name": "仲御徒町駅自転車駐車場",
+    "address": "東京都台東区東上野1丁目14番",
+    "station_id": "4781",
+    "rental_uris": {
+     "ios": "https://www.hellocycling.jp/app/port/detail/4781?referrer=odpt",
+     "web": "https://www.hellocycling.jp/app/port/detail/4781?referrer=odpt",
+     "android": "https://www.hellocycling.jp/app/port/detail/4781?referrer=odpt"
+    },
+    "parking_hoop": false,
+    "parking_type": "street_parking",
+    "contact_phone": "+8105038218282",
+    "vehicle_capacity": "20",
+    "is_charging_station": false
+   },
+   {
+    "lat": 35.7252394,
+    "lon": 139.7997131,
+    "name": "リパーク東浅草２丁目第６",
+    "address": "東京都台東区東浅草２丁目23-4",
+    "station_id": "23067",
+    "rental_uris": {
+     "ios": "https://www.hellocycling.jp/app/port/detail/23067?referrer=odpt",
+     "web": "https://www.hellocycling.jp/app/port/detail/23067?referrer=odpt",
+     "android": "https://www.hellocycling.jp/app/port/detail/23067?referrer=odpt"
+    },
+    "parking_hoop": false,
+    "parking_type": "street_parking",
+    "contact_phone": "+8105038218282",
+    "vehicle_capacity": "2",
+    "is_charging_station": false
+   }
+  ]
+ },
+ "version": "2.3",
+ "last_updated": 1794417946
+}

@@ -53,6 +53,8 @@ maplibre = "13.7.1"
 okhttp = "5.4.0"
 # ホーム画面のウィジェット(Jetpack Glance・#912)
 glance = "1.2.0"
+# healthStat / Field.health のヘルスコネクト(#870)。28〜33 はアプリ・34+ は OS が持つ
+healthConnect = "1.1.0"
 
 [libraries]
 androidx-core-ktx = { module = "androidx.core:core-ktx", version.ref = "coreKtx" }
@@ -110,6 +112,7 @@ zxing-core = { module = "com.google.zxing:core", version.ref = "zxing" }
 maplibre-android-sdk-opengl = { module = "org.maplibre.gl:android-sdk-opengl", version.ref = "maplibre" }
 glance-appwidget = { module = "androidx.glance:glance-appwidget", version.ref = "glance" }
 glance-material3 = { module = "androidx.glance:glance-material3", version.ref = "glance" }
+health-connect-client = { module = "androidx.health.connect:connect-client", version.ref = "healthConnect" }
 okhttp = { module = "com.squareup.okhttp3:okhttp", version.ref = "okhttp" }
 okhttp-mockwebserver = { module = "com.squareup.okhttp3:mockwebserver", version.ref = "okhttp" }
 

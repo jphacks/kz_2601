@@ -1,6 +1,7 @@
 package jp.kz2601.metamon.services.local
 
 import jp.kz2601.metamon.services.http.ApiError
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.toList
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
@@ -143,6 +144,30 @@ class SyncQueueTest {
         assertEquals(listOf("NotMember", "Denied", "AppStopped", "Forbidden"), kinds)
         assertTrue(store.rows("app", "todo").isEmpty())
         job.cancel()
+    }
+
+    @Test
+    fun enqueueAtTheEndOfDrainIsStillSent() = runTest(UnconfinedTestDispatcher()) {
+        val q = queue()
+        create(q, "c1")
+        var interrupted = false
+        // drain が最後の 1 件を送り終えて抜ける直前に、別のコルーチンから enqueue + drain を割り込ませる
+        q.onIdle = {
+            if (!interrupted) {
+                interrupted = true
+                coroutineScope {
+                    launch {
+                        create(q, "c2")
+                        q.drain()
+                    }.join()
+                }
+            }
+        }
+        q.drain()
+        assertTrue(interrupted)
+        assertEquals(listOf("c1", "c2"), client.calls.filter { it.kind == "create" }.map { it.clientId })
+        assertEquals(0, q.count()) // 割り込みで積んだ操作が残らない
+        assertTrue(!q.isDraining)
     }
 
     @Test

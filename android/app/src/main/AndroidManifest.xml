@@ -42,13 +42,19 @@
     <!-- アラーム(alarm: true)だけ正確な時刻で鳴らす。利用者が設定で許可した時だけ使い、無ければ正確でないアラーム。
          USE_EXACT_ALARM・USE_FULL_SCREEN_INTENT は Play で目覚まし・通話のアプリに限られるので持たない -->
     <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM" />
-    <!-- Health Connect(healthStat)の権限は、その部品と権限の理由の画面を入れる時に足す(#890 の子 Issue) -->
+    <!-- ヘルスコネクト(healthStat・Field.health・#870)。28〜33 は Health Connect のアプリ、34+ は OS が持つ。
+         聞くのは Health Connect の画面(PermissionController の contract)。理由の画面は下の activity-alias -->
+    <uses-permission android:name="android.permission.health.READ_STEPS" />
+    <uses-permission android:name="android.permission.health.READ_WEIGHT" />
+    <uses-permission android:name="android.permission.health.WRITE_WEIGHT" />
 
-    <!-- 読み上げ(TextToSpeech)のエンジンを見つける(Android 11 からのパッケージの見え方の制限) -->
+    <!-- 読み上げ(TextToSpeech)のエンジンを見つける(Android 11 からのパッケージの見え方の制限)と、
+         13 以前のヘルスコネクトのアプリ(入っているかを見る・#870) -->
     <queries>
         <intent>
             <action android:name="android.intent.action.TTS_SERVICE" />
         </intent>
+        <package android:name="com.google.android.apps.healthdata" />
     </queries>
 
     <application
@@ -100,6 +106,26 @@
                 <category android:name="android.intent.category.DEFAULT" />
             </intent-filter>
         </activity>
+        <!-- ヘルスコネクトの「権限の理由」(#870)。13 以前は Health Connect のアプリがこの action で開く -->
+        <activity
+            android:name=".health.HealthPermissionsRationaleActivity"
+            android:exported="true"
+            android:label="@string/health_rationale_title">
+            <intent-filter>
+                <action android:name="androidx.health.ACTION_SHOW_PERMISSIONS_RATIONALE" />
+            </intent-filter>
+        </activity>
+        <!-- 14+ は OS の設定(ヘルスコネクト)からこの別名で開く -->
+        <activity-alias
+            android:name=".health.ViewPermissionUsageActivity"
+            android:exported="true"
+            android:permission="android.permission.START_VIEW_PERMISSION_USAGE"
+            android:targetActivity=".health.HealthPermissionsRationaleActivity">
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW_PERMISSION_USAGE" />
+                <category android:name="android.intent.category.HEALTH_PERMISSIONS" />
+            </intent-filter>
+        </activity-alias>
         <!-- 生成アプリの通知(#886): 時刻が来た・止めた(自分の PendingIntent だけ)と、再起動・時刻の変更・更新(OS) -->
         <receiver
             android:name=".notifications.NotificationReceiver"

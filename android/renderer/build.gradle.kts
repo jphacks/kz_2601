@@ -49,6 +49,8 @@ dependencies {
     implementation(libs.camerax.view)
     // mapView / locationPicker の地図(#867)。タイルの配信元は components/map/MapStyle.kt の 1 か所
     implementation(libs.maplibre.android.sdk.opengl)
+    // healthStat(歩数・体重)と Field.health の書き込み(#870)
+    implementation(libs.health.connect.client)
     implementation(libs.compose.material.icons.core)
     implementation(libs.compose.ui.tooling.preview)
     implementation(libs.play.services.code.scanner)

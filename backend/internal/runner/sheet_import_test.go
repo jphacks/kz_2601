@@ -3,6 +3,7 @@ package runner_test
 import (
 	"context"
 	"errors"
+	"strings"
 	"testing"
 	"time"
 
@@ -391,5 +392,23 @@ func TestSheetImportValuesLikeDeviceWrites(t *testing.T) {
 	}
 	if _, ok := v3["qty"]; ok || v3["at"] != "2026-11-12T06:00:00+09:00" {
 		t.Fatalf("V-3 = %v", v3)
+	}
+}
+
+// Like fileImport, an import cannot write into a public, single or match
+// entity.
+func TestSheetImportRejectsTargetEntity(t *testing.T) {
+	for name, set := range map[string]func(*dsl.Entity){
+		"public": func(e *dsl.Entity) { e.Scope = dsl.ScopePublic },
+		"single": func(e *dsl.Entity) { e.Single = true },
+		"match":  func(e *dsl.Entity) { e.Match = "pair" },
+	} {
+		t.Run(name, func(t *testing.T) {
+			e := newImportEnv(t, [][]string{{"品番"}, {"A1"}})
+			set(&e.app.Entities[0])
+			if _, err := e.im.Import(t.Context(), e.app, importRun("ev1"), importSpec); !errors.Is(err, runner.ErrImportSpec) || !strings.Contains(err.Error(), name) || len(e.ext.calls) != 0 {
+				t.Fatalf("err = %v, calls = %d", err, len(e.ext.calls))
+			}
+		})
 	}
 }

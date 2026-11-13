@@ -7,10 +7,10 @@ import AppKit
 
 /// leaf が受けるキー(SwiftUI の `KeyPress` から作る。テストでは直接作る)
 enum MacLeafKey: Equatable {
-    case left, right, up, down, space, digit(Int), other
+    case left, right, up, down, space, delete, digit(Int), other
 }
 
-/// rating: ←↓ で 1 つ減らす・→↑ で 1 つ増やす・数字キーでその数(0 で未評価)。
+/// rating: ←↓ で 1 つ減らす・→↑ で 1 つ増やす・数字キーでその数(0 と delete で未評価)。
 enum MacRatingKeys {
     /// 押したキーの後の値。そのキーを使わなければ nil(ほかへ渡す)
     static func value(after key: MacLeafKey, current: Int, count: Int) -> Int? {
@@ -19,6 +19,7 @@ enum MacRatingKeys {
         case .left, .down: return max(cur - 1, 0)
         case .right, .up: return min(cur + 1, count)
         case .digit(let d) where (0...9).contains(d): return min(d, count)
+        case .delete: return 0
         default: return nil
         }
     }

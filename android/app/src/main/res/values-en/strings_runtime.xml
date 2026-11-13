@@ -40,6 +40,8 @@
     <string name="runtime_text_not_allowed">This contains words that can\'t be shown</string>
     <string name="runtime_text_not_allowed_field">“%1$s” contains words that can\'t be shown</string>
     <string name="runtime_unavailable_on_android">This feature isn\'t available on Android yet</string>
+    <string name="runtime_health_saved">Also saved to Health Connect</string>
+    <string name="runtime_health_save_failed">Couldn\'t save to Health Connect</string>
     <string name="runtime_unknown_action">Unsupported action: %1$s</string>
     <string name="runtime_unreachable_body">Check your connection. The app will reload automatically once you\'re back online</string>
     <string name="runtime_unreachable_title">Can\'t connect to the server</string>

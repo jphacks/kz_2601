@@ -13,6 +13,7 @@ func TestFeedValid(t *testing.T) {
 		{Type: CompFeed, Provider: FeedRSS, FeedID: "digital-news", Limit: 20},
 		{Type: CompFeed, Provider: FeedWarnings, Region: "130000"},
 		{Type: CompFeed, Provider: FeedPressure, Region: "016000", Limit: 8},
+		{Type: CompFeed, Provider: FeedTyphoon, EmptyText: "今は台風はありません"},
 	}
 	if err := app.Validate(); err != nil {
 		t.Fatalf("valid feeds rejected: %v", err)
@@ -31,6 +32,8 @@ func TestFeedSemanticErrors(t *testing.T) {
 		{Type: CompFeed, Provider: FeedWarnings, Region: "13000"}, // not 6 digits
 		{Type: CompFeed, Provider: FeedPressure},                  // region missing
 		{Type: CompFeed, Provider: FeedWarnings, Region: "130000", FeedID: "fdma-news"},
+		{Type: CompFeed, Provider: FeedTyphoon, Region: "471000"}, // typhoon takes no region
+		{Type: CompFeed, Provider: FeedTyphoon, FeedID: "TC2638"},
 	}
 	joined := strings.Join(problems(t, app), "\n")
 	for _, want := range []string{
@@ -67,6 +70,11 @@ func TestFeedSchemaClosed(t *testing.T) {
 "entities":[],"screens":[{"id":"home","title":"h","components":[{"type":"feed","provider":"weather","region":"130000","limit":3}]}]}`)
 	if _, err := Parse(ok); err != nil {
 		t.Errorf("weather feed: %v", err)
+	}
+	typhoon := []byte(`{"schemaVersion":1,"app":{"name":"x","voiceEntry":"floating"},"initialScreen":"home",
+"entities":[],"screens":[{"id":"home","title":"h","components":[{"type":"feed","provider":"typhoon"}]}]}`)
+	if _, err := Parse(typhoon); err != nil {
+		t.Errorf("typhoon feed: %v", err)
 	}
 	for _, p := range []string{"warnings", "pressure"} {
 		raw := []byte(`{"schemaVersion":1,"app":{"name":"x","voiceEntry":"floating"},"initialScreen":"home",

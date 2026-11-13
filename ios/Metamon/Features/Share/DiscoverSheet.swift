@@ -21,8 +21,7 @@ struct DiscoverSheet: View {
             ScrollView {
                 LazyVStack(spacing: Theme.Spacing.md) {
                     Picker("並び順", selection: $sort) {
-                        Text("人気").tag("popular")
-                        Text("新着").tag("new")
+                        ForEach(DiscoverSort.allCases) { Text($0.label).tag($0.rawValue) }
                     }
                     .pickerStyle(.segmented)
                     content
@@ -63,7 +62,7 @@ struct DiscoverSheet: View {
         } else if items.isEmpty {
             VStack(spacing: Theme.Spacing.sm) {
                 Image(systemName: "magnifyingglass").font(.title).foregroundStyle(Theme.brandGradient)
-                Text(query.isEmpty ? L10n.tr("まだ公開されたアプリがありません") : L10n.tr("「\(query)」に合うアプリは見つかりませんでした"))
+                Text(DiscoverCopy.emptyMessage(query: query))
                     .font(.subheadline).foregroundStyle(.secondary)
             }
             .padding(.top, Theme.Spacing.xl)
@@ -83,7 +82,7 @@ struct DiscoverSheet: View {
     private func search() async {
         guard let sharing = services.sharing else {
             loading = false
-            error = L10n.tr("「探す」はサーバー接続時のみ使えます")
+            error = DiscoverCopy.unavailable
             return
         }
         if !query.isEmpty { try? await Task.sleep(for: .milliseconds(250)) } // 入力中の連打を間引く
@@ -103,101 +102,6 @@ struct DiscoverSheet: View {
     private func install(_ item: PublicAppListing) {
         SharingUI.shared.showDiscover = false
         Task { await rt.installPublic(item) }
-    }
-}
-
-/// 検索結果カード: 名前・説明・作者・使っている部品のアイコン・インストール数。
-struct PublicAppCard: View {
-    let item: PublicAppListing
-    let install: () -> Void
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: Theme.Spacing.sm) {
-            HStack(alignment: .top, spacing: Theme.Spacing.md) {
-                Text(String(item.name.prefix(1)))
-                    .font(.system(size: 22, weight: .bold, design: .rounded))
-                    .foregroundStyle(.white)
-                    .frame(width: 48, height: 48)
-                    .background(Theme.brandGradient, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(item.name).font(.headline).lineLimit(1)
-                    Text(byline).font(.caption).foregroundStyle(.secondary).lineLimit(1)
-                }
-                Spacer(minLength: 0)
-                Button(action: install) {
-                    Text(item.mine ? L10n.tr("コピー") : L10n.tr("入れる"))
-                        .font(.subheadline.weight(.semibold))
-                        .foregroundStyle(.white)
-                        .padding(.horizontal, Theme.Spacing.md)
-                        .frame(height: 34)
-                        .background(Theme.brandGradient, in: Capsule())
-                }
-                .buttonStyle(.plain)
-                .accessibilityLabel("\(item.name)をインストール")
-            }
-            if item.hidden == true { // #321: 運営が非公開にした自分の掲載
-                Label(item.hiddenReason.map { L10n.tr("運営により非公開: \($0)") } ?? L10n.tr("運営により非公開"),
-                      systemImage: "eye.slash")
-                    .font(.caption.weight(.semibold))
-                    .foregroundStyle(.orange)
-            }
-            if !item.description.isEmpty {
-                Text(item.description)
-                    .font(.subheadline)
-                    .foregroundStyle(.secondary)
-                    .lineLimit(2)
-                    .fixedSize(horizontal: false, vertical: true)
-            }
-            HStack(spacing: Theme.Spacing.sm) {
-                ForEach(item.components.prefix(6), id: \.self) { type in
-                    Image(systemName: ComponentIcon.symbol(for: type))
-                        .font(.caption)
-                        .foregroundStyle(Theme.Colors.brandA)
-                        .frame(width: 26, height: 26)
-                        .background(Theme.Colors.brandA.opacity(0.12), in: Circle())
-                        .accessibilityLabel(type)
-                }
-                Spacer(minLength: 0)
-                ForEach(item.tags.prefix(2), id: \.self) { tag in
-                    Text("#\(tag)").font(.caption2.weight(.medium)).foregroundStyle(.secondary)
-                }
-            }
-        }
-        .metamonCard()
-    }
-
-    private var byline: String {
-        let author = item.authorName.isEmpty ? L10n.tr("匿名") : item.authorName
-        return L10n.tr("\(author) ・ \(item.installs) 人が利用") + (item.mine ? L10n.tr(" ・ あなたの公開") : "")
-    }
-}
-
-/// DSL の component type → SF Symbol(カードの部品アイコン)。
-enum ComponentIcon {
-    static func symbol(for type: String) -> String {
-        switch type {
-        case "stat": "number"
-        case "chart": "chart.bar.fill"
-        case "list", "table": "list.bullet"
-        case "button", "shareButton", "openUrlButton": "hand.tap.fill"
-        case "textField": "character.cursor.ibeam"
-        case "numberField": "textformat.123"
-        case "picker", "segmented": "filemenu.and.selection"
-        case "datePicker", "calendar": "calendar"
-        case "toggle": "switch.2"
-        case "photoField", "camera": "camera.fill"
-        case "image": "photo"
-        case "drawingField": "pencil.tip"
-        case "videoField", "videoPlayer": "video.fill"
-        case "map", "mapView", "locationButton", "locationPicker", "placeSearch": "map.fill"
-        case "timer", "timerDisplay": "timer"
-        case "webView": "safari"
-        case "qrScanner": "qrcode.viewfinder"
-        case "qrCode": "qrcode"
-        case "progress", "gauge": "gauge.with.dots.needle.50percent"
-        case "text": "text.alignleft"
-        default: "square.grid.2x2"
-        }
     }
 }
 

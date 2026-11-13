@@ -160,6 +160,7 @@ final class MacAccount {
 
     private static func registerPush() async {
         #if !APP_STORE_REVIEW
+        MacPushHost.shared.resume()
         await MacPushHost.shared.refresh()
         #endif
     }
@@ -169,6 +170,12 @@ final class MacAccount {
         session.farewell = false
         if isLive, session.user == nil { await session.signInAnonymously() }
         await adoptUser(session.user?.uid) // wipe 済みなので持ち主を入れるだけ
+    }
+
+    /// 既にあるアカウント(Apple 以外)に Apple をつなぐ(#361・設定の「サインインの方法」)。
+    /// その Apple ID が別のアカウントにあっても、切り替えもまとめもしない(uid は変わらないので端末のデータも消さない)
+    func linkApple(_ result: Result<ASAuthorization, Error>, nonce: String) async -> AppleLinkOutcome {
+        await session.linkAppleToCurrentAccount(result, nonce: nonce)
     }
 
     /// 失敗の一言(設定・カードの下に出す)。サインインし直しと引き継ぎで置き場が分かれているのをまとめる

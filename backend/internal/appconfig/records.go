@@ -11,6 +11,7 @@ import (
 	"unicode/utf8"
 
 	"github.com/jphacks/kz_2601/backend/internal/httpx"
+	"github.com/jphacks/kz_2601/backend/internal/metrics"
 	"github.com/jphacks/kz_2601/backend/internal/store"
 	"github.com/jphacks/kz_2601/backend/pkg/dsl"
 )
@@ -157,6 +158,7 @@ func (h *Handler) serveRecords(w http.ResponseWriter, r *http.Request, in record
 		fail(w, mapStoreErr(err, "entity"))
 		return
 	}
+	sharedUsage(r, cur.ID, ent, metrics.SharedRead, len(all)) // #2298: what the store read, not the page
 	if len(all) > store.MaxRecordsPerEntity {
 		fail(w, apiErr(http.StatusRequestEntityTooLarge, httpx.CodePayloadTooLarge, "too many records to sort in memory"))
 		return
@@ -384,6 +386,7 @@ func (h *Handler) createRecord(w http.ResponseWriter, r *http.Request) {
 		fail(w, mapStoreErr(err, "entity"))
 		return
 	}
+	sharedUsage(r, cur.ID, ent, metrics.SharedWrite, 1)
 	httpx.WriteJSON(w, http.StatusCreated, toRecordOut(out))
 }
 
@@ -404,6 +407,7 @@ func (h *Handler) upsertSingle(w http.ResponseWriter, r *http.Request, cur *stor
 	if !created {
 		status = http.StatusOK
 	}
+	sharedUsage(r, cur.ID, ent, metrics.SharedWrite, 1)
 	httpx.WriteJSON(w, status, toRecordOut(out))
 }
 
@@ -420,6 +424,9 @@ func (h *Handler) getRecord(w http.ResponseWriter, r *http.Request) {
 	}
 	rs := recordSet(r, cur, ent, eid)
 	rec, err := h.store.GetRecord(r.Context(), rs, rid)
+	if err == nil {
+		sharedUsage(r, cur.ID, ent, metrics.SharedRead, 1)
+	}
 	if err == nil && !canRead(ent, rec, uidOf(r)) {
 		err = store.ErrNotFound // #271: an addressed record of others
 	}
@@ -516,6 +523,9 @@ func (h *Handler) patchRecord(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	rec, err := h.updateRecordKept(r, cur, ent, rs, existing, merged) // #273
+	if err == nil {
+		sharedUsage(r, cur.ID, ent, metrics.SharedWrite, 1)
+	}
 	if err != nil {
 		fail(w, mapStoreErr(err, "record"))
 		return
@@ -550,6 +560,7 @@ func (h *Handler) deleteRecord(w http.ResponseWriter, r *http.Request) {
 		fail(w, mapStoreErr(err, "record"))
 		return
 	}
+	sharedUsage(r, cur.ID, ent, metrics.SharedWrite, 1)
 	w.WriteHeader(http.StatusNoContent)
 }
 
@@ -585,6 +596,9 @@ func (h *Handler) deleteAllRecords(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	uid := uidOf(r)
+	sharedUsage(r, cur.ID, ent, metrics.SharedRead, len(all))
+	deleted := 0
+	defer func() { sharedUsage(r, cur.ID, ent, metrics.SharedWrite, deleted) }()
 	for i := range all {
 		if !everyone && all[i].Author != uid {
 			continue
@@ -593,6 +607,7 @@ func (h *Handler) deleteAllRecords(w http.ResponseWriter, r *http.Request) {
 			fail(w, err)
 			return
 		}
+		deleted++
 	}
 	w.WriteHeader(http.StatusNoContent)
 }

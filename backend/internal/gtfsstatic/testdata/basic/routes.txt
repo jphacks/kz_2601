@@ -1,0 +1,3 @@
+route_id,agency_id,route_short_name,route_long_name,route_type
+R1,A1,10,香林坊-金沢駅,3
+R2,A1,,兼六園シャトル,3

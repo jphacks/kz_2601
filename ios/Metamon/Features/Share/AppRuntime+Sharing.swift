@@ -189,17 +189,26 @@ struct ShareLinkReceiver: ViewModifier {
 /// RootView に 1 行で付ける: URL スキーム受信・「探す」シート・DEBUG の自動操作フック。
 struct SharingHooks: ViewModifier {
     @Environment(AppRuntime.self) private var rt
+    @Environment(\.assistiveAccess) private var assistiveAccess
     @State private var ui = SharingUI.shared
     private var splash: SplashPresence { .shared }
     private var consentHold: LaunchConsentHold { .shared }
 
     func body(content: Content) -> some View {
-        content
+        let shows = assistiveAccess.shows(.shareLinks)
+        return content
             // リンクの受信は `ShareLinkReceiver`(サインイン画面の時も届く)。ここでは準備ができたら開く(#278)
             .task(id: "\(ui.isReady)|\(splash.isShowing)|\(consentHold.isHolding(before: .shareLink))|\(ui.linkSerial)") {
                 // スプラッシュ → 起動時の同意 → チュートリアルが閉じてから開く(シートを同時に出すと片方が捨てられる)
                 guard !splash.isShowing, !consentHold.isHolding(before: .shareLink) else { return }
                 guard let url = ui.takeLink() else { return }
+                // アシスティブアクセス(#1997)では追加・参加の確認を出さず、リンクは捨てて一言だけ
+                guard shows else {
+                    print("[Metamon] share link dropped (assistive access)")
+                    rt.toast = AssistiveAccessPolicy.unavailableMessage
+                    ui.linkSettled()
+                    return
+                }
                 consentHold.beginDuringLaunch(.shareLink) // 起動の途中なら、受信時の段が放されていても Intent を待たせる
                 // 取り出したリンクは id が変わっても最後まで開く(.task の取り消しでプレビューの取得を止めない)
                 await Task { @MainActor in
@@ -207,9 +216,11 @@ struct SharingHooks: ViewModifier {
                     ui.linkSettled() // 確認を出さなかった(トースト等)時はここで次へ。出した時は閉じた時(onDismiss)
                 }.value
             }
-            .sheet(isPresented: $ui.showDiscover) { DiscoverSheet() }
-            .sheet(item: $ui.pendingJoin, onDismiss: { ui.linkSettled() }) { JoinShareSheet(join: $0).onAppear { consentHold.markShown(.shareLink) } }
-            .sheet(item: $ui.pendingImport, onDismiss: { ui.linkSettled() }) { AddShareSheet(pending: $0).onAppear { consentHold.markShown(.shareLink) } }
+            .sheet(isPresented: Binding(get: { shows && ui.showDiscover }, set: { ui.showDiscover = $0 })) { DiscoverSheet() }
+            .sheet(item: Binding(get: { shows ? ui.pendingJoin : nil }, set: { ui.pendingJoin = $0 }),
+                   onDismiss: { ui.linkSettled() }) { JoinShareSheet(join: $0).onAppear { consentHold.markShown(.shareLink) } }
+            .sheet(item: Binding(get: { shows ? ui.pendingImport : nil }, set: { ui.pendingImport = $0 }),
+                   onDismiss: { ui.linkSettled() }) { AddShareSheet(pending: $0).onAppear { consentHold.markShown(.shareLink) } }
             #if DEBUG
             .task { await debugHooks() }
             .modifier(ReleaseRequestHooks())

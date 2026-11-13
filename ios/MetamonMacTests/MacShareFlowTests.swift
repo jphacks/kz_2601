@@ -64,8 +64,10 @@ final class MacShareFlowTests: XCTestCase {
     }
 
     private func flow(_ sharing: FakeSharing?, signedIn: @escaping @MainActor () -> Bool = { true }) throws -> MacShareFlow {
-        MacShareFlow(sharing: sharing, appConfig: sharing == nil ? nil : FakeAppConfig(document: try document()),
-                     isSignedIn: signedIn, envelope: { _ in nil })
+        let flow = MacShareFlow(sharing: sharing, appConfig: sharing == nil ? nil : FakeAppConfig(document: try document()),
+                                isSignedIn: signedIn, envelope: { _ in nil })
+        flow.hold = LaunchConsentHold() // 起動時の順番待ち(#1885)はテストのホストのアプリと分ける
+        return flow
     }
 
     // MARK: - 保留(ios/Shared の PendingShareLink)

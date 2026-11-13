@@ -16,7 +16,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import jp.kz2601.metamon.dsl.Component
@@ -60,7 +59,7 @@ fun SliderLeaf(c: Component, ctx: RenderContext, modifier: Modifier = Modifier) 
             )
             Text(
                 numberText(value, def),
-                fontWeight = FontWeight.SemiBold,
+                style = RenderTheme.Fonts.rowTrailing,
                 color = MaterialTheme.colorScheme.primary,
                 textAlign = TextAlign.End,
                 modifier = Modifier.widthIn(min = 40.dp),
@@ -80,7 +79,7 @@ fun StepperLeaf(c: Component, ctx: RenderContext, modifier: Modifier = Modifier)
         OutlinedButton(onClick = { form.setDouble(field, (value - step).coerceIn(bounds.start, bounds.endInclusive)) }, enabled = value > bounds.start) {
             Text("−")
         }
-        Text(numberText(value, def), fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.primary)
+        Text(numberText(value, def), style = RenderTheme.Fonts.rowTrailing, color = MaterialTheme.colorScheme.primary)
         OutlinedButton(onClick = { form.setDouble(field, (value + step).coerceIn(bounds.start, bounds.endInclusive)) }, enabled = value < bounds.endInclusive) {
             Text("+")
         }
@@ -101,7 +100,7 @@ fun RatingLeaf(c: Component, ctx: RenderContext, modifier: Modifier = Modifier) 
                 ) {
                     Text(
                         if (i <= current) "★" else "☆",
-                        style = MaterialTheme.typography.titleLarge,
+                        style = RenderTheme.Fonts.star,
                         color = if (i <= current) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outline,
                     )
                 }

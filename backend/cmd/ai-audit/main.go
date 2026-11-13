@@ -51,6 +51,52 @@ type app struct {
 	entities map[string]obj
 	fields   map[string]map[string]obj // entity -> field id -> field
 	comps    []comp                    // every component incl. container children
+	bad      []string                  // malformed (non-object) items skipped by load
+}
+
+// kind names a decoded JSON value's type for malformed-item reports.
+func kind(v any) string {
+	switch v.(type) {
+	case nil:
+		return "null"
+	case string:
+		return "string"
+	case float64:
+		return "number"
+	case bool:
+		return "bool"
+	case []any:
+		return "array"
+	}
+	return fmt.Sprintf("%T", v)
+}
+
+// objs returns the object elements of m[k], recording the others in a.bad.
+func (a *app) objs(m obj, k, at string) []obj {
+	var out []obj
+	for _, e := range a.indexed(m, k, at) {
+		out = append(out, e.o)
+	}
+	return out
+}
+
+// item is an object element of an array with its index in the original array.
+type item struct {
+	i int
+	o obj
+}
+
+// indexed is objs that keeps each object's original index (for location labels).
+func (a *app) indexed(m obj, k, at string) []item {
+	var out []item
+	for i, v := range arr(m, k) {
+		if o, ok := v.(obj); ok {
+			out = append(out, item{i, o})
+		} else {
+			a.bad = append(a.bad, fmt.Sprintf("malformed: %s.%s[%d] がオブジェクトでない(%s)", at, k, i, kind(v)))
+		}
+	}
+	return out
 }
 
 type comp struct {
@@ -64,28 +110,35 @@ func load(raw json.RawMessage) (*app, error) {
 		return nil, err
 	}
 	a := &app{raw: root, screens: map[string]obj{}, entities: map[string]obj{}, fields: map[string]map[string]obj{}}
-	for _, e := range arr(root, "entities") {
-		eo, _ := e.(obj)
+	if root == nil { // "dsl": null decodes without error; do not pass it off as an empty app
+		a.bad = append(a.bad, "malformed: dsl がオブジェクトでない(null)")
+		return a, nil
+	}
+	for _, eo := range a.objs(root, "entities", "dsl") {
 		id := str(eo, "id")
 		a.entities[id] = eo
 		a.fields[id] = map[string]obj{}
-		for _, f := range arr(eo, "fields") {
-			fo, _ := f.(obj)
+		for _, fo := range a.objs(eo, "fields", "entity "+id) {
 			a.fields[id][str(fo, "id")] = fo
 		}
 	}
-	for _, s := range arr(root, "screens") {
-		so, _ := s.(obj)
-		a.screens[str(so, "id")] = so
-		for _, c := range arr(so, "components") {
-			co, _ := c.(obj)
-			a.comps = append(a.comps, comp{str(so, "id"), co})
-			for _, ch := range arr(co, "children") {
-				cho, _ := ch.(obj)
-				a.comps = append(a.comps, comp{str(so, "id"), cho})
+	for _, so := range a.objs(root, "screens", "dsl") {
+		sid := str(so, "id")
+		a.screens[sid] = so
+		a.objs(so, "toolbar", "screen "+sid) // report only; actions() skips non-objects
+		for _, e := range a.indexed(so, "components", "screen "+sid) {
+			co := e.o
+			a.comps = append(a.comps, comp{sid, co})
+			at := fmt.Sprintf("screen %s.components[%d]", sid, e.i) // index keeps same-type containers apart
+			if t := str(co, "type"); t != "" {
+				at += " " + t
+			}
+			for _, cho := range a.objs(co, "children", at) {
+				a.comps = append(a.comps, comp{sid, cho})
 			}
 		}
 	}
+	a.objs(sub(root, "app"), "tabs", "app") // report only; lint skips non-objects
 	return a, nil
 }
 
@@ -252,13 +305,15 @@ var (
 )
 
 func lint(a *app) []string {
-	var out []string
+	out := append([]string(nil), a.bad...)
 	add := func(f string, args ...any) { out = append(out, fmt.Sprintf(f, args...)) }
 
 	// navigation
 	reached := map[string]bool{str(a.raw, "initialScreen"): true}
 	for _, t := range arr(sub(a.raw, "app"), "tabs") {
-		reached[str(t.(obj), "screen")] = true
+		if to, ok := t.(obj); ok {
+			reached[str(to, "screen")] = true
+		}
 	}
 	saveOn := map[string]bool{}
 	for _, act := range a.actions() {
@@ -426,7 +481,13 @@ func need(a *app, n string) (string, string) {
 		}
 		return "×", "チェックが無い"
 	case "tabs3":
-		return yes(len(arr(sub(a.raw, "app"), "tabs")) >= 3, "タブ 3 つ以上")
+		n := 0
+		for _, t := range arr(sub(a.raw, "app"), "tabs") {
+			if _, ok := t.(obj); ok {
+				n++
+			}
+		}
+		return yes(n >= 3, "タブ 3 つ以上")
 	case "filter_bool":
 		ok := a.has(func(c obj) bool {
 			f := sub(c, "filter")

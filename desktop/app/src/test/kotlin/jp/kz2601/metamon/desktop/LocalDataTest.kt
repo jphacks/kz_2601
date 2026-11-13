@@ -48,6 +48,7 @@ class LocalDataTest {
             SharedRecords.opening(p, scope) { p.load(models) }
         },
         wipeStore = { wiped += "store"; store.wipe() },
+        clearTempFiles = { wiped += "temp" },
     )
 
     // MARK: - 起動時のスケルトン
@@ -147,7 +148,8 @@ class LocalDataTest {
             assertTrue(store.records.rows("shopping", "groceries").isEmpty())
             assertTrue(store.records.rows("kakeibo", "expense").isEmpty())
             assertNull(store.lastAppId)
-            assertEquals(listOf("store"), wiped)
+            // 一時ファイル(写真の「既定のアプリで開く」・引き出し)も消す
+            assertEquals(listOf("store", "temp"), wiped)
             assertEquals("この端末のデータを消しました", window.message)
 
             // 同じアプリの他のウィンドウも打ちかけを捨てて最初の画面へ

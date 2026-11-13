@@ -162,6 +162,8 @@ func (s *Service) logGenerate(ctx context.Context, tr genTrace, stream bool, res
 		slog.Bool("first_generation", tr.first),
 		slog.Bool("stream", stream),
 		slog.Int64("duration_ms", d.Milliseconds()),
+		slog.String("model", s.Model),
+		slog.String("prompt_version", PromptVersion()), // compare versions during a rollout (#372)
 	}
 	if res != nil {
 		m := res.Meta

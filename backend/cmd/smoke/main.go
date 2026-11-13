@@ -560,5 +560,6 @@ func trunc(s string, n int) string {
 	if len(s) <= n {
 		return s
 	}
-	return s[:n] + "…"
+	// drops a rune split at the cut and any invalid bytes before it
+	return strings.ToValidUTF8(s[:n], "") + "…"
 }

@@ -11,6 +11,8 @@ import kotlinx.serialization.builtins.ListSerializer
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
 import java.io.File
+import java.time.Instant
+import java.time.OffsetDateTime
 import kotlin.coroutines.CoroutineContext
 
 /** ローカル行の未送信状態。`NONE` 以外は [SyncQueue] に対応する操作が積まれている。 */
@@ -94,8 +96,16 @@ class RecordStore(
     suspend fun records(appId: String, entity: String): List<Record> =
         rows(appId, entity).filter { it.pendingOp != PendingOp.DELETE }.map { it.record }
 
+    /**
+     * createdAt 降順。文字列ではなく時刻で比べる(小数秒の桁が違う `.1Z` と `.123456Z` を取り違えない)。
+     * 同じ時刻(粗い時計で同じ刻みに作った等)は後から入った行を先に出す。表は古い → 新しいの順に持つ([replace] 参照)。
+     * 読めない・無い createdAt は末尾。
+     */
     suspend fun rows(appId: String, entity: String): List<LocalRecord> =
-        lock.withLock { table(appId, entity) }.sortedByDescending { it.createdAt ?: "" }
+        lock.withLock { table(appId, entity) }
+            .withIndex()
+            .sortedWith(compareByDescending<IndexedValue<LocalRecord>> { instantOf(it.value.createdAt) }.thenByDescending { it.index })
+            .map { it.value }
 
     suspend fun row(appId: String, entity: String, recordId: String): LocalRecord? =
         lock.withLock { table(appId, entity).firstOrNull { it.recordId == recordId } }
@@ -150,7 +160,8 @@ class RecordStore(
     suspend fun replace(appId: String, entity: String, server: List<Record>) = edit(appId, entity) { t ->
         val pending = t.filter { it.pendingOp != PendingOp.NONE }
         t.clear()
-        t += server.map { LocalRecord.fromServer(appId, entity, it) }
+        // サーバーは新しい順(同時刻は id 降順)で返す。表は古い順に持つので逆にして入れる(同時刻の並びがサーバーと揃う)
+        t += server.asReversed().map { LocalRecord.fromServer(appId, entity, it) }
         for (p in pending) {
             val i = t.indexOfFirst { it.recordId == p.recordId }
             if (i >= 0) t[i] = p else t += p
@@ -249,6 +260,14 @@ class RecordStore(
     companion object {
         internal val json = Json { ignoreUnknownKeys = true; encodeDefaults = false }
         private val rowsSerializer = ListSerializer(LocalRecord.serializer())
+
+        /** ISO-8601 の時刻(`Z` でもオフセット付きでも)。無い・読めないなら [Instant.MIN]。 */
+        internal fun instantOf(s: String?): Instant {
+            if (s.isNullOrEmpty()) return Instant.MIN
+            return runCatching { Instant.parse(s) }
+                .recoverCatching { OffsetDateTime.parse(s).toInstant() }
+                .getOrDefault(Instant.MIN)
+        }
 
         internal fun safe(s: String): String = s.map { if (it.isLetterOrDigit() || it == '-' || it == '_') it else '_' }.joinToString("")
     }

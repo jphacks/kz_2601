@@ -18,9 +18,109 @@ struct RootView: View {
     @State private var fabFrame: CGRect?
     /// ソフトキーボードの表示状態(FAB を隠す・#143)
     private let keyboard = KeyboardState.shared
+    @Environment(\.assistiveAccess) private var assistiveAccess
+    /// アシスティブアクセスの一覧から開いたアプリ(#1997)
+    @State private var assistiveOpenedAppId: String?
 
+    // 1 本の長い修飾子の連なりは Staging / Release(最適化あり)の型検査が時間切れになるので、段ごとに分ける
     var body: some View {
         @Bindable var rt = rt
+        return launchLayers
+            .alert(item: $rt.confirm) { (confirm: RuntimeConfirm) -> Alert in
+                Self.confirmAlert(confirm)
+            }
+            // 編集モード中は上のカードを出さない(「完了」「キャンセル」に被る)。バーは上のカードより後に重ねる
+            .overlay(alignment: .top) { if Self.showsTopCards(gridEditing: rt.gridEdit != nil) { summaryCard } }
+            .overlay(alignment: .top) { if Self.showsTopCards(gridEditing: rt.gridEdit != nil) { errorCardOverlay } }
+            .overlay(alignment: .top) { if rt.gridEdit != nil { GridEditBar().transition(.move(edge: .top).combined(with: .opacity)) } }
+            .modifier(ToastHost(onModal: false))
+            .modifier(NewItemsHost()) // #268: 開いた直後に他の人の新着の数
+            .modifier(UsageNoticeHost()) // #317: 記録・写真が上限に近い(作成者・1 日 1 回)
+            .onChange(of: scenePhase) { _, phase in
+                rt.setForeground(phase == .active) // ホットリロードのポーリングは前面時のみ
+            }
+    }
+
+    /// 根の画面 + シート・全画面 + 共有などの受け口。
+    private var modalLayers: some View {
+        @Bindable var rt = rt
+        return mainLayers
+            .tint(RenderTheme.Colors.brandA) // 生成アプリは常に Tailor It ブランド(docs/ios/design-system.md)
+            .preferredColorScheme(colorScheme)
+            .sheet(item: $rt.sheet) { (route: Route) in
+                ModalScreen(route: route)
+            }
+            .fullScreenCover(item: $rt.fullScreen) { (route: Route) in
+                ModalScreen(route: route)
+            }
+            .modifier(HostSheets(onModal: false))
+            .modifier(RootSocialHosts())
+    }
+
+    /// 上の層 + AI ボタンの入口・触覚。
+    private var aiButtonLayers: some View {
+        modalLayers
+            // アシスティブアクセス(#1997)では AI ボタンを出さない
+            .environment(\.formToolbarAccessory, formToolbarAccessory)
+            .environment(\.aiButtonLayer, aiButtonLayerWrapper) // #629 部品から開くシートにも AI ボタン
+            .sensoryFeedback(.impact(weight: .medium), trigger: rt.showAppSwitcher) { (_: Bool, opened: Bool) -> Bool in opened }
+    }
+
+    private var formToolbarAccessory: AnyView? {
+        guard assistiveAccess.shows(.aiButton) else { return nil }
+        return AnyView(VoiceToolbarButton())
+    }
+
+    private var aiButtonLayerWrapper: AIButtonLayerWrapper? {
+        guard assistiveAccess.shows(.aiButton) else { return nil }
+        return ComponentAIButtonLayer.wrapper
+    }
+
+    /// 上の層 + 常駐の確認・バー・変身後のサムネ撮影。
+    private var promptLayers: some View {
+        aiButtonLayers
+            .modifier(PublicDataPromptHost()) // #253 生成直後の「個人の情報も公開されます」
+            .modifier(RetentionPromptHost()) // #482 記録の保存期間の確認
+            .modifier(TrackingBarHost()) // #559 位置の記録中はどの画面でも上に「記録中」バー
+            .modifier(NotificationsOffBarHost()) // L3 通知がオフなら上に「設定を開く」付きのバー
+            #if !APP_STORE_REVIEW
+            .modifier(FeedbackShakeHost()) // #319 端末を振ってフィードバック
+            #endif
+            .onChange(of: rt.document.version) { captureThumbnailAfterMorph() }
+    }
+
+    /// 変身(apply)が落ち着いてから今の画面をサムネに撮る(変身一覧カード用)
+    private func captureThumbnailAfterMorph() {
+        Task {
+            // 組み上げ演出(#626)の間は生成中の表示なので、終わって本物の画面に切り替わってから撮る
+            let reveal: Double = rt.buildReveal.map { $0.plan.total + 0.7 } ?? 0
+            try? await Task.sleep(for: .seconds(1.2 + reveal))
+            guard rt.morphJob == nil, rt.buildReveal == nil, !rt.showAppSwitcher else { return }
+            AppThumbnailStore.shared.capture(appId: rt.document.appId, isVoiceOnly: rt.dsl.isVoiceOnly)
+        }
+    }
+
+    /// 上の層 + E2E 用の自動操作(DEBUG)+ 起動時の案内。
+    private var launchLayers: some View {
+        promptLayers
+            #if DEBUG
+            .modifier(RootDebugAutomation(visibleMainRoute: { visibleMainRoute }))
+            #endif
+            // アシスティブアクセス(#1997)では起動時の案内を出さない(待たせていたリンク・Intent は下の task で放す)
+            .unlessAssistiveAccess(.launchPrompts, ConsentHost()) // #246: AI への送信の同意・音声モデルのダウンロード確認
+            .unlessAssistiveAccess(.launchPrompts, AccountLinkPromptHost()) // #276: 匿名で初めて作った後の「引き継ぎのためにサインイン」
+            .unlessAssistiveAccess(.launchPrompts, TutorialHost()) // #274: 同意のあとに初回のチュートリアル・最初のアプリの直後に直し方の例
+            #if !APP_STORE_REVIEW
+            .unlessAssistiveAccess(.launchPrompts, BetaWelcomeHost()) // #313: β の版だけ、チュートリアルのあとに初回の案内
+            #endif
+            .task(id: assistiveAccess) {
+                rt.assistiveAccess = assistiveAccess
+                if !assistiveAccess.shows(.launchPrompts) { rt.launchPresentationsAbandoned() }
+            }
+    }
+
+    /// 生成中の演出・本体の画面・FAB・編集インジケータを重ねた層。
+    private var mainLayers: some View {
         ZStack {
             Group {
                 if let stage = rt.buildStage {
@@ -34,6 +134,10 @@ struct RootView: View {
                     // 結果が届いた後も組み上げ(#626)の間はここに留まる(`rootViewID` で作り直さない)
                     GeneratingView(job: stage.job, reveal: stage.reveal)
                         .transition(.asymmetric(insertion: .identity, removal: .opacity))
+                } else if assistiveHome == .appList {
+                    AssistiveAccessAppList { assistiveOpenedAppId = $0 }
+                } else if assistiveHome == .openedApp, AssistiveActions.hasCandidates(in: rt.dsl) {
+                    AssistiveAccessActionsView() // #1998 主な動作を大きなボタンで(選べない時は今の画面のまま)
                 } else if rt.dsl.isVoiceOnly {
                     // 初期状態(voiceEntry = fullscreen)はグリッドのセル内ではなく全面に描く(背景を画面いっぱいに敷くため)。
                     // 見出しは DSL の prompt ではなく Greeting(#42: 初回/再訪/時間帯で出し分け)
@@ -59,13 +163,14 @@ struct RootView: View {
                 .environment(\.fabFrame, fabFrame)
                 .environment(\.changeHighlight, rt.changeHighlight) // #626 編集で変わった部品だけ光らせる
                 .environment(\.gridEditSession, rt.gridEdit) // #1442 手で動かす編集モード
+                .safeAreaInset(edge: .top, spacing: 0) { assistiveBackBar }
 
             // フォーム画面(push)では FAB を出さず、ナビバー右上のマイク(`formToolbarAccessory`)が入口になる(#83)
             // キーボード表示中も隠す(入力欄・キーボードのツールバーに被るため・#143)
             // シート・部品のシートが上にある間はそちらの層が出す(#629 `ModalVoiceFabLayer` / `ComponentAIButtonLayer`)
             ZStack {
                 // create の全画面「変身中」の上には出さない(重ねる方式の時は GeneratingView が覆っていた)
-                if mainEntry == .fab, rt.gridEdit == nil { // 編集モード中は FAB を出さない(部品のつまみに被る)
+                if mainEntry == .fab, rt.gridEdit == nil, assistiveAccess.shows(.aiButton) { // 編集モード中は FAB を出さない(部品のつまみに被る)
                     VoiceFab(
                         hasTabs: rt.dsl.app.hasTabs,
                         leadingObstructionTop: bottomObstructions[visibleMainRoute.id],
@@ -103,115 +208,30 @@ struct RootView: View {
                     .zIndex(3)
             }
         }
-        .tint(RenderTheme.Colors.brandA) // 生成アプリは常に Tailor It ブランド(docs/ios/design-system.md)
-        .preferredColorScheme(colorScheme)
-        .sheet(item: $rt.sheet) { route in
-            ScreenStack(root: route)
-                .modifier(ModalVoiceFabLayer()) // #629 シートの中にも AI ボタン
-                .modifier(HostSheets(onModal: true))
-                #if !APP_STORE_REVIEW
-                .modifier(NearbySheets(onModal: true))
-                .modifier(ModerationDialogs(onModal: true))
-                .modifier(MatchingSheets(onModal: true))
-                .modifier(CallSheets(onModal: true))
-                #endif
-                .modifier(ToastHost(onModal: true))
-        }
-        .fullScreenCover(item: $rt.fullScreen) { route in
-            ScreenStack(root: route)
-                .modifier(ModalVoiceFabLayer())
-                .modifier(HostSheets(onModal: true))
-                #if !APP_STORE_REVIEW
-                .modifier(NearbySheets(onModal: true))
-                .modifier(ModerationDialogs(onModal: true))
-                .modifier(MatchingSheets(onModal: true))
-                .modifier(CallSheets(onModal: true))
-                #endif
-                .modifier(ToastHost(onModal: true))
-        }
-        .modifier(HostSheets(onModal: false))
-        #if !APP_STORE_REVIEW // 審査用ビルドはシェアリンク・探す・近くの端末との共有を外す(#245)
-        .modifier(SharingHooks()) // シェアリンク受信・「探す」シート(#49 #50)
-        .modifier(HandoffAdvertiser()) // 今の画面と記録を Mac へ(連係の Handoff・#1851)
-        .modifier(NearbySheets(onModal: false)) // 近くの端末と送り合う(#36)
-        .modifier(ModerationDialogs()) // 通報・ブロック(#321)
-        .modifier(MatchingSheets()) // 仲間探しの 18 歳以上の確認(#507)
-        .modifier(CallSheets()) // 通話の画面(#447)
-        #endif
-        .environment(\.formToolbarAccessory, AnyView(VoiceToolbarButton()))
-        .environment(\.aiButtonLayer, ComponentAIButtonLayer.wrapper) // #629 部品から開くシートにも AI ボタン
-        .sensoryFeedback(.impact(weight: .medium), trigger: rt.showAppSwitcher) { _, opened in opened }
-        .modifier(PublicDataPromptHost()) // #253 生成直後の「個人の情報も公開されます」
-        .modifier(RetentionPromptHost()) // #482 記録の保存期間の確認
-        .modifier(TrackingBarHost()) // #559 位置の記録中はどの画面でも上に「記録中」バー
-        .modifier(NotificationsOffBarHost()) // L3 通知がオフなら上に「設定を開く」付きのバー
-        #if !APP_STORE_REVIEW
-        .modifier(FeedbackShakeHost()) // #319 端末を振ってフィードバック
-        #endif
-        .onChange(of: rt.document.version) {
-            // 変身(apply)が落ち着いてから今の画面をサムネに撮る(変身一覧カード用)
-            Task {
-                // 組み上げ演出(#626)の間は生成中の表示なので、終わって本物の画面に切り替わってから撮る
-                let reveal = rt.buildReveal.map { $0.plan.total + 0.7 } ?? 0
-                try? await Task.sleep(for: .seconds(1.2 + reveal))
-                guard rt.morphJob == nil, rt.buildReveal == nil, !rt.showAppSwitcher else { return }
-                AppThumbnailStore.shared.capture(appId: rt.document.appId, isVoiceOnly: rt.dsl.isVoiceOnly)
+    }
+
+    /// 確認ダイアログ(`rt.confirm`)。
+    static func confirmAlert(_ confirm: RuntimeConfirm) -> Alert {
+        let run: () -> Void = { Task { await confirm.perform() } }
+        let primary: Alert.Button = confirm.isDestructive
+            ? .destructive(Text(confirm.primaryLabel), action: run)
+            : .default(Text(confirm.primaryLabel), action: run)
+        return Alert(title: Text(confirm.message), primaryButton: primary, secondaryButton: .cancel(Text("キャンセル")))
+    }
+
+    /// アシスティブアクセス(#1997)の根に出すもの。
+    /// アシスティブアクセスで開いたアプリの「戻る」(#1997)。式を分けて Staging の型検査の時間切れを避ける
+    @ViewBuilder private var assistiveBackBar: some View {
+        if assistiveHome == .openedApp {
+            AssistiveAccessBackBar {
+                rt.paths = [:] // 次に開いた時は最初の画面から
+                assistiveOpenedAppId = nil
             }
         }
-        #if DEBUG
-        .task { await ScreenMapUI.shared.autoOpenIfRequested(rt) } // `METAMON_AUTO_SCREEN_MAP`(#116)
-        .task {
-            // ヘッドレス E2E 用: `METAMON_AUTO_SWITCHER=1` で起動 2.5 秒後に変身一覧を開く
-            guard ProcessInfo.processInfo.environment["METAMON_AUTO_SWITCHER"] == "1" else { return }
-            try? await Task.sleep(for: .seconds(2.5))
-            rt.openSwitcher()
-        }
-        .task {
-            // ヘッドレス E2E 用: `METAMON_AUTO_FOCUS=voice-sheet` で起動 2 秒後に発話シートを開く(シート内の文字入力へフォーカス・#143)
-            guard ProcessInfo.processInfo.environment["METAMON_AUTO_FOCUS"] == "voice-sheet", !rt.dsl.isVoiceOnly else { return }
-            try? await Task.sleep(for: .seconds(2))
-            rt.showVoiceSheet = true
-        }
-        .task {
-            // ヘッドレス E2E 用: `METAMON_AUTO_OPEN=<screen>[:push|sheet][:record]` で起動 2.5 秒後に画面を開く
-            // (`record` を付けると screen.entity の先頭レコードを編集モードで開く)
-            guard let spec = ProcessInfo.processInfo.environment["METAMON_AUTO_OPEN"], !spec.isEmpty else { return }
-            try? await Task.sleep(for: .seconds(2.5))
-            let parts = spec.split(separator: ":").map(String.init)
-            let screen = parts[0]
-            let recordId = parts.contains("record")
-                ? rt.dsl.screen(screen)?.entity.flatMap { rt.records(for: $0).first?.id } : nil
-            if parts.contains("sheet") {
-                rt.sheet = Route(screen: screen, recordId: recordId, stack: "sheet")
-            } else {
-                let stack = visibleMainRoute.stack
-                rt.paths[stack, default: []].append(Route(screen: screen, recordId: recordId, stack: stack))
-            }
-        }
-        #endif
-        .modifier(ConsentHost()) // #246: AI への送信の同意・音声モデルのダウンロード確認
-        .modifier(AccountLinkPromptHost()) // #276: 匿名で初めて作った後の「引き継ぎのためにサインイン」
-        .modifier(TutorialHost()) // #274: 同意のあとに初回のチュートリアル・最初のアプリの直後に直し方の例
-        #if !APP_STORE_REVIEW
-        .modifier(BetaWelcomeHost()) // #313: β の版だけ、チュートリアルのあとに初回の案内
-        #endif
-        .alert(item: $rt.confirm) { confirm in
-            let run: () -> Void = { Task { await confirm.perform() } }
-            return Alert(title: Text(confirm.message),
-                         primaryButton: confirm.isDestructive ? .destructive(Text(confirm.primaryLabel), action: run)
-                                                              : .default(Text(confirm.primaryLabel), action: run),
-                         secondaryButton: .cancel(Text("キャンセル")))
-        }
-        // 編集モード中は上のカードを出さない(「完了」「キャンセル」に被る)。バーは上のカードより後に重ねる
-        .overlay(alignment: .top) { if Self.showsTopCards(gridEditing: rt.gridEdit != nil) { summaryCard } }
-        .overlay(alignment: .top) { if Self.showsTopCards(gridEditing: rt.gridEdit != nil) { errorCardOverlay } }
-        .overlay(alignment: .top) { if rt.gridEdit != nil { GridEditBar().transition(.move(edge: .top).combined(with: .opacity)) } }
-        .modifier(ToastHost(onModal: false))
-        .modifier(NewItemsHost()) // #268: 開いた直後に他の人の新着の数
-        .modifier(UsageNoticeHost()) // #317: 記録・写真が上限に近い(作成者・1 日 1 回)
-        .onChange(of: scenePhase) { _, phase in
-            rt.setForeground(phase == .active) // ホットリロードのポーリングは前面時のみ
-        }
+    }
+
+    private var assistiveHome: AssistiveAccessPolicy.Home {
+        assistiveAccess.home(openedAppId: assistiveOpenedAppId, currentAppId: rt.document.appId)
     }
 
     /// 上部の要約・失敗のカードを出すか。編集モード(#1442)中は編集のバーを隠さないよう出さない
@@ -300,13 +320,14 @@ struct RootView: View {
 private struct ToastHost: ViewModifier {
     let onModal: Bool
     @Environment(AppRuntime.self) private var rt
+    @Environment(\.assistiveAccess) private var assistiveAccess
 
     func body(content: Content) -> some View {
         let active = onModal == (rt.sheet != nil || rt.fullScreen != nil)
         content.overlay(alignment: .bottom) {
             if active, let message = rt.toast {
                 let dismiss = { withAnimation { rt.toast = nil } }
-                let fixable = rt.fixOffer?.message == message
+                let fixable = rt.fixOffer?.message == message && assistiveAccess.shows(.voiceSheet) // #1997
                 HStack(spacing: Theme.Spacing.sm) {
                     Text(message)
                     if fixable { FixRequestToastButton() }
@@ -322,7 +343,7 @@ private struct ToastHost: ViewModifier {
                     .swipeToDismiss(edge: .bottom, onDismiss: dismiss) // 下に出るので下に払って閉じる
                     .padding(.bottom, Theme.Layout.fabBottomInset(hasTabs: true) + Theme.Layout.fabSize + Theme.Spacing.md)
                     .transition(.move(edge: .bottom).combined(with: .opacity))
-                    .task(id: message) {
+                    .task(id: rt.toastSerial) { // 同じ文言が続いても出し直す
                         // H8: VoiceOver の時は長く。「直してと頼む」付きは押す間を取る
                         try? await Task.sleep(for: .seconds(VoiceOverAnnouncer.holdSeconds(fixable ? 6 : 3)))
                         guard !Task.isCancelled else { return }
@@ -383,18 +404,20 @@ private struct UITestMorphProbe: View {
 private struct HostSheets: ViewModifier {
     let onModal: Bool
     @Environment(AppRuntime.self) private var rt
+    @Environment(\.assistiveAccess) private var assistiveAccess
 
     func body(content: Content) -> some View {
         let active = onModal == (rt.sheet != nil || rt.fullScreen != nil)
         content
-            // 部品から開いたシートが上にある間は、そちらが出す(#629 `ComponentAIButtonLayer`)
-            .sheet(isPresented: Binding(get: { active && rt.showVoiceSheet && AIButtonLayers.shared.isEmpty },
+            // 部品から開いたシートが上にある間は、そちらが出す(#629 `ComponentAIButtonLayer`)。アシスティブアクセス(#1997)では出さない
+            .sheet(isPresented: Binding(get: { active && rt.showVoiceSheet && AIButtonLayers.shared.isEmpty && assistiveAccess.shows(.voiceSheet) },
                                         set: { rt.showVoiceSheet = $0 })) {
                 VoiceInputView()
                     .presentationDetents([.large])
                     .presentationDragIndicator(.visible)
             }
-            .sheet(isPresented: Binding(get: { active && rt.showAppSwitcher }, set: { rt.showAppSwitcher = $0 })) {
+            .sheet(isPresented: Binding(get: { active && rt.showAppSwitcher && assistiveAccess.shows(.appSwitcher) },
+                                        set: { rt.showAppSwitcher = $0 })) {
                 AppSwitcherSheet()
             }
             .sheet(item: Binding(get: { active ? rt.exportFile : nil }, set: { rt.exportFile = $0 })) { file in
@@ -445,3 +468,91 @@ struct PositionHighlight: View {
         .environment(\.services, services)
         .environment(\.componentRegistry, MetamonApp.componentRegistry)
 }
+
+/// シート・全画面で開いた画面。sheet と fullScreenCover で同じ層を重ねる(#629 シートの中にも AI ボタン)
+private struct ModalScreen: View {
+    let route: Route
+
+    var body: some View {
+        ScreenStack(root: route)
+            .modifier(ModalVoiceFabLayer())
+            .modifier(HostSheets(onModal: true))
+            .modifier(ModalSocialHosts())
+            .modifier(ToastHost(onModal: true))
+    }
+}
+
+/// モーダルの中の共有・通報・仲間探し・通話。審査用ビルドでは何もしない(#245)
+private struct ModalSocialHosts: ViewModifier {
+    func body(content: Content) -> some View {
+        #if APP_STORE_REVIEW
+        content
+        #else
+        content
+            .modifier(NearbySheets(onModal: true))
+            .modifier(ModerationDialogs(onModal: true))
+            .modifier(MatchingSheets(onModal: true))
+            .modifier(CallSheets(onModal: true))
+        #endif
+    }
+}
+
+/// 根の共有・通報・仲間探し・通話。審査用ビルドはシェアリンク・探す・近くの端末との共有を外す(#245)
+private struct RootSocialHosts: ViewModifier {
+    func body(content: Content) -> some View {
+        #if APP_STORE_REVIEW
+        content
+        #else
+        content
+            .modifier(SharingHooks()) // シェアリンク受信・「探す」シート(#49 #50)
+            .modifier(HandoffAdvertiser()) // 今の画面と記録を Mac へ(連係の Handoff・#1851)
+            .modifier(NearbySheets(onModal: false)) // 近くの端末と送り合う(#36)
+            .modifier(ModerationDialogs()) // 通報・ブロック(#321)
+            .modifier(MatchingSheets()) // 仲間探しの 18 歳以上の確認(#507)
+            .modifier(CallSheets()) // 通話の画面(#447)
+        #endif
+    }
+}
+
+#if DEBUG
+/// ヘッドレス E2E 用の自動操作(環境変数で起動後に画面を開く)
+private struct RootDebugAutomation: ViewModifier {
+    @Environment(AppRuntime.self) private var rt
+    let visibleMainRoute: () -> Route
+
+    func body(content: Content) -> some View {
+        content
+            .task { await ScreenMapUI.shared.autoOpenIfRequested(rt) } // `METAMON_AUTO_SCREEN_MAP`(#116)
+            .task {
+                // `METAMON_AUTO_SWITCHER=1` で起動 2.5 秒後に変身一覧を開く
+                guard ProcessInfo.processInfo.environment["METAMON_AUTO_SWITCHER"] == "1" else { return }
+                try? await Task.sleep(for: .seconds(2.5))
+                rt.openSwitcher()
+            }
+            .task {
+                // `METAMON_AUTO_FOCUS=voice-sheet` で起動 2 秒後に発話シートを開く(シート内の文字入力へフォーカス・#143)
+                guard ProcessInfo.processInfo.environment["METAMON_AUTO_FOCUS"] == "voice-sheet", !rt.dsl.isVoiceOnly else { return }
+                try? await Task.sleep(for: .seconds(2))
+                rt.showVoiceSheet = true
+            }
+            .task { await autoOpen() }
+    }
+
+    /// `METAMON_AUTO_OPEN=<screen>[:push|sheet][:record]` で起動 2.5 秒後に画面を開く
+    /// (`record` を付けると screen.entity の先頭レコードを編集モードで開く)
+    private func autoOpen() async {
+        guard let spec = ProcessInfo.processInfo.environment["METAMON_AUTO_OPEN"], !spec.isEmpty else { return }
+        try? await Task.sleep(for: .seconds(2.5))
+        let parts = spec.split(separator: ":").map(String.init)
+        let screen = parts[0]
+        let recordId = parts.contains("record")
+            ? rt.dsl.screen(screen)?.entity.flatMap { rt.records(for: $0).first?.id } : nil
+        if parts.contains("sheet") {
+            rt.sheet = Route(screen: screen, recordId: recordId, stack: "sheet")
+        } else {
+            let stack = visibleMainRoute().stack
+            rt.paths[stack, default: []].append(Route(screen: screen, recordId: recordId, stack: stack))
+        }
+    }
+}
+#endif

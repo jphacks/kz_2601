@@ -4,48 +4,15 @@ import SwiftUI
 import MetamonRenderer
 import MetamonServices
 
-/// 外の API の断り(`ExtDenial`・#2001)の「次にすること」。判定は純粋関数(テストする)。
-enum ExtDenialRoute: Equatable {
-    /// つないでいない → つなぐ案内のシート
-    case connect(provider: String)
-    /// Pro が要る → 課金画面
-    case paywall([PaidFeature])
-    /// コイン → `CoinGate`(お店 / コインの設定)。引き受けられなければ説明のトースト
-    case coins(CoinDenial)
-    /// シートを出さず 1 文だけ
-    case toast(String)
-
-    static func of(_ denial: ExtDenial, isPro: Bool) -> ExtDenialRoute {
+extension ExtDenialRoute {
+    /// アシスティブアクセス(#1997)では課金・コイン・つなぐ案内(設定・Pro を指す文も)を出さず、`AssistiveAccessPolicy.unavailableMessage` だけ出す。
+    static func of(_ denial: ExtDenial, isPro: Bool, assistiveAccess: AssistiveAccessPolicy = .standard) -> ExtDenialRoute {
+        guard !assistiveAccess.shows(.paywall) else { return of(denial, isPro: isPro) }
         switch denial {
-        case .notConnected(let provider?):
-            return .connect(provider: provider)
-        case .notConnected(nil):
-            return .toast(ExtDenialCopy.notConnectedUnknown)
-        case .proRequired(let pro):
-            if pro.creatorNeedsPro { return .toast(pro.extMessage) } // 参加者は払っても直らない
-            if isPro { return .toast(ExtDenialCopy.proNotSynced) } // 端末は Pro なのにサーバーが知らない。課金画面を繰り返さない
-            return .paywall(pro.features.isEmpty ? [ConnectedServicesSection.paidFeature] : pro.features)
-        case .coins(let coins):
-            return .coins(coins)
-        case .unavailable:
-            return .toast(ExtDenialCopy.unavailable)
-        case .busy:
-            return .toast(ExtDenialCopy.busy)
+        case .unavailable, .busy: return of(denial, isPro: isPro) // 待てば直る。行き先を指さない
+        default: return .toast(AssistiveAccessPolicy.unavailableMessage)
         }
     }
-}
-
-enum ExtDenialCopy {
-    static func connectTitle(_ name: String) -> String { L10n.tr("\(name) とつないでください") }
-    static func connectBody(_ name: String) -> String {
-        L10n.tr("この部品は \(name) のデータを使います。つなぐと続けられます。つないだサービスは設定からいつでも切れます。")
-    }
-    static var connectUnavailable: String { L10n.tr("このサービスはいまつなげません。しばらくしてからお試しください。") }
-    static var notConnectedUnknown: String { L10n.tr("外のサービスとつながっていません。設定の「つないだサービス」からつないでください。") }
-    static var proNotSynced: String { L10n.tr("購入の確認がまだサーバーに届いていません。少し待ってから、もう一度お試しください。") }
-    static var unavailable: String { L10n.tr("外のサービスはいま使えません。しばらくしてからお試しください。") }
-    static var busy: String { L10n.tr("外のサービスが混み合っています。少し待ってから、もう一度お試しください。") }
-    static var closeNote: String { L10n.tr("閉じると、この部品は外のサービスを呼びません。") }
 }
 
 /// 外の API の断りを受けて、シート(つなぐ・課金画面・コイン)かトーストを出す。`denial` に入れると 1 回出して nil に戻す。
@@ -57,6 +24,7 @@ struct ExtDenialPresenter: ViewModifier {
     var onConnectClosed: () -> Void = {}
     @State private var connect: ConnectTarget?
     @State private var paywall: PaywallTarget?
+    @Environment(\.assistiveAccess) private var assistiveAccess
 
     struct ConnectTarget: Identifiable { var provider: String; var id: String { provider } }
     struct PaywallTarget: Identifiable { let id = UUID(); var features: [PaidFeature] }
@@ -74,7 +42,7 @@ struct ExtDenialPresenter: ViewModifier {
 
     private func present(_ denial: ExtDenial) {
         print("[Metamon] ext: denied \(denial)")
-        switch ExtDenialRoute.of(denial, isPro: ProGate.shared.isPro) {
+        switch ExtDenialRoute.of(denial, isPro: ProGate.shared.isPro, assistiveAccess: assistiveAccess) {
         case .connect(let provider): connect = ConnectTarget(provider: provider)
         case .paywall(let features): paywall = PaywallTarget(features: features)
         case .coins(let coins): if !CoinGate.shared.handle(coins) { onMessage(CoinCopy.denialBody(coins)) }
@@ -111,8 +79,8 @@ struct ExtConnectSheet: View {
         row?.name ?? ConnectedServicesState.name(nil, id: provider, english: LanguagePreference.shared.code == "en")
     }
 
-    /// `providers` が今つなげないと言っている(古いサーバー・一覧が読めない時はつなげる扱い)
-    private var canConnect: Bool { row?.enabled ?? true }
+    private var availability: ExtConnectAvailability { .of(model.state, provider: provider, providersKnown: model.providersKnown) }
+    private var canConnect: Bool { availability == .available }
 
     var body: some View {
         NavigationStack {
@@ -123,11 +91,12 @@ struct ExtConnectSheet: View {
                         .foregroundStyle(.secondary)
                         .accessibilityHidden(true)
                     Text(ExtDenialCopy.connectTitle(name))
-                        .font(.system(size: 20, weight: .bold, design: .rounded))
+                        .font(.system(.title3, design: .rounded).weight(.bold))
+                        .accessibilityAddTraits(.isHeader)
                         .fixedSize(horizontal: false, vertical: true)
                         .accessibilityIdentifier("ext.connect.title")
                 }
-                Text(canConnect ? ExtDenialCopy.connectBody(name) : ExtDenialCopy.connectUnavailable)
+                Text(availability == .unavailable ? ExtDenialCopy.connectUnavailable : ExtDenialCopy.connectBody(name))
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
@@ -143,7 +112,7 @@ struct ExtConnectSheet: View {
                     }
                 } label: {
                     Group {
-                        if model.busy == provider { ProgressView() } else { Text("つなぐ") }
+                        if model.busy == provider || availability == .loading { ProgressView() } else { Text("つなぐ") }
                     }
                     .frame(maxWidth: .infinity)
                 }
@@ -155,24 +124,19 @@ struct ExtConnectSheet: View {
             }
             .padding(Theme.Spacing.lg)
             .background(Theme.Colors.canvas.ignoresSafeArea())
-            .toolbar {
-                ToolbarItem(placement: .cancellationAction) {
-                    Button("閉じる") { dismiss() }
-                        .accessibilityIdentifier("ext.connect.close")
-                }
-            }
+            .toolbar { SheetCloseToolbarItem(identifier: "ext.connect.close") { dismiss() } }
         }
         .presentationDetents([.medium])
         .presentationDragIndicator(.visible)
         .task { await model.load(services.external) }
-        .onChange(of: row?.status) { _, status in
-            if status == .connected { dismiss() } // つなげた
+        .onChange(of: model.state) { old, new in
+            if ExtConnectAvailability.didConnect(from: old, to: new, provider: provider) { dismiss() } // つなげた
         }
         .sheet(isPresented: $showPaywall) { PaywallSheet(reason: .paidFeature([ConnectedServicesSection.paidFeature])) }
     }
 }
 
-#if DEBUG
+#if DEBUG || METAMON_STG // 開発用メニュー(#2079)から呼ぶ
 /// 開発用: 偽の provider `fakeOauth` に op を投げて、断りの案内を部品なしで出す(#2001)。
 /// `METAMON_MOCK=1` と `METAMON_MOCK_EXT_ERROR=<code>` を併せると、モックの次の呼び出しにそのエラーを仕込む(UI テスト用)。
 enum DebugExtDenial {

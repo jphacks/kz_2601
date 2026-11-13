@@ -6,6 +6,7 @@ plugins {
     alias(libs.plugins.kotlin.jvm)
     alias(libs.plugins.kotlin.compose)
     alias(libs.plugins.compose.multiplatform)
+    id("org.jetbrains.kotlinx.kover")
 }
 
 java {
@@ -21,6 +22,8 @@ dependencies {
     implementation(project(":dsl"))
     // API クライアント・記録の保存・送信待ち(android/services と同じソース・#1748 #1754)
     implementation(project(":services"))
+    // 音声入力(マイク + whisper.cpp を JNI で・#1751)。既定は使わない(TAILORIT_VOICE=1 で使う)
+    implementation(project(":whisper"))
     implementation(compose.desktop.currentOs)
     implementation(compose.material3)
     // icon の絵(#1742)。core だけ(extended は足さず、表で使う絵は Android の生成物を取り込む)。
@@ -29,7 +32,13 @@ dependencies {
     implementation(libs.zxing.core)
     // PDF の本文を読む・表を PDF に書く(#1753)。pdfbox + fontbox + pdfbox-io + commons-logging で約 3.8 MB
     implementation("org.apache.pdfbox:pdfbox:3.0.3")
+    // Windows の電池・充電・省電力を kernel32 の GetSystemPowerStatus で読む(WindowsPowerReader)。jna だけで約 1.9 MB(jna-platform は足さない)。
+    // LGPL-2.1-or-later と Apache-2.0 から選べるので Apache-2.0 を選ぶ(third-party-licenses.gradle.kts の electedLicenses)
+    implementation("net.java.dev.jna:jna:5.19.1")
 
+    // 画面のテスト(runComposeUiTest・#2415)。版は Compose Multiplatform plugin に揃う
+    @OptIn(org.jetbrains.compose.ExperimentalComposeLibrary::class)
+    testImplementation(compose.uiTest)
     testImplementation(libs.junit)
     testImplementation(libs.kotlinx.coroutines.test)
     testImplementation(libs.okhttp.mockwebserver)
@@ -50,9 +59,17 @@ tasks.test {
     inputs.dir(dslDocsDir.resolve("conformance")).withPropertyName("conformanceCases").withPathSensitivity(PathSensitivity.RELATIVE)
     inputs.dir(dslDocsDir.resolve("examples")).withPropertyName("dslExamples").withPathSensitivity(PathSensitivity.RELATIVE)
     systemProperty("metamon.dslDocsDir", dslDocsDir.absolutePath)
+    // アプリ自身のライセンスの欄をリポジトリの LICENSE と突き合わせる(LicensesTest)
+    val repoLicense = rootDir.resolve("../LICENSE")
+    inputs.file(repoLicense).withPropertyName("repoLicense").withPathSensitivity(PathSensitivity.RELATIVE)
+    systemProperty("metamon.repoLicense", repoLicense.absolutePath)
     // 文言・テーマはテストを動かす機械の言語・OS の設定に左右されないよう固定する(テストの中で切り替える)
     systemProperty("tailorit.lang", "ja")
     systemProperty("tailorit.theme", "light")
+    // 適合テストで DSL_ECHO として比べていない props の表(ConformanceEchoReportTest)だけ、標準出力を Gradle の出力に流す
+    addTestOutputListener { descriptor, event ->
+        if (descriptor.className == "jp.kz2601.metamon.desktop.ConformanceEchoReportTest") logger.lifecycle(event.message.trimEnd())
+    }
 }
 
 // Android の :renderer のうち Compose の状態しか使わない純 Kotlin(フォームの下書き・遷移の規則)は、android/ を変えずにそのまま取り込む。
@@ -60,8 +77,15 @@ val sharedRendererDir = rootDir.resolve("../android/renderer/src/main/kotlin/jp/
 val syncSharedRenderer by tasks.registering(Sync::class) {
     from(sharedRendererDir) {
         include("form/FormDraft.kt", "navigation/NavigationResolver.kt")
+        // openUrlButton の to の {{fieldId}} を埋める(Android と同じ規則)
+        include("components/actions/FormTemplate.kt")
         // icon の絵(android/scripts/gen-symbol-icons.py が icon-map.json から作った表・#1742)
         include("theme/icons/SymbolIconTable.kt", "theme/icons/VendoredIcons.kt")
+    }
+    // ライセンスの一覧の読み方・段落の分け方(Android の設定の「ライセンス」と同じ)
+    from(rootDir.resolve("../android/app/src/main/kotlin/jp/kz2601/metamon/settings")) {
+        include("ThirdPartyLicenses.kt")
+        into("settings")
     }
     into(layout.buildDirectory.dir("generated/sharedRenderer"))
 }
@@ -87,6 +111,10 @@ val syncAndroidStrings by tasks.registering(Sync::class) {
 }
 sourceSets.named("main") { resources.srcDir(syncAndroidStrings) }
 
+// 同梱するライセンスの一覧(licenses/third_party_licenses.json)。作り方は third-party-licenses.gradle.kts
+apply(from = "third-party-licenses.gradle.kts")
+sourceSets.named("main") { resources.srcDir(tasks.named("thirdPartyLicenses")) }
+
 // icon の名前の表(SF Symbols → Material)は docs/dsl/icon-map.json をそのまま同梱して読む(#1742)。
 val syncIconMap by tasks.registering(Sync::class) {
     from(dslDocsDir) {
@@ -105,6 +133,20 @@ tasks.register<JavaExec>("listApps") {
     mainClass.set("jp.kz2601.metamon.desktop.net.ListAppsKt")
 }
 
+// 同梱の実行環境の Java Access Bridge を最初から有効にする(#2209)。Windows の JDK の jlink 結果には
+// conf/accessibility.properties があり、assistive_technologies の行がコメントになっている(jabswitch -enable が外す行)。
+// その行のコメントを外す。ファイルが無い OS(Linux・macOS の JDK)では何もしない。
+tasks.matching { it.name == "createRuntimeImage" }.configureEach {
+    doLast {
+        val dest = (this as? org.jetbrains.compose.desktop.application.tasks.AbstractJLinkTask)?.destinationDir?.get()?.asFile ?: return@doLast
+        val props = dest.resolve("conf/accessibility.properties")
+        if (!props.isFile) return@doLast
+        val text = props.readText()
+        val enabled = text.replace(Regex("(?m)^\\s*#\\s*(assistive_technologies\\s*=\\s*com\\.sun\\.java\\.accessibility\\.AccessBridge)"), "$1")
+        if (enabled != text) props.writeText(enabled)
+    }
+}
+
 compose.desktop {
     application {
         mainClass = "jp.kz2601.metamon.desktop.MainKt"
@@ -114,7 +156,16 @@ compose.desktop {
             packageName = "Tailor It"
             packageVersion = "0.1.0"
             // 読み上げ(Windows の Java Access Bridge)を同梱の実行環境に入れる(#1759)
-            modules("jdk.accessibility")
+            // Google のサインインの戻り先(127.0.0.1 の受け口・LoopbackReceiver)に com.sun.net.httpserver を使う
+            modules("jdk.accessibility", "jdk.httpserver")
+            // whisper.cpp の JNI のライブラリ(whisper/native/build.sh・build.ps1 で out/<os>-<arch>/ に作る・#1751)を配る形に入れる。
+            // 作っていなければ入らず、音声入力は「この PC では用意できていません」になる。モデルは入れない(初回に落とす)
+            appResourcesRootDir.set(project(":whisper").layout.projectDirectory.dir("native/out"))
+            // CSV を「プログラムから開く」に出す(#2995・jpackage の --file-associations)。既定のアプリは奪わない(OS 側で選ぶ)。
+            // Deb・Rpm・Dmg にも同じ指定が入る
+            fileAssociation(mimeType = "text/csv", extension = "csv", description = "CSV")
+            // Windows の「送る」(#3209): jpackage の既定の WiX には shell:sendto の置き場が無い(main.wxs を丸ごと差し替えることになる)ので、
+            // 入れた物(jpackage.app-path がある)の初回の起動でアプリが %APPDATA%\Microsoft\Windows\SendTo に置く(platform/SendTo.kt)
         }
     }
 }

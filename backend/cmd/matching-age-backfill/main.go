@@ -32,19 +32,31 @@ import (
 
 	"github.com/jphacks/kz_2601/backend/internal/fsenv"
 	"github.com/jphacks/kz_2601/backend/internal/store"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 )
 
+// options are the command-line flags.
+type options struct {
+	apply, allowProd bool
+}
+
+func parseFlags(fs *flag.FlagSet, args []string) (options, error) {
+	var o options
+	fs.BoolVar(&o.apply, "apply", false, "write the flags (default: dry run, write nothing)")
+	fs.BoolVar(&o.allowProd, "allow-prod-db", false, "allow running against the production Firestore database")
+	return o, fs.Parse(args)
+}
+
 func main() {
-	apply := flag.Bool("apply", false, "write the flags (default: dry run, write nothing)")
-	allowProd := flag.Bool("allow-prod-db", false, "allow running against the production Firestore database")
-	flag.Parse()
+	o, _ := parseFlags(flag.CommandLine, os.Args[1:]) // flag.CommandLine exits on a bad flag
 
 	target := fsenv.FromEnv(os.Getenv)
-	if err := guard(target, *allowProd, os.Getenv); err != nil {
+	if err := guard(target, o.allowProd, os.Getenv); err != nil {
 		fmt.Fprintln(os.Stderr, "matching-age-backfill: refusing to start:", err)
 		os.Exit(2)
 	}
-	fmt.Printf("target: %s (emulator=%t) mode=%s\n", target, target.Emulator != "", mode(*apply))
+	fmt.Printf("target: %s (emulator=%t) mode=%s\n", target, target.Emulator != "", mode(o.apply))
 
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
@@ -54,7 +66,7 @@ func main() {
 		os.Exit(1)
 	}
 	defer func() { _ = st.Close() }()
-	if code := run(ctx, st, *apply, os.Stdout); code != 0 {
+	if code := run(ctx, st, o.apply, os.Stdout); code != 0 {
 		os.Exit(code)
 	}
 }
@@ -95,8 +107,17 @@ func run(ctx context.Context, st backfiller, apply bool, w io.Writer) int {
 	_, _ = fmt.Fprintf(w, "matching apps: %d\nprofile records: %d\nalready flagged: %d\n%s flag: %d\nauthor not declared (left hidden): %d\n",
 		c.Apps, c.Profiles, c.Marked, verb, c.ToMark, c.Undeclared)
 	if err != nil {
-		_, _ = fmt.Fprintf(w, "ERROR: %v (counts above are up to the failure; run again)\n", err)
+		_, _ = fmt.Fprintf(w, "ERROR: %s (counts above are up to the failure; run again)\n", errorCode(err))
 		return 1
 	}
 	return 0
+}
+
+// errorCode is err without its text (grpc code, or "unknown"). Same as
+// cmd/coin-initial-backfill: the raw error can carry document paths.
+func errorCode(err error) string {
+	if c := status.Code(err); c != codes.Unknown {
+		return c.String()
+	}
+	return "unknown"
 }

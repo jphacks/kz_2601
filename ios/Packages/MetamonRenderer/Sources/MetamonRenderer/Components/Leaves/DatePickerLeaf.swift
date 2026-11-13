@@ -6,6 +6,7 @@ import MetamonDSL
 struct DatePickerLeaf: View {
     let c: Component
     let ctx: RenderContext
+    @FocusState private var focused: Bool
 
     var body: some View {
         if let form = ctx.form, let field = c.field {
@@ -18,6 +19,8 @@ struct DatePickerLeaf: View {
                     .macDatePickerStyle(includesDate: true)
                     .tint(RenderTheme.Colors.brandA)
                     .accessibilityLabel(label)
+                    .focused($focused)
+                    .macFormTabStop(c, $focused)
             }
         } else {
             NeedsForm(c: c)

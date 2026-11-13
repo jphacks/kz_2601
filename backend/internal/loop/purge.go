@@ -42,7 +42,14 @@ func Sweep(ctx context.Context, s Store, src SourceChecker, users UserChecker, n
 	var sourceIDs []string
 	bySource := map[string]string{}
 	uids := map[string]bool{}
+	// gone: items a real run has deleted by the time a later step looks at
+	// them, so a dry run does not count them twice.
+	gone := map[string]bool{}
 	for _, it := range items {
+		if dryRun && it.ExpiresAt.Before(now) {
+			gone[it.ID] = true
+			continue
+		}
 		if it.Source == SourceInApp {
 			sourceIDs = append(sourceIDs, it.SourceID)
 			bySource[it.SourceID] = it.ID
@@ -56,15 +63,16 @@ func Sweep(ctx context.Context, s Store, src SourceChecker, users UserChecker, n
 		if err != nil {
 			return res, err
 		}
-		var gone []string
+		var orphans []string
 		for _, sid := range sourceIDs {
 			if !exists[sid] {
-				gone = append(gone, bySource[sid])
+				orphans = append(orphans, bySource[sid])
+				gone[bySource[sid]] = true
 			}
 		}
-		res.Orphans = len(gone)
-		if !dryRun && len(gone) > 0 {
-			if err := s.DeleteItems(ctx, gone); err != nil {
+		res.Orphans = len(orphans)
+		if !dryRun && len(orphans) > 0 {
+			if err := s.DeleteItems(ctx, orphans); err != nil {
 				return res, err
 			}
 		}
@@ -84,10 +92,16 @@ func Sweep(ctx context.Context, s Store, src SourceChecker, users UserChecker, n
 		if err != nil {
 			return res, err
 		}
-		res.Deleted += len(its) + len(ns)
 		if dryRun {
+			for _, id := range its {
+				if !gone[id] {
+					res.Deleted++
+				}
+			}
+			res.Deleted += len(ns)
 			continue
 		}
+		res.Deleted += len(its) + len(ns)
 		if err := s.DeleteItems(ctx, its); err != nil {
 			return res, err
 		}

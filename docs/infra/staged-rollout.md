@@ -2,7 +2,7 @@
 
 新しいリビジョンに少しずつトラフィックを移し(既定 5% → 25% → 100%)、段階ごとに新旧のリビジョンの指標を比べ、悪ければ前のリビジョンに 100% 戻すスクリプト `scripts/rollout.sh` の使い方です。
 
-> **スクリプトとテストだけが入っています。deploy の workflow(`.github/workflows/deploy-cloudrun.yml`)にはまだ組み込んでいません。** stg / prod で実際に動かしたこともありません。組み込みと最初の実行は、承認を得てから人が行います(下の「人の作業」)。
+> **deploy の workflow(`.github/workflows/deploy-cloudrun.yml`)には stg だけ組み込んであります。** develop への push は今まで通り 100% で出し、rollout.sh は dry-run(コマンドを出すだけ)。実際に段階を踏むのは、人が workflow_dispatch で `environment=staging`・`staged_rollout=execute` を選んだ時だけです。prod は変えていません。stg / prod で実際に動かしたことはまだありません(下の「人の作業」)。
 
 ## 目次
 
@@ -11,9 +11,11 @@
 3. [比べる指標](#比べる指標)
 4. [閾値の選び方](#閾値の選び方)
 5. [人が途中で止める](#人が途中で止める)
-6. [人の作業 1: deploy の workflow に組み込む](#人の作業-1-deploy-の-workflow-に組み込む)
-7. [人の作業 2: stg でわざと悪い版を出して戻ることを確かめる](#人の作業-2-stg-でわざと悪い版を出して戻ることを確かめる)
-8. [わかっている限界](#わかっている限界)
+6. [deploy の workflow での動き](#deploy-の-workflow-での動き)
+7. [どの版で生成したかの記録](#どの版で生成したかの記録)
+8. [人の作業 1: 権限と prod への組み込み](#人の作業-1-権限と-prod-への組み込み)
+9. [人の作業 2: stg でわざと悪い版を出して戻ることを確かめる](#人の作業-2-stg-でわざと悪い版を出して戻ることを確かめる)
+10. [わかっている限界](#わかっている限界)
 
 ## 流れ
 
@@ -85,10 +87,11 @@ scripts/rollout.sh --summarize logs.json --new ai-stg-00002-abc --old ai-stg-000
 | リクエスト数・5xx 率 | `jsonPayload.event="http.request"`(`/health` は除く) | `status >= 500` の割合 |
 | p95 の待ち時間 | 同じ | `duration`(ns → ms)の 95 パーセンタイル |
 | Claude の失敗率(ai) | `jsonPayload.event="ai.usage"` | `outcome="error"` の割合 |
+| 1 回あたりの費用(ai) | 同じ | `est_cost_usd`(#298)がある行の平均。単価の無いモデルの行は数えない |
 
 **なぜ Cloud Monitoring の `request_count` / `request_latencies` でなくログか**: 監視のアラート([observability.md](observability.md)・`infra/monitoring.tf`)は Cloud Run の組み込みの指標を使っていますが、`gcloud monitoring` には時系列を読むコマンドが無く、Monitoring API を `curl` で叩くことになります。ログなら `scripts/ai-cost.sh` と同じ `gcloud logging read` + `jq` で済み、判定の入力をそのままテストの固定データにできます。ログベースの指標 `ai_claude_calls` / `backend_panics` もログが元なので、見ているものは同じです。違いは、Cloud Run 自身が返した 503(コンテナに届かなかったもの)がログの `http.request` に入らないこと。これが要るなら、`decide` の入力(JSON)はそのままで、`fetch_metrics` を Monitoring API の `timeSeries.list`(`run.googleapis.com/request_count` を `resource.labels.revision_name` で分ける)に替えられます。
 
-費用(#298)はまだ比べていません。`ai.usage` の `est_cost_usd` を同じ形で足せます(下の「限界」)。
+費用は新旧の 1 回あたりを比べます。プロンプトやモデルの変更で 1 回の費用が跳ねた版を、5xx や待ち時間が変わらなくても戻すためです。
 
 ## 閾値の選び方
 
@@ -102,6 +105,8 @@ scripts/rollout.sh --summarize logs.json --new ai-stg-00002-abc --old ai-stg-000
 | `ROLLOUT_P95_SLACK_MS` | `100` | 差がこれ以下なら比が大きくても通す | appconfig の p95 は数十 ms なので、比だけだと 20ms → 40ms で落ちる。ユーザーが気づかない差 |
 | `ROLLOUT_MAX_CLAUDE_FAILURE_RATE` | `0.2` | 新の Claude の失敗率の上限 | 監視の `claude_failure_rate_threshold`(20%)と揃える |
 | `ROLLOUT_CLAUDE_FAILURE_MIN_COUNT` | `3` | 失敗がこの件数未満なら率は見ない | 監視の `claude_failure_min_count` と揃える。5% の段階では呼び出しが数件なので、1 件の失敗で戻さないため |
+| `ROLLOUT_MAX_COST_RATIO`(`--max-cost-ratio`) | `2` | 新の 1 回あたりの費用 / 旧の上限 | 緩めにしている。キャッシュの読みの割合や依頼の中身で 1 回の費用は揺れるので、普段の揺れ(`scripts/ai-cost.sh` で数日分)より大きく取る。費用を上げる変更を意図して出す時は引数で上げる |
+| `ROLLOUT_COST_MIN_CALLS` | `5` | 新旧どちらかの費用つきの呼び出しがこれ未満なら費用は見ない | 5% の段階では呼び出しが数件なので、1 件の重い依頼で戻さないため。旧が 0 件(100% の段階)なら比べない |
 | `ROLLOUT_MIN_REQUESTS` | `20` | 新がこれ未満なら判定しない | 5% の 1 窓に 20 件来るには、全体で 5 分に 400 件。**stg は足りないことが多い**ので、stg は `--on-insufficient promote` か、ジョブの中で負荷(スモーク)を流す |
 
 段階と窓: 5% の窓で 20 件を超える程度のトラフィックがあること、が段階と `--wait` を決める目安です。prod の今のトラフィックなら、5% の段階は `--wait 600` 以上を勧めます。段階を細かくするほど、悪い版を受けるユーザーは減るがリリースは遅くなります。
@@ -112,48 +117,41 @@ scripts/rollout.sh --summarize logs.json --new ai-stg-00002-abc --old ai-stg-000
 - どちらも、旧のリビジョンに 100% 戻してから終了コード 3 で終わります(待っている間でもすぐ。`sleep` を裏で動かして `wait` しているため)
 - 戻さずに今の割合のまま止めたい時は、ジョブを止めずに(または SIGKILL で)止め、あとは手で `gcloud run services update-traffic` を打つ
 
-## 人の作業 1: deploy の workflow に組み込む
+## deploy の workflow での動き
 
-> 承認を得てから行う。まだ誰もしていない。`.github/` はこの PR では変えていません。
+`deploy-cloudrun.yml` の `deploy-changes` ジョブが `rollout`(`off` / `dry-run` / `execute`)を決め、`deploy` ジョブは `ROLLOUT_MODE` で分かれます。
 
-`deploy-cloudrun.yml` の appconfig / ai の deploy を、次の形に変えます(appconfig の例)。
+| いつ | `ROLLOUT_MODE` | 何が起きるか |
+| --- | --- | --- |
+| main への push・`environment=production` | `off` | 今まで通り 100% で出す。`staged_rollout=execute` を選んでも無視して warning を出す |
+| develop への push・`environment=staging`(既定) | `dry-run` | 今まで通り 100% で出し、最後に `rollout.sh`(dry-run)が打つはずのコマンドを log に出す。GCP には触らない・失敗してもデプロイは成功扱い |
+| workflow_dispatch で `environment=staging`・`staged_rollout=execute` | `execute` | appconfig を `--no-traffic` で出す → `rollout.sh --env stg --service appconfig --execute --wait 120 --on-insufficient promote` → ai も同じ順で。その後にヘルスチェックとスモーク |
 
-```yaml
-      - name: Deploy appconfig-${{ env.ENV_SUFFIX }} (no traffic)
-        run: |
-          set -euo pipefail
-          gcloud run deploy "appconfig-${ENV_SUFFIX}" \
-            --image="$IMAGE" \
-            ...(今と同じ)... \
-            --no-traffic \
-            --tag="sha-${GITHUB_SHA::7}" \
-            --quiet
+- 巻き戻した時(終了コード 3 / 4)はステップが失敗し、ジョブも失敗する。理由は job summary(`### rollout <svc>: rolled back`)と `::error` 注釈(run の画面と Checks に出る)に出る。ジョブの失敗はいつもの GitHub の通知で届く
+- ai は appconfig の段階が終わってから進める(同時に進めると、どちらの版が悪いか分からない)
+- ジョブの `timeout-minutes` は execute の時だけ 70(各サービスの段階に 25 分まで)
+- `scripts-ci.yml` で `scripts/rollout-test.sh` を回す(判定・巻き戻し・通知を偽の gcloud で確かめる)
+- 巻き戻した後は次の deploy まで旧のまま。新のリビジョンは 0% で残る(消さない)
 
-      - name: Staged rollout appconfig-${{ env.ENV_SUFFIX }}
-        timeout-minutes: 30
-        env:
-          PROJECT_ID: ${{ vars.GCP_PROJECT_ID }}
-          REGION: ${{ vars.GCP_REGION }}
-        run: |
-          scripts/rollout.sh --env "$ENV_SUFFIX" --service appconfig --execute \
-            --wait "${{ env.ENV_SUFFIX == 'prod' && '600' || '120' }}" \
-            ${{ env.ENV_SUFFIX == 'stg' && '--on-insufficient promote' || '' }}
-```
+## どの版で生成したかの記録
+
+生成した版(`users/{uid}/apps/{appId}/versions/{n}` の `source`)に、モデル(`model`・前からある)とプロンプトの版(`promptVersion`)を残します。`ai.generate` のログにも `model` と `prompt_version` を出します。
+
+- `promptVersion` は `p-` + プロンプト本文(`systemPrompt` と `editRules`)の sha256 の先頭 12 桁(`backend/internal/ai/prompt_version.go`)。プロンプトやレシピの文を変えると自動で変わる。手で番号を上げる必要は無い
+- その呼び出しで送ったレシピは、今まで通り `Meta.Recipes`
+- 段階の途中で新旧を分けて見たい時は、Logs Explorer で `jsonPayload.prompt_version` ごとに `ai.generate` の `outcome` を数える
+
+## 人の作業 1: 権限と prod への組み込み
 
 | # | やること | 気をつけること |
 | --- | --- | --- |
-| 1 | `gcloud run deploy` に `--no-traffic` を足す | **初回(サービスがまだ無い)は `--no-traffic` が使えない**。サービスがある前提で足す。`--tag` を付けると、新だけを `https://sha-xxxxxxx---appconfig-stg-....run.app` で叩けて、スモークを 0% のうちに流せる |
-| 2 | deploy の後に `rollout.sh --execute` のステップを足す | ステップの `timeout-minutes` は 段階の数 × `--wait` ×(1 + `--max-extends`)より長く |
-| 3 | deploy の SA に `roles/logging.viewer` を足す(`infra/` の IAM) | 無いと最初の判定でログが読めず、毎回旧に戻る(下の限界) |
-| 4 | 今の「`/health` を叩く」ステップは、100% の後に回す | 0% のうちに `--tag` の URL で叩くとさらに良い |
-| 5 | ai は appconfig の rollout が終わってから(順に) | 同時に段階を進めると、どちらの版が悪いか分からない |
-| 6 | 失敗の通知 | ジョブの失敗(終了コード 3 / 4)でいつもの通知が飛ぶ。Slack に理由を出すなら `$GITHUB_STEP_SUMMARY` を使う |
-| 7 | `scripts-ci.yml` の `ai-cost-test` ジョブに `- run: scripts/rollout-test.sh` を足す | 今は CI で回っていない(shellcheck だけは全 `*.sh` に掛かる)。jq と bash だけで動く・GCP に触らない |
-| 8 | 巻き戻した後のイメージ | 次の deploy まで旧のまま。新のリビジョンは 0% で残る(消さない) |
+| 1 | deploy の SA に `roles/logging.viewer` を足す(`infra/` の IAM) | 無いと最初の判定でログが読めず、毎回旧に戻る(下の限界)。stg で execute を使う前に要る |
+| 2 | prod にも入れるか決める | 入れるなら `deploy-changes` の `rollout` を prod でも `execute` にし、`--env prod --wait 600`(`--on-insufficient` は既定の rollback)。承認を得てから |
+| 3 | (任意)`--tag` | `gcloud run deploy --no-traffic --tag=sha-xxxxxxx` にすると、新だけを `https://sha-xxxxxxx---appconfig-stg-....run.app` で叩けて、スモークを 0% のうちに流せる。タグは溜まるので消す手順とあわせて |
 
 ## 人の作業 2: stg でわざと悪い版を出して戻ることを確かめる
 
-Issue の完了の条件「stg でわざと悪い版を出すと、自動で前の版に戻る」の確かめ方です。組み込みの前に、手元から stg に対して行えます(要る権限は上)。
+Issue の完了の条件「stg でわざと悪い版を出すと、自動で前の版に戻る」の確かめ方です。手元から stg に対して行えます(要る権限は上)。workflow で確かめるなら、悪い版のブランチから workflow_dispatch(`environment=staging`・`staged_rollout=execute`)で出し、その間 stg に負荷を流します。
 
 1. 今の stg のリビジョンを控える: `gcloud run services describe appconfig-stg --project=jphacks-kz2601 --region=asia-northeast1 --format='value(status.traffic)'`
 2. わざと悪い版を、トラフィック 0 で出す(例: 全リクエストで 500 を返す一行の変更を入れたイメージ・または `/debug/error` を叩く負荷)。`gcloud run deploy appconfig-stg --image=<悪いイメージ> --no-traffic --tag=bad ...`
@@ -167,6 +165,6 @@ Issue の完了の条件「stg でわざと悪い版を出すと、自動で前�
 - **判定のログが読めない時**(権限・API の失敗)は、悪い版かどうか分からないので **旧に 100% 戻します**(終了コード 3)。権限の付け忘れでも毎回戻るので、組み込んだ最初の deploy で気づけます
 - `update-traffic` 自体が失敗した時は、その場で止まり(`set -e`)、トラフィックはその時の割合のままです。ジョブの失敗で気づき、手で戻すか、もう一度実行してください
 - ログに出ない 5xx(Cloud Run 自身の 503 など)は数えません(上の「比べる指標」)
-- 費用(#298 の `est_cost_usd`)と、プロンプト・モデルの版(#298・どの版で生成したか)はまだ比べていません。`summarize` に足せば `decide` に同じ形で入ります
+- 費用は 1 回あたりの平均で比べます。依頼の中身(長い会話・大きなアプリ)が窓によって偏ると、版が同じでも平均が動きます。倍率を緩め(既定 2)にしているのはこのため。プロンプト・モデルの版は記録する(上)が、判定には使っていません(新旧はリビジョンで分けている)
 - 1 窓で読むログは `LIMIT` 行まで。超えると古い行が落ちて指標が偏ります(prod のトラフィックが増えたら Monitoring API に替える)
 - ai と appconfig は同じイメージなので、片方だけ戻すと版がずれます(ai は appconfig を HTTP で呼ぶだけなので、API の互換が保たれていれば動く)

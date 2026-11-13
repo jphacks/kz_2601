@@ -9,6 +9,8 @@ import (
 
 	"github.com/jphacks/kz_2601/backend/internal/fsenv"
 	"github.com/jphacks/kz_2601/backend/internal/store"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 )
 
 func envOf(m map[string]string) func(string) string { return func(k string) string { return m[k] } }
@@ -63,5 +65,30 @@ func TestRunDryRunByDefault(t *testing.T) {
 	f.err = errors.New("boom")
 	if code := run(context.Background(), f, true, &out); code != 1 {
 		t.Fatalf("error exit: %d", code)
+	}
+}
+
+func TestRunErrorPrintsCodeNotText(t *testing.T) {
+	const path = "projects/p/databases/(default)/documents/apps/app-secret-1/profiles/uid-secret-2"
+	f := &fakeStore{err: status.Error(codes.PermissionDenied, "denied: "+path)}
+	var out bytes.Buffer
+	if code := run(context.Background(), f, true, &out); code != 1 {
+		t.Fatalf("code %d", code)
+	}
+	got := out.String()
+	if !strings.Contains(got, "ERROR: PermissionDenied") || !strings.Contains(got, "set flag: 3") {
+		t.Fatalf("want code and counts: %s", got)
+	}
+	for _, leak := range []string{path, "app-secret-1", "uid-secret-2", "denied:"} {
+		if strings.Contains(got, leak) {
+			t.Fatalf("raw error text %q leaked: %s", leak, got)
+		}
+	}
+
+	out.Reset()
+	f.err = errors.New("plain " + path)
+	run(context.Background(), f, true, &out)
+	if got := out.String(); !strings.Contains(got, "ERROR: unknown") || strings.Contains(got, "app-secret-1") {
+		t.Fatalf("non-grpc error: %s", got)
 	}
 }

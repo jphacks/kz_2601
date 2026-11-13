@@ -10,6 +10,7 @@ final class EnglishCopyTests: XCTestCase {
 
     func testServiceCopyIsEnglish() {
         XCTAssertEqual(AuthError.alreadyLinked.errorDescription, "You're already signed in with Apple")
+        XCTAssertEqual(AuthError.appleEmailInUse.errorDescription, "The email address for this Apple ID is already used by another account")
         XCTAssertEqual(RecordSyncEngine.Status.offline(pending: 2).label, "Offline, 2 unsent")
         XCTAssertEqual(TranscriberFailure.silent(seconds: 1.3, peakDecibels: -60).errorDescription,
                        "The audio was too quiet (recorded 1.3s, level -60dB). Speak toward the microphone")

@@ -9,6 +9,7 @@ extension AuthSession {
     /// 1〜4. `AccountDeletionFlow`: サーバーで論理削除 → Firebase のユーザー削除 → 端末のデータ削除 → サインアウト
     /// - Returns: 完了したら true。生成中・Apple の再認証をキャンセルしたら false(何も消していない)。
     func deleteAccount(account: any AccountClient, runtime: AppRuntime) async throws -> Bool {
+        guard !BuildConfig.isDebugTestAccount else { return false } // 試験用の枠は消さない(#2084)
         guard runtime.canDelete else { return false } // 生成中は削除しない(何も消していない)
         let isApple = user.map { !$0.isAnonymous } == true && service is FirebaseAuthService
         if isApple {

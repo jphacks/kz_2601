@@ -86,6 +86,31 @@ object RenderTheme {
         val inputValue = TextStyle(fontSize = 17.sp)
         val chip = TextStyle(fontSize = 15.sp, fontWeight = FontWeight.SemiBold)
         val legend = TextStyle(fontSize = 12.sp)
+
+        // 表示系の Leaf(text / label / markdown / badge / link / emptyState)。
+        // iOS の TextLeaf・LabelLeaf の style(title | headline | body | caption)に対応する。
+        val title = TextStyle(fontSize = 28.sp, fontWeight = FontWeight.Bold)
+        val headline = TextStyle(fontSize = 17.sp, fontWeight = FontWeight.SemiBold)
+        val body = TextStyle(fontSize = 17.sp)
+        val caption = TextStyle(fontSize = 12.sp)
+
+        /** badge のピルの文字(iOS の `.caption.weight(.semibold)`)。 */
+        val badge = TextStyle(fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
+
+        /** link の文字(iOS の `.body.weight(.medium)`)。 */
+        val link = TextStyle(fontSize = 17.sp, fontWeight = FontWeight.Medium)
+
+        /** emptyState の見出し(iOS の ContentUnavailableView の title)。 */
+        val emptyTitle = TextStyle(fontSize = 22.sp, fontWeight = FontWeight.Bold)
+
+        /** 数を打つ欄(numberField)。桁が揺れないよう等幅。 */
+        val inputNumber = TextStyle(fontSize = 17.sp, fontFeatureSettings = tabular)
+
+        /** 入力に添える小さな文字(必須の注意・選択数など)。 */
+        val inputNote = TextStyle(fontSize = 11.sp)
+
+        /** rating の星。 */
+        val star = TextStyle(fontSize = 22.sp)
     }
 
     /** 動き(iOS の Motion)。「操作を減らす」(アニメーション削除)の時は [reduceMotion] を見て止める。 */

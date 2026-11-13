@@ -7,7 +7,9 @@ import jp.kz2601.metamon.dsl.AppDSL
 import jp.kz2601.metamon.dsl.Notification
 import jp.kz2601.metamon.dsl.records.Record
 import jp.kz2601.metamon.notifications.ActivityStatReading
+import jp.kz2601.metamon.notifications.TimerActivityUpdate
 import jp.kz2601.metamon.renderer.ActionContext
+import jp.kz2601.metamon.renderer.components.health.HealthSource
 import jp.kz2601.metamon.renderer.components.play.TimerRun
 
 /** 端末の機能がまだ無い(Android で未実装)。AppRuntime が決まったトーストにする。 */
@@ -59,6 +61,12 @@ interface RuntimeHost {
     fun timerVisible(key: String, visible: Boolean) {}
 
     /**
+     * `timerDisplay.liveActivity` の進行中の表示(#913)。開始・一時停止・リセット・終了のたびに来る。
+     * 既定は何もしない(表示を持たないホスト)。通知の許可が無く出せなければ false。
+     */
+    suspend fun timerActivity(update: TimerActivityUpdate): Boolean = true
+
+    /**
      * 進行中の表示(iOS の Live Activity。Android は常駐の通知・#1030)。同じアプリの表示は差し替える。
      * 通知の許可が無く出せなければ false。[stat] は spec.stat の部品を読んだ結果。
      */
@@ -66,6 +74,9 @@ interface RuntimeHost {
         throw HostUnavailableException(ActionType.START_ACTIVITY)
 
     suspend fun endActivity(appId: String): Unit = throw HostUnavailableException(ActionType.END_ACTIVITY)
+
+    /** `Field.health` の書き込み先(#870・Health Connect)。null なら書かない(テスト・未接続)。 */
+    val health: HealthSource? get() = null
 }
 
 /** 何も持たないホスト(テスト・未接続)。 */

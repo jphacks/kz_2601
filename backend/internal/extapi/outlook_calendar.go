@@ -310,13 +310,13 @@ func (o *outlookCalendar) listEvents(ctx context.Context, in Input) (Output, err
 		to = t
 	}
 	if !to.t.After(from.t) || to.t.Sub(from.t) > gcalMaxRange {
-		return Output{}, fmt.Errorf("%w: timeMax must be after timeMin and within 366 days", ErrUnknown)
+		return Output{}, fmt.Errorf("%w: timeMax must be after timeMin and within 366 days", ErrBadArgs)
 	}
 	n := gcalDefaultResults
 	if v := in.Args["maxResults"]; v != "" {
 		x, err := strconv.Atoi(v)
 		if err != nil || x < 1 || x > gcalMaxResults {
-			return Output{}, fmt.Errorf("%w: maxResults must be 1-%d", ErrUnknown, gcalMaxResults)
+			return Output{}, fmt.Errorf("%w: maxResults must be 1-%d", ErrBadArgs, gcalMaxResults)
 		}
 		n = x
 	}
@@ -376,7 +376,7 @@ func (o *outlookCalendar) createEvent(ctx context.Context, in Input) (Output, er
 		return Output{}, err
 	}
 	if in.Args["start"] == "" {
-		return Output{}, fmt.Errorf("%w: start is required", ErrUnknown)
+		return Output{}, fmt.Errorf("%w: start is required", ErrBadArgs)
 	}
 	start, err := gcalParseTime("start", in.Args["start"])
 	if err != nil {
@@ -388,7 +388,7 @@ func (o *outlookCalendar) createEvent(ctx context.Context, in Input) (Output, er
 			return Output{}, err
 		}
 		if end.allDay != start.allDay {
-			return Output{}, fmt.Errorf("%w: start and end must both be dates or both be times", ErrUnknown)
+			return Output{}, fmt.Errorf("%w: start and end must both be dates or both be times", ErrBadArgs)
 		}
 	} else if !start.allDay {
 		end.t = start.t.Add(time.Hour)
@@ -397,14 +397,14 @@ func (o *outlookCalendar) createEvent(ctx context.Context, in Input) (Output, er
 	var s, e outlookWhen
 	if start.allDay {
 		if end.t.Before(start.t) || end.t.Sub(start.t) > gcalMaxRange {
-			return Output{}, fmt.Errorf("%w: end must be on or after start and within 366 days", ErrUnknown)
+			return Output{}, fmt.Errorf("%w: end must be on or after start and within 366 days", ErrBadArgs)
 		}
 		// all day: midnights in one time zone, the end exclusive
 		s = outlookWhen{DateTime: start.t.Format(layout), TimeZone: outlookTZ}
 		e = outlookWhen{DateTime: end.t.AddDate(0, 0, 1).Format(layout), TimeZone: outlookTZ}
 	} else {
 		if !end.t.After(start.t) || end.t.Sub(start.t) > gcalMaxRange {
-			return Output{}, fmt.Errorf("%w: end must be after start and within 366 days", ErrUnknown)
+			return Output{}, fmt.Errorf("%w: end must be after start and within 366 days", ErrBadArgs)
 		}
 		s = outlookWhen{DateTime: start.t.In(gcalJST).Format(layout), TimeZone: outlookTZ}
 		e = outlookWhen{DateTime: end.t.In(gcalJST).Format(layout), TimeZone: outlookTZ}

@@ -63,7 +63,7 @@ struct ShareAppSheet: View {
         HStack(alignment: .top) {
             VStack(alignment: .leading, spacing: Theme.Spacing.xs) {
                 Text("「\(app.name)」をシェア")
-                    .font(.system(size: 22, weight: .bold, design: .rounded))
+                    .font(.system(.title2, design: .rounded).weight(.bold))
                 Text(members?.isVisible == true
                      ? L10n.tr("受け取った人はリンクから参加して、記録を一緒に使えます")
                      : L10n.tr("受け取った人は自分のアプリとして使えます(記録は共有されません)"))
@@ -133,6 +133,7 @@ struct ShareAppSheet: View {
         VStack(alignment: .leading, spacing: Theme.Spacing.md) {
             Label("みんなに公開", systemImage: "globe.asia.australia")
                 .font(.headline)
+                .accessibilityAddTraits(.isHeader)
             if !listingLoaded {
                 RoundedRectangle(cornerRadius: 6).fill(Theme.Colors.surfaceElevated).frame(height: 44)
             } else if let listing {
@@ -213,7 +214,7 @@ struct ShareAppSheet: View {
     private func publish() async {
         busy = true
         defer { busy = false }
-        let tagList = tags.split(whereSeparator: { $0 == " " || $0 == "　" || $0 == "," || $0 == "、" }).map(String.init)
+        let tagList = PublishCopy.tags(from: tags)
         do {
             listing = try await services.sharing?.publish(appId: app.id, description: desc, tags: tagList, authorName: nil)
             flaggedField = nil
@@ -228,15 +229,7 @@ struct ShareAppSheet: View {
     }
 
     /// 公開の文字の項目(#321)。どの欄かを名前で出す
-    static func textNotAllowedMessage(field: String?) -> String {
-        switch field {
-        case "description": ErrorCopy.textNotAllowed(fieldName: L10n.tr("ひとこと説明"))
-        case "tags": ErrorCopy.textNotAllowed(fieldName: L10n.tr("タグ"))
-        case "name": ErrorCopy.textNotAllowed(fieldName: L10n.tr("アプリの名前"))
-        case "authorName": ErrorCopy.textNotAllowed(fieldName: L10n.tr("表示名"))
-        default: ErrorCopy.textNotAllowed
-        }
-    }
+    static func textNotAllowedMessage(field: String?) -> String { PublishCopy.textNotAllowedMessage(field: field) }
 
     private func unpublish() async {
         busy = true

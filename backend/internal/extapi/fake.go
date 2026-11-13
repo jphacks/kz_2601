@@ -18,7 +18,8 @@ import (
 //	fakeOauth  free, OAuth      ops listEvents, createEvent(title) EXT_FAKE_OAUTH_ENABLED=1
 //
 // Every op takes fail=5xx | 429 | 4xx | timeout | grant to fail the way a provider does
-// (4xx is billable: the provider charged it), or fail=args to refuse its
+// (4xx is billable: the provider charged it), fail=404 for a provider's "no
+// such item" (bad_request after the call), or fail=args to refuse its
 // arguments before calling the provider (bad_request).
 const (
 	FakeFree  = "fakeFree"
@@ -85,7 +86,9 @@ func fakeOp(f func(Input) Output) Operation {
 		case "grant":
 			return Output{}, ErrInvalidGrant
 		case "args":
-			return Output{}, fmt.Errorf("%w: fake bad argument", ErrUnknown)
+			return Output{}, fmt.Errorf("%w: fake bad argument", ErrBadArgs)
+		case "404":
+			return Output{}, &ProviderError{Status: 404, Err: fmt.Errorf("%w: fake has no such item", ErrUnknown)}
 		}
 		return f(in), nil
 	})

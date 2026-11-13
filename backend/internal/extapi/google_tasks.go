@@ -103,7 +103,7 @@ func gtasksLimit(v string) (int, error) {
 	}
 	x, err := strconv.Atoi(v)
 	if err != nil || x < 1 || x > gtasksMaxLimit {
-		return 0, fmt.Errorf("%w: limit must be 1-%d", ErrUnknown, gtasksMaxLimit)
+		return 0, fmt.Errorf("%w: limit must be 1-%d", ErrBadArgs, gtasksMaxLimit)
 	}
 	return x, nil
 }
@@ -116,12 +116,12 @@ func gtasksListID(v string) (string, error) {
 	case gtasksIDRe.MatchString(v):
 		return v, nil
 	}
-	return "", fmt.Errorf("%w: listId must be a Google Tasks list id", ErrUnknown)
+	return "", fmt.Errorf("%w: listId must be a Google Tasks list id", ErrBadArgs)
 }
 
 func gtasksTaskID(v string) (string, error) {
 	if !gtasksIDRe.MatchString(v) {
-		return "", fmt.Errorf("%w: taskId must be a Google Tasks task id", ErrUnknown)
+		return "", fmt.Errorf("%w: taskId must be a Google Tasks task id", ErrBadArgs)
 	}
 	return v, nil
 }
@@ -131,7 +131,7 @@ func gtasksTaskID(v string) (string, error) {
 func gtasksDate(name, v string) (time.Time, error) {
 	t, err := time.ParseInLocation(time.DateOnly, v, time.UTC)
 	if err != nil {
-		return time.Time{}, fmt.Errorf("%w: %s must be YYYY-MM-DD", ErrUnknown, name)
+		return time.Time{}, fmt.Errorf("%w: %s must be YYYY-MM-DD", ErrBadArgs, name)
 	}
 	return t, nil
 }
@@ -154,7 +154,7 @@ func gtasksDueRange(v string, now time.Time) (time.Time, time.Time, error) {
 	}
 	d, err := gtasksDate("due", v)
 	if err != nil {
-		return time.Time{}, time.Time{}, fmt.Errorf("%w: due must be today, overdue, week or YYYY-MM-DD", ErrUnknown)
+		return time.Time{}, time.Time{}, fmt.Errorf("%w: due must be today, overdue, week or YYYY-MM-DD", ErrBadArgs)
 	}
 	return d, d.AddDate(0, 0, 1), nil
 }
@@ -166,7 +166,7 @@ func gtasksStatus(v string) (string, error) {
 	case "open", "completed", "all":
 		return v, nil
 	}
-	return "", fmt.Errorf("%w: status must be open, completed or all", ErrUnknown)
+	return "", fmt.Errorf("%w: status must be open, completed or all", ErrBadArgs)
 }
 
 func checkGtasksLists(a map[string]string) error {

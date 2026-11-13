@@ -176,19 +176,11 @@ struct GridEditLayer: View {
             .accessibilityElement(children: .ignore)
             .accessibilityLabel(Text(GridEditCopy.label(item)))
             .accessibilityValue(Text(active ? drag!.candidate.notation : item.area.notation))
-            .accessibilityActions {
-                Button(L("左へ動かす")) { nudge(item, dc: -1, dr: 0) }
-                Button(L("右へ動かす")) { nudge(item, dc: 1, dr: 0) }
-                Button(L("上へ動かす")) { nudge(item, dc: 0, dr: -1) }
-                Button(L("下へ動かす")) { nudge(item, dc: 0, dr: 1) }
-                Button(L("横に広げる")) { resize(item, dc: 1, dr: 0) }
-                Button(L("横に狭める")) { resize(item, dc: -1, dr: 0) }
-                Button(L("縦に広げる")) { resize(item, dc: 0, dr: 1) }
-                Button(L("縦に狭める")) { resize(item, dc: 0, dr: -1) }
-                if session.draft.canRemove {
-                    Button(L("消す")) { session.pendingRemoval = item.componentId }
-                }
-            }
+            .accessibilityActions { editActions(item) }
+            #if os(macOS)
+            // Mac(#2323): 右クリックでも同じ操作(1 マスずつ動かす・大きさ・消す)
+            .contextMenu { editActions(item) }
+            #endif
             .accessibilityIdentifier("gridEdit.\(item.componentId)")
             .overlay(alignment: .topTrailing) {
                 if session.draft.canRemove {
@@ -221,6 +213,22 @@ struct GridEditLayer: View {
             .frame(width: r.width, height: r.height)
             .offset(x: r.minX + follow.width, y: r.minY + follow.height)
             .zIndex(active ? 1 : 0)
+    }
+
+    /// VoiceOver の操作と Mac の右クリックのメニュー
+    @ViewBuilder
+    private func editActions(_ item: GridEditDraft.Item) -> some View {
+        Button(L("左へ動かす")) { nudge(item, dc: -1, dr: 0) }
+        Button(L("右へ動かす")) { nudge(item, dc: 1, dr: 0) }
+        Button(L("上へ動かす")) { nudge(item, dc: 0, dr: -1) }
+        Button(L("下へ動かす")) { nudge(item, dc: 0, dr: 1) }
+        Button(L("横に広げる")) { resize(item, dc: 1, dr: 0) }
+        Button(L("横に狭める")) { resize(item, dc: -1, dr: 0) }
+        Button(L("縦に広げる")) { resize(item, dc: 0, dr: 1) }
+        Button(L("縦に狭める")) { resize(item, dc: 0, dr: -1) }
+        if session.draft.canRemove {
+            Button(L("消す")) { session.pendingRemoval = item.componentId }
+        }
     }
 
     private func dragGesture(_ item: GridEditDraft.Item, mode: Mode) -> some Gesture {

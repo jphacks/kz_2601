@@ -6,6 +6,7 @@ import jp.kz2601.metamon.dsl.Component
 import jp.kz2601.metamon.dsl.ComponentType
 import jp.kz2601.metamon.dsl.decode
 import jp.kz2601.metamon.dsl.records.Record
+import jp.kz2601.metamon.renderer.form.FormDraft
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.jsonArray
@@ -33,14 +34,22 @@ object DesktopLeaves {
         ComponentType.TOGGLE,
         ComponentType.PICKER,
         ComponentType.STEPPER,
+        ComponentType.OPEN_URL_BUTTON,
         *PlayLeaves.types.toTypedArray(),
     ) + DISPLAY_LEAVES + InputLeaves.types + DATA_LEAVES
 
-    /** 適合テストの `state`(rendered / unavailable / unknown)。hidden・needsForm はまだ見ない。 */
-    fun state(c: Component): String = when {
-        c.type == ComponentType.UNKNOWN -> "unknown"
-        c.type in containers || c.type in leaves || c.type in IoLeaves.types -> "rendered"
-        else -> "unavailable"
+    /**
+     * 部品の state: rendered / hidden / needsForm / unavailable / unknown(iOS の RenderTree.state と同じ順)。
+     * 描画・操作(押せるか)・適合テストの木はすべてこれを見る。[form] は開いている画面のフォーム(無ければ null)。
+     */
+    fun state(c: Component, form: FormDraft? = null, uid: String? = null): String {
+        if (form != null && form.hides(c, uid)) return "hidden"
+        if (c.type !in containers && c.type !in leaves && c.type !in IoLeaves.types) {
+            return if (c.type == ComponentType.UNKNOWN) "unknown" else "unavailable"
+        }
+        if (c.type == ComponentType.BUTTON && !isButtonVisible(c.action, form)) return "hidden"
+        if (InputLeaves.isInput(c) && (form == null || c.field == null)) return "needsForm"
+        return "rendered"
     }
 
     /** DSL に書いてある type の文字列そのまま(知らない type も)。 */
@@ -59,20 +68,27 @@ object Examples {
 
 /** モックのレコード(サインインも通信もしない骨格用)。 */
 /** createdAt / author は読み込んだ記録のもの(無ければ並び順・自分)。createdAt の "" は「分からない」(並べ替えで元の順を保つ)。 */
-data class Row(val id: String, val data: Map<String, String>, val createdAt: String? = null, val author: String? = null)
+/** authorName は投稿者の表示名(サーバーから取り直した共有の記録・#2214)。 */
+data class Row(
+    val id: String,
+    val data: Map<String, String>,
+    val createdAt: String? = null,
+    val author: String? = null,
+    val authorName: String? = null,
+)
 
 data class MockStore(val rows: Map<String, List<Row>> = emptyMap(), val nextId: Int = 1) {
     fun list(entity: String): List<Row> = rows[entity].orEmpty()
 
     fun find(entity: String, id: String): Row? = list(entity).firstOrNull { it.id == id }
 
-    /** [newId] は新規の時の id(無ければ new-N)。 */
-    fun save(entity: String, id: String?, data: Map<String, String>, newId: String? = null): MockStore {
+    /** [newId] は新規の時の id(無ければ new-N)。[createdAt] は新規の時だけ付ける(会話の並び・#2214)。 */
+    fun save(entity: String, id: String?, data: Map<String, String>, newId: String? = null, createdAt: String? = null): MockStore {
         val current = list(entity)
         return if (id != null && current.any { it.id == id }) {
             copy(rows = rows + (entity to current.map { if (it.id == id) it.copy(data = data) else it }))
         } else {
-            copy(rows = rows + (entity to current + Row(newId ?: "new-$nextId", data)), nextId = nextId + 1)
+            copy(rows = rows + (entity to current + Row(newId ?: "new-$nextId", data, createdAt)), nextId = nextId + 1)
         }
     }
 
@@ -80,7 +96,7 @@ data class MockStore(val rows: Map<String, List<Row>> = emptyMap(), val nextId: 
 
     /** 集計・式が読む形(数の field は数に)。 */
     fun records(entity: String, model: jp.kz2601.metamon.dsl.records.Entity?): List<Record> = list(entity).mapIndexed { i, r ->
-        Record(r.id, r.data.mapValues { (k, v) -> typedValue(v, model?.field(k)?.type) }, createdAt = r.createdAt ?: "%06d".format(i), author = r.author ?: "me")
+        Record(r.id, r.data.mapValues { (k, v) -> typedValue(v, model?.field(k)?.type) }, createdAt = r.createdAt ?: "%06d".format(i), author = r.author ?: "me", authorName = r.authorName)
     }
 
     companion object {

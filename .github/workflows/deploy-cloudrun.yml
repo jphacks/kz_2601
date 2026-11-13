@@ -43,6 +43,15 @@ on:
         required: true
         default: staging
         options: [staging, production]
+      # 段階的なリリース(#372・docs/infra/staged-rollout.md)。staging だけ。production では無視して今まで通り 100% で出す。
+      #   dry-run: 今まで通り 100% で出し、rollout.sh が出すはずのコマンドを log に出すだけ(develop への push もこれ)
+      #   execute: --no-traffic で出して rollout.sh --execute(5 → 25 → 100%・悪ければ前のリビジョンに 100% 戻してジョブを失敗させる)
+      staged_rollout:
+        description: 段階的なリリース(staging だけ)
+        type: choice
+        required: false
+        default: dry-run
+        options: [dry-run, execute]
 
 # 同じ環境へのデプロイは直列化(古い実行はキャンセルしない: 中途半端な状態を避ける)
 concurrency:
@@ -62,6 +71,7 @@ jobs:
       run: ${{ github.event_name == 'workflow_dispatch' || steps.filter.outputs.backend == 'true' }}
       environment: ${{ steps.target.outputs.environment }}
       suffix: ${{ steps.target.outputs.suffix }}
+      rollout: ${{ steps.target.outputs.rollout }}
     steps:
       - uses: actions/checkout@v7
         if: github.event_name == 'push'
@@ -82,6 +92,7 @@ jobs:
       - id: target
         env:
           INPUT_ENV: ${{ inputs.environment }}
+          INPUT_ROLLOUT: ${{ inputs.staged_rollout }}
           REF_NAME: ${{ github.ref_name }}
         run: |
           set -euo pipefail
@@ -97,18 +108,29 @@ jobs:
             production) suffix="prod" ;;
             *)          suffix="stg" ;;
           esac
+          # 段階的なリリース(#372): production は off(今まで通り)。staging は既定 dry-run、手動で execute を選んだ時だけ実行
+          if [ "$suffix" = "prod" ]; then
+            rollout="off"
+            [ "${INPUT_ROLLOUT:-dry-run}" = "dry-run" ] || echo "::warning::staged_rollout=${INPUT_ROLLOUT} は production では使わない(100% で出す)"
+          elif [ "${INPUT_ROLLOUT:-}" = "execute" ]; then
+            rollout="execute"
+          else
+            rollout="dry-run"
+          fi
           {
             echo "environment=$environment"
             echo "suffix=$suffix"
+            echo "rollout=$rollout"
           } >> "$GITHUB_OUTPUT"
-          echo "target: $environment (appconfig-$suffix / ai-$suffix)"
+          echo "target: $environment (appconfig-$suffix / ai-$suffix) rollout=$rollout"
 
   deploy:
     name: deploy
     needs: deploy-changes
     if: needs.deploy-changes.outputs.run == 'true'
     runs-on: ubuntu-latest
-    timeout-minutes: 20 # デプロイ ~10 分 + スモーク(staging: Claude 3 回 / production: 2 回・~1 分)
+    # デプロイ ~10 分 + スモーク(staging: Claude 3 回 / production: 2 回・~1 分)。段階的なリリースを実行する時は 2 サービス分の段階(各 25 分まで)を足す
+    timeout-minutes: ${{ needs.deploy-changes.outputs.rollout == 'execute' && 70 || 20 }}
     environment:
       name: ${{ needs.deploy-changes.outputs.environment }}
       url: ${{ steps.appconfig.outputs.url }}
@@ -117,6 +139,8 @@ jobs:
       REGION: ${{ vars.GCP_REGION }}
       RUN_SA: run-backend@${{ vars.GCP_PROJECT_ID }}.iam.gserviceaccount.com
       ENV_SUFFIX: ${{ needs.deploy-changes.outputs.suffix }}
+      # off(production)/ dry-run / execute(staging を手動で・deploy は --no-traffic)。deploy-changes の target で決める(#372)
+      ROLLOUT_MODE: ${{ needs.deploy-changes.outputs.rollout }}
       # Firestore の接続先(#290・backend/internal/fsenv)。今は stg / prod とも同じプロジェクトの (default)。
       # APP_ENV=stg が本番の DB を使うと起動を止めるので、分離(#291・#293)までは stg だけ ALLOW_SHARED_PROD_DB=1。
       # 分離したら stg 側を新しい接続先にして ALLOW_SHARED_PROD_DB=0 にする(消すと --update-env-vars では残る)。
@@ -157,7 +181,11 @@ jobs:
         id: appconfig
         run: |
           set -euo pipefail
+          # 段階的なリリース(#372)を実行する時だけ、新しいリビジョンにトラフィックを回さずに作る(下の rollout が移す)
+          traffic=()
+          if [ "$ROLLOUT_MODE" = "execute" ]; then traffic=(--no-traffic); fi
           gcloud run deploy "appconfig-${ENV_SUFFIX}" \
+            "${traffic[@]}" \
             --image="$IMAGE" \
             --project="$PROJECT_ID" \
             --region="$REGION" \
@@ -174,6 +202,16 @@ jobs:
           echo "url=$url" >> "$GITHUB_OUTPUT"
           echo "appconfig-${ENV_SUFFIX}: $url"
 
+      # 段階的なリリース(#372・docs/infra/staged-rollout.md)。staging を手動で staged_rollout=execute にした時だけ。
+      # 5 → 25 → 100% と移し、段階ごとに新旧の 5xx 率・p95・Claude の失敗率を比べる。悪ければ前のリビジョンに 100% 戻し、
+      # 終了コード 3 / 4 でジョブを失敗させる(job summary と ::error 注釈に理由)。ai は appconfig が終わってから(どちらが悪いか分けるため)。
+      # stg はトラフィックが少ないので、指標が足りないまま窓を延ばし切ったら進める(--on-insufficient promote)。
+      # Cancel(SIGINT → SIGTERM)で止めると旧に 100% 戻して終わる。
+      - name: Staged rollout appconfig-${{ env.ENV_SUFFIX }}
+        if: env.ROLLOUT_MODE == 'execute' && env.ENV_SUFFIX == 'stg'
+        timeout-minutes: 25 # 3 段階 × 120 秒 ×(1 + 延長 2 回)= 18 分 + update-traffic
+        run: scripts/rollout.sh --env stg --service appconfig --execute --wait 120 --on-insufficient promote
+
       - name: Deploy ai-${{ env.ENV_SUFFIX }}
         id: ai
         env:
@@ -184,7 +222,10 @@ jobs:
           # APPCONFIG_BASE_URL は cmd/ai/main.go が読む名前(未設定だと ai はインメモリ stub で動き appconfig を叩かない)。
           # ai → appconfig はクライアントの Firebase ID トークンをそのまま転送するので Cloud Run 間の追加認証は不要。
           # env は --update-env-vars(手で入れた RATE_LIMIT_* などを残す)、secret は --set-secrets(全置換)。
+          traffic=()
+          if [ "$ROLLOUT_MODE" = "execute" ]; then traffic=(--no-traffic); fi # 段階的なリリース(#372)
           gcloud run deploy "ai-${ENV_SUFFIX}" \
+            "${traffic[@]}" \
             --image="$IMAGE" \
             --command=/app/ai \
             --project="$PROJECT_ID" \
@@ -202,6 +243,11 @@ jobs:
             --project="$PROJECT_ID" --region="$REGION" --format='value(status.url)')"
           echo "url=$url" >> "$GITHUB_OUTPUT"
           echo "ai-${ENV_SUFFIX}: $url"
+
+      - name: Staged rollout ai-${{ env.ENV_SUFFIX }}
+        if: env.ROLLOUT_MODE == 'execute' && env.ENV_SUFFIX == 'stg'
+        timeout-minutes: 25
+        run: scripts/rollout.sh --env stg --service ai --execute --wait 120 --on-insufficient promote
 
       # runner(自動の動き・#341)。prod だけ・repo / Environment の変数 RUNNER_DEPLOY=1 の時だけ(既定は飛ばす)。
       # 非公開(--no-allow-unauthenticated): 呼べるのは Scheduler の SA runner-scheduler だけ(infra/runner.tf)。
@@ -276,7 +322,20 @@ jobs:
             fi
             echo
             echo "image: \`${IMAGE}\`"
+            echo
+            echo "staged rollout(#372): \`${ROLLOUT_MODE}\`"
           } >> "$GITHUB_STEP_SUMMARY"
+
+      # 段階的なリリースの dry-run(#372)。develop への push の既定。もう 100% で出した後なので GCP には触らず、
+      # execute にした時に rollout.sh が打つコマンドを log に出すだけ(組み込みの確認用・失敗してもデプロイは成功扱い)。
+      - name: Staged rollout(dry-run・GCP に触らない)
+        if: env.ROLLOUT_MODE == 'dry-run'
+        continue-on-error: true
+        run: |
+          set -euo pipefail
+          for svc in appconfig ai; do
+            scripts/rollout.sh --env stg --service "$svc" --wait 120 --on-insufficient promote
+          done
 
       # ---- スモーク(staging / production・Day2 の保険・非ブロッキング) -----------------
       # デモ発話を実 API で流し、表を job summary に貼る。失敗してもデプロイは成功扱い(continue-on-error)。

@@ -92,7 +92,7 @@ func argLatLng(args map[string]string, digits int) (lat, lng float64, ok bool, e
 	lat, err1 := parseCoord(ls, 90)
 	lng, err2 := parseCoord(gs, 180)
 	if err1 != nil || err2 != nil {
-		return 0, 0, false, fmt.Errorf("%w: lat / lng", ErrUnknown)
+		return 0, 0, false, fmt.Errorf("%w: lat / lng", ErrBadArgs)
 	}
 	p := math.Pow10(digits)
 	return math.Round(lat*p) / p, math.Round(lng*p) / p, true, nil
@@ -100,11 +100,11 @@ func argLatLng(args map[string]string, digits int) (lat, lng float64, ok bool, e
 
 func parseCoord(s string, limit float64) (float64, error) {
 	if s == "" || len(s) > 32 || strings.Trim(s, "0123456789.-+") != "" {
-		return 0, ErrUnknown // a plain decimal only (no hex, exponent, Inf)
+		return 0, ErrBadArgs // a plain decimal only (no hex, exponent, Inf)
 	}
 	v, err := strconv.ParseFloat(s, 64)
 	if err != nil || math.IsNaN(v) || math.IsInf(v, 0) || v < -limit || v > limit {
-		return 0, ErrUnknown
+		return 0, ErrBadArgs
 	}
 	return v, nil
 }
@@ -117,7 +117,7 @@ func argInt(args map[string]string, name string, def, lo, hi int) (int, error) {
 	}
 	n, err := strconv.Atoi(s)
 	if err != nil || n < lo || n > hi {
-		return 0, fmt.Errorf("%w: %s must be %d-%d", ErrUnknown, name, lo, hi)
+		return 0, fmt.Errorf("%w: %s must be %d-%d", ErrBadArgs, name, lo, hi)
 	}
 	return n, nil
 }

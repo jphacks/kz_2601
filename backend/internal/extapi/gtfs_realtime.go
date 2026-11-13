@@ -13,6 +13,8 @@ import (
 	"time"
 
 	"google.golang.org/protobuf/encoding/protowire"
+
+	"github.com/jphacks/kz_2601/backend/internal/gtfsstatic"
 )
 
 // GTFS Realtime (#1692): bus arrival predictions and live positions from
@@ -23,10 +25,12 @@ import (
 //	busPositions(feed, route?, limit?)      Rows: one per bus (label / "route・HH:MM 更新" / "lat,lng")
 //
 // feed is an id of gtfsFeeds; stop and route are the feed's GTFS stop_id /
-// route_id. Only the realtime part is read here: times come from the
-// TripUpdate's absolute times (a prediction given only as a delay needs the
-// static GTFS-JP timetable, which is a follow-up), and stop / route names
-// stay ids until the static data is imported.
+// route_id. Times come from the TripUpdate's absolute times. When a static
+// GTFS-JP table (gtfsstatic) is given for the feed, stop and route names
+// replace the ids and a prediction given only as a delay is shown as the
+// timetable's time plus the delay; without one, ids stay and such a
+// prediction is left out. Fetching and refreshing the static zip is not
+// wired yet (production passes no table).
 //
 // The feed is protobuf (gtfs-realtime.proto); only the fields used here are
 // read with protowire (google.golang.org/protobuf, already a dependency),
@@ -78,7 +82,7 @@ func init() {
 			{Name: "busPositions", Args: []string{"feed", "route", "limit"}, Check: checkGTFSPositions, CacheTTL: 30 * time.Second},
 		},
 		New: func(Secrets) (map[string]Operation, error) {
-			return newGTFSRealtime(func(h string) string { return h }, NewHTTPClient(gtfsHosts(), DefaultTimeout), time.Now), nil
+			return newGTFSRealtime(func(h string) string { return h }, NewHTTPClient(gtfsHosts(), DefaultTimeout), time.Now, nil), nil
 		}})
 }
 
@@ -133,9 +137,10 @@ func checkGTFSPositions(args map[string]string) error {
 }
 
 // newGTFSRealtime builds the ops; base maps a feed's host to the one to
-// reach (itself, or a test server).
-func newGTFSRealtime(base func(host string) string, hc *http.Client, now func() time.Time) map[string]Operation {
-	g := &gtfsRT{base: base, hc: hc, now: now}
+// reach (itself, or a test server). static gives a feed's static table
+// (static or its answer nil: ids only).
+func newGTFSRealtime(base func(host string) string, hc *http.Client, now func() time.Time, static func(feed string) *gtfsstatic.Table) map[string]Operation {
+	g := &gtfsRT{base: base, hc: hc, now: now, static: static}
 	return map[string]Operation{
 		"nextBuses":    OperationFunc(g.nextBuses),
 		"busPositions": OperationFunc(g.busPositions),
@@ -143,9 +148,48 @@ func newGTFSRealtime(base func(host string) string, hc *http.Client, now func() 
 }
 
 type gtfsRT struct {
-	base func(string) string
-	hc   *http.Client
-	now  func() time.Time
+	base   func(string) string
+	hc     *http.Client
+	now    func() time.Time
+	static func(string) *gtfsstatic.Table
+}
+
+// table is the feed's static table (nil when there is none; its methods
+// take nil).
+func (g *gtfsRT) table(feed string) *gtfsstatic.Table {
+	if g.static == nil {
+		return nil
+	}
+	return g.static(feed)
+}
+
+// gtfsName is the static name, else the id.
+func gtfsName(name, id string) string {
+	if name != "" {
+		return name
+	}
+	return id
+}
+
+// gtfsScheduled is a timetable time (seconds from the service day's start)
+// as a moment. startDate is the TripDescriptor's YYYYMMDD; without a valid
+// one the service day is today or yesterday in JST, whichever puts the
+// time nearer to now (a trip past midnight runs on yesterday's day).
+func gtfsScheduled(startDate string, sec int, now time.Time) time.Time {
+	at := func(d time.Time) time.Time {
+		y, m, dd := d.Date()
+		// Japan has no daylight saving: "noon minus 12h" is midnight.
+		return time.Date(y, m, dd, 0, 0, 0, 0, gtfsJST).Add(time.Duration(sec) * time.Second)
+	}
+	if d, err := time.ParseInLocation("20060102", startDate, gtfsJST); err == nil {
+		return at(d)
+	}
+	today := now.In(gtfsJST)
+	a, b := at(today), at(today.AddDate(0, 0, -1))
+	if b.Sub(now).Abs() < a.Sub(now).Abs() {
+		return b
+	}
+	return a
 }
 
 var gtfsJST = time.FixedZone("JST", 9*60*60)
@@ -204,13 +248,19 @@ func (g *gtfsRT) nextBuses(ctx context.Context, in Input) (Output, error) {
 		return Output{Rows: []Row{}}, nil
 	}
 	now := g.now()
+	tbl := g.table(f.id)
+	stopName := tbl.StopName(stop)
 	type next struct {
 		at  time.Time
 		row Row
 	}
 	var ns []next
 	for _, tu := range m.trips {
-		if tu.trip.canceled || (route != "" && tu.trip.routeID != route) {
+		rid := tu.trip.routeID
+		if rid == "" {
+			rid = tbl.RouteOf(tu.trip.tripID)
+		}
+		if tu.trip.canceled || (route != "" && rid != route) {
 			continue
 		}
 		for _, st := range tu.stops {
@@ -218,26 +268,38 @@ func (g *gtfsRT) nextBuses(ctx context.Context, in Input) (Output, error) {
 				continue
 			}
 			ev := st.arrival
-			if ev.time == 0 {
+			if ev.time == 0 && (st.departure.time != 0 || !ev.hasDelay) {
 				ev = st.departure
-			}
-			if ev.time == 0 {
-				continue // a delay without a time needs the static timetable
-			}
-			at := time.Unix(ev.time, 0)
-			if at.Before(now.Add(-time.Minute)) || at.After(now.Add(gtfsAhead)) {
-				continue
 			}
 			delay, ok := ev.delay, ev.hasDelay
 			if !ok {
 				delay, ok = tu.delay, tu.hasDelay
 			}
-			title := tu.trip.routeID
+			var at time.Time
+			sub := gtfsDelayText(delay, ok)
+			switch sched, has := tbl.Scheduled(tu.trip.tripID, stop); {
+			case ev.time != 0:
+				at = time.Unix(ev.time, 0)
+			case ok && has:
+				// only a delay: the timetable's time plus the delay
+				s := gtfsScheduled(tu.trip.startDate, sched, now)
+				at = s.Add(time.Duration(delay) * time.Second)
+				sub += "(時刻表 " + s.In(gtfsJST).Format("15:04") + ")"
+			default:
+				continue // a delay without a time or a timetable
+			}
+			if at.Before(now.Add(-time.Minute)) || at.After(now.Add(gtfsAhead)) {
+				continue
+			}
+			title := gtfsName(tbl.RouteName(rid), rid)
 			if title == "" {
 				title = "系統不明"
 			}
+			if stopName != "" {
+				sub = strings.TrimSuffix(stopName+"・"+sub, "・")
+			}
 			mins := max(0, int(math.Ceil(at.Sub(now).Minutes())))
-			ns = append(ns, next{at, Row{Title: title, Subtitle: gtfsDelayText(delay, ok),
+			ns = append(ns, next{at, Row{Title: title, Subtitle: sub,
 				Value: fmt.Sprintf("%s(あと %d 分)", at.In(gtfsJST).Format("15:04"), mins)}})
 			break
 		}
@@ -274,13 +336,18 @@ func (g *gtfsRT) busPositions(ctx context.Context, in Input) (Output, error) {
 	if err != nil {
 		return Output{}, err
 	}
+	tbl := g.table(f.id)
 	type pos struct {
 		route string
 		row   Row
 	}
 	var ps []pos
 	for _, v := range m.vehicles {
-		if !v.hasPos || (route != "" && v.trip.routeID != route) || !g.fresh(v.timestamp, m.timestamp) {
+		rid := v.trip.routeID
+		if rid == "" {
+			rid = tbl.RouteOf(v.trip.tripID)
+		}
+		if !v.hasPos || (route != "" && rid != route) || !g.fresh(v.timestamp, m.timestamp) {
 			continue
 		}
 		lat, lng := float64(v.lat), float64(v.lng)
@@ -299,10 +366,10 @@ func (g *gtfsRT) busPositions(ctx context.Context, in Input) (Output, error) {
 			ts = m.timestamp
 		}
 		sub := time.Unix(int64(ts), 0).In(gtfsJST).Format("15:04") + " 更新"
-		if v.trip.routeID != "" {
-			sub = v.trip.routeID + "・" + sub
+		if rid != "" {
+			sub = gtfsName(tbl.RouteName(rid), rid) + "・" + sub
 		}
-		ps = append(ps, pos{v.trip.routeID, Row{Title: title, Subtitle: sub, Value: gtfsCoord(v.lat) + "," + gtfsCoord(v.lng)}})
+		ps = append(ps, pos{rid, Row{Title: title, Subtitle: sub, Value: gtfsCoord(v.lat) + "," + gtfsCoord(v.lng)}})
 	}
 	slices.SortStableFunc(ps, func(a, b pos) int {
 		if c := strings.Compare(a.route, b.route); c != 0 {
@@ -330,7 +397,8 @@ type gtfsMessage struct {
 
 type gtfsTrip struct {
 	tripID, routeID string
-	canceled        bool // TripDescriptor.schedule_relationship CANCELED
+	startDate       string // YYYYMMDD, the service day ("" when not given)
+	canceled        bool   // TripDescriptor.schedule_relationship CANCELED
 }
 
 type gtfsEvent struct {
@@ -477,6 +545,8 @@ func parseGTFSTrip(b []byte) (gtfsTrip, error) {
 		switch {
 		case num == 1 && typ == protowire.BytesType:
 			t.tripID = gtfsText(sub)
+		case num == 3 && typ == protowire.BytesType:
+			t.startDate = gtfsText(sub)
 		case num == 4 && typ == protowire.VarintType:
 			t.canceled = v == 3 // CANCELED
 		case num == 5 && typ == protowire.BytesType:

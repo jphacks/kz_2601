@@ -394,7 +394,8 @@ func TestTodoistErrors(t *testing.T) {
 		t.Fatalf("bad code: %v", err)
 	}
 	// revoking an expired token renews it first (the endpoint takes an
-	// access token); a refresh token already gone is done
+	// access token); a refused refresh token is ErrInvalidGrant
+	// (Connections.Revoke reads the stored one again)
 	f.rotateNext = 0
 	if err := c.Revoke(ctx, Token{AccessToken: "td-access-0", RefreshToken: "td-refresh-0", Expiry: c.now().Add(-time.Hour)}); err != nil {
 		t.Fatal(err)
@@ -402,7 +403,7 @@ func TestTodoistErrors(t *testing.T) {
 	if len(f.revoked) != 1 || f.revoked[0] != "td-access-1" {
 		t.Fatalf("revoked %v", f.revoked)
 	}
-	if err := c.Revoke(ctx, Token{AccessToken: "x", RefreshToken: "gone", Expiry: c.now().Add(-time.Hour)}); err != nil {
+	if err := c.Revoke(ctx, Token{AccessToken: "x", RefreshToken: "gone", Expiry: c.now().Add(-time.Hour)}); !errors.Is(err, ErrInvalidGrant) {
 		t.Fatalf("gone: %v", err)
 	}
 	// a legacy app's 10-year expires_in is kept as no expiry

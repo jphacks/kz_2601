@@ -139,6 +139,8 @@ type OAuthClient interface {
 	Exchange(ctx context.Context, code, codeVerifier, redirectURI string) (Token, error)
 	// Refresh renews the access token (ErrInvalidGrant when refused).
 	Refresh(ctx context.Context, t Token) (Token, error)
-	// Revoke revokes t at the provider (ErrNoRevoke when it cannot).
+	// Revoke revokes t at the provider (ErrNoRevoke when it cannot;
+	// ErrInvalidGrant when it renews t first and the refresh token is
+	// refused: gone, or renewed elsewhere meanwhile).
 	Revoke(ctx context.Context, t Token) error
 }

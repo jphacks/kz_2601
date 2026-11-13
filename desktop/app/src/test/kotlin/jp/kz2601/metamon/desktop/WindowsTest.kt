@@ -237,7 +237,8 @@ class WindowsTest {
         left.addItem("牛乳")
         right.addItem("卵")
         p.idle()
-        assertEquals(listOf("牛乳", "卵"), store.records.rows("shopping", "groceries").reversed().map { it.data["name"].toString().trim('"') })
+        // 並びは createdAt 順で、Windows では 2 件が同じ時刻になり得るので順番は見ない
+        assertEquals(listOf("牛乳", "卵").sorted(), store.records.rows("shopping", "groceries").map { it.data["name"].toString().trim('"') }.sorted())
         // 開き直すと両方ある
         assertEquals(2, p.load(dsl.entityModels()).list("groceries").size)
         records.close()
@@ -263,7 +264,7 @@ class WindowsTest {
     @Test
     fun windowStringsExistInBothLanguages() {
         listOf("desktop_list_open_window", "desktop_tray_new_window", "desktop_window_conflict", "desktop_window_open_record", "desktop_window_title_record").forEach { k ->
-            Lang.entries.forEach { l -> assertTrue("$k ($l)", Strings.table.has(l, k)) }
+            Lang.entries.forEach { l -> assertTrue("$k ($l)", Strings.table.hasString(l, k)) }
         }
         assertEquals("Tailor It — 買い物 — 詳細", Strings.withLang(Lang.JA) { Strings.format("desktop_window_title_record", "買い物", "詳細") })
     }

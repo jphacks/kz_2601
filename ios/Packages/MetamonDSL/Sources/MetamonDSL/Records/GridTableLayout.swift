@@ -112,7 +112,7 @@ public struct GridTableLayout: Sendable {
     // MARK: - today
 
     /// 列見出しが曜日なら今日の列の index(「月」「月曜」「月曜日」「Mon」「Monday」)。曜日の列が 3 つ未満なら nil(曜日でない表を誤って強調しない)。
-    public static func todayColumn(labels: [String], now: Date = Date(), calendar: Calendar = .current) -> Int? {
+    public static func todayColumn(labels: [String], now: Date = DSLClock.now(), calendar: Calendar = .current) -> Int? {
         let weekdays = labels.map(weekdayIndex)
         guard weekdays.compactMap({ $0 }).count >= min(3, labels.count), !labels.isEmpty else { return nil }
         let today = calendar.component(.weekday, from: now) // 1 = 日曜

@@ -1,0 +1,65 @@
+{
+ "ttl": 60,
+ "data": {
+  "stations": [
+   {
+    "lat": 35.680612,
+    "lon": 139.769689,
+    "name": "B2-33.新槇町ビル",
+    "capacity": 109,
+    "region_id": "2",
+    "station_id": "7594"
+   },
+   {
+    "lat": 35.680514,
+    "lon": 139.764002,
+    "name": "A4-01.丸ビル（南側駐輪場）",
+    "capacity": 13,
+    "region_id": "1",
+    "station_id": "10023"
+   },
+   {
+    "lat": 35.67942,
+    "lon": 139.77004,
+    "name": "B2-21.八重洲二丁目北地区広場",
+    "capacity": 22,
+    "region_id": "2",
+    "station_id": "1750"
+   },
+   {
+    "lat": 35.684349,
+    "lon": 139.766958,
+    "name": "A4-08.永代通り（大手町駅B2c出口前）",
+    "capacity": 0,
+    "region_id": "1",
+    "station_id": "10197"
+   },
+   {
+    "lat": 35.680753,
+    "lon": 139.762069,
+    "name": "A4-11.二重橋前駅(メトロ4番出口)",
+    "capacity": 0,
+    "region_id": "1",
+    "station_id": "10513"
+   },
+   {
+    "lat": 35.677576,
+    "lon": 139.769822,
+    "name": "B2-11.京橋エドグラン",
+    "capacity": 12,
+    "region_id": "2",
+    "station_id": "10216"
+   },
+   {
+    "lat": 35.666349,
+    "lon": 139.741781,
+    "name": "C3-36.第35興和ビル",
+    "capacity": 3,
+    "region_id": "3",
+    "station_id": "2363"
+   }
+  ]
+ },
+ "version": "2.3",
+ "last_updated": 1794418064
+}

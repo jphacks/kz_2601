@@ -26,6 +26,16 @@ type OAuthState struct {
 	Verifier string    `firestore:"verifier"`
 	Scopes   []string  `firestore:"scopes,omitempty"`
 	ExpireAt time.Time `firestore:"expireAt"`
+	// CreatedAt is when Start made it (a connection cut after it is not saved).
+	CreatedAt time.Time `firestore:"createdAt,omitempty"`
+}
+
+// startedAt is CreatedAt, or for a state written without it ExpireAt − StateTTL.
+func (s OAuthState) startedAt() time.Time {
+	if !s.CreatedAt.IsZero() {
+		return s.CreatedAt
+	}
+	return s.ExpireAt.Add(-StateTTL)
 }
 
 // StateStore keeps OAuth states.
@@ -33,6 +43,8 @@ type StateStore interface {
 	PutState(ctx context.Context, state string, s OAuthState) error
 	// TakeState returns the state and deletes it (one use).
 	TakeState(ctx context.Context, state string) (OAuthState, bool, error)
+	// DeleteStates deletes every state of uid (account deletion).
+	DeleteStates(ctx context.Context, uid string) error
 }
 
 // ErrBadState: the callback's state is unknown, used, expired or for another provider.
@@ -95,7 +107,8 @@ func (s *Service) Start(ctx context.Context, uid, provider string, scopes []stri
 	}
 	sum := sha256.Sum256([]byte(verifier))
 	challenge := base64.RawURLEncoding.EncodeToString(sum[:])
-	if err := s.States.PutState(ctx, state, OAuthState{UID: uid, Provider: provider, Verifier: verifier, Scopes: scopes, ExpireAt: s.now().Add(StateTTL).UTC()}); err != nil {
+	now := s.now().UTC()
+	if err := s.States.PutState(ctx, state, OAuthState{UID: uid, Provider: provider, Verifier: verifier, Scopes: scopes, ExpireAt: now.Add(StateTTL), CreatedAt: now}); err != nil {
 		return "", fmt.Errorf("state: %w", err)
 	}
 	return cl.AuthURL(state, challenge, s.RedirectURI(provider), scopes), nil
@@ -141,7 +154,13 @@ func (s *Service) callback(ctx context.Context, provider, state, code string) er
 	if len(t.Scopes) == 0 {
 		t.Scopes = st.Scopes
 	}
-	if err := s.Conns.Save(ctx, st.UID, provider, t); err != nil {
+	if err := s.Conns.SaveSince(ctx, st.UID, provider, t, st.startedAt()); err != nil {
+		if errors.Is(err, ErrCutSinceStart) {
+			// the person cut it (or left) while consenting: the new grant goes too
+			if rerr := cl.Revoke(context.WithoutCancel(ctx), t); rerr != nil && !errors.Is(rerr, ErrNoRevoke) {
+				s.Log.WarnContext(ctx, "extapi: provider revoke failed", slog.String("provider", provider), slog.Any("error", rerr))
+			}
+		}
 		return err
 	}
 	s.Log.InfoContext(ctx, "extapi: connected", slog.String("provider", provider), slog.String("uid_hash", httpx.UIDHash(st.UID)))
@@ -157,13 +176,38 @@ func (s *Service) Revoke(ctx context.Context, uid, provider string) error {
 	if s.Conns == nil {
 		return ErrUnavailable
 	}
+	unlock, err := s.lockConn(ctx, uid, provider)
+	if err != nil {
+		return err
+	}
+	defer unlock()
 	return s.Conns.Revoke(ctx, uid, provider, s.oauth[provider])
 }
 
-// RevokeAll cuts every connection of uid (DELETE /v1/me).
+// lockConn takes the refresh lock of uid's connection of provider: a revoke
+// waits for a refresh on this instance (and the other way round), so it
+// revokes the token the refresh stored, not the one it replaced.
+func (s *Service) lockConn(ctx context.Context, uid, provider string) (func(), error) {
+	return s.refreshing.lock(ctx, connKey(uid, provider))
+}
+
+// connKey is the refresh lock's key of uid's connection of provider.
+func connKey(uid, provider string) string { return uid + "\x00" + provider }
+
+// RevokeAll cuts every connection of uid (DELETE /v1/me): uid's started
+// connections go first, then every connection is cut and every OAuth
+// provider gets the revoked marker, so a callback still on its way saves
+// nothing.
 func (s *Service) RevokeAll(ctx context.Context, uid string) (int, error) {
 	if s.Conns == nil || uid == "" {
 		return 0, nil
 	}
-	return s.Conns.RevokeAll(ctx, uid, func(p string) OAuthClient { return s.oauth[p] })
+	var serr error
+	if s.States != nil {
+		if serr = s.States.DeleteStates(ctx, uid); serr != nil {
+			serr = fmt.Errorf("states: %w", serr)
+		}
+	}
+	n, err := s.Conns.revokeAll(ctx, uid, func(p string) OAuthClient { return s.oauth[p] }, s.lockConn)
+	return n, errors.Join(err, serr)
 }

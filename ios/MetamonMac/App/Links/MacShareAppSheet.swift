@@ -6,7 +6,7 @@ import MetamonRenderer
 import MetamonServices
 
 /// ツールバーの「共有」(#1035): 今のアプリのシェアリンクを作り、コピー・共有メニュー・取り消しを出す。
-/// iOS の `ShareAppSheet` のリンク・QR・送り先・参加している人の Mac 版(#974・「探す」への公開は後で)。サーバーに保存したアプリだけ。
+/// iOS の `ShareAppSheet` のリンク・QR・送り先・参加している人の Mac 版(#974)。「探す」への公開は `MacPublishSection`(#2070)。サーバーに保存したアプリだけ。
 @MainActor
 @Observable
 final class MacShareAppModel: Identifiable {
@@ -30,7 +30,11 @@ final class MacShareAppModel: Identifiable {
         self.appName = appName
         self.sharing = sharing
         self.members = membership.map { MacSharedMembersModel(appId: appId, client: $0, social: social) }
+        self.publishing = sharing.map { MacPublishModel(appId: appId, appName: appName, sharing: $0) }
     }
+
+    /// 「みんなに公開」(#2070)。共有の API が無い時は nil
+    let publishing: MacPublishModel?
 
     /// ツールバーの「共有」を押せるか: 作ったアプリで、サーバーにあり、サインインしていて、共有の API がある時だけ。
     static func canShare(isCreated: Bool, isOnServer: Bool, signedIn: Bool, sharingAvailable: Bool) -> Bool {
@@ -134,6 +138,10 @@ struct MacShareAppSheet: View {
                                                 onLeft: { copied = false; model.forgetLink() },
                                                 onError: { notice = $0 })
                     }
+                    if let publishing = model.publishing {
+                        Divider()
+                        MacPublishSection(model: publishing, onNotice: { notice = $0 })
+                    }
                 }
             }
             .frame(maxHeight: 560)
@@ -155,6 +163,7 @@ struct MacShareAppSheet: View {
         .frame(width: 460)
         .task { await model.issue() }
         .task { await model.members?.load() }
+        .task { await model.publishing?.load() }
     }
 
     @ViewBuilder

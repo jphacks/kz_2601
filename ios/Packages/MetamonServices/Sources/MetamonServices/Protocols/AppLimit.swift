@@ -51,8 +51,9 @@ public struct AppLimit: Sendable, Equatable {
         self.apps = apps
     }
 
+    /// code だけで見る(status は見ない)。生成の stream(`event: error`)は 200 の中で届き、`status` が欠けると 500 扱いになるため。
     public init?(_ error: Error) {
-        guard let api = error as? APIError, api.status == 402, api.code == Self.code,
+        guard let api = error as? APIError, api.code == Self.code,
               case .server(_, _, _, let d) = api else { return nil }
         let int = { (v: JSONValue?) -> Int? in
             if case .number(let n)? = v, n.isFinite { return Int(n) }

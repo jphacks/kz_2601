@@ -4,9 +4,10 @@
 # 変更の判定(dorny/paths-filter)→ 回すもの:
 #   | 変わった場所                                                    | テスト(ubuntu・windows)   | 配布物(deb・msi)          |
 #   |-----------------------------------------------------------------|----------------------------|-----------------------------|
-#   | desktop/**(*.md 以外)                                          | :desktop:test :dsl:test    | push・手動の時だけ          |
+#   | desktop/**(*.md 以外)                                          | :desktop:test :dsl:test :whisper:test | push・手動の時だけ |
 #   | android/dsl/**(*.md 以外)・android/gradle/libs.versions.toml   | 同上                       | 同上                        |
 #   | android/{renderer,services}/src/main/**(取り込むソース・文言)  | 同上                       | 同上                        |
+#   | android/whisper/src/**(取り込むソースとテスト・#1751)           | 同上                       | 同上                        |
 #   | android/app/src/main/res/values*/**(同梱する文言)              | 同上                       | 同上                        |
 #   | docs/dsl/{conformance,examples}/**(適合テストと同梱の例)      | 同上                       | 同上                        |
 #   | .github/workflows/desktop-ci.yml                                | 同上                       | 同上                        |
@@ -71,6 +72,10 @@ jobs:
             services:
               - 'android/services/src/main/**'
               - '!android/**/*.md'
+            # desktop/whisper が取り込む純 Kotlin の部分とそのテスト(#1751)
+            whisper:
+              - 'android/whisper/src/**'
+              - '!android/**/*.md'
             strings:
               - 'android/app/src/main/res/values*/**'
             docs:
@@ -87,6 +92,7 @@ jobs:
           VERSIONS: ${{ steps.filter.outputs.versions }}
           RENDERER: ${{ steps.filter.outputs.renderer }}
           SERVICES: ${{ steps.filter.outputs.services }}
+          WHISPER: ${{ steps.filter.outputs.whisper }}
           STRINGS: ${{ steps.filter.outputs.strings }}
           DOCS: ${{ steps.filter.outputs.docs }}
           WORKFLOW: ${{ steps.filter.outputs.workflow }}
@@ -96,7 +102,7 @@ jobs:
           if [ "$EVENT" = workflow_dispatch ]; then
             run=true
           else
-            for v in "$DESKTOP" "$DSL" "$VERSIONS" "$RENDERER" "$SERVICES" "$STRINGS" "$DOCS" "$WORKFLOW"; do
+            for v in "$DESKTOP" "$DSL" "$VERSIONS" "$RENDERER" "$SERVICES" "$WHISPER" "$STRINGS" "$DOCS" "$WORKFLOW"; do
               if [ "$v" = true ]; then run=true; fi
             done
           fi
@@ -140,8 +146,9 @@ jobs:
         with:
           cache-read-only: ${{ github.event_name == 'pull_request' }}
 
-      - name: test(:desktop・:dsl)
-        run: ${{ matrix.gradlew }} :desktop:test :dsl:test --console=plain
+      # :whisper は Kotlin の側だけ(JNI のライブラリは作らない・音声入力は既定で off)
+      - name: test(:desktop・:dsl・:whisper)
+        run: ${{ matrix.gradlew }} :desktop:test :dsl:test :whisper:test --console=plain
 
       - name: 配布物を作る
         if: needs.desktop-changes.outputs.package == 'true'
@@ -164,6 +171,7 @@ jobs:
           path: |
             desktop/app/build/reports/tests/
             desktop/build/dsl/reports/tests/
+            desktop/whisper/build/reports/tests/
           retention-days: 7
           if-no-files-found: ignore
 

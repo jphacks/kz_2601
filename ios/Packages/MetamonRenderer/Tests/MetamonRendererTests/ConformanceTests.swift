@@ -304,6 +304,13 @@ final class ConformanceRuntime: DSLRuntime {
         } else if let input = o["input"]?.objectValue {
             guard let form, let f = input["field"]?.stringValue else { return false }
             form.values[f] = input["value"] ?? .null
+        } else if let imp = o["importCsv"]?.objectValue {
+            // ファイルを選ぶ操作は含めない: CSV の中身を直に渡し、列の当て方と足す記録だけを比べる
+            let id = imp["component"]?.stringValue
+            guard let c = screen?.allComponents.first(where: { id == nil ? $0.rawType == "fileImport" : $0.id == id }),
+                  c.rawType == "fileImport", let eid = c.entity, let entity = dsl.entity(eid),
+                  tree.state(of: c, ctx: RenderContext(route: route, form: form, locals: locals)) == "rendered" else { return false }
+            importCSV(Self.csvText(imp["text"]), component: c, entity: entity)
         } else if let search = o["search"]?.objectValue {
             guard let key = search["field"]?.stringValue else { return false }
             locals.values[key] = search["text"]?.stringValue ?? ""
@@ -313,6 +320,45 @@ final class ConformanceRuntime: DSLRuntime {
             return false
         }
         return true
+    }
+
+    /// `importCsv.text`: 1 つの文字列、または 1 行 1 要素の配列(読みやすさのため)。
+    static func csvText(_ v: JSONValue?) -> String {
+        if let rows = v?.arrayValue { return rows.compactMap(\.stringValue).joined(separator: "\n") + "\n" }
+        return v?.stringValue ?? ""
+    }
+
+    static func importKind(_ k: ImportRowFailure.Kind) -> String {
+        switch k {
+        case .invalid: "invalid"
+        case .required: "required"
+        case .tooLong: "tooLong"
+        }
+    }
+
+    /// `fileImport` の CSV の取り込み(`FileImportLeaf` の plan → 1 件ずつ足す を写したもの。ファイル選択・確認ダイアログの文言は含めない)。
+    private func importCSV(_ text: String, component c: Component, entity: Entity) {
+        let plan = RecordImport.plan(table: CSVReader.parse(text), entity: entity, map: c.map,
+                                     existing: records(for: entity.id).count) { field, name in
+            guard let target = field.refEntity else { return nil }
+            return records(for: target).first { refTitle($0.id, entity: target) == name }?.id
+        }
+        effects.append(.object(["imported": .object([
+            "entity": .string(entity.id),
+            "matched": .array(plan.matched.map { .object(["column": .string($0.column), "field": .string($0.field)]) }),
+            "unused": .array(plan.unused.map(JSONValue.string)),
+            "failures": .array(plan.failures.map {
+                .object(["line": .number(Double($0.line)), "field": .string($0.fieldName),
+                         "kind": .string(Self.importKind($0.kind)), "cell": .string($0.cell)])
+            }),
+            "overLimit": .number(Double(plan.overLimit)),
+        ])]))
+        for data in plan.rows {
+            let id = "new-\(nextId)"
+            nextId += 1
+            store[entity.id, default: []].append(Record(id: id, data: data))
+            effects.append(.object(["saved": .object(["entity": .string(entity.id), "recordId": .string(id), "data": .object(data)])]))
+        }
     }
 
     private func dispatch(_ action: Action, _ ctx: ActionContext) {
