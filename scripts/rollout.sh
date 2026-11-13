@@ -81,6 +81,10 @@ decide() {
     def r4: (. * 10000 | round) / 10000;
     def r6: (. * 1000000 | round) / 1000000; # 0.05 - 0.04 = 0.010000000000000002 を 0.01 として比べる
     (.new // {}) as $n | (.old // {}) as $o |
+    # 数があるのに形が違う(文字列・欠けた項目)指標は 0 扱いで進めず、判定を失敗させる(呼ぶ側が旧に戻す)
+    def shape(who; m): if (m.requests != null) and ([m.requests, m.errors_5xx, m.p95_ms] | all(type == "number") | not)
+      then error("\(who) の指標の形が違う: requests / errors_5xx / p95_ms は数") else . end;
+    shape("new"; $n) | shape("old"; $o) |
     n($n.requests) as $nr | n($n.errors_5xx) as $ne |
     n($o.requests) as $or | n($o.errors_5xx) as $oe |
     (rate($ne; $nr) | r6) as $nRate | (rate($oe; $or) | r6) as $oRate |
@@ -125,7 +129,8 @@ summarize() {
       ([ $u[] | .est_cost_usd | numbers ] as $c |
         { cost_calls: ($c | length),
           cost_usd_per_call: (if ($c | length) > 0 then (($c | add) / ($c | length) * 1000000 | round) / 1000000 else 0 end) });
-    { new: one($new), old: one($old) }
+    if type != "array" then error("logs が配列でない(gcloud logging read のエラーの JSON か)") else . end
+    | { new: one($new), old: one($old) }
   ' "$1"
 }
 

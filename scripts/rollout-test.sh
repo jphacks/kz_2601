@@ -88,6 +88,25 @@ set -e
 [ "$code" = 3 ] && [ "$code2" = 3 ] || fail "指標が読めない時の終了コード 3 のはずが $code / $code2"
 tail -n 1 "$TMP/broken.out" | grep -q 'to-revisions=old=100' || fail "指標が読めないのに戻さない"
 tail -n 1 "$TMP/broken2.out" | grep -q 'to-revisions=old=100' || fail "壊れた指標で戻さない"
+# 指標が空・形が変(文字列・項目が欠けた)でも 0 扱いで進まず、5% の段階で旧に戻す(終了コード 3・新を 100% にしない)
+for sim in sim-empty sim-string-field sim-missing-field; do
+  set +e
+  ./rollout.sh --env stg --service ai --to-revision new --from-revision old --wait 0 --metrics-dir "$D/$sim" >"$TMP/$sim.out" 2>/dev/null
+  code=$?
+  set -e
+  [ "$code" = 3 ] || fail "$sim: 終了コード 3 のはずが $code"
+  tail -n 1 "$TMP/$sim.out" | grep -q 'to-revisions=old=100' || fail "$sim: 旧に戻していない: $(cat "$TMP/$sim.out")"
+  if grep -q 'to-revisions=new=' "$TMP/$sim.out"; then
+    grep 'to-revisions=new=' "$TMP/$sim.out" | grep -qv 'new=5,old=95' && fail "$sim: 5% より先へ進んだ"
+  fi
+done
+# 判定そのものも、形が変な指標では promote を出さない(失敗する)
+for m in '{"new":{"requests":100,"errors_5xx":"0","p95_ms":5},"old":{}}' '{"new":{"requests":100},"old":{}}' '[]' '"x"'; do
+  printf '%s\n' "$m" >"$TMP/shape.json"
+  if out="$(./rollout.sh --decide "$TMP/shape.json" 2>/dev/null)" && printf '%s\n' "$out" | grep -q 'decision=promote'; then
+    fail "形が変な指標で promote した: $m"
+  fi
+done
 # 指標が足りないまま: 既定は窓を 2 回延ばしてから巻き戻す(終了コード 4)・--on-insufficient promote なら進める
 mkdir -p "$TMP/low"
 jq '.[7].metrics' "$D/decide-cases.json" >"$TMP/low/5.json"
@@ -138,6 +157,41 @@ grep -q 'update-traffic ai-stg --project=fake-project --region=asia-northeast1 -
   || fail "偽 gcloud: describe から新旧を読んでいない: $(cat "$TMP/calls")"
 tail -n 1 "$TMP/calls" | grep -q -- '--to-revisions=ai-stg-00001-old=100' || fail "偽 gcloud: 旧に戻していない: $(cat "$TMP/calls")"
 grep -q 'resource.labels.revision_name=("ai-stg-00002-new" OR "ai-stg-00001-old")' "$TMP/calls" || fail "偽 gcloud: ログのフィルタ"
+
+# 4c. --execute で、ログの読み取りが失敗・空・壊れ・形違いの時は新を進めず旧に戻す(偽の gcloud。GCP には触らない)
+mkdir -p "$TMP/bin2"
+cat >"$TMP/bin2/gcloud" <<'EOF'
+#!/usr/bin/env bash
+echo "$*" >>"$FAKE_CALLS"
+case "$*" in
+  "run services describe"*) echo '{"status":{"latestCreatedRevisionName":"ai-stg-00002-new","traffic":[{"revisionName":"ai-stg-00001-old","percent":100}]}}' ;;
+  "run services update-traffic"*) ;;
+  "logging read"*)
+    case "$FAKE_LOGS" in
+      fail) echo "ERROR: permission denied" >&2; exit 1 ;;
+      empty) ;;
+      garbage) echo 'oops, not json' ;;
+      object) echo '{"error":{"code":403}}' ;;
+      none) echo '[]' ;;
+    esac ;;
+  *) echo "fake gcloud: unexpected $*" >&2; exit 1 ;;
+esac
+EOF
+chmod +x "$TMP/bin2/gcloud"
+# モード: 期待する終了コード(none は指標ゼロ = 足りない → 窓を延ばしても足りず 4)
+for spec in fail:3 empty:3 garbage:3 object:3 none:4; do
+  mode="${spec%%:*}" want="${spec##*:}"
+  : >"$TMP/calls2"
+  set +e
+  PATH="$TMP/bin2:$PATH" PROJECT_ID=fake-project FAKE_LOGS="$mode" FAKE_CALLS="$TMP/calls2" \
+    ./rollout.sh --env stg --service ai --execute --wait 0 >/dev/null 2>&1
+  code=$?
+  set -e
+  [ "$code" = "$want" ] || fail "ログが $mode: 終了コード $want のはずが $code"
+  tail -n 1 "$TMP/calls2" | grep -q -- '--to-revisions=ai-stg-00001-old=100' || fail "ログが $mode: 旧に戻していない: $(cat "$TMP/calls2")"
+  if grep -q -- '--to-revisions=ai-stg-00002-new=100' "$TMP/calls2"; then fail "ログが $mode: 新を 100% にした"; fi
+  if grep -q -- '--to-revisions=ai-stg-00002-new=25' "$TMP/calls2"; then fail "ログが $mode: 5% の次へ進んだ"; fi
+done
 
 # 5. prod の安全装置
 out="$(./rollout.sh --env prod --service appconfig --wait 0 2>&1)"
