@@ -348,7 +348,8 @@ class DesktopSession(
                 // OS の機能を呼ぶもの(URL・通知・書き出し・ライブアクティビティ・音声)は「何を頼んだか」を残し、ホストに渡す
                 effects += obj("request" to actionJson(action))
                 if (action.type == ActionType.RESET_FORM) ctx.form?.reset()
-                message = host?.request(action, ctx, this) ?: message
+                // null は「一言を変えない」(ホストが先に出した一言を、別スレッドの答えごと上書きしない)
+                host?.request(action, ctx, this)?.let { message = it }
             }
         }
     }
