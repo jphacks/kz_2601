@@ -52,7 +52,7 @@ runner は prod で GitHub の変数 `RUNNER_DEPLOY=1` の時だけデプロイ�
 
 | 変数 | サービス | 何をするか | 既定 |
 |---|---|---|---|
-| `NOTICE_JSON` | appconfig | アプリ内のお知らせ(#333)。`GET /v1/client-config` の `notice` として 1 行のバナーを出す。形は `openapi-appconfig.yaml` の `Notice`(PR #500 で入る) | 無し(出さない) |
+| `NOTICE_JSON` | appconfig | アプリ内のお知らせ(#333)。`GET /v1/client-config` の `notice` として 1 行のバナーを出す。形は `openapi-appconfig.yaml` の `Notice`(PR #500 で入る)。`platforms`(`ios` `android` `macos` `windows` `linux` の配列・#2964)を付けると `X-Client-Platform` が合う OS にだけ出す(無し = 全 OS・知らない値を入れると notice ごと無効) | 無し(出さない) |
 | `MIN_IOS_BUILD` | appconfig | これより古い iOS ビルドに「アップデートしてください」の画面を出す(閉じられない・#302) | 無し |
 | `LATEST_IOS_BUILD` | appconfig | これより古いビルドに閉じられるアップデート案内を出す(#302) | 無し |
 | `IOS_APP_STORE_URL` | appconfig | 上の案内から開く App Store の URL(`https://apps.apple.com/app/id<id>`) | 無し |

@@ -121,8 +121,13 @@ func ClientConfigFromEnv(getenv func(string) string) ClientConfigValues {
 // ClientConfig serves GET /v1/client-config. It is public (clients check it
 // before sign-in) and holds no user data.
 func ClientConfig(v ClientConfigValues) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Cache-Control", "public, max-age=300")
+		if v.Notice != nil && len(v.Notice.Platforms) > 0 {
+			// The body depends on the OS only when the notice targets some.
+			w.Header().Add("Vary", httpx.ClientPlatformHeader)
+		}
+		v.Notice = v.Notice.forPlatform(httpx.ClientPlatform(r))
 		httpx.WriteJSON(w, http.StatusOK, v)
 	})
 }
