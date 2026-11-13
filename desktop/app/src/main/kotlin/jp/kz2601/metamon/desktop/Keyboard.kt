@@ -57,6 +57,7 @@ import jp.kz2601.metamon.dsl.Presentation
 import jp.kz2601.metamon.dsl.Screen
 import jp.kz2601.metamon.dsl.screen
 import jp.kz2601.metamon.renderer.form.FormDraft
+import jp.kz2601.metamon.desktop.onboarding.OnboardingDialog
 import jp.kz2601.metamon.services.PlanUsageSource
 
 // キーボードだけで使う(#1765): ショートカット・コマンドパレット(CommandPalette.kt)・F1 の一覧。
@@ -312,6 +313,12 @@ class DesktopKeyboard(
     var retentionReviewOpen by mutableStateOf(false)
     private var retentionTick by mutableIntStateOf(0)
 
+    /** 初回の流れ(#3201)。起動時に 1 回・F1 の一覧とパレットの「使い方を見る」から開く。 */
+    var onboardingOpen by mutableStateOf(false)
+
+    /** 初回の流れを閉じた(最後まで見た = true・あとで見る / Esc = false)。 */
+    var onOnboardingFinished: (Boolean) -> Unit = {}
+
     val root = FocusRequester()
     val modal = FocusRequester()
 
@@ -332,7 +339,7 @@ class DesktopKeyboard(
             if (!repeat) closePreview()
             return true
         }
-        if (paletteOpen || helpOpen || licensesOpen || usageOpen || wipeConfirmOpen || shareOpen) return false // パレット・一覧・確認が自分で受ける
+        if (paletteOpen || helpOpen || licensesOpen || usageOpen || wipeConfirmOpen || shareOpen || onboardingOpen) return false // パレット・一覧・確認が自分で受ける
         // 項目つきでコピーした記録の貼り付け。入力欄などを選んでいる時は普通の貼り付けに任せる
         if (isPasteKey(p)) return !bubble && rootFocused && pasteRecord()
         val s = Keymap.match(p, os) ?: return false
@@ -456,7 +463,11 @@ class DesktopKeyboard(
                 ) { retentionReviewOpen = true },
             )
         }.orEmpty()
-        return shortcuts + buttons + record + screens + apps + usage + wipe + shareLink + retention + tips + licenses
+        val onboarding = PaletteCommand(
+            "help:onboarding", Strings["onboarding_replay"], PaletteCommand.Kind.ACTION,
+            keywords = listOf("onboarding", "tutorial", "how to use", Strings["desktop_onboarding_title"]),
+        ) { onboardingOpen = true }
+        return shortcuts + buttons + record + screens + apps + usage + wipe + shareLink + retention + tips + onboarding + licenses
     }
 
     /** 今のアプリの保存期間のある entity(アプリ・entity・日数・確認済みか)。端末に残さない時は空。 */
@@ -494,7 +505,7 @@ class DesktopKeyboard(
     val modalModifier: Modifier get() = Modifier.focusRequester(modal).focusGroup()
 
     fun focusAfterNavigation(modalOpen: Boolean) {
-        if (paletteOpen || helpOpen || licensesOpen || usageOpen || shareOpen || tipsOpen || retentionReviewOpen) return
+        if (paletteOpen || helpOpen || licensesOpen || usageOpen || shareOpen || tipsOpen || retentionReviewOpen || onboardingOpen) return
         if (modalOpen && runCatching { modal.requestFocus(FocusDirection.Enter) }.getOrDefault(false)) return
         runCatching { root.requestFocus() }
     }
@@ -515,7 +526,7 @@ class DesktopKeyboard(
             }
         }
         if (helpOpen) {
-            ShortcutHelp(os, onLicenses = { helpOpen = false; licensesOpen = true }, onTips = { helpOpen = false; tipsOpen = true }) {
+            ShortcutHelp(os, onLicenses = { helpOpen = false; licensesOpen = true }, onTips = { helpOpen = false; tipsOpen = true }, onOnboarding = { helpOpen = false; onboardingOpen = true }) {
                 helpOpen = false
                 runCatching { root.requestFocus() }
             }
@@ -548,6 +559,15 @@ class DesktopKeyboard(
                     runCatching { root.requestFocus() }
                 },
             )
+        }
+        if (onboardingOpen) {
+            OnboardingDialog(os) { completed ->
+                onboardingOpen = false
+                onOnboardingFinished(completed)
+                // あとで見る: どこから見直せるかを一言で
+                if (!completed) session.message = Strings.format("desktop_onboarding_later_hint", Keymap.label(Shortcut.HELP, os))
+                runCatching { root.requestFocus() }
+            }
         }
         if (licensesOpen) {
             LicensesDialog {
