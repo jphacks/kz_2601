@@ -8,7 +8,7 @@
 | cmd | 役割 | どこで動くか | 手元で回す | 詳しい docs |
 |---|---|---|---|---|
 | `cmd/ai` | 音声/文字 → Claude → DSL(初回フル / 以後 JSON Patch) → appconfig | Cloud Run サービス `ai-stg` / `ai-prod` | `make run-ai`(`make dev` で appconfig と一緒に) | [openapi-ai.yaml](../docs/backend/openapi-ai.yaml) |
-| `cmd/ai-audit` | ai-eval の結果の DSL を「動くか」で採点する(押せないボタン・行けない画面など)。API は呼ばない | 手元 | `go run ./cmd/ai-audit` | [ai-eval の監査](../docs/backend/ai-eval/2026-10-24-audit.md) |
+| `cmd/ai-audit` | ai-eval の結果の DSL を「動くか」で採点する(押せないボタン・行けない画面など)。API は呼ばない | 手元 | `go run ./cmd/ai-audit` | [使い方](../docs/backend/ai-eval/ai-audit.md)・[ai-eval の監査](../docs/backend/ai-eval/2026-10-24-audit.md) |
 | `cmd/ai-eval` | 評価ケース(`internal/ai/eval/cases.json`)を本物の Claude で回して指標と DSL を書き出す。`-check-all` はケースの検査だけ(API なし) | 手元・`backend-ci`(`-check-all` だけ) | `go run ./cmd/ai-eval` | [ci-gate.md](../docs/backend/ai-eval/ci-gate.md) |
 | `cmd/ai-session-report` | 指定したユーザーの AI とのやり取りをセッションに切り、AI が外した疑いの強い順に並べる(読むだけ) | 手元(人が回す・定期では回さない) | `go run ./cmd/ai-session-report` | [ai-session-report.md](../docs/ops/ai-session-report.md) |
 | `cmd/appconfig` | アプリ DSL JSON の CRUD・JSON Patch 適用・バージョン・汎用レコード・各機能の API | Cloud Run サービス `appconfig-stg` / `appconfig-prod` | `make run-appconfig`(`make dev` で ai と一緒に) | [openapi-appconfig.yaml](../docs/backend/openapi-appconfig.yaml) |
