@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"os"
+	"strings"
 	"testing"
 	"time"
 )
@@ -66,5 +67,51 @@ func testMembership(t *testing.T, s Store, suffix string) {
 	}
 	if _, err := s.GetMember(ctx, app, "a"); !errors.Is(err, ErrNotFound) {
 		t.Fatalf("removed: %v", err)
+	}
+}
+
+// countingGetter counts GetMember calls and can fail them.
+type countingGetter struct {
+	*Memory
+	gets int
+	err  error
+}
+
+func (c *countingGetter) GetMember(ctx context.Context, appID, uid string) (*Member, error) {
+	c.gets++
+	if c.err != nil {
+		return nil, c.err
+	}
+	return c.Memory.GetMember(ctx, appID, uid)
+}
+
+// #2297: IsMember is one GetMember; a uid that cannot be a document ID is not read.
+func TestIsMember(t *testing.T) {
+	ctx := context.Background()
+	g := &countingGetter{Memory: NewMemory()}
+	if _, err := g.AddMember(ctx, "APP", Member{UID: "m", Via: MemberViaShare}); err != nil {
+		t.Fatal(err)
+	}
+	for uid, want := range map[string]bool{"m": true, "x": false} {
+		g.gets = 0
+		if ok, err := IsMember(ctx, g, "APP", uid); err != nil || ok != want || g.gets != 1 {
+			t.Errorf("IsMember(%q) = %v %v after %d reads, want %v after 1", uid, ok, err, g.gets, want)
+		}
+	}
+	if ok, _ := IsMember(ctx, g, "OTHER", "m"); ok {
+		t.Error("a member of another app")
+	}
+	g.gets = 0
+	for _, uid := range []string{"", ".", "..", "a/b", "__x__", strings.Repeat("a", 1501)} {
+		if ok, err := IsMember(ctx, g, "APP", uid); ok || err != nil {
+			t.Errorf("IsMember(%q) = %v %v", uid, ok, err)
+		}
+	}
+	if g.gets != 0 {
+		t.Errorf("invalid uids read %d times", g.gets)
+	}
+	g.err = errors.New("boom")
+	if _, err := IsMember(ctx, g, "APP", "m"); err == nil {
+		t.Error("a read error is returned")
 	}
 }

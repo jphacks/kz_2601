@@ -190,7 +190,7 @@ func TestPaidReserveCommitRelease(t *testing.T) {
 	}
 	es := e.ledger(user)
 	ext := spends(es, coins.KindSpendExt)
-	if len(ext) != 1 || ext[0].Amount != -12 || ext[0].Op != coins.OpExt || ext[0].USD != 0.12 || ext[0].AppID != appID {
+	if len(ext) != 1 || ext[0].Amount != -12 || ext[0].Op != coins.OpExt || ext[0].USD != 0.12 || ext[0].AppID != appID || ext[0].Provider != FakePaid {
 		t.Fatalf("spend_ext rows %+v", ext)
 	}
 	if len(spends(es, coins.KindSpendAI)) != 0 {

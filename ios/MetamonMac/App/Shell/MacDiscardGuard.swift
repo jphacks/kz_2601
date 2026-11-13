@@ -115,7 +115,7 @@ struct WindowCloseGuard: NSViewRepresentable {
 }
 
 @MainActor
-private final class CloseGuardDelegate: NSObject, NSWindowDelegate {
+final class CloseGuardDelegate: NSObject, NSWindowDelegate {
     static var key: UInt8 = 0
 
     weak var original: NSWindowDelegate?
