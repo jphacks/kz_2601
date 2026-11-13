@@ -2,6 +2,7 @@ package jp.kz2601.metamon.desktop.io
 
 import jp.kz2601.metamon.desktop.MockStore
 import jp.kz2601.metamon.desktop.Row
+import jp.kz2601.metamon.dsl.Accept
 import jp.kz2601.metamon.dsl.ImportColumn
 import jp.kz2601.metamon.dsl.logic.CsvColumnMapping
 import jp.kz2601.metamon.dsl.logic.CsvReader
@@ -98,6 +99,9 @@ object RecordIo {
 
     /** CSV ファイルのバイト列 → 表。文字コードが読めなければ null。 */
     fun csvTable(bytes: ByteArray): List<List<String>>? = CsvReader.decode(bytes)?.let(CsvReader::parse)
+
+    /** 表のファイルを受ける(fileImport の accept に csv がある)時の種類の表記。.xlsx は CSV と同じ確認に渡す(#2302)。 */
+    fun acceptLabels(accept: List<Accept>): List<String> = accept.flatMap { if (it == Accept.CSV) listOf("CSV", "XLSX") else listOf(it.wire.uppercase(Locale.ROOT)) }
 
     /** 貼り付けた文字 → 表。タブがあれば表計算の TSV、無ければ CSV。 */
     fun pastedTable(text: String): List<List<String>> = if ('\t' in text) Tsv.parse(text) else CsvReader.parse(text)
@@ -211,11 +215,12 @@ object Tsv {
 
 /** 落とした・選んだファイルの振り分け(拡張子で見る)。 */
 enum class FileKind {
-    CSV, TEXT, PDF, IMAGE, VIDEO, AUDIO, OTHER;
+    CSV, XLSX, TEXT, PDF, IMAGE, VIDEO, AUDIO, OTHER;
 
     companion object {
         fun of(name: String): FileKind = when (name.substringAfterLast('.', "").lowercase(Locale.ROOT)) {
             "csv", "tsv" -> CSV
+            "xlsx" -> XLSX
             "txt", "text", "md", "markdown", "log" -> TEXT
             "pdf" -> PDF
             "png", "jpg", "jpeg", "gif", "bmp", "webp", "heic" -> IMAGE
@@ -224,4 +229,7 @@ enum class FileKind {
             else -> OTHER
         }
     }
+
+    /** 表のファイル(取り込みの確認に渡す物) */
+    val isTable: Boolean get() = this == CSV || this == XLSX
 }

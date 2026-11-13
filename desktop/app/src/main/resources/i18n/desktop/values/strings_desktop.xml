@@ -73,6 +73,8 @@
     <string name="desktop_io_unreadable_encoding">文字コードが読めません</string>
     <string name="desktop_io_unsupported_file">このファイルは取り込めません</string>
     <string name="desktop_io_video_hint">動画を落とせます</string>
+    <string name="desktop_io_xlsx_sheet_label">%1$s(シート「%2$s」)</string>
+    <string name="desktop_io_xlsx_unreadable">Excel のファイルが読めません(.xls・パスワード付きは読めません)</string>
     <string name="desktop_keyring_no_service">この PC には鍵の保管庫(Secret Service)が無いため、サインインを保存しません。次に開く時にもう一度サインインしてください</string>
     <string name="desktop_keyring_no_session_bus">デスクトップのセッションの外で動いているため、サインインを保存しません。次に開く時にもう一度サインインしてください</string>
     <string name="desktop_keyring_probe_failed">鍵の保管庫(Secret Service)を調べられなかったため、サインインを保存しません。次に開く時にもう一度サインインしてください</string>

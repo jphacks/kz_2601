@@ -85,6 +85,8 @@ class DesktopIo(dsl: AppDSL, private val read: () -> MockStore, private val upda
         val accept = c.accept.ifEmpty { listOf(Accept.CSV) }
         when (FileKind.of(file.name)) {
             FileKind.CSV -> if (Accept.CSV in accept) importCsvFile(file, entity, c, c.label ?: file.name) else notice = Strings["desktop_io_unsupported_file"]
+            // .xlsx は CSV と同じ確認(見出しの行・列と項目の対応)に渡す(#2302)
+            FileKind.XLSX -> if (Accept.CSV in accept) importXlsxFile(file, entity, c, c.label ?: file.name) else notice = Strings["desktop_io_unsupported_file"]
             FileKind.TEXT -> if (Accept.TEXT in accept) {
                 val bytes = ImageSource.readFile(file, RecordImport.MAX_TEXT_BYTES) ?: return run { notice = Strings["desktop_io_file_too_large"] }
                 val text = RecordImport.plainText(bytes) ?: return run { notice = Strings["desktop_io_unreadable_encoding"] }
@@ -124,6 +126,20 @@ class DesktopIo(dsl: AppDSL, private val read: () -> MockStore, private val upda
     fun importCsv(bytes: ByteArray, entity: Entity, c: Component?, label: String) {
         val table = RecordIo.csvTable(bytes) ?: return run { notice = Strings["desktop_io_unreadable_encoding"] }
         offer(table, entity, c, label)
+    }
+
+    /** .xlsx のファイル。CSV と同じ上限で断り、最初のシートを読む(シートが複数なら確認の見出しにシートの名前を出す)。 */
+    fun importXlsxFile(file: File, entity: Entity, c: Component?, label: String) {
+        val bytes = ImageSource.readFile(file, RecordImport.MAX_TEXT_BYTES) ?: return run { notice = Strings["desktop_io_file_too_large"] }
+        importXlsx(bytes, entity, c, label)
+    }
+
+    fun importXlsx(bytes: ByteArray, entity: Entity, c: Component?, label: String) {
+        when (val r = XlsxIo.read(bytes)) {
+            is XlsxIo.Result.Table -> offer(r.rows, entity, c, if (r.sheetNames.size > 1) Strings.format("desktop_io_xlsx_sheet_label", label, r.sheet) else label)
+            XlsxIo.Result.TooLarge -> notice = Strings["desktop_io_file_too_large"]
+            XlsxIo.Result.Unreadable -> notice = Strings["desktop_io_xlsx_unreadable"]
+        }
     }
 
     private fun offer(table: List<List<String>>, entity: Entity, c: Component?, label: String) {
@@ -233,7 +249,7 @@ class DesktopIo(dsl: AppDSL, private val read: () -> MockStore, private val upda
                 }
             }
             val accept = when (kind) {
-                FileKind.CSV -> Accept.CSV
+                FileKind.CSV, FileKind.XLSX -> Accept.CSV
                 FileKind.TEXT -> Accept.TEXT
                 FileKind.PDF -> Accept.PDF
                 else -> null
@@ -244,11 +260,11 @@ class DesktopIo(dsl: AppDSL, private val read: () -> MockStore, private val upda
                 used = true
                 continue
             }
-            // fileImport が無い画面でも、一覧に CSV を落とせば同じ取り込みの確認
+            // fileImport が無い画面でも、一覧に CSV・.xlsx を落とせば同じ取り込みの確認
             val list = all.firstOrNull { it.type == ComponentType.LIST && it.entity != null }
             val entity = entity(list?.entity)
-            if (kind == FileKind.CSV && entity != null) {
-                importCsvFile(f, entity, null, f.name)
+            if (kind.isTable && entity != null) {
+                if (kind == FileKind.XLSX) importXlsxFile(f, entity, null, f.name) else importCsvFile(f, entity, null, f.name)
                 used = true
             }
         }
@@ -330,7 +346,7 @@ fun DesktopIo.previewKey(screen: () -> List<Component>, draft: () -> MutableMap<
 fun FileImportLeaf(c: Component, io: DesktopIo) {
     Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
         OutlinedButton(onClick = { io.pick(c) }) { Text(c.label ?: Strings["desktop_io_import_file"]) }
-        val kinds = c.accept.ifEmpty { listOf(Accept.CSV) }.joinToString(Strings["desktop_io_kind_separator"]) { it.wire.uppercase() }
+        val kinds = RecordIo.acceptLabels(c.accept.ifEmpty { listOf(Accept.CSV) }).joinToString(Strings["desktop_io_kind_separator"])
         Text(Strings.format("desktop_io_import_drop_hint", kinds), style = MaterialTheme.typography.bodySmall, color = Color.Gray)
     }
 }

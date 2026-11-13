@@ -72,6 +72,8 @@
     <string name="desktop_io_unreadable_encoding">Couldn\'t read the text encoding</string>
     <string name="desktop_io_unsupported_file">This file can\'t be imported</string>
     <string name="desktop_io_video_hint">You can drop a video here</string>
+    <string name="desktop_io_xlsx_sheet_label">%1$s (sheet \"%2$s\")</string>
+    <string name="desktop_io_xlsx_unreadable">Couldn\'t read the Excel file (.xls and password-protected files aren\'t supported)</string>
     <string name="desktop_keyring_no_service">No keyring (Secret Service) on this computer, so your sign-in isn\'t saved. Sign in again next time</string>
     <string name="desktop_keyring_no_session_bus">Not running in a desktop session, so your sign-in isn\'t saved. Sign in again next time</string>
     <string name="desktop_keyring_probe_failed">Couldn\'t check the keyring (Secret Service), so your sign-in isn\'t saved. Sign in again next time</string>
