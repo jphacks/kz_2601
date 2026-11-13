@@ -139,6 +139,8 @@ fun DesktopApp(
     notice: ServiceNotice? = null,
     onDismissNotice: (String) -> Unit = {},
     onOpenNoticeLink: ((String) -> Unit)? = null,
+    /** 最後に見た画面の写しを残すアプリ(#3204)。null なら撮らない(詳細のウィンドウ・テスト)。 */
+    thumbnailAppId: String? = null,
 ) {
     val noticeScope = rememberCoroutineScope()
     val openNoticeLink: (String) -> Unit = onOpenNoticeLink ?: { url ->
@@ -222,7 +224,9 @@ fun DesktopApp(
     // disclosure の開け閉めはこのウィンドウの間だけ覚える(#3214)
     val disclosures = remember { DisclosureMemory() }
     CompositionLocalProvider(LocalSearchTargets provides keyboard.searchTargets, LocalPhotoPreview provides keyboard::openPhoto, LocalDisclosures provides disclosures) {
-    Surface(Modifier.fillMaxSize().ioDropTarget(io, topComponents, topDraft).onPreviewKeyEvent { !keyboard.photos.isOpen && pasteKey(it) }
+    // 切り替え・画面が落ち着いた時に写しを残す(#3204)。写すのは中身だけ(印刷のプレビューなどダイアログは入らない)
+    val thumbnail = Modifier.captureAppThumbnail(thumbnailAppId) { session.nav to session.store }
+    Surface(Modifier.fillMaxSize().then(thumbnail).ioDropTarget(io, topComponents, topDraft).onPreviewKeyEvent { !keyboard.photos.isOpen && pasteKey(it) }
         .onPreviewKeyEvent { if (!keyboard.photos.isOpen && DesktopPrint.isPrintKey(it) && DesktopPrint.canPrint(dsl)) true.also { openPrint() } else false }.then(keyboard.modifier)) {
         IoOverlay(io)
         // お知らせの帯はウィンドウの一番上(sheet・fullScreen の上にも出る)
