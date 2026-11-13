@@ -54,6 +54,10 @@ curl -H "Authorization: Bearer $DEV_UID" localhost:8080/v1/apps/my-device/dsl   
 運用コマンド(`run-purge` などの機能ごとのターゲット)は `mk/<feature>.mk` に置く(Makefile が末尾で `-include` する)。
 新しく足す時は `mk/<feature>.mk` を新規に作り、ターゲットの直上に専用の `.PHONY: <target>` を書く。Makefile の共有行には足さない。
 
+網羅率: `make cover` でパッケージごとの網羅率を低い順の表で出す(しきい値で落とさない・`COVER_PKGS=./cmd/ai` で絞れる)。
+エミュレータ試験の分は環境変数が無いと skip されて数字に入らない。`make emulator` を別ターミナルで起動し、
+`FIRESTORE_EMULATOR_HOST=127.0.0.1:8089 GOOGLE_CLOUD_PROJECT=demo-kz2601 make cover` で回すと、`make test-emulator` の分も合わせた数字になる(`internal/store` など)。
+
 ai → appconfig の結合をローカルで確認する時は、appconfig を上記で起動し、ai を
 `AUTH_MODE=dev APPCONFIG_BASE_URL=http://localhost:8080 ANTHROPIC_API_KEY=... PORT=8082 go run ./cmd/ai` で起動して
 `curl -H "Authorization: Bearer $DEV_UID" -d '{"appId":"my-device","transcript":"家計簿が欲しい"}' localhost:8082/v1/generate`
@@ -73,10 +77,20 @@ ai → appconfig の結合をローカルで確認する時は、appconfig を�
 | `FIRESTORE_EMULATOR_HOST` | o | - | 設定時は Firestore クライアントが自動でエミュレータへ |
 | `FIREBASE_AUTH_EMULATOR_HOST` | o | o | ローカルのみ(`X-Debug-Uid` の有効条件) |
 | `LOG_LEVEL` | o | o | `info` |
+| `LOOP_SOURCE_GOOGLEPLAY` / `LOOP_GP_PACKAGE_NAME` / `LOOP_GP_SERVICE_ACCOUNT_JSON` | - | - | `cmd/feedback-loop` だけ。`on` で Google Play のレビューを改善ループに取り込む(既定 off・#2147)。パッケージ名の既定は `GOOGLE_PLAY_PACKAGE_NAME`、キーが空なら job の ADC。キーは Secret Manager から(JSON の中身・パスではない)([feedback-loop.md](../docs/backend/features/feedback-loop.md#環境変数)) |
+| `MIN_LINUX_BUILD` / `LATEST_LINUX_BUILD` | o | - | `GET /v1/client-config` の Linux の最低の版 / 最新の版(未設定 = 出さない・最新 < 最低なら最低に揃える・#2131)。詳しくは `docs/infra/runtime-config.md` |
+| `MIN_WINDOWS_BUILD` / `LATEST_WINDOWS_BUILD` | o | - | 同じく Windows(#2131) |
+| `RATE_LIMIT_ANON_DAILY` / `_USER_DAILY` / `_PRO_DAILY` | o | o | AI の 1 人 1 日の単位(既定 30 / 60 / 300)。他の `RATE_LIMIT_*` と理由は [docs/backend/rate-limit.md](../docs/backend/rate-limit.md) |
+| `RATE_LIMIT_ANON_DAILY_<OS>` / `_USER_DAILY_<OS>` / `_PRO_DAILY_<OS>` | o | o | 上の 3 つを OS ごとに上書き(#2133)。`<OS>` は `IOS` / `ANDROID` / `MACOS` / `WINDOWS` / `LINUX` / `OTHER`(ヘッダ `X-Client-Platform` をそろえた値・ヘッダ無しや未知は `OTHER`)。例 `RATE_LIMIT_USER_DAILY_WINDOWS=20`。未設定 = 上書きなし(今と同じ)。ai と appconfig に同じ値を入れる |
 | `FEEDBACK_DAILY_LIMIT` | o | - | `POST /v1/feedback` の 1 uid 1 日(JST)の件数(既定 5・0 で無制限・#319) |
+| `LOOP_GENFAIL_SOURCE` / `LOOP_GENFAIL_PROJECT` / `LOOP_GENFAIL_SERVICES` / `LOOP_GENFAIL_MAX_LINES` | - | - | `cmd/feedback-loop` だけ。生成の失敗の急増を読む先(既定 `file` = `LOOP_GENFAIL_LOGS`・`logging` = Cloud Logging の API・#2146)。`logging` の既定は `GOOGLE_CLOUD_PROJECT` / `ai-<APP_ENV>` / 50000 行。job の SA に `roles/logging.viewer` が要る([feedback-loop.md](../docs/backend/features/feedback-loop.md#環境変数)) |
 | `APPCONFIG_BASE_URL` | - | o | ai → appconfig。未設定なら ai 内のインメモリ stub(永続なし)。staging は `https://appconfig-stg-378953239426.asia-northeast1.run.app` |
 | `ANTHROPIC_API_KEY` | - | o | Secret Manager。ローカルは `~/Desktop/JPHACKS2026/.env`(リポ外) |
 | `APPSTORE_BUNDLE_IDS` / `APPSTORE_PRODUCT_IDS` | o | - | StoreKit 取引の許可リスト(#314)。既定 `jp.kz2601.metamon` / `jp.kz2601.metamon.pro.monthly` |
 | `APPSTORE_ENVIRONMENTS` | o | o | 受け入れる App Store の環境。既定 `Sandbox,Production`(審査・TestFlight は Sandbox)。ai は Pro の判定(#449)に使う |
+| `DEBUG_OVERRIDES` | o | o | **stg だけ**。`1` で、`DEBUG_OVERRIDE_UIDS` の uid のリクエストに限り `X-Debug-Plan: pro` / `free` で Pro の判定をそのリクエストだけ変える(#2085)。`APP_ENV` が `stg` でない時に入っていると**起動しない**。デプロイは入れない([stg-plan-override.md](../docs/infra/stg-plan-override.md)) |
+| `DEBUG_OVERRIDE_UIDS` | o | o | 上の対象にする uid(カンマ区切り)。`DEBUG_OVERRIDES=1` の時は空だと起動しない。repo には書かない |
+
+この表と docs/ に無い環境変数の一覧: `go test -run TestEnvDocs -v ./internal/envdoc`(表示だけで落とさない)。
 
 Cloud Run 上の appconfig は `AUTH_MODE` 未設定(= `firebase`)で、`run-backend` SA の ADC で Firestore と Firebase Admin を使う。

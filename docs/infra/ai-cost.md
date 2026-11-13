@@ -8,6 +8,7 @@ ai サービスが Claude を呼ぶたびに、1 行の構造化ログ `ai.usage
 
 ## 目次
 - [すぐ見る: scripts/ai-cost.sh](#すぐ見る-scriptsai-costsh)
+- [キャッシュと 1 回の費用を前後で比べる: ai-session-report usage-cost](#キャッシュと-1-回の費用を前後で比べる-ai-session-report-usage-cost)
 - [ログの形(ai.usage)](#ログの形aiusage)
 - [1 生成ごとの費用(ai.generate)](#1-生成ごとの費用aigenerate)
 - [費用の見積もり](#費用の見積もり)
@@ -44,6 +45,31 @@ scripts/ai-cost.sh prod --dry-run          # フィルタだけ出す(Logs Explo
 - パーセンタイルは最近順位法(人数が少ないと p99 = 最大になる)
 - 集計の確かめ: `scripts/ai-cost-test.sh`(固定の入力 `scripts/testdata/ai-cost/` で期待値と比べる。jq だけで動く)
 - 終了コード 3 を使えば、毎朝の定期実行(手元の cron など)で閾値超えに気づける。Cloud Monitoring のアラートは下の「人の作業 2」
+
+## キャッシュと 1 回の費用を前後で比べる: ai-session-report usage-cost
+
+キャッシュの効かせ方を変えた前後(#1770)を比べる集計です。`ai.usage` の `operation`(generate / patch / chat_first …)ごとに、回数・キャッシュの読みがあった割合(`cache_read_input_tokens > 0`)・書きがあった割合(`cache_creation_input_tokens > 0`)・1 回あたりの `est_cost_usd` の中央値と合計を出します。ログのファイルを読むだけで、Firestore にも Logging API にも触りません。出すのは数だけ(uid も hash も出さない)。
+
+```bash
+# 1) ログを書き出す(前後の両方が入る期間。人が手元で)
+gcloud logging read 'resource.type="cloud_run_revision" AND jsonPayload.event="ai.usage" AND timestamp>="2026-11-01T00:00:00+09:00"' \
+  --project=jphacks-kz2601 --format=json --limit=50000 > /tmp/ai-usage.json
+# 2) 前後の表(期間は日本時間の日付・両端の日を含む)
+cd backend
+go run ./cmd/ai-session-report usage-cost -logs /tmp/ai-usage.json \
+  -period 2026-11-01..2026-11-07 -period 2026-11-08..2026-11-14
+```
+
+`-period` を 1 回だけ渡すと 1 期間の表、2 回で「前 → 後」の表になります。再試行(`attempt` > 1)も 1 回の呼び出しとして数えます(どれも課金されるため)。単価の無いモデルの行は回数には入り、費用には入りません。出力の例(作り物のログ `backend/cmd/ai-session-report/testdata/usage_cost.json`):
+
+```text
+| operation | calls | cache read | cache write | cost / call (median, USD) | cost total (USD) |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| chat_first | 1 → 0 | 1/1 (100%) → - | 0/1 (0%) → - | 0.0100 → - | 0.0100 → - |
+| generate | 3 → 3 | 0/3 (0%) → 2/3 (67%) | 1/3 (33%) → 1/3 (33%) | 0.0500 → 0.0300 | 0.1000 → 0.1000 |
+| patch | 1 → 0 | 0/1 (0%) → - | 0/1 (0%) → - | 0.0200 → - | 0.0200 → - |
+| (all) | 5 → 3 | 1/5 (20%) → 2/3 (67%) | 1/5 (20%) → 1/3 (33%) | 0.0300 → 0.0300 | 0.1300 → 0.1000 |
+```
 
 ## ログの形(ai.usage)
 
