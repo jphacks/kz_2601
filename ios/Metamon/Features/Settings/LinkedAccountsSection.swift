@@ -34,12 +34,10 @@ struct LinkedAccountsSection: View {
     }
 
     /// つながっている方法だけ(iOS からつなげない Google の「つながっていません」は出さない)
-    static func rows(for user: AuthUser) -> [SignInProvider] {
-        SignInProvider.allCases.filter(user.providers.contains)
-    }
+    static func rows(for user: AuthUser) -> [SignInProvider] { LinkedAccountsRules.rows(for: user) }
 
     /// 「Apple で続ける」は Apple がまだつながっていない時だけ
-    static func offersApple(to user: AuthUser) -> Bool { !user.providers.contains(.apple) }
+    static func offersApple(to user: AuthUser) -> Bool { LinkedAccountsRules.offersApple(to: user) }
 
     private func row(_ provider: SignInProvider) -> some View {
         HStack(spacing: Theme.Spacing.md) {

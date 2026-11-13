@@ -42,7 +42,8 @@ public struct GridScreenLayout: View {
             let layoutH = GridLayoutHeight.resolve(current: geo.size.height, stable: stableHeight)
             #if os(macOS)
             // Mac は横長で大きさが変わるウィンドウ。縦長の比率の幅で中央に寄せる(#938)
-            let metrics = GridMetrics.resolveDesktop(width: geo.size.width, height: layoutH, inset: inset)
+            let metrics = GridMetrics.resolveDesktop(width: geo.size.width, height: layoutH, inset: inset,
+                                                     fabInGutter: MacFabExperiment.isEnabled()) // #2327 の試作(既定 off)
             #else
             let metrics = GridMetrics.resolve(width: geo.size.width, height: layoutH, inset: inset,
                                               compactHeight: verticalSizeClass == .compact)

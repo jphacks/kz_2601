@@ -9,7 +9,7 @@ import java.io.File
  * コメント・ログ・開発者向けの例外の文は見ない。残してよいものは [allowed] に理由つきで並べる。
  */
 class HardcodedJapaneseTest {
-    private val src = File("src/main/kotlin")
+    internal val src = File("src/main/kotlin")
 
     private val japanese = Regex("""[\p{IsHiragana}\p{IsKatakana}\p{IsHan}]""")
 
@@ -22,7 +22,7 @@ class HardcodedJapaneseTest {
     private val pkg = "jp/kz2601/metamon/desktop"
 
     /** 残してよい直書き(src/main/kotlin からのパス → 文字列)。 */
-    private val allowed: Map<String, Set<String>> = mapOf(
+    internal val allowed: Map<String, Set<String>> = mapOf(
         // 適合テストの描画の木の値(iOS の日本語と突き合わせる。Android の PlayNodes・BracketRules・ValueLabels.JAPANESE と同じ。画面は strings で出す)
         "$pkg/PlayLeaves.kt" to setOf("精算", "決勝", "準決勝", "準々決勝", "\$round 回戦"),
         "$pkg/LeafValues.kt" to setOf("件"),
@@ -41,12 +41,16 @@ class HardcodedJapaneseTest {
         ),
     )
 
+    /** 発話の聞き取りの辞書だけのファイル(表示しない。Android の VoiceIntent と同じ語)。 */
+    private val dictionaryFiles = setOf("$pkg/voice/VoiceIntent.kt")
+
     @Test
     fun noHardcodedJapaneseInMainSources() {
         assertTrue("ソースが無い: ${src.absolutePath}", src.isDirectory)
         val found = mutableListOf<String>()
         src.walkTopDown().filter { it.extension == "kt" }.sortedBy { it.path }.forEach { file ->
             val path = file.relativeTo(src).invariantSeparatorsPath
+            if (path in dictionaryFiles) return@forEach
             val text = file.readText()
             for ((line, at, literal) in literals(text)) {
                 if (!japanese.containsMatchIn(literal)) continue
@@ -108,7 +112,7 @@ class HardcodedJapaneseTest {
     }
 
     /** 文字列リテラル(行, 開きの `"` の位置, 中身)。コメントは飛ばす。テンプレートの中の文字列は外側の中身に含める(Android と同じ読み方)。 */
-    private fun literals(text: String): List<Triple<Int, Int, String>> {
+    internal fun literals(text: String): List<Triple<Int, Int, String>> {
         val out = mutableListOf<Triple<Int, Int, String>>()
         var i = 0
         var line = 1

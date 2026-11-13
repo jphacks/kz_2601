@@ -419,7 +419,9 @@ fun ChartLeaf(c: Component, data: LeafData) {
     }
 }
 
-private fun axisLabel(s: String): String = if (s.codePointCount(0, s.length) > 6) s.take(5) + "…" else s
+/** 軸の目盛りの文字。6 文字(コードポイント)を超えたら 5 文字 + 「…」。絵文字のサロゲートの途中で切らない。 */
+internal fun axisLabel(s: String): String =
+    if (s.codePointCount(0, s.length) > 6) s.substring(0, s.offsetByCodePoints(0, 5)) + "…" else s
 
 @Composable
 private fun BarChart(buckets: List<Aggregator.Bucket>) {
@@ -490,7 +492,7 @@ private fun PieChart(buckets: List<Aggregator.Bucket>) {
     }
 }
 
-private fun chartNumber(v: Double): String = Aggregator.format(v, null)
+internal fun chartNumber(v: Double): String = Aggregator.format(v, null)
 
 // MARK: - calendar
 

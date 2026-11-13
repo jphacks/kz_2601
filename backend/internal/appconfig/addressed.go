@@ -78,24 +78,41 @@ func recordNotFound() *apiError {
 	return apiErr(http.StatusNotFound, httpx.CodeNotFound, "record not found")
 }
 
-// participants are the creator and the members of the shared data.
-func (h *Handler) participants(ctx context.Context, appID string) (map[string]bool, error) {
+// participants tells whether a uid is the creator or a member of the shared
+// data. The owner is read once; each other uid is one members/{uid} read,
+// remembered for the request (#2297: not the whole member list).
+type participants struct {
+	ctx   context.Context
+	store store.MemberGetter
+	appID string
+	owner string
+	known map[string]bool
+}
+
+func (h *Handler) participantsOf(ctx context.Context, appID string) (*participants, error) {
 	owner, err := h.appOwner(ctx, appID)
 	if err != nil {
 		return nil, err
 	}
-	ms, err := h.store.ListMembers(ctx, appID, store.MaxMembers)
+	return &participants{ctx: ctx, store: h.store, appID: appID, owner: owner, known: map[string]bool{}}, nil
+}
+
+func (p *participants) has(uid string) (bool, error) {
+	if uid == "" {
+		return false, nil
+	}
+	if uid == p.owner {
+		return true, nil
+	}
+	if ok, seen := p.known[uid]; seen {
+		return ok, nil
+	}
+	ok, err := store.IsMember(p.ctx, p.store, p.appID, uid)
 	if err != nil {
-		return nil, err
+		return false, err
 	}
-	out := make(map[string]bool, len(ms)+1)
-	if owner != "" {
-		out[owner] = true
-	}
-	for _, m := range ms {
-		out[m.UID] = true
-	}
-	return out, nil
+	p.known[uid] = ok
+	return ok, nil
 }
 
 // checkAddressed checks a create (prev nil) or a PATCH delta: members values
@@ -104,7 +121,7 @@ func (h *Handler) checkAddressed(r *http.Request, cur *store.App, ent *dsl.Entit
 	if !ent.IsShared() {
 		return nil
 	}
-	var ps map[string]bool
+	var ps *participants
 	for i := range ent.Fields {
 		f := &ent.Fields[i]
 		v, ok := data[f.ID]
@@ -113,13 +130,18 @@ func (h *Handler) checkAddressed(r *http.Request, cur *store.App, ent *dsl.Entit
 		}
 		if ps == nil {
 			var err error
-			if ps, err = h.participants(r.Context(), cur.ID); err != nil {
+			if ps, err = h.participantsOf(r.Context(), cur.ID); err != nil {
 				return err
 			}
 		}
 		arr, _ := v.([]any)
 		for _, x := range arr {
-			if s, _ := x.(string); !ps[s] {
+			s, _ := x.(string)
+			ok, err := ps.has(s)
+			if err != nil {
+				return err
+			}
+			if !ok {
 				return invalidRecord(f.ID, "lists someone who is not a participant of this app")
 			}
 		}
