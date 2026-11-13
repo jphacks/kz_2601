@@ -2082,7 +2082,7 @@ paths:
       tags: [ext]
       summary: つないだサービスの一覧(#1493)
       description: |
-        利用者ごとの OAuth のつなぎ(`users/{uid}/connections/*`)。provider・状態・scope・日付だけを返す(トークンは返さない)。切ったもの(印だけ残っている)は出さない。
+        利用者ごとの OAuth のつなぎ(`users/{uid}/connections/*`)。provider・状態・scope・日付・今月の回数(`monthCalls`・#2144)だけを返す(トークンは返さない)。切ったもの(印だけ残っている)は出さない。
         `EXT_RUNNER_URL` が無い時は空の一覧。
         `providers` はつなげるサービスの一覧(#1566・OAuth の要る provider だけ・id の順)。`enabled` は runner が今動かしているか(`EXT_RUNNER_URL` が無い時はみな false)。偽の provider は runner が動かしている時だけ(本番では出ない)。
         `supportedFeatures` を付けると `externalCall.<id>` が入っている provider だけ。審査用の版は OAuth の provider のキーを送らないので何も出ない(決定 6)。
@@ -2435,6 +2435,10 @@ components:
         scopes: { type: array, items: { type: string } }
         connectedAt: { type: string, format: date-time }
         lastUsedAt: { type: string, format: date-time }
+        monthCalls:
+          type: integer
+          minimum: 0
+          description: 'この人が今月(JST)その provider を呼んだ回数(#2144)。回数の上限と同じ数え方(キャッシュから返した分・呼ぶ前に止まった分は数えない)で、自動の動きの分も入る。上限の値は返さない。読めなかった時・古い runner の時は省く'
     ExtProvider:
       type: object
       description: つなげるサービス(GET /me/connections の providers)

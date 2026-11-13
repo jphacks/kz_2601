@@ -41,15 +41,19 @@ import (
 	"github.com/jphacks/kz_2601/backend/internal/store"
 )
 
-func main() {
+func parseFlags(fs *flag.FlagSet, args []string) (options, error) {
 	var opts options
-	flag.BoolVar(&opts.dryRun, "dry-run", false, "only list the accounts that would be purged")
-	flag.IntVar(&opts.limit, "limit", 50, "max accounts per run")
-	flag.DurationVar(&opts.olderThan, "older-than", store.PurgeAfter, "purge accounts deleted longer ago than this")
-	flag.BoolVar(&opts.deleteAuth, "delete-auth", true, "also delete the Firebase Auth user")
-	flag.DurationVar(&opts.feedbackOlderThan, "feedback-older-than", store.FeedbackRetention, "erase feedback created longer ago than this")
-	flag.IntVar(&opts.feedbackLimit, "feedback-limit", 500, "max feedback documents erased per run")
-	flag.Parse()
+	fs.BoolVar(&opts.dryRun, "dry-run", false, "only list the accounts that would be purged")
+	fs.IntVar(&opts.limit, "limit", 50, "max accounts per run")
+	fs.DurationVar(&opts.olderThan, "older-than", store.PurgeAfter, "purge accounts deleted longer ago than this")
+	fs.BoolVar(&opts.deleteAuth, "delete-auth", true, "also delete the Firebase Auth user")
+	fs.DurationVar(&opts.feedbackOlderThan, "feedback-older-than", store.FeedbackRetention, "erase feedback created longer ago than this")
+	fs.IntVar(&opts.feedbackLimit, "feedback-limit", 500, "max feedback documents erased per run")
+	return opts, fs.Parse(args)
+}
+
+func main() {
+	opts, _ := parseFlags(flag.CommandLine, os.Args[1:]) // flag.CommandLine exits on a bad flag
 
 	logger := httpx.NewLogger()
 	slog.SetDefault(logger)

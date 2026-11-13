@@ -108,9 +108,18 @@ enum GenerateStreamEvent {
 
     /// `status` の無い `event: error` の status。生成の前に断る code は通常の応答と同じ status に戻す(それ以外は 500)。
     static func status(forCode code: String) -> Int {
-        if code == AppLimit.code || code == ProRequired.code || CoinDenial.Kind(rawValue: code) != nil { return 402 }
+        if code == AppLimit.code || code == ProRequired.code || isCoinDenialCode(code) { return 402 }
         if code == PlanLimit.code { return 403 }
         return 500
+    }
+
+    private static func isCoinDenialCode(_ code: String) -> Bool {
+        #if APP_STORE_REVIEW
+        // 審査用ビルドには CoinDenial が無い(#450)。status の対応だけは通常の版と同じにする
+        ["coins_insufficient", "allowance_exhausted", "overflow_cap_reached"].contains(code)
+        #else
+        CoinDenial.Kind(rawValue: code) != nil
+        #endif
     }
 
     private struct AppEvent: Decodable {

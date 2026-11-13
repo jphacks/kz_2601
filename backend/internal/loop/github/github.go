@@ -1,6 +1,7 @@
 // Package github is the loop's small GitHub client. It holds only what the
 // loop needs: create an issue or add a comment to one the loop filed (after
-// a human approved the draft, #369) and read how an issue was closed (#374). It cannot merge, label existing
+// a human approved the draft, #369), read how an issue was closed (#374) and
+// read the titles and labels of open issues (#2288). It cannot merge, label existing
 // issues, push or change settings, and it is given a token scoped to
 // issues only (docs/backend/features/feedback-loop.md).
 package github
@@ -24,6 +25,8 @@ type Client struct {
 	// BaseURL: "" = https://api.github.com
 	BaseURL string
 	HTTP    *http.Client
+
+	cache issuesCache // OpenIssues, per run
 }
 
 var reRepo = regexp.MustCompile(`^[A-Za-z0-9_.\-]+/[A-Za-z0-9_.\-]+$`)
