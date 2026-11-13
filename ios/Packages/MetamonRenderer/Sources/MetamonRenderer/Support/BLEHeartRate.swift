@@ -166,9 +166,12 @@ extension BLEHeartRate: CBCentralManagerDelegate, CBPeripheralDelegate {
     }
 
     public nonisolated func peripheral(_ peripheral: CBPeripheral, didUpdateValueFor characteristic: CBCharacteristic, error: Error?) {
-        guard error == nil, characteristic.uuid == Self.measurementUUID,
-              let data = characteristic.value, let m = HeartRateMeasurement(data) else { return }
-        MainActor.assumeIsolated { emit(.measurement(m)) }
+        guard error == nil, let data = characteristic.value, let m = HeartRateMeasurement(data) else { return }
+        let uuid = characteristic.uuid
+        MainActor.assumeIsolated {
+            guard uuid == Self.measurementUUID else { return }
+            emit(.measurement(m))
+        }
     }
 }
 #endif
