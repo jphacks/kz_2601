@@ -46,6 +46,12 @@
     <string name="desktop_coin_estimate">About %1$d coins</string>
     <string name="desktop_coin_estimate_a11y">Sending uses about %1$d coins</string>
     <string name="desktop_coin_estimate_a11y_balance">Sending uses about %1$d coins. %2$d coins left</string>
+    <string name="desktop_create_continue">Keep going</string>
+    <string name="desktop_create_cut_body">The connection dropped while building. You can try again.</string>
+    <string name="desktop_create_done">Done</string>
+    <string name="desktop_create_stop_body">The partly built screen will not be kept.</string>
+    <string name="desktop_create_stop_title">Stop building?</string>
+    <string name="desktop_create_title">Building your app</string>
     <string name="desktop_data_add">Add</string>
     <string name="desktop_delete_not_allowed">You can\'t delete this data</string>
     <string name="desktop_denial_admins_only">Only admins can do this (what you entered is kept)</string>

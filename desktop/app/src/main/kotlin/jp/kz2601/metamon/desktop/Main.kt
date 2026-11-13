@@ -9,6 +9,7 @@ import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.unit.dp
@@ -40,6 +41,8 @@ import jp.kz2601.metamon.desktop.hotkey.HotkeySettings
 import jp.kz2601.metamon.desktop.chat.ChatBuild
 import jp.kz2601.metamon.desktop.chat.ChatEntry
 import jp.kz2601.metamon.desktop.chat.ChatSession
+import jp.kz2601.metamon.desktop.create.AppCreator
+import jp.kz2601.metamon.desktop.create.CreateWindow
 import jp.kz2601.metamon.desktop.i18n.Strings
 import jp.kz2601.metamon.services.consent.AiConsentStore
 import jp.kz2601.metamon.desktop.io.DragOut
@@ -135,11 +138,53 @@ private fun runApp(args: Array<String>, launchAction: LaunchAction?, jump: JumpC
         DesktopAiButtonMetrics(desktopStore.aiButtonMetrics, desktopStore.aiConsent, DesktopApi.aiButtonMetricsSender(DesktopApiConfig.fromEnvironment()))
             .also { m -> loadScope.launch { m.flush() } }
     }
+    // 初回の流れ(#3201): 初めての起動で最初のウィンドウに出す。TAILORIT_RESET_ONBOARDING=1 で見ていないことに戻す。
+    // 記録の JSON を渡した起動(開発・スクリーンショット)は戻した時だけ出す(画面を塞がない)
+    val onboarding = remember { OnboardingStore(desktopStore.settings) }
+    val onboardingAtLaunch = remember {
+        val reset = onboarding.applyLaunchOverride()
+        onboarding.shouldAutoPresent() && (args.getOrNull(1) == null || reset)
+    }
+    // 最後に見た画面の写し(#3204)。記録の JSON を渡した開発・スクリーンショットの起動では撮らない
+    val thumbnails = remember { desktopStore.thumbnails.takeIf { args.getOrNull(1) == null } }
+    // サーバーのアプリ(#2379)。MOCK・サインインしていない時は何も出さない(サインイン #2151 までは TAILORIT_DEV_TOKEN をサインインと見る)
+    val apiConfig = remember { DesktopApiConfig.fromEnvironment() }
+    val appConfig = remember { DesktopApi.appConfig(apiConfig, desktopStore.documents) }
+    val serverApps = remember {
+        ServerAppsModel(appConfig?.let { ServerApps(it, desktopStore.documents) { apiConfig.devToken != null } }) { id ->
+            desktopStore.documents.load(id)?.document?.dsl?.app?.icon
+        }
+    }
+    LaunchedEffect(serverApps) { serverApps.refresh() }
+    val opener = remember { appConfig?.let { ServerAppOpener(it, desktopStore.documents) } }
+    // 最後に開いた同梱のアプリが無く、サーバーの一覧があればホームから(引数で選んだ時は選んだアプリ)
+    val home = remember {
+        args.isEmpty() && System.getProperty("tailorit.example") == null && serverApps.available &&
+            desktopStore.lastAppId?.takeIf { it in BundledApps.ids() } == null
+    }
+    val registry = remember { WindowRegistry().also { it.open(if (home) WindowKey.home() else WindowKey.app(first)) } }
+    // 会話・作る(#2160・#2163): AI の接続先(TAILORIT_API=stg・TAILORIT_AI_URL)がある時だけ。モックは通信しない。同意が無い間は送らない
+    val uiScope = rememberCoroutineScope()
+    val chat = remember {
+        val config = DesktopApiConfig.fromEnvironment()
+        val granted = { desktopStore.aiConsent.isGranted }
+        val creator = DesktopApi.generate(config, granted)?.let { source ->
+            AppCreator(
+                source,
+                uiScope,
+                locale = { Strings.locale.language },
+                cache = { desktopStore.documents.store(it.document.appId, it.envelopeJson) },
+                onOpen = { id -> registry.open(WindowKey.app(id)) },
+            )
+        }
+        ChatWiring(ChatEntry.factory(DesktopApi.ai(config, granted, desktopStore.documents)), desktopStore.aiConsent, creator)
+    }
     val hub = remember {
         // 記録の JSON を渡した時(開発・スクリーンショット)は最初のアプリだけそれを使い、端末に残さない
         val fixture = args.getOrNull(1)?.let { MockStore.fromJson(File(it).readText()) }
         AppHub(
-            load = { id -> layouts.applyTo(id, Examples.load(id)) },
+            // 作ったアプリ(#2163)はこの起動の間だけ一覧に出す。同梱のアプリは並びを直した分(#3207)を当てる
+            load = { id -> chat.creator?.created?.dsl(id) ?: layouts.applyTo(id, Examples.load(id)) },
             openRecords = { id, dsl ->
                 if (fixture != null && id == first) {
                     SharedRecords(fixture)
@@ -166,36 +211,6 @@ private fun runApp(args: Array<String>, launchAction: LaunchAction?, jump: JumpC
             loadScope.cancel()
         }
     }
-    // 会話・作る(#2160): AI の接続先(TAILORIT_API=stg・TAILORIT_AI_URL)がある時だけ。モックは通信しない。同意が無い間は送らない
-    val chat = remember {
-        val ai = DesktopApi.ai(DesktopApiConfig.fromEnvironment(), isGranted = { desktopStore.aiConsent.isGranted }, cache = desktopStore.documents)
-        ChatWiring(ChatEntry.factory(ai), desktopStore.aiConsent)
-    }
-    // 初回の流れ(#3201): 初めての起動で最初のウィンドウに出す。TAILORIT_RESET_ONBOARDING=1 で見ていないことに戻す。
-    // 記録の JSON を渡した起動(開発・スクリーンショット)は戻した時だけ出す(画面を塞がない)
-    val onboarding = remember { OnboardingStore(desktopStore.settings) }
-    val onboardingAtLaunch = remember {
-        val reset = onboarding.applyLaunchOverride()
-        onboarding.shouldAutoPresent() && (args.getOrNull(1) == null || reset)
-    }
-    // 最後に見た画面の写し(#3204)。記録の JSON を渡した開発・スクリーンショットの起動では撮らない
-    val thumbnails = remember { desktopStore.thumbnails.takeIf { args.getOrNull(1) == null } }
-    // サーバーのアプリ(#2379)。MOCK・サインインしていない時は何も出さない(サインイン #2151 までは TAILORIT_DEV_TOKEN をサインインと見る)
-    val apiConfig = remember { DesktopApiConfig.fromEnvironment() }
-    val appConfig = remember { DesktopApi.appConfig(apiConfig, desktopStore.documents) }
-    val serverApps = remember {
-        ServerAppsModel(appConfig?.let { ServerApps(it, desktopStore.documents) { apiConfig.devToken != null } }) { id ->
-            desktopStore.documents.load(id)?.document?.dsl?.app?.icon
-        }
-    }
-    LaunchedEffect(serverApps) { serverApps.refresh() }
-    val opener = remember { appConfig?.let { ServerAppOpener(it, desktopStore.documents) } }
-    // 最後に開いた同梱のアプリが無く、サーバーの一覧があればホームから(引数で選んだ時は選んだアプリ)
-    val home = remember {
-        args.isEmpty() && System.getProperty("tailorit.example") == null && serverApps.available &&
-            desktopStore.lastAppId?.takeIf { it in BundledApps.ids() } == null
-    }
-    val registry = remember { WindowRegistry().also { it.open(if (home) WindowKey.home() else WindowKey.app(first)) } }
     // 一覧で選んだ: DSL を読み、アプリのウィンドウで開く(開いていれば前に出す)
     val openServerApp: suspend (ServerAppRow) -> Boolean = { row ->
         val dsl = opener?.load(row.id)
@@ -205,6 +220,8 @@ private fun runApp(args: Array<String>, launchAction: LaunchAction?, jump: JumpC
         }
         dsl != null
     }
+    // 作っている間のウィンドウ(#2163)
+    chat.creator?.let { c -> c.current?.let { CreateWindow(c, it) } }
     val firstWindowId = remember { registry.windows.first().id }
     // 「送る」で届いたファイル(#3209)。起動の時の分は最初のウィンドウへ
     val sendTo = remember { SendToInbox().also { box -> sent?.let { box.offer(SendToArgs.readable(it), firstWindowId) } } }
@@ -432,6 +449,7 @@ private fun ApplicationScope.DesktopWindow(
                         newChat = chat.newChat,
                         buildFromChat = chat.build,
                         aiConsent = chat.consent,
+                        createdApps = chat.createdApps,
                     )
                 }
                 }
@@ -550,9 +568,12 @@ internal object WindowBounds {
     }
 }
 
-/** 会話の入口(#2160)。[newChat] が null ならパレットに出さない。作る流れ([build])は #2163。 */
+/** 会話の入口(#2160)と作る流れ(#2163)。[newChat] が null ならパレットに出さない。 */
 private class ChatWiring(
     val newChat: (() -> ChatSession)?,
     val consent: AiConsentStore,
-    val build: (ChatBuild) -> Unit = {},
-)
+    val creator: AppCreator? = null,
+) {
+    val build: (ChatBuild) -> Unit = { b -> creator?.start(b) }
+    val createdApps: () -> List<Pair<String, String>> = { creator?.created?.all?.toList().orEmpty() }
+}

@@ -157,6 +157,8 @@ fun DesktopApp(
     buildFromChat: (ChatBuild) -> Unit = {},
     /** 会話の前に確かめる同意。 */
     aiConsent: AiConsentStore? = null,
+    /** この起動で作ったアプリ(#2163)。パレットのアプリの一覧に足す。 */
+    createdApps: () -> List<Pair<String, String>> = { emptyList() },
 ) {
     val noticeScope = rememberCoroutineScope()
     val openNoticeLink: (String) -> Unit = onOpenNoticeLink ?: { url ->
@@ -232,7 +234,7 @@ fun DesktopApp(
     val keyboard = rememberDesktopKeyboard(
         dsl, session, dispatch, openPrint, onOpenApp, onOpenRecord, onWipeLocalData,
         usage = session.persistence?.usage, saveLayout = onSaveLayout,
-        newChat = newChat, buildFromChat = buildFromChat, aiConsent = aiConsent,
+        newChat = newChat, buildFromChat = buildFromChat, aiConsent = aiConsent, createdApps = createdApps,
     )
     // 初回の流れ(#3201): 閉じたら(最後まで・あとで見る・Esc のどれでも)次の起動では出さない
     keyboard.onOnboardingFinished = { onboarding?.markSeen() }

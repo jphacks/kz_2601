@@ -47,6 +47,12 @@
     <string name="desktop_coin_estimate">約 %1$d コイン</string>
     <string name="desktop_coin_estimate_a11y">送ると約 %1$d コインを使います</string>
     <string name="desktop_coin_estimate_a11y_balance">送ると約 %1$d コインを使います。残り %2$d コイン</string>
+    <string name="desktop_create_continue">続ける</string>
+    <string name="desktop_create_cut_body">作っている途中で通信が切れました。もう一度作り直せます。</string>
+    <string name="desktop_create_done">できました</string>
+    <string name="desktop_create_stop_body">途中まで組み立てた画面は残りません。</string>
+    <string name="desktop_create_stop_title">作るのをやめますか?</string>
+    <string name="desktop_create_title">アプリを作っています</string>
     <string name="desktop_data_add">追加</string>
     <string name="desktop_delete_not_allowed">このデータは削除できません</string>
     <string name="desktop_denial_admins_only">管理者だけができる操作です(入力した内容は残してあります)</string>
