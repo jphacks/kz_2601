@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"math"
 	"strconv"
 	"strings"
 	"sync"
@@ -17,8 +18,10 @@ import (
 // Every call that reaches a provider counts once against the user's and the
 // app's hourly and daily counters of that provider and the provider's
 // environment-wide daily counter (all or none, ratelimit.Store). A provider
-// that answered 429 is paused for UpstreamPause on this instance. A limited
-// call is 429 rate_limited with the scope (LimitError).
+// that answered 429 is paused for UpstreamPause on this instance: for the
+// person whose token it was (NeedsOAuth: the provider counts per token), for
+// everyone otherwise (the operator's key). A limited call is 429
+// rate_limited with the scope (LimitError).
 
 // The scopes of LimitError (the answer's "scope" and the ext.call log's "limit").
 const (
@@ -44,7 +47,9 @@ type Limits struct {
 
 // DefaultLimits apply when no env is set: low enough to stay under a
 // provider's free allocation, high enough for a person pressing buttons.
-// The real values are the owner's (env, not written in the docs).
+// The real values are the owner's (env, not written in the docs). A
+// NeedsOAuth provider has no GlobalDaily by default (its allocation is per
+// person's token): only EXT_GLOBAL_DAILY_<PROVIDER> sets one.
 var DefaultLimits = Limits{UserHourly: 30, UserDaily: 100, AppHourly: 100, AppDaily: 300, GlobalDaily: 500}
 
 // limitEnv are the scopes of EXT_LIMIT_<SCOPE> / EXT_LIMIT_<PROVIDER>_<SCOPE>.
@@ -62,10 +67,11 @@ var limitEnv = []struct {
 //
 //	EXT_LIMIT_<SCOPE>               every provider (SCOPE = USER_HOURLY / USER_DAILY / APP_HOURLY / APP_DAILY)
 //	EXT_LIMIT_<PROVIDER>_<SCOPE>    one provider (wins over the above)
-//	EXT_GLOBAL_DAILY                every provider's environment-wide day
+//	EXT_GLOBAL_DAILY                every provider's environment-wide day (not NeedsOAuth ones)
 //	EXT_GLOBAL_DAILY_<PROVIDER>     one provider's (wins over the above)
 //
-// Unset = DefaultLimits; 0 = that counter is off.
+// Unset = DefaultLimits (GlobalDaily: 0 for NeedsOAuth, Provider.GlobalDaily
+// when the provider has one); 0 = that counter is off.
 func limitsFromEnv(getenv func(string) string) (map[string]Limits, error) {
 	base := DefaultLimits
 	for _, s := range limitEnv {
@@ -76,9 +82,16 @@ func limitsFromEnv(getenv func(string) string) (map[string]Limits, error) {
 	if err := envCount(getenv, "EXT_GLOBAL_DAILY", &base.GlobalDaily); err != nil {
 		return nil, err
 	}
+	globalSet := strings.TrimSpace(getenv("EXT_GLOBAL_DAILY")) != ""
 	out := map[string]Limits{}
 	for _, p := range Providers() {
 		l, n := base, p.EnvName()
+		switch {
+		case p.NeedsOAuth:
+			l.GlobalDaily = 0
+		case p.GlobalDaily > 0 && !globalSet:
+			l.GlobalDaily = p.GlobalDaily
+		}
 		for _, s := range limitEnv {
 			if err := envCount(getenv, "EXT_LIMIT_"+n+"_"+s.name, s.of(&l)); err != nil {
 				return nil, err
@@ -129,8 +142,18 @@ type limiter struct {
 	store    ratelimit.Store
 	fallback ratelimit.Store
 
-	mu     sync.Mutex
+	mu sync.Mutex
+	// paused is until when a pause key (pauseKey) is not called.
 	paused map[string]time.Time
+}
+
+// pauseKey is what a provider's 429 pauses: the person's own token for a
+// NeedsOAuth provider (uid + provider), the provider for everyone otherwise.
+func pauseKey(p Provider, uid string) string {
+	if p.NeedsOAuth {
+		return p.ID + "\x00uid_" + uid
+	}
+	return p.ID
 }
 
 // limitCharge is what consume wrote, for refund.
@@ -138,6 +161,68 @@ type limitCharge struct {
 	store    ratelimit.Store
 	counters []ratelimit.Counter
 	expireAt time.Time
+}
+
+// Monthly use (#2144): every call counted above also counts once on the
+// user's month of the provider, shown by GET /v1/me/connections. It is the
+// last counter of the same Consume (all or none with the limits, refunded
+// with them, counted in the fallback when the store fails) and never a
+// limit (Limit is MaxInt32).
+//
+//	rateLimits/{env}_{yyyy-mm}_ext_{provider}_uid_{uid}   expires a day after the month
+const scopeUserMonthly = "user_monthly"
+
+func (s *Service) monthCounter(provider, uid string, now time.Time) ratelimit.Counter {
+	env := s.cfg.Env
+	if env == "" {
+		env = "local"
+	}
+	return ratelimit.Counter{ID: fmt.Sprintf("%s_%s_ext_%s_uid_%s", env, now.In(ratelimit.JST).Format("2006-01"), provider, docSafe(uid)),
+		Scope: scopeUserMonthly, Limit: math.MaxInt32}
+}
+
+// MonthCalls is uid's calls of each provider this month (JST), read
+// without writing (one batched read). A store that cannot peek is an error.
+func (s *Service) MonthCalls(ctx context.Context, uid string, providers []string) (map[string]int, error) {
+	peeker, ok := s.limits.store.(ratelimit.Peeker)
+	if !ok {
+		return nil, errors.New("extapi: the limit store cannot peek")
+	}
+	if uid == "" || len(providers) == 0 {
+		return map[string]int{}, nil
+	}
+	now := s.now()
+	counters := make([]ratelimit.Counter, len(providers))
+	for i, p := range providers {
+		counters[i] = s.monthCounter(p, uid, now)
+	}
+	counts, err := peeker.Peek(ctx, counters)
+	if err != nil {
+		return nil, err
+	}
+	out := make(map[string]int, len(providers))
+	for i, p := range providers {
+		out[p] = counts[i]
+	}
+	return out, nil
+}
+
+// addMonthCalls fills each connection's MonthCalls (left absent when the
+// counts cannot be read: the list itself still answers).
+func (s *Service) addMonthCalls(ctx context.Context, uid string, conns []ConnectionView) {
+	ids := make([]string, len(conns))
+	for i, c := range conns {
+		ids[i] = c.Provider
+	}
+	counts, err := s.MonthCalls(ctx, uid, ids)
+	if err != nil {
+		s.Log.WarnContext(ctx, "extapi: reading the month counts failed", slog.Any("error", err))
+		return
+	}
+	for i := range conns {
+		n := counts[conns[i].Provider]
+		conns[i].MonthCalls = &n
+	}
 }
 
 // UseLimitStore counts the call limits in store (Firestore `rateLimits` in
@@ -148,29 +233,35 @@ func (s *Service) UseLimitStore(store ratelimit.Store) {
 	}
 }
 
-// pausedFor is how long provider is still paused (0 = not paused).
-func (l *limiter) pausedFor(provider string, now time.Time) time.Duration {
+// pausedFor is how long key is still paused (0 = not paused).
+func (l *limiter) pausedFor(key string, now time.Time) time.Duration {
 	l.mu.Lock()
 	defer l.mu.Unlock()
-	until, ok := l.paused[provider]
+	until, ok := l.paused[key]
 	if !ok {
 		return 0
 	}
 	if !now.Before(until) {
-		delete(l.paused, provider)
+		delete(l.paused, key)
 		return 0
 	}
 	return until.Sub(now)
 }
 
-// pause stops calls to provider until now + d.
-func (l *limiter) pause(provider string, now time.Time, d time.Duration) {
+// pause stops calls under key until now + d. Ended pauses go at the same
+// time (per-person keys would otherwise pile up).
+func (l *limiter) pause(key string, now time.Time, d time.Duration) {
 	l.mu.Lock()
 	defer l.mu.Unlock()
 	if l.paused == nil {
 		l.paused = map[string]time.Time{}
 	}
-	l.paused[provider] = now.Add(d)
+	for k, until := range l.paused {
+		if !now.Before(until) {
+			delete(l.paused, k)
+		}
+	}
+	l.paused[key] = now.Add(d)
 }
 
 // consume counts one call of provider for uid and app. A blocked call
@@ -210,6 +301,14 @@ func (s *Service) consumeLimits(ctx context.Context, provider, uid, app string) 
 		cs = append(cs, ctr{ratelimit.Counter{ID: fmt.Sprintf("%s_%s_ext_%s_global", env, day, provider), Scope: LimitGlobalDaily,
 			Limit: lim.GlobalDaily, Shards: ratelimit.GlobalShards}, dayEnd})
 	}
+	// TTL: a day of slack so the document outlives its own window
+	expireAt := dayEnd.Add(24 * time.Hour)
+	if uid != "" {
+		monthEnd := time.Date(y, m+1, 1, 0, 0, 0, 0, ratelimit.JST)
+		cs = append(cs, ctr{s.monthCounter(provider, uid, now), monthEnd})
+		// one expireAt per Consume: the month's, so its document outlives the month
+		expireAt = monthEnd.Add(24 * time.Hour)
+	}
 	if len(cs) == 0 {
 		return limitCharge{}, nil
 	}
@@ -217,8 +316,6 @@ func (s *Service) consumeLimits(ctx context.Context, provider, uid, app string) 
 	for i, c := range cs {
 		counters[i] = c.c
 	}
-	// TTL: a day of slack so the document outlives its own window
-	expireAt := dayEnd.Add(24 * time.Hour)
 	store := s.limits.store
 	u, err := store.Consume(ctx, counters, 1, expireAt)
 	if err != nil {

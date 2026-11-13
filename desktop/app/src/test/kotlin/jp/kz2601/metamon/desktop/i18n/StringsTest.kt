@@ -84,10 +84,14 @@ class StringsTest {
     fun everyKeyUsedInTheAppExistsInJapaneseAndEnglish() {
         val src = File("src/main/kotlin")
         assertTrue("ソースが無い: ${src.absolutePath}", src.isDirectory)
-        val key = Regex("""Strings(?:\[|\.format\(|\.plural\()\s*"([a-z0-9_]+)"""")
-        val used = src.walkTopDown().filter { it.extension == "kt" }.flatMap { f -> key.findAll(f.readText()).map { it.groupValues[1] } }.toSortedSet()
-        assertTrue("文言のキーが拾えない", used.size > 20)
-        val missing = used.filter { !table.has(Lang.JA, it) || !table.has(Lang.EN, it) }
+        val texts = src.walkTopDown().filter { it.extension == "kt" }.map { it.readText() }.toList()
+        fun used(call: String) = texts.flatMap { t -> Regex("""Strings(?:$call)\s*"([a-z0-9_]+)"""").findAll(t).map { it.groupValues[1] } }.toSortedSet()
+        val strings = used("""\[|\.format\(""")
+        val plurals = used("""\.plural\(""")
+        assertTrue("文言のキーが拾えない", strings.size > 20 && plurals.isNotEmpty())
+        // plural は <plurals> に、[] と format は <string> にある(引き違えると キーそのもの が出る)
+        val missing = strings.filter { !table.hasString(Lang.JA, it) || !table.hasString(Lang.EN, it) } +
+            plurals.filter { !table.hasPlural(Lang.JA, it) || !table.hasPlural(Lang.EN, it) }
         assertTrue("日本語か英語が無いキー: $missing", missing.isEmpty())
     }
 

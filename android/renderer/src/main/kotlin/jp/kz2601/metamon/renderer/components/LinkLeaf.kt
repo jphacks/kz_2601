@@ -17,7 +17,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import jp.kz2601.metamon.dsl.Component
 import jp.kz2601.metamon.dsl.logic.ExternalUrlPolicy
@@ -57,7 +56,7 @@ fun openExternalUrl(context: Context, uri: URI) {
 @Composable
 fun LinkLeaf(c: Component, modifier: Modifier = Modifier) {
     val target = openableUri(c.url)
-    val style = MaterialTheme.typography.bodyLarge.copy(fontWeight = FontWeight.Medium)
+    val style = RenderTheme.Fonts.link
     if (target == null) {
         Text(c.text.orEmpty(), modifier.fillMaxWidth(), style = style, color = MaterialTheme.colorScheme.onSurfaceVariant)
         return

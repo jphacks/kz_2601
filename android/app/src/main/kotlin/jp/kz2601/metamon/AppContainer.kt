@@ -15,6 +15,9 @@ import jp.kz2601.metamon.discover.PublishEnv
 import jp.kz2601.metamon.renderer.form.FormDraftRestore
 import jp.kz2601.metamon.renderer.form.FormDraftStorage
 import jp.kz2601.metamon.renderer.components.location.LocationTracking
+import jp.kz2601.metamon.renderer.components.health.HealthSource
+import jp.kz2601.metamon.renderer.components.health.MockHealthSource
+import jp.kz2601.metamon.renderer.components.health.defaultHealthSource
 import jp.kz2601.metamon.renderer.components.sensors.MockSensorSource
 import jp.kz2601.metamon.renderer.components.sensors.SensorSource
 import jp.kz2601.metamon.runtime.AiTextAccess
@@ -322,6 +325,9 @@ class AppContainer(
     /** sensorValue が読むセンサー(#1195)。`METAMON_MOCK=1` なら決まった波形(エミュレータでも値が出る)、それ以外は端末のセンサー(null)。 */
     val sensorSource: SensorSource? get() = sensorSourceFor(knobs.mock)
 
+    /** healthStat が読むヘルス(#870)。`METAMON_MOCK=1` なら固定値、それ以外は端末の Health Connect(null)。 */
+    val healthSource: HealthSource? get() = healthSourceFor(knobs.mock)
+
     /** 使用量の口(「今日の残り」・設定の「使っている量」)。モックの構成は null、つまみ `METAMON_MOCK_USAGE` ならモック */
     val usageSource: PlanUsageSource? get() = DebugMocks.usage(knobs, appConfig as? PlanUsageSource)
 
@@ -503,7 +509,7 @@ class AppContainer(
                 recordSync = recordSync(context, records, "metamon-records-mock"),
                 documentCache = DocumentCache(null),
                 hotReload = null,
-                host = AndroidRuntimeHost(context.applicationContext),
+                host = AndroidRuntimeHost(context.applicationContext, health = MockHealthSource),
                 account = MockAccountClient,
                 ownerStore = AccountOwnerStore(File(context.filesDir, "metamon-account-mock")),
                 activeOwner = ActiveOwner(),
@@ -594,7 +600,11 @@ class AppContainer(
                 recordSync = recordSync(context, appConfig, "metamon-records"),
                 documentCache = documentCache,
                 hotReload = HotReload(sync, CoroutineScope(SupervisorJob() + Dispatchers.Default)),
-                host = AndroidRuntimeHost(context.applicationContext, books = HttpBookLookupClient(appConfigHttp)),
+                host = AndroidRuntimeHost(
+                    context.applicationContext,
+                    books = HttpBookLookupClient(appConfigHttp),
+                    health = defaultHealthSource(context.applicationContext),
+                ),
                 push = push,
                 account = HttpAccountClient(appConfigHttp),
                 ownerStore = AccountOwnerStore(File(context.filesDir, "metamon-account")),
@@ -717,6 +727,8 @@ class AppContainer(
 
         /** モックの構成は iOS の `MockSensorData` と同じ波形(傾きが 0〜40° を往復)に差し替える。null なら部品が端末のセンサーを使う。 */
         internal fun sensorSourceFor(mock: Boolean): SensorSource? = if (mock) MockSensorSource else null
+
+        internal fun healthSourceFor(mock: Boolean): HealthSource? = if (mock) MockHealthSource else null
 
         /** Firebase が使えれば Firebase の認証、使えなければ(json 無し・モックの構成)固定 uid のモック。 */
         internal fun chooseAuth(firebaseConfigured: Boolean, firebase: () -> AuthService?): AuthService =

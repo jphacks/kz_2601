@@ -5,6 +5,7 @@ import (
 	"net/http/httptest"
 	"net/url"
 	"strings"
+	"sync"
 	"sync/atomic"
 	"testing"
 )
@@ -110,6 +111,113 @@ func TestOpenWeatherForecast(t *testing.T) {
 	if err != nil || seen.Load().(url.Values).Get("cnt") != "8" || len(out.Rows) != 2 {
 		t.Fatalf("default limit: %+v %v", out, err)
 	}
+	// uv=0 is the plain forecast: the 5 day API, no UV in the subtitles
+	out, err = ops["forecast"].Do(t.Context(), Input{Args: map[string]string{"lat": "35", "lng": "139", "uv": "0"}})
+	if err != nil || seen.Load().(url.Values).Get("cnt") != "8" || len(out.Rows) != 2 || out.Rows[0].Subtitle != "小雨" {
+		t.Fatalf("uv=0: %+v %v", out, err)
+	}
+}
+
+// uv=1 answers from One Call 3.0 (the only forecast with uvi) and nothing
+// else: one request, the UV index at the end of each subtitle.
+func TestOpenWeatherForecastUV(t *testing.T) {
+	var paths []string
+	var mu sync.Mutex
+	var seen atomic.Value
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		mu.Lock()
+		paths = append(paths, r.URL.Path)
+		mu.Unlock()
+		seen.Store(r.URL.Query())
+		if r.URL.Path != "/data/3.0/onecall" {
+			http.NotFound(w, r)
+			return
+		}
+		_, _ = w.Write([]byte(`{"timezone_offset":32400,"hourly":[
+			{"dt":1762819200,"temp":10,"weather":[{"description":"小雨"}],"pop":0.42,"uvi":6.77},
+			{"dt":1762822800,"temp":9.5,"weather":[],"pop":0,"uvi":0},
+			{"dt":0,"temp":1,"uvi":3},
+			{"dt":1762826400,"uvi":5},
+			{"dt":1762830000,"temp":8,"weather":[{"description":"くもり"}],"uvi":-1}]}`))
+	}))
+	t.Cleanup(srv.Close)
+	ops := owOps(t, srv)
+	out, err := ops["forecast"].Do(t.Context(), Input{Args: map[string]string{"lat": "36.56133", "lng": "136.65621", "limit": "3", "uv": "1"}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	mu.Lock()
+	got := append([]string(nil), paths...)
+	mu.Unlock()
+	// never the 5 day API and One Call together (a One Call request is priced)
+	if len(got) != 1 || got[0] != "/data/3.0/onecall" {
+		t.Fatalf("requests %v", got)
+	}
+	q := seen.Load().(url.Values)
+	if q.Get("lat") != "36.56" || q.Get("lon") != "136.66" || q.Get("appid") != owTestKey || q.Get("exclude") != "current,minutely,daily,alerts" {
+		t.Fatalf("query %v", q)
+	}
+	// hours without a time or a temperature are skipped; a negative uvi is left out
+	want := []Row{
+		{Title: "11/11 09:00", Subtitle: "小雨・UV 6.8 強い(目安)", Value: "10°C・降水 42%"},
+		{Title: "11/11 10:00", Subtitle: "UV 0 弱い(目安)", Value: "9.5°C・降水 0%"},
+		{Title: "11/11 12:00", Subtitle: "くもり", Value: "8°C"},
+	}
+	if len(out.Rows) != len(want) || out.Item != nil || out.Usage.Priced {
+		t.Fatalf("output %+v", out)
+	}
+	for i := range want {
+		if out.Rows[i] != want[i] {
+			t.Fatalf("row %d = %+v, want %+v", i, out.Rows[i], want[i])
+		}
+	}
+}
+
+// The UV bands are the WHO's 1-2 / 3-5 / 6-7 / 8-10 / 11+ (a guide, not a
+// health judgement).
+func TestOpenWeatherUVIndex(t *testing.T) {
+	v := func(f float64) *float64 { return &f }
+	for in, want := range map[*float64]string{
+		nil:        "",
+		v(-0.1):    "",
+		v(0):       "UV 0 弱い(目安)",
+		v(2.94):    "UV 2.9 弱い(目安)",
+		v(3):       "UV 3 中程度(目安)",
+		v(5.96):    "UV 6 強い(目安)",
+		v(8):       "UV 8 非常に強い(目安)",
+		v(11):      "UV 11 極端に強い(目安)",
+		v(13.4999): "UV 13.5 極端に強い(目安)",
+	} {
+		if got := uvIndex(in); got != want {
+			t.Fatalf("%v: %q, want %q", in, got, want)
+		}
+	}
+}
+
+// uv is checked before anything is counted (appconfig and the runner both
+// run CheckArgs).
+func TestOpenWeatherForecastCheckArgsUV(t *testing.T) {
+	p, _ := Lookup(OpenWeather)
+	for _, a := range []map[string]string{
+		{"lat": "35", "lng": "139", "uv": "1"},
+		{"lat": "35", "lng": "139", "uv": "true"},
+		{"lat": "35", "lng": "139", "uv": "ON"},
+		{"lat": "35", "lng": "139", "uv": ""},
+		{"lat": "35", "lng": "139", "uv": "off", "limit": "40"},
+	} {
+		if _, err := p.CheckArgs("forecast", a); err != nil {
+			t.Fatalf("%v: %v", a, err)
+		}
+	}
+	for _, a := range []map[string]string{
+		{"lat": "35", "lng": "139", "uv": "1", "limit": "41"},
+		{"lat": "35", "lng": "139", "uv": "はい"},
+		{"lat": "35", "lng": "139", "uvi": "1"},
+	} {
+		if _, err := p.CheckArgs("forecast", a); Reason(err) != ReasonBadRequest {
+			t.Fatalf("%v: %s (%v)", a, Reason(err), err)
+		}
+	}
 }
 
 func TestOpenWeatherAirQuality(t *testing.T) {
@@ -167,6 +275,8 @@ func TestOpenWeatherRefusesBadArgs(t *testing.T) {
 		{"lat": "35", "lng": "139e0"},
 		{"lat": "35", "lng": "139", "limit": "41"},
 		{"lat": "35", "lng": "139", "limit": "0"},
+		{"lat": "35", "lng": "139", "uv": "yes"},
+		{"lat": "35", "lng": "139", "uv": "2"},
 	} {
 		_, err := ops["forecast"].Do(t.Context(), Input{Args: a})
 		if Reason(err) != ReasonBadRequest {

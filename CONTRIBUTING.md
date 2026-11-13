@@ -93,11 +93,22 @@ backend-ci は 5 分以内が必須。遅くなったらテストを削らず原
 cd ios
 xcodegen generate                       # .xcodeproj はコミットしない(project.yml から生成)
 xcodebuild -scheme Metamon -destination 'platform=iOS Simulator,name=iPhone 17' test CODE_SIGNING_ALLOWED=NO
+xcodebuild -scheme MetamonMac -destination 'platform=macOS' test -only-testing:MetamonMacTests CODE_SIGNING_ALLOWED=NO  # Mac(mac-ci と同じ)
 (cd Packages/MetamonDSL && swift test)  # DSL だけなら数秒(英語の文言のテストは落ちる。scripts/mac-package-test.sh MetamonDSL なら通る)
 ```
 
 - 審査用の版に関わる変更は `./scripts/build-review.sh build` も通す。
+- Mac の UI テスト(`MetamonMacUITests`)と見た目の比較(`MacSnapshotTests`)は既定では回らない。回し方は [docs/mac/system-integration.md](docs/mac/system-integration.md#テストui-テスト見た目の比較)。
 - 書式: `swift format lint --recursive --configuration .swift-format Metamon MetamonWidget MetamonTests MetamonUITests Packages`(Xcode 16 以降に同梱)。CI の `ios-format` ジョブでも回るが、**今は非ブロッキング**(既存コードに指摘が多いため)。自分が触った行は直すと良い。既存コードの一括整形は専用の PR でやる。
+
+### デスクトップ(`desktop/`)
+
+```sh
+cd desktop
+./gradlew :desktop:test :dsl:test       # desktop-ci と同じ(Ubuntu・Windows)。JDK 17 以上
+```
+
+適合テストで違ってよい所は `ConformanceAllowlist.kt` に理由付きで書く([desktop/README.md](desktop/README.md))。
 
 ## 秘密情報
 

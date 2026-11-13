@@ -6,10 +6,12 @@ extension AppRuntime {
     /// 同意済みか(`aiConsent` が無い = テスト等は同意済み扱い)。
     var hasAIConsent: Bool { aiConsent?.isGranted ?? true }
 
-    /// AI に送る直前に呼ぶ。未同意なら同意の画面を出して false(送らない)。
+    /// AI に送る直前に呼ぶ。未同意なら同意の画面を出して false(送らない)。アシスティブアクセスでは画面の代わりに一言。
     func requireAIConsent() -> Bool {
         if hasAIConsent { return true }
         print("[Metamon] AI consent not granted: not sending")
+        // アシスティブアクセス(#1997)では同意の画面を出せない → 一言だけ出して送らない
+        guard assistiveAccess.shows(.aiConsent) else { toast = AssistiveAccessPolicy.unavailableMessage; return false }
         guard showVoiceSheet else { showAIConsent = true; return false }
         // 音声シートを閉じきってから出す(シートの同時表示は SwiftUI が無視する)
         showVoiceSheet = false

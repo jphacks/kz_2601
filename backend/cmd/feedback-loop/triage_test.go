@@ -9,6 +9,7 @@ import (
 	"regexp"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/jphacks/kz_2601/backend/internal/loop"
 	"github.com/jphacks/kz_2601/backend/internal/loop/triage"
@@ -93,6 +94,18 @@ func TestTriageEvalCommand(t *testing.T) {
 	if items, _ := ta.ls.ListItems(context.Background(), loop.ItemQuery{}); len(items) != 0 {
 		t.Fatalf("items written: %d", len(items))
 	}
+	if strings.Contains(out, "embedding merge") {
+		t.Fatalf("-embed is off by default: %s", out)
+	}
+	out = ta.must(t, "triage-eval", "-set", labelledSet, "-embed", "fake", "-embed-threshold", "0.9")
+	if !strings.Contains(out, "embedding merge (cosine >= 0.90)") || !strings.Contains(out, "before ") || !strings.Contains(out, "after ") {
+		t.Fatalf("-embed fake: %s", out)
+	}
+	for _, bad := range [][]string{{"-embed", "openai"}, {"-embed", "fake", "-embed-threshold", "0"}} {
+		if err := ta.run(context.Background(), append([]string{"triage-eval", "-set", labelledSet}, bad...)); err == nil {
+			t.Fatalf("%v accepted", bad)
+		}
+	}
 
 	// -model ai uses the (fake) triage model and counts its tokens
 	fm := &fakeModel{category: "bug", cluster: "all", summary: "落ちる。"}
@@ -137,6 +150,50 @@ func TestTriageEvalAIStopsMidRun(t *testing.T) {
 	}
 }
 
+// The week's inbox becomes a labelling template (masked text, empty labels)
+// that triage-eval refuses until labelled; an existing file is never
+// overwritten and no text reaches the printed output.
+func TestTriageLabelExportCommand(t *testing.T) {
+	ta := newTestApp(t, env{"LOOP_CONSENT_VERSIONS": "feedback-2027-01"})
+	seedFeedback(t, ta, "写真を追加するとアプリが落ちて、何度やり直しても同じところで止まってしまいます。連絡は taro@ex.jp", "ダークモードが欲しい", "taro@example.com")
+	ta.must(t, "ingest")
+	ctx := context.Background()
+	old := loop.Item{ID: "old", Source: loop.SourceInApp, Text: "先月の分", AIAllowed: true, Status: loop.ItemNew,
+		IngestedAt: ta.now().Add(-30 * 24 * time.Hour)}
+	if _, err := ta.ls.PutItem(ctx, old); err != nil {
+		t.Fatal(err)
+	}
+
+	path := filepath.Join(t.TempDir(), "week.jsonl")
+	out := ta.must(t, "triage-label-export", "-out", path)
+	if !strings.Contains(out, "2 items, wrote 2") || strings.Contains(out, "写真") || strings.Contains(out, "taro") {
+		t.Fatalf("out %s", out)
+	}
+	st, err := os.Stat(path)
+	if err != nil || st.Mode().Perm() != 0o600 {
+		t.Fatalf("stat %v %v", st, err)
+	}
+	b, _ := os.ReadFile(path)
+	if strings.Contains(string(b), "taro@") || !strings.Contains(string(b), "[メール]") || strings.Contains(string(b), "先月") || !strings.Contains(string(b), "ダークモード") {
+		t.Fatalf("template:\n%s", b)
+	}
+	if err := ta.run(ctx, []string{"triage-eval", "-set", path}); err == nil || !strings.Contains(err.Error(), "not labelled yet") {
+		t.Fatalf("unlabelled eval: %v", err)
+	}
+	if err := ta.run(ctx, []string{"triage-label-export", "-out", path}); err == nil {
+		t.Fatal("overwrote an existing template")
+	}
+
+	labelled := strings.ReplaceAll(string(b), `"category":"","priority":"","bundle":""`, `"category":"bug","priority":"P2","bundle":""`)
+	if err := os.WriteFile(path, []byte(labelled), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	out = ta.must(t, "triage-eval", "-set", path)
+	if !strings.Contains(out, "2 cases") || !strings.Contains(out, "verdict:") || !strings.Contains(out, "category (rows: person") {
+		t.Fatalf("eval %s", out)
+	}
+}
+
 func TestTriageEvalAIRespectsSwitch(t *testing.T) {
 	ta := newTestApp(t, env{"LOOP_TRIAGE": ""})
 	ta.model = &fakeModel{category: "bug", cluster: "all", summary: "落ちる。"}
@@ -146,4 +203,35 @@ func TestTriageEvalAIRespectsSwitch(t *testing.T) {
 	if err := ta.run(context.Background(), []string{"triage-eval", "-set", labelledSet, "-model", "nope"}); err == nil {
 		t.Fatal("unknown model accepted")
 	}
+}
+
+func TestTriageModel(t *testing.T) {
+	t.Run("injected model wins", func(t *testing.T) {
+		ta := newTestApp(t, env{}) // no key set
+		fm := &fakeModel{}
+		ta.model = fm
+		m, err := ta.triageModel()
+		if err != nil || m != triage.Model(fm) {
+			t.Fatalf("got %v, %v", m, err)
+		}
+	})
+	t.Run("missing key", func(t *testing.T) {
+		ta := newTestApp(t, env{})
+		_, err := ta.triageModel()
+		if err == nil || err.Error() != envTriageKey+" is not set" {
+			t.Fatalf("err %v", err)
+		}
+	})
+	t.Run("key with default and named model", func(t *testing.T) {
+		for _, e := range []env{{envTriageKey: "test-key"}, {envTriageKey: "test-key", envTriageModel: "test-model"}} {
+			ta := newTestApp(t, e)
+			m, err := ta.triageModel()
+			if err != nil {
+				t.Fatal(err)
+			}
+			if _, ok := m.(triage.AIModel); !ok {
+				t.Fatalf("type %T", m)
+			}
+		}
+	})
 }

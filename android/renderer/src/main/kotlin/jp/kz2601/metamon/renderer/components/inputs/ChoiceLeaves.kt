@@ -150,7 +150,7 @@ internal fun FieldOverrideRow(c: Component, field: Field, form: FormDraft, ctx: 
                         Chips(options.map { it.id to it.title }, selected) { form.toggleId(field.id, it, options.map { o -> o.id }) }
                         Text(
                             if (selected.isEmpty()) stringResource(R.string.inputs_split_all) else stringResource(R.string.inputs_split_count, selected.size),
-                            style = MaterialTheme.typography.labelSmall,
+                            style = RenderTheme.Fonts.inputNote,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
                     }

@@ -44,6 +44,11 @@ const (
 	YouTubeAttribution = "YouTube"
 
 	youTubeHost = "https://www.googleapis.com"
+
+	// youTubeGlobalDaily is the default calls per day of the whole
+	// environment: the key's 10,000 units a day at 2 units a call
+	// (latestVideos) is 5,000; 4,000 keeps a fifth spare.
+	youTubeGlobalDaily = 4000
 )
 
 var (
@@ -55,7 +60,7 @@ var (
 )
 
 func init() {
-	register(Provider{ID: YouTube, Billing: BillingFree,
+	register(Provider{ID: YouTube, Billing: BillingFree, GlobalDaily: youTubeGlobalDaily,
 		Ops: []OpSpec{
 			{Name: "channelStats", Args: []string{"channel"}, Check: checkYTChannel, CacheTTL: time.Hour},
 			{Name: "latestVideos", Args: []string{"channel", "limit"}, Check: checkYTLatest, CacheTTL: 30 * time.Minute},
@@ -76,7 +81,7 @@ func ytChannelArg(args map[string]string) (param, value string, err error) {
 	case ytHandleRe.MatchString(c):
 		return "forHandle", c, nil
 	}
-	return "", "", fmt.Errorf("%w: channel must be a channel id (UC…) or an @handle", ErrUnknown)
+	return "", "", fmt.Errorf("%w: channel must be a channel id (UC…) or an @handle", ErrBadArgs)
 }
 
 // checkYTChannel rejects a bad channel at CheckArgs, before any limit.

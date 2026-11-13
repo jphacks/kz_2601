@@ -99,11 +99,27 @@ enum GenerateStreamEvent {
             guard let e = try? dec.decode(ErrorEvent.self, from: data) else {
                 return .failure(.http(status: 500, body: frame.data))
             }
-            return .failure(.server(status: e.error.status ?? 500, code: e.error.code, message: e.error.message,
-                                    details: e.error.details ?? [:]))
+            return .failure(.server(status: e.error.status ?? Self.status(forCode: e.error.code), code: e.error.code,
+                                    message: e.error.message, details: e.error.details ?? [:]))
         default:
             return nil // summary など(iOS は使わない)
         }
+    }
+
+    /// `status` の無い `event: error` の status。生成の前に断る code は通常の応答と同じ status に戻す(それ以外は 500)。
+    static func status(forCode code: String) -> Int {
+        if code == AppLimit.code || code == ProRequired.code || isCoinDenialCode(code) { return 402 }
+        if code == PlanLimit.code { return 403 }
+        return 500
+    }
+
+    private static func isCoinDenialCode(_ code: String) -> Bool {
+        #if APP_STORE_REVIEW
+        // 審査用ビルドには CoinDenial が無い(#450)。status の対応だけは通常の版と同じにする
+        ["coins_insufficient", "allowance_exhausted", "overflow_cap_reached"].contains(code)
+        #else
+        CoinDenial.Kind(rawValue: code) != nil
+        #endif
     }
 
     private struct AppEvent: Decodable {
@@ -127,12 +143,23 @@ enum GenerateStreamEvent {
 
     private struct RestartEvent: Decodable { var attempt: Int? }
 
+    /// `event: error` の本文。code 以外は欠けても読む(読めないと 500 = 混雑になり、上限の置き換えシートに行けない)。
     private struct ErrorEvent: Decodable {
         struct Inner: Decodable {
             var code: String
             var message: String
             var status: Int?
             var details: [String: JSONValue]?
+
+            init(from decoder: Decoder) throws {
+                let c = try decoder.container(keyedBy: CodingKeys.self)
+                code = try c.decode(String.self, forKey: .code)
+                message = (try? c.decodeIfPresent(String.self, forKey: .message)) ?? ""
+                status = try? c.decodeIfPresent(Int.self, forKey: .status)
+                details = try? c.decodeIfPresent([String: JSONValue].self, forKey: .details)
+            }
+
+            private enum CodingKeys: String, CodingKey { case code, message, status, details }
         }
         var error: Inner
     }

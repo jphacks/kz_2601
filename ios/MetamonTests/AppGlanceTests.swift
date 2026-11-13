@@ -80,8 +80,76 @@ final class AppGlanceTests: XCTestCase {
 
     func testEncryptedFieldIsLockedWithoutKey() throws {
         let d = try dsl()
-        XCTAssertEqual(AppGlance.compute(dsl: d, records: records, setting: "memo_latest", canDecrypt: false)?.value, "🔒")
-        XCTAssertEqual(AppGlance.compute(dsl: d, records: records, setting: "memo_latest", canDecrypt: true)?.value, "コーヒー")
+        XCTAssertEqual(AppGlance.compute(dsl: d, records: records, setting: "memo_latest")?.value, "🔒", "復号できても数えない")
+        XCTAssertEqual(AppGlance.compute(dsl: d, records: records, setting: "total")?.value.contains("38,200"), true)
+    }
+
+    /// 式・絞り込み・computed から暗号化した項目に触れる stat も「🔒」。
+    private func encryptedDSL() throws -> AppDSL {
+        let json = """
+        {"schemaVersion":1,"app":{"name":"日記"},"initialScreen":"home",
+         "entities":[{"id":"entry","name":"日記","fields":[
+           {"id":"mood","name":"気分","type":"string","encrypted":true},
+           {"id":"score","name":"点","type":"string","computed":{"op":"concat","args":[{"ref":"mood"},"!"]}},
+           {"id":"steps","name":"歩数","type":"number"}]}],
+         "screens":[{"id":"home","title":"日記","components":[
+           {"id":"expr_mood","type":"stat","label":"最後の気分","value":{"agg":"latest","entity":"entry","field":"mood"}},
+           {"id":"expr_filter","type":"stat","label":"良い日","value":{"agg":"count","entity":"entry","filter":[{"field":"mood","op":"eq","value":"good"}]}},
+           {"id":"computed","type":"stat","label":"点","entity":"entry","aggregate":"latest","field":"score"},
+           {"id":"filtered","type":"stat","label":"歩数","entity":"entry","aggregate":"sum","field":"steps","filter":{"field":"mood","op":"eq","value":"good"}},
+           {"id":"plain","type":"stat","label":"歩数","entity":"entry","aggregate":"sum","field":"steps"},
+           {"id":"plain_expr","type":"stat","label":"件数","value":{"agg":"count","entity":"entry"}}]}]}
+        """
+        return try JSONDecoder().decode(AppDSL.self, from: Data(json.utf8))
+    }
+
+    func testStatsTouchingEncryptedFieldsAreLocked() throws {
+        let d = try encryptedDSL()
+        let stats = Dictionary(uniqueKeysWithValues: AppGlance.choices(in: d).map { ($0.id, $0) })
+        XCTAssertEqual(stats.count, 6)
+        for id in ["expr_mood", "expr_filter", "computed", "filtered"] {
+            XCTAssertTrue(AppGlance.touchesEncrypted(try XCTUnwrap(stats[id]), in: d), id)
+        }
+        for id in ["plain", "plain_expr"] {
+            XCTAssertFalse(AppGlance.touchesEncrypted(try XCTUnwrap(stats[id]), in: d), id)
+        }
+        let rows: [String: [Record]] = ["entry": [Record(id: "x", data: ["mood": .string("good"), "steps": .number(3000)])]]
+        XCTAssertEqual(AppGlance.compute(dsl: d, records: rows, setting: "expr_mood")?.value, "🔒")
+    }
+
+    /// 使用中のアプリ(復号済みの記録)でも、暗号化した項目の数字は端末に残さない。
+    func testLockedValueIsNeverPersisted() async throws {
+        let defaults = freshDefaults()
+        let d = try dsl()
+        let store = AppGlanceStore(defaults: defaults)
+        await store.update(appId: "a", dsl: d, records: glanceRows, setting: "memo_latest")
+        XCTAssertEqual(store.values["a"]?.value, "🔒")
+        await store.update(appId: "b", dsl: d, records: glanceRows, setting: "total")
+        let raw = String(decoding: defaults.data(forKey: AppGlanceStore.defaultsKey) ?? Data(), as: UTF8.self)
+        XCTAssertFalse(raw.contains("コーヒー"))
+        XCTAssertFalse(raw.contains("\"a\""), "🔒 も残さない")
+        XCTAssertNotNil(AppGlanceStore(defaults: defaults).values["b"])
+    }
+
+    func testLegacySavedValuesAreDropped() {
+        let defaults = freshDefaults()
+        defaults.set(Data("{}".utf8), forKey: "metamon.appGlance.v1")
+        _ = AppGlanceStore(defaults: defaults)
+        XCTAssertNil(defaults.data(forKey: "metamon.appGlance.v1"))
+    }
+
+    /// 読み込みの途中でサインアウト(clear)したら、前の人の数字を書き戻さない。
+    func testClearDuringLoadDropsResult() async throws {
+        let defaults = freshDefaults()
+        let d = try dsl()
+        let store = AppGlanceStore(defaults: defaults)
+        let source = AppGlanceSource(document: { _ in d }, cached: { _, e in
+            await MainActor.run { store.clear() }
+            return glanceRows[e] ?? []
+        })
+        await store.load(appId: "a", setting: nil, source: source)
+        XCTAssertNil(store.values["a"])
+        XCTAssertNil(defaults.data(forKey: AppGlanceStore.defaultsKey))
     }
 
     // MARK: - 端末の中だけで数える
@@ -149,7 +217,7 @@ final class AppGlanceTests: XCTestCase {
         for setting in [nil, "times", "memo_latest"] as [String?] {
             let store = AppGlanceStore(defaults: freshDefaults())
             await store.load(appId: "a", setting: setting, source: source)
-            let expected = AppGlance.compute(dsl: d, records: rows, setting: setting, canDecrypt: false)
+            let expected = AppGlance.compute(dsl: d, records: rows, setting: setting)
             XCTAssertEqual(store.values["a"]?.statId, expected?.statId)
             XCTAssertEqual(store.values["a"]?.label, expected?.label)
             XCTAssertEqual(store.values["a"]?.value, expected?.value, "main の外で数えても同じ数字(\(setting ?? "既定"))")

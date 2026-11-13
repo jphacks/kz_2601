@@ -42,6 +42,13 @@ struct PromptTipsList: View {
                     }
                 } header: {
                     Label(category.title, systemImage: category.symbol)
+                } footer: {
+                    // 「直し方」の下: 動かない所も頼めば直せる(#1885・iOS の `PromptTips.fixRequest` を Mac の頼み方で)
+                    if category.id == "fix" {
+                        Text(FixRequest.macHint)
+                            .foregroundStyle(.secondary)
+                            .accessibilityIdentifier("tips.fixRequest")
+                    }
                 }
             }
         }

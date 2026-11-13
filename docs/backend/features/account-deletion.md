@@ -11,6 +11,7 @@ App Store 審査ガイドライン 5.1.1(v)(アカウントを作れるアプリ
 | `shares/*`(`ownerUid == uid`) | `revoked: true`(受け取り側の取り込み・プレビューは 404) |
 | `public_apps/*`(`ownerUid == uid`) | 取り下げ(「探す」から消える) |
 | `users/{uid}/devices/*`(プッシュ通知の端末・#269) | 消す(決定 #337: プッシュをすぐ止める。[notifications.md](notifications.md)) |
+| `users/{uid}/connections/*`(外の API の接続・#1716) | runner の `revokeAll` で provider 側の許可も取り消す。失敗してもログだけで 204。トークンは 30 日後の消去で消える([external-apis.md](external-apis.md#oauth-のトークン)) |
 | `apps_public/*`(共有アプリの DSL と共有レコード) | 残す。他人の投稿も自分の投稿も消えない |
 | Firebase Auth のユーザー | サーバーは削除しない(iOS がクライアント SDK で削除する。下記「再登録」) |
 

@@ -169,7 +169,7 @@ enum StatLookupRunner {
     /// 記録で数えられなければ一覧のひと目の数字(古くても無いよりよい)、それも無ければ未読み込み
     static func resolve(_ c: Component, dsl: AppDSL, glance: AppGlance.Value?,
                         records: () async -> [String: [Record]]?) async -> StatLookup {
-        if AppGlance.isEncrypted(c, in: dsl) { return .locked }
+        if AppGlance.touchesEncrypted(c, in: dsl) { return .locked }
         if let records = await records(),
            let value = StatReading.read(c, dsl: dsl, records: records, countUnit: WidgetSnapshotWriter.countUnit) {
             return .value(value)

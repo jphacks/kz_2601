@@ -69,6 +69,23 @@
         }
       }
     },
+    "この Apple ID のメールアドレスは、すでに別のアカウントで使われています" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The email address for this Apple ID is already used by another account"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "この Apple ID のメールアドレスは、すでに別のアカウントで使われています"
+          }
+        }
+      }
+    },
     "この Apple ID は、すでに別のアカウントで使われています" : {
       "extractionState" : "manual",
       "localizations" : {

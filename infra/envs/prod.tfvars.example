@@ -57,6 +57,14 @@ monitored_services = {
 alert_emails = ["you@example.com"]
 # alert_notification_channels = ["projects/jphacks-kz2601/notificationChannels/<n>"]
 
+# 自己改善ループの定期の実行(docs/backend/features/feedback-loop.md の「定期の実行」)。人の承認の後に true
+# feedback_loop_enabled = true
+# Secret の値を入れた後に、/app/feedback-loop を含むイメージの digest を入れるとジョブと Scheduler ができる
+# feedback_loop_job_image = "asia-northeast1-docker.pkg.dev/jphacks-kz2601/backend/backend@sha256:<digest>"
+# ストアのレビューも取り込む時だけ(LOOP_ASC_* の値を Secret Manager に入れてから)
+# feedback_loop_env = { LOOP_SOURCE_APPSTORE = "on" }
+# feedback_loop_secret_env = { ingest = ["LOOP_ASC_ISSUER_ID", "LOOP_ASC_KEY_ID", "LOOP_ASC_PRIVATE_KEY", "LOOP_ASC_APP_ID"], triage = ["LOOP_ANTHROPIC_API_KEY"], draft = [], fixed = ["LOOP_GITHUB_TOKEN"], purge = [] }
+
 # runner(自動の動き・docs/infra/runner.md)。人の承認の後に true。stg では入れない(#288 の分離まで prod だけ)
 # runner_enabled = true
 # 初回デプロイ(RUNNER_DEPLOY=1)の後に status.url を入れると Scheduler の runner-tick ができる

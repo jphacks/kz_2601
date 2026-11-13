@@ -100,7 +100,11 @@ fun TimerDisplayLeaf(c: Component, ctx: RenderContext, modifier: Modifier = Modi
     val name = c.label?.takeIf { it.isNotEmpty() } ?: stringResource(R.string.play_timer_default_name)
 
     // アプリを終了しても残す(次に開いた時に残り時間を出し直す・#1128)
-    LaunchedEffect(run, key) { host?.saveTimer(key, run) }
+    // liveActivity なら進行中の表示にも映す(開始・一時停止・リセット・終了のどれでもここを通る・#913)
+    LaunchedEffect(run, key) {
+        host?.saveTimer(key, run)
+        if (c.liveActivity == true) host?.timerActivity(key, name, if (isCountdown) total else null, run)
+    }
     val lifecycle = LocalLifecycleOwner.current.lifecycle
     DisposableEffect(key, lifecycle, host) {
         var visible = false

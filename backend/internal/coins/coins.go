@@ -138,6 +138,7 @@ type Entry struct {
 	Delta         Split     `json:"-" firestore:"delta"`
 	Op            string    `json:"op,omitempty" firestore:"op,omitempty"`
 	AppID         string    `json:"appId,omitempty" firestore:"appId,omitempty"`
+	Provider      string    `json:"provider,omitempty" firestore:"provider,omitempty"` // spend_ext: the extapi registry id (#2145; older rows have none)
 	RequestID     string    `json:"-" firestore:"requestId,omitempty"`
 	TransactionID string    `json:"transactionId,omitempty" firestore:"transactionId,omitempty"`
 	ProductID     string    `json:"productId,omitempty" firestore:"productId,omitempty"`
@@ -151,6 +152,7 @@ type Hold struct {
 	UID       string `json:"-" firestore:"uid"`
 	Op        string `json:"op" firestore:"op"`
 	AppID     string `json:"appId,omitempty" firestore:"appId,omitempty"`
+	Provider  string `json:"-" firestore:"provider,omitempty"` // OpExt: the extapi registry id, copied to its spend_ext row
 	RequestID string `json:"-" firestore:"requestId"`
 	Amount    int64  `json:"amount" firestore:"amount"`
 	// Parts is where Amount was taken from (returned to the same sources).
@@ -305,16 +307,16 @@ func settle(w *Wallet, h *Hold, charge int64, now time.Time) []Entry {
 	w.Initial += back.Initial
 	w.Purchased += back.Purchased
 	if charge > 0 {
-		kind := KindSpendAI
+		kind, provider := KindSpendAI, ""
 		switch h.Op {
 		case OpCall:
 			kind = KindSpendCall
 		case OpExt:
-			kind = KindSpendExt
+			kind, provider = KindSpendExt, h.Provider
 		}
 		out = append(out, Entry{ID: "spend_" + h.ID, Kind: kind, Amount: -charge,
 			Delta: Split{Grant: -spent.Grant, Initial: -spent.Initial, Purchased: -spent.Purchased},
-			Op:    h.Op, AppID: h.AppID, RequestID: h.RequestID, At: now})
+			Op:    h.Op, AppID: h.AppID, Provider: provider, RequestID: h.RequestID, At: now})
 	}
 	h.Charged = charge
 	h.SettledAt = now

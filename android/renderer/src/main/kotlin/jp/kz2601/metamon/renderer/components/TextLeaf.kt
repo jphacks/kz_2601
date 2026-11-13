@@ -1,10 +1,8 @@
 package jp.kz2601.metamon.renderer.components
 
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.ReadOnlyComposable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.AnnotatedString
@@ -25,21 +23,17 @@ import jp.kz2601.metamon.dsl.records.Record
 import jp.kz2601.metamon.renderer.components.actions.rememberEvaluatorFactory
 import jp.kz2601.metamon.renderer.form.FormDraft
 import jp.kz2601.metamon.renderer.registry.RenderContext
+import jp.kz2601.metamon.renderer.theme.RenderTheme
 
 /** 蛍光ペンの色(iOS の `Color.yellow.opacity(0.4)`)。ライト / ダークのどちらでも文字が読める薄さ。 */
 private val HighlightMarker = Color(0xFFFFCC00).copy(alpha = 0.4f)
 
 /** text / label の style(title | headline | body | caption)→ 文字の形。 */
-@Composable
-@ReadOnlyComposable
-internal fun leafTextStyle(style: ComponentStyle?): TextStyle {
-    val t = MaterialTheme.typography
-    return when (style) {
-        ComponentStyle.TITLE -> t.headlineSmall.copy(fontWeight = FontWeight.Bold)
-        ComponentStyle.HEADLINE -> t.titleMedium.copy(fontWeight = FontWeight.SemiBold)
-        ComponentStyle.CAPTION -> t.bodySmall
-        else -> t.bodyLarge
-    }
+internal fun leafTextStyle(style: ComponentStyle?): TextStyle = when (style) {
+    ComponentStyle.TITLE -> RenderTheme.Fonts.title
+    ComponentStyle.HEADLINE -> RenderTheme.Fonts.headline
+    ComponentStyle.CAPTION -> RenderTheme.Fonts.caption
+    else -> RenderTheme.Fonts.body
 }
 
 /**

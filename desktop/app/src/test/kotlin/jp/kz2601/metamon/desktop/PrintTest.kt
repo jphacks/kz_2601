@@ -1,5 +1,9 @@
 package jp.kz2601.metamon.desktop
 
+import androidx.compose.ui.InternalComposeUiApi
+import androidx.compose.ui.input.key.Key
+import androidx.compose.ui.input.key.KeyEvent
+import androidx.compose.ui.input.key.KeyEventType
 import jp.kz2601.metamon.desktop.io.PdfIo
 import jp.kz2601.metamon.dsl.logic.ExportTable
 import jp.kz2601.metamon.dsl.records.FieldCoding
@@ -8,10 +12,12 @@ import jp.kz2601.metamon.dsl.records.entityModels
 import jp.kz2601.metamon.renderer.form.FormDraft
 import org.apache.pdfbox.Loader
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.awt.Color
 import java.awt.image.BufferedImage
+import java.awt.print.PageFormat
 import java.awt.print.Printable
 import java.time.LocalDate
 import java.time.LocalDateTime
@@ -105,7 +111,7 @@ class PrintTest {
         val store = (1..80).fold(MockStore()) { s, i ->
             s.save("expense", null, mapOf("amount" to "100", "category" to "食費", "memo" to "メモ$i", "date" to today.toString()))
         }
-        val doc = ScreenPrint.document(dsl, "home", store, printedAt = printedAt)
+        val doc = ScreenPrint.document(dsl, "home", store, printedAt = printedAt)!!
         assertEquals("家計簿", doc.title)
         assertEquals(listOf("家計簿", "最近の支出"), doc.sections.map { it.title })
         val summary = doc.sections[0]
@@ -131,7 +137,7 @@ class PrintTest {
         val store = MockStore()
             .save("expense", null, mapOf("amount" to "300", "category" to "食費", "date" to today))
             .save("expense", null, mapOf("amount" to "200", "category" to "交通", "date" to today))
-        val doc = ScreenPrint.document(dsl, "stats", store, printedAt = printedAt)
+        val doc = ScreenPrint.document(dsl, "stats", store, printedAt = printedAt)!!
         assertEquals(listOf("カテゴリ別(今月)", "月ごとの支出"), doc.sections.map { it.title })
         val byCategory = doc.sections[0]
         assertEquals(listOf("カテゴリ", "金額"), byCategory.headers)
@@ -148,7 +154,7 @@ class PrintTest {
             .save("lecture", null, mapOf("subject" to "数学", "weekday" to "月", "period" to "1", "room" to "A101"))
             .save("lecture", null, mapOf("subject" to "英語", "weekday" to "水", "period" to "3"))
             .save("lecture", null, mapOf("subject" to "化学", "weekday" to "水", "period" to "3", "room" to "実験室"))
-        val doc = ScreenPrint.document(dsl, "home", store, printedAt = printedAt)
+        val doc = ScreenPrint.document(dsl, "home", store, printedAt = printedAt)!!
         assertEquals(1, doc.sections.size)
         val grid = doc.sections[0]
         assertEquals("今週の時間割", grid.title)
@@ -168,7 +174,7 @@ class PrintTest {
             values["amount"] = JSONValue.Num(1500.0)
             values["memo"] = JSONValue.Str("ランチ")
         }
-        val doc = ScreenPrint.document(dsl, "expense_form", MockStore(), form, printedAt = printedAt)
+        val doc = ScreenPrint.document(dsl, "expense_form", MockStore(), form, printedAt = printedAt)!!
         val rows = doc.sections.single().rows.associate { it[0] to it[1] }
         assertTrue(rows.toString(), rows.getValue("金額").contains("1,500"))
         assertEquals("ランチ", rows["メモ"])
@@ -179,10 +185,52 @@ class PrintTest {
     fun screenWithoutTablesStillPrintsOnePage() {
         val dsl = Examples.load("kakeibo")
         // フォームが無いフォーム画面: 印刷する値が無いので「記録がありません」の 1 頁
-        val doc = ScreenPrint.document(dsl, "expense_form", MockStore(), null, printedAt = printedAt)
+        val doc = ScreenPrint.document(dsl, "expense_form", MockStore(), null, printedAt = printedAt)!!
         assertEquals(1, doc.sections.size)
         assertTrue(doc.sections[0].rows.isEmpty())
         assertEquals(1, doc.pages.size)
+    }
+
+    // MARK: a4 / isPrintKey(#2617)
+
+    @Test
+    fun a4IsPortraitWithoutMargins() {
+        val pf = PrintPages.a4()
+        assertEquals(PageFormat.PORTRAIT, pf.orientation)
+        // 595.28 × 841.89 pt = 210 × 297 mm
+        assertEquals(210.0, pf.width / 72 * 25.4, 0.01)
+        assertEquals(297.0, pf.height / 72 * 25.4, 0.01)
+        assertTrue("縦長", pf.height > pf.width)
+        assertEquals(PrintPages.A4_W, pf.paper.width, 0.0)
+        assertEquals(PrintPages.A4_H, pf.paper.height, 0.0)
+        // 余白は頁の画像に入っているので用紙の余白は 0
+        assertEquals(0.0, pf.imageableX, 0.0)
+        assertEquals(0.0, pf.imageableY, 0.0)
+        assertEquals(PrintPages.A4_W, pf.imageableWidth, 0.01)
+        assertEquals(PrintPages.A4_H, pf.imageableHeight, 0.01)
+        // 毎回新しい物(呼んだ側が変えても次に影響しない)
+        pf.orientation = PageFormat.LANDSCAPE
+        assertEquals(PageFormat.PORTRAIT, PrintPages.a4().orientation)
+    }
+
+    /** 画面のキーの出来事と同じ形の KeyEvent(作る関数は compose-ui の内部向け)。 */
+    @OptIn(InternalComposeUiApi::class)
+    private fun key(k: Key = Key.P, ctrl: Boolean = false, meta: Boolean = false, alt: Boolean = false, shift: Boolean = false, type: KeyEventType = KeyEventType.KeyDown) =
+        KeyEvent(key = k, type = type, isCtrlPressed = ctrl, isMetaPressed = meta, isAltPressed = alt, isShiftPressed = shift)
+
+    @Test
+    fun printKeyIsCtrlOrCmdP() {
+        assertTrue("Ctrl+P", DesktopPrint.isPrintKey(key(ctrl = true)))
+        assertTrue("⌘P", DesktopPrint.isPrintKey(key(meta = true)))
+        assertTrue("Ctrl+Shift+P も", DesktopPrint.isPrintKey(key(ctrl = true, shift = true)))
+        // P だけ・Shift / Alt だけ・ほかのキーは数えない
+        assertFalse("P だけ", DesktopPrint.isPrintKey(key()))
+        assertFalse("Shift+P", DesktopPrint.isPrintKey(key(shift = true)))
+        assertFalse("Alt+P", DesktopPrint.isPrintKey(key(alt = true)))
+        assertFalse("Ctrl+O", DesktopPrint.isPrintKey(key(Key.O, ctrl = true)))
+        // 離した時(KeyUp)は数えない(2 回出さない)
+        assertFalse("KeyUp", DesktopPrint.isPrintKey(key(ctrl = true, type = KeyEventType.KeyUp)))
+        assertFalse("⌘ KeyUp", DesktopPrint.isPrintKey(key(meta = true, type = KeyEventType.KeyUp)))
     }
 
     private fun inkBounds(img: BufferedImage): java.awt.Rectangle {

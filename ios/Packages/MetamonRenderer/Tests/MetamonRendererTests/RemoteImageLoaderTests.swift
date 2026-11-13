@@ -86,16 +86,30 @@ final class RemoteImageLoaderTests: XCTestCase {
     }
 
     func testRemoveAllCachedEmptiesTheImageCache() {
-        let request = URLRequest(url: url)
-        let response = HTTPURLResponse(url: url, statusCode: 200, httpVersion: "HTTP/1.1", headerFields: nil)!
+        // 回ごとに別の URL にして、前の回の書き込み・削除の残りに左右されないようにする
+        let key = URL(string: "https://images.example.com/\(UUID().uuidString).png")!
+        let request = URLRequest(url: key)
+        let response = HTTPURLResponse(url: key, statusCode: 200, httpVersion: "HTTP/1.1", headerFields: nil)!
         RemoteImageLoader.cache.storeCachedResponse(CachedURLResponse(response: response, data: Data([1, 2, 3])), for: request)
-        Thread.sleep(forTimeInterval: 0.5) // 保存は裏で書かれる。後片付けは画像を見た後なので書き終わった状態で試す
-        XCTAssertNotNil(RemoteImageLoader.cache.cachedResponse(for: request))
+        // 保存も削除も裏で進み、終わりを知らせる口が無い。決め打ちで待たず、期限つきで状態を見に行く
+        XCTAssertTrue(waitUntil { RemoteImageLoader.cache.cachedResponse(for: request) != nil }, "保存が期限内に見えない")
 
-        RemoteImageLoader.removeAllCached()
-        Thread.sleep(forTimeInterval: 0.5) // 消すのも裏で進む
+        // 初めて使うキャッシュでは、見えた後もディスクへの書き込みが裏に残り、消した後に書き戻ることがある(CI で再現)。
+        // 本番の後片付けは画像を見終えた後なので、書き終わるまで消し直して「最後は空になる」ことを確かめる
+        XCTAssertTrue(waitUntil {
+            RemoteImageLoader.removeAllCached()
+            return RemoteImageLoader.cache.cachedResponse(for: request) == nil
+        }, "削除が期限内に終わらない")
+    }
 
-        XCTAssertNil(RemoteImageLoader.cache.cachedResponse(for: request))
+    /// 条件が満たされるまで短い間隔で見に行く。期限までに満たされなければ false。
+    private func waitUntil(timeout: TimeInterval = 10, _ condition: () -> Bool) -> Bool {
+        let deadline = Date().addingTimeInterval(timeout)
+        while !condition() {
+            if Date() >= deadline { return false }
+            Thread.sleep(forTimeInterval: 0.01)
+        }
+        return true
     }
 
     func testImageSessionUsesTheImageCache() {

@@ -16,6 +16,14 @@ public struct ClientConfig: Decodable, Equatable, Sendable {
     /// どの OS の版のフィールドで判定するか
     public enum Platform: Sendable {
         case ios, macos
+
+        /// notice の `platforms` での名前(`X-Client-Platform` と同じ・#3244)
+        var noticeName: String {
+            switch self {
+            case .ios: "ios"
+            case .macos: "macos"
+            }
+        }
     }
 
     public init(minIOSBuild: Int? = nil, latestIOSBuild: Int? = nil, iosAppStoreUrl: String? = nil,
@@ -144,7 +152,7 @@ public struct UpdateChecker: Sendable {
 
     public func check() async -> Result {
         guard let client, let config = try? await client.fetch() else { return Result(requirement: .none) }
-        let notice = config.notice.flatMap { $0.isDisplayable && $0.applies(toBuild: build) ? $0 : nil }
+        let notice = config.notice.flatMap { $0.isDisplayable && $0.applies(toBuild: build) && $0.applies(to: platform) ? $0 : nil }
         return Result(requirement: UpdateRequirement.evaluate(config: config, build: build, platform: platform),
                       appStoreURL: config.storeURL(platform), notice: notice)
     }

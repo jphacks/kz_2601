@@ -45,6 +45,7 @@ extension AppRuntime {
 
     /// 課金画面の差し込み口(1 か所)。#429 の `ProGate.requestPro` で出す(閉じるのは待たない。押し直しで再実行)。
     func requestProForAIText(chat: Bool = false) {
+        guard showsOrToast(.paywall) else { return } // アシスティブアクセス(#1997)
         print("[Metamon] IAP: \(chat ? "aiChat" : "aiButton generate") needs Pro → paywall")
         let copy = AITextPaywallCopy(chat: chat)
         Task { _ = await proGate.requestPro(.paidFeature([copy.feature]), closeNote: copy.closeNote) }

@@ -123,6 +123,9 @@ func TestCallLimitsRefund(t *testing.T) {
 		{"provider 5xx", func(e *env) CallRequest {
 			return e.req(FakeFree, "listItems", map[string]string{"fail": "5xx"})
 		}, ReasonUpstream, true},
+		{"provider has no such item", func(e *env) CallRequest {
+			return e.req(FakeFree, "listItems", map[string]string{"fail": "404"})
+		}, ReasonBadRequest, true},
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
@@ -182,6 +185,54 @@ func TestUpstreamPause(t *testing.T) {
 		if le.Scope != LimitProviderPaused || le.RetryAfter != s.paused {
 			t.Fatalf("step %d: %+v", i, le)
 		}
+	}
+}
+
+// An OAuth provider's 429 pauses only the person whose token it was: another
+// person goes on, and so does another provider.
+func TestUpstreamPauseOAuthPerUser(t *testing.T) {
+	e := newEnv(t, opts{cfg: withLimits(Limits{})})
+	e.connect(user)
+	e.connect("other")
+	if _, err := e.call(e.req(FakeOAuth, "listEvents", map[string]string{"fail": "429"})); Reason(err) != ReasonUpstream {
+		t.Fatalf("429: %v", err)
+	}
+	_, err := e.call(e.req(FakeOAuth, "listEvents", nil))
+	if le := limitErr(t, err); le.Scope != LimitProviderPaused || le.RetryAfter != time.Minute {
+		t.Fatalf("same person: %+v", le)
+	}
+	r := e.req(FakeOAuth, "listEvents", nil)
+	r.UserUID = "other"
+	if _, err := e.call(r); err != nil {
+		t.Fatalf("another person is paused: %v", err)
+	}
+	if _, err := e.call(e.req(FakeFree, "listItems", nil)); err != nil {
+		t.Fatalf("another provider is paused: %v", err)
+	}
+	e.c.t = e.c.t.Add(time.Minute)
+	if _, err := e.call(e.req(FakeOAuth, "listEvents", nil)); err != nil {
+		t.Fatalf("after the minute: %v", err)
+	}
+	// a key provider (the operator's key) still pauses everyone
+	if _, err := e.call(e.req(FakeFree, "listItems", map[string]string{"fail": "429"})); Reason(err) != ReasonUpstream {
+		t.Fatalf("429: %v", err)
+	}
+	r = e.req(FakeFree, "listItems", nil)
+	r.UserUID = "other"
+	_, err = e.call(r)
+	if le := limitErr(t, err); le.Scope != LimitProviderPaused {
+		t.Fatalf("key provider, another person: %+v", le)
+	}
+}
+
+// Ended pauses are dropped when a new one starts (per-person keys do not pile up).
+func TestPauseDropsEnded(t *testing.T) {
+	var l limiter
+	now := time.Now()
+	l.pause("a", now, time.Minute)
+	l.pause("b", now.Add(2*time.Minute), time.Minute)
+	if _, ok := l.paused["a"]; ok || len(l.paused) != 1 {
+		t.Fatalf("paused %v", l.paused)
 	}
 }
 
@@ -263,7 +314,12 @@ func (failingStore) Refund(context.Context, []ratelimit.Counter, int, time.Time)
 	return errors.New("down")
 }
 
+// oauthDefaults are DefaultLimits of a NeedsOAuth provider: no environment-wide day.
+var oauthDefaults = Limits{UserHourly: DefaultLimits.UserHourly, UserDaily: DefaultLimits.UserDaily,
+	AppHourly: DefaultLimits.AppHourly, AppDaily: DefaultLimits.AppDaily}
+
 // EXT_LIMIT_* / EXT_GLOBAL_DAILY*: defaults, every provider, one provider, 0 = off.
+// An OAuth provider counts per person's token: no global day unless its own env sets one.
 func TestLimitsFromEnv(t *testing.T) {
 	cases := []struct {
 		name string
@@ -271,9 +327,16 @@ func TestLimitsFromEnv(t *testing.T) {
 		want map[string]Limits // checked providers
 		err  bool
 	}{
-		{"defaults", nil, map[string]Limits{FakeFree: DefaultLimits, FakePaid: DefaultLimits}, false},
+		{"defaults", nil, map[string]Limits{FakeFree: DefaultLimits, FakePaid: DefaultLimits, FakeOAuth: oauthDefaults,
+			YouTube: {UserHourly: DefaultLimits.UserHourly, UserDaily: DefaultLimits.UserDaily, AppHourly: DefaultLimits.AppHourly, AppDaily: DefaultLimits.AppDaily, GlobalDaily: youTubeGlobalDaily}}, false},
 		{"every provider", map[string]string{"EXT_LIMIT_USER_HOURLY": "7", "EXT_GLOBAL_DAILY": "9"},
-			map[string]Limits{FakeFree: {UserHourly: 7, UserDaily: DefaultLimits.UserDaily, AppHourly: DefaultLimits.AppHourly, AppDaily: DefaultLimits.AppDaily, GlobalDaily: 9}}, false},
+			map[string]Limits{
+				FakeFree:  {UserHourly: 7, UserDaily: DefaultLimits.UserDaily, AppHourly: DefaultLimits.AppHourly, AppDaily: DefaultLimits.AppDaily, GlobalDaily: 9},
+				YouTube:   {UserHourly: 7, UserDaily: DefaultLimits.UserDaily, AppHourly: DefaultLimits.AppHourly, AppDaily: DefaultLimits.AppDaily, GlobalDaily: 9},
+				FakeOAuth: {UserHourly: 7, UserDaily: DefaultLimits.UserDaily, AppHourly: DefaultLimits.AppHourly, AppDaily: DefaultLimits.AppDaily},
+			}, false},
+		{"one OAuth provider's global day", map[string]string{"EXT_GLOBAL_DAILY_FAKE_OAUTH": "5"},
+			map[string]Limits{FakeOAuth: {UserHourly: DefaultLimits.UserHourly, UserDaily: DefaultLimits.UserDaily, AppHourly: DefaultLimits.AppHourly, AppDaily: DefaultLimits.AppDaily, GlobalDaily: 5}}, false},
 		{"one provider wins", map[string]string{"EXT_LIMIT_APP_DAILY": "4", "EXT_LIMIT_FAKE_PAID_APP_DAILY": "2", "EXT_GLOBAL_DAILY_FAKE_PAID": "0"},
 			map[string]Limits{
 				FakeFree: {UserHourly: DefaultLimits.UserHourly, UserDaily: DefaultLimits.UserDaily, AppHourly: DefaultLimits.AppHourly, AppDaily: 4, GlobalDaily: DefaultLimits.GlobalDaily},
@@ -364,4 +427,45 @@ func TestOpenWeatherBadArgsKeepLimits(t *testing.T) {
 		_, err := e.call(e.req(OpenWeather, "current", map[string]string{"lat": "36.5", "lng": "136.6"}))
 		return err
 	}())
+}
+
+// Every OAuth provider counts per person: no environment-wide day by
+// default and its 429 pauses only the person whose token it was. A provider
+// on the operator's key pauses for everyone.
+func TestOAuthProvidersPerUser(t *testing.T) {
+	cfg, err := ConfigFromEnv(func(string) string { return "" })
+	if err != nil {
+		t.Fatal(err)
+	}
+	oauth := map[string]bool{}
+	for _, p := range Providers() {
+		a, b := pauseKey(p, "uid-a"), pauseKey(p, "uid-b")
+		if p.NeedsOAuth {
+			oauth[p.ID] = true
+			if cfg.Limits[p.ID].GlobalDaily != 0 {
+				t.Errorf("%s: global day %d by default", p.ID, cfg.Limits[p.ID].GlobalDaily)
+			}
+			if p.GlobalDaily != 0 {
+				t.Errorf("%s: an OAuth provider with its own global day", p.ID)
+			}
+			if a == b {
+				t.Errorf("%s: one pause for everyone", p.ID)
+			}
+			continue
+		}
+		if a != b {
+			t.Errorf("%s: the operator's key paused per person", p.ID)
+		}
+		if cfg.Limits[p.ID].GlobalDaily <= 0 {
+			t.Errorf("%s: no global day", p.ID)
+		}
+	}
+	for _, id := range []string{GitHub, Linear, Asana, GoogleTasks, GoogleCalendar, Notion, Todoist, OutlookCalendar} {
+		if !oauth[id] {
+			t.Errorf("%s is not an OAuth provider", id)
+		}
+	}
+	if oauth[YouTube] {
+		t.Error("youtube is on the operator's key")
+	}
 }

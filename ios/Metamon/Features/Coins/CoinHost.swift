@@ -6,14 +6,17 @@ import MetamonServices
 /// (シートの上には別のシートを重ねられないので、設定・課金画面・音声シートにもそれぞれ付ける)。
 struct CoinSheetPresenter: ViewModifier {
     @State private var id = UUID()
+    @Environment(\.assistiveAccess) private var assistiveAccess
+    @Environment(AppRuntime.self) private var rt: AppRuntime?
 
     func body(content: Content) -> some View {
         let gate = CoinGate.shared
+        let shows = assistiveAccess.shows(.paywall) // アシスティブアクセス(#1997)ではお店・コインの設定を出さない
         return content
             .onAppear { gate.presenterAppeared(id) }
             .onDisappear { gate.presenterDisappeared(id) }
             .sheet(item: Binding(
-                get: { gate.request?.presenter == id ? gate.request : nil },
+                get: { gate.request(for: id, assistiveAccess: assistiveAccess) },
                 set: { if $0 == nil, gate.request?.presenter == id { gate.dismiss() } }
             )) { request in
                 switch request.sheet {
@@ -21,6 +24,12 @@ struct CoinSheetPresenter: ViewModifier {
                 case .plans: PlanComparisonSheet()
                 case .settings(let reason): CoinSettingsSheet(reason: reason)
                 }
+            }
+            // 出さない時はすぐ閉じて一言だけ
+            .onChange(of: gate.request?.id, initial: true) {
+                guard !shows, gate.request?.presenter == id else { return }
+                gate.dismiss()
+                rt?.toast = AssistiveAccessPolicy.unavailableMessage
             }
     }
 }

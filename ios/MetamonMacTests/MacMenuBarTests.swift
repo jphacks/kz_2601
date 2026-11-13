@@ -125,6 +125,15 @@ final class MacMenuBarTests: XCTestCase {
         XCTAssertEqual(MacMenuBarStats.entities(in: try kakeibo()), ["expense"])
     }
 
+    func testStatsMatchWidgetSnapshot() throws {
+        let dsl = try kakeibo()
+        let records = ["expense": [expense("1", amount: 1200), expense("2", amount: 300)]]
+        let stats = MacMenuBarStats.make(dsl: dsl, records: records)
+        let widget = WidgetSnapshotWriter.makeSnapshot(dsl: dsl, records: records, previous: nil)
+        XCTAssertEqual(stats.map(\.label), widget.stats.map(\.label), "ウィジェットと同じ並び(#1969)")
+        XCTAssertEqual(stats.map(\.value), widget.stats.map { $0.value ?? "—" }, "ウィジェットと同じ数字(#1969)")
+    }
+
     func testNoAppsShowsNothing() async {
         let source = FakeMenuBarSource(dsl: nil)
         source.apps = []

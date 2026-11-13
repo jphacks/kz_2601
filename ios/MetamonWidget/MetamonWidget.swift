@@ -10,6 +10,10 @@ struct MetamonWidgetBundle: WidgetBundle {
     var body: some Widget {
         MetamonStatWidget()
         TailorLiveActivity() // #423
+        if #available(iOS 18, *) { // コントロール(#1993)。iOS 17 では出さない
+            OpenAppControl()
+            RecordControl()
+        }
     }
 }
 

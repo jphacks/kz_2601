@@ -141,6 +141,8 @@ dependencies {
     implementation(libs.play.services.mlkit.image.labeling)
     implementation(libs.play.services.mlkit.face.detection)
     // ホーム画面のウィジェット(#912)
+    // ヘルスコネクトの権限の申請と設定の画面(#870)。読み書きは :renderer
+    implementation(libs.health.connect.client)
     implementation(libs.glance.appwidget)
     implementation(libs.glance.material3)
 

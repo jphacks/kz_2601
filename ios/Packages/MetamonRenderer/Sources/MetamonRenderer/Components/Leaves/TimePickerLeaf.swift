@@ -7,6 +7,7 @@ import MetamonDSL
 struct TimePickerLeaf: View {
     let c: Component
     let ctx: RenderContext
+    @FocusState private var focused: Bool
 
     var body: some View {
         if let form = ctx.form, let field = c.field {
@@ -18,6 +19,8 @@ struct TimePickerLeaf: View {
                     .macDatePickerStyle(includesDate: false)
                     .tint(RenderTheme.Colors.brandA)
                     .accessibilityLabel(label)
+                    .focused($focused)
+                    .macFormTabStop(c, $focused)
             }
             .onAppear { form.seedTimeIfEmpty(field) }
         } else {

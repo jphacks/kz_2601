@@ -83,12 +83,21 @@ final class MacServices: @unchecked Sendable {
 
     /// プッシュの端末と同意(#982)。iOS の `LiveWiring.push` と同じく appconfig の URL がある時だけ(モック = 登録しない)
     var pushDevices: (any PushDeviceClient)? { appConfigURL.map { HTTPPushDeviceClient(baseURL: $0, token: token) } }
+
+    /// 「あなたの声で直りました」のお知らせと「直ったら知らせてほしい」の同意(#374・#364)。iOS の `LiveWiring.notices` と同じく appconfig の URL がある時だけ
+    var loopNotices: (any LoopNoticesClient)? { appConfigURL.map { HTTPLoopNoticesClient(baseURL: $0, token: token) } }
+    /// リリース申請(#76・#2249)。iOS の `ReleaseRequests+Wiring` と同じく appconfig の URL がある時だけ(審査用ビルドは外す)
+    var releaseRequests: (any ReleaseRequestClient)? { appConfigURL.map { HTTPReleaseRequestClient(baseURL: $0, token: token) } }
     #endif
 
     /// アカウント削除(#972・`DELETE /v1/me`)。iOS の `Account+Wiring` と同じく appconfig の URL がある時だけ本物
     var account: any AccountClient {
         appConfigURL.map { HTTPAccountClient(baseURL: $0, token: token) } ?? MockAccountClient()
     }
+
+    /// 他の端末の変化の購読(#2072)。iOS の `BuildConfig.makeSync` と同じ `RealtimeDocumentSync`(SSE・切れたらポーリング)。
+    /// appconfig がある時だけ(モック・端末だけのアプリは購読しない)
+    var sync: (any DocumentSync)? { (appConfig as? HTTPAppConfigClient).map { RealtimeDocumentSync(client: $0) } }
 
     /// 作ったアプリをサーバーに置くか(本物の AI と appconfig の両方がある)。false なら記録は端末だけ
     var keepsAppsOnServer: Bool { appConfig != nil }

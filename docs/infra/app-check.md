@@ -8,6 +8,7 @@ ai / appconfig は Cloud Run で公開されていて、認可は Firebase の I
 - [しくみ](#しくみ)
 - [モード](#モード)
 - [iOS の構成ごとのプロバイダ](#ios-の構成ごとのプロバイダ)
+- [Android の構成ごとのプロバイダ](#android-の構成ごとのプロバイダ)
 - [Mac のプロバイダ](#mac-のプロバイダ)
 - [人の作業](#人の作業)
 - [モードの切り替え](#モードの切り替え)
@@ -16,7 +17,7 @@ ai / appconfig は Cloud Run で公開されていて、認可は Firebase の I
 
 ## しくみ
 
-1. iOS は Firebase App Check の SDK でトークン(約 1 時間有効・SDK がキャッシュと更新を管理)を取り、ai / appconfig への全リクエストに `X-Firebase-AppCheck` ヘッダで付けます(`MetamonServices/Live/HTTP.swift`・SSE の `RealtimeDocumentSync`)。取れない時はヘッダ無しで送ります(初回の App Attest が 5 秒を超えた時も)。
+1. アプリは Firebase App Check の SDK でトークン(約 1 時間有効・SDK がキャッシュと更新を管理)を取り、ai / appconfig への全リクエストに `X-Firebase-AppCheck` ヘッダで付けます。iOS は `MetamonServices/Live/HTTP.swift`(SSE は `RealtimeDocumentSync`)、Android は `:services` の `MetamonHttp`(SSE の `openStream` も同じ・#1008)。取れない時はヘッダ無しで送ります(初回の App Attest / Play Integrity が 5 秒を超えた時も)。
 2. backend は `internal/appcheck` のミドルウェアで、Firebase Admin SDK(公開鍵 JWKS を 6 時間ごとに取得)でトークンを検証します。サービスアカウントの権限は要りません。
 3. ai は appconfig を呼ぶ時に、受け取った `X-Firebase-AppCheck` もそのまま転送します。
 
@@ -58,6 +59,19 @@ ai / appconfig は Cloud Run で公開されていて、認可は Firebase の I
 - 選び方は `Metamon/App/MetamonApp.swift` の `appCheckMode`(`DEBUG` かシミュレータならデバッグ用)。
 - entitlement `com.apple.developer.devicecheck.appattest-environment` は `Metamon.entitlements` / `Metamon-Review.entitlements` に `$(METAMON_APP_ATTEST_ENV)` で入れ、値は `project.yml`(既定 development、Release / Review は production)。
 - `GoogleService-Info.plist` が無い時(CI・plist 未同期)は Firebase も App Check も動かず、ヘッダは付きません。CI のテストはモックなので影響しません。
+
+## Android の構成ごとのプロバイダ
+
+| 構成 | プロバイダ | 備考 |
+| --- | --- | --- |
+| debug(`stgDebug` / `prodDebug`。エミュレータ・実機) | デバッグ用(`DebugAppCheckProviderFactory`) | Firebase コンソールに登録したトークンだけ通る |
+| release(`stgRelease` / `prodRelease`。Play・内部テスト) | Play Integrity(`PlayIntegrityAppCheckProviderFactory`) | Play で配った版だけ通る |
+
+- 出し分けは build type のソースセット(`android/app/src/debug/.../AppCheckProviders.kt` と `android/app/src/release/.../AppCheckProviders.kt`)。依存も `debugImplementation` / `releaseImplementation` で分けてあるので、配布版にデバッグ用のプロバイダは入りません。
+- 組み立ては `AppContainer.makeLive`(`FirebaseBootstrap.configureIfAvailable(context, AppCheckProviders.factory())` → `FirebaseAppCheckTokenProvider.createIfConfigured()` を `MetamonHttp` に渡す)。
+- トークンが取れない・5 秒を超えた・Play 開発者サービスが無い時は null(ヘッダ無し)で先に進みます。**App Check の不調で通信は止めません**(iOS と同じ方針)。
+- `google-services.json` が無いビルド(CI・json 未同期)は Firebase も App Check も動かず、ヘッダは付きません。CI のテストはモックなので影響しません。
+- デバッグ用のトークンは初回起動時に logcat に出ます(`DebugAppCheckProvider` で検索)。**秘密情報**なのでコード・PR・Issue・チャットに貼らないでください。
 
 ## Mac のプロバイダ
 
@@ -101,17 +115,27 @@ GCP プロジェクトで `firebaseappcheck.googleapis.com` を有効にしま�
 2. Firebase コンソール →「App Check」→ iOS アプリのメニュー →「デバッグ用トークンを管理」に追加(名前は「ko-tarou のシミュレータ」など)。
 3. デバッグ用のトークンは**秘密情報**です。コード・PR・Issue・チャットに貼らないでください。漏れたらコンソールで消します。
 
-### 5. `log` で様子を見る(stg → prod)
+### 5. Android: Firebase コンソールにアプリを登録(#1008)
+
+Android は 1(App Attest の capability)が要りません。2〜4 の Android 版として行います。
+
+1. Firebase コンソール →「App Check」→「アプリ」→ Android アプリ(`jp.kz2601.metamon` / stg は `jp.kz2601.metamon.stg`)。
+2. **Play Integrity** を登録。Play Console と Firebase をリンクしておく(リンクしていないと Play Integrity の検証ができません)。
+3. debug ビルドで起動して logcat に出るデバッグ用トークンを「デバッグ用トークンを管理」に追加(名前は「○○ のエミュレータ」など)。貼る先はコンソールだけ。
+4. **`APP_CHECK_APP_IDS` を使っている場合は、Android の Firebase アプリ ID(`1:…:android:…`)を足します。**足さないと Android のトークンが `wrong_app` になります。backend のコードは変えません(値は GitHub の Environment 変数)。
+5. `enforce` にする前に、App Check 入りの版を Play の最低対応版にする(#302 の Android 相当)。
+
+### 6. `log` で様子を見る(stg → prod)
 
 GitHub の Environment 変数 `APP_CHECK_MODE` を `log` にしてデプロイします([モードの切り替え](#モードの切り替え))。数日、[ログ](#ログの見方)で `valid` の割合を見ます。最新の版の正規のクライアントがほぼ `valid` で、`missing` が古い版(`clientBuild`)だけなら次へ。
 
-### 6. `enforce` にする
+### 7. `enforce` にする
 
 - **先に、App Check 入りの版を最低対応版にする**(#302 の `MIN_IOS_BUILD`)。そうしないと古い版がすべて 401 になります(古い版は `/v1/client-config` が対象外なので「アップデートしてください」は出せます)。
-- stg で `enforce` → 実機で生成・同期・共有を一通り確認 → prod で `enforce`。
+- stg で `enforce` → iOS / Android の実機で生成・同期・共有を一通り確認 → prod で `enforce`。
 - デプロイ後のスモーク(`cmd/smoke`)は App Check のトークンを持たないので、`enforce` の環境では失敗します(非ブロッキング)。必要なら別 Issue でスモーク用のトークンの取り方を足します。
 
-### 7. 任意: Firebase Auth 自体にも App Check をかける
+### 8. 任意: Firebase Auth 自体にも App Check をかける
 
 匿名ユーザーの作成そのもの(identitytoolkit)を守るには、Firebase コンソールの App Check で **Authentication** の「適用」をオンにします。iOS の FirebaseAuth は App Check が入っていれば自動でトークンを付けます。ただしスモークの匿名サインイン(`FIREBASE_WEB_API_KEY` の REST)も弾かれるので、オンにする前にスモークの扱いを決めます。
 

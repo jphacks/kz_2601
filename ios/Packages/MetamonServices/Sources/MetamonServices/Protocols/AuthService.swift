@@ -5,11 +5,14 @@ public struct AuthUser: Sendable, Equatable {
     public var uid: String
     public var isAnonymous: Bool
     public var displayName: String?
+    /// このアカウントにつながっているサインインの方法(#361)。匿名は含めない。
+    public var providers: [SignInProvider]
 
-    public init(uid: String, isAnonymous: Bool, displayName: String? = nil) {
+    public init(uid: String, isAnonymous: Bool, displayName: String? = nil, providers: [SignInProvider] = []) {
         self.uid = uid
         self.isAnonymous = isAnonymous
         self.displayName = displayName
+        self.providers = providers
     }
 }
 
@@ -25,6 +28,9 @@ public enum AuthError: LocalizedError, Sendable {
     case alreadyLinked
     /// `switchToPendingAppleAccount()` を呼んだが、切り替え先の資格情報が残っていない
     case noPendingAppleAccount
+    /// Apple をつなぐ時、その Apple ID のメールアドレスが別のアカウントで使われている
+    /// (`AuthErrorCode.emailAlreadyInUse` / `accountExistsWithDifferentCredential`・#361)
+    case appleEmailInUse
 
     public var errorDescription: String? {
         switch self {
@@ -34,6 +40,7 @@ public enum AuthError: LocalizedError, Sendable {
         case .credentialAlreadyInUse: return L("この Apple ID は、すでに別のアカウントで使われています")
         case .alreadyLinked: return L("すでに Apple でサインインしています")
         case .noPendingAppleAccount: return L("もう一度 Apple でサインインしてください")
+        case .appleEmailInUse: return L("この Apple ID のメールアドレスは、すでに別のアカウントで使われています")
         }
     }
 }
@@ -57,11 +64,15 @@ public protocol AuthService: AnyObject, Sendable {
     /// Apple の idToken で現在のユーザーを再認証する(`deleteCurrentUser` の前・requiresRecentLogin の回避)。
     func reauthenticateWithApple(idToken: String, nonce: String) async throws
     /// 匿名ユーザーに Apple ID を結びつける(#276・Firebase の credential link)。uid は変わらないので、作ったアプリとデータはそのまま。
+    /// 匿名でない既存のアカウント(Apple 以外)にも Apple を足せる(#361)。
     /// その Apple ID が既に別のアカウントにあれば `AuthError.credentialAlreadyInUse`(その時の資格情報はサービスが持ち、
-    /// `switchToPendingAppleAccount()` で使う)。匿名でなければ `AuthError.alreadyLinked`。
+    /// `switchToPendingAppleAccount()` で使う)。既に Apple がつながっていれば `AuthError.alreadyLinked`。
+    /// その Apple ID のメールアドレスが別のアカウントにあれば `AuthError.appleEmailInUse`(切り替え先は持たない)。
     func linkWithApple(idToken: String, nonce: String, fullName: PersonNameComponents?) async throws -> AuthUser
     /// `credentialAlreadyInUse` の後、その Apple ID の既存アカウントに切り替える。匿名で作ったアプリは引き継がれない(uid が変わる)。
     func switchToPendingAppleAccount() async throws -> AuthUser
+    /// サーバーから現在のユーザーを読み直す(別の端末でつないだ方法を `providers` に反映する・#361)。
+    func reloadCurrentUser() async throws -> AuthUser?
 }
 
 public extension AuthService {
@@ -75,4 +86,6 @@ public extension AuthService {
         throw AuthError.notConfigured
     }
     func switchToPendingAppleAccount() async throws -> AuthUser { throw AuthError.noPendingAppleAccount }
+    /// 既定は手元の値をそのまま返す(モック)。
+    func reloadCurrentUser() async throws -> AuthUser? { currentUser }
 }

@@ -38,9 +38,12 @@ struct MacLocalWipe {
     var removeNotifications: @MainActor () async -> Void = MacLocalWipe.removeAllNotifications
     /// デスクトップのウィジェット(#984)の数字。App Group を空にして描き直す(iOS の `wipeLocalData` と同じ)
     var clearWidget: @MainActor () -> Void = MacLocalWipe.clearWidgetSnapshot
+    /// 他の端末の変化の購読(#2072)
+    var stopRealtime: @MainActor () -> Void = { MacRealtimeSync.shared.stopAll() }
 
     func run() async {
         MacComposeSession.wipeCount += 1 // 開いていた会話が後から履歴を書き戻さないように
+        stopRealtime() // 他の端末の変化の購読をやめる(#2072)
         await records.purgeAll()
         documents.removeAll()
         appList.clear()

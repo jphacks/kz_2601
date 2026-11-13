@@ -101,6 +101,7 @@ struct AppsUsageNotice: View {
 /// アプリの中に出す「記録・写真」のお知らせ(作成者のアプリだけ・1 日 1 回)。開いた直後の新着・要約・カードが消えてから出し、数秒で消える。
 struct UsageNoticeHost: ViewModifier {
     @Environment(AppRuntime.self) private var rt
+    @Environment(\.assistiveAccess) private var assistiveAccess
     @State private var notice: UsageNotice?
     var log = UsageNoticeLog()
 
@@ -145,7 +146,8 @@ struct UsageNoticeHost: ViewModifier {
         #if APP_STORE_REVIEW
         return nil
         #else
-        guard UsageCopy.showsProButton(notice, isPro: RemainingTodayPlan.isPro) else { return nil }
+        // アシスティブアクセス(#1997)では課金の画面を出さない
+        guard assistiveAccess.shows(.paywall), UsageCopy.showsProButton(notice, isPro: RemainingTodayPlan.isPro) else { return nil }
         return {
             self.notice = nil
             Task { _ = await rt.proGate.requestPro(.settings) }

@@ -118,6 +118,7 @@ func (f *fake) endpoints() *Endpoints {
 		WarningBase: f.srv.URL + "/warning/",
 		Pressure:    f.srv.URL + "/met/compact",
 		Holidays:    f.srv.URL + "/syukujitsu.csv",
+		TyphoonBase: f.srv.URL + "/typhoon/",
 		RSS: map[string]RSSFeed{
 			"digital-news":  {Name: "RSS2", URL: f.srv.URL + "/rss2.xml", Publisher: "A", SiteURL: "https://a.example/"},
 			"fdma-news":     {Name: "RDF", URL: f.srv.URL + "/rdf.xml", Publisher: "B", SiteURL: "https://b.example/"},
@@ -360,7 +361,7 @@ func TestUpstreamBudget(t *testing.T) {
 
 func TestBodyCap(t *testing.T) {
 	f := newFake(t)
-	f.body["/rss2.xml"] = []byte("<rss><channel>" + strings.Repeat("<item><title>x</title></item>", (512<<10)/28+10) + "</channel></rss>")
+	f.body["/rss2.xml"] = []byte("<rss><channel>" + strings.Repeat("<item><title>x</title></item>", int(providerLimits[dsl.FeedRSS].maxBody)/28+10) + "</channel></rss>")
 	s := newSvc(f, &clock{t: testNow}, Options{})
 	if _, err := s.Get(context.Background(), Query{Provider: dsl.FeedRSS, FeedID: "digital-news"}, 5); !errors.Is(err, ErrUpstream) {
 		t.Errorf("oversized body: %v, want ErrUpstream", err)
@@ -447,6 +448,49 @@ func TestDefaultEndpoints(t *testing.T) {
 	for p := range dsl.FeedProviders {
 		if _, ok := providerLimits[p]; !ok {
 			t.Errorf("no limits for %s", p)
+		}
+	}
+}
+
+// checkRedirect: an allowlisted host only, on the same scheme as the first
+// request, at most 3 hops.
+func TestFeedsCheckRedirect(t *testing.T) {
+	ep := Endpoints{
+		Holidays: "https://a.example/syukujitsu.csv",
+		RSS:      map[string]RSSFeed{"x": {URL: "https://b.example/rss.xml"}},
+		Arxiv:    "http://c.example/api/query",
+	}
+	req := func(raw string) *http.Request {
+		r, err := http.NewRequest(http.MethodGet, raw, nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+		return r
+	}
+	first := req("https://a.example/syukujitsu.csv")
+	hop := func(n int) []*http.Request {
+		v := make([]*http.Request, n)
+		for i := range v {
+			v[i] = first
+		}
+		return v
+	}
+	for _, c := range []struct {
+		name    string
+		to      string
+		hops    int
+		blocked bool
+	}{
+		{"allowlisted host", "https://b.example/rss.xml", 1, false},
+		{"last allowed hop", "https://a.example/other", 2, false},
+		{"too many hops", "https://b.example/rss.xml", 3, true},
+		{"host not on the list", "https://evil.example/x", 1, true},
+		{"https to http downgrade", "http://c.example/api/query", 1, true},
+		{"credentials in URL", "https://user:pw@a.example/x", 1, true},
+	} {
+		err := ep.checkRedirect(req(c.to), hop(c.hops))
+		if c.blocked != errors.Is(err, ErrRedirectBlocked) || (!c.blocked && err != nil) {
+			t.Errorf("%s: err = %v, blocked want %v", c.name, err, c.blocked)
 		}
 	}
 }

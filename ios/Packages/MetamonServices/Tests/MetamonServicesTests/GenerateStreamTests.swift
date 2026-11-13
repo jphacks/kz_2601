@@ -218,6 +218,52 @@ final class GenerateStreamTests: XCTestCase {
         XCTAssertEqual(ChunkedStubURLProtocol.paths, ["/v1/generate?stream=1"], "サーバーが答えたエラーで生成をやり直さない")
     }
 
+    /// 持てるアプリの数の上限(#630)を stream の中で断られた時(ai の handler.go が `event: error` で返す形そのまま)。
+    /// 402 の通常の応答と同じく `.appLimit` に分類し、置き換えシートの中身(apps)まで読めること。
+    static let appLimitErrorFrame = frame("error", #"""
+    {"error":{"code":"app_limit_reached","message":"持てるアプリの数(2 個)に達しました。","status":402,"details":{"resource":"apps","plan":"free","held":2,"limit":2,"base":2,"purchasedSlots":0,"canBuySlot":false,"slotCoins":0,"balance":0,"upgrade":true,"apps":[{"id":"a-old","name":"家計簿","mine":true,"updatedAt":"2026-11-01T00:00:00Z"},{"id":"a-shared","name":"当番表","mine":false,"updatedAt":"2026-11-02T00:00:00Z"}]}}}
+    """#)
+
+    func testAppLimitErrorEventClassifiesAsAppLimit() async throws {
+        ChunkedStubURLProtocol.reset([.init(chunks: [Self.appLimitErrorFrame])])
+        do {
+            _ = try await client.morph(transcript: "歩数計作って", appId: "new", currentVersion: 0, locale: nil) { _ in }
+            XCTFail("expected error")
+        } catch {
+            guard case .appLimit(let limit) = FailureKind.classify(error) else {
+                return XCTFail("stream の app_limit_reached は .appLimit: \(FailureKind.classify(error)) (\(error))")
+            }
+            XCTAssertEqual(limit.held, 2)
+            XCTAssertEqual(limit.limit, 2)
+            XCTAssertTrue(limit.upgrade)
+            XCTAssertEqual(limit.apps?.map(\.id), ["a-old", "a-shared"])
+            XCTAssertEqual(limit.apps?.map(\.mine), [true, false])
+        }
+        XCTAssertEqual(ChunkedStubURLProtocol.paths, ["/v1/generate?stream=1"], "上限の断りで生成をやり直さない")
+    }
+
+    /// status / message が欠けた `event: error` でも、上限は上限として読む(500 = 混雑にしない)。
+    func testAppLimitErrorEventWithoutStatusStillAppLimit() throws {
+        let frame = SSEFrame(event: "error", data: #"{"error":{"code":"app_limit_reached","details":{"held":2,"limit":2,"apps":null}}}"#)
+        guard case .failure(let e)? = GenerateStreamEvent.decode(frame) else { return XCTFail("error") }
+        XCTAssertEqual(e.status, 402)
+        guard case .appLimit(let limit) = FailureKind.classify(e) else {
+            return XCTFail("status の無い app_limit_reached も .appLimit: \(FailureKind.classify(e))")
+        }
+        XCTAssertEqual(limit.limit, 2)
+        XCTAssertNil(limit.apps, "apps が null なら端末の一覧を使う")
+        // status が 500 で来ても code で上限と分かる
+        let mislabeled = APIError.server(status: 500, code: AppLimit.code, message: "", details: ["held": .number(2), "limit": .number(2)])
+        guard case .appLimit = FailureKind.classify(mislabeled) else { return XCTFail("code で判定する") }
+    }
+
+    /// 知らない code の 402 は「言い方を変えて」(rejected)にしない: 言い直しでは直らない。
+    func testUnknownPaymentErrorIsNotRejected() {
+        let frame = SSEFrame(event: "error", data: #"{"error":{"code":"something_new","message":"x","status":402}}"#)
+        guard case .failure(let e)? = GenerateStreamEvent.decode(frame) else { return XCTFail("error") }
+        guard case .other = FailureKind.classify(e) else { return XCTFail("402 は .other: \(FailureKind.classify(e))") }
+    }
+
     func testConflictRetriesFromCurrentAfterRestart() async throws {
         ChunkedStubURLProtocol.reset([
             .init(chunks: [Self.frame("error", #"{"error":{"code":"version_conflict","message":"x","status":409}}"#)]),

@@ -31,6 +31,8 @@ type fakeAsana struct {
 	revoked    []string
 	workspaces []string
 	completed  []string
+	added      []string
+	wsCalls    int
 	lastPath   string
 	lastQuery  url.Values
 	lastBody   map[string]any
@@ -119,6 +121,7 @@ func newFakeAsana(t *testing.T) (*fakeAsana, *httptest.Server) {
 		}
 		f.mu.Lock()
 		defer f.mu.Unlock()
+		f.wsCalls++
 		var data []map[string]string
 		for _, g := range f.workspaces {
 			data = append(data, map[string]string{"gid": g})
@@ -171,6 +174,35 @@ func newFakeAsana(t *testing.T) (*fakeAsana, *httptest.Server) {
 		}
 		f.completed = append(f.completed, id)
 		writeJSON(w, 200, map[string]any{"data": map[string]any{"gid": id, "name": "資料を送る", "completed": true, "permalink_url": "https://app.asana.com/0/0/" + id}})
+	})
+	mux.HandleFunc("POST /api/1.0/tasks", func(w http.ResponseWriter, r *http.Request) {
+		if !authed(w, r) {
+			return
+		}
+		f.mu.Lock()
+		defer f.mu.Unlock()
+		record(r)
+		var body struct {
+			Data map[string]any `json:"data"`
+		}
+		if err := json.NewDecoder(r.Body).Decode(&body); err != nil || r.Header.Get("Content-Type") != "application/json" {
+			writeJSON(w, 400, map[string]any{"errors": []map[string]string{{"message": "bad body"}}})
+			return
+		}
+		f.lastBody = body.Data
+		if body.Data["workspace"] == "404" {
+			writeJSON(w, 400, map[string]any{"errors": []map[string]string{{"message": "workspace: Not a recognized ID"}}})
+			return
+		}
+		if ps, _ := body.Data["projects"].([]any); len(ps) == 1 && ps[0] == "404" {
+			writeJSON(w, 404, map[string]any{"errors": []map[string]string{{"message": "project: Unknown object"}}})
+			return
+		}
+		id := strconv.Itoa(1300 + len(f.added))
+		f.added = append(f.added, id)
+		due, _ := body.Data["due_on"].(string)
+		writeJSON(w, 201, map[string]any{"data": map[string]any{"gid": id, "name": body.Data["name"], "due_on": due, "completed": false,
+			"permalink_url": "https://app.asana.com/0/0/" + id}})
 	})
 	srv := httptest.NewServer(mux)
 	t.Cleanup(srv.Close)
@@ -415,6 +447,10 @@ func TestAsanaCheck(t *testing.T) {
 		"myTasks":      {{"workspaceId": "abc"}, {"workspaceId": "../1"}, {"workspaceId": strings.Repeat("1", 33)}, {"limit": "0"}, {"limit": "51"}, {"limit": "x"}, {"projectId": "1"}},
 		"projectTasks": {{}, {"projectId": ""}, {"projectId": "1 2"}, {"projectId": "1", "limit": "51"}},
 		"complete":     {{}, {"taskId": ""}, {"taskId": "x1"}, {"taskId": "1/../2"}, {"taskId": "1", "name": "x"}},
+		"addTask": {{}, {"name": "  "}, {"name": strings.Repeat("あ", asanaNameMax+1)}, {"name": "a\x00b"}, {"name": "a\x7f"},
+			{"name": "x", "notes": strings.Repeat("n", asanaNotesMax+1)}, {"name": "x", "notes": "a\x1bb"}, {"name": "\xff"},
+			{"name": "x", "dueOn": "2026/11/12"}, {"name": "x", "dueOn": "2026-13-01"}, {"name": "x", "dueOn": "2026-11-12T10:00:00Z"}, {"name": "x", "dueOn": "2026-2-1"},
+			{"name": "x", "workspaceId": "ws"}, {"name": "x", "projectId": "1/2"}, {"name": "x", "taskId": "1"}},
 	}
 	for op, cases := range bad {
 		for i, a := range cases {
@@ -427,6 +463,7 @@ func TestAsanaCheck(t *testing.T) {
 		"myTasks":      {},
 		"projectTasks": {"projectId": "1300", "limit": "50"},
 		"complete":     {"taskId": "1201"},
+		"addTask":      {"name": strings.Repeat("あ", asanaNameMax), "notes": "1行目\n\t2行目", "dueOn": "2026-11-30", "workspaceId": "1100", "projectId": "1300"},
 	} {
 		if _, err := p.CheckArgs(op, a); err != nil {
 			t.Errorf("%s: %v", op, err)
@@ -436,7 +473,8 @@ func TestAsanaCheck(t *testing.T) {
 
 // The real endpoints are on the allowlist; nothing else is reachable;
 // without the client id / secret the provider stays off; off by default
-// and never in the review build; only complete writes.
+// and never in the review build; only complete and addTask write (the DSL
+// asks for a confirmation).
 func TestAsanaDefinition(t *testing.T) {
 	p, ok := Lookup(Asana)
 	if !ok || !p.NeedsOAuth || p.Billing != BillingFree || p.Fake || p.EnvName() != "ASANA" || len(p.Hosts) != 1 {
@@ -450,7 +488,7 @@ func TestAsanaDefinition(t *testing.T) {
 		}
 	}
 	for _, o := range p.Ops {
-		if o.Write != (o.Name == "complete") {
+		if o.Write != (o.Name == "complete" || o.Name == "addTask") {
 			t.Errorf("%s write=%v", o.Name, o.Write)
 		}
 		for _, s := range o.Scopes {
@@ -476,6 +514,99 @@ func TestAsanaDefinition(t *testing.T) {
 	for _, f := range ReviewBuildFeatures() {
 		if f == p.FeatureKey() {
 			t.Fatal("in the review build")
+		}
+	}
+}
+
+// addTask through the service: a read-only grant is 409 and gives the run
+// back; connecting again for tasks:write asks for the reads too; the task
+// is added to the person's only workspace, assigned to them.
+func TestAsanaAddTaskFlow(t *testing.T) {
+	e, f := useAsana(t)
+	e.connectAsana(f, nil, "tasks:read workspaces:read")
+	args := map[string]string{"name": " 資料を送る ", "notes": "先方へ\n添付あり", "dueOn": "2026-11-20"}
+	if _, err := e.call(e.req(Asana, "addTask", args)); !errors.Is(err, ErrNotConnected) || e.runs() != 0 || len(f.added) != 0 {
+		t.Fatalf("addTask without scope: %v runs=%d added=%v", err, e.runs(), f.added)
+	}
+	e.connectAsana(f, []string{asanaScopeTasksWrite}, "tasks:read workspaces:read tasks:write")
+	res, err := e.call(e.req(Asana, "addTask", args))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if res.Output.ResultID != "1300" || res.Output.Item == nil || len(res.Output.Rows) != 0 ||
+		*res.Output.Item != (Row{Title: "資料を送る", Value: "2026-11-20", URL: "https://app.asana.com/0/0/1300"}) {
+		t.Fatalf("output %+v", res.Output)
+	}
+	want := map[string]any{"name": "資料を送る", "notes": "先方へ\n添付あり", "due_on": "2026-11-20", "assignee": "me", "workspace": "1100"}
+	if len(f.lastBody) != len(want) || f.lastPath != "/api/1.0/tasks" || f.lastQuery.Get("opt_fields") != asanaTaskFields {
+		t.Fatalf("request %s %v %v", f.lastPath, f.lastQuery, f.lastBody)
+	}
+	for k, v := range want {
+		if f.lastBody[k] != v {
+			t.Fatalf("body %s = %v, want %v", k, f.lastBody[k], v)
+		}
+	}
+	if e.runs() != 1 || res.Charge.Coins != 0 || len(f.added) != 1 {
+		t.Fatalf("runs = %d added=%v", e.runs(), f.added)
+	}
+}
+
+func TestAsanaAddTask(t *testing.T) {
+	c, f := asanaTestClient(t)
+	ctx := context.Background()
+	tok := &Token{AccessToken: "as-access-0", Scopes: []string{asanaScopeTasksWrite}}
+
+	// a given workspace is used as is (no workspaces call)
+	out, err := c.addTask(ctx, Input{Token: tok, Args: map[string]string{"name": "定例", "workspaceId": "2200"}})
+	if err != nil || out.ResultID != "1300" || out.Item.Title != "定例" || out.Item.Value != "" || f.wsCalls != 0 {
+		t.Fatalf("given workspace: %v %+v ws=%d", err, out, f.wsCalls)
+	}
+	if f.lastBody["workspace"] != "2200" || f.lastBody["projects"] != nil || f.lastBody["notes"] != nil || f.lastBody["due_on"] != nil {
+		t.Fatalf("body %v", f.lastBody)
+	}
+	// a project alone: Asana takes its workspace (no workspaces call)
+	if _, err := c.addTask(ctx, Input{Token: tok, Args: map[string]string{"name": "x", "projectId": "1300"}}); err != nil || f.wsCalls != 0 {
+		t.Fatalf("project: %v ws=%d", err, f.wsCalls)
+	}
+	if ps, _ := f.lastBody["projects"].([]any); len(ps) != 1 || ps[0] != "1300" || f.lastBody["workspace"] != nil {
+		t.Fatalf("project body %v", f.lastBody)
+	}
+	if _, err := c.addTask(ctx, Input{Token: tok, Args: map[string]string{"name": "x", "projectId": "404"}}); Reason(err) != ReasonBadRequest {
+		t.Fatalf("unknown project: %v", err)
+	}
+
+	// several workspaces / none without workspaceId: 400 and nothing added
+	n := len(f.added)
+	for _, ws := range [][]string{{"1100", "2200"}, nil} {
+		f.workspaces = ws
+		if _, err := c.addTask(ctx, Input{Token: tok, Args: map[string]string{"name": "x"}}); Reason(err) != ReasonBadRequest || len(f.added) != n {
+			t.Fatalf("workspaces %v: %v added=%v", ws, err, f.added)
+		}
+	}
+	// a workspace the person does not have is a bad request, not a retry
+	_, err = c.addTask(ctx, Input{Token: tok, Args: map[string]string{"name": "x", "workspaceId": "404"}})
+	var pe *ProviderError
+	if Reason(err) != ReasonBadRequest || !errors.As(err, &pe) || pe.Retryable {
+		t.Fatalf("unknown workspace: %v", err)
+	}
+
+	// scope missing: reads only (before any call), or Asana's 403 naming a scope
+	reads := &Token{AccessToken: "as-access-0", Scopes: asanaReadScopes}
+	if _, err := c.addTask(ctx, Input{Token: reads, Args: map[string]string{"name": "x", "workspaceId": "1100"}}); !errors.Is(err, ErrNotConnected) {
+		t.Fatalf("reads only: %v", err)
+	}
+	if _, err := c.addTask(ctx, Input{Token: &Token{AccessToken: "noscope"}, Args: map[string]string{"name": "x", "workspaceId": "1100"}}); !errors.Is(err, ErrNotConnected) {
+		t.Fatalf("403 scope: %v", err)
+	}
+	busy := &Token{AccessToken: "busy", Scopes: []string{asanaScopeTasksWrite}}
+	if _, err := c.addTask(ctx, Input{Token: busy, Args: map[string]string{"name": "x", "workspaceId": "1100"}}); Reason(err) != ReasonUpstream {
+		t.Fatalf("503: %v", err)
+	}
+	// bad arguments are refused before anything is sent
+	f.lastPath = ""
+	for _, a := range []map[string]string{{}, {"name": "x", "dueOn": "11/20"}, {"name": "x", "workspaceId": "a"}} {
+		if _, err := c.addTask(ctx, Input{Token: tok, Args: a}); Reason(err) != ReasonBadRequest || f.lastPath != "" {
+			t.Fatalf("%v: %v %s", a, err, f.lastPath)
 		}
 	}
 }

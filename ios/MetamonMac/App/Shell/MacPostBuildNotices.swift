@@ -301,6 +301,12 @@ struct MacEditHintBar: View {
                     .font(.callout.weight(.medium))
                     .foregroundStyle(Theme.Colors.brandText)
                     .fixedSize(horizontal: false, vertical: true)
+                // 動かない所も頼めば直せる(#1885・iOS の直し方の例と同じ一文を Mac の頼み方で)
+                Label(FixRequest.macHint, systemImage: "wrench.and.screwdriver")
+                    .font(.callout)
+                    .macSecondaryText()
+                    .fixedSize(horizontal: false, vertical: true)
+                    .accessibilityIdentifier("editHint.fixRequest")
             }
             VStack(alignment: .trailing, spacing: 6) {
                 Button("頼んでみる", action: ask)

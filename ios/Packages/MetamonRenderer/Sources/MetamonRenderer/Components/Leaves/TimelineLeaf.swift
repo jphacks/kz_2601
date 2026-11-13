@@ -16,6 +16,7 @@ struct TimelineLeaf: View {
                 Task { await rt.load(entities: [entityId], force: true) }
             }
         } else {
+            let copy = Self.copyText(rows, c: c, rt: rt)
             VStack(alignment: .leading, spacing: 0) {
                 ForEach(Array(rows.enumerated()), id: \.element.id) { index, row in
                     HStack(alignment: .top, spacing: 12) {
@@ -45,7 +46,20 @@ struct TimelineLeaf: View {
                 }
             }
         .renderCard()
+        .macTextSelection { copy } // Mac: 日付と題を選んでコピーできる(#941)
         }
+    }
+
+    /// Mac のコピー用の全文。1 行 = 1 件(「日付 題 補足」)
+    @MainActor
+    static func copyText(_ rows: [Record], c: Component, rt: any DSLRuntime) -> String {
+        let entity = rt.dsl.entity(c.entity ?? "")
+        return rows.map { row in
+            [c.dateField, c.titleField, c.subtitleField].compactMap { $0 }
+                .map { rt.display(row[$0], field: entity?.field($0)) }
+                .filter { !$0.isEmpty }
+                .joined(separator: " ")
+        }.joined(separator: "\n")
     }
 
     /// 表示する行(日付の新しい順・limit)。適合テストの描画の木(`RenderTree`)も同じ行を使う。

@@ -22,12 +22,17 @@ final class MacPushHost {
     private var authorization: () async -> UNAuthorizationStatus = MacPushHost.systemAuthorization
     private var requestToken: @MainActor () -> Void = MacPushHost.systemRequestToken
     private var openApp: @MainActor (String) -> Void = MacPushHost.routeToApp
+    private var releaseToken: @MainActor () -> Void = MacPushHost.systemReleaseToken
+    /// 登録を消した時の利用者。次に uid が変わるまでトークンを求めない・送らない(遅れて届いたトークンで戻さない)
+    private var suspended: (uid: String?, on: Bool) = (nil, false)
 
     static func systemAuthorization() async -> UNAuthorizationStatus {
         await UNUserNotificationCenter.current().notificationSettings().authorizationStatus
     }
 
     static func systemRequestToken() { NSApplication.shared.registerForRemoteNotifications() }
+
+    static func systemReleaseToken() { NSApplication.shared.unregisterForRemoteNotifications() }
 
     /// 押されたプッシュのアプリを一覧で選ぶ(ウインドウがまだ無い時は出来てから・ローカル通知と同じ道)
     static func routeToApp(_ appId: String) { MacNotificationRouter.shared.open(appId: appId) }
@@ -51,7 +56,8 @@ final class MacPushHost {
                  uid: @escaping () -> String?,
                  authorization: @escaping () async -> UNAuthorizationStatus = MacPushHost.systemAuthorization,
                  requestToken: @escaping @MainActor () -> Void = MacPushHost.systemRequestToken,
-                 openApp: @escaping @MainActor (String) -> Void = MacPushHost.routeToApp) {
+                 openApp: @escaping @MainActor (String) -> Void = MacPushHost.routeToApp,
+                 releaseToken: @escaping @MainActor () -> Void = MacPushHost.systemReleaseToken) {
         self.client = client
         self.members = members
         consent = NotifyConsentStore(defaults: defaults)
@@ -60,11 +66,20 @@ final class MacPushHost {
         self.authorization = authorization
         self.requestToken = requestToken
         self.openApp = openApp
+        self.releaseToken = releaseToken
+        suspended = (nil, false)
+    }
+
+    /// 登録を消した後か。uid が変わっていたら止めるのをやめる
+    private func isSuspended() -> Bool {
+        guard suspended.on else { return false }
+        if uid() != suspended.uid { suspended = (nil, false) }
+        return suspended.on
     }
 
     /// サインイン・前面復帰で呼ぶ。
     func refresh() async {
-        guard let registrar, uid() != nil else { return }
+        guard let registrar, uid() != nil, !isSuspended() else { return }
         switch await authorization() {
         case .authorized, .provisional: requestToken()
         case .denied: await registrar.authorizationRevoked()
@@ -73,12 +88,21 @@ final class MacPushHost {
     }
 
     func receive(token: Data) async {
-        guard let registrar, let uid = uid() else { return }
+        guard let registrar, let uid = uid(), !isSuspended() else { return }
         await registrar.register(token: PushPayload.tokenHex(token), uid: uid)
     }
 
-    /// サインアウト・退会・アカウントの切り替えの前。送れなくても戻る
-    func unregister() async { await registrar?.unregister() }
+    /// サインアウト・退会・アカウントの切り替えの前。送れなくても戻る。
+    /// 次のサインイン(uid の変化)か `resume()` まで、OS のトークンも手放して登録し直さない
+    func unregister() async {
+        guard let registrar else { return }
+        suspended = (uid(), true)
+        releaseToken()
+        await registrar.unregister()
+    }
+
+    /// 切り替え・削除が失敗して同じ利用者のまま残った時。止めるのをやめる(続けて `refresh()` で登録し直す)
+    func resume() { suspended = (nil, false) }
 
     /// 通知のタップ。サインアウト中は開かない。
     func open(appId: String) async {
@@ -107,6 +131,7 @@ final class MacPushHost {
         guard let client, let uid = uid() else { return false }
         do {
             try await client.setNotifyConsent(appId: appId, allowed: allowed)
+            guard self.uid() == uid else { return false } // 待つ間にサインアウト・切り替え: 前の利用者の控えは書かない
             consent.set(allowed, uid: uid, appId: appId)
             return true
         } catch {

@@ -42,6 +42,8 @@ struct AddRecordIntent: AppIntent {
     static var description = IntentDescription("Tailor It で作ったアプリに、アプリを開かずに記録を 1 件追加します。例: 家計簿に「ランチ 800円」。")
     #endif
     static var openAppWhenRun = false
+    /// ロック中は端末のロック解除を求める(#1995)。記録先の名前や記録をロック画面から読み書きさせない
+    static var authenticationPolicy: IntentAuthenticationPolicy = .requiresLocalDeviceAuthentication
 
     #if APP_STORE_REVIEW
     @Parameter(title: "記録先", requestValueDialog: "どの記録帳に記録しますか?")

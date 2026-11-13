@@ -33,6 +33,10 @@ func FeedIDTable(provider string) map[string]string {
 		return RSSFeeds
 	case FeedArxiv:
 		return ArxivCategories
+	case FeedBikeshare:
+		return BikeshareSystems
+	case FeedStatus:
+		return StatusPages
 	}
 	return nil
 }
@@ -60,9 +64,13 @@ func NormalizeFeedQuery(q string) (string, bool) {
 }
 
 func checkFeedQuery(where string, c *Component, add func(string, ...any)) {
+	if c.Provider == FeedBikeshare {
+		checkFeedPoint(where, c, add)
+		return
+	}
 	if c.Provider != FeedDiet {
 		if c.Query != "" {
-			add("%s: feed query is only for provider diet", where)
+			add("%s: feed query is only for provider diet or bikeshare", where)
 		}
 		return
 	}

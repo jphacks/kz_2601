@@ -210,6 +210,8 @@ public enum FailureKind: Equatable, Sendable {
             case 409: return .conflict
             case 429, 500, 502, 503: return .busy(retryAfter: api.retryAfter)
             case 504: return .timeout
+            // 402 は支払い・上限の断り。言い直しでは直らないので「言い方を変えて」(rejected)にしない
+            case 402: return .other(api.errorDescription ?? "\(api)")
             case .some(400..<500): return .rejected(api.errorDescription ?? "\(api)")
             case .some(500...): return .busy(retryAfter: api.retryAfter)
             default: return .other(api.errorDescription ?? "\(api)")

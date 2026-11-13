@@ -293,14 +293,20 @@ struct PaywallSheet: View {
 /// (root = RootView の外側・chat = 確認カードのある対話画面。音声シートの中でも重ねて出せる)。
 struct PaywallPresenter: ViewModifier {
     let placement: PaywallRequest.Placement
+    @Environment(\.assistiveAccess) private var assistiveAccess
 
     func body(content: Content) -> some View {
         let gate = ProGate.shared
+        let shows = assistiveAccess.shows(.paywall) // アシスティブアクセス(#1997)では課金の画面を出さない
         return content.sheet(item: Binding(
-            get: { gate.paywall?.placement == placement ? gate.paywall : nil },
+            get: { shows && gate.paywall?.placement == placement ? gate.paywall : nil },
             set: { if $0 == nil { gate.dismissPaywall(placement: placement) } }
         ), onDismiss: { gate.dismissPaywall(placement: placement) }) { request in
             PaywallSheet(reason: request.reason, closeNote: request.closeNote)
+        }
+        // 出さない時は閉じた(買わなかった)扱いですぐ返す(待っている呼び出し元を止めない)
+        .onChange(of: gate.paywall?.id, initial: true) {
+            if !shows, gate.paywall?.placement == placement { gate.dismissPaywall(placement: placement) }
         }
     }
 }

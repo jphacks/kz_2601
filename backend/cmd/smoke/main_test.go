@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -9,6 +10,7 @@ import (
 	"testing"
 
 	"github.com/jphacks/kz_2601/backend/internal/appconfigclient"
+	"github.com/jphacks/kz_2601/backend/pkg/dsl"
 )
 
 // -cleanup must DELETE /v1/apps/{id} (with the smoke bearer) for every app the
@@ -94,5 +96,83 @@ func TestCleanupFailureIsReported(t *testing.T) {
 	}
 	if r.print(false) != 1 {
 		t.Fatal("print must count the cleanup FAIL")
+	}
+}
+
+func comp(t dsl.ComponentType, area string, kids ...dsl.Component) dsl.Component {
+	return dsl.Component{Type: t, Area: area, Children: kids}
+}
+
+func appOf(screens [][]dsl.Component) *dsl.App {
+	app := &dsl.App{}
+	for _, cs := range screens {
+		app.Screens = append(app.Screens, dsl.Screen{Components: cs})
+	}
+	return app
+}
+
+func TestOverlapsCases(t *testing.T) {
+	text := func(area string) dsl.Component { return comp(dsl.CompText, area) }
+	cases := map[string]struct {
+		screens [][]dsl.Component
+		want    int
+	}{
+		"empty":            {nil, 0},
+		"no area":          {[][]dsl.Component{{text(""), text("")}}, 0},
+		"side by side":     {[][]dsl.Component{{text("A1:C2"), text("D1:F2")}}, 0},
+		"touching rows":    {[][]dsl.Component{{text("A1:F1"), text("A2:F2")}}, 0},
+		"one overlap":      {[][]dsl.Component{{text("A1:C2"), text("C2:D3")}}, 1},
+		"three on a cell":  {[][]dsl.Component{{text("A1:A1"), text("A1:A1"), text("A1:B1")}}, 3},
+		"malformed counts": {[][]dsl.Component{{text("Z9:Z1"), text("A1:B2")}}, 1},
+		"per screen":       {[][]dsl.Component{{text("A1:B2")}, {text("A1:B2")}}, 0},
+		"children ignored": {[][]dsl.Component{{comp(dsl.CompCard, "A1:F3", text("A1:F3"))}}, 0},
+	}
+	for name, tc := range cases {
+		t.Run(name, func(t *testing.T) {
+			if got := overlaps(appOf(tc.screens)); got != tc.want {
+				t.Fatalf("overlaps = %d, want %d", got, tc.want)
+			}
+		})
+	}
+}
+
+func TestPhotoSourceCases(t *testing.T) {
+	photo := func(src string) dsl.Component { return dsl.Component{Type: dsl.CompPhotoField, Source: src} }
+	text := comp(dsl.CompText, "")
+	cases := map[string]struct {
+		screens [][]dsl.Component
+		want    string
+	}{
+		"no screens":     {nil, ""},
+		"none":           {[][]dsl.Component{{text}}, ""},
+		"default source": {[][]dsl.Component{{photo("")}}, "default"},
+		"explicit":       {[][]dsl.Component{{photo("camera")}}, "camera"},
+		"nested":         {[][]dsl.Component{{comp(dsl.CompCard, "", comp(dsl.CompVStack, "", photo("library")))}}, "library"},
+		"first wins":     {[][]dsl.Component{{photo("camera"), photo("library")}}, "camera"},
+		"later screen":   {[][]dsl.Component{{text}, {photo("library")}}, "library"},
+	}
+	for name, tc := range cases {
+		t.Run(name, func(t *testing.T) {
+			if got := photoSource(appOf(tc.screens)); got != tc.want {
+				t.Fatalf("photoSource = %q, want %q", got, tc.want)
+			}
+		})
+	}
+}
+
+func TestCanonCases(t *testing.T) {
+	cases := map[string]struct{ in, want string }{
+		"key order":   {`{"b":1, "a":[1, 2]}`, `{"a":[1,2],"b":1}`},
+		"whitespace":  {" [ 1 ,\n2 ] ", `[1,2]`},
+		"nested keys": {`{"a":{"c":1,"b":2}}`, `{"a":{"b":2,"c":1}}`},
+		"invalid raw": {`{not json`, `{not json`},
+		"scalar":      {`"x"`, `"x"`},
+	}
+	for name, tc := range cases {
+		t.Run(name, func(t *testing.T) {
+			if got := string(canon(json.RawMessage(tc.in))); got != tc.want {
+				t.Fatalf("canon(%s) = %s, want %s", tc.in, got, tc.want)
+			}
+		})
 	}
 }

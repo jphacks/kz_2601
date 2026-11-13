@@ -347,14 +347,15 @@ func TestGitHubErrors(t *testing.T) {
 		t.Fatalf("bad code: %v", err)
 	}
 	// revoking an expired token renews it first; a token GitHub does not
-	// know (422) and a refresh token already gone are done
+	// know (422) is done; a refused refresh token is ErrInvalidGrant
+	// (Connections.Revoke reads the stored one again)
 	if err := c.Revoke(ctx, Token{AccessToken: "ghu_0", RefreshToken: "ghr_0", Expiry: c.now().Add(-time.Hour)}); err != nil {
 		t.Fatal(err)
 	}
 	if err := c.Revoke(ctx, Token{AccessToken: "gone"}); err != nil {
 		t.Fatalf("422: %v", err)
 	}
-	if err := c.Revoke(ctx, Token{AccessToken: "x", RefreshToken: "gone", Expiry: c.now().Add(-time.Hour)}); err != nil {
+	if err := c.Revoke(ctx, Token{AccessToken: "x", RefreshToken: "gone", Expiry: c.now().Add(-time.Hour)}); !errors.Is(err, ErrInvalidGrant) {
 		t.Fatalf("gone: %v", err)
 	}
 }

@@ -81,5 +81,26 @@ func TestStores(t *testing.T) {
 		if _, ok, err := st.TakeState(ctx, state); err != nil || ok {
 			t.Fatalf("state taken twice %v %v", ok, err)
 		}
+
+		// DeleteStates takes only uid's states
+		for _, k := range []string{"s1-" + u, "s2-" + u} {
+			if err := st.PutState(ctx, k, OAuthState{UID: u, Provider: FakeOAuth, Verifier: "v", ExpireAt: now.Add(StateTTL), CreatedAt: now}); err != nil {
+				t.Fatal(err)
+			}
+		}
+		if err := st.PutState(ctx, "s3-"+u, OAuthState{UID: u + "-other", Provider: FakeOAuth, Verifier: "v", ExpireAt: now.Add(StateTTL)}); err != nil {
+			t.Fatal(err)
+		}
+		if err := st.DeleteStates(ctx, u); err != nil {
+			t.Fatal(err)
+		}
+		for _, k := range []string{"s1-" + u, "s2-" + u} {
+			if _, ok, err := st.TakeState(ctx, k); err != nil || ok {
+				t.Fatalf("%s kept %v %v", k, ok, err)
+			}
+		}
+		if s, ok, err := st.TakeState(ctx, "s3-"+u); err != nil || !ok || s.UID != u+"-other" {
+			t.Fatalf("another uid's state %+v %v %v", s, ok, err)
+		}
 	})
 }

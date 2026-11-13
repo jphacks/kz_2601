@@ -15,14 +15,14 @@ object WidgetLink {
     private const val PREFIX = "tailorit://widget"
 
     fun uri(appId: String?): String =
-        if (appId.isNullOrEmpty()) PREFIX else "$PREFIX?app=${URLEncoder.encode(appId, Charsets.UTF_8)}"
+        if (appId.isNullOrEmpty()) PREFIX else "$PREFIX?app=${URLEncoder.encode(appId, "UTF-8")}"
 
     /** 開くアプリ。ウィジェットのリンクでない・アプリの指定が無ければ null。 */
     fun appId(link: String?): String? {
         if (link == null || !(link == PREFIX || link.startsWith("$PREFIX?"))) return null
         val query = link.substringAfter('?', "")
         val raw = query.split('&').firstOrNull { it.startsWith("app=") }?.removePrefix("app=") ?: return null
-        return URLDecoder.decode(raw, Charsets.UTF_8).takeIf { it.isNotEmpty() }
+        return URLDecoder.decode(raw, "UTF-8").takeIf { it.isNotEmpty() }
     }
 
     private val _pending = MutableStateFlow<String?>(null)

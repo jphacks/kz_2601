@@ -42,6 +42,16 @@ final class MacUpdateGate {
         return false
     }
 
+    /// 起動時の画面の順番待ち(#1885)。テストでは別の物を渡す
+    @ObservationIgnored var hold: LaunchConsentHold = .shared
+    @ObservationIgnored var splash: SplashPresence = .shared
+
+    /// 「新しい版があります」を出してよいか。起動時の同意・チュートリアル・シェアリンクが閉じてから(iOS の `canShowNoticeAlert` と同じ)。
+    /// アラートが出ていると同意のシートが捨てられ、順番待ちが進まなくなる
+    var canShowNoticeAlert: Bool {
+        showsNotice && !isBlocking && !splash.isShowing && !hold.isHolding
+    }
+
     func dismissNotice() {
         if case .recommended(let latest) = requirement { dismissedLatest = latest }
     }
@@ -135,7 +145,7 @@ struct MacUpdateGateModifier: ViewModifier {
             .sheet(isPresented: Binding(get: { gate.isBlocking }, set: { _ in })) {
                 MacUpdateRequiredView(storeURL: gate.storeURL)
             }
-            .alert("新しい版があります", isPresented: Binding(get: { gate.showsNotice && !gate.isBlocking }, set: { if !$0 { gate.dismissNotice() } })) {
+            .alert("新しい版があります", isPresented: Binding(get: { gate.canShowNoticeAlert }, set: { if !$0 { gate.dismissNotice() } })) {
                 Button("アップデート") {
                     gate.dismissNotice()
                     openURL(gate.storeURL)

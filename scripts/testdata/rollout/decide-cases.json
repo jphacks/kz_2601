@@ -25,5 +25,17 @@
   {"name": "promote: exactly at the limits is not over", "expect": "promote",
    "metrics": {"new": {"requests": 100, "errors_5xx": 5, "p95_ms": 600}, "old": {"requests": 100, "errors_5xx": 4, "p95_ms": 400}}},
   {"name": "insufficient: missing fields count as zero", "expect": "insufficient",
-   "metrics": {"new": {}}}
+   "metrics": {"new": {}}},
+  {"name": "rollback: cost per call over old x ratio", "expect": "rollback", "reason": "cost per call 0.05 > old 0.02 x 2 (10/200 calls)",
+   "metrics": {"new": {"requests": 100, "errors_5xx": 0, "p95_ms": 8000, "claude_calls": 10, "claude_errors": 0, "cost_calls": 10, "cost_usd_per_call": 0.05},
+               "old": {"requests": 2000, "errors_5xx": 0, "p95_ms": 8000, "claude_calls": 200, "claude_errors": 0, "cost_calls": 200, "cost_usd_per_call": 0.02}}},
+  {"name": "promote: cost per call up but within the ratio", "expect": "promote",
+   "metrics": {"new": {"requests": 100, "errors_5xx": 0, "p95_ms": 8000, "cost_calls": 10, "cost_usd_per_call": 0.04},
+               "old": {"requests": 2000, "errors_5xx": 0, "p95_ms": 8000, "cost_calls": 200, "cost_usd_per_call": 0.02}}},
+  {"name": "promote: cost not compared below the minimum calls", "expect": "promote",
+   "metrics": {"new": {"requests": 100, "errors_5xx": 0, "p95_ms": 8000, "cost_calls": 4, "cost_usd_per_call": 0.5},
+               "old": {"requests": 2000, "errors_5xx": 0, "p95_ms": 8000, "cost_calls": 200, "cost_usd_per_call": 0.02}}},
+  {"name": "promote: cost not compared when old has no cost", "expect": "promote",
+   "metrics": {"new": {"requests": 100, "errors_5xx": 0, "p95_ms": 8000, "cost_calls": 10, "cost_usd_per_call": 0.05},
+               "old": {"requests": 0, "errors_5xx": 0, "p95_ms": 0, "cost_calls": 0, "cost_usd_per_call": 0}}}
 ]

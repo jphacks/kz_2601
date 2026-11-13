@@ -11,8 +11,6 @@ struct ConnectedServicesSection: View {
     @State private var model = ConnectedServicesModel()
     @State private var confirmDisconnect: ConnectedServiceRow?
     @State private var showPaywall = false
-    /// 外の API の断り(#2001)。今は DEBUG の呼び出し口だけが入れる
-    @State private var denial: ExtDenial?
 
     var body: some View {
         Group {
@@ -30,15 +28,11 @@ struct ConnectedServicesSection: View {
             case .loaded(let rows):
                 section {
                     ForEach(rows) { row($0) }
-                    #if DEBUG
-                    debugCallRow
-                    #endif
                 }
             }
         }
         .task { await model.load(services.external) }
         .sheet(isPresented: $showPaywall) { PaywallSheet(reason: .paidFeature([Self.paidFeature])) }
-        .extDenialSheets($denial, onConnectClosed: { Task { await model.load(services.external) } }) { model.message = $0 }
         .confirmationDialog(confirmTitle, isPresented: Binding(get: { confirmDisconnect != nil }, set: { if !$0 { confirmDisconnect = nil } }),
                             titleVisibility: .visible, presenting: confirmDisconnect) { row in
             Button("切る", role: .destructive) {
@@ -91,22 +85,6 @@ struct ConnectedServicesSection: View {
         .accessibilityIdentifier("settings.connections.\(row.provider)")
     }
 
-    #if DEBUG
-    /// 開発用: 偽の provider に op を投げ、断りの案内(#2001)を部品なしで出す。審査用・リリースの版には入らない
-    private var debugCallRow: some View {
-        Button {
-            Task {
-                let (d, text) = await DebugExtDenial.call(services.external)
-                model.message = text
-                denial = d
-            }
-        } label: {
-            Text(verbatim: "開発用: 試験用のサービスを呼ぶ") // 開発用なので訳さない
-        }
-        .accessibilityIdentifier("settings.connections.debugCall")
-    }
-    #endif
-
     @ViewBuilder
     private func actions(_ row: ConnectedServiceRow) -> some View {
         switch row.status {
@@ -137,10 +115,7 @@ struct ConnectedServicesSection: View {
         }
     }
 
-    static var paidFeature: PaidFeature {
-        PaidFeature(id: "externalServices", title: L10n.tr("つないだサービス"),
-                    reason: L10n.tr("外のサービスを呼ぶたびにサーバーの費用がかかるため、Pro の機能です。"))
-    }
+    static var paidFeature: PaidFeature { ExtDenialCopy.externalServicesFeature }
 }
 
 /// 「つなぐ」の流れ(設定の一覧と、外の API の断りの案内 #2001 で同じものを呼ぶ)。

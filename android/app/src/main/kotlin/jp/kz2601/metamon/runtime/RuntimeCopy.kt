@@ -22,6 +22,10 @@ object RuntimeCopy {
     val ACTIVITY_NOTIFICATIONS_OFF = UiText.Res(R.string.runtime_activity_notifications_off)
     val FAILED = UiText.Res(R.string.runtime_failed)
     val UNAVAILABLE_ON_ANDROID = UiText.Res(R.string.runtime_unavailable_on_android)
+
+    /** Field.health(#870): ヘルスコネクトへの書き込みの結果 */
+    val HEALTH_SAVED = UiText.Res(R.string.runtime_health_saved)
+    val HEALTH_SAVE_FAILED = UiText.Res(R.string.runtime_health_save_failed)
     const val NAME_SEPARATOR = "・"
     val HOT_RELOADED = UiText.Res(R.string.runtime_hot_reloaded)
     val OFFLINE_RESTORED = UiText.Res(R.string.runtime_offline_restored)

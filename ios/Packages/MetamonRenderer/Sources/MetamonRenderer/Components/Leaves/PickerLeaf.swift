@@ -6,6 +6,7 @@ import MetamonDSL
 struct PickerLeaf: View {
     let c: Component
     let ctx: RenderContext
+    @FocusState private var focused: Bool
 
     var body: some View {
         if let form = ctx.form, let field = c.field {
@@ -18,11 +19,15 @@ struct PickerLeaf: View {
             #if os(macOS)
             // Mac: 4 件以下はラジオ・それ以上はメニュー(DSL の style が優先・#942)
             LabeledInput(label: c.label) {
-                switch MacPickerStyle.choose(hint: c.style, optionCount: options.count) {
-                case .radioGroup: picker.pickerStyle(.radioGroup).labelsHidden()
-                case .segmented: picker.pickerStyle(.segmented).labelsHidden()
-                case .menu: picker.pickerStyle(.menu).labelsHidden()
+                Group {
+                    switch MacPickerStyle.choose(hint: c.style, optionCount: options.count) {
+                    case .radioGroup: picker.pickerStyle(.radioGroup).labelsHidden()
+                    case .segmented: picker.pickerStyle(.segmented).labelsHidden()
+                    case .menu: picker.pickerStyle(.menu).labelsHidden()
+                    }
                 }
+                .focused($focused) // フルキーボードアクセスが on の時の Tab の止まり先(#2065)
+                .macFormTabStop(c, $focused)
             }
             #else
             switch Self.style(c, optionCount: options.count) {

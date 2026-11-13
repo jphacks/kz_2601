@@ -92,6 +92,10 @@ type Provider struct {
 	// Hosts are the only scheme://host the provider's client may reach
 	// (NewHTTPClient).
 	Hosts []string
+	// GlobalDaily is the provider's own default environment-wide calls per
+	// day, from its documented daily quota (0 = DefaultLimits.GlobalDaily).
+	// Not for NeedsOAuth. EXT_GLOBAL_DAILY / EXT_GLOBAL_DAILY_<PROVIDER> win.
+	GlobalDaily int
 	// Fake is the stg / test provider with fixed answers (決定 5). It is
 	// never enabled in production.
 	Fake bool

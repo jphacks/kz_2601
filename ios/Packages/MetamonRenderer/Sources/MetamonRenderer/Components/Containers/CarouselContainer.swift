@@ -34,6 +34,7 @@ struct CarouselContainer: View {
     // 「視差効果を減らす」の時は送りのアニメーションを止める(#937)。
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var scrolledPage: Int?
+    @Environment(\.formTabCoordinator) private var tabs
 
     private var count: Int { c.children.count }
     private var page: Int { CarouselPaging.step(scrolledPage ?? 0, by: 0, count: count) }
@@ -60,6 +61,11 @@ struct CarouselContainer: View {
             if CarouselPaging.showsControls(count: count) {
                 pager
             }
+        }
+        // Tab の渡し先が別のカードの中なら、そのカードへ送る(出ていなければ出てから止まる・#2065)
+        .onChange(of: tabs?.request) { _, request in
+            guard let request, let i = c.children.firstIndex(where: { FormTabOrder.contains(request.id, in: $0) }), i != page else { return }
+            scroll(to: i)
         }
         .onKeyPress(.leftArrow) { go(-1) }
         .onKeyPress(.rightArrow) { go(1) }

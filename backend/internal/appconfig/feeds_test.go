@@ -26,7 +26,7 @@ func feedsEnv(t *testing.T, perHour int, disabled ...string) (*env, *atomic.Int3
 	now := func() time.Time { return time.Date(2026, 11, 6, 12, 0, 0, 0, time.UTC) }
 	svc := feeds.New(feeds.Options{Client: srv.Client(), Now: now, Disabled: disabled, Endpoints: &feeds.Endpoints{
 		WeatherBase: srv.URL + "/w/", Holidays: srv.URL + "/h.csv",
-		RSS: map[string]feeds.RSSFeed{"digital-news": {Name: "デジタル庁 新着・更新", URL: srv.URL + "/rss", Publisher: "デジタル庁", SiteURL: "https://www.digital.go.jp/"}},
+		RSS: map[string]feeds.RSSFeed{"digital-news": {Name: "デジタル庁 新着・更新", URL: srv.URL + "/rss", Publisher: "デジタル庁ホームページ", SiteURL: "https://www.digital.go.jp/"}},
 	}})
 	return &env{t: t, h: auth.Middleware(nil, auth.ModeDev)(New(store.NewMemory(), WithFeeds(svc, perHour, now)))}, &hits
 }

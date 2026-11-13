@@ -42,7 +42,8 @@ public struct GridScreenLayout: View {
             let layoutH = GridLayoutHeight.resolve(current: geo.size.height, stable: stableHeight)
             #if os(macOS)
             // Mac は横長で大きさが変わるウィンドウ。縦長の比率の幅で中央に寄せる(#938)
-            let metrics = GridMetrics.resolveDesktop(width: geo.size.width, height: layoutH, inset: inset)
+            let metrics = GridMetrics.resolveDesktop(width: geo.size.width, height: layoutH, inset: inset,
+                                                     fabInGutter: MacFabExperiment.isEnabled()) // #2327 の試作(既定 off)
             #else
             let metrics = GridMetrics.resolve(width: geo.size.width, height: layoutH, inset: inset,
                                               compactHeight: verticalSizeClass == .compact)
@@ -111,6 +112,7 @@ public struct GridScreenLayout: View {
                         .scrollDisabled(editing?.isDragging == true) // 枠を動かしている間は画面ごと流れない
                         .scrollBounceBehavior(.basedOnSize)
                         .modifier(RequiredFieldScroller(screen: screen, form: ctx.form, proxy: proxy))
+                        .modifier(MacFormTabReveal(proxy: proxy)) // Mac: Tab の渡し先が遅延の入れ物で出ていなければ先にスクロール(#2065)
                         // キーボードが上がり切ってから、フォーカスした入力欄を可視領域(保存バーとキーボードの上)の中央へ
                         .task(id: focusRequest?.tick) {
                             guard let key = focusRequest?.key else { return }

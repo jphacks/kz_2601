@@ -16,6 +16,7 @@ import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
+import androidx.health.connect.client.PermissionController
 import jp.kz2601.metamon.MetamonApplication
 import jp.kz2601.metamon.R
 import jp.kz2601.metamon.services.permissions.AppPermission
@@ -47,9 +48,15 @@ fun rememberPermissionRequest(permission: AppPermission, explain: Boolean = true
         }
         callback(after == PermissionStatus.GRANTED)
     }
+    // ヘルスコネクトの権限は OS のダイアログでは聞けない。Health Connect の画面で聞く(#870)
+    val healthLauncher = rememberLauncherForActivityResult(PermissionController.createRequestPermissionResultContract()) { granted ->
+        val after = center.record(permission, center.requestNames(permission).associateWith { it in granted }, before, activity)
+        callback(after == PermissionStatus.GRANTED)
+    }
     val ask = {
         before = center.status(permission, activity)
-        launcher.launch(center.requestNames(permission))
+        val names = center.requestNames(permission)
+        if (permission == AppPermission.HEALTH) healthLauncher.launch(names.toSet()) else launcher.launch(names)
     }
 
     when (dialog) {
