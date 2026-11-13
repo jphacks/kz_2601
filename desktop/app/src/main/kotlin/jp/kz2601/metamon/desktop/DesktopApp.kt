@@ -166,6 +166,8 @@ fun DesktopApp(
                 appId?.let { NotificationsOffBar(it, dsl) }
                 val base = NavigationResolver.dismissModals(nav).top(dsl)
                 Box(Modifier.weight(1f)) { ScreenView(dsl, session, base, io, dispatch, openPrint, onOpenRecord) }
+                // 一覧・表の行を消した直後だけ「削除しました・元に戻す」(#3351)
+                RecordUndoBar(session)
                 // 送り待ちがある時だけ小さく出す(#1887)
                 session.persistence?.pending?.takeIf { it > 0 }?.let { n ->
                     Text(
