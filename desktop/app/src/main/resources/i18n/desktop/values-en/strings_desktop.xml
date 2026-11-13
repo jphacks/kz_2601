@@ -135,6 +135,10 @@
     <string name="desktop_timer_reset">Reset</string>
     <string name="desktop_timer_resume">Resume</string>
     <string name="desktop_timer_start">Start</string>
+    <string name="desktop_tips_copied">Copied</string>
+    <string name="desktop_tips_copy">Copy this sentence</string>
+    <string name="desktop_tips_copy_failed">Could not copy</string>
+    <string name="desktop_tips_intro">Say it like this to the finished screen to change it the way you want. Pick an example and press \"Copy this sentence\".</string>
     <string name="desktop_tray_close_to_tray">Keep in tray when window is closed</string>
     <string name="desktop_tray_hidden_hint">Still running in the tray. To quit, choose Quit from the tray menu</string>
     <string name="desktop_tray_new_window">New window</string>

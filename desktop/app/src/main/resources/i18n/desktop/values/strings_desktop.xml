@@ -136,6 +136,10 @@
     <string name="desktop_timer_reset">リセット</string>
     <string name="desktop_timer_resume">再開</string>
     <string name="desktop_timer_start">開始</string>
+    <string name="desktop_tips_copied">コピーしました</string>
+    <string name="desktop_tips_copy">この文をコピー</string>
+    <string name="desktop_tips_copy_failed">コピーできませんでした</string>
+    <string name="desktop_tips_intro">できた画面に向かって、こう話すと思いどおりに直せます。例を選んで「この文をコピー」を押してください。</string>
     <string name="desktop_tray_close_to_tray">ウィンドウを閉じてもトレイに残す</string>
     <string name="desktop_tray_hidden_hint">トレイに残っています。終わるにはトレイのメニューの「終了」を選びます</string>
     <string name="desktop_tray_new_window">新しいウィンドウ</string>
