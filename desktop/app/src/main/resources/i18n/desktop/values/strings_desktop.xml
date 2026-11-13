@@ -17,6 +17,7 @@
     <string name="desktop_delete_not_allowed">このデータは削除できません</string>
     <string name="desktop_drag_image_name">画像</string>
     <string name="desktop_drag_table_name">表</string>
+    <string name="desktop_error_app_check">このアプリからの接続を確認できませんでした。少し待ってもう一度お試しください。続く時は最新版を入れ直してください</string>
     <string name="desktop_export_clipboard">(表はクリップボードにも入れました)</string>
     <string name="desktop_export_done">%1$d 件を書き出しました: %2$s</string>
     <string name="desktop_export_writing">書き出しています…</string>
