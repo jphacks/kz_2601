@@ -20,7 +20,13 @@ struct FeedbackFixedOptIn {
             client: client,
             authorization: { await UNUserNotificationCenter.current().notificationSettings().authorizationStatus },
             requestAuthorization: { (try? await UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .sound, .badge])) ?? false },
-            registerPush: { await PushHost.shared.refresh() }
+            registerPush: {
+                #if os(macOS)
+                await MacPushHost.shared.refresh()
+                #else
+                await PushHost.shared.refresh()
+                #endif
+            }
         )
     }
 

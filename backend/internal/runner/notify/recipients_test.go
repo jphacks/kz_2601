@@ -3,6 +3,7 @@ package notify
 import (
 	"context"
 	"errors"
+	"fmt"
 	"reflect"
 	"slices"
 	"testing"
@@ -19,10 +20,19 @@ type fakeDir struct {
 	members []string
 	authors map[string]string // "entity/id" -> author
 	err     error
+	// reads: list = Members calls, one = IsMember calls (#2297)
+	listReads, oneReads int
 }
 
-func (d *fakeDir) Owner(context.Context) (string, error)     { return d.owner, d.err }
-func (d *fakeDir) Members(context.Context) ([]string, error) { return d.members, d.err }
+func (d *fakeDir) Owner(context.Context) (string, error) { return d.owner, d.err }
+func (d *fakeDir) Members(context.Context) ([]string, error) {
+	d.listReads++
+	return d.members, d.err
+}
+func (d *fakeDir) IsMember(_ context.Context, uid string) (bool, error) {
+	d.oneReads++
+	return slices.Contains(d.members, uid), d.err
+}
 func (d *fakeDir) RecordAuthor(_ context.Context, entity, id string) (string, bool, error) {
 	a, ok := d.authors[entity+"/"+id]
 	return a, ok, d.err
@@ -386,4 +396,55 @@ func TestNewResolverRequires(t *testing.T) {
 	if _, err := NewResolver(Config{}); err == nil {
 		t.Error("want error")
 	}
+}
+
+// #2297: on shared data each candidate's membership is one read; the member
+// list is read only for a notification to every member, and only once.
+func TestResolveMemberReads(t *testing.T) {
+	ctx := context.Background()
+	big := []string{"m1", "m2"}
+	for i := range 60 {
+		big = append(big, fmt.Sprintf("p%02d", i))
+	}
+	recipients := plan(dsl.RecipientRecipients)
+	recipients.UIDs = []string{"m2", "x", "o"}
+	for _, c := range []struct {
+		name      string
+		n         engine.PlannedNotify
+		list, one int
+		to        []string
+	}{
+		{"owner: no member read", plan(dsl.RecipientOwner), 0, 0, []string{"o"}},
+		{"authorOf: one read", plan(dsl.RecipientAuthorOf), 0, 1, []string{"m2"}},
+		{"recipients: one read each, not the owner", recipients, 0, 2, []string{"m2", "o"}},
+		{"members: the list once, no one-by-one", plan(dsl.RecipientMembers), 1, 0, append([]string{"o", "m2"}, big[2:]...)},
+	} {
+		t.Run(c.name, func(t *testing.T) {
+			dir, acc := world()
+			dir.members = big
+			r := resolver(t, Config{Directory: dir, Accounts: acc, Consent: allConsent{}, Age: ages{}})
+			got, err := r.Resolve(ctx, trig(dsl.ScopeShared, "m1", "m1"), c.n)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if dir.listReads != c.list || dir.oneReads != c.one {
+				t.Errorf("reads: list %d one %d, want %d %d", dir.listReads, dir.oneReads, c.list, c.one)
+			}
+			if !slices.Equal(got.To, c.to) {
+				t.Errorf("to %v, want %v", got.To, c.to)
+			}
+		})
+	}
+	// a one-by-one read error is a retry, as a list read error was
+	dir, acc := world()
+	r := resolver(t, Config{Directory: &failingMember{fakeDir: dir}, Accounts: acc, Consent: allConsent{}, Age: ages{}})
+	if _, err := r.Resolve(ctx, trig(dsl.ScopeShared, "m1", "m1"), plan(dsl.RecipientAuthorOf)); err == nil {
+		t.Error("want the IsMember error")
+	}
+}
+
+type failingMember struct{ *fakeDir }
+
+func (f *failingMember) IsMember(context.Context, string) (bool, error) {
+	return false, errors.New("boom")
 }
