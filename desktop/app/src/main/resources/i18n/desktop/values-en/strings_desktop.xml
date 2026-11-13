@@ -127,6 +127,7 @@
     <string name="desktop_print_title">Print: %1$s</string>
     <string name="desktop_print_value">Value</string>
     <string name="desktop_qr_copy_image">Copy image</string>
+    <string name="desktop_question_progress_spoken">Question %1$d, out of %2$d</string>
     <string name="desktop_record_deleted_elsewhere">This record was deleted in another window</string>
     <string name="desktop_sync_pending">%1$d waiting to send</string>
     <string name="desktop_timer_done">Time\'s up</string>
