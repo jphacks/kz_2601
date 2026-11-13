@@ -1,6 +1,7 @@
 // 審査用ビルドでは外す(#319・iOS と同じ)。
 #if !APP_STORE_REVIEW
 import SwiftUI
+import UserNotifications
 import MetamonServices
 
 /// フィードバックのウインドウ(#983)。ヘルプのメニューと設定の「詳細」から開く。
@@ -13,6 +14,8 @@ final class MacFeedbackCenter {
 
     /// Firebase につながれば appconfig へ送る(#930)。つながらない時はモック(送った内容を覚えるだけ・iOS の `FeedbackServiceKey` の既定と同じ)
     let client: any FeedbackClient = MacServices.shared.feedback
+    /// 「直ったら知らせてほしい」(#364)。モック(appconfig 無し)なら nil で出さない
+    let notifyWhenFixed: FeedbackFixedOptIn? = MacServices.shared.loopNotices.map { FeedbackFixedOptIn.live(client: $0) }
     private(set) var context: MacFeedbackContext?
     /// 中央に出しているアプリ(サーバーにある時だけ・#1330)。`MacRootView` が選択と版の変化で入れ替える
     var currentApp: MacFeedbackContext.CurrentApp?
@@ -38,7 +41,7 @@ struct MacFeedbackWindow: View {
     var body: some View {
         Group {
             if let context = center.context {
-                MacFeedbackComposerView(context: context, client: center.client) {
+                MacFeedbackComposerView(context: context, client: center.client, notifyWhenFixed: center.notifyWhenFixed) {
                     dismissWindow(id: MacFeedbackCenter.windowId)
                 }
                 .id(context.id)
@@ -61,6 +64,10 @@ struct MacFeedbackComposerView: View {
     let client: any FeedbackClient
     var onClose: () -> Void
 
+    /// 「直ったら知らせてほしい」(#364)。既定はオフ・nil(モック)なら出さない
+    @State private var fixedNotice: MacFixedNoticeChoice
+    /// 送った後の一言(同意を保存できなかった・通知が許可されていない)
+    @State private var fixedNoticeNote: String?
     @State private var kind: FeedbackSubmission.Kind = .bug
     @State private var message = ""
     @State private var attachScreenshot = false
@@ -72,6 +79,14 @@ struct MacFeedbackComposerView: View {
     @State private var receipt: FeedbackReceipt?
     /// 書きかけを捨てるかの確認。「捨てる」で呼ぶ閉じ方
     @State private var discardThen: (() -> Void)?
+
+    init(context: MacFeedbackContext, client: any FeedbackClient, notifyWhenFixed: FeedbackFixedOptIn? = nil,
+         onClose: @escaping () -> Void) {
+        self.context = context
+        self.client = client
+        self.onClose = onClose
+        _fixedNotice = State(initialValue: MacFixedNoticeChoice(optIn: notifyWhenFixed))
+    }
 
     private var trimmed: String { message.trimmingCharacters(in: .whitespacesAndNewlines) }
     /// 送っていない文がある(送った後・空白だけは書きかけにしない)
@@ -91,6 +106,7 @@ struct MacFeedbackComposerView: View {
             Form {
                 messageSection
                 attachmentSection
+                if fixedNotice.isAvailable { fixedNoticeSection }
                 consentSection
             }
             .formStyle(.grouped)
@@ -140,7 +156,11 @@ struct MacFeedbackComposerView: View {
         .alert("送信しました", isPresented: Binding(get: { receipt != nil }, set: { _ in })) {
             Button("閉じる", action: onClose)
         } message: {
-            Text("ありがとうございます。いただいた内容は改善に使います。")
+            if let fixedNoticeNote {
+                Text("ありがとうございます。いただいた内容は改善に使います。") + Text(verbatim: "\n") + Text(verbatim: fixedNoticeNote)
+            } else {
+                Text("ありがとうございます。いただいた内容は改善に使います。")
+            }
         }
     }
 
@@ -237,6 +257,15 @@ struct MacFeedbackComposerView: View {
         }
     }
 
+    private var fixedNoticeSection: some View {
+        Section {
+            Toggle("直ったら知らせてほしい", isOn: Binding(get: { fixedNotice.wants }, set: { on in Task { await fixedNotice.set(on) } }))
+                .accessibilityIdentifier("feedback.notifyWhenFixed")
+        } footer: {
+            Text("この内容がもとで直った時に、通知でお知らせします。設定の「お知らせ」にはオフでも届きます。")
+        }
+    }
+
     private var consentSection: some View {
         Section {
             Text(FeedbackCopy.consent)
@@ -264,13 +293,49 @@ struct MacFeedbackComposerView: View {
         Task {
             defer { sending = false }
             do {
-                receipt = try await client.send(submission)
+                let sent = try await client.send(submission)
+                fixedNoticeNote = await fixedNotice.afterSent()
+                receipt = sent
             } catch {
                 self.error = FeedbackCopy.message(for: error)
             }
         }
     }
 }
+/// フィードバックの「直ったら知らせてほしい」(#364・iOS の `FeedbackComposerView` と同じ動き)。
+/// オンにした時だけ通知の許可を聞き(未決定の時だけ OS の確認)、同意(`PUT /v1/me/notify-consent/feedback-fixed`)は送った後に保存する。
+@MainActor
+@Observable
+final class MacFixedNoticeChoice {
+    @ObservationIgnored let optIn: FeedbackFixedOptIn?
+    /// 既定はオフ(同意をはっきりさせるため)
+    private(set) var wants = false
+
+    init(optIn: FeedbackFixedOptIn?) {
+        self.optIn = optIn
+    }
+
+    var isAvailable: Bool { optIn != nil }
+
+    func set(_ on: Bool) async {
+        wants = on
+        guard on, let optIn else { return }
+        _ = await optIn.requestPermissionIfNeeded()
+    }
+
+    /// 送った後に呼ぶ。オンの時だけ同意を保存し、届かない時だけ一言返す
+    func afterSent() async -> String? {
+        guard wants, let optIn else { return nil }
+        guard await optIn.saveConsent() else {
+            return L10n.tr("「直ったら知らせてほしい」は保存できませんでした。設定の「お知らせ」から変えられます。")
+        }
+        guard await optIn.authorization() != .denied else {
+            return L10n.tr("通知が許可されていないため、直った時は設定の「お知らせ」でお知らせします。")
+        }
+        return nil
+    }
+}
+
 /// 書きかけの判定(#1309)と、送れるか・送る中身(#2325)。
 enum MacFeedbackDraft {
     /// 送った後と、空白・改行だけは捨てても失うものが無いので聞かない
