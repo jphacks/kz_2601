@@ -108,12 +108,15 @@ fun DesktopApp(
     windowId: Int? = null,
     /** パレットの「この端末のデータを消す」(#1887)。全アプリの分を消す。null なら出さない。 */
     onWipeLocalData: (suspend () -> Unit)? = null,
+    /** ヘッドレスで画面を順に移る(開発用・AutoNav.kt)。null なら何もしない。 */
+    autoNav: AutoNavPlan? = null,
     /** アプリの id。Windows で通知がオフの時の帯を閉じた覚えに使う。null なら帯を出さない。 */
     appId: String? = null,
 ) {
     val session = remember {
         DesktopSession(dsl, initialStore, startScreen = startScreen, host = DesktopActionHost(appName = dsl.app.name), persistence = persistence, shared = records, startRecordId = startRecordId)
     }
+    if (autoNav != null) LaunchedEffect(session) { runAutoNav(autoNav, session) }
     session.onCloseWindow = onCloseWindow
     TrayHook(session, windowId, isActive)
     HotkeyVoiceHook(session, isActive)
