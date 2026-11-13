@@ -1,0 +1,36 @@
+{
+  "data": [
+    {
+      "starting_at": "2026-11-10T00:00:00Z",
+      "ending_at": "2026-11-11T00:00:00Z",
+      "results": [
+        {
+          "uncached_input_tokens": 1500,
+          "cache_creation": {"ephemeral_1h_input_tokens": 1000, "ephemeral_5m_input_tokens": 500},
+          "cache_read_input_tokens": 200,
+          "output_tokens": 700,
+          "server_tool_use": {"web_search_requests": 3},
+          "api_key_id": null,
+          "workspace_id": null,
+          "model": "claude-sonnet-4-5",
+          "service_tier": null,
+          "context_window": null
+        },
+        {
+          "uncached_input_tokens": 40,
+          "cache_creation": {"ephemeral_1h_input_tokens": 0, "ephemeral_5m_input_tokens": 0},
+          "cache_read_input_tokens": 0,
+          "output_tokens": 10,
+          "model": "claude-haiku-4-5"
+        }
+      ]
+    },
+    {
+      "starting_at": "2026-11-11T00:00:00Z",
+      "ending_at": "2026-11-12T00:00:00Z",
+      "results": []
+    }
+  ],
+  "has_more": false,
+  "next_page": null
+}

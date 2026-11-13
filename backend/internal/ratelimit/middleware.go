@@ -98,7 +98,7 @@ func (l *Limiter) Middleware(verifier auth.IdentityVerifier) func(http.Handler) 
 			r.Body = io.NopCloser(bytes.NewReader(body))
 
 			weight := l.cfg.Weights.Weight(r, body)
-			dec, err := l.Allow(r.Context(), id, ClientIP(r), weight)
+			dec, err := l.AllowPlatform(r.Context(), id, ClientIP(r), httpx.ClientPlatform(r), weight)
 			if err != nil {
 				httpx.Error(w, http.StatusInternalServerError, httpx.CodeInternal, "rate limiter unavailable")
 				return
