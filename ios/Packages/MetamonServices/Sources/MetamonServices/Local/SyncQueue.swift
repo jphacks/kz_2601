@@ -294,10 +294,12 @@ public actor SyncQueue {
         case .create:
             let rec = try await client.create(appId: op.appId, entity: op.entity, data: data, clientId: op.id, authorName: op.authorName)
             aliases[op.recordId] = rec.id
-            await store.markSynced(appId: op.appId, entity: op.entity, localId: op.recordId, server: rec)
+            await store.markSynced(appId: op.appId, entity: op.entity, localId: op.recordId, server: rec,
+                                   keepingLocalChanges: hasLaterUpdate(after: op))
         case .update:
             let rec = try await client.update(appId: op.appId, entity: op.entity, id: serverId, data: data)
-            await store.markSynced(appId: op.appId, entity: op.entity, localId: op.recordId, server: rec)
+            await store.markSynced(appId: op.appId, entity: op.entity, localId: op.recordId, server: rec,
+                                   keepingLocalChanges: hasLaterUpdate(after: op))
         case .delete:
             do {
                 try await client.delete(appId: op.appId, entity: op.entity, id: serverId)
@@ -309,6 +311,11 @@ public actor SyncQueue {
         case .none:
             break
         }
+    }
+
+    /// 送っている間に同じ行をもう一度書いた(後ろに update が積まれている)。サーバーの応答で端末の内容を戻さない(#3667)
+    private func hasLaterUpdate(after op: SyncOperation) -> Bool {
+        ops.contains { $0.id != op.id && $0.kind == .update && rowId($0) == rowId(op) }
     }
 
     /// 操作が指すローカル行の id。積んだ後に作成が届くと、行は仮 id からサーバー id に替わっている。
