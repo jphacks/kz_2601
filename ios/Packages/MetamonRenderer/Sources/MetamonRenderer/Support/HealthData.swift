@@ -9,7 +9,7 @@ import HealthKit
 /// `healthStat` / `Field.health`(#167)が読む・書く端末のヘルスデータ。
 /// 歩数は CoreMotion の歩数計(capability 不要・直近 7 日)を優先し、使えない端末(シミュレータ等)はヘルスケアの歩数を読む。
 /// 体重はヘルスケア(HealthKit)。睡眠・安静時心拍・距離・消費カロリー・エクササイズ・マインドフルネスは読むだけ(`daily`・#1986)。
-/// 気分(State of Mind・iOS 18)は読み書き(`moods` / `saveMood`・#2234。部品はまだ無い)。
+/// 気分(State of Mind・iOS 18)は読み書き(`moods` / `saveMood`・#2234)、ワークアウトは読むだけ(`workouts`・#2236)。部品はまだ無い。
 /// 値はログ・クラッシュ報告に出さない(要配慮の情報)。ホストは `HealthData.source` を差し替えられる(`METAMON_MOCK=1` は固定値)。
 public protocol HealthDataSource: Sendable {
     /// 今日を最後とする直近 `days` 日の歩数(古い順・1 日 1 件)。
@@ -24,6 +24,8 @@ public protocol HealthDataSource: Sendable {
     func moods(from: Date, to: Date, kinds: Set<HealthMood.Kind>) async throws -> [HealthMood]
     /// 気分を 1 件ヘルスケアに書き込む(#2234)。
     func saveMood(_ mood: HealthMood) async throws
+    /// 始まりが `from..<to` のワークアウト(#2236)。古い順。読むだけ
+    func workouts(from: Date, to: Date) async throws -> [HealthWorkout]
 }
 
 public extension HealthDataSource {
@@ -37,6 +39,10 @@ public extension HealthDataSource {
     }
 
     func saveMood(_ mood: HealthMood) async throws {
+        throw HealthDataError.unavailable
+    }
+
+    func workouts(from: Date, to: Date) async throws -> [HealthWorkout] {
         throw HealthDataError.unavailable
     }
 }
@@ -296,10 +302,11 @@ public final class LiveHealthData: HealthDataSource, @unchecked Sendable {
         HKQuantityType(.distanceWalkingRunning),
         HKQuantityType(.activeEnergyBurned),
         HKQuantityType(.appleExerciseTime),
+        HKObjectType.workoutType(), // ワークアウト(#2236)
     ]
 
-    /// 読むだけの値の許可。HealthMetric の全種類を 1 回で求める(書き込みの許可は求めない)。
-    private func authorizeMetrics() async throws {
+    /// 読むだけの値の許可。HealthMetric の全種類とワークアウトを 1 回で求める(書き込みの許可は求めない)。
+    func authorizeMetrics() async throws {
         guard HKHealthStore.isHealthDataAvailable() else { throw HealthDataError.unavailable }
         do {
             try await store.requestAuthorization(toShare: [], read: Self.metricReadTypes)

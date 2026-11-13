@@ -24,13 +24,13 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Reads your Health data so the apps you build can show your steps, weight, sleep, resting heart rate, walking and running distance, active energy, exercise and mindful minutes, and state of mind."
+            "value" : "Reads your Health data so the apps you build can show your steps, weight, sleep, resting heart rate, walking and running distance, active energy, exercise and mindful minutes, workouts, and state of mind."
           }
         },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "生成したアプリで歩数・体重・睡眠・安静時心拍数・歩行と走行の距離・消費カロリー・エクササイズとマインドフルネスの時間・気分を表示するために、ヘルスケアのデータを読み取ります。"
+            "value" : "生成したアプリで歩数・体重・睡眠・安静時心拍数・歩行と走行の距離・消費カロリー・エクササイズとマインドフルネスの時間・ワークアウト・気分を表示するために、ヘルスケアのデータを読み取ります。"
           }
         }
       }
