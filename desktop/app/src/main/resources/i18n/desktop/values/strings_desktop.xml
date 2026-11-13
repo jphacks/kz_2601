@@ -203,6 +203,13 @@
     <string name="desktop_retention_confirmed">確認済み</string>
     <string name="desktop_retention_review">自動で消える記録</string>
     <string name="desktop_retention_unconfirmed">未確認</string>
+    <string name="desktop_share_qr_copied">QR コードの画像をコピーしました</string>
+    <string name="desktop_share_qr_description">参加用のリンクの QR コード</string>
+    <string name="desktop_share_qr_failed">QR コードの画像を保存できませんでした</string>
+    <string name="desktop_share_qr_file">%1$s の共有の QR</string>
+    <string name="desktop_share_qr_hint">iPhone のカメラで読むと参加できます</string>
+    <string name="desktop_share_qr_save">画像を保存</string>
+    <string name="desktop_share_qr_saved">保存しました: %1$s</string>
     <string name="desktop_sync_blocker_offline">送れませんでした。ネットワークを確認して「今送る」を押してください</string>
     <string name="desktop_sync_blocker_signed_out">サインインしていないため送れません</string>
     <string name="desktop_sync_last_sent">最後に送れた時刻: %1$s</string>

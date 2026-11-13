@@ -202,6 +202,13 @@
     <string name="desktop_retention_confirmed">Confirmed</string>
     <string name="desktop_retention_review">Records deleted automatically</string>
     <string name="desktop_retention_unconfirmed">Not confirmed</string>
+    <string name="desktop_share_qr_copied">Copied the QR code image</string>
+    <string name="desktop_share_qr_description">QR code for the invite link</string>
+    <string name="desktop_share_qr_failed">Couldn\'t save the QR code image</string>
+    <string name="desktop_share_qr_file">%1$s share QR</string>
+    <string name="desktop_share_qr_hint">Scan with an iPhone camera to join</string>
+    <string name="desktop_share_qr_save">Save image</string>
+    <string name="desktop_share_qr_saved">Saved: %1$s</string>
     <string name="desktop_sync_blocker_offline">Couldn\'t send. Check your network, then choose Send now</string>
     <string name="desktop_sync_blocker_signed_out">Can\'t send because you\'re not signed in</string>
     <string name="desktop_sync_last_sent">Last sent: %1$s</string>
