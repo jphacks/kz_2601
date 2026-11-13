@@ -7,6 +7,7 @@ backend(ai / appconfig)の 5xx の増加・panic・Claude の失敗・応答の�
 ## 目次
 
 1. [ログの形](#ログの形)
+   - [クライアントの属性](#クライアントの属性)
 2. [Error Reporting](#error-reporting)
 3. [監視(Terraform)](#監視terraform)
 4. [人の作業 1: apply](#人の作業-1-apply)
@@ -29,7 +30,23 @@ backend(ai / appconfig)の 5xx の増加・panic・Claude の失敗・応答の�
 | `uid_hash` | 認証できた呼び出し元の擬名。`sha256("ai-usage:" + uid)` の先頭 8 バイト(`ai.usage` と同じ値・[ai-cost.md](ai-cost.md))。**生の uid は出さない** |
 | `@type` / `serviceContext` | `ERROR` 以上だけ。`ReportedErrorEvent` と `K_SERVICE` / `K_REVISION`(Error Reporting 用) |
 
-リクエストごとのアクセスログ(`httpx.Log`)は `event="http.request"`・`method`・`path`(クエリは出さない)・`status`・`duration`・`client`。**5xx は `ERROR`**、それ以外は `INFO`。
+リクエストごとのアクセスログ(`httpx.Log`)は `event="http.request"`・`method`・`path`(クエリは出さない)・`status`・`duration`・`requestId`・クライアントの属性(下の「クライアントの属性」)。**5xx は `ERROR`**、それ以外は `INFO`。
+
+### クライアントの属性
+
+どの OS・どの版のクライアントから来たかを、ログの行に付ける属性です。コードは `backend/internal/httpx/client.go`(`ClientAttrs`)。クライアントが全部のリクエストに付けるヘッダから作ります。使い方は [docs/backend/client-platforms.md](../backend/client-platforms.md)、OS で絞って調べる手順は [障害対応の手順書](../ops/incident-runbook.md#os-ごとに絞って見る)。
+
+| 属性(ログの鍵) | 元のヘッダ | 値 | 付く行 |
+| --- | --- | --- | --- |
+| `clientPlatform` | `X-Client-Platform` | `ios` / `android` / `macos` / `windows` / `linux` / `other`。**必ず付く**(ヘッダが無くても `other`) | `http.request`・`appcheck` |
+| `clientVersion` | `X-Client-Version` | ヘッダの値そのまま(例 `1.0.0`)。ヘッダが無い時は付かない | 同上 |
+| `clientBuild` | `X-Client-Build` | 同上(例 `12`) | 同上 |
+| `clientDslVersion` | `X-Client-DSL-Version` | 同上。クライアントが描ける DSL の `schemaVersion` の最大 | 同上 |
+
+- **`ai.usage` の行には付かない。** Claude を呼んだ 1 回ごとの `ai.usage` は `requestId` が付くので、OS で分けたい時は同じ `requestId` の `http.request` と突き合わせる(`backend/cmd/ai-session-report` の OS 別の集計もこの方法)。
+- `clientPlatform` の丸め方(`NormalizePlatform`): 前後の空白と大文字小文字は無視する。空・知らない値・32 文字を超える値は `other`。
+- `clientVersion`・`clientBuild`・`clientDslVersion` は丸めず、32 文字を超えたら先頭の 32 文字で切る。
+- 情報として残すだけで、答えは変えない(AI の回数制限の OS ごとの上書きだけは `clientPlatform` を使う。[client-platforms.md](../backend/client-platforms.md))。
 
 **リクエストの途中のログ**: リクエストの処理中に出すログは、`log.Printf` ではなく `slog` の `LogAttrs(ctx, …)` / `ErrorContext(ctx, …)` などの **ctx を渡す形**で出す。ctx から trace・`requestId`・`uid_hash` がアクセスログと同じように付く。属性は 1 行に 1 つ(#516)。`log.Printf` のままでよいのは、起動時(`cmd/*` の main がリクエストを受ける前)と CLI(`cmd/ai-eval` など)だけ。ai の今のログ:
 
