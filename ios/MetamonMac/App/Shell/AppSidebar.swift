@@ -1,4 +1,5 @@
 import SwiftUI
+import MetamonDSL
 import MetamonServices
 
 /// サイドバーのアプリの一覧。iOS の AppSwitcherSheet に当たる(Mac では常に出す)。
@@ -14,6 +15,8 @@ struct AppSidebar: View {
     let examples: [SampleApp]
     /// 新着の数(#969)。0 なら出さない
     var newItems: (String) -> Int = { _ in 0 }
+    /// リリース申請の状況の札(#2250)。申請していなければ nil
+    var releaseBadge: (String) -> MacSidebarReleaseBadge? = { _ in nil }
     /// 行の写し(#1281)
     var thumbnail: (String) -> NSImage? = { _ in nil }
     /// 検索欄の文字(#1282)。絞り込みは呼ぶ側で済ませてある。並べ替えは絞っていない時だけ
@@ -28,6 +31,12 @@ struct AppSidebar: View {
     var onResetExample: (String) -> Void = { _ in }
     /// 「新しいウインドウで開く」(#1853)
     var onOpenInNewWindow: (String) -> Void = { _ in }
+    /// 右クリックに「リリースを申請…」を出すか(#2249)。サーバーに保存した自分のアプリだけ
+    var canRequestRelease: (String) -> Bool = { _ in false }
+    /// 「リリースを申請…」(#2249)
+    var onRequestRelease: (String) -> Void = { _ in }
+    /// 記録の行がこのアプリの行に落とされた(#2252)。値の入ったフォームを開く
+    var onDropRecord: (String, RecordClipboard.Payload) -> Void = { _, _ in }
     /// サーバーの一覧を初めて読んでいる(前回の一覧が無い・#1057)。作ったアプリの所にスケルトンを出す
     var loadingServerApps = false
     /// サーバーに届かず、前回の一覧を出している(#1057)
@@ -38,6 +47,8 @@ struct AppSidebar: View {
     @State private var renameText = ""
     @State private var deleteTarget: SampleApp?
     @State private var resetTarget: SampleApp?
+    /// 記録をドラッグして重ねている行(#2252)
+    @State private var dropTarget: String?
 
     /// 作ったアプリ・共有されたアプリ(右クリックの管理・Delete キーの対象)
     private var manageable: [SampleApp] { created + shared }
@@ -104,6 +115,9 @@ struct AppSidebar: View {
                               mascotSize: MacTheme.Mascot.small, showsBackdrop: false)
             }
         }
+        #if !APP_STORE_REVIEW
+        .safeAreaInset(edge: .bottom, spacing: 0) { MacSidebarSettingsRow() } // 設定の行と未読のお知らせの数(#3245)
+        #endif
         .navigationTitle("アプリ")
         .accessibilityIdentifier("shell.sidebar") // UI テスト(#1140)
         .alert("名前を変える", isPresented: Binding(get: { renameTarget != nil }, set: { if !$0 { renameTarget = nil } })) {
@@ -165,6 +179,7 @@ struct AppSidebar: View {
 
     private func row(_ app: SampleApp) -> some View {
         let count = newItems(app.id)
+        let release = releaseBadge(app.id)
         return HStack(spacing: 8) {
             SidebarThumbnail(name: app.name, image: thumbnail(app.id))
             VStack(alignment: .leading, spacing: MacTheme.Spacing.rowLine) {
@@ -179,14 +194,29 @@ struct AppSidebar: View {
                         .lineLimit(1)
                 }
             }
-            if count > 0 {
+            if count > 0 || release != nil {
                 Spacer(minLength: 4)
+            }
+            if let release {
+                ReleaseStatusRowBadge(badge: release)
+            }
+            if count > 0 {
                 NewItemsBadge(count: count)
             }
         }
         .padding(.vertical, 2)
+        // 記録の行を落とすと、このアプリの新しいフォームに値を入れて開く(#2252)
+        .background(RoundedRectangle(cornerRadius: 4).strokeBorder(Color.accentColor, lineWidth: 2)
+            .opacity(dropTarget == app.id ? 1 : 0))
+        .onDrop(of: [MacRecordDrop.type], isTargeted: Binding(get: { dropTarget == app.id },
+                                                             set: { dropTarget = $0 ? app.id : (dropTarget == app.id ? nil : dropTarget) })) { providers in
+            Task { @MainActor in
+                if let payload = await MacRecordDrop.load(providers) { onDropRecord(app.id, payload) }
+            }
+            return true
+        }
         .accessibilityElement(children: .combine)
-        .accessibilityLabel(Text(verbatim: MacSidebarBadges.accessibilityLabel(name: app.name, count: count)))
+        .accessibilityLabel(Text(verbatim: MacSidebarBadges.accessibilityLabel(name: app.name, count: count, release: release)))
         .tag(app.id)
     }
 
@@ -194,6 +224,13 @@ struct AppSidebar: View {
     private func move(_ section: [SampleApp], fromOffsets source: IndexSet, toOffset destination: Int) {
         library.setOrder(MacSidebarSections.moved(library.createdIds, section: section.map(\.id),
                                                   fromOffsets: source, toOffset: destination))
+        CoachMarkStore.shared.markPerformed(.switcherReorder) // 並べ替えた人には吹き出しを出さない(#3249)
+    }
+
+    /// 右クリックの「上へ / 下へ移動」。VoiceOver の代わりの操作でも並べ替えの吹き出しを済みにする(#3249・iOS と同じ)
+    private func moveByMenu(_ section: [String], _ id: String, to index: Int) {
+        library.setOrder(MacSidebarSections.moved(library.createdIds, section: section, id: id, to: index))
+        CoachMarkStore.shared.markPerformed(.switcherReorder)
     }
 
     /// 別のウインドウで開く(#1853)。行の ⌥クリックと同じ
@@ -209,12 +246,17 @@ struct AppSidebar: View {
             renameTarget = app
         }
         Button("複製") { onDuplicate(app.id) }
+        #if !APP_STORE_REVIEW // 審査用ビルドはリリース申請を外す(iOS と同じ・#245)
+        if canRequestRelease(app.id) {
+            Button("リリースを申請…") { onRequestRelease(app.id) }
+        }
+        #endif
         let ids = section(of: app.id).map(\.id)
         if !isSearching, ids.count > 1, let index = ids.firstIndex(of: app.id) {
             Divider()
-            Button("上へ移動") { library.setOrder(MacSidebarSections.moved(library.createdIds, section: ids, id: app.id, to: index - 1)) }
+            Button("上へ移動") { moveByMenu(ids, app.id, to: index - 1) }
                 .disabled(index == 0)
-            Button("下へ移動") { library.setOrder(MacSidebarSections.moved(library.createdIds, section: ids, id: app.id, to: index + 1)) }
+            Button("下へ移動") { moveByMenu(ids, app.id, to: index + 1) }
                 .disabled(index == ids.count - 1)
         }
         Divider()
@@ -234,6 +276,24 @@ private struct NewItemsBadge: View {
             .padding(.vertical, 1)
             .background(Capsule().fill(Color.accentColor))
             .help(L10n.tr("新着 \(count) 件"))
+            .accessibilityHidden(true)
+    }
+}
+
+/// 行の右のリリース申請の状況(#2250)。iOS の `ReleaseStatusBadge` と同じ色と語。読み上げは行の名前に含める
+private struct ReleaseStatusRowBadge: View {
+    let badge: MacSidebarReleaseBadge
+
+    var body: some View {
+        Label(badge.label, systemImage: badge.symbol)
+            .labelStyle(.titleAndIcon)
+            .font(.caption2.weight(.bold))
+            .foregroundStyle(.white)
+            .lineLimit(1)
+            .padding(.horizontal, 6)
+            .padding(.vertical, 1)
+            .background(.black.opacity(badge.dimmed ? 0.35 : 0.55), in: Capsule())
+            .help(badge.accessibilityLabel)
             .accessibilityHidden(true)
     }
 }

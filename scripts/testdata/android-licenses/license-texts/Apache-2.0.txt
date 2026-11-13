@@ -1,0 +1,1 @@
+Apache License 2.0(テスト用の短い本文)

@@ -98,6 +98,11 @@ func main() {
 
 	claude := ai.NewClient(apiKey, model, effort)
 	claude.StructuredOutput = os.Getenv("CLAUDE_STRUCTURED_OUTPUT") == "1"
+	// AI_GENERATE_CACHE_TTL=1h: the create turn's system blocks are cached for an hour (#2295)
+	if claude.GenerateCacheTTL, err = ai.GenerateCacheTTLFromEnv(os.Getenv); err != nil {
+		log.Fatalf("ai: %v", err)
+	}
+	log.Printf("ai: generate system cache ttl=%s", claude.GenerateCacheTTL)
 	claude.Logger = logger // ai.usage JSON lines for the cost sink (#298)
 	// free plan pause on the day's AI cost (#317): ai.usage also adds to the day's total
 	breaker := newBudget(fsClient, pro)
@@ -158,7 +163,7 @@ func main() {
 	if paused {
 		log.Printf("ai: AI_PAUSED is on; generate/chat/text answer 503 ai_paused")
 	}
-	handler := debugoverride.Middleware(dbg)(newAIHandler(ai.NewHandler(svc), logger,
+	handler := debugoverride.Middleware(dbg)(newAIHandler(ai.ClientPlatformMiddleware(ai.NewHandler(svc)), logger,
 		newAppCheck(),
 		ai.Pause(paused, logger),
 		withBudget(newRateLimit(verifier, fsClient, pro), breaker),

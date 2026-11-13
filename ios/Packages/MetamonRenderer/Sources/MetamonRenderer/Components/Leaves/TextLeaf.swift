@@ -4,7 +4,7 @@ import MetamonDSL
 /// `text`: style(title|headline|body|caption)と align(leading|center|trailing)。
 /// screen.entity の画面では `{{fieldId}}` を開いているレコードの値にする(`TextHighlight.substitutes` の field だけ・他は文字のまま)。
 /// `highlight` の語に印(marker: 背景 + 太字 / bold)。印は見た目だけで、VoiceOver はふつうの文として読む。
-/// 記録の文字(string / text の値)は長押しで「翻訳」(#2000・iOS 18+・秘密の field は出さない)。
+/// 記録の文字(string / text の値)は長押し(Mac は右クリック)で「翻訳」(#2000・#2273・iOS 18+ / macOS 15+・秘密の field は出さない)。
 struct TextLeaf: View {
     @Environment(\.dslRuntime) private var rt
     let c: Component
@@ -17,7 +17,8 @@ struct TextLeaf: View {
         Text(attributed)
             .font(font)
             .multilineTextAlignment(alignment)
-            .macTextSelection { text } // Mac: 選んでコピーできる(#941)
+            // Mac: 選んでコピーできる(#941)。「翻訳」は右クリックのメニューに一緒に出す(#2273・内側のメニューが先に出るため)
+            .macTextSelection(copy: { text }, translate: offersTranslation(text) ? { translating = true } : nil)
             .frame(maxWidth: .infinity, alignment: frameAlignment)
             .modifier(TextTranslateMenu(offers: offersTranslation(text), text: text, isPresented: $translating))
     }
@@ -56,7 +57,9 @@ private struct TextTranslateMenu: ViewModifier {
     func body(content: Content) -> some View {
         if offers {
             content
+                #if os(iOS)
                 .contextMenu { RecordTranslateMenuItem(offers: true) { isPresented = true } }
+                #endif
                 .recordTranslation(isPresented: $isPresented, text: text)
         } else {
             content
