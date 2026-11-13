@@ -12,7 +12,10 @@ import jp.kz2601.metamon.renderer.navigation.Route
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
+import org.junit.Assert.assertFalse
+import org.junit.Rule
 import org.junit.Test
+import org.junit.rules.TemporaryFolder
 import java.awt.image.BufferedImage
 import java.nio.file.Files
 import java.time.Instant
@@ -21,6 +24,9 @@ import java.time.ZonedDateTime
 
 /** アクション 16 種のうち OS に頼む物(書き出し・カレンダー・本・通知・音声など)と、sheet / fullScreen の遷移。 */
 class DesktopActionsTest {
+    @get:Rule
+    val tmp = TemporaryFolder()
+
     private val silent = object : Notifier {
         val scheduled = mutableListOf<String>()
         override fun schedule(n: Notification): String = "予約 ${n.id}".also { scheduled += n.id }
@@ -162,5 +168,54 @@ class DesktopActionsTest {
         val form = s.form(Route("expense_form"))!!
         val date = dsl.screens.flatMap { it.allComponents() }.first { it.type == jp.kz2601.metamon.dsl.ComponentType.DATE_PICKER }
         assertEquals(date.label ?: form.entity.field(date.field!!)!!.name, InputLeaves.label(date, form))
+    }
+
+    // MARK: - 書き出しの名前(writeNew)と既定の書き出し先(defaultExportDir)・#2623
+
+    private fun host(dir: java.io.File) = DesktopActionHost(BookLookupClient.mock, dir, silent, voice = null, background = { it() }, calendarDir = tmp.newFolder())
+
+    @Test
+    fun writeNewTakesAFreeNameAndKeepsExistingFiles() {
+        val dir = tmp.newFolder()
+        dir.resolve("支出.csv").writeText("前のファイル")
+        val h = host(dir)
+        val second = h.writeNew("支出.csv", "a".toByteArray())
+        val third = h.writeNew("支出.csv", "b".toByteArray())
+        assertEquals("支出 (2).csv", second.name)
+        assertEquals("支出 (3).csv", third.name)
+        assertEquals("前のファイル", dir.resolve("支出.csv").readText())
+        assertEquals("a", second.readText())
+        assertEquals("b", third.readText())
+        assertEquals("一時ファイルは残さない", setOf("支出.csv", "支出 (2).csv", "支出 (3).csv"), dir.list()!!.toSet())
+    }
+
+    @Test
+    fun writeNewReleasesTheTakenNameWhenWritingFails() {
+        val dir = tmp.newFolder()
+        val h = host(dir)
+        var taken: java.io.File? = null
+        val error = runCatching {
+            h.writeNew("支出.csv", "a".toByteArray()) { f, _ ->
+                taken = f
+                assertTrue("書く前に名前を空のファイルで取っている", f.isFile)
+                throw java.io.IOException("disk full")
+            }
+        }.exceptionOrNull()
+        assertTrue(error is java.io.IOException)
+        assertFalse("取った名前は消す", taken!!.exists())
+        assertTrue(dir.list()!!.isEmpty())
+        // 次の書き出しは同じ名前を使える
+        assertEquals("支出.csv", h.writeNew("支出.csv", "b".toByteArray()).name)
+    }
+
+    @Test
+    fun defaultExportDirPrefersDownloads() {
+        val home = tmp.newFolder()
+        assertEquals("ダウンロードが無ければホーム", home, DesktopActionHost.defaultExportDir(home))
+        home.resolve("Downloads").writeText("フォルダではない")
+        assertEquals("同じ名前のファイルはフォルダとして使わない", home, DesktopActionHost.defaultExportDir(home))
+        val other = tmp.newFolder()
+        val downloads = other.resolve("Downloads").apply { mkdirs() }
+        assertEquals(downloads, DesktopActionHost.defaultExportDir(other))
     }
 }

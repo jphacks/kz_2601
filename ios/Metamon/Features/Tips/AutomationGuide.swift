@@ -5,16 +5,8 @@ import Foundation
 /// - 文はここにだけ置く。キーは日本語(英語は `Localizable.xcstrings`)
 /// - 審査用の版でも出すので「アプリを作る」系の言い方をしない(docs/store/wording.md)
 enum AutomationGuide {
-    /// きっかけ × 動きの例。
-    struct Example: Identifiable, Equatable {
-        var id: String
-        var symbol: String
-        var triggerKey: String
-        var actionKey: String
-
-        var trigger: String { L10n.tr(String.LocalizationValue(triggerKey)) }
-        var action: String { L10n.tr(String.LocalizationValue(actionKey)) }
-    }
+    /// きっかけ × 動きの例(型は Mac と共有・Shared/Settings/AutomationGuideExample.swift)。
+    typealias Example = AutomationGuideExample
 
     /// どれも iPhone を使っている(ロックを解除している)時に起きるきっかけ。「記録を追加」はロック解除が要るため。
     static let examples: [Example] = [
