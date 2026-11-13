@@ -6,6 +6,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.contentOrNull
@@ -88,6 +89,19 @@ class FirebaseAuthRestClient(
                 refreshToken = json.string("refresh_token") ?: refreshToken,
                 expiresAt = clock().plusSeconds(json.string("expires_in")?.toLongOrNull() ?: return@call null),
             )
+        }
+    }
+
+    /** つながっているサインインの方法を読む(`accounts:lookup`・読むだけ)。 */
+    suspend fun lookupLinkedProviders(idToken: String): AuthResult<LinkedProviders> {
+        val key = config.apiKey ?: return notConfigured()
+        val url = "${config.identityToolkitUrl.trimEnd('/')}/accounts:lookup".toHttpUrl().newBuilder()
+            .addQueryParameter("key", key).build()
+        val body = JsonObject(mapOf("idToken" to JsonPrimitive(idToken))).toString().toRequestBody(JSON)
+        return call(Request.Builder().url(url).post(body).build()) { json ->
+            val user = (json["users"] as? JsonArray)?.firstOrNull() as? JsonObject ?: return@call null
+            val infos = (user["providerUserInfo"] as? JsonArray).orEmpty()
+            LinkedProviders.from(infos.mapNotNull { (it as? JsonObject)?.string("providerId") })
         }
     }
 
