@@ -123,6 +123,8 @@ fun DesktopApp(
     onboarding: OnboardingStore? = null,
     /** 開いた時に初回の流れを出す(起動時の最初のウィンドウだけ)。 */
     showOnboardingAtLaunch: Boolean = false,
+    /** パレットの「並びを直す」の保存(#3207)。null なら出さない。 */
+    onSaveLayout: ((jp.kz2601.metamon.desktop.gridedit.GridEditDraft) -> Unit)? = null,
 ) {
     val session = remember {
         DesktopSession(dsl, initialStore, startScreen = startScreen, host = DesktopActionHost(appName = dsl.app.name), persistence = persistence, shared = records, startRecordId = startRecordId)
@@ -168,7 +170,7 @@ fun DesktopApp(
     var printing by remember { mutableStateOf<PrintDocument?>(null) }
     val openPrint = { printing = ScreenPrint.document(dsl, session.top.screen, session.store, session.form(session.top), locale = Strings.locale) }
     // キーボードだけで使う(#1765): Ctrl+K パレット・Ctrl+N/S/F・Delete・Esc・F1
-    val keyboard = rememberDesktopKeyboard(dsl, session, dispatch, openPrint, onOpenApp, onOpenRecord, onWipeLocalData, usage = session.persistence?.usage)
+    val keyboard = rememberDesktopKeyboard(dsl, session, dispatch, openPrint, onOpenApp, onOpenRecord, onWipeLocalData, usage = session.persistence?.usage, saveLayout = onSaveLayout)
     // 初回の流れ(#3201): 閉じたら(最後まで・あとで見る・Esc のどれでも)次の起動では出さない
     keyboard.onOnboardingFinished = { onboarding?.markSeen() }
     LaunchedEffect(Unit) { if (showOnboardingAtLaunch && onboarding?.hasSeen != true) keyboard.onboardingOpen = true }

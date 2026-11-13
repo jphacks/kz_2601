@@ -39,6 +39,9 @@ import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.onKeyEvent
 import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.input.key.type
+import jp.kz2601.metamon.desktop.gridedit.GridEditDraft
+import jp.kz2601.metamon.desktop.gridedit.GridEditLayer
+import jp.kz2601.metamon.desktop.gridedit.gridEditDraft
 import jp.kz2601.metamon.desktop.i18n.Strings
 import jp.kz2601.metamon.desktop.share.ShareLinkDialog
 import jp.kz2601.metamon.desktop.share.ShareLinkEntry
@@ -279,6 +282,12 @@ class DesktopKeyboard(
     /** 「この端末のデータを消す」(#1887)。全アプリの分を消す口(AppHub.wipeLocalData)。null ならパレットに出さない。 */
     var wipeLocalData: (suspend () -> Unit)? = null
 
+    /** 並びを直す編集の保存(#3207)。null ならパレットに出さない。 */
+    var saveLayout: ((GridEditDraft) -> Unit)? = null
+
+    /** 並びを直す編集の最中(その画面の下書き)。 */
+    var gridEdit by mutableStateOf<GridEditDraft?>(null)
+
     /** 消す前の確認を出している。 */
     var wipeConfirmOpen by mutableStateOf(false)
 
@@ -339,7 +348,7 @@ class DesktopKeyboard(
             if (!repeat) closePreview()
             return true
         }
-        if (paletteOpen || helpOpen || licensesOpen || usageOpen || wipeConfirmOpen || shareOpen || onboardingOpen) return false // パレット・一覧・確認が自分で受ける
+        if (paletteOpen || helpOpen || licensesOpen || usageOpen || wipeConfirmOpen || shareOpen || onboardingOpen || gridEdit != null) return false // パレット・一覧・確認・並びの編集が自分で受ける
         // 項目つきでコピーした記録の貼り付け。入力欄などを選んでいる時は普通の貼り付けに任せる
         if (isPasteKey(p)) return !bubble && rootFocused && pasteRecord()
         val s = Keymap.match(p, os) ?: return false
@@ -412,6 +421,16 @@ class DesktopKeyboard(
         dispatch(Action(type = ActionType.NAVIGATE, screen = id, presentation = Presentation.PUSH), ctx())
     }
 
+    /** 並びを直す編集を始める(メインの層の、動かせる部品がある画面だけ)。 */
+    fun startGridEdit() {
+        val draft = if (session.nav.sheet == null && session.nav.fullScreen == null) dsl.gridEditDraft(session.top.screen) else null
+        if (draft == null) {
+            session.message = Strings["desktop_grid_edit_unavailable"]
+            return
+        }
+        gridEdit = draft
+    }
+
     /** パレットの中身: ショートカット → この画面のボタン → 画面 → アプリ。 */
     fun commands(): List<PaletteCommand> {
         val screen = topScreen
@@ -467,7 +486,10 @@ class DesktopKeyboard(
             "help:onboarding", Strings["onboarding_replay"], PaletteCommand.Kind.ACTION,
             keywords = listOf("onboarding", "tutorial", "how to use", Strings["desktop_onboarding_title"]),
         ) { onboardingOpen = true }
-        return shortcuts + buttons + record + screens + apps + usage + wipe + shareLink + retention + tips + onboarding + licenses
+        val layout = saveLayout?.let {
+            listOf(PaletteCommand("layout:edit", Strings["desktop_grid_edit"], PaletteCommand.Kind.ACTION, keywords = listOf("layout", "grid", "area")) { startGridEdit() })
+        }.orEmpty()
+        return shortcuts + buttons + record + layout + screens + apps + usage + wipe + shareLink + retention + tips + onboarding + licenses
     }
 
     /** 今のアプリの保存期間のある entity(アプリ・entity・日数・確認済みか)。端末に残さない時は空。 */
@@ -517,6 +539,13 @@ class DesktopKeyboard(
         LaunchedEffect(session.nav) {
             photos.close() // 画面が変わったら前の記録の写真は閉じる
             focusAfterNavigation(modalOpen)
+        }
+        gridEdit?.let { draft ->
+            val close = {
+                gridEdit = null
+                runCatching { root.requestFocus() }
+            }
+            GridEditLayer(draft, Strings["desktop_grid_edit"], onSave = { d -> close(); saveLayout?.invoke(d) }, onCancel = { close() })
         }
         if (photos.isOpen) PhotoPreviewDialog(photos, onMessage = { session.message = it }, onDismiss = ::closePreview)
         if (paletteOpen) {
@@ -614,6 +643,7 @@ fun rememberDesktopKeyboard(
     openRecord: ((String, String) -> Unit)? = null,
     wipeLocalData: (suspend () -> Unit)? = null,
     usage: PlanUsageSource? = null,
+    saveLayout: ((GridEditDraft) -> Unit)? = null,
 ): DesktopKeyboard = remember(dsl, session) { DesktopKeyboard(dsl, session) }.also {
     it.dispatch = dispatch
     it.print = print
@@ -621,4 +651,5 @@ fun rememberDesktopKeyboard(
     it.openRecord = openRecord
     it.wipeLocalData = wipeLocalData
     if (it.usage == null && usage != null) it.usage = UsageLoader(usage)
+    it.saveLayout = saveLayout
 }

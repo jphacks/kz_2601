@@ -252,7 +252,11 @@ class AppHub(
     /** 一時ファイル(写真の「既定のアプリで開く」・引き出し)を消す。 */
     private val clearTempFiles: () -> Unit = { PhotoOpen.clearTemp() },
 ) {
-    class OpenedApp(val id: String, val dsl: AppDSL, val records: SharedRecords)
+    class OpenedApp(val id: String, dsl: AppDSL, val records: SharedRecords) {
+        /** 並びを直して保存すると替わる(#3207)。替わったらウィンドウの画面を作り直す。 */
+        var dsl by mutableStateOf(dsl)
+            internal set
+    }
 
     private val apps = LinkedHashMap<String, OpenedApp>()
     private val dsls = HashMap<String, AppDSL>()
@@ -266,6 +270,13 @@ class AppHub(
     /** DSL だけ(トレイの名前・すぐ記録)。記録は開かない。 */
     @Synchronized
     fun dsl(id: String): AppDSL = apps[id]?.dsl ?: dsls.getOrPut(id) { load(id) }
+
+    /** 並びを直した DSL に替える(#3207)。開いているウィンドウ・トレイの両方。 */
+    @Synchronized
+    fun replaceDsl(id: String, dsl: AppDSL) {
+        dsls[id] = dsl
+        apps[id]?.dsl = dsl
+    }
 
     /** ウィンドウを 1 枚開いた。 */
     @Synchronized
