@@ -197,6 +197,7 @@
     <string name="desktop_qr_copy_image">画像をコピー</string>
     <string name="desktop_question_progress_spoken">質問 %1$d、全部で %2$d</string>
     <string name="desktop_record_deleted_elsewhere">この記録は別のウィンドウで消されました</string>
+    <string name="desktop_reset_time_pattern">M月d日 H:mm</string>
     <string name="desktop_sync_blocker_offline">送れませんでした。ネットワークを確認して「今送る」を押してください</string>
     <string name="desktop_sync_blocker_signed_out">サインインしていないため送れません</string>
     <string name="desktop_sync_last_sent">最後に送れた時刻: %1$s</string>
