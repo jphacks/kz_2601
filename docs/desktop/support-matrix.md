@@ -135,6 +135,6 @@ DSL の全部の type(Container 7・Leaf 70 = 77。`docs/dsl/dsl.schema.json` �
 
 ## 直す時
 
-- `DesktopLeaves` か `ConformanceAllowlist.unavailableTypes` を変えたら、この表の状態と適合 state も同じコミットで直す。
+- `DesktopLeaves` か `ConformanceAllowlist.unavailableTypes` を変えたら、この表の状態と適合 state も同じコミットで直す(食い違いは `SupportMatrixDocTest` が落とす)。
 - 「未定」の行は #1746 でオーナーが決めたら、決まった形と子の Issue に書き換える。
 - AI に描けない部品を作らせない申告(#2161)は、この表の「使えません」「未定」を元にする。
