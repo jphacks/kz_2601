@@ -26,6 +26,8 @@ import java.awt.GraphicsEnvironment
 import java.awt.Rectangle
 import java.awt.event.WindowAdapter
 import java.awt.event.WindowEvent
+import jp.kz2601.metamon.desktop.debug.DevOnboardingItems
+import jp.kz2601.metamon.desktop.debug.SeenFlagsOnboardingReplay
 import jp.kz2601.metamon.desktop.i18n.Strings
 import jp.kz2601.metamon.desktop.io.DragOut
 import jp.kz2601.metamon.desktop.store.DesktopStore
@@ -58,7 +60,7 @@ fun main(args: Array<String>) {
 
 private fun runApp(args: Array<String>) = application {
     // 端末の保存(#1887): 記録・設定は再起動しても残る。最後に開いたアプリから開く
-    val desktopStore = remember { DesktopStore.open() }
+    val desktopStore = remember { DesktopStore.open().also { DevOnboardingItems.hook = SeenFlagsOnboardingReplay(it.settings) } }
     val first = remember {
         args.firstOrNull() ?: System.getProperty("tailorit.example")
             ?: desktopStore.lastAppId?.takeIf { it in BundledApps.ids() } ?: "shopping"

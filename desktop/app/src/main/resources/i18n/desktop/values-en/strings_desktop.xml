@@ -24,6 +24,8 @@
     <string name="desktop_dev_environment">Current environment</string>
     <string name="desktop_dev_item">Developer: %1$s</string>
     <string name="desktop_dev_menu">Developer menu</string>
+    <string name="desktop_dev_onboarding_replay">Replay first-run flow</string>
+    <string name="desktop_dev_onboarding_replay_done">Cleared the first-run flow. It will show on the next launch</string>
     <string name="desktop_dev_power">Battery: %1$s</string>
     <string name="desktop_dev_power_charging">Charging</string>
     <string name="desktop_dev_power_low">15% · Low Power</string>

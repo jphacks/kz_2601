@@ -41,6 +41,7 @@ object DevMenu {
     /** 項目を作るところ。足す時は 1 行ずつ・名前順。 */
     private val providers: List<(DevMenuHost) -> List<DevMenuItem>> = listOf(
         DevEnvironmentItems::items,
+        DevOnboardingItems::items,
         DevPowerItems::items,
     )
 
