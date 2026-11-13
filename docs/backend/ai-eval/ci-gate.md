@@ -56,12 +56,16 @@ go run ./cmd/ai-eval -score '<raw dir>/*.json' -min-pass 0.9 -report md -report-
 
 1. 生成に関わる差分(`backend/internal/ai/` など)がある PR だけで、件数を絞って実 API で回す(費用の上限は `-only` とケースファイルで決める)。
 2. `-min-pass` か `-thresholds` で赤にする。
-3. `-report md -report-out` で書いた表を PR にコメントする。
+3. `-report md -report-out` で書いた表を PR にコメントする(`scripts/ai-eval-comment.sh`)。
 
 ```sh
 go run ./cmd/ai-eval -cases internal/ai/eval/m0disc_cases.json -out "$RUNNER_TEMP/ai-eval" \
   -thresholds "$THRESHOLDS" -report md -report-out "$RUNNER_TEMP/ai-eval.md"
+scripts/ai-eval-comment.sh "$PR_NUMBER" "$RUNNER_TEMP/ai-eval.md" \
+  --artifact-url "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID" --execute
 ```
+
+`scripts/ai-eval-comment.sh` は印(`<!-- ai-eval-report -->`)の付いた前のコメントがあれば書き換え、無ければ足す(PR に表のコメントは 1 つ)。既定は dry-run で、前のコメントを読んで何をするかと本文を出すだけ。表が `--max-lines`(既定 150)行より長い時は上から切り、全部は `--artifact-url`(CI の成果物)へのリンクにする。テストは `scripts/ai-eval-comment-test.sh`(作り物の `gh`)。
 
 ## 5. 人の作業
 

@@ -7,6 +7,7 @@ runner(`backend/cmd/runner`・#341)は、appconfig が outbox(`runner/{APP_ENV}/
 
 ## 目次
 - [全体の形](#全体の形)
+- [コードの分け方(internal/runner の下)](#コードの分け方internalrunner-の下)
 - [既定では何も起きない](#既定では何も起きない)
 - [出す手順](#出す手順)
 - [動いたかの確かめ方](#動いたかの確かめ方)
@@ -31,6 +32,24 @@ runner(`backend/cmd/runner`・#341)は、appconfig が outbox(`runner/{APP_ENV}/
 | ai の `AI_SERVER_RULES=1` | 人(gcloud) | 「自動の動き」を頼む発話で serverRules を作る(#343) |
 
 `schedules` / `stops` は今のコードが `expireAt` を書かないので TTL の対象にしていません(定期のルールと停止は消えては困る)。`rateLimits`(runner の上限の数も入る)の TTL は [account-purge.md の提案](account-purge.md#ratelimits-の-ttl提案)のまま別に決めます。
+
+## コードの分け方(internal/runner の下)
+
+`backend/internal/runner` が本体(outbox から取る → 走らせてよいかを確かめる → 評価 → 数える → 書く → 通知)で、下の 7 つに役割を分けています。1 行 1 パッケージ・名前順。「呼ぶ物」は repo の中のパッケージだけ(`go list` の import から)。
+
+| パッケージ | 役割 | 呼ぶ物(repo の中) | 呼ばれる所(runner の外) |
+|---|---|---|---|
+| `engine` | 1 つのルール(#340)を 1 つのきっかけに当てて、何をするか(書く・通知する)を返す(#341)。読むだけで、書かない・送らない | `pkg/dsl`・`pkg/dsl/expreval` | `cmd/ai-eval` |
+| `notify` | `engine` が決めた通知(`engine.PlannedNotify`)を受け取る人に直して送る(#341・#269 の土台)。送る口は下の `apns`(iOS)・`fcm`(Android・#918) | `internal/runner/engine`・`pkg/dsl` | `cmd/runner`・`cmd/feedback-loop`(`apns`)・`internal/loop/fixed` |
+| `queue` | outbox から仕事を取る(#341): リースで取る・結果で終える・間を延ばして再試行・`DefaultMaxAttempts`(3 回)で諦める | `internal/store` | (runner の本体だけ) |
+| `quota` | runner のする事を数えて上限をかける(#345・#338): 実行の回数・書いた記録・通知の相手・定期のルール | `internal/coins`・`internal/httpx`・`internal/paid`・`internal/ratelimit` | `cmd/runner`・`internal/extapi` |
+| `schedule` | 時刻がきっかけのルールが次にいつ走るかを計算する(#342)。時刻の計算だけで、何も読まない | (無し) | `cmd/runner`・`internal/appconfig` |
+| `scope` | 1 つのきっかけの appId に縛った読み書きの口(#337 の層 1〜3)。appId を引数に取るメソッドは無く、読める記録はきっかけの記録とそこから参照で辿れる物・一覧に限る。`engine.RefReader` と `notify` の相手・同意・端末トークンの口を実装する | `internal/runner/engine`・`internal/runner/notify`・`internal/store`・`internal/httpx`・`pkg/dsl`・`pkg/dsl/expreval` | (runner の本体だけ) |
+| `status` | runner の結果を、作者の画面に出す決まった言葉に直す(#347) | (無し) | `internal/appconfig` |
+
+- 本体 `internal/runner` は上の 7 つ全部と `internal/store`・`internal/appconfig`・`internal/coins`・`internal/extapi`・`internal/feeds`・`pkg/dsl` を呼びます。
+- 向き: `engine` は他の runner の下のパッケージを呼ばない(一番下)。`notify` は `engine` だけ、`scope` は `engine` と `notify` を呼ぶ。`schedule` と `status` は repo の中の物を呼ばないので、appconfig からも使える。
+- 推奨: 新しい役割を足す時もこの向き(`engine` に読み書きを持ち込まない・記録の読み書きは `scope` を通す)を崩さない。決まりにするかは決めること。
 
 ## 既定では何も起きない
 
