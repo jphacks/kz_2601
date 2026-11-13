@@ -12,6 +12,9 @@ struct VoiceInputView: View {
     @Environment(\.colorScheme) private var scheme
     /// 横向き(#625)はマイク・見出しを左、例文・文字入力を右に並べる
     @Environment(\.verticalSizeClass) private var verticalSizeClass
+    // 見出しは文字の大きさ設定に付いてくる(標準では 30 / 横向き 24 のまま)
+    @ScaledMetric(relativeTo: .title) private var headingRegular = LandscapeLayout.headingSize(compactHeight: false)
+    @ScaledMetric(relativeTo: .title) private var headingCompact = LandscapeLayout.headingSize(compactHeight: true)
     var prompt: String?
 
     @State private var phase: Phase = .idle
@@ -272,7 +275,7 @@ struct VoiceInputView: View {
             // 横向きは縦の空きが無いのでツルを出さない(#625)
             if isInitial, prompt == nil, !compactHeight { CraneMascot(pose: .happy, size: 76) } // #102
             Text(prompt ?? greeting.title)
-                .font(.system(size: LandscapeLayout.headingSize(compactHeight: compactHeight), weight: .bold, design: .rounded))
+                .font(.system(size: LandscapeLayout.scaledHeadingSize(compactHeight ? headingCompact : headingRegular, compactHeight: compactHeight), weight: .bold, design: .rounded))
                 .multilineTextAlignment(.center)
                 .minimumScaleFactor(0.8)
                 .contentTransition(.opacity)

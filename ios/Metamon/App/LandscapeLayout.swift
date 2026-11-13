@@ -24,6 +24,14 @@ enum LandscapeLayout {
     /// 音声画面の見出しの大きさ
     static func headingSize(compactHeight: Bool) -> CGFloat { compactHeight ? 24 : 30 }
 
+    /// 見出しを文字の大きさ設定に合わせて拡大する時の上限(横向きで画面からはみ出さない)
+    static func headingMaxSize(compactHeight: Bool) -> CGFloat { compactHeight ? 36 : 44 }
+
+    /// `@ScaledMetric` で拡大した見出しの大きさを上限内に収める
+    static func scaledHeadingSize(_ scaled: CGFloat, compactHeight: Bool) -> CGFloat {
+        min(scaled, headingMaxSize(compactHeight: compactHeight))
+    }
+
     /// チュートリアルのツルの大きさ
     static func tutorialMascotSize(compactHeight: Bool) -> CGFloat { compactHeight ? 84 : 132 }
 }
