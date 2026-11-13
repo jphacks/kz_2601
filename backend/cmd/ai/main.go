@@ -18,6 +18,7 @@ import (
 	"github.com/jphacks/kz_2601/backend/internal/appconfigclient"
 	"github.com/jphacks/kz_2601/backend/internal/auth"
 	"github.com/jphacks/kz_2601/backend/internal/books"
+	"github.com/jphacks/kz_2601/backend/internal/debugoverride"
 	"github.com/jphacks/kz_2601/backend/internal/entitlement"
 	"github.com/jphacks/kz_2601/backend/internal/fsenv"
 	"github.com/jphacks/kz_2601/backend/internal/httpx"
@@ -26,11 +27,23 @@ import (
 	fsstore "github.com/jphacks/kz_2601/backend/internal/store"
 )
 
-func env(key, def string) string {
-	if v := os.Getenv(key); v != "" {
+func env(key, def string) string { return envFrom(os.Getenv, key, def) }
+
+// envFrom is env over any getenv (a map in tests); empty counts as unset.
+func envFrom(getenv func(string) string, key, def string) string {
+	if v := getenv(key); v != "" {
 		return v
 	}
 	return def
+}
+
+// generateTimeoutSec reads GENERATE_TIMEOUT_SEC; missing, non-numeric or <= 0 is 45.
+func generateTimeoutSec(getenv func(string) string) int {
+	n, _ := strconv.Atoi(envFrom(getenv, "GENERATE_TIMEOUT_SEC", "45"))
+	if n <= 0 {
+		return 45
+	}
+	return n
 }
 
 func main() {
@@ -44,13 +57,18 @@ func main() {
 	} else if shared {
 		log.Printf("ai: warning: stg shares the production Firestore (ALLOW_SHARED_PROD_DB=1)")
 	}
+	// stg-only per-request Pro / free for listed test uids (#2085)
+	dbg, err := debugoverride.FromEnv(os.Getenv)
+	if err != nil {
+		log.Fatalf("ai: refusing to start: %v", err)
+	}
+	if dbg != nil {
+		log.Printf("ai: warning: %s=1; %s answers Pro / free for %d listed uids", debugoverride.EnabledEnv, debugoverride.Header, dbg.Len())
+	}
 	port := env("PORT", "8081")
 	model := env("CLAUDE_MODEL", "claude-sonnet-5-5")
 	effort := env("CLAUDE_EFFORT", "low")
-	timeoutSec, _ := strconv.Atoi(env("GENERATE_TIMEOUT_SEC", "45"))
-	if timeoutSec <= 0 {
-		timeoutSec = 45
-	}
+	timeoutSec := generateTimeoutSec(os.Getenv)
 
 	apiKey := os.Getenv("ANTHROPIC_API_KEY")
 	if apiKey == "" {
@@ -76,7 +94,7 @@ func main() {
 	}
 	log.Printf("ai: pro gate mode=%s", proMode)
 	fsClient := newFirestore()
-	pro := newProChecker(fsClient)
+	pro := proChecker(debugoverride.Wrap(newProChecker(fsClient), dbg, logger))
 
 	claude := ai.NewClient(apiKey, model, effort)
 	claude.StructuredOutput = os.Getenv("CLAUDE_STRUCTURED_OUTPUT") == "1"
@@ -140,11 +158,11 @@ func main() {
 	if paused {
 		log.Printf("ai: AI_PAUSED is on; generate/chat/text answer 503 ai_paused")
 	}
-	handler := newAIHandler(ai.NewHandler(svc), logger,
+	handler := debugoverride.Middleware(dbg)(newAIHandler(ai.NewHandler(svc), logger,
 		newAppCheck(),
 		ai.Pause(paused, logger),
 		withBudget(newRateLimit(verifier, fsClient, pro), breaker),
-	)
+	))
 	srv := &http.Server{
 		Addr:              ":" + port,
 		Handler:           handler,
@@ -215,35 +233,56 @@ func newAppCheck() func(http.Handler) http.Handler {
 //
 // Limits/weights: ratelimit.ConfigFromEnv.
 func newRateLimit(verifier auth.IdentityVerifier, client *firestore.Client, pro ratelimit.ProChecker) func(http.Handler) http.Handler {
-	off := func(h http.Handler) http.Handler { return h }
-	project := os.Getenv("GOOGLE_CLOUD_PROJECT")
-	mode := env("AUTH_MODE", auth.ModeFirebase)
-	switch os.Getenv("RATE_LIMIT") {
-	case "off", "0", "false":
-		log.Printf("ai: RATE_LIMIT=off; generate/chat are not limited")
-		return off
-	case "":
-		if project == "" && mode != auth.ModeDev {
-			log.Printf("ai: rate limit off (no GOOGLE_CLOUD_PROJECT); set RATE_LIMIT=on to force")
-			return off
-		}
-	}
-	cfg, err := ratelimit.ConfigFromEnv(os.Getenv)
+	plan, err := rateLimitPlanFrom(os.Getenv, client != nil)
 	if err != nil {
 		log.Fatalf("ai: %v", err)
 	}
-	var store ratelimit.Store = ratelimit.NewMemory()
-	storeName := "memory"
-	if client != nil && os.Getenv("RATE_LIMIT_STORE") != "memory" {
-		store = ratelimit.NewFirestore(client, os.Getenv("RATE_LIMIT_COLLECTION"))
-		storeName = "firestore"
+	if !plan.On {
+		log.Printf("ai: %s", plan.Reason)
+		return func(h http.Handler) http.Handler { return h }
 	}
+	var store ratelimit.Store = ratelimit.NewMemory()
+	if plan.Store == "firestore" {
+		store = ratelimit.NewFirestore(client, plan.Collection)
+	}
+	cfg := plan.Config
 	perOS := ""
 	if len(cfg.PlatformLimits) > 0 { // RATE_LIMIT_*_DAILY_<OS> (#2133)
 		perOS = fmt.Sprintf(" platformLimits=%v", cfg.PlatformLimits)
 	}
-	log.Printf("ai: rate limit on (store=%s env=%q limits=%+v%s weights=%+v pro=%v)", storeName, cfg.Env, cfg.Limits, perOS, cfg.Weights, pro != nil)
+	log.Printf("ai: rate limit on (store=%s env=%q limits=%+v%s weights=%+v pro=%v)", plan.Store, cfg.Env, cfg.Limits, perOS, cfg.Weights, pro != nil)
 	return ratelimit.New(cfg, store, pro).Middleware(verifier)
+}
+
+// rateLimitPlan is what newRateLimit builds, decided from the environment alone.
+type rateLimitPlan struct {
+	On         bool
+	Reason     string // why it is off (logged)
+	Config     ratelimit.Config
+	Store      string // "memory" | "firestore"
+	Collection string // RATE_LIMIT_COLLECTION; empty = the ratelimit default
+}
+
+// rateLimitPlanFrom decides newRateLimit from getenv; hasClient: Firestore connected.
+func rateLimitPlanFrom(getenv func(string) string, hasClient bool) (rateLimitPlan, error) {
+	switch getenv("RATE_LIMIT") {
+	case "off", "0", "false":
+		return rateLimitPlan{Reason: "RATE_LIMIT=off; generate/chat are not limited"}, nil
+	case "":
+		if getenv("GOOGLE_CLOUD_PROJECT") == "" && envFrom(getenv, "AUTH_MODE", auth.ModeFirebase) != auth.ModeDev {
+			return rateLimitPlan{Reason: "rate limit off (no GOOGLE_CLOUD_PROJECT); set RATE_LIMIT=on to force"}, nil
+		}
+	}
+	cfg, err := ratelimit.ConfigFromEnv(getenv)
+	if err != nil {
+		return rateLimitPlan{}, err
+	}
+	plan := rateLimitPlan{On: true, Config: cfg, Store: "memory"}
+	if hasClient && getenv("RATE_LIMIT_STORE") != "memory" {
+		plan.Store = "firestore"
+		plan.Collection = getenv("RATE_LIMIT_COLLECTION")
+	}
+	return plan, nil
 }
 
 // newFirestore connects to Firestore when GOOGLE_CLOUD_PROJECT is set (rate

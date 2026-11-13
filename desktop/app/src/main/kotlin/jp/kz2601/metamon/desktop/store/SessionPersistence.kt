@@ -10,6 +10,7 @@ import jp.kz2601.metamon.desktop.net.DesktopApiConfig
 import jp.kz2601.metamon.desktop.typedValue
 import jp.kz2601.metamon.dsl.records.Entity
 import jp.kz2601.metamon.dsl.records.JSONValue
+import jp.kz2601.metamon.dsl.records.Record
 import jp.kz2601.metamon.services.AppConfigClient
 import jp.kz2601.metamon.services.local.BackoffPolicy
 import jp.kz2601.metamon.services.local.LocalRecord
@@ -128,6 +129,10 @@ class SessionPersistence(
         }
     }
 
+    /** 保存期間の判定に使う形(#482): 画面の id に、端末の行の作った時刻・作った人を付ける(削除待ちは出さない)。 */
+    suspend fun retentionRows(): Map<String, List<Record>> =
+        screenRows().mapValues { (_, rows) -> rows.map { (r, row) -> Record(row.id, createdAt = r.createdAt, author = r.author) } }
+
     /**
      * 断られた(書き込みの列の上): 知らせが指す行だけ、端末に書き終えた画面([written])と今の端末の差を出して画面に渡す。
      * recordId の無い知らせ(競合)はその entity の差を全部。
@@ -218,7 +223,7 @@ class SessionPersistence(
         writes.trySend(w)
     }
 
-    private sealed interface Change {
+    internal sealed interface Change {
         val entity: String
 
         data class Put(override val entity: String, val row: Row, val created: Boolean) : Change
@@ -235,7 +240,7 @@ class SessionPersistence(
         }
     }
 
-    private fun diff(old: MockStore, new: MockStore): List<Change> = buildList {
+    internal fun diff(old: MockStore, new: MockStore): List<Change> = buildList {
         for (entity in old.rows.keys + new.rows.keys) {
             val before = old.list(entity).associateBy { it.id }
             val after = new.list(entity)
@@ -302,7 +307,7 @@ class SessionPersistence(
         pending = queue?.operations()?.count { it.appId == appId } ?: 0
     }
 
-    private fun SyncEvent.needsReload(): Boolean = when (this) {
+    internal fun SyncEvent.needsReload(): Boolean = when (this) {
         is SyncEvent.Sent, is SyncEvent.Drained, is SyncEvent.Paused -> false
         else -> true // 断られた: 端末の行を戻した・消したので読み直す
     }

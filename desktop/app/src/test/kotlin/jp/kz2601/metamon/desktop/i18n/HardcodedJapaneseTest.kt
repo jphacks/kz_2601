@@ -41,12 +41,16 @@ class HardcodedJapaneseTest {
         ),
     )
 
+    /** 発話の聞き取りの辞書だけのファイル(表示しない。Android の VoiceIntent と同じ語)。 */
+    private val dictionaryFiles = setOf("$pkg/voice/VoiceIntent.kt")
+
     @Test
     fun noHardcodedJapaneseInMainSources() {
         assertTrue("ソースが無い: ${src.absolutePath}", src.isDirectory)
         val found = mutableListOf<String>()
         src.walkTopDown().filter { it.extension == "kt" }.sortedBy { it.path }.forEach { file ->
             val path = file.relativeTo(src).invariantSeparatorsPath
+            if (path in dictionaryFiles) return@forEach
             val text = file.readText()
             for ((line, at, literal) in literals(text)) {
                 if (!japanese.containsMatchIn(literal)) continue

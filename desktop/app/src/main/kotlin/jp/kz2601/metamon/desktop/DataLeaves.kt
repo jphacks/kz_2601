@@ -277,7 +277,7 @@ object TableCells {
     }
 
     /** count は件数、sum/min/max は field の書式、avg は小数 1 桁(currency は円の整数)。 */
-    private fun aggregateText(value: Double?, op: String?, field: Field?, data: LeafData): String {
+    internal fun aggregateText(value: Double?, op: String?, field: Field?, data: LeafData): String {
         value ?: return FieldCoding.UNAVAILABLE
         if (op == "count") return FieldCoding.plainNumber(value)
         val shown = if (op == "avg" && field?.type != FieldType.CURRENCY) swiftRounded(value * 10) / 10 else value
@@ -332,7 +332,7 @@ object TimelineRows {
 }
 
 /** Swift の `rounded()`(0.5 は 0 から遠い方)。 */
-private fun swiftRounded(x: Double): Double = if (x >= 0) kotlin.math.floor(x + 0.5) else -kotlin.math.floor(-x + 0.5)
+internal fun swiftRounded(x: Double): Double = if (x >= 0) kotlin.math.floor(x + 0.5) else -kotlin.math.floor(-x + 0.5)
 
 // MARK: - 描画
 

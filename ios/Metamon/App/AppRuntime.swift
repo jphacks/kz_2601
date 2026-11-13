@@ -444,7 +444,9 @@ final class AppRuntime: RuntimeNavigating {
     @ObservationIgnored private var pendingHotReloadTask: Task<Void, Never>?
     @ObservationIgnored private var recordsRefreshTasks: [String: Task<Void, Never>] = [:]
     /// 保存中のフォーム(saveRecord の連打で同じ記録を 2 件作らない)
-    @ObservationIgnored let saveFlight = SaveFlight() // テストが保存の途中を見る
+    @ObservationIgnored private let saveFlight = SaveFlight()
+    /// `form` を保存している途中(書き込みの await の間)か。テストが保存の途中に入力する
+    func isSaving(_ form: FormDraft) -> Bool { saveFlight.isSaving(form) }
     /// 最後に書き込んだフォーム。送った後にサーバーが断ったら「保存しました」を取り消す(M10 × #317 / #346 / #321)
     @ObservationIgnored var lastSavedForm: SavedForm?
     #if !APP_STORE_REVIEW

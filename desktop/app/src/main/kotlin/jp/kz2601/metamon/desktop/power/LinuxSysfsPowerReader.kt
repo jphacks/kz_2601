@@ -66,7 +66,7 @@ class LinuxSysfsPowerReader(private val sysRoot: Path = Paths.get("/sys")) : Dev
             null
         }
 
-        private fun longAttr(dir: Path, name: String): Long? = attr(dir, name)?.toLongOrNull()?.takeIf { it > 0 }
+        fun longAttr(dir: Path, name: String): Long? = attr(dir, name)?.toLongOrNull()?.takeIf { it > 0 }
 
         private fun ratio(now: Long?, full: Long?): Double? =
             if (now != null && full != null) now.toDouble() / full * 100.0 else null

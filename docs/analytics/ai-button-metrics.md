@@ -53,6 +53,20 @@
 | 設定の切り替え | `ios/Metamon/Features/Consent/PrivacySettingsSection.swift`(「AI ボタンの利用状況を送る」) |
 | 受ける所 | `backend/internal/appconfig/aibutton_metrics.go`、契約は `docs/backend/openapi-appconfig.yaml` の `/metrics/ai-button` |
 
+### 送り手(OS ごと)
+
+`POST /v1/metrics/ai-button` を送る OS と、送っているコードの場所。数える所・貯める所・送る時点は上の流れと同じ形(Android と Mac は iOS に合わせて作った)。
+
+| OS | 送るか | 送るコード | 送る時点 | 端末内 AI の availability |
+|---|---|---|---|---|
+| Android | 送る | 本文と送信: `android/services/src/main/kotlin/jp/kz2601/metamon/services/consent/AiButtonMetrics.kt`(`AiButtonMetricsRecorder`・送り手)。数える所: `android/renderer/.../components/ai/AiButtonLeaf.kt`。つなぐ所: `android/app/.../consent/AiButtonMetricsWiring.kt`・`AppContainer.kt`(`flushAiButtonMetrics`)。設定: `android/app/.../settings/SettingsSheet.kt` | 起動(`MetamonApplication.kt`)と前面に戻った時(`lifecycle/ForegroundSteps.kt`) | 端末内 AI が無い(`UnsupportedOnDeviceAi`)ので、いつも `device_not_eligible` |
+| iOS | 送る(審査用の版は送らない) | 上の「何 / 場所」の表のとおり(`MetamonServices/Consent/AIButtonMetrics.swift`・`ios/Metamon/App/AppRuntime+AIButtonMetrics.swift`) | 起動と前面に戻った時 | Foundation Models の状態(`Support/OnDeviceAI.swift`) |
+| Mac | 送る(審査用の版は送らない) | `ios/MetamonMac/App/Services/MacAIButtonMetrics.swift`(送る時点・送り手は iOS と同じ `HTTPAIButtonMetricsSender`)。数える所: `ios/MetamonMac/App/Runtime/MacAppRuntime+AIText.swift`(`recordAIButton`)。設定: `ios/MetamonMac/App/Settings/MacSettingsView.swift` | 起動と前面に戻った時(`NSApplication.didBecomeActiveNotification`) | Foundation Models の状態(iOS と同じ `Support/OnDeviceAI.swift`。`os_too_old` は macOS 26 未満) |
+| Windows・Linux(`desktop/`) | 未対応 | 無い。aiButton をまだ描かない(#2387) | — | — |
+
+- ログの行(下の「ログの形」)には OS が無い。Android の分が入ると `device_not_eligible` の割合が上がるので、#426 の判断に使う時は OS を分けて見る必要がある。分け方は**決めること**(行に OS を足す / `client_build` の形で見分ける など)。
+- デスクトップに aiButton が入る時(#2387)は、この表に 1 行足し、端末内 AI の有無と送るかを決める。
+
 ### 版と切り替え
 
 - **審査用の版(`APP_STORE_REVIEW`)には入れない**(数えない・送らない・設定も出さない)。栄養ラベルに「使用状況データ」が増えるため。β(TestFlight)と開発の版だけ。

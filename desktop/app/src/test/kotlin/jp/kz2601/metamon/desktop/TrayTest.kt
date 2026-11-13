@@ -234,4 +234,26 @@ class TrayTest {
         keys.forEach { k -> Lang.entries.forEach { l -> assertTrue("$k ($l)", Strings.table.hasString(l, k)) } }
         assertEquals("Time's up", Strings.withLang(Lang.EN) { Strings["desktop_timer_done"] })
     }
+
+    // MARK: - timerLabel(#2627)
+
+    private fun timer(seconds: Int, countdown: Boolean, running: Boolean = true) = TimerStatus("k", "ラーメン", seconds, countdown, running)
+
+    @Test
+    fun timerLabelLeftElapsedHoursAndZero() {
+        Strings.withLang(Lang.JA) {
+            assertEquals("ラーメン 残り 02:05", TrayMenu.timerLabel(timer(125, countdown = true)))
+            assertEquals("ラーメン 02:05", TrayMenu.timerLabel(timer(125, countdown = false)))
+            assertEquals("1 時間を超えたら時も出す", "ラーメン 残り 1:00:00", TrayMenu.timerLabel(timer(3600, countdown = true)))
+            assertEquals("ラーメン 59:59", TrayMenu.timerLabel(timer(3599, countdown = false)))
+            assertEquals("ラーメン 26:01:01", TrayMenu.timerLabel(timer(26 * 3600 + 61, countdown = false)))
+            assertEquals("ラーメン 残り 00:00", TrayMenu.timerLabel(timer(0, countdown = true)))
+            assertEquals("ラーメン 00:00", TrayMenu.timerLabel(timer(0, countdown = false)))
+            assertEquals("ラーメン 残り 00:30(一時停止)", TrayMenu.timerLabel(timer(30, countdown = true, running = false)))
+        }
+        Strings.withLang(Lang.EN) {
+            assertEquals("ラーメン 02:05 left", TrayMenu.timerLabel(timer(125, countdown = true)))
+            assertEquals("ラーメン 00:00 (paused)", TrayMenu.timerLabel(timer(0, countdown = false, running = false)))
+        }
+    }
 }
