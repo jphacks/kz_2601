@@ -46,6 +46,9 @@
     <string name="desktop_dev_environment">Current environment</string>
     <string name="desktop_dev_item">Developer: %1$s</string>
     <string name="desktop_dev_menu">Developer menu</string>
+    <string name="desktop_diagnostics_copied">Copied diagnostic info. Paste it into your support request</string>
+    <string name="desktop_diagnostics_copy">Copy diagnostic info</string>
+    <string name="desktop_diagnostics_copy_failed">Couldn\'t copy to the clipboard</string>
     <string name="desktop_drag_image_name">image</string>
     <string name="desktop_drag_table_name">table</string>
     <string name="desktop_edit_hint_body">Type it in the box, or ask by voice.</string>

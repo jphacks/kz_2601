@@ -47,6 +47,9 @@
     <string name="desktop_dev_environment">今の環境</string>
     <string name="desktop_dev_item">開発用: %1$s</string>
     <string name="desktop_dev_menu">開発用メニュー</string>
+    <string name="desktop_diagnostics_copied">診断の情報をコピーしました。問い合わせに貼り付けてください</string>
+    <string name="desktop_diagnostics_copy">診断の情報をコピー</string>
+    <string name="desktop_diagnostics_copy_failed">クリップボードに入れられませんでした</string>
     <string name="desktop_drag_image_name">画像</string>
     <string name="desktop_drag_table_name">表</string>
     <string name="desktop_edit_hint_body">入力欄に書くか、声で頼めます。</string>

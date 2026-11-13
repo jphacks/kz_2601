@@ -273,6 +273,9 @@ class DesktopKeyboard(
     /** 「この端末のデータを消す」(#1887)。全アプリの分を消す口(AppHub.wipeLocalData)。null ならパレットに出さない。 */
     var wipeLocalData: (suspend () -> Unit)? = null
 
+    /** 「診断の情報をコピー」(#2200・crash/Diagnostics.kt)。null ならパレット・F1 の一覧に出さない。 */
+    var copyDiagnostics: (() -> Unit)? = null
+
     /** 消す前の確認を出している。 */
     var wipeConfirmOpen by mutableStateOf(false)
 
@@ -409,6 +412,9 @@ class DesktopKeyboard(
         val wipe = wipeLocalData?.let {
             listOf(PaletteCommand("data:wipe", KeyboardText.WIPE, PaletteCommand.Kind.ACTION, keywords = listOf("wipe", "sign out")) { wipeConfirmOpen = true })
         }.orEmpty()
+        val diagnostics = copyDiagnostics?.let { copy ->
+            listOf(PaletteCommand("about:diagnostics", Strings["desktop_diagnostics_copy"], PaletteCommand.Kind.ACTION, keywords = listOf("diagnostics", "support", "version")) { copy() })
+        }.orEmpty()
         val licenses = PaletteCommand(
             "about:licenses", LicensesText.TITLE, PaletteCommand.Kind.ACTION,
             keywords = listOf("licenses", "third-party", "oss", "notice", LicensesText.LICENSE),
@@ -416,7 +422,7 @@ class DesktopKeyboard(
         val shareLink = share?.let { listOf(it.command()) }.orEmpty()
         // stg の時だけ・配布物では出ない
         val dev = DevMenu.commands(devHost)
-        return shortcuts + buttons + record + screens + apps + wipe + shareLink + licenses + dev
+        return shortcuts + buttons + record + screens + apps + wipe + shareLink + diagnostics + licenses + dev
     }
 
     /** 確認で「消す」を押した: 全アプリの端末のデータを消し、このウィンドウを最初の画面に戻す。 */
@@ -468,7 +474,7 @@ class DesktopKeyboard(
             }
         }
         if (helpOpen) {
-            ShortcutHelp(os, onLicenses = { helpOpen = false; licensesOpen = true }) {
+            ShortcutHelp(os, onLicenses = { helpOpen = false; licensesOpen = true }, onCopyDiagnostics = copyDiagnostics) {
                 helpOpen = false
                 runCatching { root.requestFocus() }
             }
