@@ -17,5 +17,13 @@ fun main() = runBlocking {
         exitProcess(2)
     }
     println("$config platform=${ClientPlatform.current().header}")
-    client.listApps().forEach { println("${it.id}\t${it.name}\tv${it.currentVersion}") }
+    // 並びを合わせ、写しを DocumentCache に置く(#2378)。圏外・5xx なら前回の写し
+    when (val r = ServerApps(client, store.documents) { true }.load()) {
+        is ServerAppsResult.Loaded -> {
+            if (r.fromCache) println("(cached copy)")
+            r.apps.forEach { println("${it.id}\t${it.name}\tv${it.currentVersion}") }
+        }
+        is ServerAppsResult.Failed -> System.err.println("読めませんでした: ${r.error::class.simpleName}")
+        ServerAppsResult.SignedOut -> Unit
+    }
 }
