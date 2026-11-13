@@ -16,7 +16,9 @@ struct MetamonApp: App {
     /// 起動のスプラッシュ(コールド起動の 1 回だけ・UI テストのモック起動では出さない)
     private let splashMode = SplashGate.decide()
     #if !APP_STORE_REVIEW
-    @UIApplicationDelegateAdaptor(PushAppDelegate.self) private var pushDelegate // 端末トークンを受ける(#269)
+    @UIApplicationDelegateAdaptor(PushAppDelegate.self) private var pushDelegate // 端末トークンを受ける(#269)・長押しメニュー(#2232)
+    #else
+    @UIApplicationDelegateAdaptor(MetamonAppDelegate.self) private var appDelegate // 長押しメニュー(#2232)
     #endif
 
     /// Renderer 同梱のコンポーネント + アプリ本体が提供する `voiceInput`(WhisperKit 依存なので Renderer には置かない)。
