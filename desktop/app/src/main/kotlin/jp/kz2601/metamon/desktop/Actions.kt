@@ -197,10 +197,10 @@ class DesktopActionHost(
      * [exportDir] に空いている名前で書く(既存のファイルは上書きしない・Windows の予約名は頭に `_`)。
      * 名前を空のファイルで取ってから、同じフォルダの一時ファイルに書き切って置き換える(書きかけのファイルを見せない)。書けなければ取った名前を消す。
      */
-    private fun writeNew(name: String, bytes: ByteArray): File {
+    internal fun writeNew(name: String, bytes: ByteArray, write: (File, ByteArray) -> Unit = { f, b -> writeAtomically(f, b) }): File {
         val file = FileNames.createFree(exportDir, name)
         try {
-            writeAtomically(file, bytes)
+            write(file, bytes)
         } catch (e: Exception) {
             file.delete()
             throw e
@@ -233,8 +233,7 @@ class DesktopActionHost(
         val UNAVAILABLE_ACTIVITY get() = Strings["desktop_unavailable_activity"]
         val UNAVAILABLE_FOLLOW get() = Strings["desktop_unavailable_follow"]
 
-        fun defaultExportDir(): File {
-            val home = File(System.getProperty("user.home"))
+        fun defaultExportDir(home: File = File(System.getProperty("user.home"))): File {
             return home.resolve("Downloads").takeIf { it.isDirectory } ?: home
         }
     }
