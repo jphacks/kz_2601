@@ -71,7 +71,7 @@ object VoiceModels {
     fun override(
         props: (String) -> String? = System::getProperty,
         env: (String) -> String? = System::getenv,
-    ): File? = (props("tailorit.whisper.model") ?: env("TAILORIT_WHISPER_MODEL"))?.takeIf { it.isNotBlank() }?.let(::File)
+    ): File? = (props("tailorit.whisper.model")?.takeIf { it.isNotBlank() } ?: env("TAILORIT_WHISPER_MODEL")?.takeIf { it.isNotBlank() })?.let(::File)
 
     val DEFAULT = WhisperModels.DEFAULT
 }
