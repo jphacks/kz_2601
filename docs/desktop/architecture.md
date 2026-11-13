@@ -72,6 +72,8 @@ Gradle のビルドは Android とは別(`desktop/settings.gradle.kts`)。Androi
 
 デスクトップだけの文言は `desktop/app/src/main/resources/i18n/desktop` の同じ形の XML に置き、キーは `desktop_` で始める。
 
+文言の引き方・足し方・英語での確かめ方は [i18n.md](i18n.md)。
+
 ## 適合テストと許可リスト
 
 - `./gradlew :desktop:test :dsl:test :whisper:test`(`desktop/` で)。`:dsl:test` は `android/dsl` のテストを、`:whisper:test` は `android/whisper` のテストをデスクトップのビルドで回す(`:whisper:test` は Kotlin の側だけ。JNI のライブラリは要らない)。
