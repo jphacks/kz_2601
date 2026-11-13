@@ -22,9 +22,11 @@ final class DeviceContacts2218Tests: XCTestCase {
         XCTAssertEqual(DeviceContactsAccess(.denied), .denied)
         XCTAssertEqual(DeviceContactsAccess(.restricted), .restricted)
         XCTAssertEqual(DeviceContactsAccess(.authorized), .authorized)
-        if #available(iOS 18.0, macOS 15.0, *) {
+        #if os(iOS)
+        if #available(iOS 18.0, *) {
             XCTAssertEqual(DeviceContactsAccess(.limited), .limited)
         }
+        #endif
         XCTAssertTrue(DeviceContactsAccess.authorized.canRead)
         XCTAssertTrue(DeviceContactsAccess.limited.canRead)
         XCTAssertFalse(DeviceContactsAccess.denied.canRead)

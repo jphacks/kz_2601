@@ -27,12 +27,14 @@ public enum DeviceContactsAccess: String, Sendable, Equatable {
 
     public var canRead: Bool { self == .authorized || self == .limited }
 
-    /// 将来増えた値は「制限」(読まない)。
+    /// 将来増えた値は「制限」(読まない)。limited は iOS 18 だけ(macOS には無い)。
     public init(_ status: CNAuthorizationStatus) {
-        if #available(iOS 18.0, macOS 15.0, *), status == .limited {
+        #if os(iOS)
+        if #available(iOS 18.0, *), status == .limited {
             self = .limited
             return
         }
+        #endif
         switch status {
         case .notDetermined: self = .notDetermined
         case .denied: self = .denied
