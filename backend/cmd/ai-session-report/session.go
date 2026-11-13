@@ -21,7 +21,8 @@ type config struct {
 	Slow         time.Duration // generation slower than this
 	ManyClarify  int           // clarify turns before one generation
 	Top          int
-	RecordLimit  int // records counted per app (ids only)
+	RecordLimit  int  // records counted per app (ids only)
+	ByPlatform   bool // add the per-OS generation table (#2368, off by default)
 }
 
 // Step kinds of a session's timeline.
@@ -119,6 +120,7 @@ type report struct {
 	HasLogs  bool
 	Chat     chatOutcome
 	Retry    retryBreakdown
+	Platform *platformBreakdown // nil unless cfg.ByPlatform
 }
 
 // signal weights: a stronger hint of "the AI guessed wrong" weighs more.
@@ -150,6 +152,9 @@ var signalOrder = []string{"quick_undo", "gen_failed", "unchanged", "abandoned",
 func buildReport(ctx context.Context, rd reader, uids []string, logs []logEvent, hasLogs bool, cfg config) (*report, error) {
 	rep := &report{Config: cfg, LogLines: len(logs), HasLogs: hasLogs, Chat: chatOutcomes(logs, cfg.Since, cfg.Until, cfg.Gap),
 		Retry: retryBreakdowns(logs, cfg.Since, cfg.Until)}
+	if cfg.ByPlatform {
+		rep.Platform = platformBreakdowns(logs, cfg.Since, cfg.Until)
+	}
 	for i, uid := range uids {
 		u := &userReport{Label: fmt.Sprintf("U%d", i+1), UIDHash: httpx.UIDHash(uid)}
 		rep.Users = append(rep.Users, u)
