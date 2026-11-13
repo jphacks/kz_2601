@@ -192,3 +192,34 @@ func TestTriageEvalAIRespectsSwitch(t *testing.T) {
 		t.Fatal("unknown model accepted")
 	}
 }
+
+func TestTriageModel(t *testing.T) {
+	t.Run("injected model wins", func(t *testing.T) {
+		ta := newTestApp(t, env{}) // no key set
+		fm := &fakeModel{}
+		ta.model = fm
+		m, err := ta.triageModel()
+		if err != nil || m != triage.Model(fm) {
+			t.Fatalf("got %v, %v", m, err)
+		}
+	})
+	t.Run("missing key", func(t *testing.T) {
+		ta := newTestApp(t, env{})
+		_, err := ta.triageModel()
+		if err == nil || err.Error() != envTriageKey+" is not set" {
+			t.Fatalf("err %v", err)
+		}
+	})
+	t.Run("key with default and named model", func(t *testing.T) {
+		for _, e := range []env{{envTriageKey: "test-key"}, {envTriageKey: "test-key", envTriageModel: "test-model"}} {
+			ta := newTestApp(t, e)
+			m, err := ta.triageModel()
+			if err != nil {
+				t.Fatal(err)
+			}
+			if _, ok := m.(triage.AIModel); !ok {
+				t.Fatalf("type %T", m)
+			}
+		}
+	})
+}

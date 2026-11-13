@@ -6,6 +6,7 @@ import (
 	"regexp"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/jphacks/kz_2601/backend/internal/loop"
 	"github.com/jphacks/kz_2601/backend/internal/store"
@@ -118,5 +119,35 @@ func TestAuditTracesFeedbackToIssue(t *testing.T) {
 		if strings.Contains(e.Reason, "落ちる") {
 			t.Fatalf("text in audit: %+v", e)
 		}
+	}
+}
+
+func TestAudit(t *testing.T) {
+	ctx := context.Background()
+	ta := newTestApp(t, env{})
+	at := ta.now().Add(-time.Hour)
+	for _, e := range []loop.Event{
+		{At: at, Stage: loop.StageTriage, Action: "triaged", Actor: loop.ActorLoop, ItemID: "i1", Tokens: 10},
+		{At: at, Stage: loop.StageTriage, Action: "triaged", Actor: loop.ActorLoop, ItemID: "i2", Tokens: 5},
+		{At: ta.now().Add(-30 * 24 * time.Hour), Stage: loop.StageTriage, Action: "old", Actor: loop.ActorLoop, ItemID: "i3"},
+	} {
+		if err := ta.ctl.AppendAudit(ctx, e); err != nil {
+			t.Fatal(err)
+		}
+	}
+	out := ta.must(t, "audit")
+	if !strings.Contains(out, "item=i1") || !strings.Contains(out, "item=i2") || strings.Contains(out, "item=i3") || !strings.Contains(out, "2 event(s)") {
+		t.Fatalf("list:\n%s", out)
+	}
+	if out = ta.must(t, "audit", "-item", "i1"); !strings.Contains(out, "1 event(s)") {
+		t.Fatalf("item filter:\n%s", out)
+	}
+	out = ta.must(t, "audit", "-summary")
+	if !regexp.MustCompile(`triage triaged\s+2`).MatchString(out) || !regexp.MustCompile(`triage tokens\s+15`).MatchString(out) {
+		t.Fatalf("summary:\n%s", out)
+	}
+	ta.ctl.Fail = errors.New("boom")
+	if err := ta.run(ctx, []string{"audit"}); err == nil || err.Error() != "boom" {
+		t.Fatalf("store error: %v", err)
 	}
 }
