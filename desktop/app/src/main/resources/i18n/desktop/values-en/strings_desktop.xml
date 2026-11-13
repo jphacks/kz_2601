@@ -97,6 +97,8 @@
     <string name="desktop_loading">Loading…</string>
     <string name="desktop_markdown_link_confirm">Open %1$s?</string>
     <string name="desktop_match_offline">Matches appear after you sign in</string>
+    <string name="desktop_notice_tag_info">Notice</string>
+    <string name="desktop_notice_tag_warning">Important</string>
     <string name="desktop_notification_now">now</string>
     <string name="desktop_notification_scheduled">Notification scheduled (%1$s, only while the app is open)</string>
     <string name="desktop_picker_empty">No candidates</string>

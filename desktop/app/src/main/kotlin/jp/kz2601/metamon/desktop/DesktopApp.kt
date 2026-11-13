@@ -32,6 +32,7 @@ import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -72,6 +73,10 @@ import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.semantics
 import jp.kz2601.metamon.desktop.i18n.Strings
 import jp.kz2601.metamon.desktop.store.SessionPersistence
+import jp.kz2601.metamon.services.update.ServiceNotice
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import java.net.URI
 
 /** 画面 1 枚の描画に要るもの。 */
 private class ScreenScope(
@@ -105,7 +110,16 @@ fun DesktopApp(
     windowId: Int? = null,
     /** パレットの「この端末のデータを消す」(#1887)。全アプリの分を消す。null なら出さない。 */
     onWipeLocalData: (suspend () -> Unit)? = null,
+    /** アプリ内のお知らせ(#333): 出す物(出す / 出さないは DesktopNotice.toShow)・閉じた時・「詳しく」(既定はブラウザで開く)。 */
+    notice: ServiceNotice? = null,
+    onDismissNotice: (String) -> Unit = {},
+    onOpenNoticeLink: ((String) -> Unit)? = null,
 ) {
+    val noticeScope = rememberCoroutineScope()
+    val openNoticeLink: (String) -> Unit = onOpenNoticeLink ?: { url ->
+        noticeScope.launch(Dispatchers.IO) { runCatching { DesktopLicenses.browse(URI(url)) } }
+        Unit
+    }
     val session = remember {
         DesktopSession(dsl, initialStore, startScreen = startScreen, host = DesktopActionHost(), persistence = persistence, shared = records, startRecordId = startRecordId)
     }
@@ -139,7 +153,10 @@ fun DesktopApp(
     Surface(Modifier.fillMaxSize().ioDropTarget(io, topComponents, topDraft).onPreviewKeyEvent { !keyboard.photos.isOpen && pasteKey(it) }
         .onPreviewKeyEvent { if (!keyboard.photos.isOpen && DesktopPrint.isPrintKey(it) && DesktopPrint.canPrint(dsl)) true.also { openPrint() } else false }.then(keyboard.modifier)) {
         IoOverlay(io)
-        Box(Modifier.fillMaxSize()) {
+        // お知らせの帯はウィンドウの一番上(sheet・fullScreen の上にも出る)
+        Column(Modifier.fillMaxSize()) {
+        NoticeBanner(notice, onOpenLink = openNoticeLink, onDismiss = onDismissNotice)
+        Box(Modifier.weight(1f).fillMaxWidth()) {
             // モーダルの間は下の画面とタブに Tab で入らず、読み上げにも出さない
             Column(Modifier.fillMaxSize().then(keyboard.inert(nav.sheet != null || nav.fullScreen != null || previewing))) {
                 val base = NavigationResolver.dismissModals(nav).top(dsl)
@@ -189,6 +206,7 @@ fun DesktopApp(
                 }
             }
             keyboard.Overlay()
+        }
         }
     }
     }
