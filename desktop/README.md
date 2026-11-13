@@ -115,6 +115,55 @@ Firebase Auth の REST クライアント(`auth/FirebaseAuthRestClient.kt`・ま
 
 - ライセンス: F1 の一覧の「サードパーティのライセンス」かコマンドパレットで、このアプリ・依存・同梱物・Java 実行環境のライセンスを出す(`Licenses.kt`)。一覧はビルド時に `app/third-party-licenses.gradle.kts` が runtimeClasspath の POM と jar の NOTICE から作る(本文の正本は `android/scripts/license-texts`)。複数の種類から選べる依存(JNA の LGPL-2.1-or-later / Apache-2.0)は同じファイルの `electedLicenses` で選んだ種類だけを載せる(JNA は Apache-2.0)。Maven を通らない同梱物は `app/licenses/vendored/*.properties` に 1 件 1 ファイルで足す。Java 実行環境の分は起動中の実行環境の `legal/` から読む。
 
+## whisper モジュール(音声入力・#1751)
+
+`:whisper`(`whisper/`)は端末の中で音を文字にする部品。音声入力(`TAILORIT_VOICE=1`)を試す時だけ要る。Kotlin の部分は `android/whisper` のファイルをビルド時に写し(`whisper/build.gradle.kts` の `syncSharedWhisper`)、ライブラリの読み方(`WhisperNative`・`desktop/NativeLibrary.kt`)だけデスクトップの物を使う。
+
+### ネイティブのライブラリを作る
+
+whisper.cpp と JNI の口(`whisper/native/whisper_jni.cpp`)を CMake で 1 つのライブラリにする。whisper.cpp の版とハッシュは `whisper/native/CMakeLists.txt` で固定(Android と同じ)。初回だけ取得のための通信が要る。
+
+| OS | コマンド | 要る物 | できる物 |
+|---|---|---|---|
+| Linux(x64・arm64) | `whisper/native/build.sh` | CMake 3.22 以上・C/C++ コンパイラ・JDK(`JAVA_HOME` か PATH の `java`) | `whisper/native/out/linux-<arch>/libmetamon_whisper.so` |
+| macOS(試す時だけ・配るのは Mac 版) | `whisper/native/build.sh` | Linux と同じ | `whisper/native/out/macos-<arch>/libmetamon_whisper.dylib` |
+| Windows(x64・arm64) | PowerShell で `whisper\native\build.ps1 [-Arch x64\|arm64]`(既定は今の機械) | Visual Studio 2022 の「C++ によるデスクトップ開発」(MSVC・CMake)・JDK(`JAVA_HOME`) | `whisper\native\out\windows-<arch>\metamon_whisper.dll` |
+
+`out/` も途中の `build/` も git には入れない。`out/` は Compose の `appResourcesRootDir`(`app/build.gradle.kts`)なので、`:desktop:run` と配る形(msi・deb など)にそのまま入る。
+
+ライブラリは次の順に探し、最初に読めた物を使う(`NativeLibrary.candidates`)。どれも無ければ音声入力は「この PC では用意できていません」になる。
+
+1. `-Dtailorit.whisper.lib=<ファイル>` か `TAILORIT_WHISPER_LIB=<ファイル>`(作った物を直接指す)
+2. 配った形の中(Compose が渡す `compose.application.resources.dir`)
+3. `-Dtailorit.whisper.nativeDir=<native/out>` の `<os>-<arch>/`(`:whisper:transcribeWav` が付ける)
+4. `java.library.path`
+
+### モデルの置き場(VoiceModels)
+
+モデルは Android と同じ `ggml-base-q5_1.bin`(約 60MB・取得先・版・ハッシュは `android/whisper/.../WhisperModels.kt` で固定)。git にも配る形にも入れず、初回に落としてハッシュを確かめる。置き場はアプリ(`app/.../voice/Transcriber.kt` の `VoiceModels`)では次のとおり。
+
+| 決め方 | 置き場 |
+|---|---|
+| 既定 | 端末の保存先の `models/`(Windows `%APPDATA%\TailorIt\models`・Linux `$XDG_DATA_HOME/tailorit/models`(無ければ `~/.local/share/tailorit/models`)・macOS `~/Library/Application Support/TailorIt/models`)。`-Dtailorit.dataDir` で保存先を変えるとその下 |
+| `-Dtailorit.whisper.model=<ファイル>` か `TAILORIT_WHISPER_MODEL=<ファイル>` | そのファイルを落とさずに使う |
+
+「この端末のデータを消す」でもモデルは消さない。
+
+### 手元の WAV を文字にする(TranscribeWav)
+
+ライブラリを作っておけば、アプリを起動せずに読み込みと文字にする時間を測れる(`whisper/.../desktop/TranscribeWav.kt`)。
+
+```
+cd desktop
+whisper/native/build.sh                                       # Windows は whisper\native\build.ps1
+./gradlew :whisper:transcribeWav --args="/path/to/voice.wav"     # 言語の既定は ja
+./gradlew :whisper:transcribeWav --args="/path/to/voice.wav en"
+```
+
+- 音は Java Sound で読める形(WAV など)。16kHz モノラルでなくても 16kHz に直してから渡す。
+- モデルは `TAILORIT_WHISPER_MODEL` があればそれ、無ければ `whisper/build/whisper-models/` に落とす(アプリの `models/` とは別)。
+- 出るのは音の長さ・モデルの名前・読み込みと文字にする時間(ms)・文字にした結果。ライブラリが読めない時は理由を出して 1 で終わる。
+
 ## 構成
 
 | 場所 | 中身 |
