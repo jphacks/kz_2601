@@ -66,14 +66,7 @@ struct RootView: View {
                 .environment(\.fabFrame, fabFrame)
                 .environment(\.changeHighlight, rt.changeHighlight) // #626 編集で変わった部品だけ光らせる
                 .environment(\.gridEditSession, rt.gridEdit) // #1442 手で動かす編集モード
-                .safeAreaInset(edge: .top, spacing: 0) {
-                    if assistiveHome == .openedApp {
-                        AssistiveAccessBackBar {
-                            rt.paths = [:] // 次に開いた時は最初の画面から
-                            assistiveOpenedAppId = nil
-                        }
-                    }
-                }
+                .safeAreaInset(edge: .top, spacing: 0) { assistiveBackBar }
 
             // フォーム画面(push)では FAB を出さず、ナビバー右上のマイク(`formToolbarAccessory`)が入口になる(#83)
             // キーボード表示中も隠す(入力欄・キーボードのツールバーに被るため・#143)
@@ -236,6 +229,16 @@ struct RootView: View {
     }
 
     /// アシスティブアクセス(#1997)の根に出すもの。
+    /// アシスティブアクセスで開いたアプリの「戻る」(#1997)。式を分けて Staging の型検査の時間切れを避ける
+    @ViewBuilder private var assistiveBackBar: some View {
+        if assistiveHome == .openedApp {
+            AssistiveAccessBackBar {
+                rt.paths = [:] // 次に開いた時は最初の画面から
+                assistiveOpenedAppId = nil
+            }
+        }
+    }
+
     private var assistiveHome: AssistiveAccessPolicy.Home {
         assistiveAccess.home(openedAppId: assistiveOpenedAppId, currentAppId: rt.document.appId)
     }

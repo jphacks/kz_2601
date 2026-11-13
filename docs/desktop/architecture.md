@@ -2,7 +2,7 @@
 
 デスクトップ版(`desktop/`・Windows・Linux)が Android のソースをどう取り込んでいるかと、Android 側を直した時にデスクトップのどのテストが回るか。動かし方と「今できること」は [`desktop/README.md`](../../desktop/README.md)。
 
-内容は `origin/develop`(748767fd6)の `desktop/settings.gradle.kts`・`desktop/build.gradle.kts`・`desktop/app/build.gradle.kts`・`desktop/services/build.gradle.kts`・`.github/workflows/desktop-ci.yml` から書いた。
+内容は `origin/epic/god`(abe167e0f)の `desktop/settings.gradle.kts`・`desktop/build.gradle.kts`・`desktop/app/build.gradle.kts`・`desktop/services/build.gradle.kts`・`desktop/whisper/build.gradle.kts`・`.github/workflows/desktop-ci.yml` から書いた。
 
 ## 目次
 
@@ -23,21 +23,24 @@ Gradle のビルドは Android とは別(`desktop/settings.gradle.kts`)。Androi
 |---|---|---|
 | `:dsl` | `android/dsl`(同じソースをそのまま) | DSL の型・読み込み・式・記録の規則。出力先だけ `desktop/build/dsl` に分ける(`desktop/build.gradle.kts`。Android のビルドと同時に回しても `android/dsl/build` を取り合わない) |
 | `:services` | `desktop/services` | `android/services` の純 Kotlin の部分を名指しで取り込む(下の表) |
-| `:desktop` | `desktop/app` | ウィンドウ・画面の描画・OS に頼む処理。`:dsl` と `:services` を使う |
+| `:whisper` | `desktop/whisper` | 端末内の文字起こし(whisper.cpp を JNI で・#1751)。`android/whisper` の純 Kotlin の部分を名指しで取り込み、`WhisperNative` だけデスクトップの読み方にする。JNI の C++ と CMake は `desktop/whisper/native/`(作ったライブラリはリポジトリに入れない) |
+| `:desktop` | `desktop/app` | ウィンドウ・画面の描画・OS に頼む処理。`:dsl`・`:services`・`:whisper` を使う |
 
 ライブラリの版は Android と同じ `android/gradle/libs.versions.toml` を読み、デスクトップだけの物(Compose Multiplatform の版)は `desktop/settings.gradle.kts` で足す。JDK は 17。
 
 ## 取り込んでいる Android のソース
 
-名指しの一覧の場所は 2 つ。ファイルを足す・消す時はここを直す。
+名指しの一覧の場所は 3 つ。ファイルを足す・消す時はここを直す。
 
 | 取り込む物 | 一覧の場所 | ファイル |
 |---|---|---|
 | `android/services/src/main/kotlin` | `desktop/services/build.gradle.kts` の `include(...)` | `AuthService.kt`・`AppConfigClient.kt`・`CrashReporter.kt`・`PlanUsage.kt`・`consent/AiConsentStore.kt`・`consent/CrashReportingPreference.kt`・`consent/KeyValueStore.kt`・`http/*.kt`・`live/HttpAppConfigClient.kt`・`local/DocumentCache.kt`・`local/RecordStore.kt`・`local/SyncQueue.kt`・`update/ClientConfig.kt`・`update/ServiceNotice.kt`(どれも `jp/kz2601/metamon/services/` の下) |
 | `android/renderer/src/main/kotlin/jp/kz2601/metamon/renderer` | `desktop/app/build.gradle.kts` の `syncSharedRenderer` | `form/FormDraft.kt`・`navigation/NavigationResolver.kt`・`theme/icons/SymbolIconTable.kt`・`theme/icons/VendoredIcons.kt` |
+| `android/whisper/src/main/kotlin/jp/kz2601/metamon/whisper` | `desktop/whisper/build.gradle.kts` の `syncSharedWhisper` | `AudioBlocks.kt`・`IdleReleasing.kt`・`WhisperEngine.kt`・`WhisperModelManager.kt`・`WhisperModels.kt`(Android の API を使う `AudioFileDecoder.kt`・`WhisperTranscriber.kt` と、`.so` の読み方の `WhisperNative.kt` は取り込まない) |
+| `android/whisper/src/test/kotlin` | `desktop/whisper/build.gradle.kts`(test の `srcDir`) | 全部(Android と同じテストをそのまま回す) |
 | `android/dsl` | `desktop/settings.gradle.kts`(`:dsl` の `projectDir`) | モジュールの全部 |
 
-`syncSharedRenderer` はビルドの時に `desktop/app/build/generated/sharedRenderer` へ写してからコンパイルする。
+`syncSharedRenderer`・`syncSharedWhisper` はビルドの時に `desktop/app/build/generated/sharedRenderer`・`desktop/whisper/build/generated/sharedWhisper` へ写してからコンパイルする。
 
 ## 取り込みの決まり
 
@@ -69,9 +72,11 @@ Gradle のビルドは Android とは別(`desktop/settings.gradle.kts`)。Androi
 
 デスクトップだけの文言は `desktop/app/src/main/resources/i18n/desktop` の同じ形の XML に置き、キーは `desktop_` で始める。
 
+文言の引き方・足し方・英語での確かめ方は [i18n.md](i18n.md)。
+
 ## 適合テストと許可リスト
 
-- `./gradlew :desktop:test :dsl:test`(`desktop/` で)。`:dsl:test` は `android/dsl` のテストをデスクトップのビルドで回す。
+- `./gradlew :desktop:test :dsl:test :whisper:test`(`desktop/` で)。`:dsl:test` は `android/dsl` のテストを、`:whisper:test` は `android/whisper` のテストをデスクトップのビルドで回す(`:whisper:test` は Kotlin の側だけ。JNI のライブラリは要らない)。
 - `desktop/app/src/test/.../DesktopConformanceTest.kt` は全 OS 共通の期待値 `docs/dsl/conformance/cases` と `docs/dsl/examples` を読む(テストの system property `metamon.dslDocsDir`)。
 - 違ってよい所(描けない type・まだ比べない props)は `desktop/app/src/test/.../ConformanceAllowlist.kt` に理由付きで書く。そこに無い違いはテストが落ちる。
 - テストの言語とテーマは `tailorit.lang=ja`・`tailorit.theme=light` に固定する(テストを回す機械の設定に左右されない)。
@@ -80,28 +85,31 @@ Gradle のビルドは Android とは別(`desktop/settings.gradle.kts`)。Androi
 
 `.github/workflows/desktop-ci.yml`。PR(Draft でない)・`develop` と `main` への push・手動で動き、`dorny/paths-filter` で回すかを決める。
 
-| 変わった場所 | テスト(ubuntu・windows の `:desktop:test :dsl:test`) | 配布物(deb・msi) |
+| 変わった場所 | テスト(ubuntu・windows の `:desktop:test :dsl:test :whisper:test`) | 配布物(deb・msi) |
 |---|---|---|
 | `desktop/**`(`*.md` 以外) | 回る | push・手動の時だけ |
 | `android/dsl/**`(`*.md` 以外)・`android/gradle/libs.versions.toml` | 回る | 同上 |
 | `android/renderer/src/main/**`・`android/services/src/main/**`(`*.md` 以外) | 回る | 同上 |
+| `android/whisper/src/**`(`*.md` 以外・取り込むソースとテスト) | 回る | 同上 |
 | `android/app/src/main/res/values*/**` | 回る | 同上 |
 | `docs/dsl/conformance/**`・`docs/dsl/examples/**` | 回る | 同上 |
 | `.github/workflows/desktop-ci.yml` | 回る | 同上 |
 | 上のどれでもない | 回らない(`desktop-ci` は成功) | 作らない |
 | 手動(`workflow_dispatch`) | 必ず回る | 作る |
 
-`android/renderer`・`android/services` は取り込んでいないファイルを直しても回る(フィルタはディレクトリ単位)。
+`android/renderer`・`android/services`・`android/whisper` は取り込んでいないファイルを直しても回る(フィルタはディレクトリ単位)。
 
 ## 早見表: Android のこれを直したら
 
 | Android で直した物 | デスクトップへの影響 | 手元で回すもの |
 |---|---|---|
-| `android/dsl` の何か | そのまま使っている。型・式・記録の規則が変わる | `cd desktop && ./gradlew :desktop:test :dsl:test` |
+| `android/dsl` の何か | そのまま使っている。型・式・記録の規則が変わる | `cd desktop && ./gradlew :desktop:test :dsl:test :whisper:test` |
 | `android/services` の上の表のファイル | API クライアント・保存・送信待ちが変わる。Android の API を使い始めるとデスクトップのコンパイルが落ちる | 同上 |
 | `android/services` のそれ以外 | 影響しない(CI は回る) | 要らない |
 | `android/renderer` の `FormDraft.kt`・`NavigationResolver.kt`・`theme/icons/` の 2 つ | 下書き・遷移・アイコンの表が変わる | 同上 |
 | `android/renderer` のそれ以外 | 影響しない(CI は回る) | 要らない |
+| `android/whisper` の上の表の 5 つ・テスト | 音の区切り・モデルの取得・手放す時計が変わる。Android の API を使い始めるとデスクトップのコンパイルが落ちる。JNI の関数の名前・引数を変えたら `desktop/whisper/native/whisper_jni.cpp` と `desktop/whisper` の `WhisperNative.kt` も直す | `cd desktop && ./gradlew :whisper:test` |
+| `android/whisper` のそれ以外(`AudioFileDecoder.kt`・`WhisperTranscriber.kt`・`WhisperNative.kt`・`src/main/cpp`) | 影響しない(CI は回る)。whisper.cpp の版とハッシュを上げる時は `desktop/whisper/native/CMakeLists.txt` も同じにする | 要らない |
 | `android/renderer`・`android/app` の `strings*.xml` | 同じキーで引く文言が変わる。キーの名前を変える・消す時は、デスクトップでそのキーを引いている所も直す | 同上 |
 | `android/gradle/libs.versions.toml` | Kotlin・ライブラリの版が変わる | 同上 |
 | `docs/dsl/conformance`・`docs/dsl/examples` | 適合テストの期待値・同梱の例が変わる | 同上 |
