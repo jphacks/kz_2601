@@ -1,0 +1,22 @@
+{
+  "app": {"tabs": [{"screen": "home"}]},
+  "entities": [
+    {
+      "id": "task",
+      "fields": [
+        {"id": "title", "type": "text"},
+        {"id": "done", "type": "boolean"},
+        {"id": "doneCount", "type": "number", "computed": {"agg": "count", "filter": [{"field": "done", "op": "eq"}]}}
+      ]
+    }
+  ],
+  "screens": [
+    {
+      "id": "home",
+      "components": [
+        {"type": "stat", "entity": "task", "value": {"agg": "count", "filter": [{"field": "createdAt", "op": "thisMonth"}]}},
+        {"type": "card", "children": [{"type": "toggle", "field": "done"}]}
+      ]
+    }
+  ]
+}
