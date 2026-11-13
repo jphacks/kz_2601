@@ -175,6 +175,9 @@
     <string name="desktop_window_open_record">Open this record in a new window</string>
     <string name="desktop_window_title">Tailor It — %1$s</string>
     <string name="desktop_window_title_record">Tailor It — %1$s — %2$s</string>
+    <string name="desktop_a11y_bridge_title">Setting up screen reading</string>
+    <string name="desktop_a11y_bridge_body">Narrator is running, but the Java Access Bridge is not enabled, so this app may not be read aloud. Run "jabswitch -enable" in a command prompt, then restart this app. You can open this notice again from the command palette ("Screen reader help").</string>
+    <string name="desktop_a11y_bridge_command">Screen reader help</string>
     <string name="desktop_wipe">Erase data on this device</string>
     <string name="desktop_wipe_confirm">This erases the records, unsent changes and settings kept on this device. Records that haven\'t been sent can\'t be recovered.</string>
     <string name="desktop_wipe_confirm_button">Erase</string>

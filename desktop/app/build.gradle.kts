@@ -125,6 +125,20 @@ tasks.register<JavaExec>("listApps") {
     mainClass.set("jp.kz2601.metamon.desktop.net.ListAppsKt")
 }
 
+// 同梱の実行環境の Java Access Bridge を最初から有効にする(#2209)。Windows の JDK の jlink 結果には
+// conf/accessibility.properties があり、assistive_technologies の行がコメントになっている(jabswitch -enable が外す行)。
+// その行のコメントを外す。ファイルが無い OS(Linux・macOS の JDK)では何もしない。
+tasks.matching { it.name == "createRuntimeImage" }.configureEach {
+    doLast {
+        val dest = (this as? org.jetbrains.compose.desktop.application.tasks.AbstractJLinkTask)?.destinationDir?.get()?.asFile ?: return@doLast
+        val props = dest.resolve("conf/accessibility.properties")
+        if (!props.isFile) return@doLast
+        val text = props.readText()
+        val enabled = text.replace(Regex("(?m)^\\s*#\\s*(assistive_technologies\\s*=\\s*com\\.sun\\.java\\.accessibility\\.AccessBridge)"), "$1")
+        if (enabled != text) props.writeText(enabled)
+    }
+}
+
 compose.desktop {
     application {
         mainClass = "jp.kz2601.metamon.desktop.MainKt"

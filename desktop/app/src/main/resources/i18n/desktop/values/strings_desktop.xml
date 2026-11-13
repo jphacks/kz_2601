@@ -176,6 +176,9 @@
     <string name="desktop_window_open_record">この記録を別のウィンドウで開く</string>
     <string name="desktop_window_title">Tailor It — %1$s</string>
     <string name="desktop_window_title_record">Tailor It — %1$s — %2$s</string>
+    <string name="desktop_a11y_bridge_title">読み上げを使うための設定</string>
+    <string name="desktop_a11y_bridge_body">ナレーターが動いていますが、Java Access Bridge が有効でないため、このアプリの画面を読み上げられない場合があります。コマンドプロンプトで「jabswitch -enable」を実行して有効にし、このアプリを起動し直してください。この案内はコマンドパレットの「読み上げの案内」からもう一度開けます。</string>
+    <string name="desktop_a11y_bridge_command">読み上げの案内</string>
     <string name="desktop_wipe">この端末のデータを消す</string>
     <string name="desktop_wipe_confirm">この端末に残した記録・送信待ち・設定を全部消します。まだ送っていない記録は戻せません。</string>
     <string name="desktop_wipe_confirm_button">消す</string>
