@@ -10,6 +10,7 @@
 #   scripts/demo-check.sh stg --expect 89061ea   # 版を指定して照合(既定は stg=origin/develop・prod=origin/main の先頭 7 文字)
 #   scripts/demo-check.sh stg --expect skip      # 版を照合しない
 #   scripts/demo-check.sh prod --version-only    # /health の版と env だけ見る(キー不要・ユーザーを作らない)
+#   scripts/demo-check.sh --list                 # 確かめる項目の一覧(Markdown の表)を出すだけ(何も叩かない)
 #   (cd backend && make demo-check ENV=stg)
 # 版: appconfig・ai の GET /health の version(GIT_SHA 先頭 7 文字)と env を照合し、違えば NG。runner は非公開なので見ない。
 # Firebase Web API キーは $METAMON_SECRETS_DIR/GoogleService-Info.plist(既定 ~/Desktop/JPHACKS2026/secrets)の API_KEY、
@@ -18,7 +19,34 @@
 set -uo pipefail
 
 ENV_NAME="" EXPECT="" VERSION_ONLY=0
-usage() { echo "usage: $0 <stg|prod> [--expect <sha>|skip] [--version-only]" >&2; exit 2; }
+usage() { echo "usage: $0 <stg|prod> [--expect <sha>|skip] [--version-only]   |   $0 --list" >&2; exit 2; }
+
+# 確かめる項目の一覧(--list)。名前は結果の表の「確認」と揃える。項目を足したらここにも足す
+list_checks() {
+  cat <<'EOF'
+| # | 確認 | 何を見るか | --version-only | DEMO_CHECK_NO_AI=1 |
+|---|---|---|---|---|
+| 1 | 匿名ユーザー作成(accounts:signUp) | Firebase の匿名ユーザーが作れ、ID トークンが取れる | 飛ばす | 見る |
+| 2 | appconfig / ai GET /health ×3 | 3 回とも 200(1 回目でコールドスタートを温める)。所要時間を 3 回分出す | 見る | 見る |
+| 3 | appconfig / ai env(/health) | /health の env が指定した stg / prod と同じ(URL の取り違え) | 見る | 見る |
+| 4 | appconfig / ai 版(/health version) | /health の version が期待する版(既定 stg=origin/develop・prod=origin/main)の先頭 7 文字と同じ。--expect skip で見ない | 見る | 見る |
+| 5 | appconfig GET /dsl(新規 seed) | 生成用のテストアプリの DSL が取れる | 飛ばす | 飛ばす |
+| 6 | 生成「家計簿アプリが欲しい」 | ai の生成が Claude で 200 を返す(Claude 1 回) | 飛ばす | 飛ばす |
+| 7 | 対話「日記」 | ai の対話が question / ready を返す(Claude 1 回) | 飛ばす | 飛ばす |
+| 8 | 対話の状態を消す(DELETE /v1/chat) | 対話の状態を消せる | 飛ばす | 飛ばす |
+| 9 | 編集「集計のタブを足して」 | ai の編集が Claude で版を進める(Claude 1 回) | 飛ばす | 飛ばす |
+| 10 | 探す GET /public-apps | 公開アプリの一覧が 1 件以上ある(読むだけ) | 飛ばす | 見る |
+| 11 | リアルタイム用アプリ作成(GET /dsl) | リアルタイム用のテストアプリの DSL が取れる(NG の時だけ表に出る) | 飛ばす | 見る |
+| 12 | リアルタイム用アプリ作成(PUT /dsl) | 家計簿の DSL を書き込める(NG の時だけ表に出る) | 飛ばす | 見る |
+| 13 | リアルタイム SSE 購読(hello) | SSE を購読して 10 秒以内に hello が来る(NG の時だけ表に出る) | 飛ばす | 見る |
+| 14 | リアルタイム 投稿 → SSE records | レコードの投稿が 10 秒以内に SSE の records で届く。投稿から通知までの ms | 飛ばす | 見る |
+| 15 | 後片付け: テスト用レコード削除 | 14 で投稿したレコードを消せる | 飛ばす | 見る |
+| 16 | 後片付け: アーカイブ <アプリ> | このスクリプトが作ったアプリをアーカイブできる(204 / 404) | 飛ばす | 見る |
+| 17 | 後片付け: 匿名ユーザー削除(accounts:delete) | 1 で作った匿名ユーザーを消せる | 飛ばす | 見る |
+EOF
+}
+
+if [ $# = 1 ] && [ "$1" = --list ]; then list_checks; exit 0; fi
 while [ $# -gt 0 ]; do
   case "$1" in
     --expect) [ $# -ge 2 ] || usage; EXPECT="$2"; shift 2 ;;
