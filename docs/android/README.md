@@ -5,7 +5,8 @@ Android アプリ(#354・#356〜#360)の文書の入口。
 | 文書 | 中身 |
 |---|---|
 | [`android/README.md`](../../android/README.md) | モジュール・ビルドとテストのコマンド・stg / prod・Firebase の設定 |
-| [`ci.md`](ci.md) | CI の案(ワークフローの YAML。まだ置いていない) |
+| [`ci.md`](ci.md) | CI の形(`.github/workflows/android-ci.yml`・変わった場所ごとに回すもの・CI と手元で確かめるもの) |
+| [`l10n.md`](l10n.md) | 文言と言語(`values/`・`values-en/` の置き方・iOS の `Localizable.xcstrings` からの移し方・`StringsParityTest` での抜けの確認・アプリ内の言語の切り替え) |
 | [`play-billing.md`](play-billing.md) | Tailor It Pro の購入(Google Play Billing)と、backend・Play Console で残っていること |
 | [`play-background-location.md`](play-background-location.md) | Play Console の裏での位置情報の申告の文(場所に着いたら知らせる) |
 | [`../desktop/architecture.md`](../desktop/architecture.md) | デスクトップ版が取り込んでいる Android のソースと、直した時に回るデスクトップのテスト |
