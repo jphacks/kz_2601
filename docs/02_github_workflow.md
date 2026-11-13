@@ -109,6 +109,27 @@ macOS runner は Linux の 10 倍の分単価なので、ubuntu の `ios-changes
 - テストは各パッケージのフォルダで `xcodebuild test -destination platform=macOS`(`ios/scripts/mac-package-test.sh <パッケージ名>`)。署名しない・秘密を使わない。
 - 手元で回す時、repo か DerivedData が `~/Desktop`・`~/Documents`・`~/Downloads` の下にあると、テストの実行役が読めずに落ちる(macOS の保護)。repo(clone)と DerivedData(`MAC_DERIVED_DATA`)の両方を保護の外(例: `~/src`)に置く。CI では起きない。
 
+## android-ci(Android アプリの JVM テスト・ビルド)
+
+`.github/workflows/android-ci.yml`(#837)。PR が Open(非 Draft)の時と、`develop` / `main` への push で回る。**ubuntu だけ**で、エミュレータは使わない。ios-ci と同じく `android-changes` で変わった場所を見て、関係ない PR では Gradle を起動しない(workflow の `paths:` は使わない。required check が永遠に待ちになるため)。
+
+| ジョブ | いつ回るか | 回すもの |
+|---|---|---|
+| `android-build` | mode が `full`(`android/dsl/**` 以外の `android/**`・`docs/dsl/conformance/**`・`docs/dsl/examples/**`・`docs/dsl/dsl.schema.json`・この workflow。push では `android/dsl/**` も) | `./gradlew test assembleStgDebug` → `:app:compileStgDebugAndroidTestKotlin`(androidTest はコンパイルだけ)→ lint(非ブロッキング) |
+| `android-changes` | 毎回 | `dorny/paths-filter` で mode(`none` / `light` / `full`)と light で回す Gradle のタスクを決める |
+| `android-ci` | 毎回(集約) | ほかの 3 つの結果をまとめる。スキップは成功、失敗・キャンセルは失敗 |
+| `android-light` | mode が `light`(PR で `android/dsl/**` だけ・`docs/dsl/conformance/expr/**`・`docs/dsl/icon-map.json` と backend の `*.go`・iOS の `ClientCapabilities.swift` / `Localizable.xcstrings`) | 変わった物に関係する単体テストだけ(`:dsl:test`・`SymbolIconTableTest`・`DeviceCapabilitiesTest`・`RuntimeCopyIosEnglishTest`) |
+
+- 変わった場所と回すテストの細かい対応は [`docs/android/ci.md`](android/ci.md#形)。
+- 集約ジョブ `android-ci` は required check にできる形だが、`scripts/github/setup-branch-protection.sh` の `REQUIRED_CHECKS` にはまだ入っていない。**必須にするかはオーナーが判断する**。
+- `google-services.json` は CI に置かない。無くてもビルドは通り、認証はモックになる。
+
+落ちた時の見方:
+
+- **unit(`test`・`android-light` の `gradle`)**: 成果物 `android-test-reports`(full)/ `android-light-test-reports`(light)に Gradle のテストのレポート(HTML)がある。手元では `cd android && ./gradlew test` か、落ちたタスクだけ(例: `./gradlew :dsl:test`)。
+- **androidTest のコンパイル**: 本番コードの変更で `androidTest` のコードが壊れた印。`./gradlew :app:compileStgDebugAndroidTestKotlin` で再現する。実行はしていないので、端末での確認は [`docs/android/ci.md`](android/ci.md#ci-で検証されるもの--手元で確かめるもの) の手順で手元で行う。
+- **lint**: 非ブロッキング(`continue-on-error`)なので `android-ci` は落ちない。結果は job summary と警告に出て、レポートは成果物 `android-lint-reports`。手元では `./gradlew :app:lintStgDebug :renderer:lintDebug :services:lintDebug`。
+
 ## backend-emulator(Firestore エミュレータ試験・必須ではない)
 
 `.github/workflows/backend-emulator.yml`(#546)。`backend-ci` は 5 分上限なので別 workflow。
