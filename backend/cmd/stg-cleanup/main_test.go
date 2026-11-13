@@ -350,3 +350,62 @@ func uidField(t *testing.T, f *store.Firestore, path string) string {
 	uid, _ := s.Data()["uid"].(string)
 	return uid
 }
+
+func TestMode(t *testing.T) {
+	if got := mode(false); got != "dry-run" {
+		t.Errorf("mode(false) = %q, want dry-run", got)
+	}
+	if got := mode(true); got != "APPLY" {
+		t.Errorf("mode(true) = %q, want APPLY", got)
+	}
+	// dry-run is the default: the flag value without -apply
+	if got := mode(options{}.apply); got != "dry-run" {
+		t.Errorf("zero options = %q, want dry-run", got)
+	}
+}
+
+func TestTotalAndBreakdown(t *testing.T) {
+	cases := []struct {
+		name  string
+		in    map[string]int
+		total int
+		text  string
+	}{
+		{"nil", nil, 0, "[]"},
+		{"empty", map[string]int{}, 0, "[]"},
+		{"one", map[string]int{"apps": 3}, 3, "[apps=3]"},
+		{"sorted by key", map[string]int{"shares": 1, "apps": 2, "feedback": 0}, 3, "[apps=2 feedback=0 shares=1]"},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			if got := total(c.in); got != c.total {
+				t.Errorf("total = %d, want %d", got, c.total)
+			}
+			if got := breakdown(c.in); got != c.text {
+				t.Errorf("breakdown = %q, want %q", got, c.text)
+			}
+		})
+	}
+}
+
+func TestUIDHash(t *testing.T) {
+	cases := map[string]string{
+		"anonSmoke1": "79a152956ec9", // sha256("stg-cleanup:anonSmoke1")[:6]
+		"":           "fc2db1192c24",
+	}
+	for uid, want := range cases {
+		got := uidHash(uid)
+		if got != want {
+			t.Errorf("uidHash(%q) = %q, want %q", uid, got, want)
+		}
+		if strings.Contains(got, uid) && uid != "" {
+			t.Errorf("uidHash(%q) leaks the uid", uid)
+		}
+	}
+	if uidHash("a") == uidHash("b") {
+		t.Error("different uids hash the same")
+	}
+	if first, again := uidHash("a"), uidHash("a"); first != again {
+		t.Error("hash is not stable")
+	}
+}

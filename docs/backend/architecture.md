@@ -225,7 +225,7 @@ func UID(ctx context.Context) string { s, _ := ctx.Value(ctxKey{}).(string); ret
 
 ### 6.1 Claude 呼び出し
 
-> 実装: `backend/internal/ai/{client.go,schema.go,prompt.go,defaults.go,stream.go,generate.go,chat.go,handler.go}` + `backend/internal/appconfigclient`。実 API の応答サンプルは `docs/backend/ai-samples/*.response.json`、発話 16 本の品質/速度 eval は `docs/backend/ai-eval/`(ランナー `backend/cmd/ai-eval`・ケース `backend/internal/ai/eval/cases.json`、対話フェーズは `-chat` + `chat_cases.json`)。
+> 実装: `backend/internal/ai/{client.go,schema.go,prompt.go,defaults.go,stream.go,generate.go,chat.go,handler.go}` + `backend/internal/appconfigclient`。実 API の応答サンプルは `docs/backend/ai-samples/*.response.json`、発話 16 本の品質/速度 eval は `docs/backend/ai-eval/`(ランナー `backend/cmd/ai-eval`・ケース `backend/internal/ai/eval/cases.json`、対話フェーズは `-chat` + `chat_cases.json`)。回し方・フラグは [`ai-eval/README.md`](ai-eval/README.md)。
 
 | 項目 | 値(実装済み) |
 |---|---|
@@ -395,6 +395,8 @@ jobs:
 | `deploy-cloudrun.yml` | staging デプロイ後に同じものを **非ブロッキング**(`continue-on-error`)で実行し job summary に表を貼る |
 | `-only kakeibo\|training\|walk` / `SMOKE_ONLY=` | 1 本だけ |
 
+流れ・環境変数・片付け(stg-cleanup)・失敗した時の見方は [docs/infra/smoke.md](../infra/smoke.md)。
+
 ### 環境変数
 
 | 変数 | appconfig | ai | 既定 / 備考 |
@@ -426,18 +428,25 @@ backend/
   Dockerfile                 # 1 イメージに全サービス。既定は /app/appconfig、ai は --command=/app/ai
   Makefile                   # build / test / schema-check / dev。運用コマンドは mk/<feature>.mk
   go.mod                     # module github.com/jphacks/kz_2601/backend
-  mk/                        # feedback.mk / feedback-loop.mk / moderate.mk / purge.mk
+  mk/                        # appstore.mk / feedback-loop.mk / feedback.mk / moderate.mk / purge.mk / runner.mk / stg-cleanup.mk
   cmd/
     ai/                      # ai サービス: 文字(iOS が端末内で文字起こし済み)-> Claude -> DSL(全体 or JSON Patch)-> appconfig
     ai-audit/                # ai-eval の結果を機能面で採点(押しても動かないボタン・辿れない画面など)。API を呼ばない
     ai-eval/                 # internal/ai/eval/cases.json を実 Claude で流し、ケースごとの指標と DSL を JSON に出す
+    ai-session-report/       # 人ごとの操作をセッションに切り、AI が外したらしい所(言い直し・すぐの undo・やめた等)を順位づけ。人が手で回す(docs/ops/ai-session-report.md)
     appconfig/               # appconfig サービス: 配線のみ(env -> store -> handlers -> http.Server)
+    appstore-reconcile/      # App Store Server API で Pro の購読を読み直し、通知(v2)で届かなかった変化を保存(#315)。Cloud Run Job(docs/infra/app-store-notifications.md)
+    coin-initial-backfill/   # 記録が始まる前に初回のコインを受けたアカウントへ coin_initial_grants を書く(#1429)。1 回だけ人が回す(docs/infra/coin-initial-backfill.md)
+    dslgen/                  # docs/dsl/dsl.schema.json から Android(Kotlin)の DSL の型を生成(#351・make dsl-gen)
     feedback/                # アプリ内フィードバックを運営が読む(#319)。読み取りだけ
     feedback-loop/           # 自己改善ループ(#364): 取り込み・振り分け・Issue の下書きと人の承認・直ったお知らせ・停止スイッチ
+    matching-age-backfill/   # 18 歳以上の申告(#507)より前に出た仲間探しのプロフィールに ownerAgeConfirmed を付ける。1 回だけ人が回す(docs/infra/matching-age-backfill.md)
     moderate/                # 通報の確認と運営による非公開化(#321)。手順は docs/infra/moderation.md
     product-metrics/         # 指標のログ(#297)から週ごとの Markdown 表を出す。ログのエクスポートだけを読む
     purge/                   # 退会から一定期間たったアカウントと古いフィードバックを消す Cloud Run Job(#458・#319)
+    runner/                  # サーバーのルール(#341)。appconfig が貯めた outbox を POST /internal/tick で流す(docs/infra/runner.md)
     smoke/                   # デモの発話を実 API で流して表を出す(make smoke-local / smoke-stg)
+    stg-cleanup/             # stg のテストのデータ(smoke のアプリ・回数制限のカウンタ・指定した uid)を消す(#293)。既定は dry run(docs/infra/stg-cleanup.md)
   internal/                  # サービス実装(外部 import 不可)
     ai/                      # 文字 -> DSL の変更。pkg/dsl で検証し、問題があれば上限つきで再生成
     appcheck/                # Firebase App Check のトークン検証(#318・APP_CHECK_MODE)
@@ -445,13 +454,23 @@ backend/
     appconfigclient/         # ai が今の DSL を読み書きする薄いクライアント(HTTP で Bearer 転送 / Memory)
     appstore/                # StoreKit 2 の署名付き取引(JWS)を Apple に問い合わせずに検証(#314)
     auth/                    # Firebase ID トークン検証 middleware・UID(ctx)・dev 用 verifier
+    books/                   # DSL の lookupBook で ISBN から本の情報を引く(openBD・キャッシュつき)。docs/backend/features/book-lookup.md
+    budget/                  # その日の環境の AI の費用がしきい値を超えたら、無料プランの AI の処理をその日止める(#317・AI_FREE_DAILY_BUDGET_USD)
+    calls/                   # shared のアプリの音声・ビデオ通話(#447)。LiveKit のトークン発行と分の課金だけ。docs/backend/features/calls.md
+    coins/                   # コインの財布と台帳(#630)。LLM の呼び出しを Reserve / Commit / Release で払う
     entitlement/             # Pro の権利のサーバー側の記録(#314)
+    extapi/                  # runner から外の API を呼ぶ口(#1493)。決まった provider と操作だけ。docs/backend/features/external-apis.md
     fsenv/                   # 接続する Firestore の DB を決め、stg が本番の DB を使うと止める(#290)
+    googleplay/              # Google Play の購読(Android の Pro)を Google Play Developer API で読む・acknowledge する
+    gtfsstatic/              # 静的な GTFS-JP の zip からバスの停留所・路線・時刻を読む(#1692)。読むだけ
     httpx/                   # JSON 書き出し・エラー封筒・RequestID・recover・アクセスログ middleware
     loop/                    # 自己改善ループ(#364)。pii(伏せ字)・ingest・triage(LLM・道具なし)・draft(出口の検査)・github・fixed
     metrics/                 # プロダクトの指標のイベントを構造化ログに出す(#297)
+    moderation/textfilter/   # 他の人が見る文字(共有の記録・参加者の名前・公開の一覧)で明らかに不適切な語を断る(#321)。docs/infra/moderation.md
     paid/                    # 有料機能のリスト(paid_features.json)と DSL での判定。ai / appconfig が 402 で止める(#316)
+    plan/                    # プランごとに使える量の表(#317・無料 / Pro)。docs/backend/rate-limit.md
     ratelimit/               # 1 人(と全体)が 1 日に起こせる Claude の処理量の上限(#280)
+    runner/                  # サーバーのルール(#341)。outbox から取り、直前に確かめ、評価・数え・1 回だけ書き・通知する
     store/                   # users/{uid}/apps/{appId} 以下の永続化(Firestore / Memory)
   pkg/
     dsl/                     # 全サービス共有の DSL: 型・schema.json(embed)・Parse / Validate
