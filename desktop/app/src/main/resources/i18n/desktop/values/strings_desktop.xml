@@ -100,6 +100,13 @@
     <string name="desktop_match_offline">仲間探しのつながりはサインインした後に出ます</string>
     <string name="desktop_notification_now">今</string>
     <string name="desktop_notification_scheduled">通知を予約しました(%1$s・アプリを開いている間だけ)</string>
+    <string name="desktop_onboarding_keys_body">%1$s で画面・アプリ・操作を探して開けます。%2$s でショートカットの一覧を出せます。</string>
+    <string name="desktop_onboarding_keys_title">キーボードで、すぐ開く</string>
+    <string name="desktop_onboarding_later">あとで見る</string>
+    <string name="desktop_onboarding_later_hint">あとで見る時は %1$s の一覧かコマンドパレットの「使い方を見る」から開けます</string>
+    <string name="desktop_onboarding_title">使い方</string>
+    <string name="desktop_onboarding_windows_body">アプリや記録を別のウィンドウで開いて並べられます。ウィンドウを閉じてもトレイに残り、すぐ記録できます。</string>
+    <string name="desktop_onboarding_windows_title">ウィンドウを並べて使う</string>
     <string name="desktop_picker_empty">候補がありません</string>
     <string name="desktop_picker_hint">ボタンを押すと 1 つ選びます</string>
     <string name="desktop_picker_pick">選ぶ</string>

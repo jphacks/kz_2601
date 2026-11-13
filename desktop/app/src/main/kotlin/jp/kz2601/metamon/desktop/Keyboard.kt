@@ -43,6 +43,7 @@ import jp.kz2601.metamon.dsl.Presentation
 import jp.kz2601.metamon.dsl.Screen
 import jp.kz2601.metamon.dsl.screen
 import jp.kz2601.metamon.renderer.form.FormDraft
+import jp.kz2601.metamon.desktop.onboarding.OnboardingDialog
 
 // キーボードだけで使う(#1765): ショートカット・コマンドパレット(CommandPalette.kt)・F1 の一覧。
 
@@ -279,6 +280,12 @@ class DesktopKeyboard(
 
     /** サードパーティのライセンス(Licenses.kt)。F1 の一覧とパレットから開く。 */
     var licensesOpen by mutableStateOf(false)
+
+    /** 初回の流れ(#3201)。起動時に 1 回・F1 の一覧とパレットの「使い方を見る」から開く。 */
+    var onboardingOpen by mutableStateOf(false)
+
+    /** 初回の流れを閉じた(最後まで見た = true・あとで見る / Esc = false)。 */
+    var onOnboardingFinished: (Boolean) -> Unit = {}
     val root = FocusRequester()
     val modal = FocusRequester()
 
@@ -299,7 +306,7 @@ class DesktopKeyboard(
             if (!repeat) closePreview()
             return true
         }
-        if (paletteOpen || helpOpen || licensesOpen || wipeConfirmOpen) return false // パレット・一覧・確認が自分で受ける
+        if (paletteOpen || helpOpen || licensesOpen || wipeConfirmOpen || onboardingOpen) return false // パレット・一覧・確認が自分で受ける
         val s = Keymap.match(p, os) ?: return false
         if (s == Shortcut.PRINT || s.bubble != bubble) return false // 印刷は Print.kt の Ctrl+P
         // Space は何も選んでいない時だけ。見せる写真が無ければ流す(知らせも出さない)
@@ -381,7 +388,11 @@ class DesktopKeyboard(
             "about:licenses", LicensesText.TITLE, PaletteCommand.Kind.ACTION,
             keywords = listOf("licenses", "third-party", "oss", "notice", LicensesText.LICENSE),
         ) { licensesOpen = true }
-        return shortcuts + buttons + record + screens + apps + wipe + licenses
+        val onboarding = PaletteCommand(
+            "help:onboarding", Strings["onboarding_replay"], PaletteCommand.Kind.ACTION,
+            keywords = listOf("onboarding", "tutorial", "how to use", Strings["desktop_onboarding_title"]),
+        ) { onboardingOpen = true }
+        return shortcuts + buttons + record + screens + apps + wipe + onboarding + licenses
     }
 
     /** 確認で「消す」を押した: 全アプリの端末のデータを消し、このウィンドウを最初の画面に戻す。 */
@@ -412,7 +423,7 @@ class DesktopKeyboard(
     val modalModifier: Modifier get() = Modifier.focusRequester(modal).focusGroup()
 
     fun focusAfterNavigation(modalOpen: Boolean) {
-        if (paletteOpen || helpOpen || licensesOpen) return
+        if (paletteOpen || helpOpen || licensesOpen || onboardingOpen) return
         if (modalOpen && runCatching { modal.requestFocus(FocusDirection.Enter) }.getOrDefault(false)) return
         runCatching { root.requestFocus() }
     }
@@ -433,8 +444,17 @@ class DesktopKeyboard(
             }
         }
         if (helpOpen) {
-            ShortcutHelp(os, onLicenses = { helpOpen = false; licensesOpen = true }) {
+            ShortcutHelp(os, onLicenses = { helpOpen = false; licensesOpen = true }, onOnboarding = { helpOpen = false; onboardingOpen = true }) {
                 helpOpen = false
+                runCatching { root.requestFocus() }
+            }
+        }
+        if (onboardingOpen) {
+            OnboardingDialog(os) { completed ->
+                onboardingOpen = false
+                onOnboardingFinished(completed)
+                // あとで見る: どこから見直せるかを一言で
+                if (!completed) session.message = Strings.format("desktop_onboarding_later_hint", Keymap.label(Shortcut.HELP, os))
                 runCatching { root.requestFocus() }
             }
         }

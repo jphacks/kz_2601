@@ -72,6 +72,7 @@ import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.semantics
 import jp.kz2601.metamon.desktop.i18n.Strings
 import jp.kz2601.metamon.desktop.store.SessionPersistence
+import jp.kz2601.metamon.desktop.onboarding.OnboardingStore
 
 /** 画面 1 枚の描画に要るもの。 */
 private class ScreenScope(
@@ -105,6 +106,10 @@ fun DesktopApp(
     windowId: Int? = null,
     /** パレットの「この端末のデータを消す」(#1887)。全アプリの分を消す。null なら出さない。 */
     onWipeLocalData: (suspend () -> Unit)? = null,
+    /** 初回の流れを見たかの保存(#3201)。null なら見たことを残さない(テスト・開発)。 */
+    onboarding: OnboardingStore? = null,
+    /** 開いた時に初回の流れを出す(起動時の最初のウィンドウだけ)。 */
+    showOnboardingAtLaunch: Boolean = false,
 ) {
     val session = remember {
         DesktopSession(dsl, initialStore, startScreen = startScreen, host = DesktopActionHost(), persistence = persistence, shared = records, startRecordId = startRecordId)
@@ -130,6 +135,9 @@ fun DesktopApp(
     val openPrint = { printing = ScreenPrint.document(dsl, session.top.screen, session.store, session.form(session.top), locale = Strings.locale) }
     // キーボードだけで使う(#1765): Ctrl+K パレット・Ctrl+N/S/F・Delete・Esc・F1
     val keyboard = rememberDesktopKeyboard(dsl, session, dispatch, openPrint, onOpenApp, onOpenRecord, onWipeLocalData)
+    // 初回の流れ(#3201): 閉じたら(最後まで・あとで見る・Esc のどれでも)次の起動では出さない
+    keyboard.onOnboardingFinished = { onboarding?.markSeen() }
+    LaunchedEffect(Unit) { if (showOnboardingAtLaunch && onboarding?.hasSeen != true) keyboard.onboardingOpen = true }
 
     // Ctrl+F はこのウィンドウの検索欄にだけ入る
     // 写真のプレビュー(PhotoPreview.kt): 写真の部品を押すとこのウィンドウのダイアログで開く。開いている間は貼り付け・印刷を取らない

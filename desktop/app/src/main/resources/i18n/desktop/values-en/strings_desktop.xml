@@ -99,6 +99,13 @@
     <string name="desktop_match_offline">Matches appear after you sign in</string>
     <string name="desktop_notification_now">now</string>
     <string name="desktop_notification_scheduled">Notification scheduled (%1$s, only while the app is open)</string>
+    <string name="desktop_onboarding_keys_body">Press %1$s to find and open screens, apps, and actions. Press %2$s for the list of shortcuts.</string>
+    <string name="desktop_onboarding_keys_title">Open anything from the keyboard</string>
+    <string name="desktop_onboarding_later">Later</string>
+    <string name="desktop_onboarding_later_hint">To see this later, choose “How to use” in the %1$s list or the command palette</string>
+    <string name="desktop_onboarding_title">How to use</string>
+    <string name="desktop_onboarding_windows_body">Open apps and records in their own windows, side by side. Closing a window keeps the app in the tray so you can record right away.</string>
+    <string name="desktop_onboarding_windows_title">Use windows side by side</string>
     <string name="desktop_picker_empty">No candidates</string>
     <string name="desktop_picker_hint">Press the button to pick one</string>
     <string name="desktop_picker_pick">Pick</string>

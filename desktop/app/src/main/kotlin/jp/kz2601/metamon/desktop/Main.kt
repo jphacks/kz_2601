@@ -31,6 +31,7 @@ import jp.kz2601.metamon.desktop.io.DragOut
 import jp.kz2601.metamon.desktop.store.DesktopStore
 import jp.kz2601.metamon.desktop.store.DeviceWipe
 import jp.kz2601.metamon.desktop.store.SessionPersistence
+import jp.kz2601.metamon.desktop.onboarding.OnboardingStore
 import jp.kz2601.metamon.desktop.theme.TailorItTheme
 import jp.kz2601.metamon.dsl.records.entityModels
 import jp.kz2601.metamon.dsl.screen
@@ -100,6 +101,13 @@ private fun runApp(args: Array<String>) = application {
             loadScope.cancel()
         }
     }
+    // 初回の流れ(#3201): 初めての起動で最初のウィンドウに出す。TAILORIT_RESET_ONBOARDING=1 で見ていないことに戻す。
+    // 記録の JSON を渡した起動(開発・スクリーンショット)は戻した時だけ出す(画面を塞がない)
+    val onboarding = remember { OnboardingStore(desktopStore.settings) }
+    val onboardingAtLaunch = remember {
+        val reset = onboarding.applyLaunchOverride()
+        onboarding.shouldAutoPresent() && (args.getOrNull(1) == null || reset)
+    }
     val registry = remember { WindowRegistry().also { it.open(WindowKey.app(first)) } }
     val firstWindowId = remember { registry.windows.first().id }
     // トレイに常駐(#1761): × はトレイに隠す(設定で off・トレイが無ければ終わる)。終わるのはトレイの「終了」
@@ -125,7 +133,12 @@ private fun runApp(args: Array<String>) = application {
     DesktopTray(tray)
     registry.windows.toList().forEach { w ->
         key(w.id) {
-            DesktopWindow(w, registry, hub, tray, startScreen = args.getOrNull(2)?.takeIf { w.id == firstWindowId })
+            DesktopWindow(
+                w, registry, hub, tray,
+                startScreen = args.getOrNull(2)?.takeIf { w.id == firstWindowId },
+                onboarding = onboarding,
+                showOnboarding = onboardingAtLaunch && w.id == firstWindowId,
+            )
         }
     }
 }
@@ -133,7 +146,15 @@ private fun runApp(args: Array<String>) = application {
 /** ウィンドウ 1 枚。画面の状態(遷移・下書き・キー)はウィンドウごと、記録はアプリごとに共有。 */
 @OptIn(FlowPreview::class)
 @Composable
-private fun ApplicationScope.DesktopWindow(w: WindowEntry, registry: WindowRegistry, hub: AppHub, tray: TrayController, startScreen: String?) {
+private fun ApplicationScope.DesktopWindow(
+    w: WindowEntry,
+    registry: WindowRegistry,
+    hub: AppHub,
+    tray: TrayController,
+    startScreen: String?,
+    onboarding: OnboardingStore,
+    showOnboarding: Boolean,
+) {
     // アプリの記録はウィンドウの数で数える。最後の 1 枚を閉じたら書き終えて閉じる
     val app = remember(w) { hub.acquire(w.key.appId) }
     DisposableEffect(w) { onDispose { hub.release(w.key.appId) } }
@@ -206,6 +227,8 @@ private fun ApplicationScope.DesktopWindow(w: WindowEntry, registry: WindowRegis
                         isActive = { registry.active?.id == w.id },
                         windowId = w.id,
                         onWipeLocalData = hub::wipeLocalData,
+                        onboarding = onboarding,
+                        showOnboardingAtLaunch = showOnboarding,
                     )
                 }
             }
