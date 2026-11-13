@@ -175,11 +175,36 @@ macOS runner は Linux の 10 倍の分単価なので、ubuntu の `ios-changes
 
 `.github/workflows/backend-emulator.yml`(#546)。`backend-ci` は 5 分上限なので別 workflow。
 
-- 発火: `backend/**` かこの workflow を触る PR(非 Draft)と、`develop` / `main` への push。
-- gcloud SDK の `cloud-firestore-emulator` を `127.0.0.1:8089`・プロジェクト `demo-kz2601` で起動し、`t.Skip("FIRESTORE_EMULATOR_HOST not set")` を持つパッケージに `go test` をかける。`demo-` プロジェクトで認証情報も渡さないので実 GCP には繋がらない。
-- Firestore 系テスト(`TestFirestore*` / `*/firestore`)が 1 件でもスキップされたら失敗(黙ってスキップさせない)。通った件数は job summary に出る。
-- **required check にはまだしていない**(マージ条件は上の 3 本のまま)。必須にするかはオーナーが判断する。必須にするなら `paths:` をやめて `backend-ci` と同じ paths-filter 方式に変える。
-- 起動・試験の中身は `scripts/firestore-emulator.sh`。手元で同じことをするには `make -C backend test-emulator`(エミュレータが無ければ一時的に起動して止める)。開発用に起動しっぱなしにするなら `make -C backend emulator`(別ターミナル)。
+**何を回すか**: エミュレータが無いと `t.Skip("FIRESTORE_EMULATOR_HOST not set")` で飛ばされる store まわりのテスト。対象のパッケージは決め打ちせず、`scripts/firestore-emulator.sh test` がその文字列を持つ `*_test.go` を grep して集める(今は `internal/store`・`internal/appconfig`・`internal/runner` とその下の `queue` / `quota`・`internal/ai`・`internal/coins` など)。
+
+**いつ回るか**:
+
+| きっかけ | 試験ジョブ `backend-emulator-test` |
+|---|---|
+| PR(opened / synchronize / reopened / ready_for_review・Draft は除く)で `backend/**`・`.github/workflows/backend-emulator.yml`・`scripts/firestore-emulator.sh` のどれかが変わった | 回る |
+| 上の 3 つのどれも変わっていない PR | 飛ばす(集約ジョブは成功) |
+| `develop` / `main` への push(push 前との差分に上の 3 つのどれかがある) | 回る |
+
+- workflow の `paths:` は使わず、`backend-emulator-changes`(`dorny/paths-filter`)で判定する(`backend-ci` と同じ理由: required にした時に check が待ちのままにならないように)。
+- ジョブは 3 つ: `backend-emulator-changes`(判定)→ `backend-emulator-test`(試験・上限 15 分)→ `backend-emulator`(集約。試験を飛ばしたら成功、回したらその結果)。
+- 時間の目安: 試験ジョブが回った時で 3〜4 分(gcloud とエミュレータの取得込み)。回らない時は判定と集約で数十秒。
+
+**中身**: gcloud SDK の `cloud-firestore-emulator`(版は固定)を `127.0.0.1:8089`・プロジェクト `demo-kz2601` で起動し、集めたパッケージに `go test -count=1 -json` をかける。`demo-` プロジェクトで認証情報も渡さないので実 GCP には繋がらない。
+
+**skip されていないかの確かめ方**(`scripts/firestore-emulator.sh` の `test` が見る):
+
+- 出力に `FIRESTORE_EMULATOR_HOST not set` が 1 回でも出たら失敗(`::error::emulator tests were skipped`)。
+- Firestore 系テスト(名前が `TestFirestore*` か、サブテストが `*/firestore`)が 1 件でもスキップされたら失敗し、その名前を並べる。
+- 通った Firestore 系テストの件数を job summary に `Firestore emulator tests passed: <件数>` で出す。0 件なら失敗。件数が前より急に減っていたら、テストが別の理由でスキップされていないかを見る。
+
+**落ちた時の見方**:
+
+1. `backend-emulator` が赤 → 中身は `backend-emulator-test` の方。そちらを開く。
+2. `Firestore エミュレータ起動` の step で落ちた → 90 秒で応答しなかった。ログ(`emulator.log`)はその step の中と、最後の `エミュレータログ(失敗時)` に出る。gcloud・Java の取得の失敗なら Re-run でよいことが多い。
+3. `go test` の step で落ちた → 上の `::error::` 行(スキップ・件数 0)か、普通のテストの失敗。手元で `make -C backend test-emulator` で再現する(エミュレータが無ければ一時的に起動して止める)。開発用に起動しっぱなしにするなら `make -C backend emulator`(別ターミナル)。
+4. `backend-emulator-changes` が赤 → paths-filter の失敗。Re-run。
+
+**required check にはまだしていない**(`scripts/github/setup-branch-protection.sh` の `REQUIRED_CHECKS` は `backend-ci` / `ios-ci` / `secrets-scan` の 3 本)。必須にするかはオーナーが判断する(決めること)。必須にする時に登録する名前は集約ジョブの `backend-emulator`。
 
 ## CI が落ちた時の見方
 
