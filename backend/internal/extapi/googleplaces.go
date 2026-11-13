@@ -7,7 +7,10 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"net/url"
+	"os"
 	"regexp"
+	"strconv"
 	"strings"
 	"unicode/utf8"
 )
@@ -19,6 +22,7 @@ import (
 //
 //	searchText(q, lat?, lng?, radius?, limit?)      Rows; lat / lng bias the search
 //	searchNearby(type?, lat, lng, radius?, limit?)  Rows within the circle
+//	details(placeId, lang?)                         Item + Rows (#2140, off by default)
 //
 // A row is the place's name / short address / place id / Google Maps link.
 // The field mask (placesFieldMask) asks for those 4 fields only, so a call
@@ -26,6 +30,12 @@ import (
 // reviews or photos. radius is metres (1-50000, default 5000 for a text
 // search with a point and 1000 nearby), limit 1-20 (default 10); lat / lng
 // are rounded to 4 places (about 10 m).
+//
+// details (#2140) is a prototype that is registered only with
+// EXT_GOOGLE_PLACES_DETAILS=1: its field mask (placesDetailsFieldMask) adds
+// opening hours and rating, which is a higher SKU, so the default build keeps
+// the search ops and their mask unchanged. Item is the place (subtitle =
+// open now / rating), Rows are the weekly opening hours (lang ja or en).
 //
 // Terms (Places API policies): only the place id may be kept; names and
 // addresses must not be stored or cached, and the results are shown with
@@ -41,11 +51,16 @@ const (
 	googlePlacesHost = "https://places.googleapis.com"
 	placesFieldMask  = "places.id,places.displayName,places.shortFormattedAddress,places.googleMapsUri"
 	placesMaxQuery   = 200 // runes
+
+	placesDetailsFieldMask = "id,displayName,googleMapsUri,regularOpeningHours.weekdayDescriptions,currentOpeningHours.openNow,rating,userRatingCount"
+	// placesDetailsEnv turns details on (#2140).
+	placesDetailsEnv = "EXT_GOOGLE_PLACES_DETAILS"
 )
 
 var (
 	placesKeyRe  = regexp.MustCompile(`^[A-Za-z0-9_-]{20,64}$`)
 	placesTypeRe = regexp.MustCompile(`^[a-z][a-z_]{1,49}$`)
+	placesIDRe   = regexp.MustCompile(`^[A-Za-z0-9_-]{10,300}$`)
 )
 
 func init() {
@@ -53,10 +68,15 @@ func init() {
 		Ops: []OpSpec{
 			{Name: "searchText", Args: []string{"q", "lat", "lng", "radius", "limit"}},
 			{Name: "searchNearby", Args: []string{"type", "lat", "lng", "radius", "limit"}},
+			{Name: "details", Args: []string{"placeId", "lang"}},
 		},
 		Hosts: []string{googlePlacesHost},
 		New: func(sec Secrets) (map[string]Operation, error) {
-			return newGooglePlaces(sec.APIKey, googlePlacesHost, NewHTTPClient([]string{googlePlacesHost}, DefaultTimeout))
+			ops, err := newGooglePlaces(sec.APIKey, googlePlacesHost, NewHTTPClient([]string{googlePlacesHost}, DefaultTimeout))
+			if err == nil && !flag(os.Getenv(placesDetailsEnv)) {
+				delete(ops, "details") // off: Service answers ErrUnavailable
+			}
+			return ops, err
 		}})
 }
 
@@ -69,6 +89,7 @@ func newGooglePlaces(key, base string, hc *http.Client) (map[string]Operation, e
 	return map[string]Operation{
 		"searchText":   OperationFunc(g.searchText),
 		"searchNearby": OperationFunc(g.searchNearby),
+		"details":      OperationFunc(g.details),
 	}, nil
 }
 
@@ -205,4 +226,101 @@ func (g *googlePlaces) post(ctx context.Context, path string, body any, limit in
 	}
 	// no places is an answer (0 rows), not a failure: the request was billed
 	return Output{Rows: rows}, nil
+}
+
+type placesDetailsAnswer struct {
+	ID          string `json:"id"`
+	DisplayName struct {
+		Text string `json:"text"`
+	} `json:"displayName"`
+	GoogleMapsURI       string `json:"googleMapsUri"`
+	RegularOpeningHours *struct {
+		WeekdayDescriptions []string `json:"weekdayDescriptions"`
+	} `json:"regularOpeningHours"`
+	CurrentOpeningHours *struct {
+		OpenNow *bool `json:"openNow"`
+	} `json:"currentOpeningHours"`
+	Rating          *float64 `json:"rating"`
+	UserRatingCount int      `json:"userRatingCount"`
+}
+
+// details: GET /v1/places/{placeId} with the hours / rating mask (#2140).
+func (g *googlePlaces) details(ctx context.Context, in Input) (Output, error) {
+	id := strings.TrimSpace(in.Args["placeId"])
+	if !placesIDRe.MatchString(id) {
+		return Output{}, fmt.Errorf("%w: placeId", ErrBadArgs)
+	}
+	lang := strings.TrimSpace(in.Args["lang"])
+	switch lang {
+	case "":
+		lang = "ja"
+	case "ja", "en":
+	default:
+		return Output{}, fmt.Errorf("%w: lang must be ja or en", ErrBadArgs)
+	}
+	u := g.base + "/v1/places/" + url.PathEscape(id) + "?languageCode=" + lang
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, u, nil)
+	if err != nil {
+		return Output{}, errors.New("googleplaces: building the request failed")
+	}
+	req.Header.Set("X-Goog-Api-Key", g.key)
+	req.Header.Set("X-Goog-FieldMask", placesDetailsFieldMask)
+	var a placesDetailsAnswer
+	if err := sendJSON(ctx, g.hc, req, &a); err != nil {
+		return Output{}, err
+	}
+	if a.DisplayName.Text == "" {
+		return Output{Rows: []Row{}}, nil
+	}
+	item := Row{Title: a.DisplayName.Text, Subtitle: placesStatus(a, lang), Value: id}
+	if strings.HasPrefix(a.GoogleMapsURI, "https://") {
+		item.URL = a.GoogleMapsURI
+	}
+	rows := []Row{}
+	if a.RegularOpeningHours != nil {
+		for _, d := range a.RegularOpeningHours.WeekdayDescriptions {
+			if d = strings.TrimSpace(d); d != "" && len(rows) < 7 {
+				rows = append(rows, Row{Title: d})
+			}
+		}
+	}
+	return Output{Item: &item, Rows: rows}, nil
+}
+
+// placesStatus is "営業中 · ★4.3 (1,234件)" / "Open now · ★4.3 (1,234 reviews)".
+func placesStatus(a placesDetailsAnswer, lang string) string {
+	en := lang == "en"
+	var parts []string
+	if a.CurrentOpeningHours != nil && a.CurrentOpeningHours.OpenNow != nil {
+		switch {
+		case *a.CurrentOpeningHours.OpenNow && en:
+			parts = append(parts, "Open now")
+		case *a.CurrentOpeningHours.OpenNow:
+			parts = append(parts, "営業中")
+		case en:
+			parts = append(parts, "Closed now")
+		default:
+			parts = append(parts, "営業時間外")
+		}
+	}
+	switch {
+	case a.Rating != nil && en:
+		parts = append(parts, fmt.Sprintf("★%.1f (%s reviews)", *a.Rating, placesCount(a.UserRatingCount)))
+	case a.Rating != nil:
+		parts = append(parts, fmt.Sprintf("★%.1f(%s件)", *a.Rating, placesCount(a.UserRatingCount)))
+	case en:
+		parts = append(parts, "No rating")
+	default:
+		parts = append(parts, "評価なし")
+	}
+	return strings.Join(parts, " · ")
+}
+
+// placesCount is n with thousands commas.
+func placesCount(n int) string {
+	s := strconv.Itoa(max(n, 0))
+	for i := len(s) - 3; i > 0; i -= 3 {
+		s = s[:i] + "," + s[i:]
+	}
+	return s
 }

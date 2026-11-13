@@ -419,6 +419,9 @@ func (s *Service) check(r CallRequest) (Provider, OpSpec, error) {
 	if !s.Enabled(p.ID) {
 		return p, spec, ErrUnavailable
 	}
+	if _, ok := s.ops[p.ID][spec.Name]; !ok {
+		return p, spec, ErrUnavailable // an op the provider left off (e.g. googlePlaces.details, #2140)
+	}
 	if p.Billing == BillingPaid && s.Coins != nil && s.Coins.Mode() == coins.ModeEnforce && s.cfg.Reserve[p.ID] <= 0 {
 		return p, spec, ErrUnavailable // would run free under enforce (like coins.CheckReserves)
 	}
