@@ -92,6 +92,9 @@ import kotlinx.coroutines.launch
 import jp.kz2601.metamon.services.update.ServiceNotice
 import kotlinx.coroutines.Dispatchers
 import java.net.URI
+import jp.kz2601.metamon.desktop.chat.ChatBuild
+import jp.kz2601.metamon.desktop.chat.ChatSession
+import jp.kz2601.metamon.services.consent.AiConsentStore
 
 /** 画面 1 枚の描画に要るもの。 */
 private class ScreenScope(
@@ -148,6 +151,12 @@ fun DesktopApp(
     onOpenServerApp: (suspend (ServerAppRow) -> Boolean)? = null,
     /** 開いた時に出す一言(DSL を差し替えて作り直した時の「最新の内容に更新しました」・#2809) */
     hotSwapNotice: String? = null,
+    /** パレットの「新しいアプリを作る」(#2160)。AI の接続先がある時だけ渡す。null なら出さない。 */
+    newChat: (() -> ChatSession)? = null,
+    /** 会話の ready・案から作る(#2163)。 */
+    buildFromChat: (ChatBuild) -> Unit = {},
+    /** 会話の前に確かめる同意。 */
+    aiConsent: AiConsentStore? = null,
 ) {
     val noticeScope = rememberCoroutineScope()
     val openNoticeLink: (String) -> Unit = onOpenNoticeLink ?: { url ->
@@ -220,7 +229,11 @@ fun DesktopApp(
     var printing by remember { mutableStateOf<PrintDocument?>(null) }
     val openPrint = { printing = ScreenPrint.document(dsl, session.top.screen, session.store, session.form(session.top), locale = Strings.locale) }
     // キーボードだけで使う(#1765): Ctrl+K パレット・Ctrl+N/S/F・Delete・Esc・F1
-    val keyboard = rememberDesktopKeyboard(dsl, session, dispatch, openPrint, onOpenApp, onOpenRecord, onWipeLocalData, usage = session.persistence?.usage, saveLayout = onSaveLayout)
+    val keyboard = rememberDesktopKeyboard(
+        dsl, session, dispatch, openPrint, onOpenApp, onOpenRecord, onWipeLocalData,
+        usage = session.persistence?.usage, saveLayout = onSaveLayout,
+        newChat = newChat, buildFromChat = buildFromChat, aiConsent = aiConsent,
+    )
     // 初回の流れ(#3201): 閉じたら(最後まで・あとで見る・Esc のどれでも)次の起動では出さない
     keyboard.onOnboardingFinished = { onboarding?.markSeen() }
     LaunchedEffect(Unit) { if (showOnboardingAtLaunch && onboarding?.hasSeen != true) keyboard.onboardingOpen = true }

@@ -37,7 +37,13 @@ import jp.kz2601.metamon.desktop.debug.DevOnboardingItems
 import jp.kz2601.metamon.desktop.debug.SeenFlagsOnboardingReplay
 import jp.kz2601.metamon.desktop.hotkey.HotkeyRunner
 import jp.kz2601.metamon.desktop.hotkey.HotkeySettings
+import jp.kz2601.metamon.desktop.chat.ChatBuild
+import jp.kz2601.metamon.desktop.chat.ChatEntry
+import jp.kz2601.metamon.desktop.chat.ChatSession
 import jp.kz2601.metamon.desktop.i18n.Strings
+import jp.kz2601.metamon.desktop.net.DesktopApi
+import jp.kz2601.metamon.desktop.net.DesktopApiConfig
+import jp.kz2601.metamon.services.consent.AiConsentStore
 import jp.kz2601.metamon.desktop.io.DragOut
 import jp.kz2601.metamon.desktop.io.OpenWithFiles
 import jp.kz2601.metamon.desktop.io.OpenWithInbox
@@ -161,6 +167,11 @@ private fun runApp(args: Array<String>, launchAction: LaunchAction?, jump: JumpC
             hub.close()
             loadScope.cancel()
         }
+    }
+    // 会話・作る(#2160): AI の接続先(TAILORIT_API=stg・TAILORIT_AI_URL)がある時だけ。モックは通信しない。同意が無い間は送らない
+    val chat = remember {
+        val ai = DesktopApi.ai(DesktopApiConfig.fromEnvironment(), isGranted = { desktopStore.aiConsent.isGranted }, cache = desktopStore.documents)
+        ChatWiring(ChatEntry.factory(ai), desktopStore.aiConsent)
     }
     // 初回の流れ(#3201): 初めての起動で最初のウィンドウに出す。TAILORIT_RESET_ONBOARDING=1 で見ていないことに戻す。
     // 記録の JSON を渡した起動(開発・スクリーンショット)は戻した時だけ出す(画面を塞がない)
@@ -287,7 +298,7 @@ private fun runApp(args: Array<String>, launchAction: LaunchAction?, jump: JumpC
                     HomeWindow(w, registry, tray, serverApps, openServerApp)
                 } else {
                     DesktopWindow(
-                        w, registry, hub, tray, updates, layouts, sendTo,
+                        w, registry, hub, tray, updates, layouts, sendTo, chat,
                         startScreen = args.getOrNull(2)?.takeIf { w.id == firstWindowId },
                         autoNav = autoNav?.takeIf { w.id == firstWindowId },
                         onboarding = onboarding,
@@ -313,6 +324,7 @@ private fun ApplicationScope.DesktopWindow(
     updates: UpdateState,
     layouts: LayoutEditStore,
     sendTo: SendToInbox,
+    chat: ChatWiring,
     startScreen: String?,
     autoNav: AutoNavPlan?,
     onboarding: OnboardingStore,
@@ -419,6 +431,9 @@ private fun ApplicationScope.DesktopWindow(
                         serverApps = serverApps.takeIf { it.available },
                         onOpenServerApp = openServerApp,
                         hotSwapNotice = if (app.reloads > 0) Strings["runtime_hot_reloaded"] else null,
+                        newChat = chat.newChat,
+                        buildFromChat = chat.build,
+                        aiConsent = chat.consent,
                     )
                 }
                 }
@@ -536,3 +551,10 @@ internal object WindowBounds {
         }
     }
 }
+
+/** 会話の入口(#2160)。[newChat] が null ならパレットに出さない。作る流れ([build])は #2163。 */
+private class ChatWiring(
+    val newChat: (() -> ChatSession)?,
+    val consent: AiConsentStore,
+    val build: (ChatBuild) -> Unit = {},
+)

@@ -41,6 +41,8 @@ import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.input.key.type
 import jp.kz2601.metamon.desktop.debug.DevMenu
 import jp.kz2601.metamon.desktop.debug.DevMenuHost
+import jp.kz2601.metamon.desktop.chat.AiConsentDialog
+import jp.kz2601.metamon.desktop.chat.AiConsentGate
 import jp.kz2601.metamon.desktop.chat.ChatBuild
 import jp.kz2601.metamon.desktop.chat.ChatOverlay
 import jp.kz2601.metamon.desktop.chat.ChatSession
@@ -71,6 +73,7 @@ import jp.kz2601.metamon.dsl.screen
 import jp.kz2601.metamon.renderer.form.FormDraft
 import jp.kz2601.metamon.desktop.onboarding.OnboardingDialog
 import jp.kz2601.metamon.services.PlanUsageSource
+import jp.kz2601.metamon.services.consent.AiConsentStore
 
 // キーボードだけで使う(#1765): ショートカット・コマンドパレット(CommandPalette.kt)・F1 の一覧。
 
@@ -345,14 +348,33 @@ class DesktopKeyboard(
     /** 会話の ready・案から作る(作る流れは #2163)。 */
     var buildFromChat: (ChatBuild) -> Unit = {}
 
+    /** AI へ送ることの同意(#2160)。null なら確かめない(テスト・同意の要らない入口)。 */
+    var aiConsent: AiConsentStore? = null
+
     /** 開いている会話。 */
     var chat by mutableStateOf<ChatSession?>(null)
 
-    /** 会話を開く。接続先が無ければ false。 */
+    /** 会話の前に同意の説明を出している(#2160)。 */
+    var consentOpen by mutableStateOf(false)
+
+    /** 会話を開く。接続先が無ければ false。同意がまだ無ければ先に説明を出す(同意したら会話を開く)。 */
     fun openChat(): Boolean {
         val make = newChat ?: return false
-        if (chat == null) chat = make()
+        if (chat != null) return true
+        if (AiConsentGate.needsPrompt(aiConsent)) {
+            consentOpen = true
+            return true
+        }
+        chat = make()
         return true
+    }
+
+    /** 同意の説明で「同意して使う」/「あとで」。同意したら会話を開く。 */
+    fun answerConsent(agreed: Boolean) {
+        consentOpen = false
+        val store = aiConsent
+        if (agreed) store?.grant() else store?.markPrompted()
+        if (agreed) openChat() else runCatching { root.requestFocus() }
     }
 
     /** 消す前の確認を出している。 */
@@ -452,7 +474,7 @@ class DesktopKeyboard(
             if (!repeat) closePreview()
             return true
         }
-        if (paletteOpen || helpOpen || licensesOpen || usageOpen || wipeConfirmOpen || shareOpen || onboardingOpen || gridEdit != null || a11yBridgeOpen || devInfo != null || chat != null) return false // パレット・一覧・確認・並びの編集が自分で受ける
+        if (paletteOpen || helpOpen || licensesOpen || usageOpen || wipeConfirmOpen || shareOpen || onboardingOpen || gridEdit != null || a11yBridgeOpen || devInfo != null || chat != null || consentOpen) return false // パレット・一覧・確認・並びの編集が自分で受ける
         // 項目つきでコピーした記録の貼り付け。入力欄などを選んでいる時は普通の貼り付けに任せる
         if (isPasteKey(p)) return !bubble && rootFocused && pasteRecord()
         val s = Keymap.match(p, os) ?: return false
@@ -663,7 +685,7 @@ class DesktopKeyboard(
     val modalModifier: Modifier get() = Modifier.focusRequester(modal).focusGroup()
 
     fun focusAfterNavigation(modalOpen: Boolean) {
-        if (paletteOpen || helpOpen || licensesOpen || usageOpen || shareOpen || tipsOpen || retentionReviewOpen || onboardingOpen || devInfo != null || chat != null) return
+        if (paletteOpen || helpOpen || licensesOpen || usageOpen || shareOpen || tipsOpen || retentionReviewOpen || onboardingOpen || devInfo != null || chat != null || consentOpen) return
         if (modalOpen && runCatching { modal.requestFocus(FocusDirection.Enter) }.getOrDefault(false)) return
         runCatching { root.requestFocus() }
     }
@@ -773,6 +795,9 @@ class DesktopKeyboard(
                 runCatching { root.requestFocus() }
             }
         }
+        aiConsent?.takeIf { consentOpen }?.let { store ->
+            AiConsentDialog(store, onAgree = { answerConsent(true) }, onLater = { answerConsent(false) })
+        }
         chat?.let { c ->
             val close = {
                 chat = null
@@ -822,6 +847,7 @@ fun rememberDesktopKeyboard(
     saveLayout: ((GridEditDraft) -> Unit)? = null,
     newChat: (() -> ChatSession)? = null,
     buildFromChat: (ChatBuild) -> Unit = {},
+    aiConsent: AiConsentStore? = null,
 ): DesktopKeyboard = remember(dsl, session) { DesktopKeyboard(dsl, session) }.also {
     it.dispatch = dispatch
     it.print = print
@@ -832,4 +858,5 @@ fun rememberDesktopKeyboard(
     it.saveLayout = saveLayout
     it.newChat = newChat
     it.buildFromChat = buildFromChat
+    it.aiConsent = aiConsent
 }
