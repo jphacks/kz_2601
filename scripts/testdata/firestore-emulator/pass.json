@@ -1,0 +1,13 @@
+{"Action":"start","Package":"example/backend/internal/store"}
+{"Action":"run","Package":"example/backend/internal/store","Test":"TestFirestoreSave"}
+{"Action":"output","Package":"example/backend/internal/store","Test":"TestFirestoreSave","Output":"=== RUN   TestFirestoreSave\n"}
+{"Action":"pass","Package":"example/backend/internal/store","Test":"TestFirestoreSave","Elapsed":0.1}
+{"Action":"run","Package":"example/backend/internal/store","Test":"TestStoreContract"}
+{"Action":"run","Package":"example/backend/internal/store","Test":"TestStoreContract/memory"}
+{"Action":"pass","Package":"example/backend/internal/store","Test":"TestStoreContract/memory","Elapsed":0}
+{"Action":"run","Package":"example/backend/internal/store","Test":"TestStoreContract/firestore"}
+{"Action":"pass","Package":"example/backend/internal/store","Test":"TestStoreContract/firestore","Elapsed":0.2}
+{"Action":"pass","Package":"example/backend/internal/store","Test":"TestStoreContract","Elapsed":0.2}
+{"Action":"run","Package":"example/backend/internal/store","Test":"TestUnrelated"}
+{"Action":"skip","Package":"example/backend/internal/store","Test":"TestUnrelated","Elapsed":0}
+{"Action":"pass","Package":"example/backend/internal/store","Elapsed":0.3}
