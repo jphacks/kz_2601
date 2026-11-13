@@ -47,16 +47,19 @@ import javax.swing.SwingUtilities
  * 同じ保存先ではプロセスを 1 つだけ起動する。2 つ目は起動中の方へ引数を渡して前に出させる(SingleInstance.kt)。
  * 記録の JSON を渡した時(開発・スクリーンショット)は端末に残さないので、ロックを取らずに何本でも起動できる。
  */
-fun main(args: Array<String>) {
+fun main(rawArgs: Array<String>) {
+    // `--quick-record` などの旗(.desktop の Actions・#2992)は位置の引数と分ける
+    val parsed = LaunchArgs.parse(rawArgs.toList())
+    val args = parsed.positional.toTypedArray()
     // 同じ保存先で 2 つ目は起動しない(#1754 の JSON を 2 つのプロセスで書き合わない)
     if (args.getOrNull(1) == null && !SingleInstance.claim()) {
-        if (!SingleInstance.handOff(args = args.toList())) SingleInstance.reportRunning()
+        if (!SingleInstance.handOff(args = rawArgs.toList())) SingleInstance.reportRunning()
         return
     }
-    runApp(args)
+    runApp(args, parsed.action)
 }
 
-private fun runApp(args: Array<String>) = application {
+private fun runApp(args: Array<String>, launchAction: LaunchAction?) = application {
     // 端末の保存(#1887): 記録・設定は再起動しても残る。最後に開いたアプリから開く
     val desktopStore = remember { DesktopStore.open() }
     val first = remember {
@@ -107,13 +110,17 @@ private fun runApp(args: Array<String>) = application {
     tray.onOpenApp = { registry.open(WindowKey.app(it)) }
     // 2 つ目の起動: 渡されたアプリ(無ければ前にあるアプリ)を開いて前に出す。トレイに隠れていても出す
     remember {
-        SingleInstance.onHandoff { a ->
+        SingleInstance.onHandoff { raw ->
             SwingUtilities.invokeLater {
-                val id = a.firstOrNull()?.takeIf { it in BundledApps.ids() } ?: registry.active?.key?.appId ?: first
+                val p = LaunchArgs.parse(raw)
+                val id = p.positional.firstOrNull()?.takeIf { it in BundledApps.ids() } ?: registry.active?.key?.appId ?: first
                 tray.openApp(id)
+                if (p.action == LaunchAction.QUICK_RECORD) tray.quickRecord()
             }
         }
     }
+    // 最初の起動が右クリックの操作から: ウィンドウを開いた後に 1 回だけ動かす
+    LaunchedEffect(Unit) { if (launchAction == LaunchAction.QUICK_RECORD) tray.quickRecord() }
     // すぐ記録は前にあるアプリの、アプリのウィンドウへ(詳細には入れない・無ければ開く)
     tray.findQuickRecordWindow = { registry.quickRecordWindow()?.id }
     // トレイの名前・すぐ記録・集計は前にあるウィンドウのアプリ。閉じて開き直すと記録が替わるのでウィンドウごとに見直す

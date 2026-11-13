@@ -89,6 +89,9 @@
     <string name="desktop_keys_preview">Preview photo</string>
     <string name="desktop_keys_save">Save</string>
     <string name="desktop_keys_search">Search</string>
+    <string name="desktop_launch_action_new_window">New window</string>
+    <string name="desktop_launch_action_quick_record">Quick record</string>
+    <string name="desktop_launch_action_talk">Talk</string>
     <string name="desktop_licenses">Third-party notices</string>
     <string name="desktop_licenses_browse_failed">Couldn\'t open the browser. %1$s</string>
     <string name="desktop_list_empty">Nothing yet</string>
