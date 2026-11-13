@@ -1,0 +1,12 @@
+{
+  "name": "by kind: a create weighs more than an edit or a chat turn",
+  "operations": {
+    "chat": {"call": 1},
+    "chat_first": {"call": 1},
+    "generate": {"call": 10},
+    "logic": {"call": 0},
+    "patch": {"call": 5},
+    "server_rules": {"call": 0},
+    "text": {"call": 2}
+  }
+}
