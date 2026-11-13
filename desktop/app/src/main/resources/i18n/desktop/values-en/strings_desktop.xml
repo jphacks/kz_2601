@@ -48,6 +48,9 @@
     <string name="desktop_dev_menu">Developer menu</string>
     <string name="desktop_drag_image_name">image</string>
     <string name="desktop_drag_table_name">table</string>
+    <string name="desktop_edit_hint_body">Type it in the box, or ask by voice.</string>
+    <string name="desktop_edit_hint_title">Try asking this to change it</string>
+    <string name="desktop_edit_hint_try">Try asking</string>
     <string name="desktop_error_app_check">We couldn\'t verify the connection from this app. Please wait a moment and try again. If it keeps happening, reinstall the latest version</string>
     <string name="desktop_export_clipboard">" (the table is also on the clipboard)"</string>
     <string name="desktop_export_done">Exported %1$d records: %2$s</string>
