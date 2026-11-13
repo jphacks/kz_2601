@@ -254,7 +254,7 @@ private fun Caption(text: String) {
 @Composable
 private fun Note(text: String) = Text(text, color = Color.Gray, style = MaterialTheme.typography.bodySmall)
 
-private fun snap(v: Double, min: Double, step: Double?): Double {
+internal fun snap(v: Double, min: Double, step: Double?): Double {
     if (step == null || step <= 0) return v
     return roundToStep(min + Math.round((v - min) / step) * step, step)
 }
@@ -265,7 +265,7 @@ internal fun roundToStep(v: Double, step: Double): Double {
     return java.math.BigDecimal(v).setScale(scale, java.math.RoundingMode.HALF_UP).toDouble()
 }
 
-private fun bound(v: Double, min: Double?, max: Double?): Double = v.coerceAtLeast(min ?: Double.NEGATIVE_INFINITY).coerceAtMost(max ?: Double.POSITIVE_INFINITY)
+internal fun bound(v: Double, min: Double?, max: Double?): Double = v.coerceAtLeast(min ?: Double.NEGATIVE_INFINITY).coerceAtMost(max ?: Double.POSITIVE_INFINITY)
 
 /** 日付(yyyy-MM-dd)・日時(yyyy-MM-ddTHH:mm)。「今日」「前の日」「次の日」で動かす。 */
 @Composable
@@ -352,7 +352,7 @@ private fun ColorInput(caption: String, hex: String?, set: (JSONValue) -> Unit) 
     OutlinedTextField(value = hex.orEmpty(), onValueChange = { set(JSONValue.Str(it)) }, singleLine = true, placeholder = { Text("#5E35B1") }, modifier = Modifier.fillMaxWidth())
 }
 
-private fun parseHex(h: String): Color? = h.removePrefix("#").takeIf { it.length == 6 }?.toLongOrNull(16)?.let { Color(0xFF000000 or it) }
+internal fun parseHex(h: String): Color? = h.removePrefix("#").takeIf { it.length == 6 }?.toLongOrNull(16)?.let { Color(0xFF000000 or it) }
 
 /** マウス・ペンで描く。「保存」で PNG に書き、その file URI を値にする。 */
 @Composable
