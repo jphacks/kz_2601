@@ -41,7 +41,7 @@ struct PublicAppCard: View {
         VStack(alignment: .leading, spacing: Theme.Spacing.sm) {
             HStack(alignment: .top, spacing: Theme.Spacing.md) {
                 Text(String(item.name.prefix(1)))
-                    .font(.system(size: 22, weight: .bold, design: .rounded))
+                    .font(.system(.title2, design: .rounded).weight(.bold))
                     .foregroundStyle(.white)
                     .frame(width: 48, height: 48)
                     .background(Theme.brandGradient, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
