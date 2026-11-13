@@ -120,6 +120,7 @@ struct MacRootView: View {
                        shared: sidebarSections.shared.filter { $0.matches(searchText) },
                        examples: exampleApps.filter { $0.matches(searchText) },
                        newItems: { badges.count($0) },
+                       releaseBadge: releaseBadge(for:),
                        thumbnail: thumbnail(for:), searchText: searchText, selection: guardedSelection,
                        onOpen: { focus = .canvas }, onDelete: deleteApp, onDuplicate: duplicateApp,
                        onResetExample: resetExample, onOpenInNewWindow: openAppWindow,
@@ -333,6 +334,10 @@ struct MacRootView: View {
     private func refreshServerApps() async {
         guard MacAccount.shared.session.user != nil else { return }
         await library.refreshServerApps()
+        #if !APP_STORE_REVIEW
+        // リリース申請の状況(#2250)も一覧と一緒に取り直す(iOS は変身一覧を開くたび)
+        await MacReleaseRequests.shared.refresh(MacServices.shared.releaseRequests)
+        #endif
         reopenLastApp() // 前に開いていたサーバーのアプリが一覧に載ったら開き直す
         // 待っていた通知のアプリを開く。取り直しても無ければ諦める
         if let id = MacNotificationRouter.shared.resolve(among: apps.map(\.id), listRefreshed: true) {
@@ -587,6 +592,15 @@ struct MacRootView: View {
         return MacShareAppModel.canShare(isCreated: library.isCreated(app.id), isOnServer: library.isOnServer(app.id),
                                          signedIn: MacAccount.shared.session.user != nil,
                                          sharingAvailable: MacServices.shared.sharing != nil)
+        #endif
+    }
+
+    /// サイドバーの行のリリース申請の札(#2250)
+    private func releaseBadge(for appId: String) -> MacSidebarReleaseBadge? {
+        #if APP_STORE_REVIEW
+        nil
+        #else
+        MacSidebarReleaseBadge.badge(appId: appId, in: MacReleaseRequests.shared.byApp)
         #endif
     }
 

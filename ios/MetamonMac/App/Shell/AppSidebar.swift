@@ -14,6 +14,8 @@ struct AppSidebar: View {
     let examples: [SampleApp]
     /// 新着の数(#969)。0 なら出さない
     var newItems: (String) -> Int = { _ in 0 }
+    /// リリース申請の状況の札(#2250)。申請していなければ nil
+    var releaseBadge: (String) -> MacSidebarReleaseBadge? = { _ in nil }
     /// 行の写し(#1281)
     var thumbnail: (String) -> NSImage? = { _ in nil }
     /// 検索欄の文字(#1282)。絞り込みは呼ぶ側で済ませてある。並べ替えは絞っていない時だけ
@@ -169,6 +171,7 @@ struct AppSidebar: View {
 
     private func row(_ app: SampleApp) -> some View {
         let count = newItems(app.id)
+        let release = releaseBadge(app.id)
         return HStack(spacing: 8) {
             SidebarThumbnail(name: app.name, image: thumbnail(app.id))
             VStack(alignment: .leading, spacing: MacTheme.Spacing.rowLine) {
@@ -183,14 +186,19 @@ struct AppSidebar: View {
                         .lineLimit(1)
                 }
             }
-            if count > 0 {
+            if count > 0 || release != nil {
                 Spacer(minLength: 4)
+            }
+            if let release {
+                ReleaseStatusRowBadge(badge: release)
+            }
+            if count > 0 {
                 NewItemsBadge(count: count)
             }
         }
         .padding(.vertical, 2)
         .accessibilityElement(children: .combine)
-        .accessibilityLabel(Text(verbatim: MacSidebarBadges.accessibilityLabel(name: app.name, count: count)))
+        .accessibilityLabel(Text(verbatim: MacSidebarBadges.accessibilityLabel(name: app.name, count: count, release: release)))
         .tag(app.id)
     }
 
@@ -243,6 +251,24 @@ private struct NewItemsBadge: View {
             .padding(.vertical, 1)
             .background(Capsule().fill(Color.accentColor))
             .help(L10n.tr("新着 \(count) 件"))
+            .accessibilityHidden(true)
+    }
+}
+
+/// 行の右のリリース申請の状況(#2250)。iOS の `ReleaseStatusBadge` と同じ色と語。読み上げは行の名前に含める
+private struct ReleaseStatusRowBadge: View {
+    let badge: MacSidebarReleaseBadge
+
+    var body: some View {
+        Label(badge.label, systemImage: badge.symbol)
+            .labelStyle(.titleAndIcon)
+            .font(.caption2.weight(.bold))
+            .foregroundStyle(.white)
+            .lineLimit(1)
+            .padding(.horizontal, 6)
+            .padding(.vertical, 1)
+            .background(.black.opacity(badge.dimmed ? 0.35 : 0.55), in: Capsule())
+            .help(badge.accessibilityLabel)
             .accessibilityHidden(true)
     }
 }

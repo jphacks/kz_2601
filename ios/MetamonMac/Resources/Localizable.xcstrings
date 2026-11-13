@@ -14445,6 +14445,23 @@
         }
       }
     },
+    "状況が変わるとサイドバーのアプリの行に表示されます" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The status appears on the app’s row in the sidebar when it changes"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "状況が変わるとサイドバーのアプリの行に表示されます"
+          }
+        }
+      }
+    },
     "用意した記録帳" : {
       "extractionState" : "manual",
       "localizations" : {
