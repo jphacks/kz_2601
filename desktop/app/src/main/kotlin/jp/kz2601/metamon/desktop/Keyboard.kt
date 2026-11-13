@@ -723,6 +723,7 @@ class DesktopKeyboard(
                 text = { Text(lines.joinToString("\n")) },
                 confirmButton = { TextButton(onClick = { dismiss() }) { Text(KeyboardText.HELP_CLOSE) } },
             )
+        }
         usage?.takeIf { usageOpen }?.let { loader ->
             UsageDialog(loader) {
                 usageOpen = false
