@@ -13,12 +13,14 @@ class ThemeSetting(private val store: KeyValueStore) {
         get() = when (store.getString(KEY)?.trim()?.lowercase()) {
             "light" -> ThemeMode.LIGHT
             "dark" -> ThemeMode.DARK
+            "contrast" -> ThemeMode.CONTRAST
             else -> ThemeMode.SYSTEM
         }
         set(value) = when (value) {
             ThemeMode.SYSTEM -> store.remove(KEY)
             ThemeMode.LIGHT -> store.putString(KEY, "light")
             ThemeMode.DARK -> store.putString(KEY, "dark")
+            ThemeMode.CONTRAST -> store.putString(KEY, "contrast")
         }
 
     fun resolve(env: String? = envValue()): ThemeMode = resolve(env, choice)
