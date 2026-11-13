@@ -103,12 +103,12 @@ import java.awt.datatransfer.Transferable
 import java.time.Instant
 import java.util.Locale
 
-// データの部品(#1744): list・table・timeline・gridTable・searchBar・feed・matchList。stat・chart・calendar は DisplayLeaves.kt。
+// データの部品(#1744): list・table・timeline・gridTable・searchBar・feed・matchList・chatThread(ChatThreadLeaf.kt)。stat・chart・calendar は DisplayLeaves.kt。
 // 値は Android の renderer/components/lists/ListValues.kt(= iOS の各 Leaf の static な関数)と同じ規則。
 
 val DATA_LEAVES: Set<ComponentType> = setOf(
     ComponentType.LIST, ComponentType.TABLE, ComponentType.TIMELINE, ComponentType.GRID_TABLE,
-    ComponentType.SEARCH_BAR, ComponentType.FEED, ComponentType.MATCH_LIST,
+    ComponentType.SEARCH_BAR, ComponentType.FEED, ComponentType.MATCH_LIST, ComponentType.CHAT_THREAD,
 )
 
 /** データの部品が画面から受け取るもの。 */
@@ -133,6 +133,8 @@ class DataEnv(
     val copyText: (tsv: String, rows: Int) -> Unit = { _, _ -> },
     /** list の行を外へ引き出す形(TSV の文字 + CSV のファイル・#1764)。(entity, 画面の並びの recordId)。 */
     val dragRows: (entity: String, ids: List<String>) -> Transferable? = { _, _ -> null },
+    /** chatThread の送る・取り直す(#2214)。 */
+    val chat: ChatEnv = ChatEnv({ _, _ -> }),
 )
 
 @Composable
@@ -145,6 +147,7 @@ fun DataLeaf(c: Component, env: DataEnv) {
         ComponentType.SEARCH_BAR -> SearchBarLeaf(c, env.search)
         ComponentType.FEED -> OfflineCard(c.title, Strings["desktop_feed_offline"])
         ComponentType.MATCH_LIST -> OfflineCard(c.title, Strings["desktop_match_offline"])
+        ComponentType.CHAT_THREAD -> ChatThreadLeaf(c, env.data, env.chat)
         else -> Unit
     }
 }

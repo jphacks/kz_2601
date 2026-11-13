@@ -9,7 +9,6 @@ object ConformanceAllowlist {
     val unavailableTypes: Map<String, String> = mapOf(
         "aiButton" to "AI の呼び出し(/v1/ai)をデスクトップにまだつないでいない",
         "aiChat" to "AI の呼び出し(/v1/ai)をデスクトップにまだつないでいない",
-        "chatThread" to "共有レコードの購読(会話の同期)がまだ無い",
         "dashcam" to "カメラの常時録画。パソコンのカメラは使わない",
         "healthStat" to "ヘルスケアのデータ(HealthKit / Health Connect)がパソコンに無い",
         "locationTracker" to "位置情報(GPS)がパソコンに無い",
@@ -35,6 +34,7 @@ object ConformanceAllowlist {
         "audioRecorder" to echo("field"),
         "bracket" to echo("entity"),
         "card" to echo("title"),
+        "chatThread" to echo("entity", "placeholder"),
         "colorPicker" to echo("field"),
         "datePicker" to echo("field"),
         "disclosure" to echo("expanded", "title"),

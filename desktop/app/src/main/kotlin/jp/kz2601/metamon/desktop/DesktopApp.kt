@@ -143,7 +143,7 @@ fun DesktopApp(
             // モーダルの間は下の画面とタブに Tab で入らず、読み上げにも出さない
             Column(Modifier.fillMaxSize().then(keyboard.inert(nav.sheet != null || nav.fullScreen != null || previewing))) {
                 val base = NavigationResolver.dismissModals(nav).top(dsl)
-                Box(Modifier.weight(1f)) { ScreenView(dsl, session, base, io, dispatch, openPrint, onOpenRecord) }
+                Box(Modifier.weight(1f)) { ScreenView(dsl, session, base, io, dispatch, openPrint, onOpenRecord, isActive) }
                 // 送り待ちがある時だけ小さく出す(#1887)
                 session.persistence?.pending?.takeIf { it > 0 }?.let { n ->
                     Text(
@@ -184,7 +184,7 @@ fun DesktopApp(
                     val m = if (full) Modifier.fillMaxSize() else Modifier.widthIn(max = 640.dp).fillMaxWidth(0.92f).fillMaxSize(0.9f)
                     val pane = dsl.screen(top.screen)?.title?.ifEmpty { null } ?: dsl.app.name
                     Surface(m.then(keyboard.modalModifier).semantics { paneTitle = pane; isTraversalGroup = true }, shape = MaterialTheme.shapes.large, tonalElevation = 6.dp) {
-                        ScreenView(dsl, session, top, io, dispatch, openPrint, onOpenRecord)
+                        ScreenView(dsl, session, top, io, dispatch, openPrint, onOpenRecord, isActive)
                     }
                 }
             }
@@ -235,6 +235,7 @@ private fun ScreenView(
     dispatch: (Action, ActionContext) -> Unit,
     print: () -> Unit,
     openRecord: ((String, String) -> Unit)?,
+    isActive: () -> Boolean = { true },
 ) {
     val screen = dsl.screen(route.screen) ?: dsl.screens.firstOrNull() ?: return
     val form = session.form(route)
@@ -252,6 +253,12 @@ private fun ScreenView(
         copyText = io::copyText,
         dragRows = io::rowsTransferable,
         openWindow = openRecord?.let { open -> { a: Action, id: String -> RecordWindows.target(a)?.let { open(it, id) } } },
+        // 共有の会話は送り先がある時だけ開いている間取り直す(#2214)。サインインの uid はまだ無いので null
+        chat = ChatEnv(
+            send = { e, d -> session.postMessage(e, d) },
+            poll = session.persistence?.takeIf { it.isLive }?.let { p -> { e: String -> ChatSync.pull(PersistenceChatRemote(p), session.records, e, selfUid = null) } },
+            isActive = isActive,
+        ),
     )
     val scope = ScreenScope(route, form, session, perform, io, data, dataEnv)
     Column(Modifier.fillMaxSize()) {

@@ -19,6 +19,8 @@ import jp.kz2601.metamon.dsl.records.Aggregator
 import jp.kz2601.metamon.dsl.records.Entity
 import jp.kz2601.metamon.dsl.records.FieldCoding
 import jp.kz2601.metamon.dsl.records.JSONValue
+import jp.kz2601.metamon.dsl.expr.DSLClock
+import java.time.Instant
 import jp.kz2601.metamon.dsl.records.Record
 import jp.kz2601.metamon.dsl.records.RecordPermission
 import jp.kz2601.metamon.dsl.records.RecordQuery
@@ -238,6 +240,16 @@ class DesktopSession(
         }
         store = store.save(entity, id, row.data + patch)
         return true
+    }
+
+    /**
+     * 会話(chatThread・#2214)に 1 通足す。フォームの保存と同じ道(端末に残し、送り先があれば送り待ちに積む)。
+     * 並びが崩れないよう作った時刻を付ける。足した行の id を返す。
+     */
+    fun postMessage(entity: String, data: Map<String, JSONValue>, now: Instant = DSLClock.now()): String {
+        val id = persistence?.newRecordId() ?: "new-${store.nextId}"
+        store = store.save(entity, null, data.mapValues { MockStore.cell(it.value) }, newId = id, createdAt = now.toString())
+        return id
     }
 
     /** 1 件書き換えられるか(フォームの読み取りだけと同じ規則)。 */

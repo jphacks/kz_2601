@@ -24,11 +24,14 @@ import java.util.Locale
 // Aggregator・ExprEvaluator・RecordQuery で出す(読み込み中・取得失敗の状態はモックなので無い)。:renderer-core(#1739)で共有にする。
 
 /** 1 画面ぶんの記録と評価器。 */
-class LeafData(val entities: List<Entity>, source: (String) -> List<Record>, val uid: String? = "me", val labels: DataLabels = DataLabels.JAPANESE) {
+class LeafData(val entities: List<Entity>, private val source: (String) -> List<Record>, val uid: String? = "me", val labels: DataLabels = DataLabels.JAPANESE) {
     val evaluator = ExprEvaluator(entities, source)
     val locale: Locale = Locale.JAPAN
 
     fun entity(id: String?): Entity? = id?.let { i -> entities.firstOrNull { it.id == i } }
+
+    /** entity の記録(filter なし・保存した順)。chatThread が使う(#2214)。 */
+    fun records(entity: String): List<Record> = source(entity)
 
     fun filtered(c: Component): List<Record> = RecordQuery.filtered(c, entity(c.entity), evaluator, uid)
 

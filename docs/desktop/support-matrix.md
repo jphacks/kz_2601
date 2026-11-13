@@ -47,7 +47,7 @@ DSL の全部の type(Container 7・Leaf 70 = 77。`docs/dsl/dsl.schema.json` �
 | calendar | 描ける | rendered | 今月の表 | 描ける | #1744 |
 | callButton | 未定 | unavailable | パソコンに電話が無い。推奨・未確定: 番号をコピーできる枠にし、`tel:` を OS に渡す(通話のアプリが入っていれば開く) | 描ける | #1746 |
 | chart | 描ける | rendered | 棒・線・扇 | 描ける | #1744 |
-| chatThread | 使えません | unavailable | 共有レコードの購読(会話の同期)がまだ無い | 描ける | #2214 |
+| chatThread | 代わり | rendered | 吹き出しと送る(Enter で送る)。共有の会話は開いている間だけ records/query を取り直す(前に無いウィンドウは間隔を広げる・購読は #1752)。写真の添付・名前を聞く・通報はまだ | 描ける | #2214 |
 | colorPicker | 描ける | rendered | | 描ける | #1743 |
 | dashcam | 使えません | unavailable | カメラの常時録画。パソコンのカメラは使わない | 使えません | #2179 |
 | datePicker | 描ける | rendered | 文字で入れ、「今日」「‹ ›」で動かす | 描ける | #1743 |
@@ -108,7 +108,7 @@ DSL の全部の type(Container 7・Leaf 70 = 77。`docs/dsl/dsl.schema.json` �
 | voiceInput | 使えません | unavailable | 音声入力(音声認識)をまだつないでいない。端末の中の文字起こし(whisper.cpp)で描く予定 | 描ける | #1751・#2172 |
 | webView | 未定 | unavailable | Web の埋め込みを入れていない。候補: JCEF(KCEF・Chromium 同梱で +100MB 前後)。推奨・未確定: 埋め込まず「ブラウザで開く」の枠(#2176) | 描ける | #1746・#2176 |
 
-数(Container と Leaf の合計 77): 描ける 47・代わり 12・使えません 12・未定 6。
+数(Container と Leaf の合計 77): 描ける 47・代わり 13・使えません 11・未定 6。
 
 ## アクション(16)
 
