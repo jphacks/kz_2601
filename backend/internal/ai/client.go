@@ -127,6 +127,9 @@ type Client struct {
 	// ("compiled grammar is too large" / "too many optional parameters"), so
 	// the schema goes into the prompt instead and dsl.Parse stays the gate.
 	StructuredOutput bool
+	// GenerateCacheTTL is CacheTTL1h to cache a create turn's system blocks
+	// for an hour (AI_GENERATE_CACHE_TTL, #2295); otherwise 5 minutes.
+	GenerateCacheTTL string
 	// Logger receives the per-attempt ai.usage line (#298); nil = slog.Default().
 	Logger *slog.Logger
 }
@@ -235,9 +238,11 @@ func (c *Client) Complete(ctx context.Context, req Completion) (*Response, error
 	if req.Thinking != "" {
 		wr.Thinking = map[string]any{"type": req.Thinking}
 	}
+	cacheTTL := ""
 	for _, t := range []string{req.System, req.SystemSuffix} {
 		if t != "" {
-			wr.System = append(wr.System, wireBlock{Type: "text", Text: t, CacheControl: map[string]any{"type": "ephemeral"}})
+			cacheTTL = c.systemCacheTTL(ctx)
+			wr.System = append(wr.System, wireBlock{Type: "text", Text: t, CacheControl: cacheControl(cacheTTL)})
 		}
 	}
 	if req.SystemTail != "" {
@@ -283,7 +288,7 @@ func (c *Client) Complete(ctx context.Context, req Completion) (*Response, error
 		}
 		started := time.Now()
 		resp, err := c.once(ctx, body, onText)
-		c.logUsage(ctx, usageRecord{model: model, stream: req.OnText != nil, attempt: attempt + 1, resp: resp, err: err, latency: time.Since(started)})
+		c.logUsage(ctx, usageRecord{model: model, stream: req.OnText != nil, attempt: attempt + 1, resp: resp, err: err, latency: time.Since(started), cacheTTL: cacheTTL})
 		if err == nil {
 			return resp, nil
 		}
