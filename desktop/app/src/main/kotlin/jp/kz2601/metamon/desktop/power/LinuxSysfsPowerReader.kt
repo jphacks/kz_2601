@@ -15,9 +15,13 @@ import kotlin.io.path.readText
  * - Battery 以外の type(Mains・USB・Wireless など)は全部充電器とみなし、online を見る
  * - 残量は capacity。無ければ energy_now/energy_full、それも無ければ charge_now/charge_full
  * - 電池が複数(ThinkPad の BAT0 + BAT1)なら、全部に energy_full があればそれで、全部に charge_full があればそれで重みを付けた平均。どちらでもなければ単純な平均
- * - 省電力は `/sys/firmware/acpi/platform_profile` が low-power・quiet・cool の時(power-profiles-daemon の「省電力」がこれを書く)
+ * - 省電力は `/sys/firmware/acpi/platform_profile` が low-power・quiet・cool の時(power-profiles-daemon の「省電力」がこれを書く)。
+ *   platform_profile が無い機種だけ [powerProfiles](power-profiles-daemon の ActiveProfile == power-saver)を見る
  */
-class LinuxSysfsPowerReader(private val sysRoot: Path = Paths.get("/sys")) : DevicePowerReader {
+class LinuxSysfsPowerReader(
+    private val sysRoot: Path = Paths.get("/sys"),
+    private val powerProfiles: PowerProfileSource = PowerProfileSource.None,
+) : DevicePowerReader {
     override fun read(): DevicePowerState {
         val supplies = sysRoot.resolve("class/power_supply")
         val entries = if (supplies.isDirectory()) supplies.listDirectoryEntries().sortedBy { it.name } else emptyList()
@@ -47,8 +51,11 @@ class LinuxSysfsPowerReader(private val sysRoot: Path = Paths.get("/sys")) : Dev
         return Battery(capacity = capacity, status = attr(dir, "status"), energyFull = energyFull, chargeFull = chargeFull)
     }
 
-    // TODO: platform_profile が無い機種は power-profiles-daemon の D-Bus(net.hadess.PowerProfiles の ActiveProfile == "power-saver")も見る
-    private fun isPowerSaver(): Boolean = attr(sysRoot.resolve("firmware/acpi"), "platform_profile") in POWER_SAVER_PROFILES
+    private fun isPowerSaver(): Boolean {
+        val platform = attr(sysRoot.resolve("firmware/acpi"), "platform_profile")
+        if (platform != null) return platform in POWER_SAVER_PROFILES
+        return powerProfiles.activeProfile() == "power-saver"
+    }
 
     internal companion object {
         private val POWER_SAVER_PROFILES = setOf("low-power", "quiet", "cool")

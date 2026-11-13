@@ -109,7 +109,7 @@ object DevicePowerSources {
         osName: String = System.getProperty("os.name").orEmpty(),
     ): DevicePowerSource = when {
         env["METAMON_MOCK"] == "1" -> FakeDevicePowerSource.fromEnvironment(env)
-        osName.startsWith("Linux", ignoreCase = true) -> PollingDevicePowerSource(LinuxSysfsPowerReader())
+        osName.startsWith("Linux", ignoreCase = true) -> PollingDevicePowerSource(LinuxSysfsPowerReader(powerProfiles = DbusPowerProfileSource()))
         osName.startsWith("Windows", ignoreCase = true) -> PollingDevicePowerSource(WindowsPowerReader)
         // Mac は Mac 版(Swift)が受け持つ。iOS 版も Mac の電池は読まない
         else -> PollingDevicePowerSource({ DevicePowerState.Unknown })
