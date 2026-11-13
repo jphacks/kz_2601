@@ -125,6 +125,8 @@ fun DesktopApp(
     showOnboardingAtLaunch: Boolean = false,
     /** パレットの「並びを直す」の保存(#3207)。null なら出さない。 */
     onSaveLayout: ((jp.kz2601.metamon.desktop.gridedit.GridEditDraft) -> Unit)? = null,
+    /** Windows の「送る」で届いたファイル(#3209)。ドラッグ & ドロップと同じ振り分けに渡す。 */
+    sendTo: jp.kz2601.metamon.desktop.platform.SendToInbox? = null,
 ) {
     val session = remember {
         DesktopSession(dsl, initialStore, startScreen = startScreen, host = DesktopActionHost(appName = dsl.app.name), persistence = persistence, shared = records, startRecordId = startRecordId)
@@ -165,6 +167,13 @@ fun DesktopApp(
     val openWithRevision = OpenWithInbox.revision
     LaunchedEffect(openWithRevision) {
         if (openWithRevision > 0 && isActive()) OpenWithInbox.take().takeIf { it.isNotEmpty() }?.let { io.dropFiles(it, topComponents(), topDraft()) }
+    }
+    // 「送る」で届いたファイルも落とした物と同じ所へ(#3209)
+    if (sendTo != null) {
+        LaunchedEffect(sendTo.requests) {
+            val files = sendTo.take(windowId, isActive)
+            if (files.isNotEmpty()) io.dropFiles(files, topComponents(), topDraft())
+        }
     }
     // 印刷(#1767): Ctrl+P・見出しの「印刷」で一番上の画面をプレビュー
     var printing by remember { mutableStateOf<PrintDocument?>(null) }

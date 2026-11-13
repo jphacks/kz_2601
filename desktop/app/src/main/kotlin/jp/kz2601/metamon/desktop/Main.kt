@@ -41,6 +41,9 @@ import jp.kz2601.metamon.desktop.platform.JumpCommand
 import jp.kz2601.metamon.desktop.platform.JumpListPlan
 import jp.kz2601.metamon.desktop.platform.JumpListPublisher
 import jp.kz2601.metamon.desktop.platform.RecentApps
+import jp.kz2601.metamon.desktop.platform.SendToArgs
+import jp.kz2601.metamon.desktop.platform.SendToInbox
+import jp.kz2601.metamon.desktop.platform.SendToShortcut
 import jp.kz2601.metamon.desktop.power.ScreenAwake
 import jp.kz2601.metamon.desktop.store.DesktopStore
 import jp.kz2601.metamon.desktop.store.DeviceWipe
@@ -65,10 +68,13 @@ import javax.swing.SwingUtilities
  * 記録の JSON を渡した時(開発・スクリーンショット)は端末に残さないので、ロックを取らずに何本でも起動できる。
  */
 fun main(rawArgs: Array<String>) {
-    // ジャンプリストの項目(#3208)は `--jump=…` を足して起動する。ほかの引数の並びは崩さない
-    val jump = JumpArgs.parse(rawArgs.toList())
+    // 「送る」(#3209)は `--send-to` の後ろに選んだファイルが付く。先に切り出して、ほかの引数の並びは崩さない
+    val sent = SendToArgs.files(rawArgs.toList())
+    val argv = SendToArgs.strip(rawArgs.toList())
+    // ジャンプリストの項目(#3208)は `--jump=…` を足して起動する
+    val jump = JumpArgs.parse(argv)
     // `--quick-record` などの旗(.desktop の Actions・#2992)は位置の引数と分ける(`--jump=…` もここで落ちる)
-    val parsed = LaunchArgs.parse(rawArgs.toList())
+    val parsed = LaunchArgs.parse(argv)
     // 「別のアプリで開く」のファイル(#2994)は位置の引数(アプリ名など)から外す
     val openFiles = OpenWithFiles.fromArgs(parsed.positional)
     val args = OpenWithFiles.withoutFiles(parsed.positional).toTypedArray()
@@ -78,10 +84,10 @@ fun main(rawArgs: Array<String>) {
         return
     }
     OpenWithInbox.offer(openFiles)
-    runApp(args, parsed.action, jump)
+    runApp(args, parsed.action, jump, sent)
 }
 
-private fun runApp(args: Array<String>, launchAction: LaunchAction?, jump: JumpCommand? = null) = application {
+private fun runApp(args: Array<String>, launchAction: LaunchAction?, jump: JumpCommand? = null, sent: List<File>? = null) = application {
     // 端末の保存(#1887): 記録・設定は再起動しても残る。最後に開いたアプリから開く
     val desktopStore = remember { DesktopStore.open() }
     // 並びを直した分(#3207)。同梱の DSL に当て直して開く
@@ -138,12 +144,18 @@ private fun runApp(args: Array<String>, launchAction: LaunchAction?, jump: JumpC
     }
     val registry = remember { WindowRegistry().also { it.open(WindowKey.app(first)) } }
     val firstWindowId = remember { registry.windows.first().id }
+    // 「送る」で届いたファイル(#3209)。起動の時の分は最初のウィンドウへ
+    val sendTo = remember { SendToInbox().also { box -> sent?.let { box.offer(SendToArgs.readable(it), firstWindowId) } } }
+    // 入れた物(MSI)で動いている Windows なら「送る」にショートカットを置く(置いてあれば何もしない)
+    remember { loadScope.launch { SendToShortcut.create().ensure() } }
     // トレイに常駐(#1761): × はトレイに隠す(設定で off・トレイが無ければ終わる)。終わるのはトレイの「終了」
     val tray = remember { TrayController.create(hub.dsl(first)) }
     tray.onOpenApp = { registry.open(WindowKey.app(it)) }
     // 2 つ目の起動: 渡されたアプリ(無ければ前にあるアプリ)を開いて前に出す。トレイに隠れていても出す
     remember {
-        SingleInstance.onHandoff { raw ->
+        SingleInstance.onHandoff { handed ->
+            val files = SendToArgs.files(handed)
+            val raw = SendToArgs.strip(handed)
             val cmd = JumpArgs.parse(raw)
             SwingUtilities.invokeLater {
                 val p = LaunchArgs.parse(raw)
@@ -151,6 +163,8 @@ private fun runApp(args: Array<String>, launchAction: LaunchAction?, jump: JumpC
                 tray.openApp(id)
                 if (p.action == LaunchAction.QUICK_RECORD || cmd == JumpCommand.QUICK_RECORD) tray.quickRecord()
                 OpenWithInbox.offer(OpenWithFiles.fromArgs(p.positional))
+                // 送られたファイルは前にあるアプリの、アプリのウィンドウへ(すぐ記録と同じ行き先)
+                if (files != null) sendTo.offer(SendToArgs.readable(files), registry.quickRecordWindow()?.id)
             }
         }
     }
@@ -200,7 +214,7 @@ private fun runApp(args: Array<String>, launchAction: LaunchAction?, jump: JumpC
     registry.windows.toList().forEach { w ->
         key(w.id) {
             DesktopWindow(
-                w, registry, hub, tray, layouts,
+                w, registry, hub, tray, layouts, sendTo,
                 startScreen = args.getOrNull(2)?.takeIf { w.id == firstWindowId },
                 autoNav = autoNav?.takeIf { w.id == firstWindowId },
                 onboarding = onboarding,
@@ -219,6 +233,7 @@ private fun ApplicationScope.DesktopWindow(
     hub: AppHub,
     tray: TrayController,
     layouts: LayoutEditStore,
+    sendTo: SendToInbox,
     startScreen: String?,
     autoNav: AutoNavPlan?,
     onboarding: OnboardingStore,
@@ -314,6 +329,7 @@ private fun ApplicationScope.DesktopWindow(
                             reopenScreen = draft.screenId
                             hub.replaceDsl(app.id, draft.applied(app.dsl))
                         },
+                        sendTo = sendTo,
                     )
                 }
             }

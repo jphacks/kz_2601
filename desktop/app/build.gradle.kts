@@ -149,6 +149,8 @@ compose.desktop {
             // CSV を「プログラムから開く」に出す(#2995・jpackage の --file-associations)。既定のアプリは奪わない(OS 側で選ぶ)。
             // Deb・Rpm・Dmg にも同じ指定が入る
             fileAssociation(mimeType = "text/csv", extension = "csv", description = "CSV")
+            // Windows の「送る」(#3209): jpackage の既定の WiX には shell:sendto の置き場が無い(main.wxs を丸ごと差し替えることになる)ので、
+            // 入れた物(jpackage.app-path がある)の初回の起動でアプリが %APPDATA%\Microsoft\Windows\SendTo に置く(platform/SendTo.kt)
         }
     }
 }
