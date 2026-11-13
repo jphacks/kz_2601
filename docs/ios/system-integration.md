@@ -132,6 +132,25 @@ iOS 版が iOS の仕組み(集中モードのフィルタ・Spotlight・ショ�
 | Mac | 実体は作っていない(パッケージは macOS 向けにもコンパイルできる) |
 | テスト | `MetamonRendererTests/DeviceCalendarTests` |
 
+## NFC タグ(NDEF)を読む・書く(NFCTagSessionSource)
+
+NFC タグの NDEF を 1 枚だけ読む・書く口だけを置いています(#2233・`ios/Packages/MetamonRenderer/Sources/MetamonRenderer/Support/NFCTagSession.swift`)。**使う部品・アクション・スキーマ・AI の決まり・`supportedFeatures` の申告はまだありません**(#1775 の決定待ち)。
+
+| 項目 | 決まり |
+| --- | --- |
+| 口 | `NFCTagSessionSource`: `isAvailable`・`read()`・`write(_:)`。形は `DeviceCalendarSource` と同じ(protocol + 実体 + 偽物) |
+| 置き場 | `NFCTag.source`。アプリ起動時に 1 回だけ差し替える(`METAMON_MOCK=1` は `FakeNFCTagSession.sample`) |
+| 扱う種類 | well-known の文字(`T`)と URL(`U`)だけ。スマートポスター・vCard など他の種類は読んでも捨てる |
+| 組み立て・読み取り | `NFCNDEFCodec`(純関数・CoreNFC に触らない)。文字は状態バイト + 言語コード + UTF-8 で書き、読む時は UTF-16(BOM あり / なし)も受ける。URL は短縮の接頭辞 36 種(NFC Forum URI RTD)を自動で付け外しする |
+| 実体 | `LiveNFCTagSession`(`NFCNDEFReaderSession`・`invalidateAfterFirstRead: false` でタグを 1 枚つかんでから読む / 書く) |
+| 使えない時 | `readingAvailable` が false の端末・説明文の無いビルドでは `isAvailable` が false になり、`read()` / `write(_:)` は `NFCTagError.unavailable` を投げる(セッションを始めない) |
+| 失敗 | `NFCTagError`: `unavailable` / `canceled`(ユーザーが閉じた)/ `readOnly` / `tooLarge` / `empty`(読める種類が無い)/ `failed` |
+| 説明文・entitlement | `Info.plist` の `NFCReaderUsageDescription`(英語は `Metamon/Resources/InfoPlist.xcstrings`)と `Metamon.entitlements` の `com.apple.developer.nfc.readersession.formats` = `NDEF`。App ID 側に NFC Tag Reading の capability を足す人の作業が要る |
+| タグの中身 | `NFCTagRecord` の `description` / `debugDescription` に中身を出さない。ログ・クラッシュ報告・サーバーにも出さない |
+| 審査用の版 | 説明文を `strip-review-plist.sh` で外し、`Metamon-Review.entitlements` に NFC の entitlement を入れない(使う部品がまだ無いため) |
+| Mac | CoreNFC が無いので、常に使えない実装に切り替わる(パッケージは macOS 向けにもコンパイルできる) |
+| テスト | `MetamonRendererTests/NFCTagSessionTests` |
+
 ## 端末の中で文字を訳す(OnDeviceTranslator・iOS 18)
 
 Apple の Translation framework で、文字を端末の中だけで訳す口を置いています(#1999・`ios/Packages/MetamonRenderer/Sources/MetamonRenderer/Support/OnDeviceTranslator.swift`)。**アクション `translate`・スキーマ・AI の決まり・`supportedFeatures`・DeepL との切り替えはまだありません**(#1775 の決定待ち)。アプリの root に橋渡しの見えない View を付けるのも、使う側を作る時に回しています。
