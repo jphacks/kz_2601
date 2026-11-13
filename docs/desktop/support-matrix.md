@@ -26,7 +26,7 @@ DSL の全部の type(Container 7・Leaf 70 = 77。`docs/dsl/dsl.schema.json` �
 | type | 状態 | 適合 state | 理由・代わりの形 | Mac | 関係する Issue |
 |---|---|---|---|---|---|
 | card | 描ける | rendered | カードの枠に子を並べる(子に area があれば枠の中も 6 列のグリッド) | 描ける | #1741 |
-| carousel | 代わり | rendered | 横に送らず、子を縦に並べる | 描ける | #1741 |
+| carousel | 描ける | rendered | 1 枚ずつ見せ、‹ ›・← →・ページの点で送る(端で止まる・動きは付けない)。読み上げは「2 / 5 枚目」 | 描ける | #1741 |
 | disclosure | 描ける | rendered | `expanded`(無ければ閉じる)で始め、見出しを押す・Enter / Space で開け閉めする。開け閉めはウィンドウの間だけ覚える。読み上げは「開いています / 閉じています」(#3214) | 描ける | #1741 |
 | grid | 代わり | rendered | 子に area があれば 6 列のグリッド、無ければ縦に並べる(columns はまだ見ない) | 描ける | #1741 |
 | hstack | 描ける | rendered | 子を同じ幅で横に並べる | 描ける | #1741 |
@@ -135,6 +135,6 @@ DSL の全部の type(Container 7・Leaf 70 = 77。`docs/dsl/dsl.schema.json` �
 
 ## 直す時
 
-- `DesktopLeaves` か `ConformanceAllowlist.unavailableTypes` を変えたら、この表の状態と適合 state も同じコミットで直す。
+- `DesktopLeaves` か `ConformanceAllowlist.unavailableTypes` を変えたら、この表の状態と適合 state も同じコミットで直す(食い違いは `SupportMatrixDocTest` が落とす)。
 - 「未定」の行は #1746 でオーナーが決めたら、決まった形と子の Issue に書き換える。
 - AI に描けない部品を作らせない申告(#2161)は、この表の「使えません」「未定」を元にする。

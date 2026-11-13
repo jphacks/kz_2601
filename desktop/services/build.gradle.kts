@@ -34,16 +34,23 @@ sourceSets {
                 "jp/kz2601/metamon/services/consent/AiConsentStore.kt",
                 "jp/kz2601/metamon/services/consent/CrashReportingPreference.kt",
                 "jp/kz2601/metamon/services/consent/KeyValueStore.kt",
+                // 外の公開データ(feed)の読み込みと前回の写し(#2806)
+                "jp/kz2601/metamon/services/feeds/FeedCache.kt",
+                "jp/kz2601/metamon/services/feeds/FeedClient.kt",
                 "jp/kz2601/metamon/services/follows/FollowStore.kt",
                 "jp/kz2601/metamon/services/follows/FollowsClient.kt",
                 "jp/kz2601/metamon/services/http/*.kt",
                 "jp/kz2601/metamon/services/live/HttpAppConfigClient.kt",
+                "jp/kz2601/metamon/services/live/HttpFeedClient.kt",
                 "jp/kz2601/metamon/services/live/HttpFollowsClient.kt",
                 "jp/kz2601/metamon/services/local/DocumentCache.kt",
                 "jp/kz2601/metamon/services/local/RecordStore.kt",
                 "jp/kz2601/metamon/services/local/SyncQueue.kt",
                 "jp/kz2601/metamon/services/privacy/PublicPersonalData.kt",
                 "jp/kz2601/metamon/services/sharing/ShareSheetModel.kt",
+                // client-config の notice(#333)。ServiceNotice の読み方の関数は ClientConfig.kt にある
+                "jp/kz2601/metamon/services/update/ClientConfig.kt",
+                "jp/kz2601/metamon/services/update/ServiceNotice.kt",
             )
         }
     }

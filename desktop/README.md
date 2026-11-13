@@ -94,7 +94,7 @@ Firebase Auth の REST クライアント(`auth/FirebaseAuthRestClient.kt`・ま
 
 ### 電池
 
-- 電池(`power/`): 電池の残り・充電の状態・省電力を読む口(iOS の `DevicePowerSource` と同じ形)。Linux は `/sys/class/power_supply`(マウスなどの電池は数えない・複数の電池は容量で重みを付けた平均)と `/sys/firmware/acpi/platform_profile` を 60 秒ごとに読み、変わった時だけ流す。Windows と macOS は今は「不明」。`METAMON_MOCK=1` の時は `METAMON_BATTERY_LEVEL`・`METAMON_BATTERY_STATE`・`METAMON_LOW_POWER` の偽物。式と画面にはまだ出さず、値は送らない。
+- 電池(`power/`): 電池の残り・充電の状態・省電力を読む口(iOS の `DevicePowerSource` と同じ形)。Linux は `/sys/class/power_supply`(マウスなどの電池は数えない・複数の電池は容量で重みを付けた平均)と `/sys/firmware/acpi/platform_profile`、Windows は kernel32 の `GetSystemPowerStatus`(JNA・電池の有無・残量・電源につながっているか・バッテリー節約機能)を 60 秒ごとに読み、変わった時だけ流す。macOS は今は「不明」。`METAMON_MOCK=1` の時は `METAMON_BATTERY_LEVEL`・`METAMON_BATTERY_STATE`・`METAMON_LOW_POWER` の偽物。式と画面にはまだ出さず、値は送らない。
 
 ### 読み上げ
 
@@ -197,7 +197,7 @@ whisper/native/build.sh                                       # Windows は whis
 | `app/src/main/kotlin/.../desktop/PhotoPreview.kt` | 写真を大きく見るダイアログ・見せる写真の集め方(Mac の `MacQuickLook.sources` と同じ規則)・「既定のアプリで開く」の一時ファイル |
 | `app/src/main/kotlin/.../desktop/i18n/`・`app/src/main/resources/i18n/desktop/` | 文言。Android の `renderer`・`app` の `values`(日本語)・`values-en`(英語)をビルド時に `i18n/` へ同梱して読む。デスクトップだけの文言は同じ形の XML(キーは `desktop_`) |
 | `app/src/main/kotlin/.../desktop/theme/`・`A11y.kt` | OS に従う明暗・読み上げの説明 |
-| `app/src/main/kotlin/.../desktop/power/` | 電池の残り・充電・省電力を読む口(Linux は sysfs、Windows・macOS は今は不明、`METAMON_MOCK=1` で偽物)。まだどこからも使っていない |
+| `app/src/main/kotlin/.../desktop/power/` | 電池の残り・充電・省電力を読む口(Linux は sysfs、Windows は `GetSystemPowerStatus`(JNA)、macOS は今は不明、`METAMON_MOCK=1` で偽物)。まだどこからも使っていない |
 | `app/src/main/kotlin/.../desktop/auth/` | サインインの部品。Firebase Auth の REST クライアント(`FirebaseAuthRestClient.kt`・設定は `FirebaseAuthConfig.kt`)と、リフレッシュトークンの置き場の口(`TokenStore.kt`・今はメモリだけの実体)。まだ画面にはつながない([今できること](#今できること)) |
 | `app/src/main/kotlin/.../desktop/Autostart.kt` | ログイン時に開く(既定は off)。Windows は HKCU の Run、Linux は XDG の autostart に登録する([今できること](#今できること)のトレイ) |
 | `app/src/main/kotlin/.../desktop/CommandPalette.kt` | Ctrl+K のコマンドパレット(画面・アクション・アプリを名前で選ぶ・絞り込みの点の付け方)([今できること](#今できること)のキーボード) |

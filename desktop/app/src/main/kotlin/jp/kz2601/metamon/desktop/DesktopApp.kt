@@ -397,6 +397,7 @@ private fun NodeContent(c: Component, s: ScreenScope) {
             c.children.filter { s.session.state(it, s.form) != "hidden" }.forEach { Box1(Modifier.weight(1f)) { Node(it, s) } }
         }
         ComponentType.CARD -> Card(Modifier.fillMaxWidth()) { LocalGridOrChildren(c, s, Modifier.padding(12.dp)) }
+        ComponentType.CAROUSEL -> CarouselContainer(c, c.children.filter { s.session.state(it, s.form) != "hidden" }) { Node(it, s) }
         ComponentType.DISCLOSURE -> DisclosureView(c, s.route.screen) {
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) { c.children.forEach { Node(it, s) } }
         }

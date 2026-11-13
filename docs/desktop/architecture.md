@@ -35,7 +35,7 @@ Gradle のビルドは Android とは別(`desktop/settings.gradle.kts`)。Androi
 
 | 取り込む物 | 一覧の場所 | ファイル |
 |---|---|---|
-| `android/services/src/main/kotlin` | `desktop/services/build.gradle.kts` の `include(...)` | `AuthService.kt`・`AppConfigClient.kt`・`CrashReporter.kt`・`PlanUsage.kt`・`consent/AiConsentStore.kt`・`consent/CrashReportingPreference.kt`・`consent/KeyValueStore.kt`・`http/*.kt`・`live/HttpAppConfigClient.kt`・`local/DocumentCache.kt`・`local/RecordStore.kt`・`local/SyncQueue.kt`(どれも `jp/kz2601/metamon/services/` の下) |
+| `android/services/src/main/kotlin` | `desktop/services/build.gradle.kts` の `include(...)` | `AuthService.kt`・`AppConfigClient.kt`・`CrashReporter.kt`・`PlanUsage.kt`・`consent/AiConsentStore.kt`・`consent/CrashReportingPreference.kt`・`consent/KeyValueStore.kt`・`http/*.kt`・`live/HttpAppConfigClient.kt`・`local/DocumentCache.kt`・`local/RecordStore.kt`・`local/SyncQueue.kt`・`update/ClientConfig.kt`・`update/ServiceNotice.kt`(どれも `jp/kz2601/metamon/services/` の下) |
 | `android/renderer/src/main/kotlin/jp/kz2601/metamon/renderer` | `desktop/app/build.gradle.kts` の `syncSharedRenderer` | `form/FormDraft.kt`・`navigation/NavigationResolver.kt`・`theme/icons/SymbolIconTable.kt`・`theme/icons/VendoredIcons.kt` |
 | `android/whisper/src/main/kotlin/jp/kz2601/metamon/whisper` | `desktop/whisper/build.gradle.kts` の `syncSharedWhisper` | `AudioBlocks.kt`・`IdleReleasing.kt`・`WhisperEngine.kt`・`WhisperModelManager.kt`・`WhisperModels.kt`(Android の API を使う `AudioFileDecoder.kt`・`WhisperTranscriber.kt` と、`.so` の読み方の `WhisperNative.kt` は取り込まない) |
 | `android/whisper/src/test/kotlin` | `desktop/whisper/build.gradle.kts`(test の `srcDir`) | 全部(Android と同じテストをそのまま回す) |

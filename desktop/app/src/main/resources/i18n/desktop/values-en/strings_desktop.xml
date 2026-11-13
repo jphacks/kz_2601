@@ -15,6 +15,10 @@
     <string name="desktop_calendar_opened">Opened the event (%1$s)</string>
     <string name="desktop_calendar_write_failed">Couldn\'t save the event</string>
     <string name="desktop_calendar_written">Saved the event: %1$s</string>
+    <string name="desktop_carousel_go">Go to %1$d</string>
+    <string name="desktop_carousel_next">Next</string>
+    <string name="desktop_carousel_page">%1$d of %2$d</string>
+    <string name="desktop_carousel_prev">Previous</string>
     <string name="desktop_chart_empty">No data yet</string>
     <string name="desktop_close">Close</string>
     <string name="desktop_coin_estimate">About %1$d coins</string>
@@ -206,6 +210,7 @@
     <string name="desktop_tray_upcoming_hint">Choose one to cancel it (shown only while the app is open)</string>
     <string name="desktop_tray_upcoming_more">%1$d more</string>
     <string name="desktop_tray_voice">Talk by voice (not available on desktop yet)</string>
+    <string name="desktop_tray_voice_toggle">Talk by voice (start / stop recording)</string>
     <string name="desktop_unavailable_activity">Live activities aren\'t available on this computer</string>
     <string name="desktop_unavailable_follow">Following isn\'t available on desktop yet (sign-in is required)</string>
     <string name="desktop_unavailable_voice">Voice changes aren\'t available on desktop yet</string>
