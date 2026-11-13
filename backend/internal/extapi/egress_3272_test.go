@@ -25,7 +25,7 @@ func TestNewHTTPClient_ListedHostReachable_3272(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 	if resp.StatusCode != 200 {
 		t.Fatalf("status %d", resp.StatusCode)
 	}
@@ -87,7 +87,7 @@ func TestNewHTTPClient_Redirects_3272(t *testing.T) {
 	if err != nil {
 		t.Fatalf("same-host redirect: %v", err)
 	}
-	resp.Body.Close()
+	_ = resp.Body.Close()
 
 	if _, err := c.Get(s.URL + "/out"); !errors.Is(err, ErrEgress) {
 		t.Fatalf("off-list redirect err = %v, want ErrEgress", err)
