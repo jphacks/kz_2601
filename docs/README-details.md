@@ -255,6 +255,44 @@ xcodebuild -scheme Metamon -destination 'platform=iOS Simulator,name=iPhone 17' 
 - 実機では初回起動時に WhisperKit `small` モデルを DL します(進捗表示・一度 DL すればオフラインでロード)。
 - 対応言語: 日本語 / English。設定 >「言語」で即時に切り替え、生成・対話・音声認識も連動します(#129)。
 
+### Android(JDK 17+ / Android SDK 36)
+
+```sh
+cd android
+./gradlew test                 # JVM の単体テスト(全モジュール)
+./gradlew assembleStgDebug     # stg の debug APK
+./gradlew installStgDebug      # つないだ端末・エミュレータに入れる
+```
+
+- Android SDK の場所は `android/local.properties` の `sdk.dir` か `ANDROID_HOME`。
+- 詳しくは [`android/README.md`](../android/README.md)、CI は [`docs/android/ci.md`](android/ci.md)。
+
+### Mac(Xcode 16+ / xcodegen)
+
+Mac 版(`ios/MetamonMac/`)は iOS と同じ Xcode プロジェクトの別 scheme です。
+
+```sh
+cd ios
+METAMON_TEAM_ID=<TEAM_ID> xcodegen generate     # iOS と同じ .xcodeproj を作る
+xcodebuild -scheme MetamonMac -destination 'platform=macOS' build CODE_SIGNING_ALLOWED=NO
+xcodebuild -scheme MetamonMac -destination 'platform=macOS' test CODE_SIGNING_ALLOWED=NO
+scripts/mac-package-test.sh MetamonDSL          # 共有パッケージ 1 つを macOS で(Renderer / Services も可)
+```
+
+- repo か DerivedData が `~/Desktop`・`~/Documents`・`~/Downloads` の下にあると、macOS のテストが読み込みで落ちることがあります(macOS の保護)。その時は保護の外に置きます。
+- 詳しくは [`ios/README.md` のテスト](../ios/README.md#テスト)、OS との連携は [`docs/mac/system-integration.md`](mac/system-integration.md)、CI は `.github/workflows/mac-ci.yml`。
+
+### デスクトップ(Windows・Linux / JDK 17+)
+
+```sh
+cd desktop
+./gradlew :desktop:run                    # 同梱の例 shopping を開く(既定は接続先モック)
+./gradlew :desktop:test :dsl:test         # 適合テストと :dsl のテスト
+```
+
+- DSL は Android の `android/dsl` をそのまま使います(Android SDK は不要)。
+- 詳しくは [`desktop/README.md`](../desktop/README.md)、CI は `.github/workflows/desktop-ci.yml`。
+
 ### secrets の置き方(public リポ)
 
 | 秘密 | 置き場 | 流し込み |
