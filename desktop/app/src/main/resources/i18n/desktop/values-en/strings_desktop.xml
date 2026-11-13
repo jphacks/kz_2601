@@ -99,6 +99,9 @@
     <string name="desktop_match_offline">Matches appear after you sign in</string>
     <string name="desktop_notification_now">now</string>
     <string name="desktop_notification_scheduled">Notification scheduled (%1$s, only while the app is open)</string>
+    <string name="desktop_paste_record_done">Pasted %1$d fields</string>
+    <string name="desktop_paste_record_none">No fields to paste</string>
+    <string name="desktop_paste_record_partial">Pasted %1$d fields (%2$d didn\'t fit)</string>
     <string name="desktop_picker_empty">No candidates</string>
     <string name="desktop_picker_hint">Press the button to pick one</string>
     <string name="desktop_picker_pick">Pick</string>

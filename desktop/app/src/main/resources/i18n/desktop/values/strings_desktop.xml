@@ -100,6 +100,9 @@
     <string name="desktop_match_offline">仲間探しのつながりはサインインした後に出ます</string>
     <string name="desktop_notification_now">今</string>
     <string name="desktop_notification_scheduled">通知を予約しました(%1$s・アプリを開いている間だけ)</string>
+    <string name="desktop_paste_record_done">%1$d 件の項目を貼り付けました</string>
+    <string name="desktop_paste_record_none">貼り付けられる項目がありません</string>
+    <string name="desktop_paste_record_partial">%1$d 件の項目を貼り付けました(入らなかった項目 %2$d 件)</string>
     <string name="desktop_picker_empty">候補がありません</string>
     <string name="desktop_picker_hint">ボタンを押すと 1 つ選びます</string>
     <string name="desktop_picker_pick">選ぶ</string>

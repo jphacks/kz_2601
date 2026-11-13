@@ -1,6 +1,10 @@
 package jp.kz2601.metamon.desktop
 
 import androidx.compose.runtime.Composable
+import jp.kz2601.metamon.desktop.io.RecordClipboard
+import jp.kz2601.metamon.desktop.io.RecordPaste
+import java.awt.Toolkit
+import java.awt.datatransfer.Transferable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -60,6 +64,7 @@ object KeyboardText {
     val NO_PREVIEW get() = Strings["desktop_preview_none"]
     val DELETE_CONFIRM get() = Strings["desktop_keys_delete_confirm"]
     val NO_NEW get() = Strings["desktop_keys_no_new"]
+    val PASTE_NONE get() = Strings["desktop_paste_record_none"]
     val NO_SAVE get() = Strings["desktop_keys_no_save"]
     val PALETTE_PLACEHOLDER get() = Strings["desktop_keys_palette_placeholder"]
     val PALETTE_EMPTY get() = Strings["desktop_keys_palette_empty"]
@@ -300,11 +305,37 @@ class DesktopKeyboard(
             return true
         }
         if (paletteOpen || helpOpen || licensesOpen || wipeConfirmOpen) return false // パレット・一覧・確認が自分で受ける
+        // 項目つきでコピーした記録の貼り付け。入力欄などを選んでいる時は普通の貼り付けに任せる
+        if (isPasteKey(p)) return !bubble && rootFocused && pasteRecord()
         val s = Keymap.match(p, os) ?: return false
         if (s == Shortcut.PRINT || s.bubble != bubble) return false // 印刷は Print.kt の Ctrl+P
         // Space は何も選んでいない時だけ。見せる写真が無ければ流す(知らせも出さない)
         if (s == Shortcut.PREVIEW) return rootFocused && !repeat && openPreview()
         return run(s)
+    }
+
+    /** クリップボードの中身(テストで差し替える)。 */
+    var clipboard: () -> Transferable? = { runCatching { Toolkit.getDefaultToolkit().systemClipboard.getContents(null) }.getOrNull() }
+
+    private fun isPasteKey(p: KeyPress): Boolean =
+        p.key == Key.V && !p.shift && !p.alt && (if (os == HostOs.MAC) p.meta && !p.ctrl else p.ctrl && !p.meta)
+
+    /**
+     * Ctrl+V(macOS は ⌘V): 項目つきでコピーした記録が入っていれば、一番上のフォームの項目名が合う欄に値を入れる。
+     * 入った件数と入らなかった件数を知らせる。コピーした記録が無い・書けないフォームなら false(他へ流す)。
+     */
+    fun pasteRecord(): Boolean {
+        val form = session.form(session.top) ?: return false
+        if (form.isReadOnly) return false
+        val payload = clipboard()?.let(RecordClipboard::read) ?: return false
+        val r = RecordPaste.paste(payload, form.entity, session.persistence?.appId.orEmpty())
+        r.values.forEach { (field, v) -> form.values[field] = v }
+        session.message = when {
+            r.values.isEmpty() -> KeyboardText.PASTE_NONE
+            r.unmatched.isEmpty() -> Strings.format("desktop_paste_record_done", r.values.size)
+            else -> Strings.format("desktop_paste_record_partial", r.values.size, r.unmatched.size)
+        }
+        return true
     }
 
     /** 一番上の画面の記録の写真を開く([start] から)。見せる物が無ければ false。 */
