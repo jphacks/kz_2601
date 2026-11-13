@@ -192,6 +192,7 @@
     <string name="desktop_tray_upcoming_hint">Choose one to cancel it (shown only while the app is open)</string>
     <string name="desktop_tray_upcoming_more">%1$d more</string>
     <string name="desktop_tray_voice">Talk by voice (not available on desktop yet)</string>
+    <string name="desktop_tray_voice_toggle">Talk by voice (start / stop recording)</string>
     <string name="desktop_unavailable_activity">Live activities aren\'t available on this computer</string>
     <string name="desktop_unavailable_follow">Following isn\'t available on desktop yet (sign-in is required)</string>
     <string name="desktop_unavailable_voice">Voice changes aren\'t available on desktop yet</string>
