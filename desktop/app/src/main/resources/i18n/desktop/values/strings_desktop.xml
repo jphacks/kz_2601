@@ -17,6 +17,9 @@
     <string name="desktop_delete_not_allowed">このデータは削除できません</string>
     <string name="desktop_drag_image_name">画像</string>
     <string name="desktop_drag_table_name">表</string>
+    <string name="desktop_edit_hint_body">入力欄に書くか、声で頼めます。</string>
+    <string name="desktop_edit_hint_title">こう頼むと直せます</string>
+    <string name="desktop_edit_hint_try">頼んでみる</string>
     <string name="desktop_export_clipboard">(表はクリップボードにも入れました)</string>
     <string name="desktop_export_done">%1$d 件を書き出しました: %2$s</string>
     <string name="desktop_export_writing">書き出しています…</string>
