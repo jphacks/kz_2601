@@ -62,6 +62,7 @@ jobs:
       - run: scripts/ai-cost-test.sh # jq は runner に同梱
       - run: scripts/runner-usage-test.sh # runner.usage の集計(#345)
       - run: scripts/demo-check-test.sh # demo-check の版・env 照合(偽の curl)
+      - run: scripts/setup-branch-protection-test.sh # ブランチの保護の --dry-run の JSON(偽の gh・送らない)
       # 段階的なリリースの判定・巻き戻し・通知(#372・偽の gcloud)。模擬の巻き戻しを この run の summary / 注釈に出さないよう外す
       - run: env -u GITHUB_STEP_SUMMARY -u GITHUB_ACTIONS scripts/rollout-test.sh
 

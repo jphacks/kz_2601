@@ -19,7 +19,7 @@ struct LinkedAccountsSection: View {
                 ForEach(Self.rows(for: user)) { provider in
                     row(provider)
                 }
-                if Self.offersApple(to: user) {
+                if Self.offersApple(to: user), !BuildConfig.isDebugTestAccount { // 試験用の枠は Apple をつながない(#2084)
                     appleButton
                         .listRowInsets(EdgeInsets(top: Theme.Spacing.sm, leading: Theme.Spacing.md, bottom: Theme.Spacing.sm, trailing: Theme.Spacing.md))
                 }

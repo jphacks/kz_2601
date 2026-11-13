@@ -5,6 +5,7 @@
 #   wait       起動済みのエミュレータが応答するまで待つ(最大 90 秒)
 #   test       起動済みのエミュレータに対してエミュレータ試験を回す
 #   test-all   起動していなければ一時的に起動 → test → 自分で起動した分だけ止める
+#   judge F [S] go test -json の出力 F(と go test の終了コード S)だけで「黙ってスキップさせない」判定をする(テスト用)
 # 接続先は FIRESTORE_EMULATOR_HOST(既定 127.0.0.1:8089)。プロジェクトは demo-kz2601 固定
 # (demo- プロジェクトは実 GCP に繋がらない。テスト側もハードコード)。必要なもの: gcloud
 # (cloud-firestore-emulator コンポーネント)・Java 11+・Go・jq・curl。
@@ -50,9 +51,14 @@ cmd_test() {
   # shellcheck disable=SC2086
   go test -count=1 -json $pkgs > "$out" || status=$?
   jq -rj 'select(.Action=="output") | .Output' "$out"
+  judge "$out" "$status"
+}
 
-  # 黙ってスキップさせない: スキップ理由にエミュレータが出たら、または
-  # Firestore 系テスト(TestFirestore* / */firestore)が 1 件でもスキップされたら失敗
+# judge <go test -json の出力> [go test の終了コード]: 黙ってスキップさせない判定(scripts/firestore-emulator-test.sh で確かめる)。
+# スキップ理由にエミュレータが出たら、または Firestore 系テスト(TestFirestore* / */firestore)が 1 件でもスキップされたら失敗。
+# go test が失敗していればその終了コード。Firestore 系テストが 1 件も通っていなければ失敗
+judge() {
+  local out="$1" status="${2:-0}"
   if grep -q 'FIRESTORE_EMULATOR_HOST not set' "$out"; then
     echo "::error::emulator tests were skipped"; return 1
   fi
@@ -83,5 +89,6 @@ case "${1:-}" in
   wait) cmd_wait ;;
   test) cmd_test ;;
   test-all) cmd_test_all ;;
-  *) echo "usage: $0 start|wait|test|test-all" >&2; exit 2 ;;
+  judge) [ -n "${2:-}" ] || { echo "usage: $0 judge <go test -json の出力> [go test の終了コード]" >&2; exit 2; }; judge "$2" "${3:-0}" ;;
+  *) echo "usage: $0 start|wait|test|test-all|judge" >&2; exit 2 ;;
 esac

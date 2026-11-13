@@ -15,6 +15,10 @@ struct MacSettingsView: View {
                 .tabItem { Label("アカウント", systemImage: "person.crop.circle") }
             MacNotificationSettings()
                 .tabItem { Label("通知", systemImage: "bell") }
+            #if !APP_STORE_REVIEW // 審査用の版はフィードバックと一緒に外す(#374)
+            MacNoticesSettings()
+                .tabItem { Label("お知らせ", systemImage: "bell.badge") }
+            #endif
             #if !APP_STORE_REVIEW // 審査用の版は OAuth の provider を外す(決定 6)
             MacConnectedServicesSettings()
                 .tabItem { Label("つないだサービス", systemImage: "link") }
