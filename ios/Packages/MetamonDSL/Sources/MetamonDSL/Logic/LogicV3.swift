@@ -1,20 +1,45 @@
 import Foundation
+import Observation
 
 // Logic v3: agg latest/earliest(#133)・毎日リセットのチェック(#132)。lookup(#134)は ExprEvaluator.fieldValue。
 
-/// 「今日」の基準時刻。期間 filter・`today`/`now`・毎日リセットのチェックが使う。
+/// 「今日」の基準時刻。期間 filter・`today`/`now`・毎日リセットのチェック・連続記録が使う。
+/// 優先順: `fixed`(適合テスト)> `dayOffset`(開発用メニュー #2082)でずらした実時刻 > 実時刻。
 /// DEBUG ビルドだけ環境変数 `METAMON_DEBUG_TODAY=YYYY-MM-DD`(simctl は `SIMCTL_CHILD_` 接頭辞)で日付を差し替えられる
 /// (時刻は実時刻のまま。日付境界の確認用)。
 public enum DSLClock {
     /// 固定の時刻(適合テスト・#352 の `device.now`)。nil なら実時刻。アプリからは設定しない
     nonisolated(unsafe) public static var fixed: Date?
 
+    /// 日付をずらす日数(#2082)。パッケージにはアプリのコンパイル条件が渡らないので、
+    /// アプリの `#if METAMON_STG` のコードだけが入れる。入れない限り 0 で、今の動きは変わらない。
+    /// 一度入れると `now()` を読んだ View が変更で描き直される(Observation)。入れる前は追跡しない(Release の負担なし)
+    public static var dayOffset: Int {
+        get { shiftInstalled ? DSLDayShift.shared.days : 0 }
+        set {
+            shiftInstalled = true
+            if DSLDayShift.shared.days != newValue { DSLDayShift.shared.days = newValue }
+        }
+    }
+
+    nonisolated(unsafe) private static var shiftInstalled = false
+
     public static func now() -> Date {
         if let fixed { return fixed }
+        return shifted(baseNow(), days: dayOffset)
+    }
+
+    /// ずらす前の今(`fixed` は見ない)。DEBUG の `METAMON_DEBUG_TODAY` は効く。開発用メニューがずらす日数を数える基準
+    public static func baseNow() -> Date {
         #if DEBUG
         if let override = debugNow(Date()) { return override }
         #endif
         return Date()
+    }
+
+    /// `days` 日ずらす(時刻はそのまま)。0 はそのまま
+    static func shifted(_ date: Date, days: Int, calendar: Calendar = .current) -> Date {
+        days == 0 ? date : (calendar.date(byAdding: .day, value: days, to: date) ?? date)
     }
 
     /// `METAMON_DEBUG_TODAY` の日付 + 実時刻の時:分:秒。未設定・形式外は nil。
@@ -23,6 +48,13 @@ public enum DSLClock {
         let t = calendar.dateComponents([.hour, .minute, .second], from: real)
         return calendar.date(bySettingHour: t.hour ?? 0, minute: t.minute ?? 0, second: t.second ?? 0, of: day)
     }
+}
+
+/// `DSLClock.dayOffset` の入れ物。View の body で `DSLClock.now()` を読むと、ずらした時に描き直される
+@Observable
+final class DSLDayShift: @unchecked Sendable {
+    static let shared = DSLDayShift()
+    var days = 0
 }
 
 /// `list.item.resets: "daily"`(#132): toggle は date field。値が今日(端末ローカル)なら済み。
