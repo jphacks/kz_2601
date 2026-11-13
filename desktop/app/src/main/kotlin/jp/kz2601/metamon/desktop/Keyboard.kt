@@ -1,9 +1,14 @@
 package jp.kz2601.metamon.desktop
 
 import androidx.compose.runtime.Composable
+import jp.kz2601.metamon.desktop.io.RecordClipboard
+import jp.kz2601.metamon.desktop.io.RecordPaste
+import java.awt.Toolkit
+import java.awt.datatransfer.Transferable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -42,14 +47,26 @@ import jp.kz2601.metamon.desktop.share.ShareLinkEntry
 import jp.kz2601.metamon.desktop.net.DesktopApiConfig
 import jp.kz2601.metamon.desktop.theme.TextZoom
 import jp.kz2601.metamon.desktop.theme.TextZoomState
+import jp.kz2601.metamon.desktop.gridedit.GridEditDraft
+import jp.kz2601.metamon.desktop.gridedit.GridEditLayer
+import jp.kz2601.metamon.desktop.gridedit.gridEditDraft
+import jp.kz2601.metamon.desktop.usage.UsageDialog
+import jp.kz2601.metamon.desktop.usage.UsageLoader
 import jp.kz2601.metamon.dsl.Action
 import jp.kz2601.metamon.dsl.ActionType
+import jp.kz2601.metamon.desktop.io.ExportClipboard
+import jp.kz2601.metamon.desktop.store.RetentionPrompts
+import jp.kz2601.metamon.desktop.store.RetentionReviewDialog
+import jp.kz2601.metamon.desktop.voice.PromptTipsDialog
+import jp.kz2601.metamon.desktop.voice.PromptTipsText
 import jp.kz2601.metamon.dsl.AppDSL
 import jp.kz2601.metamon.dsl.ComponentType
 import jp.kz2601.metamon.dsl.Presentation
 import jp.kz2601.metamon.dsl.Screen
 import jp.kz2601.metamon.dsl.screen
 import jp.kz2601.metamon.renderer.form.FormDraft
+import jp.kz2601.metamon.desktop.onboarding.OnboardingDialog
+import jp.kz2601.metamon.services.PlanUsageSource
 
 // キーボードだけで使う(#1765): ショートカット・コマンドパレット(CommandPalette.kt)・F1 の一覧。
 
@@ -68,6 +85,7 @@ object KeyboardText {
     val DELETE_CONFIRM get() = Strings["desktop_keys_delete_confirm"]
     val UNDO get() = Strings["feedback_undo"]
     val NO_NEW get() = Strings["desktop_keys_no_new"]
+    val PASTE_NONE get() = Strings["desktop_paste_record_none"]
     val NO_SAVE get() = Strings["desktop_keys_no_save"]
     val PALETTE_PLACEHOLDER get() = Strings["desktop_keys_palette_placeholder"]
     val PALETTE_EMPTY get() = Strings["desktop_keys_palette_empty"]
@@ -306,6 +324,11 @@ class DesktopKeyboard(
 
     /** 「診断の情報をコピー」(#2200・crash/Diagnostics.kt)。null ならパレット・F1 の一覧に出さない。 */
     var copyDiagnostics: (() -> Unit)? = null
+    /** 並びを直す編集の保存(#3207)。null ならパレットに出さない。 */
+    var saveLayout: ((GridEditDraft) -> Unit)? = null
+
+    /** 並びを直す編集の最中(その画面の下書き)。 */
+    var gridEdit by mutableStateOf<GridEditDraft?>(null)
 
     /** 消す前の確認を出している。 */
     var wipeConfirmOpen by mutableStateOf(false)
@@ -324,6 +347,8 @@ class DesktopKeyboard(
         override fun showInfo(title: String, lines: List<String>) { devInfo = title to lines }
         override fun askWipe() { wipeConfirmOpen = true }
     }
+    /** アカウントの画面(AccountScreen.kt・#2505)。パレットから開く。開いている間のキーは画面が自分で受ける。 */
+    var accountOpen by mutableStateOf(false)
 
     /** このウィンドウの検索欄(Ctrl+F は他のウィンドウに入らない)。 */
     val searchTargets = SearchTargets()
@@ -348,6 +373,24 @@ class DesktopKeyboard(
     var share: ShareLinkEntry? = null
 
     private val shareOpen: Boolean get() = share?.open == true
+
+    /** 設定の「使っている量」(#2814)。サインイン中だけパレットに出す。 */
+    var usage: UsageLoader? = null
+    var usageOpen by mutableStateOf(false)
+
+    /** 頼み方のコツ(voice/PromptTipsDialog.kt)。F1 の一覧とパレットから開く。 */
+    var tipsOpen by mutableStateOf(false)
+
+    /** 設定の「自動で消える記録」の見直しの一覧(store/RetentionPrompt.kt)。パレットから開く。 */
+    var retentionReviewOpen by mutableStateOf(false)
+    private var retentionTick by mutableIntStateOf(0)
+
+    /** 初回の流れ(#3201)。起動時に 1 回・F1 の一覧とパレットの「使い方を見る」から開く。 */
+    var onboardingOpen by mutableStateOf(false)
+
+    /** 初回の流れを閉じた(最後まで見た = true・あとで見る / Esc = false)。 */
+    var onOnboardingFinished: (Boolean) -> Unit = {}
+
     val root = FocusRequester()
     val modal = FocusRequester()
 
@@ -362,18 +405,45 @@ class DesktopKeyboard(
 
     /** [repeat] は Space の押しっぱなしの 2 回目以降(開く・閉じるをしない)。 */
     fun handle(p: KeyPress, bubble: Boolean, repeat: Boolean = false): Boolean {
+        if (accountOpen) return false
         if (photos.isOpen) {
             // ダイアログが受けなかった閉じるキー(フォーカスがダイアログの外にある時)はここで閉じる。他は流す
             if (!bubble || PhotoPreview.keyOf(p) != PreviewKey.CLOSE) return false
             if (!repeat) closePreview()
             return true
         }
-        if (paletteOpen || helpOpen || licensesOpen || wipeConfirmOpen || shareOpen || a11yBridgeOpen || devInfo != null) return false // パレット・一覧・確認が自分で受ける
+        if (paletteOpen || helpOpen || licensesOpen || usageOpen || wipeConfirmOpen || shareOpen || onboardingOpen || gridEdit != null || a11yBridgeOpen || devInfo != null) return false // パレット・一覧・確認・並びの編集が自分で受ける
+        // 項目つきでコピーした記録の貼り付け。入力欄などを選んでいる時は普通の貼り付けに任せる
+        if (isPasteKey(p)) return !bubble && rootFocused && pasteRecord()
         val s = Keymap.match(p, os) ?: return false
         if (s == Shortcut.PRINT || s.bubble != bubble) return false // 印刷は Print.kt の Ctrl+P
         // Space は何も選んでいない時だけ。見せる写真が無ければ流す(知らせも出さない)
         if (s == Shortcut.PREVIEW) return rootFocused && !repeat && openPreview()
         return run(s)
+    }
+
+    /** クリップボードの中身(テストで差し替える)。 */
+    var clipboard: () -> Transferable? = { runCatching { Toolkit.getDefaultToolkit().systemClipboard.getContents(null) }.getOrNull() }
+
+    private fun isPasteKey(p: KeyPress): Boolean =
+        p.key == Key.V && !p.shift && !p.alt && (if (os == HostOs.MAC) p.meta && !p.ctrl else p.ctrl && !p.meta)
+
+    /**
+     * Ctrl+V(macOS は ⌘V): 項目つきでコピーした記録が入っていれば、一番上のフォームの項目名が合う欄に値を入れる。
+     * 入った件数と入らなかった件数を知らせる。コピーした記録が無い・書けないフォームなら false(他へ流す)。
+     */
+    fun pasteRecord(): Boolean {
+        val form = session.form(session.top) ?: return false
+        if (form.isReadOnly) return false
+        val payload = clipboard()?.let(RecordClipboard::read) ?: return false
+        val r = RecordPaste.paste(payload, form.entity, session.persistence?.appId.orEmpty())
+        r.values.forEach { (field, v) -> form.values[field] = v }
+        session.message = when {
+            r.values.isEmpty() -> KeyboardText.PASTE_NONE
+            r.unmatched.isEmpty() -> Strings.format("desktop_paste_record_done", r.values.size)
+            else -> Strings.format("desktop_paste_record_partial", r.values.size, r.unmatched.size)
+        }
+        return true
     }
 
     /** 一番上の画面の記録の写真を開く([start] から)。見せる物が無ければ false。 */
@@ -429,6 +499,16 @@ class DesktopKeyboard(
         dispatch(Action(type = ActionType.NAVIGATE, screen = id, presentation = Presentation.PUSH), ctx())
     }
 
+    /** 並びを直す編集を始める(メインの層の、動かせる部品がある画面だけ)。 */
+    fun startGridEdit() {
+        val draft = if (session.nav.sheet == null && session.nav.fullScreen == null) dsl.gridEditDraft(session.top.screen) else null
+        if (draft == null) {
+            session.message = Strings["desktop_grid_edit_unavailable"]
+            return
+        }
+        gridEdit = draft
+    }
+
     /** パレットの中身: ショートカット → この画面のボタン → 画面 → アプリ。 */
     fun commands(): List<PaletteCommand> {
         val screen = topScreen
@@ -467,7 +547,33 @@ class DesktopKeyboard(
             "about:licenses", LicensesText.TITLE, PaletteCommand.Kind.ACTION,
             keywords = listOf("licenses", "third-party", "oss", "notice", LicensesText.LICENSE),
         ) { licensesOpen = true }
+        val account = PaletteCommand(
+            "about:account", Strings["account_menu"], PaletteCommand.Kind.ACTION,
+            keywords = listOf("account", "terms", "privacy", "contact", Strings["legal_terms"], Strings["legal_privacy_policy"], Strings["settings_contact"]),
+        ) { accountOpen = true }
         val shareLink = share?.let { listOf(it.command()) }.orEmpty()
+        val usage = usage?.let {
+            listOf(PaletteCommand("account:usage", Strings["settings_usage_header"], PaletteCommand.Kind.ACTION, keywords = listOf("usage", "plan", "limit")) { usageOpen = true })
+        }.orEmpty()
+        val tips = PaletteCommand(
+            "help:prompt_tips", PromptTipsText.TITLE, PaletteCommand.Kind.ACTION,
+            keywords = listOf("tips", "prompt", "examples", "help"),
+        ) { tipsOpen = true }
+        val retention = session.takeIf { retentionRows().isNotEmpty() }?.let {
+            listOf(
+                PaletteCommand(
+                    "retention:review", Strings["desktop_retention_review"], PaletteCommand.Kind.ACTION,
+                    keywords = listOf("retention", "auto delete", Strings["retention_settings_header"]),
+                ) { retentionReviewOpen = true },
+            )
+        }.orEmpty()
+        val onboarding = PaletteCommand(
+            "help:onboarding", Strings["onboarding_replay"], PaletteCommand.Kind.ACTION,
+            keywords = listOf("onboarding", "tutorial", "how to use", Strings["desktop_onboarding_title"]),
+        ) { onboardingOpen = true }
+        val layout = saveLayout?.let {
+            listOf(PaletteCommand("layout:edit", Strings["desktop_grid_edit"], PaletteCommand.Kind.ACTION, keywords = listOf("layout", "grid", "area")) { startGridEdit() })
+        }.orEmpty()
         // Windows でナレーターが動いていて Access Bridge が無効の時だけ出す(#2209)
         val bridge = if (AccessBridgeAdvice.needed()) {
             listOf(PaletteCommand("about:a11y-bridge", Strings["desktop_a11y_bridge_command"], PaletteCommand.Kind.ACTION, keywords = listOf("narrator", "screen reader", "jabswitch")) { a11yBridgeOpen = true })
@@ -476,7 +582,14 @@ class DesktopKeyboard(
         }
         // stg の時だけ・配布物では出ない
         val dev = DevMenu.commands(devHost)
-        return shortcuts + buttons + record + screens + apps + wipe + shareLink + diagnostics + licenses + bridge + dev
+        return shortcuts + buttons + record + layout + screens + apps + usage + wipe + account + shareLink + retention + tips + onboarding + diagnostics + licenses + bridge + dev
+    }
+
+    /** 今のアプリの保存期間のある entity(アプリ・entity・日数・確認済みか)。端末に残さない時は空。 */
+    fun retentionRows(): List<RetentionPrompts.Row> {
+        val runner = session.retention ?: return emptyList()
+        val appId = session.records.persistence?.appId ?: return emptyList()
+        return RetentionPrompts.rows(appId, dsl.app.name, runner, session.models)
     }
 
     /** 確認で「消す」を押した: 全アプリの端末のデータを消し、このウィンドウを最初の画面に戻す。 */
@@ -507,7 +620,7 @@ class DesktopKeyboard(
     val modalModifier: Modifier get() = Modifier.focusRequester(modal).focusGroup()
 
     fun focusAfterNavigation(modalOpen: Boolean) {
-        if (paletteOpen || helpOpen || licensesOpen || shareOpen || devInfo != null) return
+        if (paletteOpen || helpOpen || licensesOpen || usageOpen || shareOpen || tipsOpen || retentionReviewOpen || onboardingOpen || devInfo != null) return
         if (modalOpen && runCatching { modal.requestFocus(FocusDirection.Enter) }.getOrDefault(false)) return
         runCatching { root.requestFocus() }
     }
@@ -520,6 +633,13 @@ class DesktopKeyboard(
             photos.close() // 画面が変わったら前の記録の写真は閉じる
             focusAfterNavigation(modalOpen)
         }
+        gridEdit?.let { draft ->
+            val close = {
+                gridEdit = null
+                runCatching { root.requestFocus() }
+            }
+            GridEditLayer(draft, Strings["desktop_grid_edit"], onSave = { d -> close(); saveLayout?.invoke(d) }, onCancel = { close() })
+        }
         if (photos.isOpen) PhotoPreviewDialog(photos, onMessage = { session.message = it }, onDismiss = ::closePreview)
         if (paletteOpen) {
             CommandPalette(remember(session.nav, session.store) { commands() }, os) {
@@ -528,7 +648,7 @@ class DesktopKeyboard(
             }
         }
         if (helpOpen) {
-            ShortcutHelp(os, onLicenses = { helpOpen = false; licensesOpen = true }, onCopyDiagnostics = copyDiagnostics) {
+            ShortcutHelp(os, onLicenses = { helpOpen = false; licensesOpen = true }, onTips = { helpOpen = false; tipsOpen = true }, onOnboarding = { helpOpen = false; onboardingOpen = true }, onCopyDiagnostics = copyDiagnostics) {
                 helpOpen = false
                 runCatching { root.requestFocus() }
             }
@@ -541,6 +661,44 @@ class DesktopKeyboard(
                 text = { Text(Strings["desktop_a11y_bridge_body"]) },
                 confirmButton = { TextButton(onClick = { a11yBridgeOpen = false }) { Text(KeyboardText.HELP_CLOSE) } },
             )
+        }
+        if (tipsOpen) {
+            PromptTipsDialog(
+                onCopy = { ExportClipboard.put(it) },
+                onMessage = { session.message = it },
+                onDismiss = {
+                    tipsOpen = false
+                    runCatching { root.requestFocus() }
+                },
+            )
+        }
+        if (retentionReviewOpen) {
+            val runner = session.retention
+            val appId = session.records.persistence?.appId
+            val rows = remember(retentionTick, session.store) { retentionRows() }
+            RetentionReviewDialog(
+                rows,
+                onConfirm = { r ->
+                    val entity = session.entityModel(r.entityId)
+                    if (runner != null && appId != null && entity != null) {
+                        RetentionPrompts.confirm(runner, appId, entity)
+                        retentionTick++
+                    }
+                },
+                onDismiss = {
+                    retentionReviewOpen = false
+                    runCatching { root.requestFocus() }
+                },
+            )
+        }
+        if (onboardingOpen) {
+            OnboardingDialog(os) { completed ->
+                onboardingOpen = false
+                onOnboardingFinished(completed)
+                // あとで見る: どこから見直せるかを一言で
+                if (!completed) session.message = Strings.format("desktop_onboarding_later_hint", Keymap.label(Shortcut.HELP, os))
+                runCatching { root.requestFocus() }
+            }
         }
         if (licensesOpen) {
             LicensesDialog {
@@ -565,6 +723,11 @@ class DesktopKeyboard(
                 text = { Text(lines.joinToString("\n")) },
                 confirmButton = { TextButton(onClick = { dismiss() }) { Text(KeyboardText.HELP_CLOSE) } },
             )
+        usage?.takeIf { usageOpen }?.let { loader ->
+            UsageDialog(loader) {
+                usageOpen = false
+                runCatching { root.requestFocus() }
+            }
         }
         if (wipeConfirmOpen) {
             val scope = rememberCoroutineScope()
@@ -580,6 +743,12 @@ class DesktopKeyboard(
                 dismissButton = { TextButton(onClick = { dismiss() }) { Text(Strings["inputs_cancel"]) } },
             )
         }
+        if (accountOpen) {
+            AccountDialog(onLicenses = { accountOpen = false; licensesOpen = true }) {
+                accountOpen = false
+                runCatching { root.requestFocus() }
+            }
+        }
     }
 }
 
@@ -592,10 +761,14 @@ fun rememberDesktopKeyboard(
     openApp: ((String) -> Unit)?,
     openRecord: ((String, String) -> Unit)? = null,
     wipeLocalData: (suspend () -> Unit)? = null,
+    usage: PlanUsageSource? = null,
+    saveLayout: ((GridEditDraft) -> Unit)? = null,
 ): DesktopKeyboard = remember(dsl, session) { DesktopKeyboard(dsl, session) }.also {
     it.dispatch = dispatch
     it.print = print
     it.openApp = openApp
     it.openRecord = openRecord
     it.wipeLocalData = wipeLocalData
+    if (it.usage == null && usage != null) it.usage = UsageLoader(usage)
+    it.saveLayout = saveLayout
 }

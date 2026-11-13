@@ -40,6 +40,7 @@ import androidx.compose.ui.input.key.type
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import jp.kz2601.metamon.desktop.i18n.Strings
+import jp.kz2601.metamon.desktop.voice.PromptTipsText
 import java.io.File
 import java.net.JarURLConnection
 import java.text.Normalizer
@@ -209,10 +210,12 @@ fun CommandPalette(commands: List<PaletteCommand>, os: HostOs, onDismiss: () -> 
 
 /**
  * F1 のショートカット一覧。[onLicenses] があれば「ライセンス」も出す(デスクトップに「このアプリについて」が無いので、ここを入り口にする)。
+ * [onTips] があれば「頼み方のコツ」も出す。
+ * [onOnboarding] があれば「使い方を見る」(初回の流れを見直す・#3201)。
  * [onCopyDiagnostics] があれば「診断の情報をコピー」も出す(#2200)。
  */
 @Composable
-fun ShortcutHelp(os: HostOs, onLicenses: (() -> Unit)? = null, onCopyDiagnostics: (() -> Unit)? = null, onDismiss: () -> Unit) {
+fun ShortcutHelp(os: HostOs, onLicenses: (() -> Unit)? = null, onTips: (() -> Unit)? = null, onOnboarding: (() -> Unit)? = null, onCopyDiagnostics: (() -> Unit)? = null, onDismiss: () -> Unit) {
     AlertDialog(
         onDismissRequest = onDismiss,
         title = { Text(KeyboardText.HELP) },
@@ -229,6 +232,16 @@ fun ShortcutHelp(os: HostOs, onLicenses: (() -> Unit)? = null, onCopyDiagnostics
             }
         },
         confirmButton = { TextButton(onClick = onDismiss) { Text(KeyboardText.HELP_CLOSE) } },
-        dismissButton = onLicenses?.let { open -> { TextButton(onClick = open) { Text(LicensesText.TITLE) } } },
+        dismissButton = if (onLicenses == null && onTips == null && onOnboarding == null) {
+            null
+        } else {
+            {
+                Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                    onOnboarding?.let { open -> TextButton(onClick = open) { Text(Strings["onboarding_replay"]) } }
+                    onTips?.let { open -> TextButton(onClick = open) { Text(PromptTipsText.TITLE) } }
+                    onLicenses?.let { open -> TextButton(onClick = open) { Text(LicensesText.TITLE) } }
+                }
+            }
+        },
     )
 }

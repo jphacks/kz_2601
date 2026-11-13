@@ -32,6 +32,8 @@ import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -79,8 +81,12 @@ import jp.kz2601.metamon.desktop.crash.Diagnostics
 import jp.kz2601.metamon.desktop.i18n.Strings
 import jp.kz2601.metamon.desktop.io.ExportClipboard
 import jp.kz2601.metamon.desktop.os.NotificationsOffBar
+import jp.kz2601.metamon.desktop.store.RetentionPromptDialog
+import jp.kz2601.metamon.desktop.store.RetentionPrompts
 import jp.kz2601.metamon.desktop.store.SessionPersistence
 import jp.kz2601.metamon.whisper.WhisperEngine
+import jp.kz2601.metamon.desktop.onboarding.OnboardingStore
+import kotlinx.coroutines.launch
 
 /** 画面 1 枚の描画に要るもの。 */
 private class ScreenScope(
@@ -118,6 +124,14 @@ fun DesktopApp(
     autoNav: AutoNavPlan? = null,
     /** アプリの id。Windows で通知がオフの時の帯を閉じた覚えに使う。null なら帯を出さない。 */
     appId: String? = null,
+    /** 初回の流れを見たかの保存(#3201)。null なら見たことを残さない(テスト・開発)。 */
+    onboarding: OnboardingStore? = null,
+    /** 開いた時に初回の流れを出す(起動時の最初のウィンドウだけ)。 */
+    showOnboardingAtLaunch: Boolean = false,
+    /** パレットの「並びを直す」の保存(#3207)。null なら出さない。 */
+    onSaveLayout: ((jp.kz2601.metamon.desktop.gridedit.GridEditDraft) -> Unit)? = null,
+    /** Windows の「送る」で届いたファイル(#3209)。ドラッグ & ドロップと同じ振り分けに渡す。 */
+    sendTo: jp.kz2601.metamon.desktop.platform.SendToInbox? = null,
 ) {
     val session = remember {
         DesktopSession(dsl, initialStore, startScreen = startScreen, host = DesktopActionHost(appName = dsl.app.name), persistence = persistence, shared = records, startRecordId = startRecordId)
@@ -136,6 +150,16 @@ fun DesktopApp(
     val focused = LocalWindowInfo.current.isWindowFocused
     val loaded = !session.records.loading
     LaunchedEffect(focused, loaded, session.saves) { if (focused && loaded) session.purgeExpired() }
+    // 保存期間のある entity を初めて開いた時の確認。確認するまで上の purgeExpired は消さない。前に来ているウィンドウだけが聞く
+    val retentionScope = rememberCoroutineScope()
+    var retentionTick by remember { mutableIntStateOf(0) }
+    val retentionRunner = session.retention
+    val retentionAppId = session.records.persistence?.appId
+    val retentionPrompt = if (focused && loaded && retentionRunner != null && retentionAppId != null) {
+        remember(retentionTick, session.store) { RetentionPrompts.pending(retentionAppId, retentionRunner, session.models) }
+    } else {
+        null
+    }
     var pending by remember { mutableStateOf<Pair<Action, ActionContext>?>(null) }
     val nav = session.nav
     val dispatch = { a: Action, ctx: ActionContext -> if (a.confirmMessage != null) pending = a to ctx else session.dispatch(a, ctx) }
@@ -149,11 +173,21 @@ fun DesktopApp(
     LaunchedEffect(openWithRevision) {
         if (openWithRevision > 0 && isActive()) OpenWithInbox.take().takeIf { it.isNotEmpty() }?.let { io.dropFiles(it, topComponents(), topDraft()) }
     }
+    // 「送る」で届いたファイルも落とした物と同じ所へ(#3209)
+    if (sendTo != null) {
+        LaunchedEffect(sendTo.requests) {
+            val files = sendTo.take(windowId, isActive)
+            if (files.isNotEmpty()) io.dropFiles(files, topComponents(), topDraft())
+        }
+    }
     // 印刷(#1767): Ctrl+P・見出しの「印刷」で一番上の画面をプレビュー
     var printing by remember { mutableStateOf<PrintDocument?>(null) }
     val openPrint = { printing = ScreenPrint.document(dsl, session.top.screen, session.store, session.form(session.top), locale = Strings.locale) }
     // キーボードだけで使う(#1765): Ctrl+K パレット・Ctrl+N/S/F・Delete・Esc・F1
-    val keyboard = rememberDesktopKeyboard(dsl, session, dispatch, openPrint, onOpenApp, onOpenRecord, onWipeLocalData)
+    val keyboard = rememberDesktopKeyboard(dsl, session, dispatch, openPrint, onOpenApp, onOpenRecord, onWipeLocalData, usage = session.persistence?.usage, saveLayout = onSaveLayout)
+    // 初回の流れ(#3201): 閉じたら(最後まで・あとで見る・Esc のどれでも)次の起動では出さない
+    keyboard.onOnboardingFinished = { onboarding?.markSeen() }
+    LaunchedEffect(Unit) { if (showOnboardingAtLaunch && onboarding?.hasSeen != true) keyboard.onboardingOpen = true }
     // 問い合わせ用の「診断の情報をコピー」(#2200)。明暗は今の配色から、トレイは Main から
     val dark = MaterialTheme.colorScheme.background.luminance() < 0.5f
     val traySupported = LocalTray.current?.traySupported
@@ -234,6 +268,21 @@ fun DesktopApp(
             keyboard.Overlay()
         }
     }
+    }
+
+    if (retentionPrompt != null && retentionRunner != null) {
+        RetentionPromptDialog(
+            retentionPrompt,
+            onConfirm = {
+                RetentionPrompts.confirm(retentionRunner, retentionPrompt)
+                retentionTick++
+                retentionScope.launch { session.purgeExpired() }
+            },
+            onLater = {
+                RetentionPrompts.defer(retentionPrompt)
+                retentionTick++
+            },
+        )
     }
 
     printing?.let { doc -> PrintPreview(doc, onDismiss = { printing = null }, onResult = { io.notice = it }) }

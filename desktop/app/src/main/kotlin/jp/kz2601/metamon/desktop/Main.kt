@@ -4,8 +4,11 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.unit.dp
@@ -26,6 +29,7 @@ import java.awt.GraphicsEnvironment
 import java.awt.Rectangle
 import java.awt.event.WindowAdapter
 import java.awt.event.WindowEvent
+import jp.kz2601.metamon.desktop.gridedit.LayoutEditStore
 import jp.kz2601.metamon.desktop.hotkey.GlobalHotkey
 import jp.kz2601.metamon.desktop.hotkey.GlobalHotkeys
 import jp.kz2601.metamon.desktop.i18n.Strings
@@ -33,11 +37,23 @@ import jp.kz2601.metamon.desktop.io.DragOut
 import jp.kz2601.metamon.desktop.io.OpenWithFiles
 import jp.kz2601.metamon.desktop.io.OpenWithInbox
 import jp.kz2601.metamon.desktop.net.DesktopApiConfig
+import jp.kz2601.metamon.desktop.notify.NoticeAction
+import jp.kz2601.metamon.desktop.notify.NoticeActions
+import jp.kz2601.metamon.desktop.notify.NoticeArgs
+import jp.kz2601.metamon.desktop.platform.JumpArgs
+import jp.kz2601.metamon.desktop.platform.JumpCommand
+import jp.kz2601.metamon.desktop.platform.JumpListPlan
+import jp.kz2601.metamon.desktop.platform.JumpListPublisher
+import jp.kz2601.metamon.desktop.platform.RecentApps
+import jp.kz2601.metamon.desktop.platform.SendToArgs
+import jp.kz2601.metamon.desktop.platform.SendToInbox
+import jp.kz2601.metamon.desktop.platform.SendToShortcut
 import jp.kz2601.metamon.desktop.power.ScreenAwake
 import jp.kz2601.metamon.desktop.store.DesktopStore
 import jp.kz2601.metamon.desktop.store.DeviceWipe
 import jp.kz2601.metamon.desktop.store.SessionPersistence
 import jp.kz2601.metamon.desktop.theme.ProvideTextZoom
+import jp.kz2601.metamon.desktop.onboarding.OnboardingStore
 import jp.kz2601.metamon.desktop.theme.TailorItTheme
 import jp.kz2601.metamon.desktop.update.UpdateGate
 import jp.kz2601.metamon.desktop.update.UpdateState
@@ -59,8 +75,16 @@ import javax.swing.SwingUtilities
  * 記録の JSON を渡した時(開発・スクリーンショット)は端末に残さないので、ロックを取らずに何本でも起動できる。
  */
 fun main(rawArgs: Array<String>) {
-    // `--quick-record` などの旗(.desktop の Actions・#2992)は位置の引数と分ける
-    val parsed = LaunchArgs.parse(rawArgs.toList())
+    // 通知のボタン(#3210)で起動した時は `tailorit-notice:…` の引数が付く。ほかの引数の並びは崩さない
+    val press = NoticeArgs.parse(rawArgs.toList())
+    val withoutNotice = NoticeArgs.strip(rawArgs.toList())
+    // 「送る」(#3209)は `--send-to` の後ろに選んだファイルが付く。先に切り出して、ほかの引数の並びは崩さない
+    val sent = SendToArgs.files(withoutNotice)
+    val argv = SendToArgs.strip(withoutNotice)
+    // ジャンプリストの項目(#3208)は `--jump=…` を足して起動する
+    val jump = JumpArgs.parse(argv)
+    // `--quick-record` などの旗(.desktop の Actions・#2992)は位置の引数と分ける(`--jump=…` もここで落ちる)
+    val parsed = LaunchArgs.parse(argv)
     // 「別のアプリで開く」のファイル(#2994)は位置の引数(アプリ名など)から外す
     val openFiles = OpenWithFiles.fromArgs(parsed.positional)
     val args = OpenWithFiles.withoutFiles(parsed.positional).toTypedArray()
@@ -70,12 +94,15 @@ fun main(rawArgs: Array<String>) {
         return
     }
     OpenWithInbox.offer(openFiles)
-    runApp(args, parsed.action)
+    press?.let(NoticeActions::deliver)
+    runApp(args, parsed.action, jump, sent)
 }
 
-private fun runApp(args: Array<String>, launchAction: LaunchAction?) = application {
+private fun runApp(args: Array<String>, launchAction: LaunchAction?, jump: JumpCommand? = null, sent: List<File>? = null) = application {
     // 端末の保存(#1887): 記録・設定は再起動しても残る。最後に開いたアプリから開く
     val desktopStore = remember { DesktopStore.open() }
+    // 並びを直した分(#3207)。同梱の DSL に当て直して開く
+    val layouts = remember { LayoutEditStore(desktopStore.root?.resolve("layouts")) }
     val first = remember {
         args.firstOrNull() ?: System.getProperty("tailorit.example")
             ?: desktopStore.lastAppId?.takeIf { it in BundledApps.ids() } ?: "shopping"
@@ -94,6 +121,7 @@ private fun runApp(args: Array<String>, launchAction: LaunchAction?) = applicati
         // 記録の JSON を渡した時(開発・スクリーンショット)は最初のアプリだけそれを使い、端末に残さない
         val fixture = args.getOrNull(1)?.let { MockStore.fromJson(File(it).readText()) }
         AppHub(
+            load = { id -> layouts.applyTo(id, Examples.load(id)) },
             openRecords = { id, dsl ->
                 if (fixture != null && id == first) {
                     SharedRecords(fixture)
@@ -106,6 +134,7 @@ private fun runApp(args: Array<String>, launchAction: LaunchAction?) = applicati
             },
             wipeStore = {
                 desktopStore.wipe()
+                layouts.removeAll()
                 DeviceWipe.run(desktopStore.root)
             },
         )
@@ -117,20 +146,45 @@ private fun runApp(args: Array<String>, launchAction: LaunchAction?) = applicati
             loadScope.cancel()
         }
     }
+    // 初回の流れ(#3201): 初めての起動で最初のウィンドウに出す。TAILORIT_RESET_ONBOARDING=1 で見ていないことに戻す。
+    // 記録の JSON を渡した起動(開発・スクリーンショット)は戻した時だけ出す(画面を塞がない)
+    val onboarding = remember { OnboardingStore(desktopStore.settings) }
+    val onboardingAtLaunch = remember {
+        val reset = onboarding.applyLaunchOverride()
+        onboarding.shouldAutoPresent() && (args.getOrNull(1) == null || reset)
+    }
     val registry = remember { WindowRegistry().also { it.open(WindowKey.app(first)) } }
     val firstWindowId = remember { registry.windows.first().id }
+    // 「送る」で届いたファイル(#3209)。起動の時の分は最初のウィンドウへ
+    val sendTo = remember { SendToInbox().also { box -> sent?.let { box.offer(SendToArgs.readable(it), firstWindowId) } } }
+    // 入れた物(MSI)で動いている Windows なら「送る」にショートカットを置く(置いてあれば何もしない)
+    remember { loadScope.launch { SendToShortcut.create().ensure() } }
     // トレイに常駐(#1761): × はトレイに隠す(設定で off・トレイが無ければ終わる)。終わるのはトレイの「終了」
     val tray = remember { TrayController.create(hub.dsl(first)) }
     tray.onOpenApp = { registry.open(WindowKey.app(it)) }
     // 2 つ目の起動: 渡されたアプリ(無ければ前にあるアプリ)を開いて前に出す。トレイに隠れていても出す
     remember {
-        SingleInstance.onHandoff { raw ->
+        // 通知のボタン(#3210): 開くはアプリを前に出す。どのボタンかは通知の onAction にも渡る
+        NoticeActions.onPress { p ->
+            SwingUtilities.invokeLater { if (p.action == NoticeAction.OPEN) tray.open() }
+        }
+        SingleInstance.onHandoff { handed ->
+            val press = NoticeArgs.parse(handed)
+            if (press != null) {
+                NoticeActions.deliver(press)
+                return@onHandoff
+            }
+            val files = SendToArgs.files(handed)
+            val raw = SendToArgs.strip(handed)
+            val cmd = JumpArgs.parse(raw)
             SwingUtilities.invokeLater {
                 val p = LaunchArgs.parse(raw)
                 val id = OpenWithFiles.withoutFiles(p.positional).firstOrNull()?.takeIf { it in BundledApps.ids() } ?: registry.active?.key?.appId ?: first
                 tray.openApp(id)
-                if (p.action == LaunchAction.QUICK_RECORD) tray.quickRecord()
+                if (p.action == LaunchAction.QUICK_RECORD || cmd == JumpCommand.QUICK_RECORD) tray.quickRecord()
                 OpenWithInbox.offer(OpenWithFiles.fromArgs(p.positional))
+                // 送られたファイルは前にあるアプリの、アプリのウィンドウへ(すぐ記録と同じ行き先)
+                if (files != null) sendTo.offer(SendToArgs.readable(files), registry.quickRecordWindow()?.id)
             }
         }
     }
@@ -138,11 +192,25 @@ private fun runApp(args: Array<String>, launchAction: LaunchAction?) = applicati
     LaunchedEffect(Unit) { if (launchAction == LaunchAction.QUICK_RECORD) tray.quickRecord() }
     // すぐ記録は前にあるアプリの、アプリのウィンドウへ(詳細には入れない・無ければ開く)
     tray.findQuickRecordWindow = { registry.quickRecordWindow()?.id }
+    // ジャンプリストの「すぐ記録」で起動した(#3208)
+    LaunchedEffect(Unit) { if (jump == JumpCommand.QUICK_RECORD) tray.quickRecord() }
+    // ジャンプリスト(#3208・既定は出さない)。前に出たアプリを「最近」の頭に足して出し直す
+    val jumpList = remember { JumpListPublisher.create() }
     // トレイの名前・すぐ記録・集計は前にあるウィンドウのアプリ。閉じて開き直すと記録が替わるのでウィンドウごとに見直す
     val active = registry.active
     LaunchedEffect(active?.id) {
         val appId = active?.key?.appId ?: return@LaunchedEffect
         tray.switchApp(hub.dsl(appId), hub.opened().firstOrNull { it.id == appId }?.records)
+        if (jumpList !== JumpListPublisher.Noop) {
+            val before = RecentApps.decode(desktopStore.settings.getString(RecentApps.KEY))
+            val recent = RecentApps.touch(before, appId)
+            if (recent != before) desktopStore.settings.putString(RecentApps.KEY, RecentApps.encode(recent))
+            val content = JumpListPlan.build(
+                recent, BundledApps.all().toMap(), QuickRecordTarget.find(hub.dsl(appId)) != null, VoiceFlag.enabled(),
+                JumpListPlan.Labels(Strings["desktop_jumplist_recent"], Strings["desktop_tray_quick_record"], Strings["desktop_jumplist_voice"]),
+            )
+            loadScope.launch { jumpList.publish(content) }
+        }
     }
     DesktopTray(tray)
     // どこからでも話しかけるキー(#2201): 既定は off。TAILORIT_HOTKEY か端末の設定がある時だけ裏で登録する
@@ -168,7 +236,13 @@ private fun runApp(args: Array<String>, launchAction: LaunchAction?) = applicati
     val autoNav = remember { AutoNavPlan.fromEnvironment() }
     registry.windows.toList().forEach { w ->
         key(w.id) {
-            DesktopWindow(w, registry, hub, tray, updates, startScreen = args.getOrNull(2)?.takeIf { w.id == firstWindowId }, autoNav = autoNav?.takeIf { w.id == firstWindowId })
+            DesktopWindow(
+                w, registry, hub, tray, updates, layouts, sendTo,
+                startScreen = args.getOrNull(2)?.takeIf { w.id == firstWindowId },
+                autoNav = autoNav?.takeIf { w.id == firstWindowId },
+                onboarding = onboarding,
+                showOnboarding = onboardingAtLaunch && w.id == firstWindowId,
+            )
         }
     }
 }
@@ -176,7 +250,19 @@ private fun runApp(args: Array<String>, launchAction: LaunchAction?) = applicati
 /** ウィンドウ 1 枚。画面の状態(遷移・下書き・キー)はウィンドウごと、記録はアプリごとに共有。 */
 @OptIn(FlowPreview::class)
 @Composable
-private fun ApplicationScope.DesktopWindow(w: WindowEntry, registry: WindowRegistry, hub: AppHub, tray: TrayController, updates: UpdateState, startScreen: String?, autoNav: AutoNavPlan?) {
+private fun ApplicationScope.DesktopWindow(
+    w: WindowEntry,
+    registry: WindowRegistry,
+    hub: AppHub,
+    tray: TrayController,
+    updates: UpdateState,
+    layouts: LayoutEditStore,
+    sendTo: SendToInbox,
+    startScreen: String?,
+    autoNav: AutoNavPlan?,
+    onboarding: OnboardingStore,
+    showOnboarding: Boolean,
+) {
     // アプリの記録はウィンドウの数で数える。最後の 1 枚を閉じたら書き終えて閉じる
     val app = remember(w) { hub.acquire(w.key.appId) }
     DisposableEffect(w) { onDispose { hub.release(w.key.appId) } }
@@ -191,6 +277,8 @@ private fun ApplicationScope.DesktopWindow(w: WindowEntry, registry: WindowRegis
     val close = {
         if (registry.requestClose(w.id) { tray.onCloseRequest() }) exitApplication()
     }
+    // 並びを直して保存した後に開き直す画面
+    var reopenScreen by remember(w) { mutableStateOf<String?>(null) }
     val screenTitle = w.key.screen?.let { app.dsl.screen(it)?.title?.ifEmpty { null } }
     Window(
         onCloseRequest = close,
@@ -244,10 +332,11 @@ private fun ApplicationScope.DesktopWindow(w: WindowEntry, registry: WindowRegis
                 ProvideTextZoom {
                 if (app.records.loading) {
                     LoadingSkeleton()
-                } else {
-    DesktopApp(
+                } else key(app.dsl) {
+                    // 並びを直して保存したら DSL が替わるので作り直し、編集していた画面から開く(#3207)
+                    DesktopApp(
                         app.dsl,
-                        startScreen = w.key.screen ?: startScreen,
+                        startScreen = reopenScreen ?: w.key.screen ?: startScreen,
                         onOpenApp = { registry.open(WindowKey.app(it)) },
                         records = app.records,
                         startRecordId = w.key.recordId,
@@ -259,6 +348,14 @@ private fun ApplicationScope.DesktopWindow(w: WindowEntry, registry: WindowRegis
                         onWipeLocalData = hub::wipeLocalData,
                         autoNav = autoNav,
                         appId = app.id,
+                        onboarding = onboarding,
+                        showOnboardingAtLaunch = showOnboarding,
+                        onSaveLayout = { draft ->
+                            layouts.append(app.id, draft.patch)
+                            reopenScreen = draft.screenId
+                            hub.replaceDsl(app.id, draft.applied(app.dsl))
+                        },
+                        sendTo = sendTo,
                     )
                 }
                 }
