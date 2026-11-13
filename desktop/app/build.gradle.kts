@@ -62,6 +62,10 @@ tasks.test {
     // 文言・テーマはテストを動かす機械の言語・OS の設定に左右されないよう固定する(テストの中で切り替える)
     systemProperty("tailorit.lang", "ja")
     systemProperty("tailorit.theme", "light")
+    // 適合テストで DSL_ECHO として比べていない props の表(ConformanceEchoReportTest)だけ、標準出力を Gradle の出力に流す
+    addTestOutputListener { descriptor, event ->
+        if (descriptor.className == "jp.kz2601.metamon.desktop.ConformanceEchoReportTest") logger.lifecycle(event.message.trimEnd())
+    }
 }
 
 // Android の :renderer のうち Compose の状態しか使わない純 Kotlin(フォームの下書き・遷移の規則)は、android/ を変えずにそのまま取り込む。
