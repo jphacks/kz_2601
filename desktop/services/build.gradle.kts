@@ -37,12 +37,16 @@ sourceSets {
                 // 外の公開データ(feed)の読み込みと前回の写し(#2806)
                 "jp/kz2601/metamon/services/feeds/FeedCache.kt",
                 "jp/kz2601/metamon/services/feeds/FeedClient.kt",
+                "jp/kz2601/metamon/services/follows/FollowStore.kt",
+                "jp/kz2601/metamon/services/follows/FollowsClient.kt",
                 "jp/kz2601/metamon/services/http/*.kt",
                 "jp/kz2601/metamon/services/live/HttpAppConfigClient.kt",
                 "jp/kz2601/metamon/services/live/HttpFeedClient.kt",
+                "jp/kz2601/metamon/services/live/HttpFollowsClient.kt",
                 "jp/kz2601/metamon/services/local/DocumentCache.kt",
                 "jp/kz2601/metamon/services/local/RecordStore.kt",
                 "jp/kz2601/metamon/services/local/SyncQueue.kt",
+                "jp/kz2601/metamon/services/sharing/ShareSheetModel.kt",
             )
         }
     }
@@ -52,4 +56,8 @@ dependencies {
     api(project(":dsl"))
     api(libs.kotlinx.coroutines.core)
     api(libs.okhttp)
+
+    testImplementation(libs.junit)
+    testImplementation(libs.kotlinx.coroutines.test)
+    testImplementation(libs.okhttp.mockwebserver)
 }
