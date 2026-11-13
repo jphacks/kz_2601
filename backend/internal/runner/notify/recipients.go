@@ -57,8 +57,12 @@ type Directory interface {
 	// Owner is the app's creator; "" when none is recorded.
 	Owner(ctx context.Context) (string, error)
 	// Members are the participants at run time (share-link members). The
-	// owner may or may not be included.
+	// owner may or may not be included. Read only for a notification to
+	// every member.
 	Members(ctx context.Context) ([]string, error)
+	// IsMember reports whether uid is a share-link member at run time, with
+	// one read (#2297). The owner is not asked.
+	IsMember(ctx context.Context, uid string) (bool, error)
 	// RecordAuthor is the author of entity/id; found=false when the record
 	// does not exist.
 	RecordAuthor(ctx context.Context, entity, id string) (author string, found bool, err error)
@@ -199,7 +203,7 @@ func (r *Resolver) Resolve(ctx context.Context, ev engine.Trigger, n engine.Plan
 	if err != nil {
 		return Resolution{}, fmt.Errorf("notify: owner: %w", err)
 	}
-	cands, err := r.candidates(ctx, ev, n, owner)
+	cands, listed, err := r.candidates(ctx, ev, n, owner)
 	if err != nil {
 		return Resolution{}, err
 	}
@@ -208,19 +212,11 @@ func (r *Resolver) Resolve(ctx context.Context, ev engine.Trigger, n engine.Plan
 		return res, nil
 	}
 
-	var members map[string]bool
+	// shared: each candidate is checked with one read (#2297), except when
+	// the candidates are the member list itself (already read)
+	var members *participants
 	if scope == dsl.ScopeShared {
-		ms, err := r.dir.Members(ctx)
-		if err != nil {
-			return Resolution{}, fmt.Errorf("notify: members: %w", err)
-		}
-		members = make(map[string]bool, len(ms)+1)
-		for _, m := range ms {
-			members[m] = true
-		}
-		if owner != "" {
-			members[owner] = true
-		}
+		members = &participants{dir: r.dir, owner: owner, listed: listed}
 	}
 	var actorBlocks []string
 	if ev.Actor != "" {
@@ -261,8 +257,9 @@ func (r *Resolver) Resolve(ctx context.Context, ev engine.Trigger, n engine.Plan
 	return res, nil
 }
 
-// candidates are the de-duplicated uids the kind points to.
-func (r *Resolver) candidates(ctx context.Context, ev engine.Trigger, n engine.PlannedNotify, owner string) ([]string, error) {
+// candidates are the de-duplicated uids the kind points to. listed is the
+// member list when the kind read it (members), else nil.
+func (r *Resolver) candidates(ctx context.Context, ev engine.Trigger, n engine.PlannedNotify, owner string) (cands []string, listed map[string]bool, err error) {
 	var uids []string
 	switch n.To.Kind {
 	case dsl.RecipientOwner:
@@ -271,11 +268,11 @@ func (r *Resolver) candidates(ctx context.Context, ev engine.Trigger, n engine.P
 		uids = []string{ev.Record.Author}
 	case dsl.RecipientAuthorOf:
 		if n.RefEntity == "" || n.RefID == "" {
-			return nil, nil
+			return nil, nil, nil
 		}
 		a, found, err := r.dir.RecordAuthor(ctx, n.RefEntity, n.RefID)
 		if err != nil {
-			return nil, fmt.Errorf("notify: author of %s: %w", n.RefEntity, err)
+			return nil, nil, fmt.Errorf("notify: author of %s: %w", n.RefEntity, err)
 		}
 		if found {
 			uids = []string{a}
@@ -283,7 +280,11 @@ func (r *Resolver) candidates(ctx context.Context, ev engine.Trigger, n engine.P
 	case dsl.RecipientMembers:
 		ms, err := r.dir.Members(ctx)
 		if err != nil {
-			return nil, fmt.Errorf("notify: members: %w", err)
+			return nil, nil, fmt.Errorf("notify: members: %w", err)
+		}
+		listed = make(map[string]bool, len(ms))
+		for _, m := range ms {
+			listed[m] = true
 		}
 		uids = append([]string{owner}, ms...)
 	case dsl.RecipientRecipients:
@@ -295,12 +296,37 @@ func (r *Resolver) candidates(ctx context.Context, ev engine.Trigger, n engine.P
 			out = append(out, u)
 		}
 	}
-	return out, nil
+	return out, listed, nil
+}
+
+// participants answers "is uid a participant at run time" for shared data:
+// the owner, or a member (from the list when it was read, else one read).
+type participants struct {
+	dir    Directory
+	owner  string
+	listed map[string]bool
+}
+
+func (p *participants) has(ctx context.Context, uid string) (bool, error) {
+	if uid == "" {
+		return false, nil
+	}
+	if uid == p.owner {
+		return true, nil
+	}
+	if p.listed != nil {
+		return p.listed[uid], nil
+	}
+	ok, err := p.dir.IsMember(ctx, uid)
+	if err != nil {
+		return false, fmt.Errorf("notify: members: %w", err)
+	}
+	return ok, nil
 }
 
 // check returns why uid must not receive it ("" = may).
 func (r *Resolver) check(ctx context.Context, ev engine.Trigger, scope dsl.EntityScope, owner, uid string,
-	members map[string]bool, actorBlocks []string, newActor bool) (Reason, error) {
+	members *participants, actorBlocks []string, newActor bool) (Reason, error) {
 	// the actor is not notified of their own write, except the owner of a
 	// private app (a reminder to oneself is the only notification there)
 	if uid == ev.Actor && scope != dsl.ScopePrivate {
@@ -319,7 +345,11 @@ func (r *Resolver) check(ctx context.Context, ev engine.Trigger, scope dsl.Entit
 			return ReasonNotMember, nil
 		}
 	case dsl.ScopeShared:
-		if !members[uid] {
+		ok, err := members.has(ctx, uid)
+		if err != nil {
+			return "", err
+		}
+		if !ok {
 			return ReasonNotMember, nil
 		}
 	}
