@@ -3,6 +3,16 @@ package jp.kz2601.metamon.desktop.store
 import jp.kz2601.metamon.desktop.ActionContext
 import jp.kz2601.metamon.desktop.DesktopSession
 import jp.kz2601.metamon.desktop.Examples
+import jp.kz2601.metamon.desktop.MockStore
+import jp.kz2601.metamon.desktop.Row
+import jp.kz2601.metamon.services.http.PlanLimit
+import jp.kz2601.metamon.services.http.ProRequired
+import jp.kz2601.metamon.services.http.RecordWriteDenial
+import jp.kz2601.metamon.services.local.SyncEvent
+import kotlinx.serialization.json.add
+import kotlinx.serialization.json.buildJsonArray
+import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.put
 import jp.kz2601.metamon.desktop.net.ClientPlatform
 import jp.kz2601.metamon.desktop.net.DesktopApi
 import jp.kz2601.metamon.desktop.net.DesktopApiConfig
@@ -161,5 +171,90 @@ class SessionPersistenceTest {
         assertNull(SessionPersistence.client(DesktopApiConfig.fromEnvironment(mapOf("TAILORIT_API" to "stg")), store))
         assertNull(SessionPersistence.client(DesktopApiConfig.fromEnvironment(mapOf("TAILORIT_DEV_TOKEN" to "t")), store))
         assertNotNull(SessionPersistence.client(DesktopApiConfig.fromEnvironment(mapOf("TAILORIT_API" to "stg", "TAILORIT_DEV_TOKEN" to "t")), store))
+    }
+
+    // MARK: - diff・remap・needsReload(#2622)
+
+    private fun mock() = SessionPersistence(DesktopStore(tmp.newFolder()), "a1", client = null, retryEveryMillis = null)
+
+    @Test
+    fun diffFindsAddedUpdatedRemovedAndSkipsUnchanged() = runBlocking {
+        val p = mock()
+        val old = MockStore(
+            mapOf(
+                "groceries" to listOf(Row("keep", mapOf("name" to "塩")), Row("edit", mapOf("name" to "牛乳")), Row("gone", mapOf("name" to "卵"))),
+                "dropped" to listOf(Row("x", mapOf("n" to "1"))),
+            ),
+        )
+        val new = MockStore(
+            mapOf(
+                "groceries" to listOf(Row("keep", mapOf("name" to "塩")), Row("edit", mapOf("name" to "豆乳")), Row("add", mapOf("name" to "米"))),
+            ),
+        )
+        val changes = p.diff(old, new).toSet()
+        assertEquals(
+            setOf(
+                SessionPersistence.Change.Put("groceries", Row("edit", mapOf("name" to "豆乳")), created = false),
+                SessionPersistence.Change.Put("groceries", Row("add", mapOf("name" to "米")), created = true),
+                SessionPersistence.Change.Delete("groceries", "gone"),
+                SessionPersistence.Change.Delete("dropped", "x"),
+            ),
+            changes,
+        )
+        assertTrue("同じなら差は無い", p.diff(new, new).isEmpty())
+        assertTrue("data が同じなら createdAt・author が違っても書かない", p.diff(new, new.copy(rows = mapOf("groceries" to new.list("groceries").map { it.copy(author = "other", createdAt = "t") }))).isEmpty())
+        p.shutdown()
+    }
+
+    @Test
+    fun loadRemapsServerIdsToTemporaryIdsInsideValues() = runBlocking {
+        val dir = tmp.newFolder()
+        val store = DesktopStore(dir)
+        // 送れた作成(サーバーの id srv-1・仮 id は local-c1)と、それを指す行
+        store.records.upsert(LocalRecord(appId = "a1", entity = "groceries", recordId = "srv-1", clientId = "c1", data = buildJsonObject { put("name", "牛乳") }))
+        store.records.upsert(
+            LocalRecord(
+                appId = "a1", entity = "groceries", recordId = "srv-2",
+                data = buildJsonObject {
+                    put("ref", "srv-1")
+                    put("refs", buildJsonArray { add("srv-1"); add("srv-9") })
+                    put("nested", buildJsonArray { add(buildJsonArray { add("srv-1") }) })
+                    put("obj", buildJsonObject { put("k", "srv-1") })
+                    put("qty", 2)
+                },
+            ),
+        )
+        val p = SessionPersistence(DesktopStore(dir), "a1", client = null, retryEveryMillis = null)
+        val rows = p.load(models).list("groceries").associateBy { it.id }
+        assertEquals("送れた作成は画面では仮 id のまま", setOf("local-c1", "srv-2"), rows.keys)
+        val data = rows.getValue("srv-2").data
+        assertEquals("local-c1", data["ref"])
+        assertEquals(Json.parseToJsonElement("""["local-c1","srv-9"]"""), Json.parseToJsonElement(data["refs"]!!))
+        assertEquals("配列の中の配列も付け替える", Json.parseToJsonElement("""[["local-c1"]]"""), Json.parseToJsonElement(data["nested"]!!))
+        assertEquals("オブジェクトの中は付け替えない(今の規則)", Json.parseToJsonElement("""{"k":"srv-1"}"""), Json.parseToJsonElement(data["obj"]!!))
+        assertEquals("2", data["qty"])
+        p.shutdown()
+    }
+
+    @Test
+    fun needsReloadOnlyForRejections() = runBlocking {
+        val p = mock()
+        val noReload = listOf(SyncEvent.Sent("a1", "g"), SyncEvent.Drained, SyncEvent.Paused(3))
+        val reload = listOf(
+            SyncEvent.Conflict("a1", "g", "m"),
+            SyncEvent.Rejected("a1", "g", "m"),
+            SyncEvent.Forbidden("a1", "g"),
+            SyncEvent.NotMember("a1", "g"),
+            SyncEvent.ProRequiredEvent("a1", "g", ProRequired(emptyList())),
+            SyncEvent.Denied("a1", "g", RecordWriteDenial.AdminsOnly(null)),
+            SyncEvent.PlanLimitEvent("a1", "g", PlanLimit(PlanLimit.Resource.RECORDS_PER_APP)),
+            SyncEvent.AppStopped("a1", "g"),
+            SyncEvent.TextNotAllowed("a1", "g", null),
+        )
+        with(p) {
+            noReload.forEach { assertFalse("$it", it.needsReload()) }
+            reload.forEach { assertTrue("$it", it.needsReload()) }
+        }
+        p.shutdown()
     }
 }

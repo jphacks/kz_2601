@@ -23,6 +23,6 @@ TMP="$(mktemp -d)"
 trap 'rm -rf "$TMP"' EXIT
 echo '[]' >"$TMP/empty.json"
 ./runner-usage.sh --input "$TMP/empty.json" --day 2026-11-01 >/dev/null || { echo "FAIL: 空のログで 0 以外" >&2; exit 1; }
-./runner-usage.sh prod --dry-run | grep -q 'jsonPayload.event="runner.usage"' || { echo "FAIL: dry-run のフィルタ" >&2; exit 1; }
+grep -q 'jsonPayload.event="runner.usage"' <<<"$(./runner-usage.sh prod --dry-run)" || { echo "FAIL: dry-run のフィルタ" >&2; exit 1; }
 if ./runner-usage.sh prod --threshold x >/dev/null 2>&1; then echo "FAIL: 数でない閾値で 0" >&2; exit 1; fi
 echo "ok"

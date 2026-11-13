@@ -80,6 +80,117 @@ class KeyboardTest {
         assertEquals("Esc", Keymap.label(Shortcut.CLOSE, mac))
     }
 
+    // MARK: - OS ごとの表(#2619)
+
+    @Test
+    fun matchesTablePerOs() {
+        val save = KeyChord(Key.S, primary = true)
+        val palette = KeyChord(Key.P, primary = true, shift = true)
+        val del = KeyChord(Key.Delete)
+        val cmdBackspace = KeyChord(Key.Backspace, primary = true)
+        // (組み, 押したキー, Windows, Linux, macOS)
+        val table = listOf(
+            Triple(save, KeyPress(Key.S, ctrl = true), listOf(true, true, false)),
+            Triple(save, KeyPress(Key.S, meta = true), listOf(false, false, true)),
+            // Ctrl と ⌘ を両方押したら取らない・何も押さなければ取らない
+            Triple(save, KeyPress(Key.S, ctrl = true, meta = true), listOf(false, false, false)),
+            Triple(save, KeyPress(Key.S), listOf(false, false, false)),
+            // Shift の有無は合わせる
+            Triple(save, KeyPress(Key.S, ctrl = true, shift = true), listOf(false, false, false)),
+            Triple(save, KeyPress(Key.S, meta = true, shift = true), listOf(false, false, false)),
+            Triple(palette, KeyPress(Key.P, ctrl = true, shift = true), listOf(true, true, false)),
+            Triple(palette, KeyPress(Key.P, meta = true, shift = true), listOf(false, false, true)),
+            Triple(palette, KeyPress(Key.P, ctrl = true), listOf(false, false, false)),
+            // Alt が付いたら・キーが違えば取らない
+            Triple(save, KeyPress(Key.S, ctrl = true, alt = true), listOf(false, false, false)),
+            Triple(save, KeyPress(Key.S, meta = true, alt = true), listOf(false, false, false)),
+            Triple(save, KeyPress(Key.N, ctrl = true), listOf(false, false, false)),
+            // 修飾なしのキー(Delete)は Ctrl・⌘ が付いたら取らない
+            Triple(del, KeyPress(Key.Delete), listOf(true, true, true)),
+            Triple(del, KeyPress(Key.Delete, ctrl = true), listOf(false, false, false)),
+            Triple(del, KeyPress(Key.Delete, meta = true), listOf(false, false, false)),
+            Triple(cmdBackspace, KeyPress(Key.Backspace, meta = true), listOf(false, false, true)),
+            Triple(cmdBackspace, KeyPress(Key.Backspace), listOf(false, false, false)),
+        )
+        for ((chord, press, want) in table) {
+            listOf(win, linux, mac).zip(want).forEach { (os, w) -> assertEquals("$chord $press $os", w, Keymap.matches(chord, press, os)) }
+        }
+    }
+
+    @Test
+    fun deleteAndCmdBackspacePerOs() {
+        // (押したキー, Windows・Linux, macOS)
+        val table = listOf(
+            KeyPress(Key.Delete) to (Shortcut.DELETE to Shortcut.DELETE),
+            KeyPress(Key.Backspace, meta = true) to (null to Shortcut.DELETE),
+            KeyPress(Key.Backspace, ctrl = true) to (null to null),
+            KeyPress(Key.Backspace) to (null to null),
+            KeyPress(Key.Delete, ctrl = true) to (null to null),
+            KeyPress(Key.Delete, meta = true) to (null to null),
+            KeyPress(Key.Delete, shift = true) to (null to null),
+        )
+        for ((press, want) in table) {
+            assertEquals("$press win", want.first, Keymap.match(press, win))
+            assertEquals("$press linux", want.first, Keymap.match(press, linux))
+            assertEquals("$press mac", want.second, Keymap.match(press, mac))
+        }
+    }
+
+    @Test
+    fun labelTablePerOs() {
+        // F1 の一覧に出す表記(最初の組み)。Windows と Linux は同じ
+        val table = mapOf(
+            Shortcut.PALETTE to ("Ctrl+K" to "⌘K"),
+            Shortcut.NEW to ("Ctrl+N" to "⌘N"),
+            Shortcut.SAVE to ("Ctrl+S" to "⌘S"),
+            Shortcut.SEARCH to ("Ctrl+F" to "⌘F"),
+            Shortcut.DELETE to ("Delete" to "⌘⌫"),
+            Shortcut.CLOSE to ("Esc" to "Esc"),
+            Shortcut.PRINT to ("Ctrl+P" to "⌘P"),
+            Shortcut.HELP to ("F1" to "F1"),
+            Shortcut.PREVIEW to ("Space" to "Space"),
+        )
+        assertEquals("全部のショートカットが表にある", Shortcut.entries.toSet(), table.keys)
+        for ((s, want) in table) {
+            assertEquals("$s win", want.first, Keymap.label(s, win))
+            assertEquals("$s linux", want.first, Keymap.label(s, linux))
+            assertEquals("$s mac", want.second, Keymap.label(s, mac))
+        }
+        // 2 つ目の組み
+        assertEquals("Ctrl+/", Keymap.label(Keymap.chords(Shortcut.HELP, win)[1], win))
+        assertEquals("⌘/", Keymap.label(Keymap.chords(Shortcut.HELP, mac)[1], mac))
+        assertEquals("⌦", Keymap.label(Keymap.chords(Shortcut.DELETE, mac)[1], mac))
+        assertEquals("Ctrl+Shift+S", Keymap.label(KeyChord(Key.S, primary = true, shift = true), linux))
+        assertEquals("Shift+F1", Keymap.label(KeyChord(Key.F1, shift = true), win))
+        assertEquals("⇧F1", Keymap.label(KeyChord(Key.F1, shift = true), mac))
+    }
+
+    @Test
+    fun keyNamePerOs() {
+        // (キー, Windows・Linux, macOS)
+        val table = listOf(
+            Key.Escape to ("Esc" to "Esc"),
+            Key.Delete to ("Delete" to "⌦"),
+            Key.Backspace to ("Backspace" to "⌫"),
+            Key.F1 to ("F1" to "F1"),
+            Key.Spacebar to ("Space" to "Space"),
+            Key.Slash to ("/" to "/"),
+            Key.K to ("K" to "K"),
+            Key.N to ("N" to "N"),
+            Key.P to ("P" to "P"),
+            Key.S to ("S" to "S"),
+            Key.F to ("F" to "F"),
+        )
+        for ((k, want) in table) {
+            assertEquals("$k win", want.first, Keymap.keyName(k, win))
+            assertEquals("$k linux", want.first, Keymap.keyName(k, linux))
+            assertEquals("$k mac", want.second, Keymap.keyName(k, mac))
+        }
+        // 表に無いキーは Compose の名前のまま(OS で変わらない)
+        assertEquals(Key.A.toString(), Keymap.keyName(Key.A, win))
+        assertEquals(Keymap.keyName(Key.A, win), Keymap.keyName(Key.A, mac))
+    }
+
     // MARK: - パレットの絞り込み
 
     private fun cmd(title: String, kind: PaletteCommand.Kind = PaletteCommand.Kind.ACTION, keywords: List<String> = emptyList()) =

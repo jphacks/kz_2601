@@ -47,6 +47,7 @@
 - Mac の版を手で送る時は `-p mac` にする。
 - CI(`ios-ci.yml`)はシミュレータ向けで plist も無いので送らない。CI から送るなら、plist を secrets から置いて実機向けアーカイブを作る工程が要る(今は無い)。
 - 送り先の Firebase プロジェクトは `GoogleService-Info.plist` のもの。prod の plist への切り替えは #292。
+- 送らずに送り先を確かめるには `--dry-run`(送る dSYM・バンドルの plist とその `PROJECT_ID`・run の場所を出すだけ)。テストは `scripts/crashlytics-dsym-test.sh`(#2859)。
 
 ## 動作確認(わざと落とす)
 1. Debug か Release の版を実機に入れる(審査用の Review にはボタンが無い)。シンボル付きで見るには Release をアーカイブして dSYM を送る。
