@@ -36,6 +36,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
@@ -70,8 +71,11 @@ import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.paneTitle
 import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.semantics
+import jp.kz2601.metamon.desktop.crash.Diagnostics
 import jp.kz2601.metamon.desktop.i18n.Strings
+import jp.kz2601.metamon.desktop.io.ExportClipboard
 import jp.kz2601.metamon.desktop.store.SessionPersistence
+import jp.kz2601.metamon.whisper.WhisperEngine
 
 /** 画面 1 枚の描画に要るもの。 */
 private class ScreenScope(
@@ -130,6 +134,20 @@ fun DesktopApp(
     val openPrint = { printing = ScreenPrint.document(dsl, session.top.screen, session.store, session.form(session.top), locale = Strings.locale) }
     // キーボードだけで使う(#1765): Ctrl+K パレット・Ctrl+N/S/F・Delete・Esc・F1
     val keyboard = rememberDesktopKeyboard(dsl, session, dispatch, openPrint, onOpenApp, onOpenRecord, onWipeLocalData)
+    // 問い合わせ用の「診断の情報をコピー」(#2200)。明暗は今の配色から、トレイは Main から
+    val dark = MaterialTheme.colorScheme.background.luminance() < 0.5f
+    val traySupported = LocalTray.current?.traySupported
+    keyboard.copyDiagnostics = {
+        val text = Diagnostics.format(
+            Diagnostics.collect(
+                dark = dark,
+                traySupported = traySupported,
+                pending = session.persistence?.pending,
+                voiceLibrary = { WhisperEngine.isSupported },
+            ),
+        )
+        session.message = Strings[if (ExportClipboard.put(text)) "desktop_diagnostics_copied" else "desktop_diagnostics_copy_failed"]
+    }
 
     // Ctrl+F はこのウィンドウの検索欄にだけ入る
     // 写真のプレビュー(PhotoPreview.kt): 写真の部品を押すとこのウィンドウのダイアログで開く。開いている間は貼り付け・印刷を取らない

@@ -14,6 +14,9 @@
     <string name="desktop_close">Close</string>
     <string name="desktop_data_add">Add</string>
     <string name="desktop_delete_not_allowed">You can\'t delete this data</string>
+    <string name="desktop_diagnostics_copied">Copied diagnostic info. Paste it into your support request</string>
+    <string name="desktop_diagnostics_copy">Copy diagnostic info</string>
+    <string name="desktop_diagnostics_copy_failed">Couldn\'t copy to the clipboard</string>
     <string name="desktop_drag_image_name">image</string>
     <string name="desktop_drag_table_name">table</string>
     <string name="desktop_export_clipboard">" (the table is also on the clipboard)"</string>
