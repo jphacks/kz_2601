@@ -41,8 +41,6 @@ import jp.kz2601.metamon.desktop.chat.ChatBuild
 import jp.kz2601.metamon.desktop.chat.ChatEntry
 import jp.kz2601.metamon.desktop.chat.ChatSession
 import jp.kz2601.metamon.desktop.i18n.Strings
-import jp.kz2601.metamon.desktop.net.DesktopApi
-import jp.kz2601.metamon.desktop.net.DesktopApiConfig
 import jp.kz2601.metamon.services.consent.AiConsentStore
 import jp.kz2601.metamon.desktop.io.DragOut
 import jp.kz2601.metamon.desktop.io.OpenWithFiles
