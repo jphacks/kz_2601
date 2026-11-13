@@ -107,6 +107,9 @@ private struct MacGeneralSettings: View {
             } footer: {
                 Text("作ったアプリの文字の大きさです。表示メニューの「拡大」(⌘+)・「縮小」(⌘-)・「実際のサイズ」(⌘0)でも変えられます。")
             }
+            #if !APP_STORE_REVIEW // 共有の投稿に出す表示名(#3077)
+            MacAuthorNameSettingsSection()
+            #endif
             // 声で頼むのマイク(#1221)
             MacInputDeviceSection()
             // メニューバーの常駐・ログイン時に開く(#1848)
