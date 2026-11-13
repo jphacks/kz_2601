@@ -105,10 +105,13 @@ fun DesktopApp(
     windowId: Int? = null,
     /** パレットの「この端末のデータを消す」(#1887)。全アプリの分を消す。null なら出さない。 */
     onWipeLocalData: (suspend () -> Unit)? = null,
+    /** ヘッドレスで画面を順に移る(開発用・AutoNav.kt)。null なら何もしない。 */
+    autoNav: AutoNavPlan? = null,
 ) {
     val session = remember {
         DesktopSession(dsl, initialStore, startScreen = startScreen, host = DesktopActionHost(), persistence = persistence, shared = records, startRecordId = startRecordId)
     }
+    if (autoNav != null) LaunchedEffect(session) { runAutoNav(autoNav, session) }
     session.onCloseWindow = onCloseWindow
     TrayHook(session, windowId, isActive)
     // 他のウィンドウで端末のデータを消した: 下書きを捨てて最初の画面へ(詳細のウィンドウは閉じる)
