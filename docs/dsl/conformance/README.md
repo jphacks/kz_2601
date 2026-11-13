@@ -12,6 +12,7 @@
 5. [iOS の実装](#ios-の実装)
 6. [網羅](#網羅)
 7. [Android で合わせる時の注意](#android-で合わせる時の注意)
+8. [デスクトップで合わせる時の注意](#デスクトップで合わせる時の注意)
 
 ## 置き場
 
@@ -197,3 +198,21 @@ DSL に書いた値で `props` に入れるもの: `title text label message pla
 - 時刻は `device.now` と `timeZone` で固定する。期間の filter(`thisWeek` は月曜始まり)も同じ時刻で評価する。
 - 一覧の行の並びは filter → sort → 検索(title / subtitle の部分一致・大小無視)の順。
 - `unknown` / `unavailable` の部品も node として残す(穴として位置を持つ)。
+
+## デスクトップで合わせる時の注意
+
+デスクトップ版(`desktop/`・Windows・Linux)は Android のソースを取り込んでいる。作りは [`docs/desktop/architecture.md`](../../desktop/architecture.md) にある。
+
+- 回すもの: `desktop/` で `./gradlew :desktop:test`。比べるのは `desktop/app/src/test/kotlin/jp/kz2601/metamon/desktop/DesktopConformanceTest.kt`。`docs/dsl/conformance/cases` を読み、全 case の DSL が読めること・画面の id と見出しと `layout`・部品の並びと `cell`・`state`・`props`・操作ごとの `top` と `effects` を expected.json と比べる。
+- 期待値は iOS が書く。デスクトップは expected.json を書き換えない(上の「期待値の更新(iOS だけ)」と同じ)。
+- 違ってよい所は `desktop/app/src/test/kotlin/jp/kz2601/metamon/desktop/ConformanceAllowlist.kt` に理由つきで書く。
+  - `unavailableTypes`: expected は `rendered` だがデスクトップでは描けない type。キーが type、値が理由(例: 位置情報・ヘルスケアがパソコンに無い)。
+  - `propsNotCompared`: まだ比べない props。type → キー → 理由。DSL に書いた値を写すだけのものは `echo(...)` でまとめて書く。
+- 許可リストに無い違いはテストが落ちる。どの case にも出てこない項目も落ちる(古い項目を残さない)。
+- 直す時の流れ:
+  1. 描けるようにした type・比べるようにした props を、許可リストから外す。
+  2. `:desktop:test` が通ることを確かめる。
+  3. 比べる props を増やす時は、`DesktopConformanceTest.kt` の `comparedProps` に type とキーを足す。
+- 違いが出たら、まずデスクトップ側の解決の規則(書式・並べ替え・丸め)を iOS に合わせる。iOS が間違っていると思ったら Issue にして、iOS を直して期待値を更新してもらう(Android の節と同じ)。許可リストに足して逃げない。
+- case.json の `locale` が `en*` の時は、英語の UI で比べる。時刻とタイムゾーンも `device` の値で固定する。
+- CI: `desktop-ci` が回る。`docs/dsl/conformance/**` の変更でも回る(条件は `docs/desktop/architecture.md` の「CI が回る条件」)。
