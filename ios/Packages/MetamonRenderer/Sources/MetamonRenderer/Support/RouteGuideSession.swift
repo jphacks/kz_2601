@@ -222,7 +222,7 @@ final class RouteGuideSession {
         #endif
         if synthesizer.isSpeaking { synthesizer.stopSpeaking(at: .word) }
         let u = AVSpeechUtterance(string: text)
-        u.voice = AVSpeechSynthesisVoice(language: LanguagePreference.shared.code == "en" ? "en-US" : "ja-JP")
+        SpeechVoice.configure(u, language: LeafSpeech.voiceLanguage(uiCode: LanguagePreference.shared.code)) // 設定の声・速さ(#2229)
         synthesizer.speak(u)
     }
 
