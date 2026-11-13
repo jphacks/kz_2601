@@ -245,3 +245,108 @@ func TestDebugErrors(t *testing.T) {
 		})
 	}
 }
+
+func envMap(m map[string]string) func(string) string {
+	return func(k string) string { return m[k] }
+}
+
+func TestCloudConfigFromEnv(t *testing.T) {
+	tests := []struct {
+		name string
+		env  map[string]string
+		want CloudConfig
+	}{
+		{"cloud run", map[string]string{"GOOGLE_CLOUD_PROJECT": "proj", "K_SERVICE": "ai-stg", "K_REVISION": "ai-stg-00002"},
+			CloudConfig{ProjectID: "proj", Service: "ai-stg", Version: "ai-stg-00002"}},
+		{"project only", map[string]string{"GOOGLE_CLOUD_PROJECT": "proj"}, CloudConfig{ProjectID: "proj"}},
+		{"local", nil, CloudConfig{}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := CloudConfigFromEnv(envMap(tt.env)); got != tt.want {
+				t.Fatalf("CloudConfigFromEnv = %+v, want %+v", got, tt.want)
+			}
+		})
+	}
+}
+
+// NewLogger writes Cloud Logging JSON both on Cloud Run and locally; only the
+// serviceContext of ERROR lines depends on K_SERVICE.
+func TestNewLogger(t *testing.T) {
+	tests := []struct {
+		name        string
+		env         map[string]string
+		wantService map[string]any
+	}{
+		{"cloud run", map[string]string{"K_SERVICE": "ai-stg", "K_REVISION": "ai-stg-00002"},
+			map[string]any{"service": "ai-stg", "version": "ai-stg-00002"}},
+		{"cloud run without revision", map[string]string{"K_SERVICE": "ai-stg"}, map[string]any{"service": "ai-stg"}},
+		{"local", nil, nil},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			var buf bytes.Buffer
+			log := newLogger(&buf, envMap(tt.env))
+			log.Debug("hidden at the default level")
+			log.Error("boom")
+			ls := lines(t, &buf)
+			if len(ls) != 1 {
+				t.Fatalf("want only the ERROR line with LOG_LEVEL unset: %s", buf.String())
+			}
+			m := ls[0]
+			if m["severity"] != "ERROR" || m["message"] != "boom" || m["@type"] != ReportedErrorEventType {
+				t.Fatalf("entry = %v", m)
+			}
+			sc, has := m["serviceContext"].(map[string]any)
+			if has != (tt.wantService != nil) {
+				t.Fatalf("serviceContext = %v, want %v", m["serviceContext"], tt.wantService)
+			}
+			if has && (len(sc) != len(tt.wantService) || sc["service"] != tt.wantService["service"] || sc["version"] != tt.wantService["version"]) {
+				t.Fatalf("serviceContext = %v, want %v", sc, tt.wantService)
+			}
+		})
+	}
+}
+
+func TestNewLoggerLevel(t *testing.T) {
+	var buf bytes.Buffer
+	newLogger(&buf, envMap(map[string]string{"LOG_LEVEL": "debug"})).Debug("shown")
+	if m := lines(t, &buf); len(m) != 1 || m[0]["severity"] != "DEBUG" {
+		t.Fatalf("LOG_LEVEL=debug: %s", buf.String())
+	}
+}
+
+func TestCloudHandlerWithAttrs(t *testing.T) {
+	var buf bytes.Buffer
+	cloudLogger(&buf).With("component", "ai").With("region", "asia").Error("boom")
+	m := lines(t, &buf)[0]
+	if m["component"] != "ai" || m["region"] != "asia" {
+		t.Fatalf("WithAttrs lost: %v", m)
+	}
+	if m["severity"] != "ERROR" || m["message"] != "boom" || m["@type"] != ReportedErrorEventType {
+		t.Fatalf("cloud keys lost after With: %v", m)
+	}
+	sc, _ := m["serviceContext"].(map[string]any)
+	if sc["service"] != "ai-stg" || sc["version"] != "ai-stg-00001" {
+		t.Fatalf("cfg lost after With: %v", m)
+	}
+}
+
+// Only the group and the top-level severity / message are checked: keys the
+// handler adds per record (@type, serviceContext, trace) currently land inside
+// the open group, which no caller relies on.
+func TestCloudHandlerWithGroup(t *testing.T) {
+	var buf bytes.Buffer
+	cloudLogger(&buf).With("component", "ai").WithGroup("req").With("path", "/v1").Warn("slow", "ms", 900)
+	m := lines(t, &buf)[0]
+	if m["component"] != "ai" {
+		t.Fatalf("attrs before the group lost: %v", m)
+	}
+	req, _ := m["req"].(map[string]any)
+	if req["path"] != "/v1" || req["ms"] != float64(900) {
+		t.Fatalf("WithGroup lost: %v", m)
+	}
+	if m["severity"] != "WARNING" || m["message"] != "slow" {
+		t.Fatalf("cloud keys lost after WithGroup: %v", m)
+	}
+}

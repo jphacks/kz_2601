@@ -1,0 +1,9 @@
+[
+  {"jsonPayload":{"mode":"create","outcome":"ok","validation_passed":true,"first_generation":true,"duration_ms":12000}},
+  {"jsonPayload":{"mode":"create","outcome":"ok","validation_passed":true,"first_generation":true,"duration_ms":20000}},
+  {"jsonPayload":{"mode":"create","outcome":"ok","validation_passed":true,"first_generation":true,"duration_ms":35000}},
+  {"jsonPayload":{"mode":"edit","outcome":"ok","validation_passed":true,"first_generation":false,"duration_ms":8000}},
+  {"jsonPayload":{"mode":"edit","outcome":"invalid","validation_passed":false,"first_generation":false,"duration_ms":9000}},
+  {"jsonPayload":{"mode":"create","outcome":"bad_request","validation_passed":false,"first_generation":true,"duration_ms":10}},
+  {"jsonPayload":{"mode":"chat","outcome":"ok","validation_passed":true,"first_generation":false,"duration_ms":500}}
+]
