@@ -291,6 +291,9 @@ class DesktopKeyboard(
     /** 消す前の確認を出している。 */
     var wipeConfirmOpen by mutableStateOf(false)
 
+    /** アカウントの画面(AccountScreen.kt・#2505)。パレットから開く。開いている間のキーは画面が自分で受ける。 */
+    var accountOpen by mutableStateOf(false)
+
     /** このウィンドウの検索欄(Ctrl+F は他のウィンドウに入らない)。 */
     val searchTargets = SearchTargets()
 
@@ -342,6 +345,7 @@ class DesktopKeyboard(
 
     /** [repeat] は Space の押しっぱなしの 2 回目以降(開く・閉じるをしない)。 */
     fun handle(p: KeyPress, bubble: Boolean, repeat: Boolean = false): Boolean {
+        if (accountOpen) return false
         if (photos.isOpen) {
             // ダイアログが受けなかった閉じるキー(フォーカスがダイアログの外にある時)はここで閉じる。他は流す
             if (!bubble || PhotoPreview.keyOf(p) != PreviewKey.CLOSE) return false
@@ -466,6 +470,10 @@ class DesktopKeyboard(
             "about:licenses", LicensesText.TITLE, PaletteCommand.Kind.ACTION,
             keywords = listOf("licenses", "third-party", "oss", "notice", LicensesText.LICENSE),
         ) { licensesOpen = true }
+        val account = PaletteCommand(
+            "about:account", Strings["account_menu"], PaletteCommand.Kind.ACTION,
+            keywords = listOf("account", "terms", "privacy", "contact", Strings["legal_terms"], Strings["legal_privacy_policy"], Strings["settings_contact"]),
+        ) { accountOpen = true }
         val shareLink = share?.let { listOf(it.command()) }.orEmpty()
         val usage = usage?.let {
             listOf(PaletteCommand("account:usage", Strings["settings_usage_header"], PaletteCommand.Kind.ACTION, keywords = listOf("usage", "plan", "limit")) { usageOpen = true })
@@ -489,7 +497,7 @@ class DesktopKeyboard(
         val layout = saveLayout?.let {
             listOf(PaletteCommand("layout:edit", Strings["desktop_grid_edit"], PaletteCommand.Kind.ACTION, keywords = listOf("layout", "grid", "area")) { startGridEdit() })
         }.orEmpty()
-        return shortcuts + buttons + record + layout + screens + apps + usage + wipe + shareLink + retention + tips + onboarding + licenses
+        return shortcuts + buttons + record + layout + screens + apps + usage + wipe + account + shareLink + retention + tips + onboarding + licenses
     }
 
     /** 今のアプリの保存期間のある entity(アプリ・entity・日数・確認済みか)。端末に残さない時は空。 */
@@ -629,6 +637,12 @@ class DesktopKeyboard(
                 confirmButton = { TextButton(onClick = { scope.launch { confirmWipe() } }) { Text(KeyboardText.WIPE_CONFIRM_BUTTON) } },
                 dismissButton = { TextButton(onClick = { dismiss() }) { Text(Strings["inputs_cancel"]) } },
             )
+        }
+        if (accountOpen) {
+            AccountDialog(onLicenses = { accountOpen = false; licensesOpen = true }) {
+                accountOpen = false
+                runCatching { root.requestFocus() }
+            }
         }
     }
 }
