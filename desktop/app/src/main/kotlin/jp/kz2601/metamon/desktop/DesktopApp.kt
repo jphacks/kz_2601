@@ -72,6 +72,9 @@ import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.semantics
 import jp.kz2601.metamon.desktop.i18n.Strings
 import jp.kz2601.metamon.desktop.store.SessionPersistence
+import jp.kz2601.metamon.desktop.chat.ChatBuild
+import jp.kz2601.metamon.desktop.chat.ChatSession
+import jp.kz2601.metamon.services.consent.AiConsentStore
 
 /** 画面 1 枚の描画に要るもの。 */
 private class ScreenScope(
@@ -105,6 +108,12 @@ fun DesktopApp(
     windowId: Int? = null,
     /** パレットの「この端末のデータを消す」(#1887)。全アプリの分を消す。null なら出さない。 */
     onWipeLocalData: (suspend () -> Unit)? = null,
+    /** パレットの「新しいアプリを作る」(#2160)。AI の接続先がある時だけ渡す。null なら出さない。 */
+    newChat: (() -> ChatSession)? = null,
+    /** 会話の ready・案から作る(#2163)。 */
+    buildFromChat: (ChatBuild) -> Unit = {},
+    /** 会話の前に確かめる同意。 */
+    aiConsent: AiConsentStore? = null,
 ) {
     val session = remember {
         DesktopSession(dsl, initialStore, startScreen = startScreen, host = DesktopActionHost(), persistence = persistence, shared = records, startRecordId = startRecordId)
@@ -129,7 +138,10 @@ fun DesktopApp(
     var printing by remember { mutableStateOf<PrintDocument?>(null) }
     val openPrint = { printing = ScreenPrint.document(dsl, session.top.screen, session.store, session.form(session.top), locale = Strings.locale) }
     // キーボードだけで使う(#1765): Ctrl+K パレット・Ctrl+N/S/F・Delete・Esc・F1
-    val keyboard = rememberDesktopKeyboard(dsl, session, dispatch, openPrint, onOpenApp, onOpenRecord, onWipeLocalData)
+    val keyboard = rememberDesktopKeyboard(
+        dsl, session, dispatch, openPrint, onOpenApp, onOpenRecord, onWipeLocalData,
+        newChat = newChat, buildFromChat = buildFromChat, aiConsent = aiConsent,
+    )
 
     // Ctrl+F はこのウィンドウの検索欄にだけ入る
     // 写真のプレビュー(PhotoPreview.kt): 写真の部品を押すとこのウィンドウのダイアログで開く。開いている間は貼り付け・印刷を取らない

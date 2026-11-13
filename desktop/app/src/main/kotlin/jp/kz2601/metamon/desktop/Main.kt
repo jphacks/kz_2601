@@ -26,7 +26,13 @@ import java.awt.GraphicsEnvironment
 import java.awt.Rectangle
 import java.awt.event.WindowAdapter
 import java.awt.event.WindowEvent
+import jp.kz2601.metamon.desktop.chat.ChatBuild
+import jp.kz2601.metamon.desktop.chat.ChatEntry
+import jp.kz2601.metamon.desktop.chat.ChatSession
 import jp.kz2601.metamon.desktop.i18n.Strings
+import jp.kz2601.metamon.desktop.net.DesktopApi
+import jp.kz2601.metamon.desktop.net.DesktopApiConfig
+import jp.kz2601.metamon.services.consent.AiConsentStore
 import jp.kz2601.metamon.desktop.io.DragOut
 import jp.kz2601.metamon.desktop.store.DesktopStore
 import jp.kz2601.metamon.desktop.store.DeviceWipe
@@ -100,6 +106,11 @@ private fun runApp(args: Array<String>) = application {
             loadScope.cancel()
         }
     }
+    // 会話・作る(#2160): AI の接続先(TAILORIT_API=stg・TAILORIT_AI_URL)がある時だけ。モックは通信しない。同意が無い間は送らない
+    val chat = remember {
+        val ai = DesktopApi.ai(DesktopApiConfig.fromEnvironment(), isGranted = { desktopStore.aiConsent.isGranted }, cache = desktopStore.documents)
+        ChatWiring(ChatEntry.factory(ai), desktopStore.aiConsent)
+    }
     val registry = remember { WindowRegistry().also { it.open(WindowKey.app(first)) } }
     val firstWindowId = remember { registry.windows.first().id }
     // トレイに常駐(#1761): × はトレイに隠す(設定で off・トレイが無ければ終わる)。終わるのはトレイの「終了」
@@ -125,7 +136,7 @@ private fun runApp(args: Array<String>) = application {
     DesktopTray(tray)
     registry.windows.toList().forEach { w ->
         key(w.id) {
-            DesktopWindow(w, registry, hub, tray, startScreen = args.getOrNull(2)?.takeIf { w.id == firstWindowId })
+            DesktopWindow(w, registry, hub, tray, chat, startScreen = args.getOrNull(2)?.takeIf { w.id == firstWindowId })
         }
     }
 }
@@ -133,7 +144,7 @@ private fun runApp(args: Array<String>) = application {
 /** ウィンドウ 1 枚。画面の状態(遷移・下書き・キー)はウィンドウごと、記録はアプリごとに共有。 */
 @OptIn(FlowPreview::class)
 @Composable
-private fun ApplicationScope.DesktopWindow(w: WindowEntry, registry: WindowRegistry, hub: AppHub, tray: TrayController, startScreen: String?) {
+private fun ApplicationScope.DesktopWindow(w: WindowEntry, registry: WindowRegistry, hub: AppHub, tray: TrayController, chat: ChatWiring, startScreen: String?) {
     // アプリの記録はウィンドウの数で数える。最後の 1 枚を閉じたら書き終えて閉じる
     val app = remember(w) { hub.acquire(w.key.appId) }
     DisposableEffect(w) { onDispose { hub.release(w.key.appId) } }
@@ -206,6 +217,9 @@ private fun ApplicationScope.DesktopWindow(w: WindowEntry, registry: WindowRegis
                         isActive = { registry.active?.id == w.id },
                         windowId = w.id,
                         onWipeLocalData = hub::wipeLocalData,
+                        newChat = chat.newChat,
+                        buildFromChat = chat.build,
+                        aiConsent = chat.consent,
                     )
                 }
             }
@@ -290,3 +304,10 @@ internal object WindowBounds {
         }
     }
 }
+
+/** 会話の入口(#2160)。[newChat] が null ならパレットに出さない。作る流れ([build])は #2163。 */
+private class ChatWiring(
+    val newChat: (() -> ChatSession)?,
+    val consent: AiConsentStore,
+    val build: (ChatBuild) -> Unit = {},
+)

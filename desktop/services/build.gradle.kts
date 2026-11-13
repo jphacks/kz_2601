@@ -34,6 +34,8 @@ sourceSets {
                 "jp/kz2601/metamon/services/CrashReporter.kt",
                 "jp/kz2601/metamon/services/PlanUsage.kt",
                 "jp/kz2601/metamon/services/consent/AiConsentStore.kt",
+                // 同意が無ければ ai へ送らない包み(#2160)
+                "jp/kz2601/metamon/services/consent/ConsentGatedAiClient.kt",
                 "jp/kz2601/metamon/services/consent/CrashReportingPreference.kt",
                 "jp/kz2601/metamon/services/consent/KeyValueStore.kt",
                 "jp/kz2601/metamon/services/http/*.kt",

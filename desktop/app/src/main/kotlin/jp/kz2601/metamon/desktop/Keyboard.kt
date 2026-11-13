@@ -34,6 +34,8 @@ import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.onKeyEvent
 import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.input.key.type
+import jp.kz2601.metamon.desktop.chat.AiConsentDialog
+import jp.kz2601.metamon.desktop.chat.AiConsentGate
 import jp.kz2601.metamon.desktop.chat.ChatBuild
 import jp.kz2601.metamon.desktop.chat.ChatOverlay
 import jp.kz2601.metamon.desktop.chat.ChatSession
@@ -46,6 +48,7 @@ import jp.kz2601.metamon.dsl.Presentation
 import jp.kz2601.metamon.dsl.Screen
 import jp.kz2601.metamon.dsl.screen
 import jp.kz2601.metamon.renderer.form.FormDraft
+import jp.kz2601.metamon.services.consent.AiConsentStore
 
 // キーボードだけで使う(#1765): ショートカット・コマンドパレット(CommandPalette.kt)・F1 の一覧。
 
@@ -274,14 +277,33 @@ class DesktopKeyboard(
     /** 会話の ready・案から作る(作る流れは #2163)。 */
     var buildFromChat: (ChatBuild) -> Unit = {}
 
+    /** AI へ送ることの同意(#2160)。null なら確かめない(テスト・同意の要らない入口)。 */
+    var aiConsent: AiConsentStore? = null
+
     /** 開いている会話。 */
     var chat by mutableStateOf<ChatSession?>(null)
 
-    /** 会話を開く。接続先が無ければ false。 */
+    /** 会話の前に同意の説明を出している(#2160)。 */
+    var consentOpen by mutableStateOf(false)
+
+    /** 会話を開く。接続先が無ければ false。同意がまだ無ければ先に説明を出す(同意したら会話を開く)。 */
     fun openChat(): Boolean {
         val make = newChat ?: return false
-        if (chat == null) chat = make()
+        if (chat != null) return true
+        if (AiConsentGate.needsPrompt(aiConsent)) {
+            consentOpen = true
+            return true
+        }
+        chat = make()
         return true
+    }
+
+    /** 同意の説明で「同意して使う」/「あとで」。同意したら会話を開く。 */
+    fun answerConsent(agreed: Boolean) {
+        consentOpen = false
+        val store = aiConsent
+        if (agreed) store?.grant() else store?.markPrompted()
+        if (agreed) openChat() else runCatching { root.requestFocus() }
     }
 
     /** 消す前の確認を出している。 */
@@ -321,7 +343,7 @@ class DesktopKeyboard(
             if (!repeat) closePreview()
             return true
         }
-        if (paletteOpen || helpOpen || licensesOpen || wipeConfirmOpen || chat != null) return false // パレット・一覧・確認・会話が自分で受ける
+        if (paletteOpen || helpOpen || licensesOpen || wipeConfirmOpen || chat != null || consentOpen) return false // パレット・一覧・確認・会話が自分で受ける
         val s = Keymap.match(p, os) ?: return false
         if (s == Shortcut.PRINT || s.bubble != bubble) return false // 印刷は Print.kt の Ctrl+P
         // Space は何も選んでいない時だけ。見せる写真が無ければ流す(知らせも出さない)
@@ -437,7 +459,7 @@ class DesktopKeyboard(
     val modalModifier: Modifier get() = Modifier.focusRequester(modal).focusGroup()
 
     fun focusAfterNavigation(modalOpen: Boolean) {
-        if (paletteOpen || helpOpen || licensesOpen || chat != null) return
+        if (paletteOpen || helpOpen || licensesOpen || chat != null || consentOpen) return
         if (modalOpen && runCatching { modal.requestFocus(FocusDirection.Enter) }.getOrDefault(false)) return
         runCatching { root.requestFocus() }
     }
@@ -468,6 +490,9 @@ class DesktopKeyboard(
                 licensesOpen = false
                 runCatching { root.requestFocus() }
             }
+        }
+        aiConsent?.takeIf { consentOpen }?.let { store ->
+            AiConsentDialog(store, onAgree = { answerConsent(true) }, onLater = { answerConsent(false) })
         }
         chat?.let { c ->
             val close = {
@@ -504,6 +529,7 @@ fun rememberDesktopKeyboard(
     wipeLocalData: (suspend () -> Unit)? = null,
     newChat: (() -> ChatSession)? = null,
     buildFromChat: (ChatBuild) -> Unit = {},
+    aiConsent: AiConsentStore? = null,
 ): DesktopKeyboard = remember(dsl, session) { DesktopKeyboard(dsl, session) }.also {
     it.dispatch = dispatch
     it.print = print
@@ -512,4 +538,5 @@ fun rememberDesktopKeyboard(
     it.wipeLocalData = wipeLocalData
     it.newChat = newChat
     it.buildFromChat = buildFromChat
+    it.aiConsent = aiConsent
 }
