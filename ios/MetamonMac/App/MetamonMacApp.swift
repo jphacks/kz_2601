@@ -18,10 +18,13 @@ struct MetamonMacApp: App {
     @State private var library: MacAppLibrary
 
     init() {
-        let library = MacAppLibrary(defaults: .standard, server: MacServices.shared.appConfig, serverCache: .shared)
-        _library = State(initialValue: library)
+        // NSApplication はメインスレッドで先に作る。Crashlytics は背景のキューで sharedApplication を呼ぶので、
+        // そちらが先だと別のスレッドにイベントのキューができ、起動直後に AppKit の assert で落ちる
+        _ = NSApplication.shared
         // Firebase は接続(MacServices)を組み立てる前に初期化(plist が無ければ何もせず、ログインと AI はモック・#930)
         MacFirebase.bootstrap()
+        let library = MacAppLibrary(defaults: .standard, server: MacServices.shared.appConfig, serverCache: .shared)
+        _library = State(initialValue: library)
         Task { await MacAccount.shared.start() } // 未ログインなら匿名でログインし、状態の変化を追う
         MacNotificationDelegate.install() // 前面でも通知を出す・押されたらそのアプリを開く(#965)
         MacRecordResend.shared.install() // 記録の送信待ちを前面・スリープ明け・回線の復帰・一定間隔で送り直す(#976)
