@@ -128,6 +128,13 @@
     <string name="desktop_print_value">Value</string>
     <string name="desktop_qr_copy_image">Copy image</string>
     <string name="desktop_record_deleted_elsewhere">This record was deleted in another window</string>
+    <string name="desktop_share_qr_copied">Copied the QR code image</string>
+    <string name="desktop_share_qr_description">QR code for the invite link</string>
+    <string name="desktop_share_qr_failed">Couldn\'t save the QR code image</string>
+    <string name="desktop_share_qr_file">%1$s share QR</string>
+    <string name="desktop_share_qr_hint">Scan with an iPhone camera to join</string>
+    <string name="desktop_share_qr_save">Save image</string>
+    <string name="desktop_share_qr_saved">Saved: %1$s</string>
     <string name="desktop_sync_pending">%1$d waiting to send</string>
     <string name="desktop_timer_done">Time\'s up</string>
     <string name="desktop_timer_name">Timer</string>
