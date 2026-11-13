@@ -5,6 +5,11 @@
     <string name="desktop_a11y_preview">Photo preview: %1$s</string>
     <string name="desktop_a11y_rating">%1$s %2$d of %3$d</string>
     <string name="desktop_already_running">Tailor It is already running</string>
+    <string name="desktop_app_badge_published">Published</string>
+    <string name="desktop_app_badge_requested">Release requested</string>
+    <string name="desktop_app_badge_shared">Shared</string>
+    <string name="desktop_app_badges_a11y">%1$s (%2$s)</string>
+    <string name="desktop_app_badges_separator">", "</string>
     <string name="desktop_book_searching">Looking up the book…</string>
     <string name="desktop_calendar_month_pattern">MMMM y</string>
     <string name="desktop_calendar_opened">Opened the event (%1$s)</string>
@@ -39,6 +44,8 @@
     <string name="desktop_input_qr_unavailable">Scanning with a camera isn\'t available on this computer. You can read from an image file or an image on the clipboard</string>
     <string name="desktop_input_required">Enter %1$s</string>
     <string name="desktop_input_today">Today</string>
+    <string name="desktop_input_transcribe_speak">Dictate</string>
+    <string name="desktop_input_transcribe_stop">Stop and transcribe</string>
     <string name="desktop_input_transcribe_unavailable">Voice input isn\'t available on this computer. Please type instead</string>
     <string name="desktop_input_video_capture_unavailable">Recording video isn\'t available on this computer</string>
     <string name="desktop_io_added_rows">Added %1$d records</string>
@@ -72,6 +79,9 @@
     <string name="desktop_io_unreadable_encoding">Couldn\'t read the text encoding</string>
     <string name="desktop_io_unsupported_file">This file can\'t be imported</string>
     <string name="desktop_io_video_hint">You can drop a video here</string>
+    <string name="desktop_keyring_no_service">No keyring (Secret Service) on this computer, so your sign-in isn\'t saved. Sign in again next time</string>
+    <string name="desktop_keyring_no_session_bus">Not running in a desktop session, so your sign-in isn\'t saved. Sign in again next time</string>
+    <string name="desktop_keyring_probe_failed">Couldn\'t check the keyring (Secret Service), so your sign-in isn\'t saved. Sign in again next time</string>
     <string name="desktop_keys_close">Close / Back</string>
     <string name="desktop_keys_delete">Delete</string>
     <string name="desktop_keys_delete_confirm">Delete this item?</string>
@@ -157,6 +167,7 @@
     <string name="desktop_untitled">(Untitled)</string>
     <string name="desktop_url_failed">Couldn\'t open the URL</string>
     <string name="desktop_url_unsupported">This computer can\'t open URLs: %1$s</string>
+    <string name="desktop_usage_reset_pattern">MMM d, H:mm</string>
     <string name="desktop_voice_busy">Still transcribing. Please wait a moment</string>
     <string name="desktop_voice_downloading">Downloading the voice model (%1$d MB) once before transcribing. Audio and the model stay on this PC</string>
     <string name="desktop_voice_failed">Couldn\'t transcribe. Please try again</string>
