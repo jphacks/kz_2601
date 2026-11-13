@@ -48,6 +48,7 @@ sourceSets {
                 "jp/kz2601/metamon/services/live/GenerateStreamEvent.kt",
                 "jp/kz2601/metamon/services/live/HttpAIClient.kt",
                 "jp/kz2601/metamon/services/live/HttpAppConfigClient.kt",
+                "jp/kz2601/metamon/services/live/HttpAutomationsClient.kt",
                 "jp/kz2601/metamon/services/live/HttpFeedClient.kt",
                 "jp/kz2601/metamon/services/live/HttpFollowsClient.kt",
                 "jp/kz2601/metamon/services/live/HttpReleaseRequestClient.kt",
