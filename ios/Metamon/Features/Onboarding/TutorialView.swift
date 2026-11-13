@@ -73,6 +73,7 @@ struct TutorialView: View {
 private struct TutorialCardView: View {
     let card: FirstRunTutorial.Card
     @Environment(\.verticalSizeClass) private var verticalSizeClass
+    @ScaledMetric(relativeTo: .title) private var titleSize: CGFloat = 26
     private var compactHeight: Bool { LandscapeLayout.isCompactHeight(verticalSizeClass) }
 
     var body: some View {
@@ -92,7 +93,7 @@ private struct TutorialCardView: View {
                 .accessibilityHidden(true)
 
                 Text(card.title)
-                    .font(.system(size: 26, weight: .bold, design: .rounded))
+                    .font(.system(size: titleSize, weight: .bold, design: .rounded))
                     .multilineTextAlignment(.center)
                     .accessibilityAddTraits(.isHeader)
                 Text(card.body)

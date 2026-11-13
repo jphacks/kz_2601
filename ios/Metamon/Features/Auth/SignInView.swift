@@ -7,6 +7,7 @@ struct SignInView: View {
     @Environment(AuthSession.self) private var session
     @Environment(\.colorScheme) private var colorScheme
     @State private var nonce = ""
+    @ScaledMetric(relativeTo: .largeTitle) private var titleSize: CGFloat = 40
 
     var body: some View {
         ZStack {
@@ -26,7 +27,7 @@ struct SignInView: View {
                 }
                 VStack(spacing: Theme.Spacing.sm) {
                     Text("Tailor It")
-                        .font(.system(size: 40, weight: .bold, design: .rounded))
+                        .font(.system(size: titleSize, weight: .bold, design: .rounded))
                         .brandText()
                     Text(L10n.key("話しかけるだけで、アプリが生まれ変わる", review: "話すだけで、自分専用の記録帳に"))
                         .font(.subheadline)

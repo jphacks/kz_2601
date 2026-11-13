@@ -10,6 +10,7 @@ struct ScreenMapSheet: View {
     @Environment(AppRuntime.self) private var rt
     @Environment(\.dismiss) private var dismiss
     @State private var selected: String?
+    @ScaledMetric(relativeTo: .title2) private var titleSize: CGFloat = 24
 
     private var graph: ScreenGraph { ScreenGraph(dsl: rt.dsl) }
 
@@ -54,7 +55,7 @@ struct ScreenMapSheet: View {
         HStack(alignment: .top, spacing: Theme.Spacing.md) {
             VStack(alignment: .leading, spacing: Theme.Spacing.xs) {
                 Text(ScreenMapCopy.title)
-                    .font(.system(size: 24, weight: .bold, design: .rounded))
+                    .font(.system(size: titleSize, weight: .bold, design: .rounded))
                 Text(L10n.tr("「\(rt.dsl.app.name)」の画面のつながり"))
                     .font(.footnote)
                     .foregroundStyle(.secondary)
