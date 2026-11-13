@@ -14,6 +14,7 @@ import jp.kz2601.metamon.dsl.records.Entity
 import jp.kz2601.metamon.dsl.records.JSONValue
 import jp.kz2601.metamon.dsl.records.Record
 import jp.kz2601.metamon.services.AppConfigClient
+import jp.kz2601.metamon.services.PlanUsageSource
 import jp.kz2601.metamon.services.local.BackoffPolicy
 import jp.kz2601.metamon.services.local.LocalRecord
 import jp.kz2601.metamon.services.local.PendingOp
@@ -66,6 +67,9 @@ class SessionPersistence(
             row.recordId.takeUnless { row.isTemporary }
         }
     }
+
+    /** 設定の「使っている量」を読む口(#2814)。サインイン中(送り先がある)だけ */
+    val usage: PlanUsageSource? = client as? PlanUsageSource
 
     /** 送り待ちの件数(このアプリの分だけ・画面に小さく出す)。 */
     var pending: Int by mutableStateOf(0)
