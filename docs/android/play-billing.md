@@ -18,7 +18,7 @@ iOS の「Tailor It Pro」(月額の自動更新・`jp.kz2601.metamon.pro.monthl
 
 ## backend(できた)
 
-`POST /v1/me/entitlements/google` と `POST /v1/googleplay/notifications` がある。契約は `docs/backend/openapi-appconfig.yaml`。
+`POST /v1/me/entitlements/google` と `POST /v1/googleplay/notifications` がある。契約は `docs/backend/openapi-appconfig.yaml`。サーバーの側の流れ・App Store の分との違いは [docs/backend/features/google-play-billing.md](../backend/features/google-play-billing.md)。
 
 | 場面 | 動き |
 |---|---|

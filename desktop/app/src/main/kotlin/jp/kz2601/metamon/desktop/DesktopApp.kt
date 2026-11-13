@@ -67,10 +67,12 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.isTraversalGroup
 import androidx.compose.ui.semantics.liveRegion
+import androidx.compose.ui.platform.LocalWindowInfo
 import androidx.compose.ui.semantics.paneTitle
 import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.semantics
 import jp.kz2601.metamon.desktop.i18n.Strings
+import jp.kz2601.metamon.desktop.os.NotificationsOffBar
 import jp.kz2601.metamon.desktop.store.SessionPersistence
 
 /** 画面 1 枚の描画に要るもの。 */
@@ -105,6 +107,8 @@ fun DesktopApp(
     windowId: Int? = null,
     /** パレットの「この端末のデータを消す」(#1887)。全アプリの分を消す。null なら出さない。 */
     onWipeLocalData: (suspend () -> Unit)? = null,
+    /** アプリの id。Windows で通知がオフの時の帯を閉じた覚えに使う。null なら帯を出さない。 */
+    appId: String? = null,
 ) {
     val session = remember {
         DesktopSession(dsl, initialStore, startScreen = startScreen, host = DesktopActionHost(), persistence = persistence, shared = records, startRecordId = startRecordId)
@@ -117,6 +121,10 @@ fun DesktopApp(
     // 他のウィンドウで開いている記録が消えた: 下書きを捨て、詳細のウィンドウは閉じる
     val shown = session.store
     LaunchedEffect(shown) { session.followRemoval() }
+    // 保存期間を過ぎた記録を消す(#482): 端末の記録を読み終えた時(DSL を当てた時)・ウィンドウが前に来た時・保存の後
+    val focused = LocalWindowInfo.current.isWindowFocused
+    val loaded = !session.records.loading
+    LaunchedEffect(focused, loaded, session.saves) { if (focused && loaded) session.purgeExpired() }
     var pending by remember { mutableStateOf<Pair<Action, ActionContext>?>(null) }
     val nav = session.nav
     val dispatch = { a: Action, ctx: ActionContext -> if (a.confirmMessage != null) pending = a to ctx else session.dispatch(a, ctx) }
@@ -142,6 +150,7 @@ fun DesktopApp(
         Box(Modifier.fillMaxSize()) {
             // モーダルの間は下の画面とタブに Tab で入らず、読み上げにも出さない
             Column(Modifier.fillMaxSize().then(keyboard.inert(nav.sheet != null || nav.fullScreen != null || previewing))) {
+                appId?.let { NotificationsOffBar(it, dsl) }
                 val base = NavigationResolver.dismissModals(nav).top(dsl)
                 Box(Modifier.weight(1f)) { ScreenView(dsl, session, base, io, dispatch, openPrint, onOpenRecord) }
                 // 送り待ちがある時だけ小さく出す(#1887)
@@ -218,7 +227,7 @@ internal fun confirmLabel(a: Action): String = Strings[
         jp.kz2601.metamon.dsl.ActionType.DELETE_RECORD -> "runtime_confirm_delete"
         jp.kz2601.metamon.dsl.ActionType.SAVE_RECORD -> "runtime_confirm_save"
         jp.kz2601.metamon.dsl.ActionType.EXPORT -> "runtime_confirm_export"
-        jp.kz2601.metamon.dsl.ActionType.OPEN_URL -> "runtime_confirm_open"
+        jp.kz2601.metamon.dsl.ActionType.NAVIGATE, jp.kz2601.metamon.dsl.ActionType.OPEN_URL -> "runtime_confirm_open"
         jp.kz2601.metamon.dsl.ActionType.RESET_FORM -> "runtime_confirm_reset"
         else -> "runtime_confirm_continue"
     },
