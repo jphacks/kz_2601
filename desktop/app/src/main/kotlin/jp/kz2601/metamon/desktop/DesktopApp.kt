@@ -32,6 +32,8 @@ import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -72,7 +74,10 @@ import androidx.compose.ui.semantics.paneTitle
 import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.semantics
 import jp.kz2601.metamon.desktop.i18n.Strings
+import jp.kz2601.metamon.desktop.store.RetentionPromptDialog
+import jp.kz2601.metamon.desktop.store.RetentionPrompts
 import jp.kz2601.metamon.desktop.store.SessionPersistence
+import kotlinx.coroutines.launch
 
 /** 画面 1 枚の描画に要るもの。 */
 private class ScreenScope(
@@ -122,6 +127,16 @@ fun DesktopApp(
     val focused = LocalWindowInfo.current.isWindowFocused
     val loaded = !session.records.loading
     LaunchedEffect(focused, loaded, session.saves) { if (focused && loaded) session.purgeExpired() }
+    // 保存期間のある entity を初めて開いた時の確認。確認するまで上の purgeExpired は消さない。前に来ているウィンドウだけが聞く
+    val retentionScope = rememberCoroutineScope()
+    var retentionTick by remember { mutableIntStateOf(0) }
+    val retentionRunner = session.retention
+    val retentionAppId = session.records.persistence?.appId
+    val retentionPrompt = if (focused && loaded && retentionRunner != null && retentionAppId != null) {
+        remember(retentionTick, session.store) { RetentionPrompts.pending(retentionAppId, retentionRunner, session.models) }
+    } else {
+        null
+    }
     var pending by remember { mutableStateOf<Pair<Action, ActionContext>?>(null) }
     val nav = session.nav
     val dispatch = { a: Action, ctx: ActionContext -> if (a.confirmMessage != null) pending = a to ctx else session.dispatch(a, ctx) }
@@ -196,6 +211,21 @@ fun DesktopApp(
             keyboard.Overlay()
         }
     }
+    }
+
+    if (retentionPrompt != null && retentionRunner != null) {
+        RetentionPromptDialog(
+            retentionPrompt,
+            onConfirm = {
+                RetentionPrompts.confirm(retentionRunner, retentionPrompt)
+                retentionTick++
+                retentionScope.launch { session.purgeExpired() }
+            },
+            onLater = {
+                RetentionPrompts.defer(retentionPrompt)
+                retentionTick++
+            },
+        )
     }
 
     printing?.let { doc -> PrintPreview(doc, onDismiss = { printing = null }, onResult = { io.notice = it }) }

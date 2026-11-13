@@ -128,6 +128,9 @@
     <string name="desktop_print_value">Value</string>
     <string name="desktop_qr_copy_image">Copy image</string>
     <string name="desktop_record_deleted_elsewhere">This record was deleted in another window</string>
+    <string name="desktop_retention_confirmed">Confirmed</string>
+    <string name="desktop_retention_review">Records deleted automatically</string>
+    <string name="desktop_retention_unconfirmed">Not confirmed</string>
     <string name="desktop_sync_pending">%1$d waiting to send</string>
     <string name="desktop_timer_done">Time\'s up</string>
     <string name="desktop_timer_name">Timer</string>
