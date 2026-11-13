@@ -5849,6 +5849,23 @@
         }
       }
     },
+    "もう出さない" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Don't show again"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "もう出さない"
+          }
+        }
+      }
+    },
     "もう少しかかっています…" : {
       "localizations" : {
         "en" : {
@@ -5927,6 +5944,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "やり直せませんでした"
+          }
+        }
+      }
+    },
+    "わかった" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Got it"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "わかった"
           }
         }
       }
@@ -7871,6 +7905,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "データを読み取れませんでした"
+          }
+        }
+      }
+    },
+    "ドラッグで並べ替え" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Drag to reorder"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ドラッグで並べ替え"
           }
         }
       }
@@ -12436,6 +12487,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "左の一覧から選ぶと、ここに表示します。"
+          }
+        }
+      }
+    },
+    "左の一覧の作ったアプリは、ドラッグで順番を変えられます。右クリックの「上へ移動」「下へ移動」でも変えられます。" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Drag apps you made in the sidebar to change their order. You can also right-click and choose “Move Up” or “Move Down.”"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "左の一覧の作ったアプリは、ドラッグで順番を変えられます。右クリックの「上へ移動」「下へ移動」でも変えられます。"
           }
         }
       }

@@ -194,6 +194,13 @@ struct AppSidebar: View {
     private func move(_ section: [SampleApp], fromOffsets source: IndexSet, toOffset destination: Int) {
         library.setOrder(MacSidebarSections.moved(library.createdIds, section: section.map(\.id),
                                                   fromOffsets: source, toOffset: destination))
+        CoachMarkStore.shared.markPerformed(.switcherReorder) // 並べ替えた人には吹き出しを出さない(#3249)
+    }
+
+    /// 右クリックの「上へ / 下へ移動」。VoiceOver の代わりの操作でも並べ替えの吹き出しを済みにする(#3249・iOS と同じ)
+    private func moveByMenu(_ section: [String], _ id: String, to index: Int) {
+        library.setOrder(MacSidebarSections.moved(library.createdIds, section: section, id: id, to: index))
+        CoachMarkStore.shared.markPerformed(.switcherReorder)
     }
 
     /// 別のウインドウで開く(#1853)。行の ⌥クリックと同じ
@@ -212,9 +219,9 @@ struct AppSidebar: View {
         let ids = section(of: app.id).map(\.id)
         if !isSearching, ids.count > 1, let index = ids.firstIndex(of: app.id) {
             Divider()
-            Button("上へ移動") { library.setOrder(MacSidebarSections.moved(library.createdIds, section: ids, id: app.id, to: index - 1)) }
+            Button("上へ移動") { moveByMenu(ids, app.id, to: index - 1) }
                 .disabled(index == 0)
-            Button("下へ移動") { library.setOrder(MacSidebarSections.moved(library.createdIds, section: ids, id: app.id, to: index + 1)) }
+            Button("下へ移動") { moveByMenu(ids, app.id, to: index + 1) }
                 .disabled(index == ids.count - 1)
         }
         Divider()
