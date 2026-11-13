@@ -28,11 +28,13 @@ struct RatingLeaf: View {
                                 .contentShape(Rectangle())
                         }
                         .buttonStyle(.plain)
-                        .accessibilityLabel("\(i)")
                     }
                     Spacer(minLength: 0)
                 }
                 // Mac: ←→・数字キー・VoiceOver の増減で付ける(#941)
+                .iosRatingAccessibility(label: c.label, current: current, count: count) { n in
+                    withAnimation(RenderTheme.Motion.press) { value.wrappedValue = Double(n) }
+                }
                 .macRatingControl(label: c.label, current: current, count: count) { n in
                     withAnimation(RenderTheme.Motion.press) { value.wrappedValue = Double(n) }
                 }
@@ -41,5 +43,39 @@ struct RatingLeaf: View {
         } else {
             NeedsForm(c: c)
         }
+    }
+}
+
+/// rating の VoiceOver 用の文字と増減(iOS)。星ごとのボタンでなく 1 つの調整できる要素として読む。
+enum RatingAccessibility {
+    /// 値の読み上げ「星 3、全部で 5」
+    static func value(current: Int, count: Int) -> String {
+        L("星 \(current)、全部で \(count)")
+    }
+
+    /// 部品のラベル(空なら「評価」)
+    static func label(_ raw: String?) -> String {
+        raw.flatMap { $0.isEmpty ? nil : $0 } ?? L("評価")
+    }
+}
+
+extension View {
+    /// iOS: 星の並びを 1 要素にして、ラベル + 値 + 上下スワイプの増減にする。Mac は `macRatingControl` が受け持つ。
+    @ViewBuilder
+    func iosRatingAccessibility(label: String?, current: Int, count: Int, set: @escaping (Int) -> Void) -> some View {
+        #if os(macOS)
+        self
+        #else
+        accessibilityElement(children: .ignore)
+            .accessibilityLabel(RatingAccessibility.label(label))
+            .accessibilityValue(RatingAccessibility.value(current: current, count: count))
+            .accessibilityAdjustableAction { direction in
+                switch direction {
+                case .increment: set(MacRatingKeys.adjusted(increment: true, current: current, count: count))
+                case .decrement: set(MacRatingKeys.adjusted(increment: false, current: current, count: count))
+                @unknown default: break
+                }
+            }
+        #endif
     }
 }
