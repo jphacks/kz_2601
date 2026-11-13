@@ -1,6 +1,6 @@
 # iOS の OS との連携(集中モード・Spotlight・ショートカット・電池・カレンダー・翻訳など)
 
-iOS 版が iOS の仕組み(集中モードのフィルタ・Spotlight・ショートカット・電池の状態・カレンダー・端末の中の翻訳など)とどうつながるかの決まりです。`epic/ios` に入っているものだけを書き、作業中のものは最後の [開いている PR](#開いている-pr) に並べます。
+iOS 版が iOS の仕組み(集中モードのフィルタ・Spotlight・ショートカット・電池の状態・カレンダー・端末の中の翻訳・Handoff など)とどうつながるかの決まりです。`epic/ios` に入っているものだけを書き、作業中のものは最後の [開いている PR](#開いている-pr) に並べます。
 
 - どれも **生成したアプリの DSL・スキーマ・AI の決まりは変えません**。アプリの殻(`ios/Metamon/`)と `ios/Packages/MetamonServices/`・`ios/Packages/MetamonRenderer/` の `Support/` だけで作っています。
 - どれも値を **サーバーに送りません**。
@@ -14,6 +14,7 @@ iOS 版が iOS の仕組み(集中モードのフィルタ・Spotlight・ショ�
 - [電池の残り・充電中・省電力モード(DevicePowerSource)](#電池の残り充電中省電力モードdevicepowersource)
 - [カレンダーの予定とリマインダーを読む(DeviceCalendarSource)](#カレンダーの予定とリマインダーを読むdevicecalendarsource)
 - [端末の中で文字を訳す(OnDeviceTranslator・iOS 18)](#端末の中で文字を訳すondevicetranslatorios-18)
+- [Handoff(iPhone 側)](#handoffiphone-側)
 - [開いている PR](#開いている-pr)
 
 ## 集中モードのフィルタ
@@ -150,6 +151,28 @@ Apple の Translation framework で、文字を端末の中だけで訳す口を
 | iOS 17・Mac | 本物は `os(iOS)` の時だけ作る。iOS 17 と macOS はビルドは通るが unsupported を返す |
 | 文言 | 日本語・英語(MetamonRenderer の `Localizable.xcstrings`) |
 | テスト | `MetamonRendererTests/OnDeviceTranslatorTests` |
+
+## Handoff(iPhone 側)
+
+開いている生成アプリの画面を、同じ Apple アカウントの Mac へ渡し、Mac から渡された画面を iPhone で開きます(#1851)。決まりの本体は両方に共通の `ios/Shared/Runtime/HandoffActivity.swift` で、Mac 側の動きは [Mac の OS との連携の Handoff](../mac/system-integration.md#handoff) にあります。ここは iPhone で違う所だけを書きます。内容は `origin/epic/god` のコードから書きました。
+
+| 項目 | 決まり |
+| --- | --- |
+| 受けた時 | `ShareLinkReceiver`(`AppRuntime+Sharing.swift`)が `.onContinueUserActivity(HandoffActivity.type)` で受け、`IntentHost` の `.handoff` に積む。準備(bootstrap)が済んでいればすぐ、まだなら済んでから、スプラッシュと起動時の同意の画面が閉じるのを待って実行する |
+| 受けた後に開く所 | `AppRuntime.openHandoff`。別のアプリ宛てなら `switchApp` で切り替え(切り替えに失敗したら何もしない・トーストは `switchApp` が出す)、`reveal` でモーダルを閉じて根(タブ)から矢印をたどり、画面と記録を開く。画面の id が無い・DSL にも無い時は、アプリを開くだけ |
+| 渡さない物 | 記録の中身・題名・書きかけのフォーム。activity の題名はアプリ名だけ。検索(Spotlight)・予測・公開索引には出さない |
+| 渡す物 | `appId`・`screenId`・`recordId` だけ(Info.plist の `NSUserActivityTypes` は `jp.kz2601.metamon.view`) |
+| 渡す時 | `handoffTarget`(`AppRuntime+Handoff.swift`)。生成したアプリを開いている間だけで、最初の音声の画面・生成中・アプリ id が空の時は渡さない。`RootView` の `HandoffAdvertiser` が画面と記録が変わるたびに activity を更新する |
+| 渡す画面 | 今いちばん上に見えている画面(モーダル → 選択中のタブ / main の順)と、その画面の記録。根の画面だけの時は画面を付けない |
+| 審査用の版 | 渡さず・受けない(`#if !APP_STORE_REVIEW`・Mac と同じ) |
+| `webpageURL` | このアプリのシェアリンクを iPhone で発行済みで、https の時だけ付ける(受ける端末にアプリが無い時にブラウザで開く) |
+| テスト | iOS 側の単体テストは見つからない。`HandoffTarget`・`PendingHandoff` は Mac 側の `MetamonMacTests/MacHandoffTests` が通す |
+
+### Mac の節との違い(推測・決めること)
+
+- **保留の時間切れ**: Mac の節と [architecture.md](architecture.md) は「開けない間は 60 秒だけ持つ」と書くが、iPhone の `IntentHost.pending` には時間切れの処理が見当たらない(60 秒で捨てる `PendingHandoff` は Mac だけが使っている)。実際の動きは未確認(推測)。決めること: iPhone にも 60 秒の時間切れを入れるか、文書を直すか。
+- **書きかけの入力**: Mac の節は「iOS は保存していない入力があれば破棄の確認を通す」と書くが、`openHandoff` と `switchApp` にその確認は見当たらない(推測)。決めること: 確認を入れるか、文書を直すか。
+- **ユーザーの設定**: Handoff をアプリ内でオフにする設定は見当たらない(OS の設定に従う)。
 
 ## 開いている PR
 
