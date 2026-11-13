@@ -30,6 +30,8 @@ import jp.kz2601.metamon.desktop.hotkey.GlobalHotkey
 import jp.kz2601.metamon.desktop.hotkey.GlobalHotkeys
 import jp.kz2601.metamon.desktop.i18n.Strings
 import jp.kz2601.metamon.desktop.io.DragOut
+import jp.kz2601.metamon.desktop.io.OpenWithFiles
+import jp.kz2601.metamon.desktop.io.OpenWithInbox
 import jp.kz2601.metamon.desktop.power.ScreenAwake
 import jp.kz2601.metamon.desktop.store.DesktopStore
 import jp.kz2601.metamon.desktop.store.DeviceWipe
@@ -55,12 +57,15 @@ import javax.swing.SwingUtilities
 fun main(rawArgs: Array<String>) {
     // `--quick-record` などの旗(.desktop の Actions・#2992)は位置の引数と分ける
     val parsed = LaunchArgs.parse(rawArgs.toList())
-    val args = parsed.positional.toTypedArray()
+    // 「別のアプリで開く」のファイル(#2994)は位置の引数(アプリ名など)から外す
+    val openFiles = OpenWithFiles.fromArgs(parsed.positional)
+    val args = OpenWithFiles.withoutFiles(parsed.positional).toTypedArray()
     // 同じ保存先で 2 つ目は起動しない(#1754 の JSON を 2 つのプロセスで書き合わない)
     if (args.getOrNull(1) == null && !SingleInstance.claim()) {
         if (!SingleInstance.handOff(args = rawArgs.toList())) SingleInstance.reportRunning()
         return
     }
+    OpenWithInbox.offer(openFiles)
     runApp(args, parsed.action)
 }
 
@@ -118,9 +123,10 @@ private fun runApp(args: Array<String>, launchAction: LaunchAction?) = applicati
         SingleInstance.onHandoff { raw ->
             SwingUtilities.invokeLater {
                 val p = LaunchArgs.parse(raw)
-                val id = p.positional.firstOrNull()?.takeIf { it in BundledApps.ids() } ?: registry.active?.key?.appId ?: first
+                val id = OpenWithFiles.withoutFiles(p.positional).firstOrNull()?.takeIf { it in BundledApps.ids() } ?: registry.active?.key?.appId ?: first
                 tray.openApp(id)
                 if (p.action == LaunchAction.QUICK_RECORD) tray.quickRecord()
+                OpenWithInbox.offer(OpenWithFiles.fromArgs(p.positional))
             }
         }
     }
