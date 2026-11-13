@@ -150,6 +150,7 @@ struct RootView: View {
         .environment(\.formToolbarAccessory, assistiveAccess.shows(.aiButton) ? AnyView(VoiceToolbarButton()) : nil)
         .environment(\.aiButtonLayer, assistiveAccess.shows(.aiButton) ? ComponentAIButtonLayer.wrapper : nil) // #629 部品から開くシートにも AI ボタン
         .sensoryFeedback(.impact(weight: .medium), trigger: rt.showAppSwitcher) { _, opened in opened }
+        .modifier(ShareInboxHost()) // #2224 共有シートで受け取った物の一覧
         .modifier(PublicDataPromptHost()) // #253 生成直後の「個人の情報も公開されます」
         .modifier(RetentionPromptHost()) // #482 記録の保存期間の確認
         .modifier(TrackingBarHost()) // #559 位置の記録中はどの画面でも上に「記録中」バー

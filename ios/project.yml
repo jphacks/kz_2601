@@ -118,6 +118,8 @@ targets:
           - "**/GoogleService-Info*.plist"
       # ウィジェットと共有する受け渡しモデル(WidgetSnapshot)。両ターゲットにコンパイルする
       - path: MetamonWidget/Shared
+      # 共有シートの拡張と共有する受け取り箱(ShareInbox)。両ターゲットにコンパイルする(#2224)
+      - path: MetamonShare/Shared
       # Mac と共有するランタイムの部品(UIKit に依存しない: 遷移・確認・保存/削除の前段・文言)。#939
       # Brand.xcassets(アクセント色・ツルの絵)もここ(#935)
       - path: Shared
@@ -136,6 +138,8 @@ targets:
       - package: MetamonServices
       # ホーム画面ウィジェット(埋め込み)
       - target: MetamonWidget
+      # 共有シートで受け取る拡張(埋め込み・#2224)
+      - target: MetamonShare
     # Sign in with Apple + App Group(ウィジェットとの共有)。自動署名(-allowProvisioningUpdates)が App ID に capability を付与する(有料 Developer Program 必須)。
     # 中身: Sign in with Apple / App Group / HealthKit(healthStat / Field.health・#167。自動署名で App ID に HealthKit が付く)/
     # App Attest(App Check・#318。環境は METAMON_APP_ATTEST_ENV。自動署名で App ID に App Attest が付く)/
@@ -283,6 +287,25 @@ targets:
         GENERATE_INFOPLIST_FILE: YES
         PRODUCT_BUNDLE_IDENTIFIER: jp.kz2601.metamon.widgettests
         TARGETED_DEVICE_FAMILY: "1"
+
+  # 共有シートで受け取る Share Extension(#2224)。受けた 文字・URL・画像・PDF を App Group の ShareInbox に置き、
+  # `tailorit://share-inbox` で本体を開くだけ(振り分けは #1775 の決定のあと)。Bundle ID は本体の子。
+  MetamonShare:
+    type: app-extension
+    platform: iOS
+    sources:
+      - path: MetamonShare
+    entitlements:
+      path: MetamonShare/MetamonShare.entitlements
+      properties:
+        com.apple.security.application-groups: [group.jp.kz2601.metamon]
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: jp.kz2601.metamon$(METAMON_BUNDLE_ID_SUFFIX).share
+        PRODUCT_NAME: MetamonShare
+        INFOPLIST_FILE: MetamonShare/Info.plist
+        TARGETED_DEVICE_FAMILY: "1"
+        SKIP_INSTALL: YES
 
   # UI テスト(XCUITest・#165)。モック(METAMON_MOCK=1)+ DEBUG フックで起動し、FAB のドラッグ / 長押し・チップ・チェック丸・フォームを実際に指で操作する。
   MetamonUITests:

@@ -143,6 +143,7 @@ struct MetamonApp: App {
             .modifier(DebugClockBanner()) // 日付をずらしている間の印(#2082)
             #endif
             .modifier(SpotlightOpenReceiver()) // Spotlight の結果のタップ(#1996)。サインイン前でも受けて保留
+            .modifier(ShareInboxReceiver()) // 共有シートの拡張が受け取った物(#2224)
             #if !APP_STORE_REVIEW
             .modifier(ShareLinkReceiver()) // シェアリンクはサインイン前でも受けて保留(#278)
             .modifier(PushRegistrationObserver(uid: session.user?.uid)) // #269
