@@ -9,6 +9,7 @@ Android アプリ(#354・#356〜#360)の文書の入口。
 | [`l10n.md`](l10n.md) | 文言と言語(`values/`・`values-en/` の置き方・iOS の `Localizable.xcstrings` からの移し方・`StringsParityTest` での抜けの確認・アプリ内の言語の切り替え) |
 | [`play-billing.md`](play-billing.md) | Tailor It Pro の購入(Google Play Billing)と、backend・Play Console で残っていること |
 | [`play-background-location.md`](play-background-location.md) | Play Console の裏での位置情報の申告の文(場所に着いたら知らせる) |
+| [`dsl-codegen.md`](dsl-codegen.md) | DSL の型の生成(スキーマ → dslgen → `:dsl` の generated)・作り直すコマンド・JsonElement のまま残るキー |
 | [`../desktop/architecture.md`](../desktop/architecture.md) | デスクトップ版が取り込んでいる Android のソースと、直した時に回るデスクトップのテスト |
 | [`../decisions/354-android-tech.md`](../decisions/354-android-tech.md) | 技術の選び方(UI・音声・API レベル・モジュール・DSL の型) |
 | [`../decisions/351-dsl-cross-platform.md`](../decisions/351-dsl-cross-platform.md) | DSL を iOS 以外でも描く方針 |
