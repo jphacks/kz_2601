@@ -393,6 +393,7 @@ private struct MacDetailSettings: View {
     @Environment(\.openWindow) private var openWindow
     @State private var showLicenses = false
     @State private var showTutorial = false // #971
+    @State private var showAutomationGuide = false // #3080
     #if !APP_STORE_REVIEW
     @State private var showBetaWelcome = false // #971(β の版だけ)
     private let betaWelcome = BetaWelcomeStore.shared
@@ -410,6 +411,14 @@ private struct MacDetailSettings: View {
                     Label("使い方を見る", systemImage: "questionmark.circle")
                 }
                 .accessibilityIdentifier("settings.tutorial")
+                // ショートカットのオートメーションの案内(#3080・iOS の #1995)。審査用の版でも出す
+                Button {
+                    showAutomationGuide = true
+                } label: {
+                    Label("ショートカットで自動にする", systemImage: "clock.arrow.2.circlepath")
+                }
+                .help("App を開いた時などをきっかけに「記録を追加」を動かす作り方を見ます")
+                .accessibilityIdentifier("settings.automationGuide")
                 #if !APP_STORE_REVIEW
                 if betaWelcome.isBeta {
                     Button {
@@ -470,6 +479,7 @@ private struct MacDetailSettings: View {
         }
         .formStyle(.grouped)
         .sheet(isPresented: $showLicenses) { MacLicensesView() }
+        .sheet(isPresented: $showAutomationGuide) { MacAutomationGuideView() }
         .sheet(isPresented: $showTutorial) {
             MacTutorialView {
                 FirstRunTutorialStore.shared.markTutorialSeen()

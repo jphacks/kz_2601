@@ -1318,6 +1318,40 @@
         }
       }
     },
+    "App を開いた時などをきっかけに「記録を追加」を動かす作り方を見ます" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "See how to run “Add Record” when you open an app and more"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "App を開いた時などをきっかけに「記録を追加」を動かす作り方を見ます"
+          }
+        }
+      }
+    },
+    "App を開いた時や集中モードを切り替えた時など、Mac を使っている時に Tailor It の「記録を追加」を自動で動かせます。オートメーションはショートカット App で作ります。" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "You can run Tailor It's “Add Record” automatically when you open an app, switch a Focus, or do other things while using your Mac. You build automations in the Shortcuts app."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "App を開いた時や集中モードを切り替えた時など、Mac を使っている時に Tailor It の「記録を追加」を自動で動かせます。オートメーションはショートカット App で作ります。"
+          }
+        }
+      }
+    },
     "Apple でサインイン" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -2758,6 +2792,23 @@
         }
       }
     },
+    "「+」を押し、きっかけ(App・集中モード・Wi-Fi など)を選ぶ" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Click “+” and choose a trigger (an app, a Focus, Wi-Fi, and so on)"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "「+」を押し、きっかけ(App・集中モード・Wi-Fi など)を選ぶ"
+          }
+        }
+      }
+    },
     "「AI で書く」ボタン(文を作る・要約・分類・書き直し・抜き出し・提案)は、押した時だけ送ります。短い答えは、端末の中の AI が使える時は送らず、使えない時だけ最近の記録と入力中の文字(最大 4KB)を送ります。長い答えのボタンは、いつも最大 16KB を送ります。共有のアプリで材料にするのは、自分が入れた記録だけです。" : {
       "localizations" : {
         "en" : {
@@ -2806,6 +2857,23 @@
         }
       }
     },
+    "「すぐに実行」を選ぶ(動かす前に確かめたい時は「確認後に実行」)" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Choose “Run Immediately” (or “Run After Confirmation” if you want to check first)"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "「すぐに実行」を選ぶ(動かす前に確かめたい時は「確認後に実行」)"
+          }
+        }
+      }
+    },
     "「メモ」という言葉を「ひとこと」に変えて" : {
       "localizations" : {
         "en" : {
@@ -2818,6 +2886,40 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "「メモ」という言葉を「ひとこと」に変えて"
+          }
+        }
+      }
+    },
+    "「仕事」の集中モードをオフにした時" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "When the “Work” Focus turns off"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "「仕事」の集中モードをオフにした時"
+          }
+        }
+      }
+    },
+    "「仕事」の集中モードをオンにした時" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "When the “Work” Focus turns on"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "「仕事」の集中モードをオンにした時"
           }
         }
       }
@@ -2963,6 +3065,125 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "「毎日の支出を記録して、今月の合計を見たい」のように、使い道を書いてください。"
+          }
+        }
+      }
+    },
+    "「記録を追加」で、記録先「ゲーム時間」に「終了」を入れる" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "“Add Record” puts “Stop” into “Game Time”"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "「記録を追加」で、記録先「ゲーム時間」に「終了」を入れる"
+          }
+        }
+      }
+    },
+    "「記録を追加」で、記録先「ゲーム時間」に「開始」を入れる" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "“Add Record” puts “Start” into “Game Time”"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "「記録を追加」で、記録先「ゲーム時間」に「開始」を入れる"
+          }
+        }
+      }
+    },
+    "「記録を追加」で、記録先「作業時間」に「終了」を入れる" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "With “Add Record”, put “End” in the “Work time” record"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "「記録を追加」で、記録先「作業時間」に「終了」を入れる"
+          }
+        }
+      }
+    },
+    "「記録を追加」で、記録先「作業時間」に「開始」を入れる" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "With “Add Record”, put “Start” in the “Work time” record"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "「記録を追加」で、記録先「作業時間」に「開始」を入れる"
+          }
+        }
+      }
+    },
+    "「記録を追加」で、記録先「出社」に「出社」を入れる" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "With “Add Record”, put “Arrived” in the “Office” record"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "「記録を追加」で、記録先「出社」に「出社」を入れる"
+          }
+        }
+      }
+    },
+    "「記録を追加」で記録するには、Mac のロックを解除している必要があります。ロック中に起きるきっかけではなく、Mac を使っている時に起きるきっかけを選んでください。" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "To record with “Add Record”, your Mac needs to be unlocked. Choose a trigger that happens while you're using your Mac, not one that can happen while it's locked."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "「記録を追加」で記録するには、Mac のロックを解除している必要があります。ロック中に起きるきっかけではなく、Mac を使っている時に起きるきっかけを選んでください。"
+          }
+        }
+      }
+    },
+    "「記録を追加」のほかに「話しかける」(音声入力を開く)も、きっかけに合わせて動かせます。" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Besides “Add Record”, “Talk” (opens voice input) can also run from a trigger."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "「記録を追加」のほかに「話しかける」(音声入力を開く)も、きっかけに合わせて動かせます。"
           }
         }
       }
@@ -3414,6 +3635,23 @@
         }
       }
     },
+    "お使いの macOS のショートカット App に「オートメーション」が無い時は、macOS を新しくすると使えるようになります。" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "If the Shortcuts app on your macOS doesn't have “Automation”, update macOS to use it."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "お使いの macOS のショートカット App に「オートメーション」が無い時は、macOS を新しくすると使えるようになります。"
+          }
+        }
+      }
+    },
     "お問い合わせ" : {
       "localizations" : {
         "en" : {
@@ -3477,6 +3715,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "お金"
+          }
+        }
+      }
+    },
+    "きっかけの例" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Trigger ideas"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "きっかけの例"
           }
         }
       }
@@ -6049,6 +6304,23 @@
         }
       }
     },
+    "アクションの検索で「Tailor It」と入れ、「記録を追加」を選ぶ" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Search actions for “Tailor It” and choose “Add Record”"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "アクションの検索で「Tailor It」と入れ、「記録を追加」を選ぶ"
+          }
+        }
+      }
+    },
     "アップデート" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -7076,6 +7348,40 @@
         }
       }
     },
+    "ゲームアプリを閉じた時" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "When you close a game app"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ゲームアプリを閉じた時"
+          }
+        }
+      }
+    },
+    "ゲームアプリを開いた時" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "When you open a game app"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ゲームアプリを開いた時"
+          }
+        }
+      }
+    },
     "コピー" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -7590,6 +7896,74 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "システム設定を開く"
+          }
+        }
+      }
+    },
+    "ショートカット App を開き、左の「オートメーション」を選ぶ" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Open the Shortcuts app and choose “Automation” in the sidebar"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ショートカット App を開き、左の「オートメーション」を選ぶ"
+          }
+        }
+      }
+    },
+    "ショートカット App を開く" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Open Shortcuts"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ショートカット App を開く"
+          }
+        }
+      }
+    },
+    "ショートカット App を開けませんでした。" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Couldn't open the Shortcuts app."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ショートカット App を開けませんでした。"
+          }
+        }
+      }
+    },
+    "ショートカットで自動にする" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Automate with Shortcuts"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ショートカットで自動にする"
           }
         }
       }
@@ -9763,6 +10137,23 @@
         }
       }
     },
+    "作り方" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "How to set it up"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "作り方"
+          }
+        }
+      }
+    },
     "作るのをやめました" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -10255,6 +10646,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "先に ISBN を入力してください"
+          }
+        }
+      }
+    },
+    "先に Tailor It を一度開いておいてください。開いたことが無いと記録できません。" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Open Tailor It once first. It can’t record until it has been opened."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "先に Tailor It を一度開いておいてください。開いたことが無いと記録できません。"
           }
         }
       }
@@ -15084,6 +15492,23 @@
         }
       }
     },
+    "職場の Wi-Fi につないだ時" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "When you join your workplace Wi-Fi"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "職場の Wi-Fi につないだ時"
+          }
+        }
+      }
+    },
     "自分だけにする" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -15646,6 +16071,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "記録先"
+          }
+        }
+      }
+    },
+    "記録先と内容を決めて「完了」を押す" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Set where to record and what to add, then tap “Done”"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "記録先と内容を決めて「完了」を押す"
           }
         }
       }
