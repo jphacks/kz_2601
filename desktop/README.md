@@ -23,7 +23,7 @@ stg の appconfig を手元で試す(サインインが入るまでの確かめ�
 TAILORIT_API=stg TAILORIT_DEV_TOKEN=<Firebase の ID トークン> ./gradlew :desktop:listApps
 ```
 
-AI(会話 `/v1/chat`・作る `/v1/generate`)の接続先は、`TAILORIT_API=stg` なら stg の ai、`TAILORIT_AI_URL` で差し替え(手元の backend など。モックのままでも渡せる)。接続先がある時だけコマンドパレットに「新しいアプリを作る」が出て、AI へ送ることにまだ同意していなければ先に説明と同意を出す(同意の保存は Android と同じ鍵)。既定(どちらも無い)は通信しない。
+AI(会話 `/v1/chat`・作る `/v1/generate`)の接続先は、`TAILORIT_API=stg` なら stg の ai、`TAILORIT_AI_URL` で差し替え(手元の backend など。モックのままでも渡せる)。接続先がある時だけコマンドパレットに「新しいアプリを作る」が出て、AI へ送ることにまだ同意していなければ先に説明と同意を出す(同意の保存は Android と同じ鍵)。既定(どちらも無い)は通信しない。会話の「これでいく」で `/v1/generate?stream=1` を呼び、別のウィンドウに組み上がっていく画面を出す(読めない途中は前の画面のまま)。完成したらパレットのアプリの一覧に足してそのアプリのウィンドウを開く(作ったアプリは今の起動の間だけ)。失敗・途中で切れた時は案内と「もう一度」、作っている間に閉じると確認を出す。
 
 Firebase Auth の REST クライアント(`auth/FirebaseAuthRestClient.kt`・まだ画面にはつながない)の API キーは `TAILORIT_FIREBASE_API_KEY` から読む(Firebase コンソールのプロジェクト設定 > 全般の「ウェブ API キー」。リポジトリ・ファイルには書かない)。`TAILORIT_IDENTITY_TOOLKIT_URL`・`TAILORIT_SECURE_TOKEN_URL` で接続先を差し替えられる(Auth エミュレーターなど)。
 

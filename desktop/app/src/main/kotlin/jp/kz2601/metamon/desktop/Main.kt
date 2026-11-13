@@ -6,6 +6,7 @@ import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.key
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.unit.dp
@@ -29,6 +30,8 @@ import java.awt.event.WindowEvent
 import jp.kz2601.metamon.desktop.chat.ChatBuild
 import jp.kz2601.metamon.desktop.chat.ChatEntry
 import jp.kz2601.metamon.desktop.chat.ChatSession
+import jp.kz2601.metamon.desktop.create.AppCreator
+import jp.kz2601.metamon.desktop.create.CreateWindow
 import jp.kz2601.metamon.desktop.i18n.Strings
 import jp.kz2601.metamon.desktop.net.DesktopApi
 import jp.kz2601.metamon.desktop.net.DesktopApiConfig
@@ -79,10 +82,29 @@ private fun runApp(args: Array<String>) = application {
             runCatching { DesktopActionHost.sweepCalendar() }
         }
     }
+    // 会話・作る(#2160・#2163): AI の接続先(TAILORIT_API=stg・TAILORIT_AI_URL)がある時だけ。モックは通信しない。同意が無い間は送らない
+    val uiScope = rememberCoroutineScope()
+    val registry = remember { WindowRegistry().also { it.open(WindowKey.app(first)) } }
+    val chat = remember {
+        val config = DesktopApiConfig.fromEnvironment()
+        val granted = { desktopStore.aiConsent.isGranted }
+        val creator = DesktopApi.generate(config, granted)?.let { source ->
+            AppCreator(
+                source,
+                uiScope,
+                locale = { Strings.locale.language },
+                cache = { desktopStore.documents.store(it.document.appId, it.envelopeJson) },
+                onOpen = { id -> registry.open(WindowKey.app(id)) },
+            )
+        }
+        ChatWiring(ChatEntry.factory(DesktopApi.ai(config, granted, desktopStore.documents)), desktopStore.aiConsent, creator)
+    }
     val hub = remember {
         // 記録の JSON を渡した時(開発・スクリーンショット)は最初のアプリだけそれを使い、端末に残さない
         val fixture = args.getOrNull(1)?.let { MockStore.fromJson(File(it).readText()) }
         AppHub(
+            // 作ったアプリ(#2163)はこの起動の間だけ一覧に出す
+            load = { id -> chat.creator?.created?.dsl(id) ?: Examples.load(id) },
             openRecords = { id, dsl ->
                 if (fixture != null && id == first) {
                     SharedRecords(fixture)
@@ -106,12 +128,8 @@ private fun runApp(args: Array<String>) = application {
             loadScope.cancel()
         }
     }
-    // 会話・作る(#2160): AI の接続先(TAILORIT_API=stg・TAILORIT_AI_URL)がある時だけ。モックは通信しない。同意が無い間は送らない
-    val chat = remember {
-        val ai = DesktopApi.ai(DesktopApiConfig.fromEnvironment(), isGranted = { desktopStore.aiConsent.isGranted }, cache = desktopStore.documents)
-        ChatWiring(ChatEntry.factory(ai), desktopStore.aiConsent)
-    }
-    val registry = remember { WindowRegistry().also { it.open(WindowKey.app(first)) } }
+    // 作っている間のウィンドウ(#2163)
+    chat.creator?.let { c -> c.current?.let { CreateWindow(c, it) } }
     val firstWindowId = remember { registry.windows.first().id }
     // トレイに常駐(#1761): × はトレイに隠す(設定で off・トレイが無ければ終わる)。終わるのはトレイの「終了」
     val tray = remember { TrayController.create(hub.dsl(first)) }
@@ -220,6 +238,7 @@ private fun ApplicationScope.DesktopWindow(w: WindowEntry, registry: WindowRegis
                         newChat = chat.newChat,
                         buildFromChat = chat.build,
                         aiConsent = chat.consent,
+                        createdApps = chat.createdApps,
                     )
                 }
             }
@@ -305,9 +324,12 @@ internal object WindowBounds {
     }
 }
 
-/** 会話の入口(#2160)。[newChat] が null ならパレットに出さない。作る流れ([build])は #2163。 */
+/** 会話の入口(#2160)と作る流れ(#2163)。[newChat] が null ならパレットに出さない。 */
 private class ChatWiring(
     val newChat: (() -> ChatSession)?,
     val consent: AiConsentStore,
-    val build: (ChatBuild) -> Unit = {},
-)
+    val creator: AppCreator? = null,
+) {
+    val build: (ChatBuild) -> Unit = { b -> creator?.start(b) }
+    val createdApps: () -> List<Pair<String, String>> = { creator?.created?.all?.toList().orEmpty() }
+}

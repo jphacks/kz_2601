@@ -18,6 +18,12 @@
     <string name="desktop_chat_new_app">Create a new app</string>
     <string name="desktop_chat_placeholder">Describe the app you want (Enter to send, Shift+Enter for a new line)</string>
     <string name="desktop_close">Close</string>
+    <string name="desktop_create_continue">Keep going</string>
+    <string name="desktop_create_cut_body">The connection dropped while building. You can try again.</string>
+    <string name="desktop_create_done">Done</string>
+    <string name="desktop_create_stop_body">The partly built screen will not be kept.</string>
+    <string name="desktop_create_stop_title">Stop building?</string>
+    <string name="desktop_create_title">Building your app</string>
     <string name="desktop_data_add">Add</string>
     <string name="desktop_delete_not_allowed">You can\'t delete this data</string>
     <string name="desktop_drag_image_name">image</string>

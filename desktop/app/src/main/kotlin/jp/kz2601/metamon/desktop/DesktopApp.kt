@@ -114,6 +114,8 @@ fun DesktopApp(
     buildFromChat: (ChatBuild) -> Unit = {},
     /** 会話の前に確かめる同意。 */
     aiConsent: AiConsentStore? = null,
+    /** この起動で作ったアプリ(#2163)。パレットのアプリの一覧に足す。 */
+    createdApps: () -> List<Pair<String, String>> = { emptyList() },
 ) {
     val session = remember {
         DesktopSession(dsl, initialStore, startScreen = startScreen, host = DesktopActionHost(), persistence = persistence, shared = records, startRecordId = startRecordId)
@@ -140,7 +142,7 @@ fun DesktopApp(
     // キーボードだけで使う(#1765): Ctrl+K パレット・Ctrl+N/S/F・Delete・Esc・F1
     val keyboard = rememberDesktopKeyboard(
         dsl, session, dispatch, openPrint, onOpenApp, onOpenRecord, onWipeLocalData,
-        newChat = newChat, buildFromChat = buildFromChat, aiConsent = aiConsent,
+        newChat = newChat, buildFromChat = buildFromChat, aiConsent = aiConsent, createdApps = createdApps,
     )
 
     // Ctrl+F はこのウィンドウの検索欄にだけ入る

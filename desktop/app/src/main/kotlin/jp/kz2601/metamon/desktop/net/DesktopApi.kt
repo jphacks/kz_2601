@@ -1,5 +1,7 @@
 package jp.kz2601.metamon.desktop.net
 
+import jp.kz2601.metamon.desktop.create.GenerateSource
+import jp.kz2601.metamon.desktop.create.HttpGenerateSource
 import jp.kz2601.metamon.services.AIClient
 import jp.kz2601.metamon.services.AppConfigClient
 import jp.kz2601.metamon.services.consent.ConsentGatedAiClient
@@ -95,5 +97,11 @@ object DesktopApi {
     fun ai(config: DesktopApiConfig, isGranted: () -> Boolean, cache: DocumentCache? = null): AIClient? {
         val url = config.aiUrl ?: return null
         return ConsentGatedAiClient(HttpAIClient(http(url, devTokens(config.devToken)), cache = cache), isGranted)
+    }
+
+    /** 作る(`/v1/generate?stream=1`)の行の出どころ(#2163)。接続先が無ければ null。同意が無い間は送らない。 */
+    fun generate(config: DesktopApiConfig, isGranted: () -> Boolean): GenerateSource? {
+        val url = config.aiUrl ?: return null
+        return HttpGenerateSource(http(url, devTokens(config.devToken)), isGranted)
     }
 }

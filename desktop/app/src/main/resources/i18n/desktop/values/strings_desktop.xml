@@ -19,6 +19,12 @@
     <string name="desktop_chat_new_app">新しいアプリを作る</string>
     <string name="desktop_chat_placeholder">作りたいアプリを文字で(Enter で送る・Shift+Enter で改行)</string>
     <string name="desktop_close">閉じる</string>
+    <string name="desktop_create_continue">続ける</string>
+    <string name="desktop_create_cut_body">作っている途中で通信が切れました。もう一度作り直せます。</string>
+    <string name="desktop_create_done">できました</string>
+    <string name="desktop_create_stop_body">途中まで組み立てた画面は残りません。</string>
+    <string name="desktop_create_stop_title">作るのをやめますか?</string>
+    <string name="desktop_create_title">アプリを作っています</string>
     <string name="desktop_data_add">追加</string>
     <string name="desktop_delete_not_allowed">このデータは削除できません</string>
     <string name="desktop_drag_image_name">画像</string>

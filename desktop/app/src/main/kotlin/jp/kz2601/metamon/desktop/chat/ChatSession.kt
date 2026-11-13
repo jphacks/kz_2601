@@ -23,6 +23,8 @@ data class ChatBuild(
     val paidFeatures: List<ChatPaidFeature> = emptyList(),
     /** 有料の機能を外した依頼(無ければ null) */
     val freeInstruction: String? = null,
+    /** 会話の appId(作る時も同じ id を使う・#2163)。会話の画面が渡す時に入れる。空なら作る側で新しく振る */
+    val appId: String = "",
 )
 
 /** 会話の状態(画面はこれだけを見て描く)。 */

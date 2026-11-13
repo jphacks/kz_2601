@@ -277,6 +277,9 @@ class DesktopKeyboard(
     /** 会話の ready・案から作る(作る流れは #2163)。 */
     var buildFromChat: (ChatBuild) -> Unit = {}
 
+    /** この起動で作ったアプリ(#2163)。(id, アプリ名)。パレットのアプリの一覧に足す。 */
+    var createdApps: () -> List<Pair<String, String>> = { emptyList() }
+
     /** AI へ送ることの同意(#2160)。null なら確かめない(テスト・同意の要らない入口)。 */
     var aiConsent: AiConsentStore? = null
 
@@ -408,7 +411,7 @@ class DesktopKeyboard(
         }
         // アプリは別のウィンドウで開く(開いていればそれを前に出す)
         val apps = openApp?.let { open ->
-            BundledApps.all().map { (id, name) ->
+            (BundledApps.all() + createdApps()).map { (id, name) ->
                 PaletteCommand("app:$id", name, PaletteCommand.Kind.APP, keywords = listOf(id, KeyboardText.NEW_WINDOW)) { open(id) }
             }
         }.orEmpty()
@@ -499,7 +502,7 @@ class DesktopKeyboard(
                 chat = null
                 runCatching { root.requestFocus() }
             }
-            ChatOverlay(c, onBuild = { b -> close(); buildFromChat(b) }, onClose = { close() })
+            ChatOverlay(c, onBuild = { b -> close(); buildFromChat(b.copy(appId = c.appId)) }, onClose = { close() })
         }
         if (wipeConfirmOpen) {
             val scope = rememberCoroutineScope()
@@ -530,6 +533,7 @@ fun rememberDesktopKeyboard(
     newChat: (() -> ChatSession)? = null,
     buildFromChat: (ChatBuild) -> Unit = {},
     aiConsent: AiConsentStore? = null,
+    createdApps: () -> List<Pair<String, String>> = { emptyList() },
 ): DesktopKeyboard = remember(dsl, session) { DesktopKeyboard(dsl, session) }.also {
     it.dispatch = dispatch
     it.print = print
@@ -539,4 +543,5 @@ fun rememberDesktopKeyboard(
     it.newChat = newChat
     it.buildFromChat = buildFromChat
     it.aiConsent = aiConsent
+    it.createdApps = createdApps
 }
