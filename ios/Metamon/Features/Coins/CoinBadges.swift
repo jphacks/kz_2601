@@ -7,14 +7,15 @@ struct CoinSkeleton: View {
     var width: CGFloat = 80
     var height: CGFloat = 14
     @State private var pulse = false
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
         RoundedRectangle(cornerRadius: height / 2, style: .continuous)
             .fill(Theme.Colors.surfaceElevated)
             .frame(width: width, height: height)
             .opacity(pulse ? 0.45 : 1)
-            .animation(.easeInOut(duration: 0.9).repeatForever(autoreverses: true), value: pulse)
-            .onAppear { pulse = true }
+            .animation(reduceMotion ? nil : .easeInOut(duration: 0.9).repeatForever(autoreverses: true), value: pulse)
+            .onAppear { pulse = !reduceMotion }
             .accessibilityLabel("読み込み中")
     }
 }
