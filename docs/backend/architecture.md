@@ -395,6 +395,8 @@ jobs:
 | `deploy-cloudrun.yml` | staging デプロイ後に同じものを **非ブロッキング**(`continue-on-error`)で実行し job summary に表を貼る |
 | `-only kakeibo\|training\|walk` / `SMOKE_ONLY=` | 1 本だけ |
 
+流れ・環境変数・片付け(stg-cleanup)・失敗した時の見方は [docs/infra/smoke.md](../infra/smoke.md)。
+
 ### 環境変数
 
 | 変数 | appconfig | ai | 既定 / 備考 |
