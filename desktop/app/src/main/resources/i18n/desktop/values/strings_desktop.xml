@@ -23,6 +23,10 @@
     <string name="desktop_feed_offline">フィードはデスクトップ版ではまだ取得しません</string>
     <string name="desktop_flashcards_back_hint">裏(押すと表)</string>
     <string name="desktop_flashcards_front_hint">表(押すと裏)</string>
+    <string name="desktop_hotkey_failed">どこからでも話しかけるキー(%1$s)を登録できませんでした</string>
+    <string name="desktop_hotkey_in_use">%1$s は他のアプリが使っています。別のキーを設定してください</string>
+    <string name="desktop_hotkey_invalid">どこからでも話しかけるキーの指定「%1$s」を読めませんでした(例: ctrl+shift+space)</string>
+    <string name="desktop_hotkey_title">どこからでも話しかけるキー</string>
     <string name="desktop_image_load">画像を読む</string>
     <string name="desktop_image_none">画像なし</string>
     <string name="desktop_input_audio_unavailable">録音は このパソコンでは使えません。ファイルから選べます</string>

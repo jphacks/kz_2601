@@ -22,6 +22,10 @@
     <string name="desktop_feed_offline">The desktop app doesn\'t load feeds yet</string>
     <string name="desktop_flashcards_back_hint">Back (click for the front)</string>
     <string name="desktop_flashcards_front_hint">Front (click for the back)</string>
+    <string name="desktop_hotkey_failed">Couldn\'t register the talk-anywhere key (%1$s)</string>
+    <string name="desktop_hotkey_in_use">%1$s is used by another app. Choose a different key</string>
+    <string name="desktop_hotkey_invalid">Couldn\'t read the talk-anywhere key: %1$s (e.g. ctrl+shift+space)</string>
+    <string name="desktop_hotkey_title">Talk-anywhere key</string>
     <string name="desktop_image_load">Load image</string>
     <string name="desktop_image_none">No image</string>
     <string name="desktop_input_audio_unavailable">Recording isn\'t available on this computer. You can choose a file instead</string>

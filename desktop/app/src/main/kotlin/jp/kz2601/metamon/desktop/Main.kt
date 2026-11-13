@@ -26,15 +26,19 @@ import java.awt.GraphicsEnvironment
 import java.awt.Rectangle
 import java.awt.event.WindowAdapter
 import java.awt.event.WindowEvent
+import jp.kz2601.metamon.desktop.hotkey.GlobalHotkey
+import jp.kz2601.metamon.desktop.hotkey.GlobalHotkeys
 import jp.kz2601.metamon.desktop.i18n.Strings
 import jp.kz2601.metamon.desktop.io.DragOut
 import jp.kz2601.metamon.desktop.store.DesktopStore
 import jp.kz2601.metamon.desktop.store.DeviceWipe
 import jp.kz2601.metamon.desktop.store.SessionPersistence
 import jp.kz2601.metamon.desktop.theme.TailorItTheme
+import jp.kz2601.metamon.desktop.voice.VoiceFlag
 import jp.kz2601.metamon.dsl.records.entityModels
 import jp.kz2601.metamon.dsl.screen
 import java.io.File
+import java.util.concurrent.atomic.AtomicReference
 import java.util.prefs.Preferences
 import javax.swing.SwingUtilities
 
@@ -123,6 +127,22 @@ private fun runApp(args: Array<String>) = application {
         tray.switchApp(hub.dsl(appId), hub.opened().firstOrNull { it.id == appId }?.records)
     }
     DesktopTray(tray)
+    // どこからでも話しかけるキー(#2201): 既定は off。TAILORIT_HOTKEY か端末の設定がある時だけ裏で登録する
+    DisposableEffect(tray) {
+        val hotkey = AtomicReference<GlobalHotkey?>(null)
+        val job = loadScope.launch {
+            hotkey.set(GlobalHotkeys.startFromSettings(
+                voiceEnabled = { VoiceFlag.enabled() },
+                bringToFront = { tray.open() },
+                notify = Notifier.Tray::notify,
+                post = { SwingUtilities.invokeLater(it) },
+            ))
+        }
+        onDispose {
+            job.cancel()
+            hotkey.getAndSet(null)?.close()
+        }
+    }
     registry.windows.toList().forEach { w ->
         key(w.id) {
             DesktopWindow(w, registry, hub, tray, startScreen = args.getOrNull(2)?.takeIf { w.id == firstWindowId })

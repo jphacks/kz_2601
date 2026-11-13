@@ -58,6 +58,7 @@ import jp.kz2601.metamon.desktop.io.ListIoBar
 import jp.kz2601.metamon.desktop.io.ioDropTarget
 import jp.kz2601.metamon.desktop.io.previewKey
 import jp.kz2601.metamon.desktop.io.rememberDesktopIo
+import jp.kz2601.metamon.desktop.hotkey.HotkeyVoiceHook
 import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.selection.selectableGroup
@@ -111,6 +112,7 @@ fun DesktopApp(
     }
     session.onCloseWindow = onCloseWindow
     TrayHook(session, windowId, isActive)
+    HotkeyVoiceHook(session, isActive)
     // 他のウィンドウで端末のデータを消した: 下書きを捨てて最初の画面へ(詳細のウィンドウは閉じる)
     val wipes = session.records.wipes
     LaunchedEffect(wipes) { session.followWipe() }
