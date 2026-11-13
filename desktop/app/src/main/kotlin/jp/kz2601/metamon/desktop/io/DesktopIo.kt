@@ -43,6 +43,13 @@ import jp.kz2601.metamon.dsl.logic.ImportPlan
 import jp.kz2601.metamon.dsl.logic.RecordImport
 import jp.kz2601.metamon.dsl.records.Entity
 import jp.kz2601.metamon.dsl.records.entityModels
+import androidx.compose.runtime.snapshots.Snapshot
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.launch
+import java.awt.EventQueue
 import java.awt.FileDialog
 import java.awt.Frame
 import java.awt.Toolkit
@@ -65,7 +72,15 @@ object IoLeaves {
  * ファイルの取り込み・書き出し・ドラッグ & ドロップ・クリップボード(#1753・#1764・#1766)。
  * モックの記録は [read] で読み [update] で差し替える(DesktopApp の store を持たない)。
  */
-class DesktopIo(dsl: AppDSL, private val read: () -> MockStore, private val update: (MockStore) -> Unit) {
+class DesktopIo(
+    dsl: AppDSL,
+    private val read: () -> MockStore,
+    private val update: (MockStore) -> Unit,
+    private val audio: AudioImport = AudioImport.fromEnv(),
+    private val scope: CoroutineScope = CoroutineScope(SupervisorJob() + Dispatchers.IO),
+    /** 文字にし終えた後の反映を画面のスレッドで行う(テストは直に呼ぶ)。 */
+    private val post: (() -> Unit) -> Unit = { r -> EventQueue.invokeLater { Snapshot.withMutableSnapshot(r) } },
+) {
     val entities: List<Entity> = dsl.entityModels()
     var pending by mutableStateOf<PendingImport?>(null)
     var notice by mutableStateOf<String?>(null)
@@ -104,7 +119,22 @@ class DesktopIo(dsl: AppDSL, private val read: () -> MockStore, private val upda
             } else {
                 notice = Strings["desktop_io_unsupported_file"]
             }
+            FileKind.AUDIO -> if (Accept.AUDIO in accept) importAudio(file, entity, c) else notice = Strings["desktop_io_unsupported_file"]
             else -> notice = Strings["desktop_io_unsupported_file"]
+        }
+    }
+
+    /** 録音ファイルを端末の中で文字にし、1 件の記録にする(裏で動く。終わりは [post] 経由で反映)。 */
+    fun importAudio(file: File, entity: Entity, c: Component): Job {
+        notice = Strings["desktop_voice_transcribing"]
+        return scope.launch {
+            val result = audio.transcribe(file)
+            post {
+                when (result) {
+                    is AudioImport.Result.Text -> addBody(result.text, file.name, entity, c)
+                    is AudioImport.Result.Refused -> notice = result.message
+                }
+            }
         }
     }
 
@@ -236,6 +266,7 @@ class DesktopIo(dsl: AppDSL, private val read: () -> MockStore, private val upda
                 FileKind.CSV -> Accept.CSV
                 FileKind.TEXT -> Accept.TEXT
                 FileKind.PDF -> Accept.PDF
+                FileKind.AUDIO -> Accept.AUDIO
                 else -> null
             }
             val importer = all.firstOrNull { it.type == ComponentType.FILE_IMPORT && accept != null && accept in it.accept.ifEmpty { listOf(Accept.CSV) } }

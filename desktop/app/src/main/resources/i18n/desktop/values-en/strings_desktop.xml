@@ -42,6 +42,9 @@
     <string name="desktop_input_transcribe_unavailable">Voice input isn\'t available on this computer. Please type instead</string>
     <string name="desktop_input_video_capture_unavailable">Recording video isn\'t available on this computer</string>
     <string name="desktop_io_added_rows">Added %1$d records</string>
+    <string name="desktop_io_audio_off">Voice transcription is off (turn on voice input)</string>
+    <string name="desktop_io_audio_unreadable">Couldn\'t read the recording</string>
+    <string name="desktop_io_audio_wav_only">Only wav files can be read (convert m4a/mp3 to wav)</string>
     <string name="desktop_io_cancel">Cancel</string>
     <string name="desktop_io_choose_file">Choose file</string>
     <string name="desktop_io_copied_rows">Copied %1$d records</string>
