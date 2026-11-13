@@ -185,6 +185,8 @@
     <string name="desktop_match_offline">仲間探しのつながりはサインインした後に出ます</string>
     <string name="desktop_notice_action_later">あとで</string>
     <string name="desktop_notice_action_open">開く</string>
+    <string name="desktop_notice_tag_info">お知らせ</string>
+    <string name="desktop_notice_tag_warning">重要</string>
     <string name="desktop_notification_now">今</string>
     <string name="desktop_notification_scheduled">通知を予約しました(%1$s・アプリを開いている間だけ)</string>
     <string name="desktop_onboarding_keys_body">%1$s で画面・アプリ・操作を探して開けます。%2$s でショートカットの一覧を出せます。</string>

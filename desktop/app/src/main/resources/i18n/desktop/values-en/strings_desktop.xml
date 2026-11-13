@@ -184,6 +184,8 @@
     <string name="desktop_match_offline">Matches appear after you sign in</string>
     <string name="desktop_notice_action_later">Later</string>
     <string name="desktop_notice_action_open">Open</string>
+    <string name="desktop_notice_tag_info">Notice</string>
+    <string name="desktop_notice_tag_warning">Important</string>
     <string name="desktop_notification_now">now</string>
     <string name="desktop_notification_scheduled">Notification scheduled (%1$s, only while the app is open)</string>
     <string name="desktop_onboarding_keys_body">Press %1$s to find and open screens, apps, and actions. Press %2$s for the list of shortcuts.</string>
