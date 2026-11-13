@@ -32,6 +32,11 @@ struct TableLeaf: View {
                                 .frame(maxWidth: .infinity, alignment: frameAlignment(for: col, entity: entity))
                         }
                     }
+                    #if os(macOS)
+                    .tableRecordDrag(record: TableGrouping.isGrouped(c) ? nil : rt.records(for: entityId).first { $0.id == row.id }) { record in
+                        RecordPasteboard.dragItem(record: record, entity: entity, rt: rt, text: row.texts.joined(separator: "\t"))
+                    }
+                    #endif
                 }
             }
             if cells.isEmpty {
@@ -106,3 +111,17 @@ struct TableLeaf: View {
         isNumericColumn(col, entity: entity) ? .trailing : .leading
     }
 }
+
+#if os(macOS)
+private extension View {
+    /// 表の行をサイドバーの別のアプリへドラッグする(Mac のみ・#2252)。集計表の行(記録でない)は何もしない
+    @ViewBuilder
+    func tableRecordDrag(record: Record?, _ item: @escaping (Record) -> NSItemProvider) -> some View {
+        if let record {
+            onDrag { item(record) }
+        } else {
+            self
+        }
+    }
+}
+#endif

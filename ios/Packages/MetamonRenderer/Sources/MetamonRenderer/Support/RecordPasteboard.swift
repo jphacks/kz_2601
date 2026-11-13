@@ -92,6 +92,15 @@ public enum RecordPasteboard {
         return provider
     }
 
+    /// 行のドラッグ(#2252): 項目つきの記録と文字。サイドバーの別のアプリに落とすと値の入ったフォームが開く。
+    /// 載せる項目が無い記録は文字だけ(`text` が空なら何も載せない)
+    static func dragItem(record: Record, entity: Entity?, rt: any DSLRuntime, text: String) -> NSItemProvider {
+        if let entity, let payload = payload(record: record, entity: entity, rt: rt) {
+            return itemProvider(payload, text: text.isEmpty ? self.text(payload, entity: entity, rt: rt) : text)
+        }
+        return text.isEmpty ? NSItemProvider() : NSItemProvider(object: text as NSString)
+    }
+
     /// 失効の時刻の書き方(1970 年からの秒)
     static func expiryStamp(now: Date) -> String {
         String(now.addingTimeInterval(RecordClipboard.expiry).timeIntervalSince1970)

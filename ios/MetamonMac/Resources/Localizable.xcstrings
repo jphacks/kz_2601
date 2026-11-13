@@ -2507,6 +2507,23 @@
         }
       }
     },
+    "「%@」の記録の値を入れるフォームを選んでください" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Choose the form to fill with the values from the “%@” record"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "「%@」の記録の値を入れるフォームを選んでください"
+          }
+        }
+      }
+    },
     "「%@」の設定" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -3860,6 +3877,23 @@
         }
       }
     },
+    "このアプリには、記録の値を入れられるフォームがありません" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "This app has no form that can take the record’s values"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "このアプリには、記録の値を入れられるフォームがありません"
+          }
+        }
+      }
+    },
     "このアプリには画面がありません" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -5171,6 +5205,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "どこからも行けません"
+          }
+        }
+      }
+    },
+    "どこに入れますか?" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Where should it go?"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "どこに入れますか?"
           }
         }
       }

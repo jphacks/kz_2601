@@ -381,8 +381,12 @@ struct ListLeaf: View {
             let csv = ListRowCopyText.csv(records: selectedRecords(rows), entity: entity, rt: rt)
             return ListRowCopyText.csvDragItem(csv, title: entity?.name ?? "")
         }
-        #endif
+        // 項目つきの記録も載せる(#2252)。サイドバーの別のアプリに落とすと値の入ったフォームが開く
+        return RecordPasteboard.dragItem(record: row, entity: entity, rt: rt,
+                                         text: ListRowCopyText.text(item: c.item, record: row, entity: entity, rt: rt))
+        #else
         return ListRowCopyText.dragItem(ListRowCopyText.text(item: c.item, record: row, entity: entity, rt: rt))
+        #endif
     }
 
     /// 行の背景: 保存で増えた行の一瞬のハイライト、Mac は選んでいる行(フォーカスが無い時は薄いグレー)

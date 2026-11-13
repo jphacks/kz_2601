@@ -12,6 +12,8 @@ struct AppCanvas: View {
     /// 声で頼む(#966)。生成したアプリの話して入力(#1328)も同じ認識を使う
     @Environment(MacVoiceInput.self) private var voice: MacVoiceInput?
     @State private var loadFailed = false
+    /// サイドバーに落とされた記録で開くフォームが複数ある時の選択(#2252)
+    @State private var dropChoice: DropChoice?
     let app: SampleApp
     /// 会話で作った・直したアプリの DSL(#967)。nil なら同梱の例を読む
     var dsl: AppDSL?
@@ -46,6 +48,18 @@ struct AppCanvas: View {
         .macHandoff(handoffTarget, appName: app.name)
         .onChange(of: MacHandoffInbox.shared.pending) { revealHandoff() }
         #endif
+        // サイドバーのこのアプリに記録が落とされた(#2252)。ランタイムができてから・開いている時はすぐ
+        .onChange(of: MacRecordDropInbox.shared.serial) { revealDrop() }
+        .confirmationDialog(L10n.tr("どこに入れますか?"),
+                            isPresented: Binding(get: { dropChoice != nil }, set: { if !$0 { dropChoice = nil } }),
+                            titleVisibility: .visible, presenting: dropChoice) { choice in
+            ForEach(choice.targets) { target in
+                Button(target.name) { openDrop(choice.payload, into: target) }
+            }
+            Button("キャンセル", role: .cancel) {}
+        } message: { choice in
+            Text("「\(choice.payload.appName)」の記録の値を入れるフォームを選んでください")
+        }
         .onReceive(NotificationCenter.default.publisher(for: IntentHost.recordAdded)) { note in
             // ショートカットで足した記録(#1034)を、開いている画面にすぐ出す
             guard let runtime, note.object as? String == runtime.appId, let entity = note.userInfo?["entity"] as? String else { return }
@@ -83,6 +97,7 @@ struct AppCanvas: View {
                 #endif
                 runtime = created
                 discardGuard?.runtime = created
+                revealDrop() // 落とされた記録(#2252)
                 #if !APP_STORE_REVIEW
                 revealHandoff()
                 #endif
@@ -90,6 +105,36 @@ struct AppCanvas: View {
             } catch {
                 loadFailed = true
             }
+        }
+    }
+}
+
+/// 落とされた記録(#2252)と、入れる先の候補
+private struct DropChoice {
+    var payload: RecordClipboard.Payload
+    var targets: [MacRecordDrop.Target]
+}
+
+extension AppCanvas {
+    /// このアプリ宛てに落とされた記録で新しいフォームを開く。候補が 1 つならすぐ、複数なら選んでもらう、無ければ一言
+    private func revealDrop() {
+        guard let runtime, let payload = MacRecordDropInbox.shared.take(appId: app.id) else { return }
+        let targets = MacRecordDrop.targets(payload, dsl: runtime.dsl, appId: runtime.appId, isAdmin: runtime.viewerIsAdmin == true)
+        switch targets.count {
+        case 0: runtime.toast = L10n.tr("このアプリには、記録の値を入れられるフォームがありません")
+        case 1: openDrop(payload, into: targets[0])
+        default: dropChoice = DropChoice(payload: payload, targets: targets)
+        }
+    }
+
+    /// 保存していない入力があれば確かめてから(#943)
+    private func openDrop(_ payload: RecordClipboard.Payload, into target: MacRecordDrop.Target) {
+        guard let runtime else { return }
+        let open = { Task { await runtime.openDroppedRecord(payload, into: target) } }
+        if let discardGuard {
+            discardGuard.run { _ = open() }
+        } else {
+            _ = open()
         }
     }
 }
