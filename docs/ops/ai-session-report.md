@@ -64,7 +64,7 @@ GOOGLE_CLOUD_PROJECT=jphacks-kz2601 go run ./cmd/ai-session-report \
 - ログを渡さないと、Firestore の版だけで作る(聞き返し・失敗・変化なし・作り直し・待ち時間・エラーは数えない)。
 - 手元で試す: `make emulator` を別の端末で動かし、`FIRESTORE_EMULATOR_HOST=localhost:8089 GOOGLE_CLOUD_PROJECT=demo-kz2601 go run ./cmd/ai-session-report -uids <uid> -out-dir /tmp/asr`。
 
-その他のフラグ: `-top 20`(詳しく出す件数)・`-gap 30m`(この間が空いたら別のセッション)・`-quick-undo 10m`・`-quick-fix 5m`・`-slow 60s`・`-many-clarify 3`・`-until <RFC3339>`。
+その他のフラグ: `-top 20`(詳しく出す件数)・`-gap 30m`(この間が空いたら別のセッション)・`-quick-undo 10m`・`-quick-fix 5m`・`-slow 60s`・`-many-clarify 3`・`-until <RFC3339>`・`-by-platform`(既定 off。ai.generate を X-Client-Platform ごとに生成の数・失敗の数・割合の表にする。OS は同じ requestId の http.request の `clientPlatform` から取り、無い行は `unknown`、決まった語彙以外は `other`)。
 
 ## 出力の見方(指標)
 
@@ -92,6 +92,24 @@ GOOGLE_CLOUD_PROJECT=jphacks-kz2601 go run ./cmd/ai-session-report \
 「作り直しの理由」の節(#1772)には、作り直しのあった依頼の割合(mode ごと)・理由ごとの回数・検証のコードごとの問題の数を出す。コードは `backend/pkg/dsl` の `ProblemCode`(JSON Schema の問題は `schema_<キーワード>`、意味の検証は `bad_ref`・`missing_field`・`unknown_component` など)で、アプリの中身では変わらない。多いコードから AI の決まり・部品の説明を直す(`prompt.go`・`catalog.go` を変えるのは持ち主の判断)。
 
 点は優先順位を付けるための目安で、正解ではない。上位のセッションの「依頼」「AI の要約」「作られたもの(画面と部品の名前)」「その後の直しの依頼」を並べて読み、ずれの種類を拾う。
+
+### 会話の結果(ai.chat)の節の読み方
+
+ログを渡した時だけ出る節(`backend/cmd/ai-session-report/chat_outcome.go`)。`ai.chat` の行のラベルと回数だけを数える。会話 = 同じ人の同じアプリへの往復の続き(往復の番号が戻るか、`-gap` より長く空いたら次の会話)。人とアプリは `ai.chat` の `uid_hash`・`app_hash` で会話を分けるのに使うだけで、この節には数しか出ない。
+
+| 表示 | JSON の鍵 | 意味 | 見比べ方 |
+|---|---|---|---|
+| 聞き返しの後に作る(ready)に至った | `chat.clarifyEndedInBuild` | 1 往復より後に ready を返した往復の数(聞き返しが作る依頼で終わった) | `chat.conversations` と比べる。会話の数に対して少ないなら、聞き返しの途中で止まっている |
+| 会話 | `chat.conversations` | 会話の数 | 下の 2 つの割合の分母 |
+| 最後が ready で終わった | `chat.conversationsEndedReady` | 最後の返答が ready だった会話の数(表示は会話に対する割合も出す) | 前の期間・`-by-platform` で分けた結果と割合を見比べる。下がったら、作るに至らない会話が増えた |
+| 失敗した往復 | `chat.failedTurns` | `ai.chat` の `outcome` が `failed` / `bad_request` の往復 | `chat.turns` と比べる。増えたら上の「AI のエラー」と同じ期間のログを見る |
+| 返答の種類(`question` / `ready` / `answer` / `proposal` / `other`) | `chat.replyKinds` | 返答の種類ごとの往復の数(表示は往復に対する割合) | `question` の割合が前より高いなら聞き返しが増えた。`other` は知らない種類(ログの形が変わった時に出る) |
+| 往復(割合の分母) | `chat.turns` | 返答できた往復の数(失敗は入らない) | 返答の種類の割合の分母 |
+| 会話の往復数(`1` / `2` / `3` / `4` / `5+`) | `chat.turnsPerConversation` | 作る前の往復の分布。会話が何往復で終わったかごとの会話の数 | 山の位置を前の期間と比べる。`5+` が増えたら、聞き返しが多い・伝わっていない会話が増えた。`1` だけが多いなら、聞き返さずに作ったか、1 往復で止めた |
+
+- 決まった目安の値は置かない。同じ人たちの前の期間や、OS ごと(`-by-platform`)と見比べて、動いた所を上の点の高いセッションと合わせて読む。
+- 「できない・代わりに〜」の返答は印が無いので数えていない(節の最後にも書いてある)。
+- 「作った・直した直後に版を戻した数」は、レポートにまだ無い(#2792)。入ったら同じ PR でこの表に 1 行足す。
 
 ## 読み終わったら
 

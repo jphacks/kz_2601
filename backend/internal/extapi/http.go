@@ -163,6 +163,7 @@ func (s *Service) Routes(mux *http.ServeMux) {
 				return
 			}
 			out.Connections = list
+			s.addMonthCalls(r.Context(), b.UID, out.Connections)
 		}
 		httpx.WriteJSON(w, http.StatusOK, out)
 	})
