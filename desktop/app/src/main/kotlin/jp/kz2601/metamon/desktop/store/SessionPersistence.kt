@@ -10,6 +10,7 @@ import jp.kz2601.metamon.desktop.net.DesktopApiConfig
 import jp.kz2601.metamon.desktop.typedValue
 import jp.kz2601.metamon.dsl.records.Entity
 import jp.kz2601.metamon.dsl.records.JSONValue
+import jp.kz2601.metamon.dsl.records.Record
 import jp.kz2601.metamon.services.AppConfigClient
 import jp.kz2601.metamon.services.local.BackoffPolicy
 import jp.kz2601.metamon.services.local.LocalRecord
@@ -127,6 +128,10 @@ class SessionPersistence(
             rows.map { r -> r to Row(screenId(r), r.data.mapValues { MockStore.cell(remap(JSONValue.from(it.value))) }, author = r.author) }
         }
     }
+
+    /** 保存期間の判定に使う形(#482): 画面の id に、端末の行の作った時刻・作った人を付ける(削除待ちは出さない)。 */
+    suspend fun retentionRows(): Map<String, List<Record>> =
+        screenRows().mapValues { (_, rows) -> rows.map { (r, row) -> Record(row.id, createdAt = r.createdAt, author = r.author) } }
 
     /**
      * 断られた(書き込みの列の上): 知らせが指す行だけ、端末に書き終えた画面([written])と今の端末の差を出して画面に渡す。
