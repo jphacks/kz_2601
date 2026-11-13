@@ -277,6 +277,10 @@
     <string name="desktop_share_qr_hint">iPhone のカメラで読むと参加できます</string>
     <string name="desktop_share_qr_save">画像を保存</string>
     <string name="desktop_share_qr_saved">保存しました: %1$s</string>
+    <string name="desktop_sign_out_anonymous_note">匿名のアカウントには戻れません。作ったアプリを残したい時は、先に「Google で続ける」で引き継いでください。</string>
+    <string name="desktop_sign_out_keep">データを残す</string>
+    <string name="desktop_sign_out_message">この端末に残した記録・送信待ち・設定も消しますか？ 残すと、次にこのパソコンでサインインした人にも見えます。</string>
+    <string name="desktop_sign_out_wipe">データも消す</string>
     <string name="desktop_signin_loopback_done">サインインを受け取りました。このタブを閉じて Tailor It に戻ってください。</string>
     <string name="desktop_signin_loopback_failed">サインインを終えられませんでした。このタブを閉じて Tailor It からやり直してください。</string>
     <string name="desktop_sync_blocker_offline">送れませんでした。ネットワークを確認して「今送る」を押してください</string>

@@ -55,6 +55,7 @@ import jp.kz2601.metamon.desktop.gridedit.GridEditLayer
 import jp.kz2601.metamon.desktop.gridedit.gridEditDraft
 import jp.kz2601.metamon.desktop.usage.UsageDialog
 import jp.kz2601.metamon.desktop.usage.UsageLoader
+import jp.kz2601.metamon.desktop.store.SignOutChoice
 import jp.kz2601.metamon.dsl.Action
 import jp.kz2601.metamon.dsl.ActionType
 import jp.kz2601.metamon.desktop.io.ExportClipboard
@@ -374,6 +375,20 @@ class DesktopKeyboard(
     }
     /** アカウントの画面(AccountScreen.kt・#2374・#2505)。パレット・トレイから開く。開いている間のキーは画面が自分で受ける。 */
     var accountOpen by mutableStateOf(false)
+
+    /** サインアウトの確認(#2375)を出している。 */
+    var signOutConfirmOpen by mutableStateOf(false)
+
+    /** 確認で選んだ(#2375)。消す・残すならサインアウトして未サインインに戻す(アカウントの画面は開いたまま)。 */
+    suspend fun chooseSignOut(choice: SignOutChoice) {
+        signOutConfirmOpen = false
+        val wipe = wipeLocalData ?: return
+        if (DesktopAccount.signOut(choice, wipe) && choice == SignOutChoice.WIPE) session.message = KeyboardText.WIPE_DONE
+    }
+
+    /** アカウントの画面のボタン。サインアウトは確認を出す(消す口が無ければ差し込まれた物のまま)。 */
+    fun accountActions(base: AccountActions = DesktopAccount.actions): AccountActions =
+        if (wipeLocalData == null) base else base.copy(signOut = { signOutConfirmOpen = true })
 
     /** このウィンドウの検索欄(Ctrl+F は他のウィンドウに入らない)。 */
     val searchTargets = SearchTargets()
@@ -780,9 +795,15 @@ class DesktopKeyboard(
             )
         }
         if (accountOpen) {
-            AccountDialog(onLicenses = { accountOpen = false; licensesOpen = true }) {
+            AccountDialog(onLicenses = { accountOpen = false; licensesOpen = true }, actions = accountActions()) {
                 accountOpen = false
                 runCatching { root.requestFocus() }
+            }
+        }
+        if (signOutConfirmOpen) {
+            val scope = rememberCoroutineScope()
+            SignOutConfirmDialog(anonymous = (DesktopAccount.state as? AccountState.SignedIn)?.anonymous == true) { choice ->
+                scope.launch { chooseSignOut(choice) }
             }
         }
     }

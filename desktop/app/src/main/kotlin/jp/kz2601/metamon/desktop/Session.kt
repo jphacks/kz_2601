@@ -208,6 +208,11 @@ class DesktopSession(
     fun followWipe() {
         if (records.wipes == seenWipes) return
         seenWipes = records.wipes
+        returnToStart()
+    }
+
+    /** 下書きを捨てて最初の画面へ。詳細のウィンドウは閉じる(端末のデータを消した後・サインアウトの後 #2375)。 */
+    fun returnToStart() {
         drafts.clear()
         recordUndo = null
         go(NavigationState.initial(dsl))

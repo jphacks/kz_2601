@@ -276,6 +276,10 @@
     <string name="desktop_share_qr_hint">Scan with an iPhone camera to join</string>
     <string name="desktop_share_qr_save">Save image</string>
     <string name="desktop_share_qr_saved">Saved: %1$s</string>
+    <string name="desktop_sign_out_anonymous_note">You can\'t return to an anonymous account. To keep the apps you made, choose \"Continue with Google\" first.</string>
+    <string name="desktop_sign_out_keep">Keep data</string>
+    <string name="desktop_sign_out_message">Also erase the records, unsent changes and settings saved on this device? If you keep them, the next person who signs in on this computer can see them.</string>
+    <string name="desktop_sign_out_wipe">Erase data</string>
     <string name="desktop_signin_loopback_done">Sign-in received. Close this tab and return to Tailor It.</string>
     <string name="desktop_signin_loopback_failed">Sign-in could not be completed. Close this tab and try again from Tailor It.</string>
     <string name="desktop_sync_blocker_offline">Couldn\'t send. Check your network, then choose Send now</string>
