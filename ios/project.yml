@@ -488,6 +488,12 @@ targets:
         # アプリの PRODUCT_NAME は Tailor It(ターゲット名と違う・#1054)ので、ホストの場所を書く
         TEST_HOST: $(BUILT_PRODUCTS_DIR)/Tailor It.app/Contents/MacOS/Tailor It
         BUNDLE_LOADER: $(TEST_HOST)
+      # アプリと同じく stg の版だけ METAMON_STG(開発用メニューのテストを #if METAMON_STG で包む・#2247)
+      configs:
+        Debug:
+          SWIFT_ACTIVE_COMPILATION_CONDITIONS: "$(inherited) METAMON_STG"
+        Staging:
+          SWIFT_ACTIVE_COMPILATION_CONDITIONS: "$(inherited) METAMON_STG"
 
   # Mac のキーボード操作の UI テスト(XCUITest・#1140)。モック(METAMON_MOCK=1)で起動し、⌘1 / ⌘2・Return・Esc・⌘[・⌘Z をキーだけで通す。
   # scheme では skipped(CI の `xcodebuild test -scheme MetamonMac` では回らない)。手元で回す方法は MetamonMacUITests/KeyboardShellUITests.swift の頭
