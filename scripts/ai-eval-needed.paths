@@ -1,0 +1,17 @@
+# PR の差分が「生成(AI の指示文・出力のスキーマ・部品の規則)」に関わるかの一覧(#371)。scripts/ai-eval-needed.sh が読む。
+# 書き方は scripts/agent-pr-guard.paths と同じ: 1 行 1 項目・<種類> <パターン>。種類ごと・パターンの名前順。
+# パターンはリポジトリの根からのパス。末尾が / ならその下すべて。* は / をまたいで一致する。
+# 種類 skip は除外(ほかの行より先に見る。一致したら生成に関わらないとみなす)。
+
+# 生成のコード・指示文・評価のケース
+ai backend/cmd/ai-eval/
+ai backend/internal/ai/
+
+# DSL(部品の規則・検証)
+dsl backend/pkg/dsl/
+
+# 出力のスキーマ
+schema docs/dsl/dsl.schema.json
+
+# 除外: テスト(振る舞いを変えない)
+skip *_test.go

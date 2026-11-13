@@ -36,13 +36,14 @@ enum AccountLinkPrompt {
 extension AppRuntime {
     /// 匿名ユーザーが初めてアプリを作った: 引き継ぎの案内を次の起動に予約する(H7: 最初のアプリの直後には出さない)。
     func offerAccountLinkIfNeeded(defaults: UserDefaults = .standard, launch: String = AccountLinkPrompt.currentLaunch) {
+        guard !BuildConfig.isDebugTestAccount else { return } // 試験用の枠は Apple に引き継がない(#2084)
         guard isAnonymousUser?() == true, AccountLinkPrompt.shouldOffer(defaults) else { return }
         AccountLinkPrompt.markPending(defaults, launch: launch)
     }
 
     /// 起動時(`bootstrap`): 前の起動で予約した案内があれば 1 回だけ出す。出す順番は `PostBuildNotice`(他のお知らせの後)。
     func presentDeferredAccountLinkIfNeeded(defaults: UserDefaults = .standard, launch: String = AccountLinkPrompt.currentLaunch) {
-        guard AccountLinkPrompt.isDue(defaults, launch: launch) else { return }
+        guard AccountLinkPrompt.isDue(defaults, launch: launch), !BuildConfig.isDebugTestAccount else { return }
         guard isAnonymousUser?() == true, AccountLinkPrompt.shouldOffer(defaults) else {
             defaults.removeObject(forKey: AccountLinkPrompt.pendingKey) // もう Apple に引き継いだ等
             return

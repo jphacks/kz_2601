@@ -28,7 +28,11 @@ const EnvGenFailOn = "LOOP_SOURCE_GENFAIL"
 
 // Generation-failure settings (all optional except the logs).
 const (
+	EnvGenFailSource   = "LOOP_GENFAIL_SOURCE"    // "" / file = LOOP_GENFAIL_LOGS, logging = the Cloud Logging API (#2146)
 	EnvGenFailLogs     = "LOOP_GENFAIL_LOGS"      // comma-separated `gcloud logging read --format=json` exports
+	EnvGenFailProject  = "LOOP_GENFAIL_PROJECT"   // logging: the project whose logs are read, default GOOGLE_CLOUD_PROJECT
+	EnvGenFailServices = "LOOP_GENFAIL_SERVICES"  // logging: Cloud Run services, default ai-<APP_ENV>
+	EnvGenFailMaxLines = "LOOP_GENFAIL_MAX_LINES" // logging: lines per read, default 50000
 	EnvGenFailWindow   = "LOOP_GENFAIL_WINDOW"    // Go duration, default 24h
 	EnvGenFailBaseline = "LOOP_GENFAIL_BASELINE"  // Go duration, default 168h
 	EnvGenFailMinCount = "LOOP_GENFAIL_MIN_COUNT" // default 5
@@ -50,9 +54,10 @@ type GenEvent struct {
 	ValidationCodes map[string]int
 }
 
-// GenLogSource reads ai.generate lines in [since, until]. The real reader is
-// a file the operator exported with `gcloud logging read` (the same input as
-// cmd/ai-session-report); this package never calls the Logging API.
+// GenLogSource reads ai.generate lines in [since, until]. GenLogFiles reads a
+// file the operator exported with `gcloud logging read` (the same input as
+// cmd/ai-session-report, the default); GenLogAPI reads the Cloud Logging API
+// (LOOP_GENFAIL_SOURCE=logging).
 type GenLogSource interface {
 	GenerateEvents(ctx context.Context, since, until time.Time) ([]GenEvent, error)
 }
@@ -413,13 +418,9 @@ func GenFailConfigFromEnv(getenv func(string) string) (GenFailures, error) {
 	if getenv(EnvGenFailOn) != "on" {
 		return GenFailures{}, ErrGenFailOff
 	}
-	paths := []string{}
-	for p := range ParseList(getenv(EnvGenFailLogs)) {
-		paths = append(paths, p)
-	}
-	sort.Strings(paths)
-	if len(paths) == 0 {
-		return GenFailures{}, fmt.Errorf("%s=on needs %s (gcloud logging read exports)", EnvGenFailOn, EnvGenFailLogs)
+	logs, err := genLogSourceFromEnv(getenv)
+	if err != nil {
+		return GenFailures{}, err
 	}
 	th := DefaultGenFailThreshold
 	var errs []error
@@ -459,5 +460,57 @@ func GenFailConfigFromEnv(getenv func(string) string) (GenFailures, error) {
 	if err := errors.Join(errs...); err != nil {
 		return GenFailures{}, err
 	}
-	return GenFailures{Logs: GenLogFiles{Paths: paths}, Threshold: th}, nil
+	return GenFailures{Logs: logs, Threshold: th}, nil
+}
+
+// genLogSourceFromEnv picks the log reader (LOOP_GENFAIL_SOURCE).
+func genLogSourceFromEnv(getenv func(string) string) (GenLogSource, error) {
+	switch src := strings.TrimSpace(getenv(EnvGenFailSource)); src {
+	case "", "file":
+		paths := []string{}
+		for p := range ParseList(getenv(EnvGenFailLogs)) {
+			paths = append(paths, p)
+		}
+		sort.Strings(paths)
+		if len(paths) == 0 {
+			return nil, fmt.Errorf("%s=on needs %s (gcloud logging read exports) or %s=logging", EnvGenFailOn, EnvGenFailLogs, EnvGenFailSource)
+		}
+		return GenLogFiles{Paths: paths}, nil
+	case "logging":
+		project := strings.TrimSpace(getenv(EnvGenFailProject))
+		if project == "" {
+			project = strings.TrimSpace(getenv("GOOGLE_CLOUD_PROJECT"))
+		}
+		services := []string{}
+		for s := range ParseList(getenv(EnvGenFailServices)) {
+			services = append(services, s)
+		}
+		sort.Strings(services)
+		if len(services) == 0 {
+			if env := strings.TrimSpace(getenv("APP_ENV")); env != "" {
+				services = []string{"ai-" + env}
+			}
+		}
+		var errs []error
+		if project == "" {
+			errs = append(errs, fmt.Errorf("%s=logging needs %s or GOOGLE_CLOUD_PROJECT", EnvGenFailSource, EnvGenFailProject))
+		}
+		if len(services) == 0 {
+			errs = append(errs, fmt.Errorf("%s=logging needs %s or APP_ENV", EnvGenFailSource, EnvGenFailServices))
+		}
+		api := GenLogAPI{Project: project, Services: services}
+		if v := getenv(EnvGenFailMaxLines); v != "" {
+			n, err := strconv.Atoi(v)
+			if err != nil || n <= 0 {
+				errs = append(errs, fmt.Errorf("%s: want a positive integer, got %q", EnvGenFailMaxLines, v))
+			}
+			api.MaxEntries = n
+		}
+		if err := errors.Join(errs...); err != nil {
+			return nil, err
+		}
+		return api, nil
+	default:
+		return nil, fmt.Errorf("%s: want file or logging, got %q", EnvGenFailSource, src)
+	}
 }

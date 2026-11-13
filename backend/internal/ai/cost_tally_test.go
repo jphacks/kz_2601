@@ -31,6 +31,7 @@ func attrMap(as []slog.Attr) map[string]any {
 }
 
 func TestCostTally_SumsRetriedAttempts(t *testing.T) {
+	t.Parallel() // waits out the real retry backoff
 	srv, _ := fakeAnthropic(t,
 		[2]string{"500", `{"type":"error","error":{"type":"api_error","message":"x"}}`},
 		[2]string{"200", okBody("claude-sonnet-5-5")})

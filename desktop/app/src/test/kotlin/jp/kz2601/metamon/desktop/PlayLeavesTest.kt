@@ -4,10 +4,18 @@ import com.google.zxing.BinaryBitmap
 import com.google.zxing.RGBLuminanceSource
 import com.google.zxing.common.HybridBinarizer
 import com.google.zxing.qrcode.QRCodeReader
+import jp.kz2601.metamon.dsl.Component
+import jp.kz2601.metamon.dsl.ComponentType
+import jp.kz2601.metamon.dsl.expr.Expr
 import jp.kz2601.metamon.dsl.logic.BracketDraw
 import jp.kz2601.metamon.dsl.logic.FlashcardDeck
+import jp.kz2601.metamon.dsl.records.Entity
+import jp.kz2601.metamon.dsl.records.Field
+import jp.kz2601.metamon.dsl.records.FieldType
 import jp.kz2601.metamon.dsl.records.JSONValue
+import jp.kz2601.metamon.dsl.records.Record
 import jp.kz2601.metamon.dsl.screen
+import kotlinx.serialization.json.JsonPrimitive
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
@@ -104,5 +112,76 @@ class PlayLeavesTest {
         val session = DesktopSession(dsl)
         val c = dsl.screens.flatMap { it.allComponents() }.first { it.type == jp.kz2601.metamon.dsl.ComponentType.SETTLEMENT }
         assertTrue(PlayRules.transfers(c, session.leafData()).isEmpty())
+    }
+
+    // MARK: startedField(#2612)
+
+    private val started = Entity(
+        id = "e",
+        fields = listOf(
+            Field("started", type = FieldType.DATETIME),
+            Field("day", type = FieldType.DATE),
+            Field("calc", type = FieldType.DATETIME, computed = Expr.from(JsonPrimitive("x"))),
+        ),
+    )
+
+    @Test
+    fun startedFieldNeedsStoredDatetime() {
+        fun c(id: String?) = Component(type = ComponentType.BRACKET, entity = "e", startedField = id)
+        assertEquals("started", PlayRules.startedField(c("started"), started))
+        // 指定なし・entity なし・無い項目・datetime でない・computed は使えない
+        assertNull(PlayRules.startedField(c(null), started))
+        assertNull(PlayRules.startedField(c("started"), null))
+        assertNull(PlayRules.startedField(c("missing"), started))
+        assertNull(PlayRules.startedField(c("day"), started))
+        assertNull(PlayRules.startedField(c("calc"), started))
+    }
+
+    // MARK: pickTitle / pickSubtitle(#2612)
+
+    private val pickEntity = Entity(
+        id = "item",
+        titleField = "name",
+        fields = listOf(
+            Field("name"),
+            Field("memo"),
+            Field("owner", type = FieldType.REF, refEntity = "member"),
+            Field("calc", type = FieldType.NUMBER, computed = Expr.from(JsonPrimitive("x"))),
+        ),
+    )
+    private val pickData = LeafData(listOf(pickEntity), { emptyList() })
+
+    private fun pick(title: String? = null, subtitle: String? = null) =
+        Component(type = ComponentType.RANDOM_PICKER, entity = "item", titleField = title, subtitleField = subtitle)
+
+    private fun rec(vararg kv: Pair<String, JSONValue>) = Record("r1", kv.toMap())
+
+    @Test
+    fun pickTitleUsesFieldOrEntityTitle() {
+        val r = rec("name" to JSONValue.Str("ラーメン"), "memo" to JSONValue.Str("駅前"), "owner" to JSONValue.Str("m1"))
+        // 指定なし = entity の見出し(titleField)
+        assertEquals("ラーメン", PlayRules.pickTitle(pick(), pickData, r))
+        assertEquals("駅前", PlayRules.pickTitle(pick(title = "memo"), pickData, r))
+        // ref は参照先の id をそのまま出す
+        assertEquals("m1", PlayRules.pickTitle(pick(title = "owner"), pickData, r))
+        // 空の値・無い値・空の指定は null
+        assertNull(PlayRules.pickTitle(pick(), pickData, rec("name" to JSONValue.Str(""))))
+        assertNull(PlayRules.pickTitle(pick(title = "memo"), pickData, rec()))
+        assertNull(PlayRules.pickTitle(pick(title = ""), pickData, r))
+        // entity が無いと見出しも引けない
+        assertNull(PlayRules.pickTitle(Component(type = ComponentType.RANDOM_PICKER, entity = "nope"), pickData, r))
+    }
+
+    @Test
+    fun pickSubtitleOnlyWhenSpecifiedAndShown() {
+        val r = rec("name" to JSONValue.Str("ラーメン"), "memo" to JSONValue.Str("駅前"), "owner" to JSONValue.Str("m1"))
+        assertEquals("駅前", PlayRules.pickSubtitle(pick(subtitle = "memo"), pickData, r))
+        assertEquals("m1", PlayRules.pickSubtitle(pick(subtitle = "owner"), pickData, r))
+        // 指定なし・空の指定・空の値は null(見出しへは落ちない)
+        assertNull(PlayRules.pickSubtitle(pick(), pickData, r))
+        assertNull(PlayRules.pickSubtitle(pick(subtitle = ""), pickData, r))
+        assertNull(PlayRules.pickSubtitle(pick(subtitle = "memo"), pickData, rec("memo" to JSONValue.Str(""))))
+        // 評価できない computed(「—」)は出さない
+        assertNull(PlayRules.pickSubtitle(pick(subtitle = "calc"), pickData, r))
     }
 }

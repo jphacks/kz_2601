@@ -3,6 +3,9 @@ package ratelimit
 import (
 	"fmt"
 	"strconv"
+	"strings"
+
+	"github.com/jphacks/kz_2601/backend/internal/httpx"
 )
 
 // ConfigFromEnv reads RATE_LIMIT_* (unset = defaults; 0 disables a counter):
@@ -22,6 +25,11 @@ import (
 //	RATE_LIMIT_WEIGHT_TEXT_TASK aiButton summarize etc. (/v1/text) (2)
 //	RATE_LIMIT_WEIGHT_TEXT_LONG aiButton length long / aiChat (/v1/text) (3)
 //	RATE_LIMIT_WEIGHT_TEXT_IMAGE aiButton inputPhoto (/v1/text)   (3)
+//
+// Per OS (X-Client-Platform, #2133), unset = the value above:
+//
+//	RATE_LIMIT_ANON_DAILY_<OS> / RATE_LIMIT_USER_DAILY_<OS> / RATE_LIMIT_PRO_DAILY_<OS>
+//	<OS> = IOS / ANDROID / MACOS / WINDOWS / LINUX / OTHER (httpx.Platforms)
 func ConfigFromEnv(getenv func(string) string) (Config, error) {
 	cfg := Config{Limits: DefaultLimits, Weights: DefaultWeights, Env: getenv("APP_ENV")}
 	fields := []struct {
@@ -55,5 +63,35 @@ func ConfigFromEnv(getenv func(string) string) (Config, error) {
 		}
 		*f.dst = n
 	}
+	for _, p := range httpx.Platforms {
+		for _, t := range platformTiers {
+			key := t.env + "_" + strings.ToUpper(p)
+			raw := getenv(key)
+			if raw == "" {
+				continue
+			}
+			n, err := strconv.Atoi(raw)
+			if err != nil || n < 0 {
+				return cfg, fmt.Errorf("%s must be a non-negative integer, got %q", key, raw)
+			}
+			if cfg.PlatformLimits == nil {
+				cfg.PlatformLimits = map[string]map[Tier]int{}
+			}
+			if cfg.PlatformLimits[p] == nil {
+				cfg.PlatformLimits[p] = map[Tier]int{}
+			}
+			cfg.PlatformLimits[p][t.tier] = n
+		}
+	}
 	return cfg, nil
+}
+
+// platformTiers are the per-user limits an OS can override (#2133).
+var platformTiers = []struct {
+	env  string
+	tier Tier
+}{
+	{"RATE_LIMIT_ANON_DAILY", TierAnonymous},
+	{"RATE_LIMIT_USER_DAILY", TierSignedIn},
+	{"RATE_LIMIT_PRO_DAILY", TierPro},
 }

@@ -96,6 +96,49 @@ final class MacRootFormSaveTests: XCTestCase {
         XCTAssertEqual(rt.toast, MacAnnouncement.saved.text)
     }
 
+    /// 保存の間(書き込みの await の間)に入れ直した値は保存していない: 保存の後も未保存のまま、離れる前に破棄の確認が出る
+    func testTypingDuringSaveStaysUnsaved() async throws {
+        let rt = try runtime()
+        let form = try form(rt, memo: "買い物")
+        rt.openForms.track(form, at: tabRoot) // `ScreenView` と同じく控えに入れる
+        try await typeDuringSave(rt, form, "次のメモ")
+
+        XCTAssertEqual(rt.records(for: "notes").first?.data["memo"], .string("買い物"))
+        XCTAssertEqual(form.values["memo"], .string("次のメモ"), "入れ直した値を消さない")
+        XCTAssertTrue(form.hasUnsavedChanges, "送ったのは「買い物」。入れ直した値は保存していない")
+        var left = false
+        rt.confirmDiscard { left = true } // アプリの切り替え・⌘W と同じ
+        XCTAssertFalse(left, "確認の前に離れない")
+        XCTAssertNotNil(rt.discardRequest, "破棄の確認を出す")
+    }
+
+    /// 既存の記録を直している間に入れ直した: もう一度保存すると書く(変更なしで飛ばさない)
+    func testTypingDuringEditSaveStaysUnsaved() async throws {
+        let rt = try runtime()
+        await rt.run(try saveAction(), ActionContext(route: tabRoot, form: try form(rt, memo: "朝")))
+        let record = try XCTUnwrap(rt.records(for: "notes").first)
+        let edit = FormDraft(entity: try XCTUnwrap(rt.dsl.entity("notes")))
+        edit.load(record)
+        edit.values["memo"] = .string("昼")
+        try await typeDuringSave(rt, edit, "夜", recordId: record.id)
+
+        XCTAssertTrue(edit.hasUnsavedChanges)
+        XCTAssertEqual(rt.records(for: "notes").first?.data["memo"], .string("昼"))
+        await rt.run(try saveAction(), ActionContext(route: tabRoot, form: edit, recordId: record.id))
+        XCTAssertEqual(rt.records(for: "notes").first?.data["memo"], .string("夜"), "2 回目の保存で書く")
+        XCTAssertFalse(edit.hasUnsavedChanges)
+    }
+
+    /// 書き込み(recordSync の actor)を待っている間に `text` を入れる
+    private func typeDuringSave(_ rt: MacAppRuntime, _ form: FormDraft, _ text: String, recordId: String? = nil) async throws {
+        let action = try saveAction()
+        let saving = Task { await rt.run(action, ActionContext(route: tabRoot, form: form, recordId: recordId)) }
+        for _ in 0..<1000 where !rt.book.isSaving(form) { await Task.yield() }
+        XCTAssertTrue(rt.book.isSaving(form), "保存の途中に入れる")
+        form.values["memo"] = .string(text)
+        await saving.value
+    }
+
     func testEditingExistingRecordKeepsValues() async throws {
         let rt = try runtime()
         await rt.run(try saveAction(), ActionContext(route: tabRoot, form: try form(rt, memo: "朝")))
@@ -110,6 +153,12 @@ final class MacRootFormSaveTests: XCTestCase {
 
         XCTAssertEqual(rt.toast, MacAnnouncement.saved.text)
         XCTAssertEqual(edit.values["memo"], .string("夜"), "既存の記録を直した時は入力を残す")
+        XCTAssertFalse(edit.hasUnsavedChanges, "保存の間に入れていなければ保存済み")
+        rt.openForms.track(edit, at: tabRoot)
+        var left = false
+        rt.confirmDiscard { left = true }
+        XCTAssertTrue(left, "保存済みなら確認なしで離れる")
+        XCTAssertNil(rt.discardRequest)
         XCTAssertEqual(posted, [MacAnnouncement.saved.text])
 
         // 何も変えずに保存: 書かず、何も出さない(M10)
