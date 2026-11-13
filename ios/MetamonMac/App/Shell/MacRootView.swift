@@ -124,6 +124,7 @@ struct MacRootView: View {
                        onOpen: { focus = .canvas }, onDelete: deleteApp, onDuplicate: duplicateApp,
                        onResetExample: resetExample, onOpenInNewWindow: openAppWindow,
                        canRequestRelease: canRequestRelease, onRequestRelease: openReleaseRequest,
+                       onDropRecord: dropRecord,
                        loadingServerApps: library.serverListState == .loading,
                        offline: library.serverListState == .offline)
                 .focused($focus, equals: .sidebar)
@@ -329,6 +330,12 @@ struct MacRootView: View {
     private func refreshBadges() async {
         await badges.refreshIfDue(badgeTargets, uid: MacAccount.shared.session.user?.uid,
                                   source: MacServices.shared.appConfig as? SharedRecordStampSource)
+    }
+
+    /// サイドバーのアプリの行に記録が落とされた(#2252): 預けてそのアプリを開く。中央ができたら値の入ったフォームを開く
+    private func dropRecord(_ appId: String, _ payload: RecordClipboard.Payload) {
+        MacRecordDropInbox.shared.put(payload, appId: appId)
+        notificationSelection.wrappedValue = appId // 入力中なら確認を通す・シートの間は閉じるまで待つ
     }
 
     /// サーバーの一覧を取り直す(#1057)。サインインしていなければ取らない(サインアウトの後は wipe が空にしている)
