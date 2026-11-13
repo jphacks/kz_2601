@@ -55,6 +55,7 @@ import jp.kz2601.metamon.desktop.io.DesktopIo
 import jp.kz2601.metamon.desktop.io.FileImportLeaf
 import jp.kz2601.metamon.desktop.io.IoOverlay
 import jp.kz2601.metamon.desktop.io.ListIoBar
+import jp.kz2601.metamon.desktop.io.OpenWithInbox
 import jp.kz2601.metamon.desktop.io.ioDropTarget
 import jp.kz2601.metamon.desktop.io.previewKey
 import jp.kz2601.metamon.desktop.io.rememberDesktopIo
@@ -125,6 +126,11 @@ fun DesktopApp(
     val topComponents = { dsl.screen(session.top.screen)?.components.orEmpty() }
     // 書けるフォームが無い(読み取りだけ・フォームの無い画面)なら写真・動画は入れない
     val topDraft = { session.form(session.top)?.takeIf { !it.isReadOnly }?.let(::FormDraftStrings) }
+    // 「別のアプリで開く」で渡されたファイル(#2994)は、前にあるウィンドウがドロップと同じ規則で受ける
+    val openWithRevision = OpenWithInbox.revision
+    LaunchedEffect(openWithRevision) {
+        if (openWithRevision > 0 && isActive()) OpenWithInbox.take().takeIf { it.isNotEmpty() }?.let { io.dropFiles(it, topComponents(), topDraft()) }
+    }
     // 印刷(#1767): Ctrl+P・見出しの「印刷」で一番上の画面をプレビュー
     var printing by remember { mutableStateOf<PrintDocument?>(null) }
     val openPrint = { printing = ScreenPrint.document(dsl, session.top.screen, session.store, session.form(session.top), locale = Strings.locale) }

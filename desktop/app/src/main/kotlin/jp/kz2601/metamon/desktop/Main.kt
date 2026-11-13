@@ -28,6 +28,8 @@ import java.awt.event.WindowAdapter
 import java.awt.event.WindowEvent
 import jp.kz2601.metamon.desktop.i18n.Strings
 import jp.kz2601.metamon.desktop.io.DragOut
+import jp.kz2601.metamon.desktop.io.OpenWithFiles
+import jp.kz2601.metamon.desktop.io.OpenWithInbox
 import jp.kz2601.metamon.desktop.store.DesktopStore
 import jp.kz2601.metamon.desktop.store.DeviceWipe
 import jp.kz2601.metamon.desktop.store.SessionPersistence
@@ -47,12 +49,16 @@ import javax.swing.SwingUtilities
  * 同じ保存先ではプロセスを 1 つだけ起動する。2 つ目は起動中の方へ引数を渡して前に出させる(SingleInstance.kt)。
  * 記録の JSON を渡した時(開発・スクリーンショット)は端末に残さないので、ロックを取らずに何本でも起動できる。
  */
-fun main(args: Array<String>) {
+fun main(rawArgs: Array<String>) {
+    // 「別のアプリで開く」のファイル(#2994)は位置の引数(アプリ名など)から外す
+    val openFiles = OpenWithFiles.fromArgs(rawArgs.toList())
+    val args = OpenWithFiles.withoutFiles(rawArgs.toList()).toTypedArray()
     // 同じ保存先で 2 つ目は起動しない(#1754 の JSON を 2 つのプロセスで書き合わない)
     if (args.getOrNull(1) == null && !SingleInstance.claim()) {
-        if (!SingleInstance.handOff(args = args.toList())) SingleInstance.reportRunning()
+        if (!SingleInstance.handOff(args = rawArgs.toList())) SingleInstance.reportRunning()
         return
     }
+    OpenWithInbox.offer(openFiles)
     runApp(args)
 }
 
@@ -109,8 +115,9 @@ private fun runApp(args: Array<String>) = application {
     remember {
         SingleInstance.onHandoff { a ->
             SwingUtilities.invokeLater {
-                val id = a.firstOrNull()?.takeIf { it in BundledApps.ids() } ?: registry.active?.key?.appId ?: first
+                val id = OpenWithFiles.withoutFiles(a).firstOrNull()?.takeIf { it in BundledApps.ids() } ?: registry.active?.key?.appId ?: first
                 tray.openApp(id)
+                OpenWithInbox.offer(OpenWithFiles.fromArgs(a))
             }
         }
     }
