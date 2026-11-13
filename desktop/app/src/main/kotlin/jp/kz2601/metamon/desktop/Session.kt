@@ -1,8 +1,11 @@
 package jp.kz2601.metamon.desktop
 
 import jp.kz2601.metamon.desktop.i18n.Strings
+import jp.kz2601.metamon.desktop.store.KeyValueRetentionConsent
+import jp.kz2601.metamon.desktop.store.RetentionRunner
 import jp.kz2601.metamon.desktop.store.SessionPersistence
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
@@ -68,12 +71,43 @@ class DesktopSession(
     shared: SharedRecords? = null,
     /** 記録の詳細のウィンドウ(#1763): [startScreen] をこの記録で開き、そこから戻るとウィンドウを閉じる。 */
     startRecordId: String? = null,
+    /** 記録の保存期間(#482)。既定は端末の設定に確認を覚える(端末に残さない時は使わない)。 */
+    retention: RetentionRunner? = null,
 ) {
     val models: List<Entity> = dsl.entityModels()
 
     /** 記録(同じアプリのウィンドウで共有)。 */
     val records: SharedRecords = shared ?: SharedRecords(initialStore, persistence)
     val persistence: SessionPersistence? get() = records.persistence
+
+    val retention: RetentionRunner? = retention ?: records.persistence?.let { RetentionRunner(KeyValueRetentionConsent(it.store.settings)) }
+
+    /** 保存した回数(#482)。DesktopApp が見て、保存の後に [purgeExpired] を呼ぶ。 */
+    var saves: Int by mutableIntStateOf(0)
+        private set
+
+    /**
+     * 保存期間を過ぎた記録を消す(#482): 端末の記録を読み終えた時(DSL を当てた時)・ウィンドウが前に来た時・保存の後に DesktopApp が呼ぶ。
+     * 確認済みの entity だけ。画面の記録から消すので、通常の削除と同じく端末と送信待ちに積む。端末に残さない時・読み込み中・消している最中は何もしない。消した件数。
+     */
+    suspend fun purgeExpired(): Int {
+        val runner = retention ?: return 0
+        val p = persistence ?: return 0
+        if (records.loading || records.wiping) return 0
+        val gone = runner.expired(p.appId, models, p.retentionRows(), uid)
+        if (gone.isEmpty() || records.loading || records.wiping) return 0
+        var next = store
+        var count = 0
+        for ((entity, ids) in gone) {
+            for (id in ids) {
+                if (next.find(entity, id) == null) continue
+                next = next.delete(entity, id)
+                count++
+            }
+        }
+        if (count > 0) store = next
+        return count
+    }
 
     /** 画面が見る記録。書き換えると前後の差を [persistence] に渡す。 */
     var store: MockStore
@@ -397,6 +431,7 @@ class DesktopSession(
         val to = action.screen
         if (to != null) navigate(to, action, null, ctx.route) else back(ctx.route)
         if (overwrote) message = Strings["desktop_window_conflict"]
+        saves++
     }
 
     /** 適合テストの操作 1 つ(case.json の operations)。対象が無い・見えていないなら false。 */
