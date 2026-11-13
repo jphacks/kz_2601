@@ -64,7 +64,7 @@ GOOGLE_CLOUD_PROJECT=jphacks-kz2601 go run ./cmd/ai-session-report \
 - ログを渡さないと、Firestore の版だけで作る(聞き返し・失敗・変化なし・作り直し・待ち時間・エラーは数えない)。
 - 手元で試す: `make emulator` を別の端末で動かし、`FIRESTORE_EMULATOR_HOST=localhost:8089 GOOGLE_CLOUD_PROJECT=demo-kz2601 go run ./cmd/ai-session-report -uids <uid> -out-dir /tmp/asr`。
 
-その他のフラグ: `-top 20`(詳しく出す件数)・`-gap 30m`(この間が空いたら別のセッション)・`-quick-undo 10m`・`-quick-fix 5m`・`-slow 60s`・`-many-clarify 3`・`-until <RFC3339>`。
+その他のフラグ: `-top 20`(詳しく出す件数)・`-gap 30m`(この間が空いたら別のセッション)・`-quick-undo 10m`・`-quick-fix 5m`・`-slow 60s`・`-many-clarify 3`・`-until <RFC3339>`・`-by-platform`(既定 off。ai.generate を X-Client-Platform ごとに生成の数・失敗の数・割合の表にする。OS は同じ requestId の http.request の `clientPlatform` から取り、無い行は `unknown`、決まった語彙以外は `other`)。
 
 ## 出力の見方(指標)
 

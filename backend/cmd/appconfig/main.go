@@ -163,14 +163,23 @@ func newAppCheck(ctx context.Context, project string, logger *slog.Logger) func(
 // guardTarget exits when a stg process would use the production Firestore
 // without ALLOW_SHARED_PROD_DB=1 (fsenv.Check, #290).
 func guardTarget(t fsenv.Target, logger *slog.Logger) {
-	shared, err := fsenv.Check(t, os.Getenv)
-	if err != nil {
+	if err := checkTarget(t, os.Getenv, logger); err != nil {
 		logger.Error("refusing to start", slog.Any("error", err))
 		os.Exit(1)
+	}
+}
+
+// checkTarget is guardTarget without the exit: the error refuses the start,
+// and an accepted shared database is logged as a warning.
+func checkTarget(t fsenv.Target, getenv func(string) string, logger *slog.Logger) error {
+	shared, err := fsenv.Check(t, getenv)
+	if err != nil {
+		return err
 	}
 	if shared {
 		logger.Warn("stg shares the production Firestore (ALLOW_SHARED_PROD_DB=1)", slog.String("firestore", t.String()))
 	}
+	return nil
 }
 
 // newStore returns Firestore when GOOGLE_CLOUD_PROJECT is set (database from
