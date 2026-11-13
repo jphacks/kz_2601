@@ -31,6 +31,7 @@ import jp.kz2601.metamon.desktop.io.DragOut
 import jp.kz2601.metamon.desktop.store.DesktopStore
 import jp.kz2601.metamon.desktop.store.DeviceWipe
 import jp.kz2601.metamon.desktop.store.SessionPersistence
+import jp.kz2601.metamon.desktop.store.ThumbnailStore
 import jp.kz2601.metamon.desktop.theme.TailorItTheme
 import jp.kz2601.metamon.dsl.records.entityModels
 import jp.kz2601.metamon.dsl.screen
@@ -71,6 +72,8 @@ private fun runApp(args: Array<String>) = application {
             runCatching { DragOut.sweep() }
             runCatching { DragOut.sweep(root = PhotoOpen.tempRoot()) }
             runCatching { DesktopActionHost.sweepCalendar() }
+            // 消したアプリ・数を超えた古い写し(#3204)
+            runCatching { desktopStore.thumbnails.prune(BundledApps.ids().toSet()) }
         }
     }
     val hub = remember {
@@ -100,6 +103,8 @@ private fun runApp(args: Array<String>) = application {
             loadScope.cancel()
         }
     }
+    // 最後に見た画面の写し(#3204)。記録の JSON を渡した開発・スクリーンショットの起動では撮らない
+    val thumbnails = remember { desktopStore.thumbnails.takeIf { args.getOrNull(1) == null } }
     val registry = remember { WindowRegistry().also { it.open(WindowKey.app(first)) } }
     val firstWindowId = remember { registry.windows.first().id }
     // トレイに常駐(#1761): × はトレイに隠す(設定で off・トレイが無ければ終わる)。終わるのはトレイの「終了」
@@ -125,7 +130,7 @@ private fun runApp(args: Array<String>) = application {
     DesktopTray(tray)
     registry.windows.toList().forEach { w ->
         key(w.id) {
-            DesktopWindow(w, registry, hub, tray, startScreen = args.getOrNull(2)?.takeIf { w.id == firstWindowId })
+            DesktopWindow(w, registry, hub, tray, startScreen = args.getOrNull(2)?.takeIf { w.id == firstWindowId }, thumbnails = thumbnails)
         }
     }
 }
@@ -133,7 +138,14 @@ private fun runApp(args: Array<String>) = application {
 /** ウィンドウ 1 枚。画面の状態(遷移・下書き・キー)はウィンドウごと、記録はアプリごとに共有。 */
 @OptIn(FlowPreview::class)
 @Composable
-private fun ApplicationScope.DesktopWindow(w: WindowEntry, registry: WindowRegistry, hub: AppHub, tray: TrayController, startScreen: String?) {
+private fun ApplicationScope.DesktopWindow(
+    w: WindowEntry,
+    registry: WindowRegistry,
+    hub: AppHub,
+    tray: TrayController,
+    startScreen: String?,
+    thumbnails: ThumbnailStore?,
+) {
     // アプリの記録はウィンドウの数で数える。最後の 1 枚を閉じたら書き終えて閉じる
     val app = remember(w) { hub.acquire(w.key.appId) }
     DisposableEffect(w) { onDispose { hub.release(w.key.appId) } }
@@ -189,7 +201,7 @@ private fun ApplicationScope.DesktopWindow(w: WindowEntry, registry: WindowRegis
             snapshotFlow { state.size to state.position }.debounce(500).collect { (size, pos) -> WindowBounds.save(kind, size, pos) }
         }
         // 明暗は OS に従う・文言は OS の言語(日本語か英語)・#1759
-        CompositionLocalProvider(LocalTray provides tray) {
+        CompositionLocalProvider(LocalTray provides tray, LocalAppThumbnails provides thumbnails) {
             TailorItTheme {
                 if (app.records.loading) {
                     LoadingSkeleton()
@@ -206,6 +218,7 @@ private fun ApplicationScope.DesktopWindow(w: WindowEntry, registry: WindowRegis
                         isActive = { registry.active?.id == w.id },
                         windowId = w.id,
                         onWipeLocalData = hub::wipeLocalData,
+                        thumbnailAppId = w.key.appId.takeIf { kind == WindowKind.APP },
                     )
                 }
             }

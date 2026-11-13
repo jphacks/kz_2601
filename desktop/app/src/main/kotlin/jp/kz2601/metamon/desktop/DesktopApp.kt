@@ -105,6 +105,8 @@ fun DesktopApp(
     windowId: Int? = null,
     /** パレットの「この端末のデータを消す」(#1887)。全アプリの分を消す。null なら出さない。 */
     onWipeLocalData: (suspend () -> Unit)? = null,
+    /** 最後に見た画面の写しを残すアプリ(#3204)。null なら撮らない(詳細のウィンドウ・テスト)。 */
+    thumbnailAppId: String? = null,
 ) {
     val session = remember {
         DesktopSession(dsl, initialStore, startScreen = startScreen, host = DesktopActionHost(), persistence = persistence, shared = records, startRecordId = startRecordId)
@@ -136,7 +138,9 @@ fun DesktopApp(
     val previewing = keyboard.photos.isOpen
     val pasteKey = io.previewKey(topComponents, topDraft)
     CompositionLocalProvider(LocalSearchTargets provides keyboard.searchTargets, LocalPhotoPreview provides keyboard::openPhoto) {
-    Surface(Modifier.fillMaxSize().ioDropTarget(io, topComponents, topDraft).onPreviewKeyEvent { !keyboard.photos.isOpen && pasteKey(it) }
+    // 切り替え・画面が落ち着いた時に写しを残す(#3204)。写すのは中身だけ(印刷のプレビューなどダイアログは入らない)
+    val thumbnail = Modifier.captureAppThumbnail(thumbnailAppId) { session.nav to session.store }
+    Surface(Modifier.fillMaxSize().then(thumbnail).ioDropTarget(io, topComponents, topDraft).onPreviewKeyEvent { !keyboard.photos.isOpen && pasteKey(it) }
         .onPreviewKeyEvent { if (!keyboard.photos.isOpen && DesktopPrint.isPrintKey(it) && DesktopPrint.canPrint(dsl)) true.also { openPrint() } else false }.then(keyboard.modifier)) {
         IoOverlay(io)
         Box(Modifier.fillMaxSize()) {

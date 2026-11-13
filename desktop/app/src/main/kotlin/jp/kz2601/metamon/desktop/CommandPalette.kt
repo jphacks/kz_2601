@@ -63,7 +63,14 @@ class PaletteCommand(
             }
     }
 
+    /** アプリの行ならそのアプリの id(行にサムネイルを出す・#3204)。 */
+    val appId: String? get() = if (kind == Kind.APP) id.removePrefix(APP_PREFIX).takeIf { it != id } else null
+
     override fun toString(): String = "$kind:$title"
+
+    companion object {
+        const val APP_PREFIX = "app:"
+    }
 }
 
 /**
@@ -151,6 +158,7 @@ fun CommandPalette(commands: List<PaletteCommand>, os: HostOs, onDismiss: () -> 
     LaunchedEffect(shown) { selected = 0 }
     LaunchedEffect(selected) { if (shown.isNotEmpty()) list.scrollToItem(selected.coerceIn(0, shown.lastIndex)) }
     val runAt = { i: Int -> shown.getOrNull(i)?.let { onDismiss(); it.run() } }
+    val thumbnails = LocalAppThumbnails.current
 
     Box(
         Modifier.fillMaxSize().background(Color(0x66000000)).clickable(onClick = onDismiss),
@@ -196,6 +204,8 @@ fun CommandPalette(commands: List<PaletteCommand>, os: HostOs, onDismiss: () -> 
                             horizontalArrangement = Arrangement.spacedBy(8.dp),
                         ) {
                             Text(c.kind.label, style = MaterialTheme.typography.labelSmall, color = Color.Gray, modifier = Modifier.widthIn(min = 64.dp))
+                            // 最後に見た画面の写し(無ければ今のまま)
+                            c.appId?.let { rememberAppThumbnail(it, thumbnails) }?.let { AppRowThumbnail(it) }
                             Text(c.title, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
                             c.hint?.let { Text(it, style = MaterialTheme.typography.labelMedium, color = Color.Gray) }
                         }
