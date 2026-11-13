@@ -41,6 +41,9 @@ import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.input.key.type
 import jp.kz2601.metamon.desktop.debug.DevMenu
 import jp.kz2601.metamon.desktop.debug.DevMenuHost
+import jp.kz2601.metamon.desktop.chat.ChatBuild
+import jp.kz2601.metamon.desktop.chat.ChatOverlay
+import jp.kz2601.metamon.desktop.chat.ChatSession
 import jp.kz2601.metamon.desktop.i18n.Strings
 import jp.kz2601.metamon.desktop.share.ShareLinkDialog
 import jp.kz2601.metamon.desktop.share.ShareLinkEntry
@@ -223,6 +226,7 @@ object Keymap {
 
     internal fun keyName(k: Key, os: HostOs): String = when (k) {
         Key.Escape -> "Esc"
+        Key.Enter -> if (os == HostOs.MAC) "↩" else "Enter"
         Key.Delete -> if (os == HostOs.MAC) "⌦" else "Delete"
         Key.Backspace -> if (os == HostOs.MAC) "⌫" else "Backspace"
         Key.F1 -> "F1"
@@ -332,6 +336,23 @@ class DesktopKeyboard(
 
     /** 並びを直す編集の最中(その画面の下書き)。 */
     var gridEdit by mutableStateOf<GridEditDraft?>(null)
+    /**
+     * 「新しいアプリを作る」の会話(#2381)。AI の接続先(#2160)がある時だけ渡す。null ならパレットに出さない。
+     */
+    var newChat: (() -> ChatSession)? = null
+
+    /** 会話の ready・案から作る(作る流れは #2163)。 */
+    var buildFromChat: (ChatBuild) -> Unit = {}
+
+    /** 開いている会話。 */
+    var chat by mutableStateOf<ChatSession?>(null)
+
+    /** 会話を開く。接続先が無ければ false。 */
+    fun openChat(): Boolean {
+        val make = newChat ?: return false
+        if (chat == null) chat = make()
+        return true
+    }
 
     /** 消す前の確認を出している。 */
     var wipeConfirmOpen by mutableStateOf(false)
@@ -415,7 +436,7 @@ class DesktopKeyboard(
             if (!repeat) closePreview()
             return true
         }
-        if (paletteOpen || helpOpen || licensesOpen || usageOpen || wipeConfirmOpen || shareOpen || onboardingOpen || gridEdit != null || a11yBridgeOpen || devInfo != null) return false // パレット・一覧・確認・並びの編集が自分で受ける
+        if (paletteOpen || helpOpen || licensesOpen || usageOpen || wipeConfirmOpen || shareOpen || onboardingOpen || gridEdit != null || a11yBridgeOpen || devInfo != null || chat != null) return false // パレット・一覧・確認・並びの編集が自分で受ける
         // 項目つきでコピーした記録の貼り付け。入力欄などを選んでいる時は普通の貼り付けに任せる
         if (isPasteKey(p)) return !bubble && rootFocused && pasteRecord()
         val s = Keymap.match(p, os) ?: return false
@@ -546,6 +567,9 @@ class DesktopKeyboard(
         val diagnostics = copyDiagnostics?.let { copy ->
             listOf(PaletteCommand("about:diagnostics", Strings["desktop_diagnostics_copy"], PaletteCommand.Kind.ACTION, keywords = listOf("diagnostics", "support", "version")) { copy() })
         }.orEmpty()
+        val newApp = newChat?.let {
+            listOf(PaletteCommand("chat:new", Strings["desktop_chat_new_app"], PaletteCommand.Kind.ACTION, keywords = listOf("new app", "create", "chat")) { openChat() })
+        }.orEmpty()
         val licenses = PaletteCommand(
             "about:licenses", LicensesText.TITLE, PaletteCommand.Kind.ACTION,
             keywords = listOf("licenses", "third-party", "oss", "notice", LicensesText.LICENSE),
@@ -585,7 +609,7 @@ class DesktopKeyboard(
         }
         // stg の時だけ・配布物では出ない
         val dev = DevMenu.commands(devHost)
-        return shortcuts + buttons + record + layout + screens + apps + usage + wipe + account + shareLink + retention + tips + onboarding + diagnostics + licenses + bridge + dev
+        return shortcuts + buttons + newApp + record + layout + screens + apps + usage + wipe + account + shareLink + retention + tips + onboarding + diagnostics + licenses + bridge + dev
     }
 
     /** 今のアプリの保存期間のある entity(アプリ・entity・日数・確認済みか)。端末に残さない時は空。 */
@@ -623,7 +647,7 @@ class DesktopKeyboard(
     val modalModifier: Modifier get() = Modifier.focusRequester(modal).focusGroup()
 
     fun focusAfterNavigation(modalOpen: Boolean) {
-        if (paletteOpen || helpOpen || licensesOpen || usageOpen || shareOpen || tipsOpen || retentionReviewOpen || onboardingOpen || devInfo != null) return
+        if (paletteOpen || helpOpen || licensesOpen || usageOpen || shareOpen || tipsOpen || retentionReviewOpen || onboardingOpen || devInfo != null || chat != null) return
         if (modalOpen && runCatching { modal.requestFocus(FocusDirection.Enter) }.getOrDefault(false)) return
         runCatching { root.requestFocus() }
     }
@@ -733,6 +757,13 @@ class DesktopKeyboard(
                 runCatching { root.requestFocus() }
             }
         }
+        chat?.let { c ->
+            val close = {
+                chat = null
+                runCatching { root.requestFocus() }
+            }
+            ChatOverlay(c, onBuild = { b -> close(); buildFromChat(b) }, onClose = { close() })
+        }
         if (wipeConfirmOpen) {
             val scope = rememberCoroutineScope()
             val dismiss = {
@@ -767,6 +798,8 @@ fun rememberDesktopKeyboard(
     wipeLocalData: (suspend () -> Unit)? = null,
     usage: PlanUsageSource? = null,
     saveLayout: ((GridEditDraft) -> Unit)? = null,
+    newChat: (() -> ChatSession)? = null,
+    buildFromChat: (ChatBuild) -> Unit = {},
 ): DesktopKeyboard = remember(dsl, session) { DesktopKeyboard(dsl, session) }.also {
     it.dispatch = dispatch
     it.print = print
@@ -775,4 +808,6 @@ fun rememberDesktopKeyboard(
     it.wipeLocalData = wipeLocalData
     if (it.usage == null && usage != null) it.usage = UsageLoader(usage)
     it.saveLayout = saveLayout
+    it.newChat = newChat
+    it.buildFromChat = buildFromChat
 }

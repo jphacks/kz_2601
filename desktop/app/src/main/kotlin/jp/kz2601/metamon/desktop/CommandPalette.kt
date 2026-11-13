@@ -39,6 +39,7 @@ import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.input.key.type
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import jp.kz2601.metamon.desktop.chat.ChatKey
 import jp.kz2601.metamon.desktop.i18n.Strings
 import jp.kz2601.metamon.desktop.voice.PromptTipsText
 import java.io.File
@@ -235,6 +236,14 @@ fun ShortcutHelp(os: HostOs, onLicenses: (() -> Unit)? = null, onTips: (() -> Un
                     Row(Modifier.fillMaxWidth()) {
                         Text(s.title, modifier = Modifier.weight(1f))
                         Text(Keymap.chords(s, os).joinToString(" / ") { Keymap.label(it, os) }, color = Color.Gray)
+                    }
+                }
+                // 会話の画面の入力欄(#2381)
+                Text(Strings["desktop_chat_help"], style = MaterialTheme.typography.labelMedium, color = Color.Gray)
+                ChatKey.help(os).forEach { (title, label) ->
+                    Row(Modifier.fillMaxWidth()) {
+                        Text(title, modifier = Modifier.weight(1f))
+                        Text(label, color = Color.Gray)
                     }
                 }
                 Text(KeyboardText.HELP_TAB, style = MaterialTheme.typography.bodySmall, color = Color.Gray)

@@ -36,6 +36,12 @@
     <string name="desktop_carousel_page">%1$d of %2$d</string>
     <string name="desktop_carousel_prev">Previous</string>
     <string name="desktop_chart_empty">No data yet</string>
+    <string name="desktop_chat_help">Chat</string>
+    <string name="desktop_chat_keys_close">Close the chat</string>
+    <string name="desktop_chat_keys_newline">New line</string>
+    <string name="desktop_chat_keys_send">Send</string>
+    <string name="desktop_chat_new_app">Create a new app</string>
+    <string name="desktop_chat_placeholder">Describe the app you want (Enter to send, Shift+Enter for a new line)</string>
     <string name="desktop_close">Close</string>
     <string name="desktop_coin_estimate">About %1$d coins</string>
     <string name="desktop_coin_estimate_a11y">Sending uses about %1$d coins</string>
