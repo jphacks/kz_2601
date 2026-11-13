@@ -127,6 +127,12 @@
     <string name="desktop_print_sent">%1$d 頁を印刷に送りました</string>
     <string name="desktop_print_title">印刷: %1$s</string>
     <string name="desktop_print_value">値</string>
+    <string name="desktop_public_data_body">「%1$s」の欄は、このアプリを見られる人みんなに公開されます。どうしますか？</string>
+    <string name="desktop_public_data_copied">直しの指示文をコピーしました。会話に貼って送ってください</string>
+    <string name="desktop_public_data_keep">公開のままにする</string>
+    <string name="desktop_public_data_private">自分だけにする</string>
+    <string name="desktop_public_data_remove">この欄を消す</string>
+    <string name="desktop_public_data_title">個人の情報も公開されます</string>
     <string name="desktop_qr_copy_image">画像をコピー</string>
     <string name="desktop_record_deleted_elsewhere">この記録は別のウィンドウで消されました</string>
     <string name="desktop_sync_pending">送信待ち %1$d 件</string>

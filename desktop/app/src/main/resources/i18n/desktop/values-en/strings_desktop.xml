@@ -126,6 +126,12 @@
     <string name="desktop_print_sent">Sent %1$d pages to the printer</string>
     <string name="desktop_print_title">Print: %1$s</string>
     <string name="desktop_print_value">Value</string>
+    <string name="desktop_public_data_body">The fields (%1$s) will be visible to everyone who can see this app. What would you like to do?</string>
+    <string name="desktop_public_data_copied">Copied the fix instruction. Paste it into the chat to send it</string>
+    <string name="desktop_public_data_keep">Keep public</string>
+    <string name="desktop_public_data_private">Make it only mine</string>
+    <string name="desktop_public_data_remove">Remove the fields</string>
+    <string name="desktop_public_data_title">Personal info will be public too</string>
     <string name="desktop_qr_copy_image">Copy image</string>
     <string name="desktop_record_deleted_elsewhere">This record was deleted in another window</string>
     <string name="desktop_sync_pending">%1$d waiting to send</string>
