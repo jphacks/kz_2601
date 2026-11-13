@@ -128,7 +128,15 @@
     <string name="desktop_print_value">Value</string>
     <string name="desktop_qr_copy_image">Copy image</string>
     <string name="desktop_record_deleted_elsewhere">This record was deleted in another window</string>
+    <string name="desktop_sync_blocker_offline">Couldn\'t send. Check your network, then choose Send now</string>
+    <string name="desktop_sync_blocker_signed_out">Can\'t send because you\'re not signed in</string>
+    <string name="desktop_sync_last_sent">Last sent: %1$s</string>
+    <string name="desktop_sync_never">Nothing sent yet</string>
+    <string name="desktop_sync_not_signed_in">Not sending (not signed in)</string>
+    <string name="desktop_sync_now">Send now</string>
+    <string name="desktop_sync_offline_pending">Not sending (%1$d waiting to send)</string>
     <string name="desktop_sync_pending">%1$d waiting to send</string>
+    <string name="desktop_sync_synced">Up to date</string>
     <string name="desktop_timer_done">Time\'s up</string>
     <string name="desktop_timer_name">Timer</string>
     <string name="desktop_timer_pause">Pause</string>

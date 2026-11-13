@@ -7,6 +7,7 @@ import jp.kz2601.metamon.desktop.MockStore
 import jp.kz2601.metamon.desktop.Row
 import jp.kz2601.metamon.desktop.net.DesktopApi
 import jp.kz2601.metamon.desktop.net.DesktopApiConfig
+import jp.kz2601.metamon.desktop.settings.SyncSnapshot
 import jp.kz2601.metamon.desktop.typedValue
 import jp.kz2601.metamon.dsl.records.Entity
 import jp.kz2601.metamon.dsl.records.JSONValue
@@ -64,6 +65,32 @@ class SessionPersistence(
     @Volatile
     var onReload: ((Reload) -> Unit)? = null
 
+    /** 最後に 1 件送れた時刻(このアプリの分・起動してから。まだなら null)。設定の「同期」に出す。 */
+    var lastSentAtMillis: Long? by mutableStateOf(null)
+        private set
+
+    /** 続けて失敗して止まっているか(圏外など)。次に送れたら戻る。 */
+    var isPaused: Boolean by mutableStateOf(false)
+        private set
+
+    /** 設定の「同期」に出す今の様子。 */
+    fun syncSnapshot(): SyncSnapshot = SyncSnapshot(isLive, pending, lastSentAtMillis, isPaused)
+
+    /** 「今送る」: 止まっている列も流し直す(送り先がある時だけ。無ければ null)。 */
+    fun syncNow(): Job? = resume()
+
+    private fun trackSync(ev: SyncEvent) {
+        when (ev) {
+            is SyncEvent.Sent -> {
+                isPaused = false
+                if (ev.appId == appId) lastSentAtMillis = System.currentTimeMillis()
+            }
+            is SyncEvent.Paused -> isPaused = true
+            is SyncEvent.Drained -> isPaused = false
+            else -> Unit
+        }
+    }
+
     @Volatile
     private var models: List<Entity> = emptyList()
     private val writes = Channel<suspend () -> Unit>(Channel.UNLIMITED)
@@ -80,6 +107,7 @@ class SessionPersistence(
             // 送り始める前に受け口を付ける(SharedFlow は後から来た人に過去を渡さない)
             scope.launch(start = CoroutineStart.UNDISPATCHED) {
                 q.events.collect { ev ->
+                    trackSync(ev)
                     // 列は端末に 1 本でアプリをまたぐ。他のアプリの知らせは件数を数え直すだけ
                     refreshPending()
                     if (ev.appIdOrNull == appId && ev.needsReload()) submit { reload(ev) }
