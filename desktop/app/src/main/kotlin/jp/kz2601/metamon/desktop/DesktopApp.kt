@@ -135,7 +135,9 @@ fun DesktopApp(
     // 写真のプレビュー(PhotoPreview.kt): 写真の部品を押すとこのウィンドウのダイアログで開く。開いている間は貼り付け・印刷を取らない
     val previewing = keyboard.photos.isOpen
     val pasteKey = io.previewKey(topComponents, topDraft)
-    CompositionLocalProvider(LocalSearchTargets provides keyboard.searchTargets, LocalPhotoPreview provides keyboard::openPhoto) {
+    // disclosure の開け閉めはこのウィンドウの間だけ覚える(#3214)
+    val disclosures = remember { DisclosureMemory() }
+    CompositionLocalProvider(LocalSearchTargets provides keyboard.searchTargets, LocalPhotoPreview provides keyboard::openPhoto, LocalDisclosures provides disclosures) {
     Surface(Modifier.fillMaxSize().ioDropTarget(io, topComponents, topDraft).onPreviewKeyEvent { !keyboard.photos.isOpen && pasteKey(it) }
         .onPreviewKeyEvent { if (!keyboard.photos.isOpen && DesktopPrint.isPrintKey(it) && DesktopPrint.canPrint(dsl)) true.also { openPrint() } else false }.then(keyboard.modifier)) {
         IoOverlay(io)
@@ -375,6 +377,9 @@ private fun NodeContent(c: Component, s: ScreenScope) {
             c.children.filter { s.session.state(it, s.form) != "hidden" }.forEach { Box1(Modifier.weight(1f)) { Node(it, s) } }
         }
         ComponentType.CARD -> Card(Modifier.fillMaxWidth()) { LocalGridOrChildren(c, s, Modifier.padding(12.dp)) }
+        ComponentType.DISCLOSURE -> DisclosureView(c, s.route.screen) {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) { c.children.forEach { Node(it, s) } }
+        }
         in DesktopLeaves.containers -> LocalGridOrChildren(c, s)
         ComponentType.TEXT -> Text(c.text.orEmpty())
         ComponentType.MARKDOWN -> MarkdownLeaf(c.text.orEmpty()) { url -> s.perform(markdownLinkAction(url), null) }
